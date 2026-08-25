@@ -77,9 +77,7 @@ function useSpanIdFromUrl() {
   const spanId = searchParams?.get(QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID);
   const rawAction = searchParams?.get(QUERY_PARAM_ACTION);
   const action: PlaygroundAction | null =
-    rawAction === "open-existing" || rawAction === "create-new"
-      ? rawAction
-      : null;
+    rawAction === "open-existing" || rawAction === "create-new" ? rawAction : null;
   const router = useRouter();
 
   /**
@@ -111,8 +109,7 @@ function useSpanIdFromUrl() {
  */
 export function coerceToNumber(value: unknown): number | undefined {
   if (value == null) return undefined;
-  if (typeof value === "number")
-    return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed === "") return undefined;
@@ -177,9 +174,7 @@ export function createDefaultPromptFormValues(
   };
 
   for (const param of LLM_PARAMETER_MAP) {
-    const raw = (spanData.llmConfig as Record<string, unknown>)[
-      param.formField
-    ];
+    const raw = (spanData.llmConfig as Record<string, unknown>)[param.formField];
     const coerced =
       param.coercion === "number" ? coerceToNumber(raw) : coerceToString(raw);
     if (coerced !== undefined) {
@@ -245,9 +240,7 @@ async function tryOpenExistingPromptTab({
     const prompt = await trpc.prompts.getByIdOrHandle.fetch({
       idOrHandle: promptHandle,
       projectId,
-      ...(promptTag
-        ? { tag: promptTag }
-        : { version: promptVersionNumber ?? undefined }),
+      ...(promptTag ? { tag: promptTag } : { version: promptVersionNumber ?? undefined }),
     });
 
     if (!prompt) {
@@ -303,9 +296,7 @@ function mergeTracedVariablesIntoInputs(
   promptVariables: Record<string, string>,
 ): PromptConfigFormValues {
   const existingInputs = formValues.version?.configData?.inputs ?? [];
-  const existingIdentifiers = new Set(
-    existingInputs.map((input) => input.identifier),
-  );
+  const existingIdentifiers = new Set(existingInputs.map((input) => input.identifier));
 
   const newInputs = Object.keys(promptVariables)
     .filter((key) => !existingIdentifiers.has(key))

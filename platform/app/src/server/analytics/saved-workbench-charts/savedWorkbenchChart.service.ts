@@ -34,11 +34,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { LWQL_QUERY_RESULT_DATASET } from "~/features/analytics-query/visualization/lwqlDatasetNames";
 import { validateVegaLiteSpecStructure } from "~/features/analytics-query/visualization/validateVegaLiteSpec";
-import type {
-  CustomGraph,
-  Prisma,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { CustomGraph, Prisma, PrismaClient } from "~/generated/prisma/client";
 
 import type { Protections } from "../../traces/protections";
 import { isUniqueConstraintError } from "../../utils/prismaErrors";
@@ -117,11 +113,7 @@ export class SavedWorkbenchChartService {
    *   this can only happen when the application has stored something it cannot
    *   read back.
    */
-  async getAll({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<SavedWorkbenchChart[]> {
+  async getAll({ projectId }: { projectId: string }): Promise<SavedWorkbenchChart[]> {
     const rows = await this.deps.repository.findAll({ projectId });
     return rows.map((row) => this.present(row));
   }
@@ -267,13 +259,7 @@ export class SavedWorkbenchChartService {
    * @throws {SavedWorkbenchChartNotFoundError} when no chart of this kind has
    *   that id in this project.
    */
-  async deleteChart({
-    id,
-    projectId,
-  }: {
-    id: string;
-    projectId: string;
-  }): Promise<void> {
+  async deleteChart({ id, projectId }: { id: string; projectId: string }): Promise<void> {
     const deleted = await this.deps.repository.delete({ id, projectId });
     if (deleted === 0) throw new SavedWorkbenchChartNotFoundError();
   }
@@ -391,7 +377,10 @@ export function mapDashboardSavedWorkbenchChartError(error: unknown): never {
   if (error instanceof Error && error.name === "SavedWorkbenchChartNotFoundError") {
     throw new SavedWorkbenchChartNotFoundError();
   }
-  if (error instanceof Error && error.name === "SavedWorkbenchChartDefinitionInvalidError") {
+  if (
+    error instanceof Error &&
+    error.name === "SavedWorkbenchChartDefinitionInvalidError"
+  ) {
     throw new SavedWorkbenchChartDefinitionInvalidError(
       (error as Error & { chartId?: string }).chartId ?? "unknown",
     );

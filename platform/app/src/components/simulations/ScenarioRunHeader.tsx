@@ -15,11 +15,7 @@ interface ScenarioRunHeaderProps {
   copyableIds: CopyableId[];
 }
 
-export function ScenarioRunHeader({
-  status,
-  name,
-  copyableIds,
-}: ScenarioRunHeaderProps) {
+export function ScenarioRunHeader({ status, name, copyableIds }: ScenarioRunHeaderProps) {
   return (
     <Box p={5} borderBottom="1px" borderColor="border" w="100%">
       <HStack justify="space-between" align="center">

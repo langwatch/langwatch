@@ -7,9 +7,7 @@ import type { SimulationRunMetricsProjectionRecord } from "../projections/simula
 const TABLE_NAME = "simulation_run_metrics" as const;
 const ROLLUP_TABLE_NAME = "simulation_run_metrics_rollup" as const;
 
-const logger = createLogger(
-  "langwatch:simulation-processing:run-metrics-repository",
-);
+const logger = createLogger("langwatch:simulation-processing:run-metrics-repository");
 
 type ClickHouseSimulationRunMetricsWriteRecord = WithDateWrites<
   SimulationRunMetricsProjectionRecord,
@@ -39,18 +37,14 @@ export interface SimulationRunMetricsRepository {
   insertRows(rows: SimulationRunMetricsProjectionRecord[]): Promise<void>;
 }
 
-export class SimulationRunMetricsRepositoryClickHouse
-  implements SimulationRunMetricsRepository
-{
+export class SimulationRunMetricsRepositoryClickHouse implements SimulationRunMetricsRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async insertRow(row: SimulationRunMetricsProjectionRecord): Promise<void> {
     await this.insertRows([row]);
   }
 
-  async insertRows(
-    rows: SimulationRunMetricsProjectionRecord[],
-  ): Promise<void> {
+  async insertRows(rows: SimulationRunMetricsProjectionRecord[]): Promise<void> {
     const [firstRow] = rows;
     if (!firstRow) return;
 
@@ -71,12 +65,10 @@ export class SimulationRunMetricsRepositoryClickHouse
       );
     }
 
-    const values: ClickHouseSimulationRunMetricsWriteRecord[] = rows.map(
-      (row) => ({
-        ...row,
-        OccurredAt: new Date(row.OccurredAt),
-      }),
-    );
+    const values: ClickHouseSimulationRunMetricsWriteRecord[] = rows.map((row) => ({
+      ...row,
+      OccurredAt: new Date(row.OccurredAt),
+    }));
 
     try {
       const client = await this.resolveClient(tenantId);
@@ -87,8 +79,7 @@ export class SimulationRunMetricsRepositoryClickHouse
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(
         { tenantId, count: rows.length, error: errorMessage },
         "Failed to insert simulation run metrics into ClickHouse",
@@ -159,8 +150,7 @@ export class SimulationRunMetricsRepositoryClickHouse
         roleLatencies: row?.RoleLatencies ?? {},
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(
         { tenantId, scenarioRunId, error: errorMessage },
         "Failed to read simulation run metrics from ClickHouse",

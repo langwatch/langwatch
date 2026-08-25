@@ -107,9 +107,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
         // A steady trickle across one FLUSH_AFTER_MS window.
         for (let i = 0; i < 10; i++) {
           await buffer.appendChunk({ ...ids, text: ` t${i}` });
-          await vi.advanceTimersByTimeAsync(
-            LANGY_STREAMING.FLUSH_AFTER_MS / 10,
-          );
+          await vi.advanceTimersByTimeAsync(LANGY_STREAMING.FLUSH_AFTER_MS / 10);
         }
         await vi.advanceTimersByTimeAsync(LANGY_STREAMING.FLUSH_AFTER_MS);
 
@@ -155,11 +153,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
         await buffer.appendChunk({ ...ids, text: " tail" });
         await buffer.markEnd(ids);
 
-        expect(entries.map((entry) => entry.type)).toEqual([
-          "delta",
-          "delta",
-          "end",
-        ]);
+        expect(entries.map((entry) => entry.type)).toEqual(["delta", "delta", "end"]);
         expect(deltas(entries).map((d) => d.text)).toEqual(["first", " tail"]);
       });
     });

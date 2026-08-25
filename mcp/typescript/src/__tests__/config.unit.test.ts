@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-  initConfig,
-  getConfig,
-  requireApiKey,
-  runWithConfig,
-} from "../config.js";
+import { initConfig, getConfig, requireApiKey, runWithConfig } from "../config.js";
 
 describe("config", () => {
   let originalApiKey: string | undefined;
@@ -112,7 +107,7 @@ describe("config", () => {
     it("throws when no API key is provided", () => {
       initConfig({});
       expect(() => requireApiKey()).toThrow(
-        "LANGWATCH_API_KEY is required. Set it via --apiKey flag or LANGWATCH_API_KEY environment variable."
+        "LANGWATCH_API_KEY is required. Set it via --apiKey flag or LANGWATCH_API_KEY environment variable.",
       );
     });
   });
@@ -137,7 +132,7 @@ describe("config", () => {
         () => {
           expect(getConfig().apiKey).toBe("session-key");
           expect(getConfig().endpoint).toBe("https://session.example.com");
-        }
+        },
       );
     });
 
@@ -148,7 +143,7 @@ describe("config", () => {
         { apiKey: "session-key", endpoint: "https://session.example.com" },
         () => {
           // inside: session config
-        }
+        },
       );
 
       expect(getConfig().apiKey).toBe("global-key");
@@ -165,14 +160,14 @@ describe("config", () => {
           async () => {
             await new Promise((r) => setTimeout(r, 10));
             results.push(requireApiKey());
-          }
+          },
         ),
         runWithConfig(
           { apiKey: "key-b", endpoint: "https://b.example.com" },
           async () => {
             await new Promise((r) => setTimeout(r, 5));
             results.push(requireApiKey());
-          }
+          },
         ),
       ]);
 
@@ -184,19 +179,16 @@ describe("config", () => {
       initConfig({});
       const result = runWithConfig(
         { apiKey: "key", endpoint: "https://example.com" },
-        () => 42
+        () => 42,
       );
       expect(result).toBe(42);
     });
 
     it("makes requireApiKey() use the scoped key", () => {
       initConfig({});
-      runWithConfig(
-        { apiKey: "scoped-key", endpoint: "https://example.com" },
-        () => {
-          expect(requireApiKey()).toBe("scoped-key");
-        }
-      );
+      runWithConfig({ apiKey: "scoped-key", endpoint: "https://example.com" }, () => {
+        expect(requireApiKey()).toBe("scoped-key");
+      });
     });
   });
 });

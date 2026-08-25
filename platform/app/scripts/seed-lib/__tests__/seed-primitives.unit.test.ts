@@ -22,9 +22,7 @@ describe("buildCollectorPayload", () => {
       const payload = buildCollectorPayload({ trace, fallbackFinishedAt: 0 });
       expect(payload.trace_id).toBe("mass-trace-t");
       expect(payload.spans).toHaveLength(2);
-      expect(payload.spans[0]!.timestamps.started_at).toBe(
-        1_750_000_000_000 - 1_000,
-      );
+      expect(payload.spans[0]!.timestamps.started_at).toBe(1_750_000_000_000 - 1_000);
       expect(payload.metadata.user_id).toBe("u");
       expect(payload.metadata.thread_id).toBe("th");
     });

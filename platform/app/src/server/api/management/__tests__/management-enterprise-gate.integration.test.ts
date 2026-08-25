@@ -137,12 +137,9 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("refuses the roles API with 402", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await rolesApp.request(
-        `/api/roles/${MANAGEMENT_API_VERSION}/`,
-        {
-          headers: authHeaders(),
-        },
-      );
+      const response = await rolesApp.request(`/api/roles/${MANAGEMENT_API_VERSION}/`, {
+        headers: authHeaders(),
+      });
 
       expect(response.status).toBe(402);
       expect((await response.json()).code).toBe("enterprise_plan_required");
@@ -183,15 +180,12 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("answers 403 insufficient_permissions before the plan gate can answer 402", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await rolesApp.request(
-        `/api/roles/${MANAGEMENT_API_VERSION}/`,
-        {
-          headers: {
-            Authorization: `Bearer ${viewOnlyToken}`,
-            "Content-Type": "application/json",
-          },
+      const response = await rolesApp.request(`/api/roles/${MANAGEMENT_API_VERSION}/`, {
+        headers: {
+          Authorization: `Bearer ${viewOnlyToken}`,
+          "Content-Type": "application/json",
         },
-      );
+      });
 
       expect(response.status).toBe(403);
       const body = await response.json();

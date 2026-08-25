@@ -47,16 +47,14 @@ describe("useReachableProducts", () => {
   describe("when the caller is in legacy mode", () => {
     /** @scenario "Legacy mode runs no navigation-v2 queries" */
     it("keeps the product flag queries disabled", () => {
-      const { result } = renderHook(() =>
-        useReachableProducts({ enabled: false }),
-      );
+      const { result } = renderHook(() => useReachableProducts({ enabled: false }));
 
       expect(result.current.reachableProducts).toEqual([]);
       expect(result.current.isLoading).toBe(false);
       for (const call of useFeatureFlagMock.mock.calls) {
-        expect(
-          (call as unknown as [string, { enabled: boolean }])[1].enabled,
-        ).toBe(false);
+        expect((call as unknown as [string, { enabled: boolean }])[1].enabled).toBe(
+          false,
+        );
       }
     });
   });

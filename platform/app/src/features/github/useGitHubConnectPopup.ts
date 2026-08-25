@@ -15,14 +15,8 @@ const POPUP_WIDTH = 600;
 const POPUP_HEIGHT = 760;
 const POPUP_FEATURES = (() => {
   if (typeof window === "undefined") return "";
-  const left = Math.max(
-    0,
-    (window.outerWidth - POPUP_WIDTH) / 2 + window.screenX,
-  );
-  const top = Math.max(
-    0,
-    (window.outerHeight - POPUP_HEIGHT) / 2 + window.screenY,
-  );
+  const left = Math.max(0, (window.outerWidth - POPUP_WIDTH) / 2 + window.screenX);
+  const top = Math.max(0, (window.outerHeight - POPUP_HEIGHT) / 2 + window.screenY);
   return [
     `width=${POPUP_WIDTH}`,
     `height=${POPUP_HEIGHT}`,
@@ -57,9 +51,7 @@ type IncomingMessage =
  * nothing this hook acts on. Anything arriving from the popup is untrusted, so
  * each field is checked rather than assumed.
  */
-function connectResultOf(
-  data: IncomingMessage | undefined,
-): ConnectResult | null {
+function connectResultOf(data: IncomingMessage | undefined): ConnectResult | null {
   if (!data || typeof data !== "object") return null;
   if (data.type === "github-connected" && typeof data.login === "string") {
     return { ok: true, login: data.login };
@@ -68,8 +60,7 @@ function connectResultOf(
     return {
       ok: false,
       reason: "failed",
-      error:
-        typeof data.message === "string" ? data.message : "connection failed",
+      error: typeof data.message === "string" ? data.message : "connection failed",
     };
   }
   return null;

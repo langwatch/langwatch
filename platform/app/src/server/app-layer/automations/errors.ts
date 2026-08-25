@@ -58,14 +58,10 @@ export class InvalidEmailRecipientError extends HandledError {
   declare readonly code: "invalid_email_recipient";
 
   constructor(public readonly recipient: string) {
-    super(
-      "invalid_email_recipient",
-      `"${recipient}" is not a valid email address.`,
-      {
-        meta: { recipient },
-        httpStatus: 422,
-      },
-    );
+    super("invalid_email_recipient", `"${recipient}" is not a valid email address.`, {
+      meta: { recipient },
+      httpStatus: 422,
+    });
     this.name = "InvalidEmailRecipientError";
   }
 }
@@ -180,9 +176,7 @@ export class NotificationDeliveryError extends HandledError {
     super("notification_delivery_error", message, {
       meta: {
         field: "slackChannelId",
-        ...(options.customerMessage
-          ? { message: options.customerMessage }
-          : {}),
+        ...(options.customerMessage ? { message: options.customerMessage } : {}),
       },
       httpStatus: 422,
     });

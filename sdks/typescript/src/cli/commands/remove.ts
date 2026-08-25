@@ -22,13 +22,18 @@ export const removeCommand = async (name: string): Promise<void> => {
     // Check if prompt exists in dependencies
     if (!config.prompts[name]) {
       console.error(chalk.red(`Error: Prompt "${name}" not found in dependencies`));
-      console.log(chalk.gray(`Available prompts: ${Object.keys(config.prompts).join(', ') || 'none'}`));
+      console.log(
+        chalk.gray(
+          `Available prompts: ${Object.keys(config.prompts).join(", ") || "none"}`,
+        ),
+      );
       process.exit(1);
     }
 
     const dependency = config.prompts[name];
-    const isLocalPrompt = (typeof dependency === "string" && dependency.startsWith("file:")) ||
-                         (typeof dependency === "object" && dependency.file);
+    const isLocalPrompt =
+      (typeof dependency === "string" && dependency.startsWith("file:")) ||
+      (typeof dependency === "object" && dependency.file);
 
     const spinner = createSpinner(`Removing ${chalk.cyan(name)}...`).start();
 
@@ -57,7 +62,11 @@ export const removeCommand = async (name: string): Promise<void> => {
           console.log(chalk.yellow(`⚠ Local file not found (already deleted?)`));
         }
 
-        console.log(chalk.yellow(`⚠ Note: This prompt may still exist on the server. Visit LangWatch to fully delete it.`));
+        console.log(
+          chalk.yellow(
+            `⚠ Note: This prompt may still exist on the server. Visit LangWatch to fully delete it.`,
+          ),
+        );
       }
 
       // Remove materialized file if it exists
@@ -72,7 +81,10 @@ export const removeCommand = async (name: string): Promise<void> => {
           const rootMaterializedDir = FileManager.getMaterializedDir();
 
           let currentDir = materializedDir;
-          while (currentDir !== rootMaterializedDir && currentDir !== path.dirname(currentDir)) {
+          while (
+            currentDir !== rootMaterializedDir &&
+            currentDir !== path.dirname(currentDir)
+          ) {
             try {
               const entries = fs.readdirSync(currentDir);
               if (entries.length === 0) {
@@ -100,12 +112,10 @@ export const removeCommand = async (name: string): Promise<void> => {
         spinner.succeed();
         console.log(chalk.green(`✓ Removed ${chalk.cyan(name)} from dependencies`));
       }
-
     } catch (error) {
       failSpinner({ spinner, error, action: "remove prompt" });
       process.exit(1);
     }
-
   } catch (error) {
     if (error instanceof PromptsError) {
       console.error(chalk.red(`Error: ${error.message}`));

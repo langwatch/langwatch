@@ -11,9 +11,9 @@ const { getMatchingLLMModelCost } = vi.hoisted(() => ({
 }));
 
 vi.mock("~/server/tracer/collector/cost", async () => {
-  const actual = await vi.importActual<
-    typeof import("~/server/tracer/collector/cost")
-  >("~/server/tracer/collector/cost");
+  const actual = await vi.importActual<typeof import("~/server/tracer/collector/cost")>(
+    "~/server/tracer/collector/cost",
+  );
   return {
     // Keep the real estimateCost (pure arithmetic) and stub only the
     // DB-backed model-cost lookup.

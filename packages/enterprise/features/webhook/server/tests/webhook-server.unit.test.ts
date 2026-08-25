@@ -43,9 +43,7 @@ const spendRow = (
 describe("webhook server", () => {
   it("keeps the retry ladder stable after the sixth failure", () => {
     expect(WebhookDeliveryService.retryDelayMs({ attempt: 1 })).toBe(60_000);
-    expect(WebhookDeliveryService.retryDelayMs({ attempt: 99 })).toBe(
-      12 * 60 * 60_000,
-    );
+    expect(WebhookDeliveryService.retryDelayMs({ attempt: 99 })).toBe(12 * 60 * 60_000);
   });
 
   it("maps settled rows without inventing money", () => {

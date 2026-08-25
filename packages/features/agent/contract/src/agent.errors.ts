@@ -23,9 +23,7 @@ export class InvalidAgentConfigError extends Error {
     readonly agentType: AgentType,
     readonly issues?: unknown,
   ) {
-    super(
-      `The configuration is not valid for an agent of type "${agentType}".`,
-    );
+    super(`The configuration is not valid for an agent of type "${agentType}".`);
   }
 }
 

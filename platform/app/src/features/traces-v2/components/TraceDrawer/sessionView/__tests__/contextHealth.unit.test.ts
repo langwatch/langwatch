@@ -4,17 +4,15 @@ import { contextHealthBand, contextWindowCeiling } from "../contextHealth";
 describe("contextWindowCeiling", () => {
   describe("given a session that only used standard-window models", () => {
     it("returns the 200K ceiling", () => {
-      expect(contextWindowCeiling(["claude-opus-4-8", "claude-sonnet-5"])).toBe(
-        200_000,
-      );
+      expect(contextWindowCeiling(["claude-opus-4-8", "claude-sonnet-5"])).toBe(200_000);
     });
   });
 
   describe("given a session where any call used the 1M beta", () => {
     it("returns the 1M ceiling, even if other calls used the standard window", () => {
-      expect(
-        contextWindowCeiling(["claude-opus-4-8", "claude-opus-4-8[1m]"]),
-      ).toBe(1_000_000);
+      expect(contextWindowCeiling(["claude-opus-4-8", "claude-opus-4-8[1m]"])).toBe(
+        1_000_000,
+      );
     });
   });
 

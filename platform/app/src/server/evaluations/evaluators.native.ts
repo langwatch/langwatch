@@ -10,8 +10,7 @@
 import { z } from "zod";
 
 /** Evaluator key for the native API-keys-and-secrets detector. */
-export const API_KEYS_AND_SECRETS_DETECTION =
-  "langwatch/api_keys_and_secrets_detection";
+export const API_KEYS_AND_SECRETS_DETECTION = "langwatch/api_keys_and_secrets_detection";
 
 /**
  * The Zod schema fragment merged into the generated `evaluatorsSchema`. Each
@@ -47,8 +46,7 @@ export const NATIVE_EVALUATOR_DEFINITIONS = {
         description: "Number of secrets detected; 0 means none were found",
       },
       passed: {
-        description:
-          "True when no secret was detected, false when at least one was",
+        description: "True when no secret was detected, false when at least one was",
       },
     },
   },

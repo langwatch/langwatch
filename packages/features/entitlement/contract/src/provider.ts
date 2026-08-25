@@ -38,7 +38,5 @@ export interface PlanEnricher {
 }
 
 export interface AuthorizationContextResolver {
-  resolve(
-    user: PlanProviderUser | undefined,
-  ): Pick<Plan, "overrideAddingLimitations">;
+  resolve(user: PlanProviderUser | undefined): Pick<Plan, "overrideAddingLimitations">;
 }

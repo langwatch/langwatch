@@ -22,7 +22,5 @@ export function deriveTraceOrigin(
 ): string {
   const origin = attributes?.["langwatch.origin"];
 
-  return typeof origin === "string" && origin !== ""
-    ? origin
-    : DEFAULT_TRACE_ORIGIN;
+  return typeof origin === "string" && origin !== "" ? origin : DEFAULT_TRACE_ORIGIN;
 }

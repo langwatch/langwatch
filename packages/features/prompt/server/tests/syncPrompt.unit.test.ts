@@ -139,8 +139,7 @@ describe("PromptService", () => {
 
         // Verify that compareConfigContent was called with remoteConfigData
         // that includes ALL sampling parameters, not just temperature
-        const [, remoteArg] =
-          mockRepository.compareConfigContent.mock.calls[0]!;
+        const [, remoteArg] = mockRepository.compareConfigContent.mock.calls[0]!;
         expect(remoteArg).toHaveProperty("max_tokens", 1000);
         expect(remoteArg).toHaveProperty("top_p", 0.9);
         expect(remoteArg).toHaveProperty("frequency_penalty", 0.5);
@@ -193,8 +192,7 @@ describe("PromptService", () => {
         });
 
         // remoteConfigData should NOT include undefined fields (to avoid false diffs)
-        const [, remoteArg] =
-          mockRepository.compareConfigContent.mock.calls[0]!;
+        const [, remoteArg] = mockRepository.compareConfigContent.mock.calls[0]!;
         expect(remoteArg).not.toHaveProperty("max_tokens");
         expect(remoteArg).not.toHaveProperty("top_p");
         expect(remoteArg).not.toHaveProperty("frequency_penalty");
@@ -339,9 +337,7 @@ describe("PromptService", () => {
 
     describe("when prompt does not exist and is created", () => {
       it("does not double-transform camelCase params through transformToDbFormat", async () => {
-        vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(
-          null,
-        );
+        vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(null);
 
         const createdPrompt = buildExistingPrompt({ version: 1 });
         const createSpy = vi
@@ -375,8 +371,7 @@ describe("PromptService", () => {
         // After transformToDbFormat, snake_case keys like max_tokens should be
         // passed through. The key check is that max_tokens/maxTokens is present
         // in some form and not lost.
-        const hasMaxTokens =
-          "maxTokens" in createArgs || "max_tokens" in createArgs;
+        const hasMaxTokens = "maxTokens" in createArgs || "max_tokens" in createArgs;
         expect(hasMaxTokens).toBe(true);
 
         // The value should be 1000, not undefined

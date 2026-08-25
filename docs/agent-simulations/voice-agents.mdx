@@ -5,7 +5,11 @@ keywords: langwatch, voice agents, voice testing, elevenlabs, openai realtime, t
 ---
 
 <Tip>
-  **Fastest path:** run `/scenarios add voice testing to my agent` in your coding assistant after installing the [`/scenarios` skill](https://langwatch.ai/docs/skills/directory). It detects your transport, picks the matching adapter, and wires it to your deployed agent. Prefer to do it by hand? Follow the steps below.
+  **Fastest path:** run `/scenarios add voice testing to my agent` in your coding
+  assistant after installing the [`/scenarios`
+  skill](https://langwatch.ai/docs/skills/directory). It detects your transport, picks the
+  matching adapter, and wires it to your deployed agent. Prefer to do it by hand? Follow
+  the steps below.
 </Tip>
 
 # Testing Voice Agents
@@ -18,13 +22,16 @@ Scenario tests voice agents **end-to-end over real audio**: it synthesizes a cal
 
 <CardGroup cols={2}>
   <Card title="Real-audio, multi-turn calls" icon="phone">
-    A synthesized user actually speaks to your agent and reacts to its replies, turn after turn.
+    A synthesized user actually speaks to your agent and reacts to its replies, turn after
+    turn.
   </Card>
   <Card title="Audio effects" icon="waveform-lines">
-    Inject background noise, phone-quality codec degradation, or custom WAV clips to test how the agent handles degraded audio.
+    Inject background noise, phone-quality codec degradation, or custom WAV clips to test
+    how the agent handles degraded audio.
   </Card>
   <Card title="Interruptions" icon="hand">
-    Script the user barging in mid-reply, with native barge-in or a VAD-driven fallback per adapter.
+    Script the user barging in mid-reply, with native barge-in or a VAD-driven fallback
+    per adapter.
   </Card>
   <Card title="Latency metrics" icon="gauge-high">
     Time-to-first-byte and p50/p95 per turn, so you catch a slow agent before users do.
@@ -35,17 +42,20 @@ Scenario tests voice agents **end-to-end over real audio**: it synthesizes a cal
 
 One API, every major voice transport. Pick the adapter that matches what you've already deployed:
 
-| Transport | Adapter |
-| --- | --- |
-| Pipecat / Twilio Media Streams | `PipecatAgentAdapter` |
-| ElevenLabs hosted ConvAI | `ElevenLabsAgentAdapter` |
-| OpenAI Realtime | `OpenAIRealtimeAgentAdapter` |
-| Gemini Live | `GeminiLiveAgentAdapter` |
-| Twilio phone number (PSTN) | `TwilioAgentAdapter` |
-| Text-only agent (no transport yet) | `ComposableVoiceAgent` |
+| Transport                          | Adapter                      |
+| ---------------------------------- | ---------------------------- |
+| Pipecat / Twilio Media Streams     | `PipecatAgentAdapter`        |
+| ElevenLabs hosted ConvAI           | `ElevenLabsAgentAdapter`     |
+| OpenAI Realtime                    | `OpenAIRealtimeAgentAdapter` |
+| Gemini Live                        | `GeminiLiveAgentAdapter`     |
+| Twilio phone number (PSTN)         | `TwilioAgentAdapter`         |
+| Text-only agent (no transport yet) | `ComposableVoiceAgent`       |
 
 <Note>
-  Full constructors, the per-adapter [capability matrix](https://langwatch.ai/scenario/voice/capability-matrix), and guidance on [choosing an adapter](https://langwatch.ai/scenario/voice/choosing-an-adapter) live in the Scenario docs.
+  Full constructors, the per-adapter [capability
+  matrix](https://langwatch.ai/scenario/voice/capability-matrix), and guidance on
+  [choosing an adapter](https://langwatch.ai/scenario/voice/choosing-an-adapter) live in
+  the Scenario docs.
 </Note>
 
 ## Get it running
@@ -125,27 +135,45 @@ New to Scenario? Start with [Getting Started](/agent-simulations/getting-started
         ```
       </Tab>
     </Tabs>
+
   </Step>
   <Step title="Run it">
     Run your usual test command (`pytest` or `vitest`). With `LANGWATCH_API_KEY` set, the run streams to the [Simulations dashboard](https://langwatch.ai/scenario/visualizations) with full audio playback and per-segment transcripts, and writes a `recordings/<scenario>/full.wav` to listen back.
 
     <Tip>Voice scenarios are slower than text: TTS + transport + multi-turn means 30–120s per run, so give your test runner a generous timeout.</Tip>
+
   </Step>
 </Steps>
 
 ## Dig into the full docs
 
 <CardGroup cols={2}>
-  <Card title="Voice quick start" icon="rocket" href="https://langwatch.ai/scenario/voice/getting-started">
+  <Card
+    title="Voice quick start"
+    icon="rocket"
+    href="https://langwatch.ai/scenario/voice/getting-started"
+  >
     The complete five-minute walkthrough with a worked example per adapter.
   </Card>
-  <Card title="Audio effects & interruptions" icon="sliders" href="https://langwatch.ai/scenario/voice/recipes">
+  <Card
+    title="Audio effects & interruptions"
+    icon="sliders"
+    href="https://langwatch.ai/scenario/voice/recipes"
+  >
     Background noise, codec degradation, custom WAVs, and barge-in recipes.
   </Card>
-  <Card title="Capability matrix" icon="table-list" href="https://langwatch.ai/scenario/voice/capability-matrix">
+  <Card
+    title="Capability matrix"
+    icon="table-list"
+    href="https://langwatch.ai/scenario/voice/capability-matrix"
+  >
     Exactly which features each adapter supports.
   </Card>
-  <Card title="Runnable examples" icon="github" href="https://github.com/langwatch/scenario/tree/main/python/examples/voice">
+  <Card
+    title="Runnable examples"
+    icon="github"
+    href="https://github.com/langwatch/scenario/tree/main/python/examples/voice"
+  >
     Demos per adapter and use case on GitHub.
   </Card>
 </CardGroup>

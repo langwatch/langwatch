@@ -1,9 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
-import {
-  CLICKHOUSE_GUARDRAILS,
-  consumeMissingOpsUrlWarning,
-} from "./explain-core";
+import { CLICKHOUSE_GUARDRAILS, consumeMissingOpsUrlWarning } from "./explain-core";
 
 const logger = createLogger("langwatch:ops:clickhouse:explain");
 

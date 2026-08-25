@@ -126,11 +126,7 @@ interface LangyDevLogState {
   /** INBOUND stream lane — every live turn-stream entry. */
   record: (entry: LangyStreamEntry, turnId: string | null) => void;
   /** OUTBOUND lane — what this client asked the server to do. */
-  recordOutbound: (
-    kind: "send" | "stop",
-    label: string,
-    detail: unknown,
-  ) => void;
+  recordOutbound: (kind: "send" | "stop", label: string, detail: unknown) => void;
   /** DURABLE lane — one recorded event off the tail fetch (the event log). */
   recordDurableEvent: (event: LangyConversationTurnWireEvent) => void;
   /** DURABLE lane — a snapshot seed (cursor + in-flight turn), the fold's start. */
@@ -199,8 +195,8 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
         // read it from there so the tag survives even when the store has not
         // adopted the conversation yet (a stop raced against a fresh send).
         conversationId: attributed(
-          typeof (detail as { conversationId?: unknown } | null)
-            ?.conversationId === "string"
+          typeof (detail as { conversationId?: unknown } | null)?.conversationId ===
+            "string"
             ? (detail as { conversationId: string }).conversationId
             : undefined,
         ),
@@ -257,8 +253,7 @@ export function tapeForConversation(
 ): LangyDevLogRecord[] {
   return records.filter(
     (record) =>
-      record.conversationId === null ||
-      record.conversationId === conversationId,
+      record.conversationId === null || record.conversationId === conversationId,
   );
 }
 
@@ -415,9 +410,7 @@ export function recordSummary(record: LangyDevLogRecord): string {
     case "stream": {
       const entry = record.entry;
       if (entry.type === "delta") {
-        return entry.text.length > 60
-          ? `${entry.text.slice(0, 60)}…`
-          : entry.text;
+        return entry.text.length > 60 ? `${entry.text.slice(0, 60)}…` : entry.text;
       }
       if (entry.type === "tool") return `${entry.phase ?? ""} ${entry.name}`;
       if (entry.type === "status") return entry.status || "(cleared)";

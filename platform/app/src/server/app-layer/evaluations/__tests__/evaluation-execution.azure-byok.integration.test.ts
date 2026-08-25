@@ -24,9 +24,7 @@ const { getProjectModelProvidersMock } = vi.hoisted(() => ({
 
 vi.mock("~/server/api/routers/modelProviders.utils", async (importOriginal) => {
   const actual =
-    await importOriginal<
-      typeof import("~/server/api/routers/modelProviders.utils")
-    >();
+    await importOriginal<typeof import("~/server/api/routers/modelProviders.utils")>();
   return {
     ...actual,
     getProjectModelProviders: getProjectModelProvidersMock,

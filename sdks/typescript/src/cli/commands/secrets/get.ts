@@ -15,17 +15,14 @@ import type { CommandResult } from "../../utils/output";
  * endpoint never returns the VALUE — that is what the human view's closing
  * note says — so the raw record is metadata only and safe as a payload.
  */
-export const getSecretCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const getSecretCommand = async (id: string): Promise<CommandResult | void> => {
   const credentials = await resolveCredentials();
   if (!credentials.projectId) {
     throw new Error("A project must be selected for secret operations");
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Fetching secret "${id}"...`).start();
 
@@ -62,15 +59,13 @@ export const getSecretCommand = async (
         console.log(`  ${chalk.gray("ID:")}      ${chalk.green(secret.id)}`);
         console.log(`  ${chalk.gray("Name:")}    ${chalk.cyan(secret.name)}`);
         console.log(
-          `  ${chalk.gray("Created:")} ${new Date(secret.createdAt).toLocaleString()}`
+          `  ${chalk.gray("Created:")} ${new Date(secret.createdAt).toLocaleString()}`,
         );
         console.log(
-          `  ${chalk.gray("Updated:")} ${new Date(secret.updatedAt).toLocaleString()}`
+          `  ${chalk.gray("Updated:")} ${new Date(secret.updatedAt).toLocaleString()}`,
         );
         console.log();
-        console.log(
-          chalk.gray("  (Secret values are never returned for security)")
-        );
+        console.log(chalk.gray("  (Secret values are never returned for security)"));
         console.log();
       },
     };

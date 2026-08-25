@@ -70,9 +70,7 @@ describe("safeUnflatten", () => {
     });
 
     it("preserves scalar values", () => {
-      expect(
-        safeUnflatten({ "a.str": "hello", "a.num": 42, "a.bool": true }),
-      ).toEqual({
+      expect(safeUnflatten({ "a.str": "hello", "a.num": 42, "a.bool": true })).toEqual({
         a: { str: "hello", num: 42, bool: true },
       });
     });

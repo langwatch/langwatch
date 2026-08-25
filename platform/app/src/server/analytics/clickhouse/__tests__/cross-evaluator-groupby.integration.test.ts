@@ -164,8 +164,7 @@ describe("cross-evaluator-groupby", () => {
           groupByKey: EVALUATOR_A_ID,
           series: [
             {
-              metric:
-                "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg" as AggregationTypes,
               key: EVALUATOR_A_ID,
             },
@@ -217,8 +216,7 @@ describe("cross-evaluator-groupby", () => {
           groupByKey: EVALUATOR_A_ID,
           series: [
             {
-              metric:
-                "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg" as AggregationTypes,
               key: EVALUATOR_A_ID,
             },
@@ -269,8 +267,7 @@ describe("cross-evaluator-groupby", () => {
           // no groupByKey — collect labels from all evaluators
           series: [
             {
-              metric:
-                "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg" as AggregationTypes,
               key: EVALUATOR_A_ID,
             },
@@ -334,8 +331,7 @@ describe("cross-evaluator-groupby", () => {
           groupByKey: EVALUATOR_A_ID,
           series: [
             {
-              metric:
-                "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg" as AggregationTypes,
               key: EVALUATOR_B_ID,
             },

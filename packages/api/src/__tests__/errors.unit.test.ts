@@ -62,16 +62,12 @@ describe("formatError", () => {
     });
 
     it("carries fault, tips and docsUrl when present", () => {
-      const err = new TestError(
-        "query_memory_exceeded",
-        "Query used too much memory",
-        {
-          httpStatus: 422,
-          fault: "customer",
-          tips: ["Narrow the time range"],
-          docsUrl: "https://docs.langwatch.ai/traces",
-        },
-      );
+      const err = new TestError("query_memory_exceeded", "Query used too much memory", {
+        httpStatus: 422,
+        fault: "customer",
+        tips: ["Narrow the time range"],
+        docsUrl: "https://docs.langwatch.ai/traces",
+      });
 
       const { body } = formatError({ err });
 
@@ -101,13 +97,9 @@ describe("formatError", () => {
       });
 
       it("emits `kind` for synthesized error bodies too", () => {
-        const zodErr = zodErrorFrom(() =>
-          z.object({ name: z.string() }).parse({}),
-        );
+        const zodErr = zodErrorFrom(() => z.object({ name: z.string() }).parse({}));
         expect(formatError({ err: zodErr }).body.kind).toBe("validation_error");
-        expect(formatError({ err: new Error("oops") }).body.kind).toBe(
-          "internal_error",
-        );
+        expect(formatError({ err: new Error("oops") }).body.kind).toBe("internal_error");
       });
     });
   });
@@ -168,9 +160,7 @@ describe("formatError", () => {
     it("gains the remediation channel by travelling as a HandledError", () => {
       // Before, the ZodError branch built a bare payload and validation errors
       // silently missed fault/tips/docsUrl entirely.
-      const zodError = zodErrorFrom(() =>
-        z.object({ name: z.string() }).parse({}),
-      );
+      const zodError = zodErrorFrom(() => z.object({ name: z.string() }).parse({}));
 
       const { body } = formatError({ err: zodError });
 
@@ -286,9 +276,7 @@ describe("createErrorHandler", () => {
       // Regression: a bare ZodError has no `httpStatus`, so the request logger
       // derived 500 and logged at error while the response went out 422.
       const handler = createErrorHandler();
-      const zodError = zodErrorFrom(() =>
-        z.object({ name: z.string() }).parse({}),
-      );
+      const zodError = zodErrorFrom(() => z.object({ name: z.string() }).parse({}));
       const c = fakeContext();
 
       handler(zodError as unknown as Error, c as never);

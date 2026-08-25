@@ -166,9 +166,7 @@ const virtualKeyDtoSchema = z.object({
   external_id: z.string().nullable(),
   /** Customer-owned bookkeeping, echoed back verbatim. Never interpreted. */
   metadata: z.record(z.string(), z.string()),
-  scopes: z.array(
-    z.object({ scope_type: vkScopeTypeSchema, scope_id: z.string() }),
-  ),
+  scopes: z.array(z.object({ scope_type: vkScopeTypeSchema, scope_id: z.string() })),
   routing_policy_id: z.string().nullable(),
   routing_mode: routingModeWireSchema,
   config: z.unknown(),
@@ -409,9 +407,7 @@ function createdAtIdCursor(
   const parts = decodePageCursor(encoded, 2);
   if (!parts) return null;
   const createdAt = new Date(Number(parts[0]));
-  return Number.isNaN(createdAt.getTime())
-    ? null
-    : { createdAt, id: String(parts[1]) };
+  return Number.isNaN(createdAt.getTime()) ? null : { createdAt, id: String(parts[1]) };
 }
 
 /** The (priority, createdAt, id) sort key a cache-rule cursor names. */
@@ -642,9 +638,7 @@ async function toVkDto(vk: VirtualKeyWithScopes): Promise<VirtualKeySnakeDto> {
 }
 
 /** `toVkDto` for a page, in one read of the destinations however long it is. */
-async function toVkDtos(
-  vks: VirtualKeyWithScopes[],
-): Promise<VirtualKeySnakeDto[]> {
+async function toVkDtos(vks: VirtualKeyWithScopes[]): Promise<VirtualKeySnakeDto[]> {
   const facts = await loadTraceDestinationFacts({
     client: prisma,
     virtualKeys: vks,
@@ -761,10 +755,7 @@ function trpcErrorResponse(c: GatewayContext, error: unknown): Response {
   });
 }
 
-function validationErrorResponse(
-  c: GatewayContext,
-  error: z.ZodError,
-): Response {
+function validationErrorResponse(c: GatewayContext, error: z.ZodError): Response {
   return errorResponse(c, {
     status: 400,
     code: "validation_error",
@@ -801,9 +792,7 @@ function budgetFromWire(
   if (budget === null) return null;
   const parsed = virtualKeyBudgetInputSchema.safeParse({
     limitUsd:
-      typeof budget.limit_usd === "number"
-        ? String(budget.limit_usd)
-        : budget.limit_usd,
+      typeof budget.limit_usd === "number" ? String(budget.limit_usd) : budget.limit_usd,
     window: toStoredEnum(budget.window),
     onBreach: budget.on_breach && toStoredEnum(budget.on_breach),
     name: budget.name,
@@ -857,11 +846,7 @@ async function authorizeVirtualKeyUpdate({
   }
 
   if (patch.trace_project_id !== undefined) {
-    await assertTraceProjectBelongsToOrg(
-      prisma,
-      organizationId,
-      patch.trace_project_id,
-    );
+    await assertTraceProjectBelongsToOrg(prisma, organizationId, patch.trace_project_id);
     // Re-pointing the destination is the same decision as choosing it at
     // create: it needs manage on the target project.
     if (patch.trace_project_id) {
@@ -1003,9 +988,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
   async (c) => {
     const project = c.get("project");
     const body = { data: c.req.valid("json") };
-    const idempotencyKey = readIdempotencyKey(
-      c.req.header(IDEMPOTENCY_KEY_HEADER),
-    );
+    const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
     const organizationId = await orgIdForProject(project.id);
     const { actor, actorUserId } = actorForRequest(c);
     const scopes = scopesFromWire(body.data.scopes, project.id);
@@ -1047,8 +1030,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
         scopes,
         traceProjectId: body.data.trace_project_id ?? null,
         routingPolicyId: body.data.routing_policy_id ?? null,
-        routingMode:
-          body.data.routing_mode && toStoredEnum(body.data.routing_mode),
+        routingMode: body.data.routing_mode && toStoredEnum(body.data.routing_mode),
         expiresAt: body.data.expires_at ?? null,
         budget: budgetFromWire(body.data.budget),
         config: body.data.config,
@@ -1119,11 +1101,10 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
     const service = VirtualKeyService.create(prisma);
     const organizationId = await orgIdForProject(project.id);
     try {
-      const vk = await requireVisibleVk(
-        service,
-        membershipForApiCaller(project),
-        { id, organizationId },
-      );
+      const vk = await requireVisibleVk(service, membershipForApiCaller(project), {
+        id,
+        organizationId,
+      });
       return c.json({ virtual_key: await toVkDto(vk) });
     } catch (error) {
       return trpcErrorResponse(c, error);
@@ -1278,8 +1259,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
         scopes,
         traceProjectId: body.data.trace_project_id,
         routingPolicyId: body.data.routing_policy_id,
-        routingMode:
-          body.data.routing_mode && toStoredEnum(body.data.routing_mode),
+        routingMode: body.data.routing_mode && toStoredEnum(body.data.routing_mode),
         expiresAt: body.data.expires_at,
         budget: budgetFromWire(body.data.budget),
         config: body.data.config,
@@ -1385,9 +1365,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
   async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
-    const body = disableVkSchema.safeParse(
-      await c.req.json().catch(() => ({})),
-    );
+    const body = disableVkSchema.safeParse(await c.req.json().catch(() => ({})));
     if (!body.success) return validationErrorResponse(c, body.error);
     const organizationId = await orgIdForProject(project.id);
     const { actor, actorUserId } = actorForRequest(c);
@@ -1637,9 +1615,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
       // Pushed into the query, so `limit` counts rows RETURNED. Filtering the
       // page instead would make a request for 50 group budgets come back with
       // a handful and no way to tell that from the end of the walk.
-      scopeTypes: scopeTypes
-        ? Array.from(scopeTypes, (t) => toStoredEnum(t))
-        : undefined,
+      scopeTypes: scopeTypes ? Array.from(scopeTypes, (t) => toStoredEnum(t)) : undefined,
       externalId: page.data.external_id,
     });
     const memberCounts = await groupMemberCounts(rows);
@@ -1754,9 +1730,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
     // Read before the try: a malformed key is a request-validation failure and
     // takes the same route to the wire as one the schema caught, rather than
     // being reshaped by the service-error mapping below.
-    const idempotencyKey = readIdempotencyKey(
-      c.req.header(IDEMPOTENCY_KEY_HEADER),
-    );
+    const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = c.app.gateway.budgetDecisions;
@@ -1917,8 +1891,7 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).post(
               reason: {
                 type: "string",
                 maxLength: 500,
-                description:
-                  "Free-text operator note, audit-logged with the reset.",
+                description: "Free-text operator note, audit-logged with the reset.",
               },
             },
           },
@@ -1950,9 +1923,7 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).post(
     // would be a worse contract than documenting the body by hand. Both keep
     // manual parsing for that reason, and declare their `requestBody` in
     // describeRoute so the spec still shows it.
-    const body = resetBudgetSchema.safeParse(
-      await c.req.json().catch(() => ({})),
-    );
+    const body = resetBudgetSchema.safeParse(await c.req.json().catch(() => ({})));
     if (!body.success) return validationErrorResponse(c, body.error);
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
@@ -2153,9 +2124,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
   async (c) => {
     const project = c.get("project");
     const body = { data: c.req.valid("json") };
-    const idempotencyKey = readIdempotencyKey(
-      c.req.header(IDEMPOTENCY_KEY_HEADER),
-    );
+    const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = GatewayCacheRuleService.create(prisma);
@@ -2301,9 +2270,7 @@ async function groupMemberCounts(
   budgets: Array<{ scopeType: string; scopeId: string }>,
 ): Promise<Map<string, number>> {
   const groupIds = Array.from(
-    new Set(
-      budgets.filter((b) => b.scopeType === "GROUP").map((b) => b.scopeId),
-    ),
+    new Set(budgets.filter((b) => b.scopeType === "GROUP").map((b) => b.scopeId)),
   );
   if (groupIds.length === 0) return new Map();
   const groups = await prisma.group.findMany({
@@ -2313,9 +2280,7 @@ async function groupMemberCounts(
   return new Map(groups.map((g) => [g.id, g._count.members]));
 }
 
-function scopeFromWire(
-  scope: z.infer<typeof createBudgetSchema>["scope"],
-): BudgetScope {
+function scopeFromWire(scope: z.infer<typeof createBudgetSchema>["scope"]): BudgetScope {
   switch (scope.kind) {
     case "organization":
       return { kind: "ORGANIZATION", organizationId: scope.organization_id };

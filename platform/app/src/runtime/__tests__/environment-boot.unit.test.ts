@@ -28,8 +28,6 @@ describe("explicit environment boot", () => {
 
     expect(resolved.NODE_ENV).toBe("test");
     expect(env.NODE_ENV).toBe("test");
-    expect(
-      initializeEnvironmentConfig({ NODE_ENV: "production" }),
-    ).toBe(resolved);
+    expect(initializeEnvironmentConfig({ NODE_ENV: "production" })).toBe(resolved);
   });
 });

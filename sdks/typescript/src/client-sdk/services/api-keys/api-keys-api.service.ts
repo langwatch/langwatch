@@ -26,11 +26,7 @@ export interface ApiKeyBindingInput {
  * from the bindings alone; `restricted` additionally requires an explicit
  * permissions list, which is what a CUSTOM binding grants.
  */
-export const API_KEY_PERMISSION_MODES = [
-  "all",
-  "readonly",
-  "restricted",
-] as const;
+export const API_KEY_PERMISSION_MODES = ["all", "readonly", "restricted"] as const;
 
 export type ApiKeyPermissionMode = (typeof API_KEY_PERMISSION_MODES)[number];
 
@@ -119,7 +115,11 @@ export class ApiKeysApiService {
     };
   }
 
-  private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
+  private async request<T>(
+    operation: string,
+    path: string,
+    init?: RequestInit,
+  ): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
       headers: { ...this.headers(), ...(init?.headers ?? {}) },
@@ -163,11 +163,10 @@ export class ApiKeysApiService {
   }
 
   async create(input: CreateApiKeyInput): Promise<CreatedApiKey> {
-    return this.request<CreatedApiKey>(
-      "create API key",
-      "/api/api-keys",
-      { method: "POST", body: JSON.stringify(input) },
-    );
+    return this.request<CreatedApiKey>("create API key", "/api/api-keys", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   async update({

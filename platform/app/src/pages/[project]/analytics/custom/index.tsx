@@ -82,10 +82,7 @@ import {
   FilterToggleButton,
   useFilterToggle,
 } from "../../../../components/filters/FilterToggle";
-import {
-  PeriodSelector,
-  usePeriodSelector,
-} from "../../../../components/PeriodSelector";
+import { PeriodSelector, usePeriodSelector } from "../../../../components/PeriodSelector";
 import { getRawColorValue } from "../../../../components/ui/color-mode";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import {
@@ -108,10 +105,7 @@ import type {
 import { filterOutEmptyFilters } from "../../../../server/analytics/utils";
 import type { FilterField } from "../../../../server/filters/types";
 import { api } from "../../../../utils/api";
-import {
-  type RotatingColorSet,
-  rotatingColors,
-} from "../../../../utils/rotatingColors";
+import { type RotatingColorSet, rotatingColors } from "../../../../utils/rotatingColors";
 import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
@@ -327,30 +321,24 @@ function AnalyticsCustomGraphContent({
   const { showFilters } = useFilterToggle();
 
   const formData = JSON.stringify(form.watch() ?? {});
-  const [debouncedCustomGraphInput, setDebouncedCustomGraphInput] =
-    useDebounceValue<CustomGraphInput | undefined>(undefined, 400);
-  const [debouncedCustomAPIInput, setDebouncedCustomAPIInput] =
-    useDebounceValue<CustomAPICallData | undefined>(undefined, 400);
+  const [debouncedCustomGraphInput, setDebouncedCustomGraphInput] = useDebounceValue<
+    CustomGraphInput | undefined
+  >(undefined, 400);
+  const [debouncedCustomAPIInput, setDebouncedCustomAPIInput] = useDebounceValue<
+    CustomAPICallData | undefined
+  >(undefined, 400);
 
   useEffect(() => {
     const parsedFormData = JSON.parse(formData) as CustomGraphFormData;
 
     const customGraphInput = customGraphFormToCustomGraphInput(parsedFormData);
     const apiJson = customAPIinput(parsedFormData, filterParams);
-    if (
-      typeof apiJson?.timeScale === "string" &&
-      apiJson.timeScale !== "full"
-    ) {
+    if (typeof apiJson?.timeScale === "string" && apiJson.timeScale !== "full") {
       apiJson.timeScale = parseInt(apiJson.timeScale);
     }
     setDebouncedCustomAPIInput(apiJson);
     setDebouncedCustomGraphInput(customGraphInput);
-  }, [
-    formData,
-    filterParams,
-    setDebouncedCustomAPIInput,
-    setDebouncedCustomGraphInput,
-  ]);
+  }, [formData, filterParams, setDebouncedCustomAPIInput, setDebouncedCustomGraphInput]);
 
   return (
     <DashboardLayout>
@@ -412,10 +400,7 @@ function AnalyticsCustomGraphContent({
                               openDrawer("automation", {
                                 automationId: form.getValues("alert.triggerId"),
                                 prefilledGraphId: customId,
-                                prefilledSeriesName: deriveSeriesIdentifier(
-                                  graph,
-                                  0,
-                                ),
+                                prefilledSeriesName: deriveSeriesIdentifier(graph, 0),
                               })
                             }
                           >
@@ -430,10 +415,7 @@ function AnalyticsCustomGraphContent({
                           onClick={() =>
                             openDrawer("automation", {
                               prefilledGraphId: customId,
-                              prefilledSeriesName: deriveSeriesIdentifier(
-                                graph,
-                                0,
-                              ),
+                              prefilledSeriesName: deriveSeriesIdentifier(graph, 0),
                             })
                           }
                         >
@@ -463,10 +445,7 @@ function AnalyticsCustomGraphContent({
                     input={debouncedCustomGraphInput}
                     filters={
                       filterParams.filters as
-                        | Record<
-                            FilterField,
-                            string[] | Record<string, string[]>
-                          >
+                        | Record<FilterField, string[] | Record<string, string[]>>
                         | undefined
                     }
                   />
@@ -506,9 +485,8 @@ function AnalyticsCustomGraphContent({
           </Dialog.Header>
           <Dialog.Body>
             <Text paddingBottom={8}>
-              Incorporate the following JSON payload within the body of your
-              HTTP POST request to access identical data tailored for the custom
-              graphs.
+              Incorporate the following JSON payload within the body of your HTTP POST
+              request to access identical data tailored for the custom graphs.
             </Text>
             <Box padding={4} backgroundColor="bg.subtle">
               <RenderCode
@@ -538,9 +516,7 @@ export const customGraphInputToFormData = (
 ): CustomGraphFormData => {
   return {
     title: graphInput.graphId === "custom" ? undefined : graphInput.graphId,
-    graphType: chartOptions.find(
-      (option) => option.value === graphInput.graphType,
-    )!,
+    graphType: chartOptions.find((option) => option.value === graphInput.graphType)!,
     series: graphInput.series.map((series) => ({
       name: series.name,
       colorSet: series.colorSet,
@@ -899,10 +875,7 @@ function CustomGraphForm({
             >
               <option value="">No grouping</option>
               {Object.entries(analyticsGroups).map(([groupParent, metrics]) => (
-                <optgroup
-                  key={groupParent}
-                  label={camelCaseToTitleCase(groupParent)}
-                >
+                <optgroup key={groupParent} label={camelCaseToTitleCase(groupParent)}>
                   {Object.entries(metrics).map(([groupKey, group]) => (
                     <option key={groupKey} value={`${groupParent}.${groupKey}`}>
                       {group.label}
@@ -1080,11 +1053,7 @@ function SeriesFieldItem({
           <HStack width="full" gap={1}>
             <Menu.Root>
               <Menu.Trigger asChild>
-                <Button
-                  variant="plain"
-                  padding={0}
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <Button variant="plain" padding={0} onClick={(e) => e.stopPropagation()}>
                   <Center>
                     <Box
                       width="32px"
@@ -1104,13 +1073,9 @@ function SeriesFieldItem({
                     value={key}
                     onClick={(e) => {
                       e.stopPropagation();
-                      form.setValue(
-                        `series.${index}.colorSet`,
-                        key as RotatingColorSet,
-                        {
-                          shouldTouch: true,
-                        },
-                      );
+                      form.setValue(`series.${index}.colorSet`, key as RotatingColorSet, {
+                        shouldTouch: true,
+                      });
                     }}
                   >
                     <VStack align="start" gap={2}>
@@ -1250,10 +1215,7 @@ function SeriesField({
         .join(" "),
     );
 
-    if (
-      (!customId && !form.getFieldState(`series.${index}.name`)?.isTouched) ||
-      !name
-    ) {
+    if ((!customId && !form.getFieldState(`series.${index}.name`)?.isTouched) || !name) {
       form.resetField(`series.${index}.name`, { defaultValue: name_ });
     }
     // Skip automatic color set logic when editing an existing graph
@@ -1290,9 +1252,7 @@ function SeriesField({
                 <NativeSelect.Field
                   value={metricField.value ?? ""}
                   onChange={(e) => {
-                    metricField.onChange(
-                      e.target.value as FlattenAnalyticsMetricsEnum,
-                    );
+                    metricField.onChange(e.target.value as FlattenAnalyticsMetricsEnum);
                   }}
                 >
                   {Object.entries(analyticsMetrics).map(([group, metrics]) => (
@@ -1318,9 +1278,7 @@ function SeriesField({
                   <FilterSelectField
                     field={field}
                     filter={metric_.requiresKey!.filter}
-                    emptyOption={
-                      metric_.requiresKey!.optional ? "all" : undefined
-                    }
+                    emptyOption={metric_.requiresKey!.optional ? "all" : undefined}
                     currentSelected={field.value}
                   />
                 )}
@@ -1406,9 +1364,7 @@ function SeriesField({
               return (
                 <FilterToggleButton
                   toggled={false}
-                  filters={
-                    field.value ?? ({} as Record<FilterField, FilterParam>)
-                  }
+                  filters={field.value ?? ({} as Record<FilterField, FilterParam>)}
                   onClick={() => {
                     setFlowCallbacks("seriesFilters", {
                       onChange: ({
@@ -1420,8 +1376,7 @@ function SeriesField({
                       },
                     });
                     openDrawer("seriesFilters", {
-                      filters:
-                        field.value ?? ({} as Record<FilterField, FilterParam>),
+                      filters: field.value ?? ({} as Record<FilterField, FilterParam>),
                     });
                   }}
                 >
@@ -1434,12 +1389,7 @@ function SeriesField({
           />
         </Field.Root>
         {Object.keys(nonEmptyFilters).length > 0 && (
-          <Field.Root
-            display="flex"
-            flexDirection="row"
-            alignItems="center"
-            gap={2}
-          >
+          <Field.Root display="flex" flexDirection="row" alignItems="center" gap={2}>
             <Controller
               control={form.control}
               name={`series.${index}.asPercent`}
@@ -1451,9 +1401,7 @@ function SeriesField({
                     value="on"
                     onCheckedChange={({ checked }) => field.onChange(checked)}
                   />
-                  <Field.Label flexShrink={0}>
-                    Show in percentage (%)
-                  </Field.Label>
+                  <Field.Label flexShrink={0}>Show in percentage (%)</Field.Label>
                 </>
               )}
             />
@@ -1504,10 +1452,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
     })) ?? [],
   );
 
-  if (
-    currentSelected &&
-    !options.find((option) => option.value === currentSelected)
-  ) {
+  if (currentSelected && !options.find((option) => option.value === currentSelected)) {
     options.push({ value: currentSelected, label: currentSelected });
   }
 
@@ -1553,15 +1498,10 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
           return (
             <chakraComponents.Option {...props}>
               <HStack align="end">
-                <Box width="16px">
-                  {props.isSelected && <Check width="16px" />}
-                </Box>
+                <Box width="16px">{props.isSelected && <Check width="16px" />}</Box>
                 <VStack align="start" gap={"2px"}>
                   {details && (
-                    <Text
-                      fontSize="sm"
-                      color={props.isSelected ? "fg" : "fg.muted"}
-                    >
+                    <Text fontSize="sm" color={props.isSelected ? "fg" : "fg.muted"}>
                       {details}
                     </Text>
                   )}

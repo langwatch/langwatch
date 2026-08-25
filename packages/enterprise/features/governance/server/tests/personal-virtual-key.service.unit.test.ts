@@ -43,8 +43,7 @@ class MemoryIssuer extends PersonalVirtualKeyIssuerPort {
 class MemoryOrganizations extends OrganizationService {
   getOldestTeamId = unsupported<OrganizationService["getOldestTeamId"]>();
   getBillingProfile = unsupported<OrganizationService["getBillingProfile"]>();
-  claimBillingCustomerId =
-    unsupported<OrganizationService["claimBillingCustomerId"]>();
+  claimBillingCustomerId = unsupported<OrganizationService["claimBillingCustomerId"]>();
   getPersonalWorkspaceFeatures =
     unsupported<OrganizationService["getPersonalWorkspaceFeatures"]>();
   enableAllPersonalWorkspaceFeatures =

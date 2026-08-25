@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  type AnsiLine,
-  hasAnsi,
-  parseAnsi,
-  stripAnsi,
-  xterm256ToHex,
-} from "../ansi";
+import { type AnsiLine, hasAnsi, parseAnsi, stripAnsi, xterm256ToHex } from "../ansi";
 
 /** Flatten a parsed result to plain text, joining lines with \n. */
 function textOf(lines: AnsiLine[]): string {
@@ -205,8 +199,7 @@ describe("parseAnsi", () => {
 
   describe("given a real coloured git status line", () => {
     it("splits the styled and unstyled runs", () => {
-      const input =
-        "On branch \x1b[32mmain\x1b[0m\n\x1b[31m\tmodified:   file.ts\x1b[0m";
+      const input = "On branch \x1b[32mmain\x1b[0m\n\x1b[31m\tmodified:   file.ts\x1b[0m";
       const lines = parseAnsi(input);
       expect(lines).toHaveLength(2);
       // Line 1: "On branch " (plain) + "main" (green)

@@ -3,10 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Span } from "~/server/tracer/types";
 
 import { SpanStorageService } from "../span-storage.service";
-import {
-  TEASER_ELLIPSIS,
-  TEASER_MAX_CHARS,
-} from "../visibility-window.service";
+import { TEASER_ELLIPSIS, TEASER_MAX_CHARS } from "../visibility-window.service";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -28,9 +25,7 @@ const makeService = (spans: Span[]) =>
   new SpanStorageService({
     getSpansByTraceId: vi.fn().mockResolvedValue(spans),
     getSpanByIds: vi.fn().mockResolvedValue(spans[0] ?? null),
-    findSpansPaginated: vi
-      .fn()
-      .mockResolvedValue({ spans, total: spans.length }),
+    findSpansPaginated: vi.fn().mockResolvedValue({ spans, total: spans.length }),
     findSpansSince: vi.fn().mockResolvedValue(spans),
   } as never);
 

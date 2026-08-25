@@ -1,8 +1,5 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
@@ -56,15 +53,15 @@ export class TracesApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(
-    operation: string,
-    error: unknown,
-    response?: Response,
-  ): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const status = response?.status ?? extractStatusFromResponse(error);
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status,
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status,
+      },
+    });
     throw new TracesApiError(message, operation, error, status);
   }
 
@@ -76,16 +73,16 @@ export class TracesApiService {
     return data;
   }
 
-  async get(traceId: string, options?: { format?: "digest" | "json" }): Promise<TraceGetResponse> {
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/traces/{traceId}",
-      {
-        params: {
-          path: { traceId },
-          query: options,
-        },
+  async get(
+    traceId: string,
+    options?: { format?: "digest" | "json" },
+  ): Promise<TraceGetResponse> {
+    const { data, error, response } = await this.apiClient.GET("/api/traces/{traceId}", {
+      params: {
+        path: { traceId },
+        query: options,
       },
-    );
+    });
     if (error) this.handleApiError(`get trace "${traceId}"`, error, response);
     return data;
   }

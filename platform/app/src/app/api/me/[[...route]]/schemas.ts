@@ -22,13 +22,10 @@ export const meUsageQuerySchema = z
   })
   // A half-specified window is ambiguous — require both bounds or neither,
   // rather than silently dropping a lone bound and returning the default month.
-  .refine(
-    (q) => (q.windowStartMs === undefined) === (q.windowEndMs === undefined),
-    {
-      message:
-        "windowStartMs and windowEndMs must be provided together (or both omitted for the current month).",
-    },
-  )
+  .refine((q) => (q.windowStartMs === undefined) === (q.windowEndMs === undefined), {
+    message:
+      "windowStartMs and windowEndMs must be provided together (or both omitted for the current month).",
+  })
   .refine(
     (q) =>
       q.windowStartMs === undefined ||

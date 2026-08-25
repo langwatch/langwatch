@@ -121,10 +121,7 @@ export class AdminClient {
     return (await res.json()) as T;
   }
 
-  getList<T>(
-    resource: ResourceName,
-    params: ListParams,
-  ): Promise<ListResult<T>> {
+  getList<T>(resource: ResourceName, params: ListParams): Promise<ListResult<T>> {
     const {
       pagination = { page: 1, perPage: 25 },
       sort = { field: "id", order: "ASC" as const },

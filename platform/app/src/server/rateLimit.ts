@@ -56,8 +56,7 @@ export async function rateLimit(opts: {
   // fallback below, never a crash (ADR-093).
   // Lazy to keep route-description imports free of the complete app runtime.
   // OpenAPI generation imports transport modules but never executes a request.
-  const redisConnection =
-    (await import("./app-layer/app")).tryGetApp()?.redis ?? null;
+  const redisConnection = (await import("./app-layer/app")).tryGetApp()?.redis ?? null;
   if (redisConnection) {
     const redisKey = `langwatch:ratelimit:${key}`;
     const count = await redisConnection.incr(redisKey);

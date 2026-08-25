@@ -51,9 +51,7 @@ describe("the REST boundary's request validator", () => {
       const res = await post({ name: "", metric: "latency" });
 
       const body = await res.json();
-      expect(body.message).toBe(
-        "The request body didn't match the expected shape.",
-      );
+      expect(body.message).toBe("The request body didn't match the expected shape.");
       expect(body.target).toBe("json");
     });
 
@@ -63,9 +61,11 @@ describe("the REST boundary's request validator", () => {
 
       const body = await res.json();
       expect(body.reasons).toHaveLength(3);
-      expect(
-        body.reasons.map((r: { meta: { field: string } }) => r.meta.field),
-      ).toEqual(["name", "metric", "limit"]);
+      expect(body.reasons.map((r: { meta: { field: string } }) => r.meta.field)).toEqual([
+        "name",
+        "metric",
+        "limit",
+      ]);
       expect(body.fields).toEqual(["name", "metric", "limit"]);
     });
 
@@ -131,9 +131,7 @@ describe("the REST boundary's request validator", () => {
     const appWithCatalog = () => {
       const app = new Hono();
       app.onError(handleError);
-      app.post("/", zValidator("json", catalogSchema), (c) =>
-        c.json({ ok: true }),
-      );
+      app.post("/", zValidator("json", catalogSchema), (c) => c.json({ ok: true }));
       return app;
     };
 
@@ -153,9 +151,7 @@ describe("the REST boundary's request validator", () => {
       });
       const app = new Hono();
       app.onError(handleError);
-      app.post("/", zValidator("json", bareSchema), (c) =>
-        c.json({ ok: true }),
-      );
+      app.post("/", zValidator("json", bareSchema), (c) => c.json({ ok: true }));
 
       const res = await post({ kind: "anything" }, app);
 

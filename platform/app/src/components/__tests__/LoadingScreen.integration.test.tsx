@@ -41,9 +41,7 @@ const setReducedMotion = (reduce: boolean) => {
 };
 
 const ghost = () =>
-  document.body.querySelector(
-    "[data-loading-screen-ghost]",
-  ) as HTMLElement | null;
+  document.body.querySelector("[data-loading-screen-ghost]") as HTMLElement | null;
 
 const renderScreen = () =>
   render(<LoadingScreen />, {

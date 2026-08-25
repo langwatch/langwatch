@@ -23,8 +23,7 @@ function signedRequest(path: string, overrides?: { signature?: string }) {
   const bodyHash = createHash("sha256").update("").digest("hex");
   const canonical = `GET\n${path}\n${timestamp}\n${bodyHash}`;
   const signature =
-    overrides?.signature ??
-    createHmac("sha256", SECRET).update(canonical).digest("hex");
+    overrides?.signature ?? createHmac("sha256", SECRET).update(canonical).digest("hex");
   return new Request(`http://localhost${path}`, {
     method: "GET",
     headers: {
@@ -64,9 +63,7 @@ describe("GET /api/internal/gateway/health", () => {
   });
 
   it("rejects a probe with a wrong signature", async () => {
-    const res = await app.request(
-      signedRequest(PATH, { signature: "0".repeat(64) }),
-    );
+    const res = await app.request(signedRequest(PATH, { signature: "0".repeat(64) }));
     expect(res.status).toBe(401);
   });
 });

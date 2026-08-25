@@ -87,9 +87,7 @@ export function getFieldSuggestions(query: string): SuggestionItem[] {
     } satisfies SuggestionItem,
     keys: [p.prefix],
   }));
-  return rankByMatch([...fieldItems, ...prefixItems], query, null).map(
-    (r) => r.item,
-  );
+  return rankByMatch([...fieldItems, ...prefixItems], query, null).map((r) => r.item);
 }
 
 export function getValueSuggestions(field: string, query: string): string[] {

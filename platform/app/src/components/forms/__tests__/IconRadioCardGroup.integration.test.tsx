@@ -71,10 +71,9 @@ describe("<IconRadioCardGroup/>", () => {
 
   describe("when an item is selected", () => {
     it("marks the selected item as checked", () => {
-      render(
-        <IconRadioCardGroup items={items} value="beta" onChange={() => {}} />,
-        { wrapper: Wrapper },
-      );
+      render(<IconRadioCardGroup items={items} value="beta" onChange={() => {}} />, {
+        wrapper: Wrapper,
+      });
 
       const radios = screen.getAllByRole("radio");
       expect(radios[0]).toHaveAttribute("aria-checked", "false");
@@ -83,10 +82,9 @@ describe("<IconRadioCardGroup/>", () => {
     });
 
     it("makes the selected item tabbable", () => {
-      render(
-        <IconRadioCardGroup items={items} value="beta" onChange={() => {}} />,
-        { wrapper: Wrapper },
-      );
+      render(<IconRadioCardGroup items={items} value="beta" onChange={() => {}} />, {
+        wrapper: Wrapper,
+      });
 
       const radios = screen.getAllByRole("radio");
       expect(radios[0]).toHaveAttribute("tabindex", "-1");
@@ -100,10 +98,9 @@ describe("<IconRadioCardGroup/>", () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
 
-      render(
-        <IconRadioCardGroup items={items} value="alpha" onChange={onChange} />,
-        { wrapper: Wrapper },
-      );
+      render(<IconRadioCardGroup items={items} value="alpha" onChange={onChange} />, {
+        wrapper: Wrapper,
+      });
 
       const radios = screen.getAllByRole("radio");
       await user.click(radios[2]!);
@@ -131,11 +128,7 @@ describe("<IconRadioCardGroup/>", () => {
 
     it("renders all radio items", () => {
       render(
-        <IconRadioCardGroup
-          items={items}
-          onChange={() => {}}
-          direction="vertical"
-        />,
+        <IconRadioCardGroup items={items} onChange={() => {}} direction="vertical" />,
         { wrapper: Wrapper },
       );
 

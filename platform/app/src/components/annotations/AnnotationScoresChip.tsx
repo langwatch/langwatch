@@ -31,9 +31,7 @@ export function AnnotationScoresChip({
       testId="annotation-scores-chip"
       count={countAnnotationScores(annotations)}
       countLabel={(count) => `${count} ${count === 1 ? "score" : "scores"}`}
-      textOf={(annotation) =>
-        annotationScoresLine({ annotation, scoreNamesById })
-      }
+      textOf={(annotation) => annotationScoresLine({ annotation, scoreNamesById })}
     />
   );
 }

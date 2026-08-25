@@ -65,10 +65,7 @@ export const RESOURCE_KIND_TO_DB: Record<
   thread: "THREAD",
 };
 
-const RESOURCE_KIND_FROM_DB: Record<
-  GrantResourceKindDb,
-  ResourceGrantTerms["kind"]
-> = {
+const RESOURCE_KIND_FROM_DB: Record<GrantResourceKindDb, ResourceGrantTerms["kind"]> = {
   TRACE: "trace",
   THREAD: "thread",
 };
@@ -141,9 +138,7 @@ export function grantFactToRow({
     projectId: grant.resource?.projectId ?? null,
     createdByUserId: grant.resource?.createdByUserId ?? null,
     expiresAt:
-      grant.resource?.expiresAtMs != null
-        ? new Date(grant.resource.expiresAtMs)
-        : null,
+      grant.resource?.expiresAtMs != null ? new Date(grant.resource.expiresAtMs) : null,
     maxViews: grant.resource?.maxViews ?? null,
     occurredAt: new Date(grant.occurredAtMs),
   };
@@ -375,10 +370,7 @@ export const SHARE_VISIBILITY_BY_PRINCIPAL_DB: Record<
     Object.entries(SHARE_VISIBILITY_BY_PRINCIPAL) as Array<
       [LedgerPrincipalType, CompatShareLinkRowShape["visibility"]]
     >
-  ).map(([principalType, visibility]) => [
-    PRINCIPAL_TO_DB[principalType],
-    visibility,
-  ]),
+  ).map(([principalType, visibility]) => [PRINCIPAL_TO_DB[principalType], visibility]),
 );
 
 /** ADR-057 visibility → the ledger principal it names, the inverse of
@@ -436,8 +428,7 @@ export function grantFactToCompatShareLink({
     projectId: resource.projectId,
     userId: resource.createdByUserId ?? null,
     visibility,
-    expiresAt:
-      resource.expiresAtMs != null ? new Date(resource.expiresAtMs) : null,
+    expiresAt: resource.expiresAtMs != null ? new Date(resource.expiresAtMs) : null,
     maxViews: resource.maxViews ?? null,
   };
 }

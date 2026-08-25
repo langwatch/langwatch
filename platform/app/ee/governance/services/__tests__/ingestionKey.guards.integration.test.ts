@@ -163,9 +163,7 @@ describe("IngestionKey ownership + list visibility", () => {
           organizationId: ORG_ID,
           permissionMode: "restricted",
           permissions: ["traces:create"],
-          bindings: [
-            { role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID },
-          ],
+          bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID }],
         });
 
         const visibleToA = await apiKeyService.list({

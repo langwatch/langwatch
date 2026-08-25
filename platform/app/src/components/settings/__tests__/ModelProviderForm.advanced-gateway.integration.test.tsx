@@ -41,8 +41,7 @@ const {
 }));
 
 vi.mock("../../../hooks/useModelProviderForm", () => ({
-  useModelProviderForm: (...args: unknown[]) =>
-    mockUseModelProviderForm(...args),
+  useModelProviderForm: (...args: unknown[]) => mockUseModelProviderForm(...args),
 }));
 
 vi.mock("../../../hooks/useModelProvidersSettings", () => ({
@@ -267,9 +266,7 @@ describe("Feature: Advanced (Gateway) accordion on ModelProvider drawer", () => 
         // hidden from accessibility queries via `hidden` attribute. We
         // assert no rate-limit input is exposed.
         const placeholderMatches = screen.queryAllByPlaceholderText(/no cap/i);
-        const visible = placeholderMatches.filter(
-          (el) => !el.closest("[hidden]"),
-        );
+        const visible = placeholderMatches.filter((el) => !el.closest("[hidden]"));
         expect(visible).toHaveLength(0);
       });
 

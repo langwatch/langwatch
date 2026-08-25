@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  parseJsonStringValues,
-  sanitizeInvalidJsonEscapes,
-} from "../traceRequest.utils";
+import { parseJsonStringValues, sanitizeInvalidJsonEscapes } from "../traceRequest.utils";
 
 describe("parseJsonStringValues", () => {
   describe("when given JSON object strings", () => {
@@ -80,8 +77,7 @@ describe("parseJsonStringValues", () => {
 
   describe("when JSON has PII-redaction broken escapes", () => {
     it("parses JSON with \\< invalid escape from PII redaction", () => {
-      const brokenJson =
-        '[{"role":"user","content":"SSN: \\<US_DRIVER_LICENSE>"}]';
+      const brokenJson = '[{"role":"user","content":"SSN: \\<US_DRIVER_LICENSE>"}]';
       const result = parseJsonStringValues({ messages: brokenJson });
       expect(result.messages).toEqual([
         { role: "user", content: "SSN: <US_DRIVER_LICENSE>" },
@@ -97,8 +93,7 @@ describe("parseJsonStringValues", () => {
     });
 
     it("preserves valid JSON escapes while fixing invalid ones", () => {
-      const brokenJson =
-        '{"content":"line1\\nline2 \\<US_DRIVER_LICENSE> end"}';
+      const brokenJson = '{"content":"line1\\nline2 \\<US_DRIVER_LICENSE> end"}';
       const result = parseJsonStringValues({ data: brokenJson });
       expect(result.data).toEqual({
         content: "line1\nline2 <US_DRIVER_LICENSE> end",
@@ -147,9 +142,7 @@ describe("sanitizeInvalidJsonEscapes()", () => {
   describe("when given mixed valid and invalid escapes", () => {
     it("fixes only PII angle-bracket escapes", () => {
       const input = '"line1\\nSSN: \\<US_SSN>\\ttab"';
-      expect(sanitizeInvalidJsonEscapes(input)).toBe(
-        '"line1\\nSSN: <US_SSN>\\ttab"',
-      );
+      expect(sanitizeInvalidJsonEscapes(input)).toBe('"line1\\nSSN: <US_SSN>\\ttab"');
     });
   });
 

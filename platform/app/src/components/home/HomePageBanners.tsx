@@ -110,8 +110,8 @@ const LANGY_SLIDE: Slide = {
   badge: "New",
   subtitle: (
     <>
-      Ask about a failing trace and Langy digs through your data, explains what
-      broke, and opens a pull request with the change.
+      Ask about a failing trace and Langy digs through your data, explains what broke, and
+      opens a pull request with the change.
     </>
   ),
   ctaLabel: "Ask Langy to investigate",
@@ -242,8 +242,8 @@ const SLIDES: Slide[] = [
     badge: "New",
     subtitle: (
       <>
-        Real voices, real audio, plain-English judges. Works with ElevenLabs,
-        OpenAI Realtime, Vapi, and more.
+        Real voices, real audio, plain-English judges. Works with ElevenLabs, OpenAI
+        Realtime, Vapi, and more.
       </>
     ),
     ctaLabel: "Try voice agent testing",
@@ -282,8 +282,7 @@ function useSlides(
 
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const easeInOut = (t: number) =>
-  t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
@@ -314,11 +313,7 @@ function rgbToHex(rgb: [number, number, number]): string {
 function lerpColor(a: string, b: string, t: number): string {
   const A = hexToRgb(a);
   const B = hexToRgb(b);
-  return rgbToHex([
-    lerp(A[0], B[0], t),
-    lerp(A[1], B[1], t),
-    lerp(A[2], B[2], t),
-  ]);
+  return rgbToHex([lerp(A[0], B[0], t), lerp(A[1], B[1], t), lerp(A[2], B[2], t)]);
 }
 
 function lerpPalette(a: string[], b: string[], t: number): string[] {
@@ -407,9 +402,7 @@ export function HomePageBanners({
   // What the canvas is CURRENTLY showing (mid-morph). Seeded to the target so
   // the first paint is stable.
   const [displayColors, setDisplayColors] = useState<string[]>(targetColors);
-  const [displayMesh, setDisplayMesh] = useState<Mesh>(
-    targetMesh ?? SLIDES[0]!.mesh,
-  );
+  const [displayMesh, setDisplayMesh] = useState<Mesh>(targetMesh ?? SLIDES[0]!.mesh);
   // Flips true once we measure the shader running below the fps floor — a
   // GPU that can't keep up. From then on the canvas stops animating.
   const [lowPerf, setLowPerf] = useState(false);
@@ -467,9 +460,7 @@ export function HomePageBanners({
       return;
     }
     morphRef.current = {
-      from: displayColorsRef.current.length
-        ? displayColorsRef.current
-        : targetColors,
+      from: displayColorsRef.current.length ? displayColorsRef.current : targetColors,
       fromMesh: displayMeshRef.current,
       start: null,
     };
@@ -619,8 +610,7 @@ export function HomePageBanners({
           // depth.
           filter={{ base: "blur(15px)", _dark: "blur(5px)" }}
           css={{
-            maskImage:
-              "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
+            maskImage: "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
             WebkitMaskImage:
               "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
           }}
@@ -731,8 +721,7 @@ export function HomePageBanners({
                   }}
                 >
                   <Box flexShrink={0} color="fg.muted" display="grid">
-                    {slide.iconNode ??
-                      (slide.Icon ? <slide.Icon size={14} /> : null)}
+                    {slide.iconNode ?? (slide.Icon ? <slide.Icon size={14} /> : null)}
                   </Box>
                   {slide.badge ? (
                     <chakra.span
@@ -826,19 +815,15 @@ export function HomePageBanners({
                           // it, never competing with the sentence above. Only
                           // the ACTIVE segment darkens — position, not history;
                           // shading the already-shown ones read as a checklist.
-                          background={
-                            i === active ? "fg.muted/40" : "fg.muted/15"
-                          }
+                          background={i === active ? "fg.muted/40" : "fg.muted/15"}
                           transition="background 200ms ease"
                           /* The fill's accent, resolved per colour mode here
                              because the motion.div below takes a raw style
                              object that cannot carry Chakra conditionals. */
                           css={{
-                            "--ticker-accent":
-                              "var(--chakra-colors-orange-700)",
+                            "--ticker-accent": "var(--chakra-colors-orange-700)",
                             _dark: {
-                              "--ticker-accent":
-                                "var(--chakra-colors-orange-fg)",
+                              "--ticker-accent": "var(--chakra-colors-orange-fg)",
                             },
                           }}
                         >
@@ -955,11 +940,7 @@ export function HomePageBanners({
                     bg="white/20"
                     boxShadow="inset 0 0 0 1px rgba(255,255,255,0.35)"
                   >
-                    {s.Icon ? (
-                      <Icon as={s.Icon} boxSize={5} color="white" />
-                    ) : (
-                      s.iconNode
-                    )}
+                    {s.Icon ? <Icon as={s.Icon} boxSize={5} color="white" /> : s.iconNode}
                   </Box>
 
                   <VStack align="start" gap={1.5} flex={1} minWidth={0}>
@@ -1216,9 +1197,7 @@ export function HomePageBanners({
                   }}
                 >
                   {s.iconNode ??
-                    (s.Icon ? (
-                      <Icon as={s.Icon} boxSize={5} color="white" />
-                    ) : null)}
+                    (s.Icon ? <Icon as={s.Icon} boxSize={5} color="white" /> : null)}
                 </motion.div>
               ))}
             </Box>
@@ -1323,9 +1302,7 @@ export function HomePageBanners({
                     >
                       {s.ctaLabel}
                       {s.showCtaKbd ? (
-                        <Kbd fontSize="0.6875rem">
-                          {getIsMac() ? "⌘I" : "Ctrl+I"}
-                        </Kbd>
+                        <Kbd fontSize="0.6875rem">{getIsMac() ? "⌘I" : "Ctrl+I"}</Kbd>
                       ) : (
                         <Icon as={LuArrowRight} boxSize={3.5} />
                       )}

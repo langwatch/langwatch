@@ -130,9 +130,7 @@ export default function Dataset() {
         ) : (
           status !== "failed" &&
           !datasetGone && (
-            <Text color="fg.muted">
-              Your dataset will appear here once it is ready.
-            </Text>
+            <Text color="fg.muted">Your dataset will appear here once it is ready.</Text>
           )
         )}
       </Box>

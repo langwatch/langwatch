@@ -55,11 +55,7 @@ export interface AssignablePullRequest {
  * merge and they agree; a closed-unmerged pull request has only the former.
  */
 function endOfLifeMs(pullRequest: AssignablePullRequest): number {
-  return (
-    pullRequest.prClosedAtMs ??
-    pullRequest.prMergedAtMs ??
-    Number.POSITIVE_INFINITY
-  );
+  return pullRequest.prClosedAtMs ?? pullRequest.prMergedAtMs ?? Number.POSITIVE_INFINITY;
 }
 
 /**
@@ -173,16 +169,11 @@ function firstAliveAt({
   candidates: AssignablePullRequest[] | undefined;
   startedAtMs: number;
 }): AssignablePullRequest | undefined {
-  return candidates?.find(
-    (pullRequest) => endOfLifeMs(pullRequest) >= startedAtMs,
-  );
+  return candidates?.find((pullRequest) => endOfLifeMs(pullRequest) >= startedAtMs);
 }
 
 /** Creation order, with the number breaking a same-instant tie. */
-function isEarlier(
-  a: AssignablePullRequest,
-  b: AssignablePullRequest,
-): boolean {
+function isEarlier(a: AssignablePullRequest, b: AssignablePullRequest): boolean {
   return (
     a.prCreatedAtMs < b.prCreatedAtMs ||
     (a.prCreatedAtMs === b.prCreatedAtMs && a.prNumber < b.prNumber)
@@ -204,9 +195,7 @@ function groupPullRequestsByBranch(
     byBranch.set(pullRequest.headBranch, list);
   }
   for (const list of byBranch.values()) {
-    list.sort(
-      (a, b) => a.prCreatedAtMs - b.prCreatedAtMs || a.prNumber - b.prNumber,
-    );
+    list.sort((a, b) => a.prCreatedAtMs - b.prCreatedAtMs || a.prNumber - b.prNumber);
   }
   return byBranch;
 }

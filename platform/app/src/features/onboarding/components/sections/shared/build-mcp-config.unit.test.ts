@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildMcpConfig,
-  buildMcpJson,
-  CLOUD_ENDPOINT,
-} from "./build-mcp-config";
+import { buildMcpConfig, buildMcpJson, CLOUD_ENDPOINT } from "./build-mcp-config";
 
 describe("buildMcpConfig()", () => {
   describe("when given only an API key", () => {
@@ -46,9 +42,7 @@ describe("buildMcpConfig()", () => {
       });
 
       const env = (result as any).mcpServers.langwatch.env;
-      expect(env.LANGWATCH_ENDPOINT).toBe(
-        "https://langwatch.internal.company.com",
-      );
+      expect(env.LANGWATCH_ENDPOINT).toBe("https://langwatch.internal.company.com");
       expect(env.LANGWATCH_API_KEY).toBe("lw-abc123");
     });
   });
@@ -86,9 +80,7 @@ describe("buildMcpJson()", () => {
       });
 
       const parsed = JSON.parse(json);
-      expect(parsed.mcpServers.langwatch.env).not.toHaveProperty(
-        "LANGWATCH_ENDPOINT",
-      );
+      expect(parsed.mcpServers.langwatch.env).not.toHaveProperty("LANGWATCH_ENDPOINT");
     });
   });
 

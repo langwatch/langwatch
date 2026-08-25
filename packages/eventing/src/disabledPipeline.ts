@@ -10,9 +10,9 @@ const logger = createLogger("langwatch:event-sourcing:disabled");
 /**
  * A no-op queue processor that logs errors when commands are sent.
  */
-class DisabledQueueProcessor<Payload extends Record<string, unknown>>
-  implements EventSourcedQueueProcessor<Payload>
-{
+class DisabledQueueProcessor<
+  Payload extends Record<string, unknown>,
+> implements EventSourcedQueueProcessor<Payload> {
   constructor(
     private readonly pipelineName: string,
     private readonly commandName: string,
@@ -77,23 +77,15 @@ class DisabledEventSourcingService {
  */
 export class DisabledPipeline<
   EventType extends Event = Event,
-  ProjectionTypes extends Record<string, Projection> = Record<
-    string,
-    Projection
-  >,
-> implements RegisteredPipeline<EventType, ProjectionTypes>
-{
+  ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
+> implements RegisteredPipeline<EventType, ProjectionTypes> {
   readonly name: string;
   readonly aggregateType: AggregateType;
   readonly service: EventSourcingService<EventType, ProjectionTypes>;
   readonly commands: Record<string, EventSourcedQueueProcessor<any>>;
   readonly metadata: PipelineMetadata;
 
-  constructor(
-    name: string,
-    aggregateType: AggregateType,
-    metadata: PipelineMetadata,
-  ) {
+  constructor(name: string, aggregateType: AggregateType, metadata: PipelineMetadata) {
     this.name = name;
     this.aggregateType = aggregateType;
     this.metadata = metadata;
@@ -102,13 +94,10 @@ export class DisabledPipeline<
     ) as unknown as EventSourcingService<EventType, ProjectionTypes>;
 
     // Create a proxy that returns DisabledQueueProcessor for any command
-    this.commands = new Proxy(
-      {} as Record<string, EventSourcedQueueProcessor<any>>,
-      {
-        get: (_, commandName) => {
-          return new DisabledQueueProcessor(name, String(commandName));
-        },
+    this.commands = new Proxy({} as Record<string, EventSourcedQueueProcessor<any>>, {
+      get: (_, commandName) => {
+        return new DisabledQueueProcessor(name, String(commandName));
       },
-    );
+    });
   }
 }

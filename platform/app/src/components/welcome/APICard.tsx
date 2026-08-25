@@ -1,12 +1,4 @@
-import {
-  Alert,
-  Box,
-  Heading,
-  Separator,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, Heading, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { LuCheckCheck, LuExternalLink } from "react-icons/lu";
 import { CopyableInputWithPrefix } from "../../features/onboarding/components/sections/observability/CopyableInputWithPrefix";
@@ -35,9 +27,7 @@ const APICard: React.FC = () => {
     trackEvent("api_key_copy", { project_id: project?.id });
     try {
       await navigator.clipboard.writeText(
-        withBashPrefix
-          ? `LANGWATCH_API_KEY=${effectiveApiKey}`
-          : effectiveApiKey,
+        withBashPrefix ? `LANGWATCH_API_KEY=${effectiveApiKey}` : effectiveApiKey,
       );
       toaster.create({
         title: "Copied",
@@ -61,9 +51,7 @@ const APICard: React.FC = () => {
     trackEvent("endpoint_copy", { project_id: project?.id });
     try {
       await navigator.clipboard.writeText(
-        withBashPrefix
-          ? `LANGWATCH_ENDPOINT=${effectiveEndpoint}`
-          : effectiveEndpoint,
+        withBashPrefix ? `LANGWATCH_ENDPOINT=${effectiveEndpoint}` : effectiveEndpoint,
       );
       toaster.create({
         title: "Copied",
@@ -94,8 +82,7 @@ const APICard: React.FC = () => {
           Connect to LangWatch
         </Heading>
         <Text fontSize="xs" color="fg.muted" textAlign="left">
-          Follow the instructions on our docs to setup your project with
-          LangWatch!
+          Follow the instructions on our docs to setup your project with LangWatch!
         </Text>
       </Box>
       <VStack align="start" gap={1} fontSize="sm" w="full" mb={1}>
@@ -104,8 +91,7 @@ const APICard: React.FC = () => {
             API key
           </Text>
           <Text fontSize="xs" color="fg.muted" fontWeight="normal" mt={-1}>
-            Keep it secret, keep it safe. Don&apos;t let this key fall into
-            prying eyes.
+            Keep it secret, keep it safe. Don&apos;t let this key fall into prying eyes.
           </Text>
         </VStack>
         <CopyableInputWithPrefix
@@ -116,26 +102,25 @@ const APICard: React.FC = () => {
           onCopy={copyApiKey}
         />
       </VStack>
-      {effectiveEndpoint &&
-        effectiveEndpoint !== "https://app.langwatch.ai" && (
-          <VStack align="start" gap={1} fontSize="sm" w="full" mb={1}>
-            <VStack align="start">
-              <Text fontSize="sm" color="fg" fontWeight="medium">
-                Endpoint
-              </Text>
-              <Text fontSize="xs" color="fg.muted" fontWeight="normal" mt={-1}>
-                This is the endpoint you should configure in your SDK to send
-                data to LangWatch.
-              </Text>
-            </VStack>
-            <CopyableInputWithPrefix
-              prefix="LANGWATCH_ENDPOINT="
-              value={effectiveEndpoint}
-              ariaLabel="Endpoint"
-              onCopy={copyEndpoint}
-            />
+      {effectiveEndpoint && effectiveEndpoint !== "https://app.langwatch.ai" && (
+        <VStack align="start" gap={1} fontSize="sm" w="full" mb={1}>
+          <VStack align="start">
+            <Text fontSize="sm" color="fg" fontWeight="medium">
+              Endpoint
+            </Text>
+            <Text fontSize="xs" color="fg.muted" fontWeight="normal" mt={-1}>
+              This is the endpoint you should configure in your SDK to send data to
+              LangWatch.
+            </Text>
           </VStack>
-        )}
+          <CopyableInputWithPrefix
+            prefix="LANGWATCH_ENDPOINT="
+            value={effectiveEndpoint}
+            ariaLabel="Endpoint"
+            onCopy={copyEndpoint}
+          />
+        </VStack>
+      )}
       <Box mt={1}>
         {hasFirstMessage ? (
           <Alert.Root
@@ -148,9 +133,7 @@ const APICard: React.FC = () => {
             <Alert.Indicator>
               <LuCheckCheck size={16} />
             </Alert.Indicator>
-            <Alert.Title>
-              Integration configured — traces are being received
-            </Alert.Title>
+            <Alert.Title>Integration configured — traces are being received</Alert.Title>
           </Alert.Root>
         ) : (
           <Alert.Root

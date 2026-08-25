@@ -262,33 +262,15 @@ export function translateMetric(
   }
 
   if (metric.startsWith("performance.")) {
-    return translatePerformanceMetric(
-      metric,
-      aggregation,
-      alias,
-      requiredJoins,
-    );
+    return translatePerformanceMetric(metric, aggregation, alias, requiredJoins);
   }
 
   if (metric.startsWith("evaluations.")) {
-    return translateEvaluationMetric(
-      metric,
-      aggregation,
-      alias,
-      requiredJoins,
-      key,
-    );
+    return translateEvaluationMetric(metric, aggregation, alias, requiredJoins, key);
   }
 
   if (metric.startsWith("events.")) {
-    return translateEventMetric(
-      metric,
-      aggregation,
-      alias,
-      requiredJoins,
-      key,
-      subkey,
-    );
+    return translateEventMetric(metric, aggregation, alias, requiredJoins, key, subkey);
   }
 
   if (metric.startsWith("sentiment.")) {
@@ -337,11 +319,7 @@ function translateMetadataMetric(
   switch (metric) {
     case "metadata.trace_id":
       return {
-        selectExpression: translateSimpleAggregation(
-          `${ts}.TraceId`,
-          aggregation,
-          alias,
-        ),
+        selectExpression: translateSimpleAggregation(`${ts}.TraceId`, aggregation, alias),
         alias,
         requiredJoins,
         params: {},
@@ -400,11 +378,7 @@ function translateMetadataMetric(
         requiredJoins.push("stored_spans");
       }
       return {
-        selectExpression: translateSimpleAggregation(
-          `${ts}.TraceId`,
-          aggregation,
-          alias,
-        ),
+        selectExpression: translateSimpleAggregation(`${ts}.TraceId`, aggregation, alias),
         alias,
         requiredJoins,
         params: {},
@@ -756,11 +730,7 @@ function translateEventMetric(
       }
 
       // Apply aggregation to the extracted scores array
-      const aggExpr = translateArrayAggregation(
-        scoreExtraction,
-        aggregation,
-        alias,
-      );
+      const aggExpr = translateArrayAggregation(scoreExtraction, aggregation, alias);
       return {
         selectExpression: aggExpr,
         alias,
@@ -844,11 +814,7 @@ function translateSentimentMetric(
           )
         )`;
 
-      const aggExpr = translateArrayAggregation(
-        voteExtraction,
-        aggregation,
-        alias,
-      );
+      const aggExpr = translateArrayAggregation(voteExtraction, aggregation, alias);
       return {
         selectExpression: aggExpr,
         alias,
@@ -951,10 +917,7 @@ export function translatePipelineAggregation(
   // 1. Group by (user_id, thread_id), compute thread duration
   // 2. Group by user_id, compute avg thread duration per user
   // 3. Compute avg across users
-  if (
-    metric === "threads.average_duration_per_thread" &&
-    innerMetric.requiresSubquery
-  ) {
+  if (metric === "threads.average_duration_per_thread" && innerMetric.requiresSubquery) {
     const threadIdCol = `${ts}.Attributes['gen_ai.conversation.id']`;
     // pipelineAggregation is typed as PipelineAggregationTypes (sum/avg/min/max)
     // which matches CH function names directly

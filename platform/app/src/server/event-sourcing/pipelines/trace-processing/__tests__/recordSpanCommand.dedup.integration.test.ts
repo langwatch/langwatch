@@ -16,15 +16,8 @@
  */
 
 import crypto from "node:crypto";
-import type {
-  EventSourcing,
-  PipelineWithCommandHandlers,
-} from "@langwatch/eventing";
-import {
-  defineAggregate,
-  defineEvents,
-  definePipeline,
-} from "@langwatch/eventing";
+import type { EventSourcing, PipelineWithCommandHandlers } from "@langwatch/eventing";
+import { defineAggregate, defineEvents, definePipeline } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
@@ -155,9 +148,7 @@ function createDeduplicationTestPipeline(): PipelineWithCommandHandlers<
     );
   }
   if (!redisConnection) {
-    throw new Error(
-      "Redis connection not available. Ensure testcontainers are started.",
-    );
+    throw new Error("Redis connection not available. Ensure testcontainers are started.");
   }
 
   const eventStore = new EventStoreClickHouse(

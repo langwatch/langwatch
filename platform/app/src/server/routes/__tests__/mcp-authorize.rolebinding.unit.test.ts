@@ -111,8 +111,7 @@ vi.mock("~/server/app-layer/app", async (importOriginal) => {
 });
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,
-  decrypt: (text: string) =>
-    text.startsWith("encrypted:") ? text.slice(10) : text,
+  decrypt: (text: string) => (text.startsWith("encrypted:") ? text.slice(10) : text),
 }));
 
 // misc.ts reads its connection through tryGetApp; both accessors above point
@@ -162,9 +161,7 @@ async function expectAccessDenied(res: Response) {
   const redirect = new URL(json.redirect ?? "");
   expect(`${redirect.origin}${redirect.pathname}`).toBe(validBody.redirect_uri);
   expect(redirect.searchParams.get("error")).toBe(ERROR);
-  expect(redirect.searchParams.get("error_description")).toBe(
-    ERROR_DESCRIPTION,
-  );
+  expect(redirect.searchParams.get("error_description")).toBe(ERROR_DESCRIPTION);
   expect(redirect.searchParams.get("state")).toBe(validBody.state);
   expect(redirect.searchParams.get("code")).toBeNull();
   // biome-ignore-end lint/suspicious/noMisplacedAssertion: end of the shared refusal assertions
@@ -186,9 +183,7 @@ describe("POST /mcp/authorize", () => {
     it("returns 403 (proves the RoleBinding permission gate actually runs)", async () => {
       // No bindings at all → checkPermissionFromBindings falls back to TeamUser,
       // which is also absent → access denied.
-      mockPrisma.roleBinding.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+      mockPrisma.roleBinding.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       await expectAccessDenied(await authorize());
     });

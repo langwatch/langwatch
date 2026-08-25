@@ -20,9 +20,7 @@ export class ObservabilityAuthzCutoverAdapter extends AuthzCutoverFailureReporte
     return new ObservabilityAuthzCutoverAdapter(options);
   }
 
-  private constructor(
-    private readonly options: ObservabilityAuthzCutoverAdapterOptions,
-  ) {
+  private constructor(private readonly options: ObservabilityAuthzCutoverAdapterOptions) {
     super();
   }
 

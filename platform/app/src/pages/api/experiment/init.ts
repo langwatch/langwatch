@@ -20,11 +20,7 @@ const dspyInitParamsSchema = z
   .object({
     experiment_id: z.string().optional().nullable(),
     experiment_slug: z.string().optional().nullable(),
-    experiment_type: z.enum([
-      "DSPY",
-      "BATCH_EVALUATION",
-      "BATCH_EVALUATION_V2",
-    ]),
+    experiment_type: z.enum(["DSPY", "BATCH_EVALUATION", "BATCH_EVALUATION_V2"]),
     experiment_name: z.string().optional(),
     workflowId: z.string().optional(),
   })
@@ -35,10 +31,7 @@ const dspyInitParamsSchema = z
     return true;
   });
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse,
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests
   }

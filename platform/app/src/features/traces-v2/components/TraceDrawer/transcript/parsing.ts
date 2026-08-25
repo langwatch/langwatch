@@ -84,9 +84,7 @@ function isOneChatMessage(item: unknown): item is ChatMessage {
   if (typeof obj.role !== "string") return false;
   if (!VALID_CHAT_ROLES.has(obj.role)) return false;
   const validContent =
-    obj.content === null ||
-    typeof obj.content === "string" ||
-    Array.isArray(obj.content);
+    obj.content === null || typeof obj.content === "string" || Array.isArray(obj.content);
   const hasToolCalls = Array.isArray(obj.tool_calls);
   return validContent || hasToolCalls;
 }
@@ -108,9 +106,7 @@ function isChatMessagesArray(data: unknown): data is ChatMessage[] {
 function coerceDeclaredChatMessages(value: unknown[]): ChatMessage[] | null {
   const messages = value.filter(
     (item): item is ChatMessage =>
-      typeof item === "object" &&
-      item !== null &&
-      ("role" in item || "content" in item),
+      typeof item === "object" && item !== null && ("role" in item || "content" in item),
   );
   return messages.length > 0 ? messages : null;
 }
@@ -181,9 +177,7 @@ export function coerceToChatMessages(data: unknown): ChatMessage[] | null {
  * content and `${msgIdx}.${partIdx}` for array parts, consumed by
  * `applyChatTextLeaves`.
  */
-export function collectChatTextLeaves(
-  messages: ChatMessage[],
-): Record<string, string> {
+export function collectChatTextLeaves(messages: ChatMessage[]): Record<string, string> {
   const leaves: Record<string, string> = {};
   messages.forEach((message, msgIdx) => {
     const content = message.content;
@@ -348,9 +342,7 @@ export function extractInlineBlocks(content: string): ContentBlock[] {
   return out;
 }
 
-export function parseContentBlocks(
-  content: ChatMessage["content"],
-): ContentBlock[] {
+export function parseContentBlocks(content: ChatMessage["content"]): ContentBlock[] {
   if (content == null) return [];
   if (typeof content === "string") {
     if (content.length === 0) return [];
@@ -371,9 +363,7 @@ export function parseContentBlocks(
             return blocks;
           }
         } else if (parsed && typeof parsed === "object") {
-          const single = parseContentBlocks([
-            parsed as Record<string, unknown>,
-          ]);
+          const single = parseContentBlocks([parsed as Record<string, unknown>]);
           if (single.length > 0 && single[0]!.kind !== "raw") {
             return single;
           }
@@ -467,8 +457,7 @@ export function parseContentBlocks(
       case "tool_result": {
         out.push({
           kind: "tool_result",
-          toolUseId:
-            typeof obj.tool_use_id === "string" ? obj.tool_use_id : undefined,
+          toolUseId: typeof obj.tool_use_id === "string" ? obj.tool_use_id : undefined,
           content: obj.content,
           isError: obj.is_error === true,
         });
@@ -586,10 +575,7 @@ function blockContentKey(block: ContentBlock): string {
  * namespaces a nested stack under the block it was read out of, so a key is
  * unique across the whole message however deeply the blocks nest.
  */
-export function withBlockKeys(
-  blocks: ContentBlock[],
-  prefix = "",
-): KeyedContentBlock[] {
+export function withBlockKeys(blocks: ContentBlock[], prefix = ""): KeyedContentBlock[] {
   const seen = new Map<string, number>();
   return blocks.map((block) => {
     const base = blockContentKey(block);
@@ -602,9 +588,7 @@ export function withBlockKeys(
 
 function joinTextBlocks(blocks: ContentBlock[]): string {
   return blocks
-    .filter(
-      (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
-    )
+    .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
     .map((b) => b.text)
     .join("\n");
 }
@@ -650,9 +634,7 @@ export function extractReadableText(
 
   // Bare typed-block array (no role wrapper).
   if (Array.isArray(parsed)) {
-    const blocks = parseContentBlocks(
-      parsed as Array<Record<string, unknown> | string>,
-    );
+    const blocks = parseContentBlocks(parsed as Array<Record<string, unknown> | string>);
     const text = joinTextBlocks(blocks);
     if (text.trim()) return text;
   }
@@ -694,14 +676,8 @@ export function extractSystemText(raw: string | null | undefined): string {
   return "";
 }
 
-export function getReasoning(
-  message: ChatMessage,
-  blocks: ContentBlock[],
-): string {
-  if (
-    typeof message.reasoning_content === "string" &&
-    message.reasoning_content
-  ) {
+export function getReasoning(message: ChatMessage, blocks: ContentBlock[]): string {
+  if (typeof message.reasoning_content === "string" && message.reasoning_content) {
     return message.reasoning_content;
   }
   if (typeof message.thinking === "string" && message.thinking) {
@@ -709,8 +685,7 @@ export function getReasoning(
   }
   const fromBlocks = blocks
     .filter(
-      (b): b is Extract<ContentBlock, { kind: "thinking" }> =>
-        b.kind === "thinking",
+      (b): b is Extract<ContentBlock, { kind: "thinking" }> => b.kind === "thinking",
     )
     .map((b) => b.text)
     .join("\n\n");

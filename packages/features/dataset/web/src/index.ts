@@ -23,9 +23,7 @@ export {
   bumpName,
   batchDedupeNames,
 } from "./upload/batch-name-dedup";
-export {
-  reorderColumnsBySourceHeader,
-} from "./upload/column-reorder";
+export { reorderColumnsBySourceHeader } from "./upload/column-reorder";
 export { invalidColumnNameKeys } from "./upload/column-validation";
 export {
   runWithConcurrency,
@@ -68,10 +66,7 @@ export {
   type EditorRecord,
 } from "./editor/use-dataset-editor-store";
 export type { PendingSavedChanges } from "./editor/pending-saved-changes";
-export {
-  formatRecordCount,
-  truncatedReadTooltip,
-} from "./editor/dataset-editor-copy";
+export { formatRecordCount, truncatedReadTooltip } from "./editor/dataset-editor-copy";
 export { datasetValueToString } from "./editor/dataset-value-to-string";
 export { datasetTableCss } from "./editor/dataset-table-styles";
 export {

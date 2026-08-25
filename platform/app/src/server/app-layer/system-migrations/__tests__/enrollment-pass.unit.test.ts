@@ -13,10 +13,7 @@ import {
   type TenantMigrationRecord,
 } from "@langwatch/system-migrations";
 import { describe, expect, it, vi } from "vitest";
-import {
-  migrationRunsOnThisInstallation,
-  organizationMigrates,
-} from "../cohort";
+import { migrationRunsOnThisInstallation, organizationMigrates } from "../cohort";
 
 class InMemoryStateRepository implements SystemMigrationStateRepository {
   private readonly rows = new Map<string, TenantMigrationRecord>();
@@ -35,9 +32,7 @@ class InMemoryStateRepository implements SystemMigrationStateRepository {
     this.rows.set(`${record.migrationName}:${record.tenantId}`, record);
   }
 
-  async upsertRecordUnlessRolledBack(
-    record: TenantMigrationRecord,
-  ): Promise<boolean> {
+  async upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean> {
     // The production contract: an operator's `rolled_back` pin refuses the
     // write. The fake honors it so a pass that WOULD overwrite a pin fails
     // here instead of passing against a stub looser than the real store.
@@ -214,10 +209,7 @@ describe("the migration pass under enrollment pacing", () => {
         state,
       });
 
-      for (const migration of [
-        releasedForSelfHosting,
-        notReleasedForSelfHosting,
-      ]) {
+      for (const migration of [releasedForSelfHosting, notReleasedForSelfHosting]) {
         expect(migration.migrateTenant).toHaveBeenCalledTimes(1);
         expect(migration.migrateTenant).toHaveBeenCalledWith(
           expect.objectContaining({ tenantId: "acme" }),

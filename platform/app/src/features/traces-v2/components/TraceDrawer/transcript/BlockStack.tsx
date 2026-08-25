@@ -1,11 +1,6 @@
 import { Box, Button, Icon, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
-import {
-  LuChevronDown,
-  LuChevronRight,
-  LuFileText,
-  LuWrench,
-} from "react-icons/lu";
+import { LuChevronDown, LuChevronRight, LuFileText, LuWrench } from "react-icons/lu";
 import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
 import { splitLeadingContextBlocks } from "../../../utils/leadingContext";
 import { RenderedMarkdown } from "../markdownView";
@@ -37,10 +32,7 @@ export function reparseTextBlock(text: string): ContentBlock[] | null {
  * available). Used to flatten `tool_use → tool_result` walls into a
  * single grouped card per call.
  */
-type KeyedBlock<K extends ContentBlock["kind"]> = Extract<
-  KeyedContentBlock,
-  { kind: K }
->;
+type KeyedBlock<K extends ContentBlock["kind"]> = Extract<KeyedContentBlock, { kind: K }>;
 
 type StackItem =
   | { kind: "block"; block: KeyedContentBlock }
@@ -134,16 +126,12 @@ export function BlockStack({
 
   const toolItemCount = useMemo(
     () =>
-      items.filter(
-        (it) => it.kind === "tool_pair" || it.kind === "orphan_result",
-      ).length + toolCalls.length,
+      items.filter((it) => it.kind === "tool_pair" || it.kind === "orphan_result")
+        .length + toolCalls.length,
     [items, toolCalls],
   );
   const firstToolIdx = useMemo(
-    () =>
-      items.findIndex(
-        (it) => it.kind === "tool_pair" || it.kind === "orphan_result",
-      ),
+    () => items.findIndex((it) => it.kind === "tool_pair" || it.kind === "orphan_result"),
     [items],
   );
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -276,11 +264,7 @@ export function BlockStack({
         color="fg.subtle"
         _hover={{ color: "fg.muted", bg: "bg.muted" }}
       >
-        <Icon
-          as={toolsOpen ? LuChevronDown : LuChevronRight}
-          boxSize={3}
-          marginEnd={1}
-        />
+        <Icon as={toolsOpen ? LuChevronDown : LuChevronRight} boxSize={3} marginEnd={1} />
         <Icon as={LuWrench} boxSize={3} marginEnd={1.5} />
         <Text textStyle="xs" fontWeight="500">
           {toolsOpen
@@ -294,8 +278,7 @@ export function BlockStack({
   return (
     <VStack align="stretch" gap={1.5}>
       {items.map((item, i) => {
-        const isToolItem =
-          item.kind === "tool_pair" || item.kind === "orphan_result";
+        const isToolItem = item.kind === "tool_pair" || item.kind === "orphan_result";
         if (shouldCollapseTools && isToolItem) {
           if (i === firstToolIdx) {
             return (
@@ -363,24 +346,14 @@ function ContextDisclosure({ context }: { context: string }) {
         color="fg.subtle"
         _hover={{ color: "fg.muted", bg: "bg.muted" }}
       >
-        <Icon
-          as={open ? LuChevronDown : LuChevronRight}
-          boxSize={3}
-          marginEnd={1}
-        />
+        <Icon as={open ? LuChevronDown : LuChevronRight} boxSize={3} marginEnd={1} />
         <Icon as={LuFileText} boxSize={3} marginEnd={1.5} />
         <Text textStyle="xs" fontWeight="500">
           {open ? "Hide additional context" : "Hidden additional context"}
         </Text>
       </Button>
       {!open && (
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          fontFamily="mono"
-          paddingX={2}
-          truncate
-        >
+        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono" paddingX={2} truncate>
           {snippet}
         </Text>
       )}

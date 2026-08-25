@@ -8,10 +8,7 @@
  * Tie convention: 0.5 win + 0.5 loss to each side (LMSYS Arena).
  */
 
-import {
-  type Comparability,
-  computeComparability,
-} from "./computeComparability";
+import { type Comparability, computeComparability } from "./computeComparability";
 import { mulberry32 } from "./mulberry32";
 
 export type PairwiseComparison = {
@@ -111,10 +108,7 @@ export type BTLeaderboard = {
  * b). Keyed by variantId rather than index so consumers holding an entry can
  * look a pair up without tracking the fit's ordering.
  */
-export type ScoreDifferenceCI = Record<
-  string,
-  Record<string, [number, number]>
->;
+export type ScoreDifferenceCI = Record<string, Record<string, [number, number]>>;
 
 export type BTLeaderboardOptions = {
   /**
@@ -308,10 +302,7 @@ function buildEntries({
  * Sort by score desc, but push degenerate variants to the bottom so a
  * smoothed +∞-ish "always wins" variant doesn't dominate the table.
  */
-function byScoreDegenerateLast(
-  a: BTLeaderboardEntry,
-  b: BTLeaderboardEntry,
-): number {
+function byScoreDegenerateLast(a: BTLeaderboardEntry, b: BTLeaderboardEntry): number {
   if (a.isDegenerate !== b.isDegenerate) return a.isDegenerate ? 1 : -1;
   return b.score - a.score;
 }
@@ -525,8 +516,7 @@ function mmUpdateFor({
  */
 function normalizeToGeometricMean(values: number[]): void {
   const n = values.length;
-  const logMean =
-    values.reduce((s, v) => s + Math.log(Math.max(v, 1e-300)), 0) / n;
+  const logMean = values.reduce((s, v) => s + Math.log(Math.max(v, 1e-300)), 0) / n;
   const scale = Math.exp(logMean);
   for (let i = 0; i < n; i++) values[i] = values[i]! / scale;
 }

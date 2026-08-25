@@ -66,8 +66,7 @@ export function RoutingPolicyDrawer({
 
   const seedScopes: ScopeTriadEntry[] = useMemo(() => {
     if (!seedScopeType) return [];
-    const scopeType =
-      seedScopeType.toUpperCase() as ScopeTriadEntry["scopeType"];
+    const scopeType = seedScopeType.toUpperCase() as ScopeTriadEntry["scopeType"];
     const scopeId = scopeType === "ORGANIZATION" ? organizationId : seedScopeId;
     return scopeId ? [{ scopeType, scopeId }] : [];
   }, [seedScopeType, seedScopeId, organizationId]);
@@ -80,8 +79,10 @@ export function RoutingPolicyDrawer({
     seedIsDefault: seedIsDefault === "true",
   });
 
-  const { save, isSaving, saveError, clearSaveError } =
-    useRoutingPolicyMutations({ organizationId, onSaved: closeDrawer });
+  const { save, isSaving, saveError, clearSaveError } = useRoutingPolicyMutations({
+    organizationId,
+    onSaved: closeDrawer,
+  });
 
   const { values, problems } = drawer;
   const canSave =
@@ -188,11 +189,7 @@ function DrawerBody({
     <VStack align="stretch" gap={5}>
       <Field.Root required>
         <Field.Label>Name</Field.Label>
-        <Input
-          autoFocus
-          placeholder="Developer default"
-          {...register("name")}
-        />
+        <Input autoFocus placeholder="Developer default" {...register("name")} />
       </Field.Root>
 
       <Field.Root>
@@ -221,8 +218,8 @@ function DrawerBody({
           <>
             <ProviderScopeChips scopes={scopesWithNames} />
             <Field.HelperText>
-              Fixed once the policy exists. Create another policy to cover a
-              different organization, team or project.
+              Fixed once the policy exists. Create another policy to cover a different
+              organization, team or project.
             </Field.HelperText>
           </>
         ) : (
@@ -262,9 +259,7 @@ function DrawerBody({
         control={control}
         organizationId={organizationId}
         boundProviderTypes={boundProviderTypes}
-        onTierChange={(tier: ModelTier, modelId) =>
-          setValue(`tiers.${tier}`, modelId)
-        }
+        onTierChange={(tier: ModelTier, modelId) => setValue(`tiers.${tier}`, modelId)}
         onDefaultModelChange={(modelId) => setValue("defaultModel", modelId)}
       />
 
@@ -326,9 +321,7 @@ function SaveError({
       <HStack alignItems="start" gap={2}>
         <VStack align="start" gap={0} flex={1} minWidth={0}>
           <Text fontSize="xs" fontWeight="semibold" color="red.700">
-            {isEditing
-              ? "Couldn't save the policy"
-              : "Couldn't create the policy"}
+            {isEditing ? "Couldn't save the policy" : "Couldn't create the policy"}
           </Text>
           <Text fontSize="xs" color="red.700">
             {message}

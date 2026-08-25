@@ -15,10 +15,7 @@
 import crypto from "node:crypto";
 import { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  IdempotencyReceipt,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { IdempotencyReceipt, PrismaClient } from "~/generated/prisma/client";
 
 import { encrypt } from "~/utils/encryption";
 
@@ -288,9 +285,9 @@ describe("isClaimAbandoned", () => {
       ).toBe(false);
       // Silent for the whole tolerance and not a millisecond more: the beat
       // that would have cleared it may simply be in flight.
-      expect(
-        isClaimAbandoned({ heartbeatAt: lastBeat(TAKEOVER_AFTER_MS), now }),
-      ).toBe(false);
+      expect(isClaimAbandoned({ heartbeatAt: lastBeat(TAKEOVER_AFTER_MS), now })).toBe(
+        false,
+      );
     });
   });
 
@@ -300,9 +297,7 @@ describe("isClaimAbandoned", () => {
       expect(
         isClaimAbandoned({ heartbeatAt: lastBeat(TAKEOVER_AFTER_MS + 1), now }),
       ).toBe(true);
-      expect(
-        isClaimAbandoned({ heartbeatAt: lastBeat(10 * 60_000), now }),
-      ).toBe(true);
+      expect(isClaimAbandoned({ heartbeatAt: lastBeat(10 * 60_000), now })).toBe(true);
     });
   });
 
@@ -424,9 +419,7 @@ describe("the writes a claim holder makes", () => {
       const boom = new Error("service refused");
       const { prisma, created, deleted } = recordingPrisma({ matchedRows: 0 });
 
-      await expect(
-        run(prisma, () => Promise.reject(boom) as never),
-      ).rejects.toBe(boom);
+      await expect(run(prisma, () => Promise.reject(boom) as never)).rejects.toBe(boom);
 
       // A failed create has nothing to store, but it must still not delete a
       // row another request is now working under.

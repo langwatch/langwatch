@@ -80,9 +80,7 @@ describe("assertGatewaySecretsAllOrNone", () => {
         LW_VIRTUAL_KEY_PEPPER: "a".repeat(32),
       }),
     ).toThrow();
-    const banner = errorSpy.mock.calls
-      .map((c: unknown[]) => c.join(" "))
-      .join("\n");
+    const banner = errorSpy.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
     expect(banner).toMatch(/AI Gateway secrets are partially configured/i);
     expect(banner).toMatch(/openssl rand -hex 32/);
   });
@@ -155,8 +153,7 @@ describe("gatewaySecretsSchema", () => {
           client: {},
           server: {
             LW_VIRTUAL_KEY_PEPPER: gatewaySecretsSchema.LW_VIRTUAL_KEY_PEPPER,
-            LW_GATEWAY_INTERNAL_SECRET:
-              gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
+            LW_GATEWAY_INTERNAL_SECRET: gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
             LW_GATEWAY_JWT_SECRET: gatewaySecretsSchema.LW_GATEWAY_JWT_SECRET,
           },
           runtimeEnv: {
@@ -172,9 +169,7 @@ describe("gatewaySecretsSchema", () => {
       // minimum constraint so the user can identify which keys need real secrets.
       const logged = errorSpy.mock.calls
         .map((c: unknown[]) =>
-          c
-            .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
-            .join(" "),
+          c.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "),
         )
         .join("\n");
       expect(logged).toMatch(/LW_VIRTUAL_KEY_PEPPER/);
@@ -241,18 +236,12 @@ describe("storedObjectsBackendSchema", () => {
       // would have to reach into the raw source outside executable boot.
       // Assert the two DECLARATIONS, not how many times the name appears —
       // a comment mentioning the variable twice would satisfy a count.
-      expect(source).toMatch(
-        /STORED_OBJECTS_BACKEND:\s*storedObjectsBackendSchema/,
-      );
+      expect(source).toMatch(/STORED_OBJECTS_BACKEND:\s*storedObjectsBackendSchema/);
       expect(source).toMatch(
         /AZURE_BLOB_CONTAINER:\s*z\s*\n?\s*\.string\(\)|AZURE_BLOB_CONTAINER:\s*z\.string\(\)/,
       );
-      expect(source).toMatch(
-        /STORED_OBJECTS_BACKEND:\s*source\.STORED_OBJECTS_BACKEND/,
-      );
-      expect(source).toMatch(
-        /AZURE_BLOB_CONTAINER:\s*source\.AZURE_BLOB_CONTAINER/,
-      );
+      expect(source).toMatch(/STORED_OBJECTS_BACKEND:\s*source\.STORED_OBJECTS_BACKEND/);
+      expect(source).toMatch(/AZURE_BLOB_CONTAINER:\s*source\.AZURE_BLOB_CONTAINER/);
     });
   });
 
@@ -282,9 +271,7 @@ describe("storedObjectsBackendSchema", () => {
 
     /** @scenario "An unrecognized STORED_OBJECTS_BACKEND value is rejected, not ignored" */
     it("startup fails via createEnv, naming the variable and the supported values", () => {
-      const errorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => undefined);
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
       try {
         expect(() =>
           createEnv({
@@ -299,9 +286,7 @@ describe("storedObjectsBackendSchema", () => {
         const logged = errorSpy.mock.calls
           .map((c: unknown[]) =>
             c
-              .map((a) =>
-                typeof a === "object" ? JSON.stringify(a) : String(a),
-              )
+              .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
               .join(" "),
           )
           .join("\n");
@@ -330,23 +315,19 @@ describe("azureBlobAuthModeSchema", () => {
       // appears — a comment mentioning it twice would satisfy a count, which
       // is the assertion the sibling test above deliberately avoids.
       expect(source).toMatch(/AZURE_BLOB_AUTH_MODE:\s*azureBlobAuthModeSchema/);
-      expect(source).toMatch(
-        /AZURE_BLOB_AUTH_MODE:\s*source\.AZURE_BLOB_AUTH_MODE/,
-      );
+      expect(source).toMatch(/AZURE_BLOB_AUTH_MODE:\s*source\.AZURE_BLOB_AUTH_MODE/);
     });
   });
 
   describe("given a supported value", () => {
-    it.each([
-      ["sharedKey"],
-      ["workloadIdentity"],
-      ["managedIdentity"],
-      ["azureCli"],
-    ])("accepts %s", (value) => {
-      const parsed = azureBlobAuthModeSchema.safeParse(value);
-      expect(parsed.success).toBe(true);
-      expect(parsed.success && parsed.data).toBe(value);
-    });
+    it.each([["sharedKey"], ["workloadIdentity"], ["managedIdentity"], ["azureCli"]])(
+      "accepts %s",
+      (value) => {
+        const parsed = azureBlobAuthModeSchema.safeParse(value);
+        expect(parsed.success).toBe(true);
+        expect(parsed.success && parsed.data).toBe(value);
+      },
+    );
   });
 
   describe("given no value", () => {
@@ -366,9 +347,7 @@ describe("azureBlobAuthModeSchema", () => {
 
     /** @scenario "An unrecognized AZURE_BLOB_AUTH_MODE value is rejected, not ignored" */
     it("startup fails via createEnv, naming the variable and the supported values", () => {
-      const errorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => undefined);
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
       try {
         expect(() =>
           createEnv({
@@ -383,9 +362,7 @@ describe("azureBlobAuthModeSchema", () => {
         const logged = errorSpy.mock.calls
           .map((c: unknown[]) =>
             c
-              .map((a) =>
-                typeof a === "object" ? JSON.stringify(a) : String(a),
-              )
+              .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
               .join(" "),
           )
           .join("\n");

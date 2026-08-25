@@ -14,29 +14,30 @@ Write code for the next engineer, not the compiler.
 
 ## SOLID
 
-| Principle | One-liner |
-|-----------|-----------|
-| **S**ingle Responsibility | One reason to change |
-| **O**pen/Closed | Extend behavior without modifying existing code |
-| **L**iskov Substitution | Subtypes must be substitutable for their base types |
+| Principle                 | One-liner                                               |
+| ------------------------- | ------------------------------------------------------- |
+| **S**ingle Responsibility | One reason to change                                    |
+| **O**pen/Closed           | Extend behavior without modifying existing code         |
+| **L**iskov Substitution   | Subtypes must be substitutable for their base types     |
 | **I**nterface Segregation | Don't force clients to depend on methods they don't use |
-| **D**ependency Inversion | Depend on abstractions, not concretions |
+| **D**ependency Inversion  | Depend on abstractions, not concretions                 |
 
 ## CUPID
 
 Properties that make code joyful to work with (complement SOLID's class-level focus):
 
-| Property | One-liner |
-|----------|-----------|
-| **C**omposable | Small API surface, minimal dependencies, plays well with others |
-| **U**nix philosophy | Does one thing well (outside-in view) |
-| **P**redictable | Behaves as expected, deterministic, observable |
-| **I**diomatic | Feels natural in its language/framework, follows conventions |
-| **D**omain-based | Structure mirrors the business domain |
+| Property            | One-liner                                                       |
+| ------------------- | --------------------------------------------------------------- |
+| **C**omposable      | Small API surface, minimal dependencies, plays well with others |
+| **U**nix philosophy | Does one thing well (outside-in view)                           |
+| **P**redictable     | Behaves as expected, deterministic, observable                  |
+| **I**diomatic       | Feels natural in its language/framework, follows conventions    |
+| **D**omain-based    | Structure mirrors the business domain                           |
 
 ### When SOLID and CUPID Conflict
 
 Sometimes principles tension:
+
 - SRP extraction may fragment Unix "does one thing well"
 - DIP abstractions may reduce predictability
 - ISP splits may hurt composability

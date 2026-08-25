@@ -72,9 +72,7 @@ export type AuthzDatabase = Readonly<{
 }>;
 
 /** The already fail-safe, cached migration gate injected by composition. */
-export type AuthzReadHeadSelector = (
-  organizationId: string,
-) => Promise<boolean>;
+export type AuthzReadHeadSelector = (organizationId: string) => Promise<boolean>;
 
 /**
  * The lineage reads both ports need: resolving a scope reference (read side)

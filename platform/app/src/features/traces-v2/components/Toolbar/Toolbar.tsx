@@ -58,9 +58,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const { onEndTour } = useTourEntryPoints();
 
   const showSamplePreview = useOnboardingStore((s) => s.showSamplePreview);
-  const setShowSamplePreview = useOnboardingStore(
-    (s) => s.setShowSamplePreview,
-  );
+  const setShowSamplePreview = useOnboardingStore((s) => s.setShowSamplePreview);
   // Sample data is an onboarding affordance — once the project has its
   // own real traces (`Project.firstMessage = true`, set by the
   // projectMetadata subscriber on first non-sample ingest), the toggle is
@@ -76,9 +74,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const showSampleDataToggle = hasAnyTraces === false;
   const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
-  const setCurrentSpotlightId = useOnboardingStore(
-    (s) => s.setCurrentSpotlightId,
-  );
+  const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
 
   const closeDrawer = useDrawerStore((s) => s.closeDrawer);
   const handleSamplePreviewToggle = useCallback(() => {
@@ -151,8 +147,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const activeLensId = useViewStore((s) => s.activeLensId);
   const activeLensIsDraft = useViewStore((s) => s.isDraft(activeLensId));
   const activeLensName = useViewStore(
-    (s) =>
-      s.allLenses.find((l) => l.id === activeLensId)?.name ?? "Current view",
+    (s) => s.allLenses.find((l) => l.id === activeLensId)?.name ?? "Current view",
   );
   const createLens = useViewStore((s) => s.createLens);
   // Hide "Save the result as a lens" when the current query has a parse
@@ -176,10 +171,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const labelsCompact =
-    toolbarWidth > 0 && toolbarWidth < TOOLBAR_LABELS_MIN_WIDTH;
-  const chevronsCompact =
-    toolbarWidth > 0 && toolbarWidth < TOOLBAR_CHEVRONS_MIN_WIDTH;
+  const labelsCompact = toolbarWidth > 0 && toolbarWidth < TOOLBAR_LABELS_MIN_WIDTH;
+  const chevronsCompact = toolbarWidth > 0 && toolbarWidth < TOOLBAR_CHEVRONS_MIN_WIDTH;
 
   return (
     <Flex
@@ -215,15 +208,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             variant={showSamplePreview ? "subtle" : "ghost"}
             colorPalette={showSamplePreview ? "orange" : undefined}
             onClick={handleSamplePreviewToggle}
-            aria-label={
-              showSamplePreview ? "Hide sample data" : "See sample data"
-            }
+            aria-label={showSamplePreview ? "Hide sample data" : "See sample data"}
             aria-pressed={showSamplePreview}
           >
-            <Icon
-              boxSize={3.5}
-              color={{ base: "orange.500", _dark: "orange.fg" }}
-            >
+            <Icon boxSize={3.5} color={{ base: "orange.500", _dark: "orange.fg" }}>
               {showSamplePreview ? <Tent /> : <Compass />}
             </Icon>
             {showSamplePreview ? "Hide sample data" : "See sample data"}
@@ -308,9 +296,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               <Icon
                 boxSize={3.5}
                 color={
-                  spotlightsActive
-                    ? "blue.fg"
-                    : { base: "fg.muted", _dark: "fg.subtle" }
+                  spotlightsActive ? "blue.fg" : { base: "fg.muted", _dark: "fg.subtle" }
                 }
               >
                 <Map />
@@ -324,10 +310,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               onClick={handleShowMeAround}
               aria-label="Show me around"
             >
-              <Icon
-                boxSize={3.5}
-                color={{ base: "fg.muted", _dark: "fg.subtle" }}
-              >
+              <Icon boxSize={3.5} color={{ base: "fg.muted", _dark: "fg.subtle" }}>
                 <Map />
               </Icon>
             </IconButton>
@@ -382,11 +365,5 @@ export const Toolbar: React.FC<ToolbarProps> = ({
  *  component to avoid repeating the same height + colour + margin
  *  inline four times. */
 const ToolbarDivider: React.FC = () => (
-  <Box
-    width="1px"
-    height="14px"
-    bg="border.muted"
-    marginX={0.5}
-    aria-hidden="true"
-  />
+  <Box width="1px" height="14px" bg="border.muted" marginX={0.5} aria-hidden="true" />
 );

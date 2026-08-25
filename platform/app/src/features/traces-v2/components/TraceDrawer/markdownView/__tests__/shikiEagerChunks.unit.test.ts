@@ -81,14 +81,8 @@ describe("shikiManualChunk (vite.config eager Shiki allow-list)", () => {
       ],
       ["shiki", "/repo/node_modules/shiki/dist/index.mjs"],
       ["oniguruma-to-es", "/repo/node_modules/oniguruma-to-es/dist/index.mjs"],
-      [
-        "oniguruma-parser",
-        "/repo/node_modules/oniguruma-parser/dist/index.mjs",
-      ],
-      [
-        "hast-util-to-html",
-        "/repo/node_modules/hast-util-to-html/dist/index.mjs",
-      ],
+      ["oniguruma-parser", "/repo/node_modules/oniguruma-parser/dist/index.mjs"],
+      ["hast-util-to-html", "/repo/node_modules/hast-util-to-html/dist/index.mjs"],
     ];
     it.each(corePkgPaths)("keeps %s in the eager chunk", (_pkg, path) => {
       expect(shikiManualChunk(path)).toBe("shiki");
@@ -97,9 +91,7 @@ describe("shikiManualChunk (vite.config eager Shiki allow-list)", () => {
 
   describe("given a non-Shiki module", () => {
     it("returns undefined (no opinion)", () => {
-      expect(
-        shikiManualChunk("/repo/node_modules/react/index.js"),
-      ).toBeUndefined();
+      expect(shikiManualChunk("/repo/node_modules/react/index.js")).toBeUndefined();
     });
   });
 });

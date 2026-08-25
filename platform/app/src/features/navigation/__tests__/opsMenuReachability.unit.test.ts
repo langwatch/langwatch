@@ -19,11 +19,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  backofficeGroup,
-  opsGroup,
-  type SettingsMenuGroup,
-} from "../useSettingsMenu";
+import { backofficeGroup, opsGroup, type SettingsMenuGroup } from "../useSettingsMenu";
 
 const ROUTES_PATH = path.join(__dirname, "../../../routes.tsx");
 
@@ -71,9 +67,7 @@ describe("given the internal ops pages the route table registers", () => {
   it("finds the ops routes and the menu entries", () => {
     expect(addresses.length).toBeGreaterThanOrEqual(10);
     expect(addresses).toContain("/ops");
-    expect(menu.flatMap((group) => group.items).length).toBeGreaterThanOrEqual(
-      10,
-    );
+    expect(menu.flatMap((group) => group.items).length).toBeGreaterThanOrEqual(10);
   });
 
   describe("when each address is matched against the settings menu", () => {

@@ -15,42 +15,41 @@ import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { snapshot, mockOpenDrawer, mockCloseDrawer, mockSetForScope } =
-  vi.hoisted(() => {
-    const cat = { disposition: "capture" as const, audience: {} };
-    const baseline = {
-      categories: { input: cat, output: cat, system: cat, tools: cat },
-      pii: { level: "essential" as const, entities: [] },
-      secrets: { enabled: true, customPatterns: [] },
-      customAttributes: [],
-    };
-    return {
-      mockOpenDrawer: vi.fn(),
-      mockCloseDrawer: vi.fn(),
-      mockSetForScope: vi.fn(),
-      snapshot: {
-        available: {
-          organization: { id: "org-1", name: "Acme" },
-          departments: [],
-          teams: [{ id: "team-1", name: "Platform" }],
-          projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
-        },
-        audienceOptions: { groups: [] },
-        effective: baseline,
-        effectiveTeam: baseline,
-        effectiveOrganization: baseline,
-        rules: [
-          {
-            scopeType: "TEAM" as const,
-            scopeId: "team-1",
-            name: "Platform",
-            personalOnly: false,
-            config: { categories: { input: { disposition: "drop" as const } } },
-          },
-        ],
+const { snapshot, mockOpenDrawer, mockCloseDrawer, mockSetForScope } = vi.hoisted(() => {
+  const cat = { disposition: "capture" as const, audience: {} };
+  const baseline = {
+    categories: { input: cat, output: cat, system: cat, tools: cat },
+    pii: { level: "essential" as const, entities: [] },
+    secrets: { enabled: true, customPatterns: [] },
+    customAttributes: [],
+  };
+  return {
+    mockOpenDrawer: vi.fn(),
+    mockCloseDrawer: vi.fn(),
+    mockSetForScope: vi.fn(),
+    snapshot: {
+      available: {
+        organization: { id: "org-1", name: "Acme" },
+        departments: [],
+        teams: [{ id: "team-1", name: "Platform" }],
+        projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
       },
-    };
-  });
+      audienceOptions: { groups: [] },
+      effective: baseline,
+      effectiveTeam: baseline,
+      effectiveOrganization: baseline,
+      rules: [
+        {
+          scopeType: "TEAM" as const,
+          scopeId: "team-1",
+          name: "Platform",
+          personalOnly: false,
+          config: { categories: { input: { disposition: "drop" as const } } },
+        },
+      ],
+    },
+  };
+});
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
@@ -116,9 +115,7 @@ describe("Privacy rule drawer URL routing", () => {
       const user = userEvent.setup();
       renderWithChakra(<DataPrivacyPage projectId="proj-1" />);
 
-      await user.click(
-        screen.getByRole("button", { name: "Add privacy rule" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Add privacy rule" }));
 
       expect(mockOpenDrawer).toHaveBeenCalledWith("dataPrivacyRule", {});
     });

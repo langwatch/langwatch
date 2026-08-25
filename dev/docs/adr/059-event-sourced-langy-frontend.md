@@ -16,7 +16,7 @@ ADR-049 (Postgres projections), ADR-078 (turn-phase machine — the proof of
 concept for the pure-reducer pattern this ADR generalises).
 
 **Spec:** [`specs/langy/langy-event-sourced-frontend.feature`](../../../specs/langy/langy-event-sourced-frontend.feature)
-— which *evolves* `langy-frontend-realtime.feature` (signal-then-refetch →
+— which _evolves_ `langy-frontend-realtime.feature` (signal-then-refetch →
 signal-then-fold-the-tail) while keeping its core invariant: the real-time
 channel never pushes conversation data.
 
@@ -34,7 +34,7 @@ corner of it into a state machine).
 
 ADR-078's `langyTurnPhase` proved a better shape: a **pure `(state, event) →
 state` reducer** the store wires in a few lines and the UI reads as one value.
-The backend's fold handlers are *already* that shape — they are just wrapped in
+The backend's fold handlers are _already_ that shape — they are just wrapped in
 projection plumbing (server-only store + versioning). So the frontend can fold
 the **same events** through the **same reducers** and hold its turn/conversation
 view as a genuine projection — event-driven, backend-driven, and replayable —
@@ -46,7 +46,7 @@ Every load-bearing mechanism this ADR needs already exists in production form;
 none of it is speculative. Traced 2026-07-21:
 
 - **The cursor is already a system primitive.** `ProjectionCursor
-  { acceptedAt, eventId }` (KSUID tie-breaker) is defined in
+{ acceptedAt, eventId }` (KSUID tie-breaker) is defined in
   `event-sourcing/projections/stateProjection.types.ts`, persisted per document
   by `StateProjectionStore` (`StoredProjection.cursor`) — including by the
   Langy turn fold — with a comparator in
@@ -67,7 +67,7 @@ none of it is speculative. Traced 2026-07-21:
   `getEventRecordsUpToPaged` — the tail query is that clause minus the upper
   bound.
 - **No read-after-write gap.** Event inserts use `async_insert: 1,
-  wait_for_async_insert: 1`: an acknowledged append is immediately visible to a
+wait_for_async_insert: 1`: an acknowledged append is immediately visible to a
   catch-up read.
 - **ReplacingMergeTree duplicates are handled** — the abstract store dedups by
   idempotency key after every read (`deduplicateEvents`), and the folds are
@@ -120,12 +120,13 @@ history:
    folding them locally with the shared reducer.
 
 Gaplessness rests on two properties inherited for free:
+
 - **Subscribe-before-snapshot:** signals buffered during the snapshot read are
   processed after it; any that point at-or-before the snapshot cursor are
   no-ops.
 - **Idempotent, order-insensitive-by-cursor folds:** a re-delivered or
   overlapping event is dropped by the cursor comparison, so snapshot/stream
-  overlap is harmless — which is also what makes the local tail *replayable*.
+  overlap is harmless — which is also what makes the local tail _replayable_.
 
 ### 3. The durable channel: signal-carries-the-cursor, tail via query
 
@@ -139,7 +140,7 @@ exactly like reading the conversation) and folds it. Three reasons this beats
 pushing events over the broadcast:
 
 1. **The subscriber coalesces** (15s dedup per conversation). Correct for
-   signals; would *drop events* if the signal were the event. Signal+cursor is
+   signals; would _drop events_ if the signal were the event. Signal+cursor is
    immune — any signal means "fetch everything after my position", so
    coalescing becomes a feature (one fetch per burst).
 2. **The broadcast channel is tenant-wide.** Every member's SSE sees every
@@ -152,7 +153,7 @@ pushing events over the broadcast:
 The token stream (ADR-077 Stream B) stays the ephemeral fast-path for delta
 text / reasoning. The optimistic token text reconciles against the folded
 durable answer — the same length-monotone rule as today, but the "durable" side
-is now a *local fold* rather than a re-fetch.
+is now a _local fold_ rather than a re-fetch.
 
 ### 4. Ad-hoc state collapses into the projection
 
@@ -193,7 +194,7 @@ Sharpen the seams the later phases build on; no behaviour change.
 - Move in, as the seed, `features/langy/stores/langyTurnPhase.ts` + its unit
   test; update the `langyStore` import.
 - Move the event schemas (`pipelines/langy-conversation-processing/schemas/
-  events.ts` + `constants.ts` + the shared Zod helpers they need) into the
+events.ts` + `constants.ts` + the shared Zod helpers they need) into the
   package with a portable event-envelope type; the server aliases it.
 - Move `ProjectionCursor` + a byte-wise `cursorHasReachedEvent` /
   `compareCursor` into the package; update the server's subscriber and
@@ -212,12 +213,12 @@ Sharpen the seams the later phases build on; no behaviour change.
 ### Phase 2 — cursor on the signal + authorized tail read (backend only)
 
 - Broadcast payload gains `cursor` (`langy-conversation-update-broadcast.
-  subscriber.ts` already holds `record.cursor`); the client-facing signal
+subscriber.ts` already holds `record.cursor`); the client-facing signal
   schema passes it through (owner/share fields stay server-side-stripped).
 - New event-store read `getEventsAfter({ tenantId, aggregateType, aggregateId,
-  after: cursor, limit })`: the strict-after clause from
+after: cursor, limit })`: the strict-after clause from
   `getEventRecordsUpToPaged` minus the upper bound, `ORDER BY (EventTimestamp,
-  EventId)`, with the `EventOccurredAt` lower-bound predicate derived from
+EventId)`, with the `EventOccurredAt` lower-bound predicate derived from
   `after.acceptedAt` (minus a safety window) for partition pruning. TenantId is
   the first predicate, per house CH rules.
 - New service method (`LangyConversationService` or the turn service):
@@ -256,12 +257,12 @@ Sharpen the seams the later phases build on; no behaviour change.
 
 - The conversation spine (`langyConversationState`) gets the same treatment:
   shared `foldConversation`, snapshot+tail in the store.
-- Messages: extract the message *map* logic (`langyMessageOperational.
-  mapProjection`) into a shared `mapMessageEvent(event)`; the client applies it
+- Messages: extract the message _map_ logic (`langyMessageOperational.
+mapProjection`) into a shared `mapMessageEvent(event)`; the client applies it
   over the same tail to maintain the open conversation's message list. The
-  recents *list* stays React Query + signal-then-refetch (slim, cross-
+  recents _list_ stays React Query + signal-then-refetch (slim, cross-
   conversation — the old model is right there).
-- Retire: `isBusy`-as-turn-truth, signal-then-refetch for the *open*
+- Retire: `isBusy`-as-turn-truth, signal-then-refetch for the _open_
   conversation, and the remaining derived booleans.
 - **Exit:** full spec green; `features/langy` holds no turn/conversation state
   outside the projection slice + the optimistic overlay.

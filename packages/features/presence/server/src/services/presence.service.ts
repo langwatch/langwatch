@@ -77,10 +77,7 @@ export class PresenceService extends PresenceServiceContract {
 
   async leave(input: PresenceLeaveInput): Promise<void> {
     const parsed = presenceLeaveInputSchema.parse(input);
-    const removed = await this.repository.remove(
-      parsed.projectId,
-      parsed.sessionId,
-    );
+    const removed = await this.repository.remove(parsed.projectId, parsed.sessionId);
     if (!removed) return;
     await this.publishUpdate(parsed.projectId, {
       kind: "leave",
@@ -109,10 +106,7 @@ export class PresenceService extends PresenceServiceContract {
     });
   }
 
-  private publishUpdate(
-    projectId: string,
-    event: PresenceEvent,
-  ): Promise<void> {
+  private publishUpdate(projectId: string, event: PresenceEvent): Promise<void> {
     return this.publish({
       projectId,
       event: JSON.stringify(event),

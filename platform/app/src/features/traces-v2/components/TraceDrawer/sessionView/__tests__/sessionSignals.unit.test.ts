@@ -7,9 +7,7 @@ import {
 } from "../sessionSignals";
 
 /** A healthy session: nothing to report. */
-function session(
-  over: Partial<CodingAgentSessionRow> = {},
-): CodingAgentSessionRow {
+function session(over: Partial<CodingAgentSessionRow> = {}): CodingAgentSessionRow {
   return {
     tenantId: "project-1",
     traceIds: ["trace-1"],
@@ -110,8 +108,7 @@ function session(
   };
 }
 
-const ids = (row: CodingAgentSessionRow) =>
-  deriveSessionSignals(row).map((s) => s.id);
+const ids = (row: CodingAgentSessionRow) => deriveSessionSignals(row).map((s) => s.id);
 
 describe("deriveSessionSignals", () => {
   describe("given a session that went fine", () => {
@@ -124,9 +121,7 @@ describe("deriveSessionSignals", () => {
     // This changes how you read the whole screen: the session did not finish,
     // so its output is not an answer. It has to lead.
     it("reports it first", () => {
-      const signals = deriveSessionSignals(
-        session({ truncated: true, rateLimited: 2 }),
-      );
+      const signals = deriveSessionSignals(session({ truncated: true, rateLimited: 2 }));
 
       expect(signals[0]!.id).toBe("truncated");
       expect(signals[0]!.tone).toBe("danger");
@@ -152,9 +147,7 @@ describe("deriveSessionSignals", () => {
     // train people to ignore the signal, which is worse than not having it.
     it("stays quiet", () => {
       expect(
-        ids(
-          session({ cacheReadTokens: 8_000_000, cacheCreationTokens: 100_000 }),
-        ),
+        ids(session({ cacheReadTokens: 8_000_000, cacheCreationTokens: 100_000 })),
       ).not.toContain("cache-churn");
     });
   });
@@ -170,9 +163,7 @@ describe("deriveSessionSignals", () => {
 
   describe("given a human sat waiting to approve tools", () => {
     it("reports the idle time — nothing else in the session surfaces it", () => {
-      const signals = deriveSessionSignals(
-        session({ blockedOnUserMs: 372_000 }),
-      );
+      const signals = deriveSessionSignals(session({ blockedOnUserMs: 372_000 }));
 
       const blocked = signals.find((s) => s.id === "blocked-on-user");
       expect(blocked).toBeDefined();
@@ -180,9 +171,7 @@ describe("deriveSessionSignals", () => {
     });
 
     it("ignores a couple of seconds of approval", () => {
-      expect(ids(session({ blockedOnUserMs: 3_000 }))).not.toContain(
-        "blocked-on-user",
-      );
+      expect(ids(session({ blockedOnUserMs: 3_000 }))).not.toContain("blocked-on-user");
     });
   });
 

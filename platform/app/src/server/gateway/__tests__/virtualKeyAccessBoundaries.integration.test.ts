@@ -246,9 +246,7 @@ describe("virtual key access boundaries (real PG)", () => {
     });
 
     it("answers a draft for a caller who could create at those scopes", async () => {
-      const rows = await callerFor(
-        TRACE_ADMIN_ID,
-      ).virtualKeys.applicableBudgets({
+      const rows = await callerFor(TRACE_ADMIN_ID).virtualKeys.applicableBudgets({
         organizationId: ORG_ID,
         scopes: [{ scopeType: "TEAM", scopeId: TEAM_OWNER_ID }],
       });

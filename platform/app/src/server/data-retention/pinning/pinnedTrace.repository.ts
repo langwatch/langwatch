@@ -27,21 +27,13 @@ export class PinnedTraceRepository {
     });
   }
 
-  async findAllByProject({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<PinnedTrace[]> {
+  async findAllByProject({ projectId }: { projectId: string }): Promise<PinnedTrace[]> {
     return this.prisma.pinnedTrace.findMany({
       where: { projectId },
     });
   }
 
-  async findAllTraceIds({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<string[]> {
+  async findAllTraceIds({ projectId }: { projectId: string }): Promise<string[]> {
     const pins = await this.prisma.pinnedTrace.findMany({
       where: { projectId },
       select: { traceId: true },

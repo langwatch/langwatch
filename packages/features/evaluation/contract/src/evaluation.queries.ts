@@ -12,9 +12,7 @@ export const evaluationRunsByTraceQuerySchema = z.object({
   tenantId: z.string(),
   traceId: z.string(),
 });
-export type EvaluationRunsByTraceQuery = z.infer<
-  typeof evaluationRunsByTraceQuerySchema
->;
+export type EvaluationRunsByTraceQuery = z.infer<typeof evaluationRunsByTraceQuerySchema>;
 
 export const evaluationSummariesByTraceIdsQuerySchema = z.object({
   tenantId: z.string(),

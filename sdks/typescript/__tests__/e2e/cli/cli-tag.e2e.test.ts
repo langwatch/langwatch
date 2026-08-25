@@ -1,15 +1,7 @@
 // @vitest-environment node
 // @vitest-config ./vitest.e2e.config.mts
 
-import {
-  describe,
-  expect,
-  it,
-  afterEach,
-  beforeEach,
-  afterAll,
-  beforeAll,
-} from "vitest";
+import { describe, expect, it, afterEach, beforeEach, afterAll, beforeAll } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -195,9 +187,7 @@ describe("CLI E2E", () => {
           await langwatch.prompts.tags.create({ name: tagName });
 
           try {
-            const result = cli.run(
-              `prompt tag assign ${handle} ${tagName} --version 1`,
-            );
+            const result = cli.run(`prompt tag assign ${handle} ${tagName} --version 1`);
 
             expectCliResultSuccess(result);
 
@@ -307,8 +297,7 @@ describe("CLI E2E", () => {
               cwd: testDir,
               materializedDir: true,
             });
-            const content =
-              materializedPromptFileManagement.getPromptFileContent(handle);
+            const content = materializedPromptFileManagement.getPromptFileContent(handle);
             expect(content).toContain("Version 1");
             expect(content).not.toContain("Version 2");
           } finally {

@@ -7,21 +7,14 @@
  * useTextTranslation hook; only the tRPC boundary is mocked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 vi.mock("../../scenarioRoles", async () => {
-  const actual = await vi.importActual<typeof import("../../scenarioRoles")>(
-    "../../scenarioRoles",
-  );
+  const actual =
+    await vi.importActual<typeof import("../../scenarioRoles")>("../../scenarioRoles");
   return { ...actual, useIsScenarioRole: () => false };
 });
 
@@ -63,11 +56,9 @@ vi.mock("~/components/me/PersonalFeatureGateDialog", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
-const translateMock = vi.fn(
-  async ({ textToTranslate }: { textToTranslate: string }) => ({
-    translation: `EN: ${textToTranslate}`,
-  }),
-);
+const translateMock = vi.fn(async ({ textToTranslate }: { textToTranslate: string }) => ({
+  translation: `EN: ${textToTranslate}`,
+}));
 
 vi.mock("~/utils/api", () => ({
   api: {

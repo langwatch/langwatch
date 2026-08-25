@@ -194,9 +194,7 @@ describe("TryItOut precondition preview", () => {
         // The first (and only) sample passes the client-side precondition
         // re-check, so it is queued as the first trace to run.
         expect(await screen.findByText("Waiting to run")).toBeInTheDocument();
-        expect(
-          screen.getByRole("button", { name: /run on samples/i }),
-        ).toBeEnabled();
+        expect(screen.getByRole("button", { name: /run on samples/i })).toBeEnabled();
       });
     });
 
@@ -216,9 +214,7 @@ describe("TryItOut precondition preview", () => {
           await screen.findByText("What is the capital of France?"),
         ).toBeInTheDocument();
         expect(screen.queryByText("Waiting to run")).not.toBeInTheDocument();
-        expect(
-          screen.getByRole("button", { name: /run on samples/i }),
-        ).toBeDisabled();
+        expect(screen.getByRole("button", { name: /run on samples/i })).toBeDisabled();
       });
     });
   });

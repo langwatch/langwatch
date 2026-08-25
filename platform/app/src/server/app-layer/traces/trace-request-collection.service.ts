@@ -1,8 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import {
-  SpanKind as ApiSpanKind,
-  type Span as OtelSpan,
-} from "@opentelemetry/api";
+import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 import type {
@@ -86,9 +83,7 @@ export interface TraceRequestCollectionDeps {
    * FAIL-OPEN: errors from this hook are caught by the composition root wrapper
    * and log at warn level, returning the original commandData unchanged.
    */
-  processCommandData?: (
-    data: RecordSpanCommandData,
-  ) => Promise<RecordSpanCommandData>;
+  processCommandData?: (data: RecordSpanCommandData) => Promise<RecordSpanCommandData>;
 }
 
 /**
@@ -101,9 +96,7 @@ export class TraceRequestCollectionService {
   private readonly tracer = getLangWatchTracer(
     "langwatch.trace-processing.span-ingestion",
   );
-  private readonly logger = createLogger(
-    "langwatch:trace-processing:span-ingestion",
-  );
+  private readonly logger = createLogger("langwatch:trace-processing:span-ingestion");
 
   constructor(private readonly deps: TraceRequestCollectionDeps) {}
 
@@ -146,8 +139,7 @@ export class TraceRequestCollectionService {
 
           for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
             const scope = scopeSpan?.scope;
-            const scopeParseResult =
-              instrumentationScopeSchema.safeParse(scope);
+            const scopeParseResult = instrumentationScopeSchema.safeParse(scope);
             if (!scopeParseResult.success) {
               this.logger.error(
                 { result: scopeParseResult, tenantId },
@@ -265,20 +257,12 @@ export class TraceRequestCollectionService {
 
       await this.deps.recordSpan(commandData);
 
-      await this.deps.dedup.tryConfirmProcessed(
-        tenantId,
-        span.traceId,
-        span.spanId,
-      );
+      await this.deps.dedup.tryConfirmProcessed(tenantId, span.traceId, span.spanId);
 
       return { status: "collected" };
     } catch (error) {
       if (lockAcquired) {
-        await this.deps.dedup.tryReleaseOnFailure(
-          tenantId,
-          span.traceId,
-          span.spanId,
-        );
+        await this.deps.dedup.tryReleaseOnFailure(tenantId, span.traceId, span.spanId);
       }
 
       otelSpanRef?.addEvent("span_ingestion_error", {
@@ -331,9 +315,7 @@ export class TraceRequestCollectionService {
     }
 
     const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-      TraceRequestUtils.normalizeOtlpUnixNano(
-        spanParseResult.data.startTimeUnixNano,
-      ),
+      TraceRequestUtils.normalizeOtlpUnixNano(spanParseResult.data.startTimeUnixNano),
     );
     const now = Date.now();
 

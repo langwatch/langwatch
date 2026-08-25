@@ -9,14 +9,7 @@
  * UX contract: specs/workflows/run-until-here-dialog.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { mockNodes, mockSetNode, mockStartWorkflowExecution, mockDatasetData } =
@@ -63,9 +56,7 @@ vi.mock("../nodes/Nodes", () => ({
 }));
 
 const { RunUntilHereDialog } = await import("../RunUntilHereDialog");
-const { useRunUntilHereDialogStore } = await import(
-  "@langwatch/workflow-web"
-);
+const { useRunUntilHereDialogStore } = await import("@langwatch/workflow-web");
 
 const entryNode = (data?: Record<string, unknown>) => ({
   id: "entry-1",
@@ -139,15 +130,9 @@ describe("given the run-until-here dialog", () => {
     it("opens with one field per entry input and Run and Cancel buttons", async () => {
       renderDialog();
 
-      expect(
-        await screen.findByTestId("run-until-here-dialog"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByTestId("run-until-here-input-question"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByTestId("run-until-here-input-context"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("run-until-here-dialog")).toBeInTheDocument();
+      expect(screen.getByTestId("run-until-here-input-question")).toBeInTheDocument();
+      expect(screen.getByTestId("run-until-here-input-context")).toBeInTheDocument();
       expect(screen.getByTestId("run-until-here-run")).toBeInTheDocument();
       expect(screen.getByText("Cancel")).toBeInTheDocument();
       expect(mockStartWorkflowExecution).not.toHaveBeenCalled();
@@ -164,9 +149,7 @@ describe("given the run-until-here dialog", () => {
           "What is up?",
         );
       });
-      expect(screen.getByTestId("run-until-here-input-context")).toHaveValue(
-        "ctx-1",
-      );
+      expect(screen.getByTestId("run-until-here-input-context")).toHaveValue("ctx-1");
     });
   });
 
@@ -184,9 +167,7 @@ describe("given the run-until-here dialog", () => {
           "manual Q",
         );
       });
-      expect(screen.getByTestId("run-until-here-input-context")).toHaveValue(
-        "manual C",
-      );
+      expect(screen.getByTestId("run-until-here-input-context")).toHaveValue("manual C");
     });
   });
 
@@ -195,9 +176,7 @@ describe("given the run-until-here dialog", () => {
     it("starts the scoped execution with the typed values and persists them", async () => {
       renderDialog();
 
-      const questionInput = await screen.findByTestId(
-        "run-until-here-input-question",
-      );
+      const questionInput = await screen.findByTestId("run-until-here-input-question");
       await waitFor(() => {
         expect(questionInput).toHaveValue("What is up?");
       });
@@ -226,9 +205,7 @@ describe("given the run-until-here dialog", () => {
     it("starts the scoped execution with the typed values", async () => {
       renderDialog();
 
-      const questionInput = await screen.findByTestId(
-        "run-until-here-input-question",
-      );
+      const questionInput = await screen.findByTestId("run-until-here-input-question");
       await waitFor(() => {
         expect(questionInput).toHaveValue("What is up?");
       });
@@ -251,9 +228,7 @@ describe("given the run-until-here dialog", () => {
       renderDialog({ entryData: { dataset: undefined }, rows: [] });
 
       await screen.findByTestId("run-until-here-dialog");
-      expect(
-        screen.queryByTestId("select-dataset-value"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("select-dataset-value")).not.toBeInTheDocument();
     });
   });
 
@@ -265,22 +240,16 @@ describe("given the run-until-here dialog", () => {
       fireEvent.click(await screen.findByTestId("select-dataset-value"));
 
       expect(await screen.findByText("Second question?")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("run-with-selected-row"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("run-with-selected-row")).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByText("Second question?"));
-      expect(
-        await screen.findByTestId("run-with-selected-row"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("run-with-selected-row")).toBeInTheDocument();
 
       fireEvent.click(screen.getByText("Cancel"));
       expect(
         await screen.findByTestId("run-until-here-input-question"),
       ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("run-with-selected-row"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("run-with-selected-row")).not.toBeInTheDocument();
     });
 
     /** @scenario Running with a selected row uses that row's values */

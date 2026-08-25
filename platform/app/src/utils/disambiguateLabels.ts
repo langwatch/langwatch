@@ -29,8 +29,6 @@ export function disambiguateLabels<T extends { label: string }>(
   return items.map((item) => ({
     ...item,
     displayLabel:
-      (counts[item.label] ?? 0) > 1
-        ? `${item.label} · ${suffix(item)}`
-        : item.label,
+      (counts[item.label] ?? 0) > 1 ? `${item.label} · ${suffix(item)}` : item.label,
   }));
 }

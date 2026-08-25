@@ -96,7 +96,7 @@ and it is not up for renegotiation one pull request at a time.
 
 They are opaque internal identifiers. They are not names, not email addresses,
 and not anything a person outside our systems can resolve to a human. What they
-*are* is the only thing that makes a log line attributable: they are how you
+_are_ is the only thing that makes a log line attributable: they are how you
 filter Loki down to one tenant during an incident, how you answer "did this
 customer's request actually reach us", and how a support question becomes a
 query instead of a guess. A redacted identifier costs all of that and protects
@@ -142,7 +142,7 @@ context; drop the severity claim.
 
 This is a different axis from the one in
 `specs/observability/request-log-cause-and-level.feature`, which levels a
-*request* by fault: customer fault below error, platform fault at error. This
+_request_ by fault: customer fault below error, platform fault at error. This
 one levels by **finality**. A platform fault that will be retried is still not
 final, so fault alone does not settle it.
 
@@ -152,37 +152,37 @@ ever see it, so the discarding layer is the last one that can report it.
 `ProjectionRegistry.dispatch` dropping events with no router is the worked
 example — it sat at `warn` and lost events on every rolling deploy unnoticed.
 
-| Situation | Level |
-|---|---|
-| Failed, and this layer rethrows | `warn` |
-| Failed, retry scheduled | `warn` |
-| Failed, retries exhausted / gave up | `error` |
-| Work silently discarded, nothing thrown | `error` |
+| Situation                                    | Level                         |
+| -------------------------------------------- | ----------------------------- |
+| Failed, and this layer rethrows              | `warn`                        |
+| Failed, retry scheduled                      | `warn`                        |
+| Failed, retries exhausted / gave up          | `error`                       |
+| Work silently discarded, nothing thrown      | `error`                       |
 | Handled customer fault at a request boundary | `warn` (see the request spec) |
 
 Spec: `specs/observability/retryable-failure-log-level.feature`.
 
 ## Anti-Patterns
 
-| Don't | Do |
-|-------|-----|
-| `logger.error({ error }, "...")` then `throw error` | `logger.warn(...)` then `throw` — the layer that stops the throw logs the error |
-| `logger.warn(...)` on a path that discards work | `logger.error(...)` — nothing above will report the loss |
-| `logger.warn({ error: error.message }, "...")` | `logger.warn({ error }, "...")` — a bare string under `error` loses the stack and is dropped by the log collector |
-| `logger.info("User " + userId + " logged in")` | `logger.info({ userId }, "User logged in")` |
-| `logger.error("Error: " + error.message)` | `logger.error({ error }, "Operation failed")` |
-| `logger.info({ password, apiKey }, "...")` | Never log credentials, customer content, or personal data — see above |
-| `logger.info({ userId: hash(userId) }, "...")` | `logger.info({ userId }, "...")` — identifiers go in raw |
-| `logger.info("msg", { data })` | `logger.info({ data }, "msg")` — object first in Pino |
-| `{ ...getLogContext(), ...data }` | Context is automatic via mixin |
+| Don't                                               | Do                                                                                                                |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `logger.error({ error }, "...")` then `throw error` | `logger.warn(...)` then `throw` — the layer that stops the throw logs the error                                   |
+| `logger.warn(...)` on a path that discards work     | `logger.error(...)` — nothing above will report the loss                                                          |
+| `logger.warn({ error: error.message }, "...")`      | `logger.warn({ error }, "...")` — a bare string under `error` loses the stack and is dropped by the log collector |
+| `logger.info("User " + userId + " logged in")`      | `logger.info({ userId }, "User logged in")`                                                                       |
+| `logger.error("Error: " + error.message)`           | `logger.error({ error }, "Operation failed")`                                                                     |
+| `logger.info({ password, apiKey }, "...")`          | Never log credentials, customer content, or personal data — see above                                             |
+| `logger.info({ userId: hash(userId) }, "...")`      | `logger.info({ userId }, "...")` — identifiers go in raw                                                          |
+| `logger.info("msg", { data })`                      | `logger.info({ data }, "msg")` — object first in Pino                                                             |
+| `{ ...getLogContext(), ...data }`                   | Context is automatic via mixin                                                                                    |
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PINO_LOG_LEVEL` | Base logger level | "debug" |
-| `LOG_CONSOLE_LEVEL` | Console output level (`PINO_CONSOLE_LEVEL` fallback) | "info" |
-| `LOG_OTEL_LEVEL` | OTel export level (`PINO_OTEL_LEVEL` fallback) | "debug" |
-| `PINO_OTEL_ENABLED` | Enable OTel log export | "false" |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTel collector endpoint | - |
-| `OTEL_SERVICE_NAME` | Service name in traces | "langwatch-app" |
+| Variable                      | Description                                          | Default         |
+| ----------------------------- | ---------------------------------------------------- | --------------- |
+| `PINO_LOG_LEVEL`              | Base logger level                                    | "debug"         |
+| `LOG_CONSOLE_LEVEL`           | Console output level (`PINO_CONSOLE_LEVEL` fallback) | "info"          |
+| `LOG_OTEL_LEVEL`              | OTel export level (`PINO_OTEL_LEVEL` fallback)       | "debug"         |
+| `PINO_OTEL_ENABLED`           | Enable OTel log export                               | "false"         |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTel collector endpoint                              | -               |
+| `OTEL_SERVICE_NAME`           | Service name in traces                               | "langwatch-app" |

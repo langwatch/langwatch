@@ -99,10 +99,7 @@ describe("getUserProtectionsForProject audience-aware visibility", () => {
   afterAll(async () => {
     await cleanupTestRows(prisma, [
       ["dataPrivacyPolicy", { organizationId }],
-      [
-        "roleBinding",
-        { userId: { in: [adminUserId, memberUserId] }, organizationId },
-      ],
+      ["roleBinding", { userId: { in: [adminUserId, memberUserId] }, organizationId }],
       [
         "organizationUser",
         { userId: { in: [adminUserId, memberUserId] }, organizationId },

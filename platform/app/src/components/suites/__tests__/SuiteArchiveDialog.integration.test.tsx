@@ -126,8 +126,7 @@ describe("<SuiteArchiveDialog/>", () => {
       // When loading, the Archive button shows a spinner instead of text
       const buttons = screen.getAllByRole("button");
       const archiveButton = buttons.find(
-        (btn) =>
-          btn.textContent !== "Cancel" && !btn.getAttribute("aria-label"),
+        (btn) => btn.textContent !== "Cancel" && !btn.getAttribute("aria-label"),
       );
       expect(archiveButton).toBeDisabled();
     });

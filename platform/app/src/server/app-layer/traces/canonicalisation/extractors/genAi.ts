@@ -44,10 +44,7 @@ import {
   spanTypeToGenAiOperationName,
 } from "./_extraction";
 import { asBoolean, asNumber, coerceToStringArray, isRecord } from "./_guards";
-import {
-  extractSystemInstructionFromMessages,
-  stripSystemMessages,
-} from "./_messages";
+import { extractSystemInstructionFromMessages, stripSystemMessages } from "./_messages";
 import type {
   CanonicalAttributesExtractor,
   ExtractorContext,
@@ -64,8 +61,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // Operation Name (derived from span type)
     // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.GEN_AI_OPERATION_NAME)) {
-      const spanType =
-        attrs.get(ATTR_KEYS.SPAN_TYPE) ?? attrs.get(ATTR_KEYS.TYPE);
+      const spanType = attrs.get(ATTR_KEYS.SPAN_TYPE) ?? attrs.get(ATTR_KEYS.TYPE);
       const operationName = spanTypeToGenAiOperationName(spanType);
       if (operationName) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_OPERATION_NAME, operationName);
@@ -77,11 +73,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // Provider Name (from legacy gen_ai.system)
     // ─────────────────────────────────────────────────────────────────────────
     const system = attrs.take(ATTR_KEYS.GEN_AI_SYSTEM);
-    if (
-      system !== undefined &&
-      typeof system === "string" &&
-      system.length > 0
-    ) {
+    if (system !== undefined && typeof system === "string" && system.length > 0) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_PROVIDER_NAME, system);
       ctx.recordRule(`${this.id}:provider.name`);
     }
@@ -143,15 +135,10 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     //   string: "You are a helpful assistant."
     //   array:  [{ type: "text", content: "You are a helpful assistant." }]
     // ─────────────────────────────────────────────────────────────────────────
-    const rawSystemInstructions = attrs.take(
-      ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-    );
+    const rawSystemInstructions = attrs.take(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS);
     if (rawSystemInstructions !== undefined) {
       if (typeof rawSystemInstructions === "string") {
-        ctx.setAttr(
-          ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-          rawSystemInstructions,
-        );
+        ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, rawSystemInstructions);
         ctx.recordRule(`${this.id}:system_instructions(string)`);
       } else if (Array.isArray(rawSystemInstructions)) {
         // Array of content blocks: [{ type: "text", content: "..." }]
@@ -168,10 +155,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
           }
         }
         if (textParts.length > 0) {
-          ctx.setAttr(
-            ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-            textParts.join("\n"),
-          );
+          ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, textParts.join("\n"));
           ctx.recordRule(`${this.id}:system_instructions(array)`);
         }
       }
@@ -180,10 +164,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // If gen_ai.input.messages was already present (e.g. from OpenClaw/OTEL
     // GenAI spec), extractInputMessages skips it. Still extract system
     // instruction from the existing messages if not already set.
-    if (
-      !inputExtracted &&
-      ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS] === undefined
-    ) {
+    if (!inputExtracted && ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS] === undefined) {
       const existing = attrs.get(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
       if (Array.isArray(existing)) {
         const sysInstruction = extractSystemInstructionFromMessages(existing);
@@ -202,11 +183,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
           ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined ||
           attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)
         ) {
-          recordValueType(
-            ctx,
-            ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
-            "chat_messages",
-          );
+          recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
         }
       }
     }
@@ -304,10 +281,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     );
     if (reasoningOutputTokens !== null) {
       attrs.delete(ATTR_KEYS.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS);
-      ctx.setAttr(
-        ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
-        reasoningOutputTokens,
-      );
+      ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, reasoningOutputTokens);
       ctx.recordRule(`${this.id}:usage.reasoning.output_tokens`);
     }
 
@@ -366,9 +340,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // Request Parameters (from legacy llm.invocation_parameters)
     // Extracts model parameters like temperature, max_tokens, etc.
     // ─────────────────────────────────────────────────────────────────────────
-    const invocationParams = ctx.bag.attrs.get(
-      ATTR_KEYS.LLM_INVOCATION_PARAMETERS,
-    );
+    const invocationParams = ctx.bag.attrs.get(ATTR_KEYS.LLM_INVOCATION_PARAMETERS);
     if (isRecord(invocationParams)) {
       const params = invocationParams as Record<string, unknown>;
 
@@ -391,10 +363,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
         ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_TOP_P, topP);
       }
       if (frequencyPenalty !== null) {
-        ctx.setAttr(
-          ATTR_KEYS.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-          frequencyPenalty,
-        );
+        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequencyPenalty);
       }
       if (presencePenalty !== null) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_PRESENCE_PENALTY, presencePenalty);
@@ -445,11 +414,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       const raw = attrs.get(key);
       if (raw === undefined || raw === null || raw === "") return null;
       const n =
-        typeof raw === "number"
-          ? raw
-          : typeof raw === "string"
-            ? Number(raw)
-            : NaN;
+        typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
       return Number.isFinite(n) ? n : null;
     };
     const asStringFrom = (key: string): string | null => {

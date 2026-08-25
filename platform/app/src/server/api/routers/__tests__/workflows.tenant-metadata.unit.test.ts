@@ -9,9 +9,7 @@ const { hasProjectPermission } = vi.hoisted(() => ({
 
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
 
@@ -28,9 +26,7 @@ vi.mock("../../rbac", async (importOriginal) => {
 // The router's imperative check goes through the app-layer facade.
 vi.mock("~/server/app-layer/permissions/imperative", async (importOriginal) => {
   const actual =
-    await importOriginal<
-      typeof import("~/server/app-layer/permissions/imperative")
-    >();
+    await importOriginal<typeof import("~/server/app-layer/permissions/imperative")>();
   return { ...actual, probeProjectPermission: hasProjectPermission };
 });
 
@@ -49,12 +45,10 @@ const createCaller = () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  hasProjectPermission.mockImplementation(
-    async (_ctx, projectId, permission) => {
-      expect(permission).toBe("workflows:view");
-      return projectId === "project_visible";
-    },
-  );
+  hasProjectPermission.mockImplementation(async (_ctx, projectId, permission) => {
+    expect(permission).toBe("workflows:view");
+    return projectId === "project_visible";
+  });
   findMany.mockResolvedValue([
     {
       id: "workflow_copy",

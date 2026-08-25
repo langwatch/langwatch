@@ -89,9 +89,7 @@ export interface ExtractionBudget {
   failedParts: number;
 }
 
-export function createExtractionBudget(
-  now: number = Date.now(),
-): ExtractionBudget {
+export function createExtractionBudget(now: number = Date.now()): ExtractionBudget {
   return {
     deadlineAt: now + EXTRACTION_DEADLINE_MS,
     remainingParts: MAX_MEDIA_PARTS_PER_SPAN,
@@ -144,8 +142,7 @@ export function isExtractableMediaPart(part: unknown): boolean {
         p.source.type === "data" &&
         typeof p.source.value === "string" &&
         typeof p.source.mimeType === "string",
-      binary: (p) =>
-        p.data !== undefined && p.url === undefined && p.id === undefined,
+      binary: (p) => p.data !== undefined && p.url === undefined && p.id === undefined,
       imageUrl: (url) => parseBase64DataUri(url) !== null,
       bareImage: (src) => parseBase64DataUri(src) !== null,
       inputAudio: (p) => typeof p.data === "string",
@@ -157,9 +154,7 @@ export function isExtractableMediaPart(part: unknown): boolean {
 /** A string whose ENTIRE value is one base64 `data:` URI. */
 function isBareDataUri(value: string): boolean {
   return (
-    value.startsWith("data:") &&
-    !/\s/.test(value) &&
-    parseBase64DataUri(value) !== null
+    value.startsWith("data:") && !/\s/.test(value) && parseBase64DataUri(value) !== null
   );
 }
 
@@ -310,11 +305,7 @@ async function storeCandidates(
 // Phase 3 — clone-on-write rebuild
 // ---------------------------------------------------------------------------
 
-function rebuild(
-  value: unknown,
-  sites: StoredSite[],
-  segIndex: number,
-): unknown {
+function rebuild(value: unknown, sites: StoredSite[], segIndex: number): unknown {
   const direct = sites.find((site) => site.path.length === segIndex);
   if (direct) return direct.replacement;
 

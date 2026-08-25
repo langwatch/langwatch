@@ -42,8 +42,8 @@ ALTER TABLE "Trigger"
 ```ts
 const engine = new Liquid({
   strictFilters: true,
-  strictVariables: false,   // missing vars render as empty string, no throw
-  cache: true,              // LRU of compiled templates, default 1k entries
+  strictVariables: false, // missing vars render as empty string, no throw
+  cache: true, // LRU of compiled templates, default 1k entries
 });
 ```
 
@@ -128,7 +128,7 @@ Letting templates branch on `{% if digest %}` would double the surface area cust
 
 ### Why fall-back-to-default on render failure
 
-Silent failure of customer-authored content (with operator visibility) is strictly better than blocking dispatch entirely. The customer gets *something* useful (the default message) and operators see the rendering error in the activity tab; the alternative is the customer getting nothing and having to debug from logs.
+Silent failure of customer-authored content (with operator visibility) is strictly better than blocking dispatch entirely. The customer gets _something_ useful (the default message) and operators see the rendering error in the activity tab; the alternative is the customer getting nothing and having to debug from logs.
 
 ### Why a shared module under `src/shared/templating/`
 

@@ -30,9 +30,7 @@ type StringRef = {
 
 /** The attribute an OTLP KeyValue node names, when this node is one. */
 function otlpAttributeName(value: UnknownRecord): string | undefined {
-  return typeof value.key === "string" && "value" in value
-    ? value.key
-    : undefined;
+  return typeof value.key === "string" && "value" in value ? value.key : undefined;
 }
 
 /**

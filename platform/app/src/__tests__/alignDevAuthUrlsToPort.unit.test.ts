@@ -75,9 +75,7 @@ describe("alignDevAuthUrlsToPort", () => {
         };
 
         expect(align(env)).toEqual([]);
-        expect(env.NEXTAUTH_URL).toBe(
-          "https://app.mystack.langwatch.localhost",
-        );
+        expect(env.NEXTAUTH_URL).toBe("https://app.mystack.langwatch.localhost");
       });
     });
   });
@@ -85,14 +83,8 @@ describe("alignDevAuthUrlsToPort", () => {
   describe("given an address that was set deliberately", () => {
     /** @scenario A deliberately configured address is left alone */
     it.each([
-      [
-        "a proxy in front of a preview environment",
-        "https://preview.example.com",
-      ],
-      [
-        "a loopback IP, the shell helper's escape hatch",
-        "http://127.0.0.1:5560",
-      ],
+      ["a proxy in front of a preview environment", "https://preview.example.com"],
+      ["a loopback IP, the shell helper's escape hatch", "http://127.0.0.1:5560"],
       ["a tunnel", "http://abc123.ngrok.io"],
       ["a value that is not a URL at all", "not-a-url"],
     ])("leaves %s untouched", (_label, address) => {
@@ -147,9 +139,7 @@ describe("alignDevAuthUrlsToPort", () => {
 
       align(env);
 
-      expect(env.LW_GATEWAY_PUBLIC_URL).toBe(
-        "http://host.minikube.internal:5563",
-      );
+      expect(env.LW_GATEWAY_PUBLIC_URL).toBe("http://host.minikube.internal:5563");
       expect(env.LANGWATCH_NLP_SERVICE).toBe("http://localhost:5561");
     });
   });

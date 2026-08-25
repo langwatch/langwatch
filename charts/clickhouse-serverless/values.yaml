@@ -1,13 +1,13 @@
 image:
   repository: langwatch/clickhouse-serverless
-  tag: "0.3.0"  # x-release-please-version
+  tag: "0.3.0" # x-release-please-version
   pullPolicy: IfNotPresent
 
 # Primary inputs — the image auto-tunes all ClickHouse parameters from these
 cpu: 2
 memory: "4Gi"
-replicas: 1  # 1 = standalone MergeTree, 3+ = ReplicatedMergeTree + Keeper (must be odd)
-clusterName: langwatch  # ClickHouse cluster name used in macros and remote_servers
+replicas: 1 # 1 = standalone MergeTree, 3+ = ReplicatedMergeTree + Keeper (must be odd)
+clusterName: langwatch # ClickHouse cluster name used in macros and remote_servers
 
 storage:
   size: 50Gi
@@ -17,24 +17,24 @@ storage:
 objectStorage:
   bucket: ""
   region: ""
-  endpoint: ""                     # e.g. https://s3.us-east-1.amazonaws.com/bucket/
-  useEnvironmentCredentials: true   # IRSA / workload identity / pod SA
+  endpoint: "" # e.g. https://s3.us-east-1.amazonaws.com/bucket/
+  useEnvironmentCredentials: true # IRSA / workload identity / pod SA
   credentials:
     secretKeyRef:
-      name: ""                     # K8s secret with S3 access key + secret key
+      name: "" # K8s secret with S3 access key + secret key
       accessKeyId: "accessKey"
       secretAccessKey: "secretKey"
 
 # Cold storage: tiered hot→cold data movement (requires objectStorage)
 cold:
   enabled: false
-  defaultTtlDays: 49  # App-side TTL before data moves to cold (must be divisible by 7)
+  defaultTtlDays: 49 # App-side TTL before data moves to cold (must be divisible by 7)
 
 # Backups: native ClickHouse BACKUP/RESTORE to S3 (requires objectStorage)
 backup:
   enabled: false
   database: "langwatch"
-  user: "default"  # ClickHouse user for backup/restore operations
+  user: "default" # ClickHouse user for backup/restore operations
   # Resource requests + limits for the backup/restore Job containers.
   # Both are required by clusters that enforce a "limits and requests must
   # be set" policy (Gatekeeper/Kyverno) — a Job without them is denied.
@@ -46,9 +46,9 @@ backup:
       cpu: 500m
       memory: 512Mi
   full:
-    schedule: "0 */12 * * *"       # every 12 hours
+    schedule: "0 */12 * * *" # every 12 hours
   incremental:
-    schedule: "0 * * * *"          # every hour
+    schedule: "0 * * * *" # every hour
 
   # Alerting on backup freshness, rendered as Prometheus rules.
   #
@@ -111,16 +111,16 @@ backup:
     targets:
       - name: full
         cronjob: backup-full
-        staleAfterHours: 26        # schedule is every 12h
+        staleAfterHours: 26 # schedule is every 12h
       - name: incremental
         cronjob: backup-incremental
-        staleAfterHours: 3         # schedule is hourly
+        staleAfterHours: 3 # schedule is hourly
 
 # Authentication
 auth:
-  password: ""         # Used as autogen seed when autogen.enabled=true and this is unset
-  clusterSecret: ""    # Used as autogen seed when autogen.enabled=true and this is unset
-  existingSecret: ""   # Operator-owned Secret name. Required when autogen.enabled=false.
+  password: "" # Used as autogen seed when autogen.enabled=true and this is unset
+  clusterSecret: "" # Used as autogen seed when autogen.enabled=true and this is unset
+  existingSecret: "" # Operator-owned Secret name. Required when autogen.enabled=false.
   secretKeys:
     passwordKey: "password"
     clusterSecretKey: "clusterSecret"
@@ -176,7 +176,7 @@ keeper:
       memory: 1Gi
   storage:
     size: 10Gi
-    storageClass: ""  # defaults to parent storage.storageClass
+    storageClass: "" # defaults to parent storage.storageClass
 
 # Writable scratch (emptyDir) for the paths ClickHouse and Keeper touch outside
 # their data PVC, so both can run with a read-only root filesystem.
@@ -203,9 +203,9 @@ scratch:
 # ServiceAccount
 serviceAccount:
   create: true
-  name: ""  # defaults to <fullname>
+  name: "" # defaults to <fullname>
   automountServiceAccountToken: false
-  annotations: {}  # e.g. eks.amazonaws.com/role-arn: arn:aws:iam::role/my-role (for IRSA)
+  annotations: {} # e.g. eks.amazonaws.com/role-arn: arn:aws:iam::role/my-role (for IRSA)
 
 # Pod-level settings
 imagePullSecrets: []

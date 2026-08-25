@@ -89,9 +89,7 @@ describe("BlobRow", () => {
       it("offers no destructive action at all", () => {
         const summary = blob();
         renderRow({ summary, canManage: false });
-        expect(
-          screen.queryByLabelText(`Actions for payload ${summary.hash}`),
-        ).toBeNull();
+        expect(screen.queryByLabelText(`Actions for payload ${summary.hash}`)).toBeNull();
       });
     });
   });

@@ -10,12 +10,7 @@ import { BlobStoreContent } from "./BlobStoreContent";
 export function OpsBlobsDrawer() {
   const { closeDrawer } = useDrawer();
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="xl"
-      onOpenChange={() => closeDrawer()}
-    >
+    <Drawer.Root open={true} placement="end" size="xl" onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Heading size="md">Payload store</Heading>

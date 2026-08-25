@@ -41,9 +41,7 @@ describe("given the token-created-snippets feature is implemented", () => {
 
     /** @scenario Highlight engine wiring — CodePreview registers the languages the dialog needs */
     it("the dialog declares one concrete language per block, at the call site", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
+      const dialog = readFile("src/pages/settings/api-keys/TokenCreatedDialog.tsx");
       expect(dialog).toContain('codeLanguage="ini"');
       expect(dialog).toContain('codeLanguage="shellscript"');
       expect(dialog).toContain('codeLanguage="bash"');
@@ -53,17 +51,13 @@ describe("given the token-created-snippets feature is implemented", () => {
   describe("when checking that the amber warning is present in TokenCreatedDialog", () => {
     /** @scenario Amber warning between .env block and Code Assistants section stays */
     it("TokenCreatedDialog contains the 'Copy this token now' amber warning text", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
+      const dialog = readFile("src/pages/settings/api-keys/TokenCreatedDialog.tsx");
       expect(dialog).toContain("Copy this token now");
     });
 
     /** @scenario Amber warning between .env block and Code Assistants section stays */
     it("TokenCreatedDialog renders the amber warning with a warning status Alert", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
+      const dialog = readFile("src/pages/settings/api-keys/TokenCreatedDialog.tsx");
       expect(dialog).toContain('status="warning"');
     });
   });
@@ -71,9 +65,7 @@ describe("given the token-created-snippets feature is implemented", () => {
   describe("when checking that the dialog renders through the shared snippet surface", () => {
     /** @scenario The dialog renders snippets through the same component as the traces empty state */
     it("TokenCreatedDialog imports the shared CodePreview for snippet rendering", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
+      const dialog = readFile("src/pages/settings/api-keys/TokenCreatedDialog.tsx");
       expect(dialog).toContain("CodePreview");
       expect(dialog).not.toContain("ShikiCommandBox");
     });
@@ -89,18 +81,14 @@ describe("given the token-created-snippets feature is implemented", () => {
 
     /** @scenario The dialog renders snippets through the same component as the traces empty state */
     it("TokenCreatedDialog does not directly import CodeBlock for snippet rendering", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
+      const dialog = readFile("src/pages/settings/api-keys/TokenCreatedDialog.tsx");
       // The old CodeBlock.tsx must no longer be imported
       expect(dialog).not.toMatch(/import.*CodeBlock.*from.*['"]\./);
     });
 
     /** @scenario JSON config block keeps the existing JsonHighlight wiring */
     it("JsonHighlight is still used in TokenCreatedDialog for the config block", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
+      const dialog = readFile("src/pages/settings/api-keys/TokenCreatedDialog.tsx");
       expect(dialog).toContain("JsonHighlight");
     });
   });
@@ -108,22 +96,17 @@ describe("given the token-created-snippets feature is implemented", () => {
   describe("when checking that one list drives the assistant tabs and config paths", () => {
     /** @scenario One list of coding assistants drives both the tabs and the config paths */
     it("TokenCreatedDialog no longer keeps a separate EDITOR_PATHS list", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
+      const dialog = readFile("src/pages/settings/api-keys/TokenCreatedDialog.tsx");
       expect(dialog).not.toContain("EDITOR_PATHS");
       expect(dialog).toContain("CODE_ASSISTANTS");
     });
 
     /** @scenario One list of coding assistants drives both the tabs and the config paths */
     it("renders both the tabs and the config-path chips from CODE_ASSISTANTS", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
+      const dialog = readFile("src/pages/settings/api-keys/TokenCreatedDialog.tsx");
       // Two map() call sites, both over the same list: the tab strip and the
       // config-path chip row.
-      const renders =
-        dialog.match(/CODE_ASSISTANTS[\s\S]{0,40}?\.map\(/g) ?? [];
+      const renders = dialog.match(/CODE_ASSISTANTS[\s\S]{0,40}?\.map\(/g) ?? [];
       expect(renders.length).toBeGreaterThanOrEqual(2);
     });
   });
@@ -192,10 +175,7 @@ describe("given the token-created-snippets feature is implemented", () => {
         "without a project id, self-hosted":
           "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real --env LANGWATCH_ENDPOINT=https://self.host -- npx -y @langwatch/mcp-server",
       },
-    } as const satisfies Record<
-      string,
-      Record<(typeof COMBOS)[number]["label"], string>
-    >;
+    } as const satisfies Record<string, Record<(typeof COMBOS)[number]["label"], string>>;
 
     for (const key of Object.keys(EXPECTED) as Array<keyof typeof EXPECTED>) {
       for (const combo of COMBOS) {
@@ -204,27 +184,21 @@ describe("given the token-created-snippets feature is implemented", () => {
           const assistant = CODE_ASSISTANTS.find((a) => a.key === key);
           expect(assistant?.buildCommand).toBeDefined();
 
-          const context: Parameters<
-            NonNullable<CodeAssistant["buildCommand"]>
-          >[0] = {
+          const context: Parameters<NonNullable<CodeAssistant["buildCommand"]>>[0] = {
             apiKey: API_KEY,
             projectId: combo.projectId,
             endpoint: combo.endpoint,
             isSelfHosted: combo.isSelfHosted,
           };
 
-          expect(assistant!.buildCommand!(context)).toBe(
-            EXPECTED[key][combo.label],
-          );
+          expect(assistant!.buildCommand!(context)).toBe(EXPECTED[key][combo.label]);
         });
       }
     }
 
     /** @scenario An assistant with an install command shows a terminal snippet */
     it("covers every installer in the registry", () => {
-      const withCommand = CODE_ASSISTANTS.filter((a) => a.buildCommand).map(
-        (a) => a.key,
-      );
+      const withCommand = CODE_ASSISTANTS.filter((a) => a.buildCommand).map((a) => a.key);
       // If someone adds an installer, this fails until its exact commands are
       // pinned above — which is the whole point.
       expect(Object.keys(EXPECTED).sort()).toEqual(withCommand.sort());
@@ -232,9 +206,7 @@ describe("given the token-created-snippets feature is implemented", () => {
 
     /** @scenario An assistant without an install command points at its config file */
     it("gives every installer-less assistant a config path", () => {
-      const configOnly = CODE_ASSISTANTS.filter(
-        (assistant) => !assistant.buildCommand,
-      );
+      const configOnly = CODE_ASSISTANTS.filter((assistant) => !assistant.buildCommand);
       expect(configOnly.length).toBeGreaterThan(0);
 
       for (const assistant of configOnly) {
@@ -253,9 +225,7 @@ describe("given the token-created-snippets feature is implemented", () => {
 
     /** @scenario The Shiki engine loads only when a code block renders */
     it("TokenCreatedDialog has no value import of the shiki package", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
+      const dialog = readFile("src/pages/settings/api-keys/TokenCreatedDialog.tsx");
       // Import statements are the invariant — comments may (and do) name
       // shikiAdapter when explaining the pre-existing JsonHighlight chain.
       expect(dialog).not.toMatch(/^import (?!type ).*from "shiki"/m);
@@ -270,9 +240,7 @@ describe("given the token-created-snippets feature is implemented", () => {
 
     /** @scenario The Shiki engine loads only when a code block renders */
     it("ApiKeysSection.tsx does not statically import shikiAdapter", () => {
-      const section = readFile(
-        "src/pages/settings/api-keys/ApiKeysSection.tsx",
-      );
+      const section = readFile("src/pages/settings/api-keys/ApiKeysSection.tsx");
       expect(section).not.toContain("shikiAdapter");
     });
   });

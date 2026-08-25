@@ -65,8 +65,7 @@ function DigestScheduleHint({
     dueAt && dueAt > now
       ? `Next digest due in ~${Math.max(1, Math.ceil((dueAt - now) / 60_000))}m`
       : `Digest: ${
-          CADENCE_LABELS[cadence as NotificationCadence]?.toLowerCase() ??
-          cadence
+          CADENCE_LABELS[cadence as NotificationCadence]?.toLowerCase() ?? cadence
         }`;
 
   return (
@@ -88,9 +87,7 @@ export function LastFiredCell({
   return (
     <VStack align="start" gap={0.5}>
       {stats?.lastFiredAt ? (
-        <Text as="span">
-          {formatTimeAgo(new Date(stats.lastFiredAt).getTime())}
-        </Text>
+        <Text as="span">{formatTimeAgo(new Date(stats.lastFiredAt).getTime())}</Text>
       ) : (
         <Text as="span" color="fg.muted">
           —
@@ -350,14 +347,8 @@ export function AlertSubjectCell({
 /** Alert "Fires when" cell — the threshold rule (the cadence facet). Mirrors
  *  the dashboard "Configure Alert" copy (`greater than`, `over 5 minutes`) so
  *  both creation paths read the same. */
-export function AlertRuleCell({
-  actionParams,
-}: {
-  actionParams: TriggerActionParams;
-}) {
-  const operator = actionParams.operator
-    ? OPERATOR_LABELS[actionParams.operator]
-    : null;
+export function AlertRuleCell({ actionParams }: { actionParams: TriggerActionParams }) {
+  const operator = actionParams.operator ? OPERATOR_LABELS[actionParams.operator] : null;
   const window = actionParams.timePeriod
     ? TIME_PERIOD_LABELS[actionParams.timePeriod]
     : null;

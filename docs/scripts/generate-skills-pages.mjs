@@ -28,7 +28,7 @@ const docsRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(docsRoot, "..");
 const compiledDir = path.join(repoRoot, "skills", "_compiled");
 const manifest = JSON.parse(
-  fs.readFileSync(path.join(docsRoot, "skills", "skills-pages-manifest.json"), "utf8")
+  fs.readFileSync(path.join(docsRoot, "skills", "skills-pages-manifest.json"), "utf8"),
 );
 
 // Escape text that lands in JSX text position so MDX cannot reinterpret it
@@ -97,7 +97,9 @@ function renderAccordion(entry) {
     lines.push(`  </div>`);
   } else {
     lines.push(`<div className="lw-accordion">`);
-    lines.push(`  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">`);
+    lines.push(
+      `  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">`,
+    );
     lines.push(`    <span className="lw-accordion-title">${titleHtml}</span>`);
     lines.push(`    ${ICONS.chevron}`);
     lines.push(`  </div>`);
@@ -117,7 +119,7 @@ function renderAccordion(entry) {
       })
         .split("\n")
         .map((l) => "    " + l)
-        .join("\n")
+        .join("\n"),
     );
     lines.push(`      </div>`);
     if (slashCommand) {
@@ -132,7 +134,7 @@ function renderAccordion(entry) {
         })
           .split("\n")
           .map((l) => "    " + l)
-          .join("\n")
+          .join("\n"),
       );
       lines.push(`      </div>`);
     }
@@ -141,20 +143,29 @@ function renderAccordion(entry) {
 
   // The fence must be longer than any backtick run inside the prompt so the
   // prompt text survives verbatim as server-rendered (hidden) content.
-  const longestBacktickRun = Math.max(3, ...[...prompt.matchAll(/`+/g)].map((m) => m[0].length));
-  const fence = "`".repeat(longestBacktickRun + 1);
-  lines.push(`    <div className="lw-accordion-actions${!skill ? " lw-accordion-actions-single" : ""}">`);
-  lines.push(
-    `      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title=${attr(title)} data-track-skill=${attr(skill || "platform")}>`
+  const longestBacktickRun = Math.max(
+    3,
+    ...[...prompt.matchAll(/`+/g)].map((m) => m[0].length),
   );
-  lines.push(`        <span className="lw-accordion-action-icon lw-copy-line-icon">${ICONS.copyLarge}</span>`);
+  const fence = "`".repeat(longestBacktickRun + 1);
   lines.push(
-    `        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}>${ICONS.checkLarge}</span>`
+    `    <div className="lw-accordion-actions${!skill ? " lw-accordion-actions-single" : ""}">`,
+  );
+  lines.push(
+    `      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title=${attr(title)} data-track-skill=${attr(skill || "platform")}>`,
+  );
+  lines.push(
+    `        <span className="lw-accordion-action-icon lw-copy-line-icon">${ICONS.copyLarge}</span>`,
+  );
+  lines.push(
+    `        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}>${ICONS.checkLarge}</span>`,
   );
   lines.push(`        <span className="lw-accordion-action-text">`);
-  lines.push(`          <span className="lw-accordion-action-title">Copy Full Prompt</span>`);
   lines.push(
-    `          <span className="lw-accordion-action-subtitle">${skill ? "Run skill without installing" : "Paste into any AI assistant"}</span>`
+    `          <span className="lw-accordion-action-title">Copy Full Prompt</span>`,
+  );
+  lines.push(
+    `          <span className="lw-accordion-action-subtitle">${skill ? "Run skill without installing" : "Paste into any AI assistant"}</span>`,
   );
   lines.push(`        </span>`);
   lines.push(`        <div className="lw-prompt-source">`);
@@ -168,12 +179,18 @@ function renderAccordion(entry) {
   if (skill) {
     const downloadUrl = `https://raw.githubusercontent.com/langwatch/skills/main/${skillPath}/SKILL.md`;
     lines.push(
-      `      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="${downloadUrl}" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title=${attr(title)} data-track-skill=${attr(skill)}>`
+      `      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="${downloadUrl}" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title=${attr(title)} data-track-skill=${attr(skill)}>`,
     );
-    lines.push(`        <span className="lw-accordion-action-icon">${ICONS.download}</span>`);
+    lines.push(
+      `        <span className="lw-accordion-action-icon">${ICONS.download}</span>`,
+    );
     lines.push(`        <span className="lw-accordion-action-text">`);
-    lines.push(`          <span className="lw-accordion-action-title">Download SKILL.md</span>`);
-    lines.push(`          <span className="lw-accordion-action-subtitle">Manual installation</span>`);
+    lines.push(
+      `          <span className="lw-accordion-action-title">Download SKILL.md</span>`,
+    );
+    lines.push(
+      `          <span className="lw-accordion-action-subtitle">Manual installation</span>`,
+    );
     lines.push(`        </span>`);
     lines.push(`      </div>`);
   }
@@ -198,7 +215,12 @@ for (const [pageFile, sections] of Object.entries(manifest)) {
       continue;
     }
     const generated = entries.map(renderAccordion).join("\n\n");
-    content = content.slice(0, startIdx + start.length) + "\n\n" + generated + "\n\n" + content.slice(endIdx);
+    content =
+      content.slice(0, startIdx + start.length) +
+      "\n\n" +
+      generated +
+      "\n\n" +
+      content.slice(endIdx);
   }
   fs.writeFileSync(pagePath, content);
   console.log(`Generated skill accordions in docs/${pageFile}`);

@@ -133,8 +133,7 @@ export function SummaryMetricValue({
     typeof current === "number" && typeof previous === "number" && previous > 0
       ? Math.round(((current - previous) / previous) * 100) / 100
       : undefined;
-  const increaseReversal =
-    increaseIs == "neutral" ? 0 : increaseIs === "bad" ? -1 : 1;
+  const increaseReversal = increaseIs == "neutral" ? 0 : increaseIs === "bad" ? -1 : 1;
 
   const formatChangeValue = (value: number) => {
     const abs = Math.abs(value);
@@ -184,9 +183,7 @@ export function SummaryMetricValue({
             </Text>
           )}
           {typeof previous === "number" && (
-            <Text color="fg.muted">
-              {formatPreviousValue(previous)} previous
-            </Text>
+            <Text color="fg.muted">{formatPreviousValue(previous)} previous</Text>
           )}
         </VStack>
       )}

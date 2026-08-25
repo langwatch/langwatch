@@ -40,20 +40,14 @@ import { parseSourceText } from "~/test-utils/tsAst";
  *   ENGINE = ${CLICKHOUSE_ENGINE_MERGETREE:-MergeTree()}
  */
 
-const MIGRATIONS_DIR = resolve(
-  process.cwd(),
-  "src/server/clickhouse/migrations",
-);
+const MIGRATIONS_DIR = resolve(process.cwd(), "src/server/clickhouse/migrations");
 const GOOSE_SOURCE = readFileSync(
   resolve(process.cwd(), "src/server/clickhouse/goose.ts"),
   "utf8",
 );
 
 function propertyName(property: ObjectLiteralElementLike): string | undefined {
-  if (
-    !isPropertyAssignment(property) &&
-    !isShorthandPropertyAssignment(property)
-  ) {
+  if (!isPropertyAssignment(property) && !isShorthandPropertyAssignment(property)) {
     return undefined;
   }
   const name = property.name;
@@ -179,9 +173,7 @@ function collectEngineDeclarations(): EngineDeclaration[] {
   }
 
   for (const file of files) {
-    const sql = stripLineComments(
-      readFileSync(resolve(MIGRATIONS_DIR, file), "utf8"),
-    );
+    const sql = stripLineComments(readFileSync(resolve(MIGRATIONS_DIR, file), "utf8"));
     for (const statement of sql.split(";")) {
       const create = statement.match(
         /CREATE\s+(TABLE|MATERIALIZED\s+VIEW)\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)/i,
@@ -198,9 +190,7 @@ function collectEngineDeclarations(): EngineDeclaration[] {
       // The engine expression ends where the next table clause begins, so a
       // single-line `ENGINE = X() ORDER BY ...` is judged on X() alone.
       const engineText = engine[1]!
-        .split(
-          /\s+(?:ORDER\s+BY|PARTITION\s+BY|PRIMARY\s+KEY|SETTINGS|TTL|AS)\s/i,
-        )[0]!
+        .split(/\s+(?:ORDER\s+BY|PARTITION\s+BY|PRIMARY\s+KEY|SETTINGS|TTL|AS)\s/i)[0]!
         .trim();
       declarations.push({
         file,
@@ -223,8 +213,7 @@ function isApproved(engine: string): boolean {
 
 function isHistoricalException(declaration: EngineDeclaration): boolean {
   return HISTORICAL_PLAIN_ENGINES.some(
-    (entry) =>
-      entry.file === declaration.file && entry.table === declaration.objectName,
+    (entry) => entry.file === declaration.file && entry.table === declaration.objectName,
   );
 }
 
@@ -234,9 +223,7 @@ describe("ClickHouse migration engine guard", () => {
   it("every MergeTree-family engine uses the deployment-substitutable pattern", () => {
     const violations = declarations.filter(
       (d) =>
-        isMergeTreeFamily(d.engine) &&
-        !isApproved(d.engine) &&
-        !isHistoricalException(d),
+        isMergeTreeFamily(d.engine) && !isApproved(d.engine) && !isHistoricalException(d),
     );
 
     const report = violations
@@ -251,9 +238,7 @@ describe("ClickHouse migration engine guard", () => {
           `  received it), and a hardcoded Replicated* engine would instead break\n` +
           `  single-node deployments. Declare the engine through the substitution\n` +
           `  goose.ts resolves per deployment:\n` +
-          APPROVED_ENGINE_PATTERNS.map((p) => `    ENGINE = ${p.name}`).join(
-            "\n",
-          ),
+          APPROVED_ENGINE_PATTERNS.map((p) => `    ENGINE = ${p.name}`).join("\n"),
       )
       .join("\n\n");
 

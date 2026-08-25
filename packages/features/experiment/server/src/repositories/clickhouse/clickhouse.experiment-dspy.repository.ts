@@ -77,10 +77,7 @@ type ExperimentDspySummaryRow = Pick<
   | "CreatedAt"
 >;
 
-function mergeByHash<T extends { hash: string }>(
-  existing: T[],
-  incoming: T[],
-): T[] {
+function mergeByHash<T extends { hash: string }>(existing: T[], incoming: T[]): T[] {
   const seen = new Set(existing.map((item) => item.hash));
   return [
     ...existing,
@@ -100,19 +97,14 @@ function llmSummary(calls: ExperimentDspyLlmCall[]): {
   return calls.reduce(
     (total, call) => ({
       total: total.total + 1,
-      tokens:
-        total.tokens +
-        (call.prompt_tokens ?? 0) +
-        (call.completion_tokens ?? 0),
+      tokens: total.tokens + (call.prompt_tokens ?? 0) + (call.completion_tokens ?? 0),
       cost: total.cost + (call.cost ?? 0),
     }),
     { total: 0, tokens: 0, cost: 0 },
   );
 }
 
-export class ClickHouseExperimentDspyRepository
-  extends ExperimentDspyRepository
-{
+export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository {
   static create(options: {
     resolveClient: ExperimentDspyClickHouseResolver;
     retention: ExperimentDspyRetentionPort;
@@ -187,9 +179,7 @@ export class ClickHouseExperimentDspyRepository
     }
   }
 
-  async list(
-    input: ExperimentDspyStepsLookup,
-  ): Promise<ExperimentDspyStepSummary[]> {
+  async list(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]> {
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return [];
@@ -241,9 +231,7 @@ export class ClickHouseExperimentDspyRepository
     }
   }
 
-  async tryGet(
-    input: ExperimentDspyStepLookup,
-  ): Promise<ExperimentDspyStep | null> {
+  async tryGet(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep | null> {
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return null;

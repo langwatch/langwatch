@@ -2,8 +2,7 @@ import { keepPreviousData as holdPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { api, type RouterOutputs } from "~/utils/api";
 
-export type AnnotationByTrace =
-  RouterOutputs["annotation"]["getByTraceIds"][number];
+export type AnnotationByTrace = RouterOutputs["annotation"]["getByTraceIds"][number];
 
 /**
  * tRPC v10 sends queries as GET, so the trace-id array rides in the URL.
@@ -59,16 +58,10 @@ export function useAnnotationsByTraceIds({
   // Sort too. The chunk contents are the query key, so two consumers reading
   // the same traces in different orders would otherwise key differently and
   // each fetch its own copy of the same annotations.
-  const uniqueTraceIds = useMemo(
-    () => Array.from(new Set(traceIds)).sort(),
-    [traceIds],
-  );
+  const uniqueTraceIds = useMemo(() => Array.from(new Set(traceIds)).sort(), [traceIds]);
 
   // Stable chunk identity so `useQueries` doesn't refetch every render.
-  const chunks = useMemo(
-    () => chunk(uniqueTraceIds, CHUNK_SIZE),
-    [uniqueTraceIds],
-  );
+  const chunks = useMemo(() => chunk(uniqueTraceIds, CHUNK_SIZE), [uniqueTraceIds]);
 
   const results = api.useQueries((t) =>
     chunks.map((ids) =>

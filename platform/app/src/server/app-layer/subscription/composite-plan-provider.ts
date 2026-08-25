@@ -52,10 +52,7 @@ export function createCompositePlanProvider({
       // 3. Recompute overrideAddingLimitations from user context (not plan source)
       return {
         ...selectedPlan,
-        overrideAddingLimitations: computeOverrideAddingLimitations(
-          user,
-          administrators,
-        ),
+        overrideAddingLimitations: computeOverrideAddingLimitations(user, administrators),
       };
     },
   };

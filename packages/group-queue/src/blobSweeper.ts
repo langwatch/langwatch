@@ -3,11 +3,7 @@ import type { Cluster, Redis as IORedis } from "ioredis";
 
 import { createTenantId } from "./storage";
 
-import {
-  blobHolderSetKey,
-  blobLeaseSetKey,
-  redisBlobKeyPrefix,
-} from "./blobKeys";
+import { blobHolderSetKey, blobLeaseSetKey, redisBlobKeyPrefix } from "./blobKeys";
 import {
   BLOB_SWEEP_LUA,
   BLOB_SWEEP_OUTCOMES,

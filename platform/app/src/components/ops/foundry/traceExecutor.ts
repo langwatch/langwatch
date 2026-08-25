@@ -1,10 +1,5 @@
 import type { Context, Tracer } from "@opentelemetry/api";
-import {
-  context,
-  ROOT_CONTEXT,
-  SpanStatusCode,
-  trace,
-} from "@opentelemetry/api";
+import { context, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import { createFoundryProvider } from "./otelBrowser";
 import type { SpanConfig, TraceConfig } from "./types";
 
@@ -112,14 +107,7 @@ function createFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
     const now = Date.now();
     let traceId = "";
     for (const spanConfig of traceConfig.spans) {
-      const id = buildSpan(
-        tracer,
-        spanConfig,
-        ROOT_CONTEXT,
-        now,
-        traceConfig,
-        otelDeps,
-      );
+      const id = buildSpan(tracer, spanConfig, ROOT_CONTEXT, now, traceConfig, otelDeps);
       if (!traceId) traceId = id;
     }
     return traceId;
@@ -203,10 +191,7 @@ function buildSpan(
       span.setAttribute("langwatch.thread.id", traceConfig.metadata.threadId);
     }
     if (traceConfig.metadata.customerId) {
-      span.setAttribute(
-        "langwatch.customer.id",
-        traceConfig.metadata.customerId,
-      );
+      span.setAttribute("langwatch.customer.id", traceConfig.metadata.customerId);
     }
     if (traceConfig.metadata.labels?.length) {
       span.setAttribute("langwatch.labels", traceConfig.metadata.labels);
@@ -221,9 +206,7 @@ function buildSpan(
   // trace-summary rollup.
   if (config.llm) {
     span.setAttribute("gen_ai.operation.name", "chat");
-    const system = inferGenAiSystem(
-      config.llm.requestModel ?? config.llm.responseModel,
-    );
+    const system = inferGenAiSystem(config.llm.requestModel ?? config.llm.responseModel);
     if (system) span.setAttribute("gen_ai.system", system);
     if (config.llm.requestModel) {
       span.setAttribute("gen_ai.request.model", config.llm.requestModel);
@@ -278,10 +261,7 @@ function buildSpan(
     }
     if (config.llm.metrics) {
       if (config.llm.metrics.promptTokens !== undefined) {
-        span.setAttribute(
-          "gen_ai.usage.input_tokens",
-          config.llm.metrics.promptTokens,
-        );
+        span.setAttribute("gen_ai.usage.input_tokens", config.llm.metrics.promptTokens);
       }
       if (config.llm.metrics.completionTokens !== undefined) {
         span.setAttribute(
@@ -301,10 +281,7 @@ function buildSpan(
   }
 
   if (config.rag?.contexts.length) {
-    span.setAttribute(
-      "langwatch.rag.contexts",
-      JSON.stringify(config.rag.contexts),
-    );
+    span.setAttribute("langwatch.rag.contexts", JSON.stringify(config.rag.contexts));
   }
 
   if (config.prompt) {
@@ -316,8 +293,7 @@ function buildSpan(
       // Foundry-emitted traces participate in the prompt rollup.
       const raw = config.prompt.promptId;
       const versionRef = config.prompt.version ?? config.prompt.versionId;
-      const id =
-        raw.includes(":") || !versionRef ? raw : `${raw}:${versionRef}`;
+      const id = raw.includes(":") || !versionRef ? raw : `${raw}:${versionRef}`;
       span.setAttribute("langwatch.prompt.id", id);
 
       // Also emit the separate-format keys when we have a numeric
@@ -327,10 +303,7 @@ function buildSpan(
       if (typeof config.prompt.version === "number") {
         const slug = raw.includes(":") ? raw.split(":")[0]! : raw;
         span.setAttribute("langwatch.prompt.handle", slug);
-        span.setAttribute(
-          "langwatch.prompt.version.number",
-          config.prompt.version,
-        );
+        span.setAttribute("langwatch.prompt.version.number", config.prompt.version);
       }
     }
     if (config.prompt.versionId) {
@@ -340,10 +313,7 @@ function buildSpan(
       // The pin the developer set on the call site. The projection
       // records this verbatim into `SelectedPromptId`; when it differs
       // from the resolved runtime id the drawer flags drift.
-      span.setAttribute(
-        "langwatch.prompt.selected.id",
-        config.prompt.selectedId,
-      );
+      span.setAttribute("langwatch.prompt.selected.id", config.prompt.selectedId);
     }
     if (config.prompt.variables) {
       span.setAttribute(
@@ -402,8 +372,7 @@ function buildSpan(
 function inferGenAiSystem(model: string | undefined): string | undefined {
   if (!model) return undefined;
   const m = model.toLowerCase();
-  if (m.startsWith("gpt") || m.startsWith("o1") || m.startsWith("o3"))
-    return "openai";
+  if (m.startsWith("gpt") || m.startsWith("o1") || m.startsWith("o3")) return "openai";
   if (m.includes("claude")) return "anthropic";
   if (m.includes("gemini") || m.includes("palm")) return "vertex_ai";
   if (m.includes("mistral") || m.includes("mixtral")) return "mistral_ai";

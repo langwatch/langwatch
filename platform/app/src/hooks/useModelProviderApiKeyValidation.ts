@@ -46,8 +46,7 @@ export function useModelProviderApiKeyValidation(
   const utils = api.useUtils();
   // A mutation, so the key travels in a request body rather than encoded into
   // a URL. See the procedure for why that matters.
-  const { mutateAsync: validateApiKey } =
-    api.modelProvider.validateApiKey.useMutation();
+  const { mutateAsync: validateApiKey } = api.modelProvider.validateApiKey.useMutation();
 
   const validate = useCallback(async (): Promise<boolean> => {
     // The probe reads nothing from storage — it sends the typed keys
@@ -106,13 +105,11 @@ export function useModelProviderApiKeyValidation(
       setValidationError(undefined);
 
       try {
-        const result = await utils.modelProvider.validateKeyWithCustomUrl.fetch(
-          {
-            projectId,
-            provider,
-            customBaseUrl,
-          },
-        );
+        const result = await utils.modelProvider.validateKeyWithCustomUrl.fetch({
+          projectId,
+          provider,
+          customBaseUrl,
+        });
 
         if (!result.valid) {
           setValidationError(describeRefusal(result.domainError));

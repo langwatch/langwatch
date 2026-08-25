@@ -1,9 +1,6 @@
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  buildAwsClientConfig,
-  staticCredentialsOrUndefined,
-} from "../awsClientConfig";
+import { buildAwsClientConfig, staticCredentialsOrUndefined } from "../awsClientConfig";
 
 // The assume-role branch builds a provider whose shape nothing else can read
 // back: `fromTemporaryCredentials` returns an opaque function. Mocking it is
@@ -15,10 +12,7 @@ vi.mock("@aws-sdk/credential-providers", () => ({
 // A recorder of its own arguments, so the timeouts and the agent a handler was
 // built with are readable without touching the real class's private fields.
 vi.mock("@smithy/node-http-handler", () => ({
-  NodeHttpHandler: vi.fn(function (
-    this: { options: unknown },
-    options: unknown,
-  ) {
+  NodeHttpHandler: vi.fn(function (this: { options: unknown }, options: unknown) {
     this.options = options;
   }),
 }));
@@ -158,8 +152,7 @@ describe("buildAwsClientConfig", () => {
   });
 
   describe("when a role is assumed", () => {
-    const paramsOfLastCall = () =>
-      vi.mocked(fromTemporaryCredentials).mock.lastCall![0]!;
+    const paramsOfLastCall = () => vi.mocked(fromTemporaryCredentials).mock.lastCall![0]!;
 
     /**
      * The ExternalId is what proves the AssumeRole request came from us rather

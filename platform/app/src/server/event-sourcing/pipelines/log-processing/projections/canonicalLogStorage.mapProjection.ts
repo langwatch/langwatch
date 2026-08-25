@@ -1,8 +1,5 @@
 import type { AppendStore } from "@langwatch/eventing";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import { logCommandGroupKey } from "../canonicalLog";
 import { LOG_MAP_COALESCE_MAX_BATCH } from "../schemas/constants";
 import {
@@ -21,10 +18,7 @@ export class CanonicalLogStorageMapProjection
   readonly store: AppendStore<CanonicalLogRecord>;
   protected readonly events = events;
 
-  constructor(deps: {
-    store: AppendStore<CanonicalLogRecord>;
-    shardCount: number;
-  }) {
+  constructor(deps: { store: AppendStore<CanonicalLogRecord>; shardCount: number }) {
     super();
     this.store = deps.store;
     this.options = {
@@ -34,9 +28,7 @@ export class CanonicalLogStorageMapProjection
     };
   }
 
-  mapLogRecordReceived(
-    event: CanonicalLogRecordReceivedEvent,
-  ): CanonicalLogRecord {
+  mapLogRecordReceived(event: CanonicalLogRecordReceivedEvent): CanonicalLogRecord {
     return event.data;
   }
 }

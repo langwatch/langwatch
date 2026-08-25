@@ -20,15 +20,15 @@ export class AppDatasetRuntime {
   private readonly adapter: PostgresDatasetAdapter;
 
   private constructor(options: {
-      database: PrismaClient;
-      experiments?: DatasetExperimentPort;
-      storage?: DatasetUploadPort;
-      queue?: DatasetNormalizeQueuePort;
-      /** Object-backed dataset reads/mutations; selected by the composition root. */
-      content?: DatasetContentPort;
-      storageResolver?: DatasetStorageResolver;
-      generateId?: () => string;
-    }) {
+    database: PrismaClient;
+    experiments?: DatasetExperimentPort;
+    storage?: DatasetUploadPort;
+    queue?: DatasetNormalizeQueuePort;
+    /** Object-backed dataset reads/mutations; selected by the composition root. */
+    content?: DatasetContentPort;
+    storageResolver?: DatasetStorageResolver;
+    generateId?: () => string;
+  }) {
     this.adapter = PostgresDatasetAdapter.create(options);
   }
 

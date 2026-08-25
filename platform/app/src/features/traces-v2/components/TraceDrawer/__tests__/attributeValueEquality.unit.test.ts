@@ -65,10 +65,7 @@ describe("sameAttributeValue", () => {
       /** @scenario "JSON that only changed its formatting is not marked as edited" */
       it("reads the tool calls as the same value", () => {
         expect(
-          sameAttributeValue(
-            JSON.stringify(TOOL_CALLS),
-            prettyPrinted(TOOL_CALLS),
-          ),
+          sameAttributeValue(JSON.stringify(TOOL_CALLS), prettyPrinted(TOOL_CALLS)),
         ).toBe(true);
       });
 
@@ -80,9 +77,7 @@ describe("sameAttributeValue", () => {
       });
 
       it("reads text and the structure it spells out as the same value", () => {
-        expect(sameAttributeValue(JSON.stringify(TOOL_CALLS), TOOL_CALLS)).toBe(
-          true,
-        );
+        expect(sameAttributeValue(JSON.stringify(TOOL_CALLS), TOOL_CALLS)).toBe(true);
       });
     });
   });
@@ -91,9 +86,7 @@ describe("sameAttributeValue", () => {
     describe("when it is compared with what was captured", () => {
       /** @scenario "Reordered JSON keys are not an edit" */
       it("reads them as the same value", () => {
-        expect(
-          sameAttributeValue(TOOL_CALLS, withReversedKeys(TOOL_CALLS)),
-        ).toBe(true);
+        expect(sameAttributeValue(TOOL_CALLS, withReversedKeys(TOOL_CALLS))).toBe(true);
       });
     });
   });
@@ -102,9 +95,7 @@ describe("sameAttributeValue", () => {
     describe("when it is compared with what was captured", () => {
       /** @scenario "Reordered JSON array entries are an edit" */
       it("reads them as different values", () => {
-        expect(sameAttributeValue(MESSAGES, [...MESSAGES].reverse())).toBe(
-          false,
-        );
+        expect(sameAttributeValue(MESSAGES, [...MESSAGES].reverse())).toBe(false);
       });
     });
   });
@@ -122,9 +113,7 @@ describe("sameAttributeValue", () => {
         const [first, ...rest] = structuredClone(TOOL_CALLS);
         const { providerMetadata: _dropped, ...withoutMetadata } = first!;
 
-        expect(sameAttributeValue(TOOL_CALLS, [withoutMetadata, ...rest])).toBe(
-          false,
-        );
+        expect(sameAttributeValue(TOOL_CALLS, [withoutMetadata, ...rest])).toBe(false);
       });
 
       it("reads text that only looks like a number as the text it is", () => {

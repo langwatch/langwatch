@@ -42,6 +42,7 @@ OCSF event shape (per the v1.1 spec):
 Auth is scoped to **org admin** or **auditor** role. Both roles map to project-membership of the hidden Governance Project; customer-visible project members do NOT inherit OCSF read access.
 
 Use either:
+
 - **Personal access token (PAT)**: for org admins running ad-hoc pulls
 - **Bearer access token** from `langwatch login --device`: for SIEM cron-pull integrations (the recommended path)
 
@@ -57,14 +58,14 @@ Each pull cycle:
 
 ## Supported SIEM platforms
 
-| SIEM | Adapter pattern |
-|---|---|
+| SIEM                           | Adapter pattern                                                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Splunk Enterprise Security** | Splunk add-on with a REST modular input pointing at `api.governance.ocsfExport`; bring-your-own-add-on, works against any HTTP-pull source |
-| **Datadog Security** | Custom log source via `datadog-agent` HTTP-pull integration; same shape, different transport |
-| **AWS Security Hub** | Custom integration via the `BatchImportFindings` API; your cron worker maps OCSF events to Security Hub findings |
-| **Microsoft Sentinel** | Custom data connector (Logic App + REST pull); Sentinel's native ingestion accepts OCSF v1.1 directly |
-| **Elastic Security** | Filebeat with HTTP-input + ECS-OCSF mapping module |
-| **Sumo Logic CSE** | Hosted collector with HTTP-source; accepts OCSF v1.1 with the standard OWASP AOS schema mapping |
+| **Datadog Security**           | Custom log source via `datadog-agent` HTTP-pull integration; same shape, different transport                                               |
+| **AWS Security Hub**           | Custom integration via the `BatchImportFindings` API; your cron worker maps OCSF events to Security Hub findings                           |
+| **Microsoft Sentinel**         | Custom data connector (Logic App + REST pull); Sentinel's native ingestion accepts OCSF v1.1 directly                                      |
+| **Elastic Security**           | Filebeat with HTTP-input + ECS-OCSF mapping module                                                                                         |
+| **Sumo Logic CSE**             | Hosted collector with HTTP-source; accepts OCSF v1.1 with the standard OWASP AOS schema mapping                                            |
 
 Other SIEM platforms with generic JSON-pull integrations (CrowdStrike NG-SIEM, Securonix, Exabeam, etc.) follow the same pattern.
 
@@ -89,15 +90,15 @@ Other SIEM platforms with generic JSON-pull integrations (CrowdStrike NG-SIEM, S
 
 OCSF events are derived from `recorded_spans` + `log_records` via the `governance_ocsf_events` fold projection. The mapping per origin source-type:
 
-| Source type | Actor | Action | Target |
-|---|---|---|---|
-| `otel_generic` | `user.email` attribute | `gen_ai.operation.name` (e.g. `chat`) | `gen_ai.request.model` |
-| `claude_cowork` | `user.email` attribute | `agent.action.name` (e.g. `tool_call`) | `agent.tool.name` |
-| `workato` | Webhook envelope `actor` field | Webhook envelope `event_type` | Webhook envelope `target` field |
-| `s3_custom` | Per-customer DSL mapping | Per-customer DSL mapping | Per-customer DSL mapping |
-| `copilot_studio` | Microsoft Copilot Studio audit `actor.email` | Microsoft Copilot Studio audit `event_type` | Microsoft Copilot Studio audit `target` |
-| `openai_compliance` | OpenAI Compliance API `user.email` | OpenAI Compliance API `event_type` | OpenAI Compliance API `model` |
-| `claude_compliance` | Anthropic Compliance API `user.email` | Anthropic Compliance API `event_type` | Anthropic Compliance API `model` |
+| Source type         | Actor                                        | Action                                      | Target                                  |
+| ------------------- | -------------------------------------------- | ------------------------------------------- | --------------------------------------- |
+| `otel_generic`      | `user.email` attribute                       | `gen_ai.operation.name` (e.g. `chat`)       | `gen_ai.request.model`                  |
+| `claude_cowork`     | `user.email` attribute                       | `agent.action.name` (e.g. `tool_call`)      | `agent.tool.name`                       |
+| `workato`           | Webhook envelope `actor` field               | Webhook envelope `event_type`               | Webhook envelope `target` field         |
+| `s3_custom`         | Per-customer DSL mapping                     | Per-customer DSL mapping                    | Per-customer DSL mapping                |
+| `copilot_studio`    | Microsoft Copilot Studio audit `actor.email` | Microsoft Copilot Studio audit `event_type` | Microsoft Copilot Studio audit `target` |
+| `openai_compliance` | OpenAI Compliance API `user.email`           | OpenAI Compliance API `event_type`          | OpenAI Compliance API `model`           |
+| `claude_compliance` | Anthropic Compliance API `user.email`        | Anthropic Compliance API `event_type`       | Anthropic Compliance API `model`        |
 
 When a source's expected fields are missing, the OCSF mapping falls back gracefully (Action → `unknown`, Target → `unknown`, Actor → `system`). The fold logs a warning so operators can fix the source's wire shape.
 

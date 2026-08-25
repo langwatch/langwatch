@@ -14,10 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockPush = vi.fn();
 
 const mockRouter = {
-  query: { project: "my-project" } as Record<
-    string,
-    string | string[] | undefined
-  >,
+  query: { project: "my-project" } as Record<string, string | string[] | undefined>,
   pathname: "/[project]/simulations/[[...path]]" as string,
   asPath: "/my-project/simulations" as string,
   push: mockPush,
@@ -328,8 +325,7 @@ describe("useSuiteRouting()", () => {
         project: "my-project",
         pendingBatch: "scenariobatch_xxx",
       };
-      mockRouter.asPath =
-        "/my-project/simulations/?pendingBatch=scenariobatch_xxx";
+      mockRouter.asPath = "/my-project/simulations/?pendingBatch=scenariobatch_xxx";
 
       const { result } = renderHook(() => useSuiteRouting());
 
@@ -366,18 +362,14 @@ describe("deriveFromPath", () => {
   });
 
   it("returns suite slug from run-plans path", () => {
-    expect(
-      deriveFromPath({ isReady: true, path: ["run-plans", "my-suite"] }),
-    ).toEqual({
+    expect(deriveFromPath({ isReady: true, path: ["run-plans", "my-suite"] })).toEqual({
       selectedSuiteSlug: "my-suite",
       highlightBatchId: null,
     });
   });
 
   it("returns external set with batch from path segments", () => {
-    expect(
-      deriveFromPath({ isReady: true, path: ["default", "batch_123"] }),
-    ).toEqual({
+    expect(deriveFromPath({ isReady: true, path: ["default", "batch_123"] })).toEqual({
       selectedSuiteSlug: `${EXTERNAL_SET_PREFIX}default`,
       highlightBatchId: "batch_123",
     });

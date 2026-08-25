@@ -79,47 +79,46 @@ export class AnnualEventsBillingThresholdService {
     stripeSubscriptionId: string;
     isDryRun?: boolean;
   }): Promise<ThresholdResult> {
-  const subscription =
-    await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
+    const subscription = await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
 
-  const hasAnnualEventsItem = (subscription.items?.data ?? []).some((item) =>
-    isAnnualGrowthEventsPrice(item.price.id, this.prices),
-  );
-  if (!hasAnnualEventsItem) {
-    return "not_annual_events";
-  }
-
-  const existingThreshold = subscription.billing_thresholds;
-  const existingAmount = existingThreshold?.amount_gte;
-
-  if (existingAmount != null) {
-    if (existingThreshold?.reset_billing_cycle_anchor !== true) {
-      return "already_set";
+    const hasAnnualEventsItem = (subscription.items?.data ?? []).some((item) =>
+      isAnnualGrowthEventsPrice(item.price.id, this.prices),
+    );
+    if (!hasAnnualEventsItem) {
+      return "not_annual_events";
     }
-    // The amount was chosen deliberately — keep it. The anchor reset was
-    // not: it would move the renewal date on every threshold invoice.
+
+    const existingThreshold = subscription.billing_thresholds;
+    const existingAmount = existingThreshold?.amount_gte;
+
+    if (existingAmount != null) {
+      if (existingThreshold?.reset_billing_cycle_anchor !== true) {
+        return "already_set";
+      }
+      // The amount was chosen deliberately — keep it. The anchor reset was
+      // not: it would move the renewal date on every threshold invoice.
+      if (!isDryRun) {
+        await this.stripe.subscriptions.update(stripeSubscriptionId, {
+          billing_thresholds: {
+            amount_gte: existingAmount,
+            reset_billing_cycle_anchor: false,
+          },
+        });
+      }
+      return "anchor_pinned";
+    }
+
     if (!isDryRun) {
       await this.stripe.subscriptions.update(stripeSubscriptionId, {
         billing_thresholds: {
-          amount_gte: existingAmount,
+          amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
+          // The billing anniversary must never move — threshold invoices
+          // collect mid-cycle, the renewal date stays as sold.
           reset_billing_cycle_anchor: false,
         },
       });
     }
-    return "anchor_pinned";
-  }
 
-  if (!isDryRun) {
-    await this.stripe.subscriptions.update(stripeSubscriptionId, {
-      billing_thresholds: {
-        amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
-        // The billing anniversary must never move — threshold invoices
-        // collect mid-cycle, the renewal date stays as sold.
-        reset_billing_cycle_anchor: false,
-      },
-    });
-  }
-
-  return "applied";
+    return "applied";
   }
 }

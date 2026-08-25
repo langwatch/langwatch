@@ -50,11 +50,7 @@ export const LensNameDialog: React.FC<LensNameDialogProps> = ({
   };
 
   return (
-    <DialogRoot
-      open={open}
-      onOpenChange={(e) => onOpenChange(e.open)}
-      size="sm"
-    >
+    <DialogRoot open={open} onOpenChange={(e) => onOpenChange(e.open)} size="sm">
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -76,11 +72,7 @@ export const LensNameDialog: React.FC<LensNameDialogProps> = ({
         </DialogBody>
         <DialogFooter>
           <HStack gap={2} justify="flex-end" width="full">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button

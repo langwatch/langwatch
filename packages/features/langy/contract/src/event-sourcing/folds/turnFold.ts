@@ -32,11 +32,7 @@ import type {
   LangyToolCallSucceededEventData,
 } from "../contracts/langy.events";
 import { langyJsonValueSchema } from "../../json";
-import type {
-  LangyJsonObject,
-  LangyJsonValue,
-  LangyMessagePart,
-} from "../../json";
+import type { LangyJsonObject, LangyJsonValue, LangyMessagePart } from "../../json";
 
 /**
  * Composite fold key: one turn document per `(conversationId, turnId)` within a
@@ -44,10 +40,7 @@ import type {
  * contain ":", so a single ":" is an unambiguous delimiter (mirrors
  * experiment-run's makeExperimentRunKey).
  */
-export function makeConversationTurnKey(
-  conversationId: string,
-  turnId: string,
-): string {
+export function makeConversationTurnKey(conversationId: string, turnId: string): string {
   return `${conversationId}:${turnId}`;
 }
 
@@ -87,23 +80,21 @@ export type LangyTurnToolCall = LangyJsonObject & {
  * two physical zod copies are in play. Consumers compose it only through
  * instanceof-safe combinators (`z.array`, `.parse`).
  */
-export const langyTurnToolCallSchema = z
-  .record(z.string(), langyJsonValueSchema)
-  .and(
-    z.object({
-      toolCallId: z.string(),
-      toolName: z.string(),
-      command: z.string().optional(),
-      input: langyJsonValueSchema.optional(),
-      status: z.union([
-        z.literal(LANGY_TURN_TOOL_CALL_STATUS.INITIATED),
-        z.literal(LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED),
-        z.literal(LANGY_TURN_TOOL_CALL_STATUS.FAILED),
-      ]),
-      durationMs: z.number().optional(),
-      errorText: z.string().optional(),
-    }),
-  );
+export const langyTurnToolCallSchema = z.record(z.string(), langyJsonValueSchema).and(
+  z.object({
+    toolCallId: z.string(),
+    toolName: z.string(),
+    command: z.string().optional(),
+    input: langyJsonValueSchema.optional(),
+    status: z.union([
+      z.literal(LANGY_TURN_TOOL_CALL_STATUS.INITIATED),
+      z.literal(LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED),
+      z.literal(LANGY_TURN_TOOL_CALL_STATUS.FAILED),
+    ]),
+    durationMs: z.number().optional(),
+    errorText: z.string().optional(),
+  }),
+);
 
 /**
  * The turn render document — one turn folded into its final state. A SECOND fold
@@ -246,9 +237,10 @@ function upsertToolCall(
  * (the server routes by handler name, the browser by
  * LANGY_CONVERSATION_TURN_EVENT_TYPES).
  */
-export function foldLangyConversationTurn<
-  S extends LangyConversationTurnFoldState,
->(state: S, event: LangyConversationTurnEvent): S {
+export function foldLangyConversationTurn<S extends LangyConversationTurnFoldState>(
+  state: S,
+  event: LangyConversationTurnEvent,
+): S {
   switch (event.type) {
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED: {
       const question = event.data.questionParts;
@@ -257,8 +249,7 @@ export function foldLangyConversationTurn<
         Status: LANGY_CONVERSATION_TURN_STATUS.RUNNING,
         StartedAt: state.StartedAt ?? event.occurredAt,
         // The question rides the start event so the turn doc is self-contained.
-        QuestionParts:
-          question && question.length > 0 ? question : state.QuestionParts,
+        QuestionParts: question && question.length > 0 ? question : state.QuestionParts,
       };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED: {
@@ -304,8 +295,7 @@ export function foldLangyConversationTurn<
       return { ...withIdentity(event, state), ToolCalls };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED: {
-      const { toolCallId, toolName, command, input, durationMs, errorText } =
-        event.data;
+      const { toolCallId, toolName, command, input, durationMs, errorText } = event.data;
       const ToolCalls = upsertToolCall(
         state,
         toolCallId,
@@ -361,10 +351,7 @@ export function foldLangyConversationTurn<
         ...withIdentity(event, state),
         AnswerParts: event.data.parts ?? [],
         Status: status,
-        Error:
-          outcome === "failed"
-            ? (event.data.error ?? "unknown error")
-            : state.Error,
+        Error: outcome === "failed" ? (event.data.error ?? "unknown error") : state.Error,
         EndedAt: event.occurredAt,
       };
     }

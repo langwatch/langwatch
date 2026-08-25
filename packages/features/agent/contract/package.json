@@ -3,18 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "description": "Portable Agents domain values, schemas, commands, queries, and capabilities.",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": [
-    "src"
-  ],
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
     "typecheck": "tsc --noEmit",

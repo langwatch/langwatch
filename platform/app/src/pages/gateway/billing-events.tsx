@@ -89,9 +89,7 @@ function useLedgerPaging() {
   };
 
   const append = (page: SpendEventsPage) => {
-    setPages((prev) =>
-      cursor === undefined ? [page.rows] : [...prev, page.rows],
-    );
+    setPages((prev) => (cursor === undefined ? [page.rows] : [...prev, page.rows]));
   };
 
   return { pages, cursor, setCursor, reset, append };
@@ -441,8 +439,7 @@ function BillingEventsPage() {
 
         {ledger.query.data?.clickHouseDisabled && (
           <Text fontSize="sm" color="fg.muted">
-            Billing events need ClickHouse, which is not enabled on this
-            deployment.
+            Billing events need ClickHouse, which is not enabled on this deployment.
           </Text>
         )}
 

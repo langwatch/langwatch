@@ -4,7 +4,13 @@ description: Hono-mounted REST/JSON API at /api/governance/* with an auto-genera
 sidebarTitle: REST API
 ---
 
-<Info>**Pairs with:** [Governance CLI](/ai-governance/cli) (the CLI is a thin shell over this API) and [Governance MCP server](/ai-governance/mcp) (the MCP tools are a thin shell over this API). All three surfaces dispatch through the same service-layer functions; the dashboard tRPC procedures call into the same services. There is exactly one place each governance verb is implemented.</Info>
+<Info>
+  **Pairs with:** [Governance CLI](/ai-governance/cli) (the CLI is a thin shell over this
+  API) and [Governance MCP server](/ai-governance/mcp) (the MCP tools are a thin shell
+  over this API). All three surfaces dispatch through the same service-layer functions;
+  the dashboard tRPC procedures call into the same services. There is exactly one place
+  each governance verb is implemented.
+</Info>
 
 <Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. The governance repositories hold that boundary: see `platform/app/ee/governance/repositories/ingestionTemplate.repository.ts` and `governanceAudit.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
 
@@ -20,33 +26,33 @@ Both paths call into the same service-layer functions, there is no business-logi
 
 ## Where it lives
 
-| Property | Value |
-|---|---|
-| Mount point | `/api/governance/<resource>` |
-| Spec | Emitted into the canonical `openapiLangWatch.json` on the next spec regeneration, every governance route registers via the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API |
-| Auth | Project API key, `Authorization: Bearer <projectApiKey>` or `X-Auth-Token`, same as `/api/dataset/*` and `/api/trace/*`. The org for the call derives from the project's team |
-| RBAC | Per-route ceiling permission for PAT-authed callers (`aiTools:view` on reads, `aiTools:manage` on writes for ingestion-templates; analogous `<resource>:view`, `<resource>:manage` on other resources). Legacy project tokens bypass the ceiling, same model as `gateway-platform` |
-| Tenancy | `organizationId` is derived from `project → team → organization`. Cross-org probes collapse to 404 at the service layer (no enumeration vector) |
-| Wire shape | Paths kebab-case, JSON fields snake_case (e.g. `ottl_rules`, `source_type`, `display_name`) per public-REST convention |
+| Property    | Value                                                                                                                                                                                                                                                                              |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mount point | `/api/governance/<resource>`                                                                                                                                                                                                                                                       |
+| Spec        | Emitted into the canonical `openapiLangWatch.json` on the next spec regeneration, every governance route registers via the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API                                                                       |
+| Auth        | Project API key, `Authorization: Bearer <projectApiKey>` or `X-Auth-Token`, same as `/api/dataset/*` and `/api/trace/*`. The org for the call derives from the project's team                                                                                                      |
+| RBAC        | Per-route ceiling permission for PAT-authed callers (`aiTools:view` on reads, `aiTools:manage` on writes for ingestion-templates; analogous `<resource>:view`, `<resource>:manage` on other resources). Legacy project tokens bypass the ceiling, same model as `gateway-platform` |
+| Tenancy     | `organizationId` is derived from `project → team → organization`. Cross-org probes collapse to 404 at the service layer (no enumeration vector)                                                                                                                                    |
+| Wire shape  | Paths kebab-case, JSON fields snake_case (e.g. `ottl_rules`, `source_type`, `display_name`) per public-REST convention                                                                                                                                                             |
 
 ## Resource × verb matrix
 
 Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`, `delete`, over Hono, the CLI, and the MCP server, except where the table below names a narrower verb set (`audit-log` is read-only, ingestion keys mint through their own route). The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
 
-| Resource | OpenAPI path group | Detail page |
-|---|---|---|
-| Anomaly rules | `/api/governance/anomaly-rules` | [Anomaly rules](/ai-governance/anomaly-rules) |
-| Audit log (read-only) | `/api/governance/audit-log` | [Audit log](/ai-governance/audit-log) |
-| Gateway budgets | `/api/governance/gateway-budgets` | [Control plane](/ai-governance/control-plane) |
-| Ingestion sources | `/api/governance/ingestion-sources` | [Ingestion sources](/ai-governance/ingestion-sources) |
-| Ingestion templates | `/api/governance/ingestion-templates` | [Ingestion templates](/ai-governance/ingestion-templates) |
-| Ingestion keys | `/api/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate`) | [Ingestion templates](/ai-governance/ingestion-templates) |
-| Members | `/api/governance/members` | [Members and invites](/ai-governance/members-and-invites) |
-| Invites | `/api/governance/invites` | [Members and invites](/ai-governance/members-and-invites) |
-| Role bindings | `/api/governance/role-bindings` | [Roles and permissions](/ai-governance/roles-and-permissions) |
-| AI tool entries | `/api/governance/ai-tool-entries` | [Personas](/ai-governance/personas) |
-| Sessions | `/api/governance/sessions` | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/devices`) |
-| Virtual keys | `/api/governance/virtual-keys` | [Control plane](/ai-governance/control-plane) |
+| Resource              | OpenAPI path group                                                                                    | Detail page                                                                          |
+| --------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Anomaly rules         | `/api/governance/anomaly-rules`                                                                       | [Anomaly rules](/ai-governance/anomaly-rules)                                        |
+| Audit log (read-only) | `/api/governance/audit-log`                                                                           | [Audit log](/ai-governance/audit-log)                                                |
+| Gateway budgets       | `/api/governance/gateway-budgets`                                                                     | [Control plane](/ai-governance/control-plane)                                        |
+| Ingestion sources     | `/api/governance/ingestion-sources`                                                                   | [Ingestion sources](/ai-governance/ingestion-sources)                                |
+| Ingestion templates   | `/api/governance/ingestion-templates`                                                                 | [Ingestion templates](/ai-governance/ingestion-templates)                            |
+| Ingestion keys        | `/api/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate`) | [Ingestion templates](/ai-governance/ingestion-templates)                            |
+| Members               | `/api/governance/members`                                                                             | [Members and invites](/ai-governance/members-and-invites)                            |
+| Invites               | `/api/governance/invites`                                                                             | [Members and invites](/ai-governance/members-and-invites)                            |
+| Role bindings         | `/api/governance/role-bindings`                                                                       | [Roles and permissions](/ai-governance/roles-and-permissions)                        |
+| AI tool entries       | `/api/governance/ai-tool-entries`                                                                     | [Personas](/ai-governance/personas)                                                  |
+| Sessions              | `/api/governance/sessions`                                                                            | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/devices`) |
+| Virtual keys          | `/api/governance/virtual-keys`                                                                        | [Control plane](/ai-governance/control-plane)                                        |
 
 `audit-log` is intentionally read-only (no create, update, delete), audit rows are emitted by other state-changing routes and are immutable by design.
 
@@ -54,15 +60,15 @@ Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`
 
 The first surface to ship is `ingestion-templates` (Sergey's Lane B-1 commit). The verb set:
 
-| Verb | Method + path | Returns | RBAC |
-|---|---|---|---|
-| `list` | `GET /api/governance/ingestion-templates` | `{ data: IngestionTemplateDto[] }` (end-user shape, `ottl_rules` redacted) | `aiTools:view` |
-| `admin-list` | `GET /api/governance/ingestion-templates/admin` | `{ data: IngestionTemplateDto[] }` (admin shape, includes `ottl_rules`) | `aiTools:manage` |
-| `get` | `GET /api/governance/ingestion-templates/:id` | `{ ingestion_template: IngestionTemplateDto }` | `aiTools:view` |
-| `create` | `POST /api/governance/ingestion-templates` | `{ ingestion_template: IngestionTemplateDto }` (201) | `aiTools:manage` |
-| `update-ottl-rules` | `PATCH /api/governance/ingestion-templates/:id/ottl-rules` | `{ ingestion_template: IngestionTemplateDto }` | `aiTools:manage` |
-| `archive` | `DELETE /api/governance/ingestion-templates/:id` | `{ archived: true }` (soft-archive) | `aiTools:manage` |
-| `clone-from-platform` | `POST /api/governance/ingestion-templates/clone` | `{ ingestion_template: IngestionTemplateDto }` | `aiTools:manage` |
+| Verb                  | Method + path                                              | Returns                                                                    | RBAC             |
+| --------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------- |
+| `list`                | `GET /api/governance/ingestion-templates`                  | `{ data: IngestionTemplateDto[] }` (end-user shape, `ottl_rules` redacted) | `aiTools:view`   |
+| `admin-list`          | `GET /api/governance/ingestion-templates/admin`            | `{ data: IngestionTemplateDto[] }` (admin shape, includes `ottl_rules`)    | `aiTools:manage` |
+| `get`                 | `GET /api/governance/ingestion-templates/:id`              | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:view`   |
+| `create`              | `POST /api/governance/ingestion-templates`                 | `{ ingestion_template: IngestionTemplateDto }` (201)                       | `aiTools:manage` |
+| `update-ottl-rules`   | `PATCH /api/governance/ingestion-templates/:id/ottl-rules` | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:manage` |
+| `archive`             | `DELETE /api/governance/ingestion-templates/:id`           | `{ archived: true }` (soft-archive)                                        | `aiTools:manage` |
+| `clone-from-platform` | `POST /api/governance/ingestion-templates/clone`           | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:manage` |
 
 A few resource-shape notes that generalise across the namespace:
 
@@ -72,12 +78,12 @@ A few resource-shape notes that generalise across the namespace:
 
 The second resource to ship is `ingestion-keys` (Sergey's Lane B-2 commit at `5275e7e11`). An ingestion key is just an `ApiKey` (prefix `sk-lw-`) scoped to one project with an ingest-only role, there is no separate binding model. The CLI mints one through a dedicated auth route; the dashboard manages the rest through the `ingestionKey` tRPC router (`list` / `install` / `rotate`):
 
-| Verb | Method + path | Returns | RBAC |
-|---|---|---|---|
-| `mint` | `POST /api/auth/cli/governance/ingestion-key` (body `{ source_type }`) | `{ token: "sk-lw-…", prefix, endpoint }` (token returned exactly once) | `aiTools:manage` |
-| `list` | tRPC `ingestionKey.list` | `{ data: IngestionKeyDto[] }` (project-scoped; only the `sk-lw-` prefix is visible, never the full token) | `aiTools:manage` |
-| `install` | tRPC `ingestionKey.install` | `{ key: ..., token: "sk-lw-…" }` (token returned exactly once) | `aiTools:manage` |
-| `rotate` | tRPC `ingestionKey.rotate` | `{ key: ..., token: "sk-lw-…" }` (hard-cut rotation per spec, old token is invalid immediately) | `aiTools:manage` |
+| Verb      | Method + path                                                          | Returns                                                                                                   | RBAC             |
+| --------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------- |
+| `mint`    | `POST /api/auth/cli/governance/ingestion-key` (body `{ source_type }`) | `{ token: "sk-lw-…", prefix, endpoint }` (token returned exactly once)                                    | `aiTools:manage` |
+| `list`    | tRPC `ingestionKey.list`                                               | `{ data: IngestionKeyDto[] }` (project-scoped; only the `sk-lw-` prefix is visible, never the full token) | `aiTools:manage` |
+| `install` | tRPC `ingestionKey.install`                                            | `{ key: ..., token: "sk-lw-…" }` (token returned exactly once)                                            | `aiTools:manage` |
+| `rotate`  | tRPC `ingestionKey.rotate`                                             | `{ key: ..., token: "sk-lw-…" }` (hard-cut rotation per spec, old token is invalid immediately)           | `aiTools:manage` |
 
 Two consequences:
 
@@ -107,12 +113,12 @@ The TS SDK exposes `langwatch.governance.<resource>.<verb>(...)`, the Python SDK
 
 State-changing calls always emit an audit row from the service layer (the same row a dashboard tRPC mutation would emit, there is one service-layer audit emitter, not three). Every audit row carries a **surface attribution** tag stamped into `AuditLog.metadata.surface`:
 
-| Surface | `metadata.surface` value |
-|---|---|
-| Dashboard tRPC | `"trpc"` (default) |
-| Hono REST | `"hono"` |
-| CLI | `"cli"` |
-| MCP | `"mcp"` |
+| Surface        | `metadata.surface` value |
+| -------------- | ------------------------ |
+| Dashboard tRPC | `"trpc"` (default)       |
+| Hono REST      | `"hono"`                 |
+| CLI            | `"cli"`                  |
+| MCP            | `"mcp"`                  |
 
 The shared type lives at `@ee/governance/services/auditSurface.ts` (`GovernanceCallSurface`); every mutating service method on the governance services takes an optional `surface` parameter (default `"trpc"`) which is stamped into `metadata` at audit emission. Forensic readers query `metadata->>'surface'` to filter by surface.
 

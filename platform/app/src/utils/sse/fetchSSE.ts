@@ -97,9 +97,7 @@ export async function fetchSSE<T>({
 
         if (
           response.ok &&
-          response.headers
-            .get("content-type")
-            ?.includes(EVENT_STREAM_CONTENT_TYPE)
+          response.headers.get("content-type")?.includes(EVENT_STREAM_CONTENT_TYPE)
         ) {
           return;
         }

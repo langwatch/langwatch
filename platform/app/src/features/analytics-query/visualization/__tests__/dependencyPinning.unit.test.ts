@@ -45,14 +45,12 @@ describe("the Vega dependency set", () => {
         const devDependencies = manifest.devDependencies ?? {};
 
         for (const [name, version] of Object.entries(PINNED_VEGA_PACKAGES)) {
-          expect(
-            devDependencies[name],
-            `${name} must be a direct devDependency`,
-          ).toBe(version);
-          expect(
-            /^[~^><=*]|\s|x/.test(version),
-            `${name} must be exact-pinned`,
-          ).toBe(false);
+          expect(devDependencies[name], `${name} must be a direct devDependency`).toBe(
+            version,
+          );
+          expect(/^[~^><=*]|\s|x/.test(version), `${name} must be exact-pinned`).toBe(
+            false,
+          );
           expect(
             manifest.dependencies?.[name],
             `${name} belongs in devDependencies`,
@@ -74,12 +72,8 @@ describe("the Vega dependency set", () => {
         // React 17-19, and vega-embed accepts any vega / vega-lite.
         expect(installed("vega-lite").peerDependencies?.vega).toBe("^6.0.0");
         expect(installed("vega").version).toMatch(/^6\./);
-        expect(installed("react-vega").peerDependencies?.["vega-embed"]).toBe(
-          "^7",
-        );
-        expect(installed("react-vega").peerDependencies?.react).toContain(
-          "^19",
-        );
+        expect(installed("react-vega").peerDependencies?.["vega-embed"]).toBe("^7");
+        expect(installed("react-vega").peerDependencies?.react).toContain("^19");
         expect(installed("vega-embed").version).toMatch(/^7\./);
       });
     });

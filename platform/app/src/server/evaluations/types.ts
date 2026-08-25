@@ -26,9 +26,7 @@ export const checkPreconditionFieldsSchema = z.union([
   z.literal("output"),
 ]);
 
-export type CheckPreconditionFields = z.infer<
-  typeof checkPreconditionFieldsSchema
->;
+export type CheckPreconditionFields = z.infer<typeof checkPreconditionFieldsSchema>;
 
 export const checkPreconditionSchema = z.object({
   field: checkPreconditionFieldsSchema,

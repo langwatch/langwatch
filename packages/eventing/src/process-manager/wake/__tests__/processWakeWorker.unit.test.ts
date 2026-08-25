@@ -112,10 +112,7 @@ describe("ProcessWakeWorker", () => {
         store: {
           findDueWakes: vi
             .fn()
-            .mockResolvedValue([
-              dueWake({ processName: "unknownProcess" }),
-              dueWake(),
-            ]),
+            .mockResolvedValue([dueWake({ processName: "unknownProcess" }), dueWake()]),
         },
         managers: { topicClustering: { handleWake } },
         logger,

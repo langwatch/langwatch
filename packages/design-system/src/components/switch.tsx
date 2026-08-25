@@ -25,8 +25,7 @@ export interface SwitchProps extends Omit<ChakraSwitch.RootProps, "onChange"> {
 
 export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
   function Switch(props, ref) {
-    const { inputProps, children, rootRef, trackLabel, thumbLabel, ...rest } =
-      props;
+    const { inputProps, children, rootRef, trackLabel, thumbLabel, ...rest } = props;
 
     return (
       <ChakraSwitch.Root
@@ -49,9 +48,7 @@ export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
             </ChakraSwitch.Indicator>
           )}
         </ChakraSwitch.Control>
-        {children != null && (
-          <ChakraSwitch.Label>{children}</ChakraSwitch.Label>
-        )}
+        {children != null && <ChakraSwitch.Label>{children}</ChakraSwitch.Label>}
       </ChakraSwitch.Root>
     );
   },

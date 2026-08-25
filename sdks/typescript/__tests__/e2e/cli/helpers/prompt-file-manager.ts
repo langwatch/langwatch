@@ -26,9 +26,7 @@ export interface PromptConfig {
  * - Manage prompts directory structure
  */
 export class PromptFileManager {
-  constructor(
-    private readonly config: { cwd: string; materializedDir?: boolean },
-  ) {}
+  constructor(private readonly config: { cwd: string; materializedDir?: boolean }) {}
 
   /**
    * Gets the absolute path to a prompt file.

@@ -8,8 +8,7 @@ import {
 describe("dashboard contract", () => {
   it("bounds dashboard names at the contract boundary", () => {
     expect(
-      dashboardCreateInputSchema.safeParse({ projectId: "project_1", name: "" })
-        .success,
+      dashboardCreateInputSchema.safeParse({ projectId: "project_1", name: "" }).success,
     ).toBe(false);
     expect(
       dashboardCreateInputSchema.parse({ projectId: "project_1", name: "Reports" }),

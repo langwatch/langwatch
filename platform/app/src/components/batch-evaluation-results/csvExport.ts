@@ -81,8 +81,7 @@ const comparisonVariantName = (
   column: BatchComparisonColumn,
   variantId: string,
 ): string =>
-  column.variants.find((variant) => variant.id === variantId)?.name ??
-  variantId;
+  column.variants.find((variant) => variant.id === variantId)?.name ?? variantId;
 
 /**
  * The winning candidate for one row, by name.
@@ -204,10 +203,7 @@ export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
 /**
  * Build CSV row data for a single row
  */
-const buildCsvRow = (
-  row: BatchResultRow,
-  data: BatchEvaluationData,
-): string[] => {
+const buildCsvRow = (row: BatchResultRow, data: BatchEvaluationData): string[] => {
   const values: string[] = [];
 
   // Row index first
@@ -228,9 +224,7 @@ const buildCsvRow = (
     }
     if (target.promptId) {
       values.push(target.promptId);
-      values.push(
-        target.promptVersion != null ? String(target.promptVersion) : "",
-      );
+      values.push(target.promptVersion != null ? String(target.promptVersion) : "");
     }
     // Custom metadata values
     if (target.metadata) {
@@ -347,10 +341,7 @@ export const generateCsvContent = (data: BatchEvaluationData): string => {
 /**
  * Download CSV file from BatchEvaluationData
  */
-export const downloadCsv = (
-  data: BatchEvaluationData,
-  experimentName: string,
-): void => {
+export const downloadCsv = (data: BatchEvaluationData, experimentName: string): void => {
   const csvContent = generateCsvContent(data);
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = window.URL.createObjectURL(blob);
@@ -375,10 +366,7 @@ export type CsvDownloadOptions = {
   experimentName: string;
 };
 
-export const createCsvDownloader = ({
-  data,
-  experimentName,
-}: CsvDownloadOptions) => {
+export const createCsvDownloader = ({ data, experimentName }: CsvDownloadOptions) => {
   const isEnabled = !!data && data.rows.length > 0;
 
   const download = () => {

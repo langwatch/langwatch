@@ -85,18 +85,12 @@ export const PageKeyboardShortcuts: React.FC = () => {
   const groups = useMemo(
     () =>
       pageGroups(
-        langyRoutesAsk
-          ? "Ask Langy about these traces"
-          : "Ask AI to build a query",
+        langyRoutesAsk ? "Ask Langy about these traces" : "Ask AI to build a query",
       ),
     [langyRoutesAsk],
   );
 
   return (
-    <KeyboardShortcutsHelp
-      open={open}
-      onClose={() => setOpen(false)}
-      groups={groups}
-    />
+    <KeyboardShortcutsHelp open={open} onClose={() => setOpen(false)} groups={groups} />
   );
 };

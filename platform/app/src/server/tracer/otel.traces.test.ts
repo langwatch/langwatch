@@ -1500,8 +1500,7 @@ describe("opentelemetry traces receiver", () => {
   });
 
   it("receives a strands trace", async () => {
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(strandsTrace);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(strandsTrace);
 
     expect(traces).toHaveLength(1);
 
@@ -2466,8 +2465,7 @@ describe("opentelemetry traces receiver", () => {
                     {
                       key: "metadata",
                       value: {
-                        stringValue:
-                          '{"custom.example.attribute2": "langwatch"}',
+                        stringValue: '{"custom.example.attribute2": "langwatch"}',
                       },
                     },
                     {
@@ -2590,8 +2588,7 @@ describe("opentelemetry traces receiver", () => {
   });
 
   it("receives a Spring AI trace", async () => {
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(springAITrace);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(springAITrace);
 
     expect(traces).toHaveLength(1);
 
@@ -2672,9 +2669,7 @@ describe("opentelemetry traces receiver", () => {
       resourceSpans: [
         {
           resource: {
-            attributes: [
-              { key: "service.name", value: { stringValue: "openclaw" } },
-            ],
+            attributes: [{ key: "service.name", value: { stringValue: "openclaw" } }],
           },
           scopeSpans: [
             {
@@ -2723,9 +2718,7 @@ describe("opentelemetry traces receiver", () => {
                         stringValue: JSON.stringify([
                           {
                             role: "user",
-                            content: [
-                              { type: "text", text: "What is the weather?" },
-                            ],
+                            content: [{ type: "text", text: "What is the weather?" }],
                           },
                           {
                             role: "assistant",
@@ -2797,8 +2790,7 @@ describe("opentelemetry traces receiver", () => {
       ],
     };
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(genAiRequest);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(genAiRequest);
     const span = traces[0]!.spans[0]!;
 
     expect(span.type).toBe("llm");
@@ -2957,8 +2949,7 @@ describe("opentelemetry traces receiver", () => {
       ],
     };
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(genAiRequest);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(genAiRequest);
     expect(traces.length).toBe(1);
     const span = traces[0]!.spans[0]!;
 
@@ -3030,8 +3021,7 @@ describe("opentelemetry traces receiver", () => {
       ],
     };
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(toolRequest);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(toolRequest);
     expect(traces.length).toBe(1);
     const span = traces[0]!.spans[0]!;
 

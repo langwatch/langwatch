@@ -1,11 +1,6 @@
 import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import {
-  LuBookOpen,
-  LuChevronDown,
-  LuSparkles,
-  LuTerminal,
-} from "react-icons/lu";
+import { LuBookOpen, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
@@ -248,11 +243,7 @@ export function AgentActionsMenu({
       </Menu.Trigger>
       <Menu.Content minWidth="300px" padding={1}>
         <Menu.Item value="copy-prompt" paddingY={2} onClick={copyPrompt}>
-          <AgentMenuOption
-            icon={LuTerminal}
-            label={copy.label}
-            hint={copy.hint}
-          />
+          <AgentMenuOption icon={LuTerminal} label={copy.label} hint={copy.hint} />
         </Menu.Item>
         {canAsk ? (
           <Menu.Item
@@ -270,11 +261,7 @@ export function AgentActionsMenu({
         ) : null}
         <Menu.Item value="docs" paddingY={2} asChild>
           <chakra.a href={docs.href} target="_blank" rel="noreferrer">
-            <AgentMenuOption
-              icon={LuBookOpen}
-              label={docs.label}
-              hint={docs.hint}
-            />
+            <AgentMenuOption icon={LuBookOpen} label={docs.label} hint={docs.hint} />
           </chakra.a>
         </Menu.Item>
       </Menu.Content>
@@ -333,11 +320,7 @@ function AgentMenuOption({
 }) {
   return (
     <HStack gap={2.5} width="full" align="start">
-      <Box
-        color={accent ? "orange.fg" : "fg.subtle"}
-        display="grid"
-        paddingTop="2px"
-      >
+      <Box color={accent ? "orange.fg" : "fg.subtle"} display="grid" paddingTop="2px">
         <Icon size={13} />
       </Box>
       <Box minWidth={0} flex={1}>

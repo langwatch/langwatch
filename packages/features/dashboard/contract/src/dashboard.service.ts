@@ -1,7 +1,4 @@
-import type {
-  Dashboard,
-  DashboardSummary,
-} from "./dashboard";
+import type { Dashboard, DashboardSummary } from "./dashboard";
 import type { Graph, GraphLayout } from "./graph";
 import type {
   SavedWorkbenchChart,
@@ -20,10 +17,7 @@ export abstract class DashboardService {
     dashboardId: string;
     name: string;
   }): Promise<Dashboard>;
-  abstract delete(input: {
-    projectId: string;
-    dashboardId: string;
-  }): Promise<Dashboard>;
+  abstract delete(input: { projectId: string; dashboardId: string }): Promise<Dashboard>;
   abstract reorder(input: {
     projectId: string;
     dashboardIds: string[];
@@ -50,10 +44,7 @@ export abstract class DashboardService {
     graph?: Record<string, unknown>;
     filters?: Record<string, unknown>;
   }): Promise<Graph>;
-  abstract deleteGraph(input: {
-    projectId: string;
-    graphId: string;
-  }): Promise<Graph>;
+  abstract deleteGraph(input: { projectId: string; graphId: string }): Promise<Graph>;
   abstract updateGraphLayout(input: {
     projectId: string;
     graphId: string;

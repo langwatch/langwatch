@@ -37,11 +37,7 @@ function isDeliberateStop(failure: CodedExecutionFailure | undefined): boolean {
   return raw.includes("stopped") || raw.includes("interrupted");
 }
 
-export const PostEventProvider = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
+export const PostEventProvider = ({ children }: { children: React.ReactNode }) => {
   const { project } = useOrganizationTeamProject();
   const { setSocketStatus, socketStatus } = useWorkflowStore(
     useShallow((state) => ({
@@ -162,10 +158,7 @@ export const usePostEvent = () => {
           handleServerMessage(serverEvent);
 
           // Handle evaluation errors
-          if (
-            serverEvent.type === "error" &&
-            event.type === "execute_evaluation"
-          ) {
+          if (serverEvent.type === "error" && event.type === "execute_evaluation") {
             setEvaluationState({
               status: "error",
               run_id: undefined,
@@ -311,9 +304,7 @@ export const useHandleServerMessage = ({
           );
 
           if (message.payload.execution_state?.status === "error") {
-            checkIfUnreachableErrorMessage(
-              message.payload.execution_state.error,
-            );
+            checkIfUnreachableErrorMessage(message.payload.execution_state.error);
             alertOnComponent({
               componentId: message.payload.component_id,
               execution_state: message.payload.execution_state,

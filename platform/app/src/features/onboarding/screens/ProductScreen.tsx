@@ -13,13 +13,8 @@ import { useProductFlow } from "../hooks/use-product-flow";
 import { useCreateProductScreens } from "./create-product-screens";
 
 export const ProductScreen: React.FC = () => {
-  const {
-    currentScreenIndex,
-    flow,
-    navigation,
-    canGoBack,
-    handleSelectProduct,
-  } = useProductFlow();
+  const { currentScreenIndex, flow, navigation, canGoBack, handleSelectProduct } =
+    useProductFlow();
   const { organization, isLoading } = useOrganizationTeamProject({
     redirectToOnboarding: true,
   });
@@ -47,14 +42,10 @@ export const ProductScreen: React.FC = () => {
   });
 
   const currentVisibleIndex = useMemo(
-    () =>
-      flow.visibleScreens.findIndex(
-        (s) => Number(s) === Number(currentScreenIndex),
-      ),
+    () => flow.visibleScreens.findIndex((s) => Number(s) === Number(currentScreenIndex)),
     [flow.visibleScreens, currentScreenIndex],
   );
-  const currentScreen =
-    currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : void 0;
+  const currentScreen = currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : void 0;
   if (!currentScreen) {
     return null;
   }
@@ -77,9 +68,7 @@ export const ProductScreen: React.FC = () => {
         skipHref={skipSlug ? `/${skipSlug}` : undefined}
       >
         <Box w="full">
-          <ActiveProjectProvider
-            value={{ project: activeProject, organization }}
-          >
+          <ActiveProjectProvider value={{ project: activeProject, organization }}>
             {!isLoading && currentScreen.component ? (
               <AnalyticsBoundary
                 key={currentScreen.id}

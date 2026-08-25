@@ -1,12 +1,7 @@
 import { Badge, HStack } from "@chakra-ui/react";
 import type { MouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  PopoverAnchor,
-  PopoverBody,
-  PopoverContent,
-  PopoverRoot,
-} from "./popover";
+import { PopoverAnchor, PopoverBody, PopoverContent, PopoverRoot } from "./popover";
 
 /**
  * BetaPill indicates a feature is in beta.
@@ -96,10 +91,7 @@ export function BetaPill({
           {label}
         </Badge>
       </PopoverAnchor>
-      <PopoverContent
-        onMouseEnter={handlePopoverEnter}
-        onMouseLeave={handlePopoverLeave}
-      >
+      <PopoverContent onMouseEnter={handlePopoverEnter} onMouseLeave={handlePopoverLeave}>
         <PopoverBody>{message}</PopoverBody>
       </PopoverContent>
     </PopoverRoot>

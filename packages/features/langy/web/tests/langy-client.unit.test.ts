@@ -13,8 +13,18 @@ describe("LangyClient", () => {
       relay: vi.fn(),
     };
     const client = new LangyClient(transport);
-    await client.listConversations({ projectId: "project_1", userId: "user_1", limit: 1 });
-    expect(transport.listConversations).toHaveBeenCalledWith({ projectId: "project_1", userId: "user_1", limit: 1 });
-    expect(() => client.listConversations({ projectId: "", userId: "user_1", limit: 1 })).toThrow();
+    await client.listConversations({
+      projectId: "project_1",
+      userId: "user_1",
+      limit: 1,
+    });
+    expect(transport.listConversations).toHaveBeenCalledWith({
+      projectId: "project_1",
+      userId: "user_1",
+      limit: 1,
+    });
+    expect(() =>
+      client.listConversations({ projectId: "", userId: "user_1", limit: 1 }),
+    ).toThrow();
   });
 });

@@ -102,9 +102,7 @@ const updateBindingSchema = z.object({
 
 const idParamsSchema = z.object({ id: z.string().min(1) });
 
-type OrgBindingRow = Awaited<
-  ReturnType<RoleBindingService["listForOrg"]>
->[number];
+type OrgBindingRow = Awaited<ReturnType<RoleBindingService["listForOrg"]>>[number];
 
 const principalOf = (row: OrgBindingRow): z.infer<typeof principalSchema> => {
   if (row.userId) {
@@ -247,9 +245,7 @@ const updateBindingHandler = async (
     organizationId: organization.id,
     bindingId: params.id,
     role: input.role,
-    ...(input.customRoleId !== undefined
-      ? { customRoleId: input.customRoleId }
-      : {}),
+    ...(input.customRoleId !== undefined ? { customRoleId: input.customRoleId } : {}),
     actor: orgRequestLedgerActor(c),
   });
   const binding = await readBackBinding({
@@ -264,9 +260,7 @@ const updateBindingHandler = async (
   // plain Error and degrades to the generic failure plus a trace id (ADR-045)
   // rather than pretending to be a nameable refusal.
   if (!binding) {
-    throw new Error(
-      `Role binding ${updated.id} was written but does not read back`,
-    );
+    throw new Error(`Role binding ${updated.id} was written but does not read back`);
   }
   return binding;
 };
@@ -309,54 +303,39 @@ export const app = service
           "List the organization's role bindings, each naming its principal (user, group or API key), role and scope. Filter by principal or scope; totalCount counts the filtered set.",
       }),
   )
-  .registerRoute(
-    "post",
-    "/",
-    MANAGEMENT_API_VERSION,
-    createBindingHandler,
-    (b) =>
-      guard("organization:manage")(b)
-        .withInput(createBindingSchema)
-        .withOutput(createdBindingSchema)
-        .withStatus(201)
-        .withDocs({
-          operationId: "createRoleBinding",
-          tags: ["Role Bindings"],
-          description:
-            "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them.",
-        }),
+  .registerRoute("post", "/", MANAGEMENT_API_VERSION, createBindingHandler, (b) =>
+    guard("organization:manage")(b)
+      .withInput(createBindingSchema)
+      .withOutput(createdBindingSchema)
+      .withStatus(201)
+      .withDocs({
+        operationId: "createRoleBinding",
+        tags: ["Role Bindings"],
+        description:
+          "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them.",
+      }),
   )
-  .registerRoute(
-    "patch",
-    "/:id",
-    MANAGEMENT_API_VERSION,
-    updateBindingHandler,
-    (b) =>
-      guard("organization:manage")(b)
-        .withParams(idParamsSchema)
-        .withInput(updateBindingSchema)
-        .withOutput(bindingSchema)
-        .withDocs({
-          operationId: "updateRoleBinding",
-          tags: ["Role Bindings"],
-          description:
-            "Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead.",
-        }),
+  .registerRoute("patch", "/:id", MANAGEMENT_API_VERSION, updateBindingHandler, (b) =>
+    guard("organization:manage")(b)
+      .withParams(idParamsSchema)
+      .withInput(updateBindingSchema)
+      .withOutput(bindingSchema)
+      .withDocs({
+        operationId: "updateRoleBinding",
+        tags: ["Role Bindings"],
+        description:
+          "Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead.",
+      }),
   )
-  .registerRoute(
-    "delete",
-    "/:id",
-    MANAGEMENT_API_VERSION,
-    deleteBindingHandler,
-    (b) =>
-      guard("organization:manage")(b)
-        .withParams(idParamsSchema)
-        .withOutput(z.object({ success: z.literal(true) }))
-        .withDocs({
-          operationId: "deleteRoleBinding",
-          tags: ["Role Bindings"],
-          description:
-            "Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found.",
-        }),
+  .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, deleteBindingHandler, (b) =>
+    guard("organization:manage")(b)
+      .withParams(idParamsSchema)
+      .withOutput(z.object({ success: z.literal(true) }))
+      .withDocs({
+        operationId: "deleteRoleBinding",
+        tags: ["Role Bindings"],
+        description:
+          "Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found.",
+      }),
   )
   .build();

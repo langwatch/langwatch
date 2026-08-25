@@ -22,19 +22,13 @@ import {
   ModelProviderTestRateLimitedError,
 } from "./errors";
 import { rowCannotServeEmbeddings } from "./geminiDoor";
-import {
-  assertCanManageAllScopes,
-  canReadAnyScope,
-} from "./modelProvider.authz";
+import { assertCanManageAllScopes, canReadAnyScope } from "./modelProvider.authz";
 import {
   ModelProviderRepository,
   type ModelProviderWithScopes,
   type ScopeInput,
 } from "./modelProvider.repository";
-import {
-  type ValidationResult,
-  validateProviderApiKey,
-} from "./providerValidation";
+import { type ValidationResult, validateProviderApiKey } from "./providerValidation";
 import {
   getProviderModelOptions,
   type MaybeStoredModelProvider,
@@ -61,9 +55,7 @@ export type AuthzContext = { prisma: PrismaClient; session: Session | null };
  * branches read the same payload rather than each re-deriving it.
  */
 type ModelProviderWrite = {
-  existingProvider: Awaited<
-    ReturnType<ModelProviderService["findExistingProvider"]>
-  >;
+  existingProvider: Awaited<ReturnType<ModelProviderService["findExistingProvider"]>>;
   createScopes: ScopeInput[] | undefined;
   isHandleProvided: boolean;
   normalizedHandle: string | null;
@@ -230,9 +222,7 @@ const TEST_CONNECTION_WINDOW_SECONDS = 60;
 const TEST_CONNECTION_PER_ORGANIZATION = 20;
 const TEST_CONNECTION_GLOBAL = 500;
 
-async function assertTestConnectionWithinBudget(
-  organizationId: string,
-): Promise<void> {
+async function assertTestConnectionWithinBudget(organizationId: string): Promise<void> {
   const perOrganization = await rateLimit({
     key: `model-provider-test:org:${organizationId}`,
     windowSeconds: TEST_CONNECTION_WINDOW_SECONDS,
@@ -406,10 +396,7 @@ export class ModelProviderService {
     projectId: string,
     includeKeys = true,
   ): Promise<Record<string, MaybeStoredModelProvider>> {
-    const providers = await this.getProjectModelProviders(
-      projectId,
-      includeKeys,
-    );
+    const providers = await this.getProjectModelProviders(projectId, includeKeys);
 
     return this.maskApiKeys(providers);
   }
@@ -433,8 +420,7 @@ export class ModelProviderService {
     if (!project) throw new Error("Project not found");
 
     const defaultProviders = this.buildDefaultProviders(project);
-    const savedProviders =
-      await this.repository.findAllAccessibleForProject(projectId);
+    const savedProviders = await this.repository.findAllAccessibleForProject(projectId);
     const savedProviderKeys = new Set(savedProviders.map((mp) => mp.provider));
 
     // Env-fed providers (process.env has the API key) that nobody has
@@ -519,8 +505,7 @@ export class ModelProviderService {
     const defaultProviders = oldestProject
       ? this.buildDefaultProviders(oldestProject)
       : {};
-    const savedProviders =
-      await this.repository.findAllInOrganization(organizationId);
+    const savedProviders = await this.repository.findAllInOrganization(organizationId);
     const savedProviderKeys = new Set(savedProviders.map((mp) => mp.provider));
 
     const systemRows: MaterializedModelProvider[] = [];
@@ -620,20 +605,10 @@ export class ModelProviderService {
    * already have a trusted root context. tRPC routers and any other
    * user-driven entrypoint MUST pass ctx.
    */
-  async updateModelProvider(
-    input: UpdateModelProviderInput,
-    ctx?: AuthzContext,
-  ) {
+  async updateModelProvider(input: UpdateModelProviderInput, ctx?: AuthzContext) {
     // Only what the checks below read. The rest of the payload is carried
     // whole into `writeModelProvider`, which is what performs the write.
-    const {
-      id,
-      projectId,
-      organizationId,
-      provider,
-      customKeys,
-      routingHandle,
-    } = input;
+    const { id, projectId, organizationId, provider, customKeys, routingHandle } = input;
 
     if (!projectId && !organizationId) {
       throw new ModelProviderAnchorRequiredError("project_or_organization");
@@ -977,10 +952,7 @@ export class ModelProviderService {
    * org-shared credential from under an organization they don't
    * manage.
    */
-  async deleteModelProvider(
-    input: DeleteModelProviderInput,
-    ctx?: AuthzContext,
-  ) {
+  async deleteModelProvider(input: DeleteModelProviderInput, ctx?: AuthzContext) {
     const { id, projectId, provider } = input;
 
     if (!projectId && !input.organizationId) {
@@ -1149,9 +1121,7 @@ export class ModelProviderService {
    * null when the project can't be found, letting callers fall back to a
    * project-scoped path instead of widening access.
    */
-  private async resolveProjectOrganizationId(
-    projectId: string,
-  ): Promise<string | null> {
+  private async resolveProjectOrganizationId(projectId: string): Promise<string | null> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { team: { select: { organizationId: true } } },
@@ -1241,13 +1211,10 @@ export class ModelProviderService {
             enabled,
             disabledByDefault: !enabled,
             customKeys: null,
-            models: getProviderModelOptions(providerKey, "chat").map(
+            models: getProviderModelOptions(providerKey, "chat").map((m) => m.value),
+            embeddingsModels: getProviderModelOptions(providerKey, "embedding").map(
               (m) => m.value,
             ),
-            embeddingsModels: getProviderModelOptions(
-              providerKey,
-              "embedding",
-            ).map((m) => m.value),
             deploymentMapping: null,
             extraHeaders: [],
           };
@@ -1269,18 +1236,13 @@ export class ModelProviderService {
     // `Record<provider, …>` shape we still return here — new consumers
     // that need the full list should call
     // `listProjectModelProvidersForFrontend` directly on the service.
-    const savedProviders =
-      await this.repository.findAllAccessibleForProject(projectId);
+    const savedProviders = await this.repository.findAllAccessibleForProject(projectId);
 
     return savedProviders
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
       .reduce(
         (acc, mp) => {
-          const provider_ = this.toMaybeStoredProvider(
-            mp,
-            defaultProviders,
-            includeKeys,
-          );
+          const provider_ = this.toMaybeStoredProvider(mp, defaultProviders, includeKeys);
 
           // Collapse rules when the same provider string has multiple
           // accessible rows: an enabled row beats a disabled one, then
@@ -1308,10 +1270,7 @@ export class ModelProviderService {
     const defaultProvider = defaultProviders[mp.provider];
 
     // Convert DB custom models (may be legacy string[] or new object[])
-    const customModels = toLegacyCompatibleCustomModels(
-      mp.customModels,
-      "chat",
-    );
+    const customModels = toLegacyCompatibleCustomModels(mp.customModels, "chat");
     const customEmbeddingsModels = toLegacyCompatibleCustomModels(
       mp.customEmbeddingsModels,
       "embedding",
@@ -1354,17 +1313,13 @@ export class ModelProviderService {
    * leaving URLs and other non-secret values visible. The same test decides
    * what `mergeStoredCustomKeys` keeps on a write that leaves a field out:
    * what we never show back is what a caller cannot resend. */
-  private maskRowCustomKeys(
-    customKeys: unknown,
-  ): MaybeStoredModelProvider["customKeys"] {
+  private maskRowCustomKeys(customKeys: unknown): MaybeStoredModelProvider["customKeys"] {
     if (!customKeys) return null;
     return Object.fromEntries(
-      Object.entries(customKeys as Record<string, unknown>).map(
-        ([key, value]) => [
-          key,
-          isSecretCredential(key) ? MASKED_KEY_PLACEHOLDER : value,
-        ],
-      ),
+      Object.entries(customKeys as Record<string, unknown>).map(([key, value]) => [
+        key,
+        isSecretCredential(key) ? MASKED_KEY_PLACEHOLDER : value,
+      ]),
     ) as MaybeStoredModelProvider["customKeys"];
   }
 
@@ -1396,9 +1351,7 @@ export class ModelProviderService {
     if (!project) return null;
 
     const defaultProviders = this.buildDefaultProviders(project);
-    const rows = await this.repository.findAllAccessibleForProject(
-      params.projectId,
-    );
+    const rows = await this.repository.findAllAccessibleForProject(params.projectId);
 
     const candidates = rows.filter(
       (mp) =>
@@ -1422,8 +1375,7 @@ export class ModelProviderService {
     // order.
     const sorted = [...candidates].sort((a, b) => {
       const tier =
-        this.chainSpecificity(b.scopes, chain) -
-        this.chainSpecificity(a.scopes, chain);
+        this.chainSpecificity(b.scopes, chain) - this.chainSpecificity(a.scopes, chain);
       if (tier !== 0) return tier;
       const aPriority = a.fallbackPriorityGlobal ?? Number.MAX_SAFE_INTEGER;
       const bPriority = b.fallbackPriorityGlobal ?? Number.MAX_SAFE_INTEGER;
@@ -1454,10 +1406,7 @@ export class ModelProviderService {
         best = Math.max(best, 3);
       } else if (s.scopeType === "TEAM" && s.scopeId === chain.teamId) {
         best = Math.max(best, 2);
-      } else if (
-        s.scopeType === "ORGANIZATION" &&
-        s.scopeId === chain.organizationId
-      ) {
+      } else if (s.scopeType === "ORGANIZATION" && s.scopeId === chain.organizationId) {
         best = Math.max(best, 1);
       }
     }
@@ -1473,9 +1422,10 @@ export class ModelProviderService {
     return 0;
   }
 
-  private pickNarrowestScope(
-    scopes: { scopeType: string; scopeId: string }[],
-  ): { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string } {
+  private pickNarrowestScope(scopes: { scopeType: string; scopeId: string }[]): {
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  } {
     if (scopes.length === 0) {
       return { scopeType: "PROJECT", scopeId: "" };
     }
@@ -1490,10 +1440,7 @@ export class ModelProviderService {
     };
   }
 
-  private isNarrower(
-    a: MaybeStoredModelProvider,
-    b: MaybeStoredModelProvider,
-  ): boolean {
+  private isNarrower(a: MaybeStoredModelProvider, b: MaybeStoredModelProvider): boolean {
     // Prefer an enabled row over a disabled one, regardless of scope.
     // A disabled narrower-scope row must not mask an enabled wider-scope
     // one — otherwise `hasEnabledProviders` on the frontend gates off
@@ -1587,10 +1534,7 @@ export class ModelProviderService {
 
     const providerSchema =
       modelProviders[provider as keyof typeof modelProviders]!.keysSchema;
-    const validator = z.union([
-      providerSchema,
-      z.object({ MANAGED: z.string() }),
-    ]);
+    const validator = z.union([providerSchema, z.object({ MANAGED: z.string() })]);
 
     let validatedKeys: Record<string, unknown>;
     try {
@@ -1699,10 +1643,7 @@ export class ModelProviderService {
     let customKeysToSave: Record<string, unknown> | undefined;
 
     if (customKeysProvided) {
-      const existingKeys = existingProvider.customKeys as Record<
-        string,
-        unknown
-      > | null;
+      const existingKeys = existingProvider.customKeys as Record<string, unknown> | null;
       this.assertKeepsStoredCredentials({
         provider: data.provider,
         validatedKeys,
@@ -1723,9 +1664,7 @@ export class ModelProviderService {
         customEmbeddingsModels: data.customEmbeddingsModels,
         extraHeaders: this.mergeExtraHeaders(
           data.extraHeaders,
-          existingProvider.extraHeaders as
-            | { key: string; value: string }[]
-            | null,
+          existingProvider.extraHeaders as { key: string; value: string }[] | null,
         ),
         ...(data.name !== undefined && { name: data.name }),
         ...(data.scopes !== undefined && { scopes: data.scopes }),
@@ -1771,8 +1710,7 @@ export class ModelProviderService {
         ...(data.routingHandle !== undefined && {
           routingHandle: data.routingHandle,
         }),
-        ...(customKeysProvided &&
-          validatedKeys && { customKeys: validatedKeys }),
+        ...(customKeysProvided && validatedKeys && { customKeys: validatedKeys }),
         ...pickAdvancedFields(data.advanced),
       },
       tx,
@@ -1815,8 +1753,8 @@ export class ModelProviderService {
     ]);
     if (schemaKeys.size === 1) return; // unknown provider: nothing to judge against
 
-    const incomingCredentials = Object.entries(validatedKeys ?? {}).filter(
-      ([key]) => schemaKeys.has(key),
+    const incomingCredentials = Object.entries(validatedKeys ?? {}).filter(([key]) =>
+      schemaKeys.has(key),
     );
 
     // A row whose stored credentials will not decrypt reads back as keyless,
@@ -1833,9 +1771,7 @@ export class ModelProviderService {
     if (existingUnreadable) {
       const replacement = incomingCredentials.some(
         ([, value]) =>
-          typeof value === "string" &&
-          value !== "" &&
-          value !== MASKED_KEY_PLACEHOLDER,
+          typeof value === "string" && value !== "" && value !== MASKED_KEY_PLACEHOLDER,
       );
       if (!replacement) {
         throw new ModelProviderCredentialsUnreadableError({ provider });
@@ -1851,8 +1787,7 @@ export class ModelProviderService {
     // field already sitting empty has nothing to lose, and counting it would
     // block the save right after a customer cleared one on purpose.
     const storedCredentials = Object.entries(existingKeys).filter(
-      ([key, value]) =>
-        schemaKeys.has(key) && typeof value === "string" && value !== "",
+      ([key, value]) => schemaKeys.has(key) && typeof value === "string" && value !== "",
     );
     if (storedCredentials.length === 0) return;
 

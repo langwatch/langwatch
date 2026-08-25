@@ -127,9 +127,9 @@ describe("parseCustomRolePermissions", () => {
         expect((err as MalformedCustomRolePermissionsError).code).toBe(
           "malformed_custom_role_permissions",
         );
-        expect((err as MalformedCustomRolePermissionsError).meta).toMatchObject(
-          { customRoleId },
-        );
+        expect((err as MalformedCustomRolePermissionsError).meta).toMatchObject({
+          customRoleId,
+        });
         return;
       }
       throw new Error("expected parseCustomRolePermissions to throw");

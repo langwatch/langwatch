@@ -1,10 +1,7 @@
 import { Box, HoverCard, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import {
-  type AnnotationWithUser,
-  annotationAnchorLabel,
-} from "./annotationRow";
+import { type AnnotationWithUser, annotationAnchorLabel } from "./annotationRow";
 
 /**
  * Compact count of what reviewers wrote on a row, opening the writing itself on
@@ -130,12 +127,7 @@ function AnnotationHoverEntry({
           {anchorLabel}
         </Text>
       )}
-      <Text
-        textStyle="xs"
-        whiteSpace="pre-wrap"
-        wordBreak="break-word"
-        lineClamp={6}
-      >
+      <Text textStyle="xs" whiteSpace="pre-wrap" wordBreak="break-word" lineClamp={6}>
         {text}
       </Text>
     </VStack>

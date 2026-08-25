@@ -367,10 +367,8 @@ export const cardKindFor = ({
 };
 
 /** The schema that reads a command's result. */
-export const cardSchemaFor = (command: {
-  resource: string;
-  verb: string;
-}): z.ZodType => SCHEMA_BY_CARD_KIND[cardKindFor(command)];
+export const cardSchemaFor = (command: { resource: string; verb: string }): z.ZodType =>
+  SCHEMA_BY_CARD_KIND[cardKindFor(command)];
 
 /** A CLI result, read into the card that draws it. */
 export type ParsedCliResult =
@@ -396,8 +394,7 @@ export const parseCliResult = ({
   resource: string;
   verb: string;
   output: unknown;
-}): ParsedCliResult =>
-  parseCardResult({ kind: cardKindFor({ resource, verb }), output });
+}): ParsedCliResult => parseCardResult({ kind: cardKindFor({ resource, verb }), output });
 
 /**
  * Read a result into the schema of a card that has ALREADY been decided.

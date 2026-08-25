@@ -46,9 +46,7 @@ describe("BlockStack", () => {
       render(<BlockStack blocks={[block]} toolCalls={[]} />, { wrapper });
 
       expect(screen.getByText("just a normal hello")).toBeInTheDocument();
-      expect(
-        screen.queryByText("Hidden additional context"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Hidden additional context")).not.toBeInTheDocument();
     });
   });
 });

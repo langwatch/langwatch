@@ -53,12 +53,7 @@ function InstanceRow({
         </Text>
       </Table.Cell>
       <Table.Cell>
-        <Text
-          textStyle="xs"
-          color="fg.muted"
-          fontFamily="mono"
-          title={row.projectId}
-        >
+        <Text textStyle="xs" color="fg.muted" fontFamily="mono" title={row.projectId}>
           {middleEllipsis(row.projectId, 24)}
         </Text>
       </Table.Cell>
@@ -175,12 +170,7 @@ function InstancesBody({
     );
   }
   return (
-    <InstancesTable
-      rows={rows}
-      now={now}
-      showProcess={showProcess}
-      onOpen={onOpen}
-    />
+    <InstancesTable rows={rows} now={now} showProcess={showProcess} onOpen={onOpen} />
   );
 }
 
@@ -215,12 +205,7 @@ export function ProcessInstancesDrawer({ processName }: Props) {
   const allProcesses = !processName;
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="xl"
-      onOpenChange={() => closeDrawer()}
-    >
+    <Drawer.Root open={true} placement="end" size="xl" onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack gap={2} width="full">

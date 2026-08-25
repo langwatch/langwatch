@@ -214,9 +214,7 @@ describe("Feature: Governance REST API", () => {
     }
     userIds.length = 0;
     for (const id of orgIds) {
-      await prisma.organization
-        .delete({ where: { id } })
-        .catch(() => undefined);
+      await prisma.organization.delete({ where: { id } }).catch(() => undefined);
     }
     orgIds.length = 0;
   });
@@ -244,10 +242,9 @@ describe("Feature: Governance REST API", () => {
     });
 
     it("rejects the admin template list with 403 user_token_required", async () => {
-      const res = await app.request(
-        "/api/governance/ingestion-templates/admin",
-        { headers: { "X-Auth-Token": testApiKey } },
-      );
+      const res = await app.request("/api/governance/ingestion-templates/admin", {
+        headers: { "X-Auth-Token": testApiKey },
+      });
       expect(res.status).toBe(403);
       const body = (await res.json()) as { error: { code: string } };
       expect(body.error.code).toBe("user_token_required");
@@ -299,9 +296,7 @@ describe("Feature: Governance REST API", () => {
         const body = (await res.json()) as {
           data: Array<Record<string, unknown>>;
         };
-        const platform = body.data.find(
-          (r) => (r.id as string) === platformIds[0],
-        );
+        const platform = body.data.find((r) => (r.id as string) === platformIds[0]);
         expect(platform).toBeDefined();
         expect(platform?.platform_published).toBe(true);
         expect(platform?.organization_id).toBeNull();
@@ -339,9 +334,7 @@ describe("Feature: Governance REST API", () => {
         const body = (await res.json()) as {
           data: Array<Record<string, unknown>>;
         };
-        const platform = body.data.find(
-          (r) => (r.id as string) === platformIds[0],
-        );
+        const platform = body.data.find((r) => (r.id as string) === platformIds[0]);
         expect(platform).toBeDefined();
         expect(platform?.ottl_rules).toContain('set(attributes["x"]');
       });
@@ -374,9 +367,7 @@ describe("Feature: Governance REST API", () => {
           targetId: created.id as string,
         },
       });
-      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe(
-        "hono",
-      );
+      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe("hono");
     });
 
     it("returns 400 for an invalid source_type", async () => {
@@ -430,9 +421,7 @@ describe("Feature: Governance REST API", () => {
           targetId: created.ingestion_template.id,
         },
       });
-      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe(
-        "hono",
-      );
+      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe("hono");
     });
 
     it("returns 403 when targeting a platform-published row (immutability guard)", async () => {

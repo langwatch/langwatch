@@ -117,11 +117,7 @@ export function createNotFoundRenderer() {
       return [x, y, z];
     };
 
-    const projectPoint = (
-      x: number,
-      y: number,
-      z: number,
-    ): [number, number, number] => {
+    const projectPoint = (x: number, y: number, z: number): [number, number, number] => {
       const scale = focalLength / z;
       const sx = cx + x * scale;
       const sy = y * scale;
@@ -171,10 +167,7 @@ export function createNotFoundRenderer() {
         Math.min(1, (y - horizonY) / Math.max(1, h - horizonY)),
       );
       const fadeStart = 0.18;
-      const delayedDepth = Math.max(
-        0,
-        (depthProgress - fadeStart) / (1 - fadeStart),
-      );
+      const delayedDepth = Math.max(0, (depthProgress - fadeStart) / (1 - fadeStart));
       return Math.pow(delayedDepth, 2.2);
     };
 
@@ -208,15 +201,9 @@ export function createNotFoundRenderer() {
       if (!backgroundCtx) return;
 
       const skyGradient = backgroundCtx.createLinearGradient(0, 0, 0, h);
-      skyGradient.addColorStop(
-        0,
-        `rgba(${particleR}, ${particleG}, ${particleB}, 0.08)`,
-      );
+      skyGradient.addColorStop(0, `rgba(${particleR}, ${particleG}, ${particleB}, 0.08)`);
       skyGradient.addColorStop(0.4, "rgba(8, 14, 24, 0.02)");
-      skyGradient.addColorStop(
-        1,
-        `rgba(${particleR}, ${particleG}, ${particleB}, 0.05)`,
-      );
+      skyGradient.addColorStop(1, `rgba(${particleR}, ${particleG}, ${particleB}, 0.05)`);
       backgroundCtx.fillStyle = skyGradient;
       backgroundCtx.fillRect(0, 0, w, h);
 
@@ -435,16 +422,8 @@ export function createNotFoundRenderer() {
       ctx.lineTo(line.x2 + splitX, line.y2 + splitY);
       ctx.stroke();
 
-      const mainGradient = ctx.createLinearGradient(
-        line.x1,
-        line.y1,
-        line.x2,
-        line.y2,
-      );
-      mainGradient.addColorStop(
-        0,
-        `rgba(${r}, ${g}, ${b}, ${line.startAlpha})`,
-      );
+      const mainGradient = ctx.createLinearGradient(line.x1, line.y1, line.x2, line.y2);
+      mainGradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${line.startAlpha})`);
       mainGradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, ${line.endAlpha})`);
 
       ctx.strokeStyle = mainGradient;

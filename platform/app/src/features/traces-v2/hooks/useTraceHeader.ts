@@ -4,10 +4,7 @@ import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { applyOverlayToTraceHeader } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
-import {
-  asSharedQueryResult,
-  useSharedTrace,
-} from "../context/SharedTraceContext";
+import { asSharedQueryResult, useSharedTrace } from "../context/SharedTraceContext";
 import { useDrawerStore } from "../stores/drawerStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";
@@ -33,9 +30,7 @@ export function useTraceHeaderCanonical() {
   // still runs regardless — it's not an SSE-covered transition (the
   // prompt aggregator writes asynchronously and doesn't broadcast a
   // trace-updated event when only the `lastUsedPromptId` slot fills in).
-  const sseConnected = useSseStatusStore(
-    (s) => s.sseConnectionState === "connected",
-  );
+  const sseConnected = useSseStatusStore((s) => s.sseConnectionState === "connected");
 
   // Treat the URL hint as our liveness signal. When the trace started
   // within the last 3 min and SSE is OFF, set a 10s refetch interval so
@@ -82,17 +77,14 @@ export function useTraceHeaderCanonical() {
   // only trust the timestamp when it belongs to the trace we're asking
   // about — otherwise we'd backfill trace A's time onto trace B.
   const resolvedTimestamp =
-    query.data?.traceId === queryArgs.traceId
-      ? query.data.timestamp
-      : undefined;
+    query.data?.traceId === queryArgs.traceId ? query.data.timestamp : undefined;
   useEffect(() => {
     if (occurredAtMs === null && typeof resolvedTimestamp === "number") {
       backfillOccurredAtMs(resolvedTimestamp);
     }
   }, [occurredAtMs, resolvedTimestamp, backfillOccurredAtMs]);
 
-  if (shared)
-    return asSharedQueryResult(shared.header) as unknown as typeof query;
+  if (shared) return asSharedQueryResult(shared.header) as unknown as typeof query;
   return query;
 }
 
@@ -114,8 +106,7 @@ export function useTraceHeader({
   const header = query.data;
 
   const data = useMemo(
-    () =>
-      header ? applyOverlayToTraceHeader({ header, patch, spans }) : header,
+    () => (header ? applyOverlayToTraceHeader({ header, patch, spans }) : header),
     [header, patch, spans],
   );
 

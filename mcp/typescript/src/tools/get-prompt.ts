@@ -11,12 +11,13 @@ export async function handleGetPrompt(params: {
   version?: number;
   tag?: string;
 }): Promise<string> {
-  const prompt = await apiGetPrompt(params.idOrHandle, { version: params.version, tag: params.tag });
+  const prompt = await apiGetPrompt(params.idOrHandle, {
+    version: params.version,
+    tag: params.tag,
+  });
 
   const lines: string[] = [];
-  lines.push(
-    `# Prompt: ${prompt.name || prompt.handle || prompt.id}\n`
-  );
+  lines.push(`# Prompt: ${prompt.name || prompt.handle || prompt.id}\n`);
 
   if (prompt.handle) lines.push(`**Handle**: ${prompt.handle}`);
   if (prompt.id) lines.push(`**ID**: ${prompt.id}`);

@@ -1,22 +1,10 @@
 import { z } from "zod";
 
-export const routingPolicyScopeTypeSchema = z.enum([
-  "ORGANIZATION",
-  "TEAM",
-  "PROJECT",
-]);
-export type RoutingPolicyScopeType = z.infer<
-  typeof routingPolicyScopeTypeSchema
->;
+export const routingPolicyScopeTypeSchema = z.enum(["ORGANIZATION", "TEAM", "PROJECT"]);
+export type RoutingPolicyScopeType = z.infer<typeof routingPolicyScopeTypeSchema>;
 
-export const routingPolicyWireScopeSchema = z.enum([
-  "organization",
-  "team",
-  "project",
-]);
-export type RoutingPolicyWireScope = z.infer<
-  typeof routingPolicyWireScopeSchema
->;
+export const routingPolicyWireScopeSchema = z.enum(["organization", "team", "project"]);
+export type RoutingPolicyWireScope = z.infer<typeof routingPolicyWireScopeSchema>;
 
 export const routingPolicyScopeEntrySchema = z
   .object({
@@ -24,9 +12,7 @@ export const routingPolicyScopeEntrySchema = z
     scopeId: z.string().min(1),
   })
   .strict();
-export type RoutingPolicyScopeEntry = z.infer<
-  typeof routingPolicyScopeEntrySchema
->;
+export type RoutingPolicyScopeEntry = z.infer<typeof routingPolicyScopeEntrySchema>;
 
 const stringMapSchema = z.record(z.string(), z.string());
 const jsonObjectSchema = z.record(z.string(), z.unknown());
@@ -57,9 +43,7 @@ export const listRoutingPoliciesInputSchema = z
     selectableForScope: routingPolicyScopeEntrySchema.optional(),
   })
   .strict();
-export type ListRoutingPoliciesInput = z.infer<
-  typeof listRoutingPoliciesInputSchema
->;
+export type ListRoutingPoliciesInput = z.infer<typeof listRoutingPoliciesInputSchema>;
 
 export const findRoutingPolicyInputSchema = z
   .object({
@@ -67,9 +51,7 @@ export const findRoutingPolicyInputSchema = z
     organizationId: z.string().min(1),
   })
   .strict();
-export type FindRoutingPolicyInput = z.infer<
-  typeof findRoutingPolicyInputSchema
->;
+export type FindRoutingPolicyInput = z.infer<typeof findRoutingPolicyInputSchema>;
 
 export const createRoutingPolicyInputSchema = z
   .object({
@@ -85,9 +67,7 @@ export const createRoutingPolicyInputSchema = z
     actorUserId: z.string().min(1),
   })
   .strict();
-export type CreateRoutingPolicyInput = z.infer<
-  typeof createRoutingPolicyInputSchema
->;
+export type CreateRoutingPolicyInput = z.infer<typeof createRoutingPolicyInputSchema>;
 
 export const updateRoutingPolicyInputSchema = z
   .object({
@@ -102,9 +82,7 @@ export const updateRoutingPolicyInputSchema = z
     actorUserId: z.string().min(1),
   })
   .strict();
-export type UpdateRoutingPolicyInput = z.infer<
-  typeof updateRoutingPolicyInputSchema
->;
+export type UpdateRoutingPolicyInput = z.infer<typeof updateRoutingPolicyInputSchema>;
 
 export const setDefaultRoutingPolicyInputSchema = z
   .object({
@@ -123,9 +101,7 @@ export const deleteRoutingPolicyInputSchema = z
     organizationId: z.string().min(1),
   })
   .strict();
-export type DeleteRoutingPolicyInput = z.infer<
-  typeof deleteRoutingPolicyInputSchema
->;
+export type DeleteRoutingPolicyInput = z.infer<typeof deleteRoutingPolicyInputSchema>;
 
 export const resolveDefaultRoutingPolicyInputSchema = z
   .object({
@@ -194,9 +170,7 @@ export abstract class GovernanceRoutingPolicyService {
   abstract getById(input: FindRoutingPolicyInput): Promise<RoutingPolicy>;
   abstract create(input: CreateRoutingPolicyInput): Promise<RoutingPolicy>;
   abstract update(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy>;
-  abstract setDefault(
-    input: SetDefaultRoutingPolicyInput,
-  ): Promise<RoutingPolicy>;
+  abstract setDefault(input: SetDefaultRoutingPolicyInput): Promise<RoutingPolicy>;
   abstract delete(input: DeleteRoutingPolicyInput): Promise<void>;
   abstract tryResolveDefaultForUser(
     input: ResolveDefaultRoutingPolicyInput,

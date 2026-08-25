@@ -36,7 +36,9 @@ export abstract class CodingAgentService {
     input: CodingAgentRecentSessionsInput,
   ): Promise<CodingAgentSession[]>;
 
-  abstract getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
+  abstract getUsageTotals(
+    input: CodingAgentUsageTotalsInput,
+  ): Promise<CodingAgentUsageTotals>;
 
   abstract listForProject(
     input: CodingAgentSessionsListInput,

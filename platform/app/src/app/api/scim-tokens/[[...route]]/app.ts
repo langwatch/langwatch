@@ -63,9 +63,7 @@ const createTokenHandler = async (
   const organization = organizationOf(c);
   const created = await c.get("scimTokens").generate({
     organizationId: organization.id,
-    ...(input.description !== undefined
-      ? { description: input.description }
-      : {}),
+    ...(input.description !== undefined ? { description: input.description } : {}),
   });
   emitManagementAudit({
     c,
@@ -112,43 +110,33 @@ export const app = service
           "List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once.",
       }),
   )
-  .registerRoute(
-    "post",
-    "/",
-    MANAGEMENT_API_VERSION,
-    createTokenHandler,
-    (b) =>
-      guard("organization:manage")(b)
-        .withInput(createTokenSchema)
-        .withOutput(
-          z.object({
-            id: z.string(),
-            token: z.string(),
-            description: z.string().nullable(),
-          }),
-        )
-        .withStatus(201)
-        .withDocs({
-          operationId: "createScimToken",
-          tags: ["SCIM Tokens"],
-          description:
-            "Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately.",
+  .registerRoute("post", "/", MANAGEMENT_API_VERSION, createTokenHandler, (b) =>
+    guard("organization:manage")(b)
+      .withInput(createTokenSchema)
+      .withOutput(
+        z.object({
+          id: z.string(),
+          token: z.string(),
+          description: z.string().nullable(),
         }),
+      )
+      .withStatus(201)
+      .withDocs({
+        operationId: "createScimToken",
+        tags: ["SCIM Tokens"],
+        description:
+          "Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately.",
+      }),
   )
-  .registerRoute(
-    "delete",
-    "/:id",
-    MANAGEMENT_API_VERSION,
-    revokeTokenHandler,
-    (b) =>
-      guard("organization:manage")(b)
-        .withParams(idParamsSchema)
-        .withOutput(z.object({ success: z.literal(true) }))
-        .withDocs({
-          operationId: "revokeScimToken",
-          tags: ["SCIM Tokens"],
-          description:
-            "Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found.",
-        }),
+  .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, revokeTokenHandler, (b) =>
+    guard("organization:manage")(b)
+      .withParams(idParamsSchema)
+      .withOutput(z.object({ success: z.literal(true) }))
+      .withDocs({
+        operationId: "revokeScimToken",
+        tags: ["SCIM Tokens"],
+        description:
+          "Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found.",
+      }),
   )
   .build();

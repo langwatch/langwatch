@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Center,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/ops-web";
 import { PinnedAwareJsonView } from "~/features/traces-v2/components/TraceDrawer/JsonHighlight";
 import type { ProcessInstanceDetail } from "~/server/app-layer/ops/manager-explorer.service";
@@ -17,13 +9,7 @@ import { OutboxMessageCard } from "./OutboxMessageCard";
 
 const NO_PINNED_KEYS: ReadonlySet<string> = new Set();
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <VStack align="start" gap={0}>
       <Text textStyle="xs" color="fg.muted">
@@ -206,13 +192,9 @@ export function ProcessInstanceContent({
 
   if (!detail) {
     return (
-      <Text
-        textStyle="sm"
-        color="fg.muted"
-        data-testid="process-instance-missing"
-      >
-        This process instance no longer exists — retention reaped it, or it was
-        never started for this key.
+      <Text textStyle="sm" color="fg.muted" data-testid="process-instance-missing">
+        This process instance no longer exists — retention reaped it, or it was never
+        started for this key.
       </Text>
     );
   }

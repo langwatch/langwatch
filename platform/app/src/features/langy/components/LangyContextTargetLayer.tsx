@@ -148,12 +148,8 @@ function AbsorbFlashLayer() {
 const ABSORB_OOZE_MS = 500;
 
 function AbsorbOoze({ targetId, nonce }: { targetId: string; nonce: number }) {
-  const clearAbsorbFlash = useLangyContextTargetStore(
-    (s) => s.clearAbsorbFlash,
-  );
-  const [box, setBox] = useState<{ rect: DOMRect; radius: string } | null>(
-    null,
-  );
+  const clearAbsorbFlash = useLangyContextTargetStore((s) => s.clearAbsorbFlash);
+  const [box, setBox] = useState<{ rect: DOMRect; radius: string } | null>(null);
 
   useEffect(() => {
     const element = document.querySelector<HTMLElement>(
@@ -170,10 +166,7 @@ function AbsorbOoze({ targetId, nonce }: { targetId: string; nonce: number }) {
     }
     // Self-clearing: the store holds the flash only for as long as it plays, so
     // nothing has to remember to put it away.
-    const done = window.setTimeout(
-      () => clearAbsorbFlash(nonce),
-      ABSORB_OOZE_MS,
-    );
+    const done = window.setTimeout(() => clearAbsorbFlash(nonce), ABSORB_OOZE_MS);
     return () => window.clearTimeout(done);
   }, [targetId, nonce, clearAbsorbFlash]);
 
@@ -199,9 +192,7 @@ function AbsorbOoze({ targetId, nonce }: { targetId: string; nonce: number }) {
 
 /** Follows the element: its box, and its own corners. */
 function TargetSpotlight({ targetId }: { targetId: string }) {
-  const [box, setBox] = useState<{ rect: DOMRect; radius: string } | null>(
-    null,
-  );
+  const [box, setBox] = useState<{ rect: DOMRect; radius: string } | null>(null);
 
   useEffect(() => {
     const element = document.querySelector<HTMLElement>(
@@ -215,8 +206,7 @@ function TargetSpotlight({ targetId }: { targetId: string }) {
     // around a rounded card is the tell that something is drawn on top of the
     // page instead of belonging to it.
     const radius = getComputedStyle(element).borderRadius || "0px";
-    const track = () =>
-      setBox({ rect: element.getBoundingClientRect(), radius });
+    const track = () => setBox({ rect: element.getBoundingClientRect(), radius });
     track();
 
     window.addEventListener("scroll", track, { passive: true, capture: true });
@@ -295,9 +285,7 @@ function useBottomBarLift(): number {
   useEffect(() => {
     const measure = () => {
       let needed = 0;
-      const bars = document.querySelectorAll<HTMLElement>(
-        "[data-bottom-floating-bar]",
-      );
+      const bars = document.querySelectorAll<HTMLElement>("[data-bottom-floating-bar]");
       for (const bar of bars) {
         const rect = bar.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) continue;
@@ -380,9 +368,7 @@ function ActiveLayer() {
   const frameRef = useRef<number | null>(null);
 
   const measure = useCallback(() => {
-    const elements = document.querySelectorAll<HTMLElement>(
-      "[data-langy-target]",
-    );
+    const elements = document.querySelectorAll<HTMLElement>("[data-langy-target]");
     const rects: TargetRect[] = [];
     for (const element of elements) {
       const id = element.dataset.langyTarget;
@@ -477,11 +463,9 @@ function ActiveLayer() {
     // Rows mount and unmount constantly as the virtualizer scrolls, which
     // invalidates the cache. Subscribe imperatively rather than with a selector:
     // this must NOT re-render the layer, it only has to dirty a ref.
-    const unsubscribe = useLangyContextTargetStore.subscribe(
-      (state, previous) => {
-        if (state.targets !== previous.targets) onGeometryChange();
-      },
-    );
+    const unsubscribe = useLangyContextTargetStore.subscribe((state, previous) => {
+      if (state.targets !== previous.targets) onGeometryChange();
+    });
 
     return () => {
       window.removeEventListener("pointermove", onPointerMove);
@@ -527,9 +511,7 @@ function affordancePlacement(box: DOMRect): "left" | "right" {
  */
 function TargetAffordance({ targetId }: { targetId: string }) {
   const target = useLangyContextTargetStore((s) => s.targets[targetId]);
-  const isAdded = useLangyContextTargetStore((s) =>
-    s.activeChipIds.has(targetId),
-  );
+  const isAdded = useLangyContextTargetStore((s) => s.activeChipIds.has(targetId));
 
   const [box, setBox] = useState<DOMRect | null>(null);
 
@@ -632,10 +614,7 @@ function TargetAffordance({ targetId }: { targetId: string }) {
 }
 
 /** 0 when the point is inside the rect; otherwise the shortest gap to its edge. */
-function distanceToRect(
-  point: { x: number; y: number },
-  rect: DOMRect,
-): number {
+function distanceToRect(point: { x: number; y: number }, rect: DOMRect): number {
   const dx = Math.max(rect.left - point.x, 0, point.x - rect.right);
   const dy = Math.max(rect.top - point.y, 0, point.y - rect.bottom);
   return Math.hypot(dx, dy);

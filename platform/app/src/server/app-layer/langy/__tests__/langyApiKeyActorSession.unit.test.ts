@@ -76,9 +76,7 @@ describe("key-authed Langy surface rollback switch", () => {
     // Two distinct keys. Comparing the registry entries by identity would pass
     // unconditionally — `find` returns two different array elements whatever
     // their keys say — so compare the keys themselves.
-    expect((surface as { key: string }).key).not.toBe(
-      (langy as { key: string }).key,
-    );
+    expect((surface as { key: string }).key).not.toBe((langy as { key: string }).key);
     // The surface is its own lever, not an alias: exactly one registry entry
     // answers to its key, so opening browser Langy cannot open this route as a
     // side effect.

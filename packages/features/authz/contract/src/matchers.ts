@@ -8,10 +8,7 @@
  * migration stage that removes them — the shadow comparison depends on this
  * file matching legacy behaviour, warts and all.
  */
-import {
-  bindingScopeCanGrantPermission,
-  permissionSatisfiedBy,
-} from "./registry";
+import { bindingScopeCanGrantPermission, permissionSatisfiedBy } from "./registry";
 import { builtinRoleGrants, roleKeyForTeamRole } from "./roles";
 import { audienceMatches, type ScopeChainLink } from "./scope";
 import type {
@@ -55,9 +52,7 @@ export function bindingGrants({
 
   // Non-empty custom role is authoritative; empty/missing falls through.
   if (binding.customRoleId) {
-    const customPermissions = grants.customRolePermissions.get(
-      binding.customRoleId,
-    );
+    const customPermissions = grants.customRolePermissions.get(binding.customRoleId);
     if (customPermissions && customPermissions.length > 0) {
       return permissionSatisfiedBy({
         granted: new Set(customPermissions),
@@ -104,9 +99,7 @@ export function legacyTeamFallbackGrants({
     scope.type === "organization"
       ? grants.legacyTeamMemberships.filter((row) => !row.isPersonal)
       : grants.legacyTeamMemberships.filter((row) =>
-          chain.some(
-            (link) => link.scopeType === "TEAM" && link.scopeId === row.teamId,
-          ),
+          chain.some((link) => link.scopeType === "TEAM" && link.scopeId === row.teamId),
         );
   return candidateTeams.some((row) =>
     bindingGrants({
@@ -155,7 +148,5 @@ export function matchResourceGrant({
       }) &&
       audienceMatches({ audience: grant.audience, grants }),
   );
-  return (
-    matched.find((grant) => grant.audience.kind !== "anyone") ?? matched[0]
-  );
+  return matched.find((grant) => grant.audience.kind !== "anyone") ?? matched[0];
 }

@@ -129,9 +129,7 @@ describe("Signup identification hook", () => {
 
       const args = mockNurturing.identifyUser.mock.calls[0]![0];
       expect(args.traits.createdAt).toBeDefined();
-      expect(new Date(args.traits.createdAt).toISOString()).toBe(
-        args.traits.createdAt,
-      );
+      expect(new Date(args.traits.createdAt).toISOString()).toBe(args.traits.createdAt);
     });
 
     /** @scenario 'New signup associates user with organization via group call' */
@@ -287,12 +285,8 @@ describe("Signup identification hook", () => {
   describe("when Customer.io API is unavailable", () => {
     /** @scenario 'Customer.io failure during signup does not block onboarding' */
     it("does not throw (fire-and-forget)", async () => {
-      const { captureException } = await import(
-        "~/utils/posthogErrorCapture"
-      );
-      mockNurturing.identifyUser.mockRejectedValueOnce(
-        new Error("CIO unavailable"),
-      );
+      const { captureException } = await import("~/utils/posthogErrorCapture");
+      mockNurturing.identifyUser.mockRejectedValueOnce(new Error("CIO unavailable"));
 
       expect(() =>
         fireSignupNurturingCalls({

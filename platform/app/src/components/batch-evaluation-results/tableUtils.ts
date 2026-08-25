@@ -51,9 +51,7 @@ export const calculateMinTableWidth = (
   targetColCount: number,
   comparisonColCount = 0,
 ): number => {
-  return (
-    40 + datasetColCount * 210 + targetColCount * 300 + comparisonColCount * 240
-  );
+  return 40 + datasetColCount * 210 + targetColCount * 300 + comparisonColCount * 240;
 };
 
 /**

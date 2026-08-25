@@ -78,11 +78,7 @@ describe("useURLSync applying a same-route push while already mounted", () => {
   describe("given the URL already carries a fragment on arrival", () => {
     /** @scenario Following the link from somewhere else in the project */
     it("applies it on mount, the same query and window a same-route push would carry", () => {
-      window.history.replaceState(
-        null,
-        "",
-        "/#all-traces?q=%22checkout%22&preset=24h",
-      );
+      window.history.replaceState(null, "", "/#all-traces?q=%22checkout%22&preset=24h");
 
       render(<Harness />);
 

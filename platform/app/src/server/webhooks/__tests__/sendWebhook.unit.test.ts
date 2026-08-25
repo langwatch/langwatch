@@ -2,9 +2,7 @@ import { DispatchError } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { assertWebhookDelivered, sendWebhook } from "../sendWebhook";
 
-async function captureDispatchError(
-  fn: () => Promise<unknown>,
-): Promise<DispatchError> {
+async function captureDispatchError(fn: () => Promise<unknown>): Promise<DispatchError> {
   try {
     await fn();
   } catch (err) {
@@ -94,9 +92,7 @@ describe("assertWebhookDelivered", () => {
   });
 
   describe("when the endpoint answers a retryable status", () => {
-    it.each([
-      500, 502, 503, 429, 408,
-    ])("classifies %s as retryable", (status) => {
+    it.each([500, 502, 503, 429, 408])("classifies %s as retryable", (status) => {
       try {
         assertWebhookDelivered({ result: { status, body: "" }, triggerName });
         throw new Error("expected a throw");
@@ -108,9 +104,7 @@ describe("assertWebhookDelivered", () => {
   });
 
   describe("when the endpoint answers a terminal status", () => {
-    it.each([
-      301, 400, 401, 403, 404, 422,
-    ])("classifies %s as terminal", (status) => {
+    it.each([301, 400, 401, 403, 404, 422])("classifies %s as terminal", (status) => {
       try {
         assertWebhookDelivered({ result: { status, body: "" }, triggerName });
         throw new Error("expected a throw");

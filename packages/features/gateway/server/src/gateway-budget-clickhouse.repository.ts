@@ -1,4 +1,7 @@
-import type { GatewayBudget, GatewayBudgetLedgerStatus } from "@langwatch/prisma-client/generated";
+import type {
+  GatewayBudget,
+  GatewayBudgetLedgerStatus,
+} from "@langwatch/prisma-client/generated";
 
 export type BudgetBucketBoundary = {
   bucketScopeId: string;

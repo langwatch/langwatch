@@ -83,9 +83,7 @@ const ANNOTATIONS = [
     email: null,
     createdAt: new Date("2026-08-02T10:30:00Z"),
   },
-] as unknown as React.ComponentProps<
-  typeof TurnAnnotationBadges
->["prefetchedItems"];
+] as unknown as React.ComponentProps<typeof TurnAnnotationBadges>["prefetchedItems"];
 
 function renderBadges() {
   return render(
@@ -193,12 +191,8 @@ describe("given a reviewer who may read annotations but not write them", () => {
       await openList(userEvent.setup());
 
       expect(screen.getByText("Ada")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("correction-trigger"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /Ada/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("correction-trigger")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Ada/ })).not.toBeInTheDocument();
     });
   });
 });

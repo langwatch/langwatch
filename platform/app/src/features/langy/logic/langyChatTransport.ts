@@ -46,10 +46,7 @@ export type LangyTurnSignalEntry =
        */
       readiness?: boolean;
     })
-  | Extract<
-      LangyStreamEntry,
-      { type: "progress" | "milestone" | "reasoning" | "plan" }
-    >;
+  | Extract<LangyStreamEntry, { type: "progress" | "milestone" | "reasoning" | "plan" }>;
 
 /**
  * How a turn stream terminated. "end" is the genuine end-of-turn frame — the
@@ -292,8 +289,7 @@ function subscribeTurnStream({
             if (closed) return;
             controller.enqueue({
               type: "error",
-              errorText:
-                err instanceof Error ? err.message : "Langy stream error",
+              errorText: err instanceof Error ? err.message : "Langy stream error",
             });
             finish("error");
           },

@@ -233,16 +233,17 @@ describe("APP_ERROR_CODES", () => {
   });
 
   describe("given the codes the source actually declares", () => {
-    it.each(
-      Object.entries(SHAPE_WITNESSES),
-    )("still sees a code declared as %s", (_shape, witness) => {
-      expect(
-        [...declaredCodes()],
-        `The scanner stopped finding "${witness}", which is declared in a ` +
-          `shape only one CODE_PATTERNS entry matches. That pattern is ` +
-          `broken, and every assertion below just got easier to pass.`,
-      ).toContain(witness);
-    });
+    it.each(Object.entries(SHAPE_WITNESSES))(
+      "still sees a code declared as %s",
+      (_shape, witness) => {
+        expect(
+          [...declaredCodes()],
+          `The scanner stopped finding "${witness}", which is declared in a ` +
+            `shape only one CODE_PATTERNS entry matches. That pattern is ` +
+            `broken, and every assertion below just got easier to pass.`,
+        ).toContain(witness);
+      },
+    );
 
     /** @scenario "A new app code is caught by the suite first, then by the compiler" */
     /** @scenario "The list of app codes cannot drift from the code that raises them" */

@@ -16,10 +16,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { explainHandledError, readHandledError } from "~/features/errors";
 
 import { CustomQueryMenuLink } from "../components/CustomQueryMenuLink";
-import {
-  lwqlNotEnabledPayload,
-  lwqlUnavailablePayload,
-} from "../logic/lwqlFailure";
+import { lwqlNotEnabledPayload, lwqlUnavailablePayload } from "../logic/lwqlFailure";
 
 import { SCHEMA_RESPONSE } from "./lwqlFixtures";
 
@@ -236,9 +233,10 @@ describe("the Custom query page", () => {
       it("offers the navigation entry only once the backend says it is available", () => {
         renderMenuLink();
 
-        expect(
-          screen.getByRole("link", { name: "Custom query" }),
-        ).toHaveAttribute("href", "/my-project/analytics/query");
+        expect(screen.getByRole("link", { name: "Custom query" })).toHaveAttribute(
+          "href",
+          "/my-project/analytics/query",
+        );
       });
     });
   });

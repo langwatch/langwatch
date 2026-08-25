@@ -36,9 +36,7 @@ export interface LangWatchQLVegaLoader {
  * Type-only, so no vega module is evaluated; see the file header.
  */
 type AssertLangWatchQLLoaderMatchesVega =
-  LangWatchQLVegaLoader extends Pick<Loader, keyof LangWatchQLVegaLoader>
-    ? true
-    : never;
+  LangWatchQLVegaLoader extends Pick<Loader, keyof LangWatchQLVegaLoader> ? true : never;
 const _lwqlLoaderMatchesVega: AssertLangWatchQLLoaderMatchesVega = true;
 void _lwqlLoaderMatchesVega;
 
@@ -48,9 +46,7 @@ export class LangWatchQLVegaLoadBlockedError extends Error {
 
   constructor({ reference, method }: { reference: string; method: string }) {
     const blocked = redactResourceReference(reference);
-    super(
-      `Chart resource loading is disabled: refused ${method} of ${blocked}.`,
-    );
+    super(`Chart resource loading is disabled: refused ${method} of ${blocked}.`);
     this.name = "LangWatchQLVegaLoadBlockedError";
     this.detail = lwqlVegaError({
       rule: "loader.blocked",

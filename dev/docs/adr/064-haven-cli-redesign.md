@@ -24,7 +24,7 @@ shows where that ends up:
 - **`status` means three things**: an alias of `list`, and the default
   subcommand of `clickhouse`, `postgres`, `observability`, and `hmr`. The two
   container command groups then disagree on their stop verb (`clickhouse
-  stop` vs `observability down`; `postgres` has neither).
+stop` vs `observability down`; `postgres` has neither).
 - **Four overlapping status surfaces** — `hub` (interactive + actions),
   `watch` (interactive, no actions), `list` (one-shot), `doctor` (health +
   footprints) — and **six ways to drop a database**: `down --drop-db`,
@@ -38,7 +38,7 @@ shows where that ends up:
   current selection, and nothing records it — every terminal has to get the
   incantation right again.
 - **The expensive path is the default.** `HAVEN_LANGY_REBUILD` defaults to
-  rebuilding the langyagent Docker image on *every* `up` — minutes of build
+  rebuilding the langyagent Docker image on _every_ `up` — minutes of build
   for a service many worktrees never exercise. Reusing the existing image is
   the thing you need an env var to opt into.
 - **Logs have hoops.** Attached mode writes only to whichever terminal ran
@@ -60,9 +60,9 @@ they never keep working silently.
    who wants `haven ps` can alias it in their own shell.
 2. **One meaning per flag, everywhere.** A shorthand letter or long flag
    means the same thing on every command that accepts it. `-t` is `--tail`
-   and nothing else. `-f` is `--force` — forcing the *lifecycle* action, and
+   and nothing else. `-f` is `--force` — forcing the _lifecycle_ action, and
    only on `up` (restart even a matching stack) and `down` (kill hard, no
-   graceful shutdown); destructive *data* actions confirm with `--yes`,
+   graceful shutdown); destructive _data_ actions confirm with `--yes`,
    never `--force`. `--json` and `--agent` are global. `--rebuild` means
    "rebuild the image" wherever it appears.
 3. **`up` is declarative and idempotent.** `haven up` means "make this
@@ -71,7 +71,7 @@ they never keep working silently.
    the stack is replaced in place with the new one. There is no
    refuse-then-`--force` dance to memorise.
 4. **Everything preparatory is automatic.** Proxy install and CA trust,
-   dependency install, database create/migrate/seed, database *recovery*,
+   dependency install, database create/migrate/seed, database _recovery_,
    and image ensure are idempotent preflight steps of `up` — not separate
    commands you must know to run, and not errors you must know how to fix.
 5. **Logs are a first-class tap.** Every service's output is captured
@@ -163,7 +163,7 @@ OPENCODE_AGENT_URL) mid-flight. Bouncing only the delta is the recorded
 follow-up optimisation.
 
 **Defaults flip to lean.** A fresh worktree runs `app` (workers in-process),
-`nlp`, and `gateway` — and *not* `langy`. langy costs a container image and a
+`nlp`, and `gateway` — and _not_ `langy`. langy costs a container image and a
 1.8 GB memory cap that most worktrees never exercise; the worktrees that need
 it say `+langy` once. The first `up` prints the selection and how to change
 it, so the lean default is discoverable rather than mysterious.
@@ -252,23 +252,23 @@ combined `all` stream and the per-service log groups follow it.
 
 ### What is cut, and where it went
 
-| Today | v2 |
-|---|---|
-| `setup` | automatic preflight of `up` |
-| `list` / `ls` / `status`-alias, `doctor`, `watch` | `haven status` (one-shot) and the bare-`haven` hub |
-| `hub` / `ps` / `active` | bare `haven` only |
-| `up -f/--force` | `up` reconciles; `-f` now means "restart even a matching stack" |
-| `up -w/--watch` | unchanged flag, only meaning of `--watch` |
-| `down --drop-db` / `--keep-db` | `down` keeps data, always; fresh data is `haven db reset` |
-| `clickhouse` / `ch`, `postgres` / `pg` subtrees | `haven db url`, `haven db reset`; server lifecycle is automatic |
-| `observability` / `obs` subtree | managed automatically; `restart obs`, `logs obs`, `status` |
-| `seed [--preset demo]` | `haven db seed [preset]` (in place) / `haven db reset [preset]` (fresh) |
-| `prune`, `prune --artifacts`, `cleanup` / `oc` | `haven clean` (one interactive picker, categories: worktrees, artifacts, idle DBs, orphan processes) |
-| `pr --trusted` / `--allow-scripts`, `pr --force` | `--allow-scripts` only; `--allow-closed` |
-| `hmr pause` / `resume` | `hmr on` / `off` only |
-| `git --list` vs `switch --list` divergence | `--json` on `git`; `switch --list` stays (completion) |
-| selection env vars | sticky `up +svc` / `-svc` (the env vars are refused, naming their replacement) |
-| `HAVEN_LANGY_REBUILD` | content-hashed images + `--rebuild` |
+| Today                                             | v2                                                                                                   |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `setup`                                           | automatic preflight of `up`                                                                          |
+| `list` / `ls` / `status`-alias, `doctor`, `watch` | `haven status` (one-shot) and the bare-`haven` hub                                                   |
+| `hub` / `ps` / `active`                           | bare `haven` only                                                                                    |
+| `up -f/--force`                                   | `up` reconciles; `-f` now means "restart even a matching stack"                                      |
+| `up -w/--watch`                                   | unchanged flag, only meaning of `--watch`                                                            |
+| `down --drop-db` / `--keep-db`                    | `down` keeps data, always; fresh data is `haven db reset`                                            |
+| `clickhouse` / `ch`, `postgres` / `pg` subtrees   | `haven db url`, `haven db reset`; server lifecycle is automatic                                      |
+| `observability` / `obs` subtree                   | managed automatically; `restart obs`, `logs obs`, `status`                                           |
+| `seed [--preset demo]`                            | `haven db seed [preset]` (in place) / `haven db reset [preset]` (fresh)                              |
+| `prune`, `prune --artifacts`, `cleanup` / `oc`    | `haven clean` (one interactive picker, categories: worktrees, artifacts, idle DBs, orphan processes) |
+| `pr --trusted` / `--allow-scripts`, `pr --force`  | `--allow-scripts` only; `--allow-closed`                                                             |
+| `hmr pause` / `resume`                            | `hmr on` / `off` only                                                                                |
+| `git --list` vs `switch --list` divergence        | `--json` on `git`; `switch --list` stays (completion)                                                |
+| selection env vars                                | sticky `up +svc` / `-svc` (the env vars are refused, naming their replacement)                       |
+| `HAVEN_LANGY_REBUILD`                             | content-hashed images + `--rebuild`                                                                  |
 
 ### haven play: an ephemeral PR sandbox
 
@@ -296,14 +296,14 @@ The rules it adds, and how they honour the constitution:
   free-text git headers, and GitHub's own `author`/`committer` objects are
   just a lookup of those attacker-chosen emails against accounts' verified
   addresses — the `<id>+<login>@users.noreply.github.com` form is publicly
-  derivable, so anyone can make a commit *appear* to be a maintainer's.
+  derivable, so anyone can make a commit _appear_ to be a maintainer's.
   Therefore:
   - **Same-repo PR** — the branch exists in this repository, which required
     push access to create, so the code already passed a real access check.
     Every commit author and committer is checked for write access, and an
     identity with no GitHub account is untrusted by definition.
   - **Fork PR** — attribution proves nothing, so only a commit carrying a
-    signature GitHub *verified*, whose verified signer has write access,
+    signature GitHub _verified_, whose verified signer has write access,
     counts as trusted. Every other commit is named as untrusted by sha.
 
   A listing that hits GitHub's 250-commit cap fails closed rather than
@@ -311,21 +311,22 @@ The rules it adds, and how they honour the constitution:
   failure in agent mode, where `--allow-untrusted` is the only way past. Not
   `--force`: that letter is lifecycle-only, and accepting untrusted code
   deserves a flag that says exactly what it does.
+
 - **Accepting untrusted code takes two steps, not one keystroke.** In a
   terminal the gate asks twice, because the two questions are different. The
   first names the authors without write access and takes a y/N, defaulting to
-  no. The second discloses the part the sandbox's isolation does *not* cover,
+  no. The second discloses the part the sandbox's isolation does _not_ cover,
   then accepts only the PR's number typed back.
 
   That second step exists because "isolated" is easy to over-read. The
-  isolation is of the PR's *data* — dedicated databases, volumes, hostnames and
+  isolation is of the PR's _data_ — dedicated databases, volumes, hostnames and
   checkout, and none of the developer's `.env` files. It is not a boundary
   around the developer: the install, migrations, seed and service commands are
   ordinary child processes, so they run under the developer's own account and
   inherit the environment haven was launched from, and whatever that shell
   exports — SSH agent socket, GitHub, cloud and registry tokens — goes with
   them, alongside reachable home directory and network. Containerising the
-  sandbox's *execution* would be the way to close that, and is deliberately out
+  sandbox's _execution_ would be the way to close that, and is deliberately out
   of scope here; what this decision buys instead is that nobody accepts it
   without being told, and nobody accepts it by reflex. Typing the number cannot
   be muscle memory the way a `y` can, and it means having read far enough to
@@ -334,10 +335,11 @@ The rules it adds, and how they honour the constitution:
   The same disclosure rides every route that ends in a stranger's code
   running — the second step, the `--allow-untrusted` warning line, and the
   agent-mode failure — so no path to it is quieter than the others.
+
 - **The sandbox never runs a checkout's package scripts.** Installs use
   `--ignore-scripts` unconditionally, because this repo has a postinstall and
   a PR controls package scripts — a plain install would execute PR-authored
-  code with the developer's environment before any gate on the *application*
+  code with the developer's environment before any gate on the _application_
   code mattered. Nothing is lost: the postinstall is codegen, which the
   sandbox then runs explicitly through `start:prepare:files`.
 - **Quitting always destroys everything** (processes, hostnames, containers,
@@ -374,7 +376,7 @@ confusion this ADR exists to remove, indefinitely, in a tool whose entire user
 base fits in one room. We accept a one-morning break for a permanently smaller
 surface.
 
-Making `up` declarative removes the only *safety* use of `--force` (replacing
+Making `up` declarative removes the only _safety_ use of `--force` (replacing
 a half-dead stack), so reconciliation must genuinely handle the
 already-running, half-running, and stale-registry cases; the lifecycle spec
 pins those. Flipping langy to opt-in trades a surprise for a much better one:

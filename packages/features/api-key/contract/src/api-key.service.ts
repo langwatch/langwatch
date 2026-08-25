@@ -1,4 +1,21 @@
-import type { ApiKey, ApiKeyBinding, ApiKeyBindingNames, ApiKeyDetail, ApiKeyListEnrichment, ApiKeyName, ApiKeyProject, ApiKeyScope, ApiKeyTeam, ApiKeyUser, ApiKeyVerification, CliKeyScopeSummary, CliKeySelection, CreateApiKeyInput, RevokeApiKeyInput, UpdateApiKeyInput } from "./api-key";
+import type {
+  ApiKey,
+  ApiKeyBinding,
+  ApiKeyBindingNames,
+  ApiKeyDetail,
+  ApiKeyListEnrichment,
+  ApiKeyName,
+  ApiKeyProject,
+  ApiKeyScope,
+  ApiKeyTeam,
+  ApiKeyUser,
+  ApiKeyVerification,
+  CliKeyScopeSummary,
+  CliKeySelection,
+  CreateApiKeyInput,
+  RevokeApiKeyInput,
+  UpdateApiKeyInput,
+} from "./api-key";
 import type {
   ApiKeyTokenResolutionInput,
   OrganizationApiKeyResolution,
@@ -9,7 +26,12 @@ import type {
   ApiKeyVisibleProjects,
   ApiKeyVisibleProjectsInput,
 } from "./api-key.visibility";
-export type ApiKeySelectionInput = { userId: string; organizationId: string; bindings: Array<ApiKeyScope & { role: "CUSTOM" }>; permissions: string[] };
+export type ApiKeySelectionInput = {
+  userId: string;
+  organizationId: string;
+  bindings: Array<ApiKeyScope & { role: "CUSTOM" }>;
+  permissions: string[];
+};
 export type ApiKeyListInput = { userId: string; organizationId: string };
 export type ApiKeyListAllInput = { organizationId: string };
 export type ApiKeyVerifyInput = { token: string };
@@ -18,7 +40,12 @@ export type ApiKeyIdInput = { id: string };
 export type ApiKeyOrgIdInput = { id: string; organizationId: string };
 export type ApiKeyMembershipInput = { userId: string; organizationId: string };
 export type ApiKeyAdminKeyInput = { apiKeyId: string; organizationId: string };
-export type ApiKeyCallerReadInput = { id: string; organizationId: string; callerUserId: string | null; callerCanReadAnyKey: boolean };
+export type ApiKeyCallerReadInput = {
+  id: string;
+  organizationId: string;
+  callerUserId: string | null;
+  callerCanReadAnyKey: boolean;
+};
 
 /** The only public capability for API credentials. */
 export abstract class ApiKeyService {
@@ -31,9 +58,7 @@ export abstract class ApiKeyService {
     input: ApiKeyTokenResolutionInput,
   ): Promise<ResolvedApiKeyToken | null>;
   /** Rotates a deprecated project credential while preserving its wire format. */
-  abstract regenerateLegacyProjectKey(input: {
-    projectId: string;
-  }): Promise<string>;
+  abstract regenerateLegacyProjectKey(input: { projectId: string }): Promise<string>;
   /** Resolves organization-only credentials while keeping refusal classes apart. */
   abstract resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,
@@ -56,13 +81,45 @@ export abstract class ApiKeyService {
   abstract getOrgProjects(input: ApiKeyOrgInput): Promise<ApiKeyProject[]>;
   abstract getOrgTeams(input: ApiKeyOrgInput): Promise<ApiKeyTeam[]>;
   abstract getOrgMembers(input: ApiKeyOrgInput): Promise<ApiKeyUser[]>;
-  abstract tryGetIngestionKey(input: { organizationId: string; projectId: string; sourceType: string }): Promise<ApiKey | null>;
-  abstract listIngestionKeysForProject(input: { organizationId: string; projectId: string }): Promise<ApiKey[]>;
-  abstract validateCliSelection(input: { userId: string; organizationId: string; selection: CliKeySelection }): Promise<CliKeySelection>;
-  abstract tryResolveDefaultCliSelection(input: { userId: string; organizationId: string }): Promise<CliKeySelection | null>;
-  abstract mintCliLoginKey(input: { userId: string; organizationId: string; deviceLabel: string; selection: CliKeySelection }): Promise<{ token: string; apiKeyId: string; scope: CliKeyScopeSummary }>;
-  abstract revokeCliLoginKeysForDevice(input: { userId: string; organizationId: string; deviceLabel: string; exceptApiKeyId?: string; createdBefore?: Date }): Promise<void>;
-  abstract revokeCliLoginKeyForLogout(input: { apiKeyId: string; userId: string; organizationId: string }): Promise<void>;
-  abstract enrichBindingsWithNames(input: { bindings: ApiKeyBinding[]; organizationId?: string }): Promise<ApiKeyBindingNames>;
+  abstract tryGetIngestionKey(input: {
+    organizationId: string;
+    projectId: string;
+    sourceType: string;
+  }): Promise<ApiKey | null>;
+  abstract listIngestionKeysForProject(input: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<ApiKey[]>;
+  abstract validateCliSelection(input: {
+    userId: string;
+    organizationId: string;
+    selection: CliKeySelection;
+  }): Promise<CliKeySelection>;
+  abstract tryResolveDefaultCliSelection(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<CliKeySelection | null>;
+  abstract mintCliLoginKey(input: {
+    userId: string;
+    organizationId: string;
+    deviceLabel: string;
+    selection: CliKeySelection;
+  }): Promise<{ token: string; apiKeyId: string; scope: CliKeyScopeSummary }>;
+  abstract revokeCliLoginKeysForDevice(input: {
+    userId: string;
+    organizationId: string;
+    deviceLabel: string;
+    exceptApiKeyId?: string;
+    createdBefore?: Date;
+  }): Promise<void>;
+  abstract revokeCliLoginKeyForLogout(input: {
+    apiKeyId: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<void>;
+  abstract enrichBindingsWithNames(input: {
+    bindings: ApiKeyBinding[];
+    organizationId?: string;
+  }): Promise<ApiKeyBindingNames>;
   abstract enrichApiKeyList(input: { apiKeys: ApiKey[] }): Promise<ApiKeyListEnrichment>;
 }

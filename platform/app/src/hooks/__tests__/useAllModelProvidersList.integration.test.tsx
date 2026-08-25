@@ -129,9 +129,7 @@ describe("useAllModelProvidersList()", () => {
       it("returns the same providers array reference across renders", () => {
         primeBothQueries(notReadyQueryResult());
 
-        const { result, rerender } = renderHook(() =>
-          useAllModelProvidersList(),
-        );
+        const { result, rerender } = renderHook(() => useAllModelProvidersList());
         const first = result.current.providers;
 
         rerender();
@@ -161,9 +159,7 @@ describe("useAllModelProvidersList()", () => {
             scopeId: "proj-1",
           }),
         ];
-        primeBothQueries(
-          readyQueryResult({ providers: rows, modelMetadata: {} }),
-        );
+        primeBothQueries(readyQueryResult({ providers: rows, modelMetadata: {} }));
 
         const { result } = renderHook(() => useAllModelProvidersList());
 

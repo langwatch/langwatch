@@ -140,9 +140,7 @@ describe("Azure byte paths without an account key", () => {
 
       expect(credentials.mode).toBe("sharedKey");
       expect(maybeAzureDriver()).toBeDefined();
-      await expect(
-        resolveProjectStorageDestination("proj-1"),
-      ).resolves.toMatchObject({
+      await expect(resolveProjectStorageDestination("proj-1")).resolves.toMatchObject({
         kind: "azure",
       });
     });

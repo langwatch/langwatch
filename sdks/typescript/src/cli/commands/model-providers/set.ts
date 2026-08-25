@@ -48,9 +48,7 @@ export const setModelProviderCommand = async (
       ...(options.defaultModel && { defaultModel: options.defaultModel }),
     });
 
-    spinner.succeed(
-      `Configured model provider "${chalk.cyan(provider)}"`,
-    );
+    spinner.succeed(`Configured model provider "${chalk.cyan(provider)}"`);
 
     return {
       data: {

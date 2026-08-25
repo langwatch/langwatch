@@ -37,24 +37,17 @@ describe("given a project-scoped row and an organization-scoped row that both de
         enabled: true,
         id: "zzz-project",
         scopes: [{ scopeType: "PROJECT", scopeId: "proj_2" }],
-        customModels: [
-          { modelId: "quasar-2", displayName: "Falcon Nine", mode: "chat" },
-        ],
+        customModels: [{ modelId: "quasar-2", displayName: "Falcon Nine", mode: "chat" }],
       });
       const organizationRow = makeProvider({
         provider: "vendorF",
         enabled: true,
         id: "aaa-org",
         scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_2" }],
-        customModels: [
-          { modelId: "quasar-2", displayName: "Widget Nine", mode: "chat" },
-        ],
+        customModels: [{ modelId: "quasar-2", displayName: "Widget Nine", mode: "chat" }],
       });
 
-      const result = buildCustomModelDisplayNames([
-        projectRow,
-        organizationRow,
-      ]);
+      const result = buildCustomModelDisplayNames([projectRow, organizationRow]);
 
       expect(result["vendorF/quasar-2"]).toBe("Falcon Nine");
     });
@@ -76,24 +69,17 @@ describe("given a project-scoped row and an organization-scoped row whose winnin
         enabled: true,
         id: "zzz-project",
         scopes: [{ scopeType: "PROJECT", scopeId: "proj_5" }],
-        customModels: [
-          { modelId: "comet-5", displayName: "Falcon Nine", mode: "chat" },
-        ],
+        customModels: [{ modelId: "comet-5", displayName: "Falcon Nine", mode: "chat" }],
       });
       const organizationRow = makeProvider({
         provider: "vendorN",
         enabled: true,
         id: "aaa-org",
         scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_5" }],
-        customModels: [
-          { modelId: "comet-5", displayName: "Widget Nine", mode: "chat" },
-        ],
+        customModels: [{ modelId: "comet-5", displayName: "Widget Nine", mode: "chat" }],
       });
 
-      const result = buildCustomModelDisplayNames([
-        organizationRow,
-        projectRow,
-      ]);
+      const result = buildCustomModelDisplayNames([organizationRow, projectRow]);
 
       expect(result["vendorN/comet-5"]).toBe("Falcon Nine");
     });
@@ -118,9 +104,7 @@ describe("given a project-scoped row and a row whose scope tier is not one `rank
         enabled: true,
         id: "zzz-project",
         scopes: [{ scopeType: "PROJECT", scopeId: "proj_6" }],
-        customModels: [
-          { modelId: "nova-6", displayName: "Trusted Name", mode: "chat" },
-        ],
+        customModels: [{ modelId: "nova-6", displayName: "Trusted Name", mode: "chat" }],
       });
       const unknownTierRow = makeProvider({
         provider: "vendorO",
@@ -128,16 +112,11 @@ describe("given a project-scoped row and a row whose scope tier is not one `rank
         id: "aaa-unknown",
         scopes: [
           {
-            scopeType: "WORKSPACE" as unknown as
-              | "ORGANIZATION"
-              | "TEAM"
-              | "PROJECT",
+            scopeType: "WORKSPACE" as unknown as "ORGANIZATION" | "TEAM" | "PROJECT",
             scopeId: "ws_6",
           },
         ],
-        customModels: [
-          { modelId: "nova-6", displayName: "Unranked Name", mode: "chat" },
-        ],
+        customModels: [{ modelId: "nova-6", displayName: "Unranked Name", mode: "chat" }],
       });
 
       const result = buildCustomModelDisplayNames([unknownTierRow, projectRow]);
@@ -186,10 +165,7 @@ describe("given a project-scoped row and a row whose scope tier names an inherit
         id: "aaa-prototype",
         scopes: [
           {
-            scopeType: "toString" as unknown as
-              | "ORGANIZATION"
-              | "TEAM"
-              | "PROJECT",
+            scopeType: "toString" as unknown as "ORGANIZATION" | "TEAM" | "PROJECT",
             scopeId: "proto_8",
           },
         ],
@@ -198,10 +174,7 @@ describe("given a project-scoped row and a row whose scope tier names an inherit
         ],
       });
 
-      const result = buildCustomModelDisplayNames([
-        prototypeTierRow,
-        projectRow,
-      ]);
+      const result = buildCustomModelDisplayNames([prototypeTierRow, projectRow]);
 
       expect(result["vendorR/photon-9"]).toBe("Scoped Winner");
     });
@@ -248,10 +221,7 @@ describe("given two rows scoped only via the legacy singular scopeType field (no
         ],
       });
 
-      const result = buildCustomModelDisplayNames([
-        organizationRow,
-        projectRow,
-      ]);
+      const result = buildCustomModelDisplayNames([organizationRow, projectRow]);
 
       expect(result["vendorP/pulsar-7"]).toBe("Legacy Field Winner");
     });

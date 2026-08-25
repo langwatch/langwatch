@@ -51,9 +51,7 @@ type ConversationTurnProjectionPrismaClient = {
     findUnique(
       args: Prisma.LangyConversationTurnProjectionFindUniqueArgs,
     ): Promise<Row | null>;
-    upsert(
-      args: Prisma.LangyConversationTurnProjectionUpsertArgs,
-    ): Promise<Row>;
+    upsert(args: Prisma.LangyConversationTurnProjectionUpsertArgs): Promise<Row>;
   };
 };
 
@@ -95,16 +93,10 @@ function fromRow(row: Row): StoredProjection<LangyConversationTurnData> {
 }
 
 /** Postgres row I/O for the type-aware turn projection. */
-export class PrismaLangyConversationTurnProjectionRepository
-  implements StateProjectionStore<LangyConversationTurnData>
-{
-  constructor(
-    private readonly prisma: ConversationTurnProjectionPrismaClient,
-  ) {}
+export class PrismaLangyConversationTurnProjectionRepository implements StateProjectionStore<LangyConversationTurnData> {
+  constructor(private readonly prisma: ConversationTurnProjectionPrismaClient) {}
 
-  static create(
-    database: object,
-  ): PrismaLangyConversationTurnProjectionRepository {
+  static create(database: object): PrismaLangyConversationTurnProjectionRepository {
     return new PrismaLangyConversationTurnProjectionRepository(
       database as ConversationTurnProjectionPrismaClient,
     );

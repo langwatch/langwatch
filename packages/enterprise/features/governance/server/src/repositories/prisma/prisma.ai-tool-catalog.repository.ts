@@ -59,9 +59,7 @@ export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
       if (row.departments.length > 0) {
         return (
           departmentId !== null &&
-          row.departments.some(
-            (department) => department.departmentId === departmentId,
-          )
+          row.departments.some((department) => department.departmentId === departmentId)
         );
       }
       if (row.scope === "department") {
@@ -76,8 +74,7 @@ export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
         bySlug.set(row.slug, row);
         continue;
       }
-      const rowDepartment =
-        row.departments.length > 0 || row.scope === "department";
+      const rowDepartment = row.departments.length > 0 || row.scope === "department";
       const existingDepartment =
         existing.departments.length > 0 || existing.scope === "department";
       if (rowDepartment && !existingDepartment) bySlug.set(row.slug, row);
@@ -121,10 +118,7 @@ export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
     values: CreateAiToolEntryInput;
     slug: string;
   }): Promise<AiToolEntry> {
-    const legacy = legacyScope(
-      input.values.organizationId,
-      input.values.departmentIds,
-    );
+    const legacy = legacyScope(input.values.organizationId, input.values.departmentIds);
     const row = await this.database.$transaction(async (transaction) => {
       const created = await transaction.aiToolEntry.create({
         data: {
@@ -254,9 +248,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
     const update: Array<{ id: string; iconAsset: string }> = [];
     let skipped = 0;
     for (const tile of input.tiles) {
-      const match = byFingerprint.get(
-        fingerprint(tile.type, tile.displayName),
-      );
+      const match = byFingerprint.get(fingerprint(tile.type, tile.displayName));
       if (!match) create.push(tile);
       else if (match.iconAsset === null) {
         update.push({ id: match.id, iconAsset: tile.iconAsset });
@@ -293,9 +285,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
     return { created: create.length, updated: update.length, skipped };
   }
 
-  async listConfiguredProvidersForUser(
-    input: AiToolMemberInput,
-  ): Promise<string[]> {
+  async listConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]> {
     const memberships = await this.database.teamUser.findMany({
       where: {
         userId: input.userId,
@@ -310,11 +300,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
     const projectIds = memberships.flatMap(({ team }) =>
       team.projects.map(({ id }) => id),
     );
-    return this.configuredProviders(
-      input.organizationId,
-      teamIds,
-      projectIds,
-    );
+    return this.configuredProviders(input.organizationId, teamIds, projectIds);
   }
 
   async listConfiguredProvidersForOrganization(
@@ -378,9 +364,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
       },
       select: { provider: true },
     });
-    return Array.from(
-      new Set(rows.map(({ provider }) => provider).filter(Boolean)),
-    );
+    return Array.from(new Set(rows.map(({ provider }) => provider).filter(Boolean)));
   }
 }
 
@@ -418,17 +402,11 @@ function starterData(
 
 function mapEntry(row: EntryRow): AiToolEntry {
   let departmentIds = row.departments.map(({ departmentId }) => departmentId);
-  if (
-    departmentIds.length === 0 &&
-    row.scope === "department" &&
-    row.scopeId
-  ) {
+  if (departmentIds.length === 0 && row.scope === "department" && row.scopeId) {
     departmentIds = [row.scopeId];
   }
   const scope =
-    row.scope === "organization" ||
-    row.scope === "department" ||
-    row.scope === "team"
+    row.scope === "organization" || row.scope === "department" || row.scope === "team"
       ? row.scope
       : "organization";
   const type =

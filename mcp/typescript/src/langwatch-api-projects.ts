@@ -75,8 +75,9 @@ export async function archiveProject(id: string): Promise<{
   name: string;
   archivedAt: string;
 }> {
-  return makeRequest(
-    "DELETE",
-    `/api/projects/${encodeURIComponent(id)}`,
-  ) as Promise<{ id: string; name: string; archivedAt: string }>;
+  return makeRequest("DELETE", `/api/projects/${encodeURIComponent(id)}`) as Promise<{
+    id: string;
+    name: string;
+    archivedAt: string;
+  }>;
 }

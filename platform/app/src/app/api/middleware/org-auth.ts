@@ -1,10 +1,7 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { Context, MiddlewareHandler } from "hono";
-import {
-  type ApiErrorEnvelope,
-  authRefusalBody,
-} from "~/app/api/shared/canonical-error";
+import { type ApiErrorEnvelope, authRefusalBody } from "~/app/api/shared/canonical-error";
 import type { Organization } from "~/generated/prisma/client";
 import { createOrgAuthMiddleware } from "~/server/api-key/auth-middleware";
 import type { ResolvedOrganizationApiKeyToken as OrgResolvedToken } from "@langwatch/api-key-contract";
@@ -29,8 +26,10 @@ export const orgAuthMiddleware: MiddlewareHandler = createOrgAuthMiddleware({
  * instances rather than one parameterised at request time: each builds its own
  * token resolver once, and the choice is fixed per family anyway.
  */
-export const canonicalOrgAuthMiddleware: MiddlewareHandler =
-  createOrgAuthMiddleware({ prisma, errorEnvelope: "canonical" });
+export const canonicalOrgAuthMiddleware: MiddlewareHandler = createOrgAuthMiddleware({
+  prisma,
+  errorEnvelope: "canonical",
+});
 
 /**
  * Authorizes an org-app route against the project it names, rather than the

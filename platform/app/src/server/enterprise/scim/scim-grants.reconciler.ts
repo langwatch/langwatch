@@ -120,9 +120,7 @@ export async function reconcileScimGrants({
   const toRevoke = current
     .filter((row) => !desiredKeys.has(grantKey(row)))
     .map((row) => row.id);
-  const toAttach = desired.filter(
-    (grant) => !currentKeys.has(keyOfDesired(grant)),
-  );
+  const toAttach = desired.filter((grant) => !currentKeys.has(keyOfDesired(grant)));
 
   if (toRevoke.length > 0) {
     await writer.revokeBindings({

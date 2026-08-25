@@ -156,8 +156,8 @@ function GuardrailsPage() {
               </EmptyState.Indicator>
               <EmptyState.Title>Pick a project first</EmptyState.Title>
               <EmptyState.Description>
-                Guardrails are scoped per project. Use the project switcher in
-                the top-left to pick a project before creating one.
+                Guardrails are scoped per project. Use the project switcher in the
+                top-left to pick a project before creating one.
               </EmptyState.Description>
             </EmptyState.Content>
           </EmptyState.Root>
@@ -186,10 +186,9 @@ function GuardrailsPage() {
       <Box paddingX={6} paddingY={4} width="full">
         <VStack align="stretch" gap={4}>
           <Text fontSize="sm" color="fg.muted">
-            Project-scoped LangWatch evaluators that run on every gateway
-            request bound to this project. Pick a direction (pre / post /
-            stream_chunk) and a failure mode (default fail closed). The VK
-            opt-in lives in the virtual-key drawer.
+            Project-scoped LangWatch evaluators that run on every gateway request bound to
+            this project. Pick a direction (pre / post / stream_chunk) and a failure mode
+            (default fail closed). The VK opt-in lives in the virtual-key drawer.
           </Text>
 
           {listQuery.isLoading ? (
@@ -208,14 +207,13 @@ function GuardrailsPage() {
                         <>
                           No project evaluators are marked as guardrails. Open
                           Evaluations, edit an evaluator, and switch{" "}
-                          <strong>executionMode</strong> to{" "}
-                          <code>AS_GUARDRAIL</code> before binding it here.
+                          <strong>executionMode</strong> to <code>AS_GUARDRAIL</code>{" "}
+                          before binding it here.
                         </>
                       ) : (
                         <>
-                          Click <strong>New guardrail</strong> to bind one of
-                          your project evaluators as a pre / post / stream_chunk
-                          hook.
+                          Click <strong>New guardrail</strong> to bind one of your project
+                          evaluators as a pre / post / stream_chunk hook.
                         </>
                       )}
                     </EmptyState.Description>
@@ -252,28 +250,18 @@ function GuardrailsPage() {
                         </VStack>
                       </Table.Cell>
                       <Table.Cell>
-                        <Badge variant="subtle">
-                          {DIRECTION_LABEL[row.direction]}
-                        </Badge>
+                        <Badge variant="subtle">{DIRECTION_LABEL[row.direction]}</Badge>
                       </Table.Cell>
                       <Table.Cell>
                         {evaluator ? (
                           <VStack align="start" gap={0}>
                             <Text fontSize="sm">{evaluator.name}</Text>
-                            <Text
-                              fontSize="2xs"
-                              color="fg.muted"
-                              fontFamily="mono"
-                            >
+                            <Text fontSize="2xs" color="fg.muted" fontFamily="mono">
                               {evaluator.slug}
                             </Text>
                           </VStack>
                         ) : (
-                          <Text
-                            fontSize="xs"
-                            color="fg.muted"
-                            fontFamily="mono"
-                          >
+                          <Text fontSize="xs" color="fg.muted" fontFamily="mono">
                             {row.evaluatorId}
                           </Text>
                         )}
@@ -493,8 +481,8 @@ function GuardrailDrawer({
                 </NativeSelect.Field>
               </NativeSelect.Root>
               <Field.HelperText>
-                Only evaluators with executionMode AS_GUARDRAIL are listed. Flip
-                an evaluator in Evaluations to expose it here.
+                Only evaluators with executionMode AS_GUARDRAIL are listed. Flip an
+                evaluator in Evaluations to expose it here.
               </Field.HelperText>
             </Field.Root>
 
@@ -523,20 +511,15 @@ function GuardrailDrawer({
                 <NativeSelect.Field
                   value={failureMode}
                   onChange={(e) =>
-                    setFailureMode(
-                      e.target.value as GatewayGuardrailFailureMode,
-                    )
+                    setFailureMode(e.target.value as GatewayGuardrailFailureMode)
                   }
                 >
-                  <option value="FAIL_CLOSED">
-                    {FAILURE_LABEL.FAIL_CLOSED}
-                  </option>
+                  <option value="FAIL_CLOSED">{FAILURE_LABEL.FAIL_CLOSED}</option>
                   <option value="FAIL_OPEN">{FAILURE_LABEL.FAIL_OPEN}</option>
                 </NativeSelect.Field>
               </NativeSelect.Root>
               <Field.HelperText>
-                stream_chunk is always fail-open per contract regardless of this
-                setting.
+                stream_chunk is always fail-open per contract regardless of this setting.
               </Field.HelperText>
             </Field.Root>
           </VStack>

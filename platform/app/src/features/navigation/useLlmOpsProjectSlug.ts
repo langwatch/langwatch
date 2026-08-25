@@ -66,10 +66,7 @@ export function useLlmOpsProjectSlug(): string | null {
     redirectToProjectOnboarding: false,
   });
   const { data: session } = useRequiredSession();
-  const [rememberedProjectSlug] = useLocalStorage<string>(
-    "selectedProjectSlug",
-    "",
-  );
+  const [rememberedProjectSlug] = useLocalStorage<string>("selectedProjectSlug", "");
 
   return resolveLlmOpsProjectSlug({
     ambientProject: project,

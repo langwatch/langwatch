@@ -624,9 +624,7 @@ function buildColumnPattern(col: string, alias: string): RegExp {
  * Selecting only the columns actually referenced avoids reading unused data
  * and prevents ClickHouse OOM on large result sets.
  */
-export function extractReferencedSpanColumns(
-  expressions: string[],
-): ReadonlySet<string> {
+export function extractReferencedSpanColumns(expressions: string[]): ReadonlySet<string> {
   const joined = expressions.join(" ");
   const columns = new Set<string>();
   const alias = tableAliases.stored_spans;
@@ -652,12 +650,8 @@ export function extractReferencedSpanColumns(
  * MEMORY_LIMIT_EXCEEDED in prod. The reconstructed map keeps the column name and
  * type identical, so outer `ss.SpanAttributes['key']` accesses are unchanged.
  */
-export function spanAttributesNarrowProjection(
-  keys: readonly string[],
-): string {
-  const entries = keys
-    .map((key) => `'${key}', SpanAttributes['${key}']`)
-    .join(", ");
+export function spanAttributesNarrowProjection(keys: readonly string[]): string {
+  const entries = keys.map((key) => `'${key}', SpanAttributes['${key}']`).join(", ");
   return `map(${entries}) AS SpanAttributes`;
 }
 

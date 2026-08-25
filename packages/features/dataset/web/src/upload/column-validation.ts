@@ -21,9 +21,7 @@ import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
  * in surrounding whitespace are distinct keys and not flagged. Empty is the
  * trimmed-empty case (a whitespace name is junk, never a real column).
  */
-export function invalidColumnNameKeys(
-  columns: DatasetConfirmColumns,
-): Set<string> {
+export function invalidColumnNameKeys(columns: DatasetConfirmColumns): Set<string> {
   const nameCounts = new Map<string, number>();
   for (const column of columns) {
     nameCounts.set(column.name, (nameCounts.get(column.name) ?? 0) + 1);

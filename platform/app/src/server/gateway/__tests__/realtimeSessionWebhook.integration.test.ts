@@ -11,15 +11,7 @@
  */
 import { createHmac } from "crypto";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -103,9 +95,7 @@ async function openSession(label: string, conversationId: string) {
 async function deliver(payload: unknown): Promise<Response> {
   const body = JSON.stringify(payload);
   const ts = String(Math.floor(Date.now() / 1000));
-  const mac = createHmac("sha256", WEBHOOK_SECRET)
-    .update(`${ts}.${body}`)
-    .digest("hex");
+  const mac = createHmac("sha256", WEBHOOK_SECRET).update(`${ts}.${body}`).digest("hex");
   return elevenLabsApp.request(`/api/elevenlabs/webhook/${PROVIDER_ID}`, {
     method: "POST",
     headers: {
@@ -117,9 +107,8 @@ async function deliver(payload: unknown): Promise<Response> {
 }
 
 async function statusOf(sessionId: string): Promise<string | undefined> {
-  return (
-    await prisma.gatewayRealtimeSession.findUnique({ where: { id: sessionId } })
-  )?.status;
+  return (await prisma.gatewayRealtimeSession.findUnique({ where: { id: sessionId } }))
+    ?.status;
 }
 
 describe("given an ElevenLabs credential with a stored webhook secret", () => {
@@ -262,17 +251,17 @@ describe("given an ElevenLabs credential with a stored webhook secret", () => {
           data: { conversation_id: id, metadata: { call_duration_secs: 0.2 } },
         }),
       },
-    ])("acknowledges $label and leaves the session open", async ({
-      conversationId,
-      payload,
-    }) => {
-      const sessionId = await openSession("skip", conversationId);
+    ])(
+      "acknowledges $label and leaves the session open",
+      async ({ conversationId, payload }) => {
+        const sessionId = await openSession("skip", conversationId);
 
-      const response = await deliver(payload(conversationId));
+        const response = await deliver(payload(conversationId));
 
-      expect(response.status).toBe(200);
-      expect(sentConfirmations).toHaveLength(0);
-      expect(await statusOf(sessionId)).toBe("OPEN");
-    });
+        expect(response.status).toBe(200);
+        expect(sentConfirmations).toHaveLength(0);
+        expect(await statusOf(sessionId)).toBe("OPEN");
+      },
+    );
   });
 });

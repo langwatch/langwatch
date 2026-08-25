@@ -26,16 +26,17 @@ export const annotationAnchorColumnsSchema = z
       });
     }
   });
-export type AnnotationAnchorColumns = z.infer<
-  typeof annotationAnchorColumnsSchema
->;
+export type AnnotationAnchorColumns = z.infer<typeof annotationAnchorColumnsSchema>;
 
 export const annotationAnchorScopes = ["trace", "all"] as const;
 export const annotationAnchorScopeSchema = z.enum(annotationAnchorScopes);
 export type AnnotationAnchorScope = z.infer<typeof annotationAnchorScopeSchema>;
 
 export const annotationScoreOptionSchema = z.object({
-  value: z.union([z.string(), z.array(z.string())]).nullable().optional(),
+  value: z
+    .union([z.string(), z.array(z.string())])
+    .nullable()
+    .optional(),
   reason: z.string().nullable().optional(),
 });
 export const annotationScoreOptionsSchema = z.record(z.string(), z.unknown());
@@ -120,9 +121,7 @@ export function annotationAnchorScopeWhere(
   return scope === "trace" ? { anchorKind: null } : {};
 }
 
-export function withReadableAnnotationAnchor<T extends ProjectionAnnotation>(
-  row: T,
-): T {
+export function withReadableAnnotationAnchor<T extends ProjectionAnnotation>(row: T): T {
   const kind = annotationAnchorKindSchema.safeParse(row.anchorKind);
   if (!kind.success || !row.anchorId) {
     return { ...row, anchorKind: null, anchorId: null, anchorPath: null };

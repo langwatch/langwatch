@@ -33,9 +33,7 @@ describe("selectLangySuggestions", () => {
       { ...NOTHING, hasTraces: true, hasEvaluations: true },
       EVERYTHING,
     ]) {
-      expect(selectLangySuggestions({ reach })).toHaveLength(
-        HOME_SUGGESTION_COUNT,
-      );
+      expect(selectLangySuggestions({ reach })).toHaveLength(HOME_SUGGESTION_COUNT);
     }
   });
 
@@ -92,9 +90,7 @@ describe("selectLangySuggestions", () => {
         count: PANEL_SUGGESTION_COUNT,
       });
 
-      expect(chosen.map((s) => s.label)).not.toContain(
-        "Choose what to measure",
-      );
+      expect(chosen.map((s) => s.label)).not.toContain("Choose what to measure");
     });
   });
 
@@ -104,15 +100,13 @@ describe("selectLangySuggestions", () => {
       const chosen = selectLangySuggestions({ reach: EVERYTHING });
 
       expect(chosen[0]?.requires).toBe("experiments");
-      expect(
-        chosen.some((s) => SETUP_SUGGESTIONS.some((x) => x.label === s.label)),
-      ).toBe(false);
+      expect(chosen.some((s) => SETUP_SUGGESTIONS.some((x) => x.label === s.label))).toBe(
+        false,
+      );
     });
 
     it("never invents an ask the panel does not itself offer", () => {
-      const offered = [...SUGGESTIONS, ...SETUP_SUGGESTIONS].map(
-        (s) => s.prompt,
-      );
+      const offered = [...SUGGESTIONS, ...SETUP_SUGGESTIONS].map((s) => s.prompt);
 
       for (const reach of [NOTHING, EVERYTHING]) {
         for (const suggestion of selectLangySuggestions({ reach })) {

@@ -5,11 +5,7 @@ import type { EventType } from "../domain/eventType";
 import type { TenantId } from "../domain/tenantId";
 import { TenantIdSchema } from "../domain/tenantId";
 import type { Event, EventMetadataBase, Projection } from "../domain/types";
-import {
-  EventMetadataBaseSchema,
-  EventSchema,
-  ProjectionSchema,
-} from "../domain/types";
+import { EventMetadataBaseSchema, EventSchema, ProjectionSchema } from "../domain/types";
 import { SecurityError } from "../services/errorHandling";
 
 /**
@@ -78,9 +74,7 @@ function createEvent<
   Payload = unknown,
   Metadata extends EventMetadataBase = EventMetadataBase,
   TEventType extends EventType = EventType,
->(
-  params: CreateEventParams<Payload, Metadata, TEventType>,
-): Event<Payload, Metadata> {
+>(params: CreateEventParams<Payload, Metadata, TEventType>): Event<Payload, Metadata> {
   const {
     aggregateType,
     aggregateId,
@@ -104,8 +98,7 @@ function createEvent<
   }
 
   const hasMetadata =
-    finalMetadata &&
-    Object.keys(finalMetadata as Record<string, unknown>).length > 0;
+    finalMetadata && Object.keys(finalMetadata as Record<string, unknown>).length > 0;
 
   return {
     id: generateEventId(),
@@ -152,8 +145,7 @@ function buildEventMetadataWithCurrentProcessingTraceparent<
     return metadata;
   }
 
-  const traceparent =
-    traceparentOverride ?? getCurrentTraceparentFromActiveSpan();
+  const traceparent = traceparentOverride ?? getCurrentTraceparentFromActiveSpan();
   if (!traceparent) {
     return metadata;
   }

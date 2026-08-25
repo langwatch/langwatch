@@ -1,12 +1,12 @@
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
-	MAX_TRACE_DEBOUNCE_MS,
-	MIN_TRACE_DEBOUNCE_MS,
-	NOTIFICATION_CADENCES,
-	extractReportFromTriggerRow,
-	reportActionParamsSchema,
-	type CreateTriggerCommand,
-	type NotificationCadence,
+  MAX_TRACE_DEBOUNCE_MS,
+  MIN_TRACE_DEBOUNCE_MS,
+  NOTIFICATION_CADENCES,
+  extractReportFromTriggerRow,
+  reportActionParamsSchema,
+  type CreateTriggerCommand,
+  type NotificationCadence,
 } from "@langwatch/automation-contract";
 import { EMAIL_RX } from "@langwatch/automation-contract";
 import type { SlackActionParams } from "@langwatch/automation-contract";
@@ -16,11 +16,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import {
-  AlertType,
-  TriggerAction,
-  TriggerKind,
-} from "~/generated/prisma/client";
+import { AlertType, TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
   readPersistCapCounts,
@@ -50,9 +46,7 @@ import {
   decryptWebhookSigningSecrets,
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
-import {
-	buildReportTriggerData,
-} from "~/server/app-layer/automations/report.builder";
+import { buildReportTriggerData } from "~/server/app-layer/automations/report.builder";
 import {
   type DraftProject,
   type TestFireWebhookDestination,
@@ -76,15 +70,12 @@ import { buildRetryAfterMessage } from "./rateLimitMessage";
  *  provider registry's redact hook: the encrypted Slack bot token (ADR-041)
  *  and webhook header values (ADR-040 §3 — names echo with the kept
  *  sentinel, values never return). Identity for every other action. */
-function redactTriggerForRead<
-  T extends { action: TriggerAction; actionParams: unknown },
->(trigger: T): T {
+function redactTriggerForRead<T extends { action: TriggerAction; actionParams: unknown }>(
+  trigger: T,
+): T {
   return {
     ...trigger,
-    actionParams: redactActionParamsFor(
-      trigger.action,
-      trigger.actionParams ?? {},
-    ),
+    actionParams: redactActionParamsFor(trigger.action, trigger.actionParams ?? {}),
   };
 }
 
@@ -161,9 +152,7 @@ const actionParamsSchema = z.object({
   datasetMapping: z
     .object({ mapping: z.any(), expansions: z.array(z.string()).optional() })
     .optional(),
-  annotators: z
-    .array(z.object({ id: z.string(), name: z.string() }))
-    .optional(),
+  annotators: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
   // ADR-040 SEND_WEBHOOK destination — the per-action provider schema
   // re-validates the shape (https-only URL, sanitized headers) below.
   url: z.string().optional(),
@@ -230,7 +219,9 @@ function toTemplateTRPCError(err: unknown): TRPCError {
 
 async function resolveProjectIdentity(
   projectId: string,
-  projects: { tryGetSummaryById(projectId: string): Promise<{ name: string; slug: string } | null> },
+  projects: {
+    tryGetSummaryById(projectId: string): Promise<{ name: string; slug: string } | null>;
+  },
 ): Promise<DraftProject> {
   const project = await projects.tryGetSummaryById(projectId);
   if (!project) throw new ProjectNotFoundError(projectId);
@@ -340,10 +331,7 @@ export const automationRouter = createTRPCRouter({
         // address so operators know what they're shipping. Two server
         // contracts for the same action would force the drawer to
         // branch on create-vs-edit, which is a footgun.
-        if (
-          input.actionParams.members &&
-          input.actionParams.members.length > 0
-        ) {
+        if (input.actionParams.members && input.actionParams.members.length > 0) {
           try {
             validateEmailRecipientFormats(input.actionParams.members);
           } catch (err) {
@@ -407,12 +395,13 @@ export const automationRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const checksMap = allChecks.reduce<
-        Record<string, (typeof allChecks)[number]>
-      >((map, check) => {
-        map[check.id] = check;
-        return map;
-      }, {});
+      const checksMap = allChecks.reduce<Record<string, (typeof allChecks)[number]>>(
+        (map, check) => {
+          map[check.id] = check;
+          return map;
+        },
+        {},
+      );
 
       // Load the names of any custom graphs the rows point at so the
       // automations list can render "Graph: my-p95" for graph alerts
@@ -585,9 +574,7 @@ export const automationRouter = createTRPCRouter({
       // nothing) and still advertising a next run on the automations page.
       // Pausing retires the calendar entry; resuming puts it back.
       const isReport = existing.triggerKind === TriggerKind.REPORT;
-      const report = isReport
-        ? extractReportFromTriggerRow(existing.actionParams)
-        : null;
+      const report = isReport ? extractReportFromTriggerRow(existing.actionParams) : null;
       if (isReport && input.active && !report) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -665,12 +652,9 @@ export const automationRouter = createTRPCRouter({
           triggerId: input.automationId,
           projectId: input.projectId,
         });
-        token = decryptSlackBotToken(
-          (saved?.actionParams ?? {}) as SlackActionParams,
-        );
+        token = decryptSlackBotToken((saved?.actionParams ?? {}) as SlackActionParams);
       }
-      if (!token)
-        return { channels: [], error: "no_token" as string, gaps: [] };
+      if (!token) return { channels: [], error: "no_token" as string, gaps: [] };
       return listSlackChannels(token);
     }),
   updateTriggerFilters: protectedProcedure
@@ -683,9 +667,7 @@ export const automationRouter = createTRPCRouter({
     )
     .permission("triggers:update")
     .mutation(async ({ ctx, input }) => {
-      const { sanitized, unknownFields } = sanitizeTriggerFilters(
-        input.filters,
-      );
+      const { sanitized, unknownFields } = sanitizeTriggerFilters(input.filters);
 
       if (unknownFields.length > 0 && Object.keys(sanitized).length === 0) {
         throw new TRPCError({
@@ -846,8 +828,7 @@ export const automationRouter = createTRPCRouter({
           if (!email) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message:
-                "Your account has no email address to send a test fire to.",
+              message: "Your account has no email address to send a test fire to.",
             });
           }
           recipients = [email];
@@ -870,8 +851,7 @@ export const automationRouter = createTRPCRouter({
           if (!token || !channel) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message:
-                "Add a Slack bot token and channel before sending a test fire.",
+              message: "Add a Slack bot token and channel before sending a test fire.",
             });
           }
           botDestination = { token, channel };
@@ -889,9 +869,7 @@ export const automationRouter = createTRPCRouter({
           input.webhookDestination;
         if (
           webhookDestination &&
-          Object.values(webhookDestination.headers).includes(
-            WEBHOOK_HEADER_VALUE_KEPT,
-          )
+          Object.values(webhookDestination.headers).includes(WEBHOOK_HEADER_VALUE_KEPT)
         ) {
           let saved: Record<string, string> = {};
           if (input.automationId) {
@@ -899,8 +877,7 @@ export const automationRouter = createTRPCRouter({
               triggerId: input.automationId,
               projectId: input.projectId,
             });
-            const stored = (row?.actionParams ??
-              {}) as WebhookStoredActionParams;
+            const stored = (row?.actionParams ?? {}) as WebhookStoredActionParams;
             if (stored.url !== webhookDestination.url) {
               throw new TRPCError({
                 code: "BAD_REQUEST",
@@ -911,9 +888,7 @@ export const automationRouter = createTRPCRouter({
             saved = decryptWebhookHeaders(stored);
           }
           const headers: Record<string, string> = {};
-          for (const [name, value] of Object.entries(
-            webhookDestination.headers,
-          )) {
+          for (const [name, value] of Object.entries(webhookDestination.headers)) {
             if (value === WEBHOOK_HEADER_VALUE_KEPT) {
               if (saved[name] !== undefined) headers[name] = saved[name];
               continue;
@@ -940,10 +915,7 @@ export const automationRouter = createTRPCRouter({
           }
         }
 
-        const project = await resolveProjectIdentity(
-          input.projectId,
-          ctx.app.projects,
-        );
+        const project = await resolveProjectIdentity(input.projectId, ctx.app.projects);
         return await ctx.app.triggerTemplates.testFire({
           channel: input.channel,
           trigger: input.trigger,
@@ -1090,8 +1062,7 @@ export const automationRouter = createTRPCRouter({
         // allow "kept" on edit) runs after this block — it needs the saved row.
         if (
           input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE &&
-          (!input.actionParams.annotators ||
-            input.actionParams.annotators.length === 0)
+          (!input.actionParams.annotators || input.actionParams.annotators.length === 0)
         ) {
           throw new MissingAnnotatorError();
         }
@@ -1183,11 +1154,7 @@ export const automationRouter = createTRPCRouter({
       // format loses.
       let data: Omit<
         CreateTriggerCommand,
-        | "id"
-        | "projectId"
-        | "lastRunAt"
-        | "notificationCadence"
-        | "traceDebounceMs"
+        "id" | "projectId" | "lastRunAt" | "notificationCadence" | "traceDebounceMs"
       >;
       if (isGraphAlert && input.graphAlert && input.customGraphId) {
         const graphAlert: GraphAlertActionParams = input.graphAlert;
@@ -1214,9 +1181,7 @@ export const automationRouter = createTRPCRouter({
           // conversion can't leave a stale one behind.
           filterQuery: null,
           customGraphId: built.customGraphId,
-          actionParams: z
-            .record(z.string(), z.unknown())
-            .parse(built.actionParams),
+          actionParams: z.record(z.string(), z.unknown()).parse(built.actionParams),
           slackTemplateType: input.templates.slackTemplateType ?? null,
           slackTemplate: input.templates.slackTemplate ?? null,
           emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
@@ -1243,11 +1208,8 @@ export const automationRouter = createTRPCRouter({
           // query — without this the report would only ever send the newest
           // traces in the window. A graph/dashboard report has no trace query,
           // so the column is cleared (a source change can't strand a stale one).
-          filterQuery:
-            input.report.source.kind === "traceQuery" ? filterQuery : null,
-          actionParams: z
-            .record(z.string(), z.unknown())
-            .parse(built.actionParams),
+          filterQuery: input.report.source.kind === "traceQuery" ? filterQuery : null,
+          actionParams: z.record(z.string(), z.unknown()).parse(built.actionParams),
           slackTemplateType: input.templates.slackTemplateType ?? null,
           slackTemplate: input.templates.slackTemplate ?? null,
           emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
@@ -1284,9 +1246,7 @@ export const automationRouter = createTRPCRouter({
           id: input.triggerId,
           projectId: input.projectId,
           ...data,
-          ...(cadenceUpdate !== undefined
-            ? { notificationCadence: cadenceUpdate }
-            : {}),
+          ...(cadenceUpdate !== undefined ? { notificationCadence: cadenceUpdate } : {}),
           ...(input.traceDebounceMs !== undefined
             ? { traceDebounceMs: input.traceDebounceMs }
             : {}),
@@ -1319,8 +1279,7 @@ export const automationRouter = createTRPCRouter({
               input.notificationCadence,
               isGraphAlert,
             ),
-            traceDebounceMs:
-              input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
+            traceDebounceMs: input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
           });
         } else {
           trigger = await ctx.app.automation.create({
@@ -1332,8 +1291,7 @@ export const automationRouter = createTRPCRouter({
               input.notificationCadence,
               isGraphAlert,
             ),
-            traceDebounceMs:
-              input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
+            traceDebounceMs: input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
             ...data,
           });
         }

@@ -56,12 +56,12 @@ LANGWATCH_LICENSE_PRIVATE_KEY=$(cat private.pem) \
 
 Arguments:
 
-| Flag | Required | Default | Description |
-|---|---|---|---|
-| `--org-id` | yes | — | Target `Organization.id` to attach the license to. Org must already exist. |
-| `--plan` | no | `ENTERPRISE` | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `platform/app/ee/licensing/planTemplates.ts`. |
-| `--max-members` | no | `50` | Seat cap. Must be ≥ 1. |
-| `--email` | no | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field. |
+| Flag            | Required | Default                | Description                                                                                                  |
+| --------------- | -------- | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `--org-id`      | yes      | —                      | Target `Organization.id` to attach the license to. Org must already exist.                                   |
+| `--plan`        | no       | `ENTERPRISE`           | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `platform/app/ee/licensing/planTemplates.ts`. |
+| `--max-members` | no       | `50`                   | Seat cap. Must be ≥ 1.                                                                                       |
+| `--email`       | no       | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field.                                                |
 
 Output: prints the encoded license key to stdout + writes/updates the
 `Organization.license` + `Organization.licenseExpiresAt` columns. The
@@ -113,7 +113,7 @@ unset, and is safe to call on every seed run.
 ## What about FREE-plan reproduction?
 
 The FREE plan is the default — you don't need to generate a license. Just
-*don't* call the generator. `getActivePlan()` returns FREE when no `License`
+_don't_ call the generator. `getActivePlan()` returns FREE when no `License`
 row exists for the org (or all rows are expired).
 
 ## Security notes
@@ -125,7 +125,7 @@ row exists for the org (or all rows are expired).
   unlock anything for other orgs on the same instance. So even if a dev
   generates a wide-window license for their dogfood org, the blast radius
   is one org on their local stack.
-- The verifier uses the *public* key compiled into `signing.ts`. It does
+- The verifier uses the _public_ key compiled into `signing.ts`. It does
   not touch `LANGWATCH_LICENSE_PRIVATE_KEY` at runtime — that variable is only read
   by the generator script. Production deployments should not have
   `LANGWATCH_LICENSE_PRIVATE_KEY` set in their environment.

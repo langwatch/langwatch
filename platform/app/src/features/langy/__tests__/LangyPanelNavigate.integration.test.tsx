@@ -91,11 +91,9 @@ vi.mock("@paper-design/shaders-react", () => ({
 }));
 
 const mutation = vi.fn();
-const subscription = vi.fn(
-  (_path: string, _input: unknown, _options: unknown) => ({
-    unsubscribe: vi.fn(),
-  }),
-);
+const subscription = vi.fn((_path: string, _input: unknown, _options: unknown) => ({
+  unsubscribe: vi.fn(),
+}));
 
 vi.mock("~/utils/api", () => ({
   trpcClient: {
@@ -104,8 +102,7 @@ vi.mock("~/utils/api", () => ({
         mutate: (input: unknown) => mutation("langy.createConversation", input),
       },
       continueConversation: {
-        mutate: (input: unknown) =>
-          mutation("langy.continueConversation", input),
+        mutate: (input: unknown) => mutation("langy.continueConversation", input),
       },
       onTurnStream: {
         subscribe: (input: unknown, options: unknown) =>

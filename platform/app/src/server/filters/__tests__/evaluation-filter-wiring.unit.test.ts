@@ -56,9 +56,9 @@ describe("evaluation filter requiresKey wiring", () => {
     });
 
     it("preserves evaluations.evaluator_id.guardrails_only unchanged", () => {
-      expect(
-        availableFilters["evaluations.evaluator_id.guardrails_only"].name,
-      ).toBe("Contains Evaluation (guardrails only)");
+      expect(availableFilters["evaluations.evaluator_id.guardrails_only"].name).toBe(
+        "Contains Evaluation (guardrails only)",
+      );
     });
   });
 });
@@ -91,21 +91,13 @@ describe("evaluations.state filter options", () => {
 
   describe("given ClickHouse returns a non-canonical stored status", () => {
     it("drops the phantom value the trigger matcher could never match", () => {
-      const options = extractResults([
-        row("Error_Message", 7),
-        row("error", 2),
-      ]);
+      const options = extractResults([row("Error_Message", 7), row("error", 2)]);
 
-      expect(options.map((option) => option.field)).not.toContain(
-        "Error_Message",
-      );
+      expect(options.map((option) => option.field)).not.toContain("Error_Message");
     });
 
     it("still offers the canonical status alongside its observed count", () => {
-      const options = extractResults([
-        row("Error_Message", 7),
-        row("error", 2),
-      ]);
+      const options = extractResults([row("Error_Message", 7), row("error", 2)]);
 
       expect(options).toContainEqual({
         field: "error",
@@ -120,9 +112,7 @@ describe("evaluations.state filter options", () => {
       const options = extractResults([row("processed", 5)]);
 
       expect(
-        Object.fromEntries(
-          options.map((option) => [option.field, option.count]),
-        ),
+        Object.fromEntries(options.map((option) => [option.field, option.count])),
       ).toEqual({
         scheduled: 0,
         in_progress: 0,

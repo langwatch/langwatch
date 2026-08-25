@@ -21,8 +21,7 @@ import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
 vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../license-enforcement")>();
+  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
   return {
     ...actual,
     enforceLicenseLimit: vi.fn(),
@@ -31,10 +30,7 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
 
 const PROJECT_ID = "test-project-id";
 
-async function expectTRPCError(
-  promise: Promise<unknown>,
-  code: TRPCError["code"],
-) {
+async function expectTRPCError(promise: Promise<unknown>, code: TRPCError["code"]) {
   let captured: unknown;
   try {
     await promise;
@@ -96,9 +92,7 @@ describe("experiments.deleteExperiment", () => {
         .catch(() => {});
     }
     for (const pid of createdProjectIds) {
-      await prisma.experiment
-        .deleteMany({ where: { projectId: pid } })
-        .catch(() => {});
+      await prisma.experiment.deleteMany({ where: { projectId: pid } }).catch(() => {});
       await prisma.project.delete({ where: { id: pid } }).catch(() => {});
     }
   });
@@ -471,9 +465,7 @@ describe("experiments.deleteExperiment", () => {
           where: { id, projectId: PROJECT_ID },
         });
         expect(after.slug).toBe(archived.slug);
-        expect(after.archivedAt?.getTime()).toBe(
-          archived.archivedAt?.getTime(),
-        );
+        expect(after.archivedAt?.getTime()).toBe(archived.archivedAt?.getTime());
         expect(after.workbenchState).toEqual(archived.workbenchState);
       });
     });

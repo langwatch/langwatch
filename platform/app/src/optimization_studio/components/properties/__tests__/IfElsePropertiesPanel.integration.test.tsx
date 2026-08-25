@@ -18,8 +18,7 @@ const mockSetNode = vi.fn();
 const mockSetEdges = vi.fn();
 
 vi.mock("@langwatch/workflow-web", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/workflow-web")>();
+  const actual = await importOriginal<typeof import("@langwatch/workflow-web")>();
   return {
     ...actual,
     useWorkflowStore: (selector: (state: unknown) => unknown) =>
@@ -45,8 +44,7 @@ vi.mock("~/components/blocks/CodeBlockEditor", () => ({
 }));
 
 vi.mock("../BasePropertiesPanel", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../BasePropertiesPanel")>();
+  const actual = await importOriginal<typeof import("../BasePropertiesPanel")>();
   return {
     ...actual,
     BasePropertiesPanel: ({ children }: { children: React.ReactNode }) => (
@@ -73,9 +71,7 @@ vi.mock("../../code/LiquidConditionEditor", () => ({
 
 import { IfElsePropertiesPanel } from "../IfElsePropertiesPanel";
 
-const createIfElseNode = (
-  overrides: Partial<Component> = {},
-): Node<Component> => ({
+const createIfElseNode = (overrides: Partial<Component> = {}): Node<Component> => ({
   id: "gate",
   type: "if_else",
   position: { x: 0, y: 0 },
@@ -170,9 +166,7 @@ describe("IfElsePropertiesPanel", () => {
 
       // Image is an available input type in the shared editor's Add menu
       await user.click(screen.getByTestId("add-variable-button"));
-      expect(
-        screen.getByRole("menuitem", { name: /Image/ }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("menuitem", { name: /Image/ })).toBeInTheDocument();
     });
   });
 
@@ -197,9 +191,7 @@ describe("IfElsePropertiesPanel", () => {
       expect(screen.getByTestId("code-editor")).toHaveTextContent(
         "def execute(context: str) -> bool:",
       );
-      expect(
-        screen.queryByTestId("if-else-condition-input"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("if-else-condition-input")).not.toBeInTheDocument();
     });
 
     /** @scenario Toggling Code off returns to the liquid expression */

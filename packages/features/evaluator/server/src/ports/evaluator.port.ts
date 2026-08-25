@@ -5,19 +5,23 @@ export abstract class EvaluatorAuditLogPort {
     evaluatorId: string;
     projectId: string;
     limit: number;
-  }): Promise<Array<{
-    id: string;
-    action: string;
-    createdAt: Date;
-    args: unknown;
-    userId: string | null;
-  }>>;
+  }): Promise<
+    Array<{
+      id: string;
+      action: string;
+      createdAt: Date;
+      args: unknown;
+      userId: string | null;
+    }>
+  >;
 
-  abstract users(input: { userIds: string[] }): Promise<Array<{
-    id: string;
-    name: string | null;
-    email: string | null;
-  }>>;
+  abstract users(input: { userIds: string[] }): Promise<
+    Array<{
+      id: string;
+      name: string | null;
+      email: string | null;
+    }>
+  >;
 }
 
 export type { EvaluatorHistoryEntry };

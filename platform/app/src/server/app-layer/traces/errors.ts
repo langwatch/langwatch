@@ -43,24 +43,20 @@ export class QueryTimeoutError extends HandledError {
   ) {
     const { hint, reasons } = options;
     const base = remediation("query_timeout");
-    super(
-      "query_timeout",
-      `Query timed out (${(durationMs / 1000).toFixed(1)}s)`,
-      {
-        httpStatus: 504,
-        // A 504 from our own datastore is our problem, not the caller's —
-        // same reasoning as `ClickHouseUnavailableError` below. `fault`
-        // defaults to `"customer"`, which would log this at warn and (since
-        // it now drives evaluation skip-vs-error) let a slow-query regression
-        // surface as a benign customer skip.
-        fault: "platform",
-        meta: { durationMs, ...(hint ? { hint } : {}) },
-        // The call-site hint (when given) leads; registry tips follow.
-        tips: [...(hint ? [hint] : []), ...(base.tips ?? [])],
-        ...(base.docsUrl ? { docsUrl: base.docsUrl } : {}),
-        reasons,
-      },
-    );
+    super("query_timeout", `Query timed out (${(durationMs / 1000).toFixed(1)}s)`, {
+      httpStatus: 504,
+      // A 504 from our own datastore is our problem, not the caller's —
+      // same reasoning as `ClickHouseUnavailableError` below. `fault`
+      // defaults to `"customer"`, which would log this at warn and (since
+      // it now drives evaluation skip-vs-error) let a slow-query regression
+      // surface as a benign customer skip.
+      fault: "platform",
+      meta: { durationMs, ...(hint ? { hint } : {}) },
+      // The call-site hint (when given) leads; registry tips follow.
+      tips: [...(hint ? [hint] : []), ...(base.tips ?? [])],
+      ...(base.docsUrl ? { docsUrl: base.docsUrl } : {}),
+      reasons,
+    });
     this.name = "QueryTimeoutError";
   }
 }
@@ -69,15 +65,11 @@ export class QueryMemoryExceededError extends HandledError {
   declare readonly code: "query_memory_exceeded";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
-    super(
-      "query_memory_exceeded",
-      "Query exceeded its memory limit and was aborted",
-      {
-        httpStatus: 422,
-        ...remediation("query_memory_exceeded"),
-        reasons: options.reasons,
-      },
-    );
+    super("query_memory_exceeded", "Query exceeded its memory limit and was aborted", {
+      httpStatus: 422,
+      ...remediation("query_memory_exceeded"),
+      reasons: options.reasons,
+    });
     this.name = "QueryMemoryExceededError";
   }
 }
@@ -142,19 +134,12 @@ export class TimeRangeTooWideError extends HandledError {
 
   constructor(maxDays: number) {
     const base = remediation("time_range_too_wide");
-    super(
-      "time_range_too_wide",
-      `Maximum ${maxDays} days. Narrow time range.`,
-      {
-        httpStatus: 422,
-        meta: { maxDays },
-        tips: [
-          `Narrow the time range to ${maxDays} days or less`,
-          ...(base.tips ?? []),
-        ],
-        ...(base.docsUrl ? { docsUrl: base.docsUrl } : {}),
-      },
-    );
+    super("time_range_too_wide", `Maximum ${maxDays} days. Narrow time range.`, {
+      httpStatus: 422,
+      meta: { maxDays },
+      tips: [`Narrow the time range to ${maxDays} days or less`, ...(base.tips ?? [])],
+      ...(base.docsUrl ? { docsUrl: base.docsUrl } : {}),
+    });
     this.name = "TimeRangeTooWideError";
   }
 }

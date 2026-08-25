@@ -39,9 +39,7 @@ describe("isMatchEverythingTrigger", () => {
 
       it("reports a filter set whose only field selects nothing the same way", () => {
         expect(
-          isMatchEverythingTrigger(
-            trigger({ filters: { "metadata.labels": [] } }),
-          ),
+          isMatchEverythingTrigger(trigger({ filters: { "metadata.labels": [] } })),
         ).toBe(true);
       });
 
@@ -58,9 +56,7 @@ describe("isMatchEverythingTrigger", () => {
       });
 
       it("treats a whitespace-only query as no query at all", () => {
-        expect(isMatchEverythingTrigger(trigger({ filterQuery: "   " }))).toBe(
-          true,
-        );
+        expect(isMatchEverythingTrigger(trigger({ filterQuery: "   " }))).toBe(true);
       });
     });
   });
@@ -69,9 +65,7 @@ describe("isMatchEverythingTrigger", () => {
     describe("when the trigger is classified", () => {
       it("does not report a structured filter as matching everything", () => {
         expect(
-          isMatchEverythingTrigger(
-            trigger({ filters: { "metadata.labels": ["prod"] } }),
-          ),
+          isMatchEverythingTrigger(trigger({ filters: { "metadata.labels": ["prod"] } })),
         ).toBe(false);
       });
 
@@ -84,9 +78,9 @@ describe("isMatchEverythingTrigger", () => {
       });
 
       it("does not report a query as matching everything", () => {
-        expect(
-          isMatchEverythingTrigger(trigger({ filterQuery: "status:error" })),
-        ).toBe(false);
+        expect(isMatchEverythingTrigger(trigger({ filterQuery: "status:error" }))).toBe(
+          false,
+        );
       });
     });
   });
@@ -108,9 +102,7 @@ describe("isMatchEverythingTrigger", () => {
 
       it("never reports a report", () => {
         expect(
-          isMatchEverythingTrigger(
-            trigger({ triggerKind: TriggerKind.REPORT }),
-          ),
+          isMatchEverythingTrigger(trigger({ triggerKind: TriggerKind.REPORT })),
         ).toBe(false);
       });
     });

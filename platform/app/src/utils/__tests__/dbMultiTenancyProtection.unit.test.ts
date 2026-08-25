@@ -825,10 +825,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
           model: undefined,
           action: "executeRaw",
           args: {
-            strings: [
-              `UPDATE "Trace" SET "deletedAt" = now() WHERE "tenantId" = `,
-              ``,
-            ],
+            strings: [`UPDATE "Trace" SET "deletedAt" = now() WHERE "tenantId" = `, ``],
           },
         }),
       ).resolves.toBe("ok");
@@ -905,11 +902,8 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
  * single source of truth for "this model is org-scoped, not project-scoped".
  */
 describe("project-tenancy regime partition", () => {
-  const {
-    GLOBAL_MODELS,
-    RELATIONAL_PARENT_SCOPED,
-    LICENSE_COUNTED_PROJECT_MODELS,
-  } = PROJECT_TENANCY_REGIMES;
+  const { GLOBAL_MODELS, RELATIONAL_PARENT_SCOPED, LICENSE_COUNTED_PROJECT_MODELS } =
+    PROJECT_TENANCY_REGIMES;
   const datamodel = parsePrismaDatamodel();
   const allModelNames = datamodel.map((m) => m.name);
   const modelHasField = (model: string, field: string) =>
@@ -926,9 +920,7 @@ describe("project-tenancy regime partition", () => {
       ...SCOPED_MODEL_NAMES,
       ...ORG_BEARING_MODEL_NAMES,
     ]);
-    const unclassified = noProjectIdModels.filter(
-      (name) => !classified.has(name),
-    );
+    const unclassified = noProjectIdModels.filter((name) => !classified.has(name));
     expect(unclassified).toEqual([]);
   });
 

@@ -65,8 +65,7 @@ export function EvalCard({
 
   const hasReasoning = !!eval_.reasoning && eval_.reasoning.length > 0;
   const hasErrorMessage = !!eval_.errorMessage;
-  const hasStacktrace =
-    !!eval_.errorStacktrace && eval_.errorStacktrace.length > 0;
+  const hasStacktrace = !!eval_.errorStacktrace && eval_.errorStacktrace.length > 0;
   const hasListInputs = !!eval_.inputs && Object.keys(eval_.inputs).length > 0;
   // Inputs load lazily per-card (see useEvalInputs): the verdict list drops
   // the heavy `Inputs` blob under ClickHouse memory pressure, and even when
@@ -86,8 +85,7 @@ export function EvalCard({
   // carries it alongside the badge. Only a category-only run needs no detail
   // row for it — there the label IS the header, which is also why it shows
   // even when it reads the same as the placeholder score it stands in for.
-  const hasLabel =
-    !!eval_.label && (categoryOnly || eval_.label !== String(eval_.score));
+  const hasLabel = !!eval_.label && (categoryOnly || eval_.label !== String(eval_.score));
   const showLabelDetailRow = hasLabel && !categoryOnly;
 
   const meta: string[] = [];
@@ -96,8 +94,7 @@ export function EvalCard({
   if (eval_.evalCost !== undefined && eval_.evalCost > 0)
     meta.push(formatCost(eval_.evalCost));
   if (eval_.evaluatorType) meta.push(eval_.evaluatorType);
-  if (hasRetries)
-    meta.push(`${eval_.retries} retr${eval_.retries === 1 ? "y" : "ies"}`);
+  if (hasRetries) meta.push(`${eval_.retries} retr${eval_.retries === 1 ? "y" : "ies"}`);
 
   // For skipped/error rows the reasoning *is* the message ("provider not
   // configured", "request timed out"). Surface it as the primary content.
@@ -125,8 +122,7 @@ export function EvalCard({
     showLabelDetailRow ||
     showErrorPanel ||
     showErrorIds;
-  const hasFooterRow =
-    !!eval_.spanName || meta.length > 0 || hasExpandableDetails;
+  const hasFooterRow = !!eval_.spanName || meta.length > 0 || hasExpandableDetails;
 
   return (
     <Box
@@ -188,12 +184,7 @@ export function EvalCard({
         )}
         {!noVerdict && !categoryOnly && scoreLabel !== "" && (
           <HStack gap={0.5} align="baseline" flexShrink={0}>
-            <Text
-              textStyle="lg"
-              fontWeight="bold"
-              color={tone.color}
-              lineHeight={1}
-            >
+            <Text textStyle="lg" fontWeight="bold" color={tone.color} lineHeight={1}>
               {scoreLabel}
             </Text>
             {scoreSubLabel && (
@@ -363,13 +354,7 @@ function EvalCardFooter({
 
   return (
     <>
-      <HStack
-        paddingX={3}
-        paddingY={1.5}
-        gap={3}
-        color="fg.subtle"
-        flexWrap="wrap"
-      >
+      <HStack paddingX={3} paddingY={1.5} gap={3} color="fg.subtle" flexWrap="wrap">
         {eval_.spanName && (
           <HStack gap={1}>
             <Text textStyle="2xs">from</Text>
@@ -550,13 +535,7 @@ function EvalCardFooter({
   );
 }
 
-function DetailRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <Box
       paddingX={3}

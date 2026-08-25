@@ -77,9 +77,7 @@ describe("given a source whose stored config holds fields no client is shown", (
         },
       });
 
-      expect((captured.data?.parserConfig as any).credentials).toBe(
-        STORED_ENVELOPE,
-      );
+      expect((captured.data?.parserConfig as any).credentials).toBe(STORED_ENVELOPE);
     });
 
     /** @scenario "Saving an unrelated change keeps the secret and the rotation window" */

@@ -219,9 +219,7 @@ export function buildMassMetrics(options: MassMetricsOptions): MassMetrics {
           attributes: [modelAttr],
           startTimeUnixNano: nano(startMs),
           timeUnixNano: nano(endMs),
-          asDouble: Number(
-            ((inputTokens + outputTokens * 3) * perTokenCost).toFixed(6),
-          ),
+          asDouble: Number(((inputTokens + outputTokens * 3) * perTokenCost).toFixed(6)),
         });
 
         // Latency improves over the window; the newer model is faster.

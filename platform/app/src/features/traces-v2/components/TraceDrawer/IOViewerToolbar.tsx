@@ -137,9 +137,7 @@ function IOActionsRow({
             disabled: action.disabled,
           }))}
         onSelect={(id) => {
-          actionElsRef.current[id]
-            ?.querySelector<HTMLElement>("button, a")
-            ?.click();
+          actionElsRef.current[id]?.querySelector<HTMLElement>("button, a")?.click();
         }}
         ariaLabel="More actions"
       />

@@ -1,15 +1,5 @@
-import {
-  Box,
-  Fieldset,
-  HStack,
-  Separator,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
-  type AuthzPermission,
-  isRegistryPermission,
-} from "@langwatch/authz-contract";
+import { Box, Fieldset, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import { type AuthzPermission, isRegistryPermission } from "@langwatch/authz-contract";
 import { useMemo } from "react";
 import { Info } from "react-feather";
 import type { Action, Resource } from "~/utils/rbacVocabulary";
@@ -57,10 +47,7 @@ export function PermissionSelector({
   /** One resource's permission for an action, or null when the registry
    *  does not admit that pair. Read off the grouped list so the UI can only
    *  ever name a permission it is already showing. */
-  const permissionIn = (
-    resource: Resource,
-    action: Action,
-  ): AuthzPermission | null =>
+  const permissionIn = (resource: Resource, action: Action): AuthzPermission | null =>
     (groupedPermissions[resource] ?? []).find(
       (permission) => permission === `${resource}:${action}`,
     ) ?? null;
@@ -160,8 +147,7 @@ export function PermissionSelector({
     const [resource, action] = permission.split(":") as [Resource, Action];
     const managePermission = permissionIn(resource, "manage");
     const hasManage =
-      managePermission !== null &&
-      selectedPermissions.includes(managePermission);
+      managePermission !== null && selectedPermissions.includes(managePermission);
 
     // If manage is selected, the permission is implicitly included
     // So we need to check if it's explicitly selected OR implicitly via manage

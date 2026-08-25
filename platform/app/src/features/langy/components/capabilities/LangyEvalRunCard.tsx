@@ -21,9 +21,7 @@ function parseRun(output: unknown): {
   passRate: string | null;
 } {
   const text = extractToolText(output);
-  const status = text.match(
-    /\b(completed|running|failed|queued|passed|finished)\b/i,
-  );
+  const status = text.match(/\b(completed|running|failed|queued|passed|finished)\b/i);
   const passRate = text.match(/([\d.]+\s*%)\s*(?:pass|passed|pass rate)?/i);
   return {
     status: status ? status[1]! : null,
@@ -56,9 +54,7 @@ export function LangyEvalRunCard({
       title={
         <HStack gap={2} align="center">
           <Text textStyle="sm" fontWeight="640" color="fg">
-            {hydratedName ??
-              digest?.name ??
-              (id ? `Run ${id.slice(0, 10)}` : "Run")}
+            {hydratedName ?? digest?.name ?? (id ? `Run ${id.slice(0, 10)}` : "Run")}
           </Text>
           {status ? (
             <Badge size="sm" variant="subtle" colorPalette="orange">
@@ -66,12 +62,7 @@ export function LangyEvalRunCard({
             </Badge>
           ) : null}
           {passRate ? (
-            <Text
-              textStyle="xs"
-              fontFamily="mono"
-              fontWeight="700"
-              color="green.fg"
-            >
+            <Text textStyle="xs" fontFamily="mono" fontWeight="700" color="green.fg">
               {passRate}
             </Text>
           ) : null}

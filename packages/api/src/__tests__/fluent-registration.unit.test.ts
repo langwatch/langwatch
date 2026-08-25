@@ -208,31 +208,23 @@ describe("registerRoute", () => {
 
     // A real date that was never registered is served by the latest
     // registration on or before it — params included.
-    const inherited = await app.request(
-      "/api/test/2026-09-01/th_2?verbose=false",
-    );
+    const inherited = await app.request("/api/test/2026-09-01/th_2?verbose=false");
     expect(inherited.status).toBe(200);
     await expect(inherited.json()).resolves.toEqual({
       id: "th_2",
       verbose: "false",
     });
 
-    const wrongMethod = await app.request(
-      "/api/test/2026-08-07/th_1?verbose=true",
-      {
-        method: "POST",
-      },
-    );
+    const wrongMethod = await app.request("/api/test/2026-08-07/th_1?verbose=true", {
+      method: "POST",
+    });
     expect(wrongMethod.status).toBe(404);
   });
 
   it("cannot express a new RPC family: paths must start with a slash", () => {
     expect(() =>
-      buildTestService().registerRoute(
-        "post",
-        "things.create",
-        "2026-08-07",
-        async (c) => c.body(null, 204),
+      buildTestService().registerRoute("post", "things.create", "2026-08-07", async (c) =>
+        c.body(null, 204),
       ),
     ).toThrow(/must start with "\/"/);
   });
@@ -315,8 +307,7 @@ describe("provide", () => {
         "things.app",
         "2025-03-15",
         async (context) => context.app.things,
-        (builder) =>
-          builder.withOutput(z.object({ marker: z.string() })),
+        (builder) => builder.withOutput(z.object({ marker: z.string() })),
       )
       .build();
 
@@ -400,10 +391,7 @@ describe("provide", () => {
 
     expect(response.status).toBe(200);
     expect(authorize).toHaveBeenCalledOnce();
-    expect(authorize).toHaveBeenCalledWith(
-      expect.anything(),
-      "traces:view",
-    );
+    expect(authorize).toHaveBeenCalledWith(expect.anything(), "traces:view");
   });
 
   it("rejects a body projectId different from the authenticated project", async () => {
@@ -411,10 +399,12 @@ describe("provide", () => {
       name: "test",
       basePath: "/api/test",
       projectIdInput: true,
-      middleware: [async (context, next) => {
-        context.set("project" as never, { id: "project-1" });
-        await next();
-      }],
+      middleware: [
+        async (context, next) => {
+          context.set("project" as never, { id: "project-1" });
+          await next();
+        },
+      ],
     })
       .withoutPermission("framework test endpoint")
       .register(
@@ -532,9 +522,7 @@ describe("input validation", () => {
     expect(res.status).toBe(422);
     expect(await jsonBody(res)).toMatchObject({
       code: "validation_error",
-      reasons: [
-        { code: "schema_failure", meta: { field: "name", type: "too_small" } },
-      ],
+      reasons: [{ code: "schema_failure", meta: { field: "name", type: "too_small" } }],
     });
     expect(res.headers.get("X-API-Version")).toBe("2025-03-15");
   });
@@ -602,9 +590,7 @@ describe("permission declarations", () => {
       basePath: "/api/test",
     })
       .withoutPermission(" ")
-      .register("things.list", "2025-03-15", async (c) =>
-        c.json({ ok: true }),
-      );
+      .register("things.list", "2025-03-15", async (c) => c.json({ ok: true }));
 
     expect(() => service.build()).toThrow(/blank reason/);
   });
@@ -615,19 +601,19 @@ describe("permission declarations", () => {
       basePath: "/api/test",
     })
       .withPermission("traces:view")
-      .register("things.list", "2025-03-15", async (c) =>
-        c.json({ ok: true }),
-      );
+      .register("things.list", "2025-03-15", async (c) => c.json({ ok: true }));
 
     expect(() => service.build()).toThrow(/has no permissionEnforcer/);
   });
 
   it("runs the declared permission after auth and before endpoint middleware", async () => {
     const calls: string[] = [];
-    const middleware = (name: string): MiddlewareHandler => async (_c, next) => {
-      calls.push(name);
-      await next();
-    };
+    const middleware =
+      (name: string): MiddlewareHandler =>
+      async (_c, next) => {
+        calls.push(name);
+        await next();
+      };
     const app = createRawService({
       name: "test",
       basePath: "/api/test",
@@ -641,21 +627,13 @@ describe("permission declarations", () => {
           calls.push("handler");
           return c.json({ ok: true });
         },
-        (b) =>
-          b
-            .withPermission("traces:view")
-            .withMiddleware(middleware("endpoint")),
+        (b) => b.withPermission("traces:view").withMiddleware(middleware("endpoint")),
       )
       .build();
 
     await app.request("/api/test/2025-03-15/things.list", { method: "POST" });
 
-    expect(calls).toEqual([
-      "auth",
-      "permission:traces:view",
-      "endpoint",
-      "handler",
-    ]);
+    expect(calls).toEqual(["auth", "permission:traces:view", "endpoint", "handler"]);
   });
 });
 
@@ -728,9 +706,7 @@ describe("withMiddleware", () => {
           return { ok: true };
         },
         (b) =>
-          b
-            .withMiddleware(endpointMiddleware)
-            .withOutput(z.object({ ok: z.boolean() })),
+          b.withMiddleware(endpointMiddleware).withOutput(z.object({ ok: z.boolean() })),
       )
       .build();
 
@@ -759,10 +735,7 @@ describe("resource limits", () => {
         "things.create",
         "2025-03-15",
         async () => ({ ok: true }),
-        (b) =>
-          b
-            .withResourceLimit("things")
-            .withOutput(z.object({ ok: z.boolean() })),
+        (b) => b.withResourceLimit("things").withOutput(z.object({ ok: z.boolean() })),
       )
       .build();
 
@@ -775,8 +748,7 @@ describe("resource limits", () => {
       "things.create",
       "2025-03-15",
       async () => ({ ok: true }),
-      (b) =>
-        b.withResourceLimit("things").withOutput(z.object({ ok: z.boolean() })),
+      (b) => b.withResourceLimit("things").withOutput(z.object({ ok: z.boolean() })),
     );
 
     expect(() => service.build()).toThrow(/has no resourceLimitMiddleware/);
@@ -892,9 +864,7 @@ describe("group", () => {
       };
 
     const service = buildTestService().withMiddleware(mw("service"));
-    const things = service.group("things", (b) =>
-      b.withMiddleware(mw("group")),
-    );
+    const things = service.group("things", (b) => b.withMiddleware(mw("group")));
     things.register(
       "list",
       "2025-03-15",
@@ -917,9 +887,7 @@ describe("group", () => {
       basePath: "/api/test",
       onRouteMounted: (route) => mounted.push(route),
     }).withMeta({ level: "service" });
-    const things = service.group("things", (b) =>
-      b.withMeta({ level: "group" }),
-    );
+    const things = service.group("things", (b) => b.withMeta({ level: "group" }));
     things.register(
       "create",
       "2025-03-15",
@@ -927,14 +895,11 @@ describe("group", () => {
       (b) => b.withMeta({ level: "endpoint" }),
     );
     things.register("get", "2025-03-15", async (c) => c.body(null, 204));
-    service.register("other.ping", "2025-03-15", async (c) =>
-      c.body(null, 204),
-    );
+    service.register("other.ping", "2025-03-15", async (c) => c.body(null, 204));
     service.build();
 
     const metaOf = (path: string) =>
-      mounted.find((r) => r.path === `/api/test/2025-03-15${path}`)?.config
-        ?.meta;
+      mounted.find((r) => r.path === `/api/test/2025-03-15${path}`)?.config?.meta;
 
     expect(metaOf("/things.create")).toEqual({ level: "endpoint" });
     expect(metaOf("/things.get")).toEqual({ level: "group" });
@@ -973,9 +938,7 @@ describe("group", () => {
 
     const dated = [
       ...new Set(
-        mounted
-          .filter((r) => r.path.endsWith("/things.create"))
-          .map((r) => r.version),
+        mounted.filter((r) => r.path.endsWith("/things.create")).map((r) => r.version),
       ),
     ].sort();
     expect(dated).toEqual(["2026-01-15", "2026-08-07", "latest"]);
@@ -994,9 +957,7 @@ describe("group", () => {
     );
     service.build();
 
-    expect(mounted.some((r) => r.path === "/api/test/2025-03-15/:id")).toBe(
-      true,
-    );
+    expect(mounted.some((r) => r.path === "/api/test/2025-03-15/:id")).toBe(true);
   });
 
   it("withdraws through the group under the prefixed name", async () => {
@@ -1093,9 +1054,7 @@ describe("error handling", () => {
 describe("response shapes", () => {
   it("lets a handler that declares no output build its own Response", async () => {
     const app = buildTestService()
-      .register("things.raw", "2025-03-15", async (c) =>
-        c.text("raw response", 201),
-      )
+      .register("things.raw", "2025-03-15", async (c) => c.text("raw response", 201))
       .build();
 
     const res = await app.request("/api/test/2025-03-15/things.raw", {
@@ -1156,8 +1115,8 @@ describe("global middleware", () => {
 describe("service configuration", () => {
   it("fails fast on malformed service or endpoint paths", () => {
     expect(() => createService({ name: " " })).toThrow(/must not be empty/);
-    expect(() =>
-      createService({ name: "test", basePath: "api/test" }).build(),
-    ).toThrow(/basePath must start/);
+    expect(() => createService({ name: "test", basePath: "api/test" }).build()).toThrow(
+      /basePath must start/,
+    );
   });
 });

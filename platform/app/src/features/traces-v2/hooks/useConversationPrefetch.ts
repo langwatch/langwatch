@@ -43,9 +43,7 @@ export function useConversationPrefetch(
     const idx = turns.findIndex((t) => t.traceId === currentTraceId);
     if (idx === -1) return;
 
-    const order = radialOrder(turns.length, idx, RADIUS).filter(
-      (i) => i !== idx,
-    );
+    const order = radialOrder(turns.length, idx, RADIUS).filter((i) => i !== idx);
     if (order.length === 0) return;
 
     const timer = setTimeout(() => {

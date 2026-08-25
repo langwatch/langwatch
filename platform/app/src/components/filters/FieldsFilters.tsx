@@ -210,9 +210,7 @@ function FieldsFilter({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const currentStringList = Array.isArray(current)
-    ? current
-    : Object.keys(current);
+  const currentStringList = Array.isArray(current) ? current : Object.keys(current);
 
   const allowCustomValue =
     filter.type !== "numeric" && !BOOLEAN_FILTER_IDS.includes(filterId);
@@ -288,9 +286,7 @@ function FieldsFilter({
                       <Tag.Label>{currentStringList.length}</Tag.Label>
                     </Tag.Root>
                   )}
-                  <Tooltip
-                    content={`Clear ${filter.name.toLowerCase()} filter`}
-                  >
+                  <Tooltip content={`Clear ${filter.name.toLowerCase()} filter`}>
                     <Button
                       as={Box}
                       role="button"
@@ -353,9 +349,7 @@ function FieldsFilter({
                 current={current}
                 keysAhead={[
                   ...(filter.requiresKey ? [filter.requiresKey.filter] : []),
-                  ...(filter.requiresSubkey
-                    ? [filter.requiresSubkey.filter]
-                    : []),
+                  ...(filter.requiresSubkey ? [filter.requiresSubkey.filter] : []),
                   filterId,
                 ]}
                 paddingX={4}
@@ -439,19 +433,17 @@ function NestedListSelection({
 
         const filterParam = Array.isArray(current) ? {} : cloneDeep(current);
         let current_ = filterParam;
-        keysBefore
-          .slice(0, keysAhead.length + keysBefore.length - 2)
-          .forEach((key) => {
-            const next = current_[key];
-            if (next) {
-              if (Array.isArray(next)) {
-                current_[key] = {} as Record<string, string[]>;
-                current_ = current_[key] as any;
-              } else {
-                current_ = next;
-              }
+        keysBefore.slice(0, keysAhead.length + keysBefore.length - 2).forEach((key) => {
+          const next = current_[key];
+          if (next) {
+            if (Array.isArray(next)) {
+              current_[key] = {} as Record<string, string[]>;
+              current_ = current_[key] as any;
+            } else {
+              current_ = next;
             }
-          });
+          }
+        });
 
         const lastKey = keysBefore[keysBefore.length - 1]!;
         if (keysAhead.length === 1) {
@@ -579,8 +571,7 @@ function ListSelection({
     );
   }, [options, customValueQuery]);
 
-  const showCustomValue =
-    allowCustomValue && customValueQuery && !hasExactMatch;
+  const showCustomValue = allowCustomValue && customValueQuery && !hasExactMatch;
 
   // Calculate total option count (options + custom value if shown)
   const totalOptionCount = (options?.length ?? 0) + (showCustomValue ? 1 : 0);
@@ -634,20 +625,13 @@ function ListSelection({
         onChange([...currentValues, field]);
       }
     },
-    [
-      options,
-      showCustomValue,
-      currentValues,
-      onChange,
-      handleCustomValueSelect,
-    ],
+    [options, showCustomValue, currentValues, onChange, handleCustomValueSelect],
   );
 
   // Set up the ref for keyboard selection
   useEffect(() => {
     if (selectHighlightedRef) {
-      selectHighlightedRef.current = () =>
-        handleSelectByIndex(highlightedIndex);
+      selectHighlightedRef.current = () => handleSelectByIndex(highlightedIndex);
     }
     return () => {
       if (selectHighlightedRef) {
@@ -666,17 +650,8 @@ function ListSelection({
     [highlightedIndex, onKeyboardNavChange, onHighlightChange],
   );
 
-  if (
-    filter.type === "numeric" &&
-    keys?.[0] == "thumbs_up_down" &&
-    keys?.[1] == "vote"
-  ) {
-    return (
-      <ThumbsUpDownVoteFilter
-        currentValues={currentValues}
-        onChange={onChange}
-      />
-    );
+  if (filter.type === "numeric" && keys?.[0] == "thumbs_up_down" && keys?.[1] == "vote") {
+    return <ThumbsUpDownVoteFilter currentValues={currentValues} onChange={onChange} />;
   }
 
   if (filter.type === "numeric") {
@@ -729,9 +704,7 @@ function ListSelection({
 
           const onChange_ = () => {
             if (currentValues.includes(field.toString())) {
-              onChange(
-                currentValues.filter((v) => v.toString() !== field.toString()),
-              );
+              onChange(currentValues.filter((v) => v.toString() !== field.toString()));
             } else {
               onChange([...currentValues, field]);
             }
@@ -808,9 +781,7 @@ function ListSelection({
             left={0}
             transform={`translateY(${virtualizer.getTotalSize()}px)`}
             cursor="pointer"
-            background={
-              highlightedIndex === customValueIndex ? "bg.muted" : undefined
-            }
+            background={highlightedIndex === customValueIndex ? "bg.muted" : undefined}
             borderRadius="md"
             paddingX={2}
             onMouseMove={() => handleMouseMove(customValueIndex)}
@@ -823,11 +794,7 @@ function ListSelection({
               size="sm"
               checked={currentValues.includes(customValueQuery)}
             >
-              <OverflownTextWithTooltip
-                fontSize="sm"
-                lineClamp={1}
-                wordBreak="break-all"
-              >
+              <OverflownTextWithTooltip fontSize="sm" lineClamp={1} wordBreak="break-all">
                 {customValueQuery}
               </OverflownTextWithTooltip>
             </Checkbox>
@@ -840,22 +807,20 @@ function ListSelection({
           </Text>
         )}
         {filterData.isLoading &&
-          Array.from({ length: keys && keys.length > 0 ? 2 : 5 }).map(
-            (_, i) => (
-              <HStack key={i} width="full" paddingX={2}>
-                <Checkbox
-                  checked={false}
-                  paddingY={2}
-                  gap={2}
-                  size="sm"
-                  width="full"
-                  onChange={() => void 0}
-                >
-                  <Skeleton height="14px" width="100px" />
-                </Checkbox>
-              </HStack>
-            ),
-          )}
+          Array.from({ length: keys && keys.length > 0 ? 2 : 5 }).map((_, i) => (
+            <HStack key={i} width="full" paddingX={2}>
+              <Checkbox
+                checked={false}
+                paddingY={2}
+                gap={2}
+                size="sm"
+                width="full"
+                onChange={() => void 0}
+              >
+                <Skeleton height="14px" width="100px" />
+              </Checkbox>
+            </HStack>
+          ))}
       </VStack>
     </Box>
   );

@@ -87,9 +87,7 @@ export function PublishedPromptsList() {
               <Sidebar.Item
                 icon={
                   modelProviderIcons[
-                    prompt.model?.split(
-                      "/",
-                    )[0] as keyof typeof modelProviderIcons
+                    prompt.model?.split("/")[0] as keyof typeof modelProviderIcons
                   ]
                 }
                 onClick={() => {
@@ -108,8 +106,7 @@ export function PublishedPromptsList() {
                       },
                       meta: {
                         title: defaultValues.handle ?? null,
-                        versionNumber:
-                          defaultValues.versionMetadata?.versionNumber,
+                        versionNumber: defaultValues.versionMetadata?.versionNumber,
                       },
                       variableValues: {},
                     },

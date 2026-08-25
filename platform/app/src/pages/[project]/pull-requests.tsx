@@ -27,10 +27,10 @@ function ProjectPullRequestsPage() {
         <VStack align="start" gap={0}>
           <PageLayout.Heading>Pull requests</PageLayout.Heading>
           <Text color="fg.muted" fontSize="sm">
-            What each pull request cost in assistant usage. These are the pull
-            requests this project's sessions touched, priced across everyone who
-            worked on them, over the pull request's whole life from its first
-            session to its last rather than a selected period.
+            What each pull request cost in assistant usage. These are the pull requests
+            this project's sessions touched, priced across everyone who worked on them,
+            over the pull request's whole life from its first session to its last rather
+            than a selected period.
           </Text>
         </VStack>
 

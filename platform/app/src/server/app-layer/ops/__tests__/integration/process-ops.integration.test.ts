@@ -26,10 +26,7 @@ const service = new ManagerExplorerService({
 
 const ACTOR = `user_opstest_${nanoid(6)}`;
 
-async function seedInstance(params: {
-  processKey: string;
-  nextWakeAt: Date | null;
-}) {
+async function seedInstance(params: { processKey: string; nextWakeAt: Date | null }) {
   await prisma.processManagerInstance.create({
     data: {
       processName: ns,
@@ -237,9 +234,7 @@ describe("process ops against a real Postgres", () => {
         pageSize: 10,
       });
       expect(outbox.total).toBe(4);
-      expect(outbox.messages[0]?.traceId).toBe(
-        "4bf92f3577b34da6a3ce929d0e0e4736",
-      );
+      expect(outbox.messages[0]?.traceId).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
     });
   });
 
@@ -636,9 +631,7 @@ describe("process ops against a real Postgres", () => {
         pageSize: 10,
       });
       expect(messages.map((m) => m.id)).toEqual([keepId]);
-      expect(byProcess.find((row) => row.processName === nsCount)?.count).toBe(
-        1,
-      );
+      expect(byProcess.find((row) => row.processName === nsCount)?.count).toBe(1);
     });
 
     /** @scenario Every dead letter shown can be redriven in one act */
@@ -890,10 +883,7 @@ describe("process ops against a real Postgres", () => {
         outboxId: id,
         projectId: PROJECT,
       });
-      expect(attempts.map((a) => a.errorMessage)).toEqual([
-        "first life",
-        "second life",
-      ]);
+      expect(attempts.map((a) => a.errorMessage)).toEqual(["first life", "second life"]);
       // Row identity, not the attempt number, is what stays unique.
       expect(new Set(attempts.map((a) => a.id)).size).toBe(2);
       expect(new Set(attempts.map((a) => a.attempt)).size).toBe(1);

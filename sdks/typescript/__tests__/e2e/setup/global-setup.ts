@@ -34,9 +34,18 @@ const waitForTcp = async (host: string, port: number, timeoutMs = 30_000) => {
           socket.removeAllListeners();
           socket.destroy();
         };
-        socket.on("connect", () => { cleanup(); resolve(); });
-        socket.on("error", (err) => { cleanup(); reject(err); });
-        socket.setTimeout(5_000, () => { cleanup(); reject(new Error("timeout")); });
+        socket.on("connect", () => {
+          cleanup();
+          resolve();
+        });
+        socket.on("error", (err) => {
+          cleanup();
+          reject(err);
+        });
+        socket.setTimeout(5_000, () => {
+          cleanup();
+          reject(new Error("timeout"));
+        });
       });
       return;
     } catch {

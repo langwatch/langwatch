@@ -18,11 +18,11 @@ const id = generate(KSUID_RESOURCES.MODEL_PROVIDER).toString();
 
 ## When to use KSUID vs alternatives
 
-| ID shape | Use when |
-|---|---|
-| `generate(KSUID_RESOURCES.X).toString()` at service/repo create | User-facing entities: anything that shows up in a URL, an API response, an export, or a webhook |
+| ID shape                                                            | Use when                                                                                                                  |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `generate(KSUID_RESOURCES.X).toString()` at service/repo create     | User-facing entities: anything that shows up in a URL, an API response, an export, or a webhook                           |
 | `@default(nanoid())` / `@default(cuid())` left on the Prisma column | Internal join tables (`ModelProviderScope`, `ModelDefaultConfigScope`) — never shown to users, never linked to externally |
-| Bare `nanoid()` in seed scripts / one-shot migrations | Deterministic ids during data lift, not used at runtime |
+| Bare `nanoid()` in seed scripts / one-shot migrations               | Deterministic ids during data lift, not used at runtime                                                                   |
 
 ## Where to add a new resource type
 

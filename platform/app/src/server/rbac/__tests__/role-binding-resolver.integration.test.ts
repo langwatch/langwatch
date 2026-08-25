@@ -22,10 +22,7 @@ import {
   type User,
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
-import {
-  checkRoleBindingPermission,
-  type ScopeRef,
-} from "../role-binding-resolver";
+import { checkRoleBindingPermission, type ScopeRef } from "../role-binding-resolver";
 
 const NS = `rbac-int-${nanoid(6)}`;
 

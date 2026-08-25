@@ -59,21 +59,25 @@ describe("GatewayService budget decisions", () => {
       decision: "hard_block",
       warnings: [],
       blockReason: "Budget exceeded for scope=organization window=month",
-      blockedBy: [{
-        budgetId: "budget_1",
-        scope: "organization",
-        scopeId: "org_1",
-        window: "month",
-        limitUsd: "1",
-        spentUsd: "0.500000",
-      }],
-      scopes: [{
-        scope: "organization",
-        scopeId: "org_1",
-        window: "month",
-        spentUsd: "0.500000",
-        limitUsd: "1.000000",
-      }],
+      blockedBy: [
+        {
+          budgetId: "budget_1",
+          scope: "organization",
+          scopeId: "org_1",
+          window: "month",
+          limitUsd: "1",
+          spentUsd: "0.500000",
+        },
+      ],
+      scopes: [
+        {
+          scope: "organization",
+          scopeId: "org_1",
+          window: "month",
+          spentUsd: "0.500000",
+          limitUsd: "1.000000",
+        },
+      ],
     });
   });
 

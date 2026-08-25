@@ -136,10 +136,7 @@ export class RecentItemsService {
         };
       }
       case "annotation": {
-        const queue = await this.repository.getAnnotationQueueById(
-          id,
-          projectId,
-        );
+        const queue = await this.repository.getAnnotationQueueById(id, projectId);
         if (!queue) return null;
         return {
           id: queue.id,

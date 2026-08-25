@@ -34,9 +34,7 @@ describe("useAttributionCapture()", () => {
       it("captures ref into lw_attrib.leadSource", () => {
         renderHook(() => useAttributionCapture());
 
-        expect(window.sessionStorage.getItem("lw_attrib.leadSource")).toBe(
-          "website",
-        );
+        expect(window.sessionStorage.getItem("lw_attrib.leadSource")).toBe("website");
       });
     });
 
@@ -50,37 +48,27 @@ describe("useAttributionCapture()", () => {
       /** @scenario 'Attribution hook captures full utm tuple when present in URL' */
       it("captures utm_source into lw_attrib.utmSource", () => {
         renderHook(() => useAttributionCapture());
-        expect(window.sessionStorage.getItem("lw_attrib.utmSource")).toBe(
-          "news",
-        );
+        expect(window.sessionStorage.getItem("lw_attrib.utmSource")).toBe("news");
       });
 
       it("captures utm_medium into lw_attrib.utmMedium", () => {
         renderHook(() => useAttributionCapture());
-        expect(window.sessionStorage.getItem("lw_attrib.utmMedium")).toBe(
-          "email",
-        );
+        expect(window.sessionStorage.getItem("lw_attrib.utmMedium")).toBe("email");
       });
 
       it("captures utm_campaign into lw_attrib.utmCampaign", () => {
         renderHook(() => useAttributionCapture());
-        expect(window.sessionStorage.getItem("lw_attrib.utmCampaign")).toBe(
-          "apr",
-        );
+        expect(window.sessionStorage.getItem("lw_attrib.utmCampaign")).toBe("apr");
       });
 
       it("captures utm_term into lw_attrib.utmTerm", () => {
         renderHook(() => useAttributionCapture());
-        expect(window.sessionStorage.getItem("lw_attrib.utmTerm")).toBe(
-          "agents",
-        );
+        expect(window.sessionStorage.getItem("lw_attrib.utmTerm")).toBe("agents");
       });
 
       it("captures utm_content into lw_attrib.utmContent", () => {
         renderHook(() => useAttributionCapture());
-        expect(window.sessionStorage.getItem("lw_attrib.utmContent")).toBe(
-          "cta",
-        );
+        expect(window.sessionStorage.getItem("lw_attrib.utmContent")).toBe("cta");
       });
     });
 
@@ -121,9 +109,7 @@ describe("useAttributionCapture()", () => {
       it("does not set lw_attrib.leadSource", () => {
         renderHook(() => useAttributionCapture());
 
-        expect(
-          window.sessionStorage.getItem("lw_attrib.leadSource"),
-        ).toBeNull();
+        expect(window.sessionStorage.getItem("lw_attrib.leadSource")).toBeNull();
       });
     });
 
@@ -146,9 +132,7 @@ describe("useAttributionCapture()", () => {
     it("does not overwrite the first-touch value", () => {
       renderHook(() => useAttributionCapture());
 
-      expect(window.sessionStorage.getItem("lw_attrib.leadSource")).toBe(
-        "original",
-      );
+      expect(window.sessionStorage.getItem("lw_attrib.leadSource")).toBe("original");
     });
   });
 });
@@ -166,10 +150,7 @@ describe("readAttribution()", () => {
       window.sessionStorage.setItem("lw_attrib.utmCampaign", "apr");
       window.sessionStorage.setItem("lw_attrib.utmTerm", "agents");
       window.sessionStorage.setItem("lw_attrib.utmContent", "cta");
-      window.sessionStorage.setItem(
-        "lw_attrib.referrer",
-        "https://www.langwatch.ai/",
-      );
+      window.sessionStorage.setItem("lw_attrib.referrer", "https://www.langwatch.ai/");
     });
 
     it("exposes leadSource", () => {

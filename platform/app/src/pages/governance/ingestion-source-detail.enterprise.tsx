@@ -45,11 +45,7 @@ import { Pagination } from "~/components/ui/Pagination";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import {
-  HandledErrorAlert,
-  readHandledError,
-  showErrorToast,
-} from "~/features/errors";
+import { HandledErrorAlert, readHandledError, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -74,8 +70,7 @@ import {
 
 type Source = RouterOutputs["ingestionSources"]["get"];
 type EventRow = RouterOutputs["activityMonitor"]["eventsForSource"][number];
-type SourceHealthMetrics =
-  RouterOutputs["activityMonitor"]["sourceHealthMetrics"];
+type SourceHealthMetrics = RouterOutputs["activityMonitor"]["sourceHealthMetrics"];
 
 const STATUS_META: Record<
   string,
@@ -124,18 +119,13 @@ function SourceDetailHeader({
   onRotate: () => void;
   onArchive: () => void;
 }) {
-  const status =
-    STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
+  const status = STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
   const StatusIcon = status.icon;
   return (
     <HStack alignItems="end">
       <VStack align="start" gap={1}>
         <HStack gap={2}>
-          <Link
-            href="/governance/ingestion-sources"
-            color="blue.600"
-            fontSize="xs"
-          >
+          <Link href="/governance/ingestion-sources" color="blue.600" fontSize="xs">
             <HStack gap={1}>
               <ArrowLeft size={12} />
               <Text>All sources</Text>
@@ -181,11 +171,7 @@ function SourceDetailHeader({
             variant="ghost"
             colorPalette="red"
             onClick={() => {
-              if (
-                !confirm(
-                  `Archive "${source.name}"? Historical events stay readable.`,
-                )
-              )
+              if (!confirm(`Archive "${source.name}"? Historical events stay readable.`))
                 return;
               onArchive();
             }}
@@ -455,12 +441,11 @@ function useIngestionSourceDetailPage() {
     sourceName: string;
   } | null>(null);
 
-  const { rotate: rotateMutation, archive: archiveMutation } =
-    useSourceDetailMutations({
-      orgId,
-      sourceId,
-      onSecretRevealed: setSecretReveal,
-    });
+  const { rotate: rotateMutation, archive: archiveMutation } = useSourceDetailMutations({
+    orgId,
+    sourceId,
+    onSecretRevealed: setSecretReveal,
+  });
 
   return {
     sourceId,
@@ -538,9 +523,7 @@ function IngestionSourceDetailPage() {
           canManage={canManage}
           isRotating={rotateMutation.isPending}
           isArchiving={archiveMutation.isPending}
-          onRotate={() =>
-            rotateMutation.mutate({ organizationId: orgId, id: source.id })
-          }
+          onRotate={() => rotateMutation.mutate({ organizationId: orgId, id: source.id })}
           onArchive={() =>
             archiveMutation.mutate({ organizationId: orgId, id: source.id })
           }
@@ -593,16 +576,14 @@ function StaleTimestampCallout({
       borderRadius="md"
     >
       <Text fontSize="sm" color="amber.900">
-        <strong>Heads up:</strong> the events table below has loaded{" "}
-        {eventsCount} event
-        {eventsCount === 1 ? "" : "s"}, but the rolling
-        24h&nbsp;/&nbsp;7d&nbsp;/&nbsp;30d health windows are all zero. Your
-        events likely have a stale <Code fontSize="xs">startTimeUnixNano</Code>{" "}
-        (timestamps before today). When firing test events, set{" "}
-        <Code fontSize="xs">startTimeUnixNano</Code> to{" "}
-        <Code fontSize="xs">String(Date.now() * 1_000_000)</Code> so the event
-        lands inside the rolling window. The secret-reveal modal&apos;s
-        &quot;Test it now&quot; curl already does this for you.
+        <strong>Heads up:</strong> the events table below has loaded {eventsCount} event
+        {eventsCount === 1 ? "" : "s"}, but the rolling 24h&nbsp;/&nbsp;7d&nbsp;/&nbsp;30d
+        health windows are all zero. Your events likely have a stale{" "}
+        <Code fontSize="xs">startTimeUnixNano</Code> (timestamps before today). When
+        firing test events, set <Code fontSize="xs">startTimeUnixNano</Code> to{" "}
+        <Code fontSize="xs">String(Date.now() * 1_000_000)</Code> so the event lands
+        inside the rolling window. The secret-reveal modal&apos;s &quot;Test it now&quot;
+        curl already does this for you.
       </Text>
     </Box>
   );
@@ -610,12 +591,9 @@ function StaleTimestampCallout({
 
 function EmptyEventsHint({ source }: { source: Source }) {
   const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://langwatch.invalid";
+    typeof window !== "undefined" ? window.location.origin : "https://langwatch.invalid";
   const isOtel =
-    source.sourceType === "otel_generic" ||
-    source.sourceType === "claude_cowork";
+    source.sourceType === "otel_generic" || source.sourceType === "claude_cowork";
   const isWebhook = source.sourceType === "workato";
   const mode = isOtel ? "otel" : isWebhook ? "webhook" : "<mode>";
   const endpoint = `${baseUrl}/api/ingest/${mode}/${source.id}`;
@@ -623,15 +601,14 @@ function EmptyEventsHint({ source }: { source: Source }) {
     <VStack align="stretch" gap={3}>
       <Text fontSize="sm" color="fg.muted">
         No traces from this source yet. Push an OTLP body to{" "}
-        <Code fontSize="xs">{endpoint}</Code> with the source&apos;s bearer
-        secret to start populating.
+        <Code fontSize="xs">{endpoint}</Code> with the source&apos;s bearer secret to
+        start populating.
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        Spans land in the LangWatch trace store with this source&apos;s origin
-        tag, viewable in the trace viewer. If you are sending agent traces from
-        your own LangWatch SDK, use{" "}
-        <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key
-        - different auth, same trace store. See{" "}
+        Spans land in the LangWatch trace store with this source&apos;s origin tag,
+        viewable in the trace viewer. If you are sending agent traces from your own
+        LangWatch SDK, use <Code fontSize="xs">/api/otel/v1/traces</Code> with your
+        project API key - different auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
           color="blue.600"
@@ -641,18 +618,12 @@ function EmptyEventsHint({ source }: { source: Source }) {
         .
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        Lost the secret? Click <strong>Rotate secret</strong> above - the new
-        bearer is shown once with a copy-paste curl example, and the prior
-        secret stays valid for 24h while you roll the new value through every
-        upstream client.
+        Lost the secret? Click <strong>Rotate secret</strong> above - the new bearer is
+        shown once with a copy-paste curl example, and the prior secret stays valid for
+        24h while you roll the new value through every upstream client.
       </Text>
       {isOtel && (
-        <Box
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          padding={3}
-        >
+        <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
           <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={2}>
             Minimum viable OTLP body shape (camelCase keys):
           </Text>
@@ -680,9 +651,9 @@ function EmptyEventsHint({ source }: { source: Source }) {
   }]
 }`}</Code>
           <Text fontSize="xs" color="fg.muted" mt={2}>
-            Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on
-            success. If you get <Code fontSize="xs">events: 0</Code> with a
-            hint, the body shape didn&apos;t parse. See the{" "}
+            Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success. If you
+            get <Code fontSize="xs">events: 0</Code> with a hint, the body shape
+            didn&apos;t parse. See the{" "}
             <Link
               href="https://docs.langwatch.ai/ai-gateway/governance/ingestion-sources/otel-generic"
               color="blue.600"
@@ -707,12 +678,7 @@ function MetricCard({
   isLoading?: boolean;
 }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
       <Text
         fontSize="xs"
         fontWeight="semibold"
@@ -747,9 +713,7 @@ function SecretRevealModal({
   const [copied, setCopied] = useState(false);
   if (!details) return null;
   const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://langwatch.invalid";
+    typeof window !== "undefined" ? window.location.origin : "https://langwatch.invalid";
   const otlpUrl = `${baseUrl}/api/ingest/otel/${sourceId}`;
   const webhookUrl = `${baseUrl}/api/ingest/webhook/${sourceId}`;
   const usesPushUrl =
@@ -820,10 +784,10 @@ function SecretRevealModal({
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              This is the only time we&apos;ll show this secret. Save it
-              somewhere safe and paste it into the upstream platform&apos;s
-              admin console. The previous secret keeps working for 24h so you
-              have time to roll the new value through every upstream client.
+              This is the only time we&apos;ll show this secret. Save it somewhere safe
+              and paste it into the upstream platform&apos;s admin console. The previous
+              secret keeps working for 24h so you have time to roll the new value through
+              every upstream client.
             </Text>
             <VStack align="stretch" gap={1}>
               <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -839,11 +803,7 @@ function SecretRevealModal({
                 >
                   {details.secret}
                 </Code>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => copy(details.secret)}
-                >
+                <Button size="sm" variant="outline" onClick={() => copy(details.secret)}>
                   <Copy size={14} /> {copied ? "Copied" : "Copy"}
                 </Button>
               </HStack>
@@ -907,10 +867,10 @@ function SecretRevealModal({
                   <Code fontSize="xs" backgroundColor="transparent">
                     OTEL_RESOURCE_ATTRIBUTES=team.id=…
                   </Code>{" "}
-                  - it lands as a resource attribute and slots into
-                  /governance&apos;s spendByTeam without further config.
-                  Department attribution is resolved from the project&apos;s
-                  assignment at read time, not from an OTEL attribute.
+                  - it lands as a resource attribute and slots into /governance&apos;s
+                  spendByTeam without further config. Department attribution is resolved
+                  from the project&apos;s assignment at read time, not from an OTEL
+                  attribute.
                 </Text>
               </VStack>
             )}

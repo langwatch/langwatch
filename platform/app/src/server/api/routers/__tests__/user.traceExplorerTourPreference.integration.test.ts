@@ -58,9 +58,7 @@ describe("user Traces Explorer tour preference", () => {
     expect(dismissed.dismissedAt).toBeInstanceOf(Date);
 
     const secondBrowser = createCaller(userId);
-    const persisted = await secondBrowser.user.getTraceExplorerTourPreference(
-      {},
-    );
+    const persisted = await secondBrowser.user.getTraceExplorerTourPreference({});
     expect(persisted.dismissed).toBe(true);
     expect(persisted.dismissedAt).toEqual(dismissed.dismissedAt);
 
@@ -68,9 +66,7 @@ describe("user Traces Explorer tour preference", () => {
       where: { id: userId },
       select: { tracesExplorerTourDismissedAt: true },
     });
-    expect(databaseUser.tracesExplorerTourDismissedAt).toEqual(
-      dismissed.dismissedAt,
-    );
+    expect(databaseUser.tracesExplorerTourDismissedAt).toEqual(dismissed.dismissedAt);
   });
 
   /** @scenario Dismissing the tour in one project suppresses it in another */

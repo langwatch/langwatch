@@ -1,6 +1,6 @@
 ---
-title: 'Overview'
-description: 'Create, list, update, and archive LangWatch projects programmatically. Designed for automated scaffolding and CI/CD pipelines.'
+title: "Overview"
+description: "Create, list, update, and archive LangWatch projects programmatically. Designed for automated scaffolding and CI/CD pipelines."
 ---
 
 ## Intro
@@ -21,15 +21,15 @@ Project API keys (`X-Auth-Token`) cannot be used here — they lack organization
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/projects` | List all projects in the organization |
-| `POST` | `/api/projects` | Create a new project (returns a service API key) |
-| `GET` | `/api/projects/{id}` | Get project details |
-| `PATCH` | `/api/projects/{id}` | Update project fields (including moving to a different team) |
-| `DELETE` | `/api/projects/{id}` | Archive a project |
-| `GET` | `/api/projects/{id}/api-key` | Get the project's API key |
-| `POST` | `/api/projects/{id}/regenerate-api-key` | Regenerate the project API key |
+| Method   | Path                                    | Description                                                  |
+| -------- | --------------------------------------- | ------------------------------------------------------------ |
+| `GET`    | `/api/projects`                         | List all projects in the organization                        |
+| `POST`   | `/api/projects`                         | Create a new project (returns a service API key)             |
+| `GET`    | `/api/projects/{id}`                    | Get project details                                          |
+| `PATCH`  | `/api/projects/{id}`                    | Update project fields (including moving to a different team) |
+| `DELETE` | `/api/projects/{id}`                    | Archive a project                                            |
+| `GET`    | `/api/projects/{id}/api-key`            | Get the project's API key                                    |
+| `POST`   | `/api/projects/{id}/regenerate-api-key` | Regenerate the project API key                               |
 
 ## Moving a Project to Another Team
 
@@ -43,7 +43,9 @@ curl -X PATCH https://app.langwatch.ai/api/projects/<project_id> \
 ```
 
 <Warning>
-Moving a project changes its access boundary. Members who had access through the source team will lose inherited access, while members of the destination team will gain it. Project-level access overrides are preserved.
+  Moving a project changes its access boundary. Members who had access through the source
+  team will lose inherited access, while members of the destination team will gain it.
+  Project-level access overrides are preserved.
 </Warning>
 
 ## Typical Flow
@@ -59,5 +61,6 @@ LANGWATCH_PROJECT_ID=<project id>
 ```
 
 <Info>
-The `serviceApiKey` is shown only once in the create response. Store it securely — you cannot retrieve it later.
+  The `serviceApiKey` is shown only once in the create response. Store it securely — you
+  cannot retrieve it later.
 </Info>

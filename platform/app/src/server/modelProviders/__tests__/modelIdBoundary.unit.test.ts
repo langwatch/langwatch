@@ -83,9 +83,7 @@ describe("translateModelIdForLitellm", () => {
 
   describe("Custom provider prefix", () => {
     it("keeps custom model ids verbatim (dots are part of the customer's model name)", () => {
-      const result = translateModelIdForLitellm(
-        "custom/Qwen/Qwen2.5-32B-Instruct",
-      );
+      const result = translateModelIdForLitellm("custom/Qwen/Qwen2.5-32B-Instruct");
       expect(result).toBe("custom/Qwen/Qwen2.5-32B-Instruct");
     });
   });

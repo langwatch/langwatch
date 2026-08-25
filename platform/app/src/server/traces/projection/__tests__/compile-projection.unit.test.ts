@@ -215,9 +215,7 @@ describe("compileProjection", () => {
         });
         expect(compiled.plan.needsEvents).toBe(true);
         expect(compiled.project(sampleTrace())).toEqual({
-          events: [
-            { type: "thumbs_up_down", metrics: { vote: 1 }, timestamp: 2000 },
-          ],
+          events: [{ type: "thumbs_up_down", metrics: { vote: 1 }, timestamp: 2000 }],
         });
       });
     });
@@ -393,9 +391,7 @@ describe("collection-path RBAC redaction", () => {
           },
         });
         expect(project(sampleTrace())).toEqual({
-          annotations: [
-            { is_thumbs_up: true, comment: null, expected_output: null },
-          ],
+          annotations: [{ is_thumbs_up: true, comment: null, expected_output: null }],
         });
       });
     });
@@ -407,9 +403,7 @@ describe("collection-path RBAC redaction", () => {
           protections: fullAccess,
         });
         expect(project(sampleTrace())).toEqual({
-          annotations: [
-            { is_thumbs_up: true, comment: "nice", expected_output: null },
-          ],
+          annotations: [{ is_thumbs_up: true, comment: "nice", expected_output: null }],
         });
       });
     });

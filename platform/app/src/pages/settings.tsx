@@ -22,10 +22,7 @@ import { ProjectSelector } from "../components/DashboardLayout";
 import SettingsLayout from "../components/SettingsLayout";
 import { DepartmentPicker } from "../components/settings/DepartmentPicker";
 import { useDepartmentColumn } from "../components/settings/useDepartmentColumn";
-import {
-  ProjectTechStackIcon,
-  TechStackSelector,
-} from "../components/TechStack";
+import { ProjectTechStackIcon, TechStackSelector } from "../components/TechStack";
 import { Dialog } from "../components/ui/dialog";
 import { Select } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
@@ -130,9 +127,7 @@ function SettingsForm({
   const [showLlmOpsSetupDialog, setShowLlmOpsSetupDialog] = useState(false);
   const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
 
-  const onSubmit: SubmitHandler<OrganizationFormData> = (
-    data: OrganizationFormData,
-  ) => {
+  const onSubmit: SubmitHandler<OrganizationFormData> = (data: OrganizationFormData) => {
     if (isEqual(data, defaultValues)) return;
 
     const previousIntent = defaultValues.primaryIntent;
@@ -159,18 +154,12 @@ function SettingsForm({
           // home, so the change is checked for what's missing — and the
           // user is only interrupted when something actually is. The save
           // itself always goes through first.
-          if (
-            data.primaryIntent === "LLM_OPS" &&
-            previousIntent !== "LLM_OPS"
-          ) {
+          if (data.primaryIntent === "LLM_OPS" && previousIntent !== "LLM_OPS") {
             if (!project) {
               // No project at all (governance orgs skip it at signup):
               // alert, then offer to create it.
               setShowCreateProjectDialog(true);
-            } else if (
-              previousIntent === "AGENT_GOVERNANCE" &&
-              !project.firstMessage
-            ) {
+            } else if (previousIntent === "AGENT_GOVERNANCE" && !project.firstMessage) {
               // Project exists but never received data: offer its setup.
               setShowLlmOpsSetupDialog(true);
             }
@@ -232,12 +221,7 @@ function SettingsForm({
                 helper="The unique ID of your organization"
               >
                 {hasPermission("organization:manage") ? (
-                  <Input
-                    width="full"
-                    disabled
-                    type="text"
-                    value={organization.slug}
-                  />
+                  <Input width="full" disabled type="text" value={organization.slug} />
                 ) : (
                   <Text>{organization.slug}</Text>
                 )}
@@ -285,15 +269,12 @@ function SettingsForm({
                   helper={
                     <VStack align="start" gap={1}>
                       <Text>
-                        What this organization mainly uses LangWatch for.
-                        Decides where everyone lands when opening the app:
-                        coding-agent tracking opens the personal usage page, LLM
-                        apps open the project home. &quot;Not set&quot; keeps
-                        the current behavior.
+                        What this organization mainly uses LangWatch for. Decides where
+                        everyone lands when opening the app: coding-agent tracking opens
+                        the personal usage page, LLM apps open the project home. &quot;Not
+                        set&quot; keeps the current behavior.
                       </Text>
-                      {!hasPermission("organization:manage") && (
-                        <AdminOnlyBadge />
-                      )}
+                      {!hasPermission("organization:manage") && <AdminOnlyBadge />}
                     </VStack>
                   }
                 >
@@ -307,15 +288,10 @@ function SettingsForm({
                           value={[field.value]}
                           width="full"
                           onValueChange={(d) =>
-                            field.onChange(
-                              (d.value[0] ?? "") as "" | OrganizationIntent,
-                            )
+                            field.onChange((d.value[0] ?? "") as "" | OrganizationIntent)
                           }
                         >
-                          <Select.Trigger
-                            background="bg"
-                            aria-label="Primary use"
-                          >
+                          <Select.Trigger background="bg" aria-label="Primary use">
                             <Select.ValueText />
                           </Select.Trigger>
                           <Select.Content>
@@ -349,14 +325,11 @@ function SettingsForm({
                 helper={
                   <VStack align="start" gap={1}>
                     <Text>
-                      Lets teammates see who else is on the site in real time -
-                      avatars, cursors, and which view each person is in.
-                      Disable to turn it off across every project in this
-                      organization.
+                      Lets teammates see who else is on the site in real time - avatars,
+                      cursors, and which view each person is in. Disable to turn it off
+                      across every project in this organization.
                     </Text>
-                    {!hasPermission("organization:manage") && (
-                      <AdminOnlyBadge />
-                    )}
+                    {!hasPermission("organization:manage") && <AdminOnlyBadge />}
                   </VStack>
                 }
               >
@@ -378,13 +351,11 @@ function SettingsForm({
                 helper={
                   <VStack align="start" gap={1}>
                     <Text>
-                      Lets members create share links to traces. Disable to turn
-                      sharing off across every project in this organization and
-                      revoke all existing links.
+                      Lets members create share links to traces. Disable to turn sharing
+                      off across every project in this organization and revoke all
+                      existing links.
                     </Text>
-                    {!hasPermission("organization:manage") && (
-                      <AdminOnlyBadge />
-                    )}
+                    {!hasPermission("organization:manage") && <AdminOnlyBadge />}
                   </VStack>
                 }
               >
@@ -435,8 +406,7 @@ function SettingsForm({
                     </VStack>
                   ) : (
                     <Text>
-                      S3 storage configuration is only visible to organization
-                      managers
+                      S3 storage configuration is only visible to organization managers
                     </Text>
                   )}
                 </HorizontalFormControl>
@@ -474,17 +444,14 @@ function SettingsForm({
           </Dialog.Header>
           <Dialog.Body>
             <Text>
-              Your changes are saved. Monitoring LLM apps happens inside a
-              project, and this organization doesn&apos;t have one yet — create
-              your first project so everyone has somewhere to land.
+              Your changes are saved. Monitoring LLM apps happens inside a project, and
+              this organization doesn&apos;t have one yet — create your first project so
+              everyone has somewhere to land.
             </Text>
           </Dialog.Body>
           <Dialog.Footer>
             <HStack gap={2}>
-              <Button
-                variant="outline"
-                onClick={() => setShowCreateProjectDialog(false)}
-              >
+              <Button variant="outline" onClick={() => setShowCreateProjectDialog(false)}>
                 Later
               </Button>
               <Button
@@ -494,8 +461,7 @@ function SettingsForm({
                   openDrawer("createProject", {
                     navigateOnCreate: true,
                     organizationId: organization.id,
-                    defaultTeamId: organization.teams.find((t) => !t.isPersonal)
-                      ?.id,
+                    defaultTeamId: organization.teams.find((t) => !t.isPersonal)?.id,
                   });
                 }}
               >
@@ -517,18 +483,14 @@ function SettingsForm({
           </Dialog.Header>
           <Dialog.Body>
             <Text>
-              Everyone in this organization will now land on the project home,
-              but the project hasn&apos;t received any data yet. Walk through
-              the project setup so there&apos;s something to see when they
-              arrive.
+              Everyone in this organization will now land on the project home, but the
+              project hasn&apos;t received any data yet. Walk through the project setup so
+              there&apos;s something to see when they arrive.
             </Text>
           </Dialog.Body>
           <Dialog.Footer>
             <HStack gap={2}>
-              <Button
-                variant="outline"
-                onClick={() => setShowLlmOpsSetupDialog(false)}
-              >
+              <Button variant="outline" onClick={() => setShowLlmOpsSetupDialog(false)}>
                 Later
               </Button>
               <Button
@@ -582,8 +544,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     traceSharingEnabled: project.traceSharingEnabled,
     presenceEnabled: project.presenceEnabled,
   };
-  const [previousValues, setPreviousValues] =
-    useState<ProjectFormData>(defaultValues);
+  const [previousValues, setPreviousValues] = useState<ProjectFormData>(defaultValues);
   const form = useForm({
     defaultValues,
   });
@@ -612,10 +573,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     if (isEqual(data, previousValues)) return;
 
     // Check if trace sharing is being disabled
-    if (
-      data.traceSharingEnabled === false &&
-      project.traceSharingEnabled === true
-    ) {
+    if (data.traceSharingEnabled === false && project.traceSharingEnabled === true) {
       // Show confirmation dialog before proceeding
       setShowTraceSharingDialog(true);
       return;
@@ -705,9 +663,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           <HorizontalFormControl
             label="Tech Stack"
             helper="The project language and framework"
-            invalid={
-              !!formState.errors.language || !!formState.errors.framework
-            }
+            invalid={!!formState.errors.language || !!formState.errors.framework}
           >
             {changeLanguageFramework ? (
               <TechStackSelector form={form} />
@@ -732,8 +688,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             helper={
               <VStack align="start" gap={1}>
                 <Text>
-                  Show teammate avatars, cursors, and active views inside this
-                  project.{" "}
+                  Show teammate avatars, cursors, and active views inside this project.{" "}
                   {!organization?.presenceEnabled
                     ? "Disabled at the organization level - turn it on there first."
                     : "Disable to turn presence off for this project only."}
@@ -748,13 +703,9 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               name="presenceEnabled"
               render={({ field }) => (
                 <Switch
-                  checked={
-                    field.value && (organization?.presenceEnabled ?? true)
-                  }
+                  checked={field.value && (organization?.presenceEnabled ?? true)}
                   onCheckedChange={({ checked }) => field.onChange(checked)}
-                  disabled={
-                    !userIsAdmin || !(organization?.presenceEnabled ?? true)
-                  }
+                  disabled={!userIsAdmin || !(organization?.presenceEnabled ?? true)}
                 />
               )}
             />
@@ -780,15 +731,9 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               name="traceSharingEnabled"
               render={({ field }) => (
                 <Switch
-                  checked={
-                    field.value && (organization?.traceSharingEnabled ?? true)
-                  }
-                  onCheckedChange={({ checked }) =>
-                    handleTraceSharingChange(checked)
-                  }
-                  disabled={
-                    !userIsAdmin || !(organization?.traceSharingEnabled ?? true)
-                  }
+                  checked={field.value && (organization?.traceSharingEnabled ?? true)}
+                  onCheckedChange={({ checked }) => handleTraceSharingChange(checked)}
+                  disabled={!userIsAdmin || !(organization?.traceSharingEnabled ?? true)}
                 />
               )}
             />
@@ -829,11 +774,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           )}
         </VStack>
         <HStack width="full" justify="flex-end" paddingTop={4}>
-          <Button
-            type="submit"
-            colorPalette="blue"
-            loading={updateProject.isPending}
-          >
+          <Button type="submit" colorPalette="blue" loading={updateProject.isPending}>
             Save Changes
           </Button>
         </HStack>
@@ -851,8 +792,8 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           <Dialog.Body>
             <VStack align="start" gap={4}>
               <Text>
-                Are you sure you want to save these changes and disable trace
-                sharing for this project?
+                Are you sure you want to save these changes and disable trace sharing for
+                this project?
               </Text>
               <VStack
                 align="start"
@@ -869,8 +810,8 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   </Text>
                 </HStack>
                 <Text fontSize="sm" color="orange.fg">
-                  This action will <b>immediately revoke</b> all existing shared
-                  trace links. Anyone with previously shared trace URLs will{" "}
+                  This action will <b>immediately revoke</b> all existing shared trace
+                  links. Anyone with previously shared trace URLs will{" "}
                   <b>no longer be able to access them</b>.
                 </Text>
               </VStack>

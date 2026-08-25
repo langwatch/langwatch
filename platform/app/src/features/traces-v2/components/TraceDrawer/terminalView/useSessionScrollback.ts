@@ -206,13 +206,10 @@ async function loadTurnIntoLedger({
  * it. Owns the state, the in-flight guard and the epoch that drops reads
  * resolving after the reader moved to another trace.
  */
-function useTurnLedger({
-  key,
-  projectId,
-}: {
-  key: string;
-  projectId: string;
-}): { current: Ledger; loadTurn: (target: TurnTarget) => void } {
+function useTurnLedger({ key, projectId }: { key: string; projectId: string }): {
+  current: Ledger;
+  loadTurn: (target: TurnTarget) => void;
+} {
   const utils = api.useUtils();
   const [ledger, setLedger] = useState<Ledger>(() => ({
     key,
@@ -451,10 +448,7 @@ export function useSessionScrollback({
   const opened = useOpenedTurn({
     traceId,
     timestamp:
-      turns[openedIndex]?.timestamp ??
-      occurredAtMs ??
-      openedTranscript[0]?.atMs ??
-      0,
+      turns[openedIndex]?.timestamp ?? occurredAtMs ?? openedTranscript[0]?.atMs ?? 0,
     entries: openedTranscript,
     toolSpans: openedToolSpans,
   });
@@ -489,13 +483,6 @@ export function useSessionScrollback({
       sessionStartAtMs,
       loadEarlier,
     }),
-    [
-      merged,
-      status,
-      earlierCount,
-      earlierTotals,
-      sessionStartAtMs,
-      loadEarlier,
-    ],
+    [merged, status, earlierCount, earlierTotals, sessionStartAtMs, loadEarlier],
   );
 }

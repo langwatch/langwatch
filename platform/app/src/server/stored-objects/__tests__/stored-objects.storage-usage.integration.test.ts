@@ -42,8 +42,7 @@ vi.mock("~/server/app-layer/app", async () => {
   const app = () => ({
     clickhouse: {
       enabled: true,
-      resolveClient: (tenantId: string) =>
-        clients.getClickHouseClientForTenant(tenantId),
+      resolveClient: (tenantId: string) => clients.getClickHouseClientForTenant(tenantId),
       resolveOrganizationClient: async () => {
         throw new Error("no organization client in this suite");
       },
@@ -85,9 +84,7 @@ beforeAll(async () => {
   const client = getTestClickHouseClient();
   if (!client) throw new Error("ClickHouse test container not available");
   ch = client;
-  vi.mocked(
-    clickhouseClientModule.getClickHouseClientForTenant,
-  ).mockResolvedValue(ch);
+  vi.mocked(clickhouseClientModule.getClickHouseClientForTenant).mockResolvedValue(ch);
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "so-usage-int-"));
 }, 120_000);
 

@@ -86,12 +86,7 @@ export function LangyBriefing({
   status?: ReactNode;
 }) {
   return (
-    <LangyPanelSurface
-      accent
-      fill
-      borderRadius="14px"
-      padding={{ base: 4, md: 4 }}
-    >
+    <LangyPanelSurface accent fill borderRadius="14px" padding={{ base: 4, md: 4 }}>
       <VStack align="stretch" gap={3} flex={1} minHeight={0}>
         <HStack justify="space-between" align="center" gap={3} wrap="wrap">
           {/* The sheet is LANGWATCH's read of the project — Langy is the AI you
@@ -304,9 +299,7 @@ export function LangyBriefing({
             render only when their handlers do — without Langy the sheet
             closes on the status figures (or the session link) instead of a
             row of buttons that would open a panel that never mounts. */}
-        {onAsk ||
-        (onAskSubmit && data.suggestions?.length) ||
-        data.sessionHref ? (
+        {onAsk || (onAskSubmit && data.suggestions?.length) || data.sessionHref ? (
           <HStack
             justify="space-between"
             align="center"
@@ -467,13 +460,7 @@ function ReceiptRow({
           marginTop="-1px"
           background={RECEIPT_DOT[receipt.severity]}
         />
-        <Text
-          fontSize="13px"
-          color="fg.muted"
-          flex={1}
-          minWidth={0}
-          lineHeight="1.5"
-        >
+        <Text fontSize="13px" color="fg.muted" flex={1} minWidth={0} lineHeight="1.5">
           {receipt.subject ? (
             <Text
               as="span"
@@ -570,21 +557,10 @@ function ScenarioRow({ bar }: { bar: ScenarioBar }) {
       display="grid"
       gridTemplateColumns={{ base: "1fr", md: "minmax(0, 200px) 1fr 92px" }}
     >
-      <Text
-        fontFamily="mono"
-        fontSize="12px"
-        color="fg.muted"
-        lineClamp={1}
-        minWidth={0}
-      >
+      <Text fontFamily="mono" fontSize="12px" color="fg.muted" lineClamp={1} minWidth={0}>
         {bar.label}
       </Text>
-      <Box
-        height="8px"
-        borderRadius="5px"
-        background="langy.barTrack"
-        overflow="hidden"
-      >
+      <Box height="8px" borderRadius="5px" background="langy.barTrack" overflow="hidden">
         <Box
           height="full"
           width={`${Math.max(4, Math.min(100, bar.fillPct))}%`}

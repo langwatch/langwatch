@@ -50,15 +50,13 @@ export default function dynamic<P extends Record<string, any>>(
 
   // Wrap in Suspense so the lazy component doesn't bubble up to the root
   // Suspense boundary and flash the entire page gray while loading.
-  const DynamicWrapper = forwardRef<any, P>(
-    function DynamicWrapper(props, ref) {
-      return createElement(
-        Suspense,
-        { fallback },
-        createElement(LazyComponent as any, { ...props, ref }),
-      );
-    },
-  );
+  const DynamicWrapper = forwardRef<any, P>(function DynamicWrapper(props, ref) {
+    return createElement(
+      Suspense,
+      { fallback },
+      createElement(LazyComponent as any, { ...props, ref }),
+    );
+  });
   DynamicWrapper.displayName = `Dynamic(${(LazyComponent as any).displayName || "Component"})`;
   return DynamicWrapper as unknown as ComponentType<P>;
 }

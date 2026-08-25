@@ -37,8 +37,7 @@ class MemoryExperimentRepository implements ExperimentRepository {
   async tryFindById(input: { id: string; projectId: string }) {
     return (
       this.values.find(
-        (value) =>
-          value.id === input.id && value.projectId === input.projectId,
+        (value) => value.id === input.id && value.projectId === input.projectId,
       ) ?? null
     );
   }
@@ -68,15 +67,11 @@ class MemoryExperimentRepository implements ExperimentRepository {
   async tryFindLatest(input: { projectId: string }) {
     return (await this.findAll(input)).at(-1) ?? null;
   }
-  async tryFindForWorkflow(input: {
-    projectId: string;
-    workflowId: string;
-  }) {
+  async tryFindForWorkflow(input: { projectId: string; workflowId: string }) {
     return (
       this.values.find(
         (value) =>
-          value.projectId === input.projectId &&
-          value.workflowId === input.workflowId,
+          value.projectId === input.projectId && value.workflowId === input.workflowId,
       ) ?? null
     );
   }
@@ -91,8 +86,7 @@ class MemoryExperimentRepository implements ExperimentRepository {
     return this.values
       .filter(
         (value) =>
-          value.projectId === input.projectId &&
-          value.slug.startsWith(input.slugPrefix),
+          value.projectId === input.projectId && value.slug.startsWith(input.slugPrefix),
       )
       .map((value) => value.slug);
   }
@@ -140,13 +134,19 @@ class MemoryExperimentRepository implements ExperimentRepository {
 
 class MemoryExperimentRunRepository extends ExperimentRunRepository {
   values: Record<string, ExperimentRun[]> = {};
-  async list() { return this.values; }
-  async getAggregates() { return {}; }
+  async list() {
+    return this.values;
+  }
+  async getAggregates() {
+    return {};
+  }
   async getPage(input: { experimentId: string }) {
     const runs = this.values[input.experimentId] ?? [];
     return { runs, totalHits: runs.length };
   }
-  async tryGet() { return null; }
+  async tryGet() {
+    return null;
+  }
 }
 
 class MemoryExperimentExecutionPort extends ExperimentExecutionPort {
@@ -176,8 +176,7 @@ class MemoryExperimentDspyRepository extends ExperimentDspyRepository {
     return this.values
       .filter(
         (value) =>
-          value.tenantId === input.tenantId &&
-          value.experimentId === input.experimentId,
+          value.tenantId === input.tenantId && value.experimentId === input.experimentId,
       )
       .map((value) => ({
         tenantId: value.tenantId,
@@ -358,29 +357,35 @@ describe("ExperimentService", () => {
     await expect(
       service.archive({ projectId: "project_1", id: "experiment_1" }),
     ).resolves.toEqual({ success: true });
-    expect(await repository.tryGetRowState({
-      projectId: "project_1",
-      id: "experiment_1",
-    })).toMatchObject({ archived: true });
+    expect(
+      await repository.tryGetRowState({
+        projectId: "project_1",
+        id: "experiment_1",
+      }),
+    ).toMatchObject({ archived: true });
   });
 
   it("keeps slug resolution and run reads behind one Experiment capability", async () => {
     const { repository, runRepository, service } = build();
     repository.values.push(row());
-    runRepository.values.experiment_1 = [{
-      experimentId: "experiment_1",
-      runId: "run_1",
-      workflowVersion: null,
-      timestamps: { createdAt: 1, updatedAt: 1 },
-      summary: { evaluations: {} },
-    }];
+    runRepository.values.experiment_1 = [
+      {
+        experimentId: "experiment_1",
+        runId: "run_1",
+        workflowVersion: null,
+        timestamps: { createdAt: 1, updatedAt: 1 },
+        summary: { evaluations: {} },
+      },
+    ];
 
-    await expect(service.getRunsPageBySlug({
-      projectId: "project_1",
-      experimentSlug: "draft",
-      page: 1,
-      pageSize: 50,
-    })).resolves.toMatchObject({
+    await expect(
+      service.getRunsPageBySlug({
+        projectId: "project_1",
+        experimentSlug: "draft",
+        page: 1,
+        pageSize: 50,
+      }),
+    ).resolves.toMatchObject({
       experiment: { id: "experiment_1", slug: "draft" },
       totalHits: 1,
     });
@@ -388,11 +393,13 @@ describe("ExperimentService", () => {
 
   it("throws for a missing slug instead of returning a nullable page", async () => {
     const { service } = build();
-    await expect(service.getRunsPageBySlug({
-      projectId: "project_1",
-      experimentSlug: "missing",
-      page: 1,
-      pageSize: 50,
-    })).rejects.toBeInstanceOf(ExperimentNotFoundError);
+    await expect(
+      service.getRunsPageBySlug({
+        projectId: "project_1",
+        experimentSlug: "missing",
+        page: 1,
+        pageSize: 50,
+      }),
+    ).rejects.toBeInstanceOf(ExperimentNotFoundError);
   });
 });

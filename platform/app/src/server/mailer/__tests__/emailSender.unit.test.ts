@@ -83,8 +83,7 @@ describe("rfc2047EncodeHeader", () => {
         const original = "Héllo wörld — café ☕";
         const encoded = rfc2047EncodeHeader(original);
         // Extract all encoded-words and decode them
-        const words =
-          encoded.match(/=\?UTF-8\?B\?([A-Za-z0-9+/]+=*)\?=/g) ?? [];
+        const words = encoded.match(/=\?UTF-8\?B\?([A-Za-z0-9+/]+=*)\?=/g) ?? [];
         expect(words.length).toBeGreaterThan(0);
         const decoded = words
           .map((w) => {
@@ -136,9 +135,7 @@ describe("buildRawMimeMessage", () => {
           html: "<p>Hello</p>",
           attachments: [],
         });
-        const subjectLine = msg
-          .split("\r\n")
-          .find((l) => l.startsWith("Subject:"));
+        const subjectLine = msg.split("\r\n").find((l) => l.startsWith("Subject:"));
         expect(subjectLine).toBeDefined();
         // Must use encoded-word syntax
         expect(subjectLine).toMatch(/=\?UTF-8\?B\?/);
@@ -324,9 +321,7 @@ describe("buildRawMimeMessage", () => {
           ],
         });
 
-        expect(msg).toContain(
-          'Content-Disposition: attachment; filename="report.csv"',
-        );
+        expect(msg).toContain('Content-Disposition: attachment; filename="report.csv"');
         expect(msg).not.toContain("filename*=");
       });
     });
@@ -365,9 +360,7 @@ describe("sendEmail", () => {
         });
 
         const raw = capturedRawMessage();
-        const subjectLine = raw
-          .split("\r\n")
-          .find((l) => l.startsWith("Subject:"));
+        const subjectLine = raw.split("\r\n").find((l) => l.startsWith("Subject:"));
         expect(subjectLine).toBeDefined();
         expect(subjectLine).toMatch(/=\?UTF-8\?B\?/);
       });

@@ -21,11 +21,7 @@ const wins = (winner: string, loser: string, times: number) =>
     winner,
   }));
 
-const entry = (
-  variantId: string,
-  score: number,
-  scoreCI: [number, number] | null,
-) =>
+const entry = (variantId: string, score: number, scoreCI: [number, number] | null) =>
   ({
     variantId,
     wins: 5,
@@ -64,9 +60,7 @@ describe("computeLeaderboardVerdict — claims it must not make", () => {
         bootstrapSamples: 0,
       });
 
-      expect(leaderboard.entries.filter((e) => !e.isDegenerate)).toHaveLength(
-        1,
-      );
+      expect(leaderboard.entries.filter((e) => !e.isDegenerate)).toHaveLength(1);
 
       const verdict = computeLeaderboardVerdict(leaderboard);
 
@@ -116,10 +110,7 @@ describe("computeLeaderboardVerdict — claims it must not make", () => {
       // Every comparison against NaN is false, so the overlap test returned
       // false and its negation read "distinguishable" — yielding a confident
       // clear-winner beside an adequacy panel reporting zero separated pairs.
-      const leaderboard = board([
-        entry("a", 100, [NaN, NaN]),
-        entry("b", 10, [5, 15]),
-      ]);
+      const leaderboard = board([entry("a", 100, [NaN, NaN]), entry("b", 10, [5, 15])]);
 
       expect(computeLeaderboardVerdict(leaderboard).kind).toBe("tie-at-top");
     });
@@ -137,10 +128,7 @@ describe("computeLeaderboardVerdict — claims it must not make", () => {
   describe("given a genuinely separated field", () => {
     it("still reports a clear winner", () => {
       // The guard above must not swallow real results.
-      const leaderboard = board([
-        entry("a", 200, [150, 250]),
-        entry("b", 10, [-40, 40]),
-      ]);
+      const leaderboard = board([entry("a", 200, [150, 250]), entry("b", 10, [-40, 40])]);
 
       const verdict = computeLeaderboardVerdict(leaderboard);
       expect(verdict.kind).toBe("clear-winner");
@@ -259,9 +247,7 @@ describe("computeBTLeaderboard — evidence it must not invent", () => {
       });
 
       expect(leaderboard.winMatrix.a?.b).toBe(1);
-      expect(
-        leaderboard.entries.find((e) => e.variantId === "a")?.matchups,
-      ).toBe(1);
+      expect(leaderboard.entries.find((e) => e.variantId === "a")?.matchups).toBe(1);
     });
 
     it("applies the same guard on the bootstrap path", () => {

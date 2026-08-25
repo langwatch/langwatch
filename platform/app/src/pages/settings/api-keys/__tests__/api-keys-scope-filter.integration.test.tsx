@@ -15,13 +15,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeysSection } from "../ApiKeysSection";
@@ -351,9 +345,7 @@ describe("<ApiKeysSection /> scope filter", () => {
             screen.getByTestId("filter-scope-organization-acme corp"),
           ).toBeInTheDocument(),
         );
-        await user.click(
-          screen.getByTestId("filter-scope-organization-acme corp"),
-        );
+        await user.click(screen.getByTestId("filter-scope-organization-acme corp"));
 
         await waitFor(() => {
           expect(screen.getByText("Org-Level Key")).toBeInTheDocument();
@@ -378,9 +370,7 @@ describe("<ApiKeysSection /> scope filter", () => {
         );
         await user.click(screen.getByTestId("filter-more-scopes"));
         await waitFor(() =>
-          expect(
-            screen.getByTestId("filter-scope-team-team red"),
-          ).toBeInTheDocument(),
+          expect(screen.getByTestId("filter-scope-team-team red")).toBeInTheDocument(),
         );
         await user.click(screen.getByTestId("filter-scope-team-team red"));
 
@@ -393,9 +383,7 @@ describe("<ApiKeysSection /> scope filter", () => {
           expect(screen.getByText("Project Alpha Key")).toBeInTheDocument();
           // sibling team and its project are hidden
           expect(screen.queryByText("Team Blue Key")).not.toBeInTheDocument();
-          expect(
-            screen.queryByText("Project Beta Key"),
-          ).not.toBeInTheDocument();
+          expect(screen.queryByText("Project Beta Key")).not.toBeInTheDocument();
         });
       });
     });
@@ -416,9 +404,7 @@ describe("<ApiKeysSection /> scope filter", () => {
             screen.getByTestId("filter-scope-project-project alpha"),
           ).toBeInTheDocument(),
         );
-        await user.click(
-          screen.getByTestId("filter-scope-project-project alpha"),
-        );
+        await user.click(screen.getByTestId("filter-scope-project-project alpha"));
 
         await waitFor(() => {
           // org grandparent stays
@@ -428,9 +414,7 @@ describe("<ApiKeysSection /> scope filter", () => {
           // picked project stays
           expect(screen.getByText("Project Alpha Key")).toBeInTheDocument();
           // sibling project is hidden
-          expect(
-            screen.queryByText("Project Beta Key"),
-          ).not.toBeInTheDocument();
+          expect(screen.queryByText("Project Beta Key")).not.toBeInTheDocument();
           // unrelated team is hidden
           expect(screen.queryByText("Team Blue Key")).not.toBeInTheDocument();
         });
@@ -452,9 +436,7 @@ describe("<ApiKeysSection /> scope filter", () => {
         );
         await user.click(screen.getByTestId("filter-more-scopes"));
         await waitFor(() =>
-          expect(
-            screen.getByTestId("filter-scope-team-team red"),
-          ).toBeInTheDocument(),
+          expect(screen.getByTestId("filter-scope-team-team red")).toBeInTheDocument(),
         );
         await user.click(screen.getByTestId("filter-scope-team-team red"));
 
@@ -490,9 +472,7 @@ describe("<ApiKeysSection /> scope filter", () => {
             screen.getByTestId("filter-scope-project-project beta"),
           ).toBeInTheDocument(),
         );
-        await user.click(
-          screen.getByTestId("filter-scope-project-project beta"),
-        );
+        await user.click(screen.getByTestId("filter-scope-project-project beta"));
 
         await waitFor(() => {
           // PROJ_ALPHA_KEY has proj-1 binding only.

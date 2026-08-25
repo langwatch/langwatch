@@ -186,8 +186,7 @@ export async function maybeExtractSpanMedia({
 
   const resolved: EdgeMediaExtractionDeps = {
     isEnabled: deps?.isEnabled ?? defaultIsEnabled,
-    hasContentDropRules:
-      deps?.hasContentDropRules ?? defaultHasContentDropRules,
+    hasContentDropRules: deps?.hasContentDropRules ?? defaultHasContentDropRules,
     createService:
       deps?.createService ??
       ((projectId: string) => createStoredObjectsService({ projectId })),
@@ -250,13 +249,9 @@ export async function maybeExtractSpanMedia({
       if (budget.droppedByCap > 0)
         getEdgeMediaExtractFailOpenCounter("part_cap").inc(budget.droppedByCap);
       if (budget.droppedByDeadline > 0)
-        getEdgeMediaExtractFailOpenCounter("deadline").inc(
-          budget.droppedByDeadline,
-        );
+        getEdgeMediaExtractFailOpenCounter("deadline").inc(budget.droppedByDeadline);
       if (budget.failedParts > 0)
-        getEdgeMediaExtractFailOpenCounter("part_store").inc(
-          budget.failedParts,
-        );
+        getEdgeMediaExtractFailOpenCounter("part_store").inc(budget.failedParts);
       logger.warn(
         {
           projectId,

@@ -54,16 +54,26 @@ export class DataRetentionService extends DataRetentionServiceContract {
     });
   }
 
-  async getRetentionDays(input: { projectId: string; category: RetentionCategory }): Promise<number> {
-    return (await this.getResolvedForProject({ projectId: input.projectId }))[input.category];
+  async getRetentionDays(input: {
+    projectId: string;
+    category: RetentionCategory;
+  }): Promise<number> {
+    return (await this.getResolvedForProject({ projectId: input.projectId }))[
+      input.category
+    ];
   }
 
-  async previewScopeRemoval(input: { scope: ScopeAssignment }): Promise<ResolvedRetention> {
+  async previewScopeRemoval(input: {
+    scope: ScopeAssignment;
+  }): Promise<ResolvedRetention> {
     const resolvedScope = await this.resolveScope(input.scope);
     const rows = await this.repository.findAllInOrganization({
       organizationId: resolvedScope.organizationId,
     });
-    const remaining = rows.filter((row) => !(row.scopeType === input.scope.scopeType && row.scopeId === input.scope.scopeId));
+    const remaining = rows.filter(
+      (row) =>
+        !(row.scopeType === input.scope.scopeType && row.scopeId === input.scope.scopeId),
+    );
     return resolveRetention({
       rows: remaining,
       chain: resolvedScope.chain,
@@ -79,7 +89,11 @@ export class DataRetentionService extends DataRetentionServiceContract {
     return this.repository.tryFindById(input);
   }
 
-  async setForScope(input: { scope: ScopeAssignment; category: RetentionCategory; retentionDays: number }): Promise<RetentionPolicy> {
+  async setForScope(input: {
+    scope: ScopeAssignment;
+    category: RetentionCategory;
+    retentionDays: number;
+  }): Promise<RetentionPolicy> {
     const retentionDays = retentionDaysInputSchema.parse(input.retentionDays);
     const resolvedScope = await this.resolveScope(input.scope);
     const row = await this.repository.upsertForScope({
@@ -90,7 +104,10 @@ export class DataRetentionService extends DataRetentionServiceContract {
     return row;
   }
 
-  async removeForScope(input: { scope: ScopeAssignment; category: RetentionCategory }): Promise<void> {
+  async removeForScope(input: {
+    scope: ScopeAssignment;
+    category: RetentionCategory;
+  }): Promise<void> {
     await this.repository.deleteForScope(input);
   }
 
@@ -118,5 +135,4 @@ export class DataRetentionService extends DataRetentionServiceContract {
       }),
     };
   }
-
 }

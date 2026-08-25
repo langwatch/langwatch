@@ -1,12 +1,4 @@
-import {
-  Box,
-  Heading,
-  HStack,
-  Icon,
-  SimpleGrid,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Heading, HStack, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import type { IconType } from "react-icons";
 import {
   LuActivity,
@@ -42,17 +34,16 @@ interface KeyboardShortcutsHelpProps {
   groups?: ShortcutGroup[];
 }
 
-const TITLE_DEFAULTS: Record<string, { icon: IconType; accent: GroupAccent }> =
-  {
-    View: { icon: LuEye, accent: "blue" },
-    Visualisation: { icon: LuLayers, accent: "purple" },
-    Visualization: { icon: LuLayers, accent: "purple" },
-    Navigation: { icon: LuNavigation, accent: "teal" },
-    Actions: { icon: LuActivity, accent: "pink" },
-    Help: { icon: LuCircleHelp, accent: "amber" },
-    "Filter sidebar": { icon: LuFilter, accent: "pink" },
-    "Reorder sections": { icon: LuArrowUpDown, accent: "gray" },
-  };
+const TITLE_DEFAULTS: Record<string, { icon: IconType; accent: GroupAccent }> = {
+  View: { icon: LuEye, accent: "blue" },
+  Visualisation: { icon: LuLayers, accent: "purple" },
+  Visualization: { icon: LuLayers, accent: "purple" },
+  Navigation: { icon: LuNavigation, accent: "teal" },
+  Actions: { icon: LuActivity, accent: "pink" },
+  Help: { icon: LuCircleHelp, accent: "amber" },
+  "Filter sidebar": { icon: LuFilter, accent: "pink" },
+  "Reorder sections": { icon: LuArrowUpDown, accent: "gray" },
+};
 
 const DRAWER_GROUPS: ShortcutGroup[] = TRACE_DRAWER_HELP_GROUPS;
 
@@ -158,11 +149,7 @@ export function KeyboardShortcutsHelp({
                             {item.label}
                           </Text>
                           {item.detail ? (
-                            <Text
-                              textStyle="2xs"
-                              color="fg.muted"
-                              lineHeight="1.3"
-                            >
+                            <Text textStyle="2xs" color="fg.muted" lineHeight="1.3">
                               {item.detail}
                             </Text>
                           ) : null}

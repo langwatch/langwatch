@@ -91,7 +91,7 @@ const bodyOf = (call: number): Record<string, unknown> =>
   JSON.parse(initOf(call).body as string) as Record<string, unknown>;
 
 /** Reads an iterator to exhaustion and hands back every row it yielded. */
-const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {
+const drain = async <T>(rows: AsyncIterable<T>): Promise<T[]> => {
   const collected: T[] = [];
   for await (const row of rows) collected.push(row);
   return collected;
@@ -177,17 +177,13 @@ describe("WebhooksApiService", () => {
 
   describe("archive()", () => {
     it("retires the endpoint with a DELETE and returns nothing", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ data: { archived: true } }),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse({ data: { archived: true } }));
 
       const result = await new WebhooksApiService().archive("ep_1");
 
       expect(result).toBeUndefined();
       expect(initOf(0).method).toBe("DELETE");
-      expect(urlOf(0)).toBe(
-        "https://api.langwatch.test/api/webhooks/v1/endpoints/ep_1",
-      );
+      expect(urlOf(0)).toBe("https://api.langwatch.test/api/webhooks/v1/endpoints/ep_1");
     });
 
     it("raises when the endpoint is not the caller's to archive", async () => {
@@ -204,9 +200,9 @@ describe("WebhooksApiService", () => {
         ),
       );
 
-      await expect(
-        new WebhooksApiService().archive("ep_ghost"),
-      ).rejects.toThrow(/not found/i);
+      await expect(new WebhooksApiService().archive("ep_ghost")).rejects.toThrow(
+        /not found/i,
+      );
     });
   });
 
@@ -235,9 +231,7 @@ describe("WebhooksApiService", () => {
     });
 
     it("reads a server that sends no cursor at all as an exhausted page", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ data: [emittedEvent("evt_a")] }),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse({ data: [emittedEvent("evt_a")] }));
 
       const page = await new WebhooksApiService().eventsPage(WINDOW);
 
@@ -249,9 +243,7 @@ describe("WebhooksApiService", () => {
     it("yields events across pages and stops when the cursor comes back null", async () => {
       mockFetch
         .mockResolvedValueOnce(jsonResponse(eventsPage(["evt_a"], "cursor-1")))
-        .mockResolvedValueOnce(
-          jsonResponse(eventsPage(["evt_b", "evt_c"], null)),
-        );
+        .mockResolvedValueOnce(jsonResponse(eventsPage(["evt_b", "evt_c"], null)));
 
       const events = await drain(new WebhooksApiService().iterEvents(WINDOW));
 
@@ -293,9 +285,7 @@ describe("WebhooksApiService", () => {
 
   describe("getEvent()", () => {
     it("reads one envelope back by id", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ data: emittedEvent("evt_a") }),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse({ data: emittedEvent("evt_a") }));
 
       const event = await new WebhooksApiService().getEvent("evt a/1");
 
@@ -322,17 +312,13 @@ describe("WebhooksApiService", () => {
     });
 
     it("passes a caller's cursor back verbatim", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse(deliveriesPage(["dlv_c"], null)),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse(deliveriesPage(["dlv_c"], null)));
 
       await new WebhooksApiService().deliveriesPage("ep_1", {
         cursor: "1750000000000~dlv_b",
       });
 
-      expect(new URLSearchParams(queryOf(0)).get("cursor")).toBe(
-        "1750000000000~dlv_b",
-      );
+      expect(new URLSearchParams(queryOf(0)).get("cursor")).toBe("1750000000000~dlv_b");
     });
   });
 
@@ -344,9 +330,7 @@ describe("WebhooksApiService", () => {
         )
         .mockResolvedValueOnce(jsonResponse(deliveriesPage(["dlv_c"], null)));
 
-      const deliveries = await drain(
-        new WebhooksApiService().iterDeliveries("ep_1"),
-      );
+      const deliveries = await drain(new WebhooksApiService().iterDeliveries("ep_1"));
 
       expect(deliveries.map((d) => d.id)).toEqual(["dlv_a", "dlv_b", "dlv_c"]);
       expect(mockFetch).toHaveBeenCalledTimes(2);

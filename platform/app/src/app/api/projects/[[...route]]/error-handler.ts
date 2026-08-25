@@ -12,8 +12,7 @@ export const handleProjectError = async (
   error: Error & { status?: ContentfulStatusCode },
   c: Context,
 ): Promise<Response> => {
-  const status =
-    error instanceof HttpError ? error.status : (error.status ?? 500);
+  const status = error instanceof HttpError ? error.status : (error.status ?? 500);
 
   logger.error(
     {

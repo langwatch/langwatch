@@ -5,10 +5,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 import type { Field } from "@langwatch/workflow-contract";
-import {
-  getInputsOutputs,
-  getMappingSurfaceInputs,
-} from "@langwatch/workflow-contract";
+import { getInputsOutputs, getMappingSurfaceInputs } from "@langwatch/workflow-contract";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -74,11 +71,7 @@ function buildWorkflow({
   return { nodes, edges };
 }
 
-function makeEdge(
-  identifier: string,
-  targetNodeId: string,
-  edgeIndex: number,
-): Edge {
+function makeEdge(identifier: string, targetNodeId: string, edgeIndex: number): Edge {
   return {
     id: `edge-${edgeIndex}`,
     source: "entry",

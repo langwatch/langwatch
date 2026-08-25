@@ -3,10 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { BugReport } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { app } from "~/server/routes/bug-reports";
-import {
-  BugReportRateLimitedError,
-  submitBugReport,
-} from "../bug-report.service";
+import { BugReportRateLimitedError, submitBugReport } from "../bug-report.service";
 
 /**
  * Integration tests for the bug-report intake, against the real
@@ -223,8 +220,7 @@ describe("bug reports intake", () => {
         const stored = await prisma.bugReport.findUnique({ where: { id } });
         expect(stored?.title).toBe(`${testNamespace} no slack configured`);
         const slackCalls = fetchSpy.mock.calls.filter((call) => {
-          const target =
-            call[0] instanceof Request ? call[0].url : String(call[0]);
+          const target = call[0] instanceof Request ? call[0].url : String(call[0]);
           let hostname: string;
           try {
             hostname = new URL(target).hostname;

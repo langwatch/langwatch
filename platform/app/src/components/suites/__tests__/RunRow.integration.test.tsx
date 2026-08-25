@@ -60,9 +60,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.queryByText(/Angry refund request/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/Angry refund request/)).not.toBeInTheDocument();
     });
   });
 
@@ -98,9 +96,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByText(/Prod Agent: Angry refund request/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Prod Agent: Angry refund request/)).toBeInTheDocument();
     });
 
     it("displays duration for finished runs in list view", () => {
@@ -309,9 +305,7 @@ describe("<RunRow/>", () => {
 
       const header = container.querySelector('[data-testid="run-row-header"]');
       expect(header).toBeInTheDocument();
-      const metrics = header?.querySelector(
-        '[data-testid="run-metrics-summary"]',
-      );
+      const metrics = header?.querySelector('[data-testid="run-metrics-summary"]');
       expect(metrics).toBeInTheDocument();
     });
   });
@@ -375,9 +369,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.queryByText("Checkout Flow, Login Flow"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Checkout Flow, Login Flow")).not.toBeInTheDocument();
     });
   });
 

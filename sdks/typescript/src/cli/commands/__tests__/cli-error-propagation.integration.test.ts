@@ -8,15 +8,7 @@
  *      at that server via env vars.
  *   3. Asserts on the CLI stdout/stderr the user would actually see.
  */
-import {
-  describe,
-  expect,
-  it,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
-} from "vitest";
+import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -174,9 +166,7 @@ describe("CLI surfaces meaningful error messages from the API", () => {
       const result = await runCli(["prompt", "sync"], testDir);
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toContain(
-        "handle already exists",
-      );
+      expect(result.combined.toLowerCase()).toContain("handle already exists");
       expect(result.combined.toLowerCase()).not.toContain(
         "failed to sync prompt: internal server error",
       );

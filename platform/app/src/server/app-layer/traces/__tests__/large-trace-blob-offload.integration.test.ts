@@ -195,9 +195,7 @@ function makeSpanReceivedEvent({ output }: { output: string }): Event {
         kind: 1,
         startTimeUnixNano: String(Date.now() * 1_000_000),
         endTimeUnixNano: String((Date.now() + 1000) * 1_000_000),
-        attributes: [
-          { key: "langwatch.output", value: { stringValue: output } },
-        ],
+        attributes: [{ key: "langwatch.output", value: { stringValue: output } }],
         events: [],
         links: [],
         status: { code: 1, message: null },
@@ -234,9 +232,7 @@ function extractSpanAttrs(event: Event): Record<string, string> {
  * Builds a NormalizedSpan from a span attributes map, simulating what the
  * projection receives from the command worker after leanForProjection.
  */
-function makeNormalizedSpan(
-  spanAttributes: Record<string, string>,
-): NormalizedSpan {
+function makeNormalizedSpan(spanAttributes: Record<string, string>): NormalizedSpan {
   return {
     id: SPAN_ID,
     traceId: TRACE_ID,
@@ -341,9 +337,7 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
 
     it("the reserved eventref attribute is stripped from the returned span attributes", () => {
       const attrs = resolvedResult.resolvedSpans[0]?.spanAttributes ?? {};
-      const hasRef = Object.keys(attrs).some((k) =>
-        k.startsWith(EVENTREF_ATTR_PREFIX),
-      );
+      const hasRef = Object.keys(attrs).some((k) => k.startsWith(EVENTREF_ATTR_PREFIX));
       expect(hasRef).toBe(false);
     });
 
@@ -432,9 +426,9 @@ describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-thresh
       expect(result.anyResolved).toBe(false);
 
       // Full value preserved
-      expect(
-        result.resolvedSpans[0]?.spanAttributes?.["langwatch.output"],
-      ).toBe(SMALL_OUTPUT);
+      expect(result.resolvedSpans[0]?.spanAttributes?.["langwatch.output"]).toBe(
+        SMALL_OUTPUT,
+      );
     });
   });
 });
@@ -488,13 +482,10 @@ describe("given the span was offloaded but the event_log row is missing on read 
         logger,
       });
 
-      const returnedValue =
-        result.resolvedSpans[0]?.spanAttributes?.["langwatch.output"];
+      const returnedValue = result.resolvedSpans[0]?.spanAttributes?.["langwatch.output"];
       expect(returnedValue).toBe(previewValue);
       // Preview is shorter than the original 1 MB value
-      expect((returnedValue as string).length).toBeLessThan(
-        ONE_MB_OUTPUT.length,
-      );
+      expect((returnedValue as string).length).toBeLessThan(ONE_MB_OUTPUT.length);
     });
 
     it("logs at warn level (not error or silent)", async () => {
@@ -557,12 +548,8 @@ describe("given a span whose serialized command payload exceeds COMMAND_INLINE_T
         name: "test-span",
         kind: 1,
         startTimeUnixNano: String(Date.now() * 1_000_000) as unknown as number,
-        endTimeUnixNano: String(
-          (Date.now() + 1000) * 1_000_000,
-        ) as unknown as number,
-        attributes: [
-          { key: "langwatch.output", value: { stringValue: LARGE_OUTPUT } },
-        ],
+        endTimeUnixNano: String((Date.now() + 1000) * 1_000_000) as unknown as number,
+        attributes: [{ key: "langwatch.output", value: { stringValue: LARGE_OUTPUT } }],
         events: [],
         links: [],
         status: { code: 1, message: null },

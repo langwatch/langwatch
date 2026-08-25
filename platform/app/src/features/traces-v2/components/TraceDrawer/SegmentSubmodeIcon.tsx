@@ -33,10 +33,7 @@ export function SegmentSubmodeIcon({
   tooltip,
 }: SegmentSubmodeIconProps) {
   return (
-    <Tooltip
-      content={tooltip ?? `${label} view`}
-      positioning={{ placement: "top" }}
-    >
+    <Tooltip content={tooltip ?? `${label} view`} positioning={{ placement: "top" }}>
       <Box
         as="button"
         onClick={(e: React.MouseEvent) => {
@@ -55,9 +52,7 @@ export function SegmentSubmodeIcon({
         cursor="pointer"
         transition="background 0.12s ease, color 0.12s ease"
         _hover={
-          active
-            ? { bg: "blue.solid/22" }
-            : { color: "blue.fg", bg: "blue.solid/8" }
+          active ? { bg: "blue.solid/22" } : { color: "blue.fg", bg: "blue.solid/8" }
         }
       >
         <Icon as={icon} boxSize={3} />

@@ -12,18 +12,12 @@ import {
 // Mirrors the server's deriveDefaultName. Kept here so the drawer can
 // pre-fill the input on open without an extra tRPC round trip.
 function humanizeProviderName(providerKey: string): string {
-  const def =
-    modelProvidersRegistry[providerKey as keyof typeof modelProvidersRegistry];
+  const def = modelProvidersRegistry[providerKey as keyof typeof modelProvidersRegistry];
   if (def?.name) return def.name;
-  return providerKey
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return providerKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-import {
-  computeInitialUseApiGateway,
-  useCredentialKeys,
-} from "./useCredentialKeys";
+import { computeInitialUseApiGateway, useCredentialKeys } from "./useCredentialKeys";
 import { useCustomModels } from "./useCustomModels";
 import { useDefaultProviderSelection } from "./useDefaultProviderSelection";
 import { type ExtraHeader, useExtraHeaders } from "./useExtraHeaders";
@@ -167,16 +161,14 @@ export function useModelProviderForm(
   // rows pre-fill with the humanized provider default so the input
   // never looks empty.
   const initialName =
-    (provider as { name?: string }).name ??
-    humanizeProviderName(provider.provider);
+    (provider as { name?: string }).name ?? humanizeProviderName(provider.provider);
   const [name, setName] = useState<string>(initialName);
 
   // Routing handle — stored lowercased, so the input shows what the gateway
   // will actually answer to rather than what was typed.
   const initialRoutingHandle =
     (provider as { routingHandle?: string | null }).routingHandle ?? "";
-  const [routingHandle, setRoutingHandle] =
-    useState<string>(initialRoutingHandle);
+  const [routingHandle, setRoutingHandle] = useState<string>(initialRoutingHandle);
 
   // Scope state — defaults to the stored provider's scope set when
   // editing. For brand-new providers we open at the widest scope the
@@ -212,25 +204,18 @@ export function useModelProviderForm(
 
   // Narrowest tier (PROJECT > TEAM > ORGANIZATION) — legacy consumers
   // that expected a single `scopeType` pick the most specific one.
-  const scopeType: ModelProviderScopeType = scopes.some(
-    (s) => s.scopeType === "PROJECT",
-  )
+  const scopeType: ModelProviderScopeType = scopes.some((s) => s.scopeType === "PROJECT")
     ? "PROJECT"
     : scopes.some((s) => s.scopeType === "TEAM")
       ? "TEAM"
       : (scopes[0]?.scopeType ?? defaultNewScope);
 
-  const scopeId =
-    scopes.find((s) => s.scopeType === scopeType)?.scopeId ?? undefined;
+  const scopeId = scopes.find((s) => s.scopeType === scopeType)?.scopeId ?? undefined;
 
   const setScopeType = useCallback(
     (next: ModelProviderScopeType) => {
       const nextId =
-        next === "ORGANIZATION"
-          ? organizationId
-          : next === "TEAM"
-            ? teamId
-            : projectId;
+        next === "ORGANIZATION" ? organizationId : next === "TEAM" ? teamId : projectId;
       if (!nextId) return;
       setScopes([{ scopeType: next, scopeId: nextId }]);
     },
@@ -261,8 +246,7 @@ export function useModelProviderForm(
       customEmbeddingsModels: customModelsHook.customEmbeddingsModels,
       useAsDefaultProvider: defaultProviderHook.useAsDefaultProvider,
       projectDefaultModel: defaultProviderHook.projectDefaultModel,
-      projectTopicClusteringModel:
-        defaultProviderHook.projectTopicClusteringModel,
+      projectTopicClusteringModel: defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
       name,
       routingHandle,
@@ -307,8 +291,7 @@ export function useModelProviderForm(
   // the real key.
   const isDirty = useMemo(() => {
     const initialName =
-      (provider as { name?: string }).name ??
-      humanizeProviderName(provider.provider);
+      (provider as { name?: string }).name ?? humanizeProviderName(provider.provider);
     if (name.trim() !== initialName.trim()) return true;
 
     const storedHandle =
@@ -332,9 +315,7 @@ export function useModelProviderForm(
       return true;
     }
 
-    if (
-      credentialKeysHook.useApiGateway !== computeInitialUseApiGateway(provider)
-    ) {
+    if (credentialKeysHook.useApiGateway !== computeInitialUseApiGateway(provider)) {
       return true;
     }
 
@@ -423,12 +404,9 @@ export function useModelProviderForm(
     defaultProviderHook.reset(provider, enabledProvidersCount);
     formSubmitHook.reset();
     setName(
-      (provider as { name?: string }).name ??
-        humanizeProviderName(provider.provider),
+      (provider as { name?: string }).name ?? humanizeProviderName(provider.provider),
     );
-    setRoutingHandle(
-      (provider as { routingHandle?: string | null }).routingHandle ?? "",
-    );
+    setRoutingHandle((provider as { routingHandle?: string | null }).routingHandle ?? "");
   }, [
     provider.provider,
     provider.id,
@@ -457,8 +435,7 @@ export function useModelProviderForm(
       customEmbeddingsModels: customModelsHook.customEmbeddingsModels,
       useAsDefaultProvider: defaultProviderHook.useAsDefaultProvider,
       projectDefaultModel: defaultProviderHook.projectDefaultModel,
-      projectTopicClusteringModel:
-        defaultProviderHook.projectTopicClusteringModel,
+      projectTopicClusteringModel: defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
       name,
       routingHandle,
@@ -488,8 +465,7 @@ export function useModelProviderForm(
       removeCustomEmbeddingsModel: customModelsHook.removeCustomEmbeddingsModel,
       setUseAsDefaultProvider: defaultProviderHook.setUseAsDefaultProvider,
       setProjectDefaultModel: defaultProviderHook.setProjectDefaultModel,
-      setProjectTopicClusteringModel:
-        defaultProviderHook.setProjectTopicClusteringModel,
+      setProjectTopicClusteringModel: defaultProviderHook.setProjectTopicClusteringModel,
       setProjectEmbeddingsModel: defaultProviderHook.setProjectEmbeddingsModel,
       setManaged: credentialKeysHook.setManaged,
       submit: formSubmitHook.submit,

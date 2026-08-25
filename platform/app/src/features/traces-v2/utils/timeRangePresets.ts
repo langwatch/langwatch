@@ -123,10 +123,7 @@ export function getPresetById(id: string): TimeRangePreset | undefined {
 
 const PRESET_MATCH_TOLERANCE_MS = MS_PER_MINUTE;
 
-export function matchPreset(range: {
-  from: number;
-  to: number;
-}): TimeRangePreset | null {
+export function matchPreset(range: { from: number; to: number }): TimeRangePreset | null {
   for (const preset of ALL_PRESETS) {
     const computed = preset.compute();
     if (

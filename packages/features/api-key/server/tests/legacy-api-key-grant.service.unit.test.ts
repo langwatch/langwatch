@@ -1,8 +1,5 @@
 import type { ApiKey } from "@langwatch/api-key-contract";
-import type {
-  AuthzGrantsService,
-  AuthzService,
-} from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ApiKeyDiagnosticsPort } from "../src/ports/api-key-diagnostics.port";
 import {
@@ -48,17 +45,18 @@ class RecordingDiagnostics extends ApiKeyDiagnosticsPort {
   }
 }
 
-function harness(options: {
-  cutoverAt?: Date | null;
-  now?: () => number;
-  attachBindings?: ReturnType<typeof vi.fn>;
-} = {}) {
+function harness(
+  options: {
+    cutoverAt?: Date | null;
+    now?: () => number;
+    attachBindings?: ReturnType<typeof vi.fn>;
+  } = {},
+) {
   const tryGetEngineCutoverAt = vi
     .fn()
     .mockResolvedValue(options.cutoverAt === undefined ? CUTOVER_AT : options.cutoverAt);
   const attachBindings =
-    options.attachBindings ??
-    vi.fn().mockResolvedValue({ attached: [], duplicates: [] });
+    options.attachBindings ?? vi.fn().mockResolvedValue({ attached: [], duplicates: [] });
   const diagnostics = new RecordingDiagnostics();
   const service = LegacyApiKeyGrantService.create({
     authz: { tryGetEngineCutoverAt } as unknown as AuthzService,
@@ -132,7 +130,10 @@ describe("LegacyApiKeyGrantService", () => {
 
   it.each([
     ["created at cutover", apiKey({ createdAt: CUTOVER_AT })],
-    ["already bound", apiKey({ roleBindings: [{ id: "binding-1" }] as ApiKey["roleBindings"] })],
+    [
+      "already bound",
+      apiKey({ roleBindings: [{ id: "binding-1" }] as ApiKey["roleBindings"] }),
+    ],
     ["user owned", apiKey({ userId: "user-1" })],
     ["ingestion", apiKey({ ingestSourceType: "claude_code" })],
   ])("does not widen a %s key", async (_label, key) => {
@@ -161,9 +162,9 @@ describe("LegacyApiKeyGrantService", () => {
 
 describe("legacy API-key grant facts", () => {
   it("uses a strict before-cutover boundary", () => {
-    expect(
-      keyPredatesAuthzEngine({ apiKey: apiKey(), cutoverAt: CUTOVER_AT }),
-    ).toBe(true);
+    expect(keyPredatesAuthzEngine({ apiKey: apiKey(), cutoverAt: CUTOVER_AT })).toBe(
+      true,
+    );
     expect(
       keyPredatesAuthzEngine({
         apiKey: apiKey({ createdAt: CUTOVER_AT }),
@@ -174,9 +175,7 @@ describe("legacy API-key grant facts", () => {
 
   it("derives a stable identity from the fact", () => {
     const derive = vi.fn(() => "grant-derived");
-    expect(legacyGrantForApiKey(apiKey(), derive)?.bindingId).toBe(
-      "grant-derived",
-    );
+    expect(legacyGrantForApiKey(apiKey(), derive)?.bindingId).toBe("grant-derived");
     expect(derive).toHaveBeenCalledWith({
       organizationId: "org-1",
       principal: { type: "apiKey", id: "key-1" },

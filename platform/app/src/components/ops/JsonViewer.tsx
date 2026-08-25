@@ -7,11 +7,7 @@ interface JsonViewerProps {
   maxHeight?: string;
 }
 
-function findChangedPaths(
-  prev: unknown,
-  curr: unknown,
-  path = "",
-): Set<string> {
+function findChangedPaths(prev: unknown, curr: unknown, path = ""): Set<string> {
   const changed = new Set<string>();
 
   if (prev === curr) return changed;
@@ -70,10 +66,7 @@ function findChangedPaths(
   return changed;
 }
 
-function isPathOrAncestorChanged(
-  path: string,
-  changedPaths: Set<string>,
-): boolean {
+function isPathOrAncestorChanged(path: string, changedPaths: Set<string>): boolean {
   if (changedPaths.has(path)) return true;
   for (const changed of changedPaths) {
     if (changed.startsWith(path + ".") || changed.startsWith(path + "[")) {
@@ -95,12 +88,7 @@ function renderValue(
 ): React.ReactNode[] {
   if (value === null) {
     return [
-      <TokenSpan
-        key={path}
-        color="red.400"
-        path={path}
-        changedPaths={ctx.changedPaths}
-      >
+      <TokenSpan key={path} color="red.400" path={path} changedPaths={ctx.changedPaths}>
         null
       </TokenSpan>,
     ];
@@ -133,15 +121,9 @@ function renderValue(
   }
 
   if (typeof value === "string") {
-    const display =
-      value.length > 200 ? `"${value.slice(0, 200)}..."` : `"${value}"`;
+    const display = value.length > 200 ? `"${value.slice(0, 200)}..."` : `"${value}"`;
     return [
-      <TokenSpan
-        key={path}
-        color="green.400"
-        path={path}
-        changedPaths={ctx.changedPaths}
-      >
+      <TokenSpan key={path} color="green.400" path={path} changedPaths={ctx.changedPaths}>
         {display}
       </TokenSpan>,
     ];
@@ -252,12 +234,7 @@ function renderValue(
   }
 
   return [
-    <TokenSpan
-      key={path}
-      color="fg.muted"
-      path={path}
-      changedPaths={ctx.changedPaths}
-    >
+    <TokenSpan key={path} color="fg.muted" path={path} changedPaths={ctx.changedPaths}>
       {String(value)}
     </TokenSpan>,
   ];

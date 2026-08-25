@@ -214,8 +214,7 @@ function RegistryRowComponent<TRow>({
     >
       {visibleCells.map((cell, i) => {
         const isSelectCell = cell.column.id === SELECT_COLUMN_ID;
-        const isEvalsRowSpanCell =
-          evalsRowSpansIntoIOPreview && i === evalsCellIdx;
+        const isEvalsRowSpanCell = evalsRowSpansIntoIOPreview && i === evalsCellIdx;
         const meta = cell.column.columnDef.meta as ColumnMeta | undefined;
         return (
           <Td
@@ -251,9 +250,7 @@ function RegistryRowComponent<TRow>({
             // Top border only paints when this row leads a consecutive
             // error run, so the red bracket closes the run on both
             // sides instead of being open on top.
-            borderBottomWidth={
-              isEvalsRowSpanCell ? "1px" : hasAddons ? undefined : "1px"
-            }
+            borderBottomWidth={isEvalsRowSpanCell ? "1px" : hasAddons ? undefined : "1px"}
             borderBottomColor={
               isEvalsRowSpanCell
                 ? style.bottomSeparatorColor
@@ -262,9 +259,7 @@ function RegistryRowComponent<TRow>({
                   : style.bottomSeparatorColor
             }
             borderTopWidth={isFirstOfErrorRun ? "1px" : undefined}
-            borderTopColor={
-              isFirstOfErrorRun ? style.bottomSeparatorColor : undefined
-            }
+            borderTopColor={isFirstOfErrorRun ? style.bottomSeparatorColor : undefined}
             // Select cells own their full padding so clicks anywhere inside
             // the cell (including the edge padding) hit the checkbox Box,
             // not the Td. The Box stops propagation so the row's
@@ -296,11 +291,7 @@ function RegistryRowComponent<TRow>({
               isSelectCell ? (
                 <SkeletonSelectCell />
               ) : (
-                <SkeletonCellContent
-                  meta={meta}
-                  rowIdx={skeletonRowIdx}
-                  colIdx={i}
-                />
+                <SkeletonCellContent meta={meta} rowIdx={skeletonRowIdx} colIdx={i} />
               )
             ) : (
               pickCell(registry, cell.column.id, densityMode, {
@@ -357,8 +348,7 @@ function RegistryRowComponent<TRow>({
           // share its row with rowspan-claimed main-row cells. Passing
           // an empty list keeps those addons on their existing
           // single-TD layout.
-          rowSpanClaimedIndices:
-            addon.id === "io-preview" ? rowSpanClaimedIndices : [],
+          rowSpanClaimedIndices: addon.id === "io-preview" ? rowSpanClaimedIndices : [],
         })}
       </React.Fragment>
     ))

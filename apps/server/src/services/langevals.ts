@@ -29,7 +29,8 @@ export async function startLangevals(
       command: uvBin,
       args: [
         "run",
-        "--project", projectDir,
+        "--project",
+        projectDir,
         "--no-sync",
         "python",
         join("langevals", "server.py"),

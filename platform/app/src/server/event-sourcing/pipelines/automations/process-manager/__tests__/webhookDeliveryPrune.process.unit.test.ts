@@ -78,9 +78,7 @@ describe("webhook delivery prune process", () => {
     describe("when the outbox retention delete fails", () => {
       it("still completes the prune without throwing", async () => {
         const pruneExpired = vi.fn().mockResolvedValue(3);
-        const deleteDispatchedBefore = vi
-          .fn()
-          .mockRejectedValue(new Error("boom"));
+        const deleteDispatchedBefore = vi.fn().mockRejectedValue(new Error("boom"));
         const definition = automationProcessDefinition({
           name: "webhookDeliveryPrune",
           deps: {

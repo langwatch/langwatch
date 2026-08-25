@@ -40,15 +40,15 @@ describe("metric-translator", () => {
     });
 
     it("includes key in alias when provided", () => {
-      expect(
-        buildMetricAlias(1, "evaluations.evaluation_score", "avg", "eval-123"),
-      ).toBe("1__evaluations_evaluation_score__avg__eval_123");
+      expect(buildMetricAlias(1, "evaluations.evaluation_score", "avg", "eval-123")).toBe(
+        "1__evaluations_evaluation_score__avg__eval_123",
+      );
     });
 
     it("includes both key and subkey in alias", () => {
-      expect(
-        buildMetricAlias(2, "events.event_score", "avg", "thumbs_up", "vote"),
-      ).toBe("2__events_event_score__avg__thumbs_up__vote");
+      expect(buildMetricAlias(2, "events.event_score", "avg", "thumbs_up", "vote")).toBe(
+        "2__events_event_score__avg__thumbs_up__vote",
+      );
     });
 
     it("sanitizes special characters in key and subkey", () => {
@@ -71,9 +71,7 @@ describe("metric-translator", () => {
         const result = translateMetric("metadata.user_id", "cardinality", 0);
         // Uses uniqIf to filter out empty user_ids to match ES behavior
         expect(result.selectExpression).toContain("uniqIf(");
-        expect(result.selectExpression).toContain(
-          "Attributes['langwatch.user_id']",
-        );
+        expect(result.selectExpression).toContain("Attributes['langwatch.user_id']");
         expect(result.requiredJoins).toHaveLength(0);
       });
 
@@ -81,9 +79,7 @@ describe("metric-translator", () => {
         const result = translateMetric("metadata.thread_id", "cardinality", 0);
         // Uses uniqIf to filter out empty thread_ids to match ES behavior
         expect(result.selectExpression).toContain("uniqIf(");
-        expect(result.selectExpression).toContain(
-          "Attributes['gen_ai.conversation.id']",
-        );
+        expect(result.selectExpression).toContain("Attributes['gen_ai.conversation.id']");
       });
 
       describe("metadata.span_type", () => {
@@ -92,11 +88,7 @@ describe("metric-translator", () => {
         // incorrectly required, causing fan-out that inflated trace-level SUM metrics
         // (TotalCost, TotalTokens) when combined in the same query.
         it("does not require stored_spans JOIN for cardinality aggregation", () => {
-          const result = translateMetric(
-            "metadata.span_type",
-            "cardinality",
-            0,
-          );
+          const result = translateMetric("metadata.span_type", "cardinality", 0);
           expect(result.selectExpression).toContain("uniq(");
           expect(result.selectExpression).toContain("ts.TraceId");
           expect(result.requiredJoins).not.toContain("stored_spans");
@@ -127,9 +119,7 @@ describe("metric-translator", () => {
         const result = translateMetric("performance.cost_billed", "sum", 0);
         expect(result.selectExpression).toContain("sum(");
         // billed = grand total minus the folded non-billed amount.
-        expect(result.selectExpression).toContain(
-          "coalesce(ts.TotalCost, 0) -",
-        );
+        expect(result.selectExpression).toContain("coalesce(ts.TotalCost, 0) -");
         // the non-billed amount prefers the folded column ...
         expect(result.selectExpression).toContain("ts.NonBilledCost");
         // ... falling back to the legacy boolean for pre-column rows.
@@ -159,28 +149,18 @@ describe("metric-translator", () => {
       });
 
       it("translates performance.tokens_per_second using pre-aggregated trace-level column", () => {
-        const result = translateMetric(
-          "performance.tokens_per_second",
-          "avg",
-          0,
-        );
+        const result = translateMetric("performance.tokens_per_second", "avg", 0);
         // Uses pre-aggregated TokensPerSecond from trace_summaries to avoid
         // reading SpanAttributes (Map column with large LLM text), which causes OOM.
         expect(result.selectExpression).toContain("TokensPerSecond");
         expect(result.selectExpression).not.toContain("stored_spans");
         expect(result.selectExpression).not.toContain("SpanAttributes");
-        expect(result.selectExpression).not.toContain(
-          "gen_ai.usage.output_tokens",
-        );
+        expect(result.selectExpression).not.toContain("gen_ai.usage.output_tokens");
         expect(result.requiredJoins).not.toContain("stored_spans");
       });
 
       it("translates performance.tokens_per_second with percentile aggregation using quantileTDigest", () => {
-        const result = translateMetric(
-          "performance.tokens_per_second",
-          "p95",
-          0,
-        );
+        const result = translateMetric("performance.tokens_per_second", "p95", 0);
         expect(result.selectExpression).toContain("quantileTDigest(0.95)");
         expect(result.selectExpression).toContain("TokensPerSecond");
         expect(result.requiredJoins).not.toContain("stored_spans");
@@ -193,11 +173,7 @@ describe("metric-translator", () => {
       });
 
       it("translates performance.cache_read_tokens from the reserved attribute key", () => {
-        const result = translateMetric(
-          "performance.cache_read_tokens",
-          "sum",
-          0,
-        );
+        const result = translateMetric("performance.cache_read_tokens", "sum", 0);
         expect(result.selectExpression).toContain(
           "Attributes['langwatch.reserved.cache_read_tokens']",
         );
@@ -205,22 +181,14 @@ describe("metric-translator", () => {
       });
 
       it("translates performance.cache_write_tokens from the reserved attribute key", () => {
-        const result = translateMetric(
-          "performance.cache_write_tokens",
-          "sum",
-          0,
-        );
+        const result = translateMetric("performance.cache_write_tokens", "sum", 0);
         expect(result.selectExpression).toContain(
           "Attributes['langwatch.reserved.cache_creation_tokens']",
         );
       });
 
       it("translates performance.total_processed_tokens as input+output+cache", () => {
-        const result = translateMetric(
-          "performance.total_processed_tokens",
-          "sum",
-          0,
-        );
+        const result = translateMetric("performance.total_processed_tokens", "sum", 0);
         expect(result.selectExpression).toContain("TotalPromptTokenCount");
         expect(result.selectExpression).toContain("TotalCompletionTokenCount");
         expect(result.selectExpression).toContain(
@@ -234,11 +202,7 @@ describe("metric-translator", () => {
 
     describe("evaluation metrics", () => {
       it("translates evaluations.evaluation_score and requires JOIN", () => {
-        const result = translateMetric(
-          "evaluations.evaluation_score",
-          "avg",
-          0,
-        );
+        const result = translateMetric("evaluations.evaluation_score", "avg", 0);
         expect(result.selectExpression).toContain("es.Score");
         expect(result.selectExpression).toContain("Status = 'processed'");
         expect(result.requiredJoins).toContain("evaluation_runs");
@@ -264,21 +228,13 @@ describe("metric-translator", () => {
       });
 
       it("translates evaluations.evaluation_pass_rate", () => {
-        const result = translateMetric(
-          "evaluations.evaluation_pass_rate",
-          "avg",
-          0,
-        );
+        const result = translateMetric("evaluations.evaluation_pass_rate", "avg", 0);
         expect(result.selectExpression).toContain("es.Passed");
         expect(result.requiredJoins).toContain("evaluation_runs");
       });
 
       it("translates evaluations.evaluation_runs", () => {
-        const result = translateMetric(
-          "evaluations.evaluation_runs",
-          "cardinality",
-          0,
-        );
+        const result = translateMetric("evaluations.evaluation_runs", "cardinality", 0);
         expect(result.selectExpression).toContain("uniqIf");
         expect(result.selectExpression).toContain("EvaluationId");
       });
@@ -299,9 +255,7 @@ describe("metric-translator", () => {
         );
         expect(result.selectExpression).toContain("countIf");
         // Should use parameterized query for event type (SQL injection prevention)
-        expect(result.selectExpression).toMatch(
-          /\{m_eventType_[a-f0-9]+:String\}/,
-        );
+        expect(result.selectExpression).toMatch(/\{m_eventType_[a-f0-9]+:String\}/);
         // Params should contain the event type value
         const paramKey = Object.keys(result.params).find((k) =>
           k.startsWith("m_eventType_"),
@@ -314,11 +268,7 @@ describe("metric-translator", () => {
     describe("sentiment metrics", () => {
       describe("when aggregation is cardinality", () => {
         it("counts traces with thumbs_up_down events using countIf", () => {
-          const result = translateMetric(
-            "sentiment.thumbs_up_down",
-            "cardinality",
-            0,
-          );
+          const result = translateMetric("sentiment.thumbs_up_down", "cardinality", 0);
           expect(result.selectExpression).toContain("countIf");
           expect(result.selectExpression).toMatch(
             /\{m_sentimentEventType_[a-f0-9]+:String\}/,
@@ -407,11 +357,7 @@ describe("metric-translator", () => {
 
     describe("threads metrics", () => {
       it("translates threads.average_duration_per_thread with subquery", () => {
-        const result = translateMetric(
-          "threads.average_duration_per_thread",
-          "avg",
-          0,
-        );
+        const result = translateMetric("threads.average_duration_per_thread", "avg", 0);
         expect(result.requiresSubquery).toBe(true);
         expect(result.subquery).toBeDefined();
         expect(result.subquery?.innerSelect).toContain("thread_id");
@@ -444,18 +390,10 @@ describe("metric-translator", () => {
       });
 
       it("uses correct aggregation for min/max", () => {
-        const minResult = translateMetric(
-          "performance.completion_time",
-          "min",
-          0,
-        );
+        const minResult = translateMetric("performance.completion_time", "min", 0);
         expect(minResult.selectExpression).toContain("min(");
 
-        const maxResult = translateMetric(
-          "performance.completion_time",
-          "max",
-          1,
-        );
+        const maxResult = translateMetric("performance.completion_time", "max", 1);
         expect(maxResult.selectExpression).toContain("max(");
       });
     });
@@ -471,9 +409,7 @@ describe("metric-translator", () => {
         0,
       );
       expect(result.requiresSubquery).toBe(true);
-      expect(result.subquery?.innerSelect).toContain(
-        "Attributes['langwatch.user_id']",
-      );
+      expect(result.subquery?.innerSelect).toContain("Attributes['langwatch.user_id']");
       expect(result.subquery?.innerGroupBy).toBe("pipeline_key");
       expect(result.subquery?.outerAggregation).toContain("avg(inner_value)");
     });
@@ -534,9 +470,7 @@ describe("metric-translator", () => {
       expect(result.requiresSubquery).toBe(true);
       expect(result.subquery).toBeDefined();
       expect(result.subquery?.nestedSubquery).toBeDefined();
-      expect(result.subquery?.nestedSubquery?.select).toContain(
-        "thread_duration",
-      );
+      expect(result.subquery?.nestedSubquery?.select).toContain("thread_duration");
       expect(result.subquery?.innerSelect).toContain("avg(thread_duration)");
       expect(result.selectExpression).toContain("avg(user_avg_duration)");
     });

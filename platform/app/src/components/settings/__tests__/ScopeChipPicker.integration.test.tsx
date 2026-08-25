@@ -8,13 +8,7 @@
  * the caller explicitly disallowed.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -173,9 +167,7 @@ describe("ScopeChipPicker single-select variant", () => {
           organizationId="org-1"
           organizationName="ACME Inc"
           personalScopes
-          value={[
-            { scopeType: "ORGANIZATION", scopeId: "org-1", personalOnly: true },
-          ]}
+          value={[{ scopeType: "ORGANIZATION", scopeId: "org-1", personalOnly: true }]}
           onChange={vi.fn()}
           showSummary={false}
         />,
@@ -271,16 +263,10 @@ describe("ScopeChipPicker search and team grouping", () => {
             within(group).queryByText(label) !== null &&
             within(group).queryByText(item) !== null,
         );
-      expect(groupHolding({ label: "QA Shared Team", item: "web-app" })).toBe(
-        true,
-      );
-      expect(
-        groupHolding({ label: "Platform Team", item: "billing-svc" }),
-      ).toBe(true);
+      expect(groupHolding({ label: "QA Shared Team", item: "web-app" })).toBe(true);
+      expect(groupHolding({ label: "Platform Team", item: "billing-svc" })).toBe(true);
       // A project whose team is not listed keeps the flat group.
-      expect(groupHolding({ label: "Projects", item: "orphan-app" })).toBe(
-        true,
-      );
+      expect(groupHolding({ label: "Projects", item: "orphan-app" })).toBe(true);
     });
   });
 
@@ -411,9 +397,7 @@ describe("ScopeChipPicker search and team grouping", () => {
           organizationId="org-1"
           organizationName="ACME Inc"
           availableTeams={teams}
-          availableProjects={[
-            { id: "p-web", name: "web-app", teamId: "t-acme" },
-          ]}
+          availableProjects={[{ id: "p-web", name: "web-app", teamId: "t-acme" }]}
         />,
       );
       await openDropdown();

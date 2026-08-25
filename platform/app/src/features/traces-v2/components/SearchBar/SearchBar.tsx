@@ -40,10 +40,7 @@ import {
   statusBorderColor,
 } from "./SearchBarIndicators";
 import { SyntaxHelpDrawerHost } from "./SyntaxHelpDrawer";
-import {
-  TokenValuePicker,
-  type TokenValuePickerAnchor,
-} from "./TokenValuePicker";
+import { TokenValuePicker, type TokenValuePickerAnchor } from "./TokenValuePicker";
 import { useAskLangyFromSearch } from "./useAskLangyFromSearch";
 import type { ValueResolver } from "./useFilterEditor";
 import { useFloatRect } from "./useFloatRect";
@@ -187,9 +184,7 @@ export const SearchBar: React.FC = () => {
   // SearchBar so the popover can portal into document.body and share
   // the same instance whether the click came from PlaceholderEditor or
   // the live ProseMirror editor.
-  const [tokenAnchor, setTokenAnchor] = useState<TokenValuePickerAnchor | null>(
-    null,
-  );
+  const [tokenAnchor, setTokenAnchor] = useState<TokenValuePickerAnchor | null>(null);
 
   const requestEditor = useCallback(() => setEditorMounted(true), []);
 
@@ -429,9 +424,7 @@ export const SearchBar: React.FC = () => {
             <AskAiButton
               label={askLabel}
               ariaLabel={langyRoutesAsk ? "Ask Langy" : undefined}
-              tooltip={
-                langyRoutesAsk ? "Ask Langy about these traces" : undefined
-              }
+              tooltip={langyRoutesAsk ? "Ask Langy about these traces" : undefined}
               onClick={langyRoutesAsk ? openLangyAsk : () => setAiMode(true)}
               needsProviderPrimer={askAiNeedsProviderPrimer}
               disabledReason={askAiSampleDisabledReason}
@@ -475,10 +468,7 @@ export const SearchBar: React.FC = () => {
                 editorFocused &&
                 !suggestionOpen &&
                 !askAiNeedsProviderPrimer && (
-                  <SearchSubmitHint
-                    anchorX={cursorAnchorX}
-                    askLabel={askLabel}
-                  />
+                  <SearchSubmitHint anchorX={cursorAnchorX} askLabel={askLabel} />
                 )}
             </Box>
 
@@ -488,15 +478,8 @@ export const SearchBar: React.FC = () => {
                 looking. Showing the badge *and* the banner would be
                 redundant and noisy. */}
             {status.kind !== "error" && <StatusBadge status={status} />}
-            {hasContent ? (
-              <ClearButton onClear={handleClear} />
-            ) : (
-              <Kbd>{"/"}</Kbd>
-            )}
-            <TokenValuePicker
-              anchor={tokenAnchor}
-              onClose={() => setTokenAnchor(null)}
-            />
+            {hasContent ? <ClearButton onClear={handleClear} /> : <Kbd>{"/"}</Kbd>}
+            <TokenValuePicker anchor={tokenAnchor} onClose={() => setTokenAnchor(null)} />
           </Flex>
           {/* Unified error banner — handles both parse errors and AI errors.
               AI error takes priority when both are present (AI mode is the
@@ -548,9 +531,7 @@ const UnifiedErrorBanner: React.FC<{
   // An AI failure's words come from the code-keyed registry via
   // `explainAnyError`, never from a sentence the server or the provider wrote.
   // A parse error is our own local copy and is rendered as-is.
-  const message = activeAiError
-    ? aiErrorMessage(activeAiError)
-    : activeParseError;
+  const message = activeAiError ? aiErrorMessage(activeAiError) : activeParseError;
   const handleDismiss = activeAiError ? onDismissAiError : onDismissParseError;
 
   return (
@@ -591,11 +572,7 @@ const UnifiedErrorBanner: React.FC<{
                   color="red.fg"
                   onClick={() => setExpanded((e) => !e)}
                 >
-                  {expanded ? (
-                    <ChevronUp size={12} />
-                  ) : (
-                    <ChevronDown size={12} />
-                  )}
+                  {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 </IconButton>
               )}
               <IconButton
@@ -621,8 +598,7 @@ const UnifiedErrorBanner: React.FC<{
 };
 
 const IS_MAC =
-  typeof navigator !== "undefined" &&
-  /Mac|iPhone|iPad/.test(navigator.platform);
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
 
 /**

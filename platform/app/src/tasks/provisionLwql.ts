@@ -93,9 +93,7 @@ async function planBackfillFromCurrentState({
     query: `SELECT DISTINCT ${KEY_MAP_COLUMNS.keyHash} FROM ${table}`,
     format: "JSONEachRow",
   });
-  const existingRows = (await existingResult.json()) as Array<
-    Record<string, string>
-  >;
+  const existingRows = (await existingResult.json()) as Array<Record<string, string>>;
   // `noUncheckedIndexedAccess` types the lookup as `string | undefined` even
   // though every row genuinely carries this column (it is the only thing the
   // query selects) — filtered, not defaulted, so a row that somehow lacked it
@@ -177,9 +175,7 @@ export default async function execute() {
   // The schema the tables actually live in (Prisma's `?schema=` URL
   // parameter), not a hardcoded `public` — the SaaS cloud deploys with
   // `schema=langwatch_db`, where `public."Annotation"` does not exist.
-  const postgresSchema = lwqlPostgresSchemaFromDatabaseUrl(
-    process.env.DATABASE_URL,
-  );
+  const postgresSchema = lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL);
 
   try {
     await runPostgresStatements(

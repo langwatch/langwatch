@@ -14,8 +14,7 @@ const CONTRACT_ARTIFACT = new RegExp(
 );
 const SERVER_ONLY_CONTRACT_ARTIFACT =
   /\.(?:adapter|api|mapper|migration|port|projection|repository|store)\.ts$/;
-const CONTRACT_ARTIFACT_SUFFIX =
-  /\.(?:commands|errors|events|queries|service)\.ts$/;
+const CONTRACT_ARTIFACT_SUFFIX = /\.(?:commands|errors|events|queries|service)\.ts$/;
 const SERVER_PATTERNS = [
   /^index\.ts$/,
   /^testing\.ts$/,
@@ -23,9 +22,7 @@ const SERVER_PATTERNS = [
   new RegExp(`^services/${NAME}\\.service\\.ts$`),
   new RegExp(`^ports/${NAME}\\.port\\.ts$`),
   new RegExp(`^repositories/${NAME}\\.repository\\.ts$`),
-  new RegExp(
-    `^repositories/(${NAME})/\\1\\.${NAME}\\.(?:mapper|repository)\\.ts$`,
-  ),
+  new RegExp(`^repositories/(${NAME})/\\1\\.${NAME}\\.(?:mapper|repository)\\.ts$`),
   new RegExp(`^stores/${NAME}\\.store\\.ts$`),
   new RegExp(`^stores/(${NAME})/\\1\\.${NAME}\\.store\\.ts$`),
   new RegExp(`^projections/${NAME}\\.projection\\.ts$`),
@@ -51,9 +48,7 @@ function violation(
 
 function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
-  const files = walkFiles(`${pkg.root}/src`, (path) =>
-    /\.[cm]?[jt]sx?$/.test(path),
-  );
+  const files = walkFiles(`${pkg.root}/src`, (path) => /\.[cm]?[jt]sx?$/.test(path));
   let serviceCount = 0;
 
   for (const file of files) {
@@ -110,9 +105,7 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
 
 function lintServer(pkg: ClassifiedPackage): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
-  const files = walkFiles(`${pkg.root}/src`, (path) =>
-    /\.[cm]?[jt]sx?$/.test(path),
-  );
+  const files = walkFiles(`${pkg.root}/src`, (path) => /\.[cm]?[jt]sx?$/.test(path));
   let serviceCount = 0;
 
   for (const file of files) {
@@ -152,12 +145,9 @@ function lintServer(pkg: ClassifiedPackage): ArchitectureViolation[] {
   return violations;
 }
 
-const PRIVATE_SERVER_EXPORT =
-  /(?:^|\/)(?:projections|repositories|stores)(?:\/|$)/;
+const PRIVATE_SERVER_EXPORT = /(?:^|\/)(?:projections|repositories|stores)(?:\/|$)/;
 
-function lintPrivateServerExports(
-  pkg: ClassifiedPackage,
-): ArchitectureViolation[] {
+function lintPrivateServerExports(pkg: ClassifiedPackage): ArchitectureViolation[] {
   const file = `${pkg.root}/src/index.ts`;
   if (!existsSync(file)) return [];
   const source = readFileSync(file, "utf8");
@@ -174,9 +164,7 @@ function lintPrivateServerExports(
     violations.push({
       policy: "private-runtime-export",
       file,
-      line:
-        sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
-          .line + 1,
+      line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
       specifier,
       message:
         "A feature server root cannot expose a repository, store, or projection implementation.",
@@ -213,10 +201,7 @@ function lintPrivateServerExports(
       add(statement, statement.moduleSpecifier.text);
       continue;
     }
-    if (
-      statement.exportClause &&
-      ts.isNamedExports(statement.exportClause)
-    ) {
+    if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
       for (const element of statement.exportClause.elements) {
         const local = element.propertyName?.text ?? element.name.text;
         if (privateImports.has(local)) add(element);
@@ -253,15 +238,10 @@ const QUALIFIED_ARTIFACTS = new Set([
   "store",
 ]);
 
-function claimsSubject(
-  candidate: string,
-  feature: string,
-  subject: string,
-): boolean {
+function claimsSubject(candidate: string, feature: string, subject: string): boolean {
   if (candidate === subject) return true;
   return (
-    candidate.startsWith(`${feature}-`) &&
-    candidate.slice(feature.length + 1) === subject
+    candidate.startsWith(`${feature}-`) && candidate.slice(feature.length + 1) === subject
   );
 }
 
@@ -269,11 +249,7 @@ function claimedSubjects(path: string): string[] {
   const filename = path.slice(path.lastIndexOf("/") + 1, -3);
   const parts = filename.split(".");
   const artifact = parts.at(-1);
-  if (
-    parts.length >= 3 &&
-    artifact &&
-    QUALIFIED_ARTIFACTS.has(artifact)
-  ) {
+  if (parts.length >= 3 && artifact && QUALIFIED_ARTIFACTS.has(artifact)) {
     return [parts.at(-2)!];
   }
   return parts.filter((part) => !ARTIFACT_PARTS.has(part));
@@ -304,7 +280,11 @@ function lintOwnedSubjects(
   for (const file of files) {
     const path = workspacePath(`${pkg.root}/src`, file);
     if (path === "index.ts") continue;
-    if (!/\.(?:adapter|commands|errors|events|intent|process|projection|queries|repository|service|store|subscriber)\.tsx?$/.test(path)) {
+    if (
+      !/\.(?:adapter|commands|errors|events|intent|process|projection|queries|repository|service|store|subscriber)\.tsx?$/.test(
+        path,
+      )
+    ) {
       continue;
     }
     const candidates = claimedSubjects(path);

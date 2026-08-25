@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  createNotificationCommandSchema,
-  notificationSchema,
-} from "../src/index";
+import { createNotificationCommandSchema, notificationSchema } from "../src/index";
 
 describe("Notification contract", () => {
   it("accepts the persisted notification shape", () => {

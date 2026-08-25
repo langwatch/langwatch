@@ -25,27 +25,27 @@
  */
 
 @supports (animation-timeline: scroll()) {
-	@media (prefers-reduced-motion: no-preference) {
-		/* The first thing that happens on the way down, not something the reader
+  @media (prefers-reduced-motion: no-preference) {
+    /* The first thing that happens on the way down, not something the reader
        watches: a short range, and then it is gone. */
-		.langy-home-greeting {
-			animation: langy-home-greeting-leave linear both;
-			animation-timeline: scroll(nearest block);
-			animation-range: 0px 260px;
-		}
-	}
+    .langy-home-greeting {
+      animation: langy-home-greeting-leave linear both;
+      animation-timeline: scroll(nearest block);
+      animation-range: 0px 260px;
+    }
+  }
 }
 
 @keyframes langy-home-greeting-leave {
-	from {
-		transform: translateY(0);
-		opacity: 1;
-	}
-	to {
-		/* Positive Y against a page moving up: the line falls behind, which is
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    /* Positive Y against a page moving up: the line falls behind, which is
        what reads as parallax. Small — enough to feel, not enough to look
        detached from the field under it. */
-		transform: translateY(34px);
-		opacity: 0;
-	}
+    transform: translateY(34px);
+    opacity: 0;
+  }
 }

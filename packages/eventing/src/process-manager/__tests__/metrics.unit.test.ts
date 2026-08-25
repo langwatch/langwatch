@@ -23,9 +23,7 @@ describe("process-manager fleet gauges", () => {
       expect(scraped).toContain(
         'pm_instances_overdue_wakes{process_name="automations"} 2',
       );
-      expect(scraped).toContain(
-        'pm_outbox_lapsed_leases{process_name="automations"} 1',
-      );
+      expect(scraped).toContain('pm_outbox_lapsed_leases{process_name="automations"} 1');
       // The per-pod-global trap is stated on the metric itself, where the
       // person building the alert will actually read it.
       expect(scraped).toMatch(/pm_outbox_dead.*aggregate with max\(\)/);

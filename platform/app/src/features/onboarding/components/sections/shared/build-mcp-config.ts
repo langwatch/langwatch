@@ -17,11 +17,7 @@ interface BuildMcpInput {
  * Builds the MCP server config object for LangWatch.
  * Includes the self-hosted endpoint only when it differs from the cloud default.
  */
-export function buildMcpConfig({
-  apiKey,
-  endpoint,
-  projectId,
-}: BuildMcpInput): object {
+export function buildMcpConfig({ apiKey, endpoint, projectId }: BuildMcpInput): object {
   const env: Record<string, string> = {
     LANGWATCH_API_KEY: apiKey,
   };
@@ -58,11 +54,7 @@ export function buildMcpJson(input: BuildMcpInput): string {
  * the user-actionable lines in the MCP config preview.
  */
 export function findLangwatchEnvLines(json: string): number[] {
-  const KEYS = [
-    "LANGWATCH_API_KEY",
-    "LANGWATCH_PROJECT_ID",
-    "LANGWATCH_ENDPOINT",
-  ];
+  const KEYS = ["LANGWATCH_API_KEY", "LANGWATCH_PROJECT_ID", "LANGWATCH_ENDPOINT"];
   const out: number[] = [];
   json.split("\n").forEach((line, idx) => {
     if (KEYS.some((k) => line.includes(k))) out.push(idx + 1);

@@ -225,9 +225,7 @@ describe("collectMediaRefs", () => {
       const refs = collectMediaRefs([
         {
           role: "narrator",
-          content: [
-            { type: "image_url", image_url: { url: "/api/files/p1/odd" } },
-          ],
+          content: [{ type: "image_url", image_url: { url: "/api/files/p1/odd" } }],
         },
         { type: "image_url", image_url: { url: "/api/files/p1/bare" } },
       ]);
@@ -274,10 +272,7 @@ describe("mediaRefBelongsToSide", () => {
     it("keeps a system or tool part on the input side", () => {
       for (const role of ["system", "tool", "developer", "function"] as const) {
         expect(
-          mediaRefBelongsToSide(
-            { kind: "image", url: "/api/files/p1/x", role },
-            "input",
-          ),
+          mediaRefBelongsToSide({ kind: "image", url: "/api/files/p1/x", role }, "input"),
         ).toBe(true);
       }
     });
@@ -350,9 +345,7 @@ describe("serializeMediaRefs and parseMediaRefs", () => {
     const value = [
       {
         role: "user",
-        content: [
-          { type: "image_url", image_url: { url: "/api/files/p1/i1" } },
-        ],
+        content: [{ type: "image_url", image_url: { url: "/api/files/p1/i1" } }],
       },
     ];
     const serialized = serializeMediaRefs(value);
@@ -377,9 +370,7 @@ describe("serializeMediaRefs and parseMediaRefs", () => {
     const serialized = serializeMediaRefs([
       {
         role: "assistant",
-        content: [
-          { type: "image_url", image_url: { url: "/api/files/p1/i1" } },
-        ],
+        content: [{ type: "image_url", image_url: { url: "/api/files/p1/i1" } }],
       },
     ]);
     expect(parseMediaRefs(serialized)).toEqual([
@@ -387,9 +378,7 @@ describe("serializeMediaRefs and parseMediaRefs", () => {
     ]);
 
     expect(
-      parseMediaRefs(
-        `[{"kind":"image","url":"/api/files/p1/i1","role":"nope"}]`,
-      ),
+      parseMediaRefs(`[{"kind":"image","url":"/api/files/p1/i1","role":"nope"}]`),
     ).toEqual([{ kind: "image", url: "/api/files/p1/i1" }]);
   });
 

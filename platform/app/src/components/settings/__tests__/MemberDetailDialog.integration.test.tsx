@@ -16,10 +16,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-} from "~/generated/prisma/client";
+import { OrganizationUserRole, RoleBindingScopeType } from "~/generated/prisma/client";
 import type { PendingBinding } from "../GroupBindingInputRow";
 
 const {
@@ -124,9 +121,9 @@ vi.mock("../OrganizationUserRoleField", () => ({
 }));
 
 vi.mock("../GroupBindingInputRow", async () => {
-  const actual = await vi.importActual<
-    typeof import("../GroupBindingInputRow")
-  >("../GroupBindingInputRow");
+  const actual = await vi.importActual<typeof import("../GroupBindingInputRow")>(
+    "../GroupBindingInputRow",
+  );
   const React = await vi.importActual<typeof import("react")>("react");
 
   const STUB_BINDING: PendingBinding = {
@@ -264,18 +261,14 @@ describe("<MemberDetailDialog/>", () => {
 
     it("does not show the self-guard message", () => {
       renderDialog();
-      expect(
-        screen.queryByText(/cannot change your own organization role/i),
-      ).toBeNull();
+      expect(screen.queryByText(/cannot change your own organization role/i)).toBeNull();
     });
   });
 
   describe("when the current user is viewing their own record", () => {
     it("shows the self-guard message instead of the role field", () => {
       renderDialog({ isCurrentUser: true });
-      expect(
-        screen.getByText(/cannot change your own organization role/i),
-      ).toBeTruthy();
+      expect(screen.getByText(/cannot change your own organization role/i)).toBeTruthy();
       expect(screen.queryByTestId("org-role-field")).toBeNull();
     });
   });
@@ -514,9 +507,9 @@ describe("<MemberDetailDialog/>", () => {
 
         // Only the off-seat VIEWER row is removable; the MEMBER row mirrors
         // the member's seat and is managed by the seat selector.
-        expect(
-          screen.getAllByRole("button", { name: /remove binding/i }),
-        ).toHaveLength(1);
+        expect(screen.getAllByRole("button", { name: /remove binding/i })).toHaveLength(
+          1,
+        );
       });
     });
   });
@@ -529,9 +522,7 @@ describe("<MemberDetailDialog/>", () => {
       fireEvent.click(screen.getByTestId("stub-add-binding"));
       fireEvent.click(screen.getByTestId("stub-add-binding"));
 
-      expect(screen.getAllByRole("button", { name: /undo add/i })).toHaveLength(
-        1,
-      );
+      expect(screen.getAllByRole("button", { name: /undo add/i })).toHaveLength(1);
     });
   });
 

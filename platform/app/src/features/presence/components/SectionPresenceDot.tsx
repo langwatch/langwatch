@@ -15,11 +15,7 @@ interface SectionPresenceDotProps {
  * this exact `(traceId, tab, section)` triplet. Designed to be sprinkled
  * inside accordion triggers, sub-headers, or any section anchor.
  */
-export function SectionPresenceDot({
-  traceId,
-  tab,
-  section,
-}: SectionPresenceDotProps) {
+export function SectionPresenceDot({ traceId, tab, section }: SectionPresenceDotProps) {
   const peers = usePresenceStore(
     useShallow((s) =>
       selectPeersMatching(

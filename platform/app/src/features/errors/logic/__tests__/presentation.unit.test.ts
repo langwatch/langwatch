@@ -21,9 +21,7 @@ const ALL_CODES = [
   ...Object.keys(nodeErrorCodes),
 ];
 
-const shape = (
-  overrides: Partial<HandledErrorShape> = {},
-): HandledErrorShape => ({
+const shape = (overrides: Partial<HandledErrorShape> = {}): HandledErrorShape => ({
   code: "trace_not_found",
   meta: {},
   httpStatus: 404,
@@ -323,16 +321,16 @@ describe("explainHandledError", () => {
     const reason = (code: string) => ({ code, kind: code });
 
     /** @scenario "A provider-refused credential gets its own remediation copy" */
-    it.each([
-      "upstream_unauthorized",
-      "upstream_forbidden",
-    ])("explains a %s reason as a rejected credential", (code) => {
-      const { description } = explainHandledError(
-        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
-      );
+    it.each(["upstream_unauthorized", "upstream_forbidden"])(
+      "explains a %s reason as a rejected credential",
+      (code) => {
+        const { description } = explainHandledError(
+          shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+        );
 
-      expect(description).toContain("key or its permissions");
-    });
+        expect(description).toContain("key or its permissions");
+      },
+    );
 
     /** @scenario "A provider rate limit gets its own remediation copy" */
     it("explains an upstream_rate_limited reason as a wait-and-retry", () => {
@@ -347,16 +345,16 @@ describe("explainHandledError", () => {
     });
 
     /** @scenario "A provider outage gets its own remediation copy" */
-    it.each([
-      "upstream_unavailable",
-      "upstream_timeout",
-    ])("explains a %s reason as a provider outage", (code) => {
-      const { description } = explainHandledError(
-        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
-      );
+    it.each(["upstream_unavailable", "upstream_timeout"])(
+      "explains a %s reason as a provider outage",
+      (code) => {
+        const { description } = explainHandledError(
+          shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+        );
 
-      expect(description).toContain("temporarily unavailable");
-    });
+        expect(description).toContain("temporarily unavailable");
+      },
+    );
 
     /** @scenario "An unrecognised upstream reason falls back to the generic retry line" */
     it("falls back to the generic line for a reason it does not classify", () => {
@@ -396,22 +394,20 @@ describe("explainHandledError", () => {
      * passed the label filter — and the customer read "There's a problem with
      * function Object() { [native code] }".
      */
-    it.each([
-      "constructor",
-      "toString",
-      "__proto__",
-      "hasOwnProperty",
-    ])("declines %s as a field name rather than resolving it on the prototype", (field) => {
-      const { description } = explainHandledError(
-        shape({
-          code: "validation_error",
-          httpStatus: 422,
-          meta: { fieldErrors: { [field]: ["Required"] } },
-        }),
-      );
+    it.each(["constructor", "toString", "__proto__", "hasOwnProperty"])(
+      "declines %s as a field name rather than resolving it on the prototype",
+      (field) => {
+        const { description } = explainHandledError(
+          shape({
+            code: "validation_error",
+            httpStatus: 422,
+            meta: { fieldErrors: { [field]: ["Required"] } },
+          }),
+        );
 
-      expect(description).toBe("Some of the values aren't valid.");
-    });
+        expect(description).toBe("Some of the values aren't valid.");
+      },
+    );
 
     it("declines a prototype key on the single-field code too", () => {
       const { description } = explainHandledError(
@@ -426,9 +422,7 @@ describe("explainHandledError", () => {
         shape({ code: "evaluator_missing_field", meta: { field: "toString" } }),
       );
 
-      expect(description).toBe(
-        "Map all of its required fields before running it.",
-      );
+      expect(description).toBe("Map all of its required fields before running it.");
     });
 
     it("names the model when the rejected field is the per-send modelOverride", () => {
@@ -440,9 +434,7 @@ describe("explainHandledError", () => {
           httpStatus: 422,
           meta: {
             fieldErrors: {
-              modelOverride: [
-                "modelOverride must be in 'provider/model' shape",
-              ],
+              modelOverride: ["modelOverride must be in 'provider/model' shape"],
             },
           },
         }),
@@ -464,9 +456,7 @@ describe("explainHandledError", () => {
       );
 
       expect(title).toBe("Check your input");
-      expect(description).toBe(
-        "There's a problem with the name and the URL slug.",
-      );
+      expect(description).toBe("There's a problem with the name and the URL slug.");
     });
   });
 
@@ -495,9 +485,7 @@ describe("explainHandledError", () => {
     it("keeps the general advice when no status came with it", () => {
       const { description } = explainHandledError(shape({ code: "llm_error" }));
 
-      expect(description).toBe(
-        "Try again, or check the node's model configuration.",
-      );
+      expect(description).toBe("Try again, or check the node's model configuration.");
     });
   });
 
@@ -517,9 +505,7 @@ describe("explainHandledError", () => {
         shape({ code: "evaluator_execution_error", meta }),
       );
 
-      expect(description).toBe(
-        "Check the API key for this evaluator's model provider.",
-      );
+      expect(description).toBe("Check the API key for this evaluator's model provider.");
     });
 
     it("says to retry for a failure that isn't about credentials", () => {
@@ -630,9 +616,7 @@ describe("explainHandledError", () => {
       };
 
       for (const code of ALL_CODES) {
-        const { title, description } = explainHandledError(
-          shape({ code, meta: poison }),
-        );
+        const { title, description } = explainHandledError(shape({ code, meta: poison }));
         const rendered = `${title} ${description}`;
 
         for (const [key, value] of Object.entries(poison)) {

@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
@@ -97,11 +89,7 @@ export function RoutingPoliciesTable({
               </VStack>
               <Spacer />
               {canManage && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onNew(level)}
-                >
+                <Button size="sm" variant="outline" onClick={() => onNew(level)}>
                   <Plus size={14} /> New policy
                 </Button>
               )}
@@ -130,20 +118,14 @@ export function RoutingPoliciesTable({
       })}
 
       {unplaced.length > 0 && (
-        <Box
-          borderWidth="1px"
-          borderColor="orange.300"
-          borderRadius="md"
-          padding={4}
-        >
+        <Box borderWidth="1px" borderColor="orange.300" borderRadius="md" padding={4}>
           <VStack align="start" gap={0} marginBottom={3}>
             <Text fontSize="sm" fontWeight="semibold">
               Elsewhere
             </Text>
             <Text fontSize="xs" color="fg.muted">
-              These policies apply somewhere this page does not have a section
-              for. They still route traffic, so they are listed here rather than
-              hidden.
+              These policies apply somewhere this page does not have a section for. They
+              still route traffic, so they are listed here rather than hidden.
             </Text>
           </VStack>
           <VStack align="stretch" gap={2}>
@@ -212,9 +194,7 @@ function PolicyRow({
     ? policy.modelProviderIds.length
     : 0;
   const { tierCount, mappingCount } = countAliases(policy.modelAliases);
-  const answeredTiers = policy.defaultModel
-    ? "every tier"
-    : describeTiers(tierCount);
+  const answeredTiers = policy.defaultModel ? "every tier" : describeTiers(tierCount);
 
   return (
     <HStack

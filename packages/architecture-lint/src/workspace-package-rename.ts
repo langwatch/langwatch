@@ -24,9 +24,7 @@ function replacement(value: string, from: string, to: string): string | undefine
 function quoteLike(source: string, node: ts.Node, value: string): string {
   const original = source.slice(node.getStart(), node.getEnd());
   const quote = original[0] === "'" ? "'" : '"';
-  const escaped = value
-    .replaceAll("\\", "\\\\")
-    .replaceAll(quote, `\\${quote}`);
+  const escaped = value.replaceAll("\\", "\\\\").replaceAll(quote, `\\${quote}`);
   return `${quote}${escaped}${quote}`;
 }
 
@@ -37,9 +35,8 @@ function sourceEdits(
   to: string,
   allStringLiterals: boolean,
 ): TextEdit[] {
-  const kind = file.endsWith(".tsx") || file.endsWith(".jsx")
-    ? ts.ScriptKind.TSX
-    : ts.ScriptKind.TS;
+  const kind =
+    file.endsWith(".tsx") || file.endsWith(".jsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
   const sourceFile = ts.createSourceFile(
     file,
     source,
@@ -72,10 +69,7 @@ function sourceEdits(
       ts.isExternalModuleReference(node.moduleReference)
     ) {
       add(node.moduleReference.expression);
-    } else if (
-      ts.isImportTypeNode(node) &&
-      ts.isLiteralTypeNode(node.argument)
-    ) {
+    } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
       add(node.argument.literal);
     } else if (ts.isCallExpression(node)) {
       const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
@@ -89,12 +83,7 @@ function sourceEdits(
   return edits;
 }
 
-function jsonEdits(
-  file: string,
-  source: string,
-  from: string,
-  to: string,
-): TextEdit[] {
+function jsonEdits(file: string, source: string, from: string, to: string): TextEdit[] {
   const sourceFile = ts.parseJsonText(file, source);
   const edits: TextEdit[] = [];
   const visit = (node: ts.Node): void => {

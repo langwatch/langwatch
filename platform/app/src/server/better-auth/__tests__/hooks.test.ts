@@ -398,9 +398,7 @@ describe("afterUserCreate", () => {
           }),
         },
         organizationUser: {
-          create: vi
-            .fn()
-            .mockRejectedValue(new Error("P2002 unique constraint")),
+          create: vi.fn().mockRejectedValue(new Error("P2002 unique constraint")),
           count: vi.fn().mockResolvedValue(0),
         },
       });

@@ -39,8 +39,7 @@ export class QuarantineFillEvaluatorService extends GovernanceQuarantineFillServ
   }
 
   async evaluate(input: QuarantineFillInput): Promise<QuarantineFillStats> {
-    const windowSeconds =
-      input.windowSeconds ?? QUARANTINE_DEFAULT_WINDOW_SECONDS;
+    const windowSeconds = input.windowSeconds ?? QUARANTINE_DEFAULT_WINDOW_SECONDS;
     const threshold = input.threshold ?? QUARANTINE_DEFAULT_THRESHOLD;
     const tenantId = await this.tenant.resolveTenantId(input.organizationId);
     if (!this.traceActivity) {
@@ -60,10 +59,7 @@ export class QuarantineFillEvaluatorService extends GovernanceQuarantineFillServ
           ingestionSourceId: sourceId,
           spanCount,
         }));
-      const spanCount = perSource.reduce(
-        (total, source) => total + source.spanCount,
-        0,
-      );
+      const spanCount = perSource.reduce((total, source) => total + source.spanCount, 0);
       const rate = (spanCount * 60) / Math.max(1, windowSeconds);
       return {
         windowSeconds,
@@ -74,10 +70,12 @@ export class QuarantineFillEvaluatorService extends GovernanceQuarantineFillServ
         perSource,
       };
     } catch (error) {
-      this.diagnostics.warn(
-        "quarantine fill evaluation failed — returning empty stats",
-        { organizationId: input.organizationId, tenantId, windowSeconds, error },
-      );
+      this.diagnostics.warn("quarantine fill evaluation failed — returning empty stats", {
+        organizationId: input.organizationId,
+        tenantId,
+        windowSeconds,
+        error,
+      });
       return {
         windowSeconds,
         threshold,

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  isPreciseResourceHref,
-  toRelativeSameOriginHref,
-} from "../src";
+import { isPreciseResourceHref, toRelativeSameOriginHref } from "../src";
 
 describe("toRelativeSameOriginHref", () => {
   it("preserves the path, query and hash of a same-origin URL", () => {
@@ -45,9 +42,9 @@ describe("toRelativeSameOriginHref", () => {
 
 describe("isPreciseResourceHref", () => {
   it("distinguishes a surface index from a concrete resource address", () => {
-    expect(
-      isPreciseResourceHref("https://app.langwatch.ai/demo/simulations"),
-    ).toBe(false);
+    expect(isPreciseResourceHref("https://app.langwatch.ai/demo/simulations")).toBe(
+      false,
+    );
     expect(isPreciseResourceHref("/demo/simulations")).toBe(false);
     expect(isPreciseResourceHref("/demo/datasets/ds_123")).toBe(true);
     expect(

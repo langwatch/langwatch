@@ -26,9 +26,7 @@ describe("ClickHouseLangyAnalyticsEventRepository", () => {
     const resolveClient = vi
       .fn()
       .mockResolvedValue({ insert } as unknown as ClickHouseClient);
-    const repository = new ClickHouseLangyAnalyticsEventRepository(
-      resolveClient,
-    );
+    const repository = new ClickHouseLangyAnalyticsEventRepository(resolveClient);
 
     await repository.insert(record, 45);
 
@@ -65,15 +63,10 @@ describe("ClickHouseLangyAnalyticsEventRepository", () => {
     const resolveClient = vi
       .fn()
       .mockResolvedValue({ insert } as unknown as ClickHouseClient);
-    const repository = new ClickHouseLangyAnalyticsEventRepository(
-      resolveClient,
-    );
+    const repository = new ClickHouseLangyAnalyticsEventRepository(resolveClient);
 
     await repository.insertBatch(
-      [
-        record,
-        { ...record, eventId: "event_2", aggregateId: "conversation_2" },
-      ],
+      [record, { ...record, eventId: "event_2", aggregateId: "conversation_2" }],
       90,
     );
 
@@ -101,9 +94,7 @@ describe("ClickHouseLangyAnalyticsEventRepository", () => {
 
   it("rejects a mixed-tenant batch before resolving a client", async () => {
     const resolveClient = vi.fn();
-    const repository = new ClickHouseLangyAnalyticsEventRepository(
-      resolveClient,
-    );
+    const repository = new ClickHouseLangyAnalyticsEventRepository(resolveClient);
 
     await expect(
       repository.insertBatch(
@@ -116,9 +107,7 @@ describe("ClickHouseLangyAnalyticsEventRepository", () => {
 
   it("does not resolve a client for an empty batch", async () => {
     const resolveClient = vi.fn();
-    const repository = new ClickHouseLangyAnalyticsEventRepository(
-      resolveClient,
-    );
+    const repository = new ClickHouseLangyAnalyticsEventRepository(resolveClient);
 
     await repository.insertBatch([], 90);
 

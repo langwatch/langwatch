@@ -163,9 +163,7 @@ export function stripAtSigils(text: string): string {
 // in `filterStore.applyQueryText` and once in the `filterHighlight`
 // ProseMirror plugin. They pass the same raw text, so caching the last few
 // inputs collapses both calls into a single liqe pass.
-type ParseEntry =
-  | { ok: true; ast: LiqeQuery }
-  | { ok: false; error: ParseError };
+type ParseEntry = { ok: true; ast: LiqeQuery } | { ok: false; error: ParseError };
 const PARSE_CACHE_LIMIT = 8;
 const parseCache = new Map<string, ParseEntry>();
 

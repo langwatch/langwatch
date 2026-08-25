@@ -3,10 +3,7 @@ import type {
   NormalizedPullEvent,
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
-import {
-  PROJECT_KIND,
-  type ProjectService,
-} from "@langwatch/project-contract";
+import { PROJECT_KIND, type ProjectService } from "@langwatch/project-contract";
 import type {
   GovernanceOcsfEventInput,
   GovernanceOcsfEventSinkPort,
@@ -39,9 +36,7 @@ export class IngestionPullWorkerConfiguration {
       deadlineMs?: number;
     } = {},
   ): IngestionPullWorkerConfiguration {
-    return new IngestionPullWorkerConfiguration(
-      input.deadlineMs ?? 5 * 60 * 1000,
-    );
+    return new IngestionPullWorkerConfiguration(input.deadlineMs ?? 5 * 60 * 1000);
   }
 }
 
@@ -94,10 +89,7 @@ export class IngestionPullWorkerService {
     if (!source) {
       throw new Error(`IngestionSource ${input.sourceId} not found`);
     }
-    if (
-      source.status !== "active" &&
-      source.status !== "awaiting_first_event"
-    ) {
+    if (source.status !== "active" && source.status !== "awaiting_first_event") {
       this.diagnostics.info("IngestionSource not active, skipping", {
         ingestionSourceId: source.id,
         status: source.status,
@@ -134,8 +126,7 @@ export class IngestionPullWorkerService {
         ),
       );
     } catch (error) {
-      const normalized =
-        error instanceof Error ? error : new Error(String(error));
+      const normalized = error instanceof Error ? error : new Error(String(error));
       this.diagnostics.error(
         "adapter.runOnce threw — leaving the durable cursor unchanged",
         { ingestionSourceId: source.id, adapterId, error: normalized.message },
@@ -148,9 +139,7 @@ export class IngestionPullWorkerService {
     }
 
     if (result.errorCount > 0) {
-      throw new Error(
-        `Ingestion pull adapter reported ${result.errorCount} error(s)`,
-      );
+      throw new Error(`Ingestion pull adapter reported ${result.errorCount} error(s)`);
     }
 
     if (result.events.length > 0) {
@@ -195,9 +184,7 @@ export class IngestionPullWorkerService {
       organizationId: input.source.organizationId,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
-    const recordCost = await this.usageEntitlement.isEnabled(
-      input.source.organizationId,
-    );
+    const recordCost = await this.usageEntitlement.isEnabled(input.source.organizationId);
     const observedAt = new Date(this.now());
     for (const event of input.events) {
       await this.sink.insertEvent(
@@ -222,8 +209,7 @@ export class IngestionPullWorkerService {
           observedAt,
         });
       } catch (error) {
-        const normalized =
-          error instanceof Error ? error : new Error(String(error));
+        const normalized = error instanceof Error ? error : new Error(String(error));
         this.diagnostics.error(
           "could not map a pulled item to a usage record; the audit row landed but this item has no price",
           {

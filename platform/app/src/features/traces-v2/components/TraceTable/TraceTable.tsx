@@ -55,9 +55,10 @@ const sessionsShell = (sessions: SessionGroupsResult): TableShell => ({
   maxPageSize: SESSIONS_MAX_PAGE_SIZE,
 });
 
-const tracesShell = (
-  list: Omit<TableShell, "itemNoun" | "maxPageSize">,
-): TableShell => ({ ...list, itemNoun: "traces" });
+const tracesShell = (list: Omit<TableShell, "itemNoun" | "maxPageSize">): TableShell => ({
+  ...list,
+  itemNoun: "traces",
+});
 
 /**
  * What the table shell shows before it has rows to show: the failure if the
@@ -143,11 +144,7 @@ export const TraceTable: React.FC = () => {
         />
       )}
       {rowKind === "group" && (
-        <GroupLensBody
-          traces={traces}
-          lens={activeLens}
-          isLoading={isLoading}
-        />
+        <GroupLensBody traces={traces} lens={activeLens} isLoading={isLoading} />
       )}
       {rowKind === "trace" && (
         <TraceLensBody

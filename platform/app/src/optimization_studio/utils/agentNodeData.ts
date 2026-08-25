@@ -17,11 +17,7 @@ import type {
 
 export function mapAgentInputs(agent: TypedAgent): Field[] {
   const config = agent.config;
-  if (
-    "inputs" in config &&
-    Array.isArray(config.inputs) &&
-    config.inputs.length > 0
-  ) {
+  if ("inputs" in config && Array.isArray(config.inputs) && config.inputs.length > 0) {
     return config.inputs.map((i: { identifier: string; type: string }) => ({
       identifier: i.identifier,
       type: i.type as Field["type"],
@@ -33,11 +29,7 @@ export function mapAgentInputs(agent: TypedAgent): Field[] {
 
 export function mapAgentOutputs(agent: TypedAgent): Field[] {
   const config = agent.config;
-  if (
-    "outputs" in config &&
-    Array.isArray(config.outputs) &&
-    config.outputs.length > 0
-  ) {
+  if ("outputs" in config && Array.isArray(config.outputs) && config.outputs.length > 0) {
     return config.outputs.map((o: { identifier: string; type: string }) => ({
       identifier: o.identifier,
       type: o.type as Field["type"],
@@ -52,9 +44,7 @@ export function mapAgentOutputs(agent: TypedAgent): Field[] {
  * The backend parser reads parameters to determine how to execute.
  */
 export function buildAgentParameters(agent: TypedAgent): Field[] {
-  const params: Field[] = [
-    { identifier: "agent_type", type: "str", value: agent.type },
-  ];
+  const params: Field[] = [{ identifier: "agent_type", type: "str", value: agent.type }];
 
   const config = agent.config as Record<string, unknown>;
 
@@ -230,9 +220,10 @@ export function readHttpSnapshot(
   const headersValue = readParameter(data, "headers");
   const headers =
     headersValue && typeof headersValue === "object"
-      ? Object.entries(headersValue as Record<string, string>).map(
-          ([key, value]) => ({ key, value }),
-        )
+      ? Object.entries(headersValue as Record<string, string>).map(([key, value]) => ({
+          key,
+          value,
+        }))
       : undefined;
 
   const authType = readParameter(data, "auth_type");
@@ -270,11 +261,8 @@ export function nodeMatchesAgent(
   const expected = buildAgentNodeData(agent);
   return (
     data.name === expected.name &&
-    JSON.stringify(data.parameters ?? []) ===
-      JSON.stringify(expected.parameters ?? []) &&
-    JSON.stringify(data.inputs ?? []) ===
-      JSON.stringify(expected.inputs ?? []) &&
-    JSON.stringify(data.outputs ?? []) ===
-      JSON.stringify(expected.outputs ?? [])
+    JSON.stringify(data.parameters ?? []) === JSON.stringify(expected.parameters ?? []) &&
+    JSON.stringify(data.inputs ?? []) === JSON.stringify(expected.inputs ?? []) &&
+    JSON.stringify(data.outputs ?? []) === JSON.stringify(expected.outputs ?? [])
   );
 }

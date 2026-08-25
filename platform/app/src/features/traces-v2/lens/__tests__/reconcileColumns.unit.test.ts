@@ -8,12 +8,7 @@ describe("reconcileColumns", () => {
     describe("when the saved columns include per-evaluator eval ids", () => {
       it("preserves eval:* ids even though they are not in the capability list", () => {
         const result = reconcileColumns({
-          ids: [
-            "time",
-            "trace",
-            "eval:score:evaluator_abc",
-            "eval:verdict:Toxicity",
-          ],
+          ids: ["time", "trace", "eval:score:evaluator_abc", "eval:verdict:Toxicity"],
           capability: flat,
         });
         expect(result).toContain("eval:score:evaluator_abc");

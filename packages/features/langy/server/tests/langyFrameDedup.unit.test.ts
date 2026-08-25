@@ -5,10 +5,7 @@
  * genuine insert so a duplicate can never extend the window.
  */
 import { describe, expect, it, vi } from "vitest";
-import {
-  LangyFrameDedupStore,
-  type LangyFrameDedupRedis,
-} from "@langwatch/langy-server";
+import { LangyFrameDedupStore, type LangyFrameDedupRedis } from "@langwatch/langy-server";
 
 function fakeRedis(): LangyFrameDedupRedis & {
   sets: Map<string, Set<string>>;
@@ -36,9 +33,7 @@ describe("LangyFrameDedupStore", () => {
     it("reserves it as fresh and arms the TTL", async () => {
       const redis = fakeRedis();
       const dedup = LangyFrameDedupStore.create({ redis, ttlSeconds: 60 });
-      expect(await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" })).toBe(
-        true,
-      );
+      expect(await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" })).toBe(true);
       expect(redis.expire).toHaveBeenCalledWith("langy:seen:conv-1:turn-1", 60);
     });
   });
@@ -50,9 +45,7 @@ describe("LangyFrameDedupStore", () => {
       await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" });
       redis.expire.mockClear();
 
-      expect(await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" })).toBe(
-        false,
-      );
+      expect(await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" })).toBe(false);
       expect(redis.expire).not.toHaveBeenCalled();
     });
   });

@@ -30,13 +30,9 @@ export type PostgresGovernanceServices = {
 
 /** Public composition seam; persistence repositories stay private. */
 export class PostgresGovernanceAdapter {
-  private constructor(
-    private readonly options: PostgresGovernanceAdapterOptions,
-  ) {}
+  private constructor(private readonly options: PostgresGovernanceAdapterOptions) {}
 
-  static create(
-    options: PostgresGovernanceAdapterOptions,
-  ): PostgresGovernanceAdapter {
+  static create(options: PostgresGovernanceAdapterOptions): PostgresGovernanceAdapter {
     return new PostgresGovernanceAdapter(options);
   }
 

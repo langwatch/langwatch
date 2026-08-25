@@ -76,9 +76,7 @@ describe("ExperimentsApiService.getRunResults()", () => {
         );
 
         const service = new ExperimentsApiService();
-        const err = await service
-          .getRunResults({ runId: "missing" })
-          .catch((e) => e);
+        const err = await service.getRunResults({ runId: "missing" }).catch((e) => e);
 
         expect(err).toBeInstanceOf(ExperimentsApiServiceError);
         expect((err as ExperimentsApiServiceError).operation).toContain("missing");
@@ -90,9 +88,7 @@ describe("ExperimentsApiService.getRunResults()", () => {
         mockFetch.mockResolvedValueOnce(jsonResponse(null));
 
         const service = new ExperimentsApiService();
-        const err = await service
-          .getRunResults({ runId: "ghost" })
-          .catch((e) => e);
+        const err = await service.getRunResults({ runId: "ghost" }).catch((e) => e);
 
         expect(err).toBeInstanceOf(ExperimentsApiServiceError);
         expect((err as ExperimentsApiServiceError).operation).toContain("ghost");
@@ -104,9 +100,7 @@ describe("ExperimentsApiService.getRunResults()", () => {
         mockFetch.mockRejectedValueOnce(new Error("ECONNRESET"));
 
         const service = new ExperimentsApiService();
-        const err = await service
-          .getRunResults({ runId: "run_1" })
-          .catch((e) => e);
+        const err = await service.getRunResults({ runId: "run_1" }).catch((e) => e);
 
         expect(err).toBeInstanceOf(ExperimentsApiServiceError);
       });

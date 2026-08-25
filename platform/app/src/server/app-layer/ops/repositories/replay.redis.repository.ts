@@ -40,10 +40,7 @@ export class ReplayRedisRepository implements ReplayRepository {
     );
   }
 
-  async acquireLock(params: {
-    runId: string;
-    ttlSeconds: number;
-  }): Promise<boolean> {
+  async acquireLock(params: { runId: string; ttlSeconds: number }): Promise<boolean> {
     const result = await this.redis.set(
       REPLAY_LOCK_KEY,
       params.runId,
@@ -54,10 +51,7 @@ export class ReplayRedisRepository implements ReplayRepository {
     return result !== null;
   }
 
-  async refreshLock(params: {
-    runId: string;
-    ttlSeconds: number;
-  }): Promise<boolean> {
+  async refreshLock(params: { runId: string; ttlSeconds: number }): Promise<boolean> {
     // Atomic check-and-extend: only the current holder may push the TTL out.
     const result = await this.redis.eval(
       `if redis.call('get', KEYS[1]) == ARGV[1] then
@@ -112,11 +106,7 @@ export class ReplayRedisRepository implements ReplayRepository {
   }
 
   async getHistory(): Promise<ReplayHistoryEntry[]> {
-    const raw = await this.redis.lrange(
-      REPLAY_HISTORY_KEY,
-      0,
-      REPLAY_HISTORY_MAX - 1,
-    );
+    const raw = await this.redis.lrange(REPLAY_HISTORY_KEY, 0, REPLAY_HISTORY_MAX - 1);
     const entries: ReplayHistoryEntry[] = [];
     for (const item of raw) {
       try {

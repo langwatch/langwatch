@@ -172,10 +172,9 @@ function primeAvailableEvaluators(
 }
 
 const renderDrawer = (props = {}) =>
-  render(
-    <EvaluatorTypeSelectorDrawer open={true} category="safety" {...props} />,
-    { wrapper: Wrapper },
-  );
+  render(<EvaluatorTypeSelectorDrawer open={true} category="safety" {...props} />, {
+    wrapper: Wrapper,
+  });
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -200,18 +199,14 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
       /** @scenario Azure evaluators are disabled when no Azure Safety provider is configured */
       it("marks Azure Content Safety as disabled", async () => {
         await waitFor(() => {
-          const card = screen.getByTestId(
-            "evaluator-type-azure-content_safety",
-          );
+          const card = screen.getByTestId("evaluator-type-azure-content_safety");
           expect(card.getAttribute("data-disabled")).toBe("true");
         });
       });
 
       it("marks Azure Prompt Injection as disabled", async () => {
         await waitFor(() => {
-          const card = screen.getByTestId(
-            "evaluator-type-azure-prompt_injection",
-          );
+          const card = screen.getByTestId("evaluator-type-azure-prompt_injection");
           expect(card.getAttribute("data-disabled")).toBe("true");
         });
       });
@@ -233,9 +228,7 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
       /** @scenario Non-Azure safety evaluators are unaffected by Azure Safety config */
       it("leaves non-Azure safety evaluators enabled", async () => {
         await waitFor(() => {
-          const piiCard = screen.getByTestId(
-            "evaluator-type-presidio-pii_detection",
-          );
+          const piiCard = screen.getByTestId("evaluator-type-presidio-pii_detection");
           expect(piiCard.getAttribute("data-disabled")).toBeNull();
         });
       });
@@ -244,14 +237,10 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
         const user = userEvent.setup();
 
         await waitFor(() => {
-          expect(
-            screen.getByTestId("evaluator-type-azure-content_safety"),
-          ).toBeTruthy();
+          expect(screen.getByTestId("evaluator-type-azure-content_safety")).toBeTruthy();
         });
 
-        await user.click(
-          screen.getByTestId("evaluator-type-azure-content_safety"),
-        );
+        await user.click(screen.getByTestId("evaluator-type-azure-content_safety"));
 
         expect(mockOpenDrawer).not.toHaveBeenCalled();
       });
@@ -267,9 +256,7 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
             ).toBeTruthy();
           });
 
-          await user.click(
-            screen.getByTestId("evaluator-type-azure-content_safety-cta"),
-          );
+          await user.click(screen.getByTestId("evaluator-type-azure-content_safety-cta"));
 
           expect(mockRouterPush).toHaveBeenCalledWith({
             pathname: "/settings/model-providers",
@@ -293,18 +280,14 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
       /** @scenario Configuring Azure Safety enables all three Azure evaluators */
       it("leaves Azure Content Safety enabled", async () => {
         await waitFor(() => {
-          const card = screen.getByTestId(
-            "evaluator-type-azure-content_safety",
-          );
+          const card = screen.getByTestId("evaluator-type-azure-content_safety");
           expect(card.getAttribute("data-disabled")).toBeNull();
         });
       });
 
       it("leaves Azure Prompt Injection enabled", async () => {
         await waitFor(() => {
-          const card = screen.getByTestId(
-            "evaluator-type-azure-prompt_injection",
-          );
+          const card = screen.getByTestId("evaluator-type-azure-prompt_injection");
           expect(card.getAttribute("data-disabled")).toBeNull();
         });
       });
@@ -320,14 +303,10 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
         const user = userEvent.setup();
 
         await waitFor(() => {
-          expect(
-            screen.getByTestId("evaluator-type-azure-content_safety"),
-          ).toBeTruthy();
+          expect(screen.getByTestId("evaluator-type-azure-content_safety")).toBeTruthy();
         });
 
-        await user.click(
-          screen.getByTestId("evaluator-type-azure-content_safety"),
-        );
+        await user.click(screen.getByTestId("evaluator-type-azure-content_safety"));
 
         expect(mockOpenDrawer).toHaveBeenCalledWith(
           "evaluatorEditor",

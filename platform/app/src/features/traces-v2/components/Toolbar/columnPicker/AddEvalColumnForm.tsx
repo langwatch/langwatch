@@ -35,9 +35,7 @@ const useEvaluatorSuggestions = ({
     const q = trimmed.toLowerCase();
     const matches = q
       ? evaluatorOptions.filter(
-          (o) =>
-            o.label.toLowerCase().includes(q) ||
-            o.value.toLowerCase().includes(q),
+          (o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q),
         )
       : evaluatorOptions;
     return matches.slice(0, 5);
@@ -179,9 +177,7 @@ const useEvalColumnAdder = ({
     const trimmedKey = rawKey.trim();
     if (!trimmedKey) return;
     const match = evaluatorOptions.find(
-      (o) =>
-        o.value === trimmedKey ||
-        o.label.toLowerCase() === trimmedKey.toLowerCase(),
+      (o) => o.value === trimmedKey || o.label.toLowerCase() === trimmedKey.toLowerCase(),
     );
     const key = match ? match.value : trimmedKey;
     const id = formatEvalColumnId({ field, evaluatorKey: key });
@@ -259,12 +255,7 @@ export const AddEvalColumnForm: React.FC<AddEvalColumnFormProps> = ({
         />
       )}
       {trimmed.length > 0 && (
-        <Button
-          size="xs"
-          variant="outline"
-          width="100%"
-          onClick={() => add(trimmed)}
-        >
+        <Button size="xs" variant="outline" width="100%" onClick={() => add(trimmed)}>
           Add “{trimmed}” column
         </Button>
       )}

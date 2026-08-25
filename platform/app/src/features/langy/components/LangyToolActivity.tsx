@@ -25,14 +25,7 @@
  * Kept in its own component (not inside MessageContent) so the shared turn
  * renderer stays a single insertion point.
  */
-import {
-  Box,
-  chakra,
-  HStack,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import {
   cliToolResultPayload,
@@ -51,19 +44,12 @@ import {
   commandOfToolCall,
 } from "../logic/langyCapabilityDigest";
 import { isPlanToolPart } from "../logic/langyPlan";
-import {
-  isQuestionToolPart,
-  questionToolCardParts,
-} from "../logic/langyQuestionTool";
+import { isQuestionToolPart, questionToolCardParts } from "../logic/langyQuestionTool";
 import {
   type LangyToolErrorPresentation,
   presentLangyToolError,
 } from "../logic/langyToolFailure";
-import {
-  commandOf,
-  describeToolCall,
-  effectiveToolName,
-} from "../logic/langyToolLabel";
+import { commandOf, describeToolCall, effectiveToolName } from "../logic/langyToolLabel";
 import { useLangyStore } from "../stores/langyStore";
 import {
   type CapabilityProgress,
@@ -123,11 +109,7 @@ type ToolPartLike = {
 export type PartsView = { parts: readonly unknown[] };
 
 // AI-SDK tool states that mean the call has settled (success, error, denied).
-const DONE_STATES = new Set([
-  "output-available",
-  "output-error",
-  "output-denied",
-]);
+const DONE_STATES = new Set(["output-available", "output-error", "output-denied"]);
 
 // A settled call that FAILED. It has no result to draw, so it stays on the
 // honest raw-JSON path rather than pretending to be a card.
@@ -361,9 +343,7 @@ function renderedToolFailure(part: ToolPartLike): boolean {
  * fresh array. A cache keyed on a deep hash instead would re-walk and re-parse
  * every CLI document per render, which is the exact cost this exists to remove.
  */
-function memoizeOnParts<T>(
-  read: (message: PartsView) => T,
-): (message: PartsView) => T {
+function memoizeOnParts<T>(read: (message: PartsView) => T): (message: PartsView) => T {
   const cache = new WeakMap<readonly unknown[], T>();
   return (message) => {
     const cached = cache.get(message.parts);
@@ -384,8 +364,7 @@ export const toCapabilityCalls = memoizeOnParts(readCapabilityCalls);
 function readCapabilityCalls(
   message: PartsView,
 ): Array<{ id: string; call: CapabilityToolCall } & Sequenced> {
-  const result: Array<{ id: string; call: CapabilityToolCall } & Sequenced> =
-    [];
+  const result: Array<{ id: string; call: CapabilityToolCall } & Sequenced> = [];
   message.parts.forEach((rawPart, index) => {
     const part = rawPart as ToolPartLike;
     const name = partToolName(part);
@@ -733,11 +712,7 @@ export function LangyActivityParts({
       key: `failure:${id}`,
       order,
       node: (
-        <FailedToolCallRow
-          call={call}
-          presentation={presentation}
-          devMode={devMode}
-        />
+        <FailedToolCallRow call={call} presentation={presentation} devMode={devMode} />
       ),
     })),
     ...runningGroups.map((group) => ({
@@ -745,11 +720,7 @@ export function LangyActivityParts({
       order: group.order,
       node: (
         <VStack align="stretch" gap={2} role="list">
-          <RunningActivityCard
-            group={group}
-            devMode={devMode}
-            interrupted={!live}
-          />
+          <RunningActivityCard group={group} devMode={devMode} interrupted={!live} />
         </VStack>
       ),
     })),
@@ -783,10 +754,7 @@ export function LangyActivityParts({
             order: heldGroup.lastOrder,
             node: (
               <VStack align="stretch" gap={2} role="list">
-                <LatestSettledActivityCard
-                  group={heldGroup}
-                  devMode={devMode}
-                />
+                <LatestSettledActivityCard group={heldGroup} devMode={devMode} />
               </VStack>
             ),
           },
@@ -808,9 +776,7 @@ export function LangyActivityParts({
           detail={detail}
           command={command}
           progress={index === pending.length - 1 ? turnProgress : null}
-          progressSample={
-            index === pending.length - 1 ? turnProgressSample : null
-          }
+          progressSample={index === pending.length - 1 ? turnProgressSample : null}
           interrupted={!live}
         />
       ),
@@ -872,10 +838,7 @@ function CompletedActivityBatch({
     }, 2200);
     return () => window.clearTimeout(timer);
   }, []);
-  const callCount = groups.reduce(
-    (count, group) => count + group.calls.length,
-    0,
-  );
+  const callCount = groups.reduce((count, group) => count + group.calls.length, 0);
 
   return (
     // The summary is the CARD; the steps it summarises hang beneath it. A
@@ -906,8 +869,7 @@ function CompletedActivityBatch({
             <Check size={11} />
           </Box>
           <Text textStyle="xs" fontWeight="560" color="fg" flex={1} truncate>
-            {groups.length} {groups.length === 1 ? "action" : "actions"}{" "}
-            completed
+            {groups.length} {groups.length === 1 ? "action" : "actions"} completed
           </Text>
           <Text textStyle="2xs" color="fg.subtle">
             {callCount} {callCount === 1 ? "tool call" : "tool calls"}
@@ -935,11 +897,7 @@ function CompletedActivityBatch({
           role="list"
         >
           {groups.map((group) => (
-            <CompletedActivityRow
-              key={group.key}
-              group={group}
-              devMode={devMode}
-            />
+            <CompletedActivityRow key={group.key} group={group} devMode={devMode} />
           ))}
           {/* The thinking steps the model narrated between calls — part of the
               turn's process record, so they live in the same receipt as the
@@ -986,9 +944,7 @@ function CompletedActivityRow({
   // and "why did it conclude that?" is unanswerable without it. Only rows
   // with a recorded result open — an empty disclosure would promise
   // something the record does not hold.
-  const callsWithResult = group.calls.filter(
-    (call) => toolResultText(call) !== null,
-  );
+  const callsWithResult = group.calls.filter((call) => toolResultText(call) !== null);
   const canOpenResult = callsWithResult.length > 0;
 
   // Spans, not the default paragraph: the disclosure below wraps these in a
@@ -1116,13 +1072,7 @@ function ResultDisclosureButton({
 }
 
 /** Dev mode's raw-payload toggle for one finished row. */
-function RawDataToggle({
-  isOpen,
-  onToggle,
-}: {
-  isOpen: boolean;
-  onToggle: () => void;
-}) {
+function RawDataToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => void }) {
   const label = isOpen ? "Hide raw data" : "Show raw data";
   return (
     <Tooltip content={label} showArrow>
@@ -1165,9 +1115,7 @@ function toolResultText(call: ToolCall): string | null {
   if (raw.trim().length === 0) return null;
 
   const parsed = parseWholeJson(raw);
-  return parsed === undefined
-    ? raw
-    : renderResultValue(unwrapCliEnvelope(parsed.value));
+  return parsed === undefined ? raw : renderResultValue(unwrapCliEnvelope(parsed.value));
 }
 
 /** The payload a CLI envelope carries, or the document when it is not one. */
@@ -1210,12 +1158,7 @@ function OpenedToolCall({ call }: { call: ToolCall }) {
   return (
     <VStack align="stretch" gap={1}>
       {command ? (
-        <Text
-          textStyle="2xs"
-          fontFamily="mono"
-          color="fg.subtle"
-          wordBreak="break-all"
-        >
+        <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" wordBreak="break-all">
           $ {command}
         </Text>
       ) : null}
@@ -1263,9 +1206,7 @@ type CapabilityBatch = {
  * them by semantic result (surface + tone + noun); the receipt stays compact
  * and the original cards remain one click away for inspection.
  */
-function batchCapabilityCalls(
-  entries: CapabilityCallEntry[],
-): CapabilityBatch[] {
+function batchCapabilityCalls(entries: CapabilityCallEntry[]): CapabilityBatch[] {
   const order: string[] = [];
   const batches = new Map<string, CapabilityBatch>();
   for (const entry of entries) {
@@ -1276,10 +1217,7 @@ function batchCapabilityCalls(
     const existing = batches.get(key);
     if (existing) {
       existing.entries.push(entry);
-      existing.label = capabilityBatchLabel(
-        descriptor,
-        existing.entries.length,
-      );
+      existing.label = capabilityBatchLabel(descriptor, existing.entries.length);
       continue;
     }
     order.push(key);
@@ -1381,11 +1319,7 @@ function CapabilityBatchRow({
       {open ? (
         <VStack align="stretch" gap={2} paddingLeft={2}>
           {batch.entries.map((entry) => (
-            <CapabilityCardRow
-              key={entry.id}
-              call={entry.call}
-              devMode={devMode}
-            />
+            <CapabilityCardRow key={entry.id} call={entry.call} devMode={devMode} />
           ))}
         </VStack>
       ) : null}
@@ -1416,10 +1350,7 @@ function FailedToolCallRow({
         )}
         {devMode ? (
           <Box position="absolute" top={2} right={2}>
-            <Tooltip
-              content={open ? "Hide raw data" : "Show raw data"}
-              showArrow
-            >
+            <Tooltip content={open ? "Hide raw data" : "Show raw data"} showArrow>
               <IconButton
                 size="2xs"
                 variant="ghost"
@@ -1461,10 +1392,7 @@ function CapabilityCardRow({
         <LangyCapabilityRenderer call={call} />
         {devMode ? (
           <Box position="absolute" top={2} right={2}>
-            <Tooltip
-              content={open ? "Hide raw data" : "Show raw data"}
-              showArrow
-            >
+            <Tooltip content={open ? "Hide raw data" : "Show raw data"} showArrow>
               <IconButton
                 size="2xs"
                 variant="ghost"
@@ -1598,9 +1526,7 @@ function LatestSettledActivityCard({
   // The same disclosure the receipt row carries: the reader is watching the
   // model think about what this call returned, so what it returned has to be
   // readable here too, not only after the card folds into the receipt.
-  const callsWithResult = group.calls.filter(
-    (call) => toolResultText(call) !== null,
-  );
+  const callsWithResult = group.calls.filter((call) => toolResultText(call) !== null);
 
   return (
     <VStack
@@ -1680,13 +1606,7 @@ function LatestSettledActivityCard({
  * Spans throughout, because the disclosure wraps this in a native `<button>`,
  * which may hold phrasing content only.
  */
-function SettledActivityLabel({
-  label,
-  detail,
-}: {
-  label: string;
-  detail?: string;
-}) {
+function SettledActivityLabel({ label, detail }: { label: string; detail?: string }) {
   return (
     <Box
       as="span"
@@ -1820,11 +1740,7 @@ function RunningActivityHeader({
         background={muted ? "fg.subtle" : "orange.solid"}
         opacity={muted ? 0.6 : 1}
         flexShrink={0}
-        css={
-          live
-            ? { animation: `${dotPulse} 1.4s ease-in-out infinite` }
-            : undefined
-        }
+        css={live ? { animation: `${dotPulse} 1.4s ease-in-out infinite` } : undefined}
       />
       <Text
         textStyle="2xs"
@@ -1839,10 +1755,7 @@ function RunningActivityHeader({
         {category}
       </Text>
       {devMode ? (
-        <Tooltip
-          content={jsonOpen ? "Hide raw data" : "Show raw data"}
-          showArrow
-        >
+        <Tooltip content={jsonOpen ? "Hide raw data" : "Show raw data"} showArrow>
           <IconButton
             size="2xs"
             variant="ghost"

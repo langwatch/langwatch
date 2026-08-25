@@ -149,9 +149,7 @@ describe("PersonalWorkspaceFeaturesService", () => {
       // String 'true' / 1 / 'yes' must not be treated as enabled —
       // anything that's not literal `true` defaults to false. Pins
       // the safe-by-default contract.
-      expect(personalFeatureEnabled({ datasets: "true" }, "datasets")).toBe(
-        false,
-      );
+      expect(personalFeatureEnabled({ datasets: "true" }, "datasets")).toBe(false);
       expect(personalFeatureEnabled({ datasets: 1 }, "datasets")).toBe(false);
       expect(personalFeatureEnabled({ datasets: true }, "datasets")).toBe(true);
     });

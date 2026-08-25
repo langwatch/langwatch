@@ -35,10 +35,7 @@ export type EvaluatorMappingsSectionProps = {
   /** Initial mappings - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback to persist changes to store */
-  onMappingChange?: (
-    identifier: string,
-    mapping: UIFieldMapping | undefined,
-  ) => void;
+  onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
   /** Whether to scroll to the first missing mapping on mount */
   scrollToMissingOnMount?: boolean;
   /** Visual variant — "studio" hides the red required fields error */
@@ -81,10 +78,7 @@ export function EvaluatorMappingsSection({
     if (level === "thread") {
       return getThreadAvailableSources() as AvailableSource[];
     }
-    return getTraceAvailableSources(
-      spanNames,
-      metadataKeys,
-    ) as AvailableSource[];
+    return getTraceAvailableSources(spanNames, metadataKeys) as AvailableSource[];
   }, [providedSources, level, spanNames, metadataKeys]);
 
   // Local state for mappings - source of truth for UI

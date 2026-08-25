@@ -2,14 +2,8 @@ import type { StoredLogRecordRow } from "~/server/app-layer/traces/repositories/
 import type { CanonicalLogRecord } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
 
 export interface CanonicalLogRecordRepository {
-  ensureLogRecord(
-    record: CanonicalLogRecord,
-    retentionDays?: number,
-  ): Promise<void>;
-  ensureLogRecords(
-    records: CanonicalLogRecord[],
-    retentionDays?: number,
-  ): Promise<void>;
+  ensureLogRecord(record: CanonicalLogRecord, retentionDays?: number): Promise<void>;
+  ensureLogRecords(records: CanonicalLogRecord[], retentionDays?: number): Promise<void>;
   /**
    * Every canonical log record correlated to one trace (generic — no
    * provider filter), oldest first, capped. The transcript derivation and
@@ -24,9 +18,7 @@ export interface CanonicalLogRecordRepository {
   }): Promise<StoredLogRecordRow[]>;
 }
 
-export class NullCanonicalLogRecordRepository
-  implements CanonicalLogRecordRepository
-{
+export class NullCanonicalLogRecordRepository implements CanonicalLogRecordRepository {
   async ensureLogRecord(
     _record: CanonicalLogRecord,
     _retentionDays?: number,

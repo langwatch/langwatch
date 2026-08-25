@@ -1,12 +1,4 @@
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Spacer,
-  Text,
-} from "@chakra-ui/react";
+import { Alert, Box, Button, HStack, IconButton, Spacer, Text } from "@chakra-ui/react";
 import { Eye, LogOut, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -58,20 +50,13 @@ function loadDismissed(workspaceLabel: string): boolean {
 function persistDismissed(workspaceLabel: string): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(
-      STORAGE_KEY_PREFIX + workspaceLabel,
-      String(Date.now()),
-    );
+    localStorage.setItem(STORAGE_KEY_PREFIX + workspaceLabel, String(Date.now()));
   } catch {
     // storage may be full / disabled
   }
 }
 
-export function AdminViewingAsBanner({
-  workspaceLabel,
-}: {
-  workspaceLabel: string;
-}) {
+export function AdminViewingAsBanner({ workspaceLabel }: { workspaceLabel: string }) {
   // Two visual states:
   //   - full   — first paint on a fresh workspace view, the loud
   //              "this is not your data" alert.
@@ -115,11 +100,7 @@ export function AdminViewingAsBanner({
             as admin · audit-logged.
           </Text>
           <Spacer />
-          <Link
-            href="/settings/audit-log"
-            color="fg.subtle"
-            _hover={{ color: "fg" }}
-          >
+          <Link href="/settings/audit-log" color="fg.subtle" _hover={{ color: "fg" }}>
             audit log
           </Link>
           <Button

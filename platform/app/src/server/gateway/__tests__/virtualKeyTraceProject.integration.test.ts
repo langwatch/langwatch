@@ -22,10 +22,7 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { traceProjectFor } from "../scopeResolver";
-import {
-  loadTraceDestinationFacts,
-  toVirtualKeySnakeDto,
-} from "../virtualKey.dto";
+import { loadTraceDestinationFacts, toVirtualKeySnakeDto } from "../virtualKey.dto";
 import { VirtualKeyRepository } from "../virtualKey.repository";
 import { VirtualKeyService } from "../virtualKey.service";
 
@@ -252,13 +249,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
   }, 120_000);
 
   afterAll(async () => {
-    const orgIds = [
-      ORG_BARE_ID,
-      ORG_GOV_ID,
-      ORG_CHOICE_ID,
-      ORG_ARCH_ID,
-      ORG_GOVARCH_ID,
-    ];
+    const orgIds = [ORG_BARE_ID, ORG_GOV_ID, ORG_CHOICE_ID, ORG_ARCH_ID, ORG_GOVARCH_ID];
     const teamIds = [
       TEAM_BARE_ID,
       TEAM_GOV_ID,

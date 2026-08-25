@@ -29,8 +29,7 @@ describe("scope contract", () => {
     describe("when scopeId is empty", () => {
       it("rejects it", () => {
         expect(
-          scopeAssignmentSchema.safeParse({ scopeType: "TEAM", scopeId: "" })
-            .success,
+          scopeAssignmentSchema.safeParse({ scopeType: "TEAM", scopeId: "" }).success,
         ).toBe(false);
       });
     });

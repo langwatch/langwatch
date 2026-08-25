@@ -289,19 +289,13 @@ const cases: Case[] = [
   {
     name: "evaluatorVerdict error wins over passed",
     query: "evaluatorVerdict:error",
-    trace: makeTrace(
-      {},
-      { evaluations: [makeEval({ status: "error", passed: true })] },
-    ),
+    trace: makeTrace({}, { evaluations: [makeEval({ status: "error", passed: true })] }),
     expected: true,
   },
   {
     name: "evaluatorVerdict:pass misses an errored run",
     query: "evaluatorVerdict:pass",
-    trace: makeTrace(
-      {},
-      { evaluations: [makeEval({ status: "error", passed: true })] },
-    ),
+    trace: makeTrace({}, { evaluations: [makeEval({ status: "error", passed: true })] }),
     expected: false,
   },
   {
@@ -647,9 +641,7 @@ const cases: Case[] = [
 
 describe("evaluateQueryInMemory", () => {
   it.each(cases.map((c) => [c.name, c] as const))("%s", (_name, testCase) => {
-    expect(evaluateQueryInMemory(testCase.query, testCase.trace)).toBe(
-      testCase.expected,
-    );
+    expect(evaluateQueryInMemory(testCase.query, testCase.trace)).toBe(testCase.expected);
   });
 });
 
@@ -685,40 +677,41 @@ describe("FieldDef SQL/read parity", () => {
   });
 
   describe("when a facet's in-memory read applies a default", () => {
-    it.each(
-      autoDerived.map((d) => [d.key, d] as const),
-    )("[%s] spells that default out in the ClickHouse expression too", (_key, def) => {
-      const value = def.read!(emptyTrace);
-      // No default (bare column: CH yields '' or NULL, and the read agrees),
-      // an array-valued read, or a field that can't be read at dispatch.
-      if (
-        value === UNSUPPORTED ||
-        value === null ||
-        value === "" ||
-        Array.isArray(value) ||
-        typeof value === "number"
-      ) {
-        return;
-      }
-      // A read that invents a value for an unset trace is only honest if the
-      // SQL invents the same one — otherwise the two halves disagree on
-      // exactly the rows nobody stamped.
-      expect(def.expression).toContain(`'${value}'`);
-    });
+    it.each(autoDerived.map((d) => [d.key, d] as const))(
+      "[%s] spells that default out in the ClickHouse expression too",
+      (_key, def) => {
+        const value = def.read!(emptyTrace);
+        // No default (bare column: CH yields '' or NULL, and the read agrees),
+        // an array-valued read, or a field that can't be read at dispatch.
+        if (
+          value === UNSUPPORTED ||
+          value === null ||
+          value === "" ||
+          Array.isArray(value) ||
+          typeof value === "number"
+        ) {
+          return;
+        }
+        // A read that invents a value for an unset trace is only honest if the
+        // SQL invents the same one — otherwise the two halves disagree on
+        // exactly the rows nobody stamped.
+        expect(def.expression).toContain(`'${value}'`);
+      },
+    );
   });
 
   describe("when a field is compiled to ClickHouse", () => {
-    it.each(
-      autoDerived.map((d) => [d.key, d] as const),
-    )("[%s] compiles against its registry expression", (key, def) => {
-      const literal = def.kind === "range" ? "1" : "x";
-      const compiled = translateFilterToClickHouse(
-        `${key}:${literal}`,
-        "tenant-1",
-        { from: 0, to: 1 },
-      );
-      expect(compiled?.sql).toContain(def.expression);
-    });
+    it.each(autoDerived.map((d) => [d.key, d] as const))(
+      "[%s] compiles against its registry expression",
+      (key, def) => {
+        const literal = def.kind === "range" ? "1" : "x";
+        const compiled = translateFilterToClickHouse(`${key}:${literal}`, "tenant-1", {
+          from: 0,
+          to: 1,
+        });
+        expect(compiled?.sql).toContain(def.expression);
+      },
+    );
   });
 });
 
@@ -747,29 +740,20 @@ const PROTOTYPE_FIELDS = [
 
 describe("given a filter field that collides with an Object.prototype member", () => {
   describe("when the dispatcher evaluates it in memory", () => {
-    it.each(
-      PROTOTYPE_FIELDS,
-    )("[%s] fails closed instead of throwing", (field) => {
-      expect(() =>
-        evaluateQueryInMemory(`${field}:x`, makeTrace({})),
-      ).not.toThrow();
+    it.each(PROTOTYPE_FIELDS)("[%s] fails closed instead of throwing", (field) => {
+      expect(() => evaluateQueryInMemory(`${field}:x`, makeTrace({}))).not.toThrow();
       expect(evaluateQueryInMemory(`${field}:x`, makeTrace({}))).toBe(false);
     });
 
     it("fails closed when the poisoned tag is OR-ed with a matching one", () => {
       expect(
-        evaluateQueryInMemory(
-          "topic:t1 OR constructor:x",
-          makeTrace({ topicId: "t1" }),
-        ),
+        evaluateQueryInMemory("topic:t1 OR constructor:x", makeTrace({ topicId: "t1" })),
       ).toBe(false);
     });
   });
 
   describe("when the save-time gate compiles it", () => {
-    it.each(
-      PROTOTYPE_FIELDS,
-    )("[%s] is rejected as an unknown field", (field) => {
+    it.each(PROTOTYPE_FIELDS)("[%s] is rejected as an unknown field", (field) => {
       expect(() =>
         translateFilterToClickHouse(`${field}:x`, "tenant-1", {
           from: 0,
@@ -784,12 +768,12 @@ describe("given a filter field that collides with an Object.prototype member", (
       // `Attributes['constructor'] != ''` is false in ClickHouse for every
       // trace that never carried the key; the in-memory read must agree rather
       // than hand back the inherited `Object.prototype.constructor`.
-      expect(
-        evaluateQueryInMemory("has:attribute.constructor", makeTrace({})),
-      ).toBe(false);
-      expect(
-        evaluateQueryInMemory("none:attribute.constructor", makeTrace({})),
-      ).toBe(true);
+      expect(evaluateQueryInMemory("has:attribute.constructor", makeTrace({}))).toBe(
+        false,
+      );
+      expect(evaluateQueryInMemory("none:attribute.constructor", makeTrace({}))).toBe(
+        true,
+      );
     });
 
     it("still matches an attribute genuinely named constructor", () => {
@@ -823,9 +807,7 @@ describe("queryNeeds", () => {
 
     it("collects events for event fields and prefixes", () => {
       expect(queryNeeds("event:user_feedback").has("events")).toBe(true);
-      expect(queryNeeds("event.attribute.exception.type:x").has("events")).toBe(
-        true,
-      );
+      expect(queryNeeds("event.attribute.exception.type:x").has("events")).toBe(true);
     });
 
     it("collects spans for span fields and prefixes", () => {

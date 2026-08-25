@@ -84,9 +84,7 @@ describe("LlmConfigRepository", () => {
 
         const config2 = {
           ...baseConfig,
-          messages: [
-            { role: "user" as const, content: "Different message {{input}}" },
-          ],
+          messages: [{ role: "user" as const, content: "Different message {{input}}" }],
         };
 
         const result = repository.compareConfigContent(config1, config2);

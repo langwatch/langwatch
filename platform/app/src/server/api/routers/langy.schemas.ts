@@ -21,9 +21,7 @@ export const langyConversationStatusSchema = z.enum([
   "failed",
   "archived",
 ]);
-export type LangyConversationStatus = z.infer<
-  typeof langyConversationStatusSchema
->;
+export type LangyConversationStatus = z.infer<typeof langyConversationStatusSchema>;
 
 /** The slim spine row the recent-chats list renders. No message content. */
 export const langyConversationListItemSchema = z.object({
@@ -48,20 +46,12 @@ export type LangyConversationListCursorDto = z.infer<
 >;
 
 /** Detail read for an opened conversation. Adds lifecycle status. */
-export const langyConversationDetailSchema =
-  langyConversationListItemSchema.extend({
-    status: langyConversationStatusSchema.default("active"),
-  });
-export type LangyConversationDetailDto = z.infer<
-  typeof langyConversationDetailSchema
->;
+export const langyConversationDetailSchema = langyConversationListItemSchema.extend({
+  status: langyConversationStatusSchema.default("active"),
+});
+export type LangyConversationDetailDto = z.infer<typeof langyConversationDetailSchema>;
 
-export const langyMessageRoleSchema = z.enum([
-  "user",
-  "assistant",
-  "tool",
-  "system",
-]);
+export const langyMessageRoleSchema = z.enum(["user", "assistant", "tool", "system"]);
 export type LangyMessageDtoRole = z.infer<typeof langyMessageRoleSchema>;
 
 /**

@@ -176,19 +176,17 @@ function buildService(options?: {
     change: vi.fn().mockResolvedValue(undefined),
     revoke: vi.fn().mockResolvedValue(undefined),
   };
-  const authz = ({
+  const authz = {
     listScopeBindings: () => Promise.resolve(options?.accessBindings ?? []),
     listTeamMemberBindings: () =>
-      Promise.resolve(
-        new Map([[team.id, options?.memberBindings ?? []]]),
-      ),
+      Promise.resolve(new Map([[team.id, options?.memberBindings ?? []]])),
     listUserCreatedRoles: () => Promise.resolve([]),
-  } as unknown) as AuthzService;
-  const grants = ({
+  } as unknown as AuthzService;
+  const grants = {
     attachBindings: calls.attach,
     changeBindingRole: calls.change,
     revokeBindings: calls.revoke,
-  } as unknown) as AuthzGrantsService;
+  } as unknown as AuthzGrantsService;
   const service = OrganizationService.create({
     repository: {} as OrganizationRepository,
     teams,
@@ -270,9 +268,7 @@ describe("OrganizationService team membership", () => {
 
   it("refuses removal of the last effective admin before fencing or revoking", async () => {
     const { service, teams, calls } = buildService({
-      accessBindings: [
-        accessBinding({ id: "admin", userId: "admin", role: "ADMIN" }),
-      ],
+      accessBindings: [accessBinding({ id: "admin", userId: "admin", role: "ADMIN" })],
     });
     await expect(
       service.removeTeamMember({
@@ -312,9 +308,7 @@ describe("OrganizationService team membership", () => {
 
   it("refuses a bulk edit that would remove the team's last admin", async () => {
     const { service } = buildService({
-      accessBindings: [
-        accessBinding({ id: "admin", userId: "admin", role: "ADMIN" }),
-      ],
+      accessBindings: [accessBinding({ id: "admin", userId: "admin", role: "ADMIN" })],
     });
     await expect(
       service.updateTeamWithMembers({

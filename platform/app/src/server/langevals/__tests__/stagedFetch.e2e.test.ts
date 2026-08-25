@@ -48,10 +48,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { stagedLangevalsFetch } from "../stagedFetch";
 
 const E2E_ENABLED = process.env.LANGEVALS_E2E_ENABLED === "1";
-const LANGEVALS_DIR = resolve(
-  __dirname,
-  "../../../../../../services/langevals",
-);
+const LANGEVALS_DIR = resolve(__dirname, "../../../../../../services/langevals");
 
 interface Harness {
   port: number;
@@ -127,9 +124,7 @@ describeFn("stagedLangevalsFetch e2e (real S3 + real langevals)", () => {
     // ...and after the call returns, the in-app finally must have
     // deleted the staged object, so nothing lingers in the bucket.
     const staged = await listStagingObjects(h);
-    const matching = staged.filter((k) =>
-      k.includes("project_e2e_eval/evaluation/"),
-    );
+    const matching = staged.filter((k) => k.includes("project_e2e_eval/evaluation/"));
     expect(matching).toEqual([]);
   }, 120_000);
 

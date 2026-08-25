@@ -48,13 +48,10 @@ function mergedIndexSpan({
     let high = Number.NEGATIVE_INFINITY;
     for (const point of points) {
       const counts =
-        side === "positive"
-          ? point.positiveBucketCounts
-          : point.negativeBucketCounts;
+        side === "positive" ? point.positiveBucketCounts : point.negativeBucketCounts;
       if (counts.length === 0) continue;
       const offset =
-        (side === "positive" ? point.positiveOffset : point.negativeOffset) ??
-        0;
+        (side === "positive" ? point.positiveOffset : point.negativeOffset) ?? 0;
       const divisor = 2 ** Math.max(0, (point.exponentialScale ?? 0) - scale);
       low = Math.min(low, Math.floor(offset / divisor));
       high = Math.max(high, Math.floor((offset + counts.length - 1) / divisor));
@@ -79,10 +76,7 @@ function selectCommonLayout(
   ) {
     scale--;
   }
-  const downscaled = new Map<
-    string,
-    { positive: BucketMap; negative: BucketMap }
-  >();
+  const downscaled = new Map<string, { positive: BucketMap; negative: BucketMap }>();
   for (const [pointId, point] of contributors) {
     downscaled.set(pointId, {
       positive: downscaleBuckets({
@@ -162,9 +156,7 @@ function differenceExponentialPoint({
     zeroCount,
     count,
     sum:
-      previous.sum !== null && current.sum !== null
-        ? current.sum - previous.sum
-        : null,
+      previous.sum !== null && current.sum !== null ? current.sum - previous.sum : null,
   };
 }
 
@@ -200,8 +192,7 @@ function collectContributors({
   }
   return new Map<string, CanonicalMetricDataPoint>([
     ...entries.map(
-      ({ point }) =>
-        [point.pointId, point] as [string, CanonicalMetricDataPoint],
+      ({ point }) => [point.pointId, point] as [string, CanonicalMetricDataPoint],
     ),
     ...predecessors,
   ]);

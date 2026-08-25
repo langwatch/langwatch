@@ -15,10 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // `~/features/errors` barrel, which would put it in an import cycle with the
 // toaster. `components/ui/toaster.tsx` reaches for it the same way.
 import { ErrorActions } from "~/features/errors/components/ErrorActions";
-import {
-  LangyMark,
-  LangyMarkGradientDefs,
-} from "~/features/langy/components/LangyMark";
+import { LangyMark, LangyMarkGradientDefs } from "~/features/langy/components/LangyMark";
 import "~/features/langy/langyTheme.css";
 import { CARD } from "~/features/asaplangy";
 import { classifyGenerationError } from "../scenarios/utils/classifyGenerationError";
@@ -205,9 +202,7 @@ export function AICreateModal({
         borderColor={assistant ? CARD.border : undefined}
         // A plain deep shadow — no purple "AI" glow. LangWatch's chrome is a
         // hairline and one warm accent, not a spectrum.
-        boxShadow={
-          assistant ? "0 28px 90px -32px rgba(2, 6, 23, 0.62)" : undefined
-        }
+        boxShadow={assistant ? "0 28px 90px -32px rgba(2, 6, 23, 0.62)" : undefined}
       >
         {assistant && <LangyMarkGradientDefs />}
         {showCloseButton && <Dialog.CloseTrigger />}
@@ -277,8 +272,7 @@ export function AICreateModal({
                         letterSpacing="0.1em"
                         textTransform="uppercase"
                       >
-                        {assistant.promptLabel ??
-                          `Tell ${assistant.name} what to test`}
+                        {assistant.promptLabel ?? `Tell ${assistant.name} what to test`}
                       </Text>
                       <Textarea
                         placeholder={placeholder}
@@ -424,8 +418,7 @@ function InspirationChips({
   return (
     <Box>
       <Text fontSize="sm" color="fg.muted" mb={2}>
-        Need inspiration? Pick a pattern and {assistantName} takes it from
-        there.
+        Need inspiration? Pick a pattern and {assistantName} takes it from there.
       </Text>
       <HStack gap={2} flexWrap="wrap">
         {templates.map((template) => (
@@ -593,11 +586,7 @@ function IdleFooter({
         <Button variant="ghost" onClick={onSkip}>
           I&apos;ll write it myself
         </Button>
-        <Button
-          colorPalette="blue"
-          onClick={onGenerate}
-          disabled={isGenerateDisabled}
-        >
+        <Button colorPalette="blue" onClick={onGenerate} disabled={isGenerateDisabled}>
           <Sparkles size={14} />
           Generate with AI
         </Button>
@@ -639,10 +628,7 @@ function StartModeToggle({
         <Sparkles size={13} />
         With {assistantName}
       </StartModeButton>
-      <StartModeButton
-        active={mode === "manual"}
-        onClick={() => onChange("manual")}
-      >
+      <StartModeButton active={mode === "manual"} onClick={() => onChange("manual")}>
         <PencilLine size={13} />
         Build it myself
       </StartModeButton>
@@ -715,9 +701,9 @@ function ManualStartState({ assistantName }: { assistantName: string }) {
         <VStack align="start" gap={1}>
           <Text fontWeight="semibold">Build it yourself</Text>
           <Text color="fg.muted" fontSize="sm" lineHeight="tall">
-            Open a blank scenario and write the situation and success criteria
-            by hand — no model involved. You can hand it to {assistantName} for
-            a draft at any point.
+            Open a blank scenario and write the situation and success criteria by hand —
+            no model involved. You can hand it to {assistantName} for a draft at any
+            point.
           </Text>
         </VStack>
       </HStack>
@@ -744,12 +730,7 @@ interface ErrorFooterProps {
   assistant?: AICreateAssistant;
 }
 
-function ErrorFooter({
-  error,
-  onSkip,
-  onTryAgain,
-  assistant,
-}: ErrorFooterProps) {
+function ErrorFooter({ error, onSkip, onTryAgain, assistant }: ErrorFooterProps) {
   const classified = classifyGenerationError(error);
 
   const showConfigure =

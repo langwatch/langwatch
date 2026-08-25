@@ -32,9 +32,9 @@ const nestedSpan = span.startSpan({
   name: "nested_pipeline",
 });
 
-nestedSpan.end()
+nestedSpan.end();
 
-span.end()
+span.end();
 ```
 
 Both LLM and RAG spans can also be nested like any arbritary span.

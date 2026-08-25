@@ -21,10 +21,7 @@ import { LIMIT_TYPE_DISPLAY_LABELS } from "~/server/license-enforcement/constant
 import { USAGE_UNKNOWN } from "~/server/traces/usage-count";
 import { getCurrentMonthStart } from "~/server/utils/dateUtils";
 import { TtlCache } from "~/server/utils/ttlCache";
-import {
-  captureException,
-  toError,
-} from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { NOTIFICATION_TYPES } from "@langwatch/enterprise-billing-contract";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
@@ -62,9 +59,7 @@ export interface UsageLimitData {
 }
 
 class NullNotificationRecordService extends NotificationRecordService {
-  listRecentByOrganization(
-    _input: NotificationRecentQuery,
-  ): Promise<Notification[]> {
+  listRecentByOrganization(_input: NotificationRecentQuery): Promise<Notification[]> {
     return Promise.resolve([]);
   }
 
@@ -216,8 +211,7 @@ export class UsageLimitService {
         return;
       }
 
-      const organization =
-        await this.organizationService.findWithAdmins(organizationId);
+      const organization = await this.organizationService.findWithAdmins(organizationId);
 
       if (!organization) {
         await planLimitCooldown.delete(organizationId);
@@ -225,11 +219,8 @@ export class UsageLimitService {
       }
 
       if (organization.sentPlanLimitAlert) {
-        const timeSinceLastAlert =
-          Date.now() - organization.sentPlanLimitAlert.getTime();
-        const daysSinceLastAlert = Math.floor(
-          timeSinceLastAlert / (1000 * 60 * 60 * 24),
-        );
+        const timeSinceLastAlert = Date.now() - organization.sentPlanLimitAlert.getTime();
+        const daysSinceLastAlert = Math.floor(timeSinceLastAlert / (1000 * 60 * 60 * 24));
 
         if (daysSinceLastAlert < MIN_DAYS_BETWEEN_ALERTS) {
           return;
@@ -312,8 +303,7 @@ export class UsageLimitService {
       let planName = "unknown";
       try {
         planName =
-          (await this.planProvider.getActivePlan({ organizationId })).name ??
-          "unknown";
+          (await this.planProvider.getActivePlan({ organizationId })).name ?? "unknown";
       } catch {
         // fall through with "unknown"
       }
@@ -350,8 +340,7 @@ export class UsageLimitService {
    * @returns The created notification record, or null if no notification was sent
    */
   async checkAndSendWarning(data: UsageLimitData) {
-    const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit } =
-      data;
+    const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit } = data;
 
     const usagePercentage =
       maxMonthlyUsageLimit > 0
@@ -372,8 +361,7 @@ export class UsageLimitService {
       return null;
     }
 
-    const organization =
-      await this.organizationService.findWithAdmins(organizationId);
+    const organization = await this.organizationService.findWithAdmins(organizationId);
 
     if (!organization) {
       logger.warn({ organizationId }, "Organization not found");
@@ -381,10 +369,7 @@ export class UsageLimitService {
     }
 
     if (organization.members.length === 0) {
-      logger.warn(
-        { organizationId },
-        "No admin members found for organization",
-      );
+      logger.warn({ organizationId }, "No admin members found for organization");
       return null;
     }
 
@@ -398,11 +383,10 @@ export class UsageLimitService {
     // constraint on (organizationId, threshold, yearMonth) via a database migration.
     const currentMonthStart = getCurrentMonthStart();
 
-    const recentNotifications =
-      await this.notificationRecords.listRecentByOrganization({
-        organizationId,
-        since: currentMonthStart,
-      });
+    const recentNotifications = await this.notificationRecords.listRecentByOrganization({
+      organizationId,
+      since: currentMonthStart,
+    });
 
     const recentNotification = recentNotifications.find((notification) => {
       if (!notification.metadata || typeof notification.metadata !== "object") {
@@ -429,8 +413,7 @@ export class UsageLimitService {
     }
 
     // Fetch projects and their usage
-    const projects =
-      await this.organizationService.findProjectsWithName(organizationId);
+    const projects = await this.organizationService.findProjectsWithName(organizationId);
 
     const projectIds = projects.map((p) => p.id);
     const counts = await this.usageService.getCountByProjects({
@@ -465,9 +448,7 @@ export class UsageLimitService {
       projectUsageData,
     });
 
-    const deliverableAdmins = organization.members.filter(
-      (member) => member.user.email,
-    );
+    const deliverableAdmins = organization.members.filter((member) => member.user.email);
 
     if (deliverableAdmins.length === 0) {
       logger.info(
@@ -483,16 +464,13 @@ export class UsageLimitService {
     }
 
     try {
-      const {
-        recipientsSuccessCount,
-        recipientsFailureCount,
-        failedRecipients,
-      } = await this.dispatchEmails({
-        organizationId,
-        organizationName: organization.name,
-        deliverableAdmins,
-        emailContext,
-      });
+      const { recipientsSuccessCount, recipientsFailureCount, failedRecipients } =
+        await this.dispatchEmails({
+          organizationId,
+          organizationName: organization.name,
+          deliverableAdmins,
+          emailContext,
+        });
 
       if (recipientsSuccessCount === 0) {
         logger.error(
@@ -556,9 +534,7 @@ export class UsageLimitService {
   private calculateThreshold(
     usagePercentage: number,
   ): (typeof USAGE_WARNING_THRESHOLDS)[number] | undefined {
-    return USAGE_WARNING_THRESHOLDS.findLast(
-      (threshold) => usagePercentage >= threshold,
-    );
+    return USAGE_WARNING_THRESHOLDS.findLast((threshold) => usagePercentage >= threshold);
   }
 
   /**
@@ -643,10 +619,7 @@ export class UsageLimitService {
     emailResults.forEach((result, index) => {
       const member = deliverableAdmins[index];
       if (!member) {
-        logger.warn(
-          { index, organizationId },
-          "Member not found at index, skipping",
-        );
+        logger.warn({ index, organizationId }, "Member not found at index, skipping");
         return;
       }
 
@@ -655,9 +628,7 @@ export class UsageLimitService {
       } else {
         recipientsFailureCount++;
         const errorMessage =
-          result.reason instanceof Error
-            ? result.reason.message
-            : String(result.reason);
+          result.reason instanceof Error ? result.reason.message : String(result.reason);
         failedRecipients.push({
           userId: member.user.id,
           error: errorMessage,

@@ -161,29 +161,18 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
       const cacheRead =
         asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS)) ??
         asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS));
-      const cacheWrite = asNumber(
-        attrs.take(ATTR_KEYS.AI_USAGE_CACHE_WRITE_TOKENS),
-      );
-      const noCacheTokens = asNumber(
-        attrs.take(ATTR_KEYS.AI_USAGE_NO_CACHE_TOKENS),
-      );
+      const cacheWrite = asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHE_WRITE_TOKENS));
+      const noCacheTokens = asNumber(attrs.take(ATTR_KEYS.AI_USAGE_NO_CACHE_TOKENS));
       if (cacheRead !== null && cacheRead > 0) {
-        ctx.setAttrIfAbsent(
-          ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-          cacheRead,
-        );
-        ctx.recordRule(
-          `${this.id}:ai.usage.cacheRead->gen_ai.usage.cache_read`,
-        );
+        ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cacheRead);
+        ctx.recordRule(`${this.id}:ai.usage.cacheRead->gen_ai.usage.cache_read`);
       }
       if (cacheWrite !== null && cacheWrite > 0) {
         ctx.setAttrIfAbsent(
           ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
           cacheWrite,
         );
-        ctx.recordRule(
-          `${this.id}:ai.usage.cacheWrite->gen_ai.usage.cache_creation`,
-        );
+        ctx.recordRule(`${this.id}:ai.usage.cacheWrite->gen_ai.usage.cache_creation`);
       }
 
       // The AI SDK's input count is the FULL prompt total, cache included.
@@ -204,14 +193,9 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
         }
       }
 
-      const reasoningTokens = asNumber(
-        attrs.take(ATTR_KEYS.AI_USAGE_REASONING_TOKENS),
-      );
+      const reasoningTokens = asNumber(attrs.take(ATTR_KEYS.AI_USAGE_REASONING_TOKENS));
       if (reasoningTokens !== null && reasoningTokens > 0) {
-        ctx.setAttrIfAbsent(
-          ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
-          reasoningTokens,
-        );
+        ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, reasoningTokens);
         ctx.recordRule(
           `${this.id}:ai.usage.reasoningTokens->gen_ai.usage.reasoning_tokens`,
         );
@@ -225,32 +209,23 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
       const prompt =
-        attrs.take(ATTR_KEYS.AI_PROMPT_MESSAGES) ??
-        attrs.take(ATTR_KEYS.AI_PROMPT);
+        attrs.take(ATTR_KEYS.AI_PROMPT_MESSAGES) ?? attrs.take(ATTR_KEYS.AI_PROMPT);
 
       if (typeof prompt === "string") {
         // Simple string prompt → wrap as user message
-        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [
-          { role: "user", content: prompt },
-        ]);
+        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [{ role: "user", content: prompt }]);
         ctx.recordRule(`${this.id}:ai.prompt(string)->gen_ai.input.messages`);
       } else if (isRecord(prompt)) {
         // Object prompt → pass through (may be a single message)
         ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, prompt);
-        ctx.recordRule(
-          `${this.id}:ai.prompt.messages{}->gen_ai.input.messages`,
-        );
+        ctx.recordRule(`${this.id}:ai.prompt.messages{}->gen_ai.input.messages`);
       } else if (Array.isArray(prompt)) {
         // Array of messages → pass through directly
         ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, prompt);
-        ctx.recordRule(
-          `${this.id}:ai.prompt.messages[]->gen_ai.input.messages`,
-        );
+        ctx.recordRule(`${this.id}:ai.prompt.messages[]->gen_ai.input.messages`);
       } else if (prompt !== undefined) {
         // Unknown format → best effort wrap as user message
-        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [
-          { role: "user", content: prompt },
-        ]);
+        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [{ role: "user", content: prompt }]);
         ctx.recordRule(`${this.id}:ai.prompt(unknown)->gen_ai.input.messages`);
       }
 
@@ -261,13 +236,9 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
         // Extract system instruction from input messages
         const inputMsgs = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES];
         if (Array.isArray(inputMsgs)) {
-          const sysInstruction =
-            extractSystemInstructionFromMessages(inputMsgs);
+          const sysInstruction = extractSystemInstructionFromMessages(inputMsgs);
           if (sysInstruction !== null) {
-            ctx.setAttrIfAbsent(
-              ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-              sysInstruction,
-            );
+            ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
           }
         }
       }
@@ -286,8 +257,7 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)) {
       const responseAttr = attrs.take(ATTR_KEYS.AI_RESPONSE);
-      const hasUsableResponse =
-        isNonEmptyString(responseAttr) || isRecord(responseAttr);
+      const hasUsableResponse = isNonEmptyString(responseAttr) || isRecord(responseAttr);
       const responseTextAttr = !hasUsableResponse
         ? attrs.take(ATTR_KEYS.AI_RESPONSE_TEXT)
         : undefined;
@@ -303,18 +273,13 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
             content: JSON.stringify(responseTextAttr),
           },
         ]);
-        ctx.recordRule(
-          `${this.id}:ai.response.text(parsed)->gen_ai.output.messages`,
-        );
+        ctx.recordRule(`${this.id}:ai.response.text(parsed)->gen_ai.output.messages`);
       } else if (isRecord(response)) {
         const responseObj = response as Record<string, unknown>;
         const messages: unknown[] = [];
 
         // Extract text content
-        if (
-          typeof responseObj.text === "string" &&
-          responseObj.text.length > 0
-        ) {
+        if (typeof responseObj.text === "string" && responseObj.text.length > 0) {
           messages.push({ role: "assistant", content: responseObj.text });
         }
 
@@ -342,9 +307,7 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
         ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
           { role: "assistant", content: response },
         ]);
-        ctx.recordRule(
-          `${this.id}:ai.response(string)->gen_ai.output.messages`,
-        );
+        ctx.recordRule(`${this.id}:ai.response(string)->gen_ai.output.messages`);
       }
 
       // Fallback: flat ai.response.object attribute (generateObject / streamObject)
@@ -356,12 +319,8 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
             ? JSON.stringify(obj)
             : undefined;
         if (content !== undefined) {
-          ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
-            { role: "assistant", content },
-          ]);
-          ctx.recordRule(
-            `${this.id}:ai.response.object->gen_ai.output.messages`,
-          );
+          ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [{ role: "assistant", content }]);
+          ctx.recordRule(`${this.id}:ai.response.object->gen_ai.output.messages`);
         }
       }
 
@@ -390,9 +349,7 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
       ctx.recordRule(`${this.id}:ai.toolCall.args->input`);
     }
 
-    const result = stringifyToolPayload(
-      attrs.take(ATTR_KEYS.AI_TOOL_CALL_RESULT),
-    );
+    const result = stringifyToolPayload(attrs.take(ATTR_KEYS.AI_TOOL_CALL_RESULT));
     if (result !== null) {
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_OUTPUT, result);
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT, result);

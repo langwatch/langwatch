@@ -95,12 +95,8 @@ export const platformLicenseAccessSchema = z.object({
   inspections: z.array(platformLicenseInspectionSchema),
 });
 
-export type PlatformLicenseInspection = z.infer<
-  typeof platformLicenseInspectionSchema
->;
-export type PlatformLicenseAccess = z.infer<
-  typeof platformLicenseAccessSchema
->;
+export type PlatformLicenseInspection = z.infer<typeof platformLicenseInspectionSchema>;
+export type PlatformLicenseAccess = z.infer<typeof platformLicenseAccessSchema>;
 
 /** Compatibility aliases retained while callers migrate schema casing. */
 export const LicensePlanLimitsSchema = licensePlanLimitsSchema;

@@ -64,9 +64,7 @@ beforeEach(() => {
 
 describe("viewStore sort and grouping vs. the keyset cursors", () => {
   describe("given a flat lens sorted by Spans, paged forward to the third batch", () => {
-    beforeEach(() =>
-      seedThirdPageSortedBy({ columnId: "spans", direction: "desc" }),
-    );
+    beforeEach(() => seedThirdPageSortedBy({ columnId: "spans", direction: "desc" }));
 
     describe("when the user switches to by-service grouping", () => {
       it("drops the cursors, because the reconciled sort is a different column", () => {
@@ -90,9 +88,7 @@ describe("viewStore sort and grouping vs. the keyset cursors", () => {
   });
 
   describe("given a flat lens sorted by Cost, paged forward to the third batch", () => {
-    beforeEach(() =>
-      seedThirdPageSortedBy({ columnId: "cost", direction: "desc" }),
-    );
+    beforeEach(() => seedThirdPageSortedBy({ columnId: "cost", direction: "desc" }));
 
     describe("when the user switches to by-service grouping", () => {
       it("keeps the cursors — Cost survives reconciliation, so they still address the same rows", () => {
@@ -135,9 +131,7 @@ describe("viewStore sort and grouping vs. the keyset cursors", () => {
   });
 
   describe("given a flat lens on its default Time sort, paged forward", () => {
-    beforeEach(() =>
-      seedThirdPageSortedBy({ columnId: "time", direction: "desc" }),
-    );
+    beforeEach(() => seedThirdPageSortedBy({ columnId: "time", direction: "desc" }));
 
     describe("when the user switches to by-service grouping and straight back to flat", () => {
       it("leaves the table on the first batch rather than a cursor minted under Time", () => {
@@ -156,9 +150,7 @@ describe("viewStore sort and grouping vs. the keyset cursors", () => {
   // switch is one lens reading the other's cursor space.
   describe("given the second batch, one click of Next from the start", () => {
     describe("when the user switches from the flat list to Sessions", () => {
-      beforeEach(() =>
-        seedSecondPageSortedBy({ columnId: "time", direction: "desc" }),
-      );
+      beforeEach(() => seedSecondPageSortedBy({ columnId: "time", direction: "desc" }));
 
       /** @scenario Switching lenses does not carry a cursor across */
       it("starts Sessions at its own first batch", () => {

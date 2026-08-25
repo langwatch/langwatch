@@ -92,8 +92,7 @@ const CONNECTED_STATUS = {
       repositorySelection: "all",
       repositoryCount: null,
       suspended: false,
-      uninstallUrl:
-        "https://github.com/organizations/acme/settings/installations/555",
+      uninstallUrl: "https://github.com/organizations/acme/settings/installations/555",
     },
   ],
   installUrl: "/api/github/install?organizationId=org-1",

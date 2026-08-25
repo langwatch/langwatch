@@ -9,7 +9,9 @@ Data retention sets how long LangWatch keeps your event data before deleting it 
 You can tighten or extend retention per scope: the organization, a team, or a single project.
 
 <Note>
-  Configuring data retention requires an **Enterprise plan**. On other plans, every project uses the platform default window. See the [pricing page](/pricing) for how extended retention is billed.
+  Configuring data retention requires an **Enterprise plan**. On other plans, every
+  project uses the platform default window. See the [pricing page](/pricing) for how
+  extended retention is billed.
 </Note>
 
 ## How it works
@@ -25,7 +27,8 @@ Retention is configured with **retention policies**. Each policy has two parts:
 Retention periods range from a few weeks up to several years, set in weeks, months, or years. Periods always round to whole weeks, because deletion is partition-aligned (see [How deletion works](#how-deletion-works)).
 
 <Note>
-  When you retain data longer than your plan's included window, the additional storage is billed at **€3 per extra GB**. You only pay for what you store.
+  When you retain data longer than your plan's included window, the additional storage is
+  billed at **€3 per extra GB**. You only pay for what you store.
 </Note>
 
 ## Configuration
@@ -35,18 +38,15 @@ Organization owners and administrators manage policies under **Settings → Data
 To add a scoped policy:
 
 <Steps>
-  <Step title="Open the drawer">
-    Click **Add retention policy**.
-  </Step>
+  <Step title="Open the drawer">Click **Add retention policy**.</Step>
   <Step title="Choose a scope">
-    Pick the organization, a team, or a single project. A more specific scope overrides the broader defaults.
+    Pick the organization, a team, or a single project. A more specific scope overrides
+    the broader defaults.
   </Step>
   <Step title="Pick a retention period">
     Choose one of the preset windows or enter a custom value in weeks, months, or years.
   </Step>
-  <Step title="Create">
-    Click **Create** to save the policy.
-  </Step>
+  <Step title="Create">Click **Create** to save the policy.</Step>
 </Steps>
 
 ### Applying the change to existing data
@@ -54,7 +54,7 @@ To add a scoped policy:
 When you create or update a policy, you choose whether it applies only going forward or also to data you've already stored:
 
 - **Off**: the new retention applies to newly ingested data only.
-- **On** (*"Apply this change to existing data"*): LangWatch rewrites the scope's existing rows so the new retention takes effect immediately. Data that is already older than the new window is removed on the next cleanup.
+- **On** (_"Apply this change to existing data"_): LangWatch rewrites the scope's existing rows so the new retention takes effect immediately. Data that is already older than the new window is removed on the next cleanup.
 
 ## How deletion works
 
@@ -63,7 +63,8 @@ LangWatch periodically removes any events that fall outside the configured reten
 A few things to keep in mind:
 
 <Warning>
-  **Deletion is permanent.** Once data is removed it cannot be recovered. If you need to keep data beyond your retention window, export it before it expires.
+  **Deletion is permanent.** Once data is removed it cannot be recovered. If you need to
+  keep data beyond your retention window, export it before it expires.
 </Warning>
 
 - **Retention applies to the underlying data, regardless of references.** If another object, for example a dataset or an evaluation, references an event that has since been deleted, that reference points to data that no longer exists.

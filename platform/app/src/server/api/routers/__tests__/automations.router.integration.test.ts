@@ -3,10 +3,7 @@
  *
  * Router-level tests for automation filter validation and update sanitization.
  */
-import {
-  type RedisConnection,
-  RedisConnectionService,
-} from "@langwatch/redis-client";
+import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -87,8 +84,7 @@ vi.mock("../../../rateLimit", () => ({
 }));
 
 vi.mock("~/server/license-enforcement", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/license-enforcement")>();
+  const actual = await importOriginal<typeof import("~/server/license-enforcement")>();
 
   return {
     ...actual,
@@ -372,9 +368,9 @@ describe("automationRouter", () => {
           expect(
             (result.actionParams as Record<string, unknown>).slackBotToken,
           ).toBeUndefined();
-          expect(
-            (result.actionParams as Record<string, unknown>).slackBotTokenSet,
-          ).toBe(true);
+          expect((result.actionParams as Record<string, unknown>).slackBotTokenSet).toBe(
+            true,
+          );
         });
       });
 
@@ -400,10 +396,7 @@ describe("automationRouter", () => {
 
           expect(mockTriggerCreate).toHaveBeenCalledTimes(1);
           const createArgs = mockTriggerCreate.mock.calls[0]![0];
-          const persisted = createArgs.data.actionParams as Record<
-            string,
-            unknown
-          >;
+          const persisted = createArgs.data.actionParams as Record<string, unknown>;
           expect(persisted.slackBotToken).toBeUndefined();
           expect(persisted.members).toEqual(["ops@example.com"]);
         });
@@ -448,9 +441,9 @@ describe("automationRouter", () => {
       it("rejects with NOT_FOUND before persisting", async () => {
         mockCustomGraphFindUnique.mockResolvedValueOnce(null);
 
-        await expect(
-          caller.upsert(baseGraphAlertInput as any),
-        ).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(caller.upsert(baseGraphAlertInput as any)).rejects.toMatchObject({
+          code: "NOT_FOUND",
+        });
 
         expect(mockTriggerCreate).not.toHaveBeenCalled();
       });
@@ -712,10 +705,7 @@ describe("automationRouter", () => {
           cron: "0 9 * * 1",
           timezone: "Mars/Olympus",
         },
-      ])("rejects $name before anything is written", async ({
-        cron,
-        timezone,
-      }) => {
+      ])("rejects $name before anything is written", async ({ cron, timezone }) => {
         await expect(
           caller.upsert({
             ...baseReportInput,
@@ -949,18 +939,17 @@ describe("automationRouter", () => {
   describe("getTriggerStats", () => {
     describe("when a project has fire history", () => {
       beforeEach(() => {
-        mockTriggerSentGroupBy.mockImplementation(
-          ({ _max }: { _max?: unknown }) =>
-            Promise.resolve(
-              _max
-                ? [
-                    {
-                      triggerId: "trigger_1",
-                      _max: { createdAt: new Date("2026-07-09T10:00:00Z") },
-                    },
-                  ]
-                : [{ triggerId: "trigger_1", _count: { _all: 4 } }],
-            ),
+        mockTriggerSentGroupBy.mockImplementation(({ _max }: { _max?: unknown }) =>
+          Promise.resolve(
+            _max
+              ? [
+                  {
+                    triggerId: "trigger_1",
+                    _max: { createdAt: new Date("2026-07-09T10:00:00Z") },
+                  },
+                ]
+              : [{ triggerId: "trigger_1", _count: { _all: 4 } }],
+          ),
         );
         mockTriggerSentFindMany.mockResolvedValue([{ triggerId: "trigger_1" }]);
       });
@@ -1042,8 +1031,7 @@ describe("automationRouter", () => {
           triggerId: "trigger_1",
         });
 
-        const selectArg =
-          mockTriggerSentFindMany.mock.calls[0]![0].select ?? {};
+        const selectArg = mockTriggerSentFindMany.mock.calls[0]![0].select ?? {};
         expect(Object.keys(selectArg).sort()).toEqual([
           "createdAt",
           "customGraphId",
@@ -1272,9 +1260,7 @@ describe("automationRouter", () => {
     });
 
     it("refuses the upsert create and persists nothing", async () => {
-      await expect(
-        caller.upsert(baseAutomationInput as any),
-      ).rejects.toMatchObject({
+      await expect(caller.upsert(baseAutomationInput as any)).rejects.toMatchObject({
         code: "UNPROCESSABLE_CONTENT",
         cause: { code: "trigger_filters_required" },
       });
@@ -1401,9 +1387,7 @@ describe("automationRouter", () => {
       } as any);
 
       expect(mockTriggerCreate).toHaveBeenCalledTimes(1);
-      expect(mockTriggerCreate.mock.calls[0]![0].data.triggerKind).toBe(
-        "ALERT",
-      );
+      expect(mockTriggerCreate.mock.calls[0]![0].data.triggerKind).toBe("ALERT");
     });
   });
 });

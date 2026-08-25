@@ -7,10 +7,7 @@ import {
   ClickHouseContainer,
   type StartedClickHouseContainer,
 } from "@testcontainers/clickhouse";
-import {
-  RedisContainer,
-  type StartedRedisContainer,
-} from "@testcontainers/redis";
+import { RedisContainer, type StartedRedisContainer } from "@testcontainers/redis";
 import { migrateUp } from "~/server/clickhouse/goose";
 import {
   nativeClickHouseBaseUrl,
@@ -79,20 +76,14 @@ function createStoragePolicyConfigFile(): string {
   return configPath;
 }
 
-const MIGRATIONS_HASH_FILE = path.join(
-  os.tmpdir(),
-  "langwatch-test-migrations-hash.txt",
-);
+const MIGRATIONS_HASH_FILE = path.join(os.tmpdir(), "langwatch-test-migrations-hash.txt");
 
 /**
  * Computes a hash of all migration files so we can detect when new
  * migrations are added and need to be applied to the reused container.
  */
 function computeMigrationsHash(): string {
-  const migrationsDir = path.join(
-    __dirname,
-    "../../../../server/clickhouse/migrations",
-  );
+  const migrationsDir = path.join(__dirname, "../../../../server/clickhouse/migrations");
   if (!fs.existsSync(migrationsDir)) return "";
   const files = fs
     .readdirSync(migrationsDir)
@@ -202,9 +193,7 @@ async function setupLocalServices(urls: LocalServiceUrls): Promise<void> {
   if (urls.databaseUrl) {
     console.log(`[globalSetup] Postgres URL: ${urls.databaseUrl}`);
   }
-  console.log(
-    `[globalSetup] Container info written to: ${CONTAINER_INFO_FILE}`,
-  );
+  console.log(`[globalSetup] Container info written to: ${CONTAINER_INFO_FILE}`);
 }
 
 /**
@@ -225,20 +214,14 @@ function ensureLocalPostgresDatabase(databaseUrl: string): void {
 
   const exists = execFileSync(
     "psql",
-    [
-      adminUrl.toString(),
-      "-tAc",
-      `SELECT 1 FROM pg_database WHERE datname='${dbName}'`,
-    ],
+    [adminUrl.toString(), "-tAc", `SELECT 1 FROM pg_database WHERE datname='${dbName}'`],
     { encoding: "utf-8" },
   ).trim();
   if (exists !== "1") {
     console.log(`[globalSetup] Creating Postgres database ${dbName}...`);
-    execFileSync(
-      "psql",
-      [adminUrl.toString(), "-c", `CREATE DATABASE "${dbName}"`],
-      { stdio: "inherit" },
-    );
+    execFileSync("psql", [adminUrl.toString(), "-c", `CREATE DATABASE "${dbName}"`], {
+      stdio: "inherit",
+    });
   }
 }
 
@@ -278,11 +261,7 @@ export async function setup(): Promise<void> {
   }
 
   // Skip if using CI service containers
-  if (
-    process.env.CI_CLICKHOUSE_URL &&
-    process.env.CI_REDIS_URL &&
-    process.env.CI
-  ) {
+  if (process.env.CI_CLICKHOUSE_URL && process.env.CI_REDIS_URL && process.env.CI) {
     console.log("[globalSetup] Using CI service containers");
     return;
   }
@@ -335,9 +314,7 @@ export async function setup(): Promise<void> {
     });
     saveMigrationsHash();
   } else {
-    console.log(
-      "[globalSetup] Migration files unchanged, skipping migrations.",
-    );
+    console.log("[globalSetup] Migration files unchanged, skipping migrations.");
   }
 
   // Create URL with the correct database name for test workers
@@ -354,9 +331,7 @@ export async function setup(): Promise<void> {
 
   console.log(`[globalSetup] ClickHouse URL: ${clickHouseUrl}`);
   console.log(`[globalSetup] Redis URL: ${redisUrl}`);
-  console.log(
-    `[globalSetup] Container info written to: ${CONTAINER_INFO_FILE}`,
-  );
+  console.log(`[globalSetup] Container info written to: ${CONTAINER_INFO_FILE}`);
   console.log("[globalSetup] Testcontainers started successfully");
 }
 
@@ -367,11 +342,7 @@ export async function setup(): Promise<void> {
  */
 export async function teardown(): Promise<void> {
   // Skip if using CI service containers
-  if (
-    process.env.CI_CLICKHOUSE_URL &&
-    process.env.CI_REDIS_URL &&
-    process.env.CI
-  ) {
+  if (process.env.CI_CLICKHOUSE_URL && process.env.CI_REDIS_URL && process.env.CI) {
     return;
   }
 

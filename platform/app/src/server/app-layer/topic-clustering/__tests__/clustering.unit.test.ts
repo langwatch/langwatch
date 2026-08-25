@@ -58,10 +58,7 @@ vi.mock("~/server/langevals/stagedFetch", () => ({
 
 import { prisma } from "~/server/db";
 import { stagedLangevalsFetch } from "../../../langevals/stagedFetch";
-import {
-  clusterTopicsForProject,
-  fetchTracesFromClickHouse,
-} from "../clustering";
+import { clusterTopicsForProject, fetchTracesFromClickHouse } from "../clustering";
 
 function makeProject(overrides: Record<string, unknown> = {}) {
   return {
@@ -81,17 +78,14 @@ describe("clusterTopicsForProject", () => {
 
   describe("when ClickHouse is available", () => {
     it("reads counts from CH and searches CH, no ES calls", async () => {
-      vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject() as any,
-      );
+      vi.mocked(prisma.project.findUnique).mockResolvedValue(makeProject() as any);
       resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
       // CH count query (single query for all 4 counts)
       mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "5", recent: "5", assigned: "0" }]),
+        json: () => Promise.resolve([{ total: "5", recent: "5", assigned: "0" }]),
       });
 
       // CH search query returns fewer than minimumTraces (10 for batch)
@@ -114,17 +108,14 @@ describe("clusterTopicsForProject", () => {
       // the cursor must still advance or older eligible traces are stranded.
       // The fetch returns rows (so returnedCount > 10 and lastSort is set)
       // whose ComputedInput is empty (so no usable traces survive extraction).
-      vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject() as any,
-      );
+      vi.mocked(prisma.project.findUnique).mockResolvedValue(makeProject() as any);
       resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
       // Counts
       mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
+        json: () => Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
       });
 
       // Search: a full page of empty-input traces (returnedCount > 10).
@@ -153,17 +144,14 @@ describe("clusterTopicsForProject", () => {
     // which goes through ModelProviderService → ModelProviderRepository.findAll
     // and prepareLitellmParams, requiring deeper mocking of the App singleton
     it.skip("maps CH results to TopicClusteringTrace and calls clustering", async () => {
-      vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject() as any,
-      );
+      vi.mocked(prisma.project.findUnique).mockResolvedValue(makeProject() as any);
       resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
       // Counts
       mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
+        json: () => Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
       });
 
       // CH search returns 12 traces (above the 10 minimum for batch)
@@ -190,9 +178,7 @@ describe("clusterTopicsForProject", () => {
 
   describe("when the ClickHouse resolver is unavailable for the project", () => {
     it("throws because ClickHouse is required", async () => {
-      vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject() as any,
-      );
+      vi.mocked(prisma.project.findUnique).mockResolvedValue(makeProject() as any);
       resolveClickHouseClient.mockRejectedValue(
         new Error("ClickHouse not available for tenant proj-1"),
       );
@@ -213,14 +199,10 @@ describe("clusterTopicsForProject", () => {
     // larger than one page ended after page one with a recently_clustered
     // skip and no cursor. The gate throttles run STARTS only — a
     // continuation page (searchAfter present) must go through.
-    const freshTopics = [
-      { id: "topic-1", parentId: null, createdAt: new Date() },
-    ];
+    const freshTopics = [{ id: "topic-1", parentId: null, createdAt: new Date() }];
 
     it("skips a NEW run as recently clustered", async () => {
-      vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject() as any,
-      );
+      vi.mocked(prisma.project.findUnique).mockResolvedValue(makeProject() as any);
       vi.mocked(prisma.topic.findMany).mockResolvedValue(freshTopics as any);
       resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
@@ -228,8 +210,7 @@ describe("clusterTopicsForProject", () => {
 
       // Counts: topics exist but < 1200 assigned, so still batch mode.
       mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
+        json: () => Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
       });
 
       const outcome = await clusterTopicsForProject({
@@ -242,17 +223,14 @@ describe("clusterTopicsForProject", () => {
     });
 
     it("lets a continuation page through instead of ending the walk", async () => {
-      vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject() as any,
-      );
+      vi.mocked(prisma.project.findUnique).mockResolvedValue(makeProject() as any);
       vi.mocked(prisma.topic.findMany).mockResolvedValue(freshTopics as any);
       resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
       mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
+        json: () => Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
       });
       // The fetch runs (the gate did not fire) and returns nothing further.
       mockClickHouseQuery.mockResolvedValueOnce({
@@ -272,17 +250,14 @@ describe("clusterTopicsForProject", () => {
 
   describe("when CH search uses pagination (search_after)", () => {
     it("passes cursor params to CH query", async () => {
-      vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject() as any,
-      );
+      vi.mocked(prisma.project.findUnique).mockResolvedValue(makeProject() as any);
       resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
       // Counts
       mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
+        json: () => Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
       });
 
       // Search - empty result
@@ -311,16 +286,13 @@ describe("clusterTopicsForProject", () => {
   describe("when CH search returns ComputedInput", () => {
     // Skipped: same as above — batchClusterTraces requires deeper App singleton mocking
     it.skip("extracts input text from JSON-stringified ComputedInput", async () => {
-      vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject() as any,
-      );
+      vi.mocked(prisma.project.findUnique).mockResolvedValue(makeProject() as any);
       resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
       mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
+        json: () => Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
       });
 
       // Return traces with various ComputedInput formats
@@ -403,13 +375,7 @@ describe("fetchTracesFromClickHouse de-duplication", () => {
       }),
     } as any;
 
-    const res = await fetchTracesFromClickHouse(
-      mockCh,
-      "proj-1",
-      false,
-      [],
-      [],
-    );
+    const res = await fetchTracesFromClickHouse(mockCh, "proj-1", false, [], []);
 
     expect(res.returnedCount).toBe(2); // t-0 counted once + t-1
     expect(res.traces).toHaveLength(2);

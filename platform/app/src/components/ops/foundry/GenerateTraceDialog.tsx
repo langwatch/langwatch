@@ -100,10 +100,7 @@ export function GenerateTraceDialog() {
                 value={targetSpanCount}
                 onChange={(e) =>
                   setTargetSpanCount(
-                    Math.max(
-                      10,
-                      Math.min(5000, parseInt(e.target.value) || 100),
-                    ),
+                    Math.max(10, Math.min(5000, parseInt(e.target.value) || 100)),
                   )
                 }
                 min={10}
@@ -121,9 +118,7 @@ export function GenerateTraceDialog() {
                     flex={1}
                     textStyle="2xs"
                   >
-                    {v >= 1000
-                      ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k`
-                      : v}
+                    {v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : v}
                   </Button>
                 ))}
               </Flex>
@@ -237,8 +232,7 @@ export function GenerateTraceDialog() {
               onClick={handleGenerate}
               w="full"
               disabled={
-                useRealPrompts &&
-                (promptsQuery.isLoading || !promptsQuery.data?.length)
+                useRealPrompts && (promptsQuery.isLoading || !promptsQuery.data?.length)
               }
             >
               <Sparkles size={14} />

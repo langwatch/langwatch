@@ -19,9 +19,7 @@ export type FeatureDefinitionOptions<Infrastructure> = {
   name: string;
   requires?: readonly Capability<unknown>[];
   provides?: readonly Capability<unknown>[];
-  services?(
-    context: FeatureInstallContext<Infrastructure>,
-  ): void | Promise<void>;
+  services?(context: FeatureInstallContext<Infrastructure>): void | Promise<void>;
   app?(context: FeatureRuntimeContext): void | Promise<void>;
   worker?(context: FeatureRuntimeContext): void | Promise<void>;
 };
@@ -42,12 +40,8 @@ export class FeatureDefinition<Infrastructure = unknown> {
   readonly services:
     | ((context: FeatureInstallContext<Infrastructure>) => void | Promise<void>)
     | undefined;
-  readonly app:
-    | ((context: FeatureRuntimeContext) => void | Promise<void>)
-    | undefined;
-  readonly worker:
-    | ((context: FeatureRuntimeContext) => void | Promise<void>)
-    | undefined;
+  readonly app: ((context: FeatureRuntimeContext) => void | Promise<void>) | undefined;
+  readonly worker: ((context: FeatureRuntimeContext) => void | Promise<void>) | undefined;
 
   private constructor(options: FeatureDefinitionOptions<Infrastructure>) {
     this.name = options.name.trim();
@@ -122,11 +116,7 @@ export class FeatureRuntimeBuilder<Infrastructure> {
         infrastructure: this.infrastructure,
         resources: this.resources,
         require: (token) => {
-          FeatureRuntimeBuilder.assertDeclaredRequirement(
-            feature,
-            token,
-            required,
-          );
+          FeatureRuntimeBuilder.assertDeclaredRequirement(feature, token, required);
           return registry.require(token, feature.name);
         },
         provide: (token, value) => {
@@ -155,11 +145,7 @@ export class FeatureRuntimeBuilder<Infrastructure> {
       await feature[target]?.({
         resources: this.resources,
         require: (token) => {
-          FeatureRuntimeBuilder.assertDeclaredRequirement(
-            feature,
-            token,
-            visible,
-          );
+          FeatureRuntimeBuilder.assertDeclaredRequirement(feature, token, visible);
           return registry.require(token, feature.name);
         },
       });

@@ -68,9 +68,7 @@ export type HandleEventResult =
 const STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS = 2000;
 // TECH-DEBT: This fixed delay should become a retry loop with backoff.
 const waitForStripeConsistency = () =>
-  new Promise((resolve) =>
-    setTimeout(resolve, STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS),
-  );
+  new Promise((resolve) => setTimeout(resolve, STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS));
 
 export type WebhookService = {
   /**
@@ -103,13 +101,9 @@ export type WebhookService = {
 
   handleInvoicePaymentFailed(params: { subscriptionId: string }): Promise<void>;
 
-  handleSubscriptionDeleted(params: {
-    stripeSubscriptionId: string;
-  }): Promise<void>;
+  handleSubscriptionDeleted(params: { stripeSubscriptionId: string }): Promise<void>;
 
-  handleSubscriptionUpdated(params: {
-    subscription: Stripe.Subscription;
-  }): Promise<void>;
+  handleSubscriptionUpdated(params: { subscription: Stripe.Subscription }): Promise<void>;
 };
 
 export class EEWebhookService implements WebhookService {
@@ -270,10 +264,7 @@ export class EEWebhookService implements WebhookService {
         ? checkoutSession.payment_link
         : checkoutSession.payment_link?.id;
 
-    if (
-      !this.licensePaymentLinkId ||
-      paymentLinkId !== this.licensePaymentLinkId
-    ) {
+    if (!this.licensePaymentLinkId || paymentLinkId !== this.licensePaymentLinkId) {
       return null;
     }
 
@@ -318,9 +309,7 @@ export class EEWebhookService implements WebhookService {
         | "invoice.payment_failed";
     },
   ): Promise<HandleEventResult> {
-    const paymentIntent = event.data.object as
-      | Stripe.Checkout.Session
-      | Stripe.Invoice;
+    const paymentIntent = event.data.object as Stripe.Checkout.Session | Stripe.Invoice;
 
     const subscriptionId =
       typeof paymentIntent.subscription === "string"
@@ -393,8 +382,7 @@ export class EEWebhookService implements WebhookService {
     const checkoutSession = event.data.object as Stripe.Checkout.Session;
     const selectedCurrencyRaw = checkoutSession.metadata?.selectedCurrency;
     const selectedCurrency =
-      selectedCurrencyRaw &&
-      VALID_CURRENCIES_FOR_CHECKOUT.has(selectedCurrencyRaw)
+      selectedCurrencyRaw && VALID_CURRENCIES_FOR_CHECKOUT.has(selectedCurrencyRaw)
         ? selectedCurrencyRaw
         : null;
 
@@ -453,9 +441,7 @@ export class EEWebhookService implements WebhookService {
       groupType: "organization",
       groupKey: organizationId,
       properties: {
-        subscriptionCreatedAt: new Date(
-          checkoutSession.created * 1000,
-        ).toISOString(),
+        subscriptionCreatedAt: new Date(checkoutSession.created * 1000).toISOString(),
         hasActiveSubscription: true,
       },
     });
@@ -694,10 +680,9 @@ export class EEWebhookService implements WebhookService {
       },
     });
 
-    const remainingActive =
-      await this.subscriptionRepository.findLastNonCancelled(
-        existingSubscription.organizationId,
-      );
+    const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
+      existingSubscription.organizationId,
+    );
     fireSubscriptionSyncNurturing({
       organizationId: existingSubscription.organizationId,
       hasSubscription: !!remainingActive,
@@ -714,8 +699,9 @@ export class EEWebhookService implements WebhookService {
   }): Promise<void> {
     await waitForStripeConsistency();
 
-    const existingSubForUpdate =
-      await this.subscriptionRepository.findByStripeId(subscription.id);
+    const existingSubForUpdate = await this.subscriptionRepository.findByStripeId(
+      subscription.id,
+    );
 
     if (!existingSubForUpdate) {
       logger.warn(
@@ -733,10 +719,9 @@ export class EEWebhookService implements WebhookService {
       // which is handled by handleSubscriptionDeleted.
       await this.subscriptionRepository.cancel({ id: existingSubForUpdate.id });
 
-      const remainingActive =
-        await this.subscriptionRepository.findLastNonCancelled(
-          existingSubForUpdate.organizationId,
-        );
+      const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
+        existingSubForUpdate.organizationId,
+      );
       fireSubscriptionSyncNurturing({
         organizationId: existingSubForUpdate.organizationId,
         hasSubscription: !!remainingActive,
@@ -745,8 +730,7 @@ export class EEWebhookService implements WebhookService {
       // Cancellation deliberately leaves the org's retention policies in place
       // until the paid-retention feature is released.
     } else if (subscription.status === "active") {
-      const shouldNotify =
-        existingSubForUpdate.status !== SubscriptionStatus.ACTIVE;
+      const shouldNotify = existingSubForUpdate.status !== SubscriptionStatus.ACTIVE;
 
       let tracesQuantity: number | null = null;
       let usersQuantity: number | null = null;
@@ -754,9 +738,7 @@ export class EEWebhookService implements WebhookService {
       for (const item of subscription.items.data) {
         if (isGrowthSeatPrice(item.price.id, this.itemCalculator.prices)) {
           usersQuantity = item.quantity ?? 0;
-        } else if (
-          isGrowthEventsPrice(item.price.id, this.itemCalculator.prices)
-        ) {
+        } else if (isGrowthEventsPrice(item.price.id, this.itemCalculator.prices)) {
           // Events price exists on the subscription; traces limit comes from plan limits
         } else if (
           item.price.id === this.itemCalculator.prices.LAUNCH_USERS ||
@@ -764,37 +746,32 @@ export class EEWebhookService implements WebhookService {
           item.price.id === this.itemCalculator.prices.LAUNCH_ANNUAL_USERS ||
           item.price.id === this.itemCalculator.prices.ACCELERATE_ANNUAL_USERS
         ) {
-          const calculateQuantity =
-            this.itemCalculator.calculateQuantityForPrice({
-              priceId: item.price.id,
-              quantity: item.quantity ?? 0,
-              plan: existingSubForUpdate.plan,
-            });
+          const calculateQuantity = this.itemCalculator.calculateQuantityForPrice({
+            priceId: item.price.id,
+            quantity: item.quantity ?? 0,
+            plan: existingSubForUpdate.plan,
+          });
           usersQuantity = calculateQuantity;
         } else if (
           item.price.id === this.itemCalculator.prices.ACCELERATE_TRACES_100K ||
           item.price.id === this.itemCalculator.prices.LAUNCH_TRACES_10K ||
-          item.price.id ===
-            this.itemCalculator.prices.LAUNCH_ANNUAL_TRACES_10K ||
-          item.price.id ===
-            this.itemCalculator.prices.ACCELERATE_ANNUAL_TRACES_100K
+          item.price.id === this.itemCalculator.prices.LAUNCH_ANNUAL_TRACES_10K ||
+          item.price.id === this.itemCalculator.prices.ACCELERATE_ANNUAL_TRACES_100K
         ) {
-          const calculateQuantity =
-            this.itemCalculator.calculateQuantityForPrice({
-              priceId: item.price.id,
-              quantity: item.quantity ?? 0,
-              plan: existingSubForUpdate.plan,
-            });
+          const calculateQuantity = this.itemCalculator.calculateQuantityForPrice({
+            priceId: item.price.id,
+            quantity: item.quantity ?? 0,
+            plan: existingSubForUpdate.plan,
+          });
           tracesQuantity = calculateQuantity;
         }
       }
 
-      const updatedSubscription =
-        await this.subscriptionRepository.updateQuantities({
-          id: existingSubForUpdate.id,
-          maxMembers: usersQuantity,
-          maxMessagesPerMonth: tracesQuantity,
-        });
+      const updatedSubscription = await this.subscriptionRepository.updateQuantities({
+        id: existingSubForUpdate.id,
+        maxMembers: usersQuantity,
+        maxMessagesPerMonth: tracesQuantity,
+      });
 
       if (!updatedSubscription) {
         return;
@@ -855,8 +832,7 @@ export class EEWebhookService implements WebhookService {
     // is being cancelled. Check the authoritative Stripe status before activating.
     let stripeCanceled = false;
     try {
-      const stripeSubscription =
-        await this.stripe.subscriptions.retrieve(subscriptionId);
+      const stripeSubscription = await this.stripe.subscriptions.retrieve(subscriptionId);
       stripeCanceled = stripeSubscription.status === "canceled";
     } catch (err) {
       logger.warn(
@@ -896,22 +872,18 @@ export class EEWebhookService implements WebhookService {
       );
 
       if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-        const oldSubscriptions =
-          await this.subscriptionRepository.migrateToSeatEvent({
-            organizationId: updatedSubscription.organizationId,
-            excludeSubscriptionId: updatedSubscription.id,
-          });
+        const oldSubscriptions = await this.subscriptionRepository.migrateToSeatEvent({
+          organizationId: updatedSubscription.organizationId,
+          excludeSubscriptionId: updatedSubscription.id,
+        });
 
         // Cancel in Stripe after DB is consistent (outside transaction)
         for (const oldSub of oldSubscriptions) {
           if (oldSub.stripeSubscriptionId) {
             try {
-              await this.stripe.subscriptions.cancel(
-                oldSub.stripeSubscriptionId,
-                {
-                  prorate: true,
-                },
-              );
+              await this.stripe.subscriptions.cancel(oldSub.stripeSubscriptionId, {
+                prorate: true,
+              });
             } catch (err) {
               logger.error(
                 { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
@@ -971,9 +943,7 @@ export class EEWebhookService implements WebhookService {
    * provisioning entirely, and a per-category write failure is logged and
    * skipped, mirroring the surrounding notification side effects.
    */
-  private async applySeatRetentionPolicy(
-    organizationId: string,
-  ): Promise<void> {
+  private async applySeatRetentionPolicy(organizationId: string): Promise<void> {
     // Create-if-absent, NOT upsert: a seat/subscription event must never
     // overwrite an existing org-level override. Unconditionally writing the
     // platform default here would clobber a grandfathered high policy (e.g.
@@ -983,15 +953,11 @@ export class EEWebhookService implements WebhookService {
     let covered: Set<string>;
     try {
       const existing =
-        await getApp().dataRetention.policy.listOrganizationRules(
-          organizationId,
-        );
+        await getApp().dataRetention.policy.listOrganizationRules(organizationId);
       covered = new Set(
         existing
           .filter(
-            (row) =>
-              row.scopeType === "ORGANIZATION" &&
-              row.scopeId === organizationId,
+            (row) => row.scopeType === "ORGANIZATION" && row.scopeId === organizationId,
           )
           .map((row) => row.category),
       );

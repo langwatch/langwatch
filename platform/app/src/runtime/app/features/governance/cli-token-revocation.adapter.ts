@@ -29,9 +29,7 @@ export class RedisCliTokenStoreAdapter extends CliTokenStorePort {
   }
 
   removeMembers(key: string, members: string[]): Promise<number> {
-    return members.length > 0
-      ? this.redis.srem(key, ...members)
-      : Promise.resolve(0);
+    return members.length > 0 ? this.redis.srem(key, ...members) : Promise.resolve(0);
   }
 }
 
@@ -51,9 +49,7 @@ export class AppCliTokenRevocationAdapter {
 
   build(): DefaultGovernanceCliTokenRevocationService {
     return DefaultGovernanceCliTokenRevocationService.create({
-      store: this.redis
-        ? new RedisCliTokenStoreAdapter(this.redis)
-        : undefined,
+      store: this.redis ? new RedisCliTokenStoreAdapter(this.redis) : undefined,
       diagnostics: new AppCliTokenDiagnostics(),
     });
   }

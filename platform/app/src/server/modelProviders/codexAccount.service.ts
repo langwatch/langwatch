@@ -55,11 +55,7 @@ export class CodexAuthError extends HandledError {
   public readonly status?: number;
 
   constructor(
-    public readonly kind:
-      | "http"
-      | "malformed"
-      | "timed_out"
-      | "refresh_rejected",
+    public readonly kind: "http" | "malformed" | "timed_out" | "refresh_rejected",
     message: string,
     options?: { status?: number },
   ) {
@@ -94,15 +90,13 @@ export class CodexAccountService {
     // The env override exists for tests (a local stand-in issuer) and for
     // debugging against a staging identity service; production always runs
     // on the real issuer.
-    this.issuer =
-      issuer ?? process.env.CODEX_OAUTH_ISSUER ?? CODEX_OAUTH_ISSUER;
+    this.issuer = issuer ?? process.env.CODEX_OAUTH_ISSUER ?? CODEX_OAUTH_ISSUER;
   }
 
   async startDeviceSignIn(): Promise<CodexDeviceCode> {
-    const json = await this.postJson(
-      `${this.issuer}/api/accounts/deviceauth/usercode`,
-      { client_id: CODEX_OAUTH_CLIENT_ID },
-    );
+    const json = await this.postJson(`${this.issuer}/api/accounts/deviceauth/usercode`, {
+      client_id: CODEX_OAUTH_CLIENT_ID,
+    });
     const deviceAuthId = json.device_auth_id;
     const userCode = json.user_code ?? json.usercode;
     if (typeof deviceAuthId !== "string" || typeof userCode !== "string") {
@@ -134,10 +128,10 @@ export class CodexAccountService {
   }): Promise<CodexPollResult> {
     let json: Record<string, unknown>;
     try {
-      json = await this.postJson(
-        `${this.issuer}/api/accounts/deviceauth/token`,
-        { device_auth_id: args.deviceAuthId, user_code: args.userCode },
-      );
+      json = await this.postJson(`${this.issuer}/api/accounts/deviceauth/token`, {
+        device_auth_id: args.deviceAuthId,
+        user_code: args.userCode,
+      });
     } catch (error) {
       if (
         error instanceof CodexAuthError &&
@@ -206,10 +200,7 @@ export class CodexAccountService {
     return this.toKeys(tokens);
   }
 
-  private async exchangeCode(
-    code: string,
-    verifier: string,
-  ): Promise<CodexOAuthTokens> {
+  private async exchangeCode(code: string, verifier: string): Promise<CodexOAuthTokens> {
     const form = new URLSearchParams({
       grant_type: "authorization_code",
       code,
@@ -277,18 +268,13 @@ export class CodexAccountService {
     });
   }
 
-  private async send(
-    url: string,
-    init: RequestInit,
-  ): Promise<Record<string, unknown>> {
+  private async send(url: string, init: RequestInit): Promise<Record<string, unknown>> {
     const response = await this.fetchImpl(url, init);
     const text = await response.text();
     if (!response.ok) {
-      throw new CodexAuthError(
-        "http",
-        `HTTP ${response.status}: ${text.slice(0, 200)}`,
-        { status: response.status },
-      );
+      throw new CodexAuthError("http", `HTTP ${response.status}: ${text.slice(0, 200)}`, {
+        status: response.status,
+      });
     }
     try {
       return JSON.parse(text) as Record<string, unknown>;
@@ -379,8 +365,7 @@ export class CodexGatewayRefreshService {
     const savedAtMs = Date.parse(keys.CODEX_TOKENS_SAVED_AT);
     if (
       Number.isFinite(savedAtMs) &&
-      Date.now() - savedAtMs <
-        CodexGatewayRefreshService.JUST_REFRESHED_WINDOW_MS
+      Date.now() - savedAtMs < CodexGatewayRefreshService.JUST_REFRESHED_WINDOW_MS
     ) {
       return {
         status: "refreshed",
@@ -393,10 +378,7 @@ export class CodexGatewayRefreshService {
     try {
       refreshed = await this.engine.refresh(keys);
     } catch (error) {
-      if (
-        error instanceof CodexAuthError &&
-        error.kind === "refresh_rejected"
-      ) {
+      if (error instanceof CodexAuthError && error.kind === "refresh_rejected") {
         return { status: "session_expired" };
       }
       throw error;
@@ -436,23 +418,16 @@ export function decodeCodexClaims(idToken: string): CodexClaims {
   const payload = parts[1];
   if (!payload) return { accountId: "", email: "", plan: "" };
   try {
-    const json = JSON.parse(
-      Buffer.from(payload, "base64url").toString("utf8"),
-    ) as Record<string, unknown>;
-    const auth = (json["https://api.openai.com/auth"] ?? {}) as Record<
+    const json = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Record<
       string,
       unknown
     >;
+    const auth = (json["https://api.openai.com/auth"] ?? {}) as Record<string, unknown>;
     return {
       accountId:
-        typeof auth.chatgpt_account_id === "string"
-          ? auth.chatgpt_account_id
-          : "",
+        typeof auth.chatgpt_account_id === "string" ? auth.chatgpt_account_id : "",
       email: typeof json.email === "string" ? json.email : "",
-      plan:
-        typeof auth.chatgpt_plan_type === "string"
-          ? auth.chatgpt_plan_type
-          : "",
+      plan: typeof auth.chatgpt_plan_type === "string" ? auth.chatgpt_plan_type : "",
     };
   } catch {
     return { accountId: "", email: "", plan: "" };

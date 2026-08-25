@@ -6,9 +6,7 @@ import type { CodingAgentTraceSessionRecord } from "~/server/event-sourcing/pipe
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;
 
-const logger = createLogger(
-  "langwatch:app-layer:coding-agent:trace-session-repository",
-);
+const logger = createLogger("langwatch:app-layer:coding-agent:trace-session-repository");
 
 /**
  * Persistence for the (trace → session) map rows (ADR-056 §4, migration
@@ -16,10 +14,7 @@ const logger = createLogger(
  * of the same trace simply write a newer version of the same mapping.
  */
 export interface CodingAgentTraceSessionRepository {
-  ensure(
-    records: CodingAgentTraceSessionRecord[],
-    retentionDays?: number,
-  ): Promise<void>;
+  ensure(records: CodingAgentTraceSessionRecord[], retentionDays?: number): Promise<void>;
 
   /** The session a trace belongs to, or null. A keyed point read. */
   findByTraceId(params: {
@@ -29,9 +24,7 @@ export interface CodingAgentTraceSessionRepository {
 }
 
 /** No-op store for deployments without ClickHouse. */
-export class NullCodingAgentTraceSessionRepository
-  implements CodingAgentTraceSessionRepository
-{
+export class NullCodingAgentTraceSessionRepository implements CodingAgentTraceSessionRepository {
   async ensure(): Promise<void> {
     // no-op
   }
@@ -50,9 +43,7 @@ interface ClickHouseWriteRecord {
   _retention_days: number;
 }
 
-export class CodingAgentTraceSessionClickHouseRepository
-  implements CodingAgentTraceSessionRepository
-{
+export class CodingAgentTraceSessionClickHouseRepository implements CodingAgentTraceSessionRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async ensure(

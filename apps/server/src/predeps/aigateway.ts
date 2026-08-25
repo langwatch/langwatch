@@ -53,7 +53,11 @@ function findRepoRoot(): string | null {
   return null;
 }
 
-async function buildFromCheckout(repoRoot: string, outDir: string, task: { output?: string }): Promise<void> {
+async function buildFromCheckout(
+  repoRoot: string,
+  outDir: string,
+  task: { output?: string },
+): Promise<void> {
   task.output = "building from local checkout (cmd/service)";
   // `go build ./cmd/service` produces the multi-service entrypoint that
   // dispatches on its first argument — the same artifact the release
@@ -67,7 +71,10 @@ async function buildFromCheckout(repoRoot: string, outDir: string, task: { outpu
   // `--version` on its own, which was the wrapper's only other reason to
   // exist, so it is written straight out instead.
   const out = join(outDir, "aigateway");
-  await execa("go", ["build", "-o", out, "./cmd/service"], { cwd: repoRoot, stdio: "pipe" });
+  await execa("go", ["build", "-o", out, "./cmd/service"], {
+    cwd: repoRoot,
+    stdio: "pipe",
+  });
   chmodSync(out, 0o755);
 }
 
@@ -98,7 +105,10 @@ export function makeAigatewayPredep(version: string): Predep {
         if (v) return { installed: true, version: v, resolvedPath: bundled };
         return { installed: true, version: "unknown", resolvedPath: bundled };
       }
-      return { installed: false, reason: "ai-gateway monobinary not in ~/.langwatch/bin" };
+      return {
+        installed: false,
+        reason: "ai-gateway monobinary not in ~/.langwatch/bin",
+      };
     },
 
     async install({ platform, paths, task }) {
@@ -107,7 +117,12 @@ export function makeAigatewayPredep(version: string): Predep {
 
       const url = downloadUrl(version, platform);
       try {
-        await downloadWithProgress(url, out, task, `downloading langwatch ai-gateway ${version}`);
+        await downloadWithProgress(
+          url,
+          out,
+          task,
+          `downloading langwatch ai-gateway ${version}`,
+        );
         chmodSync(out, 0o755);
         const v = (await resolveVersion(out)) ?? version;
         return { version: v, resolvedPath: out };

@@ -15,9 +15,7 @@ import type { StageId } from "../chapters/onboardingJourneyConfig";
  *   Returns React nodes, not a string.
  */
 
-export const BlinkingCursor: React.FC<{ color?: string }> = ({
-  color = "fg",
-}) => (
+export const BlinkingCursor: React.FC<{ color?: string }> = ({ color = "fg" }) => (
   <Box
     as="span"
     aria-hidden
@@ -47,20 +45,11 @@ export function applyAuroraTextShimmer(text: string): React.ReactNode {
   });
 }
 
-export function renderHeading(
-  stage: StageId,
-  heading: string,
-): React.ReactNode {
+export function renderHeading(stage: StageId, heading: string): React.ReactNode {
   if (stage === "postArrival") {
     return (
       <>
-        <Text
-          as="span"
-          color="blue.fg"
-          fontWeight={500}
-          marginRight={2}
-          aria-hidden
-        >
+        <Text as="span" color="blue.fg" fontWeight={500} marginRight={2} aria-hidden>
           ↑
         </Text>
         {applyAuroraTextShimmer(heading.replace(/^↑\s*/, ""))}
@@ -70,9 +59,7 @@ export function renderHeading(
   return applyAuroraTextShimmer(heading);
 }
 
-const AuroraTextShimmer: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => (
+const AuroraTextShimmer: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Box
     as="span"
     display="inline-block"

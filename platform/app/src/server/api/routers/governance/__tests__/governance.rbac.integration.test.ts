@@ -210,9 +210,9 @@ describe("governance routers — RBAC enforcement", () => {
 
     it("rejects anomalyRules.list with FORBIDDEN", async () => {
       const caller = callerFor(memberUserId);
-      await expect(
-        caller.anomalyRules.list({ organizationId }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(caller.anomalyRules.list({ organizationId })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
     });
 
     it("rejects anomalyRules.create with FORBIDDEN", async () => {

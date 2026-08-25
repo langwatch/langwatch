@@ -14,8 +14,7 @@
  * `seatTypeCopy.unit.test.ts` so it cannot drift from
  * `EXTERNAL_MEMBER_PERMISSIONS` unnoticed.
  */
-export const LITE_MEMBER_SHORT_DESCRIPTION =
-  "Can view the work, but not change it";
+export const LITE_MEMBER_SHORT_DESCRIPTION = "Can view the work, but not change it";
 
 export const LITE_MEMBER_EXPLANATION =
   "A lite member can open the projects they are invited to and read what the " +

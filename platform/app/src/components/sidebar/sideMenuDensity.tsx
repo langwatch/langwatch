@@ -34,10 +34,7 @@ export interface SideMenuDensityTokens {
   sectionLabel: SideMenuSectionLabelTokens;
 }
 
-export const SIDE_MENU_DENSITIES: Record<
-  SideMenuDensity,
-  SideMenuDensityTokens
-> = {
+export const SIDE_MENU_DENSITIES: Record<SideMenuDensity, SideMenuDensityTokens> = {
   comfortable: {
     fontSize: "14px",
     gap: 3,

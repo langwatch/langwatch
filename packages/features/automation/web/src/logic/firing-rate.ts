@@ -46,8 +46,7 @@ export function estimateRatePerDay(input: FiringRateInput): number {
 
   // Digest cadence: at most one notification per window that holds a match, so
   // the rate is capped at the number of windows per day.
-  const windowsPerDay =
-    (24 * 60 * 60 * 1000) / CADENCE_WINDOW_MS[input.cadence];
+  const windowsPerDay = (24 * 60 * 60 * 1000) / CADENCE_WINDOW_MS[input.cadence];
   return Math.min(matchesPerDay, windowsPerDay);
 }
 

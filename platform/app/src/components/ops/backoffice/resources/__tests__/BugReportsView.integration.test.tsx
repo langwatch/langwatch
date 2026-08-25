@@ -110,9 +110,7 @@ describe("BugReportsView", () => {
     /** @scenario "Admins see reports in the backoffice" */
     it("lists them with date, kind, agent, project, and contact", () => {
       renderView();
-      expect(
-        screen.getByText("agent stuck instrumenting python"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("agent stuck instrumenting python")).toBeInTheDocument();
       expect(screen.getByText("evaluator wizard 404")).toBeInTheDocument();
       expect(screen.getByText("Full session")).toBeInTheDocument();
       expect(screen.getByText("Summary")).toBeInTheDocument();

@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeVariantMetrics } from "../computeVariantMetrics";
 import type { BatchResultRow, BatchTargetOutput } from "../types";
 
-const target = (
-  overrides: Partial<BatchTargetOutput> = {},
-): BatchTargetOutput => ({
+const target = (overrides: Partial<BatchTargetOutput> = {}): BatchTargetOutput => ({
   targetId: "variant-a",
   output: { output: "hi" },
   cost: null,
@@ -15,10 +13,7 @@ const target = (
   ...overrides,
 });
 
-const row = (
-  targets: Record<string, BatchTargetOutput>,
-  index = 0,
-): BatchResultRow => ({
+const row = (targets: Record<string, BatchTargetOutput>, index = 0): BatchResultRow => ({
   index,
   datasetEntry: {},
   targets,

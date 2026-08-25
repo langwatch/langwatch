@@ -59,9 +59,7 @@ vi.mock("./LangyHomeHero", () => ({
 }));
 
 vi.mock("../DashboardLayout", () => ({
-  DashboardLayout: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  DashboardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("~/features/briefing", () => ({
   HomeBriefingSection: () => <div data-testid="briefing-sheet" />,
@@ -182,9 +180,7 @@ describe("HomePage composition", () => {
       gates.composition = "langy";
       renderHome();
 
-      expect(screen.getByTestId("traces-overview").dataset.variant).toBe(
-        "strip",
-      );
+      expect(screen.getByTestId("traces-overview").dataset.variant).toBe("strip");
     });
 
     /** @scenario A project with nothing in it yet still opens with the composer */

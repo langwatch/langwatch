@@ -11,11 +11,9 @@ import { remediation } from "../app-layer/error-remediation";
  * been consumed. Shared between server (where it's thrown) and client (where
  * it's matched to trigger a redirect) so the two cannot drift.
  */
-export const INVITE_ALREADY_ACCEPTED_MESSAGE =
-  "Invite was already accepted" as const;
+export const INVITE_ALREADY_ACCEPTED_MESSAGE = "Invite was already accepted" as const;
 
-export const INVITE_NOT_READY_MESSAGE =
-  "Invite is not ready to be accepted" as const;
+export const INVITE_NOT_READY_MESSAGE = "Invite is not ready to be accepted" as const;
 
 /**
  * An invite for this email is already pending in the organization.
@@ -29,15 +27,11 @@ export class DuplicateInviteError extends HandledError {
   declare readonly code: "duplicate_invite";
 
   constructor(email: string) {
-    super(
-      "duplicate_invite",
-      `An active invitation for ${email} already exists`,
-      {
-        httpStatus: 409,
-        meta: { email },
-        ...remediation("duplicate_invite"),
-      },
-    );
+    super("duplicate_invite", `An active invitation for ${email} already exists`, {
+      httpStatus: 409,
+      meta: { email },
+      ...remediation("duplicate_invite"),
+    });
     this.name = "DuplicateInviteError";
   }
 }
@@ -89,20 +83,17 @@ export class TeamNotInOrganizationError extends HandledError {
   declare readonly code: "team_not_in_organization";
 
   constructor(teamId: string) {
-    super(
-      "team_not_in_organization",
-      "That team does not belong to this organization",
-      { httpStatus: 422, meta: { teamId } },
-    );
+    super("team_not_in_organization", "That team does not belong to this organization", {
+      httpStatus: 422,
+      meta: { teamId },
+    });
     this.name = "TeamNotInOrganizationError";
   }
 }
 
 export class InviteNotReadyError extends Error {
   constructor(inviteId: string, status: string) {
-    super(
-      `Cannot apply invite ${inviteId}: status is ${status}, expected PENDING`,
-    );
+    super(`Cannot apply invite ${inviteId}: status is ${status}, expected PENDING`);
     this.name = "InviteNotReadyError";
   }
 }

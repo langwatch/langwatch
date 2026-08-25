@@ -13,11 +13,7 @@ import { useState } from "react";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
-import {
-  DeadLetterSummary,
-  DeadLettersEmpty,
-  DeadLettersTable,
-} from "./DeadLettersCard";
+import { DeadLetterSummary, DeadLettersEmpty, DeadLettersTable } from "./DeadLettersCard";
 import { useDeadLetterActions } from "./useDeadLetterActions";
 
 const PAGE_SIZE = 25;
@@ -102,12 +98,7 @@ export function DeadLettersContent() {
         onRedrive={actions.onRedrive}
         onDiscard={actions.onDiscard}
       />
-      <Pager
-        page={page}
-        total={total}
-        shown={messages.length}
-        onPage={setPage}
-      />
+      <Pager page={page} total={total} shown={messages.length} onPage={setPage} />
       <BulkConfirms
         actions={actions}
         shownCount={shownCount}

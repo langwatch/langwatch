@@ -32,10 +32,7 @@ const capturedRunOnSuccess = vi.hoisted(
       current: null,
     }) as {
       current:
-        | ((
-            result: any,
-            variables: { id: string; batchRunId?: string },
-          ) => void)
+        | ((result: any, variables: { id: string; batchRunId?: string }) => void)
         | null;
     },
 );
@@ -102,9 +99,7 @@ const successResult = {
   skippedArchived: undefined,
 };
 
-async function renderUseRunSuite(options?: {
-  onViewRun?: (suiteId: string) => void;
-}) {
+async function renderUseRunSuite(options?: { onViewRun?: (suiteId: string) => void }) {
   const { useRunSuite } = await import("~/components/suites/useRunSuite");
   return renderHook(() => useRunSuite(options));
 }

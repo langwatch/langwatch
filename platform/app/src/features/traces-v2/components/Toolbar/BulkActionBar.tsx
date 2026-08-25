@@ -11,10 +11,7 @@ import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  SELECT_ALL_MATCHING_CAP,
-  useSelectionStore,
-} from "../../stores/selectionStore";
+import { SELECT_ALL_MATCHING_CAP, useSelectionStore } from "../../stores/selectionStore";
 import { AddToAnnotationQueueDialog } from "../AddToAnnotationQueueDialog";
 
 interface BulkActionBarProps {
@@ -52,8 +49,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
 
   const explicitCount = traceIds.size;
   const allMatchingCount = Math.min(totalHits, SELECT_ALL_MATCHING_CAP);
-  const displayCount =
-    mode === "all-matching" ? allMatchingCount : explicitCount;
+  const displayCount = mode === "all-matching" ? allMatchingCount : explicitCount;
 
   if (mode === "explicit" && explicitCount === 0) return null;
 
@@ -62,8 +58,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
     mode === "explicit" &&
     pageTraceIds.length > 0 &&
     pageTraceIds.every((id) => traceIds.has(id));
-  const canSelectAllMatching =
-    allPageRowsSelected && totalHits > pageTraceIds.length;
+  const canSelectAllMatching = allPageRowsSelected && totalHits > pageTraceIds.length;
   const isAllMatchingMode = mode === "all-matching";
   const allMatchingHitsCap = totalHits >= SELECT_ALL_MATCHING_CAP;
 
@@ -91,11 +86,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
         }
         onClear={clear}
       >
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={() => onExportSelected(idsArray)}
-        >
+        <Button size="xs" variant="outline" onClick={() => onExportSelected(idsArray)}>
           <Download size={14} />
           Export selected
         </Button>

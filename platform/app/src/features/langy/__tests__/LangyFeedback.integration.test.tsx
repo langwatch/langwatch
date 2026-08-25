@@ -35,9 +35,7 @@ vi.mock("~/utils/api", () => ({
 import { LangyFeedback } from "../components/LangyFeedback";
 import { useLangyStore } from "../stores/langyStore";
 
-function renderFeedback(
-  props: Partial<React.ComponentProps<typeof LangyFeedback>> = {},
-) {
+function renderFeedback(props: Partial<React.ComponentProps<typeof LangyFeedback>> = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <LangyFeedback
@@ -153,9 +151,9 @@ describe("given the Langy feedback card", () => {
     it("remembers the answer as handled so a remount cannot re-ask", () => {
       renderFeedback({ origin: "asked" });
       fireEvent.click(screen.getByText("Great"));
-      expect(
-        useLangyStore.getState().dismissedFeedbackMessageIds.has("msg-1"),
-      ).toBe(true);
+      expect(useLangyStore.getState().dismissedFeedbackMessageIds.has("msg-1")).toBe(
+        true,
+      );
       // The acknowledgement still shows despite the handled-mark.
       expect(screen.getByText("Thanks, noted.")).toBeTruthy();
     });

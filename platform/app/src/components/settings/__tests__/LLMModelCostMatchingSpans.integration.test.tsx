@@ -67,14 +67,10 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
       },
       previewMatchingSpans: {
-        useQuery: (
-          input: Record<string, unknown>,
-          opts?: { enabled?: boolean },
-        ) => {
+        useQuery: (input: Record<string, unknown>, opts?: { enabled?: boolean }) => {
           mockPreviewQueryInputs.push({ input, enabled: opts?.enabled });
           return {
-            data:
-              opts?.enabled === false ? undefined : mockPreviewState.current,
+            data: opts?.enabled === false ? undefined : mockPreviewState.current,
             isLoading: false,
           };
         },
@@ -194,14 +190,10 @@ describe("Feature: Model cost regex matching spans preview", () => {
     it("shows the recently seen models that did not match", () => {
       renderDrawer({ prefillRegex: "nothing-matches-this" });
 
-      expect(
-        screen.getByText("no matches in the last 7 days"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("no matches in the last 7 days")).toBeInTheDocument();
       const chips = screen.getAllByTestId("unmatched-model-chip");
       expect(chips).toHaveLength(2);
-      expect(chips[0]).toHaveTextContent(
-        "bedrock/eu.anthropic.claude-sonnet-4-6",
-      );
+      expect(chips[0]).toHaveTextContent("bedrock/eu.anthropic.claude-sonnet-4-6");
       expect(chips[0]).toHaveTextContent("42");
     });
 
@@ -211,9 +203,7 @@ describe("Feature: Model cost regex matching spans preview", () => {
       fireEvent.click(screen.getAllByTestId("unmatched-model-chip")[0]!);
 
       expect(
-        screen.getByDisplayValue(
-          "^bedrock\\/eu\\.anthropic\\.claude-sonnet-4-6$",
-        ),
+        screen.getByDisplayValue("^bedrock\\/eu\\.anthropic\\.claude-sonnet-4-6$"),
       ).toBeInTheDocument();
       expect(
         screen.getByDisplayValue("bedrock/eu.anthropic.claude-sonnet-4-6"),
@@ -230,9 +220,7 @@ describe("Feature: Model cost regex matching spans preview", () => {
           "Enter a valid regular expression to preview the spans it would match.",
         ),
       ).toBeInTheDocument();
-      expect(
-        mockPreviewQueryInputs.every((call) => call.enabled === false),
-      ).toBe(true);
+      expect(mockPreviewQueryInputs.every((call) => call.enabled === false)).toBe(true);
     });
   });
 
@@ -244,9 +232,7 @@ describe("Feature: Model cost regex matching spans preview", () => {
       });
 
       expect(screen.getByTestId("matching-span-row")).toBeInTheDocument();
-      expect(
-        mockPreviewQueryInputs.some((call) => call.enabled !== false),
-      ).toBe(true);
+      expect(mockPreviewQueryInputs.some((call) => call.enabled !== false)).toBe(true);
     });
   });
 

@@ -197,9 +197,7 @@ export function LangyComposerPalette({
 
   const collection = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = q
-      ? items.filter((item) => item.searchText.includes(q))
-      : items;
+    const filtered = q ? items.filter((item) => item.searchText.includes(q)) : items;
     // `#` is CONTEXT, and only context.
     //
     // It used to append "browse"/"reveal" intent rows under a Commands
@@ -246,9 +244,7 @@ export function LangyComposerPalette({
     }
     if (value.startsWith("target:")) {
       const target =
-        useLangyContextTargetStore.getState().targets[
-          value.slice("target:".length)
-        ];
+        useLangyContextTargetStore.getState().targets[value.slice("target:".length)];
       if (target) absorbContextTarget(target);
       onClose();
       return;
@@ -280,13 +276,7 @@ export function LangyComposerPalette({
           card, so the listbox lands exactly above the composer with no
           getAnchorRect guesswork. */}
       <Combobox.Control width="full">
-        <HStack
-          gap={1.5}
-          paddingX={3}
-          paddingTop={2.5}
-          paddingBottom={1}
-          align="center"
-        >
+        <HStack gap={1.5} paddingX={3} paddingTop={2.5} paddingBottom={1} align="center">
           {/* The title badge. It carries the key you pressed as well as the
               name of the mode, so "which one is this, and what opened it" is
               answered without leaving the bar. */}
@@ -301,17 +291,9 @@ export function LangyComposerPalette({
             color="orange.fg"
           >
             <Box display="grid" placeItems="center">
-              {mode === "skills" ? (
-                <Sparkles size={11} />
-              ) : (
-                <Waypoints size={11} />
-              )}
+              {mode === "skills" ? <Sparkles size={11} /> : <Waypoints size={11} />}
             </Box>
-            <Text
-              textStyle="2xs"
-              fontWeight="semibold"
-              data-testid="langy-palette-title"
-            >
+            <Text textStyle="2xs" fontWeight="semibold" data-testid="langy-palette-title">
               {chrome.title}
             </Text>
             <Text textStyle="2xs" opacity={0.7} fontFamily="mono">
@@ -357,11 +339,7 @@ export function LangyComposerPalette({
             }}
           >
             <Combobox.Empty paddingX={2} paddingY={3}>
-              <Text
-                textStyle="xs"
-                color="fg.muted"
-                data-testid="langy-palette-empty"
-              >
+              <Text textStyle="xs" color="fg.muted" data-testid="langy-palette-empty">
                 {/* Which of the two emptinesses this is. `items` is the whole
                     offer before any filtering, so an empty one means the page
                     had nothing to give — telling that reader "nothing matches
@@ -372,11 +350,7 @@ export function LangyComposerPalette({
 
             {groups.map((group) => (
               <Combobox.ItemGroup key={group}>
-                <Combobox.ItemGroupLabel
-                  paddingX={2}
-                  paddingTop={2}
-                  paddingBottom={1}
-                >
+                <Combobox.ItemGroupLabel paddingX={2} paddingTop={2} paddingBottom={1}>
                   <Text
                     textStyle="2xs"
                     fontWeight="semibold"
@@ -398,9 +372,7 @@ export function LangyComposerPalette({
                       paddingY={1.5}
                       _hover={{ background: "bg.subtle" }}
                       _highlighted={{ background: "bg.subtle" }}
-                      onMouseEnter={() =>
-                        setSpotlight(spotlightFor(item.value))
-                      }
+                      onMouseEnter={() => setSpotlight(spotlightFor(item.value))}
                       onMouseLeave={() => setSpotlight(null)}
                     >
                       <HStack gap={2.5} width="full" align="start">

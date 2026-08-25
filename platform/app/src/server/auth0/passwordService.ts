@@ -55,8 +55,7 @@ function loadConfig(): Auth0Config {
   // the login app is a Regular Web Application with Client Credentials
   // grant enabled — uncommon).
   const mgmtClientId = env.AUTH0_MGMT_CLIENT_ID ?? env.AUTH0_CLIENT_ID;
-  const mgmtClientSecret =
-    env.AUTH0_MGMT_CLIENT_SECRET ?? env.AUTH0_CLIENT_SECRET;
+  const mgmtClientSecret = env.AUTH0_MGMT_CLIENT_SECRET ?? env.AUTH0_CLIENT_SECRET;
   if (!issuer || !mgmtClientId || !mgmtClientSecret) {
     throw new Auth0ApiError({
       status: 500,

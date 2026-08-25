@@ -112,9 +112,7 @@ function nonEmptyOrNull(value: string | undefined): string | null {
  */
 export function mapSpansToClaudeRefs(spans: Span[]): ClaudeSpanRef[] {
   return spans
-    .filter(
-      (span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null,
-    )
+    .filter((span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null)
     .slice()
     .sort((a, b) => a.timestamps.started_at - b.timestamps.started_at)
     .map((span) => ({
@@ -129,9 +127,7 @@ export function mapSpansToClaudeRefs(spans: Span[]): ClaudeSpanRef[] {
  * span has a `request_id` for the logs to join onto.
  */
 export function hasClaudeModelCallSpans(spans: Span[]): boolean {
-  return spans.some(
-    (span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null,
-  );
+  return spans.some((span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null);
 }
 
 function spanToolUseId(span: Span): string | null {
@@ -235,9 +231,7 @@ export function mapLogRowsToClaudeContentLogs(
       // re-parsing it. Absent on records ingested before that existed, which is
       // why every consumer keeps its parse as a fallback.
       derivedOutputText: nonEmptyOrNull(attrs[DERIVED_ATTRS.OUTPUT_TEXT]),
-      derivedToolCallCount: Number.isFinite(toolCallCount)
-        ? toolCallCount
-        : null,
+      derivedToolCallCount: Number.isFinite(toolCallCount) ? toolCallCount : null,
     };
   });
 }
@@ -287,8 +281,7 @@ export function enrichSpansWithClaudeLogContent({
 
     const next: Span = { ...span };
     const input = enrichment?.input ?? toolEnrichment?.input ?? null;
-    const output =
-      enrichment?.output ?? toolEnrichment?.output ?? interactionOutput;
+    const output = enrichment?.output ?? toolEnrichment?.output ?? interactionOutput;
     if (input !== null && next.input == null) next.input = input;
     if (output !== null && next.output == null) next.output = output;
     return next;
@@ -300,9 +293,7 @@ export function enrichSpansWithClaudeLogContent({
  * events only). Success arrives as the string "true"/"false"; numbers as
  * stringified numerics — both parsed here so the pure join sees clean types.
  */
-export function mapLogRowsToClaudeToolLogs(
-  rows: StoredLogRecordRow[],
-): ClaudeToolLog[] {
+export function mapLogRowsToClaudeToolLogs(rows: StoredLogRecordRow[]): ClaudeToolLog[] {
   const out: ClaudeToolLog[] = [];
   for (const row of rows) {
     const attrs = row.attributes;
@@ -369,11 +360,7 @@ export async function enrichCodingAgentSpansFromLogs({
   if (!hasCodingAgentJoinableSpans(spans)) return spans;
 
   try {
-    const logRows = await logRecords.getLogsByTraceId(
-      tenantId,
-      traceId,
-      occurredAtMs,
-    );
+    const logRows = await logRecords.getLogsByTraceId(tenantId, traceId, occurredAtMs);
     return enrichSpansWithClaudeLogContent({ spans, logRows });
   } catch (error) {
     logger?.warn(
@@ -396,9 +383,7 @@ export async function enrichCodingAgentSpansFromLogs({
  * sorted from the repository; sorted again here so the invariant doesn't hang
  * on the caller.
  */
-export function mapSummaryRowsToClaudeRefs(
-  rows: SpanSummaryRow[],
-): ClaudeSpanRef[] {
+export function mapSummaryRowsToClaudeRefs(rows: SpanSummaryRow[]): ClaudeSpanRef[] {
   return rows
     .filter((row) => row.requestId !== null)
     .slice()
@@ -426,8 +411,7 @@ export function enrichSingleSpanWithClaudeLogContent({
   modelCallRefs: ClaudeSpanRef[];
   logRows: StoredLogRecordRow[];
 }): Span {
-  const isModelCall =
-    readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null;
+  const isModelCall = readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null;
 
   const [enriched] = enrichSpansWithClaudeLogContent({
     spans: [span],

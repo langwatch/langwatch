@@ -76,9 +76,7 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
 
   try {
-    console.log(
-      "\n[1] Cross-site form POST from evil.localhost → /sign-up/email",
-    );
+    console.log("\n[1] Cross-site form POST from evil.localhost → /sign-up/email");
     // Use "evil.localhost" so the browser sees it as a distinct site
     // from "localhost" (Sec-Fetch-Site: cross-site).
     const ctx = await browser.newContext();
@@ -170,9 +168,7 @@ async function main() {
     console.log(`✅ ALL CHECKS PASSED (${passes}/${passes})`);
     process.exit(0);
   } else {
-    console.log(
-      `❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`,
-    );
+    console.log(`❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`);
     process.exit(1);
   }
 }

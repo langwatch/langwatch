@@ -49,8 +49,7 @@ const UPDATES: {
   {
     provider: "vertex_ai",
     env: {
-      GOOGLE_APPLICATION_CREDENTIALS_JSON: process.env
-        .GOOGLE_APPLICATION_CREDENTIALS
+      GOOGLE_APPLICATION_CREDENTIALS_JSON: process.env.GOOGLE_APPLICATION_CREDENTIALS
         ? readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, "utf-8")
         : undefined,
       VERTEXAI_PROJECT: process.env.GOOGLE_CLOUD_PROJECT,

@@ -126,10 +126,7 @@ describe("given the LangWatchQL parameters editor", () => {
 
       const change = latestChange(onChange);
       expect(change.sendable).toBe(true);
-      expect(Object.keys(change.parameters).sort()).toEqual([
-        "limit",
-        "offset",
-      ]);
+      expect(Object.keys(change.parameters).sort()).toEqual(["limit", "offset"]);
     });
   });
 });

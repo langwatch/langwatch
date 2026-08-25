@@ -108,12 +108,8 @@ describe("webhook emitted-events listing", () => {
       limit: 10,
       types: ["gateway.request.settled"],
     });
-    expect(settledPage.rows.map((r) => r.gatewayRequestId)).toEqual([
-      settledId,
-    ]);
-    expect(settledPage.rows[0]!.settleReason).toBe(
-      "confirmation_deadline_expired",
-    );
+    expect(settledPage.rows.map((r) => r.gatewayRequestId)).toEqual([settledId]);
+    expect(settledPage.rows[0]!.settleReason).toBe("confirmation_deadline_expired");
 
     const allPage = await eventsRepo.readEmittedEventsPage({
       tenantIds: [tenantId],

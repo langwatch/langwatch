@@ -13,10 +13,7 @@
 
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-} from "~/generated/prisma/client";
+import { OrganizationUserRole, RoleBindingScopeType } from "~/generated/prisma/client";
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";
@@ -160,9 +157,7 @@ describe("organization.setMemberDisabled", () => {
       licensedSeats = 1;
 
       for (const userId of [adminUserId, secondAdminUserId, memberUserId]) {
-        expect(
-          await repo.getUserOrgRole({ userId, organizationId }),
-        ).not.toBeNull();
+        expect(await repo.getUserOrgRole({ userId, organizationId })).not.toBeNull();
       }
 
       licensedSeats = 50;
@@ -302,9 +297,9 @@ describe("organization.setMemberDisabled", () => {
       ).rejects.toMatchObject({ code: "cannot_disable_last_admin" });
 
       // And the admin is genuinely still standing.
-      expect(
-        await repo.getUserOrgRole({ userId: adminUserId, organizationId }),
-      ).toBe(OrganizationUserRole.ADMIN);
+      expect(await repo.getUserOrgRole({ userId: adminUserId, organizationId })).toBe(
+        OrganizationUserRole.ADMIN,
+      );
     });
   });
 });

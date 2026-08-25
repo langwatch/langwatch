@@ -4,10 +4,7 @@ import {
   type WebhookUrlProblem,
 } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
-import {
-  createSSRFValidator,
-  isPrivateOrLocalhostIP,
-} from "~/utils/ssrfProtection";
+import { createSSRFValidator, isPrivateOrLocalhostIP } from "~/utils/ssrfProtection";
 
 /**
  * The one admission policy for a customer-supplied webhook destination, shared
@@ -94,8 +91,7 @@ function privateIpLiteral(url: string): string | null {
   } catch {
     return null;
   }
-  const bare =
-    host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
+  const bare = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
   return isIP(bare) !== 0 && isPrivateOrLocalhostIP(bare) ? bare : null;
 }
 

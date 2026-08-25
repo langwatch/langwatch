@@ -1,9 +1,5 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
-import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import type { RecordMetricDataPointCommandData } from "../schemas/commands";
 import { recordMetricDataPointCommandDataSchema } from "../schemas/commands";
 import {
@@ -13,13 +9,10 @@ import {
 } from "../schemas/constants";
 import type { MetricDataPointReceivedEvent } from "../schemas/events";
 
-export class RecordMetricDataPointCommand
-  implements
-    CommandHandler<
-      Command<RecordMetricDataPointCommandData>,
-      MetricDataPointReceivedEvent
-    >
-{
+export class RecordMetricDataPointCommand implements CommandHandler<
+  Command<RecordMetricDataPointCommandData>,
+  MetricDataPointReceivedEvent
+> {
   static readonly schema = defineCommandSchema(
     RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
     recordMetricDataPointCommandDataSchema,

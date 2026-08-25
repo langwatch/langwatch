@@ -85,25 +85,13 @@ export abstract class OrganizationService {
     input: PersonalWorkspaceFeaturesInput,
   ): Promise<PersonalFeatures>;
   abstract getTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam>;
-  abstract listTeams(
-    input: ListOrganizationTeamsInput,
-  ): Promise<OrganizationTeamPage>;
-  abstract createTeam(
-    input: CreateOrganizationTeamInput,
-  ): Promise<OrganizationTeam>;
-  abstract updateTeam(
-    input: UpdateOrganizationTeamInput,
-  ): Promise<OrganizationTeam>;
-  abstract archiveTeam(
-    input: GetOrganizationTeamInput,
-  ): Promise<OrganizationTeam>;
+  abstract listTeams(input: ListOrganizationTeamsInput): Promise<OrganizationTeamPage>;
+  abstract createTeam(input: CreateOrganizationTeamInput): Promise<OrganizationTeam>;
+  abstract updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam>;
+  abstract archiveTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam>;
   abstract addTeamMember(input: AddOrganizationTeamMemberInput): Promise<void>;
-  abstract removeTeamMember(
-    input: RemoveOrganizationTeamMemberInput,
-  ): Promise<void>;
-  abstract getTeamById(
-    input: GetOrganizationTeamByIdInput,
-  ): Promise<OrganizationTeam>;
+  abstract removeTeamMember(input: RemoveOrganizationTeamMemberInput): Promise<void>;
+  abstract getTeamById(input: GetOrganizationTeamByIdInput): Promise<OrganizationTeam>;
   abstract getTeamBySlugForMember(
     input: GetOrganizationTeamBySlugForMemberInput,
   ): Promise<OrganizationTeam>;
@@ -123,38 +111,22 @@ export abstract class OrganizationService {
     input: ListOrganizationTeamAccessInput,
   ): Promise<OrganizationTeamAccess[]>;
 
-  abstract getGroup(
-    input: GetOrganizationGroupInput,
-  ): Promise<OrganizationGroupDetails>;
-  abstract listGroups(
-    input: ListOrganizationGroupsInput,
-  ): Promise<OrganizationGroupPage>;
+  abstract getGroup(input: GetOrganizationGroupInput): Promise<OrganizationGroupDetails>;
+  abstract listGroups(input: ListOrganizationGroupsInput): Promise<OrganizationGroupPage>;
   abstract listGroupsForMember(
     input: ListMemberOrganizationGroupsInput,
   ): Promise<OrganizationGroupSummary[]>;
-  abstract createGroup(
-    input: CreateOrganizationGroupInput,
-  ): Promise<OrganizationGroup>;
-  abstract renameGroup(
-    input: RenameOrganizationGroupInput,
-  ): Promise<OrganizationGroup>;
+  abstract createGroup(input: CreateOrganizationGroupInput): Promise<OrganizationGroup>;
+  abstract renameGroup(input: RenameOrganizationGroupInput): Promise<OrganizationGroup>;
   abstract deleteGroup(input: DeleteOrganizationGroupInput): Promise<void>;
-  abstract addGroupMember(
-    input: ChangeOrganizationGroupMemberInput,
-  ): Promise<void>;
-  abstract removeGroupMember(
-    input: ChangeOrganizationGroupMemberInput,
-  ): Promise<void>;
+  abstract addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void>;
+  abstract removeGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void>;
   abstract listGroupBindings(
     input: GetOrganizationGroupInput,
   ): Promise<OrganizationGroupBinding[]>;
   abstract addGroupBinding(
     input: AddOrganizationGroupBindingInput,
   ): Promise<OrganizationGroupBinding>;
-  abstract removeGroupBinding(
-    input: RemoveOrganizationGroupBindingInput,
-  ): Promise<void>;
-  abstract applyGroupEdits(
-    input: ApplyOrganizationGroupEditsInput,
-  ): Promise<void>;
+  abstract removeGroupBinding(input: RemoveOrganizationGroupBindingInput): Promise<void>;
+  abstract applyGroupEdits(input: ApplyOrganizationGroupEditsInput): Promise<void>;
 }

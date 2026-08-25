@@ -1,6 +1,11 @@
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
-import type { Component, LLMConfig, Signature, StudioWorkflow } from "@langwatch/workflow-contract";
+import type {
+  Component,
+  LLMConfig,
+  Signature,
+  StudioWorkflow,
+} from "@langwatch/workflow-contract";
 
 export const useModelProviderKeys = ({
   workflow,
@@ -11,9 +16,7 @@ export const useModelProviderKeys = ({
 }) => {
   const { modelProviders } = useOrganizationTeamProject();
 
-  const modelProvidersWithoutCustomKeys = Object.values(
-    modelProviders ?? {},
-  ).filter(
+  const modelProvidersWithoutCustomKeys = Object.values(modelProviders ?? {}).filter(
     (modelProvider) => !modelProvider.enabled && !modelProvider.customKeys,
   );
 
@@ -27,20 +30,15 @@ export const useModelProviderKeys = ({
         "data" in node && typeof node.data === "object"
           ? (node.data as Signature).parameters
               ?.filter((p) => p.type === "llm")
-              .map(
-                (p) => (p.value as LLMConfig | undefined)?.model?.split("/")[0],
-              )
+              .map((p) => (p.value as LLMConfig | undefined)?.model?.split("/")[0])
           : [],
       )
       .filter(
-        (provider): provider is string =>
-          provider !== undefined && provider !== "",
+        (provider): provider is string => provider !== undefined && provider !== "",
       );
   };
 
-  const nodeProviders = new Set(
-    getModelProviders(nodesWithLLMParameter as Component[]),
-  );
+  const nodeProviders = new Set(getModelProviders(nodesWithLLMParameter as Component[]));
 
   for (const llm of extra_llms ?? []) {
     const provider = llm.model?.split("/")[0];
@@ -51,13 +49,11 @@ export const useModelProviderKeys = ({
 
   const uniqueNodeProviders = Array.from(nodeProviders);
 
-  const nodeProvidersWithoutCustomKeys = uniqueNodeProviders.filter(
-    (provider) =>
-      modelProvidersWithoutCustomKeys.some((p) => p.provider === provider),
+  const nodeProvidersWithoutCustomKeys = uniqueNodeProviders.filter((provider) =>
+    modelProvidersWithoutCustomKeys.some((p) => p.provider === provider),
   );
 
-  const hasProvidersWithoutCustomKeys =
-    nodeProvidersWithoutCustomKeys.length > 0;
+  const hasProvidersWithoutCustomKeys = nodeProvidersWithoutCustomKeys.length > 0;
 
   return {
     nodeProvidersWithoutCustomKeys,

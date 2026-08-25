@@ -27,29 +27,26 @@ const traceCol = createColumnHelper<TraceListItem>();
 const convCol = createColumnHelper<ConversationGroup>();
 const groupCol = createColumnHelper<TraceGroup>();
 
-export const traceSelectColumnDef: ColumnDef<TraceListItem, any> =
-  traceCol.display({
-    id: SELECT_COLUMN_ID,
-    size: SELECT_COLUMN_SIZE,
-    minSize: SELECT_COLUMN_SIZE,
-    enableSorting: false,
-    enableResizing: false,
-    // A placeholder row is not a trace, so while they stand in for the page the
-    // header offers the same shimmer the row checkboxes do rather than a
-    // working "select all" over ids that address nothing.
-    header: ({ table }) =>
-      isTableLoading(table) ? (
-        <SkeletonSelectCell />
-      ) : (
-        <SelectHeaderCheckbox
-          traceIds={withoutPlaceholderTraceIds(
-            table
-              .getCoreRowModel()
-              .rows.map((r) => (r.original as TraceListItem).traceId),
-          )}
-        />
-      ),
-  });
+export const traceSelectColumnDef: ColumnDef<TraceListItem, any> = traceCol.display({
+  id: SELECT_COLUMN_ID,
+  size: SELECT_COLUMN_SIZE,
+  minSize: SELECT_COLUMN_SIZE,
+  enableSorting: false,
+  enableResizing: false,
+  // A placeholder row is not a trace, so while they stand in for the page the
+  // header offers the same shimmer the row checkboxes do rather than a
+  // working "select all" over ids that address nothing.
+  header: ({ table }) =>
+    isTableLoading(table) ? (
+      <SkeletonSelectCell />
+    ) : (
+      <SelectHeaderCheckbox
+        traceIds={withoutPlaceholderTraceIds(
+          table.getCoreRowModel().rows.map((r) => (r.original as TraceListItem).traceId),
+        )}
+      />
+    ),
+});
 
 export const conversationSelectColumnDef: ColumnDef<ConversationGroup, any> =
   convCol.display({
@@ -71,22 +68,19 @@ export const conversationSelectColumnDef: ColumnDef<ConversationGroup, any> =
     ),
   });
 
-export const groupSelectColumnDef: ColumnDef<TraceGroup, any> =
-  groupCol.display({
-    id: SELECT_COLUMN_ID,
-    size: SELECT_COLUMN_SIZE,
-    minSize: SELECT_COLUMN_SIZE,
-    enableSorting: false,
-    enableResizing: false,
-    header: ({ table }) => (
-      <SelectHeaderCheckbox
-        traceIds={withoutPlaceholderTraceIds(
-          table
-            .getCoreRowModel()
-            .rows.flatMap((r) =>
-              (r.original as TraceGroup).traces.map((t) => t.traceId),
-            ),
-        )}
-      />
-    ),
-  });
+export const groupSelectColumnDef: ColumnDef<TraceGroup, any> = groupCol.display({
+  id: SELECT_COLUMN_ID,
+  size: SELECT_COLUMN_SIZE,
+  minSize: SELECT_COLUMN_SIZE,
+  enableSorting: false,
+  enableResizing: false,
+  header: ({ table }) => (
+    <SelectHeaderCheckbox
+      traceIds={withoutPlaceholderTraceIds(
+        table
+          .getCoreRowModel()
+          .rows.flatMap((r) => (r.original as TraceGroup).traces.map((t) => t.traceId)),
+      )}
+    />
+  ),
+});

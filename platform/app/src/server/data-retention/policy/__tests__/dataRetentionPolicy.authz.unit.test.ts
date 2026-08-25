@@ -34,9 +34,7 @@ const ctx = { prisma, session };
 
 describe("requiredRetentionWritePermission", () => {
   it("maps each tier to the permission the read snapshot advertises", () => {
-    expect(requiredRetentionWritePermission("ORGANIZATION")).toBe(
-      "organization:manage",
-    );
+    expect(requiredRetentionWritePermission("ORGANIZATION")).toBe("organization:manage");
     expect(requiredRetentionWritePermission("TEAM")).toBe("team:manage");
     // PROJECT uses project:update (NOT project:manage) so a team MEMBER, who
     // the snapshot shows their project as writable, can actually save.
@@ -184,9 +182,9 @@ describe("assertCanDisableRetention", () => {
   describe("given no session", () => {
     it("throws FORBIDDEN", () => {
       process.env.ADMIN_EMAILS = "ops@langwatch.ai";
-      expect(() =>
-        assertCanDisableRetention({ prisma, session: null } as any),
-      ).toThrow(TRPCError);
+      expect(() => assertCanDisableRetention({ prisma, session: null } as any)).toThrow(
+        TRPCError,
+      );
     });
   });
 });

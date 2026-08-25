@@ -19,7 +19,9 @@ import {
 } from "../adapters/langy.turn-errors.adapter";
 
 const livenessLogger = createLogger("langwatch:langy:agent-turn-liveness-subscriber");
-const broadcastLogger = createLogger("langwatch:langy:conversation-update-broadcast-subscriber");
+const broadcastLogger = createLogger(
+  "langwatch:langy:conversation-update-broadcast-subscriber",
+);
 
 export const LANGY_HEARTBEAT_GRACE_MS = 30_000;
 const MAX_STALL_MS = LANGY_HEARTBEAT_GRACE_MS * 3;
@@ -37,15 +39,36 @@ export interface LangyConversationLivenessRecord {
   lastActivityAtMs: number | null;
 }
 export interface LangyConversationLivenessReader {
-  read(params: { projectId: string; conversationId: string }): Promise<LangyConversationLivenessRecord | null>;
+  read(params: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<LangyConversationLivenessRecord | null>;
 }
 export interface LangyFailTurnCommandPort {
-  failTurn(params: { projectId: string; conversationId: string; turnId: string; error: string }): Promise<void>;
+  failTurn(params: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    error: string;
+  }): Promise<void>;
 }
 export interface LangyLivenessBufferPort {
-  liveness(params: { conversationId: string; turnId: string; now: number; graceMs: number }): Promise<{ stale: boolean }>;
-  appendStatus(params: { conversationId: string; turnId: string; status: string }): Promise<void>;
-  markError(params: { conversationId: string; turnId: string; error: string }): Promise<void>;
+  liveness(params: {
+    conversationId: string;
+    turnId: string;
+    now: number;
+    graceMs: number;
+  }): Promise<{ stale: boolean }>;
+  appendStatus(params: {
+    conversationId: string;
+    turnId: string;
+    status: string;
+  }): Promise<void>;
+  markError(params: {
+    conversationId: string;
+    turnId: string;
+    error: string;
+  }): Promise<void>;
 }
 export interface LangyWorkerDispatchPort {
   dispatch(params: {
@@ -77,7 +100,10 @@ export interface LangyTurnHandoffRecord {
   resumeToken?: string;
 }
 export interface LangyTurnHandoffReader {
-  read(params: { conversationId: string; turnId: string }): Promise<LangyTurnHandoffRecord | null>;
+  read(params: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<LangyTurnHandoffRecord | null>;
 }
 export interface AgentTurnLivenessSubscriberDeps {
   buffer: LangyLivenessBufferPort;
@@ -93,7 +119,10 @@ export interface LangyConversationFreshnessRecord {
   isShared: boolean;
 }
 export interface LangyConversationFreshnessReader {
-  read(params: { projectId: string; conversationId: string }): Promise<LangyConversationFreshnessRecord | null>;
+  read(params: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<LangyConversationFreshnessRecord | null>;
 }
 export interface LangyBroadcastPort {
   broadcastToTenant(tenantId: string, message: string, event: string): Promise<void>;
@@ -103,8 +132,13 @@ export interface LangyConversationUpdateBroadcastSubscriberDeps {
   conversations: LangyConversationFreshnessReader;
 }
 
-function projectionNotReadyError(params: { projectionName: string; eventId: string }): Error {
-  return new Error(`${params.projectionName} has not projected event ${params.eventId} yet`);
+function projectionNotReadyError(params: {
+  projectionName: string;
+  eventId: string;
+}): Error {
+  return new Error(
+    `${params.projectionName} has not projected event ${params.eventId} yet`,
+  );
 }
 function turnIdOf(event: LangyConversationProcessingEvent): string | null {
   return "turnId" in event.data ? (event.data.turnId ?? null) : null;
@@ -120,7 +154,8 @@ export function createAgentTurnLivenessSubscriber(
     options: {
       delay: LANGY_HEARTBEAT_GRACE_MS,
       deduplication: {
-        makeId: (event) => `langy-liveness:${event.tenantId}:${String(event.aggregateId)}:${turnIdOf(event) ?? "?"}`,
+        makeId: (event) =>
+          `langy-liveness:${event.tenantId}:${String(event.aggregateId)}:${turnIdOf(event) ?? "?"}`,
         ttlMs: LANGY_HEARTBEAT_GRACE_MS * 2,
       },
     },
@@ -131,12 +166,25 @@ export function createAgentTurnLivenessSubscriber(
       if (!eventTurnId) return;
       const conversation = await deps.conversations.read({ projectId, conversationId });
       if (!conversation || !cursorHasReachedEvent(conversation.cursor, event)) {
-        throw projectionNotReadyError({ projectionName: "langyConversation", eventId: event.id });
+        throw projectionNotReadyError({
+          projectionName: "langyConversation",
+          eventId: event.id,
+        });
       }
-      if (conversation.status !== LANGY_CONVERSATION_STATUS.RUNNING || conversation.currentTurnId === null || conversation.currentTurnId !== eventTurnId) return;
+      if (
+        conversation.status !== LANGY_CONVERSATION_STATUS.RUNNING ||
+        conversation.currentTurnId === null ||
+        conversation.currentTurnId !== eventTurnId
+      )
+        return;
       const turnId = conversation.currentTurnId;
       const now = clock();
-      const liveness = await deps.buffer.liveness({ conversationId, turnId, now, graceMs: LANGY_HEARTBEAT_GRACE_MS });
+      const liveness = await deps.buffer.liveness({
+        conversationId,
+        turnId,
+        now,
+        graceMs: LANGY_HEARTBEAT_GRACE_MS,
+      });
       if (!liveness.stale) {
         throw new DispatchError({
           message: `langy turn ${turnId} still live; re-checking liveness`,
@@ -144,19 +192,44 @@ export function createAgentTurnLivenessSubscriber(
           retryAfterMs: LANGY_HEARTBEAT_GRACE_MS,
         });
       }
-      const stalledMs = conversation.lastActivityAtMs === null ? MAX_STALL_MS + 1 : now - conversation.lastActivityAtMs;
+      const stalledMs =
+        conversation.lastActivityAtMs === null
+          ? MAX_STALL_MS + 1
+          : now - conversation.lastActivityAtMs;
       const candidateHandoff = await deps.handoffStore.read({ conversationId, turnId });
-      const handoff = candidateHandoff?.projectId === projectId && candidateHandoff.conversationId === conversationId && candidateHandoff.turnId === turnId ? candidateHandoff : null;
+      const handoff =
+        candidateHandoff?.projectId === projectId &&
+        candidateHandoff.conversationId === conversationId &&
+        candidateHandoff.turnId === turnId
+          ? candidateHandoff
+          : null;
       if (stalledMs > MAX_STALL_MS || !handoff) {
-        livenessLogger.warn({ projectId, conversationId, turnId, stalledMs, reason: stalledMs > MAX_STALL_MS ? "stall_expired" : "no_handoff" }, "failing a stalled langy turn");
+        livenessLogger.warn(
+          {
+            projectId,
+            conversationId,
+            turnId,
+            stalledMs,
+            reason: stalledMs > MAX_STALL_MS ? "stall_expired" : "no_handoff",
+          },
+          "failing a stalled langy turn",
+        );
         const error = serializeLangyTurnError(new LangyWorkerStoppedError());
-        await deps.buffer.markError({ conversationId, turnId, error }).catch(() => undefined);
+        await deps.buffer
+          .markError({ conversationId, turnId, error })
+          .catch(() => undefined);
         await deps.failTurn.failTurn({ projectId, conversationId, turnId, error });
         return;
       }
-      await deps.buffer.appendStatus({ conversationId, turnId, status: "Reconnecting to the agent…" }).catch(() => undefined);
+      await deps.buffer
+        .appendStatus({ conversationId, turnId, status: "Reconnecting to the agent…" })
+        .catch(() => undefined);
       await deps.worker.dispatch({
-        intent: handoff.resumeToken ? "revive" : handoff.credentials.langwatchApiKey ? "create" : "continue",
+        intent: handoff.resumeToken
+          ? "revive"
+          : handoff.credentials.langwatchApiKey
+            ? "create"
+            : "continue",
         conversationId,
         turnId,
         projectId,
@@ -183,24 +256,40 @@ export function createLangyConversationUpdateBroadcastSubscriber(
   return {
     name: "langyConversationUpdateBroadcast",
     eventTypes: LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
-    options: { deduplication: { makeId: (event) => `langy-conversation-update:${event.tenantId}:${String(event.aggregateId)}`, ttlMs: 15_000 } },
+    options: {
+      deduplication: {
+        makeId: (event) =>
+          `langy-conversation-update:${event.tenantId}:${String(event.aggregateId)}`,
+        ttlMs: 15_000,
+      },
+    },
     async handle(event): Promise<void> {
       const projectId = event.tenantId;
       const conversationId = String(event.aggregateId);
       const record = await deps.conversations.read({ projectId, conversationId });
       if (!record || !cursorHasReachedEvent(record.cursor, event)) {
-        throw projectionNotReadyError({ projectionName: "langyConversation", eventId: event.id });
+        throw projectionNotReadyError({
+          projectionName: "langyConversation",
+          eventId: event.id,
+        });
       }
       try {
-        await deps.broadcast.broadcastToTenant(projectId, JSON.stringify({
-          event: "langy_conversation_updated",
-          conversationId,
-          cursor: record.cursor,
-          ownerUserId: record.ownerUserId,
-          isShared: record.isShared,
-        }), "langy_conversation_updated");
+        await deps.broadcast.broadcastToTenant(
+          projectId,
+          JSON.stringify({
+            event: "langy_conversation_updated",
+            conversationId,
+            cursor: record.cursor,
+            ownerUserId: record.ownerUserId,
+            isShared: record.isShared,
+          }),
+          "langy_conversation_updated",
+        );
       } catch (error) {
-        broadcastLogger.warn({ projectId, conversationId, error }, "Failed to broadcast Langy conversation invalidation");
+        broadcastLogger.warn(
+          { projectId, conversationId, error },
+          "Failed to broadcast Langy conversation invalidation",
+        );
       }
     },
   };
@@ -218,16 +307,26 @@ export function createLangyTurnAdmissionLifecycleSubscriber(deps: {
   return {
     name: "langyTurnAdmissionLifecycle",
     eventTypes: [LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED, ...terminalEvents],
-    options: { deduplication: { makeId: (event) => `langy-turn-admission-lifecycle:${event.id}` } },
+    options: {
+      deduplication: { makeId: (event) => `langy-turn-admission-lifecycle:${event.id}` },
+    },
     async handle(event): Promise<void> {
       const projectId = event.tenantId;
       const conversationId = String(event.aggregateId);
       const turnId = "turnId" in event.data ? event.data.turnId : undefined;
       if (event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED) {
-        await deps.admissions.confirmAccepted({ projectId, conversationId, turnId: event.data.turnId });
+        await deps.admissions.confirmAccepted({
+          projectId,
+          conversationId,
+          turnId: event.data.turnId,
+        });
         return;
       }
-      await deps.admissions.release({ projectId, conversationId, ...(turnId ? { turnId } : {}) });
+      await deps.admissions.release({
+        projectId,
+        conversationId,
+        ...(turnId ? { turnId } : {}),
+      });
     },
   };
 }

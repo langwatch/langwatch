@@ -17,9 +17,9 @@ describe("detectUnknownVariables", () => {
       expect(found).toHaveLength(1);
       expect(found[0]!.root).toBe("tigger");
       const text = "Hello {{ tigger.name }}";
-      expect(
-        text.slice(found[0]!.index, found[0]!.index + found[0]!.token.length),
-      ).toBe("tigger.name");
+      expect(text.slice(found[0]!.index, found[0]!.index + found[0]!.token.length)).toBe(
+        "tigger.name",
+      );
     });
   });
 
@@ -45,9 +45,7 @@ describe("detectUnknownVariables", () => {
 
   describe("when the expression is a literal", () => {
     it("reports nothing", () => {
-      expect(detectUnknownVariables("{{ 'hello' }} {{ 42 }}", VARS)).toEqual(
-        [],
-      );
+      expect(detectUnknownVariables("{{ 'hello' }} {{ 42 }}", VARS)).toEqual([]);
     });
   });
 });

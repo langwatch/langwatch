@@ -33,25 +33,19 @@ async function deleteOrg(orgId: string): Promise<void> {
   process.stderr.write(`[cleanup] deleting organizationId=${orgId}\n`);
   await prisma.ingestionSource
     .deleteMany({ where: { organizationId: orgId } })
-    .catch((e) =>
-      process.stderr.write(`[cleanup] ingestionSource: ${String(e)}\n`),
-    );
+    .catch((e) => process.stderr.write(`[cleanup] ingestionSource: ${String(e)}\n`));
   await prisma.project
     .deleteMany({ where: { team: { organizationId: orgId } } })
     .catch((e) => process.stderr.write(`[cleanup] project: ${String(e)}\n`));
   await prisma.organizationUser
     .deleteMany({ where: { organizationId: orgId } })
-    .catch((e) =>
-      process.stderr.write(`[cleanup] organizationUser: ${String(e)}\n`),
-    );
+    .catch((e) => process.stderr.write(`[cleanup] organizationUser: ${String(e)}\n`));
   await prisma.team
     .deleteMany({ where: { organizationId: orgId } })
     .catch((e) => process.stderr.write(`[cleanup] team: ${String(e)}\n`));
   await prisma.organization
     .delete({ where: { id: orgId } })
-    .catch((e) =>
-      process.stderr.write(`[cleanup] organization: ${String(e)}\n`),
-    );
+    .catch((e) => process.stderr.write(`[cleanup] organization: ${String(e)}\n`));
 }
 
 async function main(): Promise<void> {

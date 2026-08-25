@@ -2,11 +2,7 @@ import type { Command, CommandHandler, Event } from "@langwatch/eventing";
 import { defineCommandSchema } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { TtlCache } from "~/server/utils/ttlCache";
-import {
-  captureException,
-  toError,
-  withScope,
-} from "~/utils/posthogErrorCapture";
+import { captureException, toError, withScope } from "~/utils/posthogErrorCapture";
 import type {
   BillableEventsQueryService,
   UsageReportingService,
@@ -17,9 +13,7 @@ import type { ReportUsageForMonthCommandData } from "../schemas/commands";
 import { reportUsageForMonthCommandDataSchema } from "../schemas/commands";
 import { BILLING_REPORT_COMMAND_TYPES } from "../schemas/constants";
 
-const logger = createLogger(
-  "langwatch:billing-reporting:report-usage-for-month",
-);
+const logger = createLogger("langwatch:billing-reporting:report-usage-for-month");
 
 /** Stripe meter event name for billable events. */
 const BILLABLE_EVENTS_EVENT_NAME = "langwatch_billable_events";
@@ -35,10 +29,7 @@ type CachedOrgData = {
   subscriptions: { id: string }[];
 };
 
-const orgCache = new TtlCache<CachedOrgData>(
-  ONE_MINUTE_MS,
-  "ttlcache:billing:orgData:",
-);
+const orgCache = new TtlCache<CachedOrgData>(ONE_MINUTE_MS, "ttlcache:billing:orgData:");
 
 export interface ReportUsageForMonthCommandDeps {
   organizations: OrganizationService;
@@ -85,9 +76,10 @@ function buildIdentifier({
  *
  * Uses constructor DI — instantiate with deps and pass via `.withCommandInstance()`.
  */
-export class ReportUsageForMonthCommand
-  implements CommandHandler<Command<ReportUsageForMonthCommandData>, Event>
-{
+export class ReportUsageForMonthCommand implements CommandHandler<
+  Command<ReportUsageForMonthCommandData>,
+  Event
+> {
   static readonly schema = SCHEMA;
 
   constructor(private readonly deps: ReportUsageForMonthCommandDeps) {}
@@ -105,9 +97,7 @@ export class ReportUsageForMonthCommand
     };
   }
 
-  async handle(
-    command: Command<ReportUsageForMonthCommandData>,
-  ): Promise<Event[]> {
+  async handle(command: Command<ReportUsageForMonthCommandData>): Promise<Event[]> {
     const { organizationId, billingMonth, tenantId } = command.data;
 
     let shouldSelfDispatch = false;
@@ -115,10 +105,7 @@ export class ReportUsageForMonthCommand
       // 1. Skip conditions
       let org = (await orgCache.get(organizationId)) ?? null;
       if (!org) {
-        org =
-          await this.deps.organizations.getOrganizationForBilling(
-            organizationId,
-          );
+        org = await this.deps.organizations.getOrganizationForBilling(organizationId);
         if (org) {
           await orgCache.set(organizationId, org);
         }
@@ -326,9 +313,7 @@ export class ReportUsageForMonthCommand
           scope.setExtra?.("delta", delta);
           scope.setExtra?.("stripeError", result?.error);
           captureException(
-            new Error(
-              `Stripe rejected meter event: ${result?.error ?? "unknown"}`,
-            ),
+            new Error(`Stripe rejected meter event: ${result?.error ?? "unknown"}`),
           );
         });
 

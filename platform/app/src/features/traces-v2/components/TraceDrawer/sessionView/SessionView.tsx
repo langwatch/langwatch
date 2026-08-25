@@ -80,10 +80,7 @@ export function SessionView({ session, entries }: SessionViewProps) {
 
         {tokenTimeline.length > 0 && (
           <Section title="Where the tokens went">
-            <TokenTimelineChart
-              points={tokenTimeline}
-              rebuilds={cacheRebuilds}
-            />
+            <TokenTimelineChart points={tokenTimeline} rebuilds={cacheRebuilds} />
           </Section>
         )}
 
@@ -97,10 +94,7 @@ export function SessionView({ session, entries }: SessionViewProps) {
 
         {Object.keys(session.toolCounts).length > 0 && (
           <Section title="Tools">
-            <ToolTable
-              counts={session.toolCounts}
-              durations={session.toolDurationMs}
-            />
+            <ToolTable counts={session.toolCounts} durations={session.toolDurationMs} />
           </Section>
         )}
 
@@ -151,10 +145,7 @@ function Headline({ session }: { session: CodingAgentSessionRow }) {
         {session.subAgents > 0 && (
           <Stat label="Sub-agents" value={boundedCount(session.subAgents)} />
         )}
-        <Stat
-          label="Files touched"
-          value={boundedCount(session.filesTouched.length)}
-        />
+        <Stat label="Files touched" value={boundedCount(session.filesTouched.length)} />
       </Grid>
     </VStack>
   );
@@ -247,11 +238,7 @@ function Steps({ steps }: { steps: [string, number, boolean][] }) {
             borderColor={failed ? "red.solid/30" : "border"}
             bg={failed ? "red.solid/8" : "bg.subtle"}
           >
-            <Text
-              textStyle="xs"
-              fontFamily="mono"
-              color={failed ? "red.fg" : "fg.muted"}
-            >
+            <Text textStyle="xs" fontFamily="mono" color={failed ? "red.fg" : "fg.muted"}>
               {name}
             </Text>
             {count > 1 && (
@@ -324,8 +311,7 @@ function TimeBreakdown({ session }: { session: CodingAgentSessionRow }) {
       </HStack>
       {meanTtft !== null && (
         <Text textStyle="xs" color="fg.subtle">
-          Typically {formatShortDuration(meanTtft)} before the model started
-          replying.
+          Typically {formatShortDuration(meanTtft)} before the model started replying.
         </Text>
       )}
     </VStack>
@@ -432,9 +418,8 @@ function CacheHealth({ session }: { session: CodingAgentSessionRow }) {
         </Grid>
         {session.largestCacheRebuildTokens > 0 && (
           <Text textStyle="xs" color="fg.muted">
-            Biggest single rebuild:{" "}
-            {formatCompact(session.largestCacheRebuildTokens)} tokens re-sent
-            instead of being reused from cache.
+            Biggest single rebuild: {formatCompact(session.largestCacheRebuildTokens)}{" "}
+            tokens re-sent instead of being reused from cache.
           </Text>
         )}
       </VStack>
@@ -461,8 +446,8 @@ function ContextNoise({ session }: { session: CodingAgentSessionRow }) {
           {formatCompact(session.compactionTokensAfter)} tokens.
         </Text>
         <Text textStyle="xs" color="fg.muted">
-          Older detail gets summarised away once the context outgrows the
-          window. Anything the agent forgot after this point, it forgot here.
+          Older detail gets summarised away once the context outgrows the window. Anything
+          the agent forgot after this point, it forgot here.
         </Text>
       </VStack>
     </Section>
@@ -545,11 +530,7 @@ function Outcome({ session }: { session: CodingAgentSessionRow }) {
           <Stat label="Commits" value={String(session.commits)} compact />
         )}
         {session.pullRequests > 0 && (
-          <Stat
-            label="Pull requests"
-            value={String(session.pullRequests)}
-            compact
-          />
+          <Stat label="Pull requests" value={String(session.pullRequests)} compact />
         )}
         {hasReview && (
           <Text textStyle="xs" color="fg.muted">

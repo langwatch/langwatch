@@ -11,24 +11,20 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const {
-  mockFeatureFlagIsEnabled,
-  mockDescribeSchema,
-  mockExecute,
-  deployment,
-} = vi.hoisted(() => ({
-  mockFeatureFlagIsEnabled: vi.fn().mockResolvedValue(true),
-  mockDescribeSchema: vi.fn().mockReturnValue({ datasets: [] }),
-  mockExecute: vi.fn().mockResolvedValue({
-    columns: [],
-    rows: [],
-    statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
-    truncated: false,
-    diagnostics: [],
-  }),
-  /** Whether this deployment has a LangWatchQL identity to run queries as. */
-  deployment: { provisioned: true },
-}));
+const { mockFeatureFlagIsEnabled, mockDescribeSchema, mockExecute, deployment } =
+  vi.hoisted(() => ({
+    mockFeatureFlagIsEnabled: vi.fn().mockResolvedValue(true),
+    mockDescribeSchema: vi.fn().mockReturnValue({ datasets: [] }),
+    mockExecute: vi.fn().mockResolvedValue({
+      columns: [],
+      rows: [],
+      statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
+      truncated: false,
+      diagnostics: [],
+    }),
+    /** Whether this deployment has a LangWatchQL identity to run queries as. */
+    deployment: { provisioned: true },
+  }));
 
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: mockFeatureFlagIsEnabled },
@@ -43,8 +39,7 @@ vi.mock("~/runtime/app/features/audit-log", () => ({
 }));
 
 vi.mock("~/server/analytics/lwql", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/analytics/lwql")>();
+  const actual = await importOriginal<typeof import("~/server/analytics/lwql")>();
   return {
     ...actual,
     getLangWatchQLService: () => ({
@@ -134,9 +129,9 @@ describe("the LangWatchQL router's feature switch", () => {
     });
 
     it("answers available and serves the schema and the query", async () => {
-      await expect(
-        caller.availability({ projectId: "proj_test_123" }),
-      ).resolves.toEqual({ available: true });
+      await expect(caller.availability({ projectId: "proj_test_123" })).resolves.toEqual({
+        available: true,
+      });
 
       await caller.schema({ projectId: "proj_test_123" });
       expect(mockDescribeSchema).toHaveBeenCalled();
@@ -153,16 +148,15 @@ describe("the LangWatchQL router's feature switch", () => {
 
     /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
     it("answers unavailable, naming the switch as the gate that closed", async () => {
-      await expect(
-        caller.availability({ projectId: "proj_test_123" }),
-      ).resolves.toEqual({ available: false, reason: "disabled" });
+      await expect(caller.availability({ projectId: "proj_test_123" })).resolves.toEqual({
+        available: false,
+        reason: "disabled",
+      });
     });
 
     /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
     it("refuses the schema with the named code and describes nothing", async () => {
-      await expect(
-        caller.schema({ projectId: "proj_test_123" }),
-      ).rejects.toMatchObject({
+      await expect(caller.schema({ projectId: "proj_test_123" })).rejects.toMatchObject({
         code: "FORBIDDEN",
         cause: { code: "lwql_not_enabled" },
       });
@@ -195,25 +189,24 @@ describe("the LangWatchQL router's feature switch", () => {
       // can only come on if the router resolved and passed the right one.
       mockFeatureFlagIsEnabled.mockImplementation(
         async (flag: string, context: { organizationId?: string }) =>
-          flag === "release_lwql_workbench" &&
-          context.organizationId === "org_test_123",
+          flag === "release_lwql_workbench" && context.organizationId === "org_test_123",
       );
     });
 
     /** @scenario "An organization-scoped rule can switch the workbench on" */
     it("switches the workbench on for that organization's project and no other", async () => {
-      await expect(
-        caller.availability({ projectId: "proj_test_123" }),
-      ).resolves.toEqual({ available: true });
+      await expect(caller.availability({ projectId: "proj_test_123" })).resolves.toEqual({
+        available: true,
+      });
 
       mockPrismaClient.project.findUnique.mockResolvedValue({
         id: "proj_other_456",
         team: { organizationId: "org_other_456" },
       });
 
-      await expect(
-        caller.availability({ projectId: "proj_other_456" }),
-      ).resolves.toEqual({ available: false, reason: "disabled" });
+      await expect(caller.availability({ projectId: "proj_other_456" })).resolves.toEqual(
+        { available: false, reason: "disabled" },
+      );
     });
   });
 
@@ -225,9 +218,10 @@ describe("the LangWatchQL router's feature switch", () => {
 
     /** @scenario "The workbench is unreachable while LangWatchQL is not provisioned" */
     it("answers unavailable, naming provisioning rather than the switch", async () => {
-      await expect(
-        caller.availability({ projectId: "proj_test_123" }),
-      ).resolves.toEqual({ available: false, reason: "unprovisioned" });
+      await expect(caller.availability({ projectId: "proj_test_123" })).resolves.toEqual({
+        available: false,
+        reason: "unprovisioned",
+      });
     });
   });
 });

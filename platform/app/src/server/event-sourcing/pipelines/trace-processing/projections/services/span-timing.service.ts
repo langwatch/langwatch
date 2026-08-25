@@ -15,13 +15,10 @@ export const isValidTimestamp = (ts: number | undefined | null): ts is number =>
  * that covers all spans seen so far.
  */
 export class SpanTimingService {
-  accumulateTiming({
-    state,
-    span,
-  }: {
-    state: TraceSummaryData;
-    span: NormalizedSpan;
-  }): { occurredAt: number; totalDurationMs: number } {
+  accumulateTiming({ state, span }: { state: TraceSummaryData; span: NormalizedSpan }): {
+    occurredAt: number;
+    totalDurationMs: number;
+  } {
     if (
       SYNTHETIC_SPAN_NAMES.has(span.name) ||
       !isValidTimestamp(span.startTimeUnixMs) ||
@@ -39,8 +36,7 @@ export class SpanTimingService {
         : span.startTimeUnixMs;
     const currentEnd =
       state.occurredAt > 0 ? state.occurredAt + state.totalDurationMs : 0;
-    const totalDurationMs =
-      Math.max(currentEnd, span.endTimeUnixMs) - occurredAt;
+    const totalDurationMs = Math.max(currentEnd, span.endTimeUnixMs) - occurredAt;
 
     return { occurredAt, totalDurationMs };
   }

@@ -1,11 +1,5 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import {
-  ArrowRight,
-  Code,
-  MessageSquare,
-  Monitor,
-  Terminal,
-} from "lucide-react";
+import { ArrowRight, Code, MessageSquare, Monitor, Terminal } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
 import { api } from "~/utils/api";
@@ -28,8 +22,7 @@ const productOptions: ProductOption[] = [
     title: "Via the Platform",
     description: "Configure everything directly from the LangWatch dashboard",
     icon: Monitor,
-    gradient:
-      "linear-gradient(135deg, rgba(49,130,206,0.05) 0%, transparent 50%)",
+    gradient: "linear-gradient(135deg, rgba(49,130,206,0.05) 0%, transparent 50%)",
   },
   {
     key: "via-claude-code",
@@ -37,8 +30,7 @@ const productOptions: ProductOption[] = [
     description:
       "Set up with prompts, skills, or MCP. Works with Claude Code, Cursor, Windsurf, and more",
     icon: Terminal,
-    gradient:
-      "linear-gradient(135deg, rgba(237,137,38,0.06) 0%, transparent 50%)",
+    gradient: "linear-gradient(135deg, rgba(237,137,38,0.06) 0%, transparent 50%)",
   },
   {
     key: "via-claude-desktop",
@@ -46,16 +38,14 @@ const productOptions: ProductOption[] = [
     description:
       "Connect any MCP client. Claude Desktop, ChatGPT, Cursor, Windsurf, and more",
     icon: MessageSquare,
-    gradient:
-      "linear-gradient(135deg, rgba(128,90,213,0.05) 0%, transparent 50%)",
+    gradient: "linear-gradient(135deg, rgba(128,90,213,0.05) 0%, transparent 50%)",
   },
   {
     key: "manually",
     title: "Manually",
     description: "Integrate the LangWatch SDK directly into your codebase",
     icon: Code,
-    gradient:
-      "linear-gradient(135deg, rgba(56,161,105,0.05) 0%, transparent 50%)",
+    gradient: "linear-gradient(135deg, rgba(56,161,105,0.05) 0%, transparent 50%)",
   },
 ];
 
@@ -66,8 +56,7 @@ interface ProductSelectionScreenProps {
 export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
   onSelectProduct,
 }) => {
-  const setIntegrationMethod =
-    api.onboarding.setIntegrationMethod.useMutation();
+  const setIntegrationMethod = api.onboarding.setIntegrationMethod.useMutation();
 
   return (
     <VStack gap={3} align="stretch" w="full" maxW="520px" mx="auto">
@@ -99,8 +88,7 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
           transition={{ duration: 0.27, delay: i * 0.054, ease: "easeOut" }}
           whileHover={{
             y: -3,
-            boxShadow:
-              "0 12px 40px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)",
             borderColor: "var(--chakra-colors-orange-emphasized)",
             transition: { duration: 0.25, ease: "easeOut" },
           }}

@@ -9,13 +9,7 @@
  * UX contract: specs/model-providers/missing-model-popup.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AI_CALL_FAILED_CAUSE } from "../../utils/trpcError";
@@ -59,13 +53,9 @@ describe("showMissingModelToast", () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/Model not configured for AI search/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Model not configured for AI search/i)).toBeInTheDocument();
     });
-    expect(
-      screen.getByText(/Pick a Fast model in Model Providers/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Pick a Fast model in Model Providers/i)).toBeInTheDocument();
   });
 
   /** @scenario The toast names the feature, the role, and the scope it couldn't resolve from */
@@ -79,9 +69,7 @@ describe("showMissingModelToast", () => {
       canConfigure: true,
     });
 
-    const title = await screen.findByText(
-      /Model not configured for AI search/i,
-    );
+    const title = await screen.findByText(/Model not configured for AI search/i);
     const root = title.closest("[data-type]");
     expect(root).not.toBeNull();
     expect(root!.getAttribute("data-type")).toBe("info");
@@ -115,15 +103,11 @@ describe("showMissingModelToast", () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/Model not configured for AI search/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Model not configured for AI search/i)).toBeInTheDocument();
     });
     expect(screen.queryByText(/Configure Fast model/i)).not.toBeInTheDocument();
     expect(
-      screen.getByText(
-        /Ask an organization or project admin to set a Fast model/i,
-      ),
+      screen.getByText(/Ask an organization or project admin to set a Fast model/i),
     ).toBeInTheDocument();
   });
 
@@ -142,9 +126,7 @@ describe("showMissingModelToast", () => {
     showMissingModelToast(info);
 
     await waitFor(() => {
-      expect(
-        screen.getAllByText(/Model not configured for AI search/i),
-      ).toHaveLength(1);
+      expect(screen.getAllByText(/Model not configured for AI search/i)).toHaveLength(1);
     });
     expect(toaster.isVisible(missingModelToastId(info))).toBe(true);
   });
@@ -162,9 +144,7 @@ describe("showAiCallFailedToast", () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/Workflow commit message failed/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Workflow commit message failed/i)).toBeInTheDocument();
     });
     expect(
       screen.getByText(/Double-check your Fast model configuration/i),
@@ -202,9 +182,7 @@ describe("showAiCallFailedToast", () => {
     showAiCallFailedToast(info);
 
     await waitFor(() => {
-      expect(
-        screen.getAllByText(/Workflow commit message failed/i),
-      ).toHaveLength(1);
+      expect(screen.getAllByText(/Workflow commit message failed/i)).toHaveLength(1);
     });
     expect(toaster.isVisible(aiCallFailedToastId(info))).toBe(true);
   });
@@ -239,18 +217,14 @@ describe("showProviderDisabledToast", () => {
     showProviderDisabledToast(buildProviderDisabledInfo({ onSwapToAlternate }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/Model unavailable for AI search/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Model unavailable for AI search/i)).toBeInTheDocument();
     });
     // Description names the disabled default + its scope, and offers the
     // cascade-next alternate.
     expect(
       screen.getByText(/openai\/gpt-4o is set at project scope/i),
     ).toBeInTheDocument();
-    const swapButton = screen.getByText(
-      "Use organization default (azure/gpt-4o)",
-    );
+    const swapButton = screen.getByText("Use organization default (azure/gpt-4o)");
     fireEvent.click(swapButton);
     // The click delegates to the injected swap handler — the interceptor
     // wires this to setFeatureOverrideForScope(model: null) at the
@@ -277,15 +251,11 @@ describe("showProviderDisabledToast", () => {
       );
 
       await waitFor(() => {
-        expect(
-          screen.getByText(/Model unavailable for AI search/i),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/Model unavailable for AI search/i)).toBeInTheDocument();
       });
       const settingsButton = screen.getByText("Open settings");
       fireEvent.click(settingsButton);
-      expect(assign).toHaveBeenCalledWith(
-        "/settings/model-providers#role-default",
-      );
+      expect(assign).toHaveBeenCalledWith("/settings/model-providers#role-default");
     } finally {
       Object.defineProperty(window, "location", {
         value: originalLocation,
@@ -310,17 +280,11 @@ describe("showProviderDisabledToast", () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/Model unavailable for AI search/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Model unavailable for AI search/i)).toBeInTheDocument();
     });
-    expect(
-      screen.getByText(/openai\/gpt-4o is set at team scope/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/openai\/gpt-4o is set at team scope/i)).toBeInTheDocument();
     expect(screen.getByText("Open settings")).toBeInTheDocument();
-    expect(
-      screen.queryByText(/Use organization default/i),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Use organization default/i)).not.toBeInTheDocument();
   });
 
   /** @scenario Repeated failures within the same scope coalesce into one toast */
@@ -332,9 +296,7 @@ describe("showProviderDisabledToast", () => {
     }
 
     await waitFor(() => {
-      expect(
-        screen.getAllByText(/Model unavailable for AI search/i),
-      ).toHaveLength(1);
+      expect(screen.getAllByText(/Model unavailable for AI search/i)).toHaveLength(1);
     });
     expect(toaster.isVisible(providerDisabledToastId(info))).toBe(true);
   });

@@ -34,9 +34,7 @@ describe("detectColdScan", () => {
 
   it("clears the flag for BETWEEN and IN predicates", () => {
     expect(
-      detectColdScan(
-        "SELECT 1 FROM stored_spans WHERE StartTime BETWEEN a AND b",
-      ),
+      detectColdScan("SELECT 1 FROM stored_spans WHERE StartTime BETWEEN a AND b"),
     ).toBeNull();
     expect(
       detectColdScan("SELECT 1 FROM stored_spans WHERE StartTime IN (1, 2, 3)"),
@@ -56,26 +54,21 @@ describe("detectColdScan", () => {
   });
 
   it("is case-insensitive on table and column names", () => {
+    expect(detectColdScan("select spanid from STORED_SPANS where tenantid = 'x'")).toBe(
+      "stored_spans",
+    );
     expect(
-      detectColdScan("select spanid from STORED_SPANS where tenantid = 'x'"),
-    ).toBe("stored_spans");
-    expect(
-      detectColdScan(
-        "select spanid from STORED_SPANS where starttime > now() - 1",
-      ),
+      detectColdScan("select spanid from STORED_SPANS where starttime > now() - 1"),
     ).toBeNull();
   });
 
   it("does not match a table whose name is a superstring (word boundary)", () => {
-    const query =
-      "SELECT * FROM stored_spans_archive WHERE TenantId = {tenantId:String}";
+    const query = "SELECT * FROM stored_spans_archive WHERE TenantId = {tenantId:String}";
     expect(detectColdScan(query)).toBeNull();
   });
 
   it("ignores non-SELECT statements", () => {
-    expect(
-      detectColdScan("INSERT INTO stored_spans (SpanId) VALUES ('x')"),
-    ).toBeNull();
+    expect(detectColdScan("INSERT INTO stored_spans (SpanId) VALUES ('x')")).toBeNull();
     expect(
       detectColdScan("ALTER TABLE stored_spans DELETE WHERE TraceId = 'x'"),
     ).toBeNull();
@@ -117,9 +110,7 @@ describe("detectColdScan", () => {
   });
 
   it("flags every tracked table when its time predicate is missing", () => {
-    for (const [table, timeColumns] of Object.entries(
-      TIME_PARTITIONED_TABLES,
-    )) {
+    for (const [table, timeColumns] of Object.entries(TIME_PARTITIONED_TABLES)) {
       const cold = `SELECT 1 FROM ${table} WHERE TenantId = 'x'`;
       expect(detectColdScan(cold)).toBe(table);
 

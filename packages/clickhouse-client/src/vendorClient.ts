@@ -28,11 +28,7 @@ import {
   type StatementMetrics,
   type StatementOperation,
 } from "./statementReporting";
-import {
-  extractQueryType,
-  extractTableName,
-  inbandExceptionOf,
-} from "./statementShape";
+import { extractQueryType, extractTableName, inbandExceptionOf } from "./statementShape";
 
 /**
  * Anything that can run the vendor's two statement methods. Method shorthand
@@ -50,9 +46,7 @@ export interface VendorStatementClient {
  * Every host that can run a query has a monotonic clock.
  */
 const now = (): number =>
-  (
-    globalThis as unknown as { performance: { now(): number } }
-  ).performance.now();
+  (globalThis as unknown as { performance: { now(): number } }).performance.now();
 
 export interface VendorClientResilienceOptions {
   /**
@@ -193,8 +187,7 @@ export class VendorClientResilience {
 
     wrapper.insert = (async (params: unknown) => {
       const table =
-        ((params as Record<string, unknown> | null)?.table as string) ??
-        "unknown";
+        ((params as Record<string, unknown> | null)?.table as string) ?? "unknown";
       const start = now();
       try {
         // Deliberately NOT retried here. See the note on this class.
@@ -286,9 +279,7 @@ export class VendorClientResilience {
    * timeout) are not transient. Callers that need a retry get it from their
    * own layer — the job queue re-runs the whole unit of work.
    */
-  private guardInbandException<
-    R extends { json?: (...args: never[]) => unknown },
-  >({
+  private guardInbandException<R extends { json?: (...args: never[]) => unknown }>({
     result,
     startMs,
     params,

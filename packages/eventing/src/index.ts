@@ -19,11 +19,7 @@
  */
 
 // Commands
-export type {
-  Command,
-  CommandHandler,
-  CommandHandlerResult,
-} from "./commands/command";
+export type { Command, CommandHandler, CommandHandlerResult } from "./commands/command";
 export type { CommandEnvelope } from "./commands/commandEnvelope";
 export { stripEnvelope, withCommandEnvelope } from "./commands/commandEnvelope";
 export type { CommandHandlerClass } from "./commands/commandHandlerClass";
@@ -40,19 +36,12 @@ export {
   defineEvents,
   EventCatalogue,
 } from "./domain/definitions";
-export type {
-  AggregateDefinition,
-  EventDefinition,
-} from "./domain/definitions";
+export type { AggregateDefinition, EventDefinition } from "./domain/definitions";
 export type { EventType } from "./domain/eventType";
 export type { TenantId } from "./domain/tenantId";
 export { createTenantId, TenantIdSchema } from "./domain/tenantId";
 export type { Event, Projection } from "./domain/types";
-export {
-  EventMetadataBaseSchema,
-  EventSchema,
-  ProjectionSchema,
-} from "./domain/types";
+export { EventMetadataBaseSchema, EventSchema, ProjectionSchema } from "./domain/types";
 export type {
   ExecutionTarget,
   RetentionPolicy,
@@ -64,10 +53,7 @@ export { EventSourcing } from "./eventSourcing";
 // Pipeline (static definitions)
 export { definePipeline } from "./pipeline/staticBuilder";
 export type { ProcessManagerApplier } from "./pipeline/processBuilder";
-export type {
-  SubscriberSpec,
-  TriggerContext,
-} from "./pipeline/processManagerDefinition";
+export type { SubscriberSpec, TriggerContext } from "./pipeline/processManagerDefinition";
 export type {
   CommandHandlerOptions,
   NoCommands,
@@ -111,10 +97,7 @@ export { EventSourcingPipeline } from "./runtimePipeline";
 export { EventSourcingService } from "./services/eventSourcingService";
 export type { JobRegistryEntry } from "./services/queues/queueManager";
 // Stores
-export type {
-  EventStore,
-  EventStoreReadContext,
-} from "./stores/eventStore.types";
+export type { EventStore, EventStoreReadContext } from "./stores/eventStore.types";
 export type {
   ProjectionStore,
   ProjectionStoreReadContext,

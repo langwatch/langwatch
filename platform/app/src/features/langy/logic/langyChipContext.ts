@@ -40,9 +40,7 @@ export interface LangyChipExplanation {
 /** Trace ids shown in full before the rest collapse into a count. */
 const IDS_SHOWN = 3;
 
-export function describeChipContext(
-  chip: LangyContextChip,
-): LangyChipExplanation {
+export function describeChipContext(chip: LangyContextChip): LangyChipExplanation {
   switch (chip.kind) {
     case "filter":
       return {
@@ -110,8 +108,7 @@ export function describeChipContext(
 
     case "automation":
       return {
-        action:
-          "Langy will read this automation — what fires it and what it does.",
+        action: "Langy will read this automation — what fires it and what it does.",
         ...(chip.ref ? { payload: chip.ref } : {}),
       };
 

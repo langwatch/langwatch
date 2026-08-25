@@ -99,10 +99,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
           }),
       });
 
-      const result = await validateProviderApiKey(
-        "gemini",
-        AI_STUDIO_CREDENTIALS,
-      );
+      const result = await validateProviderApiKey("gemini", AI_STUDIO_CREDENTIALS);
 
       expect(codeOf(result)).toBe("provider_key_restricted");
       expect(codeOf(result)).not.toBe("provider_key_invalid");
@@ -122,9 +119,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
       const requests = sentRequests();
       expect(requests).toHaveLength(1);
       expect(requests[0]!.url).toContain("aiplatform.googleapis.com");
-      expect(requests[0]!.url).toContain(
-        "/projects/acme-123/locations/us-central1/",
-      );
+      expect(requests[0]!.url).toContain("/projects/acme-123/locations/us-central1/");
       expect(requests[0]!.url).not.toContain("generativelanguage");
     });
 
@@ -155,9 +150,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
 
       const { url, init } = sentRequest();
       const headers = init.headers as Record<string, string>;
-      expect(headers["x-goog-api-key"]).toBe(
-        AGENT_PLATFORM_CREDENTIALS.GEMINI_API_KEY,
-      );
+      expect(headers["x-goog-api-key"]).toBe(AGENT_PLATFORM_CREDENTIALS.GEMINI_API_KEY);
       // `?key=` is also accepted by Agent Platform, which is exactly why this
       // is pinned: a credential in a URL reaches access logs and history.
       expect(url).not.toContain(AGENT_PLATFORM_CREDENTIALS.GEMINI_API_KEY);
@@ -192,10 +185,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
     it("reports the credential as valid", async () => {
       mockFetch.mockResolvedValue(generated());
 
-      const result = await validateProviderApiKey(
-        "gemini",
-        AGENT_PLATFORM_CREDENTIALS,
-      );
+      const result = await validateProviderApiKey("gemini", AGENT_PLATFORM_CREDENTIALS);
 
       expect(result.outcome).toBe("verified");
     });
@@ -213,10 +203,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
           }),
       });
 
-      const result = await validateProviderApiKey(
-        "gemini",
-        AGENT_PLATFORM_CREDENTIALS,
-      );
+      const result = await validateProviderApiKey("gemini", AGENT_PLATFORM_CREDENTIALS);
 
       expect(codeOf(result)).toBe("provider_key_invalid");
       expect(JSON.stringify(result)).not.toContain("sk-leaked-looking-text");
@@ -238,10 +225,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
           }),
       });
 
-      const result = await validateProviderApiKey(
-        "gemini",
-        AGENT_PLATFORM_CREDENTIALS,
-      );
+      const result = await validateProviderApiKey("gemini", AGENT_PLATFORM_CREDENTIALS);
 
       expect(codeOf(result)).not.toBe("provider_key_invalid");
       expect(codeOf(result)).toBe("provider_refused");
@@ -263,10 +247,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
           }),
       });
 
-      const result = await validateProviderApiKey(
-        "gemini",
-        AGENT_PLATFORM_CREDENTIALS,
-      );
+      const result = await validateProviderApiKey("gemini", AGENT_PLATFORM_CREDENTIALS);
 
       expect(codeOf(result)).not.toBe("provider_key_invalid");
       expect(codeOf(result)).toBe("provider_refused");
@@ -303,9 +284,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(sentRequest().url).toContain("aiplatform.googleapis.com");
-      expect(sentRequest().url).toContain(
-        "/projects/acme-123/locations/global/",
-      );
+      expect(sentRequest().url).toContain("/projects/acme-123/locations/global/");
       // `verified`, not merely `valid` — which is the whole point of this
       // test. The defect it guards is a row reported as fine after no
       // request at all, and `unchecked` also carries `valid: true`, so

@@ -58,9 +58,7 @@ vi.mock("../SaveAndRunMenu", () => ({
       </button>
       <button
         data-testid="save-and-run-button"
-        onClick={() =>
-          onSaveAndRun?.(selectedTarget ?? { type: "http", id: "agent-1" })
-        }
+        onClick={() => onSaveAndRun?.(selectedTarget ?? { type: "http", id: "agent-1" })}
       >
         Save and Run
       </button>
@@ -172,9 +170,7 @@ vi.mock("~/utils/api", () => ({
           data: mocks.mockGetByIdData,
           isLoading: mocks.mockGetByIdIsLoading,
           isError: mocks.mockGetByIdHasError,
-          error: mocks.mockGetByIdHasError
-            ? new Error("scenario read failed")
-            : null,
+          error: mocks.mockGetByIdHasError ? new Error("scenario read failed") : null,
           refetch: mocks.mockGetByIdRefetch,
         }),
       },
@@ -334,12 +330,8 @@ describe("<ScenarioFormDrawer/>", () => {
       it("pre-populates the form with initial data", () => {
         render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
 
-        expect(
-          screen.getByDisplayValue("Generated Scenario"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByDisplayValue("A generated situation"),
-        ).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Generated Scenario")).toBeInTheDocument();
+        expect(screen.getByDisplayValue("A generated situation")).toBeInTheDocument();
       });
 
       it("does not create a DB record", () => {
@@ -433,10 +425,9 @@ describe("<ScenarioFormDrawer/>", () => {
     });
 
     it("displays 'Edit Scenario' heading", () => {
-      render(
-        <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" />,
-        { wrapper: Wrapper },
-      );
+      render(<ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("Edit Scenario")).toBeInTheDocument();
     });
@@ -717,13 +708,9 @@ describe("<ScenarioFormDrawer/>", () => {
     it("opens the agent type selector drawer via local state", async () => {
       await clickCreateAgentButton();
 
-      expect(
-        screen.getByTestId("agent-type-selector-drawer"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("agent-type-selector-drawer")).toBeInTheDocument();
       // Should NOT use URL-based openDrawer for the type selector (regression #1903)
-      expect(mocks.mockOpenDrawer).not.toHaveBeenCalledWith(
-        "agentTypeSelector",
-      );
+      expect(mocks.mockOpenDrawer).not.toHaveBeenCalledWith("agentTypeSelector");
     });
 
     it("registers onSave flow callbacks for all agent editor types", async () => {
@@ -770,9 +757,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
         // Open agent type selector
         await user.click(screen.getByTestId("create-agent-button"));
-        expect(
-          screen.getByTestId("agent-type-selector-drawer"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("agent-type-selector-drawer")).toBeInTheDocument();
 
         // Close without completing (cancellation path)
         await user.click(screen.getByTestId("close-agent-selector"));
@@ -803,9 +788,7 @@ describe("<ScenarioFormDrawer/>", () => {
       });
 
       expect(screen.getByTestId("scenario-form-skeleton")).toBeInTheDocument();
-      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(
-        null,
-      );
+      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(null);
     });
 
     /** @scenario "An unloaded scenario is still titled as an edit" */
@@ -852,9 +835,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
       expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
       await waitFor(() => {
-        expect(
-          screen.getByDisplayValue("Refund Request Test"),
-        ).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Refund Request Test")).toBeInTheDocument();
       });
       expect(screen.getByTestId("save-and-run-menu")).toHaveAttribute(
         "data-loading",
@@ -885,9 +866,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
       expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
       await waitFor(() => {
-        expect(
-          screen.getByDisplayValue("Refund Request Test"),
-        ).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Refund Request Test")).toBeInTheDocument();
       });
     });
   });
@@ -914,9 +893,7 @@ describe("<ScenarioFormDrawer/>", () => {
       });
 
       expect(screen.getByTestId("scenario-read-error")).toBeInTheDocument();
-      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(
-        null,
-      );
+      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(null);
       expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
     });
 
@@ -962,9 +939,7 @@ describe("<ScenarioFormDrawer/>", () => {
       });
 
       expect(screen.getByTestId("scenario-form-skeleton")).toBeInTheDocument();
-      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(
-        null,
-      );
+      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(null);
     });
   });
 
@@ -993,9 +968,7 @@ describe("<ScenarioFormDrawer/>", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.getByDisplayValue("Refund Request Test"),
-      ).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Refund Request Test")).toBeInTheDocument();
       expect(screen.queryByTestId("scenario-read-error")).toBe(null);
     });
   });

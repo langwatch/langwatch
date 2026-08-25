@@ -25,11 +25,7 @@ import {
   resolveLocalUrl,
   resolveTargetAgent,
 } from "./dev/resolve";
-import {
-  applyDevTunnel,
-  deriveSimulationsUrl,
-  restoreDevTunnel,
-} from "./dev/write-back";
+import { applyDevTunnel, deriveSimulationsUrl, restoreDevTunnel } from "./dev/write-back";
 
 export interface AgentDevOptions {
   port?: string;
@@ -123,9 +119,7 @@ export async function startAgentDevSession(
       ),
     );
   }
-  const secret = useAuthProxy
-    ? crypto.randomBytes(24).toString("base64url")
-    : undefined;
+  const secret = useAuthProxy ? crypto.randomBytes(24).toString("base64url") : undefined;
 
   let proxy: AuthProxy | undefined;
   if (useAuthProxy && secret) {
@@ -224,9 +218,7 @@ export async function startAgentDevSession(
 
   tunnel?.once("exit", () => {
     if (shuttingDown) return;
-    console.error(
-      chalk.yellow("The tunnel process ended. Restoring the agent URL."),
-    );
+    console.error(chalk.yellow("The tunnel process ended. Restoring the agent URL."));
     void shutdown(0);
   });
 
@@ -234,9 +226,7 @@ export async function startAgentDevSession(
 }
 
 /** The `agent dev` command action: run the session until a signal ends it. */
-export const agentDevCommand = async (
-  options: AgentDevOptions,
-): Promise<void> => {
+export const agentDevCommand = async (options: AgentDevOptions): Promise<void> => {
   const session = await startAgentDevSession(options);
 
   process.once("SIGINT", () => void session.shutdown(0));

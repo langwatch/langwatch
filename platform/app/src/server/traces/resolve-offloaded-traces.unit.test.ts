@@ -114,8 +114,7 @@ const realIOService = new TraceIOExtractionService();
 
 describe("resolveOffloadedTraces()", () => {
   describe("given a trace whose span has a reserved eventref pointer", () => {
-    const fullOutput =
-      "The full 50 KB output value that was offloaded via event_log";
+    const fullOutput = "The full 50 KB output value that was offloaded via event_log";
 
     const spanWithRef = makeSpan({
       traceId: "trace-1",
@@ -142,9 +141,9 @@ describe("resolveOffloadedTraces()", () => {
           logger,
         });
 
-        expect(
-          result.resolvedSpans[0]!.spanAttributes["langwatch.output"],
-        ).toBe(fullOutput);
+        expect(result.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
+          fullOutput,
+        );
       });
 
       it("reserved eventref keys are stripped from the resolved span attributes", async () => {
@@ -160,9 +159,7 @@ describe("resolveOffloadedTraces()", () => {
         });
 
         const attrs = result.resolvedSpans[0]!.spanAttributes;
-        const hasRef = Object.keys(attrs).some((k) =>
-          k.startsWith(EVENTREF_ATTR_PREFIX),
-        );
+        const hasRef = Object.keys(attrs).some((k) => k.startsWith(EVENTREF_ATTR_PREFIX));
         expect(hasRef).toBe(false);
       });
 
@@ -255,9 +252,7 @@ describe("resolveOffloadedTraces()", () => {
 
       it("calls BlobStore.getFromEventLog zero times", async () => {
         const blobSvc = fakeBlobStore({});
-        const getFromEventLogSpy = blobSvc.getFromEventLog as ReturnType<
-          typeof vi.fn
-        >;
+        const getFromEventLogSpy = blobSvc.getFromEventLog as ReturnType<typeof vi.fn>;
         const logger = createMockLogger();
 
         await resolveOffloadedTraces({
@@ -340,9 +335,9 @@ describe("resolveOffloadedTraces()", () => {
           logger,
         });
 
-        expect(
-          result.resolvedSpans[0]!.spanAttributes["langwatch.output"],
-        ).toBe("preview…");
+        expect(result.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
+          "preview…",
+        );
       });
 
       it("logs a warning at warn level", async () => {

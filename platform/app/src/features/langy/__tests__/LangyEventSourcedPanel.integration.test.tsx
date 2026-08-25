@@ -338,11 +338,7 @@ const composerField = (): HTMLTextAreaElement => {
 };
 
 /** A recorded step, in the wire shape the tail read serves. */
-const recordedAccepted = (o: {
-  id: string;
-  createdAt: number;
-  turnId: string;
-}) => ({
+const recordedAccepted = (o: { id: string; createdAt: number; turnId: string }) => ({
   id: o.id,
   createdAt: o.createdAt,
   occurredAt: o.createdAt,
@@ -420,9 +416,7 @@ describe("given a turn I stopped partway is on the record", () => {
 
       renderReloadedPanel();
 
-      expect(
-        await screen.findByText("I got as far as the retriever"),
-      ).toBeTruthy();
+      expect(await screen.findByText("I got as far as the retriever")).toBeTruthy();
       // Settled and continuable: Send, never Stop or Stopping, and no red card.
       expect(await screen.findByLabelText("Send")).toBeTruthy();
       expect(screen.queryByLabelText("Stop")).toBeNull();
@@ -443,9 +437,7 @@ describe("given a turn I stopped partway is on the record", () => {
         ]);
       });
 
-      expect(useLangyStore.getState().turnProjection.turn?.Status).toBe(
-        "stopped",
-      );
+      expect(useLangyStore.getState().turnProjection.turn?.Status).toBe("stopped");
       expect(useLangyStore.getState().turnPhase).toBe("idle");
       expect(await screen.findByLabelText("Send")).toBeTruthy();
       expect(screen.getByText("I got as far as the retriever")).toBeTruthy();
@@ -613,9 +605,7 @@ describe("given the streamed answer is on screen", () => {
       refreshHistory();
 
       expect(await screen.findByText("and the cost?")).toBeTruthy();
-      expect(
-        screen.getByText("The retriever regressed after the reindex."),
-      ).toBeTruthy();
+      expect(screen.getByText("The retriever regressed after the reindex.")).toBeTruthy();
     });
   });
 });

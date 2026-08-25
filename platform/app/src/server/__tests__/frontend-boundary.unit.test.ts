@@ -85,8 +85,7 @@ const BACKEND_TREES = [
  */
 const BACKEND_ENTRYPOINTS = ["server.mts", "start.ts", "workers.ts"];
 
-const rel = (file: string) =>
-  path.relative(SRC, file).split(path.sep).join("/");
+const rel = (file: string) => path.relative(SRC, file).split(path.sep).join("/");
 
 const isSource = (f: string) =>
   /\.(?:mts|cts|tsx?)$/.test(f) &&
@@ -134,9 +133,7 @@ const valueImportsOf = (file: string): string[] => {
 /** Side-effect imports: `import "x"`. Always a runtime edge. */
 const sideEffectImports = (source: string): string[] => {
   const specs: string[] = [];
-  for (const [, spec] of source.matchAll(
-    /(?:^|\n)\s*import\s+["']([^"']+)["']/g,
-  )) {
+  for (const [, spec] of source.matchAll(/(?:^|\n)\s*import\s+["']([^"']+)["']/g)) {
     if (spec) specs.push(spec);
   }
   return specs;
@@ -191,15 +188,7 @@ const parseValueImports = (file: string): string[] => {
   ];
 };
 
-const CANDIDATE_SUFFIXES = [
-  "",
-  ".ts",
-  ".tsx",
-  ".mts",
-  ".cts",
-  "/index.ts",
-  "/index.tsx",
-];
+const CANDIDATE_SUFFIXES = ["", ".ts", ".tsx", ".mts", ".cts", "/index.ts", "/index.tsx"];
 
 const fileAt = (base: string): string | null => {
   // ESM-style ".js" specifiers point at TypeScript sources on disk.
@@ -295,9 +284,7 @@ const resolveAppImport = (spec: string, fromFile: string): string | null => {
   // "\0" cannot occur in a path or a specifier, so it separates the two
   // halves of the key unambiguously. Written as an escape rather than a
   // literal NUL, which would make this source file binary to git.
-  const key = spec.startsWith(".")
-    ? `${path.dirname(fromFile)}\0${spec}`
-    : spec;
+  const key = spec.startsWith(".") ? `${path.dirname(fromFile)}\0${spec}` : spec;
 
   const cached = resolutions.get(key);
   if (cached !== undefined) return cached;
@@ -377,9 +364,7 @@ const walkImportGraph = (roots: string[]) => {
 };
 
 /** Reverse the edges, so taint can flood from importee back to importer. */
-const invertEdges = (
-  children: Map<string, string[]>,
-): Map<string, string[]> => {
+const invertEdges = (children: Map<string, string[]>): Map<string, string[]> => {
   const parents = new Map<string, string[]>();
   for (const [file, kids] of children) {
     for (const kid of kids) {
@@ -476,9 +461,7 @@ const backendFiles = [
     const dir = path.join(SRC, tree);
     return fs.existsSync(dir) ? walk(dir) : [];
   }),
-  ...BACKEND_ENTRYPOINTS.map((f) => path.join(SRC, f)).filter((f) =>
-    fs.existsSync(f),
-  ),
+  ...BACKEND_ENTRYPOINTS.map((f) => path.join(SRC, f)).filter((f) => fs.existsSync(f)),
 ];
 
 describe("browser-only UI never reaches the backend", () => {
@@ -498,10 +481,7 @@ describe("browser-only UI never reaches the backend", () => {
   // above pass vacuously.
   describe("given a component that genuinely renders Chakra", () => {
     it("still reports a chain, proving the walker resolves imports", () => {
-      const component = path.join(
-        SRC,
-        "components/checks/EvaluatorSelection.tsx",
-      );
+      const component = path.join(SRC, "components/checks/EvaluatorSelection.tsx");
       expect(fs.existsSync(component)).toBe(true);
 
       expect(chainToBrowserUi(component)).not.toBeNull();
@@ -514,10 +494,7 @@ describe("browser-only UI never reaches the backend", () => {
   // which is exactly what happened when this case pointed at a component that
   // the legacy Traces removal took away with it.
   describe("given a type-only import of a component", () => {
-    const server = path.join(
-      SRC,
-      "server/app-layer/reports/report-chart.service.ts",
-    );
+    const server = path.join(SRC, "server/app-layer/reports/report-chart.service.ts");
     const component = "~/components/analytics/CustomGraph";
 
     it("still makes that import, so the case has a subject", () => {
@@ -581,9 +558,7 @@ describe("browser-only UI never reaches the backend", () => {
   // becomes a false leak.
   describe("given a dynamic import", () => {
     it("follows one in value position, so a deferred require cannot hide", () => {
-      const specs = valueImportsOf(
-        path.join(SRC, "server/tracer/collector/piiCheck.ts"),
-      );
+      const specs = valueImportsOf(path.join(SRC, "server/tracer/collector/piiCheck.ts"));
 
       expect(specs).toContain("@google-cloud/dlp");
     });
@@ -656,9 +631,7 @@ const CLIENT_IMPORTED_SERVER_MODULES = [
     clientFiles.flatMap((file) =>
       valueImportsOf(file)
         .map((spec) => resolveAppImport(spec, file))
-        .filter(
-          (target): target is string => target?.startsWith(SERVER_DIR) === true,
-        ),
+        .filter((target): target is string => target?.startsWith(SERVER_DIR) === true),
     ),
   ),
 ].sort();
@@ -674,10 +647,7 @@ const SERVER_ONLY_STATE = new Set(
 );
 
 /** Walk `via` from a root to the target it was flooded from. */
-const chainFromVia = (
-  root: string,
-  via: Map<string, string | null>,
-): string[] => {
+const chainFromVia = (root: string, via: Map<string, string | null>): string[] => {
   const chain: string[] = [];
   const guard = new Set<string>();
   let cursor: string | undefined = root;
@@ -745,10 +715,7 @@ describe("client-imported vocabulary never reaches server-only state", () => {
   describe("given the import graph rooted at each client-imported server module", () => {
     it("finds no chain into prisma, redis, the audit writer, or the authz composition root", () => {
       const violations = [
-        ...chainsToTargets(
-          CLIENT_IMPORTED_SERVER_MODULES,
-          SERVER_ONLY_STATE,
-        ).values(),
+        ...chainsToTargets(CLIENT_IMPORTED_SERVER_MODULES, SERVER_ONLY_STATE).values(),
       ].map((chain) => chain.join("\n     -> "));
 
       expect(violations).toEqual([]);
@@ -797,10 +764,7 @@ describe("client-imported vocabulary never reaches server-only state", () => {
   // database, Redis, or feature-server composition state of its own.
   describe("given a server module that consumes only the contract service", () => {
     it("reports no chain, so a clean root really is clean", () => {
-      const shadow = path.join(
-        SRC,
-        "server/app-layer/authz/trpc-middleware.ts",
-      );
+      const shadow = path.join(SRC, "server/app-layer/authz/trpc-middleware.ts");
 
       expect(CLIENT_IMPORTED_SERVER_MODULES).not.toContain(shadow);
       expect(chainToServerOnlyState(shadow)).toBeNull();

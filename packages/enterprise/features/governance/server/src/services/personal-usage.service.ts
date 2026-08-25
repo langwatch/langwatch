@@ -67,8 +67,7 @@ export class DefaultGovernancePersonalUsageService extends GovernancePersonalUsa
       billedUsd: summary.billedCost + (ingestion?.totalCost ?? 0),
       requests,
       promptTokens: summary.promptTokens + (ingestion?.promptTokens ?? 0),
-      completionTokens:
-        summary.completionTokens + (ingestion?.completionTokens ?? 0),
+      completionTokens: summary.completionTokens + (ingestion?.completionTokens ?? 0),
       mostUsedModel:
         mostUsed && requests > 0
           ? {
@@ -79,9 +78,7 @@ export class DefaultGovernancePersonalUsageService extends GovernancePersonalUsa
     };
   }
 
-  async dailyBuckets(
-    input: PersonalUsageQueryInput,
-  ): Promise<PersonalUsageBucket[]> {
+  async dailyBuckets(input: PersonalUsageQueryInput): Promise<PersonalUsageBucket[]> {
     const parsed = personalUsageQueryInputSchema.parse(input);
     const window = parsed.window ?? this.lastFourteenDaysWindow();
     if (!this.reader) return this.fillEmptyBuckets(window);
@@ -158,9 +155,7 @@ export class DefaultGovernancePersonalUsageService extends GovernancePersonalUsa
     window: PersonalUsageWindow;
   }): Promise<IngestionPrincipalSummaryRow | null> {
     try {
-      return (
-        (await this.reader?.tryFindIngestionPrincipalSummary(input)) ?? null
-      );
+      return (await this.reader?.tryFindIngestionPrincipalSummary(input)) ?? null;
     } catch {
       return null;
     }
@@ -200,11 +195,7 @@ export class DefaultGovernancePersonalUsageService extends GovernancePersonalUsa
 
   private lastFourteenDaysWindow(): PersonalUsageWindow {
     const now = new Date(this.clock());
-    const todayMs = Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-    );
+    const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     return { startMs: todayMs - 13 * DAY_MS, endMs: todayMs + DAY_MS };
   }
 
@@ -215,9 +206,7 @@ export class DefaultGovernancePersonalUsageService extends GovernancePersonalUsa
     const buckets: PersonalUsageBucket[] = [];
     for (let cursor = window.startMs; cursor < window.endMs; cursor += DAY_MS) {
       const day = new Date(cursor).toISOString().slice(0, 10);
-      buckets.push(
-        data.get(day) ?? { day, spentUsd: 0, billedUsd: 0, requests: 0 },
-      );
+      buckets.push(data.get(day) ?? { day, spentUsd: 0, billedUsd: 0, requests: 0 });
     }
     return buckets;
   }

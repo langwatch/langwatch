@@ -29,10 +29,7 @@ import { fileURLToPath } from "node:url";
 const sdkRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const skillsRoot = path.resolve(sdkRoot, "..", "..", "skills");
 const nativeRoot = path.join(skillsRoot, "_compiled", "native");
-const outPath = path.join(
-  sdkRoot,
-  "src/internal/generated/cli/skills.generated.ts",
-);
+const outPath = path.join(sdkRoot, "src/internal/generated/cli/skills.generated.ts");
 
 // --- The published set -------------------------------------------------------
 // Read FEATURE_SKILLS from skills/_lib/feature-skills.ts rather than
@@ -41,10 +38,7 @@ const outPath = path.join(
 // regex reads fine — a failure here means the file changed shape, and that
 // SHOULD break the build rather than silently ship a stale skill set.
 function listFeatureSkills() {
-  const src = fs.readFileSync(
-    path.join(skillsRoot, "_lib/feature-skills.ts"),
-    "utf8",
-  );
+  const src = fs.readFileSync(path.join(skillsRoot, "_lib/feature-skills.ts"), "utf8");
   const match = src.match(/export const FEATURE_SKILLS = \[([\s\S]*?)\] as const;/);
   if (!match) {
     throw new Error(
@@ -104,9 +98,7 @@ function splitFrontmatter(raw) {
 }
 
 // --- Bundle ------------------------------------------------------------------
-const version = fs
-  .readFileSync(path.join(skillsRoot, "version.txt"), "utf8")
-  .trim();
+const version = fs.readFileSync(path.join(skillsRoot, "version.txt"), "utf8").trim();
 
 const skills = listPublishedSkills().map(({ slug, src, isRecipe }) => {
   if (!fs.existsSync(src)) {

@@ -93,12 +93,8 @@ export function CreateApiKeyDrawer({
   const [description, setDescription] = useState("");
   const [expirationPreset, setExpirationPreset] = useState("");
   const [customDate, setCustomDate] = useState("");
-  const [selectedScopes, setSelectedScopes] = useState<ScopeChipPickerEntry[]>(
-    [],
-  );
-  const [permissionMode, setPermissionMode] = useState<"all" | "restricted">(
-    "all",
-  );
+  const [selectedScopes, setSelectedScopes] = useState<ScopeChipPickerEntry[]>([]);
+  const [permissionMode, setPermissionMode] = useState<"all" | "restricted">("all");
   const [categorySelections, setCategorySelections] = useState<
     Record<string, PermissionSelection>
   >({});
@@ -142,8 +138,7 @@ export function CreateApiKeyDrawer({
         organizationId,
         orgProjects,
         isServiceKey: keyType === "service",
-        getTeamRolePermissions: (role) =>
-          getTeamRolePermissions(role as TeamUserRole),
+        getTeamRolePermissions: (role) => getTeamRolePermissions(role as TeamUserRole),
       }),
     [
       myBindings.data,
@@ -161,9 +156,7 @@ export function CreateApiKeyDrawer({
     setExpirationPreset("");
     setCustomDate("");
     setSelectedScopes(
-      currentProjectId
-        ? [{ scopeType: "PROJECT", scopeId: currentProjectId }]
-        : [],
+      currentProjectId ? [{ scopeType: "PROJECT", scopeId: currentProjectId }] : [],
     );
     setPermissionMode("all");
     setCategorySelections({});
@@ -264,9 +257,7 @@ export function CreateApiKeyDrawer({
                 <SegmentGroup.Root
                   size="sm"
                   value={keyType}
-                  onValueChange={(e) =>
-                    setKeyType(e.value as "personal" | "service")
-                  }
+                  onValueChange={(e) => setKeyType(e.value as "personal" | "service")}
                 >
                   <SegmentGroup.Indicator />
                   <SegmentGroup.Item value="personal">
@@ -281,8 +272,8 @@ export function CreateApiKeyDrawer({
                 {keyType === "personal" && (
                   <VStack gap={2} align="start" width="full">
                     <Text fontSize="xs" color="fg.muted">
-                      Tied to a user. If the user is removed from the
-                      organization, this key will be disabled.
+                      Tied to a user. If the user is removed from the organization, this
+                      key will be disabled.
                     </Text>
                     <Select.Root
                       collection={memberCollection}
@@ -307,8 +298,8 @@ export function CreateApiKeyDrawer({
                 )}
                 {keyType === "service" && (
                   <Text fontSize="xs" color="fg.muted">
-                    Not tied to any user. Cannot be revoked when a user leaves.
-                    Set permissions below.
+                    Not tied to any user. Cannot be revoked when a user leaves. Set
+                    permissions below.
                   </Text>
                 )}
               </VStack>
@@ -395,9 +386,8 @@ export function CreateApiKeyDrawer({
                 {permissionMode === "restricted" && (
                   <PermissionCounter
                     count={
-                      Object.values(categorySelections).filter(
-                        (v) => v && v !== "none",
-                      ).length
+                      Object.values(categorySelections).filter((v) => v && v !== "none")
+                        .length
                     }
                   />
                 )}
@@ -459,11 +449,7 @@ export function CreateApiKeyDrawer({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              colorPalette="blue"
-              onClick={handleCreate}
-              disabled={!canCreate}
-            >
+            <Button colorPalette="blue" onClick={handleCreate} disabled={!canCreate}>
               Create secret key
             </Button>
           </HStack>

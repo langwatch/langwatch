@@ -9,7 +9,12 @@ import {
   parseScopeType,
 } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import { orDash, printFacts, runManagement, withParsedFlags } from "../management/_shared";
+import {
+  orDash,
+  printFacts,
+  runManagement,
+  withParsedFlags,
+} from "../management/_shared";
 
 export interface CreateRoleBindingOptions {
   principalType: string;
@@ -28,20 +33,16 @@ export interface CreateRoleBindingOptions {
 export const createRoleBindingCommand = async (
   options: CreateRoleBindingOptions,
 ): Promise<CommandResult | void> => {
-  const input = withParsedFlags(
-    (): CreateRoleBindingInput => ({
-      ...composeRoleBindingPrincipal({
-        principalType: options.principalType,
-        principalId: options.principalId,
-      }),
-      role: parseRole(options.role),
-      ...(options.customRoleId !== undefined
-        ? { customRoleId: options.customRoleId }
-        : {}),
-      scopeType: parseScopeType(options.scopeType),
-      scopeId: options.scopeId,
+  const input = withParsedFlags((): CreateRoleBindingInput => ({
+    ...composeRoleBindingPrincipal({
+      principalType: options.principalType,
+      principalId: options.principalId,
     }),
-  );
+    role: parseRole(options.role),
+    ...(options.customRoleId !== undefined ? { customRoleId: options.customRoleId } : {}),
+    scopeType: parseScopeType(options.scopeType),
+    scopeId: options.scopeId,
+  }));
 
   return runManagement({
     action: "create role binding",

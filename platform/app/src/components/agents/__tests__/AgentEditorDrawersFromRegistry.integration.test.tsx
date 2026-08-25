@@ -155,9 +155,7 @@ describe("Agent editor drawer *FromUrl wrappers (regression #3193)", () => {
   describe("given CurrentDrawer mounts AgentHttpEditorDrawerFromUrl without an `open` prop", () => {
     /** @scenario "Clicking HTTP Agent in the type selector opens the HTTP editor drawer" */
     it("opens when the URL indicates agentHttpEditor is active", async () => {
-      mockDrawerOpen.mockImplementation(
-        (drawer: string) => drawer === "agentHttpEditor",
-      );
+      mockDrawerOpen.mockImplementation((drawer: string) => drawer === "agentHttpEditor");
 
       render(<AgentHttpEditorDrawerFromUrl />, { wrapper: Wrapper });
 
@@ -178,9 +176,7 @@ describe("Agent editor drawer *FromUrl wrappers (regression #3193)", () => {
   describe("given CurrentDrawer mounts AgentCodeEditorDrawerFromUrl without an `open` prop", () => {
     /** @scenario "Clicking Code Agent in the type selector opens the code editor drawer" */
     it("opens when the URL indicates agentCodeEditor is active", async () => {
-      mockDrawerOpen.mockImplementation(
-        (drawer: string) => drawer === "agentCodeEditor",
-      );
+      mockDrawerOpen.mockImplementation((drawer: string) => drawer === "agentCodeEditor");
 
       render(<AgentCodeEditorDrawerFromUrl />, { wrapper: Wrapper });
 

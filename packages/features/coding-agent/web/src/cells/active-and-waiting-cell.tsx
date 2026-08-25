@@ -10,9 +10,7 @@ import { MissingValue } from "./missing-value";
  * The second figure is usually the one nobody had measured, and it is what
  * turns "the session took all afternoon" into something actionable.
  */
-export const ActiveAndWaitingCell: React.FC<{ row: SessionListRow }> = ({
-  row,
-}) => {
+export const ActiveAndWaitingCell: React.FC<{ row: SessionListRow }> = ({ row }) => {
   const waitingSeconds = row.blockedOnUserMs / 1000;
   if (row.activeTimeCliSec === 0 && waitingSeconds === 0) {
     return <MissingValue />;

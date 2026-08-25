@@ -18,9 +18,7 @@ import { resolveRunParameters } from "../resolve-run-parameters";
 
 const SECRET_VALUE = "tok-live-abc123";
 
-function scenario(
-  overrides: Partial<ScenarioRunConfig> = {},
-): ScenarioRunConfig {
+function scenario(overrides: Partial<ScenarioRunConfig> = {}): ScenarioRunConfig {
   return {
     id: "scen_1",
     name: "Refund flow",
@@ -66,12 +64,10 @@ describe("resolveRunParameters", () => {
     describe("when the run supplies no value for it", () => {
       /** @scenario "A secret parameter value must be supplied when the run starts" */
       it("rejects the run naming the parameter", async () => {
-        await expect(resolve({ scenarios: [declaring] })).rejects.toMatchObject(
-          {
-            code: "scenario_secret_parameter_missing",
-            meta: { names: ["api_token"] },
-          },
-        );
+        await expect(resolve({ scenarios: [declaring] })).rejects.toMatchObject({
+          code: "scenario_secret_parameter_missing",
+          meta: { names: ["api_token"] },
+        });
       });
 
       /** @scenario "Error messages never contain a secret value" */

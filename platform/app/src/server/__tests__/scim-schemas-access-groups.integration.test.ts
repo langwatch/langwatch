@@ -24,9 +24,7 @@ describe("Feature: SCIM API reference", () => {
       );
 
       expect(groupSchema).toBeDefined();
-      expect(groupSchema.description).toBe(
-        "Group (maps to a LangWatch access group)",
-      );
+      expect(groupSchema.description).toBe("Group (maps to a LangWatch access group)");
       expect(groupSchema.description).not.toContain("Team");
     });
   });

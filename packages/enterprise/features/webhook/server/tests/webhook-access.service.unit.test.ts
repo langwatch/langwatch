@@ -1,7 +1,4 @@
-import {
-  EntitlementService,
-  type Plan,
-} from "@langwatch/entitlement-contract";
+import { EntitlementService, type Plan } from "@langwatch/entitlement-contract";
 import { WebhookEndpointsNotEntitledError } from "@langwatch/enterprise-webhook-contract";
 import { describe, expect, it } from "vitest";
 import { WebhookAccessService } from "../src/services/webhook-access.service";
@@ -31,17 +28,13 @@ class FixedEntitlementService extends EntitlementService {
 
 describe("WebhookAccessService", () => {
   it("uses the shared EntitlementService plan", async () => {
-    const access = WebhookAccessService.create(
-      new FixedEntitlementService(plan(true)),
-    );
+    const access = WebhookAccessService.create(new FixedEntitlementService(plan(true)));
 
     await expect(access.assertEndpointsAvailable("org-1")).resolves.toBeUndefined();
   });
 
   it("maps a disabled entitlement to the webhook handled error", async () => {
-    const access = WebhookAccessService.create(
-      new FixedEntitlementService(plan(false)),
-    );
+    const access = WebhookAccessService.create(new FixedEntitlementService(plan(false)));
 
     await expect(access.assertEndpointsAvailable("org-1")).rejects.toBeInstanceOf(
       WebhookEndpointsNotEntitledError,

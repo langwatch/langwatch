@@ -21,9 +21,8 @@ export const DEFAULT_RESULT_FIELDS: Record<ResultField, boolean> = {
 const ROW_HEIGHT_STORAGE_KEY = "batch-results-row-height";
 
 export function useResultDisplayPreferences() {
-  const [fields, setFields] = useState<Record<ResultField, boolean>>(
-    DEFAULT_RESULT_FIELDS,
-  );
+  const [fields, setFields] =
+    useState<Record<ResultField, boolean>>(DEFAULT_RESULT_FIELDS);
   const [rowHeight, setRowHeight] = useLocalStorage<RowHeight>(
     ROW_HEIGHT_STORAGE_KEY,
     DEFAULT_ROW_HEIGHT,

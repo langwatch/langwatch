@@ -15,9 +15,7 @@ describe("navigateDedupKey", () => {
 
   describe("given no active turn id yet", () => {
     it("still produces a stable key", () => {
-      expect(navigateDedupKey({ turnId: null, href: "/demo/x" })).toBe(
-        ":/demo/x",
-      );
+      expect(navigateDedupKey({ turnId: null, href: "/demo/x" })).toBe(":/demo/x");
     });
   });
 });

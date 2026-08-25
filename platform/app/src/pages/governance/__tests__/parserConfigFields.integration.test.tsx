@@ -16,11 +16,7 @@ import { ParserConfigFields } from "../ingestion-sources.enterprise";
 function Harness({ sourceType }: { sourceType: SourceType }) {
   const [values, setValues] = useState<Record<string, string>>({});
   return (
-    <ParserConfigFields
-      sourceType={sourceType}
-      values={values}
-      onChange={setValues}
-    />
+    <ParserConfigFields sourceType={sourceType} values={values} onChange={setValues} />
   );
 }
 

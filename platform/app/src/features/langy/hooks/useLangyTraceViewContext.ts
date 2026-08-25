@@ -41,15 +41,7 @@ export function useLangyTraceViewContext(): LangyContextChip {
         grouping,
         sort,
       }),
-    [
-      queryText,
-      timeRange,
-      activeLens,
-      activeLensId,
-      hasLocalChanges,
-      grouping,
-      sort,
-    ],
+    [queryText, timeRange, activeLens, activeLensId, hasLocalChanges, grouping, sort],
   );
 }
 

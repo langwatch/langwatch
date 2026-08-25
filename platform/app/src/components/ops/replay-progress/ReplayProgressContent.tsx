@@ -63,9 +63,7 @@ export function ReplayProgressContent({ runId }: { runId: string }) {
 
   const progressPercent =
     isLiveRun && liveStatus && liveStatus.aggregatesTotal > 0
-      ? Math.round(
-          (liveStatus.aggregatesProcessed / liveStatus.aggregatesTotal) * 100,
-        )
+      ? Math.round((liveStatus.aggregatesProcessed / liveStatus.aggregatesTotal) * 100)
       : 0;
 
   const meshGradientStyle = isRunning
@@ -151,9 +149,7 @@ function LiveRunView({
 }) {
   const throughputRate = useMemo(() => {
     if (!status.startedAt || !status.eventsProcessed) return null;
-    const end = status.completedAt
-      ? new Date(status.completedAt).getTime()
-      : Date.now();
+    const end = status.completedAt ? new Date(status.completedAt).getTime() : Date.now();
     const elapsed = (end - new Date(status.startedAt).getTime()) / 1000;
     if (elapsed < 1) return null;
     return Math.round(status.eventsProcessed / elapsed);
@@ -174,9 +170,7 @@ function LiveRunView({
       <PhaseTimeline
         currentPhase={status.currentPhase}
         completedState={
-          !isRunning
-            ? (status.state as "completed" | "failed" | "cancelled")
-            : null
+          !isRunning ? (status.state as "completed" | "failed" | "cancelled") : null
         }
       />
 
@@ -198,9 +192,7 @@ function LiveRunView({
         <Stat.Root>
           <Stat.Label>Rate</Stat.Label>
           <Stat.ValueText textStyle="lg">
-            {throughputRate !== null
-              ? `${throughputRate.toLocaleString()}/s`
-              : "\u2014"}
+            {throughputRate !== null ? `${throughputRate.toLocaleString()}/s` : "\u2014"}
           </Stat.ValueText>
         </Stat.Root>
         <Stat.Root>
@@ -216,11 +208,7 @@ function LiveRunView({
       {/* Progress bar */}
       {isRunning && status.aggregatesTotal > 0 && (
         <VStack align="stretch" gap={1}>
-          <Progress.Root
-            size="sm"
-            value={progressPercent}
-            colorPalette="orange"
-          >
+          <Progress.Root size="sm" value={progressPercent} colorPalette="orange">
             <Progress.Track>
               <Progress.Range />
             </Progress.Track>
@@ -241,8 +229,7 @@ function LiveRunView({
                   <Status.Indicator />
                 </Status.Root>
                 <Text textStyle="sm" fontWeight="semibold">
-                  Replay{" "}
-                  {status.state === "running" ? "in progress" : status.state}
+                  Replay {status.state === "running" ? "in progress" : status.state}
                 </Text>
                 {activeProjectionNames.length > 0 && isRunning && (
                   <Badge size="sm" variant="subtle">
@@ -290,11 +277,7 @@ function LiveRunView({
                 <Badge
                   key={name}
                   size="sm"
-                  variant={
-                    isRunning && activeProjections.has(name)
-                      ? "solid"
-                      : "subtle"
-                  }
+                  variant={isRunning && activeProjections.has(name) ? "solid" : "subtle"}
                   colorPalette={
                     isRunning && activeProjections.has(name) ? "orange" : "gray"
                   }
@@ -381,12 +364,7 @@ function HistoricalRunView({
                 borderWidth="1px"
                 borderColor="red.200"
               >
-                <Text
-                  textStyle="xs"
-                  fontWeight="medium"
-                  color="red.500"
-                  marginBottom={1}
-                >
+                <Text textStyle="xs" fontWeight="medium" color="red.500" marginBottom={1}>
                   Error
                 </Text>
                 <Text

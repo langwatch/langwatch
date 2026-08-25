@@ -37,11 +37,7 @@ import type { CapabilityCommand } from "../logic/langyCapabilityDigest";
 /** How many rows a card draws, and therefore how many this hook hydrates. */
 const DEFAULT_MAX_ROWS = 5;
 
-export type CapabilityDataStatus =
-  | "idle"
-  | "hydrating"
-  | "hydrated"
-  | "unavailable";
+export type CapabilityDataStatus = "idle" | "hydrating" | "hydrated" | "unavailable";
 
 export interface CapabilityDataInput {
   /** The parsed command — known from the tool START frame. */
@@ -101,9 +97,7 @@ export function useCapabilityData({
   // result must NOT be silently re-run: fresh rows could contradict the
   // answer the agent actually gave, and the stored output is the honest view.
   const queryEligible = digest == null || digest.strategy === "query-ref";
-  const query = queryEligible
-    ? (digest?.query ?? command?.query ?? null)
-    : null;
+  const query = queryEligible ? (digest?.query ?? command?.query ?? null) : null;
 
   const mode =
     ids && hydrator?.byIds

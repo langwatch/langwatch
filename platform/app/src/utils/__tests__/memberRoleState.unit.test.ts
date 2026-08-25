@@ -216,9 +216,7 @@ describe("memberRoleState", () => {
   describe("getTeamRoleUpdates()", () => {
     describe("when no changes exist", () => {
       it("returns an empty array", () => {
-        const memberships = [
-          makeMembership({ teamId: "t1", role: TeamUserRole.ADMIN }),
-        ];
+        const memberships = [makeMembership({ teamId: "t1", role: TeamUserRole.ADMIN })];
 
         const result = getTeamRoleUpdates({
           teamMemberships: memberships,
@@ -232,9 +230,7 @@ describe("memberRoleState", () => {
 
     describe("when role changed", () => {
       it("returns the update payload", () => {
-        const memberships = [
-          makeMembership({ teamId: "t1", role: TeamUserRole.ADMIN }),
-        ];
+        const memberships = [makeMembership({ teamId: "t1", role: TeamUserRole.ADMIN })];
 
         const result = getTeamRoleUpdates({
           teamMemberships: memberships,
@@ -308,9 +304,7 @@ describe("memberRoleState", () => {
 
     describe("when team role changed", () => {
       it("returns true", () => {
-        const memberships = [
-          makeMembership({ teamId: "t1", role: TeamUserRole.ADMIN }),
-        ];
+        const memberships = [makeMembership({ teamId: "t1", role: TeamUserRole.ADMIN })];
 
         const result = hasPendingRoleChanges({
           teamMemberships: memberships,
@@ -325,9 +319,7 @@ describe("memberRoleState", () => {
 
     describe("when no changes exist", () => {
       it("returns false", () => {
-        const memberships = [
-          makeMembership({ teamId: "t1", role: TeamUserRole.ADMIN }),
-        ];
+        const memberships = [makeMembership({ teamId: "t1", role: TeamUserRole.ADMIN })];
 
         const result = hasPendingRoleChanges({
           teamMemberships: memberships,
@@ -342,9 +334,7 @@ describe("memberRoleState", () => {
 
     describe("when pendingOrganizationRole is null", () => {
       it("returns false even with matching team roles", () => {
-        const memberships = [
-          makeMembership({ teamId: "t1", role: TeamUserRole.ADMIN }),
-        ];
+        const memberships = [makeMembership({ teamId: "t1", role: TeamUserRole.ADMIN })];
 
         const result = hasPendingRoleChanges({
           teamMemberships: memberships,

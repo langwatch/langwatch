@@ -20,9 +20,7 @@ export interface InvokeParams {
  * This hook wraps the invokeLLM utility function in a mutation,
  * providing loading states, error handling, and cache management.
  */
-export function useInvokePrompt(
-  options?: Pick<MutationOptions, "mutationKey">,
-) {
+export function useInvokePrompt(options?: Pick<MutationOptions, "mutationKey">) {
   return useMutation<PromptExecutionResult, Error, InvokeParams>({
     ...options,
     mutationFn: async ({ projectId, data }: InvokeParams) => {

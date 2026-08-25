@@ -34,9 +34,7 @@ describe("the setup skill bodies", () => {
     });
 
     it("lists the same skills the surfaces do", () => {
-      const named = new Set(
-        Object.values(SETUP_SURFACES).map((setup) => setup.skill),
-      );
+      const named = new Set(Object.values(SETUP_SURFACES).map((setup) => setup.skill));
       expect(new Set(SETUP_SKILL_IDS)).toEqual(named);
     });
   });

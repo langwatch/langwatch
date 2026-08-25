@@ -45,9 +45,7 @@ describe("<TagPill/>", () => {
         wrapper: Wrapper,
       });
 
-      await user.click(
-        screen.getByRole("button", { name: "Remove billing tag" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Remove billing tag" }));
       expect(onRemove).toHaveBeenCalledOnce();
     });
   });
@@ -56,9 +54,7 @@ describe("<TagPill/>", () => {
     it("does not display a remove button", () => {
       render(<TagPill label="readonly" />, { wrapper: Wrapper });
 
-      expect(
-        screen.queryByRole("button", { name: /Remove/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Remove/ })).not.toBeInTheDocument();
     });
   });
 });

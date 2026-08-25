@@ -43,8 +43,7 @@ export function useSubscriptionActions({
 
   const createSubscription = api.subscription.create.useMutation();
   const upgradeWithInvites = api.subscription.upgradeWithInvites.useMutation();
-  const addTeamMemberOrEvents =
-    api.subscription.addTeamMemberOrEvents.useMutation();
+  const addTeamMemberOrEvents = api.subscription.addTeamMemberOrEvents.useMutation();
   const manageSubscription = api.subscription.manage.useMutation();
 
   const handleUpgrade = async () => {
@@ -173,8 +172,7 @@ export function useSubscriptionActions({
     handleUpgrade,
     handleUpdateSeats,
     handleManageSubscription,
-    isUpgradeLoading:
-      createSubscription.isPending || upgradeWithInvites.isPending,
+    isUpgradeLoading: createSubscription.isPending || upgradeWithInvites.isPending,
     isUpdateSeatsLoading: addTeamMemberOrEvents.isPending,
     isManageLoading: manageSubscription.isPending,
   };

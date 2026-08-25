@@ -33,9 +33,15 @@ class FakeRepository extends AnnotationRepository {
   list = vi.fn(async () => [annotation]);
   listForProjection = vi.fn(async () => []);
   findProjectOrganizationId = vi.fn(async () => "organization-1" as string | null);
-  countOrganizationUsers = vi.fn(async ({ userIds }: { userIds: string[] }) => userIds.length);
-  countAnnotationScores = vi.fn(async ({ scoreTypeIds }: { scoreTypeIds: string[] }) => scoreTypeIds.length);
-  countAnnotationQueues = vi.fn(async ({ queueIds }: { queueIds: string[] }) => queueIds.length);
+  countOrganizationUsers = vi.fn(
+    async ({ userIds }: { userIds: string[] }) => userIds.length,
+  );
+  countAnnotationScores = vi.fn(
+    async ({ scoreTypeIds }: { scoreTypeIds: string[] }) => scoreTypeIds.length,
+  );
+  countAnnotationQueues = vi.fn(
+    async ({ queueIds }: { queueIds: string[] }) => queueIds.length,
+  );
 }
 
 describe("AnnotationService", () => {

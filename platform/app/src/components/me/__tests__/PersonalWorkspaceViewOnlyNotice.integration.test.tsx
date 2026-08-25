@@ -71,17 +71,17 @@ describe("given a member opening their own personal workspace", () => {
     });
   });
 
-  describe.each([
-    OrganizationUserRole.MEMBER,
-    OrganizationUserRole.ADMIN,
-  ])("when they hold full access as %s", (role) => {
-    /** @scenario A Lite Member is told why their own workspace takes nothing */
-    it("says nothing at all", () => {
-      mockOrganizationRole.current = role;
+  describe.each([OrganizationUserRole.MEMBER, OrganizationUserRole.ADMIN])(
+    "when they hold full access as %s",
+    (role) => {
+      /** @scenario A Lite Member is told why their own workspace takes nothing */
+      it("says nothing at all", () => {
+        mockOrganizationRole.current = role;
 
-      const { container } = renderNotice();
+        const { container } = renderNotice();
 
-      expect(container).toBeEmptyDOMElement();
-    });
-  });
+        expect(container).toBeEmptyDOMElement();
+      });
+    },
+  );
 });

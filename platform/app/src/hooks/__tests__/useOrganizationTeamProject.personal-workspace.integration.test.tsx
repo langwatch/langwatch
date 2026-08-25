@@ -17,8 +17,8 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery } =
-  vi.hoisted(() => ({
+const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery } = vi.hoisted(
+  () => ({
     mockOrganizationsQuery: vi.fn(),
     idleQuery: () => ({
       data: undefined,
@@ -39,7 +39,8 @@ const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery } =
       selectedProjectSlug: "",
       lastVisitedHomeKind: "",
     } as Record<string, string>,
-  }));
+  }),
+);
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -141,10 +142,7 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
   describe("given the shared team has no project yet", () => {
     beforeEach(() => {
       mockOrganizationsQuery.mockReturnValue(
-        loadedOrganizationsQuery([
-          PERSONAL_TEAM,
-          { ...SHARED_TEAM, projects: [] },
-        ]),
+        loadedOrganizationsQuery([PERSONAL_TEAM, { ...SHARED_TEAM, projects: [] }]),
       );
     });
 
@@ -219,9 +217,7 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
 
   describe("given the organization's only team is the personal one", () => {
     beforeEach(() => {
-      mockOrganizationsQuery.mockReturnValue(
-        loadedOrganizationsQuery([PERSONAL_TEAM]),
-      );
+      mockOrganizationsQuery.mockReturnValue(loadedOrganizationsQuery([PERSONAL_TEAM]));
     });
 
     /** @scenario The personal workspace is the only one there is */
@@ -327,10 +323,7 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
       mockRouter.pathname = "/me";
       mockRouter.asPath = "/me";
       mockOrganizationsQuery.mockReturnValue(
-        loadedOrganizationsQuery([
-          PERSONAL_TEAM,
-          { ...SHARED_TEAM, projects: [] },
-        ]),
+        loadedOrganizationsQuery([PERSONAL_TEAM, { ...SHARED_TEAM, projects: [] }]),
       );
     });
 
@@ -459,9 +452,7 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
       mockRouter.route = "/me";
       mockRouter.pathname = "/me";
       mockRouter.asPath = "/me";
-      mockOrganizationsQuery.mockReturnValue(
-        loadedOrganizationsQuery([SHARED_TEAM]),
-      );
+      mockOrganizationsQuery.mockReturnValue(loadedOrganizationsQuery([SHARED_TEAM]));
     });
 
     // An EXTERNAL member with no personal workspace of their own falls

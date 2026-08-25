@@ -28,15 +28,16 @@ pnpm test
 
 Tests run against a **locally-running Next.js dev server** with Docker providing infrastructure:
 
-| Service | Dev Port | Test Port | Notes |
-|---------|----------|-----------|-------|
-| Next.js App | 5560 | 5570 | Runs on host, not in Docker |
-| PostgreSQL | 5432 | 5433 | Docker |
-| Redis | 6379 | 6380 | Docker |
-| OpenSearch | 9200 | 9201 | Docker |
-| NLP Service | 5561 | 5563 | Docker |
+| Service     | Dev Port | Test Port | Notes                       |
+| ----------- | -------- | --------- | --------------------------- |
+| Next.js App | 5560     | 5570      | Runs on host, not in Docker |
+| PostgreSQL  | 5432     | 5433      | Docker                      |
+| Redis       | 6379     | 6380      | Docker                      |
+| OpenSearch  | 9200     | 9201      | Docker                      |
+| NLP Service | 5561     | 5563      | Docker                      |
 
 **Why local app instead of Docker?**
+
 - Faster iteration during test development
 - Avoids Docker build memory issues
 - Tests run against current source code (not a built image)
@@ -99,6 +100,7 @@ test("navigate to create form", async ({ page }) => {
 ```
 
 **Benefits:**
+
 - **Traceability** - Clear mapping from tests to specs
 - **Readability** - Tests read like Gherkin (Given/When/Then)
 - **Reusability** - Steps compose into different tests
@@ -137,6 +139,7 @@ test("scenario lifecycle: create, view in list, edit, and verify", async ({ page
 ```
 
 **Why workflow tests instead of seeded data?**
+
 - No API exists for creating scenarios programmatically
 - Single test is self-contained and can run independently
 - Tests a real user journey end-to-end
@@ -149,7 +152,10 @@ Chakra UI renders duplicate dialog elements (mobile/desktop). Steps use `.last()
 ```typescript
 // Target the visible dialog's elements
 await page.getByRole("textbox", { name: "Name" }).last().fill("...");
-await page.getByRole("button", { name: /save and run/i }).last().click();
+await page
+  .getByRole("button", { name: /save and run/i })
+  .last()
+  .click();
 ```
 
 ## Authentication
@@ -157,6 +163,7 @@ await page.getByRole("button", { name: /save and run/i }).last().click();
 Tests are **self-contained** - they create their own test user automatically. No environment variables or secrets are required.
 
 The `auth.setup.ts` handles this:
+
 1. Registers a test user via the `/api/trpc/user.register` API
 2. Signs in through the UI
 3. Completes onboarding if shown
@@ -187,6 +194,7 @@ pnpm exec playwright show-report playwright-report
 ## CI Integration
 
 E2E tests are configured to run in CI with:
+
 - Infrastructure services via GitHub Actions service containers
 - Chromium browser (Firefox removed due to flakiness)
 - Retries on failure (2 retries in CI)
@@ -197,6 +205,7 @@ See `.github/workflows/e2e-ci.yml` for the full configuration.
 The CI workflow installs dependencies for both `langwatch/` and `agentic-e2e-tests/` and runs tests using `pnpm test` from the e2e directory.
 
 **Global Setup (`global-setup.ts`):**
+
 - Validates environment configuration
 - Waits for the app to be ready (up to 60 seconds)
 - Fails fast with helpful error messages if something is wrong
@@ -204,21 +213,27 @@ The CI workflow installs dependencies for both `langwatch/` and `agentic-e2e-tes
 ## Troubleshooting
 
 ### Auth issues / session expired
+
 Delete `.auth/user.json` and re-run tests. The auth setup will create a fresh session.
 
 ### Element not found / strict mode violation
+
 Chakra renders duplicate elements. Use `.first()` or `.last()`:
+
 ```typescript
 await page.getByRole("button", { name: "Save" }).last().click();
 ```
 
 ### Tests timing out
+
 1. Ensure infrastructure is running: `docker compose ps`
 2. Ensure app is running on port 5570: `curl http://localhost:5570`
 3. Check for console errors in the browser
 
 ### Database issues
+
 Reset the test database:
+
 ```bash
 docker compose down -v
 docker compose up -d
@@ -243,12 +258,12 @@ cd ../../platform/app && pnpm prisma:migrate
 
 ### Test Coverage Status
 
-| Feature | Tests | Status |
-|---------|-------|--------|
-| Scenario Editor - Navigate | ✅ | Passing |
-| Scenario Editor - Form fields | ✅ | Passing |
-| Scenario Editor - Create/Edit lifecycle | ✅ | Passing (workflow) |
-| Scenario Editor - Add criterion | ✅ | Passing |
-| Scenario Library - Navigation | ✅ | Passing |
-| Scenario Library - Empty state | ✅ | Passing |
-| Scenario Execution - Page loads | ✅ | Passing |
+| Feature                                 | Tests | Status             |
+| --------------------------------------- | ----- | ------------------ |
+| Scenario Editor - Navigate              | ✅    | Passing            |
+| Scenario Editor - Form fields           | ✅    | Passing            |
+| Scenario Editor - Create/Edit lifecycle | ✅    | Passing (workflow) |
+| Scenario Editor - Add criterion         | ✅    | Passing            |
+| Scenario Library - Navigation           | ✅    | Passing            |
+| Scenario Library - Empty state          | ✅    | Passing            |
+| Scenario Execution - Page loads         | ✅    | Passing            |

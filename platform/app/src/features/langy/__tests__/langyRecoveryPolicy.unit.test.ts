@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  explainLangyError,
-  KNOWN_LANGY_ERROR_KINDS,
-} from "../logic/langyErrorExplainer";
+import { explainLangyError, KNOWN_LANGY_ERROR_KINDS } from "../logic/langyErrorExplainer";
 import {
   canAutoRecover,
   isMutatingLangyTool,
@@ -31,10 +28,7 @@ describe("langyRecoveryPolicy", () => {
     });
 
     it("covers every kind in KNOWN_LANGY_ERROR_KINDS plus unknown", () => {
-      expect([...RECOVERY_POLICY_KINDS]).toEqual([
-        ...KNOWN_LANGY_ERROR_KINDS,
-        "unknown",
-      ]);
+      expect([...RECOVERY_POLICY_KINDS]).toEqual([...KNOWN_LANGY_ERROR_KINDS, "unknown"]);
     });
 
     it("gives every retrying policy a message and a bounded attempt count", () => {
@@ -76,9 +70,7 @@ describe("langyRecoveryPolicy", () => {
     });
 
     it("tells the user it is picking up where it left off", () => {
-      expect(policy.recoveringMessage).toContain(
-        "picking up where it left off",
-      );
+      expect(policy.recoveringMessage).toContain("picking up where it left off");
     });
   });
 
@@ -111,10 +103,7 @@ describe("langyRecoveryPolicy", () => {
     // here would silently double it and hold the user in a spinner. See
     // `server/app-layer/langy/execution/langy-turn-recovery.ts`.
     it("does NOT retry again on the client — the server already spent the budget", () => {
-      for (const kind of [
-        "langy_agent_unavailable",
-        "langy_agent_at_capacity",
-      ]) {
+      for (const kind of ["langy_agent_unavailable", "langy_agent_at_capacity"]) {
         const policy = langyRecoveryPolicy(kind);
         expect(policy.retry, kind).toBe(false);
         expect(policy.attempts, kind).toBe(0);
@@ -194,12 +183,8 @@ describe("langyRecoveryPolicy", () => {
 
   describe("when the conversation itself is gone or not theirs", () => {
     it("never retries — a retry cannot change either fact", () => {
-      expect(langyRecoveryPolicy("langy_conversation_not_found").retry).toBe(
-        false,
-      );
-      expect(langyRecoveryPolicy("langy_conversation_not_owned").retry).toBe(
-        false,
-      );
+      expect(langyRecoveryPolicy("langy_conversation_not_found").retry).toBe(false);
+      expect(langyRecoveryPolicy("langy_conversation_not_owned").retry).toBe(false);
     });
   });
 

@@ -48,19 +48,11 @@ export const oneOf = (values: readonly string[]): string => values.join(", ");
  * rounds to a different integer and long enough becomes Infinity, so the
  * request would carry a number the caller never asked for.
  */
-export const parseCount = ({
-  value,
-  flag,
-}: {
-  value: string;
-  flag: string;
-}): number => {
+export const parseCount = ({ value, flag }: { value: string; flag: string }): number => {
   const trimmed = value.trim();
   const count = Number(trimmed);
   if (!/^\d+$/.test(trimmed) || !Number.isSafeInteger(count)) {
-    throw new ManagementFlagError(
-      `Invalid ${flag} "${value}". Expected a whole number.`,
-    );
+    throw new ManagementFlagError(`Invalid ${flag} "${value}". Expected a whole number.`);
   }
   return count;
 };
@@ -144,9 +136,7 @@ export const parseScopeType = (value: string): ManagementScopeType =>
  * `role:scopeType:scopeId`, repeated: what an API key may do, and where.
  * Scope ids never contain a colon, so the three parts are unambiguous.
  */
-export const parseBindingFlags = (
-  values: string[] = [],
-): ManagementBindingInput[] =>
+export const parseBindingFlags = (values: string[] = []): ManagementBindingInput[] =>
   values.map((value) => {
     const parts = value.split(":");
     if (parts.length !== 3 || parts.some((part) => !part.trim())) {
@@ -174,14 +164,9 @@ export interface RoleBindingFilterFlags {
 }
 
 /** The principal kinds `role-bindings list` and `create` accept. */
-export const ROLE_BINDING_PRINCIPAL_FLAGS = [
-  "user",
-  "group",
-  "api-key",
-] as const;
+export const ROLE_BINDING_PRINCIPAL_FLAGS = ["user", "group", "api-key"] as const;
 
-export type RoleBindingPrincipalFlag =
-  (typeof ROLE_BINDING_PRINCIPAL_FLAGS)[number];
+export type RoleBindingPrincipalFlag = (typeof ROLE_BINDING_PRINCIPAL_FLAGS)[number];
 
 /** The request field a principal type names. */
 const PRINCIPAL_FIELD = {
@@ -192,9 +177,7 @@ const PRINCIPAL_FIELD = {
 
 export const parsePrincipalType = (value: string): RoleBindingPrincipalFlag => {
   const principalType = value.trim().toLowerCase();
-  if (
-    !(ROLE_BINDING_PRINCIPAL_FLAGS as readonly string[]).includes(principalType)
-  ) {
+  if (!(ROLE_BINDING_PRINCIPAL_FLAGS as readonly string[]).includes(principalType)) {
     throw new ManagementFlagError(
       `Invalid principal type "${value}". Expected one of ${oneOf(ROLE_BINDING_PRINCIPAL_FLAGS)}.`,
     );
@@ -220,8 +203,7 @@ export const composeRoleBindingFilters = (
         `--principal-id needs --principal-type to say what it names. Expected one of ${oneOf(ROLE_BINDING_PRINCIPAL_FLAGS)}.`,
       );
     }
-    filters[PRINCIPAL_FIELD[parsePrincipalType(flags.principalType)]] =
-      flags.principalId;
+    filters[PRINCIPAL_FIELD[parsePrincipalType(flags.principalType)]] = flags.principalId;
   } else if (flags.principalType !== undefined) {
     throw new ManagementFlagError(
       "--principal-type needs --principal-id to say which principal it names.",
@@ -253,18 +235,11 @@ export const composeRoleBindingPrincipal = ({
 });
 
 /** The permission modes `api-keys create` and `update` accept on the wire. */
-export const API_KEY_PERMISSION_MODE_FLAGS = [
-  "all",
-  "readonly",
-  "restricted",
-] as const;
+export const API_KEY_PERMISSION_MODE_FLAGS = ["all", "readonly", "restricted"] as const;
 
-export type ApiKeyPermissionModeFlag =
-  (typeof API_KEY_PERMISSION_MODE_FLAGS)[number];
+export type ApiKeyPermissionModeFlag = (typeof API_KEY_PERMISSION_MODE_FLAGS)[number];
 
-export const parsePermissionMode = (
-  value: string,
-): ApiKeyPermissionModeFlag => {
+export const parsePermissionMode = (value: string): ApiKeyPermissionModeFlag => {
   const mode = value.trim().toLowerCase();
   if (!(API_KEY_PERMISSION_MODE_FLAGS as readonly string[]).includes(mode)) {
     throw new ManagementFlagError(

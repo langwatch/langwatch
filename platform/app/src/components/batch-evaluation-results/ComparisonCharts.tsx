@@ -52,13 +52,7 @@ type MetricType =
 type MetricDefinition = {
   id: MetricType;
   name: string;
-  type:
-    | "cost"
-    | "latency"
-    | "score"
-    | "passRate"
-    | "comparison"
-    | "leaderboard";
+  type: "cost" | "latency" | "score" | "passRate" | "comparison" | "leaderboard";
   evaluatorId?: string;
 };
 
@@ -246,9 +240,7 @@ export const computeTargetMetrics = (
 /**
  * Compute aggregate metrics for a single run (global averages)
  */
-export const computeRunMetrics = (
-  data: BatchEvaluationData,
-): RunMetricsResult => {
+export const computeRunMetrics = (data: BatchEvaluationData): RunMetricsResult => {
   let totalCost = 0;
   let totalDuration = 0;
   let targetCount = 0;
@@ -492,9 +484,9 @@ export const ComparisonCharts = ({
   }, [defaultXAxis]);
 
   // Metrics selector state
-  const [internalVisibleMetrics, setInternalVisibleMetrics] = useState<
-    Set<MetricType>
-  >(() => new Set(["cost", "latency"] as MetricType[]));
+  const [internalVisibleMetrics, setInternalVisibleMetrics] = useState<Set<MetricType>>(
+    () => new Set(["cost", "latency"] as MetricType[]),
+  );
   const [metricsDropdownOpen, setMetricsDropdownOpen] = useState(false);
   const [groupByDropdownOpen, setGroupByDropdownOpen] = useState(false);
   const metricsBtnRef = useRef<HTMLButtonElement>(null);
@@ -610,16 +602,10 @@ export const ComparisonCharts = ({
         cost: run.metrics.totalCost,
         latency: run.metrics.avgLatency,
         ...Object.fromEntries(
-          Object.entries(run.metrics.avgScores).map(([k, v]) => [
-            `score_${k}`,
-            v,
-          ]),
+          Object.entries(run.metrics.avgScores).map(([k, v]) => [`score_${k}`, v]),
         ),
         ...Object.fromEntries(
-          Object.entries(run.metrics.passRates).map(([k, v]) => [
-            `pass_${k}`,
-            v,
-          ]),
+          Object.entries(run.metrics.passRates).map(([k, v]) => [`pass_${k}`, v]),
         ),
       }));
     }
@@ -660,15 +646,11 @@ export const ComparisonCharts = ({
           }
 
           // Aggregate per-target evaluator metrics (NOT global run.metrics!)
-          for (const [evalId, score] of Object.entries(
-            targetMetrics.avgScores,
-          )) {
+          for (const [evalId, score] of Object.entries(targetMetrics.avgScores)) {
             if (!existing.scores[evalId]) existing.scores[evalId] = [];
             existing.scores[evalId]!.push(score);
           }
-          for (const [evalId, rate] of Object.entries(
-            targetMetrics.passRates,
-          )) {
+          for (const [evalId, rate] of Object.entries(targetMetrics.passRates)) {
             if (!existing.passRates[evalId]) existing.passRates[evalId] = [];
             existing.passRates[evalId]!.push(rate);
           }
@@ -682,9 +664,7 @@ export const ComparisonCharts = ({
         name: data.name,
         color: targetColors[id] ?? RUN_COLORS[index % RUN_COLORS.length]!,
         cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
-        latency:
-          data.latencies.reduce((a, b) => a + b, 0) /
-          (data.latencies.length || 1),
+        latency: data.latencies.reduce((a, b) => a + b, 0) / (data.latencies.length || 1),
         ...Object.fromEntries(
           Object.entries(data.scores).map(([k, v]) => [
             `score_${k}`,
@@ -730,8 +710,7 @@ export const ComparisonCharts = ({
         if (!targetCol.promptId) {
           // Check metadata for prompt_id
           if (targetCol.metadata?.prompt_id) {
-            const version =
-              targetCol.promptVersion ?? targetCol.metadata?.version;
+            const version = targetCol.promptVersion ?? targetCol.metadata?.version;
             return version !== undefined && version !== null
               ? `${targetCol.metadata.prompt_id}::v${version}`
               : String(targetCol.metadata.prompt_id);
@@ -809,9 +788,7 @@ export const ComparisonCharts = ({
       name: data.displayName,
       color: RUN_COLORS[index % RUN_COLORS.length]!,
       cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
-      latency:
-        data.latencies.reduce((a, b) => a + b, 0) /
-        (data.latencies.length || 1),
+      latency: data.latencies.reduce((a, b) => a + b, 0) / (data.latencies.length || 1),
       ...Object.fromEntries(
         Object.entries(data.scores).map(([k, v]) => [
           `score_${k}`,
@@ -854,9 +831,7 @@ export const ComparisonCharts = ({
   }, [chartData, axis.maxLabelLength]);
   const formatAxisTick = (value: unknown): string => {
     const name = String(value);
-    return (
-      axisLabelByName.get(name) ?? truncateLabel(name, axis.maxLabelLength)
-    );
+    return axisLabelByName.get(name) ?? truncateLabel(name, axis.maxLabelLength);
   };
 
   // Height is shared by every chart in the row, including the WinRateCharts
@@ -929,12 +904,7 @@ export const ComparisonCharts = ({
         showLeaderboard: showComparisonLeaderboard,
       }),
     ],
-    [
-      scoreEvaluators,
-      passRateEvaluators,
-      comparisonColumns,
-      showComparisonLeaderboard,
-    ],
+    [scoreEvaluators, passRateEvaluators, comparisonColumns, showComparisonLeaderboard],
   );
 
   // Show every metric the run offers, including ones that appear later.
@@ -997,10 +967,7 @@ export const ComparisonCharts = ({
         if (targetCol.promptId) hasPrompt = true;
         if (targetCol.metadata) {
           if ("model" in targetCol.metadata) hasModel = true;
-          if (
-            "prompt_id" in targetCol.metadata ||
-            "prompt" in targetCol.metadata
-          ) {
+          if ("prompt_id" in targetCol.metadata || "prompt" in targetCol.metadata) {
             hasPrompt = true;
           }
         }
@@ -1029,13 +996,7 @@ export const ComparisonCharts = ({
 
   return (
     isVisible && (
-      <VStack
-        width="100%"
-        align="stretch"
-        gap={4}
-        marginBottom={4}
-        flexShrink={0}
-      >
+      <VStack width="100%" align="stretch" gap={4} marginBottom={4} flexShrink={0}>
         <VStack width="100%" align="stretch" gap={2}>
           {/* Controls row: Group by selector + Metrics selector */}
           <HStack wrap="wrap" gap={2} paddingX={2}>
@@ -1056,8 +1017,7 @@ export const ComparisonCharts = ({
                   aria-expanded={groupByDropdownOpen}
                 >
                   Group by:{" "}
-                  {xAxisOptions.find((o) => o.value === xAxisOption)?.label ??
-                    "Runs"}
+                  {xAxisOptions.find((o) => o.value === xAxisOption)?.label ?? "Runs"}
                 </Button>
                 {groupByDropdownOpen && groupByBtnRect && (
                   <Portal>
@@ -1101,16 +1061,9 @@ export const ComparisonCharts = ({
                             padding={1}
                             borderRadius="sm"
                             cursor="pointer"
-                            bg={
-                              xAxisOption === opt.value
-                                ? "blue.subtle"
-                                : "transparent"
-                            }
+                            bg={xAxisOption === opt.value ? "blue.subtle" : "transparent"}
                             _hover={{
-                              bg:
-                                xAxisOption === opt.value
-                                  ? "blue.muted"
-                                  : "bg.subtle",
+                              bg: xAxisOption === opt.value ? "blue.muted" : "bg.subtle",
                             }}
                             onClick={() => {
                               setXAxisOption(opt.value);
@@ -1129,14 +1082,8 @@ export const ComparisonCharts = ({
                           >
                             <Text
                               fontSize="sm"
-                              fontWeight={
-                                xAxisOption === opt.value ? "medium" : "normal"
-                              }
-                              color={
-                                xAxisOption === opt.value
-                                  ? "blue.fg"
-                                  : "inherit"
-                              }
+                              fontWeight={xAxisOption === opt.value ? "medium" : "normal"}
+                              color={xAxisOption === opt.value ? "blue.fg" : "inherit"}
                             >
                               {opt.label}
                             </Text>
@@ -1233,20 +1180,14 @@ export const ComparisonCharts = ({
                             borderColor="border.emphasized"
                             borderRadius="sm"
                             bg={
-                              visibleMetrics.has(metric.id)
-                                ? "blue.500"
-                                : "transparent"
+                              visibleMetrics.has(metric.id) ? "blue.500" : "transparent"
                             }
                             display="flex"
                             alignItems="center"
                             justifyContent="center"
                           >
                             {visibleMetrics.has(metric.id) && (
-                              <Text
-                                color="white"
-                                fontSize="xs"
-                                fontWeight="bold"
-                              >
+                              <Text color="white" fontSize="xs" fontWeight="bold">
                                 ✓
                               </Text>
                             )}
@@ -1330,8 +1271,7 @@ export const ComparisonCharts = ({
                         <Cell
                           key={`cell-${index}`}
                           fill={
-                            (entry as any).color ??
-                            RUN_COLORS[index % RUN_COLORS.length]
+                            (entry as any).color ?? RUN_COLORS[index % RUN_COLORS.length]
                           }
                         />
                       ))}
@@ -1399,8 +1339,7 @@ export const ComparisonCharts = ({
                         <Cell
                           key={`cell-${index}`}
                           fill={
-                            (entry as any).color ??
-                            RUN_COLORS[index % RUN_COLORS.length]
+                            (entry as any).color ?? RUN_COLORS[index % RUN_COLORS.length]
                           }
                         />
                       ))}
@@ -1437,10 +1376,7 @@ export const ComparisonCharts = ({
                       {ev.name} (Score)
                     </Text>
                     <ResponsiveContainer width="100%" height={chartHeight}>
-                      <BarChart
-                        data={chartData}
-                        margin={{ left: 10, right: 10 }}
-                      >
+                      <BarChart data={chartData} margin={{ left: 10, right: 10 }}>
                         <CartesianGrid
                           horizontal={true}
                           vertical={false}
@@ -1493,9 +1429,7 @@ export const ComparisonCharts = ({
                 Metrics dropdown alongside the sibling metric types. */}
             {comparisonColumns?.map(
               (column) =>
-                visibleMetrics.has(
-                  `comparison_${column.evaluatorId}` as MetricType,
-                ) && (
+                visibleMetrics.has(`comparison_${column.evaluatorId}` as MetricType) && (
                   <WinRateChart
                     key={`comparison-${column.evaluatorId}`}
                     column={column}
@@ -1525,9 +1459,7 @@ export const ComparisonCharts = ({
                       targetColors={targetColors}
                       modelByTargetId={modelsFromRun.modelByTargetId}
                       judgeModel={
-                        modelsFromRun.judgeModelByEvaluatorId[
-                          column.evaluatorId
-                        ] ?? null
+                        modelsFromRun.judgeModelByEvaluatorId[column.evaluatorId] ?? null
                       }
                     />
                   ),
@@ -1560,10 +1492,7 @@ export const ComparisonCharts = ({
                       {ev.name} (Pass Rate)
                     </Text>
                     <ResponsiveContainer width="100%" height={chartHeight}>
-                      <BarChart
-                        data={chartData}
-                        margin={{ left: 10, right: 10 }}
-                      >
+                      <BarChart data={chartData} margin={{ left: 10, right: 10 }}>
                         <CartesianGrid
                           horizontal={true}
                           vertical={false}
@@ -1593,9 +1522,7 @@ export const ComparisonCharts = ({
                         <Tooltip
                           content={<ChartTooltip />}
                           cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
-                          formatter={(value) =>
-                            `${Math.round((value as number) * 100)}%`
-                          }
+                          formatter={(value) => `${Math.round((value as number) * 100)}%`}
                         />
                         <Bar dataKey={`pass_${ev.id}`}>
                           {chartData.map((entry, index) => (

@@ -26,13 +26,8 @@ export function useCredentialProbeGate({
   customKeys: Record<string, string>;
   resetKey?: string;
 }) {
-  const credentialsFingerprint = useMemo(
-    () => JSON.stringify(customKeys),
-    [customKeys],
-  );
-  const [refusedCredentials, setRefusedCredentials] = useState<string | null>(
-    null,
-  );
+  const credentialsFingerprint = useMemo(() => JSON.stringify(customKeys), [customKeys]);
+  const [refusedCredentials, setRefusedCredentials] = useState<string | null>(null);
 
   // The component instance survives the drawer being reopened on a different
   // provider row, so the refusal has to be cleared with it.

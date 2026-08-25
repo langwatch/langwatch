@@ -129,9 +129,7 @@ vi.mock("~/utils/api", () => ({
     },
     experiments: {
       saveEvaluationsV3: {
-        useMutation: (callbacks?: {
-          onSuccess?: (data: { slug: string }) => void;
-        }) => ({
+        useMutation: (callbacks?: { onSuccess?: (data: { slug: string }) => void }) => ({
           mutate: (params: NonNullable<typeof saveExperimentMutateCall>) => {
             saveExperimentMutateCall = params;
             callbacks?.onSuccess?.({ slug: "test-slug-123" });
@@ -217,9 +215,7 @@ describe("ExperimentFromPlaygroundButton", () => {
 
   describe("button visibility", () => {
     it("renders Experiment button with Flask icon", () => {
-      store
-        .getState()
-        .addTab({ data: createTabData({ title: "Test Prompt" }) });
+      store.getState().addTab({ data: createTabData({ title: "Test Prompt" }) });
 
       render(<ExperimentFromPlaygroundButton />, { wrapper: Wrapper });
 
@@ -316,9 +312,7 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /create/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /create/i }));
@@ -354,9 +348,7 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /create/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /create/i }));
@@ -369,9 +361,7 @@ describe("ExperimentFromPlaygroundButton", () => {
         expect(targets?.[0]?.type).toBe("prompt");
         // Unsaved prompt MUST have localPromptConfig
         expect(targets?.[0]?.localPromptConfig).toBeDefined();
-        expect(targets?.[0]?.localPromptConfig?.llm.model).toBe(
-          "openai/gpt-4o",
-        );
+        expect(targets?.[0]?.localPromptConfig?.llm.model).toBe("openai/gpt-4o");
         expect(targets?.[0]?.localPromptConfig?.messages).toHaveLength(1);
       });
     });
@@ -411,9 +401,7 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /create/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /create/i }));
@@ -445,9 +433,7 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /create/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /create/i }));
@@ -473,17 +459,13 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /create/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /create/i }));
 
       await waitFor(() => {
-        expect(
-          screen.queryByText(/create new experiment/i),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText(/create new experiment/i)).not.toBeInTheDocument();
       });
     });
   });
@@ -504,9 +486,7 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /create/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /create/i }));
@@ -547,17 +527,13 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /cancel/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /cancel/i }));
 
       await waitFor(() => {
-        expect(
-          screen.queryByText(/create new experiment/i),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText(/create new experiment/i)).not.toBeInTheDocument();
       });
     });
 
@@ -571,9 +547,7 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /cancel/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /cancel/i }));

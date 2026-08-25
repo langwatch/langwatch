@@ -124,8 +124,7 @@ describe("prefetchScenarioData", () => {
           "scenarios.generator": "anthropic/wrong-key-generator",
         };
         const model = modelByFeatureKey[featureKey];
-        if (!model)
-          throw new Error(`unexpected feature key resolved: "${featureKey}"`);
+        if (!model) throw new Error(`unexpected feature key resolved: "${featureKey}"`);
         return model;
       }),
     };
@@ -155,9 +154,7 @@ describe("prefetchScenarioData", () => {
       it("announces the labels and api key the child environment needs", async () => {
         const deps = createMockDeps({
           scenarioFetcher: {
-            getById: vi
-              .fn()
-              .mockResolvedValue({ ...defaultScenario, labels: ["smoke"] }),
+            getById: vi.fn().mockResolvedValue({ ...defaultScenario, labels: ["smoke"] }),
           },
         });
         const onChildEnvReady = vi.fn();
@@ -300,9 +297,7 @@ describe("prefetchScenarioData", () => {
 
           const deps = createMockDeps({
             promptFetcher: {
-              tryGetPromptByIdOrHandle: vi
-                .fn()
-                .mockResolvedValue(promptWithoutModel),
+              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
             },
             modelParamsProvider: mockModelParamsProvider,
           });
@@ -337,9 +332,7 @@ describe("prefetchScenarioData", () => {
         it("calls the agent-under-test resolver exactly once", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              tryGetPromptByIdOrHandle: vi
-                .fn()
-                .mockResolvedValue(promptWithoutModel),
+              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
             },
           });
 
@@ -361,9 +354,7 @@ describe("prefetchScenarioData", () => {
         it("prepares model params exactly three times — agent, simulator, and judge", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              tryGetPromptByIdOrHandle: vi
-                .fn()
-                .mockResolvedValue(promptWithoutModel),
+              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
             },
           });
 
@@ -531,12 +522,10 @@ describe("prefetchScenarioData", () => {
     // Echoes the requested model back as params so the resolved simulator /
     // judge model is observable on result.data.{simulator,judge}ModelParams.
     const echoingProvider = (): ModelParamsProvider => ({
-      prepare: vi
-        .fn()
-        .mockImplementation(async (_projectId: string, model: string) => ({
-          success: true as const,
-          params: { api_key: "k", model },
-        })),
+      prepare: vi.fn().mockImplementation(async (_projectId: string, model: string) => ({
+        success: true as const,
+        params: { api_key: "k", model },
+      })),
     });
 
     describe("given a scenario with no simulator or judge override", () => {
@@ -564,12 +553,8 @@ describe("prefetchScenarioData", () => {
           );
           expect(result.success).toBe(true);
           if (result.success) {
-            expect(result.data.simulatorModelParams?.model).toBe(
-              "openai/sim-default",
-            );
-            expect(result.data.judgeModelParams?.model).toBe(
-              "openai/judge-default",
-            );
+            expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
+            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
           }
         });
       });
@@ -602,9 +587,7 @@ describe("prefetchScenarioData", () => {
             expect(result.data.simulatorModelParams?.model).toBe(
               "anthropic/sim-override",
             );
-            expect(result.data.judgeModelParams?.model).toBe(
-              "openai/judge-default",
-            );
+            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
           }
         });
       });
@@ -634,12 +617,8 @@ describe("prefetchScenarioData", () => {
 
           expect(result.success).toBe(true);
           if (result.success) {
-            expect(result.data.judgeModelParams?.model).toBe(
-              "anthropic/judge-override",
-            );
-            expect(result.data.simulatorModelParams?.model).toBe(
-              "openai/sim-default",
-            );
+            expect(result.data.judgeModelParams?.model).toBe("anthropic/judge-override");
+            expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
           }
         });
       });
@@ -668,13 +647,9 @@ describe("prefetchScenarioData", () => {
 
           expect(result.success).toBe(true);
           if (result.success) {
-            expect(result.data.simulatorModelParams?.model).toBe(
-              "groq/plan-sim",
-            );
+            expect(result.data.simulatorModelParams?.model).toBe("groq/plan-sim");
             // Plan leaves judge unset -> falls through to the default judge.
-            expect(result.data.judgeModelParams?.model).toBe(
-              "openai/judge-default",
-            );
+            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
           }
         });
       });
@@ -703,12 +678,8 @@ describe("prefetchScenarioData", () => {
 
           expect(result.success).toBe(true);
           if (result.success) {
-            expect(result.data.simulatorModelParams?.model).toBe(
-              "openai/sim-default",
-            );
-            expect(result.data.judgeModelParams?.model).toBe(
-              "openai/judge-default",
-            );
+            expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
+            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
           }
         });
       });
@@ -1029,14 +1000,11 @@ describe("prefetchScenarioData", () => {
             deps,
           });
 
-          expect(projectSecretsFetcher.getSecrets).toHaveBeenCalledWith(
-            "proj_123",
-          );
+          expect(projectSecretsFetcher.getSecrets).toHaveBeenCalledWith("proj_123");
           expect(result.success).toBe(true);
           // Assert explicitly before narrowing so a type drift fails loudly
           // instead of silently skipping the toEqual below.
-          if (!result.success)
-            throw new Error("prefetch should have succeeded");
+          if (!result.success) throw new Error("prefetch should have succeeded");
           expect(result.data.adapterData.type).toBe("code");
           if (result.data.adapterData.type !== "code") return;
           expect(result.data.adapterData.secrets).toEqual({
@@ -1374,9 +1342,7 @@ describe("prefetchScenarioData", () => {
 
           expect(signatureNode).toBeDefined();
 
-          const data = signatureNode?.data as
-            | Record<string, unknown>
-            | undefined;
+          const data = signatureNode?.data as Record<string, unknown> | undefined;
           const parameters = data?.parameters as
             | Array<Record<string, unknown>>
             | undefined;
@@ -1494,10 +1460,7 @@ describe("prefetchScenarioData", () => {
        * still names a model nothing in the workflow pinned.
        */
       const modelAwarePrepare = vi.fn(
-        async (
-          _projectId: string,
-          model: string,
-        ): Promise<ModelParamsResult> =>
+        async (_projectId: string, model: string): Promise<ModelParamsResult> =>
           model === CODEX_NODE_MODEL
             ? {
                 success: false,
@@ -1612,9 +1575,7 @@ describe("prefetchScenarioData", () => {
         // so we check the workflow-level prepare calls via the models passed
         const workflowModels = prepareFn.mock.calls
           .map((call) => call[1] as string)
-          .filter(
-            (m) => m === "openai/gpt-4o-mini" || m === "azure/gpt-4o-mini",
-          );
+          .filter((m) => m === "openai/gpt-4o-mini" || m === "azure/gpt-4o-mini");
         expect(workflowModels).toHaveLength(2);
         expect(workflowModels).toContain("openai/gpt-4o-mini");
         expect(workflowModels).toContain("azure/gpt-4o-mini");
@@ -1861,9 +1822,7 @@ describe("prefetchScenarioData", () => {
             type: "signature",
             data: {
               name: "LLM Call",
-              parameters: [
-                { identifier: "llm", type: "llm", value: undefined },
-              ],
+              parameters: [{ identifier: "llm", type: "llm", value: undefined }],
             },
           },
         ],
@@ -1877,34 +1836,30 @@ describe("prefetchScenarioData", () => {
             findById: vi.fn().mockResolvedValue(workflowAgent),
           },
           workflowVersionFetcher: {
-            getLatestDsl: vi
-              .fn()
-              .mockResolvedValue({ workflowId: "wf_1", dsl }),
+            getLatestDsl: vi.fn().mockResolvedValue({ workflowId: "wf_1", dsl }),
           },
           modelParamsProvider: { prepare: prepareFn },
         });
         return { deps, prepareFn };
       };
 
-      it.each([
-        "1.5",
-        "1.10",
-      ])("does not inject DEFAULT_MODEL on a %s DSL with a modelless llm param", async (specVersion) => {
-        const { deps, prepareFn } = setupFor(modellessDsl(specVersion));
+      it.each(["1.5", "1.10"])(
+        "does not inject DEFAULT_MODEL on a %s DSL with a modelless llm param",
+        async (specVersion) => {
+          const { deps, prepareFn } = setupFor(modellessDsl(specVersion));
 
-        const result = await prefetchScenarioData({
-          context: defaultContext,
-          target: workflowTarget,
-          deps,
-        });
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: workflowTarget,
+            deps,
+          });
 
-        expect(result.success).toBe(true);
-        expect(
-          prepareFn.mock.calls.some(
-            (call) => (call[1] as string) === DEFAULT_MODEL,
-          ),
-        ).toBe(false);
-      });
+          expect(result.success).toBe(true);
+          expect(
+            prepareFn.mock.calls.some((call) => (call[1] as string) === DEFAULT_MODEL),
+          ).toBe(false);
+        },
+      );
 
       it("still falls back to DEFAULT_MODEL on a 1.4 DSL", async () => {
         const { deps, prepareFn } = setupFor(modellessDsl("1.4"));
@@ -1917,9 +1872,7 @@ describe("prefetchScenarioData", () => {
 
         expect(result.success).toBe(true);
         expect(
-          prepareFn.mock.calls.some(
-            (call) => (call[1] as string) === DEFAULT_MODEL,
-          ),
+          prepareFn.mock.calls.some((call) => (call[1] as string) === DEFAULT_MODEL),
         ).toBe(true);
       });
     });
@@ -2015,9 +1968,7 @@ describe("prefetchScenarioData", () => {
           account_tier: "gold",
           region: "eu-central",
         });
-        expect(result.data.scenario.situation).toBe(
-          "A gold customer asks for a refund",
-        );
+        expect(result.data.scenario.situation).toBe("A gold customer asks for a refund");
       });
     });
 

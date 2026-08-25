@@ -1,4 +1,19 @@
 {
-  "compilerOptions": { "target": "es2022", "lib": ["es2022", "dom"], "noEmit": true, "module": "preserve", "moduleResolution": "bundler", "paths": { "@langwatch/coding-agent-contract": ["../../coding-agent/contract/src/index.ts"], "zod": ["../../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod"] }, "strict": true, "noUncheckedIndexedAccess": true, "skipLibCheck": true, "verbatimModuleSyntax": true, "types": ["node", "vitest/globals"] },
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "noEmit": true,
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "paths": {
+      "@langwatch/coding-agent-contract": ["../../coding-agent/contract/src/index.ts"],
+      "zod": ["../../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod"]
+    },
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "types": ["node", "vitest/globals"]
+  },
   "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

@@ -4,9 +4,7 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { ComputeExperimentRunMetricsCommandData } from "../../experiment-run-processing/schemas/commands";
 import type { TraceProcessingEvent } from "../schemas/events";
 
-const logger = createLogger(
-  "langwatch:trace-processing:experiment-metrics-publisher",
-);
+const logger = createLogger("langwatch:trace-processing:experiment-metrics-publisher");
 
 export const EXPERIMENT_METRICS_SYNC_DELAY_MS = 60_000;
 export const EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS = 60_000;
@@ -15,10 +13,7 @@ export interface ExperimentMetricsSyncSubscriberDeps {
   computeExperimentRunMetrics: (
     data: ComputeExperimentRunMetricsCommandData,
   ) => Promise<void>;
-  lookupExperimentId: (
-    tenantId: string,
-    runId: string,
-  ) => Promise<string | null>;
+  lookupExperimentId: (tenantId: string, runId: string) => Promise<string | null>;
 }
 
 /**

@@ -224,8 +224,7 @@ async function ensureModelProviders(
   // off customKeys for each provider (UPPER_SNAKE_CASE env-var style).
   const openaiKey = process.env.OPENAI_API_KEY ?? null;
   const anthropicKey = process.env.ANTHROPIC_API_KEY ?? null;
-  const geminiKey =
-    process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? null;
+  const geminiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? null;
   const bedrockAccessKey = process.env.AWS_ACCESS_KEY_ID ?? null;
   const bedrockSecretKey = process.env.AWS_SECRET_ACCESS_KEY ?? null;
   const bedrockRegion =
@@ -382,9 +381,7 @@ async function upsertModelProviderByName(input: {
       provider: input.provider,
       enabled: true,
       organizationId: input.organizationId,
-      customKeys: input.customKeys
-        ? encryptKeys(input.customKeys)
-        : Prisma.DbNull,
+      customKeys: input.customKeys ? encryptKeys(input.customKeys) : Prisma.DbNull,
       rateLimitRpm: input.rateLimitRpm,
       fallbackPriorityGlobal: input.fallbackPriorityGlobal,
       scopes: {
@@ -542,8 +539,7 @@ async function ensureVirtualKeys(handles: SeedHandles): Promise<MintedVk[]> {
     await mintVk({
       organizationId: handles.organizationId,
       name: "vk_project_demo",
-      description:
-        "PROJECT-scope VK — inherits OpenAI + Anthropic via team cascade",
+      description: "PROJECT-scope VK — inherits OpenAI + Anthropic via team cascade",
       routingPolicyId: null,
       principalUserId: null,
       createdById: handles.userId,
@@ -555,8 +551,7 @@ async function ensureVirtualKeys(handles: SeedHandles): Promise<MintedVk[]> {
     await mintVk({
       organizationId: handles.organizationId,
       name: "vk_personal",
-      description:
-        "Personal VK at ORG scope (lazy-mint device-flow path shape)",
+      description: "Personal VK at ORG scope (lazy-mint device-flow path shape)",
       routingPolicyId: null,
       principalUserId: handles.userId,
       createdById: handles.userId,
@@ -601,9 +596,7 @@ async function main(): Promise<void> {
   console.log("[seed-governance-refactor-dogfood] starting");
 
   const base = await ensureUserOrgTeamsProjects();
-  console.log(
-    `  ✓ user + org + 2 teams + 3 projects (org=${base.organizationId})`,
-  );
+  console.log(`  ✓ user + org + 2 teams + 3 projects (org=${base.organizationId})`);
 
   const mps = await ensureModelProviders(base);
   console.log(
@@ -616,16 +609,12 @@ async function main(): Promise<void> {
   const handles: SeedHandles = { ...base, ...mps, routingPolicyId };
 
   const vks = await ensureVirtualKeys(handles);
-  console.log(
-    `  ✓ ${vks.length} VirtualKeys minted (org/team/project/personal)`,
-  );
+  console.log(`  ✓ ${vks.length} VirtualKeys minted (org/team/project/personal)`);
 
   await ensurePrincipalBudget(handles);
   console.log(`  ✓ PRINCIPAL-scope GatewayBudget for dogfood user ($50/mo)`);
 
-  console.log(
-    "\n[seed-governance-refactor-dogfood] done. Minted VKs (capture these):",
-  );
+  console.log("\n[seed-governance-refactor-dogfood] done. Minted VKs (capture these):");
   for (const vk of vks) {
     console.log(
       `  ${vk.name.padEnd(20)} scopes=[${vk.scopes.join(", ")}]  secret=${vk.secret}`,

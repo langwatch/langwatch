@@ -118,9 +118,8 @@ vi.mock("../useTraceQueryArgs", () => ({
 }));
 
 vi.mock("../../stores/sseStatusStore", () => ({
-  useSseStatusStore: (
-    selector: (state: { sseConnectionState: string }) => boolean,
-  ) => selector({ sseConnectionState }),
+  useSseStatusStore: (selector: (state: { sseConnectionState: string }) => boolean) =>
+    selector({ sseConnectionState }),
 }));
 
 const lastTreeOptions = (): TreeQueryOptions => {

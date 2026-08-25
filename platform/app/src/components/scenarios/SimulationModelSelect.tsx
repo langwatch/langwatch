@@ -37,11 +37,10 @@ export function SimulationModelSelect({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
-  const projectProviders =
-    api.modelProvider.listAllForProjectForFrontend.useQuery(
-      { projectId },
-      { enabled: !!projectId, refetchOnMount: false },
-    );
+  const projectProviders = api.modelProvider.listAllForProjectForFrontend.useQuery(
+    { projectId },
+    { enabled: !!projectId, refetchOnMount: false },
+  );
 
   const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
     { projectId, featureKey },
@@ -63,10 +62,7 @@ export function SimulationModelSelect({
     }
 
     const registry = modelSelectorOptions
-      .filter(
-        (o) =>
-          o.mode === "chat" && enabledKeys.has(o.value.split("/")[0] ?? ""),
-      )
+      .filter((o) => o.mode === "chat" && enabledKeys.has(o.value.split("/")[0] ?? ""))
       .map((o) => o.value);
 
     const custom: string[] = [];
@@ -96,13 +92,9 @@ export function SimulationModelSelect({
         model={value ?? ""}
         options={options}
         size={size}
-        onChange={(model) =>
-          onChange(model === INHERIT_SENTINEL ? null : model)
-        }
+        onChange={(model) => onChange(model === INHERIT_SENTINEL ? null : model)}
         inheritOption={
-          inheritModel
-            ? { model: inheritModel, label: "Default model" }
-            : undefined
+          inheritModel ? { model: inheritModel, label: "Default model" } : undefined
         }
         displayNames={displayNames}
       />

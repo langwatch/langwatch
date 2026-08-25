@@ -57,9 +57,11 @@ describe("given an attribute holding a chat-shaped value", () => {
     expect(select).toHaveTextContent("Chat");
 
     await user.click(select);
-    expect(
-      (await screen.findAllByRole("menuitem")).map((i) => i.textContent),
-    ).toEqual(["Chat", "JSON", "Text"]);
+    expect((await screen.findAllByRole("menuitem")).map((i) => i.textContent)).toEqual([
+      "Chat",
+      "JSON",
+      "Text",
+    ]);
   });
 
   it("switches the rendering when another format is picked", async () => {

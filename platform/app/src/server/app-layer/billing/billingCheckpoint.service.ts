@@ -55,9 +55,7 @@ export interface BillingCheckpointService {
 /**
  * Prisma-backed billing checkpoint service.
  */
-export class PrismaBillingCheckpointService
-  implements BillingCheckpointService
-{
+export class PrismaBillingCheckpointService implements BillingCheckpointService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async getCheckpoint(params: {

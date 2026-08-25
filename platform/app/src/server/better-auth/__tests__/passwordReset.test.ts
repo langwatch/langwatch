@@ -21,9 +21,7 @@ type EmailAndPasswordOptions = {
     url: string;
     token: string;
   }) => Promise<void>;
-  onPasswordReset?: (args: {
-    user: { id: string; email: string };
-  }) => Promise<void>;
+  onPasswordReset?: (args: { user: { id: string; email: string } }) => Promise<void>;
   resetPasswordTokenExpiresIn?: number;
 };
 

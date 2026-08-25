@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import {
-  hasNoResults,
-  shouldShowNoResponse,
-} from "../scenario-run-status.utils";
+import { hasNoResults, shouldShowNoResponse } from "../scenario-run-status.utils";
 
 // Regression: #2295
 describe("hasNoResults()", () => {

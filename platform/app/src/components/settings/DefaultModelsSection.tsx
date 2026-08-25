@@ -62,10 +62,7 @@ import { scopeBreadthRank } from "~/utils/scopeBreadth";
 // 2026-05-18 dogfood, Image #118).
 import { Menu } from "../ui/menu";
 import { ModelChip } from "./ModelChip";
-import {
-  type ScopeFilter,
-  ScopeFilter as ScopeFilterComponent,
-} from "./ScopeFilter";
+import { type ScopeFilter, ScopeFilter as ScopeFilterComponent } from "./ScopeFilter";
 
 type Payload = RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
 type ConfigRow = Payload["configs"][number];
@@ -155,8 +152,7 @@ export function DefaultModelsSection({
   const { openDrawer } = useDrawer();
 
   const utils = api.useUtils();
-  const deleteMutation =
-    api.modelProvider.deleteDefaultModelsConfig.useMutation();
+  const deleteMutation = api.modelProvider.deleteDefaultModelsConfig.useMutation();
   const handleDelete = async (c: ConfigRow) => {
     try {
       await deleteMutation.mutateAsync({ id: c.id });
@@ -186,9 +182,7 @@ export function DefaultModelsSection({
     if (hierarchy) return hierarchy;
     const available = dataQuery.data?.available;
     return {
-      organization: available?.organization
-        ? { id: available.organization.id }
-        : null,
+      organization: available?.organization ? { id: available.organization.id } : null,
       teams: (available?.teams ?? []).map((t) => ({ id: t.id })),
       projects: (available?.projects ?? []).map((p) => ({
         id: p.id,
@@ -219,29 +213,18 @@ export function DefaultModelsSection({
     // and by scope name within a tier, so the same order the Model Providers
     // table above and the virtual-key picker use.
     return [...filtered].sort(compareConfigsByScopeThenName);
-  }, [
-    dataQuery.data?.configs,
-    filter,
-    team?.id,
-    project?.id,
-    effectiveHierarchy,
-  ]);
+  }, [dataQuery.data?.configs, filter, team?.id, project?.id, effectiveHierarchy]);
 
   if (dataQuery.isLoading || !dataQuery.data) {
     return (
-      <VStack
-        gap={3}
-        width="full"
-        align="stretch"
-        data-testid="default-models-section"
-      >
+      <VStack gap={3} width="full" align="stretch" data-testid="default-models-section">
         <VStack align="start" gap={1}>
           <Heading as="h3" size="md">
             Default Models
           </Heading>
           <Text fontSize="sm" color="fg.muted">
-            AI features across the platform: prompt creation, evaluations,
-            traces search, topic clustering and more
+            AI features across the platform: prompt creation, evaluations, traces search,
+            topic clustering and more
           </Text>
         </VStack>
         <DefaultModelsTableSkeleton />
@@ -283,8 +266,8 @@ export function DefaultModelsSection({
             Default Models
           </Heading>
           <Text fontSize="sm" color="fg.muted">
-            AI features across the platform: prompt creation, evaluations,
-            traces search, topic clustering and more
+            AI features across the platform: prompt creation, evaluations, traces search,
+            topic clustering and more
           </Text>
         </VStack>
         <HStack gap={2}>
@@ -372,8 +355,8 @@ function AllConfigsView({
           <VStack textAlign="center" gap={2}>
             <EmptyState.Title>No default models configured</EmptyState.Title>
             <EmptyState.Description>
-              Define a default model for prompt creation, evaluations, traces
-              search, topic clustering and more.
+              Define a default model for prompt creation, evaluations, traces search,
+              topic clustering and more.
             </EmptyState.Description>
             <Button
               size="sm"
@@ -394,9 +377,7 @@ function AllConfigsView({
         <Table.Row>
           <Table.ColumnHeader>Scopes</Table.ColumnHeader>
           {ROLES.map((role) => (
-            <Table.ColumnHeader key={role}>
-              {ROLE_LABEL[role]}
-            </Table.ColumnHeader>
+            <Table.ColumnHeader key={role}>{ROLE_LABEL[role]}</Table.ColumnHeader>
           ))}
           <Table.ColumnHeader textAlign="right" />
         </Table.Row>
@@ -407,11 +388,7 @@ function AllConfigsView({
             <Table.Cell>
               <HStack gap={2} flexWrap="wrap">
                 {c.scopes.map((s) => (
-                  <ScopeChip
-                    key={`${s.type}:${s.id}`}
-                    type={s.type}
-                    name={s.name}
-                  />
+                  <ScopeChip key={`${s.type}:${s.id}`} type={s.type} name={s.name} />
                 ))}
               </HStack>
             </Table.Cell>
@@ -513,8 +490,7 @@ function ConfigCell({
   displayNames?: Record<string, string>;
 }) {
   const isInvalid = (model: string) =>
-    !!enabledProviderKeys &&
-    !enabledProviderKeys.has(model.split("/")[0] ?? "");
+    !!enabledProviderKeys && !enabledProviderKeys.has(model.split("/")[0] ?? "");
   // The table is a "final resolved state" view: every cell renders
   // the cascade-resolved role model for the row's scope, whether the
   // policy on this row pins it or inherits it from a wider tier.
@@ -642,16 +618,12 @@ type AnchorScope = { type: "ORGANIZATION" | "TEAM" | "PROJECT"; id: string };
  * organization. A parent tier whose id can't be resolved from the
  * hierarchy is skipped rather than loosely matched.
  */
-function cascadeChainFor(
-  anchor: AnchorScope,
-  hierarchy: ScopeHierarchy,
-): AnchorScope[] {
+function cascadeChainFor(anchor: AnchorScope, hierarchy: ScopeHierarchy): AnchorScope[] {
   const organizationId = hierarchy.organization?.id ?? null;
   const chain: AnchorScope[] = [anchor];
   if (anchor.type === "PROJECT") {
     const teamId =
-      (hierarchy.projects ?? []).find((p) => p.id === anchor.id)?.teamId ??
-      null;
+      (hierarchy.projects ?? []).find((p) => p.id === anchor.id)?.teamId ?? null;
     if (teamId) chain.push({ type: "TEAM", id: teamId });
   }
   if (anchor.type !== "ORGANIZATION" && organizationId) {
@@ -687,10 +659,7 @@ export function resolveAtScope({
     const matching = configs
       .filter((c) => c.scopes.some((s) => s.type === t.type && s.id === t.id))
       .filter((c) => (c.config as Record<string, string>)[key])
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     if (matching[0]) {
       return {
         model: (matching[0].config as Record<string, string>)[key]!,
@@ -709,10 +678,8 @@ function ScopeChip({
   type: "ORGANIZATION" | "TEAM" | "PROJECT";
   name: string;
 }) {
-  const palette =
-    type === "ORGANIZATION" ? "blue" : type === "TEAM" ? "purple" : "gray";
-  const Icon =
-    type === "ORGANIZATION" ? Building2 : type === "TEAM" ? Users : Folder;
+  const palette = type === "ORGANIZATION" ? "blue" : type === "TEAM" ? "purple" : "gray";
+  const Icon = type === "ORGANIZATION" ? Building2 : type === "TEAM" ? Users : Folder;
   return (
     <Badge colorPalette={palette} variant="subtle">
       <HStack gap={1}>
@@ -725,20 +692,14 @@ function ScopeChip({
 
 function DefaultModelsTableSkeleton() {
   return (
-    <Card.Root
-      width="full"
-      overflow="hidden"
-      data-testid="default-models-table-skeleton"
-    >
+    <Card.Root width="full" overflow="hidden" data-testid="default-models-table-skeleton">
       <Card.Body paddingY={0} paddingX={0} overflowX="auto">
         <Table.Root variant="line" size="md" width="full">
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Scopes</Table.ColumnHeader>
               {ROLES.map((role) => (
-                <Table.ColumnHeader key={role}>
-                  {ROLE_LABEL[role]}
-                </Table.ColumnHeader>
+                <Table.ColumnHeader key={role}>{ROLE_LABEL[role]}</Table.ColumnHeader>
               ))}
               <Table.ColumnHeader textAlign="right" />
             </Table.Row>

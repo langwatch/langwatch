@@ -12,9 +12,7 @@ import { InternalServerError } from "../errors";
 describe("canonicalErrorFor", () => {
   describe("given a handled error with a 5xx status", () => {
     it("collapses to the opaque body instead of shipping its own code and message", () => {
-      const { status, body } = canonicalErrorFor(
-        new LangWatchQLUnavailableError(),
-      );
+      const { status, body } = canonicalErrorFor(new LangWatchQLUnavailableError());
 
       expect(status).toBe(503);
       expect(body.error.code).toBe("internal_error");
@@ -73,9 +71,7 @@ describe("canonicalErrorFor", () => {
 
   describe("given a handled error with a 4xx status", () => {
     it("keeps shipping its own code and message", () => {
-      const { status, body } = canonicalErrorFor(
-        new LangWatchQLNotEnabledError(),
-      );
+      const { status, body } = canonicalErrorFor(new LangWatchQLNotEnabledError());
 
       expect(status).toBe(403);
       expect(body.error.code).toBe("lwql_not_enabled");
@@ -86,9 +82,7 @@ describe("canonicalErrorFor", () => {
 
     it("still remaps a validation_error to 400 regardless of the class's own httpStatus", () => {
       const { status, body } = canonicalErrorFor(
-        new ValidationError(
-          "The query parameters didn't match the expected shape.",
-        ),
+        new ValidationError("The query parameters didn't match the expected shape."),
       );
 
       expect(status).toBe(400);

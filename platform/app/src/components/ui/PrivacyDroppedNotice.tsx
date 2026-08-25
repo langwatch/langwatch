@@ -24,19 +24,13 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 function describeCategories(categories: string[]): string {
-  const labels = categories.map(
-    (category) => CATEGORY_LABELS[category] ?? category,
-  );
+  const labels = categories.map((category) => CATEGORY_LABELS[category] ?? category);
   if (labels.length === 1) return labels[0]!;
   if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
   return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
 }
 
-export function PrivacyDroppedNotice({
-  categories,
-}: {
-  categories?: string[] | null;
-}) {
+export function PrivacyDroppedNotice({ categories }: { categories?: string[] | null }) {
   const { hasPermission } = useOrganizationTeamProject();
   if (!categories || categories.length === 0) return null;
 
@@ -52,17 +46,10 @@ export function PrivacyDroppedNotice({
       <Alert.Content>
         <Alert.Description fontSize="sm">
           The {list} {wasWere} dropped by this project's privacy settings before{" "}
-          {itTheyWere} stored, so {itThey} not shown here and cannot be
-          recovered.
+          {itTheyWere} stored, so {itThey} not shown here and cannot be recovered.
         </Alert.Description>
         {hasPermission("project:view") && (
-          <Button
-            asChild
-            size="xs"
-            variant="outline"
-            marginTop={1}
-            alignSelf="start"
-          >
+          <Button asChild size="xs" variant="outline" marginTop={1} alignSelf="start">
             <NextLink
               href="/settings/data-privacy"
               target="_blank"

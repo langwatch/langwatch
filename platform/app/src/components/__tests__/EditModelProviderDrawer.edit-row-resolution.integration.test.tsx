@@ -296,9 +296,7 @@ describe("<EditModelProviderDrawer/>", () => {
         // Record would resolve row-b and render row-b's values instead.
         expect(screen.getByDisplayValue(MASKED_KEY_PLACEHOLDER)).toBeTruthy();
         expect(screen.queryByDisplayValue("sk-row-b-key")).toBeNull();
-        expect(
-          screen.queryByDisplayValue("https://row-b.example.com"),
-        ).toBeNull();
+        expect(screen.queryByDisplayValue("https://row-b.example.com")).toBeNull();
       });
     });
   });
@@ -311,9 +309,7 @@ describe("<EditModelProviderDrawer/>", () => {
       });
 
       it("renders a loading spinner", () => {
-        expect(
-          document.querySelectorAll(".chakra-spinner").length,
-        ).toBeGreaterThan(0);
+        expect(document.querySelectorAll(".chakra-spinner").length).toBeGreaterThan(0);
       });
 
       it("does not mount the form", () => {

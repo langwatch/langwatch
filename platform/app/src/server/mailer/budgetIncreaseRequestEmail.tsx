@@ -1,11 +1,4 @@
-import {
-  Button,
-  Container,
-  Heading,
-  Html,
-  Img,
-  Section,
-} from "@react-email/components";
+import { Button, Container, Heading, Html, Img, Section } from "@react-email/components";
 import { render } from "@react-email/render";
 import { env } from "../../env.mjs";
 import { sendEmail } from "./emailSender";
@@ -36,8 +29,7 @@ const valueCellStyle: React.CSSProperties = {
   padding: "8px 0",
   color: "#1f2933",
   fontSize: "13px",
-  fontFamily:
-    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 };
 
 export const sendBudgetIncreaseRequestEmail = async (
@@ -55,8 +47,7 @@ export const sendBudgetIncreaseRequestEmail = async (
           borderRadius: "10px",
           padding: "24px",
           paddingBottom: "16px",
-          fontFamily:
-            "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         }}
       >
         <Img
@@ -69,9 +60,8 @@ export const sendBudgetIncreaseRequestEmail = async (
         </Heading>
         <p style={{ fontSize: "14px", lineHeight: 1.6 }}>
           <strong>{input.requesterName ?? input.requesterEmail}</strong> (
-          <a href={`mailto:${input.requesterEmail}`}>{input.requesterEmail}</a>){" "}
-          has requested a budget increase in{" "}
-          <strong>{input.organizationName}</strong>.
+          <a href={`mailto:${input.requesterEmail}`}>{input.requesterEmail}</a>) has
+          requested a budget increase in <strong>{input.organizationName}</strong>.
         </p>
         <Section style={{ paddingTop: "8px" }}>
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
@@ -136,9 +126,8 @@ export const sendBudgetIncreaseRequestEmail = async (
             color: "#5f6c7b",
           }}
         >
-          You're receiving this because you're an organization admin in
-          LangWatch. If this is unexpected, you can reply directly to{" "}
-          {input.requesterEmail}.
+          You're receiving this because you're an organization admin in LangWatch. If this
+          is unexpected, you can reply directly to {input.requesterEmail}.
         </p>
       </Container>
     </Html>,

@@ -17,12 +17,13 @@
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { checkLangyMessageRateLimit, startConversationTurn, auditLog } =
-  vi.hoisted(() => ({
+const { checkLangyMessageRateLimit, startConversationTurn, auditLog } = vi.hoisted(
+  () => ({
     checkLangyMessageRateLimit: vi.fn(),
     startConversationTurn: vi.fn(),
     auditLog: vi.fn(),
-  }));
+  }),
+);
 
 vi.mock("~/server/middleware/rate-limit-langy", () => ({
   checkLangyMessageRateLimit,
@@ -30,9 +31,7 @@ vi.mock("~/server/middleware/rate-limit-langy", () => ({
 }));
 
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   return {
     // Consumers that degrade without Redis read through this one.
     tryGetApp: () => null,
@@ -228,8 +227,8 @@ describe("langy turn-start rejections", () => {
       expect(wire.data.error).not.toBeNull();
       expect(wire.data.error).toMatchObject({ code: "validation_error" });
       expect(
-        (wire.data.error as { meta: { fieldErrors: Record<string, unknown> } })
-          .meta.fieldErrors,
+        (wire.data.error as { meta: { fieldErrors: Record<string, unknown> } }).meta
+          .fieldErrors,
       ).toHaveProperty("modelOverride");
       expect(startConversationTurn).not.toHaveBeenCalled();
     });
@@ -254,8 +253,8 @@ describe("langy turn-start rejections", () => {
       expect(wire.data.error).not.toBeNull();
       expect(wire.data.error).toMatchObject({ code: "validation_error" });
       expect(
-        (wire.data.error as { meta: { fieldErrors: Record<string, unknown> } })
-          .meta.fieldErrors,
+        (wire.data.error as { meta: { fieldErrors: Record<string, unknown> } }).meta
+          .fieldErrors,
       ).toHaveProperty("modelOverride");
       expect(startConversationTurn).not.toHaveBeenCalled();
     });

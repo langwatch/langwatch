@@ -1,8 +1,5 @@
 import type { OrganizationService as OrganizationServiceContract } from "@langwatch/organization-contract";
-import type {
-  AuthzGrantsService,
-  AuthzService,
-} from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type {
   GroupIdentityPort,
   PersonalWorkspaceDiagnosticsPort,
@@ -25,9 +22,7 @@ export interface PostgresOrganizationAdapterOptions {
 }
 
 export class PostgresOrganizationAdapter {
-  private constructor(
-    private readonly options: PostgresOrganizationAdapterOptions,
-  ) {}
+  private constructor(private readonly options: PostgresOrganizationAdapterOptions) {}
 
   static create(
     options: PostgresOrganizationAdapterOptions,

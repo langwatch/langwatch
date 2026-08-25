@@ -132,12 +132,7 @@ export function HomeBriefingSection() {
  */
 function BriefingHeadlineSkeleton() {
   return (
-    <LangyPanelSurface
-      accent
-      fill
-      borderRadius="14px"
-      padding={{ base: 4, md: 4 }}
-    >
+    <LangyPanelSurface accent fill borderRadius="14px" padding={{ base: 4, md: 4 }}>
       <VStack align="stretch" gap={3} flex={1} minHeight={0}>
         {/* The eyebrow is real — the label never needs to load. */}
         <Text
@@ -179,11 +174,7 @@ function BriefingHeadlineSkeleton() {
               background="bg.surface"
             >
               <Skeleton width="7px" height="7px" borderRadius="full" />
-              <Skeleton
-                height="12px"
-                flex={1}
-                width={row === 0 ? "70%" : "56%"}
-              />
+              <Skeleton height="12px" flex={1} width={row === 0 ? "70%" : "56%"} />
               <Skeleton height="12px" width="34px" />
             </HStack>
           ))}

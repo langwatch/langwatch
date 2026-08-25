@@ -42,9 +42,7 @@ export const ORGANIZATIONS_SPEC_OPTIONS: Partial<GenerateSpecOptions> = {
 };
 
 type SchemaSpec = NonNullable<
-  NonNullable<
-    Extract<ResponseSpec, { content?: unknown }>["content"]
-  >[string]["schema"]
+  NonNullable<Extract<ResponseSpec, { content?: unknown }>["content"]>[string]["schema"]
 >;
 
 const ORGANIZATION_SUMMARY_SCHEMA: SchemaSpec = {

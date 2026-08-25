@@ -42,10 +42,7 @@ class MemoryLicenseRepository extends LicenseRepository {
     return this.organizations.has(organizationId);
   }
 
-  async storeLicense(
-    organizationId: string,
-    license: StoredLicense,
-  ): Promise<void> {
+  async storeLicense(organizationId: string, license: StoredLicense): Promise<void> {
     this.stored.set(organizationId, license);
   }
 
@@ -96,8 +93,7 @@ class MemoryLicenseRetention extends LicenseRetentionPort {
 }
 
 class RecordingLicenseLogger extends LicenseLoggerPort {
-  readonly errors: Array<{ fields: Record<string, unknown>; message: string }> =
-    [];
+  readonly errors: Array<{ fields: Record<string, unknown>; message: string }> = [];
 
   error(fields: Record<string, unknown>, message: string): void {
     this.errors.push({ fields, message });
@@ -130,9 +126,7 @@ describe("LicenseService", () => {
   });
 
   it("uses the open-source baseline when no license is stored", async () => {
-    await expect(service.getActivePlan(ORGANIZATION_ID)).resolves.toBe(
-      UNLIMITED_PLAN,
-    );
+    await expect(service.getActivePlan(ORGANIZATION_ID)).resolves.toBe(UNLIMITED_PLAN);
   });
 
   it("lets a valid instance license satisfy platform access without listing organizations", async () => {
@@ -225,12 +219,12 @@ describe("LicenseService", () => {
       validatedAt: new Date(0),
     });
 
-    await expect(service.getActivePlan(ORGANIZATION_ID)).resolves.toBe(
-      UNLIMITED_PLAN,
-    );
-    await expect(
-      service.getSelfHostedPlan(ORGANIZATION_ID),
-    ).resolves.toMatchObject({ type: "PRO", maxMembers: 5, free: false });
+    await expect(service.getActivePlan(ORGANIZATION_ID)).resolves.toBe(UNLIMITED_PLAN);
+    await expect(service.getSelfHostedPlan(ORGANIZATION_ID)).resolves.toMatchObject({
+      type: "PRO",
+      maxMembers: 5,
+      free: false,
+    });
   });
 
   it("reports usage and distinguishes a genuine lapse from a forged one", async () => {
@@ -240,9 +234,7 @@ describe("LicenseService", () => {
       validatedAt: new Date(0),
     });
 
-    await expect(
-      service.getLicenseStatus(ORGANIZATION_ID),
-    ).resolves.toMatchObject({
+    await expect(service.getLicenseStatus(ORGANIZATION_ID)).resolves.toMatchObject({
       hasLicense: true,
       valid: false,
       expired: true,

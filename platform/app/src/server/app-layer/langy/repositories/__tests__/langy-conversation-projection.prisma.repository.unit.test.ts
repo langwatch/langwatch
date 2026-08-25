@@ -82,14 +82,8 @@ describe("PrismaLangyConversationProjectionRepository", () => {
       });
     });
 
-    const projectOne = await repository.load(
-      conversationId,
-      context("project-1"),
-    );
-    const projectTwo = await repository.load(
-      conversationId,
-      context("project-2"),
-    );
+    const projectOne = await repository.load(conversationId, context("project-1"));
+    const projectTwo = await repository.load(conversationId, context("project-2"));
 
     expect(projectOne?.state.UserId).toBe("owner-of-project-1");
     expect(projectTwo?.state.UserId).toBe("owner-of-project-2");
@@ -116,10 +110,7 @@ describe("PrismaLangyConversationProjectionRepository", () => {
   it("round-trips entity timestamps and the acceptedAt/eventId cursor", async () => {
     const storedRow = row();
     const { repository, upsert } = setup(async () => storedRow);
-    const projection = await repository.load(
-      conversationId,
-      context("project-1"),
-    );
+    const projection = await repository.load(conversationId, context("project-1"));
 
     expect(projection).toEqual({
       state: expect.objectContaining({
@@ -171,10 +162,7 @@ describe("PrismaLangyConversationProjectionRepository", () => {
       apply,
       store: repository,
     };
-    const event = (
-      id: string,
-      acceptedAt: number,
-    ): Event<Record<string, never>> => ({
+    const event = (id: string, acceptedAt: number): Event<Record<string, never>> => ({
       id,
       aggregateId: conversationId,
       aggregateType: "langy_conversation",

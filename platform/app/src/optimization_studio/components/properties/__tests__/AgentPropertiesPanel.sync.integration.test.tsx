@@ -15,8 +15,8 @@ import type { Node } from "@xyflow/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { mockAgentQuery, mockMutate, mockSetData, mockSetNode, footerHolder } =
-  vi.hoisted(() => ({
+const { mockAgentQuery, mockMutate, mockSetData, mockSetNode, footerHolder } = vi.hoisted(
+  () => ({
     mockAgentQuery: {
       current: { data: undefined as unknown, isLoading: false },
     },
@@ -24,7 +24,8 @@ const { mockAgentQuery, mockMutate, mockSetData, mockSetNode, footerHolder } =
     mockSetData: vi.fn(),
     mockSetNode: vi.fn(),
     footerHolder: { content: null as ReactNode },
-  }));
+  }),
+);
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -181,9 +182,7 @@ function nodeWithLastPatch(node: Node<AgentComponent>): Node<AgentComponent> {
 
 function renderFooter() {
   return render(
-    <ChakraProvider value={defaultSystem}>
-      {footerHolder.content}
-    </ChakraProvider>,
+    <ChakraProvider value={defaultSystem}>{footerHolder.content}</ChakraProvider>,
   );
 }
 
@@ -218,8 +217,7 @@ describe("given a code agent node in a workflow", () => {
         config: { parameters: Array<{ identifier: string; value: unknown }> };
       };
       expect(
-        mutateInput.config.parameters.find((p) => p.identifier === "code")
-          ?.value,
+        mutateInput.config.parameters.find((p) => p.identifier === "code")?.value,
       ).toBe("print('v2 edited')");
 
       // The node snapshot got the edited code and the draft cleared.
@@ -227,8 +225,7 @@ describe("given a code agent node in a workflow", () => {
         data: AgentComponent;
       };
       expect(
-        setNodePatch.data.parameters?.find((p) => p.identifier === "code")
-          ?.value,
+        setNodePatch.data.parameters?.find((p) => p.identifier === "code")?.value,
       ).toBe("print('v2 edited')");
       expect(setNodePatch.data.localConfig).toBeUndefined();
 
@@ -238,9 +235,7 @@ describe("given a code agent node in a workflow", () => {
       // After the store applies the patch, the editor still shows the
       // edited code: nothing reverts.
       rerenderPanel(nodeWithLastPatch(node));
-      expect(screen.getByTestId("code-textarea")).toHaveValue(
-        "print('v2 edited')",
-      );
+      expect(screen.getByTestId("code-textarea")).toHaveValue("print('v2 edited')");
     });
 
     /** @scenario Saving syncs the node's inputs and outputs into the agent record */
@@ -296,9 +291,7 @@ describe("given a code agent node in a workflow", () => {
         }),
       );
 
-      expect(screen.getByTestId("code-textarea")).toHaveValue(
-        "print('my draft')",
-      );
+      expect(screen.getByTestId("code-textarea")).toHaveValue("print('my draft')");
       const footer = renderFooter();
       expect(footer.getByTestId("agent-discard-button")).toBeInTheDocument();
     });
@@ -328,8 +321,7 @@ describe("given a code agent node in a workflow", () => {
         data: AgentComponent;
       };
       expect(
-        setNodePatch.data.parameters?.find((p) => p.identifier === "code")
-          ?.value,
+        setNodePatch.data.parameters?.find((p) => p.identifier === "code")?.value,
       ).toBe("print('v2 from elsewhere')");
     });
 
@@ -350,9 +342,7 @@ describe("given a code agent node in a workflow", () => {
       };
       rerenderPanel(node);
 
-      expect(screen.getByTestId("code-textarea")).toHaveValue(
-        "print('my draft')",
-      );
+      expect(screen.getByTestId("code-textarea")).toHaveValue("print('my draft')");
       expect(mockSetNode).not.toHaveBeenCalled();
     });
   });
@@ -379,8 +369,7 @@ describe("given a code agent node in a workflow", () => {
       };
       expect(setNodePatch.data.localConfig).toBeUndefined();
       expect(
-        setNodePatch.data.parameters?.find((p) => p.identifier === "code")
-          ?.value,
+        setNodePatch.data.parameters?.find((p) => p.identifier === "code")?.value,
       ).toBe("print('saved')");
     });
   });

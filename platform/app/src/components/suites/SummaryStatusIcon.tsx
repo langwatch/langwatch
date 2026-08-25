@@ -18,11 +18,7 @@ export function SummaryStatusIcon({ summary }: { summary: RunGroupSummary }) {
     <Icon
       size={14}
       color={`var(--chakra-colors-${config.colorPalette}-500)`}
-      style={
-        iconConfig.animate
-          ? { animation: "spin 2s linear infinite" }
-          : undefined
-      }
+      style={iconConfig.animate ? { animation: "spin 2s linear infinite" } : undefined}
     />
   );
 }

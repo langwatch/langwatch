@@ -20,9 +20,7 @@ export const personalUsageQueryInputSchema = z
     ingestionTenantId: z.string().min(1).optional(),
   })
   .strict();
-export type PersonalUsageQueryInput = z.infer<
-  typeof personalUsageQueryInputSchema
->;
+export type PersonalUsageQueryInput = z.infer<typeof personalUsageQueryInputSchema>;
 
 export const personalUsageSummarySchema = z
   .object({
@@ -60,18 +58,12 @@ export const personalUsageBreakdownSchema = z
     requests: z.number().int().nonnegative(),
   })
   .strict();
-export type PersonalUsageBreakdown = z.infer<
-  typeof personalUsageBreakdownSchema
->;
+export type PersonalUsageBreakdown = z.infer<typeof personalUsageBreakdownSchema>;
 
 export abstract class GovernancePersonalUsageService {
-  abstract summary(
-    input: PersonalUsageQueryInput,
-  ): Promise<PersonalUsageSummary>;
+  abstract summary(input: PersonalUsageQueryInput): Promise<PersonalUsageSummary>;
 
-  abstract dailyBuckets(
-    input: PersonalUsageQueryInput,
-  ): Promise<PersonalUsageBucket[]>;
+  abstract dailyBuckets(input: PersonalUsageQueryInput): Promise<PersonalUsageBucket[]>;
 
   abstract breakdownByModel(
     input: PersonalUsageQueryInput,

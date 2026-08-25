@@ -12,12 +12,8 @@ const pipelineLogger = createLogger("langwatch:event-sourcing:pipeline");
 
 export class EventSourcingPipeline<
   EventType extends Event = Event,
-  ProjectionTypes extends Record<string, Projection> = Record<
-    string,
-    Projection
-  >,
-> implements RegisteredPipeline<EventType, ProjectionTypes>
-{
+  ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
+> implements RegisteredPipeline<EventType, ProjectionTypes> {
   public readonly name: string;
   public readonly aggregateType: AggregateType;
   public readonly service: EventSourcingService<EventType, ProjectionTypes>;

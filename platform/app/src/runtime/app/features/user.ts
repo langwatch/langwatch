@@ -42,9 +42,7 @@ class AppUserSessionRevocationPort extends UserSessionRevocationPort {
 }
 
 class AppUserCliTokenRevocationPort extends UserCliTokenRevocationPort {
-  private constructor(
-    private readonly service: GovernanceCliTokenRevocationService,
-  ) {
+  private constructor(private readonly service: GovernanceCliTokenRevocationService) {
     super();
   }
 
@@ -91,13 +89,8 @@ export class AppUserRuntime {
   }): UserService {
     return PostgresUserAdapter.create({
       database: options.database,
-      sessions: AppUserSessionRevocationPort.create(
-        options.database,
-        options.redis,
-      ),
-      cliTokens: AppUserCliTokenRevocationPort.create(
-        options.cliTokenRevocation,
-      ),
+      sessions: AppUserSessionRevocationPort.create(options.database, options.redis),
+      cliTokens: AppUserCliTokenRevocationPort.create(options.cliTokenRevocation),
       organizations: options.organizations,
       avatarStorage: new AppUserAvatarStoragePort(),
     }).build();

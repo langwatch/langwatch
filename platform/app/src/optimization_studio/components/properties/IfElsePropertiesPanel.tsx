@@ -15,13 +15,9 @@ import {
   buildInputMappings,
 } from "../../utils/edgeMappingUtils";
 import { LiquidConditionEditor } from "../code/LiquidConditionEditor";
-import {
-  BasePropertiesPanel,
-  PropertySectionTitle,
-} from "./BasePropertiesPanel";
+import { BasePropertiesPanel, PropertySectionTitle } from "./BasePropertiesPanel";
 
-const LIQUID_OPERATORS_DOCS =
-  "https://shopify.github.io/liquid/basics/operators/";
+const LIQUID_OPERATORS_DOCS = "https://shopify.github.io/liquid/basics/operators/";
 
 function pythonAnnotation(type: Field["type"]): string {
   switch (type) {
@@ -114,9 +110,7 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
     (newVariables: Variable[]) => {
       const existingInputs = node.data.inputs ?? [];
       const newInputs: Field[] = newVariables.map((variable) => {
-        const existing = existingInputs.find(
-          (i) => i.identifier === variable.identifier,
-        );
+        const existing = existingInputs.find((i) => i.identifier === variable.identifier);
         return {
           identifier: variable.identifier,
           type: variable.type as Field["type"],
@@ -182,13 +176,7 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
   );
 
   return (
-    <BasePropertiesPanel
-      node={node}
-      hideParameters
-      hideInputs
-      hideOutputs
-      paddingX={4}
-    >
+    <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs paddingX={4}>
       <VStack width="full" align="start" gap={2}>
         <HStack width="full">
           <PropertySectionTitle>Condition</PropertySectionTitle>
@@ -215,8 +203,8 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
               viewStateKey={`if-else-condition:${node.id}`}
             />
             <Text fontSize="12px" color="fg.muted">
-              Python over the inputs, must return True or False. The not-taken
-              branch is skipped.
+              Python over the inputs, must return True or False. The not-taken branch is
+              skipped.
             </Text>
           </>
         ) : (
@@ -225,9 +213,7 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
               value={condition}
               onChange={handleConditionChange}
               placeholder={'e.g. context != ""'}
-              availableVariables={(node.data.inputs ?? []).map(
-                (i) => i.identifier,
-              )}
+              availableVariables={(node.data.inputs ?? []).map((i) => i.identifier)}
             />
             <Text fontSize="12px" color="fg.muted">
               <Link

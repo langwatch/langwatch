@@ -85,15 +85,9 @@ describe("mapClickHouseRunToExperimentRun", () => {
       record: baseClickHouseRun,
     });
 
-    expect(result.timestamps.createdAt).toBe(
-      Date.parse("2024-01-15T10:30:00.000Z"),
-    );
-    expect(result.timestamps.updatedAt).toBe(
-      Date.parse("2024-01-15T10:35:00.000Z"),
-    );
-    expect(result.timestamps.finishedAt).toBe(
-      Date.parse("2024-01-15T10:40:00.000Z"),
-    );
+    expect(result.timestamps.createdAt).toBe(Date.parse("2024-01-15T10:30:00.000Z"));
+    expect(result.timestamps.updatedAt).toBe(Date.parse("2024-01-15T10:35:00.000Z"));
+    expect(result.timestamps.finishedAt).toBe(Date.parse("2024-01-15T10:40:00.000Z"));
   });
 
   it("sets finishedAt and stoppedAt to null when absent", () => {

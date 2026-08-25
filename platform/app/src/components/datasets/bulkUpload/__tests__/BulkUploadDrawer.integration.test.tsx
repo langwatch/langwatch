@@ -70,8 +70,7 @@ const twoCols: DatasetConfirmColumns = [
   { name: "b", type: "string", sourceHeader: "b" },
 ];
 
-const csv = (name: string) =>
-  new File(["a,b\n1,2\n"], name, { type: "text/csv" });
+const csv = (name: string) => new File(["a,b\n1,2\n"], name, { type: "text/csv" });
 
 const render_ = (onUploaded = vi.fn()) =>
   render(
@@ -80,8 +79,7 @@ const render_ = (onUploaded = vi.fn()) =>
     </ChakraProvider>,
   );
 
-const fileInput = () =>
-  document.querySelector('input[type="file"]') as HTMLInputElement;
+const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
 
 const uploadButton = () => screen.getByRole("button", { name: /upload all/i });
 
@@ -105,11 +103,7 @@ describe("given the bulk upload drawer", () => {
     it("lists one row per file with its name and size, and enables upload", async () => {
       const user = userEvent.setup();
       render_();
-      await user.upload(fileInput(), [
-        csv("one.csv"),
-        csv("two.csv"),
-        csv("three.csv"),
-      ]);
+      await user.upload(fileInput(), [csv("one.csv"), csv("two.csv"), csv("three.csv")]);
 
       await waitFor(() => {
         expect(screen.getByText("one")).toBeInTheDocument();
@@ -146,9 +140,7 @@ describe("given the bulk upload drawer", () => {
       await user.upload(fileInput(), [csv("dup.csv")]);
 
       // Two rows: "dup" and the deduped "dup (1)".
-      await waitFor(() =>
-        expect(screen.getByText("dup (1)")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText("dup (1)")).toBeInTheDocument());
       expect(screen.getByText("dup")).toBeInTheDocument();
     });
   });
@@ -164,9 +156,7 @@ describe("given the bulk upload drawer", () => {
       // Two rows → two remove buttons in order; the second is the "drop" row.
       await user.click(screen.getAllByLabelText(/remove file/i)[1]!);
 
-      await waitFor(() =>
-        expect(screen.queryByText("drop")).not.toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.queryByText("drop")).not.toBeInTheDocument());
       expect(screen.getByText("keep")).toBeInTheDocument();
     });
   });
@@ -180,9 +170,7 @@ describe("given the bulk upload drawer", () => {
       await waitFor(() => expect(screen.getByText("only")).toBeInTheDocument());
 
       await user.click(screen.getByLabelText(/remove file/i));
-      await waitFor(() =>
-        expect(screen.queryByText("only")).not.toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.queryByText("only")).not.toBeInTheDocument());
       expect(uploadButton()).toBeDisabled();
     });
   });
@@ -195,9 +183,7 @@ describe("given the bulk upload drawer", () => {
       render_();
       await user.upload(fileInput(), [csv("data.csv")]);
       await waitFor(() =>
-        expect(
-          screen.getByText(/2 columns — confirm types/i),
-        ).toBeInTheDocument(),
+        expect(screen.getByText(/2 columns — confirm types/i)).toBeInTheDocument(),
       );
 
       // Collapsed: the column inputs are not rendered until expanded.
@@ -207,13 +193,9 @@ describe("given the bulk upload drawer", () => {
       const nameInput = await screen.findByLabelText("Column 1 name");
       expect(nameInput).toHaveValue("a");
       // The type picker is the styled Select (icon + label), defaulting to text.
-      expect(screen.getByLabelText("Column 1 type")).toHaveTextContent(
-        /string/i,
-      );
+      expect(screen.getByLabelText("Column 1 type")).toHaveTextContent(/string/i);
       // Editing happens in place — no separate dialog/drawer with a Save button.
-      expect(
-        screen.queryByRole("button", { name: /^save$/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^save$/i })).not.toBeInTheDocument();
     });
   });
 
@@ -229,9 +211,7 @@ describe("given the bulk upload drawer", () => {
       await user.clear(nameField);
       await user.type(nameField, "renamed{Enter}");
 
-      await waitFor(() =>
-        expect(screen.getByText("renamed")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText("renamed")).toBeInTheDocument());
 
       await user.click(uploadButton());
       await waitFor(() => expect(requestDirectUpload).toHaveBeenCalled());
@@ -260,9 +240,7 @@ describe("given the bulk upload drawer", () => {
       const user = userEvent.setup();
       render_();
       await user.upload(fileInput(), [csv("data.csv")]);
-      await waitFor(() =>
-        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText(/confirm types/i)).toBeInTheDocument());
       await user.click(screen.getByText(/confirm types/i));
       // Open the styled type Select and pick "Number" from the option list.
       await user.click(await screen.findByLabelText("Column 1 type"));
@@ -283,16 +261,12 @@ describe("given the bulk upload drawer", () => {
       const user = userEvent.setup();
       render_();
       await user.upload(fileInput(), [csv("data.csv")]);
-      await waitFor(() =>
-        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText(/confirm types/i)).toBeInTheDocument());
       await user.click(screen.getByText(/confirm types/i));
 
       // One grip per column, labelled for keyboard/AT users — the drag affordance
       // is wired without swallowing the name input / type select.
-      expect(
-        await screen.findByLabelText("Drag to reorder a"),
-      ).toBeInTheDocument();
+      expect(await screen.findByLabelText("Drag to reorder a")).toBeInTheDocument();
       expect(screen.getByLabelText("Drag to reorder b")).toBeInTheDocument();
     });
 
@@ -301,9 +275,7 @@ describe("given the bulk upload drawer", () => {
       const user = userEvent.setup();
       render_();
       await user.upload(fileInput(), [csv("data.csv")]);
-      await waitFor(() =>
-        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText(/confirm types/i)).toBeInTheDocument());
       await user.click(screen.getByText(/confirm types/i));
 
       // Each column has an exclude control; dropping "a" leaves only "b".
@@ -322,9 +294,7 @@ describe("given the bulk upload drawer", () => {
       const user = userEvent.setup();
       render_();
       await user.upload(fileInput(), [csv("data.csv")]);
-      await waitFor(() =>
-        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText(/confirm types/i)).toBeInTheDocument());
       await user.click(screen.getByText(/confirm types/i));
 
       // Drop one of the two columns; the survivor's exclude control is disabled
@@ -337,9 +307,7 @@ describe("given the bulk upload drawer", () => {
       const user = userEvent.setup();
       render_();
       await user.upload(fileInput(), [csv("data.csv")]);
-      await waitFor(() =>
-        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText(/confirm types/i)).toBeInTheDocument());
       await user.click(screen.getByText(/confirm types/i));
 
       // Rename the second column onto the first's name — normalize would collide
@@ -349,9 +317,9 @@ describe("given the bulk upload drawer", () => {
       await user.type(second, "a");
 
       await waitFor(() => expect(uploadButton()).toBeDisabled());
-      expect(
-        screen.getAllByText(/column names must be unique/i).length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByText(/column names must be unique/i).length).toBeGreaterThan(
+        0,
+      );
 
       // Resolve the collision → the gate clears.
       await user.clear(second);
@@ -366,9 +334,7 @@ describe("given the bulk upload drawer", () => {
       await user.upload(fileInput(), [csv("data.csv")]);
       await waitFor(() => expect(screen.getByText("data")).toBeInTheDocument());
       await user.upload(fileInput(), [csv("data.csv")]);
-      await waitFor(() =>
-        expect(screen.getByText("data (1)")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText("data (1)")).toBeInTheDocument());
 
       await user.click(uploadButton());
       await waitFor(() => expect(requestDirectUpload).toHaveBeenCalledTimes(2));
@@ -394,12 +360,8 @@ describe("given the bulk upload drawer", () => {
 
       await user.click(uploadButton());
 
-      await waitFor(() =>
-        expect(screen.getByText(/boom/i)).toBeInTheDocument(),
-      );
-      expect(
-        screen.getByRole("button", { name: /retry/i }),
-      ).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByText(/boom/i)).toBeInTheDocument());
+      expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     });
 
     /** @scenario Retrying a failed file re-runs only that file and creates no duplicate */
@@ -421,15 +383,11 @@ describe("given the bulk upload drawer", () => {
       await user.upload(fileInput(), [csv("ok.csv"), csv("bad.csv")]);
       await waitFor(() => expect(screen.getByText("ok")).toBeInTheDocument());
       await user.click(uploadButton());
-      await waitFor(() =>
-        expect(screen.getByText(/boom/i)).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText(/boom/i)).toBeInTheDocument());
 
       const before = requestDirectUpload.mock.calls.length;
       await user.click(screen.getByRole("button", { name: /retry/i }));
-      await waitFor(() =>
-        expect(requestDirectUpload.mock.calls.length).toBe(before + 1),
-      );
+      await waitFor(() => expect(requestDirectUpload.mock.calls.length).toBe(before + 1));
       // Only one more create — no duplicate for the already-succeeded file.
     });
   });
@@ -450,9 +408,7 @@ describe("given the bulk upload drawer", () => {
       await waitFor(() => expect(screen.getByText("a")).toBeInTheDocument());
       await user.click(uploadButton());
 
-      await waitFor(() =>
-        expect(screen.getByText(/limit reached/i)).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText(/limit reached/i)).toBeInTheDocument());
     });
   });
 

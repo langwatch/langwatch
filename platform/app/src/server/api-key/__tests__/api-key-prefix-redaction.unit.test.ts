@@ -41,9 +41,7 @@ describe("the redaction rules, given the API key prefixes the app mints", () => 
   describe("given only the prefix and a short body", () => {
     // A truncated key in a stack trace or a log line is still key material.
     it.each(prefixes)("redacts a short %s", (_label, prefix) => {
-      expect(
-        redactSecretsInText({ text: `${prefix}123af` }).redactedCount,
-      ).toBe(1);
+      expect(redactSecretsInText({ text: `${prefix}123af` }).redactedCount).toBe(1);
     });
   });
 });

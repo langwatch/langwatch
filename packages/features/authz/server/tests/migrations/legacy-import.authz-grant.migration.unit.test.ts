@@ -35,12 +35,7 @@ const NOW = 1_800_000_000_000;
 const CREATED = 1_700_000_000_000;
 
 type Sent = {
-  kind:
-    | "attachGrant"
-    | "defineRole"
-    | "changeGrantRole"
-    | "revokeGrant"
-    | "deleteRole";
+  kind: "attachGrant" | "defineRole" | "changeGrantRole" | "revokeGrant" | "deleteRole";
   commandId: string;
   payload: Record<string, unknown>;
 };
@@ -71,9 +66,7 @@ function harness(data: Data = {}) {
   const reads = { grantHeads: 0, roleHeads: 0, resourceRows: 0 };
   const store: AuthzMigrationRepository = {
     tryFindOrganizationCreatedAtMs: async () =>
-      data.organizationCreatedAtMs === undefined
-        ? CREATED
-        : data.organizationCreatedAtMs,
+      data.organizationCreatedAtMs === undefined ? CREATED : data.organizationCreatedAtMs,
     findLegacyRoleRows: async () => data.roles ?? [],
     findLegacyBindingRows: async () => data.bindings ?? [],
     findOrganizationMembers: async () => data.members ?? [],
@@ -152,9 +145,7 @@ function binding(overrides: Partial<LegacyBindingRow> = {}): LegacyBindingRow {
   };
 }
 
-function shareLink(
-  overrides: Partial<ShareLinkFactRow> = {},
-): ShareLinkFactRow {
+function shareLink(overrides: Partial<ShareLinkFactRow> = {}): ShareLinkFactRow {
   return {
     id: "share_1",
     token: "token_1",
@@ -252,9 +243,9 @@ describe("given an organization with legacy access rows", () => {
       const facts = attachedFacts(sent);
       const roleKeys = facts.map((fact) => fact.roleKey);
       // The member floor, once, as the organization's own principal.
-      expect(
-        facts.filter((fact) => fact.principal.type === "organization"),
-      ).toHaveLength(1);
+      expect(facts.filter((fact) => fact.principal.type === "organization")).toHaveLength(
+        1,
+      );
       // The unbound ADMIN's fallback fact, under its dormant key.
       expect(roleKeys).toContain("legacy-admin");
       // The EXTERNAL membership's cap.
@@ -262,8 +253,7 @@ describe("given an organization with legacy access rows", () => {
       // The team membership, at TEAM scope.
       expect(
         facts.some(
-          (fact) =>
-            fact.scope.type === "TEAM" && fact.principal.id === "user_member",
+          (fact) => fact.scope.type === "TEAM" && fact.principal.id === "user_member",
         ),
       ).toBe(true);
       // The binding, adopting its row id.
@@ -290,9 +280,7 @@ describe("given an organization with legacy access rows", () => {
         ),
       ).toBe(true);
       // Every fact carries the migration's source.
-      expect(new Set(facts.map((fact) => fact.source))).toEqual(
-        new Set(["migration"]),
-      );
+      expect(new Set(facts.map((fact) => fact.source))).toEqual(new Set(["migration"]));
     });
 
     /** @scenario "Team membership is stated directly, not promoted first" */
@@ -311,9 +299,7 @@ describe("given an organization with legacy access rows", () => {
 
       await migration.migrateTenant({ tenantId: ORG_ID });
 
-      const teamFacts = attachedFacts(sent).filter(
-        (fact) => fact.scope.type === "TEAM",
-      );
+      const teamFacts = attachedFacts(sent).filter((fact) => fact.scope.type === "TEAM");
       expect(teamFacts).toHaveLength(1);
       expect(teamFacts[0]?.roleKey).toBe("admin");
       // Derived identity, not a minted binding row: the id is a grant KSUID.
@@ -344,9 +330,7 @@ describe("given an organization with legacy access rows", () => {
 
       await migration.migrateTenant({ tenantId: ORG_ID });
 
-      const teamFacts = attachedFacts(sent).filter(
-        (fact) => fact.scope.type === "TEAM",
-      );
+      const teamFacts = attachedFacts(sent).filter((fact) => fact.scope.type === "TEAM");
       expect(teamFacts.map((fact) => fact.grantId)).toEqual(["binding_team"]);
     });
 
@@ -533,9 +517,9 @@ describe("given an organization with legacy access rows", () => {
         }),
       });
 
-      await expect(
-        migration.migrateTenant({ tenantId: ORG_ID }),
-      ).rejects.toThrow("queue hiccup");
+      await expect(migration.migrateTenant({ tenantId: ORG_ID })).rejects.toThrow(
+        "queue hiccup",
+      );
 
       const retry = await migration.migrateTenant({ tenantId: ORG_ID });
       expect(retry.status).toBe("migrated");
@@ -543,9 +527,7 @@ describe("given an organization with legacy access rows", () => {
       // the event store dedupes rather than duplicating.
       expect(attempted).toHaveLength(2);
       expect(attempted[1]).toBe(attempted[0]);
-      expect(sent.filter((entry) => entry.kind === "attachGrant")).toHaveLength(
-        1,
-      );
+      expect(sent.filter((entry) => entry.kind === "attachGrant")).toHaveLength(1);
     });
 
     /** @scenario "Re-running the migration states the same facts" */
@@ -593,9 +575,7 @@ describe("given an organization with legacy access rows", () => {
 
       // The first chunk of 100 was already in flight; the second never
       // started — the abort boundary is the chunk.
-      expect(sent.filter((entry) => entry.kind === "attachGrant")).toHaveLength(
-        100,
-      );
+      expect(sent.filter((entry) => entry.kind === "attachGrant")).toHaveLength(100);
     });
 
     /** @scenario "A row deleted on the legacy side is revoked, not left behind" */
@@ -619,8 +599,7 @@ describe("given an organization with legacy access rows", () => {
       expect(
         sent.filter(
           (entry) =>
-            entry.kind === "revokeGrant" &&
-            entry.payload.grantId === "grant_orphan",
+            entry.kind === "revokeGrant" && entry.payload.grantId === "grant_orphan",
         ),
       ).toHaveLength(1);
     });
@@ -646,9 +625,7 @@ describe("given an organization with legacy access rows", () => {
 
       await migration.migrateTenant({ tenantId: ORG_ID });
 
-      expect(sent.filter((entry) => entry.kind === "revokeGrant")).toHaveLength(
-        0,
-      );
+      expect(sent.filter((entry) => entry.kind === "revokeGrant")).toHaveLength(0);
     });
   });
 
@@ -663,9 +640,7 @@ describe("given an organization with legacy access rows", () => {
 
       // Legacy keeps counting while the organization is held; re-seeding
       // every pass is what lets the proof heal.
-      const seed = [
-        { grantId: "share_1", projectId: "project_1", viewCount: 3 },
-      ];
+      const seed = [{ grantId: "share_1", projectId: "project_1", viewCount: 3 }];
       expect(seeded).toEqual([seed, seed]);
     });
 
@@ -770,8 +745,7 @@ describe("given an organization with legacy access rows", () => {
       expect(
         sent.filter(
           (entry) =>
-            entry.kind === "revokeGrant" &&
-            entry.payload.grantId === "share_orphan",
+            entry.kind === "revokeGrant" && entry.payload.grantId === "share_orphan",
         ),
       ).toHaveLength(1);
     });
@@ -965,9 +939,7 @@ describe("given an organization with legacy access rows", () => {
 
       const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
 
-      expect(sent.filter((entry) => entry.kind === "attachGrant")).toHaveLength(
-        0,
-      );
+      expect(sent.filter((entry) => entry.kind === "attachGrant")).toHaveLength(0);
       // Nothing stated means nothing outstanding: the row holds nothing up.
       expect(outcome.status).toBe("finalized");
     });
@@ -1063,9 +1035,7 @@ describe("given an organization with legacy access rows", () => {
 
       await migration.migrateTenant({ tenantId: ORG_ID });
 
-      const teamFacts = attachedFacts(sent).filter(
-        (fact) => fact.scope.type === "TEAM",
-      );
+      const teamFacts = attachedFacts(sent).filter((fact) => fact.scope.type === "TEAM");
       expect(teamFacts.map((fact) => fact.grantId)).toEqual(["binding_team"]);
     });
 

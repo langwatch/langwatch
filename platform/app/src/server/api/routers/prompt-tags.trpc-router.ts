@@ -39,9 +39,7 @@ export const promptTagsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("prompts:view")
     .query(async ({ ctx, input }) => {
-      const organizationId = await ctx.app.projects.getOrganizationId(
-        input.projectId,
-      );
+      const organizationId = await ctx.app.projects.getOrganizationId(input.projectId);
 
       return ctx.app.prompts.listTags({ organizationId });
     }),
@@ -53,9 +51,7 @@ export const promptTagsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), name: z.string() }))
     .permission("prompts:manage")
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await ctx.app.projects.getOrganizationId(
-        input.projectId,
-      );
+      const organizationId = await ctx.app.projects.getOrganizationId(input.projectId);
 
       try {
         return await ctx.app.prompts.createTag({
@@ -81,9 +77,7 @@ export const promptTagsRouter = createTRPCRouter({
     )
     .permission("prompts:manage")
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await ctx.app.projects.getOrganizationId(
-        input.projectId,
-      );
+      const organizationId = await ctx.app.projects.getOrganizationId(input.projectId);
 
       try {
         return await ctx.app.prompts.renameTag({
@@ -103,9 +97,7 @@ export const promptTagsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), name: z.string() }))
     .permission("prompts:manage")
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await ctx.app.projects.getOrganizationId(
-        input.projectId,
-      );
+      const organizationId = await ctx.app.projects.getOrganizationId(input.projectId);
 
       try {
         const tag = await ctx.app.prompts.tryDeleteTagByName({

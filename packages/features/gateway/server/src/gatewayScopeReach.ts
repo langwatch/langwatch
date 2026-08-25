@@ -122,9 +122,7 @@ async function loadGroupIdsByPrincipal(
 ): Promise<Map<string, string[]>> {
   const byPrincipal = new Map<string, string[]>();
   const distinct = Array.from(
-    new Set(
-      principalUserIds.filter((id): id is string => typeof id === "string"),
-    ),
+    new Set(principalUserIds.filter((id): id is string => typeof id === "string")),
   );
   if (distinct.length === 0) return byPrincipal;
 
@@ -144,13 +142,7 @@ async function loadGroupIdsByPrincipal(
 type ScopeRef = Pick<GatewayBudget, "scopeType" | "scopeId">;
 
 /** The same predicate applicableForRequest uses, evaluated in memory. */
-function budgetMatchesKey({
-  budget,
-  key,
-}: {
-  budget: ScopeRef;
-  key: KeyReach;
-}): boolean {
+function budgetMatchesKey({ budget, key }: { budget: ScopeRef; key: KeyReach }): boolean {
   switch (budget.scopeType) {
     case "ORGANIZATION":
       return budget.scopeId === key.organizationId;
@@ -166,9 +158,7 @@ function budgetMatchesKey({
       // The template anchors on a virtual key or a project and applies to
       // every request on that anchor, whoever the end user turns out to be,
       // so a key reaches it by being the anchor or by tracing into it.
-      return (
-        budget.scopeId === key.virtualKeyId || budget.scopeId === key.projectId
-      );
+      return budget.scopeId === key.virtualKeyId || budget.scopeId === key.projectId;
     case "GROUP":
       // Group budgets enforce per member, so only a key that carries a
       // principal reaches one, and only through that principal's groups.
@@ -247,9 +237,7 @@ export async function resolveScopeReach({
 function tracedProjectIds(keys: KeyReach[]): string[] {
   return Array.from(
     new Set(
-      keys
-        .map((k) => k.projectId)
-        .filter((id): id is string => typeof id === "string"),
+      keys.map((k) => k.projectId).filter((id): id is string => typeof id === "string"),
     ),
   );
 }

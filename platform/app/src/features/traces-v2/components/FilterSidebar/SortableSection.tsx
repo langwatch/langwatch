@@ -14,9 +14,7 @@ interface SortableSectionProps {
    * instead of cloneElement so the SectionRenderer's typing stays
    * intact.
    */
-  children: (
-    dragHandleProps: React.HTMLAttributes<HTMLDivElement>,
-  ) => React.ReactNode;
+  children: (dragHandleProps: React.HTMLAttributes<HTMLDivElement>) => React.ReactNode;
   /**
    * True while any item in the list is being dragged. Used to make the
    * dragged source row invisible (opacity:0) so the DragOverlay ghost is
@@ -39,14 +37,8 @@ export const SortableSection: React.FC<SortableSectionProps> = ({
   children,
   isAnyDragging = false,
 }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id });
 
   // Stabilise the drag-handle props reference: @dnd-kit returns fresh
   // `attributes`/`listeners` objects on every render. Memoising by

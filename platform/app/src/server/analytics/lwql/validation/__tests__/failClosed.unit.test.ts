@@ -14,11 +14,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  clickHouseSqlParser,
-  type LangWatchQLParser,
-  type SqlAstNode,
-} from "../parser";
+import { clickHouseSqlParser, type LangWatchQLParser, type SqlAstNode } from "../parser";
 import { type LangWatchQLValidation, validateLangWatchQL } from "../validate";
 import type { LangWatchQLViolationCode } from "../violations";
 
@@ -71,9 +67,7 @@ describe("the default-deny walk", () => {
     });
 
     it("accepts it through the shipped parser too, not only the injected one", () => {
-      expect(
-        codesOf(validateLangWatchQL({ sql: BASE_SQL, ...POLICY })),
-      ).toEqual([]);
+      expect(codesOf(validateLangWatchQL({ sql: BASE_SQL, ...POLICY }))).toEqual([]);
     });
   });
 
@@ -199,9 +193,7 @@ describe("the default-deny walk", () => {
       const refusing: LangWatchQLParser = { parse: () => ({ ok: false }) };
 
       expect(
-        codesOf(
-          validateLangWatchQL({ sql: BASE_SQL, parser: refusing, ...POLICY }),
-        ),
+        codesOf(validateLangWatchQL({ sql: BASE_SQL, parser: refusing, ...POLICY })),
       ).toEqual(["PARSE_FAILED"]);
     });
   });

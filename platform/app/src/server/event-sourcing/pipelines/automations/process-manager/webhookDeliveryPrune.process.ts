@@ -4,8 +4,7 @@ import { z } from "zod";
 
 const logger = createLogger("langwatch:automation:webhook-delivery-prune");
 
-export const WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME =
-  "webhookDeliveryPrune" as const;
+export const WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME = "webhookDeliveryPrune" as const;
 /** ADR-040 §6: the delivery log is bounded at 30 days; one prune a day keeps
  *  it there. Runs in-process on the worker (scheduled process manager) — the
  *  K8s CronJob that used to curl `/api/cron/webhook_delivery_cleanup` was

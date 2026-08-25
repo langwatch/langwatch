@@ -46,7 +46,9 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
     );
   }
 
-  async getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {
+  async getResolvedForProject(input: {
+    projectId: string;
+  }): Promise<ResolvedDataPrivacy> {
     const project = await this.projects.getWithTeam(input.projectId);
     return this.cache.resolve({
       projectId: project.id,
@@ -108,21 +110,27 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
   }): Promise<string> {
     if (input.scope.scopeType === "ORGANIZATION") {
       if (input.scope.scopeId !== input.organizationId) {
-        throw new ScopeTargetNotFoundError("The policy organization does not match its scope.");
+        throw new ScopeTargetNotFoundError(
+          "The policy organization does not match its scope.",
+        );
       }
       return input.organizationId;
     }
     if (input.scope.scopeType === "TEAM") {
       const team = await this.organizations.getTeamById({ teamId: input.scope.scopeId });
       if (team.organizationId !== input.organizationId) {
-        throw new ScopeTargetNotFoundError("The policy team does not belong to its organization.");
+        throw new ScopeTargetNotFoundError(
+          "The policy team does not belong to its organization.",
+        );
       }
       return team.organizationId;
     }
     if (input.scope.scopeType === "PROJECT") {
       const project = await this.projects.getWithTeam(input.scope.scopeId);
       if (project.team.organizationId !== input.organizationId) {
-        throw new ScopeTargetNotFoundError("The policy project does not belong to its organization.");
+        throw new ScopeTargetNotFoundError(
+          "The policy project does not belong to its organization.",
+        );
       }
       return project.team.organizationId;
     }
@@ -130,7 +138,10 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
   }
 
   private validatePatterns(config: DataPrivacyConfig): void {
-    this.assertSafePatterns(config.secrets?.customPatterns ?? [], "Custom secret pattern");
+    this.assertSafePatterns(
+      config.secrets?.customPatterns ?? [],
+      "Custom secret pattern",
+    );
     for (const pattern of config.secrets?.customPatterns ?? []) {
       const ordinaryText = overBroadSecretPatternProbe(pattern);
       if (ordinaryText !== null) {
@@ -142,7 +153,13 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
     this.assertSafePatterns(config.pii?.exceptPatterns ?? [], "PII exception pattern");
     for (const pattern of config.pii?.exceptPatterns ?? []) {
       const expression = new RegExp(`^(?:${pattern})$`);
-      const probes = ["4111111111111111", "12345678901234", "someone@example.com", "Jane Doe", "+1 555 0100"];
+      const probes = [
+        "4111111111111111",
+        "12345678901234",
+        "someone@example.com",
+        "Jane Doe",
+        "+1 555 0100",
+      ];
       if (probes.filter((probe) => expression.test(probe)).length > 1) {
         throw new InvalidDataPrivacyConfigError(
           `PII exception pattern ${JSON.stringify(pattern)} is too broad.`,

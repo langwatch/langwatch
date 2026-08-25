@@ -97,10 +97,7 @@ describe("canonical OTLP metric preparation", () => {
       expect(result.rejectedDataPoints).toBe(0);
       expect(result.accepted).toHaveLength(5);
       const points = Object.fromEntries(
-        result.accepted.map(({ dataPoint }) => [
-          dataPoint.metricName,
-          dataPoint,
-        ]),
+        result.accepted.map(({ dataPoint }) => [dataPoint.metricName, dataPoint]),
       );
       expect(points.gauge).toMatchObject({
         metricKind: "gauge",
@@ -131,9 +128,7 @@ describe("canonical OTLP metric preparation", () => {
         positiveOffset: -1,
         positiveBucketCounts: ["1", "2"],
       });
-      expect(points.exponential!.canonicalPayload).toContain(
-        '"zeroThreshold":0.001',
-      );
+      expect(points.exponential!.canonicalPayload).toContain('"zeroThreshold":0.001');
       expect(points.summary).toMatchObject({
         metricKind: "summary",
         count: "5",
@@ -174,21 +169,17 @@ describe("canonical OTLP metric preparation", () => {
         },
       });
 
-      const numeric = (
-        await prepare(summaryWith([{ quantile: 0.9, value: 4.5 }]))
-      ).accepted[0]!.dataPoint;
-      const stringly = (
-        await prepare(summaryWith([{ quantile: "0.9", value: "4.5" }]))
-      ).accepted[0]!.dataPoint;
+      const numeric = (await prepare(summaryWith([{ quantile: 0.9, value: 4.5 }])))
+        .accepted[0]!.dataPoint;
+      const stringly = (await prepare(summaryWith([{ quantile: "0.9", value: "4.5" }])))
+        .accepted[0]!.dataPoint;
 
       // Same canonical content must mean the same identity AND the same stored
       // quantiles — a shared PointId with divergent rows would be a silent
       // last-writer-wins corruption.
       expect(stringly.pointId).toBe(numeric.pointId);
       expect(stringly.summaryQuantilesJson).toBe(numeric.summaryQuantilesJson);
-      expect(numeric.summaryQuantilesJson).toBe(
-        '[{"quantile":0.9,"value":4.5}]',
-      );
+      expect(numeric.summaryQuantilesJson).toBe('[{"quantile":0.9,"value":4.5}]');
     });
   });
 });

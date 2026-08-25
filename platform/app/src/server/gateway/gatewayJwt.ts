@@ -47,9 +47,7 @@ export type GatewayJwtSubject = Omit<GatewayJwtClaims, "vk_expires_at"> & {
 function getSecret(): string {
   const secret = process.env.LW_GATEWAY_JWT_SECRET ?? env.LW_GATEWAY_JWT_SECRET;
   if (!secret) {
-    throw new Error(
-      "LW_GATEWAY_JWT_SECRET is required to sign gateway-facing JWTs",
-    );
+    throw new Error("LW_GATEWAY_JWT_SECRET is required to sign gateway-facing JWTs");
   }
   return secret;
 }

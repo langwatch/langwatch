@@ -59,9 +59,7 @@ export interface AutomationDispatchPorts {
     projectId: string;
     reason: GraphTriggerEvaluationReason;
   }) => Promise<void>;
-  decideSweepCandidates: (params: {
-    now: Date;
-  }) => Promise<GraphTriggerSweepCandidate[]>;
+  decideSweepCandidates: (params: { now: Date }) => Promise<GraphTriggerSweepCandidate[]>;
   /** ADR-040 §6: deletes delivery-log rows older than 30 days; returns the
    *  row count. Driven by the daily `webhookDeliveryPrune` scheduled process
    *  manager (the K8s CronJob path was removed). */
@@ -108,11 +106,9 @@ export function buildAutomationDispatchPorts({
   // client falls back to the uncached store.
   const traceSummaryStore: FoldProjectionStore<TraceSummaryData> =
     redis && !(redis instanceof Cluster)
-      ? new RedisCachedFoldStore(
-          new TraceSummaryStore(traceSummaryRepository),
-          redis,
-          { keyPrefix: "trace_summaries" },
-        )
+      ? new RedisCachedFoldStore(new TraceSummaryStore(traceSummaryRepository), redis, {
+          keyPrefix: "trace_summaries",
+        })
       : new TraceSummaryStore(traceSummaryRepository);
 
   const traceReadDerivation = new TraceReadDerivationService(traces.spans);
@@ -145,20 +141,19 @@ export function buildAutomationDispatchPorts({
   // ADR-040 §6: one delivery-log writer shared by the digest dispatch and
   // the graph-alert path.
   const recordWebhookDelivery = (
-	input: Parameters<AutomationService["recordWebhookDelivery"]>[0],
-	) => automation.recordWebhookDelivery(input);
-	// Graph-config loads go through the process-owned automation service.
-	const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
-		loadTrigger: async ({ triggerId, projectId }) =>
-			automation.tryGetById({ triggerId, projectId }),
+    input: Parameters<AutomationService["recordWebhookDelivery"]>[0],
+  ) => automation.recordWebhookDelivery(input);
+  // Graph-config loads go through the process-owned automation service.
+  const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
+    loadTrigger: async ({ triggerId, projectId }) =>
+      automation.tryGetById({ triggerId, projectId }),
     loadCustomGraph: async ({ customGraphId, projectId }) =>
       automation.tryGetCustomGraph({ customGraphId, projectId }),
     loadProject: async (projectId) => projects.tryGetById(projectId),
-    getTimeseries: (input, options) =>
-      analytics.getTimeseries(input, options),
+    getTimeseries: (input, options) => analytics.getTimeseries(input, options),
     triggerSent: graphTriggerSentRepo,
     updateLastRunAt: async ({ triggerId, projectId }) =>
-			automation.updateLastRunAt({ triggerId, projectId }),
+      automation.updateLastRunAt({ triggerId, projectId }),
     notifier: {
       dispatch: async (input) =>
         dispatchGraphAlertAction({
@@ -255,13 +250,7 @@ export function buildAutomationDispatchPorts({
         redis,
       }),
     tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
-    consumeTenantEmailCapSlot: ({
-      projectId,
-      now,
-      cap,
-      recipientCount,
-      dedupKey,
-    }) =>
+    consumeTenantEmailCapSlot: ({ projectId, now, cap, recipientCount, dedupKey }) =>
       consumeTenantEmailCapSlot({
         projectId,
         now,
@@ -291,8 +280,7 @@ export function buildAutomationDispatchPorts({
     },
     recordWebhookDelivery,
     resolvePersistDailyCap: (projectId) => resolvePersistDailyCap(projectId),
-    consumePersistCapSlot: (params) =>
-      consumePersistCapSlot({ ...params, redis }),
+    consumePersistCapSlot: (params) => consumePersistCapSlot({ ...params, redis }),
     handlePersistCapBreach: (breach) =>
       handlePersistCapBreach(
         defaultRunawayContainmentDeps({

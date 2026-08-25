@@ -18,16 +18,12 @@ class AppGovernanceWebhookPort extends GovernanceWebhookPort {
 
   private constructor(
     private readonly dependencies: WebhookDeliveryProcessDeps,
-    private readonly send: ReturnType<
-      WebhookDeliveryService["runWebhookSendBatch"]
-    >,
+    private readonly send: ReturnType<WebhookDeliveryService["runWebhookSendBatch"]>,
   ) {
     super();
   }
 
-  static create(
-    dependencies: WebhookDeliveryProcessDeps,
-  ): AppGovernanceWebhookPort {
+  static create(dependencies: WebhookDeliveryProcessDeps): AppGovernanceWebhookPort {
     return new AppGovernanceWebhookPort(
       dependencies,
       WebhookDeliveryService.create(dependencies).runWebhookSendBatch(),
@@ -47,21 +43,15 @@ class AppGovernanceWebhookPort extends GovernanceWebhookPort {
     organizationId: string;
     eventType: string;
   }): Promise<string[]> {
-    const endpoints =
-      await this.dependencies.endpoints.getActiveByOrganization({
-        organizationId: input.organizationId,
-      });
+    const endpoints = await this.dependencies.endpoints.getActiveByOrganization({
+      organizationId: input.organizationId,
+    });
     return endpoints
-      .filter((endpoint) =>
-        eventMatches(endpoint.enabledEvents, input.eventType),
-      )
+      .filter((endpoint) => eventMatches(endpoint.enabledEvents, input.eventType))
       .map(({ id }) => id);
   }
 
-  sendBatch(
-    payload: GovernanceWebhookSendBatch,
-    context: IntentContext,
-  ): Promise<void> {
+  sendBatch(payload: GovernanceWebhookSendBatch, context: IntentContext): Promise<void> {
     return this.send(payload, context);
   }
 
@@ -75,13 +65,9 @@ class AppGovernanceWebhookPort extends GovernanceWebhookPort {
 }
 
 export class AppGovernanceWebhookAdapter {
-  private constructor(
-    private readonly dependencies: WebhookDeliveryProcessDeps,
-  ) {}
+  private constructor(private readonly dependencies: WebhookDeliveryProcessDeps) {}
 
-  static create(
-    dependencies: WebhookDeliveryProcessDeps,
-  ): AppGovernanceWebhookAdapter {
+  static create(dependencies: WebhookDeliveryProcessDeps): AppGovernanceWebhookAdapter {
     return new AppGovernanceWebhookAdapter(dependencies);
   }
 

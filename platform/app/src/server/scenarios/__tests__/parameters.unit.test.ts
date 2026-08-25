@@ -21,10 +21,7 @@ import {
   withoutParameterNames,
 } from "../parameters";
 
-const definition = (
-  name: string,
-  defaultValue?: string | number | boolean,
-) => ({
+const definition = (name: string, defaultValue?: string | number | boolean) => ({
   name,
   ...(defaultValue === undefined ? {} : { defaultValue }),
 });
@@ -73,9 +70,7 @@ describe("scenario run parameters", () => {
 
   describe("given a declaration with no default", () => {
     it("leaves the name out of the resolved values", () => {
-      expect(
-        mergeRunParameters({ definitions: [definition("region")] }),
-      ).toEqual({});
+      expect(mergeRunParameters({ definitions: [definition("region")] })).toEqual({});
     });
 
     it("keeps a supplied false and zero rather than treating them as absent", () => {
@@ -99,20 +94,15 @@ describe("scenario run parameters", () => {
           "params.region",
           "",
         ]) {
-          const result = scenarioParameterDefinitionsSchema.safeParse([
-            { name },
-          ]);
-          expect(result.success, `expected "${name}" to be rejected`).toBe(
-            false,
-          );
+          const result = scenarioParameterDefinitionsSchema.safeParse([{ name }]);
+          expect(result.success, `expected "${name}" to be rejected`).toBe(false);
         }
       });
 
       /** @scenario "A parameter name outside the identifier grammar is rejected at save time" */
       it("rejects a run value supplied under that name", () => {
         expect(
-          runParameterValuesSchema.safeParse({ "account tier": "gold" })
-            .success,
+          runParameterValuesSchema.safeParse({ "account tier": "gold" }).success,
         ).toBe(false);
       });
     });
@@ -147,12 +137,9 @@ describe("scenario run parameters", () => {
         (_, index) => definition(`p${index}`),
       );
 
+      expect(scenarioParameterDefinitionsSchema.safeParse(tooMany).success).toBe(false);
       expect(
-        scenarioParameterDefinitionsSchema.safeParse(tooMany).success,
-      ).toBe(false);
-      expect(
-        scenarioParameterDefinitionsSchema.safeParse(tooMany.slice(0, -1))
-          .success,
+        scenarioParameterDefinitionsSchema.safeParse(tooMany.slice(0, -1)).success,
       ).toBe(true);
     });
   });
@@ -167,9 +154,7 @@ describe("scenario run parameters", () => {
         ]),
       );
 
-      expect(runParameterValuesSchema.safeParse(tooManyKeys).success).toBe(
-        false,
-      );
+      expect(runParameterValuesSchema.safeParse(tooManyKeys).success).toBe(false);
     });
 
     /** @scenario "A run-time payload over the size limits is rejected before scheduling" */
@@ -182,16 +167,14 @@ describe("scenario run parameters", () => {
       expect(
         new TextEncoder().encode(JSON.stringify(tooManyBytes)).length,
       ).toBeGreaterThan(MAX_RUN_PARAMETER_BYTES);
-      expect(runParameterValuesSchema.safeParse(tooManyBytes).success).toBe(
-        false,
-      );
+      expect(runParameterValuesSchema.safeParse(tooManyBytes).success).toBe(false);
     });
 
     /** @scenario "A run-time payload over the size limits is rejected before scheduling" */
     it("rejects a single value longer than one value may be", () => {
-      expect(
-        runParameterValuesSchema.safeParse({ note: "x".repeat(4097) }).success,
-      ).toBe(false);
+      expect(runParameterValuesSchema.safeParse({ note: "x".repeat(4097) }).success).toBe(
+        false,
+      );
     });
 
     it("accepts a payload inside every limit", () => {
@@ -221,13 +204,9 @@ describe("scenario run parameters", () => {
     });
 
     it("reads a shape it does not understand as none rather than failing the run", () => {
-      expect(
-        parseScenarioParameterDefinitions({ region: "eu-central" }),
-      ).toEqual([]);
+      expect(parseScenarioParameterDefinitions({ region: "eu-central" })).toEqual([]);
       expect(parseScenarioParameterDefinitions("region")).toEqual([]);
-      expect(parseScenarioParameterDefinitions([{ label: "region" }])).toEqual(
-        [],
-      );
+      expect(parseScenarioParameterDefinitions([{ label: "region" }])).toEqual([]);
     });
   });
 
@@ -257,9 +236,7 @@ describe("scenario run parameters", () => {
         // see an empty record and answer success, and the caller would get a
         // 2xx for a value the run then ignored.
         for (const name of ["__proto__", "constructor", "prototype"]) {
-          expect(
-            runParameterValuesSchema.safeParse(fromJson(name)).success,
-          ).toBe(false);
+          expect(runParameterValuesSchema.safeParse(fromJson(name)).success).toBe(false);
         }
       });
     });

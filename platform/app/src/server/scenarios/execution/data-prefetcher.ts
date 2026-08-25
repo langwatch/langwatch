@@ -30,10 +30,7 @@ import { getInputsOutputs } from "@langwatch/workflow-contract";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { parseSuiteTargets } from "../../suites/types";
-import {
-  decryptRunSecretValues,
-  type RunSecretCiphertext,
-} from "../run-secret-values";
+import { decryptRunSecretValues, type RunSecretCiphertext } from "../run-secret-values";
 import { renderScenarioContent } from "./scenario-content-template";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
@@ -118,10 +115,7 @@ export interface PromptFetcher {
 
 /** Minimal interface for agent lookup - uses only what prefetcher needs */
 export interface AgentFetcher {
-  findById(params: {
-    projectId: string;
-    id: string;
-  }): Promise<Agent | null>;
+  findById(params: { projectId: string; id: string }): Promise<Agent | null>;
 }
 
 /**
@@ -328,10 +322,7 @@ export async function prefetchScenarioData({
   // credential missing from it, which would report a result about the
   // credential instead of about the scenario.
   let secretDeps = deps;
-  if (
-    context.secretParameters &&
-    Object.keys(context.secretParameters).length > 0
-  ) {
+  if (context.secretParameters && Object.keys(context.secretParameters).length > 0) {
     try {
       secretDeps = {
         ...deps,
@@ -395,12 +386,7 @@ export async function prefetchScenarioData({
   }
 
   const [scenarioResult, projectResult, adapterResult, suiteOverrides] =
-    await Promise.all([
-      scenarioPromise,
-      projectPromise,
-      adapterPromise,
-      suitePromise,
-    ]);
+    await Promise.all([scenarioPromise, projectPromise, adapterPromise, suitePromise]);
 
   if (!scenarioResult) {
     logger.warn(
@@ -423,11 +409,7 @@ export async function prefetchScenarioData({
   }
   const project = projectResult.data;
 
-  if (
-    adapterResult !== null &&
-    "success" in adapterResult &&
-    !adapterResult.success
-  ) {
+  if (adapterResult !== null && "success" in adapterResult && !adapterResult.success) {
     // Hydration failure from workflow DSL — surface structured error
     logger.warn(
       {
@@ -490,8 +472,7 @@ export async function prefetchScenarioData({
   if (adapterData.type === "prompt") {
     adapterData.scenarioMappings = suiteOverrides?.targets?.find(
       (candidate) =>
-        candidate.type === "prompt" &&
-        candidate.referenceId === target.referenceId,
+        candidate.type === "prompt" && candidate.referenceId === target.referenceId,
     )?.scenarioMappings;
   }
 
@@ -510,30 +491,26 @@ export async function prefetchScenarioData({
     simulatorModel =
       suiteOverrides?.simulatorModel ??
       scenarioResult.simulatorModel ??
-      (await deps.modelResolver.resolve(
-        "scenarios.user_simulator",
-        context.projectId,
-      ));
+      (await deps.modelResolver.resolve("scenarios.user_simulator", context.projectId));
     judgeModel =
       suiteOverrides?.judgeModel ??
       scenarioResult.judgeModel ??
       (await deps.modelResolver.resolve("scenarios.judge", context.projectId));
   } catch (err) {
     const message =
-      err instanceof Error
-        ? err.message
-        : "No default model configured for this project";
+      err instanceof Error ? err.message : "No default model configured for this project";
     return { success: false, error: message };
   }
 
-  const [modelParamsResult, simulatorParamsResult, judgeParamsResult] =
-    await Promise.all([
+  const [modelParamsResult, simulatorParamsResult, judgeParamsResult] = await Promise.all(
+    [
       modelForParams !== undefined
         ? deps.modelParamsProvider.prepare(context.projectId, modelForParams)
         : Promise.resolve(undefined),
       deps.modelParamsProvider.prepare(context.projectId, simulatorModel),
       deps.modelParamsProvider.prepare(context.projectId, judgeModel),
-    ]);
+    ],
+  );
 
   if (modelParamsResult && !modelParamsResult.success) {
     logger.warn(
@@ -593,9 +570,7 @@ export async function prefetchScenarioData({
     "Prefetch complete",
   );
 
-  const modelParams = modelParamsResult?.success
-    ? modelParamsResult.params
-    : undefined;
+  const modelParams = modelParamsResult?.success ? modelParamsResult.params : undefined;
 
   // Only an http target's judge fetches remote traces, so only it needs a
   // wait budget. The resolver degrades to a default on any failure, so this
@@ -728,11 +703,7 @@ async function fetchAgentData(
   deps: DataPrefetcherDependencies,
 ): Promise<TargetAdapterData | HydrationFailure | null> {
   if (target.type === "prompt") {
-    return fetchPromptConfigData(
-      projectId,
-      target.referenceId,
-      deps.promptFetcher,
-    );
+    return fetchPromptConfigData(projectId, target.referenceId, deps.promptFetcher);
   }
   if (target.type === "code") {
     return fetchCodeAgentData(
@@ -1030,9 +1001,7 @@ async function hydrateLlmParameters({
   // parameter is stale state and must NOT be silently substituted — leave
   // it unhydrated so the engine raises its typed llm_model_not_set error.
   const specParts =
-    typeof dsl.spec_version === "string"
-      ? dsl.spec_version.split(".").map(Number)
-      : [];
+    typeof dsl.spec_version === "string" ? dsl.spec_version.split(".").map(Number) : [];
   const specMajor = specParts[0] ?? NaN;
   const specMinor = specParts[1] ?? 0;
   const legacyDsl =
@@ -1060,9 +1029,7 @@ async function hydrateLlmParameters({
         ? (n.data as Record<string, unknown>)
         : null;
     const rawParameters = nodeData?.parameters;
-    const parameters = Array.isArray(rawParameters)
-      ? (rawParameters as unknown[])
-      : [];
+    const parameters = Array.isArray(rawParameters) ? (rawParameters as unknown[]) : [];
     for (const param of parameters) {
       if (typeof param !== "object" || param === null) continue;
       const p = param as Record<string, unknown>;
@@ -1127,8 +1094,7 @@ async function hydrateLlmParameters({
           ? (p.value as Record<string, unknown>)
           : null;
       const model =
-        typeof existingValue?.model === "string" &&
-        existingValue.model.length > 0
+        typeof existingValue?.model === "string" && existingValue.model.length > 0
           ? existingValue.model
           : defaultModel;
       if (!model) return param;
@@ -1175,30 +1141,25 @@ function extractWorkflowIO(dsl: Record<string, unknown>): {
   const nodes = (Array.isArray(dsl.nodes) ? dsl.nodes : []) as Node[];
   const edges = (Array.isArray(dsl.edges) ? dsl.edges : []) as Edge[];
 
-  const { inputs: rawInputs, outputs: rawOutputs } = getInputsOutputs(
-    edges,
-    nodes,
-  );
+  const { inputs: rawInputs, outputs: rawOutputs } = getInputsOutputs(edges, nodes);
 
   const inputs: WorkflowField[] = (rawInputs ?? []).flatMap((i) =>
-    typeof i.identifier === "string"
-      ? [{ identifier: i.identifier, type: "str" }]
-      : [],
+    typeof i.identifier === "string" ? [{ identifier: i.identifier, type: "str" }] : [],
   );
 
-  const outputs: WorkflowField[] = (
-    Array.isArray(rawOutputs) ? rawOutputs : []
-  ).flatMap((o: unknown): WorkflowField[] => {
-    if (typeof o !== "object" || o === null) return [];
-    const field = o as { identifier?: unknown; type?: unknown };
-    if (typeof field.identifier !== "string") return [];
-    return [
-      {
-        identifier: field.identifier,
-        type: typeof field.type === "string" ? field.type : "str",
-      },
-    ];
-  });
+  const outputs: WorkflowField[] = (Array.isArray(rawOutputs) ? rawOutputs : []).flatMap(
+    (o: unknown): WorkflowField[] => {
+      if (typeof o !== "object" || o === null) return [];
+      const field = o as { identifier?: unknown; type?: unknown };
+      if (typeof field.identifier !== "string") return [];
+      return [
+        {
+          identifier: field.identifier,
+          type: typeof field.type === "string" ? field.type : "str",
+        },
+      ];
+    },
+  );
 
   return { inputs, outputs };
 }
@@ -1224,7 +1185,6 @@ export function createDataPrefetcherDependencies({
   app: Pick<App, "agents" | "prompts" | "scenarios">;
   prisma: import("~/generated/prisma/client").PrismaClient;
 }): DataPrefetcherDependencies {
-
   return {
     scenarioFetcher: {
       getById: (params) => app.scenarios.tryGetById(params),
@@ -1246,8 +1206,7 @@ export function createDataPrefetcherDependencies({
       },
     },
     promptFetcher: {
-      tryGetPromptByIdOrHandle: (params) =>
-        app.prompts.tryGetPromptByIdOrHandle(params),
+      tryGetPromptByIdOrHandle: (params) => app.prompts.tryGetPromptByIdOrHandle(params),
     },
     agentFetcher: {
       findById: async (params) => {
@@ -1385,8 +1344,7 @@ export function createDataPrefetcherDependencies({
             params: params as LiteLLMParams,
           };
         } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
           logger.error({ error }, "failed to prepare LiteLLM params");
           return {
             success: false,

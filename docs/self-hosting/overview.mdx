@@ -28,10 +28,12 @@ Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 `examples/values-local.yaml` is a different thing and is not the one to start with: it pins every image to a `local` tag with `pullPolicy: Never`, which only resolves on a Kind cluster you have loaded those images into with `make images-local`. On any other cluster the pods sit in `ErrImageNeverPull`. See [Local Kubernetes](/self-hosting/deployment/kubernetes-local) if that is what you want.
 
 Running on AWS? Langy's sandboxed runtime needs one extra step on EKS: see [enabling Langy on EKS](/self-hosting/langy/setup#eks).
+
 </Tip>
 
 <Note>
-  Looking for a managed solution? [LangWatch Cloud](https://langwatch.ai) is fully maintained by the LangWatch team and is the fastest way to get started.
+  Looking for a managed solution? [LangWatch Cloud](https://langwatch.ai) is fully
+  maintained by the LangWatch team and is the fastest way to get started.
 </Note>
 
 ## Architecture at a Glance
@@ -56,7 +58,9 @@ graph LR
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
 
 <Note>
-Running [Langy](/langy/overview), the automated AI engineer? It ships as an optional, gVisor-sandboxed agent pod in the same umbrella chart, off by default. See [Self-hosting Langy](/self-hosting/langy/overview).
+  Running [Langy](/langy/overview), the automated AI engineer? It ships as an optional,
+  gVisor-sandboxed agent pod in the same umbrella chart, off by default. See [Self-hosting
+  Langy](/self-hosting/langy/overview).
 </Note>
 
 ## Deployment Models
@@ -66,36 +70,40 @@ Running [Langy](/langy/overview), the automated AI engineer? It ships as an opti
 Fully managed by the LangWatch team. No infrastructure to manage, sign up and start sending traces in minutes.
 
 [Sign up at langwatch.ai](https://langwatch.ai)
+
 </Card>
 
 <Card title="Self-Managed" icon="server">
 Deploy the complete LangWatch stack on your own infrastructure, AWS, Azure, GCP, or bare metal. You manage everything: compute, databases, and storage. Full data sovereignty.
 
 [Get started with Kubernetes](/self-hosting/deployment/kubernetes-helm)
+
 </Card>
 
 <Card title="Cloud Enterprise" icon="building">
 LangWatch manages the application. Your data lives on exclusive, dedicated instances deployed in your preferred cloud region. The convenience of managed, with the isolation of self-hosted.
 
 [Contact sales](https://langwatch.ai/get-a-demo)
+
 </Card>
 
 <Card title="Hybrid" icon="arrows-split-up-and-left">
 LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide the data plane, ClickHouse and S3 in your VPC. Your trace data never leaves your network.
 
 [Learn more](/hybrid-setup/overview)
+
 </Card>
 </CardGroup>
 
 ### At a Glance
 
-| | **Cloud** | **Self-Managed** | **Cloud Enterprise** | **Hybrid** |
-|---|:---:|:---:|:---:|:---:|
-| You manage infrastructure | | Yes | | |
-| You manage data storage | | Yes | Yes | Yes |
-| LangWatch manages app | Yes | | Yes | Yes |
-| Data stays in your network | | Yes | Yes | Yes |
-| Setup time | Minutes | Hours | Days | Days |
+|                            | **Cloud** | **Self-Managed** | **Cloud Enterprise** | **Hybrid** |
+| -------------------------- | :-------: | :--------------: | :------------------: | :--------: |
+| You manage infrastructure  |           |       Yes        |                      |            |
+| You manage data storage    |           |       Yes        |         Yes          |    Yes     |
+| LangWatch manages app      |    Yes    |                  |         Yes          |    Yes     |
+| Data stays in your network |           |       Yes        |         Yes          |    Yes     |
+| Setup time                 |  Minutes  |      Hours       |         Days         |    Days    |
 
 ## Quick Start
 
@@ -128,7 +136,8 @@ Choose the deployment method that fits your environment.
 ## What's New in v3
 
 <Tip>
-  LangWatch v3 is a major architecture upgrade. If you are migrating from v2, review the deployment guides for updated requirements.
+  LangWatch v3 is a major architecture upgrade. If you are migrating from v2, review the
+  deployment guides for updated requirements.
 </Tip>
 
 - **ClickHouse replaces Elasticsearch** as the primary data store, delivering faster analytical queries and lower operational overhead.

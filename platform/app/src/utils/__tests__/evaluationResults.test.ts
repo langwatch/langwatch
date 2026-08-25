@@ -141,9 +141,7 @@ describe("parseEvaluationResult", () => {
     });
 
     it("returns processed for status: 'processed' without passed field", () => {
-      expect(
-        parseEvaluationResult({ status: "processed", score: 0.6 }),
-      ).toEqual({
+      expect(parseEvaluationResult({ status: "processed", score: 0.6 })).toEqual({
         status: "processed",
         score: 0.6,
       });
@@ -436,9 +434,7 @@ describe("EVALUATION_STATUS_COLORS", () => {
 
   it("uses a deeper red for error than for fail so the two states stay distinct", () => {
     expect(EVALUATION_STATUS_COLORS.error).toBe("red.600");
-    expect(EVALUATION_STATUS_COLORS.error).not.toBe(
-      EVALUATION_STATUS_COLORS.failed,
-    );
+    expect(EVALUATION_STATUS_COLORS.error).not.toBe(EVALUATION_STATUS_COLORS.failed);
   });
 
   it("renders skipped as a light bg-style gray — it's a setup state, not a verdict, so it shouldn't compete with real pass/fail", () => {
@@ -505,12 +501,8 @@ describe("getEvalChipDisplay", () => {
     });
 
     it("normalizes the trace-list 'in_progress' / 'scheduled' tokens", () => {
-      expect(getEvalChipDisplay({ status: "in_progress" }).status).toBe(
-        "running",
-      );
-      expect(getEvalChipDisplay({ status: "scheduled" }).status).toBe(
-        "pending",
-      );
+      expect(getEvalChipDisplay({ status: "in_progress" }).status).toBe("running");
+      expect(getEvalChipDisplay({ status: "scheduled" }).status).toBe("pending");
     });
 
     it("maps the legacy 'warning' status to failed so the chip turns red", () => {
@@ -520,15 +512,13 @@ describe("getEvalChipDisplay", () => {
 
   describe("when rendering trailing verdict slot", () => {
     it("yields numeric scoreText for numeric verdicts (<= 1)", () => {
-      expect(
-        getEvalChipDisplay({ status: "processed", score: 0.75 }).scoreText,
-      ).toBe("0.75");
+      expect(getEvalChipDisplay({ status: "processed", score: 0.75 }).scoreText).toBe(
+        "0.75",
+      );
     });
 
     it("yields one-decimal scoreText for verdicts > 1", () => {
-      expect(
-        getEvalChipDisplay({ status: "processed", score: 5 }).scoreText,
-      ).toBe("5.0");
+      expect(getEvalChipDisplay({ status: "processed", score: 5 }).scoreText).toBe("5.0");
     });
 
     it("suppresses the boolean Pass/Fail label when a numeric score exists", () => {
@@ -546,15 +536,14 @@ describe("getEvalChipDisplay", () => {
   describe("when picking a display name", () => {
     it("prefers explicit name over evaluatorId", () => {
       expect(
-        getEvalChipDisplay({ name: "Safety", evaluatorId: "azure_safety" })
-          .displayName,
+        getEvalChipDisplay({ name: "Safety", evaluatorId: "azure_safety" }).displayName,
       ).toBe("Safety");
     });
 
     it("falls back to evaluatorId when name missing", () => {
-      expect(
-        getEvalChipDisplay({ evaluatorId: "azure_safety" }).displayName,
-      ).toBe("azure_safety");
+      expect(getEvalChipDisplay({ evaluatorId: "azure_safety" }).displayName).toBe(
+        "azure_safety",
+      );
     });
 
     it("accepts the trace-list shape (evaluatorName) as an alias for name", () => {

@@ -4,10 +4,7 @@ import type {
   StoredProjection,
 } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
-import {
-  Prisma,
-  type PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import type { IngestionPullRunStatusData } from "../../projections/ingestion-pull-run-status-eventing.projection";
 
 type Row = Prisma.IngestionPullRunProjectionGetPayload<object>;
@@ -34,15 +31,11 @@ function fromRow(row: Row): StoredProjection<IngestionPullRunStatusData> {
   };
 }
 
-export class PrismaIngestionPullRunProjectionRepository
-  implements StateProjectionStore<IngestionPullRunStatusData>
-{
+export class PrismaIngestionPullRunProjectionRepository implements StateProjectionStore<IngestionPullRunStatusData> {
   private constructor(private readonly prisma: PrismaClient) {}
 
   static create(database: object): PrismaIngestionPullRunProjectionRepository {
-    return new PrismaIngestionPullRunProjectionRepository(
-      database as PrismaClient,
-    );
+    return new PrismaIngestionPullRunProjectionRepository(database as PrismaClient);
   }
 
   async tryLoad(
@@ -94,9 +87,7 @@ export class PrismaIngestionPullRunProjectionRepository
         where: { id: sourceId },
         data: {
           pollerCursor:
-            projection.state.Cursor === null
-              ? Prisma.JsonNull
-              : projection.state.Cursor,
+            projection.state.Cursor === null ? Prisma.JsonNull : projection.state.Cursor,
           errorCount: projection.state.ConsecutiveErrors,
           lastEventAt:
             projection.state.Enabled &&

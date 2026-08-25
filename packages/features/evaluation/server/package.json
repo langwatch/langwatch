@@ -3,18 +3,32 @@
   "version": "0.1.0",
   "private": true,
   "description": "Canonical server-side Evaluation feature.",
+  "files": [
+    "src"
+  ],
   "type": "module",
-  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "files": ["src"],
-  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run", "test:unit": "vitest run" },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
   "dependencies": {
-    "@langwatch/eventing": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/observability": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*"
   },
-  "devDependencies": { "typescript": "^7.0.2", "vitest": "^4.1.9" }
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
 }

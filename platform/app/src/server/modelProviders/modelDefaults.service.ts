@@ -1,8 +1,5 @@
 import { ValidationError } from "@langwatch/handled-error";
-import type {
-  ModelDefaultScopeType,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { ModelDefaultScopeType, PrismaClient } from "~/generated/prisma/client";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
@@ -187,9 +184,7 @@ async function withScopeTransaction<T>(
  * two processes and put the ordering back at risk. */
 function sortForLocking(scopes: ScopeAttachment[]): ScopeAttachment[] {
   const key = (s: ScopeAttachment) => `${s.scopeType}::${s.scopeId}`;
-  return [...scopes].sort((a, b) =>
-    key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0,
-  );
+  return [...scopes].sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 }
 
 /**
@@ -230,9 +225,7 @@ async function claimScopes(
   const held = await repo.findAttachmentsForScopes(scopes, opts);
   if (held.length === 0) return;
   await repo.deleteAttachments(held.map((h) => h.id));
-  await repo.deleteConfigsWithoutScopes(
-    Array.from(new Set(held.map((h) => h.configId))),
-  );
+  await repo.deleteConfigsWithoutScopes(Array.from(new Set(held.map((h) => h.configId))));
 }
 
 /**
@@ -258,9 +251,7 @@ export async function createConfig(
     );
   }
   if (params.scopes.length === 0) {
-    throw new ValidationError(
-      "Pick at least one scope for this default-models config.",
-    );
+    throw new ValidationError("Pick at least one scope for this default-models config.");
   }
   const scopes = dedupeScopes(params.scopes);
   return withScopeTransaction(ctx.prisma, async (tx) => {
@@ -292,8 +283,7 @@ export async function updateConfig(
     authorId?: string | null;
   },
 ): Promise<void> {
-  const data: { config?: Record<string, string>; authorId?: string | null } =
-    {};
+  const data: { config?: Record<string, string>; authorId?: string | null } = {};
   let deletesTheConfig = false;
   if (params.config !== undefined) {
     const clean = sanitizeConfig(params.config);
@@ -325,9 +315,7 @@ export async function updateConfig(
   if (deletesTheConfig || params.scopes === undefined) {
     await withScopeTransaction(ctx.prisma, async (tx) => {
       const txRepo = new ModelDefaultsRepository(tx);
-      const organizationId = await txRepo.findOrganizationIdForConfig(
-        params.id,
-      );
+      const organizationId = await txRepo.findOrganizationIdForConfig(params.id);
       // Already gone: a concurrent save claimed its last scope and
       // collected it. Both branches below are satisfied by that.
       if (!organizationId) return;
@@ -360,15 +348,11 @@ export async function updateConfig(
       desired.set(`${s.scopeType}::${s.scopeId}`, s);
     }
     const current = await txRepo.findScopesForConfig(params.id);
-    const currentByKey = new Map(
-      current.map((c) => [`${c.scopeType}::${c.scopeId}`, c]),
-    );
+    const currentByKey = new Map(current.map((c) => [`${c.scopeType}::${c.scopeId}`, c]));
     const toAdd = [...desired.values()].filter(
       (s) => !currentByKey.has(`${s.scopeType}::${s.scopeId}`),
     );
-    const toRemove = current.filter(
-      (c) => !desired.has(`${c.scopeType}::${c.scopeId}`),
-    );
+    const toRemove = current.filter((c) => !desired.has(`${c.scopeType}::${c.scopeId}`));
     await claimScopes(txRepo, toAdd, { exceptConfigId: params.id });
     await txRepo.updateConfigScopes({
       id: params.id,
@@ -417,10 +401,7 @@ export async function setRoleAtScope(
   if (!valid.has(params.role)) {
     throw new Error(`Unknown role: "${params.role}".`);
   }
-  if (
-    params.model !== null &&
-    !isModelAllowedAsRoleDefault(params.model, params.role)
-  ) {
+  if (params.model !== null && !isModelAllowedAsRoleDefault(params.model, params.role)) {
     throw new Error(
       `"${params.model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be a ${params.role} role default.`,
     );
@@ -517,10 +498,7 @@ async function upsertKeyAtScope(
       scopes: [scope],
     });
 
-    const attached = await txRepo.findConfigsAtScope(
-      params.scopeType,
-      params.scopeId,
-    );
+    const attached = await txRepo.findConfigsAtScope(params.scopeType, params.scopeId);
     const target = attached[0];
 
     if (params.model === null) {

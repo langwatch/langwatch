@@ -273,13 +273,10 @@ describe("Feature: the caller's project scope", () => {
 
         const scopeCalls = findMany.mock.calls.filter(
           (call) =>
-            (call[0]?.where?.teamId as { in?: string[] } | undefined)?.in !==
-            undefined,
+            (call[0]?.where?.teamId as { in?: string[] } | undefined)?.in !== undefined,
         );
         expect(scopeCalls).toHaveLength(1);
-        const asked = (
-          scopeCalls[0]![0]!.where!.teamId as { in: string[] }
-        ).in.slice();
+        const asked = (scopeCalls[0]![0]!.where!.teamId as { in: string[] }).in.slice();
         expect(asked.sort()).toEqual([...personalTeamIds].sort());
       } finally {
         findMany.mockRestore();

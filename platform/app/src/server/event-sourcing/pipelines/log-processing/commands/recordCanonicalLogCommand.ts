@@ -1,9 +1,5 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
-import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import {
   type RecordCanonicalLogCommandData,
   recordCanonicalLogCommandDataSchema,
@@ -15,13 +11,10 @@ import {
 } from "../schemas/constants";
 import type { CanonicalLogRecordReceivedEvent } from "../schemas/events";
 
-export class RecordCanonicalLogCommand
-  implements
-    CommandHandler<
-      Command<RecordCanonicalLogCommandData>,
-      CanonicalLogRecordReceivedEvent
-    >
-{
+export class RecordCanonicalLogCommand implements CommandHandler<
+  Command<RecordCanonicalLogCommandData>,
+  CanonicalLogRecordReceivedEvent
+> {
   static readonly schema = defineCommandSchema(
     RECORD_CANONICAL_LOG_COMMAND_TYPE,
     recordCanonicalLogCommandDataSchema,

@@ -10,14 +10,7 @@ import {
   Wrench,
 } from "lucide-react";
 import type React from "react";
-import {
-  Fragment,
-  memo,
-  type ReactNode,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-} from "react";
+import { Fragment, memo, type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import type { TraceMediaRef } from "~/shared/traces/media-refs";
 import type { MediaPartData } from "~/shared/traces/mediaParts";
 import { collectMediaParts } from "~/shared/traces/mediaParts";
@@ -314,9 +307,7 @@ function mediaSrc(media: Extract<MediaPartData, { source: unknown }>): string {
 }
 
 /** Summary-provided refs → the row media summary (preferred source). */
-export function rowMediaFromRefs(
-  refs: TraceMediaRef[] | undefined,
-): RowMedia | null {
+export function rowMediaFromRefs(refs: TraceMediaRef[] | undefined): RowMedia | null {
   if (!refs || refs.length === 0) return null;
   const summary: RowMedia = { ...NO_ROW_MEDIA };
   for (const ref of refs) {
@@ -340,8 +331,7 @@ export function collectRowMedia(raw: string | null): RowMedia {
       else if (mime.startsWith("video/")) summary.hasVideo = true;
       else if (mime.startsWith("image/")) {
         summary.imageSrc ??=
-          part.url ??
-          (part.data ? `data:${part.mimeType};base64,${part.data}` : null);
+          part.url ?? (part.data ? `data:${part.mimeType};base64,${part.data}` : null);
       } else summary.hasAttachment = true;
     } else if (part.type === "image") {
       summary.imageSrc ??= mediaSrc(part);
@@ -376,11 +366,7 @@ const RowMediaIndicators: React.FC<{ media: RowMedia }> = ({ media }) => {
         </Icon>
       )}
       {media.hasAttachment && (
-        <Icon
-          boxSize="12px"
-          color="fg.muted"
-          data-testid="io-preview-attachment"
-        >
+        <Icon boxSize="12px" color="fg.muted" data-testid="io-preview-attachment">
           <Paperclip />
         </Icon>
       )}
@@ -393,10 +379,7 @@ const RowMediaIndicators: React.FC<{ media: RowMedia }> = ({ media }) => {
  * same text-then-media order the drawer uses. Height-capped with natural
  * aspect ratio; a width cap crops runaway panoramas.
  */
-const RowThumbnail: React.FC<{ src: string; height: string }> = ({
-  src,
-  height,
-}) => (
+const RowThumbnail: React.FC<{ src: string; height: string }> = ({ src, height }) => (
   // eslint-disable-next-line @next/next/no-img-element
   <img
     data-testid="io-preview-thumbnail"
@@ -458,21 +441,13 @@ const CompactIOPreview: React.FC<
   return (
     <VStack align="start" gap={0.5} fontFamily="mono">
       {inputRow && (
-        <CompactRow
-          row={inputRow}
-          fontSize={tokens.ioFontSize}
-          direction="input"
-        />
+        <CompactRow row={inputRow} fontSize={tokens.ioFontSize} direction="input" />
       )}
       {placeholders.input && (
         <CompactMissingRow direction="input" fontSize={tokens.ioFontSize} />
       )}
       {outputRow && (
-        <CompactRow
-          row={outputRow}
-          fontSize={tokens.ioFontSize}
-          direction="output"
-        />
+        <CompactRow row={outputRow} fontSize={tokens.ioFontSize} direction="output" />
       )}
       {placeholders.output && (
         <CompactMissingRow direction="output" fontSize={tokens.ioFontSize} />
@@ -513,11 +488,7 @@ interface CompactRowProps {
   direction: "input" | "output";
 }
 
-const CompactRow: React.FC<CompactRowProps> = ({
-  row,
-  fontSize,
-  direction,
-}) => {
+const CompactRow: React.FC<CompactRowProps> = ({ row, fontSize, direction }) => {
   const isInput = direction === "input";
   // Vivid palette in light mode — `*.solid` matches the saturated tone
   // the filter sidebar uses for the origin dots, so the table accents
@@ -552,9 +523,7 @@ const CompactRow: React.FC<CompactRowProps> = ({
           fontStyle="italic"
           fontWeight="400"
         />
-        {row.media.imageSrc && (
-          <RowThumbnail src={row.media.imageSrc} height="36px" />
-        )}
+        {row.media.imageSrc && <RowThumbnail src={row.media.imageSrc} height="36px" />}
       </VStack>
     </HStack>
   );
@@ -596,8 +565,7 @@ const ComfortableIOPreview: React.FC<
     () =>
       input !== null
         ? {
-            text: formatPreview(input, { maxChars: 200, newlines: "preserve" })
-              .text,
+            text: formatPreview(input, { maxChars: 200, newlines: "preserve" }).text,
             media: rowMediaFromRefs(inputMediaRefs) ?? collectRowMedia(input),
           }
         : null,
@@ -607,8 +575,7 @@ const ComfortableIOPreview: React.FC<
     () =>
       output !== null
         ? {
-            text: formatPreview(output, { maxChars: 200, newlines: "preserve" })
-              .text,
+            text: formatPreview(output, { maxChars: 200, newlines: "preserve" }).text,
             media: rowMediaFromRefs(outputMediaRefs) ?? collectRowMedia(output),
           }
         : null,

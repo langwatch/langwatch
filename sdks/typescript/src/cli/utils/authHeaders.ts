@@ -9,15 +9,8 @@
  * command through the API client works.
  */
 
-import {
-  buildAuthHeaders,
-  type LangWatchAuthHeaders,
-} from "@/internal/api/auth";
+import { buildAuthHeaders, type LangWatchAuthHeaders } from "@/internal/api/auth";
 import { scopedProjectId } from "@/internal/credentialContext";
 
-export const cliAuthHeaders = ({
-  apiKey,
-}: {
-  apiKey: string;
-}): LangWatchAuthHeaders =>
+export const cliAuthHeaders = ({ apiKey }: { apiKey: string }): LangWatchAuthHeaders =>
   buildAuthHeaders({ apiKey, projectId: scopedProjectId() });

@@ -45,11 +45,10 @@ export class GroupMemberAlreadyAddedError extends HandledError {
   declare readonly code: "group_member_already_added";
 
   constructor(userId?: string) {
-    super(
-      "group_member_already_added",
-      "That member is already in this group",
-      { httpStatus: 409, ...(userId ? { meta: { userId } } : {}) },
-    );
+    super("group_member_already_added", "That member is already in this group", {
+      httpStatus: 409,
+      ...(userId ? { meta: { userId } } : {}),
+    });
     this.name = "GroupMemberAlreadyAddedError";
   }
 }
@@ -98,11 +97,10 @@ export class GroupRoleNotAssignableError extends HandledError {
   declare readonly code: "custom_role_not_assignable";
 
   constructor(customRoleId?: string) {
-    super(
-      "custom_role_not_assignable",
-      "That custom role cannot be granted here",
-      { httpStatus: 422, ...(customRoleId ? { meta: { customRoleId } } : {}) },
-    );
+    super("custom_role_not_assignable", "That custom role cannot be granted here", {
+      httpStatus: 422,
+      ...(customRoleId ? { meta: { customRoleId } } : {}),
+    });
     this.name = "GroupRoleNotAssignableError";
   }
 }

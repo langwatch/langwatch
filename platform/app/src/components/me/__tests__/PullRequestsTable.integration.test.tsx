@@ -35,8 +35,7 @@ vi.mock("~/utils/api", () => {
     isFetched: true,
   });
   const hooksFor = (path: string): Map<string, unknown> => {
-    const useQuery = (input: unknown) =>
-      (queryImpls[path] ?? defaultQuery)(input);
+    const useQuery = (input: unknown) => (queryImpls[path] ?? defaultQuery)(input);
     return new Map<string, unknown>([
       ["useQuery", useQuery],
       ["useInfiniteQuery", useQuery],
@@ -64,9 +63,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     project: undefined,
     team: undefined,
     hasPermission: (permission: string) =>
-      permission === "organization:manage"
-        ? permissionsRef.canManageOrganization
-        : true,
+      permission === "organization:manage" ? permissionsRef.canManageOrganization : true,
     isLoading: false,
     isFetched: true,
   }),
@@ -168,9 +165,7 @@ const listedNumbers = () =>
 
 /** The heading cell a sortable column announces its state on. */
 const headingFor = (label: string) =>
-  screen
-    .getByRole("button", { name: `Sort by ${label}` })
-    .closest("th") as HTMLElement;
+  screen.getByRole("button", { name: `Sort by ${label}` }).closest("th") as HTMLElement;
 
 /** What a case may pin about a row's money, and what is derived from it. */
 type CostOverrides = {
@@ -332,9 +327,7 @@ describe("the personal Pull Requests table", () => {
       await user.click(
         screen.getByRole("button", { name: "Actions for feat/git-context" }),
       );
-      expect(
-        await screen.findByText("Link this repository"),
-      ).toBeInTheDocument();
+      expect(await screen.findByText("Link this repository")).toBeInTheDocument();
 
       cleanup();
       permissionsRef.canManageOrganization = false;
@@ -346,9 +339,7 @@ describe("the personal Pull Requests table", () => {
 
       await user.hover(disabled.closest("span[tabindex]") as HTMLElement);
       expect(
-        await screen.findByText(
-          "Ask an administrator to link this repository.",
-        ),
+        await screen.findByText("Ask an administrator to link this repository."),
       ).toBeInTheDocument();
 
       // The button is inert, so the click lands on its wrapper; it must stop
@@ -387,9 +378,7 @@ describe("the personal Pull Requests table", () => {
       );
       const chip = screen.getByText("Open");
       expect(chip).toHaveAttribute("data-status-source", "live");
-      expect(
-        screen.getByText("Link sessions to pull requests"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Link sessions to pull requests")).toBeInTheDocument();
       expect(screen.getByText("10.0K")).toBeInTheDocument();
       expect(screen.getByText("$12.50")).toBeInTheDocument();
     });
@@ -590,10 +579,7 @@ describe("the personal Pull Requests table", () => {
       renderTable();
 
       // The table opens ordered by its last update, and says so.
-      expect(headingFor("Last update")).toHaveAttribute(
-        "aria-sort",
-        "descending",
-      );
+      expect(headingFor("Last update")).toHaveAttribute("aria-sort", "descending");
       expect(headingFor("Tokens")).toHaveAttribute("aria-sort", "none");
       const opening = listedNumbers();
       expect(opening).toEqual(["#4220", "#4219", "#4218"]);
@@ -614,10 +600,7 @@ describe("the personal Pull Requests table", () => {
       // A third choice hands the table back the order it opened in.
       await user.keyboard("{Enter}");
       expect(headingFor("Tokens")).toHaveAttribute("aria-sort", "none");
-      expect(headingFor("Last update")).toHaveAttribute(
-        "aria-sort",
-        "descending",
-      );
+      expect(headingFor("Last update")).toHaveAttribute("aria-sort", "descending");
       expect(listedNumbers()).toEqual(opening);
     });
   });
@@ -889,9 +872,7 @@ describe("the personal Pull Requests table", () => {
       await user.click(await screen.findByText("Last 7 days"));
 
       expect(screen.getByText("Worked on this morning")).toBeInTheDocument();
-      expect(
-        screen.queryByText("Untouched for a month"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Untouched for a month")).not.toBeInTheDocument();
     });
 
     /** @scenario "The period starts at all time and can return to it" */
@@ -905,9 +886,7 @@ describe("the personal Pull Requests table", () => {
 
       await user.click(screen.getByRole("button", { name: /all time/i }));
       await user.click(await screen.findByText("Last 7 days"));
-      expect(
-        screen.queryByText("Untouched for a month"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Untouched for a month")).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /last 7 days/i }));
       await user.click(await screen.findByRole("button", { name: "All time" }));

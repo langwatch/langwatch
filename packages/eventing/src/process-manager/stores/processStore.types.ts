@@ -179,10 +179,7 @@ export interface ProcessStore {
    * return the already-committed state without re-running a domain transition
    * that may now correctly reject from its terminal state.
    */
-  hasConsumedSource(params: {
-    ref: ProcessRef;
-    sourceEventId: string;
-  }): Promise<boolean>;
+  hasConsumedSource(params: { ref: ProcessRef; sourceEventId: string }): Promise<boolean>;
 
   /** Atomically: consume inbox row, bump revision, persist state + wake, insert deduped messages. */
   commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult>;
@@ -206,9 +203,7 @@ export interface ProcessStore {
   }): Promise<AppendIntentsResult>;
 
   /** All messages for one process, primarily for diagnostics and tests. */
-  findMessagesByRef(params: {
-    ref: ProcessRef;
-  }): Promise<OutboxMessageRecord[]>;
+  findMessagesByRef(params: { ref: ProcessRef }): Promise<OutboxMessageRecord[]>;
 
   /**
    * Lease pending, due messages for exclusive dispatch until
@@ -307,10 +302,7 @@ export interface ProcessStore {
    * A returned count below `limit` means the family is drained, which is how
    * a caller's drain loop knows to stop.
    */
-  deleteDispatchedOutboxBatch(params: {
-    before: number;
-    limit: number;
-  }): Promise<number>;
+  deleteDispatchedOutboxBatch(params: { before: number; limit: number }): Promise<number>;
 
   /**
    * Retention sweep, dead family: delete at most `limit` DEAD outbox rows
@@ -318,10 +310,7 @@ export interface ProcessStore {
    * Dead rows are the operator's failure record, so callers give this a far
    * longer window than the dispatched family.
    */
-  deleteDeadOutboxBatch(params: {
-    before: number;
-    limit: number;
-  }): Promise<number>;
+  deleteDeadOutboxBatch(params: { before: number; limit: number }): Promise<number>;
 
   /**
    * Retention sweep, inbox family: delete at most `limit` inbox rows consumed
@@ -332,10 +321,7 @@ export interface ProcessStore {
    * packages/eventing/specs/process-manager-retention.feature for why that
    * horizon is about 25 hours.
    */
-  deleteConsumedInboxBatch(params: {
-    before: number;
-    limit: number;
-  }): Promise<number>;
+  deleteConsumedInboxBatch(params: { before: number; limit: number }): Promise<number>;
 
   /**
    * Dead-letter recovery: flip DEAD rows of one process back to pending

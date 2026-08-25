@@ -300,10 +300,7 @@ export function useViewportZoom(): ViewportZoomReturn {
 
   const minimapRect = useMemo(() => {
     if (!svgSize || !viewportSize.width) return null;
-    const scale = Math.min(
-      MINIMAP_W / svgSize.width,
-      MINIMAP_H / svgSize.height,
-    );
+    const scale = Math.min(MINIMAP_W / svgSize.width, MINIMAP_H / svgSize.height);
     const ox = (MINIMAP_W - svgSize.width * scale) / 2;
     const oy = (MINIMAP_H - svgSize.height * scale) / 2;
     return {

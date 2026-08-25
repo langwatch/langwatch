@@ -419,14 +419,8 @@ export class StoredObjectsService {
           }
         }
         span.setAttribute("stored_objects.bytes_deleted", bytesDeleted);
-        span.setAttribute(
-          "stored_objects.byte_delete_failures",
-          byteDeleteFailures,
-        );
-        span.setAttribute(
-          "stored_objects.rows_retained_for_retry",
-          byteDeleteFailures,
-        );
+        span.setAttribute("stored_objects.byte_delete_failures", byteDeleteFailures);
+        span.setAttribute("stored_objects.rows_retained_for_retry", byteDeleteFailures);
 
         // Only remove the rows whose bytes were successfully deleted.
         // Failed rows stay behind so the next cascade can retry the

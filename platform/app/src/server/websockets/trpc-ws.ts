@@ -47,10 +47,7 @@ function buildOriginAllowlist(): Set<string> | null {
   }
 }
 
-export function setupTRPCWebSocket(
-  server: HttpServer,
-  app: App,
-): TRPCWebSocketHandle {
+export function setupTRPCWebSocket(server: HttpServer, app: App): TRPCWebSocketHandle {
   // `noServer: true` — we route by URL pathname so other future WS endpoints
   // can share the same HTTP server without their upgrades fighting.
   const wss = new WebSocketServer({ noServer: true });

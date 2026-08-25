@@ -28,7 +28,6 @@ import { describe, expect, it, vi } from "vitest";
 import { PromptService } from "../src/services/prompt.service";
 import { PromptVersionService } from "../src/services/prompt-version.service";
 
-
 describe("PromptService.createPrompt — missing system prompt (Issue #3196 regression)", () => {
   describe("given a PromptService", () => {
     describe("when creating a prompt with neither a prompt nor a system message", () => {
@@ -58,9 +57,7 @@ describe("PromptService.createPrompt — missing system prompt (Issue #3196 regr
           "prompt_system_prompt_required",
         );
         expect((error as Error).message).toMatch(/prompt or system message is required/i);
-        expect((error as Error).message).not.toMatch(
-          /SystemPromptConflictError/,
-        );
+        expect((error as Error).message).not.toMatch(/SystemPromptConflictError/);
       });
     });
 
@@ -85,9 +82,7 @@ describe("PromptService.createPrompt — missing system prompt (Issue #3196 regr
             projectId: "project-1",
             handle: "conflicting-prompt",
             prompt: "You are a helpful assistant.",
-            messages: [
-              { role: "system", content: "You are a helpful assistant." },
-            ],
+            messages: [{ role: "system", content: "You are a helpful assistant." }],
           }),
         );
 

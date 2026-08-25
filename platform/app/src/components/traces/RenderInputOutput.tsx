@@ -4,10 +4,7 @@ import React, { useMemo, useState } from "react";
 import type { SpanInputOutput } from "~/server/tracer/types";
 import { collectMediaParts } from "~/shared/traces/mediaParts";
 import dynamic from "~/utils/compat/next-dynamic";
-import {
-  isPythonRepr,
-  parsePythonInsideJson,
-} from "../../utils/parsePythonInsideJson";
+import { isPythonRepr, parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
 import { CopyIcon } from "../icons/Copy";
 import { useColorMode } from "../ui/color-mode";
 import { toaster } from "../ui/toaster";
@@ -176,13 +173,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
       ) : (
         <>
           {props.showTools && (
-            <HStack
-              position="absolute"
-              top={-2}
-              right={-2}
-              zIndex={1}
-              gap="-1px"
-            >
+            <HStack position="absolute" top={-2} right={-2} zIndex={1} gap="-1px">
               {renderCopyButton()}
             </HStack>
           )}

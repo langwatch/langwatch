@@ -70,13 +70,7 @@ function summaryRow(traceId: string) {
   };
 }
 
-function spanRow({
-  traceId,
-  spanIndex,
-}: {
-  traceId: string;
-  spanIndex: number;
-}) {
+function spanRow({ traceId, spanIndex }: { traceId: string; spanIndex: number }) {
   return {
     SpanId: `${traceId}-span-${spanIndex}`,
     TraceId: traceId,
@@ -113,11 +107,7 @@ function spanRow({
  * `spanRowsServed` records what actually crossed the socket, so a test can
  * assert the heap never saw the rows.
  */
-function clickHouseThatOOMsThenBatches({
-  spansPerTrace,
-}: {
-  spansPerTrace: number;
-}) {
+function clickHouseThatOOMsThenBatches({ spansPerTrace }: { spansPerTrace: number }) {
   let refusedOnce = false;
   const spanReadSettings: Array<Record<string, unknown>> = [];
   const served = { spanRowsServed: 0 };

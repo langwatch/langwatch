@@ -14,23 +14,17 @@ export const initializeProject = async (): Promise<void> => {
       if (gitignoreResult.existed) {
         console.log(
           chalk.green(
-            `✓ Added ${chalk.gray(
-              "prompts/.materialized"
-            )} to existing .gitignore`
-          )
+            `✓ Added ${chalk.gray("prompts/.materialized")} to existing .gitignore`,
+          ),
         );
       } else {
         console.log(
-          chalk.green(
-            `✓ Created .gitignore with ${chalk.gray("prompts/.materialized")}`
-          )
+          chalk.green(`✓ Created .gitignore with ${chalk.gray("prompts/.materialized")}`),
         );
       }
     } else {
       console.log(
-        chalk.gray(
-          `• ${chalk.gray("prompts/.materialized")} already in .gitignore`
-        )
+        chalk.gray(`• ${chalk.gray("prompts/.materialized")} already in .gitignore`),
       );
     }
   } else {
@@ -47,18 +41,14 @@ export const initializeProject = async (): Promise<void> => {
 
   // Ensure directories exist
   FileManager.ensureDirectories();
-  console.log(
-    chalk.green(`✓ Created ${chalk.gray("./prompts/")} directory structure`)
-  );
+  console.log(chalk.green(`✓ Created ${chalk.gray("./prompts/")} directory structure`));
 
-  console.log(
-    chalk.green("\n✨ Project initialized! You can now add prompts with:")
-  );
+  console.log(chalk.green("\n✨ Project initialized! You can now add prompts with:"));
   console.log(chalk.gray("  langwatch prompt add <name>"));
 };
 
 export const ensureProjectInitialized = async (
-  shouldCheckForGitignore = true
+  shouldCheckForGitignore = true,
 ): Promise<{ configCreated: boolean; lockCreated: boolean }> => {
   // Initialize prompts.json
   const configResult = FileManager.initializePromptsConfig();
@@ -67,23 +57,19 @@ export const ensureProjectInitialized = async (
     console.log(chalk.green(`✓ Created ${chalk.gray("./prompts.json")}`));
 
     if (shouldCheckForGitignore) {
-      const gitignoreResult = FileManager.addToGitignore(
-        "prompts/.materialized"
-      );
+      const gitignoreResult = FileManager.addToGitignore("prompts/.materialized");
       if (gitignoreResult.added) {
         if (gitignoreResult.existed) {
           console.log(
             chalk.green(
-              `✓ Added ${chalk.gray(
-                "prompts/.materialized"
-              )} to existing .gitignore`
-            )
+              `✓ Added ${chalk.gray("prompts/.materialized")} to existing .gitignore`,
+            ),
           );
         } else {
           console.log(
             chalk.green(
-              `✓ Created .gitignore with ${chalk.gray("prompts/.materialized")}`
-            )
+              `✓ Created .gitignore with ${chalk.gray("prompts/.materialized")}`,
+            ),
           );
         }
       }

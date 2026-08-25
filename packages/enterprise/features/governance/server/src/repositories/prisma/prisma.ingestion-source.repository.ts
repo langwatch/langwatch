@@ -71,9 +71,7 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     return row ? toIngestionSource(row) : null;
   }
 
-  async findByPriorSecretHash(
-    hash: string,
-  ): Promise<GovernanceIngestionSource[]> {
+  async findByPriorSecretHash(hash: string): Promise<GovernanceIngestionSource[]> {
     const rows = await this.database.ingestionSource.findMany({
       where: {
         archivedAt: null,
@@ -92,9 +90,7 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     });
   }
 
-  async create(
-    input: CreateIngestionSourceRecord,
-  ): Promise<GovernanceIngestionSource> {
+  async create(input: CreateIngestionSourceRecord): Promise<GovernanceIngestionSource> {
     const row = await this.database.ingestionSource.create({
       data: {
         ...input,

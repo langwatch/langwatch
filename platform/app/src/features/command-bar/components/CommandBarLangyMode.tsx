@@ -1,10 +1,7 @@
 import { Box, chakra, HStack, Input, Text } from "@chakra-ui/react";
 import { CornerDownLeft } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import {
-  LangyMark,
-  LangyMarkGradientDefs,
-} from "~/features/langy/components/LangyMark";
+import { LangyMark, LangyMarkGradientDefs } from "~/features/langy/components/LangyMark";
 
 const LANGY_INPUT_RADIUS = "18px";
 const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
@@ -70,11 +67,7 @@ export function CommandBarLangyMode({
   };
 
   return (
-    <Box
-      className="langy-root"
-      data-langy-command-mode="true"
-      background="transparent"
-    >
+    <Box className="langy-root" data-langy-command-mode="true" background="transparent">
       <LangyMarkGradientDefs id={COMMAND_BAR_LANGY_GRADIENT_ID} />
 
       <Box px={{ base: 3, md: 4 }} py={{ base: 3, md: 3.5 }}>

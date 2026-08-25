@@ -30,15 +30,16 @@ describe("given organizations of every eligibility kind", () => {
         data: { name: `Cohort ${label} ${ns}`, slug: `--test-${label}-${ns}` },
       });
 
-    const [plain, enterprise, pending, cancelled, enrolled, excluded] =
-      await Promise.all([
+    const [plain, enterprise, pending, cancelled, enrolled, excluded] = await Promise.all(
+      [
         make("plain"),
         make("enterprise"),
         make("pending-ent"),
         make("cancelled-ent"),
         make("enrolled"),
         make("excluded"),
-      ]);
+      ],
+    );
     plainOrgId = plain.id;
     enterpriseOrgId = enterprise.id;
     pendingEnterpriseOrgId = pending.id;

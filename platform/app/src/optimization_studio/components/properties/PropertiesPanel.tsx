@@ -22,14 +22,13 @@ import { PromptingTechniquePropertiesPanel } from "./PromptingTechniquePropertie
 import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
 
 export function PropertiesPanel() {
-  const { selectedNode, propertiesExpanded, setPropertiesExpanded } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        selectedNode: state.nodes.find((n) => n.selected),
-        propertiesExpanded: state.propertiesExpanded,
-        setPropertiesExpanded: state.setPropertiesExpanded,
-      })),
-    );
+  const { selectedNode, propertiesExpanded, setPropertiesExpanded } = useWorkflowStore(
+    useShallow((state) => ({
+      selectedNode: state.nodes.find((n) => n.selected),
+      propertiesExpanded: state.propertiesExpanded,
+      setPropertiesExpanded: state.setPropertiesExpanded,
+    })),
+  );
 
   const ComponentPropertiesPanelMap: Record<
     ComponentType,
@@ -60,8 +59,7 @@ export function PropertiesPanel() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isPopoverOpen =
-        document.querySelector(".chakra-popover__popper") !== null;
+      const isPopoverOpen = document.querySelector(".chakra-popover__popper") !== null;
       if (e.key === "Escape" && propertiesExpanded && !isPopoverOpen) {
         setPropertiesExpanded(false);
         e.stopPropagation();
@@ -81,8 +79,7 @@ export function PropertiesPanel() {
     return null;
   }
 
-  const PropertiesPanel =
-    ComponentPropertiesPanelMap[selectedNode.type as ComponentType];
+  const PropertiesPanel = ComponentPropertiesPanelMap[selectedNode.type as ComponentType];
 
   const panelWidth = ref.current?.offsetWidth ?? 350;
   const halfPanelWidth = Math.round(panelWidth / 2);
@@ -172,9 +169,7 @@ export function PropertiesPanel() {
               // @ts-ignore
               className="js-outer-box"
               onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-                if (
-                  (e.target as HTMLElement).classList.contains("js-outer-box")
-                ) {
+                if ((e.target as HTMLElement).classList.contains("js-outer-box")) {
                   setPropertiesExpanded(false);
                 }
               }}
@@ -205,9 +200,7 @@ export function PropertiesPanel() {
               // @ts-ignore
               className="js-outer-box"
               onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-                if (
-                  (e.target as HTMLElement).classList.contains("js-outer-box")
-                ) {
+                if ((e.target as HTMLElement).classList.contains("js-outer-box")) {
                   setPropertiesExpanded(false);
                 }
               }}

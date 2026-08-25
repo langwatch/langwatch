@@ -33,11 +33,7 @@ import {
   showErrorToast,
 } from "~/features/errors";
 import type { SimulationSuite } from "~/generated/prisma/client";
-import {
-  getFlowCallbacks,
-  useDrawer,
-  useDrawerParams,
-} from "~/hooks/useDrawer";
+import { getFlowCallbacks, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import { api } from "~/utils/api";
@@ -96,11 +92,10 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const onRunRequested = callbacks?.onRunRequested;
 
   // Fetch suite data when editing
-  const { data: suite, isLoading: isSuiteLoading } =
-    api.suites.getById.useQuery(
-      { projectId: project?.id ?? "", id: suiteId ?? "" },
-      { enabled: !!project && !!suiteId && isOpen },
-    );
+  const { data: suite, isLoading: isSuiteLoading } = api.suites.getById.useQuery(
+    { projectId: project?.id ?? "", id: suiteId ?? "" },
+    { enabled: !!project && !!suiteId && isOpen },
+  );
 
   // Fetch available scenarios and targets
   const { data: scenarios } = api.scenarios.getAll.useQuery(
@@ -179,8 +174,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     onError: (err) => {
       saveAndRunRef.current = false;
       if (applyNameTakenToForm(err)) return;
-      if (applyHandledErrorToForm({ error: err, form, hasFormErrorSlot: true }))
-        return;
+      if (applyHandledErrorToForm({ error: err, form, hasFormErrorSlot: true })) return;
       showErrorToast({ error: err, fallbackTitle: "Couldn't create run plan" });
     },
   });
@@ -208,8 +202,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     onError: (err) => {
       saveAndRunRef.current = false;
       if (applyNameTakenToForm(err)) return;
-      if (applyHandledErrorToForm({ error: err, form, hasFormErrorSlot: true }))
-        return;
+      if (applyHandledErrorToForm({ error: err, form, hasFormErrorSlot: true })) return;
       showErrorToast({ error: err, fallbackTitle: "Couldn't update run plan" });
     },
   });
@@ -418,8 +411,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                     Models
                   </Text>
                   <Text fontSize="xs" color="fg.muted">
-                    Choose the models that role-play the user and judge the
-                    runs. Both default to your project&apos;s Default model.
+                    Choose the models that role-play the user and judge the runs. Both
+                    default to your project&apos;s Default model.
                   </Text>
                   <SimulationModelSelect
                     label="User simulator"
@@ -448,9 +441,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 {/* Execution Options */}
                 <Collapsible.Root
                   open={suiteForm.executionOptionsOpen}
-                  onOpenChange={(d) =>
-                    suiteForm.setExecutionOptionsOpen(d.open)
-                  }
+                  onOpenChange={(d) => suiteForm.setExecutionOptionsOpen(d.open)}
                 >
                   <Collapsible.Trigger asChild>
                     <HStack cursor="pointer" gap={2}>
@@ -484,9 +475,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                             {...form.register("repeatCount", {
                               valueAsNumber: true,
                             })}
-                            borderColor={
-                              errors.repeatCount ? "red.500" : undefined
-                            }
+                            borderColor={errors.repeatCount ? "red.500" : undefined}
                           />
                           <Text fontSize="xs" color="fg.muted">
                             times per scenario x target (max {MAX_REPEAT_COUNT})
@@ -510,11 +499,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
               <Button variant="outline" onClick={handleSave} loading={isSaving}>
                 Save
               </Button>
-              <Button
-                colorPalette="blue"
-                onClick={handleRunNow}
-                loading={isSaving}
-              >
+              <Button colorPalette="blue" onClick={handleRunNow} loading={isSaving}>
                 <Play size={14} />
                 Run Now
               </Button>

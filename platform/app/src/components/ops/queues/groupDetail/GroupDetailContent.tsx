@@ -20,13 +20,7 @@ import {
 } from "../pipelineUtils";
 import { GroupJobsSection } from "./GroupJobsSection";
 
-function DetailField({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <VStack align="start" gap={0}>
       <Text textStyle="xs" color="fg.muted">
@@ -67,10 +61,7 @@ function GroupStatusRow({
         </DetailField>
       )}
       <DetailField label="Next run">
-        <Text
-          textStyle="sm"
-          color={c.state === "retrying" ? "orange.500" : undefined}
-        >
+        <Text textStyle="sm" color={c.state === "retrying" ? "orange.500" : undefined}>
           {describeNextRun(c, now)}
         </Text>
       </DetailField>
@@ -108,13 +99,7 @@ function GroupTimingRow({ detail, now }: { detail: GroupInfo; now: number }) {
   );
 }
 
-function GroupErrorSection({
-  detail,
-  now,
-}: {
-  detail: GroupInfo;
-  now: number;
-}) {
+function GroupErrorSection({ detail, now }: { detail: GroupInfo; now: number }) {
   if (!detail.errorMessage) return null;
   return (
     <VStack align="stretch" gap={1}>
@@ -206,9 +191,9 @@ export function GroupDetailContent({
   if (!detail) {
     return (
       <Text textStyle="sm" color="fg.muted" data-testid="group-detail-missing">
-        This group no longer exists — its jobs completed and it was cleaned up,
-        or it was drained. The table refreshes every few seconds, so a finished
-        group can linger there briefly.
+        This group no longer exists — its jobs completed and it was cleaned up, or it was
+        drained. The table refreshes every few seconds, so a finished group can linger
+        there briefly.
       </Text>
     );
   }

@@ -39,7 +39,5 @@ export const SinceCell = {
   id: "since",
   label: "Since",
   render: ({ row }) => <SinceText timestamp={row.timestamp} />,
-  renderComfortable: ({ row }) => (
-    <SinceText timestamp={row.timestamp} comfortable />
-  ),
+  renderComfortable: ({ row }) => <SinceText timestamp={row.timestamp} comfortable />,
 } as const satisfies CellDef<TraceListItem>;

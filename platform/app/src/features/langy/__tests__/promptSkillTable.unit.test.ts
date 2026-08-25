@@ -14,10 +14,7 @@ import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const langyagent = path.resolve(
-  here,
-  "../../../../../../services/langyagent/internal",
-);
+const langyagent = path.resolve(here, "../../../../../../services/langyagent/internal");
 const promptPath = path.join(langyagent, "assets/AGENTS.md");
 const skillsDir = path.join(langyagent, "assets/skills");
 

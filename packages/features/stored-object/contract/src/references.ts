@@ -31,9 +31,7 @@ export const storedObjectReferenceSchema = z
 export type StoredObjectReference = z.infer<typeof storedObjectReferenceSchema>;
 
 export const storedObjectDeliveryMethodSchema = z.enum(["GET", "HEAD"]);
-export type StoredObjectDeliveryMethod = z.infer<
-  typeof storedObjectDeliveryMethodSchema
->;
+export type StoredObjectDeliveryMethod = z.infer<typeof storedObjectDeliveryMethodSchema>;
 
 export const storedObjectDeliveryCapabilitySchema = z
   .object({

@@ -26,9 +26,7 @@ vi.mock("../../../hooks/useProjectHasTraces", () => ({
 
 vi.mock("../../../hooks/useTraceFacets", () => ({
   useTraceFacets: () => ({
-    data: [
-      { kind: "categorical", key: "status", label: "Status", topValues: [] },
-    ],
+    data: [{ kind: "categorical", key: "status", label: "Status", topValues: [] }],
     isLoading: false,
   }),
 }));
@@ -104,11 +102,9 @@ vi.mock("../SectionRenderer", () => ({
 }));
 
 vi.mock("../SortableSection", () => ({
-  SortableSection: ({
-    children,
-  }: {
-    children: (p: unknown) => React.ReactNode;
-  }) => <div>{children({})}</div>,
+  SortableSection: ({ children }: { children: (p: unknown) => React.ReactNode }) => (
+    <div>{children({})}</div>
+  ),
 }));
 
 vi.mock("../FilterSidebarSkeleton", () => ({
@@ -126,9 +122,7 @@ vi.mock("@dnd-kit/core", () => ({
 }));
 
 vi.mock("@dnd-kit/sortable", () => ({
-  SortableContext: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
+  SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   sortableKeyboardCoordinates: vi.fn(),
   arrayMove: (arr: unknown[]) => arr,
   verticalListSortingStrategy: vi.fn(),

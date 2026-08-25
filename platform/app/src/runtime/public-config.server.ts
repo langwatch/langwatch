@@ -62,9 +62,7 @@ export class PublicAppConfigService {
       demoProjectSlug: source.DEMO_PROJECT_SLUG,
       mode: source.NODE_ENV,
       telemetry: {
-        browserTracing: Boolean(
-          source.RUM_ENABLED && source.OTEL_EXPORTER_OTLP_ENDPOINT,
-        ),
+        browserTracing: Boolean(source.RUM_ENABLED && source.OTEL_EXPORTER_OTLP_ENDPOINT),
         sampleRatio: source.RUM_SAMPLE_RATIO ?? RUM_DEFAULT_SAMPLE_RATIO,
         posthog: source.POSTHOG_KEY
           ? { key: source.POSTHOG_KEY, host: source.POSTHOG_HOST }
@@ -72,10 +70,7 @@ export class PublicAppConfigService {
       },
       capabilities: {
         email: hasConfiguredEmailDelivery(source),
-        nlp: Boolean(
-          source.LANGWATCH_NLP_SERVICE ||
-            source.LANGWATCH_NLP_LAMBDA_CONFIG,
-        ),
+        nlp: Boolean(source.LANGWATCH_NLP_SERVICE || source.LANGWATCH_NLP_LAMBDA_CONFIG),
         langevals: Boolean(source.LANGEVALS_ENDPOINT),
       },
       licensePaymentUrl: source.STRIPE_LICENSE_PAYMENT_LINK_URL,

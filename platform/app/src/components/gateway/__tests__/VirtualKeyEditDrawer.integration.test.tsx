@@ -83,8 +83,7 @@ vi.mock("~/utils/api", () => ({
       },
       applicableBudgets: {
         useQuery: (_input: unknown, opts?: { enabled?: boolean }) => ({
-          data:
-            opts?.enabled === false ? undefined : applicableBudgetsData.rows,
+          data: opts?.enabled === false ? undefined : applicableBudgetsData.rows,
         }),
       },
     },
@@ -165,9 +164,7 @@ const save = async () => {
   await waitFor(() => expect(updateMutateAsync).toHaveBeenCalled());
 };
 
-const ownBudgetRow = (
-  overrides: Partial<ApplicableBudget> = {},
-): ApplicableBudget => ({
+const ownBudgetRow = (overrides: Partial<ApplicableBudget> = {}): ApplicableBudget => ({
   id: "budget-own",
   name: "legacy-key budget",
   scopeType: "VIRTUAL_KEY",
@@ -220,9 +217,7 @@ describe("given the edit drawer for an existing key", () => {
 
       await waitFor(() => {
         expect(
-          screen
-            .getByTestId("vk-routing-none")
-            .querySelector("input[type=radio]"),
+          screen.getByTestId("vk-routing-none").querySelector("input[type=radio]"),
         ).toBeChecked();
       });
 
@@ -303,15 +298,11 @@ describe("given the edit drawer for an existing key", () => {
 
       await waitFor(() => {
         expect(
-          screen
-            .getByTestId("vk-providers-all")
-            .querySelector("input[type=checkbox]"),
+          screen.getByTestId("vk-providers-all").querySelector("input[type=checkbox]"),
         ).not.toBeChecked();
       });
       expect(
-        screen
-          .getByTestId("vk-provider-mp-openai")
-          .querySelector("input[type=checkbox]"),
+        screen.getByTestId("vk-provider-mp-openai").querySelector("input[type=checkbox]"),
       ).toBeChecked();
       expect(
         screen
@@ -334,9 +325,7 @@ describe("given the edit drawer for an existing key", () => {
 
       await waitFor(() =>
         expect(
-          screen
-            .getByTestId("vk-providers-all")
-            .querySelector("input[type=checkbox]"),
+          screen.getByTestId("vk-providers-all").querySelector("input[type=checkbox]"),
         ).toBeChecked(),
       );
       await save();
@@ -374,13 +363,12 @@ describe("given the edit drawer for an existing key", () => {
 
       await waitFor(() =>
         expect(
-          (screen.getByTestId("vk-expiration-preset") as HTMLSelectElement)
-            .value,
+          (screen.getByTestId("vk-expiration-preset") as HTMLSelectElement).value,
         ).toBe("custom"),
       );
-      expect(
-        (screen.getByTestId("vk-expiration-date") as HTMLInputElement).value,
-      ).toBe("2030-08-20");
+      expect((screen.getByTestId("vk-expiration-date") as HTMLInputElement).value).toBe(
+        "2030-08-20",
+      );
 
       await save();
       // Untouched means untouched: the field is left out, so the stored
@@ -393,9 +381,7 @@ describe("given the edit drawer for an existing key", () => {
     it("leaves a passed date out, so an unrelated edit to an expired key saves", async () => {
       renderDrawer({ expiresAt: "2020-01-01T00:00:00.000Z" });
 
-      const nameInput = await waitFor(() =>
-        screen.getByDisplayValue("legacy-key"),
-      );
+      const nameInput = await waitFor(() => screen.getByDisplayValue("legacy-key"));
       await userEvent.clear(nameInput);
       await userEvent.type(nameInput, "renamed-key");
 
@@ -412,10 +398,7 @@ describe("given the edit drawer for an existing key", () => {
       await waitFor(() =>
         expect(screen.getByTestId("vk-expiration-preset")).toBeTruthy(),
       );
-      await userEvent.selectOptions(
-        screen.getByTestId("vk-expiration-preset"),
-        "",
-      );
+      await userEvent.selectOptions(screen.getByTestId("vk-expiration-preset"), "");
       await save();
       expect(lastUpdateInput().expiresAt).toBeNull();
     });
@@ -423,9 +406,7 @@ describe("given the edit drawer for an existing key", () => {
     it("moves the date when a new day is typed", async () => {
       renderDrawer({ expiresAt: "2030-08-20T09:15:00.000Z" });
 
-      const dateInput = await waitFor(() =>
-        screen.getByTestId("vk-expiration-date"),
-      );
+      const dateInput = await waitFor(() => screen.getByTestId("vk-expiration-date"));
       await userEvent.clear(dateInput);
       await userEvent.type(dateInput, "2030-09-01");
       await save();
@@ -441,8 +422,7 @@ describe("given the edit drawer for an existing key", () => {
 
       await waitFor(() =>
         expect(
-          (screen.getByTestId("vk-expiration-preset") as HTMLSelectElement)
-            .value,
+          (screen.getByTestId("vk-expiration-preset") as HTMLSelectElement).value,
         ).toBe(""),
       );
       await save();

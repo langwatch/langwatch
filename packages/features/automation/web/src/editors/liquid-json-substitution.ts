@@ -127,9 +127,7 @@ export function substituteLiquidForJsonValidation(
     // Per-span substitution would wrap embedded `{{ ... }}` in `"___"` at
     // top level, producing invalid JSON and a misleading marker — fold
     // the whole region into one tag span instead.
-    const passthroughOpener = !isOutput
-      ? PASSTHROUGH_OPENER_RE.exec(span)
-      : null;
+    const passthroughOpener = !isOutput ? PASSTHROUGH_OPENER_RE.exec(span) : null;
     if (passthroughOpener) {
       const closerName = PASSTHROUGH_BLOCK_TAGS[passthroughOpener[1]!]!;
       const blockEnd = findMatchingCloseTag(source, end, closerName);

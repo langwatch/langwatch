@@ -13,9 +13,7 @@ export const MENU_ITEM_HEIGHT = SIDE_MENU_DENSITIES.comfortable.height;
 
 // Base props for the visual menu item styling
 export type SideMenuItemProps = {
-  icon:
-    | React.ComponentType<{ size?: string | number; color?: string }>
-    | React.ReactNode;
+  icon: React.ComponentType<{ size?: string | number; color?: string }> | React.ReactNode;
   label: string;
   isActive?: boolean;
   badgeNumber?: number;
@@ -86,10 +84,7 @@ export const SideMenuItem = ({
   const iconNode =
     typeof IconElem === "function" ||
     (IconElem as unknown as { render?: unknown }).render ? (
-      <IconElem
-        size={density.iconSize}
-        color="var(--chakra-colors-nav-fg-muted)"
-      />
+      <IconElem size={density.iconSize} color="var(--chakra-colors-nav-fg-muted)" />
     ) : (
       (icon as React.ReactNode)
     );
@@ -192,11 +187,7 @@ export const SideMenuLink = ({
 
   if (unavailableReason) {
     return (
-      <Tooltip
-        content={unavailableReason}
-        positioning={{ placement: "right" }}
-        showArrow
-      >
+      <Tooltip content={unavailableReason} positioning={{ placement: "right" }} showArrow>
         <Box
           width="full"
           role="link"

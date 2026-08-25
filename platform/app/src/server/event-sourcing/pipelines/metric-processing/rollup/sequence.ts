@@ -20,10 +20,7 @@ export function numberValue(point: CanonicalMetricDataPoint): number | null {
 }
 
 export function floorBucket(timeUnixMs: number): number {
-  return (
-    Math.floor(timeUnixMs / METRIC_ROLLUP_INTERVAL_MS) *
-    METRIC_ROLLUP_INTERVAL_MS
-  );
+  return Math.floor(timeUnixMs / METRIC_ROLLUP_INTERVAL_MS) * METRIC_ROLLUP_INTERVAL_MS;
 }
 
 /**
@@ -59,8 +56,7 @@ export function isGap(
   current: CanonicalMetricDataPoint,
 ): boolean {
   return (
-    !!previous &&
-    current.timeUnixMs - previous.timeUnixMs > METRIC_ROLLUP_INTERVAL_MS * 2
+    !!previous && current.timeUnixMs - previous.timeUnixMs > METRIC_ROLLUP_INTERVAL_MS * 2
   );
 }
 
@@ -83,10 +79,7 @@ export function startsNewSequence(
  * cannot answer this.
  */
 export function usesPredecessor(point: MetricSequencePoint): boolean {
-  return (
-    point.metricKind === "summary" ||
-    point.aggregationTemporality === "cumulative"
-  );
+  return point.metricKind === "summary" || point.aggregationTemporality === "cumulative";
 }
 
 export function previousPoint(

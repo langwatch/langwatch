@@ -99,8 +99,7 @@ function withFamilyToggled(
  * time the drawer opens, plus the save payload they add up to.
  */
 function useDestinationFields(isOpen: boolean, endpoint: EndpointView | null) {
-  const [destinationKind, setDestinationKind] =
-    useState<WebhookDestinationKind>("http");
+  const [destinationKind, setDestinationKind] = useState<WebhookDestinationKind>("http");
   const [url, setUrl] = useState("");
   const [queueUrl, setQueueUrl] = useState("");
   const [roleArn, setRoleArn] = useState("");
@@ -136,9 +135,7 @@ function useDestinationFields(isOpen: boolean, endpoint: EndpointView | null) {
     secretAccessKey,
     setSecretAccessKey,
     isAddressFilled:
-      destinationKind === "sqs"
-        ? queueUrl.trim().length > 0
-        : url.trim().length > 0,
+      destinationKind === "sqs" ? queueUrl.trim().length > 0 : url.trim().length > 0,
     toDestinationInput: (): DestinationInput =>
       destinationKind === "sqs"
         ? {
@@ -372,9 +369,7 @@ function SqsDestinationFields({ form }: { form: EndpointForm }) {
         onChange={form.setRoleArn}
         testId="webhook-sqs-role-arn"
       />
-      {form.externalId ? (
-        <ExternalIdField externalId={form.externalId} />
-      ) : null}
+      {form.externalId ? <ExternalIdField externalId={form.externalId} /> : null}
       <DestinationTextField
         label="Access key id"
         description="An alternative to assuming a role: a key pair belonging to a user that may send messages to the queue."
@@ -469,17 +464,10 @@ function EventFamilySection({
   const wildcardOn = selected.has(`${family}.*`);
 
   return (
-    <VStack
-      align="start"
-      gap={2}
-      width="full"
-      data-testid={`webhook-family-${family}`}
-    >
+    <VStack align="start" gap={2} width="full" data-testid={`webhook-family-${family}`}>
       <Checkbox
         checked={wildcardOn}
-        onCheckedChange={({ checked }) =>
-          onToggleFamily(family, checked === true)
-        }
+        onCheckedChange={({ checked }) => onToggleFamily(family, checked === true)}
         data-testid={`webhook-family-toggle-${family}`}
       >
         <Text fontWeight="600" fontSize="sm">
@@ -492,9 +480,7 @@ function EventFamilySection({
             key={t.type}
             checked={wildcardOn || selected.has(t.type)}
             disabled={wildcardOn}
-            onCheckedChange={({ checked }) =>
-              onToggleType(t.type, checked === true)
-            }
+            onCheckedChange={({ checked }) => onToggleType(t.type, checked === true)}
             data-testid={`webhook-event-${t.type}`}
           >
             <HStack gap={2}>

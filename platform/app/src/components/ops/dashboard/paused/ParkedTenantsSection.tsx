@@ -41,14 +41,13 @@ export function ParkedTenantsSection({
           </Text>
           {parkedTenantsBound.total > parkedTenantsBound.included && (
             <Text textStyle="xs" color="fg.muted">
-              showing {parkedTenantsBound.included} of{" "}
-              {parkedTenantsBound.total}
+              showing {parkedTenantsBound.included} of {parkedTenantsBound.total}
             </Text>
           )}
         </HStack>
         <Text textStyle="xs" color="fg.muted" marginTop={1}>
-          These tenants are at their in-flight capacity limit. Their work is
-          waiting its turn so other tenants keep moving — nothing has failed.
+          These tenants are at their in-flight capacity limit. Their work is waiting its
+          turn so other tenants keep moving — nothing has failed.
         </Text>
       </Box>
       <Table.ScrollArea>
@@ -132,9 +131,7 @@ function ParkedTenantRow({
         <Table.Cell>
           <Text fontWeight="medium">{formatCount(groupCount)}</Text>
         </Table.Cell>
-        <Table.Cell color="fg.muted">
-          {formatTimeAgo(oldestParkedMs)}
-        </Table.Cell>
+        <Table.Cell color="fg.muted">{formatTimeAgo(oldestParkedMs)}</Table.Cell>
       </Table.Row>
       {open && (
         <Table.Row>
@@ -186,8 +183,8 @@ function ParkedGroupList({
   if (query.isError) {
     return (
       <Text textStyle="xs" color="red.500" paddingX={6} paddingY={3}>
-        Could not load this tenant's parked groups. The count above still stands
-        — do not read this as cleared.
+        Could not load this tenant's parked groups. The count above still stands — do not
+        read this as cleared.
       </Text>
     );
   }
@@ -205,19 +202,12 @@ function ParkedGroupList({
     <Box paddingX={6} paddingY={2} background="bg.subtle">
       {query.data && query.data.total > groups.length && (
         <Text textStyle="xs" color="fg.muted" paddingBottom={1}>
-          Showing {groups.length} of {formatCount(query.data.total)} parked
-          groups
+          Showing {groups.length} of {formatCount(query.data.total)} parked groups
         </Text>
       )}
       {groups.map((group) => (
         <HStack key={group.groupId} gap={3} paddingY={1}>
-          <Text
-            fontFamily="mono"
-            textStyle="xs"
-            title={group.groupId}
-            flex="1"
-            truncate
-          >
+          <Text fontFamily="mono" textStyle="xs" title={group.groupId} flex="1" truncate>
             {middleEllipsis(group.groupId, 64)}
           </Text>
           <Text textStyle="xs" color="fg.muted">

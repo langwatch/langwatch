@@ -44,18 +44,14 @@ export async function syncLangyAfterDefaultModelWrite({
   let nextDefault: string | null | undefined;
   try {
     previousDefault =
-      utils.modelProvider.getResolvedDefault.getData(resolvedInput)?.model ??
-      null;
+      utils.modelProvider.getResolvedDefault.getData(resolvedInput)?.model ?? null;
     await utils.modelProvider.invalidate();
-    const resolved =
-      await utils.modelProvider.getResolvedDefault.fetch(resolvedInput);
+    const resolved = await utils.modelProvider.getResolvedDefault.fetch(resolvedInput);
     nextDefault = resolved?.model ?? fallbackModel ?? previousDefault;
   } catch {
     nextDefault = fallbackModel ?? previousDefault;
   }
   if (!nextDefault) return;
 
-  useLangyStore
-    .getState()
-    .followCodingDefaultChange({ previousDefault, nextDefault });
+  useLangyStore.getState().followCodingDefaultChange({ previousDefault, nextDefault });
 }

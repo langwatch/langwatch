@@ -94,9 +94,7 @@ describe("readRectAtRest", () => {
 
       expect(readRectAtRest(composer)).toEqual(DESTINATION);
       // Reading it naively is the bug this exists to avoid.
-      expect(composer.getBoundingClientRect().left).toBe(
-        DESTINATION.left + 392,
-      );
+      expect(composer.getBoundingClientRect().left).toBe(DESTINATION.left + 392);
     });
 
     it("puts the panel's own transform back, so framer keeps driving it", () => {

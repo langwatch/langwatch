@@ -65,13 +65,10 @@ export function starterVegaLiteSpec({
   }));
 
   const temporal = typed.find((column) => column.encoding === "temporal");
-  const quantitative = typed.find(
-    (column) => column.encoding === "quantitative",
-  );
+  const quantitative = typed.find((column) => column.encoding === "quantitative");
   const nominal =
     typed.find(
-      (column) =>
-        column.encoding === "nominal" && column.name !== TENANT_COLUMN,
+      (column) => column.encoding === "nominal" && column.name !== TENANT_COLUMN,
     ) ?? typed.find((column) => column.encoding === "nominal");
   const dimension = temporal ?? nominal;
 
@@ -107,8 +104,6 @@ export function starterVegaLiteSpec({
 }
 
 /** The starter specification as the editor's initial text. */
-export function starterVegaLiteSpecText(
-  input: StarterVegaLiteSpecInput,
-): string {
+export function starterVegaLiteSpecText(input: StarterVegaLiteSpecInput): string {
   return `${JSON.stringify(starterVegaLiteSpec(input), null, 2)}\n`;
 }

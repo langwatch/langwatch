@@ -128,9 +128,7 @@ describe("the inspector tape", () => {
       useLangyStore.setState({ activeConversationId: "c2" });
       log.record({ type: "delta", text: "yo" } as never, "t2");
 
-      const tagged = useLangyDevLog
-        .getState()
-        .records.map((r) => r.conversationId);
+      const tagged = useLangyDevLog.getState().records.map((r) => r.conversationId);
       expect(tagged).toEqual(["c1", "c1", "c2"]);
     });
 
@@ -144,9 +142,7 @@ describe("the inspector tape", () => {
       log.recordSignal({ conversationId: "c9", cursor: null });
       log.recordOutbound("stop", "stop turn t9", { conversationId: "c9" });
 
-      const tagged = useLangyDevLog
-        .getState()
-        .records.map((r) => r.conversationId);
+      const tagged = useLangyDevLog.getState().records.map((r) => r.conversationId);
       expect(tagged).toEqual(["c1", "c9", "c9"]);
     });
 

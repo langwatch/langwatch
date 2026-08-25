@@ -1,11 +1,42 @@
 {
-  "name": "@langwatch/enterprise-saas-web", "version": "0.1.0", "private": true,
+  "name": "@langwatch/enterprise-saas-web",
+  "version": "0.1.0",
+  "private": true,
   "description": "Browser-only Enterprise SaaS integrations.",
-  "license": "SEE LICENSE IN ../../../LICENSE.md", "type": "module",
-  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
-  "main": "./src/index.ts", "types": "./src/index.ts", "files": ["src"],
-  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run", "test:unit": "vitest run" },
-  "dependencies": { "@langwatch/enterprise-saas-contract": "workspace:*", "posthog-js": "^1.396.9" },
-  "peerDependencies": { "react": "^19.2.7", "react-dom": "^19.2.7" },
-  "devDependencies": { "@testing-library/react": "^16.3.2", "@types/react": "^19.2.14", "@types/react-dom": "^19.2.3", "jsdom": "^30.0.1", "react": "^19.2.7", "react-dom": "^19.2.7", "typescript": "^7.0.2", "vitest": "^4.1.9" }
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/enterprise-saas-contract": "workspace:*",
+    "posthog-js": "^1.396.9"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
 }

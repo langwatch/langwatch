@@ -42,8 +42,7 @@ export function useLangyContextDropZone(): {
   const onDragLeave = useCallback((event: DragEvent<HTMLElement>) => {
     // Dragging across the panel's own children fires leave-then-enter
     // constantly; only a leave that actually exits the panel counts.
-    if (event.currentTarget.contains(event.relatedTarget as Node | null))
-      return;
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
     setIsOver(false);
   }, []);
 

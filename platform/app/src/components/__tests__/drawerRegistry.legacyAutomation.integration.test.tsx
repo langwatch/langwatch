@@ -77,9 +77,7 @@ describe("<CurrentDrawer/>", () => {
           </ChakraProvider>,
         );
 
-        expect(
-          await screen.findByTestId("automation-drawer"),
-        ).toBeInTheDocument();
+        expect(await screen.findByTestId("automation-drawer")).toBeInTheDocument();
       });
     });
   });

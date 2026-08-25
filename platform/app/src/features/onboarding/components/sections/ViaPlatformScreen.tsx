@@ -106,12 +106,7 @@ function CapabilityCard({
           <Icon size={20} strokeWidth={1.5} />
         </Box>
         <VStack align="stretch" gap={1}>
-          <Text
-            fontSize="sm"
-            fontWeight="semibold"
-            color="fg"
-            letterSpacing="-0.01em"
-          >
+          <Text fontSize="sm" fontWeight="semibold" color="fg" letterSpacing="-0.01em">
             {title}
           </Text>
           <Text fontSize="xs" color="fg.muted" lineHeight="tall">

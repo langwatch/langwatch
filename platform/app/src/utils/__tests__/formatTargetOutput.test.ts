@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  formatTargetOutput,
-  unwrapSingleOutputKey,
-} from "../formatTargetOutput";
+import { formatTargetOutput, unwrapSingleOutputKey } from "../formatTargetOutput";
 
 describe("formatTargetOutput", () => {
   describe("null/undefined handling", () => {

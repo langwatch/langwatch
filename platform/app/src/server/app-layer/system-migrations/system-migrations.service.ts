@@ -73,10 +73,7 @@ export interface SystemMigrationEnrollmentStore {
   findOrganizationById(args: {
     organizationId: string;
   }): Promise<{ id: string; name: string } | null>;
-  isEnrolled(args: {
-    organizationId: string;
-    migrationName: string;
-  }): Promise<boolean>;
+  isEnrolled(args: { organizationId: string; migrationName: string }): Promise<boolean>;
   countEnrolledByMigration(): Promise<Map<string, number>>;
   countOrganizations(): Promise<number>;
   searchOrganizations(args: {
@@ -99,10 +96,7 @@ export interface SystemMigrationEnrollmentStore {
     migrationName: string;
     enrolledByUserId: string;
   }): Promise<{ insertedCount: number }>;
-  delete(args: {
-    organizationId: string;
-    migrationName: string;
-  }): Promise<void>;
+  delete(args: { organizationId: string; migrationName: string }): Promise<void>;
 }
 
 export interface SystemMigrationStateReader {
@@ -274,10 +268,7 @@ export class SystemMigrationsService {
        */
       rollbackGuards?: Record<
         string,
-        (args: {
-          tenantId: string;
-          record: TenantMigrationRecord;
-        }) => Promise<void>
+        (args: { tenantId: string; record: TenantMigrationRecord }) => Promise<void>
       >;
     },
   ) {}
@@ -316,16 +307,12 @@ export class SystemMigrationsService {
           title: migration.title,
           description: migration.description,
           requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
-          availableOnThisInstallation:
-            isSaaS || migration.runsAutomaticallyOnSelfHosted,
+          availableOnThisInstallation: isSaaS || migration.runsAutomaticallyOnSelfHosted,
           counts,
           enrollment: enrolledByMigration
             ? {
                 enrolledCount,
-                notEnrolledCount: Math.max(
-                  0,
-                  totalOrganizations - enrolledCount,
-                ),
+                notEnrolledCount: Math.max(0, totalOrganizations - enrolledCount),
               }
             : null,
           attention,
@@ -443,16 +430,13 @@ export class SystemMigrationsService {
     // step whose predecessor nothing will ever run would sit pending
     // forever. The first step keeps sampling the whole installation.
     const ordered = this.deps.migrations();
-    const index = ordered.findIndex(
-      (migration) => migration.name === migrationName,
-    );
+    const index = ordered.findIndex((migration) => migration.name === migrationName);
     const previous = index > 0 ? ordered[index - 1] : undefined;
-    const eligible =
-      await this.deps.enrollments.findCohortEligibleOrganizations({
-        migrationName,
-        enrolledForMigrationName: previous?.name,
-        excludeOrganizationIds: this.deps.privateDataplaneOrganizationIds(),
-      });
+    const eligible = await this.deps.enrollments.findCohortEligibleOrganizations({
+      migrationName,
+      enrolledForMigrationName: previous?.name,
+      excludeOrganizationIds: this.deps.privateDataplaneOrganizationIds(),
+    });
     const picked = sample({ pool: eligible, count: sampleSize });
     const { insertedCount } = await this.deps.enrollments.createMany({
       organizationIds: picked.map((organization) => organization.id),
@@ -590,13 +574,8 @@ export class SystemMigrationsService {
    * dangerous; an unknown name is refused before any confirmation question
    * arises.
    */
-  requiresOperatorConfirmation({
-    migrationName,
-  }: {
-    migrationName: string;
-  }): boolean {
-    return this.requireRegisteredMigration(migrationName)
-      .requiresOperatorConfirmation;
+  requiresOperatorConfirmation({ migrationName }: { migrationName: string }): boolean {
+    return this.requireRegisteredMigration(migrationName).requiresOperatorConfirmation;
   }
 
   /** The migration a name refers to, or the refusal the operator can act on. */
@@ -758,9 +737,8 @@ export class SystemMigrationsService {
     // decision that must not reuse the old moment (and so must not dedupe
     // against the old event).
     const decidedAt =
-      (record.status === "rolled_back"
-        ? rollbackDecidedAt(priorReport)
-        : null) ?? new Date().toISOString();
+      (record.status === "rolled_back" ? rollbackDecidedAt(priorReport) : null) ??
+      new Date().toISOString();
 
     // The pin FIRST, its effects after — deliberately in that order. The
     // stored `rolled_back` status is what stops the next pass re-finalizing

@@ -65,9 +65,7 @@ export const routerProxy: unknown = new Proxy(
  * two default-model mutations the make-default dialog holds at render. A suite
  * that IS about one of these passes its own value for that key.
  */
-export const modelProviderRouter = (
-  explicit: Record<string, unknown> = {},
-) => ({
+export const modelProviderRouter = (explicit: Record<string, unknown> = {}) => ({
   getResolvedDefault: {
     useQuery: () => ({
       data: { model: "openai/gpt-5-mini" },

@@ -221,8 +221,7 @@ describe("getAzureSafetyEnvFromProject", () => {
       });
 
       it("does not use process.env as a fallback when keys differ", async () => {
-        process.env.AZURE_CONTENT_SAFETY_ENDPOINT =
-          "https://fallback.example.com/";
+        process.env.AZURE_CONTENT_SAFETY_ENDPOINT = "https://fallback.example.com/";
         process.env.AZURE_CONTENT_SAFETY_KEY = "fallback-key";
 
         getProjectModelProvidersMock.mockResolvedValue({
@@ -237,9 +236,7 @@ describe("getAzureSafetyEnvFromProject", () => {
         });
 
         const result = await getAzureSafetyEnvFromProject(projectId);
-        expect(result?.AZURE_CONTENT_SAFETY_ENDPOINT).toBe(
-          "https://project.azure.com/",
-        );
+        expect(result?.AZURE_CONTENT_SAFETY_ENDPOINT).toBe("https://project.azure.com/");
         expect(result?.AZURE_CONTENT_SAFETY_KEY).toBe("project-key");
       });
     });

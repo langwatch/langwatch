@@ -24,10 +24,7 @@ export {
   type ProcessManagerServiceOptions,
   type SignalHandleResult,
 } from "./processManagerService";
-export {
-  type GeneratedProcessArtifacts,
-  ProcessRuntime,
-} from "./processRuntime";
+export { type GeneratedProcessArtifacts, ProcessRuntime } from "./processRuntime";
 export { InMemoryProcessStore } from "./stores/inMemoryProcessStore";
 export { deriveInboxKey } from "./stores/inboxKey";
 export type {

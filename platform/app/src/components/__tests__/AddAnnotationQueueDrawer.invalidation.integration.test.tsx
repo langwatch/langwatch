@@ -31,9 +31,7 @@ const mocks = vi.hoisted(() => ({
     name: "Support reviews",
     description: "",
     members: [{ user: { id: "user-1", name: "Ana" } }],
-    AnnotationQueueScores: [
-      { annotationScore: { id: "score-1", name: "Helpfulness" } },
-    ],
+    AnnotationQueueScores: [{ annotationScore: { id: "score-1", name: "Helpfulness" } }],
   },
   scores: [{ id: "score-1", name: "Helpfulness" }],
   organizationMembers: { members: [{ user: { id: "user-1", name: "Ana" } }] },

@@ -36,13 +36,8 @@ function ScenarioLibraryPage() {
   // Fetch it while the person reads the list, so the click opens the editor
   // rather than a spinner.
   usePreloadDrawer("scenarioEditor");
-  const {
-    rowSelection,
-    onRowSelectionChange,
-    selectedIds,
-    selectionCount,
-    deselectAll,
-  } = useScenarioSelection();
+  const { rowSelection, onRowSelectionChange, selectedIds, selectionCount, deselectAll } =
+    useScenarioSelection();
 
   // Archive dialog state
   const [archiveTarget, setArchiveTarget] = useState<
@@ -95,13 +90,8 @@ function ScenarioLibraryPage() {
       }),
   });
 
-  const {
-    columnFilters,
-    setColumnFilters,
-    allLabels,
-    activeLabels,
-    handleLabelToggle,
-  } = useLabelFilter(scenarios);
+  const { columnFilters, setColumnFilters, allLabels, activeLabels, handleLabelToggle } =
+    useLabelFilter(scenarios);
 
   const {
     showInlineWelcome,
@@ -187,26 +177,17 @@ function ScenarioLibraryPage() {
 
         {error && !scenarios?.length && (
           <VStack gap={4} align="center" py={8}>
-            <HandledErrorAlert
-              error={error}
-              fallbackTitle="Couldn't load scenarios"
-            />
+            <HandledErrorAlert error={error} fallbackTitle="Couldn't load scenarios" />
           </VStack>
         )}
 
-        {!isLoading &&
-          !error &&
-          scenarios?.length === 0 &&
-          showInlineWelcome && (
-            <ScenarioWelcomeScreen onProceed={handleWelcomeProceed} />
-          )}
+        {!isLoading && !error && scenarios?.length === 0 && showInlineWelcome && (
+          <ScenarioWelcomeScreen onProceed={handleWelcomeProceed} />
+        )}
 
-        {!isLoading &&
-          !error &&
-          scenarios?.length === 0 &&
-          !showInlineWelcome && (
-            <ScenarioEmptyState onCreateClick={handleNewScenario} />
-          )}
+        {!isLoading && !error && scenarios?.length === 0 && !showInlineWelcome && (
+          <ScenarioEmptyState onCreateClick={handleNewScenario} />
+        )}
 
         {scenarios && scenarios.length > 0 && (
           <>
@@ -236,10 +217,7 @@ function ScenarioLibraryPage() {
         onOpenChange={handleWelcomeModalOpenChange}
         onProceed={handleWelcomeProceed}
       />
-      <ScenarioCreateModal
-        open={showCreateModal}
-        onClose={handleCloseCreateModal}
-      />
+      <ScenarioCreateModal open={showCreateModal} onClose={handleCloseCreateModal} />
       <ScenarioArchiveDialog
         open={archiveTarget !== null}
         onClose={handleCloseArchiveDialog}

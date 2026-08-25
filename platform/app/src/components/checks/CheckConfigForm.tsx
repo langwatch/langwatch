@@ -45,10 +45,7 @@ import {
   type CheckPreconditions,
   checkPreconditionsSchema,
 } from "../../server/evaluations/types";
-import {
-  type MappingState,
-  mappingStateSchema,
-} from "../../server/tracer/tracesMapping";
+import { type MappingState, mappingStateSchema } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
 import { EvaluatorTracesMapping } from "../evaluations/EvaluatorTracesMapping";
 import { HorizontalFormControl } from "../HorizontalFormControl";
@@ -93,14 +90,13 @@ export default function CheckConfigForm({
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
     { enabled: !!project?.id },
   );
-  const resolvedDefaultEmbeddings =
-    api.modelProvider.getResolvedDefault.useQuery(
-      {
-        projectId: project?.id ?? "",
-        featureKey: "analytics.topic_clustering_embeddings",
-      },
-      { enabled: !!project?.id },
-    );
+  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
+    {
+      projectId: project?.id ?? "",
+      featureKey: "analytics.topic_clustering_embeddings",
+    },
+    { enabled: !!project?.id },
+  );
 
   const validateNameUniqueness = async (name: string) => {
     const result = await isNameAvailable.mutateAsync({
@@ -130,8 +126,7 @@ export default function CheckConfigForm({
         preconditions: checkPreconditionsSchema,
         settings: data.checkType?.startsWith("custom/")
           ? z.object({}).optional()
-          : (settingsSchema ??
-            evaluatorsSchema.shape["langevals/basic"].shape.settings),
+          : (settingsSchema ?? evaluatorsSchema.shape["langevals/basic"].shape.settings),
         executionMode: z
           .enum([
             EvaluationExecutionMode.ON_MESSAGE,
@@ -211,40 +206,28 @@ export default function CheckConfigForm({
   // because the evaluator was retired or because this server does not ship it.
   // There is no definition to render settings from, so the form falls back to
   // the picker and names the saved slug there.
-  const isRetiredEvaluator =
-    !!checkType && !!availableEvaluators && !evaluatorDefinition;
+  const isRetiredEvaluator = !!checkType && !!availableEvaluators && !evaluatorDefinition;
 
   useEffect(() => {
     if (!availableEvaluators) return;
-    if (defaultValues?.settings && defaultValues.checkType === checkType)
-      return;
+    if (defaultValues?.settings && defaultValues.checkType === checkType) return;
 
     if (!checkType) return;
 
     let defaultName = getEvaluatorDefinitions(checkType)?.name;
     if (defaultName) defaultName = evaluatorDisplayName(defaultName);
-    const allDefaultNames = Object.values(availableEvaluators).map(
-      (evaluator) => evaluatorDisplayName(evaluator.name),
+    const allDefaultNames = Object.values(availableEvaluators).map((evaluator) =>
+      evaluatorDisplayName(evaluator.name),
     );
     if (!nameValue || allDefaultNames.includes(nameValue)) {
-      form.setValue(
-        "name",
-        checkType.includes("custom") ? "" : (defaultName ?? ""),
-      );
+      form.setValue("name", checkType.includes("custom") ? "" : (defaultName ?? ""));
     }
 
-    const setDefaultSettings = (
-      defaultValues: Record<string, any>,
-      prefix: string,
-    ) => {
+    const setDefaultSettings = (defaultValues: Record<string, any>, prefix: string) => {
       if (!defaultValues) return;
 
       Object.entries(defaultValues).forEach(([key, value]) => {
-        if (
-          typeof value === "object" &&
-          !Array.isArray(value) &&
-          value !== null
-        ) {
+        if (typeof value === "object" && !Array.isArray(value) && value !== null) {
           setDefaultSettings(value, `${prefix}.${key}`);
         } else {
           //@ts-ignore
@@ -269,16 +252,12 @@ export default function CheckConfigForm({
   ]);
 
   const accordionIndex = checkType?.startsWith("custom/") ? 0 : undefined;
-  const [accordionValue, setAccordionValue] = useState(
-    accordionIndex ? ["0"] : [],
-  );
+  const [accordionValue, setAccordionValue] = useState(accordionIndex ? ["0"] : []);
 
   const runOn = (
     <Text color="fg.muted" fontStyle="italic">
       This check will run on{" "}
-      {sample >= 1
-        ? "every message"
-        : `${+(sample * 100).toFixed(2)}% of messages`}
+      {sample >= 1 ? "every message" : `${+(sample * 100).toFixed(2)}% of messages`}
       {preconditions?.length > 0 && " matching the preconditions"}
     </Text>
   );
@@ -298,10 +277,7 @@ export default function CheckConfigForm({
         })}
         style={{ width: "100%" }}
       >
-        {!checkType ||
-        isChoosing ||
-        !availableEvaluators ||
-        !evaluatorDefinition ? (
+        {!checkType || isChoosing || !availableEvaluators || !evaluatorDefinition ? (
           <EvaluatorSelection
             form={form}
             retiredEvaluatorType={isRetiredEvaluator ? checkType : undefined}
@@ -318,9 +294,7 @@ export default function CheckConfigForm({
                   >
                     <VStack align="start" width="full">
                       <HStack gap={0} width="full">
-                        <Text>
-                          {evaluatorDisplayName(evaluatorDefinition.name)}
-                        </Text>
+                        <Text>{evaluatorDisplayName(evaluatorDefinition.name)}</Text>
                         <Button
                           variant="ghost"
                           size="xs"
@@ -357,9 +331,8 @@ export default function CheckConfigForm({
                       />
                       {isNameAlreadyInUse && (
                         <Text color="red.500" fontSize="13px">
-                          An evaluation with the same name already exists,
-                          please choose a different name to have a different
-                          slug identifier as well
+                          An evaluation with the same name already exists, please choose a
+                          different name to have a different slug identifier as well
                         </Text>
                       )}
                       <Text fontSize="12px" paddingLeft={4}>
@@ -401,9 +374,7 @@ export default function CheckConfigForm({
                             As a Guardrail
                           </option>
                         )}
-                        <option value={EvaluationExecutionMode.MANUALLY}>
-                          Manually
-                        </option>
+                        <option value={EvaluationExecutionMode.MANUALLY}>Manually</option>
                       </NativeSelect.Field>
                       <NativeSelect.Indicator />
                     </NativeSelect.Root>
@@ -434,12 +405,10 @@ export default function CheckConfigForm({
                       <Accordion.ItemTrigger padding={4} paddingBottom={6}>
                         <Field.Root>
                           <VStack align="start" gap={1}>
-                            <Field.Label margin={0}>
-                              Execution Settings
-                            </Field.Label>
+                            <Field.Label margin={0}>Execution Settings</Field.Label>
                             <Field.HelperText margin={0} fontSize="13px">
-                              Configure how and when this evaluation is executed
-                              when a new message arrives
+                              Configure how and when this evaluation is executed when a
+                              new message arrives
                             </Field.HelperText>
                           </VStack>
                         </Field.Root>
@@ -463,9 +432,7 @@ export default function CheckConfigForm({
                         <PreconditionsField
                           runOn={
                             preconditions?.length === 0 &&
-                            !evaluatorDefinition?.requiredFields.includes(
-                              "contexts",
-                            ) ? (
+                            !evaluatorDefinition?.requiredFields.includes("contexts") ? (
                               sample == 1 ? (
                                 runOn
                               ) : (
@@ -481,9 +448,7 @@ export default function CheckConfigForm({
                         />
                         {checkType && evaluatorsSchema.shape[checkType] && (
                           <DynamicZodForm
-                            schema={
-                              evaluatorsSchema.shape[checkType].shape.settings
-                            }
+                            schema={evaluatorsSchema.shape[checkType].shape.settings}
                             evaluatorType={checkType}
                             prefix="settings"
                             errors={errors.settings}
@@ -510,9 +475,7 @@ export default function CheckConfigForm({
                                     step="0.1"
                                     placeholder="0.0"
                                     {...field}
-                                    onChange={(e) =>
-                                      field.onChange(+e.target.value)
-                                    }
+                                    onChange={(e) => field.onChange(+e.target.value)}
                                   />
                                   <Tooltip content="You can use this to save costs on expensive checks if you have too many messages incomming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
                                     <HelpCircle width="14px" />

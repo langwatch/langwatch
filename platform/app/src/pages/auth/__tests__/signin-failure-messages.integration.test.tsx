@@ -17,20 +17,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Installed before any import evaluates: the BetterAuth client captures a fetch
 // implementation when `~/utils/auth-client` first loads, so a stub installed
 // later in the test body would never be the one it calls.
-const { fetchMock, sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(
-  () => {
-    const fetchMock = vi.fn();
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-    return {
-      fetchMock,
-      sessionRef: { current: { data: null as unknown } },
-      publicEnvRef: {
-        current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
-      },
-      searchParamsRef: { current: new URLSearchParams("") },
-    };
-  },
-);
+const { fetchMock, sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(() => {
+  const fetchMock = vi.fn();
+  globalThis.fetch = fetchMock as unknown as typeof fetch;
+  return {
+    fetchMock,
+    sessionRef: { current: { data: null as unknown } },
+    publicEnvRef: {
+      current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
+    },
+    searchParamsRef: { current: new URLSearchParams("") },
+  };
+});
 
 // The session hook polls a live endpoint on mount; the screen under test is the
 // signed-out one. Everything below it, `signIn` included, stays real.
@@ -48,14 +46,7 @@ vi.mock("~/hooks/usePublicEnv", () => ({
 }));
 
 vi.mock("~/utils/compat/next-link", () => ({
-  default: ({
-    href,
-    children,
-    ...props
-  }: {
-    href: string;
-    children: ReactNode;
-  }) => (
+  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -83,14 +74,8 @@ const submitSignIn = async () => {
     </ChakraProvider>,
   );
 
-  await user.type(
-    container.querySelector('input[type="email"]')!,
-    "someone@example.com",
-  );
-  await user.type(
-    container.querySelector('input[type="password"]')!,
-    "whatever12345",
-  );
+  await user.type(container.querySelector('input[type="email"]')!, "someone@example.com");
+  await user.type(container.querySelector('input[type="password"]')!, "whatever12345");
   await user.click(screen.getByRole("button", { name: /sign in/i }));
 
   return container;
@@ -128,9 +113,7 @@ describe("given the sign-in screen of a credentials installation", () => {
 
       const container = await submitSignIn();
 
-      expect(await failureMessage(container)).toMatch(
-        /invalid email or password/i,
-      );
+      expect(await failureMessage(container)).toMatch(/invalid email or password/i);
     });
   });
 

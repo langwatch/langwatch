@@ -9,7 +9,9 @@ export abstract class UsageLimitEmailAdapter {
 }
 
 export class NullUsageLimitEmailAdapter extends UsageLimitEmailAdapter {
-  private constructor() { super(); }
+  private constructor() {
+    super();
+  }
 
   static create(): NullUsageLimitEmailAdapter {
     return new NullUsageLimitEmailAdapter();

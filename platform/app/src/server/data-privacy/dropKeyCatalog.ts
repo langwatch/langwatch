@@ -63,9 +63,7 @@ export const CONTENT_KEY_CATALOG: Record<ContentCategory, readonly string[]> = {
  * conversation, so dropping the key alone is not enough: the role has to be
  * stripped from the conversation arrays too, or the content survives.
  */
-const ROLE_BASED_CATEGORY_ROLES: Partial<
-  Record<ContentCategory, readonly string[]>
-> = {
+const ROLE_BASED_CATEGORY_ROLES: Partial<Record<ContentCategory, readonly string[]>> = {
   system: ["system"],
   tools: ["tool", "function"],
 };
@@ -145,11 +143,7 @@ export function stripRolesFromChatArrayJson(
       removed++;
       continue;
     }
-    if (
-      stripToolCalls &&
-      isChatMessage(message) &&
-      message.tool_calls != null
-    ) {
+    if (stripToolCalls && isChatMessage(message) && message.tool_calls != null) {
       const { tool_calls: _dropped, ...rest } = message;
       removed++;
       next.push(rest);
@@ -172,8 +166,7 @@ export const PRIVACY_DROPPED_MARKER_ATTR = "langwatch.privacy.dropped";
  * redaction did not complete instead of presenting the content as fully
  * scrubbed. The value is the level that was requested ("strict").
  */
-export const PRIVACY_PII_INCOMPLETE_MARKER_ATTR =
-  "langwatch.privacy.pii_incomplete";
+export const PRIVACY_PII_INCOMPLETE_MARKER_ATTR = "langwatch.privacy.pii_incomplete";
 
 /**
  * Marker stamped on a span whose attributes were dropped by custom attribute
@@ -211,12 +204,8 @@ export function computeDropMatchers(
 }
 
 /** The categories currently set to `drop`, for the span marker / observability. */
-export function droppedCategories(
-  policy: ResolvedDataPrivacy,
-): ContentCategory[] {
-  return CONTENT_CATEGORIES.filter(
-    (c) => policy.categories[c].disposition === "drop",
-  );
+export function droppedCategories(policy: ResolvedDataPrivacy): ContentCategory[] {
+  return CONTENT_CATEGORIES.filter((c) => policy.categories[c].disposition === "drop");
 }
 
 /**

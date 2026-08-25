@@ -16,9 +16,7 @@ import {
  */
 
 // Extract the masking logic for testing
-function maskKeys(
-  customKeys: Record<string, unknown>,
-): Record<string, unknown> {
+function maskKeys(customKeys: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(customKeys).map(([key, value]) => [
       key,
@@ -82,9 +80,7 @@ describe("modelProviders key masking logic", () => {
       const result = maskKeys(customKeys);
 
       expect(result.OPENAI_BASE_URL).toBe("https://custom.openai.com/v1");
-      expect(result.AZURE_OPENAI_ENDPOINT).toBe(
-        "https://myresource.openai.azure.com",
-      );
+      expect(result.AZURE_OPENAI_ENDPOINT).toBe("https://myresource.openai.azure.com");
     });
 
     it("handles empty customKeys", () => {
@@ -164,9 +160,7 @@ describe("getModelMetadataForFrontend", () => {
 
   it("includes OpenAI models", () => {
     const metadata = getModelMetadataForFrontend();
-    const openaiModels = Object.keys(metadata).filter((k) =>
-      k.startsWith("openai/"),
-    );
+    const openaiModels = Object.keys(metadata).filter((k) => k.startsWith("openai/"));
 
     expect(openaiModels.length).toBeGreaterThan(0);
   });
@@ -190,9 +184,7 @@ describe("getModelMetadataForFrontend", () => {
 
   it("identifies multimodal models", () => {
     const metadata = getModelMetadataForFrontend();
-    const imageModels = Object.values(metadata).filter(
-      (m) => m.supportsImageInput,
-    );
+    const imageModels = Object.values(metadata).filter((m) => m.supportsImageInput);
 
     expect(imageModels.length).toBeGreaterThan(0);
   });
@@ -388,10 +380,7 @@ describe("customModelUpdateInputSchema", () => {
 
   describe("when given invalid input", () => {
     it("rejects mixed arrays of strings and objects", () => {
-      const input = [
-        "some-string",
-        { modelId: "x", displayName: "X", mode: "chat" },
-      ];
+      const input = ["some-string", { modelId: "x", displayName: "X", mode: "chat" }];
 
       const result = customModelUpdateInputSchema.safeParse(input);
 

@@ -32,7 +32,13 @@ const defaultGenerateId = (): string =>
   `monitor_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
 function slugify(value: string): string {
-  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "monitor";
+  return (
+    value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "monitor"
+  );
 }
 
 export class MonitorService extends MonitorServiceContract {
@@ -76,7 +82,10 @@ export class MonitorService extends MonitorServiceContract {
   async create(input: MonitorCreateInput): Promise<Monitor> {
     const parsed = monitorCreateInputSchema.parse(input);
     if (!parsed.evaluatorId) throw new MonitorEvaluatorRequiredError();
-    await this.options.evaluators.getById({ id: parsed.evaluatorId, projectId: parsed.projectId });
+    await this.options.evaluators.getById({
+      id: parsed.evaluatorId,
+      projectId: parsed.projectId,
+    });
 
     const name = await this.uniqueName(parsed.projectId, parsed.name);
     const id = (this.options.generateId ?? defaultGenerateId)();
@@ -94,7 +103,10 @@ export class MonitorService extends MonitorServiceContract {
     const parsed = monitorUpdateInputSchema.parse(input);
     if (parsed.evaluatorId === null) throw new MonitorEvaluatorRequiredError();
     if (parsed.evaluatorId !== undefined) {
-      await this.options.evaluators.getById({ id: parsed.evaluatorId, projectId: parsed.projectId });
+      await this.options.evaluators.getById({
+        id: parsed.evaluatorId,
+        projectId: parsed.projectId,
+      });
     }
     const mappings = monitorMappingsInputSchema.parse(parsed.mappings);
     return this.options.repository.update({
@@ -117,7 +129,9 @@ export class MonitorService extends MonitorServiceContract {
     await this.options.repository.deleteForExperiment(input);
   }
 
-  async isNameAvailable(input: MonitorNameAvailabilityInput): Promise<{ available: boolean }> {
+  async isNameAvailable(
+    input: MonitorNameAvailabilityInput,
+  ): Promise<{ available: boolean }> {
     const parsed = monitorNameAvailabilityInputSchema.parse(input);
     return { available: await this.options.repository.isNameAvailable(parsed) };
   }

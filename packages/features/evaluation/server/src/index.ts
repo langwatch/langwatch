@@ -11,4 +11,7 @@ export {
   type EvaluationClickHouseResult,
   type EvaluationFeatureDependencies,
 } from "./ports/evaluation.port";
-export { EvaluationService, type EvaluationServiceOptions } from "./services/evaluation.service";
+export {
+  EvaluationService,
+  type EvaluationServiceOptions,
+} from "./services/evaluation.service";

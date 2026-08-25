@@ -12,9 +12,7 @@ import type { CommandResult } from "../../utils/output";
  * The service answers a bare `{ success }`, which tells a machine caller
  * nothing about WHICH key was revoked, so the id is carried alongside it.
  */
-export const revokeApiKeyCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const revokeApiKeyCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new ApiKeysApiService();

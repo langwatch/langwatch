@@ -20,15 +20,11 @@ export const legacyRedirectRoutes: RouteObject[] = [
   },
   {
     path: "/settings/governance/*",
-    element: (
-      <LegacyPrefixRedirect from="/settings/governance" to="/governance" />
-    ),
+    element: <LegacyPrefixRedirect from="/settings/governance" to="/governance" />,
   },
   {
     path: "/settings/governance",
-    element: (
-      <LegacyPrefixRedirect from="/settings/governance" to="/governance" />
-    ),
+    element: <LegacyPrefixRedirect from="/settings/governance" to="/governance" />,
   },
   {
     path: "/settings/routing-policies/*",

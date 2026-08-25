@@ -45,12 +45,7 @@ export function BlobToolbar({
           >
             Preview cleanup
           </Button>
-          <Button
-            size="2xs"
-            variant="outline"
-            colorPalette="red"
-            onClick={onRunCleanup}
-          >
+          <Button size="2xs" variant="outline" colorPalette="red" onClick={onRunCleanup}>
             Run cleanup
           </Button>
         </>

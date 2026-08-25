@@ -41,9 +41,7 @@ export class ReplayService {
     return this.repo.getHistory();
   }
 
-  async findHistoryEntry(params: {
-    runId: string;
-  }): Promise<ReplayHistoryEntry | null> {
+  async findHistoryEntry(params: { runId: string }): Promise<ReplayHistoryEntry | null> {
     const history = await this.repo.getHistory();
     return history.find((entry) => entry.runId === params.runId) ?? null;
   }
@@ -109,10 +107,7 @@ export class ReplayService {
     this.executeReplay({ runId, ...params }).then(
       () => {},
       (err) => {
-        logger.error(
-          { error: err, runId },
-          "Unexpected replay orchestration error",
-        );
+        logger.error({ error: err, runId }, "Unexpected replay orchestration error");
       },
     );
 
@@ -205,8 +200,7 @@ export class ReplayService {
           ...selectedStateProjections,
         ]) {
           const projectionName = projection.projectionName;
-          const cleared =
-            await runtime.service.checkPreviousRun(projectionName);
+          const cleared = await runtime.service.checkPreviousRun(projectionName);
           await runtime.service.cleanup(projectionName);
           logger.info(
             {
@@ -280,11 +274,9 @@ export class ReplayService {
         };
         const replayCallbacks = {
           onProgress: (progress: ReplayProgress) => {
-            this.updateProgress({ runId: params.runId, progress }).catch(
-              (err) => {
-                logger.warn({ error: err }, "Failed to update replay progress");
-              },
-            );
+            this.updateProgress({ runId: params.runId, progress }).catch((err) => {
+              logger.warn({ error: err }, "Failed to update replay progress");
+            });
 
             const now = Date.now();
             if (now - lastCancelCheck > CANCEL_CHECK_INTERVAL_MS) {
@@ -414,10 +406,7 @@ export class ReplayService {
       userName: string;
     };
   }): Promise<void> {
-    logger.error(
-      { runId: params.runId, error: params.errorMessage },
-      "Replay failed",
-    );
+    logger.error({ runId: params.runId, error: params.errorMessage }, "Replay failed");
     const current = await this.repo.getStatus();
     const completedAt = new Date().toISOString();
     await this.repo.writeStatus({

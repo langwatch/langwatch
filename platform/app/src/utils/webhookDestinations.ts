@@ -12,17 +12,12 @@
 export const WEBHOOK_DESTINATION_KINDS = ["http", "sqs"] as const;
 export type WebhookDestinationKind = (typeof WEBHOOK_DESTINATION_KINDS)[number];
 
-export function isWebhookDestinationKind(
-  value: string,
-): value is WebhookDestinationKind {
+export function isWebhookDestinationKind(value: string): value is WebhookDestinationKind {
   return (WEBHOOK_DESTINATION_KINDS as readonly string[]).includes(value);
 }
 
 /** What a customer reads. Amazon writes it "Amazon SQS", so we do too. */
-export const WEBHOOK_DESTINATION_LABELS: Record<
-  WebhookDestinationKind,
-  string
-> = {
+export const WEBHOOK_DESTINATION_LABELS: Record<WebhookDestinationKind, string> = {
   http: "HTTPS endpoint",
   sqs: "Amazon SQS queue",
 };

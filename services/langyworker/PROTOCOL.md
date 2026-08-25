@@ -124,22 +124,22 @@ Terminal (the LAST line ever emitted for a `turnId`; nothing follows it):
 ```ts
 type LangyWorkerConfig = {
   model: {
-    id: string;                                  // model id sent to the API
+    id: string; // model id sent to the API
     api: "openai-completions" | "openai-responses" | "anthropic-messages";
-    baseUrlEnv: string;                          // env var NAME holding the base URL (e.g. "OPENAI_BASE_URL")
-    apiKeyEnv: string;                           // env var NAME holding the API key (e.g. "OPENAI_API_KEY")
+    baseUrlEnv: string; // env var NAME holding the base URL (e.g. "OPENAI_BASE_URL")
+    apiKeyEnv: string; // env var NAME holding the API key (e.g. "OPENAI_API_KEY")
     reasoning?: boolean;
-    contextWindow?: number;                      // default 128000
-    maxTokens?: number;                          // default 16384
-    compat?: Record<string, unknown>;            // pi compat flags verbatim (supportsStore, supportsReasoningEffort, ...)
+    contextWindow?: number; // default 128000
+    maxTokens?: number; // default 16384
+    compat?: Record<string, unknown>; // pi compat flags verbatim (supportsStore, supportsReasoningEffort, ...)
     // Any additional keys are passed through verbatim into the generated pi
     // model entry (name, headers, samplingParams, thinkingLevelMap, ...).
   };
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
-  personaPrompt: string;                         // first system-prompt section
-  agentsFilePath: string;                        // absolute path, usually $HOME/AGENTS.md
-  skillsDir?: string;                            // dir of <name>/SKILL.md skills for the `skill` tool
-  sessionDir: string;                            // pi session JSONL storage dir
+  personaPrompt: string; // first system-prompt section
+  agentsFilePath: string; // absolute path, usually $HOME/AGENTS.md
+  skillsDir?: string; // dir of <name>/SKILL.md skills for the `skill` tool
+  sessionDir: string; // pi session JSONL storage dir
 };
 ```
 

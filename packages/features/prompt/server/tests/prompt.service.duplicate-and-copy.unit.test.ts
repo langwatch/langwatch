@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import {
-  HandleGenerationError,
-  NotFoundError,
-} from "@langwatch/prompt-contract";
+import { HandleGenerationError, NotFoundError } from "@langwatch/prompt-contract";
 import { PromptService, type VersionedPrompt } from "../src/services/prompt.service";
 
 const SOURCE_PROMPT: VersionedPrompt = {
@@ -63,8 +60,7 @@ function buildService({
 }
 
 /** Asserts the handle the service settled on, as handed to `createPrompt`. */
-const createdWithHandle = (handle: string) =>
-  expect.objectContaining({ handle });
+const createdWithHandle = (handle: string) => expect.objectContaining({ handle });
 
 describe("PromptService", () => {
   beforeEach(() => {
@@ -81,9 +77,7 @@ describe("PromptService", () => {
           projectId: "project-1",
         });
 
-        expect(createPrompt).toHaveBeenCalledWith(
-          createdWithHandle("support-bot-1"),
-        );
+        expect(createPrompt).toHaveBeenCalledWith(createdWithHandle("support-bot-1"));
       });
 
       it("records where the duplicate came from", async () => {
@@ -132,9 +126,7 @@ describe("PromptService", () => {
           projectId: "project-1",
         });
 
-        expect(createPrompt).toHaveBeenCalledWith(
-          createdWithHandle("support-bot-3"),
-        );
+        expect(createPrompt).toHaveBeenCalledWith(createdWithHandle("support-bot-3"));
       });
     });
 
@@ -149,9 +141,7 @@ describe("PromptService", () => {
           projectId: "project-1",
         });
 
-        expect(createPrompt).toHaveBeenCalledWith(
-          createdWithHandle("my-support-bot-1"),
-        );
+        expect(createPrompt).toHaveBeenCalledWith(createdWithHandle("my-support-bot-1"));
       });
     });
 
@@ -173,10 +163,7 @@ describe("PromptService", () => {
     describe("given every candidate handle is taken", () => {
       it("gives up rather than looping forever", async () => {
         const { service, createPrompt } = buildService({
-          takenHandles: Array.from(
-            { length: 101 },
-            (_, i) => `support-bot-${i + 1}`,
-          ),
+          takenHandles: Array.from({ length: 101 }, (_, i) => `support-bot-${i + 1}`),
         });
 
         await expect(
@@ -216,9 +203,7 @@ describe("PromptService", () => {
           targetProjectId: "project-2",
         });
 
-        expect(createPrompt).toHaveBeenCalledWith(
-          createdWithHandle("support-bot"),
-        );
+        expect(createPrompt).toHaveBeenCalledWith(createdWithHandle("support-bot"));
       });
 
       it("creates the copy in the target project", async () => {
@@ -266,18 +251,12 @@ describe("PromptService", () => {
           targetProjectId: "project-2",
         });
 
-        expect(createPrompt).toHaveBeenCalledWith(
-          createdWithHandle("support-bot_copy1"),
-        );
+        expect(createPrompt).toHaveBeenCalledWith(createdWithHandle("support-bot_copy1"));
       });
 
       it("counts up until it finds a free suffix", async () => {
         const { service, createPrompt } = buildService({
-          takenHandles: [
-            "support-bot",
-            "support-bot_copy1",
-            "support-bot_copy2",
-          ],
+          takenHandles: ["support-bot", "support-bot_copy1", "support-bot_copy2"],
         });
 
         await service.copyPrompt({
@@ -286,9 +265,7 @@ describe("PromptService", () => {
           targetProjectId: "project-2",
         });
 
-        expect(createPrompt).toHaveBeenCalledWith(
-          createdWithHandle("support-bot_copy3"),
-        );
+        expect(createPrompt).toHaveBeenCalledWith(createdWithHandle("support-bot_copy3"));
       });
     });
 

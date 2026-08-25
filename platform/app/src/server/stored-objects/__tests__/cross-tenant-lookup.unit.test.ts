@@ -157,9 +157,9 @@ describe("resolveStoredObjectOwner", () => {
         },
       ]);
 
-      await expect(
-        resolveStoredObjectOwner({ id: "obj-x" }),
-      ).rejects.toBeInstanceOf(StoredObjectOwnerLookupUnavailableError);
+      await expect(resolveStoredObjectOwner({ id: "obj-x" })).rejects.toBeInstanceOf(
+        StoredObjectOwnerLookupUnavailableError,
+      );
     });
 
     it("includes the failed targets on the thrown error", async () => {
@@ -179,9 +179,9 @@ describe("resolveStoredObjectOwner", () => {
         throw new Error("expected throw");
       } catch (err) {
         expect(err).toBeInstanceOf(StoredObjectOwnerLookupUnavailableError);
-        expect(
-          (err as StoredObjectOwnerLookupUnavailableError).failedTargets,
-        ).toEqual(["org_byoc_down"]);
+        expect((err as StoredObjectOwnerLookupUnavailableError).failedTargets).toEqual([
+          "org_byoc_down",
+        ]);
       }
     });
   });

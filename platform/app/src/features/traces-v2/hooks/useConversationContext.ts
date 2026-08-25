@@ -116,8 +116,7 @@ export function useConversationContext(
       total: query.data.total,
       position: idx === -1 ? 0 : idx + 1,
       previous: idx > 0 ? (turns[idx - 1] ?? null) : null,
-      next:
-        idx >= 0 && idx < turns.length - 1 ? (turns[idx + 1] ?? null) : null,
+      next: idx >= 0 && idx < turns.length - 1 ? (turns[idx + 1] ?? null) : null,
       isLoading: false,
     };
   }, [projectId, query.data, query.isLoading, conversationId, traceId, shared]);

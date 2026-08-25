@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Code,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Code, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { Ghost, RotateCcw } from "lucide-react";
 import { useRouteError } from "react-router";
 
@@ -62,10 +54,7 @@ export default function NotFoundOrErrorPage() {
         : (errorMessage ??
           "An unexpected error occurred. Try going back to the dashboard.");
   const stack =
-    isRuntimeError &&
-    error &&
-    "stack" in error &&
-    typeof error.stack === "string"
+    isRuntimeError && error && "stack" in error && typeof error.stack === "string"
       ? error.stack
       : null;
   return (

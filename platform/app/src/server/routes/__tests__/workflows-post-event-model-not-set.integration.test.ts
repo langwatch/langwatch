@@ -23,9 +23,7 @@ vi.mock("~/server/auth", () => ({
 // path leaves the real check running.
 vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
   const actual =
-    await importActual<
-      typeof import("~/server/app-layer/permissions/imperative")
-    >();
+    await importActual<typeof import("~/server/app-layer/permissions/imperative")>();
   return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
@@ -101,9 +99,7 @@ describe("POST /api/workflows/post_event with a modelless LLM node", () => {
                   type: "signature",
                   data: {
                     name: "LLM Call",
-                    parameters: [
-                      { identifier: "llm", type: "llm", value: undefined },
-                    ],
+                    parameters: [{ identifier: "llm", type: "llm", value: undefined }],
                   },
                 },
               ],

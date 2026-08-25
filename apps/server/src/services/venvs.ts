@@ -56,7 +56,11 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
         },
       );
       writeFileSync(hashFile, expected);
-      bus.emit({ type: "healthy", service: `prepare:${spec.name}` as never, durationMs: Date.now() - start });
+      bus.emit({
+        type: "healthy",
+        service: `prepare:${spec.name}` as never,
+        durationMs: Date.now() - start,
+      });
     }),
   );
 }

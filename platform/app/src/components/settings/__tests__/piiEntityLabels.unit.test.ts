@@ -18,9 +18,7 @@ describe("PII entity tooltip labels", () => {
   describe("when the strict analyzer's entity list changes", () => {
     it("labels the strict additions as exactly the analyzer entities the native engine cannot detect", () => {
       const native = new Set<string>(ESSENTIAL_PII_ENTITIES);
-      const strictOnly = PRESIDIO_STRICT_ENTITIES.filter(
-        (entity) => !native.has(entity),
-      );
+      const strictOnly = PRESIDIO_STRICT_ENTITIES.filter((entity) => !native.has(entity));
       expect(Object.keys(STRICT_ADDED_PII_ENTITY_LABELS).sort()).toEqual(
         [...strictOnly].sort(),
       );

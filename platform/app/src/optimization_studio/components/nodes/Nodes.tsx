@@ -307,8 +307,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
     [isDragging, item, props.type],
   );
 
-  const llmParams =
-    props.data.parameters?.filter((p) => p.type === "llm") ?? [];
+  const llmParams = props.data.parameters?.filter((p) => p.type === "llm") ?? [];
 
   const nodeShadow = useColorModeValue(
     `0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`,
@@ -328,9 +327,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       align="start"
       color="fg.muted"
       fontSize="11px"
-      minWidth={
-        140 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"
-      }
+      minWidth={140 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"}
       boxShadow={nodeShadow}
       border="1px solid"
       borderColor="border"
@@ -369,10 +366,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           </Menu.Trigger>
           <NodeToolbar>
             <Menu.Content>
-              <Menu.Item
-                value="duplicate"
-                onClick={() => duplicateNode(props.id)}
-              >
+              <Menu.Item value="duplicate" onClick={() => duplicateNode(props.id)}>
                 <Copy size={14} />
                 Duplicate
               </Menu.Item>
@@ -418,11 +412,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           </Tooltip>
         )}
         {node && isExecutableComponent(node) ? (
-          <ComponentExecutionButton
-            node={node}
-            marginRight="-6px"
-            marginLeft="-4px"
-          />
+          <ComponentExecutionButton node={node} marginRight="-6px" marginLeft="-4px" />
         ) : (
           <Box width="54px" />
         )}
@@ -480,29 +470,24 @@ export function ComponentExecutionButton({
   iconSize?: number;
   componentOnly?: boolean;
 } & ButtonProps) {
-  const { startComponentExecution, stopComponentExecution } =
-    useComponentExecution();
+  const { startComponentExecution, stopComponentExecution } = useComponentExecution();
 
-  const openRunUntilHereDialog = useRunUntilHereDialogStore(
-    (state) => state.open,
-  );
+  const openRunUntilHereDialog = useRunUntilHereDialogStore((state) => state.open);
 
   const [isWaitingLong] = useDebounceValue(
     node?.data.execution_state?.status === "waiting",
     600,
   );
 
-  const { propertiesExpanded, setPropertiesExpanded, setSelectedNode } =
-    useWorkflowStore(
-      ({ propertiesExpanded, setPropertiesExpanded, setSelectedNode }) => ({
-        propertiesExpanded,
-        setPropertiesExpanded,
-        setSelectedNode,
-      }),
-    );
+  const { propertiesExpanded, setPropertiesExpanded, setSelectedNode } = useWorkflowStore(
+    ({ propertiesExpanded, setPropertiesExpanded, setSelectedNode }) => ({
+      propertiesExpanded,
+      setPropertiesExpanded,
+      setSelectedNode,
+    }),
+  );
 
-  const shouldOpenExecutionResults =
-    node?.data.execution_state && !propertiesExpanded;
+  const shouldOpenExecutionResults = node?.data.execution_state && !propertiesExpanded;
 
   return (
     <>
@@ -529,17 +514,13 @@ export function ComponentExecutionButton({
             }
           }}
         >
-          {isWaitingLong &&
-            node?.data.execution_state?.status === "waiting" && (
-              <Box marginLeft="-4px" marginRight="-4px">
-                <PulseLoader size={2} speedMultiplier={0.5} />
-              </Box>
-            )}
-          {((!isWaitingLong &&
-            node?.data.execution_state?.status === "waiting") ||
-            node?.data.execution_state?.status === "running") && (
-            <Spinner size="xs" />
+          {isWaitingLong && node?.data.execution_state?.status === "waiting" && (
+            <Box marginLeft="-4px" marginRight="-4px">
+              <PulseLoader size={2} speedMultiplier={0.5} />
+            </Box>
           )}
+          {((!isWaitingLong && node?.data.execution_state?.status === "waiting") ||
+            node?.data.execution_state?.status === "running") && <Spinner size="xs" />}
           {node?.data.execution_state?.status === "error" ||
           (checkIsEvaluator(node) &&
             node?.data.execution_state?.status === "success" &&

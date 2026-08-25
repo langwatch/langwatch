@@ -86,9 +86,7 @@ const previewEnvelope = JSON.stringify({
 // is what runs.
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
   const actual =
-    await importOriginal<
-      typeof import("~/server/clickhouse/clickhouseClient")
-    >();
+    await importOriginal<typeof import("~/server/clickhouse/clickhouseClient")>();
   return { ...actual, getClickHouseClientForTenant: vi.fn() };
 });
 
@@ -116,9 +114,7 @@ async function seedOffloadedTrace() {
       span: {
         traceId,
         spanId,
-        attributes: [
-          { key: "langwatch.output", value: { stringValue: LARGE_VALUE } },
-        ],
+        attributes: [{ key: "langwatch.output", value: { stringValue: LARGE_VALUE } }],
       },
     },
   });
@@ -325,9 +321,8 @@ describe.skipIf(!hasTestcontainers)(
     describe("given the SAME offloaded trace read by the list/search grid", () => {
       describe("when it is read WITHOUT resolveBlobs", () => {
         it("keeps the 64 KB preview and never de-offloads", async () => {
-          const { ClickHouseTraceService } = await import(
-            "~/server/traces/clickhouse-trace.service"
-          );
+          const { ClickHouseTraceService } =
+            await import("~/server/traces/clickhouse-trace.service");
           const { prisma } = await import("~/server/db");
 
           // No resolvers wired at all — the list-grid construction shape.

@@ -15,9 +15,7 @@ describe("canonicalOtlpPath", () => {
   describe("given a base endpoint that already named a signal", () => {
     /** @scenario An endpoint that already named a signal */
     it("maps the appended signal onto its canonical path", () => {
-      expect(canonicalOtlpPath("/api/otel/v1/traces/v1/logs")).toBe(
-        "/api/otel/v1/logs",
-      );
+      expect(canonicalOtlpPath("/api/otel/v1/traces/v1/logs")).toBe("/api/otel/v1/logs");
     });
 
     /** @scenario A metrics suffix under a traces base is metric ingestion */
@@ -37,9 +35,7 @@ describe("canonicalOtlpPath", () => {
       expect(canonicalOtlpPath("/api/collector/api/otel/v1/traces")).toBe(
         "/api/otel/v1/traces",
       );
-      expect(canonicalOtlpPath("/api/collector/v1/traces")).toBe(
-        "/api/otel/v1/traces",
-      );
+      expect(canonicalOtlpPath("/api/collector/v1/traces")).toBe("/api/otel/v1/traces");
     });
   });
 
@@ -53,19 +49,13 @@ describe("canonicalOtlpPath", () => {
 
   describe("given a path that is already canonical", () => {
     it("reports the canonical path it is on", () => {
-      expect(canonicalOtlpPath("/api/otel/v1/traces")).toBe(
-        "/api/otel/v1/traces",
-      );
+      expect(canonicalOtlpPath("/api/otel/v1/traces")).toBe("/api/otel/v1/traces");
     });
 
     /** @scenario An endpoint with a stray trailing slash */
     it("normalises stray slashes to it", () => {
-      expect(canonicalOtlpPath("/api/otel/v1/traces/")).toBe(
-        "/api/otel/v1/traces",
-      );
-      expect(canonicalOtlpPath("/api/otel/v1//traces")).toBe(
-        "/api/otel/v1/traces",
-      );
+      expect(canonicalOtlpPath("/api/otel/v1/traces/")).toBe("/api/otel/v1/traces");
+      expect(canonicalOtlpPath("/api/otel/v1//traces")).toBe("/api/otel/v1/traces");
     });
   });
 
@@ -74,9 +64,7 @@ describe("canonicalOtlpPath", () => {
     it("claims nothing outside the recognised prefixes", () => {
       expect(canonicalOtlpPath("/api/gateway/v1/traces")).toBeNull();
       expect(canonicalOtlpPath("/api/rum/v1/traces")).toBeNull();
-      expect(
-        canonicalOtlpPath("/api/ingest/otel/src_123/v1/traces"),
-      ).toBeNull();
+      expect(canonicalOtlpPath("/api/ingest/otel/src_123/v1/traces")).toBeNull();
     });
 
     /** @scenario A path naming something other than a signal */
@@ -99,9 +87,7 @@ describe("the corrected-path marker", () => {
     });
 
     expect(
-      readCorrectedPath(
-        headers.get("x-langwatch-otlp-corrected-path") ?? void 0,
-      ),
+      readCorrectedPath(headers.get("x-langwatch-otlp-corrected-path") ?? void 0),
     ).toBe("/api/otel/v1/traces/v1/logs");
   });
 

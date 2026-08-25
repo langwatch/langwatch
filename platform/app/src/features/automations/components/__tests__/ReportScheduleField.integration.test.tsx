@@ -2,13 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,8 +11,7 @@ import { ReportScheduleField } from "../ReportScheduleField";
 // The viewer's locale is non-deterministic across machines/CI, so pin the
 // browser timezone the "default to locale" behaviour reads.
 vi.mock("@langwatch/automation-web", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/automation-web")>();
+  const actual = await importOriginal<typeof import("@langwatch/automation-web")>();
   return { ...actual, defaultTimezone: () => "Europe/Amsterdam" };
 });
 
@@ -84,12 +77,8 @@ describe("ReportScheduleField", () => {
       });
 
       expect(selectContainingOption(/Weekly/i)).toBeInTheDocument();
-      expect(
-        screen.queryByPlaceholderText("0 9 * * 1"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.getByText(/Sends every Monday at 09:00/i),
-      ).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("0 9 * * 1")).not.toBeInTheDocument();
+      expect(screen.getByText(/Sends every Monday at 09:00/i)).toBeInTheDocument();
     });
   });
 

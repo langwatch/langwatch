@@ -64,13 +64,9 @@ function isUnderNodeModules(p: string): boolean {
  * directly in the relocated dir. Idempotent via a .installed-version
  * marker — same version → no-op.
  */
-export async function ensureAppDir(
-  ctx: RuntimeContext,
-  bus: EventBus,
-): Promise<void> {
+export async function ensureAppDir(ctx: RuntimeContext, bus: EventBus): Promise<void> {
   const src = locatePackageSource();
-  if (!src)
-    throw new Error("could not locate @langwatch/server package source");
+  if (!src) throw new Error("could not locate @langwatch/server package source");
 
   // Dev mode: source is checked out at a regular path (no node_modules
   // ancestor). The tsx guard doesn't fire and editing in-place is part of

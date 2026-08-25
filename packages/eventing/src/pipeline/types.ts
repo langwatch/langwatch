@@ -13,10 +13,7 @@ import type { JobRegistryEntry } from "../services/queues/queueManager";
 import type { EventStore } from "../stores/eventStore.types";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
-import type {
-  ExecutionTarget,
-  RetentionPolicyResolver,
-} from "../runtime.types";
+import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types";
 
 /**
  * Static metadata about a pipeline for tooling and introspection.
@@ -51,10 +48,7 @@ export interface PipelineMetadata {
 
 export interface EventSourcingPipelineDefinition<
   EventType extends Event = Event,
-  _ProjectionTypes extends Record<string, Projection> = Record<
-    string,
-    Projection
-  >,
+  _ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
 > {
   name: string;
   aggregateType: AggregateType;
@@ -87,10 +81,7 @@ export interface EventSourcingPipelineDefinition<
 
 export interface RegisteredPipeline<
   EventType extends Event = Event,
-  ProjectionTypes extends Record<string, Projection> = Record<
-    string,
-    Projection
-  >,
+  ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
 > {
   name: string;
   aggregateType: AggregateType;

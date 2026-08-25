@@ -80,10 +80,7 @@ export interface CrossProjectHarness {
   /** Write a logged-in CLI config, with any extra keys merged in. */
   writeSession: (extra?: Record<string, unknown>) => void;
   /** Run the built CLI with the harness environment. */
-  run: (args: {
-    args: string[];
-    env?: Record<string, string>;
-  }) => Promise<RunResult>;
+  run: (args: { args: string[]; env?: Record<string, string> }) => Promise<RunResult>;
   /** The header a user-scoped key produces for a named project. */
   basicFor: (args: { projectId: string; apiKey: string }) => string;
   /** What the platform saw during the current case. */
@@ -189,9 +186,7 @@ export function installCrossProjectHarness(): CrossProjectHarness {
   }, 30_000);
 
   afterAll(async () => {
-    await new Promise<void>((resolveClose) =>
-      server.close(() => resolveClose()),
-    );
+    await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
   });
 
   beforeEach(() => {

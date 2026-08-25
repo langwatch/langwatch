@@ -83,11 +83,7 @@ import { createLogger } from "@langwatch/observability";
 import { classify as classifyEgressAddress } from "@langwatch/ssrf";
 import dns from "dns/promises";
 import { isIP } from "net";
-import {
-  Agent,
-  type Response as FetchResponse,
-  fetch as undiciFetch,
-} from "undici";
+import { Agent, type Response as FetchResponse, fetch as undiciFetch } from "undici";
 import { env } from "../env.mjs";
 import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./ssrfConstants";
 
@@ -156,30 +152,19 @@ interface ValidationContext {
 // Error Message Formatters (Map-based, OCP-compliant)
 // ============================================================================
 
-type ErrorFormatter = (
-  hostname: string,
-  port: number,
-  message: string,
-) => string;
+type ErrorFormatter = (hostname: string, port: number, message: string) => string;
 
 const CONNECTION_ERROR_FORMATTERS: Record<string, ErrorFormatter> = {
-  ECONNREFUSED: (h, p) =>
-    `Connection refused - is the server running at ${h}:${p}?`,
+  ECONNREFUSED: (h, p) => `Connection refused - is the server running at ${h}:${p}?`,
   ENOTFOUND: (h) => `Could not resolve hostname: ${h}`,
   ETIMEDOUT: (h, p) => `Connection timed out while connecting to ${h}:${p}`,
   ECONNRESET: (h, p) => `Connection was reset by ${h}:${p}`,
   CERT_HAS_EXPIRED: (h, _p, m) => `TLS certificate error for ${h}: ${m}`,
-  DEPTH_ZERO_SELF_SIGNED_CERT: (h, _p, m) =>
-    `TLS certificate error for ${h}: ${m}`,
-  UNABLE_TO_VERIFY_LEAF_SIGNATURE: (h, _p, m) =>
-    `TLS certificate error for ${h}: ${m}`,
+  DEPTH_ZERO_SELF_SIGNED_CERT: (h, _p, m) => `TLS certificate error for ${h}: ${m}`,
+  UNABLE_TO_VERIFY_LEAF_SIGNATURE: (h, _p, m) => `TLS certificate error for ${h}: ${m}`,
 };
 
-function formatConnectionError(
-  err: Error,
-  hostname: string,
-  port: number,
-): Error {
+function formatConnectionError(err: Error, hostname: string, port: number): Error {
   const code = (err as NodeJS.ErrnoException).code ?? "UNKNOWN";
   const formatter = CONNECTION_ERROR_FORMATTERS[code];
   const message = formatter
@@ -209,8 +194,7 @@ export function isBlockedCloudDomain(hostname: string): boolean {
   }
 
   return BLOCKED_CLOUD_DOMAINS.some(
-    (domain) =>
-      lowerHostname === domain.slice(1) || lowerHostname.endsWith(domain),
+    (domain) => lowerHostname === domain.slice(1) || lowerHostname.endsWith(domain),
   );
 }
 
@@ -261,10 +245,7 @@ function validateNotBlockedCloudDomain(ctx: ValidationContext): void {
   }
 }
 
-function validateNotPrivateIpLiteral(
-  ctx: ValidationContext,
-  blockLocal: boolean,
-): void {
+function validateNotPrivateIpLiteral(ctx: ValidationContext, blockLocal: boolean): void {
   const ipVersion = isIP(ctx.hostname);
   if (ipVersion !== 0 && blockLocal && isPrivateOrLocalhostIP(ctx.hostname)) {
     logger.warn(
@@ -365,9 +346,7 @@ function buildUnresolvedResult(
  * Use this for testability or custom configurations.
  */
 export function createSSRFValidator(config: SSRFConfig) {
-  return async function validateUrlForSSRF(
-    url: string,
-  ): Promise<SSRFValidationResult> {
+  return async function validateUrlForSSRF(url: string): Promise<SSRFValidationResult> {
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(url);
@@ -406,19 +385,14 @@ export function createSSRFValidator(config: SSRFConfig) {
     // private-IP / localhost blocking. Cloud metadata was already rejected
     // above, so it can never be allowlisted.
     if (config.allowedHosts.length > 0) {
-      const normalizedAllowed = config.allowedHosts.map((h) =>
-        h.trim().toLowerCase(),
-      );
+      const normalizedAllowed = config.allowedHosts.map((h) => h.trim().toLowerCase());
       if (normalizedAllowed.includes(hostname)) {
         logger.info(
           { url, hostname, allowedHosts: normalizedAllowed },
           "Allowing request to allowlisted host",
         );
         const ipVersion = isIP(hostname);
-        return buildAllowlistedResult(
-          ctx,
-          ipVersion !== 0 ? hostname : undefined,
-        );
+        return buildAllowlistedResult(ctx, ipVersion !== 0 ? hostname : undefined);
       }
     }
 
@@ -439,8 +413,7 @@ export function createSSRFValidator(config: SSRFConfig) {
           {
             url,
             hostname,
-            error:
-              dnsError instanceof Error ? dnsError.message : String(dnsError),
+            error: dnsError instanceof Error ? dnsError.message : String(dnsError),
           },
           "DNS resolution failed; not blocking because BLOCK_LOCAL_HTTP_CALLS is off",
         );
@@ -450,8 +423,7 @@ export function createSSRFValidator(config: SSRFConfig) {
         {
           url,
           hostname,
-          error:
-            dnsError instanceof Error ? dnsError.message : String(dnsError),
+          error: dnsError instanceof Error ? dnsError.message : String(dnsError),
         },
         "DNS resolution failed during SSRF check - blocking request",
       );
@@ -468,10 +440,7 @@ export function createSSRFValidator(config: SSRFConfig) {
         );
         return buildUnresolvedResult(ctx, "no-records");
       }
-      logger.error(
-        { url, hostname },
-        "No DNS records found - blocking request",
-      );
+      logger.error({ url, hostname }, "No DNS records found - blocking request");
       throw new Error(
         `Unable to resolve hostname "${hostname}". Please verify the URL is correct.`,
       );
@@ -592,9 +561,7 @@ function createIpPinningAgent(
     connect: {
       rejectUnauthorized: tlsConfig.rejectUnauthorized,
       lookup: (_hostname, _options, callback) => {
-        callback(null, [
-          { address: resolvedIp, family: isIP(resolvedIp) === 6 ? 6 : 4 },
-        ]);
+        callback(null, [{ address: resolvedIp, family: isIP(resolvedIp) === 6 ? 6 : 4 }]);
       },
     },
   });
@@ -696,9 +663,7 @@ export async function fetchWithResolvedIp(
 
         if (
           response.status === 303 ||
-          (response.status !== 307 &&
-            response.status !== 308 &&
-            init?.method === "POST")
+          (response.status !== 307 && response.status !== 308 && init?.method === "POST")
         ) {
           redirectInit.method = "GET";
           redirectInit.body = undefined;

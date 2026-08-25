@@ -21,13 +21,7 @@ export const EVALUATOR_CATEGORIES = [
 
 export type EvaluatorCategory = (typeof EVALUATOR_CATEGORIES)[number];
 
-export const STEPS = [
-  "task",
-  "dataset",
-  "execution",
-  "evaluation",
-  "results",
-] as const;
+export const STEPS = ["task", "dataset", "execution", "evaluation", "results"] as const;
 
 export type Step = (typeof STEPS)[number];
 
@@ -92,7 +86,8 @@ export const workbenchStateSchema = z.object({
   realTimeThreadMappings: z
     .object({
       mapping: z.record(
-        z.string(), z.object({
+        z.string(),
+        z.object({
           source: z.enum(["", "thread_id", "traces", "formatted_traces"]),
           selectedFields: z.array(z.string()).optional(),
         }),

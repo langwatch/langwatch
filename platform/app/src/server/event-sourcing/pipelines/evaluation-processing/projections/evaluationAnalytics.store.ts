@@ -1,7 +1,4 @@
-import type {
-  FoldProjectionStore,
-  ProjectionStoreContext,
-} from "@langwatch/eventing";
+import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { EvaluationAnalyticsRepository } from "~/server/app-layer/evaluations/repositories/evaluation-analytics.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import {
@@ -35,9 +32,7 @@ import {
  * so a cold-cache retry still dedups a redelivered batch. Decoding is gated on
  * the row's projection version — see `getWithApplied`.
  */
-export class EvaluationAnalyticsStore
-  implements FoldProjectionStore<EvaluationAnalyticsData>
-{
+export class EvaluationAnalyticsStore implements FoldProjectionStore<EvaluationAnalyticsData> {
   constructor(private readonly repo: EvaluationAnalyticsRepository) {}
 
   async store(
@@ -46,11 +41,7 @@ export class EvaluationAnalyticsStore
   ): Promise<void> {
     const entry = this.toRow(state, context);
     if (!entry) return;
-    await this.repo.upsert(
-      entry.row,
-      entry.retentionDays,
-      entry.appliedEventIds,
-    );
+    await this.repo.upsert(entry.row, entry.retentionDays, entry.appliedEventIds);
   }
 
   async storeBatch(
@@ -102,11 +93,8 @@ export class EvaluationAnalyticsStore
         tenantId: String(context.tenantId),
         version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
       }),
-      retentionDays:
-        context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
-      appliedEventIds: context.appliedEventIds
-        ? [...context.appliedEventIds]
-        : [],
+      retentionDays: context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      appliedEventIds: context.appliedEventIds ? [...context.appliedEventIds] : [],
     };
   }
 

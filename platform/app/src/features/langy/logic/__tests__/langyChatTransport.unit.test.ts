@@ -31,8 +31,7 @@ vi.mock("~/utils/api", () => ({
         mutate: (input: unknown) => mutation("langy.createConversation", input),
       },
       continueConversation: {
-        mutate: (input: unknown) =>
-          mutation("langy.continueConversation", input),
+        mutate: (input: unknown) => mutation("langy.continueConversation", input),
       },
       onTurnStream: {
         subscribe: (input: unknown, opts: unknown) =>
@@ -63,9 +62,7 @@ function makeTransport(
 
 const options = (over: Record<string, unknown> = {}) =>
   ({
-    messages: [
-      { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
-    ],
+    messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] }],
     ...over,
   }) as unknown as Parameters<
     ReturnType<typeof createLangyChatTransport>["sendMessages"]
@@ -113,9 +110,9 @@ describe("createLangyChatTransport", () => {
       );
 
       const [, input] = mutation.mock.calls[0]!;
-      expect((input as { messages: Array<{ role: string }> }).messages).toEqual(
-        [{ id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] }],
-      );
+      expect((input as { messages: Array<{ role: string }> }).messages).toEqual([
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ]);
     });
 
     it("sends only THIS message, not the previous conversation's questions", async () => {
@@ -266,10 +263,7 @@ describe("createLangyChatTransport", () => {
 
     it("routes a plan snapshot to onSignal and retires the cold-start status once", async () => {
       const onSignal = vi.fn();
-      const { transport } = makeTransport(
-        { conversationId: null },
-        { onSignal },
-      );
+      const { transport } = makeTransport({ conversationId: null }, { onSignal });
       await transport.sendMessages(options());
       const { onData } = streamHandlers();
 
@@ -297,10 +291,7 @@ describe("createLangyChatTransport", () => {
       // answer is already on screen; the flag is what lets the panel suppress
       // it there instead of rendering "Thinking…" under the visible reply.
       const onSignal = vi.fn();
-      const { transport } = makeTransport(
-        { conversationId: null },
-        { onSignal },
-      );
+      const { transport } = makeTransport({ conversationId: null }, { onSignal });
       await transport.sendMessages(options());
       const { onData } = streamHandlers();
 
@@ -323,10 +314,7 @@ describe("createLangyChatTransport", () => {
 
     it("shows a mid-turn sub-status between outputs (not wiped by the cold-start clear)", async () => {
       const onSignal = vi.fn();
-      const { transport } = makeTransport(
-        { conversationId: null },
-        { onSignal },
-      );
+      const { transport } = makeTransport({ conversationId: null }, { onSignal });
       await transport.sendMessages(options());
       const { onData } = streamHandlers();
 

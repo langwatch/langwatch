@@ -1,12 +1,6 @@
-import {
-  type Logger,
-  type LogRecord,
-} from "@opentelemetry/api-logs";
+import { type Logger, type LogRecord } from "@opentelemetry/api-logs";
 import type * as intSemconv from "../semconv";
-import {
-  type SemConvAttributes,
-  type SemConvLogRecordAttributes,
-} from "../semconv";
+import { type SemConvAttributes, type SemConvLogRecordAttributes } from "../semconv";
 
 /**
  * Body for a system message event in a GenAI span.

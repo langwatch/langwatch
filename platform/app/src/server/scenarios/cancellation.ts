@@ -92,10 +92,7 @@ export class ScenarioCancellationService {
   async cancelJob(params: CancelJobParams): Promise<CancelJobResult> {
     const { projectId, scenarioRunId, batchRunId, scenarioSetId } = params;
 
-    logger.info(
-      { projectId, scenarioRunId, batchRunId },
-      "Cancelling scenario job",
-    );
+    logger.info({ projectId, scenarioRunId, batchRunId }, "Cancelling scenario job");
 
     // Check current status from fold projection — if already terminal, skip
     const runs = await this.getRunsForBatch({
@@ -137,15 +134,10 @@ export class ScenarioCancellationService {
    *
    * Reads run state from fold projections and cancels each cancellable run.
    */
-  async cancelBatchRun(
-    params: CancelBatchRunParams,
-  ): Promise<CancelBatchRunResult> {
+  async cancelBatchRun(params: CancelBatchRunParams): Promise<CancelBatchRunResult> {
     const { projectId, scenarioSetId, batchRunId } = params;
 
-    logger.info(
-      { projectId, scenarioSetId, batchRunId },
-      "Cancelling batch run",
-    );
+    logger.info({ projectId, scenarioSetId, batchRunId }, "Cancelling batch run");
 
     const runs = await this.getRunsForBatch({
       projectId,
@@ -157,9 +149,7 @@ export class ScenarioCancellationService {
       return { cancelledCount: 0, skippedCount: 0 };
     }
 
-    const cancellableRuns = runs.filter((run) =>
-      isCancellableStatus(run.status),
-    );
+    const cancellableRuns = runs.filter((run) => isCancellableStatus(run.status));
     const skippedCount = runs.length - cancellableRuns.length;
 
     // Cancel in parallel with concurrency limit

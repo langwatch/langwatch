@@ -31,10 +31,7 @@ const LIGHT_MODE_GRADIENTS = {
 
 type LightModeGradient = keyof typeof LIGHT_MODE_GRADIENTS;
 
-const LIGHT_MODE_GRADIENT_BY_STATUS: Record<
-  ScenarioRunStatus,
-  LightModeGradient
-> = {
+const LIGHT_MODE_GRADIENT_BY_STATUS: Record<ScenarioRunStatus, LightModeGradient> = {
   [ScenarioRunStatus.SUCCESS]: "pass",
   [ScenarioRunStatus.FAILED]: "fail",
   [ScenarioRunStatus.ERROR]: "fail",
@@ -75,8 +72,7 @@ interface OverlayConfig {
 export function getOverlayConfig(status: ScenarioRunStatus): OverlayConfig {
   return {
     isComplete: SCENARIO_RUN_STATUS_CONFIG[status].isComplete,
-    lightModeGradient:
-      LIGHT_MODE_GRADIENTS[LIGHT_MODE_GRADIENT_BY_STATUS[status]],
+    lightModeGradient: LIGHT_MODE_GRADIENTS[LIGHT_MODE_GRADIENT_BY_STATUS[status]],
     scrim: SCRIM_TOKENS[status],
   };
 }
@@ -86,11 +82,7 @@ export function getOverlayConfig(status: ScenarioRunStatus): OverlayConfig {
  * full-card layered wash, while dark mode keeps the quieter bottom scrim.
  * Running cards get no overlay.
  */
-export function SimulationStatusOverlay({
-  status,
-}: {
-  status: ScenarioRunStatus;
-}) {
+export function SimulationStatusOverlay({ status }: { status: ScenarioRunStatus }) {
   const { isComplete, lightModeGradient, scrim } = getOverlayConfig(status);
 
   if (!isComplete) return null;

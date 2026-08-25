@@ -123,9 +123,7 @@ function fallbackFragment(
  * The caller's `run` closure issues each attempt against its own resilient
  * client, so retries and error translation apply per attempt.
  */
-export async function queryWindowed<T>(
-  opts: QueryWindowedOptions<T>,
-): Promise<T> {
+export async function queryWindowed<T>(opts: QueryWindowedOptions<T>): Promise<T> {
   const { table, hintMs, fallback, isEmpty, run } = opts;
   const windowMs = opts.windowMs ?? DEFAULT_PARTITION_WINDOW_MS;
 
@@ -136,9 +134,7 @@ export async function queryWindowed<T>(
       return result;
     }
 
-    const hinted = await run(
-      windowFragment(hintMs - windowMs, hintMs + windowMs),
-    );
+    const hinted = await run(windowFragment(hintMs - windowMs, hintMs + windowMs));
 
     // `none` treats the hinted window as authoritative (empty means genuinely
     // absent within the window), so it never widens — which also means an empty
@@ -146,10 +142,7 @@ export async function queryWindowed<T>(
     // that resolve queued work through a `none` read retry on empty, so folding
     // it into `hit` reports a permanently-failing lookup as a healthy one.
     if (fallback === "none") {
-      incrementWindowedReadCount(
-        table,
-        isEmpty(hinted) ? "windowed_empty" : "hit",
-      );
+      incrementWindowedReadCount(table, isEmpty(hinted) ? "windowed_empty" : "hit");
       return hinted;
     }
 
@@ -167,10 +160,7 @@ export async function queryWindowed<T>(
         isWidenedEmpty ? "unbounded_empty" : "unbounded_hit",
       );
     } else {
-      incrementWindowedReadCount(
-        table,
-        isWidenedEmpty ? "widened_empty" : "widened_hit",
-      );
+      incrementWindowedReadCount(table, isWidenedEmpty ? "widened_empty" : "widened_hit");
     }
     return widened;
   } catch (error) {

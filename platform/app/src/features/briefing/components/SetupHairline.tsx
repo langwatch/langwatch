@@ -1,12 +1,4 @@
-import {
-  Box,
-  Collapsible,
-  chakra,
-  Grid,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Collapsible, chakra, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { LuCheck } from "react-icons/lu";
@@ -58,10 +50,7 @@ export function SetupHairline() {
 
   return (
     <Box width="full">
-      <Collapsible.Root
-        open={open}
-        onOpenChange={(details) => setOpen(details.open)}
-      >
+      <Collapsible.Root open={open} onOpenChange={(details) => setOpen(details.open)}>
         <Box
           borderWidth="1px"
           borderColor="border.muted"
@@ -88,11 +77,7 @@ export function SetupHairline() {
                 overflow="hidden"
                 flexShrink={0}
               >
-                <Box
-                  height="full"
-                  width={`${percentage}%`}
-                  background="orange.solid"
-                />
+                <Box height="full" width={`${percentage}%`} background="orange.solid" />
               </Box>
               <Text fontFamily="mono" fontSize="12.5px" color="fg.muted">
                 Setup · {done} of {steps.length} done

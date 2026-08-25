@@ -37,11 +37,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import {
-  type Dataset,
-  Prisma,
-  type PrismaClient,
-} from "~/generated/prisma/client";
+import { type Dataset, Prisma, type PrismaClient } from "~/generated/prisma/client";
 import {
   DatasetMigrationService,
   type DatasetMigrationRepository,
@@ -77,8 +73,7 @@ const MIGRATE_PAGE_SIZE = 1000;
  * run (every upgrade re-fires this idempotent task) does the backfill.
  */
 const isMissingColumnError = (error: unknown): boolean =>
-  error instanceof Prisma.PrismaClientKnownRequestError &&
-  error.code === "P2022";
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022";
 
 /** Outcome of attempting to migrate one dataset (for structured counts). */
 export type MigrateOutcome =
@@ -242,69 +237,69 @@ export const migrateDatasetToS3 = async (
     : (datasetId, fn) =>
         DatasetMigrationService.withDatasetLock(deps.prisma, datasetId, fn);
   return withLock(dataset.id, async (tx) => {
-      const current = await tx.dataset.findFirst({
-        where: { id: dataset.id, projectId },
-      });
-      if (current?.contentLayout !== "postgres") {
-        logger.info(
-          { datasetId: dataset.id, projectId },
-          "Skipping dataset — already migrated (not on postgres layout)",
-        );
-        return "already-migrated";
-      }
-
-      // Concurrent-write guard (I-MIG): re-read count + maxUpdatedAt inside the
-      // flip transaction and compare to the pre-read baseline. A mismatch means
-      // a record was inserted/deleted/edited during the snapshot→flip window —
-      // the chunks we wrote are stale, so DO NOT flip. The dataset stays on
-      // `postgres` (fully readable from PG, non-destructive) and the next run
-      // re-migrates it from a fresh snapshot. Never flips a stale snapshot live.
-      const recheck = await deps.recordRepository.countAndMaxUpdatedAt(
-        { datasetId: dataset.id, projectId },
-        { tx },
-      );
-      if (
-        recheck.count !== baseline.count ||
-        recheck.maxUpdatedAt?.getTime() !== baseline.maxUpdatedAt?.getTime()
-      ) {
-        logger.warn(
-          {
-            datasetId: dataset.id,
-            projectId,
-            baselineCount: baseline.count,
-            recheckCount: recheck.count,
-          },
-          "Skipping flip — records changed during migration (concurrent write); will re-migrate on the next run",
-        );
-        return "skipped-concurrent-write";
-      }
-
-      await tx.dataset.update({
-        where: { id: dataset.id, projectId },
-        data: {
-          rowCount: meta.rowCount,
-          sizeBytes: BigInt(meta.sizeBytes),
-          chunkCount: meta.chunkCount,
-          chunkOffsets: meta.chunkOffsets,
-          contentLayout: "s3_jsonl",
-        },
-      });
-
-      // NON-DESTRUCTIVE (I-MIG): the `DatasetRecord` PG rows are intentionally
-      // left in place as old-pod read fallback / rollback safety. A SEPARATE
-      // later cleanup task removes them once the rollout is confirmed.
+    const current = await tx.dataset.findFirst({
+      where: { id: dataset.id, projectId },
+    });
+    if (current?.contentLayout !== "postgres") {
       logger.info(
+        { datasetId: dataset.id, projectId },
+        "Skipping dataset — already migrated (not on postgres layout)",
+      );
+      return "already-migrated";
+    }
+
+    // Concurrent-write guard (I-MIG): re-read count + maxUpdatedAt inside the
+    // flip transaction and compare to the pre-read baseline. A mismatch means
+    // a record was inserted/deleted/edited during the snapshot→flip window —
+    // the chunks we wrote are stale, so DO NOT flip. The dataset stays on
+    // `postgres` (fully readable from PG, non-destructive) and the next run
+    // re-migrates it from a fresh snapshot. Never flips a stale snapshot live.
+    const recheck = await deps.recordRepository.countAndMaxUpdatedAt(
+      { datasetId: dataset.id, projectId },
+      { tx },
+    );
+    if (
+      recheck.count !== baseline.count ||
+      recheck.maxUpdatedAt?.getTime() !== baseline.maxUpdatedAt?.getTime()
+    ) {
+      logger.warn(
         {
           datasetId: dataset.id,
           projectId,
-          rowCount: meta.rowCount,
-          chunkCount: meta.chunkCount,
-          sizeBytes: meta.sizeBytes,
+          baselineCount: baseline.count,
+          recheckCount: recheck.count,
         },
-        "Migrated dataset content to chunked JSONL (s3_jsonl)",
+        "Skipping flip — records changed during migration (concurrent write); will re-migrate on the next run",
       );
-      return "migrated";
+      return "skipped-concurrent-write";
+    }
+
+    await tx.dataset.update({
+      where: { id: dataset.id, projectId },
+      data: {
+        rowCount: meta.rowCount,
+        sizeBytes: BigInt(meta.sizeBytes),
+        chunkCount: meta.chunkCount,
+        chunkOffsets: meta.chunkOffsets,
+        contentLayout: "s3_jsonl",
+      },
     });
+
+    // NON-DESTRUCTIVE (I-MIG): the `DatasetRecord` PG rows are intentionally
+    // left in place as old-pod read fallback / rollback safety. A SEPARATE
+    // later cleanup task removes them once the rollout is confirmed.
+    logger.info(
+      {
+        datasetId: dataset.id,
+        projectId,
+        rowCount: meta.rowCount,
+        chunkCount: meta.chunkCount,
+        sizeBytes: meta.sizeBytes,
+      },
+      "Migrated dataset content to chunked JSONL (s3_jsonl)",
+    );
+    return "migrated";
+  });
 };
 
 /** Running tally of per-dataset outcomes. */
@@ -412,9 +407,7 @@ export const migrateAllPostgresDatasets = async (
  */
 export default async function execute(): Promise<void> {
   if (process.env.SKIP_DATASET_S3_MIGRATE) {
-    logger.info(
-      "SKIP_DATASET_S3_MIGRATE is set — skipping PG→S3 dataset backfill",
-    );
+    logger.info("SKIP_DATASET_S3_MIGRATE is set — skipping PG→S3 dataset backfill");
     return;
   }
 
@@ -433,8 +426,7 @@ export default async function execute(): Promise<void> {
   //   DATASET_S3_MIGRATE_DRY_RUN=1 pnpm run task backfillDatasetContentToS3
   //   pnpm run task backfillDatasetContentToS3 --dry-run
   const dryRun =
-    !!process.env.DATASET_S3_MIGRATE_DRY_RUN ||
-    process.argv.includes("--dry-run");
+    !!process.env.DATASET_S3_MIGRATE_DRY_RUN || process.argv.includes("--dry-run");
 
   logger.info(
     { dryRun },

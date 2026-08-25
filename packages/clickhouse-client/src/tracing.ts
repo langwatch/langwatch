@@ -89,7 +89,6 @@ export const SPAN_ATTRIBUTES = {
   bytesRead: "db.response.read_bytes",
 } as const;
 
-
 /**
  * Records one span per statement.
  *
@@ -144,10 +143,7 @@ export class QueryTracer {
       // Recorded so an audit can enumerate every statement that opted out of
       // the tenant predicate, and why, without reading the code.
       if (request.unscoped !== undefined) {
-        span.setAttribute(
-          SPAN_ATTRIBUTES.unscopedReason,
-          request.unscoped.reason,
-        );
+        span.setAttribute(SPAN_ATTRIBUTES.unscopedReason, request.unscoped.reason);
       }
     });
 

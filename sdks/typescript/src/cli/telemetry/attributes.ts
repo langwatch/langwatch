@@ -73,8 +73,7 @@ export const LANGWATCH_EVENTS = {
   error: "error",
 } as const;
 
-export type LangWatchEvent =
-  (typeof LANGWATCH_EVENTS)[keyof typeof LANGWATCH_EVENTS];
+export type LangWatchEvent = (typeof LANGWATCH_EVENTS)[keyof typeof LANGWATCH_EVENTS];
 
 /**
  * Switches the OTLP transport on. Unset (or any value other than a truthy one)

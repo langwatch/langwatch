@@ -48,10 +48,7 @@ describe("feature registry", () => {
       /** @scenario "A prompt without a model resolves the agent-under-test default" */
       it("registers it under the DEFAULT role", () => {
         const feature = featureByKey("scenarios.agent_under_test");
-        expect(
-          feature,
-          'feature "scenarios.agent_under_test" must exist',
-        ).toBeTruthy();
+        expect(feature, 'feature "scenarios.agent_under_test" must exist').toBeTruthy();
         expect(feature?.role).toBe("DEFAULT");
       });
 
@@ -62,8 +59,7 @@ describe("feature registry", () => {
 
         // Copy rules (dev/docs/best_practices/copywriting.md): no internal
         // service names, no abbreviations, no code-shaped identifiers.
-        const copy =
-          `${feature?.displayName} ${feature?.description}`.toLowerCase();
+        const copy = `${feature?.displayName} ${feature?.description}`.toLowerCase();
         for (const forbidden of [
           "prefetch",
           "adapter",

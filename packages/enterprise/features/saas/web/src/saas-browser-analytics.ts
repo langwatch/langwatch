@@ -20,10 +20,7 @@ export class SaasBrowserAnalytics {
     identifyPostHog: PostHogIdentify;
     intervalMs?: number;
   }): SaasBrowserAnalytics {
-    return new SaasBrowserAnalytics(
-      options.identifyPostHog,
-      options.intervalMs ?? 200,
-    );
+    return new SaasBrowserAnalytics(options.identifyPostHog, options.intervalMs ?? 200);
   }
 
   identifyPostHogUser(input: {

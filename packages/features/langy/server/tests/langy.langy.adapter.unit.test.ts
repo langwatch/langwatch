@@ -58,9 +58,7 @@ describe("PostgresLangyAdapter", () => {
 
     expect(second).toBe(first);
     expect(second.langyConversationState).toBe(first.langyConversationState);
-    expect(second.langyConversationTurnState).toBe(
-      first.langyConversationTurnState,
-    );
+    expect(second.langyConversationTurnState).toBe(first.langyConversationTurnState);
     expect(second.langyMessageStorage).toBe(first.langyMessageStorage);
     expect(second.langyTurnAdmission).toBe(first.langyTurnAdmission);
   });

@@ -34,11 +34,7 @@ async function shoot(page: Page, name: string) {
   return file;
 }
 
-async function step(
-  results: StepResult[],
-  name: string,
-  fn: () => Promise<void>,
-) {
+async function step(results: StepResult[], name: string, fn: () => Promise<void>) {
   try {
     await fn();
     results.push({ name, ok: true });
@@ -76,10 +72,7 @@ void (async () => {
   });
 
   await step(results, "click-ingestion-templates-tab", async () => {
-    await page
-      .locator('button:has-text("Ingestion Templates")')
-      .first()
-      .click();
+    await page.locator('button:has-text("Ingestion Templates")').first().click();
     // Wait for the table to render with at least one row, OR the empty state.
     await page.waitForFunction(
       () =>
@@ -109,9 +102,7 @@ void (async () => {
   });
 
   await step(results, "clone-platform-row", async () => {
-    const cloneBtn = page
-      .locator('button:has-text("Clone to customise")')
-      .first();
+    const cloneBtn = page.locator('button:has-text("Clone to customise")').first();
     await cloneBtn.waitFor({ state: "visible", timeout: 5_000 });
     await cloneBtn.click();
     // Edit drawer opens after the mutation resolves
@@ -165,8 +156,7 @@ void (async () => {
       'tr:has(span:has-text("Org-authored")) button',
     );
     const count = await archiveCandidates.count();
-    if (count < 2)
-      throw new Error(`expected 2+ buttons in org row, got ${count}`);
+    if (count < 2) throw new Error(`expected 2+ buttons in org row, got ${count}`);
     await archiveCandidates.last().click();
     await page.waitForTimeout(1000);
     await shoot(page, "08-after-archive");
@@ -183,10 +173,7 @@ void (async () => {
     results,
     output: OUT_DIR,
   };
-  fs.writeFileSync(
-    path.join(OUT_DIR, "report.json"),
-    JSON.stringify(summary, null, 2),
-  );
+  fs.writeFileSync(path.join(OUT_DIR, "report.json"), JSON.stringify(summary, null, 2));
   console.log(`\nresults: ${passed} pass / ${failed} fail`);
   console.log(`screenshots + report.json: ${OUT_DIR}`);
   process.exit(failed > 0 ? 1 : 0);

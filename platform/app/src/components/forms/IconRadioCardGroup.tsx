@@ -1,12 +1,4 @@
-import {
-  Button,
-  Circle,
-  Grid,
-  HStack,
-  Icon,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
+import { Button, Circle, Grid, HStack, Icon, Stack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useRef } from "react";
 

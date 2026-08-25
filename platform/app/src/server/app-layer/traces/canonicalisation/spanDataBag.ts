@@ -9,10 +9,7 @@ export class SpanDataBag {
   readonly attrs: AttributeBag;
   readonly events: EventBag;
 
-  constructor(
-    spanAttributes: NormalizedAttributes,
-    events: NormalizedSpan["events"],
-  ) {
+  constructor(spanAttributes: NormalizedAttributes, events: NormalizedSpan["events"]) {
     this.attrs = new AttributeBag(spanAttributes);
     this.events = new EventBag(events);
   }

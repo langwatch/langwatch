@@ -29,10 +29,7 @@ export function startSystemMigrations(args?: {
       logger.info({ summary }, "system migration pass finished");
     })
     .catch((error) => {
-      logger.error(
-        { error },
-        "system migration pass failed; next boot retries",
-      );
+      logger.error({ error }, "system migration pass failed; next boot retries");
     });
   return {
     stop: async () => {

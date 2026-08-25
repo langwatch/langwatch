@@ -12,8 +12,7 @@ import type { FoldProjectionStore } from "../foldProjection.types";
 import { ProjectionRouter } from "../projectionRouter";
 
 /** An aggregate whose rows accumulate over its whole life, so no window bounds them. */
-const LONG_LIVED_AGGREGATE_TYPE =
-  "simulation_set" as const satisfies AggregateType;
+const LONG_LIVED_AGGREGATE_TYPE = "simulation_set" as const satisfies AggregateType;
 const READ_WINDOW = { widthMs: 7 * 24 * 60 * 60 * 1000 } as const;
 
 /**
@@ -24,15 +23,11 @@ const READ_WINDOW = { widthMs: 7 * 24 * 60 * 60 * 1000 } as const;
 function createDurableWatermarkStore<State>(): FoldProjectionStore<State> {
   return {
     ...createMockFoldProjectionStore<State>(),
-    getWithApplied: vi
-      .fn()
-      .mockResolvedValue({ state: null, appliedEventIds: [] }),
+    getWithApplied: vi.fn().mockResolvedValue({ state: null, appliedEventIds: [] }),
   } as FoldProjectionStore<State>;
 }
 
-function createRouter(
-  aggregateType: AggregateType = TEST_CONSTANTS.AGGREGATE_TYPE,
-) {
+function createRouter(aggregateType: AggregateType = TEST_CONSTANTS.AGGREGATE_TYPE) {
   return new ProjectionRouter(
     aggregateType,
     TEST_CONSTANTS.PIPELINE_NAME,
@@ -121,17 +116,13 @@ describe("ProjectionRouter registration guard", () => {
           createRouter(LONG_LIVED_AGGREGATE_TYPE).registerFoldProjection(
             trustedWindowedFold("trusted-on-long-lived"),
           ),
-        ).toThrow(
-          new RegExp(`trusted-on-long-lived.*${LONG_LIVED_AGGREGATE_TYPE}`),
-        );
+        ).toThrow(new RegExp(`trusted-on-long-lived.*${LONG_LIVED_AGGREGATE_TYPE}`));
       });
     });
 
     describe("when the aggregate it is registered under is time-local", () => {
       it("registers the fold", () => {
-        expect(
-          TIME_LOCAL_AGGREGATE_TYPES.has(TEST_CONSTANTS.AGGREGATE_TYPE),
-        ).toBe(true);
+        expect(TIME_LOCAL_AGGREGATE_TYPES.has(TEST_CONSTANTS.AGGREGATE_TYPE)).toBe(true);
 
         expect(() =>
           createRouter().registerFoldProjection(

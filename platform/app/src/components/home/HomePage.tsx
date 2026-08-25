@@ -81,13 +81,7 @@ export function HomePage() {
                 ground (and its light-mode bloom) are positioned layers that
                 would otherwise paint over this static row. The page's order
                 is colour, then bloom, then every element on top. */}
-            <HStack
-              width="full"
-              align="center"
-              gap={2}
-              position="relative"
-              zIndex={2}
-            >
+            <HStack width="full" align="center" gap={2} position="relative" zIndex={2}>
               {/* The Langy home greets from the centre of its own hero, where
                   the question is being asked. Rendering the greeting here as
                   well would put it on the page twice. */}
@@ -288,11 +282,7 @@ function LangyHome() {
   const { isNewProject } = useProjectReach();
   const devState = useHomeDevState();
   const empty =
-    devState === "empty"
-      ? true
-      : devState === "populated"
-        ? false
-        : isNewProject;
+    devState === "empty" ? true : devState === "populated" ? false : isNewProject;
 
   return (
     <>

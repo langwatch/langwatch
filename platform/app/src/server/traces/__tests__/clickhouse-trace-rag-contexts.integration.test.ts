@@ -83,10 +83,7 @@ function makeTraceSummaryRow(overrides: Record<string, unknown> = {}) {
  * every SpanAttributes value is a string (Map(String, String)), with
  * objects/arrays JSON-stringified by serializeAttributes.
  */
-function makeRagSpanRow(
-  traceId: string,
-  overrides: Record<string, unknown> = {},
-) {
+function makeRagSpanRow(traceId: string, overrides: Record<string, unknown> = {}) {
   return {
     ProjectionId: `proj-${nanoid()}`,
     TenantId: tenantId,
@@ -152,8 +149,7 @@ vi.mock("~/server/app-layer/app", async () => {
   const app = () => ({
     clickhouse: {
       enabled: true,
-      resolveClient: (tenantId: string) =>
-        clients.getClickHouseClientForTenant(tenantId),
+      resolveClient: (tenantId: string) => clients.getClickHouseClientForTenant(tenantId),
       resolveOrganizationClient: async () => {
         throw new Error("no organization client in this suite");
       },
@@ -180,9 +176,7 @@ beforeAll(async () => {
 
   const { prisma } = await import("~/server/db");
   service = new ClickHouseTraceService({
-    prisma: prisma as ConstructorParameters<
-      typeof ClickHouseTraceService
-    >[0]["prisma"],
+    prisma: prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]["prisma"],
   });
 }, 60_000);
 

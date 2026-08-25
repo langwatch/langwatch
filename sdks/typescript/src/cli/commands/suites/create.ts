@@ -1,9 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import {
-  SuitesApiService,
-  type SuiteTarget,
-} from "@/client-sdk/services/suites";
+import { SuitesApiService, type SuiteTarget } from "@/client-sdk/services/suites";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
@@ -12,13 +9,21 @@ function parseTargets(targetStrings: string[]): SuiteTarget[] {
   return targetStrings.map((t) => {
     const colonIndex = t.indexOf(":");
     if (colonIndex === -1) {
-      console.error(chalk.red(`Error: Invalid target format "${t}". Use <type>:<referenceId> (e.g., http:agent_abc123)`));
+      console.error(
+        chalk.red(
+          `Error: Invalid target format "${t}". Use <type>:<referenceId> (e.g., http:agent_abc123)`,
+        ),
+      );
       process.exit(1);
     }
     const type = t.slice(0, colonIndex);
     const referenceId = t.slice(colonIndex + 1);
     if (!["prompt", "http", "code", "workflow"].includes(type)) {
-      console.error(chalk.red(`Error: Invalid target type "${type}". Must be one of: prompt, http, code, workflow`));
+      console.error(
+        chalk.red(
+          `Error: Invalid target type "${type}". Must be one of: prompt, http, code, workflow`,
+        ),
+      );
       process.exit(1);
     }
     return { type: type as SuiteTarget["type"], referenceId };
@@ -42,12 +47,16 @@ export const createSuiteCommand = async (
   await resolveCredentials();
 
   if (!options.scenarios) {
-    console.error(chalk.red("Error: --scenarios is required (comma-separated scenario IDs)"));
+    console.error(
+      chalk.red("Error: --scenarios is required (comma-separated scenario IDs)"),
+    );
     process.exit(1);
   }
 
   if (!options.targets || options.targets.length === 0) {
-    console.error(chalk.red("Error: --targets is required (format: <type>:<referenceId>)"));
+    console.error(
+      chalk.red("Error: --targets is required (format: <type>:<referenceId>)"),
+    );
     process.exit(1);
   }
 

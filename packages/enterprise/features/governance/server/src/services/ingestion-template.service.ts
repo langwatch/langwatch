@@ -43,18 +43,12 @@ export class IngestionTemplateService extends IngestionTemplatesService {
     );
   }
 
-  async listForUser(input: {
-    organizationId: string;
-  }): Promise<IngestionTemplate[]> {
-    const templates = await this.repository.listUserVisible(
-      input.organizationId,
-    );
+  async listForUser(input: { organizationId: string }): Promise<IngestionTemplate[]> {
+    const templates = await this.repository.listUserVisible(input.organizationId);
     return templates.map((template) => ({ ...template, ottlRules: "" }));
   }
 
-  listForOrgAdmin(input: {
-    organizationId: string;
-  }): Promise<IngestionTemplate[]> {
+  listForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]> {
     return this.repository.listAdminVisible(input.organizationId);
   }
 
@@ -114,9 +108,7 @@ export class IngestionTemplateService extends IngestionTemplatesService {
     return result.template;
   }
 
-  async archiveOrgTemplate(
-    input: ArchiveIngestionTemplateInput,
-  ): Promise<void> {
+  async archiveOrgTemplate(input: ArchiveIngestionTemplateInput): Promise<void> {
     const parsed = archiveIngestionTemplateInputSchema.parse(input);
     const result = await this.repository.archiveWithAudit({
       ...parsed,

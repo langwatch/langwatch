@@ -73,9 +73,7 @@ describe("ProcessManagerService", () => {
           now: T0 + LIVENESS_MS,
           limit: 10,
         });
-        expect(wakes).toEqual([
-          { ref: pilotRef, revision: 1, wakeAt: T0 + LIVENESS_MS },
-        ]);
+        expect(wakes).toEqual([{ ref: pilotRef, revision: 1, wakeAt: T0 + LIVENESS_MS }]);
       });
     });
   });
@@ -153,9 +151,7 @@ describe("ProcessManagerService", () => {
         });
         expect(result.outcome).toBe("staleWake");
         const messages = await store.findMessagesByRef({ ref: pilotRef });
-        expect(messages.map((m) => m.messageKey)).toEqual([
-          "dispatch:turn_1:1",
-        ]);
+        expect(messages.map((m) => m.messageKey)).toEqual(["dispatch:turn_1:1"]);
       });
     });
 
@@ -196,9 +192,9 @@ describe("ProcessManagerService", () => {
         });
         expect(redelivered.outcome).toBe("staleWake");
 
-        const failMessages = (
-          await store.findMessagesByRef({ ref: pilotRef })
-        ).filter((m) => m.intentType === "fail-agent-response");
+        const failMessages = (await store.findMessagesByRef({ ref: pilotRef })).filter(
+          (m) => m.intentType === "fail-agent-response",
+        );
         expect(failMessages).toHaveLength(1);
         expect(failMessages[0]?.messageKey).toBe("fail:turn_1");
       });
@@ -233,18 +229,18 @@ describe("ProcessManagerService", () => {
         expect(result.outcome).toBe("staleWake");
         const after = await store.findByRef({ ref: pilotRef });
         expect(after).toEqual(before);
-        const failMessages = (
-          await store.findMessagesByRef({ ref: pilotRef })
-        ).filter((m) => m.intentType === "fail-agent-response");
+        const failMessages = (await store.findMessagesByRef({ ref: pilotRef })).filter(
+          (m) => m.intentType === "fail-agent-response",
+        );
         expect(failMessages).toHaveLength(0);
       });
     });
 
     describe("when the completed turn had a derived title source", () => {
       it("records one title intent keyed to the turn", async () => {
-        const titles = (
-          await store.findMessagesByRef({ ref: pilotRef })
-        ).filter((m) => m.intentType === "title-generation");
+        const titles = (await store.findMessagesByRef({ ref: pilotRef })).filter(
+          (m) => m.intentType === "title-generation",
+        );
         expect(titles.map((m) => m.messageKey)).toEqual(["title:turn_1"]);
       });
     });
@@ -278,9 +274,9 @@ describe("ProcessManagerService", () => {
           now: T0 + 5_000,
         });
 
-        const titles = (
-          await store.findMessagesByRef({ ref: pilotRef })
-        ).filter((m) => m.intentType === "title-generation");
+        const titles = (await store.findMessagesByRef({ ref: pilotRef })).filter(
+          (m) => m.intentType === "title-generation",
+        );
         expect(titles).toHaveLength(0);
       });
     });
@@ -368,9 +364,7 @@ describe("ProcessManagerService", () => {
       // Interleave a competing commit between the service's read and write.
       const originalFindByRef = store.findByRef.bind(store);
       let interleaved = false;
-      store.findByRef = async <State = unknown>(params: {
-        ref: ProcessRef;
-      }) => {
+      store.findByRef = async <State = unknown>(params: { ref: ProcessRef }) => {
         const result = await originalFindByRef<State>(params);
         if (!interleaved) {
           interleaved = true;

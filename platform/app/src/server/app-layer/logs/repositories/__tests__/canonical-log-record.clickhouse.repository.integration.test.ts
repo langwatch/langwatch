@@ -91,9 +91,7 @@ async function buildRecords(baseMs: number): Promise<CanonicalLogRecord[]> {
       resourceLogs: [
         {
           resource: {
-            attributes: [
-              { key: "service.name", value: { stringValue: "claude-code" } },
-            ],
+            attributes: [{ key: "service.name", value: { stringValue: "claude-code" } }],
           },
           scopeLogs: [
             {
@@ -173,11 +171,7 @@ describe("given canonical log records ensured for one trace", () => {
 
       // All three share the trace; time order is A (-10s), C (-7.5s), B (-5s).
       expect(rows.map((row) => row.spanId)).toEqual([spanA, spanC, spanB]);
-      expect(rows.map((row) => row.traceId)).toEqual([
-        traceId,
-        traceId,
-        traceId,
-      ]);
+      expect(rows.map((row) => row.traceId)).toEqual([traceId, traceId, traceId]);
       expect(rows[0]!.scopeName).toBe(CLAUDE_CODE_EVENT_SCOPE);
     });
   });
@@ -198,9 +192,7 @@ describe("given canonical log records ensured for one trace", () => {
 
   describe("when reading back billing metadata", () => {
     it("stores the canonical payload byte size in _size_bytes, not the row size", async () => {
-      const marked = records.find(
-        (record) => record.correlationSpanId === spanA,
-      )!;
+      const marked = records.find((record) => record.correlationSpanId === spanA)!;
 
       const result = await ch.query({
         query: `

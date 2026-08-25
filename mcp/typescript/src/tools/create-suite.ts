@@ -16,7 +16,7 @@ export async function handleCreateSuite(params: {
   try {
     parsedTargets = JSON.parse(params.targets) as SuiteTarget[];
   } catch {
-    return "Error: `targets` must be a valid JSON array of objects with `type` and `referenceId` fields.\n\nExample: [{\"type\": \"http\", \"referenceId\": \"agent_abc123\"}]";
+    return 'Error: `targets` must be a valid JSON array of objects with `type` and `referenceId` fields.\n\nExample: [{"type": "http", "referenceId": "agent_abc123"}]';
   }
 
   const suite = await apiCreateSuite({

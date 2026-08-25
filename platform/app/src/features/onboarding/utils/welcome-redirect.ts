@@ -26,13 +26,11 @@ export function resolveWelcomeRedirect({
   organizations: WelcomeOrg[] | undefined;
   currentProjectSlug: string | null;
 }): WelcomeRedirectDecision {
-  const sharedTeams = (org: WelcomeOrg) =>
-    org.teams.filter((t) => !t.isPersonal);
+  const sharedTeams = (org: WelcomeOrg) => org.teams.filter((t) => !t.isPersonal);
 
   const hasAnyProject =
-    organizations?.some((org) =>
-      sharedTeams(org).some((t) => t.projects.length > 0),
-    ) ?? false;
+    organizations?.some((org) => sharedTeams(org).some((t) => t.projects.length > 0)) ??
+    false;
 
   // Membership is the test, not `primaryIntent`. That field is null for every
   // organization created before ADR-038 and for every one created outside
@@ -49,8 +47,7 @@ export function resolveWelcomeRedirect({
 
   const slug =
     currentProjectSlug ??
-    organizations?.flatMap((o) => sharedTeams(o)).flatMap((t) => t.projects)[0]
-      ?.slug;
+    organizations?.flatMap((o) => sharedTeams(o)).flatMap((t) => t.projects)[0]?.slug;
 
   // Only reachable with a shared project in hand, so with an organization too:
   // whatever happens to the slug, onboarding is not the answer.

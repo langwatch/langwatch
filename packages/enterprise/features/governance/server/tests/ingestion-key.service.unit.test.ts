@@ -27,10 +27,8 @@ class FakeOrganizations extends OrganizationService {
   projectId: string | null = "project-personal";
   getOldestTeamId = unsupported<OrganizationService["getOldestTeamId"]>();
   getBillingProfile = unsupported<OrganizationService["getBillingProfile"]>();
-  claimBillingCustomerId =
-    unsupported<OrganizationService["claimBillingCustomerId"]>();
-  ensurePersonalWorkspace =
-    unsupported<OrganizationService["ensurePersonalWorkspace"]>();
+  claimBillingCustomerId = unsupported<OrganizationService["claimBillingCustomerId"]>();
+  ensurePersonalWorkspace = unsupported<OrganizationService["ensurePersonalWorkspace"]>();
   getPersonalWorkspaceFeatures =
     unsupported<OrganizationService["getPersonalWorkspaceFeatures"]>();
   enableAllPersonalWorkspaceFeatures =

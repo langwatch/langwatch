@@ -50,7 +50,9 @@ export const listCommand = async (): Promise<CommandResult | void> => {
           console.log(chalk.gray("No datasets found."));
           console.log(chalk.gray("Create your first dataset with:"));
           console.log(
-            chalk.cyan('  langwatch dataset create "My Dataset" --columns input:string,output:string'),
+            chalk.cyan(
+              '  langwatch dataset create "My Dataset" --columns input:string,output:string',
+            ),
           );
         } else {
           console.log();

@@ -40,12 +40,8 @@ describe("LiquidConditionEditor", () => {
   describe("given a valid condition over a known input", () => {
     it("shows neither an error nor a warning", () => {
       renderEditor("amount < 5", ["amount"]);
-      expect(
-        screen.queryByTestId("if-else-condition-error"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("if-else-condition-warning"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("if-else-condition-error")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("if-else-condition-warning")).not.toBeInTheDocument();
     });
 
     it("frames the field with the liquid tag adornments", () => {

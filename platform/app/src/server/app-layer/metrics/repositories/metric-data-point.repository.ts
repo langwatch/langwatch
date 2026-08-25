@@ -32,9 +32,7 @@ export interface MetricDataPointRepository {
   upsertSeriesMany(args: MetricDataPointBulkWrite): Promise<void>;
   recomputeAffectedRollups(args: MetricDataPointWrite): Promise<void>;
   recomputeAffectedRollupsMany(args: MetricDataPointBulkWrite): Promise<void>;
-  queryUsageEstimates(
-    query: MetricUsageEstimateQuery,
-  ): Promise<MetricUsageEstimate[]>;
+  queryUsageEstimates(query: MetricUsageEstimateQuery): Promise<MetricUsageEstimate[]>;
   /**
    * Totals for every series whose point-attribute set carries
    * `attributeKey = attributeValue`, summed from the 30-second rollups
@@ -52,9 +50,7 @@ export interface MetricDataPointRepository {
   }): Promise<SeriesTotalByPointAttribute[]>;
 }
 
-export class NullMetricDataPointRepository
-  implements MetricDataPointRepository
-{
+export class NullMetricDataPointRepository implements MetricDataPointRepository {
   async ensureDataPoint(_args: MetricDataPointWrite): Promise<void> {}
 
   async ensureDataPoints(_args: MetricDataPointBulkWrite): Promise<void> {}
@@ -65,9 +61,7 @@ export class NullMetricDataPointRepository
 
   async recomputeAffectedRollups(_args: MetricDataPointWrite): Promise<void> {}
 
-  async recomputeAffectedRollupsMany(
-    _args: MetricDataPointBulkWrite,
-  ): Promise<void> {}
+  async recomputeAffectedRollupsMany(_args: MetricDataPointBulkWrite): Promise<void> {}
 
   async queryUsageEstimates(
     _query: MetricUsageEstimateQuery,

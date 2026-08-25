@@ -14,12 +14,7 @@ export function GroupDrawerHeader({
 }) {
   return (
     <HStack width="full" gap={2} align="start">
-      <Text
-        textStyle="sm"
-        fontFamily="mono"
-        wordBreak="break-all"
-        flexShrink={1}
-      >
+      <Text textStyle="sm" fontFamily="mono" wordBreak="break-all" flexShrink={1}>
         {groupId}
       </Text>
       <Button

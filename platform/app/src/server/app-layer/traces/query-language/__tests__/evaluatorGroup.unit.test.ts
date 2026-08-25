@@ -27,9 +27,7 @@ describe("toggleEvaluatorSubFilterInQuery", () => {
   describe("given an empty query", () => {
     describe("when a verdict is toggled on", () => {
       it("emits the evaluator and verdict as one parenthesised group", () => {
-        expect(toggleVerdict("", "pass")).toBe(
-          "(evaluator:X AND evaluatorVerdict:pass)",
-        );
+        expect(toggleVerdict("", "pass")).toBe("(evaluator:X AND evaluatorVerdict:pass)");
       });
 
       it("produces a query that parses without error", () => {
@@ -89,9 +87,7 @@ describe("toggleEvaluatorSubFilterInQuery", () => {
         const withVerdict = toggleVerdict("status:error", "pass");
         // include -> exclude -> neutral
         const excluded = toggleVerdict(withVerdict, "pass");
-        expect(toggleVerdict(excluded, "pass")).toBe(
-          "status:error AND evaluator:X",
-        );
+        expect(toggleVerdict(excluded, "pass")).toBe("status:error AND evaluator:X");
       });
     });
   });

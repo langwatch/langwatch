@@ -5,10 +5,7 @@ import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
 import { PrivacyDroppedNotice } from "~/components/ui/PrivacyDroppedNotice";
 import { RedactedField } from "~/components/ui/RedactedField";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type {
-  SpanTreeNode,
-  TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { changedTraceMetadataKeys } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import {
   mediaRefBelongsToSide,
@@ -68,12 +65,8 @@ export function TraceSummaryAccordions({
   // new read lands, so the captured value is only this trace's while the two
   // agree on which trace it belongs to.
   const isCanonicalThisTrace = canonicalHeader?.traceId === trace.traceId;
-  const capturedInput = isCanonicalThisTrace
-    ? canonicalHeader.input
-    : undefined;
-  const capturedOutput = isCanonicalThisTrace
-    ? canonicalHeader.output
-    : undefined;
+  const capturedInput = isCanonicalThisTrace ? canonicalHeader.input : undefined;
+  const capturedOutput = isCanonicalThisTrace ? canonicalHeader.output : undefined;
   const hasIO = !!(trace.input || trace.output);
   // A restrict privacy rule hides content the viewer may not see — the server
   // nulls `input`/`output` and sets these flags. The IO section then reads as a
@@ -105,8 +98,7 @@ export function TraceSummaryAccordions({
   const { project } = useOrganizationTeamProject();
   const promptsHref = project?.slug ? `/${project.slug}/prompts` : undefined;
   const resources = useTraceResources(trace.traceId);
-  const hasResourceAttributes =
-    Object.keys(resources.resourceAttributes).length > 0;
+  const hasResourceAttributes = Object.keys(resources.resourceAttributes).length > 0;
   const hasTraceAttributes = Object.keys(traceAttributes).length > 0;
   const hasAttributes = hasTraceAttributes || hasResourceAttributes;
   const hasScope = !!resources.scope?.name;
@@ -147,9 +139,7 @@ export function TraceSummaryAccordions({
     () =>
       richEvals.map((e) => ({
         ...e,
-        spanName: e.spanId
-          ? spans.find((s) => s.spanId === e.spanId)?.name
-          : undefined,
+        spanName: e.spanId ? spans.find((s) => s.spanId === e.spanId)?.name : undefined,
       })),
     [richEvals, spans],
   );
@@ -168,8 +158,7 @@ export function TraceSummaryAccordions({
   // matters for traces that only have span-level failures (no rolled
   // up trace.error), where the header chip would otherwise list pills
   // that lead to a section gate that never opens.
-  const hasError =
-    trace.status === "error" && (!!trace.error || errorSpans.length > 0);
+  const hasError = trace.status === "error" && (!!trace.error || errorSpans.length > 0);
 
   const hasEvalsContent = evalsForList.length > 0 || pendingCount > 0;
   const hasEventsContent = traceEvents.length > 0;
@@ -313,10 +302,7 @@ export function TraceSummaryAccordions({
                       <TraceEditableInput capturedText={trace.input ?? null} />
                     ) : trace.input ? (
                       inputCorrected ? (
-                        <CorrectedFieldFrame
-                          label="Input"
-                          original={capturedInput}
-                        >
+                        <CorrectedFieldFrame label="Input" original={capturedInput}>
                           <IOViewer
                             label="Input"
                             content={trace.input}
@@ -344,15 +330,10 @@ export function TraceSummaryAccordions({
                     visibleTo={trace.outputVisibleTo}
                   >
                     {isEditing ? (
-                      <TraceEditableOutput
-                        capturedText={trace.output ?? null}
-                      />
+                      <TraceEditableOutput capturedText={trace.output ?? null} />
                     ) : trace.output ? (
                       outputCorrected ? (
-                        <CorrectedFieldFrame
-                          label="Output"
-                          original={capturedOutput}
-                        >
+                        <CorrectedFieldFrame label="Output" original={capturedOutput}>
                           <IOViewer
                             label="Output"
                             content={trace.output}
@@ -417,15 +398,11 @@ export function TraceSummaryAccordions({
                   <AttributeTable
                     attributes={metadataEditing.baselineAttributes}
                     resourceAttributes={
-                      hasResourceAttributes
-                        ? resources.resourceAttributes
-                        : undefined
+                      hasResourceAttributes ? resources.resourceAttributes : undefined
                     }
                     title="Trace Attributes"
                     editing={metadataEditing.editing}
-                    correctedFrom={
-                      metadataCorrected ? capturedAttributes : undefined
-                    }
+                    correctedFrom={metadataCorrected ? capturedAttributes : undefined}
                     comments={metadataComments}
                   />
                 ) : resources.isLoading ? (
@@ -456,8 +433,7 @@ export function TraceSummaryAccordions({
             // without a count, leaving users to expand it to find out whether
             // they were looking at one bad span or twenty.
             const exceptionsCount =
-              errorSpans.length +
-              (trace.error && errorSpans.length === 0 ? 1 : 0);
+              errorSpans.length + (trace.error && errorSpans.length === 0 ? 1 : 0);
             return (
               <Section
                 key="exceptions"
@@ -488,14 +464,8 @@ export function TraceSummaryAccordions({
                 value="evals"
                 title="Evals"
                 spotlightAnchor={hasEvalsContent ? "drawer-evals" : undefined}
-                count={
-                  evalsForList.length > 0 ? evalsForList.length : undefined
-                }
-                empty={
-                  !evalsLoading &&
-                  evalsForList.length === 0 &&
-                  pendingCount === 0
-                }
+                count={evalsForList.length > 0 ? evalsForList.length : undefined}
+                empty={!evalsLoading && evalsForList.length === 0 && pendingCount === 0}
                 isFirst={isFirst}
                 open={isOpen}
               >
@@ -505,14 +475,10 @@ export function TraceSummaryAccordions({
                   <VStack align="stretch" gap={2}>
                     {pendingCount > 0 && (
                       <Text textStyle="xs" color="fg.muted">
-                        {pendingCount} evaluation{pendingCount === 1 ? "" : "s"}{" "}
-                        pending
+                        {pendingCount} evaluation{pendingCount === 1 ? "" : "s"} pending
                       </Text>
                     )}
-                    <EvalsList
-                      evals={evalsForList}
-                      onSelectSpan={onSelectSpan}
-                    />
+                    <EvalsList evals={evalsForList} onSelectSpan={onSelectSpan} />
                   </VStack>
                 )}
               </Section>
@@ -564,9 +530,7 @@ export function TraceSummaryAccordions({
                         icon={LuFileText}
                         title="No managed prompt"
                         description="Version, test, and reuse prompts across traces."
-                        ctaLabel={
-                          promptsHref ? "Set up a prompt" : "Learn more"
-                        }
+                        ctaLabel={promptsHref ? "Set up a prompt" : "Learn more"}
                         ctaHref={
                           promptsHref ??
                           "https://docs.langwatch.ai/prompts/template-syntax"
@@ -657,20 +621,14 @@ export function SummaryMediaStrip({
   side: TraceMediaSide;
 }): React.JSX.Element | null {
   const refs = useMemo(
-    () =>
-      parseMediaRefs(refsJson).filter((ref) =>
-        mediaRefBelongsToSide(ref, side),
-      ),
+    () => parseMediaRefs(refsJson).filter((ref) => mediaRefBelongsToSide(ref, side)),
     [refsJson, side],
   );
   if (refs.length === 0) return null;
   return (
     <VStack align="flex-start" gap={2} paddingTop={2}>
       {refs.map((ref, i) => (
-        <TraceMediaPart
-          key={`${ref.url}-${i}`}
-          part={mediaRefToMediaData(ref)}
-        />
+        <TraceMediaPart key={`${ref.url}-${i}`} part={mediaRefToMediaData(ref)} />
       ))}
     </VStack>
   );

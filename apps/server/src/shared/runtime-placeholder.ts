@@ -3,10 +3,17 @@
 // fall back to this placeholder when missing. Once the real runtime lands,
 // loadRuntime() picks it up automatically — no edit needed here.
 
-import type { RuntimeApi, RuntimeContext, RuntimeEvent, ServiceHandle } from "./runtime-contract.ts";
+import type {
+  RuntimeApi,
+  RuntimeContext,
+  RuntimeEvent,
+  ServiceHandle,
+} from "./runtime-contract.ts";
 
 const notImplemented = (name: string) => async () => {
-  throw new Error(`services/runtime.ts not yet implemented (${name}). julia is wiring this — ping in #langwatch-npx if blocked.`);
+  throw new Error(
+    `services/runtime.ts not yet implemented (${name}). julia is wiring this — ping in #langwatch-npx if blocked.`,
+  );
 };
 
 async function* emptyEvents(): AsyncIterable<RuntimeEvent> {

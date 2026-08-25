@@ -36,15 +36,11 @@ function zrangebyscoreModel({
   const minStr = String(min);
   const isExclusive = minStr.startsWith("(");
   const minVal =
-    minStr === "-inf"
-      ? -Infinity
-      : Number(isExclusive ? minStr.slice(1) : minStr);
+    minStr === "-inf" ? -Infinity : Number(isExclusive ? minStr.slice(1) : minStr);
   const maxStr = String(max);
   const isMaxExclusive = maxStr.startsWith("(");
   const maxVal =
-    maxStr === "+inf"
-      ? Infinity
-      : Number(isMaxExclusive ? maxStr.slice(1) : maxStr);
+    maxStr === "+inf" ? Infinity : Number(isMaxExclusive ? maxStr.slice(1) : maxStr);
 
   const shouldIncludeScores = rest.includes("WITHSCORES");
   const limitIdx = rest.indexOf("LIMIT");
@@ -59,9 +55,7 @@ function zrangebyscoreModel({
     )
     .sort((a, b) => a.score - b.score)
     .slice(offset, offset + count)
-    .flatMap((e) =>
-      shouldIncludeScores ? [e.member, String(e.score)] : [e.member],
-    );
+    .flatMap((e) => (shouldIncludeScores ? [e.member, String(e.score)] : [e.member]));
 }
 
 /**
@@ -95,8 +89,7 @@ function makeRedis(
           cmds.push(key);
           return chain;
         },
-        exec: async () =>
-          cmds.map((key) => [null, opts.headJobScores?.[key] ?? []]),
+        exec: async () => cmds.map((key) => [null, opts.headJobScores?.[key] ?? []]),
       };
       return chain;
     }),
@@ -213,9 +206,7 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
 
       expect(await readGauge()).toBe(0);
       expect(await readBacklogGauge()).toBe(0);
-      expect(redis.zrangebyscore.mock.calls[0]![1]).toBe(
-        MIN_PLAUSIBLE_EPOCH_MS,
-      );
+      expect(redis.zrangebyscore.mock.calls[0]![1]).toBe(MIN_PLAUSIBLE_EPOCH_MS);
     });
 
     it("leaves a healthy neighbour driving the gauge", async () => {
@@ -243,9 +234,7 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
     /** @scenario "the backlog gauge drops a head job score that is not a timestamp" */
     it("drops the head from the backlog age", async () => {
       const redis = makeRedis({
-        readyZset: [
-          { member: "tenant/sub/trace:abc", score: Date.now() + 5_000 },
-        ],
+        readyZset: [{ member: "tenant/sub/trace:abc", score: Date.now() + 5_000 }],
         headJobScores: {
           [`${PREFIX}group:tenant/sub/trace:abc:jobs`]: ["job-1", "0"],
         },
@@ -261,10 +250,7 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
       const redis = makeRedis({
         readyZset: [{ member: "tenant/sub/trace:old", score: Date.now() + 1 }],
         headJobScores: {
-          [`${PREFIX}group:tenant/sub/trace:old:jobs`]: [
-            "job-1",
-            String(veryOld),
-          ],
+          [`${PREFIX}group:tenant/sub/trace:old:jobs`]: ["job-1", String(veryOld)],
         },
       });
 
@@ -300,14 +286,9 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
       // delay), so the eligible scan sees an empty queue.
       const headDueMs = Date.now() - 60_000;
       const redis = makeRedis({
-        readyZset: [
-          { member: "tenant/sub/trace:abc", score: Date.now() + 5_000 },
-        ],
+        readyZset: [{ member: "tenant/sub/trace:abc", score: Date.now() + 5_000 }],
         headJobScores: {
-          [`${PREFIX}group:tenant/sub/trace:abc:jobs`]: [
-            "job-1",
-            String(headDueMs),
-          ],
+          [`${PREFIX}group:tenant/sub/trace:abc:jobs`]: ["job-1", String(headDueMs)],
         },
       });
 
@@ -321,9 +302,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
   describe("when a deferred group's head job is scheduled in the future", () => {
     it("does not count it as backlog", async () => {
       const redis = makeRedis({
-        readyZset: [
-          { member: "tenant/sub/trace:delayed", score: Date.now() + 5_000 },
-        ],
+        readyZset: [{ member: "tenant/sub/trace:delayed", score: Date.now() + 5_000 }],
         headJobScores: {
           [`${PREFIX}group:tenant/sub/trace:delayed:jobs`]: [
             "job-1",

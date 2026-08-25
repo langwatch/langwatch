@@ -63,10 +63,7 @@ export function serveStaticOrFallback({
   publicConfig: PublicAppConfig;
 }): boolean {
   const normalizedRelative = path.normalize(pathname.slice(1));
-  if (
-    normalizedRelative.startsWith("..") ||
-    path.isAbsolute(normalizedRelative)
-  ) {
+  if (normalizedRelative.startsWith("..") || path.isAbsolute(normalizedRelative)) {
     res.statusCode = 400;
     res.end("Bad Request");
     return true;

@@ -25,8 +25,11 @@ export function LLMModelDisplay({
   subtitle,
   ...props
 }: LLMModelDisplayProps) {
-  const { modelOption, groupedByProvider, isLoading } =
-    useModelSelectionOptions(allModelOptions, model, "chat");
+  const { modelOption, groupedByProvider, isLoading } = useModelSelectionOptions(
+    allModelOptions,
+    model,
+    "chat",
+  );
 
   // Model is disabled if explicitly marked or if provider is disabled
   const isDisabled = modelOption?.isDisabled ?? false;
@@ -72,12 +75,8 @@ export function LLMModelDisplay({
           fontFamily="mono"
           lineClamp={1}
           wordBreak="break-all"
-          color={
-            isProviderMissing ? "red.600" : isDisabled ? "fg.muted" : undefined
-          }
-          textDecoration={
-            isProviderMissing || isDisabled ? "line-through" : undefined
-          }
+          color={isProviderMissing ? "red.600" : isDisabled ? "fg.muted" : undefined}
+          textDecoration={isProviderMissing || isDisabled ? "line-through" : undefined}
         >
           {modelOption?.label ?? model}
         </OverflownTextWithTooltip>

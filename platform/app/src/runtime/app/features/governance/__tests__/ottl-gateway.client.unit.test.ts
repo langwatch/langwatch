@@ -5,9 +5,10 @@ describe("AppGovernanceOttlGateway", () => {
   it("defers validation when the gateway is not configured", async () => {
     const gateway = AppGovernanceOttlGateway.create({});
 
-    await expect(gateway.validate(["set(attributes[\"x\"], \"y\")"])).resolves.toEqual(
-      { status: "deferred", reason: "gateway_unconfigured" },
-    );
+    await expect(gateway.validate(['set(attributes["x"], "y")'])).resolves.toEqual({
+      status: "deferred",
+      reason: "gateway_unconfigured",
+    });
   });
 
   it("signs validation requests and normalizes gateway errors", async () => {
@@ -35,9 +36,7 @@ describe("AppGovernanceOttlGateway", () => {
       status: "invalid",
       errors: [{ statementIndex: 2, line: 4, col: 7, message: "bad" }],
     });
-    expect(observedUrl).toBe(
-      "https://gateway.example/internal/validate-ottl",
-    );
+    expect(observedUrl).toBe("https://gateway.example/internal/validate-ottl");
     expect(new Headers(observedInit?.headers).get("X-LangWatch-Gateway-Timestamp")).toBe(
       "1700000000",
     );
@@ -64,7 +63,7 @@ describe("AppGovernanceOttlGateway", () => {
         kind: "log",
         encoding: "proto",
         payloadB64: "b3JpZ2luYWw=",
-        statements: ["set(attributes[\"x\"], \"y\")"],
+        statements: ['set(attributes["x"], "y")'],
       }),
     ).resolves.toEqual({
       ok: true,

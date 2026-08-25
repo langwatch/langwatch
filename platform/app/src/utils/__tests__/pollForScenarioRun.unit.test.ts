@@ -3,15 +3,7 @@
  * @see specs/scenarios/scenario-failure-handler.feature "Polling Logic Improvements"
  */
 
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type {
   BatchRunDataResult,
@@ -190,9 +182,7 @@ describe("pollForScenarioRun", () => {
         // and a red toast on a healthy run is the bug this module was fixed for.
         fetchBatchRunData.mockResolvedValue(
           batchWith({
-            runs: [
-              makeRun({ status: "SOME_FUTURE_STATUS" as ScenarioRunStatus }),
-            ],
+            runs: [makeRun({ status: "SOME_FUTURE_STATUS" as ScenarioRunStatus })],
           }),
         );
 

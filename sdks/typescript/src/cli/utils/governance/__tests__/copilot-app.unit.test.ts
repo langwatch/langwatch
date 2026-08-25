@@ -26,9 +26,7 @@ describe("buildCopilotAppEnv", () => {
         captureContent: true,
       });
 
-      expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
-        "https://app.langwatch.ai/api/otel",
-      );
+      expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("https://app.langwatch.ai/api/otel");
       expect(env.COPILOT_OTEL_ENABLED).toBe("true");
     });
 
@@ -76,9 +74,7 @@ describe("buildCopilotAppEnv", () => {
         captureContent: false,
       });
 
-      expect(
-        env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
-      ).toBeUndefined();
+      expect(env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT).toBeUndefined();
       // still exports — only content is withheld
       expect(env.COPILOT_OTEL_ENABLED).toBe("true");
     });
@@ -94,9 +90,7 @@ describe("findCopilotApp", () => {
         (p) => p === "/Applications/GitHub Copilot.app/Contents/MacOS/github",
       );
 
-      expect(found).toBe(
-        "/Applications/GitHub Copilot.app/Contents/MacOS/github",
-      );
+      expect(found).toBe("/Applications/GitHub Copilot.app/Contents/MacOS/github");
     });
   });
 
@@ -180,9 +174,7 @@ describe("renderLaunchAgent", () => {
       );
       // the fix: quoted, so systemd treats the spaced path as one token
       expect(unit).toContain('ExecStart="/opt/GitHub Copilot/github-copilot"');
-      expect(unit).not.toContain(
-        "ExecStart=/opt/GitHub Copilot/github-copilot",
-      );
+      expect(unit).not.toContain("ExecStart=/opt/GitHub Copilot/github-copilot");
     });
 
     it("escapes backslashes BEFORE quotes so a trailing backslash cannot unterminate the value (CodeQL #249)", () => {
@@ -190,7 +182,7 @@ describe("renderLaunchAgent", () => {
         platform: "linux",
         home: "/home/dev",
         execPath: "/usr/bin/github-copilot",
-        env: { WEIRD: 'ends-with-backslash\\', QUOTED: 'has "quote" inside' },
+        env: { WEIRD: "ends-with-backslash\\", QUOTED: 'has "quote" inside' },
       });
 
       const unit = d.files[0]!.content;

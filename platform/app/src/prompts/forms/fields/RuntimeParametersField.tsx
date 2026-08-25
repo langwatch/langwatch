@@ -82,11 +82,7 @@ export function RuntimeParametersField() {
     syncToForm(entries.filter((_, i) => i !== index));
   };
 
-  const handleUpdate = (
-    index: number,
-    field: "key" | "value",
-    newValue: string,
-  ) => {
+  const handleUpdate = (index: number, field: "key" | "value", newValue: string) => {
     const updated = [...entries];
     const entry = updated[index];
     if (entry) {
@@ -98,12 +94,7 @@ export function RuntimeParametersField() {
   return (
     <VStack align="stretch" gap={3} width="full">
       <HStack width="full">
-        <Text
-          fontSize="xs"
-          fontWeight="bold"
-          textTransform="uppercase"
-          color="fg.muted"
-        >
+        <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color="fg.muted">
           Parameters
         </Text>
         <Spacer />
@@ -153,10 +144,7 @@ export function RuntimeParametersField() {
                 borderColor="border"
                 data-testid={`param-value-${index}`}
               />
-              <Tooltip
-                content="Remove parameter"
-                positioning={{ placement: "top" }}
-              >
+              <Tooltip content="Remove parameter" positioning={{ placement: "top" }}>
                 <Button
                   size="xs"
                   variant="ghost"

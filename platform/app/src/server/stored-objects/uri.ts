@@ -52,9 +52,7 @@ export function mintUriForDestination({
       return `azure-blob://${destination.accountName}/${destination.container}/${objectPath}`;
     default: {
       const unhandled: never = destination;
-      throw new Error(
-        `Unhandled storage destination kind: ${JSON.stringify(unhandled)}`,
-      );
+      throw new Error(`Unhandled storage destination kind: ${JSON.stringify(unhandled)}`);
     }
   }
 }

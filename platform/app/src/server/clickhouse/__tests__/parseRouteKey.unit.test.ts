@@ -16,9 +16,10 @@ const prefix = "CLICKHOUSE_URL__";
 describe("parseRouteKey", () => {
   describe("given a labelled env var", () => {
     it("routes on the org id and names the cluster after the label", () => {
-      expect(
-        parseRouteKey({ key: `${prefix}acme__org_abc123`, prefix }),
-      ).toEqual({ orgId: "org_abc123", cluster: "acme" });
+      expect(parseRouteKey({ key: `${prefix}acme__org_abc123`, prefix })).toEqual({
+        orgId: "org_abc123",
+        cluster: "acme",
+      });
     });
   });
 
@@ -30,9 +31,10 @@ describe("parseRouteKey", () => {
      * cluster — or, more likely, to none.
      */
     it("keeps the whole label and still routes on the trailing org id", () => {
-      expect(
-        parseRouteKey({ key: `${prefix}acme__eu__org_abc123`, prefix }),
-      ).toEqual({ orgId: "org_abc123", cluster: "acme__eu" });
+      expect(parseRouteKey({ key: `${prefix}acme__eu__org_abc123`, prefix })).toEqual({
+        orgId: "org_abc123",
+        cluster: "acme__eu",
+      });
     });
   });
 

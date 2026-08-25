@@ -1,7 +1,4 @@
-import {
-  AgentNotFoundError,
-  InvalidAgentConfigError,
-} from "@langwatch/agent-contract";
+import { AgentNotFoundError, InvalidAgentConfigError } from "@langwatch/agent-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
@@ -36,9 +33,7 @@ export const handleAgentError = async (
   const method = c.req.method;
   const routeParams = c.req.param();
   const status =
-    mappedError instanceof HttpError
-      ? mappedError.status
-      : (mappedError.status ?? 500);
+    mappedError instanceof HttpError ? mappedError.status : (mappedError.status ?? 500);
 
   logger.error(
     {

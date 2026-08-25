@@ -40,10 +40,7 @@
             },
             "platform": {
               "ui": "/traces",
-              "mcp": [
-                "search_traces",
-                "get_trace"
-              ],
+              "mcp": ["search_traces", "get_trace"],
               "skill": null,
               "docs": null
             },
@@ -51,9 +48,7 @@
             "docs": "https://langwatch.ai/docs/integration/overview.md"
           },
           "sync": "code-to-platform",
-          "produces": [
-            "traces"
-          ],
+          "produces": ["traces"],
           "consumes": []
         },
         {
@@ -66,9 +61,7 @@
                 "python": "langwatch.analytics",
                 "typescript": "langwatch.analytics"
               },
-              "cli": [
-                "analytics query"
-              ],
+              "cli": ["analytics query"],
               "hints": {
                 "analytics query": "langwatch analytics query -m trace-count -a sum --group-by metadata.model -o json"
               },
@@ -77,12 +70,7 @@
             },
             "platform": {
               "ui": "/analytics",
-              "mcp": [
-                "get_analytics",
-                "search_traces",
-                "get_trace",
-                "discover_schema"
-              ],
+              "mcp": ["get_analytics", "search_traces", "get_trace", "discover_schema"],
               "skill": "analytics",
               "docs": "https://langwatch.ai/docs/features/embedded-analytics.md"
             },
@@ -90,12 +78,8 @@
             "docs": "https://langwatch.ai/docs/features/embedded-analytics.md"
           },
           "sync": null,
-          "produces": [
-            "metrics"
-          ],
-          "consumes": [
-            "traces"
-          ]
+          "produces": ["metrics"],
+          "consumes": ["traces"]
         },
         {
           "id": "observability.user-events",
@@ -157,12 +141,8 @@
             "docs": "https://langwatch.ai/docs/features/annotations.md"
           },
           "sync": null,
-          "produces": [
-            "annotations"
-          ],
-          "consumes": [
-            "traces"
-          ]
+          "produces": ["annotations"],
+          "consumes": ["traces"]
         }
       ]
     },
@@ -217,14 +197,8 @@
             "docs": "https://langwatch.ai/docs/evaluations/experiments/overview.md"
           },
           "sync": "code-to-platform",
-          "produces": [
-            "experiments"
-          ],
-          "consumes": [
-            "datasets",
-            "evaluators",
-            "prompts"
-          ]
+          "produces": ["experiments"],
+          "consumes": ["datasets", "evaluators", "prompts"]
         },
         {
           "id": "evaluations.online-evaluation",
@@ -270,12 +244,8 @@
             "docs": "https://langwatch.ai/docs/evaluations/online-evaluation/overview.md"
           },
           "sync": null,
-          "produces": [
-            "monitors"
-          ],
-          "consumes": [
-            "evaluators"
-          ],
+          "produces": ["monitors"],
+          "consumes": ["evaluators"],
           "notes": "Platform side uses Monitors. Code side includes guardrails (as_guardrail=True for sync blocking)."
         }
       ]
@@ -334,13 +304,8 @@
           },
           "sync": null,
           "plannedSync": "bidirectional",
-          "produces": [
-            "scenarios"
-          ],
-          "consumes": [
-            "agents",
-            "prompts"
-          ]
+          "produces": ["scenarios"],
+          "consumes": ["agents", "prompts"]
         },
         {
           "id": "agent-simulations.runs",
@@ -353,10 +318,7 @@
                 "typescript": "langwatch.simulationRuns",
                 "go": "client.Scenarios.ListRuns"
               },
-              "cli": [
-                "simulation-run list",
-                "simulation-run get"
-              ],
+              "cli": ["simulation-run list", "simulation-run get"],
               "hints": {
                 "simulation-run list": "langwatch simulation-run list --status FAILED -o json",
                 "simulation-run get": "langwatch simulation-run get <runId> --full -o json"
@@ -366,10 +328,7 @@
             },
             "platform": {
               "ui": "/simulations",
-              "mcp": [
-                "platform_list_simulation_runs",
-                "platform_get_simulation_run"
-              ],
+              "mcp": ["platform_list_simulation_runs", "platform_get_simulation_run"],
               "skill": null,
               "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
             },
@@ -377,12 +336,8 @@
             "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
           },
           "sync": null,
-          "produces": [
-            "simulation-runs"
-          ],
-          "consumes": [
-            "scenarios"
-          ]
+          "produces": ["simulation-runs"],
+          "consumes": ["scenarios"]
         },
         {
           "id": "agent-simulations.suites",
@@ -429,14 +384,8 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "suites",
-            "simulation-runs"
-          ],
-          "consumes": [
-            "scenarios",
-            "agents"
-          ]
+          "produces": ["suites", "simulation-runs"],
+          "consumes": ["scenarios", "agents"]
         }
       ]
     },
@@ -507,9 +456,7 @@
             "docs": "https://langwatch.ai/docs/prompt-management/overview.md"
           },
           "sync": "bidirectional",
-          "produces": [
-            "prompts"
-          ],
+          "produces": ["prompts"],
           "consumes": []
         },
         {
@@ -580,12 +527,8 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "agents"
-          ],
-          "consumes": [
-            "prompts"
-          ]
+          "produces": ["agents"],
+          "consumes": ["prompts"]
         },
         {
           "id": "library.workflows",
@@ -622,13 +565,8 @@
             "docs": "https://langwatch.ai/docs/optimization-studio/overview.md"
           },
           "sync": null,
-          "produces": [
-            "workflows"
-          ],
-          "consumes": [
-            "prompts",
-            "datasets"
-          ]
+          "produces": ["workflows"],
+          "consumes": ["prompts", "datasets"]
         },
         {
           "id": "library.evaluators",
@@ -675,12 +613,8 @@
             "docs": "https://langwatch.ai/docs/evaluations/evaluators/overview.md"
           },
           "sync": null,
-          "produces": [
-            "evaluators"
-          ],
-          "consumes": [
-            "datasets"
-          ]
+          "produces": ["evaluators"],
+          "consumes": ["datasets"]
         },
         {
           "id": "library.datasets",
@@ -738,12 +672,8 @@
             "docs": "https://langwatch.ai/docs/datasets/overview.md"
           },
           "sync": null,
-          "produces": [
-            "datasets"
-          ],
-          "consumes": [
-            "traces"
-          ]
+          "produces": ["datasets"],
+          "consumes": ["traces"]
         }
       ],
       "surfaces": {
@@ -791,13 +721,8 @@
         "docs": null
       },
       "sync": null,
-      "produces": [
-        "dashboards",
-        "graphs"
-      ],
-      "consumes": [
-        "metrics"
-      ]
+      "produces": ["dashboards", "graphs"],
+      "consumes": ["metrics"]
     },
     {
       "id": "triggers",
@@ -835,12 +760,8 @@
         "docs": null
       },
       "sync": null,
-      "produces": [
-        "triggers"
-      ],
-      "consumes": [
-        "traces"
-      ]
+      "produces": ["triggers"],
+      "consumes": ["traces"]
     },
     {
       "id": "ai-gateway",
@@ -884,9 +805,7 @@
             "docs": "https://langwatch.ai/docs/ai-gateway/virtual-keys.md"
           },
           "sync": null,
-          "produces": [
-            "virtual-keys"
-          ],
+          "produces": ["virtual-keys"],
           "consumes": []
         },
         {
@@ -919,12 +838,8 @@
             "docs": "https://langwatch.ai/docs/ai-gateway/budgets.md"
           },
           "sync": null,
-          "produces": [
-            "budgets"
-          ],
-          "consumes": [
-            "virtual-keys"
-          ]
+          "produces": ["budgets"],
+          "consumes": ["virtual-keys"]
         },
         {
           "id": "ai-gateway.webhooks",
@@ -965,9 +880,7 @@
           },
           "sync": null,
           "produces": [],
-          "consumes": [
-            "spend-events"
-          ]
+          "consumes": ["spend-events"]
         },
         {
           "id": "ai-gateway.spend-events",
@@ -998,12 +911,8 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "spend-events"
-          ],
-          "consumes": [
-            "virtual-keys"
-          ]
+          "produces": ["spend-events"],
+          "consumes": ["virtual-keys"]
         },
         {
           "id": "ai-gateway.governance",
@@ -1037,9 +946,7 @@
             "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
           },
           "sync": null,
-          "produces": [
-            "ingestion-templates"
-          ],
+          "produces": ["ingestion-templates"],
           "consumes": []
         },
         {
@@ -1052,12 +959,7 @@
                 "python": null,
                 "typescript": null
               },
-              "cli": [
-                "ingest list",
-                "ingest tail",
-                "ingest health",
-                "ingest codex"
-              ],
+              "cli": ["ingest list", "ingest tail", "ingest health", "ingest codex"],
               "skill": null,
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
@@ -1071,9 +973,7 @@
             "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
           },
           "sync": null,
-          "produces": [
-            "ingestion-sources"
-          ],
+          "produces": ["ingestion-sources"],
           "consumes": []
         }
       ]
@@ -1120,9 +1020,7 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "projects"
-          ],
+          "produces": ["projects"],
           "consumes": []
         },
         {
@@ -1159,9 +1057,7 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "api-keys"
-          ],
+          "produces": ["api-keys"],
           "consumes": []
         },
         {
@@ -1194,9 +1090,7 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "organizations"
-          ],
+          "produces": ["organizations"],
           "consumes": []
         },
         {
@@ -1234,10 +1128,7 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "members",
-            "invites"
-          ],
+          "produces": ["members", "invites"],
           "consumes": []
         },
         {
@@ -1273,9 +1164,7 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "teams"
-          ],
+          "produces": ["teams"],
           "consumes": []
         },
         {
@@ -1314,9 +1203,7 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "groups"
-          ],
+          "produces": ["groups"],
           "consumes": []
         },
         {
@@ -1350,9 +1237,7 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "custom-roles"
-          ],
+          "produces": ["custom-roles"],
           "consumes": []
         },
         {
@@ -1384,9 +1269,7 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "role-bindings"
-          ],
+          "produces": ["role-bindings"],
           "consumes": []
         },
         {
@@ -1399,11 +1282,7 @@
                 "python": null,
                 "typescript": null
               },
-              "cli": [
-                "scim-tokens list",
-                "scim-tokens create",
-                "scim-tokens revoke"
-              ],
+              "cli": ["scim-tokens list", "scim-tokens create", "scim-tokens revoke"],
               "skill": null,
               "docs": null
             },
@@ -1417,9 +1296,7 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "scim-tokens"
-          ],
+          "produces": ["scim-tokens"],
           "consumes": []
         },
         {
@@ -1432,19 +1309,13 @@
                 "python": "langwatch.model_providers",
                 "typescript": "langwatch.modelProviders"
               },
-              "cli": [
-                "model-provider list",
-                "model-provider set"
-              ],
+              "cli": ["model-provider list", "model-provider set"],
               "skill": null,
               "docs": null
             },
             "platform": {
               "ui": "/settings",
-              "mcp": [
-                "platform_set_model_provider",
-                "platform_list_model_providers"
-              ],
+              "mcp": ["platform_set_model_provider", "platform_list_model_providers"],
               "skill": null,
               "docs": "https://langwatch.ai/docs/integration/custom-models.md"
             },
@@ -1452,9 +1323,7 @@
             "docs": "https://langwatch.ai/docs/integration/custom-models.md"
           },
           "sync": null,
-          "produces": [
-            "model-providers"
-          ],
+          "produces": ["model-providers"],
           "consumes": []
         },
         {
@@ -1492,9 +1361,7 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "secrets"
-          ],
+          "produces": ["secrets"],
           "consumes": []
         },
         {
@@ -1507,11 +1374,7 @@
                 "python": null,
                 "typescript": null
               },
-              "cli": [
-                "model-default list",
-                "model-default set",
-                "model-default unset"
-              ],
+              "cli": ["model-default list", "model-default set", "model-default unset"],
               "skill": null,
               "docs": null
             },
@@ -1525,9 +1388,7 @@
             "docs": null
           },
           "sync": null,
-          "produces": [
-            "model-defaults"
-          ],
+          "produces": ["model-defaults"],
           "consumes": []
         },
         {
@@ -1564,9 +1425,7 @@
             "docs": "https://langwatch.ai/docs/skills/directory"
           },
           "sync": null,
-          "produces": [
-            "skills"
-          ],
+          "produces": ["skills"],
           "consumes": []
         }
       ],
@@ -1589,9 +1448,7 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": [
-                "report"
-              ],
+              "cli": ["report"],
               "hints": {
                 "report": "npx langwatch report --user-approved --title \"what broke\" --summary \"verbatim errors and what you had to figure out\""
               },
@@ -1600,9 +1457,7 @@
             },
             "platform": {
               "ui": "/ops/backoffice/bug-reports",
-              "mcp": [
-                "report_issue"
-              ],
+              "mcp": ["report_issue"],
               "skill": null,
               "docs": null
             },
@@ -1617,10 +1472,7 @@
     }
   ],
   "meta": {
-    "mcp_docs_tools": [
-      "fetch_langwatch_docs",
-      "fetch_scenario_docs"
-    ],
+    "mcp_docs_tools": ["fetch_langwatch_docs", "fetch_scenario_docs"],
     "meta_skills": {
       "level-up": "Orchestrates tracing + prompts + evaluations + scenarios",
       "agent-performance": "Cross-cutting skill for querying performance (works for both code and platform users)",

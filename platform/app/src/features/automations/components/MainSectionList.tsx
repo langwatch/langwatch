@@ -60,10 +60,7 @@ export function MainSectionList({
   return (
     <VStack align="stretch" gap={3}>
       <NameField isEdit={isEdit} />
-      <AutomationTypePicker
-        sourceLocked={sourceLocked}
-        accordion={facetProps("type")}
-      />
+      <AutomationTypePicker sourceLocked={sourceLocked} accordion={facetProps("type")} />
       <SubjectSection
         prefilledGraphId={prefilledGraphId}
         accordion={facetProps("subject")}

@@ -1,12 +1,4 @@
-import {
-  Button,
-  Field,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Field, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { Trash2 } from "react-feather";
 import { useFieldArray, useFormContext } from "react-hook-form";
@@ -36,8 +28,7 @@ function ConfigFieldGroup({
   name: "inputs" | "outputs";
   readOnly?: boolean;
 }) {
-  const { control, setValue, getValues } =
-    useFormContext<PromptConfigFormValues>();
+  const { control, setValue, getValues } = useFormContext<PromptConfigFormValues>();
 
   const fieldArrayName = `version.configData.${name}` as const;
 
@@ -83,8 +74,7 @@ function ConfigFieldGroup({
    */
   const validateIdentifier = (index: number, value: string) => {
     const currentFields = getValues(fieldArrayName);
-    const fieldArrayIdentifierPath =
-      `${fieldArrayName}.${index}.identifier` as const;
+    const fieldArrayIdentifierPath = `${fieldArrayName}.${index}.identifier` as const;
 
     if (Array.isArray(currentFields)) {
       const identifierCount = currentFields.filter(
@@ -104,11 +94,7 @@ function ConfigFieldGroup({
 
   return (
     <VStack align="start" gap={3} width="full">
-      <FieldGroupHeader
-        title={title}
-        onAdd={handleAddField}
-        readOnly={readOnly}
-      />
+      <FieldGroupHeader title={title} onAdd={handleAddField} readOnly={readOnly} />
 
       {fields.map((field, index) => (
         <FieldRow
@@ -204,27 +190,19 @@ function FieldRow({
   const typeFieldId = `${fieldIdBase}.type`;
   const jsonSchemaFieldId = `${fieldIdBase}.json_schema`;
 
-  const currentIdentifier =
-    getValues(identifierFieldId) ?? field.identifier ?? "";
+  const currentIdentifier = getValues(identifierFieldId) ?? field.identifier ?? "";
   const currentType = getValues(typeFieldId) ?? field.type ?? "str";
   const currentJsonSchema = getValues(jsonSchemaFieldId);
 
   return (
     <Field.Root key={field.id} invalid={!!error}>
       <HStack width="full">
-        <HStack
-          background="bg.muted"
-          paddingRight={2}
-          borderRadius="8px"
-          width="full"
-        >
+        <HStack background="bg.muted" paddingRight={2} borderRadius="8px" width="full">
           {!readOnly ? (
             <Input
               name={identifierFieldId}
               onChange={(e) => {
-                const normalized = e.target.value
-                  .replace(/ /g, "_")
-                  .toLowerCase();
+                const normalized = e.target.value.replace(/ /g, "_").toLowerCase();
 
                 onChange(identifierFieldId, normalized);
               }}

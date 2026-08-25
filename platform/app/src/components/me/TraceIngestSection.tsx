@@ -133,11 +133,7 @@ export function TraceIngestSection() {
     ? (templates.find((t) => t.slug === openSlug) ?? null)
     : null;
 
-  const handleInstall = async (
-    sourceType: string,
-    templateId: string,
-    slug: string,
-  ) => {
+  const handleInstall = async (sourceType: string, templateId: string, slug: string) => {
     try {
       const result = await installMutation.mutateAsync({
         organizationId: orgId,
@@ -153,11 +149,7 @@ export function TraceIngestSection() {
     }
   };
 
-  const handleRotate = async (
-    sourceType: string,
-    templateId: string,
-    slug: string,
-  ) => {
+  const handleRotate = async (sourceType: string, templateId: string, slug: string) => {
     try {
       const result = await rotateMutation.mutateAsync({
         organizationId: orgId,
@@ -173,18 +165,10 @@ export function TraceIngestSection() {
     }
   };
 
-  const handleTileClick = (
-    sourceType: string,
-    templateId: string,
-    slug: string,
-  ) => {
+  const handleTileClick = (sourceType: string, templateId: string, slug: string) => {
     setOpenSlug(slug);
     const isAlreadyConnected = keyBySourceType.has(sourceType);
-    if (
-      !isAlreadyConnected &&
-      !installResults[slug] &&
-      !installMutation.isPending
-    ) {
+    if (!isAlreadyConnected && !installResults[slug] && !installMutation.isPending) {
       void handleInstall(sourceType, templateId, slug);
     }
   };
@@ -208,8 +192,8 @@ export function TraceIngestSection() {
           Trace Ingest
         </Heading>
         <Text color="fg.muted" fontSize="sm">
-          Connect your tools so their traces land in your personal workspace,
-          with cost, tokens, and model filled in for you.
+          Connect your tools so their traces land in your personal workspace, with cost,
+          tokens, and model filled in for you.
         </Text>
       </VStack>
 
@@ -260,11 +244,7 @@ export function TraceIngestSection() {
             )
           }
           onRotate={() =>
-            void handleRotate(
-              openTemplate.sourceType,
-              openTemplate.id,
-              openTemplate.slug,
-            )
+            void handleRotate(openTemplate.sourceType, openTemplate.id, openTemplate.slug)
           }
           onMarkInstalled={handleMarkInstalled}
         />

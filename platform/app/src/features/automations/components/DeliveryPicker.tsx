@@ -47,9 +47,7 @@ export function DeliveryPicker({
   const isAlertKind = source === "customGraph";
   const notifyOnly = isAlertKind || source === "report";
   const webhookReadOnly =
-    preserveHiddenWebhook &&
-    value === TriggerAction.SEND_WEBHOOK &&
-    !webhookEnabled;
+    preserveHiddenWebhook && value === TriggerAction.SEND_WEBHOOK && !webhookEnabled;
   const entries = Object.values(CLIENT_PROVIDERS).filter(
     (e) =>
       e.shared.action !== TriggerAction.SEND_WEBHOOK ||
@@ -120,8 +118,8 @@ export function DeliveryPicker({
             bg="colorPalette.subtle"
           >
             <Text textStyle="sm">
-              Webhook delivery is unavailable for this project. This saved setup
-              is read-only. Choose another channel to replace it.
+              Webhook delivery is unavailable for this project. This saved setup is
+              read-only. Choose another channel to replace it.
             </Text>
           </Box>
         ) : null}

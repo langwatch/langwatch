@@ -63,9 +63,7 @@ describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
         findUnique,
       },
     } as unknown as PrismaClient;
-    const repository = PostgresIngestionPullRunProjectionAdapter.create(
-      prisma,
-    ).build();
+    const repository = PostgresIngestionPullRunProjectionAdapter.create(prisma).build();
 
     await expect(
       repository.load(SOURCE_ID, {
@@ -95,9 +93,7 @@ describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
         callback(tx),
       ),
     } as unknown as PrismaClient;
-    const repository = PostgresIngestionPullRunProjectionAdapter.create(
-      prisma,
-    ).build();
+    const repository = PostgresIngestionPullRunProjectionAdapter.create(prisma).build();
 
     await expect(
       repository.store(storedProjection(), {

@@ -75,8 +75,7 @@ const protections: Protections = {
   canSeeTopics: true,
 } as Protections;
 
-const fullOutput =
-  "The full 50 KB output value that was offloaded to event_log";
+const fullOutput = "The full 50 KB output value that was offloaded to event_log";
 
 /** Minimal trace-summary row as returned by ClickHouse. */
 function makeSummaryRow(traceId: string) {

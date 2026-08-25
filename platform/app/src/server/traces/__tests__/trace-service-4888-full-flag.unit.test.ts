@@ -42,10 +42,7 @@ import type { Protections } from "~/server/traces/protections";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
 import { TraceService } from "../trace.service";
-import {
-  makeSpanRowWithEventRef,
-  makeSummaryRow,
-} from "./fixtures/ch-row-fixtures";
+import { makeSpanRowWithEventRef, makeSummaryRow } from "./fixtures/ch-row-fixtures";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the raw CH SQL boundary so the real resolver runs
@@ -218,12 +215,9 @@ describe("TraceService — AC1: getById with full=true resolves from event_log",
       it("the resolved span attribute is defined", async () => {
         setupGetTracesWithSpansMocks();
 
-        const trace = await service.getById(
-          PROJECT_ID_A,
-          TRACE_ID,
-          protections,
-          { full: true },
-        );
+        const trace = await service.getById(PROJECT_ID_A, TRACE_ID, protections, {
+          full: true,
+        });
 
         const span = trace?.spans?.[0] as
           | { params?: { langwatch?: { output?: string } } }
@@ -234,12 +228,9 @@ describe("TraceService — AC1: getById with full=true resolves from event_log",
       it("the resolved span attribute byte length equals the full 400 KB value", async () => {
         setupGetTracesWithSpansMocks();
 
-        const trace = await service.getById(
-          PROJECT_ID_A,
-          TRACE_ID,
-          protections,
-          { full: true },
-        );
+        const trace = await service.getById(PROJECT_ID_A, TRACE_ID, protections, {
+          full: true,
+        });
 
         const span = trace?.spans?.[0] as
           | { params?: { langwatch?: { output?: string } } }
@@ -251,12 +242,9 @@ describe("TraceService — AC1: getById with full=true resolves from event_log",
       it("no langwatch.reserved.* key survives in the returned span (key-level check)", async () => {
         setupGetTracesWithSpansMocks();
 
-        const trace = await service.getById(
-          PROJECT_ID_A,
-          TRACE_ID,
-          protections,
-          { full: true },
-        );
+        const trace = await service.getById(PROJECT_ID_A, TRACE_ID, protections, {
+          full: true,
+        });
 
         const span = trace?.spans?.[0] as
           | { params?: { langwatch?: { reserved?: unknown } } }
@@ -267,21 +255,16 @@ describe("TraceService — AC1: getById with full=true resolves from event_log",
         const flatParams = span?.params as Record<string, unknown> | undefined;
         if (flatParams) {
           const allKeys = Object.keys(flatParams);
-          expect(
-            allKeys.every((k) => !k.startsWith(EVENTREF_ATTR_PREFIX)),
-          ).toBe(true);
+          expect(allKeys.every((k) => !k.startsWith(EVENTREF_ATTR_PREFIX))).toBe(true);
         }
       });
 
       it("the recomputed trace.output value equals the full 400 KB value", async () => {
         setupGetTracesWithSpansMocks();
 
-        const trace = await service.getById(
-          PROJECT_ID_A,
-          TRACE_ID,
-          protections,
-          { full: true },
-        );
+        const trace = await service.getById(PROJECT_ID_A, TRACE_ID, protections, {
+          full: true,
+        });
 
         expect(trace?.output?.value).toBe(FULL_OUTPUT);
       });
@@ -403,15 +386,9 @@ describe("TraceService — AC2: getTracesWithSpans without full resolves nothing
     it("BlobStore.getFromEventLog is called 0 times", async () => {
       setupGetTracesWithSpansMocks();
 
-      await service.getTracesWithSpans(
-        PROJECT_ID_A,
-        [TRACE_ID],
-        protections,
-        undefined,
-        {
-          full: false,
-        },
-      );
+      await service.getTracesWithSpans(PROJECT_ID_A, [TRACE_ID], protections, undefined, {
+        full: false,
+      });
 
       expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
     });
@@ -476,12 +453,9 @@ describe("TraceService — AC7: cross-tenant event_log read denied, preview retu
         setupGetTracesWithSpansMocks();
         const serviceB = makeService(blobStore);
 
-        const trace = await serviceB.getById(
-          PROJECT_ID_B,
-          TRACE_ID,
-          protections,
-          { full: true },
-        );
+        const trace = await serviceB.getById(PROJECT_ID_B, TRACE_ID, protections, {
+          full: true,
+        });
 
         expect(trace?.output?.value).not.toBe(FULL_OUTPUT);
       });
@@ -684,9 +658,7 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         const flatParams = span?.params as Record<string, unknown> | undefined;
         if (flatParams) {
           const allKeys = Object.keys(flatParams);
-          expect(
-            allKeys.every((k) => !k.startsWith(EVENTREF_ATTR_PREFIX)),
-          ).toBe(true);
+          expect(allKeys.every((k) => !k.startsWith(EVENTREF_ATTR_PREFIX))).toBe(true);
         }
       });
 
@@ -724,9 +696,7 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         );
 
         const outputVal = traces![0]!.output?.value as string | undefined;
-        expect(Buffer.byteLength(outputVal!, "utf8")).toBeGreaterThan(
-          IO_PREVIEW_BYTES,
-        );
+        expect(Buffer.byteLength(outputVal!, "utf8")).toBeGreaterThan(IO_PREVIEW_BYTES);
       });
 
       it("trace.output equals FULL_OUTPUT after resolution", async () => {

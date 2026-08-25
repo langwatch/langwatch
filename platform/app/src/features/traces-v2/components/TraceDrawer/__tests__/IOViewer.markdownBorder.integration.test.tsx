@@ -49,8 +49,7 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 
 // Markdown content with structural signals but NO fenced code block, so the
 // render path stays synchronous (no Shiki / ClientOnly to await).
-const MARKDOWN =
-  "# Report\n\nThe summary line.\n\n- first point\n- second point";
+const MARKDOWN = "# Report\n\nThe summary line.\n\n- first point\n- second point";
 
 /** Walk up from a node to the nearest ancestor painting a 1px border. */
 function nearestBorderedAncestor(node: HTMLElement | null): HTMLElement | null {
@@ -70,12 +69,8 @@ describe("IOViewer Markdown container", () => {
 
       // Switch from the default Pretty view to Markdown (defaults to the
       // rendered submode) through the format selector's menu.
-      await user.click(
-        screen.getByRole("button", { name: "Output view format" }),
-      );
-      await user.click(
-        await screen.findByRole("menuitem", { name: "Markdown" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Output view format" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Markdown" }));
 
       // The heading renders as real Markdown (an <h1>), proving we're on the
       // rendered path and not the flush raw-text fallback.

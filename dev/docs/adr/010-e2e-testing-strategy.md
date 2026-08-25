@@ -46,15 +46,18 @@ We will not generate new E2E tests per feature. Existing tests that are stable c
 ## Rationale / Trade-offs
 
 **What we gain:**
+
 - Faster feedback loop — browser verification runs in one agent invocation, not four
 - No test maintenance burden — screenshots are evidence, not code to maintain
 - Coverage where it matters — integration tests handle edge cases, browser verification handles visual/interaction confidence
 
 **What we give up:**
+
 - Automated regression detection at the browser level for individual features
 - The ability to run a full E2E suite per PR
 
 **Why this is acceptable:**
+
 - Integration tests already catch most regressions
 - The small stable E2E suite catches catastrophic breakage
 - Interactive browser verification catches visual/interaction issues during development

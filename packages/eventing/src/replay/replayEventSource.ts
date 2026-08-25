@@ -21,8 +21,7 @@ export interface DiscoveredAggregate {
   aggregateId: string;
 }
 
-export interface DiscoveredAggregateWithEventTypes
-  extends DiscoveredAggregate {
+export interface DiscoveredAggregateWithEventTypes extends DiscoveredAggregate {
   eventTypes: string[];
 }
 
@@ -76,10 +75,7 @@ export interface ReplayEventSource {
   optimizeTables?(tenantId: string, tables: readonly string[]): Promise<void>;
 }
 
-export function compareEventPositions(
-  left: CutoffInfo,
-  right: CutoffInfo,
-): number {
+export function compareEventPositions(left: CutoffInfo, right: CutoffInfo): number {
   if (left.timestamp !== right.timestamp) {
     return left.timestamp - right.timestamp;
   }
@@ -90,9 +86,7 @@ export function maxEventPosition(positions: Iterable<CutoffInfo>): CutoffInfo {
   const iterator = positions[Symbol.iterator]();
   const first = iterator.next();
   if (first.done) {
-    throw new Error(
-      "Cannot find the latest event position in an empty collection",
-    );
+    throw new Error("Cannot find the latest event position in an empty collection");
   }
 
   let latest = first.value;

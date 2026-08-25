@@ -35,9 +35,7 @@ const team = {
   isPersonal: false,
   ownerUserId: null,
   members: [{ userId: "user_1", role: "ADMIN" }],
-  projects: [
-    { id: "project_1", slug: "demo", name: "Demo", isPersonal: false },
-  ],
+  projects: [{ id: "project_1", slug: "demo", name: "Demo", isPersonal: false }],
 };
 const organization = {
   id: "org_1",
@@ -295,9 +293,7 @@ describe("the settings shell in a new navigation mode", () => {
 
       const back = screen.getByRole("link", { name: "Back to Gateway" });
       expect(back).toHaveAttribute("href", "/gateway/budgets");
-      expect(
-        screen.getByRole("button", { name: "Quick Search" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();
     });
   });
 
@@ -347,9 +343,7 @@ describe("the settings shell in a new navigation mode", () => {
 
       await user.click(screen.getByRole("button", { name: "Collapse Access" }));
 
-      expect(
-        screen.queryByRole("link", { name: "Members" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Members" })).not.toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Collapse Organization" }),
       ).toHaveAttribute("aria-expanded", "true");
@@ -358,12 +352,11 @@ describe("the settings shell in a new navigation mode", () => {
       unmount();
       renderSettings();
 
-      expect(
-        screen.getByRole("button", { name: "Expand Access" }),
-      ).toHaveAttribute("aria-expanded", "false");
-      expect(
-        screen.queryByRole("link", { name: "Members" }),
-      ).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Expand Access" })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      expect(screen.queryByRole("link", { name: "Members" })).not.toBeInTheDocument();
       expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
     });
 
@@ -403,8 +396,7 @@ describe("the settings shell in a new navigation mode", () => {
       // the variable the scale is written with.
       expect(getComputedStyle(backEntry.parentElement!).marginBottom).toBe("0");
       expect(
-        getComputedStyle(screen.getByTestId("sidebar-scroll-region"))
-          .paddingTop,
+        getComputedStyle(screen.getByTestId("sidebar-scroll-region")).paddingTop,
       ).toBe("var(--chakra-spacing-1\\.5)");
     });
 
@@ -421,9 +413,7 @@ describe("the settings shell in a new navigation mode", () => {
       expect(entries.filter((entry) => entry === "API Keys")).toHaveLength(1);
       expect(entries.indexOf("API Keys")).toBe(entries.indexOf("General") + 1);
       // Members opens ACCESS, so an entry before it is in ORGANIZATION.
-      expect(entries.indexOf("API Keys")).toBeLessThan(
-        entries.indexOf("Members"),
-      );
+      expect(entries.indexOf("API Keys")).toBeLessThan(entries.indexOf("Members"));
     });
 
     /** @scenario The menu marks the page that is open */
@@ -443,9 +433,7 @@ describe("the settings shell in a new navigation mode", () => {
       mockIsEnterprise = false;
       renderSettings();
 
-      expect(
-        screen.queryByRole("link", { name: "Groups" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Groups" })).not.toBeInTheDocument();
       expect(
         screen.queryByRole("link", { name: "SCIM Provisioning" }),
       ).not.toBeInTheDocument();
@@ -457,12 +445,8 @@ describe("the settings shell in a new navigation mode", () => {
       mockIsLiteMember = true;
       renderSettings();
 
-      expect(
-        screen.queryByRole("link", { name: "API Keys" }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("link", { name: "Secrets" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "API Keys" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Secrets" })).not.toBeInTheDocument();
     });
   });
 
@@ -485,9 +469,7 @@ describe("the settings shell in a new navigation mode", () => {
       useNavigationModeStore.setState({ storedMode: "legacy" });
       renderSettings();
 
-      expect(
-        screen.getByRole("link", { name: "General Settings" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "General Settings" })).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "Quick Search" }),
       ).not.toBeInTheDocument();
@@ -521,9 +503,7 @@ describe("the settings shell in a new navigation mode", () => {
       renderSettings();
 
       expect(screen.getByText("Ops")).toBeInTheDocument();
-      expect(
-        screen.getByRole("link", { name: "The Foundry" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "The Foundry" })).toBeInTheDocument();
     });
   });
 
@@ -545,9 +525,7 @@ describe("the settings shell in a new navigation mode", () => {
 
       // The settings surface, not the project sidebar: Quick Search and
       // the settings menu are there, the product dropdown is not.
-      expect(
-        screen.getByRole("button", { name: "Quick Search" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "Switch product" }),
       ).not.toBeInTheDocument();
@@ -562,9 +540,10 @@ describe("the settings shell in a new navigation mode", () => {
       mockHasOpsAccess = true;
       renderOpsPage("/ops/scheduler");
 
-      expect(
-        screen.getByRole("link", { name: "Event Sourcing" }),
-      ).toHaveAttribute("aria-current", "page");
+      expect(screen.getByRole("link", { name: "Event Sourcing" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
     });
   });
 });

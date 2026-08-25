@@ -232,10 +232,7 @@ export function createSchemaLock({
       throw error;
     }
     try {
-      writeSync(
-        handle,
-        `${token} ${process.pid} ${new Date().toISOString()}\n`,
-      );
+      writeSync(handle, `${token} ${process.pid} ${new Date().toISOString()}\n`);
     } catch (error) {
       unlinkIfPresent(lockPath);
       throw error;

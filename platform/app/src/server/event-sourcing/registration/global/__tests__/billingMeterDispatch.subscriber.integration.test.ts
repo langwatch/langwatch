@@ -89,9 +89,8 @@ describe("billingMeterDispatchSubscriber", () => {
 
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
 
-      const { createBillingMeterDispatchSubscriber } = await import(
-        "../billingMeterDispatch.subscriber"
-      );
+      const { createBillingMeterDispatchSubscriber } =
+        await import("../billingMeterDispatch.subscriber");
       const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
@@ -133,9 +132,8 @@ describe("billingMeterDispatchSubscriber", () => {
 
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
 
-      const { createBillingMeterDispatchSubscriber } = await import(
-        "../billingMeterDispatch.subscriber"
-      );
+      const { createBillingMeterDispatchSubscriber } =
+        await import("../billingMeterDispatch.subscriber");
       const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
@@ -172,17 +170,13 @@ describe("billingMeterDispatchSubscriber", () => {
 
       const mockDispatch = vi.fn();
 
-      const { createBillingMeterDispatchSubscriber } = await import(
-        "../billingMeterDispatch.subscriber"
-      );
+      const { createBillingMeterDispatchSubscriber } =
+        await import("../billingMeterDispatch.subscriber");
       const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
-      await subscriber.handle(
-        makeEvent("orphan-proj"),
-        makeContext("orphan-proj"),
-      );
+      await subscriber.handle(makeEvent("orphan-proj"), makeContext("orphan-proj"));
 
       expect(mockLoggerWarn).toHaveBeenCalledWith(
         { projectId: "orphan-proj" },
@@ -202,9 +196,8 @@ describe("billingMeterDispatchSubscriber", () => {
         .fn()
         .mockRejectedValue(new Error("command dispatch failed"));
 
-      const { createBillingMeterDispatchSubscriber } = await import(
-        "../billingMeterDispatch.subscriber"
-      );
+      const { createBillingMeterDispatchSubscriber } =
+        await import("../billingMeterDispatch.subscriber");
       const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
@@ -235,9 +228,8 @@ describe("billingMeterDispatchSubscriber", () => {
 
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
 
-      const { createBillingMeterDispatchSubscriber } = await import(
-        "../billingMeterDispatch.subscriber"
-      );
+      const { createBillingMeterDispatchSubscriber } =
+        await import("../billingMeterDispatch.subscriber");
       const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
@@ -280,9 +272,8 @@ describe("billingMeterDispatchSubscriber", () => {
 
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
 
-      const { createBillingMeterDispatchSubscriber } = await import(
-        "../billingMeterDispatch.subscriber"
-      );
+      const { createBillingMeterDispatchSubscriber } =
+        await import("../billingMeterDispatch.subscriber");
       const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
@@ -307,9 +298,8 @@ describe("billingMeterDispatchSubscriber", () => {
 
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
 
-      const { createBillingMeterDispatchSubscriber } = await import(
-        "../billingMeterDispatch.subscriber"
-      );
+      const { createBillingMeterDispatchSubscriber } =
+        await import("../billingMeterDispatch.subscriber");
       const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
@@ -328,10 +318,8 @@ describe("billingMeterDispatchSubscriber", () => {
 
   describe("options", () => {
     it("configures runIn, makeJobId, and an immediate per-project dedup", async () => {
-      const {
-        BILLING_METER_DISPATCH_SUPPRESS_MS,
-        createBillingMeterDispatchSubscriber,
-      } = await import("../billingMeterDispatch.subscriber");
+      const { BILLING_METER_DISPATCH_SUPPRESS_MS, createBillingMeterDispatchSubscriber } =
+        await import("../billingMeterDispatch.subscriber");
 
       const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => vi.fn(),
@@ -344,9 +332,7 @@ describe("billingMeterDispatchSubscriber", () => {
       expect(subscriber.options?.ttl).toBe(BILLING_METER_DISPATCH_SUPPRESS_MS);
 
       const payload = { event: makeEvent("proj-1"), foldState: {} };
-      expect(subscriber.options?.makeJobId?.(payload)).toBe(
-        "billing_dispatch_proj-1",
-      );
+      expect(subscriber.options?.makeJobId?.(payload)).toBe("billing_dispatch_proj-1");
     });
   });
 });

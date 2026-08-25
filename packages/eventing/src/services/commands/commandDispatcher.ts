@@ -1,9 +1,6 @@
 import { performance } from "node:perf_hooks";
 import type { createLogger } from "@langwatch/observability";
-import {
-  incrementEsCommandTotal,
-  observeEsCommandDuration,
-} from "../../metrics";
+import { incrementEsCommandTotal, observeEsCommandDuration } from "../../metrics";
 import { mapValidationIssues } from "../../utils/errors";
 import type { Command, CommandHandler } from "../../commands/command";
 import { createCommand } from "../../commands/command";
@@ -52,10 +49,7 @@ export interface ProcessCommandParams<EventType extends Event> {
  * Extracted so {@link processCommand} and {@link processCommandBatch} reject
  * identical malformed handler output rather than each carrying its own copy.
  */
-function validateHandlerEvents(
-  events: unknown,
-  commandType: CommandType,
-): void {
+function validateHandlerEvents(events: unknown, commandType: CommandType): void {
   if (!events) {
     throw new ValidationError(
       `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
@@ -196,8 +190,10 @@ export async function processCommand<EventType extends Event>(
  * {@link ProcessCommandParams} but with an ordered list of payloads instead of
  * one.
  */
-export interface ProcessCommandBatchParams<EventType extends Event>
-  extends Omit<ProcessCommandParams<EventType>, "payload"> {
+export interface ProcessCommandBatchParams<EventType extends Event> extends Omit<
+  ProcessCommandParams<EventType>,
+  "payload"
+> {
   /** Same-command payloads to coalesce, in dispatch (occurredAt) order. */
   payloads: Record<string, unknown>[];
 }
@@ -273,12 +269,7 @@ async function handleBatchCommands<EventType extends Event>(args: {
   progress: BatchProgress;
 }): Promise<{ handledCommands: Command<any>[]; allEvents: EventType[] }> {
   const { params, validatedPayloads, progress } = args;
-  const {
-    getAggregateId,
-    handler,
-    commandType,
-    aggregateType,
-  } = params;
+  const { getAggregateId, handler, commandType, aggregateType } = params;
 
   const handledCommands: Command<any>[] = [];
   const allEvents: EventType[] = [];
@@ -287,12 +278,7 @@ async function handleBatchCommands<EventType extends Event>(args: {
     const aggregateId = getAggregateId(validated);
 
     progress.attempted++;
-    const command = createCommand(
-      payloadTenantId,
-      aggregateId,
-      commandType,
-      validated,
-    );
+    const command = createCommand(payloadTenantId, aggregateId, commandType, validated);
     const events = await handler.handle(command);
     validateHandlerEvents(events, commandType);
     // Only a command that contributed events is "handled" for cleanup
@@ -439,14 +425,13 @@ export async function processCommandBatch<EventType extends Event>(
 /**
  * Options for configuring a command handler.
  */
-export interface CommandHandlerOptions<Payload>
-  extends CommandSerializationOptions<Payload> {
+export interface CommandHandlerOptions<
+  Payload,
+> extends CommandSerializationOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   delay?: number;
   deduplication?: DeduplicationStrategy<Payload>;
   concurrency?: number;
-  spanAttributes?: (
-    payload: Payload,
-  ) => Record<string, string | number | boolean>;
+  spanAttributes?: (payload: Payload) => Record<string, string | number | boolean>;
 }

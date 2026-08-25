@@ -1,11 +1,4 @@
-import {
-  Button,
-  Field,
-  Heading,
-  HStack,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Field, Heading, HStack, Textarea, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { Play } from "react-feather";
 import { type FieldErrors, useForm } from "react-hook-form";
@@ -54,10 +47,7 @@ export const ExecutionInputPanel = ({
       // Find required fields that are missing
       const missingFields = fields
         .filter((field) => !field.optional)
-        .filter(
-          (field) =>
-            !values[field.identifier] || values[field.identifier] === "",
-        );
+        .filter((field) => !values[field.identifier] || values[field.identifier] === "");
 
       for (const field of missingFields) {
         errors[field.identifier] = {

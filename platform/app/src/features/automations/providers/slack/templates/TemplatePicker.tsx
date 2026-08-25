@@ -76,8 +76,7 @@ export function SlackBlockKitTemplatePicker({
   onSelectOtherCadence,
 }: Props) {
   const options = templateOptionsFor({ cadence, kind, reportSource });
-  const otherCadence: DraftCadence =
-    cadence === "digest" ? "immediate" : "digest";
+  const otherCadence: DraftCadence = cadence === "digest" ? "immediate" : "digest";
   const otherOptions = templateOptionsFor({
     cadence: otherCadence,
     kind,
@@ -121,22 +120,10 @@ export function SlackBlockKitTemplatePicker({
       {/* Alerts have no cadence choice (they always fire immediately), so
           the cross-cadence layouts section only applies to trace drafts. */}
       {kind !== "graphAlert" && otherOptions.length > 0 ? (
-        <Collapsible.Root
-          open={otherOpen}
-          onOpenChange={(d) => setOtherOpen(d.open)}
-        >
+        <Collapsible.Root open={otherOpen} onOpenChange={(d) => setOtherOpen(d.open)}>
           <Collapsible.Trigger asChild>
-            <HStack
-              cursor="pointer"
-              gap={1}
-              color="fg.muted"
-              width="fit-content"
-            >
-              {otherOpen ? (
-                <ChevronDown size={14} />
-              ) : (
-                <ChevronRight size={14} />
-              )}
+            <HStack cursor="pointer" gap={1} color="fg.muted" width="fit-content">
+              {otherOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <Text textStyle="xs">
                 {otherCadence === "digest"
                   ? `${otherOptions.length} more layouts for digest cadences`
@@ -245,12 +232,7 @@ function Card({
             <Wireframe />
           </Box>
           {locked && lockedNote ? (
-            <Badge
-              size="xs"
-              variant="subtle"
-              colorPalette="gray"
-              alignSelf="start"
-            >
+            <Badge size="xs" variant="subtle" colorPalette="gray" alignSelf="start">
               {lockedNote}
             </Badge>
           ) : (

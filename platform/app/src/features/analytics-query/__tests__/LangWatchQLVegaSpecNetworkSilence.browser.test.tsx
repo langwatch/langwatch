@@ -76,9 +76,8 @@ const DATASETS: Readonly<Record<string, LangWatchQLDataset>> = {
   model_catalog: MODEL_CATALOG_ROWS,
 };
 
-const COLUMNS_BY_DATASET: Readonly<
-  Record<string, readonly LangWatchQLDatasetColumn[]>
-> = LWQL_FIXTURE_COLUMNS;
+const COLUMNS_BY_DATASET: Readonly<Record<string, readonly LangWatchQLDatasetColumn[]>> =
+  LWQL_FIXTURE_COLUMNS;
 
 const ROW_COUNTS = Object.fromEntries(
   Object.entries(DATASETS).map(([name, rows]) => [name, rows.length]),
@@ -132,9 +131,7 @@ function recordNetwork(): NetworkRecorder {
     init?: RequestInit,
   ) {
     const url =
-      typeof input === "string" || input instanceof URL
-        ? String(input)
-        : input.url;
+      typeof input === "string" || input instanceof URL ? String(input) : input.url;
     requests.push(`fetch ${url}`);
     return realFetch.call(globalThis, input, init);
   } as typeof globalThis.fetch;
@@ -163,8 +160,7 @@ function recordNetwork(): NetworkRecorder {
       performance.getEntriesByType("resource").map((entry) => entry.name),
     release: () => {
       globalThis.fetch = realFetch;
-      XMLHttpRequest.prototype.open =
-        realOpen as typeof XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = realOpen as typeof XMLHttpRequest.prototype.open;
       navigator.sendBeacon = realBeacon;
     },
   };
@@ -226,8 +222,7 @@ async function attemptToRender(entry: CorpusEntry): Promise<CorpusOutcome> {
     }
 
     const refusalShown = await poll(
-      () =>
-        container.querySelector('[data-testid="lwql-chart-failure"]') !== null,
+      () => container.querySelector('[data-testid="lwql-chart-failure"]') !== null,
     );
     // `idle` is the runtime never having been enabled — the refusal stopped
     // this specification before anything was handed to Vega.

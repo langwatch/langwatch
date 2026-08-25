@@ -1,7 +1,4 @@
-import {
-  type HandledError,
-  handledErrorFromHerr,
-} from "@langwatch/handled-error";
+import { type HandledError, handledErrorFromHerr } from "@langwatch/handled-error";
 import { APICallError, RetryError } from "ai";
 import { z } from "zod";
 
@@ -52,11 +49,7 @@ const goErrorEnvelopeSchema = z.object({
  */
 export function isAbortLikeError(error: unknown): boolean {
   const name = (error as { name?: unknown } | null | undefined)?.name;
-  return (
-    name === "AbortError" ||
-    name === "TimeoutError" ||
-    name === "ResponseAborted"
-  );
+  return name === "AbortError" || name === "TimeoutError" || name === "ResponseAborted";
 }
 
 export function nlpgoHandledErrorFrom(error: unknown): HandledError | null {

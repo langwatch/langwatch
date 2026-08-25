@@ -16,14 +16,7 @@
 import { readHandledError } from "~/features/errors";
 
 /** The option a select is currently on. "" is Never, "custom" is a date. */
-export type VirtualKeyExpirationPreset =
-  | ""
-  | "1"
-  | "7"
-  | "30"
-  | "180"
-  | "365"
-  | "custom";
+export type VirtualKeyExpirationPreset = "" | "1" | "7" | "30" | "180" | "365" | "custom";
 
 export const VIRTUAL_KEY_EXPIRATION_OPTIONS: ReadonlyArray<{
   label: string;
@@ -79,11 +72,7 @@ function endOfDayUtc(value: string | undefined): Date | null {
   if (!value) return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;
-  const [year, month, day] = [
-    Number(match[1]),
-    Number(match[2]),
-    Number(match[3]),
-  ];
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
   const date = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
   if (Number.isNaN(date.getTime())) return null;
   if (

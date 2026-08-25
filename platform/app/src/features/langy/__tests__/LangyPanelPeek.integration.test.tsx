@@ -98,31 +98,28 @@ vi.mock("@paper-design/shaders-react", () => ({
 // jsdom. The mock exposes the variant (proves the panel chose "langy") and a
 // button that fires `onComplete` (proves the save→unblock wiring).
 const lastOnComplete = { current: null as null | (() => void) };
-vi.mock(
-  "~/features/onboarding/components/sections/ModelProviderScreen",
-  () => ({
-    ModelProviderScreen: ({
-      variant,
-      onComplete,
-    }: {
-      variant: string;
-      onComplete?: () => void;
-    }) => {
-      lastOnComplete.current = onComplete ?? null;
-      return (
-        <div data-testid="model-provider-screen" data-variant={variant}>
-          <label>
-            Provider API Key
-            <input aria-label="Provider API Key" />
-          </label>
-          <button type="button" onClick={() => onComplete?.()}>
-            Save and continue
-          </button>
-        </div>
-      );
-    },
-  }),
-);
+vi.mock("~/features/onboarding/components/sections/ModelProviderScreen", () => ({
+  ModelProviderScreen: ({
+    variant,
+    onComplete,
+  }: {
+    variant: string;
+    onComplete?: () => void;
+  }) => {
+    lastOnComplete.current = onComplete ?? null;
+    return (
+      <div data-testid="model-provider-screen" data-variant={variant}>
+        <label>
+          Provider API Key
+          <input aria-label="Provider API Key" />
+        </label>
+        <button type="button" onClick={() => onComplete?.()}>
+          Save and continue
+        </button>
+      </div>
+    );
+  },
+}));
 
 // Drives langyNeedsModel. `model: null` (or absent) => setup; a string => the
 // panel resolves a model and skips the prompt. A refetch spy lets the "save
@@ -294,8 +291,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 const renderPanel = () => render(<LangySidecar />, { wrapper: Wrapper });
 
 /** The panel itself — the one element that both peeks and opens. */
-const panel = () =>
-  screen.getByRole("complementary", { name: "Langy assistant" });
+const panel = () => screen.getByRole("complementary", { name: "Langy assistant" });
 /**
  * The same node, straight from the DOM. Needed for the flag-off case, where
  * the panel is deliberately `aria-hidden` and so is (correctly) absent from
@@ -306,8 +302,7 @@ const panelNode = () =>
     '[role="complementary"][aria-label="Langy assistant"]',
   )!;
 /** The peek's only control, a child of the panel. */
-const openControl = () =>
-  screen.queryByRole("button", { name: "Open Langy assistant" });
+const openControl = () => screen.queryByRole("button", { name: "Open Langy assistant" });
 /** The flag-off launcher orb (also labelled "Open Langy assistant"). */
 const orb = () => document.querySelector(".langy-orb-glow");
 
@@ -395,9 +390,7 @@ describe("the minimised panel peeks as itself", () => {
     it("raises on keyboard focus and opens on Enter", async () => {
       renderPanel();
       openControl()!.focus();
-      await waitFor(() =>
-        expect(panel().getAttribute("data-langy-peek")).toBe("near"),
-      );
+      await waitFor(() => expect(panel().getAttribute("data-langy-peek")).toBe("near"));
       await userEvent.keyboard("{Enter}");
       expect(useLangyStore.getState().isOpen).toBe(true);
     });
@@ -408,9 +401,7 @@ describe("the minimised panel peeks as itself", () => {
       const node = panel();
       // jsdom viewport is 1024x768: just above the resting sliver.
       movePointer(800, 760);
-      await waitFor(() =>
-        expect(node.getAttribute("data-langy-peek")).toBe("near"),
-      );
+      await waitFor(() => expect(node.getAttribute("data-langy-peek")).toBe("near"));
       expect(node.style.translate).toBe(
         resolvePeekTranslate({ mode: "floating", phase: "near" }),
       );
@@ -418,9 +409,7 @@ describe("the minimised panel peeks as itself", () => {
       expect(panel()).toBe(node);
 
       movePointer(60, 60);
-      await waitFor(() =>
-        expect(node.getAttribute("data-langy-peek")).toBe("rest"),
-      );
+      await waitFor(() => expect(node.getAttribute("data-langy-peek")).toBe("rest"));
     });
 
     it("rises further than it rests", () => {

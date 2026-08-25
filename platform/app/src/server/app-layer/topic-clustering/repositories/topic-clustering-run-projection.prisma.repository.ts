@@ -40,9 +40,7 @@ function fromRow(row: Row): StoredProjection<TopicClusteringRunStatusData> {
 }
 
 /** Postgres row I/O for the topic clustering run-status projection. */
-export class PrismaTopicClusteringRunProjectionRepository
-  implements StateProjectionStore<TopicClusteringRunStatusData>
-{
+export class PrismaTopicClusteringRunProjectionRepository implements StateProjectionStore<TopicClusteringRunStatusData> {
   constructor(private readonly prisma: RunProjectionPrismaClient) {}
 
   async load(

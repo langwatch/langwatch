@@ -36,9 +36,7 @@ function makeRAGSpan(overrides: Partial<RAGSpan> = {}): RAGSpan {
   return {
     ...makeBaseSpan(),
     type: "rag",
-    contexts: [
-      { document_id: "doc-1", chunk_id: "chunk-1", content: "some content" },
-    ],
+    contexts: [{ document_id: "doc-1", chunk_id: "chunk-1", content: "some content" }],
     ...overrides,
   };
 }
@@ -171,9 +169,7 @@ describe("langwatchSpanToReadableSpan", () => {
       ["unknown", SpanKind.INTERNAL],
     ];
 
-    it.each(
-      testCases,
-    )("maps type '%s' to SpanKind %s", (type, expectedKind) => {
+    it.each(testCases)("maps type '%s' to SpanKind %s", (type, expectedKind) => {
       const span = makeBaseSpan({ type });
       const result = langwatchSpanToReadableSpan(span);
       expect(result.kind).toBe(expectedKind);
@@ -196,9 +192,7 @@ describe("langwatchSpanToReadableSpan", () => {
         input: { type: "chat_messages", value: messages as any },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["gen_ai.input.messages"]).toBe(
-        JSON.stringify(messages),
-      );
+      expect(result.attributes["gen_ai.input.messages"]).toBe(JSON.stringify(messages));
       expect(result.attributes.input).toBeUndefined();
     });
 
@@ -248,9 +242,7 @@ describe("langwatchSpanToReadableSpan", () => {
         output: { type: "chat_messages", value: messages as any },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["gen_ai.output.messages"]).toBe(
-        JSON.stringify(messages),
-      );
+      expect(result.attributes["gen_ai.output.messages"]).toBe(JSON.stringify(messages));
       expect(result.attributes.output).toBeUndefined();
     });
 
@@ -378,9 +370,7 @@ describe("langwatchSpanToReadableSpan", () => {
       const span = makeBaseSpan({ metrics: null });
       const result = langwatchSpanToReadableSpan(span);
       expect(result.attributes["gen_ai.usage.prompt_tokens"]).toBeUndefined();
-      expect(
-        result.attributes["gen_ai.usage.completion_tokens"],
-      ).toBeUndefined();
+      expect(result.attributes["gen_ai.usage.completion_tokens"]).toBeUndefined();
       expect(result.attributes["gen_ai.usage.cost"]).toBeUndefined();
     });
 
@@ -390,23 +380,17 @@ describe("langwatchSpanToReadableSpan", () => {
       });
       const result = langwatchSpanToReadableSpan(span);
       expect(result.attributes["gen_ai.usage.prompt_tokens"]).toBe(100);
-      expect(
-        result.attributes["gen_ai.usage.completion_tokens"],
-      ).toBeUndefined();
+      expect(result.attributes["gen_ai.usage.completion_tokens"]).toBeUndefined();
       expect(result.attributes["gen_ai.usage.cost"]).toBeUndefined();
     });
   });
 
   describe("RAG span contexts", () => {
     it("maps contexts to retrieval.documents as JSON", () => {
-      const contexts = [
-        { document_id: "d1", chunk_id: "c1", content: "doc content" },
-      ];
+      const contexts = [{ document_id: "d1", chunk_id: "c1", content: "doc content" }];
       const span = makeRAGSpan({ contexts });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["retrieval.documents"]).toBe(
-        JSON.stringify(contexts),
-      );
+      expect(result.attributes["retrieval.documents"]).toBe(JSON.stringify(contexts));
     });
 
     it("handles multiple contexts", () => {
@@ -416,9 +400,7 @@ describe("langwatchSpanToReadableSpan", () => {
       ];
       const span = makeRAGSpan({ contexts });
       const result = langwatchSpanToReadableSpan(span);
-      const parsed = JSON.parse(
-        result.attributes["retrieval.documents"] as string,
-      );
+      const parsed = JSON.parse(result.attributes["retrieval.documents"] as string);
       expect(parsed).toHaveLength(2);
     });
 
@@ -584,9 +566,7 @@ describe("langwatchSpanToReadableSpan", () => {
       expect(result.attributes.input).toBe("search query");
       expect(result.attributes.output).toBe('{"results":3}');
       expect(result.attributes["retrieval.documents"]).toBeDefined();
-      const docs = JSON.parse(
-        result.attributes["retrieval.documents"] as string,
-      );
+      const docs = JSON.parse(result.attributes["retrieval.documents"] as string);
       expect(docs).toHaveLength(2);
     });
   });
@@ -622,12 +602,8 @@ describe("langwatchSpanToReadableSpan", () => {
         },
       });
       const result = langwatchSpanToReadableSpan(span);
-      expect(result.attributes["ai.toolCall.name"]).toBe(
-        "searchPropertiesTool",
-      );
-      expect(result.attributes["ai.toolCall.id"]).toBe(
-        "call_sdwWCkaRfGBee3MKlvP88t0j",
-      );
+      expect(result.attributes["ai.toolCall.name"]).toBe("searchPropertiesTool");
+      expect(result.attributes["ai.toolCall.id"]).toBe("call_sdwWCkaRfGBee3MKlvP88t0j");
     });
 
     it("JSON.stringifies arrays at leaf positions", () => {
@@ -673,15 +649,9 @@ describe("langwatchSpanToReadableSpan", () => {
       expect(result.attributes["ai.toolCall.result.stringResponse"]).toBe(
         "Here are the matching properties",
       );
-      expect(result.attributes["ai.toolCall.result.taskCompletion"]).toBe(
-        false,
-      );
-      expect(
-        result.attributes["ai.toolCall.result.taskJsonData.resultCount"],
-      ).toBe(1);
-      expect(
-        result.attributes["ai.toolCall.result.taskJsonData.listings"],
-      ).toBe(
+      expect(result.attributes["ai.toolCall.result.taskCompletion"]).toBe(false);
+      expect(result.attributes["ai.toolCall.result.taskJsonData.resultCount"]).toBe(1);
+      expect(result.attributes["ai.toolCall.result.taskJsonData.listings"]).toBe(
         JSON.stringify([
           {
             groupId: 84964,
@@ -715,9 +685,7 @@ describe("langwatchSpanToReadableSpan", () => {
       });
       const result = langwatchSpanToReadableSpan(span);
       expect(result.attributes._keys).toBeUndefined();
-      expect(result.attributes["ai.toolCall.name"]).toBe(
-        "searchPropertiesTool",
-      );
+      expect(result.attributes["ai.toolCall.name"]).toBe("searchPropertiesTool");
     });
 
     it("handles null params without error", () => {
@@ -808,27 +776,17 @@ describe("langwatchSpanToReadableSpan", () => {
       });
       const result = langwatchSpanToReadableSpan(span);
 
-      expect(result.attributes["ai.toolCall.name"]).toBe(
-        "searchPropertiesTool",
-      );
-      expect(result.attributes["ai.toolCall.id"]).toBe(
-        "call_sdwWCkaRfGBee3MKlvP88t0j",
-      );
+      expect(result.attributes["ai.toolCall.name"]).toBe("searchPropertiesTool");
+      expect(result.attributes["ai.toolCall.id"]).toBe("call_sdwWCkaRfGBee3MKlvP88t0j");
       expect(result.attributes["ai.toolCall.args.unitTypes"]).toBe(
         JSON.stringify(["TWO_BED_UNIT"]),
       );
       expect(result.attributes["ai.toolCall.result.stringResponse"]).toBe(
         "Here are the matching properties (property groups):\nProperty Group ID: 84964; Name: Tura Leeds; Location: Whitehall Riverside, Leeds, LS1 4FE; Available unit types: 1 bed (1160-1325), 2 beds (1437-1702)",
       );
-      expect(result.attributes["ai.toolCall.result.taskCompletion"]).toBe(
-        false,
-      );
-      expect(
-        result.attributes["ai.toolCall.result.taskJsonData.resultCount"],
-      ).toBe(1);
-      expect(
-        result.attributes["ai.toolCall.result.taskJsonData.listings"],
-      ).toBe(
+      expect(result.attributes["ai.toolCall.result.taskCompletion"]).toBe(false);
+      expect(result.attributes["ai.toolCall.result.taskJsonData.resultCount"]).toBe(1);
+      expect(result.attributes["ai.toolCall.result.taskJsonData.listings"]).toBe(
         JSON.stringify([
           {
             groupId: 84964,

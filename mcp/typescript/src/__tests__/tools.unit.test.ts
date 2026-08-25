@@ -274,15 +274,14 @@ describe("handleGetTrace()", () => {
     it("shows the formatted digest", async () => {
       mockGetTraceById.mockResolvedValue({
         trace_id: "trace-abc",
-        formatted_trace: "Root [server] 1200ms\n  LLM Call [llm] 800ms\n    Input: Hello\n    Output: Hi there",
+        formatted_trace:
+          "Root [server] 1200ms\n  LLM Call [llm] 800ms\n    Input: Hello\n    Output: Hi there",
         timestamps: {
           started_at: "2024-01-01T00:00:00Z",
           updated_at: "2024-01-01T00:01:00Z",
         },
         metadata: { user_id: "user-123" },
-        evaluations: [
-          { name: "Toxicity", passed: true, score: 0.95 },
-        ],
+        evaluations: [{ name: "Toxicity", passed: true, score: 0.95 }],
       });
 
       const result = await handleGetTrace({ traceId: "trace-abc" });
@@ -415,9 +414,7 @@ describe("handleGetAnalytics()", () => {
         metric: "performance.completion_time",
       });
 
-      expect(result).toContain(
-        "# Analytics: performance.completion_time (avg)"
-      );
+      expect(result).toContain("# Analytics: performance.completion_time (avg)");
       expect(result).toContain("| Date | Value |");
       expect(result).toContain("| 2024-01-01 | 42 |");
       expect(result).toContain("| 2024-01-02 | 55 |");
@@ -798,7 +795,10 @@ describe("handleGetPrompt() with tag options", () => {
 
       await handleGetPrompt({ idOrHandle: "pizza-prompt", tag: "production" });
 
-      expect(mockGetPrompt).toHaveBeenCalledWith("pizza-prompt", { version: undefined, tag: "production" });
+      expect(mockGetPrompt).toHaveBeenCalledWith("pizza-prompt", {
+        version: undefined,
+        tag: "production",
+      });
     });
   });
 });
@@ -823,7 +823,11 @@ describe("handleCreatePrompt() with tags", () => {
 describe("handleUpdatePrompt() with tags", () => {
   describe("when called with tags", () => {
     it("includes tags in the output", async () => {
-      mockUpdatePrompt.mockResolvedValue({ id: "p1", handle: "test", latestVersionNumber: 2 });
+      mockUpdatePrompt.mockResolvedValue({
+        id: "p1",
+        handle: "test",
+        latestVersionNumber: 2,
+      });
 
       const result = await handleUpdatePrompt({
         idOrHandle: "test",

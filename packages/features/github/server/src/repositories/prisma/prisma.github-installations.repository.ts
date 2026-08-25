@@ -7,9 +7,7 @@ import {
   type UpsertGithubInstallationInput,
 } from "../github-installations.repository";
 
-function parseRepositories(
-  value: Prisma.JsonValue | null,
-): GithubRepositoryRef[] | null {
+function parseRepositories(value: Prisma.JsonValue | null): GithubRepositoryRef[] | null {
   if (!Array.isArray(value)) return null;
   const refs: GithubRepositoryRef[] = [];
   for (const entry of value) {
@@ -64,9 +62,7 @@ function reposToJson(
   return repositories as unknown as Prisma.InputJsonValue;
 }
 
-export class PrismaGithubInstallationsRepository
-  extends GithubInstallationsRepository
-{
+export class PrismaGithubInstallationsRepository extends GithubInstallationsRepository {
   static create(prisma: PrismaClient): PrismaGithubInstallationsRepository {
     return new PrismaGithubInstallationsRepository(prisma);
   }
@@ -75,9 +71,7 @@ export class PrismaGithubInstallationsRepository
     super();
   }
 
-  async findAllForOrganization(
-    organizationId: string,
-  ): Promise<GithubInstallationRow[]> {
+  async findAllForOrganization(organizationId: string): Promise<GithubInstallationRow[]> {
     const records = await this.prisma.githubInstallation.findMany({
       where: { organizationId },
       orderBy: { createdAt: "asc" },

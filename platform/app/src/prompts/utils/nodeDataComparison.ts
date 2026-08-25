@@ -1,10 +1,7 @@
 import type { Node } from "@xyflow/react";
 import { isEqual } from "lodash-es";
 
-import type {
-  LlmPromptConfigComponent,
-  NodeDataset,
-} from "@langwatch/workflow-contract";
+import type { LlmPromptConfigComponent, NodeDataset } from "@langwatch/workflow-contract";
 
 /**
  * Checks if a demonstrations dataset has any records.
@@ -40,10 +37,7 @@ function standardizeNodeData(
         }))
         .sort((a, b) => a.identifier.localeCompare(b.identifier)),
       parameters: [...nodeData.parameters]
-        .filter(
-          (param) =>
-            param.identifier !== "demonstrations" || includeDemonstrations,
-        )
+        .filter((param) => param.identifier !== "demonstrations" || includeDemonstrations)
         .map((param) => {
           if (param.identifier === "demonstrations" && includeDemonstrations) {
             const records = param.value?.inline?.records ?? {};
@@ -81,12 +75,10 @@ export function isNodeDataEqual(
   nodeData1: Node<LlmPromptConfigComponent>["data"],
   nodeData2: Node<LlmPromptConfigComponent>["data"],
 ): boolean {
-  const demo1 = nodeData1.parameters.find(
-    (p) => p.identifier === "demonstrations",
-  )?.value as NodeDataset | undefined;
-  const demo2 = nodeData2.parameters.find(
-    (p) => p.identifier === "demonstrations",
-  )?.value as NodeDataset | undefined;
+  const demo1 = nodeData1.parameters.find((p) => p.identifier === "demonstrations")
+    ?.value as NodeDataset | undefined;
+  const demo2 = nodeData2.parameters.find((p) => p.identifier === "demonstrations")
+    ?.value as NodeDataset | undefined;
 
   const includeDemonstrations = hasRecords(demo1) || hasRecords(demo2);
 

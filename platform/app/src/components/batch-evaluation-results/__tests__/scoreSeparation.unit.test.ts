@@ -15,11 +15,7 @@ import { areDistinguishable } from "../scoreSeparation";
  * @see specs/experiments/comparison-leaderboard.feature
  */
 
-const entry = (
-  variantId: string,
-  score: number,
-  scoreCI: [number, number] | null,
-) =>
+const entry = (variantId: string, score: number, scoreCI: [number, number] | null) =>
   ({
     variantId,
     wins: 5,
@@ -201,13 +197,10 @@ const fourWay = ({ rows, seed }: { rows: number; seed: number }) => {
     }
     return ids[0]!;
   };
-  const comparisons: PairwiseComparison[] = Array.from(
-    { length: rows },
-    () => ({
-      candidates: [...ids],
-      winner: pickWinner(),
-    }),
-  );
+  const comparisons: PairwiseComparison[] = Array.from({ length: rows }, () => ({
+    candidates: [...ids],
+    winner: pickWinner(),
+  }));
   return computeBTLeaderboard({
     comparisons,
     variantIds: ids,
@@ -219,9 +212,7 @@ const fourWay = ({ rows, seed }: { rows: number; seed: number }) => {
 /** Every unordered pair of the variants the fit is entitled to rank. */
 const rankedPairs = (lb: ReturnType<typeof fourWay>) => {
   const ranked = lb.entries.filter((e) => !e.isDegenerate);
-  return ranked.flatMap((a, i) =>
-    ranked.slice(i + 1).map((b) => [a, b] as const),
-  );
+  return ranked.flatMap((a, i) => ranked.slice(i + 1).map((b) => [a, b] as const));
 };
 
 /** The test this feature replaced: do the two marginal intervals miss? */
@@ -232,10 +223,7 @@ const separatedByOverlap = (a: BTLeaderboardEntry, b: BTLeaderboardEntry) =>
 const overlapPairsTheDifferenceMisses = (lb: ReturnType<typeof fourWay>) =>
   rankedPairs(lb)
     .filter(([a, b]) => separatedByOverlap(a, b))
-    .filter(
-      ([a, b]) =>
-        !areDistinguishable({ a, b, differenceCI: lb.scoreDifferenceCI }),
-    )
+    .filter(([a, b]) => !areDistinguishable({ a, b, differenceCI: lb.scoreDifferenceCI }))
     .map(([a, b]) => `${a.variantId}/${b.variantId}`);
 
 /** How many pairs each of the two tests calls apart, over one fit. */

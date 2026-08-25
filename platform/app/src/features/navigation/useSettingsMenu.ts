@@ -214,9 +214,7 @@ function enterpriseAccessItems(): SettingsMenuItem[] {
   ];
 }
 
-function aiInfrastructureGroup({
-  isLiteMember,
-}: SettingsMenuGates): SettingsMenuGroup {
+function aiInfrastructureGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-ai-infrastructure",
     label: "AI Infrastructure",
@@ -234,9 +232,7 @@ function aiInfrastructureGroup({
   };
 }
 
-function dataControlsGroup({
-  hasPermission,
-}: SettingsMenuGates): SettingsMenuGroup {
+function dataControlsGroup({ hasPermission }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-data-controls",
     label: "Data Controls",

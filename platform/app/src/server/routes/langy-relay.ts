@@ -106,10 +106,7 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
   getLangyRelayFramesCounter("duplicate").inc(tally.duplicate);
   getLangyRelayFramesCounter("rejected").inc(tally.rejected);
   if (tally.terminal) getLangyRelayFramesCounter("terminal").inc();
-  logger.info(
-    { ...tally, ...(relay.pinnedTurn ?? {}) },
-    "langy relay stream closed",
-  );
+  logger.info({ ...tally, ...(relay.pinnedTurn ?? {}) }, "langy relay stream closed");
 
   return c.json(tally, 200);
 });

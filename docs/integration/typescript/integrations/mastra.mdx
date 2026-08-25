@@ -6,7 +6,9 @@ keywords: mastra, langwatch, tracing, observability, typescript, agent framework
 ---
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a
+  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set
+  this up for you automatically.
 </Tip>
 
 LangWatch integrates with Mastra through OpenTelemetry to capture traces from your Mastra agents automatically.
@@ -29,6 +31,7 @@ yarn add langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/ote
 ```bash bun
 bun add langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-exporter @mastra/libsql
 ```
+
 </CodeGroup>
 
 ## Usage
@@ -61,7 +64,7 @@ export const mastra = new Mastra({
             provider: {
               custom: {
                 endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
-                headers: { "Authorization": `Bearer ${process.env.LANGWATCH_API_KEY}` },
+                headers: { Authorization: `Bearer ${process.env.LANGWATCH_API_KEY}` },
               },
             },
           }),

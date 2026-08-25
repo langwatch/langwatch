@@ -26,13 +26,11 @@ import type { TeamFormData } from "~/components/settings/TeamForm";
 const OWNER = { id: "user-owner", name: "Jane", email: "jane@acme.test" };
 const SECOND = { id: "user-second", name: "Sam", email: "sam@acme.test" };
 
-const { mockUpdateMutate, mockArchiveMutate, mockToasterCreate } = vi.hoisted(
-  () => ({
-    mockUpdateMutate: vi.fn(),
-    mockArchiveMutate: vi.fn(),
-    mockToasterCreate: vi.fn(),
-  }),
-);
+const { mockUpdateMutate, mockArchiveMutate, mockToasterCreate } = vi.hoisted(() => ({
+  mockUpdateMutate: vi.fn(),
+  mockArchiveMutate: vi.fn(),
+  mockToasterCreate: vi.fn(),
+}));
 
 function buildTeam() {
   return {
@@ -201,9 +199,7 @@ describe("Team settings autosave", () => {
 
         refuseLatestSave();
 
-        await waitFor(() =>
-          expect(getByTestId("member-ids").textContent).toBe(OWNER.id),
-        );
+        await waitFor(() => expect(getByTestId("member-ids").textContent).toBe(OWNER.id));
       });
 
       it("surfaces the server's sentence rather than saving silently", async () => {
@@ -230,9 +226,7 @@ describe("Team settings autosave", () => {
         fireEvent.click(getByTestId("add-member"));
         await waitFor(() => expect(mockUpdateMutate).toHaveBeenCalled());
         refuseLatestSave();
-        await waitFor(() =>
-          expect(getByTestId("member-ids").textContent).toBe(OWNER.id),
-        );
+        await waitFor(() => expect(getByTestId("member-ids").textContent).toBe(OWNER.id));
 
         const callsBeforeRename = mockUpdateMutate.mock.calls.length;
         fireEvent.change(getByTestId("team-name"), {
@@ -240,9 +234,7 @@ describe("Team settings autosave", () => {
         });
 
         await waitFor(() =>
-          expect(mockUpdateMutate.mock.calls.length).toBeGreaterThan(
-            callsBeforeRename,
-          ),
+          expect(mockUpdateMutate.mock.calls.length).toBeGreaterThan(callsBeforeRename),
         );
         // The refused member never rides along, which is what kept the rename
         // from ever being accepted.

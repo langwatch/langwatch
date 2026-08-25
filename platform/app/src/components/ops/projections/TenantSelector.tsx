@@ -40,13 +40,7 @@ export function TenantSelector({
       </TagsInput.Root>
 
       <Box position="relative">
-        <HStack
-          gap={2}
-          borderWidth="1px"
-          borderRadius="md"
-          paddingX={3}
-          paddingY={1.5}
-        >
+        <HStack gap={2} borderWidth="1px" borderRadius="md" paddingX={3} paddingY={1.5}>
           <Search size={12} color="var(--chakra-colors-fg-muted)" />
           <input
             style={{

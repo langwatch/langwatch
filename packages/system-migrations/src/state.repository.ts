@@ -29,7 +29,5 @@ export interface SystemMigrationStateRepository {
    * `rolled_back`. The runner treats `false` as the pin winning: terminal
    * for that tenant this pass.
    */
-  upsertRecordUnlessRolledBack(
-    record: TenantMigrationRecord,
-  ): Promise<boolean>;
+  upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean>;
 }

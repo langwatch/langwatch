@@ -66,7 +66,7 @@ export const runAgentCommand = async (
         body: JSON.stringify(input),
       });
 
-      const result = await response.json() as Record<string, unknown>;
+      const result = (await response.json()) as Record<string, unknown>;
       runSpinner.succeed(`HTTP agent responded (${response.status})`);
 
       return {
@@ -74,7 +74,9 @@ export const runAgentCommand = async (
         table: () => {
           console.log();
           console.log(chalk.bold("  Response:"));
-          console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
+          console.log(
+            `    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`,
+          );
           console.log();
         },
       };
@@ -90,15 +92,19 @@ export const runAgentCommand = async (
     // Check if agent has a linked workflow
     const workflowId = config?.workflowId as string | undefined;
     if (!workflowId) {
-      console.error(chalk.yellow(
-        `Agent "${agent.name}" (type: ${agent.type}) cannot be executed directly from CLI.\n` +
-        `Only HTTP agents and workflow-linked agents can be run.\n` +
-        `To test this agent, use it within a workflow in the UI.`,
-      ));
+      console.error(
+        chalk.yellow(
+          `Agent "${agent.name}" (type: ${agent.type}) cannot be executed directly from CLI.\n` +
+            `Only HTTP agents and workflow-linked agents can be run.\n` +
+            `To test this agent, use it within a workflow in the UI.`,
+        ),
+      );
       process.exit(1);
     }
 
-    const runSpinner = createSpinner(`Running agent via workflow ${workflowId}...`).start();
+    const runSpinner = createSpinner(
+      `Running agent via workflow ${workflowId}...`,
+    ).start();
     try {
       const response = await fetch(
         `${endpoint}/api/workflows/${encodeURIComponent(workflowId)}/run`,
@@ -114,11 +120,15 @@ export const runAgentCommand = async (
 
       if (!response.ok) {
         const message = await formatFetchError(response);
-        failSpinner({ spinner: runSpinner, error: new Error(message), action: "run agent" });
+        failSpinner({
+          spinner: runSpinner,
+          error: new Error(message),
+          action: "run agent",
+        });
         process.exit(1);
       }
 
-      const result = await response.json() as Record<string, unknown>;
+      const result = (await response.json()) as Record<string, unknown>;
       runSpinner.succeed(`Agent "${agent.name}" executed successfully`);
 
       return {
@@ -127,13 +137,16 @@ export const runAgentCommand = async (
           console.log();
           if (result.output !== undefined) {
             console.log(chalk.bold("  Output:"));
-            const output = typeof result.output === "string"
-              ? result.output
-              : JSON.stringify(result.output, null, 2);
+            const output =
+              typeof result.output === "string"
+                ? result.output
+                : JSON.stringify(result.output, null, 2);
             console.log(`    ${output.split("\n").join("\n    ")}`);
           } else {
             console.log(chalk.bold("  Result:"));
-            console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
+            console.log(
+              `    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`,
+            );
           }
           console.log();
         },

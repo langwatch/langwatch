@@ -482,13 +482,7 @@ export const FIELD_VALUES: Record<string, string[]> = {
     "pending",
     "queued",
   ],
-  evaluatorStatus: [
-    "scheduled",
-    "in_progress",
-    "processed",
-    "skipped",
-    "error",
-  ],
+  evaluatorStatus: ["scheduled", "in_progress", "processed", "skipped", "error"],
   // `skipped` and `unknown` (Passed null but not errored/skipped) are
   // query-language-only: the sidebar drilldown surfaces pass/fail/error rows
   // and has no bucket for either — both are reachable by typing the filter

@@ -87,9 +87,7 @@ describe("Feature: API key verification", () => {
       ["apiKey", { organizationId }],
       ["organizationUser", { organizationId }],
     ]);
-    await prisma.organization
-      .delete({ where: { id: organizationId } })
-      .catch(() => {});
+    await prisma.organization.delete({ where: { id: organizationId } }).catch(() => {});
     await prisma.user.delete({ where: { id: userId } }).catch(() => {});
   });
 
@@ -206,9 +204,7 @@ describe("Feature: API key verification", () => {
       await prisma.organizationUser
         .deleteMany({ where: { userId: deactivated.id } })
         .catch(() => {});
-      await prisma.user
-        .delete({ where: { id: deactivated.id } })
-        .catch(() => {});
+      await prisma.user.delete({ where: { id: deactivated.id } }).catch(() => {});
     });
   });
 });

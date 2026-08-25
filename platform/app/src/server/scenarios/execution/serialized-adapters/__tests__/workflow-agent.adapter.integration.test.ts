@@ -29,10 +29,7 @@ import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
 const NLP = process.env.LANGWATCH_NLP_SERVICE ?? "http://localhost:5561";
 const FIXTURES = resolve(__dirname, "fixtures");
 const REPRO_BUG1 = resolve(FIXTURES, "repro-bug1-str-type.json");
-const REPRO_BUG2 = resolve(
-  FIXTURES,
-  "repro-bug2-chat_messages-type-crash.json",
-);
+const REPRO_BUG2 = resolve(FIXTURES, "repro-bug2-chat_messages-type-crash.json");
 
 // --- Helpers ---------------------------------------------------------------------
 
@@ -81,8 +78,7 @@ function getSignatureNode(workflow: WorkflowDsl): SignatureNode {
 function patchSignaturePrompt(sig: SignatureNode): void {
   const params = sig.data.parameters ?? [];
   const messagesParam = params.find((p) => p.identifier === "messages");
-  if (!messagesParam)
-    throw new Error("signature is missing the 'messages' parameter");
+  if (!messagesParam) throw new Error("signature is missing the 'messages' parameter");
   messagesParam.value = [
     {
       role: "user",
@@ -104,11 +100,7 @@ function patchSignaturePrompt(sig: SignatureNode): void {
  * Add a `random_static_value` input with a default value, mirroring the Studio
  * "Variables panel → static value" shape from the issue screenshot.
  */
-function addStaticInput(
-  sig: SignatureNode,
-  identifier: string,
-  value: string,
-): void {
+function addStaticInput(sig: SignatureNode, identifier: string, value: string): void {
   const inputs = (sig.data.inputs ??= []);
   if (!inputs.some((f) => f.identifier === identifier)) {
     inputs.push({ identifier, type: "str", value });
@@ -123,8 +115,7 @@ function buildAdapter(workflow: WorkflowDsl): SerializedWorkflowAgentAdapter {
     }>
   ).find((n) => n.id === "entry");
   const messagesType =
-    entry?.data.outputs?.find((f) => f.identifier === "messages")?.type ??
-    "str";
+    entry?.data.outputs?.find((f) => f.identifier === "messages")?.type ?? "str";
   const config: WorkflowAgentData = {
     type: "workflow",
     agentId: "e2e-agent",

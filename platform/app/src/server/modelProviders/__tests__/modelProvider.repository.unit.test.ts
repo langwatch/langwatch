@@ -10,10 +10,7 @@ vi.mock("../../../utils/encryption", () => ({
   }),
 }));
 
-import type {
-  ModelProviderScope,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { ModelProviderScope, PrismaClient } from "~/generated/prisma/client";
 import { decrypt, encrypt } from "../../../utils/encryption";
 import {
   ModelProviderRepository,
@@ -238,9 +235,7 @@ describe("ModelProviderRepository", () => {
       });
 
       it("uses findFirst instead of findUnique", async () => {
-        (prisma.modelProvider.findFirst as any).mockResolvedValue(
-          createModelProvider(),
-        );
+        (prisma.modelProvider.findFirst as any).mockResolvedValue(createModelProvider());
 
         await repository.findById("mp_test123", "proj_test");
 
@@ -288,10 +283,7 @@ describe("ModelProviderRepository", () => {
         });
         (prisma.modelProvider.findFirst as any).mockResolvedValue(stored);
 
-        const result = await repository.findByProvider(
-          "anthropic",
-          "proj_test",
-        );
+        const result = await repository.findByProvider("anthropic", "proj_test");
 
         expect(result!.customKeys).toEqual({
           ANTHROPIC_API_KEY: "sk-ant-secret",
@@ -441,8 +433,7 @@ describe("ModelProviderRepository", () => {
       it("returns an empty array without querying modelProvider", async () => {
         (prisma.project.findUnique as any).mockResolvedValue(null);
 
-        const results =
-          await repository.findAllAccessibleForProject("proj_missing");
+        const results = await repository.findAllAccessibleForProject("proj_missing");
 
         expect(results).toEqual([]);
         expect(prisma.modelProvider.findMany).not.toHaveBeenCalled();
@@ -488,8 +479,7 @@ describe("ModelProviderRepository", () => {
 
         await repository.findAllAccessibleForProject(projectId);
 
-        const findManyCall = (prisma.modelProvider.findMany as any).mock
-          .calls[0][0];
+        const findManyCall = (prisma.modelProvider.findMany as any).mock.calls[0][0];
         expect(findManyCall.where.scopes.some.OR).toEqual(
           expect.arrayContaining([
             { scopeType: "PROJECT", scopeId: projectId },
@@ -526,8 +516,7 @@ describe("ModelProviderRepository", () => {
           scopes: [{ scopeType: "PROJECT", scopeId: "proj_test" }],
         });
 
-        const createCall = (prisma.modelProvider.create as any).mock
-          .calls[0][0];
+        const createCall = (prisma.modelProvider.create as any).mock.calls[0][0];
         const storedCustomKeys = createCall.data.customKeys;
 
         // The stored value must be an encrypted string, not the original object
@@ -538,9 +527,7 @@ describe("ModelProviderRepository", () => {
 
     describe("when customKeys are null", () => {
       it("stores null without encryption", async () => {
-        (prisma.modelProvider.create as any).mockResolvedValue(
-          createModelProvider(),
-        );
+        (prisma.modelProvider.create as any).mockResolvedValue(createModelProvider());
 
         await repository.create({
           name: "OpenAI",
@@ -550,8 +537,7 @@ describe("ModelProviderRepository", () => {
           scopes: [{ scopeType: "PROJECT", scopeId: "proj_test" }],
         });
 
-        const createCall = (prisma.modelProvider.create as any).mock
-          .calls[0][0];
+        const createCall = (prisma.modelProvider.create as any).mock.calls[0][0];
         // null or undefined should pass through
         expect(createCall.data.customKeys).toBeUndefined();
       });
@@ -603,8 +589,7 @@ describe("ModelProviderRepository", () => {
           customKeys: keys,
         });
 
-        const updateCall = (prisma.modelProvider.update as any).mock
-          .calls[0][0];
+        const updateCall = (prisma.modelProvider.update as any).mock.calls[0][0];
         const storedCustomKeys = updateCall.data.customKeys;
 
         expect(typeof storedCustomKeys).toBe("string");
@@ -614,16 +599,13 @@ describe("ModelProviderRepository", () => {
 
     describe("when customKeys are not provided", () => {
       it("does not include customKeys in update", async () => {
-        (prisma.modelProvider.update as any).mockResolvedValue(
-          createModelProvider(),
-        );
+        (prisma.modelProvider.update as any).mockResolvedValue(createModelProvider());
 
         await repository.update("mp_test123", {
           enabled: false,
         });
 
-        const updateCall = (prisma.modelProvider.update as any).mock
-          .calls[0][0];
+        const updateCall = (prisma.modelProvider.update as any).mock.calls[0][0];
         expect(updateCall.data.customKeys).toBeUndefined();
       });
     });
@@ -639,12 +621,8 @@ describe("ModelProviderRepository", () => {
             scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_other" }],
           }),
         ).rejects.toThrow(/organization/);
-        expect(
-          prisma.modelProviderScope.deleteMany as any,
-        ).not.toHaveBeenCalled();
-        expect(
-          prisma.modelProviderScope.createMany as any,
-        ).not.toHaveBeenCalled();
+        expect(prisma.modelProviderScope.deleteMany as any).not.toHaveBeenCalled();
+        expect(prisma.modelProviderScope.createMany as any).not.toHaveBeenCalled();
       });
     });
 
@@ -653,20 +631,14 @@ describe("ModelProviderRepository", () => {
         (prisma.modelProvider.findUnique as any).mockResolvedValue({
           organizationId: "org_existing",
         });
-        (prisma.modelProvider.update as any).mockResolvedValue(
-          createModelProvider(),
-        );
+        (prisma.modelProvider.update as any).mockResolvedValue(createModelProvider());
 
         await repository.update("mp_test123", {
           scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_existing" }],
         });
 
-        expect(
-          prisma.modelProviderScope.deleteMany as any,
-        ).toHaveBeenCalledTimes(1);
-        expect(
-          prisma.modelProviderScope.createMany as any,
-        ).toHaveBeenCalledTimes(1);
+        expect(prisma.modelProviderScope.deleteMany as any).toHaveBeenCalledTimes(1);
+        expect(prisma.modelProviderScope.createMany as any).toHaveBeenCalledTimes(1);
       });
     });
   });

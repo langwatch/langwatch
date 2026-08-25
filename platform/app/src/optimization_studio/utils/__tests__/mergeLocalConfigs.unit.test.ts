@@ -75,11 +75,7 @@ describe("mergeLocalConfigsIntoDsl()", () => {
 
   describe("when nodes have no local state", () => {
     it("returns nodes unchanged", () => {
-      const nodes = [
-        createPlainNode(),
-        createSignatureNode({}),
-        createEvaluatorNode({}),
-      ];
+      const nodes = [createPlainNode(), createSignatureNode({}), createEvaluatorNode({})];
 
       const result = mergeLocalConfigsIntoDsl(nodes);
 
@@ -108,9 +104,9 @@ describe("mergeLocalConfigsIntoDsl()", () => {
     it("merges llm config into the llm parameter", () => {
       const nodes = [createSignatureNode({ localPromptConfig })];
       const result = mergeLocalConfigsIntoDsl(nodes);
-      const llmParam = (
-        result[0]!.data as LlmPromptConfigComponent
-      ).parameters.find((p) => p.identifier === "llm");
+      const llmParam = (result[0]!.data as LlmPromptConfigComponent).parameters.find(
+        (p) => p.identifier === "llm",
+      );
 
       expect(llmParam?.value).toEqual({
         model: "openai/gpt-4o-mini",
@@ -132,9 +128,9 @@ describe("mergeLocalConfigsIntoDsl()", () => {
     it("sets non-system messages into messages parameter", () => {
       const nodes = [createSignatureNode({ localPromptConfig })];
       const result = mergeLocalConfigsIntoDsl(nodes);
-      const messagesParam = (
-        result[0]!.data as LlmPromptConfigComponent
-      ).parameters.find((p) => p.identifier === "messages");
+      const messagesParam = (result[0]!.data as LlmPromptConfigComponent).parameters.find(
+        (p) => p.identifier === "messages",
+      );
 
       expect(messagesParam?.value).toEqual([
         { role: "user", content: "Answer: {{question}}" },
@@ -323,27 +319,22 @@ describe("mergeLocalConfigsIntoDsl()", () => {
     });
 
     it("overlays the draft code onto the executed parameters", () => {
-      const nodes = [
-        createAgentNode({ settings: { code: "print('my draft')" } }),
-      ];
+      const nodes = [createAgentNode({ settings: { code: "print('my draft')" } })];
       const result = mergeLocalConfigsIntoDsl(nodes);
       const data = result[0]!.data as AgentComponent;
 
       expect(data.parameters?.find((p) => p.identifier === "code")?.value).toBe(
         "print('my draft')",
       );
-      expect(
-        data.parameters?.find((p) => p.identifier === "agent_type")?.value,
-      ).toBe("code");
+      expect(data.parameters?.find((p) => p.identifier === "agent_type")?.value).toBe(
+        "code",
+      );
       expect(data.localConfig).toBeUndefined();
     });
 
     it("merges the draft name and leaves agent nodes without drafts untouched", () => {
       const draftless = createAgentNode();
-      const nodes = [
-        createAgentNode({ name: "renamed agent", settings: {} }),
-        draftless,
-      ];
+      const nodes = [createAgentNode({ name: "renamed agent", settings: {} }), draftless];
       const result = mergeLocalConfigsIntoDsl(nodes);
 
       expect(result[0]!.data.name).toBe("renamed agent");

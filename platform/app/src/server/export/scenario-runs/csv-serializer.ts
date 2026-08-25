@@ -130,10 +130,8 @@ export function serializeRunsToCriteriaCsv({
     const push = (criterion: string, met: boolean) =>
       rows.push([...core, text(criterion), String(met), ...tail]);
 
-    for (const criterion of run.results?.metCriteria ?? [])
-      push(criterion, true);
-    for (const criterion of run.results?.unmetCriteria ?? [])
-      push(criterion, false);
+    for (const criterion of run.results?.metCriteria ?? []) push(criterion, true);
+    for (const criterion of run.results?.unmetCriteria ?? []) push(criterion, false);
   }
   return unparse({ headers: criteriaHeaders(), rows, includeHeader });
 }
@@ -205,10 +203,7 @@ function buildCoreValues(run: SimulationExportRun): string[] {
 }
 
 function buildCriteriaListValues(run: SimulationExportRun): string[] {
-  return [
-    jsonArray(run.results?.metCriteria),
-    jsonArray(run.results?.unmetCriteria),
-  ];
+  return [jsonArray(run.results?.metCriteria), jsonArray(run.results?.unmetCriteria)];
 }
 
 /**
@@ -244,9 +239,7 @@ function buildTailValues(run: SimulationExportRun): string[] {
  * depend on which runs happened to be in the file and stop two exports lining
  * up. A run that resolved none leaves the cell empty.
  */
-function extractParameters(
-  metadata: Record<string, unknown> | null | undefined,
-): string {
+function extractParameters(metadata: Record<string, unknown> | null | undefined): string {
   const parameters = metadata?.parameters;
   if (parameters == null || typeof parameters !== "object") return "";
   if (Array.isArray(parameters)) return "";
@@ -387,14 +380,10 @@ function unparse({
 }): string {
   if (rows.length === 0) {
     return includeHeader
-      ? Parse.unparse({ fields: headers, data: [] }, { newline: NEWLINE }) +
-          NEWLINE
+      ? Parse.unparse({ fields: headers, data: [] }, { newline: NEWLINE }) + NEWLINE
       : "";
   }
-  const csv = Parse.unparse(
-    { fields: headers, data: rows },
-    { newline: NEWLINE },
-  );
+  const csv = Parse.unparse({ fields: headers, data: rows }, { newline: NEWLINE });
   return (includeHeader ? csv : stripHeader(csv)) + NEWLINE;
 }
 

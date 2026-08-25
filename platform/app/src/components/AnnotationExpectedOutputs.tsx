@@ -20,9 +20,7 @@ export const AnnotationExpectedOutputs = ({
   output: string;
 }) => {
   const { project } = useOrganizationTeamProject();
-  const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(
-    null,
-  );
+  const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
 
   const annotations = api.annotation.getByTraceId.useQuery(
     {
@@ -62,9 +60,7 @@ export const AnnotationExpectedOutputs = ({
             mode="suggest"
             annotationId={annotation.id}
             open={editingAnnotationId === annotation.id}
-            onOpenChange={(open) =>
-              setEditingAnnotationId(open ? annotation.id : null)
-            }
+            onOpenChange={(open) => setEditingAnnotationId(open ? annotation.id : null)}
             trigger={
               <Box
                 as="button"

@@ -19,6 +19,7 @@ keys, with pause/unpause through the existing pipeline controls at
 `<pipeline>/subscriber/<name>`.
 
 Implementation notes that differ from the sketch below:
+
 - The fleet reads live in `ProcessOpsPrismaRepository` behind
   `ManagerExplorerService` (the existing PM ops home), not a new service.
 - The cross-tenant aggregates use raw SQL with the tenancy guard's explicit
@@ -99,13 +100,13 @@ outbox by predicate across every processName — see its pipeline header for the
 Each of these is a real state the tables can be in; none of them reaches a
 human today until a customer notices the symptom.
 
-| Signal | Meaning | Where it hides |
-| --- | --- | --- |
-| `dead` outbox messages | Intents given up on — the effect never happened and never will until redriven | `Outbox.status = 'dead'`, count by processName |
-| Overdue pending | Delivery failing and backing off; attempts climbing | `status = 'pending' AND nextAttemptAt < now - threshold` |
-| Lapsed lease | A dispatcher died mid-delivery; the message waits out the full lease | `status = 'pending' AND leasedUntil < now` |
-| Overdue wake | The wake worker is starved, dead, or the fleet was down | `Instance.nextWakeAt < now - threshold` (already indexed) |
-| Stalled instance | Inbox rows arriving but revision not advancing | join inbox recency against `Instance.updatedAt` |
+| Signal                 | Meaning                                                                       | Where it hides                                            |
+| ---------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `dead` outbox messages | Intents given up on — the effect never happened and never will until redriven | `Outbox.status = 'dead'`, count by processName            |
+| Overdue pending        | Delivery failing and backing off; attempts climbing                           | `status = 'pending' AND nextAttemptAt < now - threshold`  |
+| Lapsed lease           | A dispatcher died mid-delivery; the message waits out the full lease          | `status = 'pending' AND leasedUntil < now`                |
+| Overdue wake           | The wake worker is starved, dead, or the fleet was down                       | `Instance.nextWakeAt < now - threshold` (already indexed) |
+| Stalled instance       | Inbox rows arriving but revision not advancing                                | join inbox recency against `Instance.updatedAt`           |
 
 Worth stating on the surface itself: **the outbox lease is not renewed
 mid-delivery** — a delivery that legitimately outlives its lease and a
@@ -153,6 +154,7 @@ scans there is no per-pod divergence to reconcile. The dashboard tile (if we
 want one later) can ride the existing detail cycle.
 
 Index check before building:
+
 - `Instance.nextWakeAt` — already indexed ✅
 - `Outbox (processName, status)` — needed for the per-name counts
 - `Outbox (status, nextAttemptAt)` — likely exists for dispatcher leasing;
@@ -170,12 +172,12 @@ page.
 Follow the scheduler pattern: every mutation lands in the existing ops audit
 trail and surfaces in a "recent actions" list on the page.
 
-| Action | Effect | Guard |
-| --- | --- | --- |
-| Wake now | `nextWakeAt = now` for one instance | Safe — `evolve` receives `now` and clamps; confirm names the process |
-| Redrive dead message | `status = 'pending'`, `nextAttemptAt = now` (attempts kept) | messageKey idempotency makes double-delivery a no-op at the consumer; confirm |
-| Redrive all dead for a processName | same, bulk | typed confirmation, canary-first like the DLQ redrive |
-| Release lapsed lease | clear `leaseToken`/`leasedUntil` | states the "died OR still delivering" risk; the fencing token makes the worst case a duplicate the messageKey absorbs |
+| Action                             | Effect                                                      | Guard                                                                                                                 |
+| ---------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Wake now                           | `nextWakeAt = now` for one instance                         | Safe — `evolve` receives `now` and clamps; confirm names the process                                                  |
+| Redrive dead message               | `status = 'pending'`, `nextAttemptAt = now` (attempts kept) | messageKey idempotency makes double-delivery a no-op at the consumer; confirm                                         |
+| Redrive all dead for a processName | same, bulk                                                  | typed confirmation, canary-first like the DLQ redrive                                                                 |
+| Release lapsed lease               | clear `leaseToken`/`leasedUntil`                            | states the "died OR still delivering" risk; the fencing token makes the worst case a duplicate the messageKey absorbs |
 
 Explicitly NOT offered: editing instance state (domain-owned; an operator
 mutation would fork it from what evolve derived), deleting instances

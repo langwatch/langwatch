@@ -8,13 +8,7 @@
  * hooks). Binds specs/datasets/dataset-upload-dropzone.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -51,15 +45,12 @@ vi.mock("~/utils/api", () => ({
 }));
 
 vi.mock("@langwatch/dataset-web", async (importActual) => {
-  const actual =
-    await importActual<typeof import("@langwatch/dataset-web")>();
+  const actual = await importActual<typeof import("@langwatch/dataset-web")>();
   return {
     ...actual,
-    retryDatasetNormalize: (...args: unknown[]) =>
-      retryDatasetNormalize(...args),
+    retryDatasetNormalize: (...args: unknown[]) => retryDatasetNormalize(...args),
     requestDirectUpload: (...args: unknown[]) => requestDirectUpload(...args),
-    putFileToPresignedUrl: (...args: unknown[]) =>
-      putFileToPresignedUrl(...args),
+    putFileToPresignedUrl: (...args: unknown[]) => putFileToPresignedUrl(...args),
     finalizeDirectUpload: (...args: unknown[]) => finalizeDirectUpload(...args),
     abortPendingUpload: (...args: unknown[]) => abortPendingUpload(...args),
   };
@@ -90,14 +81,12 @@ import {
 } from "../UploadCSVDrawer";
 
 /** Error shaped like an aborted fetch. */
-const abortError = () =>
-  Object.assign(new Error("aborted"), { name: "AbortError" });
+const abortError = () => Object.assign(new Error("aborted"), { name: "AbortError" });
 
 const wrap = (ui: React.ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 
-const fileInput = () =>
-  document.querySelector('input[type="file"]') as HTMLInputElement;
+const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
 
 afterEach(() => {
   cleanup();
@@ -153,9 +142,7 @@ describe("the upload dropzone", () => {
 
       expect(await screen.findByText("chosen.csv")).toBeInTheDocument();
       expect(screen.getByText(/\bB\b|KB|MB/)).toBeInTheDocument(); // size label
-      expect(
-        screen.getByRole("button", { name: /remove file/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /remove file/i })).toBeInTheDocument();
     });
 
     it("resets the native input value so the same file can be re-picked after a remove", async () => {
@@ -168,10 +155,7 @@ describe("the upload dropzone", () => {
         />,
       );
 
-      await user.upload(
-        fileInput(),
-        new File(["x"], "repick.csv", { type: "text/csv" }),
-      );
+      await user.upload(fileInput(), new File(["x"], "repick.csv", { type: "text/csv" }));
 
       // The captured file lives in React state; the input is cleared so the OS
       // dialog re-firing `change` for the same file isn't suppressed.
@@ -193,10 +177,7 @@ describe("the upload dropzone", () => {
         />,
       );
 
-      await user.upload(
-        fileInput(),
-        new File(["x"], "gone.csv", { type: "text/csv" }),
-      );
+      await user.upload(fileInput(), new File(["x"], "gone.csv", { type: "text/csv" }));
       expect(await screen.findByText("gone.csv")).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /remove file/i }));
@@ -220,10 +201,7 @@ describe("the upload dropzone", () => {
         />,
       );
 
-      await user.upload(
-        fileInput(),
-        new File(["x"], "big.csv", { type: "text/csv" }),
-      );
+      await user.upload(fileInput(), new File(["x"], "big.csv", { type: "text/csv" }));
       expect(await screen.findByText("big.csv")).toBeInTheDocument();
 
       // The host computes the validation and passes it down.
@@ -238,9 +216,7 @@ describe("the upload dropzone", () => {
         </ChakraProvider>,
       );
 
-      expect(screen.getByTestId("upload-error")).toHaveTextContent(
-        /file is too large/i,
-      );
+      expect(screen.getByTestId("upload-error")).toHaveTextContent(/file is too large/i);
     });
   });
 
@@ -333,9 +309,7 @@ describe("DatasetUploadProcessing", () => {
       const { rerender } = renderProcessing({ onReady, onViewDataset });
 
       expect(screen.getByText(/ready/i)).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /view dataset/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /view dataset/i })).toBeInTheDocument();
       expect(onReady).toHaveBeenCalledTimes(1);
 
       // A re-render with the same ready data must not fire onReady again.
@@ -366,9 +340,7 @@ describe("DatasetUploadProcessing", () => {
       renderProcessing({ onReady });
 
       // Not stuck on a spinner; "ready" is honored once the server says so.
-      expect(
-        screen.queryByText(/preparing your dataset/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/preparing your dataset/i)).not.toBeInTheDocument();
       expect(onReady).toHaveBeenCalledTimes(1);
     });
   });
@@ -385,9 +357,7 @@ describe("DatasetUploadProcessing", () => {
       renderProcessing();
 
       expect(screen.getByText("boom")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /retry/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     });
   });
 
@@ -399,9 +369,7 @@ describe("DatasetUploadProcessing", () => {
       renderProcessing({ onReady });
 
       expect(screen.getByText(/no longer available/i)).toBeInTheDocument();
-      expect(
-        screen.queryByText(/preparing your dataset/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/preparing your dataset/i)).not.toBeInTheDocument();
       expect(onReady).not.toHaveBeenCalled();
     });
   });
@@ -444,17 +412,12 @@ describe("UploadCSVForm cancel", () => {
         </ChakraProvider>,
       );
 
-      await user.upload(
-        fileInput(),
-        new File(["x"], "racey.csv", { type: "text/csv" }),
-      );
+      await user.upload(fileInput(), new File(["x"], "racey.csv", { type: "text/csv" }));
       await user.click(screen.getByRole("button", { name: /^upload$/i }));
 
       // Mid-flight: the cancel control is shown; click it before the presign
       // resolves (so handleCancelUpload sees no id yet → reaps nothing).
-      await user.click(
-        await screen.findByRole("button", { name: /cancel upload/i }),
-      );
+      await user.click(await screen.findByRole("button", { name: /cancel upload/i }));
       expect(abortPendingUpload).not.toHaveBeenCalled();
 
       // Now the presign resolves: the row exists, the aborted PUT throws, and

@@ -161,10 +161,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
         const incr = vi.fn().mockResolvedValue(1);
         // SET NX: first call wins ("OK"), retry loses (null). The retry must
         // GET the current count instead of INCR-ing it again.
-        const set = vi
-          .fn()
-          .mockResolvedValueOnce("OK")
-          .mockResolvedValueOnce(null);
+        const set = vi.fn().mockResolvedValueOnce("OK").mockResolvedValueOnce(null);
         redisMock.connection = {
           set,
           get: vi.fn().mockResolvedValue("1"),
@@ -481,10 +478,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
     describe("when the SAME dispatch is retried (claim already won)", () => {
       it("re-reads the counter via GET without a second INCRBY", async () => {
         const incrby = vi.fn().mockResolvedValue(4);
-        const set = vi
-          .fn()
-          .mockResolvedValueOnce("OK")
-          .mockResolvedValueOnce(null);
+        const set = vi.fn().mockResolvedValueOnce("OK").mockResolvedValueOnce(null);
         redisMock.connection = {
           set,
           get: vi.fn().mockResolvedValue("4"),

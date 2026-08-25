@@ -8,8 +8,7 @@ vi.mock("../emailSender", () => ({
 
 const baseParams = {
   email: "user@acme.test",
-  resetUrl:
-    "https://app.langwatch.ai/auth/reset-password?token=tok_abc123def456",
+  resetUrl: "https://app.langwatch.ai/auth/reset-password?token=tok_abc123def456",
 };
 
 describe("sendResetPasswordEmail", () => {

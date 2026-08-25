@@ -36,9 +36,7 @@ export function setMockOrganization(value: typeof mockOrganization) {
 // ---------------------------------------------------------------------------
 // Plan factory
 // ---------------------------------------------------------------------------
-export const createMockPlan = (
-  overrides: Partial<PlanInfo> = {},
-): PlanInfo => ({
+export const createMockPlan = (overrides: Partial<PlanInfo> = {}): PlanInfo => ({
   planSource: "free",
   type: "FREE",
   name: "Developer",

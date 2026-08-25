@@ -118,7 +118,11 @@ export class PrismaDatasetRepository extends DatasetRepository {
     return archived;
   }
 
-  async restore(input: { id: string; projectId: string; slug: string }): Promise<Dataset> {
+  async restore(input: {
+    id: string;
+    projectId: string;
+    slug: string;
+  }): Promise<Dataset> {
     const changed = await this.database.dataset.updateMany({
       where: { id: input.id, projectId: input.projectId },
       data: { slug: input.slug, archivedAt: null },
@@ -142,7 +146,8 @@ export class PrismaDatasetRepository extends DatasetRepository {
       where: { id: input.id, projectId: input.projectId },
       data: { mapping: input.mapping as Prisma.InputJsonValue },
     });
-    if (changed.count === 0) throw new Error("Dataset was not found while updating mapping");
+    if (changed.count === 0)
+      throw new Error("Dataset was not found while updating mapping");
     const updated = await this.tryFindById({
       id: input.id,
       projectId: input.projectId,

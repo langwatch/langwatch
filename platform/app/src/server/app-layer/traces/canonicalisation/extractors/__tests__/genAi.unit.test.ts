@@ -93,9 +93,7 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(
-        "You are a math tutor.",
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("You are a math tutor.");
     });
   });
 
@@ -239,9 +237,7 @@ describe("GenAIExtractor", () => {
       extractor.apply(ctx);
 
       // Numeric values stay in the bag and pass through remaining()
-      expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS)).toBe(
-        500,
-      );
+      expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS)).toBe(500);
     });
   });
 
@@ -253,9 +249,7 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
-        1024,
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(1024);
     });
 
     it("coerces cache_creation.input_tokens string to number", () => {
@@ -265,9 +259,7 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(
-        256,
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(256);
     });
   });
 
@@ -283,13 +275,9 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
-        37127,
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(37127);
       // The flat alias is consumed (does not leak through to the merged attrs).
-      expect(
-        ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS),
-      ).toBe(false);
+      expect(ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS)).toBe(false);
     });
 
     it("coerces the stringy cached_input_tokens form to a number", () => {
@@ -299,9 +287,7 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
-        1024,
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(1024);
     });
 
     it("leaves an explicit dotted cache_read.input_tokens untouched", () => {
@@ -393,10 +379,7 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_STOP_SEQUENCES]).toEqual([
-        "END",
-        "STOP",
-      ]);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_STOP_SEQUENCES]).toEqual(["END", "STOP"]);
     });
 
     it("skips choice count when n=1", () => {

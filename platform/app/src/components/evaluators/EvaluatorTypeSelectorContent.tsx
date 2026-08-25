@@ -1,7 +1,4 @@
-import {
-  EvaluatorTypePicker,
-  type EvaluatorCategoryId,
-} from "@langwatch/evaluator-web";
+import { EvaluatorTypePicker, type EvaluatorCategoryId } from "@langwatch/evaluator-web";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

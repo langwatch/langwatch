@@ -136,17 +136,7 @@ export async function processAvatarImage(file: File): Promise<string> {
       throw new AvatarImageProcessingFailedError();
     }
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(
-      img,
-      sx,
-      sy,
-      edge,
-      edge,
-      0,
-      0,
-      AVATAR_OUTPUT_SIZE,
-      AVATAR_OUTPUT_SIZE,
-    );
+    ctx.drawImage(img, sx, sy, edge, edge, 0, 0, AVATAR_OUTPUT_SIZE, AVATAR_OUTPUT_SIZE);
 
     // Prefer WebP for size; browsers without WebP encoding silently fall back
     // to PNG here, which the server also accepts.

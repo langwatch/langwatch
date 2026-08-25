@@ -11,10 +11,7 @@ import {
   type SeedRunReport,
 } from "../../../scripts/dogfood/governance/_lib/seedRunner";
 import { runSeedDemo } from "../../../scripts/dogfood/governance/seed-demo";
-import {
-  isInternalSecretValid,
-  validateInternalSecret,
-} from "./_lib/internal-secret";
+import { isInternalSecretValid, validateInternalSecret } from "./_lib/internal-secret";
 
 const logger = createLogger("langwatch:cron");
 
@@ -64,12 +61,8 @@ const oldLambdasCleanupHandler = async (c: CronContext) => {
     );
   }
 };
-secured
-  .access(cronPolicy())
-  .get("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
-secured
-  .access(cronPolicy())
-  .post("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
+secured.access(cronPolicy()).get("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
+secured.access(cronPolicy()).post("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
 
 // NOTE: the `/api/cron/triggers` graph-alert sweep was removed (ADR-034):
 // custom-graph threshold alerts now fire exclusively from the event-sourced

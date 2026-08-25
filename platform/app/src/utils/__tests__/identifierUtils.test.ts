@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  generateUniqueIdentifier,
-  normalizeIdentifier,
-} from "../identifierUtils";
+import { generateUniqueIdentifier, normalizeIdentifier } from "../identifierUtils";
 
 describe("normalizeIdentifier", () => {
   it("replaces spaces with underscores", () => {
@@ -40,27 +37,23 @@ describe("normalizeIdentifier", () => {
 
 describe("generateUniqueIdentifier", () => {
   it("returns baseName if not in existing identifiers", () => {
-    expect(generateUniqueIdentifier("output", ["input", "other"])).toBe(
-      "output",
-    );
+    expect(generateUniqueIdentifier("output", ["input", "other"])).toBe("output");
   });
 
   it("returns baseName_1 if baseName exists", () => {
-    expect(generateUniqueIdentifier("output", ["output", "other"])).toBe(
-      "output_1",
-    );
+    expect(generateUniqueIdentifier("output", ["output", "other"])).toBe("output_1");
   });
 
   it("returns baseName_2 if baseName and baseName_1 exist", () => {
-    expect(
-      generateUniqueIdentifier("output", ["output", "output_1", "other"]),
-    ).toBe("output_2");
+    expect(generateUniqueIdentifier("output", ["output", "output_1", "other"])).toBe(
+      "output_2",
+    );
   });
 
   it("finds next available number in sequence", () => {
-    expect(
-      generateUniqueIdentifier("var", ["var", "var_1", "var_2", "var_3"]),
-    ).toBe("var_4");
+    expect(generateUniqueIdentifier("var", ["var", "var_1", "var_2", "var_3"])).toBe(
+      "var_4",
+    );
   });
 
   it("handles empty existing identifiers", () => {

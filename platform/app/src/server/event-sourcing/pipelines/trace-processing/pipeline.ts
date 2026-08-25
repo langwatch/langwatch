@@ -29,10 +29,7 @@ import {
   RecordSpanCommand,
 } from "./commands/recordSpanCommand";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
-import {
-  clampSpanShardCount,
-  spanCommandGroupKey,
-} from "./commands/spanCommandGroupKey";
+import { clampSpanShardCount, spanCommandGroupKey } from "./commands/spanCommandGroupKey";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
 import {
   type TraceAnalyticsData,
@@ -163,9 +160,7 @@ export interface TraceProcessingPipelineDeps {
  * It aggregates span events into trace summary metrics (fold projection) and writes
  * individual spans to the stored_spans table (map projection).
  */
-export function createTraceProcessingPipeline(
-  deps: TraceProcessingPipelineDeps,
-) {
+export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps) {
   let builder = definePipeline<TraceProcessingEvent>({
     name: "trace_processing",
     aggregate: defineAggregate({
@@ -205,10 +200,7 @@ export function createTraceProcessingPipeline(
     })
     // Evaluation dispatch, origin-guarded (spec + guards composed by
     // createEvaluationTriggerSubscriber).
-    .withProjectionSubscriber(
-      deps.evaluationTrigger.name,
-      deps.evaluationTrigger.spec,
-    )
+    .withProjectionSubscriber(deps.evaluationTrigger.name, deps.evaluationTrigger.spec)
     // Custom SDK evaluations reported on spans. Stake-sensitive but idempotent
     // (deterministic evaluation IDs), and the queue's redelivery covers the
     // post-enqueue path; keeps the subscriber-era name so jobs staged before a
@@ -220,8 +212,7 @@ export function createTraceProcessingPipeline(
       delay: CUSTOM_EVAL_SYNC_DELAY_MS,
       ttl: CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
       dedupId: customEvaluationSyncDedupId,
-      handler: (event, context) =>
-        deps.customEvaluationSyncHandler(event, context),
+      handler: (event, context) => deps.customEvaluationSyncHandler(event, context),
     })
     // Live span feedback (langwatch.event) → tracked event, same path as the
     // REST track_event endpoint; deterministic ids keep retries idempotent.
@@ -244,8 +235,7 @@ export function createTraceProcessingPipeline(
         makeId: (event) => `${event.tenantId}:${event.aggregateId}`,
         windowMs: TRACE_UPDATE_BROADCAST_WINDOW_MS,
       }),
-      handler: (event, context) =>
-        deps.traceUpdateBroadcastHandler(event, context),
+      handler: (event, context) => deps.traceUpdateBroadcastHandler(event, context),
     })
     // First-ingest project flags, one serialized lane and one dedup key per
     // project (see projectMetadataGroupKey for why the two must pair).
@@ -266,24 +256,21 @@ export function createTraceProcessingPipeline(
       when: (_event, context) => hasSimulationMetrics(context.state),
       delay: SIMULATION_METRICS_SYNC_DELAY_MS,
       ttl: SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
-      handler: (event, context) =>
-        deps.simulationMetricsSyncHandler(event, context),
+      handler: (event, context) => deps.simulationMetricsSyncHandler(event, context),
     })
     .withProjectionSubscriber("experimentMetricsSync", {
       fold: "traceSummary",
       when: (_event, context) => hasExperimentCostMetrics(context.state),
       delay: EXPERIMENT_METRICS_SYNC_DELAY_MS,
       ttl: EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
-      handler: (event, context) =>
-        deps.experimentMetricsSyncHandler(event, context),
+      handler: (event, context) => deps.experimentMetricsSyncHandler(event, context),
     })
     .withProjectionSubscriber("triggerMatch", {
       fold: "traceSummary",
       events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
       delay: 30_000,
       ttl: 30_000,
-      handler: (event, context) =>
-        deps.automations.triggerMatchHandler(event, context),
+      handler: (event, context) => deps.automations.triggerMatchHandler(event, context),
     })
     .withEventSubscriber("graphTriggerActivity", {
       events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
@@ -299,8 +286,7 @@ export function createTraceProcessingPipeline(
       // in per-trace groups and ran as a parallel storm (see
       // graphTriggerActivityGroupKey).
       groupKeyFn: graphTriggerActivityGroupKey,
-      handler: (event, context) =>
-        deps.automations.graphActivityHandler(event, context),
+      handler: (event, context) => deps.automations.graphActivityHandler(event, context),
     })
     // SSE notification after span storage commits; the subscriber-scoped
     // dedup key keeps it independent of traceUpdateBroadcast's window.
@@ -309,8 +295,7 @@ export function createTraceProcessingPipeline(
       runIn: ["worker"],
       disabled: deps.broadcastDisabled,
       ttl: SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
-      handler: (event, context) =>
-        deps.spanStorageBroadcastHandler(event, context),
+      handler: (event, context) => deps.spanStorageBroadcastHandler(event, context),
     });
 
   if (deps.governanceKpisSync) {
@@ -343,9 +328,7 @@ export function createTraceProcessingPipeline(
   // still carries aggregateId = traceId, so the trace-summary fold (its own
   // aggregate-keyed queue) is unaffected and the summary stays exact. See
   // spanCommandGroupKey.ts and specs/trace-processing/span-command-sharding.feature.
-  const spanCommandShardCount = clampSpanShardCount(
-    deps.spanCommandShardCount ?? 1,
-  );
+  const spanCommandShardCount = clampSpanShardCount(deps.spanCommandShardCount ?? 1);
   // ADR-066 pillar 2: a trace's spans all land in one group (or one of its
   // shards), so a busy trace appends one tiny insert per span. Coalesce the
   // group's queued spans into one multi-row insert instead.
@@ -373,9 +356,7 @@ export function createTraceProcessingPipeline(
   };
   if (spanCommandShardCount > 1) {
     recordSpanOptions.getGroupKey = (payload) => {
-      const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
-        payload.span,
-      );
+      const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(payload.span);
       return spanCommandGroupKey({
         traceId,
         spanId,

@@ -15,12 +15,8 @@ import Head from "~/utils/compat/next-head";
  * Spec: specs/coding-agent/sessions-screen.feature.
  */
 function MySessionsPage() {
-  const {
-    ready,
-    isPersonalProjectResolved,
-    personalProjectId,
-    personalProjectSlug,
-  } = usePersonalContext();
+  const { ready, isPersonalProjectResolved, personalProjectId, personalProjectSlug } =
+    usePersonalContext();
 
   return (
     <MyLayout>
@@ -32,10 +28,10 @@ function MySessionsPage() {
         <VStack align="start" gap={0}>
           <PageLayout.Heading>Sessions</PageLayout.Heading>
           <Text color="fg.muted" fontSize="sm">
-            Every coding-agent session you ran over the last ninety days, with
-            the context it carried, how often it compacted, how long it worked
-            against how long it waited on you, and the pull requests it drove.
-            Choosing a session replays it in the terminal.
+            Every coding-agent session you ran over the last ninety days, with the context
+            it carried, how often it compacted, how long it worked against how long it
+            waited on you, and the pull requests it drove. Choosing a session replays it
+            in the terminal.
           </Text>
         </VStack>
 

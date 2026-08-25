@@ -48,11 +48,7 @@ async function seedUser(label: string) {
   return user;
 }
 
-function callerFor(user: {
-  id: string;
-  name: string | null;
-  email: string | null;
-}) {
+function callerFor(user: { id: string; name: string | null; email: string | null }) {
   return onboardingRouter.createCaller(
     createInnerTRPCContext({
       session: {
@@ -85,14 +81,11 @@ describe("onboarding.initializeOrganization personal workspace", () => {
     // real repo, avoiding initializeDefaultApp's require() chain.
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
-      organizations: new OrganizationService(
-        new PrismaOrganizationRepository(prisma),
-        {
-          seedTagsForOrganization: async () => {
-            /* noop */
-          },
+      organizations: new OrganizationService(new PrismaOrganizationRepository(prisma), {
+        seedTagsForOrganization: async () => {
+          /* noop */
         },
-      ),
+      }),
     });
   });
 
@@ -182,9 +175,7 @@ describe("onboarding.initializeOrganization personal workspace", () => {
         orderBy: { order: "asc" },
       });
 
-      expect(tiles.map((t) => t.slug)).toEqual(
-        STARTER_PACK_TILES.map((t) => t.slug),
-      );
+      expect(tiles.map((t) => t.slug)).toEqual(STARTER_PACK_TILES.map((t) => t.slug));
       expect(tiles.every((t) => t.enabled && t.archivedAt === null)).toBe(true);
     });
 
@@ -249,9 +240,7 @@ describe("onboarding.initializeOrganization personal workspace", () => {
         orderBy: { order: "asc" },
       });
 
-      expect(tiles.map((t) => t.slug)).toEqual(
-        STARTER_PACK_TILES.map((t) => t.slug),
-      );
+      expect(tiles.map((t) => t.slug)).toEqual(STARTER_PACK_TILES.map((t) => t.slug));
       expect(tiles.every((t) => t.enabled && t.archivedAt === null)).toBe(true);
     });
   });

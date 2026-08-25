@@ -102,8 +102,9 @@ describe("checkDeclaredPermissionAny over the real resolver", () => {
       });
 
       it("reads the project and the organization membership once", async () => {
-        const { prisma, projectFindUnique, organizationUserFindFirst } =
-          buildPrisma(TeamUserRole.VIEWER);
+        const { prisma, projectFindUnique, organizationUserFindFirst } = buildPrisma(
+          TeamUserRole.VIEWER,
+        );
         const { run } = runGate({
           prisma,
           permissions: ["annotations:update", "traces:view"],
@@ -120,8 +121,9 @@ describe("checkDeclaredPermissionAny over the real resolver", () => {
   describe("given a caller who holds none of the permissions", () => {
     describe("when the gate runs", () => {
       it("refuses with the stable denial code, without repeating the lookups", async () => {
-        const { prisma, projectFindUnique, organizationUserFindFirst } =
-          buildPrisma(TeamUserRole.VIEWER);
+        const { prisma, projectFindUnique, organizationUserFindFirst } = buildPrisma(
+          TeamUserRole.VIEWER,
+        );
         const { next, run } = runGate({
           prisma,
           permissions: ["annotations:update", "datasets:update"],
@@ -134,9 +136,7 @@ describe("checkDeclaredPermissionAny over the real resolver", () => {
           (thrown: unknown) => thrown as { cause?: unknown },
         );
         expect(error.cause).toBeInstanceOf(PermissionDeniedError);
-        expect((error.cause as PermissionDeniedError).code).toBe(
-          "permission_denied",
-        );
+        expect((error.cause as PermissionDeniedError).code).toBe("permission_denied");
         expect(next).not.toHaveBeenCalled();
         expect(projectFindUnique).toHaveBeenCalledTimes(1);
         expect(organizationUserFindFirst).toHaveBeenCalledTimes(1);

@@ -73,9 +73,7 @@ describe("havenHmrGate", () => {
 
       const plugin = havenHmrGate({ markerPath });
       (plugin.configureServer as (s: ViteDevServer) => void)(server);
-      const handleHotUpdate = plugin.handleHotUpdate as (
-        ctx: HmrContext,
-      ) => unknown;
+      const handleHotUpdate = plugin.handleHotUpdate as (ctx: HmrContext) => unknown;
 
       expect(handleHotUpdate(fakeCtx())).toEqual([]);
       expect(sentMessages).toHaveLength(0);

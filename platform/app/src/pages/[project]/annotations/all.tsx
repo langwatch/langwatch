@@ -53,9 +53,8 @@ export default function Annotations() {
   // fully-filtered project with thousands of matching traces doesn't blow
   // past the GET URL ceiling tRPC batches into.
   const filteredTraceIds =
-    traceGroups.data?.groups.flatMap((group) =>
-      group.map((trace) => trace.trace_id),
-    ) ?? [];
+    traceGroups.data?.groups.flatMap((group) => group.map((trace) => trace.trace_id)) ??
+    [];
 
   // Everything said about these traces, anchored comments included: this page
   // lists the annotations themselves rather than answering a question about each
@@ -94,32 +93,27 @@ export default function Annotations() {
   );
 
   const groupByTraceId = (dataArray: Annotation[]): GroupedAnnotation[] => {
-    const grouped = dataArray.reduce(
-      (acc: Record<string, GroupedAnnotation>, item) => {
-        if (!acc[item.traceId]) {
-          acc[item.traceId] = {
-            traceId: item.traceId,
-            annotations: [],
-            trace: traces.data?.find(
-              (trace) => trace.trace_id === item.traceId,
-            ),
-          };
-        }
-
-        const annotationWithUser: AnnotationWithUser = {
-          ...item,
-          user: (item as AnnotationWithUser).user,
+    const grouped = dataArray.reduce((acc: Record<string, GroupedAnnotation>, item) => {
+      if (!acc[item.traceId]) {
+        acc[item.traceId] = {
+          traceId: item.traceId,
+          annotations: [],
+          trace: traces.data?.find((trace) => trace.trace_id === item.traceId),
         };
+      }
 
-        const groupedAnnotation = acc[item.traceId];
-        if (groupedAnnotation) {
-          groupedAnnotation.annotations.push(annotationWithUser);
-        }
+      const annotationWithUser: AnnotationWithUser = {
+        ...item,
+        user: (item as AnnotationWithUser).user,
+      };
 
-        return acc;
-      },
-      {},
-    );
+      const groupedAnnotation = acc[item.traceId];
+      if (groupedAnnotation) {
+        groupedAnnotation.annotations.push(annotationWithUser);
+      }
+
+      return acc;
+    }, {});
 
     return Object.values(grouped);
   };
@@ -145,9 +139,7 @@ export default function Annotations() {
 
     const data =
       annotations?.data?.map((annotation) => {
-        const trace = traces.data?.find(
-          (trace) => trace.trace_id === annotation.traceId,
-        );
+        const trace = traces.data?.find((trace) => trace.trace_id === annotation.traceId);
 
         return [
           annotation.user?.name ?? "",

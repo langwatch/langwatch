@@ -14,10 +14,7 @@ export function useRollingWindow(range: number | "mtd", refreshMs = 60_000) {
   const [tick, setTick] = useState(() => quantiseToMinute(Date.now()));
 
   useEffect(() => {
-    const id = setInterval(
-      () => setTick(quantiseToMinute(Date.now())),
-      refreshMs,
-    );
+    const id = setInterval(() => setTick(quantiseToMinute(Date.now())), refreshMs);
     return () => clearInterval(id);
   }, [refreshMs]);
 

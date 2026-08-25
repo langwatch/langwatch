@@ -10,9 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SpanStorageClickHouseRepository } from "../span-storage.clickhouse.repository";
 
-function createCapturingClient(
-  resolverResponses: Array<string | number | null>,
-) {
+function createCapturingClient(resolverResponses: Array<string | number | null>) {
   const queries: Array<{
     query: string;
     query_params: Record<string, unknown>;
@@ -46,9 +44,7 @@ describe("SpanStorageClickHouseRepository trace OccurredAt resolver", () => {
     it("resolves from the windowed probe and never scans unbounded", async () => {
       const occurredAtMs = Date.now() - 60_000;
       const { client, queries } = createCapturingClient([occurredAtMs]);
-      const repo = new SpanStorageClickHouseRepository(
-        async () => client as never,
-      );
+      const repo = new SpanStorageClickHouseRepository(async () => client as never);
 
       await repo.getSpanByIds({
         tenantId: "project_test",
@@ -56,9 +52,7 @@ describe("SpanStorageClickHouseRepository trace OccurredAt resolver", () => {
         spanId: "span_1",
       });
 
-      const resolverQueries = queries.filter((q) =>
-        q.query.includes("min(OccurredAt)"),
-      );
+      const resolverQueries = queries.filter((q) => q.query.includes("min(OccurredAt)"));
       expect(resolverQueries).toHaveLength(1);
       expect(resolverQueries[0]!.query).toContain(
         "OccurredAt >= fromUnixTimestamp64Milli({sinceMs:Int64})",
@@ -69,13 +63,8 @@ describe("SpanStorageClickHouseRepository trace OccurredAt resolver", () => {
   describe("when the windowed probe misses", () => {
     it("falls back to the unbounded seek so old traces stay resolvable", async () => {
       const oldOccurredAtMs = Date.now() - 200 * 24 * 60 * 60 * 1000;
-      const { client, queries } = createCapturingClient([
-        null,
-        oldOccurredAtMs,
-      ]);
-      const repo = new SpanStorageClickHouseRepository(
-        async () => client as never,
-      );
+      const { client, queries } = createCapturingClient([null, oldOccurredAtMs]);
+      const repo = new SpanStorageClickHouseRepository(async () => client as never);
 
       await repo.getSpanByIds({
         tenantId: "project_test",
@@ -83,9 +72,7 @@ describe("SpanStorageClickHouseRepository trace OccurredAt resolver", () => {
         spanId: "span_1",
       });
 
-      const resolverQueries = queries.filter((q) =>
-        q.query.includes("min(OccurredAt)"),
-      );
+      const resolverQueries = queries.filter((q) => q.query.includes("min(OccurredAt)"));
       expect(resolverQueries).toHaveLength(2);
       expect(resolverQueries[0]!.query).toContain("OccurredAt >=");
       expect(resolverQueries[1]!.query).not.toContain("OccurredAt >=");

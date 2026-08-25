@@ -66,14 +66,10 @@ async function signUp(
     const alertCount = await page.locator('[role="alert"]').count();
     const alertTexts: string[] = [];
     for (let i = 0; i < alertCount; i++) {
-      alertTexts.push(
-        (await page.locator('[role="alert"]').nth(i).innerText()) ?? "",
-      );
+      alertTexts.push((await page.locator('[role="alert"]').nth(i).innerText()) ?? "");
     }
     console.log(`  !! signUp(${email}) timed out. url=${page.url()}`);
-    console.log(
-      `  !! form=${formCount} input=${inputCount} alerts=${alertCount}`,
-    );
+    console.log(`  !! form=${formCount} input=${inputCount} alerts=${alertCount}`);
     console.log(`  !! alertTexts: ${JSON.stringify(alertTexts)}`);
     // Also check the toast notifications
     const toasts = await page.locator('[data-part="root"]').allTextContents();
@@ -230,9 +226,7 @@ async function main() {
       !page2.url().includes("/invite/accept") &&
       !page2.url().includes("iter44-project")
     ) {
-      console.log(
-        "  → callbackUrl not honored; explicitly navigating to invite URL",
-      );
+      console.log("  → callbackUrl not honored; explicitly navigating to invite URL");
       await page2.goto(inviteUrl, { waitUntil: "networkidle" });
     }
     // The mutation fires inside a useEffect after session loads; give it
@@ -251,10 +245,7 @@ async function main() {
       !!membershipAfterAccept,
       `role=${membershipAfterAccept?.role ?? "none"}`,
     );
-    check(
-      "membership role is MEMBER",
-      membershipAfterAccept?.role === "MEMBER",
-    );
+    check("membership role is MEMBER", membershipAfterAccept?.role === "MEMBER");
     await ctx2.close();
 
     // ─────────────────────────────────────────────────────────────
@@ -279,18 +270,15 @@ async function main() {
     const ctx3 = await browser.newContext();
     await signUp(ctx3, WRONG_EMAIL, PASSWORD, "Wrong Email User");
     const page3 = await ctx3.newPage();
-    await page3.goto(
-      `${BASE_URL}/invite/accept?inviteCode=${invite2.inviteCode}`,
-      { waitUntil: "networkidle" },
-    );
+    await page3.goto(`${BASE_URL}/invite/accept?inviteCode=${invite2.inviteCode}`, {
+      waitUntil: "networkidle",
+    });
     await page3.waitForTimeout(5000);
 
     console.log(`  → wrong-email final url: ${page3.url()}`);
     const page3Body = (await page3.textContent("body")) ?? "";
     const lowered = page3Body.toLowerCase();
-    console.log(
-      `  → body preview: ${page3Body.slice(0, 200).replace(/\s+/g, " ")}`,
-    );
+    console.log(`  → body preview: ${page3Body.slice(0, 200).replace(/\s+/g, " ")}`);
     check(
       "wrong-email user sees an error message (not auto-accepted)",
       lowered.includes("error") ||
@@ -346,8 +334,7 @@ async function main() {
     const settingsBody = (await page4.textContent("body")) ?? "";
     check(
       "settings/authentication page mentions 'Change Password'",
-      settingsBody.includes("Change Password") ||
-        settingsBody.includes("Password"),
+      settingsBody.includes("Change Password") || settingsBody.includes("Password"),
     );
     await ctx4.close();
   } finally {
@@ -393,9 +380,7 @@ async function main() {
     console.log(`✅ ALL CHECKS PASSED (${passes}/${passes})`);
     process.exit(0);
   } else {
-    console.log(
-      `❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`,
-    );
+    console.log(`❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`);
     process.exit(1);
   }
 }

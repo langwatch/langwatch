@@ -5,9 +5,7 @@ import {
   type EditorColumn,
 } from "../../src/editor/use-dataset-editor-store";
 
-const columns: EditorColumn[] = [
-  { id: "input_0", name: "input", type: "string" },
-];
+const columns: EditorColumn[] = [{ id: "input_0", name: "input", type: "string" }];
 
 const seedSaved = () => {
   const store = createDatasetEditorStore();

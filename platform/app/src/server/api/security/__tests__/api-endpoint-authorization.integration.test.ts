@@ -53,9 +53,8 @@ const liveEndpoints = async (): Promise<Set<string>> => {
   const { createTestApp } = await import("~/server/app-layer/presets");
   const router = createApiRouter(createTestApp());
   const set = new Set<string>();
-  for (const r of (
-    router as unknown as { routes: { method: string; path: string }[] }
-  ).routes) {
+  for (const r of (router as unknown as { routes: { method: string; path: string }[] })
+    .routes) {
     if (isUnenumerableMount(r.method, r.path)) continue;
     set.add(`${r.method.toUpperCase()} ${r.path}`);
   }
@@ -163,10 +162,7 @@ describe("API router endpoint authorization guarantee", () => {
       await loadRouter();
       const stranded = permissionRoutes().filter(
         ({ permission }) =>
-          !hasPermissionWithHierarchy(
-            [`${resourceOf(permission)}:manage`],
-            permission,
-          ),
+          !hasPermissionWithHierarchy([`${resourceOf(permission)}:manage`], permission),
       );
 
       expect(
@@ -218,10 +214,7 @@ describe("API router endpoint authorization guarantee", () => {
       await loadRouter();
       const unreachable = permissionRoutes().filter(
         ({ permission }) =>
-          !teamRoleHasPermission(
-            TeamUserRole.ADMIN,
-            permission as Permission,
-          ) &&
+          !teamRoleHasPermission(TeamUserRole.ADMIN, permission as Permission) &&
           !organizationRoleHasPermission(
             OrganizationUserRole.ADMIN,
             permission as Permission,
@@ -240,22 +233,13 @@ describe("API router endpoint authorization guarantee", () => {
       await loadRouter();
       // Exactly what the product issues for "may work with scenarios": the
       // write grain, without the administration grain that carries delete.
-      const readAndWrite = [
-        "scenarios:view",
-        "scenarios:create",
-        "scenarios:update",
-      ];
+      const readAndWrite = ["scenarios:view", "scenarios:create", "scenarios:update"];
 
-      const declared = new Map(
-        permissionRoutes().map((r) => [r.route, r.permission]),
-      );
+      const declared = new Map(permissionRoutes().map((r) => [r.route, r.permission]));
       const run = declared.get("POST /api/suites/:id/run");
       const archive = declared.get("DELETE /api/suites/:id");
       expect(run, "the suite run route must be registered").toBeDefined();
-      expect(
-        archive,
-        "the suite archive route must be registered",
-      ).toBeDefined();
+      expect(archive, "the suite archive route must be registered").toBeDefined();
 
       expect(hasPermissionWithHierarchy(readAndWrite, run!)).toBe(true);
       expect(hasPermissionWithHierarchy(readAndWrite, archive!)).toBe(false);

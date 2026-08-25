@@ -57,7 +57,9 @@ export async function startLangwatch(
     // The langwatch app's /api/health returns 204 No Content (see
     // platform/app/src/server/routes/health.ts) — that's the deliberate
     // success signal for the helm chart's liveness probe too.
-    check: httpGetCheck(`http://127.0.0.1:${ctx.ports.langwatch}/api/health`, { expectStatus: 204 }),
+    check: httpGetCheck(`http://127.0.0.1:${ctx.ports.langwatch}/api/health`, {
+      expectStatus: 204,
+    }),
     timeoutMs: 120_000,
     intervalMs: 1000,
   });
@@ -69,16 +71,29 @@ export async function startLangwatch(
   return handle;
 }
 
-async function ensureNodeModules(langwatchDir: string, ctx: RuntimeContext, bus: EventBus): Promise<void> {
+async function ensureNodeModules(
+  langwatchDir: string,
+  ctx: RuntimeContext,
+  bus: EventBus,
+): Promise<void> {
   if (existsSync(join(langwatchDir, "node_modules"))) return;
-  bus.emit({ type: "log", service: "langwatch", stream: "stdout", line: "installing node_modules (one-time setup)..." });
+  bus.emit({
+    type: "log",
+    service: "langwatch",
+    stream: "stdout",
+    line: "installing node_modules (one-time setup)...",
+  });
   // Defensive fallback for upgrade flows where node_modules went missing
   // but the runtime was already started — ensureLangwatchDeps is the
   // primary path. resolvePnpm(paths) prefers the bundled <bin>/pnpm
   // installed by the pnpm predep.
   const pnpm = await resolvePnpm(ctx.paths);
-  await execa(pnpm.command, [...pnpm.args, "install", "--prod=false", "--frozen-lockfile"], {
-    cwd: langwatchDir,
-    stdio: "inherit",
-  });
+  await execa(
+    pnpm.command,
+    [...pnpm.args, "install", "--prod=false", "--frozen-lockfile"],
+    {
+      cwd: langwatchDir,
+      stdio: "inherit",
+    },
+  );
 }

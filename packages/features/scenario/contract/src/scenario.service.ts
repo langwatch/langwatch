@@ -11,9 +11,7 @@ export abstract class ScenarioService {
   abstract create(input: ScenarioCreateInput): Promise<Scenario>;
   abstract getById(input: ScenarioIdInput): Promise<Scenario>;
   abstract tryGetById(input: ScenarioIdInput): Promise<Scenario | null>;
-  abstract tryGetByIdIncludingArchived(
-    input: ScenarioIdInput,
-  ): Promise<Scenario | null>;
+  abstract tryGetByIdIncludingArchived(input: ScenarioIdInput): Promise<Scenario | null>;
   abstract list(input: { projectId: string }): Promise<Scenario[]>;
   abstract count(input: { projectId: string }): Promise<number>;
   abstract update(input: ScenarioUpdateInput): Promise<Scenario>;

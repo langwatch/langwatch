@@ -300,9 +300,7 @@ function withoutStubsOfRecoveredPrompts({
   if (stubs.length === 0) return logEntries;
 
   const claimed = new Set<number>();
-  const recovered = spanEntries
-    .filter(isUserPromptEntry)
-    .sort((a, b) => a.atMs - b.atMs);
+  const recovered = spanEntries.filter(isUserPromptEntry).sort((a, b) => a.atMs - b.atMs);
   for (const prompt of recovered) {
     const twin = nearestUnclaimedStub({ stubs, claimed, prompt });
     if (twin !== null) claimed.add(twin);
@@ -469,9 +467,7 @@ function collectSpanEntries(
   // usage-bearing `handle_responses` spans are the model calls. When the
   // rollup IS present (the TUI wire), those same spans are its per-response
   // parts and counting both would double every call.
-  const hasCodexTurnRollup = spans.some(
-    (span) => span.name === "session_task.turn",
-  );
+  const hasCodexTurnRollup = spans.some((span) => span.name === "session_task.turn");
 
   // Codex's conversation is recovered from its session transcript and sent
   // back on the same trace, since its own telemetry carries no content. Each
@@ -519,15 +515,10 @@ function collectSpanEntries(
  * which is why an opening assistant message repeating the previous reply is
  * dropped rather than emitted twice.
  */
-function collectRecoveredCodexTurn(
-  span: SpanDetail,
-  acc: SpanEntryAccumulator,
-): void {
+function collectRecoveredCodexTurn(span: SpanDetail, acc: SpanEntryAccumulator): void {
   const messages = parsedChatMessages(span.input);
 
-  const systemText = acc.hasEmittedSystemPrompt
-    ? null
-    : extractedSystemText(span.input);
+  const systemText = acc.hasEmittedSystemPrompt ? null : extractedSystemText(span.input);
   if (systemText !== null) {
     acc.hasEmittedSystemPrompt = true;
     acc.entries.push({
@@ -587,8 +578,7 @@ function replayRecoveredMessages({
   for (const raw of messages) {
     const message = raw as RecoveredMessage | null;
     if (!message || typeof message !== "object") continue;
-    const content =
-      typeof message.content === "string" ? message.content : null;
+    const content = typeof message.content === "string" ? message.content : null;
 
     switch (message.role) {
       case "user":
@@ -633,8 +623,7 @@ function attachToolResult({
   content: string | null;
   pending: Map<string, Extract<TranscriptEntry, { kind: "tool" }>>;
 }): void {
-  const id =
-    typeof message.tool_call_id === "string" ? message.tool_call_id : null;
+  const id = typeof message.tool_call_id === "string" ? message.tool_call_id : null;
   const entry = id === null ? null : pending.get(id);
   if (entry) entry.output = content;
 }
@@ -666,8 +655,7 @@ function replayToolCall({
   const entry: RenderedToolCall = {
     kind: "tool",
     atMs: span.startTimeMs,
-    name:
-      typeof call?.function?.name === "string" ? call.function.name : "tool",
+    name: typeof call?.function?.name === "string" ? call.function.name : "tool",
     mcpServer: null,
     input: call?.function?.arguments ?? null,
     output: null,
@@ -721,10 +709,7 @@ function replayAssistantMessage({
   });
 }
 
-function collectModelCallSpan(
-  span: SpanDetail,
-  acc: SpanEntryAccumulator,
-): void {
+function collectModelCallSpan(span: SpanDetail, acc: SpanEntryAccumulator): void {
   const call = modelCallEntry(span);
   acc.totals.modelCalls += 1;
   acc.totals.tokens += call.tokens;
@@ -733,9 +718,7 @@ function collectModelCallSpan(
 
   // Only claude's enriched llm_request inputs carry a system message;
   // codex/opencode/gemini model spans have none.
-  const systemText = acc.hasEmittedSystemPrompt
-    ? null
-    : extractedSystemText(span.input);
+  const systemText = acc.hasEmittedSystemPrompt ? null : extractedSystemText(span.input);
   if (systemText !== null) {
     acc.hasEmittedSystemPrompt = true;
     acc.entries.push({
@@ -792,10 +775,8 @@ function collectToolSpan(
   // All three failure signals, because they are set independently: a span can
   // carry an error payload, or simply an error STATUS with no payload at all,
   // and the log reports the tool's own exit separately from either.
-  const failed =
-    span.status === "error" || span.error != null || isFailed(logContent);
-  const claimed =
-    callId !== null ? acc.claimedToolCalls.get(callId) : undefined;
+  const failed = span.status === "error" || span.error != null || isFailed(logContent);
+  const claimed = callId !== null ? acc.claimedToolCalls.get(callId) : undefined;
   if (claimed !== undefined) {
     fillToolCallGaps(claimed, { durationMs: spanDurationMs(span), failed });
     return;
@@ -827,21 +808,13 @@ function collectToolSpan(
  * out of it. Dropping them lost the work entirely; flattening them into the
  * main thread pretended the main thread did it.
  */
-function countSubAgentTool(
-  agentId: string | null,
-  acc: SpanEntryAccumulator,
-): void {
+function countSubAgentTool(agentId: string | null, acc: SpanEntryAccumulator): void {
   if (agentId === null) return;
-  acc.subAgentToolCounts.set(
-    agentId,
-    (acc.subAgentToolCounts.get(agentId) ?? 0) + 1,
-  );
+  acc.subAgentToolCounts.set(agentId, (acc.subAgentToolCounts.get(agentId) ?? 0) + 1);
 }
 
 function spanDurationMs(span: SpanDetail): number | null {
-  return span.endTimeMs && span.startTimeMs
-    ? span.endTimeMs - span.startTimeMs
-    : null;
+  return span.endTimeMs && span.startTimeMs ? span.endTimeMs - span.startTimeMs : null;
 }
 
 function isFailed(logContent: CodexToolLogContent | undefined): boolean {
@@ -880,9 +853,7 @@ function modelCallEntry(span: SpanDetail): TranscriptEntry & {
     tokens,
     costUsd: span.metrics?.cost ?? 0,
     durationMs:
-      span.endTimeMs && span.startTimeMs
-        ? span.endTimeMs - span.startTimeMs
-        : null,
+      span.endTimeMs && span.startTimeMs ? span.endTimeMs - span.startTimeMs : null,
     spanId: span.spanId,
     inputTokens,
     outputTokens,
@@ -895,10 +866,7 @@ function modelCallEntry(span: SpanDetail): TranscriptEntry & {
       readNumber(span.params, "gen_ai.usage.cache_creation.input_tokens") ??
       // codex spells cache creation "cache_write", on both its span shapes.
       readNumber(span.params, "gen_ai.usage.cache_write.input_tokens") ??
-      readNumber(
-        span.params,
-        "codex.turn.token_usage.cache_write_input_tokens",
-      ) ??
+      readNumber(span.params, "codex.turn.token_usage.cache_write_input_tokens") ??
       0,
   };
 }
@@ -993,10 +961,7 @@ function logToEntry({
       // (the model-facing harness call, MCP calls without spans, span-less
       // wires) render from the log alone.
       const callId = readString(attrs, "call_id");
-      if (
-        callId !== null &&
-        readString(attrs, "event.name") === "codex.tool_result"
-      ) {
+      if (callId !== null && readString(attrs, "event.name") === "codex.tool_result") {
         const claimed = claimedToolCalls.get(callId);
         if (claimed !== undefined) {
           fillToolCallGaps(claimed, {
@@ -1012,8 +977,7 @@ function logToEntry({
           kind: "tool",
           atMs,
           name: codexToolName,
-          mcpServer:
-            mcpServer ?? parseMcpToolName(codexToolName)?.server ?? null,
+          mcpServer: mcpServer ?? parseMcpToolName(codexToolName)?.server ?? null,
           input: parseMaybeJson(readString(attrs, "arguments")),
           output: readString(attrs, "output"),
           durationMs: readNumber(attrs, "duration_ms"),
@@ -1155,8 +1119,7 @@ function logToEntry({
     }
 
     case "skill_activated": {
-      const skill =
-        readString(attrs, "skill_name") ?? readString(attrs, "skill");
+      const skill = readString(attrs, "skill_name") ?? readString(attrs, "skill");
       return {
         kind: "note",
         atMs,
@@ -1301,9 +1264,7 @@ function extractedSystemText(input: string | null | undefined): string | null {
  * while the `{type, value}` wrapper is the in-process shape; both are accepted
  * so a caller reads the same input whichever side hands it over.
  */
-function parsedChatMessages(
-  input: string | null | undefined,
-): unknown[] | null {
+function parsedChatMessages(input: string | null | undefined): unknown[] | null {
   if (typeof input !== "string") return null;
   const raw = input.trim();
   if (!raw.startsWith("[") && !raw.startsWith("{")) return null;
@@ -1336,17 +1297,10 @@ const MAX_INJECTED_CONTEXT_CHARS = 64_000;
  */
 const RECOVERED_REPLY_MATCH_CHARS = 200;
 
-function isSameRecoveredReply(
-  candidate: string,
-  previous: string | null,
-): boolean {
+function isSameRecoveredReply(candidate: string, previous: string | null): boolean {
   if (previous === null) return false;
   if (candidate === previous) return true;
-  const width = Math.min(
-    RECOVERED_REPLY_MATCH_CHARS,
-    candidate.length,
-    previous.length,
-  );
+  const width = Math.min(RECOVERED_REPLY_MATCH_CHARS, candidate.length, previous.length);
   if (width < RECOVERED_REPLY_MATCH_CHARS) return false;
   return candidate.slice(0, width) === previous.slice(0, width);
 }
@@ -1492,11 +1446,7 @@ function indexCloseTagPositions(text: string): Map<string, number[]> {
  * an attribute list running to the tag's own `>`. Anything else means this `<`
  * opens nothing: `<a/>`, `< a>` and `<1a>` are ordinary text.
  */
-function readOpenTag(
-  text: string,
-  at: number,
-  tagEnds: TagEndScan,
-): OpenTag | null {
+function readOpenTag(text: string, at: number, tagEnds: TagEndScan): OpenTag | null {
   const nameStart = at + 1;
   const nameEnd = tagNameEnd(text, nameStart);
   if (nameEnd === nameStart) return null;
@@ -1538,9 +1488,7 @@ function closeTagAtOrAfter({
  * separates it from what the user actually typed.
  */
 function systemReminderText(content: string): string | null {
-  const blocks = content.match(
-    /<system-reminder>[\s\S]*?(?:<\/system-reminder>|$)/g,
-  );
+  const blocks = content.match(/<system-reminder>[\s\S]*?(?:<\/system-reminder>|$)/g);
   if (blocks === null || blocks.length === 0) return null;
   const text = blocks.join("\n\n").trim();
   return text.length > 0 ? text : null;
@@ -1652,9 +1600,7 @@ function messagesReplyText(messages: unknown[]): string | null {
         const p = part as { text?: unknown; type?: unknown };
         const partType = p.type;
         if (
-          (partType === undefined ||
-            partType === "text" ||
-            partType === "output_text") &&
+          (partType === undefined || partType === "text" || partType === "output_text") &&
           isReplyTextPart(p)
         ) {
           texts.push(p.text);
@@ -1682,8 +1628,7 @@ function geminiResponseText(raw: string | null): string | null {
       const candidates = (root as { candidates?: unknown })?.candidates;
       if (!Array.isArray(candidates)) continue;
       for (const candidate of candidates) {
-        const parts = (candidate as { content?: { parts?: unknown } })?.content
-          ?.parts;
+        const parts = (candidate as { content?: { parts?: unknown } })?.content?.parts;
         if (!Array.isArray(parts)) continue;
         for (const part of parts) {
           const p = part as { text?: unknown; thought?: unknown };

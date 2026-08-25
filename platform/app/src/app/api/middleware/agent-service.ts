@@ -7,9 +7,6 @@ export type AgentServiceMiddlewareVariables = {
 };
 
 export const agentServiceMiddleware: MiddlewareHandler = async (c, next) => {
-  c.set(
-    "agentService",
-    LegacyAgentsRestFeature.create({ prisma, session: null }),
-  );
+  c.set("agentService", LegacyAgentsRestFeature.create({ prisma, session: null }));
   await next();
 };

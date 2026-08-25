@@ -9,9 +9,7 @@ const {
 } = vi.hoisted(() => ({
   decideGraphTriggerHeartbeatMock: vi.fn().mockResolvedValue([]),
   evaluateGraphTriggerMock: vi.fn().mockResolvedValue(undefined),
-  filterSuppressedMock: vi.fn(
-    async ({ emails }: { emails: string[] }) => emails,
-  ),
+  filterSuppressedMock: vi.fn(async ({ emails }: { emails: string[] }) => emails),
   pruneExpiredMock: vi.fn().mockResolvedValue(7),
 }));
 
@@ -23,12 +21,9 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock(
-  "~/server/app-layer/automations/graph-trigger-evaluation.service",
-  () => ({
-    evaluateGraphTrigger: evaluateGraphTriggerMock,
-  }),
-);
+vi.mock("~/server/app-layer/automations/graph-trigger-evaluation.service", () => ({
+  evaluateGraphTrigger: evaluateGraphTriggerMock,
+}));
 
 vi.mock("~/server/app-layer/automations/graph-trigger-heartbeat", () => ({
   decideGraphTriggerHeartbeat: decideGraphTriggerHeartbeatMock,
@@ -54,9 +49,7 @@ vi.mock("~/server/api/utils", () => ({
 
 vi.mock("~/server/app-layer/automations/dispatch/emailCaps", () => ({
   consumeEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
-  consumeTenantEmailCapSlot: vi
-    .fn()
-    .mockResolvedValue({ allowed: true, count: 1 }),
+  consumeTenantEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
 }));
 
 describe("automation dispatch wiring smoke", () => {

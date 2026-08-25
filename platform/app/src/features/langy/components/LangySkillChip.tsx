@@ -61,9 +61,7 @@ export function LangySkillChipView({
         {skill?.summary ?? "This capability."}
       </Text>
       <Text textStyle="2xs" color="fg.muted" marginTop={1}>
-        {target
-          ? `Aimed at: ${target.label}`
-          : "Not aimed at anything in particular."}
+        {target ? `Aimed at: ${target.label}` : "Not aimed at anything in particular."}
       </Text>
     </Box>
   );
@@ -140,11 +138,7 @@ export function LangySkillChipView({
   }
 
   return (
-    <Tooltip
-      openDelay={250}
-      positioning={{ placement: "top" }}
-      content={tooltipContent}
-    >
+    <Tooltip openDelay={250} positioning={{ placement: "top" }} content={tooltipContent}>
       <HStack {...pillProps}>
         {verb}
 

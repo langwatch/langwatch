@@ -26,10 +26,7 @@ import {
 } from "../logic/langyFeedbackDirective";
 import { langyPlan } from "../logic/langyPlan";
 import { questionToolCardParts } from "../logic/langyQuestionTool";
-import {
-  foldReasoningTitles,
-  stripReasoningTitles,
-} from "../logic/langyReasoningTitles";
+import { foldReasoningTitles, stripReasoningTitles } from "../logic/langyReasoningTitles";
 import { stripToolNarration } from "../logic/langyToolNarration";
 import { useSpaLinkClick } from "../logic/spaLink";
 import { useLangyStore } from "../stores/langyStore";
@@ -84,10 +81,7 @@ function MessageContentImpl({
 }: {
   message: UIMessage;
   organizationId?: string | null;
-  appliedOutcomes: Record<
-    string,
-    { href?: string; label?: string; onOpen?: () => void }
-  >;
+  appliedOutcomes: Record<string, { href?: string; label?: string; onOpen?: () => void }>;
   discardedProposals: Set<string>;
   applyingProposals: Set<string>;
   onApply: (proposalId: string, proposal: LangyProposal) => Promise<void>;
@@ -134,9 +128,7 @@ function MessageContentImpl({
   // flow at all: the model's thinking is not the answer (their headlines fold
   // into the completed receipt below).
   const rawText = message.parts
-    .filter(
-      (part): part is { type: "text"; text: string } => part.type === "text",
-    )
+    .filter((part): part is { type: "text"; text: string } => part.type === "text")
     .map((part) => part.text)
     .filter((text) => text.length > 0)
     .join("\n\n");
@@ -164,10 +156,7 @@ function MessageContentImpl({
   // the user mid-turn, so a card that only appeared once the turn settled
   // would hide the very thing the turn is waiting for.
   const questionCards = useMemo(
-    () =>
-      isUser
-        ? []
-        : message.parts.flatMap((part) => questionToolCardParts(part)),
+    () => (isUser ? [] : message.parts.flatMap((part) => questionToolCardParts(part))),
     [isUser, message.parts],
   );
 
@@ -186,9 +175,7 @@ function MessageContentImpl({
   // complete (a rejected push has not pushed), and the card SURVIVES A REFRESH —
   // the sentinels were stripped before the message was persisted, so it never
   // used to.
-  const progressEvents = isUser
-    ? []
-    : githubProgressFromToolParts(message.parts);
+  const progressEvents = isUser ? [] : githubProgressFromToolParts(message.parts);
 
   // Strip the hidden [langy:feedback:...] directive: when present, Langy asked
   // for feedback at a high-signal moment — surface the affordance regardless of
@@ -264,13 +251,13 @@ function MessageContentImpl({
   const hasBlocks = blockSegments !== null && blockSegments.length > 0;
   const hasContent = Boolean(
     displayText ||
-      hasBlocks ||
-      proposals.length > 0 ||
-      prs.length > 0 ||
-      progressEvents.length > 0 ||
-      questionCards.length > 0 ||
-      showsActivity ||
-      plan,
+    hasBlocks ||
+    proposals.length > 0 ||
+    prs.length > 0 ||
+    progressEvents.length > 0 ||
+    questionCards.length > 0 ||
+    showsActivity ||
+    plan,
   );
   if (!hasContent) {
     if (isUser) return null;
@@ -422,11 +409,7 @@ function MessageContentImpl({
                 "& table": { display: "block", overflowX: "auto" },
               }}
             >
-              <Markdown
-                fontSize="langyAnswer"
-                linkVariant="langy"
-                color="langy.answerFg"
-              >
+              <Markdown fontSize="langyAnswer" linkVariant="langy" color="langy.answerFg">
                 {displayText}
               </Markdown>
             </Box>
@@ -525,13 +508,8 @@ interface AnswerBlockContext {
 function AnswerWithCards({
   segments,
   ...context
-}: { segments: LangyAnswerSegment[] } & Omit<
-  AnswerBlockContext,
-  "firstTextIndex"
->) {
-  const firstTextIndex = segments.findIndex(
-    (segment) => segment.type === "text",
-  );
+}: { segments: LangyAnswerSegment[] } & Omit<AnswerBlockContext, "firstTextIndex">) {
+  const firstTextIndex = segments.findIndex((segment) => segment.type === "text");
   return (
     <VStack align="stretch" gap={2.5}>
       {segments.map((segment, index) => (
@@ -638,11 +616,7 @@ function ProseSegment({
         "& table": { display: "block", overflowX: "auto" },
       }}
     >
-      <Markdown
-        fontSize="langyAnswer"
-        linkVariant="langy"
-        color="langy.answerFg"
-      >
+      <Markdown fontSize="langyAnswer" linkVariant="langy" color="langy.answerFg">
         {display}
       </Markdown>
     </Box>
@@ -742,9 +716,7 @@ export function ProposalCard({
         triggerOpen();
       }}
       transition="border-color 150ms ease, box-shadow 150ms ease"
-      _hover={
-        hasOpen ? { borderColor: "green.fg", boxShadow: "sm" } : undefined
-      }
+      _hover={hasOpen ? { borderColor: "green.fg", boxShadow: "sm" } : undefined}
     >
       <HStack
         gap={1.5}
@@ -755,23 +727,14 @@ export function ProposalCard({
         textTransform="uppercase"
         color={overlineColor}
       >
-        {isApplied && !destructive ? (
-          <Check size={11} />
-        ) : (
-          <Sparkles size={11} />
-        )}
+        {isApplied && !destructive ? <Check size={11} /> : <Sparkles size={11} />}
         <Text>{overlineLabel}</Text>
       </HStack>
       <Text textStyle="sm" fontWeight="600" color="fg" marginBottom={0.5}>
         {proposal.summary}
       </Text>
       {proposal.rationale && (
-        <Text
-          textStyle="xs"
-          color="fg.muted"
-          lineHeight="1.45"
-          marginBottom={3}
-        >
+        <Text textStyle="xs" color="fg.muted" lineHeight="1.45" marginBottom={3}>
           {proposal.rationale}
         </Text>
       )}
@@ -784,9 +747,7 @@ export function ProposalCard({
             paddingY={2}
             borderRadius="md"
             borderWidth={0}
-            background={
-              destructive ? "var(--chakra-colors-red-solid)" : "transparent"
-            }
+            background={destructive ? "var(--chakra-colors-red-solid)" : "transparent"}
             color="white"
             fontSize="sm"
             fontWeight={500}
@@ -802,9 +763,7 @@ export function ProposalCard({
             position="relative"
             overflow="hidden"
           >
-            {!destructive && (
-              <LangyMeshLayer borderRadius="md" active={isApplying} />
-            )}
+            {!destructive && <LangyMeshLayer borderRadius="md" active={isApplying} />}
             <Box
               position="relative"
               zIndex={1}
@@ -822,12 +781,7 @@ export function ProposalCard({
                   : "Apply"}
             </Box>
           </chakra.button>
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={onDiscard}
-            disabled={isApplying}
-          >
+          <Button size="xs" variant="outline" onClick={onDiscard} disabled={isApplying}>
             {destructive ? "Cancel" : "Discard"}
           </Button>
         </HStack>
@@ -867,8 +821,7 @@ function extractProposals(
     const output = (part as { output?: unknown }).output;
     if (!isLangyProposal(output)) continue;
     const id =
-      (part as { toolCallId?: string }).toolCallId ??
-      `${message.id}:${result.length}`;
+      (part as { toolCallId?: string }).toolCallId ?? `${message.id}:${result.length}`;
     result.push({ id, proposal: output });
   }
   return result;

@@ -12,6 +12,7 @@ You are the **orchestrator**. You do NOT drive the browser yourself. You spawn a
 ## Step 1: Prepare
 
 Parse `$ARGUMENTS` for:
+
 - **Port** (optional): a number (e.g. `5570`) or `:<port>` format
 - **Feature** (optional): a description of what to verify, or a path to a `specs/*.feature` file
 
@@ -118,11 +119,13 @@ Only create what is listed above. Do not add extra data beyond what is needed.
 ## Step 4: Collect results
 
 When the sub-agent returns:
+
 1. Parse its summary table
 2. Write the report to `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md`:
 
 ```markdown
 # Browser Test: <feature-name>
+
 **Date:** YYYY-MM-DD
 **App:** http://localhost:<port>
 **Browser:** Chromium (headless)
@@ -131,14 +134,16 @@ When the sub-agent returns:
 
 ## Results
 
-| # | Scenario | Result | Screenshot |
-|---|----------|--------|------------|
-| 1 | <name>   | PASS   | screenshots/01-xxx.png |
+| #   | Scenario | Result | Screenshot             |
+| --- | -------- | ------ | ---------------------- |
+| 1   | <name>   | PASS   | screenshots/01-xxx.png |
 
 ## Failures (if any)
+
 - **Scenario 2:** Expected X but saw Y.
 
 ## Notes
+
 <any observations>
 ```
 
@@ -149,21 +154,24 @@ When the sub-agent returns:
 Screenshots are uploaded to **img402.dev** (free, no auth) instead of committed to git. This avoids binary bloat in the repo.
 
 1. **Upload each screenshot** to img402.dev:
+
    ```bash
    curl -s -F "image=@browser-tests/<feature>/<date>/screenshots/01-xxx.jpeg" https://img402.dev/api/free
    # Returns: {"url":"https://i.img402.dev/abc123.jpg", ...}
    ```
+
    Collect the returned URLs for each screenshot.
 
 2. **Update the PR description** with the results table using img402 URLs so images render inline:
 
    Read the current PR body first (`gh pr view --json body`), then append a new section:
+
    ```markdown
    ## Browser Test: <feature-name>
 
-   | # | Scenario | Result | Screenshot |
-   |---|----------|--------|------------|
-   | 1 | <name> | PASS | ![01](https://i.img402.dev/abc123.jpg) |
+   | #   | Scenario | Result | Screenshot                             |
+   | --- | -------- | ------ | -------------------------------------- |
+   | 1   | <name>   | PASS   | ![01](https://i.img402.dev/abc123.jpg) |
    ```
 
    Use `gh api repos/langwatch/langwatch/pulls/<number> -X PATCH -f body="..."` to update (not `gh pr edit`).
@@ -173,6 +181,7 @@ Screenshots are uploaded to **img402.dev** (free, no auth) instead of committed 
 ## Step 6: Report
 
 Return the summary to the user/orchestrator. Include:
+
 - The results table
 - Link to the PR where screenshots are now visible
 - Note: img402.dev free tier has 7-day retention; screenshots expire but remain in the PR body as broken images after that

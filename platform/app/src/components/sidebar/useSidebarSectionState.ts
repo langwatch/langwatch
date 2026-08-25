@@ -19,9 +19,7 @@ export const useSidebarSectionState = ({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   useEffect(() => {
-    const savedPreference = window.localStorage.getItem(
-      getSidebarSectionStorageKey(id),
-    );
+    const savedPreference = window.localStorage.getItem(getSidebarSectionStorageKey(id));
     setIsExpanded(
       savedPreference === "true" || savedPreference === "false"
         ? savedPreference === "true"
@@ -32,10 +30,7 @@ export const useSidebarSectionState = ({
   const toggleSection = () => {
     const nextExpanded = !isExpanded;
     setIsExpanded(nextExpanded);
-    window.localStorage.setItem(
-      getSidebarSectionStorageKey(id),
-      String(nextExpanded),
-    );
+    window.localStorage.setItem(getSidebarSectionStorageKey(id), String(nextExpanded));
     trackEvent("side_menu_section_toggle", {
       project_id: projectId,
       menu_item: label,

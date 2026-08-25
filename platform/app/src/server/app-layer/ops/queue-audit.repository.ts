@@ -1,8 +1,6 @@
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
-export type QueueControlAction =
-  | "queue_redrive_dlq_groups"
-  | "queue_discard_dlq_groups";
+export type QueueControlAction = "queue_redrive_dlq_groups" | "queue_discard_dlq_groups";
 
 /**
  * Audit sink for GroupQueue dead-letter recovery

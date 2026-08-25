@@ -36,10 +36,7 @@ export type SpendGroupByKey = (typeof SPEND_GROUP_BY_KEYS)[number];
  * The keys the fold rewrites after admission. Requested model and provider
  * are replaced by the resolved ones, so a row's group can move under a walk.
  */
-export const MOVABLE_GROUP_BY_KEYS: readonly SpendGroupByKey[] = [
-  "model",
-  "provider",
-];
+export const MOVABLE_GROUP_BY_KEYS: readonly SpendGroupByKey[] = ["model", "provider"];
 
 /** At most two: a third dimension multiplies the group count past what a
  *  single cursor walk can serve at a useful page size. */

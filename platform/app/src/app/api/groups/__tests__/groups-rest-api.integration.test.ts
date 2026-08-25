@@ -346,9 +346,7 @@ describe("Feature: Groups REST API", () => {
       expect(res.status).toBe(409);
       expect((await res.json()).error).toBe("scim_managed_group");
 
-      expect(
-        await prisma.group.findUnique({ where: { id: group.id } }),
-      ).not.toBeNull();
+      expect(await prisma.group.findUnique({ where: { id: group.id } })).not.toBeNull();
     });
 
     /** @scenario DELETE /api/groups/:id returns 404 for nonexistent group */
@@ -454,9 +452,7 @@ describe("Feature: Groups REST API", () => {
         },
       });
 
-      const res = await api.delete(
-        `/api/groups/${scimGroup.id}/members/${userId}`,
-      );
+      const res = await api.delete(`/api/groups/${scimGroup.id}/members/${userId}`);
       expect(res.status).toBe(409);
       expect((await res.json()).error).toBe("scim_managed_group");
     });
@@ -508,17 +504,13 @@ describe("Feature: Groups REST API", () => {
       const bindings = (await listRes.json()).data;
       const bindingId = bindings[0].id;
 
-      const res = await api.delete(
-        `/api/groups/${bindingGroupId}/bindings/${bindingId}`,
-      );
+      const res = await api.delete(`/api/groups/${bindingGroupId}/bindings/${bindingId}`);
       expect(res.status).toBe(200);
     });
 
     /** @scenario DELETE /api/groups/:id/bindings/:bindingId returns 404 for nonexistent binding */
     it("returns 404 for nonexistent binding", async () => {
-      const res = await api.delete(
-        `/api/groups/${bindingGroupId}/bindings/nonexistent`,
-      );
+      const res = await api.delete(`/api/groups/${bindingGroupId}/bindings/nonexistent`);
       expect(res.status).toBe(404);
     });
 
@@ -543,9 +535,7 @@ describe("Feature: Groups REST API", () => {
       expect(res.status).toBeGreaterThanOrEqual(400);
 
       await prisma.team.delete({ where: { id: otherTeam.id } }).catch(() => {});
-      await prisma.organization
-        .delete({ where: { id: otherOrg.id } })
-        .catch(() => {});
+      await prisma.organization.delete({ where: { id: otherOrg.id } }).catch(() => {});
     });
   });
 

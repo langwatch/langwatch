@@ -22,32 +22,24 @@ export type SecretPublic = z.infer<typeof secretPublicSchema>;
 export const secretPublicListInputSchema = z
   .object({ projectId: z.string().min(1) })
   .strict();
-export type SecretPublicListInput = z.infer<
-  typeof secretPublicListInputSchema
->;
+export type SecretPublicListInput = z.infer<typeof secretPublicListInputSchema>;
 
 export const secretPublicGetInputSchema = secretPublicListInputSchema.extend({
   id: secretIdSchema,
 });
-export type SecretPublicGetInput = z.infer<
-  typeof secretPublicGetInputSchema
->;
+export type SecretPublicGetInput = z.infer<typeof secretPublicGetInputSchema>;
 
 export const secretPublicCreateInputSchema = secretPublicListInputSchema.extend({
   name: secretNameSchema,
   value: secretValueSchema,
 });
-export type SecretPublicCreateInput = z.infer<
-  typeof secretPublicCreateInputSchema
->;
+export type SecretPublicCreateInput = z.infer<typeof secretPublicCreateInputSchema>;
 
 export const secretPublicUpdateInputSchema = secretPublicListInputSchema.extend({
   id: secretIdSchema,
   value: secretValueSchema,
 });
-export type SecretPublicUpdateInput = z.infer<
-  typeof secretPublicUpdateInputSchema
->;
+export type SecretPublicUpdateInput = z.infer<typeof secretPublicUpdateInputSchema>;
 
 export const secretPublicDeleteInputSchema = secretPublicGetInputSchema;
 export type SecretPublicDeleteInput = SecretPublicGetInput;
@@ -55,9 +47,7 @@ export type SecretPublicDeleteInput = SecretPublicGetInput;
 export const secretPublicDeleteOutputSchema = z
   .object({ id: secretIdSchema, deleted: z.literal(true) })
   .strict();
-export type SecretPublicDeleteOutput = z.infer<
-  typeof secretPublicDeleteOutputSchema
->;
+export type SecretPublicDeleteOutput = z.infer<typeof secretPublicDeleteOutputSchema>;
 
 interface SecretRpcProcedure<Input extends ZodType, Output extends ZodType> {
   readonly input: Input;

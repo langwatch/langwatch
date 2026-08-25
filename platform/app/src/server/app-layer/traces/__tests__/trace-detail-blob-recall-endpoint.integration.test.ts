@@ -70,9 +70,7 @@ const hasTestcontainers = !!(
 // getClickHouseClientForTenant, wired only when isClickHouseEnabled()) resolve to
 // the testcontainer client. importOriginal keeps every other export intact.
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import("~/server/clickhouse/clickhouseClient")
-  >()),
+  ...(await importOriginal<typeof import("~/server/clickhouse/clickhouseClient")>()),
   getClickHouseClientForTenant: vi.fn(),
   // Must be true so buildTraceBlobResolutionDeps wires the CH resolver onto the
   // BlobStore — otherwise getFromEventLog throws and every read degrades to the
@@ -307,8 +305,9 @@ function spanIoValue(span: Span, ioField: IoField): string {
  */
 function spanCarriesEventref(span: Span): boolean {
   const params = (span.params ?? {}) as Record<string, unknown>;
-  const reserved = (params.langwatch as Record<string, unknown> | undefined)
-    ?.reserved as Record<string, unknown> | undefined;
+  const reserved = (params.langwatch as Record<string, unknown> | undefined)?.reserved as
+    | Record<string, unknown>
+    | undefined;
   const eventref = reserved?.eventref;
   return eventref !== undefined && eventref !== null;
 }
@@ -329,16 +328,14 @@ describe.skipIf(!hasTestcontainers)(
       const containers = await startTestContainers();
       client = containers.clickHouseClient;
       if (!client) {
-        throw new Error(
-          "ClickHouse client not available; testcontainers required.",
-        );
+        throw new Error("ClickHouse client not available; testcontainers required.");
       }
 
       // Wire the mocked routing module to the testcontainer client, so both the
       // read path and the blob resolver dial the real `ch`.
-      vi.mocked(
-        clickhouseClientModule.getClickHouseClientForTenant,
-      ).mockResolvedValue(client);
+      vi.mocked(clickhouseClientModule.getClickHouseClientForTenant).mockResolvedValue(
+        client,
+      );
 
       // buildTraceBlobResolutionDeps()'s no-arg call — the exact shape the
       // production routers use — now takes its default resolver from
@@ -427,9 +424,7 @@ describe.skipIf(!hasTestcontainers)(
       // Staging guard: preview is truncated and the eventref key IS present.
       expect(preview).toBeDefined();
       if (!preview)
-        throw new Error(
-          `leanAttrs missing "${ioField}" after leanForProjection`,
-        );
+        throw new Error(`leanAttrs missing "${ioField}" after leanForProjection`);
       expect(preview).not.toContain(UNIQUE_TAIL);
       expect(leanAttrs[`${EVENTREF_ATTR_PREFIX}${ioField}`]).toBeDefined();
 
@@ -470,12 +465,9 @@ describe.skipIf(!hasTestcontainers)(
 
             // Even full:true cannot resolve without deps: the resolve gate needs
             // `this.resolveTraceSpans`, which is undefined for a no-deps service.
-            const trace = await service.getById(
-              tenantId,
-              traceId,
-              openProtections,
-              { full: true },
-            );
+            const trace = await service.getById(tenantId, traceId, openProtections, {
+              full: true,
+            });
 
             expect(trace).toBeDefined();
             if (!trace) throw new Error("trace is null/undefined");
@@ -507,17 +499,11 @@ describe.skipIf(!hasTestcontainers)(
           it(`returns the FULL ${ioField} value byte-identically from event_log (AC1)`, async () => {
             const { tenantId, traceId } = await seedOffloadedTrace({ ioField });
 
-            const service = TraceService.create(
-              prisma,
-              buildTraceBlobResolutionDeps(),
-            );
+            const service = TraceService.create(prisma, buildTraceBlobResolutionDeps());
 
-            const trace = await service.getById(
-              tenantId,
-              traceId,
-              openProtections,
-              { full: true },
-            );
+            const trace = await service.getById(tenantId, traceId, openProtections, {
+              full: true,
+            });
 
             expect(trace).toBeDefined();
             if (!trace) throw new Error("trace is null/undefined");
@@ -538,17 +524,11 @@ describe.skipIf(!hasTestcontainers)(
           it(`strips the reserved eventref namespace from the returned ${ioField} span attributes (AC3)`, async () => {
             const { tenantId, traceId } = await seedOffloadedTrace({ ioField });
 
-            const service = TraceService.create(
-              prisma,
-              buildTraceBlobResolutionDeps(),
-            );
+            const service = TraceService.create(prisma, buildTraceBlobResolutionDeps());
 
-            const trace = await service.getById(
-              tenantId,
-              traceId,
-              openProtections,
-              { full: true },
-            );
+            const trace = await service.getById(tenantId, traceId, openProtections, {
+              full: true,
+            });
 
             expect(trace).toBeDefined();
             if (!trace) throw new Error("trace is null/undefined");
@@ -557,9 +537,8 @@ describe.skipIf(!hasTestcontainers)(
             // FIX: no reserved eventref namespace leaks to the returned Span.
             expect(spanCarriesEventref(span)).toBe(false);
             const params = (span.params ?? {}) as Record<string, unknown>;
-            const reserved = (
-              params.langwatch as Record<string, unknown> | undefined
-            )?.reserved as Record<string, unknown> | undefined;
+            const reserved = (params.langwatch as Record<string, unknown> | undefined)
+              ?.reserved as Record<string, unknown> | undefined;
             expect(reserved?.eventref).toBeUndefined();
           });
 
@@ -570,17 +549,11 @@ describe.skipIf(!hasTestcontainers)(
               ioField,
             });
 
-            const service = TraceService.create(
-              prisma,
-              buildTraceBlobResolutionDeps(),
-            );
+            const service = TraceService.create(prisma, buildTraceBlobResolutionDeps());
 
-            const trace = await service.getById(
-              tenantId,
-              traceId,
-              openProtections,
-              { full: true },
-            );
+            const trace = await service.getById(tenantId, traceId, openProtections, {
+              full: true,
+            });
 
             expect(trace).toBeDefined();
             if (!trace) throw new Error("trace is null/undefined");
@@ -590,8 +563,7 @@ describe.skipIf(!hasTestcontainers)(
             expect(traceValue).toBeDefined();
             expect(traceValue).toContain(UNIQUE_TAIL);
             expect(traceValue).not.toBe(preview);
-            if (traceValue === undefined)
-              throw new Error("traceValue is undefined");
+            if (traceValue === undefined) throw new Error("traceValue is undefined");
             expect(traceValue.length).toBeGreaterThan(IO_PREVIEW_BYTES);
           });
         }
@@ -607,18 +579,12 @@ describe.skipIf(!hasTestcontainers)(
               shouldSeedEventLog: false,
             });
 
-            const service = TraceService.create(
-              prisma,
-              buildTraceBlobResolutionDeps(),
-            );
+            const service = TraceService.create(prisma, buildTraceBlobResolutionDeps());
 
             // AC5: the missing row must NOT break the read.
-            const trace = await service.getById(
-              tenantId,
-              traceId,
-              openProtections,
-              { full: true },
-            );
+            const trace = await service.getById(tenantId, traceId, openProtections, {
+              full: true,
+            });
 
             expect(trace).toBeDefined();
             if (!trace) throw new Error("trace is null/undefined");

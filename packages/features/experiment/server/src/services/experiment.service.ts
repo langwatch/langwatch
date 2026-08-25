@@ -97,15 +97,11 @@ export class ExperimentService extends ExperimentServiceContract {
   }
 
   async tryGetById(input: ExperimentLookup): Promise<Experiment | null> {
-    return this.options.repository.tryFindById(
-      experimentLookupSchema.parse(input),
-    );
+    return this.options.repository.tryFindById(experimentLookupSchema.parse(input));
   }
 
   async tryGetBySlug(input: ExperimentSlugLookup): Promise<Experiment | null> {
-    return this.options.repository.tryFindBySlug(
-      experimentSlugLookupSchema.parse(input),
-    );
+    return this.options.repository.tryFindBySlug(experimentSlugLookupSchema.parse(input));
   }
 
   async tryGetBySlugAndType(
@@ -136,9 +132,7 @@ export class ExperimentService extends ExperimentServiceContract {
     return { experiments, totalHits };
   }
 
-  async tryGetLatest(input: {
-    projectId: string;
-  }): Promise<Experiment | null> {
+  async tryGetLatest(input: { projectId: string }): Promise<Experiment | null> {
     return this.options.repository.tryFindLatest(input);
   }
 
@@ -206,8 +200,7 @@ export class ExperimentService extends ExperimentServiceContract {
       projectId: command.projectId,
       name: command.name,
       type: "EVALUATIONS_V3",
-      requestedSlug:
-        this.options.slugify(command.name) || "workflow-evaluation",
+      requestedSlug: this.options.slugify(command.name) || "workflow-evaluation",
       slugMode: "deduplicate",
       workflowId: command.workflowId,
       workbenchState: command.workbenchState,
@@ -246,28 +239,20 @@ export class ExperimentService extends ExperimentServiceContract {
   }
 
   async startExperimentRun(input: StartExperimentRunInput): Promise<void> {
-    await this.execution.startExperimentRun(
-      startExperimentRunInputSchema.parse(input),
-    );
+    await this.execution.startExperimentRun(startExperimentRunInputSchema.parse(input));
   }
 
   async recordTargetResult(input: RecordTargetResultInput): Promise<void> {
-    await this.execution.recordTargetResult(
-      recordTargetResultInputSchema.parse(input),
-    );
+    await this.execution.recordTargetResult(recordTargetResultInputSchema.parse(input));
   }
 
-  async recordEvaluatorResult(
-    input: RecordEvaluatorResultInput,
-  ): Promise<void> {
+  async recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void> {
     await this.execution.recordEvaluatorResult(
       recordEvaluatorResultInputSchema.parse(input),
     );
   }
 
-  async completeExperimentRun(
-    input: CompleteExperimentRunInput,
-  ): Promise<void> {
+  async completeExperimentRun(input: CompleteExperimentRunInput): Promise<void> {
     await this.execution.completeExperimentRun(
       completeExperimentRunInputSchema.parse(input),
     );
@@ -286,9 +271,7 @@ export class ExperimentService extends ExperimentServiceContract {
     return values.map((value) => experimentDspyStepSummarySchema.parse(value));
   }
 
-  async getDspyStep(
-    input: ExperimentDspyStepLookup,
-  ): Promise<ExperimentDspyStep> {
+  async getDspyStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep> {
     const lookup = experimentDspyStepLookupSchema.parse(input);
     const value = await this.options.dspyRepository.tryGet(lookup);
     if (!value) {
@@ -303,11 +286,17 @@ export class ExperimentService extends ExperimentServiceContract {
     return this.options.runRepository.list(experimentRunListInputSchema.parse(input));
   }
 
-  getRunAggregates(input: ExperimentRunListInput): Promise<Record<string, ExperimentRunAggregate>> {
-    return this.options.runRepository.getAggregates(experimentRunListInputSchema.parse(input));
+  getRunAggregates(
+    input: ExperimentRunListInput,
+  ): Promise<Record<string, ExperimentRunAggregate>> {
+    return this.options.runRepository.getAggregates(
+      experimentRunListInputSchema.parse(input),
+    );
   }
 
-  getRunsPage(input: ExperimentRunPageInput): Promise<{ runs: ExperimentRun[]; totalHits: number }> {
+  getRunsPage(
+    input: ExperimentRunPageInput,
+  ): Promise<{ runs: ExperimentRun[]; totalHits: number }> {
     return this.options.runRepository.getPage(experimentRunPageInputSchema.parse(input));
   }
 

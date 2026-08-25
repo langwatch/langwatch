@@ -23,9 +23,7 @@ export type VersionMetadata = z.infer<typeof versionMetadataSchema>;
  *
  * Single Responsibility: Normalize versionCreatedAt field for node data storage
  */
-export function versionMetadataToNodeFormat(
-  metadata: VersionMetadata | undefined,
-):
+export function versionMetadataToNodeFormat(metadata: VersionMetadata | undefined):
   | {
       versionId: string;
       versionNumber: number;

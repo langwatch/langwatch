@@ -10,13 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  CheckCircle2,
-  Circle,
-  CircleCheck,
-  CircleDashed,
-  CircleX,
-} from "lucide-react";
+import { CheckCircle2, Circle, CircleCheck, CircleDashed, CircleX } from "lucide-react";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -58,12 +52,10 @@ import { getHexColorForString } from "~/utils/rotatingColors";
  * specs/ai-governance/rbac/delegated-governance-viewer.feature
  */
 
-type SourceHealth =
-  RouterOutputs["activityMonitor"]["ingestionSourcesHealth"][number];
+type SourceHealth = RouterOutputs["activityMonitor"]["ingestionSourcesHealth"][number];
 type SpendByUser = RouterOutputs["activityMonitor"]["spendByUser"][number];
 type SpendByTeam = RouterOutputs["activityMonitor"]["spendByTeam"][number];
-type SpendByDepartment =
-  RouterOutputs["activityMonitor"]["spendByDepartment"][number];
+type SpendByDepartment = RouterOutputs["activityMonitor"]["spendByDepartment"][number];
 
 const fmtUsd = (n: number | string) => {
   const v = typeof n === "string" ? Number(n) : n;
@@ -203,8 +195,8 @@ function GovernanceOverviewPage() {
               </Badge>
             </HStack>
             <Text color="fg.muted" fontSize="sm">
-              Spend, users, anomalies, and ingestion-source health for the
-              organization. Window: last 30 days.
+              Spend, users, anomalies, and ingestion-source health for the organization.
+              Window: last 30 days.
             </Text>
           </VStack>
           <Spacer />
@@ -218,31 +210,23 @@ function GovernanceOverviewPage() {
         />
 
         {canReadActivity && !hasTraffic && (
-          <Box
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            padding={5}
-          >
+          <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={5}>
             <VStack align="start" gap={1} marginBottom={4}>
               <Heading as="h3" size="sm">
                 Setup checklist
               </Heading>
               <Text fontSize="sm" color="fg.muted">
-                Complete each step to start collecting governance data. Live
-                metrics replace this checklist once your first ingestion source
-                is reporting events. (AI Gateway traffic shows in{" "}
-                <Link href="/gateway/usage">Gateway → Usage</Link>; this
-                dashboard rolls up signals from ingestion sources beyond the
-                gateway.)
+                Complete each step to start collecting governance data. Live metrics
+                replace this checklist once your first ingestion source is reporting
+                events. (AI Gateway traffic shows in{" "}
+                <Link href="/gateway/usage">Gateway → Usage</Link>; this dashboard rolls
+                up signals from ingestion sources beyond the gateway.)
               </Text>
             </VStack>
             <VStack align="stretch" gap={2}>
               <SetupItem
                 done={hasCatalogTiles}
-                missingPermission={
-                  canReadCatalog ? undefined : "aiTools:manage"
-                }
+                missingPermission={canReadCatalog ? undefined : "aiTools:manage"}
                 title="Add tools to the catalog"
                 description="Publish the coding assistants, model providers, and internal tools your team installs from their /me portal."
                 href="/governance/tool-catalog"
@@ -254,9 +238,7 @@ function GovernanceOverviewPage() {
               />
               <SetupItem
                 done={hasPolicies}
-                missingPermission={
-                  canReadPolicies ? undefined : "routingPolicies:view"
-                }
+                missingPermission={canReadPolicies ? undefined : "routingPolicies:view"}
                 title="Define a routing policy"
                 description="Tell virtual keys which providers + models to route through."
                 href="/gateway/routing-policies"
@@ -268,9 +250,7 @@ function GovernanceOverviewPage() {
               />
               <SetupItem
                 done={hasSources}
-                missingPermission={
-                  canReadSources ? undefined : "ingestionSources:view"
-                }
+                missingPermission={canReadSources ? undefined : "ingestionSources:view"}
                 title="Connect an ingestion source"
                 description="Map an external AI platform into the activity monitor via OTel push, webhook, or S3 audit drop."
                 href="/governance/ingestion-sources"
@@ -282,9 +262,7 @@ function GovernanceOverviewPage() {
               />
               <SetupItem
                 done={hasAnomalyRules}
-                missingPermission={
-                  canReadAnomalyRules ? undefined : "anomalyRules:view"
-                }
+                missingPermission={canReadAnomalyRules ? undefined : "anomalyRules:view"}
                 title="Define anomaly rules"
                 description="Set thresholds that page on-call when activity drifts."
                 href="/governance/anomaly-rules"
@@ -331,8 +309,7 @@ function GovernanceOverviewPage() {
                   subline={
                     summary.spentThisWindowUsd === 0
                       ? "no traffic this window"
-                      : !summary.hasPriorBaseline ||
-                          summary.spentThisWindowUsd < 10
+                      : !summary.hasPriorBaseline || summary.spentThisWindowUsd < 10
                         ? "insufficient baseline"
                         : `${summary.windowOverPreviousPct >= 0 ? "↑" : "↓"} ${fmtTrendPct(summary.windowOverPreviousPct)} vs previous`
                   }
@@ -380,10 +357,7 @@ function GovernanceOverviewPage() {
                 title="Spend over time"
                 subline="Daily UTC buckets, last 30 days. Toggle the breakdown to see which dimension is driving the trend."
                 actions={
-                  <GroupByToggle
-                    value={chartGroupBy}
-                    onChange={setChartGroupBy}
-                  />
+                  <GroupByToggle value={chartGroupBy} onChange={setChartGroupBy} />
                 }
               >
                 <SpendOverTimeChart
@@ -454,28 +428,21 @@ function GovernanceOverviewPage() {
               title="Spend by department"
               subline="Spend grouped by department across every project in the org, including personal AI use (last 30 days)."
               actions={
-                <Link
-                  href="/governance/departments"
-                  color="blue.600"
-                  fontSize="sm"
-                >
+                <Link href="/governance/departments" color="blue.600" fontSize="sm">
                   Manage departments →
                 </Link>
               }
             >
               {departments.length === 0 ? (
                 <Text color="fg.muted" fontSize="sm">
-                  No spend to attribute this window. Assign people, teams, and
-                  projects to departments to compare spend across the org.
+                  No spend to attribute this window. Assign people, teams, and projects to
+                  departments to compare spend across the org.
                 </Text>
               ) : (
                 <VStack align="stretch" gap={0}>
                   <DepartmentRowHeader />
                   {departments.map((c) => (
-                    <DepartmentRow
-                      key={c.departmentId ?? "unassigned"}
-                      department={c}
-                    />
+                    <DepartmentRow key={c.departmentId ?? "unassigned"} department={c} />
                   ))}
                 </VStack>
               )}
@@ -553,10 +520,7 @@ function SessionPolicySection({
       subline="Maximum lifetime of a CLI/device session before re-login is required. Applies to every member's `langwatch login` session."
     >
       {canRead ? (
-        <SessionPolicyForm
-          organizationId={organizationId}
-          canManage={canManage}
-        />
+        <SessionPolicyForm organizationId={organizationId} canManage={canManage} />
       ) : (
         <PermissionRequiredNotice permission="organization:view" />
       )}
@@ -657,10 +621,9 @@ function SessionPolicyForm({
         )}
       </HStack>
       <Text fontSize="xs" color="fg.muted">
-        Suggested presets: <code>7</code> (high-security) · <code>30</code>{" "}
-        (standard) · <code>0</code> (open-source / small teams). Values higher
-        than the natural refresh-token life (~30d) cap at the refresh-token
-        expiry.
+        Suggested presets: <code>7</code> (high-security) · <code>30</code> (standard) ·{" "}
+        <code>0</code> (open-source / small teams). Values higher than the natural
+        refresh-token life (~30d) cap at the refresh-token expiry.
       </Text>
       {isInvalid && (
         <Text fontSize="xs" color="red.600">
@@ -711,11 +674,7 @@ function SetupItem({
       alignItems="start"
       opacity={upcoming ? 0.7 : 1}
     >
-      <Box
-        color={isDone ? "green.500" : "fg.muted"}
-        paddingTop="2px"
-        aria-hidden="true"
-      >
+      <Box color={isDone ? "green.500" : "fg.muted"} paddingTop="2px" aria-hidden="true">
         {isDone ? <CheckCircle2 size={18} /> : <Circle size={18} />}
       </Box>
       <VStack align="start" gap={0} flex={1} minWidth={0}>
@@ -761,12 +720,7 @@ function SummaryCard({
 }) {
   const accent = tone === "amber" ? "orange.500" : "fg";
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
       <Text
         fontSize="xs"
         fontWeight="semibold"
@@ -878,20 +832,15 @@ const SOURCE_STATUS_COLOR = {
 function SourceChip({ source }: { source: SourceHealth }) {
   const Icon =
     SOURCE_STATUS_ICON[
-      (source.status as keyof typeof SOURCE_STATUS_ICON) ??
-        "awaiting_first_event"
+      (source.status as keyof typeof SOURCE_STATUS_ICON) ?? "awaiting_first_event"
     ] ?? CircleDashed;
   const color =
     SOURCE_STATUS_COLOR[
-      (source.status as keyof typeof SOURCE_STATUS_COLOR) ??
-        "awaiting_first_event"
+      (source.status as keyof typeof SOURCE_STATUS_COLOR) ?? "awaiting_first_event"
     ] ?? "fg.muted";
 
   return (
-    <Link
-      href="/governance/ingestion-sources"
-      _hover={{ textDecoration: "none" }}
-    >
+    <Link href="/governance/ingestion-sources" _hover={{ textDecoration: "none" }}>
       <HStack
         borderWidth="1px"
         borderColor="border.muted"
@@ -1102,13 +1051,7 @@ function fmtTrendPct(pct: number): string {
   return `${Math.round(abs)}%`;
 }
 
-function TrendCell({
-  pct,
-  hasBaseline,
-}: {
-  pct: number;
-  hasBaseline: boolean;
-}) {
+function TrendCell({ pct, hasBaseline }: { pct: number; hasBaseline: boolean }) {
   if (!hasBaseline) {
     return (
       <Box flex={2} color="fg.muted">
@@ -1164,10 +1107,7 @@ function TeamRow({ team }: { team: SpendByTeam }) {
       <Box flex={2} color="fg.muted">
         {fmtRelative(team.lastActivityIso)}
       </Box>
-      <TrendCell
-        pct={team.deltaPctVsPriorWindow}
-        hasBaseline={team.hasPriorBaseline}
-      />
+      <TrendCell pct={team.deltaPctVsPriorWindow} hasBaseline={team.hasPriorBaseline} />
       <Box flex={2} color="fg.muted">
         {team.sourceCount} {team.sourceCount === 1 ? "source" : "sources"}
       </Box>
@@ -1221,10 +1161,7 @@ function UserRow({ user }: { user: SpendByUser }) {
         <Box flex={2} color="fg.muted">
           {fmtRelative(user.lastActivityIso)}
         </Box>
-        <TrendCell
-          pct={user.trendVsPreviousPct}
-          hasBaseline={user.hasPriorBaseline}
-        />
+        <TrendCell pct={user.trendVsPreviousPct} hasBaseline={user.hasPriorBaseline} />
         <Box flex={2} color="fg.muted">
           {user.mostUsedTarget}
         </Box>

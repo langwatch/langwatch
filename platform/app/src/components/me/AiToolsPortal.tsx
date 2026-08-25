@@ -1,11 +1,4 @@
-import {
-  Box,
-  Heading,
-  SimpleGrid,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Heading, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -121,9 +114,8 @@ export function AiToolsPortal() {
             Your AI tools portal
           </Heading>
           <Text fontSize="sm" color="fg.muted">
-            Your admin hasn&apos;t added any AI tools to your portal yet. Check
-            back once they publish your team&apos;s coding assistants and model
-            providers.
+            Your admin hasn&apos;t added any AI tools to your portal yet. Check back once
+            they publish your team&apos;s coding assistants and model providers.
           </Text>
         </VStack>
       </Box>
@@ -186,9 +178,7 @@ function RenderTile({
           iconAsset={entry.iconAsset}
           iconKey={entry.iconKey}
           providerConfigured={
-            configuredProviders
-              ? configuredProviders.has(cfg.providerKey)
-              : undefined
+            configuredProviders ? configuredProviders.has(cfg.providerKey) : undefined
           }
         />
       );

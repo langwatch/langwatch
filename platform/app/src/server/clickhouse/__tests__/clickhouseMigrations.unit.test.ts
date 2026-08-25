@@ -5,10 +5,7 @@ import { describe, expect, it } from "vitest";
 describe("ClickHouse migrations", () => {
   /** @scenario Retention schema migration versions are unique */
   it("uses unique numeric migration versions", () => {
-    const migrationDir = resolve(
-      process.cwd(),
-      "src/server/clickhouse/migrations",
-    );
+    const migrationDir = resolve(process.cwd(), "src/server/clickhouse/migrations");
     const versions = readdirSync(migrationDir)
       .map((file) => file.match(/^(\d+)_.*\.sql$/)?.[1])
       .filter((version): version is string => version != null);

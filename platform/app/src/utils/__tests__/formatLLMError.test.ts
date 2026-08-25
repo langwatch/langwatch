@@ -8,8 +8,7 @@ describe("parseLLMError", () => {
 
     expect(parseLLMError(raw)).toEqual({
       type: "not_found",
-      message:
-        "The model 'gpt-5-chat' does not exist or you do not have access to it.",
+      message: "The model 'gpt-5-chat' does not exist or you do not have access to it.",
     });
   });
 
@@ -23,8 +22,7 @@ describe("parseLLMError", () => {
   });
 
   it("parses AuthenticationError", () => {
-    const raw =
-      "litellm.AuthenticationError: OpenAIException - Invalid API key";
+    const raw = "litellm.AuthenticationError: OpenAIException - Invalid API key";
 
     expect(parseLLMError(raw)).toEqual({
       type: "auth",
@@ -82,8 +80,7 @@ describe("parseLLMError", () => {
   });
 
   it("extracts message from Python SyntaxError", () => {
-    const raw =
-      "SyntaxError('unterminated string literal (detected at line 78)')";
+    const raw = "SyntaxError('unterminated string literal (detected at line 78)')";
 
     expect(parseLLMError(raw)).toEqual({
       type: "unknown",

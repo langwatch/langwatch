@@ -48,11 +48,7 @@ const EvalResultCellView: React.FC<{
   if (field === "label") {
     if (!ev.label) return dash;
     return (
-      <ValueWithDot
-        dotColor={display.color}
-        text={ev.label}
-        textStyle={textStyle}
-      />
+      <ValueWithDot dotColor={display.color} text={ev.label} textStyle={textStyle} />
     );
   }
 

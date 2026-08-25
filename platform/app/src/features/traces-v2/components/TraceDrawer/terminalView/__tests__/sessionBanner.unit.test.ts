@@ -19,10 +19,7 @@ describe("deriveSessionBanner", () => {
           "service.version": "2.1.207",
           "project.repo": "langwatch/langwatch",
         },
-        spans: [
-          modelSpan("claude-opus-4-8", 1_000),
-          modelSpan("claude-sonnet-5", 2_000),
-        ],
+        spans: [modelSpan("claude-opus-4-8", 1_000), modelSpan("claude-sonnet-5", 2_000)],
       });
 
       expect(banner).toEqual({
@@ -65,9 +62,7 @@ describe("deriveSessionBanner", () => {
     it("stays unknown instead of wearing another agent's badge", () => {
       const banner = deriveSessionBanner({
         resourceAttributes: {},
-        spans: [
-          { name: "some.custom.span", params: {} } as unknown as SpanDetail,
-        ],
+        spans: [{ name: "some.custom.span", params: {} } as unknown as SpanDetail],
       });
       expect(banner.agent).toBe("unknown");
     });

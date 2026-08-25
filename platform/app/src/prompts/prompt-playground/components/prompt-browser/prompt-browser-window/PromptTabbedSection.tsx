@@ -183,16 +183,12 @@ export function PromptTabbedSection({
           margin="0 auto"
           paddingX={3}
         >
-          <Tabs.Trigger value={PromptTab.Conversation}>
-            Conversation
-          </Tabs.Trigger>
+          <Tabs.Trigger value={PromptTab.Conversation}>Conversation</Tabs.Trigger>
           {hasInputs && (
             <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>
           )}
           {hasDemonstrations && (
-            <Tabs.Trigger value={PromptTab.Demonstrations}>
-              Demonstrations
-            </Tabs.Trigger>
+            <Tabs.Trigger value={PromptTab.Demonstrations}>Demonstrations</Tabs.Trigger>
           )}
           <Tabs.Trigger value={PromptTab.Parameters}>Parameters</Tabs.Trigger>
           <Tabs.Context>
@@ -260,13 +256,7 @@ export function PromptTabbedSection({
           </Box>
         </Tabs.Content>
         <Tabs.Content value={PromptTab.Variables} height="full">
-          <Box
-            height="full"
-            width="full"
-            maxWidth="768px"
-            margin="0 auto"
-            padding={3}
-          >
+          <Box height="full" width="full" maxWidth="768px" margin="0 auto" padding={3}>
             <Text fontSize="xs" color="fg.subtle" marginBottom={3}>
               Variables are substituted into the prompt template at runtime.
             </Text>
@@ -303,17 +293,10 @@ export function PromptTabbedSection({
           </Tabs.Content>
         )}
         <Tabs.Content value={PromptTab.Parameters} height="full">
-          <Box
-            height="full"
-            width="full"
-            maxWidth="768px"
-            margin="0 auto"
-            padding={3}
-          >
+          <Box height="full" width="full" maxWidth="768px" margin="0 auto" padding={3}>
             <Text fontSize="xs" color="fg.subtle" marginBottom={3}>
-              Parameters are arbitrary configurations returned with the prompt,
-              for use outside the prompt itself (e.g. RAG settings, pipeline
-              config).
+              Parameters are arbitrary configurations returned with the prompt, for use
+              outside the prompt itself (e.g. RAG settings, pipeline config).
             </Text>
             <RuntimeParametersField />
           </Box>

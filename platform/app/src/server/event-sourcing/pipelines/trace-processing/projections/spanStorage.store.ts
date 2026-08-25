@@ -11,10 +11,7 @@ import type { NormalizedSpan } from "../schemas/spans";
 /**
  * Maps a pipeline NormalizedSpan to the app-layer SpanInsertData.
  */
-function toAppLayer(
-  span: NormalizedSpan,
-  retentionDays: number,
-): SpanInsertData {
+function toAppLayer(span: NormalizedSpan, retentionDays: number): SpanInsertData {
   return {
     id: span.id,
     tenantId: span.tenantId,
@@ -67,24 +64,16 @@ function toAppLayer(
 export class SpanAppendStore implements AppendStore<NormalizedSpan> {
   constructor(private readonly repo: SpanStorageRepository) {}
 
-  async append(
-    record: NormalizedSpan,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
+  async append(record: NormalizedSpan, context: ProjectionStoreContext): Promise<void> {
     const retentionDays =
       context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
     await this.repo.insertSpan(toAppLayer(record, retentionDays));
   }
 
-  async bulkAppend(
-    records: NormalizedSpan[],
-    context: BulkAppendContext,
-  ): Promise<void> {
+  async bulkAppend(records: NormalizedSpan[], context: BulkAppendContext): Promise<void> {
     if (records.length === 0) return;
     const retentionDays =
       context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    await this.repo.insertSpans(
-      records.map((r) => toAppLayer(r, retentionDays)),
-    );
+    await this.repo.insertSpans(records.map((r) => toAppLayer(r, retentionDays)));
   }
 }

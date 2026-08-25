@@ -57,9 +57,7 @@ export function ScenarioRunActions({
       {scenario && (
         <Tooltip
           content={
-            isArchived
-              ? "This scenario has been archived and cannot be run"
-              : "Run again"
+            isArchived ? "This scenario has been archived and cannot be run" : "Run again"
           }
           positioning={{ placement: "bottom" }}
         >
@@ -118,11 +116,7 @@ export function ScenarioRunActions({
             )}
             {dejaViewHref && (
               <Menu.Item value="deja-view" asChild>
-                <a
-                  href={dejaViewHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
+                <a href={dejaViewHref} target="_blank" rel="noopener noreferrer">
                   <HStack gap={2}>
                     <Icon as={ExternalLink} boxSize={3.5} />
                     <Text>Open in DejaView</Text>
@@ -133,13 +127,7 @@ export function ScenarioRunActions({
           </Menu.Content>
         </Menu.Root>
       )}
-      <Box
-        width="1px"
-        height="16px"
-        bg="border.muted"
-        marginX={0.5}
-        flexShrink={0}
-      />
+      <Box width="1px" height="16px" bg="border.muted" marginX={0.5} flexShrink={0} />
     </HStack>
   );
 }

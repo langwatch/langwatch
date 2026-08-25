@@ -39,9 +39,7 @@ function makeService() {
   };
   const prisma = {
     project: {
-      findUnique: vi
-        .fn()
-        .mockResolvedValue({ team: { organizationId: "org_1" } }),
+      findUnique: vi.fn().mockResolvedValue({ team: { organizationId: "org_1" } }),
     },
     $transaction: (fn: (tx: unknown) => Promise<unknown>) => fn({}),
   };

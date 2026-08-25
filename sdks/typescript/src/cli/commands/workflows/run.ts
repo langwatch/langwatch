@@ -47,14 +47,17 @@ export const runWorkflowCommand = async ({
     const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
 
-    const response = await fetch(`${endpoint}/api/workflows/${encodeURIComponent(id)}/run`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+    const response = await fetch(
+      `${endpoint}/api/workflows/${encodeURIComponent(id)}/run`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders({ apiKey }),
+        },
+        body: JSON.stringify(input),
       },
-      body: JSON.stringify(input),
-    });
+    );
 
     if (!response.ok) {
       const message = await formatFetchError(response);
@@ -62,7 +65,7 @@ export const runWorkflowCommand = async ({
       process.exit(1);
     }
 
-    const result = await response.json() as Record<string, unknown>;
+    const result = (await response.json()) as Record<string, unknown>;
 
     spinner.succeed(`Workflow "${id}" executed successfully`);
 
@@ -72,13 +75,16 @@ export const runWorkflowCommand = async ({
         console.log();
         if (result.output !== undefined) {
           console.log(chalk.bold("  Output:"));
-          const output = typeof result.output === "string"
-            ? result.output
-            : JSON.stringify(result.output, null, 2);
+          const output =
+            typeof result.output === "string"
+              ? result.output
+              : JSON.stringify(result.output, null, 2);
           console.log(`    ${output.split("\n").join("\n    ")}`);
         } else {
           console.log(chalk.bold("  Result:"));
-          console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
+          console.log(
+            `    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`,
+          );
         }
         console.log();
       },

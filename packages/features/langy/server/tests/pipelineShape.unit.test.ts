@@ -9,9 +9,7 @@ import {
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  LANGY_CONVERSATION_PROCESS_NAME,
-} from "@langwatch/langy-server/eventing/langy-conversation-processing/process-manager";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "@langwatch/langy-server/eventing/langy-conversation-processing/process-manager";
 import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
 import {
   agentRespondedEvent,
@@ -55,9 +53,7 @@ const SUBSCRIBER_NAMES = [
   "langyConversationUpdateBroadcast",
 ] as const;
 
-function buildPipeline(
-  overrides: Partial<LangyConversationProcessingPipelineDeps> = {},
-) {
+function buildPipeline(overrides: Partial<LangyConversationProcessingPipelineDeps> = {}) {
   const analyticsAppend = vi.fn().mockResolvedValue(undefined);
   const subscribers: EventSubscriberDefinition<LangyConversationProcessingEvent>[] =
     SUBSCRIBER_NAMES.map((name) => ({
@@ -123,9 +119,7 @@ describe("langy-conversation-processing pipeline shape", () => {
           "langyMessageOperational",
         ]);
         // The analytics map is a distinct registration from the message map.
-        expect(
-          pipeline.mapProjections.get("langyAnalyticsEvent")?.definition,
-        ).not.toBe(
+        expect(pipeline.mapProjections.get("langyAnalyticsEvent")?.definition).not.toBe(
           pipeline.mapProjections.get("langyMessageOperational")?.definition,
         );
       });
@@ -137,9 +131,7 @@ describe("langy-conversation-processing pipeline shape", () => {
         // regresses to zero the process silently stops being mounted.
         const { pipeline } = buildPipeline();
 
-        const pm = pipeline.processManagers.get(
-          LANGY_CONVERSATION_PROCESS_NAME,
-        );
+        const pm = pipeline.processManagers.get(LANGY_CONVERSATION_PROCESS_NAME);
         expect(pm).toBeDefined();
         expect(pm!.config.eventTypes.length).toBeGreaterThan(0);
         // The content boundary is what keeps message parts and tokens out of
@@ -169,9 +161,7 @@ describe("langy-conversation-processing pipeline shape", () => {
           [...SUBSCRIBER_NAMES].sort(),
         );
         for (const subscriber of subscribers) {
-          expect(pipeline.eventSubscribers.get(subscriber.name)).toBe(
-            subscriber,
-          );
+          expect(pipeline.eventSubscribers.get(subscriber.name)).toBe(subscriber);
         }
         // A live event subscriber is not smuggled into either projection
         // subscriber registry.
@@ -203,9 +193,7 @@ describe("langy-conversation-processing pipeline shape", () => {
   describe("given the analytics map projection from the static definition", () => {
     function analyticsDefinition() {
       const { pipeline, analyticsAppend } = buildPipeline();
-      const definition = pipeline.mapProjections.get(
-        "langyAnalyticsEvent",
-      )?.definition;
+      const definition = pipeline.mapProjections.get("langyAnalyticsEvent")?.definition;
       if (!definition) throw new Error("langyAnalyticsEvent not registered");
       return { definition, analyticsAppend };
     }
@@ -234,9 +222,7 @@ describe("langy-conversation-processing pipeline shape", () => {
         };
 
         // The framework's per-event step: pure map -> append. No prior read.
-        const record = definition.map(
-          event as LangyConversationProcessingEvent,
-        );
+        const record = definition.map(event as LangyConversationProcessingEvent);
         expect(record).not.toBeNull();
         await definition.store.append(record!, context);
 

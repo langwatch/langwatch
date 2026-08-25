@@ -15,7 +15,14 @@ Four kinds of patterns:
 
 Each has a `deny` list and an optional `allow` list.
 
-<Note>**Enforcement point:** policy-rule checks run immediately after authentication and rate limiting, **before** guardrails, budget reconciliation, or the upstream provider. The tools, MCP, and URL dimensions judge the request body as sent. The models dimension runs one step later, at model resolution, and judges the resolved model. A blocked request never incurs a provider token cost, a guardrail evaluator run, or a budget debit. This is the cheapest possible reject path in the dispatcher.</Note>
+<Note>
+  **Enforcement point:** policy-rule checks run immediately after authentication and rate
+  limiting, **before** guardrails, budget reconciliation, or the upstream provider. The
+  tools, MCP, and URL dimensions judge the request body as sent. The models dimension runs
+  one step later, at model resolution, and judges the resolved model. A blocked request
+  never incurs a provider token cost, a guardrail evaluator run, or a budget debit. This
+  is the cheapest possible reject path in the dispatcher.
+</Note>
 
 ## How it works
 
@@ -23,19 +30,19 @@ Each has a `deny` list and an optional `allow` list.
 {
   "policy_rules": {
     "tools": {
-      "deny":  ["^shell\\.", "^filesystem\\.(write|delete|chmod)$"],
+      "deny": ["^shell\\.", "^filesystem\\.(write|delete|chmod)$"],
       "allow": null
     },
     "mcp": {
-      "deny":  ["^.*@mcp/unverified.*$"],
+      "deny": ["^.*@mcp/unverified.*$"],
       "allow": null
     },
     "urls": {
-      "deny":  [],
+      "deny": [],
       "allow": ["^https?://(allowed\\.example\\.com|api\\.internal\\.com)/.*"]
     },
     "models": {
-      "deny":  ["^gpt-4(-turbo)?$"],
+      "deny": ["^gpt-4(-turbo)?$"],
       "allow": null
     }
   }
@@ -69,7 +76,13 @@ Blocked → `403 tool_not_allowed` (we conflate MCP denials with tool denials fo
 
 First URL that hits a deny rule (or falls outside a non-null `allow` list) → `403 url_not_allowed` before the request reaches any upstream provider. Attribution via request-id correlation (see [§Tools](#tools) above).
 
-<Note>**Enforcement vs egress control.** This layer stops a *request* from reaching a provider when it contains a disallowed URL. It does **not** prevent a provider from returning a URL that a downstream tool-runner then fetches, that requires an egress proxy on the node running the tool call, which is out of scope for the gateway. Pair blocked URLs with egress controls for defence in depth.</Note>
+<Note>
+  **Enforcement vs egress control.** This layer stops a *request* from reaching a provider
+  when it contains a disallowed URL. It does **not** prevent a provider from returning a
+  URL that a downstream tool-runner then fetches, that requires an egress proxy on the
+  node running the tool call, which is out of scope for the gateway. Pair blocked URLs
+  with egress controls for defence in depth.
+</Note>
 
 ### Models
 
@@ -90,10 +103,10 @@ Blocked → `403 model_not_allowed`. Attribution via request-id correlation (see
 
 Both gate which models a VK can call, but they solve different problems:
 
-| Field | Shape | When to use |
-|---|---|---|
-| `models_allowed` | `["claude-haiku-*", "gpt-5-mini"]` (glob allowlist) | Static, human-readable "these models and no others." Simplest case. |
-| `policy_rules.models` | `{deny: [...], allow: [...]}` (RE2 regex) | Policy that needs regex power, "deny any `gpt-4*` except `gpt-4o-mini`," "deny anything not from a provider prefix." |
+| Field                 | Shape                                               | When to use                                                                                                          |
+| --------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `models_allowed`      | `["claude-haiku-*", "gpt-5-mini"]` (glob allowlist) | Static, human-readable "these models and no others." Simplest case.                                                  |
+| `policy_rules.models` | `{deny: [...], allow: [...]}` (RE2 regex)           | Policy that needs regex power, "deny any `gpt-4*` except `gpt-4o-mini`," "deny anything not from a provider prefix." |
 
 They compose: a request passes only if both checks allow it. The gateway applies `models_allowed` first, at model resolution. The regex rules then judge the resolved model. The two checks read the resolved model in the two spellings, so an alias cannot go around them. Use `models_allowed` unless you need regex semantics, then reach for `policy_rules.models`.
 
@@ -136,12 +149,12 @@ They compose: a request passes only if both checks allow it. The gateway applies
 
 On the VK edit screen (Gateway → Virtual Keys → **Edit**), the **Policy Rules** section has four rows, one per dimension, each with a pair of monospace textareas:
 
-| Row | Deny textarea | Allow textarea |
-|---|---|---|
-| **Tools** | RE2 regexes, one per line. Match against `tools[].function.name` (OpenAI) and `tools[].name` (Anthropic). | Non-empty → only tools matching `allow` pass. Empty → deny-only. |
-| **MCP** | RE2 regexes for MCP server names and URLs. | Same allow semantics. |
-| **URLs** | RE2 regexes matched against every `http(s)://` URL extracted from the request body. | Same allow semantics. |
-| **Models** | RE2 regex policy on the resolved model, after any alias is applied (distinct from the static `models_allowed` glob on the top of the VK form). | Same allow semantics. |
+| Row        | Deny textarea                                                                                                                                  | Allow textarea                                                   |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **Tools**  | RE2 regexes, one per line. Match against `tools[].function.name` (OpenAI) and `tools[].name` (Anthropic).                                      | Non-empty → only tools matching `allow` pass. Empty → deny-only. |
+| **MCP**    | RE2 regexes for MCP server names and URLs.                                                                                                     | Same allow semantics.                                            |
+| **URLs**   | RE2 regexes matched against every `http(s)://` URL extracted from the request body.                                                            | Same allow semantics.                                            |
+| **Models** | RE2 regex policy on the resolved model, after any alias is applied (distinct from the static `models_allowed` glob on the top of the VK form). | Same allow semantics.                                            |
 
 The section header links to the relevant 403 error codes (`tool_not_allowed`, `url_not_allowed`, `model_not_allowed`) and calls out the fail-closed behaviour: **if any regex is invalid, the VK fails with 503 service_unavailable, never silent-bypass**. Fix the pattern, save the VK, and the next request picks it up (the bundle refresh invalidates the broken compiled cache).
 

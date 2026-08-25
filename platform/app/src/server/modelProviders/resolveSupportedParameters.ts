@@ -1,7 +1,4 @@
-import type {
-  CustomModelEntry,
-  SupportedParameter,
-} from "./customModel.schema";
+import type { CustomModelEntry, SupportedParameter } from "./customModel.schema";
 import { getModelMetadata } from "./registry";
 
 type ProviderWithCustomModels = {
@@ -59,9 +56,10 @@ export function resolveSupportedParameters(
  * the caller sees the input untouched. This preserves legacy behavior
  * for any model we don't have metadata for yet.
  */
-export function filterUnsupportedSamplingParams<
-  T extends Record<string, unknown>,
->(params: T, allowed: SupportedParameter[] | null): T {
+export function filterUnsupportedSamplingParams<T extends Record<string, unknown>>(
+  params: T,
+  allowed: SupportedParameter[] | null,
+): T {
   if (allowed === null) return params;
   const set = new Set<string>(allowed);
   // max_tokens is a hard ceiling, not a sampling knob; gateways need it

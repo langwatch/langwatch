@@ -45,8 +45,7 @@ export function FrameworkGrid({
     <VStack align="stretch" gap={3}>
       <VStack align="stretch" gap={0.5}>
         <Text fontSize="md" fontWeight="semibold" letterSpacing="-0.01em">
-          Integrate LangWatch with{" "}
-          {framework?.label ?? "your selected framework"}
+          Integrate LangWatch with {framework?.label ?? "your selected framework"}
         </Text>
         <Text fontSize="xs" color="fg.muted" lineHeight="tall">
           Pick your model provider or framework to tailor setup guide.

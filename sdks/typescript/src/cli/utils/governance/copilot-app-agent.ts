@@ -52,12 +52,8 @@ const defaultIo: AgentIo = {
 };
 
 /** The file registered with the OS service manager (no side effects). */
-export function copilotAppAgentPath(
-  platform: AppPlatform,
-  home: string,
-): string {
-  return renderLaunchAgent({ platform, home, execPath: "", env: {} })
-    .registerPath;
+export function copilotAppAgentPath(platform: AppPlatform, home: string): string {
+  return renderLaunchAgent({ platform, home, execPath: "", env: {} }).registerPath;
 }
 
 /** Every file the agent writes on this platform — for cleanup. Paths are
@@ -98,10 +94,7 @@ interface OsCommand {
 }
 
 /** The OS commands that register the descriptor, per platform. */
-function registerCommands(
-  platform: AppPlatform,
-  descriptorPath: string,
-): OsCommand[] {
+function registerCommands(platform: AppPlatform, descriptorPath: string): OsCommand[] {
   switch (platform) {
     case "darwin":
       return [
@@ -113,10 +106,7 @@ function registerCommands(
         // silently off — verified against launchd on macOS 15.
         {
           cmd: "launchctl",
-          args: [
-            "bootout",
-            `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`,
-          ],
+          args: ["bootout", `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`],
           tolerateFailure: true,
         },
         {
@@ -167,22 +157,14 @@ function unregisterCommands(platform: AppPlatform): OsCommand[] {
       return [
         {
           cmd: "launchctl",
-          args: [
-            "bootout",
-            `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`,
-          ],
+          args: ["bootout", `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`],
         },
       ];
     case "linux":
       return [
         {
           cmd: "systemctl",
-          args: [
-            "--user",
-            "disable",
-            "--now",
-            `${COPILOT_APP_AGENT_LABEL}.service`,
-          ],
+          args: ["--user", "disable", "--now", `${COPILOT_APP_AGENT_LABEL}.service`],
         },
       ];
     case "win32":

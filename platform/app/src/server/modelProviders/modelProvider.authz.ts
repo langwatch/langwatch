@@ -47,10 +47,7 @@ export function requiredManagePermission(
   return "project:manage";
 }
 
-async function canManageScope(
-  ctx: RBACContext,
-  scope: Scope,
-): Promise<boolean> {
+async function canManageScope(ctx: RBACContext, scope: Scope): Promise<boolean> {
   if (!ctx.session) return false;
   if (scope.scopeType === "ORGANIZATION") {
     return probeOrganizationPermission(

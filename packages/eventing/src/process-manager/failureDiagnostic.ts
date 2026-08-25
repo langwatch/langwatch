@@ -1,5 +1,4 @@
-const GENERIC_FAILURE_MESSAGE =
-  "Operation failed; sensitive details were omitted";
+const GENERIC_FAILURE_MESSAGE = "Operation failed; sensitive details were omitted";
 
 /**
  * Returns a bounded diagnostic that is safe for logs and exported telemetry.

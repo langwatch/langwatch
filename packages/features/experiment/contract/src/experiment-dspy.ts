@@ -74,25 +74,15 @@ export const experimentDspyStepLookupSchema = z.object({
   stepIndex: z.string(),
 });
 
-export const experimentDspyStepsLookupSchema = experimentDspyStepLookupSchema
-  .pick({ tenantId: true, experimentId: true });
+export const experimentDspyStepsLookupSchema = experimentDspyStepLookupSchema.pick({
+  tenantId: true,
+  experimentId: true,
+});
 
-export type ExperimentDspyExample = z.infer<
-  typeof experimentDspyExampleSchema
->;
-export type ExperimentDspyLlmCall = z.infer<
-  typeof experimentDspyLlmCallSchema
->;
-export type ExperimentDspyPredictor = z.infer<
-  typeof experimentDspyPredictorSchema
->;
+export type ExperimentDspyExample = z.infer<typeof experimentDspyExampleSchema>;
+export type ExperimentDspyLlmCall = z.infer<typeof experimentDspyLlmCallSchema>;
+export type ExperimentDspyPredictor = z.infer<typeof experimentDspyPredictorSchema>;
 export type ExperimentDspyStep = z.infer<typeof experimentDspyStepSchema>;
-export type ExperimentDspyStepSummary = z.infer<
-  typeof experimentDspyStepSummarySchema
->;
-export type ExperimentDspyStepLookup = z.infer<
-  typeof experimentDspyStepLookupSchema
->;
-export type ExperimentDspyStepsLookup = z.infer<
-  typeof experimentDspyStepsLookupSchema
->;
+export type ExperimentDspyStepSummary = z.infer<typeof experimentDspyStepSummarySchema>;
+export type ExperimentDspyStepLookup = z.infer<typeof experimentDspyStepLookupSchema>;
+export type ExperimentDspyStepsLookup = z.infer<typeof experimentDspyStepsLookupSchema>;

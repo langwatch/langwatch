@@ -42,9 +42,7 @@ import { sendLicenseEmail } from "~/server/mailer/licenseEmail";
 import { LicensePurchaseService } from "../license-purchase.service";
 
 const mockSendLicenseEmail = sendLicenseEmail as ReturnType<typeof vi.fn>;
-const handleLicensePurchase = (
-  input: Parameters<LicensePurchaseService["handle"]>[0],
-) =>
+const handleLicensePurchase = (input: Parameters<LicensePurchaseService["handle"]>[0]) =>
   LicensePurchaseService.create({
     sendLicenseEmail,
     notifyLicensePurchase: mockSendSlackLicensePurchase,
@@ -151,9 +149,7 @@ describe("licensePurchaseHandler", () => {
             stripe: mockStripe as any,
             privateKey: "test-private-key",
           }),
-        ).rejects.toThrow(
-          "No email found in checkout session customer_details",
-        );
+        ).rejects.toThrow("No email found in checkout session customer_details");
       });
     });
 

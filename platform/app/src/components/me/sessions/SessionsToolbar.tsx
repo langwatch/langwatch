@@ -2,10 +2,7 @@ import { HStack } from "@chakra-ui/react";
 import type { PeriodSelection } from "@langwatch/coding-agent-web";
 import type React from "react";
 
-import {
-  computeRelativeWindow,
-  PeriodSelector,
-} from "~/components/PeriodSelector";
+import { computeRelativeWindow, PeriodSelector } from "~/components/PeriodSelector";
 import { SearchInput } from "~/components/ui/SearchInput";
 
 /**

@@ -287,9 +287,7 @@ export const ScenarioExecutionResultSchema = z.object({
   /** When true, the job was cancelled by user (not a crash/error). */
   cancelled: z.boolean().optional(),
 });
-export type ScenarioExecutionResult = z.infer<
-  typeof ScenarioExecutionResultSchema
->;
+export type ScenarioExecutionResult = z.infer<typeof ScenarioExecutionResultSchema>;
 
 // ============================================================================
 // Child Process Types (for OTEL isolation)
@@ -370,8 +368,7 @@ export const ChildProcessJobDataSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["judgeModelParams"],
-        message:
-          "No model params for the judge, and no modelParams to fall back to",
+        message: "No model params for the judge, and no modelParams to fall back to",
       });
     }
   });

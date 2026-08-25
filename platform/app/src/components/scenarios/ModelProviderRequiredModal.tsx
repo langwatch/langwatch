@@ -26,9 +26,9 @@ export function ModelProviderRequiredModal({
               <Icon as={AlertTriangle} boxSize={6} />
             </Box>
             <Text color="fg.muted" fontSize="sm" textAlign="center">
-              Scenarios need an enabled provider with a default model to run.
-              Configure default model provider to get started, or proceed to
-              create a new scenario anyway.
+              Scenarios need an enabled provider with a default model to run. Configure
+              default model provider to get started, or proceed to create a new scenario
+              anyway.
             </Text>
           </VStack>
         </Dialog.Body>

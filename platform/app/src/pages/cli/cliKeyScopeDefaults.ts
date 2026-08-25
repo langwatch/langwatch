@@ -23,9 +23,7 @@ import type { ScopeTriadEntry } from "~/components/settings/ScopeChipPicker";
 export function defaultCliKeyScopes(args: {
   organizationId: string;
   /** The caller's own role bindings in this organization. */
-  bindings:
-    | Array<{ scopeType: string; scopeId: string; role: string }>
-    | undefined;
+  bindings: Array<{ scopeType: string; scopeId: string; role: string }> | undefined;
   /** Non-personal team ids of the organization, in display order. */
   sharedTeamIds: string[];
   /** The caller's own personal workspace project, when one exists. */

@@ -56,9 +56,7 @@ class RequestLimiterService {
     redisUrl: Config.url(),
   });
 
-  static create(input: {
-    config: ConfigValue<typeof RequestLimiterService.config>;
-  }) {
+  static create(input: { config: ConfigValue<typeof RequestLimiterService.config> }) {
     return new RequestLimiterService(input.config);
   }
 }

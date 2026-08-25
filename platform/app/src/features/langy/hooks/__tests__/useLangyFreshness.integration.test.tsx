@@ -34,9 +34,7 @@ const eventsAfterFetch = vi.fn();
 
 // The callback the coordinator hands the SSE listener — driving it is how a
 // test delivers a freshness signal through the real hook logic.
-let capturedOnUpdate:
-  | ((signals: LangyConversationUpdateSignal[]) => void)
-  | null = null;
+let capturedOnUpdate: ((signals: LangyConversationUpdateSignal[]) => void) | null = null;
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: PROJECT_ID } }),
@@ -233,13 +231,9 @@ describe("the open conversation's catch-up from the recorded tail", () => {
         deliverSignal(at(300, "evt_c"));
 
         await waitFor(() =>
-          expect(useLangyStore.getState().turnProjection.turn?.Status).toBe(
-            "completed",
-          ),
+          expect(useLangyStore.getState().turnProjection.turn?.Status).toBe("completed"),
         );
-        expect(
-          useLangyStore.getState().turnProjection.turn?.ToolCalls,
-        ).toHaveLength(0);
+        expect(useLangyStore.getState().turnProjection.turn?.ToolCalls).toHaveLength(0);
       });
     });
   });
@@ -273,10 +267,7 @@ describe("the open conversation's catch-up from the recorded tail", () => {
         // The snapshot resolves at a position taken BEFORE the step.
         snapshotLoads(at(100, "evt_a"), TURN_ID);
         eventsAfterFetch.mockResolvedValue(
-          tail(
-            [toolInitiated({ id: "evt_b", createdAt: 200 })],
-            at(200, "evt_b"),
-          ),
+          tail([toolInitiated({ id: "evt_b", createdAt: 200 })], at(200, "evt_b")),
         );
         deliverSignal(at(200, "evt_b"));
 
@@ -290,9 +281,7 @@ describe("the open conversation's catch-up from the recorded tail", () => {
           conversationId: CONVERSATION_ID,
           after: at(100, "evt_a"),
         });
-        expect(
-          useLangyStore.getState().turnProjection.turn?.ToolCalls,
-        ).toHaveLength(1);
+        expect(useLangyStore.getState().turnProjection.turn?.ToolCalls).toHaveLength(1);
 
         // A re-delivery of the same signal is now at-or-behind the fold: no
         // second read, and the folded document is the very same object — the
@@ -337,9 +326,7 @@ describe("the open conversation's catch-up from the recorded tail", () => {
           after: at(100, "evt_a"),
         });
         const { turn } = useLangyStore.getState().turnProjection;
-        expect(turn?.ToolCalls.map((call) => call.toolCallId)).toEqual([
-          "call-1",
-        ]);
+        expect(turn?.ToolCalls.map((call) => call.toolCallId)).toEqual(["call-1"]);
         expect(turn?.Status).toBe("completed");
       });
 
@@ -459,9 +446,7 @@ describe("the open conversation's catch-up from the recorded tail", () => {
 
         deliverSignal(at(300, "evt_c"));
 
-        await waitFor(() =>
-          expect(useLangyStore.getState().turnPhase).toBe("idle"),
-        );
+        await waitFor(() => expect(useLangyStore.getState().turnPhase).toBe("idle"));
         // One fetch — everything missed while away arrives in a single tail.
         expect(eventsAfterFetch).toHaveBeenCalledTimes(1);
         const { turn } = useLangyStore.getState().turnProjection;

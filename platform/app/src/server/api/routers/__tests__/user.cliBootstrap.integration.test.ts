@@ -193,9 +193,7 @@ describe("user.cliBootstrap integration", () => {
         organizationId: ORG_ID,
       });
 
-      expect(result.tools).toEqual([
-        { slug: "claude", displayName: "Claude Code" },
-      ]);
+      expect(result.tools).toEqual([{ slug: "claude", displayName: "Claude Code" }]);
       expect(result.providers).toEqual([
         { name: "anthropic", displayName: "Anthropic", configured: false },
       ]);

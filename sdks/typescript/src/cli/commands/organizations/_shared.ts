@@ -9,10 +9,7 @@ import {
   INSTANCE_ADMIN_KEY_ENV,
   OrganizationsAdminApiService,
 } from "@/client-sdk/services/organizations-admin/organizations-admin-api.service";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 
 /** The instance credential from the flag or the environment, or a refusal. */
 export const requireInstanceKey = (fromFlag?: string): string => {
@@ -28,7 +25,5 @@ export const requireInstanceKey = (fromFlag?: string): string => {
   return instanceKey;
 };
 
-export const instanceAdminService = (
-  instanceKey: string,
-): OrganizationsAdminApiService =>
+export const instanceAdminService = (instanceKey: string): OrganizationsAdminApiService =>
   new OrganizationsAdminApiService({ instanceKey });

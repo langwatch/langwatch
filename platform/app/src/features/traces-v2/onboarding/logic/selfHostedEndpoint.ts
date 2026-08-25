@@ -8,9 +8,7 @@ import { CLOUD_ENDPOINT } from "~/features/onboarding/components/sections/shared
  * `BASE_HOST` counts as the default too: emitting `LANGWATCH_ENDPOINT=""`
  * silently breaks the SDK.
  */
-export function selfHostedEndpoint(
-  baseHost: string | undefined,
-): string | null {
+export function selfHostedEndpoint(baseHost: string | undefined): string | null {
   if (!baseHost || baseHost === CLOUD_ENDPOINT) return null;
   return baseHost;
 }

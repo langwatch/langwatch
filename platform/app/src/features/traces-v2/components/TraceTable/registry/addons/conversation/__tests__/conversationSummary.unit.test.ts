@@ -47,9 +47,9 @@ describe("given an expanded session holding more traces than the turn preview lo
   describe("when the expanded summary renders", () => {
     /** @scenario An expanded session says how much of it the turn list shows */
     it("reports how many of the session's traces are listed", () => {
-      expect(
-        traceCountLabel(group({ traceCount: 250, traces: turns(100) })),
-      ).toBe("100 of 250 traces");
+      expect(traceCountLabel(group({ traceCount: 250, traces: turns(100) }))).toBe(
+        "100 of 250 traces",
+      );
     });
 
     it("reports the plain total once every turn is loaded", () => {
@@ -59,15 +59,11 @@ describe("given an expanded session holding more traces than the turn preview lo
     });
 
     it("reports the plain total before any turn has loaded", () => {
-      expect(traceCountLabel(group({ traceCount: 250, traces: [] }))).toBe(
-        "250 traces",
-      );
+      expect(traceCountLabel(group({ traceCount: 250, traces: [] }))).toBe("250 traces");
     });
 
     it("keeps the singular for a one-trace session", () => {
-      expect(traceCountLabel(group({ traceCount: 1, traces: turns(1) }))).toBe(
-        "1 trace",
-      );
+      expect(traceCountLabel(group({ traceCount: 1, traces: turns(1) }))).toBe("1 trace");
     });
   });
 });

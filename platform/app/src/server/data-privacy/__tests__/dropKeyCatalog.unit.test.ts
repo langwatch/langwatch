@@ -14,9 +14,7 @@ import {
 } from "../dropKeyCatalog";
 
 function policy(
-  dispositions: Partial<
-    Record<"input" | "output" | "system" | "tools", Disposition>
-  >,
+  dispositions: Partial<Record<"input" | "output" | "system" | "tools", Disposition>>,
   customAttributes: ResolvedDataPrivacy["customAttributes"] = [],
 ): ResolvedDataPrivacy {
   const cat = (d: Disposition = "capture") => ({
@@ -36,9 +34,7 @@ function policy(
   };
 }
 
-function dropRule(
-  pattern: string,
-): ResolvedDataPrivacy["customAttributes"][number] {
+function dropRule(pattern: string): ResolvedDataPrivacy["customAttributes"][number] {
   return { pattern, disposition: "drop", audience: { ...EMPTY_AUDIENCE } };
 }
 
@@ -92,9 +88,9 @@ describe("computeDropMatchers", () => {
 
 describe("droppedCategories", () => {
   it("lists only the categories set to drop", () => {
-    expect(
-      droppedCategories(policy({ input: "drop", output: "restrict" })),
-    ).toEqual(["input"]);
+    expect(droppedCategories(policy({ input: "drop", output: "restrict" }))).toEqual([
+      "input",
+    ]);
   });
 });
 

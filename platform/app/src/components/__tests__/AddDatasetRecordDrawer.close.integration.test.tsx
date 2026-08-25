@@ -9,14 +9,7 @@
  * See specs/traces-v2/drawer-stacking.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -123,13 +116,10 @@ vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-const { AddDatasetRecordDrawerV2 } = await import(
-  "~/components/AddDatasetRecordDrawer"
-);
+const { AddDatasetRecordDrawerV2 } = await import("~/components/AddDatasetRecordDrawer");
 const { clearDrawerStack, useDrawer } = await import("~/hooks/useDrawer");
-const { useAnnotationQueueSessionStore } = await import(
-  "~/features/traces-v2/stores/annotationQueueSessionStore"
-);
+const { useAnnotationQueueSessionStore } =
+  await import("~/features/traces-v2/stores/annotationQueueSessionStore");
 
 /** Opens the trace drawer the way a trace row does, then the dataset drawer. */
 function OpenFromTrace() {

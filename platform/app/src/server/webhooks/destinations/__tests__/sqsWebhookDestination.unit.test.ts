@@ -124,9 +124,7 @@ describe("sqsWebhookDestination", () => {
       expect(attributes[WEBHOOK_SIGNATURE_HEADER]!.StringValue).toMatch(
         /^t=\d+,v1=[0-9a-f]+/,
       );
-      expect(attributes["X-LangWatch-Delivery-Id"]!.StringValue).toBe(
-        "wh_1:abc123",
-      );
+      expect(attributes["X-LangWatch-Delivery-Id"]!.StringValue).toBe("wh_1:abc123");
       expect(attributes["X-LangWatch-Delivery-Attempt"]!.StringValue).toBe("3");
       // A consumer that routes test fires away from its ingest path reads this
       // attribute, so its absence on an ordinary delivery is the contract too.
@@ -277,15 +275,11 @@ describe("sqsWebhookDestination", () => {
           name: "AWS.SimpleQueueService.NonExistentQueue",
         }).verdict,
       ).toBe("terminal");
-      expect(classifySqsFailure({ name: "QueueDoesNotExist" }).verdict).toBe(
+      expect(classifySqsFailure({ name: "QueueDoesNotExist" }).verdict).toBe("terminal");
+      expect(classifySqsFailure({ name: "AccessDenied" }).verdict).toBe("terminal");
+      expect(classifySqsFailure({ name: "AccessDeniedException" }).verdict).toBe(
         "terminal",
       );
-      expect(classifySqsFailure({ name: "AccessDenied" }).verdict).toBe(
-        "terminal",
-      );
-      expect(
-        classifySqsFailure({ name: "AccessDeniedException" }).verdict,
-      ).toBe("terminal");
     });
 
     /** @scenario A missing or forbidden queue is terminal, a throttled one retries */
@@ -293,22 +287,18 @@ describe("sqsWebhookDestination", () => {
       expect(classifySqsFailure({ name: "ThrottlingException" }).verdict).toBe(
         "retryable",
       );
-      expect(
-        classifySqsFailure({ $metadata: { httpStatusCode: 503 } }).verdict,
-      ).toBe("retryable");
-      expect(classifySqsFailure({ code: "ECONNRESET" }).verdict).toBe(
+      expect(classifySqsFailure({ $metadata: { httpStatusCode: 503 } }).verdict).toBe(
         "retryable",
       );
+      expect(classifySqsFailure({ code: "ECONNRESET" }).verdict).toBe("retryable");
     });
 
     /** @scenario A missing or forbidden queue is terminal, a throttled one retries */
     it("keeps an expired credential retryable, so an expiring session is not a dead queue", () => {
-      expect(classifySqsFailure({ name: "ExpiredToken" }).verdict).toBe(
+      expect(classifySqsFailure({ name: "ExpiredToken" }).verdict).toBe("retryable");
+      expect(classifySqsFailure({ name: "ExpiredTokenException" }).verdict).toBe(
         "retryable",
       );
-      expect(
-        classifySqsFailure({ name: "ExpiredTokenException" }).verdict,
-      ).toBe("retryable");
     });
 
     it("treats a failure it has never seen as retryable, since the ladder gives up on its own", () => {
@@ -464,9 +454,9 @@ describe("queue URL admission", () => {
   // this spelling has no region in it. Accepting it would mean guessing
   // us-east-1 and writing to whatever queue of that name lives there.
   it("refuses the region-less legacy spelling", () => {
-    expect(
-      inspectSqsQueueUrl("https://queue.amazonaws.com/381491922238/events"),
-    ).toEqual({ ok: false, problem: "shape" });
+    expect(inspectSqsQueueUrl("https://queue.amazonaws.com/381491922238/events")).toEqual(
+      { ok: false, problem: "shape" },
+    );
   });
 });
 

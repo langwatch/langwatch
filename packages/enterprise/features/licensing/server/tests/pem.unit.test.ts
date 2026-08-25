@@ -63,15 +63,13 @@ describe("normalizePemKey, given input that is not one plain key", () => {
     });
 
     it("keeps a bundle signable, as it was before normalization", () => {
-      expect(
-        signAndVerify(normalizePemKey(`${TEST_PUBLIC_KEY}${canonicalKey}`)),
-      ).toBe(true);
+      expect(signAndVerify(normalizePemKey(`${TEST_PUBLIC_KEY}${canonicalKey}`))).toBe(
+        true,
+      );
     });
 
     it("selects the private key when it comes first too", () => {
-      expect(normalizePemKey(`${canonicalKey}${TEST_PUBLIC_KEY}`)).toBe(
-        canonicalKey,
-      );
+      expect(normalizePemKey(`${canonicalKey}${TEST_PUBLIC_KEY}`)).toBe(canonicalKey);
     });
   });
 
@@ -103,9 +101,7 @@ describe("normalizePemKey, given an encrypted key", () => {
       const normalized = normalizePemKey(`   ${encryptedKey}`);
 
       expect(normalized).toContain("Proc-Type: 4,ENCRYPTED\nDEK-Info:");
-      expect(normalized.startsWith("-----BEGIN RSA PRIVATE KEY-----")).toBe(
-        true,
-      );
+      expect(normalized.startsWith("-----BEGIN RSA PRIVATE KEY-----")).toBe(true);
     });
 
     it("keeps the header block intact when every line is indented", () => {

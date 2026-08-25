@@ -12,13 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { useRef, useState } from "react";
 import type { IconType } from "react-icons";
-import {
-  LuBuilding2,
-  LuCopy,
-  LuFolderClosed,
-  LuGlobe,
-  LuTrash2,
-} from "react-icons/lu";
+import { LuBuilding2, LuCopy, LuFolderClosed, LuGlobe, LuTrash2 } from "react-icons/lu";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Dialog } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
@@ -208,9 +202,7 @@ function CreateShareLinkForm({
           <Select.Root
             collection={visibilityCollection}
             value={[visibility]}
-            onValueChange={(e) =>
-              setVisibility(e.value[0] as ShareVisibilityOption)
-            }
+            onValueChange={(e) => setVisibility(e.value[0] as ShareVisibilityOption)}
           >
             <Select.Trigger>
               <Select.ValueText />
@@ -344,15 +336,8 @@ export function ShareTraceDialog({
   projectId: string | undefined;
   traceId: string;
 }) {
-  const {
-    links,
-    isLoading,
-    isError,
-    createLink,
-    isCreating,
-    revokeLink,
-    revokingId,
-  } = useShareTrace({ projectId, traceId, active: open });
+  const { links, isLoading, isError, createLink, isCreating, revokeLink, revokingId } =
+    useShareTrace({ projectId, traceId, active: open });
 
   // Park initial focus on the panel itself. Left to its own devices the dialog
   // focuses the close button, which opens with a focus ring drawn around it.

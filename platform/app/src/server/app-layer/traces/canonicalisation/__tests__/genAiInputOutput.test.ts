@@ -66,9 +66,7 @@ describe("CanonicalizeSpanAttributesService", () => {
       expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
 
       // gen_ai.output.messages must survive as-is
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(
-        outputMessages,
-      );
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
 
       // Model and usage should be extracted correctly
       expect(result.attributes["gen_ai.request.model"]).toBe("claude-opus-4-6");
@@ -113,9 +111,7 @@ describe("CanonicalizeSpanAttributesService", () => {
           parts: [{ type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" }],
         },
       ]);
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(
-        outputMessages,
-      );
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
 
       // System instruction extracted from content blocks using 'content' field
       expect(result.attributes["gen_ai.system_instructions"]).toBe(
@@ -147,9 +143,7 @@ describe("CanonicalizeSpanAttributesService", () => {
         {
           "gen_ai.input.messages": inputMessages,
           // Legacy key that should NOT overwrite gen_ai.input.messages
-          "gen_ai.prompt": JSON.stringify([
-            { role: "user", content: "Legacy prompt" },
-          ]),
+          "gen_ai.prompt": JSON.stringify([{ role: "user", content: "Legacy prompt" }]),
         },
         [],
         stubSpan,

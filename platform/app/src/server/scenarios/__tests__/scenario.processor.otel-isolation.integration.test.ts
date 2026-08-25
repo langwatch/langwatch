@@ -112,9 +112,7 @@ describe.skipIf(process.env.CI)("Scenario Processor - OTEL Isolation", () => {
       spawnChildProcessDirectly(jobData2, env),
     ]);
 
-    await new Promise((resolve) =>
-      setTimeout(resolve, CONCURRENT_TRACE_FLUSH_WAIT_MS),
-    );
+    await new Promise((resolve) => setTimeout(resolve, CONCURRENT_TRACE_FLUSH_WAIT_MS));
 
     expect(result1.result).toBeDefined();
     expect(result2.result).toBeDefined();
@@ -124,21 +122,17 @@ describe.skipIf(process.env.CI)("Scenario Processor - OTEL Isolation", () => {
     const allBodies = mockCollector.requests.map((r) => r.body).join("");
 
     const hasScenarioA =
-      allBodies.includes("scenario-isolation-AAA") ||
-      allBodies.includes("batch-run-AAA");
+      allBodies.includes("scenario-isolation-AAA") || allBodies.includes("batch-run-AAA");
     const hasScenarioB =
-      allBodies.includes("scenario-isolation-BBB") ||
-      allBodies.includes("batch-run-BBB");
+      allBodies.includes("scenario-isolation-BBB") || allBodies.includes("batch-run-BBB");
 
     expect(hasScenarioA).toBe(true);
     expect(hasScenarioB).toBe(true);
 
     const hasMixedTraces = mockCollector.requests.some(
       (r) =>
-        (r.body.includes("scenario-isolation-AAA") ||
-          r.body.includes("batch-run-AAA")) &&
-        (r.body.includes("scenario-isolation-BBB") ||
-          r.body.includes("batch-run-BBB")),
+        (r.body.includes("scenario-isolation-AAA") || r.body.includes("batch-run-AAA")) &&
+        (r.body.includes("scenario-isolation-BBB") || r.body.includes("batch-run-BBB")),
     );
     expect(hasMixedTraces).toBe(false);
   }, 90000);

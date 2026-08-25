@@ -9,9 +9,7 @@ import { passesTraceOriginGuards } from "../_originGuardedSubscriber";
 
 const NOW = new Date("2026-07-18T12:00:00.000Z").getTime();
 
-function event(
-  overrides: Partial<TraceProcessingEvent> = {},
-): TraceProcessingEvent {
+function event(overrides: Partial<TraceProcessingEvent> = {}): TraceProcessingEvent {
   return {
     id: "event-1",
     aggregateId: "trace-1",
@@ -51,10 +49,7 @@ describe("passesTraceOriginGuards", () => {
     it("admits span and origin-resolution events", () => {
       expect(passesTraceOriginGuards(event(), fold())).toBe(true);
       expect(
-        passesTraceOriginGuards(
-          event({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
-          fold(),
-        ),
+        passesTraceOriginGuards(event({ type: ORIGIN_RESOLVED_EVENT_TYPE }), fold()),
       ).toBe(true);
     });
   });
@@ -62,10 +57,7 @@ describe("passesTraceOriginGuards", () => {
   describe("given an event older than one hour", () => {
     it("rejects it", () => {
       expect(
-        passesTraceOriginGuards(
-          event({ occurredAt: NOW - 60 * 60 * 1000 - 1 }),
-          fold(),
-        ),
+        passesTraceOriginGuards(event({ occurredAt: NOW - 60 * 60 * 1000 - 1 }), fold()),
       ).toBe(false);
     });
   });
@@ -73,10 +65,7 @@ describe("passesTraceOriginGuards", () => {
   describe("given a derived trace event", () => {
     it("rejects it", () => {
       expect(
-        passesTraceOriginGuards(
-          event({ type: "lw.obs.trace.topic_assigned" }),
-          fold(),
-        ),
+        passesTraceOriginGuards(event({ type: "lw.obs.trace.topic_assigned" }), fold()),
       ).toBe(false);
     });
   });
@@ -100,9 +89,7 @@ describe("passesTraceOriginGuards", () => {
 
   describe("given a trace without a usable resolved origin", () => {
     it("rejects unresolved and guardrail-blocked folds", () => {
-      expect(passesTraceOriginGuards(event(), fold({ attributes: {} }))).toBe(
-        false,
-      );
+      expect(passesTraceOriginGuards(event(), fold({ attributes: {} }))).toBe(false);
       expect(
         passesTraceOriginGuards(
           event(),

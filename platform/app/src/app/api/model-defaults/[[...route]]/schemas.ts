@@ -81,6 +81,4 @@ export type CreateModelDefaultConfigInput = z.infer<
 export type UpdateModelDefaultConfigInput = z.infer<
   typeof updateModelDefaultConfigInputSchema
 >;
-export type ApiResponseModelDefaults = z.infer<
-  typeof apiResponseModelDefaultsSchema
->;
+export type ApiResponseModelDefaults = z.infer<typeof apiResponseModelDefaultsSchema>;

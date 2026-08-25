@@ -18,20 +18,9 @@ import {
   ProcessRuntime,
 } from "@langwatch/eventing";
 import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
-import {
-  InMemorySpanExporter,
-  SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
@@ -60,8 +49,7 @@ function buildLangyManager(ports = createStubLangyEffectPorts().ports) {
   });
 }
 
-const W3C_TRACEPARENT_REGEX =
-  /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/;
+const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/;
 
 const ref: ProcessRef = {
   processName: LANGY_CONVERSATION_PROCESS_NAME,
@@ -111,13 +99,10 @@ describe("Langy process trace continuity", () => {
   function generatedSubscriber(ports = createStubLangyEffectPorts().ports) {
     const runtime = new ProcessRuntime({ store, consumersEnabled: false });
     const definition = buildLangyManager(ports);
-    const { subscribers } =
-      runtime.registerPipeline<LangyConversationProcessingEvent>({
-        pipelineName: "langy-conversation-processing",
-        processManagers: new Map([
-          [LANGY_CONVERSATION_PROCESS_NAME, definition],
-        ]),
-      });
+    const { subscribers } = runtime.registerPipeline<LangyConversationProcessingEvent>({
+      pipelineName: "langy-conversation-processing",
+      processManagers: new Map([[LANGY_CONVERSATION_PROCESS_NAME, definition]]),
+    });
     const subscriber = subscribers[0];
     if (!subscriber) throw new Error("runtime generated no subscriber");
     return subscriber;
@@ -127,31 +112,27 @@ describe("Langy process trace continuity", () => {
     handle: (event: any, context: any) => Promise<void>;
   }): Promise<{ producerTraceId: string }> {
     const tracer = trace.getTracer("test");
-    return await tracer.startActiveSpan(
-      "langy.queue.consume",
-      async (producer) => {
-        try {
-          await subscriber.handle(
-            agentTurnAcceptedEvent({
-              id: "evt_started",
-              occurredAt: T0,
-              turnId: "turn_1",
-            }),
-            subscriberContext,
-          );
-          return { producerTraceId: producer.spanContext().traceId };
-        } finally {
-          producer.end();
-        }
-      },
-    );
+    return await tracer.startActiveSpan("langy.queue.consume", async (producer) => {
+      try {
+        await subscriber.handle(
+          agentTurnAcceptedEvent({
+            id: "evt_started",
+            occurredAt: T0,
+            turnId: "turn_1",
+          }),
+          subscriberContext,
+        );
+        return { producerTraceId: producer.spanContext().traceId };
+      } finally {
+        producer.end();
+      }
+    });
   }
 
   describe("given the subscriber handles a queued event inside an active trace", () => {
     it("persists the ambient W3C carrier on the pending intent", async () => {
-      const { producerTraceId } = await handleStartedTurnInsideProducerSpan(
-        generatedSubscriber(),
-      );
+      const { producerTraceId } =
+        await handleStartedTurnInsideProducerSpan(generatedSubscriber());
 
       const [message] = await store.findMessagesByRef({ ref });
       expect(message).toBeDefined();
@@ -185,9 +166,7 @@ describe("Langy process trace continuity", () => {
       // so the dispatch window has to be read against the same clock.
       const report = await dispatcher.runOnce({ now: Date.now() + 1 });
 
-      expect(report.dispatched).toEqual([
-        `process:${CONVERSATION_ID}:dispatch:turn_1`,
-      ]);
+      expect(report.dispatched).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
       expect(calls.dispatchedTurns).toEqual([
         {
           projectId: PROJECT_ID,

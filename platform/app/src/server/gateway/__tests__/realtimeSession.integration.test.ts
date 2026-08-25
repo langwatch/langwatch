@@ -10,15 +10,7 @@
  * Spec: specs/ai-gateway/realtime-sessions.feature
  */
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -103,11 +95,7 @@ async function keyWithCap(id: string, max: number | null): Promise<string> {
   return id;
 }
 
-function reservation(
-  virtualKeyId: string,
-  sessionId: string,
-  traceId?: string,
-) {
+function reservation(virtualKeyId: string, sessionId: string, traceId?: string) {
   return {
     sessionId,
     projectId: PROJECT_ID,
@@ -291,9 +279,7 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
   it("writes nothing more when the same settlement is delivered again", async () => {
     const vk = await keyWithCap(`vk-replay-${nanoid(6)}`, null);
     const sessionId = `rp-${nanoid(6)}`;
-    await reserveRealtimeSession(
-      reservation(vk, sessionId, `trace-${nanoid(10)}`),
-    );
+    await reserveRealtimeSession(reservation(vk, sessionId, `trace-${nanoid(10)}`));
     const session = await prisma.gatewayRealtimeSession.findUniqueOrThrow({
       where: { id: sessionId },
     });
@@ -345,15 +331,11 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
   it("refuses the mint past the cap and books nothing", async () => {
     const vk = await keyWithCap(`vk-cap-${nanoid(6)}`, 1);
 
-    expect(
-      await reserveRealtimeSession(reservation(vk, `s1-${nanoid(6)}`)),
-    ).toEqual({
+    expect(await reserveRealtimeSession(reservation(vk, `s1-${nanoid(6)}`))).toEqual({
       ok: true,
     });
 
-    const refused = await reserveRealtimeSession(
-      reservation(vk, `s2-${nanoid(6)}`),
-    );
+    const refused = await reserveRealtimeSession(reservation(vk, `s2-${nanoid(6)}`));
     expect(refused).toEqual({
       ok: false,
       reason: "session_limit",
@@ -383,9 +365,7 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
       reason: "the mint never produced a credential",
     });
 
-    expect(
-      await reserveRealtimeSession(reservation(vk, `s2-${nanoid(6)}`)),
-    ).toEqual({
+    expect(await reserveRealtimeSession(reservation(vk, `s2-${nanoid(6)}`))).toEqual({
       ok: true,
     });
   });
@@ -412,17 +392,13 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
     await prisma.gatewayRealtimeSession.update({
       where: { id: stale },
       data: {
-        mintedAt: new Date(
-          Date.now() - REALTIME_OPEN_SESSION_WINDOW_MS - 60_000,
-        ),
+        mintedAt: new Date(Date.now() - REALTIME_OPEN_SESSION_WINDOW_MS - 60_000),
       },
     });
 
     // An OpenAI socket never signals that it closed, so without this a key
     // ratchets down one slot at a time until it can mint nothing.
-    expect(
-      await reserveRealtimeSession(reservation(vk, `fresh-${nanoid(6)}`)),
-    ).toEqual({
+    expect(await reserveRealtimeSession(reservation(vk, `fresh-${nanoid(6)}`))).toEqual({
       ok: true,
     });
     const expired = await prisma.gatewayRealtimeSession.findUnique({
@@ -434,11 +410,11 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
   it("counts every open session when the key has no cap", async () => {
     const vk = await keyWithCap(`vk-nocap-${nanoid(6)}`, null);
     for (let i = 0; i < 3; i++) {
-      expect(
-        await reserveRealtimeSession(reservation(vk, `n${i}-${nanoid(6)}`)),
-      ).toEqual({
-        ok: true,
-      });
+      expect(await reserveRealtimeSession(reservation(vk, `n${i}-${nanoid(6)}`))).toEqual(
+        {
+          ok: true,
+        },
+      );
     }
   });
 
@@ -532,12 +508,10 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
     await expireStaleRealtimeSessions({ virtualKeyId: vk });
 
     expect(
-      (await prisma.gatewayRealtimeSession.findUnique({ where: { id: old } }))
-        ?.status,
+      (await prisma.gatewayRealtimeSession.findUnique({ where: { id: old } }))?.status,
     ).toBe("EXPIRED");
     expect(
-      (await prisma.gatewayRealtimeSession.findUnique({ where: { id: fresh } }))
-        ?.status,
+      (await prisma.gatewayRealtimeSession.findUnique({ where: { id: fresh } }))?.status,
     ).toBe("OPEN");
   });
 

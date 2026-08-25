@@ -30,8 +30,7 @@ export function readJobContext(
     userId: readString(rec, "userId"),
     organizationId: readString(rec, "organizationId"),
   };
-  const hasAny =
-    info.traceId ?? info.projectId ?? info.userId ?? info.organizationId;
+  const hasAny = info.traceId ?? info.projectId ?? info.userId ?? info.organizationId;
   return hasAny ? info : null;
 }
 
@@ -48,8 +47,7 @@ export function readJobKind(data: Record<string, unknown> | null): JobKindInfo {
   return {
     jobType: typeof rec.__jobType === "string" ? rec.__jobType : null,
     jobName: typeof rec.__jobName === "string" ? rec.__jobName : null,
-    pipelineName:
-      typeof rec.__pipelineName === "string" ? rec.__pipelineName : null,
+    pipelineName: typeof rec.__pipelineName === "string" ? rec.__pipelineName : null,
   };
 }
 
@@ -62,7 +60,6 @@ export function jobMatchesFilter(job: JobEntry, filter: string): boolean {
   const needle = filter.trim().toLowerCase();
   if (!needle) return true;
   if (job.jobId.toLowerCase().includes(needle)) return true;
-  if (job.data && JSON.stringify(job.data).toLowerCase().includes(needle))
-    return true;
+  if (job.data && JSON.stringify(job.data).toLowerCase().includes(needle)) return true;
   return job.envelope?.blobId?.toLowerCase().includes(needle) ?? false;
 }

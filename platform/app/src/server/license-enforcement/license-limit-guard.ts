@@ -78,11 +78,7 @@ export async function assertMemberTypeLimitNotExceeded(
         })
         .catch(captureException);
 
-      throw new LimitExceededError(
-        "membersLite",
-        liteCount,
-        limits.maxMembersLite,
-      );
+      throw new LimitExceededError("membersLite", liteCount, limits.maxMembersLite);
     }
   }
 }

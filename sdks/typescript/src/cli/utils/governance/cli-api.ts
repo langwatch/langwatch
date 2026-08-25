@@ -24,10 +24,7 @@ import {
   refreshSessionIfExpired,
   type SessionRefreshDeps,
 } from "./session-refresh";
-import {
-  CLI_SURFACE_HEADER,
-  CLI_SURFACE_VALUE,
-} from "./surface";
+import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "./surface";
 
 export interface IngestionSourceSummary {
   id: string;
@@ -303,9 +300,7 @@ export async function getEventsForSource(
   const qs = params.toString() ? `?${params.toString()}` : "";
   const body = await getJSON<{ events: ActivityEventDetailRow[] }>(
     cfg,
-    `/api/auth/cli/governance/ingest/sources/${encodeURIComponent(
-      sourceId,
-    )}/events${qs}`,
+    `/api/auth/cli/governance/ingest/sources/${encodeURIComponent(sourceId)}/events${qs}`,
     options,
   );
   return body.events;
@@ -321,9 +316,7 @@ export async function getSourceHealth(
 }> {
   return getJSON(
     cfg,
-    `/api/auth/cli/governance/ingest/sources/${encodeURIComponent(
-      sourceId,
-    )}/health`,
+    `/api/auth/cli/governance/ingest/sources/${encodeURIComponent(sourceId)}/health`,
     options,
   );
 }
@@ -425,11 +418,7 @@ export async function getCliBootstrap(
   options: CliApiOptions = {},
 ): Promise<CliBootstrapResponse | null> {
   try {
-    return await getJSON<CliBootstrapResponse>(
-      cfg,
-      `/api/auth/cli/bootstrap`,
-      options,
-    );
+    return await getJSON<CliBootstrapResponse>(cfg, `/api/auth/cli/bootstrap`, options);
   } catch (err) {
     if (err instanceof GovernanceCliError && err.status === 404) {
       return null;
@@ -542,8 +531,7 @@ async function requestREST<T>(
     return {
       method,
       headers,
-      body:
-        options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     };
   };
   const res = await authorizedFetch(cfg, url, buildInit, options);
@@ -670,7 +658,6 @@ export async function issuePersonalVirtualKey(
     mutating: true,
   });
 }
-
 
 /**
  * Extracts the 16-char lookupId from an ingestion token.

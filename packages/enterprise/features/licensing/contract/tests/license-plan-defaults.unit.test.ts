@@ -210,9 +210,7 @@ describe("resolvePlanDefaults and the webhook endpoints entitlement", () => {
   describe("given a payload that omits it", () => {
     /** @scenario A licensed webhook entitlement survives the PlanInfo mapping */
     it("says nothing rather than no, leaving the tier to decide", () => {
-      expect(
-        resolvePlanDefaults(licenseWith()).webhookEndpointsEnabled,
-      ).toBeUndefined();
+      expect(resolvePlanDefaults(licenseWith()).webhookEndpointsEnabled).toBeUndefined();
     });
   });
 

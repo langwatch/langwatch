@@ -46,9 +46,7 @@ export function useAttributionCapture(): void {
       if (value) setAttributionIfAbsent(field, value);
     }
 
-    const referrer = document.referrer
-      ? sanitizeReferrer(document.referrer)
-      : null;
+    const referrer = document.referrer ? sanitizeReferrer(document.referrer) : null;
     if (referrer) {
       setAttributionIfAbsent("referrer", referrer);
     }

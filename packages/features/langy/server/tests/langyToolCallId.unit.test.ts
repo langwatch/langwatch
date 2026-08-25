@@ -11,13 +11,7 @@ const REAL_ID = "oljdh6z0";
 const SIGNATURE = `Eo4RCosRARFNMg${"AbCd-_09".repeat(360)}`;
 const POLLUTED_ID = `${REAL_ID}_ts_${SIGNATURE}`;
 
-function toolFrame({
-  id,
-  phase = "start",
-}: {
-  id: string;
-  phase?: "start" | "end";
-}) {
+function toolFrame({ id, phase = "start" }: { id: string; phase?: "start" | "end" }) {
   return { type: "tool", id, name: "bash", phase };
 }
 
@@ -26,18 +20,14 @@ describe("langy tool call id", () => {
     describe("when the frame is parsed at the wire boundary", () => {
       /** @scenario A tool id carrying a thought signature is reduced to the real id */
       it("records the tool call under the id the provider issued", () => {
-        const parsed = langyRelayFrameSchema.parse(
-          toolFrame({ id: POLLUTED_ID }),
-        );
+        const parsed = langyRelayFrameSchema.parse(toolFrame({ id: POLLUTED_ID }));
 
         expect(parsed).toMatchObject({ type: "tool", id: REAL_ID });
       });
 
       /** @scenario A tool id carrying a thought signature is reduced to the real id */
       it("keeps the signature out of everything it parsed", () => {
-        const parsed = langyRelayFrameSchema.parse(
-          toolFrame({ id: POLLUTED_ID }),
-        );
+        const parsed = langyRelayFrameSchema.parse(toolFrame({ id: POLLUTED_ID }));
 
         expect(JSON.stringify(parsed)).not.toContain("_ts_");
         expect(JSON.stringify(parsed)).not.toContain(SIGNATURE.slice(0, 32));
@@ -136,9 +126,7 @@ describe("langy tool call id", () => {
     describe("when its start is recorded as a durable milestone", () => {
       /** @scenario A tool call's durable key is built from the normalised id */
       it("builds the event's idempotency key from the normalised id", async () => {
-        const frame = langyRelayFrameSchema.parse(
-          toolFrame({ id: POLLUTED_ID }),
-        );
+        const frame = langyRelayFrameSchema.parse(toolFrame({ id: POLLUTED_ID }));
         if (frame.type !== "tool") throw new Error("expected a tool frame");
 
         const [event] = await new InitiateToolCallCommand().handle({
@@ -154,9 +142,7 @@ describe("langy tool call id", () => {
           },
         } as never);
 
-        expect(event!.idempotencyKey).toBe(
-          `project-1:langyconv_1:tool-start:${REAL_ID}`,
-        );
+        expect(event!.idempotencyKey).toBe(`project-1:langyconv_1:tool-start:${REAL_ID}`);
         expect(event!.idempotencyKey!.length).toBeLessThan(200);
       });
     });

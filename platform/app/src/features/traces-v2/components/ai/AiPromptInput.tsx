@@ -153,10 +153,7 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
   thinkingVerbs = DEFAULT_THINKING_VERBS,
 }) => {
   const reduceMotion = useReducedMotion();
-  const typewriter = useTypewriterPlaceholder(
-    !prompt && !isPending,
-    placeholderExamples,
-  );
+  const typewriter = useTypewriterPlaceholder(!prompt && !isPending, placeholderExamples);
   const verb = useCyclingVerb(isPending, thinkingVerbs);
   // The shimmer's `animation` property comes from `thinkingShimmerStyles`;
   // override it to `none` for users who prefer reduced motion. Static
@@ -185,20 +182,9 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
 
   return (
     <Flex align="center" gap={2} width="full" position="relative">
-      <svg
-        width="0"
-        height="0"
-        aria-hidden="true"
-        style={{ position: "absolute" }}
-      >
+      <svg width="0" height="0" aria-hidden="true" style={{ position: "absolute" }}>
         <defs>
-          <linearGradient
-            id={ICON_GRADIENT_ID}
-            x1="0%"
-            y1="0%"
-            x2="100%"
-            y2="100%"
-          >
+          <linearGradient id={ICON_GRADIENT_ID} x1="0%" y1="0%" x2="100%" y2="100%">
             {aiBrandPalette.map((color, i) => (
               <stop
                 key={color}

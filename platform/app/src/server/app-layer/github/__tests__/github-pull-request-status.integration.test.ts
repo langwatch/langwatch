@@ -10,15 +10,7 @@
  */
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {

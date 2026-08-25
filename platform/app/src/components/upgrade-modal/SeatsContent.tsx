@@ -1,11 +1,4 @@
-import {
-  Button,
-  HStack,
-  Separator,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, HStack, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Crown } from "lucide-react";
 import { useState } from "react";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
@@ -222,9 +215,7 @@ export function SeatsContent({
           onClick={() => void handleConfirm()}
           loading={isConfirming}
           disabled={
-            prorationQuery?.isLoading ||
-            prorationQuery?.isError ||
-            !subscriptionApi
+            prorationQuery?.isLoading || prorationQuery?.isError || !subscriptionApi
           }
         >
           Confirm & Update

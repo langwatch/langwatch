@@ -1,9 +1,6 @@
 import { Box, HStack, SimpleGrid } from "@chakra-ui/react";
 import { ChartCard } from "~/components/analytics/ChartCard";
-import {
-  CustomGraph,
-  type CustomGraphInput,
-} from "~/components/analytics/CustomGraph";
+import { CustomGraph, type CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import GraphsLayout from "~/components/GraphsLayout";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";

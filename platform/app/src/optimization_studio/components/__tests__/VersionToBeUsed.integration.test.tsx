@@ -7,13 +7,7 @@
  * they had not touched.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -96,9 +90,7 @@ describe("given the Evaluate dialog version fields", () => {
         </Harness>,
       );
 
-      const description = screen.getByPlaceholderText(
-        "What changes have you made?",
-      );
+      const description = screen.getByPlaceholderText("What changes have you made?");
       expect(description).toHaveValue("");
       // Chakra's Field.Root marks the field with data-invalid when invalid.
       expect(container.querySelector("[data-invalid]")).toBeNull();
@@ -117,9 +109,7 @@ describe("given the Evaluate dialog version fields", () => {
 
       // Validation resolves asynchronously after the submit attempt.
       await waitFor(() => {
-        const description = screen.getByPlaceholderText(
-          "What changes have you made?",
-        );
+        const description = screen.getByPlaceholderText("What changes have you made?");
         expect(description.closest("[data-invalid]")).not.toBeNull();
       });
     });

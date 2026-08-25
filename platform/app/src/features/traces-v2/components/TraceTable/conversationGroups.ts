@@ -88,9 +88,7 @@ function tallyEvaluations(traces: TraceListItem[]): {
   return { totalEvals, evalsPassedCount, evalsFailedCount };
 }
 
-export function groupTracesByConversation(
-  traces: TraceListItem[],
-): ConversationGroup[] {
+export function groupTracesByConversation(traces: TraceListItem[]): ConversationGroup[] {
   const map = new Map<string, TraceListItem[]>();
   for (const t of traces) {
     if (!t.conversationId) continue;
@@ -134,8 +132,7 @@ export function groupTracesByConversation(
       totalEvents += t.events.totalCount;
     }
 
-    const lastOutput =
-      [...sorted].reverse().find((t) => t.output)?.output ?? "";
+    const lastOutput = [...sorted].reverse().find((t) => t.output)?.output ?? "";
 
     result.push({
       conversationId: id,

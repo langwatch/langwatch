@@ -5,11 +5,7 @@ describe("computeLineDiff", () => {
   describe("given identical old and new text", () => {
     it("marks every line as context", () => {
       const lines = computeLineDiff("a\nb\nc", "a\nb\nc");
-      expect(lines.map((l) => l.kind)).toEqual([
-        "context",
-        "context",
-        "context",
-      ]);
+      expect(lines.map((l) => l.kind)).toEqual(["context", "context", "context"]);
     });
   });
 

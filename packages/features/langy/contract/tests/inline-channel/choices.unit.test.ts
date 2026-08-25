@@ -32,8 +32,7 @@ describe("langyChoiceSelectionSchema", () => {
   describe("given a selection that answers nothing", () => {
     it("refuses an empty selection", () => {
       expect(
-        langyChoiceSelectionSchema.safeParse({ blockId: "b1", optionIds: [] })
-          .success,
+        langyChoiceSelectionSchema.safeParse({ blockId: "b1", optionIds: [] }).success,
       ).toBe(false);
     });
 
@@ -50,9 +49,9 @@ describe("langyChoiceSelectionSchema", () => {
 
   describe("given a selection without a blockId", () => {
     it("refuses it — the answer must bind to its exact question", () => {
-      expect(
-        langyChoiceSelectionSchema.safeParse({ optionIds: ["a"] }).success,
-      ).toBe(false);
+      expect(langyChoiceSelectionSchema.safeParse({ optionIds: ["a"] }).success).toBe(
+        false,
+      );
     });
   });
 });
@@ -145,12 +144,13 @@ describe("deriveLangyChoicesLockState", () => {
   describe("when two questions exist and one is answered", () => {
     it("binds the answer to its exact question, never the other", () => {
       const timeline = [question("q1"), question("q2"), selection("q2")];
-      expect(
-        deriveLangyChoicesLockState({ blockId: "q2", timeline }),
-      ).toEqual({ status: "answered", optionIds: ["staging"] });
-      expect(
-        deriveLangyChoicesLockState({ blockId: "q1", timeline }),
-      ).toEqual({ status: "superseded" });
+      expect(deriveLangyChoicesLockState({ blockId: "q2", timeline })).toEqual({
+        status: "answered",
+        optionIds: ["staging"],
+      });
+      expect(deriveLangyChoicesLockState({ blockId: "q1", timeline })).toEqual({
+        status: "superseded",
+      });
     });
   });
 

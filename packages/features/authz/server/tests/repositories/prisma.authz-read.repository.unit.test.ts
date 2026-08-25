@@ -62,9 +62,7 @@ describe("PrismaAuthzReadRepository", () => {
         roleBinding: { findMany },
       } as unknown as AuthzDatabase;
 
-      const rows = await PrismaAuthzReadRepository.create(
-        prisma,
-      ).findUserBindings({
+      const rows = await PrismaAuthzReadRepository.create(prisma).findUserBindings({
         userId: "alice",
         organizationId: "org-1",
       });
@@ -109,9 +107,10 @@ describe("PrismaAuthzReadRepository", () => {
         roleBinding: { findMany },
       } as unknown as AuthzDatabase;
 
-      const rows = await PrismaAuthzReadRepository.create(
-        prisma,
-      ).findGroupBindings({ userId: "alice", organizationId: "org-1" });
+      const rows = await PrismaAuthzReadRepository.create(prisma).findGroupBindings({
+        userId: "alice",
+        organizationId: "org-1",
+      });
 
       // The membership gate sits on the GROUP MEMBER, not on the binding: a
       // GroupMembership row outlives removal from the organization, so
@@ -184,9 +183,7 @@ describe("PrismaAuthzReadRepository", () => {
         } as unknown as AuthzDatabase;
 
         const owner =
-          await PrismaAuthzReadRepository.create(prisma).tryFindApiKeyOwner(
-            "key-1",
-          );
+          await PrismaAuthzReadRepository.create(prisma).tryFindApiKeyOwner("key-1");
 
         expect(findUnique).toHaveBeenCalledWith({
           where: { id: "key-1" },
@@ -224,9 +221,7 @@ describe("PrismaAuthzReadRepository", () => {
           customRole: { findMany },
         } as unknown as AuthzDatabase;
 
-        await PrismaAuthzReadRepository.create(
-          prisma,
-        ).findCustomRolePermissions({
+        await PrismaAuthzReadRepository.create(prisma).findCustomRolePermissions({
           organizationId: "org-1",
           principal: { type: "user", id: "alice" },
           customRoleIds: ["role-1", "role-2"],
@@ -250,9 +245,7 @@ describe("PrismaAuthzReadRepository", () => {
           customRole: { findMany },
         } as unknown as AuthzDatabase;
 
-        await PrismaAuthzReadRepository.create(
-          prisma,
-        ).findCustomRolePermissions({
+        await PrismaAuthzReadRepository.create(prisma).findCustomRolePermissions({
           organizationId: "org-1",
           principal: { type: "apiKey", id: "key-1" },
           customRoleIds: ["role-1"],
@@ -288,9 +281,7 @@ describe("PrismaAuthzReadRepository", () => {
             customRole: { findMany },
           } as unknown as AuthzDatabase;
 
-          await PrismaAuthzReadRepository.create(
-            prisma,
-          ).findCustomRolePermissions({
+          await PrismaAuthzReadRepository.create(prisma).findCustomRolePermissions({
             organizationId: "org-1",
             principal: { type: "apiKey", id: "key-1" },
             customRoleIds: ["orphan-role"],
@@ -413,9 +404,10 @@ describe("PrismaAuthzReadRepository", () => {
       } as unknown as AuthzDatabase;
       const repository = PrismaAuthzReadRepository.create(prisma);
 
-      expect(
-        await repository.tryFindProjectLineage({ projectId: "proj-1" }),
-      ).toEqual({ teamId: "team-1", organizationId: "org-1" });
+      expect(await repository.tryFindProjectLineage({ projectId: "proj-1" })).toEqual({
+        teamId: "team-1",
+        organizationId: "org-1",
+      });
       expect(
         await repository.tryFindProjectLineage({ projectId: "proj-ghost" }),
       ).toBeNull();

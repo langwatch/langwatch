@@ -17,7 +17,9 @@ LLM traffic never uses this path; it goes to the in-cluster [LangWatch AI Gatewa
 The one boundary to understand before you rely on this in a regulated environment: the L7 adapter is **cooperative by default**. A prompt-injected worker can dial an external IP directly on `:443` and bypass it, and that bypass is monitored, not blocked, in the stock pod. Mandatory enforcement is designed but not shipped. The details are below and in [The sandbox](/langy/security/sandbox).
 
 <Info>
-**Also check:** [Self-hosting overview](/self-hosting/langy/overview), [Environment variables](/self-hosting/langy/environment-variables), [The sandbox](/langy/security/sandbox).
+  **Also check:** [Self-hosting overview](/self-hosting/langy/overview), [Environment
+  variables](/self-hosting/langy/environment-variables), [The
+  sandbox](/langy/security/sandbox).
 </Info>
 
 ## Why egress is L7, not iptables
@@ -28,12 +30,12 @@ That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy
 
 ## What the agent needs to reach
 
-| Destination | Why | Path |
-|---|---|---|
-| In-cluster LangWatch AI Gateway | All LLM traffic (traced, budgeted, policed) | Always, in-cluster |
-| In-cluster LangWatch app | The `langwatch` CLI (per-session key) | Always, in-cluster |
-| `github.com`, `api.github.com`, `codeload.github.com` | Clone and push for pull requests | Only when egress is on |
-| `api.github.com`, or `GITHUB_LANGY_HOST` when one is set (from the control plane, not the agent pod) | Mint 1-hour installation tokens, read installation metadata, and list pull requests for a branch | Control plane |
+| Destination                                                                                          | Why                                                                                              | Path                   |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------- |
+| In-cluster LangWatch AI Gateway                                                                      | All LLM traffic (traced, budgeted, policed)                                                      | Always, in-cluster     |
+| In-cluster LangWatch app                                                                             | The `langwatch` CLI (per-session key)                                                            | Always, in-cluster     |
+| `github.com`, `api.github.com`, `codeload.github.com`                                                | Clone and push for pull requests                                                                 | Only when egress is on |
+| `api.github.com`, or `GITHUB_LANGY_HOST` when one is set (from the control plane, not the agent pod) | Mint 1-hour installation tokens, read installation metadata, and list pull requests for a branch | Control plane          |
 
 Private ranges (RFC 1918), CGNAT (`100.64.0.0/10`), and the cloud metadata service are blocked at L3/L4 regardless of the egress toggle, which is the SSRF and IMDS protection.
 
@@ -62,12 +64,12 @@ Make sure `privateExcept` and `privateExceptV6` include any non-RFC1918 service 
 
 When egress is on, each worker's outbound traffic is forced through a per-worker CONNECT proxy (ADR-076) that applies, in order:
 
-| Control | Env var | Default | Effect |
-|---|---|---|---|
-| Require TLS | `LANGY_EGRESS_REQUIRE_TLS` | `true` | Refuse cleartext and non-`:443` forwards. |
-| FQDN floor | `LANGY_EGRESS_FQDN_FLOOR` | `github.com,api.github.com,codeload.github.com` | Operator always-allowed FQDNs, on top of a project's own allow-list. |
-| Enforce floor | `LANGY_EGRESS_ENFORCE_FLOOR` | `false` | When on, the floor becomes a hard ceiling for projects that have no allow-list of their own. Default is monitor-only. |
-| SNI cross-check | `LANGY_EGRESS_SNI_CROSSCHECK` | `true` | Cross-check the TLS SNI against the CONNECT authority to block domain-fronting. |
+| Control         | Env var                       | Default                                         | Effect                                                                                                                |
+| --------------- | ----------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Require TLS     | `LANGY_EGRESS_REQUIRE_TLS`    | `true`                                          | Refuse cleartext and non-`:443` forwards.                                                                             |
+| FQDN floor      | `LANGY_EGRESS_FQDN_FLOOR`     | `github.com,api.github.com,codeload.github.com` | Operator always-allowed FQDNs, on top of a project's own allow-list.                                                  |
+| Enforce floor   | `LANGY_EGRESS_ENFORCE_FLOOR`  | `false`                                         | When on, the floor becomes a hard ceiling for projects that have no allow-list of their own. Default is monitor-only. |
+| SNI cross-check | `LANGY_EGRESS_SNI_CROSSCHECK` | `true`                                          | Cross-check the TLS SNI against the CONNECT authority to block domain-fronting.                                       |
 
 See [Environment variables](/self-hosting/langy/environment-variables#egress) for the full table.
 

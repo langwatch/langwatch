@@ -285,9 +285,7 @@ describe("virtualKeys — scope-aware RBAC", () => {
           scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
         }),
       ).rejects.toMatchObject({
-        message: expect.stringContaining(
-          `virtualKeys:manage at ORGANIZATION:${ORG_ID}`,
-        ),
+        message: expect.stringContaining(`virtualKeys:manage at ORGANIZATION:${ORG_ID}`),
       });
     });
 
@@ -397,9 +395,7 @@ describe("virtualKeys — scope-aware RBAC", () => {
           ],
         }),
       ).rejects.toMatchObject({
-        message: expect.stringContaining(
-          `virtualKeys:manage at TEAM:${TEAM_DATA_SCI}`,
-        ),
+        message: expect.stringContaining(`virtualKeys:manage at TEAM:${TEAM_DATA_SCI}`),
       });
     });
 
@@ -545,9 +541,9 @@ describe("virtualKeys — scope-aware RBAC", () => {
         { scopeType: "TEAM", scopeId: TEAM_DATA_SCI },
       ]);
       const olive = await seedTeamMember([TEAM_PLATFORM]);
-      const ids = (
-        await olive.virtualKeys.list({ organizationId: ORG_ID })
-      ).map((vk) => vk.id);
+      const ids = (await olive.virtualKeys.list({ organizationId: ORG_ID })).map(
+        (vk) => vk.id,
+      );
       expect(ids).toContain(vkOrg);
       expect(ids).toContain(vkPlatform);
       expect(ids).not.toContain(vkDataSci);
@@ -572,9 +568,9 @@ describe("virtualKeys — scope-aware RBAC", () => {
         { scopeType: "PROJECT", scopeId: PROJECT_ML_PROD },
       ]);
       const admin = await seedOrgAdmin();
-      const ids = (
-        await admin.virtualKeys.list({ organizationId: ORG_ID })
-      ).map((vk) => vk.id);
+      const ids = (await admin.virtualKeys.list({ organizationId: ORG_ID })).map(
+        (vk) => vk.id,
+      );
       expect(ids).toContain(vkDemo);
       expect(ids).toContain(vkMlProd);
     });
@@ -585,9 +581,9 @@ describe("virtualKeys — scope-aware RBAC", () => {
         { scopeType: "PROJECT", scopeId: PROJECT_ML_PROD },
       ]);
       const olive = await seedTeamMember([TEAM_PLATFORM]);
-      const ids = (
-        await olive.virtualKeys.list({ organizationId: ORG_ID })
-      ).map((vk) => vk.id);
+      const ids = (await olive.virtualKeys.list({ organizationId: ORG_ID })).map(
+        (vk) => vk.id,
+      );
       expect(ids).not.toContain(vkMlProd);
     });
   });

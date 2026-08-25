@@ -7,10 +7,7 @@ import {
   storedObjectIdSchema,
   storedObjectProjectIdSchema,
 } from "./ids";
-import {
-  storedObjectMetadataSchema,
-  storedObjectTimestampSchema,
-} from "./metadata";
+import { storedObjectMetadataSchema, storedObjectTimestampSchema } from "./metadata";
 import { storedObjectDeliveryCapabilitySchema } from "./references";
 import {
   createStoredObjectsCreateUploadInputSchema,
@@ -35,9 +32,7 @@ export const storedObjectsGetOutputSchema = z
     capability: storedObjectDeliveryCapabilitySchema,
   })
   .strict();
-export type StoredObjectsGetOutput = z.infer<
-  typeof storedObjectsGetOutputSchema
->;
+export type StoredObjectsGetOutput = z.infer<typeof storedObjectsGetOutputSchema>;
 
 export const storedObjectsDeleteInputSchema = z
   .object({
@@ -46,9 +41,7 @@ export const storedObjectsDeleteInputSchema = z
     idempotencyKey: storedObjectIdempotencyKeySchema,
   })
   .strict();
-export type StoredObjectsDeleteInput = z.infer<
-  typeof storedObjectsDeleteInputSchema
->;
+export type StoredObjectsDeleteInput = z.infer<typeof storedObjectsDeleteInputSchema>;
 
 export const storedObjectsDeleteOutputSchema = z
   .object({
@@ -57,9 +50,7 @@ export const storedObjectsDeleteOutputSchema = z
     deletedAt: storedObjectTimestampSchema,
   })
   .strict();
-export type StoredObjectsDeleteOutput = z.infer<
-  typeof storedObjectsDeleteOutputSchema
->;
+export type StoredObjectsDeleteOutput = z.infer<typeof storedObjectsDeleteOutputSchema>;
 
 export interface StoredObjectsRpcProcedure<
   Input extends ZodTypeAny,
@@ -101,10 +92,7 @@ function publicRpcContract(
       output: storedObjectsDeleteOutputSchema,
       permission: "project:manage",
     },
-  } as const satisfies Record<
-    string,
-    StoredObjectsRpcProcedure<ZodTypeAny, ZodTypeAny>
-  >;
+  } as const satisfies Record<string, StoredObjectsRpcProcedure<ZodTypeAny, ZodTypeAny>>;
 }
 
 /** Portable declarations consumed by the unified API registration adapter. */

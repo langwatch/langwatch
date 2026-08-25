@@ -49,9 +49,7 @@ function runHelper({
 }): { stdout: string; nlpService: string; exitCode: number } {
   const exports = Object.entries(env)
     .map(([k, v]) =>
-      v === undefined
-        ? `unset ${k}`
-        : `export ${k}='${v.replace(/'/g, "'\\''")}'`,
+      v === undefined ? `unset ${k}` : `export ${k}='${v.replace(/'/g, "'\\''")}'`,
     )
     .join("\n");
   const script = `
@@ -151,8 +149,7 @@ describe("resolve-nlp-service.sh", () => {
     it("resolves the overlay's address, the one the app loads last", () => {
       const appDir = appDirWith({
         ".env": 'LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
-        ".env.portless":
-          'LANGWATCH_NLP_SERVICE="http://nlp.plum.langwatch.localhost"\n',
+        ".env.portless": 'LANGWATCH_NLP_SERVICE="http://nlp.plum.langwatch.localhost"\n',
       });
 
       const r = runHelper({ appDir });

@@ -6,10 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { hasThreadMappings } from "~/server/evaluations/threadMappingResolver";
-import {
-  getThreadAvailableSources,
-  getTraceAvailableSources,
-} from "../tracesMapping";
+import { getThreadAvailableSources, getTraceAvailableSources } from "../tracesMapping";
 
 describe("Feature: Thread variables available in trace-level evaluator input mapping", () => {
   describe("getTraceAvailableSources()", () => {

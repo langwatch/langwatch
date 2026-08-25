@@ -16,26 +16,18 @@
  * throughout.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { sessionRef, publicEnvRef, searchParamsRef, mutateMock } = vi.hoisted(
-  () => ({
-    sessionRef: { current: { data: null as unknown } },
-    publicEnvRef: {
-      current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
-    },
-    searchParamsRef: { current: new URLSearchParams("") },
-    mutateMock: vi.fn(() => Promise.resolve({})),
-  }),
-);
+const { sessionRef, publicEnvRef, searchParamsRef, mutateMock } = vi.hoisted(() => ({
+  sessionRef: { current: { data: null as unknown } },
+  publicEnvRef: {
+    current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
+  },
+  searchParamsRef: { current: new URLSearchParams("") },
+  mutateMock: vi.fn(() => Promise.resolve({})),
+}));
 
 vi.mock("~/utils/auth-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/utils/auth-client")>();

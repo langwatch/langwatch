@@ -32,9 +32,7 @@ export function mergeRunData({
 }): ScenarioRunData[] {
   const storedIds = new Set(esRuns.map((run) => run.scenarioRunId));
 
-  const remainingQueued = queuedRuns.filter(
-    (run) => !storedIds.has(run.scenarioRunId),
-  );
+  const remainingQueued = queuedRuns.filter((run) => !storedIds.has(run.scenarioRunId));
 
   return [...esRuns, ...remainingQueued];
 }

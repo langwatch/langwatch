@@ -40,11 +40,7 @@ describe("TraceSummaryStore.get", () => {
 
       await store.get("trace-1", context);
 
-      expect(findByTraceId).toHaveBeenCalledWith(
-        "project-1",
-        "trace-1",
-        undefined,
-      );
+      expect(findByTraceId).toHaveBeenCalledWith("project-1", "trace-1", undefined);
     });
 
     it("does not derive a window from occurredAtMs on its own", async () => {
@@ -57,11 +53,7 @@ describe("TraceSummaryStore.get", () => {
 
       await store.get("trace-1", context);
 
-      expect(findByTraceId).toHaveBeenCalledWith(
-        "project-1",
-        "trace-1",
-        undefined,
-      );
+      expect(findByTraceId).toHaveBeenCalledWith("project-1", "trace-1", undefined);
     });
   });
 });

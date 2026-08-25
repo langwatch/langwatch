@@ -274,10 +274,7 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
     });
 
     // Create test tables in both containers
-    await Promise.all([
-      setupTestTables(sharedClient),
-      setupTestTables(privateClient),
-    ]);
+    await Promise.all([setupTestTables(sharedClient), setupTestTables(privateClient)]);
 
     // Create Prisma records for both orgs
     const [privateOrg, sharedOrg] = await Promise.all([
@@ -329,14 +326,11 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
    * and throws if the client is null (mirrors production wiring).
    */
   async function buildResolver(): Promise<ClickHouseClientResolver> {
-    const { getClickHouseClientForTenant } =
-      await import("../clickhouseClient");
+    const { getClickHouseClientForTenant } = await import("../clickhouseClient");
     return async (tenantId: string) => {
       const client = await getClickHouseClientForTenant(tenantId);
       if (!client) {
-        throw new Error(
-          `No ClickHouse client resolved for tenantId: ${tenantId}`,
-        );
+        throw new Error(`No ClickHouse client resolved for tenantId: ${tenantId}`);
       }
       return client;
     };
@@ -354,10 +348,7 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
         const record = makeEventRecord({ tenantId: privateProjectId });
         await repo.insertEventRecords([record]);
 
-        const privateRows = await queryEventLog(
-          privateClient,
-          privateProjectId,
-        );
+        const privateRows = await queryEventLog(privateClient, privateProjectId);
         expect(privateRows).toHaveLength(1);
         expect(privateRows[0]!.EventId).toBe(record.EventId);
 
@@ -398,17 +389,11 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
         const span = makeSpanInsertData({ tenantId: privateProjectId });
         await repo.insertSpan(span);
 
-        const privateRows = await queryStoredSpans(
-          privateClient,
-          privateProjectId,
-        );
+        const privateRows = await queryStoredSpans(privateClient, privateProjectId);
         expect(privateRows).toHaveLength(1);
         expect(privateRows[0]!.SpanId).toBe(span.spanId);
 
-        const sharedRows = await queryStoredSpans(
-          sharedClient,
-          privateProjectId,
-        );
+        const sharedRows = await queryStoredSpans(sharedClient, privateProjectId);
         expect(sharedRows).toHaveLength(0);
       });
     });
@@ -432,47 +417,26 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
         });
 
         // Insert concurrently
-        await Promise.all([
-          repo.insertSpan(privateSpan),
-          repo.insertSpan(sharedSpan),
-        ]);
+        await Promise.all([repo.insertSpan(privateSpan), repo.insertSpan(sharedSpan)]);
 
         // Private span lands in private container only
-        const privateRows = await queryStoredSpans(
-          privateClient,
-          privateProjectId,
-        );
-        const privateSpanRow = privateRows.find(
-          (r) => r.SpanId === privateSpan.spanId,
-        );
+        const privateRows = await queryStoredSpans(privateClient, privateProjectId);
+        const privateSpanRow = privateRows.find((r) => r.SpanId === privateSpan.spanId);
         expect(privateSpanRow).toBeDefined();
 
-        const privateInShared = await queryStoredSpans(
-          sharedClient,
-          privateProjectId,
-        );
+        const privateInShared = await queryStoredSpans(sharedClient, privateProjectId);
         const leakedPrivate = privateInShared.find(
           (r) => r.SpanId === privateSpan.spanId,
         );
         expect(leakedPrivate).toBeUndefined();
 
         // Shared span lands in shared container only
-        const sharedRows = await queryStoredSpans(
-          sharedClient,
-          sharedProjectId,
-        );
-        const sharedSpanRow = sharedRows.find(
-          (r) => r.SpanId === sharedSpan.spanId,
-        );
+        const sharedRows = await queryStoredSpans(sharedClient, sharedProjectId);
+        const sharedSpanRow = sharedRows.find((r) => r.SpanId === sharedSpan.spanId);
         expect(sharedSpanRow).toBeDefined();
 
-        const sharedInPrivate = await queryStoredSpans(
-          privateClient,
-          sharedProjectId,
-        );
-        const leakedShared = sharedInPrivate.find(
-          (r) => r.SpanId === sharedSpan.spanId,
-        );
+        const sharedInPrivate = await queryStoredSpans(privateClient, sharedProjectId);
+        const leakedShared = sharedInPrivate.find((r) => r.SpanId === sharedSpan.spanId);
         expect(leakedShared).toBeUndefined();
       });
     });

@@ -27,10 +27,7 @@ import {
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
-import type {
-  GetAllTracesForProjectInput,
-  TracesForProjectResult,
-} from "../types";
+import type { GetAllTracesForProjectInput, TracesForProjectResult } from "../types";
 import { openProtections } from "./open-protections";
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
@@ -45,8 +42,7 @@ vi.mock("~/server/app-layer/app", async () => {
   const app = () => ({
     clickhouse: {
       enabled: true,
-      resolveClient: (tenantId: string) =>
-        clients.getClickHouseClientForTenant(tenantId),
+      resolveClient: (tenantId: string) => clients.getClickHouseClientForTenant(tenantId),
       resolveOrganizationClient: async () => {
         throw new Error("no organization client in this suite");
       },
@@ -230,8 +226,7 @@ afterAll(async () => {
   if (ch) {
     for (const t of [tenantId, filterTenant]) {
       await ch.exec({
-        query:
-          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: t },
       });
     }

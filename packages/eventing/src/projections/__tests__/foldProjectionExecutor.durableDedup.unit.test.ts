@@ -68,15 +68,10 @@ describe("FoldProjectionExecutor durable dedup", () => {
   }
 
   function appendingApply() {
-    return vi.fn(
-      (state: FoldState, event: Event): FoldState => ({
-        ids: [...state.ids, event.id],
-        LastEventOccurredAt: Math.max(
-          state.LastEventOccurredAt,
-          event.occurredAt ?? 0,
-        ),
-      }),
-    );
+    return vi.fn((state: FoldState, event: Event): FoldState => ({
+      ids: [...state.ids, event.id],
+      LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt ?? 0),
+    }));
   }
 
   const contextWith = (
@@ -159,12 +154,7 @@ describe("FoldProjectionExecutor durable dedup", () => {
         expect(storeFn).toHaveBeenCalledTimes(1);
         // The commit records the UNION, so a later redelivery of the whole
         // batch against this row recognises every event.
-        expect(storeFn.mock.calls[0]![1].appliedEventIds).toEqual([
-          "a",
-          "b",
-          "c",
-          "d",
-        ]);
+        expect(storeFn.mock.calls[0]![1].appliedEventIds).toEqual(["a", "b", "c", "d"]);
       });
     });
 
@@ -222,11 +212,7 @@ describe("FoldProjectionExecutor durable dedup", () => {
           apply: appendingApply(),
         });
 
-        await executor.executeBatch(
-          fold,
-          [a, b],
-          contextWith({ deliveryAttempt: 1 }),
-        );
+        await executor.executeBatch(fold, [a, b], contextWith({ deliveryAttempt: 1 }));
 
         expect(storeFn).toHaveBeenCalledTimes(1);
         expect(storeFn.mock.calls[0]![1].appliedEventIds).toEqual(["a", "b"]);

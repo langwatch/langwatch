@@ -39,11 +39,7 @@ const RowCheckbox: React.FC<RowCheckboxProps> = ({
       : traceIds.reduce((n, id) => n + (traceIdSet.has(id) ? 1 : 0), 0);
 
   const checked: boolean | "indeterminate" =
-    checkedCount === 0
-      ? false
-      : checkedCount === totalCount
-        ? true
-        : "indeterminate";
+    checkedCount === 0 ? false : checkedCount === totalCount ? true : "indeterminate";
 
   // Whole-cell hit target — the Td has padding=0 so this Box fills every
   // pixel of the cell. Native <button> guarantees click + keyboard
@@ -54,9 +50,7 @@ const RowCheckbox: React.FC<RowCheckboxProps> = ({
     <ChakraButton
       type="button"
       aria-label={ariaLabel}
-      aria-checked={
-        checked === true ? "true" : checked === false ? "false" : "mixed"
-      }
+      aria-checked={checked === true ? "true" : checked === false ? "false" : "mixed"}
       display="flex"
       alignItems="center"
       justifyContent="center"
@@ -84,10 +78,7 @@ export const TraceSelectCell = {
   id: SELECT_COLUMN_ID,
   label: "Select",
   render: ({ row }) => (
-    <RowCheckbox
-      traceIds={[row.traceId]}
-      ariaLabel={`Select trace ${row.traceId}`}
-    />
+    <RowCheckbox traceIds={[row.traceId]} ariaLabel={`Select trace ${row.traceId}`} />
   ),
 } as const satisfies CellDef<TraceListItem>;
 

@@ -49,8 +49,7 @@ vi.mock("~/utils/api", () => {
     isFetched: true,
   });
   const hooksFor = (path: string): Map<string, unknown> => {
-    const useQuery = (input: unknown) =>
-      (queryImpls[path] ?? defaultQuery)(input);
+    const useQuery = (input: unknown) => (queryImpls[path] ?? defaultQuery)(input);
     const hooks = new Map<string, unknown>([
       ["useQuery", useQuery],
       ["useInfiniteQuery", useQuery],
@@ -273,9 +272,7 @@ describe("the pull request detail drawer", () => {
     it("shows the header, the totals, the contributors, the models and the sessions", () => {
       renderDrawer();
 
-      expect(
-        screen.getByText("Link sessions to pull requests"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Link sessions to pull requests")).toBeInTheDocument();
       expect(screen.getByText("#4218")).toBeInTheDocument();
       expect(screen.getByText("acme/widgets")).toBeInTheDocument();
       const githubLink = screen.getByText("Open on GitHub").closest("a");
@@ -286,9 +283,7 @@ describe("the pull request detail drawer", () => {
       expect(githubLink).toHaveAttribute("target", "_blank");
       expect(githubLink?.getAttribute("rel")).toContain("noopener");
 
-      expect(
-        screen.getByRole("heading", { name: "Sessions" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Sessions" })).toBeInTheDocument();
       expect(screen.getByText("10.0K")).toBeInTheDocument();
       expect(screen.getByText("$12.50")).toBeInTheDocument();
 
@@ -305,9 +300,7 @@ describe("the pull request detail drawer", () => {
 
       expect(screen.getAllByText("Claude Code").length).toBeGreaterThan(0);
       expect(
-        document.body.querySelector(
-          'img[src="/images/external-icons/claude-code.svg"]',
-        ),
+        document.body.querySelector('img[src="/images/external-icons/claude-code.svg"]'),
       ).not.toBeNull();
       expect(screen.getByText("$5.00")).toBeInTheDocument();
       // The session id is a handle onto the transcript, and the drawer renders
@@ -355,15 +348,11 @@ describe("the pull request detail drawer", () => {
 
       expect(screen.getAllByText("Claude Code").length).toBeGreaterThan(0);
       expect(
-        document.body.querySelector(
-          'img[src="/images/external-icons/claude-code.svg"]',
-        ),
+        document.body.querySelector('img[src="/images/external-icons/claude-code.svg"]'),
       ).not.toBeNull();
       expect(screen.getByText("Codex")).toBeInTheDocument();
       expect(
-        document.body.querySelector(
-          'img[src="/images/external-icons/codex.svg"]',
-        ),
+        document.body.querySelector('img[src="/images/external-icons/codex.svg"]'),
       ).not.toBeNull();
 
       // An assistant this build cannot name keeps the spelling that arrived,
@@ -384,15 +373,10 @@ describe("the pull request detail drawer", () => {
       // A new tab is what leaves the detail where it was, so the target is the
       // behavior under test rather than a detail of the markup.
       const link = screen.getByText("Open on GitHub").closest("a");
-      expect(link).toHaveAttribute(
-        "href",
-        "https://github.com/acme/widgets/pull/4218",
-      );
+      expect(link).toHaveAttribute("href", "https://github.com/acme/widgets/pull/4218");
       expect(link).toHaveAttribute("target", "_blank");
       expect(link?.getAttribute("rel")).toContain("noopener");
-      expect(
-        screen.getByText("Link sessions to pull requests"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Link sessions to pull requests")).toBeInTheDocument();
     });
   });
 
@@ -462,9 +446,7 @@ describe("the pull request detail drawer", () => {
 
   describe("given a pull request nothing has run on yet", () => {
     it("says so in each section rather than showing empty tables", () => {
-      pinDetail(
-        detailPayload({ contributors: [], modelBreakdown: [], sessions: [] }),
-      );
+      pinDetail(detailPayload({ contributors: [], modelBreakdown: [], sessions: [] }));
 
       renderDrawer();
 
@@ -640,9 +622,7 @@ describe("the pull request detail drawer", () => {
 
       renderDrawer();
 
-      expect(
-        screen.getByText("Couldn't load this pull request"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Couldn't load this pull request")).toBeInTheDocument();
     });
   });
 
@@ -677,9 +657,10 @@ describe("the pull request detail drawer", () => {
         // The turns of that session, and the last of them is what a replay
         // opens on.
         await waitFor(() =>
-          expect(utils.tracesV2.conversationContext.fetch).toHaveBeenCalledWith(
-            { projectId: "proj-personal", conversationId: "session-a" },
-          ),
+          expect(utils.tracesV2.conversationContext.fetch).toHaveBeenCalledWith({
+            projectId: "proj-personal",
+            conversationId: "session-a",
+          }),
         );
         // The project travels with the trace. These rows are read from the
         // caller's own workspace, so a drawer left to resolve the project
@@ -713,9 +694,7 @@ describe("the pull request detail drawer", () => {
         // detail is never closed, and the reader is never sent to a page.
         expect(mockCloseDrawer).not.toHaveBeenCalled();
         expect(mockRouterPush).not.toHaveBeenCalled();
-        expect(
-          screen.getByText("Link sessions to pull requests"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Link sessions to pull requests")).toBeInTheDocument();
       });
 
       it("marks the row busy and shows nothing else opening while the turn resolves", async () => {
@@ -730,9 +709,7 @@ describe("the pull request detail drawer", () => {
 
         await user.click(screen.getByText("Teach the fold about branches"));
 
-        const row = screen
-          .getByText("Teach the fold about branches")
-          .closest("tr");
+        const row = screen.getByText("Teach the fold about branches").closest("tr");
         expect(row).toHaveAttribute("aria-busy", "true");
 
         releaseTurns({ turns: [{ traceId: "trace-last", timestamp: 2_000 }] });
@@ -785,9 +762,7 @@ describe("the pull request detail drawer", () => {
 
         // The second click lands while the first lookup is still in flight,
         // and is the same request, so it is dropped rather than answered.
-        expect(utils.tracesV2.conversationContext.fetch).toHaveBeenCalledTimes(
-          1,
-        );
+        expect(utils.tracesV2.conversationContext.fetch).toHaveBeenCalledTimes(1);
 
         releaseTurns({ turns: [{ traceId: "trace-last", timestamp: 2_000 }] });
         await waitFor(() => expect(mockOpenDrawer).toHaveBeenCalledTimes(1));
@@ -801,9 +776,7 @@ describe("the pull request detail drawer", () => {
 
         await user.hover(screen.getByText("Teach the fold about branches"));
 
-        expect(
-          utils.tracesV2.conversationContext.prefetch,
-        ).toHaveBeenCalledWith({
+        expect(utils.tracesV2.conversationContext.prefetch).toHaveBeenCalledWith({
           projectId: "proj-personal",
           conversationId: "session-a",
         });

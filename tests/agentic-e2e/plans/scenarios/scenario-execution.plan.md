@@ -24,6 +24,7 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 **File:** `tests/scenarios/scenario-execution/run-scenario-with-prompt-target.spec.ts`
 
 **Steps:**
+
 1. Seed a scenario named "Refund Flow" with criteria via API
 2. Seed a published prompt "Support Agent" via API
 3. Navigate to the simulations page via sidebar
@@ -34,6 +35,7 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 8. Click the "Run" button in the modal
 
 **Expected Results:**
+
 - The Run Scenario modal displays with target selection options
 - Prompts section shows available prompts including "Support Agent"
 - After clicking Run, the modal closes
@@ -45,6 +47,7 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 **File:** `tests/scenarios/scenario-execution/run-scenario-with-http-agent-target.spec.ts`
 
 **Steps:**
+
 1. Seed a scenario named "Refund Flow" with criteria via API
 2. Seed an HTTP agent "Production API" via API
 3. Navigate to the simulations page via sidebar
@@ -55,6 +58,7 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 8. Click the "Run" button in the modal
 
 **Expected Results:**
+
 - The Run Scenario modal displays HTTP Agents section
 - "Production API" appears in the HTTP Agents list
 - After clicking Run, the scenario execution starts
@@ -71,12 +75,14 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 **File:** `tests/scenarios/scenario-execution/view-conversation-in-real-time.spec.ts`
 
 **Steps:**
+
 1. Seed a scenario and trigger a run via API (or use existing in-progress run)
 2. Navigate to the scenario run visualization page
 3. Observe the conversation area while the run is in progress
 4. Wait for new messages to appear
 
 **Expected Results:**
+
 - The run visualization page loads showing the scenario name in header
 - A status indicator shows "IN_PROGRESS" or similar running state
 - The conversation area displays messages between simulator and target
@@ -96,11 +102,13 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 **File:** `tests/scenarios/scenario-execution/view-completed-run-results.spec.ts`
 
 **Steps:**
+
 1. Seed a completed scenario run with mixed criteria results via API
 2. Navigate to the scenario run visualization page
 3. Scroll down to view the simulation console area
 
 **Expected Results:**
+
 - The scenario run header shows SUCCESS or FAILED status with appropriate icon
 - The simulation console displays in a dark terminal-like interface
 - Met criteria are listed with green checkmarks and count (e.g., "Met Criteria (2):")
@@ -115,11 +123,13 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 **File:** `tests/scenarios/scenario-execution/view-criteria-reasoning.spec.ts`
 
 **Steps:**
+
 1. Seed a completed scenario run with reasoning data via API
 2. Navigate to the scenario run visualization page
 3. Locate the simulation console section
 
 **Expected Results:**
+
 - A "Reasoning:" section is visible in the console
 - The reasoning text explains why criteria were met or unmet
 - Reasoning text is styled distinctly (bold, colored based on verdict)
@@ -130,11 +140,13 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 **File:** `tests/scenarios/scenario-execution/view-full-conversation-history.spec.ts`
 
 **Steps:**
+
 1. Seed a completed scenario run with multiple conversation turns via API
 2. Navigate to the scenario run visualization page
 3. Observe the conversation area
 
 **Expected Results:**
+
 - All messages from the conversation are displayed
 - Messages are ordered chronologically
 - User (simulator) messages are visually distinct from assistant (target) messages
@@ -153,10 +165,12 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 **File:** `tests/scenarios/scenario-execution/navigate-back-to-scenarios.spec.ts`
 
 **Steps:**
+
 1. Navigate to an individual scenario run visualization page
 2. Click the "View All" button (with ArrowLeft icon)
 
 **Expected Results:**
+
 - The "View All" button is visible in the header area
 - Clicking it navigates to the batch run grid view
 - URL changes to match the batch run pattern (e.g., `/simulations/[setId]/[batchId]`)
@@ -167,10 +181,12 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 **File:** `tests/scenarios/scenario-execution/navigate-from-grid-to-run.spec.ts`
 
 **Steps:**
+
 1. Navigate to a batch run grid view page
 2. Click on one of the scenario run cards in the grid
 
 **Expected Results:**
+
 - Scenario run cards are displayed in a responsive grid layout
 - Clicking a card navigates to the individual run page
 - URL includes the scenarioRunId
@@ -186,11 +202,13 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 **File:** `tests/scenarios/scenario-execution/view-run-history.spec.ts`
 
 **Steps:**
+
 1. Seed a scenario that has been run multiple times via API
 2. Navigate to an individual scenario run visualization page
 3. Click the "Previous Runs" button
 
 **Expected Results:**
+
 - The "Previous Runs" button is visible in the header
 - Clicking it opens a sidebar panel on the right
 - The sidebar displays "Previous Runs" heading
@@ -207,11 +225,13 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 **File:** `tests/scenarios/scenario-execution/click-history-run-to-view.spec.ts`
 
 **Steps:**
+
 1. Navigate to a scenario run page with previous runs available
 2. Open the "Previous Runs" sidebar
 3. Click on a different run in the history list
 
 **Expected Results:**
+
 - Each run item in the list is clickable (cursor: pointer)
 - Clicking a run navigates to that run's visualization page
 - The URL updates to include the selected scenarioRunId
@@ -222,10 +242,12 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 **File:** `tests/scenarios/scenario-execution/empty-run-history.spec.ts`
 
 **Steps:**
+
 1. Navigate to a scenario run page for a scenario with only one run
 2. Open the "Previous Runs" sidebar
 
 **Expected Results:**
+
 - An empty state is displayed with appropriate icon
 - Message says "No previous runs found"
 - Description explains "There are no simulations for this scenario yet"
@@ -241,10 +263,12 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 **File:** `tests/scenarios/scenario-execution/view-error-details.spec.ts`
 
 **Steps:**
+
 1. Seed a scenario run that ended in ERROR status via API
 2. Navigate to the scenario run visualization page
 
 **Expected Results:**
+
 - The status shows ERROR with appropriate styling
 - Error details are displayed in the simulation console
 - The error message provides useful debugging information
@@ -265,6 +289,7 @@ The Scenario Execution feature allows LangWatch users to run behavioral test sce
 ## Test Data Requirements
 
 Tests require API seeding capabilities for:
+
 - Creating scenarios with specific names and criteria
 - Creating HTTP agents with configured endpoints
 - Creating published prompts

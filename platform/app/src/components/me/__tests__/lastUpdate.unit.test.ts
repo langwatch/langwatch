@@ -17,25 +17,23 @@ describe("formatLastUpdate", () => {
   describe("given an update from within the last day", () => {
     /** @scenario "A recent update reads as time ago and an older one as a date" */
     it("reads as a distance", () => {
-      expect(
-        formatLastUpdate({ timestampMs: NOW - 3 * HOUR_MS, now: NOW }),
-      ).toBe("3h ago");
+      expect(formatLastUpdate({ timestampMs: NOW - 3 * HOUR_MS, now: NOW })).toBe(
+        "3h ago",
+      );
     });
 
     /** @scenario "A recent update reads as time ago and an older one as a date" */
     it("reads in minutes when it just happened", () => {
-      expect(
-        formatLastUpdate({ timestampMs: NOW - 5 * 60 * 1000, now: NOW }),
-      ).toBe("5m ago");
+      expect(formatLastUpdate({ timestampMs: NOW - 5 * 60 * 1000, now: NOW })).toBe(
+        "5m ago",
+      );
     });
   });
 
   describe("given an update older than a day", () => {
     /** @scenario "A recent update reads as time ago and an older one as a date" */
     it("reads as the short date", () => {
-      expect(
-        formatLastUpdate({ timestampMs: NOW - 3 * DAY_MS, now: NOW }),
-      ).toBe("Aug 4");
+      expect(formatLastUpdate({ timestampMs: NOW - 3 * DAY_MS, now: NOW })).toBe("Aug 4");
     });
   });
 

@@ -68,9 +68,7 @@ describe("command-registry", () => {
     });
 
     it("includes settings command", () => {
-      const settings = navigationCommands.find(
-        (cmd) => cmd.id === "nav-settings",
-      );
+      const settings = navigationCommands.find((cmd) => cmd.id === "nav-settings");
       expect(settings).toBeDefined();
       expect(settings?.path).toBe("/settings");
     });
@@ -94,16 +92,12 @@ describe("command-registry", () => {
     });
 
     it("includes new agent command", () => {
-      const newAgent = actionCommands.find(
-        (cmd) => cmd.id === "action-new-agent",
-      );
+      const newAgent = actionCommands.find((cmd) => cmd.id === "action-new-agent");
       expect(newAgent).toBeDefined();
     });
 
     it("includes new evaluation command", () => {
-      const newEval = actionCommands.find(
-        (cmd) => cmd.id === "action-new-evaluation",
-      );
+      const newEval = actionCommands.find((cmd) => cmd.id === "action-new-evaluation");
       expect(newEval).toBeDefined();
     });
   });

@@ -18,11 +18,7 @@ export function CriteriaDetails({ results }: CriteriaDetailsProps) {
       {/* Met Criteria */}
       {results.metCriteria && results.metCriteria.length > 0 && (
         <Box>
-          <Text
-            color={CONSOLE_COLORS.successColor}
-            fontWeight="semibold"
-            mb={1}
-          >
+          <Text color={CONSOLE_COLORS.successColor} fontWeight="semibold" mb={1}>
             ✓ Met Criteria ({results.metCriteria.length}):
           </Text>
           <VStack align="start" gap={1} pl={2}>
@@ -38,11 +34,7 @@ export function CriteriaDetails({ results }: CriteriaDetailsProps) {
       {/* Unmet Criteria */}
       {results.unmetCriteria && results.unmetCriteria.length > 0 && (
         <Box>
-          <Text
-            color={CONSOLE_COLORS.failureColor}
-            fontWeight="semibold"
-            mb={1}
-          >
+          <Text color={CONSOLE_COLORS.failureColor} fontWeight="semibold" mb={1}>
             ✗ Unmet Criteria ({results.unmetCriteria.length}):
           </Text>
           <VStack align="start" gap={1} pl={2}>

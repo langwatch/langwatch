@@ -52,9 +52,7 @@ let summaryRepo: TraceSummaryClickHouseRepository;
 // horizon and the fixtures silently vanish before the reads.
 const baseMs = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 60_000) * 60_000;
 
-function makeAnalyticsRow(
-  overrides: Partial<TraceAnalyticsRow> = {},
-): TraceAnalyticsRow {
+function makeAnalyticsRow(overrides: Partial<TraceAnalyticsRow> = {}): TraceAnalyticsRow {
   return {
     tenantId: "tenant-default",
     traceId: "trace-default",
@@ -156,8 +154,7 @@ describe("trace_analytics slim fold (integration)", () => {
 
     afterAll(async () => {
       await ch.exec({
-        query:
-          "ALTER TABLE trace_analytics DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE trace_analytics DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId },
       });
     });
@@ -253,8 +250,7 @@ describe("trace_analytics slim fold (integration)", () => {
 
     afterAll(async () => {
       await ch.exec({
-        query:
-          "ALTER TABLE trace_analytics DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE trace_analytics DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId },
       });
     });
@@ -391,13 +387,11 @@ describe("trace_analytics slim fold (integration)", () => {
 
     afterAll(async () => {
       await ch.exec({
-        query:
-          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId },
       });
       await ch.exec({
-        query:
-          "ALTER TABLE trace_analytics DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE trace_analytics DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId },
       });
     });
@@ -448,9 +442,7 @@ describe("trace_analytics slim fold (integration)", () => {
         expect(slim.TopicId).toBe(summary!.topicId);
         expect(slim.Origin).toBe(summary!.attributes["langwatch.origin"] ?? "");
         expect(slim.UserId).toBe(summary!.attributes["langwatch.user_id"]);
-        expect(slim.ConversationId).toBe(
-          summary!.attributes["gen_ai.conversation.id"],
-        );
+        expect(slim.ConversationId).toBe(summary!.attributes["gen_ai.conversation.id"]);
         expect(slim.TraceName).toBe(summary!.traceName);
         // Slim has typed Array(String); summary has JSON-encoded string.
         expect(slim.Labels.sort()).toEqual(["prod", "vip"]);

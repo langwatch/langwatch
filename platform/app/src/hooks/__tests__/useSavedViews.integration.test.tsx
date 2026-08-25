@@ -153,10 +153,7 @@ function simulateRouterPush() {
   mockRouterPush.mockImplementation(
     (url: { pathname?: string; query?: Record<string, unknown> }) => {
       if (url.query) {
-        mockRouterQuery = url.query as Record<
-          string,
-          string | string[] | undefined
-        >;
+        mockRouterQuery = url.query as Record<string, string | string[] | undefined>;
       }
       if (url.pathname) {
         const queryString = Object.entries(url.query ?? {})
@@ -225,9 +222,7 @@ describe("useSavedViews() localStorage caching", () => {
 
       renderHook(() => useSavedViews(), { wrapper });
 
-      const parsed = JSON.parse(
-        localStorage.getItem(cacheKey("test-project"))!,
-      );
+      const parsed = JSON.parse(localStorage.getItem(cacheKey("test-project"))!);
       expect(parsed[0]).toEqual({
         id: "db-view",
         name: "DB View",
@@ -243,13 +238,8 @@ describe("useSavedViews() localStorage caching", () => {
 
   describe("when localStorage has cached views and tRPC has not resolved", () => {
     it("populates customViews immediately from cache", () => {
-      const cachedViews = [
-        { id: "cached-1", name: "Cached View", filters: {} },
-      ];
-      localStorage.setItem(
-        cacheKey("test-project"),
-        JSON.stringify(cachedViews),
-      );
+      const cachedViews = [{ id: "cached-1", name: "Cached View", filters: {} }];
+      localStorage.setItem(cacheKey("test-project"), JSON.stringify(cachedViews));
 
       mockUseQuery.mockReturnValue({
         data: undefined,
@@ -338,9 +328,7 @@ describe("useSavedViews() localStorage caching", () => {
 
       renderHook(() => useSavedViews(), { wrapper });
 
-      const stored = JSON.parse(
-        localStorage.getItem(cacheKey("test-project"))!,
-      );
+      const stored = JSON.parse(localStorage.getItem(cacheKey("test-project"))!);
       expect(stored).toHaveLength(3);
       expect(stored[2].id).toBe("view-3");
     });
@@ -469,10 +457,7 @@ describe("useSavedViews() localStorage caching", () => {
 
   describe("when selected view is all-traces with cached views", () => {
     it("does not push filters to router", () => {
-      localStorage.setItem(
-        cacheKey("test-project"),
-        JSON.stringify(sampleDbViews),
-      );
+      localStorage.setItem(cacheKey("test-project"), JSON.stringify(sampleDbViews));
       localStorage.setItem(selectedKey("test-project"), "all-traces");
 
       mockUseQuery.mockReturnValue({
@@ -488,10 +473,7 @@ describe("useSavedViews() localStorage caching", () => {
 
   describe("when no selected view is stored", () => {
     it("does not push filters to router on mount", () => {
-      localStorage.setItem(
-        cacheKey("test-project"),
-        JSON.stringify(sampleDbViews),
-      );
+      localStorage.setItem(cacheKey("test-project"), JSON.stringify(sampleDbViews));
 
       mockUseQuery.mockReturnValue({
         data: undefined,
@@ -590,10 +572,7 @@ describe("useSavedViews() router.push always includes pathname", () => {
   describe("when restoring a saved view on page load", () => {
     it("calls router.push with pathname during restore", async () => {
       localStorage.setItem(selectedKey("test-project"), "app-view");
-      localStorage.setItem(
-        cacheKey("test-project"),
-        JSON.stringify([applicationView]),
-      );
+      localStorage.setItem(cacheKey("test-project"), JSON.stringify([applicationView]));
 
       mockUseQuery.mockReturnValue({
         data: undefined,
@@ -646,10 +625,7 @@ describe("useSavedViews() full restore lifecycle", () => {
   it("restores view selection and applies filters to URL", async () => {
     // 1. User previously selected "app-view" — stored in localStorage
     localStorage.setItem(selectedKey("test-project"), "app-view");
-    localStorage.setItem(
-      cacheKey("test-project"),
-      JSON.stringify([applicationView]),
-    );
+    localStorage.setItem(cacheKey("test-project"), JSON.stringify([applicationView]));
 
     // 2. Page loads — tRPC not yet resolved
     mockUseQuery.mockReturnValue({
@@ -743,8 +719,6 @@ describe("useSavedViews() full restore lifecycle", () => {
     expect(urlObj.pathname).toBe("/[project]/messages");
 
     expect(result.current.selectedViewId).toBe("all-traces");
-    expect(localStorage.getItem(selectedKey("test-project"))).toBe(
-      "all-traces",
-    );
+    expect(localStorage.getItem(selectedKey("test-project"))).toBe("all-traces");
   });
 });

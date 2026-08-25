@@ -57,9 +57,7 @@ const summarize = ({
       errors.length > 0 &&
       errors.every(
         (error) =>
-          Boolean(error.code) &&
-          error.path.startsWith("/") &&
-          error.message.length > 0,
+          Boolean(error.code) && error.path.startsWith("/") && error.message.length > 0,
       ),
     namedTheExpectedRule: errors.some((error) => error.rule === expectedRule),
   };
@@ -78,28 +76,22 @@ describe("the LangWatchQL Vega-Lite fixture corpus", () => {
       it("refuses every one with a structured error naming the path it attacks", () => {
         expect(ADVERSARIAL_VEGA_FIXTURES.length).toBeGreaterThan(20);
 
-        const outcomes = ADVERSARIAL_VEGA_FIXTURES.map(
-          ({ name, attacks, spec }) =>
-            summarize({ name, expectedRule: attacks, spec }),
+        const outcomes = ADVERSARIAL_VEGA_FIXTURES.map(({ name, attacks, spec }) =>
+          summarize({ name, expectedRule: attacks, spec }),
         );
 
         expect(namesFailing(outcomes, (o) => o.refused)).toEqual([]);
         expect(namesFailing(outcomes, (o) => o.structured)).toEqual([]);
-        expect(namesFailing(outcomes, (o) => o.namedTheExpectedRule)).toEqual(
-          [],
-        );
+        expect(namesFailing(outcomes, (o) => o.namedTheExpectedRule)).toEqual([]);
       });
 
       it("refuses the mistaken specs by the rule each of them names", () => {
-        const outcomes = INVALID_VEGA_FIXTURES.map(
-          ({ name, refusedBy, spec }) =>
-            summarize({ name, expectedRule: refusedBy, spec }),
+        const outcomes = INVALID_VEGA_FIXTURES.map(({ name, refusedBy, spec }) =>
+          summarize({ name, expectedRule: refusedBy, spec }),
         );
 
         expect(namesFailing(outcomes, (o) => o.refused)).toEqual([]);
-        expect(namesFailing(outcomes, (o) => o.namedTheExpectedRule)).toEqual(
-          [],
-        );
+        expect(namesFailing(outcomes, (o) => o.namedTheExpectedRule)).toEqual([]);
       });
 
       it("still admits every working chart in the valid corpus", () => {

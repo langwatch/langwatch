@@ -53,31 +53,37 @@ architecture-beta
 **LangWatch App** (:5560)
 
 Web UI, REST API, OTel ingestion, authentication, SSE real-time updates. The only externally-exposed component.
+
 </Card>
 <Card title="Processing" icon="microchip">
 **LangWatch Workers**
 
 Event sourcing pipeline via BullMQ, span ingestion, trace summarisation, cost enrichment, evaluations, PII redaction, and more.
+
 </Card>
 <Card title="Services" icon="flask">
 **LangWatch NLP** (:5561) and **LangEvals** (:5562)
 
 NLP workflows, topic clustering, built-in evaluators, guardrails. Call external LLMs for model-based operations.
+
 </Card>
 <Card title="Control Plane" icon="database">
 **PostgreSQL**
 
 Users, teams, projects, configurations, prompt versions. Managed via Prisma with auto-migrations.
+
 </Card>
 <Card title="Data Plane" icon="chart-bar">
 **ClickHouse**
 
 All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold storage on S3. Auto-tuned via the clickhouse-serverless subchart.
+
 </Card>
 <Card title="Queue & Storage" icon="layer-group">
 **Redis**: BullMQ job queue, caching, sessions.
 
 **S3**: ClickHouse cold storage, backups, datasets.
+
 </Card>
 </CardGroup>
 
@@ -129,10 +135,10 @@ Stores users, teams, projects, configurations, prompt versions, evaluator defini
 
 Stores all high-volume data: traces, spans, evaluations, experiments, analytics, and event sourcing events/projections.
 
-| Mode | Replicas | Engine | Use Case |
-|------|----------|--------|----------|
-| Standalone | 1 | MergeTree | Dev, small production |
-| Replicated | 3+ (odd) | ReplicatedMergeTree + Keeper | HA production |
+| Mode       | Replicas | Engine                       | Use Case              |
+| ---------- | -------- | ---------------------------- | --------------------- |
+| Standalone | 1        | MergeTree                    | Dev, small production |
+| Replicated | 3+ (odd) | ReplicatedMergeTree + Keeper | HA production         |
 
 The `clickhouse-serverless` subchart auto-tunes internal parameters from two inputs: `cpu` and `memory`.
 
@@ -198,38 +204,40 @@ The pipeline produces three types of output:
 
 **Events**: immutable records of what happened. Stored in ClickHouse and never modified.
 
-| Event | Produced By | What It Contains |
-|-------|------------|------------------|
-| SpanIngested | Span Ingestion | Raw span data from SDK |
-| TraceSummarised | Trace Summarisation | Aggregated trace with input/output |
-| CostEnriched | LLM Cost Enrichment | Token costs per model |
-| MetricsExtracted | LLM Metric Processing | Latency, token counts, model info |
-| EmbeddingsGenerated | Embedding Extraction | Vector embeddings for similarity |
-| PIIRedacted | PII Redaction | Redacted fields and detection metadata |
-| EvaluationCompleted | Evaluation Execution | Evaluator scores and results |
-| ExperimentResultRecorded | Experiment Processing | Run results for A/B tests |
+| Event                    | Produced By           | What It Contains                       |
+| ------------------------ | --------------------- | -------------------------------------- |
+| SpanIngested             | Span Ingestion        | Raw span data from SDK                 |
+| TraceSummarised          | Trace Summarisation   | Aggregated trace with input/output     |
+| CostEnriched             | LLM Cost Enrichment   | Token costs per model                  |
+| MetricsExtracted         | LLM Metric Processing | Latency, token counts, model info      |
+| EmbeddingsGenerated      | Embedding Extraction  | Vector embeddings for similarity       |
+| PIIRedacted              | PII Redaction         | Redacted fields and detection metadata |
+| EvaluationCompleted      | Evaluation Execution  | Evaluator scores and results           |
+| ExperimentResultRecorded | Experiment Processing | Run results for A/B tests              |
 
 **Projections**: derived tables that dashboards and APIs read from. Built from events.
 
-| Projection | Built From | Used By |
-|-----------|-----------|---------|
-| Traces | SpanIngested + TraceSummarised | Trace explorer, search |
-| Spans | SpanIngested | Span detail views |
-| Evaluations | EvaluationCompleted | Quality scores, monitors |
-| ExperimentRuns | ExperimentResultRecorded | Experiment result tables |
-| Analytics | All events | Dashboard aggregations |
-| Topics | TraceSummarised + clustering | Conversation topic groups |
+| Projection     | Built From                     | Used By                   |
+| -------------- | ------------------------------ | ------------------------- |
+| Traces         | SpanIngested + TraceSummarised | Trace explorer, search    |
+| Spans          | SpanIngested                   | Span detail views         |
+| Evaluations    | EvaluationCompleted            | Quality scores, monitors  |
+| ExperimentRuns | ExperimentResultRecorded       | Experiment result tables  |
+| Analytics      | All events                     | Dashboard aggregations    |
+| Topics         | TraceSummarised + clustering   | Conversation topic groups |
 
 **Reactions**: side effects triggered during processing.
 
-| Reaction | Triggered By | Effect |
-|----------|-------------|--------|
-| SSE Update | Any event | Real-time UI refresh in browser |
+| Reaction       | Triggered By        | Effect                             |
+| -------------- | ------------------- | ---------------------------------- |
+| SSE Update     | Any event           | Real-time UI refresh in browser    |
 | Alert, Trigger | EvaluationCompleted | Slack, email, webhook notification |
-| Dataset Append | Automation rules | Auto-add traces to datasets |
+| Dataset Append | Automation rules    | Auto-add traces to datasets        |
 
 <Note>
-If Worker queue depth grows in Redis, it means processing is falling behind ingestion. The fix is to add more Worker replicas, each one is stateless and consumes jobs independently.
+  If Worker queue depth grows in Redis, it means processing is falling behind ingestion.
+  The fix is to add more Worker replicas, each one is stateless and consumes jobs
+  independently.
 </Note>
 
 ## Data Flow
@@ -257,6 +265,7 @@ sequenceDiagram
 ```
 
 Additionally, Kubernetes CronJobs trigger periodic tasks via HTTP on the App:
+
 - **Topic clustering**: daily at midnight, via the NLP service
 - **Alert triggers**: every 3 minutes, evaluates monitor conditions
 - **Retention cleanup**: daily at 01:00, removes data past retention period
@@ -265,27 +274,28 @@ Additionally, Kubernetes CronJobs trigger periodic tasks via HTTP on the App:
 
 Only the App is exposed externally. Everything else is cluster-internal:
 
-| Component | Service Type | External |
-|-----------|-------------|----------|
-| App | Ingress, LoadBalancer | Yes |
-| Workers | None (no Service needed) | No |
-| NLP | ClusterIP | No |
-| LangEvals | ClusterIP | No |
-| PostgreSQL | ClusterIP | No |
-| ClickHouse | ClusterIP | No |
-| Redis | ClusterIP | No |
+| Component  | Service Type             | External |
+| ---------- | ------------------------ | -------- |
+| App        | Ingress, LoadBalancer    | Yes      |
+| Workers    | None (no Service needed) | No       |
+| NLP        | ClusterIP                | No       |
+| LangEvals  | ClusterIP                | No       |
+| PostgreSQL | ClusterIP                | No       |
+| ClickHouse | ClusterIP                | No       |
+| Redis      | ClusterIP                | No       |
 
 <Note>
-LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, etc.). Ensure these pods have network egress to the relevant endpoints.
+  LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, etc.).
+  Ensure these pods have network egress to the relevant endpoints.
 </Note>
 
 ## Docker Images
 
-| Image | Port | Purpose |
-|-------|------|---------|
-| `langwatch/langwatch` | 5560 | App + Workers (same image, different entrypoint) |
-| `langwatch/langwatch_nlp` | 5561 | NLP, workflows, topic clustering |
-| `langwatch/langevals` | 5562 | Evaluators, guardrails |
+| Image                     | Port | Purpose                                          |
+| ------------------------- | ---- | ------------------------------------------------ |
+| `langwatch/langwatch`     | 5560 | App + Workers (same image, different entrypoint) |
+| `langwatch/langwatch_nlp` | 5561 | NLP, workflows, topic clustering                 |
+| `langwatch/langevals`     | 5562 | Evaluators, guardrails                           |
 
 ## OpenTelemetry Integration
 

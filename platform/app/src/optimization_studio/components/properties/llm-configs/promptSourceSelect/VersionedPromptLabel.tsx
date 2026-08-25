@@ -10,11 +10,7 @@ import { useVersionDrift } from "../signature-properties-panel/hooks/useVersionD
 /**
  * Label for the versioned prompt in the optimization studio
  */
-export function VersionedPromptLabel({
-  node,
-}: {
-  node: Node<LlmPromptConfigComponent>;
-}) {
+export function VersionedPromptLabel({ node }: { node: Node<LlmPromptConfigComponent> }) {
   const { latestPromptVersion, nodeVersion } = useVersionDrift(node);
   const configId = node.data.configId;
   const { resetFormWithLatestVersion } = useResetFormWithLatestDatabaseVersion({

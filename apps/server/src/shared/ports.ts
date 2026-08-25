@@ -42,7 +42,9 @@ export function allocatePorts(base: number = PORT_BASE_DEFAULT): PortAllocation 
   };
 }
 
-export function portsToCheck(alloc: PortAllocation): Array<{ port: number; label: string }> {
+export function portsToCheck(
+  alloc: PortAllocation,
+): Array<{ port: number; label: string }> {
   return [
     { port: alloc.langwatch, label: "langwatch" },
     { port: alloc.nlp, label: "nlpgo" },

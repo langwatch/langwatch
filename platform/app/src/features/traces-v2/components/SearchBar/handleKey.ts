@@ -27,10 +27,7 @@ export type KeyAction =
       reopenInValueMode: boolean;
     };
 
-function acceptAction(
-  ctx: EditorContext,
-  highlighted: string,
-): KeyAction | null {
+function acceptAction(ctx: EditorContext, highlighted: string): KeyAction | null {
   if (!ctx.suggestion.open) return null;
 
   const { tokenStart } = ctx.suggestion;

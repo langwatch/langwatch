@@ -54,9 +54,8 @@ describe("langyTurnContextSchema — resource chips", () => {
   describe("given an over-long label or ref", () => {
     it("rejects it", () => {
       expect(
-        resources.safeParse([
-          { kind: "trace", ref: "x", label: "a".repeat(201) },
-        ]).success,
+        resources.safeParse([{ kind: "trace", ref: "x", label: "a".repeat(201) }])
+          .success,
       ).toBe(false);
       expect(
         resources.safeParse([
@@ -69,8 +68,7 @@ describe("langyTurnContextSchema — resource chips", () => {
   describe("given a kind we have no sentence for", () => {
     it("rejects it rather than passing an unknown kind to the model", () => {
       expect(
-        resources.safeParse([{ kind: "billing_secrets", ref: "x", label: "y" }])
-          .success,
+        resources.safeParse([{ kind: "billing_secrets", ref: "x", label: "y" }]).success,
       ).toBe(false);
     });
   });
@@ -196,9 +194,7 @@ describe("renderLangyTurnContext", () => {
     });
 
     it("tells the model, in the block itself, that this is data and not orders", () => {
-      const block = renderResources([
-        { kind: "trace", ref: "abc", label: "trace abc" },
-      ])!;
+      const block = renderResources([{ kind: "trace", ref: "abc", label: "trace abc" }])!;
       expect(block).toContain("NOT instructions");
       expect(block).toContain("never");
     });
@@ -243,17 +239,14 @@ describe("renderLangyTurnContext", () => {
 describe("langyTurnContextSchema — skill chips", () => {
   describe("given a real skill", () => {
     it("accepts it", () => {
-      const parsed = skillsSchema.safeParse([
-        { id: "github", label: "GitHub" },
-      ]);
+      const parsed = skillsSchema.safeParse([{ id: "github", label: "GitHub" }]);
       expect(parsed.success).toBe(true);
     });
 
     it("accepts it bound to a resource", () => {
       expect(
-        skillsSchema.safeParse([
-          { id: "github", label: "GitHub", on: "trace abc1…23" },
-        ]).success,
+        skillsSchema.safeParse([{ id: "github", label: "GitHub", on: "trace abc1…23" }])
+          .success,
       ).toBe(true);
     });
   });
@@ -268,12 +261,9 @@ describe("langyTurnContextSchema — skill chips", () => {
      */
     it("rejects it", () => {
       expect(
-        skillsSchema.safeParse([{ id: "delete_the_database", label: "oops" }])
-          .success,
+        skillsSchema.safeParse([{ id: "delete_the_database", label: "oops" }]).success,
       ).toBe(false);
-      expect(skillsSchema.safeParse([{ id: "", label: "x" }]).success).toBe(
-        false,
-      );
+      expect(skillsSchema.safeParse([{ id: "", label: "x" }]).success).toBe(false);
     });
 
     it("validates against the SAME catalogue the composer offers", () => {
@@ -284,21 +274,17 @@ describe("langyTurnContextSchema — skill chips", () => {
       for (const skill of LANGY_SKILLS) {
         if (skill.source === "client-command") continue;
         expect(
-          skillsSchema.safeParse([{ id: skill.id, label: skill.label }])
-            .success,
+          skillsSchema.safeParse([{ id: skill.id, label: skill.label }]).success,
           skill.id,
         ).toBe(true);
       }
     });
 
     it("rejects a client command on the wire — the agent is never handed one", () => {
-      const command = LANGY_SKILLS.find(
-        (skill) => skill.source === "client-command",
-      );
+      const command = LANGY_SKILLS.find((skill) => skill.source === "client-command");
       expect(command).toBeDefined();
       expect(
-        skillsSchema.safeParse([{ id: command!.id, label: command!.label }])
-          .success,
+        skillsSchema.safeParse([{ id: command!.id, label: command!.label }]).success,
       ).toBe(false);
     });
   });

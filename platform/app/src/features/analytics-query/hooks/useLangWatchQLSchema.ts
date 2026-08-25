@@ -13,10 +13,7 @@ import { useMemo } from "react";
 
 import { api } from "~/utils/api";
 
-import {
-  type LangWatchQLSchemaModel,
-  lwqlSchemaModel,
-} from "../logic/lwqlSchemaModel";
+import { type LangWatchQLSchemaModel, lwqlSchemaModel } from "../logic/lwqlSchemaModel";
 
 export interface UseLangWatchQLSchema {
   /** Exactly what the endpoint returned, shaped for the browser and editor. */

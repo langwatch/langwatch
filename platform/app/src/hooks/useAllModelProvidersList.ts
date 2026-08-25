@@ -107,9 +107,7 @@ export function useAllModelProvidersList() {
  * caller that branches on "is there a specific row to resolve" uses the
  * same rule.
  */
-export function isResolvableProviderId(
-  modelProviderId: string | undefined,
-): boolean {
+export function isResolvableProviderId(modelProviderId: string | undefined): boolean {
   return !!modelProviderId && modelProviderId !== "new";
 }
 

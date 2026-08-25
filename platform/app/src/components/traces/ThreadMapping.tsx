@@ -107,15 +107,9 @@ const mapThreadToDatasetEntry = (
         const filteredTraces = (thread.traces ?? []).map((trace) => {
           const filteredTrace: Record<string, any> = {};
           for (const field of selectedFields) {
-            const traceMapping =
-              TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
+            const traceMapping = TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
             if (traceMapping) {
-              filteredTrace[field] = traceMapping.mapping(
-                trace as any,
-                "",
-                "",
-                {},
-              );
+              filteredTrace[field] = traceMapping.mapping(trace as any, "", "", {});
             }
           }
           return filteredTrace;
@@ -164,10 +158,9 @@ export const ThreadMapping = ({
 }) => {
   const currentMapping = threadMapping ?? { mapping: {} };
 
-  const [threadMappingState, setThreadMappingState_] =
-    useState<ThreadMappingState>({
-      mapping: {},
-    });
+  const [threadMappingState, setThreadMappingState_] = useState<ThreadMappingState>({
+    mapping: {},
+  });
 
   const setThreadMappingState = useCallback(
     (callback: (mappingState: ThreadMappingState) => ThreadMappingState) => {
@@ -293,9 +286,7 @@ export const ThreadMapping = ({
     <VStack align="start" width="full" gap={3}>
       <Grid
         width="full"
-        templateColumns={
-          isThreeColumns ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"
-        }
+        templateColumns={isThreeColumns ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"}
         alignItems="center"
         gap={2}
       >
@@ -346,10 +337,7 @@ export const ThreadMapping = ({
                           {Object.entries(dsl.sourceOptions).map(
                             ([key, { label, fields }]) => {
                               const options = fields.map((field) => (
-                                <option
-                                  key={field}
-                                  value={`${key}.outputs.${field}`}
-                                >
+                                <option key={field} value={`${key}.outputs.${field}`}>
                                   {field}
                                 </option>
                               ));
@@ -393,8 +381,7 @@ export const ThreadMapping = ({
                                   | (typeof SERVER_ONLY_THREAD_SOURCES)[number]
                                   | "",
                                 selectedFields:
-                                  prev.mapping[targetField]?.selectedFields ??
-                                  [],
+                                  prev.mapping[targetField]?.selectedFields ?? [],
                               },
                             },
                           }));
@@ -442,8 +429,7 @@ export const ThreadMapping = ({
                               mapping: {
                                 ...prev.mapping,
                                 [targetField]: {
-                                  source:
-                                    prev.mapping[targetField]?.source ?? "",
+                                  source: prev.mapping[targetField]?.source ?? "",
                                   selectedFields: newValue.map((v) => v.value),
                                 },
                               },

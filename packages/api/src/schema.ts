@@ -23,16 +23,11 @@ export type ApiSchemaResult =
   | { success: true; data: unknown }
   | { success: false; error: ApiSchemaError };
 
-export function parseApiSchemaSync(
-  schema: ApiSchema,
-  value: unknown,
-): ApiSchemaResult {
+export function parseApiSchemaSync(schema: ApiSchema, value: unknown): ApiSchemaResult {
   const zodLike = schema as {
     safeParse?: (
       input: unknown,
-    ) =>
-      | { success: true; data: unknown }
-      | { success: false; error: ApiSchemaError };
+    ) => { success: true; data: unknown } | { success: false; error: ApiSchemaError };
   };
   if (zodLike.safeParse) return zodLike.safeParse(value);
 
@@ -53,8 +48,7 @@ export async function parseApiSchema(
     safeParseAsync?: (
       input: unknown,
     ) => Promise<
-      | { success: true; data: unknown }
-      | { success: false; error: ApiSchemaError }
+      { success: true; data: unknown } | { success: false; error: ApiSchemaError }
     >;
   };
   if (zodLike.safeParseAsync) return zodLike.safeParseAsync(value);
@@ -65,9 +59,7 @@ export async function parseApiSchema(
     : { success: true, data: result.value };
 }
 
-export function createApiSchemaError(
-  issues: readonly ApiSchemaIssue[],
-): ApiSchemaError {
+export function createApiSchemaError(issues: readonly ApiSchemaIssue[]): ApiSchemaError {
   const wrapped = new Error("Validation error") as ApiSchemaError;
   wrapped.name = "ZodError";
   Object.defineProperties(wrapped, {

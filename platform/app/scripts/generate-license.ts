@@ -147,9 +147,7 @@ interface CliArgs {
 function parseQuota(flag: string, value: string): number {
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < 0) {
-    process.stderr.write(
-      `Error: ${flag} must be a whole number, got: ${value}\n\n`,
-    );
+    process.stderr.write(`Error: ${flag} must be a whole number, got: ${value}\n\n`);
     printUsage();
     process.exit(2);
   }
@@ -165,10 +163,7 @@ function parseExpiresAt(value: string): Date {
   const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? new Date(`${value}T00:00:00.000Z`)
     : new Date(Number.NaN);
-  if (
-    Number.isNaN(parsed.getTime()) ||
-    parsed.toISOString().slice(0, 10) !== value
-  ) {
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
     process.stderr.write(
       `Error: --expires-at must be a calendar date as YYYY-MM-DD, got: ${value}\n\n`,
     );

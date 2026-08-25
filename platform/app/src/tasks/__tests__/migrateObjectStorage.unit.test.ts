@@ -74,14 +74,12 @@ describe("migrateObjectStorage task configuration", () => {
     ).toThrow(/must not include an account key/);
   });
 
-  it.each([
-    "plan",
-    "copy",
-    "finalize",
-    "verify",
-  ] as const)("accepts the %s phase", (phase) => {
-    expect(parseMigrationTaskPhase(phase)).toBe(phase);
-  });
+  it.each(["plan", "copy", "finalize", "verify"] as const)(
+    "accepts the %s phase",
+    (phase) => {
+      expect(parseMigrationTaskPhase(phase)).toBe(phase);
+    },
+  );
 
   it("rejects an unknown phase before making changes", () => {
     expect(() => parseMigrationTaskPhase("delete-source")).toThrow(
@@ -123,8 +121,7 @@ describe("migrateObjectStorage task configuration", () => {
   it("refuses to copy from a different active provider endpoint", () => {
     const config = parseMigrationTaskConfig({
       ...validEnvironment(),
-      OBJECT_STORAGE_MIGRATION_S3_ENDPOINT:
-        "https://migration-s3.example.test/",
+      OBJECT_STORAGE_MIGRATION_S3_ENDPOINT: "https://migration-s3.example.test/",
     });
 
     expect(() =>
@@ -369,8 +366,7 @@ describe("toAzureCredentials transport guards", () => {
       OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_KEY: "",
       OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT:
         "https://destination.blob.core.usgovcloudapi.net",
-      OBJECT_STORAGE_MIGRATION_AZURE_AUTHORITY_HOST:
-        "https://login.microsoftonline.us",
+      OBJECT_STORAGE_MIGRATION_AZURE_AUTHORITY_HOST: "https://login.microsoftonline.us",
     });
 
     expect(toAzureCredentials(config)).toMatchObject({

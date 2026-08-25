@@ -89,10 +89,7 @@ vi.mock("tiktoken/load", () => ({
 vi.mock("node-fetch-cache", () => ({
   default: {
     create() {
-      return function cachedFetch(
-        url: string,
-        init?: { signal?: AbortSignal },
-      ) {
+      return function cachedFetch(url: string, init?: { signal?: AbortSignal }) {
         return globalThis.fetch(url, init);
       };
     },
@@ -111,14 +108,12 @@ describe("TiktokenClient", () => {
       // impl: no fetch, dummy ranks. Fresh client per test so the internal
       // cache never leaks across cases.
       loadMock.mockClear();
-      loadMock.mockImplementation(
-        async (registry: Record<string, unknown>) => ({
-          explicit_n_vocab: undefined,
-          pat_str: registry.pat_str,
-          special_tokens: registry.special_tokens,
-          bpe_ranks: "",
-        }),
-      );
+      loadMock.mockImplementation(async (registry: Record<string, unknown>) => ({
+        explicit_n_vocab: undefined,
+        pat_str: registry.pat_str,
+        special_tokens: registry.special_tokens,
+        bpe_ranks: "",
+      }));
       client = new TiktokenClient();
     });
 
@@ -155,10 +150,7 @@ describe("TiktokenClient", () => {
     });
 
     it("falls back to o200k_base for unknown models", async () => {
-      const count = await client.countTokens(
-        "some-unknown-model-xyz",
-        "Hello, world!",
-      );
+      const count = await client.countTokens("some-unknown-model-xyz", "Hello, world!");
       expect(count).toBeGreaterThan(0);
     });
   });
@@ -201,9 +193,7 @@ describe("TiktokenClient", () => {
                 reject(new Error("aborted"));
                 return;
               }
-              signal.addEventListener("abort", () =>
-                reject(new Error("aborted")),
-              );
+              signal.addEventListener("abort", () => reject(new Error("aborted")));
             }
           }),
       );
@@ -248,9 +238,7 @@ describe("NullTokenizerClient", () => {
 
   describe("countTokens", () => {
     it("always returns undefined", async () => {
-      expect(await client.countTokens("gpt-4o", "Hello, world!")).toBe(
-        undefined,
-      );
+      expect(await client.countTokens("gpt-4o", "Hello, world!")).toBe(undefined);
     });
   });
 });

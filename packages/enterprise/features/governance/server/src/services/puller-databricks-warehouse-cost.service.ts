@@ -708,12 +708,10 @@ function mergeWarehouseCost({
         usdToNanoUsd(already.costUsd) + usdToNanoUsd(priced.costUsd),
       ),
       hourTotalExecutionMs: (
-        BigInt(already.hourTotalExecutionMs) +
-        BigInt(priced.hourTotalExecutionMs)
+        BigInt(already.hourTotalExecutionMs) + BigInt(priced.hourTotalExecutionMs)
       ).toString(),
       hourBillableUsd: nanoUsdToDecimalString(
-        usdToNanoUsd(already.hourBillableUsd) +
-          usdToNanoUsd(priced.hourBillableUsd),
+        usdToNanoUsd(already.hourBillableUsd) + usdToNanoUsd(priced.hourBillableUsd),
       ),
     });
   }

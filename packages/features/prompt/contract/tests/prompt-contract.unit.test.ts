@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { createPromptCommandSchema, promptConfigDataSchema, promptHandleSchema } from "../src";
+import {
+  createPromptCommandSchema,
+  promptConfigDataSchema,
+  promptHandleSchema,
+} from "../src";
 
 describe("Prompt contract", () => {
   it("accepts the portable prompt configuration shape", () => {
-    expect(promptConfigDataSchema.parse({
-      prompt: "Hello {{name}}",
-      messages: [],
-      inputs: [{ identifier: "name", type: "str" }],
-      outputs: [{ identifier: "output", type: "str" }],
-      model: "openai/gpt-4o",
-    }).model).toBe("openai/gpt-4o");
+    expect(
+      promptConfigDataSchema.parse({
+        prompt: "Hello {{name}}",
+        messages: [],
+        inputs: [{ identifier: "name", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+        model: "openai/gpt-4o",
+      }).model,
+    ).toBe("openai/gpt-4o");
   });
 
   it("rejects invalid handles before persistence", () => {
@@ -18,7 +24,13 @@ describe("Prompt contract", () => {
   });
 
   it("requires a project and handle for creation", () => {
-    expect(createPromptCommandSchema.safeParse({ projectId: "p1", handle: "support-bot" }).success).toBe(true);
-    expect(createPromptCommandSchema.safeParse({ projectId: "", handle: "support-bot" }).success).toBe(false);
+    expect(
+      createPromptCommandSchema.safeParse({ projectId: "p1", handle: "support-bot" })
+        .success,
+    ).toBe(true);
+    expect(
+      createPromptCommandSchema.safeParse({ projectId: "", handle: "support-bot" })
+        .success,
+    ).toBe(false);
   });
 });

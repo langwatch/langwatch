@@ -1,9 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  selectNumericModesFor,
-  useNumericModeStore,
-} from "../numericModeStore";
+import { selectNumericModesFor, useNumericModeStore } from "../numericModeStore";
 
 const PROJECT = "proj-1";
 const STORAGE_KEY = "langwatch:traces-v2:numeric-mode:v1:proj-1";

@@ -10,15 +10,7 @@
  */
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 let auth0Issuer = "http://127.0.0.1:0";
 
@@ -174,9 +166,7 @@ describe("getManagementApiToken", () => {
         status: 401,
         body: { error: "access_denied" },
       });
-      await expect(getManagementApiToken()).rejects.toBeInstanceOf(
-        Auth0ApiError,
-      );
+      await expect(getManagementApiToken()).rejects.toBeInstanceOf(Auth0ApiError);
     });
   });
 
@@ -188,9 +178,7 @@ describe("getManagementApiToken", () => {
       const original = auth0Issuer;
       auth0Issuer = "http://127.0.0.1:1"; // closed port
       try {
-        await expect(getManagementApiToken()).rejects.toBeInstanceOf(
-          Auth0ApiError,
-        );
+        await expect(getManagementApiToken()).rejects.toBeInstanceOf(Auth0ApiError);
       } finally {
         auth0Issuer = original;
       }
@@ -202,10 +190,7 @@ describe("updateUserPassword", () => {
   describe("when the Management API returns 200 OK", () => {
     it("sends the password + connection and bearer token", async () => {
       handler = (req) => {
-        if (
-          req.method === "PATCH" &&
-          req.path === "/api/v2/users/auth0%7Cabc123"
-        ) {
+        if (req.method === "PATCH" && req.path === "/api/v2/users/auth0%7Cabc123") {
           return { status: 200, body: { user_id: "auth0|abc123" } };
         }
         return { status: 404 };
@@ -415,8 +400,7 @@ describe("verifyCurrentPassword", () => {
         status: 403,
         body: {
           error: "unauthorized_client",
-          error_description:
-            "Grant type 'password' not allowed for the client.",
+          error_description: "Grant type 'password' not allowed for the client.",
         },
       });
 
@@ -479,9 +463,7 @@ describe("changeAuth0Password", () => {
       expect(result).toEqual({ ok: true });
       // 1) ROPG verify, 2) client_credentials, 3) PATCH
       expect(captured).toHaveLength(3);
-      expect((captured[0]?.body as { grant_type?: string }).grant_type).toBe(
-        "password",
-      );
+      expect((captured[0]?.body as { grant_type?: string }).grant_type).toBe("password");
       expect((captured[1]?.body as { grant_type?: string }).grant_type).toBe(
         "client_credentials",
       );

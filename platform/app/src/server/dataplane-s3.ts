@@ -79,17 +79,11 @@ function parsePrivateS3EnvVars(): Map<string, DataplaneS3Config> {
     }
 
     map.set(orgId, result.data);
-    logger.info(
-      { orgId, envVar: key },
-      "Loaded private S3 config from env var",
-    );
+    logger.info({ orgId, envVar: key }, "Loaded private S3 config from env var");
   }
 
   if (map.size > 0) {
-    logger.info(
-      { count: map.size },
-      "Private S3 dataplane instances configured",
-    );
+    logger.info({ count: map.size }, "Private S3 dataplane instances configured");
   }
 
   return map;

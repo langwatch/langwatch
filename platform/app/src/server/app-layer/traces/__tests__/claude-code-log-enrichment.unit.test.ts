@@ -168,9 +168,7 @@ describe("enrichCodingAgentSpansFromLogs", () => {
 
       const result = await enrich({
         spans,
-        logRecords: logStore(
-          vi.fn().mockRejectedValue(new Error("clickhouse down")),
-        ),
+        logRecords: logStore(vi.fn().mockRejectedValue(new Error("clickhouse down"))),
       });
 
       expect(result).toBe(spans);

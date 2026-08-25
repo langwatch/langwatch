@@ -27,9 +27,10 @@ const ACTION_META = {
 
 function actionMeta(action: string) {
   return (
-    (ACTION_META as Record<string, { label: string; icon: LucideIcon }>)[
-      action
-    ] ?? { label: action, icon: X }
+    (ACTION_META as Record<string, { label: string; icon: LucideIcon }>)[action] ?? {
+      label: action,
+      icon: X,
+    }
   );
 }
 
@@ -49,12 +50,7 @@ export function AgentHistoryDrawer({
   );
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="md"
-      onOpenChange={closeDrawer}
-    >
+    <Drawer.Root open={true} placement="end" size="md" onOpenChange={closeDrawer}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
@@ -87,21 +83,11 @@ export function AgentHistoryDrawer({
                   <HStack key={entry.id} align="start" gap={3}>
                     {/* Timeline line + icon */}
                     <VStack gap={0} align="center" flexShrink={0} width="24px">
-                      <Box
-                        bg="blue.subtle"
-                        borderRadius="full"
-                        padding={1}
-                        mt="2px"
-                      >
+                      <Box bg="blue.subtle" borderRadius="full" padding={1} mt="2px">
                         <Icon size={12} color="var(--chakra-colors-blue-fg)" />
                       </Box>
                       {!isLast && (
-                        <Box
-                          width="1px"
-                          flex={1}
-                          minHeight="24px"
-                          bg="border.muted"
-                        />
+                        <Box width="1px" flex={1} minHeight="24px" bg="border.muted" />
                       )}
                     </VStack>
 
@@ -111,10 +97,8 @@ export function AgentHistoryDrawer({
                         {label}
                       </Text>
                       <Text color="fg.muted" fontSize="xs">
-                        {entry.user?.name ??
-                          entry.user?.email ??
-                          "Unknown user"}{" "}
-                        · {formatTimeAgo(new Date(entry.createdAt).getTime())}
+                        {entry.user?.name ?? entry.user?.email ?? "Unknown user"} ·{" "}
+                        {formatTimeAgo(new Date(entry.createdAt).getTime())}
                       </Text>
                     </VStack>
                   </HStack>

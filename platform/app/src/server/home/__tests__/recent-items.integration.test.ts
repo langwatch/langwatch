@@ -265,9 +265,7 @@ describe("Recent Items Integration", () => {
         limit: 12,
       });
 
-      const archivedItem = result.find(
-        (item) => item.id === archivedWorkflow.id,
-      );
+      const archivedItem = result.find((item) => item.id === archivedWorkflow.id);
       expect(archivedItem).toBeUndefined();
     });
 

@@ -73,10 +73,7 @@ export class BroadcastService {
     const channels = ALL_EVENT_TYPES.map(redisChannel);
     this.subscriber.subscribe(...channels, (err, count) => {
       if (err) {
-        this.logger.error(
-          { error: err },
-          "Failed to subscribe to SSE channels",
-        );
+        this.logger.error({ error: err }, "Failed to subscribe to SSE channels");
         return;
       }
       this.logger.debug(
@@ -86,9 +83,7 @@ export class BroadcastService {
     });
 
     this.subscriber.on("message", (channel, message) => {
-      const eventType = ALL_EVENT_TYPES.find(
-        (et) => redisChannel(et) === channel,
-      );
+      const eventType = ALL_EVENT_TYPES.find((et) => redisChannel(et) === channel);
       if (!eventType) return;
 
       try {
@@ -103,10 +98,7 @@ export class BroadcastService {
 
         this.broadcastToTenantLocally(tenantId, event, eventType);
       } catch (error) {
-        this.logger.error(
-          { error, message },
-          "Failed to parse SSE broadcast message",
-        );
+        this.logger.error({ error, message }, "Failed to parse SSE broadcast message");
       }
     });
 
@@ -145,10 +137,7 @@ export class BroadcastService {
     }
 
     if (cleanedCount > 0) {
-      this.logger.debug(
-        { cleanedCount },
-        "Cleaned up stale EventEmitters after timeout",
-      );
+      this.logger.debug({ cleanedCount }, "Cleaned up stale EventEmitters after timeout");
     }
   }
 
@@ -186,10 +175,7 @@ export class BroadcastService {
         }),
       );
 
-      this.logger.debug(
-        { tenantId, event, eventType },
-        "Published SSE event to Redis",
-      );
+      this.logger.debug({ tenantId, event, eventType }, "Published SSE event to Redis");
     } catch (error) {
       this.logger.error(
         { error, tenantId, event, eventType },
@@ -301,9 +287,7 @@ export class BroadcastService {
     this.active = false;
 
     // Allow in-flight Redis publishes to drain
-    await new Promise((resolve) =>
-      setTimeout(resolve, BroadcastService.DRAIN_DELAY_MS),
-    );
+    await new Promise((resolve) => setTimeout(resolve, BroadcastService.DRAIN_DELAY_MS));
 
     if (!this.subscriber) return;
 

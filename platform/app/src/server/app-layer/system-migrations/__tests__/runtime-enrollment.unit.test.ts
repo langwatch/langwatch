@@ -34,8 +34,7 @@ vi.mock("~/env.mjs", () => ({ env: { IS_SAAS: true } }));
 vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog: vi.fn() }));
 vi.mock("../../app", () => ({ tryGetApp: () => null }));
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof import("@langwatch/observability")>();
   return {
     ...actual,
     createLogger: (name: string) => {
@@ -71,27 +70,19 @@ describe("migrationPassCohort on cloud", () => {
       const backfill = "authz-team-user-backfill";
       stubs.enrollmentFindMany.mockResolvedValueOnce([]);
       const firstPass = await migrationPassCohort();
-      expect(firstPass({ tenantId: "org_acme", migrationName: backfill })).toBe(
-        false,
-      );
+      expect(firstPass({ tenantId: "org_acme", migrationName: backfill })).toBe(false);
 
       // The operator enrolls (and later withdraws) with no restart anywhere.
       stubs.enrollmentFindMany.mockResolvedValueOnce([
         { organizationId: "org_acme", migrationName: backfill },
       ]);
       const secondPass = await migrationPassCohort();
-      expect(
-        secondPass({ tenantId: "org_acme", migrationName: backfill }),
-      ).toBe(true);
-      expect(
-        secondPass({ tenantId: "org_globex", migrationName: backfill }),
-      ).toBe(false);
+      expect(secondPass({ tenantId: "org_acme", migrationName: backfill })).toBe(true);
+      expect(secondPass({ tenantId: "org_globex", migrationName: backfill })).toBe(false);
 
       stubs.enrollmentFindMany.mockResolvedValueOnce([]);
       const thirdPass = await migrationPassCohort();
-      expect(thirdPass({ tenantId: "org_acme", migrationName: backfill })).toBe(
-        false,
-      );
+      expect(thirdPass({ tenantId: "org_acme", migrationName: backfill })).toBe(false);
 
       expect(stubs.enrollmentFindMany).toHaveBeenCalledTimes(3);
     });

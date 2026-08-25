@@ -29,9 +29,7 @@ function flattenContent(content: unknown): string {
     .trim();
 }
 
-function assistantMessages(
-  result: ScenarioResult,
-): Array<Record<string, unknown>> {
+function assistantMessages(result: ScenarioResult): Array<Record<string, unknown>> {
   const messages =
     (result as { messages?: Array<Record<string, unknown>> }).messages ?? [];
   return messages.filter((msg) => msg?.role === "assistant");

@@ -20,10 +20,7 @@
 
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type {
-  GatewayBudget,
-  GatewayBudgetWindow,
-} from "~/generated/prisma/client";
+import type { GatewayBudget, GatewayBudgetWindow } from "~/generated/prisma/client";
 import { Prisma } from "~/generated/prisma/client";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import {
@@ -178,14 +175,15 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
     });
 
     /** @scenario "Spend recorded against a budget is visible on that budget" */
-    it.each(
-      ALL_WINDOWS,
-    )("reports a %s budget as past its limit once spend exceeds it", (window) => {
-      const budget = budgets.find((b) => b.window === window)!;
-      const spent = Number.parseFloat(spendByBudgetId.get(budget.id)!);
+    it.each(ALL_WINDOWS)(
+      "reports a %s budget as past its limit once spend exceeds it",
+      (window) => {
+        const budget = budgets.find((b) => b.window === window)!;
+        const spent = Number.parseFloat(spendByBudgetId.get(budget.id)!);
 
-      expect(spent).toBeGreaterThanOrEqual(Number.parseFloat(LIMIT_USD));
-    });
+        expect(spent).toBeGreaterThanOrEqual(Number.parseFloat(LIMIT_USD));
+      },
+    );
   });
 
   describe("when the ClickHouse server does not run in UTC", () => {
@@ -253,15 +251,9 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
     }, 120_000);
 
     /** @scenario "Spend stays visible when the ClickHouse server does not run in UTC" */
-    it.each(
-      TZ_WINDOWS,
-    )("still reports non-zero spend on a %s budget", async (window) => {
+    it.each(TZ_WINDOWS)("still reports non-zero spend on a %s budget", async (window) => {
       const budget = tzBudgets.find((b) => b.window === window)!;
-      const spend = await repo.getSpendForBudgets(
-        TENANT_ID,
-        [budget],
-        tzOccurredAt,
-      );
+      const spend = await repo.getSpendForBudgets(TENANT_ID, [budget], tzOccurredAt);
 
       expect(Number.parseFloat(spend[0]!.spentUsd)).toBeGreaterThan(0);
     });
@@ -361,11 +353,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
         },
       });
 
-      const spend = await repo.getSpendForBudgets(
-        TENANT_ID,
-        preBudgets,
-        preOccurredAt,
-      );
+      const spend = await repo.getSpendForBudgets(TENANT_ID, preBudgets, preOccurredAt);
       spendBeforeRebuild = new Map(spend.map((s) => [s.budgetId, s.spentUsd]));
 
       // The upgrade under test: the CURRENT rollup rebuild, which pins the
@@ -389,32 +377,28 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
     }, 120_000);
 
     /** @scenario "Spend recorded before the rollup rebuild still counts after it" */
-    it.each(
-      PRE_WINDOWS,
-    )("starts from a %s budget whose recorded spend reads $0", (window) => {
-      // The pre-rebuild read is the bug the rebuild exists for: history
-      // sits in a local-midnight bucket the reader never asks about. If
-      // this reads non-zero the fixture is not on the seam and the
-      // assertions below prove nothing.
-      const budget = preBudgets.find((b) => b.window === window)!;
-      expect(Number.parseFloat(spendBeforeRebuild.get(budget.id)!)).toBe(0);
-    });
+    it.each(PRE_WINDOWS)(
+      "starts from a %s budget whose recorded spend reads $0",
+      (window) => {
+        // The pre-rebuild read is the bug the rebuild exists for: history
+        // sits in a local-midnight bucket the reader never asks about. If
+        // this reads non-zero the fixture is not on the seam and the
+        // assertions below prove nothing.
+        const budget = preBudgets.find((b) => b.window === window)!;
+        expect(Number.parseFloat(spendBeforeRebuild.get(budget.id)!)).toBe(0);
+      },
+    );
 
     /** @scenario "Spend recorded before the rollup rebuild still counts after it" */
-    it.each(
-      PRE_WINDOWS,
-    )("reads the full pre-rebuild spend on a %s budget after the rebuild", async (window) => {
-      const budget = preBudgets.find((b) => b.window === window)!;
-      const spend = await repo.getSpendForBudgets(
-        TENANT_ID,
-        [budget],
-        preOccurredAt,
-      );
+    it.each(PRE_WINDOWS)(
+      "reads the full pre-rebuild spend on a %s budget after the rebuild",
+      async (window) => {
+        const budget = preBudgets.find((b) => b.window === window)!;
+        const spend = await repo.getSpendForBudgets(TENANT_ID, [budget], preOccurredAt);
 
-      expect(Number.parseFloat(spend[0]!.spentUsd)).toBe(
-        Number.parseFloat(DEBIT_USD),
-      );
-    });
+        expect(Number.parseFloat(spend[0]!.spentUsd)).toBe(Number.parseFloat(DEBIT_USD));
+      },
+    );
 
     /** @scenario "Spend recorded before the rollup rebuild still counts after it" */
     it("reproduces identical totals for spend already keyed by UTC boundaries", () => {

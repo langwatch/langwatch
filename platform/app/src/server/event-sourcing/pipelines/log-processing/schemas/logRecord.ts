@@ -8,11 +8,7 @@ export const logCorrelationSourceSchema = z.enum([
 ]);
 export type LogCorrelationSource = z.infer<typeof logCorrelationSourceSchema>;
 
-export const logProviderKindSchema = z.enum([
-  "generic",
-  "claude_code",
-  "codex",
-]);
+export const logProviderKindSchema = z.enum(["generic", "claude_code", "codex"]);
 export type LogProviderKind = z.infer<typeof logProviderKindSchema>;
 
 export const canonicalLogRecordSchema = z.object({
@@ -92,10 +88,7 @@ export const logTraceContributionSchema = z.object({
   correlationSource: logCorrelationSourceSchema.exclude(["none"]),
   input: z.string().nullable(),
   output: z.string().nullable(),
-  liftedAttributes: z.record(
-    z.string(),
-    z.union([z.string(), z.number(), z.boolean()]),
-  ),
+  liftedAttributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
   nonBillable: z.boolean(),
   piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]),
   occurredAt: z.number().int().nonnegative(),

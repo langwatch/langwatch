@@ -98,9 +98,7 @@ describe("recordMissAndDecideToSpawn", () => {
       it("refuses to spawn, because that daemon's socket could never be private", () => {
         fs.mkdirSync(identity.socketDir, { recursive: true, mode: 0o777 });
         // chown needs root; moving OUR uid makes the same comparison fail.
-        vi.spyOn(process, "getuid").mockReturnValue(
-          (process.getuid?.() ?? 0) + 1,
-        );
+        vi.spyOn(process, "getuid").mockReturnValue((process.getuid?.() ?? 0) + 1);
 
         expect(recordMissAndDecideToSpawn(identity)).toBe(false);
         expect(recordMissAndDecideToSpawn(identity)).toBe(false);

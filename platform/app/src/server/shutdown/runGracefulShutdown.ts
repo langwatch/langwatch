@@ -91,12 +91,10 @@ export async function runGracefulShutdown({
   // that calls process.exit() when its flush resolves wins the race.
   const all: ShutdownPhase[] = [
     ...phases,
-    ...telemetryFlushes().map(
-      (f): ShutdownPhase => ({
-        name: `telemetry:${f.name}`,
-        run: f.run,
-      }),
-    ),
+    ...telemetryFlushes().map((f): ShutdownPhase => ({
+      name: `telemetry:${f.name}`,
+      run: f.run,
+    })),
   ];
 
   try {

@@ -20,21 +20,15 @@ export const useOnboardingFlow = () => {
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
 
-  const [organizationName, setOrganizationName] = useState<string | undefined>(
-    void 0,
-  );
+  const [organizationName, setOrganizationName] = useState<string | undefined>(void 0);
   const [agreement, setAgreement] = useState<boolean>(false);
   const [intent, setIntent] = useState<OrganizationIntent | undefined>(void 0);
   const [usageStyle, setUsageStyle] = useState<UsageStyle | undefined>(void 0);
   const [phoneNumber, setPhoneNumber] = useState<string | undefined>(void 0);
   const [phoneHasValue, setPhoneHasValue] = useState<boolean>(false);
   const [phoneIsValid, setPhoneIsValid] = useState<boolean>(true);
-  const [companySize, setCompanySize] = useState<CompanySize | undefined>(
-    void 0,
-  );
-  const [solutionType, setSolutionType] = useState<SolutionType | undefined>(
-    void 0,
-  );
+  const [companySize, setCompanySize] = useState<CompanySize | undefined>(void 0);
+  const [solutionType, setSolutionType] = useState<SolutionType | undefined>(void 0);
   const [selectedDesires, setDesires] = useState<DesireType[]>([]);
   const [role, setRole] = useState<RoleType | undefined>(void 0);
 
@@ -42,8 +36,9 @@ export const useOnboardingFlow = () => {
   // v5): flag off (or loading, which reports enabled=false) = the exact
   // pre-fork flow. User-level evaluation — there is no org yet during
   // onboarding.
-  const { enabled: intentForkEnabled, isLoading: intentForkLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled");
+  const { enabled: intentForkEnabled, isLoading: intentForkLoading } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+  );
 
   // Flow configuration — recomputed when the intent changes (ADR-038 fork).
   // Safe mid-flow: intent only changes while ON the INTENT screen, whose
@@ -66,9 +61,7 @@ export const useOnboardingFlow = () => {
         // resolves enabled, the (kept) BASIC_INFO position silently skips
         // the required INTENT screen. Resolution is one query; on error the
         // flag settles disabled and the pre-fork flow proceeds.
-        return (
-          Boolean(organizationName?.trim() && agreement) && !intentForkLoading
-        );
+        return Boolean(organizationName?.trim() && agreement) && !intentForkLoading;
 
       case OnboardingScreenIndex.INTENT:
         return intent !== void 0;
@@ -92,8 +85,10 @@ export const useOnboardingFlow = () => {
   };
 
   // Use generic flow hook for navigation
-  const { currentScreenIndex, direction, navigation } =
-    useGenericOnboardingFlow(flow, canProceed);
+  const { currentScreenIndex, direction, navigation } = useGenericOnboardingFlow(
+    flow,
+    canProceed,
+  );
 
   // Snapshot first-touch attribution once per mount. `readAttribution` is a
   // pure sessionStorage read; memoizing keeps getFormData / formContextValue

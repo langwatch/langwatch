@@ -55,9 +55,7 @@ function firstTokenAtFromLangWatchTimestamps(value: unknown): number | null {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     return null;
   }
-  const firstTokenAt = coerceToNumber(
-    (parsed as Record<string, unknown>).first_token_at,
-  );
+  const firstTokenAt = coerceToNumber((parsed as Record<string, unknown>).first_token_at);
   return firstTokenAt !== null && firstTokenAt > 0 ? firstTokenAt : null;
 }
 
@@ -91,8 +89,7 @@ export class SpanCostService {
     // `langwatch.tokens.estimated` flag when one or both counts were missing
     // from the semconv attrs (and so were derived elsewhere).
     const hasFullSemconv =
-      coerceToNumber(inputTokens) !== null &&
-      coerceToNumber(outputTokens) !== null;
+      coerceToNumber(inputTokens) !== null && coerceToNumber(outputTokens) !== null;
 
     return {
       promptTokens,
@@ -257,8 +254,7 @@ export class SpanCostService {
     const totalCost = (state.totalCost ?? 0) + metrics.cost;
     // Bundled portion: only this span's cost when the span is non-billable.
     const nonBilledCost =
-      (state.nonBilledCost ?? 0) +
-      (this.isSpanCostNonBillable(span) ? metrics.cost : 0);
+      (state.nonBilledCost ?? 0) + (this.isSpanCostNonBillable(span) ? metrics.cost : 0);
 
     const timing = this.extractTokenTiming(span);
     let timeToFirstTokenMs = state.timeToFirstTokenMs;
@@ -282,13 +278,11 @@ export class SpanCostService {
         : null;
 
     return {
-      totalPromptTokenCount:
-        totalPromptTokenCount > 0 ? totalPromptTokenCount : null,
+      totalPromptTokenCount: totalPromptTokenCount > 0 ? totalPromptTokenCount : null,
       totalCompletionTokenCount:
         totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null,
       totalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
-      nonBilledCost:
-        nonBilledCost > 0 ? Number(nonBilledCost.toFixed(6)) : null,
+      nonBilledCost: nonBilledCost > 0 ? Number(nonBilledCost.toFixed(6)) : null,
       tokensEstimated: state.tokensEstimated || metrics.estimated,
       timeToFirstTokenMs,
       timeToLastTokenMs,

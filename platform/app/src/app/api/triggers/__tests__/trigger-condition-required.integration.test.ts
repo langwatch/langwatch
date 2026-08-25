@@ -195,9 +195,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
       const after = await prisma.trigger.findUniqueOrThrow({
         where: { id: stored.id, projectId: projectId() },
       });
-      expect(after.filters).toBe(
-        JSON.stringify({ "metadata.labels": ["prod"] }),
-      );
+      expect(after.filters).toBe(JSON.stringify({ "metadata.labels": ["prod"] }));
     });
 
     it("allows it when a query still narrows the automation", async () => {

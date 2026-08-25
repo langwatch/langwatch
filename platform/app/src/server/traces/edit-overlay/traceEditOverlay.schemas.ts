@@ -107,13 +107,11 @@ function patchExceedsSizeLimit(value: unknown): boolean {
   const json = JSON.stringify(value) ?? "";
   if (json.length > TRACE_EDIT_OVERLAY_MAX_PATCH_BYTES) return true;
   if (json.length * 3 <= TRACE_EDIT_OVERLAY_MAX_PATCH_BYTES) return false;
-  return (
-    new TextEncoder().encode(json).length > TRACE_EDIT_OVERLAY_MAX_PATCH_BYTES
-  );
+  return new TextEncoder().encode(json).length > TRACE_EDIT_OVERLAY_MAX_PATCH_BYTES;
 }
 
-export const traceEditOverlayPatchSchema =
-  traceEditOverlayPatchObjectSchema.superRefine((patch, ctx) => {
+export const traceEditOverlayPatchSchema = traceEditOverlayPatchObjectSchema.superRefine(
+  (patch, ctx) => {
     if (patchExceedsSizeLimit(patch)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -122,7 +120,8 @@ export const traceEditOverlayPatchSchema =
         )} MB limit.`,
       });
     }
-  });
+  },
+);
 
 export type TraceEditOverlayPatch = z.infer<typeof traceEditOverlayPatchSchema>;
 
@@ -142,9 +141,7 @@ export function emptyTraceEditOverlayPatch(): TraceEditOverlayPatch {
  * read path already handles, so degrading is strictly better than failing a
  * trace read.
  */
-export function parseTraceEditOverlayPatch(
-  value: unknown,
-): TraceEditOverlayPatch | null {
+export function parseTraceEditOverlayPatch(value: unknown): TraceEditOverlayPatch | null {
   const parsed = traceEditOverlayPatchSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 }
@@ -153,9 +150,7 @@ export function parseTraceEditOverlayPatch(
  *  nothing is rejected on write and treated as absent on read. */
 export function patchHasAnyEdit(patch: TraceEditOverlayPatch): boolean {
   if (patch.deletedSpanIds.length > 0) return true;
-  if (
-    TRACE_EDIT_TRACE_FIELDS.some((field) => patch.trace?.[field] !== undefined)
-  ) {
+  if (TRACE_EDIT_TRACE_FIELDS.some((field) => patch.trace?.[field] !== undefined)) {
     return true;
   }
   return patch.spans.some((span) =>
@@ -173,10 +168,7 @@ function asChatMessages(value: unknown): ChatMessage[] | null {
   if (!Array.isArray(value) || value.length === 0) return null;
   const looksLikeTranscript = value.every(
     (entry) =>
-      !!entry &&
-      typeof entry === "object" &&
-      !Array.isArray(entry) &&
-      "role" in entry,
+      !!entry && typeof entry === "object" && !Array.isArray(entry) && "role" in entry,
   );
   if (!looksLikeTranscript) return null;
   const parsed = z.array(chatMessageSchema).safeParse(value);

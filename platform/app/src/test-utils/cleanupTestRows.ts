@@ -137,9 +137,7 @@ function sanitizeList(
   const kept: unknown[] = [];
   value.forEach((member, index) => {
     if (member === undefined || member === null || member === "") {
-      collectors.dropped.push(
-        `${path}[${index}] was ${describe(member)}; dropped`,
-      );
+      collectors.dropped.push(`${path}[${index}] was ${describe(member)}; dropped`);
       return;
     }
     // Object members recurse: `OR: [{ scopeId: undefined }]` collapses
@@ -168,9 +166,7 @@ function sanitizeObject(
   if (keys.length === 0) {
     // `{ id: {} }` is an empty nested filter: it matches every row,
     // exactly the collapse this helper exists to prevent.
-    collectors.fatal.push(
-      `${path} is an empty object, which matches every row`,
-    );
+    collectors.fatal.push(`${path} is an empty object, which matches every row`);
     return undefined;
   }
   const rebuilt: Record<string, unknown> = {};

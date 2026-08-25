@@ -152,9 +152,7 @@ describe("given a trace a reviewer commented on one span of", () => {
           "Ada (on web_search span (0af31b2c) · Output): too terse [thumbs down]",
         );
       });
-      expect(entries.at(-1)?.[0]?.annotations).toContain(
-        "Grace: reads well [thumbs up]",
-      );
+      expect(entries.at(-1)?.[0]?.annotations).toContain("Grace: reads well [thumbs up]");
     });
   });
 });

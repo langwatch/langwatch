@@ -84,9 +84,7 @@ vi.mock("../GroupLensBody", () => ({
 }));
 
 vi.mock("../EmptyFilterState", () => ({
-  EmptyFilterState: () => (
-    <div data-testid="empty-filter-state">Nothing matches</div>
-  ),
+  EmptyFilterState: () => <div data-testid="empty-filter-state">Nothing matches</div>,
 }));
 
 vi.mock("../TraceTableLayout", () => ({
@@ -209,9 +207,7 @@ describe("<TraceTable /> empty-state gating", () => {
 
         renderTable();
 
-        expect(
-          screen.queryByTestId("empty-filter-state"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("empty-filter-state")).not.toBeInTheDocument();
         expect(screen.getByTestId("trace-lens-body")).toBeInTheDocument();
       });
     });
@@ -227,9 +223,7 @@ describe("<TraceTable /> empty-state gating", () => {
 
         renderTable();
 
-        expect(
-          screen.queryByTestId("empty-filter-state"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("empty-filter-state")).not.toBeInTheDocument();
         expect(screen.getByTestId("trace-lens-body")).toBeInTheDocument();
       });
     });
@@ -240,9 +234,7 @@ describe("<TraceTable /> empty-state gating", () => {
       it("renders the lens body, not EmptyFilterState", () => {
         mockTraceListResult = {
           ...mockTraceListResult,
-          data: [
-            { traceId: "trace-abc-123" },
-          ] as typeof mockTraceListResult.data,
+          data: [{ traceId: "trace-abc-123" }] as typeof mockTraceListResult.data,
           totalHits: 1,
           isFetching: false,
           isPlaceholderData: false,
@@ -250,9 +242,7 @@ describe("<TraceTable /> empty-state gating", () => {
 
         renderTable();
 
-        expect(
-          screen.queryByTestId("empty-filter-state"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("empty-filter-state")).not.toBeInTheDocument();
         expect(screen.getByTestId("trace-lens-body")).toBeInTheDocument();
       });
     });
@@ -277,12 +267,8 @@ describe("<TraceTable /> failed-read gating", () => {
 
         renderTable();
 
-        expect(
-          screen.queryByTestId("empty-filter-state"),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.getByText(/could not load your traces/i),
-        ).toBeInTheDocument();
+        expect(screen.queryByTestId("empty-filter-state")).not.toBeInTheDocument();
+        expect(screen.getByText(/could not load your traces/i)).toBeInTheDocument();
       });
     });
   });
@@ -306,9 +292,7 @@ describe("<TraceTable /> failed-read gating", () => {
 
         renderTable();
 
-        expect(
-          screen.queryByTestId("empty-filter-state"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("empty-filter-state")).not.toBeInTheDocument();
         expect(
           screen.getByText(/could not load your conversations/i),
         ).toBeInTheDocument();

@@ -283,14 +283,10 @@ function ComposerImpl({
       <Box
         position="relative"
         borderRadius={COMPOSER_RADIUS}
-        transform={
-          turnActive && !reduceMotion ? "translateY(3px)" : "translateY(0)"
-        }
+        transform={turnActive && !reduceMotion ? "translateY(3px)" : "translateY(0)"}
         transition="transform 380ms cubic-bezier(0.32, 0.72, 0, 1)"
       >
-        {turnActive ? (
-          <Box className="langy-composer-sheen" aria-hidden />
-        ) : null}
+        {turnActive ? <Box className="langy-composer-sheen" aria-hidden /> : null}
         {/* One integrated surface. The field, the page-context chips, the
             model picker and send all live inside a single rounded card that
             lights up in the brand orange on focus — the composer reads as one
@@ -679,10 +675,7 @@ function ComposerSendControl({
         {turnPhase === "idle" ? (
           <SubmitTurnButton canSend={canSend} onSend={onSend} />
         ) : (
-          <StopTurnButton
-            isStopping={turnPhase === "stopping"}
-            onStop={onStop}
-          />
+          <StopTurnButton isStopping={turnPhase === "stopping"} onStop={onStop} />
         )}
       </MotionSwap>
     </AnimatePresence>
@@ -716,13 +709,7 @@ function StopTurnButton({
   );
 }
 
-function SubmitTurnButton({
-  canSend,
-  onSend,
-}: {
-  canSend: boolean;
-  onSend: () => void;
-}) {
+function SubmitTurnButton({ canSend, onSend }: { canSend: boolean; onSend: () => void }) {
   return (
     <SendButton
       aria-label="Send"
@@ -897,8 +884,8 @@ function ContextSummaryMenu({
       <Menu.Content minWidth="300px" maxWidth="360px" padding={1}>
         {contextChips.length === 0 && addableChips.length === 0 ? (
           <Text padding={3} textStyle="xs" color="fg.muted">
-            Langy can use the trace, evaluation, dataset, or feature you&apos;re
-            looking at. Open one to make it available here.
+            Langy can use the trace, evaluation, dataset, or feature you&apos;re looking
+            at. Open one to make it available here.
           </Text>
         ) : null}
         {contextChips.length > 0 ? (
@@ -934,9 +921,7 @@ function ContextSummaryMenu({
             })}
           </Menu.ItemGroup>
         ) : null}
-        {contextChips.length > 0 && addableChips.length > 0 ? (
-          <Menu.Separator />
-        ) : null}
+        {contextChips.length > 0 && addableChips.length > 0 ? <Menu.Separator /> : null}
         {addableChips.map((chip) => {
           const Icon = CONTEXT_ICON[chip.kind] ?? Waypoints;
           return (

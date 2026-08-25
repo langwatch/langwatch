@@ -56,7 +56,10 @@ export const redisPredep: Predep = {
       const v = await resolveVersion(bundled);
       if (v) return { installed: true, version: v, resolvedPath: bundled };
     }
-    return { installed: false, reason: `not yet downloaded to ${paths.bin}/redis-server` };
+    return {
+      installed: false,
+      reason: `not yet downloaded to ${paths.bin}/redis-server`,
+    };
   },
 
   async install({ platform, paths, task }) {
@@ -68,7 +71,9 @@ export const redisPredep: Predep = {
     task.output = "verifying sha256";
     const expectedRes = await fetch(`${url}.sha256`);
     if (!expectedRes.ok) {
-      throw new Error(`redis sha256 sidecar missing (${url}.sha256): HTTP ${expectedRes.status}`);
+      throw new Error(
+        `redis sha256 sidecar missing (${url}.sha256): HTTP ${expectedRes.status}`,
+      );
     }
     const expected = (await expectedRes.text()).trim().split(/\s+/)[0]!;
     const actual = await sha256OfFile(tmp);
@@ -90,10 +95,14 @@ export const redisPredep: Predep = {
     const cliBin = join(paths.bin, "redis-cli");
     if (!existsSync(serverBin) || !existsSync(cliBin)) {
       throw new Error(
-        `redis tarball ${url} extracted incompletely — expected both redis-server and redis-cli, got ${[
-          existsSync(serverBin) ? "redis-server" : null,
-          existsSync(cliBin) ? "redis-cli" : null,
-        ].filter(Boolean).join(", ") || "neither"}`,
+        `redis tarball ${url} extracted incompletely — expected both redis-server and redis-cli, got ${
+          [
+            existsSync(serverBin) ? "redis-server" : null,
+            existsSync(cliBin) ? "redis-cli" : null,
+          ]
+            .filter(Boolean)
+            .join(", ") || "neither"
+        }`,
       );
     }
     chmodSync(serverBin, 0o755);

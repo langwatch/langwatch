@@ -78,9 +78,7 @@ describe("password reset for an OAuth-born user (upstream premise pin)", () => {
         body: { token: token!, newPassword: "brand-new-password-1" },
       });
 
-      const credentialAccounts = db.account!.filter(
-        (a) => a.providerId === "credential",
-      );
+      const credentialAccounts = db.account!.filter((a) => a.providerId === "credential");
       expect(credentialAccounts).toHaveLength(1);
 
       const session = await auth.api.signInEmail({
@@ -108,9 +106,7 @@ describe("password reset for an OAuth-born user (upstream premise pin)", () => {
         // about token validation.
       ).rejects.toMatchObject({ body: { code: "INVALID_TOKEN" } });
 
-      const credentialAccounts = db.account!.filter(
-        (a) => a.providerId === "credential",
-      );
+      const credentialAccounts = db.account!.filter((a) => a.providerId === "credential");
       expect(credentialAccounts).toHaveLength(0);
 
       await expect(

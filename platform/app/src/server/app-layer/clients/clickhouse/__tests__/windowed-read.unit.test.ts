@@ -11,13 +11,10 @@ const TABLE = "windowed_read_test";
  *  would intercept nothing and pass regardless. */
 async function outcomeCount(outcome: string): Promise<number> {
   const { register } = await import("prom-client");
-  const metric = await register
-    .getSingleMetric("clickhouse_windowed_read_total")
-    ?.get();
+  const metric = await register.getSingleMetric("clickhouse_windowed_read_total")?.get();
   return (
-    metric?.values.find(
-      (v) => v.labels.table === TABLE && v.labels.outcome === outcome,
-    )?.value ?? 0
+    metric?.values.find((v) => v.labels.table === TABLE && v.labels.outcome === outcome)
+      ?.value ?? 0
   );
 }
 

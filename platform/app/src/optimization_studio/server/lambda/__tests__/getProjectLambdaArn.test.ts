@@ -34,9 +34,7 @@ describe("getProjectLambdaArn", () => {
     // Creating a project Lambda also provisions its log group. Stubbed so the
     // suite never reaches the network, which otherwise costs a real AWS
     // round trip per create-path test and fails noisily without credentials.
-    vi.spyOn(CloudWatchLogsClient.prototype as any, "send").mockResolvedValue(
-      {},
-    );
+    vi.spyOn(CloudWatchLogsClient.prototype as any, "send").mockResolvedValue({});
     await clearLambdaArnCache();
   });
 
@@ -99,15 +97,13 @@ describe("getProjectLambdaArn", () => {
         .mockResolvedValueOnce({
           Configuration: mockLambdaConfig,
           Code: {
-            ImageUri:
-              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+            ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
           },
         })
         .mockResolvedValueOnce({
           Configuration: mockLambdaConfig,
           Code: {
-            ImageUri:
-              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+            ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
           },
         })
         .mockResolvedValueOnce({ Configuration: mockLambdaConfig });
@@ -139,14 +135,11 @@ describe("getProjectLambdaArn", () => {
         .mockResolvedValue({
           Configuration: mockLambdaConfig,
           Code: {
-            ImageUri:
-              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+            ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
           },
         });
 
-      const calls = Array.from({ length: 100 }, () =>
-        getProjectLambdaArn("projectA"),
-      );
+      const calls = Array.from({ length: 100 }, () => getProjectLambdaArn("projectA"));
       // Let the event loop register all 100 awaiters before releasing.
       await new Promise((r) => setImmediate(r));
       resolveCheck({
@@ -180,15 +173,13 @@ describe("getProjectLambdaArn", () => {
         .mockResolvedValueOnce({
           Configuration: mockLambdaConfig,
           Code: {
-            ImageUri:
-              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+            ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
           },
         })
         .mockResolvedValueOnce({
           Configuration: mockLambdaConfig,
           Code: {
-            ImageUri:
-              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+            ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
           },
         })
         .mockResolvedValueOnce({ Configuration: mockLambdaConfig });

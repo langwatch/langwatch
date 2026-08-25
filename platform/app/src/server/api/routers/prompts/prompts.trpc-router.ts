@@ -364,8 +364,7 @@ export const promptsRouter = createTRPCRouter({
       if (!hasSourcePermission) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message:
-            "You do not have permission to create prompts in the source project",
+          message: "You do not have permission to create prompts in the source project",
         });
       }
 
@@ -468,8 +467,7 @@ export const promptsRouter = createTRPCRouter({
       if (!hasSourcePermission) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message:
-            "You do not have permission to view prompts in the source project",
+          message: "You do not have permission to view prompts in the source project",
         });
       }
 
@@ -581,9 +579,7 @@ export const promptsRouter = createTRPCRouter({
 
       // Filter copies if copyIds is provided
       const copiesToPush = input.copyIds
-        ? copies.filter((copy) =>
-            input.copyIds!.includes(copy.id),
-          )
+        ? copies.filter((copy) => input.copyIds!.includes(copy.id))
         : copies;
 
       if (copiesToPush.length === 0) {
@@ -677,8 +673,7 @@ export const promptsRouter = createTRPCRouter({
       if (results.length === 0) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message:
-            "You do not have permission to update any of the copied prompts",
+          message: "You do not have permission to update any of the copied prompts",
         });
       }
 

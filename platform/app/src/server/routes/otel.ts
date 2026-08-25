@@ -103,10 +103,7 @@ export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
  * the unified-auth middleware (PR #3520) — same fields, same shape, so
  * existing CloudWatch queries work.
  */
-async function authenticate(
-  c: RouteContext,
-  logger: ReturnType<typeof createLogger>,
-) {
+async function authenticate(c: RouteContext, logger: ReturnType<typeof createLogger>) {
   const diag = collectAuthDiagnostics(c);
   const credentials = extractCredentials((name) => c.req.header(name));
 
@@ -191,16 +188,9 @@ const CORRECTED_PATH_LOG_WINDOW_MS = 10 * 60 * 1000;
 const CORRECTED_PATH_LOG_MAX_PAIRS = 1000;
 const correctedPathLastLoggedAt = new Map<string, number>();
 
-function correctedPathIsDueToLog({
-  pair,
-  now,
-}: {
-  pair: string;
-  now: number;
-}): boolean {
+function correctedPathIsDueToLog({ pair, now }: { pair: string; now: number }): boolean {
   const last = correctedPathLastLoggedAt.get(pair);
-  if (last !== void 0 && now - last < CORRECTED_PATH_LOG_WINDOW_MS)
-    return false;
+  if (last !== void 0 && now - last < CORRECTED_PATH_LOG_WINDOW_MS) return false;
 
   if (correctedPathLastLoggedAt.size >= CORRECTED_PATH_LOG_MAX_PAIRS) {
     correctedPathLastLoggedAt.clear();
@@ -224,9 +214,7 @@ function logCorrectedPath({
   projectId: string;
   logger: ReturnType<typeof createLogger>;
 }): void {
-  const originalPath = readCorrectedPath(
-    c.req.header(OTLP_CORRECTED_PATH_HEADER),
-  );
+  const originalPath = readCorrectedPath(c.req.header(OTLP_CORRECTED_PATH_HEADER));
   if (!originalPath) return;
   // NUL joins the pair because it cannot appear in a URL pathname, so no
   // project and path can collide with a different pair.
@@ -384,9 +372,7 @@ async function applyReceiverProvenanceToTraces({
     sourceType: resolved.ingestSourceType,
   });
   stampIngestKeyProvenanceOnTraceRequest(
-    request as unknown as Parameters<
-      typeof stampIngestKeyProvenanceOnTraceRequest
-    >[0],
+    request as unknown as Parameters<typeof stampIngestKeyProvenanceOnTraceRequest>[0],
     {
       apiKeyId: resolved.apiKeyId,
       sourceType: resolved.ingestSourceType,
@@ -614,12 +600,11 @@ secured
           policy: c.app.governance.policy,
         });
 
-        const collectionResult =
-          await c.app.traces.collection.handleOtlpTraceRequest(
-            project.id,
-            traceRequest,
-            DEFAULT_PII_REDACTION_LEVEL,
-          );
+        const collectionResult = await c.app.traces.collection.handleOtlpTraceRequest(
+          project.id,
+          traceRequest,
+          DEFAULT_PII_REDACTION_LEVEL,
+        );
 
         return c.json({
           message: "Trace received successfully.",
@@ -699,14 +684,12 @@ secured
           policy: c.app.governance.policy,
         });
 
-        const result = await c.app.traces.logCollection.handleOtlpLogRequest(
-          {
-            tenantId: project.id,
-            organizationId: project.team.organizationId,
-            logRequest,
-            piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-          },
-        );
+        const result = await c.app.traces.logCollection.handleOtlpLogRequest({
+          tenantId: project.id,
+          organizationId: project.team.organizationId,
+          logRequest,
+          piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+        });
 
         // Nothing was durably accepted, and the cause is ours. OTLP treats a 200
         // with `partialSuccess` as a permanent rejection the client must not
@@ -721,9 +704,7 @@ secured
             ? {
                 partialSuccess: {
                   rejectedLogRecords: result.rejectedLogRecords,
-                  ...(result.errorMessage
-                    ? { errorMessage: result.errorMessage }
-                    : {}),
+                  ...(result.errorMessage ? { errorMessage: result.errorMessage } : {}),
                 },
               }
             : {},
@@ -798,13 +779,12 @@ secured
           c.app.apiKeys.markUsed({ id: resolved.apiKeyId });
         }
 
-        const result =
-          await c.app.traces.metricCollection.handleOtlpMetricRequest({
-            tenantId: project.id,
-            organizationId: project.team.organizationId,
-            metricRequest: metricsRequest,
-            piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-          });
+        const result = await c.app.traces.metricCollection.handleOtlpMetricRequest({
+          tenantId: project.id,
+          organizationId: project.team.organizationId,
+          metricRequest: metricsRequest,
+          piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+        });
 
         // Nothing was durably accepted, and the cause is ours. OTLP treats a 200
         // with `partialSuccess` as a permanent rejection the client must not
@@ -818,9 +798,7 @@ secured
         return c.json({
           partialSuccess: {
             rejectedDataPoints: result.rejectedDataPoints,
-            ...(result.errorMessage
-              ? { errorMessage: result.errorMessage }
-              : {}),
+            ...(result.errorMessage ? { errorMessage: result.errorMessage } : {}),
           },
         });
       },

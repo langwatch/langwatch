@@ -1,9 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import {
-  createTRPCClientProxy,
-  httpBatchLink,
-  TRPCUntypedClient,
-} from "@trpc/client";
+import { createTRPCClientProxy, httpBatchLink, TRPCUntypedClient } from "@trpc/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 
@@ -144,9 +140,7 @@ describe("fetchSpanTreePages", () => {
       await fetchSpanTreePages({ utils, input, onPage });
 
       expect(onPage).toHaveBeenCalledTimes(1);
-      expect(
-        onPage.mock.calls[0]![0].map((n: SpanTreeNode) => n.spanId),
-      ).toEqual(["a"]);
+      expect(onPage.mock.calls[0]![0].map((n: SpanTreeNode) => n.spanId)).toEqual(["a"]);
     });
 
     it("forwards the abort signal to every page request", async () => {
@@ -243,9 +237,7 @@ describe("spanTreeQueryFn progressive publishing", () => {
       const result = await queryFn({});
 
       expect(result.map((n) => n.spanId)).toEqual(["a", "b"]);
-      const published = queryClient.getQueryData<SpanTreeNode[]>(
-        spanTreeQueryKey(input),
-      );
+      const published = queryClient.getQueryData<SpanTreeNode[]>(spanTreeQueryKey(input));
       expect(published?.map((n) => n.spanId)).toEqual(["a"]);
     });
 
@@ -290,9 +282,7 @@ describe("spanTreeQueryFn progressive publishing", () => {
       const queryFn = spanTreeQueryFn({ utils, queryClient, input });
       await queryFn({});
 
-      const cached = queryClient.getQueryData<SpanTreeNode[]>(
-        spanTreeQueryKey(input),
-      );
+      const cached = queryClient.getQueryData<SpanTreeNode[]>(spanTreeQueryKey(input));
       expect(cached).toBe(fullTree);
     });
   });
@@ -301,9 +291,9 @@ describe("spanTreeQueryFn progressive publishing", () => {
 describe("spanTreeDeltaSinceMs", () => {
   describe("when the tree has spans", () => {
     it("returns 1ms before the newest row version so same-millisecond writes are re-fetched", () => {
-      expect(
-        spanTreeDeltaSinceMs([node("a", 100), node("b", 300), node("c", 200)]),
-      ).toBe(299);
+      expect(spanTreeDeltaSinceMs([node("a", 100), node("b", 300), node("c", 200)])).toBe(
+        299,
+      );
     });
 
     it("keys off the row version, not the span start, so in-place updates advance the mark", () => {

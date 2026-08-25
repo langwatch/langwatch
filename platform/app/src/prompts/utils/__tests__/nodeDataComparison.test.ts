@@ -311,15 +311,11 @@ describe("isNodeDataEqual", () => {
   it("different llm model", () => {
     const node1: NodeData = {
       ...baseNodeData,
-      parameters: [
-        { identifier: "llm", type: "llm", value: { model: "gpt-4" } },
-      ],
+      parameters: [{ identifier: "llm", type: "llm", value: { model: "gpt-4" } }],
     };
     const node2: NodeData = {
       ...baseNodeData,
-      parameters: [
-        { identifier: "llm", type: "llm", value: { model: "gpt-3.5-turbo" } },
-      ],
+      parameters: [{ identifier: "llm", type: "llm", value: { model: "gpt-3.5-turbo" } }],
     };
     expect(isNodeDataEqual(node1, node2)).toBe(false);
   });
@@ -455,9 +451,7 @@ describe("isNodeDataEqual", () => {
     };
     const node2: NodeData = {
       ...baseNodeData,
-      parameters: [
-        { identifier: "llm", type: "llm", value: { model: "gpt-4" } },
-      ],
+      parameters: [{ identifier: "llm", type: "llm", value: { model: "gpt-4" } }],
     };
     expect(isNodeDataEqual(node1, node2)).toBe(false);
   });

@@ -1,8 +1,5 @@
 import type { AppendStore } from "@langwatch/eventing";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import {
   type EvaluatorResultEvent,
   evaluatorResultEventSchema,
@@ -44,22 +41,15 @@ export interface ClickHouseExperimentRunResultRecord {
   OccurredAt: Date;
 }
 
-const resultEvents = [
-  targetResultEventSchema,
-  evaluatorResultEventSchema,
-] as const;
+const resultEvents = [targetResultEventSchema, evaluatorResultEventSchema] as const;
 
 /**
  * Map projection that transforms TargetResultEvent and EvaluatorResultEvent
  * into ClickHouse records for storage in the experiment_run_items table.
  */
 export class ExperimentRunResultStorageMapProjection
-  extends AbstractMapProjection<
-    ClickHouseExperimentRunResultRecord,
-    typeof resultEvents
-  >
-  implements
-    MapEventHandlers<typeof resultEvents, ClickHouseExperimentRunResultRecord>
+  extends AbstractMapProjection<ClickHouseExperimentRunResultRecord, typeof resultEvents>
+  implements MapEventHandlers<typeof resultEvents, ClickHouseExperimentRunResultRecord>
 {
   readonly name = "experimentRunResultStorage";
   readonly store: AppendStore<ClickHouseExperimentRunResultRecord>;
@@ -72,9 +62,7 @@ export class ExperimentRunResultStorageMapProjection
       `experiment:${event.data.experimentId}:result:${event.data.runId}:item:${event.data.index}`,
   };
 
-  constructor(deps: {
-    store: AppendStore<ClickHouseExperimentRunResultRecord>;
-  }) {
+  constructor(deps: { store: AppendStore<ClickHouseExperimentRunResultRecord> }) {
     super();
     this.store = deps.store;
   }
@@ -100,9 +88,7 @@ export class ExperimentRunResultStorageMapProjection
       TargetId: event.data.targetId,
       ResultType: "target",
       DatasetEntry: JSON.stringify(event.data.entry),
-      Predicted: event.data.predicted
-        ? JSON.stringify(event.data.predicted)
-        : null,
+      Predicted: event.data.predicted ? JSON.stringify(event.data.predicted) : null,
       TargetCost: event.data.cost ?? null,
       TargetDurationMs: normalizeDurationMs(event.data.duration),
       TargetError: event.data.error ?? null,
@@ -164,9 +150,7 @@ export class ExperimentRunResultStorageMapProjection
             : 0,
       EvaluationDetails: event.data.details ?? null,
       EvaluationCost: event.data.cost ?? null,
-      EvaluationInputs: event.data.inputs
-        ? JSON.stringify(event.data.inputs)
-        : null,
+      EvaluationInputs: event.data.inputs ? JSON.stringify(event.data.inputs) : null,
       EvaluationDurationMs: normalizeDurationMs(event.data.duration),
       OccurredAt: new Date(event.occurredAt),
     };

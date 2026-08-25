@@ -53,11 +53,7 @@ export function useLicenseEnforcement(limitType: LimitType) {
       if (checkResult.data.allowed) {
         return onAllowed();
       } else {
-        openUpgradeModal(
-          limitType,
-          checkResult.data.current,
-          checkResult.data.max,
-        );
+        openUpgradeModal(limitType, checkResult.data.current, checkResult.data.max);
         // Fire-and-forget: notify backend that a UI pre-check blocked the user
         if (organization?.id) {
           reportBlocked.mutate({
@@ -68,13 +64,7 @@ export function useLicenseEnforcement(limitType: LimitType) {
         return undefined;
       }
     },
-    [
-      checkResult.data,
-      openUpgradeModal,
-      limitType,
-      organization?.id,
-      reportBlocked,
-    ],
+    [checkResult.data, openUpgradeModal, limitType, organization?.id, reportBlocked],
   );
 
   return {

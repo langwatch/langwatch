@@ -42,18 +42,9 @@
 
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
 import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
-import {
-  PAYLOAD_BLOCKLIST_EXACT,
-  PAYLOAD_BLOCKLIST_PREFIXES,
-} from "./payload-blocklist";
-import {
-  collectStringValues,
-  hasFilterValues,
-} from "../query-builders/_shared";
-import {
-  type AnalyticsMetricSource,
-  getMetricSource,
-} from "./field-availability";
+import { PAYLOAD_BLOCKLIST_EXACT, PAYLOAD_BLOCKLIST_PREFIXES } from "./payload-blocklist";
+import { collectStringValues, hasFilterValues } from "../query-builders/_shared";
+import { type AnalyticsMetricSource, getMetricSource } from "./field-availability";
 
 /** The six destination tables routed between. */
 export type AnalyticsTable =
@@ -156,20 +147,15 @@ const ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST = [
   "evaluations.evaluation_pass_rate",
   "evaluations.evaluation_runs",
 ] as const;
-export type EvalRollupMetricKey =
-  (typeof ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST)[number];
+export type EvalRollupMetricKey = (typeof ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST)[number];
 
 /** Backwards-compatible union — all rollup-rollable metric keys, any source. */
-export type RollupRollableMetricKey =
-  | TraceRollupMetricKey
-  | EvalRollupMetricKey;
+export type RollupRollableMetricKey = TraceRollupMetricKey | EvalRollupMetricKey;
 
-export const ROLLUP_ROLLABLE_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
-  [
-    ...ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST,
-    ...ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST,
-  ],
-);
+export const ROLLUP_ROLLABLE_METRIC_KEYS: ReadonlySet<string> = new Set<string>([
+  ...ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST,
+  ...ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST,
+]);
 
 export function isRollupRollableMetricKey(
   metric: string,
@@ -228,9 +214,7 @@ export const ROLLUP_AVG_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
   ROLLUP_AVG_METRIC_KEYS_LIST,
 );
 
-export function isRollupAvgMetricKey(
-  metric: string,
-): metric is RollupAvgMetricKey {
+export function isRollupAvgMetricKey(metric: string): metric is RollupAvgMetricKey {
   return ROLLUP_AVG_METRIC_KEYS.has(metric);
 }
 
@@ -257,8 +241,7 @@ const SLIM_ELIGIBLE_TRACE_METRIC_KEYS_LIST = [
   "performance.total_processed_tokens",
   "performance.tokens_per_second",
 ] as const;
-export type SlimTraceMetricKey =
-  (typeof SLIM_ELIGIBLE_TRACE_METRIC_KEYS_LIST)[number];
+export type SlimTraceMetricKey = (typeof SLIM_ELIGIBLE_TRACE_METRIC_KEYS_LIST)[number];
 
 /**
  * Registry metric keys that can be served from the slim
@@ -270,8 +253,7 @@ const SLIM_ELIGIBLE_EVAL_METRIC_KEYS_LIST = [
   "evaluations.evaluation_pass_rate",
   "evaluations.evaluation_runs",
 ] as const;
-export type SlimEvalMetricKey =
-  (typeof SLIM_ELIGIBLE_EVAL_METRIC_KEYS_LIST)[number];
+export type SlimEvalMetricKey = (typeof SLIM_ELIGIBLE_EVAL_METRIC_KEYS_LIST)[number];
 
 export type SlimEligibleMetricKey = SlimTraceMetricKey | SlimEvalMetricKey;
 
@@ -280,9 +262,7 @@ export const SLIM_ELIGIBLE_METRIC_KEYS: ReadonlySet<string> = new Set<string>([
   ...SLIM_ELIGIBLE_EVAL_METRIC_KEYS_LIST,
 ]);
 
-export function isSlimEligibleMetricKey(
-  metric: string,
-): metric is SlimEligibleMetricKey {
+export function isSlimEligibleMetricKey(metric: string): metric is SlimEligibleMetricKey {
   return SLIM_ELIGIBLE_METRIC_KEYS.has(metric);
 }
 
@@ -386,30 +366,26 @@ const SLIM_EVAL_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
 // ─── Filter eligibility ──────────────────────────────────────────────
 
 /** Trace-rollup filter fields (none — anything filterable forces slim). */
-const ROLLUP_TRACE_FILTER_FIELDS: ReadonlySet<string> =
-  new Set<string>();
+const ROLLUP_TRACE_FILTER_FIELDS: ReadonlySet<string> = new Set<string>();
 
 /** Eval-rollup filter fields — fields on the rollup's keying tuple. */
-const ROLLUP_EVAL_FILTER_FIELDS: ReadonlySet<string> =
-  new Set<string>();
+const ROLLUP_EVAL_FILTER_FIELDS: ReadonlySet<string> = new Set<string>();
 
 /** Slim-trace filter fields (typed columns + trimmed Attributes reads). */
-const SLIM_TRACE_FILTER_FIELDS: ReadonlySet<string> = new Set<string>(
-  [
-    "topics.topics",
-    "topics.subtopics",
-    "metadata.user_id",
-    "metadata.thread_id",
-    "metadata.customer_id",
-    "metadata.labels",
-    "metadata.key",
-    "metadata.value",
-    "metadata.prompt_ids",
-    "traces.origin",
-    "traces.error",
-    "traces.name",
-  ],
-);
+const SLIM_TRACE_FILTER_FIELDS: ReadonlySet<string> = new Set<string>([
+  "topics.topics",
+  "topics.subtopics",
+  "metadata.user_id",
+  "metadata.thread_id",
+  "metadata.customer_id",
+  "metadata.labels",
+  "metadata.key",
+  "metadata.value",
+  "metadata.prompt_ids",
+  "traces.origin",
+  "traces.error",
+  "traces.name",
+]);
 
 /** Slim-eval filter fields — typed columns on the slim row. */
 const SLIM_EVAL_FILTER_FIELDS: ReadonlySet<string> = new Set<string>([
@@ -465,9 +441,7 @@ export interface PickAnalyticsTableInput {
   filters?: Partial<
     Record<
       string,
-      | string[]
-      | Record<string, string[]>
-      | Record<string, Record<string, string[]>>
+      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
     >
   >;
   groupBy?: string;
@@ -492,9 +466,7 @@ export interface PickAnalyticsTableInput {
  *   2. Try the source's slim.
  *   3. Otherwise the source's legacy fallback.
  */
-export function pickAnalyticsTable(
-  input: PickAnalyticsTableInput,
-): AnalyticsTable {
+export function pickAnalyticsTable(input: PickAnalyticsTableInput): AnalyticsTable {
   // Empty series → can't route confidently; fall back to the broad legacy.
   if (!input.series || input.series.length === 0) return "trace_summaries";
 
@@ -636,10 +608,7 @@ function slimHandlesAllSeries(
   return series.every((s) => slimHandlesSeries(s, source));
 }
 
-function slimHandlesSeries(
-  s: AnalyticsSeries,
-  source: AnalyticsMetricSource,
-): boolean {
+function slimHandlesSeries(s: AnalyticsSeries, source: AnalyticsMetricSource): boolean {
   // group by a dim then re-aggregate the groups. The slim builder does NOT
   // implement the outer re-aggregation — it only ever emits the flat inner
   // aggregation, silently returning e.g. the total distinct trace count for
@@ -652,9 +621,7 @@ function slimHandlesSeries(
   // `evaluation_runs` rather than being silently blended across evaluators.
   if (s.key !== undefined || s.subkey !== undefined) return false;
   const keys =
-    source === "trace"
-      ? SLIM_ELIGIBLE_TRACE_METRIC_KEYS
-      : SLIM_ELIGIBLE_EVAL_METRIC_KEYS;
+    source === "trace" ? SLIM_ELIGIBLE_TRACE_METRIC_KEYS : SLIM_ELIGIBLE_EVAL_METRIC_KEYS;
   return keys.has(s.metric);
 }
 
@@ -663,8 +630,7 @@ function slimHandlesGroupBy(
   source: AnalyticsMetricSource,
 ): boolean {
   if (!groupBy) return true;
-  const keys =
-    source === "trace" ? SLIM_TRACE_GROUP_BY_KEYS : SLIM_EVAL_GROUP_BY_KEYS;
+  const keys = source === "trace" ? SLIM_TRACE_GROUP_BY_KEYS : SLIM_EVAL_GROUP_BY_KEYS;
   return keys.has(groupBy);
 }
 
@@ -673,8 +639,7 @@ function slimHandlesFilters(
   source: AnalyticsMetricSource,
 ): boolean {
   if (!filters) return true;
-  const allowed =
-    source === "trace" ? SLIM_TRACE_FILTER_FIELDS : SLIM_EVAL_FILTER_FIELDS;
+  const allowed = source === "trace" ? SLIM_TRACE_FILTER_FIELDS : SLIM_EVAL_FILTER_FIELDS;
   for (const [field, value] of Object.entries(filters)) {
     if (!hasAnyFilterValue(value)) continue;
     if (!allowed.has(field as string)) return false;
@@ -692,9 +657,7 @@ function slimHandlesFilters(
  * service's blocklist; if a user is filtering on `gen_ai.prompt` we MUST
  * fall back because slim dropped the key at write time.
  */
-function filtersHitBlocklist(
-  filters: PickAnalyticsTableInput["filters"],
-): boolean {
+function filtersHitBlocklist(filters: PickAnalyticsTableInput["filters"]): boolean {
   if (!filters) return false;
   const metadataKey = filters["metadata.key"];
   if (metadataKey) {

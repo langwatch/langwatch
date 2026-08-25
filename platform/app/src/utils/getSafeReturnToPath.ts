@@ -9,9 +9,7 @@ const SAFE_RETURN_TO_REGEX = /^\/(?!\/)[^\r\n]*$/;
  * @example
  * const safePath = getSafeReturnToPath(router.query.return_to as string);
  */
-export function getSafeReturnToPath(
-  returnTo?: string | string[] | null,
-): string | null {
+export function getSafeReturnToPath(returnTo?: string | string[] | null): string | null {
   const normalizedValue = typeof returnTo === "string" ? returnTo : null;
 
   if (!normalizedValue) {

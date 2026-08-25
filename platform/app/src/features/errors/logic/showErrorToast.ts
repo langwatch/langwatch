@@ -97,7 +97,5 @@ function bodyCopy({
   if (!description) return tip ?? "";
   if (!tip) return description;
 
-  return /[.!?]$/.test(description)
-    ? `${description} ${tip}`
-    : `${description}. ${tip}`;
+  return /[.!?]$/.test(description) ? `${description} ${tip}` : `${description}. ${tip}`;
 }

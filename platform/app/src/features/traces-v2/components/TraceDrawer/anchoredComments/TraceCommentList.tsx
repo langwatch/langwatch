@@ -154,8 +154,7 @@ function AnchorBreadcrumb({
   });
   if (!label) return null;
 
-  const isGone =
-    isOnThisTrace && !!comment.anchorId && !resolvable.has(comment.anchorId);
+  const isGone = isOnThisTrace && !!comment.anchorId && !resolvable.has(comment.anchorId);
   if (isGone) {
     return (
       <Text textStyle="2xs" color="fg.subtle" fontStyle="italic">

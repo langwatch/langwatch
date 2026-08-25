@@ -2,13 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { afterEach, describe, expect, it } from "vitest";
@@ -100,9 +94,7 @@ describe("<RuntimeParametersField />", () => {
 
       await user.click(screen.getByTestId("remove-param-0"));
 
-      expect(screen.getByTestId("parameters-value")).toHaveTextContent(
-        '{"retries":3}',
-      );
+      expect(screen.getByTestId("parameters-value")).toHaveTextContent('{"retries":3}');
     });
   });
 
@@ -186,9 +178,7 @@ describe("<RuntimeParametersField />", () => {
         target: { value: "5" },
       });
 
-      expect(screen.getByTestId("parameters-value")).toHaveTextContent(
-        '"count":5',
-      );
+      expect(screen.getByTestId("parameters-value")).toHaveTextContent('"count":5');
     });
   });
 });

@@ -56,9 +56,9 @@ describe("secret references", () => {
     });
 
     it("leaves it as written when the project has no secrets at all", () => {
-      expect(
-        resolveSecretRefs({ value: "{{ secrets.AGENT_TOKEN }}", secrets: {} }),
-      ).toBe("{{ secrets.AGENT_TOKEN }}");
+      expect(resolveSecretRefs({ value: "{{ secrets.AGENT_TOKEN }}", secrets: {} })).toBe(
+        "{{ secrets.AGENT_TOKEN }}",
+      );
     });
   });
 
@@ -82,9 +82,7 @@ describe("secret references", () => {
       });
 
       expect(fenced.template).not.toContain("tok-live-123");
-      expect(fenced.restore(fenced.template)).toBe(
-        "https://api.test/tok-live-123",
-      );
+      expect(fenced.restore(fenced.template)).toBe("https://api.test/tok-live-123");
     });
 
     it("puts an unresolved reference back exactly as written", () => {
@@ -100,9 +98,7 @@ describe("secret references", () => {
       const fenced = preserveSecretRefs("body {{ secrets.AGENT_TOKEN }} end");
 
       expect(fenced.template).not.toContain("secrets.AGENT_TOKEN");
-      expect(fenced.restore(fenced.template)).toBe(
-        "body {{ secrets.AGENT_TOKEN }} end",
-      );
+      expect(fenced.restore(fenced.template)).toBe("body {{ secrets.AGENT_TOKEN }} end");
     });
 
     it("leaves a template with no reference in it byte for byte", () => {
@@ -188,9 +184,7 @@ describe("secret references", () => {
             'Get "https://api.test?token=tok-live-123": dial tcp, sent tok-live-123',
           secrets: SECRETS,
         }),
-      ).toBe(
-        'Get "https://api.test?token=[redacted]": dial tcp, sent [redacted]',
-      );
+      ).toBe('Get "https://api.test?token=[redacted]": dial tcp, sent [redacted]');
     });
 
     it("leaves a message that carries none unchanged", () => {
@@ -203,9 +197,9 @@ describe("secret references", () => {
     });
 
     it("ignores an empty secret value rather than replacing everything", () => {
-      expect(
-        redactSecrets({ message: "anything at all", secrets: { EMPTY: "" } }),
-      ).toBe("anything at all");
+      expect(redactSecrets({ message: "anything at all", secrets: { EMPTY: "" } })).toBe(
+        "anything at all",
+      );
     });
   });
 });

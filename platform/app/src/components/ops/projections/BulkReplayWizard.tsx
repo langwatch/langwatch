@@ -46,10 +46,7 @@ function WizardStep({
   children: React.ReactNode;
 }) {
   return (
-    <Box
-      opacity={disabled ? 0.5 : 1}
-      pointerEvents={disabled ? "none" : "auto"}
-    >
+    <Box opacity={disabled ? 0.5 : 1} pointerEvents={disabled ? "none" : "auto"}>
       <HStack justify="space-between" marginBottom={2}>
         <Text textStyle="sm" fontWeight="medium">
           {step}. {title}
@@ -61,19 +58,13 @@ function WizardStep({
   );
 }
 
-export function BulkReplayWizard({
-  onReplayStarted,
-}: {
-  onReplayStarted: () => void;
-}) {
+export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => void }) {
   const { hasAccess } = useOpsPermission();
 
   const [tenantIds, setTenantIds] = useState<string[]>([]);
   const [allTenants, setAllTenants] = useState(false);
   const [since, setSince] = useState("");
-  const [selectedProjections, setSelectedProjections] = useState<Set<string>>(
-    new Set(),
-  );
+  const [selectedProjections, setSelectedProjections] = useState<Set<string>>(new Set());
   const [description, setDescription] = useState("");
   const [fullRebuild, setFullRebuild] = useState(false);
 
@@ -119,10 +110,7 @@ export function BulkReplayWizard({
   const projectionMetaByName = useMemo(
     () =>
       new Map(
-        (projectionsQuery.data?.projections ?? []).map((p) => [
-          p.projectionName,
-          p,
-        ]),
+        (projectionsQuery.data?.projections ?? []).map((p) => [p.projectionName, p]),
       ),
     [projectionsQuery.data?.projections],
   );
@@ -253,14 +241,8 @@ export function BulkReplayWizard({
           </Checkbox>
         }
       >
-        <Box
-          opacity={allTenants ? 0.4 : 1}
-          pointerEvents={allTenants ? "none" : "auto"}
-        >
-          <TenantSelector
-            tenantIds={tenantIds}
-            onTenantIdsChange={setTenantIds}
-          />
+        <Box opacity={allTenants ? 0.4 : 1} pointerEvents={allTenants ? "none" : "auto"}>
+          <TenantSelector tenantIds={tenantIds} onTenantIdsChange={setTenantIds} />
         </Box>
         {!hasTenants && !allTenants && (
           <Text textStyle="xs" color="orange.500" marginTop={2}>
@@ -339,9 +321,7 @@ export function BulkReplayWizard({
                     <Table.ColumnHeader width="40px" />
                     <Table.ColumnHeader>Projection</Table.ColumnHeader>
                     <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
-                    <Table.ColumnHeader textAlign="end">
-                      Aggregates
-                    </Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="end">Aggregates</Table.ColumnHeader>
                     <Table.ColumnHeader>Tenants</Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
@@ -349,9 +329,7 @@ export function BulkReplayWizard({
                   {discoverQuery.data!.projections.map((proj) => {
                     const hasData = proj.aggregateCount > 0;
                     const meta = projectionMetaByName.get(proj.projectionName);
-                    const isSelected = selectedProjections.has(
-                      proj.projectionName,
-                    );
+                    const isSelected = selectedProjections.has(proj.projectionName);
                     return (
                       <Table.Row
                         key={proj.projectionName}
@@ -365,9 +343,7 @@ export function BulkReplayWizard({
                           <Checkbox
                             checked={isSelected}
                             disabled={!hasData}
-                            onCheckedChange={() =>
-                              toggleProjection(proj.projectionName)
-                            }
+                            onCheckedChange={() => toggleProjection(proj.projectionName)}
                           />
                         </Table.Cell>
                         <Table.Cell>
@@ -383,11 +359,7 @@ export function BulkReplayWizard({
                               </Badge>
                             )}
                             {!hasData && (
-                              <Badge
-                                size="sm"
-                                variant="subtle"
-                                colorPalette="gray"
-                              >
+                              <Badge size="sm" variant="subtle" colorPalette="gray">
                                 no data
                               </Badge>
                             )}
@@ -428,9 +400,7 @@ export function BulkReplayWizard({
                 </Stat.Root>
                 <Stat.Root>
                   <Stat.Label>Tenants</Stat.Label>
-                  <Stat.ValueText>
-                    {allTenants ? "All" : tenantIds.length}
-                  </Stat.ValueText>
+                  <Stat.ValueText>{allTenants ? "All" : tenantIds.length}</Stat.ValueText>
                 </Stat.Root>
               </HStack>
 
@@ -455,15 +425,10 @@ export function BulkReplayWizard({
                     >
                       <Text textStyle="sm">Rebuild from scratch</Text>
                     </Checkbox>
-                    <Text
-                      textStyle="xs"
-                      color="fg.muted"
-                      marginTop={1}
-                      marginLeft={6}
-                    >
-                      Clears replay markers first. Use it when the target table
-                      was truncated or swapped empty; otherwise the run resumes
-                      and skips finished aggregates.
+                    <Text textStyle="xs" color="fg.muted" marginTop={1} marginLeft={6}>
+                      Clears replay markers first. Use it when the target table was
+                      truncated or swapped empty; otherwise the run resumes and skips
+                      finished aggregates.
                     </Text>
                   </Box>
                   <HStack gap={2}>
@@ -492,9 +457,9 @@ export function BulkReplayWizard({
                     )}
                   </HStack>
                   <Text textStyle="xs" color="fg.muted">
-                    Full replay pauses projections, drains active jobs, replays
-                    events from ClickHouse, then unpauses. Dry run processes 5
-                    sample aggregates in memory without writing.
+                    Full replay pauses projections, drains active jobs, replays events
+                    from ClickHouse, then unpauses. Dry run processes 5 sample aggregates
+                    in memory without writing.
                   </Text>
 
                   {dryRunResult && (
@@ -514,8 +479,8 @@ export function BulkReplayWizard({
                       </Text>
                       <Text textStyle="sm">{dryRunResult.message}</Text>
                       <Text textStyle="xs" color="fg.muted" marginTop={1}>
-                        Projections: {dryRunResult.projectionNames.join(", ")} |
-                        Sample size: {dryRunResult.sampleSize}
+                        Projections: {dryRunResult.projectionNames.join(", ")} | Sample
+                        size: {dryRunResult.sampleSize}
                       </Text>
                     </Box>
                   )}

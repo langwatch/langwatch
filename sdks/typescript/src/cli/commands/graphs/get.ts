@@ -12,14 +12,11 @@ import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
  * Returns the graph rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getGraphCommand = async (
-  id: string
-): Promise<CommandResult | void> => {
+export const getGraphCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Fetching graph "${id}"...`).start();
 
@@ -57,18 +54,19 @@ export const getGraphCommand = async (
         console.log(`  ${chalk.gray("ID:")}        ${chalk.green(graph.id)}`);
         console.log(`  ${chalk.gray("Name:")}      ${chalk.cyan(graph.name)}`);
         console.log(
-          `  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`
+          `  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`,
         );
         console.log(
-          `  ${chalk.gray("Position:")}  (${graph.gridColumn}, ${graph.gridRow})`
+          `  ${chalk.gray("Position:")}  (${graph.gridColumn}, ${graph.gridRow})`,
         );
         console.log(`  ${chalk.gray("Size:")}      ${graph.colSpan}x${graph.rowSpan}`);
         if (graph.graph) {
-          const graphType = typeof graph.graph.type === "string" ? graph.graph.type : "custom";
+          const graphType =
+            typeof graph.graph.type === "string" ? graph.graph.type : "custom";
           console.log(`  ${chalk.gray("Type:")}      ${graphType}`);
         }
         console.log(
-          `  ${chalk.gray("Created:")}   ${new Date(graph.createdAt).toLocaleString()}`
+          `  ${chalk.gray("Created:")}   ${new Date(graph.createdAt).toLocaleString()}`,
         );
         console.log();
       },

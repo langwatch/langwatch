@@ -26,9 +26,7 @@ describe("<RunSummaryCounts/>", () => {
   describe("given a summary with only passed counts non-zero", () => {
     it("displays passed count with check icon and hides failed", () => {
       render(
-        <RunSummaryCounts
-          summary={makeSummary({ passedCount: 8, failedCount: 0 })}
-        />,
+        <RunSummaryCounts summary={makeSummary({ passedCount: 8, failedCount: 0 })} />,
         { wrapper: Wrapper },
       );
 
@@ -40,9 +38,7 @@ describe("<RunSummaryCounts/>", () => {
   describe("given a summary with passed and failed counts non-zero", () => {
     it("displays both as word labels", () => {
       render(
-        <RunSummaryCounts
-          summary={makeSummary({ passedCount: 8, failedCount: 2 })}
-        />,
+        <RunSummaryCounts summary={makeSummary({ passedCount: 8, failedCount: 2 })} />,
         { wrapper: Wrapper },
       );
 
@@ -105,9 +101,7 @@ describe("<RunSummaryCounts/>", () => {
         { wrapper: Wrapper },
       );
 
-      const countsEl = container.querySelector(
-        '[data-testid="run-summary-counts"]',
-      );
+      const countsEl = container.querySelector('[data-testid="run-summary-counts"]');
       expect(countsEl).toBeInTheDocument();
       expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
       expect(screen.queryByText(/failed/)).not.toBeInTheDocument();

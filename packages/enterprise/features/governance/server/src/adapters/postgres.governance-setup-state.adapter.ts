@@ -12,10 +12,7 @@ export class PostgresGovernanceSetupStateAdapter {
     database: object;
     activity?: GovernanceSetupActivityPort;
   }): PostgresGovernanceSetupStateAdapter {
-    return new PostgresGovernanceSetupStateAdapter(
-      options.database,
-      options.activity,
-    );
+    return new PostgresGovernanceSetupStateAdapter(options.database, options.activity);
   }
 
   build(): DefaultGovernanceSetupStateService {

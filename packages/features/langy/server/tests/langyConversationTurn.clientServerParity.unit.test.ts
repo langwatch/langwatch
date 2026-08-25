@@ -176,9 +176,7 @@ describe("given the recorded steps of a completed turn", () => {
 
     it("folds a whole turn on both sides — the comparison is not of two empties", () => {
       // Guards the assertion above: two blank documents would also be equal.
-      expect(backendState.Status).toBe(
-        LANGY_CONVERSATION_TURN_STATUS.COMPLETED,
-      );
+      expect(backendState.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.COMPLETED);
       expect(backendState.ToolCalls).toHaveLength(1);
       expect(backendState.ToolCalls[0]?.status).toBe(
         LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED,

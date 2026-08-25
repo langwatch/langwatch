@@ -286,9 +286,7 @@ export interface DaemonStatus {
 }
 
 /** Ask a running daemon for its stats. Resolves null when nothing is listening. */
-export async function requestStatus(
-  socketPath: string,
-): Promise<DaemonStatus | null> {
+export async function requestStatus(socketPath: string): Promise<DaemonStatus | null> {
   // A socket we do not own is not our daemon, so there is nothing to report.
   if (inspectSocketTrust(socketPath)) return null;
 

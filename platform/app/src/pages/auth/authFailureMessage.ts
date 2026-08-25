@@ -52,8 +52,7 @@ export const isCredentialRejection = ({
 }: {
   code?: string;
   message?: string;
-}): boolean =>
-  CREDENTIAL_REJECTION_KEYS.has(normalize(code) || normalize(message));
+}): boolean => CREDENTIAL_REJECTION_KEYS.has(normalize(code) || normalize(message));
 
 /** The wording for each identifier worth naming beyond a credential rejection. */
 const KEYED_MESSAGES: Record<string, string> = {
@@ -72,10 +71,7 @@ const KEYED_MESSAGES: Record<string, string> = {
  * and a server-side fault each get their own sentence, everything else falls
  * through to the message-or-fallback handling.
  */
-const statusClassMessage = (
-  status: number | undefined,
-  key: string,
-): string | null => {
+const statusClassMessage = (status: number | undefined, key: string): string | null => {
   if (status === 429 || key.includes("too_many")) {
     return "Too many attempts. Wait a minute and try again.";
   }

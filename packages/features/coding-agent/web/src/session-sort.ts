@@ -73,17 +73,11 @@ export function sessionTotalTokens(row: {
   cacheCreationTokens: number;
 }): number {
   return (
-    row.inputTokens +
-    row.outputTokens +
-    row.cacheReadTokens +
-    row.cacheCreationTokens
+    row.inputTokens + row.outputTokens + row.cacheReadTokens + row.cacheCreationTokens
   );
 }
 
-const SESSIONS_SORT_RULES: ColumnSortRules<
-  SessionsSortColumn,
-  SortableSessionRow
-> = {
+const SESSIONS_SORT_RULES: ColumnSortRules<SessionsSortColumn, SortableSessionRow> = {
   defaultSort: DEFAULT_SESSIONS_SORT,
   // A measure leads with its largest value, a name leads with A.
   initialDirection: {

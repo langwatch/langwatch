@@ -37,9 +37,7 @@ import {
   spanPayload,
 } from "./support/traceProcessingFixtures";
 
-function recordSpanRegistration(
-  deps: Partial<TraceProcessingPipelineDeps> = {},
-) {
+function recordSpanRegistration(deps: Partial<TraceProcessingPipelineDeps> = {}) {
   return createTraceProcessingPipeline(buildTraceDeps(deps)).commands.find(
     (candidate) => candidate.name === "recordSpan",
   );
@@ -113,9 +111,7 @@ describe("recordSpan append coalescing", () => {
       it("caps a spooled span at one, since its queued size hides what it becomes", () => {
         const bound = coalesceResolverOf();
 
-        expect(
-          bound(spanPayload({ spanId: spanId(0), spoolRef: "spool/abc" })),
-        ).toBe(1);
+        expect(bound(spanPayload({ spanId: spanId(0), spoolRef: "spool/abc" }))).toBe(1);
       });
 
       it("leaves the existing span deduplication untouched", () => {
@@ -132,9 +128,7 @@ describe("recordSpan append coalescing", () => {
         expect(bound(spanPayload({ spanId: spanId(0) }))).toBe(
           RECORD_SPAN_COALESCE_MAX_BATCH,
         );
-        expect(
-          bound(spanPayload({ spanId: spanId(0), spoolRef: "spool/abc" })),
-        ).toBe(1);
+        expect(bound(spanPayload({ spanId: spanId(0), spoolRef: "spool/abc" }))).toBe(1);
       });
     });
   });
@@ -153,13 +147,11 @@ describe("recordSpan append coalescing", () => {
 
         expect(storeEventsFn).toHaveBeenCalledTimes(1);
         const [events, context] = storeEventsFn.mock.calls[0]!;
+        expect((events as Event[]).map((event) => event.metadata?.spanId)).toEqual(
+          payloads.map((payload) => payload.span.spanId),
+        );
         expect(
-          (events as Event[]).map((event) => event.metadata?.spanId),
-        ).toEqual(payloads.map((payload) => payload.span.spanId));
-        expect(
-          (events as Event[]).every(
-            (event) => event.type === SPAN_RECEIVED_EVENT_TYPE,
-          ),
+          (events as Event[]).every((event) => event.type === SPAN_RECEIVED_EVENT_TYPE),
         ).toBe(true);
         expect(context).toEqual({ tenantId: FIXTURE_TENANT_ID });
       });
@@ -167,16 +159,12 @@ describe("recordSpan append coalescing", () => {
       /** @scenario 'coalescing preserves every item' */
       it("keeps each span's idempotency key so a retry cannot duplicate it", async () => {
         const storeEventsFn = vi.fn().mockResolvedValue(undefined);
-        const payloads = [0, 1].map((index) =>
-          spanPayload({ spanId: spanId(index) }),
-        );
+        const payloads = [0, 1].map((index) => spanPayload({ spanId: spanId(index) }));
 
         await processCommandBatch(batchParamsFor({ payloads, storeEventsFn }));
 
         const [events] = storeEventsFn.mock.calls[0]!;
-        expect(
-          (events as Event[]).map((event) => event.idempotencyKey),
-        ).toEqual(
+        expect((events as Event[]).map((event) => event.idempotencyKey)).toEqual(
           payloads.map(
             (payload) =>
               `${FIXTURE_TENANT_ID}:${FIXTURE_TRACE_ID}:${payload.span.spanId}`,
@@ -187,16 +175,14 @@ describe("recordSpan append coalescing", () => {
       /** @scenario 'many items for one aggregate become one insert' */
       it("emits every span's event as a single trace aggregate", async () => {
         const storeEventsFn = vi.fn().mockResolvedValue(undefined);
-        const payloads = [0, 1, 2].map((index) =>
-          spanPayload({ spanId: spanId(index) }),
-        );
+        const payloads = [0, 1, 2].map((index) => spanPayload({ spanId: spanId(index) }));
 
         await processCommandBatch(batchParamsFor({ payloads, storeEventsFn }));
 
         const [events] = storeEventsFn.mock.calls[0]!;
-        expect(
-          new Set((events as Event[]).map((event) => event.aggregateId)),
-        ).toEqual(new Set([FIXTURE_TRACE_ID]));
+        expect(new Set((events as Event[]).map((event) => event.aggregateId))).toEqual(
+          new Set([FIXTURE_TRACE_ID]),
+        );
       });
     });
   });
@@ -208,11 +194,9 @@ describe("recordSpan append coalescing", () => {
     describe("when the batch is stored", () => {
       it("deletes each span's spool once, after the single append", async () => {
         const order: string[] = [];
-        const deleteSpool = vi.fn(
-          async ({ spoolRef }: { spoolRef: string }) => {
-            order.push(`delete:${spoolRef}`);
-          },
-        );
+        const deleteSpool = vi.fn(async ({ spoolRef }: { spoolRef: string }) => {
+          order.push(`delete:${spoolRef}`);
+        });
         const blobStore = {
           // The spool locates its object from the command's own trusted
           // tenant + span ids, so the stub takes the same named shape and

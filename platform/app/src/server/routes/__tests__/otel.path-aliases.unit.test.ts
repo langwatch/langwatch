@@ -52,8 +52,7 @@ vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
 });
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof import("@langwatch/observability")>();
   return {
     ...actual,
     createLogger: vi.fn(() => ({
@@ -70,9 +69,7 @@ vi.mock("~/utils/posthogErrorCapture", () => ({ captureException: vi.fn() }));
 
 const { app: otelApp } = await import("../otel");
 const { app: otelPathAliasApp } = await import("../otel-path-aliases");
-const { stampCorrectedPath } = await import(
-  "~/server/otel/otlpPathCanonicalisation"
-);
+const { stampCorrectedPath } = await import("~/server/otel/otlpPathCanonicalisation");
 
 // Mount order mirrors api-router.ts: the canonical routes get first refusal.
 const testApp = new Hono();
@@ -201,9 +198,7 @@ describe("OTLP endpoint path canonicalisation", () => {
       });
 
       expect(response.status).toBe(200);
-      expect(response.headers.get("content-type")).toContain(
-        "application/json",
-      );
+      expect(response.headers.get("content-type")).toContain("application/json");
       expect(mockHandleTraces).toHaveBeenCalledTimes(1);
     });
   });
@@ -292,9 +287,7 @@ describe("OTLP endpoint path canonicalisation", () => {
         },
         body: new ReadableStream({
           start(controller) {
-            controller.enqueue(
-              new TextEncoder().encode(JSON.stringify(tracePayload)),
-            );
+            controller.enqueue(new TextEncoder().encode(JSON.stringify(tracePayload)));
             controller.close();
           },
         }),

@@ -78,16 +78,12 @@ export const agentsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(createInput)
     .permission("evaluations:manage")
-    .mutation(({ ctx, input }) =>
-      withAgentErrors(() => ctx.app.agents.create(input)),
-    ),
+    .mutation(({ ctx, input }) => withAgentErrors(() => ctx.app.agents.create(input))),
 
   update: protectedProcedure
     .input(updateAgentCommandSchema)
     .permission("evaluations:manage")
-    .mutation(({ ctx, input }) =>
-      withAgentErrors(() => ctx.app.agents.update(input)),
-    ),
+    .mutation(({ ctx, input }) => withAgentErrors(() => ctx.app.agents.update(input))),
 
   getRelatedEntities: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
@@ -106,9 +102,7 @@ export const agentsRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
     .permission("evaluations:manage")
-    .mutation(({ ctx, input }) =>
-      withAgentErrors(() => ctx.app.agents.archive(input)),
-    ),
+    .mutation(({ ctx, input }) => withAgentErrors(() => ctx.app.agents.archive(input))),
 
   getCopies: protectedProcedure
     .input(z.object({ projectId: z.string(), agentId: z.string() }))
@@ -124,16 +118,10 @@ export const agentsRouter = createTRPCRouter({
       const authorized = await Promise.all(
         copies.map(async (copy) => ({
           copy,
-          allowed: await hasProjectPermission(
-            ctx,
-            copy.projectId,
-            "evaluations:view",
-          ),
+          allowed: await hasProjectPermission(ctx, copy.projectId, "evaluations:view"),
         })),
       );
-      return authorized
-        .filter(({ allowed }) => allowed)
-        .map(({ copy }) => copy);
+      return authorized.filter(({ allowed }) => allowed).map(({ copy }) => copy);
     }),
 
   copy: protectedProcedure
@@ -148,11 +136,7 @@ export const agentsRouter = createTRPCRouter({
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       if (
-        !(await hasProjectPermission(
-          ctx,
-          input.sourceProjectId,
-          "evaluations:manage",
-        ))
+        !(await hasProjectPermission(ctx, input.sourceProjectId, "evaluations:manage"))
       ) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
@@ -217,13 +201,7 @@ export const agentsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = ctx.app.agents;
       const source = await withAgentErrors(() => service.getSourceOfCopy(input));
-      if (
-        !(await hasProjectPermission(
-          ctx,
-          source.projectId,
-          "evaluations:manage",
-        ))
-      ) {
+      if (!(await hasProjectPermission(ctx, source.projectId, "evaluations:manage"))) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message:
@@ -241,7 +219,5 @@ export const agentsRouter = createTRPCRouter({
   getHistory: protectedProcedure
     .input(z.object({ agentId: z.string(), projectId: z.string() }))
     .permission("evaluations:view")
-    .query(({ ctx, input }) =>
-      withAgentErrors(() => ctx.app.agents.getHistory(input)),
-    ),
+    .query(({ ctx, input }) => withAgentErrors(() => ctx.app.agents.getHistory(input))),
 });

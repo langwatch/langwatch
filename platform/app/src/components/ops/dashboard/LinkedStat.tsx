@@ -31,9 +31,7 @@ export function LinkedStat({
       transition="background 0.1s"
       data-testid={testId}
       title={hint}
-      data-warning={
-        warning === undefined ? undefined : warning ? "true" : "false"
-      }
+      data-warning={warning === undefined ? undefined : warning ? "true" : "false"}
     >
       <Stat.Label whiteSpace="nowrap">
         <HStack gap={1}>
@@ -45,12 +43,7 @@ export function LinkedStat({
         {value}
       </Stat.ValueText>
       {sublabel && (
-        <Text
-          textStyle="xs"
-          color="fg.muted"
-          fontWeight="normal"
-          whiteSpace="nowrap"
-        >
+        <Text textStyle="xs" color="fg.muted" fontWeight="normal" whiteSpace="nowrap">
           {sublabel}
         </Text>
       )}

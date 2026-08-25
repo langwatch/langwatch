@@ -16,11 +16,7 @@ import { IconCheckboxCardGroup } from "../../../components/forms/IconCheckboxCar
 import { IconRadioCardGroup } from "../../../components/forms/IconRadioCardGroup";
 import { BasicInfoConditionalFields } from "../components/sections/BasicInfoConditionalFields";
 import { IntentSelectionScreen } from "../components/sections/IntentSelectionScreen";
-import {
-  desireItems,
-  roleItems,
-  usageStyleItems,
-} from "../constants/onboarding-data";
+import { desireItems, roleItems, usageStyleItems } from "../constants/onboarding-data";
 import { useOnboardingFormContext } from "../contexts/form-context";
 import {
   type DesireType,
@@ -189,8 +185,7 @@ export const useCreateWelcomeScreens = ({
         id: "intent",
         required: true,
         heading: "What do you want to do?",
-        subHeading:
-          "Pick your starting point. You can explore the rest anytime",
+        subHeading: "Pick your starting point. You can explore the rest anytime",
         component: IntentSelectionScreen,
       },
       [OnboardingScreenIndex.BASIC_INFO]: {

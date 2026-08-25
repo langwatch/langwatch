@@ -97,10 +97,7 @@ function Content({ children, ...props }: PropsWithChildren<CardRootProps>) {
 
 interface HeaderButtonProps extends ChakraButtonProps {}
 
-function HeaderButton({
-  children,
-  ...props
-}: PropsWithChildren<HeaderButtonProps>) {
+function HeaderButton({ children, ...props }: PropsWithChildren<HeaderButtonProps>) {
   return (
     <Button variant="outline" size="sm" {...props}>
       {children}

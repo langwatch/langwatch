@@ -27,10 +27,7 @@ export const TerminalDiff = memo(function TerminalDiff({
   newText,
   filePath,
 }: TerminalDiffProps) {
-  const lines = useMemo(
-    () => computeLineDiff(oldText, newText),
-    [oldText, newText],
-  );
+  const lines = useMemo(() => computeLineDiff(oldText, newText), [oldText, newText]);
   const stat = useMemo(() => diffStat(lines), [lines]);
 
   return (
@@ -83,11 +80,7 @@ export const TerminalDiff = memo(function TerminalDiff({
 function DiffRow({ line }: { line: DiffLine }) {
   const isAdd = line.kind === "add";
   const isRemove = line.kind === "remove";
-  const bg = isAdd
-    ? DIFF_TOKENS.addBg
-    : isRemove
-      ? DIFF_TOKENS.removeBg
-      : undefined;
+  const bg = isAdd ? DIFF_TOKENS.addBg : isRemove ? DIFF_TOKENS.removeBg : undefined;
   const gutterColor = isAdd
     ? DIFF_TOKENS.addFg
     : isRemove
@@ -110,13 +103,7 @@ function DiffRow({ line }: { line: DiffLine }) {
       >
         {lineNo ?? ""}
       </Text>
-      <Text
-        as="span"
-        color={gutterColor}
-        width="1.2em"
-        flexShrink={0}
-        userSelect="none"
-      >
+      <Text as="span" color={gutterColor} width="1.2em" flexShrink={0} userSelect="none">
         {sign}
       </Text>
       <Text

@@ -78,10 +78,7 @@ export interface RecordSpanCommandDependencies {
   };
   /** Service for estimating token counts from input/output text. */
   tokenEstimationService: {
-    estimateSpanTokens: (args: {
-      span: OtlpSpan;
-      tenantId?: string;
-    }) => Promise<void>;
+    estimateSpanTokens: (args: { span: OtlpSpan; tenantId?: string }) => Promise<void>;
   };
   /** Service for dropping configured content categories per the data-privacy policy. */
   contentDropService: {
@@ -117,21 +114,18 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
 /**
  * Command handler for recording spans in the trace processing pipeline.
  */
-export class RecordSpanCommand
-  implements CommandHandler<Command<RecordSpanCommandData>, SpanReceivedEvent>
-{
+export class RecordSpanCommand implements CommandHandler<
+  Command<RecordSpanCommandData>,
+  SpanReceivedEvent
+> {
   static readonly schema = defineCommandSchema(
     RECORD_SPAN_COMMAND_TYPE,
     recordSpanCommandDataSchema,
     "Command to record a span in the trace processing pipeline",
   );
 
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.record-span",
-  );
-  private readonly logger = createLogger(
-    "langwatch:trace-processing:record-span",
-  );
+  private readonly tracer = getLangWatchTracer("langwatch.trace-processing.record-span");
+  private readonly logger = createLogger("langwatch:trace-processing:record-span");
   private readonly deps: RecordSpanCommandDependencies;
   private readonly blobStore?: BlobStore;
 
@@ -167,9 +161,7 @@ export class RecordSpanCommand
     this.blobStore = resolved.blobStore;
   }
 
-  async handle(
-    command: Command<RecordSpanCommandData>,
-  ): Promise<SpanReceivedEvent[]> {
+  async handle(command: Command<RecordSpanCommandData>): Promise<SpanReceivedEvent[]> {
     return await this.tracer.withActiveSpan(
       "RecordSpanCommand.handle",
       {
@@ -216,9 +208,7 @@ export class RecordSpanCommand
           // ADR-022: spool body is the full serialized RecordSpanCommandData.
           // Merge the spooled span/resource/instrumentationScope fields back into
           // the in-flight command (the queue message carries only spoolRef + id fields).
-          const parsed = JSON.parse(
-            spoolBody.toString("utf-8"),
-          ) as RecordSpanCommandData;
+          const parsed = JSON.parse(spoolBody.toString("utf-8")) as RecordSpanCommandData;
           resolvedCommandData = {
             ...commandData,
             span: parsed.span,
@@ -296,10 +286,7 @@ export class RecordSpanCommand
             piiRedactionLevel,
             tenantId,
           ),
-          this.deps.costEnrichmentService.enrichSpan(
-            spanToProcess,
-            tenantIdStr,
-          ),
+          this.deps.costEnrichmentService.enrichSpan(spanToProcess, tenantIdStr),
           this.deps.tokenEstimationService.estimateSpanTokens({
             span: spanToProcess,
             tenantId: tenantIdStr,
@@ -402,9 +389,7 @@ export class RecordSpanCommand
    * state, eliminating the race bug that arose when a single handler instance was
    * shared across parallel queue jobs (pipeline.ts uses withCommandInstance).
    */
-  async cleanupAfterStore(
-    command: Command<RecordSpanCommandData>,
-  ): Promise<void> {
+  async cleanupAfterStore(command: Command<RecordSpanCommandData>): Promise<void> {
     const spoolRef = command.data.spoolRef;
     if (spoolRef && this.blobStore) {
       await this.blobStore
@@ -433,9 +418,7 @@ export class RecordSpanCommand
   static getSpanAttributes(
     payload: RecordSpanCommandData,
   ): Record<string, string | number | boolean> {
-    const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
-      payload.span,
-    );
+    const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(payload.span);
 
     return {
       "payload.trace.id": traceId,
@@ -484,9 +467,7 @@ export class RecordSpanCommand
   ): void {
     const RESERVED_PREFIX = "langwatch.reserved.";
 
-    const strip = (
-      attributes: OtlpSpan["attributes"],
-    ): OtlpSpan["attributes"] => {
+    const strip = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] => {
       const filtered = attributes.filter((attr) => {
         if (
           attr.key.startsWith(RESERVED_PREFIX) &&
@@ -516,9 +497,7 @@ export class RecordSpanCommand
   }
 
   static makeJobId(payload: RecordSpanCommandData): string {
-    const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
-      payload.span,
-    );
+    const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(payload.span);
 
     return `${payload.tenantId}:${traceId}:${spanId}`;
   }

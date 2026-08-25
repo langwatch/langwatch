@@ -67,11 +67,11 @@ await scenario.run({
 
 **`langwatch` namespace fields** (strict Zod schema at the API layer):
 
-| Field | Type | Required | Purpose |
-|---|---|---|---|
-| `targetReferenceId` | `string` | yes | ID of the agent/prompt target this run was executed against |
-| `targetType` | `"prompt" \| "http" \| "code"` | yes | Target kind, matches `scenarioJobSchema.target.type` |
-| `simulationSuiteId` | `string` | no | `SimulationSuite.id` — which suite dispatched this run |
+| Field               | Type                           | Required | Purpose                                                     |
+| ------------------- | ------------------------------ | -------- | ----------------------------------------------------------- |
+| `targetReferenceId` | `string`                       | yes      | ID of the agent/prompt target this run was executed against |
+| `targetType`        | `"prompt" \| "http" \| "code"` | yes      | Target kind, matches `scenarioJobSchema.target.type`        |
+| `simulationSuiteId` | `string`                       | no       | `SimulationSuite.id` — which suite dispatched this run      |
 
 The entire `langwatch` object is optional on metadata (SDK users never send it).
 
@@ -84,6 +84,7 @@ The entire `langwatch` object is optional on metadata (SDK users never send it).
 ## Consequences
 
 **Positive:**
+
 - Users can attach arbitrary context to scenario runs
 - LangWatch can store orchestration context without polluting the SDK's core schema
 - Namespace convention prevents collisions
@@ -91,10 +92,12 @@ The entire `langwatch` object is optional on metadata (SDK users never send it).
 - Future platform metadata needs use the same `langwatch` namespace without schema changes
 
 **Negative:**
+
 - User metadata is untyped beyond "JSON-serializable"
 - ES `dynamic: true` on `metadata.langwatch` means any field sent there gets indexed; the Zod schema guards against this at the API layer, but bulk-inserted documents bypass it
 
 **Neutral:**
+
 - The server remains a dumb pipe
 - The `@langwatch/scenario` SDK needs a release for both JS and Python packages
 

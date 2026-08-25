@@ -5,12 +5,12 @@ const NOW = Date.parse("2026-07-16T12:00:00.000Z");
 
 describe("formatLangyConversationDate", () => {
   it("labels today and yesterday for fast scanning", () => {
-    expect(
-      formatLangyConversationDate(Date.parse("2026-07-16T08:00:00.000Z"), NOW),
-    ).toBe("Today");
-    expect(
-      formatLangyConversationDate(Date.parse("2026-07-15T08:00:00.000Z"), NOW),
-    ).toBe("Yesterday");
+    expect(formatLangyConversationDate(Date.parse("2026-07-16T08:00:00.000Z"), NOW)).toBe(
+      "Today",
+    );
+    expect(formatLangyConversationDate(Date.parse("2026-07-15T08:00:00.000Z"), NOW)).toBe(
+      "Yesterday",
+    );
   });
 
   it("includes the year only for older conversations", () => {

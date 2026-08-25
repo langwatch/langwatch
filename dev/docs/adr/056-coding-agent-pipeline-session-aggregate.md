@@ -17,17 +17,17 @@ empirically (live telemetry + agent source), not assumed:
 - **Spans** carry real trace context. One session's spans share one wire
   `TraceId` per interaction; the session key rides as an attribute
   (`session.id` on Claude Code, `gen_ai.conversation.id` on opencode — the
-  *values* are identical across signals, only the spelling differs).
+  _values_ are identical across signals, only the spelling differs).
 - **Logs** carry content (prompts, replies, tool decisions) plus lifecycle
   events. The canonical log pipeline (ADR-055) stamps every record with a
   `CorrelationTraceId` — the wire id when present, otherwise a deterministic
   hash of the session key (`CorrelationSource: synthesized`). A tool the human
-  *denied* never ran, so it exists **only** as a log.
+  _denied_ never ran, so it exists **only** as a log.
 - **Metrics** carry **no trace context at all**: an OTLP datapoint has no
   trace/span field, only exemplars could carry one, and neither the OTel Rust
   nor JS SDK implements exemplars. Measured on live data: 0 of 356
   coding-agent points carried a trace id; 356 of 356 carried `session.id`.
-  Metrics are also the *only* source of lines-of-code, commits, PRs, edit
+  Metrics are also the _only_ source of lines-of-code, commits, PRs, edit
   accept/reject and active-time — and some sessions emit **only metrics**
   (measured: 5 metric sessions vs 3 span sessions in the same window; Codex
   and Copilot metrics are fleet-level by design upstream).
@@ -36,18 +36,18 @@ PR #5708 built the first coding-agent session view as a **fold inside
 `trace-processing`, keyed by `TraceId`**. That shipped real value (Session
 tab, Terminal transcript, five-agent vocabulary normalization, several silent
 bug fixes), but the trace-first shape forces workarounds that all share one
-root cause — *the model has no session aggregate, only a trace aggregate*:
+root cause — _the model has no session aggregate, only a trace aggregate_:
 
 1. The session row is keyed by `TraceId`, so a session spanning traces
    (sub-agent `claude -p` spawns) scatters across rows, and a metric-only
    session cannot exist at all.
-2. Log facts are re-routed *into* the trace pipeline
+2. Log facts are re-routed _into_ the trace pipeline
    (`RecordLogContributionCommand`) so a trace-keyed fold can see them —
    re-coupling the log pipeline to traces right after ADR-055 separated them.
 3. Metrics structurally cannot feed the fold, so the read path re-scans
    `metric_time_rollups` by `session.id` on every session-view open and
    overlays the result.
-4. Context-less logs must first *become* a trace (synthesized trace ids) to
+4. Context-less logs must first _become_ a trace (synthesized trace ids) to
    participate — everything must be a trace before it can be seen.
 5. `trace-processing` already serves many post-fold concerns; coding-agent
    lifecycle and projections there would deepen an unrelated side-effect graph.
@@ -71,8 +71,8 @@ aggregate is the **session**, not the trace.
      vocabulary; content never rides, lengths/ids/counters only).
    - `contributeMetricFacts` — from metric-processing (**net-new**: the
      converged per-series totals for the session's series).
-   The trace pipeline's coding-agent fold and its log re-routing are retired;
-   the trace becomes a *contribution and a drill-down*, not the spine.
+     The trace pipeline's coding-agent fold and its log re-routing are retired;
+     the trace becomes a _contribution and a drill-down_, not the spine.
 
 3. **Consumption primitives: subscribers, projections, one process manager.**
    Fan-in is `withEventSubscriber`; read models are
@@ -108,7 +108,7 @@ aggregate is the **session**, not the trace.
      read-time span content enrichment, exemplar-correlated metrics like
      TTFT) reads by `CorrelationTraceId` and does **not** depend on the
      session aggregate. It works for any trace, coding-agent or not.
-   Neither surface can break the other.
+     Neither surface can break the other.
 
 7. **Provider vocabulary lives here.** The per-agent knowledge (identity
    predicates, name prefixes, alias quirks) is single-sourced in this
@@ -143,7 +143,7 @@ managers make multi-step lifecycle a named, testable saga (ADR-052).
 Everything this pipeline needs maps onto those two plus projections.
 
 **Why engine-fold for metrics, app-fold for spans/logs:** span/log facts are
-*derived and non-summable* (step sequencing, cache-rebuild detection, error
+_derived and non-summable_ (step sequencing, cache-rebuild detection, error
 classes) — they need the app-side fold. Metric facts are sums/counts —
 exactly what `ReplacingMergeTree` + `GROUP BY` do natively, with replay
 safety inherited from the converged-value rule rather than bespoke state.

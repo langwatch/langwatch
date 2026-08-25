@@ -29,15 +29,10 @@ const promptPath = path.resolve(
  */
 const STAMPED_ONLY_ORIGINS = ["langy"];
 
-const expectedOrigins = [
-  ...Object.keys(ORIGIN_DISPLAY),
-  ...STAMPED_ONLY_ORIGINS,
-];
+const expectedOrigins = [...Object.keys(ORIGIN_DISPLAY), ...STAMPED_ONLY_ORIGINS];
 
 function originsNamedInPrompt(prompt: string): string[] {
-  const line = prompt
-    .split("\n")
-    .find((l) => l.startsWith("**Trace origins:**"));
+  const line = prompt.split("\n").find((l) => l.startsWith("**Trace origins:**"));
   if (!line) throw new Error("the prompt no longer has a Trace origins line");
   // Only the sentence that enumerates them; later sentences cite single
   // origins as examples and would otherwise count as part of the list.
@@ -51,9 +46,7 @@ describe("given Langy's prompt lists the trace origins", () => {
   describe("when the list is compared with the origins the platform stamps", () => {
     /** @scenario The prompt names every trace origin the platform stamps */
     it("names every one of them, and invents none", () => {
-      expect(originsNamedInPrompt(prompt).sort()).toEqual(
-        [...expectedOrigins].sort(),
-      );
+      expect(originsNamedInPrompt(prompt).sort()).toEqual([...expectedOrigins].sort());
     });
   });
 });

@@ -29,11 +29,7 @@
  * than derived, so what lives here is the write-time decision that fills the
  * column and the read that follows it.
  */
-import type {
-  ModelProvider,
-  Prisma,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { ModelProvider, Prisma, PrismaClient } from "~/generated/prisma/client";
 import { isDispatchableProvider } from "~/server/modelProviders/registry";
 import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
 
@@ -318,9 +314,7 @@ export async function decideTraceDestination(
       organizationId: input.organizationId,
       projectId: input.traceProjectId,
     });
-    return named
-      ? { outcome: "resolved", project: named }
-      : { outcome: "unknown" };
+    return named ? { outcome: "resolved", project: named } : { outcome: "unknown" };
   }
 
   const projectScopes = input.scopes.filter((s) => s.scopeType === "PROJECT");
@@ -337,10 +331,7 @@ export async function decideTraceDestination(
   // projects it could name: "there is nowhere for this key's traces to go"
   // is the more useful half of the truth, and it is the one an operator has
   // to act on.
-  const governance = await oldestGovernanceProject(
-    client,
-    input.organizationId,
-  );
+  const governance = await oldestGovernanceProject(client, input.organizationId);
   if (!governance) return { outcome: "no_destination" };
 
   // An organization whose only live project IS the governance one is left

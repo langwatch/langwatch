@@ -20,9 +20,7 @@ import {
   type BillableEventsWindow,
 } from "../../ports/billable-events.port";
 
-export type ClickHouseClientResolver = (
-  tenantId: string,
-) => Promise<ClickHouseClient>;
+export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseClient>;
 
 export class BillableEventsClickHouseRepository extends BillableEventsRepository {
   private constructor(

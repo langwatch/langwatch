@@ -57,12 +57,7 @@ export interface TooltipLine {
   negated: boolean;
 }
 
-export type SectionGroup =
-  | "trace"
-  | "evaluation"
-  | "span"
-  | "metadata"
-  | "prompt";
+export type SectionGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";
 
 export type SectionKind = "cat" | "range" | "attributes";
 
@@ -148,7 +143,4 @@ export interface AttributesSectionData extends SectionBase {
   emptyDocsHref?: string;
 }
 
-export type Section =
-  | CategoricalSection
-  | RangeSectionData
-  | AttributesSectionData;
+export type Section = CategoricalSection | RangeSectionData | AttributesSectionData;

@@ -32,9 +32,10 @@ export class AnalyticsClientUnavailableError extends Error {
   }
 }
 
-type TimeseriesBuilder = (
-  input: AnalyticsTimeseriesBuilderInput,
-) => { sql: string; params: Record<string, unknown> };
+type TimeseriesBuilder = (input: AnalyticsTimeseriesBuilderInput) => {
+  sql: string;
+  params: Record<string, unknown>;
+};
 
 const builderFor = (table: AnalyticsTable): TimeseriesBuilder => {
   switch (table) {
@@ -59,16 +60,12 @@ const builderFor = (table: AnalyticsTable): TimeseriesBuilder => {
 /** The one ClickHouse persistence implementation for all timeseries tables. */
 export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   static create(options: {
-    resolveClient: (
-      tenantId: string,
-    ) => Promise<ClickHouseClient | null>;
+    resolveClient: (tenantId: string) => Promise<ClickHouseClient | null>;
   }): ClickHouseAnalyticsRepository {
     return new ClickHouseAnalyticsRepository(options.resolveClient);
   }
 
-  private readonly logger = createLogger(
-    "langwatch:analytics:timeseries-repository",
-  );
+  private readonly logger = createLogger("langwatch:analytics:timeseries-repository");
 
   private constructor(
     private readonly resolveClient: (
@@ -188,12 +185,14 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
           traceId: doc.traceId,
           content: doc.content,
         })),
-        totalUniqueDocuments:
-          typeof total === "string" ? parseInt(total, 10) : total,
+        totalUniqueDocuments: typeof total === "string" ? parseInt(total, 10) : total,
       };
     } catch (error) {
       this.logger.warn(
-        { tenantId: input.projectId, error: error instanceof Error ? error.message : String(error) },
+        {
+          tenantId: input.projectId,
+          error: error instanceof Error ? error.message : String(error),
+        },
         "Failed to execute topDocuments query",
       );
       throw error;
@@ -229,7 +228,10 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       };
     } catch (error) {
       this.logger.warn(
-        { tenantId: input.projectId, error: error instanceof Error ? error.message : String(error) },
+        {
+          tenantId: input.projectId,
+          error: error instanceof Error ? error.message : String(error),
+        },
         "Failed to execute feedbacks query",
       );
       throw error;
@@ -268,9 +270,8 @@ function toFeedbackEvent(
     if (metricKey) metrics.push({ key: metricKey, value: parseFloat(value) || 0 });
     else eventDetails.push({ key, value });
   }
-  const startedAt = typeof row.started_at === "string"
-    ? parseInt(row.started_at, 10)
-    : row.started_at;
+  const startedAt =
+    typeof row.started_at === "string" ? parseInt(row.started_at, 10) : row.started_at;
   return {
     event_id: row.event_id,
     event_type: row.event_type,

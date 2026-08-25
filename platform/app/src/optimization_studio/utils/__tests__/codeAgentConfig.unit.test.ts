@@ -2,11 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 
-import {
-  buildCodeConfig,
-  DEFAULT_CODE,
-  getCodeFromConfig,
-} from "../codeAgentConfig";
+import { buildCodeConfig, DEFAULT_CODE, getCodeFromConfig } from "../codeAgentConfig";
 
 describe("codeAgentConfig", () => {
   describe("getCodeFromConfig", () => {

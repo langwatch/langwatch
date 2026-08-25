@@ -1,7 +1,4 @@
-import {
-  SIMULATION_RUN_EVENT_TYPES,
-  SIMULATION_SET_EVENT_TYPES,
-} from "./constants";
+import { SIMULATION_RUN_EVENT_TYPES, SIMULATION_SET_EVENT_TYPES } from "./constants";
 import type {
   SimulationMessageSnapshotEvent,
   SimulationProcessingEvent,

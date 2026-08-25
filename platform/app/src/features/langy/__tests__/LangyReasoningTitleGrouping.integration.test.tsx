@@ -160,9 +160,7 @@ describe("given a settled turn whose text carries leaked reasoning headlines", (
     expect(screen.getByText(/actions completed/)).toBeInTheDocument();
     // The receipt renders expanded on settle, so the folded thinking steps
     // are on screen as rows of its list.
-    const rows = screen
-      .getAllByRole("listitem")
-      .map((row) => row.textContent ?? "");
+    const rows = screen.getAllByRole("listitem").map((row) => row.textContent ?? "");
     for (const title of TITLES) {
       expect(rows.some((row) => row.includes(title))).toBe(true);
     }
@@ -191,15 +189,13 @@ describe("given a settled turn whose parts carry reasoning parts", () => {
 
   it("accounts for the reasoning headlines in the completed receipt", () => {
     renderMessage(reasoningPartsMessage());
-    const rows = screen
-      .getAllByRole("listitem")
-      .map((row) => row.textContent ?? "");
-    expect(
-      rows.some((row) => row.includes("Planning task execution strategy")),
-    ).toBe(true);
-    expect(
-      rows.some((row) => row.includes("Summarizing recent trace counts")),
-    ).toBe(true);
+    const rows = screen.getAllByRole("listitem").map((row) => row.textContent ?? "");
+    expect(rows.some((row) => row.includes("Planning task execution strategy"))).toBe(
+      true,
+    );
+    expect(rows.some((row) => row.includes("Summarizing recent trace counts"))).toBe(
+      true,
+    );
   });
 });
 
@@ -248,12 +244,12 @@ describe("given a settled turn whose process record is a plan", () => {
     const rows = Array.from(planCard.querySelectorAll("[role='listitem']")).map(
       (row) => row.textContent ?? "",
     );
-    expect(
-      rows.some((row) => row.includes("Planning task execution strategy")),
-    ).toBe(true);
-    expect(
-      rows.some((row) => row.includes("Summarizing recent trace counts")),
-    ).toBe(true);
+    expect(rows.some((row) => row.includes("Planning task execution strategy"))).toBe(
+      true,
+    );
+    expect(rows.some((row) => row.includes("Summarizing recent trace counts"))).toBe(
+      true,
+    );
   });
 
   it("renders the reply as its own block below the plan card", () => {

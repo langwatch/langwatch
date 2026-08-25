@@ -99,9 +99,7 @@ describe("LangyConversationTurnFoldProjection", () => {
           1000,
         ),
       );
-      expect(state.QuestionParts).toEqual([
-        { type: "text", text: "why failing?" },
-      ]);
+      expect(state.QuestionParts).toEqual([{ type: "text", text: "why failing?" }]);
     });
   });
 
@@ -112,10 +110,7 @@ describe("LangyConversationTurnFoldProjection", () => {
       it("accretes one tool call and resolves it to succeeded", () => {
         const initiated = fold.apply(
           running,
-          toolInitiated(
-            { command: "grep traces", input: { q: "traces" } },
-            1100,
-          ),
+          toolInitiated({ command: "grep traces", input: { q: "traces" } }, 1100),
         );
         expect(initiated.ToolCalls).toHaveLength(1);
         expect(initiated.ToolCalls[0]).toMatchObject({
@@ -203,9 +198,7 @@ describe("LangyConversationTurnFoldProjection", () => {
           ),
         );
         expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.COMPLETED);
-        expect(state.AnswerParts).toEqual([
-          { type: "text", text: "here is why" },
-        ]);
+        expect(state.AnswerParts).toEqual([{ type: "text", text: "here is why" }]);
         expect(state.EndedAt).toBe(2000);
         expect(state.Error).toBeNull();
       });

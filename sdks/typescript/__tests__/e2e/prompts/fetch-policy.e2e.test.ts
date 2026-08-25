@@ -61,9 +61,7 @@ describe("Prompt fetch policies (real API)", () => {
     );
     expect(prompt).toBeTruthy();
     expect(prompt?.handle).toContain("default-policy");
-    expect((prompt)?.prompt ?? "").toContain(
-      "Hello from default policy",
-    );
+    expect(prompt?.prompt ?? "").toContain("Hello from default policy");
     expect(calls).toBeGreaterThan(0);
     await langwatch.prompts.delete(handle);
   }, 60_000);
@@ -77,7 +75,7 @@ describe("Prompt fetch policies (real API)", () => {
     );
     expect(prompt).toBeTruthy();
     expect(prompt?.handle).toContain("always-fetch");
-    expect((prompt)?.prompt ?? "").toContain("Always fetch from API");
+    expect(prompt?.prompt ?? "").toContain("Always fetch from API");
     expect(calls).toBeGreaterThan(0);
     await langwatch.prompts.delete(handle);
   }, 60_000);

@@ -58,7 +58,8 @@ export class IngestionPullRunStatusProjection {
         if (
           state.lastRunScheduledFor !== null &&
           event.data.scheduledFor < state.lastRunScheduledFor
-        ) return state;
+        )
+          return state;
         return {
           ...state,
           sourceId: event.data.sourceId,
@@ -75,7 +76,8 @@ export class IngestionPullRunStatusProjection {
         if (
           state.lastRunScheduledFor !== null &&
           event.data.scheduledFor < state.lastRunScheduledFor
-        ) return state;
+        )
+          return state;
         return {
           ...state,
           sourceId: event.data.sourceId,

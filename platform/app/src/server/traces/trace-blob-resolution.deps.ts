@@ -70,15 +70,12 @@ export function buildTraceBlobResolutionDeps(overrides?: {
   const resolveClickHouseClient: ClickHouseClientResolver =
     overrides?.resolveClickHouseClient ??
     ((tenantId) => getApp().clickhouse.resolveClient(tenantId));
-  const clickhouseEnabled =
-    overrides?.clickhouseEnabled ?? defaultClickHouseEnabled();
+  const clickhouseEnabled = overrides?.clickhouseEnabled ?? defaultClickHouseEnabled();
 
   return {
     blobStore: new BlobStore({
       resolveS3Client: createS3Client,
-      resolveClickHouseClient: clickhouseEnabled
-        ? resolveClickHouseClient
-        : undefined,
+      resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : undefined,
       spoolStorage: defaultSpoolStorage,
       logger: createLogger("langwatch:traces:blob-store"),
     }),

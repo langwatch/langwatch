@@ -102,8 +102,7 @@ function LLMModelCostForm({
     ? llmModelCosts.find((llmModelCost) => llmModelCost.id === id)
     : cloneModel
       ? llmModelCosts.find(
-          (llmModelCost) =>
-            !llmModelCost.id && llmModelCost.model === cloneModel,
+          (llmModelCost) => !llmModelCost.id && llmModelCost.model === cloneModel,
         )
       : undefined;
 
@@ -140,8 +139,7 @@ function LLMModelCostForm({
       outputCostPerToken: currentLLMModelCost?.outputCostPerToken,
       cacheReadCostPerToken: currentLLMModelCost?.cacheReadCostPerToken,
       cacheCreationCostPerToken: currentLLMModelCost?.cacheCreationCostPerToken,
-      cacheCreation1hCostPerToken:
-        currentLLMModelCost?.cacheCreation1hCostPerToken,
+      cacheCreation1hCostPerToken: currentLLMModelCost?.cacheCreation1hCostPerToken,
       regex: currentLLMModelCost?.regex ?? prefillRegex,
     },
   });
@@ -162,18 +160,14 @@ function LLMModelCostForm({
   const [debouncedValues] = useDebounce(liveValues, 400);
   const finiteOrUndefined = (value: unknown): number | undefined => {
     const num = typeof value === "string" ? Number(value) : (value as number);
-    return typeof num === "number" && Number.isFinite(num) && num >= 0
-      ? num
-      : undefined;
+    return typeof num === "number" && Number.isFinite(num) && num >= 0 ? num : undefined;
   };
   const previewInput: MatchingSpansPreviewInput = {
     regex: debouncedValues.regex ?? "",
     model: debouncedValues.model || undefined,
     inputCostPerToken: finiteOrUndefined(debouncedValues.inputCostPerToken),
     outputCostPerToken: finiteOrUndefined(debouncedValues.outputCostPerToken),
-    cacheReadCostPerToken: finiteOrUndefined(
-      debouncedValues.cacheReadCostPerToken,
-    ),
+    cacheReadCostPerToken: finiteOrUndefined(debouncedValues.cacheReadCostPerToken),
     cacheCreationCostPerToken: finiteOrUndefined(
       debouncedValues.cacheCreationCostPerToken,
     ),
@@ -199,9 +193,7 @@ function LLMModelCostForm({
         outputCostPerToken: data.outputCostPerToken,
         cacheReadCostPerToken: optionalRate(data.cacheReadCostPerToken),
         cacheCreationCostPerToken: optionalRate(data.cacheCreationCostPerToken),
-        cacheCreation1hCostPerToken: optionalRate(
-          data.cacheCreation1hCostPerToken,
-        ),
+        cacheCreation1hCostPerToken: optionalRate(data.cacheCreation1hCostPerToken),
         projectId: project.id,
         scopeType: selectedScope?.scopeType,
         scopeId: selectedScope?.scopeId,
@@ -210,9 +202,7 @@ function LLMModelCostForm({
         onSuccess: () => {
           toaster.create({
             title: "Success",
-            description: `LLM model cost ${
-              id ? "updated" : "created"
-            } successfully`,
+            description: `LLM model cost ${id ? "updated" : "created"} successfully`,
             type: "success",
             duration: 5000,
           });
@@ -220,8 +210,7 @@ function LLMModelCostForm({
           void llmModelCostsQuery.refetch();
         },
         onError: (error) => {
-          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
-            return;
+          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
           showErrorToast({
             error,
             fallbackTitle: id
@@ -287,8 +276,7 @@ function LLMModelCostForm({
               required
               {...register("regex", {
                 validate: (value) =>
-                  isSafeRegex(value) ||
-                  "Please enter a valid regular expression",
+                  isSafeRegex(value) || "Please enter a valid regular expression",
               })}
             />
           </InputGroup>
@@ -338,9 +326,7 @@ function LLMModelCostForm({
               })}
             />
           </InputGroup>
-          <Field.ErrorText>
-            {errors.outputCostPerToken?.message}
-          </Field.ErrorText>
+          <Field.ErrorText>{errors.outputCostPerToken?.message}</Field.ErrorText>
         </HorizontalFormControl>
         <HorizontalFormControl
           label="Cache Read Cost Per Token"
@@ -356,9 +342,7 @@ function LLMModelCostForm({
               })}
             />
           </InputGroup>
-          <Field.ErrorText>
-            {errors.cacheReadCostPerToken?.message}
-          </Field.ErrorText>
+          <Field.ErrorText>{errors.cacheReadCostPerToken?.message}</Field.ErrorText>
         </HorizontalFormControl>
         <HorizontalFormControl
           label="Cache Write Cost Per Token (5 minutes)"
@@ -374,9 +358,7 @@ function LLMModelCostForm({
               })}
             />
           </InputGroup>
-          <Field.ErrorText>
-            {errors.cacheCreationCostPerToken?.message}
-          </Field.ErrorText>
+          <Field.ErrorText>{errors.cacheCreationCostPerToken?.message}</Field.ErrorText>
         </HorizontalFormControl>
         <HorizontalFormControl
           label="Cache Write Cost Per Token (1 hour)"
@@ -392,9 +374,7 @@ function LLMModelCostForm({
               })}
             />
           </InputGroup>
-          <Field.ErrorText>
-            {errors.cacheCreation1hCostPerToken?.message}
-          </Field.ErrorText>
+          <Field.ErrorText>{errors.cacheCreation1hCostPerToken?.message}</Field.ErrorText>
         </HorizontalFormControl>
         <Button
           marginTop={4}

@@ -41,9 +41,7 @@ function asDate(epochMs: number): Date {
   return new Date(epochMs);
 }
 
-function toJsonInput(
-  value: JsonValue,
-): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+function toJsonInput(value: JsonValue): Prisma.InputJsonValue | typeof Prisma.JsonNull {
   return value === null ? Prisma.JsonNull : value;
 }
 
@@ -150,9 +148,7 @@ export class PrismaProcessStore implements ProcessStore {
     return row !== null;
   }
 
-  async commit<State = unknown>(
-    commit: ProcessCommit<State>,
-  ): Promise<CommitResult> {
+  async commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult> {
     try {
       return await this.prisma.$transaction(async (tx) => {
         // This lock only serializes commits for the same process reference.
@@ -204,8 +200,7 @@ export class PrismaProcessStore implements ProcessStore {
           userId: commit.userId ?? null,
           state: toJsonInput(commit.state as JsonValue),
           revision,
-          nextWakeAt:
-            commit.nextWakeAt === null ? null : asDate(commit.nextWakeAt),
+          nextWakeAt: commit.nextWakeAt === null ? null : asDate(commit.nextWakeAt),
           updatedAt: asDate(commit.now),
         };
 
@@ -213,9 +208,7 @@ export class PrismaProcessStore implements ProcessStore {
           const inserted = await tx.processManagerInstance.createMany({
             data: [
               {
-                id: generate(
-                  KSUID_RESOURCES.PROCESS_MANAGER_INSTANCE,
-                ).toString(),
+                id: generate(KSUID_RESOURCES.PROCESS_MANAGER_INSTANCE).toString(),
                 ...refWhere(commit.ref),
                 ...instanceData,
               },
@@ -304,10 +297,9 @@ export class PrismaProcessStore implements ProcessStore {
             ],
             skipDuplicates: true,
           });
-          (inserted.count === 1
-            ? insertedMessageKeys
-            : duplicateMessageKeys
-          ).push(message.messageKey);
+          (inserted.count === 1 ? insertedMessageKeys : duplicateMessageKeys).push(
+            message.messageKey,
+          );
         }
 
         return {
@@ -398,9 +390,7 @@ export class PrismaProcessStore implements ProcessStore {
     };
   }
 
-  async findMessagesByRef(params: {
-    ref: ProcessRef;
-  }): Promise<OutboxMessageRecord[]> {
+  async findMessagesByRef(params: { ref: ProcessRef }): Promise<OutboxMessageRecord[]> {
     const rows = await this.prisma.processManagerOutbox.findMany({
       where: refWhere(params.ref),
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -418,9 +408,7 @@ export class PrismaProcessStore implements ProcessStore {
     if (params.processNames && params.processNames.length === 0) return [];
     const now = asDate(params.now);
     const leasedUntil = asDate(params.now + params.leaseDurationMs);
-    const leaseBatchToken = generate(
-      KSUID_RESOURCES.PROCESS_MANAGER_OUTBOX,
-    ).toString();
+    const leaseBatchToken = generate(KSUID_RESOURCES.PROCESS_MANAGER_OUTBOX).toString();
     const processNameFilter = params.processNames
       ? Prisma.sql`AND "processName" IN (${Prisma.join([...params.processNames])})`
       : Prisma.empty;

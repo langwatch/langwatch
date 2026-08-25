@@ -47,9 +47,10 @@ function createMockCommandHandlerClass(
 function createMockCommandHandlerClassWithGroupKey(
   name: string,
 ): CommandHandlerClass<any, CommandType, Event> {
-  class MockCommandHandlerWithGroupKey
-    implements CommandHandler<Command<any, any>, Event>
-  {
+  class MockCommandHandlerWithGroupKey implements CommandHandler<
+    Command<any, any>,
+    Event
+  > {
     static readonly schema = defineCommandSchema(
       `test.command.${name}` as CommandType,
       payloadSchema,
@@ -110,8 +111,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
         [
           {
             name: "recordResult",
-            handlerClass:
-              createMockCommandHandlerClassWithGroupKey("recordResult"),
+            handlerClass: createMockCommandHandlerClassWithGroupKey("recordResult"),
           },
         ],
         vi.fn(),
@@ -170,9 +170,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       };
 
       const groupKey = entry?.groupKeyFn(payload);
-      expect(groupKey).toBe(
-        `${tenantId}/command/startRun/${aggregateType}:exp1:run1`,
-      );
+      expect(groupKey).toBe(`${tenantId}/command/startRun/${aggregateType}:exp1:run1`);
     });
   });
 
@@ -194,8 +192,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
         [
           {
             name: "recordResult",
-            handlerClass:
-              createMockCommandHandlerClassWithGroupKey("recordResult"),
+            handlerClass: createMockCommandHandlerClassWithGroupKey("recordResult"),
             options: { getGroupKey: optionsGroupKey },
           },
         ],
@@ -253,8 +250,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
   function loggerInfoSpyOf(manager: QueueManager) {
     return vi.spyOn(
-      (manager as unknown as { logger: { info: (...a: any[]) => void } })
-        .logger,
+      (manager as unknown as { logger: { info: (...a: any[]) => void } }).logger,
       "info",
     );
   }
@@ -379,8 +375,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           [
             {
               name: "sharded",
-              handlerClass:
-                createMockCommandHandlerClassWithGroupKey("sharded"),
+              handlerClass: createMockCommandHandlerClassWithGroupKey("sharded"),
             },
           ],
           vi.fn(),
@@ -432,8 +427,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           [
             {
               name: "sharded",
-              handlerClass:
-                createMockCommandHandlerClassWithGroupKey("sharded"),
+              handlerClass: createMockCommandHandlerClassWithGroupKey("sharded"),
               options: { coalesceMaxBatch: 256 },
             },
           ],
@@ -535,8 +529,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           [
             {
               name: "sharded",
-              handlerClass:
-                createMockCommandHandlerClassWithGroupKey("sharded"),
+              handlerClass: createMockCommandHandlerClassWithGroupKey("sharded"),
               options: { coalesceMaxBatch: (p: any) => (p.oversized ? 1 : 64) },
             },
           ],
@@ -619,9 +612,7 @@ describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {
 
       manager.initializeHandlerQueues(handlers, vi.fn());
 
-      const entry = globalJobRegistry.get(
-        "test-pipeline:handler:resultStorage",
-      );
+      const entry = globalJobRegistry.get("test-pipeline:handler:resultStorage");
       expect(entry?.groupKeyFn).toBeDefined();
 
       const event = {
@@ -661,9 +652,7 @@ describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {
 
       manager.initializeHandlerQueues(handlers, vi.fn());
 
-      const entry = globalJobRegistry.get(
-        "test-pipeline:handler:resultStorage",
-      );
+      const entry = globalJobRegistry.get("test-pipeline:handler:resultStorage");
 
       const event = {
         tenantId,
@@ -673,9 +662,7 @@ describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {
       };
 
       const groupKey = entry?.groupKeyFn(event);
-      expect(groupKey).toBe(
-        `${tenantId}/map/resultStorage/${aggregateType}:exp1:run1`,
-      );
+      expect(groupKey).toBe(`${tenantId}/map/resultStorage/${aggregateType}:exp1:run1`);
     });
   });
 });

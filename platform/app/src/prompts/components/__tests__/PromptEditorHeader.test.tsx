@@ -15,14 +15,11 @@ vi.mock("~/prompts/forms/fields/ModelSelectFieldMini", () => ({
   ),
 }));
 
-vi.mock(
-  "~/prompts/forms/prompt-config-form/components/VersionHistoryButton",
-  () => ({
-    VersionHistoryButton: () => (
-      <button data-testid="version-history-button">History</button>
-    ),
-  }),
-);
+vi.mock("~/prompts/forms/prompt-config-form/components/VersionHistoryButton", () => ({
+  VersionHistoryButton: () => (
+    <button data-testid="version-history-button">History</button>
+  ),
+}));
 
 vi.mock("~/prompts/components/GeneratePromptApiSnippetDialog", () => {
   const Dialog = ({ children }: { children: React.ReactNode }) => (
@@ -35,15 +32,11 @@ vi.mock("~/prompts/components/GeneratePromptApiSnippetDialog", () => {
 });
 
 vi.mock("~/components/GenerateApiSnippetButton", () => ({
-  GenerateApiSnippetButton: () => (
-    <button data-testid="api-snippet-button">API</button>
-  ),
+  GenerateApiSnippetButton: () => <button data-testid="api-snippet-button">API</button>,
 }));
 
 vi.mock("~/prompts/components/SavePromptButton", () => ({
-  SavePromptButton: () => (
-    <button data-testid="save-prompt-button">Save</button>
-  ),
+  SavePromptButton: () => <button data-testid="save-prompt-button">Save</button>,
 }));
 
 vi.mock("~/prompts/components/DeployPromptDialog", () => ({
@@ -148,9 +141,7 @@ describe("<PromptEditorHeader/>", () => {
         </TestWrapper>,
       );
 
-      expect(
-        screen.getByRole("button", { name: /deploy/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /deploy/i })).toBeInTheDocument();
     });
   });
 
@@ -172,9 +163,7 @@ describe("<PromptEditorHeader/>", () => {
         </TestWrapper>,
       );
 
-      expect(
-        screen.queryByTestId("version-history-button"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("version-history-button")).not.toBeInTheDocument();
     });
 
     it("does not render the API snippet button", () => {
@@ -184,9 +173,7 @@ describe("<PromptEditorHeader/>", () => {
         </TestWrapper>,
       );
 
-      expect(
-        screen.queryByTestId("api-snippet-button"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("api-snippet-button")).not.toBeInTheDocument();
     });
 
     it("does not render the save button", () => {
@@ -196,9 +183,7 @@ describe("<PromptEditorHeader/>", () => {
         </TestWrapper>,
       );
 
-      expect(
-        screen.queryByTestId("save-prompt-button"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("save-prompt-button")).not.toBeInTheDocument();
     });
 
     it("does not render the deploy button", () => {
@@ -208,9 +193,7 @@ describe("<PromptEditorHeader/>", () => {
         </TestWrapper>,
       );
 
-      expect(
-        screen.queryByRole("button", { name: /deploy/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /deploy/i })).not.toBeInTheDocument();
     });
   });
 });

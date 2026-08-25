@@ -26,10 +26,7 @@ import type { ResolvedTraceSpans } from "../resolve-offloaded-traces";
 import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
 import { resolveOffloadedTracesBatch } from "../resolve-offloaded-traces-batch";
 import type { GetAllTracesForProjectInput } from "../types";
-import {
-  makeSpanRowWithEventRef,
-  makeSummaryRow,
-} from "./fixtures/ch-row-fixtures";
+import { makeSpanRowWithEventRef, makeSummaryRow } from "./fixtures/ch-row-fixtures";
 
 // ---------------------------------------------------------------------------
 // Hoisted mock — only the raw CH SQL boundary
@@ -204,9 +201,7 @@ function setupThreadMocks() {
     // resolveOccurredAtRange: min/max OccurredAt for partition pruning (#5231)
     .mockResolvedValueOnce({
       json: () =>
-        Promise.resolve([
-          { fromMs: 1_700_000_000_000, toMs: 1_700_000_100_000 },
-        ]),
+        Promise.resolve([{ fromMs: 1_700_000_000_000, toMs: 1_700_000_100_000 }]),
     })
     // fetchTracesWithSpansJoined: summary, spans
     .mockResolvedValueOnce({
@@ -244,11 +239,10 @@ describe("ClickHouseTraceService.getAllTracesForProject — #4991 AC1 export", (
         const { blobStore, getFromEventLog } = makeEventRefBlobStore();
         const service = buildService(blobStore);
 
-        const result = await service.getAllTracesForProject(
-          baseInput,
-          protections,
-          { includeSpans: true, resolveBlobs: true },
-        );
+        const result = await service.getAllTracesForProject(baseInput, protections, {
+          includeSpans: true,
+          resolveBlobs: true,
+        });
 
         const trace = result!.groups.flat()[0]!;
         expect(getFromEventLog).toHaveBeenCalled();
@@ -260,16 +254,13 @@ describe("ClickHouseTraceService.getAllTracesForProject — #4991 AC1 export", (
         const { blobStore } = makeEventRefBlobStore();
         const service = buildService(blobStore);
 
-        const result = await service.getAllTracesForProject(
-          baseInput,
-          protections,
-          { includeSpans: true, resolveBlobs: true },
-        );
+        const result = await service.getAllTracesForProject(baseInput, protections, {
+          includeSpans: true,
+          resolveBlobs: true,
+        });
 
         const outputVal = result!.groups.flat()[0]!.output?.value as string;
-        expect(Buffer.byteLength(outputVal, "utf8")).toBeGreaterThan(
-          IO_PREVIEW_BYTES,
-        );
+        expect(Buffer.byteLength(outputVal, "utf8")).toBeGreaterThan(IO_PREVIEW_BYTES);
       });
     });
   });
@@ -316,9 +307,7 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
       it("throws naming the cardinality mismatch", async () => {
         setupThreadMocks();
         // Violates the contract: 0 resolutions for 1 input trace.
-        const service = buildServiceWithBatchResolver(() =>
-          Promise.resolve([]),
-        );
+        const service = buildServiceWithBatchResolver(() => Promise.resolve([]));
 
         await expect(
           service.getTracesByThreadId(PROJECT_ID, "thread-1", protections, {
@@ -338,8 +327,7 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
       mockClickHouseQuery
         // fetchTracesWithSpansJoined: summary rows
         .mockResolvedValueOnce({
-          json: () =>
-            Promise.resolve([makeSummaryRow(TRACE_A), makeSummaryRow(TRACE_B)]),
+          json: () => Promise.resolve([makeSummaryRow(TRACE_A), makeSummaryRow(TRACE_B)]),
         })
         // fetchTracesWithSpansJoined: span rows
         .mockResolvedValueOnce({
@@ -389,10 +377,7 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
         mockClickHouseQuery
           .mockResolvedValueOnce({
             json: () =>
-              Promise.resolve([
-                makeSummaryRow(TRACE_A),
-                makeSummaryRow(TRACE_B),
-              ]),
+              Promise.resolve([makeSummaryRow(TRACE_A), makeSummaryRow(TRACE_B)]),
           })
           .mockResolvedValueOnce({
             json: () =>
@@ -407,10 +392,7 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
         const service = buildServiceWithBatchResolver((_projectId, spans) =>
           // Right count (2 for 2), transposed: TRACE_A's index gets the span-less
           // resolution, TRACE_B's index gets TRACE_A's spans.
-          Promise.resolve([
-            passthrough(spans[1] ?? []),
-            passthrough(spans[0] ?? []),
-          ]),
+          Promise.resolve([passthrough(spans[1] ?? []), passthrough(spans[0] ?? [])]),
         );
 
         await expect(
@@ -468,15 +450,12 @@ describe("ClickHouseTraceService.getTracesByThreadId — ordering contract", () 
         mockClickHouseQuery
           // SELECT DISTINCT TraceId
           .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve([{ TraceId: LATE }, { TraceId: EARLY }]),
+            json: () => Promise.resolve([{ TraceId: LATE }, { TraceId: EARLY }]),
           })
           // resolveOccurredAtRange (hint-less thread read)
           .mockResolvedValueOnce({
             json: () =>
-              Promise.resolve([
-                { fromMs: 1_700_000_000_000, toMs: 1_700_000_100_000 },
-              ]),
+              Promise.resolve([{ fromMs: 1_700_000_000_000, toMs: 1_700_000_100_000 }]),
           })
           // joined summary rows — deliberately LATE first, as a trace-id-ordered
           // read may well return them.
@@ -526,11 +505,10 @@ describe("ClickHouseTraceService.getAllTracesForProject — #4991 AC1 summary re
         const { blobStore, getFromEventLog } = makeEventRefBlobStore();
         const service = buildService(blobStore);
 
-        const result = await service.getAllTracesForProject(
-          baseInput,
-          protections,
-          { includeSpans: false, resolveBlobs: true },
-        );
+        const result = await service.getAllTracesForProject(baseInput, protections, {
+          includeSpans: false,
+          resolveBlobs: true,
+        });
 
         const trace = result!.groups.flat()[0]!;
         expect(getFromEventLog).toHaveBeenCalled();
@@ -542,11 +520,10 @@ describe("ClickHouseTraceService.getAllTracesForProject — #4991 AC1 summary re
         const { blobStore } = makeEventRefBlobStore();
         const service = buildService(blobStore);
 
-        const result = await service.getAllTracesForProject(
-          baseInput,
-          protections,
-          { includeSpans: false, resolveBlobs: true },
-        );
+        const result = await service.getAllTracesForProject(baseInput, protections, {
+          includeSpans: false,
+          resolveBlobs: true,
+        });
 
         const trace = result!.groups.flat()[0]!;
         expect(trace.spans ?? []).toEqual([]);
@@ -579,11 +556,9 @@ describe("ClickHouseTraceService.getAllTracesForProject — #4991 AC5 list prote
         const { blobStore } = makeEventRefBlobStore();
         const service = buildService(blobStore);
 
-        const result = await service.getAllTracesForProject(
-          baseInput,
-          protections,
-          { includeSpans: true },
-        );
+        const result = await service.getAllTracesForProject(baseInput, protections, {
+          includeSpans: true,
+        });
 
         // Falsifiable: assert the exact preview, not merely "not the full value"
         // (a broken mapper returning "" / null would slip past not.toBe).

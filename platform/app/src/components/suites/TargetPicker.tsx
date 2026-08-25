@@ -5,14 +5,7 @@
  * list with type indicators, and a footer with count + select all/clear buttons.
  */
 
-import {
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, Plus, X } from "lucide-react";
 import type { SuiteTarget } from "~/server/suites/types";
 import { Checkbox } from "../ui/checkbox";
@@ -98,13 +91,7 @@ export function TargetPicker({
         </Tooltip>
       </HStack>
 
-      <VStack
-        maxHeight="200px"
-        overflow="auto"
-        paddingX={3}
-        gap={1}
-        align="stretch"
-      >
+      <VStack maxHeight="200px" overflow="auto" paddingX={3} gap={1} align="stretch">
         {targets.map((target) => {
           const selected = isTargetSelected(target.type, target.referenceId);
 
@@ -171,11 +158,7 @@ export function TargetPicker({
             </Text>
           </HStack>
           {archivedTargets.map((target) => (
-            <HStack
-              key={`${target.type}-${target.referenceId}`}
-              gap={2}
-              paddingLeft={5}
-            >
+            <HStack key={`${target.type}-${target.referenceId}`} gap={2} paddingLeft={5}>
               <Text fontSize="sm" color="fg.muted" flex={1} fontStyle="italic">
                 {target.name}
               </Text>
@@ -203,8 +186,8 @@ export function TargetPicker({
         borderColor="border"
       >
         <Text fontSize="xs" color="fg.muted">
-          {selectedTargets.length - (archivedTargets?.length ?? 0)} of{" "}
-          {totalCount} selected
+          {selectedTargets.length - (archivedTargets?.length ?? 0)} of {totalCount}{" "}
+          selected
         </Text>
         <HStack gap={2}>
           <Button size="xs" variant="ghost" onClick={onSelectAll}>

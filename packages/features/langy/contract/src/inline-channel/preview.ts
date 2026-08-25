@@ -62,7 +62,6 @@ export function reconcileLangyDerivedCardPreviews<
   settledCardIds: ReadonlySet<string>;
 }): P[] {
   return previews.filter(
-    (preview) =>
-      preview.card === null || !settledCardIds.has(preview.card.blockId),
+    (preview) => preview.card === null || !settledCardIds.has(preview.card.blockId),
   );
 }

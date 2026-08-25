@@ -41,8 +41,9 @@ const draggedLlmValue = () => {
   const props = nodeDraggableProps.mock.calls.at(-1)![0] as {
     component: { parameters: Array<{ identifier: string; value: unknown }> };
   };
-  return props.component.parameters.find((p) => p.identifier === "llm")
-    ?.value as { model: string };
+  return props.component.parameters.find((p) => p.identifier === "llm")?.value as {
+    model: string;
+  };
 };
 
 describe("LlmSignatureNodeDraggable", () => {

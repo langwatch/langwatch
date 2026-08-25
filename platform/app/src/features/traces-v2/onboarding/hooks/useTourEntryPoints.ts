@@ -56,9 +56,7 @@ export interface OnboardingEntryState {
 export function useTourEntryPoints(): OnboardingEntryState {
   const { project } = useOrganizationTeamProject();
   const { hasAnyTraces } = useProjectHasTraces();
-  const setupDismissedByProject = useOnboardingStore(
-    (s) => s.setupDismissedByProject,
-  );
+  const setupDismissedByProject = useOnboardingStore((s) => s.setupDismissedByProject);
   const setSetupDismissedForProject = useOnboardingStore(
     (s) => s.setSetupDismissedForProject,
   );
@@ -67,9 +65,7 @@ export function useTourEntryPoints(): OnboardingEntryState {
   const utils = api.useUtils();
 
   const projectId = project?.id;
-  const setupDismissed = projectId
-    ? !!setupDismissedByProject[projectId]
-    : false;
+  const setupDismissed = projectId ? !!setupDismissedByProject[projectId] : false;
 
   const onLaunchTour = useCallback(() => {
     if (!projectId) return;

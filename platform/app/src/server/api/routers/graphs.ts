@@ -104,20 +104,20 @@ export const graphsRouter = createTRPCRouter({
       // rows leave the server, the same registry-driven redaction the
       // automations router applies on its read paths.
       return graphs.map((graph: Graph) => {
-          const trigger = triggerByGraphId.get(graph.id) ?? null;
-          return {
-            ...legacyGraph(graph),
-            trigger: trigger
-              ? {
-                  ...trigger,
-                  actionParams: redactActionParamsFor(
-                    trigger.action,
-                    trigger.actionParams ?? {},
-                  ),
-                }
-              : null,
-          };
-        });
+        const trigger = triggerByGraphId.get(graph.id) ?? null;
+        return {
+          ...legacyGraph(graph),
+          trigger: trigger
+            ? {
+                ...trigger,
+                actionParams: redactActionParamsFor(
+                  trigger.action,
+                  trigger.actionParams ?? {},
+                ),
+              }
+            : null,
+        };
+      });
     }),
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
@@ -125,10 +125,12 @@ export const graphsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { id } = input;
       try {
-        return legacyGraph(await ctx.app.dashboard.deleteGraph({
-          projectId: input.projectId,
-          graphId: id,
-        }));
+        return legacyGraph(
+          await ctx.app.dashboard.deleteGraph({
+            projectId: input.projectId,
+            graphId: id,
+          }),
+        );
       } catch (error) {
         if (error instanceof Error && error.name === "GraphNotFoundError") {
           throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
@@ -164,10 +166,7 @@ export const graphsRouter = createTRPCRouter({
 
         for (const [key, value] of Object.entries(graph.filters)) {
           if (filterFieldsEnum.safeParse(key).success) {
-            if (
-              Array.isArray(value) ||
-              (typeof value === "object" && value !== null)
-            ) {
+            if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
               validFilters[key] = value;
             }
           }
@@ -175,10 +174,7 @@ export const graphsRouter = createTRPCRouter({
 
         validatedFilters =
           Object.keys(validFilters).length > 0
-            ? (validFilters as Record<
-                FilterField,
-                string[] | Record<string, string[]>
-              >)
+            ? (validFilters as Record<FilterField, string[] | Record<string, string[]>>)
             : undefined;
       }
 
@@ -190,12 +186,11 @@ export const graphsRouter = createTRPCRouter({
 
       let alertData = undefined;
       if (trigger?.active && !trigger.deleted) {
-        const actionParams =
-          trigger.actionParams as unknown as AlertActionParams & {
-            threshold: number;
-            operator: string;
-            timePeriod: number;
-          };
+        const actionParams = trigger.actionParams as unknown as AlertActionParams & {
+          threshold: number;
+          operator: string;
+          timePeriod: number;
+        };
         alertData = {
           enabled: true,
           threshold: actionParams.threshold,
@@ -269,16 +264,18 @@ export const graphsRouter = createTRPCRouter({
     .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
       try {
-        return legacyGraph(await ctx.app.dashboard.updateGraphLayout({
-          projectId: input.projectId,
-          graphId: input.graphId,
-          layout: {
-            gridColumn: input.gridColumn,
-            gridRow: input.gridRow,
-            colSpan: input.colSpan,
-            rowSpan: input.rowSpan,
-          },
-        }));
+        return legacyGraph(
+          await ctx.app.dashboard.updateGraphLayout({
+            projectId: input.projectId,
+            graphId: input.graphId,
+            layout: {
+              gridColumn: input.gridColumn,
+              gridRow: input.gridRow,
+              colSpan: input.colSpan,
+              rowSpan: input.rowSpan,
+            },
+          }),
+        );
       } catch (error) {
         if (error instanceof Error && error.name === "GraphNotFoundError") {
           throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });

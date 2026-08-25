@@ -47,9 +47,7 @@ withdrawWorkerCountOverride(process.env);
 export default defineConfig({
   test: {
     // Global setup runs once before all tests - starts shared containers
-    globalSetup: [
-      "./src/server/event-sourcing/__tests__/integration/globalSetup.ts",
-    ],
+    globalSetup: ["./src/server/event-sourcing/__tests__/integration/globalSetup.ts"],
     setupFiles: [
       // setupEnv.ts MUST run first - sets env vars before any application code loads
       "./src/server/event-sourcing/__tests__/integration/setupEnv.ts",

@@ -15,30 +15,24 @@ import { TabIdProvider } from "./ui/TabContext";
  * Single Responsibility: Manages the browser-like tab interface for editing multiple prompts simultaneously.
  */
 export function PromptPlaygroundBrowser() {
-  const {
-    windows,
-    splitTab,
-    moveTab,
-    setActiveTab,
-    activeWindowId,
-    setActiveWindow,
-  } = useDraggableTabsBrowserStore(
-    ({
-      windows,
-      splitTab,
-      moveTab,
-      setActiveTab,
-      activeWindowId,
-      setActiveWindow,
-    }) => ({
-      windows,
-      splitTab,
-      moveTab,
-      setActiveTab,
-      activeWindowId,
-      setActiveWindow,
-    }),
-  );
+  const { windows, splitTab, moveTab, setActiveTab, activeWindowId, setActiveWindow } =
+    useDraggableTabsBrowserStore(
+      ({
+        windows,
+        splitTab,
+        moveTab,
+        setActiveTab,
+        activeWindowId,
+        setActiveWindow,
+      }) => ({
+        windows,
+        splitTab,
+        moveTab,
+        setActiveTab,
+        activeWindowId,
+        setActiveWindow,
+      }),
+    );
 
   function handleTabMove(params: {
     tabId: string;
@@ -52,13 +46,7 @@ export function PromptPlaygroundBrowser() {
     });
   }
 
-  function handleTabChange({
-    windowId,
-    tabId,
-  }: {
-    windowId: string;
-    tabId: string;
-  }) {
+  function handleTabChange({ windowId, tabId }: { windowId: string; tabId: string }) {
     setActiveTab({ windowId, tabId });
   }
 
@@ -76,15 +64,11 @@ export function PromptPlaygroundBrowser() {
           onTabChange={handleTabChange}
           onWindowClick={() => setActiveWindow({ windowId: tabbedWindow.id })}
           maxWidth={
-            windows.length > 1
-              ? `calc((100vw - 340px) / ${windows.length})`
-              : "auto"
+            windows.length > 1 ? `calc((100vw - 340px) / ${windows.length})` : "auto"
           }
           paddingTop={0}
         >
-          <DraggableTabsBrowser.TabBar
-            tabIds={tabbedWindow.tabs.map((tab) => tab.id)}
-          >
+          <DraggableTabsBrowser.TabBar tabIds={tabbedWindow.tabs.map((tab) => tab.id)}>
             {/* The switcher lives inside the strip, not in the toolbar below,
                 because the toolbar only renders for the active pane — and a
                 pane you are not working in still has tabs worth reaching. */}
@@ -116,14 +100,11 @@ export function PromptPlaygroundBrowser() {
                     pointerEvents: "none",
                   }}
                 >
-                  <ExperimentFromPlaygroundButton
-                    iconOnly={windows.length > 1}
-                  />
+                  <ExperimentFromPlaygroundButton iconOnly={windows.length > 1} />
                   <Tooltip content="Compare" disabled={windows.length <= 1}>
                     <PageLayout.HeaderButton
                       onClick={() =>
-                        tabbedWindow.activeTabId &&
-                        handleSplit(tabbedWindow.activeTabId)
+                        tabbedWindow.activeTabId && handleSplit(tabbedWindow.activeTabId)
                       }
                       disabled={!tabbedWindow.activeTabId}
                       title="Split tab to compare prompts side by side"

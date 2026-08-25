@@ -36,7 +36,11 @@ import {
   toJsonlChunks,
   toSingleJsonl,
 } from "../services/dataset-chunking";
-import type { DatasetStorage, PresignedUpload, DatasetS3ClientResolver } from "../ports/dataset-storage.port";
+import type {
+  DatasetStorage,
+  PresignedUpload,
+  DatasetS3ClientResolver,
+} from "../ports/dataset-storage.port";
 import {
   ChunkTooLargeError,
   MissingChunkError,
@@ -54,11 +58,16 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
    * credentials). A single instance serving one request resolves each
    * project's client once.
    */
-  private readonly clients = new Map<string, Promise<Awaited<ReturnType<DatasetS3ClientResolver["resolve"]>>>>();
+  private readonly clients = new Map<
+    string,
+    Promise<Awaited<ReturnType<DatasetS3ClientResolver["resolve"]>>>
+  >();
 
   constructor(private readonly resolver: DatasetS3ClientResolver) {}
 
-  private client(projectId: string): Promise<Awaited<ReturnType<DatasetS3ClientResolver["resolve"]>>> {
+  private client(
+    projectId: string,
+  ): Promise<Awaited<ReturnType<DatasetS3ClientResolver["resolve"]>>> {
     const cached = this.clients.get(projectId);
     if (cached) return cached;
     const created = this.resolver.resolve(projectId);
@@ -83,9 +92,10 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
     maxBytes?: number;
   }): Promise<DatasetChunk[]> {
     assertNoTraversal(projectId, datasetId);
-    const chunks = toJsonlChunks(records, maxBytes ? { maxBytes } : {}).map(
-      (c) => ({ ...c, index: c.index + fromIndex }),
-    );
+    const chunks = toJsonlChunks(records, maxBytes ? { maxBytes } : {}).map((c) => ({
+      ...c,
+      index: c.index + fromIndex,
+    }));
     const { s3Client, s3Bucket } = await this.client(projectId);
     for (const chunk of chunks) {
       await s3Client.send(
@@ -247,9 +257,7 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
     const { s3Client, s3Bucket } = await this.client(projectId);
     let head: HeadObjectCommandOutput;
     try {
-      head = await s3Client.send(
-        new HeadObjectCommand({ Bucket: s3Bucket, Key: key }),
-      );
+      head = await s3Client.send(new HeadObjectCommand({ Bucket: s3Bucket, Key: key }));
     } catch (error: unknown) {
       // A never-completed (or already-reaped) upload — distinct from a too-large
       // one (M5). NoSuchKey / NotFound both surface here depending on the SDK.
@@ -275,9 +283,7 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
   }): Promise<void> {
     assertKeyWithinProject(projectId, key);
     const { s3Client, s3Bucket } = await this.client(projectId);
-    await s3Client.send(
-      new DeleteObjectCommand({ Bucket: s3Bucket, Key: key }),
-    );
+    await s3Client.send(new DeleteObjectCommand({ Bucket: s3Bucket, Key: key }));
   }
 
   async streamStaged({

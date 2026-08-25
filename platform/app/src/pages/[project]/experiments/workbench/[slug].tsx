@@ -308,8 +308,8 @@ export default function ExperimentsWorkbenchPage() {
             <Alert.Indicator />
             <Alert.Title>Experiment not found</Alert.Title>
             <Alert.Description>
-              The experiment you&apos;re looking for doesn&apos;t exist or you
-              don&apos;t have access to it.
+              The experiment you&apos;re looking for doesn&apos;t exist or you don&apos;t
+              have access to it.
             </Alert.Description>
           </Alert.Root>
         </Box>
@@ -358,9 +358,7 @@ export default function ExperimentsWorkbenchPage() {
             <UndoRedo />
             <TableSettingsMenu disabled={isLoadingExperiment} />
             <HistoryButton disabled={isLoadingExperiment} />
-            <RunEvaluationButton
-              disabled={isLoadingExperiment || isLoadingDatasets}
-            />
+            <RunEvaluationButton disabled={isLoadingExperiment || isLoadingDatasets} />
           </HStack>
         </HStack>
 

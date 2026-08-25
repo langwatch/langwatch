@@ -60,10 +60,7 @@ export function ReplayWizardContent() {
 
         <ReplayHistoryTable />
       </VStack>
-      <ReplayProgressDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-      />
+      <ReplayProgressDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </>
   );
 }

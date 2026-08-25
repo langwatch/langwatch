@@ -33,9 +33,7 @@ function parseValidIp(ip: string): string | null {
   return null;
 }
 
-export function getClientIp(
-  req: NextApiRequest | undefined,
-): string | undefined {
+export function getClientIp(req: NextApiRequest | undefined): string | undefined {
   if (!req) {
     return undefined;
   }

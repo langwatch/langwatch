@@ -29,8 +29,7 @@ describe("useTraceSwitchOverlay", () => {
   describe("when the same trace refreshes in place", () => {
     it("never shows the overlay", () => {
       const { result, rerender } = renderHook(
-        ({ isLoading }) =>
-          useTraceSwitchOverlay({ traceId: "trace-a", isLoading }),
+        ({ isLoading }) => useTraceSwitchOverlay({ traceId: "trace-a", isLoading }),
         { initialProps: { isLoading: false } },
       );
       // A live update flips isLoading without changing the traceId.
@@ -67,8 +66,7 @@ describe("useTraceSwitchOverlay", () => {
   describe("when switching to a trace that is still loading", () => {
     it("holds the overlay until the data resolves, then clears after the floor", () => {
       const { result, rerender } = renderHook(
-        ({ traceId, isLoading }) =>
-          useTraceSwitchOverlay({ traceId, isLoading }),
+        ({ traceId, isLoading }) => useTraceSwitchOverlay({ traceId, isLoading }),
         { initialProps: { traceId: "trace-a", isLoading: false } },
       );
 

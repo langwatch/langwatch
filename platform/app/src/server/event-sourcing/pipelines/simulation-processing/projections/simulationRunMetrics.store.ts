@@ -17,9 +17,7 @@ import type { SimulationRunMetricsProjectionRecord } from "./simulationRunMetric
  * TenantId (bulk appends are tenant-scoped per the BulkAppendContext
  * contract).
  */
-export class SimulationRunMetricsAppendStore
-  implements AppendStore<SimulationRunMetricsProjectionRecord>
-{
+export class SimulationRunMetricsAppendStore implements AppendStore<SimulationRunMetricsProjectionRecord> {
   constructor(private readonly repository: SimulationRunMetricsRepository) {}
 
   async append(

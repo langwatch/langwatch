@@ -43,8 +43,7 @@ export function createEnterpriseWebhookEndpointService(
     ids,
     secrets,
     configuration: WebhookEndpointConfiguration.create({
-      allowInsecureLocalUrls:
-        process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS === "1",
+      allowInsecureLocalUrls: process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS === "1",
       allowAmbientAwsCredentials:
         process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS === "1",
     }),
@@ -52,8 +51,6 @@ export function createEnterpriseWebhookEndpointService(
   });
 }
 
-export function installEnterpriseWebhookAccess(
-  entitlements: EntitlementService,
-): void {
+export function installEnterpriseWebhookAccess(entitlements: EntitlementService): void {
   AppWebhookAccessRuntime.install(entitlements);
 }

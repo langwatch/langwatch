@@ -58,19 +58,12 @@ export function stepPrecision(step: number): number {
  * Snap rawMax to the nearest step-aligned value above min.
  * zag-js requires max > min and (max - min) divisible by step.
  */
-export function alignMaxToStep(
-  rawMax: number,
-  min: number,
-  step: number,
-): number {
+export function alignMaxToStep(rawMax: number, min: number, step: number): number {
   const range = rawMax - min;
   const stepsInRange = range > 0 ? Math.floor(range / step) : 0;
   const snappedMax = min + stepsInRange * step;
   const p = stepPrecision(step);
-  return Math.max(
-    Number(snappedMax.toFixed(p)),
-    Number((min + step).toFixed(p)),
-  );
+  return Math.max(Number(snappedMax.toFixed(p)), Number((min + step).toFixed(p)));
 }
 
 // ============================================================================
@@ -103,16 +96,12 @@ export function useSliderControl({
 
   // For dynamic max params (like max_tokens), default to the model's max
   // For other params, use the config default
-  const sensibleDefault =
-    config.dynamicMax && maxOverride ? maxOverride : config.default;
+  const sensibleDefault = config.dynamicMax && maxOverride ? maxOverride : config.default;
 
   const currentValue = value ?? sensibleDefault;
 
   // Ensure current value is within bounds
-  const boundedValue = Math.min(
-    Math.max(currentValue, effectiveMin),
-    effectiveMax,
-  );
+  const boundedValue = Math.min(Math.max(currentValue, effectiveMin), effectiveMax);
 
   // Local state for input field while typing
   const [inputValue, setInputValue] = useState(String(boundedValue));

@@ -107,8 +107,7 @@ describe("EventExplorerService", () => {
           tenantIds: [],
         });
 
-        const call = (repo.findAggregates as ReturnType<typeof vi.fn>).mock
-          .calls[0]![0];
+        const call = (repo.findAggregates as ReturnType<typeof vi.fn>).mock.calls[0]![0];
         expect(call.sinceMs).toBe(new Date("2024-06-15").getTime());
       });
     });

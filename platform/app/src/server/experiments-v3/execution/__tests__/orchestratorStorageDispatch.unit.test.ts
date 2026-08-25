@@ -140,10 +140,7 @@ describe("buildTargetMetadata", () => {
           loadedPrompts: new Map<string, VersionedPrompt>(),
           loadedAgents: emptyAgents,
           loadedEvaluators: new Map([
-            [
-              "evaluator-1",
-              { id: "evaluator-1", name: "Comparison", config: {} },
-            ],
+            ["evaluator-1", { id: "evaluator-1", name: "Comparison", config: {} }],
           ]),
         });
 

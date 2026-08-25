@@ -256,9 +256,7 @@ describe("Monitor-Evaluator Integration", () => {
       const monitorWithEvaluator = monitors.find((m) => m.evaluatorId !== null);
       expect(monitorWithEvaluator).toBeDefined();
       expect(monitorWithEvaluator?.evaluator).toBeDefined();
-      expect(monitorWithEvaluator?.evaluator?.id).toBe(
-        monitorWithEvaluator?.evaluatorId,
-      );
+      expect(monitorWithEvaluator?.evaluator?.id).toBe(monitorWithEvaluator?.evaluatorId);
     });
   });
 

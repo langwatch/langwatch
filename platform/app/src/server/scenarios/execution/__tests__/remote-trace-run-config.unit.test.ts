@@ -12,10 +12,7 @@
 import fs from "fs";
 import path from "path";
 import { describe, expect, it } from "vitest";
-import {
-  buildRemoteTraceRunConfig,
-  TRACE_WAIT_CAP_MS,
-} from "../remote-trace-run-config";
+import { buildRemoteTraceRunConfig, TRACE_WAIT_CAP_MS } from "../remote-trace-run-config";
 
 describe("buildRemoteTraceRunConfig", () => {
   const base = {
@@ -108,9 +105,7 @@ describe("scenario child process wiring", () => {
       expect(source).toContain("ScenarioRunner.judgeAgent({");
       // Remote fetching arrives through the run configuration alone.
       expect(source).toContain("...buildRemoteTraceRunConfig({");
-      expect(source).toContain(
-        "traceWaitTimeoutMs: jobData.traceWaitTimeoutMs",
-      );
+      expect(source).toContain("traceWaitTimeoutMs: jobData.traceWaitTimeoutMs");
     });
   });
 });

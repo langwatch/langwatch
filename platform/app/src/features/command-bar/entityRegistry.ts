@@ -43,8 +43,7 @@ export const entityRegistry: EntityConfig[] = [
     type: "agent",
     icon: Bot,
     label: "Agent",
-    pathBuilder: (id, p) =>
-      `/${p}/agents?drawer.open=agentViewer&drawer.agentId=${id}`,
+    pathBuilder: (id, p) => `/${p}/agents?drawer.open=agentViewer&drawer.agentId=${id}`,
   },
   {
     prefix: "dataset_",

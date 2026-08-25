@@ -8,10 +8,7 @@
  *
  * @see specs/migration/authz-grants-rollout.feature
  */
-import {
-  BindingMissingError,
-  DuplicateBindingError,
-} from "@langwatch/authz-contract";
+import { BindingMissingError, DuplicateBindingError } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ACTOR,
@@ -132,9 +129,7 @@ describe("given an organization the genesis import has not reached", () => {
       expect(sent).toEqual([]);
       expect(db.roleBinding.create).not.toHaveBeenCalled();
       expect(db.roleBinding.createMany).toHaveBeenCalledTimes(1);
-      expect(db.roleBinding.createMany.mock.calls[0]![0].skipDuplicates).toBe(
-        true,
-      );
+      expect(db.roleBinding.createMany.mock.calls[0]![0].skipDuplicates).toBe(true);
     });
 
     it("still answers the duplicates the identity pre-check found", async () => {
@@ -496,10 +491,7 @@ describe("given a batch of bindings to attach", () => {
 
       const outcome = await writer.attachBindings({
         organizationId: ORG_ID,
-        bindings: [
-          binding,
-          { ...binding, bindingId: "rb_2", scopeId: "team_billing" },
-        ],
+        bindings: [binding, { ...binding, bindingId: "rb_2", scopeId: "team_billing" }],
         actor: ACTOR,
         onDuplicate: "skip",
       });

@@ -56,9 +56,7 @@ const check = (label: string, condition: boolean, detail?: string) => {
 };
 
 /** Every address Mailpit saw delivered, across the To and Bcc of each copy. */
-async function collectEnvelopeRecipients(
-  list: { ID: string }[],
-): Promise<Set<string>> {
+async function collectEnvelopeRecipients(list: { ID: string }[]): Promise<Set<string>> {
   const addresses = new Set<string>();
   for (const m of list) {
     const d = await messageDetail(m.ID);
@@ -109,10 +107,7 @@ async function scenarioPlainAlert() {
   );
 
   const raw = await rawSource(first.ID);
-  check(
-    "List-Unsubscribe header delivered through SMTP",
-    /List-Unsubscribe:/i.test(raw),
-  );
+  check("List-Unsubscribe header delivered through SMTP", /List-Unsubscribe:/i.test(raw));
 }
 
 async function scenarioFullSurface() {
@@ -152,10 +147,7 @@ async function scenarioFullSurface() {
     JSON.stringify(detail.Attachments),
   );
   check("reply-to set", /Reply-To:\s*support@langwatch\.ai/i.test(raw));
-  check(
-    "custom header delivered",
-    /X-LangWatch-QA:\s*gateway-smoke/i.test(raw),
-  );
+  check("custom header delivered", /X-LangWatch-QA:\s*gateway-smoke/i.test(raw));
   check(
     "both visible recipients in To header",
     /primary@example\.com/.test(raw) && /second@example\.com/.test(raw),
@@ -205,9 +197,7 @@ async function main() {
   await scenarioUnicode();
 
   console.log(
-    failures === 0
-      ? "\nAll gateway checks passed."
-      : `\n${failures} check(s) FAILED.`,
+    failures === 0 ? "\nAll gateway checks passed." : `\n${failures} check(s) FAILED.`,
   );
   process.exit(failures === 0 ? 0 : 1);
 }

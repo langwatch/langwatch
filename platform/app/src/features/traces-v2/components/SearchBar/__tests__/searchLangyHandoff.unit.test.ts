@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  handOffSearchToLangy,
-  SEARCH_HANDOFF_DRAFT,
-} from "../searchLangyHandoff";
+import { handOffSearchToLangy, SEARCH_HANDOFF_DRAFT } from "../searchLangyHandoff";
 
 /**
  * The search bar's ask affordance handed to Langy — what a typed question and

@@ -65,10 +65,7 @@ export interface CapabilityHydrator {
 const ROW_TEXT_MAX = 90;
 
 /** A flag's value as text, whichever of its spellings the command used. */
-function queryText(
-  query: Record<string, unknown>,
-  keys: string[],
-): string | undefined {
+function queryText(query: Record<string, unknown>, keys: string[]): string | undefined {
   for (const key of keys) {
     const value = query[key];
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -161,8 +158,7 @@ async function traceByQuery({
 }): Promise<CapabilityHydration> {
   const to = queryEpochMs(query, ["end-date", "endDate"]) ?? Date.now();
   const from =
-    queryEpochMs(query, ["start-date", "startDate"]) ??
-    to - DEFAULT_SEARCH_WINDOW_MS;
+    queryEpochMs(query, ["start-date", "startDate"]) ?? to - DEFAULT_SEARCH_WINDOW_MS;
   const text = queryText(query, ["q", "query"]);
 
   const page = await utils.tracesV2.list.fetch({
@@ -185,9 +181,7 @@ async function traceByQuery({
         latencyMs: item.durationMs,
         cost: item.totalCost,
         isError: item.status === "error",
-        ...(item.output
-          ? { output: truncateRowText(item.output, ROW_TEXT_MAX) }
-          : {}),
+        ...(item.output ? { output: truncateRowText(item.output, ROW_TEXT_MAX) } : {}),
       }),
       timestamp: item.timestamp,
     })),
@@ -254,9 +248,7 @@ async function promptByIds({
     rows.push({
       id: prompt.id,
       primary: prompt.handle ?? prompt.name,
-      ...(prompt.version != null
-        ? { secondary: `version ${prompt.version}` }
-        : {}),
+      ...(prompt.version != null ? { secondary: `version ${prompt.version}` } : {}),
     });
   }
   return { rows };
@@ -283,9 +275,7 @@ async function experimentByIds({
     rows.push({
       id: experiment.slug ?? experiment.id,
       primary: experiment.name ?? experiment.slug ?? experiment.id,
-      ...(experiment.slug && experiment.name
-        ? { secondary: experiment.slug }
-        : {}),
+      ...(experiment.slug && experiment.name ? { secondary: experiment.slug } : {}),
     });
   }
   return { rows };

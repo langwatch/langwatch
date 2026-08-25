@@ -19,17 +19,15 @@ const topicRows = [
   },
 ];
 
-function makeDatabase(overrides: {
-  topicRows?: unknown[];
-  projection?: unknown;
-  history?: unknown;
-} = {}) {
-  const topicFindMany = vi
-    .fn()
-    .mockResolvedValue(overrides.topicRows ?? topicRows);
-  const statusFindUnique = vi
-    .fn()
-    .mockResolvedValue(overrides.projection ?? null);
+function makeDatabase(
+  overrides: {
+    topicRows?: unknown[];
+    projection?: unknown;
+    history?: unknown;
+  } = {},
+) {
+  const topicFindMany = vi.fn().mockResolvedValue(overrides.topicRows ?? topicRows);
+  const statusFindUnique = vi.fn().mockResolvedValue(overrides.projection ?? null);
   const historyFindUnique = vi
     .fn()
     .mockResolvedValue(

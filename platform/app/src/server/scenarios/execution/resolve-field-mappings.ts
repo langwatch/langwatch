@@ -53,17 +53,13 @@ export type ScenarioSourceField = "input" | "messages" | "threadId";
  * decide JSON treatment: `messages` is a pre-serialized JSON array (inject
  * raw), everything else is a scalar string (must be JSON-escaped).
  */
-export function sourceFieldOf(
-  mapping: FieldMapping,
-): ScenarioSourceField | null {
+export function sourceFieldOf(mapping: FieldMapping): ScenarioSourceField | null {
   if (mapping.type === "value" || mapping.sourceId !== "scenario") {
     return null;
   }
   const [rawField] = mapping.path;
   const field = LEGACY_FIELD_NAMES[rawField ?? ""] ?? rawField;
-  return field === "input" || field === "messages" || field === "threadId"
-    ? field
-    : null;
+  return field === "input" || field === "messages" || field === "threadId" ? field : null;
 }
 
 function resolveMapping({
@@ -101,9 +97,7 @@ function resolveMapping({
 }
 
 function extractLastUserMessage(agentInput: AgentInput): string {
-  const lastUserMessage = agentInput.messages.findLast(
-    (m) => m.role === "user",
-  );
+  const lastUserMessage = agentInput.messages.findLast((m) => m.role === "user");
   if (!lastUserMessage) return "";
   return typeof lastUserMessage.content === "string"
     ? lastUserMessage.content

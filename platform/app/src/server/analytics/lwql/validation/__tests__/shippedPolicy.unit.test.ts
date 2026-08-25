@@ -42,8 +42,7 @@ const GRAMMAR_EXTENSIONS = [
 ];
 
 /** Module names that would mean we had built a front end of our own. */
-const OWN_FRONT_END_PATTERN =
-  /(grammar|lexer|tokeni[sz]|compiler|codegen|\bir\b)/i;
+const OWN_FRONT_END_PATTERN = /(grammar|lexer|tokeni[sz]|compiler|codegen|\bir\b)/i;
 
 /**
  * The ADR that owns the table-function and SSRF policy.
@@ -66,9 +65,7 @@ function readManifest(): {
   dependencies: Record<string, string>;
   all: string[];
 } {
-  const manifest = JSON.parse(
-    readFileSync(join(APP_ROOT, "package.json"), "utf8"),
-  ) as {
+  const manifest = JSON.parse(readFileSync(join(APP_ROOT, "package.json"), "utf8")) as {
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
   };
@@ -126,17 +123,14 @@ describe("what the LangWatchQL API ships", () => {
       const { dependencies } = readManifest();
       const pin = dependencies["@clickhouse/parser"];
 
-      expect(
-        pin,
-        "@clickhouse/parser must be a direct dependency",
-      ).toBeDefined();
+      expect(pin, "@clickhouse/parser must be a direct dependency").toBeDefined();
       expect(
         pin,
         "a 0.x parser whose AST is the validator's security contract is pinned, not ranged",
       ).toMatch(/^\d+\.\d+\.\d+$/);
-      expect(
-        readFileSync(join(LWQL_ROOT, "validation", "parser.ts"), "utf8"),
-      ).toContain('from "@clickhouse/parser"');
+      expect(readFileSync(join(LWQL_ROOT, "validation", "parser.ts"), "utf8")).toContain(
+        'from "@clickhouse/parser"',
+      );
     });
   });
 
@@ -164,10 +158,9 @@ describe("what the LangWatchQL API ships", () => {
         policy.text,
         `${POLICY_ADR} no longer documents the table-function policy`,
       ).toMatch(TABLE_FUNCTION_PATTERN);
-      expect(
-        policy.text,
-        `${POLICY_ADR} no longer documents the SSRF policy`,
-      ).toMatch(/SSRF/i);
+      expect(policy.text, `${POLICY_ADR} no longer documents the SSRF policy`).toMatch(
+        /SSRF/i,
+      );
 
       // Both mechanisms, because the ADR's job is to stop either one being
       // mistaken for the whole boundary.
@@ -184,10 +177,7 @@ describe("what the LangWatchQL API ships", () => {
       // policy is the ambiguity worth failing on.
       expect(
         adrs
-          .filter(
-            ({ name }) =>
-              TABLE_FUNCTION_PATTERN.test(name) && /ssrf/i.test(name),
-          )
+          .filter(({ name }) => TABLE_FUNCTION_PATTERN.test(name) && /ssrf/i.test(name))
           .map(({ name }) => name),
         "a second ADR is named for the table-function and SSRF policy, so which one governs is ambiguous",
       ).toEqual([POLICY_ADR]);

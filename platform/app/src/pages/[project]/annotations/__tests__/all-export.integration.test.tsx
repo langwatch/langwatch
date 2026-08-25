@@ -167,9 +167,7 @@ describe("All annotations page", () => {
       expect(suggestionsAt).toBeGreaterThan(-1);
       expect(call.fields).not.toContain("Expected output");
       expect(call.rows[0][suggestionsAt]).toBe("a better answer");
-      expect(call.rows[1][suggestionsAt]).toBe(
-        "Span span-abc123 · Output: thirty days",
-      );
+      expect(call.rows[1][suggestionsAt]).toBe("Span span-abc123 · Output: thirty days");
       expect(call.rows[2][suggestionsAt]).toBe("");
     });
 

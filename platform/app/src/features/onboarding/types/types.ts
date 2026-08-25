@@ -25,11 +25,7 @@ export enum OnboardingFlowDirection {
   BACKWARD = -1,
 }
 
-export const USAGE_STYLES = [
-  "For myself",
-  "For my clients",
-  "For my company",
-] as const;
+export const USAGE_STYLES = ["For myself", "For my clients", "For my company"] as const;
 export const COMPANY_SIZES = [
   "1_to_10",
   "11_to_50",

@@ -7,9 +7,7 @@ import {
 } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 
-const logger = createLogger(
-  "langwatch:trace-processing:origin-guarded-subscriber",
-);
+const logger = createLogger("langwatch:trace-processing:origin-guarded-subscriber");
 
 const OLD_TRACE_THRESHOLD_MS = 60 * 60 * 1000;
 
@@ -54,10 +52,7 @@ export function passesTraceOriginGuards(
   //    even on a genuine new span. Checks the TRACE START
   //    (foldState.occurredAt), not event.occurredAt — a re-emitted or late
   //    event is fresh, but the trace itself is days old.
-  if (
-    foldState.occurredAt > 0 &&
-    foldState.occurredAt < Date.now() - MAX_TRACE_AGE_MS
-  ) {
+  if (foldState.occurredAt > 0 && foldState.occurredAt < Date.now() - MAX_TRACE_AGE_MS) {
     return false;
   }
 
@@ -127,8 +122,7 @@ export function defineOriginGuardedTraceSubscriber(opts: {
     event: TraceProcessingEvent,
     context: TriggerContext<TraceSummaryData>,
   ): boolean =>
-    passesTraceOriginGuards(event, context.state) &&
-    (opts.isRelevant?.(event) ?? true);
+    passesTraceOriginGuards(event, context.state) && (opts.isRelevant?.(event) ?? true);
 
   return {
     name: opts.name,

@@ -10,10 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { BarChart2 } from "lucide-react";
 import { Fragment, useCallback } from "react";
-import {
-  CustomGraph,
-  type CustomGraphInput,
-} from "~/components/analytics/CustomGraph";
+import { CustomGraph, type CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import GraphsLayout from "~/components/GraphsLayout";
 import { Link } from "~/components/ui/link";
@@ -290,9 +287,7 @@ const renderGridItems = (
               <HStack gap={2}>
                 <BarChart2 color="orange" />
                 <Heading size="sm">{check.name}</Heading>
-                {traceCheck && (
-                  <Text fontWeight={300}>- {traceCheck.name}</Text>
-                )}
+                {traceCheck && <Text fontWeight={300}>- {traceCheck.name}</Text>}
               </HStack>
               {!check.enabled && (
                 <Text color="gray" fontSize="sm">
@@ -348,15 +343,11 @@ function EvaluationsContent() {
     { enabled: !!project },
   );
   const selectedEvaluationId =
-    typeof router.query.evaluationId === "string"
-      ? router.query.evaluationId
-      : undefined;
+    typeof router.query.evaluationId === "string" ? router.query.evaluationId : undefined;
   const selectedEvaluation = checks.data?.find(
     (check) => check.id === selectedEvaluationId,
   );
-  const visibleChecks = selectedEvaluation
-    ? [selectedEvaluation]
-    : (checks.data ?? []);
+  const visibleChecks = selectedEvaluation ? [selectedEvaluation] : (checks.data ?? []);
 
   const handleGraphClick = useCallback(
     (params: {
@@ -405,8 +396,7 @@ function EvaluationsContent() {
         }
       } else if (isCategoryEvaluator && params.groupKey) {
         // For category evaluators, filter by label
-        filterParams[`evaluation_label.${params.evaluatorId}`] =
-          params.groupKey;
+        filterParams[`evaluation_label.${params.evaluatorId}`] = params.groupKey;
       }
 
       // Add date range filter if provided (for bar chart drill-down)
@@ -441,9 +431,7 @@ function EvaluationsContent() {
           <Alert.Content>
             <Alert.Title>No online evaluations yet</Alert.Title>
             <Alert.Description>
-              <Text as="span">
-                Online evaluation results will be displayed here.{" "}
-              </Text>
+              <Text as="span">Online evaluation results will be displayed here. </Text>
               <Link href={`/${project?.slug}/online-evaluations`}>
                 Set up an online evaluation
               </Link>

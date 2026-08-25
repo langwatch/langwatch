@@ -66,9 +66,8 @@ vi.mock("~/utils/api", () => ({
 }));
 
 const { TracesMapping } = await import("../TracesMapping");
-const { EvaluatorTracesMapping } = await import(
-  "../../evaluations/EvaluatorTracesMapping"
-);
+const { EvaluatorTracesMapping } =
+  await import("../../evaluations/EvaluatorTracesMapping");
 
 const TRACE_IN_A_THREAD = {
   trace_id: "trace-1",

@@ -84,9 +84,7 @@ describe("getWorkerMetricsPort", () => {
 
     it("throws an error for port below valid range", () => {
       process.env.WORKER_METRICS_PORT = "0";
-      expect(() => getWorkerMetricsPort()).toThrow(
-        'Invalid WORKER_METRICS_PORT: "0"',
-      );
+      expect(() => getWorkerMetricsPort()).toThrow('Invalid WORKER_METRICS_PORT: "0"');
     });
 
     it("throws an error for port above valid range", () => {
@@ -139,15 +137,11 @@ describe("isMetricsAuthorized", () => {
     });
 
     it("authorizes a matching bearer token", () => {
-      expect(
-        isMetricsAuthorized(requestWithAuth("Bearer the-metrics-key")),
-      ).toBe(true);
+      expect(isMetricsAuthorized(requestWithAuth("Bearer the-metrics-key"))).toBe(true);
     });
 
     it("rejects a mismatched bearer token", () => {
-      expect(isMetricsAuthorized(requestWithAuth("Bearer wrong-key"))).toBe(
-        false,
-      );
+      expect(isMetricsAuthorized(requestWithAuth("Bearer wrong-key"))).toBe(false);
     });
 
     it("rejects a request with no Authorization header", () => {
@@ -156,9 +150,7 @@ describe("isMetricsAuthorized", () => {
 
     it("authorizes a matching bearer token in production too", () => {
       vi.stubEnv("NODE_ENV", "production");
-      expect(
-        isMetricsAuthorized(requestWithAuth("Bearer the-metrics-key")),
-      ).toBe(true);
+      expect(isMetricsAuthorized(requestWithAuth("Bearer the-metrics-key"))).toBe(true);
     });
   });
 
@@ -172,9 +164,9 @@ describe("isMetricsAuthorized", () => {
 describe("normalizeMetricsPath", () => {
   describe("when the path carries entity IDs", () => {
     it("collapses prefixed entity ids to {id}", () => {
-      expect(
-        normalizeMetricsPath("/api/traces/trace_MWS36ZJSXeAGyj5zXLk7M"),
-      ).toBe("/api/traces/{id}");
+      expect(normalizeMetricsPath("/api/traces/trace_MWS36ZJSXeAGyj5zXLk7M")).toBe(
+        "/api/traces/{id}",
+      );
       expect(normalizeMetricsPath("/api/prompts/prompt_Ab12Cd34Ef56")).toBe(
         "/api/prompts/{id}",
       );
@@ -182,9 +174,7 @@ describe("normalizeMetricsPath", () => {
 
     it("collapses hex trace ids to {id}", () => {
       expect(
-        normalizeMetricsPath(
-          "/api/trace/search/traces/957239e7ddb315d5518a4792601c3d67",
-        ),
+        normalizeMetricsPath("/api/trace/search/traces/957239e7ddb315d5518a4792601c3d67"),
       ).toBe("/api/trace/search/traces/{id}");
     });
 
@@ -209,15 +199,11 @@ describe("normalizeMetricsPath", () => {
     });
 
     it("collapses unprefixed nanoid tokens to {id}", () => {
-      expect(normalizeMetricsPath("/share/oS6jK-KV33KjjGwZ1aKq8")).toBe(
-        "/share/{id}",
-      );
+      expect(normalizeMetricsPath("/share/oS6jK-KV33KjjGwZ1aKq8")).toBe("/share/{id}");
     });
 
     it("collapses digit-free nanoid tokens to {id}", () => {
-      expect(normalizeMetricsPath("/share/oSjKKVKjjGwZaKqBt")).toBe(
-        "/share/{id}",
-      );
+      expect(normalizeMetricsPath("/share/oSjKKVKjjGwZaKqBt")).toBe("/share/{id}");
     });
 
     it("keeps the id inside a longer route template", () => {
@@ -229,9 +215,7 @@ describe("normalizeMetricsPath", () => {
 
   describe("when the path is a static route", () => {
     it("keeps route words untouched", () => {
-      expect(normalizeMetricsPath("/api/evaluations/list")).toBe(
-        "/api/evaluations/list",
-      );
+      expect(normalizeMetricsPath("/api/evaluations/list")).toBe("/api/evaluations/list");
       expect(normalizeMetricsPath("/api/prompts/tags/production")).toBe(
         "/api/prompts/tags/production",
       );

@@ -6,16 +6,16 @@ sidebarTitle: Open-core licensing
 
 LangWatch is open-core. Some governance surfaces work for every self-hosted deployment under the **Apache 2.0** license; others require a paid **Enterprise** plan. Use this map when planning a rollout:
 
-| Surface | License | Notes |
-|---|---|---|
-| [Personal IDE keys](/ai-gateway/governance/personal-keys) | Apache 2.0 | Always available. The Personal Virtual Key + `langwatch login` flow is the open-core floor. |
-| [AI Tools Portal at `/me`](/ai-governance/personal-portal/overview) | Apache 2.0 | Always available. Catalog editor at `/governance/tool-catalog`, three tile classes, admin-curated. |
-| [Routing Policies](/ai-gateway/governance/routing-policies) | Apache 2.0 | Always available. The gateway-side policy chain is core. |
-| [CLI debugging](/ai-governance/cli-debug) | Apache 2.0 | Always available. CLI 409, 401, 403 catalog. |
-| [Ingestion Sources](/ai-governance/ingestion-sources/index) | Enterprise | The `otel_generic` source type at the platform default retention window is available on the Apache 2.0 floor; multiple sources and configurable retention require Enterprise. |
-| [Anomaly Rules](/ai-governance/anomaly-rules) | Enterprise | Admin-curated detection rules + dispatch (Slack, PagerDuty, SIEM). |
-| [Compliance architecture](/ai-governance/compliance-architecture) | Enterprise | OCSF, SIEM export, multi-class retention, tamper-evidence (post-GA follow-up). |
-| Gateway webhooks | Enterprise | Signed delivery of AI Gateway spend and budget events to your own systems, with retries, replay and a delivery log. This is the surface platforms meter and rebill their own customers on. |
+| Surface                                                             | License    | Notes                                                                                                                                                                                      |
+| ------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [Personal IDE keys](/ai-gateway/governance/personal-keys)           | Apache 2.0 | Always available. The Personal Virtual Key + `langwatch login` flow is the open-core floor.                                                                                                |
+| [AI Tools Portal at `/me`](/ai-governance/personal-portal/overview) | Apache 2.0 | Always available. Catalog editor at `/governance/tool-catalog`, three tile classes, admin-curated.                                                                                         |
+| [Routing Policies](/ai-gateway/governance/routing-policies)         | Apache 2.0 | Always available. The gateway-side policy chain is core.                                                                                                                                   |
+| [CLI debugging](/ai-governance/cli-debug)                           | Apache 2.0 | Always available. CLI 409, 401, 403 catalog.                                                                                                                                               |
+| [Ingestion Sources](/ai-governance/ingestion-sources/index)         | Enterprise | The `otel_generic` source type at the platform default retention window is available on the Apache 2.0 floor; multiple sources and configurable retention require Enterprise.              |
+| [Anomaly Rules](/ai-governance/anomaly-rules)                       | Enterprise | Admin-curated detection rules + dispatch (Slack, PagerDuty, SIEM).                                                                                                                         |
+| [Compliance architecture](/ai-governance/compliance-architecture)   | Enterprise | OCSF, SIEM export, multi-class retention, tamper-evidence (post-GA follow-up).                                                                                                             |
+| Gateway webhooks                                                    | Enterprise | Signed delivery of AI Gateway spend and budget events to your own systems, with retries, replay and a delivery log. This is the surface platforms meter and rebill their own customers on. |
 
 In the LangWatch UI, Enterprise-only surfaces show an **"Available on Enterprise plans"** card with an upgrade CTA when the org isn't on an Enterprise plan; the same surfaces gray out the source-type dropdown to `otel_generic` for non-enterprise users.
 
@@ -23,11 +23,11 @@ In the LangWatch UI, Enterprise-only surfaces show an **"Available on Enterprise
 
 The repository tree is split 1:1 by license, so the directory a file lives in is its license:
 
-| Path | License | SPDX identifier |
-|---|---|---|
-| `sdks/typescript/`, `sdks/python/`, `mcp/typescript/` | MIT | `MIT` |
-| Inside `platform/app/ee/` | Enterprise (LangWatch EE) | `LicenseRef-LangWatch-Enterprise` |
-| Everything else | Apache 2.0 | `Apache-2.0` |
+| Path                                                  | License                   | SPDX identifier                   |
+| ----------------------------------------------------- | ------------------------- | --------------------------------- |
+| `sdks/typescript/`, `sdks/python/`, `mcp/typescript/` | MIT                       | `MIT`                             |
+| Inside `platform/app/ee/`                             | Enterprise (LangWatch EE) | `LicenseRef-LangWatch-Enterprise` |
+| Everything else                                       | Apache 2.0                | `Apache-2.0`                      |
 
 The client SDKs are MIT so that integrating LangWatch never puts a copyleft
 obligation on your own application. MIT still asks you to retain its copyright

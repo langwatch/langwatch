@@ -1,12 +1,4 @@
-import {
-  Box,
-  Code,
-  HStack,
-  Spacer,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Code, HStack, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
 import { useCallback } from "react";
 import {
   AddMessageButton,
@@ -48,9 +40,7 @@ function MessageRow({
       <HStack width="full" paddingBottom={2}>
         <MessageRoleLabel role={message.role} />
         <Spacer />
-        {canRemove && (
-          <RemoveMessageButton onRemove={onRemove} disabled={disabled} />
-        )}
+        {canRemove && <RemoveMessageButton onRemove={onRemove} disabled={disabled} />}
       </HStack>
       <Textarea
         value={message.content}
@@ -141,7 +131,5 @@ export function TestMessagesBuilder({
  * Converts messages array to JSON string for template rendering
  */
 export function messagesToJson(messages: TestMessage[]): string {
-  return JSON.stringify(
-    messages.map((m) => ({ role: m.role, content: m.content })),
-  );
+  return JSON.stringify(messages.map((m) => ({ role: m.role, content: m.content })));
 }

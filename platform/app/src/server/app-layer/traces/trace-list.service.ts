@@ -450,13 +450,9 @@ interface FacetValuesResult {
   totalDistinct: number;
 }
 
-const discoverLogger = createLogger(
-  "langwatch:app-layer:traces:trace-list-discover",
-);
+const discoverLogger = createLogger("langwatch:app-layer:traces:trace-list-discover");
 
-function isExpressionCategorical(
-  def: FacetDefinition,
-): def is ExpressionCategoricalDef {
+function isExpressionCategorical(def: FacetDefinition): def is ExpressionCategoricalDef {
   return def.kind === "categorical" && "expression" in def;
 }
 
@@ -540,9 +536,7 @@ export class TraceListService {
     });
 
     const hasMore = result.rows.length > params.pageSize;
-    const visibleRows = hasMore
-      ? result.rows.slice(0, params.pageSize)
-      : result.rows;
+    const visibleRows = hasMore ? result.rows.slice(0, params.pageSize) : result.rows;
     const items = visibleRows.map((row) => mapToTraceListItem(row));
     const traceIds = items.map((item) => item.traceId);
 
@@ -557,8 +551,7 @@ export class TraceListService {
     // untouched. Labels are user-authored metadata strings, so they're gated
     // alongside the content fields to avoid leaking through on old traces.
     const gatedItems =
-      params.visibilityCutoffMs === null ||
-      params.visibilityCutoffMs === undefined
+      params.visibilityCutoffMs === null || params.visibilityCutoffMs === undefined
         ? items
         : items.map((item) =>
             item.timestamp < params.visibilityCutoffMs!
@@ -714,10 +707,7 @@ export class TraceListService {
     return { facets: [], pending: true };
   }
 
-  private refreshDiscoverInBackground(
-    params: DiscoverParams,
-    cacheKey: string,
-  ): void {
+  private refreshDiscoverInBackground(params: DiscoverParams, cacheKey: string): void {
     // Per-pod dedup: avoid stacking redundant background refreshes on
     // the same key inside this process. Cross-pod dedup uses
     // `DISCOVER_CACHE.claim()` (a Redis SET NX EX leadership lease) so
@@ -735,10 +725,7 @@ export class TraceListService {
         // refresh attempt — if we lose the claim, another pod is
         // already on it and its write will hydrate the value cache for
         // every reader.
-        const claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(
-          cacheKey,
-          Date.now(),
-        );
+        const claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(cacheKey, Date.now());
         if (!claimed) return;
 
         const fresh = await this.computeDiscover(params);
@@ -780,9 +767,7 @@ export class TraceListService {
     })();
   }
 
-  private async computeDiscover(
-    params: DiscoverParams,
-  ): Promise<FacetDescriptor[]> {
+  private async computeDiscover(params: DiscoverParams): Promise<FacetDescriptor[]> {
     const TOP_N = 50;
     // Distinct integer values fetched per `isDiscrete`-flagged facet. The exact
     // distinct count comes back regardless of this cap, so the sidebar can
@@ -803,10 +788,7 @@ export class TraceListService {
 
     for (const def of FACET_REGISTRY) {
       if (def.kind === "categorical") {
-        if (
-          isExpressionCategorical(def) &&
-          !def.expression.includes("arrayJoin")
-        ) {
+        if (isExpressionCategorical(def) && !def.expression.includes("arrayJoin")) {
           const slot = batched.get(def.table) ?? {
             categoricals: [],
             ranges: [],
@@ -908,13 +890,11 @@ export class TraceListService {
               column: def.expression,
               limit: DISCRETE_VALUE_LIMIT,
             })
-            .then(
-              (result): Outcome => ({
-                kind: "discrete",
-                key: def.key,
-                result,
-              }),
-            ),
+            .then((result): Outcome => ({
+              kind: "discrete",
+              key: def.key,
+              result,
+            })),
         ),
       );
     }
@@ -1283,8 +1263,7 @@ function cursorForTraceRow(
       sortValue = row.spanCount;
       break;
     case "TotalTokens":
-      sortValue =
-        (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);
+      sortValue = (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);
       break;
     case "TimeToFirstTokenMs":
       sortValue = row.timeToFirstTokenMs ?? 0;
@@ -1307,9 +1286,7 @@ function cursorForTraceRow(
 }
 
 /** Parsed refs, or undefined so media-free rows serialize without the field. */
-function presentMediaRefs(
-  serialized: string | undefined,
-): TraceMediaRef[] | undefined {
+function presentMediaRefs(serialized: string | undefined): TraceMediaRef[] | undefined {
   const refs = parseMediaRefs(serialized);
   return refs.length > 0 ? refs : undefined;
 }
@@ -1360,9 +1337,7 @@ export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     input: row.computedInput,
     output: row.computedOutput,
     inputMediaRefs: presentMediaRefs(row.attributes[RESERVED_INPUT_MEDIA_REFS]),
-    outputMediaRefs: presentMediaRefs(
-      row.attributes[RESERVED_OUTPUT_MEDIA_REFS],
-    ),
+    outputMediaRefs: presentMediaRefs(row.attributes[RESERVED_OUTPUT_MEDIA_REFS]),
     error: row.errorMessage,
     conversationId: row.attributes["gen_ai.conversation.id"] ?? null,
     userId: row.attributes["langwatch.user_id"] ?? null,

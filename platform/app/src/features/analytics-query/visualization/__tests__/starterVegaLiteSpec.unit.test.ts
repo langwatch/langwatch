@@ -15,10 +15,7 @@ import {
   starterVegaLiteSpecText,
 } from "../starterVegaLiteSpec";
 import { validateVegaLiteSpec } from "../validateVegaLiteSpec";
-import type {
-  DatasetRowCounts,
-  LangWatchQLDatasetColumn,
-} from "../visualization.types";
+import type { DatasetRowCounts, LangWatchQLDatasetColumn } from "../visualization.types";
 
 const DATASET = "query_result";
 const ROWS: DatasetRowCounts = { [DATASET]: 12 };
@@ -62,10 +59,7 @@ const shapeNamed = (name: string): readonly LangWatchQLDatasetColumn[] => {
   return shape.columns;
 };
 
-const validate = (
-  spec: unknown,
-  columns: readonly LangWatchQLDatasetColumn[],
-) =>
+const validate = (spec: unknown, columns: readonly LangWatchQLDatasetColumn[]) =>
   validateVegaLiteSpec({
     spec,
     columnsByDataset: { [DATASET]: columns },

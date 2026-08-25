@@ -167,9 +167,7 @@ export function daemonSocketDir(): string {
  * the daemon can never disagree about what "the endpoint" is — a drift there
  * would silently key two identical invocations to two different daemons.
  */
-export function resolveIdentity(
-  env: NodeJS.ProcessEnv = process.env,
-): DaemonIdentity {
+export function resolveIdentity(env: NodeJS.ProcessEnv = process.env): DaemonIdentity {
   const endpoint = resolveControlPlaneUrl();
   const apiKey = env.LANGWATCH_API_KEY ?? "";
   const uid = typeof process.getuid === "function" ? process.getuid() : 0;
@@ -325,9 +323,7 @@ function hasLooseMode(mode: number): boolean {
  * group-writable `$HOME` is a broken machine, and one this CLI degrades safely
  * on rather than pretends to fix.
  */
-export function inspectSocketTrust(
-  socketPath: string,
-): SocketTrustProblem | null {
+export function inspectSocketTrust(socketPath: string): SocketTrustProblem | null {
   // No POSIX ownership to check (and the daemon is disabled there anyway).
   if (typeof process.getuid !== "function") return null;
   const uid = process.getuid();

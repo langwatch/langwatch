@@ -53,9 +53,9 @@ function record(): CanonicalLogRecord {
 
 describe("CanonicalLogRecordClickHouseRepository", () => {
   it("writes the authoritative row before the payload-free usage estimate", async () => {
-    const insert = vi.fn<
-      (args: { table: string; values: unknown[] }) => Promise<void>
-    >(async () => undefined);
+    const insert = vi.fn<(args: { table: string; values: unknown[] }) => Promise<void>>(
+      async () => undefined,
+    );
     const repository = new CanonicalLogRecordClickHouseRepository(
       async () => ({ insert }) as never,
     );
@@ -88,9 +88,9 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
 
   describe("given a coding-agent log record", () => {
     it("stamps it on the caller's retention like any other", async () => {
-      const insert = vi.fn<
-        (args: { table: string; values: unknown[] }) => Promise<void>
-      >(async () => undefined);
+      const insert = vi.fn<(args: { table: string; values: unknown[] }) => Promise<void>>(
+        async () => undefined,
+      );
       const repository = new CanonicalLogRecordClickHouseRepository(
         async () => ({ insert }) as never,
       );
@@ -108,9 +108,9 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
   });
 
   it("writes a same-tenant batch with two ClickHouse inserts total", async () => {
-    const insert = vi.fn<
-      (args: { table: string; values: unknown[] }) => Promise<void>
-    >(async () => undefined);
+    const insert = vi.fn<(args: { table: string; values: unknown[] }) => Promise<void>>(
+      async () => undefined,
+    );
     const repository = new CanonicalLogRecordClickHouseRepository(
       async () => ({ insert }) as never,
     );
@@ -181,9 +181,7 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
 
     /** @scenario "Codex events are rendered whichever way the agent named them" */
     it("backfills event.name so attribute-keyed readers can recognise the record", async () => {
-      const [log] = await readOneRow(
-        storedRow({ EventName: "codex.tool_result" }),
-      );
+      const [log] = await readOneRow(storedRow({ EventName: "codex.tool_result" }));
 
       expect(log?.attributes["event.name"]).toBe("codex.tool_result");
     });

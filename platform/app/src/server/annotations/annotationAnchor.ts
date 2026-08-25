@@ -31,9 +31,7 @@ export const annotationAnchorColumnsSchema = z.object({
   anchorPath: z.string().min(1).optional(),
 });
 
-export type AnnotationAnchorColumns = z.infer<
-  typeof annotationAnchorColumnsSchema
->;
+export type AnnotationAnchorColumns = z.infer<typeof annotationAnchorColumnsSchema>;
 
 /**
  * Refuses half an anchor. A kind without the element it names would store a
@@ -141,10 +139,7 @@ export function withReadableAnnotationAnchor<
  * The fields a suggestion can correct. A trace and a span spell their captured
  * input and output the same way, so one union names both.
  */
-export type AnnotationSuggestionField = Extract<
-  TraceEditSpanField,
-  "input" | "output"
->;
+export type AnnotationSuggestionField = Extract<TraceEditSpanField, "input" | "output">;
 
 /**
  * Where a suggestion left with a comment belongs in the trace's correction.

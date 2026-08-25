@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
@@ -25,9 +17,7 @@ export function SingleAggregateReplay({
 
   const [aggregateId, setAggregateId] = useState("");
   const [tenantId, setTenantId] = useState("");
-  const [selectedProjections, setSelectedProjections] = useState<Set<string>>(
-    new Set(),
-  );
+  const [selectedProjections, setSelectedProjections] = useState<Set<string>>(new Set());
   const [since] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 3);
@@ -96,12 +86,8 @@ export function SingleAggregateReplay({
             <Badge
               key={p.projectionName}
               size="sm"
-              variant={
-                selectedProjections.has(p.projectionName) ? "solid" : "outline"
-              }
-              colorPalette={
-                selectedProjections.has(p.projectionName) ? "orange" : "gray"
-              }
+              variant={selectedProjections.has(p.projectionName) ? "solid" : "outline"}
+              colorPalette={selectedProjections.has(p.projectionName) ? "orange" : "gray"}
               cursor="pointer"
               onClick={() => toggleProjection(p.projectionName)}
             >
@@ -134,8 +120,7 @@ export function SingleAggregateReplay({
           Replay Single
         </Button>
         <Text textStyle="xs" color="fg.muted">
-          Replays selected projections for a single tenant (events from last 3
-          months)
+          Replays selected projections for a single tenant (events from last 3 months)
         </Text>
       </HStack>
     </VStack>

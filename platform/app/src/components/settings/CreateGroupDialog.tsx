@@ -40,11 +40,10 @@ export function CreateGroupDialog({
   const [addMemberId, setAddMemberId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
 
-  const orgMembers =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      { organizationId },
-      { enabled: open },
-    );
+  const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+    { organizationId },
+    { enabled: open },
+  );
 
   const createGroup = api.group.create.useMutation();
 
@@ -149,9 +148,7 @@ export function CreateGroupDialog({
                         color="fg.muted"
                         aria-label={`Remove ${b.customRoleName ?? b.role} binding on ${b.scopeName ?? b.scopeId}`}
                         onClick={() =>
-                          setPendingBindings((prev) =>
-                            prev.filter((_, j) => j !== i),
-                          )
+                          setPendingBindings((prev) => prev.filter((_, j) => j !== i))
                         }
                       >
                         <X size={14} />

@@ -50,13 +50,7 @@ function makeDeps({
 
 const WINDOW = { from: 0, to: 3_600_000 };
 
-function run({
-  deps,
-  source,
-}: {
-  deps: ReportChartDeps;
-  source: ReportSource;
-}) {
+function run({ deps, source }: { deps: ReportChartDeps; source: ReportSource }) {
   return loadReportCharts({ deps, source, projectId: "proj-1", ...WINDOW });
 }
 

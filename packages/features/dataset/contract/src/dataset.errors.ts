@@ -17,15 +17,15 @@ export class DatasetNotReadyError extends Error {
   readonly statusError: string | null;
 
   constructor(
-    options: { status?: string | null; statusError?: string | null } | string =
-      "Dataset is not ready",
+    options:
+      | { status?: string | null; statusError?: string | null }
+      | string = "Dataset is not ready",
   ) {
     const message = typeof options === "string" ? options : "Dataset is not ready";
     super(message);
     this.name = "DatasetNotReadyError";
-    this.status = typeof options === "string" ? null : options.status ?? null;
-    this.statusError =
-      typeof options === "string" ? null : options.statusError ?? null;
+    this.status = typeof options === "string" ? null : (options.status ?? null);
+    this.statusError = typeof options === "string" ? null : (options.statusError ?? null);
   }
 }
 

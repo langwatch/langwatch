@@ -48,8 +48,9 @@ export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
   });
 
   const [state, setState] = useState<CacheRuleFormState>(emptyFormState());
-  const [fieldComplaint, setFieldComplaint] =
-    useState<CacheRuleFormComplaint | null>(null);
+  const [fieldComplaint, setFieldComplaint] = useState<CacheRuleFormComplaint | null>(
+    null,
+  );
 
   useEffect(() => {
     if (rule) {

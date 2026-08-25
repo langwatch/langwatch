@@ -44,12 +44,8 @@ describe("parseHandledError, given dialect 1 (the flattened Hono handler body)",
     const parsed = parseHandledError({ status: 404, body });
 
     expect(parsed.traceId).toBe(TRACE_ID);
-    expect(parsed.traceUrl).toBe(
-      "https://grafana.example.com/explore?traceId=4bf",
-    );
-    expect(parsed.logsUrl).toBe(
-      "https://grafana.example.com/explore?logs=4bf",
-    );
+    expect(parsed.traceUrl).toBe("https://grafana.example.com/explore?traceId=4bf");
+    expect(parsed.logsUrl).toBe("https://grafana.example.com/explore?logs=4bf");
     expect(parsed.meta).toEqual({ id: "sales-q3" });
   });
 
@@ -166,7 +162,11 @@ describe("parseHandledError, given dialect 3 (the new framework envelope)", () =
     // degrades a perfectly well-named error to a status-derived guess.
     const parsed = parseHandledError({
       status: 404,
-      body: { type: "dataset_not_found", message: "dataset_not_found", meta: { id: "ds_1" } },
+      body: {
+        type: "dataset_not_found",
+        message: "dataset_not_found",
+        meta: { id: "ds_1" },
+      },
     });
 
     expect(parsed.code).toBe("dataset_not_found");
@@ -328,9 +328,7 @@ describe("parseHandledError, given the platform's remediation channel", () => {
       },
     });
 
-    expect(parsed.suggestions).toEqual([
-      "Run `lw dataset list` to see what exists",
-    ]);
+    expect(parsed.suggestions).toEqual(["Run `lw dataset list` to see what exists"]);
     expect(parsed.docUrl).toBe("https://docs.langwatch.ai/datasets");
   });
 });
@@ -421,9 +419,7 @@ describe("the JSON error document round-trip", () => {
       },
     });
 
-    const read = readCliErrorDocument(
-      JSON.stringify(toCliErrorDocument(parsed)),
-    );
+    const read = readCliErrorDocument(JSON.stringify(toCliErrorDocument(parsed)));
 
     expect(read).toEqual(parsed);
   });
@@ -726,46 +722,42 @@ describe("isTerminalFailure", () => {
   describe("given a failure no argument can change", () => {
     it("calls a plan limit terminal", () => {
       expect(
-        isTerminalFailure(
-          failure({ status: 403, code: "resource_limit_exceeded" }),
-        ),
+        isTerminalFailure(failure({ status: 403, code: "resource_limit_exceeded" })),
       ).toBe(true);
     });
 
     it("calls a refused permission terminal", () => {
       expect(
-        isTerminalFailure(
-          failure({ status: 403, code: "api_key_permission_denied" }),
-        ),
+        isTerminalFailure(failure({ status: 403, code: "api_key_permission_denied" })),
       ).toBe(true);
     });
 
     it("calls a missing resource terminal", () => {
-      expect(
-        isTerminalFailure(failure({ status: 404, code: "dataset_not_found" })),
-      ).toBe(true);
+      expect(isTerminalFailure(failure({ status: 404, code: "dataset_not_found" }))).toBe(
+        true,
+      );
     });
   });
 
   describe("given a failure a different request could fix", () => {
     it("leaves a validation error open, since the fields can be corrected", () => {
-      expect(
-        isTerminalFailure(failure({ status: 422, code: "validation_error" })),
-      ).toBe(false);
+      expect(isTerminalFailure(failure({ status: 422, code: "validation_error" }))).toBe(
+        false,
+      );
     });
 
     it("leaves rate limiting open, since waiting is a fix", () => {
-      expect(
-        isTerminalFailure(failure({ status: 429, code: "rate_limited" })),
-      ).toBe(false);
+      expect(isTerminalFailure(failure({ status: 429, code: "rate_limited" }))).toBe(
+        false,
+      );
     });
   });
 
   describe("given a failure that is ours", () => {
     it("never calls our own outage the caller's dead end", () => {
-      expect(
-        isTerminalFailure(failure({ status: 503, code: "internal_error" })),
-      ).toBe(false);
+      expect(isTerminalFailure(failure({ status: 503, code: "internal_error" }))).toBe(
+        false,
+      );
     });
 
     it("never trusts a status read off something we did not answer with", () => {
@@ -786,9 +778,7 @@ describe("isTerminalFailure", () => {
     });
 
     it("states it for the retryable failures too, rather than omitting it", () => {
-      const document = toCliErrorDocument(
-        failure({ status: 429, code: "rate_limited" }),
-      );
+      const document = toCliErrorDocument(failure({ status: 429, code: "rate_limited" }));
       expect(document.error.terminal).toBe(false);
     });
   });

@@ -71,8 +71,7 @@ const turn = (): UIMessage =>
         toolCallId: "call-1",
         state: "output-error",
         input: {
-          command:
-            "langwatch scenario create 'New scenario' --situation x --format json",
+          command: "langwatch scenario create 'New scenario' --situation x --format json",
         },
         errorText: limitFailure,
       },
@@ -114,9 +113,7 @@ describe("a tool call refused on a plan limit", () => {
   describe("when the viewer can change the plan", () => {
     it("offers the upgrade as the card's action", () => {
       renderTurn();
-      expect(
-        screen.getByRole("button", { name: /upgrade plan/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: /upgrade plan/i })).toBeTruthy();
     });
 
     it("navigates in-app rather than reloading the page", () => {
@@ -158,9 +155,7 @@ describe("a tool call refused on a plan limit", () => {
 
     it("offers no upgrade action they would be refused at", () => {
       renderTurn();
-      expect(
-        screen.queryByRole("button", { name: /upgrade plan/i }),
-      ).toBeNull();
+      expect(screen.queryByRole("button", { name: /upgrade plan/i })).toBeNull();
     });
 
     it("tells them who to ask", () => {

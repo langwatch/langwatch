@@ -324,11 +324,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
         createdAt: 3000,
       });
 
-      await store.storeEvents(
-        [event1, event2, event3, event4],
-        context,
-        aggregateType,
-      );
+      await store.storeEvents([event1, event2, event3, event4], context, aggregateType);
 
       // Count events before event4 (timestamp 3000)
       const count = await store.countEventsBefore(

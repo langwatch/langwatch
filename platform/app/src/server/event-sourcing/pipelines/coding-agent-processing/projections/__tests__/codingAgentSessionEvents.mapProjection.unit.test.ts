@@ -295,9 +295,7 @@ describe("CodingAgentSessionEventsMapProjection", () => {
 
       for (const event of contributionsInBothSpellings(admittedNames)) {
         expect(mapsToCodingAgentSessionEvent(event as Event)).toBe(true);
-        expect(
-          projection.mapCodingAgentSessionLogFactsContributed(event),
-        ).not.toBeNull();
+        expect(projection.mapCodingAgentSessionLogFactsContributed(event)).not.toBeNull();
       }
     });
 
@@ -322,18 +320,14 @@ describe("CodingAgentSessionEventsMapProjection", () => {
       expect(rejected.length).toBeGreaterThan(0);
 
       for (const event of rejected) {
-        expect(
-          projection.mapCodingAgentSessionLogFactsContributed(event),
-        ).toBeNull();
+        expect(projection.mapCodingAgentSessionLogFactsContributed(event)).toBeNull();
       }
     });
 
     it("declines the records that dominate a real session", () => {
       for (const name of DECLINED_WIRE_NAMES) {
         expect(
-          mapsToCodingAgentSessionEvent(
-            logFactsEvent({ "event.name": name }) as Event,
-          ),
+          mapsToCodingAgentSessionEvent(logFactsEvent({ "event.name": name }) as Event),
         ).toBe(false);
       }
     });

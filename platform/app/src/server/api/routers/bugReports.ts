@@ -15,10 +15,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
  * read is audit-logged: reports carry reporter-submitted transcripts and
  * contact emails.
  */
-const requireAdmin = (
-  user: { email?: string | null },
-  ops: OpsService,
-) => {
+const requireAdmin = (user: { email?: string | null }, ops: OpsService) => {
   if (!ops.isAdmin(user)) {
     throw new TRPCError({
       code: "FORBIDDEN",

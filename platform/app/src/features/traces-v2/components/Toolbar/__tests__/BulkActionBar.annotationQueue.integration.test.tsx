@@ -19,10 +19,7 @@ vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
 }));
 vi.mock("~/features/langy/stores/langyStore", () => ({
   useLangyStore: (
-    selector: (s: {
-      attachContext: () => void;
-      openPanel: () => void;
-    }) => unknown,
+    selector: (s: { attachContext: () => void; openPanel: () => void }) => unknown,
   ) => selector({ attachContext: vi.fn(), openPanel: vi.fn() }),
 }));
 vi.mock("~/hooks/useDrawer", () => ({
@@ -43,14 +40,9 @@ vi.mock("~/components/me/usePersonalFeatureGate", () => ({
 // The dialog is covered on its own; here we only care that the bar hands it
 // the right traces at the right moment.
 vi.mock("../../AddToAnnotationQueueDialog", () => ({
-  AddToAnnotationQueueDialog: (props: {
-    open: boolean;
-    traceIds: string[];
-  }) => {
+  AddToAnnotationQueueDialog: (props: { open: boolean; traceIds: string[] }) => {
     return props.open ? (
-      <div data-testid="annotation-queue-dialog">
-        {props.traceIds.join(",")}
-      </div>
+      <div data-testid="annotation-queue-dialog">{props.traceIds.join(",")}</div>
     ) : null;
   },
 }));
@@ -70,8 +62,7 @@ const renderBar = () =>
     </ChakraProvider>,
   );
 
-const buttonNames = () =>
-  screen.getAllByRole("button").map((b) => b.textContent ?? "");
+const buttonNames = () => screen.getAllByRole("button").map((b) => b.textContent ?? "");
 
 beforeEach(() => {
   mocks.permissions = new Set<string>(["annotations:create"]);
@@ -88,9 +79,7 @@ describe("BulkActionBar add to annotation queue", () => {
 
       const names = buttonNames();
       const context = names.findIndex((n) => n.includes("Add to context"));
-      const queue = names.findIndex((n) =>
-        n.includes("Add to annotation queue"),
-      );
+      const queue = names.findIndex((n) => n.includes("Add to annotation queue"));
       const dataset = names.findIndex((n) => n.includes("Add to dataset"));
 
       expect(queue).toBeGreaterThan(context);
@@ -103,17 +92,13 @@ describe("BulkActionBar add to annotation queue", () => {
         useSelectionStore.getState().setMany(["t1", "t2", "t3"], true);
         renderBar();
 
-        expect(
-          screen.queryByTestId("annotation-queue-dialog"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("annotation-queue-dialog")).not.toBeInTheDocument();
 
-        fireEvent.click(
-          screen.getByRole("button", { name: /Add to annotation queue/ }),
+        fireEvent.click(screen.getByRole("button", { name: /Add to annotation queue/ }));
+
+        expect(await screen.findByTestId("annotation-queue-dialog")).toHaveTextContent(
+          "t1,t2,t3",
         );
-
-        expect(
-          await screen.findByTestId("annotation-queue-dialog"),
-        ).toHaveTextContent("t1,t2,t3");
       });
     });
   });
@@ -141,9 +126,7 @@ describe("BulkActionBar add to annotation queue", () => {
       expect(
         screen.queryByRole("button", { name: /Add to annotation queue/ }),
       ).not.toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /Add to dataset/ }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Add to dataset/ })).toBeInTheDocument();
     });
   });
 });

@@ -1,10 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import {
-  canonicalErrorFor,
-  requestTraceIds,
-} from "../../shared/canonical-error";
+import { canonicalErrorFor, requestTraceIds } from "../../shared/canonical-error";
 
 const logger = createLogger("langwatch:api:webhooks:errors");
 

@@ -283,9 +283,9 @@ describe("sharedTrace.get", () => {
         resetAt: 0,
       });
 
-      await expect(
-        createAnonymousCaller().get({ token: TOKEN }),
-      ).rejects.toThrow(/too often/i);
+      await expect(createAnonymousCaller().get({ token: TOKEN })).rejects.toThrow(
+        /too often/i,
+      );
       // Refused before any work: the point of the limit is that an abusive
       // caller cannot drive the analytics reads at all.
       expect(mockResolveForViewer).not.toHaveBeenCalled();
@@ -311,9 +311,7 @@ describe("sharedTrace.get", () => {
     /** @scenario A very large trace shares its timeline without every step's detail */
     it("caps the span detail and flags the truncation", async () => {
       mockGetSpansByTraceId.mockResolvedValue(
-        Array.from({ length: SHARE_MAX_FULL_SPANS + 25 }, (_, i) =>
-          buildSpanFixture(i),
-        ),
+        Array.from({ length: SHARE_MAX_FULL_SPANS + 25 }, (_, i) => buildSpanFixture(i)),
       );
 
       const dto = await createAnonymousCaller().get({ token: TOKEN });
@@ -358,9 +356,7 @@ describe("sharedTrace.get", () => {
         buildResolvedShare({ resourceType: "THREAD" }),
       );
 
-      await expect(
-        createAnonymousCaller().get({ token: TOKEN }),
-      ).rejects.toMatchObject({
+      await expect(createAnonymousCaller().get({ token: TOKEN })).rejects.toMatchObject({
         code: "NOT_FOUND",
         message: "This share link is not available.",
       });

@@ -39,7 +39,8 @@ export const listScenariosCommand = async (): Promise<CommandResult | void> => {
         const tableData = scenarios.map((scenario) => ({
           Name: scenario.name,
           ID: scenario.id,
-          Labels: scenario.labels.length > 0 ? scenario.labels.join(", ") : chalk.gray("—"),
+          Labels:
+            scenario.labels.length > 0 ? scenario.labels.join(", ") : chalk.gray("—"),
           Criteria: `${scenario.criteria.length}`,
         }));
 

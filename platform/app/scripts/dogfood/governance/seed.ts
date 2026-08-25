@@ -61,9 +61,7 @@ function generateIngestSecret(): string {
 
 function hashIngestSecret(rawSecret: string): string {
   const pepper = env.LW_VIRTUAL_KEY_PEPPER ?? "";
-  return createHash("sha256")
-    .update(`${pepper}::${rawSecret}`)
-    .digest("base64url");
+  return createHash("sha256").update(`${pepper}::${rawSecret}`).digest("base64url");
 }
 
 async function main(): Promise<void> {

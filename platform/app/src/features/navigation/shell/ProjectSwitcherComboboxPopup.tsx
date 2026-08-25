@@ -22,19 +22,9 @@ export function ProjectComboboxPopup({
   return (
     <Portal>
       <Combobox.Positioner>
-        <Combobox.Content
-          minWidth="260px"
-          maxHeight="360px"
-          overflowY="auto"
-          padding={0}
-        >
+        <Combobox.Content minWidth="260px" maxHeight="360px" overflowY="auto" padding={0}>
           <ProjectSearchHeader />
-          <Combobox.Empty
-            paddingX={3}
-            paddingY={2}
-            color="fg.muted"
-            fontSize="13px"
-          >
+          <Combobox.Empty paddingX={3} paddingY={2} color="fg.muted" fontSize="13px">
             No projects match your search.
           </Combobox.Empty>
           <Box padding={1}>

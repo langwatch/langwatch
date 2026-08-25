@@ -1,8 +1,5 @@
 import { create } from "zustand";
-import {
-  INITIAL_STAGE,
-  type StageId,
-} from "../chapters/onboardingJourneyConfig";
+import { INITIAL_STAGE, type StageId } from "../chapters/onboardingJourneyConfig";
 
 /**
  * Consolidated onboarding state. Combines the stage state-machine, the
@@ -212,8 +209,7 @@ function loadPersisted(): PersistedShape {
               : {},
           firstTraceSpotlightFired: firstTraceFiredFrom(parsed),
           seenDrawerSpotlights:
-            parsed.seenDrawerSpotlights &&
-            typeof parsed.seenDrawerSpotlights === "object"
+            parsed.seenDrawerSpotlights && typeof parsed.seenDrawerSpotlights === "object"
               ? parsed.seenDrawerSpotlights
               : {},
         };
@@ -276,8 +272,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   setupDismissedByProject: initial.setupDismissedByProject,
   setupDisengaged: false,
   tourActive: false,
-  integrationCtaDismissedAtByProject:
-    initial.integrationCtaDismissedAtByProject,
+  integrationCtaDismissedAtByProject: initial.integrationCtaDismissedAtByProject,
   showSamplePreview: false,
   spotlightsActive: false,
   currentSpotlightId: null,
@@ -332,8 +327,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     });
     persist({
       setupDismissedByProject: next,
-      integrationCtaDismissedAtByProject:
-        get().integrationCtaDismissedAtByProject,
+      integrationCtaDismissedAtByProject: get().integrationCtaDismissedAtByProject,
       firstTraceSpotlightFired: get().firstTraceSpotlightFired,
       seenDrawerSpotlights: get().seenDrawerSpotlights,
     });
@@ -379,8 +373,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     set({ firstTraceSpotlightFired: true });
     persist({
       setupDismissedByProject: get().setupDismissedByProject,
-      integrationCtaDismissedAtByProject:
-        get().integrationCtaDismissedAtByProject,
+      integrationCtaDismissedAtByProject: get().integrationCtaDismissedAtByProject,
       firstTraceSpotlightFired: true,
       seenDrawerSpotlights: get().seenDrawerSpotlights,
     });
@@ -393,8 +386,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     set({ seenDrawerSpotlights: next });
     persist({
       setupDismissedByProject: get().setupDismissedByProject,
-      integrationCtaDismissedAtByProject:
-        get().integrationCtaDismissedAtByProject,
+      integrationCtaDismissedAtByProject: get().integrationCtaDismissedAtByProject,
       firstTraceSpotlightFired: get().firstTraceSpotlightFired,
       seenDrawerSpotlights: next,
     });
@@ -412,8 +404,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
  * journeys skip the `densityIntro` stage so the user isn't asked the same
  * one-time preference repeatedly.
  */
-const DENSITY_CONFIRMED_KEY =
-  "langwatch:traces-v2:onboarding:density-confirmed:v1";
+const DENSITY_CONFIRMED_KEY = "langwatch:traces-v2:onboarding:density-confirmed:v1";
 
 export function hasDensityBeenConfirmed(): boolean {
   if (typeof window === "undefined") return false;
@@ -439,8 +430,7 @@ export function markDensityConfirmed(): void {
  * Returning users get a hub of jump-to-this-bit buttons on the welcome
  * screen instead of the full linear narrative.
  */
-const JOURNEY_COMPLETED_KEY =
-  "langwatch:traces-v2:onboarding:journey-completed:v1";
+const JOURNEY_COMPLETED_KEY = "langwatch:traces-v2:onboarding:journey-completed:v1";
 
 export function hasCompletedJourney(): boolean {
   if (typeof window === "undefined") return false;

@@ -35,10 +35,7 @@ import {
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
-import type {
-  GetAllTracesForProjectInput,
-  TracesForProjectResult,
-} from "../types";
+import type { GetAllTracesForProjectInput, TracesForProjectResult } from "../types";
 import { openProtections } from "./open-protections";
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
@@ -53,8 +50,7 @@ vi.mock("~/server/app-layer/app", async () => {
   const app = () => ({
     clickhouse: {
       enabled: true,
-      resolveClient: (tenantId: string) =>
-        clients.getClickHouseClientForTenant(tenantId),
+      resolveClient: (tenantId: string) => clients.getClickHouseClientForTenant(tenantId),
       resolveOrganizationClient: async () => {
         throw new Error("no organization client in this suite");
       },
@@ -259,15 +255,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (ch) {
-    for (const t of [
-      liveTenant,
-      backdatedTenant,
-      tamperTenant,
-      arrivalTenant,
-    ]) {
+    for (const t of [liveTenant, backdatedTenant, tamperTenant, arrivalTenant]) {
       await ch.exec({
-        query:
-          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: t },
       });
     }
@@ -302,9 +292,7 @@ describe("updated-axis scroll when a trace is modified mid-pagination", () => {
         // may drop it, and no trace may arrive twice.
         expect(new Set(seen).size).toBe(seen.length);
         expect(seen).toContain(live.d);
-        expect([...seen].sort()).toEqual(
-          [live.a, live.b, live.c, live.d].sort(),
-        );
+        expect([...seen].sort()).toEqual([live.a, live.b, live.c, live.d].sort());
 
         // And the count handed out on page 1 must match what the scroll
         // actually delivered — otherwise a shortfall is invisible.
@@ -349,9 +337,7 @@ describe("updated-axis scroll when a trace is modified mid-pagination", () => {
         // Pin what the scroll DID deliver first. Without this the assertion
         // below passes just as happily on a scroll that returned nothing,
         // which would hide a total breakage as a known limitation.
-        expect([...seen].sort()).toEqual(
-          [backdated.a, backdated.b, backdated.c].sort(),
-        );
+        expect([...seen].sort()).toEqual([backdated.a, backdated.b, backdated.c].sort());
 
         // Asserting CURRENT behaviour against an unreachable input. A failure
         // here means something started backdating UpdatedAt — go read why
@@ -421,12 +407,8 @@ describe("updated-axis scroll when a trace is modified mid-pagination", () => {
       scrollId: string;
       scrollStart: unknown;
     }) => {
-      const cursor = JSON.parse(
-        Buffer.from(scrollId, "base64").toString("utf-8"),
-      );
-      return Buffer.from(JSON.stringify({ ...cursor, scrollStart })).toString(
-        "base64",
-      );
+      const cursor = JSON.parse(Buffer.from(scrollId, "base64").toString("utf-8"));
+      return Buffer.from(JSON.stringify({ ...cursor, scrollStart })).toString("base64");
     };
 
     for (const [label, value] of [

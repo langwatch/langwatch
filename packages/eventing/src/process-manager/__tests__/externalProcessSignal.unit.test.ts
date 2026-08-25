@@ -83,8 +83,7 @@ function definition(): ProcessDefinition<LifecycleState> {
       if (previousState.status !== "pending") {
         throw new Error(`cannot confirm ${previousState.status}`);
       }
-      const generation = (inputSignal.payload as { generation: number })
-        .generation;
+      const generation = (inputSignal.payload as { generation: number }).generation;
       return {
         state: { status: "confirming", generation },
         nextWakeAt: null,
@@ -100,9 +99,7 @@ function definition(): ProcessDefinition<LifecycleState> {
   };
 }
 
-async function initialize(
-  service: ProcessManagerService<LifecycleState>,
-): Promise<void> {
+async function initialize(service: ProcessManagerService<LifecycleState>): Promise<void> {
   const initialized = await service.handleEvent({ envelope: event(), now: T0 });
   expect(initialized.outcome).toBe("committed");
 }
@@ -220,10 +217,7 @@ describe("synchronous external process signals", () => {
       const originalCommit = store.commit.bind(store);
       let interleaved = false;
       store.commit = async (commit) => {
-        if (
-          !interleaved &&
-          commit.sourceEventId?.startsWith("external-signal:")
-        ) {
+        if (!interleaved && commit.sourceEventId?.startsWith("external-signal:")) {
           interleaved = true;
           await originalCommit({
             ref,
@@ -263,10 +257,7 @@ describe("synchronous external process signals", () => {
       const originalCommit = store.commit.bind(store);
       let interleaved = false;
       store.commit = async (commit) => {
-        if (
-          !interleaved &&
-          commit.sourceEventId?.startsWith("external-signal:")
-        ) {
+        if (!interleaved && commit.sourceEventId?.startsWith("external-signal:")) {
           interleaved = true;
           await originalCommit({
             ref,
@@ -322,9 +313,7 @@ describe("synchronous external process signals", () => {
         const readsReleased = new Promise<void>((resolve) => {
           releaseReads = resolve;
         });
-        store.findByRef = async <State = unknown>(params: {
-          ref: ProcessRef;
-        }) => {
+        store.findByRef = async <State = unknown>(params: { ref: ProcessRef }) => {
           const result = await originalFindByRef<State>(params);
           if (synchronizedReads < 2) {
             synchronizedReads++;
@@ -346,9 +335,7 @@ describe("synchronous external process signals", () => {
             now: T0 + 30 * 60_000,
           });
         const operations =
-          firstInput === "signal"
-            ? [runSignal(), runWake()]
-            : [runWake(), runSignal()];
+          firstInput === "signal" ? [runSignal(), runWake()] : [runWake(), runSignal()];
 
         await Promise.allSettled(operations);
 

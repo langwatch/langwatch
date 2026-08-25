@@ -19,8 +19,7 @@ import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 // License limits need the app layer, which is not initialized under
 // vitest — same workaround as the other router integration tests.
 vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../license-enforcement")>();
+  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
   return {
     ...actual,
     enforceLicenseLimit: vi.fn(),
@@ -30,10 +29,7 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
 import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { blankTemplate } from "../../../../optimization_studio/templates/blank";
-import type {
-  LLMConfig,
-  StudioWorkflow,
-} from "@langwatch/workflow-contract";
+import type { LLMConfig, StudioWorkflow } from "@langwatch/workflow-contract";
 import { DEFAULT_MODEL } from "../../../../utils/constants";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
@@ -203,9 +199,7 @@ describe("workflow.create node LLM materialization", () => {
 
   /** @scenario An explicit node-owned model is never rewritten */
   it("keeps an explicit node-owned model untouched", async () => {
-    const template = JSON.parse(
-      JSON.stringify(blankTemplate),
-    ) as typeof blankTemplate;
+    const template = JSON.parse(JSON.stringify(blankTemplate)) as typeof blankTemplate;
     const llmParam = template.nodes
       .find((n) => n.type === "signature")!
       .data.parameters!.find((p) => p.type === "llm")!;

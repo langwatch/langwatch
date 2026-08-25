@@ -30,15 +30,11 @@ export function usePeerCursors({
   enabled = true,
 }: UsePeerCursorsOptions): PeerCursor[] {
   const sessionId = useTabSessionId();
-  const [cursors, setCursors] = useState<Map<string, PeerCursor>>(
-    () => new Map(),
-  );
+  const [cursors, setCursors] = useState<Map<string, PeerCursor>>(() => new Map());
   const cursorsRef = useRef(cursors);
   cursorsRef.current = cursors;
 
-  const subscriptionEnabled = Boolean(
-    enabled && projectId && anchor && sessionId,
-  );
+  const subscriptionEnabled = Boolean(enabled && projectId && anchor && sessionId);
 
   useSSESubscription<
     PresenceCursorEvent,

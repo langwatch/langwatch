@@ -23,8 +23,7 @@ import { buildCellWorkflow } from "../workflowBuilder";
  */
 // Skip when NLP service or OpenAI key isn't available (CI or prisma-integration tests)
 // Both are required: NLP service processes requests, OpenAI key enables the model provider.
-const hasNlpService =
-  !!process.env.LANGWATCH_NLP_SERVICE && !!process.env.OPENAI_API_KEY;
+const hasNlpService = !!process.env.LANGWATCH_NLP_SERVICE && !!process.env.OPENAI_API_KEY;
 
 describe.skipIf(!hasNlpService)("WorkflowExecution Integration", () => {
   let project: Project;
@@ -63,9 +62,7 @@ describe.skipIf(!hasNlpService)("WorkflowExecution Integration", () => {
     outputs: [{ identifier: "output", type: "str" }],
   });
 
-  const createTargetConfig = (
-    overrides?: Partial<TargetConfig>,
-  ): TargetConfig => ({
+  const createTargetConfig = (overrides?: Partial<TargetConfig>): TargetConfig => ({
     id: "target-1",
     type: "prompt",
     inputs: [{ identifier: "input", type: "str" }],
@@ -196,12 +193,7 @@ describe.skipIf(!hasNlpService)("WorkflowExecution Integration", () => {
 
       // Find the component_state_change event for the target
       const targetCompletedEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "target-1" &&
           e.payload.execution_state?.status === "success",
@@ -213,8 +205,7 @@ describe.skipIf(!hasNlpService)("WorkflowExecution Integration", () => {
       ).toBeDefined();
 
       // The output should be a string (the LLM response)
-      const output =
-        targetCompletedEvent?.payload.execution_state?.outputs?.output;
+      const output = targetCompletedEvent?.payload.execution_state?.outputs?.output;
       expect(typeof output).toBe("string");
     }, 60000);
 
@@ -290,12 +281,7 @@ describe.skipIf(!hasNlpService)("WorkflowExecution Integration", () => {
       ]);
 
       const targetEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "target-1" &&
           e.payload.execution_state?.status === "success",

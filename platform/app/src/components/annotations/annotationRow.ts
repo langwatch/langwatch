@@ -47,9 +47,7 @@ export function suggestionExportLine({
 }): string {
   if (!annotation.expectedOutput) return "";
   const label = annotationAnchorLabel({ annotation, traceId });
-  return label
-    ? `${label}: ${annotation.expectedOutput}`
-    : annotation.expectedOutput;
+  return label ? `${label}: ${annotation.expectedOutput}` : annotation.expectedOutput;
 }
 
 /**
@@ -81,9 +79,7 @@ export interface AnnotationScoreAnswer {
 function answeredValues(value: unknown): string[] {
   const answers = Array.isArray(value) ? value : [value];
   return answers
-    .filter(
-      (answer) => answer !== null && answer !== undefined && answer !== "",
-    )
+    .filter((answer) => answer !== null && answer !== undefined && answer !== "")
     .map(String);
 }
 
@@ -196,9 +192,7 @@ const toDate = (value: Date | string | null | undefined): Date | null => {
 };
 
 /** The newest annotation's creation date, which is when the row was last judged. */
-export function lastAnnotatedAt(
-  annotations: AnnotationWithUser[],
-): Date | null {
+export function lastAnnotatedAt(annotations: AnnotationWithUser[]): Date | null {
   let newest: Date | null = null;
   for (const annotation of annotations) {
     const created = toDate(annotation.createdAt);
@@ -246,9 +240,7 @@ type GroupedAnnotation = {
  * Traces with everything said about them, as the all annotations page reads
  * them: dated by the newest annotation, and with no queue item behind them.
  */
-export function groupedAnnotationsToRows(
-  groups: GroupedAnnotation[],
-): AnnotationRow[] {
+export function groupedAnnotationsToRows(groups: GroupedAnnotation[]): AnnotationRow[] {
   return groups.map((group) => ({
     id: group.traceId,
     queueItemId: null,

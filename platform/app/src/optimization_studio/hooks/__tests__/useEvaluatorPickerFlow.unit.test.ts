@@ -453,11 +453,7 @@ describe("useEvaluatorPickerFlow()", () => {
       const editorCallbacks = mockSetFlowCallbacks.mock.calls.find(
         (call: unknown[]) => call[0] === "evaluatorEditor",
       )![1] as {
-        onSave: (saved: {
-          id: string;
-          name: string;
-          evaluatorType?: string;
-        }) => void;
+        onSave: (saved: { id: string; name: string; evaluatorType?: string }) => void;
       };
 
       act(() => {
@@ -504,11 +500,7 @@ describe("useEvaluatorPickerFlow()", () => {
       const editorCallbacks = mockSetFlowCallbacks.mock.calls.find(
         (call: unknown[]) => call[0] === "evaluatorEditor",
       )![1] as {
-        onSave: (saved: {
-          id: string;
-          name: string;
-          evaluatorType?: string;
-        }) => void;
+        onSave: (saved: { id: string; name: string; evaluatorType?: string }) => void;
       };
 
       act(() => {

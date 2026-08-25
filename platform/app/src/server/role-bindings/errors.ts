@@ -41,15 +41,11 @@ export class RoleBindingAlreadyExistsError extends HandledError {
   declare readonly code: "role_binding_already_exists";
 
   constructor(options: { meta?: Record<string, unknown> } = {}) {
-    super(
-      "role_binding_already_exists",
-      "An identical role binding already exists",
-      {
-        httpStatus: 409,
-        ...remediation("role_binding_already_exists"),
-        ...(options.meta ? { meta: options.meta } : {}),
-      },
-    );
+    super("role_binding_already_exists", "An identical role binding already exists", {
+      httpStatus: 409,
+      ...remediation("role_binding_already_exists"),
+      ...(options.meta ? { meta: options.meta } : {}),
+    });
     this.name = "RoleBindingAlreadyExistsError";
   }
 }
@@ -75,11 +71,10 @@ export class UserNotInOrganizationError extends HandledError {
   declare readonly code: "user_not_in_organization";
 
   constructor(userId: string) {
-    super(
-      "user_not_in_organization",
-      "That user is not a member of this organization",
-      { httpStatus: 422, meta: { userId } },
-    );
+    super("user_not_in_organization", "That user is not a member of this organization", {
+      httpStatus: 422,
+      meta: { userId },
+    });
     this.name = "UserNotInOrganizationError";
   }
 }
@@ -140,11 +135,9 @@ export class CustomRoleIdRequiredError extends HandledError {
   declare readonly code: "custom_role_id_required";
 
   constructor() {
-    super(
-      "custom_role_id_required",
-      "A CUSTOM role binding needs a customRoleId",
-      { httpStatus: 422 },
-    );
+    super("custom_role_id_required", "A CUSTOM role binding needs a customRoleId", {
+      httpStatus: 422,
+    });
     this.name = "CustomRoleIdRequiredError";
   }
 }
@@ -159,11 +152,10 @@ export class CustomRoleNotAssignableError extends HandledError {
   declare readonly code: "custom_role_not_assignable";
 
   constructor(customRoleId: string) {
-    super(
-      "custom_role_not_assignable",
-      "That custom role cannot be assigned here",
-      { httpStatus: 422, meta: { customRoleId } },
-    );
+    super("custom_role_not_assignable", "That custom role cannot be assigned here", {
+      httpStatus: 422,
+      meta: { customRoleId },
+    });
     this.name = "CustomRoleNotAssignableError";
   }
 }

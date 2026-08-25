@@ -15,14 +15,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  Archive,
-  ArrowLeft,
-  FileClock,
-  Pencil,
-  Receipt,
-  TimerReset,
-} from "lucide-react";
+import { Archive, ArrowLeft, FileClock, Pencil, Receipt, TimerReset } from "lucide-react";
 import { useState } from "react";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
@@ -153,28 +146,18 @@ function BudgetDetailPage() {
               {/* Audit history remains reachable even after archive —
                   the full lifecycle trail stays queryable so operators
                   can reconstruct why a budget was archived. */}
-              <Link
-                href={`/settings/audit-log?targetKind=budget&targetId=${budget.id}`}
-              >
+              <Link href={`/settings/audit-log?targetKind=budget&targetId=${budget.id}`}>
                 <Button variant="outline" size="sm">
                   <FileClock size={14} /> Audit history
                 </Button>
               </Link>
               {!isArchived && canUpdate && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setResetting(true)}
-                >
+                <Button variant="outline" size="sm" onClick={() => setResetting(true)}>
                   <TimerReset size={14} /> Reset period
                 </Button>
               )}
               {!isArchived && canUpdate && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditing(true)}
-                >
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
                   <Pencil size={14} /> Edit
                 </Button>
               )}
@@ -200,32 +183,26 @@ function BudgetDetailPage() {
           ) : (
             <VStack align="stretch" gap={6} maxWidth="960px">
               {!budget.spendAvailable && (
-                <Alert.Root
-                  status="warning"
-                  data-testid="budget-spend-unavailable"
-                >
+                <Alert.Root status="warning" data-testid="budget-spend-unavailable">
                   <Alert.Indicator />
                   <Alert.Content>
                     <Alert.Title>Spend figures are unavailable</Alert.Title>
                     <Alert.Description>
-                      Spend cannot be totalled right now, so this budget is not
-                      stopping or warning about anything.
+                      Spend cannot be totalled right now, so this budget is not stopping
+                      or warning about anything.
                     </Alert.Description>
                   </Alert.Content>
                 </Alert.Root>
               )}
               {budget.unreachableByAnyKey && (
-                <Alert.Root
-                  status="warning"
-                  data-testid="budget-unreachable-alert"
-                >
+                <Alert.Root status="warning" data-testid="budget-unreachable-alert">
                   <Alert.Indicator />
                   <Alert.Content>
                     <Alert.Title>No key sends traffic here</Alert.Title>
                     <Alert.Description>
-                      Traffic is attributed to the project a key is scoped to.
-                      No active key is scoped so that its traffic reaches this
-                      budget, so it will stay at zero and never stop a request.
+                      Traffic is attributed to the project a key is scoped to. No active
+                      key is scoped so that its traffic reaches this budget, so it will
+                      stay at zero and never stop a request.
                     </Alert.Description>
                   </Alert.Content>
                 </Alert.Root>
@@ -287,9 +264,7 @@ function BudgetDetailPage() {
                       <Progress.Root
                         value={pct}
                         size="sm"
-                        colorPalette={
-                          pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
-                        }
+                        colorPalette={pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"}
                       >
                         <Progress.Track>
                           <Progress.Range />
@@ -308,13 +283,9 @@ function BudgetDetailPage() {
                         {budget.window === "TOTAL" ? (
                           "never"
                         ) : (
-                          <Tooltip
-                            content={new Date(budget.resetsAt).toLocaleString()}
-                          >
+                          <Tooltip content={new Date(budget.resetsAt).toLocaleString()}>
                             <span>
-                              {formatTimeAgo(
-                                new Date(budget.resetsAt).getTime(),
-                              )}
+                              {formatTimeAgo(new Date(budget.resetsAt).getTime())}
                             </span>
                           </Tooltip>
                         )}
@@ -322,8 +293,7 @@ function BudgetDetailPage() {
                     </Text>
                     <Text>·</Text>
                     <Text>
-                      On breach:{" "}
-                      <strong>{budget.onBreach.toLowerCase()}</strong>
+                      On breach: <strong>{budget.onBreach.toLowerCase()}</strong>
                     </Text>
                   </HStack>
                 </VStack>
@@ -345,9 +315,7 @@ function BudgetDetailPage() {
                   />
                 </DetailRow>
                 <DetailRow label="Created">
-                  <Tooltip
-                    content={new Date(budget.createdAt).toLocaleString()}
-                  >
+                  <Tooltip content={new Date(budget.createdAt).toLocaleString()}>
                     <Text fontSize="sm" color="fg.muted">
                       {formatTimeAgo(new Date(budget.createdAt).getTime())}
                     </Text>
@@ -355,9 +323,7 @@ function BudgetDetailPage() {
                 </DetailRow>
                 {budget.lastResetAt && (
                   <DetailRow label="Last reset">
-                    <Tooltip
-                      content={new Date(budget.lastResetAt).toLocaleString()}
-                    >
+                    <Tooltip content={new Date(budget.lastResetAt).toLocaleString()}>
                       <Text fontSize="sm" color="fg.muted">
                         {formatTimeAgo(new Date(budget.lastResetAt).getTime())}
                       </Text>
@@ -380,8 +346,8 @@ function BudgetDetailPage() {
                       </EmptyState.Indicator>
                       <EmptyState.Title>No usage yet</EmptyState.Title>
                       <EmptyState.Description>
-                        Activity shows up here after the first completed request
-                        against a virtual key in this scope.
+                        Activity shows up here after the first completed request against a
+                        virtual key in this scope.
                       </EmptyState.Description>
                     </EmptyState.Content>
                   </EmptyState.Root>
@@ -400,15 +366,9 @@ function BudgetDetailPage() {
                       {budget.recentLedger.map((line) => (
                         <Table.Row key={line.id}>
                           <Table.Cell>
-                            <Tooltip
-                              content={new Date(
-                                line.occurredAt,
-                              ).toLocaleString()}
-                            >
+                            <Tooltip content={new Date(line.occurredAt).toLocaleString()}>
                               <Text fontSize="xs" color="fg.muted">
-                                {formatTimeAgo(
-                                  new Date(line.occurredAt).getTime(),
-                                )}
+                                {formatTimeAgo(new Date(line.occurredAt).getTime())}
                               </Text>
                             </Tooltip>
                           </Table.Cell>
@@ -423,9 +383,7 @@ function BudgetDetailPage() {
                           <Table.Cell>
                             <Code fontSize="xs">{line.model}</Code>
                           </Table.Cell>
-                          <Table.Cell>
-                            {formatAmount(line.amountUsd)}
-                          </Table.Cell>
+                          <Table.Cell>{formatAmount(line.amountUsd)}</Table.Cell>
                           <Table.Cell>
                             <StatusBadge status={line.status} />
                           </Table.Cell>
@@ -435,8 +393,7 @@ function BudgetDetailPage() {
                   </Table.Root>
                 )}
                 <Text fontSize="xs" color="fg.muted" mt={1}>
-                  Most recent 20 requests. See Usage for aggregates over the
-                  full history.
+                  Most recent 20 requests. See Usage for aggregates over the full history.
                 </Text>
               </Section>
             </VStack>
@@ -478,13 +435,7 @@ function BudgetDetailPage() {
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Box>
       <Heading size="sm" mb={2}>
@@ -498,13 +449,7 @@ function Section({
   );
 }
 
-function DetailRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <HStack gap={4} align="flex-start">
       <Text fontSize="sm" color="fg.muted" minWidth="140px">
@@ -557,10 +502,8 @@ function ScopeBadge({
       )}
       {target.kind === "GROUP" && typeof target.memberCount === "number" && (
         <Text fontSize="xs" color="fg.muted">
-          {target.memberCount === 1
-            ? "1 member"
-            : `${target.memberCount} members`}
-          , each with their own allowance
+          {target.memberCount === 1 ? "1 member" : `${target.memberCount} members`}, each
+          with their own allowance
         </Text>
       )}
     </HStack>

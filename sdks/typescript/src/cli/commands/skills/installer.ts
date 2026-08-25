@@ -141,9 +141,7 @@ export const findSkill = (name: string): BundledSkill | undefined => {
   const normalized = name.replace(/^\/+|\/+$/g, "");
   const recipe = /^recipes\/(.+)$/.exec(normalized);
   if (recipe) {
-    return SKILLS_BUNDLE.find(
-      (skill) => skill.isRecipe && skill.slug === recipe[1],
-    );
+    return SKILLS_BUNDLE.find((skill) => skill.isRecipe && skill.slug === recipe[1]);
   }
   return SKILLS_BUNDLE.find((skill) => skill.slug === normalized);
 };
@@ -162,12 +160,7 @@ export const resolveSkills = (
   return { skills, unknown };
 };
 
-export type SkillFileAction =
-  | "created"
-  | "updated"
-  | "removed"
-  | "unchanged"
-  | "skipped";
+export type SkillFileAction = "created" | "updated" | "removed" | "unchanged" | "skipped";
 
 export interface SkillFileResult {
   slug: string;

@@ -4,10 +4,7 @@ import {
   isAtOrBeforeCutoff,
   isAtOrBeforeCutoffMarker,
 } from "../../replay/replayConstants";
-import {
-  RedisReplayMarkerChecker,
-  ReplayDeferralError,
-} from "../replayMarkerCheck";
+import { RedisReplayMarkerChecker, ReplayDeferralError } from "../replayMarkerCheck";
 
 function makeEvent(overrides: Partial<Event> = {}): Event {
   return {
@@ -50,12 +47,8 @@ describe("isAtOrBeforeCutoff", () => {
 
 describe("isAtOrBeforeCutoffMarker", () => {
   it("parses marker format and compares correctly", () => {
-    expect(isAtOrBeforeCutoffMarker(1000, "evt-001", "2000:evt-999")).toBe(
-      true,
-    );
-    expect(isAtOrBeforeCutoffMarker(3000, "evt-001", "2000:evt-999")).toBe(
-      false,
-    );
+    expect(isAtOrBeforeCutoffMarker(1000, "evt-001", "2000:evt-999")).toBe(true);
+    expect(isAtOrBeforeCutoffMarker(3000, "evt-001", "2000:evt-999")).toBe(false);
   });
 
   it("returns false for malformed markers (no colon)", () => {
@@ -64,9 +57,7 @@ describe("isAtOrBeforeCutoffMarker", () => {
 
   it("handles marker with eventId containing colons", () => {
     // eventId could theoretically contain colons — only first colon separates timestamp
-    expect(isAtOrBeforeCutoffMarker(1000, "evt:001", "2000:evt:002")).toBe(
-      true,
-    );
+    expect(isAtOrBeforeCutoffMarker(1000, "evt:001", "2000:evt:002")).toBe(true);
   });
 });
 
@@ -98,10 +89,7 @@ describe("RedisReplayMarkerChecker", () => {
     };
     const redis = { pipeline: () => pipelineObj };
     const checker = new RedisReplayMarkerChecker(redis);
-    const setMarkers = (opts: {
-      cutoff?: string | null;
-      done?: string | null;
-    }) => {
+    const setMarkers = (opts: { cutoff?: string | null; done?: string | null }) => {
       markers.cutoff = opts.cutoff ?? null;
       markers.done = opts.done ?? null;
     };
@@ -112,9 +100,7 @@ describe("RedisReplayMarkerChecker", () => {
     it("returns 'process'", async () => {
       const { checker, hget, get } = createChecker();
 
-      await expect(checker.check("traceSummary", makeEvent())).resolves.toBe(
-        "process",
-      );
+      await expect(checker.check("traceSummary", makeEvent())).resolves.toBe("process");
       expect(hget).toHaveBeenCalledWith(
         "projection-replay:cutoff:traceSummary",
         "tenant-1:trace:agg-1",

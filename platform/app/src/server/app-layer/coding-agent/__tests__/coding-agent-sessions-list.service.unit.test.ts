@@ -26,9 +26,7 @@ type PullRequestCandidate = Awaited<
   ReturnType<GithubPullRequestLookup["findForBranches"]>
 >[number];
 
-function sessionRow(
-  over: Partial<CodingAgentSessionRow> = {},
-): CodingAgentSessionRow {
+function sessionRow(over: Partial<CodingAgentSessionRow> = {}): CodingAgentSessionRow {
   return codingAgentSessionRow({
     tenantId: PROJECT,
     sessionId: "session-a",

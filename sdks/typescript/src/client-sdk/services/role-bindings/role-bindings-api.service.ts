@@ -10,20 +10,12 @@ import {
   type ManagementRequest,
   resolveManagementToken,
 } from "../_shared/management-request";
-import type {
-  ManagementRole,
-  ManagementScopeType,
-} from "../_shared/management-types";
+import type { ManagementRole, ManagementScopeType } from "../_shared/management-types";
 
 /** The three kinds of principal a binding can name. */
-export const ROLE_BINDING_PRINCIPAL_TYPES = [
-  "user",
-  "group",
-  "apiKey",
-] as const;
+export const ROLE_BINDING_PRINCIPAL_TYPES = ["user", "group", "apiKey"] as const;
 
-export type RoleBindingPrincipalType =
-  (typeof ROLE_BINDING_PRINCIPAL_TYPES)[number];
+export type RoleBindingPrincipalType = (typeof ROLE_BINDING_PRINCIPAL_TYPES)[number];
 
 export interface RoleBindingPrincipal {
   type: RoleBindingPrincipalType;
@@ -108,9 +100,7 @@ export class RoleBindingsApiService {
     });
   }
 
-  async list(
-    options: ListRoleBindingsOptions = {},
-  ): Promise<ListRoleBindingsResponse> {
+  async list(options: ListRoleBindingsOptions = {}): Promise<ListRoleBindingsResponse> {
     return this.#request({
       operation: "list role bindings",
       path: managementPath("/api/role-bindings"),

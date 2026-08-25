@@ -8,7 +8,9 @@ keywords: java, spring, spring ai, spring boot, opentelemetry, langwatch, observ
 LangWatch captures traces from Java applications using Spring AI when you export OpenTelemetry data to LangWatch. The configuration below is the minimum you add to your Spring Boot app.
 
 <Note>
-For a complete, runnable example, see the full working example repository: [Spring AI + LangWatch (OpenTelemetry) example](https://github.com/langwatch/otel-integration-examples/tree/main/java-spring-ai).
+  For a complete, runnable example, see the full working example repository: [Spring AI +
+  LangWatch (OpenTelemetry)
+  example](https://github.com/langwatch/otel-integration-examples/tree/main/java-spring-ai).
 </Note>
 
 ## Prerequisites
@@ -23,10 +25,10 @@ For a complete, runnable example, see the full working example repository: [Spri
 <Step title="Set required environment variables">
   Export your provider API keys as environment variables used by your app.
 
-  ```bash
-  export OPENAI_API_KEY="your-openai-api-key"
-  export LANGWATCH_API_KEY="your-langwatch-api-key"
-  ```
+```bash
+export OPENAI_API_KEY="your-openai-api-key"
+export LANGWATCH_API_KEY="your-langwatch-api-key"
+```
 
   <Tip>
   Use your platform's secret manager for variables in production. Never store secrets in source control.
@@ -36,40 +38,40 @@ For a complete, runnable example, see the full working example repository: [Spri
 <Step title="Configure the OpenTelemetry exporter to LangWatch">
   Configure OpenTelemetry and SpringAI in your `src/main/resources/application.yaml` so your app captures and sends traces directly to LangWatch.
 
-  ```yaml application.yaml
+```yaml application.yaml
 spring.ai:
-  chat:
-    client:
-      observations:
-        log-prompt: true
+chat:
+  client:
     observations:
-      log-prompt: true # Include prompt content in tracing (disabled by default for privacy)
-      log-completion: true # Include completion content in tracing (disabled by default)
-  openai:
-    api-key: ${OPENAI_API_KEY}
-
+      log-prompt: true
+  observations:
+    log-prompt: true # Include prompt content in tracing (disabled by default for privacy)
+    log-completion: true # Include completion content in tracing (disabled by default)
+openai:
+  api-key: ${OPENAI_API_KEY}
 
 management:
-  tracing.enabled: true
-  logging.export.enabled: true
+tracing.enabled: true
+logging.export.enabled: true
 
 otel:
-  java:
-    global-autoconfigure:
-      enabled: true
-  exporter:
-    otlp:
-      endpoint: "https://app.langwatch.ai/api/otel"
-      protocol: "http/protobuf"
-      headers:
-        Authorization: ${LANGWATCH_API_KEY}
-  traces:
-    exporter: otlp
-    sampler:
-      ratio: 1.0
-  metrics.exporter: otlp
-  logs.exporter: otlp
-  ```
+java:
+  global-autoconfigure:
+    enabled: true
+exporter:
+  otlp:
+    endpoint: "https://app.langwatch.ai/api/otel"
+    protocol: "http/protobuf"
+    headers:
+      Authorization: ${LANGWATCH_API_KEY}
+traces:
+  exporter: otlp
+  sampler:
+    ratio: 1.0
+metrics.exporter: otlp
+logs.exporter: otlp
+```
+
 </Step>
 
 <Step title="Start your Spring Boot application as usual">
@@ -91,6 +93,7 @@ otel:
 ## Monitoring
 
 Once configured:
+
 - Visit your LangWatch dashboard to explore spans and AI-specific attributes
 - Analyze model performance, usage, and costs
 - Investigate failures with full trace context
@@ -111,6 +114,7 @@ Once configured:
 </AccordionGroup>
 
 <Info>
-For a complete implementation showing controllers, Spring AI configuration, and OpenTelemetry setup, see the
-[full working example repository](https://github.com/langwatch/otel-integration-examples/tree/main/java-spring-ai).
+  For a complete implementation showing controllers, Spring AI configuration, and
+  OpenTelemetry setup, see the [full working example
+  repository](https://github.com/langwatch/otel-integration-examples/tree/main/java-spring-ai).
 </Info>

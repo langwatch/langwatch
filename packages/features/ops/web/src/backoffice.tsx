@@ -25,9 +25,7 @@ export function formatDate(value: string | Date | null | undefined): string {
   return date.toLocaleDateString();
 }
 
-export function formatDateTime(
-  value: string | Date | null | undefined,
-): string {
+export function formatDateTime(value: string | Date | null | undefined): string {
   if (!value) return "—";
   const date = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return "—";

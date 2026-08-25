@@ -2,10 +2,7 @@ import { Box, Center, HStack, Text } from "@chakra-ui/react";
 import type { ComponentProps } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
-import type {
-  DatasetColumns,
-  DatasetRecordInput,
-} from "@langwatch/dataset-contract";
+import type { DatasetColumns, DatasetRecordInput } from "@langwatch/dataset-contract";
 import { DatasetPreviewTable } from "./editor/DatasetPreviewTable";
 
 export function DatasetPreview({
@@ -28,9 +25,7 @@ export function DatasetPreview({
       width="100%"
       maxHeight="200px"
       overflow="auto"
-      borderBottom={
-        rows.length === 0 ? "1px solid rgba(189, 195, 199, 0.58)" : "none"
-      }
+      borderBottom={rows.length === 0 ? "1px solid rgba(189, 195, 199, 0.58)" : "none"}
       className="dataset-preview"
       position="relative"
       {...props}

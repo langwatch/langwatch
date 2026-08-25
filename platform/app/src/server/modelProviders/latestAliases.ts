@@ -27,18 +27,13 @@ interface RegistryEntry {
   mode: "chat" | "embedding";
 }
 
-const REGISTRY = (
-  llmModels as unknown as { models: Record<string, RegistryEntry> }
-).models;
+const REGISTRY = (llmModels as unknown as { models: Record<string, RegistryEntry> })
+  .models;
 
 export const LATEST_ALIAS_SUFFIXES = ["latest", "latest-mini"] as const;
 export type LatestAliasSuffix = (typeof LATEST_ALIAS_SUFFIXES)[number];
 
-export const LATEST_ALIAS_PROVIDERS = [
-  "openai",
-  "anthropic",
-  "gemini",
-] as const;
+export const LATEST_ALIAS_PROVIDERS = ["openai", "anthropic", "gemini"] as const;
 export type LatestAliasProvider = (typeof LATEST_ALIAS_PROVIDERS)[number];
 
 const ALIAS_PATTERN = new RegExp(
@@ -110,18 +105,13 @@ export function resolveLatestAlias(model: string): string | null {
   const { provider, suffix } = parts;
   if (provider === "openai") {
     const variant = suffix === "latest" ? "flagship" : "mini";
-    return (
-      pickLatestChat("openai", (id) => rankOpenAIChatModel({ id, variant })) ??
-      null
-    );
+    return pickLatestChat("openai", (id) => rankOpenAIChatModel({ id, variant })) ?? null;
   }
   if (provider === "anthropic") {
     const family = suffix === "latest" ? "opus" : "sonnet";
     return (
       pickLatestChat("anthropic", (id) => {
-        const m = new RegExp(
-          `^anthropic\\/claude-${family}-(\\d+)-(\\d+)$`,
-        ).exec(id);
+        const m = new RegExp(`^anthropic\\/claude-${family}-(\\d+)-(\\d+)$`).exec(id);
         if (!m) return null;
         return { major: Number(m[1]), minor: Number(m[2]) };
       }) ?? null
@@ -131,12 +121,7 @@ export function resolveLatestAlias(model: string): string | null {
     const allowed =
       suffix === "latest"
         ? new Set(["pro", "pro-preview"])
-        : new Set([
-            "flash",
-            "flash-lite",
-            "flash-preview",
-            "flash-lite-preview",
-          ]);
+        : new Set(["flash", "flash-lite", "flash-preview", "flash-lite-preview"]);
     return (
       pickLatestChat("gemini", (id) => {
         const m = /^gemini\/gemini-(\d+)\.(\d+)-([a-z-]+)$/.exec(id);

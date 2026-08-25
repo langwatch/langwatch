@@ -48,11 +48,8 @@ export class DataRetentionPolicyService {
    * counts — a caller who can manage this scope never learns a sibling scope's
    * rule identity, only the number their data would land on.
    */
-  async previewScopeRemoval(
-    scope: ScopeAssignment,
-  ): Promise<ResolvedRetention> {
-    const organizationId =
-      await this.repository.findOrganizationForScope(scope);
+  async previewScopeRemoval(scope: ScopeAssignment): Promise<ResolvedRetention> {
+    const organizationId = await this.repository.findOrganizationForScope(scope);
     if (!organizationId) {
       return {
         traces: PLATFORM_DEFAULT_RETENTION_DAYS,
@@ -69,9 +66,7 @@ export class DataRetentionPolicyService {
   }
 
   /** Every retention override row in the organization (unfiltered). */
-  async listOrganizationRules(
-    organizationId: string,
-  ): Promise<RetentionPolicy[]> {
+  async listOrganizationRules(organizationId: string): Promise<RetentionPolicy[]> {
     return this.repository.findAllInOrganization(organizationId);
   }
 
@@ -94,8 +89,7 @@ export class DataRetentionPolicyService {
     category: RetentionCategory;
     retentionDays: number;
   }): Promise<RetentionPolicy> {
-    const organizationId =
-      await this.repository.findOrganizationForScope(scope);
+    const organizationId = await this.repository.findOrganizationForScope(scope);
     if (!organizationId) {
       throw new ScopeTargetNotFoundError("Scope target not found.");
     }

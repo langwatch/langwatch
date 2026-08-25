@@ -146,10 +146,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
 
   return (
     <VStack gap={6} width="full" align="start" paddingBottom={12}>
-      <ClusteringStatusCard
-        projectId={project.id}
-        lastTriggeredAt={lastTriggeredAt}
-      />
+      <ClusteringStatusCard projectId={project.id} lastTriggeredAt={lastTriggeredAt} />
       <Card.Root width="full">
         <Card.Header>
           <Heading>Manual topic clustering</Heading>
@@ -157,25 +154,23 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
         <Card.Body width="full">
           <VStack align="start" gap={4}>
             <Text>
-              Group your recent traces into topics and subtopics without waiting
-              for the next scheduled run.
+              Group your recent traces into topics and subtopics without waiting for the
+              next scheduled run.
             </Text>
 
             <Alert.Root>
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Description>
-                  Topic clustering needs at least 10 traces to group anything,
-                  and can take several minutes.
+                  Topic clustering needs at least 10 traces to group anything, and can
+                  take several minutes.
                 </Alert.Description>
               </Alert.Content>
             </Alert.Root>
 
             <Button
               colorPalette="blue"
-              onClick={() =>
-                triggerClustering.mutate({ projectId: project.id })
-              }
+              onClick={() => triggerClustering.mutate({ projectId: project.id })}
               loading={triggerClustering.isPending}
             >
               Run topic clustering
@@ -259,14 +254,9 @@ function ClusteringStatusCard({
           <VStack align="start" gap={3}>
             <HStack gap={3}>
               <Text fontWeight="medium">Last run</Text>
-              {outcomeBadge(
-                status.data.lastRunOutcome,
-                status.data.isRunInFlight,
-              )}
+              {outcomeBadge(status.data.lastRunOutcome, status.data.isRunInFlight)}
               {status.data.lastRunAt && (
-                <Text color="fg.muted">
-                  {formatTimeAgo(status.data.lastRunAt)}
-                </Text>
+                <Text color="fg.muted">{formatTimeAgo(status.data.lastRunAt)}</Text>
               )}
             </HStack>
             {status.data.lastRunOutcome === "completed" && (
@@ -274,10 +264,7 @@ function ClusteringStatusCard({
                 {/* The mode is only trustworthy on a completed run: a failure
                     leaves the previous run's mode in place. */}
                 {(() => {
-                  const modeCopy = copyFor(
-                    RUN_MODE_COPY,
-                    status.data.lastRunMode,
-                  );
+                  const modeCopy = copyFor(RUN_MODE_COPY, status.data.lastRunMode);
                   return modeCopy ? `${modeCopy}. ` : null;
                 })()}
                 Organized {status.data.lastRunTracesProcessed} traces into{" "}
@@ -288,35 +275,28 @@ function ClusteringStatusCard({
             {status.data.lastRunOutcome === "skipped" &&
               status.data.lastRunSkippedReason && (
                 <Text fontSize="sm" color="fg.muted">
-                  {copyFor(
-                    SKIP_REASON_COPY,
-                    status.data.lastRunSkippedReason,
-                  ) ?? "Skipped"}
+                  {copyFor(SKIP_REASON_COPY, status.data.lastRunSkippedReason) ??
+                    "Skipped"}
                   .
                 </Text>
               )}
             {status.data.lastRunOutcome === "failed" &&
               (() => {
                 const guidance = status.data.isLastRunErrorUserActionable
-                  ? copyFor(
-                      CLUSTERING_FAILURE_GUIDANCE,
-                      status.data.lastRunErrorCode,
-                    )
+                  ? copyFor(CLUSTERING_FAILURE_GUIDANCE, status.data.lastRunErrorCode)
                   : undefined;
                 return guidance ? (
                   <Alert.Root status="warning">
                     <Alert.Indicator />
                     <Alert.Content>
                       <Alert.Title>{guidance.title}</Alert.Title>
-                      <Alert.Description>
-                        {guidance.description}
-                      </Alert.Description>
+                      <Alert.Description>{guidance.description}</Alert.Description>
                     </Alert.Content>
                   </Alert.Root>
                 ) : (
                   <Text fontSize="sm" color="red.fg">
-                    The last run failed on our side. It will retry automatically
-                    at the next scheduled run.
+                    The last run failed on our side. It will retry automatically at the
+                    next scheduled run.
                   </Text>
                 );
               })()}
@@ -430,8 +410,7 @@ function RunHistoryCard({ projectId }: { projectId: string }) {
           </Table.Root>
         ) : (
           <Text color="fg.muted" padding={6}>
-            No runs yet. History appears here after the first scheduled or
-            manual run.
+            No runs yet. History appears here after the first scheduled or manual run.
           </Text>
         )}
       </Card.Body>

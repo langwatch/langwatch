@@ -79,9 +79,7 @@ describe("given a fetched trace to read as one conversation turn", () => {
     });
 
     it("counts the trace's spans as the turn's steps", () => {
-      const turn = legacyTraceToTurn(
-        trace({ spans: [{}, {}] as Trace["spans"] }),
-      );
+      const turn = legacyTraceToTurn(trace({ spans: [{}, {}] as Trace["spans"] }));
 
       expect(turn.spanCount).toBe(2);
     });

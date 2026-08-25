@@ -63,14 +63,11 @@ describe("POST /api/experiments/execute auth", () => {
   describe("when the request carries a user session but no project API key", () => {
     /** @scenario Browser execution authenticates by user session */
     it("is not rejected by the project API-key guard", async () => {
-      const res = await router.request(
-        "http://localhost/api/experiments/execute",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(validExecuteBody),
-        },
-      );
+      const res = await router.request("http://localhost/api/experiments/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validExecuteBody),
+      });
 
       const body = (await res.json()) as { error?: string; message?: string };
 
@@ -84,14 +81,11 @@ describe("POST /api/experiments/execute auth", () => {
   describe("when the request has neither a session nor an API key", () => {
     /** @scenario Execution endpoint rejects requests with no session */
     it("returns 401 from the session guard telling the user to log in", async () => {
-      const res = await router.request(
-        "http://localhost/api/experiments/execute",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(validExecuteBody),
-        },
-      );
+      const res = await router.request("http://localhost/api/experiments/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validExecuteBody),
+      });
 
       expect(res.status).toBe(401);
       const body = (await res.json()) as { error?: string };

@@ -16,9 +16,7 @@ function checkPipelineErrors(
   if (!results) throw new Error(`Pipeline returned null during ${operation}`);
   for (const [err] of results) {
     if (err)
-      throw new Error(
-        `Pipeline command failed during ${operation}: ${err.message}`,
-      );
+      throw new Error(`Pipeline command failed during ${operation}: ${err.message}`);
   }
 }
 
@@ -209,9 +207,7 @@ export async function clearFailedBatchMarkers({
     log.write({
       step: "error",
       error: `failed to clear replay markers for failed batch: ${
-        cleanupError instanceof Error
-          ? cleanupError.message
-          : String(cleanupError)
+        cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
       }`,
     });
   }
@@ -315,10 +311,7 @@ export async function markCutoffForProjections({
   cutoffsByProjection,
 }: {
   redis: IORedis;
-  cutoffsByProjection: Map<
-    string,
-    Map<string, { timestamp: number; eventId: string }>
-  >;
+  cutoffsByProjection: Map<string, Map<string, { timestamp: number; eventId: string }>>;
 }): Promise<void> {
   const pipeline = redis.pipeline();
   let commands = 0;
@@ -346,10 +339,7 @@ export async function markCompletedForProjections({
   cutoffsByProjection,
 }: {
   redis: IORedis;
-  cutoffsByProjection: Map<
-    string,
-    Map<string, { timestamp: number; eventId: string }>
-  >;
+  cutoffsByProjection: Map<string, Map<string, { timestamp: number; eventId: string }>>;
 }): Promise<void> {
   const pipeline = redis.pipeline();
   let commands = 0;

@@ -56,9 +56,7 @@ class FixedTriggers extends TraceAlertTriggerPort {
 
 class RecordingMatches extends TraceAlertTriggerMatchPort {
   readonly inputs: Parameters<TraceAlertTriggerMatchPort["send"]>[0][] = [];
-  send(
-    input: Parameters<TraceAlertTriggerMatchPort["send"]>[0],
-  ): Promise<void> {
+  send(input: Parameters<TraceAlertTriggerMatchPort["send"]>[0]): Promise<void> {
     this.inputs.push(input);
     return Promise.resolve();
   }

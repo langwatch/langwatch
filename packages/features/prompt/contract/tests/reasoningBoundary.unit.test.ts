@@ -23,10 +23,7 @@ vi.mock("../../modelProviders/registry", () => ({
     // Return mock model data based on modelId
     // Note: Model registry still uses provider-specific names for UI clarity
     // Translation to reasoning_effort happens in mapReasoningToProvider
-    const models: Record<
-      string,
-      { reasoningConfig?: { parameterName: string } }
-    > = {
+    const models: Record<string, { reasoningConfig?: { parameterName: string } }> = {
       "openai/gpt-5": {
         reasoningConfig: { parameterName: "reasoning_effort" },
       },
@@ -66,15 +63,11 @@ describe("reasoningBoundary", () => {
     });
 
     it("maps thinkingLevel to reasoning_effort", () => {
-      expect(LITELLM_PARAMETER_TRANSLATION.thinkingLevel).toBe(
-        "reasoning_effort",
-      );
+      expect(LITELLM_PARAMETER_TRANSLATION.thinkingLevel).toBe("reasoning_effort");
     });
 
     it("maps reasoning_effort to reasoning_effort (passthrough)", () => {
-      expect(LITELLM_PARAMETER_TRANSLATION.reasoning_effort).toBe(
-        "reasoning_effort",
-      );
+      expect(LITELLM_PARAMETER_TRANSLATION.reasoning_effort).toBe("reasoning_effort");
     });
   });
 
@@ -99,35 +92,23 @@ describe("reasoningBoundary", () => {
       /** @scenario Maps reasoning to reasoning_effort for Anthropic models */
       it("maps reasoning to reasoning_effort for Anthropic models", () => {
         // Model registry returns effort, but function translates to reasoning_effort
-        const result = mapReasoningToProvider(
-          "anthropic/claude-opus-4",
-          "medium",
-        );
+        const result = mapReasoningToProvider("anthropic/claude-opus-4", "medium");
         expect(result).toEqual({ reasoning_effort: "medium" });
       });
 
       it("maps reasoning to reasoning_effort for Gemini 2.5 models", () => {
-        const result = mapReasoningToProvider(
-          "gemini/gemini-2.5-pro",
-          "medium",
-        );
+        const result = mapReasoningToProvider("gemini/gemini-2.5-pro", "medium");
         expect(result).toEqual({ reasoning_effort: "medium" });
       });
 
       it("maps reasoning to reasoning_effort for Anthropic Claude Opus 4.5", () => {
-        const result = mapReasoningToProvider(
-          "anthropic/claude-opus-4.5",
-          "high",
-        );
+        const result = mapReasoningToProvider("anthropic/claude-opus-4.5", "high");
         expect(result).toEqual({ reasoning_effort: "high" });
       });
 
       it("uses reasoning_effort for custom providers too", () => {
         // LiteLLM receives the canonical parameter regardless of provider.
-        const result = mapReasoningToProvider(
-          "custom/model-with-custom-param",
-          "high",
-        );
+        const result = mapReasoningToProvider("custom/model-with-custom-param", "high");
         expect(result).toEqual({ reasoning_effort: "high" });
       });
     });
@@ -146,10 +127,7 @@ describe("reasoningBoundary", () => {
 
       it("falls back to reasoning_effort for unknown Anthropic models", () => {
         // Previously returned effort, now returns reasoning_effort
-        const result = mapReasoningToProvider(
-          "anthropic/unknown-model",
-          "medium",
-        );
+        const result = mapReasoningToProvider("anthropic/unknown-model", "medium");
         expect(result).toEqual({ reasoning_effort: "medium" });
       });
 

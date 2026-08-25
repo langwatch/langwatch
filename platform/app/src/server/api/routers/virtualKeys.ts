@@ -77,11 +77,10 @@ async function requireVisibleVk(
     organizationId,
     ctx.session.user.id,
   );
-  return requireVisibleVkForMembership(
-    VirtualKeyService.create(ctx.prisma),
-    membership,
-    { id, organizationId },
-  );
+  return requireVisibleVkForMembership(VirtualKeyService.create(ctx.prisma), membership, {
+    id,
+    organizationId,
+  });
 }
 
 const routingModeSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);
@@ -248,11 +247,7 @@ export const virtualKeysRouter = createTRPCRouter({
       // anyone who can see an org-wide key read a sibling team's budget
       // names and spend by injecting that team's scope into the input.
       if (input.virtualKeyId) {
-        const vk = await requireVisibleVk(
-          ctx,
-          input.organizationId,
-          input.virtualKeyId,
-        );
+        const vk = await requireVisibleVk(ctx, input.organizationId, input.virtualKeyId);
         return resolveApplicableBudgetsForDraftKey(
           ctx.prisma,
           {
@@ -277,11 +272,7 @@ export const virtualKeysRouter = createTRPCRouter({
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         input.scopes,
       );
-      await assertScopesBelongToOrg(
-        ctx.prisma,
-        input.organizationId,
-        input.scopes,
-      );
+      await assertScopesBelongToOrg(ctx.prisma, input.organizationId, input.scopes);
       await assertTraceProjectBelongsToOrg(
         ctx.prisma,
         input.organizationId,
@@ -353,11 +344,7 @@ export const virtualKeysRouter = createTRPCRouter({
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         input.scopes,
       );
-      await assertScopesBelongToOrg(
-        ctx.prisma,
-        input.organizationId,
-        input.scopes,
-      );
+      await assertScopesBelongToOrg(ctx.prisma, input.organizationId, input.scopes);
       await assertTraceProjectBelongsToOrg(
         ctx.prisma,
         input.organizationId,
@@ -373,15 +360,11 @@ export const virtualKeysRouter = createTRPCRouter({
           [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
         );
       }
-      const vkProjectId = await resolveVkProjectId(
-        ctx.prisma,
-        input.organizationId,
-        {
-          vkId: null,
-          inputScopes: input.scopes,
-          traceProjectId: input.traceProjectId ?? null,
-        },
-      );
+      const vkProjectId = await resolveVkProjectId(ctx.prisma, input.organizationId, {
+        vkId: null,
+        inputScopes: input.scopes,
+        traceProjectId: input.traceProjectId ?? null,
+      });
       await assertGuardrailAttachmentsAllowed(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         vkProjectId,
@@ -439,11 +422,7 @@ export const virtualKeysRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await requireExistingVk(
-        service,
-        input.id,
-        input.organizationId,
-      );
+      const existing = await requireExistingVk(service, input.id, input.organizationId);
       // Mutating an existing key needs virtualKeys:update on one of the
       // scopes it already lives in.
       await assertActorCanOperateOnAnyScope(
@@ -458,11 +437,7 @@ export const virtualKeysRouter = createTRPCRouter({
           { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
           input.scopes,
         );
-        await assertScopesBelongToOrg(
-          ctx.prisma,
-          input.organizationId,
-          input.scopes,
-        );
+        await assertScopesBelongToOrg(ctx.prisma, input.organizationId, input.scopes);
       }
       if (input.traceProjectId !== undefined) {
         await assertTraceProjectBelongsToOrg(
@@ -479,18 +454,14 @@ export const virtualKeysRouter = createTRPCRouter({
           );
         }
       }
-      const vkProjectId = await resolveVkProjectId(
-        ctx.prisma,
-        input.organizationId,
-        {
-          vkId: input.id,
-          inputScopes: input.scopes,
-          traceProjectId:
-            input.traceProjectId !== undefined
-              ? input.traceProjectId
-              : existing.traceProjectId,
-        },
-      );
+      const vkProjectId = await resolveVkProjectId(ctx.prisma, input.organizationId, {
+        vkId: input.id,
+        inputScopes: input.scopes,
+        traceProjectId:
+          input.traceProjectId !== undefined
+            ? input.traceProjectId
+            : existing.traceProjectId,
+      });
       // Newly-submitted attachments are always validated. When the caller
       // is ALSO changing scopes (a possible project move) but did not
       // re-send config, revalidate the existing attachments against the
@@ -541,11 +512,7 @@ export const virtualKeysRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await requireExistingVk(
-        service,
-        input.id,
-        input.organizationId,
-      );
+      const existing = await requireExistingVk(service, input.id, input.organizationId);
       await assertActorCanOperateOnAnyScope(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         existing.scopes,
@@ -578,11 +545,7 @@ export const virtualKeysRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await requireExistingVk(
-        service,
-        input.id,
-        input.organizationId,
-      );
+      const existing = await requireExistingVk(service, input.id, input.organizationId);
       await assertActorCanOperateOnAnyScope(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         existing.scopes,
@@ -612,11 +575,7 @@ export const virtualKeysRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await requireExistingVk(
-        service,
-        input.id,
-        input.organizationId,
-      );
+      const existing = await requireExistingVk(service, input.id, input.organizationId);
       await assertActorCanOperateOnAnyScope(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         existing.scopes,
@@ -647,11 +606,7 @@ export const virtualKeysRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await requireExistingVk(
-        service,
-        input.id,
-        input.organizationId,
-      );
+      const existing = await requireExistingVk(service, input.id, input.organizationId);
       await assertActorCanOperateOnAnyScope(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         existing.scopes,

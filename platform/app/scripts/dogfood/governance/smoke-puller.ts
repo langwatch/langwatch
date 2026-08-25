@@ -30,8 +30,7 @@ import { runIngestionPull } from "../../../ee/governance/services/pullers/puller
 import { prisma } from "../../../src/server/db";
 
 const CLICKHOUSE_URL =
-  process.env.CLICKHOUSE_URL ??
-  "http://default:langwatch@localhost:8123/langwatch";
+  process.env.CLICKHOUSE_URL ?? "http://default:langwatch@localhost:8123/langwatch";
 
 function rid(prefix: string) {
   return `${prefix}_${randomBytes(8).toString("hex")}`;
@@ -191,9 +190,7 @@ async function main(): Promise<void> {
       console.error("[smoke-puller] FAIL — see output above");
       process.exit(1);
     }
-    console.log(
-      `[smoke-puller] OK — ${rows.length} OCSF rows + cursor drained`,
-    );
+    console.log(`[smoke-puller] OK — ${rows.length} OCSF rows + cursor drained`);
   } finally {
     await ch.close();
     await closeFixture();

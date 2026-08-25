@@ -6,9 +6,7 @@ import { apiKeyRouter } from "../apiKey";
 
 vi.mock("nanoid", () => ({
   nanoid: vi.fn(() => "mock-nano-id"),
-  customAlphabet: vi.fn(
-    () => () => "mock48characterrandomstringforapikeygeneration",
-  ),
+  customAlphabet: vi.fn(() => () => "mock48characterrandomstringforapikeygeneration"),
 }));
 
 vi.mock("../../rbac", async (importOriginal) => {
@@ -113,9 +111,7 @@ describe("apiKey.myBindings", () => {
 
       expect(projectBindings).toHaveLength(1);
       expect(projectBindings[0]!.scopeId).toBe(ACTIVE_PROJECT_ID);
-      expect(
-        result.find((b) => b.scopeId === ARCHIVED_PROJECT_ID),
-      ).toBeUndefined();
+      expect(result.find((b) => b.scopeId === ARCHIVED_PROJECT_ID)).toBeUndefined();
     });
 
     it("keeps organization-scoped bindings unchanged", async () => {

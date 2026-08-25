@@ -209,13 +209,7 @@ const RECOGNIZERS: Recognizer[] = [
     entity: "US_BANK_NUMBER",
     regex: /\b\d{8,17}\b/g,
     contextRequired: true,
-    contextWords: [
-      "account number",
-      "account #",
-      "routing",
-      "bank account",
-      "iban",
-    ],
+    contextWords: ["account number", "account #", "routing", "bank account", "iban"],
   },
   {
     entity: "US_DRIVER_LICENSE",
@@ -283,8 +277,7 @@ const HAS_LETTER = /[A-Za-z]/;
 const HAS_DIGIT = /\d/;
 const HAS_LOWERCASE = /[a-z]/;
 const HAS_UPPERCASE = /[A-Z]/;
-const UUID_VALUE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_VALUE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HEX_RUN_VALUE = /^[0-9a-f]{16,}$/i;
 const BASE64ISH_VALUE = /^[A-Za-z0-9+/_=-]{16,}$/;
 
@@ -329,9 +322,7 @@ function isIdentifierShapedValue(value: string): boolean {
   if (HAS_DIGIT.test(value) && IDENTIFIER_VALUE.test(value)) return true;
   if (UUID_VALUE.test(value) || HEX_RUN_VALUE.test(value)) return true;
   return (
-    BASE64ISH_VALUE.test(value) &&
-    HAS_LOWERCASE.test(value) &&
-    HAS_UPPERCASE.test(value)
+    BASE64ISH_VALUE.test(value) && HAS_LOWERCASE.test(value) && HAS_UPPERCASE.test(value)
   );
 }
 
@@ -353,15 +344,8 @@ function insideIdentifierToken(text: string, span: Span): boolean {
   return HAS_LETTER.test(text.slice(start, end));
 }
 
-function hasContextWord(
-  text: string,
-  span: Span,
-  words: readonly string[],
-): boolean {
-  const before = text.slice(
-    Math.max(0, span.start - CONTEXT_WINDOW),
-    span.start,
-  );
+function hasContextWord(text: string, span: Span, words: readonly string[]): boolean {
+  const before = text.slice(Math.max(0, span.start - CONTEXT_WINDOW), span.start);
   const after = text.slice(span.end, span.end + CONTEXT_WINDOW);
   const window = (before + " " + after).toLowerCase();
   return words.some((word) => window.includes(word));
@@ -393,9 +377,7 @@ export function matchesPiiException(
  * compile failure here means legacy or hand-edited config, and redaction must
  * keep running rather than crash ingestion.
  */
-export function compilePiiExceptPatterns(
-  patterns: readonly string[],
-): RegExp[] {
+export function compilePiiExceptPatterns(patterns: readonly string[]): RegExp[] {
   const compiled: RegExp[] = [];
   for (const pattern of patterns) {
     try {
@@ -729,11 +711,7 @@ export function redactEssentialPiiInText({
   exceptPatterns?: readonly RegExp[];
   isAttributeValue?: boolean;
 }): PiiRedactionResult {
-  if (
-    typeof text !== "string" ||
-    text.length === 0 ||
-    text.length > MAX_SCAN_LENGTH
-  ) {
+  if (typeof text !== "string" || text.length === 0 || text.length > MAX_SCAN_LENGTH) {
     return { text, redactedCount: 0 };
   }
 

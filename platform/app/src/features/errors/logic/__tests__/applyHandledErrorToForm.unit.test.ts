@@ -24,9 +24,7 @@ const registered = (name: string) => ({ _f: { name, ref: {} } });
 
 const formWithFields = (...fields: string[]): FormStub => ({
   control: {
-    _fields: Object.fromEntries(
-      fields.map((field) => [field, registered(field)]),
-    ),
+    _fields: Object.fromEntries(fields.map((field) => [field, registered(field)])),
   },
   setError: vi.fn(),
 });
@@ -77,9 +75,7 @@ describe("applyHandledErrorToForm", () => {
         form,
       );
 
-      const focused = form.setError.mock.calls.filter(
-        (call) => call[2]?.shouldFocus,
-      );
+      const focused = form.setError.mock.calls.filter((call) => call[2]?.shouldFocus);
       expect(focused).toHaveLength(1);
     });
   });
@@ -310,12 +306,8 @@ describe("applyHandledErrorToForm", () => {
       const form = formWithFields("name");
 
       expect(apply(validationError({}), form)).toBe(false);
-      expect(apply(validationError({ fieldErrors: { name: [] } }), form)).toBe(
-        false,
-      );
-      expect(
-        apply(validationError({ fieldErrors: "not an object" }), form),
-      ).toBe(false);
+      expect(apply(validationError({ fieldErrors: { name: [] } }), form)).toBe(false);
+      expect(apply(validationError({ fieldErrors: "not an object" }), form)).toBe(false);
       expect(form.setError).not.toHaveBeenCalled();
     });
   });

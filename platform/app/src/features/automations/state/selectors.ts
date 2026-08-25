@@ -27,10 +27,8 @@ export const useTestHistory = () => useAutomationStore((s) => s.testHistory);
 
 export const useConditionsSet = () =>
   useAutomationStore((s) => conditionsAreSet(s.draft));
-export const useSubjectSet = () =>
-  useAutomationStore((s) => subjectIsSet(s.draft));
-export const useCadenceSet = () =>
-  useAutomationStore((s) => cadenceIsSet(s.draft));
+export const useSubjectSet = () => useAutomationStore((s) => subjectIsSet(s.draft));
+export const useCadenceSet = () => useAutomationStore((s) => cadenceIsSet(s.draft));
 /** Preset noun set (heading / button / toast copy) for the chosen type.
  *  `isEdit` is a caller concern, so it stays an argument rather than store
  *  state; the hook only subscribes to `draft.source`. */
@@ -42,8 +40,7 @@ export const useConfigComplete = () =>
   useAutomationStore((s) => configIsComplete(s.draft));
 export const useConfigurationSummary = () =>
   useAutomationStore((s) => configurationSummary(s.draft));
-export const useNotifyChannel = () =>
-  useAutomationStore((s) => notifyChannel(s.draft));
+export const useNotifyChannel = () => useAutomationStore((s) => notifyChannel(s.draft));
 
 /**
  * Resolves the active notify provider + its slice, or null when the

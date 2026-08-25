@@ -93,7 +93,9 @@ const create = protectedProcedure
   .mutation(async ({ ctx, input }) => {
     const definition = validateSavedWorkbenchChartDefinition({
       projectId: input.projectId,
-      protections: await getUserProtectionsForProject(ctx, { projectId: input.projectId }),
+      protections: await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      }),
       definition: input.definition,
       lwql: ctx.app.langWatchQL,
     });
@@ -123,14 +125,17 @@ const update = protectedProcedure
   .permission("analytics:update")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    const definition = input.definition === undefined
-      ? undefined
-      : validateSavedWorkbenchChartDefinition({
-          projectId: input.projectId,
-          protections: await getUserProtectionsForProject(ctx, { projectId: input.projectId }),
-          definition: input.definition,
-          lwql: ctx.app.langWatchQL,
-        });
+    const definition =
+      input.definition === undefined
+        ? undefined
+        : validateSavedWorkbenchChartDefinition({
+            projectId: input.projectId,
+            protections: await getUserProtectionsForProject(ctx, {
+              projectId: input.projectId,
+            }),
+            definition: input.definition,
+            lwql: ctx.app.langWatchQL,
+          });
     return await dashboardSavedChartCall(() =>
       ctx.app.dashboard.updateSavedWorkbenchChart({
         chartId: input.id,

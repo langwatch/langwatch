@@ -185,13 +185,7 @@ describe("Feature: Personal usage REST API", () => {
   const windowStartMs = Date.UTC(2026, 0, 1);
   const windowEndMs = Date.UTC(2026, 0, 31);
 
-  const authHeaders = ({
-    apiKey,
-    projectId,
-  }: {
-    apiKey: string;
-    projectId: string;
-  }) => ({
+  const authHeaders = ({ apiKey, projectId }: { apiKey: string; projectId: string }) => ({
     Authorization: `Bearer ${apiKey}`,
     "X-Project-Id": projectId,
     "Content-Type": "application/json",
@@ -476,12 +470,8 @@ describe("Feature: Personal usage REST API", () => {
     await prisma.roleBinding
       .deleteMany({ where: { organizationId: testOrganization.id } })
       .catch(() => {});
-    await prisma.project
-      .deleteMany({ where: { teamId: testTeam.id } })
-      .catch(() => {});
-    await prisma.teamUser
-      .deleteMany({ where: { teamId: testTeam.id } })
-      .catch(() => {});
+    await prisma.project.deleteMany({ where: { teamId: testTeam.id } }).catch(() => {});
+    await prisma.teamUser.deleteMany({ where: { teamId: testTeam.id } }).catch(() => {});
     const orgUsers = await prisma.organizationUser
       .findMany({ where: { organizationId: testOrganization.id } })
       .catch(() => []);
@@ -557,24 +547,21 @@ describe("Feature: Personal usage REST API", () => {
           0,
         );
         expect(total).toBeCloseTo(0.5, 5);
-        expect(
-          body.breakdownByModel.map((m: { label: string }) => m.label),
-        ).toContain("gpt-4o");
+        expect(body.breakdownByModel.map((m: { label: string }) => m.label)).toContain(
+          "gpt-4o",
+        );
       });
     });
 
     describe("when a half-specified window is provided", () => {
       /** @scenario "A half-specified window is rejected" */
       it("returns 400 explaining both bounds are required", async () => {
-        const res = await app.request(
-          `/api/me/usage?windowStartMs=${windowStartMs}`,
-          {
-            headers: authHeaders({
-              apiKey: seededProject.apiKey,
-              projectId: seededProject.id,
-            }),
-          },
-        );
+        const res = await app.request(`/api/me/usage?windowStartMs=${windowStartMs}`, {
+          headers: authHeaders({
+            apiKey: seededProject.apiKey,
+            projectId: seededProject.id,
+          }),
+        });
         // 422: the window failed the query SCHEMA, so the validation boundary
         // reports it as unprocessable with the offending fields attached. 400
         // stays for a request the parser could not read at all.
@@ -714,9 +701,7 @@ describe("Feature: Personal usage REST API", () => {
         // is the assertion that says so.
         expect(body.summary.spentUsd).toBe(0.300000123);
         expect(body.summary.requests).toBe(1);
-        const labels = body.breakdownByModel.map(
-          (m: { label: string }) => m.label,
-        );
+        const labels = body.breakdownByModel.map((m: { label: string }) => m.label);
         expect(labels).toContain("claude-sonnet-4-6");
         // gpt-4o only appears on the foreign-tenant row — proves exclusion.
         expect(labels).not.toContain("gpt-4o");

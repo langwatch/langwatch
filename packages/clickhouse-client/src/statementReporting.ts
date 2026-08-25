@@ -55,10 +55,7 @@ export interface StatementMetrics {
     table: string;
     durationSeconds: number;
   }): void;
-  incrementCount(input: {
-    queryType: VendorQueryType;
-    outcome: StatementOutcome;
-  }): void;
+  incrementCount(input: { queryType: VendorQueryType; outcome: StatementOutcome }): void;
 }
 
 /** The subset of a structured logger this package writes through. */
@@ -223,10 +220,7 @@ export class StatementReporter {
         `ClickHouse ${operation} failed`,
       );
     } catch (loggingError) {
-      this.noticeLogger.error(
-        { loggingError },
-        "Failed to log ClickHouse query failure",
-      );
+      this.noticeLogger.error({ loggingError }, "Failed to log ClickHouse query failure");
     }
   }
 
@@ -249,9 +243,7 @@ export class StatementReporter {
       // per call. Worth warning even when fast, because the cost is request
       // count, not latency.
       const coldScanTable =
-        operation === "query"
-          ? this.detectColdScan(extractRawQuery(params))
-          : null;
+        operation === "query" ? this.detectColdScan(extractRawQuery(params)) : null;
 
       if (coldScanTable !== null) {
         this.outcomeLogger.warn(
@@ -280,10 +272,7 @@ export class StatementReporter {
         );
       }
     } catch (loggingError) {
-      this.noticeLogger.error(
-        { loggingError },
-        "Failed to log ClickHouse query success",
-      );
+      this.noticeLogger.error({ loggingError }, "Failed to log ClickHouse query success");
     }
   }
 

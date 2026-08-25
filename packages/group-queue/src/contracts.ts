@@ -104,9 +104,7 @@ export interface GroupQueueDependencies<Payload> {
   activity?: GroupQueueActivityPort<Payload>;
   failures?: GroupQueueFailureClassifier;
   objectStoreFor?: (projectId: string) => ObjectStore;
-  resolveStorageDestination?: (
-    projectId: string,
-  ) => Promise<ProjectStorageDestination>;
+  resolveStorageDestination?: (projectId: string) => Promise<ProjectStorageDestination>;
 }
 
 export interface QueueAuditAdapter<Payload> {
@@ -122,11 +120,7 @@ export interface QueueAuditAdapter<Payload> {
     attempt: number;
     leasedUntil?: Date;
   }): Promise<void>;
-  onDispatched(event: {
-    payload: Payload;
-    at: Date;
-    attempt: number;
-  }): Promise<void>;
+  onDispatched(event: { payload: Payload; at: Date; attempt: number }): Promise<void>;
   onFailed(event: {
     payload: Payload;
     error: string;
@@ -134,17 +128,11 @@ export interface QueueAuditAdapter<Payload> {
     nextAttemptAt?: Date;
     attempt: number;
   }): Promise<void>;
-  onDead(event: {
-    payload: Payload;
-    lastError: string;
-    attempt: number;
-  }): Promise<void>;
+  onDead(event: { payload: Payload; lastError: string; attempt: number }): Promise<void>;
 }
 
 /** Internal runtime shape. Public callers create this through defineGroupQueue. */
-export interface GroupQueueRuntimeDefinition<
-  Payload extends Record<string, unknown>,
-> {
+export interface GroupQueueRuntimeDefinition<Payload extends Record<string, unknown>> {
   name: string;
   process: (payload: Payload, delivery?: JobDelivery) => Promise<void>;
   processBatch?: (payloads: Payload[], delivery?: JobDelivery) => Promise<void>;

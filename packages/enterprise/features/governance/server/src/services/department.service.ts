@@ -9,9 +9,7 @@ import type { DepartmentRepository } from "../ports/department.port";
 export class DepartmentService {
   private constructor(private readonly repository: DepartmentRepository) {}
 
-  static create(options: {
-    repository: DepartmentRepository;
-  }): DepartmentService {
+  static create(options: { repository: DepartmentRepository }): DepartmentService {
     return new DepartmentService(options.repository);
   }
 
@@ -19,23 +17,15 @@ export class DepartmentService {
     return this.repository.getAll(input.organizationId);
   }
 
-  tryGetById(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<Department | null> {
+  tryGetById(input: { id: string; organizationId: string }): Promise<Department | null> {
     return this.repository.tryGetById(input);
   }
 
-  getAssignments(input: {
-    organizationId: string;
-  }): Promise<DepartmentAssignments> {
+  getAssignments(input: { organizationId: string }): Promise<DepartmentAssignments> {
     return this.repository.getAssignments(input.organizationId);
   }
 
-  create(input: {
-    organizationId: string;
-    name: string;
-  }): Promise<Department> {
+  create(input: { organizationId: string; name: string }): Promise<Department> {
     return this.repository.create(input);
   }
 
@@ -57,10 +47,7 @@ export class DepartmentService {
     return this.getDepartment(input);
   }
 
-  async archive(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<void> {
+  async archive(input: { id: string; organizationId: string }): Promise<void> {
     if (!(await this.repository.archive(input))) {
       throw new DepartmentNotFoundError();
     }

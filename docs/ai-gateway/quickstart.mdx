@@ -15,27 +15,39 @@ The fastest path depends on which side of the rollout you're on. **Pick one befo
     Your admin already wired up the gateway and you got an SSO sign-in link or asked to install `langwatch`.
 
     Skip ahead to **Personal IDE keys**: `langwatch login --device` provisions your virtual key automatically. You don't need to set up providers, budgets, or routing.
+
   </Card>
   <Card title="I'm an org admin" icon="shield-halved" href="/ai-gateway/governance/admin-setup">
     Your company just bought governance and you're rolling it out for the team.
 
     Skip ahead to **Admin setup**: connect SSO, providers, and routing policies once, every developer auto-onboards from there.
+
   </Card>
 </CardGroup>
 
 The rest of this page uses a **service virtual key**, the flow for non-personal traffic (server-to-server calls from your applications, evaluators, prompt playground, etc.).
 
-<Note>You'll need a LangWatch account, an **organisation admin** or **project admin** role, and at least one model provider (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, or Gemini) configured at **Settings → Model Providers**. If you haven't set one up yet, start there, the AI Gateway reuses those credentials.</Note>
+<Note>
+  You'll need a LangWatch account, an **organisation admin** or **project admin** role,
+  and at least one model provider (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, or
+  Gemini) configured at **Settings → Model Providers**. If you haven't set one up yet,
+  start there, the AI Gateway reuses those credentials.
+</Note>
 
 <CardGroup cols={2}>
   <Card title="Python, TypeScript SDK" icon="code" href="/ai-gateway/sdks/python">
     Drop-in for the OpenAI, Anthropic SDKs, swap `base_url` and `api_key`.
   </Card>
-  <Card title="Use it from your coding assistant" icon="terminal" href="/ai-gateway/cli/overview">
+  <Card
+    title="Use it from your coding assistant"
+    icon="terminal"
+    href="/ai-gateway/cli/overview"
+  >
     Wire Claude Code, Codex, OpenCode, Cursor, or Aider through the gateway.
   </Card>
   <Card title="Core concepts" icon="compass" href="/ai-gateway/concepts">
-    Virtual keys, budgets, ModelProvider gateway settings, routing policies, cache rules, fallback chains.
+    Virtual keys, budgets, ModelProvider gateway settings, routing policies, cache rules,
+    fallback chains.
   </Card>
   <Card title="API reference" icon="book" href="/ai-gateway/api/chat-completions">
     OpenAI-compatible `/v1/chat/completions` + Anthropic-shape `/v1/messages`.
@@ -136,15 +148,15 @@ Within ~30 seconds the request appears in the project the virtual key belongs to
 
 Every gateway trace carries these attributes:
 
-| Attribute | Meaning |
-|---|---|
-| `langwatch.vk_id` | Virtual key id. |
-| `langwatch.project_id` | Owning project. |
-| `langwatch.team_id` | Owning team. |
-| `langwatch.org_id` | Owning organisation. |
-| `langwatch.principal_id` | User or service account that made the call. |
+| Attribute                                                                          | Meaning                                                         |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `langwatch.vk_id`                                                                  | Virtual key id.                                                 |
+| `langwatch.project_id`                                                             | Owning project.                                                 |
+| `langwatch.team_id`                                                                | Owning team.                                                    |
+| `langwatch.org_id`                                                                 | Owning organisation.                                            |
+| `langwatch.principal_id`                                                           | User or service account that made the call.                     |
 | `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens` | Cache economics (OTel GenAI semconv; zero when cache bypassed). |
-| `langwatch.fallback.attempt` | 0 on primary success, N for fallback attempts. |
+| `langwatch.fallback.attempt`                                                       | 0 on primary success, N for fallback attempts.                  |
 
 ## 4. Add a budget
 

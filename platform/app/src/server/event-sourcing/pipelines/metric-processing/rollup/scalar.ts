@@ -40,9 +40,7 @@ export function buildSumRow({
     const starts = startsNewSequence(previous, point);
     const previousValue = previous ? numberValue(previous) : null;
     const decreased =
-      point.isMonotonic === true &&
-      previousValue !== null &&
-      current < previousValue;
+      point.isMonotonic === true && previousValue !== null && current < previousValue;
     if (starts || decreased || previousValue === null) {
       resetOrGap({ row, previous, current: point });
       addStats(row, current);

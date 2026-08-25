@@ -129,8 +129,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (ch) {
     await ch.exec({
-      query:
-        "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+      query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId },
     });
   }
@@ -265,8 +264,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
 
     afterAll(async () => {
       await ch.exec({
-        query:
-          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: eventsTenantId },
       });
     });
@@ -389,13 +387,10 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
         rollupRow({
           traceId: noisyTraceId,
           spanId: "noisy-span",
-          events: Array.from(
-            { length: MAX_EVENT_NAMES_PER_TRACE + 5 },
-            (_, i) => ({
-              ts: at(100 + i),
-              name: `event.kind.${String(i).padStart(2, "0")}`,
-            }),
-          ),
+          events: Array.from({ length: MAX_EVENT_NAMES_PER_TRACE + 5 }, (_, i) => ({
+            ts: at(100 + i),
+            name: `event.kind.${String(i).padStart(2, "0")}`,
+          })),
         }),
         // Our own half of the shared trace id, so the read has something to
         // return for it and the isolation assertion is not vacuous.
@@ -408,22 +403,17 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       // The neighbour's half: same trace id, different tenant. A read missing
       // its tenant predicate would fold this in.
       await insertRows([
-        makeEventRow(
-          "other-tenant-span",
-          [{ ts: at(10), name: "leaked", attrs: {} }],
-          {
-            TenantId: `${rollupTenantId}-neighbour`,
-            TraceId: otherTenantTraceId,
-          },
-        ),
+        makeEventRow("other-tenant-span", [{ ts: at(10), name: "leaked", attrs: {} }], {
+          TenantId: `${rollupTenantId}-neighbour`,
+          TraceId: otherTenantTraceId,
+        }),
       ]);
     });
 
     afterAll(async () => {
       for (const tenant of [rollupTenantId, `${rollupTenantId}-neighbour`]) {
         await ch.exec({
-          query:
-            "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+          query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
           query_params: { tenantId: tenant },
         });
       }
@@ -617,13 +607,11 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
 
     afterAll(async () => {
       await ch.exec({
-        query:
-          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: hintlessTenantId },
       });
       await ch.exec({
-        query:
-          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: hintlessTenantId },
       });
     });
@@ -740,13 +728,11 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
 
     afterAll(async () => {
       await ch.exec({
-        query:
-          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: hintlessTenantId },
       });
       await ch.exec({
-        query:
-          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: hintlessTenantId },
       });
     });
@@ -927,8 +913,7 @@ describe("SpanStorageClickHouseRepository per-span cost columns (integration)", 
   afterAll(async () => {
     if (ch) {
       await ch.exec({
-        query:
-          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: costTenantId },
       });
     }
@@ -1110,13 +1095,7 @@ describe("SpanStorageClickHouseRepository cursor-paged span summaries (integrati
       const pages = await walkSpanSummaries(longTraceId, 2);
 
       const all = pages.flatMap((p) => p.rows.map((r) => r.spanId));
-      expect(all).toEqual([
-        "early-0",
-        "early-1",
-        "early-2",
-        "late-0",
-        "late-1",
-      ]);
+      expect(all).toEqual(["early-0", "early-1", "early-2", "late-0", "late-1"]);
     });
   });
 });
@@ -1221,8 +1200,7 @@ describe("SpanStorageClickHouseRepository lone-surrogate span insert (integratio
   afterAll(async () => {
     if (ch) {
       await ch.exec({
-        query:
-          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: surrogateTenantId },
       });
     }

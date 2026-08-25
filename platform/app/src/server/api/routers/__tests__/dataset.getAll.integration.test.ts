@@ -117,10 +117,7 @@ describe("dataset.getAll", () => {
     // projects it touched — the tenancy guard requires the projectId besides.
     const projectIds = [PROJECT_ID, otherProjectId];
     await cleanupTestRows(prisma, [
-      [
-        "datasetRecord",
-        { datasetId: { in: datasetIds }, projectId: { in: projectIds } },
-      ],
+      ["datasetRecord", { datasetId: { in: datasetIds }, projectId: { in: projectIds } }],
       ["dataset", { id: { in: datasetIds }, projectId: { in: projectIds } }],
       ["project", { id: otherProjectId }],
     ]);
@@ -157,9 +154,9 @@ describe("dataset.getAll", () => {
 
         // The neighbouring project's dataset is not in my list at all, and its
         // 25 entries have not inflated any row here.
-        expect(
-          listed.some((dataset) => dataset.name === "neighbour dataset"),
-        ).toBe(false);
+        expect(listed.some((dataset) => dataset.name === "neighbour dataset")).toBe(
+          false,
+        );
       });
 
       /** @scenario "Listing never counts another project's entries" */

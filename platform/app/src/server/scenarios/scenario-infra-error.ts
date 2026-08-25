@@ -170,9 +170,7 @@ function exposesInternals(message: string): boolean {
 
 /** Net bracket depth a line opens (negative when it closes more than it opens). */
 function bracketDelta(line: string): number {
-  return (
-    (line.match(/[{[]/g)?.length ?? 0) - (line.match(/[}\]]/g)?.length ?? 0)
-  );
+  return (line.match(/[{[]/g)?.length ?? 0) - (line.match(/[}\]]/g)?.length ?? 0);
 }
 
 /**
@@ -289,9 +287,7 @@ function isTunnelGoneFailure(text: string): boolean {
  * tunnel: the caller supplies the "target has a devTunnel" fact, this module
  * supplies the "the failure looks like the tunnel is gone" half.
  */
-export function isTransportLevelScenarioFailure(
-  raw: string | undefined,
-): boolean {
+export function isTransportLevelScenarioFailure(raw: string | undefined): boolean {
   const text = (raw ?? "").trim();
   if (text.length === 0) return false;
   return (
@@ -436,8 +432,7 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
     alsoRequires: isOurRunnerCrash,
     build: () => ({
       code: ScenarioInfraErrorCode.RunnerUnavailable,
-      message:
-        "The simulation runner couldn't start, so the scenario never ran.",
+      message: "The simulation runner couldn't start, so the scenario never ran.",
       hint: "This is a fault on our side, not a problem with your scenario. Retry the run, and contact support if it keeps happening.",
     }),
   },
@@ -496,9 +491,7 @@ export function classifyScenarioInfraError(
   }
 
   for (const rule of CLASSIFICATION_RULES) {
-    const hasMatchingNeedle = rule.needles.some((needle) =>
-      contains(text, needle),
-    );
+    const hasMatchingNeedle = rule.needles.some((needle) => contains(text, needle));
     if (hasMatchingNeedle && (rule.alsoRequires?.(text) ?? true)) {
       return rule.build(text);
     }
@@ -534,15 +527,12 @@ export function decodeScenarioError(
   }
   if (!parsed || typeof parsed !== "object") return null;
   const candidate = parsed as Record<string, unknown>;
-  if (
-    typeof candidate.code !== "string" ||
-    typeof candidate.message !== "string"
-  ) {
+  if (typeof candidate.code !== "string" || typeof candidate.message !== "string") {
     return null;
   }
-  const knownCode = (
-    Object.values(ScenarioInfraErrorCode) as string[]
-  ).includes(candidate.code);
+  const knownCode = (Object.values(ScenarioInfraErrorCode) as string[]).includes(
+    candidate.code,
+  );
   if (!knownCode) return null;
   return {
     code: candidate.code as ScenarioInfraErrorCode,
@@ -591,8 +581,7 @@ export function extractScenarioErrorText(raw: string): string {
  */
 export function resolveScenarioError(raw: string): ScenarioErrorEnvelope {
   return (
-    decodeScenarioError(raw) ??
-    classifyScenarioInfraError(extractScenarioErrorText(raw))
+    decodeScenarioError(raw) ?? classifyScenarioInfraError(extractScenarioErrorText(raw))
   );
 }
 

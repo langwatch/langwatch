@@ -3,10 +3,7 @@ import type { editor, IDisposable, Position } from "monaco-editor";
 import { PYTHON_BUILTIN_BY_NAME } from "../pythonStdlib";
 import { ATTR_ACCESS, type ContractRef, scanImports } from "./shared";
 
-export function registerHover(
-  monaco: Monaco,
-  contractRef: ContractRef,
-): IDisposable {
+export function registerHover(monaco: Monaco, contractRef: ContractRef): IDisposable {
   return monaco.languages.registerHoverProvider("python", {
     provideHover: (model: editor.ITextModel, position: Position) => {
       const word = model.getWordAtPosition(position);
@@ -50,8 +47,7 @@ export function registerHover(
             contents: [
               { value: `**${mod.name}.${member.name}**` },
               {
-                value:
-                  "```python\n" + (member.signature ?? member.name) + "\n```",
+                value: "```python\n" + (member.signature ?? member.name) + "\n```",
               },
               { value: member.doc ?? "" },
             ],
@@ -59,33 +55,25 @@ export function registerHover(
         }
       }
       // Bare identifier — node input, output, or builtin (in that order).
-      const input = contractRef.current.inputs.find(
-        (f) => f.identifier === word.word,
-      );
+      const input = contractRef.current.inputs.find((f) => f.identifier === word.word);
       if (input) {
         return {
           contents: [
             { value: `**${input.identifier}** *(node input)*` },
             {
-              value:
-                "```python\n" + `${input.identifier}: ${input.type}\n` + "```",
+              value: "```python\n" + `${input.identifier}: ${input.type}\n` + "```",
             },
             { value: "Wired in the Inputs section of the properties panel." },
           ],
         };
       }
-      const output = contractRef.current.outputs.find(
-        (f) => f.identifier === word.word,
-      );
+      const output = contractRef.current.outputs.find((f) => f.identifier === word.word);
       if (output) {
         return {
           contents: [
             { value: `**${output.identifier}** *(node output)*` },
             {
-              value:
-                "```python\n" +
-                `${output.identifier}: ${output.type}\n` +
-                "```",
+              value: "```python\n" + `${output.identifier}: ${output.type}\n` + "```",
             },
             {
               value:
@@ -112,8 +100,7 @@ export function registerHover(
           contents: [
             { value: `**${builtin.name}**` },
             {
-              value:
-                "```python\n" + (builtin.signature ?? builtin.name) + "\n```",
+              value: "```python\n" + (builtin.signature ?? builtin.name) + "\n```",
             },
             { value: builtin.doc ?? "" },
           ],

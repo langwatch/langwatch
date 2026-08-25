@@ -5,12 +5,7 @@ import {
   TABLE_TIME_COLUMNS,
 } from "../facet-registry";
 import { EVALUATOR_DEF, LABEL_DEF, MODEL_DEF } from "./custom-handlers";
-import type {
-  CategoricalRead,
-  FieldDef,
-  FieldNeeds,
-  RangeRead,
-} from "./field-def";
+import type { CategoricalRead, FieldDef, FieldNeeds, RangeRead } from "./field-def";
 import { UNSUPPORTED } from "./field-def";
 import {
   categorical,
@@ -27,15 +22,11 @@ import { META_FIELD_DEFS } from "./meta-handlers";
 
 const FACET_BY_KEY = new Map(FACET_REGISTRY.map((d) => [d.key, d]));
 
-function expressionFacet(
-  key: string,
-): ExpressionCategoricalDef | RangeFacetDef {
+function expressionFacet(key: string): ExpressionCategoricalDef | RangeFacetDef {
   const def = FACET_BY_KEY.get(key);
   if (!def) throw new Error(`facet '${key}' is missing from FACET_REGISTRY`);
   if (!("expression" in def)) {
-    throw new Error(
-      `facet '${key}' has no expression to derive a handler from`,
-    );
+    throw new Error(`facet '${key}' has no expression to derive a handler from`);
   }
   return def;
 }
@@ -85,11 +76,7 @@ function crossCategoricalFacet(
   );
 }
 
-function crossRangeFacet(
-  key: string,
-  needs: FieldNeeds,
-  read: RangeRead,
-): FieldDef {
+function crossRangeFacet(key: string, needs: FieldNeeds, read: RangeRead): FieldDef {
   const def = expressionFacet(key);
   if (def.kind !== "range") {
     throw new Error(`facet '${key}' is not a range facet`);
@@ -263,11 +250,7 @@ export const FIELD_DEFS = {
     "evaluations",
     evaluatorVerdictRead,
   ),
-  evaluatorScore: crossRangeFacet(
-    "evaluatorScore",
-    "evaluations",
-    evaluatorScoreRead,
-  ),
+  evaluatorScore: crossRangeFacet("evaluatorScore", "evaluations", evaluatorScoreRead),
   evaluatorLabel: crossCategoricalFacet(
     "evaluatorLabel",
     "evaluations",

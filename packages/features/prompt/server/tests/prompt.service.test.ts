@@ -98,13 +98,9 @@ describe("PromptService", () => {
         };
 
         mockRepository.updateConfig.mockResolvedValue(mockConfig);
-        mockRepository.versions.getLatestVersion.mockResolvedValue(
-          mockLatestVersion,
-        );
+        mockRepository.versions.getLatestVersion.mockResolvedValue(mockLatestVersion);
         mockVersionService.createVersion.mockResolvedValue(mockUpdatedVersion);
-        mockPrisma.$transaction.mockImplementation(async (cb: any) =>
-          cb(mockPrisma),
-        );
+        mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
 
         await promptService.updatePrompt({
           idOrHandle: "test-prompt",
@@ -129,13 +125,9 @@ describe("PromptService", () => {
         };
 
         mockRepository.updateConfig.mockResolvedValue(mockConfig);
-        mockRepository.versions.getLatestVersion.mockResolvedValue(
-          mockLatestVersion,
-        );
+        mockRepository.versions.getLatestVersion.mockResolvedValue(mockLatestVersion);
         mockVersionService.createVersion.mockResolvedValue(mockUpdatedVersion);
-        mockPrisma.$transaction.mockImplementation(async (cb: any) =>
-          cb(mockPrisma),
-        );
+        mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
 
         await promptService.updatePrompt({
           idOrHandle: "test-prompt",
@@ -168,13 +160,9 @@ describe("PromptService", () => {
         };
 
         mockRepository.updateConfig.mockResolvedValue(mockConfig);
-        mockRepository.versions.getLatestVersion.mockResolvedValue(
-          mockLatestVersion,
-        );
+        mockRepository.versions.getLatestVersion.mockResolvedValue(mockLatestVersion);
         mockVersionService.createVersion.mockResolvedValue(mockUpdatedVersion);
-        mockPrisma.$transaction.mockImplementation(async (cb: any) =>
-          cb(mockPrisma),
-        );
+        mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
 
         await promptService.updatePrompt({
           idOrHandle: configId,

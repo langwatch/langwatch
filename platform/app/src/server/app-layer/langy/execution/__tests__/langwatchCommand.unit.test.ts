@@ -7,18 +7,16 @@ import {
 describe("parseLangwatchCommand", () => {
   describe("given a plain CLI invocation", () => {
     it("reads the resource and the verb", () => {
-      expect(
-        parseLangwatchCommand("langwatch trace search --format json"),
-      ).toMatchObject({ resource: "trace", verb: "search" });
+      expect(parseLangwatchCommand("langwatch trace search --format json")).toMatchObject(
+        { resource: "trace", verb: "search" },
+      );
     });
 
     it("reads a verb that carries an argument", () => {
-      expect(parseLangwatchCommand("langwatch trace get abc123")).toMatchObject(
-        {
-          resource: "trace",
-          verb: "get",
-        },
-      );
+      expect(parseLangwatchCommand("langwatch trace get abc123")).toMatchObject({
+        resource: "trace",
+        verb: "get",
+      });
     });
 
     it("reads a kebab-case verb", () => {
@@ -28,9 +26,7 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("reads a kebab-case resource", () => {
-      expect(
-        parseLangwatchCommand("langwatch simulation-run list"),
-      ).toMatchObject({
+      expect(parseLangwatchCommand("langwatch simulation-run list")).toMatchObject({
         resource: "simulation-run",
         verb: "list",
       });
@@ -52,9 +48,7 @@ describe("parseLangwatchCommand", () => {
 
     it("finds it before a pipe", () => {
       expect(
-        parseLangwatchCommand(
-          "langwatch trace search --format json | jq '.traces[0]'",
-        ),
+        parseLangwatchCommand("langwatch trace search --format json | jq '.traces[0]'"),
       ).toMatchObject({ resource: "trace", verb: "search" });
     });
 
@@ -88,9 +82,7 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("does not read a quoted argument as the resource", () => {
-      expect(
-        parseLangwatchCommand('langwatch "scenario" run scn_123'),
-      ).toMatchObject({
+      expect(parseLangwatchCommand('langwatch "scenario" run scn_123')).toMatchObject({
         resource: "scenario",
         verb: "run",
       });
@@ -111,9 +103,7 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("returns null when langwatch is only an argument to another program", () => {
-      expect(
-        parseLangwatchCommand("echo langwatch trace search > note.txt"),
-      ).toBeNull();
+      expect(parseLangwatchCommand("echo langwatch trace search > note.txt")).toBeNull();
     });
 
     it("returns null when langwatch is a grep pattern", () => {
@@ -141,8 +131,7 @@ describe("parseLangwatchCommand", () => {
 
     it("parses --flag=value and keeps the positional under _", () => {
       expect(
-        parseLangwatchCommand("langwatch dataset get golden-set --format=json")
-          ?.args,
+        parseLangwatchCommand("langwatch dataset get golden-set --format=json")?.args,
       ).toEqual({ _: ["golden-set"], format: "json" });
     });
 
@@ -156,9 +145,7 @@ describe("parseLangwatchCommand", () => {
 
     it("stops at a shell separator so the next command's flags stay out", () => {
       expect(
-        parseLangwatchCommand(
-          "langwatch trace search --limit 3 | jq '.traces[0]'",
-        )?.args,
+        parseLangwatchCommand("langwatch trace search --limit 3 | jq '.traces[0]'")?.args,
       ).toEqual({ limit: "3" });
     });
 
@@ -177,9 +164,7 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("returns null when the second word is a path, not a verb", () => {
-      expect(
-        parseLangwatchCommand("langwatch docs integration/python/guide"),
-      ).toBeNull();
+      expect(parseLangwatchCommand("langwatch docs integration/python/guide")).toBeNull();
     });
 
     it("returns null when the verb position holds a flag", () => {
@@ -201,9 +186,10 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("finds it when invoked by path", () => {
-      expect(
-        parseLangwatchCommand("/opt/homebrew/bin/lw trace search"),
-      ).toMatchObject({ resource: "trace", verb: "search" });
+      expect(parseLangwatchCommand("/opt/homebrew/bin/lw trace search")).toMatchObject({
+        resource: "trace",
+        verb: "search",
+      });
     });
 
     it("does not mistake a word merely ending in lw for the bin", () => {
@@ -218,9 +204,9 @@ describe("parseLangwatchCommand", () => {
    */
   describe("given globals in root position, before the resource", () => {
     it("skips a value-taking global and its value", () => {
-      expect(
-        parseLangwatchCommand("langwatch --output json monitor list"),
-      ).toMatchObject({ resource: "monitor", verb: "list" });
+      expect(parseLangwatchCommand("langwatch --output json monitor list")).toMatchObject(
+        { resource: "monitor", verb: "list" },
+      );
     });
 
     it("skips the short form too", () => {
@@ -241,9 +227,10 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("skips an --flag=value global", () => {
-      expect(
-        parseLangwatchCommand("lw --output=json monitor list"),
-      ).toMatchObject({ resource: "monitor", verb: "list" });
+      expect(parseLangwatchCommand("lw --output=json monitor list")).toMatchObject({
+        resource: "monitor",
+        verb: "list",
+      });
     });
 
     it("still returns null when the globals name no resource at all", () => {
@@ -255,16 +242,14 @@ describe("parseLangwatchCommand", () => {
 describe("isSoleLangwatchInvocation", () => {
   describe("given one plain langwatch invocation", () => {
     it("accepts a bare command with flags and positionals", () => {
-      expect(
-        isSoleLangwatchInvocation("langwatch trace get run_1 --format json"),
-      ).toBe(true);
+      expect(isSoleLangwatchInvocation("langwatch trace get run_1 --format json")).toBe(
+        true,
+      );
     });
 
     it("accepts wrappers and env assignments before the program", () => {
       expect(
-        isSoleLangwatchInvocation(
-          "LANGWATCH_API_KEY=x npx langwatch monitor list",
-        ),
+        isSoleLangwatchInvocation("LANGWATCH_API_KEY=x npx langwatch monitor list"),
       ).toBe(true);
     });
   });
@@ -279,28 +264,16 @@ describe("isSoleLangwatchInvocation", () => {
     });
 
     it("rejects pipes, redirects, and substitution", () => {
-      expect(isSoleLangwatchInvocation("langwatch trace search | jq .")).toBe(
-        false,
-      );
-      expect(
-        isSoleLangwatchInvocation("langwatch trace get x > out.json"),
-      ).toBe(false);
-      expect(isSoleLangwatchInvocation("langwatch trace get $(cat id)")).toBe(
-        false,
-      );
-      expect(isSoleLangwatchInvocation("langwatch trace get `cat id`")).toBe(
-        false,
-      );
-      expect(
-        isSoleLangwatchInvocation("echo hi && langwatch trace get x"),
-      ).toBe(false);
+      expect(isSoleLangwatchInvocation("langwatch trace search | jq .")).toBe(false);
+      expect(isSoleLangwatchInvocation("langwatch trace get x > out.json")).toBe(false);
+      expect(isSoleLangwatchInvocation("langwatch trace get $(cat id)")).toBe(false);
+      expect(isSoleLangwatchInvocation("langwatch trace get `cat id`")).toBe(false);
+      expect(isSoleLangwatchInvocation("echo hi && langwatch trace get x")).toBe(false);
     });
 
     it("rejects a command where langwatch is only mentioned, not run", () => {
       expect(isSoleLangwatchInvocation("cat langwatch")).toBe(false);
-      expect(isSoleLangwatchInvocation("echo langwatch trace get x")).toBe(
-        false,
-      );
+      expect(isSoleLangwatchInvocation("echo langwatch trace get x")).toBe(false);
     });
   });
 });

@@ -1,27 +1,14 @@
-import {
-  Box,
-  Popover as ChakraPopover,
-  HStack,
-  Skeleton,
-} from "@chakra-ui/react";
+import { Box, Popover as ChakraPopover, HStack, Skeleton } from "@chakra-ui/react";
 import React, { useCallback, useState } from "react";
 import { ChevronDown } from "react-feather";
-import {
-  Controller,
-  useFieldArray,
-  useFormContext,
-  useWatch,
-} from "react-hook-form";
+import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import {
   LLMConfigPopover,
   type Output,
   type OutputType,
 } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "~/components/ModelSelector";
+import { allModelOptions, useModelSelectionOptions } from "~/components/ModelSelector";
 import { NoModelsConfiguredCallout } from "~/components/NoModelsConfiguredCallout";
 import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -48,8 +35,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   showStructuredOutputs = true,
 }: ModelSelectFieldMiniProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const { control, formState, trigger } =
-    useFormContext<PromptConfigFormValues>();
+  const { control, formState, trigger } = useFormContext<PromptConfigFormValues>();
 
   const outputsFieldArray = useFieldArray({
     control,

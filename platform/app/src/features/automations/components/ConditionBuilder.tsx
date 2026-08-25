@@ -111,8 +111,7 @@ export function ConditionBuilder({
       { id: `n${nextId.current++}`, field: "", operator: "is", value: "" },
     ]);
 
-  const removeCondition = (id: string) =>
-    commit(conditions.filter((c) => c.id !== id));
+  const removeCondition = (id: string) => commit(conditions.filter((c) => c.id !== id));
 
   return (
     <VStack align="stretch" gap={2}>
@@ -141,12 +140,7 @@ export function ConditionBuilder({
           />
         </VStack>
       ))}
-      <Button
-        alignSelf="flex-start"
-        size="xs"
-        variant="outline"
-        onClick={addCondition}
-      >
+      <Button alignSelf="flex-start" size="xs" variant="outline" onClick={addCondition}>
         <Plus size={13} />
         {conditions.length === 0 ? "Add a condition" : "Add AND condition"}
       </Button>
@@ -308,11 +302,7 @@ function ValueControl({
 
   if (suggestions.length > 0) {
     return (
-      <ValuePicker
-        value={condition.value}
-        suggestions={suggestions}
-        onValue={onValue}
-      />
+      <ValuePicker value={condition.value} suggestions={suggestions} onValue={onValue} />
     );
   }
 

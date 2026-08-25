@@ -89,8 +89,7 @@ describe("buildDecorationSlots", () => {
         {
           from: 13,
           to: 16,
-          className:
-            "filter-keyword filter-keyword-and filter-keyword-clickable",
+          className: "filter-keyword filter-keyword-and filter-keyword-clickable",
           opLoc: { start: 13, end: 16 },
         },
         {
@@ -116,8 +115,7 @@ describe("buildDecorationSlots", () => {
         {
           from: 13,
           to: 15,
-          className:
-            "filter-keyword filter-keyword-or filter-keyword-clickable",
+          className: "filter-keyword filter-keyword-or filter-keyword-clickable",
           opLoc: { start: 13, end: 15 },
         },
         {
@@ -163,9 +161,7 @@ describe("buildDecorationSlots", () => {
   describe("given an unparseable query", () => {
     it("falls back to the regex highlighter", () => {
       const slots = buildDecorationSlots("status:error AND ");
-      expect(slots.some((s) => s.className.includes("filter-token"))).toBe(
-        true,
-      );
+      expect(slots.some((s) => s.className.includes("filter-token"))).toBe(true);
     });
   });
 
@@ -190,9 +186,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       const text = "model:gpt-* AND status:error";
       const plan = buildDecorationPlan(text);
 
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokenSlots).toEqual([
         {
           from: 0,
@@ -250,9 +244,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
   describe("given an OR between two wildcard tags", () => {
     it("emits two tag tokens and the OR keyword separately", () => {
       const plan = buildDecorationPlan("model:gpt-* OR model:claude-*");
-      const tokens = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokens = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokens).toHaveLength(2);
       expect(plan.slots).toContainEqual({
         from: 12,
@@ -269,15 +261,11 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // Liqe parse fails for incomplete AND. The regex fallback decorates
       // the field:value span; `flagOperatorShapedTypos` paints the dangling
       // AND so it doesn't suddenly un-bold mid-edit.
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
+      expect(tokenSlots).toEqual([{ from: 0, to: 11, className: "filter-token" }]);
+      expect(plan.slots.some((s) => s.className.includes("filter-keyword-and"))).toBe(
+        true,
       );
-      expect(tokenSlots).toEqual([
-        { from: 0, to: 11, className: "filter-token" },
-      ]);
-      expect(
-        plan.slots.some((s) => s.className.includes("filter-keyword-and")),
-      ).toBe(true);
       // The fallback emits a widget too — without it, breaking the parse
       // mid-edit (a trailing AND, an unmatched quote) would visually delete
       // every chip's X button until the user tidied the syntax.
@@ -301,9 +289,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       ["less-or-equal", "duration:<=5000"],
     ])("`%s` (%s) is decorated as a single numeric filter-token", (_label, query) => {
       const plan = buildDecorationPlan(query);
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokenSlots).toHaveLength(1);
       // Comparison form sits on a numeric field → green tint.
       expect(tokenSlots[0]?.className).toContain("filter-token-numeric");
@@ -321,9 +307,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     // specifically by giving it queries that don't parse.
     it("recognises `duration:>1000 AND` (regex fallback) as a single token", () => {
       const plan = buildDecorationPlan("duration:>1000 AND");
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokenSlots).toHaveLength(1);
       expect(tokenSlots[0]?.from).toBe(0);
       expect(tokenSlots[0]?.to).toBe("duration:>1000".length);
@@ -333,9 +317,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
 
     it("recognises `cost:<=5 AND` (regex fallback) as a single token", () => {
       const plan = buildDecorationPlan("cost:<=5 AND");
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokenSlots).toHaveLength(1);
       expect(tokenSlots[0]?.from).toBe(0);
       expect(tokenSlots[0]?.to).toBe("cost:<=5".length);
@@ -349,9 +331,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     ])("`%s` (%s) survives the regex fallback path", (_label, comparison) => {
       // Force the fallback by appending a trailing `AND` (parse-fail).
       const plan = buildDecorationPlan(`${comparison} AND`);
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokenSlots).toHaveLength(1);
       expect(tokenSlots[0]?.to).toBe(comparison.length);
     });
@@ -368,9 +348,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // workaround in walkAst (e.g. `tag.expression.location.end` for
       // RangeExpression). The widget tokens have the same defect.
       const plan = buildDecorationPlan("cost:[1 TO 10]");
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokenSlots).toHaveLength(1);
       expect(tokenSlots[0]?.from).toBe(5);
       expect(Number.isNaN(tokenSlots[0]?.to)).toBe(true);
@@ -380,9 +358,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
   describe("operator matrix — quoted values", () => {
     it("preserves the quotes inside the token span — they're part of the value", () => {
       const plan = buildDecorationPlan('errorMessage:"rate limit"');
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokenSlots).toEqual([
         {
           from: 0,
@@ -413,9 +389,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // ImplicitField — no chip, no X widget. The walkAst early-return
       // for isImplicit is what makes this true.
       expect(plan.tokens).toEqual([]);
-      expect(plan.slots.some((s) => s.className.includes("filter-token"))).toBe(
-        false,
-      );
+      expect(plan.slots.some((s) => s.className.includes("filter-token"))).toBe(false);
     });
   });
 
@@ -429,9 +403,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       "scenarioStatus",
     ])("`%s:foo` gets the scenario class", (field) => {
       const plan = buildDecorationPlan(`${field}:foo`);
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokenSlots[0]?.className).toContain("filter-token-scenario");
     });
   });
@@ -447,9 +419,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       "tokensPerSecond",
     ])("`%s:>5` gets the numeric class", (field) => {
       const plan = buildDecorationPlan(`${field}:>5`);
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokenSlots[0]?.className).toContain("filter-token-numeric");
     });
   });
@@ -457,18 +427,14 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
   describe("negation interaction with field-type accents", () => {
     it("a NOT-prefixed scenario field gets the exclude class — exclude wins over scenario", () => {
       const plan = buildDecorationPlan("NOT scenarioVerdict:success");
-      const tokenSlot = plan.slots.find((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlot = plan.slots.find((s) => s.className.includes("filter-token"));
       // Token-class precedence: negated > scenario > numeric > default.
       expect(tokenSlot?.className).toBe("filter-token filter-token-exclude");
     });
 
     it("a `-` prefixed numeric field gets the exclude class", () => {
       const plan = buildDecorationPlan("-cost:>5");
-      const tokenSlot = plan.slots.find((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlot = plan.slots.find((s) => s.className.includes("filter-token"));
       expect(tokenSlot?.className).toBe("filter-token filter-token-exclude");
     });
   });
@@ -497,18 +463,19 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       ["status:err", 1, 1],
       ["status:erro", 1, 1],
       ["status:error", 1, 1],
-    ])("after typing %j: %d filter-token slot(s), %d delete widget(s)", (input, expectedTokens, expectedWidgets) => {
-      const plan = buildDecorationPlan(input);
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
-      expect(tokenSlots.length, `tokens for ${JSON.stringify(input)}`).toBe(
-        expectedTokens,
-      );
-      expect(plan.tokens.length, `widgets for ${JSON.stringify(input)}`).toBe(
-        expectedWidgets,
-      );
-    });
+    ])(
+      "after typing %j: %d filter-token slot(s), %d delete widget(s)",
+      (input, expectedTokens, expectedWidgets) => {
+        const plan = buildDecorationPlan(input);
+        const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
+        expect(tokenSlots.length, `tokens for ${JSON.stringify(input)}`).toBe(
+          expectedTokens,
+        );
+        expect(plan.tokens.length, `widgets for ${JSON.stringify(input)}`).toBe(
+          expectedWidgets,
+        );
+      },
+    );
 
     it("the half-built `status:` widget carries a null value (no `data-value` on the X)", () => {
       const plan = buildDecorationPlan("status:");
@@ -522,16 +489,12 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     // Critical regression: previously the X button rendered for any tag
     // including ImplicitField. Now it only renders on recognised
     // `field:value` tags.
-    it.each([
-      "A",
-      "AN",
-      "AND",
-      "refund",
-      "refund policy",
-      '"refund"',
-    ])("typed `%s` produces zero delete widgets", (input) => {
-      expect(buildDecorationPlan(input).tokens).toEqual([]);
-    });
+    it.each(["A", "AN", "AND", "refund", "refund policy", '"refund"'])(
+      "typed `%s` produces zero delete widgets",
+      (input) => {
+        expect(buildDecorationPlan(input).tokens).toEqual([]);
+      },
+    );
   });
 
   describe("partial typing — chip transitions from null-value → real-value cleanly", () => {
@@ -562,9 +525,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // dangles syntactically). The regex fallback now recognises BOTH
       // `status:error` and `model:` as fallback tokens so the X widgets
       // don't disappear the moment the user breaks the parse mid-edit.
-      const bTokens = b.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const bTokens = b.slots.filter((s) => s.className.includes("filter-token"));
       expect(bTokens.length).toBeGreaterThanOrEqual(1);
       expect(bTokens[0]?.from).toBe(0);
       expect(bTokens[0]?.to).toBe(12);
@@ -596,9 +557,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
         "status:e",
         "status:",
       ];
-      const tokenCounts = steps.map(
-        (s) => buildDecorationPlan(s).tokens.length,
-      );
+      const tokenCounts = steps.map((s) => buildDecorationPlan(s).tokens.length);
       expect(tokenCounts).toEqual([1, 1, 1, 1, 1, 1]);
     });
 
@@ -616,12 +575,8 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // ImplicitField — no chip. So the user sees one half-built chip and
       // an unstyled trailing word — a visible signal that the clause split.
       const plan = buildDecorationPlan("status: error");
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
-      expect(tokenSlots).toEqual([
-        { from: 0, to: 7, className: "filter-token" },
-      ]);
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
+      expect(tokenSlots).toEqual([{ from: 0, to: 7, className: "filter-token" }]);
       // Only one widget — for the empty status: chip. The free-text arm
       // never gets a delete affordance.
       expect(plan.tokens).toEqual([
@@ -634,15 +589,11 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // The user thinks they wrote a negation; the parser accepted it as
       // a literal field. Visually they get one chip with the WHOLE
       // `NOT-status:error` highlighted in default blue (not red exclude).
-      const tokenSlot = plan.slots.find((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlot = plan.slots.find((s) => s.className.includes("filter-token"));
       // The unknown-field hint kicks in here — `NOT-status` isn't in
       // SEARCH_FIELDS, so the chip renders with the dashed-yellow accent
       // instead of the default blue.
-      expect(tokenSlot?.className).toBe(
-        "filter-token filter-token-unknown-field",
-      );
+      expect(tokenSlot?.className).toBe("filter-token filter-token-unknown-field");
       // Widget carries the literal-field name so a "you can't query this
       // field" hint can be wired off the dataset later.
       expect(plan.tokens).toEqual([
@@ -664,13 +615,9 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
 
     it("`(status:error` (unmatched) falls back to regex AND emits a fallback widget", () => {
       const plan = buildDecorationPlan("(status:error");
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       // The regex matches `status:error` from offset 1.
-      expect(tokenSlots).toEqual([
-        { from: 1, to: 13, className: "filter-token" },
-      ]);
+      expect(tokenSlots).toEqual([{ from: 1, to: 13, className: "filter-token" }]);
       // Fallback path now emits a widget so the X stays clickable while
       // the user fixes the unmatched paren.
       expect(plan.tokens).toEqual([
@@ -692,9 +639,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
   describe("partial typing — leading whitespace offsets are exact", () => {
     it("`   status:error` shifts both the slot AND the widget position by leadingWs", () => {
       const plan = buildDecorationPlan("   status:error");
-      const tokenSlot = plan.slots.find((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlot = plan.slots.find((s) => s.className.includes("filter-token"));
       expect(tokenSlot).toEqual({
         from: 3,
         to: 15,
@@ -727,9 +672,9 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
         },
       ]);
       // AND is recognised as a keyword, not absorbed into a value.
-      expect(
-        plan.slots.some((s) => s.className.includes("filter-keyword-and")),
-      ).toBe(true);
+      expect(plan.slots.some((s) => s.className.includes("filter-keyword-and"))).toBe(
+        true,
+      );
     });
   });
 
@@ -737,10 +682,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     // While the user is in the middle of typing a wildcard value, the
     // chip should remain stable (no flicker between recognised/not).
     it.each([
-      [
-        "model:g",
-        { start: 0, end: 7, field: "model", value: "g", kind: "ast" as const },
-      ],
+      ["model:g", { start: 0, end: 7, field: "model", value: "g", kind: "ast" as const }],
       [
         "model:gp",
         {
@@ -794,9 +736,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // AND keyword recognised. The test pins that behaviour so a future
       // regression that DOES strip the space would show up loudly.
       const plan = buildDecorationPlan("model:gpt-*AND");
-      const tokenSlots = plan.slots.filter((s) =>
-        s.className.includes("filter-token"),
-      );
+      const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokenSlots).toEqual([
         {
           from: 0,
@@ -815,9 +755,9 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
         },
       ]);
       // No AND keyword decoration — there is no boolean operator in the AST.
-      expect(
-        plan.slots.some((s) => s.className.includes("filter-keyword-and")),
-      ).toBe(false);
+      expect(plan.slots.some((s) => s.className.includes("filter-keyword-and"))).toBe(
+        false,
+      );
     });
   });
 });

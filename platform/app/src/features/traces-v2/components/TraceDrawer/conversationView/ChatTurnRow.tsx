@@ -1,22 +1,6 @@
-import {
-  Box,
-  Circle,
-  Flex,
-  HStack,
-  Icon,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Circle, Flex, HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
-import {
-  Fragment,
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Markdown } from "~/components/Markdown";
 import { TraceMediaStrip } from "~/components/traces/TraceMediaStrip";
 import { RedactedInline } from "~/components/ui/RedactedField";
@@ -94,10 +78,7 @@ function splitAnnotationsBySide({
 } {
   const onField = (path: "input" | "output") =>
     anchoredAnnotations.filter(
-      (a) =>
-        a.anchorKind === "field" &&
-        a.anchorId === traceId &&
-        a.anchorPath === path,
+      (a) => a.anchorKind === "field" && a.anchorId === traceId && a.anchorPath === path,
     );
   return {
     userAnnotations: summarizeAnnotations(onField("input")),
@@ -109,9 +90,7 @@ function splitAnnotationsBySide({
 }
 
 /** What one message's cluster needs of its translation: the state, and the toggle. */
-function toMessageTranslation(
-  translation: UseTextTranslationResult,
-): MessageTranslation {
+function toMessageTranslation(translation: UseTextTranslationResult): MessageTranslation {
   return {
     isActive: translation.isActive,
     isLoading: translation.isLoading,
@@ -233,8 +212,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   const userVisuals = getDisplayRoleVisuals("user", { isScenario });
   const assistantVisuals = getDisplayRoleVisuals("assistant", { isScenario });
   const userSide = userVisuals.displayRole === "user" ? "left" : "right";
-  const assistantSide =
-    assistantVisuals.displayRole === "user" ? "left" : "right";
+  const assistantSide = assistantVisuals.displayRole === "user" ? "left" : "right";
   const UserIcon = userVisuals.Icon;
   const AssistantIcon = assistantVisuals.Icon;
   // The raw model id labels the agent's response — i.e. whichever bubble
@@ -247,15 +225,12 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   // render-side half of the same rule, so a reference that outlives its
   // content still shows nothing.
   const visibleUserMedia = turn.inputRedacted ? EMPTY_MEDIA : userMedia;
-  const visibleAssistantMedia = turn.outputRedacted
-    ? EMPTY_MEDIA
-    : assistantMedia;
+  const visibleAssistantMedia = turn.outputRedacted ? EMPTY_MEDIA : assistantMedia;
   // Only the thread layout has a message body to hang media off, so it is the
   // only one where media on its own is reason enough to draw a message: a
   // voice turn that recorded no transcript would otherwise lose its recording.
   const hasUserMedia = layout === "thread" && visibleUserMedia.length > 0;
-  const hasAssistantMedia =
-    layout === "thread" && visibleAssistantMedia.length > 0;
+  const hasAssistantMedia = layout === "thread" && visibleAssistantMedia.length > 0;
 
   // Each side carries what it said, so a correction of it starts from that
   // text: the reply's from the turn's output, the user message's from the
@@ -449,12 +424,7 @@ function RedactedTurnLine({
   if (layout === "thread") {
     return (
       <Flex gap={2.5} align="center" width="full" paddingX={3} paddingY={2.5}>
-        <Circle
-          size="24px"
-          bg={palette.muted}
-          color={palette.fg}
-          flexShrink={0}
-        >
+        <Circle size="24px" bg={palette.muted} color={palette.fg} flexShrink={0}>
           <Icon boxSize="13px">{icon}</Icon>
         </Circle>
         <Box flex={1} minWidth={0}>
@@ -477,11 +447,7 @@ function RedactedTurnLine({
   // bubble would, framed by the same role label.
   return (
     <Flex justify={side === "right" ? "flex-end" : "flex-start"} width="full">
-      <VStack
-        align={side === "right" ? "flex-end" : "flex-start"}
-        gap={1}
-        maxWidth="78%"
-      >
+      <VStack align={side === "right" ? "flex-end" : "flex-start"} gap={1} maxWidth="78%">
         <HStack gap={1.5} color={palette.fg}>
           <Icon boxSize="13px">{icon}</Icon>
           <Text
@@ -568,10 +534,7 @@ function ThreadMessage({
   const display =
     !canExpand || expanded
       ? text
-      : truncateMarkdown({ text, maxChars: THREAD_MAX_CHARS }).replace(
-          /\n+…\s*$/,
-          "",
-        );
+      : truncateMarkdown({ text, maxChars: THREAD_MAX_CHARS }).replace(/\n+…\s*$/, "");
 
   // No persistent "selected" background — the active turn reads flat like the
   // rest of the thread (ChatGPT-style); only a transient hover cue signals the
@@ -644,22 +607,13 @@ function ThreadMessage({
           {annotate && (
             <>
               <Spacer />
-              <MessageAnnotateCluster
-                target={annotate}
-                translation={translate}
-              />
+              <MessageAnnotateCluster target={annotate} translation={translate} />
             </>
           )}
         </HStack>
 
         {reasoning && (
-          <Box
-            mb={text ? "2.5" : "0"}
-            bg="bg.muted/60"
-            px="3"
-            py="2"
-            borderRadius="md"
-          >
+          <Box mb={text ? "2.5" : "0"} bg="bg.muted/60" px="3" py="2" borderRadius="md">
             <ReasoningBlock text={reasoning} />
           </Box>
         )}
@@ -690,10 +644,7 @@ function ThreadMessage({
             with, the way attachments sit under an email body. Clicks stay on
             the widget so scrubbing a player doesn't navigate to the turn. */}
         {media.length > 0 && (
-          <Box
-            paddingTop={2}
-            onClick={(e: React.MouseEvent) => e.stopPropagation()}
-          >
+          <Box paddingTop={2} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <TraceMediaStrip parts={media} />
           </Box>
         )}
@@ -853,10 +804,7 @@ const TurnSeparator: React.FC<{
         {...badgeAnchor}
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
-        <TurnEditTraceAction
-          traceId={turn.traceId}
-          occurredAtMs={turn.timestamp}
-        />
+        <TurnEditTraceAction traceId={turn.traceId} occurredAtMs={turn.timestamp} />
       </HStack>
     </Box>
   );

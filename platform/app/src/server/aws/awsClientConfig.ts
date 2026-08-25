@@ -117,9 +117,7 @@ export interface AwsClientConfigInput {
  */
 export interface AwsClientConfig {
   region?: string;
-  credentials?:
-    | AwsStaticCredentialIdentity
-    | ReturnType<typeof fromTemporaryCredentials>;
+  credentials?: AwsStaticCredentialIdentity | ReturnType<typeof fromTemporaryCredentials>;
   endpoint?: string;
   /** Always set, so no client falls back to the SDK's own handler and its
    *  unbounded timeouts. */
@@ -192,11 +190,8 @@ function resolveCredentials({
     params: {
       RoleArn: assumeRole.roleArn,
       RoleSessionName: assumeRole.sessionName ?? "langwatch",
-      ...(present(assumeRole.externalId)
-        ? { ExternalId: assumeRole.externalId }
-        : {}),
-      DurationSeconds:
-        assumeRole.durationSeconds ?? DEFAULT_ASSUME_ROLE_DURATION_SECONDS,
+      ...(present(assumeRole.externalId) ? { ExternalId: assumeRole.externalId } : {}),
+      DurationSeconds: assumeRole.durationSeconds ?? DEFAULT_ASSUME_ROLE_DURATION_SECONDS,
     },
     clientConfig: {
       ...(present(region) ? { region } : {}),
@@ -215,9 +210,7 @@ export function buildAwsClientConfig({
   disableSdkRetries = false,
 }: AwsClientConfigInput): AwsClientConfig {
   const config: AwsClientConfig = {
-    requestHandler: awsRequestHandler(
-      resolveProxyForHost(hostnameOf(targetHost)),
-    ),
+    requestHandler: awsRequestHandler(resolveProxyForHost(hostnameOf(targetHost))),
   };
 
   if (present(region)) config.region = region;

@@ -282,8 +282,7 @@ describe("virtual key spend (real PG + real CH)", () => {
     if (ch) {
       for (const tenantId of [PROJECT_ID, GOV_PROJECT_ID]) {
         await ch.command({
-          query:
-            "DELETE FROM trace_summaries WHERE TenantId = {tenantId:String}",
+          query: "DELETE FROM trace_summaries WHERE TenantId = {tenantId:String}",
           query_params: { tenantId },
         });
       }
@@ -294,12 +293,7 @@ describe("virtual key spend (real PG + real CH)", () => {
     await prisma.virtualKey.deleteMany({
       where: {
         id: {
-          in: [
-            VK_UNBUDGETED_ID,
-            VK_BUDGETED_ID,
-            VK_ORG_SCOPED_ID,
-            VK_TWO_MODELS_ID,
-          ],
+          in: [VK_UNBUDGETED_ID, VK_BUDGETED_ID, VK_ORG_SCOPED_ID, VK_TWO_MODELS_ID],
         },
       },
     });
@@ -508,9 +502,7 @@ describe("virtual key spend (real PG + real CH)", () => {
         window: windowNow(),
         model: "claude-sonnet-4",
       });
-      expect(filtered.recentDebits.map((d) => d.model)).toEqual([
-        "claude-sonnet-4",
-      ]);
+      expect(filtered.recentDebits.map((d) => d.model)).toEqual(["claude-sonnet-4"]);
       // The chips are the control the model is picked from, so they and
       // the totals have to read the same either way.
       expect(filtered.totalRequests).toBe(unfiltered.totalRequests);

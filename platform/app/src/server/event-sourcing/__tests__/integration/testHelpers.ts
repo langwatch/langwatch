@@ -99,9 +99,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
   }
 
   if (!redisConnection) {
-    throw new Error(
-      "Redis connection not available. Ensure testcontainers are started.",
-    );
+    throw new Error("Redis connection not available. Ensure testcontainers are started.");
   }
 
   // Create stores
@@ -137,10 +135,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     pipelineName,
     // Wait for queue workers to be ready before sending commands
     ready: () => pipeline.service.waitUntilReady(),
-  } as PipelineWithCommandHandlers<
-    RegisteredPipeline<any, any>,
-    { testCommand: any }
-  > & {
+  } as PipelineWithCommandHandlers<RegisteredPipeline<any, any>, { testCommand: any }> & {
     eventStore: EventStoreClickHouse;
     eventSourcing: EventSourcing;
     pipelineName: string;
@@ -267,9 +262,7 @@ export async function waitForEventHandler(
 /**
  * Cleans up test data for a specific tenant.
  */
-export async function cleanupTestDataForTenant(
-  tenantId: string,
-): Promise<void> {
+export async function cleanupTestDataForTenant(tenantId: string): Promise<void> {
   await cleanupTestData(tenantId);
 }
 
@@ -290,9 +283,7 @@ export function createTestTenantId(): ReturnType<typeof createTenantId> {
 /**
  * Gets the tenant ID string from a TenantId object.
  */
-export function getTenantIdString(
-  tenantId: ReturnType<typeof createTenantId>,
-): string {
+export function getTenantIdString(tenantId: ReturnType<typeof createTenantId>): string {
   return String(tenantId);
 }
 

@@ -9,16 +9,12 @@ import type { TraceProcessingEvent } from "../schemas/events";
 import { isSpanReceivedEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
 
-const logger = createLogger(
-  "langwatch:trace-processing:custom-evaluation-sync",
-);
+const logger = createLogger("langwatch:trace-processing:custom-evaluation-sync");
 
 export const CUSTOM_EVAL_SYNC_DELAY_MS = 5_000;
 export const CUSTOM_EVAL_SYNC_DEDUP_TTL_MS = 30_000;
 
-export function customEvaluationSyncDedupId(
-  event: TraceProcessingEvent,
-): string {
+export function customEvaluationSyncDedupId(event: TraceProcessingEvent): string {
   return `${event.tenantId}:${event.aggregateId}:${event.id}`;
 }
 
@@ -67,9 +63,7 @@ type OtlpSpanEvent = NonNullable<OtlpSpan["events"]>[number];
 
 function readEvaluationPayload(event: OtlpSpanEvent): string | undefined {
   if (event.name !== EVAL_EVENT_NAME) return undefined;
-  const jsonAttr = event.attributes.find(
-    (attr) => attr.key === "json_encoded_event",
-  );
+  const jsonAttr = event.attributes.find((attr) => attr.key === "json_encoded_event");
   return jsonAttr?.value && "stringValue" in jsonAttr.value
     ? (jsonAttr.value.stringValue ?? undefined)
     : undefined;
@@ -249,16 +243,13 @@ function buildReportPayload({
   evaluation: SdkEvaluation;
   occurredAt: number;
 }): ReportEvaluationCommandData {
-  const status =
-    evaluation.status ?? (evaluation.error ? "error" : "processed");
+  const status = evaluation.status ?? (evaluation.error ? "error" : "processed");
 
   return {
     tenantId,
     evaluationId:
-      evaluation.evaluation_id ??
-      deterministicEvaluationId({ traceId, evaluation }),
-    evaluatorId:
-      evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name),
+      evaluation.evaluation_id ?? deterministicEvaluationId({ traceId, evaluation }),
+    evaluatorId: evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name),
     evaluatorType: "custom",
     evaluatorName: evaluation.name,
     traceId,

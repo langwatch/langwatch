@@ -111,9 +111,7 @@ describe("traceRequest.utils", () => {
         expect(result["llm.model"]).toBe("gpt-4");
         expect(result["other.key"]).toBe(69);
         expect(result).toHaveProperty("llm.messages");
-        expect(result["llm.messages"]).toEqual([
-          { content: "Hello", role: "user" },
-        ]);
+        expect(result["llm.messages"]).toEqual([{ content: "Hello", role: "user" }]);
       });
     });
 
@@ -279,9 +277,7 @@ describe("traceRequest.utils", () => {
       });
 
       it("handles null-ish input", () => {
-        const result = TraceRequestUtils.normalizeOtlpAttributes(
-          null as unknown as [],
-        );
+        const result = TraceRequestUtils.normalizeOtlpAttributes(null as unknown as []);
         expect(result).toEqual({});
       });
     });
@@ -310,11 +306,7 @@ describe("traceRequest.utils", () => {
             key: "mixed.values",
             value: {
               arrayValue: {
-                values: [
-                  { stringValue: "hello" },
-                  { intValue: 69 },
-                  { boolValue: true },
-                ],
+                values: [{ stringValue: "hello" }, { intValue: 69 }, { boolValue: true }],
               },
             },
           },
@@ -388,10 +380,7 @@ describe("traceRequest.utils", () => {
       });
 
       it("flattens intValue as number", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
-          { intValue: 69 },
-          "count",
-        );
+        const result = TraceRequestUtils.normalizeOtlpAnyValue({ intValue: 69 }, "count");
 
         expect(result).toEqual({ count: 69 });
       });
@@ -474,10 +463,7 @@ describe("traceRequest.utils", () => {
       it("drops intValue 0 due to falsy check", () => {
         // BUG: scalar() checks `v.intValue` which is falsy for 0,
         // so intValue: 0 is never captured and returns undefined.
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
-          { intValue: 0 },
-          "count",
-        );
+        const result = TraceRequestUtils.normalizeOtlpAnyValue({ intValue: 0 }, "count");
 
         expect(result).toEqual({});
       });
@@ -600,11 +586,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAnyValue(
           {
             arrayValue: {
-              values: [
-                { stringValue: "a" },
-                { stringValue: "b" },
-                { stringValue: "c" },
-              ],
+              values: [{ stringValue: "a" }, { stringValue: "b" }, { stringValue: "c" }],
             },
           },
           "tags",
@@ -617,11 +599,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAnyValue(
           {
             arrayValue: {
-              values: [
-                { stringValue: "hello" },
-                { intValue: 69 },
-                { boolValue: true },
-              ],
+              values: [{ stringValue: "hello" }, { intValue: 69 }, { boolValue: true }],
             },
           },
           "mixed",
@@ -687,10 +665,7 @@ describe("traceRequest.utils", () => {
                   key: "tags",
                   value: {
                     arrayValue: {
-                      values: [
-                        { stringValue: "alpha" },
-                        { stringValue: "beta" },
-                      ],
+                      values: [{ stringValue: "alpha" }, { stringValue: "beta" }],
                     },
                   },
                 },
@@ -893,16 +868,12 @@ describe("traceRequest.utils", () => {
         // NOT reconstructed due to heterogeneous key signatures
         expect(result).not.toHaveProperty("llm.output_messages");
         expect(result["llm.output_messages.0.message.role"]).toBe("assistant");
-        expect(result["llm.output_messages.0.message.content"]).toBe(
-          "Let me check.",
-        );
+        expect(result["llm.output_messages.0.message.content"]).toBe("Let me check.");
         expect(result["llm.output_messages.0.message.tool_calls"]).toEqual([
           { function: { name: "search" } },
         ]);
         expect(result["llm.output_messages.1.message.role"]).toBe("tool");
-        expect(result["llm.output_messages.1.message.content"]).toBe(
-          "Result: 69",
-        );
+        expect(result["llm.output_messages.1.message.content"]).toBe("Result: 69");
       });
     });
 
@@ -960,11 +931,7 @@ describe("traceRequest.utils", () => {
 
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
-        expect(result["langwatch.labels"]).toEqual([
-          "production",
-          "v2",
-          "critical",
-        ]);
+        expect(result["langwatch.labels"]).toEqual(["production", "v2", "critical"]);
       });
     });
 

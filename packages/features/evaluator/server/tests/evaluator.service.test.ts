@@ -27,9 +27,7 @@ function evaluator(overrides: Partial<Evaluator> = {}): Evaluator {
   return { ...baseEvaluator, ...overrides };
 }
 
-function repository(
-  overrides: Partial<EvaluatorRepository> = {},
-): EvaluatorRepository {
+function repository(overrides: Partial<EvaluatorRepository> = {}): EvaluatorRepository {
   return {
     tryFindById: vi.fn().mockResolvedValue(baseEvaluator),
     tryFindByIdOnly: vi.fn().mockResolvedValue(baseEvaluator),
@@ -45,9 +43,7 @@ function repository(
   } as EvaluatorRepository;
 }
 
-function workflows(
-  overrides: Partial<WorkflowService> = {},
-): WorkflowService {
+function workflows(overrides: Partial<WorkflowService> = {}): WorkflowService {
   return {
     assertInProject: vi.fn().mockResolvedValue(undefined),
     getFields: vi.fn().mockResolvedValue({
@@ -60,10 +56,12 @@ function workflows(
   } as WorkflowService;
 }
 
-function service(options: {
-  repository?: EvaluatorRepository;
-  workflows?: WorkflowService;
-} = {}): EvaluatorService {
+function service(
+  options: {
+    repository?: EvaluatorRepository;
+    workflows?: WorkflowService;
+  } = {},
+): EvaluatorService {
   return EvaluatorService.create({
     repository: options.repository ?? repository(),
     workflows: options.workflows ?? workflows(),
@@ -88,9 +86,11 @@ describe("EvaluatorService", () => {
   it("keeps one workflow owned by one evaluator", async () => {
     const evaluators = service({
       repository: repository({
-        tryFindByWorkflow: vi.fn().mockResolvedValue(
-          evaluator({ id: "existing", workflowId: "w1", type: "workflow" }),
-        ),
+        tryFindByWorkflow: vi
+          .fn()
+          .mockResolvedValue(
+            evaluator({ id: "existing", workflowId: "w1", type: "workflow" }),
+          ),
       }),
     });
 
@@ -197,9 +197,11 @@ describe("EvaluatorService", () => {
   it("uses empty inputs and standard outputs for an unknown evaluator", async () => {
     const evaluators = service({
       repository: repository({
-        tryFindById: vi.fn().mockResolvedValue(
-          evaluator({ config: { evaluatorType: "unknown/evaluator" } }),
-        ),
+        tryFindById: vi
+          .fn()
+          .mockResolvedValue(
+            evaluator({ config: { evaluatorType: "unknown/evaluator" } }),
+          ),
       }),
     });
 
@@ -234,9 +236,7 @@ describe("EvaluatorService", () => {
     });
 
     expect(result.fields).toEqual([{ identifier: "input", type: "str" }]);
-    expect(result.outputFields).toEqual([
-      { identifier: "passed", type: "bool" },
-    ]);
+    expect(result.outputFields).toEqual([{ identifier: "passed", type: "bool" }]);
   });
 
   it("gets workflow fields through the canonical workflow service", async () => {
@@ -249,9 +249,9 @@ describe("EvaluatorService", () => {
     });
     const evaluators = service({
       repository: repository({
-        tryFindById: vi.fn().mockResolvedValue(
-          evaluator({ type: "workflow", workflowId: "w1" }),
-        ),
+        tryFindById: vi
+          .fn()
+          .mockResolvedValue(evaluator({ type: "workflow", workflowId: "w1" })),
       }),
       workflows: workflows({ getFields }),
     });
@@ -266,9 +266,7 @@ describe("EvaluatorService", () => {
       projectId: "p1",
     });
     expect(result.fields).toEqual([{ identifier: "input", type: "str" }]);
-    expect(result.outputFields).toEqual([
-      { identifier: "result", type: "float" },
-    ]);
+    expect(result.outputFields).toEqual([{ identifier: "result", type: "float" }]);
     expect(result.workflowName).toBe("Workflow");
     expect(result.workflowIcon).toBe("sparkles");
   });
@@ -276,9 +274,9 @@ describe("EvaluatorService", () => {
   it("falls back to standard outputs when a workflow declares none", async () => {
     const evaluators = service({
       repository: repository({
-        tryFindById: vi.fn().mockResolvedValue(
-          evaluator({ type: "workflow", workflowId: "w1" }),
-        ),
+        tryFindById: vi
+          .fn()
+          .mockResolvedValue(evaluator({ type: "workflow", workflowId: "w1" })),
       }),
     });
 

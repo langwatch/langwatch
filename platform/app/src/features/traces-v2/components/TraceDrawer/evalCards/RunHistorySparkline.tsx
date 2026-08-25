@@ -19,8 +19,7 @@ export function RunHistorySparkline({ runs }: { runs: EvalRunHistoryEntry[] }) {
 
   const numericRuns = runs
     .filter(
-      (r): r is EvalRunHistoryEntry & { score: number } =>
-        typeof r.score === "number",
+      (r): r is EvalRunHistoryEntry & { score: number } => typeof r.score === "number",
     )
     .slice(-8);
 

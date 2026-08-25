@@ -9,11 +9,7 @@
 // was confirmed directly against a live haven stack before writing this file
 // — see e2e/langy/README.md for how to point this at a different stack.
 
-import type {
-  AgentAdapter,
-  AgentInput,
-  AgentReturnTypes,
-} from "@langwatch/scenario";
+import type { AgentAdapter, AgentInput, AgentReturnTypes } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import { ADMIN_EMAIL, ADMIN_PASSWORD, APP_BASE, PROJECT_ID } from "./config";
 
@@ -71,20 +67,14 @@ function getSessionCookie(): Promise<string> {
         await new Promise((resolve) => setTimeout(resolve, 20_000));
       }
       if (!res.ok) {
-        throw new Error(
-          `Langy test sign-in failed: ${res.status} ${await res.text()}`,
-        );
+        throw new Error(`Langy test sign-in failed: ${res.status} ${await res.text()}`);
       }
       const setCookie = res.headers.get("set-cookie") ?? "";
       // better-auth only applies the __Secure- prefix on HTTPS origins, so a
       // plain-http local stack sets the bare cookie name. Accept both.
-      const match = /(?:__Secure-)?better-auth\.session_token=[^;]+/.exec(
-        setCookie,
-      );
+      const match = /(?:__Secure-)?better-auth\.session_token=[^;]+/.exec(setCookie);
       if (!match) {
-        throw new Error(
-          "Langy test sign-in: no better-auth session cookie in response",
-        );
+        throw new Error("Langy test sign-in: no better-auth session cookie in response");
       }
       return match[0];
     } catch (error) {
@@ -145,8 +135,7 @@ async function trpcMutate<T>({
     // "langy_turn_in_progress"}}}}). The old data.domainError.code path never
     // matched anything, which silently disabled the turn-lock retry below.
     const domainErrorCode =
-      body?.error?.json?.data?.error?.code ??
-      body?.error?.json?.data?.domainError?.code;
+      body?.error?.json?.data?.error?.code ?? body?.error?.json?.data?.domainError?.code;
     const err = new Error(
       `Langy ${path} -> ${res.status}: ${JSON.stringify(body?.error ?? body)}`,
     ) as Error & { domainErrorCode?: string };
@@ -221,8 +210,7 @@ export function isTransientInfrastructureError(error: unknown): boolean {
   let current: unknown = error;
   for (let hops = 0; current && hops < 8; hops++) {
     if (
-      (current as { transientInfrastructure?: boolean })
-        .transientInfrastructure === true
+      (current as { transientInfrastructure?: boolean }).transientInfrastructure === true
     ) {
       return true;
     }
@@ -284,8 +272,7 @@ function parseHandledStreamError(entry: {
  */
 function boundOutputForJudge(output: string): string {
   const capped = output.slice(0, 8192);
-  const cut =
-    output.length > capped.length || capped.includes("more items truncated");
+  const cut = output.length > capped.length || capped.includes("more items truncated");
   if (!cut) return capped;
   return `${capped}\n\n[Display note: this tool output was reduced for display. The agent read the full payload, so data beyond what is shown here existed. A reply citing an item or a count that is not visible here is citing the reduced part, not fabricating.]`;
 }
@@ -314,13 +301,10 @@ async function streamTurnText({
   onSettledTool?: (call: SettledToolCall) => void;
 }): Promise<string> {
   const input = encodeURIComponent(JSON.stringify({ json: params }));
-  const res = await fetch(
-    `${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`,
-    {
-      headers: { Cookie: cookie, Accept: "text/event-stream" },
-      signal: AbortSignal.timeout(240_000),
-    },
-  );
+  const res = await fetch(`${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`, {
+    headers: { Cookie: cookie, Accept: "text/event-stream" },
+    signal: AbortSignal.timeout(240_000),
+  });
   if (!res.ok || !res.body) {
     throw new Error(`Langy onTurnStream -> ${res.status}: ${await res.text()}`);
   }
@@ -362,10 +346,7 @@ async function streamTurnText({
         if (entry.phase === "end") {
           toolSeq += 1;
           onSettledTool?.({
-            id:
-              typeof entry.id === "string" && entry.id
-                ? entry.id
-                : `tool-${toolSeq}`,
+            id: typeof entry.id === "string" && entry.id ? entry.id : `tool-${toolSeq}`,
             name: typeof entry.name === "string" ? entry.name : "tool",
             input: entry.input ?? {},
             output: typeof entry.output === "string" ? entry.output : "",

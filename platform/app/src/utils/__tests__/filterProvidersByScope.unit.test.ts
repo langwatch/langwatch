@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  filterProvidersByScope,
-  type ScopeHierarchy,
-} from "../filterProvidersByScope";
+import { filterProvidersByScope, type ScopeHierarchy } from "../filterProvidersByScope";
 
 type FixtureProvider = {
   provider: string;

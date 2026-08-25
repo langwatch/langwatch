@@ -144,8 +144,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   setSyntaxHelpOpen: (open) => set({ syntaxHelpOpen: open }),
 
   setShortcutsHelpOpen: (open) => set({ shortcutsHelpOpen: open }),
-  toggleShortcutsHelp: () =>
-    set((s) => ({ shortcutsHelpOpen: !s.shortcutsHelpOpen })),
+  toggleShortcutsHelp: () => set((s) => ({ shortcutsHelpOpen: !s.shortcutsHelpOpen })),
 
   setFacetManagerOpen: (open) => set({ facetManagerOpen: open }),
 }));

@@ -1,9 +1,7 @@
 import { NoOpLogger } from "../../../../logger";
 import { setupObservability } from "../index";
 
-type SetupObservabilityOptions = NonNullable<
-  Parameters<typeof setupObservability>[0]
->;
+type SetupObservabilityOptions = NonNullable<Parameters<typeof setupObservability>[0]>;
 
 /**
  * Shared setup for observability integration tests.

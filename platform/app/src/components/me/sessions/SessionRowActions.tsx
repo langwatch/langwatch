@@ -5,7 +5,6 @@ import type React from "react";
 
 import { Menu } from "~/components/ui/menu";
 
-
 /**
  * Everything a reader can do with a row other than choose it. Choosing the row
  * already opens the replay over the table, so the menu repeats that and adds

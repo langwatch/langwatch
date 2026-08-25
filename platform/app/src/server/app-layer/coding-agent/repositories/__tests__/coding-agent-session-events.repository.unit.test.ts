@@ -75,8 +75,7 @@ describe("CodingAgentSessionEventsClickHouseRepository per-model totals routing"
           }),
         ]);
         const repository = new CodingAgentSessionEventsClickHouseRepository(
-          async (tenantId) =>
-            tenantId === "tenant-a" ? first.client : second.client,
+          async (tenantId) => (tenantId === "tenant-a" ? first.client : second.client),
         );
 
         const totals = await repository.sumTokensByModelPerSession({
@@ -87,10 +86,7 @@ describe("CodingAgentSessionEventsClickHouseRepository per-model totals routing"
 
         expect(first.sentTenantIds()).toEqual([["tenant-a"]]);
         expect(second.sentTenantIds()).toEqual([["tenant-b"]]);
-        expect(totals.map((row) => row.sessionId)).toEqual([
-          "session-a",
-          "session-b",
-        ]);
+        expect(totals.map((row) => row.sessionId)).toEqual(["session-a", "session-b"]);
         expect(totals.map((row) => row.costUsd)).toEqual([3, 4]);
       });
     });

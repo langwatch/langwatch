@@ -64,11 +64,7 @@ export const CreateExperimentButton = () => {
         </PageLayout.HeaderButton>
       </Menu.Trigger>
       <Menu.Content minWidth="320px">
-        <Menu.Item
-          value="experiment-ui"
-          onClick={handleCreate}
-          disabled={isCreating}
-        >
+        <Menu.Item value="experiment-ui" onClick={handleCreate} disabled={isCreating}>
           <Box width="100%">
             <Text fontWeight="medium">
               {isCreating && <Spinner size="xs" marginRight={2} />}

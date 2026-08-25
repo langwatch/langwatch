@@ -42,10 +42,7 @@ const planWith = ({
   maxMembersLite: number;
 }) => ({ maxMembers, maxMembersLite }) as any;
 
-const renderSeatUsage = (plan: {
-  maxMembers: number;
-  maxMembersLite: number;
-}) =>
+const renderSeatUsage = (plan: { maxMembers: number; maxMembersLite: number }) =>
   render(
     <ChakraProvider value={defaultSystem}>
       <MemberSeatUsage organizationId="org_1" activePlan={planWith(plan)} />

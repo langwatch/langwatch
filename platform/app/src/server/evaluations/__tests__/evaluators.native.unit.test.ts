@@ -35,8 +35,8 @@ describe("native evaluator merge into the facade", () => {
   });
 
   it("resolves native evaluators through the shared definition lookup", () => {
-    expect(
-      getEvaluatorDefinitions(API_KEYS_AND_SECRETS_DETECTION)?.isGuardrail,
-    ).toBe(true);
+    expect(getEvaluatorDefinitions(API_KEYS_AND_SECRETS_DETECTION)?.isGuardrail).toBe(
+      true,
+    );
   });
 });

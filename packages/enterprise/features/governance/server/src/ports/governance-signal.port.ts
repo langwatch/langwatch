@@ -46,10 +46,6 @@ export abstract class GovernanceSignalPort {
     candidates: GatewayBudgetCrossingCandidate[],
     now: Date,
   ): Promise<GovernanceResolvedBudgetCrossing[]>;
-  abstract appendVirtualKeyLifecycle(
-    data: GovernanceVkLifecycleData,
-  ): Promise<void>;
-  abstract appendBudgetCrossing(
-    data: GovernanceBudgetCrossingData,
-  ): Promise<void>;
+  abstract appendVirtualKeyLifecycle(data: GovernanceVkLifecycleData): Promise<void>;
+  abstract appendBudgetCrossing(data: GovernanceBudgetCrossingData): Promise<void>;
 }

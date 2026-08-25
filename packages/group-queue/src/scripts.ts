@@ -1822,8 +1822,7 @@ export class GroupStagingScripts {
     // queueName already includes hash tags, e.g. "{pipeline/handler/spanStorage}"
     this.queueName = queueName;
     this.keyPrefix = `${queueName}:gq:`;
-    this.tenantConcurrencyCap =
-      policy.tenantConcurrencyCap ?? DEFAULT_TENANT_CAP;
+    this.tenantConcurrencyCap = policy.tenantConcurrencyCap ?? DEFAULT_TENANT_CAP;
     this.globalConcurrencyBudget =
       policy.globalConcurrencyBudget ?? DEFAULT_GLOBAL_BUDGET;
   }
@@ -2452,12 +2451,7 @@ export class GroupStagingScripts {
     groupId: string;
     workerId: string;
   }): Promise<void> {
-    await releaseClaimScript.run(
-      this.redis,
-      1,
-      this.claimMarkerKey(groupId),
-      workerId,
-    );
+    await releaseClaimScript.run(this.redis, 1, this.claimMarkerKey(groupId), workerId);
   }
 
   /**
@@ -2557,12 +2551,7 @@ export class GroupStagingScripts {
    * and nothing re-signals at the due time.
    */
   async getEarliestReadyScore(): Promise<number | null> {
-    const result = await this.redis.zrange(
-      `${this.keyPrefix}ready`,
-      0,
-      0,
-      "WITHSCORES",
-    );
+    const result = await this.redis.zrange(`${this.keyPrefix}ready`, 0, 0, "WITHSCORES");
     if (result.length < 2) return null;
     const score = Number(result[1]);
     return Number.isFinite(score) ? score : null;

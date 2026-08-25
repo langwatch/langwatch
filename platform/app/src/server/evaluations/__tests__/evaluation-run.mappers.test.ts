@@ -78,13 +78,9 @@ describe("mapClickHouseEvaluationToTraceEvaluation", () => {
 
   it("converts UInt8 IsGuardrail to boolean", () => {
     const guardrailRow = { ...baseCHRow, IsGuardrail: 1 };
-    expect(
-      mapClickHouseEvaluationToTraceEvaluation(guardrailRow).isGuardrail,
-    ).toBe(true);
+    expect(mapClickHouseEvaluationToTraceEvaluation(guardrailRow).isGuardrail).toBe(true);
 
-    expect(
-      mapClickHouseEvaluationToTraceEvaluation(baseCHRow).isGuardrail,
-    ).toBe(false);
+    expect(mapClickHouseEvaluationToTraceEvaluation(baseCHRow).isGuardrail).toBe(false);
   });
 
   it("converts UInt8 Passed=1 to true", () => {
@@ -94,16 +90,12 @@ describe("mapClickHouseEvaluationToTraceEvaluation", () => {
 
   it("converts UInt8 Passed=0 to false", () => {
     const failedRow = { ...baseCHRow, Passed: 0 };
-    expect(mapClickHouseEvaluationToTraceEvaluation(failedRow).passed).toBe(
-      false,
-    );
+    expect(mapClickHouseEvaluationToTraceEvaluation(failedRow).passed).toBe(false);
   });
 
   it("converts null Passed to null", () => {
     const nullPassedRow = { ...baseCHRow, Passed: null };
-    expect(
-      mapClickHouseEvaluationToTraceEvaluation(nullPassedRow).passed,
-    ).toBeNull();
+    expect(mapClickHouseEvaluationToTraceEvaluation(nullPassedRow).passed).toBeNull();
   });
 
   it("parses DateTime64 strings to Unix milliseconds", () => {
@@ -136,16 +128,12 @@ describe("mapClickHouseEvaluationToTraceEvaluation", () => {
 
   it("handles null Score", () => {
     const nullScore = { ...baseCHRow, Score: null };
-    expect(
-      mapClickHouseEvaluationToTraceEvaluation(nullScore).score,
-    ).toBeNull();
+    expect(mapClickHouseEvaluationToTraceEvaluation(nullScore).score).toBeNull();
   });
 
   it("handles null EvaluatorName", () => {
     const nullName = { ...baseCHRow, EvaluatorName: null };
-    expect(
-      mapClickHouseEvaluationToTraceEvaluation(nullName).evaluatorName,
-    ).toBeNull();
+    expect(mapClickHouseEvaluationToTraceEvaluation(nullName).evaluatorName).toBeNull();
   });
 });
 
@@ -155,10 +143,7 @@ describe("mapClickHouseEvaluationToTraceEvaluation", () => {
 
 describe("mapEsEvaluationToTraceEvaluation", () => {
   it("maps snake_case fields to camelCase", () => {
-    const result = mapEsEvaluationToTraceEvaluation(
-      baseEsEvaluation,
-      "trace-1",
-    );
+    const result = mapEsEvaluationToTraceEvaluation(baseEsEvaluation, "trace-1");
 
     expect(result.evaluationId).toBe("eval-001");
     expect(result.evaluatorId).toBe("evaluator-1");
@@ -175,10 +160,7 @@ describe("mapEsEvaluationToTraceEvaluation", () => {
   });
 
   it("maps ES timestamps to canonical format", () => {
-    const result = mapEsEvaluationToTraceEvaluation(
-      baseEsEvaluation,
-      "trace-1",
-    );
+    const result = mapEsEvaluationToTraceEvaluation(baseEsEvaluation, "trace-1");
 
     expect(result.timestamps.scheduledAt).toBe(1705312200000);
     expect(result.timestamps.startedAt).toBe(1705312201000);
@@ -195,10 +177,7 @@ describe("mapEsEvaluationToTraceEvaluation", () => {
   });
 
   it("sets error to null when no error", () => {
-    const result = mapEsEvaluationToTraceEvaluation(
-      baseEsEvaluation,
-      "trace-1",
-    );
+    const result = mapEsEvaluationToTraceEvaluation(baseEsEvaluation, "trace-1");
     expect(result.error).toBeNull();
   });
 
@@ -340,21 +319,14 @@ describe("mapTraceEvaluationsToLegacyEvaluations", () => {
 });
 
 describe("EVALUATION_RUN_COLUMNS_WITH_INPUTS", () => {
-  const columns = EVALUATION_RUN_COLUMNS_WITH_INPUTS.split(",").map((c) =>
-    c.trim(),
-  );
+  const columns = EVALUATION_RUN_COLUMNS_WITH_INPUTS.split(",").map((c) => c.trim());
 
   it("lists exactly the columns the row mapper consumes (stays in sync with ClickHouseEvaluationRunRow)", () => {
     expect([...columns].sort()).toEqual(Object.keys(baseCHRow).sort());
   });
 
   it("excludes evaluation_runs columns no reader consumes (the SELECT * over-read)", () => {
-    for (const unused of [
-      "ErrorDetails",
-      "CostId",
-      "ArchivedAt",
-      "CreatedAt",
-    ]) {
+    for (const unused of ["ErrorDetails", "CostId", "ArchivedAt", "CreatedAt"]) {
       expect(columns).not.toContain(unused);
     }
   });

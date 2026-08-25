@@ -22,16 +22,12 @@ describe("enterprise", () => {
     describe("when plan type is not ENTERPRISE", () => {
       /** @scenario FREE plan is not recognized as enterprise */
       /** @scenario OPEN_SOURCE plan is not recognized as enterprise */
-      it.each([
-        "FREE",
-        "OPEN_SOURCE",
-        "PRO",
-        "GROWTH",
-        "STARTER",
-        "",
-      ])("returns false for %s", (planType) => {
-        expect(isEnterpriseTier(planType)).toBe(false);
-      });
+      it.each(["FREE", "OPEN_SOURCE", "PRO", "GROWTH", "STARTER", ""])(
+        "returns false for %s",
+        (planType) => {
+          expect(isEnterpriseTier(planType)).toBe(false);
+        },
+      );
     });
   });
 
@@ -41,12 +37,7 @@ describe("enterprise", () => {
     });
 
     describe("when role is not a custom role", () => {
-      it.each([
-        "ADMIN",
-        "MEMBER",
-        "VIEWER",
-        "",
-      ])("returns false for %s", (role) => {
+      it.each(["ADMIN", "MEMBER", "VIEWER", ""])("returns false for %s", (role) => {
         expect(isCustomRole(role)).toBe(false);
       });
     });
@@ -107,29 +98,27 @@ describe("enterprise", () => {
     });
 
     describe("when plan is not ENTERPRISE", () => {
-      it.each([
-        "FREE",
-        "OPEN_SOURCE",
-        "PRO",
-        "GROWTH",
-      ])("throws FORBIDDEN for %s plan", async (planType) => {
-        const plan: PlanInfo = {
-          ...FREE_PLAN,
-          type: planType,
-        };
-        mockGetActivePlan.mockResolvedValue(plan);
+      it.each(["FREE", "OPEN_SOURCE", "PRO", "GROWTH"])(
+        "throws FORBIDDEN for %s plan",
+        async (planType) => {
+          const plan: PlanInfo = {
+            ...FREE_PLAN,
+            type: planType,
+          };
+          mockGetActivePlan.mockResolvedValue(plan);
 
-        await expect(
-          assertEnterprisePlan({
-            planProvider,
-            organizationId: "org-1",
-            errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-          }),
-        ).rejects.toMatchObject({
-          code: "FORBIDDEN",
-          message: ENTERPRISE_FEATURE_ERRORS.RBAC,
-        });
-      });
+          await expect(
+            assertEnterprisePlan({
+              planProvider,
+              organizationId: "org-1",
+              errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+            }),
+          ).rejects.toMatchObject({
+            code: "FORBIDDEN",
+            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
+          });
+        },
+      );
 
       it("uses the provided errorMessage", async () => {
         mockGetActivePlan.mockResolvedValue({
@@ -153,9 +142,7 @@ describe("enterprise", () => {
     describe("when plan provider fails", () => {
       /** @scenario Guard fails closed when plan lookup fails */
       it("denies access by propagating the error", async () => {
-        mockGetActivePlan.mockRejectedValue(
-          new Error("Plan provider unavailable"),
-        );
+        mockGetActivePlan.mockRejectedValue(new Error("Plan provider unavailable"));
 
         await expect(
           assertEnterprisePlan({

@@ -40,7 +40,10 @@ export function postgresLayout(postgresBinPath: string): PostgresLayout {
 // rebuild the embeds tarball with --with-rpath '$ORIGIN/../lib' or run
 // patchelf post-extract — tracked as a follow-up against the embeds
 // repo, this is the surgical runtime fix.
-function pgEnv(resolvedPath: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+function pgEnv(
+  resolvedPath: string,
+  base: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
   const libDir = join(dirname(dirname(resolvedPath)), "lib");
   if (!existsSync(libDir)) return base;
   const var_ = process.platform === "darwin" ? "DYLD_LIBRARY_PATH" : "LD_LIBRARY_PATH";
@@ -55,7 +58,10 @@ function pgEnv(resolvedPath: string, base: NodeJS.ProcessEnv = process.env): Nod
  * Idempotent. On first run: initdb, then start; subsequently: just start.
  * Database creation (langwatch_db) happens after the server is healthy.
  */
-export async function startPostgres(ctx: RuntimeContext, bus: EventBus): Promise<SupervisedHandle> {
+export async function startPostgres(
+  ctx: RuntimeContext,
+  bus: EventBus,
+): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "postgres" });
   const start = Date.now();
 
@@ -75,12 +81,18 @@ export async function startPostgres(ctx: RuntimeContext, bus: EventBus): Promise
       name: "postgres",
       command: layout.postgresBin,
       args: [
-        "-D", dataDir,
-        "-p", String(ctx.ports.postgres),
-        "-h", "127.0.0.1",
-        "-c", "unix_socket_directories=" + dirname(sp.pid("postgres")),
-        "-c", "log_destination=stderr",
-        "-c", "logging_collector=off",
+        "-D",
+        dataDir,
+        "-p",
+        String(ctx.ports.postgres),
+        "-h",
+        "127.0.0.1",
+        "-c",
+        "unix_socket_directories=" + dirname(sp.pid("postgres")),
+        "-c",
+        "log_destination=stderr",
+        "-c",
+        "logging_collector=off",
       ],
       env,
     },
@@ -91,7 +103,17 @@ export async function startPostgres(ctx: RuntimeContext, bus: EventBus): Promise
   const ready = await pollUntilHealthy({
     check: execCheck(
       layout.psql.replace(/psql$/, "pg_isready"),
-      ["-h", "127.0.0.1", "-p", String(ctx.ports.postgres), "-U", DB_USER, "-d", "postgres", "-q"],
+      [
+        "-h",
+        "127.0.0.1",
+        "-p",
+        String(ctx.ports.postgres),
+        "-U",
+        DB_USER,
+        "-d",
+        "postgres",
+        "-q",
+      ],
       { env },
     ),
     timeoutMs: 30_000,
@@ -107,7 +129,11 @@ export async function startPostgres(ctx: RuntimeContext, bus: EventBus): Promise
   return handle;
 }
 
-async function initdb(layout: PostgresLayout, dataDir: string, env: NodeJS.ProcessEnv): Promise<void> {
+async function initdb(
+  layout: PostgresLayout,
+  dataDir: string,
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
   mkdirSync(dataDir, { recursive: true });
   await execa(
     layout.initdb,
@@ -116,18 +142,46 @@ async function initdb(layout: PostgresLayout, dataDir: string, env: NodeJS.Proce
   );
 }
 
-async function ensureDatabase(layout: PostgresLayout, port: number, env: NodeJS.ProcessEnv): Promise<void> {
+async function ensureDatabase(
+  layout: PostgresLayout,
+  port: number,
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
   const probe1 = await execa(
     layout.psql,
-    ["-h", "127.0.0.1", "-p", String(port), "-U", DB_USER, "-d", "postgres", "-tc", `SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'`],
+    [
+      "-h",
+      "127.0.0.1",
+      "-p",
+      String(port),
+      "-U",
+      DB_USER,
+      "-d",
+      "postgres",
+      "-tc",
+      `SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'`,
+    ],
     { reject: false, env },
   );
   if (probe1.exitCode !== 0) {
-    throw new Error(`postgres connect probe failed (psql exit ${probe1.exitCode}): ${probe1.stderr || probe1.stdout || "no output"}`);
+    throw new Error(
+      `postgres connect probe failed (psql exit ${probe1.exitCode}): ${probe1.stderr || probe1.stdout || "no output"}`,
+    );
   }
   const probe = await execa(
     layout.psql,
-    ["-h", "127.0.0.1", "-p", String(port), "-U", DB_USER, "-d", "postgres", "-tAc", `SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'`],
+    [
+      "-h",
+      "127.0.0.1",
+      "-p",
+      String(port),
+      "-U",
+      DB_USER,
+      "-d",
+      "postgres",
+      "-tAc",
+      `SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'`,
+    ],
     { reject: false, env },
   );
   if (probe.stdout.trim() === "1") return;

@@ -21,9 +21,7 @@ import {
   validateRoutingPolicyForm,
 } from "../routingPolicyForm";
 
-function storedPolicy(
-  overrides: Partial<StoredRoutingPolicy> = {},
-): StoredRoutingPolicy {
+function storedPolicy(overrides: Partial<StoredRoutingPolicy> = {}): StoredRoutingPolicy {
   return {
     name: "developer default",
     description: null,
@@ -54,9 +52,7 @@ describe("given a stored policy whose mapping mixes tiers and ordinary names", (
       reasoning: "",
       fast: "openai/gpt-5-mini",
     });
-    expect(values.nameMappings).toEqual([
-      { from: "gpt-4o", to: "openai/gpt-5" },
-    ]);
+    expect(values.nameMappings).toEqual([{ from: "gpt-4o", to: "openai/gpt-5" }]);
   });
 
   it("puts them back together unchanged", () => {
@@ -159,9 +155,7 @@ describe("given a policy being validated before save", () => {
       boundProviderTypes: new Set(["openai"]),
     });
 
-    expect(problems.some((problem) => problem.includes("more than once"))).toBe(
-      true,
-    );
+    expect(problems.some((problem) => problem.includes("more than once"))).toBe(true);
   });
 
   it("refuses a target naming a provider this policy does not route through", () => {

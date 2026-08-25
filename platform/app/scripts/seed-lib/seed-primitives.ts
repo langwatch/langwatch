@@ -23,9 +23,7 @@ export interface TraceFixture {
 
 export function assertLocalUrl(name: string, value: string | undefined): void {
   if (!value) throw new Error(`${name} is required`);
-  const hostname = new URL(value).hostname
-    .replace(/^\[|\]$/g, "")
-    .toLowerCase();
+  const hostname = new URL(value).hostname.replace(/^\[|\]$/g, "").toLowerCase();
   if (
     hostname !== "localhost" &&
     hostname !== "127.0.0.1" &&

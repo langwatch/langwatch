@@ -43,8 +43,7 @@ class MemoryDriver implements StorageDriver {
   }
 }
 
-const digest = (bytes: Buffer) =>
-  createHash("sha256").update(bytes).digest("hex");
+const digest = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
 
 const storedObject = ({
   projectId,
@@ -218,8 +217,7 @@ describe("Feature: Object storage provider parity and migration", () => {
     expect(report.foreignSchemeRows).toBe(1);
     await state.migration.finalize();
     expect(
-      state.rows.get("project-1")?.find((r) => r.id === foreign.id)
-        ?.storage_uri,
+      state.rows.get("project-1")?.find((r) => r.id === foreign.id)?.storage_uri,
     ).toBe(foreign.storage_uri);
   });
 
@@ -233,10 +231,7 @@ describe("Feature: Object storage provider parity and migration", () => {
           ...storedObject({
             projectId: "project-1",
             bytes,
-            storageUri: state.source.storedObjectUri(
-              "project-1",
-              digest(bytes),
-            ),
+            storageUri: state.source.storedObjectUri("project-1", digest(bytes)),
           }),
           id: `object-${index.toString().padStart(4, "0")}`,
         };
@@ -257,11 +252,7 @@ describe("Feature: Object storage provider parity and migration", () => {
       ],
     });
     seedStoredObject(state, "global", Buffer.from("global"));
-    const privateRow = seedStoredObject(
-      state,
-      "private",
-      Buffer.from("private"),
-    );
+    const privateRow = seedStoredObject(state, "private", Buffer.from("private"));
 
     const report = await state.migration.copy();
 
@@ -269,10 +260,7 @@ describe("Feature: Object storage provider parity and migration", () => {
     expect(state.destinationDriver.puts).toHaveLength(1);
     expect(
       state.destinationDriver.objects.has(
-        state.destination.storedObjectUri(
-          privateRow.project_id,
-          privateRow.sha256,
-        ),
+        state.destination.storedObjectUri(privateRow.project_id, privateRow.sha256),
       ),
     ).toBe(false);
   });
@@ -284,10 +272,7 @@ describe("Feature: Object storage provider parity and migration", () => {
 
     await state.migration.copy();
 
-    const target = state.destination.storedObjectUri(
-      row.project_id,
-      row.sha256,
-    );
+    const target = state.destination.storedObjectUri(row.project_id, row.sha256);
     expect(state.destinationDriver.objects.get(target)).toEqual(
       state.sourceDriver.objects.get(row.storage_uri),
     );
@@ -302,10 +287,7 @@ describe("Feature: Object storage provider parity and migration", () => {
     const mismatched = storedObject({
       projectId: "project-1",
       bytes: Buffer.from("two"),
-      storageUri: state.source.storedObjectUri(
-        "project-1",
-        digest(Buffer.from("two")),
-      ),
+      storageUri: state.source.storedObjectUri("project-1", digest(Buffer.from("two"))),
     });
     state.rows.set("project-1", [verified, mismatched]);
     state.sourceDriver.objects.set(mismatched.storage_uri, Buffer.from("two"));
@@ -360,9 +342,7 @@ describe("Feature: Object storage provider parity and migration", () => {
       ],
     });
 
-    await expect(state.migration.finalize()).rejects.toThrow(
-      /dataset-1.*processing/,
-    );
+    await expect(state.migration.finalize()).rejects.toThrow(/dataset-1.*processing/);
     expect(state.history).toEqual([]);
   });
 
@@ -394,11 +374,7 @@ describe("Feature: Object storage provider parity and migration", () => {
     // The chunk exists ONLY at the destination — uploaded while that
     // provider was briefly the active backend (#6323 posture).
     state.destinationDriver.objects.set(
-      state.destination.datasetChunkUri(
-        "project-1",
-        "dataset-on-destination",
-        0,
-      ),
+      state.destination.datasetChunkUri("project-1", "dataset-on-destination", 0),
       Buffer.from("chunk-at-destination"),
     );
 
@@ -427,9 +403,7 @@ describe("Feature: Object storage provider parity and migration", () => {
       ],
     });
 
-    await expect(state.migration.copy()).rejects.toThrow(
-      /missing from both providers/,
-    );
+    await expect(state.migration.copy()).rejects.toThrow(/missing from both providers/);
   });
 
   /** @scenario A dataset with no usable chunk count is reported rather than aborting the run */
@@ -473,22 +447,19 @@ describe("Feature: Object storage provider parity and migration", () => {
   });
 
   /** @scenario Outstanding queue work blocks finalization */
-  it.each([
-    "pending",
-    "delayed",
-    "active",
-    "blocked",
-    "staged-durable-ref",
-  ] as const)("Outstanding queue work blocks finalization: %s", async (kind) => {
-    const state = setup({
-      queueBlockers: [{ queueName: "events", kind, count: 1 }],
-    });
+  it.each(["pending", "delayed", "active", "blocked", "staged-durable-ref"] as const)(
+    "Outstanding queue work blocks finalization: %s",
+    async (kind) => {
+      const state = setup({
+        queueBlockers: [{ queueName: "events", kind, count: 1 }],
+      });
 
-    await expect(state.migration.finalize()).rejects.toThrow(
-      new RegExp(`events.*${kind}`),
-    );
-    expect(state.history).toEqual([]);
-  });
+      await expect(state.migration.finalize()).rejects.toThrow(
+        new RegExp(`events.*${kind}`),
+      );
+      expect(state.history).toEqual([]);
+    },
+  );
 
   /** @scenario Finalization publishes verified destination addresses without erasing history */
   it("Finalization publishes verified destination addresses without erasing history", async () => {
@@ -512,62 +483,55 @@ describe("Feature: Object storage provider parity and migration", () => {
   it.each([
     ["s3", "azure"],
     ["azure", "s3"],
-  ] as const)("A finalized provider migration preserves durable customer data: %s to %s", async (sourceProvider, destinationProvider) => {
-    const state = setup({ sourceProvider, destinationProvider });
-    const row = seedStoredObject(state);
-    const dataset: MigrationDataset = {
-      id: "dataset-1",
-      projectId: "project-1",
-      contentLayout: "s3_jsonl",
-      status: "ready",
-      chunkCount: 2,
-    };
-    state.datasetRows.push(dataset);
-    for (let index = 0; index < (dataset.chunkCount ?? 0); index++) {
-      state.sourceDriver.objects.set(
-        state.source.datasetChunkUri(dataset.projectId, dataset.id, index),
-        Buffer.from(`chunk-${index}`),
+  ] as const)(
+    "A finalized provider migration preserves durable customer data: %s to %s",
+    async (sourceProvider, destinationProvider) => {
+      const state = setup({ sourceProvider, destinationProvider });
+      const row = seedStoredObject(state);
+      const dataset: MigrationDataset = {
+        id: "dataset-1",
+        projectId: "project-1",
+        contentLayout: "s3_jsonl",
+        status: "ready",
+        chunkCount: 2,
+      };
+      state.datasetRows.push(dataset);
+      for (let index = 0; index < (dataset.chunkCount ?? 0); index++) {
+        state.sourceDriver.objects.set(
+          state.source.datasetChunkUri(dataset.projectId, dataset.id, index),
+          Buffer.from(`chunk-${index}`),
+        );
+      }
+
+      const result = await state.migration.finalize();
+      const activeRegistry = new StorageRegistry({
+        s3: destinationProvider === "s3" ? state.destinationDriver : state.sourceDriver,
+        file: new MemoryDriver(),
+        "azure-blob":
+          destinationProvider === "azure" ? state.destinationDriver : state.sourceDriver,
+      });
+      const publishedRow = state.rows.get("project-1")?.[0];
+      const newBytes = Buffer.from("post-cutover-write");
+      const newUri = state.destination.storedObjectUri("project-1", digest(newBytes));
+      await activeRegistry.put(newUri, newBytes, "application/octet-stream");
+
+      expect(result.destinationProvider).toBe(destinationProvider);
+      expect(publishedRow?.storage_uri).toBe(
+        state.destination.storedObjectUri(row.project_id, row.sha256),
       );
-    }
-
-    const result = await state.migration.finalize();
-    const activeRegistry = new StorageRegistry({
-      s3:
-        destinationProvider === "s3"
-          ? state.destinationDriver
-          : state.sourceDriver,
-      file: new MemoryDriver(),
-      "azure-blob":
-        destinationProvider === "azure"
-          ? state.destinationDriver
-          : state.sourceDriver,
-    });
-    const publishedRow = state.rows.get("project-1")?.[0];
-    const newBytes = Buffer.from("post-cutover-write");
-    const newUri = state.destination.storedObjectUri(
-      "project-1",
-      digest(newBytes),
-    );
-    await activeRegistry.put(newUri, newBytes, "application/octet-stream");
-
-    expect(result.destinationProvider).toBe(destinationProvider);
-    expect(publishedRow?.storage_uri).toBe(
-      state.destination.storedObjectUri(row.project_id, row.sha256),
-    );
-    expect(
-      await readBuffer(await activeRegistry.get(publishedRow!.storage_uri)),
-    ).toEqual(Buffer.from("stored-object"));
-    expect(
-      await readBuffer(
-        await state.destination.driver.get(
-          state.destination.datasetChunkUri(dataset.projectId, dataset.id, 1),
+      expect(
+        await readBuffer(await activeRegistry.get(publishedRow!.storage_uri)),
+      ).toEqual(Buffer.from("stored-object"));
+      expect(
+        await readBuffer(
+          await state.destination.driver.get(
+            state.destination.datasetChunkUri(dataset.projectId, dataset.id, 1),
+          ),
         ),
-      ),
-    ).toEqual(Buffer.from("chunk-1"));
-    expect(await readBuffer(await activeRegistry.get(newUri))).toEqual(
-      newBytes,
-    );
-  });
+      ).toEqual(Buffer.from("chunk-1"));
+      expect(await readBuffer(await activeRegistry.get(newUri))).toEqual(newBytes);
+    },
+  );
 
   /** @scenario A failed finalization can be resumed before traffic restarts */
   it("A failed finalization can be resumed before traffic restarts", async () => {
@@ -576,10 +540,7 @@ describe("Feature: Object storage provider parity and migration", () => {
     const second = storedObject({
       projectId: "project-1",
       bytes: Buffer.from("two"),
-      storageUri: state.source.storedObjectUri(
-        "project-1",
-        digest(Buffer.from("two")),
-      ),
+      storageUri: state.source.storedObjectUri("project-1", digest(Buffer.from("two"))),
     });
     state.rows.set("project-1", [first, second]);
     state.sourceDriver.objects.set(second.storage_uri, Buffer.from("two"));
@@ -596,9 +557,7 @@ describe("Feature: Object storage provider parity and migration", () => {
       );
     });
 
-    await expect(state.migration.finalize()).rejects.toThrow(
-      "ClickHouse unavailable",
-    );
+    await expect(state.migration.finalize()).rejects.toThrow("ClickHouse unavailable");
     state.setPublisher(async (row) => {
       state.history.push(row);
       state.rows.set(
@@ -615,9 +574,7 @@ describe("Feature: Object storage provider parity and migration", () => {
     expect(
       state.rows
         .get("project-1")
-        ?.every((row) =>
-          row.storage_uri.startsWith(`${state.destination.scheme}://`),
-        ),
+        ?.every((row) => row.storage_uri.startsWith(`${state.destination.scheme}://`)),
     ).toBe(true);
   });
 

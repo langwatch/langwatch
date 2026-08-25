@@ -8,10 +8,7 @@
  */
 import type { GatewayBudgetWindow } from "~/generated/prisma/client";
 
-export function nextResetAt(
-  window: GatewayBudgetWindow,
-  now: Date = new Date(),
-): Date {
+export function nextResetAt(window: GatewayBudgetWindow, now: Date = new Date()): Date {
   const d = new Date(now);
   d.setUTCMilliseconds(0);
 
@@ -79,9 +76,7 @@ export const CYCLIC_WINDOWS = [
   "MONTH",
 ] as const satisfies readonly CyclicWindow[];
 
-export function isCyclicWindow(
-  window: GatewayBudgetWindow,
-): window is CyclicWindow {
+export function isCyclicWindow(window: GatewayBudgetWindow): window is CyclicWindow {
   return (CYCLIC_WINDOWS as readonly GatewayBudgetWindow[]).includes(window);
 }
 
@@ -213,8 +208,7 @@ export function nextAnchoredResetAt({
 
   if (window !== "MONTH") {
     return new Date(
-      anchoredPeriodStart({ window, anchorAt, now }).getTime() +
-        FIXED_CYCLE_MS[window],
+      anchoredPeriodStart({ window, anchorAt, now }).getTime() + FIXED_CYCLE_MS[window],
     );
   }
 

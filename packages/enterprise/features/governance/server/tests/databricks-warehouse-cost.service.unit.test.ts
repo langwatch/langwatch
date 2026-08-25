@@ -292,9 +292,7 @@ describe("allocateWarehouseCost", () => {
     // a statement out of two hours and then reporting the first hour's total
     // as the denominator makes the record read as a twentyfold error, and the
     // record is what anyone reconciling the bill actually reads.
-    expect(costByStatementId.get("straddler")?.hourTotalExecutionMs).toBe(
-      "2401000",
-    );
+    expect(costByStatementId.get("straddler")?.hourTotalExecutionMs).toBe("2401000");
     expect(costByStatementId.get("straddler")?.hourBillableUsd).toBe("12");
   });
 
@@ -365,9 +363,7 @@ describe("allocateWarehouseCost", () => {
     expect(skipped).toHaveLength(0);
     // And the hour it did not work in stays out of the ingredients, which are
     // what anyone reconciling this figure divides by.
-    expect(costByStatementId.get("on-the-hour")?.hourTotalExecutionMs).toBe(
-      "3600000",
-    );
+    expect(costByStatementId.get("on-the-hour")?.hourTotalExecutionMs).toBe("3600000");
     expect(costByStatementId.get("on-the-hour")?.hourBillableUsd).toBe("6");
   });
 
@@ -453,9 +449,9 @@ describe("costReadFloorMs", () => {
 
   /** @scenario "A source that prices nothing does not widen its window" */
   it("reads only what is new when the source prices nothing", () => {
-    expect(
-      warehouseCosts.costReadFloor({ sinceMs, nowMs, costEnabled: false }),
-    ).toBe(sinceMs);
+    expect(warehouseCosts.costReadFloor({ sinceMs, nowMs, costEnabled: false })).toBe(
+      sinceMs,
+    );
   });
 
   it("never reads less than the watermark already guarantees", () => {
@@ -476,17 +472,14 @@ describe("costReadFloorMs", () => {
     // Databricks publishes a query's compute well after the query. If this
     // window is tighter than that delay, every question sits at zero forever
     // and nothing anywhere reports a problem.
-    expect(WAREHOUSE_COST_SETTLING_LAG_MS).toBeGreaterThanOrEqual(
-      60 * 60 * 1000,
-    );
+    expect(WAREHOUSE_COST_SETTLING_LAG_MS).toBeGreaterThanOrEqual(60 * 60 * 1000);
   });
 });
 
 describe("splitting the window into readable pieces", () => {
   const ONE_HOUR = 60 * 60 * 1000;
   /** An exact hour boundary, so the arithmetic is readable in the assertions. */
-  const HOUR_START =
-    Math.floor(Date.UTC(2026, 7, 1, 9, 0, 0) / ONE_HOUR) * ONE_HOUR;
+  const HOUR_START = Math.floor(Date.UTC(2026, 7, 1, 9, 0, 0) / ONE_HOUR) * ONE_HOUR;
 
   it("covers the whole window with no gap and no overlap", () => {
     // The gap is the part that would be silent: an hour falling between two
@@ -590,9 +583,7 @@ describe("splitting the window into readable pieces", () => {
   });
 
   it("asks nothing about an empty or backwards window", () => {
-    expect(
-      warehouseCosts.chunks({ fromMs: HOUR_START, toMs: HOUR_START }),
-    ).toEqual([]);
+    expect(warehouseCosts.chunks({ fromMs: HOUR_START, toMs: HOUR_START })).toEqual([]);
     expect(
       warehouseCosts.chunks({
         fromMs: HOUR_START,
@@ -601,9 +592,7 @@ describe("splitting the window into readable pieces", () => {
     ).toEqual([]);
     // A clock or a stored watermark that arrived unreadable. Returning nothing
     // prices nothing, where looping on NaN would hang the run.
-    expect(warehouseCosts.chunks({ fromMs: NaN, toMs: HOUR_START })).toEqual(
-      [],
-    );
+    expect(warehouseCosts.chunks({ fromMs: NaN, toMs: HOUR_START })).toEqual([]);
   });
 });
 

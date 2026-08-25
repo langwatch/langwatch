@@ -12,9 +12,7 @@ const NULL_BYTE = "\u0000";
 
 export const stripNullBytes = (value: unknown): unknown => {
   if (typeof value === "string") {
-    return value.includes(NULL_BYTE)
-      ? value.replaceAll(NULL_BYTE, "")
-      : value;
+    return value.includes(NULL_BYTE) ? value.replaceAll(NULL_BYTE, "") : value;
   }
   if (Array.isArray(value)) {
     return value.map(stripNullBytes);

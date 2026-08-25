@@ -43,11 +43,7 @@ import {
   type StagedObject,
   stagePayloadToS3,
 } from "../../s3/stagePayload";
-import {
-  hasGo,
-  type NlpgoSubprocess,
-  startNlpgoSubprocess,
-} from "./_nlpgoSubprocess";
+import { hasGo, type NlpgoSubprocess, startNlpgoSubprocess } from "./_nlpgoSubprocess";
 
 // AWS Lambda synchronous InvokeFunction Payload cap. A body over this fails
 // inline with "Request must be smaller than 6291456 bytes for the
@@ -196,17 +192,14 @@ describe("oversized nlpgo invoke staged through real S3 to live nlpgo", () => {
 
             // Empty body + staged header = exactly what lambdaFetch sends and what
             // readStudioRequestBody fetches from S3 instead of the inline body.
-            const res = await fetch(
-              `${nlpgo!.baseUrl}/go/studio/execute_sync`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  [STAGED_PAYLOAD_HEADER]: staged.stagedUrl,
-                },
-                body: "",
+            const res = await fetch(`${nlpgo!.baseUrl}/go/studio/execute_sync`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                [STAGED_PAYLOAD_HEADER]: staged.stagedUrl,
               },
-            );
+              body: "",
+            });
 
             expect(res.status).toBe(200);
             const result = (await res.json()) as {
@@ -279,8 +272,7 @@ describe("oversized nlpgo invoke staged through real S3 to live nlpgo", () => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              [STAGED_PAYLOAD_HEADER]:
-                "https://evil.example.com/staged.json?sig=x",
+              [STAGED_PAYLOAD_HEADER]: "https://evil.example.com/staged.json?sig=x",
             },
             body: "",
           });

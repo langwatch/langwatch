@@ -101,11 +101,7 @@ export async function authorizeDirectUpload(
         error: "Cross-site request blocked.",
       };
     }
-    const permitted = await probeProjectPermission(
-      { session },
-      projectId,
-      PERMISSION,
-    );
+    const permitted = await probeProjectPermission({ session }, projectId, PERMISSION);
     if (!permitted) {
       return {
         ok: false,

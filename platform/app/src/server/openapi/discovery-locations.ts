@@ -40,15 +40,12 @@ export const ROOT_DISCOVERY_PATHS: readonly string[] = [
  */
 export function isRootDiscoveryPath(pathname: string): boolean {
   const withoutTrailingSlash =
-    pathname.length > 1 && pathname.endsWith("/")
-      ? pathname.slice(0, -1)
-      : pathname;
+    pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
   return ROOT_DISCOVERY_PATHS.includes(withoutTrailingSlash);
 }
 
 /** Escapes a literal path for embedding in a regular expression. */
-const escapeForRegExp = (value: string) =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeForRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * The dev proxy rule matching exactly these paths, built here so `vite.config.ts`

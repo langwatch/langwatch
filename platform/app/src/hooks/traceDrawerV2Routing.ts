@@ -26,11 +26,7 @@ export function routeTraceDrawerForV2(
   drawer: DrawerType,
   props: Record<string, unknown> | undefined,
 ): { drawer: DrawerType; props: Record<string, unknown> | undefined } {
-  if (
-    drawer === "traceDetails" &&
-    typeof props?.traceId === "string" &&
-    props.traceId
-  ) {
+  if (drawer === "traceDetails" && typeof props?.traceId === "string" && props.traceId) {
     return {
       drawer: "traceV2Details",
       props: {

@@ -18,9 +18,7 @@ export type EvaluationAdapterOptions = {
   workflows: WorkflowService;
 };
 
-class PassthroughEvaluationInputsResolution
-  extends EvaluationInputsResolutionPort
-{
+class PassthroughEvaluationInputsResolution extends EvaluationInputsResolutionPort {
   async resolve(input: {
     tenantId: string;
     inputs: Record<string, unknown> | null;

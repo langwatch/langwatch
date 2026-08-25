@@ -22,10 +22,7 @@ describe("PlanProvider wiring patterns", () => {
       });
 
       expect(result).toBe(FREE_PLAN);
-      expect(mockSaasProvider.getActivePlan).toHaveBeenCalledWith(
-        "org_1",
-        user,
-      );
+      expect(mockSaasProvider.getActivePlan).toHaveBeenCalledWith("org_1", user);
     });
 
     it("forwards impersonator to SaaS provider", async () => {
@@ -44,10 +41,7 @@ describe("PlanProvider wiring patterns", () => {
       };
       await planProvider.getActivePlan({ organizationId: "org_1", user });
 
-      expect(mockSaasProvider.getActivePlan).toHaveBeenCalledWith(
-        "org_1",
-        user,
-      );
+      expect(mockSaasProvider.getActivePlan).toHaveBeenCalledWith("org_1", user);
     });
   });
 
@@ -101,9 +95,9 @@ describe("PlanProvider wiring patterns", () => {
         },
       });
 
-      await expect(
-        planProvider.getActivePlan({ organizationId: "org_1" }),
-      ).rejects.toBe(error);
+      await expect(planProvider.getActivePlan({ organizationId: "org_1" })).rejects.toBe(
+        error,
+      );
     });
 
     it("propagates errors from license adapter unchanged", async () => {
@@ -114,9 +108,9 @@ describe("PlanProvider wiring patterns", () => {
         },
       });
 
-      await expect(
-        planProvider.getActivePlan({ organizationId: "org_1" }),
-      ).rejects.toBe(error);
+      await expect(planProvider.getActivePlan({ organizationId: "org_1" })).rejects.toBe(
+        error,
+      );
     });
   });
 });

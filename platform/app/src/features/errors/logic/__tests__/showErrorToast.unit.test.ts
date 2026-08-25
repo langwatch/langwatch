@@ -16,20 +16,16 @@ interface ToastArgs {
 const create = vi.fn<(args: ToastArgs) => void>();
 vi.mock("~/components/ui/toaster", () => ({ toaster: { create } }));
 
-const isHandledByGlobalHandler = vi.fn<(error: unknown) => boolean>(
-  () => false,
-);
+const isHandledByGlobalHandler = vi.fn<(error: unknown) => boolean>(() => false);
 vi.mock("~/utils/trpcError", () => ({
-  isHandledByGlobalHandler: (error: unknown) =>
-    isHandledByGlobalHandler(error as never),
+  isHandledByGlobalHandler: (error: unknown) => isHandledByGlobalHandler(error as never),
 }));
 
 const { showErrorToast } = await import("../showErrorToast");
 
-const handledError = (
-  error: Record<string, unknown> | null,
-  traceId?: string,
-) => ({ data: { error, ...(traceId ? { traceId } : {}) } });
+const handledError = (error: Record<string, unknown> | null, traceId?: string) => ({
+  data: { error, ...(traceId ? { traceId } : {}) },
+});
 
 beforeEach(() => {
   create.mockClear();
@@ -246,9 +242,7 @@ describe("showErrorToast", () => {
         fallbackTitle: "Couldn't save",
       });
 
-      expect(create.mock.calls[0]![0].description).not.toContain(
-        "Unexpected token",
-      );
+      expect(create.mock.calls[0]![0].description).not.toContain("Unexpected token");
     });
   });
 

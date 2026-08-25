@@ -21,9 +21,7 @@ const isAppPackageDir = (dir: string): boolean => {
   }
 };
 
-export const resolveAppPackageRoot = (
-  start: string = process.cwd(),
-): string => {
+export const resolveAppPackageRoot = (start: string = process.cwd()): string => {
   const resolvedStart = path.resolve(start);
   if (cached?.start === resolvedStart) return cached.root;
   let dir = resolvedStart;

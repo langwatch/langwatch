@@ -21,9 +21,7 @@ export async function handleCreateApiKey(params: {
   lines.push(`**Token**: \`${result.token}\``);
   lines.push(`**Created**: ${result.apiKey.createdAt}`);
   lines.push("");
-  lines.push(
-    "> ⚠️ Save this token now — it will not be shown again.",
-  );
+  lines.push("> ⚠️ Save this token now — it will not be shown again.");
 
   return lines.join("\n");
 }

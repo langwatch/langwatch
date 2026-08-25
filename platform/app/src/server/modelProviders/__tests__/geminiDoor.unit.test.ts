@@ -8,10 +8,7 @@
  * specs/model-providers/google-agent-platform.feature.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  geminiAgentPlatformPair,
-  rowCannotServeEmbeddings,
-} from "../geminiDoor";
+import { geminiAgentPlatformPair, rowCannotServeEmbeddings } from "../geminiDoor";
 
 const envKeys = ["GEMINI_PROJECT", "GEMINI_LOCATION"] as const;
 const savedEnv: Record<string, string | undefined> = {};

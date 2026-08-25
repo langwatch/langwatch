@@ -27,10 +27,7 @@ import {
   stateFilePath,
   writeFingerprint,
 } from "./hook-state";
-import {
-  codexSessionIndexPath,
-  readCodexThreadNames,
-} from "./codex-session-index";
+import { codexSessionIndexPath, readCodexThreadNames } from "./codex-session-index";
 import {
   buildSessionContextLogPayload,
   normalizeSessionName,
@@ -42,7 +39,10 @@ import {
 
 /** Deterministic 16-hex span id derived from the turn's trace_id. */
 function ioSpanId(traceId: string): string {
-  return createHash("sha256").update(`${traceId}:langwatch.io`).digest("hex").slice(0, 16);
+  return createHash("sha256")
+    .update(`${traceId}:langwatch.io`)
+    .digest("hex")
+    .slice(0, 16);
 }
 
 function attr(key: string, value: string) {
@@ -168,9 +168,7 @@ async function walkRolloutFiles(
  */
 export function defaultCodexSessionsRoot(): string {
   const codexHome = process.env.CODEX_HOME;
-  return codexHome
-    ? join(codexHome, "sessions")
-    : join(homedir(), ".codex", "sessions");
+  return codexHome ? join(codexHome, "sessions") : join(homedir(), ".codex", "sessions");
 }
 
 /**
@@ -402,9 +400,7 @@ function codexSessionContext({
   meta: CodexRolloutMeta;
   runGit: GitRunner;
 }): SessionContext | null {
-  const live = meta.cwd
-    ? readSessionContext({ directory: meta.cwd, runGit })
-    : null;
+  const live = meta.cwd ? readSessionContext({ directory: meta.cwd, runGit }) : null;
   if (live) return live;
   const repository = meta.gitRepositoryUrl
     ? parseGitRemoteUrl(meta.gitRepositoryUrl)
@@ -427,16 +423,8 @@ export async function postCodexSessionContext(args: {
   fetchImpl?: typeof fetch;
   runGit?: GitRunner;
 }): Promise<boolean> {
-  const {
-    meta,
-    nowMs,
-    logsEndpoint,
-    token,
-    threadName,
-    stateDir,
-    fetchImpl,
-    runGit,
-  } = args;
+  const { meta, nowMs, logsEndpoint, token, threadName, stateDir, fetchImpl, runGit } =
+    args;
   if (!logsEndpoint) return false;
   if (!meta?.sessionId) return false;
   const title = meta.firstUserMessage
@@ -560,9 +548,7 @@ async function postCodexSessionContexts(args: {
             // and this guard keeps that true for the caller if it ever stops.
             await postCodexSessionContext({
               meta,
-              threadName: meta?.sessionId
-                ? threadNames?.get(meta.sessionId)
-                : null,
+              threadName: meta?.sessionId ? threadNames?.get(meta.sessionId) : null,
               ...post,
             }).catch(() => false);
           }

@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -198,7 +202,9 @@ describe("getSimulationRunCommand()", () => {
         text: async () => '{"error":"Not found"}',
       });
 
-      await expect(getSimulationRunCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+      await expect(getSimulationRunCommand("nonexistent")).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 

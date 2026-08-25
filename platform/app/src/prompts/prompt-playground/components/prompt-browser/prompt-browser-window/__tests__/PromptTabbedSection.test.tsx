@@ -103,9 +103,7 @@ describe("Playground Variables Section Integration", () => {
         variables: [{ identifier: "input", type: "str" }],
       });
 
-      expect(
-        screen.queryByTestId("remove-variable-input"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("remove-variable-input")).not.toBeInTheDocument();
     });
 
     it("shows delete button for non-locked variables", () => {
@@ -117,9 +115,7 @@ describe("Playground Variables Section Integration", () => {
       });
 
       // Input should not have delete button
-      expect(
-        screen.queryByTestId("remove-variable-input"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("remove-variable-input")).not.toBeInTheDocument();
       // Context should have delete button
       expect(screen.getByTestId("remove-variable-context")).toBeInTheDocument();
     });
@@ -171,9 +167,7 @@ describe("Playground Variables Section Integration", () => {
       await user.click(screen.getByTestId("remove-variable-context"));
 
       // onChange should be called with only input remaining
-      expect(onChange).toHaveBeenCalledWith([
-        { identifier: "input", type: "str" },
-      ]);
+      expect(onChange).toHaveBeenCalledWith([{ identifier: "input", type: "str" }]);
     });
 
     it("cannot remove the locked input variable", () => {
@@ -185,9 +179,7 @@ describe("Playground Variables Section Integration", () => {
       });
 
       // Input delete button should not exist
-      expect(
-        screen.queryByTestId("remove-variable-input"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("remove-variable-input")).not.toBeInTheDocument();
       // But we can still see the variable
       expect(screen.getByText("input")).toBeInTheDocument();
     });
@@ -209,14 +201,10 @@ describe("Playground Variables Section Integration", () => {
       // Values should be shown in inputs
       const inputs = screen.getAllByRole("textbox");
       expect(
-        inputs.some(
-          (input) => (input as HTMLInputElement).value === "Hello world",
-        ),
+        inputs.some((input) => (input as HTMLInputElement).value === "Hello world"),
       ).toBe(true);
       expect(
-        inputs.some(
-          (input) => (input as HTMLInputElement).value === "Some context",
-        ),
+        inputs.some((input) => (input as HTMLInputElement).value === "Some context"),
       ).toBe(true);
     });
 
@@ -231,9 +219,7 @@ describe("Playground Variables Section Integration", () => {
       });
 
       const inputs = screen.getAllByRole("textbox");
-      const valueInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "",
-      );
+      const valueInput = inputs.find((input) => (input as HTMLInputElement).value === "");
 
       if (valueInput) {
         await user.type(valueInput, "test");
@@ -364,26 +350,22 @@ describe("PromptTabbedSection Store Integration", () => {
       expect(store.getState().getByTabId(tab1Id!)?.variableValues.name).toBe(
         "Tab1Updated",
       );
-      expect(store.getState().getByTabId(tab2Id!)?.variableValues.name).toBe(
-        "Tab2Value",
-      );
+      expect(store.getState().getByTabId(tab2Id!)?.variableValues.name).toBe("Tab2Value");
     });
   });
 
   describe("demonstrations tab logic", () => {
     it("demonstrates transposeColumnsFirstToRowsFirstWithId returns empty for no data", async () => {
-      const { transposeColumnsFirstToRowsFirstWithId } = await import(
-        "~/optimization_studio/utils/datasetUtils"
-      );
+      const { transposeColumnsFirstToRowsFirstWithId } =
+        await import("~/optimization_studio/utils/datasetUtils");
 
       const result = transposeColumnsFirstToRowsFirstWithId({});
       expect(result).toEqual([]);
     });
 
     it("demonstrates transposeColumnsFirstToRowsFirstWithId returns rows for data", async () => {
-      const { transposeColumnsFirstToRowsFirstWithId } = await import(
-        "~/optimization_studio/utils/datasetUtils"
-      );
+      const { transposeColumnsFirstToRowsFirstWithId } =
+        await import("~/optimization_studio/utils/datasetUtils");
 
       const records = {
         input: ["hello", "world"],
@@ -531,30 +513,22 @@ describe("PromptTabbedSection Layout Modes", () => {
   describe("common features", () => {
     it("shows Conversation tab in both modes", () => {
       renderPromptTabbedSection({ layoutMode: "vertical" });
-      expect(
-        screen.getByRole("tab", { name: /conversation/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /conversation/i })).toBeInTheDocument();
 
       cleanup();
 
       renderPromptTabbedSection({ layoutMode: "horizontal" });
-      expect(
-        screen.getByRole("tab", { name: /conversation/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /conversation/i })).toBeInTheDocument();
     });
 
     it("shows Reset chat button in both modes", () => {
       renderPromptTabbedSection({ layoutMode: "vertical" });
-      expect(
-        screen.getByRole("button", { name: /reset chat/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /reset chat/i })).toBeInTheDocument();
 
       cleanup();
 
       renderPromptTabbedSection({ layoutMode: "horizontal" });
-      expect(
-        screen.getByRole("button", { name: /reset chat/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /reset chat/i })).toBeInTheDocument();
     });
 
     it("shows editable runtime parameters in the Parameters tab", async () => {
@@ -630,9 +604,7 @@ describe("PromptTabbedSection Layout Modes", () => {
 
       await user.click(screen.getByRole("tab", { name: /variables/i }));
       const textboxes = await screen.findAllByRole("textbox");
-      const valueInput = textboxes.find(
-        (el) => (el as HTMLInputElement).value === "",
-      );
+      const valueInput = textboxes.find((el) => (el as HTMLInputElement).value === "");
       expect(valueInput).toBeDefined();
       await user.type(valueInput!, "flushed");
 
@@ -641,9 +613,7 @@ describe("PromptTabbedSection Layout Modes", () => {
       // than cancel it — otherwise the edit is lost.
       unmount();
 
-      expect(store.getState().getByTabId(tabId!)?.variableValues.topic).toBe(
-        "flushed",
-      );
+      expect(store.getState().getByTabId(tabId!)?.variableValues.topic).toBe("flushed");
       // (afterEach restores tabIdRef even if the assertion above throws)
     });
   });
@@ -666,10 +636,7 @@ describe("PromptTabbedSection Layout Modes", () => {
       };
 
       // Mount, type a value, then unmount — this is "switch away".
-      const first = renderPromptTabbedSection(
-        { layoutMode: "vertical" },
-        formValues,
-      );
+      const first = renderPromptTabbedSection({ layoutMode: "vertical" }, formValues);
       await user.click(screen.getByRole("tab", { name: /variables/i }));
       const emptyInput = (await screen.findAllByRole("textbox")).find(
         (el) => (el as HTMLInputElement).value === "",

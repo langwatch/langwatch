@@ -41,26 +41,25 @@ describe("suiteTargetSchema", () => {
 
   describe("given an agent target carrying scenario mappings", () => {
     /** @scenario "An agent target cannot carry a prompt's bindings" */
-    it.each([
-      "http",
-      "code",
-      "workflow",
-    ] as const)("rejects the mappings on a %s target", (type) => {
-      const result = suiteTargetSchema.safeParse({
-        type,
-        referenceId: "agent_123",
-        scenarioMappings: {
-          question: { type: "source", sourceId: "scenario", path: ["input"] },
-        },
-      });
+    it.each(["http", "code", "workflow"] as const)(
+      "rejects the mappings on a %s target",
+      (type) => {
+        const result = suiteTargetSchema.safeParse({
+          type,
+          referenceId: "agent_123",
+          scenarioMappings: {
+            question: { type: "source", sourceId: "scenario", path: ["input"] },
+          },
+        });
 
-      // A run reads mappings from prompt targets only, so accepting these
-      // would store a binding nothing ever applies.
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0]?.path).toEqual(["scenarioMappings"]);
-      }
-    });
+        // A run reads mappings from prompt targets only, so accepting these
+        // would store a binding nothing ever applies.
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues[0]?.path).toEqual(["scenarioMappings"]);
+        }
+      },
+    );
 
     it("still accepts the same target without mappings", () => {
       const parsed = suiteTargetSchema.parse({

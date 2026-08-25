@@ -24,11 +24,7 @@ const projection = new TopicClusteringRunHistoryFoldProjection({
   store: stubStore,
 });
 
-function baseEvent(overrides: {
-  type: string;
-  occurredAt?: number;
-  data: unknown;
-}) {
+function baseEvent(overrides: { type: string; occurredAt?: number; data: unknown }) {
   return {
     id: `evt-${overrides.type}-${overrides.occurredAt ?? 1}`,
     aggregateId: "project-1",

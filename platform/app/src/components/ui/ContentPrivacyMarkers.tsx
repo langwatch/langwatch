@@ -65,9 +65,7 @@ function markerFor(
     const audience = status.visibleTo;
     return {
       icon: Lock,
-      label: audience
-        ? `${name} hidden (visible to ${audience})`
-        : `${name} hidden`,
+      label: audience ? `${name} hidden (visible to ${audience})` : `${name} hidden`,
       tooltip:
         audience && audience !== "no one"
           ? `A privacy rule limits who can read the ${name.toLowerCase()}. Visible to: ${audience}.`
@@ -154,9 +152,7 @@ export const ContentPrivacyMarkers: React.FC<{
       category,
       copy: markerFor(category, privacy[category], skipRestricted),
     }))
-    .filter(
-      (m): m is { category: Category; copy: MarkerCopy } => m.copy !== null,
-    );
+    .filter((m): m is { category: Category; copy: MarkerCopy } => m.copy !== null);
 
   if (markers.length === 0) return null;
 
@@ -198,9 +194,9 @@ export const PiiIncompleteNotice: React.FC<{
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description fontSize="sm">
-          Name and location redaction did not run for this span, so the content
-          may still contain names or locations. Emails, card numbers, and other
-          identifiers were still removed.
+          Name and location redaction did not run for this span, so the content may still
+          contain names or locations. Emails, card numbers, and other identifiers were
+          still removed.
         </Alert.Description>
       </Alert.Content>
     </Alert.Root>

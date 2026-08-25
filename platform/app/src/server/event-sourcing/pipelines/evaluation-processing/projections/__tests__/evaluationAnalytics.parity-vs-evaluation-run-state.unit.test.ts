@@ -156,10 +156,7 @@ describe("evaluationAnalytics fold — parity vs evaluationRun fold", () => {
       } as unknown as EvaluationReportedEvent;
 
       const slimState = slim.handleEvaluationReported(errored, slim.init());
-      const runState = runFold.handleEvaluationReported(
-        errored,
-        runFold.init(),
-      );
+      const runState = runFold.handleEvaluationReported(errored, runFold.init());
 
       expect(slimState.passed).toBeNull();
       expect(slimState.score).toBeNull();
@@ -180,10 +177,7 @@ describe("evaluationAnalytics fold — parity vs evaluationRun fold", () => {
 
       const reported = makeReported();
       const slimState = slim.handleEvaluationReported(reported, slim.init());
-      const runState = runFold.handleEvaluationReported(
-        reported,
-        runFold.init(),
-      );
+      const runState = runFold.handleEvaluationReported(reported, runFold.init());
 
       expect(slimState.evaluationId).toBe(runState.evaluationId);
       expect(slimState.evaluatorId).toBe(runState.evaluatorId);

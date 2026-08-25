@@ -96,8 +96,7 @@ export function createEvaluationProcessingPipeline(
       events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
       delay: 10_000,
       ttl: 30_000,
-      handler: (event, context) =>
-        deps.automations.triggerMatchHandler(event, context),
+      handler: (event, context) => deps.automations.triggerMatchHandler(event, context),
     })
     .withEventSubscriber("graphTriggerActivity", {
       events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
@@ -113,8 +112,7 @@ export function createEvaluationProcessingPipeline(
       // ONE lane per tenant — a sweep evaluates all of the tenant's graph
       // triggers regardless of which event kind woke it.
       groupKeyFn: graphTriggerActivityGroupKey,
-      handler: (event, context) =>
-        deps.automations.graphActivityHandler(event, context),
+      handler: (event, context) => deps.automations.graphActivityHandler(event, context),
     })
     .withCommandInstance(
       "executeEvaluation",

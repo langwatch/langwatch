@@ -1,7 +1,4 @@
-import type {
-  AggregateType,
-  ProjectionStoreContext,
-} from "@langwatch/eventing";
+import type { AggregateType, ProjectionStoreContext } from "@langwatch/eventing";
 import { TIME_LOCAL_AGGREGATE_TYPES } from "@langwatch/eventing";
 import { createMockFoldProjectionStore } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";

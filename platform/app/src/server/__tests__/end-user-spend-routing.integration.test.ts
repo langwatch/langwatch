@@ -37,9 +37,7 @@ vi.mock("~/server/app-layer/app", async () => {
   // The REST org-auth middleware decides through
   // appFromContext(c).permissions (ADR-092); the fake carries the real
   // composition over the real test database so requests reach the routes.
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   const { prisma: dbForPermissions } = await import("~/server/db");
   const permissions = appPermissionsService(dbForPermissions);
   return {
@@ -55,13 +53,9 @@ vi.mock("~/server/app-layer/app", async () => {
       },
       gateway: {
         budgets: new GatewayBudgetClickHouseRepository(async () => chClient),
-        virtualKeySpend: new GatewayVirtualKeySpendRepository(
-          async () => chClient,
-        ),
+        virtualKeySpend: new GatewayVirtualKeySpendRepository(async () => chClient),
         spendEvents: new GatewaySpendEventsRepository(async () => chClient),
-        webhookEvents: WebhookEventsClickHouseRepository.create(
-          async () => chClient,
-        ),
+        webhookEvents: WebhookEventsClickHouseRepository.create(async () => chClient),
       },
     }),
   };
@@ -69,9 +63,7 @@ vi.mock("~/server/app-layer/app", async () => {
 let chClient: ClickHouseClient;
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
   const original =
-    await importOriginal<
-      typeof import("~/server/clickhouse/clickhouseClient")
-    >();
+    await importOriginal<typeof import("~/server/clickhouse/clickhouseClient")>();
   return {
     ...original,
     getClickHouseClientForTenant: async () => chClient,
@@ -102,9 +94,8 @@ describe("end-user spend on the composed router", () => {
 
   beforeAll(async () => {
     await startTestContainers();
-    const { getTestClickHouseClient } = await import(
-      "~/server/event-sourcing/__tests__/integration/testContainers"
-    );
+    const { getTestClickHouseClient } =
+      await import("~/server/event-sourcing/__tests__/integration/testContainers");
     const client = getTestClickHouseClient();
     if (!client) throw new Error("test ClickHouse client unavailable");
     chClient = client;
@@ -170,9 +161,8 @@ describe("end-user spend on the composed router", () => {
     const { getApp } = await import("~/server/app-layer/app");
     const built = createApiRouter(getApp());
     router = built as unknown as typeof router;
-    routes = (
-      built as unknown as { routes: Array<{ method: string; path: string }> }
-    ).routes;
+    routes = (built as unknown as { routes: Array<{ method: string; path: string }> })
+      .routes;
   }, 120_000);
 
   afterAll(async () => {

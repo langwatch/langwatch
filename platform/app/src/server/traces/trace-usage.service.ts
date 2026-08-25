@@ -5,11 +5,7 @@ import { OrganizationRepository } from "~/server/repositories/organization.repos
 import { TtlCache } from "~/server/utils/ttlCache";
 import { getBillingMonth } from "~/runtime/app/features/billing";
 import { getApp } from "~/server/app-layer/app";
-import {
-  type ProjectUsageCounts,
-  USAGE_UNKNOWN,
-  type UsageCount,
-} from "./usage-count";
+import { type ProjectUsageCounts, USAGE_UNKNOWN, type UsageCount } from "./usage-count";
 
 const logger = createLogger("langwatch:traces:traceUsage");
 
@@ -21,9 +17,7 @@ const monthCountCache = new TtlCache<number>(
 );
 
 export class TraceUsageService {
-  constructor(
-    private readonly organizationRepository: OrganizationRepository,
-  ) {}
+  constructor(private readonly organizationRepository: OrganizationRepository) {}
 
   static create(db: PrismaClient = prisma): TraceUsageService {
     return new TraceUsageService(new OrganizationRepository(db));
@@ -46,8 +40,7 @@ export class TraceUsageService {
       return cached;
     }
 
-    const projectIds =
-      await this.organizationRepository.getProjectIds(organizationId);
+    const projectIds = await this.organizationRepository.getProjectIds(organizationId);
     logger.info(
       { organizationId, projectIds },
       "getCurrentMonthCount: querying trace_summaries",

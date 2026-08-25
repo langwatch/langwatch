@@ -56,16 +56,12 @@ describe("GroupQueue metrics", () => {
     });
 
     it("registers gq_oldest_pending_age_milliseconds gauge", () => {
-      const metric = register.getSingleMetric(
-        "gq_oldest_pending_age_milliseconds",
-      );
+      const metric = register.getSingleMetric("gq_oldest_pending_age_milliseconds");
       expect(metric).toBeDefined();
     });
 
     it("registers gq_oldest_backlog_age_milliseconds gauge", () => {
-      const metric = register.getSingleMetric(
-        "gq_oldest_backlog_age_milliseconds",
-      );
+      const metric = register.getSingleMetric("gq_oldest_backlog_age_milliseconds");
       expect(metric).toBeDefined();
     });
 
@@ -79,9 +75,7 @@ describe("GroupQueue metrics", () => {
     it("records delayed total with routing labels", async () => {
       gqJobsDelayedTotal.inc(routingLabels);
 
-      const lines = await register.getSingleMetricAsString(
-        "gq_jobs_delayed_total",
-      );
+      const lines = await register.getSingleMetricAsString("gq_jobs_delayed_total");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('job_type="fold"');
       expect(lines).toContain('job_name="traceSummary"');
@@ -90,9 +84,7 @@ describe("GroupQueue metrics", () => {
     it("records delay duration with routing labels", async () => {
       gqJobDelayMilliseconds.observe(routingLabels, 5000);
 
-      const lines = await register.getSingleMetricAsString(
-        "gq_job_delay_milliseconds",
-      );
+      const lines = await register.getSingleMetricAsString("gq_job_delay_milliseconds");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('job_type="fold"');
       expect(lines).toContain('job_name="traceSummary"');
@@ -137,9 +129,7 @@ describe("GroupQueue metrics", () => {
     it("records completed total with routing labels", async () => {
       gqJobsCompletedTotal.inc(routingLabels);
 
-      const lines = await register.getSingleMetricAsString(
-        "gq_jobs_completed_total",
-      );
+      const lines = await register.getSingleMetricAsString("gq_jobs_completed_total");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('job_type="fold"');
       expect(lines).toContain('job_name="traceSummary"');
@@ -148,9 +138,7 @@ describe("GroupQueue metrics", () => {
     it("records retried total with routing labels", async () => {
       gqJobsRetriedTotal.inc(routingLabels);
 
-      const lines = await register.getSingleMetricAsString(
-        "gq_jobs_retried_total",
-      );
+      const lines = await register.getSingleMetricAsString("gq_jobs_retried_total");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('job_name="traceSummary"');
     });
@@ -158,9 +146,7 @@ describe("GroupQueue metrics", () => {
     it("records exhausted total with routing labels", async () => {
       gqJobsExhaustedTotal.inc(routingLabels);
 
-      const lines = await register.getSingleMetricAsString(
-        "gq_jobs_exhausted_total",
-      );
+      const lines = await register.getSingleMetricAsString("gq_jobs_exhausted_total");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('job_name="traceSummary"');
     });
@@ -168,9 +154,7 @@ describe("GroupQueue metrics", () => {
     it("records non-retryable total with routing labels", async () => {
       gqJobsNonRetryableTotal.inc(routingLabels);
 
-      const lines = await register.getSingleMetricAsString(
-        "gq_jobs_non_retryable_total",
-      );
+      const lines = await register.getSingleMetricAsString("gq_jobs_non_retryable_total");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('job_name="traceSummary"');
     });
@@ -178,9 +162,7 @@ describe("GroupQueue metrics", () => {
     it("records groups blocked total with routing labels", async () => {
       gqGroupsBlockedTotal.inc(routingLabels);
 
-      const lines = await register.getSingleMetricAsString(
-        "gq_groups_blocked_total",
-      );
+      const lines = await register.getSingleMetricAsString("gq_groups_blocked_total");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('job_name="traceSummary"');
     });
@@ -210,9 +192,7 @@ describe("GroupQueue metrics", () => {
     });
 
     it("can be reset to zero when no groups are blocked", () => {
-      expect(() =>
-        gqBlockedGroups.set({ queue_name: "test-queue" }, 0),
-      ).not.toThrow();
+      expect(() => gqBlockedGroups.set({ queue_name: "test-queue" }, 0)).not.toThrow();
     });
   });
 });

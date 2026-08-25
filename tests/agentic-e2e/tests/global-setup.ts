@@ -25,13 +25,11 @@ async function waitForApp(): Promise<void> {
       }
 
       console.log(
-        `⏳ Attempt ${attempt}/${MAX_RETRIES}: Got status ${response.status}, retrying...`
+        `⏳ Attempt ${attempt}/${MAX_RETRIES}: Got status ${response.status}, retrying...`,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.log(
-        `⏳ Attempt ${attempt}/${MAX_RETRIES}: ${message}, retrying...`
-      );
+      console.log(`⏳ Attempt ${attempt}/${MAX_RETRIES}: ${message}, retrying...`);
     }
 
     if (attempt < MAX_RETRIES) {
@@ -45,7 +43,7 @@ async function waitForApp(): Promise<void> {
       `  1. cd platform/app\n` +
       `  2. PORT=5570 pnpm dev\n\n` +
       `Or check if infrastructure is running:\n` +
-      `  docker compose -f compose.test.yml ps\n`
+      `  docker compose -f compose.test.yml ps\n`,
   );
 }
 
@@ -70,7 +68,7 @@ async function waitForApi(): Promise<void> {
         return;
       }
       console.log(
-        `⏳ Attempt ${attempt}/${MAX_RETRIES}: API status ${response.status}, retrying...`
+        `⏳ Attempt ${attempt}/${MAX_RETRIES}: API status ${response.status}, retrying...`,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -84,7 +82,7 @@ async function waitForApi(): Promise<void> {
 
   throw new Error(
     `\n❌ API not ready at ${url} after ${MAX_RETRIES} attempts.\n` +
-      `The app shell loaded but the backend never served publicEnv.\n`
+      `The app shell loaded but the backend never served publicEnv.\n`,
   );
 }
 
@@ -95,11 +93,7 @@ function validateEnvironment(): void {
 
   // These env vars are used by the langwatch app, not the test runner
   // But we can check that they look reasonable if set
-  const appEnvVars = [
-    "DATABASE_URL",
-    "REDIS_URL",
-    "NEXTAUTH_SECRET",
-  ];
+  const appEnvVars = ["DATABASE_URL", "REDIS_URL", "NEXTAUTH_SECRET"];
 
   // In CI, these should be set by the workflow
   // Locally, the .env file should have them
@@ -114,12 +108,12 @@ function validateEnvironment(): void {
 
     if (dbUrl.includes(":5432") && !dbUrl.includes(":5433")) {
       warnings.push(
-        "DATABASE_URL uses default port 5432 - consider using test port 5433 to avoid conflicts"
+        "DATABASE_URL uses default port 5432 - consider using test port 5433 to avoid conflicts",
       );
     }
     if (redisUrl.includes(":6379") && !redisUrl.includes(":6380")) {
       warnings.push(
-        "REDIS_URL uses default port 6379 - consider using test port 6380 to avoid conflicts"
+        "REDIS_URL uses default port 6379 - consider using test port 6380 to avoid conflicts",
       );
     }
   }

@@ -94,10 +94,7 @@ describe("classifyGroup", () => {
     describe("when one is eligible now and the other is deferred", () => {
       /** @scenario "Work due now is distinguished from work deferred into the future" */
       it("reads the eligible one as due and the deferred one as scheduled with its time", () => {
-        const due = classifyGroup(
-          makeGroup({ pendingJobs: 3, score: NOW - 500 }),
-          NOW,
-        );
+        const due = classifyGroup(makeGroup({ pendingJobs: 3, score: NOW - 500 }), NOW);
         const deferred = classifyGroup(
           makeGroup({ pendingJobs: 3, score: NOW + 120_000 }),
           NOW,
@@ -122,19 +119,14 @@ describe("classifyGroup", () => {
 
   describe("given a group with nothing pending and nothing active", () => {
     it("classifies it as idle", () => {
-      expect(classifyGroup(makeGroup({ pendingJobs: 0 }), NOW).state).toBe(
-        "idle",
-      );
+      expect(classifyGroup(makeGroup({ pendingJobs: 0 }), NOW).state).toBe("idle");
     });
   });
 
   describe("given blocked-set groups", () => {
     it("classifies a blocked group with work as blocked", () => {
       expect(
-        classifyGroup(
-          makeGroup({ isBlocked: true, errorMessage: "poison" }),
-          NOW,
-        ).state,
+        classifyGroup(makeGroup({ isBlocked: true, errorMessage: "poison" }), NOW).state,
       ).toBe("blocked");
     });
 
@@ -178,24 +170,16 @@ describe("sortGroupsBySeverity", () => {
           NOW,
         ).map((g) => g.groupId);
         expect(ordered[0]).toBe("g/blocked");
-        expect(ordered.indexOf("g/retrying")).toBeLessThan(
-          ordered.indexOf("g/due"),
-        );
-        expect(ordered.indexOf("g/retrying")).toBeLessThan(
-          ordered.indexOf("g/active"),
-        );
-        expect(ordered.indexOf("g/retrying")).toBeLessThan(
-          ordered.indexOf("g/idle"),
-        );
+        expect(ordered.indexOf("g/retrying")).toBeLessThan(ordered.indexOf("g/due"));
+        expect(ordered.indexOf("g/retrying")).toBeLessThan(ordered.indexOf("g/active"));
+        expect(ordered.indexOf("g/retrying")).toBeLessThan(ordered.indexOf("g/idle"));
       });
     });
 
     it("breaks severity ties by pending depth", () => {
       const shallow = makeGroup({ groupId: "g/shallow", pendingJobs: 1 });
       const deep = makeGroup({ groupId: "g/deep", pendingJobs: 50 });
-      const ordered = sortGroupsBySeverity([shallow, deep], NOW).map(
-        (g) => g.groupId,
-      );
+      const ordered = sortGroupsBySeverity([shallow, deep], NOW).map((g) => g.groupId);
       expect(ordered).toEqual(["g/deep", "g/shallow"]);
     });
   });
@@ -216,10 +200,7 @@ describe("describeNextRun", () => {
   });
 
   it("says running for an active group", () => {
-    const c = classifyGroup(
-      makeGroup({ hasActiveJob: true, activeJobId: "j" }),
-      NOW,
-    );
+    const c = classifyGroup(makeGroup({ hasActiveJob: true, activeJobId: "j" }), NOW);
     expect(describeNextRun(c, NOW)).toBe("running");
   });
 
@@ -233,10 +214,7 @@ describe("describeNextRun", () => {
   });
 
   it("shows a dash for a blocked group the dispatcher will not touch", () => {
-    const c = classifyGroup(
-      makeGroup({ isBlocked: true, errorMessage: "poison" }),
-      NOW,
-    );
+    const c = classifyGroup(makeGroup({ isBlocked: true, errorMessage: "poison" }), NOW);
     expect(describeNextRun(c, NOW)).toBe("—");
   });
 });

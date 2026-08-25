@@ -126,9 +126,7 @@ export const emailSuppressionRouter = createTRPCRouter({
           recordCount: rows.length,
           triggerIds: [
             ...new Set(
-              rows
-                .map((r) => r.triggerId)
-                .filter((id): id is string => id != null),
+              rows.map((r) => r.triggerId).filter((id): id is string => id != null),
             ),
           ],
         },

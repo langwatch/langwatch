@@ -23,8 +23,7 @@ export class AppWebhookAccessRuntime {
   private static service: WebhookAccessService | undefined;
 
   static install(entitlements: EntitlementService): void {
-    AppWebhookAccessRuntime.service =
-      WebhookAccessService.create(entitlements);
+    AppWebhookAccessRuntime.service = WebhookAccessService.create(entitlements);
   }
 
   static clear(): void {
@@ -35,15 +34,12 @@ export class AppWebhookAccessRuntime {
     if (!AppWebhookAccessRuntime.service) {
       throw new Error("AppWebhookEntitlementRuntime has not been installed");
     }
-    await AppWebhookAccessRuntime.service.assertEndpointsAvailable(
-      organizationId,
-    );
+    await AppWebhookAccessRuntime.service.assertEndpointsAvailable(organizationId);
   }
 }
 
-export const assertWebhookEndpointsEntitled = (
-  organizationId: string,
-): Promise<void> => AppWebhookAccessRuntime.assertEntitled(organizationId);
+export const assertWebhookEndpointsEntitled = (organizationId: string): Promise<void> =>
+  AppWebhookAccessRuntime.assertEntitled(organizationId);
 
 export const createWebhookEndpointService = (
   options: WebhookEndpointServiceOptions,
@@ -80,11 +76,8 @@ export const webhookDeliveryPM = (
   WebhookDeliveryService.create(deps).processManager();
 
 export const assertValidDeliveryControls = (
-  controls: Parameters<
-    WebhookEndpointPolicyService["assertValidDeliveryControls"]
-  >[0],
-): void =>
-  WebhookEndpointPolicyService.create().assertValidDeliveryControls(controls);
+  controls: Parameters<WebhookEndpointPolicyService["assertValidDeliveryControls"]>[0],
+): void => WebhookEndpointPolicyService.create().assertValidDeliveryControls(controls);
 
 export const describeDestination = (
   endpoint: Parameters<WebhookEndpointPolicyService["describeDestination"]>[0],

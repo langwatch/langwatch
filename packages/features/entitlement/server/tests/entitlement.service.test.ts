@@ -32,12 +32,12 @@ describe("EntitlementService", () => {
       subscription: { resolve: subscription },
     });
 
-    await expect(
-      service.getActivePlan({ organizationId: "org" }),
-    ).resolves.toMatchObject({
-      type: "ENTERPRISE",
-      planSource: "license",
-    });
+    await expect(service.getActivePlan({ organizationId: "org" })).resolves.toMatchObject(
+      {
+        type: "ENTERPRISE",
+        planSource: "license",
+      },
+    );
     expect(subscription).not.toHaveBeenCalled();
   });
 
@@ -49,20 +49,18 @@ describe("EntitlementService", () => {
       subscription: { resolve: async () => paid("GROWTH") },
     });
 
-    await expect(
-      service.getActivePlan({ organizationId: "org" }),
-    ).resolves.toMatchObject({
-      type: "GROWTH",
-      planSource: "subscription",
-    });
+    await expect(service.getActivePlan({ organizationId: "org" })).resolves.toMatchObject(
+      {
+        type: "GROWTH",
+        planSource: "subscription",
+      },
+    );
   });
 
   /** @scenario The core baseline works without enterprise sources */
   it("uses the baseline when no enterprise source is installed", async () => {
     const service = EntitlementService.create({ baseline: free });
-    await expect(
-      service.getActivePlan({ organizationId: "org" }),
-    ).resolves.toEqual(free);
+    await expect(service.getActivePlan({ organizationId: "org" })).resolves.toEqual(free);
   });
 
   /** @scenario Operator context is applied after plan selection */

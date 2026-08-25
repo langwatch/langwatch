@@ -30,23 +30,17 @@ describe("parseLangyCardPart", () => {
 
   describe("given a part whose identity disagrees with its card", () => {
     it("refuses a kind mismatch", () => {
-      expect(
-        parseLangyCardPart({ ...stampedPart, kind: "table" }),
-      ).toBeNull();
+      expect(parseLangyCardPart({ ...stampedPart, kind: "table" })).toBeNull();
     });
 
     it("refuses a blockId mismatch", () => {
-      expect(
-        parseLangyCardPart({ ...stampedPart, blockId: "other" }),
-      ).toBeNull();
+      expect(parseLangyCardPart({ ...stampedPart, blockId: "other" })).toBeNull();
     });
   });
 
   describe("given a part without derived provenance", () => {
     it("refuses it — the chrome keys off this field", () => {
-      expect(
-        parseLangyCardPart({ ...stampedPart, provenance: "measured" }),
-      ).toBeNull();
+      expect(parseLangyCardPart({ ...stampedPart, provenance: "measured" })).toBeNull();
     });
   });
 

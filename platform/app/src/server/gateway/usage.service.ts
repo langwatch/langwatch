@@ -158,18 +158,9 @@ export class GatewayUsageService {
     });
     if (buckets.length === 0) return emptySummary();
 
-    const byVk = new Map<
-      string,
-      { totalUsd: Prisma.Decimal; requests: number }
-    >();
-    const byModel = new Map<
-      string,
-      { totalUsd: Prisma.Decimal; requests: number }
-    >();
-    const byDay = new Map<
-      string,
-      { totalUsd: Prisma.Decimal; requests: number }
-    >();
+    const byVk = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
+    const byModel = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
+    const byDay = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
     let totalUsd = new Prisma.Decimal(0);
     let totalRequests = 0;
     let blockedRequests = 0;
@@ -190,15 +181,13 @@ export class GatewayUsageService {
       totalRequests,
       blockedRequests,
       avgUsdPerRequest: averagePerRequest(totalUsd, totalRequests),
-      byVirtualKey: topEntries(byVk).map(
-        ([virtualKeyId, { totalUsd, requests }]) => ({
-          virtualKeyId,
-          name: vkMeta.get(virtualKeyId)?.name ?? virtualKeyId,
-          displayPrefix: vkMeta.get(virtualKeyId)?.displayPrefix ?? "",
-          totalUsd: totalUsd.toFixed(6),
-          requests,
-        }),
-      ),
+      byVirtualKey: topEntries(byVk).map(([virtualKeyId, { totalUsd, requests }]) => ({
+        virtualKeyId,
+        name: vkMeta.get(virtualKeyId)?.name ?? virtualKeyId,
+        displayPrefix: vkMeta.get(virtualKeyId)?.displayPrefix ?? "",
+        totalUsd: totalUsd.toFixed(6),
+        requests,
+      })),
       byModel: topEntries(byModel).map(([model, { totalUsd, requests }]) => ({
         model,
         totalUsd: totalUsd.toFixed(6),
@@ -248,14 +237,8 @@ export class GatewayUsageService {
       }),
     ]);
 
-    const byModel = new Map<
-      string,
-      { totalUsd: Prisma.Decimal; requests: number }
-    >();
-    const byDay = new Map<
-      string,
-      { totalUsd: Prisma.Decimal; requests: number }
-    >();
+    const byModel = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
+    const byDay = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
     let totalUsd = new Prisma.Decimal(0);
     let totalRequests = 0;
     let blockedRequests = 0;
@@ -329,10 +312,7 @@ function topEntries(
   limit = 10,
 ): Array<[string, { totalUsd: Prisma.Decimal; requests: number }]> {
   return [...map.entries()]
-    .sort(
-      (a, b) =>
-        b[1].totalUsd.comparedTo(a[1].totalUsd) || a[0].localeCompare(b[0]),
-    )
+    .sort((a, b) => b[1].totalUsd.comparedTo(a[1].totalUsd) || a[0].localeCompare(b[0]))
     .slice(0, limit);
 }
 

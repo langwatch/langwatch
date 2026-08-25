@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Field,
-  HStack,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Field, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Upload, X } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { Link } from "~/components/ui/link";
@@ -38,11 +30,9 @@ export function NoLicenseCard({
 }: NoLicenseCardProps) {
   const publicEnv = usePublicEnv();
   const purchaseLinkUrl =
-    publicEnv.data?.STRIPE_LICENSE_PAYMENT_LINK_URL ??
-    DEFAULT_LICENSE_PURCHASE_URL;
+    publicEnv.data?.STRIPE_LICENSE_PAYMENT_LINK_URL ?? DEFAULT_LICENSE_PURCHASE_URL;
 
-  const [activationMethod, setActivationMethod] =
-    useState<ActivationMethod>("file");
+  const [activationMethod, setActivationMethod] = useState<ActivationMethod>("file");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -133,9 +123,7 @@ export function NoLicenseCard({
 
           <RadioGroup
             value={activationMethod}
-            onValueChange={(e) =>
-              handleMethodChange(e.value as ActivationMethod)
-            }
+            onValueChange={(e) => handleMethodChange(e.value as ActivationMethod)}
             disabled={isActivating}
           >
             <HStack gap={4}>

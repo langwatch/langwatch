@@ -85,10 +85,7 @@ const AGENT_SKILLS: LangySkill[] = (GENERATED_SKILLS as GeneratedSkill[]).map(
   (skill) => ({
     id: skill.id,
     label: skill.label,
-    source:
-      skill.category === "recipe"
-        ? ("recipe" as const)
-        : ("agent-skill" as const),
+    source: skill.category === "recipe" ? ("recipe" as const) : ("agent-skill" as const),
     summary: skill.description,
     prompt: skill.userPrompt,
     searchText:
@@ -141,8 +138,7 @@ const CLI_SKILLS: LangySkill[] = FEATURES.filter(
   label: feature.name,
   source: "cli" as const,
   summary: summarize(feature.name, feature.cli),
-  searchText:
-    `${feature.name} ${feature.id} ${feature.cli.join(" ")}`.toLowerCase(),
+  searchText: `${feature.name} ${feature.id} ${feature.cli.join(" ")}`.toLowerCase(),
 }));
 
 /**

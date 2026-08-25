@@ -54,8 +54,7 @@ function buildRequest(input: {
             logRecords: [
               {
                 timeUnixNano: input.timeUnixNano ?? "1714978800000000000",
-                observedTimeUnixNano:
-                  input.timeUnixNano ?? "1714978800000000000",
+                observedTimeUnixNano: input.timeUnixNano ?? "1714978800000000000",
                 severityNumber: 9,
                 severityText: "INFO",
                 body: { stringValue: "" },
@@ -129,9 +128,7 @@ describe("extractCanonicalCostEvents", () => {
     it("prefers the record-level value (closer to the event)", () => {
       const events = extractor.extract(
         buildRequest({
-          resourceAttrs: [
-            strKv("langwatch.principal.email", "default@acme.test"),
-          ],
+          resourceAttrs: [strKv("langwatch.principal.email", "default@acme.test")],
           recordAttrs: [
             strKv("langwatch.principal.email", "actor@acme.test"),
             dblKv("langwatch.cost.usd", 0.01),
@@ -198,9 +195,7 @@ describe("extractCanonicalCostEvents", () => {
         }),
       );
 
-      expect(events[0]?.occurredAt).toEqual(
-        new Date(Number(nanos / 1_000_000n)),
-      );
+      expect(events[0]?.occurredAt).toEqual(new Date(Number(nanos / 1_000_000n)));
     });
   });
 

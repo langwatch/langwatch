@@ -100,8 +100,7 @@ export function VirtualKeyCreateDrawer({
   const [providerAccess, setProviderAccess] =
     useState<ProviderAccessValue>(ALL_PROVIDERS);
   const [routing, setRouting] = useState<VirtualKeyRoutingValue>(ROUTING_NONE);
-  const [expiration, setExpiration] =
-    useState<VirtualKeyExpirationValue>(NEVER_EXPIRES);
+  const [expiration, setExpiration] = useState<VirtualKeyExpirationValue>(NEVER_EXPIRES);
   const [expiryFieldError, setExpiryFieldError] = useState<string | null>(null);
 
   const canCreateShared = hasPermission("virtualKeys:manage");
@@ -150,11 +149,10 @@ export function VirtualKeyCreateDrawer({
       await utils.virtualKeys.list.invalidate({ organizationId });
     },
   });
-  const orgProvidersQuery =
-    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
-      { organizationId },
-      { enabled: open && !!organizationId },
-    );
+  const orgProvidersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+    { organizationId },
+    { enabled: open && !!organizationId },
+  );
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId },
     { enabled: open && !!organizationId },
@@ -165,11 +163,9 @@ export function VirtualKeyCreateDrawer({
     { organizationId },
     { enabled: open && !!organizationId && ownership.kind === "PERSONAL" },
   );
-  const personalProjectId =
-    personalContextQuery.data?.workspace.project.id ?? null;
+  const personalProjectId = personalContextQuery.data?.workspace.project.id ?? null;
 
-  const providers = (orgProvidersQuery.data?.providers ??
-    []) as OrgModelProvider[];
+  const providers = (orgProvidersQuery.data?.providers ?? []) as OrgModelProvider[];
   const policies = (policiesQuery.data ?? []) as Array<{
     id: string;
     name: string;
@@ -185,8 +181,7 @@ export function VirtualKeyCreateDrawer({
   };
 
   const scopes = useMemo(
-    () =>
-      ownershipToScopes(ownership, { organizationId, personalProjectId }) ?? [],
+    () => ownershipToScopes(ownership, { organizationId, personalProjectId }) ?? [],
     [ownership, organizationId, personalProjectId],
   );
   const eligible = useMemo(
@@ -243,10 +238,7 @@ export function VirtualKeyCreateDrawer({
     if (orgProvidersQuery.isLoading) {
       return "Loading providers…";
     }
-    const providerReason = providerAccessInvalidReason(
-      providerAccess,
-      eligible,
-    );
+    const providerReason = providerAccessInvalidReason(providerAccess, eligible);
     if (providerReason) return providerReason;
     return expiryIncompleteReason({ preset: expiration.preset, expiresAt });
   })();
@@ -265,9 +257,7 @@ export function VirtualKeyCreateDrawer({
         name,
         description: description || undefined,
         principalUserId:
-          ownership.kind === "PERSONAL"
-            ? (session.data?.user?.id ?? null)
-            : null,
+          ownership.kind === "PERSONAL" ? (session.data?.user?.id ?? null) : null,
         scopes,
         traceProjectId: ownershipTraceProjectId(ownership),
         routingMode: routing.mode,
@@ -314,12 +304,7 @@ export function VirtualKeyCreateDrawer({
   };
 
   return (
-    <Drawer.Root
-      open={open}
-      onOpenChange={() => handleClose()}
-      placement="end"
-      size="md"
-    >
+    <Drawer.Root open={open} onOpenChange={() => handleClose()} placement="end" size="md">
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>New virtual key</Drawer.Title>
@@ -367,9 +352,7 @@ export function VirtualKeyCreateDrawer({
                 maxLength={TAGS_CSV_MAX_LENGTH}
               />
               {tagsNotice && (
-                <Field.HelperText color="orange.600">
-                  {tagsNotice}
-                </Field.HelperText>
+                <Field.HelperText color="orange.600">{tagsNotice}</Field.HelperText>
               )}
             </Field.Root>
 
@@ -388,9 +371,7 @@ export function VirtualKeyCreateDrawer({
               organizationId={organizationId}
               scopes={scopes}
               principalUserId={
-                ownership.kind === "PERSONAL"
-                  ? (session.data?.user?.id ?? null)
-                  : null
+                ownership.kind === "PERSONAL" ? (session.data?.user?.id ?? null) : null
               }
             />
 

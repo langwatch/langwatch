@@ -9,11 +9,7 @@ export { VersionBadge } from "./version-badge";
 export { OrganizationBadge } from "./organization-badge";
 export { PanelHeader } from "./panel-header";
 export { generateUniqueIdentifier } from "./identifier";
-export {
-  getDisplayHandle,
-  getPromptFolder,
-  NEW_PROMPT_TITLE,
-} from "./prompt-handle";
+export { getDisplayHandle, getPromptFolder, NEW_PROMPT_TITLE } from "./prompt-handle";
 export {
   LLM_PARAMETER_MAP,
   type LlmParameterMapping,

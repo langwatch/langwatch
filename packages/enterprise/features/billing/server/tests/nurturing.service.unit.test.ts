@@ -25,9 +25,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-function createMockFetch(
-  response: Partial<Response> = { ok: true, status: 200 },
-) {
+function createMockFetch(response: Partial<Response> = { ok: true, status: 200 }) {
   return vi.fn().mockResolvedValue(response);
 }
 
@@ -66,8 +64,7 @@ describe("NurturingService", () => {
         expect(options.method).toBe("POST");
 
         const authHeader = options.headers.Authorization;
-        const expectedAuth =
-          "Basic " + Buffer.from("test-api-key:").toString("base64");
+        const expectedAuth = "Basic " + Buffer.from("test-api-key:").toString("base64");
         expect(authHeader).toBe(expectedAuth);
       });
 
@@ -233,9 +230,7 @@ describe("NurturingService", () => {
           // Simulate the abort signal triggering
           if (options?.signal) {
             options.signal.addEventListener("abort", () => {
-              reject(
-                new DOMException("The operation was aborted.", "AbortError"),
-              );
+              reject(new DOMException("The operation was aborted.", "AbortError"));
             });
           }
         });

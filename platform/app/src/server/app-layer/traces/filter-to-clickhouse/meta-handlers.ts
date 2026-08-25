@@ -125,9 +125,7 @@ function translateExistence(
   const traceAttrKey = stripTraceAttributePrefix(value);
   if (traceAttrKey !== null) {
     if (!traceAttrKey) {
-      throw new FilterParseError(
-        "attribute.<key> requires a key after the dot",
-      );
+      throw new FilterParseError("attribute.<key> requires a key after the dot");
     }
     const p = nextParam(ctx, "attrKey");
     ctx.params[p] = traceAttrKey;
@@ -139,10 +137,7 @@ function translateExistence(
       return wrap("ContainsErrorStatus = 1", negated);
 
     case "eval":
-      return wrap(
-        boundedSubquery("evaluation_runs", "ScheduledAt", "1 = 1"),
-        negated,
-      );
+      return wrap(boundedSubquery("evaluation_runs", "ScheduledAt", "1 = 1"), negated);
 
     case "feedback":
       return wrap(
@@ -269,14 +264,12 @@ function evaluateExistence(
 
 const HAS_DEF: FieldDef = {
   toClickHouse: (tag, negated, ctx) => translateExistence(tag, negated, ctx),
-  evaluateInMemory: (tag, negated, trace) =>
-    evaluateExistence(tag, negated, trace),
+  evaluateInMemory: (tag, negated, trace) => evaluateExistence(tag, negated, trace),
 };
 
 const NONE_DEF: FieldDef = {
   toClickHouse: (tag, negated, ctx) => translateExistence(tag, !negated, ctx),
-  evaluateInMemory: (tag, negated, trace) =>
-    evaluateExistence(tag, !negated, trace),
+  evaluateInMemory: (tag, negated, trace) => evaluateExistence(tag, !negated, trace),
 };
 
 // ---------------------------------------------------------------------------
@@ -291,11 +284,7 @@ const EVAL_DEF: FieldDef = {
     const p = nextParam(ctx, "evaluatorName");
     ctx.params[p] = value;
     return wrap(
-      boundedSubquery(
-        "evaluation_runs",
-        "ScheduledAt",
-        `EvaluatorName = {${p}:String}`,
-      ),
+      boundedSubquery("evaluation_runs", "ScheduledAt", `EvaluatorName = {${p}:String}`),
       negated,
     );
   },
@@ -315,11 +304,7 @@ const EVENT_DEF: FieldDef = {
     const p = nextParam(ctx, "eventName");
     ctx.params[p] = value;
     return wrap(
-      boundedSubquery(
-        "stored_spans",
-        "StartTime",
-        `has(\`Events.Name\`, {${p}:String})`,
-      ),
+      boundedSubquery("stored_spans", "StartTime", `has(\`Events.Name\`, {${p}:String})`),
       negated,
     );
   },
@@ -349,8 +334,7 @@ const PROMPT_DEF: FieldDef = {
   evaluateInMemory: (tag, negated, trace) => {
     const value = extractStringValue(tag);
     const promptIds =
-      parseJsonStringArray(trace.summary.attributes["langwatch.prompt_ids"]) ??
-      [];
+      parseJsonStringArray(trace.summary.attributes["langwatch.prompt_ids"]) ?? [];
     const matched = promptIds.includes(value);
     return negated ? !matched : matched;
   },
@@ -366,11 +350,7 @@ const SPAN_ID_DEF: FieldDef = {
     if (value.includes("*")) {
       ctx.params[p] = value.replace(/\*/g, "%");
       return wrap(
-        boundedSubquery(
-          "stored_spans",
-          "StartTime",
-          `SpanId LIKE {${p}:String}`,
-        ),
+        boundedSubquery("stored_spans", "StartTime", `SpanId LIKE {${p}:String}`),
         negated,
       );
     }
@@ -398,8 +378,7 @@ const SCENARIO_RUN_DEF: FieldDef = {
   },
   evaluateInMemory: (tag, negated, trace) => {
     const value = extractStringValue(tag);
-    const matched =
-      (trace.summary.attributes["scenario.run_id"] ?? "") === value;
+    const matched = (trace.summary.attributes["scenario.run_id"] ?? "") === value;
     return negated ? !matched : matched;
   },
 };

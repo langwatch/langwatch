@@ -65,10 +65,7 @@ describe("the no-network Vega loader", () => {
         // in an array would be unhandled until the loop reached them.
         const attempts: [string, () => Promise<unknown>][] = [
           ["load", () => loader.load("https://exfiltrate.example/rows.json")],
-          [
-            "sanitize",
-            () => loader.sanitize("https://exfiltrate.example/rows.json"),
-          ],
+          ["sanitize", () => loader.sanitize("https://exfiltrate.example/rows.json")],
           ["http", () => loader.http("https://exfiltrate.example/rows.json")],
           ["file", () => loader.file("/etc/passwd")],
         ];
@@ -93,13 +90,7 @@ describe("the no-network Vega loader", () => {
           createNoNetworkVegaLoader().load(withSecrets),
         );
 
-        for (const secret of [
-          "hunter2",
-          "SECRET",
-          "token=",
-          "anchor",
-          "user:",
-        ]) {
+        for (const secret of ["hunter2", "SECRET", "token=", "anchor", "user:"]) {
           expect(raised.message).not.toContain(secret);
           expect(JSON.stringify(raised.detail)).not.toContain(secret);
         }
@@ -110,15 +101,11 @@ describe("the no-network Vega loader", () => {
         expect(redactResourceReference("data/local.json?token=SECRET")).toBe(
           "data/local.json",
         );
-        expect(redactResourceReference("not a url at all")).toBe(
-          "not a url at all",
-        );
+        expect(redactResourceReference("not a url at all")).toBe("not a url at all");
       });
 
       it("hands each view its own loader so one can never mutate another's", () => {
-        expect(createNoNetworkVegaLoader()).not.toBe(
-          createNoNetworkVegaLoader(),
-        );
+        expect(createNoNetworkVegaLoader()).not.toBe(createNoNetworkVegaLoader());
       });
     });
   });

@@ -1,8 +1,5 @@
 import { chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import {
-  MissingValue,
-  type SessionPullRequest,
-} from "@langwatch/coding-agent-web";
+import { MissingValue, type SessionPullRequest } from "@langwatch/coding-agent-web";
 import type React from "react";
 
 import { Tooltip } from "~/components/ui/tooltip";
@@ -76,13 +73,7 @@ export const PullRequestsCell: React.FC<{
         >
           {/* The remaining numbers are written down nowhere else on this row,
               so the hover has a tab stop behind it. */}
-          <Text
-            as="span"
-            fontSize="sm"
-            color="fg.muted"
-            cursor="help"
-            tabIndex={0}
-          >
+          <Text as="span" fontSize="sm" color="fg.muted" cursor="help" tabIndex={0}>
             +{rest.length}
           </Text>
         </Tooltip>

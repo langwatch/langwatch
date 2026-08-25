@@ -36,14 +36,8 @@ export const TimelineBar = memo(function TimelineBar({
     () => setHoveredSpanId(span.spanId),
     [setHoveredSpanId, span.spanId],
   );
-  const handleMouseLeave = useCallback(
-    () => setHoveredSpanId(null),
-    [setHoveredSpanId],
-  );
-  const handleClick = useCallback(
-    () => onSelect(span.spanId),
-    [onSelect, span.spanId],
-  );
+  const handleMouseLeave = useCallback(() => setHoveredSpanId(null), [setHoveredSpanId]);
+  const handleClick = useCallback(() => onSelect(span.spanId), [onSelect, span.spanId]);
   const isError = span.status === "error";
   const duration = span.durationMs;
   // Mirrors TreeRow's purple skill accent so the tree/timeline twins of a
@@ -53,9 +47,7 @@ export const TimelineBar = memo(function TimelineBar({
   const isZeroDuration = duration === 0;
 
   const leftPct =
-    rootDuration > 0
-      ? ((span.startTimeMs - rootStart) / rootDuration) * 100
-      : 0;
+    rootDuration > 0 ? ((span.startTimeMs - rootStart) / rootDuration) * 100 : 0;
   const widthPct = rootDuration > 0 ? (duration / rootDuration) * 100 : 50;
 
   return (
@@ -120,11 +112,7 @@ export const TimelineBar = memo(function TimelineBar({
             opacity={isSelected ? 0.95 : isHovered ? 0.85 : 0.7}
             borderWidth={isError ? "1.5px" : isSelected ? "1px" : "0px"}
             borderColor={
-              isError
-                ? "red.solid"
-                : isSelected
-                  ? "border.emphasized"
-                  : undefined
+              isError ? "red.solid" : isSelected ? "border.emphasized" : undefined
             }
             transition="opacity 0.1s ease"
             boxShadow={
@@ -154,9 +142,7 @@ export const GroupTimelineBar = memo(function GroupTimelineBar({
   const leftPct =
     rootDuration > 0 ? ((group.minStart - rootStart) / rootDuration) * 100 : 0;
   const widthPct =
-    rootDuration > 0
-      ? ((group.maxEnd - group.minStart) / rootDuration) * 100
-      : 50;
+    rootDuration > 0 ? ((group.maxEnd - group.minStart) / rootDuration) * 100 : 50;
 
   return (
     <Flex height={`${GROUP_ROW_HEIGHT}px`} align="center" position="relative">

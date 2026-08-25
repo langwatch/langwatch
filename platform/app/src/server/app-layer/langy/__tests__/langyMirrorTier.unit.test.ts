@@ -13,9 +13,7 @@ import { resolveLangyMirrorTier } from "../langy-credential.test-adapter";
 describe("resolveLangyMirrorTier", () => {
   describe("when no mirror project id is configured", () => {
     it("defaults every project to content", () => {
-      expect(resolveLangyMirrorTier({ projectId: "proj-customer" }, {})).toBe(
-        "content",
-      );
+      expect(resolveLangyMirrorTier({ projectId: "proj-customer" }, {})).toBe("content");
     });
   });
 

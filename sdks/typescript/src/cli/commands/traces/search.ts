@@ -24,15 +24,17 @@ const PROGRESS_CHUNK = 5;
  */
 const BOOLEAN_OPERATORS = /(^|\s)(AND|OR|NOT)(\s|$)/;
 
-export const searchTracesCommand = async (options: {
-  query?: string;
-  startDate?: string;
-  endDate?: string;
-  limit?: string;
-  origin?: string;
-  errorsOnly?: boolean;
-  project?: string;
-} & RawOutputFlags): Promise<void> => {
+export const searchTracesCommand = async (
+  options: {
+    query?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: string;
+    origin?: string;
+    errorsOnly?: boolean;
+    project?: string;
+  } & RawOutputFlags,
+): Promise<void> => {
   await resolveCredentials({ project: options.project });
 
   const service = new TracesApiService();
@@ -50,9 +52,7 @@ export const searchTracesCommand = async (options: {
     const startDate = options.startDate
       ? new Date(options.startDate).getTime()
       : oneDayAgo;
-    const endDate = options.endDate
-      ? new Date(options.endDate).getTime()
-      : now;
+    const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
     const pageSize = options.limit ? parseInt(options.limit, 10) : 25;
     const originFilter = parseOriginOption(options.origin);
     // "Show me my failed traces" has no text to search for: the error lives on
@@ -217,9 +217,7 @@ const printTable = ({
     );
   }
   console.log(
-    chalk.gray(
-      `Use ${chalk.cyan("langwatch trace get <traceId>")} to view full details`,
-    ),
+    chalk.gray(`Use ${chalk.cyan("langwatch trace get <traceId>")} to view full details`),
   );
 };
 
@@ -227,11 +225,19 @@ function toRow(trace: Record<string, unknown>): Record<string, string> {
   const traceId = (trace.traceId ?? trace.trace_id ?? trace.id ?? "—") as string;
   const rawInput = trace.input ?? trace.ComputedInput ?? "—";
   const rawOutput = trace.output ?? trace.ComputedOutput ?? "—";
-  const input = truncate(typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput), 60);
-  const output = truncate(typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput), 40);
+  const input = truncate(
+    typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput),
+    60,
+  );
+  const output = truncate(
+    typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput),
+    40,
+  );
   const timestamps = trace.timestamps as Record<string, unknown> | undefined;
   const startedAt = timestamps?.started_at ?? trace.StartedAt ?? trace.startedAt;
-  const timeStr = startedAt ? formatRelativeTime(new Date(startedAt as number).toISOString()) : "—";
+  const timeStr = startedAt
+    ? formatRelativeTime(new Date(startedAt as number).toISOString())
+    : "—";
 
   return {
     "Trace ID": traceId.substring(0, 20),

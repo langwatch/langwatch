@@ -41,9 +41,7 @@ describe("assertPlanAllowsRetentionValue", () => {
 
   describe("given a paid (non-enterprise) SaaS plan", () => {
     it.each([35, 63])("allows the fixed preset of %i days", (days) => {
-      expect(() =>
-        assertPlanAllowsRetentionValue(paidPlan, days),
-      ).not.toThrow();
+      expect(() => assertPlanAllowsRetentionValue(paidPlan, days)).not.toThrow();
     });
 
     it("rejects an arbitrary off-menu value (e.g. 364d)", () => {
@@ -60,18 +58,15 @@ describe("assertPlanAllowsRetentionValue", () => {
   });
 
   describe("given an enterprise SaaS plan", () => {
-    it.each([
-      35, 63, 91, 371, 1827,
-    ])("allows the enterprise preset of %i days", (days) => {
-      expect(() =>
-        assertPlanAllowsRetentionValue(enterprisePlan, days),
-      ).not.toThrow();
-    });
+    it.each([35, 63, 91, 371, 1827])(
+      "allows the enterprise preset of %i days",
+      (days) => {
+        expect(() => assertPlanAllowsRetentionValue(enterprisePlan, days)).not.toThrow();
+      },
+    );
 
     it("allows a custom value at or above the 49d floor", () => {
-      expect(() =>
-        assertPlanAllowsRetentionValue(enterprisePlan, 56),
-      ).not.toThrow();
+      expect(() => assertPlanAllowsRetentionValue(enterprisePlan, 56)).not.toThrow();
     });
 
     it("rejects a custom value below the 49d floor that isn't a paid preset", () => {
@@ -149,9 +144,9 @@ describe("assertRetentionWriteAllowed", () => {
         organization: { findUnique: vi.fn().mockResolvedValue(null) },
       },
     } as any;
-    await expect(
-      assertRetentionWriteAllowed(ctx, ORG_SCOPE, 35),
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(assertRetentionWriteAllowed(ctx, ORG_SCOPE, 35)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
     expect(planMocks.getActivePlan).not.toHaveBeenCalled();
   });
 });

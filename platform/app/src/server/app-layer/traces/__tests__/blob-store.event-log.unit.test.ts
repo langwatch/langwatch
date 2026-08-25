@@ -95,9 +95,7 @@ function makeMockChClient({
   return { client, sqlCaptures, paramCaptures };
 }
 
-function makeS3Resolver(s3Client: {
-  send: ReturnType<typeof vi.fn>;
-}): S3ClientResolver {
+function makeS3Resolver(s3Client: { send: ReturnType<typeof vi.fn> }): S3ClientResolver {
   return async () => ({
     s3Client: s3Client as never,
     s3Bucket: "test-spool-bucket",
@@ -685,9 +683,7 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
       });
 
       expect(result).toBe(BIG);
-      expect(Buffer.byteLength(result, "utf8")).toBe(
-        Buffer.byteLength(BIG, "utf8"),
-      );
+      expect(Buffer.byteLength(result, "utf8")).toBe(Buffer.byteLength(BIG, "utf8"));
       expect(result.length).toBeGreaterThan(65536);
     });
   });

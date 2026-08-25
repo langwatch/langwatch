@@ -63,7 +63,12 @@ export class DatasetService {
    * @param status - The HTTP status code
    * @param slugOrId - The dataset identifier (only passed for operations targeting an existing resource)
    */
-  private handleApiError(operation: string, error: unknown, status: number, slugOrId?: string): never {
+  private handleApiError(
+    operation: string,
+    error: unknown,
+    status: number,
+    slugOrId?: string,
+  ): never {
     if (status === 404 && slugOrId) {
       throw new DatasetNotFoundError(slugOrId);
     }
@@ -107,7 +112,7 @@ export class DatasetService {
    * Wrapper for API calls to endpoints not yet in the generated OpenAPI types.
    * Quarantines `as any` casts to a single location.
    */
-  private async untypedRequest<M extends 'GET' | 'POST' | 'PATCH' | 'DELETE'>(
+  private async untypedRequest<M extends "GET" | "POST" | "PATCH" | "DELETE">(
     method: M,
     path: string,
     options?: Record<string, unknown>,
@@ -171,7 +176,7 @@ export class DatasetService {
    */
   async getDataset<T extends Record<string, unknown> = Record<string, unknown>>(
     slugOrId: string,
-    _options?: GetDatasetOptions
+    _options?: GetDatasetOptions,
   ): Promise<Dataset<T>> {
     this.config.logger.debug(`Fetching dataset: ${slugOrId}`);
 
@@ -201,7 +206,7 @@ export class DatasetService {
     }));
 
     this.config.logger.debug(
-      `Fetched dataset ${slugOrId} with ${entries.length} entries`
+      `Fetched dataset ${slugOrId} with ${entries.length} entries`,
     );
 
     return {
@@ -221,7 +226,7 @@ export class DatasetService {
   async listDatasets(options?: ListDatasetsOptions): Promise<ListDatasetsApiResponse> {
     this.config.logger.debug("Listing datasets");
 
-    const response = await this.untypedRequest('GET', '/api/dataset', {
+    const response = await this.untypedRequest("GET", "/api/dataset", {
       params: {
         query: {
           page: options?.page,
@@ -230,10 +235,7 @@ export class DatasetService {
       },
     });
 
-    return this.unwrapResponse<ListDatasetsApiResponse>(
-      response,
-      "list datasets",
-    );
+    return this.unwrapResponse<ListDatasetsApiResponse>(response, "list datasets");
   }
 
   /**
@@ -242,7 +244,7 @@ export class DatasetService {
   async createDataset(options: CreateDatasetOptions): Promise<DatasetMetadata> {
     this.config.logger.debug(`Creating dataset: ${options.name}`);
 
-    const response = await this.untypedRequest('POST', '/api/dataset', {
+    const response = await this.untypedRequest("POST", "/api/dataset", {
       body: {
         name: options.name,
         columnTypes: options.columnTypes ?? [],
@@ -258,10 +260,13 @@ export class DatasetService {
   /**
    * Updates a dataset by its slug or ID.
    */
-  async updateDataset(slugOrId: string, options: UpdateDatasetOptions): Promise<DatasetMetadata> {
+  async updateDataset(
+    slugOrId: string,
+    options: UpdateDatasetOptions,
+  ): Promise<DatasetMetadata> {
     this.config.logger.debug(`Updating dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest('PATCH', '/api/dataset/{slugOrId}', {
+    const response = await this.untypedRequest("PATCH", "/api/dataset/{slugOrId}", {
       params: {
         path: { slugOrId },
       },
@@ -281,7 +286,7 @@ export class DatasetService {
   async deleteDataset(slugOrId: string): Promise<DatasetMetadata> {
     this.config.logger.debug(`Deleting dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest('DELETE', '/api/dataset/{slugOrId}', {
+    const response = await this.untypedRequest("DELETE", "/api/dataset/{slugOrId}", {
       params: {
         path: { slugOrId },
       },
@@ -301,14 +306,20 @@ export class DatasetService {
     slugOrId: string,
     entries: Record<string, unknown>[],
   ): Promise<BatchCreateRecordsResponse> {
-    this.config.logger.debug(`Creating ${entries.length} records in dataset: ${slugOrId}`);
+    this.config.logger.debug(
+      `Creating ${entries.length} records in dataset: ${slugOrId}`,
+    );
 
-    const response = await this.untypedRequest('POST', '/api/dataset/{slugOrId}/records', {
-      params: {
-        path: { slugOrId },
+    const response = await this.untypedRequest(
+      "POST",
+      "/api/dataset/{slugOrId}/records",
+      {
+        params: {
+          path: { slugOrId },
+        },
+        body: { entries },
       },
-      body: { entries },
-    });
+    );
 
     return this.unwrapResponse<BatchCreateRecordsResponse>(
       response,
@@ -327,12 +338,16 @@ export class DatasetService {
   ): Promise<DatasetRecordResponse> {
     this.config.logger.debug(`Updating record ${recordId} in dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest('PATCH', '/api/dataset/{slugOrId}/records/{recordId}', {
-      params: {
-        path: { slugOrId, recordId },
+    const response = await this.untypedRequest(
+      "PATCH",
+      "/api/dataset/{slugOrId}/records/{recordId}",
+      {
+        params: {
+          path: { slugOrId, recordId },
+        },
+        body: { entry },
       },
-      body: { entry },
-    });
+    );
 
     return this.unwrapResponse<DatasetRecordResponse>(
       response,
@@ -348,14 +363,20 @@ export class DatasetService {
     slugOrId: string,
     recordIds: string[],
   ): Promise<DeleteRecordsResponse> {
-    this.config.logger.debug(`Deleting ${recordIds.length} records from dataset: ${slugOrId}`);
+    this.config.logger.debug(
+      `Deleting ${recordIds.length} records from dataset: ${slugOrId}`,
+    );
 
-    const response = await this.untypedRequest('DELETE', '/api/dataset/{slugOrId}/records', {
-      params: {
-        path: { slugOrId },
+    const response = await this.untypedRequest(
+      "DELETE",
+      "/api/dataset/{slugOrId}/records",
+      {
+        params: {
+          path: { slugOrId },
+        },
+        body: { recordIds },
       },
-      body: { recordIds },
-    });
+    );
 
     return this.unwrapResponse<DeleteRecordsResponse>(
       response,
@@ -377,7 +398,7 @@ export class DatasetService {
   ): Promise<ListRecordsApiResponse> {
     this.config.logger.debug(`Listing records for dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest('GET', '/api/dataset/{slugOrId}/records', {
+    const response = await this.untypedRequest("GET", "/api/dataset/{slugOrId}/records", {
       params: {
         path: { slugOrId },
         query: {
@@ -503,12 +524,17 @@ export class DatasetService {
   /**
    * Append strategy: try uploading to existing dataset; if not found, create from file.
    */
-  private async _uploadAppend(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
+  private async _uploadAppend(
+    slugOrId: string,
+    file: File | Blob,
+  ): Promise<UploadResponse> {
     try {
       return await this.uploadFile(slugOrId, file);
     } catch (error) {
       if (error instanceof DatasetNotFoundError) {
-        return this.toUploadResponse(await this.createDatasetFromUpload({ name: slugOrId, file }));
+        return this.toUploadResponse(
+          await this.createDatasetFromUpload({ name: slugOrId, file }),
+        );
       }
       throw error;
     }
@@ -517,14 +543,19 @@ export class DatasetService {
   /**
    * Replace strategy: if dataset exists, delete all records then upload; if not found, create from file.
    */
-  private async _uploadReplace(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
+  private async _uploadReplace(
+    slugOrId: string,
+    file: File | Blob,
+  ): Promise<UploadResponse> {
     try {
       await this.getDataset(slugOrId);
       await this._deleteAllRecords(slugOrId);
       return await this.uploadFile(slugOrId, file);
     } catch (error) {
       if (error instanceof DatasetNotFoundError) {
-        return this.toUploadResponse(await this.createDatasetFromUpload({ name: slugOrId, file }));
+        return this.toUploadResponse(
+          await this.createDatasetFromUpload({ name: slugOrId, file }),
+        );
       }
       throw error;
     }
@@ -533,7 +564,10 @@ export class DatasetService {
   /**
    * Error strategy: if dataset exists, throw 409; if not found, create from file.
    */
-  private async _uploadError(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
+  private async _uploadError(
+    slugOrId: string,
+    file: File | Blob,
+  ): Promise<UploadResponse> {
     let datasetExists = false;
     try {
       await this.getDataset(slugOrId);
@@ -545,14 +579,12 @@ export class DatasetService {
     }
 
     if (datasetExists) {
-      throw new DatasetApiError(
-        `Dataset already exists: ${slugOrId}`,
-        409,
-        "upload",
-      );
+      throw new DatasetApiError(`Dataset already exists: ${slugOrId}`, 409, "upload");
     }
 
-    return this.toUploadResponse(await this.createDatasetFromUpload({ name: slugOrId, file }));
+    return this.toUploadResponse(
+      await this.createDatasetFromUpload({ name: slugOrId, file }),
+    );
   }
 
   /**
@@ -586,10 +618,7 @@ export class DatasetService {
   /**
    * Uploads a file to an existing dataset.
    */
-  async uploadFile(
-    slugOrId: string,
-    file: File | Blob,
-  ): Promise<UploadResponse> {
+  async uploadFile(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
     this.config.logger.debug(`Uploading file to dataset: ${slugOrId}`);
 
     const formData = new FormData();

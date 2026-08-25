@@ -113,10 +113,7 @@ export function AutomationsHistory({
   isLoading: boolean;
   onOpenAutomation: (triggerId: string) => void;
 }) {
-  const triggersById = useMemo(
-    () => new Map(triggers.map((t) => [t.id, t])),
-    [triggers],
-  );
+  const triggersById = useMemo(() => new Map(triggers.map((t) => [t.id, t])), [triggers]);
   const days = useMemo(() => {
     const entries = toActivityEntries({ fires, triggersById });
     const grouped = new Map<string, ActivityEntry[]>();
@@ -149,8 +146,8 @@ export function AutomationsHistory({
         textAlign="center"
       >
         <Text textStyle="sm" color="fg.muted">
-          Nothing has fired yet. When your automations, alerts, and reports run,
-          you'll see what they did here.
+          Nothing has fired yet. When your automations, alerts, and reports run, you'll
+          see what they did here.
         </Text>
       </Box>
     );
@@ -160,12 +157,7 @@ export function AutomationsHistory({
     <VStack align="stretch" gap={6}>
       {days.map((entries) => (
         <VStack align="stretch" gap={0} key={dayKeyOf(entries[0]!.at)}>
-          <Text
-            textStyle="xs"
-            fontWeight="semibold"
-            color="fg.muted"
-            paddingBottom={2}
-          >
+          <Text textStyle="xs" fontWeight="semibold" color="fg.muted" paddingBottom={2}>
             {dayLabelOf(entries[0]!.at)}
           </Text>
           <VStack
@@ -191,13 +183,7 @@ export function AutomationsHistory({
   );
 }
 
-function ActivityRow({
-  entry,
-  onOpen,
-}: {
-  entry: ActivityEntry;
-  onOpen: () => void;
-}) {
+function ActivityRow({ entry, onOpen }: { entry: ActivityEntry; onOpen: () => void }) {
   const meta = KIND_META[entry.kind];
   const Icon = meta.icon;
   return (

@@ -37,12 +37,7 @@ function MeScopeChip() {
         <Text fontSize="13px" whiteSpace="nowrap">
           {name}
         </Text>
-        <Badge
-          variant="outline"
-          fontSize="10px"
-          color="fg.muted"
-          borderRadius="md"
-        >
+        <Badge variant="outline" fontSize="10px" color="fg.muted" borderRadius="md">
           Personal
         </Badge>
       </HStack>
@@ -79,18 +74,12 @@ function ProjectScopeMenu() {
       team,
       projects: projects.filter(
         (candidate) =>
-          candidate.orgId === organization.id &&
-          candidate.teamId === team.teamId,
+          candidate.orgId === organization.id && candidate.teamId === team.teamId,
       ),
     }))
-    .filter(
-      (group) => group.projects.length > 0 || group.team.canCreateProject,
-    );
+    .filter((group) => group.projects.length > 0 || group.team.canCreateProject);
 
-  const projectCount = groups.reduce(
-    (count, group) => count + group.projects.length,
-    0,
-  );
+  const projectCount = groups.reduce((count, group) => count + group.projects.length, 0);
   const showTeamHeaders = orgTeams.length > 1;
 
   return (
@@ -166,10 +155,7 @@ function ProjectMenu({
                   fontSize="13px"
                   asChild
                 >
-                  <Link
-                    href={candidate.href}
-                    _hover={{ textDecoration: "none" }}
-                  >
+                  <Link href={candidate.href} _hover={{ textDecoration: "none" }}>
                     <HStack gap={2} width="full">
                       <ProjectAvatar name={candidate.label} />
                       <Text flex={1}>{candidate.label}</Text>

@@ -24,10 +24,7 @@ import {
 /** Legacy `Organization.governanceLogContentMode` values. */
 export type LegacyContentMode = "full" | "strip_io" | "strip_all";
 /** Legacy `Project.captured{Input,Output}Visibility` values. */
-export type LegacyVisibility =
-  | "VISIBLE_TO_ALL"
-  | "VISIBLE_TO_ADMIN"
-  | "REDACTED_TO_ALL";
+export type LegacyVisibility = "VISIBLE_TO_ALL" | "VISIBLE_TO_ADMIN" | "REDACTED_TO_ALL";
 /** Legacy `Project.piiRedactionLevel` values. */
 export type LegacyPiiLevel = "STRICT" | "ESSENTIAL" | "DISABLED";
 
@@ -48,9 +45,7 @@ export function mapLegacyContentModeToConfig(
   return null;
 }
 
-function visibilityToCategory(
-  visibility: LegacyVisibility,
-): CategorySetting | null {
+function visibilityToCategory(visibility: LegacyVisibility): CategorySetting | null {
   switch (visibility) {
     case "VISIBLE_TO_ADMIN":
       return { disposition: "restrict", audience: { admins: true } };

@@ -159,9 +159,7 @@ export const buildOnboardingSteps = (
 /**
  * Calculate completion percentage
  */
-export const calculateCompletionPercentage = (
-  steps: OnboardingStep[],
-): number => {
+export const calculateCompletionPercentage = (steps: OnboardingStep[]): number => {
   const completedCount = steps.filter((s) => s.complete).length;
   return Math.round((completedCount / steps.length) * 100);
 };
@@ -215,11 +213,10 @@ export function OnboardingProgress() {
   const { project } = useOrganizationTeamProject();
   const { emit } = useAnalytics();
 
-  const { data: checkStatus, isLoading } =
-    api.integrationsChecks.getCheckStatus.useQuery(
-      { projectId: project?.id ?? "" },
-      { enabled: !!project?.id },
-    );
+  const { data: checkStatus, isLoading } = api.integrationsChecks.getCheckStatus.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
 
   // Track onboarding status when data first loads
   // Using isLoading as trigger - tracks once when loading completes
@@ -303,11 +300,7 @@ export function OnboardingProgress() {
         qualifier={`${completionPercentage}% done`}
       >
         <Box width="80px">
-          <Progress.Root
-            value={completionPercentage}
-            colorPalette="orange"
-            size="sm"
-          >
+          <Progress.Root value={completionPercentage} colorPalette="orange" size="sm">
             <Progress.Track borderRadius="full">
               <Progress.Range />
             </Progress.Track>

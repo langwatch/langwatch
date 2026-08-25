@@ -92,15 +92,9 @@ export const IntegrationChecks = () => {
           <Link href={`/${project?.slug}/traces`}>
             <List.Indicator
               asChild
-              color={
-                integrationChecks.data?.firstMessage ? "green.500" : "gray.500"
-              }
+              color={integrationChecks.data?.firstMessage ? "green.500" : "gray.500"}
             >
-              {integrationChecks.data?.firstMessage ? (
-                <CheckCircle />
-              ) : (
-                <Circle />
-              )}
+              {integrationChecks.data?.firstMessage ? <CheckCircle /> : <Circle />}
             </List.Indicator>
             <Text
               display="inline"
@@ -117,9 +111,7 @@ export const IntegrationChecks = () => {
           <Link href={`/${project?.slug}/workflows`}>
             <List.Indicator
               asChild
-              color={
-                integrationChecks.data?.workflows ? "green.500" : "gray.500"
-              }
+              color={integrationChecks.data?.workflows ? "green.500" : "gray.500"}
             >
               {integrationChecks.data?.workflows ? <CheckCircle /> : <Circle />}
             </List.Indicator>
@@ -138,17 +130,9 @@ export const IntegrationChecks = () => {
           <Link href={`/${project?.slug}/online-evaluations`}>
             <List.Indicator
               asChild
-              color={
-                integrationChecks.data?.onlineEvaluations
-                  ? "green.500"
-                  : "gray.500"
-              }
+              color={integrationChecks.data?.onlineEvaluations ? "green.500" : "gray.500"}
             >
-              {integrationChecks.data?.onlineEvaluations ? (
-                <CheckCircle />
-              ) : (
-                <Circle />
-              )}
+              {integrationChecks.data?.onlineEvaluations ? <CheckCircle /> : <Circle />}
             </List.Indicator>
             <Text
               display="inline"
@@ -162,15 +146,10 @@ export const IntegrationChecks = () => {
           </Link>
         </List.Item>
         <List.Item className="group" display="block" asChild>
-          <Link
-            href="https://docs.langwatch.ai/features/automations"
-            isExternal
-          >
+          <Link href="https://docs.langwatch.ai/features/automations" isExternal>
             <List.Indicator
               asChild
-              color={
-                integrationChecks.data?.triggers ? "green.500" : "gray.500"
-              }
+              color={integrationChecks.data?.triggers ? "green.500" : "gray.500"}
             >
               {integrationChecks.data?.triggers ? <CheckCircle /> : <Circle />}
             </List.Indicator>
@@ -189,9 +168,7 @@ export const IntegrationChecks = () => {
           <Link href="https://docs.langwatch.ai/datasets/overview" isExternal>
             <List.Indicator
               asChild
-              color={
-                integrationChecks.data?.datasets ? "green.500" : "gray.500"
-              }
+              color={integrationChecks.data?.datasets ? "green.500" : "gray.500"}
             >
               {integrationChecks.data?.datasets ? <CheckCircle /> : <Circle />}
             </List.Indicator>
@@ -210,15 +187,9 @@ export const IntegrationChecks = () => {
           <Link href={`/${project?.slug}/analytics/reports`}>
             <List.Indicator
               asChild
-              color={
-                integrationChecks.data?.customGraphs ? "green.500" : "gray.500"
-              }
+              color={integrationChecks.data?.customGraphs ? "green.500" : "gray.500"}
             >
-              {integrationChecks.data?.customGraphs ? (
-                <CheckCircle />
-              ) : (
-                <Circle />
-              )}
+              {integrationChecks.data?.customGraphs ? <CheckCircle /> : <Circle />}
             </List.Indicator>
             <Text
               display="inline"

@@ -21,9 +21,7 @@ describe("savedViewsLogic", () => {
     describe("when value is undefined or null", () => {
       it("returns undefined", () => {
         expect(normalizeFilterValue(undefined)).toBeUndefined();
-        expect(
-          normalizeFilterValue(null as unknown as undefined),
-        ).toBeUndefined();
+        expect(normalizeFilterValue(null as unknown as undefined)).toBeUndefined();
       });
     });
 

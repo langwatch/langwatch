@@ -114,9 +114,7 @@ export function renderPinPills(
             overflowY="auto"
           >
             {overflowCustom.map((p) => (
-              <Box key={`${p.pin.source}:${p.pin.key}`}>
-                {renderPinPill(p, onUnpin)}
-              </Box>
+              <Box key={`${p.pin.source}:${p.pin.key}`}>{renderPinPill(p, onUnpin)}</Box>
             ))}
           </VStack>
         }

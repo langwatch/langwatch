@@ -32,18 +32,16 @@ describe("prepareEnvKeys", () => {
 
     it("returns the openai credentials stored on the row", () => {
       expect(
-        prepareEnvKeys(
-          providerRow("openai", { OPENAI_API_KEY: "sk-openai-row" }),
-        ),
+        prepareEnvKeys(providerRow("openai", { OPENAI_API_KEY: "sk-openai-row" })),
       ).toEqual({ OPENAI_API_KEY: "sk-openai-row" });
     });
   });
 
   describe("given a provider with a plain credentials object", () => {
     it("returns the credentials stored on the row", () => {
-      expect(
-        prepareEnvKeys(providerRow("groq", { GROQ_API_KEY: "gsk-row" })),
-      ).toEqual({ GROQ_API_KEY: "gsk-row" });
+      expect(prepareEnvKeys(providerRow("groq", { GROQ_API_KEY: "gsk-row" }))).toEqual({
+        GROQ_API_KEY: "gsk-row",
+      });
     });
   });
 

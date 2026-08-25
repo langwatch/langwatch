@@ -12,11 +12,7 @@
 import { createStore, type StoreApi } from "zustand";
 
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
-import type {
-  AutosaveState,
-  CellPosition,
-  RowHeightMode,
-} from "./dataset-table-context";
+import type { AutosaveState, CellPosition, RowHeightMode } from "./dataset-table-context";
 import type { PendingSavedChanges } from "./pending-saved-changes";
 
 export type EditorColumn = {
@@ -95,12 +91,7 @@ export type DatasetEditorActions = {
   upsertExternalRecord: (record: EditorRecord) => void;
   /** Display-sync removal counterpart to upsertExternalRecord. */
   removeExternalRecord: (recordId: string) => void;
-  setCellValue: (
-    datasetId: string,
-    row: number,
-    columnId: string,
-    value: string,
-  ) => void;
+  setCellValue: (datasetId: string, row: number, columnId: string, value: string) => void;
   addRow: () => number;
   deleteSelectedRows: () => void;
   setEditingCell: (cell: CellPosition | undefined) => void;
@@ -293,8 +284,7 @@ export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
       set({ expandedCells });
     },
 
-    setRowHeightMode: (mode) =>
-      set({ rowHeightMode: mode, expandedCells: new Set() }),
+    setRowHeightMode: (mode) => set({ rowHeightMode: mode, expandedCells: new Set() }),
 
     clearPendingChange: (dbDatasetId, recordId) => {
       const pendingSavedChanges = { ...get().pendingSavedChanges };

@@ -37,9 +37,7 @@ const STUDIO_INVOKE_STAGING_THRESHOLD_BYTES = 5 * 1024 * 1024;
  * Strip secrets from a studio event before passing to error reporters.
  * Returns a shallow copy with workflow.secrets redacted.
  */
-const sanitizeEventForLogging = (
-  event: StudioClientEvent,
-): StudioClientEvent => {
+const sanitizeEventForLogging = (event: StudioClientEvent): StudioClientEvent => {
   if (!("payload" in event) || !("workflow" in (event as any).payload)) {
     return event;
   }
@@ -70,17 +68,13 @@ type LangWatchLambdaConfig = {
 const parseLambdaConfig = (): LangWatchLambdaConfig => {
   const configStr = process.env.LANGWATCH_NLP_LAMBDA_CONFIG;
   if (!configStr) {
-    throw new Error(
-      "LANGWATCH_NLP_LAMBDA_CONFIG environment variable is required",
-    );
+    throw new Error("LANGWATCH_NLP_LAMBDA_CONFIG environment variable is required");
   }
 
   try {
     return JSON.parse(configStr) as LangWatchLambdaConfig;
   } catch (error) {
-    throw new Error(
-      "Failed to parse LANGWATCH_NLP_LAMBDA_CONFIG: " + String(error),
-    );
+    throw new Error("Failed to parse LANGWATCH_NLP_LAMBDA_CONFIG: " + String(error));
   }
 };
 
@@ -102,9 +96,7 @@ export const LWA_PRELUDE_SEPARATOR_LEN = 8;
  *  positive on the body side is not a practical concern. The buffer
  *  parameter is typed as Uint8Array<ArrayBufferLike> so AWS SDK
  *  PayloadChunk.Payload values flow through without an extra copy. */
-export function findLWAPreludeSeparator(
-  buf: Uint8Array<ArrayBufferLike>,
-): number {
+export function findLWAPreludeSeparator(buf: Uint8Array<ArrayBufferLike>): number {
   for (let i = 0; i + LWA_PRELUDE_SEPARATOR_LEN <= buf.length; i++) {
     let allZero = true;
     for (let j = 0; j < LWA_PRELUDE_SEPARATOR_LEN; j++) {
@@ -201,10 +193,7 @@ const createLogGroupWithRetention = async (
   } catch (error: any) {
     if (error.name === "ResourceAlreadyExistsException") {
       // Log group already exists, just set retention
-      logger.info(
-        { functionName },
-        "Log group already exists, setting retention policy",
-      );
+      logger.info({ functionName }, "Log group already exists, setting retention policy");
 
       const retentionCommand = new PutRetentionPolicyCommand({
         logGroupName,
@@ -296,9 +285,7 @@ const pollLambdaUntilReady = async (
     const config = await checkLambdaExists(lambda, functionName);
 
     if (!config) {
-      throw new Error(
-        `Lambda function ${functionName} disappeared during polling`,
-      );
+      throw new Error(`Lambda function ${functionName} disappeared during polling`);
     }
 
     if (config.State === "Active" && config.LastUpdateStatus === "Successful") {
@@ -317,9 +304,7 @@ const pollLambdaUntilReady = async (
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 
-  throw new Error(
-    `Lambda function ${functionName} did not become ready within timeout`,
-  );
+  throw new Error(`Lambda function ${functionName} did not become ready within timeout`);
 };
 
 const updateProjectLambdaImage = async (
@@ -398,9 +383,7 @@ export const clearLambdaArnCache = async (): Promise<void> => {
   await Promise.all(ids.map((id) => lambdaArnCache.delete(id)));
 };
 
-export const getProjectLambdaArn = async (
-  projectId: string,
-): Promise<string> => {
+export const getProjectLambdaArn = async (projectId: string): Promise<string> => {
   const config = parseLambdaConfig();
   const functionName = `langwatch_nlp-${projectId}`;
 
@@ -418,11 +401,7 @@ export const getProjectLambdaArn = async (
 
   const resolution = (async () => {
     try {
-      const arn = await resolveProjectLambdaArn(
-        projectId,
-        config,
-        functionName,
-      );
+      const arn = await resolveProjectLambdaArn(projectId, config, functionName);
       trackedProjectIds.add(projectId);
       await lambdaArnCache.set(projectId, { arn, imageUri: config.image_uri });
       return arn;
@@ -443,12 +422,10 @@ const resolveProjectLambdaArn = async (
   const lambda = createLambdaClient();
 
   // Check if Lambda exists
-  let lambdaConfig = await checkLambdaExists(lambda, functionName).catch(
-    (error) => {
-      logger.error({ projectId, error }, "Failed to check Lambda exists");
-      return null;
-    },
-  );
+  let lambdaConfig = await checkLambdaExists(lambda, functionName).catch((error) => {
+    logger.error({ projectId, error }, "Failed to check Lambda exists");
+    return null;
+  });
 
   if (!lambdaConfig) {
     // Create the Lambda function (includes log group creation with retention)
@@ -461,10 +438,7 @@ const resolveProjectLambdaArn = async (
         (error.message.includes("already exist") ||
           error.message.includes("An update is in progress"))
       ) {
-        logger.info(
-          { projectId },
-          "Lambda function already exists, skipping creation",
-        );
+        logger.info({ projectId }, "Lambda function already exists, skipping creation");
         await new Promise((resolve) => setTimeout(resolve, 1000));
         lambdaConfig = await checkLambdaExists(lambda, functionName);
         if (!lambdaConfig) {
@@ -565,10 +539,7 @@ export const invokeLambda = async (
     // requestContext / headers overhead — not to the raw event body. So a
     // heavy dataset row fails before our code runs with "Request must be
     // smaller than 6291456 bytes".
-    const buildInvokeBody = (p: {
-      body: string;
-      headers: Record<string, string>;
-    }) =>
+    const buildInvokeBody = (p: { body: string; headers: Record<string, string> }) =>
       JSON.stringify({
         rawPath: path,
         requestContext: { http: { method: "POST" } },
@@ -585,8 +556,7 @@ export const invokeLambda = async (
     if (options.supportsStaging) {
       const invokeBytes = Buffer.byteLength(invokeBody, "utf-8");
       const threshold =
-        env.LANGEVALS_STAGING_THRESHOLD_BYTES ??
-        STUDIO_INVOKE_STAGING_THRESHOLD_BYTES;
+        env.LANGEVALS_STAGING_THRESHOLD_BYTES ?? STUDIO_INVOKE_STAGING_THRESHOLD_BYTES;
       if (invokeBytes > threshold) {
         stagedInvoke = await stagePayloadToS3({
           projectId,
@@ -660,9 +630,7 @@ export const invokeLambda = async (
                   continue;
                 }
                 try {
-                  const preludeText = new TextDecoder().decode(
-                    merged.slice(0, sepIdx),
-                  );
+                  const preludeText = new TextDecoder().decode(merged.slice(0, sepIdx));
                   statusCode = parseInt(JSON.parse(preludeText).statusCode);
                 } catch {
                   /* safe json parse fallback — keep default 200 */
@@ -713,9 +681,7 @@ export const invokeLambda = async (
               });
               throw error;
             }
-            throw new Error(
-              `Failed run workflow: ${statusCode}\n\n${errorMessage}`,
-            );
+            throw new Error(`Failed run workflow: ${statusCode}\n\n${errorMessage}`);
           }
           controller.close();
         } catch (error) {
@@ -736,13 +702,10 @@ export const invokeLambda = async (
 
     return webStream.getReader();
   } else {
-    const response = await fetch(
-      `${process.env.LANGWATCH_NLP_SERVICE}${path}`,
-      {
-        method: "POST",
-        ...payload,
-      },
-    );
+    const response = await fetch(`${process.env.LANGWATCH_NLP_SERVICE}${path}`, {
+      method: "POST",
+      ...payload,
+    });
 
     if (!response.ok) {
       let body = await response.text();

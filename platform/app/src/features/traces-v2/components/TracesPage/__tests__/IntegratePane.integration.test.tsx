@@ -90,12 +90,10 @@ describe("the integrate pane", () => {
 
       // Document order is the reading order: title, token, actions.
       expect(
-        title.compareDocumentPosition(tokenCard) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        title.compareDocumentPosition(tokenCard) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
       expect(
-        tokenCard.compareDocumentPosition(actions) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        tokenCard.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
       expect(
         screen.getByRole("button", { name: /setup via agent/i }),
@@ -127,9 +125,7 @@ describe("the integrate pane", () => {
 
       await user.click(toggle);
       await waitFor(() => {
-        expect(
-          screen.getByText("Select your platform or language"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Select your platform or language")).toBeInTheDocument();
       });
       expect(toggle).toHaveAttribute("aria-expanded", "true");
 

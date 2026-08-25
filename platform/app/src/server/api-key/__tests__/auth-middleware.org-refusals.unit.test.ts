@@ -53,10 +53,7 @@ type TestEnv = {
  * they do in production. Thrown errors are captured by onError so each test
  * can assert on the error itself rather than on a re-rendered body.
  */
-function buildApp(options: {
-  prisma: PrismaClient;
-  refusals?: "respond" | "throw";
-}) {
+function buildApp(options: { prisma: PrismaClient; refusals?: "respond" | "throw" }) {
   const caught: unknown[] = [];
   const app = new Hono<TestEnv>();
   app.onError((error, c) => {
@@ -78,9 +75,7 @@ function buildApp(options: {
       ...(options.refusals ? { refusals: options.refusals } : {}),
     }),
   );
-  app.get("/probe", (c) =>
-    c.json({ organizationId: c.get("organization").id }),
-  );
+  app.get("/probe", (c) => c.json({ organizationId: c.get("organization").id }));
   return { app, caught };
 }
 
@@ -112,8 +107,7 @@ describe("createOrgAuthMiddleware", () => {
       expect(res.status).toBe(401);
       expect(await res.json()).toEqual({
         error: "Unauthorized",
-        message:
-          "Authentication required. Use Authorization: Bearer <api-key>.",
+        message: "Authentication required. Use Authorization: Bearer <api-key>.",
       });
       expect(caught).toEqual([]);
     });

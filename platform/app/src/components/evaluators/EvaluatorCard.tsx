@@ -20,11 +20,7 @@ export type EvaluatorCardProps = Omit<
 };
 
 /** App composition seam for API usage, Langy targeting, and relative-time formatting. */
-export function EvaluatorCard({
-  evaluator,
-  onUseFromApi,
-  ...props
-}: EvaluatorCardProps) {
+export function EvaluatorCard({ evaluator, onUseFromApi, ...props }: EvaluatorCardProps) {
   const [showApiDialog, setShowApiDialog] = useState(false);
   const handleUseFromApi = () => {
     if (onUseFromApi) {

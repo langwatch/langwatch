@@ -15,12 +15,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 //    dropped `trace` on retry, so a guardrail retried after a transient
 //    500 lost `droppedCategories` and could report clean.
 
-const { stagedLangevalsFetchMock, augmentEvaluationResultMock } = vi.hoisted(
-  () => ({
-    stagedLangevalsFetchMock: vi.fn(),
-    augmentEvaluationResultMock: vi.fn(),
-  }),
-);
+const { stagedLangevalsFetchMock, augmentEvaluationResultMock } = vi.hoisted(() => ({
+  stagedLangevalsFetchMock: vi.fn(),
+  augmentEvaluationResultMock: vi.fn(),
+}));
 
 vi.mock("~/server/langevals/stagedFetch", () => ({
   stagedLangevalsFetch: stagedLangevalsFetchMock,
@@ -28,9 +26,7 @@ vi.mock("~/server/langevals/stagedFetch", () => ({
 
 vi.mock("~/server/evaluations/native/registry", async (importOriginal) => {
   const actual =
-    await importOriginal<
-      typeof import("~/server/evaluations/native/registry")
-    >();
+    await importOriginal<typeof import("~/server/evaluations/native/registry")>();
   return {
     ...actual,
     augmentEvaluationResult: augmentEvaluationResultMock,
@@ -38,8 +34,7 @@ vi.mock("~/server/evaluations/native/registry", async (importOriginal) => {
 });
 
 vi.mock("~/server/evaluations/evaluators", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/evaluations/evaluators")>();
+  const actual = await importOriginal<typeof import("~/server/evaluations/evaluators")>();
   return {
     ...actual,
     AVAILABLE_EVALUATORS: {

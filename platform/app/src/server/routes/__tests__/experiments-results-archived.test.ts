@@ -27,8 +27,7 @@ vi.mock("~/server/api/rbac", async (importActual) => {
 });
 
 vi.mock("~/server/license-enforcement", async (importActual) => {
-  const actual =
-    await importActual<typeof import("~/server/license-enforcement")>();
+  const actual = await importActual<typeof import("~/server/license-enforcement")>();
   return { ...actual, enforceLicenseLimit: vi.fn() };
 });
 
@@ -56,8 +55,7 @@ const resolve = vi.fn().mockResolvedValue({
 });
 const markUsed = vi.fn();
 vi.mock("~/server/api-key/auth-middleware", async (importActual) => {
-  const actual =
-    await importActual<typeof import("~/server/api-key/auth-middleware")>();
+  const actual = await importActual<typeof import("~/server/api-key/auth-middleware")>();
   return {
     ...actual,
     enforceApiKeyCeiling: vi.fn().mockResolvedValue(undefined),

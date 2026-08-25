@@ -46,10 +46,7 @@ import { randomBytes } from "crypto";
 import { prisma } from "~/server/db";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { encrypt } from "~/utils/encryption";
-import {
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@langwatch/prisma-client/generated";
+import { RoleBindingScopeType, TeamUserRole } from "@langwatch/prisma-client/generated";
 
 export interface SeedPersonasArgs {
   email: string;
@@ -97,9 +94,7 @@ export async function runSeedPersonas(
   const user = await prisma.user.findUnique({ where: { email: args.email } });
   if (!user) throw new Error(`user ${args.email} not found — sign up first`);
 
-  process.stderr.write(
-    `[seed-personas] persona=${args.persona} user=${user.id}\n`,
-  );
+  process.stderr.write(`[seed-personas] persona=${args.persona} user=${user.id}\n`);
 
   if (args.persona === "p1") {
     await prisma.user.update({
@@ -146,8 +141,7 @@ export async function runSeedPersonas(
   // surfaced this when seed-personas-created MEMBER 401d on
   // resolveHome despite the carve-out (see PR doc §"RBAC
   // defense-in-depth → Open thread", `9e373c284`).
-  const rbRole =
-    teamRole === "ADMIN" ? TeamUserRole.ADMIN : TeamUserRole.MEMBER;
+  const rbRole = teamRole === "ADMIN" ? TeamUserRole.ADMIN : TeamUserRole.MEMBER;
   await prisma.roleBinding.createMany({
     data: [
       {
@@ -316,8 +310,7 @@ export async function runSeedPersonas(
 
 // CLI bootstrap — only fires when this file is the entry point.
 const isCliInvocation =
-  typeof process.argv[1] === "string" &&
-  import.meta.url === `file://${process.argv[1]}`;
+  typeof process.argv[1] === "string" && import.meta.url === `file://${process.argv[1]}`;
 
 if (isCliInvocation) {
   const args = parseArgs(process.argv.slice(2));
@@ -326,9 +319,7 @@ if (isCliInvocation) {
       process.stdout.write(JSON.stringify(summary) + "\n");
     })
     .catch((err) => {
-      process.stderr.write(
-        `[seed-personas] ERROR: ${err.message}\n${err.stack}\n`,
-      );
+      process.stderr.write(`[seed-personas] ERROR: ${err.message}\n${err.stack}\n`);
       process.exit(1);
     })
     .finally(async () => {

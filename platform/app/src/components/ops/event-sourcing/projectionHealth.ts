@@ -27,10 +27,7 @@ export function joinProjectionHealth({
   projections: ProjectionMeta[];
   pipelineTree: PipelineNode[];
 }): ProjectionHealthRow[] {
-  const live = new Map<
-    string,
-    { pending: number; active: number; blocked: number }
-  >();
+  const live = new Map<string, { pending: number; active: number; blocked: number }>();
   for (const pipeline of pipelineTree) {
     for (const typeNode of pipeline.children) {
       if (
@@ -50,9 +47,7 @@ export function joinProjectionHealth({
   }
 
   const rows = projections.map((meta) => {
-    const counts = live.get(
-      `${meta.pipelineName}/${meta.kind}/${meta.projectionName}`,
-    );
+    const counts = live.get(`${meta.pipelineName}/${meta.kind}/${meta.projectionName}`);
     return {
       ...meta,
       pending: counts?.pending ?? 0,

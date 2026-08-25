@@ -317,23 +317,24 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
             <Text textStyle="2xs" fontWeight="600">
               {triggerLabel}
             </Text>
-            {orderedKeysAll.length > 0 && showCount && (
-              // Subtle "shown / available" hint so the user can tell at a
-              // glance how many facets are hidden behind the picker without
-              // opening it. Hidden when the sidebar is narrow (see showCount).
-              <Box
-                as="span"
-                bg="bg.muted"
-                color="fg.subtle"
-                borderRadius="sm"
-                paddingX={1}
-                fontVariantNumeric="tabular-nums"
-              >
-                <Text as="span" textStyle="2xs" fontWeight="600">
-                  {visibleCount}/{orderedKeysAll.length}
-                </Text>
-              </Box>
-            )}
+            {orderedKeysAll.length > 0 &&
+              showCount && (
+                // Subtle "shown / available" hint so the user can tell at a
+                // glance how many facets are hidden behind the picker without
+                // opening it. Hidden when the sidebar is narrow (see showCount).
+                <Box
+                  as="span"
+                  bg="bg.muted"
+                  color="fg.subtle"
+                  borderRadius="sm"
+                  paddingX={1}
+                  fontVariantNumeric="tabular-nums"
+                >
+                  <Text as="span" textStyle="2xs" fontWeight="600">
+                    {visibleCount}/{orderedKeysAll.length}
+                  </Text>
+                </Box>
+              )}
           </Button>
         ) : (
           <IconButton
@@ -408,9 +409,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                     // tabbable, and arrow keys move selection + focus.
                     tabIndex={active ? 0 : -1}
                     onKeyDown={(e) => {
-                      const idx = FACET_PERSPECTIVES.findIndex(
-                        (x) => x.id === p.id,
-                      );
+                      const idx = FACET_PERSPECTIVES.findIndex((x) => x.id === p.id);
                       const len = FACET_PERSPECTIVES.length;
                       let nextIdx: number | null = null;
                       if (e.key === "ArrowDown" || e.key === "ArrowRight") {
@@ -422,23 +421,14 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                       e.preventDefault();
                       selectPerspective(FACET_PERSPECTIVES[nextIdx]!.id);
                       const radios =
-                        e.currentTarget.parentElement?.querySelectorAll(
-                          '[role="radio"]',
-                        );
+                        e.currentTarget.parentElement?.querySelectorAll('[role="radio"]');
                       (radios?.[nextIdx] as HTMLElement | undefined)?.focus();
                     }}
                   >
-                    <Icon
-                      boxSize={3}
-                      color={active ? "blue.solid" : "fg.subtle"}
-                    >
+                    <Icon boxSize={3} color={active ? "blue.solid" : "fg.subtle"}>
                       <RadioIcon />
                     </Icon>
-                    <Text
-                      textStyle="xs"
-                      color="fg"
-                      fontWeight={active ? "600" : "500"}
-                    >
+                    <Text textStyle="xs" color="fg" fontWeight={active ? "600" : "500"}>
                       {p.label}
                     </Text>
                   </chakra.button>
@@ -505,12 +495,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                   const GroupIcon = GROUP_ICON[group.id] ?? Filter;
                   return (
                     <Box key={group.id}>
-                      <HStack
-                        gap={1.5}
-                        paddingX={3}
-                        paddingTop={2}
-                        paddingBottom={1}
-                      >
+                      <HStack gap={1.5} paddingX={3} paddingTop={2} paddingBottom={1}>
                         <Icon boxSize={3} color="fg.subtle">
                           <GroupIcon />
                         </Icon>
@@ -535,9 +520,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                             paddingY={1}
                             _hover={{ bg: "bg.muted" }}
                             cursor="pointer"
-                            onClick={() =>
-                              checked ? onHide(key) : onShow(key)
-                            }
+                            onClick={() => (checked ? onHide(key) : onShow(key))}
                           >
                             <HStack justify="space-between" gap={2}>
                               <Checkbox
@@ -574,8 +557,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   {(["range", "discrete"] as const).map((m) => {
-                                    const active =
-                                      numericModeByKey.get(key) === m;
+                                    const active = numericModeByKey.get(key) === m;
                                     return (
                                       <chakra.button
                                         key={m}

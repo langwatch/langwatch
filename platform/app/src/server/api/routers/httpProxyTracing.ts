@@ -186,9 +186,7 @@ export async function createAgentTestTrace({
     method: testContext.method,
     headers: sanitizedHeaders,
     body: requestBody,
-    ...(testContext.output_path
-      ? { output_path: testContext.output_path }
-      : {}),
+    ...(testContext.output_path ? { output_path: testContext.output_path } : {}),
   };
 
   const outputValue = {
@@ -227,9 +225,7 @@ export async function createAgentTestTrace({
       url: testContext.url,
       method: testContext.method,
       has_auth: testContext.has_auth,
-      ...(testContext.output_path
-        ? { output_path: testContext.output_path }
-        : {}),
+      ...(testContext.output_path ? { output_path: testContext.output_path } : {}),
     },
   };
 

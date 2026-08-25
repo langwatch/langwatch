@@ -9,10 +9,7 @@ import { useNow } from "~/hooks/useNow";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
-import {
-  computeBatchRunSummary,
-  computeIterationMap,
-} from "./run-history-transforms";
+import { computeBatchRunSummary, computeIterationMap } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
 import type { ViewMode } from "./useRunHistoryStore";
 

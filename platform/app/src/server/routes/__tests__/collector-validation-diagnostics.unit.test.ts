@@ -13,8 +13,7 @@ import { getApp } from "~/server/app-layer/app";
 const logCalls: Array<{ level: string; fields: any; message: string }> = [];
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof import("@langwatch/observability")>();
   const record = (level: string) => (fields: any, message?: string) => {
     logCalls.push({ level, fields, message: message ?? "" });
   };

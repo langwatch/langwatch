@@ -39,7 +39,6 @@ const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
 const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const destinations = WebhookDestinationService.create();
 
-
 function toView(endpoint: WebhookEndpoint): WebhookEndpointView {
   return {
     id: endpoint.id,
@@ -76,22 +75,14 @@ const URL_PROBLEM_MESSAGES: Record<WebhookUrlProblemCode, string> = {
   credentials: "url must not carry credentials",
 };
 
-function assertValidUrl(
-  url: string,
-  configuration: WebhookEndpointConfiguration,
-): void {
+function assertValidUrl(url: string, configuration: WebhookEndpointConfiguration): void {
   // Same policy the sender enforces at dispatch, so an endpoint that saves is
   // an endpoint that can deliver. Operator opt-in for local development and
   // internal receivers relaxes the origin here exactly as it relaxes the
   // local-address fence on the send.
-  const problem = destinations.tryInspectUrl(
-    url,
-    configuration.allowInsecureLocalUrls,
-  );
+  const problem = destinations.tryInspectUrl(url, configuration.allowInsecureLocalUrls);
   if (problem) {
-    throw new WebhookEndpointValidationError(
-      URL_PROBLEM_MESSAGES[problem],
-    );
+    throw new WebhookEndpointValidationError(URL_PROBLEM_MESSAGES[problem]);
   }
 }
 
@@ -220,14 +211,10 @@ function assertValidDestination(
 ): StoredDestination {
   if (params.destinationKind === "http") {
     if (!params.url) {
-      throw new WebhookEndpointValidationError(
-        "url is required for an http endpoint",
-      );
+      throw new WebhookEndpointValidationError("url is required for an http endpoint");
     }
     if (params.sqs) {
-      throw new WebhookEndpointValidationError(
-        "sqs does not apply to an http endpoint",
-      );
+      throw new WebhookEndpointValidationError("sqs does not apply to an http endpoint");
     }
     assertValidUrl(params.url, configuration);
     return { ...EMPTY_DESTINATION, url: params.url };
@@ -411,9 +398,7 @@ function assertValidSqsUpdate({
  * what makes the key pair dead weight rather than a second way in. Clearing it
  * here means the row says what the read view says.
  */
-function withExclusiveCredentials(
-  sqs: SqsDestinationInput,
-): SqsDestinationInput {
+function withExclusiveCredentials(sqs: SqsDestinationInput): SqsDestinationInput {
   if (sqs.roleArn) {
     return { ...sqs, accessKeyId: null, secretAccessKey: null };
   }
@@ -442,9 +427,7 @@ function assertValidEvents(enabledEvents: string[]): void {
   }
   for (const selector of enabledEvents) {
     if (!isValidEventSelector(selector)) {
-      throw new WebhookEndpointValidationError(
-        `unknown event selector "${selector}"`,
-      );
+      throw new WebhookEndpointValidationError(`unknown event selector "${selector}"`);
     }
   }
 }
@@ -539,9 +522,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
     return { endpoint: toView(endpoint), secret };
   }
 
-  async getAll(params: {
-    organizationId: string;
-  }): Promise<WebhookEndpointView[]> {
+  async getAll(params: { organizationId: string }): Promise<WebhookEndpointView[]> {
     const endpoints = await this.prisma.webhookEndpoint.findMany({
       where: { organizationId: params.organizationId, archivedAt: null },
       orderBy: { createdAt: "asc" },
@@ -582,8 +563,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
             secrets: this.deps.secrets,
           })
         : {};
-    if (params.enabledEvents !== undefined)
-      assertValidEvents(params.enabledEvents);
+    if (params.enabledEvents !== undefined) assertValidEvents(params.enabledEvents);
     this.policy.assertValidDeliveryControls(params);
     const data: Prisma.WebhookEndpointUncheckedUpdateInput = { ...sqsUpdate };
     if (params.url !== undefined) data.url = params.url;
@@ -633,9 +613,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
       data: {
         secretEncrypted: this.deps.secrets.encrypt(secret),
         previousSecretEncrypted: endpoint.secretEncrypted,
-        previousSecretExpiresAt: new Date(
-          now.getTime() + WEBHOOK_PREVIOUS_SECRET_TTL_MS,
-        ),
+        previousSecretExpiresAt: new Date(now.getTime() + WEBHOOK_PREVIOUS_SECRET_TTL_MS),
       },
     });
     return { endpoint: toView(updated), secret };
@@ -681,10 +659,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
   }
 
   /** Soft-delete; deliveries cascade on hard delete only. */
-  async archive(params: {
-    organizationId: string;
-    endpointId: string;
-  }): Promise<void> {
+  async archive(params: { organizationId: string; endpointId: string }): Promise<void> {
     const endpoint = await this.getEndpoint(params);
     await this.prisma.webhookEndpoint.update({
       where: { id: endpoint.id },
@@ -770,9 +745,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
       endpoint.previousSecretExpiresAt.getTime() > now.getTime();
     const secrets = [this.deps.secrets.decrypt(endpoint.secretEncrypted)];
     if (previousIsValid) {
-      secrets.push(
-        this.deps.secrets.decrypt(endpoint.previousSecretEncrypted as string),
-      );
+      secrets.push(this.deps.secrets.decrypt(endpoint.previousSecretEncrypted as string));
     }
     return secrets;
   }
@@ -844,14 +817,11 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
       }),
     ]);
     const attempted = byOutcome.reduce((sum, g) => sum + g._count._all, 0);
-    const delivered =
-      byOutcome.find((g) => g.outcome === "success")?._count._all ?? 0;
+    const delivered = byOutcome.find((g) => g.outcome === "success")?._count._all ?? 0;
     return {
       attempted,
       delivered,
-      latencies: sample
-        .map((d) => d.latencyMs)
-        .filter((l): l is number => l !== null),
+      latencies: sample.map((d) => d.latencyMs).filter((l): l is number => l !== null),
     };
   }
 
@@ -873,9 +843,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
     // Cross-tenant by design: this is the delivery sweep's entry point, so
     // it uses the raw-SQL tenancy opt-out the guard sanctions for
     // system-owned maintenance scans.
-    const rows = await this.prisma.$queryRaw<
-      Array<{ organizationId: string }>
-    >`
+    const rows = await this.prisma.$queryRaw<Array<{ organizationId: string }>>`
       SELECT DISTINCT "organizationId"
       FROM "WebhookEndpoint"
       WHERE "status" = 'ACTIVE'::"WebhookEndpointStatus"
@@ -931,10 +899,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
         responseStatus: params.responseStatus ?? null,
         latencyMs: params.latencyMs ?? null,
         error: params.error ?? null,
-        response:
-          params.response === undefined
-            ? undefined
-            : (params.response as object),
+        response: params.response === undefined ? undefined : (params.response as object),
         firedAt: now,
       },
     });
@@ -1008,18 +973,12 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
    */
   private async autoDisableIfStreakExpired(params: {
     organizationId: string;
-    endpoint: Pick<
-      WebhookEndpoint,
-      "id" | "destinationKind" | "url" | "sqsQueueUrl"
-    >;
+    endpoint: Pick<WebhookEndpoint, "id" | "destinationKind" | "url" | "sqsQueueUrl">;
     failingSince: Date;
     now: Date;
   }): Promise<void> {
     const { organizationId, endpoint, failingSince, now } = params;
-    if (
-      now.getTime() - failingSince.getTime() <
-      WEBHOOK_AUTO_DISABLE_AFTER_MS
-    ) {
+    if (now.getTime() - failingSince.getTime() < WEBHOOK_AUTO_DISABLE_AFTER_MS) {
       return;
     }
     const flipped = await this.prisma.webhookEndpoint.updateMany({
@@ -1082,15 +1041,15 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
     await this.getEndpoint(params);
     const limit = Math.min(params.limit ?? 25, 200);
     const where: Prisma.WebhookEndpointDeliveryWhereInput = {
-        // The log is shared with the automations channel now. Those rows carry
-        // no organizationId or endpointId so they could not match anyway, but
-        // saying so keeps this reader's scope in the query rather than in a
-        // reader's head.
-        channel: "platform",
-        organizationId: params.organizationId,
-        endpointId: params.endpointId,
-        // Strictly after the cursor row in (firedAt desc, id desc) order,
-        // so a page boundary stays stable while new attempts land above.
+      // The log is shared with the automations channel now. Those rows carry
+      // no organizationId or endpointId so they could not match anyway, but
+      // saying so keeps this reader's scope in the query rather than in a
+      // reader's head.
+      channel: "platform",
+      organizationId: params.organizationId,
+      endpointId: params.endpointId,
+      // Strictly after the cursor row in (firedAt desc, id desc) order,
+      // so a page boundary stays stable while new attempts land above.
     };
     if (params.cursor) {
       where.OR = [
@@ -1125,17 +1084,12 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
         firedAt: r.firedAt,
       })),
       nextCursor:
-        rows.length > limit && last
-          ? { firedAt: last.firedAt, id: last.id }
-          : null,
+        rows.length > limit && last ? { firedAt: last.firedAt, id: last.id } : null,
     };
   }
 
   /** The health strip: streak, last success, disabled state. */
-  async health(params: {
-    organizationId: string;
-    endpointId: string;
-  }): Promise<{
+  async health(params: { organizationId: string; endpointId: string }): Promise<{
     status: "ACTIVE" | "DISABLED";
     disabledReason: string | null;
     failingSince: Date | null;

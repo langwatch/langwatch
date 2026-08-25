@@ -72,12 +72,9 @@ export function ioContainerChrome({
   isVirtualizingChat: boolean;
 }): { flush: boolean; innerPadding: number } {
   const flush = format === "pretty" && isChat;
-  const isFlushMarkdownSource =
-    format === "markdown" && markdownSubmode === "source";
+  const isFlushMarkdownSource = format === "markdown" && markdownSubmode === "source";
   const innerPadding =
-    flush || isFlushMarkdownSource || isVirtualizingChat
-      ? 0
-      : IO_CONTAINER_PADDING;
+    flush || isFlushMarkdownSource || isVirtualizingChat ? 0 : IO_CONTAINER_PADDING;
   return { flush, innerPadding };
 }
 
@@ -258,10 +255,7 @@ export const IOViewer = memo(function IOViewer({
     [displayContent],
   );
 
-  const markdownBody = useMemo(
-    () => asMarkdownBody(displayContent),
-    [displayContent],
-  );
+  const markdownBody = useMemo(() => asMarkdownBody(displayContent), [displayContent]);
 
   // For string-shaped content that isn't a clean chat array, walk the lines
   // and pull out any inline `{"type":"thinking"|"tool_use"|"tool_result"}`
@@ -277,9 +271,7 @@ export const IOViewer = memo(function IOViewer({
 
   const formatOptions = useMemo<ViewFormat[]>(
     () =>
-      canJson
-        ? ["pretty", "text", "json", "markdown"]
-        : ["pretty", "text", "markdown"],
+      canJson ? ["pretty", "text", "json", "markdown"] : ["pretty", "text", "markdown"],
     [canJson],
   );
 

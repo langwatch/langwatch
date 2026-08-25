@@ -2,13 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -91,9 +85,7 @@ vi.mock("~/utils/api", () => ({
     },
     annotation: {
       deleteQueueItems: {
-        useMutation: (options: {
-          onSuccess?: (result: { deleted: number }) => void;
-        }) => {
+        useMutation: (options: { onSuccess?: (result: { deleted: number }) => void }) => {
           mocks.deleteOptions = options;
           return { mutate: mocks.deleteMutate, isLoading: false };
         },
@@ -140,17 +132,10 @@ vi.mock("~/components/traces/AddParticipants", () => ({
       <div data-testid="picked-annotators">
         {annotators.map((annotator) => annotator.id).join(",")}
       </div>
-      <button
-        type="button"
-        onClick={() => setAnnotators(mocks.pickedAnnotators)}
-      >
+      <button type="button" onClick={() => setAnnotators(mocks.pickedAnnotators)}>
         Pick participants
       </button>
-      <button
-        type="button"
-        disabled={annotators.length === 0}
-        onClick={sendToQueue}
-      >
+      <button type="button" disabled={annotators.length === 0} onClick={sendToQueue}>
         Send
       </button>
     </div>
@@ -186,10 +171,7 @@ vi.mock("~/components/me/usePersonalFeatureGate", () => ({
   }),
 }));
 
-import {
-  AnnotationsTable,
-  type AnnotationsTableProps,
-} from "../AnnotationsTable";
+import { AnnotationsTable, type AnnotationsTableProps } from "../AnnotationsTable";
 import { groupedAnnotationsToRows } from "../annotationRow";
 
 const setItems = (items: QueueItem[]) => {
@@ -366,9 +348,7 @@ describe("AnnotationsTable selection", () => {
         renderTable();
 
         fireEvent.click(headerCheckbox());
-        fireEvent.click(
-          screen.getAllByRole("button", { name: /Add to dataset/ })[0]!,
-        );
+        fireEvent.click(screen.getAllByRole("button", { name: /Add to dataset/ })[0]!);
 
         await vi.waitFor(() =>
           expect(mocks.openDrawer).toHaveBeenCalledWith("addDatasetRecord", {
@@ -440,9 +420,7 @@ describe("AnnotationsTable selection", () => {
 
         fireEvent.click(rowCheckbox("trace-1"));
         fireEvent.click(rowCheckbox("trace-3"));
-        fireEvent.click(
-          screen.getAllByRole("button", { name: /Add to dataset/ })[0]!,
-        );
+        fireEvent.click(screen.getAllByRole("button", { name: /Add to dataset/ })[0]!);
 
         await vi.waitFor(() =>
           expect(mocks.openDrawer).toHaveBeenCalledWith("addDatasetRecord", {
@@ -464,9 +442,7 @@ describe("AnnotationsTable selection", () => {
         renderTable();
 
         fireEvent.click(rowCheckbox("trace-1"));
-        fireEvent.click(
-          screen.getAllByRole("button", { name: /Add to dataset/ })[0]!,
-        );
+        fireEvent.click(screen.getAllByRole("button", { name: /Add to dataset/ })[0]!);
 
         await vi.waitFor(() => expect(mocks.requestEnable).toHaveBeenCalled());
         await act(async () => {
@@ -484,9 +460,7 @@ describe("AnnotationsTable selection", () => {
 
         fireEvent.click(rowCheckbox("trace-1"));
         fireEvent.click(rowCheckbox("trace-3"));
-        fireEvent.click(
-          screen.getByRole("button", { name: /Remove from queue/ }),
-        );
+        fireEvent.click(screen.getByRole("button", { name: /Remove from queue/ }));
 
         expect(mocks.deleteMutate).toHaveBeenCalledWith({
           projectId: "project-1",

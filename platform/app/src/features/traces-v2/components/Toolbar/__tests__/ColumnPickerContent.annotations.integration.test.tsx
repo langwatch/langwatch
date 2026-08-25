@@ -19,9 +19,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme" },
     hasPermission: (permission: string) =>
-      permission === "annotations:view"
-        ? harness.permissions.annotationsView
-        : true,
+      permission === "annotations:view" ? harness.permissions.annotationsView : true,
   }),
 }));
 
@@ -61,8 +59,7 @@ function renderPicker() {
 }
 
 /** The column toggles the reader can actually turn on, by their label. */
-const toggleFor = (label: string) =>
-  screen.queryByRole("checkbox", { name: label });
+const toggleFor = (label: string) => screen.queryByRole("checkbox", { name: label });
 
 describe("ColumnPickerContent", () => {
   describe("given a reader who may see annotations", () => {

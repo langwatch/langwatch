@@ -275,9 +275,7 @@ describe("POST /api/collector", () => {
 
         expect(res.status).toBe(429);
         const body = await res.json();
-        expect(body.message).toBe(
-          "Too many evaluations, maximum of 200 per trace",
-        );
+        expect(body.message).toBe("Too many evaluations, maximum of 200 per trace");
         expect(mockReportEvaluation).not.toHaveBeenCalled();
         expect(mockIngestNormalizedSpan).not.toHaveBeenCalled();
       });

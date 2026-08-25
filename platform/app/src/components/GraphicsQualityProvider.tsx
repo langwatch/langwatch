@@ -85,8 +85,7 @@ export function GraphicsQualityProvider({
   const probeReducedGraphicsRef = useRef(probeReducedGraphics);
   probeReducedGraphicsRef.current = probeReducedGraphics;
 
-  const reducedGraphics =
-    override === "auto" ? probeReducedGraphics : override === "on";
+  const reducedGraphics = override === "auto" ? probeReducedGraphics : override === "on";
 
   useEffect(() => {
     applyReducedGraphicsAttribute(reducedGraphics);
@@ -177,9 +176,5 @@ export function GraphicsQualityProvider({
   // (e.g. an override change that leaves reducedGraphics the same).
   const contextValue = useMemo(() => ({ reducedGraphics }), [reducedGraphics]);
 
-  return (
-    <GraphicsQualityContext value={contextValue}>
-      {children}
-    </GraphicsQualityContext>
-  );
+  return <GraphicsQualityContext value={contextValue}>{children}</GraphicsQualityContext>;
 }

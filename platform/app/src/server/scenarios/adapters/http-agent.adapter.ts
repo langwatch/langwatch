@@ -66,8 +66,9 @@ export class HttpAgentAdapter extends AgentAdapter {
       const config = await this.fetchAgentConfig();
       // One capture per turn: the traceparent header and the `{{ traceId }}`
       // / `{{ traceparent }}` template variables all name the same trace.
-      const { headers: propagationHeaders, traceId } =
-        injectTraceContextHeaders({ headers: {} });
+      const { headers: propagationHeaders, traceId } = injectTraceContextHeaders({
+        headers: {},
+      });
       const traceparent = propagationHeaders.traceparent;
       const templateContext = buildTemplateContext({
         input,
@@ -83,21 +84,14 @@ export class HttpAgentAdapter extends AgentAdapter {
         templateContext,
         propagationHeaders,
       );
-      const body = this.buildRequestBody(
-        config.bodyTemplate,
-        input,
-        templateContext,
-      );
+      const body = this.buildRequestBody(config.bodyTemplate, input, templateContext);
       const responseData = await this.executeHttpRequest(
         url,
         config.method,
         headers,
         body,
       );
-      const result = this.extractResponseContent(
-        responseData,
-        config.outputPath,
-      );
+      const result = this.extractResponseContent(responseData, config.outputPath);
 
       logger.info(
         {
@@ -134,9 +128,7 @@ export class HttpAgentAdapter extends AgentAdapter {
     }
 
     if (agent.type !== "http") {
-      throw new Error(
-        `Agent ${this.agentId} is not an HTTP agent (type: ${agent.type})`,
-      );
+      throw new Error(`Agent ${this.agentId} is not an HTTP agent (type: ${agent.type})`);
     }
 
     logger.debug(
@@ -208,10 +200,7 @@ export class HttpAgentAdapter extends AgentAdapter {
       body: method !== "GET" ? body : undefined,
     });
 
-    logger.debug(
-      { status: response.status, ok: response.ok },
-      "HTTP response received",
-    );
+    logger.debug({ status: response.status, ok: response.ok }, "HTTP response received");
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -224,10 +213,7 @@ export class HttpAgentAdapter extends AgentAdapter {
     return response.text();
   }
 
-  private extractResponseContent(
-    data: unknown,
-    outputPath: string | undefined,
-  ): string {
+  private extractResponseContent(data: unknown, outputPath: string | undefined): string {
     if (!outputPath?.trim() || !data) {
       return this.stringify(data);
     }

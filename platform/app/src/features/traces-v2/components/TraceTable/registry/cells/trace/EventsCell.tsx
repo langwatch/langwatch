@@ -18,13 +18,7 @@ const VISIBLE_BADGES = 3;
  * marker for a trace that recorded none, and otherwise a badge per event name.
  * The first two exist so the empty marker only ever means "recorded nothing".
  */
-function renderEvents({
-  row,
-  density,
-}: {
-  row: TraceListItem;
-  density: Density;
-}) {
+function renderEvents({ row, density }: { row: TraceListItem; density: Density }) {
   const textStyle = density === "compact" ? "xs" : "sm";
   const { groups, distinctCount } = row.events;
 
@@ -39,11 +33,7 @@ function renderEvents({
     // and we simply cannot say. The rest of the row is unaffected.
     if (row.eventsUnavailable) {
       return (
-        <Text
-          textStyle={textStyle}
-          color="fg.subtle"
-          title="Events could not be loaded"
-        >
+        <Text textStyle={textStyle} color="fg.subtle" title="Events could not be loaded">
           Unavailable
         </Text>
       );

@@ -6,13 +6,7 @@
  * drawer links across to the End node.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -43,8 +37,7 @@ const mockSetNode = vi.fn();
 const mockSetSelectedNode = vi.fn();
 
 vi.mock("@langwatch/workflow-web", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/workflow-web")>();
+  const actual = await importOriginal<typeof import("@langwatch/workflow-web")>();
   return {
     ...actual,
     useWorkflowStore: (selector: (state: unknown) => unknown) =>
@@ -79,8 +72,7 @@ vi.mock("../../../hooks/useGetDatasetData", () => ({
 // Keep the shell light but the inputs editor real - the editable
 // inputs ARE the behavior under test.
 vi.mock("../BasePropertiesPanel", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../BasePropertiesPanel")>();
+  const actual = await importOriginal<typeof import("../BasePropertiesPanel")>();
   return {
     ...actual,
     BasePropertiesPanel: ({ children }: { children: React.ReactNode }) => (
@@ -134,9 +126,7 @@ describe("EntryPointPropertiesPanel", () => {
       renderPanel();
 
       expect(screen.getByTestId("attach-dataset-button")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("entry-dataset-card"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("entry-dataset-card")).not.toBeInTheDocument();
     });
 
     /** @scenario Adding an input on the entry point */
@@ -194,9 +184,7 @@ describe("EntryPointPropertiesPanel", () => {
             },
         );
         const update = updates.find((u) =>
-          u.data.outputs?.some(
-            (o) => o.identifier === "query" && o.value === "hello",
-          ),
+          u.data.outputs?.some((o) => o.identifier === "query" && o.value === "hello"),
         );
         expect(update).toBeTruthy();
       });
@@ -249,8 +237,7 @@ describe("EntryPointPropertiesPanel", () => {
         );
         expect(update).toBeTruthy();
         expect(
-          (update!.data.outputs as Array<{ identifier: string }>)[0]!
-            .identifier,
+          (update!.data.outputs as Array<{ identifier: string }>)[0]!.identifier,
         ).toBe("query");
         // setNode merges data shallowly - dataset is not part of the
         // update, so the attachment survives.
@@ -281,9 +268,7 @@ describe("EntryPointPropertiesPanel", () => {
       expect(screen.queryByText("Manual Test Entry")).not.toBeInTheDocument();
       // Optimization does not exist on the Go engine, so no train/test
       // split configuration is offered.
-      expect(
-        screen.queryByText("Optimization/Test Split"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Optimization/Test Split")).not.toBeInTheDocument();
     });
   });
 

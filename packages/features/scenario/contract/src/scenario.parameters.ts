@@ -8,17 +8,10 @@ export const MAX_PARAMETER_NAME_LENGTH = 64;
 export const MAX_PARAMETER_DESCRIPTION_LENGTH = 500;
 export const SCENARIO_PARAMETER_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-const reservedParameterNames = new Set([
-  "__proto__",
-  "constructor",
-  "prototype",
-]);
+const reservedParameterNames = new Set(["__proto__", "constructor", "prototype"]);
 
 function isUsableParameterName(name: string): boolean {
-  return (
-    SCENARIO_PARAMETER_NAME_PATTERN.test(name) &&
-    !reservedParameterNames.has(name)
-  );
+  return SCENARIO_PARAMETER_NAME_PATTERN.test(name) && !reservedParameterNames.has(name);
 }
 const parameterNameMessage =
   "Parameter names start with a letter or underscore and may contain only letters, digits and underscores";
@@ -94,9 +87,7 @@ export const runParameterValuesSchema = z.preprocess(
     }
     return value;
   },
-  z
-    .record(runParameterKeySchema, parameterValueSchema)
-  .superRefine((values, context) => {
+  z.record(runParameterKeySchema, parameterValueSchema).superRefine((values, context) => {
     const names = Object.keys(values);
     for (const name of names) {
       if (!SCENARIO_PARAMETER_NAME_PATTERN.test(name)) {
@@ -113,13 +104,15 @@ export const runParameterValuesSchema = z.preprocess(
         message: `A run can supply at most ${MAX_RUN_PARAMETER_KEYS} parameter values`,
       });
     }
-    if (new TextEncoder().encode(JSON.stringify(values)).length > MAX_RUN_PARAMETER_BYTES) {
+    if (
+      new TextEncoder().encode(JSON.stringify(values)).length > MAX_RUN_PARAMETER_BYTES
+    ) {
       context.addIssue({
         code: "custom",
         message: `Parameter values are limited to ${MAX_RUN_PARAMETER_BYTES} bytes in total`,
       });
     }
-    }),
+  }),
 );
 export type RunParameterValues = z.infer<typeof runParameterValuesSchema>;
 
@@ -156,9 +149,7 @@ export function withoutParameterNames({
   names: ReadonlySet<string>;
 }): RunParameterValues | undefined {
   if (!values || names.size === 0) return values;
-  return Object.fromEntries(
-    Object.entries(values).filter(([name]) => !names.has(name)),
-  );
+  return Object.fromEntries(Object.entries(values).filter(([name]) => !names.has(name)));
 }
 
 /** Resolves declared defaults, overridden by caller-provided values. */
@@ -171,10 +162,7 @@ export function mergeRunParameters({
 }): RunParameterValues {
   const resolved = new Map<string, ScenarioParameterValue>();
   for (const definition of definitions) {
-    if (
-      definition.defaultValue !== undefined &&
-      isUsableParameterName(definition.name)
-    ) {
+    if (definition.defaultValue !== undefined && isUsableParameterName(definition.name)) {
       resolved.set(definition.name, definition.defaultValue);
     }
   }

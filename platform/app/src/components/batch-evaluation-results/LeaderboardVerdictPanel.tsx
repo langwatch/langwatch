@@ -12,10 +12,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 
 import type { BTLeaderboard } from "./computeBTLeaderboard";
-import type {
-  CheaperAlternative,
-  LeaderboardVerdict,
-} from "./computeLeaderboardVerdict";
+import type { CheaperAlternative, LeaderboardVerdict } from "./computeLeaderboardVerdict";
 import { formatLeaderboardHeadline } from "./formatLeaderboardHeadline";
 
 export type LeaderboardVerdictPanelProps = {
@@ -26,10 +23,8 @@ export type LeaderboardVerdictPanelProps = {
   targetColors?: Record<string, string>;
 };
 
-const nameOf = (
-  variantId: string,
-  variantNames: Record<string, string>,
-): string => variantNames[variantId] ?? variantId;
+const nameOf = (variantId: string, variantNames: Record<string, string>): string =>
+  variantNames[variantId] ?? variantId;
 
 /**
  * The horizontal scale for the score bars: which scores are allowed to set the
@@ -72,8 +67,7 @@ export const computeScoreBarScale = (
   return {
     min,
     max,
-    pct: (value: number) =>
-      Math.min(100, Math.max(0, ((value - min) / span) * 100)),
+    pct: (value: number) => Math.min(100, Math.max(0, ((value - min) / span) * 100)),
   };
 };
 
@@ -196,12 +190,8 @@ function Callout({
  * chart to slivers at the left edge. So treat a non-finite interval as no
  * interval at all rather than letting it poison the scale.
  */
-const finiteCI = (
-  entry: BTLeaderboard["entries"][number],
-): [number, number] | null =>
-  entry.scoreCI &&
-  Number.isFinite(entry.scoreCI[0]) &&
-  Number.isFinite(entry.scoreCI[1])
+const finiteCI = (entry: BTLeaderboard["entries"][number]): [number, number] | null =>
+  entry.scoreCI && Number.isFinite(entry.scoreCI[0]) && Number.isFinite(entry.scoreCI[1])
     ? entry.scoreCI
     : null;
 
@@ -233,10 +223,8 @@ function ScoreBarCaption({
         ) : null}
       </HStack>
       <Text fontSize="2xs" color="fg.muted">
-        {entry.winRate === null
-          ? "—"
-          : `${Math.round(entry.winRate * 100)}% win rate`}{" "}
-        · {entry.matchups} comparisons
+        {entry.winRate === null ? "—" : `${Math.round(entry.winRate * 100)}% win rate`} ·{" "}
+        {entry.matchups} comparisons
       </Text>
     </HStack>
   );
@@ -340,10 +328,10 @@ function ScoreBars({
         pinned down, which is what they are for; they just are not the test.
       */}
       <Text fontSize="2xs" color="fg.muted">
-        Bar marks the score, the shaded band the range it could plausibly be.
-        Two bands overlapping does not by itself mean the run failed to separate
-        them — that is judged on the gap between the two scores, which is pinned
-        down better than either score alone
+        Bar marks the score, the shaded band the range it could plausibly be. Two bands
+        overlapping does not by itself mean the run failed to separate them — that is
+        judged on the gap between the two scores, which is pinned down better than either
+        score alone
         {showTieShading
           ? ", and “tied for first” marks the variants it could not separate from the top scorer"
           : ""}

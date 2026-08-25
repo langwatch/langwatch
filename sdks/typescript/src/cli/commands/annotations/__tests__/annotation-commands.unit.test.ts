@@ -1,17 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AnnotationsApiError } from "@/client-sdk/services/annotations/annotations-api.service";
 
-vi.mock("@/client-sdk/services/annotations/annotations-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    AnnotationsApiService: vi.fn(),
-  };
-});
+vi.mock(
+  "@/client-sdk/services/annotations/annotations-api.service",
+  async (importOriginal) => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+    const actual = (await importOriginal()) as Record<string, unknown>;
+    return {
+      ...actual,
+      AnnotationsApiService: vi.fn(),
+    };
+  },
+);
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -60,13 +67,15 @@ describe("listAnnotationsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll = vi.fn();
-    vi.mocked(AnnotationsApiService).mockImplementation(function () { return ({
-      getAll: mockGetAll,
-      get: vi.fn(),
-      getByTrace: vi.fn(),
-      create: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as AnnotationsApiService; });
+    vi.mocked(AnnotationsApiService).mockImplementation(function () {
+      return {
+        getAll: mockGetAll,
+        get: vi.fn(),
+        getByTrace: vi.fn(),
+        create: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as AnnotationsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -113,13 +122,15 @@ describe("getAnnotationCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(AnnotationsApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: mockGet,
-      getByTrace: vi.fn(),
-      create: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as AnnotationsApiService; });
+    vi.mocked(AnnotationsApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: mockGet,
+        getByTrace: vi.fn(),
+        create: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as AnnotationsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -137,9 +148,7 @@ describe("getAnnotationCommand()", () => {
 
   describe("when annotation is not found", () => {
     it("exits with code 1", async () => {
-      mockGet.mockRejectedValue(
-        new AnnotationsApiError("Not found", "fetch annotation"),
-      );
+      mockGet.mockRejectedValue(new AnnotationsApiError("Not found", "fetch annotation"));
 
       await expect(getAnnotationCommand("nonexistent")).rejects.toThrow(ProcessExitError);
     });
@@ -152,13 +161,15 @@ describe("createAnnotationCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
-    vi.mocked(AnnotationsApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: vi.fn(),
-      getByTrace: vi.fn(),
-      create: mockCreate,
-      delete: vi.fn(),
-    }) as unknown as AnnotationsApiService; });
+    vi.mocked(AnnotationsApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: vi.fn(),
+        getByTrace: vi.fn(),
+        create: mockCreate,
+        delete: vi.fn(),
+      } as unknown as AnnotationsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -205,13 +216,15 @@ describe("deleteAnnotationCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDelete = vi.fn();
-    vi.mocked(AnnotationsApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: vi.fn(),
-      getByTrace: vi.fn(),
-      create: vi.fn(),
-      delete: mockDelete,
-    }) as unknown as AnnotationsApiService; });
+    vi.mocked(AnnotationsApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: vi.fn(),
+        getByTrace: vi.fn(),
+        create: vi.fn(),
+        delete: mockDelete,
+      } as unknown as AnnotationsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -233,7 +246,9 @@ describe("deleteAnnotationCommand()", () => {
         new AnnotationsApiError("Not found", "delete annotation"),
       );
 
-      await expect(deleteAnnotationCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+      await expect(deleteAnnotationCommand("nonexistent")).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });

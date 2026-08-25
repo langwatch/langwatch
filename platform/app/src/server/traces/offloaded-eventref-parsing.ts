@@ -30,9 +30,7 @@ export interface ParsedSpanEventRefs {
 
 /** True when the attribute map carries at least one eventref pointer. */
 export function hasEventRefs(attributes: NormalizedAttributes): boolean {
-  return Object.keys(attributes).some((key) =>
-    key.startsWith(EVENTREF_ATTR_PREFIX),
-  );
+  return Object.keys(attributes).some((key) => key.startsWith(EVENTREF_ATTR_PREFIX));
 }
 
 /**
@@ -44,9 +42,7 @@ export function hasEventRefs(attributes: NormalizedAttributes): boolean {
  * - A reserved key with malformed JSON is silently dropped (the preview already
  *   sits in `cleanedAttrs` under the non-reserved IO key).
  */
-export function parseSpanEventRefs(
-  attrs: NormalizedAttributes,
-): ParsedSpanEventRefs {
+export function parseSpanEventRefs(attrs: NormalizedAttributes): ParsedSpanEventRefs {
   const cleanedAttrs: NormalizedAttributes = {};
   const eventrefEntries: EventRefEntry[] = [];
   const missingEventIdKeys: string[] = [];
@@ -56,11 +52,7 @@ export function parseSpanEventRefs(
       const attrKey = key.slice(EVENTREF_ATTR_PREFIX.length);
       try {
         const decoded = typeof value === "string" ? JSON.parse(value) : value;
-        if (
-          typeof decoded !== "object" ||
-          decoded === null ||
-          Array.isArray(decoded)
-        ) {
+        if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) {
           continue;
         }
         const ref = decoded as { field?: unknown; eventId?: unknown };
@@ -71,9 +63,7 @@ export function parseSpanEventRefs(
         eventrefEntries.push({
           attrKey,
           field:
-            typeof ref.field === "string" && ref.field.length > 0
-              ? ref.field
-              : attrKey,
+            typeof ref.field === "string" && ref.field.length > 0 ? ref.field : attrKey,
           eventId: ref.eventId,
         });
       } catch {

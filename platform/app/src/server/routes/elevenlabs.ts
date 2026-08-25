@@ -169,12 +169,9 @@ function parseSignatureHeader(
  * variables. Used only when the delivery carries no conversation id we
  * already recorded.
  */
-function echoedSessionId(
-  payload: z.infer<typeof postCallSchema>,
-): string | undefined {
+function echoedSessionId(payload: z.infer<typeof postCallSchema>): string | undefined {
   const value =
-    payload.data?.conversation_initiation_client_data?.dynamic_variables
-      ?.lw_session_id;
+    payload.data?.conversation_initiation_client_data?.dynamic_variables?.lw_session_id;
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
@@ -196,8 +193,7 @@ async function handleElevenLabsWebhook(c: Context): Promise<Response> {
     !verifyElevenLabsSignature({
       rawBody,
       header:
-        c.req.header("elevenlabs-signature") ??
-        c.req.header("ElevenLabs-Signature"),
+        c.req.header("elevenlabs-signature") ?? c.req.header("ElevenLabs-Signature"),
       secret: configured.secret,
     })
   ) {

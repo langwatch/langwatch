@@ -20,8 +20,7 @@ describe("findPromptReferenceInAncestors()", () => {
           startTime: 100,
           attributes: {
             "langwatch.prompt.id": "team/sample-prompt:3",
-            "langwatch.prompt.variables":
-              '{"type":"json","value":{"name":"Alice"}}',
+            "langwatch.prompt.variables": '{"type":"json","value":{"name":"Alice"}}',
           },
         },
       ];
@@ -986,8 +985,7 @@ describe("flattenParamsToPromptAttributes()", () => {
 
       expect(result).toEqual({
         "langwatch.prompt.id": "team/prompt:1",
-        "langwatch.prompt.variables":
-          '{"type":"json","value":{"name":"Alice"}}',
+        "langwatch.prompt.variables": '{"type":"json","value":{"name":"Alice"}}',
       });
     });
   });

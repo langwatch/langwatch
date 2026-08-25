@@ -4,10 +4,7 @@ import type { Event } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types";
-import type {
-  DiscoveredAggregate,
-  ReplayEventSource,
-} from "./replayEventSource";
+import type { DiscoveredAggregate, ReplayEventSource } from "./replayEventSource";
 
 export interface RegisteredFoldProjection {
   projectionName: string;

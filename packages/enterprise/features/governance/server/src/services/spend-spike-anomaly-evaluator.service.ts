@@ -45,9 +45,7 @@ export class SpendSpikeAnomalyEvaluatorService {
     );
   }
 
-  async evaluateAll(
-    input: { now?: Date } = {},
-  ): Promise<SpendSpikeEvaluationSummary> {
+  async evaluateAll(input: { now?: Date } = {}): Promise<SpendSpikeEvaluationSummary> {
     const now = input.now ?? new Date();
     const rules = await this.repository.listActiveRules();
     const skipped: Record<string, number> = {};
@@ -80,17 +78,14 @@ export class SpendSpikeAnomalyEvaluatorService {
   ): Promise<SpendSpikeEvaluationResult> {
     const parsed = safeParseSpendSpikeThresholdConfig(rule.thresholdConfig);
     if (!parsed.ok) {
-      this.diagnostics.warn(
-        "Spend spike rule has invalid threshold configuration",
-        {
-          ruleId: rule.id,
-          organizationId: rule.organizationId,
-          issues: parsed.error.issues.map((issue) => ({
-            path: issue.path.join("."),
-            message: issue.message,
-          })),
-        },
-      );
+      this.diagnostics.warn("Spend spike rule has invalid threshold configuration", {
+        ruleId: rule.id,
+        organizationId: rule.organizationId,
+        issues: parsed.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
+      });
       return noDataResult(
         rule,
         now,
@@ -102,9 +97,7 @@ export class SpendSpikeAnomalyEvaluatorService {
     const windowMs = parsed.data.windowSec * 1_000;
     const windowEnd = now;
     const windowStart = new Date(now.getTime() - windowMs);
-    const baselineStart = new Date(
-      windowStart.getTime() - BASELINE_WINDOWS * windowMs,
-    );
+    const baselineStart = new Date(windowStart.getTime() - BASELINE_WINDOWS * windowMs);
     const tenantId = await this.repository.tryResolveGovernanceTenantId(
       rule.organizationId,
     );

@@ -110,17 +110,15 @@ describe("winMatrixHasPairwiseDetail", () => {
       // render a leaderboard at all.
       const winMatrix = { A: { B: 9 }, B: { A: 3 } };
 
-      expect(
-        winMatrixHasPairwiseDetail({ winMatrix, variantIds: ["A", "B"] }),
-      ).toBe(false);
+      expect(winMatrixHasPairwiseDetail({ winMatrix, variantIds: ["A", "B"] })).toBe(
+        false,
+      );
     });
   });
 
   describe("given an empty matrix", () => {
     it("reports no pairwise detail", () => {
-      expect(
-        winMatrixHasPairwiseDetail({ winMatrix: {}, variantIds: [] }),
-      ).toBe(false);
+      expect(winMatrixHasPairwiseDetail({ winMatrix: {}, variantIds: [] })).toBe(false);
     });
   });
 });

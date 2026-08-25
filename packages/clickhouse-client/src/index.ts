@@ -7,11 +7,7 @@ export type {
   VendorLogRecord,
   VendorLogSink,
 } from "./logging";
-export {
-  decideVendorLog,
-  emitVendorLog,
-  VENDOR_CAUSE_FIELD,
-} from "./logging";
+export { decideVendorLog, emitVendorLog, VENDOR_CAUSE_FIELD } from "./logging";
 export type {
   AbortSignalLike,
   QueryDriver,
@@ -21,11 +17,7 @@ export type {
 } from "./query";
 export type { ClickHouseQueryClientOptions } from "./client";
 export { ClickHouseQueryClient } from "./client";
-export type {
-  PoolSizeSource,
-  PoolSizingDecision,
-  PoolSizingInput,
-} from "./pool";
+export type { PoolSizeSource, PoolSizingDecision, PoolSizingInput } from "./pool";
 export {
   DEFAULT_CLIENTS_PER_PROCESS,
   DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
@@ -39,15 +31,8 @@ export {
   resolvePoolSize,
 } from "./pool";
 export type { ConcurrencyLimiterOptions, LimiterStats } from "./rateLimit";
-export {
-  AcquireAbortedError,
-  ConcurrencyLimiter,
-  QueueFullError,
-} from "./rateLimit";
-export type {
-  BackoffInput,
-  TransientClassificationInput,
-} from "./resilience";
+export { AcquireAbortedError, ConcurrencyLimiter, QueueFullError } from "./rateLimit";
+export type { BackoffInput, TransientClassificationInput } from "./resilience";
 export {
   isTransientClickHouseError,
   jitteredBackoffMs,
@@ -90,11 +75,7 @@ export type {
   VendorStatementClient,
 } from "./vendorClient";
 export { VendorClientResilience } from "./vendorClient";
-export {
-  checkTenantScope,
-  TenantGuard,
-  TenantScopeError,
-} from "./tenantGuard";
+export { checkTenantScope, TenantGuard, TenantScopeError } from "./tenantGuard";
 export type {
   QueryErrorDescriptor,
   QueryOutcome,
@@ -102,11 +83,7 @@ export type {
   TraceOptions,
   TracerPort,
 } from "./tracing";
-export {
-  describeQueryError,
-  QueryTracer,
-  SPAN_ATTRIBUTES,
-} from "./tracing";
+export { describeQueryError, QueryTracer, SPAN_ATTRIBUTES } from "./tracing";
 export type {
   RetentionDaysProvider,
   RetentionFloorLogger,

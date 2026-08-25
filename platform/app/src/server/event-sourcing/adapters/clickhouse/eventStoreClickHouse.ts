@@ -94,9 +94,7 @@ export class EventStoreClickHouse<
     context: EventStoreReadContext<EventType>,
   ): Promise<EventRecord[]> {
     if (!this.retentionPolicyResolver || records.length === 0) return records;
-    const policy = await this.retentionPolicyResolver.resolve(
-      String(context.tenantId),
-    );
+    const policy = await this.retentionPolicyResolver.resolve(String(context.tenantId));
     const retentionDays = policy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
     return records.map((r) => ({ ...r, _retention_days: retentionDays }));
   }

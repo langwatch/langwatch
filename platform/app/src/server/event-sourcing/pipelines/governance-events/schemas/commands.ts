@@ -31,10 +31,7 @@ export type RecordVkLifecycleCommandData = z.infer<
   typeof recordVkLifecycleCommandDataSchema
 >;
 
-export const budgetCrossingKindSchema = z.enum([
-  "threshold_crossed",
-  "breached",
-]);
+export const budgetCrossingKindSchema = z.enum(["threshold_crossed", "breached"]);
 export type BudgetCrossingKind = z.infer<typeof budgetCrossingKindSchema>;
 
 export const recordBudgetCrossingCommandDataSchema = z.object({

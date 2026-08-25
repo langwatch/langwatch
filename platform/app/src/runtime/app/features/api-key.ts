@@ -1,7 +1,4 @@
-import type {
-  AuthzGrantsService,
-  AuthzService,
-} from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import {
   ApiKeyDiagnosticsPort,

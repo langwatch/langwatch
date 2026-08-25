@@ -23,11 +23,7 @@ export type PromptTextAreaWithVariablesProps = {
   /** Callback when a new variable should be created */
   onCreateVariable?: (variable: Variable) => void;
   /** Callback when a variable mapping should be set */
-  onSetVariableMapping?: (
-    identifier: string,
-    sourceId: string,
-    field: string,
-  ) => void;
+  onSetVariableMapping?: (identifier: string, sourceId: string, field: string) => void;
   /** Whether the textarea is disabled */
   disabled?: boolean;
   /** Whether to show the "Add variable" button */

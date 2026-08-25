@@ -1,17 +1,11 @@
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type {
-  WorkflowDsl,
-  WorkflowService,
-} from "@langwatch/workflow-contract";
+import type { WorkflowDsl, WorkflowService } from "@langwatch/workflow-contract";
 import type { WorkflowExecutionPort } from "@langwatch/workflow-server";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import type {
-  ExecutionStatus,
-  StudioWorkflow,
-} from "@langwatch/workflow-contract";
+import type { ExecutionStatus, StudioWorkflow } from "@langwatch/workflow-contract";
 import type { StudioClientEvent } from "../../optimization_studio/types/events";
 import { migrateDSLVersion } from "@langwatch/workflow-contract";
 import { getEntryInputs } from "@langwatch/workflow-contract";
@@ -43,10 +37,7 @@ export type WorkflowExecutionRuntime = {
   getProjectModelProviders(
     projectId: string,
   ): Promise<
-    Record<
-      string,
-      { provider: string; customKeys: Record<string, unknown> | null }
-    >
+    Record<string, { provider: string; customKeys: Record<string, unknown> | null }>
   >;
   stripUnsupportedParams(input: {
     projectId: string;
@@ -276,9 +267,10 @@ export class WorkflowEvaluationRunner {
   }
 }
 
-function normalizeEvaluationResponse(
-  value: unknown,
-): { result: SingleEvaluationResult; status: ExecutionStatus } {
+function normalizeEvaluationResponse(value: unknown): {
+  result: SingleEvaluationResult;
+  status: ExecutionStatus;
+} {
   const response = workflowExecutionResponseSchema.parse(value);
   if (!response.result) {
     throw new Error("Workflow execution returned an invalid result.");
@@ -316,7 +308,9 @@ function normalizeEvaluationResponse(
           ? normalized.error_type
           : "WORKFLOW_ERROR",
       traceback: Array.isArray(normalized.traceback)
-        ? normalized.traceback.filter((entry): entry is string => typeof entry === "string")
+        ? normalized.traceback.filter(
+            (entry): entry is string => typeof entry === "string",
+          )
         : [],
     }),
   };

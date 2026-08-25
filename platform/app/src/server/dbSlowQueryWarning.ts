@@ -32,9 +32,7 @@ const RAW_ACTIONS = new Set(["queryRaw", "executeRaw"]);
  * off entirely, which is the escape hatch for a deployment that decides the
  * lines are not worth it; an unset or unparseable value keeps the default.
  */
-export function resolveSlowQueryBudgetMs(
-  env: NodeJS.ProcessEnv = process.env,
-): number {
+export function resolveSlowQueryBudgetMs(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env.POSTGRES_SLOW_QUERY_MS;
   if (typeof raw !== "string" || raw.trim() === "") {
     return DEFAULT_SLOW_QUERY_MS;
@@ -58,8 +56,7 @@ export function safeArgKeys({
   args: unknown;
 }): string[] | undefined {
   if (RAW_ACTIONS.has(action)) return undefined;
-  if (!args || typeof args !== "object" || Array.isArray(args))
-    return undefined;
+  if (!args || typeof args !== "object" || Array.isArray(args)) return undefined;
   return Object.keys(args as Record<string, unknown>);
 }
 

@@ -12,12 +12,7 @@ import { ReplayWizardContent } from "./ReplayWizardContent";
 export function OpsReplayDrawer() {
   const { closeDrawer } = useDrawer();
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="xl"
-      onOpenChange={() => closeDrawer()}
-    >
+    <Drawer.Root open={true} placement="end" size="xl" onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Heading size="md">Projection replay</Heading>

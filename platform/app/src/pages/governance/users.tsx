@@ -48,9 +48,7 @@ function SortChip({
         borderColor: active
           ? "var(--chakra-colors-orange-500)"
           : "var(--chakra-colors-border-muted)",
-        backgroundColor: active
-          ? "var(--chakra-colors-orange-50)"
-          : "transparent",
+        backgroundColor: active ? "var(--chakra-colors-orange-50)" : "transparent",
         color: active
           ? "var(--chakra-colors-orange-700)"
           : "var(--chakra-colors-fg-muted)",
@@ -100,9 +98,7 @@ function GovernanceUsersListPage() {
   const orgId = organization?.id ?? "";
   const canReadActivity = hasAnyPermission("activityMonitor:view");
 
-  const sortBy: SortField = isSortField(router.query.sort)
-    ? router.query.sort
-    : "spend";
+  const sortBy: SortField = isSortField(router.query.sort) ? router.query.sort : "spend";
   const setSortBy = (next: SortField) => {
     const params = new URLSearchParams();
     if (next !== "spend") params.set("sort", next);
@@ -122,18 +118,14 @@ function GovernanceUsersListPage() {
             </Text>
             <Heading size="md">All users by {SORT_LABEL[sortBy]}</Heading>
             <Text color="fg.muted" fontSize="sm">
-              Every LangWatch member that reported activity in the last 30 days.
-              Click a row to drill into a single user.
+              Every LangWatch member that reported activity in the last 30 days. Click a
+              row to drill into a single user.
             </Text>
           </VStack>
         </HStack>
 
         {canReadActivity ? (
-          <UserSpendPanel
-            orgId={orgId}
-            sortBy={sortBy}
-            onSortChange={setSortBy}
-          />
+          <UserSpendPanel orgId={orgId} sortBy={sortBy} onSortChange={setSortBy} />
         ) : (
           <PermissionRequiredNotice
             permission="activityMonitor:view"

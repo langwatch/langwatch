@@ -1,7 +1,4 @@
-import {
-  type PromptReference,
-  parsePromptReference,
-} from "./parsePromptReference";
+import { type PromptReference, parsePromptReference } from "./parsePromptReference";
 
 /**
  * Span shape used for prompt reference lookup.
@@ -243,9 +240,7 @@ const INTERNAL_PROMPT_VARIABLE_KEYS = new Set<string>([
  * declared variables. Returns null only when every remaining entry is
  * null/empty.
  */
-function mergeVariables(
-  refs: PromptReference[],
-): Record<string, string> | null {
+function mergeVariables(refs: PromptReference[]): Record<string, string> | null {
   const merged: Record<string, string> = {};
   for (const r of refs) {
     if (!r.promptVariables) continue;

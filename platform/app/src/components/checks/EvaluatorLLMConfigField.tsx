@@ -5,10 +5,7 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { LLMConfigPopover } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
 import { toInternalKey } from "~/components/llmPromptConfigs/parameterConfig";
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "~/components/ModelSelector";
+import { allModelOptions, useModelSelectionOptions } from "~/components/ModelSelector";
 import { NoModelsConfiguredCallout } from "~/components/NoModelsConfiguredCallout";
 import { Popover } from "~/components/ui/popover";
 import type { LLMConfig } from "@langwatch/workflow-contract";

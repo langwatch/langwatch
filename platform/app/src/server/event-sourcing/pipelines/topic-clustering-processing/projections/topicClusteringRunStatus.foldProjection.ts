@@ -1,8 +1,5 @@
 import type { StateProjectionStore } from "@langwatch/eventing";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
 import {
   TOPIC_CLUSTERING_PROJECTION_VERSIONS,
   TOPIC_CLUSTERING_RUN_OUTCOME,
@@ -84,10 +81,7 @@ export class TopicClusteringRunStatusFoldProjection
     StateProjectionStore<TopicClusteringRunStatusData>
   >
   implements
-    FoldEventHandlers<
-      typeof topicClusteringEvents,
-      TopicClusteringRunStatusData
-    >
+    FoldEventHandlers<typeof topicClusteringEvents, TopicClusteringRunStatusData>
 {
   readonly name = "topicClusteringRunStatus";
   readonly version = TOPIC_CLUSTERING_PROJECTION_VERSIONS.RUN_STATUS;
@@ -95,9 +89,7 @@ export class TopicClusteringRunStatusFoldProjection
 
   protected readonly events = topicClusteringEvents;
 
-  constructor(deps: {
-    store: StateProjectionStore<TopicClusteringRunStatusData>;
-  }) {
+  constructor(deps: { store: StateProjectionStore<TopicClusteringRunStatusData> }) {
     super();
     this.store = deps.store;
   }
@@ -152,9 +144,7 @@ export class TopicClusteringRunStatusFoldProjection
       InProgressRunId: event.data.runId,
       InProgressTraces: sameRun ? state.InProgressTraces : 0,
       InProgressPages: sameRun ? state.InProgressPages : 0,
-      InProgressStartedAt: sameRun
-        ? state.InProgressStartedAt
-        : event.occurredAt,
+      InProgressStartedAt: sameRun ? state.InProgressStartedAt : event.occurredAt,
     };
   }
 
@@ -164,8 +154,7 @@ export class TopicClusteringRunStatusFoldProjection
   ): TopicClusteringRunStatusData {
     const { data } = event;
     const sameRun = state.InProgressRunId === data.runId;
-    const tracesSoFar =
-      (sameRun ? state.InProgressTraces : 0) + data.tracesProcessed;
+    const tracesSoFar = (sameRun ? state.InProgressTraces : 0) + data.tracesProcessed;
     const pagesSoFar = (sameRun ? state.InProgressPages : 0) + 1;
 
     if (data.nextSearchAfter) {
@@ -178,9 +167,7 @@ export class TopicClusteringRunStatusFoldProjection
         // A completion can open a run the projection never saw start (the
         // best-effort run_started announcement was lost); date the run from
         // this first observed event, never restamping an already-open run.
-        InProgressStartedAt: sameRun
-          ? state.InProgressStartedAt
-          : event.occurredAt,
+        InProgressStartedAt: sameRun ? state.InProgressStartedAt : event.occurredAt,
       };
     }
 

@@ -35,12 +35,12 @@ class DispatchError extends Error {
 Automation delivery endpoints throw this error rather than swallowing a
 failed effect. The classification is:
 
-| Failure | `retryable` |
-|---|---|
-| HTTP 429, HTTP 5xx, timeout, connection refusal | `true` |
-| HTTP 4xx other than 429 | `false` |
-| Invalid persisted payload | `false` |
-| Unknown or unclassified failure | `true` |
+| Failure                                         | `retryable` |
+| ----------------------------------------------- | ----------- |
+| HTTP 429, HTTP 5xx, timeout, connection refusal | `true`      |
+| HTTP 4xx other than 429                         | `false`     |
+| Invalid persisted payload                       | `false`     |
+| Unknown or unclassified failure                 | `true`      |
 
 The process-manager intent dispatcher handles it as follows:
 

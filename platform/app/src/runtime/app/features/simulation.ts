@@ -39,21 +39,15 @@ export class AppSimulationExecutionPort extends SimulationExecutionPort {
     return this.commands.startRun(input);
   }
 
-  messageSnapshot(
-    input: Parameters<SimulationExecutionPort["messageSnapshot"]>[0],
-  ) {
+  messageSnapshot(input: Parameters<SimulationExecutionPort["messageSnapshot"]>[0]) {
     return this.commands.messageSnapshot(input);
   }
 
-  textMessageStart(
-    input: Parameters<SimulationExecutionPort["textMessageStart"]>[0],
-  ) {
+  textMessageStart(input: Parameters<SimulationExecutionPort["textMessageStart"]>[0]) {
     return this.commands.textMessageStart(input);
   }
 
-  textMessageEnd(
-    input: Parameters<SimulationExecutionPort["textMessageEnd"]>[0],
-  ) {
+  textMessageEnd(input: Parameters<SimulationExecutionPort["textMessageEnd"]>[0]) {
     return this.commands.textMessageEnd(input);
   }
 

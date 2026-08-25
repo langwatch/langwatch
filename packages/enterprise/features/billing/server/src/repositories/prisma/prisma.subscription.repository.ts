@@ -16,15 +16,15 @@ import {
  * Handles only subscription-table CRUD -- no organization or team queries.
  */
 export class PrismaSubscriptionRepository extends BillingSubscriptionRepository {
-  private constructor(private readonly prisma: PrismaClient) { super(); }
+  private constructor(private readonly prisma: PrismaClient) {
+    super();
+  }
 
   static create(database: object): PrismaSubscriptionRepository {
     return new PrismaSubscriptionRepository(database as PrismaClient);
   }
 
-  async tryFindActive(
-    organizationId: string,
-  ): Promise<BillingSubscriptionRecord | null> {
+  async tryFindActive(organizationId: string): Promise<BillingSubscriptionRecord | null> {
     return this.prisma.subscription.findFirst({
       where: { organizationId, status: SubscriptionStatus.ACTIVE },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -68,9 +68,10 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionRepository 
     });
   }
 
-  async updatePlan(
-    input: { id: string; plan: string },
-  ): Promise<BillingSubscriptionRecord> {
+  async updatePlan(input: {
+    id: string;
+    plan: string;
+  }): Promise<BillingSubscriptionRecord> {
     return await this.prisma.subscription.update({
       where: { id: input.id },
       data: { plan: input.plan as PrismaPlanTypes },

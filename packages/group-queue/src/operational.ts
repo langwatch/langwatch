@@ -27,10 +27,7 @@ export {
   type BlobSweepOutcome,
 } from "./blobSweepLua";
 export type { BlobSweepReport, BlobSweepTally } from "./blobSweeper";
-export {
-  BlobSweeper,
-  BlobSweeper as GroupQueueBlobSweeper,
-} from "./blobSweeper";
+export { BlobSweeper, BlobSweeper as GroupQueueBlobSweeper } from "./blobSweeper";
 export { CachedLuaScript, isNoScriptResult } from "./cachedLuaScript";
 export {
   DecodeFailureError,

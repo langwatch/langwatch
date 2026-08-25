@@ -45,11 +45,7 @@ function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 }
 
-function buildRawSpan(
-  traceId: string,
-  spanId: string,
-  startTimeMs: number,
-): OtlpSpan {
+function buildRawSpan(traceId: string, spanId: string, startTimeMs: number): OtlpSpan {
   const startNano = BigInt(startTimeMs) * 1_000_000n;
   const endNano = startNano + BigInt(10) * 1_000_000n;
   return {
@@ -74,95 +70,88 @@ const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
 );
 
-describe.skipIf(!hasTestcontainers)(
-  "Trace summary fold coalescing -> ClickHouse",
-  () => {
-    let tenantId: ReturnType<typeof createTestTenantId>;
-    let tenantIdString: string;
-    let traceSummaryStore: TraceSummaryStore;
+describe.skipIf(!hasTestcontainers)("Trace summary fold coalescing -> ClickHouse", () => {
+  let tenantId: ReturnType<typeof createTestTenantId>;
+  let tenantIdString: string;
+  let traceSummaryStore: TraceSummaryStore;
 
-    beforeEach(() => {
-      const clickHouseClient = getTestClickHouseClient();
-      if (!clickHouseClient) throw new Error("ClickHouse required.");
-      tenantId = createTestTenantId();
-      tenantIdString = getTenantIdString(tenantId);
-      traceSummaryStore = new TraceSummaryStore(
-        new TraceSummaryService(
-          new TraceSummaryClickHouseRepository(async () => clickHouseClient),
-        ).repository,
-      );
-      // Touch span-storage wiring too, to keep the import surface honest.
-      void new SpanStorageService(
-        new SpanStorageClickHouseRepository(async () => clickHouseClient),
-      );
-    });
+  beforeEach(() => {
+    const clickHouseClient = getTestClickHouseClient();
+    if (!clickHouseClient) throw new Error("ClickHouse required.");
+    tenantId = createTestTenantId();
+    tenantIdString = getTenantIdString(tenantId);
+    traceSummaryStore = new TraceSummaryStore(
+      new TraceSummaryService(
+        new TraceSummaryClickHouseRepository(async () => clickHouseClient),
+      ).repository,
+    );
+    // Touch span-storage wiring too, to keep the import surface honest.
+    void new SpanStorageService(
+      new SpanStorageClickHouseRepository(async () => clickHouseClient),
+    );
+  });
 
-    afterEach(async () => {
-      await cleanupTestDataForTenant(tenantIdString);
-    });
+  afterEach(async () => {
+    await cleanupTestDataForTenant(tenantIdString);
+  });
 
-    describe("given many spans for one trace folded as one coalesced batch", () => {
-      /** @scenario 'Coalesced folding produces the correct accumulated state through the pipeline' */
-      it("folds every span into the exact accumulated count persisted in ClickHouse", async () => {
-        const traceId = generateId("trace");
-        const SPAN_COUNT = 40;
-        const base = Date.now();
+  describe("given many spans for one trace folded as one coalesced batch", () => {
+    /** @scenario 'Coalesced folding produces the correct accumulated state through the pipeline' */
+    it("folds every span into the exact accumulated count persisted in ClickHouse", async () => {
+      const traceId = generateId("trace");
+      const SPAN_COUNT = 40;
+      const base = Date.now();
 
-        // Build valid normalized span events via the real command (no queue), so
-        // this is deterministic. executeBatch then folds them in ONE
-        // load/apply/store cycle — the coalescing path — straight to ClickHouse.
-        const command = new TestRecordSpanCommand();
-        const events: SpanReceivedEvent[] = [];
-        for (let i = 0; i < SPAN_COUNT; i++) {
-          const produced = await command.handle({
-            type: RECORD_SPAN_COMMAND_TYPE,
-            aggregateId: traceId,
-            tenantId: tenantIdString,
-            data: {
-              span: buildRawSpan(
-                traceId,
-                `${generateId("span")}-${i}`,
-                base + i,
-              ),
-              resource: null,
-              instrumentationScope: null,
-              piiRedactionLevel: "DISABLED",
-              occurredAt: base + i,
-            },
-          } as never);
-          events.push(...produced);
-        }
-        expect(events).toHaveLength(SPAN_COUNT);
+      // Build valid normalized span events via the real command (no queue), so
+      // this is deterministic. executeBatch then folds them in ONE
+      // load/apply/store cycle — the coalescing path — straight to ClickHouse.
+      const command = new TestRecordSpanCommand();
+      const events: SpanReceivedEvent[] = [];
+      for (let i = 0; i < SPAN_COUNT; i++) {
+        const produced = await command.handle({
+          type: RECORD_SPAN_COMMAND_TYPE,
+          aggregateId: traceId,
+          tenantId: tenantIdString,
+          data: {
+            span: buildRawSpan(traceId, `${generateId("span")}-${i}`, base + i),
+            resource: null,
+            instrumentationScope: null,
+            piiRedactionLevel: "DISABLED",
+            occurredAt: base + i,
+          },
+        } as never);
+        events.push(...produced);
+      }
+      expect(events).toHaveLength(SPAN_COUNT);
 
-        const executor = new FoldProjectionExecutor();
-        const fold = new TraceSummaryFoldProjection({
-          store: traceSummaryStore,
-        });
-        const context = { aggregateId: traceId, tenantId, key: traceId };
+      const executor = new FoldProjectionExecutor();
+      const fold = new TraceSummaryFoldProjection({
+        store: traceSummaryStore,
+      });
+      const context = { aggregateId: traceId, tenantId, key: traceId };
 
-        const folded = (await executor.executeBatch(
-          fold as never,
-          events as never,
+      const folded = (await executor.executeBatch(
+        fold as never,
+        events as never,
+        context,
+      )) as TraceSummaryData;
+
+      // In-memory result: every span folded, no double-count, no loss.
+      expect(folded.spanCount).toBe(SPAN_COUNT);
+
+      // Persisted in ClickHouse: read the single stored summary back. Poll to
+      // tolerate ClickHouse insert visibility lag (the row is written once).
+      let persisted: TraceSummaryData | null = null;
+      const deadline = Date.now() + 10000;
+      while (Date.now() < deadline) {
+        persisted = (await traceSummaryStore.get(
+          traceId,
           context,
-        )) as TraceSummaryData;
-
-        // In-memory result: every span folded, no double-count, no loss.
-        expect(folded.spanCount).toBe(SPAN_COUNT);
-
-        // Persisted in ClickHouse: read the single stored summary back. Poll to
-        // tolerate ClickHouse insert visibility lag (the row is written once).
-        let persisted: TraceSummaryData | null = null;
-        const deadline = Date.now() + 10000;
-        while (Date.now() < deadline) {
-          persisted = (await traceSummaryStore.get(
-            traceId,
-            context,
-          )) as TraceSummaryData | null;
-          if (persisted?.spanCount === SPAN_COUNT) break;
-          await new Promise((r) => setTimeout(r, 200));
-        }
-        expect(persisted?.spanCount).toBe(SPAN_COUNT);
-      }, 45000);
-    });
-  },
-);
+        )) as TraceSummaryData | null;
+        if (persisted?.spanCount === SPAN_COUNT) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      expect(persisted?.spanCount).toBe(SPAN_COUNT);
+    }, 45000);
+  });
+});

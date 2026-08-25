@@ -1,7 +1,4 @@
-import {
-  HandledError,
-  type SerializedHandledError,
-} from "@langwatch/handled-error";
+import { HandledError, type SerializedHandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
@@ -9,10 +6,7 @@ import {
   providerDefaultBaseUrls,
 } from "../../features/onboarding/regions/model-providers/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
-import {
-  RedirectRefusedError,
-  ssrfSafeFetch,
-} from "../../utils/ssrfProtection";
+import { RedirectRefusedError, ssrfSafeFetch } from "../../utils/ssrfProtection";
 import { ModelProviderRepository } from "./modelProvider.repository";
 import { modelProviders } from "./registry";
 
@@ -180,10 +174,7 @@ const VALIDATION_ONLY_BASE_URLS: Record<string, string> = {
  * @param defaultBaseUrl - The default base URL for the provider
  * @returns The full URL to the models endpoint
  */
-function buildModelsEndpointUrl(
-  baseUrl: string,
-  defaultBaseUrl: string,
-): string {
+function buildModelsEndpointUrl(baseUrl: string, defaultBaseUrl: string): string {
   const endpoint = baseUrl || defaultBaseUrl;
   const normalized = endpoint.replace(/\/$/, "");
 
@@ -266,16 +257,12 @@ export class ProviderKeyRestrictedError extends HandledError {
      */
     googleDoor?: "gemini-api" | "agent-platform";
   }) {
-    super(
-      "provider_key_restricted",
-      `${provider} refused the API key (${reason})`,
-      {
-        fault: "customer",
-        httpStatus: 403,
-        meta: { provider, reason, ...(googleDoor ? { googleDoor } : {}) },
-        tips: ["Adjust the key's restrictions in the Google Cloud console."],
-      },
-    );
+    super("provider_key_restricted", `${provider} refused the API key (${reason})`, {
+      fault: "customer",
+      httpStatus: 403,
+      meta: { provider, reason, ...(googleDoor ? { googleDoor } : {}) },
+      tips: ["Adjust the key's restrictions in the Google Cloud console."],
+    });
   }
 }
 
@@ -288,15 +275,11 @@ export class ProviderKeyRestrictedError extends HandledError {
  */
 export class ProviderRefusedError extends HandledError {
   constructor({ provider, status }: { provider: string; status: number }) {
-    super(
-      "provider_refused",
-      `${provider} refused the credential check with ${status}`,
-      {
-        fault: "provider",
-        httpStatus: 502,
-        meta: { provider, status },
-      },
-    );
+    super("provider_refused", `${provider} refused the credential check with ${status}`, {
+      fault: "provider",
+      httpStatus: 502,
+      meta: { provider, status },
+    });
   }
 }
 
@@ -354,25 +337,18 @@ export class ProviderUnreachableError extends HandledError {
     hasConfigurableEndpoint: boolean;
   }) {
     const tips = hasConfigurableEndpoint
-      ? [
-          "Check your network connection.",
-          "Check the base URL is correct and reachable.",
-        ]
+      ? ["Check your network connection.", "Check the base URL is correct and reachable."]
       : ["Check your network connection."];
 
-    super(
-      "provider_unreachable",
-      `Could not reach ${provider} to check the API key`,
-      {
-        fault: "provider",
-        httpStatus: 502,
-        // `hasConfigurableEndpoint` is in `meta` because the registry entry
-        // branches on it: only some providers have a base URL there is any
-        // point telling someone to check.
-        meta: { provider, hasConfigurableEndpoint },
-        tips,
-      },
-    );
+    super("provider_unreachable", `Could not reach ${provider} to check the API key`, {
+      fault: "provider",
+      httpStatus: 502,
+      // `hasConfigurableEndpoint` is in `meta` because the registry entry
+      // branches on it: only some providers have a base URL there is any
+      // point telling someone to check.
+      meta: { provider, hasConfigurableEndpoint },
+      tips,
+    });
   }
 }
 
@@ -402,8 +378,7 @@ const GEMINI_REASON_ERRORS: Record<
   }) => HandledError
 > = {
   API_KEY_INVALID: ({ provider }) => new ProviderKeyInvalidError({ provider }),
-  SERVICE_DISABLED: ({ provider }) =>
-    new ProviderServiceDisabledError({ provider }),
+  SERVICE_DISABLED: ({ provider }) => new ProviderServiceDisabledError({ provider }),
   API_KEY_SERVICE_BLOCKED: (args) =>
     new ProviderKeyRestrictedError({
       ...args,
@@ -490,10 +465,7 @@ function redactApiKey(text: string, apiKey: string): string {
   const encoded = encodeURIComponent(apiKey);
   const forms = encoded === apiKey ? [apiKey] : [apiKey, encoded];
 
-  return forms.reduce(
-    (redacted, form) => redacted.split(form).join("[redacted]"),
-    text,
-  );
+  return forms.reduce((redacted, form) => redacted.split(form).join("[redacted]"), text);
 }
 
 /**
@@ -592,10 +564,7 @@ async function handleHttpError({
   response: ProbeResponse;
   context: ProbeContext;
 }): Promise<RankedFailure> {
-  const { message, reason } = await readUpstreamRefusal(
-    response,
-    context.apiKey,
-  );
+  const { message, reason } = await readUpstreamRefusal(response, context.apiKey);
 
   // The one place the provider's own words are kept. Redacted at the point of
   // reading, because this is a log and the key is what it would otherwise
@@ -848,12 +817,9 @@ type RankedFailure = {
  * API key" here, which is the one answer that is certainly wrong when no
  * request was made, and the exact misdiagnosis this module exists to remove.
  */
-function mostInformativeFailure(
-  failures: RankedFailure[],
-): RankedFailure | undefined {
+function mostInformativeFailure(failures: RankedFailure[]): RankedFailure | undefined {
   return failures.reduce<RankedFailure | undefined>(
-    (chosen, failure) =>
-      !chosen || failure.rank < chosen.rank ? failure : chosen,
+    (chosen, failure) => (!chosen || failure.rank < chosen.rank ? failure : chosen),
     undefined,
   );
 }
@@ -917,8 +883,7 @@ async function probeOnce({
   context: ProbeContext;
   deadline: AbortSignal;
 }): Promise<
-  | { accepted: true; failure?: undefined }
-  | { accepted: false; failure: RankedFailure }
+  { accepted: true; failure?: undefined } | { accepted: false; failure: RankedFailure }
 > {
   let response: ProbeResponse;
   try {
@@ -1063,10 +1028,7 @@ export async function validateKeyWithCustomUrl({
   const repository = new ModelProviderRepository(prisma);
   const storedProvider = await repository.findByProvider(provider, projectId);
 
-  const storedKeys = storedProvider?.customKeys as Record<
-    string,
-    string
-  > | null;
+  const storedKeys = storedProvider?.customKeys as Record<string, string> | null;
   let apiKey = storedKeys?.[apiKeyField]?.trim() ?? "";
 
   // Fallback to env var if no stored key
@@ -1230,16 +1192,12 @@ export async function validateProviderApiKey(
   const endpointField = providerDef.endpointKey;
 
   const apiKey = customKeys[apiKeyField]?.trim() ?? "";
-  const baseUrl = endpointField
-    ? (customKeys[endpointField]?.trim() ?? "")
-    : "";
+  const baseUrl = endpointField ? (customKeys[endpointField]?.trim() ?? "") : "";
 
   // Get auth strategy (default to bearer) and base URL
   const authStrategy = PROVIDER_AUTH_OVERRIDES[provider] ?? "bearer";
   const defaultBaseUrl =
-    providerDefaultBaseUrls[provider] ??
-    VALIDATION_ONLY_BASE_URLS[provider] ??
-    "";
+    providerDefaultBaseUrls[provider] ?? VALIDATION_ONLY_BASE_URLS[provider] ?? "";
 
   const agentPlatform = agentPlatformPair({ provider, customKeys });
 
@@ -1293,8 +1251,6 @@ function googleDoorFor({
   }
   return {
     googleDoor:
-      agentPlatform.project && agentPlatform.location
-        ? "agent-platform"
-        : "gemini-api",
+      agentPlatform.project && agentPlatform.location ? "agent-platform" : "gemini-api",
   };
 }

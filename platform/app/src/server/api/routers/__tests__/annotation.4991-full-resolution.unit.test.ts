@@ -14,8 +14,8 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { annotationRouter } from "../annotation";
 
-const { mockCreate, mockGetTracesWithSpans, mockBuildDeps, BLOB_DEPS } =
-  vi.hoisted(() => {
+const { mockCreate, mockGetTracesWithSpans, mockBuildDeps, BLOB_DEPS } = vi.hoisted(
+  () => {
     const BLOB_DEPS = {
       blobStore: { tag: "blobStore" },
       ioExtractionService: { tag: "ioExtractionService" },
@@ -26,7 +26,8 @@ const { mockCreate, mockGetTracesWithSpans, mockBuildDeps, BLOB_DEPS } =
       mockBuildDeps: vi.fn(() => BLOB_DEPS),
       BLOB_DEPS,
     };
-  });
+  },
+);
 
 const mockAnnotationFindMany = vi.fn().mockResolvedValue([]);
 const mockQueueItemFindMany = vi.fn();
@@ -34,9 +35,7 @@ const mockQueueItemCount = vi.fn().mockResolvedValue(1);
 
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
 

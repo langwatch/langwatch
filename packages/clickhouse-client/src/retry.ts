@@ -75,8 +75,10 @@ export interface RetryAttemptNotice {
   level: "warn" | "debug";
 }
 
-export interface RunWithRetryOptions
-  extends Omit<RetryOptions, "onRetry" | "transientMessageFragments"> {
+export interface RunWithRetryOptions extends Omit<
+  RetryOptions,
+  "onRetry" | "transientMessageFragments"
+> {
   transientMessageFragments?: readonly string[] | undefined;
   onRetry?: ((notice: RetryAttemptNotice) => void) | undefined;
   /** Stop retrying once this reports true. Nobody is waiting any more. */

@@ -41,8 +41,7 @@ export function useNavigationV2Tracking(): void {
     }
 
     const enteringSettings =
-      location.pathname === "/settings" ||
-      location.pathname.startsWith("/settings/");
+      location.pathname === "/settings" || location.pathname.startsWith("/settings/");
     if (enteringSettings && previous) {
       // No-ops unless the previous page belonged to a product, so hopping
       // between settings pages never overwrites the capture.

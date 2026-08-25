@@ -16,9 +16,7 @@ export interface AnalyticsTimeseriesBuilderInput {
   readonly series: AnalyticsSeries[];
   readonly filters?: Record<
     string,
-    | string[]
-    | Record<string, string[]>
-    | Record<string, Record<string, string[]>>
+    string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
   >;
   readonly groupBy?: string;
   readonly groupByKey?: string;

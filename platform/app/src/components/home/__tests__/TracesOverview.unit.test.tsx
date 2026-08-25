@@ -29,9 +29,7 @@ vi.mock("~/components/analytics/CustomGraph", () => ({
   }) => (
     <div
       data-testid={
-        input?.graphType === "line"
-          ? "traces-overview-trend"
-          : "traces-overview-graph"
+        input?.graphType === "line" ? "traces-overview-trend" : "traces-overview-graph"
       }
     >
       {emptyState}
@@ -63,18 +61,19 @@ describe("<TracesOverview />", () => {
   it("offers useful first actions instead of a dead no-data message", () => {
     renderWithProviders(<TracesOverview />);
 
-    expect(
-      screen.getByText("Nothing here yet — pick a quick start"),
-    ).toBeDefined();
-    expect(
-      screen.getByRole("link", { name: /Connect tracing/ }),
-    ).toHaveAttribute("href", "/my-project/traces");
-    expect(
-      screen.getByRole("link", { name: /Create a prompt/ }),
-    ).toHaveAttribute("href", "/my-project/prompts");
-    expect(
-      screen.getByRole("link", { name: /Run a simulation/ }),
-    ).toHaveAttribute("href", "/my-project/simulations");
+    expect(screen.getByText("Nothing here yet — pick a quick start")).toBeDefined();
+    expect(screen.getByRole("link", { name: /Connect tracing/ })).toHaveAttribute(
+      "href",
+      "/my-project/traces",
+    );
+    expect(screen.getByRole("link", { name: /Create a prompt/ })).toHaveAttribute(
+      "href",
+      "/my-project/prompts",
+    );
+    expect(screen.getByRole("link", { name: /Run a simulation/ })).toHaveAttribute(
+      "href",
+      "/my-project/simulations",
+    );
   });
 });
 
@@ -129,9 +128,7 @@ describe("<TracesOverview /> presentation", () => {
       expect(
         screen.getByText("Each figure is compared with the period before it."),
       ).toBeDefined();
-      expect(
-        screen.getByRole("button", { name: /Show the trend/ }),
-      ).toBeDefined();
+      expect(screen.getByRole("button", { name: /Show the trend/ })).toBeDefined();
     });
 
     /** @scenario Every figure says what window it covers */
@@ -159,9 +156,7 @@ describe("<TracesOverview /> presentation", () => {
       renderWithProviders(<TracesOverview variant="trend" />);
 
       expect(screen.getByTestId("traces-overview-trend")).toBeDefined();
-      expect(
-        screen.queryByRole("button", { name: /Show the trend/ }),
-      ).toBeNull();
+      expect(screen.queryByRole("button", { name: /Show the trend/ })).toBeNull();
     });
   });
 

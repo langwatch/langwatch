@@ -33,10 +33,7 @@ import {
   extractParentTraceForNlpgo,
   maxCausalityDepthOfSpans,
 } from "../app-layer/evaluations/evaluation-execution.service";
-import {
-  evaluationDurationHistogram,
-  getEvaluationStatusCounter,
-} from "../metrics";
+import { evaluationDurationHistogram, getEvaluationStatusCounter } from "../metrics";
 import { formatSpansDigest } from "../tracer/spanToReadableSpan";
 import {
   type MappingState,
@@ -91,10 +88,7 @@ const buildThreadData = async (
 
   // #4991: evaluators score against content, so the thread read must resolve
   // the FULL offloaded IO (ADR-022), not the ≤64KB preview.
-  const traceService = TraceService.create(
-    undefined,
-    buildTraceBlobResolutionDeps(),
-  );
+  const traceService = TraceService.create(undefined, buildTraceBlobResolutionDeps());
   const threadTraces = await traceService.getTracesByThreadId(
     projectId,
     threadId,
@@ -104,9 +98,7 @@ const buildThreadData = async (
 
   const result: Record<string, any> = {};
 
-  for (const [targetField, mappingConfig] of Object.entries(
-    mappingState.mapping,
-  )) {
+  for (const [targetField, mappingConfig] of Object.entries(mappingState.mapping)) {
     const isThreadMapping =
       ("type" in mappingConfig && mappingConfig.type === "thread") ||
       ("source" in mappingConfig &&
@@ -122,9 +114,7 @@ const buildThreadData = async (
       if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
         if (source === "formatted_traces") {
           result[targetField] = (
-            await Promise.all(
-              threadTraces.map((t) => formatSpansDigest(t.spans ?? [])),
-            )
+            await Promise.all(threadTraces.map((t) => formatSpansDigest(t.spans ?? [])))
           ).join("\n\n---\n\n");
         }
       } else {
@@ -140,9 +130,7 @@ const buildThreadData = async (
       }
     } else if ("source" in mappingConfig) {
       if (
-        (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(
-          mappingConfig.source,
-        )
+        (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(mappingConfig.source)
       ) {
         if (mappingConfig.source === "formatted_trace") {
           result[targetField] = await formatSpansDigest(trace.spans ?? []);
@@ -216,9 +204,7 @@ const buildDataForEvaluation = async (
       for (const [field, config] of Object.entries(mappings.mapping)) {
         if (
           "source" in config &&
-          (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(
-            config.source,
-          )
+          (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(config.source)
         ) {
           if (config.source === "formatted_trace") {
             mappedData[field] = await formatSpansDigest(trace.spans ?? []);
@@ -230,10 +216,7 @@ const buildDataForEvaluation = async (
     data = mappedData;
 
     if (mappings && hasThreadMappings(mappings)) {
-      const traceService = TraceService.create(
-        undefined,
-        buildTraceBlobResolutionDeps(),
-      );
+      const traceService = TraceService.create(undefined, buildTraceBlobResolutionDeps());
       await resolveThreadMappingsIntoData({
         data: data as Record<string, unknown>,
         trace,
@@ -256,9 +239,7 @@ const buildDataForEvaluation = async (
   }
 
   const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];
-  const data_ = Object.fromEntries(
-    fields.map((field) => [field, data[field] ?? ""]),
-  );
+  const data_ = Object.fromEntries(fields.map((field) => [field, data[field] ?? ""]));
 
   return { type: "default", data: data_ };
 };
@@ -306,13 +287,9 @@ export const runEvaluationForTrace = async ({
     };
   }
 
-  const isThreadLevel = level
-    ? level === "thread"
-    : hasThreadMappings(mappings);
+  const isThreadLevel = level ? level === "thread" : hasThreadMappings(mappings);
   const evaluation_thread_id =
-    isThreadLevel && trace.metadata?.thread_id
-      ? trace.metadata.thread_id
-      : undefined;
+    isThreadLevel && trace.metadata?.thread_id ? trace.metadata.thread_id : undefined;
 
   // Parity with the legacy worker's getTraceById({ includeEvaluations: true }):
   // getById → getTracesWithSpans does not enrich evaluations, but evaluator
@@ -460,12 +437,7 @@ export const runEvaluation = async ({
     builtInEvaluatorType !== "openai/moderation"
   ) {
     try {
-      const modelEnv = await setupModelEnv(
-        settings.model,
-        false,
-        projectId,
-        settings,
-      );
+      const modelEnv = await setupModelEnv(settings.model, false, projectId, settings);
       evaluatorEnv = { ...evaluatorEnv, ...modelEnv };
     } catch (error) {
       if (error instanceof EvaluatorConfigError) {
@@ -549,14 +521,8 @@ export const runEvaluation = async ({
             input: tryAndConvertTo(data.data.input, "string"),
             output: tryAndConvertTo(data.data.output, "string"),
             contexts: tryAndConvertTo(data.data.contexts, "string[]"),
-            expected_contexts: tryAndConvertTo(
-              data.data.expected_contexts,
-              "string[]",
-            ),
-            expected_output: tryAndConvertTo(
-              data.data.expected_output,
-              "string",
-            ),
+            expected_contexts: tryAndConvertTo(data.data.expected_contexts, "string[]"),
+            expected_output: tryAndConvertTo(data.data.expected_output, "string"),
             conversation: tryAndConvertTo(data.data.conversation, "array"),
           },
         ],

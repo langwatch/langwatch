@@ -14,9 +14,7 @@ describe("PrismaSubscriptionRepository", () => {
         update: vi.fn().mockResolvedValue({}),
       },
     };
-    repo = PrismaSubscriptionRepository.create(
-      prisma as unknown as PrismaClient,
-    );
+    repo = PrismaSubscriptionRepository.create(prisma as unknown as PrismaClient);
   });
 
   describe("cancel", () => {

@@ -13,9 +13,7 @@ type LlmSignatureNodeDraggableProps = {
   onDragEnd?: (item: { node: NodeWithOptionalPosition<Component> }) => void;
 };
 
-export function LlmSignatureNodeDraggable({
-  onDragEnd,
-}: LlmSignatureNodeDraggableProps) {
+export function LlmSignatureNodeDraggable({ onDragEnd }: LlmSignatureNodeDraggableProps) {
   const { project } = useOrganizationTeamProject();
 
   // Nodes own their LLM config: seed freshly dragged nodes with the

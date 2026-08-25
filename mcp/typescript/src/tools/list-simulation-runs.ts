@@ -26,14 +26,20 @@ export async function handleListSimulationRuns(params: {
   }
 
   const lines: string[] = [];
-  lines.push(`# Simulation Runs (${runs.length} results${result.hasMore ? ", more available" : ""})\n`);
+  lines.push(
+    `# Simulation Runs (${runs.length} results${result.hasMore ? ", more available" : ""})\n`,
+  );
 
   for (const run of runs) {
-    const statusIcon = run.status === "SUCCESS" ? "pass" : run.status === "FAILED" ? "FAIL" : run.status;
-    const duration = run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—";
+    const statusIcon =
+      run.status === "SUCCESS" ? "pass" : run.status === "FAILED" ? "FAIL" : run.status;
+    const duration =
+      run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—";
     const verdict = run.results?.verdict ?? "";
 
-    lines.push(`## ${run.name ?? run.scenarioId} — ${statusIcon}${verdict ? ` (${verdict})` : ""}`);
+    lines.push(
+      `## ${run.name ?? run.scenarioId} — ${statusIcon}${verdict ? ` (${verdict})` : ""}`,
+    );
     lines.push(`**Run ID**: ${run.scenarioRunId}`);
     lines.push(`**Batch**: ${run.batchRunId}`);
     lines.push(`**Duration**: ${duration}`);
@@ -43,7 +49,9 @@ export async function handleListSimulationRuns(params: {
     lines.push("");
   }
 
-  lines.push("> Use `platform_get_simulation_run` with a run ID to see full details (messages, results).");
+  lines.push(
+    "> Use `platform_get_simulation_run` with a run ID to see full details (messages, results).",
+  );
 
   return lines.join("\n");
 }

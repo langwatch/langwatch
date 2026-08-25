@@ -28,10 +28,7 @@ import { usePublicEnv } from "../../../hooks/usePublicEnv";
 import { api, type RouterOutputs } from "../../../utils/api";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 import { apiKeyRowAnchorId } from "./apiKeyAnchor";
-import {
-  CreateApiKeyDrawer,
-  type CreateApiKeyInput,
-} from "./CreateApiKeyDrawer";
+import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./CreateApiKeyDrawer";
 import { EditApiKeyDrawer } from "./EditApiKeyDrawer";
 import { IngestionKeysSection } from "./IngestionKeysSection";
 import { RevokeConfirmDialog } from "./RevokeConfirmDialog";
@@ -110,8 +107,7 @@ export function ApiKeysSection({
   const session = useSession();
   const currentUserId = session.data?.user?.id ?? "";
   const publicEnv = usePublicEnv();
-  const { project, team, organization, hasPermission } =
-    useOrganizationTeamProject();
+  const { project, team, organization, hasPermission } = useOrganizationTeamProject();
   const endpoint = publicEnv.data?.BASE_HOST ?? "https://app.langwatch.ai";
 
   // Rotating the legacy project base key is a project-level admin action,
@@ -137,9 +133,7 @@ export function ApiKeysSection({
   } = useDisclosure();
 
   const [newToken, setNewToken] = useState<string | null>(null);
-  const [newKeyInput, setNewKeyInput] = useState<CreateApiKeyInput | null>(
-    null,
-  );
+  const [newKeyInput, setNewKeyInput] = useState<CreateApiKeyInput | null>(null);
   const [apiKeyToRevoke, setApiKeyToRevoke] = useState<string | null>(null);
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
   const [isRotateConfirmOpen, setIsRotateConfirmOpen] = useState(false);
@@ -234,9 +228,7 @@ export function ApiKeysSection({
       {
         organizationId,
         name: input.name,
-        description: input.description.trim()
-          ? input.description.trim()
-          : undefined,
+        description: input.description.trim() ? input.description.trim() : undefined,
         expiresAt: input.expiresAt,
         permissionMode: input.permissionMode,
         keyType: input.keyType,
@@ -332,8 +324,7 @@ export function ApiKeysSection({
           void queryClient.organization.getAll.invalidate();
           toaster.create({
             title: "Project API key rotated",
-            description:
-              "The previous key no longer works. Update your integrations.",
+            description: "The previous key no longer works. Update your integrations.",
             type: "warning",
             duration: 6000,
           });
@@ -466,11 +457,7 @@ export function ApiKeysSection({
                         </Badge>
                       </Table.Cell>
                       <Table.Cell>
-                        <Text
-                          fontSize="xs"
-                          fontFamily="monospace"
-                          color="fg.muted"
-                        >
+                        <Text fontSize="xs" fontFamily="monospace" color="fg.muted">
                           sk-…{projectApiKey.slice(-4)}
                         </Text>
                       </Table.Cell>
@@ -520,10 +507,7 @@ export function ApiKeysSection({
 
                   {/* User-scoped API key rows */}
                   {filteredKeys.map((apiKey) => (
-                    <Table.Row
-                      key={apiKey.id}
-                      id={apiKeyRowAnchorId(apiKey.id)}
-                    >
+                    <Table.Row key={apiKey.id} id={apiKeyRowAnchorId(apiKey.id)}>
                       <Table.Cell>
                         <HStack align="start">
                           <Box paddingTop={1}>
@@ -551,37 +535,26 @@ export function ApiKeysSection({
                         )}
                       </Table.Cell>
                       <Table.Cell>
-                        <Text
-                          fontSize="xs"
-                          fontFamily="monospace"
-                          color="fg.muted"
-                        >
+                        <Text fontSize="xs" fontFamily="monospace" color="fg.muted">
                           sk-lw-{apiKey.lookupIdPrefix}…
                         </Text>
                       </Table.Cell>
                       <Table.Cell>
-                        {new Date(apiKey.createdAt).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          },
-                        )}
+                        {new Date(apiKey.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
                       </Table.Cell>
                       <Table.Cell>
                         {apiKey.lastUsedAt ? (
-                          <Tooltip
-                            content={new Date(apiKey.lastUsedAt).toISOString()}
-                          >
+                          <Tooltip content={new Date(apiKey.lastUsedAt).toISOString()}>
                             <Text
                               cursor="help"
                               tabIndex={0}
                               aria-label={`Last used at ${new Date(apiKey.lastUsedAt).toISOString()}`}
                             >
-                              {formatTimeAgo(
-                                new Date(apiKey.lastUsedAt).getTime(),
-                              )}
+                              {formatTimeAgo(new Date(apiKey.lastUsedAt).getTime())}
                             </Text>
                           </Tooltip>
                         ) : (
@@ -635,11 +608,7 @@ export function ApiKeysSection({
                     scopeFilter.kind === "all" && (
                       <Table.Row>
                         <Table.Cell colSpan={9}>
-                          <Text
-                            color="fg.muted"
-                            textAlign="center"
-                            paddingY={4}
-                          >
+                          <Text color="fg.muted" textAlign="center" paddingY={4}>
                             No API keys. Create one to get started.
                           </Text>
                         </Table.Cell>
@@ -650,13 +619,9 @@ export function ApiKeysSection({
                     scopeFilter.kind !== "all" && (
                       <Table.Row>
                         <Table.Cell colSpan={9}>
-                          <Text
-                            color="fg.muted"
-                            textAlign="center"
-                            paddingY={4}
-                          >
-                            No keys match the current scope. Change the filter
-                            above to see other keys.
+                          <Text color="fg.muted" textAlign="center" paddingY={4}>
+                            No keys match the current scope. Change the filter above to
+                            see other keys.
                           </Text>
                         </Table.Cell>
                       </Table.Row>

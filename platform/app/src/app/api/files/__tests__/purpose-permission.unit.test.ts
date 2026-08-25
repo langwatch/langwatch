@@ -19,9 +19,7 @@ describe("requiredPermissionForPurpose", () => {
 
   describe("given scenario purposes", () => {
     it("requires scenarios:view", () => {
-      expect(requiredPermissionForPurpose("scenario_attachment")).toBe(
-        "scenarios:view",
-      );
+      expect(requiredPermissionForPurpose("scenario_attachment")).toBe("scenarios:view");
       expect(requiredPermissionForPurpose("scenario_event_content")).toBe(
         "scenarios:view",
       );

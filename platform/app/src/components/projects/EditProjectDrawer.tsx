@@ -101,10 +101,7 @@ export function EditProjectDrawer({
             closeDrawer();
           },
           onError: (error) => {
-            if (
-              applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })
-            )
-              return;
+            if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
             showErrorToast({
               error,
               fallbackTitle: "Couldn't update the project",
@@ -144,8 +141,8 @@ export function EditProjectDrawer({
               <FormServerError form={form} />
 
               <Text fontSize="sm" color="fg.muted">
-                Update the project name or move it to a different team. Moving a
-                project changes which team members inherit access.
+                Update the project name or move it to a different team. Moving a project
+                changes which team members inherit access.
               </Text>
 
               <Field.Root invalid={!!errors.name}>
@@ -157,9 +154,7 @@ export function EditProjectDrawer({
                   })}
                   placeholder="AI Project"
                 />
-                {errors.name && (
-                  <Field.ErrorText>{errors.name.message}</Field.ErrorText>
-                )}
+                {errors.name && <Field.ErrorText>{errors.name.message}</Field.ErrorText>}
               </Field.Root>
 
               <Field.Root invalid={!!errors.teamId}>
@@ -182,8 +177,8 @@ export function EditProjectDrawer({
                       <Select.Trigger>
                         <Select.ValueText placeholder="Select team">
                           {() =>
-                            teamOptions.find((o) => o.value === field.value)
-                              ?.label ?? "Select team"
+                            teamOptions.find((o) => o.value === field.value)?.label ??
+                            "Select team"
                           }
                         </Select.ValueText>
                       </Select.Trigger>

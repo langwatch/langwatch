@@ -5,8 +5,7 @@
 import { type AnchorHTMLAttributes, forwardRef, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router";
 
-interface NextLinkProps
-  extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
+interface NextLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
   href: string | { pathname: string; query?: Record<string, any> };
   as?: string;
   replace?: boolean;
@@ -57,11 +56,7 @@ const Link = forwardRef<HTMLAnchorElement, NextLinkProps>(function Link(
   const to = buildHref(href);
 
   // External links
-  if (
-    to.startsWith("http://") ||
-    to.startsWith("https://") ||
-    to.startsWith("mailto:")
-  ) {
+  if (to.startsWith("http://") || to.startsWith("https://") || to.startsWith("mailto:")) {
     return (
       <a ref={ref} href={to} {...rest}>
         {children}

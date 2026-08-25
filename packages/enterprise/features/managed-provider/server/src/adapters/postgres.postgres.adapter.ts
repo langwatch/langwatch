@@ -26,9 +26,7 @@ export class PostgresManagedProviderAdapter {
     return ManagedProviderService.create({
       configuration: this.options.configuration,
       credentials: this.options.credentials,
-      projects: PrismaManagedProviderProjectRepository.create(
-        this.options.database,
-      ),
+      projects: PrismaManagedProviderProjectRepository.create(this.options.database),
     });
   }
 }

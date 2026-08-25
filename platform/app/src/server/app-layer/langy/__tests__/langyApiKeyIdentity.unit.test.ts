@@ -9,11 +9,7 @@ import { resolveLangyKeyIdentity } from "../langyApiKeyIdentity";
  * `ResolvedToken` still fits that contract is enforced where `langy-api.ts`
  * passes one in, which is the only place a real one exists.
  */
-function apiKeyToken({
-  userId,
-}: {
-  userId: string | null;
-}): LangyIdentityToken {
+function apiKeyToken({ userId }: { userId: string | null }): LangyIdentityToken {
   return {
     type: "apiKey",
     userId,
@@ -61,10 +57,7 @@ describe("resolveLangyKeyIdentity", () => {
     // One token value, used for both calls: nothing about the key is edited
     // between them. Only the cohort answer changes.
     const resolved = apiKeyToken({ userId: "customer-3" });
-    const isEnabled = vi
-      .fn()
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+    const isEnabled = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
 
     const before = await resolveLangyKeyIdentity({
       resolved,

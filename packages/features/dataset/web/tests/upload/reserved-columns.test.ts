@@ -56,13 +56,7 @@ describe("reservedColumns utilities", () => {
     });
 
     it("handles multiple collision iterations", () => {
-      const existingNames = new Set([
-        "test",
-        "test_",
-        "test_1",
-        "test_2",
-        "test_3",
-      ]);
+      const existingNames = new Set(["test", "test_", "test_1", "test_2", "test_3"]);
 
       // Should find the first available numeric suffix when "test" is already taken
       expect(getSafeColumnName("test", existingNames)).toBe("test_4");
@@ -77,9 +71,7 @@ describe("reservedColumns utilities", () => {
     it("returns original name if not reserved and no collision", () => {
       const existingNames = new Set(["other_name"]);
 
-      expect(getSafeColumnName("unique_name", existingNames)).toBe(
-        "unique_name",
-      );
+      expect(getSafeColumnName("unique_name", existingNames)).toBe("unique_name");
     });
   });
 

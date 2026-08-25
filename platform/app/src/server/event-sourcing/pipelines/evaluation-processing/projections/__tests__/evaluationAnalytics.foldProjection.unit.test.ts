@@ -31,11 +31,9 @@ function projectFromState(state: EvaluationAnalyticsData) {
 const makeScheduled = () =>
   createEvaluationScheduledEvent({ metadata: { "metadata.team": "platform" } });
 
-const makeStarted = () =>
-  createEvaluationStartedEvent({ occurredAt: 1_000_500 });
+const makeStarted = () => createEvaluationStartedEvent({ occurredAt: 1_000_500 });
 
-const makeCompleted = () =>
-  createEvaluationCompletedEvent({ occurredAt: 1_002_500 });
+const makeCompleted = () => createEvaluationCompletedEvent({ occurredAt: 1_002_500 });
 
 const makeReportedAtomic = () =>
   createEvaluationReportedEvent({

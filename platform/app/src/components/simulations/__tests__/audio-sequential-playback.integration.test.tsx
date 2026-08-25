@@ -75,18 +75,9 @@ const playCalls: LwEl[] = [];
 const pauseCalls: LwEl[] = [];
 
 // Save originals so afterAll can restore them.
-const origPlay = Object.getOwnPropertyDescriptor(
-  HTMLMediaElement.prototype,
-  "play",
-);
-const origPause = Object.getOwnPropertyDescriptor(
-  HTMLMediaElement.prototype,
-  "pause",
-);
-const origPaused = Object.getOwnPropertyDescriptor(
-  HTMLMediaElement.prototype,
-  "paused",
-);
+const origPlay = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "play");
+const origPause = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "pause");
+const origPaused = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "paused");
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
@@ -310,8 +301,7 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
       it("plays the third audio, not the first", async () => {
         renderMessages([audioMsg("a1"), audioMsg("a2"), audioMsg("a3")]);
 
-        const [, audioB, audioC] =
-          document.querySelectorAll<HTMLAudioElement>("audio");
+        const [, audioB, audioC] = document.querySelectorAll<HTMLAudioElement>("audio");
 
         playCalls.length = 0;
         fireAudioEvent(audioB!, "ended");
@@ -427,8 +417,7 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
           </ChakraProvider>,
         );
 
-        const [, audioB, audioC] =
-          document.querySelectorAll<HTMLAudioElement>("audio");
+        const [, audioB, audioC] = document.querySelectorAll<HTMLAudioElement>("audio");
         expect(audioC).toBeDefined();
 
         playCalls.length = 0;

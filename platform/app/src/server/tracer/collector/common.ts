@@ -8,10 +8,7 @@ import type {
 } from "../types";
 
 export const getFirstInputAsText = (spans: Span[]): string => {
-  const topmostSpans = flattenSpanTree(
-    organizeSpansIntoTree(spans),
-    "outside-in",
-  );
+  const topmostSpans = flattenSpanTree(organizeSpansIntoTree(spans), "outside-in");
 
   const topmostInputs = topmostSpans.filter(
     (span) =>
@@ -35,17 +32,12 @@ export const getFirstInputAsText = (spans: Span[]): string => {
   ) {
     input = {
       type: "json",
-      value: Object.values(
-        (topmostSpans[0]?.input?.value as any)?.data,
-      )[0] as any,
+      value: Object.values((topmostSpans[0]?.input?.value as any)?.data)[0] as any,
     };
   }
   if (!input) {
     const topmostSpan = topmostSpans.filter((span) => !span.parent_id)[0];
-    if (
-      topmostSpan?.params?.http?.method &&
-      topmostSpan?.params?.http?.target
-    ) {
+    if (topmostSpan?.params?.http?.method && topmostSpan?.params?.http?.target) {
       return `${topmostSpan?.params?.http?.method} ${topmostSpan?.params?.http?.target}`;
     }
     return topmostSpan?.name ?? "";
@@ -92,14 +84,10 @@ export const getLastOutputAsText = (spans: Span[]): string => {
   // First we try to see if the topLevel node has a valid output, if so, we go with that, so users
   // can take control of which output to use by controlling the top level one by hand, even if it
   // doesn't finish last because of some background process span being captured
-  const topLevelNodes = flattenSpanTree(
-    organizeSpansIntoTree(spans),
-    "inside-out",
-  )
+  const topLevelNodes = flattenSpanTree(organizeSpansIntoTree(spans), "inside-out")
     .filter(nonEmptySpan)
     .toReversed();
-  const singleTopLevelNode =
-    topLevelNodes.length === 1 ? topLevelNodes[0] : undefined;
+  const singleTopLevelNode = topLevelNodes.length === 1 ? topLevelNodes[0] : undefined;
 
   if (singleTopLevelNode?.output) {
     return typedValueToText(singleTopLevelNode.output, true);
@@ -123,10 +111,9 @@ export const getLastOutputAsText = (spans: Span[]): string => {
     }
   }
 
-  const topmostSpan = flattenSpanTree(
-    organizeSpansIntoTree(spans),
-    "outside-in",
-  ).filter((span) => !span.parent_id)[0];
+  const topmostSpan = flattenSpanTree(organizeSpansIntoTree(spans), "outside-in").filter(
+    (span) => !span.parent_id,
+  )[0];
   if (topmostSpan?.params?.http?.status_code) {
     return topmostSpan.params.http.status_code.toString();
   }
@@ -278,16 +265,10 @@ export const typedValueToText = (
       if (typeof json.inputs === "object" && json.inputs.query !== undefined) {
         return json.inputs.query;
       }
-      if (
-        typeof json.inputs === "object" &&
-        json.inputs.question !== undefined
-      ) {
+      if (typeof json.inputs === "object" && json.inputs.question !== undefined) {
         return json.inputs.question;
       }
-      if (
-        typeof json.outputs === "object" &&
-        json.outputs.output !== undefined
-      ) {
+      if (typeof json.outputs === "object" && json.outputs.output !== undefined) {
         return json.outputs.output;
       }
       if (typeof json.outputs === "string") {
@@ -327,9 +308,7 @@ export const typedValueToText = (
       ) {
         const firstItem = json[Object.keys(json)[0]!];
         const mapped =
-          typeof firstItem === "object"
-            ? specialKeysMapping(firstItem)
-            : undefined;
+          typeof firstItem === "object" ? specialKeysMapping(firstItem) : undefined;
         if (mapped !== undefined) {
           return stringified(mapped);
         }
@@ -398,12 +377,7 @@ export const typedValueToText = (
       // Only recurse into structured SpanInputOutput items (have "type" and "value").
       // Non-structured list items (primitives, arbitrary objects) cannot be
       // meaningfully represented as text and are intentionally ignored.
-      if (
-        item &&
-        typeof item === "object" &&
-        "type" in item &&
-        "value" in item
-      ) {
+      if (item && typeof item === "object" && "type" in item && "value" in item) {
         return typedValueToText(item as SpanInputOutput, last, preferRole);
       }
     }

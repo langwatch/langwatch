@@ -19,11 +19,7 @@ export default function OpsProjectionsSectionPage() {
     <EventSourcingLayout pageTitle="Projections">
       <HStack marginBottom={3}>
         <Spacer />
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={() => openDrawer("opsReplay", {})}
-        >
+        <Button size="xs" variant="outline" onClick={() => openDrawer("opsReplay", {})}>
           <RotateCcw size={12} />
           Replay projections
         </Button>

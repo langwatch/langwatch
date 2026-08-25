@@ -18,8 +18,8 @@ export function LiteMemberRestrictionContent({
       <Dialog.Body>
         <VStack gap={4} align="start">
           <Text>
-            This feature is not available for your current role. Contact your
-            organization admin for access.
+            This feature is not available for your current role. Contact your organization
+            admin for access.
           </Text>
         </VStack>
       </Dialog.Body>

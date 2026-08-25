@@ -119,9 +119,7 @@ describe("given a spend rollup grouping", () => {
 
   describe("when the window has settled", () => {
     it("serves the movable grouping it would have refused", () => {
-      expect(windowHasSettled({ toMs: SETTLED_WINDOW_END, nowMs: NOW })).toBe(
-        true,
-      );
+      expect(windowHasSettled({ toMs: SETTLED_WINDOW_END, nowMs: NOW })).toBe(true);
       expect(() =>
         assertGroupingIsWalkable({
           keys: ["model", "provider"],
@@ -147,9 +145,7 @@ describe("given a spend rollup grouping", () => {
       );
       const meta = (refusal.meta ?? {}) as Record<string, unknown>;
       expect(meta.group_by).toEqual(["model", "bucket:hour"]);
-      expect(meta.settles_at).toBe(
-        new Date(LIVE_WINDOW_END + GRACE_MS).toISOString(),
-      );
+      expect(meta.settles_at).toBe(new Date(LIVE_WINDOW_END + GRACE_MS).toISOString());
     });
   });
 

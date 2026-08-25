@@ -102,8 +102,7 @@ secured.access(requires("traces:view")).get(
         in: "path",
         required: true,
         schema: { type: "string" },
-        description:
-          "The agent's own session id (session.id / conversation id).",
+        description: "The agent's own session id (session.id / conversation id).",
       },
       {
         name: "kinds",
@@ -117,8 +116,7 @@ secured.access(requires("traces:view")).get(
         in: "query",
         required: false,
         schema: { type: "string" },
-        description:
-          "Opaque keyset cursor from the previous response's nextCursor.",
+        description: "Opaque keyset cursor from the previous response's nextCursor.",
       },
       {
         name: "limit",
@@ -145,8 +143,7 @@ secured.access(requires("traces:view")).get(
     responses: {
       ...baseResponses,
       200: {
-        description:
-          "One page of session events plus the cursor for the next page",
+        description: "One page of session events plus the cursor for the next page",
         content: {
           "application/json": {
             schema: resolver(
@@ -181,18 +178,15 @@ secured.access(requires("traces:view")).get(
       throw new ValidationError("from and to must be supplied together");
     }
 
-    const { events, nextCursor } =
-      await c.app.codingAgents.sessions.getSessionEvents({
-        projectId: project.id,
-        sessionId,
-        kinds,
-        occurredAt:
-          from !== undefined && to !== undefined
-            ? { fromMs: from, toMs: to }
-            : undefined,
-        cursor,
-        limit,
-      });
+    const { events, nextCursor } = await c.app.codingAgents.sessions.getSessionEvents({
+      projectId: project.id,
+      sessionId,
+      kinds,
+      occurredAt:
+        from !== undefined && to !== undefined ? { fromMs: from, toMs: to } : undefined,
+      cursor,
+      limit,
+    });
 
     return c.json({
       events,
@@ -248,9 +242,10 @@ function encodeCursor(cursor: SessionEventsCursor): string {
 
 function decodeCursor(raw: string): SessionEventsCursor | null {
   try {
-    const parsed = JSON.parse(
-      Buffer.from(raw, "base64url").toString("utf8"),
-    ) as { t?: unknown; r?: unknown };
+    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as {
+      t?: unknown;
+      r?: unknown;
+    };
     if (typeof parsed.t !== "number" || typeof parsed.r !== "string") {
       return null;
     }
@@ -340,9 +335,7 @@ const usageQuerySchema = z.object({
    * states github.com, which is the default every instance has until it names
    * another host.
    */
-  host: z
-    .string()
-    .min(1),
+  host: z.string().min(1),
 });
 
 // GET /pull-request-usage: what one pull request cost in assistant usage,
@@ -410,9 +403,7 @@ secured.access(requires("traces:view")).get(
     const query = usageQuerySchema.safeParse({
       repository: c.req.query("repository"),
       pullRequest: c.req.query("pullRequest"),
-      host:
-        c.req.query("host") ??
-        new URL(c.app.github.getWebBase()).hostname,
+      host: c.req.query("host") ?? new URL(c.app.github.getWebBase()).hostname,
     });
     if (!query.success) throw ValidationError.fromZodError(query.error);
 
@@ -433,14 +424,13 @@ secured.access(requires("traces:view")).get(
       organizationId,
     });
 
-    const usage =
-      await c.app.codingAgents.pullRequestUsage.getPullRequestUsage({
-        organizationId,
-        repositoryHost: query.data.host,
-        repositoryFullName: query.data.repository,
-        prNumber: query.data.pullRequest,
-        ...scope,
-      });
+    const usage = await c.app.codingAgents.pullRequestUsage.getPullRequestUsage({
+      organizationId,
+      repositoryHost: query.data.host,
+      repositoryFullName: query.data.repository,
+      prNumber: query.data.pullRequest,
+      ...scope,
+    });
 
     // This answer names people, so who read it stays attributable. Awaited
     // before the answer leaves, so a read is never served unrecorded. Never
@@ -457,9 +447,7 @@ secured.access(requires("traces:view")).get(
         repository: query.data.repository,
         host: query.data.host,
         pullRequest: query.data.pullRequest,
-        contributingProjectCount: new Set(
-          usage.rows.map((row) => row.projectId),
-        ).size,
+        contributingProjectCount: new Set(usage.rows.map((row) => row.projectId)).size,
       },
     });
 

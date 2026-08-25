@@ -15,11 +15,7 @@ class AppEvaluatorAuditLogPort extends EvaluatorAuditLogPort {
     super();
   }
 
-  async history(input: {
-    evaluatorId: string;
-    projectId: string;
-    limit: number;
-  }) {
+  async history(input: { evaluatorId: string; projectId: string; limit: number }) {
     return this.database.auditLog.findMany({
       where: {
         projectId: input.projectId,

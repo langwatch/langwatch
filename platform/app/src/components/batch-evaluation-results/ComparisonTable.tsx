@@ -68,10 +68,7 @@ type ComparisonTableProps = {
 type ComparisonRow = {
   index: number;
   datasetEntries: Record<string, Record<string, unknown>>;
-  targetsByRun: Record<
-    string,
-    Record<string, BatchResultRow["targets"][string]>
-  >;
+  targetsByRun: Record<string, Record<string, BatchResultRow["targets"][string]>>;
   runColors: Record<string, string>;
 };
 
@@ -127,12 +124,7 @@ const buildComparisonColumns = ({
       header: "",
       size: 32,
       cell: ({ row }) => (
-        <Text
-          fontSize="12px"
-          color="fg.muted"
-          textAlign="right"
-          paddingRight={1}
-        >
+        <Text fontSize="12px" color="fg.muted" textAlign="right" paddingRight={1}>
           {row.original.index + 1}
         </Text>
       ),
@@ -195,8 +187,7 @@ const buildComparisonColumns = ({
 
   // Target columns with diff values.
   // Skip them entirely when no target field is shown.
-  const showTargetColumns =
-    showOutputs || showEvaluations || showCostAndLatency;
+  const showTargetColumns = showOutputs || showEvaluations || showCostAndLatency;
   for (const [targetId, targetCol] of showTargetColumns
     ? allTargetColumns
     : new Map<string, BatchTargetColumn>()) {
@@ -249,9 +240,7 @@ const buildComparisonColumns = ({
 /**
  * Transform comparison data into row format
  */
-const buildComparisonRows = (
-  comparisonData: ComparisonRunData[],
-): ComparisonRow[] => {
+const buildComparisonRows = (comparisonData: ComparisonRunData[]): ComparisonRow[] => {
   // Find the max row count across all runs
   const maxRows = Math.max(
     0,
@@ -423,12 +412,7 @@ const GroupMeanBadges = ({
         <VStack key={run.runId} gap={0} align="end">
           {entries.map(([evId, stats]) => (
             <HStack key={evId} gap={1} fontSize="11px" color="fg.muted">
-              <Box
-                width="6px"
-                height="6px"
-                borderRadius="full"
-                bg={run.color}
-              />
+              <Box width="6px" height="6px" borderRadius="full" bg={run.color} />
               <Text>{stats.evaluatorName}</Text>
               <Text
                 fontWeight="medium"
@@ -499,11 +483,7 @@ const GroupHeaderRow = ({
         <Text fontSize="13px" fontWeight="semibold">
           {value}
         </Text>
-        <Text
-          fontSize="12px"
-          color="fg.muted"
-          data-testid={`group-count-${value}`}
-        >
+        <Text fontSize="12px" color="fg.muted" data-testid={`group-count-${value}`}>
           {rowCount}
           {rowCount === 1 ? " row" : " rows"}
         </Text>
@@ -626,9 +606,7 @@ export function ComparisonTable({
       : null;
 
   // Collapse state for grouped sections.
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
   const toggleCollapse = useCallback((value: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -652,9 +630,7 @@ export function ComparisonTable({
   }, [comparisonRows, effectiveGroupBy, comparisonData]);
 
   // State for scroll container - using state triggers re-render when mounted
-  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(
-    null,
-  );
+  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
 
   // Callback ref to set the scroll container
   const scrollContainerRef = useCallback((node: HTMLDivElement | null) => {
@@ -665,15 +641,9 @@ export function ComparisonTable({
   const rowCount = comparisonRows.length;
 
   // Stable callbacks for virtualizer
-  const getScrollElement = useCallback(
-    () => scrollContainer,
-    [scrollContainer],
-  );
+  const getScrollElement = useCallback(() => scrollContainer, [scrollContainer]);
   const estimatedRowHeight = ESTIMATED_ROW_HEIGHT_PX[rowHeight];
-  const estimateSize = useCallback(
-    () => estimatedRowHeight,
-    [estimatedRowHeight],
-  );
+  const estimateSize = useCallback(() => estimatedRowHeight, [estimatedRowHeight]);
 
   // Set up row virtualization with dynamic measurement. Virtualization
   // assumes a flat tbody — when grouping is active we render multiple
@@ -686,8 +656,7 @@ export function ComparisonTable({
     enabled: !!scrollContainer && !groupedRows,
     measureElement:
       typeof window !== "undefined"
-        ? (element) =>
-            element?.getBoundingClientRect().height ?? estimatedRowHeight
+        ? (element) => element?.getBoundingClientRect().height ?? estimatedRowHeight
         : undefined,
   });
 
@@ -708,9 +677,8 @@ export function ComparisonTable({
   // Calculate minimum table width from first run with data
   const firstRunWithData = comparisonData.find((run) => run.data !== null);
   const datasetColCount =
-    firstRunWithData?.data?.datasetColumns.filter(
-      (c) => !hiddenColumns.has(c.name),
-    ).length ?? 0;
+    firstRunWithData?.data?.datasetColumns.filter((c) => !hiddenColumns.has(c.name))
+      .length ?? 0;
   const targetColCount =
     showOutputs || showEvaluations || showCostAndLatency
       ? (firstRunWithData?.data?.targetColumns.length ?? 0)
@@ -725,9 +693,7 @@ export function ComparisonTable({
   const columnCount = table.getAllColumns().length;
   // Lookup table-row by original index, so the grouped render can reuse
   // TanStack's column model without rebuilding cells from scratch.
-  const tableRowByIndex = new Map(
-    tableRows.map((r) => [r.original.index, r] as const),
-  );
+  const tableRowByIndex = new Map(tableRows.map((r) => [r.original.index, r] as const));
 
   // Calculate padding to maintain scroll position (only when virtualizing)
   const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
@@ -755,10 +721,7 @@ export function ComparisonTable({
                   <th key={header.id} style={{ width: header.getSize() }}>
                     {header.isPlaceholder
                       ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
+                      : flexRender(header.column.columnDef.header, header.getContext())}
                   </th>
                 ))}
               </tr>
@@ -788,14 +751,8 @@ export function ComparisonTable({
                 tableRows.map((row) => (
                   <tr key={row.id} data-index={row.index}>
                     {row.getVisibleCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        style={{ width: cell.column.getSize() }}
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
+                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
                   </tr>
@@ -822,14 +779,8 @@ export function ComparisonTable({
                         ref={rowVirtualizer.measureElement}
                       >
                         {row.getVisibleCells().map((cell) => (
-                          <td
-                            key={cell.id}
-                            style={{ width: cell.column.getSize() }}
-                          >
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext(),
-                            )}
+                          <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </td>
                         ))}
                       </tr>

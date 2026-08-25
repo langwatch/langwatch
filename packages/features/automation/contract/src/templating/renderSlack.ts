@@ -1,9 +1,6 @@
 import { testFireSlackBlock, testFireSlackText } from "./banner";
 import { filterBlockKit } from "./blockKitAllowlist";
-import {
-  DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
-  DEFAULT_SLACK_TEMPLATE,
-} from "./defaults";
+import { DEFAULT_SLACK_BLOCK_KIT_TEMPLATE, DEFAULT_SLACK_TEMPLATE } from "./defaults";
 import { renderLiquid } from "./engine";
 import { errorMessage, renderWithFallback } from "./renderWithFallback";
 import type {
@@ -25,9 +22,7 @@ export interface SlackRenderDefaults {
 
 export type SlackTemplateType = "string" | "block_kit";
 
-export type SlackPayload =
-  | { text: string }
-  | { blocks: Record<string, unknown>[] };
+export type SlackPayload = { text: string } | { blocks: Record<string, unknown>[] };
 
 export interface RenderedSlack {
   payload: SlackPayload;
@@ -72,14 +67,10 @@ function defaultSlackText({
   testFire: boolean;
   defaultSlackString: string;
 }): Promise<{ text: string; missingVariables: string[] }> {
-  return renderLiquid({ template: defaultSlackString, context }).then(
-    (rendered) => ({
-      text: testFire
-        ? `${testFireSlackText()}\n\n${rendered.output}`
-        : rendered.output,
-      missingVariables: rendered.missingVariables,
-    }),
-  );
+  return renderLiquid({ template: defaultSlackString, context }).then((rendered) => ({
+    text: testFire ? `${testFireSlackText()}\n\n${rendered.output}` : rendered.output,
+    missingVariables: rendered.missingVariables,
+  }));
 }
 
 /**
@@ -113,8 +104,7 @@ export async function renderTriggerSlack({
 }): Promise<RenderedSlack> {
   const ctx = context as unknown as Record<string, unknown>;
   const slackString = defaults?.slackString ?? DEFAULT_SLACK_TEMPLATE;
-  const slackBlockKit =
-    defaults?.slackBlockKit ?? DEFAULT_SLACK_BLOCK_KIT_TEMPLATE;
+  const slackBlockKit = defaults?.slackBlockKit ?? DEFAULT_SLACK_BLOCK_KIT_TEMPLATE;
 
   if (templateType !== "block_kit") {
     const rendered = await renderWithFallback({

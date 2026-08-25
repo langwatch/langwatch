@@ -14,9 +14,7 @@ import { DEFAULT_CLICKHOUSE_SETTINGS } from "./queryDefaults";
  * extension (e.g. {@link ResilientClickHouseClient}) so callers keep access to
  * the wrapped client's extra methods without a cast.
  */
-export function wrapWithDefaultSettings<T extends ClickHouseClient>(
-  client: T,
-): T {
+export function wrapWithDefaultSettings<T extends ClickHouseClient>(client: T): T {
   return new Proxy(client, {
     get(target, prop, receiver) {
       if (prop !== "query") {
@@ -28,9 +26,7 @@ export function wrapWithDefaultSettings<T extends ClickHouseClient>(
           ...params,
           clickhouse_settings: {
             ...DEFAULT_CLICKHOUSE_SETTINGS,
-            ...(params.clickhouse_settings as
-              | Record<string, unknown>
-              | undefined),
+            ...(params.clickhouse_settings as Record<string, unknown> | undefined),
           },
         };
         return target.query(merged as Parameters<typeof target.query>[0]);

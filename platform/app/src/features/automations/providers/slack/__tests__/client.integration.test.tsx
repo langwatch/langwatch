@@ -10,13 +10,7 @@
  * asserted through their wrapper test ids.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -28,10 +22,9 @@ vi.mock("~/components/ui/color-mode", () => ({
 }));
 /** Channels the mocked listSlackChannels mutation has "already loaded". Tests
  *  that care about the picker set this before rendering. */
-const listedChannels: { current: { id: string; name: string }[] | undefined } =
-  {
-    current: undefined,
-  };
+const listedChannels: { current: { id: string; name: string }[] | undefined } = {
+  current: undefined,
+};
 /** Why the listing is short of the workspace, as the server would report it. */
 const listedGaps: { current: string[] } = { current: [] };
 
@@ -54,15 +47,9 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import {
-  SLACK_BOT_TOKEN_KEPT,
-  type SlackPreview,
-} from "@langwatch/automation-contract";
+import { SLACK_BOT_TOKEN_KEPT, type SlackPreview } from "@langwatch/automation-contract";
 import slackClient, { type SlackSlice } from "../client";
-import {
-  SLACK_BLOCK_KIT_TEMPLATES,
-  templateOptionsFor,
-} from "../templates/registry";
+import { SLACK_BLOCK_KIT_TEMPLATES, templateOptionsFor } from "../templates/registry";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -106,9 +93,7 @@ function Harness({
   initial?: SlackSlice;
   onChangeSpy?: (next: SlackSlice) => void;
 }) {
-  const [slice, setSlice] = useState<SlackSlice>(
-    initial ?? slackClient.initialSlice(),
-  );
+  const [slice, setSlice] = useState<SlackSlice>(initial ?? slackClient.initialSlice());
   const Form = slackClient.ConfigForm;
   return (
     <Form
@@ -163,9 +148,7 @@ describe("SlackConfigForm authoring tiers", () => {
       it("keeps the code editor hidden", () => {
         renderForm();
 
-        expect(
-          screen.queryByTestId("slack-code-editor"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("slack-code-editor")).not.toBeInTheDocument();
       });
 
       it("renders the synced preview", () => {
@@ -248,9 +231,7 @@ describe("SlackConfigForm authoring tiers", () => {
       // "edit as code" disclosure (the drawer UX rework).
       await user.click(screen.getByRole("radio", { name: "Code" }));
 
-      expect(
-        await screen.findByTestId("slack-code-editor"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("slack-code-editor")).toBeInTheDocument();
     });
   });
 
@@ -279,14 +260,10 @@ describe("SlackConfigForm delivery method", () => {
     it("is bot-only — channel + token fields, no webhook option", () => {
       renderForm();
 
-      expect(
-        screen.getByPlaceholderText(/#alerts or c0123/i),
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/#alerts or c0123/i)).toBeInTheDocument();
       expect(screen.getByPlaceholderText(/xoxb-/i)).toBeInTheDocument();
       // A new automation cannot pick a webhook — no field, no connection toggle.
-      expect(
-        screen.queryByPlaceholderText(/hooks\.slack\.com/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText(/hooks\.slack\.com/i)).not.toBeInTheDocument();
       expect(
         screen.queryByRole("radio", { name: /incoming webhook/i }),
       ).not.toBeInTheDocument();
@@ -304,9 +281,7 @@ describe("SlackConfigForm delivery method", () => {
     it("keeps the webhook editable and offers an upgrade to a Slack app", () => {
       renderForm({ initial: legacySlice() });
 
-      expect(
-        screen.getByPlaceholderText(/hooks\.slack\.com/i),
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/hooks\.slack\.com/i)).toBeInTheDocument();
       expect(
         screen.getByRole("radio", { name: /incoming webhook/i }),
       ).toBeInTheDocument();
@@ -332,9 +307,7 @@ describe("SlackConfigForm delivery method", () => {
       expect(
         screen.getByPlaceholderText(/unchanged, leave blank to keep/i),
       ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /replace token/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /replace token/i })).toBeInTheDocument();
     });
 
     it("lets the author select a template that needs a Slack app", () => {
@@ -690,9 +663,7 @@ describe("SlackConfigForm channel picker", () => {
       it("shows the channel name rather than the raw id", async () => {
         renderForm({ initial: botSlice({ channelId: "C003" }) });
 
-        expect(
-          await screen.findByDisplayValue("#release-signoff"),
-        ).toBeInTheDocument();
+        expect(await screen.findByDisplayValue("#release-signoff")).toBeInTheDocument();
       });
     });
   });
@@ -702,17 +673,15 @@ describe("Slack client slice contract", () => {
   describe("given a bot slice", () => {
     describe("when the channel is set and a token is stored", () => {
       it("reports the config as complete without a typed token", () => {
-        expect(
-          slackClient.isComplete(botSlice({ botTokenAlreadySet: true })),
-        ).toBe(true);
+        expect(slackClient.isComplete(botSlice({ botTokenAlreadySet: true }))).toBe(true);
       });
     });
 
     describe("when the channel is set but no token exists yet", () => {
       it("reports the config as incomplete", () => {
-        expect(
-          slackClient.isComplete(botSlice({ botTokenAlreadySet: false })),
-        ).toBe(false);
+        expect(slackClient.isComplete(botSlice({ botTokenAlreadySet: false }))).toBe(
+          false,
+        );
       });
     });
 

@@ -4,9 +4,7 @@ import { extractLiquidVariables } from "../liquidTokenizer";
 describe("extractLiquidVariables()", () => {
   describe("when text contains variables inside Liquid tags", () => {
     it("finds variables in both tag conditions and variable expressions", () => {
-      const result = extractLiquidVariables(
-        "{% if tone %}{{ name }}{% endif %}",
-      );
+      const result = extractLiquidVariables("{% if tone %}{{ name }}{% endif %}");
 
       expect(result.inputVariables).toContain("tone");
       expect(result.inputVariables).toContain("name");
@@ -47,9 +45,7 @@ describe("extractLiquidVariables()", () => {
 
   describe("when text contains filters", () => {
     it("extracts only the variable name, not filter names", () => {
-      const result = extractLiquidVariables(
-        "{{ name | upcase | truncate: 20 }}",
-      );
+      const result = extractLiquidVariables("{{ name | upcase | truncate: 20 }}");
 
       expect(result.inputVariables).toContain("name");
       expect(result.inputVariables).not.toContain("upcase");
@@ -78,9 +74,7 @@ describe("extractLiquidVariables()", () => {
 
   describe("when text contains for loops with range literals", () => {
     it("does not treat range literals like (1..5) as variables", () => {
-      const result = extractLiquidVariables(
-        "{% for i in (1..5) %}{{ i }}{% endfor %}",
-      );
+      const result = extractLiquidVariables("{% for i in (1..5) %}{{ i }}{% endfor %}");
 
       expect(result.loopVariables).toContain("i");
       expect(result.inputVariables).not.toContain("(1");

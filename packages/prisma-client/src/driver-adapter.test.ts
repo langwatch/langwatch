@@ -6,12 +6,9 @@ describe("PrismaDriverAdapterService", () => {
 
   it("routes model and raw queries to the URL schema", () => {
     expect(
-      service.poolConfig(
-        "postgresql://user:pass@localhost:5432/db?schema=langwatch_db",
-      ),
+      service.poolConfig("postgresql://user:pass@localhost:5432/db?schema=langwatch_db"),
     ).toEqual({
-      connectionString:
-        "postgresql://user:pass@localhost:5432/db?schema=langwatch_db",
+      connectionString: "postgresql://user:pass@localhost:5432/db?schema=langwatch_db",
       schema: "langwatch_db",
       options: '-c search_path="langwatch_db"',
     });
@@ -19,12 +16,9 @@ describe("PrismaDriverAdapterService", () => {
 
   it("maps Prisma pool tuning parameters onto pg", () => {
     expect(
-      service.poolConfig(
-        "postgresql://localhost/db?connection_limit=7&pool_timeout=20",
-      ),
+      service.poolConfig("postgresql://localhost/db?connection_limit=7&pool_timeout=20"),
     ).toEqual({
-      connectionString:
-        "postgresql://localhost/db?connection_limit=7&pool_timeout=20",
+      connectionString: "postgresql://localhost/db?connection_limit=7&pool_timeout=20",
       schema: undefined,
       max: 7,
       connectionTimeoutMillis: 20_000,

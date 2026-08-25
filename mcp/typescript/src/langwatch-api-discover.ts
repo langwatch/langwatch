@@ -62,9 +62,7 @@ async function postDiscover<T>(url: string): Promise<T> {
     );
   }
   if (!response.ok) {
-    throw new Error(
-      `rpc.discover fetch failed for ${url}: HTTP ${response.status}`,
-    );
+    throw new Error(`rpc.discover fetch failed for ${url}: HTTP ${response.status}`);
   }
   return (await response.json()) as T;
 }

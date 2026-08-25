@@ -118,9 +118,8 @@ vi.mock("~/components/Markdown", () => ({
 vi.mock("@paper-design/shaders-react", () => ({ MeshGradient: () => null }));
 
 vi.mock("~/utils/api", async () => {
-  const { createTrpcUtils, idleQuery, withFallback } = await import(
-    "./support/langyApiMock"
-  );
+  const { createTrpcUtils, idleQuery, withFallback } =
+    await import("./support/langyApiMock");
   const trpcUtils = createTrpcUtils();
 
   return {
@@ -266,10 +265,7 @@ const streamToken = (answerSoFar: string) =>
 const lastPropsFor = (messageId: string) =>
   [...rendered]
     .reverse()
-    .find(
-      (props) =>
-        (props.message as { id?: string } | undefined)?.id === messageId,
-    );
+    .find((props) => (props.message as { id?: string } | undefined)?.id === messageId);
 
 describe("given a conversation with an open choices card", () => {
   beforeEach(() => {

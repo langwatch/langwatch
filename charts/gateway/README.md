@@ -65,18 +65,18 @@ helm install gateway ./charts/gateway -n langwatch -f values.prod.yaml
 The defaults in `values.yaml` are tuned for typical production
 self-hosting. The values you most often override:
 
-| Path                          | Purpose                                                              |
-|-------------------------------|----------------------------------------------------------------------|
-| `image.tag`                   | Image tag override (defaults to `Chart.AppVersion`)                  |
-| `controlPlane.baseUrl`        | URL of your LangWatch app. Empty resolves to `<release>-app:5560`     |
-| `secrets.existingSecretName`  | Name of the Secret created above (default `gateway-runtime-secrets`) |
-| `ingress.host`                | Customer-facing hostname for the gateway                             |
-| `ingress.tls.secretName`      | TLS Secret managed by cert-manager (or BYO)                          |
-| `replicaCount`                | Static replicas if `autoscaling.enabled: false`                      |
-| `autoscaling.minReplicas` / `maxReplicas` | HPA bounds                                              |
-| `resources`                   | Pod CPU/memory requests + limits                                     |
-| `otel.endpoint`               | Optional OTLP HTTP exporter URL (gateway emits its own spans)        |
-| `spend.enabled`               | Kill switch for spend emission (default `true`). Off means no budget debits are ever written |
+| Path                                      | Purpose                                                                                      |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `image.tag`                               | Image tag override (defaults to `Chart.AppVersion`)                                          |
+| `controlPlane.baseUrl`                    | URL of your LangWatch app. Empty resolves to `<release>-app:5560`                            |
+| `secrets.existingSecretName`              | Name of the Secret created above (default `gateway-runtime-secrets`)                         |
+| `ingress.host`                            | Customer-facing hostname for the gateway                                                     |
+| `ingress.tls.secretName`                  | TLS Secret managed by cert-manager (or BYO)                                                  |
+| `replicaCount`                            | Static replicas if `autoscaling.enabled: false`                                              |
+| `autoscaling.minReplicas` / `maxReplicas` | HPA bounds                                                                                   |
+| `resources`                               | Pod CPU/memory requests + limits                                                             |
+| `otel.endpoint`                           | Optional OTLP HTTP exporter URL (gateway emits its own spans)                                |
+| `spend.enabled`                           | Kill switch for spend emission (default `true`). Off means no budget debits are ever written |
 
 The pod ships hardened (`podSecurityContext` / `containerSecurityContext` in
 `values.yaml`): non-root at both pod and container level, read-only root,
@@ -101,11 +101,11 @@ today survive v1.1 without re-pinning. See
 The chart wires three Kubernetes probes against the gateway's HTTP
 listener (port `5563`, named `http`):
 
-| Probe        | Endpoint    | Validates                                                  |
-|--------------|-------------|------------------------------------------------------------|
-| `livenessProbe` | `/healthz`  | Process is responsive (cheap; never does network I/O)      |
-| `readinessProbe`| `/readyz`   | Pod is not draining; OK to receive new traffic             |
-| `startupProbe`  | `/startupz` | Auth-cache bootstrap completed; gives ~60 s of boot room   |
+| Probe            | Endpoint    | Validates                                                |
+| ---------------- | ----------- | -------------------------------------------------------- |
+| `livenessProbe`  | `/healthz`  | Process is responsive (cheap; never does network I/O)    |
+| `readinessProbe` | `/readyz`   | Pod is not draining; OK to receive new traffic           |
+| `startupProbe`   | `/startupz` | Auth-cache bootstrap completed; gives ~60 s of boot room |
 
 Response shape and tuning are documented in
 [Health Checks](https://docs.langwatch.ai/ai-gateway/self-hosting/health-checks).

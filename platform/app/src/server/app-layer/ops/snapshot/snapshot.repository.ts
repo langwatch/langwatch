@@ -122,15 +122,9 @@ export interface SnapshotRepository {
   /** No-op when this instance does not hold the lease. */
   releaseLease(): Promise<void>;
   /** Resolves true when the artifact was published, false when fenced out. */
-  writeLive(params: {
-    snapshot: LiveSnapshot;
-    leaseToken: string;
-  }): Promise<boolean>;
+  writeLive(params: { snapshot: LiveSnapshot; leaseToken: string }): Promise<boolean>;
   /** Resolves true when the artifact was published, false when fenced out. */
-  writeDetail(params: {
-    snapshot: DetailSnapshot;
-    leaseToken: string;
-  }): Promise<boolean>;
+  writeDetail(params: { snapshot: DetailSnapshot; leaseToken: string }): Promise<boolean>;
   readLive(): Promise<LiveSnapshot | null>;
   readDetail(): Promise<DetailSnapshot | null>;
 }
@@ -150,11 +144,7 @@ export class SnapshotRedisRepository implements SnapshotRepository {
    * not the writer id, is what lands in the lease key — see `LeaseState.token`
    * for why a stable per-pod value cannot fence a write.
    */
-  async acquireOrRenewLease({
-    writerId,
-  }: {
-    writerId: string;
-  }): Promise<LeaseState> {
+  async acquireOrRenewLease({ writerId }: { writerId: string }): Promise<LeaseState> {
     if (this.currentToken) {
       const renewed = await this.redis.eval(
         RENEW_LUA,
@@ -194,12 +184,7 @@ export class SnapshotRedisRepository implements SnapshotRepository {
 
   async releaseLease(): Promise<void> {
     if (!this.currentToken) return;
-    await this.redis.eval(
-      RELEASE_LUA,
-      1,
-      SNAPSHOT_LEASE_KEY,
-      this.currentToken,
-    );
+    await this.redis.eval(RELEASE_LUA, 1, SNAPSHOT_LEASE_KEY, this.currentToken);
     this.currentToken = null;
   }
 
@@ -258,16 +243,10 @@ export class SnapshotRedisRepository implements SnapshotRepository {
   }
 
   async readLive(): Promise<LiveSnapshot | null> {
-    return parseSnapshot(
-      liveSnapshotSchema,
-      await this.redis.get(SNAPSHOT_LIVE_KEY),
-    );
+    return parseSnapshot(liveSnapshotSchema, await this.redis.get(SNAPSHOT_LIVE_KEY));
   }
 
   async readDetail(): Promise<DetailSnapshot | null> {
-    return parseSnapshot(
-      detailSnapshotSchema,
-      await this.redis.get(SNAPSHOT_DETAIL_KEY),
-    );
+    return parseSnapshot(detailSnapshotSchema, await this.redis.get(SNAPSHOT_DETAIL_KEY));
   }
 }

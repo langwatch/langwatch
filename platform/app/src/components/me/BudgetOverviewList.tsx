@@ -111,11 +111,7 @@ function barColor(item: BudgetOverviewItemView): string {
   return "blue.400";
 }
 
-export function BudgetOverviewList({
-  items,
-}: {
-  items: BudgetOverviewItemView[];
-}) {
+export function BudgetOverviewList({ items }: { items: BudgetOverviewItemView[] }) {
   return (
     <VStack align="stretch" gap={4}>
       {items.map((item) => {
@@ -188,22 +184,16 @@ function BudgetTooltip({ item }: { item: BudgetOverviewItemView }) {
   return (
     <VStack gap={0.5} align="start">
       <Text fontWeight="semibold">{item.name}</Text>
-      {item.providerLabel && (
-        <Text>Counts {item.providerLabel} spend only</Text>
-      )}
+      {item.providerLabel && <Text>Counts {item.providerLabel} spend only</Text>}
       {item.isPerMember && (
-        <Text>
-          Per-member allowance: each member of {item.scopeLabel} gets this much
-        </Text>
+        <Text>Per-member allowance: each member of {item.scopeLabel} gets this much</Text>
       )}
       {item.onBreach === "BLOCK" ? (
         <Text>Blocks requests when the limit is reached</Text>
       ) : (
         <Text>Warns when the limit is reached, without blocking</Text>
       )}
-      {item.resetsAt && (
-        <Text>Resets {new Date(item.resetsAt).toLocaleString()}</Text>
-      )}
+      {item.resetsAt && <Text>Resets {new Date(item.resetsAt).toLocaleString()}</Text>}
       {item.topModels && item.topModels.length > 0 && (
         <>
           <Text marginTop={1}>Top models this month:</Text>

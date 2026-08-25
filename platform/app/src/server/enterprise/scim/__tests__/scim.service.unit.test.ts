@@ -62,9 +62,7 @@ function createMockPrisma() {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    $transaction: vi
-      .fn()
-      .mockImplementation((ops: unknown[]) => Promise.all(ops)),
+    $transaction: vi.fn().mockImplementation((ops: unknown[]) => Promise.all(ops)),
   };
   return mock as unknown as PrismaClient;
 }
@@ -145,15 +143,11 @@ describe("ScimService", () => {
     describe("when the user does not exist", () => {
       it("creates a new user and adds them to the organization", async () => {
         const newUser = buildMockUser();
-        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
-          null,
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (prisma.user.create as ReturnType<typeof vi.fn>).mockResolvedValue(newUser);
+        (prisma.organizationUser.create as ReturnType<typeof vi.fn>).mockResolvedValue(
+          {},
         );
-        (prisma.user.create as ReturnType<typeof vi.fn>).mockResolvedValue(
-          newUser,
-        );
-        (
-          prisma.organizationUser.create as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({});
 
         const result = await service.createUser({
           request: {
@@ -217,9 +211,9 @@ describe("ScimService", () => {
         (
           prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
         ).mockResolvedValue(null);
-        (
-          prisma.organizationUser.create as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({});
+        (prisma.organizationUser.create as ReturnType<typeof vi.fn>).mockResolvedValue(
+          {},
+        );
 
         const result = await service.createUser({
           request: {
@@ -249,9 +243,7 @@ describe("ScimService", () => {
         (
           prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
         ).mockResolvedValue(null);
-        (
-          prisma.organizationUser.create as ReturnType<typeof vi.fn>
-        ).mockRejectedValue(
+        (prisma.organizationUser.create as ReturnType<typeof vi.fn>).mockRejectedValue(
           new PrismaClientKnownRequestError("Unique constraint failed", {
             code: "P2002",
             clientVersion: "7.0.0",
@@ -325,12 +317,10 @@ describe("ScimService", () => {
     describe("when listing without a filter", () => {
       it("returns all org members in SCIM list format", async () => {
         const user = buildMockUser();
-        (
-          prisma.organizationUser.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([{ user }]);
-        (
-          prisma.organizationUser.count as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(1);
+        (prisma.organizationUser.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+          { user },
+        ]);
+        (prisma.organizationUser.count as ReturnType<typeof vi.fn>).mockResolvedValue(1);
 
         const result = await service.listUsers({ organizationId: "org-1" });
 
@@ -339,21 +329,16 @@ describe("ScimService", () => {
         ]);
         expect(result.totalResults).toBe(1);
         expect(result.Resources).toHaveLength(1);
-        expect(result.Resources[0]).toHaveProperty(
-          "userName",
-          "alice@acme.com",
-        );
+        expect(result.Resources[0]).toHaveProperty("userName", "alice@acme.com");
       });
     });
 
     describe("when filtering by userName", () => {
       it("passes the email filter to the query", async () => {
-        (
-          prisma.organizationUser.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([]);
-        (
-          prisma.organizationUser.count as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(0);
+        (prisma.organizationUser.findMany as ReturnType<typeof vi.fn>).mockResolvedValue(
+          [],
+        );
+        (prisma.organizationUser.count as ReturnType<typeof vi.fn>).mockResolvedValue(0);
 
         await service.listUsers({
           organizationId: "org-1",
@@ -408,9 +393,10 @@ describe("ScimService", () => {
           userId: "user-1",
           organizationId: "org-1",
         });
-        (
-          prisma.roleBinding.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([{ id: "rb-1" }, { id: "rb-2" }]);
+        (prisma.roleBinding.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+          { id: "rb-1" },
+          { id: "rb-2" },
+        ]);
         (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue(
           buildMockUser({ deactivatedAt: new Date() }),
         );

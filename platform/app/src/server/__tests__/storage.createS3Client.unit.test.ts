@@ -61,8 +61,7 @@ vi.mock("../../env.mjs", () => ({
           S3_SESSION_TOKEN: process.env.S3_SESSION_TOKEN,
           S3_REGION: process.env.S3_REGION,
           S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
-          LANGWATCH_LOCAL_STORAGE_PATH:
-            process.env.LANGWATCH_LOCAL_STORAGE_PATH,
+          LANGWATCH_LOCAL_STORAGE_PATH: process.env.LANGWATCH_LOCAL_STORAGE_PATH,
         };
         return map[key];
       },
@@ -275,9 +274,7 @@ describe("given the resolved destination is azure", () => {
     it("throws a configuration error identifying the azure backend instead of falling back to the langwatch bucket", async () => {
       const createS3ClientFresh = await importWithAzureDestination();
 
-      await expect(createS3ClientFresh("test-project")).rejects.toThrow(
-        /azure/i,
-      );
+      await expect(createS3ClientFresh("test-project")).rejects.toThrow(/azure/i);
       expect(s3ClientConstructorCalls).toHaveLength(0);
     });
   });

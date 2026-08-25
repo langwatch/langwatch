@@ -21,16 +21,11 @@ import {
   SimulationExecutionPort,
 } from "@langwatch/simulation-server";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
 import { ScenarioRunExportService } from "../scenario-run-export.service";
 import type { ScenarioRunExportRequest } from "../types";
 
-function buildRun(
-  overrides: Partial<SimulationExportRun> = {},
-): SimulationExportRun {
+function buildRun(overrides: Partial<SimulationExportRun> = {}): SimulationExportRun {
   return {
     scenarioRunId: "run_1",
     scenarioId: "scenario_1",
@@ -90,9 +85,7 @@ function pagingService(pages: SimulationExportRun[][]): {
 } {
   const calls: FindCall[] = [];
   const simulations = createSimulationService();
-  vi.spyOn(simulations, "countRunsForExport").mockResolvedValue(
-    pages.flat().length,
-  );
+  vi.spyOn(simulations, "countRunsForExport").mockResolvedValue(pages.flat().length);
   vi.spyOn(simulations, "findRunsForExport").mockImplementation(
     async (params: FindCall) => {
       calls.push(params);
@@ -162,11 +155,7 @@ describe("ScenarioRunExportService", () => {
         .split("\n")
         .filter((line) => line.startsWith("run_scenario_name,"));
       expect(headerLines).toHaveLength(1);
-      expect(rowsOf(csv).map((row) => row.run_scenario_run_id)).toEqual([
-        "a",
-        "b",
-        "c",
-      ]);
+      expect(rowsOf(csv).map((row) => row.run_scenario_run_id)).toEqual(["a", "b", "c"]);
     });
 
     /** @scenario Progress is shown while a large export streams */

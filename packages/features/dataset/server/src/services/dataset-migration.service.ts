@@ -1,15 +1,9 @@
 import type { DatasetStorage } from "../ports/dataset-storage.port";
-import {
-  DatasetRecordContentRepository,
-} from "../repositories/prisma/dataset-record-content.repository";
-import {
-  withDatasetLock as runWithDatasetLock,
-} from "./dataset-lock";
+import { DatasetRecordContentRepository } from "../repositories/prisma/dataset-record-content.repository";
+import { withDatasetLock as runWithDatasetLock } from "./dataset-lock";
 import { StreamingChunkWriter } from "./dataset-chunk-writer";
 
-type DatasetDatabase = Parameters<
-  typeof DatasetRecordContentRepository.create
->[0];
+type DatasetDatabase = Parameters<typeof DatasetRecordContentRepository.create>[0];
 
 export type DatasetMigrationRecord = { id: string; entry: unknown };
 
@@ -24,10 +18,13 @@ export interface DatasetMigrationRepository {
     take: number;
     cursorId?: string;
   }): Promise<DatasetMigrationRecord[]>;
-  countAndMaxUpdatedAt(input: {
-    datasetId: string;
-    projectId: string;
-  }, options?: { tx?: DatasetMigrationTransaction }): Promise<{
+  countAndMaxUpdatedAt(
+    input: {
+      datasetId: string;
+      projectId: string;
+    },
+    options?: { tx?: DatasetMigrationTransaction },
+  ): Promise<{
     count: number;
     maxUpdatedAt: Date | null;
   }>;
@@ -58,10 +55,13 @@ export class DatasetMigrationService implements DatasetMigrationRepository {
     return this.records.findDatasetRecordsPage(input);
   }
 
-  countAndMaxUpdatedAt(input: {
-    datasetId: string;
-    projectId: string;
-  }, options?: { tx?: DatasetMigrationTransaction }): Promise<{
+  countAndMaxUpdatedAt(
+    input: {
+      datasetId: string;
+      projectId: string;
+    },
+    options?: { tx?: DatasetMigrationTransaction },
+  ): Promise<{
     count: number;
     maxUpdatedAt: Date | null;
   }> {
@@ -74,9 +74,7 @@ export class DatasetMigrationService implements DatasetMigrationRepository {
     storage: DatasetStorage;
     projectId: string;
     datasetId: string;
-    readPage: (
-      cursorId?: string,
-    ) => Promise<DatasetMigrationRecord[]>;
+    readPage: (cursorId?: string) => Promise<DatasetMigrationRecord[]>;
   }): Promise<{
     rowCount: number;
     sizeBytes: number;
@@ -95,9 +93,7 @@ export class DatasetMigrationService implements DatasetMigrationRepository {
     storage: DatasetStorage;
     projectId: string;
     datasetId: string;
-    readPage: (
-      cursorId?: string,
-    ) => Promise<DatasetMigrationRecord[]>;
+    readPage: (cursorId?: string) => Promise<DatasetMigrationRecord[]>;
   }): Promise<{
     rowCount: number;
     sizeBytes: number;
@@ -130,11 +126,7 @@ export class DatasetMigrationService implements DatasetMigrationRepository {
     datasetId: string,
     fn: (transaction: DatasetMigrationTransaction) => Promise<T>,
   ): Promise<T> {
-    return DatasetMigrationService.withDatasetLock(
-      this.database,
-      datasetId,
-      fn,
-    );
+    return DatasetMigrationService.withDatasetLock(this.database, datasetId, fn);
   }
 
   static withDatasetLock<T>(
@@ -142,9 +134,8 @@ export class DatasetMigrationService implements DatasetMigrationRepository {
     datasetId: string,
     fn: (transaction: DatasetMigrationTransaction) => Promise<T>,
   ): Promise<T> {
-    return runWithDatasetLock(
-      { prisma: database, datasetId },
-      (transaction) => fn(transaction),
+    return runWithDatasetLock({ prisma: database, datasetId }, (transaction) =>
+      fn(transaction),
     );
   }
 }

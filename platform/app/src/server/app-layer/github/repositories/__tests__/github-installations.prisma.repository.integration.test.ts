@@ -58,9 +58,7 @@ describe("PrismaGithubInstallationsRepository.insertOrGetExisting", () => {
       const installationId = `${namespace}-fresh`;
       const orgId = `${namespace}-org-a`;
 
-      const result = await repository.insertOrGetExisting(
-        input(installationId, orgId),
-      );
+      const result = await repository.insertOrGetExisting(input(installationId, orgId));
 
       expect(result.wasInserted).toBe(true);
       expect(result.row.organizationId).toBe(orgId);
@@ -85,9 +83,7 @@ describe("PrismaGithubInstallationsRepository.insertOrGetExisting", () => {
       // The loser's "existing" read is the winner's committed row — never a
       // stale/absent value — proving the unique index, not call ordering,
       // resolved the race.
-      expect(conflicted[0]!.row.organizationId).toBe(
-        inserted[0]!.row.organizationId,
-      );
+      expect(conflicted[0]!.row.organizationId).toBe(inserted[0]!.row.organizationId);
 
       const stored = await prisma.githubInstallation.findUnique({
         where: { installationId },
@@ -119,9 +115,7 @@ describe("PrismaGithubInstallationsRepository.insertOrGetExisting", () => {
       const orgB = `${namespace}-org-b`;
       await repository.insertOrGetExisting(input(installationId, orgA));
 
-      const result = await repository.insertOrGetExisting(
-        input(installationId, orgB),
-      );
+      const result = await repository.insertOrGetExisting(input(installationId, orgB));
 
       expect(result.wasInserted).toBe(false);
       expect(result.row.organizationId).toBe(orgA);

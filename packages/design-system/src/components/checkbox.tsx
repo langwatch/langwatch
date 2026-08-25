@@ -22,14 +22,10 @@ export const Checkbox = React.forwardRef<
   return (
     <ChakraCheckbox.Root ref={rootRef} {...(rest as any as CheckboxProps)}>
       <ChakraCheckbox.HiddenInput ref={ref} {...inputProps} />
-      <ChakraCheckbox.Control
-        borderColor={!rest.checked ? rest.borderColor : undefined}
-      >
+      <ChakraCheckbox.Control borderColor={!rest.checked ? rest.borderColor : undefined}>
         {icon ?? <ChakraCheckbox.Indicator />}
       </ChakraCheckbox.Control>
-      {children != null && (
-        <ChakraCheckbox.Label>{children}</ChakraCheckbox.Label>
-      )}
+      {children != null && <ChakraCheckbox.Label>{children}</ChakraCheckbox.Label>}
     </ChakraCheckbox.Root>
   );
 });

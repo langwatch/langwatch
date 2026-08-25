@@ -6,7 +6,12 @@ sidebarTitle: Audit log
 
 Every gateway-resource mutation (Virtual Key, Budget, ModelProvider, Routing Policy, Cache Rule) writes a row to the platform-wide `AuditLog` table. There is no separate gateway-only audit table, gateway events live alongside org-level platform events (member changes, settings, RBAC, billing) in **/settings/audit-log**, with a Source badge distinguishing the two.
 
-<Note>**One audit log, two write shapes.** Gateway-shape rows carry `targetKind`, `targetId`, `before`, `after`. Platform-shape rows carry `args`, `metadata`, `error`. The viewer renders both with the same row template, computes `source` from the presence of `targetKind`, and offers a target-kind filter for narrowing to gateway events only.</Note>
+<Note>
+  **One audit log, two write shapes.** Gateway-shape rows carry `targetKind`, `targetId`,
+  `before`, `after`. Platform-shape rows carry `args`, `metadata`, `error`. The viewer
+  renders both with the same row template, computes `source` from the presence of
+  `targetKind`, and offers a target-kind filter for narrowing to gateway events only.
+</Note>
 
 ## What's logged
 
@@ -14,12 +19,12 @@ Action codes for gateway mutations (TypeScript `const` union in `platform/app/sr
 
 Action codes use a `gateway.<resource>.<verb>` dotted-lowercase shape, parallel to platform-side codes (`organization.member.add`, `project.update`). Verbs are past-tense to match Stripe, GitHub, Slack, Datadog audit conventions.
 
-| Action code | Actor | Target |
-|---|---|---|
-| `gateway.virtual_key.{created, updated, rotated, revoked, deleted}` | resolved user (session, PAT, or API token mapped to a user) | `targetKind=virtual_key`, `targetId=<vk_id>` |
-| `gateway.budget.{created, updated, deleted}` | same | `targetKind=budget`, `targetId=<budget_id>` (`deleted` is the soft-archive) |
-| `gateway.provider_binding.{created, updated, deleted}` | same | `targetKind=provider_binding`, `targetId=<binding_id>` |
-| `gateway.cache_rule.{created, updated, deleted}` | same | `targetKind=cache_rule`, `targetId=<rule_id>` |
+| Action code                                                         | Actor                                                       | Target                                                                      |
+| ------------------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `gateway.virtual_key.{created, updated, rotated, revoked, deleted}` | resolved user (session, PAT, or API token mapped to a user) | `targetKind=virtual_key`, `targetId=<vk_id>`                                |
+| `gateway.budget.{created, updated, deleted}`                        | same                                                        | `targetKind=budget`, `targetId=<budget_id>` (`deleted` is the soft-archive) |
+| `gateway.provider_binding.{created, updated, deleted}`              | same                                                        | `targetKind=provider_binding`, `targetId=<binding_id>`                      |
+| `gateway.cache_rule.{created, updated, deleted}`                    | same                                                        | `targetKind=cache_rule`, `targetId=<rule_id>`                               |
 
 <Info>Guardrail attach/detach events are NOT recorded as standalone audit rows, guardrail configuration changes flow through `gateway.virtual_key.updated` (the guardrail list is a field on `VirtualKey.config`). Standalone `gateway.guardrail.{attached, detached}` actions are a v1.1 follow-up if operators want finer-grained audit.</Info>
 

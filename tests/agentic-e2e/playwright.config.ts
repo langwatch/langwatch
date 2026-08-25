@@ -35,10 +35,7 @@ export default defineConfig({
   retries: IS_CI ? 2 : 0,
 
   /* Reporter configuration */
-  reporter: [
-    ["html", { outputFolder: "./playwright-report" }],
-    ["list"],
-  ],
+  reporter: [["html", { outputFolder: "./playwright-report" }], ["list"]],
 
   /* Shared settings for all projects */
   use: {

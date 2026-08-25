@@ -149,12 +149,7 @@ function AddSpanMenu({ parentId }: { parentId: string | null }) {
       </Flex>
       {isOpen && (
         <>
-          <Box
-            position="fixed"
-            inset={0}
-            zIndex={10}
-            onClick={() => setIsOpen(false)}
-          />
+          <Box position="fixed" inset={0} zIndex={10} onClick={() => setIsOpen(false)} />
           <Box
             position="absolute"
             left={0}

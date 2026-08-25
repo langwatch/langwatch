@@ -59,14 +59,10 @@ async function login(page) {
     waitUntil: "domcontentloaded",
     timeout: 45_000,
   });
-  const emailInput = page
-    .locator('input[name="email"], input[type="email"]')
-    .first();
+  const emailInput = page.locator('input[name="email"], input[type="email"]').first();
   await emailInput.waitFor({ state: "visible", timeout: 10_000 });
   await emailInput.fill(EMAIL);
-  const pwInput = page
-    .locator('input[name="password"], input[type="password"]')
-    .first();
+  const pwInput = page.locator('input[name="password"], input[type="password"]').first();
   await pwInput.fill(PASSWORD);
   const signIn = page.getByRole("button", { name: /sign in/i }).first();
   await signIn.click();
@@ -108,8 +104,7 @@ async function login(page) {
     }
 
     if (wants("me-traces")) {
-      const slug =
-        process.env.PERSONAL_PROJECT_SLUG ?? "personal-hc4fdei9kqog--yvcpd";
+      const slug = process.env.PERSONAL_PROJECT_SLUG ?? "personal-hc4fdei9kqog--yvcpd";
       await page.goto(`${BASE}/${slug}/traces`, {
         waitUntil: "domcontentloaded",
         timeout: 45_000,
@@ -119,11 +114,8 @@ async function login(page) {
     }
 
     if (wants("trace-details")) {
-      const slug =
-        process.env.PERSONAL_PROJECT_SLUG ?? "personal-hc4fdei9kqog--yvcpd";
-      const traceIds = (process.env.TRACE_IDS ?? "")
-        .split(",")
-        .filter(Boolean);
+      const slug = process.env.PERSONAL_PROJECT_SLUG ?? "personal-hc4fdei9kqog--yvcpd";
+      const traceIds = (process.env.TRACE_IDS ?? "").split(",").filter(Boolean);
       for (const [idx, tid] of traceIds.entries()) {
         // v2 lives at /traces (not /messages, which is the pre-v2 page),
         // and the v2 drawer is keyed by `drawer.open=traceV2Details`

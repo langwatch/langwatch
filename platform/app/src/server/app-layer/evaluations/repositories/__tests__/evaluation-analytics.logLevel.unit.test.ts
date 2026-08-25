@@ -23,12 +23,10 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => logger,
 }));
 
-const { EvaluationAnalyticsClickHouseRepository } = await import(
-  "../evaluation-analytics.clickhouse.repository"
-);
-const { EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST } = await import(
-  "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection"
-);
+const { EvaluationAnalyticsClickHouseRepository } =
+  await import("../evaluation-analytics.clickhouse.repository");
+const { EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST } =
+  await import("~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection");
 
 const TENANT_ID = "project_evalanalyticsloglevel";
 const EVALUATION_ID = "eval-log-level";
@@ -63,9 +61,7 @@ describe("evaluation analytics writes", () => {
         logger.warn.mockClear();
         logger.error.mockClear();
 
-        await expect(refusingRepository().upsert(row())).rejects.toThrow(
-          REFUSED,
-        );
+        await expect(refusingRepository().upsert(row())).rejects.toThrow(REFUSED);
 
         expect(logger.error).not.toHaveBeenCalled();
         expect(logger.warn).toHaveBeenCalledTimes(1);
@@ -75,9 +71,7 @@ describe("evaluation analytics writes", () => {
       it("keeps the identifiers only this layer holds", async () => {
         logger.warn.mockClear();
 
-        await expect(refusingRepository().upsert(row())).rejects.toThrow(
-          REFUSED,
-        );
+        await expect(refusingRepository().upsert(row())).rejects.toThrow(REFUSED);
 
         expect(logger.warn.mock.calls[0]?.[0]).toMatchObject({
           tenantId: TENANT_ID,
@@ -91,9 +85,7 @@ describe("evaluation analytics writes", () => {
       it("passes the Error instance so the stack survives", async () => {
         logger.warn.mockClear();
 
-        await expect(refusingRepository().upsert(row())).rejects.toThrow(
-          REFUSED,
-        );
+        await expect(refusingRepository().upsert(row())).rejects.toThrow(REFUSED);
 
         // The instance itself, not merely some Error: a layer that wrapped or
         // recreated it would lose the original failure context while still
@@ -110,9 +102,9 @@ describe("evaluation analytics writes", () => {
         logger.warn.mockClear();
         logger.error.mockClear();
 
-        await expect(
-          refusingRepository().upsertBatch([{ row: row() }]),
-        ).rejects.toThrow(REFUSED);
+        await expect(refusingRepository().upsertBatch([{ row: row() }])).rejects.toThrow(
+          REFUSED,
+        );
 
         expect(logger.error).not.toHaveBeenCalled();
         expect(logger.warn).toHaveBeenCalledTimes(1);

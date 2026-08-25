@@ -1,4 +1,7 @@
-import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/enterprise-sso-contract";
+import {
+  extractEmailDomain,
+  isSsoProviderMatch,
+} from "@langwatch/enterprise-sso-contract";
 import { platformSSOAllowed } from "~/runtime/app/features/sso";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
@@ -73,10 +76,7 @@ export const beforeUserCreate = async ({
   user,
 }: {
   prisma: PrismaClient;
-  user: { email: string; deactivatedAt?: Date | null } & Record<
-    string,
-    unknown
-  >;
+  user: { email: string; deactivatedAt?: Date | null } & Record<string, unknown>;
 }): Promise<boolean | void> => {
   if (user.deactivatedAt) {
     logger.warn({ email: user.email }, "Blocked signup: user is deactivated");
@@ -176,9 +176,7 @@ const joinSsoOrganization = async ({
   user: { id: string; email: string; name: string };
   org: { id: string; name: string };
 }): Promise<void> => {
-  const pendingInvite = await InviteService.create(
-    prisma,
-  ).findPendingByOrgAndEmail({
+  const pendingInvite = await InviteService.create(prisma).findPendingByOrgAndEmail({
     organizationId: org.id,
     email: user.email,
   });
@@ -210,10 +208,7 @@ const joinSsoOrganization = async ({
     // any other constraint (an applied invite's rows, the grant below) is a
     // real failure and propagates instead of being logged as an
     // already-present membership.
-    if (
-      !(err instanceof Prisma.PrismaClientKnownRequestError) ||
-      err.code !== "P2002"
-    ) {
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") {
       throw err;
     }
     logger.info(
@@ -596,10 +591,7 @@ export const beforeSessionCreate = async ({
     select: { deactivatedAt: true },
   });
   if (user?.deactivatedAt) {
-    logger.warn(
-      { userId: session.userId },
-      "Blocked session create: user deactivated",
-    );
+    logger.warn({ userId: session.userId }, "Blocked session create: user deactivated");
     return false;
   }
 };
@@ -628,10 +620,7 @@ export const afterSessionCreate = async ({
     userId: string;
     hasOrganization: boolean;
   }) => void;
-  ensureUserSyncedToCio: (args: {
-    userId: string;
-    hasOrganization: boolean;
-  }) => void;
+  ensureUserSyncedToCio: (args: { userId: string; hasOrganization: boolean }) => void;
 }): Promise<void> => {
   // lastLoginAt is only updated for "real" sessions — not admin impersonation.
   if (!isImpersonationSession) {
@@ -641,10 +630,7 @@ export const afterSessionCreate = async ({
         data: { lastLoginAt: new Date() },
       });
     } catch (err) {
-      logger.error(
-        { err, userId },
-        "Failed to update lastLoginAt after session create",
-      );
+      logger.error({ err, userId }, "Failed to update lastLoginAt after session create");
     }
   }
 

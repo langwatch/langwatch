@@ -26,9 +26,7 @@ export const SPRING_AI_SCOPE_NAMES = new Set([
   "org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
 ]);
 
-export const CLAUDE_CODE_SCOPE_NAMES = new Set([
-  "com.anthropic.claude_code.events",
-]);
+export const CLAUDE_CODE_SCOPE_NAMES = new Set(["com.anthropic.claude_code.events"]);
 
 /**
  * Codex's instrumentation scope varies across versions (codex_exec
@@ -68,8 +66,7 @@ export function shouldOverrideOutput({
   if (isRoot) return !outputFromRoot || endTime >= currentEndTime;
   if (outputFromRoot) return false;
   if (isExplicit && !currentIsExplicit) return true;
-  if (isExplicit === currentIsExplicit && endTime >= currentEndTime)
-    return true;
+  if (isExplicit === currentIsExplicit && endTime >= currentEndTime) return true;
   return false;
 }
 
@@ -86,8 +83,7 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
     if (!identifier || !content) return { input: null, output: null };
     if (identifier === "Chat Model Prompt Content:")
       return { input: content, output: null };
-    if (identifier === "Chat Model Completion:")
-      return { input: null, output: content };
+    if (identifier === "Chat Model Completion:") return { input: null, output: content };
   }
 
   if (CLAUDE_CODE_SCOPE_NAMES.has(data.scopeName)) {
@@ -128,9 +124,7 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
           : null,
       )
     ) {
-      const responseText = extractAssistantTextFromResponseBody(
-        data.attributes.body,
-      );
+      const responseText = extractAssistantTextFromResponseBody(data.attributes.body);
       if (responseText !== null) {
         return { input: null, output: responseText };
       }
@@ -229,17 +223,9 @@ function accumulateMediaRefs({
  * root > explicit (langwatch) > last-finishing inferred (gen_ai).
  */
 export class TraceIOAccumulationService {
-  constructor(
-    private readonly traceIOExtractionService: TraceIOExtractionService,
-  ) {}
+  constructor(private readonly traceIOExtractionService: TraceIOExtractionService) {}
 
-  accumulateIO({
-    state,
-    span,
-  }: {
-    state: TraceSummaryData;
-    span: NormalizedSpan;
-  }): {
+  accumulateIO({ state, span }: { state: TraceSummaryData; span: NormalizedSpan }): {
     computedInput: string | null;
     computedOutput: string | null;
     outputFromRootSpan: boolean;
@@ -254,8 +240,7 @@ export class TraceIOAccumulationService {
   } {
     const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
     const currentOutputSource =
-      state.attributes["langwatch.reserved.output_source"] ??
-      OUTPUT_SOURCE.INFERRED;
+      state.attributes["langwatch.reserved.output_source"] ?? OUTPUT_SOURCE.INFERRED;
     const currentInputIsFallback =
       state.attributes["langwatch.reserved.input_is_fallback"] === "true";
     const currentOutputIsFallback =
@@ -289,11 +274,7 @@ export class TraceIOAccumulationService {
 
     if (spanType === "guardrail") {
       const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
-      if (
-        rawOutput &&
-        typeof rawOutput === "object" &&
-        !Array.isArray(rawOutput)
-      ) {
+      if (rawOutput && typeof rawOutput === "object" && !Array.isArray(rawOutput)) {
         if ((rawOutput as Record<string, unknown>).passed === false)
           blockedByGuardrail = true;
       }
@@ -361,8 +342,10 @@ export class TraceIOAccumulationService {
       // service's `text` (best-effort stringification of the wrapper)
       // so ComputedInput is non-null when the span has real data,
       // but ONLY if no prior span already contributed a semantic match.
-      const inputFallback =
-        this.traceIOExtractionService.extractFallbackIOFromSpan(span, "input");
+      const inputFallback = this.traceIOExtractionService.extractFallbackIOFromSpan(
+        span,
+        "input",
+      );
       if (inputFallback) {
         computedInput = preferText(inputFallback.text, inputFallback.raw);
         inputIsFallback = true;
@@ -404,9 +387,7 @@ export class TraceIOAccumulationService {
         computedOutput = preferText(outputResult.text, outputResult.raw);
         outputFromRootSpan = isRoot;
         outputSpanEndTimeMs = span.endTimeUnixMs;
-        outputSource = isExplicit
-          ? OUTPUT_SOURCE.EXPLICIT
-          : OUTPUT_SOURCE.INFERRED;
+        outputSource = isExplicit ? OUTPUT_SOURCE.EXPLICIT : OUTPUT_SOURCE.INFERRED;
         outputIsFallback = false;
       }
     } else if (computedOutput === null) {
@@ -415,8 +396,10 @@ export class TraceIOAccumulationService {
       // outputIsFallback so a later-arriving semantic match can override it
       // regardless of span end-time ordering. outputFromRootSpan stays unset
       // so the next semantic root-span match still wins.
-      const outputFallback =
-        this.traceIOExtractionService.extractFallbackIOFromSpan(span, "output");
+      const outputFallback = this.traceIOExtractionService.extractFallbackIOFromSpan(
+        span,
+        "output",
+      );
       if (outputFallback) {
         computedOutput = preferText(outputFallback.text, outputFallback.raw);
         outputSpanEndTimeMs = span.endTimeUnixMs;

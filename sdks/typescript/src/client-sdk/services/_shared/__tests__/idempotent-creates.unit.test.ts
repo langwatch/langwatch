@@ -15,10 +15,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { GatewayBudgetsApiService } from "../../gateway-budgets/gateway-budgets-api.service";
 import { VirtualKeysApiService } from "../../virtual-keys/virtual-keys-api.service";
 import { WebhooksApiService } from "../../webhooks/webhooks-api.service";
-import {
-  IDEMPOTENCY_KEY_HEADER,
-  IDEMPOTENT_REPLAY_HEADER,
-} from "../mutation-options";
+import { IDEMPOTENCY_KEY_HEADER, IDEMPOTENT_REPLAY_HEADER } from "../mutation-options";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -37,9 +34,7 @@ const jsonResponse = (
 
 /** The headers of one recorded call, however fetch was handed them. */
 const headersOf = (call: number): Headers =>
-  new Headers(
-    (mockFetch.mock.calls[call]?.[1] as RequestInit | undefined)?.headers,
-  );
+  new Headers((mockFetch.mock.calls[call]?.[1] as RequestInit | undefined)?.headers);
 
 const bodyOf = (call: number): string =>
   (mockFetch.mock.calls[call]?.[1] as RequestInit).body as string;
@@ -57,8 +52,7 @@ const CREATES = [
         { name: "checkout" },
         options,
       ),
-    idOf: (result: unknown) =>
-      (result as { virtual_key: { id: string } }).virtual_key.id,
+    idOf: (result: unknown) => (result as { virtual_key: { id: string } }).virtual_key.id,
     expectedId: "vk_1",
   },
   {
@@ -141,9 +135,7 @@ describe("Feature: retrying a create without minting a duplicate", () => {
       it("hands back the same resource both times", async () => {
         mockFetch
           .mockResolvedValueOnce(jsonResponse(surface.response))
-          .mockResolvedValueOnce(
-            jsonResponse(surface.response, { replayed: true }),
-          );
+          .mockResolvedValueOnce(jsonResponse(surface.response, { replayed: true }));
 
         const first = await surface.create({ idempotencyKey: "key-abc" });
         const second = await surface.create({ idempotencyKey: "key-abc" });
@@ -156,9 +148,7 @@ describe("Feature: retrying a create without minting a duplicate", () => {
       it("tells a caller who asked that the second answer was a replay", async () => {
         mockFetch
           .mockResolvedValueOnce(jsonResponse(surface.response))
-          .mockResolvedValueOnce(
-            jsonResponse(surface.response, { replayed: true }),
-          );
+          .mockResolvedValueOnce(jsonResponse(surface.response, { replayed: true }));
         const replays = vi.fn();
 
         await surface.create({

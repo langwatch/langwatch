@@ -8,10 +8,7 @@ import {
 import { applyOverlayToSpanDetail } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import { api } from "~/utils/api";
-import {
-  asSharedQueryResult,
-  useSharedTrace,
-} from "../context/SharedTraceContext";
+import { asSharedQueryResult, useSharedTrace } from "../context/SharedTraceContext";
 import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
@@ -33,8 +30,7 @@ export function useSpansFullCanonical(enabled: boolean) {
     placeholderData: keepPreviousData,
   });
 
-  if (shared)
-    return asSharedQueryResult(shared.spansFull) as unknown as typeof query;
+  if (shared) return asSharedQueryResult(shared.spansFull) as unknown as typeof query;
   return query;
 }
 

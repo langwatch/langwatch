@@ -34,9 +34,7 @@ const harness = vi.hoisted(() => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
   const rbac =
-    await vi.importActual<typeof import("~/server/api/rbac")>(
-      "~/server/api/rbac",
-    );
+    await vi.importActual<typeof import("~/server/api/rbac")>("~/server/api/rbac");
   const holds = (permission: string) =>
     rbac.hasPermissionWithHierarchy(harness.permissions, permission);
   return {
@@ -65,8 +63,7 @@ vi.mock("~/components/governance/GovernanceLayout", () => ({
 }));
 
 vi.mock("~/components/enterprise/EnterpriseLockedSurface", () => ({
-  EnterpriseLockedSurface: ({ children }: { children: React.ReactNode }) =>
-    children,
+  EnterpriseLockedSurface: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 vi.mock("~/components/governance/QuarantineFillAlert", () => ({
@@ -110,8 +107,7 @@ vi.mock("~/utils/api", () => {
           if (typeof property !== "string") return undefined;
           if (property === "useQuery") {
             return (_input: unknown, options?: { enabled?: boolean }) => {
-              if (options?.enabled !== false)
-                harness.requested.push(path.join("."));
+              if (options?.enabled !== false) harness.requested.push(path.join("."));
               return queryResult();
             };
           }
@@ -177,9 +173,7 @@ const ORGANIZATION_ADMIN: string[] = [
   ...getOrganizationRolePermissions(
     "ADMIN" as Parameters<typeof getOrganizationRolePermissions>[0],
   ),
-  ...getTeamRolePermissions(
-    "ADMIN" as Parameters<typeof getTeamRolePermissions>[0],
-  ),
+  ...getTeamRolePermissions("ADMIN" as Parameters<typeof getTeamRolePermissions>[0]),
 ];
 
 function renderPage(Page: React.ComponentType) {
@@ -212,9 +206,7 @@ describe("governance pages for a delegated viewer", () => {
       expect(screen.getByText(/activityMonitor:view/)).toBeInTheDocument();
       // The page did not collapse into the notice: its own heading and the
       // panels that need no activity-monitor grant are still there.
-      expect(
-        screen.getByRole("heading", { name: "AI Governance" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "AI Governance" })).toBeInTheDocument();
       expect(screen.getByText("CLI session policy")).toBeInTheDocument();
     });
 
@@ -235,9 +227,7 @@ describe("governance pages for a delegated viewer", () => {
       renderPage(DepartmentsPage);
 
       expect(screen.queryByText("Create a department")).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: "Actions" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Actions" })).not.toBeInTheDocument();
       expect(screen.getByText(/governance:manage/)).toBeInTheDocument();
     });
 
@@ -256,9 +246,7 @@ describe("governance pages for a delegated viewer", () => {
       harness.permissions = [...DELEGATED_VIEWER, "anomalyRules:view"];
       renderPage(AnomalyRulesPage);
 
-      expect(
-        screen.queryByRole("button", { name: /New rule/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /New rule/ })).not.toBeInTheDocument();
       expect(screen.getByText(/anomalyRules:manage/)).toBeInTheDocument();
       expect(harness.requested).toContain("anomalyRules.list");
     });

@@ -48,10 +48,7 @@ interface AuthStrategy {
    * requests itself, so it has to answer in the same shape the family's
    * handlers do.
    */
-  chainFor(
-    policy: AccessPolicy,
-    errorEnvelope: ApiErrorEnvelope,
-  ): MiddlewareHandler[];
+  chainFor(policy: AccessPolicy, errorEnvelope: ApiErrorEnvelope): MiddlewareHandler[];
 }
 
 const HTTP_VERBS = ["get", "post", "put", "patch", "delete"] as const;
@@ -257,8 +254,7 @@ function unsupported(scope: string, policy: AccessPolicy): never {
 const projectStrategy: AuthStrategy = {
   scope: "project",
   chainFor(policy, errorEnvelope) {
-    const auth =
-      errorEnvelope === "canonical" ? canonicalAuthMiddleware : authMiddleware;
+    const auth = errorEnvelope === "canonical" ? canonicalAuthMiddleware : authMiddleware;
     switch (policy.kind) {
       case "permission":
         return [auth, requirePermission(policy.permission, errorEnvelope)];
@@ -285,9 +281,7 @@ const orgStrategy: AuthStrategy = {
   scope: "organization",
   chainFor(policy, errorEnvelope) {
     const auth =
-      errorEnvelope === "canonical"
-        ? canonicalOrgAuthMiddleware
-        : orgAuthMiddleware;
+      errorEnvelope === "canonical" ? canonicalOrgAuthMiddleware : orgAuthMiddleware;
     switch (policy.kind) {
       case "permission":
         return [auth, requireOrgPermission(policy.permission, errorEnvelope)];
@@ -322,9 +316,7 @@ const orgStrategy: AuthStrategy = {
  * which set additional context (e.g. a service middleware that sets
  * `c.var.modelProviderService`), so handlers keep full `c.get(...)` typing.
  */
-export function createProjectApp<
-  Extra extends object = Record<never, never>,
->(args: {
+export function createProjectApp<Extra extends object = Record<never, never>>(args: {
   basePath: string;
   /**
    * The error shape this family publishes. New families pass `canonical`;
@@ -341,9 +333,7 @@ export function createProjectApp<
  * and authorizes `requires(...)` against org-scoped role bindings — the Hono
  * equivalent of tRPC's `checkOrganizationPermission`.
  */
-export function createOrgApp<
-  Extra extends object = Record<never, never>,
->(args: {
+export function createOrgApp<Extra extends object = Record<never, never>>(args: {
   basePath: string;
   /**
    * The error shape this family publishes. New families pass `canonical`;

@@ -8,10 +8,7 @@ const TABLE_NAME = "billable_events" as const;
 
 export interface BillableEventsRepository {
   /** Inserts one deduplicated billable-event row. */
-  insert(input: {
-    record: BillableEventRecord;
-    organizationId: string;
-  }): Promise<void>;
+  insert(input: { record: BillableEventRecord; organizationId: string }): Promise<void>;
 }
 
 /**
@@ -24,9 +21,7 @@ export interface BillableEventsRepository {
  * signature rather than the tenant-keyed `ClickHouseClientResolver` most
  * repositories take.
  */
-export class BillableEventsMeterClickHouseRepository
-  implements BillableEventsRepository
-{
+export class BillableEventsMeterClickHouseRepository implements BillableEventsRepository {
   constructor(
     private readonly resolveClient: (
       organizationId: string,

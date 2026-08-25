@@ -142,13 +142,7 @@ export const ComponentIcon = ({
     color = "green.solid";
   }
 
-  return (
-    <ColorfulBlockIcon
-      color={color}
-      size={size}
-      icon={componentIconMap[type]}
-    />
-  );
+  return <ColorfulBlockIcon color={color} size={size} icon={componentIconMap[type]} />;
 };
 
 export function WorkflowIcon({
@@ -169,9 +163,7 @@ export function WorkflowIcon({
 
   return (
     <Box
-      background={`url('data:image/svg+xml;utf8,${encodeURIComponent(
-        reactflowBg,
-      )}')`}
+      background={`url('data:image/svg+xml;utf8,${encodeURIComponent(reactflowBg)}')`}
       borderRadius="4px"
       border="1px solid"
       borderColor="border"

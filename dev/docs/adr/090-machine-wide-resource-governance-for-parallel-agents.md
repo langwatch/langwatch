@@ -28,10 +28,10 @@ The first drafts of this ADR had a third gap, and it was the load-bearing one: t
 
 A scan of 40 real transcripts on this machine — 14,121 cache-writing requests, about 53M cache-write tokens — comes back **perfectly bimodal**:
 
-| Population | Requests | Cache-write tokens | TTL |
-|---|---:|---:|---|
-| Sub-agent transcripts | 5,960 | 28.3M | **100% five-minute** |
-| Main-session transcripts | 8,161 | 25.4M | **100% one-hour** |
+| Population               | Requests | Cache-write tokens | TTL                  |
+| ------------------------ | -------: | -----------------: | -------------------- |
+| Sub-agent transcripts    |    5,960 |              28.3M | **100% five-minute** |
+| Main-session transcripts |    8,161 |              25.4M | **100% one-hour**    |
 
 Not one request wrote both lifetimes, so this is not a breakpoint split inside a request. **Claude Code gives a main session the one-hour cache and a sub-agent the five-minute cache.** (A single headless `claude -p` probe reports one-hour, which is consistent and is exactly how an earlier draft of this ADR reached the wrong general conclusion: `-p` is a main session.)
 
@@ -43,7 +43,7 @@ The regime therefore does not need detecting by inference. The hook payload carr
 
 One correction while being precise about premises. Earlier drafts said macOS offers no way to bound a process's memory. It does: `taskpolicy -m <MiB>` sets a jetsam memory limit at spawn, and `-j` sets a jetsam priority. That is rejected below, but on its merits rather than on a false claim of impossibility.
 
-Two further structural notes. `taskpolicy -b` moves a process into the throttled background band and `-B` moves it back out; `-p` applies both to an already-running process, but the man page's inheritance guarantee covers children of a program *launched* under the policy, not a tree that is already running — so demotion has to walk the process group rather than signal the launcher and assume. And summed RSS is not the pressure signal: `GroupRSS`'s `ps` summation double-counts shared pages and overstates by several GB. The honest signals are the compressor's occupied pages and swap usage.
+Two further structural notes. `taskpolicy -b` moves a process into the throttled background band and `-B` moves it back out; `-p` applies both to an already-running process, but the man page's inheritance guarantee covers children of a program _launched_ under the policy, not a tree that is already running — so demotion has to walk the process group rather than signal the launcher and assume. And summed RSS is not the pressure signal: `GroupRSS`'s `ps` summation double-counts shared pages and overstates by several GB. The honest signals are the compressor's occupied pages and swap usage.
 
 ## Decision
 
@@ -61,14 +61,14 @@ This is also where CLAUDE.md's warning is answered rather than waved at. Its gui
 
 **One precedence table decides admission, and every scenario maps to a row of it.**
 
-| Pressure | Slot free | Caller | Fits inside a 5-minute floor | Outcome |
-|---|---|---|---|---|
-| green / amber | yes | any | — | admit unchanged |
-| green / amber | no | main session or terminal | — | queue |
-| green / amber | no | sub-agent | no / unknown | queue |
-| green / amber | no | sub-agent | yes | narrow, admit, consume a slot |
-| red | yes | any | — | admit unchanged |
-| red | no | any | — | refuse, with a reason |
+| Pressure      | Slot free | Caller                   | Fits inside a 5-minute floor | Outcome                       |
+| ------------- | --------- | ------------------------ | ---------------------------- | ----------------------------- |
+| green / amber | yes       | any                      | —                            | admit unchanged               |
+| green / amber | no        | main session or terminal | —                            | queue                         |
+| green / amber | no        | sub-agent                | no / unknown                 | queue                         |
+| green / amber | no        | sub-agent                | yes                          | narrow, admit, consume a slot |
+| red           | yes       | any                      | —                            | admit unchanged               |
+| red           | no        | any                      | —                            | refuse, with a reason         |
 
 Red is the only level that refuses. Amber's job is to demote and to stop admitting at full width; it does not refuse work.
 
@@ -86,9 +86,9 @@ Red is the only level that refuses. Amber's job is to demote and to stop admitti
 
 ## Rationale / Trade-offs
 
-**A jetsam memory limit is available and is still the wrong tool.** `taskpolicy -m` would give a per-stack ceiling at spawn — closer to a cgroup than the earlier drafts admitted. It is rejected because jetsam *kills* the process that breaches its limit. That converts a slow machine into lost work, which is the outcome this whole ADR is arranged to avoid, and `RunOnceBounded` already covers the genuinely runaway case with an RSS and duration ceiling. What was missing was admission, not a harder kill. The `-m` option is worth knowing about because a future decision might want it for a stack whose death is cheap; it is not worth using here.
+**A jetsam memory limit is available and is still the wrong tool.** `taskpolicy -m` would give a per-stack ceiling at spawn — closer to a cgroup than the earlier drafts admitted. It is rejected because jetsam _kills_ the process that breaches its limit. That converts a slow machine into lost work, which is the outcome this whole ADR is arranged to avoid, and `RunOnceBounded` already covers the genuinely runaway case with an RSS and duration ceiling. What was missing was admission, not a harder kill. The `-m` option is worth knowing about because a future decision might want it for a stack whose death is cheap; it is not worth using here.
 
-**The narrowing argument was attacked twice and survived in a smaller, better-defined shape.** Two reviews pointed out that a *running* tool call issues no API requests either, so a narrowed run that outlives the floor loses the cache exactly as a park does. That was correct, and it is why narrowing is now conditioned on the run fitting inside the floor rather than merely being narrower. A first probe then suggested the floor was an hour, which would have removed most of the motive — but that probe was a headless main session, and the transcript scan showed the floor is five minutes for precisely the population this ADR governs. So the lever came back, for sub-agents only, with the fit condition attached.
+**The narrowing argument was attacked twice and survived in a smaller, better-defined shape.** Two reviews pointed out that a _running_ tool call issues no API requests either, so a narrowed run that outlives the floor loses the cache exactly as a park does. That was correct, and it is why narrowing is now conditioned on the run fitting inside the floor rather than merely being narrower. A first probe then suggested the floor was an hour, which would have removed most of the motive — but that probe was a headless main session, and the transcript scan showed the floor is five minutes for precisely the population this ADR governs. So the lever came back, for sub-agents only, with the fit condition attached.
 
 Recording the sequence is the point. The premise went from asserted, to attacked, to measured wrong, to measured right, and the design is different at each step. Nobody had looked at a transcript until the third revision, and the answer was sitting in 40 of them.
 

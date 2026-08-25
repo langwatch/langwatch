@@ -22,11 +22,7 @@ type Props = {
   onCreated?: () => void;
 };
 
-export function CacheRuleCreateDrawer({
-  open,
-  onOpenChange,
-  onCreated,
-}: Props) {
+export function CacheRuleCreateDrawer({ open, onOpenChange, onCreated }: Props) {
   const { organization } = useOrganizationTeamProject();
   const utils = api.useUtils();
 
@@ -41,8 +37,9 @@ export function CacheRuleCreateDrawer({
   });
 
   const [state, setState] = useState<CacheRuleFormState>(emptyFormState());
-  const [fieldComplaint, setFieldComplaint] =
-    useState<CacheRuleFormComplaint | null>(null);
+  const [fieldComplaint, setFieldComplaint] = useState<CacheRuleFormComplaint | null>(
+    null,
+  );
 
   const handleClose = () => {
     if (createMutation.isPending) return;
@@ -86,12 +83,7 @@ export function CacheRuleCreateDrawer({
   };
 
   return (
-    <Drawer.Root
-      open={open}
-      onOpenChange={() => handleClose()}
-      placement="end"
-      size="md"
-    >
+    <Drawer.Root open={open} onOpenChange={() => handleClose()} placement="end" size="md">
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>New cache rule</Drawer.Title>

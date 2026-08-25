@@ -19,8 +19,7 @@ const receipt: BriefingReceipt = {
     label: "New error shape: Provider rate limit",
     query: 'errorMessage:"Provider rate limit"',
   },
-  askPrompt:
-    "Investigate this new error shape and separate evidence from hypotheses.",
+  askPrompt: "Investigate this new error shape and separate evidence from hypotheses.",
 };
 
 const data: BriefingData = {
@@ -71,9 +70,7 @@ describe("LangyBriefing attention inbox actions", () => {
   it("does not render a separate per-row Ask Langy button", () => {
     renderBriefing({ onInvestigateReceipt: vi.fn() });
 
-    expect(
-      screen.queryByRole("button", { name: /Ask Langy about/ }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ask Langy about/ })).toBeNull();
   });
 });
 
@@ -96,9 +93,7 @@ describe("LangyBriefing without Langy", () => {
       expect(screen.queryByRole("button", { name: /in Langy/ })).toBeNull();
       expect(screen.queryByRole("button", { name: /Investigate/ })).toBeNull();
       expect(screen.queryByText("⌘I")).toBeNull();
-      expect(
-        screen.queryByRole("button", { name: "Why did errors spike?" }),
-      ).toBeNull();
+      expect(screen.queryByRole("button", { name: "Why did errors spike?" })).toBeNull();
       expect(screen.queryByText("Missing a signal? Tell us")).toBeNull();
     });
   });
@@ -110,9 +105,7 @@ describe("LangyBriefing without Langy", () => {
       renderBriefing({ onAsk: vi.fn(), onAskSubmit });
 
       expect(screen.getByText("⌘I")).toBeDefined();
-      fireEvent.click(
-        screen.getByRole("button", { name: "Why did errors spike?" }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: "Why did errors spike?" }));
 
       expect(onAskSubmit).toHaveBeenCalledWith("Why did errors spike?");
     });

@@ -200,11 +200,7 @@ function templatesFromSlice(_slice: WebhookSlice) {
  * "Send a test" button — the author sees the real HTTP status (or what broke)
  * where they pressed the button, without hunting for a toast.
  */
-function LastTestResult({
-  attempt,
-}: {
-  attempt: ConfigFormCtx["lastTestAttempt"];
-}) {
+function LastTestResult({ attempt }: { attempt: ConfigFormCtx["lastTestAttempt"] }) {
   const last = attempt?.channel === "webhook" ? attempt : null;
   if (!last) return null;
 
@@ -251,8 +247,7 @@ function HeadersEditor({
       <Field.Label>Headers</Field.Label>
       <VStack align="stretch" gap={2} width="full">
         {slice.headers.map((row, index) => {
-          const reserved =
-            row.name.trim() !== "" && isReservedWebhookHeader(row.name);
+          const reserved = row.name.trim() !== "" && isReservedWebhookHeader(row.name);
           return (
             <VStack key={row.id} align="stretch" gap={1}>
               <HStack gap={2}>
@@ -316,8 +311,8 @@ function HeadersEditor({
         </Button>
       </VStack>
       <Field.HelperText>
-        Sent with every request — for example an Authorization header your
-        endpoint expects. Values are stored encrypted and never shown again.
+        Sent with every request — for example an Authorization header your endpoint
+        expects. Values are stored encrypted and never shown again.
       </Field.HelperText>
     </Field.Root>
   );
@@ -363,8 +358,8 @@ function SigningSecretField({
         ) : null}
       </HStack>
       <Field.HelperText>
-        When set, deliveries carry an X-LangWatch-Signature header the receiver
-        can verify. Leave it empty to send unsigned deliveries.
+        When set, deliveries carry an X-LangWatch-Signature header the receiver can
+        verify. Leave it empty to send unsigned deliveries.
       </Field.HelperText>
     </Field.Root>
   );
@@ -436,8 +431,8 @@ function WebhookConfigForm({
       />
       <VStack align="stretch" gap={2}>
         <Text textStyle="xs" color="fg.muted">
-          Write the JSON your endpoint receives. Values in braces fill in from
-          your trace or alert when the request sends.
+          Write the JSON your endpoint receives. Values in braces fill in from your trace
+          or alert when the request sends.
         </Text>
         <Box data-testid="webhook-body-editor">
           <LiquidEditor

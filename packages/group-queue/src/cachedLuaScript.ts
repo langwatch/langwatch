@@ -91,8 +91,6 @@ function isNoScript(err: unknown): boolean {
 }
 
 /** True when a pipelined result failed only because the node had no cached copy. */
-export function isNoScriptResult(
-  result: [Error | null, unknown] | undefined,
-): boolean {
+export function isNoScriptResult(result: [Error | null, unknown] | undefined): boolean {
   return isNoScript(result?.[0]);
 }

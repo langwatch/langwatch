@@ -128,9 +128,7 @@ describe("spend event envelope", () => {
     );
     const completed = spendRowToEnvelope(row());
     expect(settled.id).not.toBe(completed.id);
-    expect(settled.data.gateway_request_id).toBe(
-      completed.data.gateway_request_id,
-    );
+    expect(settled.data.gateway_request_id).toBe(completed.data.gateway_request_id);
   });
 
   /** @scenario The pull surface serves in-flight rows as admitted envelopes */

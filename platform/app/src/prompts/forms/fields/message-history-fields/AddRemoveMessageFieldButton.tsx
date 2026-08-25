@@ -52,10 +52,7 @@ export function AddRemoveMessageFieldButton({
           <Menu.Item value="add-user" onClick={() => handleAdd("user")}>
             Add user message
           </Menu.Item>
-          <Menu.Item
-            value="add-assistant"
-            onClick={() => handleAdd("assistant")}
-          >
+          <Menu.Item value="add-assistant" onClick={() => handleAdd("assistant")}>
             Add assistant message
           </Menu.Item>
         </Menu.Content>

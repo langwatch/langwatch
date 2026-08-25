@@ -51,11 +51,7 @@ export interface ErrorPresentation {
 }
 
 /** Reads a string out of `meta` without trusting it. */
-const str = (
-  error: HandledErrorShape,
-  key: string,
-  fallback: string,
-): string => {
+const str = (error: HandledErrorShape, key: string, fallback: string): string => {
   const value = error.meta[key];
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
@@ -101,14 +97,10 @@ type MissingModelRequestType =
 
 const missingModelDescriptions = {
   chat: 'Add a top-level "model" field to POST /v1/chat/completions, then try again.',
-  messages:
-    'Add a top-level "model" field to POST /v1/messages, then try again.',
-  responses:
-    'Add a top-level "model" field to POST /v1/responses, then try again.',
-  embeddings:
-    'Add a top-level "model" field to POST /v1/embeddings, then try again.',
-  speech:
-    'Add a top-level "model" field to POST /v1/audio/speech, then try again.',
+  messages: 'Add a top-level "model" field to POST /v1/messages, then try again.',
+  responses: 'Add a top-level "model" field to POST /v1/responses, then try again.',
+  embeddings: 'Add a top-level "model" field to POST /v1/embeddings, then try again.',
+  speech: 'Add a top-level "model" field to POST /v1/audio/speech, then try again.',
   transcription:
     'Add a "model" field to the multipart form for POST /v1/audio/transcriptions, then try again.',
   passthrough: "Put the model in the Gemini request URL, then try again.",
@@ -129,27 +121,19 @@ const reachableSentence = (error: HandledErrorShape): string => {
 };
 
 /** Reads a `meta` string and compares it, treating anything unexpected as no match. */
-const strEq = (
-  error: HandledErrorShape,
-  key: string,
-  expected: string,
-): boolean => str(error, key, "") === expected;
+const strEq = (error: HandledErrorShape, key: string, expected: string): boolean =>
+  str(error, key, "") === expected;
 
 const describeMissingModel = (error: HandledErrorShape): string =>
-  (missingModelDescriptions as Record<string, string>)[
-    str(error, "request_type", "")
-  ] ?? "Set the model where this endpoint expects it, then try again.";
+  (missingModelDescriptions as Record<string, string>)[str(error, "request_type", "")] ??
+  "Set the model where this endpoint expects it, then try again.";
 
 /**
  * Reads a number out of `meta` without trusting it. `meta` crosses a wire,
  * so a value that arrives as a string or NaN has to read as absent rather
  * than reach a sentence as "NaN projects".
  */
-const num = (
-  error: HandledErrorShape,
-  key: string,
-  fallback: number,
-): number => {
+const num = (error: HandledErrorShape, key: string, fallback: number): number => {
   const value = error.meta[key];
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 };
@@ -281,10 +265,7 @@ const DEPRECATED_PROVIDER_REPLACEMENTS: Record<string, string> = {
  * function Object() { [native code] }". Same hazard `explainHandledError`
  * guards `code` against, and the same fix.
  */
-const label = (
-  map: Record<string, string>,
-  key: string,
-): string | undefined => {
+const label = (map: Record<string, string>, key: string): string | undefined => {
   if (!Object.hasOwn(map, key)) return undefined;
   const value = map[key];
   return typeof value === "string" ? value : undefined;
@@ -313,13 +294,11 @@ const presentations = {
   },
   query_memory_exceeded: {
     title: "This search was too large",
-    describe: () =>
-      "Narrow the time range, add a filter, or select fewer fields.",
+    describe: () => "Narrow the time range, add a filter, or select fewer fields.",
   },
   query_scan_limit_exceeded: {
     title: "This query read too much data",
-    describe: () =>
-      "Narrow the time range or add filters so the query reads less.",
+    describe: () => "Narrow the time range or add filters so the query reads less.",
   },
   time_range_too_wide: {
     title: "Time range is too wide",
@@ -327,8 +306,7 @@ const presentations = {
   },
   page_too_deep: {
     title: "That page is too deep to open by number",
-    describe: () =>
-      "Narrow the time range or filters, or step forward with Next.",
+    describe: () => "Narrow the time range or filters, or step forward with Next.",
   },
   filter_parse_error: {
     title: "This filter isn't valid",
@@ -419,8 +397,7 @@ const presentations = {
   },
   clickhouse_overloaded: {
     title: "Too much running at once",
-    describe: () =>
-      "We paused this one to keep the rest responsive. Try again.",
+    describe: () => "We paused this one to keep the rest responsive. Try again.",
   },
   broadcaster_not_active: {
     title: "Live updates disconnected",
@@ -457,8 +434,7 @@ const presentations = {
     // mid-report — so the copy says plainly that the report was not filed and
     // that waiting fixes it.
     title: "Too many reports just now",
-    describe: () =>
-      "This one wasn't sent. Wait a few minutes, then report it again.",
+    describe: () => "This one wasn't sent. Wait a few minutes, then report it again.",
   },
 
   // ---- evaluations & experiments ----
@@ -486,9 +462,7 @@ const presentations = {
     describe: (error) => {
       const status = error.meta.httpStatus;
       const isAuthFailure =
-        str(error, "reason", "") === "auth_failed" ||
-        status === 401 ||
-        status === 403;
+        str(error, "reason", "") === "auth_failed" || status === 401 || status === 403;
       return isAuthFailure
         ? "Check the API key for this evaluator's model provider."
         : "Try running it again.";
@@ -546,8 +520,7 @@ const presentations = {
     // them first, so by the time this copy renders the password they typed was
     // not the account's, which leaves exactly two moves worth naming.
     title: "That email already has an account",
-    describe: () =>
-      "Sign in with it, or reset the password if you don't have it.",
+    describe: () => "Sign in with it, or reset the password if you don't have it.",
   },
   prompt_not_found: {
     title: "Prompt not found",
@@ -559,8 +532,7 @@ const presentations = {
   },
   system_prompt_conflict: {
     title: "Set one prompt, not both",
-    describe: () =>
-      "This prompt has both a system prompt and a prompt. Remove one.",
+    describe: () => "This prompt has both a system prompt and a prompt. Remove one.",
   },
 
   // ---- API keys ----
@@ -734,11 +706,7 @@ const presentations = {
     // inference.
     title: "This model can't be used here",
     describe: (error) => {
-      const featureDisplayName = str(
-        error,
-        "featureDisplayName",
-        "this feature",
-      );
+      const featureDisplayName = str(error, "featureDisplayName", "this feature");
       return `Pick a different default model for ${featureDisplayName} in your project's model settings.`;
     },
   },
@@ -872,13 +840,11 @@ const presentations = {
     // has to exist before the action is possible — so the copy names who to
     // go to rather than offering a retry that cannot work.
     title: "No administrator is set up",
-    describe: () =>
-      "Ask whoever set up LangWatch here to add one, then try again.",
+    describe: () => "Ask whoever set up LangWatch here to add one, then try again.",
   },
   license_key_invalid: {
     title: "That license key isn't valid",
-    describe: () =>
-      "Check the key you pasted, or ask your account team for a new one.",
+    describe: () => "Check the key you pasted, or ask your account team for a new one.",
   },
   license_expired: {
     title: "Your license has expired",
@@ -894,8 +860,7 @@ const presentations = {
   },
   license_signing_failed: {
     title: "That private key couldn't sign the license",
-    describe: () =>
-      "Check it is the license signing key and was copied in full.",
+    describe: () => "Check it is the license signing key and was copied in full.",
   },
   malformed_custom_role_permissions: {
     title: "This role's permissions are invalid",
@@ -1075,10 +1040,7 @@ const presentations = {
   migration_enrollment_already_exists: {
     title: "This organization is already enrolled",
     describe: (error) => {
-      const migration = label(
-        MIGRATION_NAME_LABELS,
-        str(error, "migrationName", ""),
-      );
+      const migration = label(MIGRATION_NAME_LABELS, str(error, "migrationName", ""));
       return migration
         ? `It is already enrolled for ${migration}, so the next pass will process it. Nothing to do.`
         : "It is already enrolled for that migration, so the next pass will process it. Nothing to do.";
@@ -1092,10 +1054,7 @@ const presentations = {
   migration_enrollment_not_found: {
     title: "This organization is not enrolled",
     describe: (error) => {
-      const migration = label(
-        MIGRATION_NAME_LABELS,
-        str(error, "migrationName", ""),
-      );
+      const migration = label(MIGRATION_NAME_LABELS, str(error, "migrationName", ""));
       return migration
         ? `There is no enrollment for ${migration} for this organization to withdraw. Check the organization and the migration.`
         : "There is no enrollment for this organization to withdraw. Check the organization and the migration.";
@@ -1109,10 +1068,7 @@ const presentations = {
   migration_run_requires_enrollment: {
     title: "Enroll this organization first",
     describe: (error) => {
-      const migration = label(
-        MIGRATION_NAME_LABELS,
-        str(error, "migrationName", ""),
-      );
+      const migration = label(MIGRATION_NAME_LABELS, str(error, "migrationName", ""));
       return migration
         ? `Targeted runs follow enrollment: enroll the organization for ${migration}, then run it.`
         : "Targeted runs follow enrollment: enroll the organization for the migration, then run it.";
@@ -1260,8 +1216,7 @@ const presentations = {
   },
   role_binding_already_exists: {
     title: "That role is already bound",
-    describe: () =>
-      "An identical binding already exists, so there's nothing to add.",
+    describe: () => "An identical binding already exists, so there's nothing to add.",
   },
   role_binding_principal_invalid: {
     title: "Choose who this role applies to",
@@ -1285,8 +1240,7 @@ const presentations = {
   },
   scim_token_not_found: {
     title: "SCIM token not found",
-    describe: () =>
-      "It may already be revoked. Reload to see the current tokens.",
+    describe: () => "It may already be revoked. Reload to see the current tokens.",
   },
   insufficient_permissions: {
     // Names the permission when the server sent one, for the same reason
@@ -1358,8 +1312,7 @@ const presentations = {
   },
   cannot_impersonate_deactivated_user: {
     title: "This account is deactivated",
-    describe: () =>
-      "Its sessions were revoked on purpose. Reactivate the account first.",
+    describe: () => "Its sessions were revoked on purpose. Reactivate the account first.",
   },
   user_to_impersonate_not_found: {
     title: "User not found",
@@ -1384,8 +1337,7 @@ const presentations = {
   // open — the copy names what the endpoint refused and what changes it.
   rum_ingest_disabled: {
     title: "Browser telemetry isn't enabled",
-    describe: () =>
-      "Turn on browser monitoring for this project to collect it.",
+    describe: () => "Turn on browser monitoring for this project to collect it.",
   },
   rum_payload_invalid: {
     title: "That telemetry report couldn't be read",
@@ -1410,8 +1362,7 @@ const presentations = {
   // because that is the only thing the caller can fix.
   missing_credentials: {
     title: "This request carried no API key",
-    describe: () =>
-      "Send an organization API key as Authorization: Bearer <api-key>.",
+    describe: () => "Send an organization API key as Authorization: Bearer <api-key>.",
   },
   contested_credentials: {
     title: "This request carried more than one credential",
@@ -1478,8 +1429,7 @@ const presentations = {
   },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",
-    describe: () =>
-      "Your session has expired. Log in and try the export again.",
+    describe: () => "Your session has expired. Log in and try the export again.",
   },
   scenario_run_export_forbidden: {
     title: "You can't export this project's simulation runs",
@@ -1533,8 +1483,7 @@ const presentations = {
     // side, so there is nothing for them to correct — and telling them to
     // "check their input" would send them hunting for a field that isn't wrong.
     title: "This plan isn't ready to buy yet",
-    describe: () =>
-      "We've been notified. Contact support if you need it sooner.",
+    describe: () => "We've been notified. Contact support if you need it sooner.",
   },
   billing_currency_unsupported: {
     // Account state, not an outage, and not fixable from the UI: the account is
@@ -1617,8 +1566,7 @@ const presentations = {
   },
   ingestion_source_not_found: {
     title: "Ingestion source not found",
-    describe: () =>
-      "It may have been archived. Reload to see the current list.",
+    describe: () => "It may have been archived. Reload to see the current list.",
   },
   ingestion_source_cap_reached: {
     title: "You've hit the limit for ingestion sources",
@@ -1646,16 +1594,14 @@ const presentations = {
   },
   dataset_stale_columns: {
     title: "This dataset's columns have changed",
-    describe: () =>
-      "Reload to pick up the current columns, then make your change again.",
+    describe: () => "Reload to pick up the current columns, then make your change again.",
   },
   export_failed: {
     // fault: platform. The export ran on our side and did not finish, so the
     // copy has to say nothing was changed — an export that half-worked is the
     // thing a customer will assume otherwise.
     title: "That export didn't finish",
-    describe: () =>
-      "Nothing was changed. Try again, or export a smaller slice.",
+    describe: () => "Nothing was changed. Try again, or export a smaller slice.",
   },
 
   // ---- shared trace links (ADR-057) ----
@@ -1734,8 +1680,7 @@ const presentations = {
   template_immutable: {
     // A refusal by design, so no retry is offered — only the way around it.
     title: "This template can't be edited",
-    describe: () =>
-      "It's one of the built-in ones. Duplicate it, then edit your copy.",
+    describe: () => "It's one of the built-in ones. Duplicate it, then edit your copy.",
   },
   template_validation_error: {
     title: "This template isn't valid",
@@ -1743,8 +1688,7 @@ const presentations = {
     // wrote the template — but it is still server-supplied prose, so it is
     // clamped like every other sentence that isn't authored in this file.
     describe: (error) =>
-      safeProse(str(error, "syntaxError", "")) ||
-      "Check the template and try again.",
+      safeProse(str(error, "syntaxError", "")) || "Check the template and try again.",
   },
   invalid_email_recipient: {
     title: "That email address isn't valid",
@@ -1784,8 +1728,7 @@ const presentations = {
     // Clamped like any server-authored sentence; nothing to scrub, because
     // nothing here originated with the provider.
     describe: (error) =>
-      safeProse(str(error, "message", "")) ||
-      "Check the destination and try again.",
+      safeProse(str(error, "message", "")) || "Check the destination and try again.",
   },
   test_fire_unavailable: {
     title: "Nothing to test yet",
@@ -1859,8 +1802,7 @@ const presentations = {
     // message never reached Langy, so the copy says so and gives the one
     // action that works: wait.
     title: "Too many messages just now",
-    describe: () =>
-      "That one wasn't sent. Wait a few seconds, then send it again.",
+    describe: () => "That one wasn't sent. Wait a few seconds, then send it again.",
   },
   langy_turn_in_progress: {
     title: "Langy is still replying",
@@ -2099,20 +2041,17 @@ const presentations = {
   },
   end_user_required: {
     title: "This key needs a user on every request",
-    describe: () =>
-      "Send the OpenAI user field or the X-LangWatch-End-User-Id header.",
+    describe: () => "Send the OpenAI user field or the X-LangWatch-End-User-Id header.",
   },
   virtual_key_disabled: {
     title: "This key is disabled",
-    describe: () =>
-      "An administrator can re-enable it; the key itself is unchanged.",
+    describe: () => "An administrator can re-enable it; the key itself is unchanged.",
   },
   virtual_key_expired: {
     // Distinct from revoked on purpose: the key material is intact, so the
     // cheap fix is a new date rather than a new secret in every client.
     title: "This key has expired",
-    describe: () =>
-      "Extend its expiration date in settings, or create a new key.",
+    describe: () => "Extend its expiration date in settings, or create a new key.",
   },
   rate_limited: {
     title: "Too many requests",
@@ -2625,8 +2564,7 @@ const presentations = {
         error,
         whenAbsent: "Try again, or check the node's model configuration.",
         whenOther: "Check the node's model configuration, then run again.",
-        whenRejected:
-          "Check the API key for this model provider, then run again.",
+        whenRejected: "Check the API key for this model provider, then run again.",
       }),
   },
   llm_executor_unavailable: {
@@ -2761,10 +2699,7 @@ const presentations = {
     describe: () =>
       "Remove the parameter named in the message, or pick a model that supports it.",
   },
-} satisfies Record<
-  AppErrorCode | GoErrorCode | NodeErrorCode,
-  ErrorPresentation
->;
+} satisfies Record<AppErrorCode | GoErrorCode | NodeErrorCode, ErrorPresentation>;
 
 /**
  * Wire identifiers translated into the words the evaluator UI puts on screen.
@@ -2913,9 +2848,7 @@ export interface ErrorExplanation {
  * itself, humanised — specific and quotable to support — rather than to a
  * fault-shaped guess at what went wrong.
  */
-export function explainHandledError(
-  error: HandledErrorShape,
-): ErrorExplanation {
+export function explainHandledError(error: HandledErrorShape): ErrorExplanation {
   // `hasOwn`, not a bare index: `code` is untrusted, and `"toString"` or
   // `"constructor"` would otherwise resolve to an inherited Object.prototype
   // member — truthy, so it would report itself registered and render a blank
@@ -2929,10 +2862,7 @@ export function explainHandledError(
     // one case where there is genuinely nothing specific to say.
     const humanized = humanizeCode(error.code);
     return {
-      title:
-        humanized ||
-        FAULT_TITLES[error.fault] ||
-        UNKNOWN_ERROR_PRESENTATION.title,
+      title: humanized || FAULT_TITLES[error.fault] || UNKNOWN_ERROR_PRESENTATION.title,
       // Deliberately empty, even though `meta.message` may well hold a
       // sentence.
       //

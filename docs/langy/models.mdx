@@ -20,26 +20,27 @@ The menu has two parts:
 
 The groups are:
 
-| Group | What it holds |
-|---|---|
-| Quick | Small, fast models for cheap turns. |
-| Balanced | General-purpose models. |
+| Group     | What it holds                                                                     |
+| --------- | --------------------------------------------------------------------------------- |
+| Quick     | Small, fast models for cheap turns.                                               |
+| Balanced  | General-purpose models.                                                           |
 | Reasoning | Models with extended reasoning, including Codex `gpt-5.6` over the Responses API. |
 
 <Note>
-The exact number of models under **More models** depends on which providers you have enabled and which models each exposes. There is no fixed count.
+  The exact number of models under **More models** depends on which providers you have
+  enabled and which models each exposes. There is no fixed count.
 </Note>
 
 ## Langy's model role
 
 LangWatch resolves models by role. Langy has its own role, separate from the others, so changing Langy's model does not change what your playground, evaluations, or workflows use.
 
-| Role | Used by |
-|---|---|
-| Default | The general default across the platform. |
-| Fast | Cheaper, quicker assists. |
-| Langy | The model Langy chats and works with. |
-| Embeddings | Vector embeddings. |
+| Role       | Used by                                  |
+| ---------- | ---------------------------------------- |
+| Default    | The general default across the platform. |
+| Fast       | Cheaper, quicker assists.                |
+| Langy      | The model Langy chats and works with.    |
+| Embeddings | Vector embeddings.                       |
 
 Setting a model in the Langy composer sets the Langy role for the project.
 
@@ -60,7 +61,8 @@ Langy never calls a provider directly. Every Langy LLM call rides a per-project 
 - **Model policy.** The gateway enforces which models are allowed, server-side, as a second check on top of the picker.
 
 <Info>
-**Also check:** [Token usage and cost](/langy/token-usage-and-cost), [Data flow and privacy](/langy/security/data-flow-and-privacy).
+  **Also check:** [Token usage and cost](/langy/token-usage-and-cost), [Data flow and
+  privacy](/langy/security/data-flow-and-privacy).
 </Info>
 
 ## Reference

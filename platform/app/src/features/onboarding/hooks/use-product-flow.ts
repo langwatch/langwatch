@@ -27,10 +27,7 @@ const PRODUCT_TO_SCREENS: Record<
   [ProductScreenIndex, ...ProductScreenIndex[]]
 > = {
   "via-claude-code": [ProductScreenIndex.VIA_CLAUDE_CODE],
-  "via-platform": [
-    ProductScreenIndex.MODEL_PROVIDER,
-    ProductScreenIndex.VIA_PLATFORM,
-  ],
+  "via-platform": [ProductScreenIndex.MODEL_PROVIDER, ProductScreenIndex.VIA_PLATFORM],
   "via-claude-desktop": [ProductScreenIndex.VIA_CLAUDE_DESKTOP],
   manually: [ProductScreenIndex.MANUALLY],
 };
@@ -40,11 +37,10 @@ const firstScreenFor = (product: ProductSelection): ProductScreenIndex =>
 
 export function useProductFlow() {
   const router = useRouter();
-  const [selectedProduct, setSelectedProduct] = useState<
-    ProductSelection | undefined
-  >(undefined);
-  const [flowConfig, setFlowConfig] =
-    useState<ProductFlowConfig>(PRODUCT_FLOW_CONFIG);
+  const [selectedProduct, setSelectedProduct] = useState<ProductSelection | undefined>(
+    undefined,
+  );
+  const [flowConfig, setFlowConfig] = useState<ProductFlowConfig>(PRODUCT_FLOW_CONFIG);
 
   // Initialize selected product from URL: prefer product, then step, then slug
   useEffect(() => {
@@ -66,18 +62,13 @@ export function useProductFlow() {
     ) {
       inferred = stepFromQuery as ProductSelection;
     } else {
-      const currentPath: string =
-        typeof router.asPath === "string" ? router.asPath : "";
+      const currentPath: string = typeof router.asPath === "string" ? router.asPath : "";
       const pathNoQuery = currentPath.split("?")[0] ?? "";
       const segments = pathNoQuery
         .split("/")
         .filter((seg): seg is string => !!seg && seg.length > 0);
-      const lastSegment =
-        segments.length > 0 ? segments[segments.length - 1] : undefined;
-      if (
-        lastSegment &&
-        VALID_PRODUCTS.includes(lastSegment as ProductSelection)
-      ) {
+      const lastSegment = segments.length > 0 ? segments[segments.length - 1] : undefined;
+      if (lastSegment && VALID_PRODUCTS.includes(lastSegment as ProductSelection)) {
         inferred = lastSegment as ProductSelection;
       }
     }
@@ -126,17 +117,12 @@ export function useProductFlow() {
   const canProceed = useCallback(() => true, []);
 
   // Use generic flow hook for navigation (with URL sync)
-  const {
-    currentScreenIndex,
-    direction,
-    navigation,
-    canGoBack,
-    setCurrentScreenIndex,
-  } = useGenericOnboardingFlow(flowConfig, canProceed, {
-    queryParamName: "step",
-    screenIdMap,
-    firstScreenId: "product-selection",
-  });
+  const { currentScreenIndex, direction, navigation, canGoBack, setCurrentScreenIndex } =
+    useGenericOnboardingFlow(flowConfig, canProceed, {
+      queryParamName: "step",
+      screenIdMap,
+      firstScreenId: "product-selection",
+    });
 
   // If product inferred but step missing, land on the flavour's first screen
   // after selection and sync URL

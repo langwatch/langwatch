@@ -122,10 +122,9 @@ describe("the shared webhook delivery log", () => {
       await writeAutomationsRow(now, `evt_${ns}_shape`);
       await writePlatformRow(now, `btch_${ns}_shape`);
 
-      const automationsRow =
-        await prisma.webhookEndpointDelivery.findFirstOrThrow({
-          where: { projectId, dispatchId: `evt_${ns}_shape` },
-        });
+      const automationsRow = await prisma.webhookEndpointDelivery.findFirstOrThrow({
+        where: { projectId, dispatchId: `evt_${ns}_shape` },
+      });
       expect(automationsRow.channel).toBe("automations");
       expect(automationsRow.organizationId).toBeNull();
       expect(automationsRow.endpointId).toBeNull();
@@ -134,11 +133,9 @@ describe("the shared webhook delivery log", () => {
       expect(automationsRow.attempt).toBeNull();
       expect(automationsRow.eventCount).toBeNull();
 
-      const platformRow = await prisma.webhookEndpointDelivery.findFirstOrThrow(
-        {
-          where: { organizationId, dispatchId: `btch_${ns}_shape` },
-        },
-      );
+      const platformRow = await prisma.webhookEndpointDelivery.findFirstOrThrow({
+        where: { organizationId, dispatchId: `btch_${ns}_shape` },
+      });
       expect(platformRow.channel).toBe("platform");
       expect(platformRow.projectId).toBeNull();
       expect(platformRow.triggerId).toBeNull();
@@ -169,9 +166,7 @@ describe("the shared webhook delivery log", () => {
   describe("the retention sweep", () => {
     it("clears expired rows of BOTH channels in one pass", async () => {
       const now = new Date();
-      const expired = new Date(
-        now.getTime() - WEBHOOK_DELIVERY_RETENTION_MS - DAY_MS,
-      );
+      const expired = new Date(now.getTime() - WEBHOOK_DELIVERY_RETENTION_MS - DAY_MS);
       await writeAutomationsRow(expired, `evt_${ns}_old`);
       await writePlatformRow(expired, `btch_${ns}_old`);
       await writeAutomationsRow(now, `evt_${ns}_fresh`);
@@ -181,14 +176,13 @@ describe("the shared webhook delivery log", () => {
 
       // Read each channel back through its own tenancy anchor; the guard
       // refuses an unscoped read of the shared log, which is the point.
-      const automationsSurvivors =
-        await prisma.webhookEndpointDelivery.findMany({
-          where: {
-            projectId,
-            dispatchId: { in: [`evt_${ns}_old`, `evt_${ns}_fresh`] },
-          },
-          select: { dispatchId: true },
-        });
+      const automationsSurvivors = await prisma.webhookEndpointDelivery.findMany({
+        where: {
+          projectId,
+          dispatchId: { in: [`evt_${ns}_old`, `evt_${ns}_fresh`] },
+        },
+        select: { dispatchId: true },
+      });
       const platformSurvivors = await prisma.webhookEndpointDelivery.findMany({
         where: {
           organizationId,
@@ -196,12 +190,8 @@ describe("the shared webhook delivery log", () => {
         },
         select: { dispatchId: true },
       });
-      expect(automationsSurvivors.map((r) => r.dispatchId)).toEqual([
-        `evt_${ns}_fresh`,
-      ]);
-      expect(platformSurvivors.map((r) => r.dispatchId)).toEqual([
-        `btch_${ns}_fresh`,
-      ]);
+      expect(automationsSurvivors.map((r) => r.dispatchId)).toEqual([`evt_${ns}_fresh`]);
+      expect(platformSurvivors.map((r) => r.dispatchId)).toEqual([`btch_${ns}_fresh`]);
     });
   });
 });

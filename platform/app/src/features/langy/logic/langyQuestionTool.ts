@@ -109,8 +109,7 @@ export function questionToolCardParts(part: unknown): LangyCardPart[] {
       .map((option, optionIndex) => ({
         id: `opt-${optionIndex + 1}`,
         label: option.label,
-        ...(typeof option.description === "string" &&
-        option.description.trim() !== ""
+        ...(typeof option.description === "string" && option.description.trim() !== ""
           ? { description: option.description }
           : {}),
       }));

@@ -74,18 +74,14 @@ describe("parseHeaderColumns", () => {
       // First object's value alone exceeds the slice, so it never closes → no
       // header can be determined; caller uploads without confirm.
       const giant = "x".repeat(HEADER_PARSE_MAX_BYTES + 1024);
-      const result = await parseHeaderColumns(
-        file(`[{"a":"${giant}"`, "data.json"),
-      );
+      const result = await parseHeaderColumns(file(`[{"a":"${giant}"`, "data.json"));
       expect(result).toBeNull();
     });
   });
 
   describe("when the header cannot be determined", () => {
     it("returns null for an unsupported extension", async () => {
-      expect(
-        await parseHeaderColumns(file("a,b\n1,2\n", "data.txt")),
-      ).toBeNull();
+      expect(await parseHeaderColumns(file("a,b\n1,2\n", "data.txt"))).toBeNull();
     });
 
     it("returns null for an empty file", async () => {

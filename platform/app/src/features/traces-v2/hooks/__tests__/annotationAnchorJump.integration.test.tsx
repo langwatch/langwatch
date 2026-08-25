@@ -5,13 +5,7 @@
  * detail holding a field opened and briefly highlighted.
  * See specs/traces-v2/anchored-comments.feature.
  */
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -92,9 +86,7 @@ describe("given a span carries a comment about its output", () => {
 
       fireEvent.click(screen.getByText("Go to the comment"));
 
-      await waitFor(() =>
-        expect(screen.getByTestId("section-glow")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByTestId("section-glow")).toBeInTheDocument());
     });
 
     it("selects the span the field belongs to and shows the trace view", () => {

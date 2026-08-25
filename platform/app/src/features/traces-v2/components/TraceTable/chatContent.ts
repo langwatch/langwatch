@@ -16,9 +16,7 @@ const SNIPPET_LENGTH = 80;
 const ELLIPSIS = "\u2026";
 
 function snippet(text: string): string {
-  return text.length > SNIPPET_LENGTH
-    ? text.slice(0, SNIPPET_LENGTH) + ELLIPSIS
-    : text;
+  return text.length > SNIPPET_LENGTH ? text.slice(0, SNIPPET_LENGTH) + ELLIPSIS : text;
 }
 
 function isMessageArray(value: unknown): value is ChatMessage[] {
@@ -115,11 +113,7 @@ export function findMessageContent({
   if (!raw) return "";
   const parsed = tryParseJson(raw);
   if (!isMessageArray(parsed)) {
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      !Array.isArray(parsed)
-    ) {
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
       return JSON.stringify(parsed);
     }
     return raw;
@@ -133,13 +127,7 @@ export function parseSystemPrompt(raw: string | null | undefined): string {
   return findMessageContent({ raw, role: "system", pick: "first" });
 }
 
-export function truncateText({
-  text,
-  limit,
-}: {
-  text: string;
-  limit: number;
-}): string {
+export function truncateText({ text, limit }: { text: string; limit: number }): string {
   if (limit <= 0 || text.length <= limit) return text;
   return text.slice(0, limit) + ELLIPSIS;
 }

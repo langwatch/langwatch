@@ -40,31 +40,28 @@ export const ASSISTANT_KIND_TO_TOOL_SLUG: Partial<
   github_copilot: "copilot",
 };
 
-export const codingAssistantConfigSchema = z
-  .object({
-    assistantKind: assistantKindSchema.optional(),
-    setupCommand: z.string().min(1).max(256),
-    setupDocsUrl: z.string().url().max(2048).optional(),
-    helperText: z.string().max(2048).optional(),
-    allowVk: z.boolean().optional(),
-    allowOtelDirect: z.boolean().optional(),
-    bundledPlan: z.boolean().optional(),
-  });
+export const codingAssistantConfigSchema = z.object({
+  assistantKind: assistantKindSchema.optional(),
+  setupCommand: z.string().min(1).max(256),
+  setupDocsUrl: z.string().url().max(2048).optional(),
+  helperText: z.string().max(2048).optional(),
+  allowVk: z.boolean().optional(),
+  allowOtelDirect: z.boolean().optional(),
+  bundledPlan: z.boolean().optional(),
+});
 
-export const modelProviderToolConfigSchema = z
-  .object({
-    providerKey: z.string().min(1).max(64),
-    suggestedRoutingPolicyId: z.string().min(1).optional(),
-    defaultLabel: z.string().max(64).optional(),
-    projectSuggestionText: z.string().max(512).optional(),
-  });
+export const modelProviderToolConfigSchema = z.object({
+  providerKey: z.string().min(1).max(64),
+  suggestedRoutingPolicyId: z.string().min(1).optional(),
+  defaultLabel: z.string().max(64).optional(),
+  projectSuggestionText: z.string().max(512).optional(),
+});
 
-export const externalToolConfigSchema = z
-  .object({
-    descriptionMarkdown: z.string().max(8192),
-    linkUrl: z.string().url().max(2048),
-    ctaLabel: z.string().max(64).optional(),
-  });
+export const externalToolConfigSchema = z.object({
+  descriptionMarkdown: z.string().max(8192),
+  linkUrl: z.string().url().max(2048),
+  ctaLabel: z.string().max(64).optional(),
+});
 
 export const aiToolConfigEnvelopeSchema = z.discriminatedUnion("type", [
   z.object({
@@ -80,9 +77,7 @@ export const aiToolConfigEnvelopeSchema = z.discriminatedUnion("type", [
     config: externalToolConfigSchema,
   }),
 ]);
-export type AiToolConfigEnvelope = z.infer<
-  typeof aiToolConfigEnvelopeSchema
->;
+export type AiToolConfigEnvelope = z.infer<typeof aiToolConfigEnvelopeSchema>;
 export type AiToolConfig = AiToolConfigEnvelope["config"];
 
 const configRecordSchema = z.record(z.string(), z.unknown());
@@ -114,9 +109,7 @@ export type AiToolEntry = z.infer<typeof aiToolEntrySchema>;
 export const aiToolOrganizationInputSchema = z
   .object({ organizationId: z.string().min(1) })
   .strict();
-export type AiToolOrganizationInput = z.infer<
-  typeof aiToolOrganizationInputSchema
->;
+export type AiToolOrganizationInput = z.infer<typeof aiToolOrganizationInputSchema>;
 
 export const aiToolMemberInputSchema = z
   .object({
@@ -146,9 +139,7 @@ export const createAiToolEntryInputSchema = z
     actorUserId: z.string().nullable().optional(),
   })
   .strict();
-export type CreateAiToolEntryInput = z.infer<
-  typeof createAiToolEntryInputSchema
->;
+export type CreateAiToolEntryInput = z.infer<typeof createAiToolEntryInputSchema>;
 
 export const updateAiToolEntryInputSchema = z
   .object({
@@ -164,9 +155,7 @@ export const updateAiToolEntryInputSchema = z
     actorUserId: z.string().nullable().optional(),
   })
   .strict();
-export type UpdateAiToolEntryInput = z.infer<
-  typeof updateAiToolEntryInputSchema
->;
+export type UpdateAiToolEntryInput = z.infer<typeof updateAiToolEntryInputSchema>;
 
 export const reorderAiToolEntriesInputSchema = aiToolOrganizationInputSchema
   .extend({
@@ -175,9 +164,7 @@ export const reorderAiToolEntriesInputSchema = aiToolOrganizationInputSchema
     ),
   })
   .strict();
-export type ReorderAiToolEntriesInput = z.infer<
-  typeof reorderAiToolEntriesInputSchema
->;
+export type ReorderAiToolEntriesInput = z.infer<typeof reorderAiToolEntriesInputSchema>;
 
 export const seedAiToolStarterPackInputSchema = aiToolOrganizationInputSchema
   .extend({
@@ -185,9 +172,7 @@ export const seedAiToolStarterPackInputSchema = aiToolOrganizationInputSchema
     slugs: z.array(z.string().min(1)).optional(),
   })
   .strict();
-export type SeedAiToolStarterPackInput = z.infer<
-  typeof seedAiToolStarterPackInputSchema
->;
+export type SeedAiToolStarterPackInput = z.infer<typeof seedAiToolStarterPackInputSchema>;
 
 export type AiToolStarterTile = {
   type: AiToolType;
@@ -206,8 +191,7 @@ export const AI_TOOL_STARTER_TILES: readonly AiToolStarterTile[] = [
     config: {
       assistantKind: "claude_code",
       setupCommand: "langwatch claude",
-      setupDocsUrl:
-        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+      setupDocsUrl: "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
     },
   },
   {
@@ -218,8 +202,7 @@ export const AI_TOOL_STARTER_TILES: readonly AiToolStarterTile[] = [
     config: {
       assistantKind: "codex",
       setupCommand: "langwatch codex",
-      setupDocsUrl:
-        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+      setupDocsUrl: "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
     },
   },
   {
@@ -230,8 +213,7 @@ export const AI_TOOL_STARTER_TILES: readonly AiToolStarterTile[] = [
     config: {
       assistantKind: "gemini",
       setupCommand: "langwatch gemini",
-      setupDocsUrl:
-        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+      setupDocsUrl: "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
     },
   },
   {
@@ -242,8 +224,7 @@ export const AI_TOOL_STARTER_TILES: readonly AiToolStarterTile[] = [
     config: {
       assistantKind: "opencode",
       setupCommand: "langwatch opencode",
-      setupDocsUrl:
-        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+      setupDocsUrl: "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
     },
   },
   {
@@ -254,8 +235,7 @@ export const AI_TOOL_STARTER_TILES: readonly AiToolStarterTile[] = [
     config: {
       assistantKind: "github_copilot",
       setupCommand: "langwatch copilot",
-      setupDocsUrl:
-        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+      setupDocsUrl: "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
     },
   },
   {
@@ -340,9 +320,7 @@ export abstract class GovernanceAiToolCatalogService {
   abstract seedStarterPack(
     input: SeedAiToolStarterPackInput,
   ): Promise<{ created: number; updated: number; skipped: number }>;
-  abstract listConfiguredProvidersForUser(
-    input: AiToolMemberInput,
-  ): Promise<string[]>;
+  abstract listConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]>;
   abstract listProviderOptionsForAdmin(
     input: AiToolOrganizationInput,
   ): Promise<AiToolProviderOption[]>;
@@ -353,13 +331,9 @@ export abstract class GovernanceAiToolCatalogService {
   abstract resolveToolPolicyOverrides(
     input: AiToolMemberInput,
   ): Promise<Partial<Record<PlatformToolSlug, PlatformToolPolicy>>>;
-  abstract resolveToolPolicyMap(
-    input: AiToolMemberInput,
-  ): Promise<PlatformToolPolicyMap>;
+  abstract resolveToolPolicyMap(input: AiToolMemberInput): Promise<PlatformToolPolicyMap>;
   abstract resolveToolPolicy(
     input: AiToolMemberInput & { slug: PlatformToolSlug },
   ): Promise<PlatformToolPolicy>;
-  abstract resolveCliCatalogForUser(
-    input: AiToolMemberInput,
-  ): Promise<AiToolCliCatalog>;
+  abstract resolveCliCatalogForUser(input: AiToolMemberInput): Promise<AiToolCliCatalog>;
 }

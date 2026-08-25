@@ -120,9 +120,7 @@ describe("tracesHrefForKey narrowed to one model", () => {
         virtualKeyId: "vk_01HTEST",
         model: "gpt-5-mini",
       });
-      expect(
-        parseFragment(bare.slice(bare.indexOf("#")))?.overrides.query,
-      ).toBe(
+      expect(parseFragment(bare.slice(bare.indexOf("#")))?.overrides.query).toBe(
         'trace.attribute.langwatch.virtual_key_id:"vk_01HTEST" AND model:gpt-5-mini',
       );
     });
@@ -136,8 +134,7 @@ describe("tracesHrefForKey narrowed to one model", () => {
         model: null,
       });
       expect(
-        parseFragment(unfiltered.slice(unfiltered.indexOf("#")))?.overrides
-          .query,
+        parseFragment(unfiltered.slice(unfiltered.indexOf("#")))?.overrides.query,
       ).toBe('trace.attribute.langwatch.virtual_key_id:"vk_01HTEST"');
     });
   });
@@ -155,9 +152,7 @@ describe("resolveTracesHrefForKey", () => {
           traceProjectId: "project-web-app",
           traceProjectArchived: false,
         }),
-      ).toBe(
-        tracesHrefForKey({ projectSlug: "web-app", virtualKeyId: "vk_1" }),
-      );
+      ).toBe(tracesHrefForKey({ projectSlug: "web-app", virtualKeyId: "vk_1" }));
     });
   });
 

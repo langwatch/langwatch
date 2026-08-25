@@ -17,10 +17,7 @@ import {
   TraceAnalyticsFoldProjection,
 } from "../traceAnalytics.foldProjection";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 function llmSpan(id: string, model: string) {
   return createTestSpan({
@@ -186,8 +183,6 @@ describe("when mapping folded attributes to read-side metadata", () => {
     const metadata = mapAttributesToMetadata(state.attributes, null, null);
     expect(metadata.model).toBe("claude-opus-5[1m]");
     expect(metadata.models).toEqual(["claude-opus-5[1m]", "claude-opus-5"]);
-    expect(
-      metadata["langwatch.reserved.model_metadata_stamped"],
-    ).toBeUndefined();
+    expect(metadata["langwatch.reserved.model_metadata_stamped"]).toBeUndefined();
   });
 });

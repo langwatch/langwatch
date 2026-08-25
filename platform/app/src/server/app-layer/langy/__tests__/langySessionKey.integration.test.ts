@@ -24,10 +24,7 @@ import { getApp } from "~/server/app-layer/app";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
-import {
-  LangySessionKeyScopeError,
-  mintLangySessionApiKey,
-} from "../langyApiKey";
+import { LangySessionKeyScopeError, mintLangySessionApiKey } from "../langyApiKey";
 import { experimentRoutePermissions } from "./helpers/routePermissions";
 
 wireDefaultTestApp();
@@ -60,10 +57,7 @@ const EXPECTED_HELD_SUBSET = [
 // A member who can work with experiments the ordinary way: the dedicated
 // experiments read every project role holds, plus management of the
 // evaluations family that actually executes a run.
-const EXPERIMENTER_ROLE_PERMISSIONS = [
-  "experiments:view",
-  "evaluations:manage",
-];
+const EXPERIMENTER_ROLE_PERMISSIONS = ["experiments:view", "evaluations:manage"];
 
 describe("Langy session key (caller-scoped)", () => {
   const ns = `langy-session-${nanoid(8)}`;
@@ -74,8 +68,7 @@ describe("Langy session key (caller-scoped)", () => {
   let experimenterUserId: string;
   let noAccessUserId: string;
 
-  const sessionFor = (userId: string) =>
-    ({ user: { id: userId }, expires: "1" }) as any;
+  const sessionFor = (userId: string) => ({ user: { id: userId }, expires: "1" }) as any;
 
   beforeAll(async () => {
     const organization = await prisma.organization.create({
@@ -191,10 +184,7 @@ describe("Langy session key (caller-scoped)", () => {
       ["project", { teamId }],
       ["organizationUser", { organizationId }],
       ["team", { id: teamId }],
-      [
-        "user",
-        { id: { in: [editorUserId, experimenterUserId, noAccessUserId] } },
-      ],
+      ["user", { id: { in: [editorUserId, experimenterUserId, noAccessUserId] } }],
       ["organization", { id: organizationId }],
     ]);
   });
@@ -246,9 +236,7 @@ describe("Langy session key (caller-scoped)", () => {
         const customRole = await prisma.customRole.findUnique({
           where: { id: binding.customRoleId! },
         });
-        const permissions = (customRole!.permissions as string[])
-          .slice()
-          .sort();
+        const permissions = (customRole!.permissions as string[]).slice().sort();
 
         // Exactly the held subset — nothing the human can't already do.
         expect(permissions).toEqual(EXPECTED_HELD_SUBSET);
@@ -317,10 +305,7 @@ describe("Langy session key (caller-scoped)", () => {
         // The human holds `evaluations:manage`, which implies the delete. The
         // key deliberately stops at view/create/update, so Langy cannot reach
         // the delete even though the person who asked for it could.
-        for (const permission of [
-          "evaluations:delete",
-          "evaluations:manage",
-        ] as const) {
+        for (const permission of ["evaluations:delete", "evaluations:manage"] as const) {
           await expect(
             enforceApiKeyCeiling({ resolved: resolved!, permission }),
           ).rejects.toThrow();

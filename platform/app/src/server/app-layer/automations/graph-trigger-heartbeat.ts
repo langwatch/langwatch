@@ -36,9 +36,7 @@ import { isNoDataPredicate, parseSeriesIndex } from "@langwatch/automation-contr
 import type { GraphTriggerEvaluationReason } from "./graph-trigger-evaluation.service";
 import type { AutomationService } from "@langwatch/automation-contract";
 
-const logger = createLogger(
-  "langwatch:app-layer:triggers:graph-trigger-heartbeat",
-);
+const logger = createLogger("langwatch:app-layer:triggers:graph-trigger-heartbeat");
 
 export const GRAPH_TRIGGER_HEARTBEAT_NAME = "graphTriggerHeartbeat" as const;
 export const GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS = 30_000;
@@ -118,10 +116,7 @@ const SLIM_TABLE_BY_SOURCE: Record<AnalyticsMetricSource, string> = {
 /** Aggregate-id column per source. The IN-tuple dedup pattern uses this
  *  as the (TenantId, <id>, UpdatedAt) grouping key for the slim
  *  `ReplacingMergeTree(UpdatedAt)` table. */
-const SLIM_AGGREGATE_ID_COLUMN_BY_SOURCE: Record<
-  AnalyticsMetricSource,
-  string
-> = {
+const SLIM_AGGREGATE_ID_COLUMN_BY_SOURCE: Record<AnalyticsMetricSource, string> = {
   trace: "TraceId",
   evaluation: "EvaluationId",
 };
@@ -146,9 +141,7 @@ export interface GraphTriggerSweepCandidate {
  * `projectId: { in }`. Without this the heartbeat throws on its first query
  * every tick and no absence/resolve alert ever fires.
  */
-export function defaultCandidateSources(
-  prisma: PrismaClient,
-): HeartbeatCandidateSources {
+export function defaultCandidateSources(prisma: PrismaClient): HeartbeatCandidateSources {
   const loadCandidateProjectIds = async (): Promise<string[]> => {
     const projects = await prisma.project.findMany({
       where: { firstMessage: true, archivedAt: null },
@@ -209,9 +202,7 @@ export async function decideGraphTriggerHeartbeat({
     sources.loadProjectsWithGraphTriggers(),
     sources.loadProjectsWithOpenGraphTriggerSent(),
   ]);
-  const projectIds = Array.from(
-    new Set<string>([...graphProjects, ...openSentProjects]),
-  );
+  const projectIds = Array.from(new Set<string>([...graphProjects, ...openSentProjects]));
   if (projectIds.length === 0) return [];
 
   const candidates: GraphTriggerSweepCandidate[] = [];
@@ -297,10 +288,7 @@ async function collectCandidatesForProject({
     const recency = recencyBySource.get(candidate.source);
     if (!recency) continue;
     const cutoff = now.getTime() - candidate.windowMs;
-    if (
-      recency.lastOccurredAtMs !== null &&
-      recency.lastOccurredAtMs > cutoff
-    ) {
+    if (recency.lastOccurredAtMs !== null && recency.lastOccurredAtMs > cutoff) {
       // Real-time path is firing for this trigger; skip.
       continue;
     }
@@ -308,9 +296,7 @@ async function collectCandidatesForProject({
       triggerId: candidate.triggerId,
       projectId,
       reason:
-        candidate.reasonKind === "absence"
-          ? "heartbeat-absence"
-          : "heartbeat-resolve",
+        candidate.reasonKind === "absence" ? "heartbeat-absence" : "heartbeat-resolve",
     });
   }
   return surviving;
@@ -325,8 +311,7 @@ async function loadCandidatesForProject({
   projectId: string;
   hasOpenSent: boolean;
 }): Promise<CandidateTrigger[]> {
-  const triggers =
-    await deps.automation.getActiveGraphTriggersForProject(projectId);
+  const triggers = await deps.automation.getActiveGraphTriggersForProject(projectId);
   if (triggers.length === 0) return [];
 
   const openIds = hasOpenSent
@@ -339,11 +324,7 @@ async function loadCandidatesForProject({
     const operator = params.operator;
     const threshold = params.threshold;
     const timePeriod = params.timePeriod;
-    if (
-      operator === undefined ||
-      threshold === undefined ||
-      timePeriod === undefined
-    ) {
+    if (operator === undefined || threshold === undefined || timePeriod === undefined) {
       continue;
     }
     const windowMs = Math.max(MIN_BOUND_WINDOW_MS, timePeriod * 60 * 1000);
@@ -469,9 +450,7 @@ async function loadProjectRecency({
       return { projectId, source, lastOccurredAtMs: null };
     }
     const ms =
-      typeof row.lastMs === "string"
-        ? Number.parseInt(row.lastMs, 10)
-        : row.lastMs;
+      typeof row.lastMs === "string" ? Number.parseInt(row.lastMs, 10) : row.lastMs;
     if (!Number.isFinite(ms) || ms <= 0) {
       return { projectId, source, lastOccurredAtMs: null };
     }

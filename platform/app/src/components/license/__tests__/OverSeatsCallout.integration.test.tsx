@@ -48,9 +48,7 @@ describe("OverSeatsCallout", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        container.querySelector('[data-testid="over-seats-callout"]'),
-      ).toBeNull();
+      expect(container.querySelector('[data-testid="over-seats-callout"]')).toBeNull();
     });
   });
 });

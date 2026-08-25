@@ -9,10 +9,7 @@ import {
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
 } from "../metrics";
-import {
-  decodeFoldCacheEntry,
-  encodeFoldCacheEntry,
-} from "./foldCache/foldCacheEntry";
+import { decodeFoldCacheEntry, encodeFoldCacheEntry } from "./foldCache/foldCacheEntry";
 import type { FoldProjectionStore } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
@@ -125,10 +122,7 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     this.updatedAtOf = options.updatedAtOf ?? readUpdatedAt;
   }
 
-  async get(
-    aggregateId: string,
-    context: ProjectionStoreContext,
-  ): Promise<State | null> {
+  async get(aggregateId: string, context: ProjectionStoreContext): Promise<State | null> {
     return (await this.getWithApplied(aggregateId, context)).state;
   }
 
@@ -224,11 +218,7 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     }
 
     incrementEsFoldCacheTotal(this.keyPrefix, "hit");
-    observeEsFoldCacheGetDuration(
-      this.keyPrefix,
-      "redis",
-      performance.now() - startedAt,
-    );
+    observeEsFoldCacheGetDuration(this.keyPrefix, "redis", performance.now() - startedAt);
 
     let decoded: ReturnType<typeof decodeFoldCacheEntry<State>>;
     try {
@@ -297,10 +287,7 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     await this.inner.store(state, context);
     await this.cache(state, aggregateId, context);
 
-    observeEsFoldCacheStoreDuration(
-      this.keyPrefix,
-      performance.now() - startedAt,
-    );
+    observeEsFoldCacheStoreDuration(this.keyPrefix, performance.now() - startedAt);
   }
 
   /**
@@ -343,10 +330,7 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     }
   }
 
-  private redisKey(
-    aggregateId: string,
-    context: ProjectionStoreContext,
-  ): string {
+  private redisKey(aggregateId: string, context: ProjectionStoreContext): string {
     return `fold:${this.keyPrefix}:${String(context.tenantId)}:${aggregateId}`;
   }
 }

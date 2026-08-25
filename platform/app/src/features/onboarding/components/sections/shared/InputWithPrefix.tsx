@@ -48,10 +48,7 @@ export function InputWithPrefix({
   invalid = false,
 }: InputWithPrefixProps): React.ReactElement {
   const [isVisible, setIsVisible] = useState(false);
-  const focusBoxShadow = useColorModeValue<InputProps["boxShadow"]>(
-    "sm",
-    "2xl",
-  );
+  const focusBoxShadow = useColorModeValue<InputProps["boxShadow"]>("sm", "2xl");
   const borderColor = invalid ? "border.error" : "border";
 
   function toggleVisibility(): void {
@@ -59,8 +56,7 @@ export function InputWithPrefix({
   }
 
   const hasEndAddon = showVisibilityToggle || onCopyPlain || onCopyWithPrefix;
-  const inputType =
-    type ?? (showVisibilityToggle && !isVisible ? "password" : "text");
+  const inputType = type ?? (showVisibilityToggle && !isVisible ? "password" : "text");
 
   return (
     <InputGroup

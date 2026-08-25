@@ -1,10 +1,5 @@
 // App (composition root)
-export {
-  App,
-  getApp,
-  initializeApp,
-  resetApp,
-} from "./app";
+export { App, getApp, initializeApp, resetApp } from "./app";
 // Client factories. ClickHouse and Redis are deliberately absent: both are
 // reached through the App (a repository, or `getApp().redis`), never by
 // constructing a client. See ~/server/clickhouse/managedClient.ts and ADR-093.
@@ -24,9 +19,7 @@ export {
   initializeWorkerApp,
 } from "./presets";
 // Projects
-export {
-  type ProjectFeatureFlag,
-} from "@langwatch/project-contract";
+export { type ProjectFeatureFlag } from "@langwatch/project-contract";
 export type { ProjectService } from "@langwatch/project-contract";
 // Tracing
 export { traced } from "./tracing";

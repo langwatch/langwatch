@@ -1,20 +1,9 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { formatBytes, formatTimeAgo } from "@langwatch/ops-web";
 import { PinnedAwareJsonView } from "~/features/traces-v2/components/TraceDrawer/JsonHighlight";
 import type { JobEntry } from "~/server/app-layer/ops/repositories/queue.repository";
-import {
-  type GrafanaDeepLinkConfig,
-  grafanaTraceUrl,
-} from "~/utils/grafanaLinks";
+import { type GrafanaDeepLinkConfig, grafanaTraceUrl } from "~/utils/grafanaLinks";
 import { middleEllipsis } from "../clusterGroups";
 import { type JobContextInfo, readJobContext, readJobKind } from "./jobContext";
 
@@ -69,13 +58,7 @@ function JobHeaderRow({
 }) {
   return (
     <HStack gap={2}>
-      <Text
-        textStyle="xs"
-        fontFamily="mono"
-        truncate
-        title={job.jobId}
-        flexShrink={1}
-      >
+      <Text textStyle="xs" fontFamily="mono" truncate title={job.jobId} flexShrink={1}>
         {job.jobId}
       </Text>
       <Spacer />
@@ -146,9 +129,7 @@ function JobContextRows({
       {context.traceId && (
         <ContextRow label="Trace" value={context.traceId} href={traceHref} />
       )}
-      {context.projectId && (
-        <ContextRow label="Project" value={context.projectId} />
-      )}
+      {context.projectId && <ContextRow label="Project" value={context.projectId} />}
       {context.userId && <ContextRow label="User" value={context.userId} />}
       {context.organizationId && (
         <ContextRow label="Organization" value={context.organizationId} />
@@ -176,9 +157,7 @@ export function GroupJobCard({
   const [showJson, setShowJson] = useState(false);
   const context = readJobContext(job.data);
   const traceHref =
-    context?.traceId && grafana
-      ? grafanaTraceUrl(context.traceId, grafana)
-      : null;
+    context?.traceId && grafana ? grafanaTraceUrl(context.traceId, grafana) : null;
 
   return (
     <Card.Root variant="outline">

@@ -55,9 +55,7 @@ vi.mock("../../rbac", async (importOriginal) => {
 
 const getActivePlan = vi.fn();
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   return {
     // Consumers that degrade without Redis read through this one.
     tryGetApp: () => null,

@@ -25,11 +25,7 @@ export default function OpsPage() {
         <PageLayout.Header>
           <PageLayout.Heading>Ops Dashboard</PageLayout.Heading>
           <Spacer />
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => openDrawer("opsBlobs", {})}
-          >
+          <Button size="xs" variant="outline" onClick={() => openDrawer("opsBlobs", {})}>
             <Database size={12} /> Payload store
           </Button>
           {/* The snapshot's own age, not just the socket's health: this page

@@ -92,8 +92,7 @@ const taskConfigSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["s3"],
-        message:
-          "S3 access key id and secret access key must be provided together",
+        message: "S3 access key id and secret access key must be provided together",
       });
     }
     if (value.azure.authMode === "sharedKey" && !value.azure.accountKey) {
@@ -115,9 +114,7 @@ const taskConfigSchema = z
 export type MigrationTaskConfig = z.infer<typeof taskConfigSchema>;
 export type MigrationTaskPhase = "plan" | "copy" | "finalize" | "verify";
 
-export function parseMigrationTaskConfig(
-  source: NodeJS.ProcessEnv,
-): MigrationTaskConfig {
+export function parseMigrationTaskConfig(source: NodeJS.ProcessEnv): MigrationTaskConfig {
   return taskConfigSchema.parse({
     sourceProvider: source.OBJECT_STORAGE_MIGRATION_SOURCE_PROVIDER,
     targetProvider: source.OBJECT_STORAGE_MIGRATION_TARGET_PROVIDER,
@@ -127,31 +124,23 @@ export function parseMigrationTaskConfig(
       bucket: source.OBJECT_STORAGE_MIGRATION_S3_BUCKET,
       endpoint: source.OBJECT_STORAGE_MIGRATION_S3_ENDPOINT || undefined,
       region: source.OBJECT_STORAGE_MIGRATION_S3_REGION || undefined,
-      accessKeyId:
-        source.OBJECT_STORAGE_MIGRATION_S3_ACCESS_KEY_ID || undefined,
-      secretAccessKey:
-        source.OBJECT_STORAGE_MIGRATION_S3_SECRET_ACCESS_KEY || undefined,
-      sessionToken:
-        source.OBJECT_STORAGE_MIGRATION_S3_SESSION_TOKEN || undefined,
+      accessKeyId: source.OBJECT_STORAGE_MIGRATION_S3_ACCESS_KEY_ID || undefined,
+      secretAccessKey: source.OBJECT_STORAGE_MIGRATION_S3_SECRET_ACCESS_KEY || undefined,
+      sessionToken: source.OBJECT_STORAGE_MIGRATION_S3_SESSION_TOKEN || undefined,
     },
     azure: {
       accountName: source.OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_NAME,
       container: source.OBJECT_STORAGE_MIGRATION_AZURE_CONTAINER,
-      accountKey:
-        source.OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_KEY || undefined,
+      accountKey: source.OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_KEY || undefined,
       endpoint: source.OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT || undefined,
       authMode: source.OBJECT_STORAGE_MIGRATION_AZURE_AUTH_MODE || undefined,
-      authorityHost:
-        source.OBJECT_STORAGE_MIGRATION_AZURE_AUTHORITY_HOST || undefined,
-      tokenAudience:
-        source.OBJECT_STORAGE_MIGRATION_AZURE_TOKEN_AUDIENCE || undefined,
+      authorityHost: source.OBJECT_STORAGE_MIGRATION_AZURE_AUTHORITY_HOST || undefined,
+      tokenAudience: source.OBJECT_STORAGE_MIGRATION_AZURE_TOKEN_AUDIENCE || undefined,
     },
   });
 }
 
-export function parseMigrationTaskPhase(
-  value: string | undefined,
-): MigrationTaskPhase {
+export function parseMigrationTaskPhase(value: string | undefined): MigrationTaskPhase {
   if (
     value === "plan" ||
     value === "copy" ||
@@ -236,8 +225,7 @@ function assertActiveAzureMatches({
     effectiveAzureEndpoint(
       config.azure.accountName,
       activeEnvironment.AZURE_BLOB_ENDPOINT,
-    ) !==
-    effectiveAzureEndpoint(config.azure.accountName, config.azure.endpoint)
+    ) !== effectiveAzureEndpoint(config.azure.accountName, config.azure.endpoint)
   ) {
     throw new Error(
       `Migration ${phase} expects the active Azure endpoint to match the migration endpoint`,
@@ -253,10 +241,7 @@ function effectiveAzureEndpoint(
   accountName: string,
   endpoint: string | undefined,
 ): string {
-  return (
-    normalizeEndpoint(endpoint) ??
-    `https://${accountName}.blob.core.windows.net`
-  );
+  return normalizeEndpoint(endpoint) ?? `https://${accountName}.blob.core.windows.net`;
 }
 
 export function createMigrationTask({
@@ -270,9 +255,7 @@ export function createMigrationTask({
   publishStoredObject: ConstructorParameters<
     typeof ObjectStorageMigration
   >[0]["publishStoredObject"];
-  auditQueues: ConstructorParameters<
-    typeof ObjectStorageMigration
-  >[0]["auditQueues"];
+  auditQueues: ConstructorParameters<typeof ObjectStorageMigration>[0]["auditQueues"];
 }): ObjectStorageMigration {
   const endpoints = {
     s3: createMigrationStorageEndpoint({
@@ -311,8 +294,7 @@ export default async function execute(phaseValue?: string): Promise<void> {
   const migration = createMigrationTask({
     config,
     inventory: createMigrationInventory(repository, getPrivateS3Configs()),
-    publishStoredObject: (row) =>
-      repository.insert({ projectId: row.project_id, row }),
+    publishStoredObject: (row) => repository.insert({ projectId: row.project_id, row }),
     auditQueues: auditQueuesForCutover,
   });
   const report = await runMigrationPhase(migration, phase);
@@ -383,14 +365,9 @@ async function auditQueuesForCutover() {
       "Redis is required to audit GroupQueue before migration finalization",
     );
   }
-  const { redis, scanNodes, cleanup } =
-    await createCutoverAuditRedis(connection);
+  const { redis, scanNodes, cleanup } = await createCutoverAuditRedis(connection);
   try {
-    return await auditGroupQueuesForStorageMigration(
-      redis,
-      Date.now(),
-      scanNodes,
-    );
+    return await auditGroupQueuesForStorageMigration(redis, Date.now(), scanNodes);
   } finally {
     cleanup();
     connection.disconnect();
@@ -406,9 +383,7 @@ async function auditQueuesForCutover() {
  * master-only duplicate of the connection; single-node Redis has no
  * replicas to mis-route to and is used as-is.
  */
-export async function createCutoverAuditRedis(
-  sharedConnection: unknown,
-): Promise<{
+export async function createCutoverAuditRedis(sharedConnection: unknown): Promise<{
   redis: QueueAuditRedis;
   scanNodes: QueueAuditRedis[];
   cleanup: () => void;
@@ -481,9 +456,7 @@ async function runMigrationPhase(
   return migration.finalize();
 }
 
-export function toAzureCredentials(
-  config: MigrationTaskConfig,
-): AzureCredentials {
+export function toAzureCredentials(config: MigrationTaskConfig): AzureCredentials {
   const common = {
     accountName: config.azure.accountName,
     endpointBaseUrl: config.azure.endpoint,
@@ -557,17 +530,13 @@ class ExplicitS3Driver implements StorageDriver {
 
   async delete(uri: string): Promise<void> {
     const { bucket, key } = parseS3Uri(uri);
-    await this.client.send(
-      new DeleteObjectCommand({ Bucket: bucket, Key: key }),
-    );
+    await this.client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
   }
 
   async exists(uri: string): Promise<boolean> {
     const { bucket, key } = parseS3Uri(uri);
     try {
-      await this.client.send(
-        new HeadObjectCommand({ Bucket: bucket, Key: key }),
-      );
+      await this.client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
       return true;
     } catch (error) {
       if (isS3Missing(error)) return false;
@@ -603,11 +572,7 @@ function isAwsS3Endpoint(endpoint: string): boolean {
 
 function parseS3Uri(uri: string): { bucket: string; key: string } {
   const parsed = new URL(uri);
-  if (
-    parsed.protocol !== "s3:" ||
-    !parsed.hostname ||
-    parsed.pathname === "/"
-  ) {
+  if (parsed.protocol !== "s3:" || !parsed.hostname || parsed.pathname === "/") {
     throw new Error(`Invalid S3 migration URI: ${uri}`);
   }
   return {

@@ -14,15 +14,11 @@ import type {
 } from "./personal-usage.clickhouse.repository";
 
 class AppPersonalUsageReader extends PersonalUsageReaderPort {
-  private constructor(
-    private readonly repository: PersonalUsageClickHouseRepository,
-  ) {
+  private constructor(private readonly repository: PersonalUsageClickHouseRepository) {
     super();
   }
 
-  static create(
-    repository: PersonalUsageClickHouseRepository,
-  ): AppPersonalUsageReader {
+  static create(repository: PersonalUsageClickHouseRepository): AppPersonalUsageReader {
     return new AppPersonalUsageReader(repository);
   }
 
@@ -40,10 +36,7 @@ class AppPersonalUsageReader extends PersonalUsageReaderPort {
     return this.repository.findTopModel(this.toAppInput(input));
   }
 
-  findDailyBuckets(input: {
-    tenantId: string;
-    window: PortablePersonalUsageWindow;
-  }) {
+  findDailyBuckets(input: { tenantId: string; window: PortablePersonalUsageWindow }) {
     return this.repository.findDailyBuckets(this.toAppInput(input));
   }
 
@@ -63,9 +56,7 @@ class AppPersonalUsageReader extends PersonalUsageReaderPort {
     userId: string;
     window: PortablePersonalUsageWindow;
   }): Promise<IngestionPrincipalSummaryRow | null> {
-    return this.repository.findIngestionPrincipalSummary(
-      this.toAppPrincipalInput(input),
-    );
+    return this.repository.findIngestionPrincipalSummary(this.toAppPrincipalInput(input));
   }
 
   findIngestionPrincipalBuckets(input: {
@@ -73,9 +64,7 @@ class AppPersonalUsageReader extends PersonalUsageReaderPort {
     userId: string;
     window: PortablePersonalUsageWindow;
   }) {
-    return this.repository.findIngestionPrincipalBuckets(
-      this.toAppPrincipalInput(input),
-    );
+    return this.repository.findIngestionPrincipalBuckets(this.toAppPrincipalInput(input));
   }
 
   findIngestionPrincipalBreakdown(input: {
@@ -88,10 +77,10 @@ class AppPersonalUsageReader extends PersonalUsageReaderPort {
     );
   }
 
-  private toAppInput(input: {
+  private toAppInput(input: { tenantId: string; window: PortablePersonalUsageWindow }): {
     tenantId: string;
-    window: PortablePersonalUsageWindow;
-  }): { tenantId: string; window: PersonalUsageWindow } {
+    window: PersonalUsageWindow;
+  } {
     return {
       tenantId: input.tenantId,
       window: {

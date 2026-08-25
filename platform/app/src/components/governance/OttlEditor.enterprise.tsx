@@ -53,11 +53,9 @@ export function EnterpriseOttlEditor({
       refetchOnWindowFocus: false,
     },
   );
-  const { mutateAsync: validateOttl } =
-    api.ingestionSources.validateOttl.useMutation();
+  const { mutateAsync: validateOttl } = api.ingestionSources.validateOttl.useMutation();
   const client = useMemo(
-    () =>
-      AppGovernanceOttlValidationClient.create((input) => validateOttl(input)),
+    () => AppGovernanceOttlValidationClient.create((input) => validateOttl(input)),
     [validateOttl],
   );
 

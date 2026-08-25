@@ -3,11 +3,7 @@ import {
   ENTERPRISE_TEMPLATE,
   PRO_TEMPLATE,
 } from "@langwatch/enterprise-licensing-contract";
-import {
-  getPlanDefaults,
-  PLAN_DEFAULTS,
-  type PlanType,
-} from "../planFormDefaults";
+import { getPlanDefaults, PLAN_DEFAULTS, type PlanType } from "../planFormDefaults";
 
 /**
  * Spec: specs/licensing/license-generation.feature
@@ -67,9 +63,7 @@ describe("planFormDefaults", () => {
 
       expect(proDefaults.maxMembers).toBe(PRO_TEMPLATE.maxMembers);
       expect(proDefaults.maxMembersLite).toBe(PRO_TEMPLATE.maxMembersLite);
-      expect(proDefaults.maxMessagesPerMonth).toBe(
-        PRO_TEMPLATE.maxMessagesPerMonth,
-      );
+      expect(proDefaults.maxMessagesPerMonth).toBe(PRO_TEMPLATE.maxMessagesPerMonth);
     });
 
     it("includes usageUnit in PRO and ENTERPRISE defaults", () => {
@@ -80,12 +74,8 @@ describe("planFormDefaults", () => {
     it("ENTERPRISE defaults match ENTERPRISE_TEMPLATE values without fallbacks", () => {
       const enterpriseDefaults = PLAN_DEFAULTS.ENTERPRISE;
 
-      expect(enterpriseDefaults.maxMembers).toBe(
-        ENTERPRISE_TEMPLATE.maxMembers,
-      );
-      expect(enterpriseDefaults.maxMembersLite).toBe(
-        ENTERPRISE_TEMPLATE.maxMembersLite,
-      );
+      expect(enterpriseDefaults.maxMembers).toBe(ENTERPRISE_TEMPLATE.maxMembers);
+      expect(enterpriseDefaults.maxMembersLite).toBe(ENTERPRISE_TEMPLATE.maxMembersLite);
       expect(enterpriseDefaults.maxMessagesPerMonth).toBe(
         ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
       );

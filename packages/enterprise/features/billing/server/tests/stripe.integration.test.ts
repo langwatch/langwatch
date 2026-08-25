@@ -185,8 +185,9 @@ describeIfStripeKey("Stripe billing integration", () => {
       const currentItems = current.items.data;
 
       // Delete all current items and add ACCELERATE base
-      const itemUpdates: Stripe.SubscriptionUpdateParams.Item[] =
-        currentItems.map((item) => ({ id: item.id, deleted: true }));
+      const itemUpdates: Stripe.SubscriptionUpdateParams.Item[] = currentItems.map(
+        (item) => ({ id: item.id, deleted: true }),
+      );
       itemUpdates.push({ price: prices.ACCELERATE, quantity: 1 });
 
       const updated = await stripe.subscriptions.update(subscriptionId, {
@@ -233,9 +234,7 @@ describeIfStripeKey("Stripe billing integration", () => {
 
       expect(session.id).toMatch(/^cs_test_/);
       expect(session.url).toContain("checkout.stripe.com");
-      expect(session.client_reference_id).toBe(
-        "subscription_setup_test-sub-id",
-      );
+      expect(session.client_reference_id).toBe("subscription_setup_test-sub-id");
     });
   });
 

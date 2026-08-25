@@ -45,9 +45,7 @@ export function ProcessRecentActions() {
                     </Text>
                   </Table.Cell>
                   <Table.Cell width="200px">
-                    <Text textStyle="xs">
-                      {ACTION_LABELS[row.action] ?? row.action}
-                    </Text>
+                    <Text textStyle="xs">{ACTION_LABELS[row.action] ?? row.action}</Text>
                   </Table.Cell>
                   <Table.Cell>
                     <Text

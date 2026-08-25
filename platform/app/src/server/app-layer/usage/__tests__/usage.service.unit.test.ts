@@ -146,26 +146,20 @@ describe("UsageService", () => {
   describe("checkLimit", () => {
     describe("when team has no organization", () => {
       it("throws OrganizationNotFoundForTeamError", async () => {
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
-          null,
-        );
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(null);
 
-        await expect(
-          service.checkLimit({ teamId: "team-123" }),
-        ).rejects.toThrow("Organization for team not found: team-123");
+        await expect(service.checkLimit({ teamId: "team-123" })).rejects.toThrow(
+          "Organization for team not found: team-123",
+        );
       });
     });
 
     describe("when the counting store cannot report usage", () => {
       beforeEach(() => {
         mockEnv.IS_SAAS = true;
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
-          "org-123",
-        );
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-        mockEventUsageService.getCountByProjects.mockResolvedValue(
-          USAGE_UNKNOWN,
-        );
+        mockEventUsageService.getCountByProjects.mockResolvedValue(USAGE_UNKNOWN);
         (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           ...FREE_PLAN,
           maxMessagesPerMonth: 50_000,
@@ -204,9 +198,7 @@ describe("UsageService", () => {
     describe("when free-tier org exceeds limit on SaaS", () => {
       beforeEach(() => {
         mockEnv.IS_SAAS = true;
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
-          "org-123",
-        );
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         mockEventUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 50_000 },
@@ -232,9 +224,7 @@ describe("UsageService", () => {
       beforeEach(() => {
         mockEnv.IS_SAAS = false;
         mockEnv.BASE_HOST = "https://my-langwatch.example.com";
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
-          "org-123",
-        );
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         mockEventUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 50_000 },
@@ -259,9 +249,7 @@ describe("UsageService", () => {
     describe("when paid TIERED org exceeds limit on SaaS", () => {
       beforeEach(() => {
         mockEnv.IS_SAAS = true;
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
-          "org-123",
-        );
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         mockTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 10_000 },
@@ -276,9 +264,7 @@ describe("UsageService", () => {
         const result = await service.checkLimit({ teamId: "team-123" });
 
         assertExceeded(result);
-        expect(result.message).toContain(
-          "Monthly limit of 10000 traces reached",
-        );
+        expect(result.message).toContain("Monthly limit of 10000 traces reached");
         expect(result.message).toContain(
           "upgrade your plan at https://app.langwatch.ai/settings/subscription",
         );
@@ -296,9 +282,7 @@ describe("UsageService", () => {
       beforeEach(() => {
         mockEnv.IS_SAAS = false;
         mockEnv.BASE_HOST = "https://my-langwatch.example.com";
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
-          "org-123",
-        );
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         mockTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 10_000 },
@@ -313,9 +297,7 @@ describe("UsageService", () => {
         const result = await service.checkLimit({ teamId: "team-123" });
 
         assertExceeded(result);
-        expect(result.message).toContain(
-          "Monthly limit of 10000 traces reached",
-        );
+        expect(result.message).toContain("Monthly limit of 10000 traces reached");
         expect(result.message).toContain(
           "buy a license at https://my-langwatch.example.com/settings/license",
         );
@@ -324,9 +306,7 @@ describe("UsageService", () => {
 
     describe("when count >= maxMessagesPerMonth", () => {
       beforeEach(() => {
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
-          "org-123",
-        );
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         // Free plan resolves to events counter
         mockEventUsageService.getCountByProjects.mockResolvedValue([
@@ -386,18 +366,14 @@ describe("UsageService", () => {
         expect(result.maxMessagesPerMonth).toBe(1000);
         // "Monthly"/"events" only come from firstPlan (free: false, license
         // override with usageUnit "events"); laterPlan would render "Free"/"traces".
-        expect(result.message).toContain(
-          "Monthly limit of 1000 events reached",
-        );
+        expect(result.message).toContain("Monthly limit of 1000 events reached");
         expect(mockPlanResolver).toHaveBeenCalledTimes(1);
       });
     });
 
     describe("when count < maxMessagesPerMonth", () => {
       it("returns exceeded: false", async () => {
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
-          "org-123",
-        );
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         // Free plan resolves to events counter
         mockEventUsageService.getCountByProjects.mockResolvedValue([
@@ -417,10 +393,7 @@ describe("UsageService", () => {
 
   describe("getCurrentMonthCount", () => {
     it("delegates to EventUsageService for free plan and sums counts", async () => {
-      vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
-        "proj-1",
-        "proj-2",
-      ]);
+      vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1", "proj-2"]);
       // Free plan (default) resolves to events counter
       mockEventUsageService.getCountByProjects.mockResolvedValue([
         { projectId: "proj-1", count: 42 },
@@ -442,10 +415,7 @@ describe("UsageService", () => {
       (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
         ...PAID_TIERED_PLAN,
       });
-      vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
-        "proj-1",
-        "proj-2",
-      ]);
+      vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1", "proj-2"]);
       mockTraceUsageService.getCountByProjects.mockResolvedValue([
         { projectId: "proj-1", count: 42 },
         { projectId: "proj-2", count: 58 },
@@ -673,10 +643,7 @@ describe("UsageService", () => {
         (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           ...SEAT_UNLIMITED_PLAN,
         });
-        vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
-          "proj-1",
-          "proj-2",
-        ]);
+        vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1", "proj-2"]);
         mockEventUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 30_000 },
           { projectId: "proj-2", count: 7_924 },

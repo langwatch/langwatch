@@ -16,8 +16,7 @@ const logRecords: {
  * real.
  */
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof import("@langwatch/observability")>();
   const record =
     (level: string) => (payload: Record<string, unknown>, message: string) => {
       logRecords.push({ level, payload, message });
@@ -69,16 +68,12 @@ describe("given a request that fails", () => {
 
   describe("when the handler throws a customer-fault HandledError", () => {
     it("writes exactly one record, at warn, with the handled-error metadata", async () => {
-      const app = appThatThrows(
-        new NotFoundError("not_found", "Resource", "abc"),
-      );
+      const app = appThatThrows(new NotFoundError("not_found", "Resource", "abc"));
 
       const res = await app.request("/things");
 
       expect(res.status).toBe(404);
-      const records = logRecords.filter(
-        (r) => r.message === "error handling request",
-      );
+      const records = logRecords.filter((r) => r.message === "error handling request");
       expect(records).toHaveLength(1);
       expect(records[0]!.level).toBe("warn");
       expect(records[0]!.payload).toMatchObject({
@@ -128,9 +123,7 @@ describe("given a request that succeeds", () => {
 
       expect(res.status).toBe(200);
       expect(errorRecords()).toHaveLength(0);
-      expect(
-        logRecords.filter((r) => r.message === "request handled"),
-      ).toHaveLength(1);
+      expect(logRecords.filter((r) => r.message === "request handled")).toHaveLength(1);
     });
   });
 });

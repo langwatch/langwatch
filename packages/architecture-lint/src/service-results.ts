@@ -11,8 +11,7 @@ function lineOf(source: ts.SourceFile, node: ts.Node): number {
 function containsNullableType(node: ts.TypeNode): boolean {
   if (
     node.kind === ts.SyntaxKind.UndefinedKeyword ||
-    (ts.isLiteralTypeNode(node) &&
-      node.literal.kind === ts.SyntaxKind.NullKeyword)
+    (ts.isLiteralTypeNode(node) && node.literal.kind === ts.SyntaxKind.NullKeyword)
   ) {
     return true;
   }
@@ -46,19 +45,21 @@ function definitelyNonNullableType(node: ts.TypeNode): boolean {
   if (ts.isLiteralTypeNode(node)) {
     return node.literal.kind !== ts.SyntaxKind.NullKeyword;
   }
-  return [
-    ts.SyntaxKind.StringKeyword,
-    ts.SyntaxKind.NumberKeyword,
-    ts.SyntaxKind.BooleanKeyword,
-    ts.SyntaxKind.BigIntKeyword,
-    ts.SyntaxKind.SymbolKeyword,
-    ts.SyntaxKind.ObjectKeyword,
-    ts.SyntaxKind.VoidKeyword,
-  ].includes(node.kind) ||
+  return (
+    [
+      ts.SyntaxKind.StringKeyword,
+      ts.SyntaxKind.NumberKeyword,
+      ts.SyntaxKind.BooleanKeyword,
+      ts.SyntaxKind.BigIntKeyword,
+      ts.SyntaxKind.SymbolKeyword,
+      ts.SyntaxKind.ObjectKeyword,
+      ts.SyntaxKind.VoidKeyword,
+    ].includes(node.kind) ||
     ts.isTypeLiteralNode(node) ||
     ts.isArrayTypeNode(node) ||
     ts.isTupleTypeNode(node) ||
-    ts.isFunctionTypeNode(node);
+    ts.isFunctionTypeNode(node)
+  );
 }
 
 function lintResultContract(file: string): ArchitectureViolation[] {
@@ -73,13 +74,10 @@ function lintResultContract(file: string): ArchitectureViolation[] {
   const visit = (node: ts.Node): void => {
     if (
       ts.isMethodDeclaration(node) &&
-      (ts.isClassDeclaration(node.parent) ||
-        ts.isClassExpression(node.parent)) &&
+      (ts.isClassDeclaration(node.parent) || ts.isClassExpression(node.parent)) &&
       node.name &&
       ts.isIdentifier(node.name) &&
-      !node.modifiers?.some(
-        (modifier) => modifier.kind === ts.SyntaxKind.PrivateKeyword,
-      )
+      !node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.PrivateKeyword)
     ) {
       const name = node.name.text;
       if (name.startsWith("require")) {
@@ -135,10 +133,7 @@ export function lintServiceResultContracts(
   packages: readonly ClassifiedPackage[],
 ): ArchitectureViolation[] {
   return packages.flatMap((pkg) => {
-    if (
-      pkg.layoutVersion !== 0 ||
-      (pkg.kind !== "contract" && pkg.kind !== "server")
-    ) {
+    if (pkg.layoutVersion !== 0 || (pkg.kind !== "contract" && pkg.kind !== "server")) {
       return [];
     }
     return walkFiles(join(pkg.root, "src"), (file) =>

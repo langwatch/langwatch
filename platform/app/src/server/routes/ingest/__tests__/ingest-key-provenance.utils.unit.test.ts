@@ -18,36 +18,27 @@ const PROVENANCE = {
   organizationId: "org_1",
 };
 
-function attrMap(
-  attrs: { key: string; value: { stringValue?: string | null } }[],
-) {
+function attrMap(attrs: { key: string; value: { stringValue?: string | null } }[]) {
   return Object.fromEntries(attrs.map((a) => [a.key, a.value.stringValue]));
 }
 
 describe("originForIngestSourceType", () => {
   describe("given a CLI coding-assistant source type", () => {
-    it.each([
-      "claude_code",
-      "codex",
-      "gemini",
-      "opencode",
-      "cursor",
-    ])("maps %s to coding_agent", (sourceType) => {
-      expect(originForIngestSourceType(sourceType)).toBe(
-        CODING_AGENT_ORIGIN_VALUE,
-      );
-    });
+    it.each(["claude_code", "codex", "gemini", "opencode", "cursor"])(
+      "maps %s to coding_agent",
+      (sourceType) => {
+        expect(originForIngestSourceType(sourceType)).toBe(CODING_AGENT_ORIGIN_VALUE);
+      },
+    );
   });
 
   describe("given any other ingest source type", () => {
-    it.each([
-      "claude_cowork",
-      "otel_generic",
-      "workato",
-      "unknown_tool",
-    ])("maps %s to ai_tool", (sourceType) => {
-      expect(originForIngestSourceType(sourceType)).toBe(AI_TOOL_ORIGIN_VALUE);
-    });
+    it.each(["claude_cowork", "otel_generic", "workato", "unknown_tool"])(
+      "maps %s to ai_tool",
+      (sourceType) => {
+        expect(originForIngestSourceType(sourceType)).toBe(AI_TOOL_ORIGIN_VALUE);
+      },
+    );
   });
 });
 
@@ -58,18 +49,13 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
         resourceMetrics: [
           {
             resource: {
-              attributes: [
-                { key: "service.name", value: { stringValue: "claude" } },
-              ],
+              attributes: [{ key: "service.name", value: { stringValue: "claude" } }],
             },
           },
           { resource: { attributes: [] } },
         ],
       };
-      const stamped = stampIngestKeyProvenanceOnMetricRequest(
-        request,
-        PROVENANCE,
-      );
+      const stamped = stampIngestKeyProvenanceOnMetricRequest(request, PROVENANCE);
       expect(stamped).toBe(2);
       for (const rm of request.resourceMetrics) {
         const map = attrMap(rm.resource.attributes);
@@ -118,10 +104,9 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
       expect(map[PROVENANCE_ATTR_API_KEY_ID]).toBe("key_abc");
       expect(map["langwatch.origin"]).toBe(CODING_AGENT_ORIGIN_VALUE);
       // No duplicate keys remain after the strip-then-push.
-      const sourceCount =
-        request.resourceMetrics[0]!.resource.attributes.filter(
-          (a) => a.key === "langwatch.source",
-        ).length;
+      const sourceCount = request.resourceMetrics[0]!.resource.attributes.filter(
+        (a) => a.key === "langwatch.source",
+      ).length;
       expect(sourceCount).toBe(1);
     });
   });
@@ -312,9 +297,9 @@ describe("enforceApiKeyIdOnTraceRequest", () => {
     const span = request.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
     const holders = [span, span.events[0]!, span.links[0]!];
     for (const holder of holders) {
-      expect(
-        holder.attributes.some((a) => a.key === PROVENANCE_ATTR_API_KEY_ID),
-      ).toBe(false);
+      expect(holder.attributes.some((a) => a.key === PROVENANCE_ATTR_API_KEY_ID)).toBe(
+        false,
+      );
     }
   });
 
@@ -373,9 +358,9 @@ describe("dropForeignScopesForVscodeKey", () => {
       const dropped = dropForeignScopesForVscodeKey(request, "copilot_vscode");
 
       expect(dropped).toBe(3);
-      expect(
-        request.resourceSpans[0]!.scopeSpans.map((s) => s.scope?.name),
-      ).toEqual(["github.copilot"]);
+      expect(request.resourceSpans[0]!.scopeSpans.map((s) => s.scope?.name)).toEqual([
+        "github.copilot",
+      ]);
     });
 
     it("drops a resource group entirely when nothing copilot remains", () => {
@@ -424,9 +409,9 @@ describe("dropForeignScopesForVscodeKey", () => {
       const dropped = dropForeignScopesForVscodeKey(request, "copilot_vscode");
 
       expect(dropped).toBe(1);
-      expect(
-        request.resourceMetrics[0]!.scopeMetrics.map((s) => s.scope?.name),
-      ).toEqual(["github.copilot"]);
+      expect(request.resourceMetrics[0]!.scopeMetrics.map((s) => s.scope?.name)).toEqual([
+        "github.copilot",
+      ]);
     });
   });
 });

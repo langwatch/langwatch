@@ -36,9 +36,7 @@ describe("webhook URL admission policy", () => {
     });
 
     it("rejects credentials in the URL", () => {
-      expect(inspect("https://user:pass@example.com/x")?.code).toBe(
-        "credentials",
-      );
+      expect(inspect("https://user:pass@example.com/x")?.code).toBe("credentials");
       expect(inspect("https://user@example.com/x")?.code).toBe("credentials");
     });
   });

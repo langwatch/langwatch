@@ -55,14 +55,9 @@ describe("<SuiteContextMenu/>", () => {
       const onEdit = vi.fn();
       const onClose = vi.fn();
 
-      render(
-        <SuiteContextMenu
-          {...defaultProps}
-          onEdit={onEdit}
-          onClose={onClose}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteContextMenu {...defaultProps} onEdit={onEdit} onClose={onClose} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Edit"));
       expect(onEdit).toHaveBeenCalledOnce();
@@ -98,11 +93,7 @@ describe("<SuiteContextMenu/>", () => {
       const onClose = vi.fn();
 
       render(
-        <SuiteContextMenu
-          {...defaultProps}
-          onArchive={onArchive}
-          onClose={onClose}
-        />,
+        <SuiteContextMenu {...defaultProps} onArchive={onArchive} onClose={onClose} />,
         { wrapper: Wrapper },
       );
 

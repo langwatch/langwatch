@@ -95,9 +95,9 @@ function triggerConfetti() {
 function triggerBarrelRoll() {
   const dialog = document.querySelector('[role="dialog"]');
   if (dialog) {
-    dialog.animate(
-      [{ transform: "rotate(0deg)" }, { transform: "rotate(360deg)" }],
-      { duration: 1000, easing: "ease-in-out" },
-    );
+    dialog.animate([{ transform: "rotate(0deg)" }, { transform: "rotate(360deg)" }], {
+      duration: 1000,
+      easing: "ease-in-out",
+    });
   }
 }

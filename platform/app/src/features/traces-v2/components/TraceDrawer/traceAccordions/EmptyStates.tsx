@@ -81,8 +81,7 @@ export function EmptyEventsState() {
           No events recorded
         </Text>
         <Text textStyle="xs" color="fg.subtle">
-          Events capture key moments like tool calls, user feedback, or custom
-          milestones.
+          Events capture key moments like tool calls, user feedback, or custom milestones.
         </Text>
       </VStack>
       <Button size="xs" variant="outline" asChild>

@@ -111,9 +111,7 @@ describe("GovernanceSignalService", () => {
   it("emits only threshold and breach crossings", async () => {
     const port = new RecordingSignalPort();
     port.resolved = [resolved("79"), resolved("80"), resolved("100")];
-    await GovernanceSignalService.create(port).detectBudgetCrossings([
-      candidate,
-    ]);
+    await GovernanceSignalService.create(port).detectBudgetCrossings([candidate]);
 
     expect(port.crossings.map(({ kind }) => kind)).toEqual([
       "threshold_crossed",
@@ -134,10 +132,9 @@ describe("GovernanceSignalService", () => {
     port.failure = new Error("store unavailable");
 
     await expect(
-      GovernanceSignalService.create(
-        port,
-        diagnostics,
-      ).detectBudgetCrossings([candidate]),
+      GovernanceSignalService.create(port, diagnostics).detectBudgetCrossings([
+        candidate,
+      ]),
     ).resolves.toBeUndefined();
     expect(diagnostics.warnings).toEqual([
       expect.objectContaining({

@@ -16,10 +16,7 @@ interface OverSeatsCalloutProps {
  * seat, and only new members are refused until they do. See
  * seat-reconciliation.feature.
  */
-export function OverSeatsCallout({
-  currentMembers,
-  maxMembers,
-}: OverSeatsCalloutProps) {
+export function OverSeatsCallout({ currentMembers, maxMembers }: OverSeatsCalloutProps) {
   const overBy = currentMembers - maxMembers;
 
   if (overBy <= 0) return null;
@@ -47,11 +44,10 @@ export function OverSeatsCallout({
               : `${overBy} members are over the seats your license covers`}
           </Text>
           <Text color="fg.muted" fontSize="sm">
-            Your license covers {maxMembers}{" "}
-            {maxMembers === 1 ? "seat" : "seats"} and {currentMembers} members
-            are active. Everyone keeps working, but you cannot add anyone new
-            until you are back within {maxMembers}. Disable the members who no
-            longer need access, or talk to us about more seats.
+            Your license covers {maxMembers} {maxMembers === 1 ? "seat" : "seats"} and{" "}
+            {currentMembers} members are active. Everyone keeps working, but you cannot
+            add anyone new until you are back within {maxMembers}. Disable the members who
+            no longer need access, or talk to us about more seats.
           </Text>
           <HStack gap={3} paddingTop={1}>
             <Button asChild size="sm" colorPalette="orange">

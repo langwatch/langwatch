@@ -17,7 +17,10 @@ const trigger = () => ({
   id: "trg_1",
   name: "alert me",
   action: "SEND_SLACK_MESSAGE",
-  actionParams: { slackWebhook: WEBHOOK, headers: { Authorization: "Bearer sk-live-abc" } },
+  actionParams: {
+    slackWebhook: WEBHOOK,
+    headers: { Authorization: "Bearer sk-live-abc" },
+  },
   active: true,
 });
 
@@ -60,7 +63,10 @@ describe("redactTriggerSecrets", () => {
 
   describe("given a trigger with no actionParams", () => {
     it.each([[null], [undefined], [{}]])("returns it unharmed for %s", (params) => {
-      const input = { id: "trg_2", actionParams: params as Record<string, unknown> | null };
+      const input = {
+        id: "trg_2",
+        actionParams: params as Record<string, unknown> | null,
+      };
 
       expect(() => redactTriggerSecrets(input)).not.toThrow();
       expect(redactTriggerSecrets(input).id).toBe("trg_2");
@@ -74,7 +80,11 @@ describe("redactTriggerSecrets", () => {
   describe("given a payload whose declared type omits actionParams", () => {
     it("still strips the field the API actually returned", () => {
       const declared: { id: string; name: string } = JSON.parse(
-        JSON.stringify({ id: "trg_3", name: "x", actionParams: { slackWebhook: WEBHOOK } }),
+        JSON.stringify({
+          id: "trg_3",
+          name: "x",
+          actionParams: { slackWebhook: WEBHOOK },
+        }),
       );
 
       expect(JSON.stringify(redactTriggerSecrets(declared))).not.toContain(WEBHOOK);

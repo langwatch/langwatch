@@ -56,9 +56,7 @@ const datasetToggleLabel = (sessionCount: number) => {
 
 /** A trace timestamp is only useful to the drawer when it is a real number. */
 const partitionHint = (startedAt: unknown): number | null =>
-  typeof startedAt === "number" && Number.isFinite(startedAt)
-    ? startedAt
-    : null;
+  typeof startedAt === "number" && Number.isFinite(startedAt) ? startedAt : null;
 
 /** Where a queue item is read. One shape, so every way in agrees. */
 const queueItemHref = ({
@@ -111,9 +109,7 @@ function useQueueEnding({
   const noteHandoffOpened = useAnnotationQueueSessionStore(
     (state) => state.noteHandoffOpened,
   );
-  const resetHandoff = useAnnotationQueueSessionStore(
-    (state) => state.resetHandoff,
-  );
+  const resetHandoff = useAnnotationQueueSessionStore((state) => state.resetHandoff);
   // The drawer is dismissed only once it has been seen open: the frame between
   // asking for it and the URL naming it would otherwise read as a dismissal.
   const drawerWasSeenOpen = useRef(false);
@@ -132,13 +128,7 @@ function useQueueEnding({
     noteHandoffOpened();
     openHandoffDrawer(traceIds);
     setEnding("handoff");
-  }, [
-    handoffWanted,
-    traceIds,
-    noteHandoffOpened,
-    openHandoffDrawer,
-    celebrate,
-  ]);
+  }, [handoffWanted, traceIds, noteHandoffOpened, openHandoffDrawer, celebrate]);
 
   useHandoffOutcome({
     isOffered: ending === "handoff",
@@ -180,9 +170,7 @@ function useHandoffOutcome({
   onDismissed: () => void;
 }) {
   const handoff = useAnnotationQueueSessionStore((state) => state.handoff);
-  const setSessionActive = useAnnotationQueueSessionStore(
-    (state) => state.setActive,
-  );
+  const setSessionActive = useAnnotationQueueSessionStore((state) => state.setActive);
 
   useEffect(() => {
     if (!isOffered) return;
@@ -238,14 +226,10 @@ export default function TraceAnnotations() {
 
   // Force re-render when items change by creating a key
   const queueItemsKey = useMemo(() => {
-    return pendingQueueItems
-      .map((item) => `${item.id}-${item.doneAt}`)
-      .join(",");
+    return pendingQueueItems.map((item) => `${item.id}-${item.doneAt}`).join(",");
   }, [pendingQueueItems]);
 
-  let currentQueueItem = pendingQueueItems.find(
-    (item) => item.id === queueItem,
-  );
+  let currentQueueItem = pendingQueueItems.find((item) => item.id === queueItem);
 
   if (!currentQueueItem) {
     currentQueueItem = pendingQueueItems[0];
@@ -329,17 +313,10 @@ export default function TraceAnnotations() {
   // ── The sitting ───────────────────────────────────────────────────────
   // Which traces to keep is a decision about this sitting, so the set lives in
   // the browser for as long as the queue is open and is dropped on the way out.
-  const setSessionActive = useAnnotationQueueSessionStore(
-    (state) => state.setActive,
-  );
-  const noteWalked = useAnnotationQueueSessionStore(
-    (state) => state.noteWalked,
-  );
+  const setSessionActive = useAnnotationQueueSessionStore((state) => state.setActive);
+  const noteWalked = useAnnotationQueueSessionStore((state) => state.noteWalked);
   const sessionMarks = useAnnotationQueueSessionStore((state) => state.marks);
-  const sessionIds = useMemo(
-    () => sessionTraceIds(sessionMarks),
-    [sessionMarks],
-  );
+  const sessionIds = useMemo(() => sessionTraceIds(sessionMarks), [sessionMarks]);
   // The hand-off is a decision, not a display: off at the start of every
   // sitting, and answered once for the whole walk rather than per item.
   const [handoffWanted, setHandoffWanted] = useState(false);
@@ -371,19 +348,14 @@ export default function TraceAnnotations() {
   const currentQueueItemId = currentQueueItem?.id;
   const nextPendingItemId = useMemo(() => {
     if (!currentQueueItemId) return undefined;
-    const index = pendingQueueItems.findIndex(
-      (item) => item.id === currentQueueItemId,
-    );
+    const index = pendingQueueItems.findIndex((item) => item.id === currentQueueItemId);
     return pendingQueueItems[index + 1]?.id;
   }, [pendingQueueItems, currentQueueItemId]);
 
   const projectId = project?.id;
   const projectSlug = project?.slug;
   const advanceToNextItem = useCallback(
-    () =>
-      router.push(
-        queueItemHref({ projectSlug, queueItemId: nextPendingItemId }),
-      ),
+    () => router.push(queueItemHref({ projectSlug, queueItemId: nextPendingItemId })),
     [router, projectSlug, nextPendingItemId],
   );
 
@@ -412,10 +384,7 @@ export default function TraceAnnotations() {
     },
     [projectId, currentQueueItemId, markDone, refetchQueueItems],
   );
-  const recordItemDone = useCallback(
-    () => finishCurrentItem(),
-    [finishCurrentItem],
-  );
+  const recordItemDone = useCallback(() => finishCurrentItem(), [finishCurrentItem]);
 
   const { ending, finishLastItem, confirmEndWithoutDataset, keepSession } =
     useQueueEnding({
@@ -508,9 +477,7 @@ export default function TraceAnnotations() {
                   resetKeys={[currentQueueItem?.trace?.trace_id ?? ""]}
                 >
                   <ConversationView
-                    key={
-                      currentQueueItem?.trace?.trace_id ?? currentQueueItem?.id
-                    }
+                    key={currentQueueItem?.trace?.trace_id ?? currentQueueItem?.id}
                     conversationId={renderedConversationId}
                     currentTraceId={currentTraceId}
                     // Which turn the reviewer was sent here for, so it
@@ -645,8 +612,8 @@ const UnavailableTraceCard = ({
       This trace is no longer available
     </Text>
     <Text color="fg.muted" maxWidth="480px">
-      The trace behind this queue item cannot be found in this project, so there
-      is nothing here to review.
+      The trace behind this queue item cannot be found in this project, so there is
+      nothing here to review.
     </Text>
     <HStack gap={3}>
       {canRemove && (
@@ -722,9 +689,7 @@ const AnnotationQueuePicker = ({
 
   const navigateToQueue = async (queueItemId: string) => {
     setIsNavigating(true);
-    await router.push(
-      queueItemHref({ projectSlug: project?.slug, queueItemId }),
-    );
+    await router.push(queueItemHref({ projectSlug: project?.slug, queueItemId }));
     releaseNavigatingWhenSettled();
   };
 
@@ -750,9 +715,7 @@ const AnnotationQueuePicker = ({
     openTraceEditorFromConversation({
       openDrawer,
       traceId: currentQueueItem.trace?.trace_id ?? currentQueueItem.traceId,
-      occurredAtMs: partitionHint(
-        currentQueueItem.trace?.timestamps?.started_at,
-      ),
+      occurredAtMs: partitionHint(currentQueueItem.trace?.timestamps?.started_at),
     });
   };
 
@@ -803,26 +766,18 @@ const AnnotationQueuePicker = ({
               // With nothing counted there is nothing to decide about, so the
               // switch has nothing to switch.
               disabled={sessionCount === 0}
-              onCheckedChange={(event) =>
-                onHandoffWantedChange(!!event.checked)
-              }
+              onCheckedChange={(event) => onHandoffWantedChange(!!event.checked)}
             >
               {datasetToggleLabel(sessionCount)}
             </Checkbox>
             {canEditTrace && (
-              <Button
-                variant="outline"
-                disabled={isNavigating}
-                onClick={editTrace}
-              >
+              <Button variant="outline" disabled={isNavigating} onClick={editTrace}>
                 <LuPencil /> Edit trace
               </Button>
             )}
             <Button
               colorPalette="blue"
-              disabled={
-                currentQueueItem.doneAt !== null || isFinishing || isNavigating
-              }
+              disabled={currentQueueItem.doneAt !== null || isFinishing || isNavigating}
               onClick={finishAndMoveOn}
             >
               {nextItem ? (

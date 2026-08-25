@@ -7,14 +7,10 @@ import type { MetricDataPointRepository } from "~/server/app-layer/metrics/repos
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { CanonicalMetricDataPoint } from "../schemas/metricDataPoint";
 
-abstract class MetricStoreBase
-  implements AppendStore<CanonicalMetricDataPoint>
-{
+abstract class MetricStoreBase implements AppendStore<CanonicalMetricDataPoint> {
   constructor(protected readonly repo: MetricDataPointRepository) {}
 
-  protected retention(
-    context: ProjectionStoreContext | BulkAppendContext,
-  ): number {
+  protected retention(context: ProjectionStoreContext | BulkAppendContext): number {
     return context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
   }
 

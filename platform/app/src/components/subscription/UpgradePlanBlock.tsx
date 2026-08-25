@@ -1,15 +1,7 @@
 /**
  * Upgrade Plan Block - displays upgrade CTA with features and dynamic pricing
  */
-import {
-  Button,
-  Card,
-  Flex,
-  HStack,
-  SimpleGrid,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Card, Flex, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import type React from "react";
 import { PricingSummary } from "./PricingSummary";
@@ -32,11 +24,7 @@ export function UpgradePlanBlock({
   isLoading?: boolean;
 }) {
   return (
-    <Card.Root
-      data-testid="upgrade-plan-block"
-      borderWidth={1}
-      borderColor="border"
-    >
+    <Card.Root data-testid="upgrade-plan-block" borderWidth={1} borderColor="border">
       <Card.Body paddingY={5} paddingX={6}>
         <VStack align="stretch" gap={5}>
           <Flex justifyContent="space-between" alignItems="center">

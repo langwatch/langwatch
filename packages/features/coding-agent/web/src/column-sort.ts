@@ -139,8 +139,7 @@ export function useColumnSort<Column extends string, Row, T extends Row>({
   );
 
   const onSort = useCallback(
-    (column: Column) =>
-      setSort((current) => nextColumnSort({ current, column, rules })),
+    (column: Column) => setSort((current) => nextColumnSort({ current, column, rules })),
     [rules],
   );
 

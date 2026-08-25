@@ -114,11 +114,7 @@ const traceOutputPatch = (output: string): TraceEditOverlayPatch => ({
 });
 
 const buildService = () =>
-  TraceService.create(
-    {} as never,
-    undefined,
-    {} as unknown as LogRecordStorageService,
-  );
+  TraceService.create({} as never, undefined, {} as unknown as LogRecordStorageService);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -173,11 +169,7 @@ describe("TraceService read seam for reviewer corrections", () => {
       expect(result?.spans[0]?.name).toBe("captured");
       expect(mockGetPatchesByTraceIds).not.toHaveBeenCalled();
 
-      const single = await buildService().getById(
-        PROJECT_ID,
-        "trace-1",
-        protections,
-      );
+      const single = await buildService().getById(PROJECT_ID, "trace-1", protections);
       expect(single?.spans[0]?.name).toBe("captured");
       expect(mockGetPatchesByTraceIds).not.toHaveBeenCalled();
     });
@@ -277,12 +269,10 @@ describe("TraceService read seam for reviewer corrections", () => {
         ]),
       );
 
-      const corrected = await buildService().getById(
-        PROJECT_ID,
-        "trace-1",
-        protections,
-        { full: true, withEditOverlay: true },
-      );
+      const corrected = await buildService().getById(PROJECT_ID, "trace-1", protections, {
+        full: true,
+        withEditOverlay: true,
+      });
 
       expect(mockEnrichCodingAgentSpansFromLogs).toHaveBeenCalled();
       expect(corrected?.spans[0]?.output).toEqual({
@@ -321,9 +311,7 @@ describe("TraceService read seam for reviewer corrections", () => {
         ["trace-1"],
         {
           ...protections,
-          hiddenAttributes: [
-            { pattern: "gen_ai.prompt.id", visibleTo: "Admins" },
-          ],
+          hiddenAttributes: [{ pattern: "gen_ai.prompt.id", visibleTo: "Admins" }],
         },
         undefined,
         { withEditOverlay: true },

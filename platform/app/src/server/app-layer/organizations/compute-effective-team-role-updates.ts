@@ -52,12 +52,12 @@ export function computeEffectiveTeamRoleUpdates(params: {
   currentMemberships: CurrentTeamMembership[];
   newOrganizationRole: OrganizationUserRole;
 }): EffectiveTeamRoleUpdate[] {
-  const { requestedTeamRoleUpdates, currentMemberships, newOrganizationRole } =
-    params;
+  const { requestedTeamRoleUpdates, currentMemberships, newOrganizationRole } = params;
 
-  const requested = requestedTeamRoleUpdates.map(
-    (update): EffectiveTeamRoleUpdate => ({ ...update, origin: "requested" }),
-  );
+  const requested = requestedTeamRoleUpdates.map((update): EffectiveTeamRoleUpdate => ({
+    ...update,
+    origin: "requested",
+  }));
   const correctTo = (
     memberships: CurrentTeamMembership[],
     role: TeamUserRole,
@@ -74,9 +74,7 @@ export function computeEffectiveTeamRoleUpdates(params: {
       return requested;
     }
 
-    const requestedTeamIdSet = new Set(
-      requested.map((update) => update.teamId),
-    );
+    const requestedTeamIdSet = new Set(requested.map((update) => update.teamId));
     return [
       ...requested,
       ...correctTo(
@@ -90,18 +88,14 @@ export function computeEffectiveTeamRoleUpdates(params: {
 
   if (newOrganizationRole === OrganizationUserRole.EXTERNAL) {
     return correctTo(
-      currentMemberships.filter(
-        (membership) => membership.role !== TeamUserRole.VIEWER,
-      ),
+      currentMemberships.filter((membership) => membership.role !== TeamUserRole.VIEWER),
       TeamUserRole.VIEWER,
     );
   }
 
   if (newOrganizationRole === OrganizationUserRole.MEMBER) {
     return correctTo(
-      currentMemberships.filter(
-        (membership) => membership.role === TeamUserRole.VIEWER,
-      ),
+      currentMemberships.filter((membership) => membership.role === TeamUserRole.VIEWER),
       TeamUserRole.MEMBER,
     );
   }

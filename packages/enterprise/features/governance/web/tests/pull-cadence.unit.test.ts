@@ -21,9 +21,7 @@ import {
 
 /** Derived from the real defaults so an adapter added with a schedule the
  *  picker cannot speak fails here the day it lands. */
-const RECOMMENDED_SCHEDULES = [
-  ...new Set(Object.values(PULL_SCHEDULE_DEFAULTS)),
-];
+const RECOMMENDED_SCHEDULES = [...new Set(Object.values(PULL_SCHEDULE_DEFAULTS))];
 
 describe("given the pull-cadence cron mapping", () => {
   describe("when a recommended adapter schedule arrives", () => {

@@ -79,10 +79,7 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         texts.push(part.text);
       } else if (typeof part.content === "string") {
         texts.push(part.content);
-      } else if (
-        part.type === "thinking" &&
-        typeof part.thinking === "string"
-      ) {
+      } else if (part.type === "thinking" && typeof part.thinking === "string") {
         texts.push(part.thinking);
       } else if (part.type === "tool_use" && part.input != null) {
         const s = safeStringify(part.input);
@@ -96,10 +93,7 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         // toolResult content union below, where key presence discriminates.
         const s = safeStringify(part.toolUse.input);
         if (s !== null) texts.push(s);
-      } else if (
-        isRecord(part.toolResult) &&
-        isUnknownArray(part.toolResult.content)
-      ) {
+      } else if (isRecord(part.toolResult) && isUnknownArray(part.toolResult.content)) {
         // Converse tool-result content is a union; we handle the {text} and
         // {json} variants and ignore the rest (document, image, video,
         // searchResult). The json variant is stringified in place so block
@@ -127,9 +121,7 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
  * Extracts the text content of the last user message from an array of messages.
  * Iterates backwards to find the most recent user message.
  */
-export const extractLastUserMessageText = (
-  messages: unknown,
-): string | null => {
+export const extractLastUserMessageText = (messages: unknown): string | null => {
   if (!Array.isArray(messages)) return null;
 
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -158,8 +150,7 @@ const textFromBlock = (p: unknown): string | null => {
  * Gets the content array from a message, checking both `content` and `parts`
  * (Vercel AI SDK / pi-ai use `parts` instead of `content`).
  */
-const getMessageContentOrParts = (msg: MessageLike): unknown =>
-  msg.content ?? msg.parts;
+const getMessageContentOrParts = (msg: MessageLike): unknown => msg.content ?? msg.parts;
 
 export const extractSystemInstructionFromMessages = (
   messages: unknown,
@@ -183,9 +174,7 @@ export const extractSystemInstructionFromMessages = (
   }
 
   if (isUnknownArray(content)) {
-    const texts = content
-      .map(textFromBlock)
-      .filter((p): p is string => p !== null);
+    const texts = content.map(textFromBlock).filter((p): p is string => p !== null);
 
     const extracted = texts.join("");
     return extracted.length > 0 ? extracted : null;
@@ -210,11 +199,7 @@ export const isSystemRole = (role: unknown): boolean =>
 export const stripSystemMessages = (messages: unknown[]): unknown[] =>
   messages.filter(
     (m) =>
-      !(
-        m &&
-        typeof m === "object" &&
-        isSystemRole((m as Record<string, unknown>).role)
-      ),
+      !(m && typeof m === "object" && isSystemRole((m as Record<string, unknown>).role)),
   );
 
 /**
@@ -237,11 +222,7 @@ export const decodeMessagesPayload = (payload: unknown): unknown => {
  */
 export const unwrapWrappedMessages = (messages: unknown[]): unknown[] => {
   return messages.map((msg) => {
-    if (
-      isRecord(msg) &&
-      isRecord(msg.message) &&
-      Object.keys(msg).length === 1
-    ) {
+    if (isRecord(msg) && isRecord(msg.message) && Object.keys(msg).length === 1) {
       return msg.message;
     }
     return msg;

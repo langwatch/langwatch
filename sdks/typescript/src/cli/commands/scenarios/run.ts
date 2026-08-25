@@ -1,10 +1,7 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import {
-  SuitesApiService,
-  type SuiteTarget,
-} from "@/client-sdk/services/suites";
+import { SuitesApiService, type SuiteTarget } from "@/client-sdk/services/suites";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { resolveOutputFormat } from "../../utils/errorOutput";
@@ -16,13 +13,21 @@ import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 function parseTarget(targetStr: string): SuiteTarget {
   const colonIndex = targetStr.indexOf(":");
   if (colonIndex === -1) {
-    console.error(chalk.red(`Error: Invalid target format "${targetStr}". Use <type>:<referenceId> (e.g., http:agent_abc123)`));
+    console.error(
+      chalk.red(
+        `Error: Invalid target format "${targetStr}". Use <type>:<referenceId> (e.g., http:agent_abc123)`,
+      ),
+    );
     process.exit(1);
   }
   const type = targetStr.slice(0, colonIndex);
   const referenceId = targetStr.slice(colonIndex + 1);
   if (!["prompt", "http", "code", "workflow"].includes(type)) {
-    console.error(chalk.red(`Error: Invalid target type "${type}". Must be one of: prompt, http, code, workflow`));
+    console.error(
+      chalk.red(
+        `Error: Invalid target type "${type}". Must be one of: prompt, http, code, workflow`,
+      ),
+    );
     process.exit(1);
   }
   return { type: type as SuiteTarget["type"], referenceId };
@@ -37,8 +42,12 @@ export const runScenarioCommand = async (
   const parameters = parseRunParameterFlags({ pairs: options.param });
 
   if (!options.target) {
-    console.error(chalk.red("Error: --target is required. Specify what to run the scenario against."));
-    console.error(chalk.gray("  Example: langwatch scenario run <id> --target http:agent_abc123"));
+    console.error(
+      chalk.red("Error: --target is required. Specify what to run the scenario against."),
+    );
+    console.error(
+      chalk.gray("  Example: langwatch scenario run <id> --target http:agent_abc123"),
+    );
     console.error(chalk.gray("  Target types: http, code, workflow, prompt"));
     process.exit(1);
   }
@@ -77,7 +86,9 @@ export const runScenarioCommand = async (
     if (!options.wait) {
       console.log();
       console.log(`  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`);
-      console.log(`  ${chalk.gray("Suite ID:")}     ${chalk.gray(suite.id)} ${chalk.gray("(ephemeral)")}`);
+      console.log(
+        `  ${chalk.gray("Suite ID:")}     ${chalk.gray(suite.id)} ${chalk.gray("(ephemeral)")}`,
+      );
       console.log();
       console.log(
         chalk.gray(`View results in the LangWatch dashboard under Simulations.`),
@@ -114,7 +125,9 @@ export const runScenarioCommand = async (
         // document above must keep stdout to itself.
         if (resolveOutputFormat() === "text") {
           console.log(
-            chalk.yellow(`Check results in the dashboard. Batch ID: ${result.batchRunId}`),
+            chalk.yellow(
+              `Check results in the dashboard. Batch ID: ${result.batchRunId}`,
+            ),
           );
         }
         await suitesService.delete(suite.id).catch(() => undefined);
@@ -149,8 +162,7 @@ export const runScenarioCommand = async (
             // `--wait` exists to report the verdict. Exiting 0 on a failed
             // run hides it from every machine caller — see suites/run.ts.
             process.exitCode = 1;
-          }
-          else {
+          } else {
             pollSpinner.succeed(
               `Scenario run completed: ${chalk.green(`${passed}/${total} passed`)}`,
             );

@@ -1,7 +1,4 @@
-import {
-  type ReportTraceRow,
-  reportSnippet,
-} from "@langwatch/automation-contract";
+import { type ReportTraceRow, reportSnippet } from "@langwatch/automation-contract";
 import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
 
 /**

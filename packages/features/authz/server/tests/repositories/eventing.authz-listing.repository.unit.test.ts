@@ -57,9 +57,7 @@ const prismaWith = (data: {
   };
   return {
     prisma,
-    repository: EventingAuthzListingRepository.create(
-      prisma as unknown as AuthzDatabase,
-    ),
+    repository: EventingAuthzListingRepository.create(prisma as unknown as AuthzDatabase),
   };
 };
 
@@ -416,9 +414,7 @@ describe("EventingAuthzListingRepository", () => {
 
       expect([...byTeam.keys()].sort()).toEqual(["team-1", "team-empty"]);
       expect(byTeam.get("team-empty")).toEqual([]);
-      expect(byTeam.get("team-1")?.map((member) => member.userId)).toEqual([
-        "alice",
-      ]);
+      expect(byTeam.get("team-1")?.map((member) => member.userId)).toEqual(["alice"]);
       expect(prisma.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -432,9 +428,7 @@ describe("EventingAuthzListingRepository", () => {
   describe("when the synthesis read expands the user's groups", () => {
     it("keeps a group grant only when the user is in that group in the grant's own organization", async () => {
       const { repository } = prismaWith({
-        groupMemberships: [
-          { groupId: "group-mine", group: { organizationId: ORG } },
-        ],
+        groupMemberships: [{ groupId: "group-mine", group: { organizationId: ORG } }],
         grants: [
           grantRow({
             id: "g-direct",

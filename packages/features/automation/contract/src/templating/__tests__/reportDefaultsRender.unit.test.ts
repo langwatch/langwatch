@@ -87,9 +87,7 @@ describe("report-default Slack rendering", () => {
           blocks: Record<string, unknown>[];
         };
 
-        expect(sectionTexts(payload.blocks).join("\n")).toContain(
-          "…and 90 more",
-        );
+        expect(sectionTexts(payload.blocks).join("\n")).toContain("…and 90 more");
       });
     });
 

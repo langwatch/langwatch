@@ -1,9 +1,5 @@
 import { nanoid } from "nanoid";
-import type {
-  Experiment,
-  Prisma,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { Experiment, Prisma, PrismaClient } from "~/generated/prisma/client";
 
 /**
  * Repository layer for experiment data access.
@@ -29,9 +25,7 @@ export class ExperimentRepository {
    * where clause. Always returns a new object so callers cannot inadvertently
    * mutate the predicate later.
    */
-  private active(
-    where: Prisma.ExperimentWhereInput,
-  ): Prisma.ExperimentWhereInput {
+  private active(where: Prisma.ExperimentWhereInput): Prisma.ExperimentWhereInput {
     return { ...where, archivedAt: null };
   }
 
@@ -91,10 +85,7 @@ export class ExperimentRepository {
     input: { projectId: string },
     options?: { tx?: Prisma.TransactionClient },
   ): Promise<Experiment[]> {
-    return this.findManyActive(
-      { where: { projectId: input.projectId } },
-      options,
-    );
+    return this.findManyActive({ where: { projectId: input.projectId } }, options);
   }
 
   async findPage(
@@ -164,9 +155,7 @@ export class ExperimentRepository {
    * draft-name generation to avoid producing a slug that collides with an
    * archived row's renamed slug.
    */
-  async findAllSlugs(input: {
-    projectId: string;
-  }): Promise<Array<{ slug: string }>> {
+  async findAllSlugs(input: { projectId: string }): Promise<Array<{ slug: string }>> {
     return await this.prisma.experiment.findMany({
       select: { slug: true },
       where: { projectId: input.projectId },
@@ -221,9 +210,7 @@ export class ExperimentRepository {
   async getRowStatusById(
     input: { id: string; projectId: string },
     options?: { tx?: Prisma.TransactionClient },
-  ): Promise<
-    { exists: false } | { exists: true; archived: boolean; slug: string }
-  > {
+  ): Promise<{ exists: false } | { exists: true; archived: boolean; slug: string }> {
     const client = options?.tx ?? this.prisma;
     const row = await client.experiment.findUnique({
       where: { id: input.id, projectId: input.projectId },

@@ -25,9 +25,7 @@ describe("SecuredApp", () => {
         verifySecret: noopSecret,
       });
 
-      app
-        .access(internalSecret("unit test route"))
-        .get("/ping", (c) => c.text("ok"));
+      app.access(internalSecret("unit test route")).get("/ping", (c) => c.text("ok"));
 
       const recorded = getRoutePolicy("GET", "/api/__test_secured/ping");
       expect(recorded).toBeDefined();
@@ -87,18 +85,14 @@ describe("SecuredApp", () => {
     it("records the real permission in the registry (not 'any authenticated')", () => {
       const app = createProjectApp({ basePath: "/api/__test_apikey" });
 
-      app
-        .access(apiKeyPermission("virtualKeys:view"))
-        .get("/keys", (c) => c.text("ok"));
+      app.access(apiKeyPermission("virtualKeys:view")).get("/keys", (c) => c.text("ok"));
 
       const recorded = getRoutePolicy("GET", "/api/__test_apikey/keys");
       expect(recorded?.policy).toEqual({
         kind: "apiKeyPermission",
         permission: "virtualKeys:view",
       });
-      expect(describeAccessPolicy(recorded!.policy)).toContain(
-        "virtualKeys:view",
-      );
+      expect(describeAccessPolicy(recorded!.policy)).toContain("virtualKeys:view");
     });
   });
 
@@ -143,9 +137,7 @@ describe("SecuredApp", () => {
         basePath: "/api/__test_canonical",
         errorEnvelope: "canonical",
       });
-      app
-        .access(apiKeyPermission("virtualKeys:view"))
-        .get("/x", (c) => c.text("ok"));
+      app.access(apiKeyPermission("virtualKeys:view")).get("/x", (c) => c.text("ok"));
 
       const res = await app.hono.request("/api/__test_canonical/x");
       expect(res.status).toBe(401);
@@ -164,9 +156,7 @@ describe("SecuredApp", () => {
     /** @scenario A legacy family keeps the flat error body its consumers parse */
     it("keeps the flat legacy body by default", async () => {
       const app = createProjectApp({ basePath: "/api/__test_legacy" });
-      app
-        .access(apiKeyPermission("virtualKeys:view"))
-        .get("/x", (c) => c.text("ok"));
+      app.access(apiKeyPermission("virtualKeys:view")).get("/x", (c) => c.text("ok"));
 
       const res = await app.hono.request("/api/__test_legacy/x");
       expect(res.status).toBe(401);

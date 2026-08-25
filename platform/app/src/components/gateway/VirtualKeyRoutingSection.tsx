@@ -43,9 +43,7 @@ function decode(raw: string): VirtualKeyRoutingValue {
   if (raw.startsWith("POLICY:")) {
     return { mode: "POLICY", policyId: raw.slice("POLICY:".length) };
   }
-  return raw === "FALLBACK_ALL"
-    ? { mode: "FALLBACK_ALL", policyId: null }
-    : ROUTING_NONE;
+  return raw === "FALLBACK_ALL" ? { mode: "FALLBACK_ALL", policyId: null } : ROUTING_NONE;
 }
 
 /**

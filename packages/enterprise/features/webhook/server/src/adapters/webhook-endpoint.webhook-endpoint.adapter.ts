@@ -33,21 +33,59 @@ export type WebhookEndpointStatusSnapshot = {
 };
 
 export interface WebhookEndpointRuntime {
-  create(input: CreateWebhookEndpointCommand): Promise<{ endpoint: WebhookEndpointView; secret: string }>;
+  create(
+    input: CreateWebhookEndpointCommand,
+  ): Promise<{ endpoint: WebhookEndpointView; secret: string }>;
   getAll(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
-  getById(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
+  getById(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointView>;
   update(input: UpdateWebhookEndpointCommand): Promise<WebhookEndpointView>;
-  rollSecret(input: { organizationId: string; endpointId: string; now?: Date }): Promise<{ endpoint: WebhookEndpointView; secret: string }>;
-  enable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
-  disable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
+  rollSecret(input: {
+    organizationId: string;
+    endpointId: string;
+    now?: Date;
+  }): Promise<{ endpoint: WebhookEndpointView; secret: string }>;
+  enable(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointView>;
+  disable(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointView>;
   archive(input: { organizationId: string; endpointId: string }): Promise<void>;
-  tryGetDeliverable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView | null>;
-  getDestinationConfig(input: { organizationId: string; endpointId: string }): Promise<WebhookDestinationConfig>;
-  getSigningSecret(input: { organizationId: string; endpointId: string }): Promise<string>;
-  getSigningSecrets(input: { organizationId: string; endpointId: string; now?: Date }): Promise<string[]>;
-  tryGetStatusSnapshot(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointStatusSnapshot | null>;
-  getDeliveryStats(input: { organizationId: string; endpointId: string; since: Date; sampleLimit: number }): Promise<{ attempted: number; delivered: number; latencies: number[] }>;
-  getActiveByOrganization(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
+  tryGetDeliverable(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointView | null>;
+  getDestinationConfig(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookDestinationConfig>;
+  getSigningSecret(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<string>;
+  getSigningSecrets(input: {
+    organizationId: string;
+    endpointId: string;
+    now?: Date;
+  }): Promise<string[]>;
+  tryGetStatusSnapshot(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointStatusSnapshot | null>;
+  getDeliveryStats(input: {
+    organizationId: string;
+    endpointId: string;
+    since: Date;
+    sampleLimit: number;
+  }): Promise<{ attempted: number; delivered: number; latencies: number[] }>;
+  getActiveByOrganization(input: {
+    organizationId: string;
+  }): Promise<WebhookEndpointView[]>;
   organizationIdsWithActiveEndpoints(): Promise<string[]>;
   recordDeliveryAttempt(input: {
     organizationId: string;
@@ -81,7 +119,10 @@ export interface WebhookEndpointRuntime {
     }>;
     nextCursor: { firedAt: Date; id: string } | null;
   }>;
-  health(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointStatusSnapshot>;
+  health(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointStatusSnapshot>;
   pruneDeliveries(now?: Date): Promise<number>;
 }
 

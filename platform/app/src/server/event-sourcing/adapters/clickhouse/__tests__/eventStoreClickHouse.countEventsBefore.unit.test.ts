@@ -33,9 +33,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([{ count: 0 }]),
       };
-      (
-        mockClickHouseClient.query as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(mockResult);
+      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
+        mockResult,
+      );
 
       const count = await store.countEventsBefore(
         aggregateId,
@@ -70,9 +70,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([{ count: 1 }]),
       };
-      (
-        mockClickHouseClient.query as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(mockResult);
+      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
+        mockResult,
+      );
 
       const count = await store.countEventsBefore(
         aggregateId,
@@ -103,9 +103,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([{ count: 1 }]),
       };
-      (
-        mockClickHouseClient.query as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(mockResult);
+      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
+        mockResult,
+      );
 
       const count = await store.countEventsBefore(
         aggregateId,
@@ -136,9 +136,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([{ count: 0 }]),
       };
-      (
-        mockClickHouseClient.query as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(mockResult);
+      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
+        mockResult,
+      );
 
       const count = await store.countEventsBefore(
         aggregateId,
@@ -160,9 +160,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([{ count: 0 }]),
       };
-      (
-        mockClickHouseClient.query as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(mockResult);
+      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
+        mockResult,
+      );
 
       await store.countEventsBefore(
         aggregateId,
@@ -211,9 +211,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([{ count: 2 }]),
       };
-      (
-        mockClickHouseClient.query as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(mockResult);
+      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
+        mockResult,
+      );
 
       const count = await store.countEventsBefore(
         aggregateId,
@@ -231,9 +231,7 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       if (callArgs && typeof callArgs === "object" && "query" in callArgs) {
         const query = String(callArgs.query);
         // Verify query contains both conditions
-        expect(query).toMatch(
-          /EventTimestamp\s*<\s*\{beforeTimestamp:UInt64\}/s,
-        );
+        expect(query).toMatch(/EventTimestamp\s*<\s*\{beforeTimestamp:UInt64\}/s);
         expect(query).toMatch(
           /EventTimestamp\s*=\s*\{beforeTimestamp:UInt64\}\s*AND\s*EventId\s*<\s*\{beforeEventId:String\}/s,
         );
@@ -246,18 +244,12 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const eventId = "event-1";
 
       const queryError = new Error("ClickHouse connection failed");
-      (
-        mockClickHouseClient.query as ReturnType<typeof vi.fn>
-      ).mockRejectedValue(queryError);
+      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockRejectedValue(
+        queryError,
+      );
 
       await expect(
-        store.countEventsBefore(
-          aggregateId,
-          context,
-          aggregateType,
-          timestamp,
-          eventId,
-        ),
+        store.countEventsBefore(aggregateId, context, aggregateType, timestamp, eventId),
       ).rejects.toThrow("ClickHouse connection failed");
     });
   });

@@ -1,7 +1,6 @@
 export const METRIC_DATA_POINT_RECEIVED_EVENT_TYPE =
   "lw.obs.metric.data_point_received" as const;
-export const METRIC_DATA_POINT_RECEIVED_EVENT_VERSION_LATEST =
-  "2026-07-15" as const;
+export const METRIC_DATA_POINT_RECEIVED_EVENT_VERSION_LATEST = "2026-07-15" as const;
 
 export const METRIC_PROCESSING_EVENT_TYPES = [
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,

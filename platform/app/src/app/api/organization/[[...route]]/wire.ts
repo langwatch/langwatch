@@ -98,9 +98,7 @@ export const updateMemberSchema = z
     disabled: z.boolean().optional(),
   })
   .superRefine((value, ctx) => {
-    const fields = [value.role, value.disabled].filter(
-      (field) => field !== undefined,
-    );
+    const fields = [value.role, value.disabled].filter((field) => field !== undefined);
     if (fields.length !== 1) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

@@ -54,8 +54,7 @@ function buildComposerFormState({
     scoreOptions: draft.scoreOptions,
     setScoreOptions: (update) =>
       patchDraft({
-        scoreOptions:
-          typeof update === "function" ? update(draft.scoreOptions) : update,
+        scoreOptions: typeof update === "function" ? update(draft.scoreOptions) : update,
       }),
     scores: mutations.scores,
     isEdit: mutations.isEdit,

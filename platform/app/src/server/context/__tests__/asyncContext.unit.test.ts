@@ -266,9 +266,7 @@ describe("asyncContext", () => {
 
     it("does nothing when no context is set", () => {
       // Should not throw
-      expect(() =>
-        updateCurrentContext({ organizationId: "no-context" }),
-      ).not.toThrow();
+      expect(() => updateCurrentContext({ organizationId: "no-context" })).not.toThrow();
     });
   });
 });

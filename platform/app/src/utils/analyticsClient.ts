@@ -11,9 +11,7 @@ interface CreateAppAnalyticsClientParams {
   isGtagReady: boolean;
 }
 
-export function createAppAnalyticsClient(
-  params: CreateAppAnalyticsClientParams,
-) {
+export function createAppAnalyticsClient(params: CreateAppAnalyticsClientParams) {
   const { isSaaS, posthogClient, isGtagReady } = params;
   const registeredProviders = [] as Provider[];
   const isDev = process.env.NODE_ENV !== "production";

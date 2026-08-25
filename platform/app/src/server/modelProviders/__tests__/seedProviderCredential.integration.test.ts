@@ -18,10 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { startTestContainers } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { decrypt, encrypt } from "~/utils/encryption";
-import {
-  decideCredentialWrite,
-  readStoredCredential,
-} from "../seedProviderCredential";
+import { decideCredentialWrite, readStoredCredential } from "../seedProviderCredential";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-seedcred-${suffix}`;
@@ -44,10 +41,7 @@ async function storedKey(): Promise<string | undefined> {
     where: { id: MP_ID },
     select: { customKeys: true },
   });
-  const keys = JSON.parse(decrypt(row.customKeys as string)) as Record<
-    string,
-    string
-  >;
+  const keys = JSON.parse(decrypt(row.customKeys as string)) as Record<string, string>;
   return keys.OPENAI_API_KEY;
 }
 
@@ -77,9 +71,7 @@ async function seedCredential({
     await prisma.modelProvider.update({
       where: { id: MP_ID },
       data: {
-        ...(replacement
-          ? { customKeys: encrypt(JSON.stringify(replacement)) }
-          : {}),
+        ...(replacement ? { customKeys: encrypt(JSON.stringify(replacement)) } : {}),
         enabled: true,
       },
     });

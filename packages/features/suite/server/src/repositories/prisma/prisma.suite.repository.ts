@@ -72,13 +72,17 @@ export class PrismaSuiteRepository extends SuiteRepository {
       data: {
         ...data,
         ...(slug === undefined ? {} : { slug }),
-        ...(data.targets === undefined ? {} : { targets: data.targets as Prisma.InputJsonValue }),
+        ...(data.targets === undefined
+          ? {}
+          : { targets: data.targets as Prisma.InputJsonValue }),
       },
     });
     return mapSuite(row);
   }
 
-  async archive(input: SuiteIdInput & { archivedAt: Date; archivedSlug: string }): Promise<Suite> {
+  async archive(
+    input: SuiteIdInput & { archivedAt: Date; archivedSlug: string },
+  ): Promise<Suite> {
     const row = await this.database.simulationSuite.update({
       where: { id: input.id, projectId: input.projectId },
       data: { archivedAt: input.archivedAt, slug: input.archivedSlug },

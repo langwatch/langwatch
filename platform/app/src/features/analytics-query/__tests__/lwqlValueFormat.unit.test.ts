@@ -35,18 +35,12 @@ describe("a LangWatchQL result value", () => {
 
         const rendered = {
           // The column is in the result, but this row carries no key for it.
-          missing: lwqlCellText(
-            readLangWatchQLCell({ row, column: "absentColumn" }),
-          ),
+          missing: lwqlCellText(readLangWatchQLCell({ row, column: "absentColumn" })),
           null: lwqlCellText(readLangWatchQLCell({ row, column: "nullValue" })),
           zero: lwqlCellText(readLangWatchQLCell({ row, column: "zero" })),
-          emptyString: lwqlCellText(
-            readLangWatchQLCell({ row, column: "emptyString" }),
-          ),
+          emptyString: lwqlCellText(readLangWatchQLCell({ row, column: "emptyString" })),
           nan: lwqlCellText(readLangWatchQLCell({ row, column: "notANumber" })),
-          infinity: lwqlCellText(
-            readLangWatchQLCell({ row, column: "infinite" }),
-          ),
+          infinity: lwqlCellText(readLangWatchQLCell({ row, column: "infinite" })),
         };
 
         expect(new Set(Object.values(rendered)).size).toBe(6);
@@ -92,19 +86,18 @@ describe("a LangWatchQL result value", () => {
 
       /** @scenario "Nothing coerces distinct emptiness and non-finite values together" */
       it("tells negative infinity from positive infinity", () => {
-        expect(
-          lwqlCellText(describeLangWatchQLValue(Number.NEGATIVE_INFINITY)),
-        ).toBe("-Infinity");
-        expect(
-          lwqlCellText(describeLangWatchQLValue(Number.POSITIVE_INFINITY)),
-        ).toBe("Infinity");
+        expect(lwqlCellText(describeLangWatchQLValue(Number.NEGATIVE_INFINITY))).toBe(
+          "-Infinity",
+        );
+        expect(lwqlCellText(describeLangWatchQLValue(Number.POSITIVE_INFINITY))).toBe(
+          "Infinity",
+        );
       });
 
       /** @scenario "Nothing coerces distinct emptiness and non-finite values together" */
       it("reports a key that is present but undefined the same way as an absent one", () => {
         expect(
-          readLangWatchQLCell({ row: { value: undefined }, column: "value" })
-            .kind,
+          readLangWatchQLCell({ row: { value: undefined }, column: "value" }).kind,
         ).toBe("missing");
       });
     });
@@ -164,9 +157,7 @@ describe("a LangWatchQL result value", () => {
 
         if (cell.kind !== "structured") throw new Error("expected a structure");
         expect(cell.clipped).toBe(true);
-        expect(cell.display.length).toBeLessThanOrEqual(
-          LWQL_VALUE_PREVIEW_LIMIT + 1,
-        );
+        expect(cell.display.length).toBeLessThanOrEqual(LWQL_VALUE_PREVIEW_LIMIT + 1);
         expect(cell.display.endsWith("…")).toBe(true);
         // The bound is on the display only; the copy is the whole thing.
         expect(cell.copy).toBe(JSON.stringify(value));

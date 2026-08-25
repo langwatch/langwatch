@@ -23,9 +23,7 @@ const secured = createServiceApp({ basePath: "/api" });
 const logger = createLogger("langwatch:auth");
 
 const authPolicy = () =>
-  publicEndpoint(
-    "BetterAuth session/OAuth handshake; framework manages its own session",
-  );
+  publicEndpoint("BetterAuth session/OAuth handshake; framework manages its own session");
 
 // ---------- POST /api/auth/validate ----------
 secured.access(authPolicy()).post("/auth/validate", async (c) => {

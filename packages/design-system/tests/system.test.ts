@@ -5,9 +5,7 @@ import { createDesignSystem, system } from "../src/system";
 type TokenLayer = Record<string, Record<string, string>>;
 
 function tokens(value: typeof system): TokenLayer {
-  return (value.getTokenCss() as { "@layer tokens": TokenLayer })[
-    "@layer tokens"
-  ];
+  return (value.getTokenCss() as { "@layer tokens": TokenLayer })["@layer tokens"];
 }
 
 describe("LangWatch design system", () => {
@@ -44,12 +42,8 @@ describe("LangWatch design system", () => {
 
     expect(layer[":root &, .light &"]?.["--chakra-colors-bg-surface"]).toBeDefined();
     expect(
-      layer[".dark &, .dark .chakra-theme:not(.light) &"]?.[
-        "--chakra-colors-bg-surface"
-      ],
+      layer[".dark &, .dark .chakra-theme:not(.light) &"]?.["--chakra-colors-bg-surface"],
     ).toBeDefined();
-    expect(layer[".feature &"]?.["--chakra-colors-bg-surface"]).toBe(
-      "rebeccapurple",
-    );
+    expect(layer[".feature &"]?.["--chakra-colors-bg-surface"]).toBe("rebeccapurple");
   });
 });

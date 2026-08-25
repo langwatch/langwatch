@@ -160,9 +160,7 @@ async function insertSessionLog({
       resourceLogs: [
         {
           resource: {
-            attributes: [
-              { key: "service.name", value: { stringValue: "claude-code" } },
-            ],
+            attributes: [{ key: "service.name", value: { stringValue: "claude-code" } }],
           },
           scopeLogs: [
             {
@@ -199,14 +197,10 @@ async function insertSessionLog({
     );
   }
   const logRepo = new CanonicalLogRecordClickHouseRepository(async () => ch);
-  await logRepo.ensureLogRecords(
-    result.accepted.map((prepared) => prepared.record),
-  );
+  await logRepo.ensureLogRecords(result.accepted.map((prepared) => prepared.record));
 }
 
-function query(
-  overrides: Partial<SessionGroupsQuery> = {},
-): SessionGroupsQuery {
+function query(overrides: Partial<SessionGroupsQuery> = {}): SessionGroupsQuery {
   return {
     tenantId,
     timeRange,
@@ -333,9 +327,7 @@ describe("SessionGroupsClickHouseRepository", () => {
       expect(page.totalHits).toBe(2);
 
       const full = await repository.findSessionGroups(query());
-      const alpha = full.rows.find(
-        (row) => row.conversationId === SESSION_ALPHA,
-      )!;
+      const alpha = full.rows.find((row) => row.conversationId === SESSION_ALPHA)!;
       expect(alpha.traceCount).toBe(3);
       expect(alpha.totalCost).toBeCloseTo(6);
       expect(alpha.totalTokens).toBe(900);
@@ -344,10 +336,7 @@ describe("SessionGroupsClickHouseRepository", () => {
       expect(alpha.totalDurationMs).toBeCloseTo(6000);
       expect(alpha.startedAtMs).toBe(baseMs - 300_000);
       expect(alpha.lastActivityMs).toBe(baseMs - 100_000);
-      expect([...alpha.models].sort()).toEqual([
-        "claude-haiku-4",
-        "claude-sonnet-4",
-      ]);
+      expect([...alpha.models].sort()).toEqual(["claude-haiku-4", "claude-sonnet-4"]);
       expect(alpha.serviceName).toBe("coding-agent-cli");
       expect(alpha.input).toBe("latest alpha prompt");
     });
@@ -358,12 +347,8 @@ describe("SessionGroupsClickHouseRepository", () => {
     it("names the latest trace of every session row", async () => {
       const page = await repository.findSessionGroups(query());
 
-      const alpha = page.rows.find(
-        (row) => row.conversationId === SESSION_ALPHA,
-      )!;
-      const beta = page.rows.find(
-        (row) => row.conversationId === SESSION_BETA,
-      )!;
+      const alpha = page.rows.find((row) => row.conversationId === SESSION_ALPHA)!;
+      const beta = page.rows.find((row) => row.conversationId === SESSION_BETA)!;
 
       // Alpha's newest trace is the one at baseMs - 100s, beta's at
       // baseMs - 50s: the id has to follow the last activity, not insert order.
@@ -399,9 +384,7 @@ describe("SessionGroupsClickHouseRepository", () => {
       ]);
 
       const page = await repository.findSessionGroups(query());
-      const session = page.rows.find(
-        (row) => row.conversationId === sessionId,
-      )!;
+      const session = page.rows.find((row) => row.conversationId === sessionId)!;
 
       expect(session.traceCount).toBe(1);
       expect(session.totalCost).toBeCloseTo(4);
@@ -412,13 +395,9 @@ describe("SessionGroupsClickHouseRepository", () => {
   describe("given a content term that only one session's transcript mentions", () => {
     /** @scenario Session content search matches transcript text in log records */
     it("returns only the session whose log body mentions the term", async () => {
-      const page = await repository.findSessionGroups(
-        query({ contentTerms: ["#6418"] }),
-      );
+      const page = await repository.findSessionGroups(query({ contentTerms: ["#6418"] }));
 
-      expect(page.rows.map((row) => row.conversationId)).toEqual([
-        SESSION_ALPHA,
-      ]);
+      expect(page.rows.map((row) => row.conversationId)).toEqual([SESSION_ALPHA]);
       // The rollup still sums the whole session, not the matching log alone.
       expect(page.rows[0]!.traceCount).toBe(3);
       expect(page.totalHits).toBe(1);
@@ -435,9 +414,7 @@ describe("SessionGroupsClickHouseRepository", () => {
         }),
       );
 
-      expect(page.rows.map((row) => row.conversationId)).toEqual([
-        SESSION_ALPHA,
-      ]);
+      expect(page.rows.map((row) => row.conversationId)).toEqual([SESSION_ALPHA]);
     });
   });
 
@@ -476,9 +453,7 @@ describe("SessionGroupsClickHouseRepository", () => {
           },
         }),
       );
-      expect(stale.rows.map((row) => row.conversationId)).not.toContain(
-        sessionId,
-      );
+      expect(stale.rows.map((row) => row.conversationId)).not.toContain(sessionId);
 
       const current = await repository.findSessionGroups(
         query({
@@ -488,9 +463,7 @@ describe("SessionGroupsClickHouseRepository", () => {
           },
         }),
       );
-      expect(current.rows.map((row) => row.conversationId)).toContain(
-        sessionId,
-      );
+      expect(current.rows.map((row) => row.conversationId)).toContain(sessionId);
     });
   });
 
@@ -515,9 +488,7 @@ describe("SessionGroupsClickHouseRepository", () => {
       let cursor: SessionGroupsQuery["cursor"];
       let didReachLastPage = false;
       for (let guard = 0; guard < 10; guard++) {
-        const page = await repository.findSessionGroups(
-          query({ limit: 3, cursor }),
-        );
+        const page = await repository.findSessionGroups(query({ limit: 3, cursor }));
         const pageRows = page.rows.slice(0, 2);
         seen.push(...pageRows.map((row) => row.conversationId));
         activities.push(...pageRows.map((row) => row.lastActivityMs));

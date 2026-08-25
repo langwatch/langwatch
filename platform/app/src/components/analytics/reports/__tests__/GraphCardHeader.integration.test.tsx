@@ -91,9 +91,7 @@ describe("GraphCardHeader", () => {
       it("opens the automations drawer pre-filled with this graph and its first series", async () => {
         renderHeader();
 
-        await userEvent.click(
-          screen.getByRole("button", { name: /add alert/i }),
-        );
+        await userEvent.click(screen.getByRole("button", { name: /add alert/i }));
 
         expect(openDrawerMock).toHaveBeenCalledTimes(1);
         expect(openDrawerMock).toHaveBeenCalledWith("automation", {
@@ -111,9 +109,7 @@ describe("GraphCardHeader", () => {
           trigger: { id: "trigger_abc", active: true, alertType: "WARNING" },
         });
 
-        await userEvent.click(
-          screen.getByRole("button", { name: "Edit alert" }),
-        );
+        await userEvent.click(screen.getByRole("button", { name: "Edit alert" }));
 
         expect(openDrawerMock).toHaveBeenCalledTimes(1);
         expect(openDrawerMock).toHaveBeenCalledWith("automation", {

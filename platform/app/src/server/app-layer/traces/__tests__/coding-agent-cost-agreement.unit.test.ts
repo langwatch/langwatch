@@ -79,9 +79,7 @@ const SHORT_LIVED_USD = 0.126069;
  */
 const CENTS_OF_A_CENT = 6;
 
-function claudeCallEvent(
-  extra: Record<string, string | number> = {},
-): SpanReceivedEvent {
+function claudeCallEvent(extra: Record<string, string | number> = {}): SpanReceivedEvent {
   return createSpanReceivedEvent({
     traceId: TRACE_ID,
     spanId: SPAN_ID,
@@ -101,8 +99,7 @@ const noopAppendStore = { append: async () => {}, bulkAppend: async () => {} };
 function traceSummaryCost(extra: CallExtra = {}): number | null {
   return new TraceSummaryFoldProjection({
     store: noopFoldStore,
-  }).handleTraceSpanReceived(claudeCallEvent(extra), createInitState())
-    .totalCost;
+  }).handleTraceSpanReceived(claudeCallEvent(extra), createInitState()).totalCost;
 }
 
 /** The analytics fold, which answers cost-over-time when the rollup cannot. */
@@ -110,10 +107,8 @@ function traceAnalyticsCost(extra: CallExtra = {}): number | null {
   const projection = new TraceAnalyticsFoldProjection({
     store: noopFoldStore,
   });
-  return projection.handleTraceSpanReceived(
-    claudeCallEvent(extra),
-    projection.init(),
-  ).totalCost;
+  return projection.handleTraceSpanReceived(claudeCallEvent(extra), projection.init())
+    .totalCost;
 }
 
 /** The per-minute rollup the analytics graphs read by default. */
@@ -202,8 +197,7 @@ function terminalFooterCost(extra: CallExtra = {}): number {
 
   const transcript = buildCodingAgentTranscript({ spans: [detail], logs: [] });
   return (
-    buildEntryTimeline({ entries: transcript.entries }).at(-1)
-      ?.cumulativeCostUsd ?? 0
+    buildEntryTimeline({ entries: transcript.entries }).at(-1)?.cumulativeCostUsd ?? 0
   );
 }
 
@@ -287,8 +281,7 @@ describe("the cost of one claude code model call", () => {
       // full write as hour-long: the stated split must win.
       const cost = traceSummaryCost({
         "llm_request.context": "tool",
-        "gen_ai.usage.cache_creation_1h.input_tokens":
-          CALL.cache_creation_tokens,
+        "gen_ai.usage.cache_creation_1h.input_tokens": CALL.cache_creation_tokens,
       });
       expect(cost).toBeCloseTo(CHARGED_USD, CENTS_OF_A_CENT);
     });

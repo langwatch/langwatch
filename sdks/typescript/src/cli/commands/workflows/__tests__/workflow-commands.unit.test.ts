@@ -1,17 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { WorkflowsApiError } from "@/client-sdk/services/workflows/workflows-api.service";
 
-vi.mock("@/client-sdk/services/workflows/workflows-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    WorkflowsApiService: vi.fn(),
-  };
-});
+vi.mock(
+  "@/client-sdk/services/workflows/workflows-api.service",
+  async (importOriginal) => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+    const actual = (await importOriginal()) as Record<string, unknown>;
+    return {
+      ...actual,
+      WorkflowsApiService: vi.fn(),
+    };
+  },
+);
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -62,11 +69,13 @@ describe("listWorkflowsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll = vi.fn();
-    vi.mocked(WorkflowsApiService).mockImplementation(function () { return ({
-      getAll: mockGetAll,
-      get: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as WorkflowsApiService; });
+    vi.mocked(WorkflowsApiService).mockImplementation(function () {
+      return {
+        getAll: mockGetAll,
+        get: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as WorkflowsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -124,11 +133,13 @@ describe("getWorkflowCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(WorkflowsApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: mockGet,
-      delete: vi.fn(),
-    }) as unknown as WorkflowsApiService; });
+    vi.mocked(WorkflowsApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: mockGet,
+        delete: vi.fn(),
+      } as unknown as WorkflowsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -146,9 +157,7 @@ describe("getWorkflowCommand()", () => {
 
   describe("when workflow is not found", () => {
     it("exits with code 1", async () => {
-      mockGet.mockRejectedValue(
-        new WorkflowsApiError("Not found", "get workflow"),
-      );
+      mockGet.mockRejectedValue(new WorkflowsApiError("Not found", "get workflow"));
 
       await expect(getWorkflowCommand("nonexistent")).rejects.toThrow(ProcessExitError);
     });
@@ -163,11 +172,13 @@ describe("deleteWorkflowCommand()", () => {
     vi.clearAllMocks();
     mockGet = vi.fn();
     mockDelete = vi.fn();
-    vi.mocked(WorkflowsApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: mockGet,
-      delete: mockDelete,
-    }) as unknown as WorkflowsApiService; });
+    vi.mocked(WorkflowsApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: mockGet,
+        delete: mockDelete,
+      } as unknown as WorkflowsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -187,11 +198,11 @@ describe("deleteWorkflowCommand()", () => {
 
   describe("when workflow is not found", () => {
     it("exits with code 1 without calling delete", async () => {
-      mockGet.mockRejectedValue(
-        new WorkflowsApiError("Not found", "get workflow"),
-      );
+      mockGet.mockRejectedValue(new WorkflowsApiError("Not found", "get workflow"));
 
-      await expect(deleteWorkflowCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+      await expect(deleteWorkflowCommand("nonexistent")).rejects.toThrow(
+        ProcessExitError,
+      );
       expect(mockDelete).not.toHaveBeenCalled();
     });
   });
@@ -232,9 +243,9 @@ describe("updateWorkflowCommand()", () => {
 
   describe("when no fields are provided", () => {
     it("exits with code 1", async () => {
-      await expect(
-        updateWorkflowCommand("workflow_abc123", {}),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(updateWorkflowCommand("workflow_abc123", {})).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 
@@ -246,9 +257,9 @@ describe("updateWorkflowCommand()", () => {
         text: async () => '{"error":"Workflow not found"}',
       });
 
-      await expect(
-        updateWorkflowCommand("nonexistent", { name: "X" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(updateWorkflowCommand("nonexistent", { name: "X" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });

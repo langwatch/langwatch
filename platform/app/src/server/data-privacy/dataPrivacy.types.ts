@@ -1,7 +1,4 @@
-import {
-  REDACTION_MARKER_ENTITIES,
-  SECRET_MARKER_ENTITY,
-} from "@langwatch/redaction";
+import { REDACTION_MARKER_ENTITIES, SECRET_MARKER_ENTITY } from "@langwatch/redaction";
 import { z } from "zod";
 
 /**
@@ -10,9 +7,7 @@ import { z } from "zod";
  * from the dependency-free marker registry so it stays pinned to the engines.
  */
 const VALID_PII_ENTITIES: ReadonlySet<string> = new Set(
-  [...REDACTION_MARKER_ENTITIES].filter(
-    (entity) => entity !== SECRET_MARKER_ENTITY,
-  ),
+  [...REDACTION_MARKER_ENTITIES].filter((entity) => entity !== SECRET_MARKER_ENTITY),
 );
 
 /**
@@ -26,23 +21,13 @@ const VALID_PII_ENTITIES: ReadonlySet<string> = new Set(
  * populated `ResolvedDataPrivacy`.
  */
 
-export const CONTENT_CATEGORIES = [
-  "input",
-  "output",
-  "system",
-  "tools",
-] as const;
+export const CONTENT_CATEGORIES = ["input", "output", "system", "tools"] as const;
 export type ContentCategory = (typeof CONTENT_CATEGORIES)[number];
 
 export const DISPOSITIONS = ["capture", "restrict", "drop"] as const;
 export type Disposition = (typeof DISPOSITIONS)[number];
 
-export const PII_LEVELS = [
-  "disabled",
-  "essential",
-  "strict",
-  "custom",
-] as const;
+export const PII_LEVELS = ["disabled", "essential", "strict", "custom"] as const;
 export type PiiLevel = (typeof PII_LEVELS)[number];
 
 /**
@@ -86,8 +71,7 @@ export type CategorySetting = z.infer<typeof categorySettingSchema>;
  * the audience.
  */
 export const CUSTOM_ATTRIBUTE_DISPOSITIONS = ["restrict", "drop"] as const;
-export type CustomAttributeDisposition =
-  (typeof CUSTOM_ATTRIBUTE_DISPOSITIONS)[number];
+export type CustomAttributeDisposition = (typeof CUSTOM_ATTRIBUTE_DISPOSITIONS)[number];
 
 export const customAttributeRuleSchema = z
   .object({
@@ -131,10 +115,7 @@ export const dataPrivacyConfigSchema = z
         // A detected span whose entire matched text matches one of these is
         // left as it was. Unioned down the cascade like secret customPatterns;
         // each is safe-regex validated at the service layer before write.
-        exceptPatterns: z
-          .array(z.string().trim().min(1).max(512))
-          .max(50)
-          .optional(),
+        exceptPatterns: z.array(z.string().trim().min(1).max(512)).max(50).optional(),
       })
       .strict()
       .superRefine((pii, ctx) => {
@@ -160,8 +141,7 @@ export const dataPrivacyConfigSchema = z
         ) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message:
-              "Exception patterns need a PII level that redacts something",
+            message: "Exception patterns need a PII level that redacts something",
             path: ["exceptPatterns"],
           });
         }

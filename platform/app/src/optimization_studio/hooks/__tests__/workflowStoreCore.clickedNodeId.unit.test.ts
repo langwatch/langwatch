@@ -15,10 +15,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
-import {
-  store as storeCreator,
-  type WorkflowStore,
-} from "@langwatch/workflow-web";
+import { store as storeCreator, type WorkflowStore } from "@langwatch/workflow-web";
 
 function makeNode({
   id,
@@ -55,9 +52,7 @@ describe("workflowStoreCore — clickedNodeId lifecycle", () => {
 
   describe("when ReactFlow selects a node via mousedown", () => {
     it("does not set clickedNodeId", () => {
-      store
-        .getState()
-        .onNodesChange([{ id: "node-1", type: "select", selected: true }]);
+      store.getState().onNodesChange([{ id: "node-1", type: "select", selected: true }]);
 
       const state = store.getState();
       expect(state.nodes.find((n) => n.id === "node-1")?.selected).toBe(true);
@@ -67,9 +62,7 @@ describe("workflowStoreCore — clickedNodeId lifecycle", () => {
 
   describe("when onNodeClick fires after selection", () => {
     it("records clickedNodeId for the selected node", () => {
-      store
-        .getState()
-        .onNodesChange([{ id: "node-1", type: "select", selected: true }]);
+      store.getState().onNodesChange([{ id: "node-1", type: "select", selected: true }]);
       store.getState().setClickedNodeId("node-1");
 
       expect(store.getState().clickedNodeId).toBe("node-1");
@@ -78,14 +71,10 @@ describe("workflowStoreCore — clickedNodeId lifecycle", () => {
 
   describe("when a node is deselected", () => {
     it("clears clickedNodeId", () => {
-      store
-        .getState()
-        .onNodesChange([{ id: "node-1", type: "select", selected: true }]);
+      store.getState().onNodesChange([{ id: "node-1", type: "select", selected: true }]);
       store.getState().setClickedNodeId("node-1");
 
-      store
-        .getState()
-        .onNodesChange([{ id: "node-1", type: "select", selected: false }]);
+      store.getState().onNodesChange([{ id: "node-1", type: "select", selected: false }]);
 
       expect(store.getState().clickedNodeId).toBeNull();
     });

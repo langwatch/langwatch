@@ -4,15 +4,7 @@
  * Integration tests for Secrets tRPC endpoints.
  * Tests the actual CRUD operations through the tRPC layer with a real database.
  */
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { decrypt } from "../../../../utils/encryption";
 import { getTestUser } from "../../../../utils/testUtils";
@@ -24,8 +16,7 @@ wireDefaultTestApp();
 
 // Mock license enforcement to avoid limits during tests
 vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../license-enforcement")>();
+  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
   return {
     ...actual,
     enforceLicenseLimit: vi.fn(),
@@ -54,9 +45,7 @@ describe("Secrets Endpoints", () => {
   });
 
   afterAll(async () => {
-    await prisma.projectSecret
-      .deleteMany({ where: { projectId } })
-      .catch(() => {});
+    await prisma.projectSecret.deleteMany({ where: { projectId } }).catch(() => {});
   });
 
   describe("create", () => {

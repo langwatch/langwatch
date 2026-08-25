@@ -83,8 +83,7 @@ async function enqueueOutcomeCount(outcome: string): Promise<number> {
   return snapshot.values
     .filter(
       (v) =>
-        v.labels.subscriber_name === "seamSubscriber" &&
-        v.labels.outcome === outcome,
+        v.labels.subscriber_name === "seamSubscriber" && v.labels.outcome === outcome,
     )
     .reduce((sum, v) => sum + v.value, 0);
 }
@@ -191,10 +190,7 @@ describe("subscriber enqueue-time contract", () => {
         );
 
         const causes = await expectDispatchFailure(
-          router.dispatch(
-            [makeEvent("evt-a"), makeEvent("evt-b")],
-            readContext,
-          ),
+          router.dispatch([makeEvent("evt-a"), makeEvent("evt-b")], readContext),
           /filter blew up/,
         );
 
@@ -227,10 +223,7 @@ describe("subscriber enqueue-time contract", () => {
         const service = new EventSourcingService<Event>({
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+          allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
           eventStore,
           subscribers: [
             {

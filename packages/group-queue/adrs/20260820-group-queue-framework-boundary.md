@@ -70,12 +70,11 @@ const projectionWork = defineGroupQueue({
 
 const producer = new GroupQueueProducer(projectionWork, producerDependencies);
 
-const consumer = new GroupQueueConsumer(
-  projectionWork,
-  consumerDependencies,
-).handle(async (job, context) => {
-  // context contains delivery attempt and cancellation
-});
+const consumer = new GroupQueueConsumer(projectionWork, consumerDependencies).handle(
+  async (job, context) => {
+    // context contains delivery attempt and cancellation
+  },
+);
 ```
 
 `GroupQueueConsumer` is the public name for the consuming runtime. “Worker” is

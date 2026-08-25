@@ -26,11 +26,7 @@ const SEVERITY_COLLECTION = createListCollection({ items: SEVERITY_OPTIONS });
  * whether to `@channel` by it. Self-gates to `customGraph` so the main pane
  * can drop it in unconditionally.
  */
-export function SeveritySection({
-  accordion,
-}: {
-  accordion?: FacetAccordionProps;
-}) {
+export function SeveritySection({ accordion }: { accordion?: FacetAccordionProps }) {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
 
@@ -42,9 +38,7 @@ export function SeveritySection({
       help="How urgent this alert is when it fires. Higher severities stand out in the notification and can page the whole channel."
       accordion={accordion}
       complete={draft.alertType !== null}
-      summary={
-        draft.alertType ? SEVERITY_LABEL[draft.alertType] : "Pick a severity"
-      }
+      summary={draft.alertType ? SEVERITY_LABEL[draft.alertType] : "Pick a severity"}
     >
       <Select.Root
         collection={SEVERITY_COLLECTION}

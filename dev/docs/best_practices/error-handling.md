@@ -77,15 +77,15 @@ export class EvaluationNotFoundError extends NotFoundError {
 
 Each field earns its place:
 
-| field | rule |
-|---|---|
-| `code` | Stable, `snake_case`, unique platform-wide. This is the wire discriminant, the key every client explainer is written against, **and the literal wire message on tRPC and SSE** — renaming one is a breaking change. |
-| `message` | **Write it so a customer could read it.** It is server-*first* — logs, OTel and exception capture are its main readers — but it is not private: the REST boundary puts it straight in the response body (`error-handler.ts` sends `{ error: code, message }`, pinned by `error-handler.unit.test.ts`). Nothing on a handled error is sensitive; that is what "handled" means. So no env vars, no internal hostnames, no service names — those go in the log line next to the throw, where they belong. This is *not* the app's UI copy either: that lives in the client presentation registry, keyed by `code`. See "Where the words come from" below. |
-| `fault` | Who can act. Drives **log level and alerting**, not UI. Defaults to `customer` — so any subclass with a 5xx status must set `platform` or `provider` explicitly, or a real incident logs as routine noise. |
-| `meta` | Structured context the **client can actually use**. Not a debug dump. If no UI reads a field, it does not belong here — put it in the log instead. |
-| `tips` | Short, actionable, imperative. Written for an agent driving the API/CLI/MCP with no UI to fall back on. In the app they are a *fallback*, shown only for a code the presentation registry has no description for — see "Surfacing one to the user". |
-| `docsUrl` | Canonical `docs.langwatch.ai` link, built from a static path in `error-remediation.ts` — never interpolated from request data. The client renders it as an `href` and validates the origin first (`safeDocsUrl` in `readHandledError.ts`), dropping anything that isn't a link to the docs site — because a relayed Go error's `docs_url` is parsed from an upstream response body. |
-| `reasons` | The cause chain. Non-handled links serialise as `{ code: "unknown" }` automatically — safe to pass an internal error here. |
+| field     | rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `code`    | Stable, `snake_case`, unique platform-wide. This is the wire discriminant, the key every client explainer is written against, **and the literal wire message on tRPC and SSE** — renaming one is a breaking change.                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `message` | **Write it so a customer could read it.** It is server-_first_ — logs, OTel and exception capture are its main readers — but it is not private: the REST boundary puts it straight in the response body (`error-handler.ts` sends `{ error: code, message }`, pinned by `error-handler.unit.test.ts`). Nothing on a handled error is sensitive; that is what "handled" means. So no env vars, no internal hostnames, no service names — those go in the log line next to the throw, where they belong. This is _not_ the app's UI copy either: that lives in the client presentation registry, keyed by `code`. See "Where the words come from" below. |
+| `fault`   | Who can act. Drives **log level and alerting**, not UI. Defaults to `customer` — so any subclass with a 5xx status must set `platform` or `provider` explicitly, or a real incident logs as routine noise.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `meta`    | Structured context the **client can actually use**. Not a debug dump. If no UI reads a field, it does not belong here — put it in the log instead.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `tips`    | Short, actionable, imperative. Written for an agent driving the API/CLI/MCP with no UI to fall back on. In the app they are a _fallback_, shown only for a code the presentation registry has no description for — see "Surfacing one to the user".                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `docsUrl` | Canonical `docs.langwatch.ai` link, built from a static path in `error-remediation.ts` — never interpolated from request data. The client renders it as an `href` and validates the origin first (`safeDocsUrl` in `readHandledError.ts`), dropping anything that isn't a link to the docs site — because a relayed Go error's `docs_url` is parsed from an upstream response body.                                                                                                                                                                                                                                                                    |
+| `reasons` | The cause chain. Non-handled links serialise as `{ code: "unknown" }` automatically — safe to pass an internal error here.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 `tips` and `docsUrl` are centralised in
 `platform/app/src/server/app-layer/error-remediation.ts`. Add remediation copy there,
@@ -109,24 +109,24 @@ meta: { query: rawSql, durationMs: 4210, shard: "ch-03" }
 
 This is the part that trips people up, so be precise about it:
 
-| | source |
-|---|---|
-| What a customer reads **in the app** | The **client presentation registry**, keyed by `code` — `platform/app/src/features/errors/logic/presentation.ts` |
-| `HandledError.message` | Logs, OTel, exception capture — **and the REST response body**. Customer-safe by rule, never the app's UI copy |
-| The wire `message` field | **Per transport.** tRPC collapses it to the `code` ([#5984](https://github.com/langwatch/langwatch/pull/5984)). REST sends `{ error: code, message }`, so the sentence rides *alongside* the code. SSE sends the code with the serialised payload beside it |
-| Server-authored dynamic prose | `meta.message`, an explicit opt-in — mirrors Go, where free text appears only when a caller sets `Meta["message"]`. Almost always prose *we* wrote; the exception is a third party's own sentence deliberately relayed because it is the whole answer (a model provider's "your credit balance is too low" — `llm_upstream_error`). Either way a registry entry that renders it passes it through `safeProse` first, and the codes allowed to render it at all are named one by one in `presentation.unit.test.ts` |
-| What a consumer with no registry reads | `meta.message` → `message` → `code`, in that order — the CLI (`packages/langy/src/cards/handled-error.ts`) and the Python SDK (`extract_api_error_detail`) both implement it |
+|                                        | source                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| What a customer reads **in the app**   | The **client presentation registry**, keyed by `code` — `platform/app/src/features/errors/logic/presentation.ts`                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `HandledError.message`                 | Logs, OTel, exception capture — **and the REST response body**. Customer-safe by rule, never the app's UI copy                                                                                                                                                                                                                                                                                                                                                                                                     |
+| The wire `message` field               | **Per transport.** tRPC collapses it to the `code` ([#5984](https://github.com/langwatch/langwatch/pull/5984)). REST sends `{ error: code, message }`, so the sentence rides _alongside_ the code. SSE sends the code with the serialised payload beside it                                                                                                                                                                                                                                                        |
+| Server-authored dynamic prose          | `meta.message`, an explicit opt-in — mirrors Go, where free text appears only when a caller sets `Meta["message"]`. Almost always prose _we_ wrote; the exception is a third party's own sentence deliberately relayed because it is the whole answer (a model provider's "your credit balance is too low" — `llm_upstream_error`). Either way a registry entry that renders it passes it through `safeProse` first, and the codes allowed to render it at all are named one by one in `presentation.unit.test.ts` |
+| What a consumer with no registry reads | `meta.message` → `message` → `code`, in that order — the CLI (`packages/langy/src/cards/handled-error.ts`) and the Python SDK (`extract_api_error_detail`) both implement it                                                                                                                                                                                                                                                                                                                                       |
 
 Handled-error messages were leaking env vars and internal hostnames to browsers.
 Two things closed that, and only one of them is on the wire: tRPC now sends the
 stable code where a message is required, and — the durable half — a handled
-error's `message` is *written* customer-safe in the first place, because REST
+error's `message` is _written_ customer-safe in the first place, because REST
 does ship it. The consequence for app code: **`error.message` on a tRPC error is
 a code slug, not a sentence.** Rendering it directly puts `validation_error` in
 front of a customer.
 
 That last row is a deliberate ordering, not a shrug. A bare code slug is an ugly
-last resort but a *specific* one: `project_slug_taken` tells a CLI user which
+last resort but a _specific_ one: `project_slug_taken` tells a CLI user which
 thing went wrong, where "Failed to save." tells them nothing at all. Degrade
 towards the specific. The app can do better than the slug because it has a
 registry — see the fault-based fallback below — but a consumer without one shows
@@ -141,20 +141,20 @@ in order of how often they are violated:
    is the code slug; for an unhandled one it is unsafe. Call `showErrorToast` and let
    it decide — it reads the handled payload, renders from the registry, and
    falls back to the generic unknown state. The one narrow exception is handled
-   *inside* that helper and described under "The 4xx authored-prose channel"
+   _inside_ that helper and described under "The 4xx authored-prose channel"
    below; it is not something to reimplement at a call site.
 
    A Biome plugin (`biome-plugins/no-raw-error-toast.grit`) flags this at author
    time and `logic/__tests__/noRawErrorToasts.unit.test.ts` scans the tree for
    it. Both work by derivation, so they will occasionally flag a value that only
-   *looks* message-derived — a string that went through a sanitiser, or a local
+   _looks_ message-derived — a string that went through a sanitiser, or a local
    parser's message that never crossed the wire. Mark that one line
    `// no-raw-error-toast-ok` with a reason. Prefer the marker to the guard's
    file-level allowlist: an exemption entry blinds the guard to the whole file.
 
-   **The marker goes where the value is *used*, not where it is derived.** The
+   **The marker goes where the value is _used_, not where it is derived.** The
    scanner tracks taint through locals to a fixpoint — `const message = e
-   instanceof Error ? e.message : "…"` taints `message`, and so does a second
+instanceof Error ? e.message : "…"` taints `message`, and so does a second
    local assigned from it — but it only ever reports the copy slot the tainted
    value reaches. Suppression is matched against the line of that slot's key
    (`title`, `description` or `fallbackTitle`), so a marker parked on the
@@ -172,9 +172,9 @@ in order of how often they are violated:
    anywhere from the key's line to the line the value ends on — so both the
    compact and the wrapped spelling work.
 
-   **Write the marker *inside* the call or element it exempts.** Both guards
+   **Write the marker _inside_ the call or element it exempts.** Both guards
    honour it there, and only there. GritQL sees a node as the span from its
-   first token to its last, so the Biome plugin can only see comments *between*
+   first token to its last, so the Biome plugin can only see comments _between_
    those tokens: a marker trailing the statement's closing `);` suppresses the
    scanner but not the plugin, and the line still fails CI. Inside the
    construct, either spelling is honoured:
@@ -187,7 +187,7 @@ in order of how often they are violated:
 
    <Alert.Description>
      {parseFailure /* no-raw-error-toast-ok — local parser, never on the wire */}
-   </Alert.Description>
+   </Alert.Description>;
    ```
 
    If you need a blanket escape hatch, `// biome-ignore lint: <reason>` on the
@@ -206,11 +206,11 @@ in order of how often they are violated:
    action, where a slug names only the failure. Registry copy is the one thing
    that beats a fallback, since it describes this exact failure. So on the path
    this doc tells you to write — always pass a `fallbackTitle` — the humanised
-   code is a *last* resort, not the usual unregistered-code headline. The
+   code is a _last_ resort, not the usual unregistered-code headline. The
    `fault`-based fallback (customer → "Check your input", platform → "Something
    went wrong on our end", provider → "A connected service didn't respond") is
    reached only when there is no code at all. Those three are distinct on
-   purpose — a provider fault is a *third party* that didn't answer, and telling
+   purpose — a provider fault is a _third party_ that didn't answer, and telling
    the customer it was us is both wrong and less actionable.
 3. **`docsUrl` is always offered; a `tip` shows unless it repeats the
    description.** `ErrorActions` renders the docs link whenever there is one.
@@ -220,7 +220,7 @@ in order of how often they are violated:
    `query_timeout`'s description and its first tip both say "narrow the time
    range", so showing both makes the surface repeat itself. Where a tip says
    something the description does not, it is kept: dropping every tip whenever
-   the registry had *any* description threw away the escalation path on nearly
+   the registry had _any_ description threw away the escalation path on nearly
    every error, and `clickhouse_unavailable`'s "check the status page or
    contact support" never once reached a customer.
 
@@ -229,10 +229,11 @@ in order of how often they are violated:
    `<HandledErrorAlert>` lists every remaining tip, `showErrorToast` folds in
    the first. Pinned by `logic/__tests__/showErrorToast.unit.test.ts` and
    `components/__tests__/HandledErrorAlert.integration.test.tsx`.
+
 4. **Never render raw `meta` or the reason chain in the UI.** They are for agents
    and logs. A customer sees a title, a description (registry copy, plus any
    tip that adds to it), a docs link, and a copyable error id. The
-   registry may read a *named* `meta` field where its entry declares the shape
+   registry may read a _named_ `meta` field where its entry declares the shape
    and the value is something the customer supplied or chose — a filter field
    they typed, a notification channel they picked. That is the whole of the
    exception: a registry entry reads `meta.field`, never `error.meta`.
@@ -244,15 +245,15 @@ in order of how often they are violated:
 
 Everything lives in `platform/app/src/features/errors`:
 
-| export | use it for |
-|---|---|
-| `showErrorToast` | The only sanctioned error toast. Absorbs the global-handler dedup check. |
-| `<HandledErrorAlert>` | The inline counterpart. A toast is for something that just happened; an alert is for something that is still true. |
-| `applyHandledErrorToForm` + `<FormServerError>` | A rejected submit. See the warning below — they ship as a pair. |
-| `describeError` | Slots that can only take a string: a `title=` tooltip, an `aria-label`, a state field typed `string`. It loses the tips, the docs link and the error id, so prefer a component wherever one can be rendered. |
-| `explainSerializedError` | A handled error that arrived already-structured on an event payload (a `target_result.domainError`) rather than off a transport envelope. |
-| `readHandledError` | Lifting the payload when you need to branch on `code` yourself. |
-| `resolveErrorCopy` | Title, description, supplemental tips, docs link and trace id, resolved once, for a surface that renders its own chrome. `showErrorToast`, `<HandledErrorAlert>` and `describeError` are all built on it — reach for it only when none of those three fits. |
+| export                                          | use it for                                                                                                                                                                                                                                                  |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `showErrorToast`                                | The only sanctioned error toast. Absorbs the global-handler dedup check.                                                                                                                                                                                    |
+| `<HandledErrorAlert>`                           | The inline counterpart. A toast is for something that just happened; an alert is for something that is still true.                                                                                                                                          |
+| `applyHandledErrorToForm` + `<FormServerError>` | A rejected submit. See the warning below — they ship as a pair.                                                                                                                                                                                             |
+| `describeError`                                 | Slots that can only take a string: a `title=` tooltip, an `aria-label`, a state field typed `string`. It loses the tips, the docs link and the error id, so prefer a component wherever one can be rendered.                                                |
+| `explainSerializedError`                        | A handled error that arrived already-structured on an event payload (a `target_result.domainError`) rather than off a transport envelope.                                                                                                                   |
+| `readHandledError`                              | Lifting the payload when you need to branch on `code` yourself.                                                                                                                                                                                             |
+| `resolveErrorCopy`                              | Title, description, supplemental tips, docs link and trace id, resolved once, for a surface that renders its own chrome. `showErrorToast`, `<HandledErrorAlert>` and `describeError` are all built on it — reach for it only when none of those three fits. |
 
 Do not hand-roll `error.data?.error` at a call site — three separate ad-hoc
 readers is how this got inconsistent the first time. In particular, do not
@@ -267,7 +268,7 @@ ways, not two: handled → registry, **plain non-5xx with an authored message �
 that message**, everything else → the generic unknown state.
 
 The middle branch exists because #5984 collapsed the wire message to the code
-for *handled* errors but deliberately left a plain non-5xx `TRPCError`'s message
+for _handled_ errors but deliberately left a plain non-5xx `TRPCError`'s message
 alone. Several hundred procedures throw one with real copy in it — "You've
 already used this invite", "That name is taken" — and replacing those with
 "we've been notified" tells the user to wait for something that will never
@@ -282,8 +283,8 @@ the code name, and not when it was inherited from a `cause`. That excludes the
 two accidents that otherwise reach a customer:
 
 ```ts
-new TRPCError({ code: "NOT_FOUND" })                     // message IS "NOT_FOUND"
-new TRPCError({ code: "BAD_REQUEST", cause: err })       // message is err's
+new TRPCError({ code: "NOT_FOUND" }); // message IS "NOT_FOUND"
+new TRPCError({ code: "BAD_REQUEST", cause: err }); // message is err's
 ```
 
 The first put a shouted code slug in front of a customer; the second dragged a
@@ -297,10 +298,10 @@ are easy to state wrong:
 
 - **The status test is not "non-5xx".** The boundary only excludes
   `INTERNAL_SERVER_ERROR` (on the error, or on the shape's `data.code`). The
-  `>= 500` test is a *second*, client-side gate in `readAuthoredMessage`.
+  `>= 500` test is a _second_, client-side gate in `readAuthoredMessage`.
 - **Carrying a `cause` is not by itself disqualifying.** `isInheritedFromCause`
   walks the cause chain and compares messages, so what gets rejected is a
-  message *equal to* something in that chain — the tell that tRPC copied it up
+  message _equal to_ something in that chain — the tell that tRPC copied it up
   rather than the procedure writing it. A procedure that writes real copy **and**
   attaches a `cause` for the logs keeps its copy. An earlier version disqualified
   any error with a `cause` at all, which was safe but ate deliberate prose.
@@ -332,14 +333,14 @@ The same trap applies per field. The bridge only claims a field it can satisfy
 itself this form actually renders an input for — a bare key check is not enough,
 because zod's `flatten()` collapses a nested path to its head, so `version` looks
 owned while nothing is registered against it and `shouldFocus` finds no ref. Even
-so, it cannot see whether you render an *error slot* beside that input. If a
+so, it cannot see whether you render an _error slot_ beside that input. If a
 field is in the schema but has no visible input — the prompt forms collect
 `handle` in a separate dialog — don't route validation errors to that form at
 all.
 
-**There is a third outcome the boolean hides.** On a *partial* match — the error
+**There is a third outcome the boolean hides.** On a _partial_ match — the error
 names four fields and this form owns two — the bridge marks the two it owns
-**and still returns `false`**. So the user sees red fields *and* the caller's
+**and still returns `false`**. So the user sees red fields _and_ the caller's
 toast, deliberately: the half this form cannot show must not vanish. It also
 skips the focus jump in that case, because yanking focus into a field while a
 toast explains a different problem reads as two things fighting for attention.
@@ -364,7 +365,7 @@ Not every transport carries the identical shape yet. Know which one you are on:
   contract, and don't assume a code is available when consuming them.
 - **Hono REST** — throw the `HandledError`; `createServiceApp`'s `onError`
   serialises it to `{ error: code, message, ...meta, tips?, docsUrl?, fault?,
-  reasons? }`. Note that `message` is the error's own sentence here, not the
+reasons? }`. Note that `message` is the error's own sentence here, not the
   code — which is why it has to be written customer-safe. Hand-rolling
   `c.json({ error: "..." }, { status })` is a code smell and bypasses the whole
   contract.

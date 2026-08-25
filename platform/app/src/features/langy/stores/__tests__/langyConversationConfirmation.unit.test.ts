@@ -20,9 +20,7 @@ describe("langyStore conversation confirmation", () => {
       useLangyStore
         .getState()
         .beginTurn({ conversationId: "conv-new", turnId: "turn-1" });
-      expect(
-        useLangyStore.getState().unconfirmedConversations["conv-new"],
-      ).toBe(true);
+      expect(useLangyStore.getState().unconfirmedConversations["conv-new"]).toBe(true);
     });
 
     describe("when a durable confirmation arrives", () => {
@@ -45,12 +43,8 @@ describe("langyStore conversation confirmation", () => {
         useLangyStore.getState().confirmConversation("conv-a");
         const afterFirst = useLangyStore.getState().unconfirmedConversations;
         useLangyStore.getState().confirmConversation("conv-a");
-        expect(useLangyStore.getState().unconfirmedConversations).toBe(
-          afterFirst,
-        );
-        expect(
-          useLangyStore.getState().unconfirmedConversations["conv-b"],
-        ).toBe(true);
+        expect(useLangyStore.getState().unconfirmedConversations).toBe(afterFirst);
+        expect(useLangyStore.getState().unconfirmedConversations["conv-b"]).toBe(true);
       });
     });
   });

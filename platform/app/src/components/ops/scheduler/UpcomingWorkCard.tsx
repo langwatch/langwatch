@@ -81,8 +81,7 @@ export function UpcomingWorkCard() {
   );
 
   const now =
-    Math.max(schedulesQuery.dataUpdatedAt, wakesQuery.dataUpdatedAt) ||
-    Date.now();
+    Math.max(schedulesQuery.dataUpdatedAt, wakesQuery.dataUpdatedAt) || Date.now();
 
   const rows = useMemo(() => {
     const merged: TimedWorkRow[] = [];

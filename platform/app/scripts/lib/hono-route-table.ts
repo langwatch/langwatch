@@ -257,9 +257,7 @@ function routeMatches(source: string, framework: boolean): RouteMatch[] {
     // Count every call site and refuse to guess. `register` is tried after
     // `registerRoute`/`registerSse` so each site counts exactly once.
     const frameworkCalls = [
-      ...source.matchAll(
-        /\.(registerRoute|registerSse|register|withdraw)\(\s*"/g,
-      ),
+      ...source.matchAll(/\.(registerRoute|registerSse|register|withdraw)\(\s*"/g),
     ].length;
     if (frameworkMatches.length !== frameworkCalls) {
       throw new Error(
@@ -451,13 +449,7 @@ function codePositions(text: string): boolean[] {
  * Index just past the comment or string literal starting at `start`, or `start`
  * itself when the character there is code.
  */
-function endOfNonCodeSpan({
-  text,
-  start,
-}: {
-  text: string;
-  start: number;
-}): number {
+function endOfNonCodeSpan({ text, start }: { text: string; start: number }): number {
   const character = text[start];
   const next = text[start + 1];
 
@@ -477,13 +469,7 @@ function endOfNonCodeSpan({
 }
 
 /** Index just past the string or template literal opening at `start`. */
-function endOfStringLiteral({
-  text,
-  start,
-}: {
-  text: string;
-  start: number;
-}): number {
+function endOfStringLiteral({ text, start }: { text: string; start: number }): number {
   const quote = text[start];
 
   for (let index = start + 1; index < text.length; index++) {
@@ -529,13 +515,7 @@ function closingBraceIndex({
 }
 
 /** An object literal reduced to the text of its own keys. */
-function topLevelOf({
-  literal,
-  isCode,
-}: {
-  literal: string;
-  isCode: boolean[];
-}): string {
+function topLevelOf({ literal, isCode }: { literal: string; isCode: boolean[] }): string {
   let depth = 0;
   let kept = "";
 

@@ -10,9 +10,7 @@ import { GroupQueueProcessor } from "./groupQueue";
 
 function assertRuleResult(rule: "groupBy" | "identify", value: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(
-      `Group Queue ${rule}(payload) must return a non-empty string`,
-    );
+    throw new Error(`Group Queue ${rule}(payload) must return a non-empty string`);
   }
   return value;
 }
@@ -62,10 +60,8 @@ function runtimeDefinition<Payload extends Record<string, unknown>>({
     name: definition.transportName,
     process,
     processBatch,
-    groupKey: (payload) =>
-      assertRuleResult("groupBy", definition.groupBy(payload)),
-    identify: (payload) =>
-      assertRuleResult("identify", definition.identify(payload)),
+    groupKey: (payload) => assertRuleResult("groupBy", definition.groupBy(payload)),
+    identify: (payload) => assertRuleResult("identify", definition.identify(payload)),
     score: definition.score,
     spanAttributes: definition.spanAttributes,
     delay: definition.delay,
@@ -115,10 +111,7 @@ export class GroupQueueProducer<Payload extends Record<string, unknown>> {
     );
   }
 
-  async send(
-    payload: Payload,
-    options?: QueueSendOptions<Payload>,
-  ): Promise<void> {
+  async send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void> {
     await this.#processor.send(this.definition.payload.parse(payload), options);
   }
 
@@ -126,9 +119,7 @@ export class GroupQueueProducer<Payload extends Record<string, unknown>> {
     payloads: readonly Payload[],
     options?: QueueSendOptions<Payload>,
   ): Promise<void> {
-    const decoded = payloads.map((payload) =>
-      this.definition.payload.parse(payload),
-    );
+    const decoded = payloads.map((payload) => this.definition.payload.parse(payload));
     await this.#processor.sendBatch(decoded, options);
   }
 
@@ -155,23 +146,14 @@ export class GroupQueueConsumer<Payload extends Record<string, unknown>> {
   }
 
   handle(
-    handler: (
-      payload: Payload,
-      context: GroupQueueHandlerContext,
-    ) => Promise<void>,
+    handler: (payload: Payload, context: GroupQueueHandlerContext) => Promise<void>,
   ): RunningGroupQueueConsumer<Payload> {
     return this.start({ each: handler });
   }
 
   handleBatch(options: {
-    each: (
-      payload: Payload,
-      context: GroupQueueHandlerContext,
-    ) => Promise<void>;
-    batch: (
-      payloads: Payload[],
-      context: GroupQueueHandlerContext,
-    ) => Promise<void>;
+    each: (payload: Payload, context: GroupQueueHandlerContext) => Promise<void>;
+    batch: (payloads: Payload[], context: GroupQueueHandlerContext) => Promise<void>;
   }): RunningGroupQueueConsumer<Payload> {
     if (!this.definition.coalescing) {
       throw new Error(
@@ -182,14 +164,8 @@ export class GroupQueueConsumer<Payload extends Record<string, unknown>> {
   }
 
   private start(handlers: {
-    each: (
-      payload: Payload,
-      context: GroupQueueHandlerContext,
-    ) => Promise<void>;
-    batch?: (
-      payloads: Payload[],
-      context: GroupQueueHandlerContext,
-    ) => Promise<void>;
+    each: (payload: Payload, context: GroupQueueHandlerContext) => Promise<void>;
+    batch?: (payloads: Payload[], context: GroupQueueHandlerContext) => Promise<void>;
   }): RunningGroupQueueConsumer<Payload> {
     const abort = new AbortController();
     const context = (delivery?: JobDelivery): GroupQueueHandlerContext => ({
@@ -221,9 +197,7 @@ export class GroupQueueConsumer<Payload extends Record<string, unknown>> {
   }
 }
 
-export class RunningGroupQueueConsumer<
-  Payload extends Record<string, unknown>,
-> {
+export class RunningGroupQueueConsumer<Payload extends Record<string, unknown>> {
   readonly #processor: GroupQueueProcessor<Payload>;
   readonly #abort: AbortController;
 

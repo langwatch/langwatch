@@ -25,9 +25,6 @@ export {
   PrismaMigrationService,
   type PrismaMigrationServiceOptions,
 } from "./migration";
-export {
-  PrismaReadinessService,
-  type PrismaReadinessOptions,
-} from "./readiness";
+export { PrismaReadinessService, type PrismaReadinessOptions } from "./readiness";
 export { PrismaSeed, PrismaSeedService } from "./seed";
 export { PrismaShutdownService } from "./shutdown";

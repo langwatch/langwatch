@@ -72,10 +72,18 @@ export const llmModelCostsRouter = createTRPCRouter({
       // (organization:manage / team:manage / project:manage), and the scope
       // must resolve to a single organization the cost is then anchored to.
       return await ctx.app.modelProviders.upsertCost({
-        id, projectId, scopeType, scopeId, model, regex,
+        id,
+        projectId,
+        scopeType,
+        scopeId,
+        model,
+        regex,
         actorId: ctx.session?.user?.id,
-        inputCostPerToken, outputCostPerToken, cacheReadCostPerToken,
-        cacheCreationCostPerToken, cacheCreation1hCostPerToken,
+        inputCostPerToken,
+        outputCostPerToken,
+        cacheReadCostPerToken,
+        cacheCreationCostPerToken,
+        cacheCreation1hCostPerToken,
       });
     }),
 
@@ -90,7 +98,10 @@ export const llmModelCostsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       // Derive the scope from the row itself, then authorize manage on that
       // scope. Never trust a caller-supplied scope for a delete.
-      return await ctx.app.modelProviders.deleteCost({ ...input, actorId: ctx.session?.user?.id });
+      return await ctx.app.modelProviders.deleteCost({
+        ...input,
+        actorId: ctx.session?.user?.id,
+      });
     }),
 
   /**

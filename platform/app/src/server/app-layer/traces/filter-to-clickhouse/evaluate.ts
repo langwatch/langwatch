@@ -7,11 +7,7 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "liqe";
-import {
-  MAX_NODE_COUNT,
-  normalizeQuery,
-  translateFilterToClickHouse,
-} from "./ast";
+import { MAX_NODE_COUNT, normalizeQuery, translateFilterToClickHouse } from "./ast";
 import { FIELD_DEF_BY_NAME } from "./build-handlers";
 import {
   type FieldNeeds,
@@ -42,10 +38,7 @@ const logger = createLogger("langwatch:traces:filter-evaluate");
  * dispatch time ({@link UNSUPPORTED}). An empty query has no constraints, so it
  * matches every trace (`true`), mirroring the compiler returning no WHERE clause.
  */
-export function evaluateQueryInMemory(
-  queryText: string,
-  trace: InMemoryTrace,
-): boolean {
+export function evaluateQueryInMemory(queryText: string, trace: InMemoryTrace): boolean {
   // Reuse the compiler as the validation gate — it enforces the exact
   // MAX_NODE_COUNT / MAX_PARAM_COUNT caps, rejects invalid syntax, and throws
   // FilterFieldUnknownError for unknown fields. Anything it rejects fails closed.
@@ -188,10 +181,7 @@ function evaluateTag(
       trace,
     );
   }
-  if (
-    fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) &&
-    fieldName !== "event"
-  ) {
+  if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) && fieldName !== "event") {
     return evaluateEventAttribute(
       fieldName.slice(EVENT_ATTRIBUTE_PREFIX_LEGACY.length),
       tag,
@@ -240,9 +230,7 @@ function evaluateFreeText(
   // that coalesce actually happens is the analytics repository's row mapping, so
   // a summary built from a fold state that predates the field would throw here
   // and take the whole evaluation (including trigger dispatch) down with it.
-  const nameMatch = (trace.summary.traceName ?? "")
-    .toLowerCase()
-    .includes(value);
+  const nameMatch = (trace.summary.traceName ?? "").toLowerCase().includes(value);
   const spanMatch =
     trace.spans?.some((s) => s.name.toLowerCase().includes(value)) ?? false;
 
@@ -287,9 +275,7 @@ function evaluateEventAttribute(
   if (!key) return UNSUPPORTED;
   if (trace.events == null) return UNSUPPORTED;
   const value = extractStringValue(tag);
-  const matched = trace.events.some(
-    (e) => readAttribute(e.attributes, key) === value,
-  );
+  const matched = trace.events.some((e) => readAttribute(e.attributes, key) === value);
   return negated ? !matched : matched;
 }
 
@@ -351,10 +337,7 @@ function collectTagNeeds(tag: TagToken, needs: Set<FieldNeeds>): void {
     return;
   }
   if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) return;
-  if (
-    fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) &&
-    fieldName !== "event"
-  ) {
+  if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) && fieldName !== "event") {
     needs.add("events");
     return;
   }

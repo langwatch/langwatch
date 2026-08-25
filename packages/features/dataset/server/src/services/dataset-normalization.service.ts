@@ -48,18 +48,13 @@ export class DatasetNormalizationService extends DatasetNormalizeQueuePort {
     return this.processPayload(payload);
   }
 
-  async enqueueNormalize(input: {
-    datasetId: string;
-    projectId: string;
-  }): Promise<void> {
+  async enqueueNormalize(input: { datasetId: string; projectId: string }): Promise<void> {
     const dataset = await this.datasets.findOneOrThrow({
       id: input.datasetId,
       projectId: input.projectId,
     });
     if (!dataset.stagingKey || !dataset.uploadFilename) {
-      throw new UploadNotPendingError(
-        "Dataset normalization requires a staged upload",
-      );
+      throw new UploadNotPendingError("Dataset normalization requires a staged upload");
     }
     const payload: DatasetNormalizePayload = {
       id: dataset.id,
@@ -80,9 +75,7 @@ export class DatasetNormalizationService extends DatasetNormalizeQueuePort {
   private runInline(payload: DatasetNormalizePayload): Promise<void> {
     const key = `${payload.projectId}:${payload.datasetId}`;
     const prior = this.inlineChains.get(key) ?? Promise.resolve();
-    const next = prior
-      .catch(() => undefined)
-      .then(() => this.processPayload(payload));
+    const next = prior.catch(() => undefined).then(() => this.processPayload(payload));
     this.inlineChains.set(key, next);
     void next.finally(() => {
       if (this.inlineChains.get(key) === next) {

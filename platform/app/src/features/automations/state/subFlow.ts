@@ -6,10 +6,7 @@ import { getDrawerStack } from "~/hooks/useDrawer";
  * an alias kept for links handed out before this drawer replaced the
  * filter-only one; it renders the same component over the same draft.
  */
-const AUTOMATION_DRAWERS = new Set<DrawerType>([
-  "automation",
-  "editAutomationFilter",
-]);
+const AUTOMATION_DRAWERS = new Set<DrawerType>(["automation", "editAutomationFilter"]);
 
 /**
  * Whether the authoring drawer is still part of the open drawer flow.

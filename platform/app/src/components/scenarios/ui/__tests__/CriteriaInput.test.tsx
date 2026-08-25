@@ -3,13 +3,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CriteriaInput } from "../CriteriaInput";
 
@@ -67,9 +61,7 @@ describe("CriteriaInput", () => {
       fireEvent.click(screen.getByText("Add the first criteria"));
 
       await waitFor(() => {
-        expect(
-          screen.getByPlaceholderText("Add a criterion..."),
-        ).toBeInTheDocument();
+        expect(screen.getByPlaceholderText("Add a criterion...")).toBeInTheDocument();
       });
 
       const input = screen.getByPlaceholderText("Add a criterion...");
@@ -89,10 +81,7 @@ describe("CriteriaInput", () => {
   describe("when criteria exist", () => {
     it("displays criteria as numbered plain text", async () => {
       renderWithChakra(
-        <CriteriaInput
-          value={["first", "second", "third"]}
-          onChange={vi.fn()}
-        />,
+        <CriteriaInput value={["first", "second", "third"]} onChange={vi.fn()} />,
       );
 
       await waitFor(() => {
@@ -116,10 +105,7 @@ describe("CriteriaInput", () => {
     it("removes criterion via trash button in edit mode", async () => {
       const onChange = vi.fn();
       renderWithChakra(
-        <CriteriaInput
-          value={["first", "second", "third"]}
-          onChange={onChange}
-        />,
+        <CriteriaInput value={["first", "second", "third"]} onChange={onChange} />,
       );
 
       await waitFor(() => {
@@ -141,10 +127,7 @@ describe("CriteriaInput", () => {
     it("removes criterion when text is cleared and saved", async () => {
       const onChange = vi.fn();
       renderWithChakra(
-        <CriteriaInput
-          value={["first", "second", "third"]}
-          onChange={onChange}
-        />,
+        <CriteriaInput value={["first", "second", "third"]} onChange={onChange} />,
       );
 
       await waitFor(() => {
@@ -169,10 +152,7 @@ describe("CriteriaInput", () => {
     it("saves edited criterion on blur (regression: editing and clicking away must persist)", async () => {
       const onChange = vi.fn();
       renderWithChakra(
-        <CriteriaInput
-          value={["first", "second", "third"]}
-          onChange={onChange}
-        />,
+        <CriteriaInput value={["first", "second", "third"]} onChange={onChange} />,
       );
 
       await waitFor(() => {
@@ -193,11 +173,7 @@ describe("CriteriaInput", () => {
       fireEvent.blur(textarea);
 
       await waitFor(() => {
-        expect(onChange).toHaveBeenCalledWith([
-          "first",
-          "second edited",
-          "third",
-        ]);
+        expect(onChange).toHaveBeenCalledWith(["first", "second edited", "third"]);
       });
     });
   });

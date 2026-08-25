@@ -20,9 +20,7 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
   }): Promise<void> {
     try {
       await navigator.clipboard.writeText(
-        withBashPrefix
-          ? `LANGWATCH_API_KEY=${effectiveApiKey}`
-          : effectiveApiKey,
+        withBashPrefix ? `LANGWATCH_API_KEY=${effectiveApiKey}` : effectiveApiKey,
       );
       toaster.create({
         title: "Copied",
@@ -45,9 +43,7 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
   }): Promise<void> {
     try {
       await navigator.clipboard.writeText(
-        withBashPrefix
-          ? `LANGWATCH_ENDPOINT=${effectiveEndpoint}`
-          : effectiveEndpoint,
+        withBashPrefix ? `LANGWATCH_ENDPOINT=${effectiveEndpoint}` : effectiveEndpoint,
       );
       toaster.create({
         title: "Copied",
@@ -69,9 +65,7 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
           Your LangWatch Integration Info
         </Text>
         <Text fontSize="xs" color="fg.muted" lineHeight="tall">
-          {
-            "You can access your API key again anytime in the project's settings "
-          }
+          {"You can access your API key again anytime in the project's settings "}
           {"page."}
         </Text>
       </VStack>

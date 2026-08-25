@@ -17,9 +17,7 @@ import superjson from "superjson";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 // Lazy-load appRouter — same reason as trpc.ts (circular dependency avoidance)
-let _appRouter:
-  | Awaited<typeof import("~/server/api/root")>["appRouter"]
-  | null = null;
+let _appRouter: Awaited<typeof import("~/server/api/root")>["appRouter"] | null = null;
 async function getAppRouter() {
   if (!_appRouter) {
     const mod = await import("~/server/api/root");
@@ -74,11 +72,7 @@ function handledCauseOf(err: unknown): HandledError | undefined {
  * loggers: customer-fault handled errors warn (spike-watched), platform /
  * provider and unhandled errors log at error.
  */
-function logSseError(
-  err: unknown,
-  logData: Record<string, unknown>,
-  msg: string,
-) {
+function logSseError(err: unknown, logData: Record<string, unknown>, msg: string) {
   const handled = handledCauseOf(err);
   const level = handled && handled.fault === "customer" ? "warn" : "error";
   logger[level](
@@ -109,9 +103,7 @@ function buildReqShim(req: Request): any {
   req.headers.forEach((value, key) => {
     const existing = headers[key];
     if (existing) {
-      headers[key] = Array.isArray(existing)
-        ? [...existing, value]
-        : [existing, value];
+      headers[key] = Array.isArray(existing) ? [...existing, value] : [existing, value];
     } else {
       headers[key] = value;
     }
@@ -175,9 +167,7 @@ secured
     // Create caller and resolve the procedure
     const router = await getAppRouter();
     const caller = router.createCaller(ctx);
-    const procedure = path
-      .split(".")
-      .reduce<any>((obj, key) => obj?.[key], caller);
+    const procedure = path.split(".").reduce<any>((obj, key) => obj?.[key], caller);
 
     if (typeof procedure !== "function") {
       return c.json({ message: "Procedure not found" }, 404);

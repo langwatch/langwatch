@@ -130,9 +130,7 @@ describe("context/core", () => {
 
     describe("when the span context is invalid", () => {
       it("returns undefined", async () => {
-        const { trace, isSpanContextValid } = await import(
-          "@opentelemetry/api"
-        );
+        const { trace, isSpanContextValid } = await import("@opentelemetry/api");
         vi.mocked(trace.getSpan).mockReturnValueOnce({
           spanContext: () => ({
             traceId: "00000000000000000000000000000000",

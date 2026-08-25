@@ -12,19 +12,25 @@ even briefly: one Organization-scope rule in the
 content is stripped in the ingestion pipeline, before it ever lands
 in storage.
 
-<Info>**Pairs with:** [Data privacy policy](/ai-governance/data-privacy) (the full reference for scopes, dispositions, audiences, and redaction), [Compliance architecture](/ai-governance/compliance-architecture) (the observability substrate this posture operates against), and [Self-hosting compliance](/self-hosting/compliance) (where this fits in the SOC 2, ISO 27001, HIPAA mapping).</Info>
+<Info>
+  **Pairs with:** [Data privacy policy](/ai-governance/data-privacy) (the full reference
+  for scopes, dispositions, audiences, and redaction), [Compliance
+  architecture](/ai-governance/compliance-architecture) (the observability substrate this
+  posture operates against), and [Self-hosting compliance](/self-hosting/compliance)
+  (where this fits in the SOC 2, ISO 27001, HIPAA mapping).
+</Info>
 
 ## Setting it up
 
 At **Settings > Privacy**, add an **Organization** rule and set the
 content categories to Drop:
 
-| Category | Disposition |
-|---|---|
-| Input | Drop |
-| Output | Drop |
-| System instructions | Drop |
-| Tool calls | Capture, or Drop for the strictest posture |
+| Category            | Disposition                                |
+| ------------------- | ------------------------------------------ |
+| Input               | Drop                                       |
+| Output              | Drop                                       |
+| System instructions | Drop                                       |
+| Tool calls          | Capture, or Drop for the strictest posture |
 
 Dropping tool calls as well removes tool arguments and tool results.
 That is the strictest posture, and it may break debugging flows that
@@ -66,11 +72,12 @@ The rule's scope decides which projects those are:
 - **Organization-wide**: every project in the organization drops the
   chosen categories, application traces included.
 
-<Note>If the requirement is "only a small audience may read it"
-rather than "it must not exist", set the categories to **Restrict**
-with a narrow [audience](/ai-governance/data-privacy#audiences)
-instead. Restriction keeps the content for the chosen reviewers and
-applies retroactively to traces already stored.</Note>
+<Note>
+  If the requirement is "only a small audience may read it" rather than "it must not
+  exist", set the categories to **Restrict** with a narrow
+  [audience](/ai-governance/data-privacy#audiences) instead. Restriction keeps the content
+  for the chosen reviewers and applies retroactively to traces already stored.
+</Note>
 
 ## Drop is forward-looking only
 

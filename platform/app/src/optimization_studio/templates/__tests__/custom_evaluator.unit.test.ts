@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { customEvaluatorTemplate } from "../custom_evaluator";
 
-const node = (id: string) =>
-  customEvaluatorTemplate.nodes.find((n) => n.id === id);
+const node = (id: string) => customEvaluatorTemplate.nodes.find((n) => n.id === id);
 
 describe("customEvaluatorTemplate", () => {
   describe("the entry point", () => {
@@ -15,9 +14,7 @@ describe("customEvaluatorTemplate", () => {
 
     /** @scenario Custom evaluator template has no attached dataset */
     it("has no attached dataset", () => {
-      expect(
-        (node("entry")?.data as { dataset?: unknown }).dataset,
-      ).toBeUndefined();
+      expect((node("entry")?.data as { dataset?: unknown }).dataset).toBeUndefined();
     });
   });
 
@@ -47,9 +44,9 @@ describe("customEvaluatorTemplate", () => {
     /** @scenario Custom evaluator template lists details first on the end node */
     it("puts details first so the reasoning edge does not cross the verdict", () => {
       expect(
-        (
-          node("end")?.data as { inputs: Array<{ identifier: string }> }
-        ).inputs.map((i) => i.identifier),
+        (node("end")?.data as { inputs: Array<{ identifier: string }> }).inputs.map(
+          (i) => i.identifier,
+        ),
       ).toEqual(["details", "passed", "score", "label"]);
     });
   });

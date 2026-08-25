@@ -40,9 +40,7 @@ describe("mintFileUri", () => {
         projectId: "proj-abc",
         sha256: "deadbeef1234",
       });
-      expect(uri).toBe(
-        "file:///var/lib/langwatch/objects/proj-abc/deadbeef1234",
-      );
+      expect(uri).toBe("file:///var/lib/langwatch/objects/proj-abc/deadbeef1234");
     });
 
     it("normalises a root without a leading slash", () => {
@@ -51,9 +49,7 @@ describe("mintFileUri", () => {
         projectId: "proj-abc",
         sha256: "deadbeef1234",
       });
-      expect(uri).toBe(
-        "file:///var/lib/langwatch/objects/proj-abc/deadbeef1234",
-      );
+      expect(uri).toBe("file:///var/lib/langwatch/objects/proj-abc/deadbeef1234");
     });
   });
 
@@ -84,9 +80,7 @@ describe("getUriScheme", () => {
 
   describe("given an unknown scheme", () => {
     it("throws on an unrecognised scheme", () => {
-      expect(() => getUriScheme("gs://bucket/object")).toThrow(
-        /Unrecognised URI scheme/,
-      );
+      expect(() => getUriScheme("gs://bucket/object")).toThrow(/Unrecognised URI scheme/);
     });
 
     it("throws when there is no colon", () => {

@@ -10,7 +10,5 @@ import { useBreakpointValue } from "@chakra-ui/react";
  * Spec: specs/navigation/mobile-chrome.feature
  */
 export function useIsMobileViewport(): boolean {
-  return (
-    useBreakpointValue({ base: true, md: false }, { fallback: "md" }) === true
-  );
+  return useBreakpointValue({ base: true, md: false }, { fallback: "md" }) === true;
 }

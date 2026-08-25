@@ -134,10 +134,7 @@ function metaForIssue(issue: RawIssue): ValidationIssueMeta {
 
     case "invalid_literal":
       // `expected` is the literal our schema declares, so it is ours to log.
-      if (
-        typeof issue.expected === "string" ||
-        typeof issue.expected === "number"
-      ) {
+      if (typeof issue.expected === "string" || typeof issue.expected === "number") {
         meta.expected = String(issue.expected);
       }
       break;

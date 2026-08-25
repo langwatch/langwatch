@@ -22,12 +22,9 @@ export interface LangyModelProfile {
   isMultimodal: boolean;
 }
 
-const QUICK_NAME =
-  /(?:^|[-_.])(flash|haiku|instant|lite|mini|nano|small)(?:$|[-_.])/i;
-const QUICK_DESCRIPTION =
-  /\b(fast|faster|low[- ]latency|reduced latency|compact)\b/i;
-const LONG_RUNNING =
-  /\b(deep research|deep-research|research model|long-running)\b/i;
+const QUICK_NAME = /(?:^|[-_.])(flash|haiku|instant|lite|mini|nano|small)(?:$|[-_.])/i;
+const QUICK_DESCRIPTION = /\b(fast|faster|low[- ]latency|reduced latency|compact)\b/i;
+const LONG_RUNNING = /\b(deep research|deep-research|research model|long-running)\b/i;
 
 /**
  * Present registry capabilities as user intent. Speed is deliberately called
@@ -45,17 +42,15 @@ export function profileLangyModel({
 }): LangyModelProfile {
   const description = metadata?.description ?? "";
   const modelName = modelId.split("/").slice(1).join("/");
-  const isQuick =
-    QUICK_NAME.test(modelName) || QUICK_DESCRIPTION.test(description);
+  const isQuick = QUICK_NAME.test(modelName) || QUICK_DESCRIPTION.test(description);
   const isLongRunning =
-    LONG_RUNNING.test(modelName.replaceAll("_", " ")) ||
-    LONG_RUNNING.test(description);
+    LONG_RUNNING.test(modelName.replaceAll("_", " ")) || LONG_RUNNING.test(description);
   const hasReasoning = metadata?.reasoningConfig?.supported === true;
   const isMultimodal = Boolean(
     metadata?.supportsImageInput ||
-      metadata?.supportsAudioInput ||
-      metadata?.supportsImageOutput ||
-      metadata?.supportsAudioOutput,
+    metadata?.supportsAudioInput ||
+    metadata?.supportsImageOutput ||
+    metadata?.supportsAudioOutput,
   );
 
   const group: LangyModelGroup = isCustom

@@ -15,20 +15,14 @@ import {
  * The type-level checks fail the typecheck on drift in either direction.
  */
 
-type AssertMutuallyAssignable<A, B> = A extends B
-  ? B extends A
-    ? true
-    : never
-  : never;
+type AssertMutuallyAssignable<A, B> = A extends B ? (B extends A ? true : never) : never;
 
 const _triggerActionParity: AssertMutuallyAssignable<
   PackageTriggerAction,
   PrismaTriggerAction
 > = true;
-const _alertTypeParity: AssertMutuallyAssignable<
-  PackageAlertType,
-  PrismaAlertType
-> = true;
+const _alertTypeParity: AssertMutuallyAssignable<PackageAlertType, PrismaAlertType> =
+  true;
 
 describe("prisma enum parity", () => {
   describe("when the package enums are compared to the Prisma enums", () => {

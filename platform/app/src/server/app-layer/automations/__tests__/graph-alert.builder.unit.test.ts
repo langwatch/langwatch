@@ -269,34 +269,35 @@ describe("extractGraphAlertFromTriggerRow (builder5015-004)", () => {
   describe("round-trip", () => {
     it.each(
       GRAPH_ALERT_OPERATORS.flatMap((operator) =>
-        GRAPH_ALERT_TIME_PERIODS.map(
-          (timePeriod) => [operator, timePeriod] as const,
-        ),
+        GRAPH_ALERT_TIME_PERIODS.map((timePeriod) => [operator, timePeriod] as const),
       ),
-    )("build then extract yields the same threshold rule (operator=%s, timePeriod=%d)", (operator, timePeriod) => {
-      const data = buildGraphAlertTriggerData({
-        id: "t-1",
-        name: "test",
-        projectId: "p",
-        action: TriggerAction.SEND_EMAIL,
-        alertType: AlertType.INFO,
-        customGraphId: "g",
-        actionParams: {
+    )(
+      "build then extract yields the same threshold rule (operator=%s, timePeriod=%d)",
+      (operator, timePeriod) => {
+        const data = buildGraphAlertTriggerData({
+          id: "t-1",
+          name: "test",
+          projectId: "p",
+          action: TriggerAction.SEND_EMAIL,
+          alertType: AlertType.INFO,
+          customGraphId: "g",
+          actionParams: {
+            threshold: 42,
+            operator,
+            timePeriod,
+            seriesName: "0/metric/sum",
+            members: ["a@b.co"],
+          },
+        });
+        const extracted = extractGraphAlertFromTriggerRow(data.actionParams);
+        expect(extracted).toMatchObject({
           threshold: 42,
           operator,
           timePeriod,
           seriesName: "0/metric/sum",
           members: ["a@b.co"],
-        },
-      });
-      const extracted = extractGraphAlertFromTriggerRow(data.actionParams);
-      expect(extracted).toMatchObject({
-        threshold: 42,
-        operator,
-        timePeriod,
-        seriesName: "0/metric/sum",
-        members: ["a@b.co"],
-      });
-    });
+        });
+      },
+    );
   });
 });

@@ -14,7 +14,9 @@
     "paths": {
       "@langwatch/enterprise-webhook-contract": ["../contract/src/index.ts"],
       "@langwatch/handled-error": ["../../../../handled-error/src/index.ts"],
-      "@langwatch/prisma-client/generated": ["../../../../prisma-client/src/generated/client.ts"]
+      "@langwatch/prisma-client/generated": [
+        "../../../../prisma-client/src/generated/client.ts"
+      ]
     }
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"]

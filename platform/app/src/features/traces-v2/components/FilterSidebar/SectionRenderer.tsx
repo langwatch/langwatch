@@ -25,15 +25,7 @@ interface SectionRendererProps {
   /** Force a categorical value to excluded / back to neutral — drives the
    * row's trailing exclude affordance. */
   excludeFacet: ({ field, value }: { field: string; value: string }) => void;
-  setRange: ({
-    field,
-    from,
-    to,
-  }: {
-    field: string;
-    from: string;
-    to: string;
-  }) => void;
+  setRange: ({ field, from, to }: { field: string; from: string; to: string }) => void;
   removeRange: ({ field }: { field: string }) => void;
   /** Evaluator-scoped group mutations — passed straight to the evaluator
    * drilldown so its verdict / score / label picks land inside
@@ -95,10 +87,8 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
     const noneToggleValue = NONE_TOGGLE_VALUE[section.key];
     const noneRow = noneToggleValue
       ? {
-          active:
-            getFacetValueState(ast, "none", noneToggleValue) === "include",
-          onToggle: () =>
-            toggleFacet({ field: "none", value: noneToggleValue }),
+          active: getFacetValueState(ast, "none", noneToggleValue) === "include",
+          onToggle: () => toggleFacet({ field: "none", value: noneToggleValue }),
         }
       : undefined;
 
@@ -143,11 +133,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
     // selected criteria applies correctly.
     const renderInactiveRowExtras =
       section.key === "evaluator"
-        ? (
-            item: FacetItem,
-            isExpanded: boolean,
-            onToggleExpand: () => void,
-          ) => {
+        ? (item: FacetItem, isExpanded: boolean, onToggleExpand: () => void) => {
             if (!item.aggregates) return null;
             // Picking a verdict / score / label on an inactive evaluator
             // also enables the `evaluator:<id>` anchor — the group mutation
@@ -158,9 +144,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
                 <Box
                   as="button"
                   aria-label={
-                    isExpanded
-                      ? "Hide evaluator breakdown"
-                      : "Show evaluator breakdown"
+                    isExpanded ? "Hide evaluator breakdown" : "Show evaluator breakdown"
                   }
                   aria-expanded={isExpanded}
                   display="flex"
@@ -275,8 +259,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
           field={section.key}
           items={facetItemsByKey.get(section.key) ?? []}
           getValueState={
-            valueStateGetters.get(section.key) ??
-            ((): FacetValueState => "neutral")
+            valueStateGetters.get(section.key) ?? ((): FacetValueState => "neutral")
           }
           onToggle={(field, value) => toggleFacet({ field, value })}
           onExclude={(field, value) => excludeFacet({ field, value })}
@@ -320,8 +303,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
   // only on the Metadata section) trims the redundant `metadata.` from the
   // rendered label; the FULL key still drives `fieldFor`, so the filter
   // resolves to the same trace-attribute predicate.
-  const { filterPrefix, keys, label, displayStripPrefix, emptyDocsHref } =
-    section;
+  const { filterPrefix, keys, label, displayStripPrefix, emptyDocsHref } = section;
   const fieldFor = (attrKey: string) => `${filterPrefix}.${attrKey}`;
   return (
     <AttributesSection
@@ -336,12 +318,8 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
       getNoneActive={(attrKey) =>
         getFacetValueState(ast, "none", fieldFor(attrKey)) === "include"
       }
-      onToggleValue={(attrKey, value) =>
-        toggleFacet({ field: fieldFor(attrKey), value })
-      }
-      onToggleNone={(attrKey) =>
-        toggleFacet({ field: "none", value: fieldFor(attrKey) })
-      }
+      onToggleValue={(attrKey, value) => toggleFacet({ field: fieldFor(attrKey), value })}
+      onToggleNone={(attrKey) => toggleFacet({ field: "none", value: fieldFor(attrKey) })}
       onShiftToggle={onShiftToggle}
       onHide={onHide}
       dragHandleProps={dragHandleProps}

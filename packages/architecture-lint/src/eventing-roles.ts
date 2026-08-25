@@ -61,17 +61,12 @@ function roleOf(file: string): EventingRole | null {
 }
 
 function lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
-  return (
-    sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1
-  );
+  return sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
 }
 
 function callName(expression: ts.LeftHandSideExpression): string | null {
   if (ts.isIdentifier(expression)) return expression.text;
-  if (
-    ts.isPropertyAccessExpression(expression) ||
-    ts.isPropertyAccessChain(expression)
-  ) {
+  if (ts.isPropertyAccessExpression(expression) || ts.isPropertyAccessChain(expression)) {
     return expression.name.text;
   }
   return null;
@@ -96,12 +91,7 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
   const violations: ArchitectureViolation[] = [];
   const seen = new Set<string>();
 
-  const add = (
-    policy: string,
-    node: ts.Node,
-    message: string,
-    allowed: string,
-  ): void => {
+  const add = (policy: string, node: ts.Node, message: string, allowed: string): void => {
     const line = lineOf(sourceFile, node);
     const key = policy;
     if (seen.has(key)) return;
@@ -200,10 +190,7 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
   return violations;
 }
 
-function subscriberRedeliveryTest(
-  file: string,
-  pkg: ClassifiedPackage,
-): string {
+function subscriberRedeliveryTest(file: string, pkg: ClassifiedPackage): string {
   const subject = basename(file, ".subscriber.ts");
   return join(
     pkg.root,
@@ -247,9 +234,7 @@ export function lintEventingRoles(
     .sort((left, right) => right.root.length - left.root.length);
 
   for (const scanRoot of new Set(scanRoots)) {
-    for (const file of walkFiles(scanRoot, (candidate) =>
-      candidate.endsWith(".ts"),
-    )) {
+    for (const file of walkFiles(scanRoot, (candidate) => candidate.endsWith(".ts"))) {
       if (/(?:^|\/)(?:__tests__|tests|fixtures)(?:\/|$)/.test(file)) continue;
       const role = roleOf(file);
       if (!role) continue;

@@ -11,14 +11,10 @@ type MessageProjectionPrismaClient = {
 };
 
 /** Append-only Postgres adapter for operational message rows. */
-export class PrismaLangyMessageProjectionRepository
-  implements AppendStore<LangyMessageProjectionRecord>
-{
+export class PrismaLangyMessageProjectionRepository implements AppendStore<LangyMessageProjectionRecord> {
   constructor(private readonly prisma: MessageProjectionPrismaClient) {}
 
-  static create(
-    database: object,
-  ): PrismaLangyMessageProjectionRepository {
+  static create(database: object): PrismaLangyMessageProjectionRepository {
     return new PrismaLangyMessageProjectionRepository(
       database as MessageProjectionPrismaClient,
     );

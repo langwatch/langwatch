@@ -50,9 +50,7 @@ export const handledErrorEnvelopeSchema = z
     fault: z
       .string()
       .optional()
-      .describe(
-        "Who the failure is attributable to: customer, platform, provider",
-      ),
+      .describe("Who the failure is attributable to: customer, platform, provider"),
     tips: z.array(z.string()).optional(),
     docsUrl: z.string().optional(),
   })
@@ -78,9 +76,7 @@ const handledErrorSchema = z.object({
   fault: z
     .string()
     .optional()
-    .describe(
-      "Who the failure is attributable to: customer, platform, provider",
-    ),
+    .describe("Who the failure is attributable to: customer, platform, provider"),
   traceId: z.string().optional(),
   tips: z.array(z.string()).optional(),
   docsUrl: z.string().optional(),
@@ -90,10 +86,7 @@ export const startRunResponseSchema = z.object({
   runId: z.string().describe("Identifier to poll this run with"),
   status: z.literal("running"),
   total: z.number().describe("Number of cells this run will execute"),
-  runUrl: z
-    .string()
-    .optional()
-    .describe("Link to the run in the LangWatch app"),
+  runUrl: z.string().optional().describe("Link to the run in the LangWatch app"),
 });
 
 const evaluationSummarySchema = z.object({
@@ -169,9 +162,7 @@ const executionSummarySchema = z.object({
   chDispatchFailures: z
     .number()
     .optional()
-    .describe(
-      "Non-zero means some rows may be missing from the stored results",
-    ),
+    .describe("Non-zero means some rows may be missing from the stored results"),
   timestamps: z.object({
     startedAt: z.number(),
     finishedAt: z.number().optional(),
@@ -205,10 +196,7 @@ const executionSummarySchema = z.object({
   totalFailed: z.number().optional(),
   passRate: z.number().optional(),
   totalCost: z.number().optional(),
-  runUrl: z
-    .string()
-    .optional()
-    .describe("Link to the run in the LangWatch app"),
+  runUrl: z.string().optional().describe("Link to the run in the LangWatch app"),
 });
 
 /**

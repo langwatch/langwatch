@@ -52,39 +52,21 @@ export function TokenBreakdownTooltipContent({
   return (
     <VStack align="stretch" gap={0.5} minWidth="180px">
       <TooltipRow label="Input" value={inputTokens?.toLocaleString() ?? "—"} />
-      <TooltipRow
-        label="Output"
-        value={outputTokens?.toLocaleString() ?? "—"}
-      />
+      <TooltipRow label="Output" value={outputTokens?.toLocaleString() ?? "—"} />
       {cacheReadTokens != null && (
-        <TooltipRow
-          label="Cache read"
-          value={cacheReadTokens.toLocaleString()}
-        />
+        <TooltipRow label="Cache read" value={cacheReadTokens.toLocaleString()} />
       )}
       {cacheCreationTokens != null && (
-        <TooltipRow
-          label="Cache write"
-          value={cacheCreationTokens.toLocaleString()}
-        />
+        <TooltipRow label="Cache write" value={cacheCreationTokens.toLocaleString()} />
       )}
       {cacheCreation5mTokens != null && cacheCreation5mTokens > 0 && (
-        <TooltipRow
-          label="↳ 5m cache"
-          value={cacheCreation5mTokens.toLocaleString()}
-        />
+        <TooltipRow label="↳ 5m cache" value={cacheCreation5mTokens.toLocaleString()} />
       )}
       {cacheCreation1hTokens != null && cacheCreation1hTokens > 0 && (
-        <TooltipRow
-          label="↳ 1h cache"
-          value={cacheCreation1hTokens.toLocaleString()}
-        />
+        <TooltipRow label="↳ 1h cache" value={cacheCreation1hTokens.toLocaleString()} />
       )}
       {reasoningTokens != null && (
-        <TooltipRow
-          label="Reasoning"
-          value={reasoningTokens.toLocaleString()}
-        />
+        <TooltipRow label="Reasoning" value={reasoningTokens.toLocaleString()} />
       )}
       <Box height="1px" bg="border" marginY={1} />
       <TooltipRow label="Total" value={totalWithCache.toLocaleString()} />

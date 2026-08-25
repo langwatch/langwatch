@@ -83,8 +83,7 @@ export class LicenseService extends LicensingServiceContract {
     this.usage = options.usage;
     this.retention = options.retention;
     this.logger = options.logger ?? new SilentLicenseLogger();
-    this.configuration =
-      options.configuration ?? LicenseServiceConfiguration.create();
+    this.configuration = options.configuration ?? LicenseServiceConfiguration.create();
   }
 
   static create(options: LicenseServiceOptions): LicenseService {
@@ -96,10 +95,9 @@ export class LicenseService extends LicensingServiceContract {
   }): Promise<PlatformLicenseAccess> {
     const inspections: PlatformLicenseInspection[] = [];
     if (input.instanceLicenseKey) {
-      const inspection = this.inspectPlatformLicense(
-        input.instanceLicenseKey,
-        { source: "instance" },
-      );
+      const inspection = this.inspectPlatformLicense(input.instanceLicenseKey, {
+        source: "instance",
+      });
       inspections.push(inspection);
       if (inspection.valid) return { allowed: true, inspections };
     }
@@ -167,10 +165,7 @@ export class LicenseService extends LicensingServiceContract {
         planName: validation.licenseData.plan.name,
         expiresAt: validation.licenseData.expiresAt,
         organizationName: validation.licenseData.organizationName,
-        ...(await this.getResourceCounts(
-          organizationId,
-          validation.licenseData.plan,
-        )),
+        ...(await this.getResourceCounts(organizationId, validation.licenseData.plan)),
       };
     }
 
@@ -247,21 +242,17 @@ export class LicenseService extends LicensingServiceContract {
     };
   }
 
-  private async provisionMissingRetentionPolicies(
-    organizationId: string,
-  ): Promise<void> {
+  private async provisionMissingRetentionPolicies(organizationId: string): Promise<void> {
     const retentionConfiguration = this.configuration.retention;
     if (!this.retention || !retentionConfiguration) return;
 
     try {
-      const existing =
-        await this.retention.listOrganizationRules(organizationId);
+      const existing = await this.retention.listOrganizationRules(organizationId);
       const covered = new Set(
         existing
           .filter(
             (rule) =>
-              rule.scopeType === "ORGANIZATION" &&
-              rule.scopeId === organizationId,
+              rule.scopeType === "ORGANIZATION" && rule.scopeId === organizationId,
           )
           .map((rule) => rule.category),
       );

@@ -6,7 +6,9 @@ description: "Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0"
 LangWatch v3 replaces Elasticsearch/OpenSearch with **ClickHouse** as the primary data store. This guide walks you through the full migration. The process is the same whether you're coming from v1.x or v2.x.
 
 <Tip>
-This is a **zero-downtime migration**. Elasticsearch and ClickHouse run side-by-side during the transition. New data flows to ClickHouse immediately, and you migrate historical data at your own pace.
+  This is a **zero-downtime migration**. Elasticsearch and ClickHouse run side-by-side
+  during the transition. New data flows to ClickHouse immediately, and you migrate
+  historical data at your own pace.
 </Tip>
 
 ## What Changed
@@ -106,7 +108,8 @@ helm upgrade langwatch langwatch/langwatch \
 ```
 
 <Note>
-The Helm chart configures `CLICKHOUSE_URL` automatically from the ClickHouse values, no manual env var needed for either managed or external ClickHouse.
+  The Helm chart configures `CLICKHOUSE_URL` automatically from the ClickHouse values, no
+  manual env var needed for either managed or external ClickHouse.
 </Note>
 
 ### What Happens on Startup
@@ -117,7 +120,8 @@ The Helm chart configures `CLICKHOUSE_URL` automatically from the ClickHouse val
 - **Historical data** in Elasticsearch remains readable until you migrate it
 
 <Note>
-Keep your `ELASTICSEARCH_NODE_URL` configured during this phase. LangWatch v3 can still read from Elasticsearch for data that hasn't been migrated yet.
+  Keep your `ELASTICSEARCH_NODE_URL` configured during this phase. LangWatch v3 can still
+  read from Elasticsearch for data that hasn't been migrated yet.
 </Note>
 
 ## Step 3: Migrate Historical Data
@@ -151,7 +155,9 @@ export ELASTICSEARCH_API_KEY="your-api-key"
 ```
 
 <Warning>
-Point these at your actual Elasticsearch and ClickHouse instances. If they're running in Docker or Kubernetes, you may need to set up port forwarding or use the internal network addresses.
+  Point these at your actual Elasticsearch and ClickHouse instances. If they're running in
+  Docker or Kubernetes, you may need to set up port forwarding or use the internal network
+  addresses.
 </Warning>
 
 **Credential requirements:**
@@ -162,7 +168,8 @@ Point these at your actual Elasticsearch and ClickHouse instances. If they're ru
 ### Disable ClickHouse TTLs Before Migrating
 
 <Warning>
-**This step is critical.** If you skip it, ClickHouse may immediately expire or offload historical data as it arrives during migration.
+  **This step is critical.** If you skip it, ClickHouse may immediately expire or offload
+  historical data as it arrives during migration.
 </Warning>
 
 LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. By default, data older than 49 days is moved to cold storage (or dropped if cold storage isn't configured). When you migrate historical data from Elasticsearch, much of it is older than 49 days, so ClickHouse tries to expire or offload it the moment it lands.
@@ -218,20 +225,21 @@ The TTL reconciler runs on startup and updates the ClickHouse table metadata wit
 Once the migration is complete, set `TIERED_STORAGE_DEFAULT_HOT_DAYS` back to your desired retention value and restart LangWatch. ClickHouse handles the offloading gracefully in the background.
 
 <Tip>
-We recommend setting TTL values to a **multiple of 7** (e.g., 7, 14, 28, 49) to align with ClickHouse partition boundaries for more efficient data management.
+  We recommend setting TTL values to a **multiple of 7** (e.g., 7, 14, 28, 49) to align
+  with ClickHouse partition boundaries for more efficient data management.
 </Tip>
 
 ### Migration Targets
 
 The tool migrates data in separate targets:
 
-| Target | Description |
-|--------|-------------|
-| `traces-combined` | Traces and their evaluations |
-| `simulations` | Simulation run events |
-| `batch-evaluations` | Batch experiment evaluation data |
-| `dspy-steps` | DSPy optimization steps |
-| `all` | Run all primary targets in sequence |
+| Target              | Description                         |
+| ------------------- | ----------------------------------- |
+| `traces-combined`   | Traces and their evaluations        |
+| `simulations`       | Simulation run events               |
+| `batch-evaluations` | Batch experiment evaluation data    |
+| `dspy-steps`        | DSPy optimization steps             |
+| `all`               | Run all primary targets in sequence |
 
 ### Testing Workflow
 
@@ -264,7 +272,8 @@ pnpm tsx src/index.ts all
 ```
 
 <Tip>
-For large history systems, we recommend running one target at a time instead of `all`, so you can apply the tuning profiles below for each target individually.
+  For large history systems, we recommend running one target at a time instead of `all`,
+  so you can apply the tuning profiles below for each target individually.
 </Tip>
 
 ### Recommended Tuning
@@ -349,11 +358,11 @@ helm upgrade langwatch langwatch/langwatch \
 
 ## Environment Variable Changes
 
-| Variable | v1.x, v2.x | v3.0 |
-|----------|-------------|------|
-| `ELASTICSEARCH_NODE_URL` | Required | Remove |
-| `ELASTICSEARCH_API_KEY` | Optional | Remove |
-| `CLICKHOUSE_URL` |, | Required |
+| Variable                 | v1.x, v2.x | v3.0     |
+| ------------------------ | ---------- | -------- |
+| `ELASTICSEARCH_NODE_URL` | Required   | Remove   |
+| `ELASTICSEARCH_API_KEY`  | Optional   | Remove   |
+| `CLICKHOUSE_URL`         | ,          | Required |
 
 All other environment variables remain the same. See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 

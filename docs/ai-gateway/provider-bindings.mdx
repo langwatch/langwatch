@@ -8,6 +8,7 @@ sidebarTitle: Gateway provider settings
 **Renamed in v1.** What used to be called a "provider binding" (`GatewayProviderCredential`) is gone. Gateway-only settings now live directly on the **ModelProvider** record itself, on the **Advanced (Gateway)** tab of the ModelProvider editor.
 
 There is no separate gateway-binding entity to create, list, edit, or disable. One ModelProvider = one gateway-eligible credential. Virtual keys reference ModelProviders directly.
+
 </Note>
 
 ## Why the change
@@ -18,14 +19,14 @@ Folding the gateway-specific fields onto the ModelProvider itself collapses the 
 
 ## What replaced the binding
 
-| Old (v0) | New (v1) |
-|---|---|
-| `GatewayProviderCredential` row | (deleted, fields folded onto `ModelProvider`) |
-| Bound to a project | Lives at any of `ORGANIZATION`, `TEAM`, `PROJECT` scope (see [Scope](#scope)) |
-| `slot` (free-form label) | Removed. VKs now reference ModelProviders by id directly; the routing policy carries the ordered list |
-| `rate_limit.rpm`, `.tpm`, `.rpd` | Same fields, now on **ModelProvider → Advanced (Gateway)** tab |
-| `fallback_priority_global` | Same field, on the Advanced tab. Default-policy ordering uses this then `createdAt` |
-| `provider_credential_id` (VK reference) | VKs reference `model_provider_id` directly |
+| Old (v0)                                | New (v1)                                                                                              |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `GatewayProviderCredential` row         | (deleted, fields folded onto `ModelProvider`)                                                         |
+| Bound to a project                      | Lives at any of `ORGANIZATION`, `TEAM`, `PROJECT` scope (see [Scope](#scope))                         |
+| `slot` (free-form label)                | Removed. VKs now reference ModelProviders by id directly; the routing policy carries the ordered list |
+| `rate_limit.rpm`, `.tpm`, `.rpd`        | Same fields, now on **ModelProvider → Advanced (Gateway)** tab                                        |
+| `fallback_priority_global`              | Same field, on the Advanced tab. Default-policy ordering uses this then `createdAt`                   |
+| `provider_credential_id` (VK reference) | VKs reference `model_provider_id` directly                                                            |
 
 For the new wire shape of the bundle a VK resolves to, see the [`/config/:vk_id` contract](/ai-gateway/api/management#config-vk-id) and the `vk-config-bundle.feature` spec.
 
@@ -41,11 +42,11 @@ For the new wire shape of the bundle a VK resolves to, see the [`/config/:vk_id`
 
 ModelProviders live at one of three scopes:
 
-| Scope | Visible to VKs scoped at… |
-|---|---|
-| `ORGANIZATION` | every team and project in the org |
-| `TEAM` | projects in that team, and the team itself |
-| `PROJECT` | that project only |
+| Scope          | Visible to VKs scoped at…                  |
+| -------------- | ------------------------------------------ |
+| `ORGANIZATION` | every team and project in the org          |
+| `TEAM`         | projects in that team, and the team itself |
+| `PROJECT`      | that project only                          |
 
 A VK's eligible-provider set is the union of every ModelProvider whose scope is at or above one of the VK's scopes (see [vk-scope-inheritance.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-scope-inheritance.feature) for the full cascade).
 

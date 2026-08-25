@@ -25,9 +25,7 @@ export default function AuthenticationSettings() {
       <VStack gap={6} width="full" align="start">
         <VStack align="start" gap={1}>
           <Heading as="h2">Sign-in Methods</Heading>
-          {session?.user?.email && (
-            <Text color="fg.muted">({session.user.email})</Text>
-          )}
+          {session?.user?.email && <Text color="fg.muted">({session.user.email})</Text>}
         </VStack>
 
         <SignInMethodsSection />

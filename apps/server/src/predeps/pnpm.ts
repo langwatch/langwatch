@@ -51,7 +51,10 @@ export const pnpmPredep: Predep = {
       }
       // Stale binary from an older PNPM_VERSION pin — fall through and
       // re-download. install() overwrites, so this is recoverable.
-      return { installed: false, reason: `bundled pnpm ${v ?? "unknown"} != pinned ${PNPM_VERSION}` };
+      return {
+        installed: false,
+        reason: `bundled pnpm ${v ?? "unknown"} != pinned ${PNPM_VERSION}`,
+      };
     }
     // Fall through to user's system pnpm if it's a 10.x — pnpm 10's
     // `manage-package-manager-versions: true` default handles the
@@ -65,9 +68,12 @@ export const pnpmPredep: Predep = {
     if (sysVersion && /^10\./.test(sysVersion)) {
       return { installed: true, version: sysVersion, resolvedPath: "pnpm" };
     }
-    return { installed: false, reason: sysVersion
-      ? `system pnpm ${sysVersion} is not 10.x — bundled pnpm ${PNPM_VERSION} required`
-      : "no system pnpm on PATH; will install bundled" };
+    return {
+      installed: false,
+      reason: sysVersion
+        ? `system pnpm ${sysVersion} is not 10.x — bundled pnpm ${PNPM_VERSION} required`
+        : "no system pnpm on PATH; will install bundled",
+    };
   },
 
   async install({ platform, paths, task }: InstallContext) {
@@ -77,7 +83,9 @@ export const pnpmPredep: Predep = {
     chmodSync(bin, 0o755);
     const version = (await resolveVersion(bin)) ?? "unknown";
     if (version !== PNPM_VERSION) {
-      throw new Error(`pnpm install: downloaded binary reports v${version}, expected v${PNPM_VERSION}`);
+      throw new Error(
+        `pnpm install: downloaded binary reports v${version}, expected v${PNPM_VERSION}`,
+      );
     }
     return { version, resolvedPath: bin };
   },

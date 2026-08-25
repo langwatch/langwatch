@@ -12,9 +12,7 @@ test("automation overview keeps activity and setup guidance", async ({
   await page.goto(basePath);
   await expect(page.locator("h1", { hasText: "Overview" })).toBeVisible();
   await expect(page.locator(`a[href="${basePath}/alerts"]`)).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Overview", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Overview", exact: true })).toBeVisible();
   await expect(page.getByText("Recent activity")).toBeVisible();
   await expect(page.getByText("Error spike")).toBeVisible();
   await expect(page.getByText("Traffic drop")).toBeVisible();
@@ -40,19 +38,12 @@ test("automation overview keeps activity and setup guidance", async ({
   await page.getByRole("link", { name: "Schedules", exact: true }).click();
   await expect(page).toHaveURL(`${basePath}/schedules`);
   await expect(page.locator("h1", { hasText: "Schedules" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "New schedule" })).toHaveCount(
-    1,
-  );
+  await expect(page.getByRole("button", { name: "New schedule" })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("schedules.png") });
 
-  await page
-    .getByRole("link", { name: "Automations", exact: true })
-    .last()
-    .click();
+  await page.getByRole("link", { name: "Automations", exact: true }).last().click();
   await expect(page).toHaveURL(`${basePath}/automations`);
   await expect(page.locator("h1", { hasText: "Automations" })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "New automation" }),
-  ).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "New automation" })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("activity.png") });
 });

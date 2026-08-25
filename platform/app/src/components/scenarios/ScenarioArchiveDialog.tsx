@@ -30,17 +30,11 @@ export function ScenarioArchiveDialog({
   isLoading?: boolean;
 }) {
   const isBatch = scenarios.length > 1;
-  const title = isBatch
-    ? `Archive ${scenarios.length} scenarios?`
-    : "Archive scenario?";
+  const title = isBatch ? `Archive ${scenarios.length} scenarios?` : "Archive scenario?";
 
   return (
     <Dialog.Root open={open} onOpenChange={onClose} placement="center">
-      <Dialog.Content
-        bg="bg"
-        maxWidth="500px"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <Dialog.Content bg="bg" maxWidth="500px" onClick={(e) => e.stopPropagation()}>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">

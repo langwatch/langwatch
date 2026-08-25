@@ -17,10 +17,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type {
-  ModelDefaultScopeType,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { ModelDefaultScopeType, PrismaClient } from "~/generated/prisma/client";
 
 const UNRESOLVABLE_ALIAS = "openai/latest";
 

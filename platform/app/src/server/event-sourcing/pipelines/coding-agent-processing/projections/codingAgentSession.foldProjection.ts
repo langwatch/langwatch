@@ -1,15 +1,6 @@
-import type {
-  FoldProjectionOptions,
-  FoldProjectionStore,
-} from "@langwatch/eventing";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
-import {
-  codingAgentCostComputedUsd,
-  codingAgentCostReportedUsd,
-} from "../metrics";
+import type { FoldProjectionOptions, FoldProjectionStore } from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
+import { codingAgentCostComputedUsd, codingAgentCostReportedUsd } from "../metrics";
 import {
   type LogFactsContributedEvent,
   logFactsContributedEventSchema,
@@ -131,9 +122,7 @@ function costDriftLabels({
   facts: Record<string, unknown>;
 }): { agent: string; model: string } {
   const model =
-    facts.model ??
-    facts["gen_ai.request.model"] ??
-    facts["gen_ai.response.model"];
+    facts.model ?? facts["gen_ai.request.model"] ?? facts["gen_ai.response.model"];
   return {
     agent: agent ?? "unknown",
     model: typeof model === "string" && model.length > 0 ? model : "unknown",
@@ -228,8 +217,7 @@ export class CodingAgentSessionFoldProjection
     "updatedAt",
     "LastEventOccurredAt"
   >
-  implements
-    FoldEventHandlers<typeof codingAgentSessionEvents, CodingAgentSessionState>
+  implements FoldEventHandlers<typeof codingAgentSessionEvents, CodingAgentSessionState>
 {
   readonly name = "codingAgentSession";
   readonly version = CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST;
@@ -387,8 +375,7 @@ export class CodingAgentSessionFoldProjection
     // The reported half of the cost-drift canary: what the agent says this
     // call billed. Computed-vs-reported per model is the alarm for a stale
     // price, ours or theirs.
-    const reportedDelta =
-      next.agentReportedCostUsd - state.agentReportedCostUsd;
+    const reportedDelta = next.agentReportedCostUsd - state.agentReportedCostUsd;
     if (reportedDelta > 0) {
       codingAgentCostReportedUsd.inc(
         costDriftLabels({ agent: data.agent, facts: data.facts }),
@@ -684,16 +671,14 @@ export function projectCodingAgentSessionToRow({
     subAgentIds: state.subAgentIds,
     stepStartedAt: state.steps.map((s) => s.startedAtMs),
     previousCallContextTokens: state.previousCallContextTokens,
-    metricSeries: Object.entries(state.metricSeries).map(
-      ([seriesId, fact]) => ({
-        seriesId,
-        metricName: fact.metricName,
-        type: fact.type ?? "",
-        decision: fact.decision ?? "",
-        language: fact.language ?? "",
-        value: fact.value,
-      }),
-    ),
+    metricSeries: Object.entries(state.metricSeries).map(([seriesId, fact]) => ({
+      seriesId,
+      metricName: fact.metricName,
+      type: fact.type ?? "",
+      decision: fact.decision ?? "",
+      language: fact.language ?? "",
+      value: fact.value,
+    })),
     createdAt: state.createdAt,
     updatedAt: state.updatedAt,
     lastEventOccurredAt: state.LastEventOccurredAt,
@@ -737,8 +722,7 @@ const titleSourceFromRow = (value: string): SessionTitleSource | null =>
   sessionTitleSourceSchema.safeParse(value).data ?? null;
 
 /** An empty string in a row column reads back as "unset" (null) in state. */
-const nullIfEmpty = (value: string): string | null =>
-  value === "" ? null : value;
+const nullIfEmpty = (value: string): string | null => (value === "" ? null : value);
 
 /**
  * Decode the fold's working state from its persisted row — the `fromRow`

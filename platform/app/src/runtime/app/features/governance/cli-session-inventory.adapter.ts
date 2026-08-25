@@ -27,9 +27,7 @@ export class AppCliSessionInventoryAdapter {
 
   build(): DefaultGovernanceCliSessionInventoryService {
     return DefaultGovernanceCliSessionInventoryService.create({
-      store: this.redis
-        ? new RedisCliTokenStoreAdapter(this.redis)
-        : undefined,
+      store: this.redis ? new RedisCliTokenStoreAdapter(this.redis) : undefined,
       diagnostics: new AppCliSessionDiagnostics(),
     });
   }

@@ -62,9 +62,7 @@ function parseFiltersObject(filters: string): Record<string, unknown> | null {
   }
 }
 
-export function ViewAutomationDrawer({
-  automationId,
-}: ViewAutomationDrawerProps) {
+export function ViewAutomationDrawer({ automationId }: ViewAutomationDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, closeDrawer } = useDrawer();
 
@@ -102,8 +100,7 @@ export function ViewAutomationDrawer({
     { enabled: !!project?.id && trigger?.action === "ADD_TO_DATASET" },
   );
   const datasetName = actionParams.datasetId
-    ? (datasetsQuery.data?.find((d) => d.id === actionParams.datasetId)?.name ??
-      null)
+    ? (datasetsQuery.data?.find((d) => d.id === actionParams.datasetId)?.name ?? null)
     : null;
 
   const destinationSummary = (): React.ReactNode => {
@@ -114,12 +111,7 @@ export function ViewAutomationDrawer({
         // full URL only on hover, mirroring the list page's Slack cell.
         return actionParams.slackWebhook ? (
           <Tooltip content={actionParams.slackWebhook}>
-            <Text
-              textStyle="sm"
-              lineClamp={1}
-              width="fit-content"
-              cursor="help"
-            >
+            <Text textStyle="sm" lineClamp={1} width="fit-content" cursor="help">
               Slack webhook
             </Text>
           </Tooltip>
@@ -135,9 +127,7 @@ export function ViewAutomationDrawer({
       case "SEND_WEBHOOK": {
         let hostname = "Webhook";
         try {
-          hostname = actionParams.url
-            ? new URL(actionParams.url).hostname
-            : hostname;
+          hostname = actionParams.url ? new URL(actionParams.url).hostname : hostname;
         } catch {
           // Stored rows are validated; retain a safe label for legacy data.
         }
@@ -170,18 +160,14 @@ export function ViewAutomationDrawer({
         ? TIME_PERIOD_LABELS[actionParams.timePeriod]
         : null;
       const seriesLabel = actionParams.seriesName
-        ? (resolveSeriesLabel(
-            graphQuery.data?.graph,
-            actionParams.seriesName,
-          ) ?? actionParams.seriesName)
+        ? (resolveSeriesLabel(graphQuery.data?.graph, actionParams.seriesName) ??
+          actionParams.seriesName)
         : "Metric";
       return (
         <Text textStyle="sm">
           {seriesLabel}
           {operator ? ` ${operator}` : ""}
-          {actionParams.threshold !== undefined
-            ? ` ${actionParams.threshold}`
-            : ""}
+          {actionParams.threshold !== undefined ? ` ${actionParams.threshold}` : ""}
           {window ? ` over ${window}` : ""}
         </Text>
       );
@@ -190,12 +176,7 @@ export function ViewAutomationDrawer({
       // ADR-043: a trace-subject automation shows its search query, mirroring
       // the automations page's "Acts on" cell.
       return (
-        <Code
-          size="sm"
-          variant="surface"
-          whiteSpace="pre-wrap"
-          wordBreak="break-word"
-        >
+        <Code size="sm" variant="surface" whiteSpace="pre-wrap" wordBreak="break-word">
           {trigger.filterQuery}
         </Code>
       );
@@ -234,11 +215,7 @@ export function ViewAutomationDrawer({
             ) : (
               <Heading size="md">
                 {trigger?.name ??
-                  (isGraphAlert
-                    ? "Alert"
-                    : isSchedule
-                      ? "Schedule"
-                      : "Automation")}
+                  (isGraphAlert ? "Alert" : isSchedule ? "Schedule" : "Automation")}
               </Heading>
             )}
             {isGraphAlert ? (
@@ -264,8 +241,7 @@ export function ViewAutomationDrawer({
               </Text>
               <Text textStyle="sm">
                 {trigger
-                  ? (CLIENT_PROVIDERS[trigger.action]?.shared.label ??
-                    trigger.action)
+                  ? (CLIENT_PROVIDERS[trigger.action]?.shared.label ?? trigger.action)
                   : null}
               </Text>
             </VStack>
@@ -316,9 +292,7 @@ export function ViewAutomationDrawer({
                     No delivery attempts recorded yet.
                   </Text>
                 ) : (
-                  <WebhookDeliveriesList
-                    deliveries={webhookDeliveriesQuery.data ?? []}
-                  />
+                  <WebhookDeliveriesList deliveries={webhookDeliveriesQuery.data ?? []} />
                 )}
               </VStack>
             ) : null}
@@ -406,12 +380,7 @@ function RecentFiresList({
           <Text textStyle="sm" flex="1" minWidth="0">
             {row.label}
           </Text>
-          <Text
-            textStyle="xs"
-            color={row.detailColor}
-            flexShrink={0}
-            whiteSpace="nowrap"
-          >
+          <Text textStyle="xs" color={row.detailColor} flexShrink={0} whiteSpace="nowrap">
             {row.detail}
           </Text>
         </HStack>
@@ -436,8 +405,7 @@ function groupFiresByLabel(
   return groups;
 }
 
-type WebhookDelivery =
-  RouterOutputs["automation"]["getWebhookDeliveries"][number];
+type WebhookDelivery = RouterOutputs["automation"]["getWebhookDeliveries"][number];
 
 const OUTCOME_DOT: Record<WebhookDelivery["outcome"], string> = {
   success: "green.solid",
@@ -452,11 +420,7 @@ const OUTCOME_DOT: Record<WebhookDelivery["outcome"], string> = {
  * to its error and a plain-language explanation of what went wrong — the log
  * stores outcome facts only, never request or response content.
  */
-function WebhookDeliveriesList({
-  deliveries,
-}: {
-  deliveries: WebhookDelivery[];
-}) {
+function WebhookDeliveriesList({ deliveries }: { deliveries: WebhookDelivery[] }) {
   // Rows arrive newest-first. Group by dispatchId keeping first-seen order
   // (newest fire on top); reverse each group so attempts read oldest→newest.
   const groups: { dispatchId: string; attempts: WebhookDelivery[] }[] = [];
@@ -528,17 +492,11 @@ function DeliveryAttemptRow({
       ? `HTTP ${attempt.responseStatus}`
       : (attempt.error ?? "No response");
   const guidance =
-    attempt.outcome === "success"
-      ? undefined
-      : guidanceForStatus(attempt.responseStatus);
+    attempt.outcome === "success" ? undefined : guidanceForStatus(attempt.responseStatus);
   const hasDetail = Boolean(attempt.error ?? guidance ?? attempt.response);
 
   return (
-    <Box
-      borderBottomWidth="1px"
-      borderColor="border"
-      _last={{ borderBottomWidth: 0 }}
-    >
+    <Box borderBottomWidth="1px" borderColor="border" _last={{ borderBottomWidth: 0 }}>
       <HStack
         as="button"
         gap={2.5}
@@ -559,12 +517,7 @@ function DeliveryAttemptRow({
           {total > 1 ? `Attempt ${index + 1} · ` : ""}
           {statusText}
         </Text>
-        <Text
-          textStyle="xs"
-          color="fg.muted"
-          flexShrink={0}
-          whiteSpace="nowrap"
-        >
+        <Text textStyle="xs" color="fg.muted" flexShrink={0} whiteSpace="nowrap">
           {attempt.latencyMs != null ? `${attempt.latencyMs}ms · ` : ""}
           {formatTimeAgo(new Date(attempt.firedAt).getTime())}
         </Text>
@@ -572,34 +525,19 @@ function DeliveryAttemptRow({
       {open && hasDetail ? (
         <VStack align="stretch" gap={2} paddingX={3} paddingBottom={3}>
           {attempt.error ? (
-            <Code
-              fontSize="xs"
-              width="full"
-              whiteSpace="pre-wrap"
-              wordBreak="break-word"
-            >
+            <Code fontSize="xs" width="full" whiteSpace="pre-wrap" wordBreak="break-word">
               {attempt.error}
             </Code>
           ) : null}
           {attempt.response?.body ? (
-            <Code
-              fontSize="xs"
-              width="full"
-              whiteSpace="pre-wrap"
-              wordBreak="break-word"
-            >
+            <Code fontSize="xs" width="full" whiteSpace="pre-wrap" wordBreak="break-word">
               {attempt.response.body}
             </Code>
           ) : null}
           {attempt.response?.headers ? (
             <VStack align="stretch" gap={0.5}>
               {Object.entries(attempt.response.headers).map(([name, value]) => (
-                <Code
-                  key={name}
-                  fontSize="xs"
-                  width="full"
-                  whiteSpace="pre-wrap"
-                >
+                <Code key={name} fontSize="xs" width="full" whiteSpace="pre-wrap">
                   {name}: {value}
                 </Code>
               ))}

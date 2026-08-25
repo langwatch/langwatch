@@ -43,13 +43,8 @@ function grantedByPolicyButNotByTheMint(): string[] {
 
   return [...permissionsDemandedByRoutes()]
     .filter(([permission]) => !granted.has(permission))
-    .filter(
-      ([permission]) => classifyForLangy(permission).disposition === "granted",
-    )
-    .map(
-      ([permission, routes]) =>
-        `${permission} — demanded by ${routes.join(", ")}`,
-    );
+    .filter(([permission]) => classifyForLangy(permission).disposition === "granted")
+    .map(([permission, routes]) => `${permission} — demanded by ${routes.join(", ")}`);
 }
 
 /** Permissions the mint asks for that the policy says Langy must never hold. */
@@ -144,9 +139,7 @@ describe("Langy permission coverage", () => {
           );
 
         expect(
-          monitorRoutes("evaluations:create").some((route) =>
-            route.startsWith("POST "),
-          ),
+          monitorRoutes("evaluations:create").some((route) => route.startsWith("POST ")),
           "Creating a monitor must demand evaluations:create, matching " +
             "server/api/routers/monitors.ts. Any coarser grain refuses every " +
             "least-privilege key while the UI creates the same enabled monitor",
@@ -188,9 +181,7 @@ describe("Langy permission coverage", () => {
         const demanded = permissionsDemandedByRoutes();
 
         const experimentGrains = [...demanded.entries()]
-          .filter(([, routes]) =>
-            routes.some((r) => r.includes("/api/experiments")),
-          )
+          .filter(([, routes]) => routes.some((r) => r.includes("/api/experiments")))
           .map(([permission]) => permission);
 
         // The list endpoint's dedicated read must be there...

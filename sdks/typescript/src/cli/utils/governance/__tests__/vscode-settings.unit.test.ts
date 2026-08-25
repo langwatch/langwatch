@@ -166,9 +166,7 @@ describe("clearVscodeTerminalOtelEnv()", () => {
   });
 
   it("is a no-op when there are no keys to clear", () => {
-    expect(
-      clearVscodeTerminalOtelEnv({ platform: "darwin", home, keys: [] }),
-    ).toBeNull();
+    expect(clearVscodeTerminalOtelEnv({ platform: "darwin", home, keys: [] })).toBeNull();
   });
 });
 
@@ -177,7 +175,11 @@ describe("removeVscodeTerminalOtelEnv()", () => {
     it("removes only our keys and drops the now-empty env object", () => {
       const p = clearVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS })!;
 
-      const changed = removeVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS });
+      const changed = removeVscodeTerminalOtelEnv({
+        platform: "darwin",
+        home,
+        keys: KEYS,
+      });
 
       expect(changed).toBe(true);
       const s = readJson(p);
@@ -198,16 +200,16 @@ describe("removeVscodeTerminalOtelEnv()", () => {
 
       const s = readJson(p);
       expect(s["editor.tabSize"]).toBe(2);
-      expect(
-        (s["terminal.integrated.env.osx"] as Record<string, unknown>).MY_OWN,
-      ).toBe("keep");
+      expect((s["terminal.integrated.env.osx"] as Record<string, unknown>).MY_OWN).toBe(
+        "keep",
+      );
     });
   });
 
   it("returns false when settings.json is absent (idempotent)", () => {
-    expect(
-      removeVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS }),
-    ).toBe(false);
+    expect(removeVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS })).toBe(
+      false,
+    );
   });
 
   it("leaves a malformed settings.json untouched", () => {
@@ -215,9 +217,9 @@ describe("removeVscodeTerminalOtelEnv()", () => {
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, "{ not valid json ");
 
-    expect(
-      removeVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS }),
-    ).toBe(false);
+    expect(removeVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS })).toBe(
+      false,
+    );
     expect(fs.readFileSync(p, "utf8")).toBe("{ not valid json ");
   });
 });
@@ -236,9 +238,7 @@ describe("VSCODE_TELEMETRY_ENV_KEYS", () => {
   // block injects, or terminals would leak a key we forgot to clear.
   it("matches the keys of the code buildOtelEnvBlock exactly", () => {
     const block = buildOtelEnvBlock("code", "http://app/api/otel", "sk-lw-tok");
-    expect([...VSCODE_TELEMETRY_ENV_KEYS].sort()).toEqual(
-      Object.keys(block).sort(),
-    );
+    expect([...VSCODE_TELEMETRY_ENV_KEYS].sort()).toEqual(Object.keys(block).sort());
   });
 
   it("includes the bearer-token header key (the sensitive one)", () => {

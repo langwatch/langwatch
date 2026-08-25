@@ -1,9 +1,7 @@
 import type { LLMSpan, Span } from "../server/tracer/types";
 
 export const getSpanNameOrModel = (span: Span) => {
-  return (
-    span.name ?? (span.type === "llm" ? (span as LLMSpan).model : undefined)
-  );
+  return span.name ?? (span.type === "llm" ? (span as LLMSpan).model : undefined);
 };
 
 const TRACE_ID_BYTES = 16;
@@ -25,8 +23,6 @@ const generateRandomHexId = (byteCount: number): string => {
   return hex;
 };
 
-export const generateOtelTraceId = (): string =>
-  generateRandomHexId(TRACE_ID_BYTES);
+export const generateOtelTraceId = (): string => generateRandomHexId(TRACE_ID_BYTES);
 
-export const generateOtelSpanId = (): string =>
-  generateRandomHexId(SPAN_ID_BYTES);
+export const generateOtelSpanId = (): string => generateRandomHexId(SPAN_ID_BYTES);

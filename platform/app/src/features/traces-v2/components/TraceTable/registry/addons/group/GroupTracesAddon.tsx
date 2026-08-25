@@ -78,12 +78,7 @@ const GroupedTraceRow: React.FC<GroupedTraceRowProps> = ({
         colSpan={colCount}
       >
         <VStack gap={0} align="stretch">
-          <HStack
-            gap={2}
-            paddingX={2}
-            paddingLeft={6}
-            paddingY={density.rowPaddingY}
-          >
+          <HStack gap={2} paddingX={2} paddingLeft={6} paddingY={density.rowPaddingY}>
             <StatusDot status={trace.status} size="6px" />
             <MonoCell color="fg.subtle" flexShrink={0}>
               {formatRelativeTime(trace.timestamp)}
@@ -103,9 +98,7 @@ const GroupedTraceRow: React.FC<GroupedTraceRowProps> = ({
                 {trace.serviceName}
               </MonoCell>
             )}
-            <MonoCell flexShrink={0}>
-              {formatDuration(trace.durationMs)}
-            </MonoCell>
+            <MonoCell flexShrink={0}>{formatDuration(trace.durationMs)}</MonoCell>
             <MonoCell flexShrink={0}>
               {formatCost(trace.totalCost, trace.tokensEstimated)}
             </MonoCell>

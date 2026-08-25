@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Flex,
-  HStack,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
 import { Send } from "react-feather";
@@ -149,9 +141,7 @@ export const ChatBox = ({
     const message = entryInputs
       .map((edge) => {
         const sourceHandle = edge.sourceHandle?.split(".")[1];
-        return sourceHandle
-          ? `${sourceHandle}: ${inputs[sourceHandle] ?? ""}`
-          : "";
+        return sourceHandle ? `${sourceHandle}: ${inputs[sourceHandle] ?? ""}` : "";
       })
       .join("\n");
 
@@ -224,23 +214,15 @@ export const ChatBox = ({
                 </Box>
               ))}
               {message.output.map((output, outputIndex) =>
-                output ||
-                optimization.isPending ||
-                executionStatus === "running" ? (
+                output || optimization.isPending || executionStatus === "running" ? (
                   <Box
                     key={`output-${outputIndex}`}
                     alignSelf="flex-start"
                     maxWidth="70%"
                     mb={2}
                   >
-                    <Box
-                      bg="bg.emphasized"
-                      p={2}
-                      borderRadius="lg"
-                      whiteSpace="pre-wrap"
-                    >
-                      {optimization.isPending ||
-                      executionStatus === "running" ? (
+                    <Box bg="bg.emphasized" p={2} borderRadius="lg" whiteSpace="pre-wrap">
+                      {optimization.isPending || executionStatus === "running" ? (
                         <RunningStatus isLoading={optimization.isPending} />
                       ) : (
                         output
@@ -283,10 +265,7 @@ const MultipleInput = ({
     sendMultiMessage();
   };
 
-  if (
-    (!isSingle && entryInputs.length === 1) ||
-    (isSingle && entryInputs.length > 1)
-  ) {
+  if ((!isSingle && entryInputs.length === 1) || (isSingle && entryInputs.length > 1)) {
     return null;
   }
 
@@ -349,10 +328,7 @@ const MultipleInput = ({
               value={inputs[index]}
               required
               onChange={(e) =>
-                handleInputChange(
-                  edge.sourceHandle?.split(".")[1] ?? "",
-                  e.target.value,
-                )
+                handleInputChange(edge.sourceHandle?.split(".")[1] ?? "", e.target.value)
               }
             />
           </VStack>

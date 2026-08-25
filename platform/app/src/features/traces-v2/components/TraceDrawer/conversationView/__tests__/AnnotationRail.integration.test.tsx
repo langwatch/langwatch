@@ -298,9 +298,7 @@ describe("given the rail is open beside a turn", () => {
   it("renders the turn before its rail", () => {
     renderRow();
 
-    const position = screen
-      .getByTestId("chat-turn-row")
-      .compareDocumentPosition(rail());
+    const position = screen.getByTestId("chat-turn-row").compareDocumentPosition(rail());
 
     expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -346,9 +344,7 @@ describe("given the rail is open beside a turn", () => {
       fireEvent.click(screen.getByText("the model invented a policy number"));
 
       expect(draft()).toBeNull();
-      expect(
-        screen.queryByLabelText("Annotation composer"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Annotation composer")).not.toBeInTheDocument();
     });
   });
 });
@@ -363,20 +359,20 @@ describe("given a comment started from one of the turn's messages", () => {
       anchorPath,
     });
 
-  describe.each([
-    "input",
-    "output",
-  ] as const)("when it was started on the turn's %s", (anchorPath) => {
-    /** @scenario "The message's annotate action writes in the rail" */
-    it("opens the composer in the rail rather than over the conversation", () => {
-      startFromMessage(anchorPath);
+  describe.each(["input", "output"] as const)(
+    "when it was started on the turn's %s",
+    (anchorPath) => {
+      /** @scenario "The message's annotate action writes in the rail" */
+      it("opens the composer in the rail rather than over the conversation", () => {
+        startFromMessage(anchorPath);
 
-      renderRow();
+        renderRow();
 
-      const composer = screen.getByLabelText("Annotation composer");
-      expect(rail().contains(composer)).toBe(true);
-    });
-  });
+        const composer = screen.getByLabelText("Annotation composer");
+        expect(rail().contains(composer)).toBe(true);
+      });
+    },
+  );
 
   describe("when it was started on the reply", () => {
     /** @scenario "Annotate opens the composer in the rail beside the turn" */
@@ -385,12 +381,10 @@ describe("given a comment started from one of the turn's messages", () => {
 
       renderRow();
 
-      expect(
-        rail().contains(screen.getByLabelText("Annotation composer")),
-      ).toBe(true);
-      expect(
-        screen.getByTestId("annotation-composer-anchor"),
-      ).toHaveTextContent("Output");
+      expect(rail().contains(screen.getByLabelText("Annotation composer"))).toBe(true);
+      expect(screen.getByTestId("annotation-composer-anchor")).toHaveTextContent(
+        "Output",
+      );
     });
   });
 });
@@ -416,24 +410,23 @@ describe("given a suggestion started on the turn's user message", () => {
     renderRow();
 
     expect(screen.getByText("Suggested input")).toBeInTheDocument();
-    expect(
-      screen.getByPlaceholderText("What should the input have been?"),
-    ).toHaveValue("a question");
+    expect(screen.getByPlaceholderText("What should the input have been?")).toHaveValue(
+      "a question",
+    );
   });
 
   /** @scenario "A suggestion on the user message starts from the turn's input" */
   it("reads its diff against the input rather than the reply", () => {
     renderRow();
 
-    fireEvent.change(
-      screen.getByPlaceholderText("What should the input have been?"),
-      { target: { value: "a clearer question" } },
-    );
+    fireEvent.change(screen.getByPlaceholderText("What should the input have been?"), {
+      target: { value: "a clearer question" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
 
-    expect(
-      screen.getByPlaceholderText("What should the input have been?"),
-    ).toHaveValue("a question");
+    expect(screen.getByPlaceholderText("What should the input have been?")).toHaveValue(
+      "a question",
+    );
   });
 });
 
@@ -476,9 +469,7 @@ describe("given a turn commented on its own output", () => {
     renderRow({ anchoredAnnotations: [onTheOutput] });
 
     expect(screen.getByTestId("annotation-anchor")).toHaveTextContent("Output");
-    expect(screen.getByTestId("annotation-anchor")).not.toHaveTextContent(
-      "Trace",
-    );
+    expect(screen.getByTestId("annotation-anchor")).not.toHaveTextContent("Trace");
   });
 });
 
@@ -510,9 +501,7 @@ describe("given a comment being written about one side of a turn", () => {
 
     renderRow();
 
-    expect(screen.getByTestId("annotation-composer-anchor")).toHaveTextContent(
-      "Output",
-    );
+    expect(screen.getByTestId("annotation-composer-anchor")).toHaveTextContent("Output");
   });
 });
 
@@ -524,9 +513,7 @@ describe("given a pane too narrow for two columns", () => {
     const inset = rail().parentElement!;
     expect(inset).toHaveStyle({ paddingLeft: "34px" });
 
-    const position = screen
-      .getByTestId("chat-turn-row")
-      .compareDocumentPosition(rail());
+    const position = screen.getByTestId("chat-turn-row").compareDocumentPosition(rail());
     expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
@@ -544,9 +531,7 @@ describe("given the reviewer has typed a comment in the rail composer", () => {
       first.unmount();
       renderRow();
 
-      expect(screen.getByPlaceholderText("Optional")).toHaveValue(
-        "half a thought",
-      );
+      expect(screen.getByPlaceholderText("Optional")).toHaveValue("half a thought");
     });
   });
 });
@@ -665,9 +650,7 @@ describe("given a turn commented on as a whole and on two of its spans", () => {
   it("lists the comments on its parts in the rail beside it", () => {
     renderCommentedTurn();
 
-    expect(
-      screen.getByText("this search returned nothing"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("this search returned nothing")).toBeInTheDocument();
     expect(screen.getByText("and this one timed out")).toBeInTheDocument();
   });
 
@@ -740,9 +723,7 @@ describe("given the project has active annotation score keys", () => {
       renderRow();
 
       fireEvent.click(rail());
-      await userEvent.click(
-        screen.getByRole("button", { name: /Helpfulness/ }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: /Helpfulness/ }));
       await userEvent.click(await screen.findByRole("radio", { name: "Good" }));
       await userEvent.click(screen.getByRole("button", { name: "OK" }));
       fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -793,9 +774,7 @@ describe("given a turn carrying a comment written before anchoring", () => {
   it("reads in the rail as a comment about the whole turn", () => {
     renderRow({ annotations: [beforeAnchoring] });
 
-    expect(
-      screen.getByText("the model invented a policy number"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("the model invented a policy number")).toBeInTheDocument();
     expect(screen.queryByTestId("annotation-anchor")).not.toBeInTheDocument();
   });
 
@@ -809,9 +788,7 @@ describe("given a turn carrying a comment written before anchoring", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Update" }));
 
-    expect(
-      screen.queryByTestId("annotation-composer-anchor"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("annotation-composer-anchor")).not.toBeInTheDocument();
     expect(mocks.update).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "annotation-1",
@@ -838,12 +815,8 @@ describe("given a comment is being written about one span of a turn", () => {
 
     renderRow();
 
-    expect(
-      screen.queryByLabelText("Annotation composer"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Add annotation/ }),
-    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Annotation composer")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Add annotation/ })).toBeInTheDocument();
   });
 });
 

@@ -92,11 +92,7 @@ describe("the management command tree", () => {
         "archive",
         "members",
       ]);
-      expect(nestedVerbsOf("teams", "members")).toEqual([
-        "list",
-        "add",
-        "remove",
-      ]);
+      expect(nestedVerbsOf("teams", "members")).toEqual(["list", "add", "remove"]);
       expect(carriesFlag("teams members add", "--role <role>")).toBe(true);
     });
 
@@ -111,16 +107,8 @@ describe("the management command tree", () => {
         "members",
         "bindings",
       ]);
-      expect(nestedVerbsOf("groups", "members")).toEqual([
-        "list",
-        "add",
-        "remove",
-      ]);
-      expect(nestedVerbsOf("groups", "bindings")).toEqual([
-        "list",
-        "add",
-        "remove",
-      ]);
+      expect(nestedVerbsOf("groups", "members")).toEqual(["list", "add", "remove"]);
+      expect(nestedVerbsOf("groups", "bindings")).toEqual(["list", "add", "remove"]);
 
       // A binding is a role at a scope, and may defer to a custom role.
       const addBinding = flagsOf("groups bindings add").join(" ");
@@ -145,18 +133,14 @@ describe("the management command tree", () => {
         .filter(
           (entry) =>
             entry.children.length === 0 &&
-            (MANAGEMENT_GROUPS as readonly string[]).includes(
-              entry.path.split(" ")[0]!,
-            ),
+            (MANAGEMENT_GROUPS as readonly string[]).includes(entry.path.split(" ")[0]!),
         )
         .map((entry) => entry.path);
 
       // Canary: an empty list would make the check below pass vacuously.
       expect(managementLeaves.length).toBeGreaterThanOrEqual(40);
 
-      const undeclared = managementLeaves.filter(
-        (path) => !declared.has(path),
-      );
+      const undeclared = managementLeaves.filter((path) => !declared.has(path));
       expect(
         undeclared,
         [

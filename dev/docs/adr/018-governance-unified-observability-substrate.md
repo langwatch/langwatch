@@ -69,15 +69,15 @@ cannot request its own retention tier through user attributes.
 
 Supported source shapes are:
 
-| Source | Delivery | Normalized shape |
-|---|---|---|
-| generic OTLP | push | spans |
-| Claude Cowork | push | spans |
-| Workato | webhook | logs |
-| custom object-store feed | batch/callback | logs |
-| Copilot Studio compliance | pull | logs |
-| OpenAI compliance | pull | logs |
-| Claude compliance | pull | logs |
+| Source                    | Delivery       | Normalized shape |
+| ------------------------- | -------------- | ---------------- |
+| generic OTLP              | push           | spans            |
+| Claude Cowork             | push           | spans            |
+| Workato                   | webhook        | logs             |
+| custom object-store feed  | batch/callback | logs             |
+| Copilot Studio compliance | pull           | logs             |
+| OpenAI compliance         | pull           | logs             |
+| Claude compliance         | pull           | logs             |
 
 ## Alternatives considered
 

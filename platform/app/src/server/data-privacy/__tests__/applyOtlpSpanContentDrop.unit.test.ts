@@ -86,16 +86,8 @@ function marker(span: OtlpSpan): string | undefined {
   );
 }
 
-function attrVal({
-  span,
-  key,
-}: {
-  span: OtlpSpan;
-  key: string;
-}): string | undefined {
-  return (
-    span.attributes.find((a) => a.key === key)?.value.stringValue ?? undefined
-  );
+function attrVal({ span, key }: { span: OtlpSpan; key: string }): string | undefined {
+  return span.attributes.find((a) => a.key === key)?.value.stringValue ?? undefined;
 }
 
 describe("stripOtlpSpanContent", () => {
@@ -300,9 +292,7 @@ describe("stripOtlpSpanContent", () => {
             {
               role: "assistant",
               content: "let me check",
-              tool_calls: [
-                { id: "1", function: { name: "lookup", arguments: "{}" } },
-              ],
+              tool_calls: [{ id: "1", function: { name: "lookup", arguments: "{}" } }],
             },
             { role: "tool", content: "secret tool result" },
             { role: "assistant", content: "all done" },

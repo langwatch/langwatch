@@ -96,8 +96,7 @@ function unfoldWhateverHides({
 
   const foldedInto = rows.find(
     (row) =>
-      row.kind === "group" &&
-      row.spans.some((span) => span.spanId === selectedSpanId),
+      row.kind === "group" && row.spans.some((span) => span.spanId === selectedSpanId),
   );
   if (foldedInto?.kind !== "group") return;
 

@@ -28,9 +28,8 @@ vi.mock("~/server/rbac/role-binding-resolver", () => ({
 
 // The ceiling resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appCredentialPermissionsMock } = await import(
-    "~/test-utils/appCredentialPermissionsMock"
-  );
+  const { appCredentialPermissionsMock } =
+    await import("~/test-utils/appCredentialPermissionsMock");
   return appCredentialPermissionsMock();
 });
 
@@ -75,9 +74,7 @@ function appWith(
   resolved: ResolvedToken | undefined,
   permission: Permission = "project:update",
 ) {
-  const handler = vi.fn((c: { text: (body: string) => Response }) =>
-    c.text("reached"),
-  );
+  const handler = vi.fn((c: { text: (body: string) => Response }) => c.text("reached"));
   const app = new Hono();
   app.use("*", appContextMiddlewareFor(getApp()));
   app.use("*", async (c, next) => {
@@ -257,10 +254,7 @@ describe("requireApiKeyPermission()", () => {
     describe("when a Langy session key asks for a permission it is never delegated", () => {
       it("answers 403 with the not-delegable code and a tip that does not send the user to an admin", async () => {
         resolveMock.mockResolvedValue(false);
-        const { app, handler } = appWith(
-          langySessionKeyToken,
-          "triggers:create",
-        );
+        const { app, handler } = appWith(langySessionKeyToken, "triggers:create");
 
         const res = await app.request("/");
         const body = (await res.json()) as {

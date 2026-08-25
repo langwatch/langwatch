@@ -80,12 +80,8 @@ async function main() {
       console.log(`     attempt ${i}: HTTP ${r.status()} code=${errCode}`);
     }
 
-    const unauthorizedCount = results.filter(
-      (r) => r.code === "UNAUTHORIZED",
-    ).length;
-    const tooManyCount = results.filter(
-      (r) => r.code === "TOO_MANY_REQUESTS",
-    ).length;
+    const unauthorizedCount = results.filter((r) => r.code === "UNAUTHORIZED").length;
+    const tooManyCount = results.filter((r) => r.code === "TOO_MANY_REQUESTS").length;
     check(
       "first 5 attempts return UNAUTHORIZED",
       unauthorizedCount === 5,
@@ -135,17 +131,12 @@ async function main() {
     await page2.click('button:has-text("Sign in")');
     let signinOk = false;
     try {
-      await page2.waitForURL(
-        (url) => !url.toString().includes("/auth/signin"),
-        { timeout: 10000 },
-      );
+      await page2.waitForURL((url) => !url.toString().includes("/auth/signin"), {
+        timeout: 10000,
+      });
       signinOk = true;
     } catch {}
-    check(
-      "user can still sign in with ORIGINAL password",
-      signinOk,
-      page2.url(),
-    );
+    check("user can still sign in with ORIGINAL password", signinOk, page2.url());
 
     await ctx.close();
     await ctx2.close();
@@ -168,9 +159,7 @@ async function main() {
     console.log(`✅ ALL CHECKS PASSED (${passes}/${passes})`);
     process.exit(0);
   } else {
-    console.log(
-      `❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`,
-    );
+    console.log(`❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`);
     process.exit(1);
   }
 }

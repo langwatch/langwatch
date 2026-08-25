@@ -17,10 +17,7 @@ import {
   liveRoles,
 } from "../../src/repositories/eventing/eventing.authz-live-rows.mapper";
 
-const REPOSITORIES = path.join(
-  import.meta.dirname,
-  "../../src/repositories/eventing",
-);
+const REPOSITORIES = path.join(import.meta.dirname, "../../src/repositories/eventing");
 
 /** The repositories whose reads answer, or list, live access. Deliberately
  *  excludes the migration repository: its job is to inventory what an

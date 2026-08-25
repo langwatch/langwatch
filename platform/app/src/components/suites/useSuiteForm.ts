@@ -26,20 +26,13 @@ export const suiteFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string(),
   labels: z.array(z.string()),
-  selectedScenarioIds: z
-    .array(z.string())
-    .min(1, "At least one scenario is required"),
-  selectedTargets: z
-    .array(suiteTargetSchema)
-    .min(1, "At least one target is required"),
+  selectedScenarioIds: z.array(z.string()).min(1, "At least one scenario is required"),
+  selectedTargets: z.array(suiteTargetSchema).min(1, "At least one target is required"),
   repeatCount: z
     .number()
     .int()
     .min(1, `Repeat count must be between 1 and ${MAX_REPEAT_COUNT}`)
-    .max(
-      MAX_REPEAT_COUNT,
-      `Repeat count must be between 1 and ${MAX_REPEAT_COUNT}`,
-    ),
+    .max(MAX_REPEAT_COUNT, `Repeat count must be between 1 and ${MAX_REPEAT_COUNT}`),
   // null = follow the project default (scenarios.user_simulator /
   // scenarios.judge); a string pins the model for the whole run plan.
   simulatorModel: z.string().nullable(),
@@ -140,9 +133,7 @@ export function useSuiteForm({
   const [executionOptionsOpen, setExecutionOptionsOpen] = useState(false);
   const [scenarioSearch, setScenarioSearch] = useState("");
   const [targetSearch, setTargetSearch] = useState("");
-  const [activeLabelFilter, setActiveLabelFilter] = useState<string | null>(
-    null,
-  );
+  const [activeLabelFilter, setActiveLabelFilter] = useState<string | null>(null);
 
   // -- Watch form values for derived state --
   const selectedScenarioIds = form.watch("selectedScenarioIds");
@@ -159,11 +150,7 @@ export function useSuiteForm({
         // http, code, and workflow agents are supported as suite targets.
         // signature agents are excluded — they're used as sub-components of
         // workflows rather than as stand-alone scenario targets.
-        if (
-          agent.type !== "http" &&
-          agent.type !== "code" &&
-          agent.type !== "workflow"
-        ) {
+        if (agent.type !== "http" && agent.type !== "code" && agent.type !== "workflow") {
           continue;
         }
         result.push({
@@ -279,8 +266,7 @@ export function useSuiteForm({
     );
     const next = exists
       ? current.filter(
-          (t) =>
-            !(t.type === target.type && t.referenceId === target.referenceId),
+          (t) => !(t.type === target.type && t.referenceId === target.referenceId),
         )
       : [...current, target];
     form.setValue("selectedTargets", next);
@@ -314,15 +300,11 @@ export function useSuiteForm({
   };
 
   const isTargetSelected = (type: string, referenceId: string) =>
-    selectedTargets.some(
-      (t) => t.type === type && t.referenceId === referenceId,
-    );
+    selectedTargets.some((t) => t.type === type && t.referenceId === referenceId);
 
   const selectAllTargets = () => {
     const current = form.getValues("selectedTargets");
-    const currentKeys = new Set(
-      current.map((t) => `${t.type}:${t.referenceId}`),
-    );
+    const currentKeys = new Set(current.map((t) => `${t.type}:${t.referenceId}`));
     const newTargets = filteredTargets
       .filter((t) => !currentKeys.has(`${t.type}:${t.referenceId}`))
       .map((t) => ({ type: t.type, referenceId: t.referenceId }));
@@ -343,10 +325,7 @@ export function useSuiteForm({
   const selectAllScenarios = () => {
     if (filteredScenarios) {
       const current = form.getValues("selectedScenarioIds");
-      const merged = new Set([
-        ...current,
-        ...filteredScenarios.map((s) => s.id),
-      ]);
+      const merged = new Set([...current, ...filteredScenarios.map((s) => s.id)]);
       form.setValue("selectedScenarioIds", Array.from(merged));
     }
   };
@@ -378,15 +357,12 @@ export function useSuiteForm({
     );
   };
 
-  const removeArchivedTarget = (
-    target: Pick<SuiteTarget, "type" | "referenceId">,
-  ) => {
+  const removeArchivedTarget = (target: Pick<SuiteTarget, "type" | "referenceId">) => {
     const current = form.getValues("selectedTargets");
     form.setValue(
       "selectedTargets",
       current.filter(
-        (t) =>
-          !(t.type === target.type && t.referenceId === target.referenceId),
+        (t) => !(t.type === target.type && t.referenceId === target.referenceId),
       ),
     );
   };

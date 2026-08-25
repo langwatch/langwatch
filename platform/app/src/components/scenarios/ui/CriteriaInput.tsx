@@ -216,12 +216,7 @@ export function CriteriaInput({
             >
               Cancel
             </Button>
-            <Button
-              type="button"
-              size="xs"
-              variant="outline"
-              onClick={handleSaveNew}
-            >
+            <Button type="button" size="xs" variant="outline" onClick={handleSaveNew}>
               Save
             </Button>
           </HStack>

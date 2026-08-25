@@ -57,14 +57,12 @@ export function useInviteActions({
   const subscriptionApi = (api as any).subscription;
   // Build-time invariant: subscriptionApi shape is fixed per build (SaaS vs OSS)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, react-hooks/rules-of-hooks
-  const expandSeatsMutation =
-    subscriptionApi?.addTeamMemberOrEvents?.useMutation() as
-      | { mutateAsync: (input: Record<string, unknown>) => Promise<unknown> }
-      | undefined;
+  const expandSeatsMutation = subscriptionApi?.addTeamMemberOrEvents?.useMutation() as
+    | { mutateAsync: (input: Record<string, unknown>) => Promise<unknown> }
+    | undefined;
 
   const createInvitesMutation = api.organization.createInvites.useMutation();
-  const createInviteRequestMutation =
-    api.organization.createInviteRequest.useMutation();
+  const createInviteRequestMutation = api.organization.createInviteRequest.useMutation();
   const approveInviteMutation = api.organization.approveInvite.useMutation();
   const deleteInviteMutation = api.organization.deleteInvite.useMutation();
 
@@ -105,9 +103,7 @@ export function useInviteActions({
             : "All invites have been created. View invite link under actions menu.";
 
           toaster.create({
-            title: `${
-              totalInvites > 1 ? "Invites" : "Invite"
-            } created successfully`,
+            title: `${totalInvites > 1 ? "Invites" : "Invite"} created successfully`,
             description,
             type: "success",
             duration: 2000,

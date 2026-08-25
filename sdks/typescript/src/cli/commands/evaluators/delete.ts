@@ -34,13 +34,13 @@ export const deleteEvaluatorCommand = async (
     process.exit(1);
   }
 
-  const deleteSpinner = createSpinner(`Archiving evaluator "${evaluatorName}"...`).start();
+  const deleteSpinner = createSpinner(
+    `Archiving evaluator "${evaluatorName}"...`,
+  ).start();
 
   try {
     await service.delete(evaluatorId);
-    deleteSpinner.succeed(
-      `Archived evaluator "${chalk.cyan(evaluatorName)}"`,
-    );
+    deleteSpinner.succeed(`Archived evaluator "${chalk.cyan(evaluatorName)}"`);
   } catch (error) {
     failSpinner({
       spinner: deleteSpinner,

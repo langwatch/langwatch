@@ -8,13 +8,8 @@ test("experiment creation keeps the SDK workflow discoverable", async ({
   const projectSlug = await getProjectSlug(page);
 
   await page.goto(`/${projectSlug}/evaluations`);
-  const newExperiment = page
-    .getByRole("button", { name: "New Experiment" })
-    .first();
-  await expect(newExperiment).toHaveCSS(
-    "background-color",
-    "rgb(255, 255, 255)",
-  );
+  const newExperiment = page.getByRole("button", { name: "New Experiment" }).first();
+  await expect(newExperiment).toHaveCSS("background-color", "rgb(255, 255, 255)");
   await newExperiment.click();
   const sdkExperiment = page.getByRole("menuitem", {
     name: /New Experiment via SDK/,
@@ -28,9 +23,10 @@ test("experiment creation keeps the SDK workflow discoverable", async ({
   });
 
   await page.goto(`/${projectSlug}/online-evaluations`);
-  await expect(
-    page.getByRole("button", { name: "Set up Guardrail" }).first(),
-  ).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.getByRole("button", { name: "Set up Guardrail" }).first()).toHaveCSS(
+    "background-color",
+    "rgb(255, 255, 255)",
+  );
   await expect(
     page.getByRole("button", { name: "New Online Evaluation" }).first(),
   ).toHaveCSS("background-color", "rgb(255, 255, 255)");

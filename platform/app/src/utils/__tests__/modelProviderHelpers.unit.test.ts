@@ -15,9 +15,7 @@ describe("modelProviderHelpers", () => {
   describe("getProviderFromModel()", () => {
     it("extracts provider key from model string", () => {
       expect(getProviderFromModel("openai/gpt-4")).toBe("openai");
-      expect(getProviderFromModel("anthropic/claude-sonnet-4")).toBe(
-        "anthropic",
-      );
+      expect(getProviderFromModel("anthropic/claude-sonnet-4")).toBe("anthropic");
       expect(getProviderFromModel("azure/gpt-4-turbo")).toBe("azure");
     });
 
@@ -141,11 +139,7 @@ describe("modelProviderHelpers", () => {
       const storedKeys = { OPENAI_API_KEY: "sk-old" };
       const previousKeys = { OPENAI_API_KEY: "sk-user-typing" };
 
-      const result = buildCustomKeyState(
-        displayKeyMap,
-        storedKeys,
-        previousKeys,
-      );
+      const result = buildCustomKeyState(displayKeyMap, storedKeys, previousKeys);
 
       expect(result.OPENAI_API_KEY).toBe("sk-user-typing");
     });
@@ -155,11 +149,7 @@ describe("modelProviderHelpers", () => {
       const storedKeys = {};
       const previousKeys = { MANAGED: "true" };
 
-      const result = buildCustomKeyState(
-        displayKeyMap,
-        storedKeys,
-        previousKeys,
-      );
+      const result = buildCustomKeyState(displayKeyMap, storedKeys, previousKeys);
 
       expect(result).toEqual({ MANAGED: "true" });
     });
@@ -169,12 +159,7 @@ describe("modelProviderHelpers", () => {
       const storedKeys = {};
       const options = { providerEnabledWithEnvVars: true };
 
-      const result = buildCustomKeyState(
-        displayKeyMap,
-        storedKeys,
-        undefined,
-        options,
-      );
+      const result = buildCustomKeyState(displayKeyMap, storedKeys, undefined, options);
 
       expect(result.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
       expect(result.OPENAI_BASE_URL).toBe(""); // URL fields are not masked
@@ -194,12 +179,7 @@ describe("modelProviderHelpers", () => {
       const storedKeys = { OPENAI_API_KEY: "sk-actual-key" };
       const options = { providerEnabledWithEnvVars: true };
 
-      const result = buildCustomKeyState(
-        displayKeyMap,
-        storedKeys,
-        undefined,
-        options,
-      );
+      const result = buildCustomKeyState(displayKeyMap, storedKeys, undefined, options);
 
       expect(result.OPENAI_API_KEY).toBe("sk-actual-key");
     });
@@ -276,23 +256,17 @@ describe("modelProviderHelpers", () => {
   describe("shouldAutoEnableAsDefault()", () => {
     describe("when enabledProvidersCount is 0 or 1", () => {
       it("returns true for the first-provider case (0)", () => {
-        expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 0 })).toBe(
-          true,
-        );
+        expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 0 })).toBe(true);
       });
 
       it("returns true when there is exactly one provider", () => {
-        expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 1 })).toBe(
-          true,
-        );
+        expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 1 })).toBe(true);
       });
     });
 
     describe("when enabledProvidersCount is greater than 1", () => {
       it("returns false; the user must opt in explicitly", () => {
-        expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 2 })).toBe(
-          false,
-        );
+        expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 2 })).toBe(false);
       });
     });
   });

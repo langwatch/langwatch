@@ -42,9 +42,7 @@ const RecordPulledUsageCommand = defineCommand({
 });
 
 export class PulledUsageEventingAdapter {
-  private constructor(
-    private readonly ledger: PulledUsageLedgerProcess | undefined,
-  ) {}
+  private constructor(private readonly ledger: PulledUsageLedgerProcess | undefined) {}
 
   static create(
     options: {

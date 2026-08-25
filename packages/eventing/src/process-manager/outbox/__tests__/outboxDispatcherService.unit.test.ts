@@ -197,9 +197,7 @@ describe("OutboxDispatcherService", () => {
       });
 
       it("redacts the diagnostic for an untyped error, which can carry anything", async () => {
-        const handler = vi
-          .fn()
-          .mockRejectedValue(new Error("raw payload: sk-secret"));
+        const handler = vi.fn().mockRejectedValue(new Error("raw payload: sk-secret"));
         const dispatcher = new OutboxDispatcherService({
           store,
           handlers: { "worker-dispatch": handler },
@@ -578,9 +576,7 @@ describe("OutboxDispatcherService", () => {
             if (property !== "leaseDueMessages") {
               return Reflect.get(target, property, receiver);
             }
-            return async (
-              params: Parameters<typeof store.leaseDueMessages>[0],
-            ) => {
+            return async (params: Parameters<typeof store.leaseDueMessages>[0]) => {
               // The store anchors leasedUntil before the query runs, so a
               // slow query burns real lease time before any delivery starts.
               elapsed += 900;
@@ -662,9 +658,7 @@ describe("OutboxDispatcherService", () => {
           leaseDurationMs: 100,
         });
         void crashed.runOnce({ now: T0 + 1 });
-        await vi.waitFor(() =>
-          expect(observeDispatchLag).toHaveBeenCalledTimes(1),
-        );
+        await vi.waitFor(() => expect(observeDispatchLag).toHaveBeenCalledTimes(1));
 
         const handler = vi.fn().mockResolvedValue(undefined);
         const dispatcher = new OutboxDispatcherService({

@@ -1,8 +1,5 @@
 import type { AppendStore } from "@langwatch/eventing";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import { CODING_AGENT_MAP_COALESCE_MAX_BATCH } from "../schemas/constants";
 import {
   type LogFactsContributedEvent,
@@ -25,10 +22,7 @@ export interface CodingAgentTraceSessionRecord {
   occurredAtMs: number;
 }
 
-const events = [
-  spanFactsContributedEventSchema,
-  logFactsContributedEventSchema,
-] as const;
+const events = [spanFactsContributedEventSchema, logFactsContributedEventSchema] as const;
 
 export class CodingAgentTraceSessionsMapProjection
   extends AbstractMapProjection<CodingAgentTraceSessionRecord, typeof events>

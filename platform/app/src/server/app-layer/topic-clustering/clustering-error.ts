@@ -86,11 +86,7 @@ const USER_ACTIONABLE_CODES = new Set<ClusteringErrorCode>([
 export class ClusteringError extends Error {
   readonly code: ClusteringErrorCode;
 
-  constructor(
-    code: ClusteringErrorCode,
-    message: string,
-    options?: { cause?: unknown },
-  ) {
+  constructor(code: ClusteringErrorCode, message: string, options?: { cause?: unknown }) {
     super(message, options);
     this.name = "ClusteringError";
     this.code = code;
@@ -101,9 +97,7 @@ export class ClusteringError extends Error {
   }
 }
 
-export function classifyClusteringError(
-  error: unknown,
-): ClassifiedClusteringError {
+export function classifyClusteringError(error: unknown): ClassifiedClusteringError {
   if (error instanceof ClusteringError) {
     return { code: error.code, isUserActionable: error.isUserActionable };
   }

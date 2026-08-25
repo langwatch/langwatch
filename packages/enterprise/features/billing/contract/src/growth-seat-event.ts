@@ -21,10 +21,7 @@ const GROWTH_EVENTS_PRICE_NAMES = [
 ] as const satisfies readonly StripePriceName[];
 
 /** Checks whether a given price ID corresponds to a Growth seat price. */
-export const isGrowthSeatPrice = (
-  priceId: string,
-  prices: StripePriceMap,
-): boolean =>
+export const isGrowthSeatPrice = (priceId: string, prices: StripePriceMap): boolean =>
   priceIds(prices, [
     "GROWTH_SEAT_EUR_MONTHLY",
     "GROWTH_SEAT_EUR_ANNUAL",
@@ -33,10 +30,8 @@ export const isGrowthSeatPrice = (
   ]).has(priceId);
 
 /** Checks whether a given price ID corresponds to a Growth events price. */
-export const isGrowthEventsPrice = (
-  priceId: string,
-  prices: StripePriceMap,
-): boolean => priceIds(prices, GROWTH_EVENTS_PRICE_NAMES).has(priceId);
+export const isGrowthEventsPrice = (priceId: string, prices: StripePriceMap): boolean =>
+  priceIds(prices, GROWTH_EVENTS_PRICE_NAMES).has(priceId);
 
 /** Growth events prices with an annual interval — the ones whose accrued
  * usage would otherwise only be collected at renewal. */
@@ -58,9 +53,7 @@ export type BillingInterval = "monthly" | "annual";
 export type GrowthSeatPlanType = (typeof GROWTH_SEAT_PLAN_TYPES)[number];
 
 /** Type guard: returns true for any of the four GROWTH_SEAT_* plan types. */
-export const isGrowthSeatEventPlan = (
-  planType: string,
-): planType is GrowthSeatPlanType =>
+export const isGrowthSeatEventPlan = (planType: string): planType is GrowthSeatPlanType =>
   (GROWTH_SEAT_PLAN_TYPES as readonly string[]).includes(planType);
 
 /** Builds the plan type string from currency + billing interval. */
@@ -95,8 +88,7 @@ export const resolveGrowthSeatPriceId = ({
   interval: BillingInterval;
   prices: StripePriceMap;
 }): string => {
-  const key =
-    `GROWTH_SEAT_${currency}_${interval.toUpperCase()}` as StripePriceName;
+  const key = `GROWTH_SEAT_${currency}_${interval.toUpperCase()}` as StripePriceName;
   const priceId = prices[key];
   if (!priceId) {
     throw new Error(`Unsupported Growth seat price: ${currency}/${interval}`);
@@ -114,8 +106,7 @@ export const resolveGrowthEventsPriceId = ({
   interval: BillingInterval;
   prices: StripePriceMap;
 }): string => {
-  const key =
-    `GROWTH_EVENTS_${currency}_${interval.toUpperCase()}` as StripePriceName;
+  const key = `GROWTH_EVENTS_${currency}_${interval.toUpperCase()}` as StripePriceName;
   const priceId = prices[key];
   if (!priceId) {
     throw new Error(`Unsupported Growth events price: ${currency}/${interval}`);

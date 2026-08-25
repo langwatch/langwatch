@@ -44,11 +44,7 @@ class TestSessionKeyService implements LangySessionKeyService {
 class TestVirtualKeyService implements LangyVirtualKeyService {
   constructor(private readonly prisma: PrismaClient) {}
 
-  provision(input: {
-    projectId: string;
-    organizationId: string;
-    actorUserId: string;
-  }) {
+  provision(input: { projectId: string; organizationId: string; actorUserId: string }) {
     return provisionLangyVirtualKey({ prisma: this.prisma, ...input });
   }
 }

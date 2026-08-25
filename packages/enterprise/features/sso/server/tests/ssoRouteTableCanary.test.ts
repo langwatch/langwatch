@@ -173,9 +173,7 @@ describe("better-auth route table (ADR-027 gate coverage canary)", () => {
       for (const route of registeredRoutes()) {
         expect({
           path: route.path,
-          gated: isGatedSsoPath(
-            concreteUrl(route.path, { trailingSlash: true }),
-          ),
+          gated: isGatedSsoPath(concreteUrl(route.path, { trailingSlash: true })),
         }).toEqual({
           path: route.path,
           gated: ROUTE_CLASSIFICATION[route.path] === "federating",

@@ -239,9 +239,7 @@ describe("handleError", () => {
     it("logs error and does not throw when NON_CRITICAL with logger", () => {
       const logger = createMockLogger();
       const err = new HandlerError("h", "e-1", "minor issue");
-      expect(() =>
-        handleError(err, ErrorCategory.CRITICAL, logger as any),
-      ).not.toThrow();
+      expect(() => handleError(err, ErrorCategory.CRITICAL, logger as any)).not.toThrow();
       expect(logger.error).toHaveBeenCalledOnce();
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ errorName: "HandlerError" }),
@@ -257,9 +255,7 @@ describe("handleError", () => {
     it("logs warning and does not throw when RECOVERABLE with logger", () => {
       const logger = createMockLogger();
       const err = new QueueError("q", "enqueue", "redis timeout");
-      expect(() =>
-        handleError(err, ErrorCategory.CRITICAL, logger as any),
-      ).not.toThrow();
+      expect(() => handleError(err, ErrorCategory.CRITICAL, logger as any)).not.toThrow();
       expect(logger.warn).toHaveBeenCalledOnce();
       expect(logger.warn).toHaveBeenCalledWith(
         expect.objectContaining({ errorName: "QueueError" }),
@@ -340,15 +336,11 @@ describe("handleError", () => {
 
 describe("categorizeError", () => {
   it("returns CRITICAL for SecurityError", () => {
-    expect(categorizeError(new SecurityError("op", "msg"))).toBe(
-      ErrorCategory.CRITICAL,
-    );
+    expect(categorizeError(new SecurityError("op", "msg"))).toBe(ErrorCategory.CRITICAL);
   });
 
   it("returns CRITICAL for ValidationError", () => {
-    expect(categorizeError(new ValidationError("reason"))).toBe(
-      ErrorCategory.CRITICAL,
-    );
+    expect(categorizeError(new ValidationError("reason"))).toBe(ErrorCategory.CRITICAL);
   });
 
   it("returns RECOVERABLE for QueueError", () => {
@@ -370,9 +362,7 @@ describe("categorizeError", () => {
   });
 
   it("returns RECOVERABLE for plain Error", () => {
-    expect(categorizeError(new Error("unknown"))).toBe(
-      ErrorCategory.RECOVERABLE,
-    );
+    expect(categorizeError(new Error("unknown"))).toBe(ErrorCategory.RECOVERABLE);
   });
 
   it("returns RECOVERABLE for non-Error value", () => {
@@ -407,9 +397,7 @@ describe("classifyClickHouseError", () => {
 
     it("returns RECOVERABLE for an expired wait, whose reason names no ClickHouse code", () => {
       const shed = new ClickHouseOverloadedError({
-        reasons: [
-          new Error("Aborted while waiting for a ClickHouse concurrency slot."),
-        ],
+        reasons: [new Error("Aborted while waiting for a ClickHouse concurrency slot.")],
       });
 
       expect(classifyClickHouseError(shed)).toBe(ErrorCategory.RECOVERABLE);
@@ -479,9 +467,7 @@ describe("classifyClickHouseError", () => {
 
     it("returns RECOVERABLE for connection refused", () => {
       expect(
-        classifyClickHouseError(
-          new Error("connect ECONNREFUSED 127.0.0.1:8123"),
-        ),
+        classifyClickHouseError(new Error("connect ECONNREFUSED 127.0.0.1:8123")),
       ).toBe(ErrorCategory.RECOVERABLE);
     });
 
@@ -566,9 +552,7 @@ describe("classifyClickHouseError", () => {
         "EAI_AGAIN",
       ])("returns RECOVERABLE for socket errno %s", (code) => {
         expect(
-          classifyClickHouseError(
-            Object.assign(new Error("request failed"), { code }),
-          ),
+          classifyClickHouseError(Object.assign(new Error("request failed"), { code })),
         ).toBe(ErrorCategory.RECOVERABLE);
       });
 
@@ -577,14 +561,14 @@ describe("classifyClickHouseError", () => {
       // Either is all that survives an error that crossed a worker or
       // serialisation boundary and lost its errno.
       /** @scenario A socket failure that survived only as a message is still recoverable */
-      it.each([
-        "socket hang up",
-        "other side closed",
-      ])("returns RECOVERABLE for a bare %j message with no code", (message) => {
-        expect(classifyClickHouseError(new Error(message))).toBe(
-          ErrorCategory.RECOVERABLE,
-        );
-      });
+      it.each(["socket hang up", "other side closed"])(
+        "returns RECOVERABLE for a bare %j message with no code",
+        (message) => {
+          expect(classifyClickHouseError(new Error(message))).toBe(
+            ErrorCategory.RECOVERABLE,
+          );
+        },
+      );
 
       // The shared client owns the retry policy for reads; this classifier
       // owns it for queued jobs. They read the same failures, so a code the
@@ -593,9 +577,7 @@ describe("classifyClickHouseError", () => {
       it("agrees with every socket code the shared ClickHouse client retries", () => {
         for (const code of TRANSIENT_NETWORK_CODES) {
           expect(
-            classifyClickHouseError(
-              Object.assign(new Error("request failed"), { code }),
-            ),
+            classifyClickHouseError(Object.assign(new Error("request failed"), { code })),
           ).toBe(ErrorCategory.RECOVERABLE);
         }
       });
@@ -633,9 +615,7 @@ describe("classifyClickHouseError", () => {
     it("returns RECOVERABLE for a handled query_memory_exceeded wrapping code 241", () => {
       const raw = Object.assign(new Error("memory"), { code: "241" });
       const translated = new QueryMemoryExceededError({ reasons: [raw] });
-      expect(classifyClickHouseError(translated)).toBe(
-        ErrorCategory.RECOVERABLE,
-      );
+      expect(classifyClickHouseError(translated)).toBe(ErrorCategory.RECOVERABLE);
     });
 
     it("returns RECOVERABLE for a handled clickhouse_unavailable wrapping ECONNREFUSED", () => {
@@ -643,9 +623,7 @@ describe("classifyClickHouseError", () => {
         code: "ECONNREFUSED",
       });
       const translated = new ClickHouseUnavailableError({ reasons: [raw] });
-      expect(classifyClickHouseError(translated)).toBe(
-        ErrorCategory.RECOVERABLE,
-      );
+      expect(classifyClickHouseError(translated)).toBe(ErrorCategory.RECOVERABLE);
     });
 
     it("returns CRITICAL for a handled error wrapping a non-transient cause", () => {

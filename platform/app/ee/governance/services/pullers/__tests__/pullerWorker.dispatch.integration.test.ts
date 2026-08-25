@@ -202,10 +202,7 @@ describe("PullerAdapter framework — end-to-end with real CH + real fetch", () 
       cursor: null,
     });
 
-    const govProject = await ensureHiddenGovernanceProject(
-      prisma,
-      organizationId,
-    );
+    const govProject = await ensureHiddenGovernanceProject(prisma, organizationId);
     govProjectId = govProject.id;
 
     // async_insert + wait_for_async_insert=0 means the row may take

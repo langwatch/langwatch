@@ -114,9 +114,8 @@ describe("HttpPollingPullerAdapter", () => {
 
   describe("runOnce — single page", () => {
     it("returns mapped events with cursor=null when API drains in one call", async () => {
-      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
-        "../httpPollingPullerAdapter"
-      );
+      const { HttpPollingPullerAdapter: AdapterUnderTest } =
+        await import("../httpPollingPullerAdapter");
       const adapter = new AdapterUnderTest();
       responseQueue.push({
         status: 200,
@@ -165,9 +164,8 @@ describe("HttpPollingPullerAdapter", () => {
     });
 
     it("substitutes credentials into header templates", async () => {
-      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
-        "../httpPollingPullerAdapter"
-      );
+      const { HttpPollingPullerAdapter: AdapterUnderTest } =
+        await import("../httpPollingPullerAdapter");
       const adapter = new AdapterUnderTest();
       responseQueue.push({
         status: 200,
@@ -189,9 +187,8 @@ describe("HttpPollingPullerAdapter", () => {
 
   describe("runOnce — multi-page pagination", () => {
     it("chains calls until next_cursor is null", async () => {
-      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
-        "../httpPollingPullerAdapter"
-      );
+      const { HttpPollingPullerAdapter: AdapterUnderTest } =
+        await import("../httpPollingPullerAdapter");
       const adapter = new AdapterUnderTest();
       responseQueue.push({
         status: 200,
@@ -235,12 +232,10 @@ describe("HttpPollingPullerAdapter", () => {
     });
 
     it("uses absolute next_cursor URL as-is when API returns one (Microsoft Graph pattern)", async () => {
-      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
-        "../httpPollingPullerAdapter"
-      );
+      const { HttpPollingPullerAdapter: AdapterUnderTest } =
+        await import("../httpPollingPullerAdapter");
       const adapter = new AdapterUnderTest();
-      const nextLink =
-        "https://graph.microsoft.com/v1.0/auditLogs/foo?$skiptoken=ABC";
+      const nextLink = "https://graph.microsoft.com/v1.0/auditLogs/foo?$skiptoken=ABC";
       responseQueue.push({
         status: 200,
         body: { events: [], next_cursor: nextLink },
@@ -261,9 +256,8 @@ describe("HttpPollingPullerAdapter", () => {
 
   describe("error paths", () => {
     it("4xx fails fast — single call, errorCount=1, cursor unchanged", async () => {
-      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
-        "../httpPollingPullerAdapter"
-      );
+      const { HttpPollingPullerAdapter: AdapterUnderTest } =
+        await import("../httpPollingPullerAdapter");
       const adapter = new AdapterUnderTest();
       responseQueue.push({ status: 401, body: { error: "unauthorized" } });
 
@@ -279,9 +273,8 @@ describe("HttpPollingPullerAdapter", () => {
     });
 
     it("5xx retries up to twice; if all fail, errorCount=1 + cursor unchanged", async () => {
-      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
-        "../httpPollingPullerAdapter"
-      );
+      const { HttpPollingPullerAdapter: AdapterUnderTest } =
+        await import("../httpPollingPullerAdapter");
       const adapter = new AdapterUnderTest();
       responseQueue.push({ status: 503, body: { error: "down" } });
       responseQueue.push({ status: 503, body: { error: "down" } });
@@ -300,9 +293,8 @@ describe("HttpPollingPullerAdapter", () => {
 
   describe("cursor extraction edge cases", () => {
     it("treats missing next_cursor field as drained (cursor=null)", async () => {
-      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
-        "../httpPollingPullerAdapter"
-      );
+      const { HttpPollingPullerAdapter: AdapterUnderTest } =
+        await import("../httpPollingPullerAdapter");
       const adapter = new AdapterUnderTest();
       responseQueue.push({
         status: 200,

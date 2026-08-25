@@ -54,9 +54,7 @@ function apiKeyClaims({
 }
 
 /** The two credential kinds a browser-served byte endpoint accepts. */
-type ByteEndpointClaim =
-  | { kind: "api-key" }
-  | { kind: "session"; userId: string };
+type ByteEndpointClaim = { kind: "api-key" } | { kind: "session"; userId: string };
 
 /**
  * Dual-auth middleware for browser-served byte endpoints.

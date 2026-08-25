@@ -111,8 +111,6 @@ function splitLines(text: string): string[] {
   if (text.length === 0) return [];
   const normalized = text.replace(/\r\n/g, "\n");
   // Drop a single trailing newline so "a\n" is one line, not one line + empty.
-  const trimmed = normalized.endsWith("\n")
-    ? normalized.slice(0, -1)
-    : normalized;
+  const trimmed = normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized;
   return trimmed.split("\n");
 }

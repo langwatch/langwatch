@@ -165,9 +165,7 @@ describe("ttlReconciler", () => {
 
     describe("when engine_full has no TTL", () => {
       it("returns false", () => {
-        expect(hasLegacyRetentionTTL("MergeTree ORDER BY (TenantId)")).toBe(
-          false,
-        );
+        expect(hasLegacyRetentionTTL("MergeTree ORDER BY (TenantId)")).toBe(false);
       });
     });
   });
@@ -179,8 +177,7 @@ describe("ttlReconciler", () => {
           shouldRewriteTTL({
             currentDays: 30,
             desiredDays: 49,
-            engineFull:
-              "TTL toDateTime(EndTime) + toIntervalDay(30) TO VOLUME 'cold'",
+            engineFull: "TTL toDateTime(EndTime) + toIntervalDay(30) TO VOLUME 'cold'",
           }),
         ).toBe(true);
       });
@@ -192,8 +189,7 @@ describe("ttlReconciler", () => {
           shouldRewriteTTL({
             currentDays: 49,
             desiredDays: 49,
-            engineFull:
-              "TTL toDateTime(EndTime) + toIntervalDay(49) TO VOLUME 'cold'",
+            engineFull: "TTL toDateTime(EndTime) + toIntervalDay(49) TO VOLUME 'cold'",
           }),
         ).toBe(false);
       });
@@ -230,9 +226,7 @@ describe("ttlReconciler", () => {
         config: sampleEntry,
         days: 14,
       });
-      expect(result).toBe(
-        "toDateTime(EndTime) + INTERVAL 14 DAY TO VOLUME 'cold'",
-      );
+      expect(result).toBe("toDateTime(EndTime) + INTERVAL 14 DAY TO VOLUME 'cold'");
     });
 
     it("uses the ttlColumn from the config entry", () => {
@@ -243,9 +237,7 @@ describe("ttlReconciler", () => {
         hardcodedDefault: 30,
       };
       const result = buildDesiredTTLExpression({ config: entry, days: 7 });
-      expect(result).toBe(
-        "toDateTime(StartedAt) + INTERVAL 7 DAY TO VOLUME 'cold'",
-      );
+      expect(result).toBe("toDateTime(StartedAt) + INTERVAL 7 DAY TO VOLUME 'cold'");
     });
 
     it("uses ttlColumnExpression override when provided", () => {

@@ -126,9 +126,7 @@ function spanEvent({
 describe("traceAnalytics storage anchor", () => {
   describe("given a trace whose only signal is a log record", () => {
     const logAtMs = BASE_MS + 60_000;
-    const state = foldAll([
-      logRecordEvent({ eventId: "evt-log", occurredAt: logAtMs }),
-    ]);
+    const state = foldAll([logRecordEvent({ eventId: "evt-log", occurredAt: logAtMs })]);
     const row = project(state);
 
     /** @scenario "A trace whose only signal is a log record is anchored in real time" */
@@ -242,9 +240,7 @@ describe("traceAnalytics storage anchor", () => {
 
     /** @scenario "A late earlier-starting span moves the trace's timing, not its anchor" */
     it("pulls the timing baseline back to the earlier span", () => {
-      expect(project(afterLateSpan).earliestSpanStartMs).toBe(
-        lateEarlierStartMs,
-      );
+      expect(project(afterLateSpan).earliestSpanStartMs).toBe(lateEarlierStartMs);
     });
 
     /** @scenario "A late earlier-starting span moves the trace's timing, not its anchor" */
@@ -252,9 +248,7 @@ describe("traceAnalytics storage anchor", () => {
       // ADR-071's four consequences — orphaned versions, cross-partition
       // orphans, a TTL deadline that moves towards the row, and a dedup scope
       // that can miss the true latest — all come from this value moving.
-      expect(project(afterLateSpan).occurredAtMs).toBe(
-        project(anchored).occurredAtMs,
-      );
+      expect(project(afterLateSpan).occurredAtMs).toBe(project(anchored).occurredAtMs);
       expect(project(afterLateSpan).occurredAtMs).toBe(firstFoldedStartMs);
     });
   });

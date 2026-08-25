@@ -18,8 +18,7 @@ import type { Component } from "@langwatch/workflow-contract";
 const mockSetNode = vi.fn();
 
 vi.mock("@langwatch/workflow-web", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/workflow-web")>();
+  const actual = await importOriginal<typeof import("@langwatch/workflow-web")>();
   return {
     ...actual,
     useWorkflowStore: (selector: (state: unknown) => unknown) =>

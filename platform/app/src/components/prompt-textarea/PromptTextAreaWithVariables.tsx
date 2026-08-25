@@ -23,10 +23,7 @@ import { useParagraphDragDrop } from "./hooks/useParagraphDragDrop";
 import { useTemplateLogicMenu } from "./hooks/useTemplateLogicMenu";
 import { useTextareaResize } from "./hooks/useTextareaResize";
 import { useVariableMenu } from "./hooks/useVariableMenu";
-import {
-  extractLiquidVariables,
-  tokenizeLiquidTemplate,
-} from "./liquidTokenizer";
+import { extractLiquidVariables, tokenizeLiquidTemplate } from "./liquidTokenizer";
 import type { PromptTextAreaWithVariablesProps } from "./types";
 import {
   findJustCompletedVariable,
@@ -116,8 +113,10 @@ export const PromptTextAreaWithVariables = ({
   const [isHovered, setIsHovered] = useState(false);
 
   // Debounced textarea value management
-  const { localValue, handleValueChange, setValueImmediate } =
-    useDebouncedTextarea({ value, onChange });
+  const { localValue, handleValueChange, setValueImmediate } = useDebouncedTextarea({
+    value,
+    onChange,
+  });
 
   // Existing variable identifiers
   const existingVariableIds = useMemo(
@@ -165,10 +164,7 @@ export const PromptTextAreaWithVariables = ({
           if (variableMenu.menuOpen && !variableMenu.buttonMenuMode) {
             const cursor = nativeTextarea.selectionStart;
             const stillTyping = findUnclosedBraces(localValue, cursor);
-            const stillOnCompleted = findJustCompletedVariable(
-              localValue,
-              cursor,
-            );
+            const stillOnCompleted = findJustCompletedVariable(localValue, cursor);
             if (!stillTyping && !stillOnCompleted) {
               variableMenu.closeMenu();
             }
@@ -176,13 +172,7 @@ export const PromptTextAreaWithVariables = ({
         }
       }
     },
-    [
-      containerRef,
-      caretPositionRef,
-      lastUserCursorPosRef,
-      variableMenu,
-      localValue,
-    ],
+    [containerRef, caretPositionRef, lastUserCursorPosRef, variableMenu, localValue],
   );
 
   // Textarea resize detection
@@ -214,20 +204,14 @@ export const PromptTextAreaWithVariables = ({
   });
 
   // Variables used in text - Liquid-aware extraction
-  const liquidVariables = useMemo(
-    () => extractLiquidVariables(localValue),
-    [localValue],
-  );
+  const liquidVariables = useMemo(() => extractLiquidVariables(localValue), [localValue]);
 
   const usedVariables = liquidVariables.inputVariables;
 
   // Variables that are defined locally (loop iterators, assign) - not "undefined"
   const locallyDefinedVariables = useMemo(
     () =>
-      new Set([
-        ...liquidVariables.loopVariables,
-        ...liquidVariables.assignedVariables,
-      ]),
+      new Set([...liquidVariables.loopVariables, ...liquidVariables.assignedVariables]),
     [liquidVariables],
   );
 
@@ -302,9 +286,7 @@ export const PromptTextAreaWithVariables = ({
         case "ArrowUp":
           e.preventDefault();
           activeMenu.setIsKeyboardNav(true);
-          activeMenu.setHighlightedIndex((prev: number) =>
-            Math.max(prev - 1, 0),
-          );
+          activeMenu.setHighlightedIndex((prev: number) => Math.max(prev - 1, 0));
           break;
         case "Enter":
         case "Tab":
@@ -339,8 +321,7 @@ export const PromptTextAreaWithVariables = ({
 
         if (!logicMenu.menuOpen) {
           setTimeout(
-            () =>
-              logicMenu.openMenu(unclosedPercent.start, unclosedPercent.query),
+            () => logicMenu.openMenu(unclosedPercent.start, unclosedPercent.query),
             0,
           );
         } else {
@@ -360,8 +341,7 @@ export const PromptTextAreaWithVariables = ({
       if (unclosedBraces) {
         if (!variableMenu.menuOpen) {
           setTimeout(
-            () =>
-              variableMenu.openMenu(unclosedBraces.start, unclosedBraces.query),
+            () => variableMenu.openMenu(unclosedBraces.start, unclosedBraces.query),
             0,
           );
         } else {
@@ -384,10 +364,7 @@ export const PromptTextAreaWithVariables = ({
 
       if (completedIsUnknown) {
         if (!variableMenu.menuOpen) {
-          setTimeout(
-            () => variableMenu.openMenu(completed.start, completed.name),
-            0,
-          );
+          setTimeout(() => variableMenu.openMenu(completed.start, completed.name), 0);
         } else {
           variableMenu.setMenuQuery(completed.name);
         }
@@ -424,8 +401,7 @@ export const PromptTextAreaWithVariables = ({
           const varName = inner.split("|")[0]!.trim().split(".")[0]!.trim();
           // Valid if it's an existing external variable OR a locally-defined one (loop/assign)
           const isInvalid = varName
-            ? !existingVariableIds.has(varName) &&
-              !locallyDefinedVariables.has(varName)
+            ? !existingVariableIds.has(varName) && !locallyDefinedVariables.has(varName)
             : true;
 
           const variableColor = isInvalid
@@ -441,9 +417,7 @@ export const PromptTextAreaWithVariables = ({
                 // changes character width and breaks caret positioning. Use text-shadow
                 // for a "faux bold" effect that doesn't affect text metrics.
                 fontWeight: borderless ? undefined : 600,
-                textShadow: borderless
-                  ? `0px 0px 1px ${variableColor}`
-                  : undefined,
+                textShadow: borderless ? `0px 0px 1px ${variableColor}` : undefined,
               }}
             >
               {token.value}
@@ -685,9 +659,7 @@ export const PromptTextAreaWithVariables = ({
           isOpen={logicMenu.menuOpen}
           position={logicMenu.menuPosition}
           query={logicMenu.menuQuery}
-          onQueryChange={
-            logicMenu.buttonMenuMode ? logicMenu.setMenuQuery : undefined
-          }
+          onQueryChange={logicMenu.buttonMenuMode ? logicMenu.setMenuQuery : undefined}
           filteredConstructs={logicMenu.filteredConstructs}
           highlightedIndex={logicMenu.highlightedIndex}
           onHighlightChange={logicMenu.setHighlightedIndex}

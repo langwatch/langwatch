@@ -1,12 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import {
-  Button,
-  Container,
-  Heading,
-  Html,
-  Section,
-  Text,
-} from "@react-email/components";
+import { Button, Container, Heading, Html, Section, Text } from "@react-email/components";
 import { render } from "@react-email/render";
 import { sendEmail } from "./emailSender";
 

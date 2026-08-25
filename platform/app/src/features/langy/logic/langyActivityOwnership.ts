@@ -29,10 +29,7 @@ export function resolveLangyActivityOwnership({
     standaloneProgressSample: hasInlineProgressOwner ? null : progressSample,
     showStandaloneSignals: !hasInlineProgressOwner || metricsCount > 0,
     waveStatusActive:
-      turnInFlight &&
-      !hasInlineProgressOwner &&
-      !!status &&
-      status.trim().length > 0,
+      turnInFlight && !hasInlineProgressOwner && !!status && status.trim().length > 0,
   };
 }
 

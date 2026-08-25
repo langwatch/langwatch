@@ -30,10 +30,7 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
   const init = (): CountState => ({ ids: [], LastEventOccurredAt: 0 });
   const apply = (state: CountState, event: Event): CountState => ({
     ids: [...state.ids, event.id],
-    LastEventOccurredAt: Math.max(
-      state.LastEventOccurredAt,
-      event.occurredAt ?? 0,
-    ),
+    LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt ?? 0),
   });
 
   const context: ProjectionStoreContext = {
@@ -101,13 +98,7 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
   describe("given the store misses and the fold is order-insensitive with a paged loader", () => {
     describe("when the history spans multiple pages", () => {
       it("pages through the whole history and folds every event", async () => {
-        const history = [
-          ev("e1", 1),
-          ev("e2", 2),
-          ev("e3", 3),
-          ev("e4", 4),
-          ev("e5", 5),
-        ];
+        const history = [ev("e1", 1), ev("e2", 2), ev("e3", 3), ev("e4", 4), ev("e5", 5)];
         const loader = pagedLoaderFrom(history);
         const { foldDef, store } = makeFold(loader);
         // 2 events per page → 3 loader calls ([e1,e2] | [e3,e4] | [e5]).
@@ -173,11 +164,7 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
         const executor = new FoldProjectionExecutor(2);
         const e1 = ev("e1", 1);
 
-        const result = (await executor.execute(
-          foldDef,
-          e1,
-          context,
-        )) as CountState;
+        const result = (await executor.execute(foldDef, e1, context)) as CountState;
 
         expect(result.ids).toEqual(["e1"]);
         expect(store.store).toHaveBeenCalled();

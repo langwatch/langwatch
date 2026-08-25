@@ -119,11 +119,10 @@ export function BudgetCreateDrawer({
       refetchOnWindowFocus: false,
     },
   );
-  const providersQuery =
-    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
-      { organizationId: orgId },
-      { enabled: !!orgId && open, refetchOnWindowFocus: false },
-    );
+  const providersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId && open, refetchOnWindowFocus: false },
+  );
 
   const teams = useMemo(
     () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
@@ -301,12 +300,7 @@ export function BudgetCreateDrawer({
   };
 
   return (
-    <Drawer.Root
-      open={open}
-      onOpenChange={() => close()}
-      placement="end"
-      size="md"
-    >
+    <Drawer.Root open={open} onOpenChange={() => close()} placement="end" size="md">
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>New budget</Drawer.Title>
@@ -373,11 +367,7 @@ export function BudgetCreateDrawer({
                   All AI spend in {organization?.name ?? "the organization"}.
                 </Text>
               ) : (
-                <NativeSelect.Root
-                  size="sm"
-                  marginTop={1}
-                  disabled={targetsLoading}
-                >
+                <NativeSelect.Root size="sm" marginTop={1} disabled={targetsLoading}>
                   <NativeSelect.Field
                     value={targetId}
                     aria-label="Budget target"
@@ -472,9 +462,7 @@ export function BudgetCreateDrawer({
                 <NativeSelect.Root size="sm">
                   <NativeSelect.Field
                     value={window}
-                    onChange={(e) =>
-                      setWindow((e.target.value as Window) ?? "MONTH")
-                    }
+                    onChange={(e) => setWindow((e.target.value as Window) ?? "MONTH")}
                   >
                     <option value="MINUTE">Per minute</option>
                     <option value="HOUR">Per hour</option>
@@ -536,9 +524,7 @@ export function BudgetCreateDrawer({
                   }
                 >
                   <option value="BLOCK">Block: reject requests at limit</option>
-                  <option value="WARN">
-                    Warn: tag responses, keep serving
-                  </option>
+                  <option value="WARN">Warn: tag responses, keep serving</option>
                 </NativeSelect.Field>
               </NativeSelect.Root>
             </Field.Root>
@@ -547,11 +533,7 @@ export function BudgetCreateDrawer({
         <Drawer.Footer>
           <HStack width="full">
             <Spacer />
-            <Button
-              variant="ghost"
-              onClick={close}
-              disabled={createMutation.isPending}
-            >
+            <Button variant="ghost" onClick={close} disabled={createMutation.isPending}>
               Cancel
             </Button>
             <Button

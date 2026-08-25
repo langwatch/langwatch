@@ -77,9 +77,7 @@ function makeRepository() {
       captured.push(...args.values);
     },
   } as unknown as ClickHouseClient;
-  const repository = new CodingAgentSessionClickHouseRepository(
-    async () => client,
-  );
+  const repository = new CodingAgentSessionClickHouseRepository(async () => client);
   return { repository, captured };
 }
 
@@ -200,9 +198,7 @@ describe("CodingAgentSessionClickHouseRepository DateTime64 decode", () => {
         });
 
         expect(found?.row.startedAtMs).toBe(Date.parse("2026-07-24T12:00:00Z"));
-        expect(found?.row.updatedAt).toBe(
-          Date.parse("2026-07-24T12:00:02.500Z"),
-        );
+        expect(found?.row.updatedAt).toBe(Date.parse("2026-07-24T12:00:02.500Z"));
         expect(found?.row.lastEventOccurredAt).toBe(
           Date.parse("2026-07-24T12:00:01.250Z"),
         );
@@ -244,9 +240,7 @@ describe("CodingAgentSessionClickHouseRepository DateTime64 decode", () => {
  * of it: that helper lives on an unmerged branch, and its grammar does not
  * cover the summed key this repository emits.
  */
-function orderingClient(
-  rows: Array<Record<string, unknown>>,
-): ClickHouseClient {
+function orderingClient(rows: Array<Record<string, unknown>>): ClickHouseClient {
   return {
     query: async (params: { query: string }) => ({
       json: async () => applyOrderBy(rows, params.query).slice(0, 1),
@@ -287,10 +281,7 @@ function applyOrderBy(
 }
 
 /** UInt64 columns arrive as strings on the wire; DateTime64 sorts lexically. */
-function evaluate(
-  row: Record<string, unknown>,
-  expression: string,
-): number | string {
+function evaluate(row: Record<string, unknown>, expression: string): number | string {
   const arrayLength = /^length\((.+)\)$/i.exec(expression);
   if (arrayLength) {
     const value = row[arrayLength[1]!.trim()];
@@ -304,9 +295,7 @@ function evaluate(
   const raw = row[expression];
   if (typeof raw === "number") return raw;
   const asString = String(raw ?? "");
-  return asString !== "" && !Number.isNaN(Number(asString))
-    ? Number(asString)
-    : asString;
+  return asString !== "" && !Number.isNaN(Number(asString)) ? Number(asString) : asString;
 }
 
 /**
@@ -466,8 +455,7 @@ function chTime(ms: number): string {
  * fall inside the requested window, and the window assertions would be
  * measuring the fake's bug rather than the repository's behaviour.
  */
-const millis = (value: unknown): number =>
-  parseClickHouseDateTimeMs(String(value));
+const millis = (value: unknown): number => parseClickHouseDateTimeMs(String(value));
 
 /**
  * Splits the emitted list query into its two scopes: the inner
@@ -490,8 +478,7 @@ function splitScopes(query: string): { inner: string; outer: string } {
   };
 }
 
-const boundsStartedAt = (scope: string): boolean =>
-  /StartedAt\s+BETWEEN/i.test(scope);
+const boundsStartedAt = (scope: string): boolean => /StartedAt\s+BETWEEN/i.test(scope);
 const narrowsToUser = (scope: string): boolean => /UserId\s*=/i.test(scope);
 
 /** Applies whichever predicates the repository actually put in this scope. */
@@ -523,10 +510,7 @@ function listClient(rows: Array<Record<string, unknown>>): {
 } {
   let sent = "";
   const client = {
-    query: async (args: {
-      query: string;
-      query_params: Record<string, unknown>;
-    }) => {
+    query: async (args: { query: string; query_params: Record<string, unknown> }) => {
       sent = args.query;
       const { inner, outer } = splitScopes(args.query);
 
@@ -534,19 +518,15 @@ function listClient(rows: Array<Record<string, unknown>>): {
       for (const row of rows) {
         if (!inScope(row, inner, args.query_params)) continue;
         const key = `${String(row.TenantId)}\u0000${String(row.SessionId)}`;
-        latest.set(
-          key,
-          Math.max(latest.get(key) ?? -Infinity, millis(row.UpdatedAt)),
-        );
+        latest.set(key, Math.max(latest.get(key) ?? -Infinity, millis(row.UpdatedAt)));
       }
 
       const selected = rows
         .filter((row) => inScope(row, outer, args.query_params))
         .filter(
           (row) =>
-            latest.get(
-              `${String(row.TenantId)}\u0000${String(row.SessionId)}`,
-            ) === millis(row.UpdatedAt),
+            latest.get(`${String(row.TenantId)}\u0000${String(row.SessionId)}`) ===
+            millis(row.UpdatedAt),
         )
         .sort((left, right) => millis(right.StartedAt) - millis(left.StartedAt))
         .slice(0, Number(args.query_params.limit));
@@ -590,15 +570,13 @@ const listRecent = (
   client: ClickHouseClient,
   userId?: string,
 ): Promise<CodingAgentSessionRow[]> =>
-  new CodingAgentSessionClickHouseRepository(async () => client).findManyRecent(
-    {
-      tenantId: "tenant-1",
-      fromMs: WINDOW_FROM,
-      toMs: WINDOW_TO,
-      limit: 50,
-      ...(userId !== undefined ? { userId } : {}),
-    },
-  );
+  new CodingAgentSessionClickHouseRepository(async () => client).findManyRecent({
+    tenantId: "tenant-1",
+    fromMs: WINDOW_FROM,
+    toMs: WINDOW_TO,
+    limit: 50,
+    ...(userId !== undefined ? { userId } : {}),
+  });
 
 describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
   describe("given a windowed list read", () => {
@@ -901,9 +879,8 @@ describe("CodingAgentSessionClickHouseRepository branch-list routing", () => {
             costUsd: 4,
           }),
         ]);
-        const repository = new CodingAgentSessionClickHouseRepository(
-          async (tenantId) =>
-            tenantId === "tenant-a" ? first.client : second.client,
+        const repository = new CodingAgentSessionClickHouseRepository(async (tenantId) =>
+          tenantId === "tenant-a" ? first.client : second.client,
         );
 
         const listed = await repository.listByRepositoryBranch({
@@ -917,10 +894,7 @@ describe("CodingAgentSessionClickHouseRepository branch-list routing", () => {
 
         expect(first.sentTenantIds()).toEqual([["tenant-a"]]);
         expect(second.sentTenantIds()).toEqual([["tenant-b"]]);
-        expect(listed.map((row) => row.sessionId)).toEqual([
-          "session-a",
-          "session-b",
-        ]);
+        expect(listed.map((row) => row.sessionId)).toEqual(["session-a", "session-b"]);
         expect(listed.map((row) => row.costUsd)).toEqual([3, 4]);
         expect(listed.map((row) => row.lastEventOccurredAtMs)).toEqual([
           WINDOW_FROM + 60_000,
@@ -1034,9 +1008,7 @@ describe("CodingAgentSessionClickHouseRepository list-read cost signal", () => {
           },
         } as unknown as ClickHouseClient;
 
-        await expect(listRecent(failing)).rejects.toThrow(
-          "clickhouse unavailable",
-        );
+        await expect(listRecent(failing)).rejects.toThrow("clickhouse unavailable");
 
         expect(await listReadObservations("error")).toBe(beforeError + 1);
         expect(await listReadObservations("hit")).toBe(beforeHit);

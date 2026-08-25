@@ -165,9 +165,7 @@ describe("Script - injection timing", () => {
           vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
           vi.useFakeTimers();
 
-          const { unmount } = render(
-            <Script id="pendo">{`window.pendo = {};`}</Script>,
-          );
+          const { unmount } = render(<Script id="pendo">{`window.pendo = {};`}</Script>);
 
           unmount();
           vi.runAllTimers();
@@ -201,8 +199,7 @@ describe("Script - injection timing", () => {
 
           window.dispatchEvent(new Event("load"));
           vi.runAllTimers();
-          const scriptCountAfterFirstLoad =
-            document.querySelectorAll("#pendo").length;
+          const scriptCountAfterFirstLoad = document.querySelectorAll("#pendo").length;
 
           window.dispatchEvent(new Event("load"));
           vi.runAllTimers();
@@ -217,9 +214,7 @@ describe("Script - injection timing", () => {
           vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
           vi.useFakeTimers();
 
-          const { unmount } = render(
-            <Script id="pendo">{`window.pendo = {};`}</Script>,
-          );
+          const { unmount } = render(<Script id="pendo">{`window.pendo = {};`}</Script>);
 
           unmount();
           window.dispatchEvent(new Event("load"));

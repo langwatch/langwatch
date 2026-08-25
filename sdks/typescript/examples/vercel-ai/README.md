@@ -13,11 +13,13 @@ This example demonstrates how to use the Vercel AI SDK with LangWatch observabil
 ## Setup
 
 1. Install dependencies:
+
 ```bash
 npm install
 ```
 
 2. Set up your environment variables:
+
 ```bash
 cp .env.example .env
 # Edit .env with your OpenAI API key

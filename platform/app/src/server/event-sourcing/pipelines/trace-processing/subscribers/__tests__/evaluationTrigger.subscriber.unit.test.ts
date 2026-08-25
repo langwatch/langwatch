@@ -11,9 +11,7 @@ import {
 } from "../evaluationTrigger.subscriber";
 import { DEFERRED_CHECK_DELAY_MS } from "../originGate.subscriber";
 
-function createFoldState(
-  overrides: Partial<TraceSummaryData> = {},
-): TraceSummaryData {
+function createFoldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {
     traceId: "trace-1",
     traceName: "",
@@ -119,9 +117,7 @@ function createOriginEvent(origin = "application"): TraceProcessingEvent {
   } as unknown as TraceProcessingEvent;
 }
 
-function createContext(
-  state: TraceSummaryData,
-): TriggerContext<TraceSummaryData> {
+function createContext(state: TraceSummaryData): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "tenant-1",
     aggregateId: "trace-1",
@@ -224,9 +220,7 @@ describe("evaluationTrigger subscriber", () => {
 
       await subscriber.spec.handler(createOriginEvent(), createContext(state));
 
-      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith(
-        "tenant-1",
-      );
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
   });
@@ -240,10 +234,7 @@ describe("evaluationTrigger subscriber", () => {
         attributes: { "langwatch.origin": "application" },
       });
 
-      await subscriber.spec.handler(
-        createTopicAssignedEvent(),
-        createContext(state),
-      );
+      await subscriber.spec.handler(createTopicAssignedEvent(), createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
       expect(deps.evaluation).not.toHaveBeenCalled();
@@ -399,10 +390,7 @@ describe("evaluationTrigger subscriber", () => {
       const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({ attributes: {} });
 
-      await subscriber.spec.handler(
-        createOriginEvent(""),
-        createContext(state),
-      );
+      await subscriber.spec.handler(createOriginEvent(""), createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
       expect(deps.evaluation).not.toHaveBeenCalled();
@@ -422,9 +410,7 @@ describe("evaluationTrigger subscriber", () => {
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
       expect(options!.deduplication).toBeDefined();
-      expect(options!.deduplication!.ttlMs).toBe(
-        DEFERRED_CHECK_DELAY_MS + 60_000,
-      );
+      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
       expect(options!.delay).toBeUndefined();
     });
 
@@ -533,9 +519,7 @@ describe("evaluationTrigger subscriber", () => {
 
       await subscriber.spec.handler(event, createContext(state));
 
-      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith(
-        "tenant-1",
-      );
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
   });
@@ -584,9 +568,9 @@ describe("evaluationTrigger relevance check", () => {
   describe("given a trace with a resolved origin", () => {
     /** @scenario "The origin guard admits a genuine message event before enqueue" */
     it("agrees to react to a recent span event", () => {
-      expect(
-        shouldDispatch({ event: createSpanEvent(), state: withOrigin() }),
-      ).toBe(true);
+      expect(shouldDispatch({ event: createSpanEvent(), state: withOrigin() })).toBe(
+        true,
+      );
     });
 
     /** @scenario "The origin guard filters a non-message event before enqueue" */
@@ -602,9 +586,7 @@ describe("evaluationTrigger relevance check", () => {
     /** @scenario "The evaluation trigger declines a synthetic span before enqueue" */
     it("declines a synthetic span", () => {
       const synthetic = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
-      expect(shouldDispatch({ event: synthetic, state: withOrigin() })).toBe(
-        false,
-      );
+      expect(shouldDispatch({ event: synthetic, state: withOrigin() })).toBe(false);
     });
 
     /** @scenario "The evaluation trigger dispatches nothing past the span processing cap" */
@@ -613,9 +595,7 @@ describe("evaluationTrigger relevance check", () => {
       // runs once per event of a coalesced batch and would multiply the
       // once-per-crossing warn by the batch size.
       const atCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS });
-      expect(shouldDispatch({ event: createSpanEvent(), state: atCap })).toBe(
-        true,
-      );
+      expect(shouldDispatch({ event: createSpanEvent(), state: atCap })).toBe(true);
 
       const deps = createDeps();
       const subscriber = createEvaluationTriggerSubscriber(deps);
@@ -627,19 +607,13 @@ describe("evaluationTrigger relevance check", () => {
       const pastCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS + 1 });
       const depsPast = createDeps();
       const subscriberPast = createEvaluationTriggerSubscriber(depsPast);
-      await subscriberPast.spec.handler(
-        createSpanEvent(),
-        createContext(pastCap),
-      );
+      await subscriberPast.spec.handler(createSpanEvent(), createContext(pastCap));
       expect(depsPast.evaluation).not.toHaveBeenCalled();
 
       const belowCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS - 1 });
       const depsBelow = createDeps();
       const subscriberBelow = createEvaluationTriggerSubscriber(depsBelow);
-      await subscriberBelow.spec.handler(
-        createSpanEvent(),
-        createContext(belowCap),
-      );
+      await subscriberBelow.spec.handler(createSpanEvent(), createContext(belowCap));
       expect(depsBelow.evaluation).toHaveBeenCalledTimes(1);
     });
   });
@@ -647,9 +621,9 @@ describe("evaluationTrigger relevance check", () => {
   describe("given a trace whose origin is unresolved", () => {
     /** @scenario "The origin guard filters a trace with no resolved origin before enqueue" */
     it("declines a span event", () => {
-      expect(
-        shouldDispatch({ event: createSpanEvent(), state: createFoldState() }),
-      ).toBe(false);
+      expect(shouldDispatch({ event: createSpanEvent(), state: createFoldState() })).toBe(
+        false,
+      );
     });
   });
 });

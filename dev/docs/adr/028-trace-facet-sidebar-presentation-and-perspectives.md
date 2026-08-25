@@ -39,7 +39,7 @@ alternatives:
    `FacetManagerPopover` ("Configure") lists every facet grouped under nine
    `FACET_GROUPS` headers. Ordering and grouping are held by a single,
    global `facetLensStore` arrangement (`{ sectionOrder, groupOrder,
-   sectionOpen }`); its `FacetLens` shape already carries unused `id`/`name`
+sectionOpen }`); its `FacetLens` shape already carries unused `id`/`name`
    fields, i.e. it was built to hold more than one named arrangement. We want
    the manager to present **the full facet set through three task-oriented
    perspectives** — Observability, LLM, Cost & Performance — each re-grouping and
@@ -66,7 +66,7 @@ and
 A numeric (range-kind) facet may be presented two ways, chosen per facet:
 
 - **Range** — the existing double-handled slider; serialises `field:[from TO
-  to]`. Unchanged, and the only mode for floats and wide integer ranges.
+to]`. Unchanged, and the only mode for floats and wide integer ranges.
 - **Discrete** — a multi-select list of the integer values present, **reusing
   the categorical `FacetSection` UI and its multi-value (OR) selection
   pipeline**. A selection serialises through the same exact-match path a

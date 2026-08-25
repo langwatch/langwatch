@@ -83,16 +83,12 @@ export const exportTracesCommand = async (options: {
   const startDate = options.startDate
     ? new Date(options.startDate).getTime()
     : now - 7 * 24 * 60 * 60 * 1000; // 7 days ago
-  const endDate = options.endDate
-    ? new Date(options.endDate).getTime()
-    : now;
+  const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
 
   const limit = options.limit ? Number(options.limit) : 1000;
   if (!Number.isSafeInteger(limit) || limit <= 0) {
     console.error(
-      chalk.red(
-        `Error: --limit must be a positive whole number, got "${options.limit}"`,
-      ),
+      chalk.red(`Error: --limit must be a positive whole number, got "${options.limit}"`),
     );
     process.exit(1);
   }
@@ -188,7 +184,9 @@ export const exportTracesCommand = async (options: {
       if (!scrollId || exhausted || traces.length >= limit) break;
     }
 
-    spinner.succeed(`Exported ${traces.length} trace${traces.length !== 1 ? "s" : ""}${matched > traces.length ? ` (${matched} total)` : ""}`);
+    spinner.succeed(
+      `Exported ${traces.length} trace${traces.length !== 1 ? "s" : ""}${matched > traces.length ? ` (${matched} total)` : ""}`,
+    );
 
     // Serialising each trace is real per-row work, so this progress is genuinely
     // the file being built — not a bar invented for the sake of having one.

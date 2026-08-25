@@ -87,11 +87,7 @@ export function SectionNavigationFrame({
 }: SectionNavigationFrameProps) {
   return (
     <Box width="full" padding={4} data-testid="section-navigation-layout">
-      <Container
-        maxW="1600px"
-        paddingX={0}
-        data-testid="section-navigation-container"
-      >
+      <Container maxW="1600px" paddingX={0} data-testid="section-navigation-container">
         <Stack
           direction={{ base: "column", md: "row" }}
           alignItems={{ base: "stretch", md: "start" }}

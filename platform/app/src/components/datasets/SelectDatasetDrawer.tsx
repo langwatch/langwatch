@@ -27,17 +27,12 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
 
   const onClose = props.onClose ?? closeDrawer;
   const onSelect =
-    props.onSelect ??
-    (complexProps.onSelect as SelectDatasetDrawerProps["onSelect"]);
+    props.onSelect ?? (complexProps.onSelect as SelectDatasetDrawerProps["onSelect"]);
   // Note: props.open can be a string (drawer name) from CurrentDrawer, convert to boolean
   const isOpen = props.open !== false && props.open !== undefined;
 
   return (
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="md"
-    >
+    <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()} size="md">
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>

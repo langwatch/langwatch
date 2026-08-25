@@ -1,4 +1,8 @@
-import type { CreateSuiteCommand, SuiteIdInput, UpdateSuiteCommand } from "./suite.commands";
+import type {
+  CreateSuiteCommand,
+  SuiteIdInput,
+  UpdateSuiteCommand,
+} from "./suite.commands";
 import type {
   Suite,
   SuiteArchivedNamesInput,

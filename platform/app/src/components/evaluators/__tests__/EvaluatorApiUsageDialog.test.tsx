@@ -61,11 +61,7 @@ const renderDialog = (
 ) => {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <EvaluatorApiUsageDialog
-        evaluator={evaluator}
-        open={open}
-        onClose={onClose}
-      />
+      <EvaluatorApiUsageDialog evaluator={evaluator} open={open} onClose={onClose} />
     </ChakraProvider>,
   );
 };
@@ -117,9 +113,7 @@ describe("EvaluatorApiUsageDialog", () => {
   describe("mode switching", () => {
     it("defaults to Online Evaluation mode", () => {
       renderDialog(mockEvaluatorWithType);
-      const modeSelect = screen.getByTestId(
-        "usage-mode-select",
-      ) as HTMLSelectElement;
+      const modeSelect = screen.getByTestId("usage-mode-select") as HTMLSelectElement;
       expect(modeSelect.value).toBe("online");
     });
 
@@ -131,9 +125,9 @@ describe("EvaluatorApiUsageDialog", () => {
       await user.selectOptions(modeSelect, "experiment");
 
       await waitFor(() => {
-        expect(
-          (screen.getByTestId("usage-mode-select") as HTMLSelectElement).value,
-        ).toBe("experiment");
+        expect((screen.getByTestId("usage-mode-select") as HTMLSelectElement).value).toBe(
+          "experiment",
+        );
       });
     });
 
@@ -168,9 +162,7 @@ describe("EvaluatorApiUsageDialog", () => {
   describe("language switching", () => {
     it("defaults to Python", () => {
       renderDialog(mockEvaluatorWithType);
-      const langSelect = screen.getByTestId(
-        "language-select",
-      ) as HTMLSelectElement;
+      const langSelect = screen.getByTestId("language-select") as HTMLSelectElement;
       expect(langSelect.value).toBe("python");
     });
 
@@ -182,9 +174,9 @@ describe("EvaluatorApiUsageDialog", () => {
       await user.selectOptions(langSelect, "typescript");
 
       await waitFor(() => {
-        expect(
-          (screen.getByTestId("language-select") as HTMLSelectElement).value,
-        ).toBe("typescript");
+        expect((screen.getByTestId("language-select") as HTMLSelectElement).value).toBe(
+          "typescript",
+        );
       });
     });
 

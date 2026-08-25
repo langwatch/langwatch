@@ -46,10 +46,7 @@ type PassRateCircleProps = {
  * Color interpolates from red (0%) through orange (50%) to green (100%).
  * Null passRate renders a gray circle (no verdict runs).
  */
-export const PassRateCircle = ({
-  passRate,
-  size = "10px",
-}: PassRateCircleProps) => (
+export const PassRateCircle = ({ passRate, size = "10px" }: PassRateCircleProps) => (
   <Circle size={size} bg={getPassRateGradientColor(passRate)} flexShrink={0} />
 );
 

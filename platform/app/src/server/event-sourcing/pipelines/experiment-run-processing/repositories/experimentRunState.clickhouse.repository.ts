@@ -19,17 +19,12 @@ import type {
   ExperimentRunState,
   ExperimentRunStateData,
 } from "../projections/experimentRunState.foldProjection";
-import {
-  makeExperimentRunKey,
-  parseExperimentRunKey,
-} from "../utils/compositeKey";
+import { makeExperimentRunKey, parseExperimentRunKey } from "../utils/compositeKey";
 import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
 
 const TABLE_NAME = "experiment_runs" as const;
 
-const logger = createLogger(
-  "langwatch:experiment-run-processing:run-state-repository",
-);
+const logger = createLogger("langwatch:experiment-run-processing:run-state-repository");
 
 interface ClickHouseExperimentRunRecord {
   ProjectionId: string;
@@ -73,8 +68,7 @@ type ClickHouseExperimentRunWriteRecord = WithDateWrites<
 
 export class ExperimentRunStateRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
-> implements ExperimentRunStateRepository<ProjectionType>
-{
+> implements ExperimentRunStateRepository<ProjectionType> {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   private mapClickHouseRecordToProjectionData(
@@ -225,8 +219,7 @@ export class ExperimentRunStateRepositoryClickHouse<
 
       return projection as ProjectionType;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(
         { runId, tenantId: context.tenantId, error: errorMessage },
         "Failed to get projection from ClickHouse",
@@ -293,8 +286,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(
         {
           tenantId: context.tenantId,
@@ -365,8 +357,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(
         {
           tenantId: context.tenantId,

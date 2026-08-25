@@ -40,11 +40,7 @@ export function callerProject({
   requestedProjectId: string | undefined;
 }): Project {
   if (requestedProjectId !== project.id) {
-    throw new NotFoundError(
-      "project_not_found",
-      "Project",
-      requestedProjectId ?? "",
-    );
+    throw new NotFoundError("project_not_found", "Project", requestedProjectId ?? "");
   }
   return project;
 }
@@ -56,9 +52,7 @@ export function callerProject({
  *
  * @throws {LangWatchQLNotEnabledError} when the flag is off for this project.
  */
-export async function requireLangWatchQLEnabled(
-  project: Project,
-): Promise<void> {
+export async function requireLangWatchQLEnabled(project: Project): Promise<void> {
   // Asked through `lwqlEnabled` rather than evaluated here: it is the
   // one place the flag is read, so this boundary and the tRPC one cannot drift
   // into answering the same question differently.

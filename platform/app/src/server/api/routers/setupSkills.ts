@@ -1,9 +1,6 @@
 import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
-import {
-  isSetupSkillId,
-  setupSkillBody,
-} from "~/server/skills/setupSkills.service";
+import { isSetupSkillId, setupSkillBody } from "~/server/skills/setupSkills.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**

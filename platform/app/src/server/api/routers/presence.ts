@@ -26,9 +26,7 @@ export const presenceRouter = createTRPCRouter({
    * impersonate another user by setting it in the payload.
    */
   update: protectedProcedure
-    .input(
-      presenceUpdateInputSchema.omit({ user: true }),
-    )
+    .input(presenceUpdateInputSchema.omit({ user: true }))
     .permission("traces:view")
     .mutation(async ({ input, ctx }) => {
       if (!(await ctx.app.presence.isEnabledForProject(input))) {
@@ -98,18 +96,12 @@ export const presenceRouter = createTRPCRouter({
           try {
             decoded = JSON.parse(payload.event);
           } catch {
-            logger.warn(
-              { projectId },
-              "Ignoring malformed presence broadcast payload",
-            );
+            logger.warn({ projectId }, "Ignoring malformed presence broadcast payload");
             continue;
           }
           const result = presenceEventSchema.safeParse(decoded);
           if (!result.success) {
-            logger.warn(
-              { projectId },
-              "Ignoring invalid presence broadcast payload",
-            );
+            logger.warn({ projectId }, "Ignoring invalid presence broadcast payload");
             continue;
           }
           const parsed = result.data;
@@ -143,9 +135,7 @@ export const presenceRouter = createTRPCRouter({
    * silently if the per-tenant rate-limit bucket is exhausted.
    */
   cursor: protectedProcedure
-    .input(
-      presenceCursorInputSchema.omit({ user: true }),
-    )
+    .input(presenceCursorInputSchema.omit({ user: true }))
     .permission("traces:view")
     .mutation(async ({ input, ctx }) => {
       if (!(await ctx.app.presence.isEnabledForProject(input))) {

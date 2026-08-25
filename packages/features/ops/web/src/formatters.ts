@@ -44,10 +44,7 @@ export function formatMs(ms: number): string {
  * Format duration between two timestamps, or elapsed time from start until now.
  * When `completedAt` is null/undefined, computes elapsed from `startedAt` to now.
  */
-export function formatDuration(
-  startedAt: string,
-  completedAt?: string | null,
-): string {
+export function formatDuration(startedAt: string, completedAt?: string | null): string {
   const end = completedAt ? new Date(completedAt).getTime() : Date.now();
   return formatDurationMs(end - new Date(startedAt).getTime());
 }

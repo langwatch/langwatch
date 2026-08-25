@@ -221,8 +221,7 @@ export async function matchRealtimeSession(params: {
   }
 
   const since = new Date(
-    (params.callStartedAt?.getTime() ?? Date.now()) -
-      REALTIME_OPEN_SESSION_WINDOW_MS,
+    (params.callStartedAt?.getTime() ?? Date.now()) - REALTIME_OPEN_SESSION_WINDOW_MS,
   );
   const candidates = await prisma.gatewayRealtimeSession.findMany({
     where: {

@@ -167,12 +167,7 @@ export const SyntaxHelpDrawerHost: React.FC = () => {
   const open = useUIStore((s) => s.syntaxHelpOpen);
   const setOpen = useUIStore((s) => s.setSyntaxHelpOpen);
   return (
-    <Drawer.Root
-      open={open}
-      onOpenChange={(e) => setOpen(e.open)}
-      size="md"
-      modal
-    >
+    <Drawer.Root open={open} onOpenChange={(e) => setOpen(e.open)} size="md" modal>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Query syntax</Drawer.Title>
@@ -190,9 +185,7 @@ interface SyntaxHelpBodyProps {
   onClose: () => void;
 }
 
-const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({
-  onClose: _onClose,
-}) => {
+const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({ onClose: _onClose }) => {
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   // Append onto whatever is already in the bar so the user can stack
   // suggestions while learning. Empty bar → first suggestion lands as-is.
@@ -324,9 +317,7 @@ const Section: React.FC<{
   </VStack>
 );
 
-const ExampleCookbook: React.FC<{ onApply: (query: string) => void }> = ({
-  onApply,
-}) => (
+const ExampleCookbook: React.FC<{ onApply: (query: string) => void }> = ({ onApply }) => (
   <VStack gap={3} align="stretch">
     {EXAMPLE_GROUPS.map((group) => (
       <ExampleCard key={group.title} group={group} onApply={onApply} />
@@ -507,9 +498,7 @@ const CopyableQuery: React.FC<{
   </HStack>
 );
 
-const FieldsTable: React.FC<{ onApply: (query: string) => void }> = ({
-  onApply,
-}) => {
+const FieldsTable: React.FC<{ onApply: (query: string) => void }> = ({ onApply }) => {
   const entries = Object.entries(SEARCH_FIELDS);
   return (
     <Table.Root size="sm" variant="outline">
@@ -556,11 +545,7 @@ const FieldRow: React.FC<{
         </Code>
       </Table.Cell>
       <Table.Cell>
-        <Badge
-          size="xs"
-          colorPalette={TYPE_PALETTE[meta.valueType]}
-          variant="subtle"
-        >
+        <Badge size="xs" colorPalette={TYPE_PALETTE[meta.valueType]} variant="subtle">
           {meta.valueType}
         </Badge>
       </Table.Cell>

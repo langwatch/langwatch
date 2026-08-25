@@ -113,8 +113,7 @@ vi.mock("~/utils/api", () => {
   // The hooks a node answers itself, keyed by name; a Map so ordinary object
   // members (constructor, toString) keep nesting instead of resolving here.
   const hooksFor = (path: string): Map<string, unknown> => {
-    const useQuery = (input: unknown) =>
-      (queryImpls[path] ?? defaultQuery)(input);
+    const useQuery = (input: unknown) => (queryImpls[path] ?? defaultQuery)(input);
     return new Map<string, unknown>([
       ["useUtils", () => chainable],
       ["useContext", () => chainable],
@@ -149,8 +148,7 @@ vi.mock("~/components/me/MyLayout", () => ({
 }));
 
 vi.mock("~/hooks/useFeatureFlag", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/hooks/useFeatureFlag")>();
+  const actual = await importOriginal<typeof import("~/hooks/useFeatureFlag")>();
   return {
     ...actual,
     useFeatureFlag: () => ({ enabled: true, isLoading: false }),
@@ -190,9 +188,8 @@ vi.mock("~/features/langy/stores/langyStore", () => {
   };
   // Shaped like a zustand hook: callable with a selector, and carrying the
   // store statics (langyContextTargetStore subscribes at module scope).
-  const useLangyStore = (
-    selector: (current: Record<string, unknown>) => unknown,
-  ) => selector(state);
+  const useLangyStore = (selector: (current: Record<string, unknown>) => unknown) =>
+    selector(state);
   useLangyStore.subscribe = () => () => undefined;
   useLangyStore.getState = () => state;
   useLangyStore.setState = () => undefined;
@@ -226,8 +223,7 @@ function renderPage() {
   );
 }
 
-const connectButton = () =>
-  screen.queryByRole("button", { name: /connect your agent/i });
+const connectButton = () => screen.queryByRole("button", { name: /connect your agent/i });
 
 /** Renders the page and hands the menu trigger back for the test to assert on. */
 function renderMenuTrigger() {
@@ -275,9 +271,7 @@ describe("the /me usage home's Connect your agent button, given a personal proje
     screen.getByText("Explore via your coding agent");
     screen.getByText(/copy a prompt so claude code can inspect/i);
     const guide = screen.getByText("Read the guide");
-    expect(guide.closest("a")?.getAttribute("href")).toContain(
-      EXPLORE_USAGE_DOCS_PATH,
-    );
+    expect(guide.closest("a")?.getAttribute("href")).toContain(EXPLORE_USAGE_DOCS_PATH);
   });
 
   /** @scenario Explore via Langy hands Langy a usage-exploration prompt */

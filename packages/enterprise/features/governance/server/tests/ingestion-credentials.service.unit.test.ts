@@ -17,9 +17,7 @@ class ReversibleEncryption extends GovernanceEncryptionPort {
   }
 }
 
-const credentials = IngestionCredentialsService.create(
-  new ReversibleEncryption(),
-);
+const credentials = IngestionCredentialsService.create(new ReversibleEncryption());
 
 describe("ingestionCredentials", () => {
   describe("given a parserConfig with plaintext credentials", () => {

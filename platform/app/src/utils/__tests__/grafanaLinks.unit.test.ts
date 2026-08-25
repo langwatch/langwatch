@@ -27,9 +27,7 @@ describe("grafanaTraceUrl", () => {
       });
       const { parsed, panes } = panesOf(url);
 
-      expect(parsed.origin + parsed.pathname).toBe(
-        "http://127.0.0.1:3000/explore",
-      );
+      expect(parsed.origin + parsed.pathname).toBe("http://127.0.0.1:3000/explore");
       expect(parsed.searchParams.get("schemaVersion")).toBe("1");
 
       const pane = panes.lw;
@@ -69,12 +67,8 @@ describe("grafanaTraceUrl", () => {
   describe("when the base URL is malformed (a bare host with no scheme)", () => {
     it("fails closed to null instead of throwing on the error path", () => {
       // A bad GRAFANA_BASE_URL must not turn a handled error into a second throw.
-      expect(
-        grafanaTraceUrl(TRACE_ID, { baseUrl: "127.0.0.1:3000" }),
-      ).toBeNull();
-      expect(
-        grafanaLogsUrlByTrace(TRACE_ID, { baseUrl: "127.0.0.1:3000" }),
-      ).toBeNull();
+      expect(grafanaTraceUrl(TRACE_ID, { baseUrl: "127.0.0.1:3000" })).toBeNull();
+      expect(grafanaLogsUrlByTrace(TRACE_ID, { baseUrl: "127.0.0.1:3000" })).toBeNull();
     });
   });
 });
@@ -134,12 +128,8 @@ describe("group-scoped links", () => {
 
   describe("when the base URL is malformed", () => {
     it("fails closed to null like the trace-id builders", () => {
-      expect(
-        grafanaGroupTracesUrl(GROUP_ID, { baseUrl: "127.0.0.1:3000" }),
-      ).toBeNull();
-      expect(
-        grafanaGroupLogsUrl(GROUP_ID, { baseUrl: "127.0.0.1:3000" }),
-      ).toBeNull();
+      expect(grafanaGroupTracesUrl(GROUP_ID, { baseUrl: "127.0.0.1:3000" })).toBeNull();
+      expect(grafanaGroupLogsUrl(GROUP_ID, { baseUrl: "127.0.0.1:3000" })).toBeNull();
     });
   });
 });
@@ -173,9 +163,7 @@ describe("grafanaLinksForTrace", () => {
 
   describe("when the base URL is malformed", () => {
     it("returns null so a bad env value can't throw through the error handler", () => {
-      expect(
-        grafanaLinksForTrace(TRACE_ID, { baseUrl: "127.0.0.1:3000" }),
-      ).toBeNull();
+      expect(grafanaLinksForTrace(TRACE_ID, { baseUrl: "127.0.0.1:3000" })).toBeNull();
     });
   });
 });

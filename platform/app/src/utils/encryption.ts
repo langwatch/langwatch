@@ -9,9 +9,7 @@ const logger = createLogger("langwatch.utils.encryption");
 function getEncryptionKey(): Uint8Array {
   const CREDENTIALS_SECRET = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;
   if (!CREDENTIALS_SECRET) {
-    throw new Error(
-      "CREDENTIALS_SECRET is not set in the environment variables",
-    );
+    throw new Error("CREDENTIALS_SECRET is not set in the environment variables");
   }
 
   const key = new Uint8Array(Buffer.from(CREDENTIALS_SECRET, "hex"));
@@ -26,11 +24,7 @@ function getEncryptionKey(): Uint8Array {
 export function encrypt(text: string): string {
   const key = getEncryptionKey();
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv(
-    ENCRYPTION_ALGORITHM,
-    key,
-    new Uint8Array(iv),
-  );
+  const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, new Uint8Array(iv));
 
   let encrypted = cipher.update(text, "utf8", "hex");
   encrypted += cipher.final("hex");
@@ -65,8 +59,6 @@ export function decrypt(encryptedString: string): string {
   } catch (error) {
     logger.error(error, "decryption failure");
 
-    throw new Error(
-      "Failed to decrypt: Data may be corrupted or tampered with",
-    );
+    throw new Error("Failed to decrypt: Data may be corrupted or tampered with");
   }
 }

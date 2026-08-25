@@ -8,14 +8,7 @@ import {
   type PullRequestStatus,
   usePullRequestSort,
 } from "@langwatch/coding-agent-web";
-import {
-  Button,
-  HStack,
-  Skeleton,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import { GitPullRequest, MoreVertical } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
@@ -36,10 +29,7 @@ import { Pagination } from "~/components/ui/Pagination";
 import { SearchInput } from "~/components/ui/SearchInput";
 import { Tooltip } from "~/components/ui/tooltip";
 import { CostBreakdownTooltipContent } from "~/features/traces-v2/components/shared/CostBreakdownTooltip";
-import {
-  formatCost,
-  formatTokens,
-} from "~/features/traces-v2/utils/formatters";
+import { formatCost, formatTokens } from "~/features/traces-v2/utils/formatters";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -277,8 +267,7 @@ const ListedPullRequests: React.FC<{
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");
-  const [periodSelection, setPeriodSelection] =
-    useState<PeriodSelection | null>(null);
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection | null>(null);
 
   const filteredRows = useMemo(
     () =>
@@ -392,11 +381,7 @@ const OnePageOfPullRequests: React.FC<{
             <PullRequestRow
               key={row.key}
               row={row}
-              status={
-                row.pullRequest
-                  ? statuses.byRef.get(statusKeyOf(row))
-                  : undefined
-              }
+              status={row.pullRequest ? statuses.byRef.get(statusKeyOf(row)) : undefined}
               installUrl={installUrl}
               canManageOrganization={canManageOrganization}
               tokenStats={tokenStats}
@@ -484,11 +469,9 @@ function matchesPullRequestSearch({
     return true;
   }
 
-  return [
-    row.pullRequest?.title ?? "",
-    row.headBranch,
-    row.repositoryFullName,
-  ].some((field) => field.toLowerCase().includes(needle));
+  return [row.pullRequest?.title ?? "", row.headBranch, row.repositoryFullName].some(
+    (field) => field.toLowerCase().includes(needle),
+  );
 }
 
 /** Whether a row's last update falls inside the period, if there is one. */
@@ -566,30 +549,15 @@ const TableHeaderRow: React.FC<{
         sort={sort}
         onSort={onSort}
       />
-      <SortableColumnHeader
-        label="Title"
-        column="title"
-        sort={sort}
-        onSort={onSort}
-      />
-      <SortableColumnHeader
-        label="Status"
-        column="status"
-        sort={sort}
-        onSort={onSort}
-      />
+      <SortableColumnHeader label="Title" column="title" sort={sort} onSort={onSort} />
+      <SortableColumnHeader label="Status" column="status" sort={sort} onSort={onSort} />
       <SortableColumnHeader
         label="Last update"
         column="lastActivity"
         sort={sort}
         onSort={onSort}
       />
-      <SortableColumnHeader
-        label="Models"
-        column="models"
-        sort={sort}
-        onSort={onSort}
-      />
+      <SortableColumnHeader label="Models" column="models" sort={sort} onSort={onSort} />
       <SortableColumnHeader
         label="Tokens"
         column="tokens"
@@ -792,9 +760,7 @@ const StatusCell: React.FC<{
     );
   }
 
-  return (
-    <PullRequestStatusBadge status={row.snapshotStatus} source="payload" />
-  );
+  return <PullRequestStatusBadge status={row.snapshotStatus} source="payload" />;
 };
 
 /**
@@ -915,9 +881,7 @@ const RowActionsMenu: React.FC<{
             size="xs"
             variant="ghost"
             aria-label={`Actions for ${
-              row.pullRequest
-                ? `pull request ${row.pullRequest.number}`
-                : row.headBranch
+              row.pullRequest ? `pull request ${row.pullRequest.number}` : row.headBranch
             }`}
           >
             <MoreVertical size={14} />
@@ -949,12 +913,7 @@ const RowActionsMenu: React.FC<{
                 positioning={{ placement: "left" }}
                 showArrow
               >
-                <Menu.Item
-                  value="link"
-                  disabled
-                  opacity={0.5}
-                  cursor="not-allowed"
-                >
+                <Menu.Item value="link" disabled opacity={0.5} cursor="not-allowed">
                   <LuLink />
                   Link this repository
                 </Menu.Item>
@@ -1019,8 +978,5 @@ function toBranchListRow(row: UnlinkedBranchPayload): PullRequestListRow {
 function toListRows(data: UsagePayload | undefined): PullRequestListRow[] {
   if (!data) return [];
 
-  return [
-    ...data.rows.map(toMappedListRow),
-    ...data.unlinked.map(toBranchListRow),
-  ];
+  return [...data.rows.map(toMappedListRow), ...data.unlinked.map(toBranchListRow)];
 }

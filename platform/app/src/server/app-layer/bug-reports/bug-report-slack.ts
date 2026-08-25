@@ -16,10 +16,7 @@ export async function notifyBugReportOnSlack({
   if (!token) return;
   const channel = env.SLACK_BUG_REPORTS_CHANNEL ?? "#dev";
 
-  const base = (env.BASE_HOST ?? "https://app.langwatch.ai").replace(
-    /\/+$/,
-    "",
-  );
+  const base = (env.BASE_HOST ?? "https://app.langwatch.ai").replace(/\/+$/, "");
   const adminUrl = `${base}/ops/backoffice/bug-reports?report=${report.id}`;
 
   const summaryExcerpt = (report.summary ?? "").trim().slice(0, 600);

@@ -67,19 +67,16 @@ describe("given the field's own length cap", () => {
       ).join(", ");
 
       expect(fullList.length).toBeLessThanOrEqual(TAGS_CSV_MAX_LENGTH);
-      expect(normalizeVkTags(parseTagsCsv(fullList))).toHaveLength(
-        VK_TAGS_MAX_COUNT,
-      );
+      expect(normalizeVkTags(parseTagsCsv(fullList))).toHaveLength(VK_TAGS_MAX_COUNT);
     });
   });
 
   describe("when the tags are made of astral-plane characters", () => {
     it("still fits, because the cap counts UTF-16 units and the server counts code points", () => {
       const emojiTag = "🙂".repeat(VK_TAG_MAX_LENGTH);
-      const fullList = Array.from(
-        { length: VK_TAGS_MAX_COUNT },
-        () => emojiTag,
-      ).join(", ");
+      const fullList = Array.from({ length: VK_TAGS_MAX_COUNT }, () => emojiTag).join(
+        ", ",
+      );
 
       expect([...emojiTag]).toHaveLength(VK_TAG_MAX_LENGTH);
       expect(emojiTag.length).toBeGreaterThan(VK_TAG_MAX_LENGTH);
@@ -109,17 +106,12 @@ describe("given a line of typed tags", () => {
     });
 
     it("counts repeats once, the way saving does", () => {
-      const withRepeats = Array.from(
-        { length: VK_TAGS_MAX_COUNT },
-        (_, i) => `team=${i}`,
-      )
+      const withRepeats = Array.from({ length: VK_TAGS_MAX_COUNT }, (_, i) => `team=${i}`)
         .concat("team=0", "team=1")
         .join(",");
 
       expect(tagsBeyondLimitsNotice(withRepeats)).toBeNull();
-      expect(normalizeVkTags(parseTagsCsv(withRepeats))).toHaveLength(
-        VK_TAGS_MAX_COUNT,
-      );
+      expect(normalizeVkTags(parseTagsCsv(withRepeats))).toHaveLength(VK_TAGS_MAX_COUNT);
     });
   });
 

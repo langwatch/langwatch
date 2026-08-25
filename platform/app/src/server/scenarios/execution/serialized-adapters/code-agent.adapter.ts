@@ -39,10 +39,7 @@ export class SerializedCodeAgentAdapterError extends Error {
     message: string,
     options: { kind: AdapterErrorKind; httpStatus?: number; cause?: unknown },
   ) {
-    super(
-      message,
-      options.cause === undefined ? undefined : { cause: options.cause },
-    );
+    super(message, options.cause === undefined ? undefined : { cause: options.cause });
     this.name = "SerializedCodeAgentAdapterError";
     this.kind = options.kind;
     this.httpStatus = options.httpStatus;
@@ -135,8 +132,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     resolvedValues: Record<string, string>,
     params: RunParameterValues,
   ) {
-    const { ENTRY_NODE_ID, CODE_NODE_ID, END_NODE_ID } =
-      SerializedCodeAgentAdapter;
+    const { ENTRY_NODE_ID, CODE_NODE_ID, END_NODE_ID } = SerializedCodeAgentAdapter;
 
     const inputs =
       this.config.inputs.length > 0
@@ -200,9 +196,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
   }
 
   /** Build the entry node that provides input fields to the workflow. */
-  private buildEntryNode(
-    inputs: { identifier: string; type: string; value: string }[],
-  ) {
+  private buildEntryNode(inputs: { identifier: string; type: string; value: string }[]) {
     return {
       id: SerializedCodeAgentAdapter.ENTRY_NODE_ID,
       type: "entry",
@@ -327,10 +321,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             });
           } catch (fetchError) {
             if (timedOut) {
-              span.setAttribute(
-                "error.kind",
-                "timeout" satisfies AdapterErrorKind,
-              );
+              span.setAttribute("error.kind", "timeout" satisfies AdapterErrorKind);
               throw new SerializedCodeAgentAdapterError(
                 `Code execution failed: NLP service ${url} did not respond within ${NLP_FETCH_TIMEOUT_MS}ms (request aborted).`,
                 { kind: "timeout", cause: fetchError },
@@ -412,9 +403,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     }
 
     // Legacy behavior: first input = last user message, rest = ""
-    const lastUserMessage = agentInput.messages.findLast(
-      (m) => m.role === "user",
-    );
+    const lastUserMessage = agentInput.messages.findLast((m) => m.role === "user");
     const inputValue =
       typeof lastUserMessage?.content === "string"
         ? lastUserMessage.content

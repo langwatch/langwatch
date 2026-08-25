@@ -25,9 +25,7 @@ export function DemonstrationsModal({
   onClose: () => void;
   node: NodeProps<Node<Component>> | Node<Component>;
 }) {
-  const [editingDataset, setEditingDataset] = useState<
-    NodeDataset | undefined
-  >();
+  const [editingDataset, setEditingDataset] = useState<NodeDataset | undefined>();
   const editorPortalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -45,9 +43,7 @@ export function DemonstrationsModal({
     ) {
       demonstrations = {
         inline: {
-          records: Object.fromEntries(
-            columns.map((column) => [column.name, []]),
-          ),
+          records: Object.fromEntries(columns.map((column) => [column.name, []])),
           columnTypes: columns,
         },
       };

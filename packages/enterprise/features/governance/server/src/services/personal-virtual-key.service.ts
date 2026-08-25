@@ -73,9 +73,7 @@ export class DefaultGovernancePersonalVirtualKeyService extends GovernancePerson
     });
   }
 
-  async issue(
-    input: IssuePersonalVirtualKeyInput,
-  ): Promise<IssuedPersonalVirtualKey> {
+  async issue(input: IssuePersonalVirtualKeyInput): Promise<IssuedPersonalVirtualKey> {
     const parsed = issuePersonalVirtualKeyInputSchema.parse(input);
     let policy = null;
     if (parsed.routingPolicyId) {
@@ -135,9 +133,7 @@ export class DefaultGovernancePersonalVirtualKeyService extends GovernancePerson
     return this.repository.list(listPersonalVirtualKeysInputSchema.parse(input));
   }
 
-  async revoke(
-    input: RevokePersonalVirtualKeyInput,
-  ): Promise<PersonalVirtualKey> {
+  async revoke(input: RevokePersonalVirtualKeyInput): Promise<PersonalVirtualKey> {
     const parsed = revokePersonalVirtualKeyInputSchema.parse(input);
     const key = await this.repository.tryFindOwned({
       id: parsed.virtualKeyId,
@@ -152,9 +148,7 @@ export class DefaultGovernancePersonalVirtualKeyService extends GovernancePerson
     });
   }
 
-  async revokeAllForUser(
-    input: RevokeAllPersonalVirtualKeysInput,
-  ): Promise<number> {
+  async revokeAllForUser(input: RevokeAllPersonalVirtualKeysInput): Promise<number> {
     const parsed = revokeAllPersonalVirtualKeysInputSchema.parse(input);
     const keys = await this.repository.listActiveForUser(parsed.userId);
     for (const key of keys) {

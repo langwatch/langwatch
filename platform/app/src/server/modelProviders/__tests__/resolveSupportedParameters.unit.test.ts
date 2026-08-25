@@ -38,9 +38,9 @@ describe("resolveSupportedParameters", () => {
           },
         ] as CustomModelEntry[],
       };
-      expect(
-        resolveSupportedParameters("openai/custom/embed-model", provider),
-      ).toEqual([]);
+      expect(resolveSupportedParameters("openai/custom/embed-model", provider)).toEqual(
+        [],
+      );
     });
   });
 
@@ -74,10 +74,7 @@ describe("filterUnsupportedSamplingParams", () => {
   });
 
   it("never strips max_tokens even when not in the allowlist", () => {
-    const out = filterUnsupportedSamplingParams(
-      { model: "x", max_tokens: 2048 },
-      [],
-    );
+    const out = filterUnsupportedSamplingParams({ model: "x", max_tokens: 2048 }, []);
     expect(out).toEqual({ model: "x", max_tokens: 2048 });
   });
 

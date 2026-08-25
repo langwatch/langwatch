@@ -182,12 +182,13 @@ Include these files in your deployment package:
 ### 3. Deploy to Air-Gapped Environment
 
 The application runs entirely offline, using only materialized prompts. No LangWatch API access required.
-{/*
+{/\*
+
 ## Advanced Fetch Policies (Future Feature)
 
 <Note>
-  **Coming Soon**: Advanced fetch policies will provide fine-grained control
-  over when prompts are fetched vs. using materialized versions.
+  **Coming Soon**: Advanced fetch policies will provide fine-grained control over when
+  prompts are fetched vs. using materialized versions.
 </Note>
 
 <Tabs>
@@ -256,11 +257,11 @@ The application runs entirely offline, using only materialized prompts. No LangW
 ### Fetch Policy Options
 
 | Policy               | Behavior                                              | Use Case                                         |
-| -------------------- | ----------------------------------------------------- | ------------------------------------------------ |
+| -------------------- | ----------------------------------------------------- | ------------------------------------------------ | ---- |
 | `MATERIALIZED_FIRST` | Use local file if available, otherwise fetch from API | Default behavior, best for most applications     |
 | `ALWAYS_FETCH`       | Always try API first, fall back to materialized       | Live updates with offline fallback               |
 | `CACHE_TTL`          | Fetch every X minutes, use materialized between       | Hot deployments with controlled update frequency |
-| `MATERIALIZED_ONLY`  | Never fetch, use materialized files only              | Air-gapped or strict offline environments        | */}
+| `MATERIALIZED_ONLY`  | Never fetch, use materialized files only              | Air-gapped or strict offline environments        | \*/} |
 
 ## CI/CD Integration
 
@@ -278,7 +279,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
 
       - name: Install LangWatch CLI
         run: npm install -g langwatch

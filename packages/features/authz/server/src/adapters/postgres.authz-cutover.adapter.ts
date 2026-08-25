@@ -53,9 +53,7 @@ export class PostgresAuthzCutoverAdapter {
     return new PostgresAuthzCutoverAdapter(options);
   }
 
-  private constructor(
-    private readonly options: PostgresAuthzCutoverAdapterOptions,
-  ) {
+  private constructor(private readonly options: PostgresAuthzCutoverAdapterOptions) {
     this.cache =
       options.cache ??
       PerOrganizationCachedGateStore.create({
@@ -64,32 +62,22 @@ export class PostgresAuthzCutoverAdapter {
       });
   }
 
-  async readUncached({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<boolean> {
-    const record =
-      await this.options.database.systemMigrationTenantState.findUnique({
-        where: {
-          migrationName_tenantId: {
-            migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
-            tenantId: organizationId,
-          },
+  async readUncached({ organizationId }: { organizationId: string }): Promise<boolean> {
+    const record = await this.options.database.systemMigrationTenantState.findUnique({
+      where: {
+        migrationName_tenantId: {
+          migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
+          tenantId: organizationId,
         },
-        select: { status: true },
-      });
+      },
+      select: { status: true },
+    });
     return (
-      record !== null &&
-      (ON_ENGINE_STATUSES as readonly string[]).includes(record.status)
+      record !== null && (ON_ENGINE_STATUSES as readonly string[]).includes(record.status)
     );
   }
 
-  async query({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<boolean> {
+  async query({ organizationId }: { organizationId: string }): Promise<boolean> {
     try {
       return await this.readUncached({ organizationId });
     } catch (error) {
@@ -115,18 +103,16 @@ export class PostgresAuthzCutoverAdapter {
     organizationId: string;
   }): Promise<Date | null> {
     try {
-      const record =
-        await this.options.database.systemMigrationTenantState.findUnique({
-          where: {
-            migrationName_tenantId: {
-              migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
-              tenantId: organizationId,
-            },
+      const record = await this.options.database.systemMigrationTenantState.findUnique({
+        where: {
+          migrationName_tenantId: {
+            migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
+            tenantId: organizationId,
           },
-          select: { status: true, occurredAt: true },
-        });
-      return record &&
-        (ON_ENGINE_STATUSES as readonly string[]).includes(record.status)
+        },
+        select: { status: true, occurredAt: true },
+      });
+      return record && (ON_ENGINE_STATUSES as readonly string[]).includes(record.status)
         ? (record.occurredAt ?? null)
         : null;
     } catch (error) {

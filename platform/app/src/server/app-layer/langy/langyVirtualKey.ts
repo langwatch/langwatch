@@ -75,8 +75,7 @@ export async function provisionLangyVirtualKey(args: {
   const created = await virtualKeyService.create({
     organizationId,
     name: LANGY_VK_DISPLAY_NAME,
-    description:
-      "Auto-provisioned virtual key for the Langy in-product assistant.",
+    description: "Auto-provisioned virtual key for the Langy in-product assistant.",
     principalUserId: null,
     scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
     actorUserId,
@@ -102,10 +101,7 @@ export async function provisionLangyVirtualKey(args: {
     // Race: another caller (e.g. concurrent /chat + eager project.create)
     // provisioned + stored first. Our just-created VK is now an orphan but
     // does no harm. Read the winner's secret and return that.
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const winner = await prisma.projectSecret.findFirst({
         where: { projectId, name: LANGY_VK_SECRET_NAME },
         select: { encryptedValue: true },

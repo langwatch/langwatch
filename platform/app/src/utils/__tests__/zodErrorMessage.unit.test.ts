@@ -71,9 +71,7 @@ describe("zodErrorMessage", () => {
     describe("when the message is formatted", () => {
       /** @scenario A base-schema rejection keeps the wording it already had */
       it("reports each missing field with its path", () => {
-        const error = errorFrom(() =>
-          z.object({ trace_id: z.string() }).parse({}),
-        );
+        const error = errorFrom(() => z.object({ trace_id: z.string() }).parse({}));
 
         expect(zodErrorMessage(error)).toContain("trace_id");
       });

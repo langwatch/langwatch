@@ -29,16 +29,12 @@ export const DEFAULT_MAPPINGS: MappingState = {
  * mappings can never reference `evaluations`, so their shape safely returns
  * false here.
  */
-export const mappingsReadEvaluationsSource = (
-  mappings: MappingState | null,
-): boolean =>
+export const mappingsReadEvaluationsSource = (mappings: MappingState | null): boolean =>
   Object.values(mappings?.mapping ?? {}).some(
     (config) => "source" in config && config.source === "evaluations",
   );
 
-export const migrateLegacyMappings = (
-  mappings: Record<string, string>,
-): MappingState => {
+export const migrateLegacyMappings = (mappings: Record<string, string>): MappingState => {
   if (mappings.mapping) {
     return mappings as any as MappingState;
   }

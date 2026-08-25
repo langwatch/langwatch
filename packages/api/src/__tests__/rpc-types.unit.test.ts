@@ -45,8 +45,7 @@ const ILLEGAL = [
  * `RpcName<T>` resolves to `unknown` exactly when the name is legal, so this
  * reads as "the compiler accepts it".
  */
-type CompilerAccepts<T extends string> =
-  unknown extends RpcName<T> ? true : false;
+type CompilerAccepts<T extends string> = unknown extends RpcName<T> ? true : false;
 
 /**
  * Applied per element, NOT to the union of them.
@@ -66,12 +65,8 @@ type CompilerAcceptsEach<T extends readonly string[]> = {
   [K in keyof T]: CompilerAccepts<T[K] & string>;
 };
 
-type AllTrue<T extends readonly boolean[]> = T[number] extends true
-  ? true
-  : false;
-type AllFalse<T extends readonly boolean[]> = T[number] extends false
-  ? true
-  : false;
+type AllTrue<T extends readonly boolean[]> = T[number] extends true ? true : false;
+type AllFalse<T extends readonly boolean[]> = T[number] extends false ? true : false;
 
 type AssertTrue<T extends true> = T;
 
@@ -93,9 +88,7 @@ const handler = async () => ({ id: "1" });
 export function rpcRegistrationsTheCompilerJudges(): void {
   const service = createService({ name: "things" });
 
-  service.register("things.create", "2026-08-07", handler, (b) =>
-    b.withOutput(output),
-  );
+  service.register("things.create", "2026-08-07", handler, (b) => b.withOutput(output));
   service.register("things.nested.get", "2026-08-07", handler, (b) =>
     b.withOutput(output),
   );

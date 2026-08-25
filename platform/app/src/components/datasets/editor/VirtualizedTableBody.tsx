@@ -49,10 +49,7 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
   trailingSpacerWidth,
 }: VirtualizedTableBodyProps<TData>) {
   // Stable callbacks for virtualizer
-  const getScrollElement = useCallback(
-    () => scrollContainer,
-    [scrollContainer],
-  );
+  const getScrollElement = useCallback(() => scrollContainer, [scrollContainer]);
   const estimateSize = useCallback(() => COMPACT_ROW_HEIGHT, []);
 
   // Set up row virtualization (contained in this component to prevent parent re-renders)
@@ -118,10 +115,7 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
       {/* Top padding row */}
       {paddingTop > 0 && (
         <tr>
-          <td
-            style={{ height: `${paddingTop}px`, padding: 0 }}
-            colSpan={columnCount}
-          />
+          <td style={{ height: `${paddingTop}px`, padding: 0 }} colSpan={columnCount} />
         </tr>
       )}
       {/* Render only virtualized rows */}
@@ -146,10 +140,7 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
             ))}
             {trailingSpacerWidth ? (
               /* Filler column - absorbs remaining space (+ drawer spacer) */
-              <td
-                colSpan={2}
-                style={{ width: "auto", minWidth: trailingSpacerWidth }}
-              />
+              <td colSpan={2} style={{ width: "auto", minWidth: trailingSpacerWidth }} />
             ) : null}
           </tr>
         );

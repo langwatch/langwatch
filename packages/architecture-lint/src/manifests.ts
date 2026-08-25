@@ -1,15 +1,7 @@
-import type {
-  ArchitectureViolation,
-  ClassifiedPackage,
-  PackageManifest,
-} from "./types";
+import type { ArchitectureViolation, ClassifiedPackage, PackageManifest } from "./types";
 
 function exportKeys(exportsValue: unknown): string[] {
-  if (
-    !exportsValue ||
-    typeof exportsValue !== "object" ||
-    Array.isArray(exportsValue)
-  ) {
+  if (!exportsValue || typeof exportsValue !== "object" || Array.isArray(exportsValue)) {
     return [];
   }
   return Object.keys(exportsValue as Record<string, unknown>);
@@ -62,9 +54,7 @@ function matchingEnterpriseComposition(
   return false;
 }
 
-export function manifestDependencies(
-  manifest: PackageManifest,
-): Record<string, string> {
+export function manifestDependencies(manifest: PackageManifest): Record<string, string> {
   return {
     ...manifest.dependencies,
     ...manifest.peerDependencies,
@@ -72,9 +62,7 @@ export function manifestDependencies(
   };
 }
 
-export function lintManifests(
-  packages: ClassifiedPackage[],
-): ArchitectureViolation[] {
+export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
 
@@ -110,10 +98,7 @@ export function lintManifests(
     if (pkg.feature) {
       const zodVersion = manifestDependencies(pkg.manifest).zod;
       const requiresZod = pkg.kind === "contract";
-      if (
-        (requiresZod || zodVersion !== undefined) &&
-        !isZod4Range(zodVersion)
-      ) {
+      if ((requiresZod || zodVersion !== undefined) && !isZod4Range(zodVersion)) {
         violations.push({
           policy: "retired-package-runtime",
           file: pkg.manifestPath,
@@ -126,10 +111,7 @@ export function lintManifests(
 
     for (const dependency of Object.keys(manifestDependencies(pkg.manifest))) {
       const target = byName.get(dependency);
-      if (
-        pkg.kind === "enterprise-root" &&
-        isEnterpriseRuntimeDependency(dependency)
-      ) {
+      if (pkg.kind === "enterprise-root" && isEnterpriseRuntimeDependency(dependency)) {
         violations.push({
           policy: "enterprise-composition",
           file: pkg.manifestPath,
@@ -140,11 +122,7 @@ export function lintManifests(
         });
       }
       if (!target) continue;
-      if (
-        pkg.kind === "application" &&
-        target.kind === "application" &&
-        target !== pkg
-      ) {
+      if (pkg.kind === "application" && target.kind === "application" && target !== pkg) {
         violations.push({
           policy: "application-boundary",
           file: pkg.manifestPath,
@@ -246,8 +224,7 @@ export function lintManifests(
           policy: "package-role",
           file: pkg.manifestPath,
           specifier: dependency,
-          message:
-            "A contract package cannot depend on its implementation packages.",
+          message: "A contract package cannot depend on its implementation packages.",
         });
       }
       if (pkg.kind === "web" && target.kind === "server") {

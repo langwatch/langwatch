@@ -18,15 +18,9 @@ import {
   sharedFiltersInputSchema,
 } from "./types";
 
-const numericMetricDefaults: Pick<
-  AnalyticsMetric,
-  "format" | "allowedAggregations"
-> = {
+const numericMetricDefaults: Pick<AnalyticsMetric, "format" | "allowedAggregations"> = {
   format: "0.[0]a",
-  allowedAggregations: [
-    ...numericAggregationTypes,
-    ...percentileAggregationTypes,
-  ],
+  allowedAggregations: [...numericAggregationTypes, ...percentileAggregationTypes],
 };
 
 export const analyticsMetrics = {
@@ -175,9 +169,7 @@ export const analyticsMetrics = {
       colorSet: "purpleTones",
       format: "0.00a",
       increaseIs: "neutral",
-      allowedAggregations: allAggregationTypes.filter(
-        (agg) => agg != "cardinality",
-      ),
+      allowedAggregations: allAggregationTypes.filter((agg) => agg != "cardinality"),
       requiresKey: {
         filter: "events.event_type",
       },
@@ -254,11 +246,9 @@ export type FlattenAnalyticsMetricsEnum = {
     keyof (typeof analyticsMetrics)[T]}`;
 }[AnalyticsMetricsGroupsEnum];
 
-export const flattenAnalyticsMetricsEnum = Object.keys(
-  analyticsMetrics,
-).flatMap((key) =>
-  Object.keys(analyticsMetrics[key as AnalyticsMetricsGroupsEnum]).map(
-    (subkey) => [key, subkey].join("."),
+export const flattenAnalyticsMetricsEnum = Object.keys(analyticsMetrics).flatMap((key) =>
+  Object.keys(analyticsMetrics[key as AnalyticsMetricsGroupsEnum]).map((subkey) =>
+    [key, subkey].join("."),
   ),
 ) as [FlattenAnalyticsMetricsEnum, ...FlattenAnalyticsMetricsEnum[]];
 
@@ -355,34 +345,22 @@ export const analyticsGroups = {
 export type AnalyticsGroupsGroupsEnum = keyof typeof analyticsGroups;
 
 export type FlattenAnalyticsGroupsEnum = {
-  [T in AnalyticsGroupsGroupsEnum]: `${T}.${string &
-    keyof (typeof analyticsGroups)[T]}`;
+  [T in AnalyticsGroupsGroupsEnum]: `${T}.${string & keyof (typeof analyticsGroups)[T]}`;
 }[AnalyticsGroupsGroupsEnum];
 
-export const flattenAnalyticsGroupsEnum = Object.keys(analyticsGroups).flatMap(
-  (key) =>
-    Object.keys(analyticsGroups[key as AnalyticsGroupsGroupsEnum]).map(
-      (subkey) => [key, subkey].join("."),
-    ),
+export const flattenAnalyticsGroupsEnum = Object.keys(analyticsGroups).flatMap((key) =>
+  Object.keys(analyticsGroups[key as AnalyticsGroupsGroupsEnum]).map((subkey) =>
+    [key, subkey].join("."),
+  ),
 ) as [FlattenAnalyticsGroupsEnum, ...FlattenAnalyticsGroupsEnum[]];
 
-export const getMetric = (
-  groupMetric: FlattenAnalyticsMetricsEnum,
-): AnalyticsMetric => {
-  const [group, metric_] = groupMetric.split(".") as [
-    AnalyticsMetricsGroupsEnum,
-    string,
-  ];
+export const getMetric = (groupMetric: FlattenAnalyticsMetricsEnum): AnalyticsMetric => {
+  const [group, metric_] = groupMetric.split(".") as [AnalyticsMetricsGroupsEnum, string];
   return (analyticsMetrics[group] as any)[metric_];
 };
 
-export const getGroup = (
-  groupMetric: FlattenAnalyticsGroupsEnum,
-): AnalyticsGroup => {
-  const [group, field] = groupMetric.split(".") as [
-    AnalyticsGroupsGroupsEnum,
-    string,
-  ];
+export const getGroup = (groupMetric: FlattenAnalyticsGroupsEnum): AnalyticsGroup => {
+  const [group, field] = groupMetric.split(".") as [AnalyticsGroupsGroupsEnum, string];
   return (analyticsGroups[group] as any)[field];
 };
 

@@ -2,11 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { readHandledError, showErrorToast } from "~/features/errors";
 import type { ExportProgressEvent } from "~/server/api/routers/export";
-import type {
-  ExportFormat,
-  ExportMode,
-  ExportProgress,
-} from "~/server/export/types";
+import type { ExportFormat, ExportMode, ExportProgress } from "~/server/export/types";
 import { api } from "~/utils/api";
 
 interface ExportConfig {
@@ -49,13 +45,7 @@ interface UseExportTracesReturn {
  * Triggers a browser download from a Blob and a filename.
  * Creates a temporary anchor element and clicks it.
  */
-function triggerBlobDownload({
-  blob,
-  filename,
-}: {
-  blob: Blob;
-  filename: string;
-}): void {
+function triggerBlobDownload({ blob, filename }: { blob: Blob; filename: string }): void {
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -79,9 +69,7 @@ function extractFilename({
 }): string {
   if (!contentDisposition) return fallbackName;
 
-  const filenameMatch = contentDisposition.match(
-    /filename\*?=(?:UTF-8''|")?([^";]+)"?/i,
-  );
+  const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^";]+)"?/i);
   if (filenameMatch?.[1]) {
     return decodeURIComponent(filenameMatch[1]);
   }
@@ -159,15 +147,11 @@ export function useExportTraces({
     exported: 0,
     total: 0,
   });
-  const [selectedTraceIds, setSelectedTraceIds] = useState<
-    string[] | undefined
-  >();
+  const [selectedTraceIds, setSelectedTraceIds] = useState<string[] | undefined>();
   const [currentExportId, setCurrentExportId] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // tRPC subscription for export progress via BroadcastService (Redis pub/sub)
   api.export.onExportProgress.useSubscription(
@@ -191,13 +175,10 @@ export function useExportTraces({
     },
   );
 
-  const openExportDialog = useCallback(
-    (options?: { selectedTraceIds?: string[] }) => {
-      setSelectedTraceIds(options?.selectedTraceIds);
-      setIsDialogOpen(true);
-    },
-    [],
-  );
+  const openExportDialog = useCallback((options?: { selectedTraceIds?: string[] }) => {
+    setSelectedTraceIds(options?.selectedTraceIds);
+    setIsDialogOpen(true);
+  }, []);
 
   const closeExportDialog = useCallback(() => {
     setIsDialogOpen(false);
@@ -281,10 +262,7 @@ export function useExportTraces({
           }
 
           // Read total from header immediately
-          const totalTraces = parseInt(
-            response.headers.get("X-Total-Traces") ?? "0",
-            10,
-          );
+          const totalTraces = parseInt(response.headers.get("X-Total-Traces") ?? "0", 10);
           setProgress((prev) => ({ ...prev, total: totalTraces }));
 
           // Activate tRPC subscription for real-time progress

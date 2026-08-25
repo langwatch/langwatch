@@ -1,11 +1,6 @@
 import { Box, chakra, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { type ReactNode, useMemo, useState } from "react";
-import {
-  LuChevronDown,
-  LuChevronRight,
-  LuSparkles,
-  LuWrench,
-} from "react-icons/lu";
+import { LuChevronDown, LuChevronRight, LuSparkles, LuWrench } from "react-icons/lu";
 import { hasAnsi } from "../../../utils/ansi/ansi";
 // Direct file import (not the barrel) so we don't pull TerminalView -> transcript
 // back into transcript and form an import cycle. TerminalOutput has no
@@ -73,10 +68,7 @@ export function ToolPairCard({
   // A `Skill` tool_use is a skill run, not an ordinary tool call — surface it
   // with its own glyph/accent and the invoked skill's name in the header so a
   // reader spots skill invocations at a glance.
-  const skill = useMemo(
-    () => skillInvocationFromToolUse({ name, input }),
-    [name, input],
-  );
+  const skill = useMemo(() => skillInvocationFromToolUse({ name, input }), [name, input]);
   const isSkill = skill !== null;
 
   const argEntries = useMemo<Array<[string, unknown]> | null>(() => {
@@ -133,9 +125,7 @@ export function ToolPairCard({
     <Box
       borderRadius="md"
       borderWidth="1px"
-      borderColor={
-        isError ? "red.muted" : isSkill ? "purple.muted" : "border.muted"
-      }
+      borderColor={isError ? "red.muted" : isSkill ? "purple.muted" : "border.muted"}
       bg={isSkill ? "purple.subtle/40" : "bg.subtle"}
       overflow="hidden"
     >
@@ -197,12 +187,7 @@ export function ToolPairCard({
           </Text>
         )}
         {!result && (
-          <Text
-            textStyle="2xs"
-            fontFamily="mono"
-            color="fg.subtle"
-            flexShrink={0}
-          >
+          <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" flexShrink={0}>
             no result
           </Text>
         )}

@@ -56,13 +56,17 @@ describe("resolveOutputOptions flag normalisation", () => {
       // is still load-bearing for `trace export`: its own `-o, --output
       // <file>` wins the conflict check in registerOutputOptions, and the
       // preAction hook feeds EVERY command's options through this function.
-      expect(resolveOutputOptions({ output: "out.csv", format: "jsonl" }).format).toBe("table");
+      expect(resolveOutputOptions({ output: "out.csv", format: "jsonl" }).format).toBe(
+        "table",
+      );
     });
   });
 
   describe("given the new contract", () => {
     it("lets -o/--output beat the legacy -f/--format", () => {
-      expect(resolveOutputOptions({ output: "json", format: "table" }).format).toBe("json");
+      expect(resolveOutputOptions({ output: "json", format: "table" }).format).toBe(
+        "json",
+      );
     });
 
     it("implies json from --json <fields> and splits the list", () => {

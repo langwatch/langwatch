@@ -75,13 +75,10 @@ describe("resolveEvaluatorSettingsDefaults", () => {
       // The embeddings model must come from its own feature key — a typo'd
       // key would fall into the mock's catch-all and still return the right
       // value, so pin the exact second call.
-      expect(getResolvedDefaultForFeature).toHaveBeenCalledWith(
-        expect.anything(),
-        {
-          projectId: "proj-1",
-          featureKey: "analytics.topic_clustering_embeddings",
-        },
-      );
+      expect(getResolvedDefaultForFeature).toHaveBeenCalledWith(expect.anything(), {
+        projectId: "proj-1",
+        featureKey: "analytics.topic_clustering_embeddings",
+      });
     });
 
     it("resolves for the given project id and the evaluator.create_default feature key (AC#3/#4)", async () => {
@@ -93,10 +90,10 @@ describe("resolveEvaluatorSettingsDefaults", () => {
 
       await resolveEvaluatorSettingsDefaults("proj-42");
 
-      expect(getResolvedDefaultForFeature).toHaveBeenCalledWith(
-        expect.anything(),
-        { projectId: "proj-42", featureKey: "evaluator.create_default" },
-      );
+      expect(getResolvedDefaultForFeature).toHaveBeenCalledWith(expect.anything(), {
+        projectId: "proj-42",
+        featureKey: "evaluator.create_default",
+      });
       // Never called with an undefined project id (AC#4).
       for (const call of getResolvedDefaultForFeature.mock.calls) {
         expect(call[1].projectId).toBe("proj-42");
@@ -111,10 +108,7 @@ describe("resolveEvaluatorSettingsDefaults", () => {
       });
 
       const resolved = await resolveEvaluatorSettingsDefaults("proj-1");
-      const settings = getEvaluatorDefaultSettings(
-        evaluatorWithModel,
-        resolved,
-      );
+      const settings = getEvaluatorDefaultSettings(evaluatorWithModel, resolved);
 
       expect((settings as any).model).toBe("openai/gpt-5-mini");
       expect((settings as any).model).not.toBe(DEFAULT_MODEL);
@@ -143,10 +137,7 @@ describe("resolveEvaluatorSettingsDefaults", () => {
       const resolved = await resolveEvaluatorSettingsDefaults("proj-1");
       expect(resolved).toEqual({ defaultModel: null, embeddingsModel: null });
 
-      const settings = getEvaluatorDefaultSettings(
-        evaluatorWithModel,
-        resolved,
-      );
+      const settings = getEvaluatorDefaultSettings(evaluatorWithModel, resolved);
       expect((settings as any).model).toBe(DEFAULT_MODEL);
     });
   });

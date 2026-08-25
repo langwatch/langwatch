@@ -199,9 +199,7 @@ export function CodePreview({
                 {!disableActions && enableVisibilityToggle && (
                   <Tooltip
                     content={
-                      isVisible
-                        ? "Hide sensitive values"
-                        : "Show sensitive values"
+                      isVisible ? "Hide sensitive values" : "Show sensitive values"
                     }
                     openDelay={0}
                     showArrow
@@ -211,9 +209,7 @@ export function CodePreview({
                       variant="ghost"
                       onClick={toggleVisibility}
                       aria-label={
-                        isVisible
-                          ? "Hide sensitive values"
-                          : "Show sensitive values"
+                        isVisible ? "Hide sensitive values" : "Show sensitive values"
                       }
                     >
                       {isVisible ? <EyeOff /> : <Eye />}

@@ -33,9 +33,6 @@ export type {
 export { RedisConnectionService } from "./connection";
 export type { RedisConnectionServiceOptions } from "./connection";
 export { RedisReadinessService } from "./readiness";
-export type {
-  RedisPingOptions,
-  RedisReadinessServiceOptions,
-} from "./readiness";
+export type { RedisPingOptions, RedisReadinessServiceOptions } from "./readiness";
 export { RedisShutdownService } from "./shutdown";
 export type { RedisConnection, RedisLogger } from "./types";

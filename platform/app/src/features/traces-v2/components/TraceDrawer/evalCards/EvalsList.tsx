@@ -25,8 +25,8 @@ export function EvalsList({ evals, onSelectSpan }: EvalsListProps) {
             No evaluations yet
           </Text>
           <Text textStyle="xs" color="fg.subtle">
-            Set up evaluators to automatically score traces on quality, safety,
-            and accuracy.
+            Set up evaluators to automatically score traces on quality, safety, and
+            accuracy.
           </Text>
         </VStack>
         <Button size="xs" variant="outline" asChild>

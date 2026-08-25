@@ -34,9 +34,11 @@ export function usePublicEnv(options: {
 export function usePublicEnv(options?: {
   includeCapabilities?: false;
 }): StaticEnvironmentResult;
-export function usePublicEnv(options: {
-  includeCapabilities?: boolean;
-} = {}): CapabilityEnvironmentQuery | StaticEnvironmentResult {
+export function usePublicEnv(
+  options: {
+    includeCapabilities?: boolean;
+  } = {},
+): CapabilityEnvironmentQuery | StaticEnvironmentResult {
   const includeCapabilities = options.includeCapabilities ?? false;
   const capabilities = api.publicEnv.useQuery(
     {},
@@ -71,8 +73,6 @@ export function usePublicEnv(options: {
 
   return {
     ...capabilities,
-    data: capabilities.data
-      ? { ...staticValues, ...capabilities.data }
-      : undefined,
+    data: capabilities.data ? { ...staticValues, ...capabilities.data } : undefined,
   };
 }

@@ -33,26 +33,17 @@ describe("buildModelChangeValues", () => {
     });
 
     it("sets topP to registry default (1)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<
-        string,
-        unknown
-      >;
+      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<string, unknown>;
       expect(result.topP).toBe(1);
     });
 
     it("sets frequencyPenalty to registry default (0)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<
-        string,
-        unknown
-      >;
+      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<string, unknown>;
       expect(result.frequencyPenalty).toBe(0);
     });
 
     it("sets presencePenalty to registry default (0)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<
-        string,
-        unknown
-      >;
+      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<string, unknown>;
       expect(result.presencePenalty).toBe(0);
     });
 
@@ -107,11 +98,7 @@ describe("buildModelChangeValues", () => {
       const metadata = {
         maxCompletionTokens: 16384,
       } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues(
-        "openai/gpt-4.1",
-        undefined,
-        metadata,
-      );
+      const result = buildModelChangeValues("openai/gpt-4.1", undefined, metadata);
       expect(result.maxTokens).toBe(16384);
     });
 
@@ -119,11 +106,7 @@ describe("buildModelChangeValues", () => {
       const metadata = {
         maxCompletionTokens: 16384,
       } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues(
-        "openai/gpt-4.1",
-        undefined,
-        metadata,
-      );
+      const result = buildModelChangeValues("openai/gpt-4.1", undefined, metadata);
       expect(result.max_tokens).toBe(16384);
     });
 
@@ -131,21 +114,13 @@ describe("buildModelChangeValues", () => {
       const metadata = {
         maxCompletionTokens: 128000,
       } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues(
-        "openai/gpt-5.2",
-        undefined,
-        metadata,
-      );
+      const result = buildModelChangeValues("openai/gpt-5.2", undefined, metadata);
       expect(result.maxTokens).toBe(128000);
     });
 
     it("uses contextLength when maxCompletionTokens not available", () => {
       const metadata = { contextLength: 8192 } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues(
-        "openai/gpt-4.1",
-        undefined,
-        metadata,
-      );
+      const result = buildModelChangeValues("openai/gpt-4.1", undefined, metadata);
       expect(result.maxTokens).toBe(8192);
     });
   });

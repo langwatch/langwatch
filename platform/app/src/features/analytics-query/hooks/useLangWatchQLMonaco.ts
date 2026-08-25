@@ -59,19 +59,17 @@ function completionProvider({
         startColumn: word.startColumn,
         endColumn: word.endColumn,
       };
-      const schemaSuggestions = lwqlCompletionItems(readSchema()).map(
-        (item) => ({
-          label: item.label,
-          kind:
-            item.kind === "dataset"
-              ? monaco.languages.CompletionItemKind.Struct
-              : monaco.languages.CompletionItemKind.Field,
-          insertText: item.insertText,
-          detail: item.detail,
-          documentation: item.documentation,
-          range,
-        }),
-      );
+      const schemaSuggestions = lwqlCompletionItems(readSchema()).map((item) => ({
+        label: item.label,
+        kind:
+          item.kind === "dataset"
+            ? monaco.languages.CompletionItemKind.Struct
+            : monaco.languages.CompletionItemKind.Field,
+        insertText: item.insertText,
+        detail: item.detail,
+        documentation: item.documentation,
+        range,
+      }));
       // Keywords rank ahead of identifiers on an equal fuzzy match, so a
       // member typing "sel" is offered SELECT before a column that happens to
       // start with the same letters.
@@ -216,20 +214,17 @@ export function useLangWatchQLMonaco({
     disposablesRef.current.push(disposable);
   }, []);
 
-  const applyMarkers = useCallback(
-    (next: readonly LangWatchQLEditorMarker[]) => {
-      const monaco = monacoRef.current;
-      const model = editorRef.current?.getModel();
-      if (!monaco || !model) return;
+  const applyMarkers = useCallback((next: readonly LangWatchQLEditorMarker[]) => {
+    const monaco = monacoRef.current;
+    const model = editorRef.current?.getModel();
+    if (!monaco || !model) return;
 
-      monaco.editor.setModelMarkers(
-        model,
-        LWQL_MARKER_OWNER,
-        next.map((marker) => markerDataFor({ monaco, marker })),
-      );
-    },
-    [],
-  );
+    monaco.editor.setModelMarkers(
+      model,
+      LWQL_MARKER_OWNER,
+      next.map((marker) => markerDataFor({ monaco, marker })),
+    );
+  }, []);
 
   useEffect(() => {
     applyMarkers(markers);
@@ -262,9 +257,7 @@ export function useLangWatchQLMonaco({
       ),
     );
 
-    registerInsert?.((text: string) =>
-      insertAtCursor({ editor: instance, text }),
-    );
+    registerInsert?.((text: string) => insertAtCursor({ editor: instance, text }));
 
     // Guarded, because test doubles of Monaco routinely stub only what a
     // given test reads — a missing key table must degrade to "no shortcut",

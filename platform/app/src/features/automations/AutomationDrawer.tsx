@@ -16,10 +16,7 @@ import {
   type NotificationCadence,
 } from "@langwatch/automation-contract";
 import { defaultsForSourceKind } from "@langwatch/automation-contract";
-import {
-  EXAMPLE_MATCHES,
-  TEMPLATE_VARIABLES,
-} from "@langwatch/automation-contract";
+import { EXAMPLE_MATCHES, TEMPLATE_VARIABLES } from "@langwatch/automation-contract";
 import { renderTriggerEmail } from "@langwatch/automation-contract";
 import { renderTriggerSlack } from "@langwatch/automation-contract";
 import { renderWebhookBody } from "@langwatch/automation-contract";
@@ -52,16 +49,8 @@ import {
   type ConfigFormCtx,
   isNotifyEntry,
 } from "~/features/automations/providers/types";
-import {
-  explainAnyError,
-  readHandledError,
-  showErrorToast,
-} from "~/features/errors";
-import {
-  AlertType,
-  TriggerAction,
-  TriggerKind,
-} from "~/generated/prisma/client";
+import { explainAnyError, readHandledError, showErrorToast } from "~/features/errors";
+import { AlertType, TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -102,10 +91,7 @@ import {
   useDraft,
   useSection,
 } from "./state/selectors";
-import {
-  consumeDraftKeptOnSubFlowReturn,
-  isInAutomationFlow,
-} from "./state/subFlow";
+import { consumeDraftKeptOnSubFlowReturn, isInAutomationFlow } from "./state/subFlow";
 
 /**
  * Headlines naming the template the server rejected.
@@ -256,11 +242,13 @@ export function AutomationDrawer({
   const queryClient = api.useUtils();
   const { filterParams } = useFilterParams();
   const projectId = project?.id ?? "";
-  const { enabled: webhookEnabled, isLoading: webhookFlagLoading } =
-    useFeatureFlag("release_webhook_automations", {
+  const { enabled: webhookEnabled, isLoading: webhookFlagLoading } = useFeatureFlag(
+    "release_webhook_automations",
+    {
       projectId: project?.id,
       enabled: !!project,
-    });
+    },
+  );
 
   const draft = useDraft();
   const section = useSection();
@@ -415,10 +403,7 @@ export function AutomationDrawer({
     // to no filters rather than crashing the open.
     if (initialFilters && initialSource !== "customGraph") {
       try {
-        const raw = JSON.parse(initialFilters) as Record<
-          string,
-          TriggerFilterValue
-        >;
+        const raw = JSON.parse(initialFilters) as Record<string, TriggerFilterValue>;
         const { sanitized } = sanitizeTriggerFilters(raw);
         dispatch({
           type: "SET_FILTERS",
@@ -477,10 +462,7 @@ export function AutomationDrawer({
     let filtersRaw: Record<string, TriggerFilterValue> = {};
     if (typeof row.filters === "string") {
       try {
-        filtersRaw = JSON.parse(row.filters) as Record<
-          string,
-          TriggerFilterValue
-        >;
+        filtersRaw = JSON.parse(row.filters) as Record<string, TriggerFilterValue>;
       } catch {
         filtersRaw = {};
       }
@@ -496,11 +478,7 @@ export function AutomationDrawer({
       action,
       name: row.name,
       alertType: row.alertType,
-      source: isReportRow
-        ? "report"
-        : row.customGraphId
-          ? "customGraph"
-          : "trace",
+      source: isReportRow ? "report" : row.customGraphId ? "customGraph" : "trace",
       customGraphId: row.customGraphId,
       // ADR-043: a trace automation — and a trace-query report — edited from a
       // saved row keeps its liqe query so the Subject editor rehydrates it
@@ -518,9 +496,9 @@ export function AutomationDrawer({
         : INITIAL_DRAFT.report,
       filters: sanitized as Partial<Record<FilterField, FilterParam>>,
       // Defensive narrow: column is a free-form TEXT (see the repo parser).
-      notificationCadence: (
-        NOTIFICATION_CADENCES as readonly string[]
-      ).includes(row.notificationCadence)
+      notificationCadence: (NOTIFICATION_CADENCES as readonly string[]).includes(
+        row.notificationCadence,
+      )
         ? (row.notificationCadence as NotificationCadence)
         : "immediate",
       // Clamp to the same bounds the router enforces so a stale row outside
@@ -801,9 +779,7 @@ export function AutomationDrawer({
   const editLoading = !!automationId && triggerQuery.isLoading;
   const editError = !!automationId && triggerQuery.isError;
   const webhookReadOnly =
-    !!automationId &&
-    draft.action === TriggerAction.SEND_WEBHOOK &&
-    !webhookEnabled;
+    !!automationId && draft.action === TriggerAction.SEND_WEBHOOK && !webhookEnabled;
 
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
@@ -823,9 +799,7 @@ export function AutomationDrawer({
     if (!channel || !projectId || !draft.action) return;
     const entry = CLIENT_PROVIDERS[draft.action];
     if (!isNotifyEntry(entry)) return;
-    const target = entry.client.testFireTarget(
-      draft.slices[draft.action] as never,
-    );
+    const target = entry.client.testFireTarget(draft.slices[draft.action] as never);
     testFire.mutate(
       // Alert drafts carry a non-null `graphAlert` so the server renders the
       // alert-shaped example context (not trace matches) — see
@@ -877,9 +851,7 @@ export function AutomationDrawer({
             status: "failure",
             errorTitle:
               templateTitle ??
-              (explanation.isRegistered
-                ? explanation.title
-                : "Test fire failed"),
+              (explanation.isRegistered ? explanation.title : "Test fire failed"),
             // The title when the code has no description of its own. The
             // attempt log is persistent history a person reads back later, and
             // a title-only code otherwise wrote a blank row into it.
@@ -923,18 +895,13 @@ export function AutomationDrawer({
         // graph/dashboard report sources itself). Only a graph alert never has
         // one. When set the router persists `filters` as `{}` and matches the
         // query in-memory.
-        filterQuery:
-          draft.source === "customGraph" ? null : draft.filterQuery || null,
-        customGraphId:
-          draft.source === "customGraph" ? draft.customGraphId : null,
+        filterQuery: draft.source === "customGraph" ? null : draft.filterQuery || null,
+        customGraphId: draft.source === "customGraph" ? draft.customGraphId : null,
         // The graph-alert threshold rule travels alongside the destination
         // keys; the router merges them into the persisted `actionParams`.
-        graphAlert:
-          draft.source === "customGraph" ? draft.graphAlert : undefined,
+        graphAlert: draft.source === "customGraph" ? draft.graphAlert : undefined,
         report:
-          draft.source === "report"
-            ? reportInputFromDraft(draft.report)
-            : undefined,
+          draft.source === "report" ? reportInputFromDraft(draft.report) : undefined,
         actionParams: actionParamsFromDraft(draft) as never,
         templates: templatesFromDraft(draft),
         notificationCadence: draft.notificationCadence,
@@ -965,23 +932,13 @@ export function AutomationDrawer({
           }),
       },
     );
-  }, [
-    automationId,
-    canSave,
-    closeDrawer,
-    draft,
-    projectId,
-    queryClient,
-    upsert,
-  ]);
+  }, [automationId, canSave, closeDrawer, draft, projectId, queryClient, upsert]);
 
   // Alerts always deliver immediately (the server pins their cadence), so
   // template pickers and variable filtering treat them as immediate even if
   // the dormant draft cadence says otherwise.
   const cadenceMode: "immediate" | "digest" =
-    isGraphAlert || draft.notificationCadence === "immediate"
-      ? "immediate"
-      : "digest";
+    isGraphAlert || draft.notificationCadence === "immediate" ? "immediate" : "digest";
   const hasEvaluationFilter = Object.keys(draft.filters).some((k) =>
     k.startsWith("evaluations."),
   );
@@ -1020,8 +977,7 @@ export function AutomationDrawer({
             ? "report"
             : "trace",
       // Narrows a report's layouts to the content it actually sends.
-      reportSourceKind:
-        draft.source === "report" ? draft.report.sourceKind : undefined,
+      reportSourceKind: draft.source === "report" ? draft.report.sourceKind : undefined,
       // Lets a notify provider offer a "Send test" button inside its config.
       onTestFire,
       testFireLoading: testFire.isPending,
@@ -1055,8 +1011,7 @@ export function AutomationDrawer({
   // in-progress multi-stage draft. Until the baseline lands we treat the
   // draft as clean so a close during the first paint never prompts.
   const isDirty =
-    baselineRef.current !== null &&
-    JSON.stringify(draft) !== baselineRef.current;
+    baselineRef.current !== null && JSON.stringify(draft) !== baselineRef.current;
 
   const requestClose = useCallback(() => {
     if (isDirty) {
@@ -1098,16 +1053,11 @@ export function AutomationDrawer({
                 bg="colorPalette.subtle"
               >
                 <Text textStyle="sm" color="fg">
-                  Couldn't load this {labels.noun}. Close the drawer and try
-                  again.
+                  Couldn't load this {labels.noun}. Close the drawer and try again.
                 </Text>
               </Box>
             ) : editLoading ? (
-              <VStack
-                align="stretch"
-                gap={4}
-                data-testid="automation-edit-loading"
-              >
+              <VStack align="stretch" gap={4} data-testid="automation-edit-loading">
                 <Skeleton height="32px" width="60%" />
                 <Skeleton height="80px" width="full" />
                 <Skeleton height="80px" width="full" />
@@ -1187,8 +1137,8 @@ export function AutomationDrawer({
           </Dialog.Header>
           <Dialog.Body>
             <Text color="fg.muted" textStyle="sm">
-              This {labels.noun} has changes you haven't saved yet. Close the
-              drawer and discard them?
+              This {labels.noun} has changes you haven't saved yet. Close the drawer and
+              discard them?
             </Text>
           </Dialog.Body>
           <Dialog.Footer>
@@ -1240,8 +1190,8 @@ function EmailLinkLandingBanner() {
           <Mail size={16} />
         </Box>
         <Text textStyle="sm" color="fg">
-          Opened from an email notification. You're editing the automation that
-          produced that alert.
+          Opened from an email notification. You're editing the automation that produced
+          that alert.
         </Text>
       </HStack>
     </Box>

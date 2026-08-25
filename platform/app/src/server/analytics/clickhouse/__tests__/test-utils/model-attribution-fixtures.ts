@@ -304,30 +304,22 @@ export const ALL_SPANS = [
 ];
 
 /** Ungrouped truths the grouped buckets must partition to. */
-export const EXPECTED_TOTAL_COST =
-  0.875 + 0.0625 + 0.03125 + 0.25 + 0.512 + 0.09375; // 1.8245
+export const EXPECTED_TOTAL_COST = 0.875 + 0.0625 + 0.03125 + 0.25 + 0.512 + 0.09375; // 1.8245
 export const EXPECTED_NON_BILLED_COST = 0.125 + 0.25; // A's span split + E's legacy marker
 export const EXPECTED_PROMPT_TOKENS = 7000 + 800 + 100; // 7900
 export const EXPECTED_COMPLETION_TOKENS = 700 + 80 + 10; // 790
-export const EXPECTED_TOTAL_TOKENS =
-  EXPECTED_PROMPT_TOKENS + EXPECTED_COMPLETION_TOKENS; // 8690
+export const EXPECTED_TOTAL_TOKENS = EXPECTED_PROMPT_TOKENS + EXPECTED_COMPLETION_TOKENS; // 8690
 
 export function traceSummaryRow(tenantId: string, t: TraceFixture) {
   const attributes: Record<string, string> = { "metadata.env": "test" };
   if (t.cacheReadTokens) {
-    attributes["langwatch.reserved.cache_read_tokens"] = String(
-      t.cacheReadTokens,
-    );
+    attributes["langwatch.reserved.cache_read_tokens"] = String(t.cacheReadTokens);
   }
   if (t.cacheWriteTokens) {
-    attributes["langwatch.reserved.cache_creation_tokens"] = String(
-      t.cacheWriteTokens,
-    );
+    attributes["langwatch.reserved.cache_creation_tokens"] = String(t.cacheWriteTokens);
   }
   if (t.reasoningTokens) {
-    attributes["langwatch.reserved.reasoning_tokens"] = String(
-      t.reasoningTokens,
-    );
+    attributes["langwatch.reserved.reasoning_tokens"] = String(t.reasoningTokens);
   }
   if (t.labels) {
     attributes["langwatch.labels"] = JSON.stringify(t.labels);

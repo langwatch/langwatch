@@ -28,14 +28,7 @@ const getIconForType = (type: RecentItemType): ReactNode => {
   if (config) {
     return <Icon as={config.icon} width="14px" height="14px" display="block" />;
   }
-  return (
-    <Icon
-      as={featureIcons.home.icon}
-      width="14px"
-      height="14px"
-      display="block"
-    />
-  );
+  return <Icon as={featureIcons.home.icon} width="14px" height="14px" display="block" />;
 };
 
 /**
@@ -75,12 +68,7 @@ const MAX_RECENT_ROWS = 8;
 function RecentItemRow({ item }: { item: RecentItem }) {
   const timeAgo = formatTimeAgo(item.updatedAt.getTime());
   return (
-    <ChakraLink
-      asChild
-      _hover={{ textDecoration: "none" }}
-      width="full"
-      display="block"
-    >
+    <ChakraLink asChild _hover={{ textDecoration: "none" }} width="full" display="block">
       <NextLink href={item.href}>
         <HStack
           gap={2.5}
@@ -112,12 +100,7 @@ function RecentItemRow({ item }: { item: RecentItem }) {
           >
             {item.name}
           </Text>
-          <Text
-            fontFamily="mono"
-            fontSize="11px"
-            color="fg.subtle"
-            flexShrink={0}
-          >
+          <Text fontFamily="mono" fontSize="11px" color="fg.subtle" flexShrink={0}>
             {getLabelForType(item.type)}
           </Text>
           {timeAgo ? (

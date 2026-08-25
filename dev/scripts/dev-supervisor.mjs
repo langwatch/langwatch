@@ -232,9 +232,7 @@ function passThrough(argv, env, { detached, leader = null }) {
       clearInterval(watch);
       if (why !== null) stderr(`${PREFIX} ${why}, stopping the dev stack.\n`);
       if (!(await stack.takeDown())) {
-        stderr(
-          `${PREFIX} some of the dev stack outlived SIGKILL, giving up.\n`,
-        );
+        stderr(`${PREFIX} some of the dev stack outlived SIGKILL, giving up.\n`);
       }
       finish();
     };

@@ -6,10 +6,7 @@ import { SummaryMetricValue } from "./SummaryMetric";
 
 export const DocumentsCountsTable = () => {
   const { filterParams, queryOpts } = useFilterParams();
-  const documents = api.analytics.topUsedDocuments.useQuery(
-    filterParams,
-    queryOpts,
-  );
+  const documents = api.analytics.topUsedDocuments.useQuery(filterParams, queryOpts);
 
   if (documents.isLoading) return <Box>Loading...</Box>;
   if (documents.error) return <Box>An error occurred</Box>;
@@ -64,10 +61,7 @@ export const DocumentsCountsTable = () => {
 
 export const DocumentsCountsSummary = () => {
   const { filterParams, queryOpts } = useFilterParams();
-  const documents = api.analytics.topUsedDocuments.useQuery(
-    filterParams,
-    queryOpts,
-  );
+  const documents = api.analytics.topUsedDocuments.useQuery(filterParams, queryOpts);
 
   const count = documents.data?.totalUniqueDocuments;
 

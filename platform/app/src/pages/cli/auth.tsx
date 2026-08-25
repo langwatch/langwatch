@@ -146,12 +146,7 @@ function StatusCard({
           marginTop={0.5}
         />
         <VStack align="stretch" gap={1} flex={1}>
-          <Text
-            textStyle="sm"
-            fontWeight="semibold"
-            color="fg"
-            lineHeight="snug"
-          >
+          <Text textStyle="sm" fontWeight="semibold" color="fg" lineHeight="snug">
             {title}
           </Text>
           <Text textStyle="xs" color="fg.muted" lineHeight="tall">
@@ -166,11 +161,9 @@ function StatusCard({
 export default function CliAuthPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const { organizations, project: currentProject } = useOrganizationTeamProject(
-    {
-      redirectToOnboarding: false,
-    },
-  );
+  const { organizations, project: currentProject } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
 
   // router.query values can legitimately be string | string[] | undefined
   // (Next.js parses repeated query keys as arrays). The CLI always emits a
@@ -186,9 +179,7 @@ export default function CliAuthPage() {
   const [lookup, setLookup] = useState<LookupState>({ kind: "loading" });
   const [action, setAction] = useState<ActionState>({ kind: "idle" });
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    null,
-  );
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   // device_session mode: what the minted CLI key will be able to access.
   // Scopes preselect to the widest access the user holds (see
@@ -197,11 +188,8 @@ export default function CliAuthPage() {
   const [selectedScopes, setSelectedScopes] = useState<ScopeTriadEntry[]>([]);
   // The org the current scope defaults were computed for, so arriving data
   // never clobbers a user's edited selection within the same org.
-  const [scopeDefaultsOrgId, setScopeDefaultsOrgId] = useState<string | null>(
-    null,
-  );
-  const [arePermissionsCustomized, setArePermissionsCustomized] =
-    useState(false);
+  const [scopeDefaultsOrgId, setScopeDefaultsOrgId] = useState<string | null>(null);
+  const [arePermissionsCustomized, setArePermissionsCustomized] = useState(false);
   const [permissionSelections, setPermissionSelections] = useState<
     Record<string, PermissionSelection>
   >({});
@@ -284,9 +272,7 @@ export default function CliAuthPage() {
   // ambient project; on creation the org list refreshes and the effect below
   // promotes the new project (matched by slug) to the current selection.
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
-  const [pendingCreatedSlug, setPendingCreatedSlug] = useState<string | null>(
-    null,
-  );
+  const [pendingCreatedSlug, setPendingCreatedSlug] = useState<string | null>(null);
   useEffect(() => {
     if (!pendingCreatedSlug) return;
     const created = projectsForOrg.find((p) => p.slug === pendingCreatedSlug);
@@ -302,9 +288,7 @@ export default function CliAuthPage() {
     if (sessionStatus === "loading") return;
     if (!session && userCode) {
       const callbackUrl = `/cli/auth?user_code=${encodeURIComponent(userCode)}`;
-      void router.replace(
-        `/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`,
-      );
+      void router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
     }
   }, [session, sessionStatus, userCode, router]);
 
@@ -440,8 +424,7 @@ export default function CliAuthPage() {
       organizationId: selectedOrgId,
       orgProjects: offeredProjects.map((p) => ({ id: p.id, teamId: p.teamId })),
       isServiceKey: false,
-      getTeamRolePermissions: (role) =>
-        getTeamRolePermissions(role as TeamUserRole),
+      getTeamRolePermissions: (role) => getTeamRolePermissions(role as TeamUserRole),
     });
   }, [selectedScopes, selectedOrgId, myBindings.data, offeredProjects]);
 
@@ -468,9 +451,7 @@ export default function CliAuthPage() {
   // one permission.
   const defaultCliKeyPermissionsHeld = useMemo<string[]>(() => {
     const held = new Set(cliKeyUserPermissions);
-    return defaultCliKeyPermissions().filter((permission) =>
-      held.has(permission),
-    );
+    return defaultCliKeyPermissions().filter((permission) => held.has(permission));
   }, [cliKeyUserPermissions]);
 
   // The customized rows, re-narrowed to the ceiling of whatever is selected
@@ -506,9 +487,7 @@ export default function CliAuthPage() {
       setArePermissionsCustomized(false);
       setPermissionSelections({});
     } else {
-      setPermissionSelections(
-        selectionsFromPermissions(defaultCliKeyPermissionsHeld),
-      );
+      setPermissionSelections(selectionsFromPermissions(defaultCliKeyPermissionsHeld));
       setArePermissionsCustomized(true);
     }
   };
@@ -559,15 +538,12 @@ export default function CliAuthPage() {
         setAction({
           kind: "error",
           message:
-            data.message ??
-            data.error_description ??
-            `Approval failed (${r.status})`,
+            data.message ?? data.error_description ?? `Approval failed (${r.status})`,
         });
         return;
       }
       const orgName =
-        organizations?.find((o) => o.id === selectedOrgId)?.name ??
-        "your organization";
+        organizations?.find((o) => o.id === selectedOrgId)?.name ?? "your organization";
       const projectName = requiresProject
         ? offeredProjects.find((p) => p.id === selectedProjectId)?.name
         : undefined;
@@ -602,14 +578,9 @@ export default function CliAuthPage() {
 
   const expiryText = useMemo(() => {
     if (lookup.kind !== "ready") return null;
-    const seconds = Math.max(
-      0,
-      Math.round((lookup.expiresAt - Date.now()) / 1000),
-    );
+    const seconds = Math.max(0, Math.round((lookup.expiresAt - Date.now()) / 1000));
     const minutes = Math.floor(seconds / 60);
-    return minutes > 0
-      ? `Expires in ~${minutes} min`
-      : `Expires in ${seconds}s`;
+    return minutes > 0 ? `Expires in ~${minutes} min` : `Expires in ${seconds}s`;
   }, [lookup]);
 
   if (sessionStatus === "loading" || (!session && userCode)) {
@@ -623,9 +594,7 @@ export default function CliAuthPage() {
       </Head>
       <OnboardingContainer
         title={
-          requiresProject
-            ? "Connect a project to the CLI"
-            : "Authorize the LangWatch CLI"
+          requiresProject ? "Connect a project to the CLI" : "Authorize the LangWatch CLI"
         }
         subTitle={
           requiresProject
@@ -637,13 +606,9 @@ export default function CliAuthPage() {
       >
         <VStack align="stretch" gap={6}>
           {!userCode && (
-            <StatusCard
-              palette="orange"
-              icon={CircleAlert}
-              title="No code provided"
-            >
-              Run <code>langwatch login</code> in your terminal, it will print a
-              link with your code embedded.
+            <StatusCard palette="orange" icon={CircleAlert} title="No code provided">
+              Run <code>langwatch login</code> in your terminal, it will print a link with
+              your code embedded.
             </StatusCard>
           )}
 
@@ -659,19 +624,14 @@ export default function CliAuthPage() {
           {lookup.kind === "expired" && (
             <>
               <StatusCard palette="orange" icon={Clock3} title="Code expired">
-                Restart <code>langwatch login</code> in your terminal to get a
-                new code.
+                Restart <code>langwatch login</code> in your terminal to get a new code.
               </StatusCard>
             </>
           )}
 
           {lookup.kind === "error" && (
             <>
-              <StatusCard
-                palette="red"
-                icon={TriangleAlert}
-                title="Something went wrong"
-              >
+              <StatusCard palette="red" icon={TriangleAlert} title="Something went wrong">
                 {lookup.message}
               </StatusCard>
             </>
@@ -713,12 +673,7 @@ export default function CliAuthPage() {
 
                 {organizations && organizations.length > 1 && (
                   <Box>
-                    <Text
-                      textStyle="sm"
-                      fontWeight="semibold"
-                      color="fg"
-                      mb={2}
-                    >
+                    <Text textStyle="sm" fontWeight="semibold" color="fg" mb={2}>
                       Organization
                     </Text>
                     <VStack align="stretch" gap={2}>
@@ -726,12 +681,8 @@ export default function CliAuthPage() {
                         <Button
                           key={org.id}
                           size="sm"
-                          colorPalette={
-                            selectedOrgId === org.id ? "orange" : "gray"
-                          }
-                          variant={
-                            selectedOrgId === org.id ? "surface" : "outline"
-                          }
+                          colorPalette={selectedOrgId === org.id ? "orange" : "gray"}
+                          variant={selectedOrgId === org.id ? "surface" : "outline"}
                           onClick={() => setSelectedOrgId(org.id)}
                           justifyContent="flex-start"
                         >
@@ -764,9 +715,8 @@ export default function CliAuthPage() {
                         icon={CircleAlert}
                         title="No projects yet"
                       >
-                        Create a project in this organization first, then pick
-                        it here; the key flows back to your terminal
-                        automatically.
+                        Create a project in this organization first, then pick it here;
+                        the key flows back to your terminal automatically.
                       </StatusCard>
                     ) : (
                       <>
@@ -797,9 +747,9 @@ export default function CliAuthPage() {
                           personalProject &&
                           selectedProjectId === personalProject.id && (
                             <Text textStyle="xs" color="fg.muted" mt={1.5}>
-                              No shared projects in this organization yet, so
-                              your personal project is preselected. Only you can
-                              read what lands there.
+                              No shared projects in this organization yet, so your
+                              personal project is preselected. Only you can read what
+                              lands there.
                             </Text>
                           )}
                       </>
@@ -810,17 +760,12 @@ export default function CliAuthPage() {
                 {!requiresProject && (
                   <>
                     <Box>
-                      <Text
-                        textStyle="sm"
-                        fontWeight="semibold"
-                        color="fg"
-                        mb={1}
-                      >
+                      <Text textStyle="sm" fontWeight="semibold" color="fg" mb={1}>
                         What the CLI can access
                       </Text>
                       <Text textStyle="xs" color="fg.muted" mb={2}>
-                        The key works inside these scopes, always limited to
-                        your own access.
+                        The key works inside these scopes, always limited to your own
+                        access.
                       </Text>
                       {myBindings.isLoading ? (
                         <HStack>
@@ -845,10 +790,9 @@ export default function CliAuthPage() {
                         selectedScopes.length === 0 &&
                         !hasAnyScopeToOffer && (
                           <Text textStyle="xs" color="orange.fg" mt={2}>
-                            Your account holds no access in this organization,
-                            so there is nothing to give the CLI. Ask an
-                            administrator to add you to a team, then run{" "}
-                            <code>langwatch login</code> again.
+                            Your account holds no access in this organization, so there is
+                            nothing to give the CLI. Ask an administrator to add you to a
+                            team, then run <code>langwatch login</code> again.
                           </Text>
                         )}
                     </Box>
@@ -864,9 +808,7 @@ export default function CliAuthPage() {
                           color="fg.muted"
                           onClick={handleToggleCustomizePermissions}
                         >
-                          {arePermissionsCustomized
-                            ? "Use default"
-                            : "Customize"}
+                          {arePermissionsCustomized ? "Use default" : "Customize"}
                         </Button>
                       </HStack>
                       {arePermissionsCustomized ? (
@@ -885,10 +827,9 @@ export default function CliAuthPage() {
                         </VStack>
                       ) : (
                         <Text textStyle="xs" color="fg.muted" lineHeight="tall">
-                          The key gets your access for everyday work: traces,
-                          datasets, prompts, evaluations, the AI Gateway, and
-                          project settings. It cannot manage members and roles,
-                          or manage the organization.
+                          The key gets your access for everyday work: traces, datasets,
+                          prompts, evaluations, the AI Gateway, and project settings. It
+                          cannot manage members and roles, or manage the organization.
                         </Text>
                       )}
                     </Box>
@@ -896,11 +837,7 @@ export default function CliAuthPage() {
                 )}
 
                 {action.kind === "error" && (
-                  <StatusCard
-                    palette="red"
-                    icon={TriangleAlert}
-                    title="Approval failed"
-                  >
+                  <StatusCard palette="red" icon={TriangleAlert} title="Approval failed">
                     {action.message}
                   </StatusCard>
                 )}
@@ -935,16 +872,10 @@ export default function CliAuthPage() {
           {action.kind === "success" && (
             <>
               {action.credentialType === "project_api_key" ? (
-                <StatusCard
-                  palette="green"
-                  icon={CheckCircle2}
-                  title="API key approved"
-                >
-                  The API key for{" "}
-                  <strong>{action.projectName ?? "your project"}</strong> (
-                  {action.organizationName}) is on its way to your terminal, and
-                  the CLI will save it to your <code>.env</code>. You can close
-                  this tab.
+                <StatusCard palette="green" icon={CheckCircle2} title="API key approved">
+                  The API key for <strong>{action.projectName ?? "your project"}</strong>{" "}
+                  ({action.organizationName}) is on its way to your terminal, and the CLI
+                  will save it to your <code>.env</code>. You can close this tab.
                 </StatusCard>
               ) : (
                 <>
@@ -954,8 +885,8 @@ export default function CliAuthPage() {
                     title="You're signed in!"
                   >
                     LangWatch CLI is now authorized for{" "}
-                    <strong>{action.organizationName}</strong>. You can close
-                    this tab and return to your terminal.
+                    <strong>{action.organizationName}</strong>. You can close this tab and
+                    return to your terminal.
                   </StatusCard>
                   <FirstTraceRedirect />
                 </>
@@ -965,11 +896,7 @@ export default function CliAuthPage() {
 
           {action.kind === "denied" && (
             <>
-              <StatusCard
-                palette="blue"
-                icon={Info}
-                title="Authorization denied"
-              >
+              <StatusCard palette="blue" icon={Info} title="Authorization denied">
                 The CLI session has been rejected. You can close this tab.
               </StatusCard>
             </>
@@ -993,11 +920,7 @@ export default function CliAuthPage() {
 
 function FullPageSpinner() {
   return (
-    <OnboardingContainer
-      title="Authorize the LangWatch CLI"
-      loading
-      isLogoInside
-    >
+    <OnboardingContainer title="Authorize the LangWatch CLI" loading isLogoInside>
       {null}
     </OnboardingContainer>
   );

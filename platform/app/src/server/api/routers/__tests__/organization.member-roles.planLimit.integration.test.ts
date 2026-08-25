@@ -36,10 +36,7 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import {
-  bindCustomRoleToTeam,
-  grantOrganizationAdmin,
-} from "./helpers/roleBindings";
+import { bindCustomRoleToTeam, grantOrganizationAdmin } from "./helpers/roleBindings";
 
 describe("organization member role plan limit enforcement", () => {
   const testNamespace = `member-role-limit-${nanoid(8)}`;

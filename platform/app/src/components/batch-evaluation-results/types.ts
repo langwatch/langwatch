@@ -289,9 +289,7 @@ export const transformBatchEvaluationData = (
       id: target.id,
       name: target.name,
       type:
-        target.type === "custom"
-          ? "custom"
-          : (target.type as BatchTargetColumn["type"]),
+        target.type === "custom" ? "custom" : (target.type as BatchTargetColumn["type"]),
       promptId: target.promptId,
       promptVersion: target.promptVersion,
       agentId: target.agentId,
@@ -305,14 +303,12 @@ export const transformBatchEvaluationData = (
     // Retrocompatibility: handle old format where predicted is flat vs nested
     const predictedColumns = detectPredictedColumns(dataset);
     if (Object.keys(predictedColumns).length > 0) {
-      targetColumns = Object.entries(predictedColumns).map(
-        ([node, fields]) => ({
-          id: node || "output",
-          name: node === "end" || node === "" ? "Output" : node,
-          type: "legacy" as const,
-          outputFields: Array.from(fields),
-        }),
-      );
+      targetColumns = Object.entries(predictedColumns).map(([node, fields]) => ({
+        id: node || "output",
+        name: node === "end" || node === "" ? "Output" : node,
+        type: "legacy" as const,
+        outputFields: Array.from(fields),
+      }));
     } else if (evaluations.length > 0) {
       // API evaluations: no targets, no predicted - create one virtual target per evaluator
       // Each evaluator's inputs (data=) will be displayed as the target output
@@ -332,10 +328,7 @@ export const transformBatchEvaluationData = (
           id: `_eval_${evaluatorId}`,
           name: evaluatorName,
           type: "legacy" as const,
-          outputFields: detectEvaluatorOutputFieldsForEvaluator(
-            evaluations,
-            evaluatorId,
-          ),
+          outputFields: detectEvaluatorOutputFieldsForEvaluator(evaluations, evaluatorId),
         }),
       );
     } else if (hasRowLevelErrorsWithoutTarget) {
@@ -374,10 +367,7 @@ export const transformBatchEvaluationData = (
   }
 
   // Group evaluations by index and target
-  const evaluationsByIndexAndTarget = new Map<
-    string,
-    (typeof evaluations)[number][]
-  >();
+  const evaluationsByIndexAndTarget = new Map<string, (typeof evaluations)[number][]>();
   for (const evaluation of evaluations) {
     const key = `${evaluation.index}:${evaluation.targetId ?? ""}`;
     const existing = evaluationsByIndexAndTarget.get(key) ?? [];
@@ -394,8 +384,7 @@ export const transformBatchEvaluationData = (
 
   // Determine the total number of rows
   // When dataset is empty, rowCount should be 0
-  const rowCount =
-    dataset.length > 0 ? Math.max(...dataset.map((d) => d.index)) + 1 : 0;
+  const rowCount = dataset.length > 0 ? Math.max(...dataset.map((d) => d.index)) + 1 : 0;
 
   // Build rows
   const rows: BatchResultRow[] = [];
@@ -458,9 +447,7 @@ export const transformBatchEvaluationData = (
         // Virtual evaluator target: only include this specific evaluator
         const evaluatorId = targetId.slice(6);
         const rowEvaluations = evaluationsByIndexAndTarget.get(`${i}:`) ?? [];
-        targetEvaluations = rowEvaluations.filter(
-          (ev) => ev.evaluator === evaluatorId,
-        );
+        targetEvaluations = rowEvaluations.filter((ev) => ev.evaluator === evaluatorId);
       } else {
         targetEvaluations =
           evaluationsByIndexAndTarget.get(`${i}:${targetId}`) ??
@@ -469,20 +456,18 @@ export const transformBatchEvaluationData = (
             : (evaluationsByIndexAndTarget.get(`${i}:`) ?? []));
       }
 
-      const evaluatorResults: BatchEvaluatorResult[] = targetEvaluations.map(
-        (ev) => ({
-          evaluatorId: ev.evaluator,
-          evaluatorName: ev.name ?? ev.evaluator,
-          status: ev.status,
-          score: ev.score,
-          passed: ev.passed,
-          label: ev.label,
-          details: ev.details,
-          cost: ev.cost,
-          duration: ev.duration,
-          inputs: ev.inputs ?? undefined,
-        }),
-      );
+      const evaluatorResults: BatchEvaluatorResult[] = targetEvaluations.map((ev) => ({
+        evaluatorId: ev.evaluator,
+        evaluatorName: ev.name ?? ev.evaluator,
+        status: ev.status,
+        score: ev.score,
+        passed: ev.passed,
+        label: ev.label,
+        details: ev.details,
+        cost: ev.cost,
+        duration: ev.duration,
+        inputs: ev.inputs ?? undefined,
+      }));
 
       rowTargets[targetId] = {
         targetId,
@@ -516,11 +501,7 @@ export const transformBatchEvaluationData = (
     targetColumns,
     evaluatorIds: Array.from(evaluatorMap.keys()),
     evaluatorNames: Object.fromEntries(evaluatorMap),
-    comparisonColumns: detectComparisonColumns(
-      evaluations,
-      targetColumns,
-      rows,
-    ),
+    comparisonColumns: detectComparisonColumns(evaluations, targetColumns, rows),
     rows,
   };
 };
@@ -636,8 +617,7 @@ const detectComparisonColumns = (
   // the label-shape filter below) made an all-tie bucket with no resolvable
   // candidate ids wrongly fall back to a hardcoded 2-variant slice, silently
   // dropping any 3rd+ variant.
-  const isLegacySlotLabel = (v: string): v is "A" | "B" =>
-    v === "A" || v === "B";
+  const isLegacySlotLabel = (v: string): v is "A" | "B" => v === "A" || v === "B";
 
   // Also treat any evaluator whose type or display name looks like a
   // comparison judge as one, even if this row's label doesn't match a known
@@ -646,12 +626,8 @@ const detectComparisonColumns = (
   // handle resolved by langevals but not reflected in the run's targets
   // snapshot), and the strict shape check silently dropped the whole
   // evaluator on the floor — chip suppression + win-rate chart both no-op'd.
-  const isComparisonEvaluator = (
-    ev: ExperimentRunWithItems["evaluations"][number],
-  ) => {
-    const fields = [ev.evaluator ?? "", ev.name ?? ""].map((f) =>
-      f.toLowerCase(),
-    );
+  const isComparisonEvaluator = (ev: ExperimentRunWithItems["evaluations"][number]) => {
+    const fields = [ev.evaluator ?? "", ev.name ?? ""].map((f) => f.toLowerCase());
     return fields.some(
       (field) =>
         field.includes("pairwise") ||
@@ -863,20 +839,15 @@ const detectComparisonColumns = (
           label: rawLabel,
           variants: variants.map((v) => v.id ?? ""),
         });
-        const isUnresolvedSlot =
-          resolved === "" || resolved === "A" || resolved === "B";
+        const isUnresolvedSlot = resolved === "" || resolved === "A" || resolved === "B";
         isUnresolved = isUnresolvedSlot;
-        winnerId = isUnresolvedSlot
-          ? null
-          : (resolveToTargetId(resolved) ?? resolved);
+        winnerId = isUnresolvedSlot ? null : (resolveToTargetId(resolved) ?? resolved);
       }
 
       // Look up the winning variant's actual output text so the row cell can
       // show "what was right" alongside "why". Ties get no winner output —
       // there was no definitively-right answer to surface.
-      const winnerCell = winnerId
-        ? rows[rowIndex]?.targets[winnerId]
-        : undefined;
+      const winnerCell = winnerId ? rows[rowIndex]?.targets[winnerId] : undefined;
 
       verdictsByRow[rowIndex] = {
         rowIndex,
@@ -1001,11 +972,7 @@ const detectPredictedColumns = (
     for (const entry of dataset) {
       if (!entry.predicted) continue;
       for (const [node, value] of Object.entries(entry.predicted)) {
-        if (
-          typeof value === "object" &&
-          value !== null &&
-          !Array.isArray(value)
-        ) {
+        if (typeof value === "object" && value !== null && !Array.isArray(value)) {
           if (!columns[node]) columns[node] = new Set();
           for (const key of Object.keys(value)) {
             columns[node]!.add(key);

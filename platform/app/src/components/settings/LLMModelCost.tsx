@@ -24,13 +24,7 @@ import { PageLayout } from "../ui/layouts/PageLayout";
  * zero. Green marks a rate that comes from a stored cost rule, at whatever
  * scope, rather than from the model catalog.
  */
-function RateCell({
-  rate,
-  isCustom,
-}: {
-  rate: number | undefined;
-  isCustom: boolean;
-}) {
+function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: boolean }) {
   return (
     <Table.Cell padding={0}>
       <Text
@@ -101,9 +95,7 @@ export function LLMModelCost(props: { projectId?: string }) {
                   is narrow, so the identifying columns give up some width to
                   keep the prices readable. */}
               <Table.ColumnHeader width="18%">Model name</Table.ColumnHeader>
-              <Table.ColumnHeader width="18%">
-                Regex match rule
-              </Table.ColumnHeader>
+              <Table.ColumnHeader width="18%">Regex match rule</Table.ColumnHeader>
               <Table.ColumnHeader>Input cost</Table.ColumnHeader>
               <Table.ColumnHeader>Output cost</Table.ColumnHeader>
               <Table.ColumnHeader>Cache read</Table.ColumnHeader>
@@ -127,10 +119,7 @@ export function LLMModelCost(props: { projectId?: string }) {
             {llmModelCosts.data?.map((row) => (
               <Table.Row key={row.model} width="full">
                 <Table.Cell>
-                  <Text
-                    truncate
-                    color={!!row.updatedAt ? "green.500" : undefined}
-                  >
+                  <Text truncate color={!!row.updatedAt ? "green.500" : undefined}>
                     {row.model}
                   </Text>
                 </Table.Cell>
@@ -159,24 +148,11 @@ export function LLMModelCost(props: { projectId?: string }) {
                 </Table.Cell>
                 <RateCell rate={row.inputCostPerToken} isCustom={!!row.id} />
                 <RateCell rate={row.outputCostPerToken} isCustom={!!row.id} />
-                <RateCell
-                  rate={row.cacheReadCostPerToken}
-                  isCustom={!!row.id}
-                />
-                <RateCell
-                  rate={row.cacheCreationCostPerToken}
-                  isCustom={!!row.id}
-                />
-                <RateCell
-                  rate={row.cacheCreation1hCostPerToken}
-                  isCustom={!!row.id}
-                />
+                <RateCell rate={row.cacheReadCostPerToken} isCustom={!!row.id} />
+                <RateCell rate={row.cacheCreationCostPerToken} isCustom={!!row.id} />
+                <RateCell rate={row.cacheCreation1hCostPerToken} isCustom={!!row.id} />
                 <Table.Cell padding={1}>
-                  <ActionsMenu
-                    id={row.id}
-                    model={row.model}
-                    projectId={row.projectId}
-                  />
+                  <ActionsMenu id={row.id} model={row.model} projectId={row.projectId} />
                 </Table.Cell>
               </Table.Row>
             ))}

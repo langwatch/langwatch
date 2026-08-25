@@ -96,9 +96,7 @@ export const checkDeclaredPermission = ({
       }
 
       const scope = requireDeclaredScope({ permission, input, via });
-      const { permitted, organizationRole } = await appOf(
-        ctx,
-      ).permissions.getDecision({
+      const { permitted, organizationRole } = await appOf(ctx).permissions.getDecision({
         userId: ctx.session.user.id,
         permission,
         scope,
@@ -157,9 +155,7 @@ export const checkDeclaredPermissionAny = (
     },
   );
 
-const SENSITIVE_SCOPE_FIELDS = Object.values(
-  SCOPE_TIER_FIELDS,
-) as ScopeTierField[];
+const SENSITIVE_SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];
 
 /**
  * `.noPermission({ reason, allow })` — authenticated, deliberately
@@ -181,9 +177,7 @@ export const declaredNoPermission = ({
       const allowedKeys = Object.keys(allow ?? {});
       for (const key of SENSITIVE_SCOPE_FIELDS) {
         if (key in input && !allowedKeys.includes(key)) {
-          throw new Error(
-            `${key} is not allowed to be used without permission check`,
-          );
+          throw new Error(`${key} is not allowed to be used without permission check`);
         }
       }
       ctx.permissionChecked = true;
@@ -272,9 +266,7 @@ function deniedError({
     return new TRPCError({
       code: "UNAUTHORIZED",
       message: "This feature is not available for your account",
-      cause: new LiteMemberRestrictedError(
-        permission.split(":")[0] ?? "unknown",
-      ),
+      cause: new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown"),
     });
   }
   const denied = new PermissionDeniedError({

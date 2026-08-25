@@ -148,9 +148,7 @@ describe("CascadeArchiveDialog", () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.queryByText("This will also affect:"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("This will also affect:")).not.toBeInTheDocument();
     });
   });
 
@@ -160,9 +158,7 @@ describe("CascadeArchiveDialog", () => {
     render(<CascadeArchiveDialog {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      const confirmButton = screen.getByTestId(
-        "cascade-archive-confirm-button",
-      );
+      const confirmButton = screen.getByTestId("cascade-archive-confirm-button");
       expect(confirmButton).toBeDisabled();
     });
 
@@ -170,9 +166,7 @@ describe("CascadeArchiveDialog", () => {
     await user.type(input, "delete");
 
     await waitFor(() => {
-      const confirmButton = screen.getByTestId(
-        "cascade-archive-confirm-button",
-      );
+      const confirmButton = screen.getByTestId("cascade-archive-confirm-button");
       expect(confirmButton).not.toBeDisabled();
     });
   });
@@ -242,9 +236,7 @@ describe("CascadeArchiveDialog", () => {
     });
 
     await waitFor(() => {
-      const confirmButton = screen.getByTestId(
-        "cascade-archive-confirm-button",
-      );
+      const confirmButton = screen.getByTestId("cascade-archive-confirm-button");
       expect(confirmButton).toBeDisabled();
     });
   });

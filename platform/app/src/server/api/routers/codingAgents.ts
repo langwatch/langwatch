@@ -128,11 +128,10 @@ export const codingAgentsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         projectId: input.projectId,
       });
-      const usage =
-        await app.codingAgents.pullRequestUsage.getForPersonalProject({
-          projectId: input.projectId,
-          ...scope,
-        });
+      const usage = await app.codingAgents.pullRequestUsage.getForPersonalProject({
+        projectId: input.projectId,
+        ...scope,
+      });
       const organizationId = await resolveOrganizationId(input.projectId);
       const installations = organizationId
         ? await app.github.getAllForOrganization(organizationId)
@@ -142,9 +141,7 @@ export const codingAgentsRouter = createTRPCRouter({
         connection: {
           connected: installations.length > 0,
           installUrl:
-            organizationId &&
-            app.github.configured &&
-            Boolean(env.GITHUB_LANGY_APP_SLUG)
+            organizationId && app.github.configured && Boolean(env.GITHUB_LANGY_APP_SLUG)
               ? `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`
               : null,
         },
@@ -184,14 +181,13 @@ export const codingAgentsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         organizationId,
       });
-      const detail =
-        await ctx.app.codingAgents.pullRequestUsage.getPullRequestDetail({
-          organizationId,
-          repositoryHost: input.repositoryHost,
-          repositoryFullName: input.repositoryFullName,
-          prNumber: input.prNumber,
-          ...scope,
-        });
+      const detail = await ctx.app.codingAgents.pullRequestUsage.getPullRequestDetail({
+        organizationId,
+        repositoryHost: input.repositoryHost,
+        repositoryFullName: input.repositoryFullName,
+        prNumber: input.prNumber,
+        ...scope,
+      });
       return {
         ...detail,
         sessions: gatePullRequestSessionTitles({

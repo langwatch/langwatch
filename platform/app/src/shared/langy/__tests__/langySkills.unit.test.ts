@@ -1,10 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  deriveSkills,
-  skillSourceDirs,
-} from "../../../../scripts/generate-langy-skills";
+import { deriveSkills, skillSourceDirs } from "../../../../scripts/generate-langy-skills";
 import { findSkill, LANGY_SKILLS } from "../langySkills";
 import GENERATED from "../langySkills.generated.json";
 
@@ -80,9 +77,7 @@ describe("given the Langy skill catalogue", () => {
   describe("when a platform feature has a real skill behind it", () => {
     it("is not offered twice", () => {
       const labels = LANGY_SKILLS.map((skill) => skill.label.toLowerCase());
-      const duplicated = labels.filter(
-        (label, index) => labels.indexOf(label) !== index,
-      );
+      const duplicated = labels.filter((label, index) => labels.indexOf(label) !== index);
 
       expect(duplicated).toEqual([]);
       // The `datasets` skill supersedes the `library.datasets` CLI feature.

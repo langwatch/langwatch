@@ -43,9 +43,7 @@ describe("FrameDecoder", () => {
       const raw = Buffer.from([0x00, 0xff, 0x80, 0x41, 0xf0, 0x9f, 0x92, 0xa9]);
       const decoder = new FrameDecoder<ServerFrame>();
 
-      const [frame] = decoder.push(
-        encodeFrame({ t: "out", d: raw.toString("base64") }),
-      );
+      const [frame] = decoder.push(encodeFrame({ t: "out", d: raw.toString("base64") }));
 
       expect(frame).toBeDefined();
       const decoded = Buffer.from((frame as { d: string }).d, "base64");
@@ -63,9 +61,9 @@ describe("FrameDecoder", () => {
       );
 
       expect(frames).toHaveLength(1);
-      expect(
-        Buffer.from((frames[0] as { d: string }).d, "base64").toString(),
-      ).toBe("line one\nline two\n");
+      expect(Buffer.from((frames[0] as { d: string }).d, "base64").toString()).toBe(
+        "line one\nline two\n",
+      );
     });
   });
 

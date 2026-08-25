@@ -37,19 +37,13 @@ export function useFirstTraceSpotlightTrigger({
     isDismissed,
     isResolved,
   } = useTraceExplorerTourPreference();
-  const firstTraceSpotlightFired = useOnboardingStore(
-    (s) => s.firstTraceSpotlightFired,
-  );
-  const seenDrawerSpotlights = useOnboardingStore(
-    (s) => s.seenDrawerSpotlights,
-  );
+  const firstTraceSpotlightFired = useOnboardingStore((s) => s.firstTraceSpotlightFired);
+  const seenDrawerSpotlights = useOnboardingStore((s) => s.seenDrawerSpotlights);
   const markFired = useOnboardingStore((s) => s.markFirstTraceSpotlightFired);
   const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
   const tourActive = useOnboardingStore((s) => s.tourActive);
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
-  const setCurrentSpotlightId = useOnboardingStore(
-    (s) => s.setCurrentSpotlightId,
-  );
+  const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
   const hasLegacyTourHistoryOnMount = useRef(
     firstTraceSpotlightFired || Object.keys(seenDrawerSpotlights).length > 0,
   ).current;

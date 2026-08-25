@@ -1,9 +1,6 @@
 import { useEffect } from "react";
 import { useDrawerStore } from "../stores/drawerStore";
-import {
-  selectIsTraceEditDirty,
-  useTraceEditStore,
-} from "../stores/traceEditStore";
+import { selectIsTraceEditDirty, useTraceEditStore } from "../stores/traceEditStore";
 import { useTraceEditOverlay } from "./useTraceEditOverlay";
 
 /**
@@ -23,9 +20,7 @@ export function useTraceEditSession(traceId: string | undefined): void {
 
   useEffect(() => {
     if (!isEditing || !traceId || !overlayPatch) return;
-    useTraceEditStore
-      .getState()
-      .adoptBasePatch({ traceId, basePatch: overlayPatch });
+    useTraceEditStore.getState().adoptBasePatch({ traceId, basePatch: overlayPatch });
   }, [isEditing, traceId, overlayPatch]);
 
   useEffect(() => {

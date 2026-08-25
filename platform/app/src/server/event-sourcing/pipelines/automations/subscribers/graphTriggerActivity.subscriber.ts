@@ -3,9 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { GraphTriggerEvaluationReason } from "~/server/app-layer/automations/graph-trigger-evaluation.service";
 import type { AutomationService } from "@langwatch/automation-contract";
 
-const logger = createLogger(
-  "langwatch:automation:graph-trigger-activity-subscriber",
-);
+const logger = createLogger("langwatch:automation:graph-trigger-activity-subscriber");
 
 /** Locked ADR-034 Phase 5 real-time debounce. */
 export const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
@@ -27,9 +25,7 @@ export const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
  * of stale sweep jobs degrades to cheap sequential re-evaluations. The queue
  * prefixes `<tenantId>/subscriber/graphTriggerActivity/` around this key.
  */
-export function graphTriggerActivityGroupKey(event: {
-  tenantId: string;
-}): string {
+export function graphTriggerActivityGroupKey(event: { tenantId: string }): string {
   return `graph-trigger-activity:${event.tenantId}`;
 }
 
@@ -59,8 +55,7 @@ export function createGraphTriggerActivityHandler(
     // Old-event guard — replay floods, resyncs, late-arriving spans.
     if (event.occurredAt < Date.now() - 60 * 60 * 1000) return;
 
-    const triggers =
-      await deps.automation.getActiveGraphTriggersForProject(projectId);
+    const triggers = await deps.automation.getActiveGraphTriggersForProject(projectId);
     if (triggers.length === 0) return;
 
     let failures = 0;

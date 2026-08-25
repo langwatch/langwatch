@@ -47,7 +47,8 @@ function isRunnableCron(cron: string): boolean {
     !validCronField(day, 1, 31) ||
     !validCronField(month, 1, 12) ||
     !validCronField(weekday, 0, 7)
-  ) return false;
+  )
+    return false;
   if (/^\d+$/.test(day) && /^\d+$/.test(month)) {
     const maximum = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][Number(month) - 1];
     if (maximum === undefined || Number(day) > maximum) return false;
@@ -55,21 +56,24 @@ function isRunnableCron(cron: string): boolean {
   return true;
 }
 
-export const pullScheduleSchema = z.string().min(1).superRefine((cron, ctx) => {
-  if (cron.trim().split(/\s+/).length !== 5) {
-    ctx.addIssue({
-      code: "custom",
-      message: "pull schedule must be a five-field cron expression",
-    });
-    return;
-  }
-  if (!isRunnableCron(cron)) {
-    ctx.addIssue({
-      code: "custom",
-      message: "pull schedule is not a valid cron expression",
-    });
-  }
-});
+export const pullScheduleSchema = z
+  .string()
+  .min(1)
+  .superRefine((cron, ctx) => {
+    if (cron.trim().split(/\s+/).length !== 5) {
+      ctx.addIssue({
+        code: "custom",
+        message: "pull schedule must be a five-field cron expression",
+      });
+      return;
+    }
+    if (!isRunnableCron(cron)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "pull schedule is not a valid cron expression",
+      });
+    }
+  });
 
 export function isValidPullSchedule(cron: string): boolean {
   return pullScheduleSchema.safeParse(cron).success;
@@ -131,9 +135,19 @@ export const ingestionPullProcessingEventSchema = z.discriminatedUnion("type", [
   ingestionPullRunFailedEventSchema,
 ]);
 
-export type IngestionPullConfiguredEventData = z.infer<typeof ingestionPullConfiguredEventDataSchema>;
-export type IngestionPullDisabledEventData = z.infer<typeof ingestionPullDisabledEventDataSchema>;
-export type IngestionPullRunCompletedEventData = z.infer<typeof ingestionPullRunCompletedEventDataSchema>;
-export type IngestionPullRunFailedEventData = z.infer<typeof ingestionPullRunFailedEventDataSchema>;
-export type IngestionPullProcessingEvent = z.infer<typeof ingestionPullProcessingEventSchema>;
+export type IngestionPullConfiguredEventData = z.infer<
+  typeof ingestionPullConfiguredEventDataSchema
+>;
+export type IngestionPullDisabledEventData = z.infer<
+  typeof ingestionPullDisabledEventDataSchema
+>;
+export type IngestionPullRunCompletedEventData = z.infer<
+  typeof ingestionPullRunCompletedEventDataSchema
+>;
+export type IngestionPullRunFailedEventData = z.infer<
+  typeof ingestionPullRunFailedEventDataSchema
+>;
+export type IngestionPullProcessingEvent = z.infer<
+  typeof ingestionPullProcessingEventSchema
+>;
 export type IngestionPullProcessingEventType = IngestionPullProcessingEvent["type"];

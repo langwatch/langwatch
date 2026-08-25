@@ -10,20 +10,14 @@ import {
 } from "@langwatch/trace-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 
-import {
-  TraceRepository,
-  type TraceSpanSummaryRecord,
-} from "../ports/trace.port";
+import { TraceRepository, type TraceSpanSummaryRecord } from "../ports/trace.port";
 
 type TraceComposition = {
   repository: TraceRepository;
   modelProviders: ModelProviderService;
 };
 
-const gateCosts = (
-  nodes: SpanTreeNode[],
-  canSeeCosts: boolean,
-): SpanTreeNode[] =>
+const gateCosts = (nodes: SpanTreeNode[], canSeeCosts: boolean): SpanTreeNode[] =>
   canSeeCosts ? nodes : nodes.map((node) => ({ ...node, cost: null }));
 
 export class TraceService extends TraceServiceContract {
@@ -72,14 +66,13 @@ export class TraceService extends TraceServiceContract {
       traceId: parsed.traceId,
       sinceUpdatedAtMs: parsed.sinceUpdatedAtMs,
     });
-    return gateCosts(rows.map((row) => this.price(row)), parsed.canSeeCosts);
+    return gateCosts(
+      rows.map((row) => this.price(row)),
+      parsed.canSeeCosts,
+    );
   }
 
-  private price({
-    costInput,
-    cost,
-    ...node
-  }: TraceSpanSummaryRecord): SpanTreeNode {
+  private price({ costInput, cost, ...node }: TraceSpanSummaryRecord): SpanTreeNode {
     if (cost !== null) return { ...node, cost };
     const computed = this.composition.modelProviders.estimateCost(costInput);
     return { ...node, cost: computed > 0 ? computed : null };

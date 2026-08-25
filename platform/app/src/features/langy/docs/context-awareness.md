@@ -10,16 +10,16 @@ Spec: `specs/langy/langy-context-awareness.feature` (page-side gesture) and
 
 ## The pieces
 
-| Piece | Where |
-|---|---|
-| Target registry, picks, spotlight (+ the orphaned reveal — see below) | `stores/langyContextTargetStore.ts` |
-| Opt-in hook / wrapper | `hooks/useLangyContextTarget.ts`, `components/LangyContextTarget.tsx` |
-| Pointer proximity + the one "Absorb context" button | `components/LangyContextTargetLayer.tsx` |
-| The visual (ring, shimmer, reduced-motion) | `langyContextTarget.css` |
-| Chip identity (one resource = one chip id) | `logic/langyContextChips.ts` |
-| Chip composition per page | `hooks/useLangyPageContext.ts` (+ drawer / selection / filter sub-hooks) |
-| The `#` palette (and its `/` twin) | `components/LangyComposerPalette.tsx` |
-| The wire + prompt rendering | `server/app-layer/langy/langyTurnContext.schema.ts` |
+| Piece                                                                 | Where                                                                    |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Target registry, picks, spotlight (+ the orphaned reveal — see below) | `stores/langyContextTargetStore.ts`                                      |
+| Opt-in hook / wrapper                                                 | `hooks/useLangyContextTarget.ts`, `components/LangyContextTarget.tsx`    |
+| Pointer proximity + the one "Absorb context" button                   | `components/LangyContextTargetLayer.tsx`                                 |
+| The visual (ring, shimmer, reduced-motion)                            | `langyContextTarget.css`                                                 |
+| Chip identity (one resource = one chip id)                            | `logic/langyContextChips.ts`                                             |
+| Chip composition per page                                             | `hooks/useLangyPageContext.ts` (+ drawer / selection / filter sub-hooks) |
+| The `#` palette (and its `/` twin)                                    | `components/LangyComposerPalette.tsx`                                    |
+| The wire + prompt rendering                                           | `server/app-layer/langy/langyTurnContext.schema.ts`                      |
 
 ## The affordance: a proximity field, not a page-wide glow
 
@@ -75,7 +75,7 @@ The pointer route and the keyboard route teach each other:
   registered as a target that isn't already a chip. Picking one absorbs it.
 - **Highlighting a row lights the thing it names.** The palette writes
   `spotlightId` on the target store while a row is highlighted and clears it on
-  the way out, so the list says *which* card it means rather than asking the
+  the way out, so the list says _which_ card it means rather than asking the
   user to match a label against nine of them.
 - **`#` is CONTEXT, and only context.** It carries no navigation and no
   commands. It once appended "browse"/"reveal" intent rows for a query naming a

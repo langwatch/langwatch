@@ -8,15 +8,7 @@
  */
 
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -41,15 +33,11 @@ const { mockAddAnnotation, mockRemoveAnnotation } = vi.hoisted(() => ({
 }));
 
 vi.mock("~/server/app-layer/app", async () => {
-  const clickhouseClients = await import(
-    "~/server/clickhouse/clickhouseClient"
-  );
+  const clickhouseClients = await import("~/server/clickhouse/clickhouseClient");
   // The real composition over the real test database: `.permission()`
   // procedures decide through getApp().permissions (ADR-092), so a fake App
   // without it dies at the middleware, before the code this suite tests.
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   const { prisma: dbForPermissions } = await import("~/server/db");
   return {
     // Consumers that degrade without Redis read through this one.
@@ -121,11 +109,9 @@ describe("Annotation CRUD", () => {
     await prisma.annotation.deleteMany({ where: { projectId } });
     await sweepOverlays();
 
-    vi.spyOn(
-      ClickHouseTraceService.prototype,
-      "findExistingTraceIds",
-    ).mockImplementation(async ({ traceIds }) =>
-      traceIds.filter((id) => resolvableTraceIds?.has(id) ?? true),
+    vi.spyOn(ClickHouseTraceService.prototype, "findExistingTraceIds").mockImplementation(
+      async ({ traceIds }) =>
+        traceIds.filter((id) => resolvableTraceIds?.has(id) ?? true),
     );
 
     const user = await getTestUser();
@@ -220,9 +206,7 @@ describe("Annotation CRUD", () => {
 
   describe("when the ClickHouse sync fails on create", () => {
     it("still returns and persists the annotation", async () => {
-      mockAddAnnotation.mockRejectedValueOnce(
-        new Error("ClickHouse unavailable"),
-      );
+      mockAddAnnotation.mockRejectedValueOnce(new Error("ClickHouse unavailable"));
 
       const result = await caller.annotation.create({
         projectId,
@@ -251,9 +235,7 @@ describe("Annotation CRUD", () => {
         scoreOptions: {},
       });
 
-      mockRemoveAnnotation.mockRejectedValueOnce(
-        new Error("ClickHouse unavailable"),
-      );
+      mockRemoveAnnotation.mockRejectedValueOnce(new Error("ClickHouse unavailable"));
 
       const deleted = await caller.annotation.deleteById({
         annotationId: created.id,
@@ -675,9 +657,9 @@ describe("Annotation CRUD", () => {
         anchorId: messageTraceId,
         anchorPath: "assistant-2-9f1c",
       });
-      expect(
-        onTrace.filter((row) => row.anchorPath === "assistant-3-1ab2"),
-      ).toHaveLength(0);
+      expect(onTrace.filter((row) => row.anchorPath === "assistant-3-1ab2")).toHaveLength(
+        0,
+      );
     });
 
     it("refuses a comment that names a part without saying what kind it is", async () => {
@@ -864,9 +846,7 @@ describe("Annotation CRUD", () => {
       it("lists and exports all four comments, each naming what it is about", async () => {
         const listed = await caller.annotation.getAll({ projectId });
 
-        const forTrace = listed.filter(
-          (row) => row.traceId === commentedTraceId,
-        );
+        const forTrace = listed.filter((row) => row.traceId === commentedTraceId);
         expect(forTrace.map((row) => row.comment).sort()).toEqual(everyComment);
         // The export is taken from the rows the list holds, so it carries the
         // same four rows and the same anchors.
@@ -898,18 +878,18 @@ describe("Annotation CRUD", () => {
           new Set(),
         );
 
-        expect(
-          (JSON.parse(row!.comments as string) as string[]).sort(),
-        ).toEqual(everyComment);
+        expect((JSON.parse(row!.comments as string) as string[]).sort()).toEqual(
+          everyComment,
+        );
         // The readable column is one text a reader reads straight through, one
         // review per line with a rule between them, not a list to parse. A
         // dataset row leaves the product, so each anchored review names its
         // span by id as well.
         const readable = (row!.readable as string).split("\n---\n");
         expect(readable).toHaveLength(everyComment.length);
-        expect(
-          readable.filter((line) => line.includes("(on span (span-")),
-        ).toHaveLength(spanIds.length);
+        expect(readable.filter((line) => line.includes("(on span (span-"))).toHaveLength(
+          spanIds.length,
+        );
       });
 
       it("still narrows to the trace's own comments when a caller asks", async () => {
@@ -919,9 +899,7 @@ describe("Annotation CRUD", () => {
           anchor: "trace",
         });
 
-        expect(traceLevel.map((row) => row.comment)).toEqual([
-          "the whole trace is off",
-        ]);
+        expect(traceLevel.map((row) => row.comment)).toEqual(["the whole trace is off"]);
       });
 
       /** @scenario "A queue item carries every comment about its trace" */
@@ -1193,9 +1171,7 @@ describe("Annotation CRUD", () => {
           expectedOutput: "what is the capital of the Netherlands?",
         });
 
-        expect(created.expectedOutput).toBe(
-          "what is the capital of the Netherlands?",
-        );
+        expect(created.expectedOutput).toBe("what is the capital of the Netherlands?");
         const patch = await overlayPatchFor(inputTraceId);
         expect(patch).toMatchObject({
           version: 1,
@@ -1306,20 +1282,12 @@ describe("Annotation CRUD", () => {
           },
         },
         update: {
-          permissions: [
-            "traces:view",
-            "annotations:view",
-            "annotations:create",
-          ],
+          permissions: ["traces:view", "annotations:view", "annotations:create"],
         },
         create: {
           organizationId: createOnlyOrganizationId,
           name: customRoleName,
-          permissions: [
-            "traces:view",
-            "annotations:view",
-            "annotations:create",
-          ],
+          permissions: ["traces:view", "annotations:view", "annotations:create"],
         },
       });
 
@@ -1441,10 +1409,7 @@ describe("Annotation CRUD", () => {
     afterAll(async () => {
       resolvableTraceIds = null;
       await cleanupTestRows(prisma, [
-        [
-          "annotationQueueItem",
-          { projectId, traceId: { startsWith: sendTracePrefix } },
-        ],
+        ["annotationQueueItem", { projectId, traceId: { startsWith: sendTracePrefix } }],
       ]);
     });
 
@@ -1584,10 +1549,7 @@ describe("Annotation CRUD", () => {
 
     afterAll(async () => {
       await cleanupTestRows(prisma, [
-        [
-          "annotationQueueItem",
-          { projectId, traceId: { startsWith: queueTracePrefix } },
-        ],
+        ["annotationQueueItem", { projectId, traceId: { startsWith: queueTracePrefix } }],
         ["teamUser", { userId: viewerUserId, teamId: viewerTeamId }],
         [
           "organizationUser",

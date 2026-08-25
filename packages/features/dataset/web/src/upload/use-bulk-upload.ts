@@ -20,11 +20,7 @@ import {
   retryDatasetNormalize,
 } from "./direct-upload";
 import { parseHeaderColumns } from "./parse-header-columns";
-import {
-  baseNameFromFilename,
-  batchDedupeNames,
-  bumpName,
-} from "./batch-name-dedup";
+import { baseNameFromFilename, batchDedupeNames, bumpName } from "./batch-name-dedup";
 import {
   runWithConcurrency,
   uploadSingleFile,
@@ -85,9 +81,7 @@ const isSupportedType = (file: File): boolean => {
 };
 
 /** Parse `files` headers with a small concurrency so a large drop stays smooth. */
-const parseHeaders = async (
-  files: File[],
-): Promise<(DatasetConfirmColumns | null)[]> => {
+const parseHeaders = async (files: File[]): Promise<(DatasetConfirmColumns | null)[]> => {
   const results: (DatasetConfirmColumns | null)[] = Array.from(
     { length: files.length },
     () => null,
@@ -110,9 +104,7 @@ const parseHeaders = async (
 };
 
 const errorMessage = (error: unknown): string =>
-  error instanceof Error
-    ? error.message
-    : "Something went wrong preparing this file.";
+  error instanceof Error ? error.message : "Something went wrong preparing this file.";
 
 export type BulkUploadTransport = UploadSingleFileDeps & {
   retryDatasetNormalize: typeof retryDatasetNormalize;
@@ -182,8 +174,7 @@ export function useBulkUpload(
   }, []);
 
   const setColumnTypes = useCallback(
-    (id: string, columnTypes: DatasetConfirmColumns) =>
-      update(id, { columnTypes }),
+    (id: string, columnTypes: DatasetConfirmColumns) => update(id, { columnTypes }),
     [update],
   );
 
@@ -251,14 +242,10 @@ export function useBulkUpload(
     const pending = filesRef.current.filter((f) => f.status === "pending");
     if (pending.length === 0) return;
     setFiles((prev) =>
-      prev.map((f) =>
-        f.status === "pending" ? { ...f, status: "queued" } : f,
-      ),
+      prev.map((f) => (f.status === "pending" ? { ...f, status: "queued" } : f)),
     );
     // Fire-and-forget (NOT an effect) → survives drawer close.
-    void runWithConcurrency(pending, BULK_UPLOAD_CONCURRENCY, (f) =>
-      runOne(f.id),
-    );
+    void runWithConcurrency(pending, BULK_UPLOAD_CONCURRENCY, (f) => runOne(f.id));
   }, [runOne]);
 
   /** Cancel an in-flight (or queued) file; reaps its row, leaves others alone. */
@@ -318,13 +305,10 @@ export function useBulkUpload(
   const counts: BulkUploadCounts = {
     total: files.length,
     ready: files.filter((f) => f.status === "ready").length,
-    preparing: files.filter(
-      (f) => f.status === "uploading" || f.status === "processing",
-    ).length,
+    preparing: files.filter((f) => f.status === "uploading" || f.status === "processing")
+      .length,
     queued: files.filter((f) => f.status === "queued").length,
-    failed: files.filter(
-      (f) => f.status === "failed" || f.status === "rejected",
-    ).length,
+    failed: files.filter((f) => f.status === "failed" || f.status === "rejected").length,
   };
 
   const hasUploadable = files.some((f) => f.status === "pending");

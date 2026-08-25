@@ -105,15 +105,13 @@ describe("SchedulerService cross-pod wake (best-effort Redis)", () => {
       try {
         // Let the loop settle into its long sleep after the first scan.
         await new Promise((r) => setTimeout(r, 30));
-        const scansBefore = (repo.findDue as ReturnType<typeof vi.fn>).mock
-          .calls.length;
+        const scansBefore = (repo.findDue as ReturnType<typeof vi.fn>).mock.calls.length;
 
         // A published wake arrives on the subscriber → loop re-scans now.
         fake.emitMessage("scheduler:wake");
         await new Promise((r) => setTimeout(r, 30));
 
-        const scansAfter = (repo.findDue as ReturnType<typeof vi.fn>).mock.calls
-          .length;
+        const scansAfter = (repo.findDue as ReturnType<typeof vi.fn>).mock.calls.length;
         expect(scansAfter).toBeGreaterThan(scansBefore);
       } finally {
         await svc.stop();

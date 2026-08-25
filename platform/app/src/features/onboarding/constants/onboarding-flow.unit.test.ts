@@ -135,20 +135,14 @@ describe("getOnboardingFlowConfig", () => {
           intent: "AGENT_GOVERNANCE",
           intentForkEnabled: true,
         }).visibleScreens,
-      ).toEqual([
-        OnboardingScreenIndex.ORGANIZATION,
-        OnboardingScreenIndex.INTENT,
-      ]);
+      ).toEqual([OnboardingScreenIndex.ORGANIZATION, OnboardingScreenIndex.INTENT]);
       expect(
         getOnboardingFlowConfig({
           isSaaS: false,
           intent: "LLM_OPS",
           intentForkEnabled: true,
         }).visibleScreens,
-      ).toEqual([
-        OnboardingScreenIndex.ORGANIZATION,
-        OnboardingScreenIndex.INTENT,
-      ]);
+      ).toEqual([OnboardingScreenIndex.ORGANIZATION, OnboardingScreenIndex.INTENT]);
     });
   });
 });

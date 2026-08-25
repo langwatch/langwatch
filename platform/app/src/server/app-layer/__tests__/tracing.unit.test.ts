@@ -6,12 +6,7 @@
  * value it actually hands back. A stub can be made to agree with a wrapper that
  * is wrong.
  */
-import {
-  context,
-  propagation,
-  SpanStatusCode,
-  trace,
-} from "@opentelemetry/api";
+import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
   type ReadableSpan,
@@ -250,10 +245,7 @@ describe("traced()", () => {
 
   describe("when the method is an async generator", () => {
     it("returns something async-iterable rather than a promise", () => {
-      const returned = service().stream(1) as unknown as Record<
-        symbol,
-        unknown
-      >;
+      const returned = service().stream(1) as unknown as Record<symbol, unknown>;
 
       expect(returned[Symbol.asyncIterator]).toBeTypeOf("function");
       expect(returned).not.toBeInstanceOf(Promise);

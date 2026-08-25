@@ -1,18 +1,9 @@
-import {
-  Button,
-  createListCollection,
-  Field,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
-import {
-  hasPermissionWithHierarchy,
-  teamRoleHasPermission,
-} from "../../server/api/rbac";
+import { hasPermissionWithHierarchy, teamRoleHasPermission } from "../../server/api/rbac";
 import { api } from "../../utils/api";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
@@ -43,16 +34,13 @@ export const CopyExperimentDialog = ({
     organizations?.flatMap((org) =>
       org.teams.flatMap((team) => {
         // Find the current user's membership in this team
-        const teamMember = team.members.find(
-          (member) => member.userId === currentUserId,
-        );
+        const teamMember = team.members.find((member) => member.userId === currentUserId);
         if (!teamMember) return [];
 
         // Check if user has evaluations:manage permission in this team
         let hasTeamManagePermission = false;
         if (teamMember.assignedRole) {
-          const permissions =
-            (teamMember.assignedRole.permissions as string[]) ?? [];
+          const permissions = (teamMember.assignedRole.permissions as string[]) ?? [];
           if (permissions.length > 0) {
             hasTeamManagePermission = hasPermissionWithHierarchy(
               permissions,
@@ -131,9 +119,7 @@ export const CopyExperimentDialog = ({
                 collection={projectCollection}
                 value={selectedProjectId}
                 onValueChange={(e) => {
-                  const selectedProject = projects.find(
-                    (p) => p.value === e.value[0],
-                  );
+                  const selectedProject = projects.find((p) => p.value === e.value[0]);
                   // Only allow selection if user has manage permission
                   if (selectedProject?.hasManagePermission) {
                     setSelectedProjectId(e.value);
@@ -190,8 +176,7 @@ export const CopyExperimentDialog = ({
             loading={copyExperiment.isPending}
             disabled={
               !selectedProjectId.length ||
-              !projects.find((p) => p.value === selectedProjectId[0])
-                ?.hasManagePermission
+              !projects.find((p) => p.value === selectedProjectId[0])?.hasManagePermission
             }
           >
             Replicate

@@ -20,13 +20,7 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-function writeFile({
-  relative,
-  source,
-}: {
-  relative: string;
-  source: string;
-}): void {
+function writeFile({ relative, source }: { relative: string; source: string }): void {
   const full = path.join(root, relative);
   mkdirSync(path.dirname(full), { recursive: true });
   writeFileSync(full, source);
@@ -37,9 +31,9 @@ describe("graphLaneForSource", () => {
     it("keeps it on the mocking lane, because a hoisted mock cannot apply to a shared registry", () => {
       expect(graphLaneForSource('vi.mock("~/server/db");')).toBe("mocking");
       expect(graphLaneForSource("vi.doMock('./x');")).toBe("mocking");
-      expect(
-        graphLaneForSource("const { a } = vi.hoisted(() => ({ a: 1 }));"),
-      ).toBe("mocking");
+      expect(graphLaneForSource("const { a } = vi.hoisted(() => ({ a: 1 }));")).toBe(
+        "mocking",
+      );
     });
 
     it("reads it through whitespace, the way it is actually written", () => {
@@ -49,15 +43,13 @@ describe("graphLaneForSource", () => {
 
   describe("given a file that mocks nothing", () => {
     it("lets it share a registry", () => {
-      expect(graphLaneForSource("import { prisma } from '~/server/db';")).toBe(
-        "shared",
-      );
+      expect(graphLaneForSource("import { prisma } from '~/server/db';")).toBe("shared");
     });
 
     it("is not fooled by other vi helpers, which do not touch the registry", () => {
-      expect(
-        graphLaneForSource("vi.fn(); vi.spyOn(x, 'y'); vi.useFakeTimers();"),
-      ).toBe("shared");
+      expect(graphLaneForSource("vi.fn(); vi.spyOn(x, 'y'); vi.useFakeTimers();")).toBe(
+        "shared",
+      );
     });
   });
 });
@@ -87,10 +79,7 @@ describe("partitionByModuleGraph", () => {
         ],
       });
 
-      expect(mocking.sort()).toEqual([
-        "a.integration.test.ts",
-        "c.integration.test.ts",
-      ]);
+      expect(mocking.sort()).toEqual(["a.integration.test.ts", "c.integration.test.ts"]);
       expect(shared).toEqual(["b.integration.test.ts"]);
       expect([...mocking, ...shared]).toHaveLength(3);
     });
@@ -111,12 +100,8 @@ describe("partitionByModuleGraph", () => {
 
 describe("selectedGraphLane", () => {
   it("reads the two lane names and nothing else", () => {
-    expect(selectedGraphLane({ INTEGRATION_GRAPH_LANE: "shared" })).toBe(
-      "shared",
-    );
-    expect(selectedGraphLane({ INTEGRATION_GRAPH_LANE: "mocking" })).toBe(
-      "mocking",
-    );
+    expect(selectedGraphLane({ INTEGRATION_GRAPH_LANE: "shared" })).toBe("shared");
+    expect(selectedGraphLane({ INTEGRATION_GRAPH_LANE: "mocking" })).toBe("mocking");
     expect(selectedGraphLane({ INTEGRATION_GRAPH_LANE: "yes" })).toBeNull();
     expect(selectedGraphLane({})).toBeNull();
   });

@@ -115,9 +115,7 @@ export function useCodexDeviceSignIn({
             setPhase({
               name: "error",
               message:
-                error instanceof Error
-                  ? error.message
-                  : "The sign-in failed. Try again.",
+                error instanceof Error ? error.message : "The sign-in failed. Try again.",
               timedOut: false,
             });
           }

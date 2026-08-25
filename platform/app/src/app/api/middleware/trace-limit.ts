@@ -7,10 +7,7 @@ const logger = createLogger("langwatch:api:middleware:trace-limit");
 /**
  * Middleware to check trace usage limits before allowing requests
  */
-export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (
-  c,
-  next,
-) => {
+export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (c, next) => {
   const app = c.app;
   const project = c.get("project");
   const result = await app.usage.checkLimit({ teamId: project.teamId });
@@ -32,10 +29,7 @@ export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (
         max: result.maxMessagesPerMonth,
       });
     } catch (error) {
-      logger.error(
-        { error, projectId: project.id },
-        "Plan limit notification failed",
-      );
+      logger.error({ error, projectId: project.id }, "Plan limit notification failed");
     }
 
     logger.info(

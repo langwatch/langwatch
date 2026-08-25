@@ -4,10 +4,7 @@ import {
   secretSchema,
   type Secret,
 } from "@langwatch/secret-contract";
-import {
-  Prisma,
-  type PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { SecretRepository } from "../secret.repository";
 
 const safeSecretSelection = {

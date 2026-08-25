@@ -12,10 +12,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/snapshot/snapshot-reader";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import { systemMigrationsService } from "~/server/app-layer/system-migrations/runtime";
-import {
-  resolveHotDays,
-  TABLE_TTL_CONFIG,
-} from "~/server/clickhouse/ttlReconciler";
+import { resolveHotDays, TABLE_TTL_CONFIG } from "~/server/clickhouse/ttlReconciler";
 import {
   getEventSubscriberMetadata,
   getProjectionMetadata,
@@ -121,7 +118,9 @@ export const opsRouter = createTRPCRouter({
    * ops route itself.
    */
   getBadgeCounts: protectedProcedure.use(opsViewPermission).query(
-    ({ ctx }): {
+    ({
+      ctx,
+    }): {
       blockedCount: number;
       dlqCount: number;
       computedAt: Date | null;
@@ -305,18 +304,15 @@ export const opsRouter = createTRPCRouter({
    * so the base URL is not a secret to an operator.
    */
   getGrafanaLinkConfig: protectedProcedure.use(opsViewPermission).query(() => {
-    const { baseUrl, tempoDatasourceUid, lokiDatasourceUid } =
-      grafanaConfigFromEnv();
+    const { baseUrl, tempoDatasourceUid, lokiDatasourceUid } = grafanaConfigFromEnv();
     if (!baseUrl) return null;
     return { baseUrl, tempoDatasourceUid, lokiDatasourceUid };
   }),
 
-  getBlockedSummary: protectedProcedure
-    .use(opsViewPermission)
-    .query(async ({ ctx }) => {
-      const ops = ctx.app.ops;
-      return ops.queues.getBlockedSummary();
-    }),
+  getBlockedSummary: protectedProcedure.use(opsViewPermission).query(async ({ ctx }) => {
+    const ops = ctx.app.ops;
+    return ops.queues.getBlockedSummary();
+  }),
 
   getGroupJobs: protectedProcedure
     .use(opsViewPermission)
@@ -811,12 +807,10 @@ export const opsRouter = createTRPCRouter({
       };
     }),
 
-  getReplayHistory: protectedProcedure
-    .use(opsViewPermission)
-    .query(async ({ ctx }) => {
-      const ops = ctx.app.ops;
-      return ops.replay.getHistory();
-    }),
+  getReplayHistory: protectedProcedure.use(opsViewPermission).query(async ({ ctx }) => {
+    const ops = ctx.app.ops;
+    return ops.replay.getHistory();
+  }),
 
   getReplayRun: protectedProcedure
     .use(opsViewPermission)
@@ -841,8 +835,7 @@ export const opsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
 
-      const userName =
-        ctx.session.user.name ?? ctx.session.user.email ?? "unknown";
+      const userName = ctx.session.user.name ?? ctx.session.user.email ?? "unknown";
 
       try {
         return await ops.replay.startReplay({
@@ -871,12 +864,10 @@ export const opsRouter = createTRPCRouter({
     return ops.replay.getStatus();
   }),
 
-  cancelReplay: protectedProcedure
-    .use(opsManagePermission)
-    .mutation(async ({ ctx }) => {
-      const ops = ctx.app.ops;
-      return ops.replay.cancelReplay();
-    }),
+  cancelReplay: protectedProcedure.use(opsManagePermission).mutation(async ({ ctx }) => {
+    const ops = ctx.app.ops;
+    return ops.replay.cancelReplay();
+  }),
 
   listDlqGroups: protectedProcedure
     .use(opsViewPermission)
@@ -890,12 +881,10 @@ export const opsRouter = createTRPCRouter({
       return ops.queues.listDlqGroups(input);
     }),
 
-  listAllDlqGroups: protectedProcedure
-    .use(opsViewPermission)
-    .query(async ({ ctx }) => {
-      const ops = ctx.app.ops;
-      return ops.queues.getAllDlqGroups();
-    }),
+  listAllDlqGroups: protectedProcedure.use(opsViewPermission).query(async ({ ctx }) => {
+    const ops = ctx.app.ops;
+    return ops.queues.getAllDlqGroups();
+  }),
 
   listPausedKeys: protectedProcedure
     .use(opsViewPermission)
@@ -1069,16 +1058,14 @@ export const opsRouter = createTRPCRouter({
   // derived hot-tier window for event_log so the DejaView UI can render
   // the banner under the search box. Cold-tier reads still work but get
   // quite some slower; the banner makes the bound visible up front.
-  getEventLogSearchWindow: protectedProcedure
-    .use(opsViewPermission)
-    .query(() => {
-      const ttl = TABLE_TTL_CONFIG.find((c) => c.table === "event_log");
-      return {
-        searchLookbackDays: 365,
-        hotTierDays: ttl ? resolveHotDays(ttl) : null,
-        hotTierEnvVar: ttl?.envVar ?? null,
-      };
-    }),
+  getEventLogSearchWindow: protectedProcedure.use(opsViewPermission).query(() => {
+    const ttl = TABLE_TTL_CONFIG.find((c) => c.table === "event_log");
+    return {
+      searchLookbackDays: 365,
+      hotTierDays: ttl ? resolveHotDays(ttl) : null,
+      hotTierEnvVar: ttl?.envVar ?? null,
+    };
+  }),
 
   loadAggregateEvents: protectedProcedure
     .use(opsViewPermission)
@@ -1167,80 +1154,77 @@ export const opsRouter = createTRPCRouter({
    * Read-only: no PostHog calls happen on this path either, so opening
    * the page does not cost a flag call.
    */
-  listFeatureFlags: protectedProcedure
-    .use(opsViewPermission)
-    .query(async () => {
-      const store = getFeatureFlagStore();
-      const stored = await store.listAll();
-      const explicit = listFeatureFlags();
-      const families = listFeatureFlagFamilies();
-      const explicitKeys = new Set(explicit.map((e) => e.key));
+  listFeatureFlags: protectedProcedure.use(opsViewPermission).query(async () => {
+    const store = getFeatureFlagStore();
+    const stored = await store.listAll();
+    const explicit = listFeatureFlags();
+    const families = listFeatureFlagFamilies();
+    const explicitKeys = new Set(explicit.map((e) => e.key));
 
-      const explicitRows = explicit.map((def) => {
-        const row = stored.find((s) => s.key === def.key);
-        const envOverride = checkFlagEnvOverride(def.key, def.legacyEnvVar);
+    const explicitRows = explicit.map((def) => {
+      const row = stored.find((s) => s.key === def.key);
+      const envOverride = checkFlagEnvOverride(def.key, def.legacyEnvVar);
+      const effective = resolveEffectiveForListing({
+        envOverride: envOverride ?? null,
+        rules: row?.rules ?? [],
+        rowEnabled: row?.enabled ?? null,
+        registryDefault: def.defaultValue,
+      });
+      return {
+        key: def.key,
+        scope: def.scope,
+        defaultValue: def.defaultValue,
+        description: def.description,
+        family: def.family ?? null,
+        storedValue: row?.enabled ?? null,
+        rules: row?.rules ?? [],
+        envOverride: envOverride ?? null,
+        effective,
+        lastEditedBy: row?.lastEditedBy ?? null,
+        updatedAt: row?.updatedAt ?? null,
+      };
+    });
+
+    // Stored postgres rows without an explicit registry entry remain visible
+    // so operators can clean them up.
+    const orphanRows = stored
+      .filter((s) => !explicitKeys.has(s.key))
+      .map((s) => {
+        const def = resolveFlagDefinition(s.key);
+        const envOverride = checkFlagEnvOverride(s.key, def?.legacyEnvVar);
         const effective = resolveEffectiveForListing({
           envOverride: envOverride ?? null,
-          rules: row?.rules ?? [],
-          rowEnabled: row?.enabled ?? null,
-          registryDefault: def.defaultValue,
+          rules: s.rules,
+          rowEnabled: s.enabled,
+          registryDefault: def?.defaultValue ?? false,
         });
         return {
-          key: def.key,
-          scope: def.scope,
-          defaultValue: def.defaultValue,
-          description: def.description,
-          family: def.family ?? null,
-          storedValue: row?.enabled ?? null,
-          rules: row?.rules ?? [],
+          key: s.key,
+          scope: def?.scope ?? "SYSTEM",
+          defaultValue: def?.defaultValue ?? false,
+          description:
+            def?.description ?? "Orphaned postgres flag row (no longer registered).",
+          family: def?.family ?? null,
+          storedValue: s.enabled,
+          rules: s.rules,
           envOverride: envOverride ?? null,
           effective,
-          lastEditedBy: row?.lastEditedBy ?? null,
-          updatedAt: row?.updatedAt ?? null,
+          lastEditedBy: s.lastEditedBy,
+          updatedAt: s.updatedAt,
         };
       });
 
-      // Stored postgres rows without an explicit registry entry remain visible
-      // so operators can clean them up.
-      const orphanRows = stored
-        .filter((s) => !explicitKeys.has(s.key))
-        .map((s) => {
-          const def = resolveFlagDefinition(s.key);
-          const envOverride = checkFlagEnvOverride(s.key, def?.legacyEnvVar);
-          const effective = resolveEffectiveForListing({
-            envOverride: envOverride ?? null,
-            rules: s.rules,
-            rowEnabled: s.enabled,
-            registryDefault: def?.defaultValue ?? false,
-          });
-          return {
-            key: s.key,
-            scope: def?.scope ?? "SYSTEM",
-            defaultValue: def?.defaultValue ?? false,
-            description:
-              def?.description ??
-              "Orphaned postgres flag row (no longer registered).",
-            family: def?.family ?? null,
-            storedValue: s.enabled,
-            rules: s.rules,
-            envOverride: envOverride ?? null,
-            effective,
-            lastEditedBy: s.lastEditedBy,
-            updatedAt: s.updatedAt,
-          };
-        });
-
-      return {
-        flags: [...explicitRows, ...orphanRows],
-        families: families.map((f) => ({
-          family: f.family,
-          keyPrefix: f.keyPrefix,
-          scope: f.scope,
-          defaultValue: f.defaultValue,
-          description: f.description,
-        })),
-      };
-    }),
+    return {
+      flags: [...explicitRows, ...orphanRows],
+      families: families.map((f) => ({
+        family: f.family,
+        keyPrefix: f.keyPrefix,
+        scope: f.scope,
+        defaultValue: f.defaultValue,
+        description: f.description,
+      })),
+    };
+  }),
 
   setFeatureFlag: protectedProcedure
     .use(opsManagePermission)
@@ -1258,11 +1242,7 @@ export const opsRouter = createTRPCRouter({
           message: `Unknown feature flag key: ${input.key}`,
         });
       }
-      await getFeatureFlagStore().set(
-        input.key,
-        input.enabled,
-        ctx.session.user.id,
-      );
+      await getFeatureFlagStore().set(input.key, input.enabled, ctx.session.user.id);
       return { ok: true };
     }),
 
@@ -1282,8 +1262,7 @@ export const opsRouter = createTRPCRouter({
             (rules) =>
               rules.every((rule) =>
                 [rule.match.projectId, rule.match.organizationId].every(
-                  (id) =>
-                    id === undefined || (id.length > 0 && id === id.trim()),
+                  (id) => id === undefined || (id.length > 0 && id === id.trim()),
                 ),
               ),
             {
@@ -1301,11 +1280,7 @@ export const opsRouter = createTRPCRouter({
           message: `Unknown feature flag key: ${input.key}`,
         });
       }
-      await getFeatureFlagStore().setRules(
-        input.key,
-        input.rules,
-        ctx.session.user.id,
-      );
+      await getFeatureFlagStore().setRules(input.key, input.rules, ctx.session.user.id);
       return { ok: true };
     }),
 
@@ -1333,11 +1308,9 @@ export const opsRouter = createTRPCRouter({
     return ctx.app.ops.listBlobQueues();
   }),
 
-  getBlobStoreStats: protectedProcedure
-    .use(opsViewPermission)
-    .query(async ({ ctx }) => {
-      return ctx.app.ops.getBlobStoreStats();
-    }),
+  getBlobStoreStats: protectedProcedure.use(opsViewPermission).query(async ({ ctx }) => {
+    return ctx.app.ops.getBlobStoreStats();
+  }),
 
   listBlobs: protectedProcedure
     .use(opsViewPermission)
@@ -1405,13 +1378,11 @@ export const opsRouter = createTRPCRouter({
    * `isSaaS` so the page can say honestly that a self-hosted installation
    * has nothing to enroll.
    */
-  listMigrationEnrollments: protectedProcedure
-    .use(opsViewPermission)
-    .query(({ ctx }) =>
-      systemMigrationsService.getEnrollments({
-        requestedBy: ctx.session.user.id,
-      }),
-    ),
+  listMigrationEnrollments: protectedProcedure.use(opsViewPermission).query(({ ctx }) =>
+    systemMigrationsService.getEnrollments({
+      requestedBy: ctx.session.user.id,
+    }),
+  ),
 
   /**
    * The organization lookup behind the page's pickers: enroll, targeted run
@@ -1559,12 +1530,10 @@ export const opsRouter = createTRPCRouter({
    * already keep two passes off the same organization, so the worst case for
    * a double click is a pass that finds everything claimed and does nothing.
    */
-  runSystemMigrationPass: protectedProcedure
-    .use(opsManagePermission)
-    .mutation(() => {
-      systemMigrationsService.startPass();
-      return { started: true };
-    }),
+  runSystemMigrationPass: protectedProcedure.use(opsManagePermission).mutation(() => {
+    systemMigrationsService.startPass();
+    return { started: true };
+  }),
 
   assertSystemMigrationLegacyWritersDrained: protectedProcedure
     .use(opsManagePermission)

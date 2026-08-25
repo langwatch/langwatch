@@ -1,9 +1,6 @@
 import { KeyRound, Repeat, Settings2, Users } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
-import {
-  isSettingsMenuItemActive,
-  type SettingsMenuItem,
-} from "../useSettingsMenu";
+import { isSettingsMenuItemActive, type SettingsMenuItem } from "../useSettingsMenu";
 
 // The unit lane stubs the compat router, so the real resolver is asked for
 // by name. It is what turns an address into the route pattern below.
@@ -92,9 +89,9 @@ describe("isSettingsMenuItemActive", () => {
 
   describe("when an entry is one that only its own page marks", () => {
     it("marks General on the settings home", () => {
-      expect(
-        isSettingsMenuItemActive({ item: GENERAL, pathname: "/settings" }),
-      ).toBe(true);
+      expect(isSettingsMenuItemActive({ item: GENERAL, pathname: "/settings" })).toBe(
+        true,
+      );
     });
 
     it("leaves General unmarked on a page below it", () => {
@@ -118,9 +115,7 @@ describe("isSettingsMenuItemActive", () => {
       const pattern = resolvePathname("/settings/api-keys");
 
       expect(pattern).toBe("/settings/[[...path]]");
-      expect(
-        isSettingsMenuItemActive({ item: API_KEYS, pathname: pattern }),
-      ).toBe(false);
+      expect(isSettingsMenuItemActive({ item: API_KEYS, pathname: pattern })).toBe(false);
     });
   });
 });

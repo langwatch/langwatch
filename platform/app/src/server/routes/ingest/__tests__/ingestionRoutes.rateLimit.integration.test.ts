@@ -20,20 +20,13 @@
  *
  * Spec: specs/ai-gateway/governance/receiver-auth-rate-limit.feature
  */
-import {
-  type RedisConnection,
-  RedisConnectionService,
-} from "@langwatch/redis-client";
+import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 
-import {
-  checkIpRateLimit,
-  ipRateLimitKey,
-  isRateLimitDisabled,
-} from "../rateLimit";
+import { checkIpRateLimit, ipRateLimitKey, isRateLimitDisabled } from "../rateLimit";
 
 /**
  * Most calls below omit `redis` and so take the App's — which is the path
@@ -86,10 +79,7 @@ afterEach(async () => {
       redisConnection as {
         scan: (...args: unknown[]) => Promise<[string, string[]]>;
       }
-    ).scan(cursor, "MATCH", `lwingest:rate:${ns}-*`, "COUNT", 100)) as [
-      string,
-      string[],
-    ];
+    ).scan(cursor, "MATCH", `lwingest:rate:${ns}-*`, "COUNT", 100)) as [string, string[]];
     cursor = next;
     for (const k of found) {
       await redisConnection.del(k);

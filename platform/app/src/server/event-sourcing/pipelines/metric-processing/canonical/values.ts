@@ -1,10 +1,5 @@
 import type { MetricKind } from "../schemas/metricDataPoint";
-import {
-  finiteNumber,
-  finiteNumbers,
-  integerDecimal,
-  integerDecimals,
-} from "./numbers";
+import { finiteNumber, finiteNumbers, integerDecimal, integerDecimals } from "./numbers";
 import { isRecord, type UnknownRecord } from "./serialization";
 
 /**
@@ -33,9 +28,7 @@ export interface CanonicalPointValues {
   quantileValues: Array<{ quantile: number | null; value: number | null }>;
 }
 
-function canonicalQuantiles(
-  value: unknown,
-): CanonicalPointValues["quantileValues"] {
+function canonicalQuantiles(value: unknown): CanonicalPointValues["quantileValues"] {
   if (!Array.isArray(value)) return [];
   return value.map((entry) => {
     const quantile = isRecord(entry) ? entry : {};
@@ -62,8 +55,7 @@ export function canonicalPointValues({
   // stays a double rather than becoming an int zero.
   const isScalar = kind === "gauge" || kind === "sum";
   const hasInt = isScalar && point.asInt !== undefined && point.asInt !== null;
-  const hasDouble =
-    isScalar && point.asDouble !== undefined && point.asDouble !== null;
+  const hasDouble = isScalar && point.asDouble !== undefined && point.asDouble !== null;
   const valueType = hasInt ? "int" : hasDouble ? "double" : "none";
 
   return {
@@ -85,8 +77,7 @@ export function canonicalPointValues({
     positiveBucketCounts: integerDecimals(positive.bucketCounts),
     negativeOffset: isExponential ? Number(negative.offset ?? 0) : null,
     negativeBucketCounts: integerDecimals(negative.bucketCounts),
-    quantileValues:
-      kind === "summary" ? canonicalQuantiles(point.quantileValues) : [],
+    quantileValues: kind === "summary" ? canonicalQuantiles(point.quantileValues) : [],
   };
 }
 

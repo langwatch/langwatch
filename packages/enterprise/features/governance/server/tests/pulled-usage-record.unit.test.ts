@@ -21,8 +21,7 @@ class FixedRatePort extends PulledUsageRatePort {
     rateVersion: string;
   } {
     return {
-      costNanoUsd:
-        input.quantities.tokensInput + input.quantities.tokensOutput,
+      costNanoUsd: input.quantities.tokensInput + input.quantities.tokensOutput,
       rateVersion: "test-rate",
     };
   }

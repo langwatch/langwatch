@@ -11,10 +11,7 @@ import type React from "react";
 import { useCallback, useMemo } from "react";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { useEvaluatorOptions } from "../../hooks/useEvaluatorOptions";
-import {
-  getColumnSizingKey,
-  useColumnSizingStore,
-} from "../../stores/columnSizingStore";
+import { getColumnSizingKey, useColumnSizingStore } from "../../stores/columnSizingStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { type LensConfig, useViewStore } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
@@ -90,9 +87,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   const setVisibleColumns = useViewStore((s) => s.setVisibleColumns);
 
   const sizingKey = getColumnSizingKey(lens.id, "trace");
-  const persistedSizing = useColumnSizingStore(
-    (s) => s.byKey[sizingKey] ?? null,
-  );
+  const persistedSizing = useColumnSizingStore((s) => s.byKey[sizingKey] ?? null);
   const setSizing = useColumnSizingStore((s) => s.setSizing);
   const columnSizing = useMemo<ColumnSizingState>(
     () => persistedSizing ?? {},
@@ -100,8 +95,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   );
   const handleColumnSizingChange = useCallback(
     (updater: Updater<ColumnSizingState>) => {
-      const next =
-        typeof updater === "function" ? updater(columnSizing) : updater;
+      const next = typeof updater === "function" ? updater(columnSizing) : updater;
       setSizing(sizingKey, next);
     },
     [columnSizing, sizingKey, setSizing],
@@ -230,25 +224,17 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
                 addons={lens.addons}
                 status={row.original.status}
                 hoverScope="unified"
-                isSelected={
-                  !isLoading && row.original.traceId === selectedTraceId
-                }
+                isSelected={!isLoading && row.original.traceId === selectedTraceId}
                 isFocused={!isLoading && virtualItem.index === focusedIndex}
-                isExpanded={
-                  !isLoading && row.original.traceId === expandedTraceId
-                }
+                isExpanded={!isLoading && row.original.traceId === expandedTraceId}
                 isNew={!isLoading && newIds.has(row.original.traceId)}
                 rowDomId={row.original.traceId}
-                onSelect={
-                  isLoading ? undefined : () => toggleTrace(row.original)
-                }
+                onSelect={isLoading ? undefined : () => toggleTrace(row.original)}
                 onTogglePeek={
                   isLoading ? undefined : () => togglePeek(row.original.traceId)
                 }
                 isLoading={isLoading}
-                isFirstOfErrorRun={
-                  !isLoading && isFirstOfErrorRun[virtualItem.index]
-                }
+                isFirstOfErrorRun={!isLoading && isFirstOfErrorRun[virtualItem.index]}
                 // A trace row IS a trace, so it offers itself to Langy like any
                 // other addressable resource on the page.
                 //
@@ -264,10 +250,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
                 langyTarget={
                   isLoading
                     ? null
-                    : traceContextChip(
-                        row.original.traceId,
-                        row.original.name ?? null,
-                      )
+                    : traceContextChip(row.original.traceId, row.original.name ?? null)
                 }
               />
             );

@@ -177,8 +177,7 @@ export const builtInPresets: Preset[] = [
                 messages: [
                   {
                     role: "user",
-                    content:
-                      "What's the weather in Tokyo and convert 100 USD to JPY?",
+                    content: "What's the weather in Tokyo and convert 100 USD to JPY?",
                   },
                   {
                     role: "assistant",
@@ -566,8 +565,7 @@ export const builtInPresets: Preset[] = [
               input: {
                 type: "json",
                 value: {
-                  template:
-                    "Help {{customer_name}} with their {{issue}} issue.",
+                  template: "Help {{customer_name}} with their {{issue}} issue.",
                 },
               },
               output: {
@@ -589,8 +587,7 @@ export const builtInPresets: Preset[] = [
                   },
                   {
                     role: "user",
-                    content:
-                      "I was charged twice for my subscription last month.",
+                    content: "I was charged twice for my subscription last month.",
                   },
                   {
                     role: "assistant",
@@ -805,9 +802,7 @@ export const builtInPresets: Preset[] = [
               output: {
                 type: "json",
                 value: {
-                  results: [
-                    { title: "EU AI Act Update", snippet: "New provisions..." },
-                  ],
+                  results: [{ title: "EU AI Act Update", snippet: "New provisions..." }],
                 },
               },
               attributes: {
@@ -845,8 +840,7 @@ export const builtInPresets: Preset[] = [
   {
     id: "mastra-agent",
     name: "Mastra Agent",
-    description:
-      "A Mastra framework agent trace with workflow steps and tool execution",
+    description: "A Mastra framework agent trace with workflow steps and tool execution",
     builtIn: true,
     config: {
       id: "mastra-agent",
@@ -868,8 +862,7 @@ export const builtInPresets: Preset[] = [
           },
           output: {
             type: "text",
-            value:
-              "Here are today's top trending repos: 1. langwatch/langwatch...",
+            value: "Here are today's top trending repos: 1. langwatch/langwatch...",
           },
           children: [
             span({
@@ -881,13 +874,11 @@ export const builtInPresets: Preset[] = [
                 messages: [
                   {
                     role: "system",
-                    content:
-                      "You are a research assistant with access to GitHub tools.",
+                    content: "You are a research assistant with access to GitHub tools.",
                   },
                   {
                     role: "user",
-                    content:
-                      "Summarize the top 3 trending repos on GitHub today",
+                    content: "Summarize the top 3 trending repos on GitHub today",
                   },
                   {
                     role: "assistant",
@@ -1071,8 +1062,7 @@ export const builtInPresets: Preset[] = [
   {
     id: "agno-agent",
     name: "Agno Agent",
-    description:
-      "An Agno (formerly Phidata) agent with knowledge base and tool use",
+    description: "An Agno (formerly Phidata) agent with knowledge base and tool use",
     builtIn: true,
     config: {
       id: "agno-agent",
@@ -1204,8 +1194,7 @@ export const builtInPresets: Preset[] = [
               durationMs: 4500,
               attributes: {
                 "crewai.agent.role": "Senior Researcher",
-                "crewai.task.description":
-                  "Research the latest trends in AI agents",
+                "crewai.task.description": "Research the latest trends in AI agents",
               },
               children: [
                 span({
@@ -1277,8 +1266,7 @@ export const builtInPresets: Preset[] = [
               offsetMs: 4800,
               attributes: {
                 "crewai.agent.role": "Content Writer",
-                "crewai.task.description":
-                  "Write a blog post based on the research",
+                "crewai.task.description": "Write a blog post based on the research",
               },
               children: [
                 span({
@@ -1317,8 +1305,7 @@ export const builtInPresets: Preset[] = [
   {
     id: "openai-agents-sdk",
     name: "OpenAI Agents SDK",
-    description:
-      "OpenAI Agents SDK trace with handoffs between specialized agents",
+    description: "OpenAI Agents SDK trace with handoffs between specialized agents",
     builtIn: true,
     config: {
       id: "openai-agents-sdk",
@@ -1486,8 +1473,7 @@ export const builtInPresets: Preset[] = [
                   },
                   {
                     role: "assistant",
-                    content:
-                      "David Gregory inherited castle number of storeys floors",
+                    content: "David Gregory inherited castle number of storeys floors",
                   },
                 ],
                 metrics: { promptTokens: 30, completionTokens: 12 },
@@ -1663,8 +1649,7 @@ export const builtInPresets: Preset[] = [
                 messages: [
                   {
                     role: "user",
-                    content:
-                      "Can you at least tell me where to find the 2FA settings?",
+                    content: "Can you at least tell me where to find the 2FA settings?",
                   },
                   {
                     role: "assistant",
@@ -1831,8 +1816,7 @@ export const builtInPresets: Preset[] = [
   {
     id: "prompt-heavy",
     name: "Multiple Prompts",
-    description:
-      "A trace using several managed prompts with variables and versioning",
+    description: "A trace using several managed prompts with variables and versioning",
     builtIn: true,
     config: {
       id: "prompt-heavy",
@@ -1854,8 +1838,7 @@ export const builtInPresets: Preset[] = [
                 version: 3,
                 versionId: "ver-ic-prod-3",
                 variables: {
-                  user_message:
-                    "I want to cancel my subscription and get a refund",
+                  user_message: "I want to cancel my subscription and get a refund",
                 },
               },
               input: {
@@ -1883,8 +1866,7 @@ export const builtInPresets: Preset[] = [
                   },
                   {
                     role: "assistant",
-                    content:
-                      '{"intent": "cancellation_refund", "confidence": 0.97}',
+                    content: '{"intent": "cancellation_refund", "confidence": 0.97}',
                   },
                 ],
                 metrics: { promptTokens: 25, completionTokens: 15 },
@@ -1934,8 +1916,7 @@ export const builtInPresets: Preset[] = [
                   },
                   {
                     role: "user",
-                    content:
-                      "I want to cancel my subscription and get a refund",
+                    content: "I want to cancel my subscription and get a refund",
                   },
                   {
                     role: "assistant",
@@ -1973,8 +1954,7 @@ export const builtInPresets: Preset[] = [
               },
               output: {
                 type: "text",
-                value:
-                  "Generate empathetic follow-up given sentiment: frustrated",
+                value: "Generate empathetic follow-up given sentiment: frustrated",
               },
             }),
             span({
@@ -1987,8 +1967,7 @@ export const builtInPresets: Preset[] = [
                 version: 1,
                 versionId: "ver-cs-latest",
                 variables: {
-                  conversation:
-                    "[user: cancel subscription] [agent: retention offer]",
+                  conversation: "[user: cancel subscription] [agent: retention offer]",
                   format: "bullet_points",
                 },
               },
@@ -2109,8 +2088,7 @@ export const builtInPresets: Preset[] = [
                 messages: [
                   {
                     role: "system",
-                    content:
-                      "You are a coding assistant. Respond with code examples.",
+                    content: "You are a coding assistant. Respond with code examples.",
                   },
                   {
                     role: "user",
@@ -2136,8 +2114,7 @@ export const builtInPresets: Preset[] = [
                 value: [
                   {
                     role: "system",
-                    content:
-                      "You are a coding assistant. Respond with code examples.",
+                    content: "You are a coding assistant. Respond with code examples.",
                   },
                   {
                     role: "user",
@@ -2182,22 +2159,18 @@ export const builtInPresets: Preset[] = [
                   },
                   {
                     role: "assistant",
-                    content:
-                      "It's 15°C and partly cloudy in London with 72% humidity.",
+                    content: "It's 15°C and partly cloudy in London with 72% humidity.",
                   },
                 ],
                 metrics: { promptTokens: 40, completionTokens: 30 },
               },
               input: {
                 type: "chat_messages",
-                value: [
-                  { role: "user", content: "What's the weather in London?" },
-                ],
+                value: [{ role: "user", content: "What's the weather in London?" }],
               },
               output: {
                 type: "text",
-                value:
-                  "It's 15°C and partly cloudy in London with 72% humidity.",
+                value: "It's 15°C and partly cloudy in London with 72% humidity.",
               },
             }),
             span({
@@ -2426,8 +2399,7 @@ export const builtInPresets: Preset[] = [
                 messages: [
                   {
                     role: "user",
-                    content:
-                      "What are the benefits of event-driven architecture?",
+                    content: "What are the benefits of event-driven architecture?",
                   },
                   {
                     role: "assistant",

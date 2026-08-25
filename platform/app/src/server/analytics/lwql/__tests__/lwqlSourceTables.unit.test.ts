@@ -92,9 +92,7 @@ describe("given the LangWatchQL source tables", () => {
         tables.map((table) => table.database).sort(),
         "each source keeps the database it actually lives in",
       ).toEqual([NAMES.database, SOURCE_DATABASE].sort());
-      expect(new Set(tables.map((table) => table.table))).toEqual(
-        new Set(["events"]),
-      );
+      expect(new Set(tables.map((table) => table.table))).toEqual(new Set(["events"]));
     });
   });
 });

@@ -1,9 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  type AggregateType,
-  createTenantId,
-  type Event,
-} from "@langwatch/eventing";
+import { type AggregateType, createTenantId, type Event } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EventRepositoryClickHouse } from "../eventRepositoryClickHouse";
 import { EventStoreClickHouse } from "../eventStoreClickHouse";
@@ -44,11 +40,7 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
   ])("given $label", ({ aggregateId }) => {
     describe("when getEvents is called", () => {
       it("returns no events without touching ClickHouse", async () => {
-        const events = await store.getEvents(
-          aggregateId,
-          { tenantId },
-          aggregateType,
-        );
+        const events = await store.getEvents(aggregateId, { tenantId }, aggregateType);
 
         expect(events).toEqual([]);
         expect(mockClickHouseClient.query).not.toHaveBeenCalled();
@@ -88,9 +80,9 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
   describe("given a real aggregateId", () => {
     describe("when getEvents is called", () => {
       it("issues the event_log read", async () => {
-        (
-          mockClickHouseClient.query as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({ json: vi.fn().mockResolvedValue([]) });
+        (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue({
+          json: vi.fn().mockResolvedValue([]),
+        });
 
         await store.getEvents("trace-123", { tenantId }, aggregateType);
 

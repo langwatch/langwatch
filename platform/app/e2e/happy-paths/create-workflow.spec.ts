@@ -14,9 +14,7 @@ const createWorkflow = async (page: Page) => {
   await page.getByTestId("active-create-new-workflow-button").click();
   await page.getByTestId("new-workflow-card-simple_rag").click();
   await page.getByRole("textbox", { name: "Name and Icon" }).click();
-  await page
-    .getByRole("textbox", { name: "Name and Icon" })
-    .fill("Test Simple RAG");
+  await page.getByRole("textbox", { name: "Name and Icon" }).fill("Test Simple RAG");
   await page.getByRole("button", { name: "Create Workflow" }).click();
 };
 

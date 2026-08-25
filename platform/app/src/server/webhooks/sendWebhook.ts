@@ -63,9 +63,7 @@ function buildWebhookHeaders({
   // resolved by the caller (save / test-fire / decrypt-at-dispatch); never
   // send the literal marker to the customer's endpoint.
   const resolvedHeaders = Object.fromEntries(
-    Object.entries(headers).filter(
-      ([, value]) => value !== WEBHOOK_HEADER_VALUE_KEPT,
-    ),
+    Object.entries(headers).filter(([, value]) => value !== WEBHOOK_HEADER_VALUE_KEPT),
   );
   return {
     ...sanitizeWebhookHeaders(resolvedHeaders),
@@ -80,9 +78,7 @@ function buildWebhookHeaders({
           }),
         }
       : {}),
-    ...(attempt !== undefined
-      ? { "X-LangWatch-Delivery-Attempt": String(attempt) }
-      : {}),
+    ...(attempt !== undefined ? { "X-LangWatch-Delivery-Attempt": String(attempt) } : {}),
     ...(testFire ? { "X-LangWatch-Test-Fire": "true" } : {}),
   };
 }

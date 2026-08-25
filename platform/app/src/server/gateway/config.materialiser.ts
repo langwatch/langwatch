@@ -17,10 +17,7 @@ import type {
 } from "~/generated/prisma/client";
 
 import { readCustomKeys } from "~/server/modelProviders/customKeys";
-import {
-  resolveLangyMirrorTier,
-  type LangyMirrorTier,
-} from "@langwatch/langy-contract";
+import { resolveLangyMirrorTier, type LangyMirrorTier } from "@langwatch/langy-contract";
 import { modelProviders } from "../modelProviders/registry";
 import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "./budgetPeriod";
@@ -310,10 +307,7 @@ export class GatewayConfigMaterialiser {
     const providers = allowed
       ? eligibleProviders.filter((mp) => allowed.includes(mp.id))
       : eligibleProviders;
-    const scopeReachable = await scopeReachableModelProvidersForVk(
-      this.prisma,
-      vk,
-    );
+    const scopeReachable = await scopeReachableModelProvidersForVk(this.prisma, vk);
     const { routingExcluded, accessExcluded } = providerExclusions({
       scopeReachable,
       eligibleProviders,
@@ -343,10 +337,7 @@ export class GatewayConfigMaterialiser {
   }
 
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
-    const eligibleProviders = await eligibleModelProvidersForVk(
-      this.prisma,
-      vk,
-    );
+    const eligibleProviders = await eligibleModelProvidersForVk(this.prisma, vk);
     const traceProject = await traceProjectFor(this.prisma, vk.traceProjectId);
     const budgets = await this.applicableBudgets(vk, traceProject);
     const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
@@ -389,8 +380,7 @@ export class GatewayConfigMaterialiser {
         // that serves the model, so the attempt budget is one. Pinning it
         // here makes no-fallback real for gateways that predate the
         // routing_mode field instead of promising it in the UI only.
-        max_attempts:
-          vk.routingMode === "NONE" ? 1 : config.fallback.maxAttempts,
+        max_attempts: vk.routingMode === "NONE" ? 1 : config.fallback.maxAttempts,
       },
       model_aliases: policySides.modelAliases,
       models_allowed: config.modelsAllowed,
@@ -406,9 +396,7 @@ export class GatewayConfigMaterialiser {
         tpm: config.rateLimits.tpm,
         rpd: config.rateLimits.rpd,
       },
-      budgets: budgets.map((resolved) =>
-        budgetToWire(resolved, spendByBudgetId),
-      ),
+      budgets: budgets.map((resolved) => budgetToWire(resolved, spendByBudgetId)),
       cache_rules: cacheRules.map(cacheRuleToWire),
       metadata: config.metadata ?? {},
       vk_tags: config.metadata?.tags ?? [],
@@ -419,9 +407,7 @@ export class GatewayConfigMaterialiser {
   private async applicableCacheRules(
     organizationId: string,
   ): Promise<GatewayCacheRule[]> {
-    return GatewayCacheRuleService.create(this.prisma).bundleFor(
-      organizationId,
-    );
+    return GatewayCacheRuleService.create(this.prisma).bundleFor(organizationId);
   }
 
   /**
@@ -453,11 +439,7 @@ export class GatewayConfigMaterialiser {
       evaluator_id: r.evaluatorId,
       evaluator_slug: r.evaluator?.slug ?? null,
       direction:
-        r.direction === "PRE"
-          ? "pre"
-          : r.direction === "POST"
-            ? "post"
-            : "stream_chunk",
+        r.direction === "PRE" ? "pre" : r.direction === "POST" ? "post" : "stream_chunk",
       failure_mode: r.failureMode === "FAIL_OPEN" ? "fail_open" : "fail_closed",
     }));
     const guardrailIdSet = new Set(rows.map((r) => r.id));
@@ -487,10 +469,7 @@ export class GatewayConfigMaterialiser {
       return new Map();
     }
     try {
-      const tenantIds = await organizationSpendTenantIds(
-        this.prisma,
-        vk.organizationId,
-      );
+      const tenantIds = await organizationSpendTenantIds(this.prisma, vk.organizationId);
       if (tenantIds.length === 0) return new Map();
       // Read each budget's spend from its RESOLVED bucket, exactly. The
       // bundle enforces this key's buckets, so the figure must be the
@@ -646,9 +625,7 @@ function resolvePolicySideOfBundle(
 // aiplatform.googleapis.com at the path those two fields name, while a
 // bare key goes to the Gemini API. See
 // specs/model-providers/google-agent-platform.feature.
-function geminiCredentials(
-  pick: (k: string) => string,
-): Record<string, unknown> {
+function geminiCredentials(pick: (k: string) => string): Record<string, unknown> {
   // Trimmed here as well as at the schema: rows stored before the schema
   // trimmed could carry whitespace, and a whitespace-only "pair" must not
   // pick the Agent Platform door.
@@ -683,8 +660,7 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
     case "azure": {
       return {
         api_key: pick("AZURE_OPENAI_API_KEY") || pick("api-key"),
-        endpoint:
-          pick("AZURE_OPENAI_ENDPOINT") || pick("AZURE_API_GATEWAY_BASE_URL"),
+        endpoint: pick("AZURE_OPENAI_ENDPOINT") || pick("AZURE_API_GATEWAY_BASE_URL"),
         api_version:
           pick("AZURE_OPENAI_API_VERSION") || pick("AZURE_API_GATEWAY_VERSION"),
       };
@@ -704,8 +680,7 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
         project_number: pick("VERTEXAI_PROJECT_NUMBER"),
         region: pick("VERTEXAI_LOCATION") || pick("GOOGLE_REGION"),
         auth_credentials:
-          pick("GOOGLE_APPLICATION_CREDENTIALS") ||
-          pick("VERTEXAI_SERVICE_ACCOUNT_JSON"),
+          pick("GOOGLE_APPLICATION_CREDENTIALS") || pick("VERTEXAI_SERVICE_ACCOUNT_JSON"),
       };
     }
     case "openai_codex": {
@@ -748,9 +723,7 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
     case "cloudflare":
       return { api_key: pick("CLOUDFLARE_API_KEY") };
     default: {
-      const apiKey = Object.entries(customKeys).find(([k]) =>
-        /_API_KEY$/.test(k),
-      )?.[1];
+      const apiKey = Object.entries(customKeys).find(([k]) => /_API_KEY$/.test(k))?.[1];
       return { api_key: typeof apiKey === "string" ? apiKey : "" };
     }
   }
@@ -779,9 +752,7 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   const endpointKey = supportsBaseURLOverride
     ? modelProviders[mp.provider as keyof typeof modelProviders]?.endpointKey
     : undefined;
-  const registryBaseURL = endpointKey
-    ? pickString(customKeys, endpointKey)
-    : undefined;
+  const registryBaseURL = endpointKey ? pickString(customKeys, endpointKey) : undefined;
   const baseURL =
     pickString(customKeys, "base_url") ??
     pickString(customKeys, "BASE_URL") ??
@@ -821,10 +792,7 @@ function routingWire({
   };
 }
 
-function pickString(
-  obj: Record<string, unknown>,
-  key: string,
-): string | undefined {
+function pickString(obj: Record<string, unknown>, key: string): string | undefined {
   const v = obj[key];
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }

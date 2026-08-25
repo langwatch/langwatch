@@ -26,10 +26,7 @@ const LANGWATCH_ROOT = resolve(__dirname, "../..");
 const REPO_ROOT = resolve(LANGWATCH_ROOT, "../..");
 
 const document = JSON.parse(
-  readFileSync(
-    join(LANGWATCH_ROOT, "src/app/api/openapiLangWatch.json"),
-    "utf8",
-  ),
+  readFileSync(join(LANGWATCH_ROOT, "src/app/api/openapiLangWatch.json"), "utf8"),
 ) as {
   paths: Record<
     string,
@@ -37,10 +34,7 @@ const document = JSON.parse(
       string,
       {
         requestBody?: unknown;
-        responses?: Record<
-          string,
-          { content?: Record<string, { schema?: unknown }> }
-        >;
+        responses?: Record<string, { content?: Record<string, { schema?: unknown }> }>;
       }
     >
   >;
@@ -74,8 +68,8 @@ describe("the experiments REST API", () => {
 
       expect(create?.requestBody).toBeDefined();
 
-      const success = Object.entries(create?.responses ?? {}).filter(
-        ([status]) => /^2\d\d$/.test(status),
+      const success = Object.entries(create?.responses ?? {}).filter(([status]) =>
+        /^2\d\d$/.test(status),
       );
       expect(success.length).toBeGreaterThan(0);
       expect(

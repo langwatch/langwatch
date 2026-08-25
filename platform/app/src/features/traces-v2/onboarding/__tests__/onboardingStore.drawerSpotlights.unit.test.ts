@@ -18,9 +18,9 @@ describe("onboardingStore drawer spotlights", () => {
     describe("when markDrawerSpotlightSeen is called", () => {
       it("flags the id in store state", () => {
         useOnboardingStore.getState().markDrawerSpotlightSeen("drawer-io");
-        expect(
-          useOnboardingStore.getState().seenDrawerSpotlights["drawer-io"],
-        ).toBe(true);
+        expect(useOnboardingStore.getState().seenDrawerSpotlights["drawer-io"]).toBe(
+          true,
+        );
       });
 
       it("persists the map to localStorage", () => {
@@ -48,9 +48,7 @@ describe("onboardingStore drawer spotlights", () => {
   describe("given other persisted onboarding fields exist", () => {
     describe("when a drawer spotlight is marked seen", () => {
       it("keeps the other persisted maps intact", () => {
-        useOnboardingStore
-          .getState()
-          .setSetupDismissedForProject("proj-1", true);
+        useOnboardingStore.getState().setSetupDismissedForProject("proj-1", true);
         useOnboardingStore.getState().markDrawerSpotlightSeen("drawer-events");
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
         expect(stored.setupDismissedByProject).toEqual({ "proj-1": true });

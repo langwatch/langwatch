@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  adminIdentitySchema,
-  startImpersonationInputSchema,
-} from "../src";
+import { adminIdentitySchema, startImpersonationInputSchema } from "../src";
 
 describe("admin contract", () => {
   it("accepts a nullable admin identity email", () => {

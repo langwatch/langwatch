@@ -64,11 +64,5 @@ export function getValidActionsForResource(resource: Resource): Action[] {
     // folds, never created/updated/deleted through these endpoints.
     return [Actions.VIEW];
   }
-  return [
-    Actions.MANAGE,
-    Actions.VIEW,
-    Actions.CREATE,
-    Actions.UPDATE,
-    Actions.DELETE,
-  ];
+  return [Actions.MANAGE, Actions.VIEW, Actions.CREATE, Actions.UPDATE, Actions.DELETE];
 }

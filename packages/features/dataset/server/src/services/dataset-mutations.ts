@@ -63,9 +63,7 @@ const tryToMapPreviousColumnsToNewColumns = (
     const exact = newColumns.find((column) => column.name === previous.name);
     if (exact) mapping[previous.name] = exact.name;
   }
-  const previousUnmapped = previousColumns.filter(
-    (column) => !(column.name in mapping),
-  );
+  const previousUnmapped = previousColumns.filter((column) => !(column.name in mapping));
   const newUnmapped = newColumns.filter(
     (column) => !Object.values(mapping).includes(column.name),
   );
@@ -580,8 +578,7 @@ export const editS3JsonlRecord = async ({
           id: dataset.id,
           projectId,
           data: {
-            sizeBytes:
-              (current.sizeBytes ?? 0n) + BigInt(offset.byteSize - oldByteSize),
+            sizeBytes: (current.sizeBytes ?? 0n) + BigInt(offset.byteSize - oldByteSize),
             chunkOffsets: patched as unknown as Prisma.InputJsonValue,
           },
         },
@@ -814,9 +811,7 @@ export const deleteS3JsonlRecords = async ({
         datasetId: dataset.id,
         index,
       });
-      const kept = rows.filter(
-        (line) => !(isChunkLine(line) && removeSet.has(line.id)),
-      );
+      const kept = rows.filter((line) => !(isChunkLine(line) && removeSet.has(line.id)));
       const removedHere = rows.length - kept.length;
       if (removedHere > 0) {
         deleted += removedHere;
@@ -882,10 +877,7 @@ export const recomputeDatasetCounts = async ({
   const repository = providedRepository ?? DatasetRepository.create(prisma);
 
   return withDatasetLock({ prisma, datasetId }, async (tx) => {
-    const current = await repository.findOneOrThrow(
-      { id: datasetId, projectId },
-      { tx },
-    );
+    const current = await repository.findOneOrThrow({ id: datasetId, projectId }, { tx });
 
     const chunkCount = current.chunkCount ?? 0;
     const perChunk: Array<{ rowCount: number; byteSize: number }> = [];
@@ -1000,9 +992,7 @@ export const migrateS3JsonlColumns = async ({
     // to a different schema would make the remap below read those rows with the
     // stale schema and shift/drop values. Abort so the caller retries against the
     // now-current schema (no partial rewrite occurs — we bail before any write).
-    if (
-      JSON.stringify(current.columnTypes) !== JSON.stringify(oldColumnTypes)
-    ) {
+    if (JSON.stringify(current.columnTypes) !== JSON.stringify(oldColumnTypes)) {
       throw new DatasetConflictError(
         "Dataset columns changed since you opened the editor — please reopen and retry.",
         { reason: "stale_columns" },

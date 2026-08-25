@@ -58,8 +58,8 @@ export function PromptTargetMappingSection({
   return (
     <VStack align="stretch" gap={4} width="full">
       <Text fontSize="sm" color="fg.muted">
-        Choose which part of a simulation each prompt reads. Anything left unset
-        is matched by name when the run starts.
+        Choose which part of a simulation each prompt reads. Anything left unset is
+        matched by name when the run starts.
       </Text>
       {promptTargets.map(({ target, prompt }) => (
         <Box key={`${target.type}-${target.referenceId}`} width="full">
@@ -68,9 +68,7 @@ export function PromptTargetMappingSection({
           </Text>
           <ScenarioInputMappingSection
             inputs={prompt.inputs ?? []}
-            mappings={
-              (target.scenarioMappings ?? {}) as Record<string, FieldMapping>
-            }
+            mappings={(target.scenarioMappings ?? {}) as Record<string, FieldMapping>}
             onMappingChange={(identifier, mapping) =>
               onMappingChange({ target, identifier, mapping })
             }

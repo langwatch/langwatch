@@ -34,9 +34,9 @@ describe("cleanupTestRows refusal rules", () => {
       const { prisma, calls } = recordingPrisma();
       let teamId!: string;
 
-      await expect(
-        cleanupTestRows(prisma, [["team", { id: teamId }]]),
-      ).rejects.toThrow(/team\[0\]\.where\.id is undefined/);
+      await expect(cleanupTestRows(prisma, [["team", { id: teamId }]])).rejects.toThrow(
+        /team\[0\]\.where\.id is undefined/,
+      );
 
       expect(calls).toEqual([]);
     });
@@ -96,9 +96,9 @@ describe("cleanupTestRows refusal rules", () => {
     it("refuses an empty where outright", async () => {
       const { prisma, calls } = recordingPrisma();
 
-      await expect(
-        cleanupTestRows(prisma, [["organization", {}]]),
-      ).rejects.toThrow(/organization\[0\]\.where must be a non-empty object/);
+      await expect(cleanupTestRows(prisma, [["organization", {}]])).rejects.toThrow(
+        /organization\[0\]\.where must be a non-empty object/,
+      );
 
       expect(calls).toEqual([]);
     });
@@ -124,10 +124,7 @@ describe("cleanupTestRows refusal rules", () => {
           [
             "modelProvider",
             {
-              OR: [
-                { organizationId: "org_a" },
-                { scopes: { some: { scopeId } } },
-              ],
+              OR: [{ organizationId: "org_a" }, { scopes: { some: { scopeId } } }],
             },
           ],
         ]),
@@ -179,9 +176,7 @@ describe("cleanupTestRows refusal rules", () => {
 
       await expect(
         cleanupTestRows(prisma, [["organization", { id: "org_a" }]]),
-      ).rejects.toThrow(
-        /organization is not a Prisma delegate with deleteMany/,
-      );
+      ).rejects.toThrow(/organization is not a Prisma delegate with deleteMany/);
     });
   });
 });

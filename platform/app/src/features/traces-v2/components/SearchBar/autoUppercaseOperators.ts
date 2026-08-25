@@ -42,10 +42,7 @@ export const AutoUppercaseOperators = Extension.create({
           if (newText.length > 5_000) return null;
 
           let diffAt = 0;
-          while (
-            diffAt < oldText.length &&
-            oldText[diffAt] === newText[diffAt]
-          ) {
+          while (diffAt < oldText.length && oldText[diffAt] === newText[diffAt]) {
             diffAt += 1;
           }
           const inserted = newText[diffAt];

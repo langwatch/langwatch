@@ -48,8 +48,7 @@ export const sanitizeHeaders = (
   if (!headers) return undefined;
   const entries = Object.entries(headers)
     .map(
-      ([name, value]) =>
-        [sanitizeHeaderName(name), sanitizeHeaderValue(value)] as const,
+      ([name, value]) => [sanitizeHeaderName(name), sanitizeHeaderValue(value)] as const,
     )
     .filter(([name]) => name !== "");
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
@@ -155,9 +154,7 @@ export const buildRawMimeMessage = ({
   ];
 
   for (const attachment of attachments) {
-    const base64Content = foldBase64(
-      Buffer.from(attachment.content).toString("base64"),
-    );
+    const base64Content = foldBase64(Buffer.from(attachment.content).toString("base64"));
     lines.push(
       `--${boundary}`,
       `Content-Type: ${sanitizeHeaderValue(attachment.contentType)}; ${encodeHeaderParam("name", attachment.filename)}`,

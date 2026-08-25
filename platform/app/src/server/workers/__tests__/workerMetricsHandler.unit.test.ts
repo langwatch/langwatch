@@ -16,10 +16,7 @@
 import { Counter, register } from "prom-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  createWorkerMetricsHandler,
-  WORKER_LIVENESS_PATH,
-} from "../startWorkers";
+import { createWorkerMetricsHandler, WORKER_LIVENESS_PATH } from "../startWorkers";
 
 // Derive the fakes' types from the handler itself, so this test cannot drift
 // from the @types/node signature the real listener is checked against.

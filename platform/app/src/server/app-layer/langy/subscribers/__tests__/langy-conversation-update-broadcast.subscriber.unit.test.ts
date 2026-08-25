@@ -32,9 +32,7 @@ function makeEvent(
   } as LangyConversationProcessingEvent;
 }
 
-function makeDeps(params?: {
-  cursor?: { acceptedAt: number; eventId: string };
-}) {
+function makeDeps(params?: { cursor?: { acceptedAt: number; eventId: string } }) {
   return {
     conversations: {
       read: vi.fn().mockResolvedValue({

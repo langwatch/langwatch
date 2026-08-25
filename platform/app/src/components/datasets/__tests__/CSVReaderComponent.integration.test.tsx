@@ -43,10 +43,7 @@ import { CSVReaderComponent } from "../UploadCSVDrawer";
 
 function renderReader(props: {
   parse?: boolean;
-  onUploadAccepted?: (results: {
-    data: string[][];
-    acceptedFile: File;
-  }) => void;
+  onUploadAccepted?: (results: { data: string[][]; acceptedFile: File }) => void;
   onRawFile?: (file: File | null) => void;
   onUploadRemoved?: () => void;
 }) {
@@ -72,9 +69,7 @@ describe("CSVReaderComponent", () => {
       const onUploadAccepted = vi.fn();
       renderReader({ parse: false, onRawFile, onUploadAccepted });
 
-      const input = document.querySelector(
-        'input[type="file"]',
-      ) as HTMLInputElement;
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
       const file = new File(["a,b\n1,2\n"], "big.csv", { type: "text/csv" });
       await userEvent.upload(input, file);
 
@@ -92,18 +87,11 @@ describe("CSVReaderComponent", () => {
       const onUploadRemoved = vi.fn();
       renderReader({ parse: false, onRawFile, onUploadRemoved });
 
-      const input = document.querySelector(
-        'input[type="file"]',
-      ) as HTMLInputElement;
-      await userEvent.upload(
-        input,
-        new File(["x"], "f.csv", { type: "text/csv" }),
-      );
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      await userEvent.upload(input, new File(["x"], "f.csv", { type: "text/csv" }));
       onRawFile.mockClear();
 
-      await userEvent.click(
-        screen.getByRole("button", { name: /remove file/i }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: /remove file/i }));
 
       expect(onRawFile).toHaveBeenCalledWith(null);
       expect(onUploadRemoved).toHaveBeenCalledTimes(1);

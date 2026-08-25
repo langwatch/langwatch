@@ -3,13 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "description": "Canonical server-side notification record service and private persistence.",
+  "files": [
+    "src"
+  ],
   "type": "module",
-  "exports": {
-    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
-  },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "files": ["src"],
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

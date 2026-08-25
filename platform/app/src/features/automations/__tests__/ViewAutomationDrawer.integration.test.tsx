@@ -157,9 +157,7 @@ describe("ViewAutomationDrawer", () => {
         renderDrawer();
 
         // A resolved incident shows when it fired and how long it lasted.
-        expect(
-          screen.getByText(/about 5 hours ago · lasted 15m/),
-        ).toBeDefined();
+        expect(screen.getByText(/about 5 hours ago · lasted 15m/)).toBeDefined();
       });
 
       it("marks the open incident as still firing", () => {
@@ -201,9 +199,7 @@ describe("ViewAutomationDrawer", () => {
       renderDrawer();
 
       expect(screen.getByText("PATCH events.example.test")).toBeDefined();
-      expect(
-        screen.getByText("No delivery attempts recorded yet."),
-      ).toBeDefined();
+      expect(screen.getByText("No delivery attempts recorded yet.")).toBeDefined();
       expect(screen.queryByText(/token=hidden/)).toBeNull();
     });
   });
@@ -249,9 +245,7 @@ describe("ViewAutomationDrawer", () => {
 
         expect(screen.getByText("<script>alert('xss')</script>")).toBeDefined();
         expect(document.querySelector("script")).toBeNull();
-        expect(
-          screen.getByText("X-Debug: <img src=x onerror=alert(1)>"),
-        ).toBeDefined();
+        expect(screen.getByText("X-Debug: <img src=x onerror=alert(1)>")).toBeDefined();
         expect(document.querySelector("img")).toBeNull();
       });
     });
@@ -334,9 +328,7 @@ describe("ViewAutomationDrawer", () => {
         renderDrawer();
 
         expect(screen.getByText("Automation")).toBeDefined();
-        expect(
-          screen.getByText("This automation has not fired yet."),
-        ).toBeDefined();
+        expect(screen.getByText("This automation has not fired yet.")).toBeDefined();
       });
     });
   });

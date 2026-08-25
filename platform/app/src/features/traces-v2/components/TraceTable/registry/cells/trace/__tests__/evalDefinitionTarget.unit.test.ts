@@ -7,9 +7,7 @@ describe("evalDefinitionTarget", () => {
     describe("when resolving the definition target", () => {
       it("has no definition (the id carries a slash)", () => {
         expect(evalDefinitionTarget("ragas/faithfulness")).toBeNull();
-        expect(
-          evalDefinitionTarget("langevals/competitor_blocklist"),
-        ).toBeNull();
+        expect(evalDefinitionTarget("langevals/competitor_blocklist")).toBeNull();
       });
     });
   });

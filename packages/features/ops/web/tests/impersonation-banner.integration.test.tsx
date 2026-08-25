@@ -19,9 +19,7 @@ describe("ImpersonationBanner", () => {
   describe("when user is not being impersonated", () => {
     it("renders nothing", () => {
       const { container } = render(
-        <ImpersonationBanner
-          user={{ name: "Alice", email: "alice@test.com" }}
-        />,
+        <ImpersonationBanner user={{ name: "Alice", email: "alice@test.com" }} />,
         { wrapper },
       );
       expect(container.innerHTML).toBe("");

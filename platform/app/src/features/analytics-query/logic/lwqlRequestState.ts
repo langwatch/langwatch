@@ -150,9 +150,7 @@ function parametersMatch(
   // `Object.hasOwn` rather than a bare read: a parameter explicitly set to
   // `null` is a value the API accepts, and `b[key] === undefined` cannot tell
   // it apart from a key that is absent.
-  return keys.every(
-    (key) => Object.hasOwn(b, key) && Object.is(a[key], b[key]),
-  );
+  return keys.every((key) => Object.hasOwn(b, key) && Object.is(a[key], b[key]));
 }
 
 function timeWindowsMatch(
@@ -207,10 +205,7 @@ export function lwqlRequestReducer(
   }
 }
 
-function withSql(
-  state: LangWatchQLRequestState,
-  sql: string,
-): LangWatchQLRequestState {
+function withSql(state: LangWatchQLRequestState, sql: string): LangWatchQLRequestState {
   if (sql === state.draft.sql) return state;
   return { ...state, draft: { ...state.draft, sql } };
 }
@@ -294,9 +289,7 @@ function abandoned(state: LangWatchQLRequestState): LangWatchQLRequestState {
  * to keep reading it while they edit the next query — it is *labelled*, which
  * is the difference between a stale answer and a lie.
  */
-export function isLangWatchQLResultStale(
-  state: LangWatchQLRequestState,
-): boolean {
+export function isLangWatchQLResultStale(state: LangWatchQLRequestState): boolean {
   if (state.outcome === null) return false;
   // Against the OUTCOME's snapshot, never `submitted`. The two differ whenever
   // a later submission was abandoned before it answered, and reading
@@ -313,14 +306,10 @@ export type LangWatchQLActionLabel = "Run query" | "Reload";
  * request. Anything else — an edit, a failure, nothing run yet — reads
  * `Run query`, because that is what pressing it would do.
  */
-export function lwqlActionLabel(
-  state: LangWatchQLRequestState,
-): LangWatchQLActionLabel {
+export function lwqlActionLabel(state: LangWatchQLRequestState): LangWatchQLActionLabel {
   if (state.outcome?.kind !== "result") return "Run query";
   // The visible result's own snapshot, for the same reason staleness reads it:
   // `Reload` promises to re-run what produced what you are looking at, and only
   // this comparison can keep that promise.
-  return lwqlSnapshotsMatch(state.draft, state.outcome.snapshot)
-    ? "Reload"
-    : "Run query";
+  return lwqlSnapshotsMatch(state.draft, state.outcome.snapshot) ? "Reload" : "Run query";
 }

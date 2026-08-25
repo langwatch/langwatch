@@ -1,7 +1,4 @@
-export {
-  AuthzService,
-  type AuthzServiceOptions,
-} from "./services/authz.service";
+export { AuthzService, type AuthzServiceOptions } from "./services/authz.service";
 export {
   AuthzGrantsService,
   type AuthzGrantsServiceOptions,

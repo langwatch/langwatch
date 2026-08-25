@@ -56,10 +56,7 @@ export function classifySseFrame(
   }
 }
 
-const toTrpcError = <TRouter extends AnyRouter>(
-  err: unknown,
-  prefix: string,
-) => {
+const toTrpcError = <TRouter extends AnyRouter>(err: unknown, prefix: string) => {
   const msg = err instanceof Error ? err.message : String(err);
   return TRPCClientError.from<TRouter>(new Error(`${prefix}: ${msg}`));
 };
@@ -140,10 +137,7 @@ export function sseLink<TRouter extends AnyRouter = AnyRouter>(
 
             if (!closed && !startedSent) {
               startedSent = true;
-              logger.debug(
-                { path: endpointUrl.pathname },
-                "SSE started event sent",
-              );
+              logger.debug({ path: endpointUrl.pathname }, "SSE started event sent");
               observer.next({ result: { type: "started" } });
             }
           };
@@ -162,10 +156,7 @@ export function sseLink<TRouter extends AnyRouter = AnyRouter>(
                   );
                   return;
                 case "complete":
-                  logger.info(
-                    { path: endpointUrl.pathname },
-                    "SSE stream completed",
-                  );
+                  logger.info({ path: endpointUrl.pathname }, "SSE stream completed");
                   observer.complete();
                   close();
                   return;
@@ -195,9 +186,7 @@ export function sseLink<TRouter extends AnyRouter = AnyRouter>(
               });
             } catch (error) {
               logger.error({ error }, "SSE message parse failed");
-              observer.error(
-                toTrpcError<TRouter>(error, "SSE message parsing failed"),
-              );
+              observer.error(toTrpcError<TRouter>(error, "SSE message parsing failed"));
               close();
             }
           };

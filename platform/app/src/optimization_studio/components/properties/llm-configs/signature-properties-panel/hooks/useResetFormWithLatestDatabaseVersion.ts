@@ -15,9 +15,7 @@ const logger = createLogger(
  * - Provides a method (resetFormWithLatestVersion) to reload the latest version into the form via the useFormContext.
  * - Returns { resetFormWithLatestVersion } for use in UI components.
  */
-export function useResetFormWithLatestDatabaseVersion(params: {
-  configId?: string;
-}) {
+export function useResetFormWithLatestDatabaseVersion(params: { configId?: string }) {
   const { configId } = params;
   const formProps = useFormContext<PromptConfigFormValues>();
   const { getPromptById } = usePrompts();

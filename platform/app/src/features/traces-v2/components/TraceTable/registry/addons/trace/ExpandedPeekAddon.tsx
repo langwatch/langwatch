@@ -1,24 +1,10 @@
-import {
-  Box,
-  Circle,
-  Flex,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Circle, Flex, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useTraceSpanTree } from "../../../../../hooks/useTraceSpanTree";
-import type {
-  TraceEvalResult,
-  TraceListItem,
-} from "../../../../../types/trace";
-import {
-  formatDuration,
-  SPAN_TYPE_COLORS,
-} from "../../../../../utils/formatters";
+import type { TraceEvalResult, TraceListItem } from "../../../../../types/trace";
+import { formatDuration, SPAN_TYPE_COLORS } from "../../../../../utils/formatters";
 import { Td, Tr } from "../../../TablePrimitives";
 import { evalChipColor, formatEvalScore } from "../../sharedChips";
 import type { AddonDef } from "../../types";
@@ -82,10 +68,7 @@ function flattenPeekTree(nodes: PeekTreeNode[]): PeekTreeNode[] {
 }
 
 const InlinePeekContent: React.FC<{ trace: TraceListItem }> = ({ trace }) => {
-  const { data: spans, isLoading } = useTraceSpanTree(
-    trace.traceId,
-    trace.timestamp,
-  );
+  const { data: spans, isLoading } = useTraceSpanTree(trace.traceId, trace.timestamp);
 
   const flatSpans = useMemo(() => {
     if (!spans || spans.length === 0) return [];
@@ -136,12 +119,7 @@ const InlinePeekContent: React.FC<{ trace: TraceListItem }> = ({ trace }) => {
               bg="red.subtle"
               align="start"
             >
-              <Circle
-                size="6px"
-                bg="red.solid"
-                flexShrink={0}
-                marginTop="4px"
-              />
+              <Circle size="6px" bg="red.solid" flexShrink={0} marginTop="4px" />
               <VStack align="start" gap={0} minWidth={0}>
                 {trace.errorSpanName && (
                   <Text textStyle="2xs" color="red.fg" fontWeight="medium">
@@ -212,12 +190,7 @@ const PeekSkeleton: React.FC<{ spanCount?: number }> = ({ spanCount }) => {
               <Skeleton height="8px" width={shape.name} borderRadius="full" />
             </HStack>
             <Box flex={1} height="6px" borderRadius="sm" bg="fg.subtle/8" />
-            <Skeleton
-              height="8px"
-              width="36px"
-              borderRadius="full"
-              flexShrink={0}
-            />
+            <Skeleton height="8px" width="36px" borderRadius="full" flexShrink={0} />
           </Flex>
         );
       })}
@@ -231,8 +204,7 @@ const PeekSpanRow: React.FC<{
   traceDuration: number;
 }> = ({ node, traceStart, traceDuration }) => {
   const { span, depth } = node;
-  const color =
-    (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+  const color = (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
   const icon = PEEK_SPAN_TYPE_ICONS[span.type ?? "span"] ?? "\u25CB";
   const isError = span.status === "error";
 
@@ -267,13 +239,7 @@ const PeekSpanRow: React.FC<{
         )}
       </HStack>
 
-      <Box
-        flex={1}
-        height="8px"
-        position="relative"
-        borderRadius="sm"
-        bg="fg.subtle/5"
-      >
+      <Box flex={1} height="8px" position="relative" borderRadius="sm" bg="fg.subtle/5">
         <Box
           position="absolute"
           left={`${leftPct}%`}
@@ -315,13 +281,7 @@ const PeekEvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
       bg="bg.panel"
     >
       <Circle size="6px" bg={color} flexShrink={0} />
-      <Text
-        textStyle="2xs"
-        fontWeight="medium"
-        color="fg"
-        truncate
-        maxWidth="100px"
-      >
+      <Text textStyle="2xs" fontWeight="medium" color="fg" truncate maxWidth="100px">
         {displayName}
       </Text>
       {scoreText && (

@@ -51,12 +51,8 @@ export interface ILicenseEnforcementRepository {
  * Repository implementation for counting resources per organization.
  * Pure data access layer - only Prisma queries, no business logic.
  */
-export class LicenseEnforcementRepository
-  implements ILicenseEnforcementRepository
-{
-  constructor(
-    private readonly prisma: PrismaClient | Prisma.TransactionClient,
-  ) {}
+export class LicenseEnforcementRepository implements ILicenseEnforcementRepository {
+  constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
 
   /**
    * Counts full members in organization:
@@ -125,9 +121,7 @@ export class LicenseEnforcementRepository
   /**
    * Gets custom roles and their permissions for an organization.
    */
-  private async getCustomRoleMap(
-    organizationId: string,
-  ): Promise<Map<string, string[]>> {
+  private async getCustomRoleMap(organizationId: string): Promise<Map<string, string[]>> {
     const customRoles = await this.prisma.customRole.findMany({
       where: { organizationId },
       select: { id: true, permissions: true },
@@ -190,10 +184,7 @@ export class LicenseEnforcementRepository
    */
   private countMembersByType(
     context: MemberClassificationContext,
-    predicate: (
-      role: OrganizationUserRole,
-      permissions: string[] | undefined,
-    ) => boolean,
+    predicate: (role: OrganizationUserRole, permissions: string[] | undefined) => boolean,
   ): number {
     let count = 0;
 

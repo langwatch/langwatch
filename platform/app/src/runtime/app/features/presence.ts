@@ -33,11 +33,7 @@ class AppPresenceBroadcastPort extends PresenceBroadcastPort {
       );
       return;
     }
-    await this.broadcast.broadcastToTenant(
-      input.projectId,
-      input.event,
-      input.channel,
-    );
+    await this.broadcast.broadcastToTenant(input.projectId, input.event, input.channel);
   }
 }
 

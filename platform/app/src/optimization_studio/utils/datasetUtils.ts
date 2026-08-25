@@ -96,9 +96,7 @@ export function datasetColumnsToFields(columns: DatasetColumns): Field[] {
   }));
 }
 
-export function inMemoryDatasetToNodeDataset(
-  dataset: InMemoryDataset,
-): NodeDataset {
+export function inMemoryDatasetToNodeDataset(dataset: InMemoryDataset): NodeDataset {
   return dataset.datasetId
     ? {
         id: dataset.datasetId,
@@ -107,9 +105,7 @@ export function inMemoryDatasetToNodeDataset(
     : {
         name: dataset.name,
         inline: {
-          records: transpostRowsFirstToColumnsFirstWithoutId(
-            dataset.datasetRecords,
-          ),
+          records: transpostRowsFirstToColumnsFirstWithoutId(dataset.datasetRecords),
           columnTypes: dataset.columnTypes,
         },
       };
@@ -180,9 +176,7 @@ export const tryToMapPreviousColumnsToNewColumns = (
 
   // First pass: exact name matches
   previousColumns.forEach((prevCol) => {
-    const matchingNewCol = newColumns.find(
-      (newCol) => newCol.name === prevCol.name,
-    );
+    const matchingNewCol = newColumns.find((newCol) => newCol.name === prevCol.name);
     if (matchingNewCol) {
       columnNameMap[prevCol.name] = matchingNewCol.name;
     }

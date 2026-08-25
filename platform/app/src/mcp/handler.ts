@@ -22,11 +22,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import {
-  getConfig,
-  initConfig,
-  runWithConfig,
-} from "@langwatch/mcp-server/config";
+import { getConfig, initConfig, runWithConfig } from "@langwatch/mcp-server/config";
 import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
 import { createLogger } from "@langwatch/observability";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -307,10 +303,8 @@ export function createMcpHandler(): McpHandler {
   // Route matching
   // -------------------------------------------------------------------------
 
-  const PROTECTED_RESOURCE_METADATA_PATH =
-    "/.well-known/oauth-protected-resource";
-  const AUTHORIZATION_SERVER_METADATA_PATH =
-    "/.well-known/oauth-authorization-server";
+  const PROTECTED_RESOURCE_METADATA_PATH = "/.well-known/oauth-protected-resource";
+  const AUTHORIZATION_SERVER_METADATA_PATH = "/.well-known/oauth-authorization-server";
 
   const MCP_ROUTES = new Set([
     "/mcp",
@@ -341,9 +335,7 @@ export function createMcpHandler(): McpHandler {
 
   function isMcpRoute(pathname: string): boolean {
     if (MCP_ROUTES.has(pathname)) return true;
-    return OAUTH_METADATA_PREFIXES.some((prefix) =>
-      pathname.startsWith(prefix),
-    );
+    return OAUTH_METADATA_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   }
 
   /** The resource paths whose metadata this server publishes. */
@@ -368,11 +360,7 @@ export function createMcpHandler(): McpHandler {
   // JSON helpers
   // -------------------------------------------------------------------------
 
-  function sendJson(
-    res: ServerResponse,
-    statusCode: number,
-    data: unknown,
-  ): void {
+  function sendJson(res: ServerResponse, statusCode: number, data: unknown): void {
     const body = JSON.stringify(data);
     res.writeHead(statusCode, {
       "Content-Type": "application/json",
@@ -690,10 +678,7 @@ export function createMcpHandler(): McpHandler {
   // -------------------------------------------------------------------------
 
   /** Store session metadata in Redis so other pods can serve it. */
-  async function storeSessionInRedis(
-    sessionId: string,
-    apiKey: string,
-  ): Promise<void> {
+  async function storeSessionInRedis(sessionId: string, apiKey: string): Promise<void> {
     if (!redis) return;
     try {
       const data = JSON.stringify({
@@ -707,10 +692,7 @@ export function createMcpHandler(): McpHandler {
         SESSION_REDIS_TTL_SECONDS,
       );
       // Track session ID in a per-key set for counting
-      await redis.sadd(
-        `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
-        sessionId,
-      );
+      await redis.sadd(`${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, sessionId);
       await redis.expire(
         `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
         SESSION_REDIS_TTL_SECONDS,
@@ -721,10 +703,7 @@ export function createMcpHandler(): McpHandler {
   }
 
   /** Refresh the Redis TTL when a session is active (called on each request). */
-  async function touchSessionInRedis(
-    sessionId: string,
-    apiKey: string,
-  ): Promise<void> {
+  async function touchSessionInRedis(sessionId: string, apiKey: string): Promise<void> {
     if (!redis) return;
     try {
       await redis.expire(
@@ -741,9 +720,7 @@ export function createMcpHandler(): McpHandler {
   }
 
   /** Look up session metadata from Redis (returns apiKey or null). */
-  async function getSessionFromRedis(
-    sessionId: string,
-  ): Promise<string | null> {
+  async function getSessionFromRedis(sessionId: string): Promise<string | null> {
     if (!redis) return null;
     try {
       const data = await redis.get(`${REDIS_SESSION_PREFIX}${sessionId}`);
@@ -764,10 +741,7 @@ export function createMcpHandler(): McpHandler {
     if (!redis) return;
     try {
       await redis.del(`${REDIS_SESSION_PREFIX}${sessionId}`);
-      await redis.srem(
-        `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
-        sessionId,
-      );
+      await redis.srem(`${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, sessionId);
     } catch {
       // Best-effort cleanup
     }
@@ -910,9 +884,7 @@ export function createMcpHandler(): McpHandler {
     }
   }
 
-  async function getSseSessionFromRedis(
-    sessionId: string,
-  ): Promise<string | null> {
+  async function getSseSessionFromRedis(sessionId: string): Promise<string | null> {
     if (!redis) return null;
     try {
       const data = await redis.get(`${REDIS_SSE_SESSION_PREFIX}${sessionId}`);
@@ -944,10 +916,7 @@ export function createMcpHandler(): McpHandler {
   }
 
   /** Drop every trace of an SSE session: local map, relay subscription, Redis. */
-  async function releaseSseSession(
-    sessionId: string,
-    apiKey: string,
-  ): Promise<void> {
+  async function releaseSseSession(sessionId: string, apiKey: string): Promise<void> {
     sseSessions.delete(sessionId);
     const channel = relayChannel(sessionId);
     relayListeners.delete(channel);
@@ -999,10 +968,7 @@ export function createMcpHandler(): McpHandler {
     });
   }
 
-  function handleOAuthMetadata(
-    _req: IncomingMessage,
-    res: ServerResponse,
-  ): void {
+  function handleOAuthMetadata(_req: IncomingMessage, res: ServerResponse): void {
     // Use configured endpoint to prevent host header injection
     const baseUrl = process.env.BASE_HOST ?? "https://app.langwatch.ai";
 
@@ -1072,10 +1038,7 @@ export function createMcpHandler(): McpHandler {
         client: { redirectUris: body.redirect_uris, clientName },
       });
     } catch (err) {
-      logger.error(
-        { error: err },
-        "Failed to persist OAuth client registration",
-      );
+      logger.error({ error: err }, "Failed to persist OAuth client registration");
       sendJson(res, 500, { error: "server_error" });
       return;
     }
@@ -1103,12 +1066,9 @@ export function createMcpHandler(): McpHandler {
     const header = req.headers.authorization;
     if (!header?.toLowerCase().startsWith("basic ")) return null;
     try {
-      const decoded = Buffer.from(header.slice(6).trim(), "base64").toString(
-        "utf-8",
-      );
+      const decoded = Buffer.from(header.slice(6).trim(), "base64").toString("utf-8");
       const separator = decoded.indexOf(":");
-      const rawClientId =
-        separator === -1 ? decoded : decoded.slice(0, separator);
+      const rawClientId = separator === -1 ? decoded : decoded.slice(0, separator);
       return decodeURIComponent(rawClientId) || null;
     } catch {
       return null;
@@ -1202,9 +1162,7 @@ export function createMcpHandler(): McpHandler {
       // registration is gone that its *code* was bad sends it round the
       // authorize loop forever; `invalid_client` is the code that makes it
       // register again (RFC 6749 §5.2).
-      const registeredClient = await getOAuthClient(clientIdParam).catch(
-        () => null,
-      );
+      const registeredClient = await getOAuthClient(clientIdParam).catch(() => null);
       if (!registeredClient) {
         sendJson(res, 401, {
           error: "invalid_client",
@@ -1251,8 +1209,7 @@ export function createMcpHandler(): McpHandler {
     if (stored.redirectUri !== redirectUriParam) {
       sendJson(res, 400, {
         error: "invalid_grant",
-        error_description:
-          "redirect_uri does not match the authorization request",
+        error_description: "redirect_uri does not match the authorization request",
       });
       return;
     }
@@ -1376,17 +1333,12 @@ export function createMcpHandler(): McpHandler {
       apiKey: redisApiKey,
       callerUserId: recoveredCtx?.userId,
     });
-    await handleWithSessionConfig(redisApiKey, () =>
-      sessionServer.connect(transport),
-    );
+    await handleWithSessionConfig(redisApiKey, () => sessionServer.connect(transport));
 
     return session;
   }
 
-  async function handleMcpPost(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
+  async function handleMcpPost(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await readJsonBody(req, res);
     if (body === undefined) return;
 
@@ -1399,9 +1351,7 @@ export function createMcpHandler(): McpHandler {
     // Existing session — check local Map first, then Redis
     if (sessionId) {
       let session = sessions.get(sessionId);
-      const callerApiKey = incomingToken
-        ? await resolveApiKey(incomingToken)
-        : null;
+      const callerApiKey = incomingToken ? await resolveApiKey(incomingToken) : null;
 
       // L2: Redis lookup — session may live on another pod. Only a caller
       // that already proved it owns the session gets this far, so naming
@@ -1496,9 +1446,7 @@ export function createMcpHandler(): McpHandler {
         apiKey,
         callerUserId: userId,
       });
-      await handleWithSessionConfig(apiKey, () =>
-        sessionServer.connect(transport),
-      );
+      await handleWithSessionConfig(apiKey, () => sessionServer.connect(transport));
 
       await handleWithSessionConfig(apiKey, () =>
         transport.handleRequest(req, res, body),
@@ -1518,10 +1466,7 @@ export function createMcpHandler(): McpHandler {
     });
   }
 
-  async function handleMcpGet(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
+  async function handleMcpGet(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     if (!sessionId) {
       sendJson(res, 400, { error: "Invalid request — no valid session ID" });
@@ -1530,9 +1475,7 @@ export function createMcpHandler(): McpHandler {
 
     let session = sessions.get(sessionId);
     const incomingToken = extractBearerToken(req);
-    const callerApiKey = incomingToken
-      ? await resolveApiKey(incomingToken)
-      : null;
+    const callerApiKey = incomingToken ? await resolveApiKey(incomingToken) : null;
 
     // L2: Redis lookup — the session may have been created on another pod, and
     // reopening the stream is exactly what a client does after a reconnect.
@@ -1560,9 +1503,7 @@ export function createMcpHandler(): McpHandler {
       // which is also the answer that confirms nothing about it.
       send401(
         res,
-        incomingToken
-          ? "Session expired or not found"
-          : "Authorization header required",
+        incomingToken ? "Session expired or not found" : "Authorization header required",
       );
       return;
     }
@@ -1663,10 +1604,7 @@ export function createMcpHandler(): McpHandler {
       );
       await touchSseSessionInRedis(sessionId, session.apiKey);
     } catch (err) {
-      logger.error(
-        { error: err, sessionId },
-        "Failed to handle relayed MCP SSE message",
-      );
+      logger.error({ error: err, sessionId }, "Failed to handle relayed MCP SSE message");
     }
   }
 
@@ -1722,9 +1660,7 @@ export function createMcpHandler(): McpHandler {
       releaseSseSession(sessionId, apiKey).catch(() => {});
     });
 
-    await handleWithSessionConfig(apiKey, () =>
-      sessionServer.connect(transport),
-    );
+    await handleWithSessionConfig(apiKey, () => sessionServer.connect(transport));
   }
 
   async function handleSseMessage(
@@ -1794,10 +1730,7 @@ export function createMcpHandler(): McpHandler {
       return;
     }
 
-    const receivers = await redis.publish(
-      relayChannel(sessionId),
-      JSON.stringify(body),
-    );
+    const receivers = await redis.publish(relayChannel(sessionId), JSON.stringify(body));
     if (receivers === 0) {
       // Nobody is listening: the replica that held the stream is gone, and the
       // record outlived it. Clear it so the client reconnects instead of

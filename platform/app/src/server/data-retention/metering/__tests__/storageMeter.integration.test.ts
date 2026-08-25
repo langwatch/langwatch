@@ -53,18 +53,19 @@ describe("given the production-metered table list", () => {
   });
 
   describe("when each table is asked for its metered size", () => {
-    it.each(
-      PRODUCTION_STORAGE_METER_TABLES,
-    )("%s answers sum(_size_bytes)", async (table) => {
-      const result = await ch.query({
-        query: `SELECT sum(_size_bytes) AS total FROM ${table} WHERE TenantId = {tenantId:String}`,
-        query_params: { tenantId },
-        format: "JSONEachRow",
-      });
-      const rows = (await result.json()) as Array<{ total: string }>;
+    it.each(PRODUCTION_STORAGE_METER_TABLES)(
+      "%s answers sum(_size_bytes)",
+      async (table) => {
+        const result = await ch.query({
+          query: `SELECT sum(_size_bytes) AS total FROM ${table} WHERE TenantId = {tenantId:String}`,
+          query_params: { tenantId },
+          format: "JSONEachRow",
+        });
+        const rows = (await result.json()) as Array<{ total: string }>;
 
-      expect(Number(rows[0]?.total ?? 0)).toBe(0);
-    });
+        expect(Number(rows[0]?.total ?? 0)).toBe(0);
+      },
+    );
   });
 
   describe("when they are summed the way the meter does it", () => {
@@ -110,24 +111,26 @@ describe("given the analytics projections that never declared _size_bytes", () =
     "evaluation_analytics_rollup",
   ] as const;
 
-  it.each(
-    tablesWithoutSizeColumn,
-  )("keeps %s retention-managed while excluding it from metering", (table) => {
-    expect(RETENTION_MANAGED_TABLES).toContain(table);
-    expect(PRODUCTION_STORAGE_METER_TABLES).not.toContain(table);
-  });
+  it.each(tablesWithoutSizeColumn)(
+    "keeps %s retention-managed while excluding it from metering",
+    (table) => {
+      expect(RETENTION_MANAGED_TABLES).toContain(table);
+      expect(PRODUCTION_STORAGE_METER_TABLES).not.toContain(table);
+    },
+  );
 
   describe("when one is asked for its metered size anyway", () => {
-    it.each(
-      tablesWithoutSizeColumn,
-    )("%s rejects the query rather than reporting zero", async (table) => {
-      await expect(
-        ch.query({
-          query: `SELECT sum(_size_bytes) AS total FROM ${table} WHERE TenantId = {tenantId:String}`,
-          query_params: { tenantId },
-          format: "JSONEachRow",
-        }),
-      ).rejects.toThrow(/_size_bytes/);
-    });
+    it.each(tablesWithoutSizeColumn)(
+      "%s rejects the query rather than reporting zero",
+      async (table) => {
+        await expect(
+          ch.query({
+            query: `SELECT sum(_size_bytes) AS total FROM ${table} WHERE TenantId = {tenantId:String}`,
+            query_params: { tenantId },
+            format: "JSONEachRow",
+          }),
+        ).rejects.toThrow(/_size_bytes/);
+      },
+    );
   });
 });

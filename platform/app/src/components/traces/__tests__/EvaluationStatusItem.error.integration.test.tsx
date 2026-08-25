@@ -112,9 +112,7 @@ describe("<EvaluationStatusItem /> error rendering", () => {
 
       render(<EvaluationStatusItem check={check} />, { wrapper: Wrapper });
 
-      expect(
-        screen.getByText(/Azure returned 401 Unauthorized/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Azure returned 401 Unauthorized/)).toBeInTheDocument();
     });
   });
 

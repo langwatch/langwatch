@@ -21,10 +21,9 @@ describe("validateLiquidCondition", () => {
 
   describe("given malformed syntax", () => {
     it("reports a clean error without the if-wrapper or line/col noise", () => {
-      const result = validateLiquidCondition(
-        "foobar < 5 asdjoiasjdioa 123 %^!",
-        ["amount"],
-      );
+      const result = validateLiquidCondition("foobar < 5 asdjoiasjdioa 123 %^!", [
+        "amount",
+      ]);
       expect(result.error).toBeTruthy();
       expect(result.error).not.toContain("line:");
       expect(result.error).not.toContain("{% if");

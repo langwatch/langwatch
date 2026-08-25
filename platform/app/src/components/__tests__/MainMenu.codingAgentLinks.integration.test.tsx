@@ -89,11 +89,7 @@ vi.mock("~/components/sidebar/SideMenuLink", () => ({
     href: string;
     isActive?: boolean;
   }) => (
-    <a
-      href={href}
-      aria-label={label}
-      aria-current={isActive ? "page" : undefined}
-    >
+    <a href={href} aria-label={label} aria-current={isActive ? "page" : undefined}>
       {label}
     </a>
   ),
@@ -117,11 +113,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const daysAgo = (days: number): Date =>
-  new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+const daysAgo = (days: number): Date => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-const linkNamed = (label: string) =>
-  screen.queryByRole("link", { name: label });
+const linkNamed = (label: string) => screen.queryByRole("link", { name: label });
 
 const projectWith = (over: Record<string, unknown> = {}) => ({
   id: "project-1",
@@ -166,12 +160,8 @@ describe("<MainMenu /> coding-agent destinations", () => {
     it("puts the destination after Online Evals in the Observe section", () => {
       render(<MainMenu />, { wrapper: Wrapper });
 
-      const labels = screen
-        .getAllByRole("link")
-        .map((link) => link.textContent);
-      expect(labels.indexOf("Sessions")).toBe(
-        labels.indexOf("Online Evals") + 1,
-      );
+      const labels = screen.getAllByRole("link").map((link) => link.textContent);
+      expect(labels.indexOf("Sessions")).toBe(labels.indexOf("Online Evals") + 1);
     });
   });
 
@@ -199,10 +189,7 @@ describe("<MainMenu /> coding-agent destinations", () => {
     it("shows the Pull requests destination", () => {
       render(<MainMenu />, { wrapper: Wrapper });
 
-      expect(linkNamed("Pull requests")).toHaveAttribute(
-        "href",
-        "/demo/pull-requests",
-      );
+      expect(linkNamed("Pull requests")).toHaveAttribute("href", "/demo/pull-requests");
     });
 
     /** @scenario "Each destination is grown by its own signal" */
@@ -240,10 +227,7 @@ describe("<MainMenu /> coding-agent destinations", () => {
 
         render(<MainMenu />, { wrapper: Wrapper });
 
-        expect(linkNamed("Pull requests")).toHaveAttribute(
-          "aria-current",
-          "page",
-        );
+        expect(linkNamed("Pull requests")).toHaveAttribute("aria-current", "page");
         expect(linkNamed("Sessions")).not.toHaveAttribute("aria-current");
       });
     });

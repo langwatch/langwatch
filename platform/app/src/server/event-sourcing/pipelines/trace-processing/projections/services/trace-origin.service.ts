@@ -20,8 +20,7 @@ export const LEGACY_ORIGIN_RULES: Array<{
     origin: "simulation",
   },
   {
-    check: (s) =>
-      s.spanAttributes["metadata.platform"] === "optimization_studio",
+    check: (s) => s.spanAttributes["metadata.platform"] === "optimization_studio",
     origin: "workflow",
   },
   {
@@ -72,9 +71,7 @@ export class TraceOriginService {
     }
 
     if (mergedAttributes["langwatch.labels"]) {
-      const allLabels = parseJsonStringArray(
-        mergedAttributes["langwatch.labels"],
-      );
+      const allLabels = parseJsonStringArray(mergedAttributes["langwatch.labels"]);
       const filtered = allLabels.filter((l) => l !== "scenario-runner");
       if (filtered.length > 0) {
         mergedAttributes["langwatch.labels"] = JSON.stringify(filtered);
@@ -104,11 +101,8 @@ export class TraceOriginService {
     const spanOrigin = span.spanAttributes["langwatch.origin"];
     const resourceOrigin = span.resourceAttributes["langwatch.origin"];
     const explicitOrigin =
-      typeof spanOrigin === "string" && spanOrigin !== ""
-        ? spanOrigin
-        : resourceOrigin;
-    const hasExplicitOrigin =
-      typeof explicitOrigin === "string" && explicitOrigin !== "";
+      typeof spanOrigin === "string" && spanOrigin !== "" ? spanOrigin : resourceOrigin;
+    const hasExplicitOrigin = typeof explicitOrigin === "string" && explicitOrigin !== "";
     const existingOrigin = state.attributes["langwatch.origin"];
 
     // Eval-chain detection: nlpgo's BaggageAttributeProcessor stamps
@@ -164,8 +158,7 @@ export class TraceOriginService {
       } else if (inferred && !state.attributes["langwatch.origin"]) {
         mergedAttributes["langwatch.origin"] = inferred;
       } else if (state.attributes["langwatch.origin"]) {
-        mergedAttributes["langwatch.origin"] =
-          state.attributes["langwatch.origin"];
+        mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
       } else if (isRootSpan && mergedAttributes["sdk.name"]) {
         // SDK heuristic: only on root spans. sdk.name is a resource
         // attribute identical across ALL spans — inferring origin from it

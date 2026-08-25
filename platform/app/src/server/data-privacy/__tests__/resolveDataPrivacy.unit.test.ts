@@ -170,12 +170,10 @@ describe("resolveDataPrivacy", () => {
       ];
 
       expect(
-        resolveDataPrivacy({ rows, facts: aliceWorkspace }).categories.input
-          .disposition,
+        resolveDataPrivacy({ rows, facts: aliceWorkspace }).categories.input.disposition,
       ).toBe("drop");
       expect(
-        resolveDataPrivacy({ rows, facts: teamProject }).categories.input
-          .disposition,
+        resolveDataPrivacy({ rows, facts: teamProject }).categories.input.disposition,
       ).toBe("capture");
     });
   });
@@ -211,14 +209,10 @@ describe("resolveDataPrivacy", () => {
     it("unions the distinct patterns from every matching rule", () => {
       const rows = [
         rule("ORGANIZATION", "acme", {
-          customAttributes: [
-            { pattern: "http.request.body", disposition: "drop" },
-          ],
+          customAttributes: [{ pattern: "http.request.body", disposition: "drop" }],
         }),
         rule("PROJECT", "web-app", {
-          customAttributes: [
-            { pattern: "app.session_token", disposition: "drop" },
-          ],
+          customAttributes: [{ pattern: "app.session_token", disposition: "drop" }],
         }),
       ];
 
@@ -233,9 +227,7 @@ describe("resolveDataPrivacy", () => {
     it("lets the most-specific scope win when both set the same pattern", () => {
       const rows = [
         rule("ORGANIZATION", "acme", {
-          customAttributes: [
-            { pattern: "app.session_token", disposition: "drop" },
-          ],
+          customAttributes: [{ pattern: "app.session_token", disposition: "drop" }],
         }),
         rule("PROJECT", "web-app", {
           customAttributes: [

@@ -31,8 +31,8 @@ const mockFollow = vi.fn();
 vi.mock("@langwatch/langy-server", () => ({
   LangyTokenBuffer: {
     create: vi.fn(() => ({
-    readTail: mockReadTail,
-    follow: mockFollow,
+      readTail: mockReadTail,
+      follow: mockFollow,
     })),
   },
 }));
@@ -83,9 +83,7 @@ describe("awaitTurnSettlement (buffered path)", () => {
 
   it("settles fast when follow() delivers the terminal frame, answer from the fold", async () => {
     // Fold is behind on the first read, settled on the confirm re-read.
-    mockGetEventsAfter
-      .mockResolvedValueOnce(emptyTail)
-      .mockResolvedValue(settledFold);
+    mockGetEventsAfter.mockResolvedValueOnce(emptyTail).mockResolvedValue(settledFold);
     // follow() yields the terminal immediately — no fold-poll tick is needed.
     mockFollow.mockImplementation(async function* () {
       yield { id: "1-1", entry: { type: "end" } };
@@ -128,9 +126,7 @@ describe("awaitTurnSettlement (buffered path)", () => {
   it("returns null on abort without treating the ended follow() as settlement", async () => {
     mockGetEventsAfter.mockResolvedValue(emptyTail);
     // follow() honors the signal: it ends (without terminal) when aborted.
-    mockFollow.mockImplementation(async function* (opts: {
-      signal: AbortSignal;
-    }) {
+    mockFollow.mockImplementation(async function* (opts: { signal: AbortSignal }) {
       await new Promise((resolve) =>
         opts.signal.addEventListener("abort", resolve, { once: true }),
       );

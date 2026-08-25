@@ -206,12 +206,12 @@ describe("StoredObjectService", () => {
       idempotencyKey: "delete_retry_1",
     });
 
-    await expect(
-      service.cleanupDeletedObjects({ projectId: "project_1" }),
-    ).resolves.toBe(0);
-    await expect(
-      service.cleanupDeletedObjects({ projectId: "project_1" }),
-    ).resolves.toBe(1);
+    await expect(service.cleanupDeletedObjects({ projectId: "project_1" })).resolves.toBe(
+      0,
+    );
+    await expect(service.cleanupDeletedObjects({ projectId: "project_1" })).resolves.toBe(
+      1,
+    );
     await expect(
       store.tryFind({ tenantId: "project_1", id: stored.reference.id }),
     ).resolves.toMatchObject({ status: "deleted", storage: null });

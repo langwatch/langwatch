@@ -25,9 +25,7 @@ const AZURE_EVALUATOR_TYPES = [
   "azure/jailbreak",
 ] as const;
 
-function buildCommand(
-  evaluatorType: string,
-): Command<ExecuteEvaluationCommandData> {
+function buildCommand(evaluatorType: string): Command<ExecuteEvaluationCommandData> {
   const tenantId = createTenantId("proj-byok-1");
   return {
     tenantId,
@@ -109,8 +107,7 @@ function buildCommandWithMocks({
   const azureSafetyEnvResolver = vi.fn().mockResolvedValue(
     azureConfigured
       ? {
-          AZURE_CONTENT_SAFETY_ENDPOINT:
-            "https://byok.cognitiveservices.azure.com/",
+          AZURE_CONTENT_SAFETY_ENDPOINT: "https://byok.cognitiveservices.azure.com/",
           AZURE_CONTENT_SAFETY_KEY: "byok-key",
         }
       : null,
@@ -138,9 +135,7 @@ describe("Feature: ExecuteEvaluationCommand — Azure Safety BYOK gate", () => {
     vi.clearAllMocks();
   });
 
-  describe.each(
-    AZURE_EVALUATOR_TYPES,
-  )("given a monitor for %s", (evaluatorType) => {
+  describe.each(AZURE_EVALUATOR_TYPES)("given a monitor for %s", (evaluatorType) => {
     describe("and the project has NO azure_safety provider configured", () => {
       describe("when the command handles the evaluation", () => {
         it("emits a skipped event with the configure message", async () => {

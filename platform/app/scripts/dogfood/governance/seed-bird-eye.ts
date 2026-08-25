@@ -112,8 +112,7 @@ function parseArgs(argv: string[]): Args {
     else if (argv[i] === "--rows") out.rows = Number(argv[++i]);
     else if (argv[i] === "--no-anomaly") out.withAnomaly = false;
   }
-  if (!out.organizationId)
-    throw new Error("--org <organizationId> is required");
+  if (!out.organizationId) throw new Error("--org <organizationId> is required");
   return out as Args;
 }
 
@@ -309,9 +308,7 @@ async function ensureSourcesAcrossTeams({
   }
 
   console.log(
-    `[seed-bird-eye] sources: ${sources
-      .map((s) => `${s.id}(${s.teamName})`)
-      .join(", ")}`,
+    `[seed-bird-eye] sources: ${sources.map((s) => `${s.id}(${s.teamName})`).join(", ")}`,
   );
   void govProjectId;
   return sources;
@@ -327,8 +324,7 @@ async function seedTraceSummaries({
   args: Args;
 }): Promise<{ totalCostUsd: number; rowsInserted: number }> {
   const ch = await getClickHouseClientForTenant(govProjectId);
-  if (!ch)
-    throw new Error("ClickHouse client unavailable for governance tenant");
+  if (!ch) throw new Error("ClickHouse client unavailable for governance tenant");
 
   const traceRows: Record<string, unknown>[] = [];
   let totalCostUsd = 0;
@@ -336,10 +332,7 @@ async function seedTraceSummaries({
   for (let i = 0; i < args.rows; i++) {
     const model = pickModel();
     const promptTokens = rand(model.promptRange[0], model.promptRange[1]);
-    const completionTokens = rand(
-      model.completionRange[0],
-      model.completionRange[1],
-    );
+    const completionTokens = rand(model.completionRange[0], model.completionRange[1]);
     const costUsd =
       promptTokens * model.costPerInputToken +
       completionTokens * model.costPerOutputToken;
@@ -354,8 +347,7 @@ async function seedTraceSummaries({
     // Per-source time skew so each team has a distinct trend shape —
     // see SOURCE_TIME_SKEWS for the per-index rationale.
     const recentSkew =
-      SOURCE_TIME_SKEWS[Math.min(sourceIdx, SOURCE_TIME_SKEWS.length - 1)] ??
-      1.6;
+      SOURCE_TIME_SKEWS[Math.min(sourceIdx, SOURCE_TIME_SKEWS.length - 1)] ?? 1.6;
     const daysAgo = pickDaysAgo(args.days, recentSkew);
     const now = new Date();
     const occurredAt = new Date(now);
@@ -516,9 +508,7 @@ async function maybeSeedAnomalyAlert({
         detail,
       },
     });
-    console.log(
-      `[seed-bird-eye] anomaly alert refreshed id=${updated.id} state=open`,
-    );
+    console.log(`[seed-bird-eye] anomaly alert refreshed id=${updated.id} state=open`);
     return;
   }
 
@@ -600,8 +590,7 @@ export async function runSeedBirdEye(args: Args): Promise<SeedBirdEyeSummary> {
 // CLI bootstrap — only fires when this file is the entry point, not
 // when imported by the SeedAction wrapper or the cron API path.
 const isCliInvocation =
-  typeof process.argv[1] === "string" &&
-  import.meta.url === `file://${process.argv[1]}`;
+  typeof process.argv[1] === "string" && import.meta.url === `file://${process.argv[1]}`;
 
 if (isCliInvocation) {
   const args = parseArgs(process.argv.slice(2));

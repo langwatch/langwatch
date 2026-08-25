@@ -53,8 +53,7 @@ describe("captureException()", () => {
       expect(posthog.capture).toHaveBeenCalledWith(
         "$exception",
         expect.objectContaining({
-          $exception_stack_trace_raw:
-            expect.stringContaining("connection failed"),
+          $exception_stack_trace_raw: expect.stringContaining("connection failed"),
         }),
       );
     });

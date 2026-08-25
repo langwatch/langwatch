@@ -1,22 +1,10 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Icon,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
-import {
-  formatCost,
-  formatDuration,
-  formatTokens,
-} from "../../../utils/formatters";
+import { formatCost, formatDuration, formatTokens } from "../../../utils/formatters";
 
 const LLM_REQUEST_SPAN = "claude_code.llm_request";
 const TOOL_SPAN = "claude_code.tool";
@@ -137,17 +125,13 @@ function selectSteps(spans: SpanDetail[]): Step[] {
       return {
         spanId: span.spanId,
         kind: isTool ? ("tool" as const) : ("model" as const),
-        label: isTool
-          ? (asString(params.tool_name) ?? "Tool")
-          : (span.model ?? "model"),
+        label: isTool ? (asString(params.tool_name) ?? "Tool") : (span.model ?? "model"),
         arg: isTool
           ? (asString(params.full_command) ?? asString(params.file_path))
           : null,
         durationMs: span.durationMs,
         isError: span.status === "error",
-        tokens:
-          (span.metrics?.promptTokens ?? 0) +
-          (span.metrics?.completionTokens ?? 0),
+        tokens: (span.metrics?.promptTokens ?? 0) + (span.metrics?.completionTokens ?? 0),
         costUsd: span.metrics?.cost ?? 0,
       };
     });

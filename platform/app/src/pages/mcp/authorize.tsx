@@ -12,10 +12,7 @@ import { useEffect, useState } from "react";
 import { isAllowedRedirectScheme } from "~/mcp/redirectSchemes";
 import { useSession } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
-import {
-  DashboardLayout,
-  ProjectSelector,
-} from "../../components/DashboardLayout";
+import { DashboardLayout, ProjectSelector } from "../../components/DashboardLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
@@ -46,9 +43,7 @@ export default function McpAuthorize() {
         if (value) params.set(key, value);
       }
       const callbackUrl = `/mcp/authorize?${params.toString()}`;
-      void router.replace(
-        `/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`,
-      );
+      void router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
     }
   }, [session, status]);
 
@@ -143,18 +138,14 @@ export default function McpAuthorize() {
               </Heading>
               <Spacer />
               {organizations && project && (
-                <ProjectSelector
-                  organizations={organizations}
-                  project={project}
-                />
+                <ProjectSelector organizations={organizations} project={project} />
               )}
             </HStack>
           </Card.Header>
           <Card.Body>
             <VStack align="start" gap={6}>
               <Text>
-                Allow this application to access your LangWatch project tools
-                and data?
+                Allow this application to access your LangWatch project tools and data?
               </Text>
               <Text fontSize="sm" color="fg.muted">
                 Scopes: {scopeDisplay}

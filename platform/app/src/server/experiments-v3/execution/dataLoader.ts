@@ -7,14 +7,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Agent } from "@langwatch/agent-contract";
-import type {
-  Evaluator,
-  EvaluatorService,
-} from "@langwatch/evaluator-contract";
-import {
-  parseStudioWorkflow,
-  type StudioWorkflow,
-} from "@langwatch/workflow-contract";
+import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
+import { parseStudioWorkflow, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import { AgentsFeature } from "~/runtime/app/features/agents";
 import { getApp } from "~/server/app-layer/app";
@@ -132,9 +126,7 @@ export const loadDataset = async (
 
     // Parse JSON columns
     const jsonColumns = new Set(
-      columns
-        .filter((c) => JSON_COLUMN_TYPES.includes(c.type as any))
-        .map((c) => c.name),
+      columns.filter((c) => JSON_COLUMN_TYPES.includes(c.type as any)).map((c) => c.name),
     );
     rows = parseJsonColumns(rows, jsonColumns);
   } else if (dataset.type === "saved" && dataset.datasetId) {
@@ -149,15 +141,11 @@ export const loadDataset = async (
     });
 
     columns = dataset.columns;
-    rows = loadedDataset.records.map(
-      (r) => r.entry as Record<string, unknown>,
-    );
+    rows = loadedDataset.records.map((r) => r.entry as Record<string, unknown>);
 
     // Parse JSON columns (saved datasets already use names as keys)
     const jsonColumns = new Set(
-      columns
-        .filter((c) => JSON_COLUMN_TYPES.includes(c.type as any))
-        .map((c) => c.name),
+      columns.filter((c) => JSON_COLUMN_TYPES.includes(c.type as any)).map((c) => c.name),
     );
     rows = parseJsonColumns(rows, jsonColumns);
   } else {
@@ -236,9 +224,7 @@ export const applyParametersToRows = ({
  * structured fields are already structured. A caller that hand-sends
  * stringified JSON is responsible for sending it parsed instead.
  */
-const rowsFromInlineData = (
-  data: Array<Record<string, unknown>>,
-): LoadedDataset => {
+const rowsFromInlineData = (data: Array<Record<string, unknown>>): LoadedDataset => {
   const columnNames: string[] = [];
   const seen = new Set<string>();
   for (const row of data) {
@@ -277,8 +263,7 @@ export type LoadedWorkflow = {
 export const workflowLoadKey = (target: {
   workflowId?: string;
   workflowVersionId?: string;
-}): string =>
-  `${target.workflowId ?? ""}::${target.workflowVersionId ?? "published"}`;
+}): string => `${target.workflowId ?? ""}::${target.workflowVersionId ?? "published"}`;
 
 export type LoadedExecutionData = {
   datasetRows: Array<Record<string, unknown>>;
@@ -357,16 +342,12 @@ export const loadExecutionData = async (
     ).map((c) => ({ id: c.name, name: c.name, type: c.type }));
     const jsonColumnKeys = new Set(
       columns
-        .filter((c) =>
-          (JSON_COLUMN_TYPES as readonly string[]).includes(c.type),
-        )
+        .filter((c) => (JSON_COLUMN_TYPES as readonly string[]).includes(c.type))
         .map((c) => c.name),
     );
     baseDataset = {
       rows: parseJsonColumns(
-        loadedDataset.records.map(
-          (r) => r.entry as Record<string, unknown>,
-        ),
+        loadedDataset.records.map((r) => r.entry as Record<string, unknown>),
         jsonColumnKeys,
       ),
       columns,
@@ -513,8 +494,7 @@ export const loadExecutionData = async (
     if (agent?.type !== "workflow") continue;
 
     const linkedWorkflowId =
-      agent.workflowId ??
-      (agent.config as { workflow_id?: string }).workflow_id;
+      agent.workflowId ?? (agent.config as { workflow_id?: string }).workflow_id;
     if (!linkedWorkflowId) continue;
 
     const key = workflowLoadKey({ workflowId: linkedWorkflowId });

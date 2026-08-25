@@ -23,16 +23,12 @@ export const useFilterParams = () => {
   const filters: Partial<Record<FilterField, FilterParam>> = {};
 
   const queryString = router.asPath.split("?")[1] ?? "";
-  const queryParams = qs.parse(
-    queryString.replaceAll("%2C", ","),
-    URL_QS_PARSE_OPTIONS,
-  );
+  const queryParams = qs.parse(queryString.replaceAll("%2C", ","), URL_QS_PARSE_OPTIONS);
 
   for (const [filterKey, filter] of Object.entries(availableFilters)) {
     const param = queryParams[filter.urlKey];
     if (param) {
-      const filterParam =
-        typeof param === "string" ? [param] : (param as FilterParam);
+      const filterParam = typeof param === "string" ? [param] : (param as FilterParam);
 
       const filterEmptyAndConverScalarToArray = (
         obj: FilterParam,
@@ -43,32 +39,27 @@ export const useFilterParams = () => {
         }
 
         return Object.fromEntries(
-          Object.entries(obj).flatMap(
-            ([key, value]): [string, FilterParam][] => {
-              if (Array.isArray(value)) {
-                const value_ = value.filter((x) => x !== "");
-                if (filter && value_.length === 0) {
-                  return [];
-                }
-                return [[key, value_]];
-              } else if (value && typeof value === "object") {
-                const value_ = filterEmptyAndConverScalarToArray(value, filter);
-                if (filter && Object.keys(value_).length === 0) {
-                  return [];
-                }
-                return [[key, value_]];
-              } else {
-                return [[key, [value]]];
+          Object.entries(obj).flatMap(([key, value]): [string, FilterParam][] => {
+            if (Array.isArray(value)) {
+              const value_ = value.filter((x) => x !== "");
+              if (filter && value_.length === 0) {
+                return [];
               }
-            },
-          ),
+              return [[key, value_]];
+            } else if (value && typeof value === "object") {
+              const value_ = filterEmptyAndConverScalarToArray(value, filter);
+              if (filter && Object.keys(value_).length === 0) {
+                return [];
+              }
+              return [[key, value_]];
+            } else {
+              return [[key, [value]]];
+            }
+          }),
         ) as FilterParam;
       };
 
-      const filterParam_ = filterEmptyAndConverScalarToArray(
-        filterParam,
-        false,
-      );
+      const filterParam_ = filterEmptyAndConverScalarToArray(filterParam, false);
       filters[filterKey as FilterField] = filterParam_;
     }
   }
@@ -78,9 +69,7 @@ export const useFilterParams = () => {
   // query already has the correct filters. Layout params like project, view,
   // group_by are fine — only filter keys, dates, and search prevent fallback.
   const hasUrlFilterOrDateParams =
-    Object.values(availableFilters).some(
-      (f) => queryParams[f.urlKey] !== undefined,
-    ) ||
+    Object.values(availableFilters).some((f) => queryParams[f.urlKey] !== undefined) ||
     !!queryParams.query ||
     !!queryParams.startDate ||
     !!queryParams.endDate;
@@ -92,9 +81,7 @@ export const useFilterParams = () => {
         localStorage.getItem(`langwatch-selected-view-${project.id}`);
 
       if (viewId && viewId !== "all-traces") {
-        const raw = localStorage.getItem(
-          `langwatch-saved-views-cache-${project.id}`,
-        );
+        const raw = localStorage.getItem(`langwatch-saved-views-cache-${project.id}`);
         if (raw) {
           const cached = JSON.parse(raw) as Array<{
             id: string;
@@ -201,8 +188,7 @@ export const useFilterParams = () => {
           ...Object.entries(filtersToSet).reduce(
             (acc, [filter, params]) => ({
               ...acc,
-              [availableFilters[filter as keyof typeof availableFilters]
-                .urlKey]: params,
+              [availableFilters[filter as keyof typeof availableFilters].urlKey]: params,
             }),
             {},
           ),
@@ -218,8 +204,7 @@ export const useFilterParams = () => {
         ([key]) =>
           key !== "query" &&
           !Object.values(availableFilters).some(
-            (filter) =>
-              key === filter.urlKey || key.startsWith(filter.urlKey + "."),
+            (filter) => key === filter.urlKey || key.startsWith(filter.urlKey + "."),
           ),
       ),
     );

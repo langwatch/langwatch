@@ -184,9 +184,7 @@ describe("saved workbench charts (integration)", () => {
 
         const listed = await service.getAll({ projectId: project.id });
 
-        expect(listed.map(({ id }) => id).sort()).toEqual(
-          [first.id, second.id].sort(),
-        );
+        expect(listed.map(({ id }) => id).sort()).toEqual([first.id, second.id].sort());
         expect(listed.map(({ id }) => id)).not.toContain(builder.id);
       });
     });
@@ -284,9 +282,7 @@ describe("saved workbench charts (integration)", () => {
         ).rejects.toMatchObject({
           code: "saved_workbench_chart_definition_invalid",
         });
-        await expect(
-          service.getAll({ projectId: project.id }),
-        ).rejects.toMatchObject({
+        await expect(service.getAll({ projectId: project.id })).rejects.toMatchObject({
           code: "saved_workbench_chart_definition_invalid",
         });
       });

@@ -11,9 +11,7 @@ export const ingestionKeyMintCommandSchema = z
     createdByDeviceLabel: z.string().nullable().optional(),
   })
   .strict();
-export type IngestionKeyMintCommand = z.infer<
-  typeof ingestionKeyMintCommandSchema
->;
+export type IngestionKeyMintCommand = z.infer<typeof ingestionKeyMintCommandSchema>;
 
 export const issuedIngestionKeySchema = z
   .object({
@@ -36,13 +34,9 @@ export const personalIngestionKeySchema = z
 export type PersonalIngestionKey = z.infer<typeof personalIngestionKeySchema>;
 
 export abstract class GovernanceIngestionKeyService {
-  abstract ensureForProject(
-    input: IngestionKeyMintCommand,
-  ): Promise<IssuedIngestionKey>;
+  abstract ensureForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey>;
 
-  abstract issueForProject(
-    input: IngestionKeyMintCommand,
-  ): Promise<IssuedIngestionKey>;
+  abstract issueForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey>;
 
   abstract ensureForPersonalProject(input: {
     userId: string;

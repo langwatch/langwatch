@@ -19,14 +19,10 @@ const spyRepository = (name: string): AuthzReadRepository =>
     tryFindProjectLineage: vi
       .fn()
       .mockResolvedValue({ teamId: "team-1", organizationId: "org-1" }),
-    tryFindTeamOrganization: vi
-      .fn()
-      .mockResolvedValue({ organizationId: "org-1" }),
+    tryFindTeamOrganization: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
   }) as unknown as AuthzReadRepository;
 
-const repositoryFor = (
-  selectHead: (organizationId: string) => Promise<boolean>,
-) => {
+const repositoryFor = (selectHead: (organizationId: string) => Promise<boolean>) => {
   const legacy = spyRepository("legacy");
   const eventing = spyRepository("eventing");
   return {
@@ -135,10 +131,7 @@ describe("RoutedAuthzReadRepository", () => {
   });
 
   it("pins one head per organization for the lifetime of a read pass", async () => {
-    const selectHead = vi
-      .fn()
-      .mockResolvedValueOnce(true)
-      .mockResolvedValue(false);
+    const selectHead = vi.fn().mockResolvedValueOnce(true).mockResolvedValue(false);
     const { legacy, eventing, repository } = repositoryFor(selectHead);
     const args = { userId: "alice", organizationId: "org-1" };
 
@@ -152,10 +145,7 @@ describe("RoutedAuthzReadRepository", () => {
   });
 
   it("lets a new pass observe a rollback", async () => {
-    const selectHead = vi
-      .fn()
-      .mockResolvedValueOnce(true)
-      .mockResolvedValue(false);
+    const selectHead = vi.fn().mockResolvedValueOnce(true).mockResolvedValue(false);
     const { legacy, eventing, repository } = repositoryFor(selectHead);
     const args = { userId: "alice", organizationId: "org-1" };
 

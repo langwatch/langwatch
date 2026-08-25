@@ -38,8 +38,14 @@ describe("MemorySuiteRunRepository", () => {
 
     await repository.storeProjection(projection, { tenantId });
 
-    await expect(repository.getProjection("batch_1", { tenantId })).resolves.toEqual(projection);
-    await expect(repository.getSuiteRunState({ projectId: "project_1", batchRunId: "batch_1" })).resolves.toBeNull();
-    await expect(repository.getBatchHistory({ projectId: "project_1", scenarioSetId: "set_1" })).resolves.toEqual([]);
+    await expect(repository.getProjection("batch_1", { tenantId })).resolves.toEqual(
+      projection,
+    );
+    await expect(
+      repository.getSuiteRunState({ projectId: "project_1", batchRunId: "batch_1" }),
+    ).resolves.toBeNull();
+    await expect(
+      repository.getBatchHistory({ projectId: "project_1", scenarioSetId: "set_1" }),
+    ).resolves.toEqual([]);
   });
 });

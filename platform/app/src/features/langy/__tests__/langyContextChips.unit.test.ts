@@ -80,12 +80,7 @@ describe("mergeContextChips", () => {
   describe("given a source that produced nothing", () => {
     describe("when it is merged", () => {
       it("skips the empty slots", () => {
-        const merged = mergeContextChips([
-          null,
-          autoDerivedTrace,
-          undefined,
-          null,
-        ]);
+        const merged = mergeContextChips([null, autoDerivedTrace, undefined, null]);
 
         expect(merged).toEqual([autoDerivedTrace]);
       });
@@ -98,23 +93,18 @@ describe("mergeContextChips", () => {
         // The direction that matters. Being on a page, or having a drawer
         // open, is an OFFER — the model is told about a resource only once
         // someone decided to tell it.
-        const candidates = mergeContextChips([
-          autoDerivedTrace,
-          pickedEvaluation,
-        ]);
+        const candidates = mergeContextChips([autoDerivedTrace, pickedEvaluation]);
 
         expect(selectVisibleChips(candidates, new Set())).toEqual([]);
       });
 
       it("offers all of it through the '+ context' control", () => {
-        const candidates = mergeContextChips([
-          autoDerivedTrace,
-          pickedEvaluation,
-        ]);
+        const candidates = mergeContextChips([autoDerivedTrace, pickedEvaluation]);
 
-        expect(
-          selectAddableChips(candidates, new Set()).map((chip) => chip.id),
-        ).toEqual(["trace:abc123def456", "evaluation:mon_1"]);
+        expect(selectAddableChips(candidates, new Set()).map((chip) => chip.id)).toEqual([
+          "trace:abc123def456",
+          "evaluation:mon_1",
+        ]);
       });
     });
   });
@@ -122,27 +112,21 @@ describe("mergeContextChips", () => {
   describe("given the user chose one of them", () => {
     describe("when both are still produced by their sources", () => {
       it("shows the chosen one in the composer", () => {
-        const candidates = mergeContextChips([
-          autoDerivedTrace,
-          pickedEvaluation,
-        ]);
+        const candidates = mergeContextChips([autoDerivedTrace, pickedEvaluation]);
         const chosen = new Set(["trace:abc123def456"]);
 
-        expect(
-          selectVisibleChips(candidates, chosen).map((chip) => chip.id),
-        ).toEqual(["trace:abc123def456"]);
+        expect(selectVisibleChips(candidates, chosen).map((chip) => chip.id)).toEqual([
+          "trace:abc123def456",
+        ]);
       });
 
       it("leaves the other one on the '+ context' menu", () => {
-        const candidates = mergeContextChips([
-          autoDerivedTrace,
-          pickedEvaluation,
-        ]);
+        const candidates = mergeContextChips([autoDerivedTrace, pickedEvaluation]);
         const chosen = new Set(["trace:abc123def456"]);
 
-        expect(
-          selectAddableChips(candidates, chosen).map((chip) => chip.id),
-        ).toEqual(["evaluation:mon_1"]);
+        expect(selectAddableChips(candidates, chosen).map((chip) => chip.id)).toEqual([
+          "evaluation:mon_1",
+        ]);
       });
     });
 
@@ -152,9 +136,9 @@ describe("mergeContextChips", () => {
         const chosen = new Set<string>();
 
         expect(selectVisibleChips(candidates, chosen)).toEqual([]);
-        expect(
-          selectAddableChips(candidates, chosen).map((chip) => chip.id),
-        ).toEqual(["trace:abc123def456"]);
+        expect(selectAddableChips(candidates, chosen).map((chip) => chip.id)).toEqual([
+          "trace:abc123def456",
+        ]);
       });
     });
   });
@@ -233,9 +217,7 @@ describe("promptContextChip", () => {
 
   describe("given a prompt with no handle", () => {
     it("falls back to the shortened id for both", () => {
-      expect(
-        promptContextChip({ promptId: "prompt_123456", handle: null }),
-      ).toEqual({
+      expect(promptContextChip({ promptId: "prompt_123456", handle: null })).toEqual({
         id: "prompt:prompt_123456",
         kind: "prompt",
         label: "prompt prompt…56",
@@ -258,33 +240,31 @@ describe("the resource chip factories", () => {
   describe("given a card on a list page that knows the resource's name", () => {
     it("leads with the name a person recognises, not the id", () => {
       expect(
-        workflowContextChip({ workflowId: "wf_123456789", name: "checkout" })
-          .label,
+        workflowContextChip({ workflowId: "wf_123456789", name: "checkout" }).label,
       ).toBe("workflow: checkout");
       expect(
         agentContextChip({ agentId: "ag_123456789", name: "triage bot" }).label,
       ).toBe("agent: triage bot");
       expect(
-        dashboardContextChip({ dashboardId: "db_123456789", name: "costs" })
-          .label,
+        dashboardContextChip({ dashboardId: "db_123456789", name: "costs" }).label,
       ).toBe("dashboard: costs");
     });
 
     it("still sends the id to the agent, where an id is what is wanted", () => {
-      expect(
-        agentContextChip({ agentId: "ag_123456789", name: "triage bot" }).ref,
-      ).toBe("ag_123456789");
+      expect(agentContextChip({ agentId: "ag_123456789", name: "triage bot" }).ref).toBe(
+        "ag_123456789",
+      );
     });
   });
 
   describe("given a resource with no name to show", () => {
     it("falls back to a shortened id rather than an empty label", () => {
-      expect(
-        automationContextChip({ automationId: "au_123456789" }).label,
-      ).toBe("automation au_123…89");
-      expect(
-        workflowContextChip({ workflowId: "wf_123456789", name: "  " }).label,
-      ).toBe("workflow wf_123…89");
+      expect(automationContextChip({ automationId: "au_123456789" }).label).toBe(
+        "automation au_123…89",
+      );
+      expect(workflowContextChip({ workflowId: "wf_123456789", name: "  " }).label).toBe(
+        "workflow wf_123…89",
+      );
     });
   });
 
@@ -293,33 +273,31 @@ describe("the resource chip factories", () => {
     // path. A card that mints a different key would put the same thing in the
     // composer twice — once from the click, once from the route.
     it("shares the route-derived chip id, so the two dedupe into one", () => {
-      expect(
-        workflowContextChip({ workflowId: "wf_1", name: "checkout" }).id,
-      ).toBe("workflow:wf_1");
-      expect(agentContextChip({ agentId: "ag_1", name: "bot" }).id).toBe(
-        "agent:ag_1",
+      expect(workflowContextChip({ workflowId: "wf_1", name: "checkout" }).id).toBe(
+        "workflow:wf_1",
       );
-      expect(
-        automationContextChip({ automationId: "au_1", name: "alert" }).id,
-      ).toBe("automation:au_1");
+      expect(agentContextChip({ agentId: "ag_1", name: "bot" }).id).toBe("agent:ag_1");
+      expect(automationContextChip({ automationId: "au_1", name: "alert" }).id).toBe(
+        "automation:au_1",
+      );
       // Annotation queues live at `/annotations/<slug>`, so the chip is keyed
       // on the slug — not the queue's database id.
-      expect(
-        annotationContextChip({ annotationId: "triage", name: "Triage" }).id,
-      ).toBe("annotation:triage");
+      expect(annotationContextChip({ annotationId: "triage", name: "Triage" }).id).toBe(
+        "annotation:triage",
+      );
       // Experiments live at `/experiments/<slug>`, for the same reason.
       expect(experimentContextChip({ slug: "run-42", name: "Run 42" }).id).toBe(
         "experiment:run-42",
       );
-      expect(
-        evaluationContextChip({ evaluationId: "ev_1", name: "latency" }).id,
-      ).toBe("evaluation:ev_1");
-      expect(
-        scenarioContextChip({ scenarioId: "sr_1", name: "checkout" }).id,
-      ).toBe("scenario:sr_1");
-      expect(
-        dashboardContextChip({ dashboardId: "db_1", name: "costs" }).id,
-      ).toBe("dashboard:db_1");
+      expect(evaluationContextChip({ evaluationId: "ev_1", name: "latency" }).id).toBe(
+        "evaluation:ev_1",
+      );
+      expect(scenarioContextChip({ scenarioId: "sr_1", name: "checkout" }).id).toBe(
+        "scenario:sr_1",
+      );
+      expect(dashboardContextChip({ dashboardId: "db_1", name: "costs" }).id).toBe(
+        "dashboard:db_1",
+      );
     });
   });
 

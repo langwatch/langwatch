@@ -12,9 +12,9 @@ describe("MANUAL window math", () => {
     expect(shouldResetBudget("MANUAL", resetsAt, NOW)).toBe(false);
     // Sentinel timestamps still answer no: the boundary only moves by an
     // explicit reset, whatever the clock says.
-    expect(
-      shouldResetBudget("MANUAL", new Date("2000-01-01T00:00:00Z"), NOW),
-    ).toBe(false);
+    expect(shouldResetBudget("MANUAL", new Date("2000-01-01T00:00:00Z"), NOW)).toBe(
+      false,
+    );
   });
 
   it("buckets MANUAL debits under the epoch sentinel like TOTAL", () => {

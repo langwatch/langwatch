@@ -75,9 +75,7 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
               select: { id: true, name: true },
             })
           : [];
-      const virtualKeyNames = Object.fromEntries(
-        vks.map((vk) => [vk.id, vk.name]),
-      );
+      const virtualKeyNames = Object.fromEntries(vks.map((vk) => [vk.id, vk.name]));
 
       return { rows, nextCursor, virtualKeyNames, clickHouseDisabled: false };
     }),

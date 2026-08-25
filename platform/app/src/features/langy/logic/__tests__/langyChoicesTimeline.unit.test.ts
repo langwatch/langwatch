@@ -54,10 +54,7 @@ describe("langyChoicesTimeline", () => {
         { role: "assistant", parts: [questionPart("q1")] },
         {
           role: "user",
-          parts: [
-            selectionPart("q1", ["a"]),
-            { type: "text", text: "Chose: A" },
-          ],
+          parts: [selectionPart("q1", ["a"]), { type: "text", text: "Chose: A" }],
         },
       ]);
       expect(timeline).toEqual([

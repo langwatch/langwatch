@@ -125,9 +125,7 @@ describe("given the Cadence section of the composer", () => {
       const input = screen.getByLabelText<HTMLInputElement>("Cron expression");
       await user.clear(input);
       await user.type(input, "99 * * * *");
-      expect(
-        screen.getByText(/five fields|can't run|cannot run/i),
-      ).toBeTruthy();
+      expect(screen.getByText(/five fields|can't run|cannot run/i)).toBeTruthy();
       // A cron that parses but never fires — February 30th — gets its own
       // message, matching the server's next-run refusal.
       await user.clear(input);

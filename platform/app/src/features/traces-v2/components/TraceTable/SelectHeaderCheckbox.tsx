@@ -27,19 +27,13 @@ export const SelectHeaderCheckbox: React.FC<SelectHeaderCheckboxProps> = ({
       : traceIds.reduce((n, id) => n + (traceIdSet.has(id) ? 1 : 0), 0);
 
   const checked: boolean | "indeterminate" =
-    selectedCount === 0
-      ? false
-      : selectedCount === total
-        ? true
-        : "indeterminate";
+    selectedCount === 0 ? false : selectedCount === total ? true : "indeterminate";
 
   return (
     <ChakraButton
       type="button"
       aria-label="Select all on this page"
-      aria-checked={
-        checked === true ? "true" : checked === false ? "false" : "mixed"
-      }
+      aria-checked={checked === true ? "true" : checked === false ? "false" : "mixed"}
       display="flex"
       alignItems="center"
       justifyContent="center"

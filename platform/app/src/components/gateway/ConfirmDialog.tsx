@@ -31,17 +31,11 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const palette = tone === "danger" ? "red" : "orange";
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(details) => onOpenChange(details.open)}
-    >
+    <Dialog.Root open={open} onOpenChange={(details) => onOpenChange(details.open)}>
       <Dialog.Content bg="bg" maxWidth="480px">
         <Dialog.Header>
           <HStack gap={3} align="start">
-            <AlertTriangle
-              size={20}
-              color={tone === "danger" ? "#E53E3E" : "#ED8936"}
-            />
+            <AlertTriangle size={20} color={tone === "danger" ? "#E53E3E" : "#ED8936"} />
             <VStack align="start" gap={0}>
               <Dialog.Title>{title}</Dialog.Title>
             </VStack>
@@ -62,11 +56,7 @@ export function ConfirmDialog({
             >
               Cancel
             </Button>
-            <Button
-              colorPalette={palette}
-              onClick={onConfirm}
-              loading={loading}
-            >
+            <Button colorPalette={palette} onClick={onConfirm} loading={loading}>
               {confirmLabel}
             </Button>
           </HStack>

@@ -19,9 +19,7 @@ export const TracePresenceAvatars = memo(function TracePresenceAvatars({
   max = 3,
   size = "2xs",
 }: TracePresenceAvatarsProps) {
-  const peers = usePresenceStore(
-    useShallow((s) => selectPeersOnTrace(s, traceId)),
-  );
+  const peers = usePresenceStore(useShallow((s) => selectPeersOnTrace(s, traceId)));
   if (peers.length === 0) return null;
   return <PresenceAvatarStack sessions={peers} max={max} size={size} />;
 });

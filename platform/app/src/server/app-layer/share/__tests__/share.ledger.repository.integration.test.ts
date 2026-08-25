@@ -234,12 +234,7 @@ describe("given a cut-over organization's capped share link", () => {
     it("admits exactly the remaining views when several viewers open at once", async () => {
       // Four concurrent opens against one remaining view. The cap is held by
       // the statement, so precisely one of them may win.
-      const outcomes = await Promise.all([
-        consume(),
-        consume(),
-        consume(),
-        consume(),
-      ]);
+      const outcomes = await Promise.all([consume(), consume(), consume(), consume()]);
 
       expect(outcomes.filter(Boolean)).toHaveLength(MAX_VIEWS - SEEDED_VIEWS);
       expect((await usage())?.viewCount).toBe(MAX_VIEWS);
@@ -247,9 +242,7 @@ describe("given a cut-over organization's capped share link", () => {
 
     describe("when the link has no usage row at all", () => {
       it("creates it on the first view rather than losing the count", async () => {
-        await cleanupTestRows(prisma, [
-          ["grantUsage", { grantId: shareLinkId }],
-        ]);
+        await cleanupTestRows(prisma, [["grantUsage", { grantId: shareLinkId }]]);
 
         expect(await consume()).toBe(true);
 
@@ -259,9 +252,7 @@ describe("given a cut-over organization's capped share link", () => {
       it("lets exactly one of two simultaneous first views create it", async () => {
         // The race the create exists to resolve: the unique violation on the
         // primary key is what tells the loser it was a race and not a cap.
-        await cleanupTestRows(prisma, [
-          ["grantUsage", { grantId: shareLinkId }],
-        ]);
+        await cleanupTestRows(prisma, [["grantUsage", { grantId: shareLinkId }]]);
 
         const outcomes = await Promise.all([consume(), consume()]);
 

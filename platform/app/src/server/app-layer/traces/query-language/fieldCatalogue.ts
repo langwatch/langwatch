@@ -28,9 +28,7 @@ export interface FieldCatalogueInput {
 }
 
 /** One line per field: `- name (valueType): label — e.g. a, b, c`. */
-export async function buildFieldsBlock(
-  input: FieldCatalogueInput,
-): Promise<string> {
+export async function buildFieldsBlock(input: FieldCatalogueInput): Promise<string> {
   const dynamicValues = await fetchDynamicCategoricalValues(input);
   const lines: string[] = [];
   for (const [name, meta] of Object.entries(SEARCH_FIELDS)) {
@@ -48,10 +46,7 @@ function pickSampleValues(
 ): string[] {
   const fromDb = facetField ? (dynamic.get(facetField) ?? []) : [];
   const fromStatic = FIELD_VALUES[fieldName] ?? [];
-  return Array.from(new Set([...fromDb, ...fromStatic])).slice(
-    0,
-    SAMPLES_SHOWN,
-  );
+  return Array.from(new Set([...fromDb, ...fromStatic])).slice(0, SAMPLES_SHOWN);
 }
 
 /**

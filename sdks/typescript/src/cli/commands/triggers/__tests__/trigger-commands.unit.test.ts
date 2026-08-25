@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -175,9 +179,9 @@ describe("createTriggerCommand()", () => {
 
   describe("when invalid action is provided", () => {
     it("exits with code 1", async () => {
-      await expect(
-        createTriggerCommand("Bad", { action: "INVALID" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(createTriggerCommand("Bad", { action: "INVALID" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });

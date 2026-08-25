@@ -14,13 +14,7 @@
  * `key_selection` and when the approve action is available.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -163,35 +157,33 @@ const approveBodies: Array<{
 }> = [];
 
 const serveCliAuthEndpoints = () => {
-  fetchMock.mockImplementation(
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes("/api/auth/cli/lookup")) {
-        return new Response(
-          JSON.stringify({
-            user_code: "WDJB-MJHT",
-            status: "pending",
-            expires_at: Date.now() + 10 * 60_000,
-            credential_type: "device_session",
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        );
-      }
-      if (url.includes("/api/auth/cli/approve")) {
-        approveBodies.push(
-          JSON.parse(String(init?.body ?? "{}")) as (typeof approveBodies)[0],
-        );
-        return new Response(
-          JSON.stringify({ ok: true, kind: "device_session" }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        );
-      }
-      return new Response(JSON.stringify({}), {
+  fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/api/auth/cli/lookup")) {
+      return new Response(
+        JSON.stringify({
+          user_code: "WDJB-MJHT",
+          status: "pending",
+          expires_at: Date.now() + 10 * 60_000,
+          credential_type: "device_session",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+    if (url.includes("/api/auth/cli/approve")) {
+      approveBodies.push(
+        JSON.parse(String(init?.body ?? "{}")) as (typeof approveBodies)[0],
+      );
+      return new Response(JSON.stringify({ ok: true, kind: "device_session" }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    },
-  );
+    }
+    return new Response(JSON.stringify({}), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
 };
 
 const renderPage = () =>
@@ -379,11 +371,7 @@ describe("/cli/auth key selection, given teams the user holds different roles on
     expect(held.has("traces:view")).toBe(true);
     // The write side is ADMIN-only on one team and absent on the other, so
     // no permission the VIEWER team refuses may go out.
-    for (const adminOnly of [
-      "traces:update",
-      "datasets:manage",
-      "project:manage",
-    ]) {
+    for (const adminOnly of ["traces:update", "datasets:manage", "project:manage"]) {
       expect(held.has(adminOnly)).toBe(false);
     }
   });
@@ -400,9 +388,7 @@ describe("/cli/auth key selection, given teams the user holds different roles on
     await user.click(within(tracesRow).getByText("Read"));
 
     // Only Read and None are offered: Write is above the intersected ceiling.
-    expect(
-      await screen.findByRole("menuitem", { name: "Read" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Read" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Write" })).toBeNull();
   });
 });

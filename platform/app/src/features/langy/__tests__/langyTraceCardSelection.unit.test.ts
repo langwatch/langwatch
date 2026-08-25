@@ -103,9 +103,7 @@ describe("toCapabilityCalls trace-card selection", () => {
   describe("given a single trace search", () => {
     describe("when it found nothing", () => {
       it("still renders its one honest empty card", () => {
-        const turn = message([
-          traceSearch({ id: "only", totalHits: 0, rows: 0 }),
-        ]);
+        const turn = message([traceSearch({ id: "only", totalHits: 0, rows: 0 })]);
 
         expect(toCapabilityCalls(turn)).toHaveLength(1);
       });

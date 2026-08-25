@@ -26,13 +26,11 @@ export class EventRepositoryMemory implements EventRepository {
     // Mirror the ClickHouse lower-bound semantics so tests exercise the same
     // behaviour: keep events at/after the bound, plus events with an unknown
     // occurred time (EventOccurredAt 0 / null).
-    const hasLowerBound =
-      typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+    const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
     const filtered = hasLowerBound
       ? records.filter(
           (record) =>
-            !record.EventOccurredAt ||
-            record.EventOccurredAt >= occurredAtFromMs,
+            !record.EventOccurredAt || record.EventOccurredAt >= occurredAtFromMs,
         )
       : records;
     // Return a copy to prevent mutation
@@ -61,8 +59,7 @@ export class EventRepositoryMemory implements EventRepository {
     // Mirrors the ClickHouse lower bound so a window that would drop events in
     // production drops them here too — otherwise a too-small window passes
     // every test and only fails against real data.
-    const hasLowerBound =
-      typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+    const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
 
     const filteredRecords = records.filter((record) => {
       // Records with an unknown occurred time are always kept, exactly as the
@@ -80,10 +77,7 @@ export class EventRepositoryMemory implements EventRepository {
       if (record.EventTimestamp < upToTimestamp) {
         return true;
       }
-      if (
-        record.EventTimestamp === upToTimestamp &&
-        record.EventId <= upToEventId
-      ) {
+      if (record.EventTimestamp === upToTimestamp && record.EventId <= upToEventId) {
         return true;
       }
       return false;
@@ -128,8 +122,7 @@ export class EventRepositoryMemory implements EventRepository {
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
 
-    const hasLowerBound =
-      typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+    const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
 
     // Mirrors the ClickHouse lower bound; unknown occurred times are kept.
     const withinLowerBound = (record: EventRecord): boolean =>
@@ -140,24 +133,18 @@ export class EventRepositoryMemory implements EventRepository {
 
     const withinUpperBound = (record: EventRecord): boolean =>
       record.EventTimestamp < upToTimestamp ||
-      (record.EventTimestamp === upToTimestamp &&
-        record.EventId <= upToEventId);
+      (record.EventTimestamp === upToTimestamp && record.EventId <= upToEventId);
 
     // Strict cursor: only records ordered AFTER (after.timestamp, after.eventId).
     const afterCursor = (record: EventRecord): boolean => {
       if (!after) return true;
       if (record.EventTimestamp > after.timestamp) return true;
-      return (
-        record.EventTimestamp === after.timestamp &&
-        record.EventId > after.eventId
-      );
+      return record.EventTimestamp === after.timestamp && record.EventId > after.eventId;
     };
 
     const filtered = records.filter(
       (record) =>
-        withinLowerBound(record) &&
-        withinUpperBound(record) &&
-        afterCursor(record),
+        withinLowerBound(record) && withinUpperBound(record) && afterCursor(record),
     );
 
     // Plain relational comparison, not localeCompare: withinUpperBound and
@@ -189,10 +176,7 @@ export class EventRepositoryMemory implements EventRepository {
       if (record.EventTimestamp < beforeTimestamp) {
         return true;
       }
-      if (
-        record.EventTimestamp === beforeTimestamp &&
-        record.EventId < beforeEventId
-      ) {
+      if (record.EventTimestamp === beforeTimestamp && record.EventId < beforeEventId) {
         return true;
       }
       return false;
@@ -209,9 +193,7 @@ export class EventRepositoryMemory implements EventRepository {
       const aggregateEvents = this.eventsByKey.get(key) ?? [];
 
       // Prevent duplicates by checking if event with same ID already exists
-      const alreadyExists = aggregateEvents.some(
-        (e) => e.EventId === record.EventId,
-      );
+      const alreadyExists = aggregateEvents.some((e) => e.EventId === record.EventId);
       if (alreadyExists) {
         // Log duplicate attempt for observability
         if (process.env.NODE_ENV !== "test") {
@@ -231,8 +213,7 @@ export class EventRepositoryMemory implements EventRepository {
       aggregateEvents.push({
         ...record,
         EventPayload:
-          typeof record.EventPayload === "object" &&
-          record.EventPayload !== null
+          typeof record.EventPayload === "object" && record.EventPayload !== null
             ? JSON.parse(JSON.stringify(record.EventPayload))
             : record.EventPayload,
       });

@@ -29,9 +29,8 @@ vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
   useCanAskLangy: () => gates.langy,
 }));
 vi.mock("~/features/langy/stores/langyStore", () => ({
-  useLangyStore: (
-    selector: (state: { askLangy: typeof askLangy }) => unknown,
-  ) => selector({ askLangy }),
+  useLangyStore: (selector: (state: { askLangy: typeof askLangy }) => unknown) =>
+    selector({ askLangy }),
 }));
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { slug: "acme" } }),
@@ -67,9 +66,7 @@ describe("QuietHeadline invitation", () => {
       it("lands on the trace surface", () => {
         renderHeadline();
 
-        fireEvent.click(
-          screen.getByRole("link", { name: "Send your first trace" }),
-        );
+        fireEvent.click(screen.getByRole("link", { name: "Send your first trace" }));
 
         expect(push).toHaveBeenCalledWith("/acme/traces");
       });
@@ -77,10 +74,9 @@ describe("QuietHeadline invitation", () => {
       it("leaves modified clicks to the browser for open-in-a-tab", () => {
         renderHeadline();
 
-        fireEvent.click(
-          screen.getByRole("link", { name: "Send your first trace" }),
-          { metaKey: true },
-        );
+        fireEvent.click(screen.getByRole("link", { name: "Send your first trace" }), {
+          metaKey: true,
+        });
 
         expect(push).not.toHaveBeenCalled();
       });
@@ -95,9 +91,7 @@ describe("QuietHeadline invitation", () => {
             name: "Learn more: Generate a dataset",
           }),
         ).toBeDefined();
-        expect(
-          screen.queryByRole("button", { name: /Send a trace/ }),
-        ).toBeNull();
+        expect(screen.queryByRole("button", { name: /Send a trace/ })).toBeNull();
       });
     });
   });
@@ -115,9 +109,7 @@ describe("QuietHeadline invitation", () => {
       it("still opens the trace surface", () => {
         renderHeadline();
 
-        fireEvent.click(
-          screen.getByRole("link", { name: "Send your first trace" }),
-        );
+        fireEvent.click(screen.getByRole("link", { name: "Send your first trace" }));
 
         expect(push).toHaveBeenCalledWith("/acme/traces");
         expect(askLangy).not.toHaveBeenCalled();
@@ -155,9 +147,7 @@ describe("QuietHeadline invitation", () => {
           }),
         );
 
-        expect(askLangy).toHaveBeenCalledWith(
-          expect.stringContaining("first trace"),
-        );
+        expect(askLangy).toHaveBeenCalledWith(expect.stringContaining("first trace"));
         expect(push).not.toHaveBeenCalled();
       });
     });
@@ -170,9 +160,7 @@ describe("QuietHeadline invitation", () => {
           screen.getByRole("button", { name: "Ask Langy: Generate a dataset" }),
         );
 
-        expect(askLangy).toHaveBeenCalledWith(
-          expect.stringContaining("dataset"),
-        );
+        expect(askLangy).toHaveBeenCalledWith(expect.stringContaining("dataset"));
         expect(screen.getByText("Do it with Langy")).toBeDefined();
       });
     });

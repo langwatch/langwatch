@@ -29,10 +29,7 @@ export function ScenarioRunModelDialog({
   isRunning: boolean;
 }) {
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(details) => onOpenChange(details.open)}
-    >
+    <Dialog.Root open={open} onOpenChange={(details) => onOpenChange(details.open)}>
       <Dialog.Content bg="bg">
         <Dialog.Header>
           <Dialog.Title>Choose models for this run</Dialog.Title>
@@ -40,8 +37,8 @@ export function ScenarioRunModelDialog({
         <Dialog.Body>
           <VStack gap={4} align="stretch">
             <Text fontSize="sm" color="fg.muted">
-              Pick the model that role-plays the user and the model that judges
-              the run. Both default to your project&apos;s Default model.
+              Pick the model that role-plays the user and the model that judges the run.
+              Both default to your project&apos;s Default model.
             </Text>
             <SimulationModelSelect
               label="User simulator"

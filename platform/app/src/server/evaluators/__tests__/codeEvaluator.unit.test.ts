@@ -18,15 +18,13 @@ describe("codeEvaluator", () => {
   describe("when parsing the config schema", () => {
     it("accepts the default seeded config", () => {
       expect(
-        codeEvaluatorConfigSchema.safeParse(DEFAULT_CODE_EVALUATOR_CONFIG)
-          .success,
+        codeEvaluatorConfigSchema.safeParse(DEFAULT_CODE_EVALUATOR_CONFIG).success,
       ).toBe(true);
     });
 
     it("rejects configs without code or fields", () => {
       expect(
-        codeEvaluatorConfigSchema.safeParse({ inputs: [], outputs: [] })
-          .success,
+        codeEvaluatorConfigSchema.safeParse({ inputs: [], outputs: [] }).success,
       ).toBe(false);
       expect(
         codeEvaluatorConfigSchema.safeParse({
@@ -41,9 +39,7 @@ describe("codeEvaluator", () => {
   describe("when routing checkTypes", () => {
     it("recognizes and parses code checkTypes", () => {
       expect(isCodeEvaluatorCheckType("code/evaluator_abc")).toBe(true);
-      expect(codeEvaluatorIdFromCheckType("code/evaluator_abc")).toBe(
-        "evaluator_abc",
-      );
+      expect(codeEvaluatorIdFromCheckType("code/evaluator_abc")).toBe("evaluator_abc");
     });
 
     it("ignores other checkTypes", () => {

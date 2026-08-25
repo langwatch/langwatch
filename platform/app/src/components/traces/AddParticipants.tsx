@@ -49,15 +49,14 @@ export const AddParticipants = ({
 
   const selectedValues = annotators.map((a) => a.id);
 
-  const users =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      {
-        organizationId: organization?.id ?? "",
-      },
-      {
-        enabled: !!organization,
-      },
-    );
+  const users = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+    {
+      organizationId: organization?.id ?? "",
+    },
+    {
+      enabled: !!organization,
+    },
+  );
 
   const userOptions = users.data?.members.map((member) => ({
     label: member.user.name ?? "",
@@ -138,9 +137,7 @@ export const AddParticipants = ({
                           color="fg.muted"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setAnnotators(
-                              annotators.filter((a) => a.id !== item.value),
-                            );
+                            setAnnotators(annotators.filter((a) => a.id !== item.value));
                           }}
                         />
                       </Badge>

@@ -28,8 +28,7 @@ const intentOptions: IntentOption[] = [
   {
     value: "LLM_OPS",
     title: "Monitor & evaluate my LLM app",
-    description:
-      "Trace, evaluate, and improve the LLM apps and agents you're building",
+    description: "Trace, evaluate, and improve the LLM apps and agents you're building",
     icon: Telescope,
   },
   {

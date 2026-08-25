@@ -22,11 +22,7 @@ import {
 } from "react-feather";
 import { FormProvider, useForm } from "react-hook-form";
 import { RenderCode } from "~/components/code/RenderCode";
-import type {
-  Dataset,
-  DatasetRecord,
-  Project,
-} from "~/generated/prisma/client";
+import type { Dataset, DatasetRecord, Project } from "~/generated/prisma/client";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 import { SmallLabel } from "../../components/SmallLabel";
 import { Dialog } from "../../components/ui/dialog";
@@ -38,10 +34,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useWorkflowStore } from "@langwatch/workflow-web";
-import {
-  parseStudioWorkflow,
-  type StudioWorkflow,
-} from "@langwatch/workflow-contract";
+import { parseStudioWorkflow, type StudioWorkflow } from "@langwatch/workflow-contract";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
@@ -183,8 +176,7 @@ const exportWorkflow = async (
   const dsl = { ...publishedWorkflow };
   try {
     if (datasetData && datasetData.datasetRecords.length > 0) {
-      const inMemoryDataset =
-        datasetDatabaseRecordsToInMemoryDataset(datasetData);
+      const inMemoryDataset = datasetDatabaseRecordsToInMemoryDataset(datasetData);
       inMemoryDataset.datasetId = undefined;
       const dataset = inMemoryDatasetToNodeDataset(inMemoryDataset);
 
@@ -254,8 +246,7 @@ function PublishMenu({
     : getWorkflow();
 
   // Add dataset fetching hooks here
-  const datasetId = (workflow?.nodes[0]?.data as NodeDataWithDataset)?.dataset
-    ?.id;
+  const datasetId = (workflow?.nodes[0]?.data as NodeDataWithDataset)?.dataset?.id;
 
   const datasetRecords = api.datasetRecord.getAll.useQuery(
     {
@@ -267,33 +258,30 @@ function PublishMenu({
     },
   );
 
-  const disableAsComponentMutation =
-    api.optimization.disableAsComponent.useMutation({
-      onSuccess: () => {
-        void trpc.optimization.getComponents.invalidate();
-        toaster.create({
-          title: "Component status updated",
-          type: "success",
-          duration: 5000,
-        });
-      },
-    });
+  const disableAsComponentMutation = api.optimization.disableAsComponent.useMutation({
+    onSuccess: () => {
+      void trpc.optimization.getComponents.invalidate();
+      toaster.create({
+        title: "Component status updated",
+        type: "success",
+        duration: 5000,
+      });
+    },
+  });
 
-  const disableAsEvaluatorMutation =
-    api.optimization.disableAsEvaluator.useMutation({
-      onSuccess: () => {
-        void trpc.optimization.getComponents.invalidate();
-        toaster.create({
-          title: "Evaluator status updated",
-          type: "success",
-          duration: 5000,
-        });
-      },
-    });
+  const disableAsEvaluatorMutation = api.optimization.disableAsEvaluator.useMutation({
+    onSuccess: () => {
+      void trpc.optimization.getComponents.invalidate();
+      toaster.create({
+        title: "Evaluator status updated",
+        type: "success",
+        duration: 5000,
+      });
+    },
+  });
 
   const canPublish =
-    !canSaveNewVersion &&
-    publishedWorkflow.data?.version === versionToBeEvaluated.version
+    !canSaveNewVersion && publishedWorkflow.data?.version === versionToBeEvaluated.version
       ? "Current version is already published"
       : undefined;
 
@@ -339,19 +327,13 @@ function PublishMenu({
         </>
       )}
       <Tooltip content={canPublish} positioning={{ placement: "right" }}>
-        <Menu.Item
-          onClick={onTogglePublish}
-          disabled={!!canPublish}
-          value="publish"
-        >
+        <Menu.Item onClick={onTogglePublish} disabled={!!canPublish} value="publish">
           <ArrowUp size={16} />{" "}
           <Text textTransform="capitalize">{`Publish ${workflow_type}`}</Text>
         </Menu.Item>
       </Tooltip>
       <Menu.Item
-        hidden={
-          workflow_type === "workflow" || !publishedWorkflow.data?.isEvaluator
-        }
+        hidden={workflow_type === "workflow" || !publishedWorkflow.data?.isEvaluator}
         onClick={disableAsEvaluator}
         value="evaluator"
       >
@@ -359,19 +341,14 @@ function PublishMenu({
       </Menu.Item>
 
       <Menu.Item
-        hidden={
-          workflow_type === "workflow" || !publishedWorkflow.data?.isComponent
-        }
+        hidden={workflow_type === "workflow" || !publishedWorkflow.data?.isComponent}
         value="component"
         onClick={disableAsComponent}
       >
         <XCircle size={16} /> Unpublish Component
       </Menu.Item>
 
-      <Tooltip
-        content={publishDisabledLabel}
-        positioning={{ placement: "right" }}
-      >
+      <Tooltip content={publishDisabledLabel} positioning={{ placement: "right" }}>
         <Menu.Item
           onClick={onToggleApi}
           disabled={!!publishDisabledLabel}
@@ -380,10 +357,7 @@ function PublishMenu({
           <Code size={16} /> View API Reference
         </Menu.Item>
       </Tooltip>
-      <Menu.Item
-        onClick={() => void handleExportWorkflow()}
-        value="export-workflow"
-      >
+      <Menu.Item onClick={() => void handleExportWorkflow()} value="export-workflow">
         <Share2 size={16} /> Export Workflow
       </Menu.Item>
     </>
@@ -477,13 +451,7 @@ function PublishModalContent({
   );
 
   const onSubmit = useCallback(
-    async ({
-      version,
-      commitMessage,
-    }: {
-      version: string;
-      commitMessage: string;
-    }) => {
+    async ({ version, commitMessage }: { version: string; commitMessage: string }) => {
       if (!project || !workflowId) return;
 
       let versionId: string | undefined;
@@ -613,8 +581,8 @@ function PublishModalContent({
         <Dialog.Body>
           <VStack align="start" width="full" gap={10}>
             <Text fontSize="15px" color="black">
-              Publish your workflow to make it available via API, as a component
-              to other workflows, or as a custom evaluator.
+              Publish your workflow to make it available via API, as a component to other
+              workflows, or as a custom evaluator.
             </Text>
             <VersionToBeUsed />
           </VStack>
@@ -634,18 +602,14 @@ function PublishModalContent({
                   <Button
                     variant="outline"
                     type="submit"
-                    loading={
-                      commitVersion.isPending || publishWorkflow.isPending
-                    }
+                    loading={commitVersion.isPending || publishWorkflow.isPending}
                     disabled={!!isDisabled}
                   >
                     <ArrowUpCircle size={16} />{" "}
                     {isDisabled
                       ? "Publish"
                       : `Publish Version ${
-                          canSave
-                            ? formVersion
-                            : (versionToBeEvaluated.version ?? "")
+                          canSave ? formVersion : (versionToBeEvaluated.version ?? "")
                         }`}
                   </Button>
                 </HStack>
@@ -721,8 +685,8 @@ export const ApiModalContent = () => {
       <Dialog.CloseTrigger />
       <Dialog.Body>
         <Text paddingBottom={8}>
-          Incorporate the following JSON payload within the body of your HTTP
-          POST request to get the workflow result.
+          Incorporate the following JSON payload within the body of your HTTP POST request
+          to get the workflow result.
         </Text>
         <Box padding={4} backgroundColor={"#272822"}>
           <RenderCode
@@ -741,23 +705,15 @@ EOF`}
         </Box>
         <Text marginTop={4}>
           To retrieve your API key, click{" "}
-          <Link
-            href={`/${project?.slug}/setup`}
-            textDecoration="underline"
-            isExternal
-          >
+          <Link href={`/${project?.slug}/setup`} textDecoration="underline" isExternal>
             here
           </Link>
           .
         </Text>
         <Text marginTop={4}>
-          To access the API details and view more information, please refer to
-          the official documentation{" "}
-          <Link
-            href="https://docs.langwatch.ai"
-            textDecoration="underline"
-            isExternal
-          >
+          To access the API details and view more information, please refer to the
+          official documentation{" "}
+          <Link href="https://docs.langwatch.ai" textDecoration="underline" isExternal>
             here
           </Link>
           .

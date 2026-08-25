@@ -23,9 +23,7 @@ import type {
 
 const TABLE_NAME = "trace_summaries" as const;
 
-const logger = createLogger(
-  "langwatch:app-layer:traces:trace-summary-repository",
-);
+const logger = createLogger("langwatch:app-layer:traces:trace-summary-repository");
 
 type ClickHouseSummaryWriteRecord = WithDateWrites<
   ClickHouseSummaryRecord,
@@ -79,9 +77,7 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   _retention_days: number;
 }
 
-export class TraceSummaryClickHouseRepository
-  implements TraceSummaryRepository
-{
+export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async upsert(
@@ -89,10 +85,7 @@ export class TraceSummaryClickHouseRepository
     tenantId: string,
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): Promise<void> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "TraceSummaryClickHouseRepository.upsert",
-    );
+    EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.upsert");
 
     const projectionId = IdUtils.generateDeterministicTraceSummaryIdFromData(
       tenantId,
@@ -117,8 +110,7 @@ export class TraceSummaryClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(
         { tenantId, traceId: data.traceId, error: errorMessage },
         "Failed to store trace summary in ClickHouse",
@@ -143,23 +135,20 @@ export class TraceSummaryClickHouseRepository
 
     try {
       const client = await this.resolveClient(tenantId);
-      const records = entries.map(
-        ({ data, tenantId: tid, retentionDays: rd }) => {
-          const projectionId =
-            IdUtils.generateDeterministicTraceSummaryIdFromData(
-              tid,
-              data.traceId,
-              data.occurredAt,
-            );
-          return this.toClickHouseRecord(
-            data,
-            tid,
-            projectionId,
-            TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-            rd,
-          );
-        },
-      );
+      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
+        const projectionId = IdUtils.generateDeterministicTraceSummaryIdFromData(
+          tid,
+          data.traceId,
+          data.occurredAt,
+        );
+        return this.toClickHouseRecord(
+          data,
+          tid,
+          projectionId,
+          TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+          rd,
+        );
+      });
 
       await client.insert({
         table: TABLE_NAME,
@@ -168,8 +157,7 @@ export class TraceSummaryClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(
         { tenantId, count: entries.length, error: errorMessage },
         "Failed to batch store trace summaries in ClickHouse",
@@ -216,8 +204,7 @@ export class TraceSummaryClickHouseRepository
               : null,
         });
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         logger.warn(
           { tenantId, traceId, error: errorMessage },
           "Failed to get trace summary from ClickHouse",
@@ -297,8 +284,7 @@ export class TraceSummaryClickHouseRepository
         },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(
         { tenantId, traceId, error: errorMessage },
         "Failed to get trace summary from ClickHouse",
@@ -352,9 +338,7 @@ export class TraceSummaryClickHouseRepository
     const rowCountRaw = rows[0]?.rowCount;
     const raw = rows[0]?.occurredAtMs;
     const rowCount =
-      typeof rowCountRaw === "string"
-        ? Number(rowCountRaw)
-        : (rowCountRaw ?? NaN);
+      typeof rowCountRaw === "string" ? Number(rowCountRaw) : (rowCountRaw ?? NaN);
     if (!Number.isFinite(rowCount) || rowCount <= 0) {
       return { found: false };
     }
@@ -460,9 +444,7 @@ export class TraceSummaryClickHouseRepository
     return this.fromClickHouseRecord(row);
   }
 
-  private fromClickHouseRecord(
-    record: ClickHouseSummaryRecord,
-  ): TraceSummaryData {
+  private fromClickHouseRecord(record: ClickHouseSummaryRecord): TraceSummaryData {
     return {
       traceId: record.TraceId,
       spanCount: record.SpanCount,
@@ -554,13 +536,9 @@ export class TraceSummaryClickHouseRepository
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,
       TimeToFirstTokenMs:
-        data.timeToFirstTokenMs != null
-          ? Math.round(data.timeToFirstTokenMs)
-          : null,
+        data.timeToFirstTokenMs != null ? Math.round(data.timeToFirstTokenMs) : null,
       TimeToLastTokenMs:
-        data.timeToLastTokenMs != null
-          ? Math.round(data.timeToLastTokenMs)
-          : null,
+        data.timeToLastTokenMs != null ? Math.round(data.timeToLastTokenMs) : null,
       TotalDurationMs: Math.round(data.totalDurationMs),
       TokensPerSecond:
         data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,

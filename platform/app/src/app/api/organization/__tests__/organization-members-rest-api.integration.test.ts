@@ -11,15 +11,7 @@
  */
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -152,10 +144,7 @@ describe("Feature: Organization members and invites REST API", () => {
           ? ([
               ["roleBinding", { organizationId: lastAdminOrg.organization.id }],
               ["apiKey", { organizationId: lastAdminOrg.organization.id }],
-              [
-                "organizationUser",
-                { organizationId: lastAdminOrg.organization.id },
-              ],
+              ["organizationUser", { organizationId: lastAdminOrg.organization.id }],
             ] as const)
           : []),
         ["user", { email: { endsWith: `-${ns}@example.com` } }],
@@ -199,9 +188,12 @@ describe("Feature: Organization members and invites REST API", () => {
         data: { disabledAt: new Date() },
       });
 
-      const response = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/members`, {
-        headers: authHeaders(),
-      });
+      const response = await app.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/members`,
+        {
+          headers: authHeaders(),
+        },
+      );
       expect(response.status).toBe(200);
       const body = await response.json();
       const activeRow = body.members.find(
@@ -349,9 +341,9 @@ describe("Feature: Organization members and invites REST API", () => {
         data: { disabledAt: new Date() },
       });
 
-      const occupied = await new LicenseEnforcementRepository(
-        prisma,
-      ).getMemberCount(seeded.organization.id);
+      const occupied = await new LicenseEnforcementRepository(prisma).getMemberCount(
+        seeded.organization.id,
+      );
       mockGetActivePlan.mockResolvedValue({
         ...ENTERPRISE_TEST_PLAN,
         maxMembers: occupied,
@@ -574,24 +566,30 @@ describe("Feature: Organization members and invites REST API", () => {
     /** @scenario Listing invites includes the invite link */
     it("lists a pending invite with its email, role, code and link", async () => {
       const email = `invitee-list-${ns}@example.com`;
-      const create = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/invites`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          invites: [
-            {
-              email,
-              role: "MEMBER",
-              teams: [{ teamId: teamAId, role: "MEMBER" }],
-            },
-          ],
-        }),
-      });
+      const create = await app.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/invites`,
+        {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            invites: [
+              {
+                email,
+                role: "MEMBER",
+                teams: [{ teamId: teamAId, role: "MEMBER" }],
+              },
+            ],
+          }),
+        },
+      );
       expect(create.status).toBe(201);
 
-      const response = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/invites`, {
-        headers: authHeaders(),
-      });
+      const response = await app.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/invites`,
+        {
+          headers: authHeaders(),
+        },
+      );
       expect(response.status).toBe(200);
       const body = await response.json();
       const invite = body.invites.find(
@@ -604,9 +602,12 @@ describe("Feature: Organization members and invites REST API", () => {
     });
 
     it("records the read, because the list hands out acceptance codes", async () => {
-      const response = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/invites`, {
-        headers: authHeaders(),
-      });
+      const response = await app.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/invites`,
+        {
+          headers: authHeaders(),
+        },
+      );
       expect(response.status).toBe(200);
       const listed = (await response.json()).invites.length;
 
@@ -620,9 +621,7 @@ describe("Feature: Organization members and invites REST API", () => {
           orderBy: { createdAt: "desc" },
         });
         expect(recorded).not.toBeNull();
-        expect((recorded?.args as { returned?: number } | null)?.returned).toBe(
-          listed,
-        );
+        expect((recorded?.args as { returned?: number } | null)?.returned).toBe(listed);
       });
     });
 
@@ -641,19 +640,20 @@ describe("Feature: Organization members and invites REST API", () => {
         `invitee-custom-1-${ns}@example.com`,
         `invitee-custom-2-${ns}@example.com`,
       ];
-      const response = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/invites`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          invites: emails.map((email) => ({
-            email,
-            role: "MEMBER",
-            teams: [
-              { teamId: teamAId, role: "CUSTOM", customRoleId: customRole.id },
-            ],
-          })),
-        }),
-      });
+      const response = await app.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/invites`,
+        {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            invites: emails.map((email) => ({
+              email,
+              role: "MEMBER",
+              teams: [{ teamId: teamAId, role: "CUSTOM", customRoleId: customRole.id }],
+            })),
+          }),
+        },
+      );
 
       expect(response.status).toBe(201);
       const body = await response.json();
@@ -675,19 +675,22 @@ describe("Feature: Organization members and invites REST API", () => {
 
     /** @scenario Inviting an existing member is refused */
     it("refuses an address that already belongs to a member and writes nothing", async () => {
-      const response = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/invites`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          invites: [
-            {
-              email: seeded.adminEmail,
-              role: "MEMBER",
-              teams: [{ teamId: teamAId, role: "MEMBER" }],
-            },
-          ],
-        }),
-      });
+      const response = await app.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/invites`,
+        {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            invites: [
+              {
+                email: seeded.adminEmail,
+                role: "MEMBER",
+                teams: [{ teamId: teamAId, role: "MEMBER" }],
+              },
+            ],
+          }),
+        },
+      );
 
       expect(response.status).toBe(409);
       expect((await response.json()).code).toBe("already_organization_member");
@@ -704,34 +707,40 @@ describe("Feature: Organization members and invites REST API", () => {
     /** @scenario A duplicate pending invite is refused */
     it("refuses a second pending invite for the same address", async () => {
       const email = `invitee-dup-${ns}@example.com`;
-      const first = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/invites`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          invites: [
-            {
-              email,
-              role: "MEMBER",
-              teams: [{ teamId: teamAId, role: "MEMBER" }],
-            },
-          ],
-        }),
-      });
+      const first = await app.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/invites`,
+        {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            invites: [
+              {
+                email,
+                role: "MEMBER",
+                teams: [{ teamId: teamAId, role: "MEMBER" }],
+              },
+            ],
+          }),
+        },
+      );
       expect(first.status).toBe(201);
 
-      const second = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/invites`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          invites: [
-            {
-              email,
-              role: "MEMBER",
-              teams: [{ teamId: teamAId, role: "MEMBER" }],
-            },
-          ],
-        }),
-      });
+      const second = await app.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/invites`,
+        {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            invites: [
+              {
+                email,
+                role: "MEMBER",
+                teams: [{ teamId: teamAId, role: "MEMBER" }],
+              },
+            ],
+          }),
+        },
+      );
 
       expect(second.status).toBe(409);
       expect((await second.json()).code).toBe("duplicate_invite");
@@ -744,9 +753,9 @@ describe("Feature: Organization members and invites REST API", () => {
 
     /** @scenario Invites beyond the seat limit are refused */
     it("refuses a batch that would exceed the seats and creates none of it", async () => {
-      const occupied = await new LicenseEnforcementRepository(
-        prisma,
-      ).getMemberCount(seeded.organization.id);
+      const occupied = await new LicenseEnforcementRepository(prisma).getMemberCount(
+        seeded.organization.id,
+      );
       mockGetActivePlan.mockResolvedValue({
         ...ENTERPRISE_TEST_PLAN,
         maxMembers: occupied + 1,
@@ -757,17 +766,20 @@ describe("Feature: Organization members and invites REST API", () => {
         `invitee-over-2-${ns}@example.com`,
         `invitee-over-3-${ns}@example.com`,
       ];
-      const response = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/invites`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          invites: emails.map((email) => ({
-            email,
-            role: "MEMBER",
-            teams: [{ teamId: teamAId, role: "MEMBER" }],
-          })),
-        }),
-      });
+      const response = await app.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/invites`,
+        {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            invites: emails.map((email) => ({
+              email,
+              role: "MEMBER",
+              teams: [{ teamId: teamAId, role: "MEMBER" }],
+            })),
+          }),
+        },
+      );
 
       expect(response.status).toBe(403);
       expect((await response.json()).code).toBe("member_seat_limit_reached");
@@ -784,19 +796,22 @@ describe("Feature: Organization members and invites REST API", () => {
     /** @scenario Revoking a pending invite deletes it */
     it("revokes an invite, removes it from the list, and 404s a second revoke", async () => {
       const email = `invitee-revoke-${ns}@example.com`;
-      const create = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/invites`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          invites: [
-            {
-              email,
-              role: "MEMBER",
-              teams: [{ teamId: teamAId, role: "MEMBER" }],
-            },
-          ],
-        }),
-      });
+      const create = await app.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/invites`,
+        {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            invites: [
+              {
+                email,
+                role: "MEMBER",
+                teams: [{ teamId: teamAId, role: "MEMBER" }],
+              },
+            ],
+          }),
+        },
+      );
       const created = await create.json();
       const inviteId = created.invites[0].id;
 
@@ -806,19 +821,25 @@ describe("Feature: Organization members and invites REST API", () => {
       );
       expect(revoke.status).toBe(200);
 
-      const list = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/invites`, {
-        headers: authHeaders(),
-      });
+      const list = await app.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/invites`,
+        {
+          headers: authHeaders(),
+        },
+      );
       expect(
         (await list.json()).invites.find(
           (entry: { id: string }) => entry.id === inviteId,
         ),
       ).toBeUndefined();
 
-      const again = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/invites/${inviteId}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
+      const again = await app.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/invites/${inviteId}`,
+        {
+          method: "DELETE",
+          headers: authHeaders(),
+        },
+      );
       expect(again.status).toBe(404);
       expect((await again.json()).code).toBe("invite_not_found");
     });

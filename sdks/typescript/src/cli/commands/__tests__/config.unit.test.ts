@@ -8,11 +8,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import {
-  configGetCommand,
-  configListCommand,
-  configSetCommand,
-} from "../config";
+import { configGetCommand, configListCommand, configSetCommand } from "../config";
 import { loadConfig } from "../../utils/governance/config";
 
 describe("config commands", () => {
@@ -29,11 +25,9 @@ describe("config commands", () => {
     process.env.LANGWATCH_CLI_CONFIG = configFile;
     logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation((() => {
-        throw new Error("process.exit called");
-      }) as never);
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called");
+    }) as never);
   });
 
   afterEach(() => {
@@ -70,9 +64,7 @@ describe("config commands", () => {
     let writeSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      writeSpy = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation(() => true);
+      writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     });
 
     it("defaults to on when nothing was persisted", async () => {

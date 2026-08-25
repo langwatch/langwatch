@@ -63,10 +63,7 @@ export class LangyFeedbackPromptPolicy {
     );
   }
 
-  async markShown(input: {
-    userId: string;
-    conversationId: string;
-  }): Promise<void> {
+  async markShown(input: { userId: string; conversationId: string }): Promise<void> {
     if (!this.deps.redis) return;
     try {
       await this.deps.redis.set(

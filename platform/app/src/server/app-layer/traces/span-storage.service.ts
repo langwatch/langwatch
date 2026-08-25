@@ -67,17 +67,13 @@ const applyVisibilityGate = <T extends Span>(
     return spans;
   }
   return spans.map((span) =>
-    span.timestamps.started_at < visibilityCutoffMs
-      ? redactSpanContent(span)
-      : span,
+    span.timestamps.started_at < visibilityCutoffMs ? redactSpanContent(span) : span,
   );
 };
 
 export class SpanStorageService {
   private readonly blobResolutionDeps?: SpanReadBlobResolutionDeps;
-  private readonly logger = createLogger(
-    "langwatch:traces:span-storage-service",
-  );
+  private readonly logger = createLogger("langwatch:traces:span-storage-service");
 
   constructor(
     readonly repository: SpanStorageRepository,
@@ -112,8 +108,7 @@ export class SpanStorageService {
     }
 
     // Fetch normalized spans so resolution can access raw spanAttributes.
-    const normalizedSpans =
-      await this.repository.getNormalizedSpansByTraceId(params);
+    const normalizedSpans = await this.repository.getNormalizedSpansByTraceId(params);
     const { resolvedSpans } = await resolveOffloadedTraces({
       projectId: params.tenantId,
       normalizedSpans,
@@ -166,17 +161,14 @@ export class SpanStorageService {
    */
   async getSpanById(params: BySpanId & VisibilityGate): Promise<Span | null> {
     const gateOne = (span: Span | null): Span | null =>
-      span
-        ? (applyVisibilityGate([span], params.visibilityCutoffMs)[0] ?? null)
-        : null;
+      span ? (applyVisibilityGate([span], params.visibilityCutoffMs)[0] ?? null) : null;
 
     if (!this.blobResolutionDeps) {
       return gateOne(await this.repository.getSpanByIds(params));
     }
 
     // Resolve the single span via the normalized+resolve path.
-    const normalizedSpans =
-      await this.repository.getNormalizedSpansByTraceId(params);
+    const normalizedSpans = await this.repository.getNormalizedSpansByTraceId(params);
     const { resolvedSpans } = await resolveOffloadedTraces({
       projectId: params.tenantId,
       normalizedSpans,
@@ -189,9 +181,7 @@ export class SpanStorageService {
     return gateOne(mapNormalizedSpanToSpan(resolved));
   }
 
-  async getTraceEventsByTraceId(
-    params: ByTraceId,
-  ): Promise<DerivedTraceEvent[]> {
+  async getTraceEventsByTraceId(params: ByTraceId): Promise<DerivedTraceEvent[]> {
     return this.repository.getTraceEventsByTraceId(params);
   }
 
@@ -226,9 +216,7 @@ export class SpanStorageService {
     return this.repository.findLangwatchSignalsByTraceId(params);
   }
 
-  async getSpanResourcesByTraceId(
-    params: ByTraceId,
-  ): Promise<SpanResourceInfo[]> {
+  async getSpanResourcesByTraceId(params: ByTraceId): Promise<SpanResourceInfo[]> {
     return this.repository.findSpanResourcesByTraceId(params);
   }
 

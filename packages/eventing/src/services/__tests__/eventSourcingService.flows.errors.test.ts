@@ -36,10 +36,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
@@ -67,10 +64,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
         foldProjections: [foldDef],
@@ -117,10 +111,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
 
         mapProjections: [mapDef],
@@ -133,9 +124,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         tenantId,
       );
 
-      await expect(
-        service.storeEvents([event], context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents([event], context)).resolves.not.toThrow();
 
       expect(mapDef.map).toHaveBeenCalled();
     });
@@ -152,10 +141,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
 
         mapProjections: [mapDef1, mapDef2],
@@ -167,9 +153,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         tenantId,
       );
 
-      await expect(
-        service.storeEvents([event], context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents([event], context)).resolves.not.toThrow();
 
       expect(mapDef1.map).toHaveBeenCalledTimes(1);
       expect(mapDef2.map).toHaveBeenCalledTimes(1);
@@ -186,10 +170,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
 
         mapProjections: [mapDef],
@@ -201,9 +182,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         tenantId,
       );
 
-      await expect(
-        service.storeEvents([event], context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents([event], context)).resolves.not.toThrow();
 
       expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
     });
@@ -222,10 +201,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -260,10 +236,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef1, foldDef2],
       });
@@ -293,10 +266,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -329,10 +299,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -352,10 +319,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
@@ -375,10 +339,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
@@ -399,10 +360,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [createMockFoldProjectionDefinition("projection")],
       });

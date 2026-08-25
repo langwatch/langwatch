@@ -34,9 +34,7 @@ describe("STATUS_DISPLAY_TEXT_MAP", () => {
   describe("given a STALLED status", () => {
     describe("when looking up display text", () => {
       it("maps to STALLED text", () => {
-        expect(STATUS_DISPLAY_TEXT_MAP[ScenarioRunStatus.STALLED]).toBe(
-          "STALLED",
-        );
+        expect(STATUS_DISPLAY_TEXT_MAP[ScenarioRunStatus.STALLED]).toBe("STALLED");
       });
     });
 
@@ -103,9 +101,7 @@ describe("getOverlayConfig()", () => {
       /** @scenario Light mode restores the full-card completion wash */
       it("uses the established layered green light-mode gradient", () => {
         const config = getOverlayConfig(ScenarioRunStatus.SUCCESS);
-        expect(config.lightModeGradient.match(/radial-gradient/g)).toHaveLength(
-          3,
-        );
+        expect(config.lightModeGradient.match(/radial-gradient/g)).toHaveLength(3);
         expect(config.lightModeGradient).toContain("rgba(56, 161, 105");
       });
 

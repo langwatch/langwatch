@@ -10,11 +10,7 @@
 import jwt from "jsonwebtoken";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  type GatewayJwtSubject,
-  signGatewayJwt,
-  verifyGatewayJwt,
-} from "../gatewayJwt";
+import { type GatewayJwtSubject, signGatewayJwt, verifyGatewayJwt } from "../gatewayJwt";
 
 // Sequential-hex signing fixture for this suite, not a credential.
 const SECRET = "0123456789abcdef0123456789abcdef";

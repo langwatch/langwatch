@@ -3,11 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "description": "Portable Simulation feature contract and Zod 4 schemas.",
+  "files": [
+    "src"
+  ],
   "type": "module",
-  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "files": ["src"],
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
     "typecheck": "tsc --noEmit",

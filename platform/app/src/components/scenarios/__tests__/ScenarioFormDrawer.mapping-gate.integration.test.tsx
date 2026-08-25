@@ -307,10 +307,9 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
       await user.click(screen.getByTestId("save-and-run-button"));
 
       await waitFor(() => {
-        expect(mocks.mockOpenDrawer).toHaveBeenCalledWith(
-          "agentWorkflowEditor",
-          { urlParams: { agentId: "workflow-agent-1" } },
-        );
+        expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("agentWorkflowEditor", {
+          urlParams: { agentId: "workflow-agent-1" },
+        });
       });
 
       expect(mocks.mockRunScenario).not.toHaveBeenCalled();
@@ -407,10 +406,9 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
       await user.click(screen.getByTestId("save-and-run-button"));
 
       await waitFor(() => {
-        expect(mocks.mockOpenDrawer).toHaveBeenCalledWith(
-          "agentWorkflowEditor",
-          { urlParams: { agentId: "workflow-agent-2" } },
-        );
+        expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("agentWorkflowEditor", {
+          urlParams: { agentId: "workflow-agent-2" },
+        });
       });
 
       expect(mocks.mockRunScenario).not.toHaveBeenCalled();

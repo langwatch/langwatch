@@ -72,9 +72,7 @@ const genericOAuthConfigs = buildGenericOAuthConfigs(ssoConfiguration);
 // own `isAdmin` check (ee/admin/isAdmin.ts) and the legacy
 // Session.impersonating JSON column handled in src/server/auth.ts.
 const plugins =
-  genericOAuthConfigs.length > 0
-    ? [genericOAuth({ config: genericOAuthConfigs })]
-    : [];
+  genericOAuthConfigs.length > 0 ? [genericOAuth({ config: genericOAuthConfigs })] : [];
 
 /**
  * Wire BetterAuth's secondary storage to the App's Redis connection. Used by
@@ -214,9 +212,7 @@ export const auth = betterAuth({
         // services), BASE_HOST is the external URL while NEXTAUTH_URL may
         // be the internal one. Accept both so sign-in/sign-up don't fail
         // with "Invalid origin".
-        ...(env.BASE_HOST && env.BASE_HOST !== env.NEXTAUTH_URL
-          ? [env.BASE_HOST]
-          : []),
+        ...(env.BASE_HOST && env.BASE_HOST !== env.NEXTAUTH_URL ? [env.BASE_HOST] : []),
       ],
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
   database: prismaAdapter(prisma, { provider: "postgresql" }),
@@ -355,8 +351,7 @@ export const auth = betterAuth({
     enabled: isEmailPasswordEnabled(env),
     password: {
       hash: async (password: string) => hash(password, 10),
-      verify: async ({ password, hash: storedHash }) =>
-        compare(password, storedHash),
+      verify: async ({ password, hash: storedHash }) => compare(password, storedHash),
     },
     /**
      * Reset-link lifetime. Kept at BetterAuth's one-hour default but stated
@@ -456,8 +451,7 @@ export const auth = betterAuth({
           });
         },
         after: async (account) => {
-          if (!account.userId || !account.providerId || !account.accountId)
-            return;
+          if (!account.userId || !account.providerId || !account.accountId) return;
           await afterAccountCreate({
             prisma,
             account: {
@@ -473,8 +467,7 @@ export const auth = betterAuth({
           // BetterAuth refreshes tokens on the linked Account row on every
           // OAuth sign-in. Use that as the trigger to reconcile pendingSsoSetup
           // for users whose correct-provider account is already linked.
-          if (!account.userId || !account.providerId || !account.accountId)
-            return;
+          if (!account.userId || !account.providerId || !account.accountId) return;
           await afterAccountUpdate({
             prisma,
             account: {

@@ -4,10 +4,7 @@ export {
   type DesignSystemExtension,
   system,
 } from "./system";
-export {
-  DesignSystemProvider,
-  type DesignSystemProviderProps,
-} from "./provider";
+export { DesignSystemProvider, type DesignSystemProviderProps } from "./provider";
 export {
   BASE_OVERLAY_Z_INDEX,
   OverlayDepthContext,

@@ -136,12 +136,7 @@ export function TerminalTab({
 
 function TranscriptError() {
   return (
-    <VStack
-      align="center"
-      justify="center"
-      height="full"
-      bg={TERMINAL_TOKENS.screenBg}
-    >
+    <VStack align="center" justify="center" height="full" bg={TERMINAL_TOKENS.screenBg}>
       <Text textStyle="xs" color="fg.error" fontFamily="mono">
         Couldn&apos;t load this session&apos;s transcript
       </Text>

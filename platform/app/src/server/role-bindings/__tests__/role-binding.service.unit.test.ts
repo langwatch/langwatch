@@ -103,9 +103,7 @@ beforeEach(() => {
   groupUpdate.mockResolvedValue(undefined);
   groupMembershipDeleteMany.mockResolvedValue(undefined);
   groupMembershipCreateMany.mockResolvedValue(undefined);
-  transaction.mockImplementation(async (cb: (tx: PrismaClient) => unknown) =>
-    cb(prisma),
-  );
+  transaction.mockImplementation(async (cb: (tx: PrismaClient) => unknown) => cb(prisma));
   // RoleBindingService consumes the canonical Role capability. Keep the
   // policy test's mocked role rows behind that capability rather than
   // constructing the removed legacy Prisma-backed RoleService here.
@@ -119,18 +117,12 @@ beforeEach(() => {
         scopeType: RoleBindingScopeType;
       }>;
     }) => {
-      if (
-        customBindings.every(
-          (binding) => binding.scopeType === "ORGANIZATION",
-        )
-      ) {
+      if (customBindings.every((binding) => binding.scopeType === "ORGANIZATION")) {
         return;
       }
       const roles = await customRoleFindMany();
       for (const binding of customBindings) {
-        const role = roles.find(
-          (candidate) => candidate.id === binding.customRoleId,
-        );
+        const role = roles.find((candidate) => candidate.id === binding.customRoleId);
         const permission = role?.permissions.find((candidate: string) =>
           [
             "organization",
@@ -226,9 +218,7 @@ describe("RoleBindingService create", () => {
       expect(attachBindings).toHaveBeenCalledWith(
         expect.objectContaining({
           organizationId: "org_1",
-          bindings: [
-            expect.objectContaining({ principal: { apiKeyId: "key_1" } }),
-          ],
+          bindings: [expect.objectContaining({ principal: { apiKeyId: "key_1" } })],
           onDuplicate: "reject",
         }),
       );
@@ -311,9 +301,9 @@ describe("RoleBindingService create", () => {
     it("does not swallow other write failures", async () => {
       attachBindings.mockRejectedValue(new Error("connection reset"));
 
-      await expect(
-        service.create({ ...bindingInput, userId: "user_1" }),
-      ).rejects.toThrow("connection reset");
+      await expect(service.create({ ...bindingInput, userId: "user_1" })).rejects.toThrow(
+        "connection reset",
+      );
     });
   });
 });

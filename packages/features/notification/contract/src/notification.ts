@@ -11,10 +11,7 @@ const jsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
   ]),
 );
 
-export const notificationMetadataSchema = z.record(
-  z.string(),
-  jsonValueSchema,
-);
+export const notificationMetadataSchema = z.record(z.string(), jsonValueSchema);
 
 export const notificationSchema = z
   .object({
@@ -39,9 +36,7 @@ export const createNotificationCommandSchema = z
   })
   .strict();
 
-export type CreateNotificationCommand = z.infer<
-  typeof createNotificationCommandSchema
->;
+export type CreateNotificationCommand = z.infer<typeof createNotificationCommandSchema>;
 
 export const notificationRecentQuerySchema = z
   .object({
@@ -50,6 +45,4 @@ export const notificationRecentQuerySchema = z
   })
   .strict();
 
-export type NotificationRecentQuery = z.infer<
-  typeof notificationRecentQuerySchema
->;
+export type NotificationRecentQuery = z.infer<typeof notificationRecentQuerySchema>;

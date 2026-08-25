@@ -157,13 +157,7 @@ describe.skipIf(!hasCredentialsSecret)(
       );
     }
 
-    async function setHandle({
-      id,
-      handle,
-    }: {
-      id: string;
-      handle: string | null;
-    }) {
+    async function setHandle({ id, handle }: { id: string; handle: string | null }) {
       return await ModelProviderService.create(prisma).updateModelProvider(
         {
           id,
@@ -267,9 +261,7 @@ describe.skipIf(!hasCredentialsSecret)(
      * never reaches the wire fails the lifecycle scenarios rather than passing
      * on the eviction alone.
      */
-    async function materialisedHandles(): Promise<
-      Map<string, string | undefined>
-    > {
+    async function materialisedHandles(): Promise<Map<string, string | undefined>> {
       const key = await prisma.virtualKey.create({
         data: {
           organizationId,
@@ -289,10 +281,7 @@ describe.skipIf(!hasCredentialsSecret)(
           key.id,
           organizationId,
         );
-        const bundle = await new GatewayConfigMaterialiser(
-          prisma,
-          null,
-        ).materialise(vk!);
+        const bundle = await new GatewayConfigMaterialiser(prisma, null).materialise(vk!);
         return new Map(bundle.providers.map((slot) => [slot.id, slot.handle]));
       } finally {
         await prisma.virtualKey.delete({ where: { id: key.id } });
@@ -373,9 +362,7 @@ describe.skipIf(!hasCredentialsSecret)(
 
         // The handle reaches the wire on the same terms as one set later: a
         // config materialised now already carries it.
-        expect((await materialisedHandles()).get(created.id)).toBe(
-          "created-evicts",
-        );
+        expect((await materialisedHandles()).get(created.id)).toBe("created-evicts");
       });
     });
 

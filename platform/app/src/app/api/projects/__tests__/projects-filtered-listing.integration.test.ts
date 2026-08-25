@@ -207,9 +207,7 @@ describe("Feature: GET /api/projects honours the credential's reach", () => {
       const { status, json } = await listAs(token);
 
       expect(status).toBe(200);
-      expect(json.data!.map((project) => project.id).sort()).toEqual(
-        [...bound].sort(),
-      );
+      expect(json.data!.map((project) => project.id).sort()).toEqual([...bound].sort());
       expect(json.pagination!.total).toBe(2);
     });
   });

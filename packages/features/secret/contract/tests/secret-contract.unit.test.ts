@@ -13,8 +13,12 @@ describe("Secret contract", () => {
   });
 
   it("enforces the value ceiling", () => {
-    expect(secretValueSchema.safeParse("x".repeat(MAX_SECRET_VALUE_LENGTH)).success).toBe(true);
-    expect(secretValueSchema.safeParse("x".repeat(MAX_SECRET_VALUE_LENGTH + 1)).success).toBe(false);
+    expect(secretValueSchema.safeParse("x".repeat(MAX_SECRET_VALUE_LENGTH)).success).toBe(
+      true,
+    );
+    expect(
+      secretValueSchema.safeParse("x".repeat(MAX_SECRET_VALUE_LENGTH + 1)).success,
+    ).toBe(false);
   });
 
   it("publishes metadata without a value field", () => {

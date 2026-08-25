@@ -51,10 +51,7 @@ describe("Subscription sync hook", () => {
 
   describe("when a subscription is activated", () => {
     it("identifies all org members with has_subscription true", async () => {
-      mockFindMany.mockResolvedValue([
-        { userId: "user-1" },
-        { userId: "user-2" },
-      ]);
+      mockFindMany.mockResolvedValue([{ userId: "user-1" }, { userId: "user-2" }]);
 
       fireSubscriptionSyncNurturing({
         organizationId: "org-123",
@@ -136,13 +133,9 @@ describe("Subscription sync hook", () => {
 
   describe("when Customer.io API is unavailable", () => {
     it("does not throw (fire-and-forget)", async () => {
-      const { captureException } = await import(
-        "~/utils/posthogErrorCapture"
-      );
+      const { captureException } = await import("~/utils/posthogErrorCapture");
       mockFindMany.mockResolvedValue([{ userId: "user-1" }]);
-      mockNurturing.identifyUser.mockRejectedValueOnce(
-        new Error("Customer.io error"),
-      );
+      mockNurturing.identifyUser.mockRejectedValueOnce(new Error("Customer.io error"));
 
       expect(() =>
         fireSubscriptionSyncNurturing({

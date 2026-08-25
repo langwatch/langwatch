@@ -101,9 +101,7 @@ describe("createLangyEffectPorts", () => {
           prompt: "Fix my trace",
           system: "System prompt",
           credentials: stored.credentials,
-          ...(expectedIntent === "revive"
-            ? { resumeToken: "resume-token" }
-            : {}),
+          ...(expectedIntent === "revive" ? { resumeToken: "resume-token" } : {}),
         }),
       );
     });
@@ -127,24 +125,24 @@ describe("createLangyEffectPorts", () => {
     const deps = makeDeps(stored);
     const ports = createLangyEffectPorts(deps);
 
-    await expect(
-      ports.workerDispatch.dispatchTurn(dispatchParams),
-    ).rejects.toThrow("Langy turn handoff identity mismatch");
+    await expect(ports.workerDispatch.dispatchTurn(dispatchParams)).rejects.toThrow(
+      "Langy turn handoff identity mismatch",
+    );
     expect(deps.worker.dispatch).not.toHaveBeenCalled();
   });
 
-  it.each([
-    "busy",
-    "unavailable",
-  ] as const)("throws a retry signal when worker dispatch returns %s", async (outcome) => {
-    const deps = makeDeps();
-    deps.worker.dispatch.mockResolvedValue(outcome);
-    const ports = createLangyEffectPorts(deps);
+  it.each(["busy", "unavailable"] as const)(
+    "throws a retry signal when worker dispatch returns %s",
+    async (outcome) => {
+      const deps = makeDeps();
+      deps.worker.dispatch.mockResolvedValue(outcome);
+      const ports = createLangyEffectPorts(deps);
 
-    await expect(
-      ports.workerDispatch.dispatchTurn(dispatchParams),
-    ).rejects.toBeInstanceOf(LangyTurnDispatchRetry);
-  });
+      await expect(
+        ports.workerDispatch.dispatchTurn(dispatchParams),
+      ).rejects.toBeInstanceOf(LangyTurnDispatchRetry);
+    },
+  );
 
   it("recovers a stale probe by minting once, replacing the handoff, and redriving", async () => {
     const stored = handoff({
@@ -201,9 +199,9 @@ describe("createLangyEffectPorts", () => {
     deps.handoffStore.stash.mockRejectedValueOnce(new Error("redis down"));
     const ports = createLangyEffectPorts(deps);
 
-    await expect(
-      ports.workerDispatch.dispatchTurn(dispatchParams),
-    ).rejects.toThrow("redis down");
+    await expect(ports.workerDispatch.dispatchTurn(dispatchParams)).rejects.toThrow(
+      "redis down",
+    );
     expect(deps.revokeSessionKey).toHaveBeenCalledWith({
       apiKeyId: "key-recovered",
       projectId: PROJECT,
@@ -276,9 +274,9 @@ describe("when the agent permanently rejects the dispatch", () => {
     deps.worker.dispatch.mockResolvedValue("unavailable");
     const ports = createLangyEffectPorts(deps);
 
-    await expect(
-      ports.workerDispatch.dispatchTurn(dispatchParams),
-    ).rejects.toThrow(/not accepted/);
+    await expect(ports.workerDispatch.dispatchTurn(dispatchParams)).rejects.toThrow(
+      /not accepted/,
+    );
     expect(deps.failTurn.failTurn).not.toHaveBeenCalled();
   });
 });

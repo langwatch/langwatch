@@ -20,16 +20,15 @@ label and the action buttons.
 ```tsx
 import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
 
-{selectedRows.size > 0 && (
-  <SelectionActionBar
-    label={`${selectedRows.size} selected`}
-    onClear={clearSelection}
-  >
-    <Button size="xs" variant="outline" colorPalette="red" onClick={deleteSelected}>
-      <Trash2 size={14} /> Delete
-    </Button>
-  </SelectionActionBar>
-)}
+{
+  selectedRows.size > 0 && (
+    <SelectionActionBar label={`${selectedRows.size} selected`} onClear={clearSelection}>
+      <Button size="xs" variant="outline" colorPalette="red" onClick={deleteSelected}>
+        <Trash2 size={14} /> Delete
+      </Button>
+    </SelectionActionBar>
+  );
+}
 ```
 
 Rules:

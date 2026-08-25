@@ -1,10 +1,4 @@
-export function ChatBalloonIcon({
-  width,
-  height,
-}: {
-  width: number;
-  height: number;
-}) {
+export function ChatBalloonIcon({ width, height }: { width: number; height: number }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

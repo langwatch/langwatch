@@ -2,8 +2,7 @@ import { nanoid } from "nanoid";
 import { mean, median, standardDeviation } from "simple-statistics";
 import { beforeAll, describe, expect, test } from "vitest";
 
-const LANGWATCH_ENDPOINT =
-  process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560";
+const LANGWATCH_ENDPOINT = process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560";
 
 const LANGWATCH_API_KEY = process.env.LANGWATCH_API_KEY;
 

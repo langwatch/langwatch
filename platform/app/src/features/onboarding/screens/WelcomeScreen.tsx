@@ -20,9 +20,7 @@ import { useCreateWelcomeScreens } from "./create-welcome-screens";
 export const WelcomeScreen: React.FC = () => {
   const router = useRouter();
   const { data: session } = useRequiredSession();
-  const [onboardingNeeded, setOnboardingNeeded] = useState<boolean | undefined>(
-    void 0,
-  );
+  const [onboardingNeeded, setOnboardingNeeded] = useState<boolean | undefined>(void 0);
 
   const {
     organization,
@@ -43,8 +41,7 @@ export const WelcomeScreen: React.FC = () => {
 
   const screens = useCreateWelcomeScreens({ flow });
 
-  const initializeOrganization =
-    api.onboarding.initializeOrganization.useMutation();
+  const initializeOrganization = api.onboarding.initializeOrganization.useMutation();
 
   // Same-origin continuation (e.g. the CLI device-approval page sends a
   // fresh signup here with return_to=/cli/auth?user_code=… so the approval
@@ -71,9 +68,7 @@ export const WelcomeScreen: React.FC = () => {
       return;
     }
     setOnboardingNeeded(false);
-    void router.push(
-      returnTo ?? (decision.kind === "home" ? "/" : `/${decision.slug}`),
-    );
+    void router.push(returnTo ?? (decision.kind === "home" ? "/" : `/${decision.slug}`));
   }, [organizationIsLoading, organizations, project?.slug, returnTo]);
 
   function handleFinalizeSubmit() {
@@ -149,11 +144,7 @@ export const WelcomeScreen: React.FC = () => {
     );
   }
 
-  if (
-    !session ||
-    !onboardingNeeded ||
-    (organizationIsLoading && !organization)
-  ) {
+  if (!session || !onboardingNeeded || (organizationIsLoading && !organization)) {
     return <LoadingScreen />;
   }
 
@@ -180,19 +171,8 @@ export const WelcomeScreen: React.FC = () => {
         showBackButton={false}
       >
         <VStack gap={5} align="stretch" w="full" minW="0">
-          <Box
-            position="relative"
-            overflow="hidden"
-            py="1"
-            px="2"
-            my="-1"
-            mx="-2"
-          >
-            <AnimatePresence
-              mode="popLayout"
-              custom={direction}
-              initial={false}
-            >
+          <Box position="relative" overflow="hidden" py="1" px="2" my="-1" mx="-2">
+            <AnimatePresence mode="popLayout" custom={direction} initial={false}>
               <motion.div
                 key={currentScreenIndex}
                 custom={direction}
@@ -245,9 +225,7 @@ export const WelcomeScreen: React.FC = () => {
                       disabled={pendingOrSuccessful}
                       style={{ width: "100%", minWidth: 0 }}
                     >
-                      {currentScreen?.component ? (
-                        <currentScreen.component />
-                      ) : null}
+                      {currentScreen?.component ? <currentScreen.component /> : null}
                     </fieldset>
                   </OnboardingFormProvider>
                 </AnalyticsBoundary>
@@ -255,10 +233,7 @@ export const WelcomeScreen: React.FC = () => {
             </AnimatePresence>
           </Box>
 
-          <motion.div
-            layout
-            transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-          >
+          <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
             <OnboardingNavigation
               currentScreenIndex={currentScreenIndex}
               onPrev={navigation.prevScreen}
@@ -273,10 +248,7 @@ export const WelcomeScreen: React.FC = () => {
             />
           </motion.div>
 
-          <motion.div
-            layout
-            transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-          >
+          <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
             <HStack justify="center" gap={1.5}>
               {flow.visibleScreens.map((_, idx) => (
                 <Box

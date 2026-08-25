@@ -77,9 +77,7 @@ export function useLangyPageContext(): {
   // Things the user pointed at on the page. Full chip copies, so a picked trace
   // row that has since scrolled out of the virtualized table keeps its chip.
   const pickedChips = useLangyContextTargetStore((s) => s.picked);
-  const setActiveChipIds = useLangyContextTargetStore(
-    (s) => s.setActiveChipIds,
-  );
+  const setActiveChipIds = useLangyContextTargetStore((s) => s.setActiveChipIds);
 
   // The Trace Explorer lives at `/:project/traces`. Its selection + filter
   // stores are module singletons that survive navigation, so only surface

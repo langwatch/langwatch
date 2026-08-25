@@ -6,10 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { CliHandledError } from "@langwatch/langy-contract/cards/handled-error";
-import {
-  fallbackSuggestionsFor,
-  withFallbackSuggestions,
-} from "../errorSuggestions";
+import { fallbackSuggestionsFor, withFallbackSuggestions } from "../errorSuggestions";
 
 const domain = (overrides: Partial<CliHandledError> = {}): CliHandledError => ({
   code: "not_found",
@@ -51,7 +48,9 @@ describe("fallbackSuggestionsFor", () => {
 
 describe("withFallbackSuggestions", () => {
   it("fills suggestions and docUrl when the platform sent neither", () => {
-    const enriched = withFallbackSuggestions(domain({ code: "missing_api_key", kind: "missing_api_key" }));
+    const enriched = withFallbackSuggestions(
+      domain({ code: "missing_api_key", kind: "missing_api_key" }),
+    );
 
     expect(enriched.suggestions).toEqual(
       fallbackSuggestionsFor("missing_api_key")?.suggestions,
@@ -82,9 +81,7 @@ describe("withFallbackSuggestions", () => {
     );
 
     expect(suggestionsOnly.suggestions).toEqual(["The server's own next step"]);
-    expect(suggestionsOnly.docUrl).toBe(
-      "https://langwatch.ai/docs/integration/cli",
-    );
+    expect(suggestionsOnly.docUrl).toBe("https://langwatch.ai/docs/integration/cli");
 
     // Server sent docUrl but no suggestions → fallback fills suggestions only.
     const docUrlOnly = withFallbackSuggestions(
@@ -109,9 +106,7 @@ describe("withFallbackSuggestions", () => {
 });
 
 describe("given the API refuses a management call because the plan is below Enterprise", () => {
-  const planRefusal = (
-    overrides: Partial<CliHandledError> = {},
-  ): CliHandledError =>
+  const planRefusal = (overrides: Partial<CliHandledError> = {}): CliHandledError =>
     domain({
       code: "enterprise_plan_required",
       kind: "enterprise_plan_required",

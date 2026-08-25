@@ -1,7 +1,4 @@
-import {
-  type SubscriberDispatchDefinition,
-  throttledWindow,
-} from "@langwatch/eventing";
+import { type SubscriberDispatchDefinition, throttledWindow } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/observability", () => ({
@@ -164,59 +161,54 @@ const windowed = [
 }[];
 
 describe("subscriber throttle policy", () => {
-  describe.each(windowed)("given the $name subscriber", ({
-    subscriber,
-    windowMs,
-    dedupTtlMs,
-  }) => {
-    it("holds events for exactly the window the policy assigns it", () => {
-      expect(subscriber.options?.delay).toBe(windowMs);
-    });
+  describe.each(windowed)(
+    "given the $name subscriber",
+    ({ subscriber, windowMs, dedupTtlMs }) => {
+      it("holds events for exactly the window the policy assigns it", () => {
+        expect(subscriber.options?.delay).toBe(windowMs);
+      });
 
-    it("pins the window's deadline so a continuous stream cannot defer it forever", () => {
-      expect(subscriber.options?.deduplication?.extend).toBe(false);
-    });
+      it("pins the window's deadline so a continuous stream cannot defer it forever", () => {
+        expect(subscriber.options?.deduplication?.extend).toBe(false);
+      });
 
-    it("keeps its dedup key alive for exactly the suppression the policy assigns it", () => {
-      expect(subscriber.options?.deduplication?.ttlMs).toBe(dedupTtlMs);
-    });
+      it("keeps its dedup key alive for exactly the suppression the policy assigns it", () => {
+        expect(subscriber.options?.deduplication?.ttlMs).toBe(dedupTtlMs);
+      });
 
-    it("never lets the key expire before the job it is holding dispatches", () => {
-      const { delay, deduplication } = subscriber.options!;
-      expect(deduplication?.ttlMs).toBeGreaterThanOrEqual(delay!);
-    });
+      it("never lets the key expire before the job it is holding dispatches", () => {
+        const { delay, deduplication } = subscriber.options!;
+        expect(deduplication?.ttlMs).toBeGreaterThanOrEqual(delay!);
+      });
 
-    it("collapses on the same job id the router collapses on", () => {
-      expect(subscriber.options?.makeJobId).toBe(
-        subscriber.options?.deduplication?.makeId,
-      );
-    });
-  });
+      it("collapses on the same job id the router collapses on", () => {
+        expect(subscriber.options?.makeJobId).toBe(
+          subscriber.options?.deduplication?.makeId,
+        );
+      });
+    },
+  );
 
   describe("given a trigger that arrives after the window has already fired", () => {
     // Most of these rebuild their output from the fold's running state, or
     // notify a client that the state moved, so they have to re-trigger:
     // dropping the LAST event of an aggregate would leave the previous partial
     // write as the final answer. The table says which is which, and why.
-    it.each(
-      windowed,
-    )("holds $name to the post-dispatch suppression the policy allows it", ({
-      subscriber,
-      survivesDispatch,
-    }) => {
-      expect(subscriber.options?.deduplication?.shouldSurviveDispatch).toBe(
-        survivesDispatch,
-      );
-    });
+    it.each(windowed)(
+      "holds $name to the post-dispatch suppression the policy allows it",
+      ({ subscriber, survivesDispatch }) => {
+        expect(subscriber.options?.deduplication?.shouldSurviveDispatch).toBe(
+          survivesDispatch,
+        );
+      },
+    );
 
     // The table above only binds a subscriber to the decision written next to it,
     // so on its own it would follow a subscriber that quietly opted in. This is
     // what makes opting in cost an edit here, argued for by name.
     it("keeps suppression past a dispatch an exception", () => {
       expect(
-        windowed
-          .filter((entry) => entry.survivesDispatch)
-          .map(({ name }) => name),
+        windowed.filter((entry) => entry.survivesDispatch).map(({ name }) => name),
       ).toEqual(["pullRequestMapping"]);
     });
   });
@@ -225,9 +217,8 @@ describe("subscriber throttle policy", () => {
     // Deliberately excluded. Read the comment on the subscriber before adding a
     // window here — the reason is specific, not incidental.
     it("leaves spanStorageBroadcast firing immediately, because nothing polls behind it while a trace is open", () => {
-      const subscriber = tracePipeline.mapSubscribers.get(
-        "spanStorageBroadcast",
-      )!.definition;
+      const subscriber =
+        tracePipeline.mapSubscribers.get("spanStorageBroadcast")!.definition;
 
       expect(subscriber.options?.delay ?? 0).toBe(0);
     });
@@ -252,9 +243,9 @@ describe("subscriber throttle policy", () => {
         getDispatch: () => async () => {},
       });
 
-      expect(
-        subscriber.options?.deduplication?.shouldSurviveDispatch ?? false,
-      ).toBe(false);
+      expect(subscriber.options?.deduplication?.shouldSurviveDispatch ?? false).toBe(
+        false,
+      );
     });
   });
 });

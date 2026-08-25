@@ -59,15 +59,11 @@ export interface LangWatchQLResultTableProps {
   result: LangWatchQLQueryResult;
 }
 
-export function LangWatchQLResultTable({
-  result,
-}: LangWatchQLResultTableProps) {
+export function LangWatchQLResultTable({ result }: LangWatchQLResultTableProps) {
   // Held in state rather than a ref so that attaching the element re-renders
   // once and the virtualizer gets a scroll element to measure. A bare ref is
   // still `null` on the render that would have set the count.
-  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(
-    null,
-  );
+  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
 
   const duplicates = useMemo(
     () => duplicateLangWatchQLColumnNames(result.columns),
@@ -76,10 +72,7 @@ export function LangWatchQLResultTable({
 
   const columns = useMemo(() => columnDefs(result.columns), [result.columns]);
 
-  const typeByColumnId = useMemo(
-    () => typesByColumnId(result.columns),
-    [result.columns],
-  );
+  const typeByColumnId = useMemo(() => typesByColumnId(result.columns), [result.columns]);
 
   const data = useMemo(() => result.rows as LangWatchQLRow[], [result.rows]);
 
@@ -173,10 +166,7 @@ function typesByColumnId(
   columns: LangWatchQLQueryResult["columns"],
 ): Map<string, string> {
   return new Map(
-    columns.map((column, index) => [
-      columnId({ name: column.name, index }),
-      column.type,
-    ]),
+    columns.map((column, index) => [columnId({ name: column.name, index }), column.type]),
   );
 }
 
@@ -224,10 +214,7 @@ function ResultTableHeader({
           >
             <VStack align="start" gap={0}>
               <Text fontSize="12.5px" fontWeight="semibold">
-                {flexRender(
-                  header.column.columnDef.header,
-                  header.getContext(),
-                )}
+                {flexRender(header.column.columnDef.header, header.getContext())}
               </Text>
               {/* The database's own type, on screen rather than behind a
                   hover: it is what tells a member whether a column can be
@@ -262,11 +249,7 @@ function ResultTableBody({
       <Table.Body>
         <Table.Row>
           <Table.Cell colSpan={Math.max(columnCount, 1)}>
-            <Text
-              fontSize="13px"
-              color="fg.muted"
-              data-testid="lwql-result-empty"
-            >
+            <Text fontSize="13px" color="fg.muted" data-testid="lwql-result-empty">
               The query ran and matched no rows.
             </Text>
           </Table.Cell>
@@ -311,19 +294,10 @@ function ResultTableBody({
  * The height of the rows that are not mounted, carried by a row of its own so
  * the scrollbar spans the whole result rather than the window of it on screen.
  */
-function SpacerRow({
-  height,
-  columnCount,
-}: {
-  height: number;
-  columnCount: number;
-}) {
+function SpacerRow({ height, columnCount }: { height: number; columnCount: number }) {
   return (
     <Table.Row aria-hidden="true">
-      <Table.Cell
-        colSpan={columnCount}
-        style={{ height: `${height}px`, padding: 0 }}
-      />
+      <Table.Cell colSpan={columnCount} style={{ height: `${height}px`, padding: 0 }} />
     </Table.Row>
   );
 }

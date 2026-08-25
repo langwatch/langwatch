@@ -1,8 +1,5 @@
 import type { AppendStore } from "@langwatch/eventing";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import { metricMapGroupKey } from "../canonical/shards";
 import { METRIC_MAP_COALESCE_MAX_BATCH } from "../schemas/constants";
 import {

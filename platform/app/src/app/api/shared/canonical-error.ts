@@ -76,13 +76,8 @@ function reasonsOf(error: unknown): ApiErrorReason[] {
   if (!HandledError.isHandled(error)) return [];
   return error.serialize().reasons.map((reason) => ({
     code: reason.code,
-    message:
-      typeof reason.meta?.message === "string"
-        ? reason.meta.message
-        : reason.code,
-    ...(reason.meta && Object.keys(reason.meta).length > 0
-      ? { meta: reason.meta }
-      : {}),
+    message: typeof reason.meta?.message === "string" ? reason.meta.message : reason.code,
+    ...(reason.meta && Object.keys(reason.meta).length > 0 ? { meta: reason.meta } : {}),
   }));
 }
 

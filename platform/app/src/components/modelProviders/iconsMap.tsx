@@ -17,10 +17,7 @@ import { Voyage } from "../icons/Voyage";
 import { Xai } from "../icons/Xai";
 import { IconGlyph } from "../ui/IconGlyph";
 
-export const modelProviderIcons: Record<
-  keyof typeof modelProviders,
-  React.ReactNode
-> = {
+export const modelProviderIcons: Record<keyof typeof modelProviders, React.ReactNode> = {
   openai: <OpenAI />,
   openai_codex: <Codex />,
   azure: <Azure />,

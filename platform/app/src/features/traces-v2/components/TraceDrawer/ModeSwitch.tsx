@@ -66,13 +66,7 @@ interface TabProps {
   disabledReason?: string;
 }
 
-function ModePresenceDot({
-  traceId,
-  mode,
-}: {
-  traceId: string;
-  mode: DrawerViewMode;
-}) {
+function ModePresenceDot({ traceId, mode }: { traceId: string; mode: DrawerViewMode }) {
   const peers = usePresenceStore(
     useShallow((s) =>
       selectPeersMatching(
@@ -84,9 +78,7 @@ function ModePresenceDot({
     ),
   );
   if (peers.length === 0) return null;
-  return (
-    <PresenceMarker peers={peers} size={16} tooltipSuffix={`${mode} view`} />
-  );
+  return <PresenceMarker peers={peers} size={16} tooltipSuffix={`${mode} view`} />;
 }
 
 function ModeTab({

@@ -1,60 +1,63 @@
 import { z } from "zod";
 
 const identifierSchema = z.string().trim().min(1);
-const moneySchema = z.union([
-  z.number().finite(),
-  z.string().trim().min(1),
-]);
+const moneySchema = z.union([z.number().finite(), z.string().trim().min(1)]);
 
 /** The request-time preflight check used by the Gateway and compatibility APIs. */
-export const gatewayBudgetCheckInputSchema = z.object({
-  organizationId: identifierSchema,
-  teamId: identifierSchema.nullable(),
-  projectId: identifierSchema.nullable(),
-  virtualKeyId: identifierSchema,
-  principalUserId: identifierSchema.nullable().optional(),
-  projectedCostUsd: moneySchema,
-  providerKey: identifierSchema.nullable().optional(),
-}).strict();
+export const gatewayBudgetCheckInputSchema = z
+  .object({
+    organizationId: identifierSchema,
+    teamId: identifierSchema.nullable(),
+    projectId: identifierSchema.nullable(),
+    virtualKeyId: identifierSchema,
+    principalUserId: identifierSchema.nullable().optional(),
+    projectedCostUsd: moneySchema,
+    providerKey: identifierSchema.nullable().optional(),
+  })
+  .strict();
 
-export type GatewayBudgetCheckInput = z.infer<
-  typeof gatewayBudgetCheckInputSchema
->;
+export type GatewayBudgetCheckInput = z.infer<typeof gatewayBudgetCheckInputSchema>;
 
-const budgetWarningSchema = z.object({
-  scope: z.string(),
-  pctUsed: z.number().finite(),
-  limitUsd: z.string(),
-}).strict();
+const budgetWarningSchema = z
+  .object({
+    scope: z.string(),
+    pctUsed: z.number().finite(),
+    limitUsd: z.string(),
+  })
+  .strict();
 
-const blockedBudgetSchema = z.object({
-  budgetId: identifierSchema,
-  scope: z.string(),
-  scopeId: identifierSchema,
-  window: z.string(),
-  limitUsd: z.string(),
-  spentUsd: z.string(),
-}).strict();
+const blockedBudgetSchema = z
+  .object({
+    budgetId: identifierSchema,
+    scope: z.string(),
+    scopeId: identifierSchema,
+    window: z.string(),
+    limitUsd: z.string(),
+    spentUsd: z.string(),
+  })
+  .strict();
 
-const budgetScopeSpendSchema = z.object({
-  scope: z.string(),
-  scopeId: identifierSchema,
-  window: z.string(),
-  spentUsd: z.string(),
-  limitUsd: z.string(),
-}).strict();
+const budgetScopeSpendSchema = z
+  .object({
+    scope: z.string(),
+    scopeId: identifierSchema,
+    window: z.string(),
+    spentUsd: z.string(),
+    limitUsd: z.string(),
+  })
+  .strict();
 
-export const gatewayBudgetCheckResultSchema = z.object({
-  decision: z.enum(["allow", "soft_warn", "hard_block"]),
-  warnings: z.array(budgetWarningSchema),
-  blockReason: z.string().nullable(),
-  blockedBy: z.array(blockedBudgetSchema),
-  scopes: z.array(budgetScopeSpendSchema),
-}).strict();
+export const gatewayBudgetCheckResultSchema = z
+  .object({
+    decision: z.enum(["allow", "soft_warn", "hard_block"]),
+    warnings: z.array(budgetWarningSchema),
+    blockReason: z.string().nullable(),
+    blockedBy: z.array(blockedBudgetSchema),
+    scopes: z.array(budgetScopeSpendSchema),
+  })
+  .strict();
 
-export type GatewayBudgetCheckResult = z.infer<
-  typeof gatewayBudgetCheckResultSchema
->;
+export type GatewayBudgetCheckResult = z.infer<typeof gatewayBudgetCheckResultSchema>;
 
 export type GatewayBudgetScopeType =
   | "ORGANIZATION"
@@ -111,11 +114,14 @@ export type GatewayBudgetListWithHealth = {
   budgets: GatewayBudgetWithSeats[];
   spendAvailable: boolean;
   readAt: Date;
-  scopeReach: Map<string, {
-    budgetId: string;
-    reachable: boolean;
-    reachableProjectIds: string[];
-  }>;
+  scopeReach: Map<
+    string,
+    {
+      budgetId: string;
+      reachable: boolean;
+      reachableProjectIds: string[];
+    }
+  >;
 };
 
 export type GatewayBudgetScope =
@@ -201,46 +207,55 @@ const gatewayBudgetWindowSchema = z.enum([
 
 const dateOrIsoSchema = z.union([
   z.date(),
-  z.string().datetime({ offset: true }).transform((value) => new Date(value)),
+  z
+    .string()
+    .datetime({ offset: true })
+    .transform((value) => new Date(value)),
 ]);
 
-export const createGatewayBudgetInputSchema = z.object({
-  organizationId: identifierSchema,
-  scope: gatewayBudgetScopeSchema,
-  name: z.string().min(1).max(128),
-  description: z.string().nullable().optional(),
-  window: gatewayBudgetWindowSchema,
-  limitUsd: moneySchema,
-  onBreach: z.enum(["BLOCK", "WARN"]).optional(),
-  timezone: z.string().nullable().optional(),
-  providerKey: identifierSchema.nullable().optional(),
-  externalId: identifierSchema.nullable().optional(),
-  metadata: z.record(z.string(), z.string()).optional(),
-  cycleAnchorAt: dateOrIsoSchema.nullable().optional(),
-  allowUnreachable: z.boolean().optional(),
-  actorUserId: identifierSchema,
-}).strict();
+export const createGatewayBudgetInputSchema = z
+  .object({
+    organizationId: identifierSchema,
+    scope: gatewayBudgetScopeSchema,
+    name: z.string().min(1).max(128),
+    description: z.string().nullable().optional(),
+    window: gatewayBudgetWindowSchema,
+    limitUsd: moneySchema,
+    onBreach: z.enum(["BLOCK", "WARN"]).optional(),
+    timezone: z.string().nullable().optional(),
+    providerKey: identifierSchema.nullable().optional(),
+    externalId: identifierSchema.nullable().optional(),
+    metadata: z.record(z.string(), z.string()).optional(),
+    cycleAnchorAt: dateOrIsoSchema.nullable().optional(),
+    allowUnreachable: z.boolean().optional(),
+    actorUserId: identifierSchema,
+  })
+  .strict();
 
-export const updateGatewayBudgetInputSchema = z.object({
-  id: identifierSchema,
-  organizationId: identifierSchema,
-  name: z.string().min(1).max(128).optional(),
-  description: z.string().nullable().optional(),
-  limitUsd: moneySchema.optional(),
-  onBreach: z.enum(["BLOCK", "WARN"]).optional(),
-  timezone: z.string().nullable().optional(),
-  externalId: identifierSchema.nullable().optional(),
-  metadata: z.record(z.string(), z.string()).optional(),
-  actorUserId: identifierSchema,
-}).strict();
+export const updateGatewayBudgetInputSchema = z
+  .object({
+    id: identifierSchema,
+    organizationId: identifierSchema,
+    name: z.string().min(1).max(128).optional(),
+    description: z.string().nullable().optional(),
+    limitUsd: moneySchema.optional(),
+    onBreach: z.enum(["BLOCK", "WARN"]).optional(),
+    timezone: z.string().nullable().optional(),
+    externalId: identifierSchema.nullable().optional(),
+    metadata: z.record(z.string(), z.string()).optional(),
+    actorUserId: identifierSchema,
+  })
+  .strict();
 
-export const resetGatewayBudgetInputSchema = z.object({
-  id: identifierSchema,
-  organizationId: identifierSchema,
-  actorUserId: identifierSchema,
-  endUserId: identifierSchema.nullable().optional(),
-  reason: z.string().nullable().optional(),
-}).strict();
+export const resetGatewayBudgetInputSchema = z
+  .object({
+    id: identifierSchema,
+    organizationId: identifierSchema,
+    actorUserId: identifierSchema,
+    endUserId: identifierSchema.nullable().optional(),
+    reason: z.string().nullable().optional(),
+  })
+  .strict();
 
 export type GatewayBudgetPageInput = {
   organizationId: string;
@@ -264,15 +279,11 @@ export type GatewayBudgetHealth = {
  * key, routing, usage, and guardrail surfaces migrate behind this service.
  */
 export abstract class GatewayService {
-  abstract checkBudget(
-    input: GatewayBudgetCheckInput,
-  ): Promise<GatewayBudgetCheckResult>;
+  abstract checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult>;
 
   abstract list(organizationId: string): Promise<GatewayBudgetWithSeats[]>;
   abstract listForProject(projectId: string): Promise<GatewayBudgetWithSeats[]>;
-  abstract listWithHealth(
-    organizationId: string,
-  ): Promise<GatewayBudgetListWithHealth>;
+  abstract listWithHealth(organizationId: string): Promise<GatewayBudgetListWithHealth>;
   abstract listForProjectWithHealth(
     projectId: string,
   ): Promise<GatewayBudgetListWithHealth>;
@@ -287,19 +298,10 @@ export abstract class GatewayService {
     id: string,
     organizationId: string,
   ): Promise<GatewayBudgetHealth | null>;
-  abstract getDetail(
-    id: string,
-    organizationId: string,
-  ): Promise<unknown>;
+  abstract getDetail(id: string, organizationId: string): Promise<unknown>;
   abstract scopeReach(input: unknown): Promise<unknown>;
-  abstract create(
-    input: CreateGatewayBudgetInput,
-  ): Promise<GatewayBudgetResource>;
-  abstract update(
-    input: UpdateGatewayBudgetInput,
-  ): Promise<GatewayBudgetResource>;
-  abstract archive(
-    input: ArchiveGatewayBudgetInput,
-  ): Promise<GatewayBudgetResource>;
+  abstract create(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource>;
+  abstract update(input: UpdateGatewayBudgetInput): Promise<GatewayBudgetResource>;
+  abstract archive(input: ArchiveGatewayBudgetInput): Promise<GatewayBudgetResource>;
   abstract reset(input: ResetGatewayBudgetInput): Promise<GatewayBudgetResource>;
 }

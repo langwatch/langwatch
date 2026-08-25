@@ -28,11 +28,7 @@ describe("readNumberAttribute", () => {
     describe("when only the raw key is present", () => {
       it("falls through to it, so a trace folded before the sum landed still reads", () => {
         expect(
-          readNumberAttribute(
-            { [RAW_PER_SPAN]: "10" },
-            RESERVED_SUM,
-            RAW_PER_SPAN,
-          ),
+          readNumberAttribute({ [RAW_PER_SPAN]: "10" }, RESERVED_SUM, RAW_PER_SPAN),
         ).toBe(10);
       });
     });

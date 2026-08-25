@@ -37,9 +37,8 @@ export function PersonalWorkspaceViewOnlyNotice() {
           <Eye size={16} />
         </Box>
         <Text fontSize="sm" color="fg.muted">
-          Your organization gives you view-only access, so you can read your
-          workspace but not add to it. Ask an organization admin if you need to
-          change something here.
+          Your organization gives you view-only access, so you can read your workspace but
+          not add to it. Ask an organization admin if you need to change something here.
         </Text>
       </HStack>
     </Box>

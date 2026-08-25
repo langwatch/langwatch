@@ -153,14 +153,7 @@ const CONVERSATION_CAPABILITY: LensCapability = {
     "status",
   ],
   addons: [{ id: "conversation-turns", label: "Conversation turns" }],
-  sortableColumnIds: [
-    "started",
-    "lastTurn",
-    "duration",
-    "cost",
-    "tokens",
-    "turns",
-  ],
+  sortableColumnIds: ["started", "lastTurn", "duration", "cost", "tokens", "turns"],
   defaultSort: { columnId: "lastTurn", direction: "desc" },
 };
 
@@ -235,10 +228,7 @@ export function reconcileAddons(
   return ids.filter((id) => valid.has(id));
 }
 
-export function reconcileSort(
-  sort: SortConfig,
-  capability: LensCapability,
-): SortConfig {
+export function reconcileSort(sort: SortConfig, capability: LensCapability): SortConfig {
   const sortable = new Set(capability.sortableColumnIds);
   if (sortable.has(sort.columnId)) return sort;
   return { ...capability.defaultSort };

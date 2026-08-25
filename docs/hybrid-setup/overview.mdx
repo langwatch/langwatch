@@ -52,12 +52,13 @@ graph LR
 
 The data plane requires:
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
+| Component      | Minimum                        | Recommended               |
+| -------------- | ------------------------------ | ------------------------- |
 | **ClickHouse** | Single node, 2 vCPU, 4 GiB RAM | 3-node replicated cluster |
-| **S3 storage** | Any S3-compatible provider | Same region as ClickHouse |
+| **S3 storage** | Any S3-compatible provider     | Same region as ClickHouse |
 
 ClickHouse can be deployed as:
+
 - A managed service (e.g., ClickHouse Cloud, Aiven, Altinity)
 - Self-hosted on your Kubernetes cluster using our [clickhouse-serverless helm chart](https://github.com/langwatch/langwatch/tree/main/charts/clickhouse-serverless)
 - Self-hosted on VMs
@@ -73,6 +74,10 @@ The hybrid setup requires coordination with our team to configure the secure con
 3. **Configure the connection**: We'll establish a secure link (typically via VPC peering, PrivateLink, or VPN) between LangWatch Cloud and your data plane
 4. **Verify**: Run traces and confirm data flows correctly while staying in your infrastructure
 
-<Card title="Interested in hybrid setup?" icon="envelope" href="mailto:support@langwatch.ai">
+<Card
+  title="Interested in hybrid setup?"
+  icon="envelope"
+  href="mailto:support@langwatch.ai"
+>
   Contact our team to discuss your requirements and get started with a hybrid deployment.
 </Card>

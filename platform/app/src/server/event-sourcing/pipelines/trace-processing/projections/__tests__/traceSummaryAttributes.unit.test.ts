@@ -1,19 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary attribute forwarding", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    extractSpy = vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    );
+    extractSpy = vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan");
     extractSpy.mockReturnValue(null);
   });
 
@@ -203,9 +197,7 @@ describe("applySpanToSummary attribute forwarding", () => {
 
       const state = applySpanToSummary({ state: createInitState(), span });
 
-      expect(state.attributes["langwatch.virtual_key_id"]).toBe(
-        "vk_live_abc123",
-      );
+      expect(state.attributes["langwatch.virtual_key_id"]).toBe("vk_live_abc123");
     });
 
     it("forwards langwatch.gateway_request_id to trace attributes", () => {
@@ -217,9 +209,7 @@ describe("applySpanToSummary attribute forwarding", () => {
 
       const state = applySpanToSummary({ state: createInitState(), span });
 
-      expect(state.attributes["langwatch.gateway_request_id"]).toBe(
-        "req_01HZX0ABCDEF",
-      );
+      expect(state.attributes["langwatch.gateway_request_id"]).toBe("req_01HZX0ABCDEF");
     });
 
     it("forwards both markers together so a trace can be joined to its request", () => {

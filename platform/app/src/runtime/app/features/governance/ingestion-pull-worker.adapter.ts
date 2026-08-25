@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import {
-  GetObjectCommand,
-  ListObjectsV2Command,
-  S3Client,
-} from "@aws-sdk/client-s3";
+import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import {
   governanceIngestionSourceSchema,
   type GovernanceIngestionSource,
@@ -33,11 +29,7 @@ import { featureFlagService } from "~/server/featureFlag/featureFlag.service";
 import { EMPTY_SPEND_USAGE } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 import { AppGovernanceEncryptionPort } from "./governance-infrastructure.adapter";
-import {
-  captureException,
-  toError,
-  withScope,
-} from "~/utils/posthogErrorCapture";
+import { captureException, toError, withScope } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 const MAX_S3_FILES = 100;
@@ -260,21 +252,18 @@ export class AppIngestionPullWorkerAdapter {
     const credentials = IngestionCredentialsService.create(
       new AppGovernanceEncryptionPort(),
     );
-    const pricing = PulledUsagePricingService.create(
-      new AppPulledUsageRatePort(),
-    );
+    const pricing = PulledUsagePricingService.create(new AppPulledUsageRatePort());
     return IngestionPullWorkerService.create({
       sources: AppIngestionPullSourcePort.create(this.database),
       registry,
       credentials,
       projects: this.projects,
       sink: AppGovernanceOcsfEventSinkPort.create(this.events),
-      usageEntitlement: AppPulledUsageEntitlementPort.create(
-        (organizationId) =>
-          featureFlagService.isEnabled("release_pulled_usage_cost_enabled", {
-            distinctId: organizationId,
-            organizationId,
-          }),
+      usageEntitlement: AppPulledUsageEntitlementPort.create((organizationId) =>
+        featureFlagService.isEnabled("release_pulled_usage_cost_enabled", {
+          distinctId: organizationId,
+          organizationId,
+        }),
       ),
       usageRecords: PulledUsageRecordService.create(pricing),
       diagnostics,

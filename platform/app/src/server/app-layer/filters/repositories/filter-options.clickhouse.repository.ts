@@ -28,9 +28,7 @@ export interface FilterOptionsRepository {
  * what is genuinely its own - validating the caller, tracing the call, and
  * deciding that an unsupported field simply has no options.
  */
-export class FilterOptionsClickHouseRepository
-  implements FilterOptionsRepository
-{
+export class FilterOptionsClickHouseRepository implements FilterOptionsRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async findOptions(input: FindFilterOptionsInput): Promise<FilterOption[]> {
@@ -70,9 +68,7 @@ export class FilterOptionsClickHouseRepository
     return definition.extractResults((await result.json()) as unknown[]);
   }
 
-  private definitionFor(
-    field: FilterField,
-  ): SupportedClickHouseFilterDefinition | null {
+  private definitionFor(field: FilterField): SupportedClickHouseFilterDefinition | null {
     const definition = clickHouseFilters[field];
     if (!definition || definition.tableName === null) {
       logger.debug({ field }, "Filter not supported in ClickHouse");

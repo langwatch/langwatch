@@ -49,9 +49,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 vi.mock("~/components/DashboardLayout", () => ({
-  DashboardLayout: ({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  ),
+  DashboardLayout: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
 // Render only the chrome (headerActions) so the page's Run experiment button shows
@@ -61,9 +59,7 @@ vi.mock("~/components/datasets/editor/DatasetEditorTable", () => ({
   ),
 }));
 
-const { default: DatasetEditPage } = await import(
-  "~/pages/[project]/datasets/[id]"
-);
+const { default: DatasetEditPage } = await import("~/pages/[project]/datasets/[id]");
 
 describe("Dataset editor Run experiment", () => {
   afterEach(() => cleanup());

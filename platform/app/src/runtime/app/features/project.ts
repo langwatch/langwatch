@@ -12,9 +12,7 @@ import {
  * private Project implementation.
  */
 export class AppProjectRuntime {
-  private constructor(
-    private readonly options: PostgresProjectAdapterOptions,
-  ) {}
+  private constructor(private readonly options: PostgresProjectAdapterOptions) {}
 
   static create(options: PostgresProjectAdapterOptions): AppProjectRuntime {
     return new AppProjectRuntime(options);

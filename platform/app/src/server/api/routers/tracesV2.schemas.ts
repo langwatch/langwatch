@@ -151,9 +151,7 @@ export const traceHeaderSchema = z.object({
    * at ingestion, so the drawer can surface the "dropped, cannot be recovered"
    * banner. Absent/null when nothing was dropped.
    */
-  privacy: z
-    .object({ droppedCategories: z.array(z.string()).optional() })
-    .nullish(),
+  privacy: z.object({ droppedCategories: z.array(z.string()).optional() }).nullish(),
 });
 
 export type TraceHeader = z.infer<typeof traceHeaderSchema>;
@@ -259,11 +257,7 @@ export type SpanLangwatchSignals = z.infer<typeof spanLangwatchSignalsSchema>;
  * - `restricted`: stored but hidden from this viewer; `visibleTo` names who can.
  * - `dropped`: removed by a `drop` policy at ingestion, not stored, unrecoverable.
  */
-export const CONTENT_PRIVACY_STATES = [
-  "visible",
-  "restricted",
-  "dropped",
-] as const;
+export const CONTENT_PRIVACY_STATES = ["visible", "restricted", "dropped"] as const;
 
 const categoryPrivacySchema = z.object({
   state: z.enum(CONTENT_PRIVACY_STATES),

@@ -94,11 +94,7 @@ export function parseAdvancedDraft(
     // Reject valid-but-non-object JSON ([1,2], 42, "x", null) up front
     // so the user gets a clean inline error instead of the gateway zod
     // rejecting it with a cryptic "Expected object, received array".
-    if (
-      parsed === null ||
-      typeof parsed !== "object" ||
-      Array.isArray(parsed)
-    ) {
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("Provider config must be a JSON object");
     }
     providerConfig = parsed as Record<string, unknown>;
@@ -182,8 +178,7 @@ export function ModelProviderAdvancedSection({
           {!modelProviderId ? (
             <Box width="full" paddingY={2}>
               <Text fontSize="xs" color="gray.500">
-                Save the provider first to configure rate limits and routing
-                hints.
+                Save the provider first to configure rate limits and routing hints.
               </Text>
             </Box>
           ) : (
@@ -232,13 +227,11 @@ export function ModelProviderAdvancedSection({
                   type="number"
                   placeholder="Auto"
                   value={draft.fallbackPriorityGlobal}
-                  onChange={(e) =>
-                    setField("fallbackPriorityGlobal")(e.target.value)
-                  }
+                  onChange={(e) => setField("fallbackPriorityGlobal")(e.target.value)}
                 />
                 <Field.HelperText>
-                  Order used when a Virtual Key has no Routing Policy. Lower
-                  tries first. Tiebreak by creation order.
+                  Order used when a Virtual Key has no Routing Policy. Lower tries first.
+                  Tiebreak by creation order.
                 </Field.HelperText>
               </Field.Root>
 
@@ -250,9 +243,7 @@ export function ModelProviderAdvancedSection({
                   fontFamily="mono"
                   fontSize="xs"
                   value={draft.providerConfigJson}
-                  onChange={(e) =>
-                    setField("providerConfigJson")(e.target.value)
-                  }
+                  onChange={(e) => setField("providerConfigJson")(e.target.value)}
                 />
                 {jsonError ? (
                   <Text fontSize="xs" color="red.500">
@@ -260,8 +251,8 @@ export function ModelProviderAdvancedSection({
                   </Text>
                 ) : (
                   <Field.HelperText>
-                    Provider-specific routing hints. Bedrock region, Azure
-                    deployment override, etc.
+                    Provider-specific routing hints. Bedrock region, Azure deployment
+                    override, etc.
                   </Field.HelperText>
                 )}
               </Field.Root>
@@ -275,12 +266,8 @@ export function ModelProviderAdvancedSection({
                 <SmallLabel>Health (read-only)</SmallLabel>
                 <VStack align="start" gap={1} fontSize="xs" color="fg.muted">
                   <Text>Status: {initial.healthStatus ?? "UNKNOWN"}</Text>
-                  <Text>
-                    Last checked: {formatDate(initial.lastHealthCheckAt)}
-                  </Text>
-                  <Text>
-                    Circuit opened: {formatDate(initial.circuitOpenedAt)}
-                  </Text>
+                  <Text>Last checked: {formatDate(initial.lastHealthCheckAt)}</Text>
+                  <Text>Circuit opened: {formatDate(initial.circuitOpenedAt)}</Text>
                   {initial.disabledAt && (
                     <Text color="red.500">
                       Disabled at: {formatDate(initial.disabledAt)}

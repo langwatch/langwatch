@@ -34,12 +34,12 @@ describe("the armed ring stylesheet", () => {
       expect(ruleBody(".langy-target[data-langy-target-state] {")).toContain(
         "--langy-target-color: var(--langy-target-near-2)",
       );
-      expect(
-        ruleBody('.langy-target[data-langy-target-state="hover"] {'),
-      ).toContain("--langy-target-color: var(--langy-target-hover-2)");
-      expect(
-        ruleBody('.langy-target[data-langy-target-state="added"] {'),
-      ).toContain("--langy-target-color: var(--langy-target-added)");
+      expect(ruleBody('.langy-target[data-langy-target-state="hover"] {')).toContain(
+        "--langy-target-color: var(--langy-target-hover-2)",
+      );
+      expect(ruleBody('.langy-target[data-langy-target-state="added"] {')).toContain(
+        "--langy-target-color: var(--langy-target-added)",
+      );
     });
   });
 
@@ -49,9 +49,7 @@ describe("the armed ring stylesheet", () => {
       // monitor, which read as "arming does nothing". Quiet is the brief;
       // invisible is a bug. Every near/hover stop must stay at or above 0.15.
       const stops = [
-        ...css.matchAll(
-          /--langy-target-(?:near|hover)-\d:\s*rgba\([^)]*,\s*([\d.]+)\)/g,
-        ),
+        ...css.matchAll(/--langy-target-(?:near|hover)-\d:\s*rgba\([^)]*,\s*([\d.]+)\)/g),
       ];
       expect(stops.length).toBeGreaterThan(0);
       for (const [declaration, alpha] of stops) {

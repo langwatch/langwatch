@@ -1,9 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import {
-  isSpanContextValid,
-  context as otelContext,
-  trace,
-} from "@opentelemetry/api";
+import { isSpanContextValid, context as otelContext, trace } from "@opentelemetry/api";
 
 /**
  * Business context that can be propagated across async boundaries.
@@ -71,9 +67,7 @@ export function updateCurrentContext(updates: Partial<RequestContext>): void {
  * Gets the current OTel span context if available.
  * Used for propagating trace context to job payloads for span linking.
  */
-export function getOtelSpanContext():
-  | { traceId: string; spanId: string }
-  | undefined {
+export function getOtelSpanContext(): { traceId: string; spanId: string } | undefined {
   const span = trace.getSpan(otelContext.active());
   if (!span) return undefined;
 
@@ -97,9 +91,7 @@ export type JobDataWithContext<T extends Record<string, unknown>> = T & {
  * Rebuilds business context from propagated job metadata. Trace/span context is
  * restored by the queue's OpenTelemetry instrumentation rather than ALS.
  */
-export function createContextFromJobData(
-  metadata?: JobContextMetadata,
-): RequestContext {
+export function createContextFromJobData(metadata?: JobContextMetadata): RequestContext {
   return {
     organizationId: metadata?.organizationId,
     projectId: metadata?.projectId,

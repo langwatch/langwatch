@@ -71,9 +71,7 @@ describe("canonical OTLP metric validation", () => {
         request: requestForMetric({
           metric: gaugeMetric({
             name: "nonfinite.metric",
-            dataPoints: [
-              { timeUnixNano: "1700000000000000000", asDouble: value },
-            ],
+            dataPoints: [{ timeUnixNano: "1700000000000000000", asDouble: value }],
           }),
         }),
       });
@@ -106,9 +104,7 @@ describe("canonical OTLP metric validation", () => {
 
       expect(result.accepted).toHaveLength(0);
       expect(result.rejectedDataPoints).toBe(1);
-      expect(result.errors[0]).toContain(
-        "histogram sum must be a finite number",
-      );
+      expect(result.errors[0]).toContain("histogram sum must be a finite number");
     });
   });
 
@@ -217,13 +213,16 @@ describe("canonical OTLP metric validation", () => {
         { resourceMetrics: [{ scopeMetrics: [{ metrics: "nope" }] }] },
         "metrics must be an array",
       ],
-    ])("reports a controlled rejection for a malformed %s", async (_, request, message) => {
-      const result = await prepare({ request });
+    ])(
+      "reports a controlled rejection for a malformed %s",
+      async (_, request, message) => {
+        const result = await prepare({ request });
 
-      expect(result.accepted).toHaveLength(0);
-      expect(result.rejectedDataPoints).toBe(1);
-      expect(result.errors[0]).toContain(message);
-    });
+        expect(result.accepted).toHaveLength(0);
+        expect(result.rejectedDataPoints).toBe(1);
+        expect(result.errors[0]).toContain(message);
+      },
+    );
 
     it("keeps preparing the valid siblings of a malformed container", async () => {
       const result = await prepare({
@@ -237,9 +236,7 @@ describe("canonical OTLP metric validation", () => {
                   metrics: [
                     gaugeMetric({
                       name: "survivor",
-                      dataPoints: [
-                        { timeUnixNano: "1700000000000000000", asDouble: 1 },
-                      ],
+                      dataPoints: [{ timeUnixNano: "1700000000000000000", asDouble: 1 }],
                     }),
                   ],
                 },

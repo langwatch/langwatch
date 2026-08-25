@@ -83,9 +83,7 @@ export async function loadDirectBudgetsForKeys(args: {
       budgetId: budget.id,
       window: budget.window,
       limitUsd: budget.limitUsd.toFixed(6),
-      periodSpentUsd: spentByBudgetId
-        ? (spentByBudgetId.get(budget.id) ?? "0")
-        : null,
+      periodSpentUsd: spentByBudgetId ? (spentByBudgetId.get(budget.id) ?? "0") : null,
       // Recomputed from the window rather than read off the row: the
       // stored instant is only rewritten when the window changes, so a
       // budget that has been running for days carries a reset moment

@@ -36,9 +36,7 @@ export type SpecReader = () => Record<string, unknown> | undefined;
 function parseSpecText(text: string): Record<string, unknown> | undefined {
   try {
     const parsed: unknown = JSON.parse(text);
-    return typeof parsed === "object" &&
-      parsed !== null &&
-      !Array.isArray(parsed)
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : undefined;
   } catch {
@@ -90,9 +88,7 @@ export function useSavedChartWiring({
   query: UseLangWatchQLQuery;
 }) {
   const [openedRevision, setOpenedRevision] = useState(0);
-  const [openedSpecText, setOpenedSpecText] = useState<string | undefined>(
-    undefined,
-  );
+  const [openedSpecText, setOpenedSpecText] = useState<string | undefined>(undefined);
   const [openedParameters, setOpenedParameters] = useState<
     Readonly<Record<string, LangWatchQLParameterValue>> | undefined
   >(undefined);
@@ -103,9 +99,7 @@ export function useSavedChartWiring({
    * reader itself. Cleared whenever a chart is opened, so one chart's
    * specification can never be carried into another's Save.
    */
-  const lastSeenSpecRef = useRef<Record<string, unknown> | undefined>(
-    undefined,
-  );
+  const lastSeenSpecRef = useRef<Record<string, unknown> | undefined>(undefined);
   const registerSpecReader = useCallback((read: SpecReader | null) => {
     specReaderRef.current = read;
   }, []);
@@ -122,17 +116,14 @@ export function useSavedChartWiring({
         setParameters(opened.parameters);
         setOpenedParameters(opened.parameters);
         setOpenedSpecText(
-          opened.vegaLiteSpec
-            ? JSON.stringify(opened.vegaLiteSpec, null, 2)
-            : undefined,
+          opened.vegaLiteSpec ? JSON.stringify(opened.vegaLiteSpec, null, 2) : undefined,
         );
         setOpenedRevision((revision) => revision + 1);
       },
       [setSql, setParameters],
     ),
     onError: useCallback(
-      (error: unknown, fallbackTitle: string) =>
-        showErrorToast({ error, fallbackTitle }),
+      (error: unknown, fallbackTitle: string) => showErrorToast({ error, fallbackTitle }),
       [],
     ),
   });

@@ -21,10 +21,7 @@ class TestPuller extends GovernancePuller<{ token: string }> {
     return { token: config.token };
   }
 
-  async runOnce(
-    options: PullRunOptions,
-    config: { token: string },
-  ): Promise<PullResult> {
+  async runOnce(options: PullRunOptions, config: { token: string }): Promise<PullResult> {
     return {
       events: [],
       cursor: `${config.token}:${options.cursor ?? "first"}`,
@@ -42,9 +39,9 @@ describe("PullerRegistryService", () => {
 
     const resolved = registry.tryGet("test");
     const config = resolved?.validateConfig({ token: "secret" });
-    await expect(
-      resolved?.runOnce({ cursor: "next" }, config),
-    ).resolves.toMatchObject({ cursor: "secret:next" });
+    await expect(resolved?.runOnce({ cursor: "next" }, config)).resolves.toMatchObject({
+      cursor: "secret:next",
+    });
     expect(registry.ids()).toEqual(["test"]);
   });
 

@@ -493,12 +493,7 @@ function extractMessageContent(content: unknown): string {
 }
 
 function normaliseRole(role: unknown): PreviewResult["role"] {
-  if (
-    role === "user" ||
-    role === "assistant" ||
-    role === "system" ||
-    role === "tool"
-  ) {
+  if (role === "user" || role === "assistant" || role === "system" || role === "tool") {
     return role;
   }
   return undefined;

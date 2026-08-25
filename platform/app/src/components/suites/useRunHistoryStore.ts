@@ -13,8 +13,7 @@ import { RUN_GROUP_TYPES, type RunGroupType } from "./run-history-transforms";
 
 function isValidGroupBy(value: unknown): value is RunGroupType {
   return (
-    typeof value === "string" &&
-    (RUN_GROUP_TYPES as readonly string[]).includes(value)
+    typeof value === "string" && (RUN_GROUP_TYPES as readonly string[]).includes(value)
   );
 }
 

@@ -57,9 +57,7 @@ function acceptingAuthMiddleware() {
 
 function refusingAuthMiddleware() {
   authMiddlewareMock.mockImplementation(
-    async (c: {
-      json: (body: unknown, status: number) => Response;
-    }): Promise<Response> =>
+    async (c: { json: (body: unknown, status: number) => Response }): Promise<Response> =>
       c.json({ error: "Unauthorized", message: "Invalid credentials" }, 401),
   );
 }

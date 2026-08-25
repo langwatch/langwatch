@@ -25,8 +25,7 @@ import { JSON_POINTER_ROOT } from "./vegaLiteStructure";
 import type { VegaValidationError } from "./visualization.types";
 
 /** The canonical `$schema` for the supported version. */
-export const VEGA_LITE_SCHEMA_URL =
-  "https://vega.github.io/schema/vega-lite/v6.json";
+export const VEGA_LITE_SCHEMA_URL = "https://vega.github.io/schema/vega-lite/v6.json";
 
 /**
  * `$schema` values that mean "Vega-Lite v6": the canonical URL, and the patch-
@@ -84,9 +83,7 @@ export function validateAgainstVegaLiteSchema(
 ): VegaValidationError[] {
   const validate = getVegaLiteSchemaValidator();
   if (validate(spec)) return [];
-  const reported = mostSpecificErrors(validate.errors ?? []).map(
-    toValidationError,
-  );
+  const reported = mostSpecificErrors(validate.errors ?? []).map(toValidationError);
   // A refusal with no reported errors must not read as an acceptance. Ajv can
   // return `false` with `errors` null or empty, and `mostSpecificErrors` takes
   // `Math.max` over that empty pool — `-Infinity`, which nothing matches — so
@@ -97,8 +94,7 @@ export function validateAgainstVegaLiteSchema(
       lwqlVegaError({
         rule: "spec.schema-invalid",
         path: JSON_POINTER_ROOT,
-        message:
-          "This chart specification does not match the Vega-Lite v6 schema.",
+        message: "This chart specification does not match the Vega-Lite v6 schema.",
       }),
     ];
   }
@@ -117,9 +113,7 @@ export function validateAgainstVegaLiteSchema(
  * outrank a real nested one.
  */
 function pointerDepth(error: ErrorObject): number {
-  return error.instancePath === ""
-    ? 0
-    : error.instancePath.split("/").length - 1;
+  return error.instancePath === "" ? 0 : error.instancePath.split("/").length - 1;
 }
 
 function mostSpecificErrors(errors: readonly ErrorObject[]): ErrorObject[] {
@@ -142,8 +136,7 @@ function mostSpecificErrors(errors: readonly ErrorObject[]): ErrorObject[] {
 }
 
 function toValidationError(error: ErrorObject): VegaValidationError {
-  const path =
-    error.instancePath === "" ? JSON_POINTER_ROOT : error.instancePath;
+  const path = error.instancePath === "" ? JSON_POINTER_ROOT : error.instancePath;
   return lwqlVegaError({
     rule: "spec.schema-invalid",
     path,

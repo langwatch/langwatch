@@ -42,32 +42,32 @@ function row(
 describe("ioPreviewWillRenderFor", () => {
   describe("given a row with input and output", () => {
     it("renders when not expanded", () => {
-      expect(
-        ioPreviewWillRenderFor(row({ input: "hi", output: "hello" }), false),
-      ).toBe(true);
+      expect(ioPreviewWillRenderFor(row({ input: "hi", output: "hello" }), false)).toBe(
+        true,
+      );
     });
 
     it("suppresses when expanded so the expanded peek owns the area", () => {
-      expect(
-        ioPreviewWillRenderFor(row({ input: "hi", output: "hello" }), true),
-      ).toBe(false);
+      expect(ioPreviewWillRenderFor(row({ input: "hi", output: "hello" }), true)).toBe(
+        false,
+      );
     });
   });
 
   describe("given a row missing one side", () => {
     describe("when only the input is present", () => {
       it("renders (the preview shows a missing-output placeholder)", () => {
-        expect(
-          ioPreviewWillRenderFor(row({ input: "hi", output: null }), false),
-        ).toBe(true);
+        expect(ioPreviewWillRenderFor(row({ input: "hi", output: null }), false)).toBe(
+          true,
+        );
       });
     });
 
     describe("when only the output is present", () => {
       it("renders the preview", () => {
-        expect(
-          ioPreviewWillRenderFor(row({ input: null, output: "hello" }), false),
-        ).toBe(true);
+        expect(ioPreviewWillRenderFor(row({ input: null, output: "hello" }), false)).toBe(
+          true,
+        );
       });
     });
   });
@@ -75,9 +75,9 @@ describe("ioPreviewWillRenderFor", () => {
   describe("given a row with neither side", () => {
     describe("when the addon evaluates eligibility", () => {
       it("skips the row", () => {
-        expect(
-          ioPreviewWillRenderFor(row({ input: null, output: null }), false),
-        ).toBe(false);
+        expect(ioPreviewWillRenderFor(row({ input: null, output: null }), false)).toBe(
+          false,
+        );
       });
     });
   });
@@ -96,14 +96,7 @@ describe("ioPreviewContentBoundary", () => {
   it("stops at the leftmost reserved column (labels / evals / prompt / events)", () => {
     expect(
       ioPreviewContentBoundary({
-        visibleColumnIds: [
-          "time",
-          "trace",
-          "model",
-          "labels",
-          "evaluations",
-          "events",
-        ],
+        visibleColumnIds: ["time", "trace", "model", "labels", "evaluations", "events"],
         colCount: 6,
       }),
     ).toBe(3);

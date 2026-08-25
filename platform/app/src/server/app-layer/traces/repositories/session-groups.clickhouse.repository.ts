@@ -92,23 +92,16 @@ function buildBaseWhere(
   return { sql: parts.join(" AND "), params };
 }
 
-export class SessionGroupsClickHouseRepository
-  implements SessionGroupsRepository
-{
+export class SessionGroupsClickHouseRepository implements SessionGroupsRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async findSessionGroups(
-    query: SessionGroupsQuery,
-  ): Promise<SessionGroupsPage> {
+  async findSessionGroups(query: SessionGroupsQuery): Promise<SessionGroupsPage> {
     EventUtils.validateTenantId(
       { tenantId: query.tenantId },
       "SessionGroupsClickHouseRepository.findSessionGroups",
     );
 
-    const { sql: baseWhere, params } = buildBaseWhere(
-      query.tenantId,
-      query.timeRange,
-    );
+    const { sql: baseWhere, params } = buildBaseWhere(query.tenantId, query.timeRange);
 
     // Latest-version dedup, the rollup must sum each logical trace exactly
     // once even while ReplacingMergeTree merges lag. Same IN-tuple shape as
@@ -120,8 +113,11 @@ export class SessionGroupsClickHouseRepository
           GROUP BY TenantId, TraceId
         )`;
 
-    const { sql: sessionMatchClause, params: matchParams } =
-      this.buildSessionMatchClause(query, baseWhere, dedupFilter);
+    const { sql: sessionMatchClause, params: matchParams } = this.buildSessionMatchClause(
+      query,
+      baseWhere,
+      dedupFilter,
+    );
     Object.assign(params, matchParams);
 
     const sortExpression = SORT_EXPRESSIONS[query.sort.column];
@@ -200,8 +196,7 @@ export class SessionGroupsClickHouseRepository
 
     const rows = await result.json<ClickHouseSessionGroupRow>();
     const countRows = await countResult.json<{ totalHits: number | string }>();
-    const totalHits =
-      countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
+    const totalHits = countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
 
     const previews = await this.findPreviewsByTraceIds({
       tenantId: query.tenantId,
@@ -248,9 +243,7 @@ export class SessionGroupsClickHouseRepository
       Object.assign(params, query.filterWhere.params);
     }
 
-    const contentTerms = (query.contentTerms ?? []).filter(
-      (term) => term.length > 0,
-    );
+    const contentTerms = (query.contentTerms ?? []).filter((term) => term.length > 0);
     if (contentTerms.length > 0) {
       const termPredicates = contentTerms
         .map((term, index) => {
@@ -300,16 +293,10 @@ export class SessionGroupsClickHouseRepository
     timeRange: { from: number; to: number; live?: boolean };
     traceIds: string[];
   }): Promise<Map<string, { input: string | null; output: string | null }>> {
-    const previews = new Map<
-      string,
-      { input: string | null; output: string | null }
-    >();
+    const previews = new Map<string, { input: string | null; output: string | null }>();
     if (args.traceIds.length === 0) return previews;
 
-    const { sql: baseWhere, params } = buildBaseWhere(
-      args.tenantId,
-      args.timeRange,
-    );
+    const { sql: baseWhere, params } = buildBaseWhere(args.tenantId, args.timeRange);
 
     const client = await this.resolveClient(args.tenantId);
     const result = await client.query({

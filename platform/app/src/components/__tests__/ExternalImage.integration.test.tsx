@@ -39,11 +39,7 @@ describe("an expandable image in a results cell", () => {
     const user = userEvent.setup();
 
     render(
-      <ExternalImage
-        alt={ALT_TEXT}
-        src="https://example.com/chart.png"
-        expandable
-      />,
+      <ExternalImage alt={ALT_TEXT} src="https://example.com/chart.png" expandable />,
       { wrapper: Wrapper },
     );
 

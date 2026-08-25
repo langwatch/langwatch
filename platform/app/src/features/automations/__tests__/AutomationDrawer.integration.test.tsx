@@ -279,9 +279,7 @@ describe("AutomationDrawer", () => {
         // Facet-ordered todo copy: name, then the trace subject, then delivery.
         await waitFor(() => {
           expect(
-            screen.getByText(
-              /choose which traces to act on.*pick a delivery channel/i,
-            ),
+            screen.getByText(/choose which traces to act on.*pick a delivery channel/i),
           ).toBeInTheDocument();
         });
       });
@@ -308,9 +306,7 @@ describe("AutomationDrawer", () => {
 
     const writeDraft = (name: string) =>
       act(() => {
-        useAutomationStore
-          .getState()
-          .dispatch({ type: "SET_NAME", value: name });
+        useAutomationStore.getState().dispatch({ type: "SET_NAME", value: name });
       });
 
     describe("when the drawer comes back from a dataset sub-flow", () => {
@@ -347,9 +343,7 @@ describe("AutomationDrawer", () => {
         renderDrawer({ automationId: "trigger-1" });
 
         await waitFor(() => {
-          expect(useAutomationStore.getState().draft.name).toBe(
-            "Saved automation",
-          );
+          expect(useAutomationStore.getState().draft.name).toBe("Saved automation");
         });
         expect(screen.getByText("Edit automation")).toBeInTheDocument();
       });
@@ -365,15 +359,11 @@ describe("AutomationDrawer", () => {
         }));
         renderDrawer({ automationId: "trigger-1" });
 
-        expect(
-          await screen.findByTestId("automation-edit-loading"),
-        ).toBeInTheDocument();
+        expect(await screen.findByTestId("automation-edit-loading")).toBeInTheDocument();
         // The blank form must not render — a keystroke into it would block
         // hydration and let Save overwrite the row with a near-blank draft.
         expect(screen.queryByPlaceholderText(/name/i)).not.toBeInTheDocument();
-        expect(
-          screen.getByRole("button", { name: "Save changes" }),
-        ).toBeDisabled();
+        expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
       });
 
       it("swaps the skeleton for the hydrated form once the row lands", async () => {
@@ -384,9 +374,7 @@ describe("AutomationDrawer", () => {
           error: null,
         }));
         const { rerender } = renderDrawer({ automationId: "trigger-1" });
-        expect(
-          await screen.findByTestId("automation-edit-loading"),
-        ).toBeInTheDocument();
+        expect(await screen.findByTestId("automation-edit-loading")).toBeInTheDocument();
 
         mockTriggerRow = savedRow();
         mockGetTriggerByIdQuery.mockImplementation(() => ({
@@ -398,13 +386,9 @@ describe("AutomationDrawer", () => {
         rerender(<AutomationDrawer automationId="trigger-1" />);
 
         await waitFor(() => {
-          expect(useAutomationStore.getState().draft.name).toBe(
-            "Saved automation",
-          );
+          expect(useAutomationStore.getState().draft.name).toBe("Saved automation");
         });
-        expect(
-          screen.queryByTestId("automation-edit-loading"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("automation-edit-loading")).not.toBeInTheDocument();
       });
     });
 
@@ -418,12 +402,8 @@ describe("AutomationDrawer", () => {
         }));
         renderDrawer({ automationId: "trigger-1" });
 
-        expect(
-          await screen.findByText(/couldn't load this/i),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByRole("button", { name: "Save changes" }),
-        ).toBeDisabled();
+        expect(await screen.findByText(/couldn't load this/i)).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
       });
     });
 
@@ -433,9 +413,7 @@ describe("AutomationDrawer", () => {
         const { rerender } = renderDrawer({ automationId: "trigger-1" });
 
         await waitFor(() => {
-          expect(useAutomationStore.getState().draft.name).toBe(
-            "Saved automation",
-          );
+          expect(useAutomationStore.getState().draft.name).toBe("Saved automation");
         });
 
         // Author edits the name mid-session.
@@ -454,13 +432,9 @@ describe("AutomationDrawer", () => {
         rerender(<AutomationDrawer automationId="trigger-1" />);
 
         await waitFor(() => {
-          expect(useAutomationStore.getState().draft.name).toBe(
-            "My local edit",
-          );
+          expect(useAutomationStore.getState().draft.name).toBe("My local edit");
         });
-        expect(useAutomationStore.getState().draft.name).not.toBe(
-          "Server-changed name",
-        );
+        expect(useAutomationStore.getState().draft.name).not.toBe("Server-changed name");
       });
     });
   });
@@ -480,9 +454,7 @@ describe("AutomationDrawer", () => {
         fireEvent.change(input, { target: { value: "status:error" } });
 
         await waitFor(() => {
-          expect(useAutomationStore.getState().draft.filterQuery).toBe(
-            "status:error",
-          );
+          expect(useAutomationStore.getState().draft.filterQuery).toBe("status:error");
         });
       });
     });
@@ -507,9 +479,7 @@ describe("AutomationDrawer", () => {
         renderDrawer({ initialSource: "customGraph" });
 
         await waitFor(() => {
-          expect(useAutomationStore.getState().draft.source).toBe(
-            "customGraph",
-          );
+          expect(useAutomationStore.getState().draft.source).toBe("customGraph");
         });
 
         // The subject facet is inline — the graph select is on the main pane.
@@ -593,9 +563,7 @@ describe("AutomationDrawer", () => {
         renderDrawer({ initialSource: "customGraph" });
 
         await waitFor(() => {
-          expect(useAutomationStore.getState().draft.source).toBe(
-            "customGraph",
-          );
+          expect(useAutomationStore.getState().draft.source).toBe("customGraph");
         });
         expect(screen.getByText(/Severity/)).toBeInTheDocument();
       });
@@ -650,9 +618,7 @@ describe("AutomationDrawer", () => {
         });
         // The trace scope of a "top matching traces" report lives on the row's
         // filterQuery — losing it would silently send the newest traces.
-        expect(useAutomationStore.getState().draft.filterQuery).toBe(
-          "status:error",
-        );
+        expect(useAutomationStore.getState().draft.filterQuery).toBe("status:error");
         expect(screen.getByText("Edit schedule")).toBeInTheDocument();
       });
 
@@ -710,8 +676,7 @@ describe("AutomationDrawer", () => {
       it("refreshes the automations list and the dashboard graph cards", async () => {
         const user = userEvent.setup();
         mockUpsertMutate.mockImplementation(
-          (_input: unknown, opts?: { onSuccess?: () => void }) =>
-            opts?.onSuccess?.(),
+          (_input: unknown, opts?: { onSuccess?: () => void }) => opts?.onSuccess?.(),
         );
         mockTriggerRow = savedReportRow();
         renderDrawer({ automationId: "trigger-1" });
@@ -743,9 +708,7 @@ describe("AutomationDrawer", () => {
         // The author's cron rehydrates verbatim — a schedule too tight to run
         // is blocked, never silently swapped for a default.
         await waitFor(() => {
-          expect(useAutomationStore.getState().draft.report.cron).toBe(
-            "* * * * *",
-          );
+          expect(useAutomationStore.getState().draft.report.cron).toBe("* * * * *");
         });
         expect(
           await screen.findByRole("button", { name: "Save schedule" }),
@@ -769,9 +732,7 @@ describe("AutomationDrawer", () => {
         const input = await screen.findByPlaceholderText(/status:error/i);
         fireEvent.change(input, { target: { value: "status:error" } });
         await waitFor(() => {
-          expect(useAutomationStore.getState().draft.filterQuery).toBe(
-            "status:error",
-          );
+          expect(useAutomationStore.getState().draft.filterQuery).toBe("status:error");
         });
 
         await user.click(screen.getByRole("button", { name: /^Schedule/ }));
@@ -779,9 +740,7 @@ describe("AutomationDrawer", () => {
         await waitFor(() => {
           expect(useAutomationStore.getState().draft.source).toBe("report");
         });
-        expect(useAutomationStore.getState().draft.filterQuery).toBe(
-          "status:error",
-        );
+        expect(useAutomationStore.getState().draft.filterQuery).toBe("status:error");
       });
     });
   });

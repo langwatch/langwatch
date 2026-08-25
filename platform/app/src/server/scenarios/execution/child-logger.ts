@@ -47,9 +47,7 @@ export function encodeScenarioLogContext(context: ScenarioLogContext): string {
  * throws. Malformed JSON triggers a stderr warning so it's still visible
  * during incident response.
  */
-export function decodeScenarioLogContext(
-  raw: string | undefined,
-): ScenarioLogContext {
+export function decodeScenarioLogContext(raw: string | undefined): ScenarioLogContext {
   if (!raw) {
     return {};
   }

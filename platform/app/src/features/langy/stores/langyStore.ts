@@ -66,10 +66,7 @@ const UNKNOWN_SCOPE: LangyScope = {
  * looking like a scope CHANGE (which would wipe the very conversation a refresh
  * is meant to restore).
  */
-function mergeScope(
-  current: LangyScope | null,
-  update: Partial<LangyScope>,
-): LangyScope {
+function mergeScope(current: LangyScope | null, update: Partial<LangyScope>): LangyScope {
   return { ...(current ?? UNKNOWN_SCOPE), ...update };
 }
 
@@ -812,14 +809,12 @@ export const useLangyStore = create<LangyState>()(
       followConversationModel: ({ conversationId, model, resolvedDefault }) =>
         set((state) => {
           if (state.activeConversationId !== conversationId) return state;
-          if (state.modelSeededForConversationId === conversationId)
-            return state;
+          if (state.modelSeededForConversationId === conversationId) return state;
           // An empty override, or one equal to the resolved default the panel
           // seeds on open, both mean the user never picked since opening this
           // conversation — only then may the record's model take the pill.
           const isUntouched =
-            state.modelOverride === "" ||
-            state.modelOverride === resolvedDefault;
+            state.modelOverride === "" || state.modelOverride === resolvedDefault;
           return isUntouched
             ? {
                 modelOverride: model,
@@ -873,9 +868,7 @@ export const useLangyStore = create<LangyState>()(
             return state;
           }
           return {
-            attachedContext: state.attachedContext.filter(
-              (item) => item.id !== id,
-            ),
+            attachedContext: state.attachedContext.filter((item) => item.id !== id),
           };
         }),
       clearAttachedContext: () =>
@@ -1012,8 +1005,7 @@ export const useLangyStore = create<LangyState>()(
           // The stop never went out, so nothing was interrupted.
           interruptedConversationId: null,
         })),
-      observeBackendTurn: (inFlight) =>
-        set((s) => reduceObserveBackendTurn(s, inFlight)),
+      observeBackendTurn: (inFlight) => set((s) => reduceObserveBackendTurn(s, inFlight)),
       settleTurn: (turnId) => set((s) => reduceSettleTurn(s, turnId)),
 
       // The local turn projection (ADR-059) — pure reducers from
@@ -1022,10 +1014,7 @@ export const useLangyStore = create<LangyState>()(
       turnProjection: initialLangyTurnProjection,
       seedTurnProjection: (snapshot) =>
         set((s) => {
-          const turnProjection = seedLangyTurnProjection(
-            s.turnProjection,
-            snapshot,
-          );
+          const turnProjection = seedLangyTurnProjection(s.turnProjection, snapshot);
           // Refresh-resume: the durable record names a turn in flight and this
           // tab tracks none — adopt it so Stop targets it and live signals
           // route to it. `activeTurnId === null` keeps a mid-send tab from
@@ -1074,15 +1063,12 @@ export const useLangyStore = create<LangyState>()(
             // marker must not demote it to idle. Clear it, and drop the
             // settled turn's id with it so the new turn is adopted.
             const base =
-              s.settledTurnId !== null &&
-              turnProjection.turnId !== s.settledTurnId
+              s.settledTurnId !== null && turnProjection.turnId !== s.settledTurnId
                 ? {
                     ...s,
                     settledTurnId: null,
                     activeTurnId:
-                      s.activeTurnId === s.settledTurnId
-                        ? null
-                        : s.activeTurnId,
+                      s.activeTurnId === s.settledTurnId ? null : s.activeTurnId,
                   }
                 : s;
             return {
@@ -1101,13 +1087,11 @@ export const useLangyStore = create<LangyState>()(
       turnProgressSample: null,
       turnReasoning: null,
       turnPlan: null,
-      setTurnStatus: (turnStatus) =>
-        set({ turnStatus, turnStatusIsReadiness: false }),
+      setTurnStatus: (turnStatus) => set({ turnStatus, turnStatusIsReadiness: false }),
       setTurnReadinessStatus: (turnStatus) =>
         set({ turnStatus, turnStatusIsReadiness: true }),
       setTurnProgress: (turnProgress) => set({ turnProgress }),
-      setTurnProgressSample: (turnProgressSample) =>
-        set({ turnProgressSample }),
+      setTurnProgressSample: (turnProgressSample) => set({ turnProgressSample }),
       appendTurnReasoning: (text) =>
         set((s) => ({ turnReasoning: (s.turnReasoning ?? "") + text })),
       setTurnPlan: (turnPlan) => set({ turnPlan }),
@@ -1176,9 +1160,7 @@ export const useLangyStore = create<LangyState>()(
             scopeAnnounced: true,
             activeConversationScope: unchanged ? current : merged,
             activeConversationId: unchanged ? state.activeConversationId : null,
-            historyLoadConversationId: unchanged
-              ? state.activeConversationId
-              : null,
+            historyLoadConversationId: unchanged ? state.activeConversationId : null,
             conversationEpoch: unchanged
               ? state.conversationEpoch
               : state.conversationEpoch + 1,
@@ -1246,9 +1228,7 @@ export function selectAddableChips(
  * a derived chip. The chip id namespaces on kind + ref so an attached trace and a
  * route-derived one for the same trace collapse into one instead of stacking.
  */
-export function attachedContextToChip(
-  item: LangyAttachedContext,
-): LangyContextChip {
+export function attachedContextToChip(item: LangyAttachedContext): LangyContextChip {
   return {
     id: `${item.type}:${item.id}`,
     kind: item.type,

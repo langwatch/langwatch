@@ -40,7 +40,7 @@ export async function handleGetSuite(params: {
   lines.push(`\n**Total jobs per run**: ${totalJobs}`);
 
   lines.push(
-    "\n> Use `platform_run_suite` to trigger a run, or `platform_update_suite` to modify."
+    "\n> Use `platform_run_suite` to trigger a run, or `platform_update_suite` to modify.",
   );
 
   return lines.join("\n");

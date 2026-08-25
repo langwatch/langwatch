@@ -4,7 +4,8 @@ sidebarTitle: Scenarios in code
 ---
 
 <Tip>
-  **Quick setup?** [Copy the scenarios prompt](/skills/code-prompts#add-scenario-tests) into your coding agent to add simulation tests automatically.
+  **Quick setup?** [Copy the scenarios prompt](/skills/code-prompts#add-scenario-tests)
+  into your coding agent to add simulation tests automatically.
 </Tip>
 
 Scenarios in code run with the open-source Scenario SDK, inside your own test suite and CI. To run scenarios from the platform against your agent's HTTP endpoint instead, with no test code, see [Connect your agent](/agent-simulations/connect-your-agent).
@@ -18,16 +19,8 @@ For more in-depth information and advanced use cases, please refer to the offici
 First, you need to install the `scenario` library in your project. Choose your language below.
 
 <Tabs>
-  <Tab title="Python">
-  ```bash
-  uv add langwatch-scenario
-  ```
-  </Tab>
-  <Tab title="TypeScript">
-  ```bash
-  npm install @langwatch/scenario
-  ```
-  </Tab>
+  <Tab title="Python">```bash uv add langwatch-scenario ```</Tab>
+  <Tab title="TypeScript">```bash npm install @langwatch/scenario ```</Tab>
 </Tabs>
 
 ## 2. Configure Environment Variables
@@ -107,6 +100,7 @@ First, you need to create an agent adapter that implements your agent logic. For
         )
         return response.choices[0].message
     ```
+
   </Tab>
   <Tab title="TypeScript">
     ```typescript

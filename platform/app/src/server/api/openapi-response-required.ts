@@ -87,10 +87,7 @@ function requireDefaultedProperties(schema: JsonSchemaLike | undefined): void {
   // Existing entries keep their order so the document stays diff-stable; the
   // newly required ones follow in property order.
   const already = schema.required ?? [];
-  schema.required = [
-    ...already,
-    ...defaulted.filter((name) => !already.includes(name)),
-  ];
+  schema.required = [...already, ...defaulted.filter((name) => !already.includes(name))];
 }
 
 const OPENAPI_METHODS = [
@@ -107,8 +104,7 @@ const OPENAPI_METHODS = [
 interface OperationLike {
   responses?: Record<
     string,
-    | { content?: Record<string, { schema?: JsonSchemaLike } | undefined> }
-    | undefined
+    { content?: Record<string, { schema?: JsonSchemaLike } | undefined> } | undefined
   >;
 }
 

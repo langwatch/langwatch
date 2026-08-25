@@ -14,10 +14,7 @@ import type { LimitCheckResult, LimitType, limitTypes } from "./types";
  * Associates each LimitType with functions to get count and max.
  */
 type LimitTypeConfig = {
-  getCount: (
-    repo: ILicenseEnforcementRepository,
-    orgId: string,
-  ) => Promise<number>;
+  getCount: (repo: ILicenseEnforcementRepository, orgId: string) => Promise<number>;
   getMax: (plan: PlanInfo) => number;
 };
 

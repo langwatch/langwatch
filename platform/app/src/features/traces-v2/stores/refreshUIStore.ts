@@ -68,9 +68,7 @@ export const useRefreshUIStore = create<RefreshUIState>((set) => ({
     refreshRequestTimer = setTimeout(() => {
       refreshRequestTimer = null;
       set((s) =>
-        s.refreshRequested
-          ? { refreshRequested: false, refreshSawFetch: false }
-          : s,
+        s.refreshRequested ? { refreshRequested: false, refreshSawFetch: false } : s,
       );
     }, REFRESH_REQUEST_TIMEOUT_MS);
   },

@@ -103,9 +103,7 @@ export interface ProcessEvolution<State> {
   intents?: ProcessIntent[];
 }
 
-export interface ProcessHandlerContext<
-  Intents extends Record<string, IntentSpec<any>>,
-> {
+export interface ProcessHandlerContext<Intents extends Record<string, IntentSpec<any>>> {
   /**
    * The instant the input refers to: the event's `occurredAt`, or the slot a
    * wake was scheduled for. May be arbitrarily far in the past when the
@@ -123,20 +121,13 @@ export interface ProcessHandlerContext<
   intents: IntentFactories<Intents>;
 }
 
-export type EventHandler<
-  State,
-  Data,
-  Intents extends Record<string, IntentSpec<any>>,
-> = (
+export type EventHandler<State, Data, Intents extends Record<string, IntentSpec<any>>> = (
   state: State,
   data: Data,
   context: ProcessHandlerContext<Intents>,
 ) => ProcessEvolution<State>;
 
-export type WakeHandler<
-  State,
-  Intents extends Record<string, IntentSpec<any>>,
-> = (
+export type WakeHandler<State, Intents extends Record<string, IntentSpec<any>>> = (
   state: State,
   context: ProcessHandlerContext<Intents>,
 ) => ProcessEvolution<State>;
@@ -154,10 +145,7 @@ export type SignalHandler<
 export interface SignalSpec<
   Schema extends ZodTypeAny = ZodTypeAny,
   State = unknown,
-  Intents extends Record<string, IntentSpec<any>> = Record<
-    string,
-    IntentSpec<any>
-  >,
+  Intents extends Record<string, IntentSpec<any>> = Record<string, IntentSpec<any>>,
 > {
   schema: Schema;
   handle: SignalHandler<State, z.output<Schema>, Intents>;
@@ -229,10 +217,7 @@ export interface ProcessManagerConfig<
 
 export interface ProcessManagerDefinition<
   State = unknown,
-  Intents extends Record<string, IntentSpec<any>> = Record<
-    string,
-    IntentSpec<any>
-  >,
+  Intents extends Record<string, IntentSpec<any>> = Record<string, IntentSpec<any>>,
   E extends Event = Event,
 > {
   readonly config: ProcessManagerConfig<State, Intents, E>;
@@ -270,9 +255,7 @@ export function defineProcessManager<
   return { config };
 }
 
-export function buildIntentFactories<
-  Intents extends Record<string, IntentSpec<any>>,
->(
+export function buildIntentFactories<Intents extends Record<string, IntentSpec<any>>>(
   intents: Intents,
   options?: { processKey?: string },
 ): IntentFactories<Intents> {

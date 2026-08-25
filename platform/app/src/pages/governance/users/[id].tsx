@@ -43,9 +43,7 @@ const fmtRelative = (date: Date | string | null): string => {
 function GovernanceUserDetailPage() {
   const router = useRouter();
   const actor =
-    typeof router.query.id === "string"
-      ? decodeURIComponent(router.query.id)
-      : null;
+    typeof router.query.id === "string" ? decodeURIComponent(router.query.id) : null;
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
@@ -56,11 +54,10 @@ function GovernanceUserDetailPage() {
     { organizationId: orgId, windowDays: 30, limit: 500 },
     { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
   );
-  const personalProjectQuery =
-    api.governance.resolveActorPersonalProject.useQuery(
-      { organizationId: orgId, actor: actor ?? "" },
-      { enabled: !!orgId && !!actor, refetchOnWindowFocus: false },
-    );
+  const personalProjectQuery = api.governance.resolveActorPersonalProject.useQuery(
+    { organizationId: orgId, actor: actor ?? "" },
+    { enabled: !!orgId && !!actor, refetchOnWindowFocus: false },
+  );
   const personalProject = personalProjectQuery.data;
 
   const user = (usersQuery.data ?? []).find((u) => u.actor === actor);
@@ -88,9 +85,7 @@ function GovernanceUserDetailPage() {
               borderRadius="full"
               backgroundColor={actor ? getHexColorForString(actor) : "fg.muted"}
             />
-            <Heading size="md">
-              {user?.actor ?? actor ?? "User not found"}
-            </Heading>
+            <Heading size="md">{user?.actor ?? actor ?? "User not found"}</Heading>
           </HStack>
         </VStack>
 
@@ -107,12 +102,7 @@ function GovernanceUserDetailPage() {
         ) : usersQuery.isLoading ? (
           <Spinner />
         ) : !user ? (
-          <Box
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            padding={5}
-          >
+          <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={5}>
             <Text fontSize="sm" color="fg.muted">
               No spend data for this user in the last 30 days.
             </Text>
@@ -121,14 +111,8 @@ function GovernanceUserDetailPage() {
           <>
             <SimpleGrid columns={{ base: 1, md: 4 }} gap={3}>
               <Stat label="Spend (30 d)" value={fmtUsd(user.spendUsd)} />
-              <Stat
-                label="Requests"
-                value={numeral(user.requests).format("0,0")}
-              />
-              <Stat
-                label="Last active"
-                value={fmtRelative(user.lastActivityIso)}
-              />
+              <Stat label="Requests" value={numeral(user.requests).format("0,0")} />
+              <Stat label="Last active" value={fmtRelative(user.lastActivityIso)} />
               <Stat label="Most-used" value={user.mostUsedTarget ?? "—"} />
             </SimpleGrid>
 
@@ -142,8 +126,8 @@ function GovernanceUserDetailPage() {
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend trend and per-model breakdown for this user will
-                land here in a follow-up.
+                Per-day spend trend and per-model breakdown for this user will land here
+                in a follow-up.
               </Text>
               {personalProject && (
                 <>
@@ -155,28 +139,18 @@ function GovernanceUserDetailPage() {
                   >
                     View {personalProject.displayName}'s personal workspace →
                   </Link>
-                  <Text
-                    fontSize="xs"
-                    color="fg.subtle"
-                    marginTop={1}
-                    marginBottom={3}
-                  >
-                    Opens their trace explorer with a 'Viewing as admin' banner.
-                    Each access is recorded at /settings/audit-log.
+                  <Text fontSize="xs" color="fg.subtle" marginTop={1} marginBottom={3}>
+                    Opens their trace explorer with a 'Viewing as admin' banner. Each
+                    access is recorded at /settings/audit-log.
                   </Text>
                 </>
               )}
-              <Link
-                href="/governance"
-                color="blue.600"
-                fontSize="sm"
-                fontWeight="medium"
-              >
+              <Link href="/governance" color="blue.600" fontSize="sm" fontWeight="medium">
                 See this user in the bird's-eye chart →
               </Link>
               <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-                The chart's {`'By User'`} toggle exercises the same data through
-                one orthogonal lens until the dedicated drilldown ships.
+                The chart's {`'By User'`} toggle exercises the same data through one
+                orthogonal lens until the dedicated drilldown ships.
               </Text>
             </Box>
           </>
@@ -188,12 +162,7 @@ function GovernanceUserDetailPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={3}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
       <Text
         fontSize="xs"
         fontWeight="semibold"

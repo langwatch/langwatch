@@ -137,9 +137,7 @@ export class ReplayService {
     const mapProjections = config.mapProjections ?? [];
     const stateProjections = config.stateProjections ?? [];
     const totalProjections =
-      config.projections.length +
-      mapProjections.length +
-      stateProjections.length;
+      config.projections.length + mapProjections.length + stateProjections.length;
     const log = callbacks?.log ?? nullLog;
 
     for (let si = 0; si < stateProjections.length; si++) {

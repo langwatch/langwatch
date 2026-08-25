@@ -122,18 +122,13 @@ export function BudgetExceededBanner({
           <AlertTriangle size={20} aria-hidden="true" />
         </Box>
         <VStack align="start" gap={2} flex={1}>
-          <Text
-            fontWeight="semibold"
-            color="red.700"
-            _dark={{ color: "red.200" }}
-          >
+          <Text fontWeight="semibold" color="red.700" _dark={{ color: "red.200" }}>
             Budget limit reached
           </Text>
           <Text fontSize="sm" color="red.700" _dark={{ color: "red.200" }}>
             You&rsquo;ve used <strong>{fmtUsd(spentUsd)}</strong> of your{" "}
-            <strong>{fmtUsd(limitUsd)}</strong> {periodLabel} {scopeLabel}{" "}
-            budget. New requests are being blocked until the limit resets or
-            your admin raises it.
+            <strong>{fmtUsd(limitUsd)}</strong> {periodLabel} {scopeLabel} budget. New
+            requests are being blocked until the limit resets or your admin raises it.
           </Text>
           {(requestIncreaseUrl || adminEmail) && (
             <HStack gap={4} fontSize="sm" wrap="wrap">

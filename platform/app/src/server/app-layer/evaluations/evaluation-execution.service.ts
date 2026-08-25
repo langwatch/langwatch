@@ -120,8 +120,7 @@ export function extractParentTraceForNlpgo(
     return (a.span_id ?? "").localeCompare(b.span_id ?? "");
   });
   const rootSpan = rootCandidates[0];
-  if (!rootSpan?.span_id || !SPAN_ID_HEX.test(rootSpan.span_id))
-    return undefined;
+  if (!rootSpan?.span_id || !SPAN_ID_HEX.test(rootSpan.span_id)) return undefined;
   return {
     traceId: trace.trace_id.toLowerCase(),
     parentSpanId: rootSpan.span_id.toLowerCase(),
@@ -211,15 +210,8 @@ export class EvaluationExecutionService {
     level?: "trace" | "thread";
     workflowId?: string | null;
   }): Promise<EvaluationExecutionResult> {
-    const {
-      projectId,
-      traceId,
-      evaluatorType,
-      settings,
-      mappings,
-      level,
-      workflowId,
-    } = params;
+    const { projectId, traceId, evaluatorType, settings, mappings, level, workflowId } =
+      params;
 
     // 1. Fetch trace. Evaluators must see the FULL IO values (not the 64 KB
     // preview), so opt into blob resolution (#4888). Under the per-call gate
@@ -247,14 +239,10 @@ export class EvaluationExecutionService {
     }
 
     // 3. Determine evaluation level
-    const isThreadLevel = level
-      ? level === "thread"
-      : hasThreadMappings(mappings);
+    const isThreadLevel = level ? level === "thread" : hasThreadMappings(mappings);
 
     const evaluationThreadId =
-      isThreadLevel && trace.metadata?.thread_id
-        ? trace.metadata.thread_id
-        : undefined;
+      isThreadLevel && trace.metadata?.thread_id ? trace.metadata.thread_id : undefined;
 
     // A thread-based evaluation needs a thread_id to group the conversation.
     // A trace without one can never be thread-evaluated, so skip it here —
@@ -278,12 +266,11 @@ export class EvaluationExecutionService {
     // live-monitor path and the fetch is a heavy Inputs-projection
     // ClickHouse read that most evaluator mappings never need.
     if (mappingsReadEvaluationsSource(mappings)) {
-      const evaluationsByTrace =
-        await this.deps.traceService.getEvaluationsMultiple(
-          projectId,
-          [traceId],
-          INTERNAL_PROTECTIONS,
-        );
+      const evaluationsByTrace = await this.deps.traceService.getEvaluationsMultiple(
+        projectId,
+        [traceId],
+        INTERNAL_PROTECTIONS,
+      );
       trace.evaluations = evaluationsByTrace[traceId] ?? [];
     }
 
@@ -370,13 +357,12 @@ export class EvaluationExecutionService {
         for (const [field, config] of Object.entries(mappings.mapping)) {
           if (
             "source" in config &&
-            (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(
-              config.source,
-            )
+            (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(config.source)
           ) {
             if (config.source === "formatted_trace") {
-              (mappedData as Record<string, unknown>)[field] =
-                await formatSpansDigest(trace.spans ?? []);
+              (mappedData as Record<string, unknown>)[field] = await formatSpansDigest(
+                trace.spans ?? [],
+              );
             }
           }
         }
@@ -454,19 +440,16 @@ export class EvaluationExecutionService {
       );
     }
 
-    const threadTraces =
-      await this.deps.traceService.getTracesWithSpansByThreadIds(
-        projectId,
-        [threadId],
-        INTERNAL_PROTECTIONS,
-        { full: true },
-      );
+    const threadTraces = await this.deps.traceService.getTracesWithSpansByThreadIds(
+      projectId,
+      [threadId],
+      INTERNAL_PROTECTIONS,
+      { full: true },
+    );
 
     const result: Record<string, unknown> = {};
 
-    for (const [targetField, mappingConfig] of Object.entries(
-      mappings.mapping,
-    )) {
+    for (const [targetField, mappingConfig] of Object.entries(mappings.mapping)) {
       const isThreadMapping =
         ("type" in mappingConfig && mappingConfig.type === "thread") ||
         ("source" in mappingConfig &&
@@ -479,14 +462,10 @@ export class EvaluationExecutionService {
         const source = mappingConfig.source;
         if (!source) continue;
 
-        if (
-          (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)
-        ) {
+        if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
           if (source === "formatted_traces") {
             result[targetField] = (
-              await Promise.all(
-                threadTraces.map((t) => formatSpansDigest(t.spans ?? [])),
-              )
+              await Promise.all(threadTraces.map((t) => formatSpansDigest(t.spans ?? [])))
             ).join("\n\n---\n\n");
           }
         } else {
@@ -503,9 +482,7 @@ export class EvaluationExecutionService {
       } else if ("source" in mappingConfig) {
         // Regular trace mapping
         if (
-          (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(
-            mappingConfig.source,
-          )
+          (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(mappingConfig.source)
         ) {
           if (mappingConfig.source === "formatted_trace") {
             result[targetField] = await formatSpansDigest(trace.spans ?? []);

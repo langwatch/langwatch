@@ -16,11 +16,7 @@ export type ModelProviderKey =
   | "vertex_ai";
 
 /** The surfaces the provider grid renders on. */
-export type ModelProviderSurface =
-  | "evaluations"
-  | "prompts"
-  | "langy"
-  | "onboarding";
+export type ModelProviderSurface = "evaluations" | "prompts" | "langy" | "onboarding";
 
 export interface FieldMetadata {
   label: string;

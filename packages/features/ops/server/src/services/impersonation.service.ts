@@ -54,8 +54,7 @@ export class ImpersonationService {
     private readonly access: AdminAccess,
     private readonly audit: AdminAuditSink,
     private readonly now: () => Date,
-  ) {
-  }
+  ) {}
 
   static create(options: ImpersonationServiceOptions): ImpersonationService {
     return new ImpersonationService(

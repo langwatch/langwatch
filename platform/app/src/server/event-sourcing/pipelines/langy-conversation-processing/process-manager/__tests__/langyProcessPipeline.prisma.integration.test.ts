@@ -110,13 +110,10 @@ describe("Langy process manager and outbox with Postgres", () => {
     // The real production path: ProcessRuntime generates the
     // `pm:langyConversation` subscriber from the pipeline declaration.
     const runtime = new ProcessRuntime({ store, consumersEnabled: false });
-    const { subscribers } =
-      runtime.registerPipeline<LangyConversationProcessingEvent>({
-        pipelineName: "langy-conversation-processing",
-        processManagers: new Map([
-          [LANGY_CONVERSATION_PROCESS_NAME, definition],
-        ]),
-      });
+    const { subscribers } = runtime.registerPipeline<LangyConversationProcessingEvent>({
+      pipelineName: "langy-conversation-processing",
+      processManagers: new Map([[LANGY_CONVERSATION_PROCESS_NAME, definition]]),
+    });
     const subscriber = subscribers[0];
     if (!subscriber) throw new Error("runtime generated no subscriber");
     const events = lifecycle();
@@ -179,9 +176,7 @@ describe("Langy process manager and outbox with Postgres", () => {
         resumeFromTurnId: null,
       },
     ]);
-    expect(calls.titleRequests).toEqual([
-      { projectId, conversationId, turnId },
-    ]);
+    expect(calls.titleRequests).toEqual([{ projectId, conversationId, turnId }]);
 
     expect(
       await prisma.processManagerOutbox.count({

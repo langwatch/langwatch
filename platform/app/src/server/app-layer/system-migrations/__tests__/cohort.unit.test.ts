@@ -1,19 +1,12 @@
 import { describe, expect, it } from "vitest";
-import {
-  migrationRunsOnThisInstallation,
-  organizationMigrates,
-} from "../cohort";
+import { migrationRunsOnThisInstallation, organizationMigrates } from "../cohort";
 
 describe("organizationMigrates", () => {
   describe("when the installation is self-hosted", () => {
     /** @scenario "A self-hosted installation migrates every organization" */
     it("includes every organization, enrolled or not", () => {
-      expect(organizationMigrates({ isSaaS: false, enrolled: false })).toBe(
-        true,
-      );
-      expect(organizationMigrates({ isSaaS: false, enrolled: true })).toBe(
-        true,
-      );
+      expect(organizationMigrates({ isSaaS: false, enrolled: false })).toBe(true);
+      expect(organizationMigrates({ isSaaS: false, enrolled: true })).toBe(true);
     });
   });
 
@@ -21,9 +14,7 @@ describe("organizationMigrates", () => {
     /** @scenario "Cloud rollout processes only enrolled organizations" */
     it("includes exactly the enrolled organizations", () => {
       expect(organizationMigrates({ isSaaS: true, enrolled: true })).toBe(true);
-      expect(organizationMigrates({ isSaaS: true, enrolled: false })).toBe(
-        false,
-      );
+      expect(organizationMigrates({ isSaaS: true, enrolled: false })).toBe(false);
     });
   });
 });

@@ -8,13 +8,7 @@
  * @see specs/analytics/lwql-workbench.feature
  */
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { api } from "~/utils/api";
 
@@ -84,10 +78,7 @@ export function useLangWatchQLQuery({
     controller.getState,
   );
 
-  const setSql = useCallback(
-    (sql: string) => controller.setSql(sql),
-    [controller],
-  );
+  const setSql = useCallback((sql: string) => controller.setSql(sql), [controller]);
   const setParameters = useCallback(
     (parameters: Readonly<Record<string, LangWatchQLParameterValue>>) =>
       controller.setParameters(parameters),

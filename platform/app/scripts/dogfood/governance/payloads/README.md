@@ -34,9 +34,7 @@ A canned payload is a JSON document with **at least** this shape:
   "resourceSpans": [
     {
       "resource": {
-        "attributes": [
-          { "key": "service.name", "value": { "stringValue": "..." } }
-        ]
+        "attributes": [{ "key": "service.name", "value": { "stringValue": "..." } }]
       },
       "scopeSpans": [
         {
@@ -44,13 +42,15 @@ A canned payload is a JSON document with **at least** this shape:
           "spans": [
             {
               "traceId": "<placeholder>",
-              "spanId":  "<placeholder>",
-              "name":    "...",
-              "kind":    1,
+              "spanId": "<placeholder>",
+              "name": "...",
+              "kind": 1,
               "startTimeUnixNano": "...",
-              "endTimeUnixNano":   "...",
-              "attributes": [ { "key": "gen_ai.system", "value": { "stringValue": "anthropic" } } ],
-              "status":     { "code": 1 }
+              "endTimeUnixNano": "...",
+              "attributes": [
+                { "key": "gen_ai.system", "value": { "stringValue": "anthropic" } }
+              ],
+              "status": { "code": 1 }
             }
           ]
         }

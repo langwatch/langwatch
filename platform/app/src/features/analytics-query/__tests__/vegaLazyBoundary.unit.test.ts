@@ -25,10 +25,7 @@ const FEATURE_DIR = fileURLToPath(new URL("../", import.meta.url));
 /** `…/analytics-query` → `…/src`, which the `~/` alias resolves from. */
 const SRC_DIR = resolve(FEATURE_DIR, "../..");
 
-const LAZY_BOUNDARY = join(
-  FEATURE_DIR,
-  "components/LazyLangWatchQLChartMode.tsx",
-);
+const LAZY_BOUNDARY = join(FEATURE_DIR, "components/LazyLangWatchQLChartMode.tsx");
 const CHART_MODE = join(FEATURE_DIR, "components/LangWatchQLChartMode.tsx");
 
 /** Packages whose presence in a chunk means the Vega runtime is in it. */
@@ -139,9 +136,7 @@ const featureSourceFiles = (directory: string): string[] =>
     }
     // A declaration file is erased too, so it is never in a chunk.
     if (entry.name.endsWith(".d.ts")) return [];
-    return EXTENSIONS.some((extension) => entry.name.endsWith(extension))
-      ? [path]
-      : [];
+    return EXTENSIONS.some((extension) => entry.name.endsWith(extension)) ? [path] : [];
   });
 
 describe("where the Vega runtime can be reached from", () => {
@@ -193,9 +188,7 @@ describe("where the Vega runtime can be reached from", () => {
 
       it("records it even where no semicolon closes the type-only line", () => {
         expect(
-          specifiersOf(
-            'export type Foo = string\nimport vegaEmbed from "vega-embed"\n',
-          ),
+          specifiersOf('export type Foo = string\nimport vegaEmbed from "vega-embed"\n'),
         ).toEqual(["vega-embed"]);
       });
 
@@ -204,9 +197,9 @@ describe("where the Vega runtime can be reached from", () => {
       });
 
       it("still reads a specifier across a multi-line brace list", () => {
-        expect(
-          specifiersOf('import {\n  a,\n  b,\n} from "vega-lite";\n'),
-        ).toEqual(["vega-lite"]);
+        expect(specifiersOf('import {\n  a,\n  b,\n} from "vega-lite";\n')).toEqual([
+          "vega-lite",
+        ]);
       });
     });
   });

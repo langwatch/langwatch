@@ -37,10 +37,7 @@ export function parseJsonStringArray(raw: string | undefined): string[] {
 /**
  * Returns the value at `key` if it is a string, otherwise `undefined`.
  */
-export function stringAttr(
-  attrs: NormalizedAttributes,
-  key: string,
-): string | undefined {
+export function stringAttr(attrs: NormalizedAttributes, key: string): string | undefined {
   const v = attrs[key];
   return typeof v === "string" ? v : undefined;
 }

@@ -137,9 +137,9 @@ describe("visitContentPart", () => {
 
   describe("given a media part whose source shape is not one we speak", () => {
     it("passes it through rather than inventing an empty payload", () => {
-      expect(
-        decode({ type: "image", source: { type: "container", id: "abc" } }),
-      ).toEqual({ branch: "unknown" });
+      expect(decode({ type: "image", source: { type: "container", id: "abc" } })).toEqual(
+        { branch: "unknown" },
+      );
     });
   });
 });

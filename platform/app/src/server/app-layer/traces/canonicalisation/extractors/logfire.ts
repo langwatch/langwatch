@@ -59,8 +59,7 @@ export class LogfireExtractor implements CanonicalAttributesExtractor {
             name: "gen_ai.choice",
             extractor: (event: NormalizedEvent) => {
               const eventAttrs = event.attributes as Record<string, unknown>;
-              const message =
-                eventAttrs.message ?? eventAttrs.content ?? eventAttrs.text;
+              const message = eventAttrs.message ?? eventAttrs.content ?? eventAttrs.text;
 
               if (message !== undefined) {
                 return { role: "assistant", content: safeJsonParse(message) };

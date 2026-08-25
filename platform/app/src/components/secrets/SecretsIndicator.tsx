@@ -23,17 +23,11 @@ interface SecretsIndicatorProps {
  * Button that reveals a popover listing project secrets.
  * Clicking a secret name inserts `secrets.NAME` at the editor cursor.
  */
-export function SecretsIndicator({
-  projectId,
-  onInsertSecret,
-}: SecretsIndicatorProps) {
+export function SecretsIndicator({ projectId, onInsertSecret }: SecretsIndicatorProps) {
   const [open, setOpen] = useState(false);
   // Only list secrets once the popover is opened — the trigger is static, so
   // there's no need to fetch on mount for every editor that renders this.
-  const secretsQuery = api.secrets.list.useQuery(
-    { projectId },
-    { enabled: open },
-  );
+  const secretsQuery = api.secrets.list.useQuery({ projectId }, { enabled: open });
   const secrets = secretsQuery.data ?? [];
 
   const handleSecretClick = (secretName: string) => {
@@ -133,14 +127,8 @@ export function SecretsIndicator({
                       // `text/x-langwatch-secret` is our private MIME the Monaco
                       // drop handler matches on. `text/plain` is the fallback so
                       // dragging into a normal textarea still works.
-                      e.dataTransfer.setData(
-                        "text/x-langwatch-secret",
-                        secret.name,
-                      );
-                      e.dataTransfer.setData(
-                        "text/plain",
-                        `secrets.${secret.name}`,
-                      );
+                      e.dataTransfer.setData("text/x-langwatch-secret", secret.name);
+                      e.dataTransfer.setData("text/plain", `secrets.${secret.name}`);
                       e.dataTransfer.effectAllowed = "copy";
                     }}
                     data-testid={`secret-item-${secret.name}`}
@@ -157,8 +145,7 @@ export function SecretsIndicator({
                 <Alert.Indicator />
                 <Alert.Content>
                   <Text fontSize="xs">
-                    Use <Code fontSize="xs">secrets.NAME</Code> syntax in your
-                    code
+                    Use <Code fontSize="xs">secrets.NAME</Code> syntax in your code
                   </Text>
                 </Alert.Content>
               </Alert.Root>

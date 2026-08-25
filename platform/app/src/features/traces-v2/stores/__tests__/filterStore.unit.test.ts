@@ -21,9 +21,7 @@ describe("toggleFacet", () => {
       it("AND-appends the new clause", () => {
         useFilterStore.getState().applyQueryText("model:gpt-4o");
         useFilterStore.getState().toggleFacet("status", "error");
-        expect(useFilterStore.getState().queryText).toBe(
-          "model:gpt-4o AND status:error",
-        );
+        expect(useFilterStore.getState().queryText).toBe("model:gpt-4o AND status:error");
       });
     });
   });
@@ -37,9 +35,7 @@ describe("toggleFacet", () => {
         // built by typing in the filter bar — no sidebar click produces
         // this combinator any more — but the store mechanism stays.)
         useFilterStore.getState().applyQueryText("model:gpt-4o");
-        useFilterStore
-          .getState()
-          .toggleFacet("status", "error", { combinator: "OR" });
+        useFilterStore.getState().toggleFacet("status", "error", { combinator: "OR" });
         expect(useFilterStore.getState().queryText).toBe(
           "(model:gpt-4o) OR (status:error)",
         );
@@ -50,9 +46,7 @@ describe("toggleFacet", () => {
   describe("given a query with an existing OR group and a neutral state", () => {
     describe("when called with orGroupLocation pointing at the group", () => {
       it("splices the new value into the existing group instead of appending", () => {
-        useFilterStore
-          .getState()
-          .applyQueryText("status:error OR model:gpt-4o");
+        useFilterStore.getState().applyQueryText("status:error OR model:gpt-4o");
         const query = useFilterStore.getState().queryText;
         useFilterStore.getState().toggleFacet("origin", "application", {
           orGroupLocation: { start: 0, end: query.length },
@@ -70,15 +64,11 @@ describe("toggleFacet", () => {
         // `status:error` is already an include — toggling cycles to
         // exclude via the standard toggleFacetInQuery path, NOT the
         // splice path. The orGroupLocation hint is ignored.
-        useFilterStore
-          .getState()
-          .applyQueryText("status:error OR model:gpt-4o");
+        useFilterStore.getState().applyQueryText("status:error OR model:gpt-4o");
         useFilterStore.getState().toggleFacet("status", "error", {
           orGroupLocation: { start: 0, end: 28 },
         });
-        expect(useFilterStore.getState().queryText).toContain(
-          "NOT status:error",
-        );
+        expect(useFilterStore.getState().queryText).toContain("NOT status:error");
       });
     });
   });
@@ -103,9 +93,7 @@ describe("toggleFacet", () => {
         // Precedence guard: `model:x AND origin:a OR origin:b` would bind
         // as `(model:x AND origin:a) OR origin:b` — the parens keep the
         // OR scoped to the origin field.
-        useFilterStore
-          .getState()
-          .applyQueryText("model:gpt-4o AND origin:sample");
+        useFilterStore.getState().applyQueryText("model:gpt-4o AND origin:sample");
         useFilterStore.getState().toggleFacet("origin", "application");
         expect(useFilterStore.getState().queryText).toBe(
           "model:gpt-4o AND (origin:sample OR origin:application)",
@@ -131,9 +119,7 @@ describe("toggleFacet", () => {
         // Mirror production: the location comes from `analyzeOrGroups`,
         // which reports the INNER OR expression's span (inside the
         // parens), so the splice lands before the closing `)`.
-        useFilterStore
-          .getState()
-          .applyQueryText("(origin:sample OR origin:application)");
+        useFilterStore.getState().applyQueryText("(origin:sample OR origin:application)");
         const { ast } = useFilterStore.getState();
         const group = analyzeOrGroups(ast).groups[0]!;
         useFilterStore.getState().toggleFacet("origin", "api", {
@@ -148,9 +134,7 @@ describe("toggleFacet", () => {
     describe("when a value is removed (2 → 1)", () => {
       /** @scenario "Unchecking down to one value collapses the OR group to a bare clause" */
       it("collapses the group back to a bare tag", () => {
-        useFilterStore
-          .getState()
-          .applyQueryText("(origin:sample OR origin:application)");
+        useFilterStore.getState().applyQueryText("(origin:sample OR origin:application)");
         useFilterStore.getState().removeFacet("origin", "application");
         expect(useFilterStore.getState().queryText).toBe("origin:sample");
       });
@@ -225,9 +209,7 @@ describe("lastAiTranslation lifecycle", () => {
 
     describe("when swapOperator runs", () => {
       it("clears the translation", () => {
-        useFilterStore
-          .getState()
-          .applyQueryText("status:error AND model:gpt-4o");
+        useFilterStore.getState().applyQueryText("status:error AND model:gpt-4o");
         useFilterStore.getState().recordAiTranslation(TRANSLATION); // re-set after applyQueryText cleared it
         // AND lives at offsets 13..16 in the trimmed string.
         useFilterStore.getState().swapOperator(13, 16);
@@ -296,9 +278,7 @@ describe("lastAiTranslation lifecycle", () => {
         useFilterStore.getState().applyQueryText("status:error");
         useFilterStore.getState().recordAiTranslation(TRANSLATION);
         useFilterStore.getState().applyQueryText("status:error");
-        expect(useFilterStore.getState().lastAiTranslation).toEqual(
-          TRANSLATION,
-        );
+        expect(useFilterStore.getState().lastAiTranslation).toEqual(TRANSLATION);
       });
     });
   });

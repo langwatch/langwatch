@@ -38,9 +38,7 @@ function signedResolveKey(keyPresented: string) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const bodyHash = createHash("sha256").update(body).digest("hex");
   const canonical = `POST\n${path}\n${timestamp}\n${bodyHash}`;
-  const signature = createHmac("sha256", SECRET)
-    .update(canonical)
-    .digest("hex");
+  const signature = createHmac("sha256", SECRET).update(canonical).digest("hex");
   return new Request(`http://localhost${path}`, {
     method: "POST",
     body,
@@ -122,13 +120,7 @@ describe("virtual key expiry (real PG + internal route)", () => {
     await stopTestContainers();
   });
 
-  async function mintKey({
-    name,
-    expiresAt,
-  }: {
-    name: string;
-    expiresAt?: Date;
-  }) {
+  async function mintKey({ name, expiresAt }: { name: string; expiresAt?: Date }) {
     return service.create({
       organizationId: ORG_ID,
       name: `${name}-${nanoid(6)}`,

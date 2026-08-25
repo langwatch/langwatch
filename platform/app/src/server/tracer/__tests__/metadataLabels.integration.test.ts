@@ -35,9 +35,7 @@ function createOtelTraceWithAttributes(
     resourceSpans: [
       {
         resource: {
-          attributes: [
-            { key: "service.name", value: { stringValue: "test-service" } },
-          ],
+          attributes: [{ key: "service.name", value: { stringValue: "test-service" } }],
         },
         scopeSpans: [
           {
@@ -73,8 +71,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         { key: "gen_ai.conversation.id", value: { stringValue: "conv-123" } },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -86,8 +83,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         { key: "session.id", value: { stringValue: "session-456" } },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -99,8 +95,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         { key: "langwatch.thread.id", value: { stringValue: "lw-thread-789" } },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -116,8 +111,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -132,8 +126,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         { key: "user.id", value: { stringValue: "user-123" } },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -145,8 +138,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         { key: "langwatch.user.id", value: { stringValue: "lw-user-456" } },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -160,8 +152,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         { key: "langwatch.customer.id", value: { stringValue: "cust-789" } },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -186,8 +177,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -206,16 +196,12 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
       // langwatch.labels goes through metadata extraction
-      expect(trace.reservedTraceMetadata.labels).toEqual([
-        "env:prod",
-        "version:1.0",
-      ]);
+      expect(trace.reservedTraceMetadata.labels).toEqual(["env:prod", "version:1.0"]);
     });
   });
 
@@ -230,8 +216,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -255,8 +240,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -281,8 +265,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -319,8 +302,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -362,8 +344,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -386,8 +367,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -410,8 +390,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -428,8 +407,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         { key: "langwatch.customer.id", value: { stringValue: "11111" } },
       ]);
 
-      const traces =
-        await openTelemetryTraceRequestToTracesForCollection(request);
+      const traces = await openTelemetryTraceRequestToTracesForCollection(request);
       expect(traces).toHaveLength(1);
 
       const trace = traces[0]!;
@@ -486,8 +464,7 @@ describe("Metadata and Labels Flow - SDK Telemetry attributes", () => {
       ],
     };
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -510,8 +487,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       },
     ]);
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -530,8 +506,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       },
     ]);
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -546,8 +521,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       },
     ]);
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -564,8 +538,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       },
     ]);
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -582,8 +555,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       },
     ]);
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -604,8 +576,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       },
     ]);
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -628,8 +599,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       },
     ]);
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -654,8 +624,7 @@ describe("Vercel AI SDK telemetry metadata", () => {
       },
     ]);
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -734,17 +703,13 @@ describe("Integration - Real-world SDK scenarios", () => {
       ],
     };
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
     expect(trace.reservedTraceMetadata.thread_id).toBe("phoenix-session-123");
     expect(trace.reservedTraceMetadata.user_id).toBe("phoenix-user-456");
-    expect(trace.reservedTraceMetadata.labels).toEqual([
-      "openinference",
-      "openai",
-    ]);
+    expect(trace.reservedTraceMetadata.labels).toEqual(["openinference", "openai"]);
     expect(trace.customMetadata.experiment).toBe("test-run-1");
   });
 
@@ -799,8 +764,7 @@ describe("Integration - Real-world SDK scenarios", () => {
       ],
     };
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -869,8 +833,7 @@ describe("Integration - Real-world SDK scenarios", () => {
       ],
     };
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -930,8 +893,7 @@ describe("Metadata Mapping - resource attributes", () => {
       { key: "tag.tags", value: { stringValue: "checkout-flow" } },
     ]);
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -944,8 +906,7 @@ describe("Metadata Mapping - resource attributes", () => {
       { key: "langwatch.thread.id", value: { stringValue: "conv-123" } },
     ]);
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -957,8 +918,7 @@ describe("Metadata Mapping - resource attributes", () => {
       { key: "service.name", value: { stringValue: "langyagent" } },
     ]);
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -975,8 +935,7 @@ describe("Metadata Mapping - resource attributes", () => {
       { key: "langwatch.thread.id", value: { stringValue: "conv-123" } },
     ]);
 
-    const traces =
-      await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;

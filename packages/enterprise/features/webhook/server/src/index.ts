@@ -44,7 +44,10 @@ export {
   WEBHOOK_MAX_BATCH_SIZE_BOUNDS,
   type WebhookEndpointConfigurationInput,
 } from "./services/webhook-endpoint-policy.service";
-export { WebhookEventsRepository, type WebhookEventsPage } from "./repositories/webhook-events.repository";
+export {
+  WebhookEventsRepository,
+  type WebhookEventsPage,
+} from "./repositories/webhook-events.repository";
 export { WebhookTenantsRepository } from "./repositories/webhook-tenants.repository";
 export {
   WebhookDestinationService,

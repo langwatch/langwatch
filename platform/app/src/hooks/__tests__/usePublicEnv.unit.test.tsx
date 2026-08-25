@@ -36,14 +36,9 @@ describe("usePublicEnv", () => {
   it("waits only when caller-specific capabilities are requested", () => {
     useQuery.mockReturnValue({ data: undefined, isLoading: true });
 
-    const { result } = renderHook(() =>
-      usePublicEnv({ includeCapabilities: true }),
-    );
+    const { result } = renderHook(() => usePublicEnv({ includeCapabilities: true }));
 
-    expect(useQuery).toHaveBeenCalledWith(
-      {},
-      expect.objectContaining({ enabled: true }),
-    );
+    expect(useQuery).toHaveBeenCalledWith({}, expect.objectContaining({ enabled: true }));
     expect(result.current.data).toBeUndefined();
     expect(result.current.isLoading).toBe(true);
   });

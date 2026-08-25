@@ -77,9 +77,7 @@ export type PaginationMode = "cursor" | "offset";
  * @param mode - see {@link PaginationMode}. Defaults to `offset`, which is the
  *   behaviour every caller had before the mode existed.
  */
-export const useMessagesNavigationFooter = (
-  mode: PaginationMode = "offset",
-) => {
+export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => {
   const router = useRouter();
   const isCursorMode = mode === "cursor";
 
@@ -100,14 +98,10 @@ export const useMessagesNavigationFooter = (
     [router.query.pageSize],
   );
 
-  const urlScrollId = isCursorMode
-    ? (router.query.scrollId as string | null)
-    : null;
+  const urlScrollId = isCursorMode ? (router.query.scrollId as string | null) : null;
 
   const cursorInfo = useMemo(() => decodeCursor(urlScrollId), [urlScrollId]);
-  const estimatedTotalPages = Math.ceil(
-    totalHits / (cursorInfo?.pageSize || pageSize),
-  );
+  const estimatedTotalPages = Math.ceil(totalHits / (cursorInfo?.pageSize || pageSize));
 
   // Back at the first page (no cursor in the URL) the walked-cursor stack is
   // meaningless — drop it so "previous" cannot pop into a stale scroll.
@@ -123,17 +117,8 @@ export const useMessagesNavigationFooter = (
   // In cursor mode `pageOffset` is stripped and never written back, so an old
   // link loses it rather than carrying a value the server will reject.
   const buildPaginationQuery = useCallback(
-    (overrides: {
-      pageOffset?: number;
-      pageSize?: number;
-      scrollId?: string | null;
-    }) => {
-      const {
-        pageOffset: _po,
-        pageSize: _ps,
-        scrollId: _si,
-        ...rest
-      } = router.query;
+    (overrides: { pageOffset?: number; pageSize?: number; scrollId?: string | null }) => {
+      const { pageOffset: _po, pageSize: _ps, scrollId: _si, ...rest } = router.query;
 
       const query: Record<string, string | string[] | undefined> = { ...rest };
 
@@ -193,14 +178,7 @@ export const useMessagesNavigationFooter = (
         { shallow: true },
       );
     },
-    [
-      router,
-      pageOffset,
-      pageSize,
-      isCursorMode,
-      urlScrollId,
-      buildPaginationQuery,
-    ],
+    [router, pageOffset, pageSize, isCursorMode, urlScrollId, buildPaginationQuery],
   );
 
   /**
@@ -397,9 +375,7 @@ export function MessagesNavigationFooter({
   // A cursor list is out of pages when the response carried no cursor — which
   // is also true on its first page, so this cannot be keyed on having walked
   // past page one. An offset list is out when the window reaches the total.
-  const isNextDisabled = isCursorMode
-    ? !scrollId
-    : pageOffset + pageSize >= totalHits;
+  const isNextDisabled = isCursorMode ? !scrollId : pageOffset + pageSize >= totalHits;
 
   return (
     <HStack padding={6} gap={2}>

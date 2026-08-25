@@ -28,9 +28,7 @@ describe("askLangy — command-bar → panel handoff", () => {
 
     it("queues the trimmed question for the panel to send", () => {
       useLangyStore.getState().askLangy("  why are my traces failing  ");
-      expect(useLangyStore.getState().pendingPrompt).toBe(
-        "why are my traces failing",
-      );
+      expect(useLangyStore.getState().pendingPrompt).toBe("why are my traces failing");
     });
 
     it("starts a fresh conversation — no old pointer, no old draft", () => {

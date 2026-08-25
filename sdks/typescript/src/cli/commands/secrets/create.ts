@@ -22,7 +22,7 @@ import type { CommandResult } from "../../utils/output";
  */
 export const createSecretCommand = async (
   name: string,
-  options: { value: string }
+  options: { value: string },
 ): Promise<CommandResult | void> => {
   const credentials = await resolveCredentials();
   if (!credentials.projectId) {
@@ -39,8 +39,7 @@ export const createSecretCommand = async (
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Creating secret "${name}"...`).start();
 

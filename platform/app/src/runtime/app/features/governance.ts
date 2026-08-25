@@ -47,10 +47,7 @@ import { AppIngestionKeyAdapter } from "./governance/ingestion-key.adapter";
 export type { CanonicalCostEvent };
 
 type GovernanceSetupActivity = {
-  hasRecentActivity(input: {
-    tenantId: string;
-    sinceMs: number;
-  }): Promise<boolean>;
+  hasRecentActivity(input: { tenantId: string; sinceMs: number }): Promise<boolean>;
 };
 
 class AppGovernanceSetupActivityPort extends GovernanceSetupActivityPort {
@@ -58,9 +55,7 @@ class AppGovernanceSetupActivityPort extends GovernanceSetupActivityPort {
     super();
   }
 
-  static create(
-    activity: GovernanceSetupActivity,
-  ): AppGovernanceSetupActivityPort {
+  static create(activity: GovernanceSetupActivity): AppGovernanceSetupActivityPort {
     return new AppGovernanceSetupActivityPort(activity);
   }
 
@@ -114,9 +109,7 @@ export class AppGovernanceRuntime {
       };
     },
   ): AppGovernanceRuntime {
-    const personalUsage = AppPersonalUsageAdapter.create(
-      options.personalUsage,
-    ).build();
+    const personalUsage = AppPersonalUsageAdapter.create(options.personalUsage).build();
     const products = AppGovernanceProductAdapter.create({
       database,
       organizations: options.organizations,

@@ -1,7 +1,4 @@
-import type {
-  FoldProjectionStore,
-  ProjectionStoreContext,
-} from "@langwatch/eventing";
+import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { ExperimentRunStateRepository } from "../repositories/experimentRunState.repository";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import { parseExperimentRunKey } from "../utils/compositeKey";
@@ -27,9 +24,7 @@ export function createExperimentRunStateFoldStore(
       // even before the "started" event sets them via apply().
       // This prevents the split-row bug where ExperimentId mutates from ""
       // to the real value between writes.
-      const { experimentId, runId } = parseExperimentRunKey(
-        context.aggregateId,
-      );
+      const { experimentId, runId } = parseExperimentRunKey(context.aggregateId);
       const stateWithKeys: ExperimentRunStateData = {
         ...state,
         RunId: runId,

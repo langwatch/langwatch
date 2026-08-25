@@ -125,30 +125,20 @@ describe("given latest-alias model resolution", () => {
     });
     /** @scenario Latest-mini picks the fast tier of the newest generation */
     it("resolves openai/latest-mini to the newest generation's fast tier", () => {
-      expect(resolveLatestAlias("openai/latest-mini")).toBe(
-        "openai/gpt-5.6-luna",
-      );
+      expect(resolveLatestAlias("openai/latest-mini")).toBe("openai/gpt-5.6-luna");
     });
     /** @scenario The balanced middle tier is never an alias target */
     it("never resolves either openai alias to the balanced middle tier", () => {
-      expect(resolveLatestAlias("openai/latest")).not.toBe(
-        "openai/gpt-5.6-terra",
-      );
-      expect(resolveLatestAlias("openai/latest-mini")).not.toBe(
-        "openai/gpt-5.6-terra",
-      );
+      expect(resolveLatestAlias("openai/latest")).not.toBe("openai/gpt-5.6-terra");
+      expect(resolveLatestAlias("openai/latest-mini")).not.toBe("openai/gpt-5.6-terra");
     });
     /** @scenario Pro serving modes are skipped */
     it("skips -pro serving modes when picking the flagship", () => {
       expect(resolveLatestAlias("openai/latest")).toBe("openai/gpt-5.6-sol");
-      expect(resolveLatestAlias("openai/latest")).not.toBe(
-        "openai/gpt-5.6-sol-pro",
-      );
+      expect(resolveLatestAlias("openai/latest")).not.toBe("openai/gpt-5.6-sol-pro");
     });
     it("resolves anthropic/latest to the newest claude-opus model", () => {
-      expect(resolveLatestAlias("anthropic/latest")).toBe(
-        "anthropic/claude-opus-4-5",
-      );
+      expect(resolveLatestAlias("anthropic/latest")).toBe("anthropic/claude-opus-4-5");
     });
     it("resolves anthropic/latest-mini to the newest claude-sonnet model (not haiku, parallel to gpt-mini ≠ nano)", () => {
       expect(resolveLatestAlias("anthropic/latest-mini")).toBe(
@@ -159,9 +149,7 @@ describe("given latest-alias model resolution", () => {
       expect(resolveLatestAlias("gemini/latest")).toBe("gemini/gemini-2.5-pro");
     });
     it("resolves gemini/latest-mini to the newest gemini flash model", () => {
-      expect(resolveLatestAlias("gemini/latest-mini")).toBe(
-        "gemini/gemini-2.5-flash",
-      );
+      expect(resolveLatestAlias("gemini/latest-mini")).toBe("gemini/gemini-2.5-flash");
     });
     it("returns null for non-aliases", () => {
       expect(resolveLatestAlias("openai/gpt-5.5")).toBeNull();

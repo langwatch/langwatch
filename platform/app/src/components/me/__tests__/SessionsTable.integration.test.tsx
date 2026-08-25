@@ -16,13 +16,7 @@
  * @see specs/coding-agent/sessions-screen.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -92,8 +86,7 @@ vi.mock("~/utils/api", () => {
     isFetched: true,
   });
   const hooksFor = (path: string): Map<string, unknown> => {
-    const useQuery = (input: unknown) =>
-      (queryImpls[path] ?? defaultQuery)(input);
+    const useQuery = (input: unknown) => (queryImpls[path] ?? defaultQuery)(input);
     const hooks = new Map<string, unknown>([
       ["useQuery", useQuery],
       ["useInfiniteQuery", useQuery],
@@ -219,9 +212,7 @@ const listedTitles = () =>
 
 /** The heading cell a sortable column announces its state on. */
 const headingFor = (label: string) =>
-  screen
-    .getByRole("button", { name: `Sort by ${label}` })
-    .closest("th") as HTMLElement;
+  screen.getByRole("button", { name: `Sort by ${label}` }).closest("th") as HTMLElement;
 
 /** One stored turn, as the conversation lookup hands it over. */
 const turn = (over: Record<string, unknown> = {}) => ({
@@ -258,12 +249,8 @@ describe("the personal Sessions table", () => {
 
       renderTable();
 
-      expect(
-        screen.getByText("Link sessions to pull requests"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("acme/widgets · feat/git-context"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Link sessions to pull requests")).toBeInTheDocument();
+      expect(screen.getByText("acme/widgets · feat/git-context")).toBeInTheDocument();
 
       // Everything the session consumed across its life, over the context it
       // was carrying at its heaviest.
@@ -290,9 +277,7 @@ describe("the personal Sessions table", () => {
       await user.hover(screen.getByText("Peak 156.8K"));
 
       expect(
-        await screen.findByText(
-          /largest context carried into a single model call/i,
-        ),
+        await screen.findByText(/largest context carried into a single model call/i),
       ).toBeInTheDocument();
     });
 
@@ -346,9 +331,7 @@ describe("the personal Sessions table", () => {
       renderTable();
 
       expect(screen.getByText("Untitled session")).toBeInTheDocument();
-      expect(
-        screen.getByText("acme/widgets · feat/git-context"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("acme/widgets · feat/git-context")).toBeInTheDocument();
     });
   });
 
@@ -417,9 +400,7 @@ describe("the personal Sessions table", () => {
       expect(screen.queryByText("#4221")).not.toBeInTheDocument();
 
       await user.hover(screen.getByText("+2"));
-      expect(
-        await screen.findByText("#4221 Pull request 4221"),
-      ).toBeInTheDocument();
+      expect(await screen.findByText("#4221 Pull request 4221")).toBeInTheDocument();
     });
   });
 
@@ -523,9 +504,7 @@ describe("the personal Sessions table", () => {
       await user.click(await screen.findByText("Last 7 days"));
 
       expect(screen.getByText("Worked on this morning")).toBeInTheDocument();
-      expect(
-        screen.queryByText("Untouched for a month"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Untouched for a month")).not.toBeInTheDocument();
     });
   });
 
@@ -560,17 +539,10 @@ describe("the personal Sessions table", () => {
       const user = userEvent.setup();
       renderTable();
 
-      expect(headingFor("Last update")).toHaveAttribute(
-        "aria-sort",
-        "descending",
-      );
+      expect(headingFor("Last update")).toHaveAttribute("aria-sort", "descending");
       expect(headingFor("Context")).toHaveAttribute("aria-sort", "none");
       const opening = listedTitles();
-      expect(opening).toEqual([
-        "Middling session",
-        "Heavy session",
-        "Light session",
-      ]);
+      expect(opening).toEqual(["Middling session", "Heavy session", "Light session"]);
 
       await user.click(screen.getByRole("button", { name: "Sort by Context" }));
       expect(headingFor("Context")).toHaveAttribute("aria-sort", "descending");
@@ -591,10 +563,7 @@ describe("the personal Sessions table", () => {
 
       await user.click(screen.getByRole("button", { name: "Sort by Context" }));
       expect(headingFor("Context")).toHaveAttribute("aria-sort", "none");
-      expect(headingFor("Last update")).toHaveAttribute(
-        "aria-sort",
-        "descending",
-      );
+      expect(headingFor("Last update")).toHaveAttribute("aria-sort", "descending");
       expect(listedTitles()).toEqual(opening);
     });
   });
@@ -641,11 +610,9 @@ describe("the personal Sessions table", () => {
       await user.click(screen.getByText("Link sessions to pull requests"));
 
       await waitFor(() =>
-        expect(mockOpenTrace).toHaveBeenCalledWith(
-          "trace-last",
-          LONG_AGO + 5_000,
-          { projectId: "proj-personal" },
-        ),
+        expect(mockOpenTrace).toHaveBeenCalledWith("trace-last", LONG_AGO + 5_000, {
+          projectId: "proj-personal",
+        }),
       );
       expect(utils.tracesV2.conversationContext.fetch).toHaveBeenCalledWith({
         projectId: "proj-personal",
@@ -673,17 +640,11 @@ describe("the personal Sessions table", () => {
       renderTable();
 
       await user.click(screen.getByText("Link sessions to pull requests"));
-      expect(document.querySelector("tbody tr")).toHaveAttribute(
-        "aria-busy",
-        "true",
-      );
+      expect(document.querySelector("tbody tr")).toHaveAttribute("aria-busy", "true");
 
       resolveTurns({ conversationId: "session-1", total: 1, turns: [turn()] });
       await waitFor(() =>
-        expect(document.querySelector("tbody tr")).toHaveAttribute(
-          "aria-busy",
-          "false",
-        ),
+        expect(document.querySelector("tbody tr")).toHaveAttribute("aria-busy", "false"),
       );
     });
 

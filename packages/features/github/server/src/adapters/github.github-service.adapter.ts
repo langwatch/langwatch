@@ -4,15 +4,10 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GithubNonceRedis } from "./github.github-install-nonce.adapter";
-import {
-  GithubAppTokenService,
-  type RedisLike,
-} from "./github.github-app-token.adapter";
+import { GithubAppTokenService, type RedisLike } from "./github.github-app-token.adapter";
 import type { GithubHostConfig } from "./github.github-host.adapter";
 import { GithubInstallationsService } from "../services/github-installations.service";
-import {
-  GithubPullRequestMappingService,
-} from "../services/github-pull-request-mapping.service";
+import { GithubPullRequestMappingService } from "../services/github-pull-request-mapping.service";
 import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service";
 import { PrismaGithubInstallationsRepository } from "../repositories/prisma/prisma.github-installations.repository";
 import { PrismaGithubPullRequestsRepository } from "../repositories/prisma/prisma.github-pull-requests.repository";

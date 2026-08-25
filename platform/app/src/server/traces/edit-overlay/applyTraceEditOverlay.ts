@@ -86,8 +86,7 @@ export function indexSpanPatches(
   patch: TraceEditOverlayPatch,
 ): Map<string, TraceEditSpanPatch> {
   const bySpanId = new Map<string, TraceEditSpanPatch>();
-  for (const spanPatch of patch.spans)
-    bySpanId.set(spanPatch.spanId, spanPatch);
+  for (const spanPatch of patch.spans) bySpanId.set(spanPatch.spanId, spanPatch);
   return bySpanId;
 }
 

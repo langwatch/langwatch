@@ -471,9 +471,7 @@ const prompt = await promptService.createPrompt({
 ```typescript
 const result = await promptService.syncPrompt({
   idOrHandle: "my-prompt",
-  localConfigData: {
-    /* config data */
-  },
+  localConfigData: {/* config data */},
   localVersion: 1,
   projectId: "proj_123",
   organizationId: "org_456",

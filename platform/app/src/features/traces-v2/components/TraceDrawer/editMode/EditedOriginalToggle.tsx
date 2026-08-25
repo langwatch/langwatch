@@ -3,10 +3,7 @@ import { LuGitCompare } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useTraceEditOverlay } from "../../../hooks/useTraceEditOverlay";
 import { useDrawerStore } from "../../../stores/drawerStore";
-import {
-  type TraceOverlayView,
-  useTraceEditStore,
-} from "../../../stores/traceEditStore";
+import { type TraceOverlayView, useTraceEditStore } from "../../../stores/traceEditStore";
 import { formatAbsoluteTime } from "../../../utils/formatters";
 import { SegmentedToggle } from "../SegmentedToggle";
 import { TraceEditDiffDialog } from "../TraceEditDiffDialog";
@@ -48,9 +45,7 @@ export function EditedOriginalToggle() {
         />
         {author && (
           <Tooltip
-            content={formatAbsoluteTime(
-              new Date(correction.updatedAt).getTime(),
-            )}
+            content={formatAbsoluteTime(new Date(correction.updatedAt).getTime())}
             positioning={{ placement: "bottom" }}
             openDelay={300}
           >
@@ -59,12 +54,7 @@ export function EditedOriginalToggle() {
             </Text>
           </Tooltip>
         )}
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={() => setDiffOpen(true)}
-          gap={1.5}
-        >
+        <Button size="xs" variant="ghost" onClick={() => setDiffOpen(true)} gap={1.5}>
           <Icon as={LuGitCompare} boxSize={3} />
           <Text textStyle="2xs">View diff</Text>
         </Button>

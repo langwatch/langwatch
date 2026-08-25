@@ -67,10 +67,7 @@ type SidebarSectionHeaderProps = BoxProps;
  * @param props - The component props including children and any Box props
  * @returns A styled section header with medium weight text
  */
-function SidebarSectionHeader({
-  children,
-  ...props
-}: SidebarSectionHeaderProps) {
+function SidebarSectionHeader({ children, ...props }: SidebarSectionHeaderProps) {
   return (
     <Box
       paddingX="3"

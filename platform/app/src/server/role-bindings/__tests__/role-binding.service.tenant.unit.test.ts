@@ -1,7 +1,4 @@
-import type {
-  AuthzGrantsService,
-  AuthzService,
-} from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type PrismaClient,

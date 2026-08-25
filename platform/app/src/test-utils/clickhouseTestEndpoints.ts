@@ -115,10 +115,7 @@ export interface TestClickHouseEndpoint {
  * that asks for a namespace the variable cannot carry has a mistake to fix in
  * the line it wrote, and a quietly rewritten namespace would hide it.
  */
-const routableIdSuffix = customAlphabet(
-  "0123456789abcdefghijklmnopqrstuvwxyz",
-  6,
-);
+const routableIdSuffix = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 6);
 
 export function privateRouteOrgId(name: string): string {
   if (name.includes("__")) {
@@ -197,21 +194,19 @@ async function startContainerEndpoints({
   names: string[];
 }): Promise<TestClickHouseEndpoint[]> {
   const started = await Promise.all(
-    names.map(
-      async (name): Promise<[string, StartedClickHouseContainer]> => [
-        name,
-        await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
-          .withLabels({
-            "langwatch.test": "true",
-            [`langwatch.test.${suite}`]: name,
-            ...TEST_CLICKHOUSE_TUNING_LABEL,
-          })
-          .withReuse()
-          .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING])
-          .withStartupTimeout(120_000)
-          .start(),
-      ],
-    ),
+    names.map(async (name): Promise<[string, StartedClickHouseContainer]> => [
+      name,
+      await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
+        .withLabels({
+          "langwatch.test": "true",
+          [`langwatch.test.${suite}`]: name,
+          ...TEST_CLICKHOUSE_TUNING_LABEL,
+        })
+        .withReuse()
+        .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING])
+        .withStartupTimeout(120_000)
+        .start(),
+    ]),
   );
 
   const endpoints: TestClickHouseEndpoint[] = [];
@@ -254,13 +249,7 @@ async function ensureEndpoint({
  * endpoint names read better with dashes. The `test_` prefix marks the database
  * as disposable next to a developer's real `langwatch` one on the same server.
  */
-function databaseName({
-  suite,
-  name,
-}: {
-  suite: string;
-  name: string;
-}): string {
+function databaseName({ suite, name }: { suite: string; name: string }): string {
   return `test_${[suite, name].join("_").replace(/[^a-zA-Z0-9_]/g, "_")}`;
 }
 

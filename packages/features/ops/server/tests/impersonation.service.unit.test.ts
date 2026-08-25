@@ -97,9 +97,7 @@ describe("ImpersonationService", () => {
         req: input.req,
       },
     ]);
-    expect(repository.window?.expires.toISOString()).toBe(
-      "2026-01-01T01:00:00.000Z",
-    );
+    expect(repository.window?.expires.toISOString()).toBe("2026-01-01T01:00:00.000Z");
   });
 
   it("rejects missing, deactivated, and platform-admin targets", async () => {
@@ -115,9 +113,7 @@ describe("ImpersonationService", () => {
     ).rejects.toBeInstanceOf(CannotImpersonateDeactivatedUserError);
     await expect(
       serviceFor(
-        new InMemoryImpersonationRepository(
-          target({ email: "Root@Langwatch.ai" }),
-        ),
+        new InMemoryImpersonationRepository(target({ email: "Root@Langwatch.ai" })),
       ).service.start(input),
     ).rejects.toBeInstanceOf(CannotImpersonateAdminError);
   });

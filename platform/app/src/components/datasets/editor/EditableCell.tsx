@@ -91,9 +91,7 @@ const validateNumber = (
  * Try to parse and format a value as JSON.
  * Returns the formatted JSON string if successful, or the original value if not.
  */
-const tryFormatAsJson = (
-  value: string,
-): { formatted: string; isJson: boolean } => {
+const tryFormatAsJson = (value: string): { formatted: string; isJson: boolean } => {
   if (!value || typeof value !== "string") {
     return { formatted: value, isJson: false };
   }
@@ -159,8 +157,7 @@ export function EditableCell({
   const cellKey = `${row}-${columnId}`;
   const isCellExpanded = expandedCells.has(cellKey);
 
-  const isEditing =
-    editingCell?.row === row && editingCell?.columnId === columnId;
+  const isEditing = editingCell?.row === row && editingCell?.columnId === columnId;
 
   const [editValue, setEditValue] = useState(value);
   const [editorStyle, setEditorStyle] = useState<React.CSSProperties>({});
@@ -188,17 +185,13 @@ export function EditableCell({
   }, [isEditing, value, dataType]);
 
   // Track the calculated textarea height
-  const [textareaHeight, setTextareaHeight] = useState<number | undefined>(
-    undefined,
-  );
+  const [textareaHeight, setTextareaHeight] = useState<number | undefined>(undefined);
 
   // Where the editor should land in viewport coordinates. position:fixed
   // resolves against the nearest transformed ancestor instead of the viewport
   // when the editor portals into an animated dialog/drawer, so after render
   // we measure the miss and shift exactly once per edit session.
-  const intendedPositionRef = useRef<{ top: number; left: number } | null>(
-    null,
-  );
+  const intendedPositionRef = useRef<{ top: number; left: number } | null>(null);
   const offsetCorrectedRef = useRef(false);
 
   useLayoutEffect(() => {
@@ -233,18 +226,12 @@ export function EditableCell({
         const footerHeight = 28;
         const padding = 16;
         // Make textarea at least 80px, but expand to fit cell content
-        const calculatedHeight = Math.max(
-          80,
-          rect.height + padding - footerHeight,
-        );
+        const calculatedHeight = Math.max(80, rect.height + padding - footerHeight);
         setTextareaHeight(calculatedHeight);
         // Clamp into the viewport: the min-width can push editors opened on
         // last-column cells past the right edge.
         const width = Math.max(rect.width + padding, 250);
-        const left = Math.max(
-          8,
-          Math.min(rect.left - 8, window.innerWidth - width - 8),
-        );
+        const left = Math.max(8, Math.min(rect.left - 8, window.innerWidth - width - 8));
         intendedPositionRef.current = { top: rect.top - 8, left };
         offsetCorrectedRef.current = false;
         setEditorStyle({
@@ -297,15 +284,7 @@ export function EditableCell({
     // Other types: save as-is
     setCellValue(datasetId, row, columnId, editValue);
     setEditingCell(undefined);
-  }, [
-    datasetId,
-    row,
-    columnId,
-    editValue,
-    dataType,
-    setCellValue,
-    setEditingCell,
-  ]);
+  }, [datasetId, row, columnId, editValue, dataType, setCellValue, setEditingCell]);
 
   const handleCancel = useCallback(() => {
     isCancelingRef.current = true;
@@ -410,15 +389,12 @@ export function EditableCell({
   }, [isCellExpanded]);
 
   // Determine if we should show clamped view
-  const showClamped =
-    rowHeightMode === "compact" && !isCellExpanded && isOverflowing;
+  const showClamped = rowHeightMode === "compact" && !isCellExpanded && isOverflowing;
 
   // Calculate the effective max height for expanded cells
   // Use custom height if set (from dragging), otherwise use default expanded height
   const expandedMaxHeight =
-    customHeight !== null
-      ? `${customHeight}px`
-      : `${EXPANDED_DEFAULT_MAX_HEIGHT}px`;
+    customHeight !== null ? `${customHeight}px` : `${EXPANDED_DEFAULT_MAX_HEIGHT}px`;
 
   const handleExpandClick = useCallback(
     (e: React.MouseEvent) => {
@@ -450,8 +426,7 @@ export function EditableCell({
       if (!isCellExpanded) {
         dragStartHeightRef.current = COMPACT_MAX_HEIGHT;
       } else if (contentRef.current) {
-        dragStartHeightRef.current =
-          customHeight ?? contentRef.current.scrollHeight;
+        dragStartHeightRef.current = customHeight ?? contentRef.current.scrollHeight;
       }
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -663,9 +638,7 @@ export function EditableCell({
               <HStack position="absolute" bottom="32px" left={2} gap={1}>
                 <Button
                   size="xs"
-                  variant={
-                    editValue.toLowerCase() === "true" ? "solid" : "outline"
-                  }
+                  variant={editValue.toLowerCase() === "true" ? "solid" : "outline"}
                   colorPalette="green"
                   onClick={() => {
                     setCellValue(datasetId, row, columnId, "true");
@@ -677,9 +650,7 @@ export function EditableCell({
                 </Button>
                 <Button
                   size="xs"
-                  variant={
-                    editValue.toLowerCase() === "false" ? "solid" : "outline"
-                  }
+                  variant={editValue.toLowerCase() === "false" ? "solid" : "outline"}
                   colorPalette="red"
                   onClick={() => {
                     setCellValue(datasetId, row, columnId, "false");

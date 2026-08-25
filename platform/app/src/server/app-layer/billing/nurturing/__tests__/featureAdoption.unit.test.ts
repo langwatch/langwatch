@@ -94,12 +94,8 @@ describe("Feature adoption hooks", () => {
     describe("when Customer.io API is unavailable", () => {
       /** @scenario 'Feature adoption hook failure does not break the originating action' */
       it("does not throw (fire-and-forget)", async () => {
-        const { captureException } = await import(
-          "~/utils/posthogErrorCapture"
-        );
-        mockNurturing.identifyUser.mockRejectedValueOnce(
-          new Error("CIO unavailable"),
-        );
+        const { captureException } = await import("~/utils/posthogErrorCapture");
+        mockNurturing.identifyUser.mockRejectedValueOnce(new Error("CIO unavailable"));
 
         expect(() =>
           fireTeamMemberInvitedNurturing({
@@ -167,12 +163,8 @@ describe("Feature adoption hooks", () => {
 
     describe("when Customer.io API is unavailable", () => {
       it("does not throw (fire-and-forget)", async () => {
-        const { captureException } = await import(
-          "~/utils/posthogErrorCapture"
-        );
-        mockNurturing.identifyUser.mockRejectedValueOnce(
-          new Error("CIO unavailable"),
-        );
+        const { captureException } = await import("~/utils/posthogErrorCapture");
+        mockNurturing.identifyUser.mockRejectedValueOnce(new Error("CIO unavailable"));
 
         expect(() =>
           fireWorkflowCreatedNurturing({
@@ -241,12 +233,8 @@ describe("Feature adoption hooks", () => {
 
     describe("when Customer.io API is unavailable", () => {
       it("does not throw (fire-and-forget)", async () => {
-        const { captureException } = await import(
-          "~/utils/posthogErrorCapture"
-        );
-        mockNurturing.identifyUser.mockRejectedValueOnce(
-          new Error("CIO unavailable"),
-        );
+        const { captureException } = await import("~/utils/posthogErrorCapture");
+        mockNurturing.identifyUser.mockRejectedValueOnce(new Error("CIO unavailable"));
 
         expect(() =>
           fireScenarioCreatedNurturing({
@@ -308,12 +296,8 @@ describe("Feature adoption hooks", () => {
 
     describe("when Customer.io API is unavailable", () => {
       it("does not throw (fire-and-forget)", async () => {
-        const { captureException } = await import(
-          "~/utils/posthogErrorCapture"
-        );
-        mockNurturing.trackEvent.mockRejectedValueOnce(
-          new Error("CIO unavailable"),
-        );
+        const { captureException } = await import("~/utils/posthogErrorCapture");
+        mockNurturing.trackEvent.mockRejectedValueOnce(new Error("CIO unavailable"));
 
         expect(() =>
           fireExperimentRanNurturing({

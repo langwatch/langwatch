@@ -253,9 +253,7 @@ function buildSparkline(values: number[]): string {
   if (max === min) return SPARKLINE_GLYPHS[3].repeat(values.length);
   return values
     .map((v) => {
-      const idx = Math.round(
-        ((v - min) / (max - min)) * (SPARKLINE_GLYPHS.length - 1),
-      );
+      const idx = Math.round(((v - min) / (max - min)) * (SPARKLINE_GLYPHS.length - 1));
       return SPARKLINE_GLYPHS[idx] ?? SPARKLINE_GLYPHS[0];
     })
     .join("");
@@ -330,15 +328,13 @@ export function buildGraphAlertTemplateContext({
   const graphUrl = window
     ? `${baseGraphUrl}?startDate=${encodeURIComponent(window.start.toISOString())}&endDate=${encodeURIComponent(window.end.toISOString())}`
     : baseGraphUrl;
-  const historyPoints: GraphAlertHistoryPoint[] = (history ?? []).map(
-    (point) => ({
-      timestamp:
-        typeof point.timestamp === "string"
-          ? point.timestamp
-          : point.timestamp.toISOString(),
-      value: point.value,
-    }),
-  );
+  const historyPoints: GraphAlertHistoryPoint[] = (history ?? []).map((point) => ({
+    timestamp:
+      typeof point.timestamp === "string"
+        ? point.timestamp
+        : point.timestamp.toISOString(),
+    value: point.value,
+  }));
   return {
     trigger: {
       id: trigger.id,

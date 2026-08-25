@@ -58,10 +58,7 @@ function makeFold({
     init: () => ({ count: 0, LastEventOccurredAt: 0 }),
     apply: (state: CounterState, event: Event) => ({
       count: state.count + 1,
-      LastEventOccurredAt: Math.max(
-        state.LastEventOccurredAt,
-        event.occurredAt ?? 0,
-      ),
+      LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt ?? 0),
     }),
     options: {
       refoldOnOutOfOrder: false,
@@ -80,10 +77,12 @@ function makeFold({
   return { fold, store, eventLoaderUpTo };
 }
 
-const trustedMetric =
-  incrementEsFoldAbsentMissTrustedTotal as unknown as ReturnType<typeof vi.fn>;
-const fallbackMetric =
-  incrementEsFoldReadWindowFallbackTotal as unknown as ReturnType<typeof vi.fn>;
+const trustedMetric = incrementEsFoldAbsentMissTrustedTotal as unknown as ReturnType<
+  typeof vi.fn
+>;
+const fallbackMetric = incrementEsFoldReadWindowFallbackTotal as unknown as ReturnType<
+  typeof vi.fn
+>;
 
 describe("FoldProjectionExecutor trustAbsentMiss", () => {
   const tenantId = createTestTenantId();
@@ -113,11 +112,7 @@ describe("FoldProjectionExecutor trustAbsentMiss", () => {
       it("skips the unwindowed retry and folds from init()", async () => {
         const { fold, store } = makeFold();
 
-        const state = await executor.execute(
-          fold,
-          eventAt(OCCURRED_AT),
-          context,
-        );
+        const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
         expect(store.get).toHaveBeenCalledTimes(1);
         expect(state.count).toBe(1);
@@ -141,11 +136,7 @@ describe("FoldProjectionExecutor trustAbsentMiss", () => {
           miss: "absent",
         });
 
-        const state = await executor.execute(
-          fold,
-          eventAt(OCCURRED_AT),
-          context,
-        );
+        const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
         expect(store.getWithApplied).toHaveBeenCalledTimes(1);
         // The whole point: event_log is not read for a trusted absence.
@@ -193,11 +184,7 @@ describe("FoldProjectionExecutor trustAbsentMiss", () => {
           miss: "undecodable",
         });
 
-        const state = await executor.execute(
-          fold,
-          eventAt(OCCURRED_AT),
-          context,
-        );
+        const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
         // The rescue machinery the flag retires for `absent` must survive for
         // `undecodable` — folding from init() here would write a PARTIAL state
@@ -217,18 +204,13 @@ describe("FoldProjectionExecutor trustAbsentMiss", () => {
           LastEventOccurredAt: OCCURRED_AT - 1,
         });
 
-        const state = await executor.execute(
-          fold,
-          eventAt(OCCURRED_AT),
-          context,
-        );
+        const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
         expect(store.get).toHaveBeenCalledTimes(1);
         expect(state.count).toBe(4);
         expect(trustedMetric).not.toHaveBeenCalled();
       });
     });
-
   });
 
   describe("given a fold that does NOT declare trustAbsentMiss", () => {

@@ -97,15 +97,11 @@ describe("saveOrCommitWorkflowVersion", () => {
       });
 
       const savedDsl = version.dsl as any;
-      const signatureNode = savedDsl.nodes.find(
-        (n: any) => n.type === "signature",
-      );
+      const signatureNode = savedDsl.nodes.find((n: any) => n.type === "signature");
       expect(signatureNode).toBeDefined();
 
       const params = signatureNode.data.parameters;
-      const instructions = params.find(
-        (p: any) => p.identifier === "instructions",
-      );
+      const instructions = params.find((p: any) => p.identifier === "instructions");
       const messages = params.find((p: any) => p.identifier === "messages");
 
       // The NEW prompt must be in parameters, not the old one
@@ -143,9 +139,7 @@ describe("saveOrCommitWorkflowVersion", () => {
       });
 
       const savedDsl = version.dsl as any;
-      const signatureNode = savedDsl.nodes.find(
-        (n: any) => n.type === "signature",
-      );
+      const signatureNode = savedDsl.nodes.find((n: any) => n.type === "signature");
       const instructions = signatureNode.data.parameters.find(
         (p: any) => p.identifier === "instructions",
       );

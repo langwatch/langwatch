@@ -117,9 +117,7 @@ describe("SelectDatasetDrawer", () => {
     it("shows search input", async () => {
       renderDrawer();
       await waitFor(() => {
-        expect(
-          screen.getByPlaceholderText("Search datasets..."),
-        ).toBeInTheDocument();
+        expect(screen.getByPlaceholderText("Search datasets...")).toBeInTheDocument();
       });
     });
 
@@ -162,9 +160,7 @@ describe("SelectDatasetDrawer", () => {
 
       await waitFor(() => {
         expect(screen.getByText("thread_test2")).toBeInTheDocument();
-        expect(
-          screen.queryByText("Draft Evaluation (245)"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText("Draft Evaluation (245)")).not.toBeInTheDocument();
       });
     });
 
@@ -176,9 +172,7 @@ describe("SelectDatasetDrawer", () => {
       await user.type(searchInput, "nonexistent");
 
       await waitFor(() => {
-        expect(
-          screen.getByText("No datasets match your search"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("No datasets match your search")).toBeInTheDocument();
       });
     });
   });
@@ -242,9 +236,7 @@ describe("SelectDatasetDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(
-          screen.getByText("No datasets found in this project"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("No datasets found in this project")).toBeInTheDocument();
       });
     });
   });

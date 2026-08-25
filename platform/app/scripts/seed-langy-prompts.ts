@@ -62,8 +62,7 @@ function parseArgs(argv: string[]): Args {
     const i = argv.indexOf(flag);
     return i >= 0 ? argv[i + 1] : undefined;
   };
-  const projectId =
-    get("--project") ?? process.env.LANGY_PROMPT_PROJECT_ID ?? "";
+  const projectId = get("--project") ?? process.env.LANGY_PROMPT_PROJECT_ID ?? "";
   if (!projectId) {
     throw new Error(
       "Missing project: pass --project <projectId> or set LANGY_PROMPT_PROJECT_ID",

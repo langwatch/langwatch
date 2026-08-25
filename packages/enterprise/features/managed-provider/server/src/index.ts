@@ -1,9 +1,5 @@
-export {
-  AwsStsManagedProviderCredentialAdapter,
-} from "./adapters/aws-sts.aws-sts.adapter";
-export {
-  EnvironmentManagedProviderConfigurationAdapter,
-} from "./adapters/environment-config.environment-config.adapter";
+export { AwsStsManagedProviderCredentialAdapter } from "./adapters/aws-sts.aws-sts.adapter";
+export { EnvironmentManagedProviderConfigurationAdapter } from "./adapters/environment-config.environment-config.adapter";
 export { PostgresManagedProviderAdapter } from "./adapters/postgres.postgres.adapter";
 export {
   ManagedProviderConfigurationPort,

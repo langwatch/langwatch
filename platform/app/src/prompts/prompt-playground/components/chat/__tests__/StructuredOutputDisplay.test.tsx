@@ -14,10 +14,7 @@ vi.mock("~/components/traces/RenderInputOutput", () => ({
   ),
 }));
 
-import {
-  StructuredOutputDisplay,
-  tryParseJson,
-} from "../StructuredOutputDisplay";
+import { StructuredOutputDisplay, tryParseJson } from "../StructuredOutputDisplay";
 
 afterEach(() => {
   cleanup();
@@ -26,10 +23,7 @@ afterEach(() => {
 describe("tryParseJson", () => {
   it.each([
     ['{"score": 10}', { score: 10 }],
-    [
-      '{"complete_name": "Sergio", "score": 10}',
-      { complete_name: "Sergio", score: 10 },
-    ],
+    ['{"complete_name": "Sergio", "score": 10}', { complete_name: "Sergio", score: 10 }],
     ['{"data": {"inner": "value"}}', { data: { inner: "value" } }],
     ['{"passed": true}', { passed: true }],
     ['{"value": null}', { value: null }],

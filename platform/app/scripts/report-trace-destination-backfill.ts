@@ -241,9 +241,7 @@ async function loadProjects(prisma: PrismaClient): Promise<ProjectRow[]> {
 }
 
 /** Oldest live governance project per organization, the rule's own order. */
-function oldestLiveGovernanceByOrg(
-  projects: ProjectRow[],
-): Map<string, string> {
+function oldestLiveGovernanceByOrg(projects: ProjectRow[]): Map<string, string> {
   const byOrg = new Map<string, string>();
   for (const project of projects) {
     if (project.kind !== "internal_governance" || project.archived) continue;
@@ -304,16 +302,10 @@ function withFallback(
     governanceByOrg: Map<string, string>;
   },
 ): Resolution {
-  const projectScopes = key.scopes.filter(
-    (scope) => scope.scopeType === "PROJECT",
-  );
+  const projectScopes = key.scopes.filter((scope) => scope.scopeType === "PROJECT");
   if (projectScopes.length === 1) {
     const scoped = byId.get(projectScopes[0]!.scopeId);
-    if (
-      scoped &&
-      !scoped.archived &&
-      scoped.organizationId === key.organizationId
-    ) {
+    if (scoped && !scoped.archived && scoped.organizationId === key.organizationId) {
       return reason ?? "single-scope";
     }
   }

@@ -18,10 +18,7 @@
  *     end if any action failed
  */
 
-import type {
-  Organization,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import type { Organization, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { DemoOrgScope } from "./scopeGuard";
 
 export type SeedActionOutcome =
@@ -65,10 +62,7 @@ export async function runSeedActions(args: {
   const now = args.now ?? (() => new Date());
   const startedAt = now().toISOString();
 
-  const organization = await args.scope.loadOrg(
-    args.prisma,
-    args.organizationId,
-  );
+  const organization = await args.scope.loadOrg(args.prisma, args.organizationId);
 
   const actionReports: SeedRunReport["actions"] = [];
   for (const action of args.actions) {

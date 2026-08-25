@@ -40,11 +40,7 @@ type EditorState =
   | { kind: "create" }
   | null;
 
-export function IngestionTemplatesEditor({
-  organizationId,
-}: {
-  organizationId: string;
-}) {
+export function IngestionTemplatesEditor({ organizationId }: { organizationId: string }) {
   const utils = api.useUtils();
   const listQuery = api.ingestionTemplates.adminList.useQuery(
     { organizationId },
@@ -122,8 +118,8 @@ export function IngestionTemplatesEditor({
               No ingestion templates yet
             </Text>
             <Text fontSize="xs" color="fg.muted">
-              Platform defaults seed lazily on first /me Trace Ingest visit.
-              Click 'New template' to author a custom one for this org.
+              Platform defaults seed lazily on first /me Trace Ingest visit. Click 'New
+              template' to author a custom one for this org.
             </Text>
           </VStack>
         </Box>
@@ -266,10 +262,7 @@ export function IngestionTemplatesEditor({
         <Spacer />
         <Text fontSize="xs" color="fg.muted">
           OTTL authoring guide:{" "}
-          <Link
-            href="/docs/ai-governance/ingestion-templates"
-            color="orange.600"
-          >
+          <Link href="/docs/ai-governance/ingestion-templates" color="orange.600">
             two-tier trust model
           </Link>
           .
@@ -335,16 +328,14 @@ function ViewOttlDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title>
-            OTTL — {state?.kind === "view" ? state.slug : ""}
-          </Drawer.Title>
+          <Drawer.Title>OTTL — {state?.kind === "view" ? state.slug : ""}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={3}>
             <Text fontSize="xs" color="fg.muted">
-              Platform-authored OTTL. Read-only — clone the row from the catalog
-              table to customise it for this org.
+              Platform-authored OTTL. Read-only — clone the row from the catalog table to
+              customise it for this org.
             </Text>
             {detailQuery.isLoading ? (
               <Spinner size="sm" />
@@ -450,10 +441,9 @@ function EditOttlDrawer({
         <Drawer.Body>
           <VStack align="stretch" gap={3}>
             <Text fontSize="xs" color="fg.muted">
-              Each line is one OTTL statement. Validation runs against the
-              gateway parser as you type. The receiver applies these AFTER
-              stamping the binding's authoritative principal + provenance keys,
-              so OTTL cannot forge attribution.
+              Each line is one OTTL statement. Validation runs against the gateway parser
+              as you type. The receiver applies these AFTER stamping the binding's
+              authoritative principal + provenance keys, so OTTL cannot forge attribution.
             </Text>
             {detailQuery.isLoading ? (
               <Spinner size="sm" />
@@ -496,9 +486,7 @@ function CreateTemplateDrawer({
   organizationId: string;
   state: EditorState;
   onClose: () => void;
-  onCreated: (
-    row: { id: string; slug: string; sourceType: string } | null,
-  ) => void;
+  onCreated: (row: { id: string; slug: string; sourceType: string } | null) => void;
 }) {
   const open = state?.kind === "create";
 
@@ -529,8 +517,7 @@ function CreateTemplateDrawer({
       showErrorToast({ error: err, fallbackTitle: "Couldn't create template" }),
   });
 
-  const canSubmit =
-    displayName.trim().length > 0 && /^[a-z0-9_]{1,40}$/.test(sourceType);
+  const canSubmit = displayName.trim().length > 0 && /^[a-z0-9_]{1,40}$/.test(sourceType);
 
   return (
     <Drawer.Root
@@ -566,17 +553,14 @@ function CreateTemplateDrawer({
                 size="sm"
                 value={sourceType}
                 onChange={(e) =>
-                  setSourceType(
-                    e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
-                  )
+                  setSourceType(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))
                 }
                 fontFamily="mono"
                 placeholder="e.g. codex_internal"
               />
               <Text fontSize="xs" color="fg.muted">
-                Lowercase letters / digits / underscores only. Drives the /me
-                Trace Ingest tile slug + the langwatch.source provenance
-                attribute on emitted spans.
+                Lowercase letters / digits / underscores only. Drives the /me Trace Ingest
+                tile slug + the langwatch.source provenance attribute on emitted spans.
               </Text>
             </VStack>
             <VStack align="stretch" gap={1}>
@@ -592,9 +576,8 @@ function CreateTemplateDrawer({
               />
             </VStack>
             <Text fontSize="xs" color="fg.muted">
-              After creation, you'll edit the OTTL rules in the next step. The
-              template starts with empty rules — admin authoring continues
-              there.
+              After creation, you'll edit the OTTL rules in the next step. The template
+              starts with empty rules — admin authoring continues there.
             </Text>
           </VStack>
         </Drawer.Body>

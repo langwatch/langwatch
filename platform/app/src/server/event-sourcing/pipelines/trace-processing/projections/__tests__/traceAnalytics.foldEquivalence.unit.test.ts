@@ -479,22 +479,23 @@ describe("traceAnalytics fold-equivalence across the read-back boundary", () => 
   });
 
   describe.each(SEQUENCES)("given $name", ({ events }) => {
-    describe.each(
-      splitPointsOf(events),
-    )("when the fold is interrupted after event %i and resumed from the committed row", (splitAt) => {
-      const before = events.slice(0, splitAt);
-      const after = events.slice(splitAt);
+    describe.each(splitPointsOf(events))(
+      "when the fold is interrupted after event %i and resumed from the committed row",
+      (splitAt) => {
+        const before = events.slice(0, splitAt);
+        const after = events.slice(splitAt);
 
-      /** @scenario a fold whose stored row is a slimmed analytics summary still recovers its working state */
-      it("reaches the same row as the fold that never lost its state", () => {
-        const committed = foldAll(before, projection.init());
+        /** @scenario a fold whose stored row is a slimmed analytics summary still recovers its working state */
+        it("reaches the same row as the fold that never lost its state", () => {
+          const committed = foldAll(before, projection.init());
 
-        const uninterrupted = foldAll(after, committed);
-        const resumed = foldAll(after, roundTrip(committed));
+          const uninterrupted = foldAll(after, committed);
+          const resumed = foldAll(after, roundTrip(committed));
 
-        expect(project(resumed)).toEqual(project(uninterrupted));
-      });
-    });
+          expect(project(resumed)).toEqual(project(uninterrupted));
+        });
+      },
+    );
   });
 
   /**
@@ -508,10 +509,7 @@ describe("traceAnalytics fold-equivalence across the read-back boundary", () => 
    */
   describe("given the log-led trace interrupted before its span arrives", () => {
     const splitAt = LOG_LED_LIFECYCLE.length - 2;
-    const committed = foldAll(
-      LOG_LED_LIFECYCLE.slice(0, splitAt),
-      projection.init(),
-    );
+    const committed = foldAll(LOG_LED_LIFECYCLE.slice(0, splitAt), projection.init());
     const rest = LOG_LED_LIFECYCLE.slice(splitAt);
 
     /** @scenario "A log-led trace resumed from its committed row keeps its anchor and its timing" */
@@ -520,9 +518,7 @@ describe("traceAnalytics fold-equivalence across the read-back boundary", () => 
       const resumed = foldAll(rest, roundTrip(committed));
 
       expect(resumed.storageAnchorMs).toBe(uninterrupted.storageAnchorMs);
-      expect(project(resumed).occurredAtMs).toBe(
-        project(committed).occurredAtMs,
-      );
+      expect(project(resumed).occurredAtMs).toBe(project(committed).occurredAtMs);
     });
 
     /** @scenario "A log-led trace resumed from its committed row keeps its anchor and its timing" */
@@ -690,8 +686,7 @@ describe("traceAnalytics fold-equivalence across the read-back boundary", () => 
 
       expect(ids).toEqual(
         tail.map(
-          (_, index) =>
-            `prompt_2Zx9QwErTyUiOpAsDfGhJ${OVER_CAP_SPANS - 3 + index}:3`,
+          (_, index) => `prompt_2Zx9QwErTyUiOpAsDfGhJ${OVER_CAP_SPANS - 3 + index}:3`,
         ),
       );
     });
@@ -764,13 +759,13 @@ describe("traceAnalytics read-back field coverage", () => {
     const state = foldAll(FALLBACK_LIFECYCLE.slice(0, 3), projection.init());
     const decoded = roundTrip(state);
 
-    it.each([
-      "traceNameFromFallback",
-      "rootMetadataFromFallback",
-    ] as const)("restores %s while it is still set", (field) => {
-      expect(state[field]).toBe(true);
-      expect(decoded[field]).toBe(true);
-    });
+    it.each(["traceNameFromFallback", "rootMetadataFromFallback"] as const)(
+      "restores %s while it is still set",
+      (field) => {
+        expect(state[field]).toBe(true);
+        expect(decoded[field]).toBe(true);
+      },
+    );
   });
 
   describe("given a state folded from the full event sequence", () => {
@@ -808,12 +803,8 @@ describe("traceAnalytics read-back field coverage", () => {
       });
 
       it("carries the read-modify-write accumulators back untouched", () => {
-        expect(decoded.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
-          "750",
-        );
-        expect(decoded.attributes["langwatch.reserved.log_record_count"]).toBe(
-          "1",
-        );
+        expect(decoded.attributes["langwatch.reserved.cache_read_tokens"]).toBe("750");
+        expect(decoded.attributes["langwatch.reserved.log_record_count"]).toBe("1");
       });
 
       it("hands back the capped metadata value, not the original", () => {
@@ -822,9 +813,7 @@ describe("traceAnalytics read-back field coverage", () => {
         // is idempotent — which is why the equivalence property still holds.
         expect(state.attributes["metadata.debug_payload"]).toHaveLength(5000);
         expect(decoded.attributes["metadata.debug_payload"]).toMatch(/…$/);
-        expect(
-          decoded.attributes["metadata.debug_payload"]!.length,
-        ).toBeLessThan(5000);
+        expect(decoded.attributes["metadata.debug_payload"]!.length).toBeLessThan(5000);
       });
 
       it("never had the payload span attribute to lose", () => {

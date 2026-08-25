@@ -215,11 +215,7 @@ const SORT_FIELD_TO_AGG_EXPR: Record<SpendSortField, string> = {
  */
 const TEAM_ROW_SORT_KEYS: Record<
   SpendSortField,
-  (row: {
-    thisSpendNano: bigint;
-    requestCount: number;
-    lastActivityMs: number;
-  }) => number
+  (row: { thisSpendNano: bigint; requestCount: number; lastActivityMs: number }) => number
 > = {
   spend: (r) => Number(r.thisSpendNano),
   requests: (r) => r.requestCount,
@@ -296,15 +292,7 @@ function extractSourceLabel(detail: unknown): string {
 
 function startOfUtcDay(ms: number): number {
   const d = new Date(ms);
-  return Date.UTC(
-    d.getUTCFullYear(),
-    d.getUTCMonth(),
-    d.getUTCDate(),
-    0,
-    0,
-    0,
-    0,
-  );
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0);
 }
 
 /**
@@ -356,9 +344,8 @@ function pulledUsageFromRawOcsf(rawPayload: string): {
 } {
   let extension: unknown;
   try {
-    extension = (
-      JSON.parse(rawPayload) as { metadata?: { extension?: unknown } }
-    )?.metadata?.extension;
+    extension = (JSON.parse(rawPayload) as { metadata?: { extension?: unknown } })
+      ?.metadata?.extension;
   } catch {
     extension = null;
   }
@@ -488,9 +475,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
    * when the org has no Gov Project yet (no IngestionSource has ever been
    * minted) - callers short-circuit to empty results in that case.
    */
-  private async tryResolveGovProjectId(
-    organizationId: string,
-  ): Promise<string | null> {
+  private async tryResolveGovProjectId(organizationId: string): Promise<string | null> {
     const project = await this.prisma.project.findFirst({
       where: {
         kind: INTERNAL_GOVERNANCE_PROJECT_KIND,
@@ -512,13 +497,9 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
     organizationId: string;
     windowDays: number;
   }): Promise<SummaryResult> {
-    const anomalyBreakdown = await this.openAnomalyBreakdown(
-      input.organizationId,
-    );
+    const anomalyBreakdown = await this.openAnomalyBreakdown(input.organizationId);
     const openAnomalyCount =
-      anomalyBreakdown.critical +
-      anomalyBreakdown.warning +
-      anomalyBreakdown.info;
+      anomalyBreakdown.critical + anomalyBreakdown.warning + anomalyBreakdown.info;
 
     const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
     if (!govProjectId) {
@@ -746,9 +727,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
 
     const { userDepartmentByEmail, userTeamDepartmentByEmail } =
       await this.resolveUserDepartments(input.organizationId);
-    const activeDepartmentNames = await this.activeDepartmentNames(
-      input.organizationId,
-    );
+    const activeDepartmentNames = await this.activeDepartmentNames(input.organizationId);
 
     const now = Date.now();
     const windowStart = now - input.windowDays * 24 * 60 * 60 * 1000;
@@ -803,8 +782,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       // An archived or otherwise-unknown department rolls up as Unassigned
       // without a backfill: it is simply absent from the active name map.
       const key =
-        departmentId !== UNASSIGNED_DEPARTMENT &&
-        activeDepartmentNames.has(departmentId)
+        departmentId !== UNASSIGNED_DEPARTMENT && activeDepartmentNames.has(departmentId)
           ? departmentId
           : UNASSIGNED_DEPARTMENT;
       const prior = acc.get(key) ?? {
@@ -815,10 +793,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       acc.set(key, {
         spendNanoUsd: prior.spendNanoUsd + usdToNanoUsd(r.spendUsdStr),
         requestCount: prior.requestCount + Number(r.requests),
-        lastActivityMs: Math.max(
-          prior.lastActivityMs,
-          Number(r.lastActivityMs),
-        ),
+        lastActivityMs: Math.max(prior.lastActivityMs, Number(r.lastActivityMs)),
       });
     }
 
@@ -826,15 +801,11 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       .map(([key, v]) => ({
         departmentId: key === UNASSIGNED_DEPARTMENT ? null : key,
         departmentName:
-          key === UNASSIGNED_DEPARTMENT
-            ? "Unassigned"
-            : activeDepartmentNames.get(key)!,
+          key === UNASSIGNED_DEPARTMENT ? "Unassigned" : activeDepartmentNames.get(key)!,
         spendUsd: nanoUsdToDecimalString(v.spendNanoUsd),
         requestCount: v.requestCount,
         lastActivityIso:
-          v.lastActivityMs > 0
-            ? new Date(v.lastActivityMs).toISOString()
-            : null,
+          v.lastActivityMs > 0 ? new Date(v.lastActivityMs).toISOString() : null,
       }))
       .sort((a, b) => {
         const aNano = usdToNanoUsd(a.spendUsd);
@@ -891,9 +862,8 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       const email = m.user.email;
       if (!email) continue;
       userDepartmentByEmail.set(email, m.departmentId);
-      const inherited = m.user.teamMemberships.find(
-        (tm) => tm.team.departmentId,
-      )?.team.departmentId;
+      const inherited = m.user.teamMemberships.find((tm) => tm.team.departmentId)?.team
+        .departmentId;
       userTeamDepartmentByEmail.set(email, inherited ?? null);
     }
     return { userDepartmentByEmail, userTeamDepartmentByEmail };
@@ -990,9 +960,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
     }>;
     if (sourceRows.length === 0) return [];
 
-    const sourceIds = sourceRows
-      .map((r) => r.sourceId)
-      .filter((id) => id !== "");
+    const sourceIds = sourceRows.map((r) => r.sourceId).filter((id) => id !== "");
     const sources = await this.prisma.ingestionSource.findMany({
       where: { id: { in: sourceIds }, organizationId: input.organizationId },
       select: {
@@ -1031,10 +999,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
         existing.prevSpendNano += prevSpendNano;
         existing.requestCount += requestCount;
         existing.sourceCount += 1;
-        existing.lastActivityMs = Math.max(
-          existing.lastActivityMs,
-          lastActivityMs,
-        );
+        existing.lastActivityMs = Math.max(existing.lastActivityMs, lastActivityMs);
       } else {
         byTeam.set(key, {
           teamId,
@@ -1065,9 +1030,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
         ),
         hasPriorBaseline: t.prevSpendNano > 0n,
         lastActivityIso:
-          t.lastActivityMs > 0
-            ? new Date(t.lastActivityMs).toISOString()
-            : null,
+          t.lastActivityMs > 0 ? new Date(t.lastActivityMs).toISOString() : null,
         sourceCount: t.sourceCount,
       }));
   }
@@ -1427,9 +1390,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
     if (sources.length === 0) return [];
 
     const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
-    const ch = govProjectId
-      ? await this.tryGetClickhouse(input.organizationId)
-      : null;
+    const ch = govProjectId ? await this.tryGetClickhouse(input.organizationId) : null;
 
     const eventsBySource = new Map<string, number>();
     if (ch && govProjectId) {
@@ -1585,9 +1546,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       ch,
       tenantId: govProjectId,
       sourceId: input.sourceId,
-      beforeMs: input.beforeIso
-        ? new Date(input.beforeIso).getTime()
-        : Date.now(),
+      beforeMs: input.beforeIso ? new Date(input.beforeIso).getTime() : Date.now(),
       limit,
     };
 
@@ -1601,8 +1560,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       .sort(
         (a, b) =>
           new Date(b.eventTimestampIso).getTime() -
-            new Date(a.eventTimestampIso).getTime() ||
-          b.eventId.localeCompare(a.eventId),
+            new Date(a.eventTimestampIso).getTime() || b.eventId.localeCompare(a.eventId),
       )
       .filter((event) => {
         if (seen.has(event.eventId)) return false;

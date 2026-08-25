@@ -15,8 +15,7 @@ import { DemonstrationsModal } from "../../modals/DemonstrationsModal";
  * to generate the correct output.
  */
 export function DemonstrationsField() {
-  const { control, watch, formState } =
-    useFormContext<PromptConfigFormValues>();
+  const { control, watch, formState } = useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
   const { open, onOpen, onClose } = useDisclosure();
   const demonstrations = watch("version.configData.demonstrations");
@@ -60,13 +59,7 @@ export function DemonstrationsField() {
   );
 }
 
-function DemonstrationsLabel({
-  total,
-  onOpen,
-}: {
-  total: number;
-  onOpen: () => void;
-}) {
+function DemonstrationsLabel({ total, onOpen }: { total: number; onOpen: () => void }) {
   return (
     <HStack width="full" align="center">
       <HStack gap={2} align="center">

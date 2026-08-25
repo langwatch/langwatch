@@ -23,9 +23,9 @@ describe("scopeChipDetail", () => {
         secondary: "acme-HXECRq",
       });
       expect(detail).toBe("acme-HXECRq");
-      expect(
-        scopeChipTooltip({ scopeType: "ORGANIZATION", name: "ACME", detail }),
-      ).toBe("Organization: ACME · acme-HXECRq");
+      expect(scopeChipTooltip({ scopeType: "ORGANIZATION", name: "ACME", detail })).toBe(
+        "Organization: ACME · acme-HXECRq",
+      );
     });
   });
 
@@ -76,14 +76,8 @@ describe("scopeChipDetail", () => {
         [{ scopeType: "TEAM", name: "Platform" }, "Team: Platform"],
         [{ scopeType: "PROJECT", name: "Web App" }, "Project: Web App"],
         [{ scopeType: "GROUP", name: "Engineering" }, "Group: Engineering"],
-        [
-          { scopeType: "PRINCIPAL", name: "Ada Lovelace" },
-          "Person: Ada Lovelace",
-        ],
-        [
-          { scopeType: "VIRTUAL_KEY", name: "Scenario CI" },
-          "Virtual key: Scenario CI",
-        ],
+        [{ scopeType: "PRINCIPAL", name: "Ada Lovelace" }, "Person: Ada Lovelace"],
+        [{ scopeType: "VIRTUAL_KEY", name: "Scenario CI" }, "Virtual key: Scenario CI"],
         [
           { scopeType: "ATTRIBUTED_USER", name: "prod-openai" },
           "Attributed user: prod-openai",
@@ -103,9 +97,9 @@ describe("scopeChipDetail", () => {
         name: "Web App",
       });
       expect(detail).toBeUndefined();
-      expect(
-        scopeChipTooltip({ scopeType: "PROJECT", name: "Web App", detail }),
-      ).toBe("Project: Web App");
+      expect(scopeChipTooltip({ scopeType: "PROJECT", name: "Web App", detail })).toBe(
+        "Project: Web App",
+      );
     });
 
     it("has no detail at all when there is no target", () => {

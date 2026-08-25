@@ -12,13 +12,7 @@ import { LogoIcon } from "../icons/LogoIcon";
  * width with two-column form rows; a single sentence stretched across the same
  * span is a long line to track back from, and every state here is prose.
  */
-export function AuthCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+export function AuthCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Container maxW="container.md" paddingTop="calc(40vh - 164px)">
       <Card.Root>

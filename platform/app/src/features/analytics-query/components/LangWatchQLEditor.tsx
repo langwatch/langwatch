@@ -21,10 +21,7 @@ import { useCallback, useState } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import dynamic from "~/utils/compat/next-dynamic";
 
-import {
-  LWQL_LANGUAGE,
-  useLangWatchQLMonaco,
-} from "../hooks/useLangWatchQLMonaco";
+import { LWQL_LANGUAGE, useLangWatchQLMonaco } from "../hooks/useLangWatchQLMonaco";
 import type { LangWatchQLEditorMarker } from "../logic/lwqlFailure";
 import type { LangWatchQLSchemaModel } from "../logic/lwqlSchemaModel";
 
@@ -58,10 +55,7 @@ const EDITOR_MIN_HEIGHT = 116;
 const EDITOR_MAX_HEIGHT = 380;
 
 function clampEditorHeight(contentHeight: number): number {
-  return Math.min(
-    EDITOR_MAX_HEIGHT,
-    Math.max(EDITOR_MIN_HEIGHT, contentHeight),
-  );
+  return Math.min(EDITOR_MAX_HEIGHT, Math.max(EDITOR_MIN_HEIGHT, contentHeight));
 }
 
 export interface LangWatchQLEditorProps {
@@ -121,11 +115,7 @@ export function LangWatchQLEditor({
   );
 
   return (
-    <Box
-      height={`${editorHeight}px`}
-      overflow="hidden"
-      data-testid="lwql-editor"
-    >
+    <Box height={`${editorHeight}px`} overflow="hidden" data-testid="lwql-editor">
       <MonacoEditor
         height="100%"
         language={LWQL_LANGUAGE}

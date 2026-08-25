@@ -34,10 +34,7 @@ describe("Experiment.compare", () => {
     const answerEachRow = (experiment: Experiment, item: { answer: string }) =>
       Promise.all([
         experiment.withTarget("gpt-5-mini", () => `${item.answer}.`),
-        experiment.withTarget(
-          "claude-sonnet-5",
-          () => `The answer is ${item.answer}.`
-        ),
+        experiment.withTarget("claude-sonnet-5", () => `The answer is ${item.answer}.`),
       ]);
 
     describe("when a row is compared without naming it", () => {
@@ -51,12 +48,12 @@ describe("Experiment.compare", () => {
             await answerEachRow(experiment, item);
             await experiment.compare();
           },
-          { concurrency: 3 }
+          { concurrency: 3 },
         );
 
         expect(harness.judgeRequests).toHaveLength(3);
         expect(
-          harness.judgeRequests.map((request) => request.data.row_index).sort()
+          harness.judgeRequests.map((request) => request.data.row_index).sort(),
         ).toEqual([0, 1, 2]);
         for (const request of harness.judgeRequests) {
           const city = CITIES[request.data.row_index!]!.answer;
@@ -78,7 +75,7 @@ describe("Experiment.compare", () => {
             await answerEachRow(experiment, item);
             if (index === 2) await experiment.compare({ index: 0 });
           },
-          { concurrency: 1 }
+          { concurrency: 1 },
         );
 
         expect(harness.judgeRequests).toHaveLength(1);
@@ -98,17 +95,12 @@ describe("Experiment.compare", () => {
       it("asks for the row instead of judging whichever one it could reach", async () => {
         const experiment = await createExperiment();
         await experiment.withTarget("gpt-5-mini", () => "Amsterdam.");
-        await experiment.withTarget(
-          "claude-sonnet-5",
-          () => "The answer is Amsterdam."
-        );
+        await experiment.withTarget("claude-sonnet-5", () => "The answer is Amsterdam.");
 
         const error = await experiment.compare().catch((err: unknown) => err);
 
         expect(error).toBeInstanceOf(ComparisonError);
-        expect((error as ComparisonError).message).toContain(
-          "Pass index explicitly"
-        );
+        expect((error as ComparisonError).message).toContain("Pass index explicitly");
         expect((error as ComparisonError).message).toContain("run()");
         expect(harness.judgeRequests).toHaveLength(0);
       });
@@ -116,10 +108,7 @@ describe("Experiment.compare", () => {
       it("judges the row once it is named", async () => {
         const experiment = await createExperiment();
         await experiment.withTarget("gpt-5-mini", () => "Amsterdam.");
-        await experiment.withTarget(
-          "claude-sonnet-5",
-          () => "The answer is Amsterdam."
-        );
+        await experiment.withTarget("claude-sonnet-5", () => "The answer is Amsterdam.");
 
         const verdict = await experiment.compare({ index: 0 });
 
@@ -144,12 +133,12 @@ describe("Experiment.compare", () => {
           async ({ index }) => {
             await Promise.all(
               Object.entries(THREE_OUTPUTS).map(([target, output]) =>
-                experiment.withTarget(target, () => output)
-              )
+                experiment.withTarget(target, () => output),
+              ),
             );
             await experiment.compare({ index });
           },
-          { concurrency: 2 }
+          { concurrency: 2 },
         );
 
         // Both rows reach the judge before either verdict comes back, which

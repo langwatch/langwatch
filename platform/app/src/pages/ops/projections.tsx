@@ -8,9 +8,7 @@ import { useRouter } from "~/utils/compat/next-router";
 export default function OpsProjectionsPage() {
   const router = useRouter();
   useEffect(() => {
-    void router.replace(
-      "/ops/event-sourcing/projections?drawer.open=opsReplay",
-    );
+    void router.replace("/ops/event-sourcing/projections?drawer.open=opsReplay");
   }, [router]);
   return null;
 }

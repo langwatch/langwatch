@@ -38,9 +38,7 @@ describe("ES pipeline metrics", () => {
     });
 
     it("registers es_command_duration_milliseconds histogram", () => {
-      const metric = register.getSingleMetric(
-        "es_command_duration_milliseconds",
-      );
+      const metric = register.getSingleMetric("es_command_duration_milliseconds");
       expect(metric).toBeDefined();
     });
 
@@ -50,9 +48,7 @@ describe("ES pipeline metrics", () => {
     });
 
     it("registers es_fold_projection_duration_milliseconds histogram", () => {
-      const metric = register.getSingleMetric(
-        "es_fold_projection_duration_milliseconds",
-      );
+      const metric = register.getSingleMetric("es_fold_projection_duration_milliseconds");
       expect(metric).toBeDefined();
     });
 
@@ -62,9 +58,7 @@ describe("ES pipeline metrics", () => {
     });
 
     it("registers es_map_projection_duration_milliseconds histogram", () => {
-      const metric = register.getSingleMetric(
-        "es_map_projection_duration_milliseconds",
-      );
+      const metric = register.getSingleMetric("es_map_projection_duration_milliseconds");
       expect(metric).toBeDefined();
     });
 
@@ -87,9 +81,7 @@ describe("ES pipeline metrics", () => {
     });
 
     it("registers es_reactor_duration_milliseconds histogram", () => {
-      const metric = register.getSingleMetric(
-        "es_reactor_duration_milliseconds",
-      );
+      const metric = register.getSingleMetric("es_reactor_duration_milliseconds");
       expect(metric).toBeDefined();
     });
 
@@ -99,9 +91,7 @@ describe("ES pipeline metrics", () => {
     });
 
     it("registers es_fold_cache_get_duration_milliseconds histogram", () => {
-      const metric = register.getSingleMetric(
-        "es_fold_cache_get_duration_milliseconds",
-      );
+      const metric = register.getSingleMetric("es_fold_cache_get_duration_milliseconds");
       expect(metric).toBeDefined();
     });
 
@@ -113,9 +103,7 @@ describe("ES pipeline metrics", () => {
     });
 
     it("registers es_fold_cache_redis_error_total counter", () => {
-      const metric = register.getSingleMetric(
-        "es_fold_cache_redis_error_total",
-      );
+      const metric = register.getSingleMetric("es_fold_cache_redis_error_total");
       expect(metric).toBeDefined();
     });
 
@@ -125,25 +113,19 @@ describe("ES pipeline metrics", () => {
      * fold failure that left durable state behind from one that did not.
      */
     it("registers es_fold_post_store_failure_total counter", () => {
-      const metric = register.getSingleMetric(
-        "es_fold_post_store_failure_total",
-      );
+      const metric = register.getSingleMetric("es_fold_post_store_failure_total");
       expect(metric).toBeDefined();
     });
   });
 
   describe("when deprecated metrics are removed", () => {
     it("does not register collector_index_delay_milliseconds", () => {
-      const metric = register.getSingleMetric(
-        "collector_index_delay_milliseconds",
-      );
+      const metric = register.getSingleMetric("collector_index_delay_milliseconds");
       expect(metric).toBeUndefined();
     });
 
     it("does not register event_sourcing_lock_contention_total", () => {
-      const metric = register.getSingleMetric(
-        "event_sourcing_lock_contention_total",
-      );
+      const metric = register.getSingleMetric("event_sourcing_lock_contention_total");
       expect(metric).toBeUndefined();
     });
 
@@ -184,9 +166,7 @@ describe("ES pipeline metrics", () => {
         status: "completed",
       });
 
-      const lines = await register.getSingleMetricAsString(
-        "es_fold_projection_total",
-      );
+      const lines = await register.getSingleMetricAsString("es_fold_projection_total");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('projection_name="traceSummary"');
       expect(lines).toContain('status="completed"');
@@ -215,9 +195,7 @@ describe("ES pipeline metrics", () => {
         status: "completed",
       });
 
-      const lines = await register.getSingleMetricAsString(
-        "es_map_projection_total",
-      );
+      const lines = await register.getSingleMetricAsString("es_map_projection_total");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('projection_name="evaluationSync"');
       expect(lines).toContain('status="completed"');
@@ -263,9 +241,7 @@ describe("ES pipeline metrics", () => {
         durationMs: 7.5,
       });
 
-      const totals = await register.getSingleMetricAsString(
-        "es_projection_total",
-      );
+      const totals = await register.getSingleMetricAsString("es_projection_total");
       expect(totals).toContain('projection_kind="fold"');
       expect(totals).toContain('projection_kind="map"');
       expect(totals).toContain('projection_kind="state"');
@@ -292,9 +268,7 @@ describe("ES pipeline metrics", () => {
         durationMs: 3.2,
       });
 
-      const totals = await register.getSingleMetricAsString(
-        "es_subscriber_total",
-      );
+      const totals = await register.getSingleMetricAsString("es_subscriber_total");
       expect(totals).toContain('subscriber_name="audit"');
       expect(totals).toContain('status="failed"');
 
@@ -371,11 +345,7 @@ describe("ES pipeline metrics", () => {
 
   describe("when subscriber metrics are recorded", () => {
     it("increments subscriber total with correct labels", async () => {
-      incrementEsReactorTotal(
-        "test-pipeline",
-        "evaluationTrigger",
-        "completed",
-      );
+      incrementEsReactorTotal("test-pipeline", "evaluationTrigger", "completed");
 
       const lines = await register.getSingleMetricAsString("es_reactor_total");
       expect(lines).toContain('pipeline_name="test-pipeline"');
@@ -400,9 +370,7 @@ describe("ES pipeline metrics", () => {
       incrementEsFoldCacheTotal("traceSummary", "miss");
       incrementEsFoldCacheTotal("traceSummary", "fallback_error");
 
-      const lines = await register.getSingleMetricAsString(
-        "es_fold_cache_total",
-      );
+      const lines = await register.getSingleMetricAsString("es_fold_cache_total");
       expect(lines).toContain('projection_name="traceSummary"');
       expect(lines).toContain('result="hit"');
       expect(lines).toContain('result="miss"');

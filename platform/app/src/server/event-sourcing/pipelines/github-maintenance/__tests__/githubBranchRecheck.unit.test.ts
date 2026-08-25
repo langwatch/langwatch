@@ -182,9 +182,7 @@ describe("githubBranchRecheck process", () => {
           branchRecheck: noopDeps,
         });
 
-        const pm = pipeline.processManagers.get(
-          GITHUB_BRANCH_RECHECK_PROCESS_NAME,
-        );
+        const pm = pipeline.processManagers.get(GITHUB_BRANCH_RECHECK_PROCESS_NAME);
         expect(pm).toBeDefined();
         expect(pm?.config.schedule?.everyMs).toBeGreaterThan(0);
         // No event handlers: a scheduled-only process must not register a

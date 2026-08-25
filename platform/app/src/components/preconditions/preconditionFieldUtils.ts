@@ -52,10 +52,7 @@ export function getFieldOptionsByCategory(): {
   fields: { value: CheckPreconditionFields; label: string }[];
 }[] {
   const available = getAvailablePreconditionFields();
-  const groups = new Map<
-    string,
-    { value: CheckPreconditionFields; label: string }[]
-  >();
+  const groups = new Map<string, { value: CheckPreconditionFields; label: string }[]>();
 
   for (const entry of available) {
     const category = deriveCategory(entry.field);

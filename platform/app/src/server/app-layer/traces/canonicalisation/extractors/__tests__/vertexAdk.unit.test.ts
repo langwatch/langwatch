@@ -192,9 +192,7 @@ describe("VertexAdkExtractor", () => {
 
         extractor.apply(ctx);
 
-        expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(
-          SYSTEM_INSTRUCTION,
-        );
+        expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(SYSTEM_INSTRUCTION);
         const input = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as unknown[];
         for (const message of input) {
           expect((message as { role: string }).role).not.toBe("system");
@@ -257,9 +255,7 @@ describe("VertexAdkExtractor", () => {
 
         expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBeUndefined();
         expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS]).toBeUndefined();
-        expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS)).toBe(
-          2500,
-        );
+        expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS)).toBe(2500);
       });
 
       it("still lifts cached prompt tokens as cache-read tokens", () => {
@@ -267,9 +263,7 @@ describe("VertexAdkExtractor", () => {
 
         extractor.apply(ctx);
 
-        expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
-          2100,
-        );
+        expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(2100);
       });
     });
 
@@ -298,9 +292,7 @@ describe("VertexAdkExtractor", () => {
         extractor.apply(ctx);
 
         expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toBeUndefined();
-        expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)).toEqual(
-          existing,
-        );
+        expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)).toEqual(existing);
       });
     });
 
@@ -315,9 +307,7 @@ describe("VertexAdkExtractor", () => {
 
         extractor.apply(ctx);
 
-        expect(ctx.out[ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS]).toEqual([
-          "STOP",
-        ]);
+        expect(ctx.out[ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS]).toEqual(["STOP"]);
       });
     });
 
@@ -438,9 +428,7 @@ describe("VertexAdkExtractor", () => {
 
         extractor.apply(ctx);
 
-        expect(ctx.bag.attrs.has("gcp.vertex.agent.tool_call_args")).toBe(
-          false,
-        );
+        expect(ctx.bag.attrs.has("gcp.vertex.agent.tool_call_args")).toBe(false);
         expect(ctx.bag.attrs.has("gcp.vertex.agent.tool_response")).toBe(false);
         expect(ctx.bag.attrs.has("gcp.vertex.agent.llm_request")).toBe(false);
         expect(ctx.bag.attrs.has("gcp.vertex.agent.llm_response")).toBe(false);
@@ -508,9 +496,7 @@ describe("VertexAdkExtractor", () => {
 
         extractor.apply(ctx);
 
-        expect(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]).toBe(
-          "session-1234abcd",
-        );
+        expect(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]).toBe("session-1234abcd");
       });
     });
   });

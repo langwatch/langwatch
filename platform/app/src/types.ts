@@ -1,10 +1,7 @@
 import type { Node, XYPosition } from "@xyflow/react";
 import type { Component } from "@langwatch/workflow-contract";
 
-export type NodeWithOptionalPosition<T extends Component> = Omit<
-  Node<T>,
-  "position"
-> & {
+export type NodeWithOptionalPosition<T extends Component> = Omit<Node<T>, "position"> & {
   position?: XYPosition;
 };
 
@@ -23,20 +20,14 @@ export const LlmConfigInputTypes = [
 ] as const;
 export type LlmConfigInputType = (typeof LlmConfigInputTypes)[number];
 
-export const LlmConfigOutputTypes = [
-  "str",
-  "float",
-  "bool",
-  "json_schema",
-] as const;
+export const LlmConfigOutputTypes = ["str", "float", "bool", "json_schema"] as const;
 export type LlmConfigOutputType = (typeof LlmConfigOutputTypes)[number];
 
 export const ANALYTICS_KEYS = {
   PROJECT_ACTIVE_TODAY: "PROJECT_ACTIVE_TODAY",
   PROJECT_TRACE_COUNT_PER_DAY: "PROJECT_TRACE_COUNT_PER_DAY",
   SCENARIO_EVENT_COUNT_PER_DAY: "SCENARIO_EVENT_COUNT_PER_DAY",
-  SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY:
-    "SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY",
+  SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY: "SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY",
   SCENARIO_RUN_STARTED_COUNT_PER_DAY: "SCENARIO_RUN_STARTED_COUNT_PER_DAY",
   SCENARIO_RUN_FINISHED_COUNT_PER_DAY: "SCENARIO_RUN_FINISHED_COUNT_PER_DAY",
 };

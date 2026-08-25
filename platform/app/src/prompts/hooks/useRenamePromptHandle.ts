@@ -8,9 +8,7 @@ import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";
 
-const logger = createLogger(
-  "langwatch:prompt-configs:use-rename-prompt-handle",
-);
+const logger = createLogger("langwatch:prompt-configs:use-rename-prompt-handle");
 
 type UseRenamePromptHandleOptions = {
   promptId: string;

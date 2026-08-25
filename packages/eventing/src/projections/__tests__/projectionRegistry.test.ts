@@ -27,9 +27,7 @@ function createMockGlobalQueue(): {
   };
 }
 
-function createMockSubscriber(
-  name: string,
-): SubscriberDispatchDefinition<Event> {
+function createMockSubscriber(name: string): SubscriberDispatchDefinition<Event> {
   return {
     name,
     handle: vi.fn().mockResolvedValue(void 0),
@@ -88,9 +86,7 @@ describe("ProjectionRegistry", () => {
         const map2 = createMockMapProjectionDefinition("sameName");
 
         registry.registerMapProjection(map1);
-        expect(() => registry.registerMapProjection(map2)).toThrow(
-          /already registered/,
-        );
+        expect(() => registry.registerMapProjection(map2)).toThrow(/already registered/);
       });
     });
   });
@@ -105,9 +101,9 @@ describe("ProjectionRegistry", () => {
         const { globalQueue, globalJobRegistry } = createMockGlobalQueue();
         registry.initialize(globalQueue, globalJobRegistry);
 
-        expect(() =>
-          registry.initialize(globalQueue, globalJobRegistry),
-        ).toThrow(/Already initialized/);
+        expect(() => registry.initialize(globalQueue, globalJobRegistry)).toThrow(
+          /Already initialized/,
+        );
       });
     });
 
@@ -121,9 +117,7 @@ describe("ProjectionRegistry", () => {
         registry.initialize(globalQueue, globalJobRegistry);
         await registry.close();
 
-        expect(() =>
-          registry.initialize(globalQueue, globalJobRegistry),
-        ).not.toThrow();
+        expect(() => registry.initialize(globalQueue, globalJobRegistry)).not.toThrow();
       });
     });
   });
@@ -141,9 +135,7 @@ describe("ProjectionRegistry", () => {
         ];
 
         // Does not throw, just warns
-        await expect(
-          registry.dispatch(events, { tenantId }),
-        ).resolves.not.toThrow();
+        await expect(registry.dispatch(events, { tenantId })).resolves.not.toThrow();
       });
     });
 
@@ -181,9 +173,7 @@ describe("ProjectionRegistry", () => {
         registry.registerFoldProjection(fold);
 
         const subscriber = createMockSubscriber("mySubscriber");
-        expect(() =>
-          registry.registerSubscriber("myFold", subscriber),
-        ).not.toThrow();
+        expect(() => registry.registerSubscriber("myFold", subscriber)).not.toThrow();
       });
     });
 
@@ -192,9 +182,9 @@ describe("ProjectionRegistry", () => {
         const registry = new ProjectionRegistry();
         const subscriber = createMockSubscriber("mySubscriber");
 
-        expect(() =>
-          registry.registerSubscriber("missingFold", subscriber),
-        ).toThrow(/fold "missingFold" — fold not registered/);
+        expect(() => registry.registerSubscriber("missingFold", subscriber)).toThrow(
+          /fold "missingFold" — fold not registered/,
+        );
       });
     });
 
@@ -208,9 +198,9 @@ describe("ProjectionRegistry", () => {
         const subscriber2 = createMockSubscriber("sameName");
 
         registry.registerSubscriber("myFold", subscriber1);
-        expect(() =>
-          registry.registerSubscriber("myFold", subscriber2),
-        ).toThrow(/already registered/);
+        expect(() => registry.registerSubscriber("myFold", subscriber2)).toThrow(
+          /already registered/,
+        );
       });
     });
   });
@@ -221,10 +211,7 @@ describe("ProjectionRegistry", () => {
         const registry = new ProjectionRegistry();
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
-        registry.registerSubscriber(
-          "myFold",
-          createMockSubscriber("mySubscriber"),
-        );
+        registry.registerSubscriber("myFold", createMockSubscriber("mySubscriber"));
 
         expect(registry.hasProjections).toBe(true);
       });
@@ -244,15 +231,10 @@ describe("ProjectionRegistry", () => {
         const registry = new ProjectionRegistry();
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
-        registry.registerSubscriber(
-          "myFold",
-          createMockSubscriber("mySubscriber"),
-        );
+        registry.registerSubscriber("myFold", createMockSubscriber("mySubscriber"));
 
         const { globalQueue, globalJobRegistry } = createMockGlobalQueue();
-        expect(() =>
-          registry.initialize(globalQueue, globalJobRegistry),
-        ).not.toThrow();
+        expect(() => registry.initialize(globalQueue, globalJobRegistry)).not.toThrow();
       });
     });
   });

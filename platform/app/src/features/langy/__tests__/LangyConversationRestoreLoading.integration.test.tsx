@@ -211,10 +211,7 @@ vi.mock("~/utils/api", async () => {
         useQuery: (
           input: { projectId: string; conversationId: string },
           opts?: { enabled?: boolean },
-        ) =>
-          useHeldHistoryQuery(
-            opts?.enabled !== false && !!input.conversationId,
-          ),
+        ) => useHeldHistoryQuery(opts?.enabled !== false && !!input.conversationId),
       },
       stopTurn: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
@@ -310,9 +307,7 @@ describe("reopening a conversation that has not loaded yet", () => {
         // the question is read off the rendered text rather than matched as
         // one node.
         await waitFor(() =>
-          expect(document.body.textContent).toContain(
-            "the remembered question",
-          ),
+          expect(document.body.textContent).toContain("the remembered question"),
         );
         expect(skeleton()).toBeNull();
         expect(invitation()).toBeNull();

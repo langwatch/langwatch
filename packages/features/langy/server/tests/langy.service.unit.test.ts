@@ -24,9 +24,7 @@ const conversation = {
 };
 
 class Conversations extends ConversationRepository {
-  readonly tryGet = vi.fn(
-    async (): Promise<typeof conversation | null> => conversation,
-  );
+  readonly tryGet = vi.fn(async (): Promise<typeof conversation | null> => conversation);
   list = vi.fn(async () => ({ items: [conversation], nextCursor: null }));
   create = vi.fn(async () => conversation);
   archive = vi.fn(async () => undefined);

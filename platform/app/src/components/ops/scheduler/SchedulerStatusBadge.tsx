@@ -2,10 +2,7 @@ import { Badge, HStack, Text } from "@chakra-ui/react";
 import { formatDurationMs } from "@langwatch/ops-web";
 import type { SchedulerJobStatus } from "./schedulerStatus";
 
-const PRESENTATION: Record<
-  SchedulerJobStatus,
-  { label: string; palette: string }
-> = {
+const PRESENTATION: Record<SchedulerJobStatus, { label: string; palette: string }> = {
   overdue: { label: "Overdue", palette: "red" },
   retrying: { label: "Retrying", palette: "orange" },
   running: { label: "Running", palette: "blue" },

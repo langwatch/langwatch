@@ -37,9 +37,7 @@ describe("mapStatus", () => {
     });
 
     it("stays neutral even when a score is present (score-only evaluator)", () => {
-      expect(mapStatus(makeEvaluation({ passed: null, score: 0.85 }))).toBe(
-        "processed",
-      );
+      expect(mapStatus(makeEvaluation({ passed: null, score: 0.85 }))).toBe("processed");
     });
   });
 
@@ -66,9 +64,7 @@ describe("mapScore", () => {
 
   describe("when the evaluation carries neither score nor verdict", () => {
     it("returns null instead of a fabricated 0", () => {
-      expect(
-        mapScore(makeEvaluation({ score: null, passed: null })),
-      ).toBeNull();
+      expect(mapScore(makeEvaluation({ score: null, passed: null }))).toBeNull();
     });
   });
 });

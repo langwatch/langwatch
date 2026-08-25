@@ -1,18 +1,12 @@
 import type { AppendStore } from "@langwatch/eventing";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
 } from "~/server/app-layer/traces/span-normalization.service";
-import {
-  type SpanReceivedEvent,
-  spanReceivedEventSchema,
-} from "../schemas/events";
+import { type SpanReceivedEvent, spanReceivedEventSchema } from "../schemas/events";
 import { NormalizedStatusCode } from "../schemas/spans";
 import { SpanCostService } from "./services/span-cost.service";
 
@@ -134,8 +128,7 @@ export class TraceAnalyticsRollupMapProjection
     // counts that usage exactly once. The rollup is a trace-level aggregate
     // too, so it must apply the same gate. (`stored_spans.Cost` deliberately
     // does NOT: that column is per-span detail, not a trace total.)
-    const skipTokenAccumulation =
-      spanCostService.isTokenAccumulationSkipped(span);
+    const skipTokenAccumulation = spanCostService.isTokenAccumulationSkipped(span);
     const tokens = skipTokenAccumulation
       ? { promptTokens: 0, completionTokens: 0, cost: 0 }
       : spanCostService.extractTokenMetrics(span);
@@ -155,9 +148,7 @@ export class TraceAnalyticsRollupMapProjection
       // Mirrors `accumulateTokens`: the bundled portion is this span's own cost
       // when the span is non-billable, and 0 otherwise. Skipped spans carry
       // cost 0, so they contribute nothing here either.
-      nonBilledCostSum: spanCostService.isSpanCostNonBillable(span)
-        ? tokens.cost
-        : 0,
+      nonBilledCostSum: spanCostService.isSpanCostNonBillable(span) ? tokens.cost : 0,
       // Root span carries trace wall-clock duration; children contribute 0 so the
       // SimpleAggregateFunction(sum) over a trace's spans equals the trace's
       // duration. (Same gate the prior MV applied via `ParentSpanId IS NULL`.)

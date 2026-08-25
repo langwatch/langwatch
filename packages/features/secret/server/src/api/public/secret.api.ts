@@ -1,7 +1,4 @@
-import type {
-  EndpointVariables,
-  ServiceBuilder,
-} from "@langwatch/api";
+import type { EndpointVariables, ServiceBuilder } from "@langwatch/api";
 import {
   secretPublicRpc,
   toSecretPublic,
@@ -35,9 +32,7 @@ export class SecretPublicApi {
       SECRET_PUBLIC_API_VERSION,
       async (context, input: SecretPublicListInput) => {
         const service = context.app.secrets;
-        return (await service.list({ projectId: input.projectId })).map(
-          toSecretPublic,
-        );
+        return (await service.list({ projectId: input.projectId })).map(toSecretPublic);
       },
       (builder) =>
         builder

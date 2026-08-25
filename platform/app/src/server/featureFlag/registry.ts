@@ -367,9 +367,7 @@ const FLAGS_BY_KEY: Map<string, FeatureFlagDefinition> = new Map(
  * legacy in-memory evaluation in that case (back-compat for flags that
  * existed before the registry).
  */
-export function resolveFlagDefinition(
-  key: string,
-): FeatureFlagDefinition | undefined {
+export function resolveFlagDefinition(key: string): FeatureFlagDefinition | undefined {
   const explicit = FLAGS_BY_KEY.get(key);
   if (explicit) return explicit;
   for (const fam of FEATURE_FLAG_FAMILIES) {

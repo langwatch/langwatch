@@ -81,9 +81,7 @@ describe("Feature: Role bindings REST API", () => {
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
-          .mockResolvedValue(
-            ENTERPRISE_TEST_PLAN,
-          ) as PlanProvider["getActivePlan"],
+          .mockResolvedValue(ENTERPRISE_TEST_PLAN) as PlanProvider["getActivePlan"],
       }),
     });
 
@@ -192,10 +190,7 @@ describe("Feature: Role bindings REST API", () => {
   afterAll(async () => {
     try {
       await cleanupTestRows(prisma, [
-        [
-          "groupMembership",
-          { group: { organizationId: seeded?.organization.id } },
-        ],
+        ["groupMembership", { group: { organizationId: seeded?.organization.id } }],
         ["roleBinding", { organizationId: seeded?.organization.id }],
         ["teamUser", { team: { organizationId: seeded?.organization.id } }],
         ["apiKey", { organizationId: seeded?.organization.id }],
@@ -212,9 +207,7 @@ describe("Feature: Role bindings REST API", () => {
         ["organizationUser", { organizationId: seeded?.organization.id }],
         ["user", { email: { endsWith: `-${ns}@example.com` } }],
         ["organization", { id: seeded?.organization.id }],
-        ...(foreignOrgId
-          ? ([["organization", { id: foreignOrgId }]] as const)
-          : []),
+        ...(foreignOrgId ? ([["organization", { id: foreignOrgId }]] as const) : []),
       ]);
     } finally {
       // The suite swapped the global app; leaving its mocked plan provider
@@ -610,9 +603,7 @@ describe("Feature: Role bindings REST API", () => {
       });
 
       expect(response.status).toBe(403);
-      expect((await response.json()).code).toBe(
-        "personal_workspace_not_managed_here",
-      );
+      expect((await response.json()).code).toBe("personal_workspace_not_managed_here");
       expect(
         await prisma.roleBinding.count({
           where: {
@@ -703,10 +694,13 @@ describe("Feature: Role bindings REST API", () => {
         ).permitted,
       ).toBe(true);
 
-      const response = await app.request(`/api/role-bindings/${MANAGEMENT_API_VERSION}/${created.id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
+      const response = await app.request(
+        `/api/role-bindings/${MANAGEMENT_API_VERSION}/${created.id}`,
+        {
+          method: "DELETE",
+          headers: authHeaders(),
+        },
+      );
       expect(response.status).toBe(200);
       expect((await response.json()).success).toBe(true);
 

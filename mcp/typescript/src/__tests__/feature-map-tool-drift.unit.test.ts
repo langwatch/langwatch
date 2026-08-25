@@ -26,7 +26,7 @@ const REPO_ROOT = join(__dirname, "../../../..");
  */
 function toolNamesInFeatureMap(): Set<string> {
   const map: unknown = JSON.parse(
-    readFileSync(join(REPO_ROOT, "feature-map.json"), "utf-8")
+    readFileSync(join(REPO_ROOT, "feature-map.json"), "utf-8"),
   );
   const names = new Set<string>();
 
@@ -58,10 +58,7 @@ function toolNamesInFeatureMap(): Set<string> {
  * registration is a string literal in every case.
  */
 function registeredToolNames(): Set<string> {
-  const source = readFileSync(
-    join(__dirname, "../create-mcp-server.ts"),
-    "utf-8"
-  );
+  const source = readFileSync(join(__dirname, "../create-mcp-server.ts"), "utf-8");
   const names = new Set<string>();
   for (const match of source.matchAll(/server\.tool\(\s*"([^"]+)"/g)) {
     names.add(match[1]!);

@@ -51,9 +51,7 @@ export type SelectParameterDefinition = {
   dynamicOptions?: boolean;
 };
 
-export type ParameterDefinition =
-  | SliderParameterDefinition
-  | SelectParameterDefinition;
+export type ParameterDefinition = SliderParameterDefinition | SelectParameterDefinition;
 
 export interface ParameterRegistration {
   /** Snake_case parameter name (canonical) */
@@ -203,9 +201,7 @@ export class ParameterRegistry {
         ? ["temperature"]
         : supportedParameters.filter((param) => this.parameters.has(param));
 
-    const withMaxTokens = base.includes("max_tokens")
-      ? base
-      : [...base, "max_tokens"];
+    const withMaxTokens = base.includes("max_tokens") ? base : [...base, "max_tokens"];
 
     return withMaxTokens.sort((a, b) => {
       const aIndex = displayOrder.indexOf(a);
@@ -307,8 +303,7 @@ parameterRegistry.register({
     step: 0.1,
     default: 1,
     label: "Temperature",
-    helper:
-      "Lower = more focused and consistent. Higher = more creative and varied.",
+    helper: "Lower = more focused and consistent. Higher = more creative and varied.",
   },
   icon: Thermometer,
   iconColor: "orange.500",

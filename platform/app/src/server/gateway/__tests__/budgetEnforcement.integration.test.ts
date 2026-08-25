@@ -13,9 +13,7 @@
  * A budget that silently never enforces is worse than no budget, so this fails
  * if the ladder from allow to warn to block ever stops working.
  */
-import {
-  type WriteGatewayDebitsPayload,
-} from "@langwatch/enterprise-governance-server";
+import { type WriteGatewayDebitsPayload } from "@langwatch/enterprise-governance-server";
 import { AppGatewayDebitAdapter } from "~/runtime/app/features/governance/gateway-debit.adapter";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -198,9 +196,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
     writeDebits = (payload) => debitRuntime.write(payload);
 
     recordOneRequest = async () => {
-      await writeDebits(
-        servedRequest({ projectId: PROJECT_ID, virtualKeyId: VK_ID }),
-      );
+      await writeDebits(servedRequest({ projectId: PROJECT_ID, virtualKeyId: VK_ID }));
     };
   }, 120_000);
 
@@ -292,8 +288,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
     it("reports spend as unavailable rather than as zero", async () => {
       const withoutLedger = GatewayBudgetService.create(prisma, undefined);
 
-      const { budgets, spendAvailable } =
-        await withoutLedger.listWithHealth(ORG_ID);
+      const { budgets, spendAvailable } = await withoutLedger.listWithHealth(ORG_ID);
 
       expect(spendAvailable).toBe(false);
       // The budget is still listed, and the only spend figure left on it is
@@ -487,9 +482,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
 
         expect(decision.decision).toBe("hard_block");
         expect(decision.blockReason).toBeTruthy();
-        expect(decision.blockedBy.map((b) => b.budgetId)).toContain(
-          PRE_BUDGET_ID,
-        );
+        expect(decision.blockedBy.map((b) => b.budgetId)).toContain(PRE_BUDGET_ID);
       });
     });
   });

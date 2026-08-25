@@ -261,13 +261,7 @@ export class AnomalyDetector {
  * Linear-interpolated percentile. Returns 0 for empty input. Sorts a
  * defensive copy so the input array is not mutated.
  */
-export function percentile({
-  values,
-  p,
-}: {
-  values: number[];
-  p: number;
-}): number {
+export function percentile({ values, p }: { values: number[]; p: number }): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const rank = (p / 100) * (sorted.length - 1);

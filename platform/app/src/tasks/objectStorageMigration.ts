@@ -89,16 +89,13 @@ export function createMigrationStorageEndpoint({
       provider,
       scheme: "s3",
       driver,
-      storedObjectUri: (projectId, sha256) =>
-        mintS3Uri({ bucket, projectId, sha256 }),
+      storedObjectUri: (projectId, sha256) => mintS3Uri({ bucket, projectId, sha256 }),
       datasetChunkUri: (projectId, datasetId, index) =>
         `s3://${bucket}/${chunkKey(projectId, datasetId, index)}`,
     };
   }
   if (!accountName?.trim() || !container?.trim()) {
-    throw new Error(
-      "Azure migration endpoint requires an account name and container",
-    );
+    throw new Error("Azure migration endpoint requires an account name and container");
   }
   return {
     provider,
@@ -236,11 +233,7 @@ export class ObjectStorageMigration {
             `Stored object ${row.id} (project ${row.project_id}) already uses the ${this.deps.destination.scheme} scheme, but its recorded bucket/account is not the one configured as this migration's destination`,
           );
         }
-        await assertUriDigest(
-          this.deps.destination.driver,
-          destinationUri,
-          row.sha256,
-        );
+        await assertUriDigest(this.deps.destination.driver, destinationUri, row.sha256);
         report.skippedVerified += 1;
         continue;
       }
@@ -320,14 +313,10 @@ export class ObjectStorageMigration {
 
   async finalize(): Promise<MigrationFinalizeReport> {
     if (!this.deps.writesPaused()) {
-      throw new MigrationBlockedError(
-        "Finalization requires writes to be paused",
-      );
+      throw new MigrationBlockedError("Finalization requires writes to be paused");
     }
     if (!this.deps.readsPaused()) {
-      throw new MigrationBlockedError(
-        "Finalization requires read traffic to be paused",
-      );
+      throw new MigrationBlockedError("Finalization requires read traffic to be paused");
     }
 
     const scope = await this.eligibleScope();
@@ -336,18 +325,14 @@ export class ObjectStorageMigration {
       const detail = plan.blockingDatasets
         .map(({ id, status, reason }) => `${id} (${status}, ${reason})`)
         .join(", ");
-      throw new MigrationBlockedError(
-        `Finalization blocked by datasets: ${detail}`,
-      );
+      throw new MigrationBlockedError(`Finalization blocked by datasets: ${detail}`);
     }
     const queueBlockers = await this.deps.auditQueues();
     if (queueBlockers.length > 0) {
       const detail = queueBlockers
         .map(({ queueName, kind, count }) => `${queueName} ${kind}=${count}`)
         .join(", ");
-      throw new MigrationBlockedError(
-        `Finalization blocked by queues: ${detail}`,
-      );
+      throw new MigrationBlockedError(`Finalization blocked by queues: ${detail}`);
     }
 
     // A final delta copy runs only after writers stop. Every destination byte
@@ -390,11 +375,7 @@ export class ObjectStorageMigration {
         row.project_id,
         row.sha256,
       );
-      await assertUriDigest(
-        this.deps.destination.driver,
-        destinationUri,
-        row.sha256,
-      );
+      await assertUriDigest(this.deps.destination.driver, destinationUri, row.sha256);
     }
     for await (const chunk of this.eligibleDatasetChunks(scope)) {
       // Mirror of the copy loop's already-at-destination tolerance: a chunk
@@ -501,9 +482,7 @@ export class ObjectStorageMigration {
     }
   }
 
-  private async *datasets(
-    scope: EligibleScope,
-  ): AsyncGenerator<MigrationDataset> {
+  private async *datasets(scope: EligibleScope): AsyncGenerator<MigrationDataset> {
     // Iterated per eligible project (sorted for a stable, resumable order):
     // BYOC projects are excluded by never being asked for, and every page
     // query is tenant-scoped as the data layer requires.

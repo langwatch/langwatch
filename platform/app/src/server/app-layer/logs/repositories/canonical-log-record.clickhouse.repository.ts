@@ -9,9 +9,7 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import type { CanonicalLogRecord } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
 import type { CanonicalLogRecordRepository } from "./canonical-log-record.repository";
 
-const logger = createLogger(
-  "langwatch:app-layer:logs:canonical-log-record-repository",
-);
+const logger = createLogger("langwatch:app-layer:logs:canonical-log-record-repository");
 const MAX_UINT64 = 18_446_744_073_709_551_615n;
 
 function dedupVersion(acceptedAt: number): string {
@@ -25,9 +23,7 @@ function validate(record: CanonicalLogRecord, operation: string) {
   }
 }
 
-function groupByTenant(
-  records: CanonicalLogRecord[],
-): Map<string, CanonicalLogRecord[]> {
+function groupByTenant(records: CanonicalLogRecord[]): Map<string, CanonicalLogRecord[]> {
   const groups = new Map<string, CanonicalLogRecord[]>();
   for (const record of records) {
     const group = groups.get(record.tenantId) ?? [];
@@ -104,17 +100,13 @@ function toUsageEstimateRow(record: CanonicalLogRecord) {
     RecordId: record.recordId,
     ProviderKind: record.providerKind,
     AcceptedAt: new Date(record.acceptedAt),
-    AcceptedHour: new Date(
-      Math.floor(record.acceptedAt / 3_600_000) * 3_600_000,
-    ),
+    AcceptedHour: new Date(Math.floor(record.acceptedAt / 3_600_000) * 3_600_000),
     CanonicalSourceBytes: record.canonicalSizeBytes,
     DedupVersion: dedupVersion(record.acceptedAt),
   };
 }
 
-export class CanonicalLogRecordClickHouseRepository
-  implements CanonicalLogRecordRepository
-{
+export class CanonicalLogRecordClickHouseRepository implements CanonicalLogRecordRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async ensureLogRecord(
@@ -132,10 +124,7 @@ export class CanonicalLogRecordClickHouseRepository
     const byTenant = groupByTenant(records);
     for (const [tenantId, tenantRecords] of byTenant) {
       for (const record of tenantRecords) {
-        validate(
-          record,
-          "CanonicalLogRecordClickHouseRepository.ensureLogRecords",
-        );
+        validate(record, "CanonicalLogRecordClickHouseRepository.ensureLogRecords");
       }
       const client = await this.resolveClient(tenantId);
       try {
@@ -158,9 +147,7 @@ export class CanonicalLogRecordClickHouseRepository
           {
             tenantId,
             recordCount: tenantRecords.length,
-            recordIds: tenantRecords
-              .slice(0, 10)
-              .map((record) => record.recordId),
+            recordIds: tenantRecords.slice(0, 10).map((record) => record.recordId),
             error,
           },
           "Failed to persist canonical log record batch",
@@ -241,10 +228,7 @@ export class CanonicalLogRecordClickHouseRepository
       );
     }
     return rows.map((row) => {
-      const attributes = JSON.parse(row.AttributesFlatJson) as Record<
-        string,
-        string
-      >;
+      const attributes = JSON.parse(row.AttributesFlatJson) as Record<string, string>;
       // Emitters using the OTel Event API (codex's Rust SDK among them) put
       // the event name on the top-level LogRecord.eventName field, not in the
       // attributes, ingest persists it to the EventName column and backfills
@@ -261,9 +245,10 @@ export class CanonicalLogRecordClickHouseRepository
         timeUnixMs: Number(row.TimeUnixMs),
         body: row.BodyText ?? "",
         attributes,
-        resourceAttributes: JSON.parse(
-          row.ResourceAttributesFlatJson,
-        ) as Record<string, string>,
+        resourceAttributes: JSON.parse(row.ResourceAttributesFlatJson) as Record<
+          string,
+          string
+        >,
         scopeName: row.ScopeName,
         scopeVersion: row.ScopeVersion || null,
       };

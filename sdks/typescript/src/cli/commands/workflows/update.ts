@@ -37,17 +37,14 @@ export const updateWorkflowCommand = async (
       process.exit(1);
     }
 
-    const response = await fetch(
-      `${endpoint}/api/workflows/${encodeURIComponent(id)}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey }),
-        },
-        body: JSON.stringify(body),
+    const response = await fetch(`${endpoint}/api/workflows/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...buildAuthHeaders({ apiKey }),
       },
-    );
+      body: JSON.stringify(body),
+    });
 
     if (!response.ok) {
       const message = await formatFetchError(response);
@@ -55,7 +52,7 @@ export const updateWorkflowCommand = async (
       process.exit(1);
     }
 
-    const workflow = await response.json() as {
+    const workflow = (await response.json()) as {
       id: string;
       name: string;
       icon: string | null;
@@ -70,8 +67,12 @@ export const updateWorkflowCommand = async (
         console.log();
         console.log(`  ${chalk.gray("ID:")}          ${chalk.green(workflow.id)}`);
         console.log(`  ${chalk.gray("Name:")}        ${chalk.cyan(workflow.name)}`);
-        console.log(`  ${chalk.gray("Icon:")}        ${workflow.icon ?? chalk.gray("—")}`);
-        console.log(`  ${chalk.gray("Description:")} ${workflow.description ?? chalk.gray("—")}`);
+        console.log(
+          `  ${chalk.gray("Icon:")}        ${workflow.icon ?? chalk.gray("—")}`,
+        );
+        console.log(
+          `  ${chalk.gray("Description:")} ${workflow.description ?? chalk.gray("—")}`,
+        );
         console.log();
       },
     };

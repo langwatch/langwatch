@@ -200,10 +200,7 @@ const XML_ASSERTION_IN_TEXT =
 export function redactAuthorizationMaterial(text: string): string {
   return (
     text
-      .replace(
-        AUTHORIZATION_MATERIAL_IN_TEXT,
-        (_m, scheme: string) => `${scheme} ***`,
-      )
+      .replace(AUTHORIZATION_MATERIAL_IN_TEXT, (_m, scheme: string) => `${scheme} ***`)
       // Each quote is captured and re-emitted rather than assumed: consuming the
       // key's closing quote without restoring it turned
       // `"access_token":"…"` into `"access_token:"***"`, which redacts the
@@ -216,10 +213,7 @@ export function redactAuthorizationMaterial(text: string): string {
         const [field, keyQuote, separator, openQuote, closeQuote] = captures;
         return `${field}${keyQuote}${separator}${openQuote}***${closeQuote}`;
       })
-      .replace(
-        XML_ASSERTION_IN_TEXT,
-        (_m, tag: string) => `<${tag}>***</${tag}>`,
-      )
+      .replace(XML_ASSERTION_IN_TEXT, (_m, tag: string) => `<${tag}>***</${tag}>`)
   );
 }
 

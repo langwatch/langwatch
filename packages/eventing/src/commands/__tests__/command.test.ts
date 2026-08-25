@@ -12,12 +12,7 @@ describe("createCommand", () => {
       const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test" };
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload);
 
       expect(command.tenantId).toBe(tenantId);
     });
@@ -28,12 +23,7 @@ describe("createCommand", () => {
       const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test" };
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload);
 
       expect(command.aggregateId).toBe(aggregateId);
     });
@@ -44,12 +34,7 @@ describe("createCommand", () => {
       const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test" };
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload);
 
       expect(command.type).toBe(commandType);
     });
@@ -60,12 +45,7 @@ describe("createCommand", () => {
       const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test", value: 42 };
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload);
 
       expect(command.data).toEqual(payload);
     });
@@ -78,12 +58,7 @@ describe("createCommand", () => {
       const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test" };
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload);
 
       expect(command.metadata).toBeUndefined();
     });
@@ -142,12 +117,7 @@ describe("createCommand", () => {
       const commandType = TEST_COMMAND_TYPES[0];
       const payload = "string-payload";
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload);
 
       expect(command.data).toBe(payload);
     });
@@ -158,12 +128,7 @@ describe("createCommand", () => {
       const commandType = TEST_COMMAND_TYPES[0];
       const payload = 42;
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload);
 
       expect(command.data).toBe(payload);
     });
@@ -174,12 +139,7 @@ describe("createCommand", () => {
       const commandType = TEST_COMMAND_TYPES[0];
       const payload = { key: "value", number: 123 };
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload);
 
       expect(command.data).toEqual(payload);
     });
@@ -190,12 +150,7 @@ describe("createCommand", () => {
       const commandType = TEST_COMMAND_TYPES[0];
       const payload = [1, 2, 3, "four"];
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload);
 
       expect(command.data).toEqual(payload);
     });
@@ -206,12 +161,7 @@ describe("createCommand", () => {
       const commandType = TEST_COMMAND_TYPES[0];
       const payload = null;
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload);
 
       expect(command.data).toBeNull();
     });

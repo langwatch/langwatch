@@ -13,9 +13,7 @@ export const suiteRunStartedEventDataSchema = z.object({
   scenarioIds: z.array(z.string()),
   targetIds: z.array(z.string()),
 });
-export type SuiteRunStartedEventData = z.infer<
-  typeof suiteRunStartedEventDataSchema
->;
+export type SuiteRunStartedEventData = z.infer<typeof suiteRunStartedEventDataSchema>;
 
 export const SuiteRunStartedEventSchema = EventSchema.extend({
   type: z.literal(SUITE_RUN_EVENT_TYPES.STARTED),
@@ -41,9 +39,7 @@ export const SuiteRunItemStartedEventSchema = EventSchema.extend({
   version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_STARTED),
   data: suiteRunItemStartedEventDataSchema,
 });
-export type SuiteRunItemStartedEvent = z.infer<
-  typeof SuiteRunItemStartedEventSchema
->;
+export type SuiteRunItemStartedEvent = z.infer<typeof SuiteRunItemStartedEventSchema>;
 
 /**
  * SuiteRunItemCompleted event - emitted when an individual item finishes.
@@ -67,9 +63,7 @@ export const SuiteRunItemCompletedEventSchema = EventSchema.extend({
   version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_COMPLETED),
   data: suiteRunItemCompletedEventDataSchema,
 });
-export type SuiteRunItemCompletedEvent = z.infer<
-  typeof SuiteRunItemCompletedEventSchema
->;
+export type SuiteRunItemCompletedEvent = z.infer<typeof SuiteRunItemCompletedEventSchema>;
 
 /**
  * Union of all suite run processing event types.

@@ -40,9 +40,9 @@ export const STRICT_ADDED_PII_ENTITY_LABELS: Record<string, string> = {
   IN_VOTER: "Indian voter IDs",
 };
 
-export const ESSENTIAL_PII_SUMMARY = Object.values(
-  ESSENTIAL_PII_ENTITY_LABELS,
-).join(", ");
+export const ESSENTIAL_PII_SUMMARY = Object.values(ESSENTIAL_PII_ENTITY_LABELS).join(
+  ", ",
+);
 
 export const STRICT_ADDED_PII_SUMMARY = Object.values(
   STRICT_ADDED_PII_ENTITY_LABELS,

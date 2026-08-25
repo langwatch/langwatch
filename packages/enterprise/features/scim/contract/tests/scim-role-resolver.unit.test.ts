@@ -7,30 +7,20 @@ describe("resolveHighestRole()", () => {
   describe("when resolving built-in roles", () => {
     /** @scenario User with multiple roles resolves to the most permissive */
     it("picks MEMBER over VIEWER", () => {
-      const result = resolveHighestRole([
-        "VIEWER",
-        "MEMBER",
-      ]);
+      const result = resolveHighestRole(["VIEWER", "MEMBER"]);
 
       expect(result).toBe("MEMBER");
     });
 
     it("picks ADMIN over MEMBER", () => {
-      const result = resolveHighestRole([
-        "MEMBER",
-        "ADMIN",
-      ]);
+      const result = resolveHighestRole(["MEMBER", "ADMIN"]);
 
       expect(result).toBe("ADMIN");
     });
 
     /** @scenario Role hierarchy resolves ADMIN as most permissive */
     it("picks ADMIN over all roles", () => {
-      const result = resolveHighestRole([
-        "VIEWER",
-        "MEMBER",
-        "ADMIN",
-      ]);
+      const result = resolveHighestRole(["VIEWER", "MEMBER", "ADMIN"]);
 
       expect(result).toBe("ADMIN");
     });
@@ -51,33 +41,23 @@ describe("resolveHighestRole()", () => {
   describe("when verifying hierarchy ordering", () => {
     /** @scenario Role hierarchy ordering */
     it("ranks ADMIN above MEMBER", () => {
-      expect(
-        resolveHighestRole(["MEMBER", "ADMIN"]),
-      ).toBe("ADMIN");
+      expect(resolveHighestRole(["MEMBER", "ADMIN"])).toBe("ADMIN");
     });
 
     it("ranks MEMBER above VIEWER", () => {
-      expect(
-        resolveHighestRole(["VIEWER", "MEMBER"]),
-      ).toBe("MEMBER");
+      expect(resolveHighestRole(["VIEWER", "MEMBER"])).toBe("MEMBER");
     });
   });
 
   describe("when CUSTOM roles are present", () => {
     it("returns the built-in role when mixed with CUSTOM", () => {
-      const result = resolveHighestRole([
-        "CUSTOM",
-        "VIEWER",
-      ]);
+      const result = resolveHighestRole(["CUSTOM", "VIEWER"]);
 
       expect(result).toBe("VIEWER");
     });
 
     it("returns CUSTOM when only CUSTOM roles are present", () => {
-      const result = resolveHighestRole([
-        "CUSTOM",
-        "CUSTOM",
-      ]);
+      const result = resolveHighestRole(["CUSTOM", "CUSTOM"]);
 
       expect(result).toBe("CUSTOM");
     });

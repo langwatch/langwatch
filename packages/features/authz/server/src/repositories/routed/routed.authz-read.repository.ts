@@ -68,10 +68,7 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
    * PROMISE rather than a resolved value, so two reads racing inside one pass
    * share the one gate call instead of both starting their own.
    */
-  private readonly pinnedHeads = new Map<
-    string,
-    Promise<AuthzReadRepository>
-  >();
+  private readonly pinnedHeads = new Map<string, Promise<AuthzReadRepository>>();
 
   static create({
     database,
@@ -129,9 +126,7 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     return (await this.readerFor(args.organizationId)).findApiKeyBindings(args);
   }
 
-  async tryFindApiKeyOwner(
-    apiKeyId: string,
-  ): Promise<{ userId: string | null } | null> {
+  async tryFindApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null> {
     return this.repositories.legacy.tryFindApiKeyOwner(apiKeyId);
   }
 
@@ -139,9 +134,7 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     userId: string;
     organizationId: string;
   }): Promise<LegacyTeamMembership[]> {
-    return (
-      await this.readerFor(args.organizationId)
-    ).findLegacyTeamMemberships(args);
+    return (await this.readerFor(args.organizationId)).findLegacyTeamMemberships(args);
   }
 
   async findCustomRolePermissions(args: {
@@ -149,9 +142,7 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     principal: AuthzPrincipalRef;
     customRoleIds: readonly string[];
   }): Promise<CustomRolePermissionsRow[]> {
-    return (
-      await this.readerFor(args.organizationId)
-    ).findCustomRolePermissions(args);
+    return (await this.readerFor(args.organizationId)).findCustomRolePermissions(args);
   }
 
   async findShareLinks(args: {
@@ -187,9 +178,7 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     return this.repositories.legacy.tryFindTeamOrganization(args);
   }
 
-  private async readerFor(
-    organizationId: string,
-  ): Promise<AuthzReadRepository> {
+  private async readerFor(organizationId: string): Promise<AuthzReadRepository> {
     const pinned = this.pinnedHeads.get(organizationId);
     if (pinned) return pinned;
     const resolving = this.selectHead(organizationId).then((onEngine) =>

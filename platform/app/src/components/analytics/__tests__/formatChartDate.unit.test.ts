@@ -4,9 +4,7 @@ import { formatChartDate } from "../formatChartDate";
 describe("formatChartDate()", () => {
   describe("when date is falsy", () => {
     it("returns empty string for empty string", () => {
-      expect(
-        formatChartDate({ date: "", timeScale: 1440, daysDifference: 7 }),
-      ).toBe("");
+      expect(formatChartDate({ date: "", timeScale: 1440, daysDifference: 7 })).toBe("");
     });
   });
 

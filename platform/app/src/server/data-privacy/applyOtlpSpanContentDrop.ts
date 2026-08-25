@@ -60,9 +60,7 @@ export function stripOtlpSpanContent({
 
   let droppedCount = 0;
   const droppedAttributeKeys = new Set<string>();
-  const stripAttrs = (
-    attributes: OtlpSpan["attributes"],
-  ): OtlpSpan["attributes"] =>
+  const stripAttrs = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] =>
     attributes.filter((attr) => {
       if (droppedKeys.has(attr.key)) {
         droppedCount++;
@@ -80,11 +78,8 @@ export function stripOtlpSpanContent({
   // input/output conversation, so strip those roles from every surviving
   // chat-message array. Done before canonicalization can re-derive
   // gen_ai.system_instructions from a system turn that was left behind.
-  const { roles: droppedRoles, stripToolCalls } =
-    rolesDroppedFromChatArrays(policy);
-  const stripRoles = (
-    attributes: OtlpSpan["attributes"],
-  ): OtlpSpan["attributes"] => {
+  const { roles: droppedRoles, stripToolCalls } = rolesDroppedFromChatArrays(policy);
+  const stripRoles = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] => {
     if (droppedRoles.size === 0 && !stripToolCalls) return attributes;
     return attributes.map((attr) => {
       const stringValue = attr.value?.stringValue;

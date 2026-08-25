@@ -89,8 +89,7 @@ vi.mock("~/server/app-layer/app", async () => {
   const app = () => ({
     clickhouse: {
       enabled: true,
-      resolveClient: (tenantId: string) =>
-        clients.getClickHouseClientForTenant(tenantId),
+      resolveClient: (tenantId: string) => clients.getClickHouseClientForTenant(tenantId),
       resolveOrganizationClient: async () => {
         throw new Error("no organization client in this suite");
       },
@@ -113,16 +112,12 @@ beforeAll(async () => {
   ch = containers.clickHouseClient;
 
   const chModule = await import("~/server/clickhouse/clickhouseClient");
-  const getClickHouseClientForTenant = vi.mocked(
-    chModule.getClickHouseClientForTenant,
-  );
+  const getClickHouseClientForTenant = vi.mocked(chModule.getClickHouseClientForTenant);
   getClickHouseClientForTenant.mockResolvedValue(ch);
 
   const { prisma } = await import("~/server/db");
   service = new ClickHouseTraceService({
-    prisma: prisma as ConstructorParameters<
-      typeof ClickHouseTraceService
-    >[0]["prisma"],
+    prisma: prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]["prisma"],
   });
 }, 60_000);
 

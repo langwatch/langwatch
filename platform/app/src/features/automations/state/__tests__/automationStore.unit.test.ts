@@ -21,9 +21,7 @@ describe("automationStore", () => {
         useAutomationStore
           .getState()
           .dispatch({ type: "SET_ACTION", value: TriggerAction.SEND_EMAIL });
-        expect(useAutomationStore.getState().draft.action).toBe(
-          TriggerAction.SEND_EMAIL,
-        );
+        expect(useAutomationStore.getState().draft.action).toBe(TriggerAction.SEND_EMAIL);
       });
     });
 

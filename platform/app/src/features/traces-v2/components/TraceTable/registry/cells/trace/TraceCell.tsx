@@ -7,9 +7,7 @@ export const TraceCell = {
   id: "trace",
   label: "Trace",
   render: ({ row }) => <TraceContent trace={row} size="compact" />,
-  renderComfortable: ({ row }) => (
-    <TraceContent trace={row} size="comfortable" />
-  ),
+  renderComfortable: ({ row }) => <TraceContent trace={row} size="comfortable" />,
 } as const satisfies CellDef<TraceListItem>;
 
 const TraceContent: React.FC<{

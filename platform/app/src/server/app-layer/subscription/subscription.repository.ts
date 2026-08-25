@@ -13,10 +13,7 @@ export interface SubscriptionRepository {
     plan: string;
   }): Promise<Subscription | null>;
 
-  updateStatus(input: {
-    id: string;
-    status: string;
-  }): Promise<Subscription | null>;
+  updateStatus(input: { id: string; status: string }): Promise<Subscription | null>;
 
   updatePlan(input: { id: string; plan: string }): Promise<Subscription | null>;
 
@@ -34,10 +31,7 @@ export interface SubscriptionRepository {
     previousStatus: string;
   }): Promise<SubscriptionWithOrg | null>;
 
-  recordPaymentFailure(input: {
-    id: string;
-    currentStatus: string;
-  }): Promise<void>;
+  recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void>;
 
   cancel(input: { id: string }): Promise<void>;
 
@@ -56,9 +50,7 @@ export interface SubscriptionRepository {
 }
 
 export class NullSubscriptionRepository implements SubscriptionRepository {
-  async findLastNonCancelled(
-    _organizationId: string,
-  ): Promise<Subscription | null> {
+  async findLastNonCancelled(_organizationId: string): Promise<Subscription | null> {
     return null;
   }
 
@@ -76,16 +68,11 @@ export class NullSubscriptionRepository implements SubscriptionRepository {
     return null;
   }
 
-  async updatePlan(_input: {
-    id: string;
-    plan: string;
-  }): Promise<Subscription | null> {
+  async updatePlan(_input: { id: string; plan: string }): Promise<Subscription | null> {
     return null;
   }
 
-  async findByStripeId(
-    _stripeSubscriptionId: string,
-  ): Promise<Subscription | null> {
+  async findByStripeId(_stripeSubscriptionId: string): Promise<Subscription | null> {
     return null;
   }
 

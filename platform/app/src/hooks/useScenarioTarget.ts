@@ -20,11 +20,10 @@ export function useScenarioTarget(scenarioId: string | undefined) {
       ? `langwatch:scenario-target:${project.id}:${scenarioId}`
       : null;
 
-  const [persistedTarget, setPersistedTarget] =
-    useLocalStorage<PersistedTarget | null>(
-      storageKey ?? "langwatch:scenario-target:temp",
-      null,
-    );
+  const [persistedTarget, setPersistedTarget] = useLocalStorage<PersistedTarget | null>(
+    storageKey ?? "langwatch:scenario-target:temp",
+    null,
+  );
 
   const target: TargetValue =
     persistedTarget && storageKey

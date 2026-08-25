@@ -6,9 +6,9 @@ export * from "./templating/exampleContext";
 export * from "./templating/markdown";
 export * from "./templating/renderEmail";
 export type {
-	SlackPayload,
-	SlackRenderDefaults,
-	RenderedSlack,
+  SlackPayload,
+  SlackRenderDefaults,
+  RenderedSlack,
 } from "./templating/renderSlack";
 export { renderTriggerSlack } from "./templating/renderSlack";
 export * from "./templating/renderWebhookBody";

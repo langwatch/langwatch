@@ -469,12 +469,10 @@ describe("Custom Role Functionality Tests", () => {
       ];
 
       testCases.forEach(({ permission, expected, reason }) => {
-        it(`${
-          expected ? "allows" : "denies"
-        } ${permission} (${reason})`, () => {
-          expect(
-            hasPermissionWithHierarchy(customPermissions, permission),
-          ).toBe(expected);
+        it(`${expected ? "allows" : "denies"} ${permission} (${reason})`, () => {
+          expect(hasPermissionWithHierarchy(customPermissions, permission)).toBe(
+            expected,
+          );
         });
       });
     });
@@ -510,12 +508,10 @@ describe("Custom Role Functionality Tests", () => {
       ];
 
       testCases.forEach(({ permission, expected, reason }) => {
-        it(`${
-          expected ? "allows" : "denies"
-        } ${permission} (${reason})`, () => {
-          expect(
-            hasPermissionWithHierarchy(customPermissions, permission),
-          ).toBe(expected);
+        it(`${expected ? "allows" : "denies"} ${permission} (${reason})`, () => {
+          expect(hasPermissionWithHierarchy(customPermissions, permission)).toBe(
+            expected,
+          );
         });
       });
     });
@@ -567,12 +563,10 @@ describe("Custom Role Functionality Tests", () => {
       ];
 
       testCases.forEach(({ permission, expected, reason }) => {
-        it(`${
-          expected ? "allows" : "denies"
-        } ${permission} (${reason})`, () => {
-          expect(
-            hasPermissionWithHierarchy(customPermissions, permission),
-          ).toBe(expected);
+        it(`${expected ? "allows" : "denies"} ${permission} (${reason})`, () => {
+          expect(hasPermissionWithHierarchy(customPermissions, permission)).toBe(
+            expected,
+          );
         });
       });
     });
@@ -609,23 +603,21 @@ describe("Custom Role Functionality Tests", () => {
     it("handles empty permission arrays", () => {
       const emptyPermissions: string[] = [];
 
-      expect(
-        hasPermissionWithHierarchy(emptyPermissions, "workflows:view"),
-      ).toBe(false);
-      expect(
-        hasPermissionWithHierarchy(emptyPermissions, "workflows:manage"),
-      ).toBe(false);
+      expect(hasPermissionWithHierarchy(emptyPermissions, "workflows:view")).toBe(false);
+      expect(hasPermissionWithHierarchy(emptyPermissions, "workflows:manage")).toBe(
+        false,
+      );
     });
 
     it("handles undefined permission arrays", () => {
       const undefinedPermissions = undefined as any;
 
-      expect(
-        hasPermissionWithHierarchy(undefinedPermissions, "workflows:view"),
-      ).toBe(false);
-      expect(
-        hasPermissionWithHierarchy(undefinedPermissions, "workflows:manage"),
-      ).toBe(false);
+      expect(hasPermissionWithHierarchy(undefinedPermissions, "workflows:view")).toBe(
+        false,
+      );
+      expect(hasPermissionWithHierarchy(undefinedPermissions, "workflows:manage")).toBe(
+        false,
+      );
     });
   });
 });

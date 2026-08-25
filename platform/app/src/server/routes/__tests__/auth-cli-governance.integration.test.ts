@@ -300,10 +300,7 @@ describe("GET /api/auth/cli/governance/*", () => {
   describe("GET /governance/ingest/sources", () => {
     describe("when called with org A's Bearer token", () => {
       it("returns only org A's sources, not org B's", async () => {
-        const res = await callGovernance(
-          "/ingest/sources",
-          `Bearer ${TOKEN_A}`,
-        );
+        const res = await callGovernance("/ingest/sources", `Bearer ${TOKEN_A}`);
         expect(res.status).toBe(200);
         const body = (await res.json()) as {
           sources: Array<{ id: string; name: string }>;
@@ -543,13 +540,10 @@ describe("GET /api/auth/cli/governance/*", () => {
 
     describe("when called with a valid Bearer token", () => {
       it("returns 200 with keys array containing only live (non-revoked) entries", async () => {
-        const res = await app.request(
-          "/api/auth/cli/governance/ingestion-keys",
-          {
-            method: "GET",
-            headers: { Authorization: `Bearer ${INGEST_KEY_TOKEN}` },
-          },
-        );
+        const res = await app.request("/api/auth/cli/governance/ingestion-keys", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${INGEST_KEY_TOKEN}` },
+        });
         expect(res.status).toBe(200);
         const body = (await res.json()) as {
           keys: Array<{
@@ -566,13 +560,10 @@ describe("GET /api/auth/cli/governance/*", () => {
       });
 
       it("includes lookup_id so the CLI can detect stale cached tokens", async () => {
-        const res = await app.request(
-          "/api/auth/cli/governance/ingestion-keys",
-          {
-            method: "GET",
-            headers: { Authorization: `Bearer ${INGEST_KEY_TOKEN}` },
-          },
-        );
+        const res = await app.request("/api/auth/cli/governance/ingestion-keys", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${INGEST_KEY_TOKEN}` },
+        });
         expect(res.status).toBe(200);
         const body = (await res.json()) as {
           keys: Array<{ source_type: string; lookup_id: string }>;
@@ -586,10 +577,9 @@ describe("GET /api/auth/cli/governance/*", () => {
 
     describe("when called without a Bearer token", () => {
       it("returns 401", async () => {
-        const res = await app.request(
-          "/api/auth/cli/governance/ingestion-keys",
-          { method: "GET" },
-        );
+        const res = await app.request("/api/auth/cli/governance/ingestion-keys", {
+          method: "GET",
+        });
         expect(res.status).toBe(401);
       });
     });
@@ -604,20 +594,21 @@ describe("GET /api/auth/cli/governance/*", () => {
     ];
 
     describe("when called with a valid Bearer for an org on FREE plan", () => {
-      it.each(
-        endpoints,
-      )("returns 402 with payment_required envelope on %s", async (path) => {
-        const res = await callGovernance(path, `Bearer ${TOKEN_C}`);
-        expect(res.status).toBe(402);
-        const body = (await res.json()) as {
-          error: string;
-          error_description: string;
-          upgrade_url: string;
-        };
-        expect(body.error).toBe("payment_required");
-        expect(body.error_description).toMatch(/Enterprise/i);
-        expect(body.upgrade_url).toMatch(/\/settings\/subscription$/);
-      });
+      it.each(endpoints)(
+        "returns 402 with payment_required envelope on %s",
+        async (path) => {
+          const res = await callGovernance(path, `Bearer ${TOKEN_C}`);
+          expect(res.status).toBe(402);
+          const body = (await res.json()) as {
+            error: string;
+            error_description: string;
+            upgrade_url: string;
+          };
+          expect(body.error).toBe("payment_required");
+          expect(body.error_description).toMatch(/Enterprise/i);
+          expect(body.upgrade_url).toMatch(/\/settings\/subscription$/);
+        },
+      );
     });
   });
 });

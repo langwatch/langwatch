@@ -50,12 +50,7 @@ export type LLMModelPricing = {
 // Reasoning Configuration Types
 // ============================================================================
 
-export type ReasoningEffortOption =
-  | "none"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh";
+export type ReasoningEffortOption = "none" | "low" | "medium" | "high" | "xhigh";
 
 /**
  * Reasoning/thinking parameter configuration for a model

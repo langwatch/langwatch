@@ -350,16 +350,12 @@ export class CodingAgentSessionService {
     );
     if (needy.length === 0) return rows;
 
-    const startedAts = needy
-      .map((row) => row.startedAtMs)
-      .filter((ms) => ms > 0);
+    const startedAts = needy.map((row) => row.startedAtMs).filter((ms) => ms > 0);
     const fromMs =
-      (range?.fromMs ??
-        (startedAts.length > 0 ? Math.min(...startedAts) : Date.now())) -
+      (range?.fromMs ?? (startedAts.length > 0 ? Math.min(...startedAts) : Date.now())) -
       60 * 60 * 1000;
     const toMs =
-      (range?.toMs ??
-        (startedAts.length > 0 ? Math.max(...startedAts) : Date.now())) +
+      (range?.toMs ?? (startedAts.length > 0 ? Math.max(...startedAts) : Date.now())) +
       7 * 24 * 60 * 60 * 1000;
 
     let totals: SessionMetricTotal[];
@@ -392,8 +388,7 @@ export class CodingAgentSessionService {
         inputTokens: row.inputTokens || filled.inputTokens,
         outputTokens: row.outputTokens || filled.outputTokens,
         cacheReadTokens: row.cacheReadTokens || filled.cacheReadTokens,
-        cacheCreationTokens:
-          row.cacheCreationTokens || filled.cacheCreationTokens,
+        cacheCreationTokens: row.cacheCreationTokens || filled.cacheCreationTokens,
       };
     });
   }

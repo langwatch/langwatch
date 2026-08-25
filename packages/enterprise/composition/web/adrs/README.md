@@ -1,5 +1,5 @@
 # Enterprise web composition decisions
 
-| Decision | Status |
-| --- | --- |
+| Decision                                                                            | Status   |
+| ----------------------------------------------------------------------------------- | -------- |
 | [Enterprise web composition stays role-specific](./001-web-composition-boundary.md) | Accepted |

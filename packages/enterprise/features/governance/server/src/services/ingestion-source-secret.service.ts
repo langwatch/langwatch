@@ -3,9 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 export class IngestionSecretConfiguration {
   private constructor(readonly pepper: string) {}
 
-  static create(input: {
-    pepper?: string | null;
-  }): IngestionSecretConfiguration {
+  static create(input: { pepper?: string | null }): IngestionSecretConfiguration {
     return new IngestionSecretConfiguration(input.pepper ?? "");
   }
 }

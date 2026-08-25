@@ -29,9 +29,8 @@ vi.mock("~/components/ui/toaster", () => ({
 
 const askLangyMock = vi.fn();
 vi.mock("~/features/langy/stores/langyStore", () => ({
-  useLangyStore: (
-    selector: (s: { askLangy: (p: string) => void }) => unknown,
-  ) => selector({ askLangy: askLangyMock }),
+  useLangyStore: (selector: (s: { askLangy: (p: string) => void }) => unknown) =>
+    selector({ askLangy: askLangyMock }),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -73,13 +72,7 @@ const REPO_CONNECTED: SetupSurface[] = [
   "simulationRuns",
 ];
 
-function renderButton({
-  surface,
-  apiKey,
-}: {
-  surface: SetupSurface;
-  apiKey?: string;
-}) {
+function renderButton({ surface, apiKey }: { surface: SetupSurface; apiKey?: string }) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <SetupWithAgentButton surface={surface} apiKey={apiKey} />
@@ -97,9 +90,7 @@ describe("SETUP_SURFACES", () => {
   /** @scenario Every empty surface offers its own skill */
   it("maps every surface to a real docs skill", () => {
     for (const [surface, setup] of Object.entries(SETUP_SURFACES)) {
-      expect(KNOWN_SKILLS, `${surface} must use a known skill`).toContain(
-        setup.skill,
-      );
+      expect(KNOWN_SKILLS, `${surface} must use a known skill`).toContain(setup.skill);
       expect(setup.docsUrl).toMatch(/^https:\/\/(docs\.)?langwatch\.ai\//);
     }
   });
@@ -112,9 +103,7 @@ describe("SETUP_SURFACES", () => {
   /** @scenario Repo-connected surfaces ask Langy to connect the repository */
   it("asks Langy to connect the repository only on the code-landing surfaces", () => {
     for (const surface of Object.keys(SETUP_SURFACES) as SetupSurface[]) {
-      const mentionsRepo = /repositor/i.test(
-        SETUP_SURFACES[surface].langyPrompt,
-      );
+      const mentionsRepo = /repositor/i.test(SETUP_SURFACES[surface].langyPrompt);
       expect(mentionsRepo, `${surface} repo-connect expectation`).toBe(
         REPO_CONNECTED.includes(surface),
       );
@@ -139,9 +128,7 @@ describe("SetupWithAgentButton", () => {
     /** @scenario the traces empty state keeps Setup via Agent on every project */
     it("reads Setup via Agent with no per-surface override", () => {
       renderButton({ surface: "traces" });
-      expect(
-        screen.getByRole("button", { name: /setup via agent/i }),
-      ).toBeDefined();
+      expect(screen.getByRole("button", { name: /setup via agent/i })).toBeDefined();
       expect(screen.queryByText(/connect your agent/i)).toBeNull();
     });
   });
@@ -152,12 +139,8 @@ describe("SetupWithAgentButton", () => {
       const user = userEvent.setup();
       renderButton({ surface: "simulations" });
 
-      await user.click(
-        screen.getByRole("button", { name: /setup via agent/i }),
-      );
-      const copy = await screen.findByText(
-        "Copy a prompt for your coding agent",
-      );
+      await user.click(screen.getByRole("button", { name: /setup via agent/i }));
+      const copy = await screen.findByText("Copy a prompt for your coding agent");
       const langy = screen.getByText("Ask Langy to set it up");
       screen.getByText(/read the simulations documentation/i);
 
@@ -167,9 +150,7 @@ describe("SetupWithAgentButton", () => {
       ).toBeTruthy();
 
       await user.click(langy);
-      expect(askLangyMock).toHaveBeenCalledWith(
-        SETUP_SURFACES.simulations.langyPrompt,
-      );
+      expect(askLangyMock).toHaveBeenCalledWith(SETUP_SURFACES.simulations.langyPrompt);
     });
   });
 
@@ -180,9 +161,7 @@ describe("SetupWithAgentButton", () => {
       const user = userEvent.setup();
       renderButton({ surface: "datasets" });
 
-      await user.click(
-        screen.getByRole("button", { name: /setup via agent/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /setup via agent/i }));
       await screen.findByText("Copy a prompt for your coding agent");
       expect(screen.queryByText("Ask Langy to set it up")).toBeNull();
       screen.getByText(/read the datasets documentation/i);
@@ -201,16 +180,10 @@ describe("SetupWithAgentButton", () => {
       });
       renderButton({ surface: "traces" });
 
-      await user.click(
-        screen.getByRole("button", { name: /setup via agent/i }),
-      );
-      await user.click(
-        await screen.findByText("Copy a prompt for your coding agent"),
-      );
+      await user.click(screen.getByRole("button", { name: /setup via agent/i }));
+      await user.click(await screen.findByText("Copy a prompt for your coding agent"));
 
-      await waitFor(() =>
-        expect(writeText).toHaveBeenCalledWith(mockSkillBody),
-      );
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith(mockSkillBody));
     });
 
     /** @scenario The copied prompt leads with the project's keys */
@@ -224,12 +197,8 @@ describe("SetupWithAgentButton", () => {
       });
       renderButton({ surface: "traces", apiKey: "sk-lw-minted" });
 
-      await user.click(
-        screen.getByRole("button", { name: /setup via agent/i }),
-      );
-      await user.click(
-        await screen.findByText("Copy a prompt for your coding agent"),
-      );
+      await user.click(screen.getByRole("button", { name: /setup via agent/i }));
+      await user.click(await screen.findByText("Copy a prompt for your coding agent"));
 
       await waitFor(() =>
         expect(writeText).toHaveBeenCalledWith(
@@ -260,12 +229,8 @@ describe("SetupWithAgentButton", () => {
       });
       renderButton({ surface: "traces" });
 
-      await user.click(
-        screen.getByRole("button", { name: /setup via agent/i }),
-      );
-      await user.click(
-        await screen.findByText("Copy a prompt for your coding agent"),
-      );
+      await user.click(screen.getByRole("button", { name: /setup via agent/i }));
+      await user.click(await screen.findByText("Copy a prompt for your coding agent"));
 
       await waitFor(() =>
         expect(writeText).toHaveBeenCalledWith(setupAgentPrompt("traces")),
@@ -286,12 +251,8 @@ describe("SetupWithAgentButton", () => {
       });
       renderButton({ surface: "traces" });
 
-      await user.click(
-        screen.getByRole("button", { name: /setup via agent/i }),
-      );
-      await user.click(
-        await screen.findByText("Copy a prompt for your coding agent"),
-      );
+      await user.click(screen.getByRole("button", { name: /setup via agent/i }));
+      await user.click(await screen.findByText("Copy a prompt for your coding agent"));
 
       await waitFor(() =>
         expect(toasterCreateMock).toHaveBeenCalledWith(
@@ -306,16 +267,9 @@ describe("SetupWithAgentButton", () => {
       const user = userEvent.setup();
       renderButton({ surface: "prompts" });
 
-      await user.click(
-        screen.getByRole("button", { name: /setup via agent/i }),
-      );
-      const docs = await screen.findByText(
-        /read the prompt management documentation/i,
-      );
-      expect(docs.closest("a")).toHaveAttribute(
-        "href",
-        SETUP_SURFACES.prompts.docsUrl,
-      );
+      await user.click(screen.getByRole("button", { name: /setup via agent/i }));
+      const docs = await screen.findByText(/read the prompt management documentation/i);
+      expect(docs.closest("a")).toHaveAttribute("href", SETUP_SURFACES.prompts.docsUrl);
     });
   });
 });

@@ -127,21 +127,19 @@ export function AddMembersForm({
 
   useEffect(() => {
     if (prevOrgRoleRef.current !== orgRole && selectedTeams?.length > 0) {
-      selectedTeams.forEach(
-        (team: TeamAssignment | undefined, teamIndex: number) => {
-          if (!team) return;
-          if (orgRole === OrganizationUserRole.EXTERNAL) {
-            if (team.role !== TeamUserRole.VIEWER) {
-              setValue(`teams.${teamIndex}.role`, TeamUserRole.VIEWER);
-              setValue(`teams.${teamIndex}.customRoleId`, undefined);
-            }
-          } else if (orgRole === OrganizationUserRole.MEMBER) {
-            if (team.role === TeamUserRole.VIEWER) {
-              setValue(`teams.${teamIndex}.role`, TeamUserRole.MEMBER);
-            }
+      selectedTeams.forEach((team: TeamAssignment | undefined, teamIndex: number) => {
+        if (!team) return;
+        if (orgRole === OrganizationUserRole.EXTERNAL) {
+          if (team.role !== TeamUserRole.VIEWER) {
+            setValue(`teams.${teamIndex}.role`, TeamUserRole.VIEWER);
+            setValue(`teams.${teamIndex}.customRoleId`, undefined);
           }
-        },
-      );
+        } else if (orgRole === OrganizationUserRole.MEMBER) {
+          if (team.role === TeamUserRole.VIEWER) {
+            setValue(`teams.${teamIndex}.role`, TeamUserRole.MEMBER);
+          }
+        }
+      });
     }
     prevOrgRoleRef.current = orgRole;
   }, [orgRole, selectedTeams, setValue]);
@@ -149,13 +147,10 @@ export function AddMembersForm({
   const getAvailableTeamOptions = (currentTeamIndex?: number) => {
     const selectedTeamIds = selectedTeams
       ?.map((team: TeamAssignment | undefined, idx: number) => {
-        if (currentTeamIndex !== undefined && idx === currentTeamIndex)
-          return null;
+        if (currentTeamIndex !== undefined && idx === currentTeamIndex) return null;
         return team?.teamId;
       })
-      .filter(
-        (id: string | null | undefined): id is string => !!id && id !== "",
-      );
+      .filter((id: string | null | undefined): id is string => !!id && id !== "");
     return teamOptions.filter((opt) => !selectedTeamIds?.includes(opt.value));
   };
 
@@ -219,8 +214,7 @@ export function AddMembersForm({
                     .split(/[\s,;]+/)
                     .map((e) => e.trim())
                     .filter(Boolean);
-                  if (emails.length === 0)
-                    return "At least one email is required";
+                  if (emails.length === 0) return "At least one email is required";
                   const invalid = emails.find(
                     (e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e),
                   );
@@ -249,11 +243,7 @@ export function AddMembersForm({
                 >
                   <VStack align="start" gap={0}>
                     <HStack gap={0}>
-                      <Text
-                        fontSize="sm"
-                        fontWeight="medium"
-                        lineHeight="short"
-                      >
+                      <Text fontSize="sm" fontWeight="medium" lineHeight="short">
                         Lite Member
                       </Text>
                       <InfoWithoutSelecting>
@@ -370,12 +360,7 @@ export function AddMembersForm({
         )}
 
         <HStack justify="end" width="100%" marginTop={4}>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isLoading}
-          >
+          <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
             {onCloseText}
           </Button>
           <Button
@@ -385,9 +370,7 @@ export function AddMembersForm({
           >
             <HStack>
               {isLoading ? <Spinner size="sm" /> : <Mail size={18} />}
-              <Text>
-                {hasEmailProvider ? "Send invites" : "Create invites"}
-              </Text>
+              <Text>{hasEmailProvider ? "Send invites" : "Create invites"}</Text>
             </HStack>
           </Button>
         </HStack>
@@ -455,8 +438,7 @@ function getFilteredTeamRoles(
     customRoleId: role.id,
   }));
 
-  if (orgRole === OrganizationUserRole.EXTERNAL)
-    return [teamRolesOptions.VIEWER];
+  if (orgRole === OrganizationUserRole.EXTERNAL) return [teamRolesOptions.VIEWER];
   if (orgRole === OrganizationUserRole.MEMBER) {
     if (!isInviterAdmin) return [teamRolesOptions.MEMBER];
     return [
@@ -504,10 +486,7 @@ function TeamRoleSelect({
           if (!val) return;
           field.onChange(val);
           if (val.startsWith("custom:")) {
-            setValue(
-              `teams.${teamIndex}.customRoleId`,
-              val.replace("custom:", ""),
-            );
+            setValue(`teams.${teamIndex}.customRoleId`, val.replace("custom:", ""));
           } else {
             setValue(`teams.${teamIndex}.customRoleId`, undefined);
           }

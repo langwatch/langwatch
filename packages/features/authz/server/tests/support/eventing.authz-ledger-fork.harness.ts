@@ -109,9 +109,7 @@ export function harness({
   const cutover = PostgresAuthzCutoverAdapter.create({
     database: {
       systemMigrationTenantState: {
-        findUnique: vi
-          .fn()
-          .mockResolvedValue(onLedger ? { status: "finalized" } : null),
+        findUnique: vi.fn().mockResolvedValue(onLedger ? { status: "finalized" } : null),
       },
     },
     reporter: new SilentReporter(),

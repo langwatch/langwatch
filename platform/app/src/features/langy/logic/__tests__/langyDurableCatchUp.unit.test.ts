@@ -275,9 +275,7 @@ describe("catchUpConversationFold", () => {
         targetCursor: { acceptedAt: 200, eventId: "e2" },
       });
 
-      expect(
-        useLangyStore.getState().unconfirmedConversations["conv-1"],
-      ).toBeUndefined();
+      expect(useLangyStore.getState().unconfirmedConversations["conv-1"]).toBeUndefined();
     });
   });
 

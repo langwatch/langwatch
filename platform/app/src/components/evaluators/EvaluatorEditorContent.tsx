@@ -72,14 +72,7 @@ export function EvaluatorEditorContent({
 }: EvaluatorEditorContentProps) {
   return (
     <FormProvider {...form}>
-      <VStack
-        gap={4}
-        align="stretch"
-        flex={1}
-        paddingX={4}
-        paddingY={2}
-        overflowY="auto"
-      >
+      <VStack gap={4} align="stretch" flex={1} paddingX={4} paddingY={2} overflowY="auto">
         {/* Description */}
         {description && (
           <Text fontSize="sm" color="fg.muted">
@@ -117,8 +110,8 @@ export function EvaluatorEditorContent({
         {isWorkflowEvaluator && workflow && (
           <VStack gap={4} paddingTop={4} align="stretch">
             <Text fontSize="sm" color="fg.muted">
-              This evaluator is powered by a workflow. Click below to open the
-              workflow editor:
+              This evaluator is powered by a workflow. Click below to open the workflow
+              editor:
             </Text>
             <Link
               href={`/${workflow.projectSlug}/studio/${workflow.id}`}
@@ -129,12 +122,7 @@ export function EvaluatorEditorContent({
                 name={workflow.name}
                 icon={workflow.icon}
                 updatedAt={workflow.updatedAt}
-                action={
-                  <ExternalLink
-                    size={16}
-                    color="var(--chakra-colors-fg-muted)"
-                  />
-                }
+                action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
                 width="300px"
               />
             </Link>

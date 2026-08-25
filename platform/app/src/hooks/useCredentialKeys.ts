@@ -41,12 +41,9 @@ export type UseCredentialKeysReturn = UseCredentialKeysState &
       | undefined;
   };
 
-export function computeInitialUseApiGateway(
-  provider: MaybeStoredModelProvider,
-): boolean {
+export function computeInitialUseApiGateway(provider: MaybeStoredModelProvider): boolean {
   if (provider.provider === "azure" && provider.customKeys) {
-    return !!(provider.customKeys as Record<string, unknown>)
-      .AZURE_API_GATEWAY_BASE_URL;
+    return !!(provider.customKeys as Record<string, unknown>).AZURE_API_GATEWAY_BASE_URL;
   }
   return false;
 }
@@ -57,9 +54,7 @@ export function useCredentialKeys({
   provider: MaybeStoredModelProvider;
 }): UseCredentialKeysReturn {
   const providerDefinition =
-    modelProvidersRegistry[
-      provider.provider as keyof typeof modelProvidersRegistry
-    ];
+    modelProvidersRegistry[provider.provider as keyof typeof modelProvidersRegistry];
 
   const originalStoredKeysRef = useRef<Record<string, unknown>>(
     (provider.customKeys as Record<string, unknown>) || {},
@@ -84,14 +79,9 @@ export function useCredentialKeys({
   }, [provider.provider, useApiGateway, originalSchemaShape]);
 
   const [customKeys, setCustomKeys] = useState<Record<string, string>>(() =>
-    buildCustomKeyState(
-      displayKeys,
-      originalStoredKeysRef.current ?? {},
-      undefined,
-      {
-        providerEnabledWithEnvVars: provider.enabled,
-      },
-    ),
+    buildCustomKeyState(displayKeys, originalStoredKeysRef.current ?? {}, undefined, {
+      providerEnabledWithEnvVars: provider.enabled,
+    }),
   );
 
   const setUseApiGateway = useCallback(
@@ -135,8 +125,7 @@ export function useCredentialKeys({
 
   const reset = useCallback(
     (nextProvider: MaybeStoredModelProvider): boolean => {
-      const storedKeys =
-        (nextProvider.customKeys as Record<string, unknown>) ?? {};
+      const storedKeys = (nextProvider.customKeys as Record<string, unknown>) ?? {};
       originalStoredKeysRef.current = storedKeys;
 
       const nextUseApiGateway = computeInitialUseApiGateway(nextProvider);

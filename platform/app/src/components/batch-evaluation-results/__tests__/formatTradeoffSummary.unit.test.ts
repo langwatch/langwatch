@@ -108,9 +108,7 @@ describe("formatTradeoffSummary", () => {
         dominance: dominance({
           dimensions: ["quality"],
           dominatedBy: { a: [], b: ["a"] },
-          edges: [
-            { winnerId: "a", loserId: "b", strictlyBetterOn: ["quality"] },
-          ],
+          edges: [{ winnerId: "a", loserId: "b", strictlyBetterOn: ["quality"] }],
         }),
       })!;
 

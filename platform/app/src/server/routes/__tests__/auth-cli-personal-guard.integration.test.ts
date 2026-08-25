@@ -20,15 +20,7 @@
  *
  * Spec: specs/ai-gateway/governance/cli-login-personal-guard.feature
  */
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.mock is hoisted above every top-level const, so the values the session
 // mock needs must come from vi.hoisted (hoisted alongside it). Math.random,
@@ -56,9 +48,7 @@ vi.mock("~/server/auth", () => ({
 // the old path leaves the real check running and the deny test inert.
 vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
   const actual =
-    await importActual<
-      typeof import("~/server/app-layer/permissions/imperative")
-    >();
+    await importActual<typeof import("~/server/app-layer/permissions/imperative")>();
   return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 

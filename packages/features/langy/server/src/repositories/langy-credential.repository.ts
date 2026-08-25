@@ -1,8 +1,6 @@
 /** Langy credential persistence. The database shape stays private to server. */
 export abstract class LangyCredentialRepository {
-  abstract tryFindProject(
-    projectId: string,
-  ): Promise<{ organizationId: string } | null>;
+  abstract tryFindProject(projectId: string): Promise<{ organizationId: string } | null>;
 
   abstract tryFindVirtualKeyConfig(input: {
     projectId: string;

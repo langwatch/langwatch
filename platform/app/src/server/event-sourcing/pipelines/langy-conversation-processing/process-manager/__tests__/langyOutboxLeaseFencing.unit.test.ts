@@ -101,9 +101,7 @@ describe("Langy process outbox lease fencing", () => {
       // waiting on the manager).
       const runA = dispatcherA.runOnce({ now: T0, limit: 1 });
       await vi.waitFor(() =>
-        expect(delivered).toContain(
-          `A:process:${CONVERSATION_ID}:dispatch:turn_1`,
-        ),
+        expect(delivered).toContain(`A:process:${CONVERSATION_ID}:dispatch:turn_1`),
       );
 
       const fastHandler = vi.fn<IntentHandler>(async ({ message }) => {
@@ -118,9 +116,7 @@ describe("Langy process outbox lease fencing", () => {
       // After the 100ms lease has expired but while A is still in-flight, B
       // re-leases the row and delivers the SAME turn a second time.
       const reportB = await dispatcherB.runOnce({ now: T0 + 200, limit: 1 });
-      expect(reportB.dispatched).toEqual([
-        `process:${CONVERSATION_ID}:dispatch:turn_1`,
-      ]);
+      expect(reportB.dispatched).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
       expect(delivered).toEqual([
         `A:process:${CONVERSATION_ID}:dispatch:turn_1`,
         `B:process:${CONVERSATION_ID}:dispatch:turn_1`,
@@ -156,9 +152,7 @@ describe("Langy process outbox lease fencing", () => {
 
       const runA = dispatcherA.runOnce({ now: T0, limit: 1 });
       await vi.waitFor(() =>
-        expect(delivered).toContain(
-          `A:process:${CONVERSATION_ID}:dispatch:turn_1`,
-        ),
+        expect(delivered).toContain(`A:process:${CONVERSATION_ID}:dispatch:turn_1`),
       );
 
       const fastHandler = vi.fn<IntentHandler>(async ({ message }) => {
@@ -178,9 +172,7 @@ describe("Langy process outbox lease fencing", () => {
       });
       expect(reportB.dispatched).toEqual([]);
       expect(fastHandler).not.toHaveBeenCalled();
-      expect(delivered).toEqual([
-        `A:process:${CONVERSATION_ID}:dispatch:turn_1`,
-      ]);
+      expect(delivered).toEqual([`A:process:${CONVERSATION_ID}:dispatch:turn_1`]);
 
       releaseSlow();
       await runA;
@@ -189,9 +181,7 @@ describe("Langy process outbox lease fencing", () => {
 
   describe("given the configured Langy lease window", () => {
     it("outlasts the worker-dispatch budget so a live turn is never re-delivered", () => {
-      expect(LANGY_OUTBOX_LEASE_DURATION_MS).toBeGreaterThan(
-        AGENT_DISPATCH_TIMEOUT_MS,
-      );
+      expect(LANGY_OUTBOX_LEASE_DURATION_MS).toBeGreaterThan(AGENT_DISPATCH_TIMEOUT_MS);
     });
   });
 });

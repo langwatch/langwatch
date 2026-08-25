@@ -22,8 +22,7 @@ import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 
@@ -127,8 +126,7 @@ describe("updateLangwatchClaudePlugin", () => {
       const { updateLangwatchClaudePlugin } = await loadModule();
 
       updateLangwatchClaudePlugin({
-        onCheckStart: () =>
-          spawnsWhenAnnounced.push(spawnSyncMock.mock.calls.length),
+        onCheckStart: () => spawnsWhenAnnounced.push(spawnSyncMock.mock.calls.length),
       });
 
       // Announced once, and before anything reached the network. The probe is

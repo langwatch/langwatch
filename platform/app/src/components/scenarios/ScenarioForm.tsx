@@ -90,10 +90,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
         {/* Name */}
         <Field.Root invalid={!!errors.name}>
           <SectionHeader>Name</SectionHeader>
-          <Input
-            {...register("name")}
-            placeholder="e.g., Angry refund request"
-          />
+          <Input {...register("name")} placeholder="e.g., Angry refund request" />
           <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
         </Field.Root>
       </VStack>
@@ -103,8 +100,8 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
         <VStack align="stretch" gap={1}>
           <SectionHeader>Situation</SectionHeader>
           <Text fontSize="13px" color="fg.muted">
-            Describe the user, their context, and what they're trying to
-            accomplish. Think about a critical path or a complex edge case.
+            Describe the user, their context, and what they're trying to accomplish. Think
+            about a critical path or a complex edge case.
           </Text>
         </VStack>
         <Field.Root invalid={!!errors.situation}>
@@ -123,8 +120,8 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
         <VStack align="stretch" gap={1}>
           <SectionHeader>Criteria</SectionHeader>
           <Text fontSize="13px" color="fg.muted">
-            What must the agent DO or NOT DO? e.g. "Must remain empathetic",
-            "Must NOT offer refund without manager approval"
+            What must the agent DO or NOT DO? e.g. "Must remain empathetic", "Must NOT
+            offer refund without manager approval"
           </Text>
         </VStack>
         <Controller
@@ -201,11 +198,7 @@ function AdvancedSection({
   return (
     <Collapsible.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
       <Collapsible.Trigger asChild>
-        <HStack
-          cursor="pointer"
-          userSelect="none"
-          _hover={{ color: "fg.emphasized" }}
-        >
+        <HStack cursor="pointer" userSelect="none" _hover={{ color: "fg.emphasized" }}>
           <ChevronIcon size={14} />
           <SectionHeader>Advanced</SectionHeader>
         </HStack>
@@ -251,8 +244,8 @@ function AdvancedSection({
             </Field.Root>
           </HStack>
           <Text fontSize="12px" color="fg.muted">
-            Max Turns caps the conversation length. Min Turns prevents the judge
-            from ending the test early.
+            Max Turns caps the conversation length. Min Turns prevents the judge from
+            ending the test early.
           </Text>
         </VStack>
       </Collapsible.Content>

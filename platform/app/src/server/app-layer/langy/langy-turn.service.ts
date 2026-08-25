@@ -60,10 +60,7 @@ import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext
 import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import type { LangyMessageRow } from "@langwatch/langy-contract";
-import {
-  LangyFinalPartsService,
-  mintRunToken,
-} from "@langwatch/langy-server";
+import { LangyFinalPartsService, mintRunToken } from "@langwatch/langy-server";
 import type {
   LangyTurnAccessStore,
   LangyTurnHandoffStore,
@@ -267,9 +264,7 @@ export function composeLangyTurnPrompt({
     .filter((block) => block.length > 0);
   if (preamble.length === 0) return { prompt: userText, labelled: false };
   return {
-    prompt: [...preamble, `${LANGY_USER_MESSAGE_LABEL}\n${userText}`].join(
-      "\n\n",
-    ),
+    prompt: [...preamble, `${LANGY_USER_MESSAGE_LABEL}\n${userText}`].join("\n\n"),
     labelled: true,
   };
 }
@@ -322,10 +317,7 @@ export interface LangyTurnServiceDeps {
    * is the best-effort worker abort behind a user Stop (ADR-078); `warm` is
    * the fire-and-forget panel-open pre-boot
    * (specs/langy/langy-worker-prewarm.feature). */
-  worker: Pick<
-    LangyWorkerPort,
-    "probe" | "dispatch" | "cancel" | "warm"
-  > | null;
+  worker: Pick<LangyWorkerPort, "probe" | "dispatch" | "cancel" | "warm"> | null;
   /**
    * The durable token buffer (ADR-044). A user Stop reads its `delta` tail to
    * reconstruct the partial answer as the source of truth, then `markEnd`s it so
@@ -364,10 +356,7 @@ export interface LangyTurnServiceDeps {
     projectId: string;
     organizationId: string;
   }) => Promise<{ token: string; apiKeyId: string }>;
-  revokeSessionKey: (args: {
-    apiKeyId: string;
-    projectId: string;
-  }) => Promise<void>;
+  revokeSessionKey: (args: { apiKeyId: string; projectId: string }) => Promise<void>;
   admission: LangyTurnAdmissionCapability;
   accessStore: LangyTurnAccessStore | null;
   handoffStore: LangyTurnHandoffStore | null;
@@ -546,8 +535,7 @@ export class LangyTurnService {
     // mutation, and a wedged worker must not delay the stop the user already got.
     await Promise.allSettled([
       tokenBuffer?.markEnd({ conversationId, turnId }) ?? Promise.resolve(),
-      worker?.cancel({ conversationId, turnId, projectId }) ??
-        Promise.resolve(),
+      worker?.cancel({ conversationId, turnId, projectId }) ?? Promise.resolve(),
     ]);
   }
 
@@ -766,9 +754,7 @@ export class LangyTurnService {
     // empty turn is one the agent can only 422, and a permanently rejected
     // dispatch used to poison the process outbox with endless retries.
     const lastUserMessage = messages[messages.length - 1];
-    const userText = extractLangyTextFromParts(
-      lastUserMessage?.parts,
-    );
+    const userText = extractLangyTextFromParts(lastUserMessage?.parts);
     if (!userText.trim()) {
       // Self-report like every other rejection branch — without this the
       // empty-send path is invisible in the turn-outcome metric.
@@ -1027,8 +1013,7 @@ export class LangyTurnService {
 
       // Projection read is only a rollout/back-compat hint. The Postgres
       // admission claim above is the concurrency authority.
-      const current =
-        currentResult.status === "fulfilled" ? currentResult.value : null;
+      const current = currentResult.status === "fulfilled" ? currentResult.value : null;
       if (currentResult.status === "rejected") {
         logger.warn(
           { error: currentResult.reason, conversationId: conversation.id },
@@ -1163,10 +1148,7 @@ export class LangyTurnService {
       // ask with no label at all.
       const historySeed =
         seedBlocks.length > 0
-          ? [
-              ...seedBlocks,
-              ...(labelled ? [] : [LANGY_USER_MESSAGE_LABEL]),
-            ].join("\n\n")
+          ? [...seedBlocks, ...(labelled ? [] : [LANGY_USER_MESSAGE_LABEL])].join("\n\n")
           : "";
 
       if (handoffResult.status === "rejected") {
@@ -1239,9 +1221,7 @@ export class LangyTurnService {
                 },
               }
             : {}),
-          ...(pendingHandoff
-            ? { consumeHandoffTurnId: pendingHandoff.turnId }
-            : {}),
+          ...(pendingHandoff ? { consumeHandoffTurnId: pendingHandoff.turnId } : {}),
         });
       } catch (error) {
         logger.warn(

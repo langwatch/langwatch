@@ -10,10 +10,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
 import { Drawer } from "../../ui/drawer";
 import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
@@ -84,9 +81,7 @@ describe("ScenarioRunDetailDrawer", () => {
           { wrapper: DrawerWrapper },
         );
 
-        expect(
-          screen.getByText("my-agent: Echo user request"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("my-agent: Echo user request")).toBeInTheDocument();
       });
 
       it("displays copyable IDs below the header", () => {
@@ -137,10 +132,7 @@ describe("ScenarioRunDetailDrawer", () => {
     describe("given a pending run", () => {
       it("displays running status without criteria", () => {
         render(
-          <SimulationConsole
-            results={null}
-            status={ScenarioRunStatus.IN_PROGRESS}
-          />,
+          <SimulationConsole results={null} status={ScenarioRunStatus.IN_PROGRESS} />,
           { wrapper: Wrapper },
         );
 

@@ -10,11 +10,7 @@ import {
 import { describe, expect, it } from "vitest";
 import { AlertType, TriggerAction } from "~/generated/prisma/client";
 import { SERVER_PROVIDERS } from "~/server/app-layer/automations/providers/registry";
-import {
-  ACTION_PROVIDERS,
-  CLIENT_PROVIDERS,
-  NOTIFY_PROVIDERS,
-} from "../registry";
+import { ACTION_PROVIDERS, CLIENT_PROVIDERS, NOTIFY_PROVIDERS } from "../registry";
 import {
   SLACK_BLOCK_KIT_TEMPLATES,
   type SlackBlockKitTemplateOption,
@@ -45,9 +41,7 @@ describe("provider registry parity", () => {
 
       it("shares the same shared definition between client and server per action", () => {
         for (const action of Object.values(TriggerAction)) {
-          expect(CLIENT_PROVIDERS[action].shared).toBe(
-            SERVER_PROVIDERS[action].shared,
-          );
+          expect(CLIENT_PROVIDERS[action].shared).toBe(SERVER_PROVIDERS[action].shared);
         }
       });
 
@@ -57,9 +51,7 @@ describe("provider registry parity", () => {
         expect(new Set([...notifyActions, ...actionActions])).toEqual(
           new Set(Object.values(TriggerAction)),
         );
-        expect(notifyActions.some((a) => actionActions.includes(a))).toBe(
-          false,
-        );
+        expect(notifyActions.some((a) => actionActions.includes(a))).toBe(false);
       });
 
       it("gives notify providers a channel string the preview/testFire endpoints accept", () => {
@@ -112,9 +104,7 @@ describe("provider registry parity", () => {
     // The reason-keyed lifecycle templates (ADR-041 Phase 1) branch on
     // `reason`; render each against the reason it is built for so the primary
     // branch is exercised. The others read the breach path (`real-time`).
-    const reasonForTemplate = (
-      id: string,
-    ): GraphAlertTemplateContext["reason"] =>
+    const reasonForTemplate = (id: string): GraphAlertTemplateContext["reason"] =>
       id === "graph_alert_resolved"
         ? "heartbeat-resolve"
         : id === "graph_alert_no_data"
@@ -168,8 +158,7 @@ describe("provider registry parity", () => {
       buildReportTemplateContext({
         trigger: { id: "rep_2", name: "Weekly latency report" },
         report: {
-          sourceLabel:
-            sourceKind === "dashboard" ? "Dashboard" : "Custom graph",
+          sourceLabel: sourceKind === "dashboard" ? "Dashboard" : "Custom graph",
           scheduleLabel: "every Monday at 09:00 (UTC)",
           sourceKind,
         },
@@ -217,16 +206,10 @@ describe("provider registry parity", () => {
     ): Record<string, unknown> => {
       const sources = template.reportSources ?? [];
       if (sources.includes("dashboard")) {
-        return reportChartContext("dashboard") as unknown as Record<
-          string,
-          unknown
-        >;
+        return reportChartContext("dashboard") as unknown as Record<string, unknown>;
       }
       if (sources.includes("customGraph")) {
-        return reportChartContext("customGraph") as unknown as Record<
-          string,
-          unknown
-        >;
+        return reportChartContext("customGraph") as unknown as Record<string, unknown>;
       }
       return reportTraceContext as unknown as Record<string, unknown>;
     };
@@ -235,33 +218,31 @@ describe("provider registry parity", () => {
       cadence: "immediate" | "digest",
     ): Record<string, unknown> =>
       template.kind === "graphAlert"
-        ? (graphAlertContextFor(template.id) as unknown as Record<
-            string,
-            unknown
-          >)
+        ? (graphAlertContextFor(template.id) as unknown as Record<string, unknown>)
         : template.kind === "report"
           ? contextForReport(template)
           : (contextsByCadence[cadence] as unknown as Record<string, unknown>);
 
     describe("when each template renders against the example context for its kind and cadence", () => {
-      it.each(
-        SLACK_BLOCK_KIT_TEMPLATES.map((t) => [t.id, t] as const),
-      )("%s produces a non-empty Block Kit blocks array", async (_id, template) => {
-        const cadences =
-          template.cadenceFit === "both"
-            ? (["immediate", "digest"] as const)
-            : ([template.cadenceFit] as const);
-        for (const cadence of cadences) {
-          const context = contextForTemplate(template, cadence);
-          const { output } = await renderLiquid({
-            template: template.source,
-            context: context as unknown as Record<string, unknown>,
-          });
-          const blocks: unknown = JSON.parse(output);
-          expect(Array.isArray(blocks)).toBe(true);
-          expect((blocks as unknown[]).length).toBeGreaterThan(0);
-        }
-      });
+      it.each(SLACK_BLOCK_KIT_TEMPLATES.map((t) => [t.id, t] as const))(
+        "%s produces a non-empty Block Kit blocks array",
+        async (_id, template) => {
+          const cadences =
+            template.cadenceFit === "both"
+              ? (["immediate", "digest"] as const)
+              : ([template.cadenceFit] as const);
+          for (const cadence of cadences) {
+            const context = contextForTemplate(template, cadence);
+            const { output } = await renderLiquid({
+              template: template.source,
+              context: context as unknown as Record<string, unknown>,
+            });
+            const blocks: unknown = JSON.parse(output);
+            expect(Array.isArray(blocks)).toBe(true);
+            expect((blocks as unknown[]).length).toBeGreaterThan(0);
+          }
+        },
+      );
     });
 
     // ADR-041 modern suite. A complete trace context (metadata model/cost/
@@ -321,29 +302,20 @@ describe("provider registry parity", () => {
           unknown
         >,
       graph_alert_no_data: () =>
-        graphAlertContextFor("graph_alert_no_data") as unknown as Record<
-          string,
-          unknown
-        >,
+        graphAlertContextFor("graph_alert_no_data") as unknown as Record<string, unknown>,
       graph_alert_history_table: () =>
         graphAlertContextFor("graph_alert_history_table") as unknown as Record<
           string,
           unknown
         >,
-      trace_card_rich: () =>
-        richTraceContext as unknown as Record<string, unknown>,
-      eval_failure_rich: () =>
-        richTraceContext as unknown as Record<string, unknown>,
+      trace_card_rich: () => richTraceContext as unknown as Record<string, unknown>,
+      eval_failure_rich: () => richTraceContext as unknown as Record<string, unknown>,
       digest_evaluator_rollup: () =>
         digestTraceContext as unknown as Record<string, unknown>,
-      digest_table: () =>
-        digestTraceContext as unknown as Record<string, unknown>,
-      report_summary_card: () =>
-        reportTraceContext as unknown as Record<string, unknown>,
-      report_table: () =>
-        reportTraceContext as unknown as Record<string, unknown>,
-      report_digest: () =>
-        reportTraceContext as unknown as Record<string, unknown>,
+      digest_table: () => digestTraceContext as unknown as Record<string, unknown>,
+      report_summary_card: () => reportTraceContext as unknown as Record<string, unknown>,
+      report_table: () => reportTraceContext as unknown as Record<string, unknown>,
+      report_digest: () => reportTraceContext as unknown as Record<string, unknown>,
       report_chart: () =>
         reportChartContext("customGraph") as unknown as Record<string, unknown>,
       report_chart_card: () =>
@@ -353,33 +325,32 @@ describe("provider registry parity", () => {
     };
 
     describe("when a modern-suite template (ADR-041) renders against a complete example", () => {
-      it.each(
-        Object.keys(modernExamples),
-      )("%s renders valid, allowlist-surviving Block Kit with no missing variables", async (id) => {
-        const template = SLACK_BLOCK_KIT_TEMPLATES.find((t) => t.id === id);
-        expect(template).toBeDefined();
-        const { output, missingVariables } = await renderLiquid({
-          template: template!.source,
-          context: modernExamples[id]!(),
-        });
-        const blocks = JSON.parse(output) as unknown[];
-        expect(Array.isArray(blocks)).toBe(true);
-        expect(blocks.length).toBeGreaterThan(0);
-        // No dangling references — the author (or preview) sees a clean bill.
-        expect(missingVariables).toEqual([]);
-        // Every modern template survives the allowlist non-empty: the gated
-        // hero block (alert / card / data_visualization / data_table) is
-        // stripped by default, and the template degrades to its surrounding
-        // allowlisted header / section / rich_text / context fallback.
-        const survivors = filterBlockKit(blocks);
-        expect(survivors.length).toBeGreaterThan(0);
-        // The gated hero is indeed dropped on the default (webhook) path.
-        if (template!.gatedBlock) {
-          expect(survivors.some((b) => b.type === template!.gatedBlock)).toBe(
-            false,
-          );
-        }
-      });
+      it.each(Object.keys(modernExamples))(
+        "%s renders valid, allowlist-surviving Block Kit with no missing variables",
+        async (id) => {
+          const template = SLACK_BLOCK_KIT_TEMPLATES.find((t) => t.id === id);
+          expect(template).toBeDefined();
+          const { output, missingVariables } = await renderLiquid({
+            template: template!.source,
+            context: modernExamples[id]!(),
+          });
+          const blocks = JSON.parse(output) as unknown[];
+          expect(Array.isArray(blocks)).toBe(true);
+          expect(blocks.length).toBeGreaterThan(0);
+          // No dangling references — the author (or preview) sees a clean bill.
+          expect(missingVariables).toEqual([]);
+          // Every modern template survives the allowlist non-empty: the gated
+          // hero block (alert / card / data_visualization / data_table) is
+          // stripped by default, and the template degrades to its surrounding
+          // allowlisted header / section / rich_text / context fallback.
+          const survivors = filterBlockKit(blocks);
+          expect(survivors.length).toBeGreaterThan(0);
+          // The gated hero is indeed dropped on the default (webhook) path.
+          if (template!.gatedBlock) {
+            expect(survivors.some((b) => b.type === template!.gatedBlock)).toBe(false);
+          }
+        },
+      );
     });
   });
 });

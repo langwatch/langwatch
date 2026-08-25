@@ -33,8 +33,7 @@ export function buildTree(spans: SpanTreeNode[]): BuiltTree {
         depth,
         parent,
         children: [],
-        isOrphaned:
-          span.parentSpanId !== null && !spanById.has(span.parentSpanId),
+        isOrphaned: span.parentSpanId !== null && !spanById.has(span.parentSpanId),
       };
       all.push(node);
       byId.set(span.spanId, node);
@@ -48,10 +47,7 @@ export function buildTree(spans: SpanTreeNode[]): BuiltTree {
   return { roots, all, byId, maxDepth };
 }
 
-export function computeSpanContext(
-  node: FlameNode,
-  fullRange: Viewport,
-): SpanContext {
+export function computeSpanContext(node: FlameNode, fullRange: Viewport): SpanContext {
   const dur = node.span.endTimeMs - node.span.startTimeMs;
   const parentDur = node.parent
     ? node.parent.span.endTimeMs - node.parent.span.startTimeMs
@@ -61,8 +57,7 @@ export function computeSpanContext(
     duration: dur,
     parentName: node.parent?.span.name ?? null,
     parentDuration: parentDur,
-    pctOfParent:
-      parentDur !== null && parentDur > 0 ? (dur / parentDur) * 100 : null,
+    pctOfParent: parentDur !== null && parentDur > 0 ? (dur / parentDur) * 100 : null,
     pctOfTrace: traceDur > 0 ? (dur / traceDur) * 100 : null,
   };
 }

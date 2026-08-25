@@ -1,8 +1,5 @@
 import type { ProcessDefinition } from "@langwatch/eventing";
-import {
-  buildProcessDefinition,
-  buildProcessManager,
-} from "@langwatch/eventing";
+import { buildProcessDefinition, buildProcessManager } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { STALL_THRESHOLD_MS } from "~/server/scenarios/scenario.constants";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
@@ -143,10 +140,7 @@ function runningState(
 }
 
 /** Recursively collects every object key reachable from a value. */
-function collectKeys(
-  value: unknown,
-  into: Set<string> = new Set(),
-): Set<string> {
+function collectKeys(value: unknown, into: Set<string> = new Set()): Set<string> {
   if (Array.isArray(value)) {
     for (const item of value) collectKeys(item, into);
   } else if (typeof value === "object" && value !== null) {
@@ -418,9 +412,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
           data: queuedData(data),
         }),
       );
-      return evolution.intents[0]?.payload as
-        | Record<string, unknown>
-        | undefined;
+      return evolution.intents[0]?.payload as Record<string, unknown> | undefined;
     }
 
     /** @scenario "A secret value reaches targets through the secrets namespace" */
@@ -472,9 +464,9 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       expect(evolution.intents[0]?.payload).toMatchObject({
         status: ScenarioRunStatus.ERROR,
       });
-      expect(
-        (evolution.intents[0]?.payload as { error: string }).error,
-      ).toContain("api_token");
+      expect((evolution.intents[0]?.payload as { error: string }).error).toContain(
+        "api_token",
+      );
     });
 
     it("submits the run when the ciphertext covers every declared name", () => {
@@ -661,9 +653,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       const finishKey = (intents: typeof graceWake.intents) =>
         intents.find((intent) => intent.intentType === "finish")!.messageKey;
 
-      expect(finishKey(graceWake.intents)).toBe(
-        finishKey(cancelWhileQueued.intents),
-      );
+      expect(finishKey(graceWake.intents)).toBe(finishKey(cancelWhileQueued.intents));
     });
 
     it("keeps the grace wake armed while the cancel is still young", () => {
@@ -681,44 +671,44 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
     });
 
     /** @scenario "Run quiet past the stall threshold finishes ERROR" */
-    it.each([
-      "queued",
-      "running",
-    ] as const)("finishes a %s run ERROR/stalled once the stall threshold passed", (phase) => {
-      const state = queuedState({ phase, lastActivityAtMs: 10_000 });
-      const now = 10_000 + STALL_THRESHOLD_MS;
+    it.each(["queued", "running"] as const)(
+      "finishes a %s run ERROR/stalled once the stall threshold passed",
+      (phase) => {
+        const state = queuedState({ phase, lastActivityAtMs: 10_000 });
+        const now = 10_000 + STALL_THRESHOLD_MS;
 
-      const evolution = evolveWake(state, now, now);
+        const evolution = evolveWake(state, now, now);
 
-      expect(evolution.state.phase).toBe("terminal");
-      expect(evolution.nextWakeAt).toBeNull();
-      expect(evolution.intents).toEqual([
-        {
-          messageKey: intentKey(`finish:${RUN_ID}:stalled`),
-          intentType: "finish",
-          payload: {
-            scenarioRunId: RUN_ID,
-            projectId: PROJECT_ID,
-            status: ScenarioRunStatus.ERROR,
-            error: "stalled",
+        expect(evolution.state.phase).toBe("terminal");
+        expect(evolution.nextWakeAt).toBeNull();
+        expect(evolution.intents).toEqual([
+          {
+            messageKey: intentKey(`finish:${RUN_ID}:stalled`),
+            intentType: "finish",
+            payload: {
+              scenarioRunId: RUN_ID,
+              projectId: PROJECT_ID,
+              status: ScenarioRunStatus.ERROR,
+              error: "stalled",
+            },
           },
-        },
-      ]);
-    });
+        ]);
+      },
+    );
 
-    it.each([
-      "queued",
-      "running",
-    ] as const)("re-arms the wake untouched while a %s run is still active", (phase) => {
-      const state = queuedState({ phase, lastActivityAtMs: 10_000 });
-      const now = 10_000 + STALL_THRESHOLD_MS - 1;
+    it.each(["queued", "running"] as const)(
+      "re-arms the wake untouched while a %s run is still active",
+      (phase) => {
+        const state = queuedState({ phase, lastActivityAtMs: 10_000 });
+        const now = 10_000 + STALL_THRESHOLD_MS - 1;
 
-      const evolution = evolveWake(state, now, now);
+        const evolution = evolveWake(state, now, now);
 
-      expect(evolution.state).toEqual(state);
-      expect(evolution.intents).toEqual([]);
-      expect(evolution.nextWakeAt).toBe(10_000 + STALL_THRESHOLD_MS);
-    });
+        expect(evolution.state).toEqual(state);
+        expect(evolution.intents).toEqual([]);
+        expect(evolution.nextWakeAt).toBe(10_000 + STALL_THRESHOLD_MS);
+      },
+    );
 
     /** @scenario "A queued run whose execute intent never lands is finished as stalled" */
     it("finishes a run that never left queued, so a lost execute cannot pin it", () => {
@@ -846,9 +836,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       } as unknown as Parameters<typeof buildSimulationRunEventView>[0]);
 
       expect(view.target).toBeNull();
-      expect(() =>
-        simulationRunProcessEventViewSchema.parse(view),
-      ).not.toThrow();
+      expect(() => simulationRunProcessEventViewSchema.parse(view)).not.toThrow();
     });
 
     it("keeps a well-formed target", () => {
@@ -871,14 +859,13 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       // existed have no such key, and handleRunQueued re-parses them on
       // delivery. A required key here would turn every pre-upgrade row into a
       // forever-redelivering handler.
-      const { parameters: _dropped, ...legacyRow } =
-        buildSimulationRunEventView(
-          makeEvent({
-            type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
-            occurredAt: 10_000,
-            data: queuedData(),
-          }),
-        );
+      const { parameters: _dropped, ...legacyRow } = buildSimulationRunEventView(
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+          occurredAt: 10_000,
+          data: queuedData(),
+        }),
+      );
 
       const parsed = simulationRunProcessEventViewSchema.parse(legacyRow);
 
@@ -957,9 +944,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         ...MARKERS.filter((marker) => serialized.includes(marker)).map(
           (marker) => `leaked marker: ${marker}`,
         ),
-        ...BANNED_KEYS.filter((key) => keys.has(key)).map(
-          (key) => `leaked key: ${key}`,
-        ),
+        ...BANNED_KEYS.filter((key) => keys.has(key)).map((key) => `leaked key: ${key}`),
       ];
     }
 

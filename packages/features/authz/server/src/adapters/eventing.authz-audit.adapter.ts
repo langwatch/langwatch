@@ -55,13 +55,7 @@ const AUDIT_METADATA_FIELDS: Record<AuditableEventType, readonly string[]> = {
   ],
   [GRANT_ROLE_CHANGED_EVENT_TYPE]: ["grantId", "from", "to"],
   [GRANT_REVOKED_EVENT_TYPE]: ["grantId", "selector", "reason"],
-  [ROLE_DEFINED_EVENT_TYPE]: [
-    "roleId",
-    "name",
-    "description",
-    "permissions",
-    "kind",
-  ],
+  [ROLE_DEFINED_EVENT_TYPE]: ["roleId", "name", "description", "permissions", "kind"],
   [ROLE_PERMISSIONS_CHANGED_EVENT_TYPE]: ["roleId", "permissions"],
   [ROLE_DELETED_EVENT_TYPE]: ["roleId"],
 };
@@ -168,9 +162,7 @@ export class EventingAuthzAuditAdapter {
 
   private constructor(private readonly store: AuthzAuditTrailStore) {}
 
-  static create(
-    options: EventingAuthzAuditAdapterOptions,
-  ): EventingAuthzAuditAdapter {
+  static create(options: EventingAuthzAuditAdapterOptions): EventingAuthzAuditAdapter {
     return new EventingAuthzAuditAdapter(options.store);
   }
 

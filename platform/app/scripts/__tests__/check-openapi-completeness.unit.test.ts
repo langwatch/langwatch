@@ -93,11 +93,7 @@ describe("auditSpec", () => {
   });
 
   describe("given a write with no request body", () => {
-    it.each([
-      "post",
-      "patch",
-      "put",
-    ] as const)("reports %s as incomplete", (method) => {
+    it.each(["post", "patch", "put"] as const)("reports %s as incomplete", (method) => {
       const violations = auditSpec(
         {
           paths: {
@@ -237,9 +233,7 @@ describe("auditSpec", () => {
         NO_QUERY_HANDLERS,
       );
 
-      expect(rules(violations)).toEqual([
-        "GET /api/gateway/v1/things [security]",
-      ]);
+      expect(rules(violations)).toEqual(["GET /api/gateway/v1/things [security]"]);
     });
 
     it("accepts an empty requirement, which is a real answer", () => {
@@ -297,18 +291,15 @@ describe("applySuppressions", () => {
     });
 
     it("suppresses only the rule it names", () => {
-      const result = report(
-        [violation, { ...violation, rule: "response-schema" }],
-        {
-          exemptions: [
-            {
-              operation: violation.operation,
-              rules: ["request-body"],
-              why: "rotation takes no input",
-            },
-          ],
-        },
-      );
+      const result = report([violation, { ...violation, rule: "response-schema" }], {
+        exemptions: [
+          {
+            operation: violation.operation,
+            rules: ["request-body"],
+            why: "rotation takes no input",
+          },
+        ],
+      });
 
       expect(rules(result.reported)).toEqual([
         `${violation.operation} [response-schema]`,
@@ -479,8 +470,6 @@ describe("isEntryModule", () => {
   });
 
   it("declines when nothing was invoked", () => {
-    expect(
-      isEntryModule({ invokedPath: undefined, modulePath: "scripts" }),
-    ).toBe(false);
+    expect(isEntryModule({ invokedPath: undefined, modulePath: "scripts" })).toBe(false);
   });
 });

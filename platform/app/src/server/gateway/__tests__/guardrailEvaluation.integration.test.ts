@@ -314,9 +314,7 @@ describe("GatewayGuardrailEvaluationService against real PG", () => {
       const routed = GatewayGuardrailEvaluationService.create(
         prisma,
         async ({ settings }) =>
-          (settings as { verdict?: string })?.verdict === "fail"
-            ? failing
-            : passing,
+          (settings as { verdict?: string })?.verdict === "fail" ? failing : passing,
       );
       const blocked = await routed.check({
         projectId: PROJECT_ID,

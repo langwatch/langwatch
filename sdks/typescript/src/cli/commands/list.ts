@@ -24,13 +24,9 @@ export const listCommand = async (): Promise<CommandResult | void> => {
       const draftPrompts = allPrompts.filter((prompt) => !prompt.version);
 
       spinner.succeed(
-        `Found ${prompts.length} published prompt${
-          prompts.length !== 1 ? "s" : ""
-        } ` +
+        `Found ${prompts.length} published prompt${prompts.length !== 1 ? "s" : ""} ` +
           chalk.gray(
-            `(+${draftPrompts.length} draft${
-              draftPrompts.length !== 1 ? "s" : ""
-            })`,
+            `(+${draftPrompts.length} draft${draftPrompts.length !== 1 ? "s" : ""})`,
           ),
       );
 
@@ -90,13 +86,7 @@ export const listCommand = async (): Promise<CommandResult | void> => {
     if (error instanceof PromptsError) {
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
-      console.error(
-        chalk.red(
-          `Unexpected error: ${
-            formatApiErrorMessage({ error })
-          }`,
-        ),
-      );
+      console.error(chalk.red(`Unexpected error: ${formatApiErrorMessage({ error })}`));
     }
     process.exit(1);
   }

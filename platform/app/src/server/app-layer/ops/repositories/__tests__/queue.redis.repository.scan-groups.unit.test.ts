@@ -74,10 +74,7 @@ class FakeRedis {
   ): Promise<string[]> {
     const entries = this.sorted(key);
     const end = stop === -1 ? entries.length - 1 : stop;
-    return FakeRedis.flat(
-      entries.slice(start, end + 1),
-      withScores === "WITHSCORES",
-    );
+    return FakeRedis.flat(entries.slice(start, end + 1), withScores === "WITHSCORES");
   }
 
   // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional zrevrange signature
@@ -89,10 +86,7 @@ class FakeRedis {
   ): Promise<string[]> {
     const entries = this.sorted(key).reverse();
     const end = stop === -1 ? entries.length - 1 : stop;
-    return FakeRedis.flat(
-      entries.slice(start, end + 1),
-      withScores === "WITHSCORES",
-    );
+    return FakeRedis.flat(entries.slice(start, end + 1), withScores === "WITHSCORES");
   }
 
   pipeline() {

@@ -26,9 +26,7 @@ const QUERY_ROWS: LangWatchQLDataset = [
   { model: "gpt-5-mini", total: 3 },
   { model: "claude", total: 5 },
 ];
-const CATALOG_ROWS: LangWatchQLDataset = [
-  { model: "gpt-5-mini", vendor: "OpenAI" },
-];
+const CATALOG_ROWS: LangWatchQLDataset = [{ model: "gpt-5-mini", vendor: "OpenAI" }];
 
 const PINNED = {
   background: "transparent",
@@ -89,10 +87,7 @@ describe("building the specification the chart runtime is given", () => {
           model_catalog: CATALOG_ROWS,
         });
 
-        expect([...datasetNames].sort()).toEqual([
-          "model_catalog",
-          "query_result",
-        ]);
+        expect([...datasetNames].sort()).toEqual(["model_catalog", "query_result"]);
         expect(spec.datasets).toEqual({
           query_result: [...QUERY_ROWS],
           model_catalog: [...CATALOG_ROWS],
@@ -140,9 +135,9 @@ describe("building the specification the chart runtime is given", () => {
 
       it("sizes a single view against its container, and leaves a stated width alone", () => {
         expect(build(barOverQueryResult).spec.width).toBe("container");
-        expect(
-          build({ ...(barOverQueryResult as object), width: 420 }).spec.width,
-        ).toBe(420);
+        expect(build({ ...(barOverQueryResult as object), width: 420 }).spec.width).toBe(
+          420,
+        );
       });
 
       it("leaves a composition alone, which cannot be container-sized", () => {

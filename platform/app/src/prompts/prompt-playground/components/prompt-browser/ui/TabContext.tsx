@@ -13,9 +13,7 @@ export function TabIdProvider({
   tabId: string;
   children: React.ReactNode;
 }) {
-  return (
-    <TabIdContext.Provider value={tabId}>{children}</TabIdContext.Provider>
-  );
+  return <TabIdContext.Provider value={tabId}>{children}</TabIdContext.Provider>;
 }
 
 /**

@@ -25,12 +25,7 @@ const renderSection = ({
   defaultExpanded?: boolean;
 } = {}) =>
   render(
-    <SidebarSection
-      id={id}
-      label={label}
-      defaultExpanded={defaultExpanded}
-      showExpanded
-    >
+    <SidebarSection id={id} label={label} defaultExpanded={defaultExpanded} showExpanded>
       <Text>Section destination</Text>
     </SidebarSection>,
     { wrapper: Wrapper },
@@ -56,12 +51,11 @@ describe("<SidebarSection />", () => {
     await user.click(collapseButton);
 
     expect(screen.queryByText("Section destination")).not.toBeInTheDocument();
-    expect(localStorage.getItem(getSidebarSectionStorageKey("observe"))).toBe(
+    expect(localStorage.getItem(getSidebarSectionStorageKey("observe"))).toBe("false");
+    expect(screen.getByRole("button", { name: "Expand Observe" })).toHaveAttribute(
+      "aria-expanded",
       "false",
     );
-    expect(
-      screen.getByRole("button", { name: "Expand Observe" }),
-    ).toHaveAttribute("aria-expanded", "false");
   });
 
   /** @scenario Collapse primary navigation sections */
@@ -93,9 +87,7 @@ describe("<SidebarSection />", () => {
     renderSection();
 
     expect(screen.queryByText("Section destination")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Expand Observe" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand Observe" })).toBeInTheDocument();
   });
 
   /** @scenario Use sensible section defaults without a saved preference */
@@ -107,9 +99,7 @@ describe("<SidebarSection />", () => {
     });
 
     expect(screen.queryByText("Section destination")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Expand Build" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand Build" })).toBeInTheDocument();
   });
 
   /** @scenario Use sensible section defaults without a saved preference */
@@ -123,8 +113,6 @@ describe("<SidebarSection />", () => {
     });
 
     expect(screen.getByText("Section destination")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Collapse Build" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse Build" })).toBeInTheDocument();
   });
 });

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildStripScoreEvaluatorIds,
-  shouldStripScore,
-} from "../evaluatorScoreFilter";
+import { buildStripScoreEvaluatorIds, shouldStripScore } from "../evaluatorScoreFilter";
 
 describe("evaluatorScoreFilter", () => {
   describe("shouldStripScore", () => {
@@ -72,9 +69,7 @@ describe("evaluatorScoreFilter", () => {
     });
 
     it("does not include custom evaluators", () => {
-      const evaluators = [
-        { id: "eval-1", evaluatorType: "custom/my-evaluator" },
-      ];
+      const evaluators = [{ id: "eval-1", evaluatorType: "custom/my-evaluator" }];
 
       const result = buildStripScoreEvaluatorIds(evaluators);
 

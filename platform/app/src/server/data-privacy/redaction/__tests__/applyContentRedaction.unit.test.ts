@@ -34,9 +34,7 @@ describe("redactStringNative", () => {
   describe("given secrets enabled and essential PII", () => {
     it("redacts both a secret and an email", () => {
       const p = policy({});
-      expect(redactStringNative({ text: SECRET, policy: p }).text).toContain(
-        "[SECRET]",
-      );
+      expect(redactStringNative({ text: SECRET, policy: p }).text).toContain("[SECRET]");
       expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(
         "mail [EMAIL_ADDRESS] end",
       );
@@ -57,9 +55,7 @@ describe("redactStringNative", () => {
     it("redacts the secret but keeps the email", () => {
       const p = policy({ piiLevel: "disabled" });
       expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(EMAIL);
-      expect(redactStringNative({ text: SECRET, policy: p }).text).toContain(
-        "[SECRET]",
-      );
+      expect(redactStringNative({ text: SECRET, policy: p }).text).toContain("[SECRET]");
     });
   });
 
@@ -69,9 +65,7 @@ describe("redactStringNative", () => {
       expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(
         "mail [EMAIL_ADDRESS] end",
       );
-      expect(redactStringNative({ text: SECRET, policy: p }).text).toContain(
-        "[SECRET]",
-      );
+      expect(redactStringNative({ text: SECRET, policy: p }).text).toContain("[SECRET]");
     });
   });
 
@@ -164,8 +158,7 @@ describe("redactAttributeNative", () => {
 
 describe("redactAttributeNative on identifier-shaped values", () => {
   const stored = (value: string) =>
-    redactAttributeNative({ key: "deployment.name", value, policy: policy({}) })
-      .text;
+    redactAttributeNative({ key: "deployment.name", value, policy: policy({}) }).text;
 
   describe("given a value that is exclusively one identifier-shaped token", () => {
     /** @scenario "A datestamped identifier attribute value is not read as a phone number" */
@@ -225,17 +218,13 @@ describe("redactAttributeNative on identifier-shaped values", () => {
 
   describe("given a value that is a sentence rather than one token", () => {
     it("redacts a phone number mentioned between words", () => {
-      expect(stored("ref 2026081209 checkpoint")).toBe(
-        "ref [PHONE_NUMBER] checkpoint",
-      );
+      expect(stored("ref 2026081209 checkpoint")).toBe("ref [PHONE_NUMBER] checkpoint");
     });
   });
 
   describe("given a value that is structure holding data, not an identifier", () => {
     it("redacts a phone number inside minified JSON", () => {
-      expect(stored('{"phone":"+14155552671"}')).toBe(
-        '{"phone":"[PHONE_NUMBER]"}',
-      );
+      expect(stored('{"phone":"+14155552671"}')).toBe('{"phone":"[PHONE_NUMBER]"}');
     });
 
     it("redacts a phone number inside a URL", () => {

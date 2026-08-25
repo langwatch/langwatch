@@ -20,9 +20,7 @@ export function loadEnvironment(): void {
   const rootOverlayPath = "../../.env.portless";
   const legacyOverlayPath = ".env.portless";
   const envPath = existsSync(rootEnvPath) ? rootEnvPath : legacyEnvPath;
-  const overlayPath = existsSync(rootOverlayPath)
-    ? rootOverlayPath
-    : legacyOverlayPath;
+  const overlayPath = existsSync(rootOverlayPath) ? rootOverlayPath : legacyOverlayPath;
 
   dotenv.config({ path: envPath, override: true, quiet });
   dotenv.config({

@@ -1,11 +1,4 @@
-import {
-  Field,
-  HStack,
-  Input,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
@@ -47,8 +40,7 @@ export function VirtualKeyExpirationSection({
   fieldError?: string | null;
 }) {
   const resolved = useMemo(
-    () =>
-      resolveExpiresAt({ preset: value.preset, customDate: value.customDate }),
+    () => resolveExpiresAt({ preset: value.preset, customDate: value.customDate }),
     [value.preset, value.customDate],
   );
   // Recomputed every render rather than memoised once, so the floor tracks
@@ -105,9 +97,7 @@ export function VirtualKeyExpirationSection({
               data-testid="vk-expiration-date"
               min={minDate}
               value={value.customDate}
-              onChange={(e) =>
-                onChange({ ...value, customDate: e.target.value })
-              }
+              onChange={(e) => onChange({ ...value, customDate: e.target.value })}
             />
           </Field.Root>
         )}

@@ -15,10 +15,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { findCurrentRoute } from "~/utils/routes";
 import { resolveShellRoute, type ShellRoute } from "../logic/resolveShellRoute";
 import type { ProductId } from "../products";
-import {
-  SHELL_SIDEBAR_WIDTH_COMPACT,
-  SHELL_SIDEBAR_WIDTH_EXPANDED,
-} from "./shellLayout";
+import { SHELL_SIDEBAR_WIDTH_COMPACT, SHELL_SIDEBAR_WIDTH_EXPANDED } from "./shellLayout";
 import { useIsMobileViewport } from "./useIsMobileViewport";
 
 type OrganizationTeamProject = ReturnType<typeof useOrganizationTeamProject>;
@@ -70,10 +67,7 @@ export function useNavigationV2ShellState({
   isPersonalScope: boolean;
   isOrgScope: boolean;
 }): NavigationV2ShellState {
-  const isSmallScreen = useBreakpointValue(
-    { base: true, lg: false },
-    { fallback: "lg" },
-  );
+  const isSmallScreen = useBreakpointValue({ base: true, lg: false }, { fallback: "lg" });
   const isMobile = useIsMobileViewport();
   const router = useRouter();
 
@@ -105,8 +99,7 @@ export function useNavigationV2ShellState({
     pathname: router.pathname,
     isPersonalScope,
     isOrgScope,
-    isOnOwnPersonalProject:
-      !!team?.isPersonal && team.ownerUserId === session?.user?.id,
+    isOnOwnPersonalProject: !!team?.isPersonal && team.ownerUserId === session?.user?.id,
   });
 
   if (!session || isShellDataPending({ workspace, route })) {

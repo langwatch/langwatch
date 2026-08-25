@@ -41,10 +41,7 @@ describe("ProcessOutboxWorker", () => {
     vi.useFakeTimers();
     const logger = makeLogger();
     const failure = new Error("database unavailable");
-    const runOnce = vi
-      .fn()
-      .mockRejectedValueOnce(failure)
-      .mockResolvedValue(report());
+    const runOnce = vi.fn().mockRejectedValueOnce(failure).mockResolvedValue(report());
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
       logger,

@@ -41,18 +41,21 @@ const openai = new OpenAI({
 
 `getGatewayHeaders()` reads the active LangWatch trace (via the SDK's AsyncLocalStorage context) and returns a header object with `traceparent`, `X-LangWatch-Trace-Id`, `X-LangWatch-Parent-Span-Id`, `X-LangWatch-Thread-Id`. The gateway uses these to parent its span under your trace, no duplicate cost.
 
-<Note>`getGatewayHeaders()` ships in langwatch npm ≥ `v0.26.0` alongside the gateway GA. Check with `npm ls langwatch`.</Note>
+<Note>
+  `getGatewayHeaders()` ships in langwatch npm ≥ `v0.26.0` alongside the gateway GA. Check
+  with `npm ls langwatch`.
+</Note>
 
 ### Response headers for correlation
 
 Every gateway response carries these headers so clients can stitch the gateway span into their own trace tooling without the LangWatch SDK:
 
-| Header | Value |
-|---|---|
-| `X-LangWatch-Trace-Id` | 32-hex trace id. Equals the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted id |
-| `X-LangWatch-Span-Id` | 16-hex gateway span id |
-| `traceparent` | W3C traceparent re-injected for downstream stitching, forward to any further hop |
-| `X-LangWatch-Gateway-Request-Id` | `req_` + 30 hex characters, use in support tickets |
+| Header                           | Value                                                                                                          |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `X-LangWatch-Trace-Id`           | 32-hex trace id. Equals the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted id |
+| `X-LangWatch-Span-Id`            | 16-hex gateway span id                                                                                         |
+| `traceparent`                    | W3C traceparent re-injected for downstream stitching, forward to any further hop                               |
+| `X-LangWatch-Gateway-Request-Id` | `req_` + 30 hex characters, use in support tickets                                                             |
 
 ```ts
 const raw = await openai.chat.completions.withResponse().create({
@@ -100,7 +103,7 @@ const resp = await openai.chat.completions.create(
       "X-LangWatch-Cache": "disable",
       "X-LangWatch-Trace-Metadata": JSON.stringify({ tier: "free" }),
     },
-  }
+  },
 );
 ```
 

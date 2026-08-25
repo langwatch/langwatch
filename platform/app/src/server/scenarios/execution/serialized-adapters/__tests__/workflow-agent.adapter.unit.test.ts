@@ -390,9 +390,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
   describe("when scenarioOutputField is set", () => {
     it("extracts that specific field from result", async () => {
-      mockFetch.mockResolvedValue(
-        nlpResponse({ answer: "42", output: "ignored" }),
-      );
+      mockFetch.mockResolvedValue(nlpResponse({ answer: "42", output: "ignored" }));
       const config: WorkflowAgentData = {
         ...defaultConfig,
         outputs: [
@@ -413,9 +411,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     });
 
     it("stringifies a non-string value when the field is found", async () => {
-      mockFetch.mockResolvedValue(
-        nlpResponse({ structured: { key: "value" } }),
-      );
+      mockFetch.mockResolvedValue(nlpResponse({ structured: { key: "value" } }));
       const config: WorkflowAgentData = {
         ...defaultConfig,
         outputs: [{ identifier: "structured", type: "str" }],
@@ -521,9 +517,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
   });
 
   describe("given a run that resolved parameter values", () => {
-    function callWithParameters(
-      parameters: Record<string, string | number | boolean>,
-    ) {
+    function callWithParameters(parameters: Record<string, string | number | boolean>) {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
         nlpServiceUrl,

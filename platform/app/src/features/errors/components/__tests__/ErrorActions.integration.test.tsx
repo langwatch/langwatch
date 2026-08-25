@@ -67,9 +67,7 @@ describe("<ErrorActions />", () => {
      */
     /** @scenario "An error id stays readable where it cannot be copied" */
     it("falls back to the id as selectable text", async () => {
-      withClipboard(
-        vi.fn<() => Promise<void>>().mockRejectedValue(new Error("denied")),
-      );
+      withClipboard(vi.fn<() => Promise<void>>().mockRejectedValue(new Error("denied")));
 
       renderActions({ traceId: TRACE_ID });
 

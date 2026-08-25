@@ -47,9 +47,7 @@ export function useCreateDraftPrompt() {
    */
   const createDraftPrompt = useCallback(async () => {
     const defaultModel = resolvedDefault.data?.model ?? "";
-    const defaultModelMetadata = defaultModel
-      ? modelMetadata?.[defaultModel]
-      : undefined;
+    const defaultModelMetadata = defaultModel ? modelMetadata?.[defaultModel] : undefined;
     const maxTokens = getMaxTokenLimit(defaultModelMetadata);
 
     // Use unified defaults with project model override if available

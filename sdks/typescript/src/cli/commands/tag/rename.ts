@@ -10,7 +10,10 @@ import type { CommandResult } from "../../utils/output";
  * @param oldName The current tag name.
  * @param newName The new tag name.
  */
-export const tagRenameCommand = async (oldName: string, newName: string): Promise<CommandResult | void> => {
+export const tagRenameCommand = async (
+  oldName: string,
+  newName: string,
+): Promise<CommandResult | void> => {
   const validationError = validateTagName(newName);
   if (validationError) {
     reportCommandError({ error: commandValidationError(validationError) });

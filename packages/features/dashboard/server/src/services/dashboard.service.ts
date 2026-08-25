@@ -71,7 +71,9 @@ export class DashboardService extends DashboardServiceContract {
 
   async create(input: { projectId: string; name: string }) {
     const parsed = dashboardCreateInputSchema.parse(input);
-    const last = await this.repository.tryFindLastDashboard({ projectId: parsed.projectId });
+    const last = await this.repository.tryFindLastDashboard({
+      projectId: parsed.projectId,
+    });
     return this.repository.createDashboard({
       id: this.ids.generate(),
       projectId: parsed.projectId,
@@ -119,9 +121,10 @@ export class DashboardService extends DashboardServiceContract {
 
   async listGraphs(input: { projectId: string; dashboardId?: string }) {
     const projectId = zProjectId(input.projectId);
-    const dashboardId = input.dashboardId === undefined
-      ? undefined
-      : dashboardIdSchema.parse(input.dashboardId);
+    const dashboardId =
+      input.dashboardId === undefined
+        ? undefined
+        : dashboardIdSchema.parse(input.dashboardId);
     return this.repository.findAllGraphs({ projectId, dashboardId });
   }
 
@@ -145,11 +148,18 @@ export class DashboardService extends DashboardServiceContract {
       ...input.layout,
     });
     if (parsed.dashboardId !== undefined) {
-      await this.getById({ projectId: parsed.projectId, dashboardId: parsed.dashboardId });
+      await this.getById({
+        projectId: parsed.projectId,
+        dashboardId: parsed.dashboardId,
+      });
     }
-    const lastGridRow = parsed.dashboardId === undefined
-      ? null
-      : await this.repository.tryFindLastGraphGridRow({ projectId: parsed.projectId, dashboardId: parsed.dashboardId });
+    const lastGridRow =
+      parsed.dashboardId === undefined
+        ? null
+        : await this.repository.tryFindLastGraphGridRow({
+            projectId: parsed.projectId,
+            dashboardId: parsed.dashboardId,
+          });
     const layout = graphLayoutSchema.parse({
       ...defaultLayout,
       ...input.layout,
@@ -181,8 +191,12 @@ export class DashboardService extends DashboardServiceContract {
       projectId: parsed.projectId,
       graphId: parsed.graphId,
       ...(parsed.name === undefined ? {} : { name: graphNameSchema.parse(parsed.name) }),
-      ...(parsed.graph === undefined ? {} : { graph: graphPayloadSchema.parse(parsed.graph) }),
-      ...(parsed.filters === undefined ? {} : { filters: graphFiltersSchema.parse(parsed.filters) }),
+      ...(parsed.graph === undefined
+        ? {}
+        : { graph: graphPayloadSchema.parse(parsed.graph) }),
+      ...(parsed.filters === undefined
+        ? {}
+        : { filters: graphFiltersSchema.parse(parsed.filters) }),
     });
   }
 
@@ -192,7 +206,11 @@ export class DashboardService extends DashboardServiceContract {
     return this.repository.deleteGraph(parsed);
   }
 
-  async updateGraphLayout(input: { projectId: string; graphId: string; layout: GraphLayout }) {
+  async updateGraphLayout(input: {
+    projectId: string;
+    graphId: string;
+    layout: GraphLayout;
+  }) {
     const parsed = graphLayoutSchema.parse(input.layout);
     const ref = zGraphRef(input);
     await this.getGraph(ref);
@@ -216,7 +234,9 @@ export class DashboardService extends DashboardServiceContract {
   }
 
   async listSavedWorkbenchCharts(input: { projectId: string }) {
-    const rows = await this.repository.findAllSavedWorkbenchCharts({ projectId: zProjectId(input.projectId) });
+    const rows = await this.repository.findAllSavedWorkbenchCharts({
+      projectId: zProjectId(input.projectId),
+    });
     return rows.map((row) => this.presentSavedWorkbenchChart(row));
   }
 
@@ -238,7 +258,10 @@ export class DashboardService extends DashboardServiceContract {
     const definition = savedWorkbenchChartDefinitionSchema.parse(input.definition);
     await this.savedWorkbenchChartPolicy.validate({ projectId, definition });
     const chart = await this.repository.createSavedWorkbenchChart({
-      id: input.id === undefined ? this.ids.generate() : savedWorkbenchChartIdSchema.parse(input.id),
+      id:
+        input.id === undefined
+          ? this.ids.generate()
+          : savedWorkbenchChartIdSchema.parse(input.id),
       projectId,
       name,
       definition,
@@ -254,15 +277,32 @@ export class DashboardService extends DashboardServiceContract {
   }) {
     const parsed = zSavedChartRef(input);
     await this.getSavedWorkbenchChart(parsed);
-    const name = input.name === undefined ? undefined : savedWorkbenchChartNameSchema.parse(input.name);
-    const definition = input.definition === undefined ? undefined : savedWorkbenchChartDefinitionSchema.parse(input.definition);
-    if (definition !== undefined) await this.savedWorkbenchChartPolicy.validate({ projectId: parsed.projectId, definition });
-    const chart = await this.repository.tryUpdateSavedWorkbenchChart({ ...parsed, name, definition });
+    const name =
+      input.name === undefined
+        ? undefined
+        : savedWorkbenchChartNameSchema.parse(input.name);
+    const definition =
+      input.definition === undefined
+        ? undefined
+        : savedWorkbenchChartDefinitionSchema.parse(input.definition);
+    if (definition !== undefined)
+      await this.savedWorkbenchChartPolicy.validate({
+        projectId: parsed.projectId,
+        definition,
+      });
+    const chart = await this.repository.tryUpdateSavedWorkbenchChart({
+      ...parsed,
+      name,
+      definition,
+    });
     if (!chart) throw new SavedWorkbenchChartNotFoundError();
     return this.presentSavedWorkbenchChart(chart);
   }
 
-  async deleteSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<void> {
+  async deleteSavedWorkbenchChart(input: {
+    projectId: string;
+    chartId: string;
+  }): Promise<void> {
     const parsed = zSavedChartRef(input);
     const count = await this.repository.deleteSavedWorkbenchChart(parsed);
     if (count === 0) throw new SavedWorkbenchChartNotFoundError();

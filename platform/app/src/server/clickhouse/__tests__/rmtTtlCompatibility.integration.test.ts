@@ -9,8 +9,7 @@ describe("ReplacingMergeTree + TTL retention compatibility", () => {
 
   beforeAll(async () => {
     const connectionUrl =
-      process.env.CLICKHOUSE_URL ??
-      "http://default:langwatch@localhost:8123/langwatch";
+      process.env.CLICKHOUSE_URL ?? "http://default:langwatch@localhost:8123/langwatch";
     const url = new URL(connectionUrl);
     database = url.pathname.replace("/", "") || "langwatch";
     client = createClient({ url: connectionUrl });

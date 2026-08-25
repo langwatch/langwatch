@@ -107,15 +107,12 @@ export interface StoredObjectInputsMarker {
 }
 
 /** Type guard: is this value an offload marker (not plain inputs)? */
-export function isStoredObjectMarker(
-  value: unknown,
-): value is StoredObjectInputsMarker {
+export function isStoredObjectMarker(value: unknown): value is StoredObjectInputsMarker {
   return (
     typeof value === "object" &&
     value !== null &&
     !Array.isArray(value) &&
-    typeof (value as Record<string, unknown>)[STORED_OBJECT_MARKER_KEY] ===
-      "object" &&
+    typeof (value as Record<string, unknown>)[STORED_OBJECT_MARKER_KEY] === "object" &&
     (value as Record<string, unknown>)[STORED_OBJECT_MARKER_KEY] !== null
   );
 }
@@ -403,16 +400,9 @@ export async function resolveInputsMarker({
     }
     // Bound the read: the object we wrote is at most the hard ceiling, so a
     // stream beyond it is a tampered/unexpected object and must not OOM.
-    const buffer = await streamToBuffer(
-      result.stream,
-      EVAL_INPUTS_HARD_CEILING_BYTES,
-    );
+    const buffer = await streamToBuffer(result.stream, EVAL_INPUTS_HARD_CEILING_BYTES);
     const parsed: unknown = JSON.parse(buffer.toString("utf8"));
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      !Array.isArray(parsed)
-    ) {
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
       return parsed as Record<string, unknown>;
     }
     return inputs;

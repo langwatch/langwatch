@@ -93,8 +93,7 @@ export default class DurationManifestReporter implements Reporter {
     // `process.cwd()` is the app root: every script that runs vitest here does
     // so with platform/app as the working directory, and the sequencer resolves
     // the manifest from its own __dirname, which is the same place.
-    this.manifestPath =
-      options.manifestPath ?? path.join(process.cwd(), DEFAULT_DELTA);
+    this.manifestPath = options.manifestPath ?? path.join(process.cwd(), DEFAULT_DELTA);
     this.root = options.root ?? path.dirname(this.manifestPath);
   }
 

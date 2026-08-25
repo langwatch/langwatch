@@ -18,10 +18,7 @@ function findActiveTokenStart(text: string, cursorPos: number): number {
   return 0;
 }
 
-export function getSuggestionState(
-  text: string,
-  cursorPos: number,
-): SuggestionState {
+export function getSuggestionState(text: string, cursorPos: number): SuggestionState {
   // Empty/whitespace-only input — open in field mode on focus so users can
   // discover available fields without having to type a leading character.
   if (text.trim().length === 0) {
@@ -33,9 +30,7 @@ export function getSuggestionState(
   // Only consume chars that are actually behind the cursor. When cursor sits
   // before any input (cursorPos === wordStart), there are no token chars yet.
   const tokenStart =
-    wordStart < cursorPos && text[wordStart] === "-"
-      ? wordStart + 1
-      : wordStart;
+    wordStart < cursorPos && text[wordStart] === "-" ? wordStart + 1 : wordStart;
 
   let inner = tokenStart;
   let hadSigil = false;

@@ -40,9 +40,7 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
       roleBinding: {
         findMany: vi
           .fn()
-          .mockResolvedValue([
-            { role: "ADMIN", customRoleId: null, scopeType: "TEAM" },
-          ]),
+          .mockResolvedValue([{ role: "ADMIN", customRoleId: null, scopeType: "TEAM" }]),
       },
       customRole: { findUnique: vi.fn().mockResolvedValue(null) },
       teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -74,9 +72,7 @@ vi.mock("~/server/app-layer/app", async (importOriginal) => {
   // The authorize route decides through the App's permissions (ADR-092);
   // composing over this file's mocked ~/server/db keeps the roleBinding
   // stubs in charge of every outcome.
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   const { prisma: dbForPermissions } = await import("~/server/db");
   const fakeApp = () => ({
     redis: mockRedis,
@@ -90,8 +86,7 @@ vi.mock("~/server/app-layer/app", async (importOriginal) => {
 });
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,
-  decrypt: (text: string) =>
-    text.startsWith("encrypted:") ? text.slice(10) : text,
+  decrypt: (text: string) => (text.startsWith("encrypted:") ? text.slice(10) : text),
 }));
 
 function registeredClient(redirectUris = [REGISTERED_REDIRECT_URI]) {
@@ -125,12 +120,8 @@ function resetMocks() {
   mockRedis.get.mockReset();
   mockPrisma.roleBinding.findMany
     .mockReset()
-    .mockResolvedValue([
-      { role: "ADMIN", customRoleId: null, scopeType: "TEAM" },
-    ]);
-  mockPrisma.organizationUser.findFirst
-    .mockReset()
-    .mockResolvedValue({ role: "MEMBER" });
+    .mockResolvedValue([{ role: "ADMIN", customRoleId: null, scopeType: "TEAM" }]);
+  mockPrisma.organizationUser.findFirst.mockReset().mockResolvedValue({ role: "MEMBER" });
 }
 
 describe("POST /api/mcp/authorize — redirect_uri binding", () => {
@@ -249,9 +240,7 @@ describe("POST /api/mcp/authorize — where failures are reported", () => {
       const redirect = new URL(json.redirect ?? "");
       expect(redirect.origin + redirect.pathname).toBe(REGISTERED_REDIRECT_URI);
       expect(redirect.searchParams.get("error")).toBe("invalid_request");
-      expect(redirect.searchParams.get("error_description")).toContain(
-        "code_challenge",
-      );
+      expect(redirect.searchParams.get("error_description")).toContain("code_challenge");
       expect(redirect.searchParams.get("state")).toBe("xyz");
       expect(redirect.searchParams.get("code")).toBeNull();
       expect(mockRedis.set).not.toHaveBeenCalled();

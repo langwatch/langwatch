@@ -22,23 +22,15 @@ describe("cardKindFor, given a CLI resource and verb", () => {
 
   describe("when the command runs an experiment", () => {
     it("draws the run card for run/results/status", () => {
-      expect(cardKindFor({ resource: "experiment", verb: "run" })).toBe(
-        "evalRun",
-      );
-      expect(cardKindFor({ resource: "experiment", verb: "results" })).toBe(
-        "evalRun",
-      );
-      expect(cardKindFor({ resource: "experiment", verb: "status" })).toBe(
-        "evalRun",
-      );
+      expect(cardKindFor({ resource: "experiment", verb: "run" })).toBe("evalRun");
+      expect(cardKindFor({ resource: "experiment", verb: "results" })).toBe("evalRun");
+      expect(cardKindFor({ resource: "experiment", verb: "status" })).toBe("evalRun");
     });
 
     it("draws the generic resource card for a plain get, not a run card", () => {
       // An `experiment get` returns the experiment's config, not a run's
       // pass/fail — so it reads as a resource, not an evaluation run.
-      expect(cardKindFor({ resource: "experiment", verb: "get" })).toBe(
-        "resourceRead",
-      );
+      expect(cardKindFor({ resource: "experiment", verb: "get" })).toBe("resourceRead");
     });
   });
 
@@ -56,20 +48,14 @@ describe("cardKindFor, given a CLI resource and verb", () => {
     });
 
     it("draws the diff card for a prompt push or sync", () => {
-      expect(cardKindFor({ resource: "prompt", verb: "push" })).toBe(
-        "promptDiff",
-      );
-      expect(cardKindFor({ resource: "prompt", verb: "sync" })).toBe(
-        "promptDiff",
-      );
+      expect(cardKindFor({ resource: "prompt", verb: "push" })).toBe("promptDiff");
+      expect(cardKindFor({ resource: "prompt", verb: "sync" })).toBe("promptDiff");
     });
   });
 
   describe("when the resource is one this registry has never heard of", () => {
     it("falls back to the generic resource card rather than to nothing", () => {
-      expect(cardKindFor({ resource: "quasar", verb: "list" })).toBe(
-        "resourceRead",
-      );
+      expect(cardKindFor({ resource: "quasar", verb: "list" })).toBe("resourceRead");
     });
   });
 });
@@ -95,9 +81,7 @@ describe("cliVerbTone, given a CLI verb", () => {
       // updates (tone) and shows a diff (card), and both live in this one place.
       expect(cliVerbTone("sync")).toBe("updated");
       expect(cliVerbTone("push")).toBe("updated");
-      expect(cardKindFor({ resource: "prompt", verb: "sync" })).toBe(
-        "promptDiff",
-      );
+      expect(cardKindFor({ resource: "prompt", verb: "sync" })).toBe("promptDiff");
     });
 
     it("reads a key rotation and a default reset as updates", () => {

@@ -1,6 +1,4 @@
-import {
-  ScimTokenRepository,
-} from "../../services/scim-token.service";
+import { ScimTokenRepository } from "../../services/scim-token.service";
 import type { ScimTokenDatabase } from "../../ports/scim-token-database.port";
 
 export class PrismaScimTokenRepository extends ScimTokenRepository {
@@ -20,9 +18,7 @@ export class PrismaScimTokenRepository extends ScimTokenRepository {
     return this.database.scimToken.create({ data: input });
   }
 
-  list(
-    organizationId: string,
-  ): ReturnType<ScimTokenDatabase["scimToken"]["findMany"]> {
+  list(organizationId: string): ReturnType<ScimTokenDatabase["scimToken"]["findMany"]> {
     return this.database.scimToken.findMany({
       where: { organizationId },
       select: { id: true, description: true, createdAt: true, lastUsedAt: true },

@@ -80,11 +80,7 @@ export const SupportMenu = ({
             toggleSupportChat();
           }}
         >
-          <SideMenuItem
-            icon={LuMessageCircle}
-            label="Chat"
-            showLabel={showLabel}
-          />
+          <SideMenuItem icon={LuMessageCircle} label="Chat" showLabel={showLabel} />
         </Box>
       )}
 
@@ -125,10 +121,7 @@ export const SupportMenu = ({
               showLabel={showLabel}
               rightElement={
                 showLabel ? (
-                  <LuChevronRight
-                    size={14}
-                    color="var(--chakra-colors-nav-fg-muted)"
-                  />
+                  <LuChevronRight size={14} color="var(--chakra-colors-nav-fg-muted)" />
                 ) : undefined
               }
             />
@@ -186,10 +179,7 @@ export const SupportMenu = ({
               </Link>
             </Menu.Item>
             <Menu.Item value="bug-reports">
-              <Link
-                isExternal
-                href="https://github.com/langwatch/langwatch/issues"
-              >
+              <Link isExternal href="https://github.com/langwatch/langwatch/issues">
                 <LuBug /> Report a Bug
               </Link>
             </Menu.Item>

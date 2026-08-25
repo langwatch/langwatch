@@ -22,8 +22,7 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner("Fetching secrets...").start();
 
@@ -50,9 +49,7 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
       updatedAt: string;
     }>;
 
-    spinner.succeed(
-      `Found ${secrets.length} secret${secrets.length !== 1 ? "s" : ""}`
-    );
+    spinner.succeed(`Found ${secrets.length} secret${secrets.length !== 1 ? "s" : ""}`);
 
     return {
       data: secrets,
@@ -62,7 +59,7 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
           console.log(chalk.gray("No secrets found."));
           console.log(chalk.gray("Create one with:"));
           console.log(
-            chalk.cyan('  langwatch secret create MY_API_KEY --value "sk-..."')
+            chalk.cyan('  langwatch secret create MY_API_KEY --value "sk-..."'),
           );
           return;
         }

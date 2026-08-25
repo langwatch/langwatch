@@ -26,9 +26,7 @@ export interface PostgresModelProviderAdapterOptions {
 
 /** Composes the public Model Provider service with its private Postgres adapters. */
 export class PostgresModelProviderAdapter {
-  private constructor(
-    private readonly options: PostgresModelProviderAdapterOptions,
-  ) {}
+  private constructor(private readonly options: PostgresModelProviderAdapterOptions) {}
 
   static create(
     options: PostgresModelProviderAdapterOptions,
@@ -38,7 +36,10 @@ export class PostgresModelProviderAdapter {
 
   build(): ModelProviderServiceContract {
     return ModelProviderService.create({
-      repository: PrismaModelProviderRepository.create(this.options.database, this.options.credentials),
+      repository: PrismaModelProviderRepository.create(
+        this.options.database,
+        this.options.credentials,
+      ),
       credentialPolicy: this.options.credentialPolicy,
       defaults: PrismaModelDefaultRepository.create(this.options.database),
       costs: PrismaModelCostRepository.create(this.options.database),

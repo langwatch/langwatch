@@ -26,9 +26,7 @@ import {
 } from "../../../api/rbac";
 
 describe("built-in role parity with legacy bags", () => {
-  describe.each(
-    Object.values(TeamUserRole),
-  )("given team role %s", (teamRole) => {
+  describe.each(Object.values(TeamUserRole))("given team role %s", (teamRole) => {
     it("answers every registry permission exactly like the legacy bag", () => {
       const mismatches = ALL_PERMISSIONS.filter(
         (permission) =>
@@ -96,36 +94,36 @@ describe("hierarchy rule parity", () => {
     [],
   ];
 
-  describe.each(
-    sampleSets.map((set) => [set.join(",") || "(empty)", set]),
-  )("given granted set [%s]", (_label, granted) => {
-    it("satisfies exactly the permissions the legacy helper satisfies", () => {
-      const grantedSet = new Set(granted);
-      const mismatches = ALL_PERMISSIONS.filter(
-        (permission) =>
-          permissionSatisfiedBy({
-            granted: grantedSet,
-            requested: permission,
-          }) !== hasPermissionWithHierarchy(granted, permission),
-      );
-      expect(mismatches).toEqual([]);
-    });
-  });
+  describe.each(sampleSets.map((set) => [set.join(",") || "(empty)", set]))(
+    "given granted set [%s]",
+    (_label, granted) => {
+      it("satisfies exactly the permissions the legacy helper satisfies", () => {
+        const grantedSet = new Set(granted);
+        const mismatches = ALL_PERMISSIONS.filter(
+          (permission) =>
+            permissionSatisfiedBy({
+              granted: grantedSet,
+              requested: permission,
+            }) !== hasPermissionWithHierarchy(granted, permission),
+        );
+        expect(mismatches).toEqual([]);
+      });
+    },
+  );
 });
 
 describe("scope fence parity (ADR-021)", () => {
-  describe.each([
-    "ORGANIZATION",
-    "TEAM",
-    "PROJECT",
-  ] as const)("given a binding at %s scope", (scopeType) => {
-    it("fences exactly the permissions the legacy fence fences", () => {
-      const mismatches = ALL_PERMISSIONS.filter(
-        (permission) =>
-          bindingScopeCanGrantPermission({ scopeType, permission }) !==
-          bindingScopeCanGrant(scopeType, permission as Permission),
-      );
-      expect(mismatches).toEqual([]);
-    });
-  });
+  describe.each(["ORGANIZATION", "TEAM", "PROJECT"] as const)(
+    "given a binding at %s scope",
+    (scopeType) => {
+      it("fences exactly the permissions the legacy fence fences", () => {
+        const mismatches = ALL_PERMISSIONS.filter(
+          (permission) =>
+            bindingScopeCanGrantPermission({ scopeType, permission }) !==
+            bindingScopeCanGrant(scopeType, permission as Permission),
+        );
+        expect(mismatches).toEqual([]);
+      });
+    },
+  );
 });

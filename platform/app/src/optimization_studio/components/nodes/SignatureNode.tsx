@@ -32,9 +32,7 @@ export const SignatureNode = forwardRef(function SignatureNode(
 
   return (
     <PromptingTechniqueWrapper
-      decoratedBy={
-        parameters.prompting_technique?.value as { ref: string } | undefined
-      }
+      decoratedBy={parameters.prompting_technique?.value as { ref: string } | undefined}
     >
       <PromptingTechniqueDropArea id={props.id}>
         <ComponentNode ref={ref} {...props} />

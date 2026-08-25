@@ -37,10 +37,7 @@ export const getLatestFlagshipForProvider = (
     const [, modelProvider, , major, minor] = match;
     if (modelProvider !== provider) continue;
     const v: [number, number] = [Number(major), Number(minor)];
-    if (
-      v[0] > bestVersion[0] ||
-      (v[0] === bestVersion[0] && v[1] > bestVersion[1])
-    ) {
+    if (v[0] > bestVersion[0] || (v[0] === bestVersion[0] && v[1] > bestVersion[1])) {
       bestVersion = v;
       bestId = model.id;
     }

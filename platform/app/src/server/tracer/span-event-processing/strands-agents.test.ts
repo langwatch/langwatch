@@ -9,9 +9,7 @@ import {
 
 describe("isStrandsAgentsInstrumentation", () => {
   it("returns true for scope.name === 'strands-agents'", () => {
-    expect(isStrandsAgentsInstrumentation({ name: "strands-agents" }, {})).toBe(
-      true,
-    );
+    expect(isStrandsAgentsInstrumentation({ name: "strands-agents" }, {})).toBe(true);
   });
   it("returns true for scope.attributes['gen_ai.system'] === 'strands-agents'", () => {
     expect(
@@ -29,9 +27,7 @@ describe("isStrandsAgentsInstrumentation", () => {
     expect(
       isStrandsAgentsInstrumentation(
         {
-          attributes: [
-            { key: "system.name", value: { stringValue: "strands-agents" } },
-          ],
+          attributes: [{ key: "system.name", value: { stringValue: "strands-agents" } }],
         },
         {},
       ),
@@ -57,19 +53,14 @@ describe("isStrandsAgentsInstrumentation", () => {
       isStrandsAgentsInstrumentation(
         {},
         {
-          attributes: [
-            { key: "service.name", value: { stringValue: "strands-agents" } },
-          ],
+          attributes: [{ key: "service.name", value: { stringValue: "strands-agents" } }],
         },
       ),
     ).toBe(true);
   });
   it("returns true for span.name.includes('Agents')", () => {
     expect(
-      isStrandsAgentsInstrumentation(
-        {},
-        { name: "invoke_agent Strands Agents" },
-      ),
+      isStrandsAgentsInstrumentation({}, { name: "invoke_agent Strands Agents" }),
     ).toBe(true);
   });
   it("returns true for scope.name === 'opentelemetry.instrumentation.strands'", () => {
@@ -85,22 +76,18 @@ describe("isStrandsAgentsInstrumentation", () => {
       isStrandsAgentsInstrumentation(
         {},
         {
-          attributes: [
-            { key: "service.name", value: { stringValue: "other-service" } },
-          ],
+          attributes: [{ key: "service.name", value: { stringValue: "other-service" } }],
         },
       ),
     ).toBe(false);
   });
   it("returns false for null scope and span", () => {
-    expect(isStrandsAgentsInstrumentation(null as any, null as any)).toBe(
-      false,
-    );
+    expect(isStrandsAgentsInstrumentation(null as any, null as any)).toBe(false);
   });
   it("returns false for undefined scope and span", () => {
-    expect(
-      isStrandsAgentsInstrumentation(undefined as any, undefined as any),
-    ).toBe(false);
+    expect(isStrandsAgentsInstrumentation(undefined as any, undefined as any)).toBe(
+      false,
+    );
   });
   it("returns false when no relevant attributes present", () => {
     expect(isStrandsAgentsInstrumentation({}, {})).toBe(false);
@@ -117,9 +104,7 @@ describe("isStrandsAgentsInstrumentation", () => {
 
 describe("isStrandsAgentsInstrumentation (extensive attribute checks)", () => {
   it("returns true for scope.name === 'strands-agents' (exact match)", () => {
-    expect(isStrandsAgentsInstrumentation({ name: "strands-agents" }, {})).toBe(
-      true,
-    );
+    expect(isStrandsAgentsInstrumentation({ name: "strands-agents" }, {})).toBe(true);
   });
   it("returns false for scope.name !== 'strands-agents'", () => {
     expect(isStrandsAgentsInstrumentation({ name: "other" }, {})).toBe(false);
@@ -141,9 +126,7 @@ describe("isStrandsAgentsInstrumentation (extensive attribute checks)", () => {
     expect(
       isStrandsAgentsInstrumentation(
         {
-          attributes: [
-            { key: "gen_ai.system", value: { stringValue: "other" } },
-          ],
+          attributes: [{ key: "gen_ai.system", value: { stringValue: "other" } }],
         },
         {},
       ),
@@ -162,9 +145,7 @@ describe("isStrandsAgentsInstrumentation (extensive attribute checks)", () => {
     expect(
       isStrandsAgentsInstrumentation(
         {
-          attributes: [
-            { key: "system.name", value: { stringValue: "strands-agents" } },
-          ],
+          attributes: [{ key: "system.name", value: { stringValue: "strands-agents" } }],
         },
         {},
       ),
@@ -230,9 +211,7 @@ describe("isStrandsAgentsInstrumentation (extensive attribute checks)", () => {
       isStrandsAgentsInstrumentation(
         {},
         {
-          attributes: [
-            { key: "service.name", value: { stringValue: "strands-agents" } },
-          ],
+          attributes: [{ key: "service.name", value: { stringValue: "strands-agents" } }],
         },
       ),
     ).toBe(true);
@@ -242,9 +221,7 @@ describe("isStrandsAgentsInstrumentation (extensive attribute checks)", () => {
       isStrandsAgentsInstrumentation(
         {},
         {
-          attributes: [
-            { key: "service.name", value: { stringValue: "other-service" } },
-          ],
+          attributes: [{ key: "service.name", value: { stringValue: "other-service" } }],
         },
       ),
     ).toBe(false);
@@ -278,12 +255,10 @@ describe("isStrandsAgentsInstrumentation (extensive attribute checks)", () => {
   });
 
   it("returns false for null or undefined scope/span", () => {
-    expect(isStrandsAgentsInstrumentation(null as any, null as any)).toBe(
+    expect(isStrandsAgentsInstrumentation(null as any, null as any)).toBe(false);
+    expect(isStrandsAgentsInstrumentation(undefined as any, undefined as any)).toBe(
       false,
     );
-    expect(
-      isStrandsAgentsInstrumentation(undefined as any, undefined as any),
-    ).toBe(false);
   });
 });
 
@@ -683,11 +658,7 @@ describe("extractStrandsAgentsMetadata", () => {
           key: "array.attr",
           value: {
             arrayValue: {
-              values: [
-                { stringValue: "item1" },
-                { intValue: 123 },
-                { boolValue: true },
-              ],
+              values: [{ stringValue: "item1" }, { intValue: 123 }, { boolValue: true }],
             },
           },
         },

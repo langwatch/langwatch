@@ -68,8 +68,7 @@ export class EventExplorerService {
     }> = [];
 
     for (const projection of selected) {
-      const tenantBreakdown =
-        byAggregateType.get(projection.aggregateType) ?? [];
+      const tenantBreakdown = byAggregateType.get(projection.aggregateType) ?? [];
       const aggregateCount = tenantBreakdown.reduce(
         (sum, t) => sum + t.aggregateCount,
         0,
@@ -178,9 +177,7 @@ export class EventExplorerService {
       let parsedPayload: unknown;
       try {
         parsedPayload =
-          typeof row.payload === "string"
-            ? JSON.parse(row.payload)
-            : row.payload;
+          typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
       } catch {
         parsedPayload = {};
       }

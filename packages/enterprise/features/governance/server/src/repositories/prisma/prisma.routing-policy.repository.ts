@@ -71,9 +71,7 @@ export class PrismaRoutingPolicyRepository extends RoutingPolicyRepository {
     if (teamIds.length > 0) {
       predicates.push({ scopeType: "TEAM", scopeId: { in: teamIds } });
     }
-    const projectIds = teams.flatMap(({ projects }) =>
-      projects.map(({ id }) => id),
-    );
+    const projectIds = teams.flatMap(({ projects }) => projects.map(({ id }) => id));
     if (projectIds.length > 0) {
       predicates.push({ scopeType: "PROJECT", scopeId: { in: projectIds } });
     }
@@ -166,9 +164,7 @@ export class PrismaRoutingPolicyRepository extends RoutingPolicyRepository {
     return mapPolicy(row);
   }
 
-  async setDefault(
-    input: SetDefaultRoutingPolicyInput,
-  ): Promise<RoutingPolicy> {
+  async setDefault(input: SetDefaultRoutingPolicyInput): Promise<RoutingPolicy> {
     const target = await this.database.routingPolicy.findUniqueOrThrow({
       where: { id: input.id },
       include: { scopes: true },
@@ -283,9 +279,7 @@ export class PrismaRoutingPolicyRepository extends RoutingPolicyRepository {
 
 function mapPolicy(row: PolicyRow): RoutingPolicy {
   const modelProviderIds = Array.isArray(row.modelProviderIds)
-    ? row.modelProviderIds.filter(
-        (value): value is string => typeof value === "string",
-      )
+    ? row.modelProviderIds.filter((value): value is string => typeof value === "string")
     : [];
   const modelAliases = toStringMap(row.modelAliases);
   const policyRules = toObject(row.policyRules);

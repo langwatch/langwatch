@@ -9,7 +9,9 @@ import {
 } from "./evaluators.native";
 import type { EvaluatorDefinition, EvaluatorCategory } from "./evaluator";
 
-export const evaluatorsSchema = generatedEvaluatorsSchema.extend(nativeEvaluatorsSchemaShape);
+export const evaluatorsSchema = generatedEvaluatorsSchema.extend(
+  nativeEvaluatorsSchemaShape,
+);
 export type Evaluators = z.infer<typeof evaluatorsSchema>;
 export type EvaluatorTypes = keyof Evaluators;
 export type { EvaluatorDefinition, EvaluatorCategory };

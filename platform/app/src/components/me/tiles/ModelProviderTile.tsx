@@ -8,14 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
 import { Link } from "~/components/ui/link";
@@ -171,10 +164,7 @@ export function ModelProviderTile({
           <Text fontSize="sm" fontWeight="semibold">
             {displayName}
           </Text>
-          <Text
-            fontSize="xs"
-            color={providerConfigured ? "fg.muted" : "orange.700"}
-          >
+          <Text fontSize="xs" color={providerConfigured ? "fg.muted" : "orange.700"}>
             {providerConfigured
               ? "Issue your own virtual key"
               : "Provider not configured"}
@@ -193,17 +183,17 @@ export function ModelProviderTile({
           backgroundColor="orange.50"
         >
           <Text fontSize="sm" color="orange.900" marginBottom={2}>
-            Your organization doesn&apos;t have {articleFor(displayName)}{" "}
-            {displayName} credential configured yet, so issuing a key here would
-            mint a VK that fails on first call with{" "}
+            Your organization doesn&apos;t have {articleFor(displayName)} {displayName}{" "}
+            credential configured yet, so issuing a key here would mint a VK that fails on
+            first call with{" "}
             <Code fontSize="xs" backgroundColor="transparent">
               provider_error
             </Code>
             .
           </Text>
           <Text fontSize="xs" color="orange.800">
-            Ask your organization admin to add {articleFor(displayName)}{" "}
-            {displayName} provider in{" "}
+            Ask your organization admin to add {articleFor(displayName)} {displayName}{" "}
+            provider in{" "}
             <Link
               href="/settings/model-providers"
               color="orange.800"
@@ -257,18 +247,10 @@ export function ModelProviderTile({
             />
           </VStack>
           <HStack gap={2}>
-            <Button
-              size="sm"
-              onClick={onIssue}
-              disabled={!label.trim() || issuing}
-            >
+            <Button size="sm" onClick={onIssue} disabled={!label.trim() || issuing}>
               {issuing ? "Issuing…" : "Issue key"}
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setExpanded(false)}
-            >
+            <Button size="sm" variant="ghost" onClick={() => setExpanded(false)}>
               Cancel
             </Button>
           </HStack>
@@ -312,9 +294,7 @@ export function ModelProviderTile({
               backgroundColor="bg.subtle"
             >
               <Code flex={1} backgroundColor="transparent" fontSize="sm">
-                {secretRevealed
-                  ? issued.secret
-                  : issued.secret.slice(0, 14) + "…"}
+                {secretRevealed ? issued.secret : issued.secret.slice(0, 14) + "…"}
               </Code>
               <IconButton
                 size="xs"

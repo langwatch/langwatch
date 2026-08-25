@@ -136,9 +136,7 @@ describe("createTenantId", () => {
     it("throws error with correct message format", () => {
       expect(() => {
         createTenantId("");
-      }).toThrow(
-        "[SECURITY] TenantId must be a non-empty string for tenant isolation",
-      );
+      }).toThrow("[SECURITY] TenantId must be a non-empty string for tenant isolation");
     });
   });
 });

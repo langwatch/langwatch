@@ -81,9 +81,7 @@ export const llmPromptConfigVersionFactory = Factory.define<
     projectId: nanoid(), // This should be overridden with an actual project ID when used
     runtimeParameters: params?.runtimeParameters ?? {},
   } as LlmPromptConfigVersion & {
-    configData: z.infer<
-      (typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]
-    >;
+    configData: z.infer<(typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]>;
   };
 });
 

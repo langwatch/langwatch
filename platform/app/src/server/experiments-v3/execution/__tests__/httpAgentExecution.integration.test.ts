@@ -124,9 +124,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
     const events: StudioServerEvent[] = [];
 
     // Build loadedData with mock agent if httpConfig provided
-    const loadedData = httpConfig
-      ? { agent: createMockHttpAgent(httpConfig) }
-      : {};
+    const loadedData = httpConfig ? { agent: createMockHttpAgent(httpConfig) } : {};
 
     const { workflow, targetNodeId } = buildCellWorkflow(
       {
@@ -140,9 +138,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
     // Build inputs based on target's declared inputs and their mappings
     const inputs: Record<string, unknown> = {};
     const datasetId = cell.datasetEntry._datasetId as string | undefined;
-    const targetMappings = datasetId
-      ? (cell.targetConfig.mappings[datasetId] ?? {})
-      : {};
+    const targetMappings = datasetId ? (cell.targetConfig.mappings[datasetId] ?? {}) : {};
 
     for (const input of cell.targetConfig.inputs ?? []) {
       const mapping = targetMappings[input.identifier];
@@ -237,12 +233,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
 
       // Should have received a success event for the HTTP node
       const successEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "http-target-1" &&
           e.payload.execution_state?.status === "success",
@@ -269,21 +260,14 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       );
 
       const successEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "http-target-1" &&
           e.payload.execution_state?.status === "success",
       );
 
       expect(successEvent).toBeDefined();
-      expect(successEvent?.payload.execution_state?.outputs?.output).toBe(
-        "Test message",
-      );
+      expect(successEvent?.payload.execution_state?.outputs?.output).toBe("Test message");
     }, 60000);
   });
 
@@ -326,12 +310,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       );
 
       const successEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "http-target-1" &&
           e.payload.execution_state?.status === "success",
@@ -367,21 +346,14 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       );
 
       const successEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "http-target-1" &&
           e.payload.execution_state?.status === "success",
       );
 
       expect(successEvent).toBeDefined();
-      expect(successEvent?.payload.execution_state?.outputs?.output).toBe(
-        "deep value",
-      );
+      expect(successEvent?.payload.execution_state?.outputs?.output).toBe("deep value");
     }, 60000);
   });
 
@@ -408,12 +380,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       );
 
       const successEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "http-target-1" &&
           e.payload.execution_state?.status === "success",
@@ -448,12 +415,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       );
 
       const successEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "http-target-1" &&
           e.payload.execution_state?.status === "success",
@@ -507,24 +469,14 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
 
       // Find error or success event
       const errorEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "http-target-1" &&
           e.payload.execution_state?.status === "error",
       );
 
       const successEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "http-target-1" &&
           e.payload.execution_state?.status === "success",
@@ -532,16 +484,12 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
 
       // Should NOT have "Invalid JSON" error (this is the bug)
       if (errorEvent) {
-        expect(errorEvent.payload.execution_state?.error).not.toContain(
-          "Invalid JSON",
-        );
+        expect(errorEvent.payload.execution_state?.error).not.toContain("Invalid JSON");
       }
 
       // Should succeed and have the messages in the output
       expect(successEvent).toBeDefined();
-      expect(
-        successEvent?.payload.execution_state?.outputs?.output,
-      ).toMatchObject({
+      expect(successEvent?.payload.execution_state?.outputs?.output).toMatchObject({
         messages: [{ role: "user", content: "hi" }],
         model: "test-model",
       });
@@ -582,21 +530,14 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       );
 
       const successEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "http-target-1" &&
           e.payload.execution_state?.status === "success",
       );
 
       expect(successEvent).toBeDefined();
-      expect(
-        successEvent?.payload.execution_state?.outputs?.output,
-      ).toMatchObject({
+      expect(successEvent?.payload.execution_state?.outputs?.output).toMatchObject({
         input: 'hello "world"\nline2',
       });
     }, 60000);
@@ -620,12 +561,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       );
 
       const errorEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "http-target-1" &&
           e.payload.execution_state?.status === "error",
@@ -651,12 +587,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       );
 
       const errorEvent = events.find(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > =>
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change" &&
           e.payload.component_id === "http-target-1" &&
           e.payload.execution_state?.status === "error",

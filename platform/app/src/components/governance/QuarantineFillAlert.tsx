@@ -17,11 +17,7 @@ import { api } from "~/utils/api";
  * Spec: specs/ai-gateway/governance/ingestion-attribution.feature
  *       (quarantine-fill admin warning scenario)
  */
-export function QuarantineFillAlert({
-  organizationId,
-}: {
-  organizationId: string;
-}) {
+export function QuarantineFillAlert({ organizationId }: { organizationId: string }) {
   const { data } = api.governance.quarantineFillStats.useQuery(
     { organizationId },
     {
@@ -39,16 +35,15 @@ export function QuarantineFillAlert({
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Title>
-          {Math.round(data.rate)} spans/min landing in quarantine — likely
-          misconfigured ingest
+          {Math.round(data.rate)} spans/min landing in quarantine — likely misconfigured
+          ingest
         </Alert.Title>
         <Alert.Description>
           <VStack align="start" gap={2}>
             <Text fontSize="sm">
-              Unrecognized traffic is being routed to the org-wide quarantine
-              project (admin-only). End users do not see this data. Configure
-              the credential on the source listed below to send traces to the
-              right scope.
+              Unrecognized traffic is being routed to the org-wide quarantine project
+              (admin-only). End users do not see this data. Configure the credential on
+              the source listed below to send traces to the right scope.
             </Text>
             {data.perSource.length > 0 && (
               <Box>
@@ -71,11 +66,7 @@ export function QuarantineFillAlert({
                 </VStack>
               </Box>
             )}
-            <Link
-              href="/governance/ingestion-sources"
-              fontSize="sm"
-              color="orange.600"
-            >
+            <Link href="/governance/ingestion-sources" fontSize="sm" color="orange.600">
               Review ingestion sources →
             </Link>
           </VStack>

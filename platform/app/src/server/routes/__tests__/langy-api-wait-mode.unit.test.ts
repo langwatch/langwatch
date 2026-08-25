@@ -40,8 +40,7 @@ vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
   return {
     ...actual,
     extractCredentials: (...args: unknown[]) => mockExtractCredentials(...args),
-    enforceApiKeyCeiling: (...args: unknown[]) =>
-      mockEnforceApiKeyCeiling(...args),
+    enforceApiKeyCeiling: (...args: unknown[]) => mockEnforceApiKeyCeiling(...args),
   };
 });
 
@@ -59,13 +58,11 @@ const mockResolveLangyKeyIdentity = vi.fn();
 const mockResolveLangyActorSession = vi.fn();
 
 vi.mock("~/server/app-layer/langy/langyApiKeyIdentity", () => ({
-  resolveLangyKeyIdentity: (...args: unknown[]) =>
-    mockResolveLangyKeyIdentity(...args),
+  resolveLangyKeyIdentity: (...args: unknown[]) => mockResolveLangyKeyIdentity(...args),
 }));
 
 vi.mock("~/server/app-layer/langy/langyApiKeyActorSession", () => ({
-  resolveLangyActorSession: (...args: unknown[]) =>
-    mockResolveLangyActorSession(...args),
+  resolveLangyActorSession: (...args: unknown[]) => mockResolveLangyActorSession(...args),
 }));
 
 // ─── App layer ────────────────────────────────────────────────────────────────
@@ -286,9 +283,7 @@ describe("/api/langy wait mode (Prefer: wait)", () => {
   });
 
   it("treats projection lag as keep-waiting, not gone", async () => {
-    const { LangyConversationNotFoundError } = await import(
-      "@langwatch/langy-contract"
-    );
+    const { LangyConversationNotFoundError } = await import("@langwatch/langy-contract");
     mockGetEventsAfter
       .mockRejectedValueOnce(new LangyConversationNotFoundError("conv-1"))
       .mockResolvedValue({

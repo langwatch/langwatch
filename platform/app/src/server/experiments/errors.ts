@@ -29,10 +29,7 @@ export class RunNotFoundError extends NotFoundError {
 export class ExperimentNotFoundError extends NotFoundError {
   declare readonly code: "experiment_not_found";
 
-  constructor(
-    experimentId: string,
-    options: { reasons?: readonly Error[] } = {},
-  ) {
+  constructor(experimentId: string, options: { reasons?: readonly Error[] } = {}) {
     super("experiment_not_found", "Experiment", experimentId, {
       meta: { experimentId },
       ...options,

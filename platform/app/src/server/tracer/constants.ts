@@ -7,6 +7,4 @@
 export const TRACK_EVENT_SPAN_NAME = "langwatch.track_event";
 
 /** Span names that represent synthetic events, not real execution. */
-export const SYNTHETIC_SPAN_NAMES: ReadonlySet<string> = new Set([
-  TRACK_EVENT_SPAN_NAME,
-]);
+export const SYNTHETIC_SPAN_NAMES: ReadonlySet<string> = new Set([TRACK_EVENT_SPAN_NAME]);

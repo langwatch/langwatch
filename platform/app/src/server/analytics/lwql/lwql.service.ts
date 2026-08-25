@@ -54,10 +54,7 @@ import {
   lwqlVisibleViews,
 } from "./catalog/types";
 import { type LangWatchQLDiagnostic, lwqlDiagnostics } from "./diagnostics";
-import {
-  LangWatchQLParameterMissingError,
-  LangWatchQLUnavailableError,
-} from "./errors";
+import { LangWatchQLParameterMissingError, LangWatchQLUnavailableError } from "./errors";
 import {
   createLangWatchQLExecutor,
   DEFAULT_LWQL_RESULT_LIMITS,
@@ -71,10 +68,7 @@ import { resolveLangWatchQLTimeWindow } from "./resolveTimeWindow";
 import { describeLangWatchQLSchema, type LangWatchQLSchema } from "./schema";
 import type { LangWatchQLTimeWindow } from "./timeWindow";
 import { lwqlValidationError } from "./validation/errors";
-import {
-  type AcceptedLangWatchQL,
-  validateLangWatchQL,
-} from "./validation/validate";
+import { type AcceptedLangWatchQL, validateLangWatchQL } from "./validation/validate";
 
 const logger = createLogger("langwatch:analytics:lwql");
 
@@ -233,11 +227,7 @@ export class LangWatchQLService {
    * LangWatchQL identity can still describe what the API would expose. Answering
    * it does not disclose anything a caller could not read in the docs.
    */
-  describeSchema({
-    protections,
-  }: {
-    protections: Protections;
-  }): LangWatchQLSchema {
+  describeSchema({ protections }: { protections: Protections }): LangWatchQLSchema {
     return describeLangWatchQLSchema({
       database: this.deps.database,
       protections,
@@ -384,9 +374,7 @@ export class LangWatchQLService {
       sql,
       // The resolved record, not the caller's: it is the one carrying the
       // window this surface injected.
-      ...(validation.boundParameters
-        ? { parameters: validation.boundParameters }
-        : {}),
+      ...(validation.boundParameters ? { parameters: validation.boundParameters } : {}),
       tenantCapability: lwqlTenantCapability({
         secret: project.lwqlKey,
       }),
@@ -498,9 +486,7 @@ export function getLangWatchQLService(): LangWatchQLService {
  * never calls this — see the note above for why the container is not the seam
  * in this slice.
  */
-export function setLangWatchQLService(
-  service: LangWatchQLService | null,
-): void {
+export function setLangWatchQLService(service: LangWatchQLService | null): void {
   cached = service;
 }
 

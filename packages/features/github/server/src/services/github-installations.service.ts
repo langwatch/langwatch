@@ -113,9 +113,7 @@ export class GithubInstallationsService {
     return this.organization.isMember(params);
   }
 
-  getAllForOrganization(
-    organizationId: string,
-  ): Promise<GithubInstallationRow[]> {
+  getAllForOrganization(organizationId: string): Promise<GithubInstallationRow[]> {
     return this.repo.findAllForOrganization(organizationId);
   }
 
@@ -131,9 +129,7 @@ export class GithubInstallationsService {
    * set. Gating it would drop pull-request announcements the payload alone can
    * be written from, and would hide the uninstall link for a row that exists.
    */
-  tryGetByInstallationId(
-    installationId: string,
-  ): Promise<GithubInstallationRow | null> {
+  tryGetByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {
     return this.repo.tryFindByInstallationId(installationId);
   }
 
@@ -157,8 +153,7 @@ export class GithubInstallationsService {
       // Best-effort: cache the selected repo list so settings can show it
       // without a live call. A failure here must not fail the install.
       try {
-        repositories =
-          await this.appTokens.listInstallationRepositories(installationId);
+        repositories = await this.appTokens.listInstallationRepositories(installationId);
       } catch (error) {
         logger.warn(
           { error, installationId },
@@ -213,10 +208,7 @@ export class GithubInstallationsService {
     try {
       void Promise.resolve(this.onInstallationRecorded(params)).catch(
         (error: unknown) => {
-          logger.warn(
-            { error, ...params },
-            "installation-recorded hook failed",
-          );
+          logger.warn({ error, ...params }, "installation-recorded hook failed");
         },
       );
     } catch (error) {
@@ -255,7 +247,7 @@ export class GithubInstallationsService {
         // Repository-set changes (and a re-created installation already mapped)
         // refresh the cached selection. An unknown installation with no local
         // row is left alone — the setup callback owns first-time org mapping.
-      const existing = await this.repo.tryFindByInstallationId(installationId);
+        const existing = await this.repo.tryFindByInstallationId(installationId);
         if (!existing) return;
         // Re-fetch the authoritative selection rather than trust the event's
         // partial repo list.
@@ -295,8 +287,7 @@ export class GithubInstallationsService {
   async listRepositoriesForOrganization(
     organizationId: string,
   ): Promise<GithubRepository[]> {
-    const installations =
-      await this.repo.findAllForOrganization(organizationId);
+    const installations = await this.repo.findAllForOrganization(organizationId);
     const usable = installations.filter((i) => !i.suspendedAt);
     if (installations.length > 0 && usable.length === 0) {
       throw new GithubInstallationSuspendedError({
@@ -306,9 +297,7 @@ export class GithubInstallationsService {
     const seen = new Set<string>();
     const out: GithubRepository[] = [];
     for (const inst of usable) {
-      const repos = await this.listRepositoriesForInstallation(
-        inst.installationId,
-      );
+      const repos = await this.listRepositoriesForInstallation(inst.installationId);
       for (const repo of repos) {
         if (seen.has(repo.fullName)) continue;
         seen.add(repo.fullName);
@@ -364,13 +353,9 @@ export class GithubInstallationsService {
     repositoryFullName: string;
   }): Promise<{ installationId: string; repositoryId: string } | null> {
     if (!this.configured) return null;
-    const installations =
-      await this.repo.findAllForOrganization(organizationId);
+    const installations = await this.repo.findAllForOrganization(organizationId);
     for (const inst of installations.filter((i) => !i.suspendedAt)) {
-      const resolved = await this.resolveRepositoryIdOrHeal(
-        inst,
-        repositoryFullName,
-      );
+      const resolved = await this.resolveRepositoryIdOrHeal(inst, repositoryFullName);
       if (resolved.repoId) {
         return {
           installationId: inst.installationId,
@@ -410,16 +395,13 @@ export class GithubInstallationsService {
     if (!this.configured) return false;
     const wanted = repositoryFullName.toLowerCase();
     const owner = wanted.split("/")[0] ?? "";
-    const installations =
-      await this.repo.findAllForOrganization(organizationId);
+    const installations = await this.repo.findAllForOrganization(organizationId);
     return installations
       .filter((i) => !i.suspendedAt)
       .some((inst) =>
         inst.repositorySelection === "all"
           ? inst.accountLogin.toLowerCase() === owner
-          : (inst.repositories ?? []).some(
-              (r) => r.fullName.toLowerCase() === wanted,
-            ),
+          : (inst.repositories ?? []).some((r) => r.fullName.toLowerCase() === wanted),
       );
   }
 
@@ -455,8 +437,7 @@ export class GithubInstallationsService {
     repositoryFullName?: string;
   }): Promise<GithubTurnToken | null> {
     if (!this.configured) return null;
-    const installations =
-      await this.repo.findAllForOrganization(organizationId);
+    const installations = await this.repo.findAllForOrganization(organizationId);
     const usable = installations.filter((i) => !i.suspendedAt);
     if (usable.length === 0) return null;
 
@@ -476,10 +457,7 @@ export class GithubInstallationsService {
     repositoryFullName: string,
   ): Promise<GithubTurnToken | null> {
     for (const inst of usable) {
-      const resolved = await this.resolveRepositoryIdOrHeal(
-        inst,
-        repositoryFullName,
-      );
+      const resolved = await this.resolveRepositoryIdOrHeal(inst, repositoryFullName);
       if (!resolved.repoId) continue;
       const outcome = await this.mintScoped({
         installationId: inst.installationId,
@@ -585,9 +563,7 @@ export class GithubInstallationsService {
     repositoryFullName: string,
   ): Promise<string | null> {
     const wanted = repositoryFullName.toLowerCase();
-    const fromCache = inst.repositories?.find(
-      (r) => r.fullName.toLowerCase() === wanted,
-    );
+    const fromCache = inst.repositories?.find((r) => r.fullName.toLowerCase() === wanted);
     if (fromCache) return fromCache.id;
     // "all" selection has no cached list — resolve live.
     try {

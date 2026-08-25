@@ -19,9 +19,7 @@ export const SUITE_SET_SUFFIX = "__suite";
  * Checks if a set ID belongs to a suite.
  */
 export function isSuiteSetId(setId: string): boolean {
-  return (
-    setId.startsWith(INTERNAL_SET_PREFIX) && setId.endsWith(SUITE_SET_SUFFIX)
-  );
+  return setId.startsWith(INTERNAL_SET_PREFIX) && setId.endsWith(SUITE_SET_SUFFIX);
 }
 
 /**

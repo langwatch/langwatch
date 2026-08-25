@@ -176,8 +176,7 @@ export function createCodingAgentProcessingPipeline(
             windowMs: PULL_REQUEST_MAPPING_WINDOW_MS,
             shouldSurviveDispatch: true,
           }),
-          handler: (event, context) =>
-            deps.pullRequestMappingHandler!(event, context),
+          handler: (event, context) => deps.pullRequestMappingHandler!(event, context),
         })
       : builder
   ).build();

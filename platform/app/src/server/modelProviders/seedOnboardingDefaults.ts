@@ -1,7 +1,4 @@
-import type {
-  ModelDefaultScopeType,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { ModelDefaultScopeType, PrismaClient } from "~/generated/prisma/client";
 
 import { llmModels } from "./loadModelCatalog";
 import { ModelDefaultsRepository } from "./modelDefaults.repository";
@@ -12,9 +9,8 @@ interface RegistryEntry {
   mode: "chat" | "embedding";
 }
 
-const REGISTRY = (
-  llmModels as unknown as { models: Record<string, RegistryEntry> }
-).models;
+const REGISTRY = (llmModels as unknown as { models: Record<string, RegistryEntry> })
+  .models;
 
 function pickLatestEmbedding(provider: string): string | undefined {
   // Embedding model ids don't follow X.Y. Pick the highest version-like

@@ -1,6 +1,6 @@
 ---
-title: 'Overview'
-description: 'Create, list, update, and archive LangWatch teams programmatically. Designed for automated provisioning and cleanup of team structures.'
+title: "Overview"
+description: "Create, list, update, and archive LangWatch teams programmatically. Designed for automated provisioning and cleanup of team structures."
 ---
 
 ## Intro
@@ -21,30 +21,30 @@ Project API keys (`X-Auth-Token`) cannot be used here — they lack organization
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/teams` | List all teams in the organization |
-| `POST` | `/api/teams` | Create a new team |
-| `GET` | `/api/teams/{id}` | Get team details |
-| `PATCH` | `/api/teams/{id}` | Update a team |
-| `DELETE` | `/api/teams/{id}` | Archive a team (soft-delete) |
-| `GET` | `/api/teams/{id}/members` | List team members |
-| `POST` | `/api/teams/{id}/members` | Add a member to the team |
-| `DELETE` | `/api/teams/{id}/members/{userId}` | Remove a member from the team |
-| `GET` | `/api/teams/{id}/projects` | List projects in the team |
+| Method   | Path                               | Description                        |
+| -------- | ---------------------------------- | ---------------------------------- |
+| `GET`    | `/api/teams`                       | List all teams in the organization |
+| `POST`   | `/api/teams`                       | Create a new team                  |
+| `GET`    | `/api/teams/{id}`                  | Get team details                   |
+| `PATCH`  | `/api/teams/{id}`                  | Update a team                      |
+| `DELETE` | `/api/teams/{id}`                  | Archive a team (soft-delete)       |
+| `GET`    | `/api/teams/{id}/members`          | List team members                  |
+| `POST`   | `/api/teams/{id}/members`          | Add a member to the team           |
+| `DELETE` | `/api/teams/{id}/members/{userId}` | Remove a member from the team      |
+| `GET`    | `/api/teams/{id}/projects`         | List projects in the team          |
 
 ## Errors
 
 Every refusal carries a stable `code`. Branch on that, not on the message.
 
-| Code | Status | Meaning |
-|------|--------|---------|
-| `team_not_found` | 404 | No such team in this organization, or it is archived |
-| `team_name_taken` | 409 | Another team here already uses that name |
-| `team_member_already_added` | 409 | They already hold that role on the team |
-| `team_membership_not_found` | 404 | They hold no role on this team |
-| `user_not_in_organization` | 422 | The user is not a member of this organization |
-| `personal_workspace_not_managed_here` | 403 | The team is somebody's personal workspace |
+| Code                                  | Status | Meaning                                              |
+| ------------------------------------- | ------ | ---------------------------------------------------- |
+| `team_not_found`                      | 404    | No such team in this organization, or it is archived |
+| `team_name_taken`                     | 409    | Another team here already uses that name             |
+| `team_member_already_added`           | 409    | They already hold that role on the team              |
+| `team_membership_not_found`           | 404    | They hold no role on this team                       |
+| `user_not_in_organization`            | 422    | The user is not a member of this organization        |
+| `personal_workspace_not_managed_here` | 403    | The team is somebody's personal workspace            |
 
 ## Soft Delete
 

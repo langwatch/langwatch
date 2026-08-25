@@ -50,10 +50,7 @@ export function useReachableProducts({
     ? PRODUCTS.filter((product) =>
         product.gates.every((gate) => {
           if (gate.flag !== undefined && !flagValues[gate.flag]) return false;
-          if (
-            gate.permission !== undefined &&
-            !hasPermission(gate.permission)
-          ) {
+          if (gate.permission !== undefined && !hasPermission(gate.permission)) {
             return false;
           }
           return true;
@@ -73,9 +70,7 @@ export function useReachableProducts({
   return {
     reachableProducts,
     isLoading: enabled
-      ? isOrganizationLoading ||
-        gatewayFlag.isLoading ||
-        governanceFlag.isLoading
+      ? isOrganizationLoading || gatewayFlag.isLoading || governanceFlag.isLoading
       : false,
   };
 }

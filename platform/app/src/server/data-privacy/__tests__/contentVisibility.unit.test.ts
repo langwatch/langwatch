@@ -42,20 +42,14 @@ describe("isContentVisible", () => {
     /** @scenario Content restricted to admins is hidden from a plain member */
     it("hides it from a plain member", () => {
       expect(
-        isContentVisible(
-          eff("restrict", { admins: true }),
-          viewer({ isAdmin: false }),
-        ),
+        isContentVisible(eff("restrict", { admins: true }), viewer({ isAdmin: false })),
       ).toBe(false);
     });
 
     /** @scenario Content restricted to admins is visible to an admin */
     it("shows it to an admin", () => {
       expect(
-        isContentVisible(
-          eff("restrict", { admins: true }),
-          viewer({ isAdmin: true }),
-        ),
+        isContentVisible(eff("restrict", { admins: true }), viewer({ isAdmin: true })),
       ).toBe(true);
     });
   });
@@ -64,12 +58,10 @@ describe("isContentVisible", () => {
     /** @scenario Content restricted to a group is visible to members of that group */
     it("shows it to a group member and hides it from a non-member", () => {
       const restriction = eff("restrict", { groupIds: ["security"] });
-      expect(
-        isContentVisible(restriction, viewer({ groupIds: ["security"] })),
-      ).toBe(true);
-      expect(
-        isContentVisible(restriction, viewer({ groupIds: ["other"] })),
-      ).toBe(false);
+      expect(isContentVisible(restriction, viewer({ groupIds: ["security"] }))).toBe(
+        true,
+      );
+      expect(isContentVisible(restriction, viewer({ groupIds: ["other"] }))).toBe(false);
     });
   });
 
@@ -77,24 +69,18 @@ describe("isContentVisible", () => {
     /** @scenario Content restricted to the Members role group excludes admins and viewers */
     it("shows it only to holders of the member role", () => {
       const restriction = eff("restrict", { members: true });
-      expect(
-        isContentVisible(restriction, viewer({ isMemberRole: true })),
-      ).toBe(true);
-      expect(isContentVisible(restriction, viewer({ isAdmin: true }))).toBe(
-        false,
-      );
-      expect(isContentVisible(restriction, viewer({ isViewer: true }))).toBe(
-        false,
-      );
+      expect(isContentVisible(restriction, viewer({ isMemberRole: true }))).toBe(true);
+      expect(isContentVisible(restriction, viewer({ isAdmin: true }))).toBe(false);
+      expect(isContentVisible(restriction, viewer({ isViewer: true }))).toBe(false);
     });
   });
 
   describe("given an empty audience", () => {
     /** @scenario An empty audience hides content from everyone including admins */
     it("hides it even from an admin", () => {
-      expect(
-        isContentVisible(eff("restrict", {}), viewer({ isAdmin: true })),
-      ).toBe(false);
+      expect(isContentVisible(eff("restrict", {}), viewer({ isAdmin: true }))).toBe(
+        false,
+      );
     });
   });
 
@@ -102,12 +88,8 @@ describe("isContentVisible", () => {
     /** @scenario Content restricted to viewers is visible to a viewer-role holder */
     it("shows it to a viewer-role holder and hides it from a plain member", () => {
       const restriction = eff("restrict", { viewers: true });
-      expect(isContentVisible(restriction, viewer({ isViewer: true }))).toBe(
-        true,
-      );
-      expect(isContentVisible(restriction, viewer({ isViewer: false }))).toBe(
-        false,
-      );
+      expect(isContentVisible(restriction, viewer({ isViewer: true }))).toBe(true);
+      expect(isContentVisible(restriction, viewer({ isViewer: false }))).toBe(false);
     });
   });
 
@@ -115,12 +97,8 @@ describe("isContentVisible", () => {
     /** @scenario Only the owner of a personal project sees its content */
     it("shows it to the owner and hides it from an admin", () => {
       const restriction = eff("restrict", { projectOwner: true });
-      expect(
-        isContentVisible(restriction, viewer({ isProjectOwner: true })),
-      ).toBe(true);
-      expect(isContentVisible(restriction, viewer({ isAdmin: true }))).toBe(
-        false,
-      );
+      expect(isContentVisible(restriction, viewer({ isProjectOwner: true }))).toBe(true);
+      expect(isContentVisible(restriction, viewer({ isAdmin: true }))).toBe(false);
     });
 
     /** @scenario The owner-only audience can be widened with a chosen group */
@@ -129,33 +107,27 @@ describe("isContentVisible", () => {
         projectOwner: true,
         groupIds: ["super-admins"],
       });
-      expect(
-        isContentVisible(restriction, viewer({ groupIds: ["super-admins"] })),
-      ).toBe(true);
+      expect(isContentVisible(restriction, viewer({ groupIds: ["super-admins"] }))).toBe(
+        true,
+      );
       expect(isContentVisible(restriction, viewer({}))).toBe(false);
     });
   });
 
   describe("given all-members or captured content", () => {
     it("shows captured content to any member and hides everything from a non-member", () => {
-      expect(isContentVisible(eff("capture"), viewer({ isMember: true }))).toBe(
-        true,
-      );
+      expect(isContentVisible(eff("capture"), viewer({ isMember: true }))).toBe(true);
       expect(
         isContentVisible(
           eff("restrict", { allMembers: true }),
           viewer({ isMember: true }),
         ),
       ).toBe(true);
-      expect(
-        isContentVisible(eff("capture"), viewer({ isMember: false })),
-      ).toBe(false);
+      expect(isContentVisible(eff("capture"), viewer({ isMember: false }))).toBe(false);
     });
 
     it("treats dropped content as not visible", () => {
-      expect(isContentVisible(eff("drop"), viewer({ isAdmin: true }))).toBe(
-        false,
-      );
+      expect(isContentVisible(eff("drop"), viewer({ isAdmin: true }))).toBe(false);
     });
   });
 });
@@ -186,9 +158,7 @@ describe("needsAudienceFacts and isContentVisibleToPublic", () => {
 
   it("shows a public viewer only captured content", () => {
     expect(isContentVisibleToPublic(eff("capture"))).toBe(true);
-    expect(isContentVisibleToPublic(eff("restrict", { admins: true }))).toBe(
-      false,
-    );
+    expect(isContentVisibleToPublic(eff("restrict", { admins: true }))).toBe(false);
     expect(isContentVisibleToPublic(eff("drop"))).toBe(false);
   });
 });

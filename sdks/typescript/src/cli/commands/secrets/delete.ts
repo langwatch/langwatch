@@ -12,17 +12,14 @@ import type { CommandResult } from "../../utils/output";
  * Returns the deletion result rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const deleteSecretCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const deleteSecretCommand = async (id: string): Promise<CommandResult | void> => {
   const credentials = await resolveCredentials();
   if (!credentials.projectId) {
     throw new Error("A project must be selected for secret operations");
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Deleting secret "${id}"...`).start();
 

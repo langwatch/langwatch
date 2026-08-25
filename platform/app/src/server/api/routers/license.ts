@@ -1,17 +1,11 @@
-import {
-  authProviderIsMounted,
-  platformSSOAllowed,
-} from "~/runtime/app/features/sso";
+import { authProviderIsMounted, platformSSOAllowed } from "~/runtime/app/features/sso";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import {
-  getLicenseCryptography,
-  getLicenseHandler,
-} from "~/runtime/app/licensing";
+import { getLicenseCryptography, getLicenseHandler } from "~/runtime/app/licensing";
 import {
   buildMintedPlan,
   getPlanTemplate,
@@ -29,14 +23,8 @@ const logger = createLogger("langwatch:api:licenseRouter");
  */
 const planLimitsSchema = z.object({
   maxMembers: z.number().int().positive("Plan limits must be positive numbers"),
-  maxMembersLite: z
-    .number()
-    .int()
-    .positive("Plan limits must be positive numbers"),
-  maxMessagesPerMonth: z
-    .number()
-    .int()
-    .positive("Plan limits must be positive numbers"),
+  maxMembersLite: z.number().int().positive("Plan limits must be positive numbers"),
+  maxMessagesPerMonth: z.number().int().positive("Plan limits must be positive numbers"),
   canPublish: z.boolean(),
   webhookEndpointsEnabled: z.boolean().optional(),
   usageUnit: z.enum(["traces", "events"]),
@@ -155,9 +143,7 @@ export const licenseRouter = createTRPCRouter({
     )
     .permission("organization:manage")
     .mutation(async ({ input }) => {
-      const result = await getLicenseHandler().removeLicense(
-        input.organizationId,
-      );
+      const result = await getLicenseHandler().removeLicense(input.organizationId);
 
       return {
         success: true,
@@ -179,8 +165,7 @@ export const licenseRouter = createTRPCRouter({
     )
     .permission("organization:manage")
     .mutation(async ({ input }) => {
-      const { privateKey, organizationName, email, expiresAt, planType, plan } =
-        input;
+      const { privateKey, organizationName, email, expiresAt, planType, plan } = input;
 
       // Validate expiration is in the future
       if (expiresAt <= new Date()) {
@@ -218,10 +203,7 @@ export const licenseRouter = createTRPCRouter({
 
       try {
         // Sign the license
-        const signedLicense = licenseCryptography.signLicense(
-          licenseData,
-          privateKey,
-        );
+        const signedLicense = licenseCryptography.signLicense(licenseData, privateKey);
 
         // Encode as base64
         const licenseKey = licenseCryptography.encodeLicenseKey(signedLicense);

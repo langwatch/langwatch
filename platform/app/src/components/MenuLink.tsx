@@ -47,10 +47,7 @@ export const MenuLink = ({
       cursor={disabled ? "not-allowed" : undefined}
       pointerEvents={disabled ? "none" : undefined}
     >
-      <NextLink
-        href={href}
-        {...(target ? { target, rel: "noopener noreferrer" } : {})}
-      >
+      <NextLink href={href} {...(target ? { target, rel: "noopener noreferrer" } : {})}>
         <HStack width="full" gap={2}>
           {icon}
           <Text>{children}</Text>

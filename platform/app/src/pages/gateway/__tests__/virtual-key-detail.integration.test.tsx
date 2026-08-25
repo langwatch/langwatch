@@ -234,9 +234,7 @@ describe("virtual key detail page", () => {
     /** @scenario "The detail page states when the key expires" */
     it("reads Never", async () => {
       renderPage();
-      expect((await screen.findByTestId("vk-detail-expires")).textContent).toBe(
-        "Never",
-      );
+      expect((await screen.findByTestId("vk-detail-expires")).textContent).toBe("Never");
     });
   });
 
@@ -245,9 +243,9 @@ describe("virtual key detail page", () => {
     it("badges a key past its date as expired", async () => {
       detail.current = baseKey({ expiresAt: "2020-01-01T00:00:00.000Z" });
       renderPage();
-      expect(
-        (await screen.findByTestId("vk-detail-status")).textContent,
-      ).toContain("expired");
+      expect((await screen.findByTestId("vk-detail-status")).textContent).toContain(
+        "expired",
+      );
     });
 
     /** @scenario "An expired key can still be edited so the date can be extended" */
@@ -274,10 +272,7 @@ describe("virtual key detail page", () => {
         "/web-app/traces#all-traces?",
       );
       expect(
-        screen
-          .getByTestId("vk-usage-view-traces")
-          .closest("a")
-          ?.getAttribute("href"),
+        screen.getByTestId("vk-usage-view-traces").closest("a")?.getAttribute("href"),
       ).toContain("/web-app/traces#all-traces?");
     });
 
@@ -286,15 +281,9 @@ describe("virtual key detail page", () => {
       detail.current = baseKey({ traceProjectId: null });
       renderPage();
 
-      await waitFor(() =>
-        expect(screen.getByText("Identity")).toBeInTheDocument(),
-      );
-      expect(
-        screen.queryByTestId("vk-header-view-traces"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("vk-usage-view-traces"),
-      ).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.getByText("Identity")).toBeInTheDocument());
+      expect(screen.queryByTestId("vk-header-view-traces")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("vk-usage-view-traces")).not.toBeInTheDocument();
     });
   });
 
@@ -307,14 +296,9 @@ describe("virtual key detail page", () => {
         await screen.findByTestId("vk-usage-model-claude-sonnet-4-5"),
       );
 
-      await waitFor(() =>
-        expect(usageInputs.at(-1)?.model).toBe("claude-sonnet-4-5"),
-      );
+      await waitFor(() => expect(usageInputs.at(-1)?.model).toBe("claude-sonnet-4-5"));
       expect(
-        screen
-          .getByTestId("vk-usage-view-traces")
-          .closest("a")
-          ?.getAttribute("href"),
+        screen.getByTestId("vk-usage-view-traces").closest("a")?.getAttribute("href"),
       ).toContain(encodeURIComponent("claude-sonnet-4-5"));
     });
 
@@ -360,12 +344,10 @@ describe("virtual key detail page", () => {
       policy.current = { data: undefined, isError: true };
       renderPage();
 
-      expect(
-        (await screen.findByTestId("vk-routing-policy-id")).textContent,
-      ).toBe("rp-eu");
-      expect(
-        screen.queryByTestId("vk-routing-policy-link"),
-      ).not.toBeInTheDocument();
+      expect((await screen.findByTestId("vk-routing-policy-id")).textContent).toBe(
+        "rp-eu",
+      );
+      expect(screen.queryByTestId("vk-routing-policy-link")).not.toBeInTheDocument();
     });
 
     /** @scenario "A provider the routing policy leaves out is marked as such" */

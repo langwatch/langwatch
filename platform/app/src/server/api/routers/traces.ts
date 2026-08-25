@@ -125,10 +125,7 @@ export const tracesRouter = createTRPCRouter({
         undefined,
         ctx.app.evaluations,
       );
-      return traceService.getEvaluationInputs(
-        input.projectId,
-        input.evaluationId,
-      );
+      return traceService.getEvaluationInputs(input.projectId, input.evaluationId);
     }),
 
   getEvaluationsMultiple: protectedProcedure
@@ -237,14 +234,9 @@ export const tracesRouter = createTRPCRouter({
         buildTraceBlobResolutionDeps(),
       );
 
-      return traceService.getTracesByThreadId(
-        projectId,
-        threadId,
-        protections,
-        {
-          full: true,
-        },
-      );
+      return traceService.getTracesByThreadId(projectId, threadId, protections, {
+        full: true,
+      });
     }),
 
   getTracesWithSpans: protectedProcedure
@@ -309,10 +301,7 @@ export const tracesRouter = createTRPCRouter({
 
       return Object.fromEntries(
         await Promise.all(
-          traces.map(async (t) => [
-            t.trace_id,
-            await formatSpansDigest(t.spans ?? []),
-          ]),
+          traces.map(async (t) => [t.trace_id, await formatSpansDigest(t.spans ?? [])]),
         ),
       );
     }),
@@ -375,9 +364,7 @@ export const tracesRouter = createTRPCRouter({
         protections,
       );
 
-      const traceIds = groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id),
-      );
+      const traceIds = groups.flatMap((group) => group.map((trace) => trace.trace_id));
 
       if (traceIds.length === 0) {
         return [];
@@ -415,9 +402,7 @@ export const tracesRouter = createTRPCRouter({
       tracesFilterInput.extend({
         query: z.string().optional(),
         sortBy: z.string().optional(),
-        evaluatorType: evaluatorsSchema
-          .keyof()
-          .or(z.string().startsWith("custom/")),
+        evaluatorType: evaluatorsSchema.keyof().or(z.string().startsWith("custom/")),
         preconditions: z.array(checkPreconditionSchema),
         expectedResults: z.number(),
       }),
@@ -443,16 +428,13 @@ export const tracesRouter = createTRPCRouter({
         protections,
       );
 
-      const traceIds = groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id),
-      );
+      const traceIds = groups.flatMap((group) => group.map((trace) => trace.trace_id));
 
       if (traceIds.length === 0) {
         return [];
       }
 
-      const { projectId, evaluatorType, preconditions, expectedResults } =
-        input;
+      const { projectId, evaluatorType, preconditions, expectedResults } = input;
 
       const traceWithSpans = await traceService.getTracesWithSpans(
         projectId,
@@ -549,10 +531,7 @@ export const tracesRouter = createTRPCRouter({
         for await (const eventArgs of on(emitter, "trace_updated", {
           signal: opts.signal,
         })) {
-          logger.debug(
-            { projectId, event: eventArgs[0] },
-            "SSE event received",
-          );
+          logger.debug({ projectId, event: eventArgs[0] }, "SSE event received");
           yield eventArgs[0];
         }
         logger.info({ projectId }, "SSE subscription ended normally");

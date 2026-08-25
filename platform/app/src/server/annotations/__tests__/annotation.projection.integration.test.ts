@@ -87,16 +87,16 @@ describe("annotations for a page of traces", () => {
         traceIds: [traceId],
       });
 
-      expect(
-        rows.find((row) => row.comment === "this output is wrong"),
-      ).toMatchObject({
+      expect(rows.find((row) => row.comment === "this output is wrong")).toMatchObject({
         anchorKind: "field",
         anchorId: "span-search",
         anchorPath: "output",
       });
-      expect(
-        rows.find((row) => row.comment === "the whole trace is off"),
-      ).toMatchObject({ anchorKind: null, anchorId: null, anchorPath: null });
+      expect(rows.find((row) => row.comment === "the whole trace is off")).toMatchObject({
+        anchorKind: null,
+        anchorId: null,
+        anchorPath: null,
+      });
     });
   });
 

@@ -36,14 +36,14 @@ function makeService(opts: { dedupAcquire?: boolean | null } = {}) {
     Promise.resolve(),
   );
 
-  const tryAcquireProcessingLock = vi.fn<
-    SpanDedupService["tryAcquireProcessingLock"]
-  >(() => Promise.resolve(opts.dedupAcquire ?? true));
-  const tryConfirmProcessed = vi.fn<SpanDedupService["tryConfirmProcessed"]>(
-    () => Promise.resolve(),
+  const tryAcquireProcessingLock = vi.fn<SpanDedupService["tryAcquireProcessingLock"]>(
+    () => Promise.resolve(opts.dedupAcquire ?? true),
   );
-  const tryReleaseOnFailure = vi.fn<SpanDedupService["tryReleaseOnFailure"]>(
-    () => Promise.resolve(),
+  const tryConfirmProcessed = vi.fn<SpanDedupService["tryConfirmProcessed"]>(() =>
+    Promise.resolve(),
+  );
+  const tryReleaseOnFailure = vi.fn<SpanDedupService["tryReleaseOnFailure"]>(() =>
+    Promise.resolve(),
   );
 
   const dedup: SpanDedupService = {
@@ -84,11 +84,7 @@ describe("TraceRequestCollectionService.ingestNormalizedSpan", () => {
 
         expect(result.status).toBe("collected");
         expect(recordSpan).toHaveBeenCalledTimes(1);
-        expect(tryConfirmProcessed).toHaveBeenCalledWith(
-          tenantId,
-          "trace_x",
-          "span_1",
-        );
+        expect(tryConfirmProcessed).toHaveBeenCalledWith(tenantId, "trace_x", "span_1");
       });
     });
   });
@@ -134,11 +130,7 @@ describe("TraceRequestCollectionService.ingestNormalizedSpan", () => {
         });
 
         expect(result.status).toBe("failed");
-        expect(tryReleaseOnFailure).toHaveBeenCalledWith(
-          tenantId,
-          "trace_x",
-          "span_1",
-        );
+        expect(tryReleaseOnFailure).toHaveBeenCalledWith(tenantId, "trace_x", "span_1");
       });
     });
   });

@@ -54,9 +54,7 @@ vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => harness.router,
 }));
 
-const { clearDrawerStack, getDrawerStack, useDrawer } = await import(
-  "../useDrawer"
-);
+const { clearDrawerStack, getDrawerStack, useDrawer } = await import("../useDrawer");
 
 /** What the address bar holds for the drawer, as the browser would show it. */
 function drawerInUrl(): Record<string, string> {
@@ -163,9 +161,7 @@ describe("given a drawer I dismissed earlier in the session", () => {
         result.current.openDrawer("traceV2Details", { traceId: "trace-2" });
       });
 
-      expect(getDrawerStack().map((entry) => entry.drawer)).toEqual([
-        "traceV2Details",
-      ]);
+      expect(getDrawerStack().map((entry) => entry.drawer)).toEqual(["traceV2Details"]);
 
       harness.thawQuery();
       act(() => result.current.goBack());
@@ -188,9 +184,7 @@ describe("given a dataset drawer open over the traces list", () => {
         result.current.openDrawer("traceV2Details", { traceId: "trace-2" });
       });
 
-      expect(getDrawerStack().map((entry) => entry.drawer)).toEqual([
-        "traceV2Details",
-      ]);
+      expect(getDrawerStack().map((entry) => entry.drawer)).toEqual(["traceV2Details"]);
 
       act(() => result.current.goBack());
 

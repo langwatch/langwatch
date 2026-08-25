@@ -36,12 +36,7 @@ interface RateLimiter {
 
 interface ResponseCache {
   get(key: string): Promise<Uint8Array | null>;
-  set(
-    key: string,
-    tag: string,
-    body: Uint8Array,
-    ttlSeconds: number,
-  ): Promise<void>;
+  set(key: string, tag: string, body: Uint8Array, ttlSeconds: number): Promise<void>;
   invalidateTag(tag: string): Promise<void>;
 }
 ```

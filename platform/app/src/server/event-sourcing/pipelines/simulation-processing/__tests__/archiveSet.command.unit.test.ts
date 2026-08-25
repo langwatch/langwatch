@@ -64,9 +64,7 @@ describe("ArchiveSetCommand (lw#3636)", () => {
       /** @scenario ArchiveSetCommand idempotency key collapses retries on the same set */
       it("collapses both invocations to the same idempotency key", async () => {
         const handler = new ArchiveSetCommand();
-        const a = await handler.handle(
-          makeArchiveSetCommand({ occurredAt: 1 }),
-        );
+        const a = await handler.handle(makeArchiveSetCommand({ occurredAt: 1 }));
         const b = await handler.handle(
           makeArchiveSetCommand({
             occurredAt: 2,

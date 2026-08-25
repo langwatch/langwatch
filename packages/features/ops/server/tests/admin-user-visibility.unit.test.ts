@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  mapUserToBackofficeRow,
-  type UserWithBackofficeIncludes,
-} from "../src";
+import { mapUserToBackofficeRow, type UserWithBackofficeIncludes } from "../src";
 
 /**
  * Pins the Backoffice Users list's project-visibility rule: a user who has
@@ -55,7 +52,7 @@ interface OrgWithTeams {
   name: string;
   slug: string;
   teams: Team[];
-};
+}
 
 function buildOrg(overrides: Partial<OrgWithTeams> = {}): OrgWithTeams {
   return {
@@ -67,9 +64,7 @@ function buildOrg(overrides: Partial<OrgWithTeams> = {}): OrgWithTeams {
   };
 }
 
-function buildTeam(
-  overrides: Partial<Team> = {},
-): Team {
+function buildTeam(overrides: Partial<Team> = {}): Team {
   return {
     id: "team_1",
     name: "Engineering",

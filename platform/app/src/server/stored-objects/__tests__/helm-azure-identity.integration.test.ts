@@ -219,8 +219,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
 
       // And the webhook label on each of those same three pod templates:
       // a count short here means one workload silently never gets a token.
-      const labelled =
-        out.match(/^\s*azure\.workload\.identity\/use: "true"$/gm) ?? [];
+      const labelled = out.match(/^\s*azure\.workload\.identity\/use: "true"$/gm) ?? [];
       expect(labelled).toHaveLength(0);
     });
 
@@ -396,8 +395,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       // call the app over HTTP and never reach storage themselves, and the
       // sibling "never binds the storage identity to cron pods" pins that
       // exclusion rather than leaving it to this count.
-      const labelled =
-        out.match(/^\s*azure\.workload\.identity\/use: "true"$/gm) ?? [];
+      const labelled = out.match(/^\s*azure\.workload\.identity\/use: "true"$/gm) ?? [];
       expect(labelled).toHaveLength(2);
     });
 
@@ -434,9 +432,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
           "--set",
           "app.dataplane.providers.azureBlob.authMode=nonsense",
         ]),
-      ).toMatch(
-        /must be one of sharedKey, workloadIdentity, managedIdentity, azureCli/,
-      );
+      ).toMatch(/must be one of sharedKey, workloadIdentity, managedIdentity, azureCli/);
     });
   });
 
@@ -465,9 +461,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
      * storage call. Failing at render moves that to deploy time.
      */
     it("refuses to render without a matching identity authority", () => {
-      expect(renderExpectingFailure(SOVEREIGN)).toMatch(
-        /not the Azure public cloud/,
-      );
+      expect(renderExpectingFailure(SOVEREIGN)).toMatch(/not the Azure public cloud/);
     });
 
     it("emits the authority and audience when they are configured", () => {
@@ -674,10 +668,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       "app.storedObjects.localFilesystem.enabled=false",
     ];
 
-    const MIGRATION = [
-      ...MIGRATION_WITHOUT_SERVICE_ACCOUNT,
-      ...IDENTITY_SERVICE_ACCOUNT,
-    ];
+    const MIGRATION = [...MIGRATION_WITHOUT_SERVICE_ACCOUNT, ...IDENTITY_SERVICE_ACCOUNT];
 
     /** @scenario "Historical Azure objects stay readable after moving writes to S3" */
     it("writes to S3 while keeping the Azure read settings", () => {
@@ -705,9 +696,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       const out = render(MIGRATION);
 
       // Without this the webhook never fires and the reads fail at runtime.
-      expect(
-        out.match(/azure\.workload\.identity\/use: "true"/g) ?? [],
-      ).toHaveLength(2);
+      expect(out.match(/azure\.workload\.identity\/use: "true"/g) ?? []).toHaveLength(2);
     });
 
     /** @scenario "Cron pods never receive the storage identity" */
@@ -745,9 +734,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
           "--set",
           "app.dataplane.legacyAzureRead=true",
         ]),
-      ).toMatch(
-        /legacyAzureRead is set but azureBlob is already the active provider/,
-      );
+      ).toMatch(/legacyAzureRead is set but azureBlob is already the active provider/);
     });
 
     /** @scenario "The chart rejects a legacy read flag aimed at the active provider" */
@@ -761,9 +748,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
           "--set",
           "app.dataplane.legacyS3ReadBucket=old-bucket",
         ]),
-      ).toMatch(
-        /legacyS3ReadBucket is set but awsS3 is already the active provider/,
-      );
+      ).toMatch(/legacyS3ReadBucket is set but awsS3 is already the active provider/);
     });
 
     /** @scenario "The chart rejects a legacy read flag aimed at the active provider" */
@@ -790,9 +775,9 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
         "global.serviceAccount.name=preexisting-identity",
       ]);
 
-      expect(
-        out.match(/serviceAccountName: preexisting-identity$/gm) ?? [],
-      ).toHaveLength(2);
+      expect(out.match(/serviceAccountName: preexisting-identity$/gm) ?? []).toHaveLength(
+        2,
+      );
       // create=false, so we must not manufacture the account.
       expect(out).not.toMatch(
         /kind: ServiceAccount\n[\s\S]{0,200}?name: preexisting-identity\n/,

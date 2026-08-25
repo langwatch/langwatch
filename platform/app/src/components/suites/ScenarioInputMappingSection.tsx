@@ -37,9 +37,7 @@ const SCENARIO_INPUT_INFO: Record<string, string> = {
 };
 
 /** The single scenario output field. */
-const SCENARIO_OUTPUT_FIELD: Variable[] = [
-  { identifier: "output", type: "str" },
-];
+const SCENARIO_OUTPUT_FIELD: Variable[] = [{ identifier: "output", type: "str" }];
 
 const SCENARIO_OUTPUT_INFO: Record<string, string> = {
   output: "The agent's response sent back to the scenario",
@@ -54,10 +52,7 @@ export type ScenarioInputMappingSectionProps = {
    */
   mappings: Record<string, FieldMapping>;
   /** Called with updated mappings in stored format (agent_input → scenario_source). */
-  onMappingChange: (
-    identifier: string,
-    mapping: FieldMapping | undefined,
-  ) => void;
+  onMappingChange: (identifier: string, mapping: FieldMapping | undefined) => void;
   /** Declared outputs for the agent. */
   outputs?: Variable[];
   /** Currently selected output field identifier for the scenario result. */
@@ -115,9 +110,7 @@ function buildAgentOutputSource(outputs: Variable[]): AvailableSource {
  * and the Save & Run drawer gate — keeps both sides in agreement on what
  * "mapped enough to run" means for the input half.
  */
-export function hasScenarioInputMapping(
-  mappings: Record<string, FieldMapping>,
-): boolean {
+export function hasScenarioInputMapping(mappings: Record<string, FieldMapping>): boolean {
   const mappedPaths = Object.values(mappings)
     .filter((m) => m.type === "source")
     .map((m) => m.path[0]);
@@ -169,8 +162,7 @@ export function ScenarioInputMappingSection({
   const hasOutputs = (outputs ?? []).length > 0;
   const autoOutputLabel = outputs?.[0]?.identifier ?? "output";
   // undefined = not yet set (auto-populate), "" = explicitly cleared, string = user selection
-  const selectedOutput =
-    outputField === undefined ? autoOutputLabel : outputField;
+  const selectedOutput = outputField === undefined ? autoOutputLabel : outputField;
   const hasOutputMapping = selectedOutput !== "" && hasOutputs;
 
   const outputDisplayMappings = useMemo<Record<string, FieldMapping>>(
@@ -246,9 +238,8 @@ export function ScenarioInputMappingSection({
           Scenario Mappings
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          Configure how this agent connects to the scenario framework. When run
-          as a scenario target, these mappings control which data flows in and
-          out.{" "}
+          Configure how this agent connects to the scenario framework. When run as a
+          scenario target, these mappings control which data flows in and out.{" "}
           <Link
             href="https://docs.langwatch.ai/features/scenarios"
             target="_blank"
@@ -285,12 +276,7 @@ export function ScenarioInputMappingSection({
           <VStack align="stretch" gap={1} marginTop={2}>
             {valueMappings.map(([identifier, mapping]) => (
               <Box key={identifier}>
-                <Text
-                  as="span"
-                  fontSize="xs"
-                  color="fg.muted"
-                  fontFamily="mono"
-                >
+                <Text as="span" fontSize="xs" color="fg.muted" fontFamily="mono">
                   {identifier}
                 </Text>
                 <Text as="span" fontSize="xs" color="fg.muted">

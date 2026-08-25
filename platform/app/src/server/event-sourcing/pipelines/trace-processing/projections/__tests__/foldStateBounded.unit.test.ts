@@ -5,10 +5,7 @@ import {
   MAX_PROCESSED_SPANS,
   TraceSummaryFoldProjection,
 } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * Regression guard for the O(n^2) fold incident: a single long-lived trace

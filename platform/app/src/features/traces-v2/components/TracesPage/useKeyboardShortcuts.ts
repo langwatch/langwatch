@@ -86,8 +86,7 @@ export const useFindShortcut = (): void => {
 const isInteractiveTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;
   if (isTextInput(target)) return true;
-  if (target.closest("[role='dialog'], [role='textbox'], [data-find-bar]"))
-    return true;
+  if (target.closest("[role='dialog'], [role='textbox'], [data-find-bar]")) return true;
   return false;
 };
 

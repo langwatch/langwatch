@@ -16,15 +16,7 @@
  */
 
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,

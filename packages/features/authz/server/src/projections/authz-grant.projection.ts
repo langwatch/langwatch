@@ -59,10 +59,7 @@ export abstract class GrantProjectionWriteStore implements AppendStore<GrantProj
     context: ProjectionStoreContext,
   ): Promise<void>;
 
-  bulkAppend?(
-    writes: GrantProjectionWrite[],
-    context: BulkAppendContext,
-  ): Promise<void>;
+  bulkAppend?(writes: GrantProjectionWrite[], context: BulkAppendContext): Promise<void>;
 }
 
 export const AUTHZ_GRANTS_WRITE_PROJECTION_NAME = "authzGrantsWrite" as const;
@@ -119,9 +116,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
         scopeId: data.scope.id,
         token: data.resource?.token ?? null,
         permission: data.resource?.permission ?? null,
-        resourceKind: data.resource
-          ? RESOURCE_KIND_TO_DB[data.resource.kind]
-          : null,
+        resourceKind: data.resource ? RESOURCE_KIND_TO_DB[data.resource.kind] : null,
         projectId: data.resource?.projectId ?? null,
         createdByUserId: data.resource?.createdByUserId ?? null,
         expiresAt: data.resource?.expiresAtMs

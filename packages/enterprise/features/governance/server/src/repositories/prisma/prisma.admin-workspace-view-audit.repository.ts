@@ -12,9 +12,7 @@ export class PrismaAdminWorkspaceViewAuditRepository extends AdminWorkspaceViewA
   }
 
   static create(database: object): PrismaAdminWorkspaceViewAuditRepository {
-    return new PrismaAdminWorkspaceViewAuditRepository(
-      database as PrismaClient,
-    );
+    return new PrismaAdminWorkspaceViewAuditRepository(database as PrismaClient);
   }
 
   async tryFindTarget(input: {

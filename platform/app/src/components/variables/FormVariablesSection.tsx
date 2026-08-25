@@ -23,10 +23,7 @@ type FormVariablesSectionProps = {
   /** Mappings for each variable */
   mappings?: Record<string, FieldMapping>;
   /** Callback when a mapping changes */
-  onMappingChange?: (
-    identifier: string,
-    mapping: FieldMapping | undefined,
-  ) => void;
+  onMappingChange?: (identifier: string, mapping: FieldMapping | undefined) => void;
   /** Whether in read-only mode */
   readOnly?: boolean;
   /** Set of variable identifiers that are missing required mappings (for highlighting) */
@@ -118,9 +115,7 @@ export const FormVariablesSection = ({
         // Removed a variable - find which one
         for (let i = 0; i < currentFields.length; i++) {
           const currentField = currentFields[i];
-          if (
-            !newVariables.some((v) => v.identifier === currentField?.identifier)
-          ) {
+          if (!newVariables.some((v) => v.identifier === currentField?.identifier)) {
             remove(i);
             break;
           }

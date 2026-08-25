@@ -9,13 +9,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Server } from "lucide-react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -53,10 +47,7 @@ const PRELOADED: FacetItem[] = [
 
 const neutral = (): FacetValueState => "neutral";
 
-function renderSection(props?: {
-  serverValueSearch?: boolean;
-  items?: FacetItem[];
-}) {
+function renderSection(props?: { serverValueSearch?: boolean; items?: FacetItem[] }) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <FacetSection
@@ -74,9 +65,7 @@ function renderSection(props?: {
 }
 
 const openSearchAndType = (text: string) => {
-  fireEvent.click(
-    screen.getByRole("button", { name: "Search SERVICE values" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Search SERVICE values" }));
   const input = screen.getByPlaceholderText(/Search or press Enter/i);
   fireEvent.change(input, { target: { value: text } });
   return input as HTMLInputElement;
@@ -234,9 +223,7 @@ describe("<FacetSection /> server-side value search", () => {
       openSearchAndType("finance");
 
       // Debounced: the spinner appears once the server query actually fires.
-      expect(
-        await screen.findByTestId("facet-search-spinner"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("facet-search-spinner")).toBeInTheDocument();
     });
   });
 });

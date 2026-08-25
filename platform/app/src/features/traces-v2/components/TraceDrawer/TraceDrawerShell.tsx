@@ -103,13 +103,9 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   // so the chrome stays usable on phones. We also cap any
   // persisted/default width against the current viewport so a width
   // remembered on a wide monitor never overflows a narrower window.
-  const viewportWidth =
-    typeof window !== "undefined" ? window.innerWidth : Infinity;
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : Infinity;
   const isCompactViewport = viewportWidth < 768;
-  const effectiveWidthPx = Math.min(
-    widthPx ?? DRAWER_DEFAULT_WIDTH_PX,
-    viewportWidth,
-  );
+  const effectiveWidthPx = Math.min(widthPx ?? DRAWER_DEFAULT_WIDTH_PX, viewportWidth);
   const contentWidthStyle = isCompactViewport
     ? undefined
     : {

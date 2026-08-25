@@ -65,8 +65,8 @@ describe("given the LWQL catalog and the ClickHouse migrations", () => {
   });
 
   it("no catalog view name collides with a migration-created object", () => {
-    const collisions = LWQL_VIEW_CATALOG.map((view) => view.name).filter(
-      (name) => migrationNames.has(name.toLowerCase()),
+    const collisions = LWQL_VIEW_CATALOG.map((view) => view.name).filter((name) =>
+      migrationNames.has(name.toLowerCase()),
     );
     expect(collisions).toEqual([]);
   });

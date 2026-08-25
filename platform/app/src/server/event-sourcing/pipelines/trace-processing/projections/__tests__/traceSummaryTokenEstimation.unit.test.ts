@@ -1,19 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary token estimation integration", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    extractSpy = vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    );
+    extractSpy = vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan");
     extractSpy.mockReturnValue(null);
   });
 
@@ -40,12 +34,8 @@ describe("applySpanToSummary token estimation integration", () => {
           "gen_ai.usage.input_tokens": 25,
           "gen_ai.usage.output_tokens": 12,
           "langwatch.tokens.estimated": true,
-          "gen_ai.input.messages": [
-            { role: "user", content: "Hello, how are you?" },
-          ],
-          "gen_ai.output.messages": [
-            { role: "assistant", content: "I'm doing well!" },
-          ],
+          "gen_ai.input.messages": [{ role: "user", content: "Hello, how are you?" }],
+          "gen_ai.output.messages": [{ role: "assistant", content: "I'm doing well!" }],
         },
       });
 
@@ -105,12 +95,8 @@ describe("applySpanToSummary token estimation integration", () => {
         spanAttributes: {
           "langwatch.span.type": "llm",
           "gen_ai.request.model": "gpt-4o-mini",
-          "gen_ai.input.messages": [
-            { role: "user", content: "Hello, how are you?" },
-          ],
-          "gen_ai.output.messages": [
-            { role: "assistant", content: "I'm doing well!" },
-          ],
+          "gen_ai.input.messages": [{ role: "user", content: "Hello, how are you?" }],
+          "gen_ai.output.messages": [{ role: "assistant", content: "I'm doing well!" }],
         },
       });
 

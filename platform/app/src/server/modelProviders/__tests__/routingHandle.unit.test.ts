@@ -26,10 +26,7 @@ const check = (input: string | null | undefined) =>
  * the test fails loudly if the shape ever stops matching.
  */
 function gatewayProviderFamilies(): string[] {
-  const repoRoot = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../../../..",
-  );
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
   const source = readFileSync(
     resolve(repoRoot, "services/aigateway/domain/provider.go"),
     "utf8",

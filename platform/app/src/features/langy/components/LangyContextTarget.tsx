@@ -42,10 +42,7 @@ export function LangyContextTarget({
   target,
   children,
 }: {
-  target:
-    | (LangyContextTargetDescriptor & { enabled?: boolean })
-    | null
-    | undefined;
+  target: (LangyContextTargetDescriptor & { enabled?: boolean }) | null | undefined;
   /** Exactly one element — the thing itself. Its props are merged, not replaced. */
   children: ReactElement<{ className?: string; style?: CSSProperties }>;
 }) {

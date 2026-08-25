@@ -1,10 +1,4 @@
-import fs, {
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  unlinkSync,
-  writeFileSync,
-} from "fs";
+import fs, { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "fs";
 import { createServer, request as httpRequest, type Server } from "http";
 import type { AddressInfo } from "net";
 import { tmpdir } from "os";
@@ -13,10 +7,7 @@ import { Readable } from "stream";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { serveStaticOrFallback } from "../static-handler";
-import {
-  readPublicAppConfig,
-  type PublicAppConfig,
-} from "../../runtime/public-config";
+import { readPublicAppConfig, type PublicAppConfig } from "../../runtime/public-config";
 
 const publicConfig: PublicAppConfig = {
   appBaseUrl: "https://app.example.com",
@@ -171,9 +162,7 @@ describe("serveStaticOrFallback", () => {
       expect(
         readPublicAppConfig({
           querySelector: () =>
-            content
-              ? ({ getAttribute: () => content } as unknown as Element)
-              : null,
+            content ? ({ getAttribute: () => content } as unknown as Element) : null,
         }),
       ).toEqual(publicConfig);
     });
@@ -315,9 +304,7 @@ describe("serveStaticOrFallback", () => {
           }
           const stream = new Readable({ read() {} });
           // Emit after the handler attaches its 'error' listener and pipes.
-          queueMicrotask(() =>
-            stream.emit("error", new Error("forced stream error")),
-          );
+          queueMicrotask(() => stream.emit("error", new Error("forced stream error")));
           return stream as unknown as ReturnType<typeof fs.createReadStream>;
         }) as typeof fs.createReadStream);
 

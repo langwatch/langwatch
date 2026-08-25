@@ -327,9 +327,9 @@ describe("given a cumulative series long enough to span several rollup buckets",
     it("counts every sample exactly once across the buckets", async () => {
       const chunked = await readRollups(chunkSeriesId);
 
-      expect(
-        chunked.reduce((total, row) => total + row.sourcePointCount, 0),
-      ).toBe(values.length);
+      expect(chunked.reduce((total, row) => total + row.sourcePointCount, 0)).toBe(
+        values.length,
+      );
     });
   });
 
@@ -411,14 +411,10 @@ describe("given a series whose chunk points have stored points between them", ()
 
   beforeAll(async () => {
     await repo.recomputeAffectedRollupsMany({
-      points: preStored.map((index) =>
-        sample({ seriesId: foldedSeriesId, index }),
-      ),
+      points: preStored.map((index) => sample({ seriesId: foldedSeriesId, index })),
     });
     await repo.recomputeAffectedRollupsMany({
-      points: folded.map((index) =>
-        sample({ seriesId: foldedSeriesId, index }),
-      ),
+      points: folded.map((index) => sample({ seriesId: foldedSeriesId, index })),
     });
     // The reference series never touches the folded entry point, for either
     // half. Seeding its pre-stored half with a chunk would have let a
@@ -450,9 +446,9 @@ describe("given a series whose chunk points have stored points between them", ()
   it("counts every sample exactly once across the buckets", async () => {
     const chunked = await readRollups(foldedSeriesId);
 
-    expect(
-      chunked.reduce((total, row) => total + row.sourcePointCount, 0),
-    ).toBe(values.length);
+    expect(chunked.reduce((total, row) => total + row.sourcePointCount, 0)).toBe(
+      values.length,
+    );
   });
 });
 
@@ -572,9 +568,9 @@ describe("given one chunk carrying two series staggered in time", () => {
     for (const seriesId of [earlySeriesId, lateSeriesId]) {
       const folded = await readRollups(seriesId);
 
-      expect(
-        folded.reduce((total, row) => total + row.sourcePointCount, 0),
-      ).toBe(values.length);
+      expect(folded.reduce((total, row) => total + row.sourcePointCount, 0)).toBe(
+        values.length,
+      );
     }
   });
 });

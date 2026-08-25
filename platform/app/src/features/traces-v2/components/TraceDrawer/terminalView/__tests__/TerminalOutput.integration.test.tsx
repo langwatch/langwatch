@@ -13,8 +13,7 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 // A real `git status` fragment: "main" is green, the modified line is red.
-const GIT_STATUS =
-  "On branch \x1b[32mmain\x1b[0m\n\x1b[31m\tmodified:   file.ts\x1b[0m";
+const GIT_STATUS = "On branch \x1b[32mmain\x1b[0m\n\x1b[31m\tmodified:   file.ts\x1b[0m";
 
 describe("TerminalOutput", () => {
   describe("given output containing ANSI escape codes", () => {
@@ -59,10 +58,7 @@ describe("TerminalOutput", () => {
   });
 
   describe("given output longer than the collapse threshold", () => {
-    const LONG_OUTPUT = Array.from(
-      { length: 20 },
-      (_, i) => `line ${i + 1}`,
-    ).join("\n");
+    const LONG_OUTPUT = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join("\n");
 
     it("shows only the first few lines and a fold marker naming how many are hidden", () => {
       const { container } = render(<TerminalOutput text={LONG_OUTPUT} />, {
@@ -70,9 +66,7 @@ describe("TerminalOutput", () => {
       });
       expect(container.textContent).toContain("line 1");
       expect(container.textContent).not.toContain("line 20");
-      expect(
-        screen.getByText(/… \+14 lines \(click to expand\)/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/… \+14 lines \(click to expand\)/)).toBeInTheDocument();
     });
 
     it("shows the rest when the fold marker is clicked", () => {
@@ -93,9 +87,7 @@ describe("TerminalOutput", () => {
     it("collapses it by size with a fold marker naming the hidden volume", () => {
       const { container } = render(<TerminalOutput text={BLOB} />, { wrapper });
       expect(container.textContent!.length).toBeLessThan(11_000);
-      expect(
-        screen.getByText(/… \+40k chars \(click to expand\)/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/… \+40k chars \(click to expand\)/)).toBeInTheDocument();
     });
 
     it("copies the complete text even while collapsed", () => {
@@ -140,12 +132,9 @@ describe("TerminalOutput", () => {
 
   describe("given an error stream", () => {
     it("still renders the output text", () => {
-      const { container } = render(
-        <TerminalOutput text={"npm ERR! boom"} isError />,
-        {
-          wrapper,
-        },
-      );
+      const { container } = render(<TerminalOutput text={"npm ERR! boom"} isError />, {
+        wrapper,
+      });
       expect(container.textContent).toContain("npm ERR! boom");
     });
   });

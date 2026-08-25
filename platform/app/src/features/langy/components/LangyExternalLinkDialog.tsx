@@ -104,8 +104,8 @@ export function LangyExternalLinkDialog({
                 </Text>
               </Box>
               <Dialog.Description fontSize="sm" color="fg.muted">
-                A link can read as one place and open another, so check the
-                address before you continue.
+                A link can read as one place and open another, so check the address before
+                you continue.
               </Dialog.Description>
             </VStack>
           </Dialog.Body>

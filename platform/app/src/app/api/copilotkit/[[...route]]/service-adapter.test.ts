@@ -59,8 +59,7 @@ const { generateOtelTraceIdMock } = vi.hoisted(() => ({
   generateOtelTraceIdMock: vi.fn<() => string>(),
 }));
 vi.mock("~/utils/trace", async () => {
-  const actual =
-    await vi.importActual<typeof import("~/utils/trace")>("~/utils/trace");
+  const actual = await vi.importActual<typeof import("~/utils/trace")>("~/utils/trace");
   return {
     ...actual,
     generateOtelTraceId: generateOtelTraceIdMock,
@@ -92,27 +91,21 @@ type StreamEvent =
  * so we satisfy that surface.
  */
 type MockEventSource = {
-  stream: (
-    callback: (eventStream$: MockEventStream) => Promise<void>,
-  ) => Promise<void>;
+  stream: (callback: (eventStream$: MockEventStream) => Promise<void>) => Promise<void>;
 };
 
 type MockEventStream = {
   sendTextMessageStart: (args: { messageId: string }) => void;
-  sendTextMessageContent: (args: {
-    messageId: string;
-    content: string;
-  }) => void;
+  sendTextMessageContent: (args: { messageId: string; content: string }) => void;
   sendTextMessageEnd: (args: { messageId: string }) => void;
   complete: () => void;
 };
 
 // `process()` typing requires the real RuntimeEventSource; our duck-typed mock
 // satisfies the runtime surface but not the structural type.
-type RequestForProcess = Omit<
-  CopilotRuntimeChatCompletionRequest,
-  "eventSource"
-> & { eventSource: MockEventSource };
+type RequestForProcess = Omit<CopilotRuntimeChatCompletionRequest, "eventSource"> & {
+  eventSource: MockEventSource;
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -175,9 +168,7 @@ async function runProcess(
   adapter: PromptStudioAdapter,
   request: RequestForProcess,
 ): Promise<CopilotRuntimeChatCompletionResponse> {
-  return adapter.process(
-    request as unknown as CopilotRuntimeChatCompletionRequest,
-  );
+  return adapter.process(request as unknown as CopilotRuntimeChatCompletionRequest);
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -249,10 +240,7 @@ describe("PromptStudioAdapter", () => {
 
     function lastPostedEvent(): any {
       const mocked = vi.mocked(studioBackendPostEvent);
-      expect(
-        mocked,
-        "studioBackendPostEvent must have been called",
-      ).toHaveBeenCalled();
+      expect(mocked, "studioBackendPostEvent must have been called").toHaveBeenCalled();
       // The component_state_change consumer is async; we only need the
       // envelope shape that was passed in. The `!` propagates the
       // toHaveBeenCalled guarantee past TS's noUncheckedIndexedAccess.
@@ -304,8 +292,7 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
-      const sent: { role: string; content: string }[] =
-        envelope.payload.inputs.messages;
+      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
       // Exactly one user turn — the template's `{{input}}` slot, NOT a
       // duplicated live "test7" turn. Server-side render will resolve
       // the placeholder against inputs.input.
@@ -335,8 +322,7 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
-      const sent: { role: string; content: string }[] =
-        envelope.payload.inputs.messages;
+      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
       // Prior live history (older question + older reply) FIRST, then
       // the template's `{{input}}` slot which renders to the latest
       // "test7" turn at the END. Pre-2026-05-17 the order was inverted
@@ -383,8 +369,7 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
-      const sent: { role: string; content: string }[] =
-        envelope.payload.inputs.messages;
+      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
       // Chronological history (everything BEFORE the latest user turn)
       // + template's `{{input}}` slot at the end, which the downstream
       // render will resolve to "huh?".
@@ -422,8 +407,7 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
-      const sent: { role: string; content: string }[] =
-        envelope.payload.inputs.messages;
+      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
       // ONE user turn — the template's explicit "answer it". The
       // live "how much is 2+3" is absorbed into inputs.input, not
       // appended as a second user turn.
@@ -455,8 +439,7 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
-      const sent: { role: string; content: string }[] =
-        envelope.payload.inputs.messages;
+      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
       expect(sent).toEqual([
         { role: "user", content: "answer it" },
         { role: "user", content: "how much is 2+3" },
@@ -540,10 +523,7 @@ describe("PromptStudioAdapter", () => {
     it("streams a Configuration Error message", async () => {
       const { eventSource, collect } = createMockEventSource();
 
-      await runProcess(
-        adapter,
-        buildRequest({ model: "{not valid json", eventSource }),
-      );
+      await runProcess(adapter, buildRequest({ model: "{not valid json", eventSource }));
 
       const events = await collect();
 
@@ -567,10 +547,7 @@ describe("PromptStudioAdapter", () => {
        */
       const { eventSource, collect } = createMockEventSource();
 
-      await runProcess(
-        adapter,
-        buildRequest({ model: "{not valid json", eventSource }),
-      );
+      await runProcess(adapter, buildRequest({ model: "{not valid json", eventSource }));
 
       const events = await collect();
       const startEvent = events.find((e) => e.type === "TextMessageStart");
@@ -585,10 +562,7 @@ describe("PromptStudioAdapter", () => {
     it("uses the same messageId across start, content, and end events", async () => {
       const { eventSource, collect } = createMockEventSource();
 
-      await runProcess(
-        adapter,
-        buildRequest({ model: "{not valid json", eventSource }),
-      );
+      await runProcess(adapter, buildRequest({ model: "{not valid json", eventSource }));
 
       const events = await collect();
       const ids = new Set(events.map((e) => e.messageId));

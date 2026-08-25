@@ -94,9 +94,7 @@ export function ScenarioTable({
       columnHelper.accessor("updatedAt", {
         header: "Updated",
         cell: (info) => (
-          <Text color="fg.muted">
-            {formatTimeAgo(info.getValue().getTime())}
-          </Text>
+          <Text color="fg.muted">{formatTimeAgo(info.getValue().getTime())}</Text>
         ),
       }),
       columnHelper.display({
@@ -147,8 +145,7 @@ export function ScenarioTable({
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: (updater) => {
-      const newFilters =
-        typeof updater === "function" ? updater(columnFilters) : updater;
+      const newFilters = typeof updater === "function" ? updater(columnFilters) : updater;
       onColumnFiltersChange(newFilters);
     },
     getCoreRowModel: getCoreRowModel(),
@@ -177,16 +174,9 @@ export function ScenarioTable({
                 }
               >
                 <HStack gap={1}>
-                  {flexRender(
-                    header.column.columnDef.header,
-                    header.getContext(),
-                  )}
-                  {header.column.getIsSorted() === "asc" && (
-                    <ChevronUp size={14} />
-                  )}
-                  {header.column.getIsSorted() === "desc" && (
-                    <ChevronDown size={14} />
-                  )}
+                  {flexRender(header.column.columnDef.header, header.getContext())}
+                  {header.column.getIsSorted() === "asc" && <ChevronUp size={14} />}
+                  {header.column.getIsSorted() === "desc" && <ChevronDown size={14} />}
                 </HStack>
               </Table.ColumnHeader>
             ))}

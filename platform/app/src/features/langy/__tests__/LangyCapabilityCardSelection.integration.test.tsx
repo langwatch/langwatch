@@ -140,9 +140,7 @@ function settledCall({
   };
 }
 
-function renderCall(
-  call: Parameters<typeof LangyCapabilityRenderer>[0]["call"],
-) {
+function renderCall(call: Parameters<typeof LangyCapabilityRenderer>[0]["call"]) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });

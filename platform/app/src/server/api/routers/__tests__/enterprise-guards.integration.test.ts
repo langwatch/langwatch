@@ -772,9 +772,7 @@ describe("enterprise feature guards", () => {
   describe("when plan provider fails", () => {
     /** @scenario Guard fails closed when plan lookup fails */
     it("denies access to role.create", async () => {
-      mockGetActivePlan.mockRejectedValue(
-        new Error("Plan provider unavailable"),
-      );
+      mockGetActivePlan.mockRejectedValue(new Error("Plan provider unavailable"));
       const caller = createCaller();
 
       await expect(

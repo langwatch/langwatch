@@ -59,9 +59,7 @@ function resolutionWinner(rows: SubscriptionRow[]): SubscriptionRow {
   return [...rows].sort(compareBySubscriptionOrder)[0]!;
 }
 
-function groupByOrganization(
-  rows: SubscriptionRow[],
-): Map<string, SubscriptionRow[]> {
+function groupByOrganization(rows: SubscriptionRow[]): Map<string, SubscriptionRow[]> {
   const byOrganization = new Map<string, SubscriptionRow[]>();
   for (const row of rows) {
     const existing = byOrganization.get(row.organizationId);
@@ -91,9 +89,7 @@ function reportDuplicateOrganization(
   const plans = new Set(rows.map((row) => row.plan ?? "unknown"));
   console.log("");
   console.log(`organization ${organizationId}`);
-  console.log(
-    `  rows: ${rows.length}, distinct plans: ${[...plans].join(", ")}`,
-  );
+  console.log(`  rows: ${rows.length}, distinct plans: ${[...plans].join(", ")}`);
   for (const row of rows) {
     const marker = row.id === winner.id ? "picked " : "       ";
     console.log(
@@ -106,9 +102,7 @@ function reportDuplicateOrganization(
 
 function reportActive(active: SubscriptionRow[]): void {
   const byOrganization = groupByOrganization(active);
-  const duplicated = [...byOrganization.entries()].filter(
-    ([, rows]) => rows.length > 1,
-  );
+  const duplicated = [...byOrganization.entries()].filter(([, rows]) => rows.length > 1);
 
   console.log(`active subscriptions: ${active.length}`);
   console.log(`organizations holding one: ${byOrganization.size}`);
@@ -126,9 +120,7 @@ function reportPending(pending: SubscriptionRow[]): void {
     `organizations with a pending subscription: ${groupByOrganization(pending).size}`,
   );
   const pendingByPlan = countBy(pending, (row) => row.plan ?? "unknown");
-  for (const [plan, count] of [...pendingByPlan.entries()].sort(
-    (a, b) => b[1] - a[1],
-  )) {
+  for (const [plan, count] of [...pendingByPlan.entries()].sort((a, b) => b[1] - a[1])) {
     console.log(`  ${plan.padEnd(28)} ${count}`);
   }
   const oldestPending = pending

@@ -13,21 +13,15 @@ const { resolvePathname, buildUrl } = await vi.importActual<
 describe("resolvePathname()", () => {
   describe("when path matches a project route", () => {
     it("converts /my-project/messages to /[project]/messages", () => {
-      expect(resolvePathname("/my-project/messages")).toBe(
-        "/[project]/messages",
-      );
+      expect(resolvePathname("/my-project/messages")).toBe("/[project]/messages");
     });
 
     it("converts /my-project/analytics to /[project]/analytics", () => {
-      expect(resolvePathname("/my-project/analytics")).toBe(
-        "/[project]/analytics",
-      );
+      expect(resolvePathname("/my-project/analytics")).toBe("/[project]/analytics");
     });
 
     it("converts /my-project/evaluations to /[project]/evaluations", () => {
-      expect(resolvePathname("/my-project/evaluations")).toBe(
-        "/[project]/evaluations",
-      );
+      expect(resolvePathname("/my-project/evaluations")).toBe("/[project]/evaluations");
     });
 
     it("converts /my-project/online-evaluations to /[project]/online-evaluations", () => {
@@ -41,9 +35,7 @@ describe("resolvePathname()", () => {
     // compares against the pattern. The sidebar lost its active state on both
     // of these that way.
     it("converts /my-project/sessions to /[project]/sessions", () => {
-      expect(resolvePathname("/my-project/sessions")).toBe(
-        "/[project]/sessions",
-      );
+      expect(resolvePathname("/my-project/sessions")).toBe("/[project]/sessions");
     });
 
     it("converts /my-project/pull-requests to /[project]/pull-requests", () => {
@@ -61,9 +53,9 @@ describe("resolvePathname()", () => {
     });
 
     it("converts /my-project/messages/trace-abc/traceDetails to /[project]/messages/[trace]/[openTab]", () => {
-      expect(
-        resolvePathname("/my-project/messages/trace-abc/traceDetails"),
-      ).toBe("/[project]/messages/[trace]/[openTab]");
+      expect(resolvePathname("/my-project/messages/trace-abc/traceDetails")).toBe(
+        "/[project]/messages/[trace]/[openTab]",
+      );
     });
   });
 
@@ -109,17 +101,13 @@ describe("resolvePathname()", () => {
 
   describe("when path matches a catch-all route", () => {
     it("converts /settings/models/foo to /settings/[[...path]]", () => {
-      expect(resolvePathname("/settings/models/foo")).toBe(
-        "/settings/[[...path]]",
-      );
+      expect(resolvePathname("/settings/models/foo")).toBe("/settings/[[...path]]");
     });
   });
 
   describe("when path has no match", () => {
     it("returns the path unchanged", () => {
-      expect(resolvePathname("/unknown/deeply/nested")).toBe(
-        "/unknown/deeply/nested",
-      );
+      expect(resolvePathname("/unknown/deeply/nested")).toBe("/unknown/deeply/nested");
     });
   });
 });

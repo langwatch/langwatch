@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  type GatewayBudget,
-  Prisma,
-  type PrismaClient,
-} from "~/generated/prisma/client";
+import { type GatewayBudget, Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 import type {
   GatewayBudgetClickHouseRepository,
@@ -99,9 +95,7 @@ describe("GatewayBudgetService.check", () => {
   describe("when projected spend stays well under limit", () => {
     it("returns allow without warnings", async () => {
       const sut = GatewayBudgetService.create(
-        mockPrismaWithBudgets([
-          stubBudget({ spentUsd: new Prisma.Decimal("10.00") }),
-        ]),
+        mockPrismaWithBudgets([stubBudget({ spentUsd: new Prisma.Decimal("10.00") })]),
       );
 
       const result = await sut.check({ ...baseCheck, projectedCostUsd: 5 });
@@ -113,9 +107,7 @@ describe("GatewayBudgetService.check", () => {
   describe("when projected spend crosses the 80% threshold on a BLOCK budget", () => {
     it("returns soft_warn — warning but not blocked", async () => {
       const sut = GatewayBudgetService.create(
-        mockPrismaWithBudgets([
-          stubBudget({ spentUsd: new Prisma.Decimal("75.00") }),
-        ]),
+        mockPrismaWithBudgets([stubBudget({ spentUsd: new Prisma.Decimal("75.00") })]),
       );
 
       const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
@@ -129,9 +121,7 @@ describe("GatewayBudgetService.check", () => {
     /** @scenario Hard-block budget returns 402 when spent >= limit */
     it("returns hard_block with a descriptive reason", async () => {
       const sut = GatewayBudgetService.create(
-        mockPrismaWithBudgets([
-          stubBudget({ spentUsd: new Prisma.Decimal("95.00") }),
-        ]),
+        mockPrismaWithBudgets([stubBudget({ spentUsd: new Prisma.Decimal("95.00") })]),
       );
 
       const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
@@ -257,10 +247,7 @@ describe("GatewayBudgetService.check", () => {
 
       expect(result.decision).toBe("allow");
       expect(result.scopes).toHaveLength(2);
-      expect(result.scopes.map((s) => s.scope).sort()).toEqual([
-        "organization",
-        "team",
-      ]);
+      expect(result.scopes.map((s) => s.scope).sort()).toEqual(["organization", "team"]);
       expect(result.scopes[0]).toHaveProperty("spentUsd");
       expect(result.scopes[0]).toHaveProperty("limitUsd");
     });
@@ -320,10 +307,8 @@ describe("GatewayBudgetService.getDetail", () => {
     budget: GatewayBudget | null,
     scopeRow: Record<string, unknown> | null,
   ): PrismaClient {
-    const targetRows =
-      budget && scopeRow ? [{ id: budget.scopeId, ...scopeRow }] : [];
-    const rowsFor = (kind: string) =>
-      budget?.scopeType === kind ? targetRows : [];
+    const targetRows = budget && scopeRow ? [{ id: budget.scopeId, ...scopeRow }] : [];
+    const rowsFor = (kind: string) => (budget?.scopeType === kind ? targetRows : []);
     return {
       gatewayBudget: {
         findFirst: vi.fn(async () => budget),
@@ -401,10 +386,10 @@ describe("GatewayBudgetService.getDetail", () => {
       // The VK's PROJECT scope points at project_01, whose slug comes
       // back from the batch resolver's slug map.
       const sut = GatewayBudgetService.create(
-        mockPrismaWithDetail(
-          stubBudget({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }),
-          { name: "prod-openai", displayPrefix: "lw_live_abc" },
-        ),
+        mockPrismaWithDetail(stubBudget({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }), {
+          name: "prod-openai",
+          displayPrefix: "lw_live_abc",
+        }),
       );
       const detail = await sut.getDetail("b_01", "org_01");
       expect(detail?.scopeTarget).toEqual({
@@ -420,20 +405,20 @@ describe("GatewayBudgetService.getDetail", () => {
   describe("when scope is PRINCIPAL", () => {
     it("prefers user.name but falls back to email then id", async () => {
       const sut1 = GatewayBudgetService.create(
-        mockPrismaWithDetail(
-          stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }),
-          { name: "Alex Chen", email: "alex@example.com" },
-        ),
+        mockPrismaWithDetail(stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }), {
+          name: "Alex Chen",
+          email: "alex@example.com",
+        }),
       );
       expect((await sut1.getDetail("b_01", "org_01"))?.scopeTarget.name).toBe(
         "Alex Chen",
       );
 
       const sut2 = GatewayBudgetService.create(
-        mockPrismaWithDetail(
-          stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }),
-          { name: null, email: "alex@example.com" },
-        ),
+        mockPrismaWithDetail(stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }), {
+          name: null,
+          email: "alex@example.com",
+        }),
       );
       expect((await sut2.getDetail("b_01", "org_01"))?.scopeTarget.name).toBe(
         "alex@example.com",
@@ -445,9 +430,7 @@ describe("GatewayBudgetService.getDetail", () => {
           null,
         ),
       );
-      expect((await sut3.getDetail("b_01", "org_01"))?.scopeTarget.name).toBe(
-        "user_42",
-      );
+      expect((await sut3.getDetail("b_01", "org_01"))?.scopeTarget.name).toBe("user_42");
     });
   });
 
@@ -457,10 +440,7 @@ describe("GatewayBudgetService.getDetail", () => {
       // lookup) the resolver must not null-pointer-crash. Detail page
       // should still render.
       const sut = GatewayBudgetService.create(
-        mockPrismaWithDetail(
-          stubBudget({ scopeType: "TEAM", scopeId: "team_01" }),
-          null,
-        ),
+        mockPrismaWithDetail(stubBudget({ scopeType: "TEAM", scopeId: "team_01" }), null),
       );
       const detail = await sut.getDetail("b_01", "org_01");
       expect(detail?.scopeTarget.name).toBe("team_01");

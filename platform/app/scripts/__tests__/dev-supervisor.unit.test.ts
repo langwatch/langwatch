@@ -14,13 +14,7 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import {
-  chmodSync,
-  existsSync,
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -76,11 +70,7 @@ const readyFile = () => path.join(scratch, "stack-is-up");
  */
 function writeStack(body: string): string {
   const file = path.join(scratch, `${marker}-stack.sh`);
-  writeFileSync(
-    file,
-    `#!/bin/bash\ntouch ${asBashWord(readyFile())}\n${body}\n`,
-    "utf8",
-  );
+  writeFileSync(file, `#!/bin/bash\ntouch ${asBashWord(readyFile())}\n${body}\n`, "utf8");
   chmodSync(file, 0o755);
   return file;
 }
@@ -355,9 +345,7 @@ describe("dev stack supervisor", () => {
 
       /** @scenario "A command still runs when it cannot be supervised" */
       it("reports a command it cannot start rather than hanging", () => {
-        const result = runSupervised([
-          path.join(scratch, `${marker}-does-not-exist`),
-        ]);
+        const result = runSupervised([path.join(scratch, `${marker}-does-not-exist`)]);
 
         expect(result.status).toBe(127);
         expect(result.stderr).toContain("could not start");

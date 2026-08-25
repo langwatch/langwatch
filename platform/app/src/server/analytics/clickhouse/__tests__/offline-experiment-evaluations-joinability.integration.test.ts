@@ -273,8 +273,7 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
           ...baseInput,
           series: [
             {
-              metric:
-                "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg",
               key: NUMERIC_EVALUATOR_ID,
             },
@@ -320,8 +319,7 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
           ...baseInput,
           series: [
             {
-              metric:
-                "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+              metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg",
               key: BOOL_EVALUATOR_ID,
             },

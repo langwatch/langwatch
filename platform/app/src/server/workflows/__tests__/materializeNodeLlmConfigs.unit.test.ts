@@ -77,9 +77,7 @@ describe("materializeNodeLlmConfigs", () => {
   });
 
   it("propagates unexpected resolver failures instead of pinning a model", async () => {
-    vi.mocked(resolveModelForFeature).mockRejectedValue(
-      new Error("database is down"),
-    );
+    vi.mocked(resolveModelForFeature).mockRejectedValue(new Error("database is down"));
     const dsl = dslWith(undefined);
 
     await expect(

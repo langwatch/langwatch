@@ -20,9 +20,7 @@ import type { TraceAnalyticsRepository } from "./trace-analytics.repository";
 
 const TABLE_NAME = "trace_analytics" as const;
 
-const logger = createLogger(
-  "langwatch:app-layer:traces:trace-analytics-repository",
-);
+const logger = createLogger("langwatch:app-layer:traces:trace-analytics-repository");
 
 /**
  * ClickHouse write shape for the slim `trace_analytics` table (ADR-034 Phase 2,
@@ -118,9 +116,7 @@ function toClickHouseRecord(
     NonBilledCost: row.nonBilledCost,
     TotalDurationMs: String(Math.round(row.totalDurationMs)),
     TimeToFirstTokenMs:
-      row.timeToFirstTokenMs !== null
-        ? Math.round(row.timeToFirstTokenMs)
-        : null,
+      row.timeToFirstTokenMs !== null ? Math.round(row.timeToFirstTokenMs) : null,
     TokensPerSecond:
       row.tokensPerSecond !== null ? Math.round(row.tokensPerSecond) : null,
     PromptTokens: row.promptTokens,
@@ -135,18 +131,12 @@ function toClickHouseRecord(
 
     SpanCount: Math.max(0, Math.round(row.spanCount)),
     AnnotationIds: row.annotationIds,
-    RootSpanStartTimeMs: String(
-      Math.max(0, Math.round(row.rootSpanStartTimeMs)),
-    ),
+    RootSpanStartTimeMs: String(Math.max(0, Math.round(row.rootSpanStartTimeMs))),
     TraceNameFromFallback: row.traceNameFromFallback,
     RootMetadataFromFallback: row.rootMetadataFromFallback,
     TraceNameUserOverridden: row.traceNameUserOverridden,
-    LastEventOccurredAt: String(
-      Math.max(0, Math.round(row.lastEventOccurredAt)),
-    ),
-    EarliestSpanStartMs: String(
-      Math.max(0, Math.round(row.earliestSpanStartMs)),
-    ),
+    LastEventOccurredAt: String(Math.max(0, Math.round(row.lastEventOccurredAt))),
+    EarliestSpanStartMs: String(Math.max(0, Math.round(row.earliestSpanStartMs))),
 
     AppliedEventIds: [...appliedEventIds],
 
@@ -158,9 +148,7 @@ function toClickHouseRecord(
   };
 }
 
-export class TraceAnalyticsClickHouseRepository
-  implements TraceAnalyticsRepository
-{
+export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async upsert(
@@ -300,9 +288,7 @@ export class TraceAnalyticsClickHouseRepository
       } | null>({
         table: TABLE_NAME,
         hintMs: window !== undefined ? (window.fromMs + window.toMs) / 2 : null,
-        ...(window !== undefined
-          ? { windowMs: (window.toMs - window.fromMs) / 2 }
-          : {}),
+        ...(window !== undefined ? { windowMs: (window.toMs - window.fromMs) / 2 } : {}),
         fallback: "none",
         isEmpty: (result) => result === null,
         run: async (fragment) =>
@@ -442,9 +428,7 @@ export class TraceAnalyticsClickHouseRepository
       query_params: {
         tenantId,
         traceId,
-        ...(window !== undefined
-          ? { from: window.fromMs, to: window.toMs }
-          : {}),
+        ...(window !== undefined ? { from: window.fromMs, to: window.toMs } : {}),
       },
       format: "JSONEachRow",
     });
@@ -521,11 +505,9 @@ function fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
       asNumber(record.SpanCount) > 0 ||
       asNumber(record.EarliestSpanStartMs) > 0 ||
       !["", "0"].includes(
-        asStringMap(record.Attributes)["langwatch.reserved.log_record_count"] ??
-          "",
+        asStringMap(record.Attributes)["langwatch.reserved.log_record_count"] ?? "",
       ) ||
-      String(record.Version ?? "") <
-        TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+      String(record.Version ?? "") < TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
 
     spanCount: asNumber(record.SpanCount),
     annotationIds: asStringArray(record.AnnotationIds),

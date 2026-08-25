@@ -28,9 +28,7 @@ export function AgentLabel({ agent }: { agent: string }) {
           height="14px"
           objectFit="contain"
           _dark={
-            preset.darkModeInvert
-              ? { filter: "invert(1) hue-rotate(180deg)" }
-              : undefined
+            preset.darkModeInvert ? { filter: "invert(1) hue-rotate(180deg)" } : undefined
           }
         />
       ) : null}

@@ -35,9 +35,7 @@ export function RunViaApiButton({
   projectSlug?: string;
 }) {
   const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://app.langwatch.ai";
+    typeof window !== "undefined" ? window.location.origin : "https://app.langwatch.ai";
 
   const { dataSource, setDataSource, tabs } = useRunViaApiTabs(
     ({ lang, dataSource: source }) =>
@@ -59,9 +57,7 @@ export function RunViaApiButton({
       snippets={[]}
       targets={[]}
       tabs={tabs}
-      controls={
-        <DataSourcePicker value={dataSource} onChange={setDataSource} />
-      }
+      controls={<DataSourcePicker value={dataSource} onChange={setDataSource} />}
       title="Run via API"
       description="Trigger this workflow's evaluation through the LangWatch API and read the per-row results back."
     >

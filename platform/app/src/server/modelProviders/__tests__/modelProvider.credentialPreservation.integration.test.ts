@@ -143,11 +143,8 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
 
     async function storedKeysOf(id: string) {
       const rows = await service().getProjectModelProviders(projectId, true);
-      const row = Object.values(rows).find(
-        (r) => (r as { id?: string }).id === id,
-      );
-      return (row as { customKeys?: Record<string, unknown> } | undefined)
-        ?.customKeys;
+      const row = Object.values(rows).find((r) => (r as { id?: string }).id === id);
+      return (row as { customKeys?: Record<string, unknown> } | undefined)?.customKeys;
     }
 
     describe("given a provider whose API key is already on file", () => {
@@ -214,9 +211,9 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
       // record `storedKeysOf` uses: these cases create several azure rows in
       // one project, and only one of them wins that collapse.
       async function keysById(id: string) {
-        const row = await new ModelProviderRepository(
-          prisma,
-        ).findByIdWithDecryptedKeys(id);
+        const row = await new ModelProviderRepository(prisma).findByIdWithDecryptedKeys(
+          id,
+        );
         return row?.customKeys;
       }
 
@@ -489,38 +486,37 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
             },
             rejectedWith: /invalid api key configuration/i,
           },
-        ])("refuses it for $provider and keeps the stored credentials", async ({
-          provider,
-          stored,
-          rejectedWith,
-        }) => {
-          const created = await service().updateModelProvider(
-            {
-              projectId,
-              provider,
-              enabled: true,
-              customKeys: stored,
-              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-            },
-            ctx(),
-          );
-
-          await expect(
-            service().updateModelProvider(
+        ])(
+          "refuses it for $provider and keeps the stored credentials",
+          async ({ provider, stored, rejectedWith }) => {
+            const created = await service().updateModelProvider(
               {
                 projectId,
-                id: created.id,
                 provider,
                 enabled: true,
-                customKeys: { "x-tenant": "acme" },
+                customKeys: stored,
                 scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
               },
               ctx(),
-            ),
-          ).rejects.toThrow(rejectedWith);
+            );
 
-          expect(await keysById(created.id)).toEqual(stored);
-        });
+            await expect(
+              service().updateModelProvider(
+                {
+                  projectId,
+                  id: created.id,
+                  provider,
+                  enabled: true,
+                  customKeys: { "x-tenant": "acme" },
+                  scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+                },
+                ctx(),
+              ),
+            ).rejects.toThrow(rejectedWith);
+
+            expect(await keysById(created.id)).toEqual(stored);
+          },
+        );
       });
     });
 
@@ -636,9 +632,9 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
             ctx(),
           );
 
-          const row = await new ModelProviderRepository(
-            prisma,
-          ).findByIdWithDecryptedKeys(created.id);
+          const row = await new ModelProviderRepository(prisma).findByIdWithDecryptedKeys(
+            created.id,
+          );
           expect(row?.customKeys).toEqual({
             AZURE_OPENAI_API_KEY: "sk-fresh",
             AZURE_OPENAI_ENDPOINT: "https://acme3.openai.azure.com",

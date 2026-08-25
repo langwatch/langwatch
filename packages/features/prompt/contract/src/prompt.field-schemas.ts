@@ -1,15 +1,31 @@
 import { z } from "zod";
 import { SchemaVersion } from "./prompt.enums";
 
-const LlmConfigInputTypes = ["str", "float", "bool", "image", "list", "list[str]", "list[float]", "list[int]", "list[bool]", "dict", "chat_messages"] as const;
+const LlmConfigInputTypes = [
+  "str",
+  "float",
+  "bool",
+  "image",
+  "list",
+  "list[str]",
+  "list[float]",
+  "list[int]",
+  "list[bool]",
+  "dict",
+  "chat_messages",
+] as const;
 const LlmConfigOutputTypes = ["str", "float", "bool", "json_schema"] as const;
 export const nodeDatasetSchema = z.object({
   id: z.string().optional(),
   name: z.string().optional(),
-  inline: z.object({
-    records: z.record(z.string(), z.array(z.unknown())),
-    columnTypes: z.array(z.object({ id: z.string().optional(), name: z.string(), type: z.string() })),
-  }).optional(),
+  inline: z
+    .object({
+      records: z.record(z.string(), z.array(z.unknown())),
+      columnTypes: z.array(
+        z.object({ id: z.string().optional(), name: z.string(), type: z.string() }),
+      ),
+    })
+    .optional(),
 });
 
 /**
@@ -127,9 +143,7 @@ export const schemaVersionSchema = z.nativeEnum(SchemaVersion);
 export function deriveResponseFormatFromOutputs(
   outputs: z.infer<typeof outputsSchema>[],
 ): z.infer<typeof responseFormatSchema> | undefined {
-  const jsonSchemaOutput = outputs.find(
-    (o) => o.type === "json_schema" && o.json_schema,
-  );
+  const jsonSchemaOutput = outputs.find((o) => o.type === "json_schema" && o.json_schema);
   if (!jsonSchemaOutput?.json_schema) return undefined;
 
   return {
@@ -146,19 +160,17 @@ export function deriveResponseFormatFromOutputs(
 // recursive schema as a named $ref; unregistered recursion is a hard error
 // at spec build time.
 const jsonValue: z.ZodType<unknown> = z.lazy(() =>
-    z.union([
-      z.string(),
-      z.number(),
-      z.boolean(),
-      z.null(),
-      z.array(jsonValue),
-      z.record(z.string(), jsonValue),
-    ]),
-  );
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(jsonValue),
+    z.record(z.string(), jsonValue),
+  ]),
+);
 
-export const runtimeParametersSchema = z
-  .record(z.string(), jsonValue)
-  .default({});
+export const runtimeParametersSchema = z.record(z.string(), jsonValue).default({});
 
 /**
  * Extended runtime input schema including a value for execution time.

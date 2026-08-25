@@ -8,9 +8,7 @@ const service = new SpanNormalizationPipelineService(
   new CanonicalizeSpanAttributesService(),
 );
 
-function makeOtlpSpanWithEvaluation(
-  evalPayload: Record<string, unknown>,
-): OtlpSpan {
+function makeOtlpSpanWithEvaluation(evalPayload: Record<string, unknown>): OtlpSpan {
   return {
     traceId: "aaaa0000000000000000000000000001",
     spanId: "bbbb000000000001",
@@ -50,19 +48,14 @@ describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
         label: "safe",
       });
 
-      const normalized = service.normalizeSpanReceived(
-        "tenant-1",
-        otlpSpan,
-        null,
-        null,
-      );
+      const normalized = service.normalizeSpanReceived("tenant-1", otlpSpan, null, null);
 
       expect(normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe(
         "toxicity",
       );
-      expect(
-        normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE],
-      ).toBe(0.95);
+      expect(normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE]).toBe(
+        0.95,
+      );
     });
 
     it("does not set langwatch.reserved.evaluations (no metadata leakage)", () => {
@@ -71,12 +64,7 @@ describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
         score: 1,
       });
 
-      const normalized = service.normalizeSpanReceived(
-        "tenant-1",
-        otlpSpan,
-        null,
-        null,
-      );
+      const normalized = service.normalizeSpanReceived("tenant-1", otlpSpan, null, null);
 
       expect(
         normalized.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS],
@@ -89,12 +77,7 @@ describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
         score: 1,
       });
 
-      const normalized = service.normalizeSpanReceived(
-        "tenant-1",
-        otlpSpan,
-        null,
-        null,
-      );
+      const normalized = service.normalizeSpanReceived("tenant-1", otlpSpan, null, null);
 
       const evalEvents = normalized.events.filter(
         (e: { name: string }) => e.name === "langwatch.evaluation.custom",

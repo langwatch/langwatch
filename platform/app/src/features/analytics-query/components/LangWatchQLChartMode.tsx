@@ -19,15 +19,7 @@
  * @see specs/analytics/lwql-workbench.feature
  */
 
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Stack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Stack, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { LWQL_QUERY_RESULT_DATASET } from "../visualization/lwqlDatasetNames";
@@ -231,9 +223,7 @@ function PolicyAcceptsReference() {
           </Text>
           , which loads remote resources.
         </Text>
-        <Text>
-          Reviewed transforms — {ALLOWED_VEGA_LITE_TRANSFORMS.join(", ")}.
-        </Text>
+        <Text>Reviewed transforms — {ALLOWED_VEGA_LITE_TRANSFORMS.join(", ")}.</Text>
         <Text>
           Expressions over{" "}
           <Text as="span" fontFamily="mono" fontSize="11px" color="fg">
@@ -252,8 +242,8 @@ function PolicyAcceptsReference() {
         borderTopWidth="1px"
         borderColor="border"
       >
-        Refusals name the exact JSON pointer they refer to. Warnings inform
-        without blocking.
+        Refusals name the exact JSON pointer they refer to. Warnings inform without
+        blocking.
       </Text>
     </>
   );
@@ -435,8 +425,8 @@ function SpecificationView({
             Chart specification
           </Text>
           <Text fontSize="10.5px" color="fg.subtle">
-            Vega-Lite v6 · the example follows each new result until you edit —
-            your edits are never overwritten
+            Vega-Lite v6 · the example follows each new result until you edit — your edits
+            are never overwritten
           </Text>
           <Box flex="1" />
           <Button

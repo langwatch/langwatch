@@ -153,9 +153,7 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
   }): Promise<CodingAgentSession | null> {
     const parsed = codingAgentSessionLookupInputSchema.parse(input);
     const window =
-      parsed.startedAtMs === undefined
-        ? undefined
-        : readWindowAround(parsed.startedAtMs);
+      parsed.startedAtMs === undefined ? undefined : readWindowAround(parsed.startedAtMs);
     const row =
       (await this.repositories.sessions.findBySessionId({
         tenantId: parsed.projectId,
@@ -299,7 +297,10 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
     const gathered = await this.gatherPullRequest(query);
     const costProjects = new Set(query.costProjectIds);
     return codingAgentPullRequestDetailSchema.parse({
-      pullRequest: { ...pullRequestIdentity(gathered.target), title: gathered.target.title },
+      pullRequest: {
+        ...pullRequestIdentity(gathered.target),
+        title: gathered.target.title,
+      },
       totals: usageTotals(gathered.rows),
       contributors: gathered.rows,
       modelBreakdown: gathered.modelBreakdown,
@@ -349,7 +350,9 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
         organizationId,
         repositoryHost: group.repositoryHost,
         repositoryFullName: group.repositoryFullName,
-        headBranches: [...new Set(group.sessions.flatMap((session) => session.headBranches))],
+        headBranches: [
+          ...new Set(group.sessions.flatMap((session) => session.headBranches)),
+        ],
       });
       const assignments = assignmentFor(
         group.sessions.map((session) => ({
@@ -361,7 +364,9 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
         pullRequests,
       );
       const discovered = pullRequests.filter((pullRequest) =>
-        group.sessions.some((session) => assignments.get(session.sessionId) === pullRequest.prNumber),
+        group.sessions.some(
+          (session) => assignments.get(session.sessionId) === pullRequest.prNumber,
+        ),
       );
       if (discovered.length > 0) {
         rows.push(
@@ -375,7 +380,9 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
           })),
         );
       }
-      const unmatched = group.sessions.filter((session) => !assignments.has(session.sessionId));
+      const unmatched = group.sessions.filter(
+        (session) => !assignments.has(session.sessionId),
+      );
       if (unmatched.length === 0) continue;
       const repoCovered = await this.repositories.github.coversRepository({
         organizationId,
@@ -486,7 +493,9 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
       repositoryHost: input.group.repositoryHost,
       repositoryOwner,
       repositoryName,
-      branches: [...new Set(input.discovered.map((pullRequest) => pullRequest.headBranch))],
+      branches: [
+        ...new Set(input.discovered.map((pullRequest) => pullRequest.headBranch)),
+      ],
       startedAtFromMs: input.toMs - USAGE_SESSION_WINDOW_MS,
     });
     const assignments = assignmentFor(sessions, input.pullRequests);
@@ -501,8 +510,15 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
     });
     const costProjects = new Set(input.query.costProjectIds);
     return input.discovered.map((pullRequest) => {
-      const attached = sessions.filter((session) => assignments.get(session.sessionId) === pullRequest.prNumber);
-      const rows = groupedUsageRows(attached, costProjects, nonBillableAgents, input.query.projects);
+      const attached = sessions.filter(
+        (session) => assignments.get(session.sessionId) === pullRequest.prNumber,
+      );
+      const rows = groupedUsageRows(
+        attached,
+        costProjects,
+        nonBillableAgents,
+        input.query.projects,
+      );
       const totals = usageTotals(rows);
       return {
         ...pullRequestIdentity(pullRequest),
@@ -529,7 +545,9 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
         }),
       })),
     );
-    return new Set(answers.filter((answer) => answer.nonBillable).map((answer) => answer.agent));
+    return new Set(
+      answers.filter((answer) => answer.nonBillable).map((answer) => answer.agent),
+    );
   }
 
   private githubHost(): string {
@@ -641,12 +659,9 @@ function normalizeMetricName(raw: string): "token_usage" | "cost_usage" | null {
   return null;
 }
 
-function normalizeTokenType(raw: string):
-  | "input"
-  | "output"
-  | "cache_read"
-  | "cache_creation"
-  | null {
+function normalizeTokenType(
+  raw: string,
+): "input" | "output" | "cache_read" | "cache_creation" | null {
   switch (raw.replace(/[_-]/g, "").toLowerCase()) {
     case "input":
     case "prompt":
@@ -710,10 +725,15 @@ type UsageTotals = {
   nonBilledCostUsd: number | null;
 };
 
-function branchesOf(session: { gitBranch: string; gitBranches: readonly string[] }): string[] {
+function branchesOf(session: {
+  gitBranch: string;
+  gitBranches: readonly string[];
+}): string[] {
   return session.gitBranches.length > 0
     ? [...session.gitBranches]
-    : session.gitBranch === "" ? [] : [session.gitBranch];
+    : session.gitBranch === ""
+      ? []
+      : [session.gitBranch];
 }
 
 function assignable(pullRequests: readonly GithubPullRequest[]) {
@@ -727,7 +747,12 @@ function assignable(pullRequests: readonly GithubPullRequest[]) {
 }
 
 function assignmentFor(
-  sessions: readonly { sessionId: string; startedAtMs: number; gitBranch: string; gitBranches: readonly string[] }[],
+  sessions: readonly {
+    sessionId: string;
+    startedAtMs: number;
+    gitBranch: string;
+    gitBranches: readonly string[];
+  }[],
   pullRequests: readonly GithubPullRequest[],
 ): Map<string, number> {
   const byBranch = new Map<string, ReturnType<typeof assignable>>();
@@ -743,14 +768,22 @@ function assignmentFor(
   for (const session of sessions) {
     let winner: ReturnType<typeof assignable>[number] | undefined;
     for (const branch of branchesOf(session)) {
-      const matched = byBranch.get(branch)?.find((pullRequest) =>
-        (pullRequest.prClosedAtMs ?? pullRequest.prMergedAtMs ?? Number.POSITIVE_INFINITY) >= session.startedAtMs,
-      );
+      const matched = byBranch
+        .get(branch)
+        ?.find(
+          (pullRequest) =>
+            (pullRequest.prClosedAtMs ??
+              pullRequest.prMergedAtMs ??
+              Number.POSITIVE_INFINITY) >= session.startedAtMs,
+        );
       if (
         matched &&
-        (!winner || matched.prCreatedAtMs < winner.prCreatedAtMs ||
-          (matched.prCreatedAtMs === winner.prCreatedAtMs && matched.prNumber < winner.prNumber))
-      ) winner = matched;
+        (!winner ||
+          matched.prCreatedAtMs < winner.prCreatedAtMs ||
+          (matched.prCreatedAtMs === winner.prCreatedAtMs &&
+            matched.prNumber < winner.prNumber))
+      )
+        winner = matched;
     }
     if (winner) assignments.set(session.sessionId, winner.prNumber);
   }
@@ -791,7 +824,9 @@ function tokenTotal(row: {
   cacheReadTokens: number;
   cacheCreationTokens: number;
 }): number {
-  return row.inputTokens + row.outputTokens + row.cacheReadTokens + row.cacheCreationTokens;
+  return (
+    row.inputTokens + row.outputTokens + row.cacheReadTokens + row.cacheCreationTokens
+  );
 }
 
 function groupedUsageRows(
@@ -833,11 +868,15 @@ function groupedUsageRows(
     if (priced) {
       row.costUsd = (row.costUsd ?? 0) + session.costUsd;
       row.billedCostUsd = (row.billedCostUsd ?? 0) + (nonBilled ? 0 : session.costUsd);
-      row.nonBilledCostUsd = (row.nonBilledCostUsd ?? 0) + (nonBilled ? session.costUsd : 0);
+      row.nonBilledCostUsd =
+        (row.nonBilledCostUsd ?? 0) + (nonBilled ? session.costUsd : 0);
     }
     for (const model of session.models) row.modelSet.add(model);
   }
-  return [...grouped.values()].map(({ modelSet, ...row }) => ({ ...row, models: [...modelSet].sort() }));
+  return [...grouped.values()].map(({ modelSet, ...row }) => ({
+    ...row,
+    models: [...modelSet].sort(),
+  }));
 }
 
 function usageTotals(rows: readonly UsageRow[]): UsageTotals {
@@ -860,9 +899,16 @@ function usageTotals(rows: readonly UsageRow[]): UsageTotals {
       cacheReadTokens: totals.cacheReadTokens + row.cacheReadTokens,
       cacheCreationTokens: totals.cacheCreationTokens + row.cacheCreationTokens,
       totalTokens: totals.totalTokens + row.totalTokens,
-      costUsd: row.costUsd === null ? totals.costUsd : (totals.costUsd ?? 0) + row.costUsd,
-      billedCostUsd: row.billedCostUsd === null ? totals.billedCostUsd : (totals.billedCostUsd ?? 0) + row.billedCostUsd,
-      nonBilledCostUsd: row.nonBilledCostUsd === null ? totals.nonBilledCostUsd : (totals.nonBilledCostUsd ?? 0) + row.nonBilledCostUsd,
+      costUsd:
+        row.costUsd === null ? totals.costUsd : (totals.costUsd ?? 0) + row.costUsd,
+      billedCostUsd:
+        row.billedCostUsd === null
+          ? totals.billedCostUsd
+          : (totals.billedCostUsd ?? 0) + row.billedCostUsd,
+      nonBilledCostUsd:
+        row.nonBilledCostUsd === null
+          ? totals.nonBilledCostUsd
+          : (totals.nonBilledCostUsd ?? 0) + row.nonBilledCostUsd,
     }),
     empty,
   );
@@ -873,28 +919,46 @@ function modelUsage(
   totals: readonly SessionModelTotalsRow[],
   costProjects: ReadonlySet<string>,
 ): ModelUsage[] {
-  const attached = new Set(sessions.map((session) => `${session.tenantId}\0${session.sessionId}`));
+  const attached = new Set(
+    sessions.map((session) => `${session.tenantId}\0${session.sessionId}`),
+  );
   const byModel = new Map<string, ModelUsage>();
   for (const total of totals) {
-    if (!attached.has(`${total.tenantId}\0${total.sessionId}`) || total.model === "") continue;
+    if (!attached.has(`${total.tenantId}\0${total.sessionId}`) || total.model === "")
+      continue;
     const existing = byModel.get(total.model) ?? {
-      model: total.model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0,
-      cacheCreationTokens: 0, totalTokens: 0, costUsd: null, tokensKnown: true,
+      model: total.model,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+      totalTokens: 0,
+      costUsd: null,
+      tokensKnown: true,
     };
     existing.inputTokens += total.inputTokens;
     existing.outputTokens += total.outputTokens;
     existing.cacheReadTokens += total.cacheReadTokens;
     existing.cacheCreationTokens += total.cacheCreationTokens;
     existing.totalTokens += tokenTotal(total);
-    if (costProjects.has(total.tenantId)) existing.costUsd = (existing.costUsd ?? 0) + total.costUsd;
+    if (costProjects.has(total.tenantId))
+      existing.costUsd = (existing.costUsd ?? 0) + total.costUsd;
     byModel.set(total.model, existing);
   }
-  if (byModel.size > 0) return [...byModel.values()].sort((a, b) => b.totalTokens - a.totalTokens);
+  if (byModel.size > 0)
+    return [...byModel.values()].sort((a, b) => b.totalTokens - a.totalTokens);
   const models = new Set<string>();
-  for (const session of sessions) for (const model of session.models) if (model !== "") models.add(model);
+  for (const session of sessions)
+    for (const model of session.models) if (model !== "") models.add(model);
   return [...models].sort().map((model) => ({
-    model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0,
-    cacheCreationTokens: 0, totalTokens: 0, costUsd: null, tokensKnown: false,
+    model,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    totalTokens: 0,
+    costUsd: null,
+    tokensKnown: false,
   }));
 }
 
@@ -915,19 +979,29 @@ function pullRequestIdentity(pullRequest: GithubPullRequest) {
 }
 
 function latestActivity(sessions: readonly CodingAgentSession[]): number {
-  return sessions.reduce((latest, session) =>
-    Math.max(latest, Math.max(session.startedAtMs, session.lastEventOccurredAt || 0)), 0);
+  return sessions.reduce(
+    (latest, session) =>
+      Math.max(latest, Math.max(session.startedAtMs, session.lastEventOccurredAt || 0)),
+    0,
+  );
 }
 
 function contributorsSummary(
   sessions: readonly CodingAgentSession[],
   projects: Record<string, CodingAgentContributorProject>,
 ) {
-  const grouped = new Map<string, ReturnType<typeof contributorFor> & { sessionsCount: number }>();
+  const grouped = new Map<
+    string,
+    ReturnType<typeof contributorFor> & { sessionsCount: number }
+  >();
   for (const session of sessions) {
     const current = grouped.get(session.tenantId);
     if (current) current.sessionsCount += 1;
-    else grouped.set(session.tenantId, { ...contributorFor(session.tenantId, projects), sessionsCount: 1 });
+    else
+      grouped.set(session.tenantId, {
+        ...contributorFor(session.tenantId, projects),
+        sessionsCount: 1,
+      });
   }
   return [...grouped.values()].sort((a, b) => b.sessionsCount - a.sessionsCount);
 }
@@ -959,9 +1033,14 @@ function personalRepositoryGroups(
 ): PersonalRepositoryGroup[] {
   const groups = new Map<string, PersonalRepositoryGroup>();
   for (const session of sessions) {
-    if (!session.repositoryOwner || !session.repositoryName || !session.gitBranch) continue;
-    const repositoryHost = normalizeGithubHost(session.repositoryHost, configuredGithubHost);
-    const repositoryFullName = `${session.repositoryOwner}/${session.repositoryName}`.toLowerCase();
+    if (!session.repositoryOwner || !session.repositoryName || !session.gitBranch)
+      continue;
+    const repositoryHost = normalizeGithubHost(
+      session.repositoryHost,
+      configuredGithubHost,
+    );
+    const repositoryFullName =
+      `${session.repositoryOwner}/${session.repositoryName}`.toLowerCase();
     const key = `${repositoryHost} ${repositoryFullName}`;
     const group = groups.get(key) ?? { repositoryHost, repositoryFullName, sessions: [] };
     group.sessions.push({
@@ -999,24 +1078,44 @@ function unlinkedRows(
     repositoryHost: group.repositoryHost,
     repositoryFullName: group.repositoryFullName,
     headBranch,
-    lastActivityAtMs: branchSessions.reduce((latest, session) =>
-      Math.max(latest, Math.max(session.startedAtMs, session.lastEventOccurredAtMs || 0)), 0),
+    lastActivityAtMs: branchSessions.reduce(
+      (latest, session) =>
+        Math.max(
+          latest,
+          Math.max(session.startedAtMs, session.lastEventOccurredAtMs || 0),
+        ),
+      0,
+    ),
     sessionsCount: branchSessions.length,
-    totalTokens: branchSessions.reduce((total, session) => total + tokenTotal(session), 0),
+    totalTokens: branchSessions.reduce(
+      (total, session) => total + tokenTotal(session),
+      0,
+    ),
     modelBreakdown: namedModels(branchSessions),
     costUsd: branchSessions.reduce((total, session) => total + session.costUsd, 0),
-    billedCostUsd: branchSessions.filter((session) => !nonBillableAgents.has(session.agent)).reduce((total, session) => total + session.costUsd, 0),
-    nonBilledCostUsd: branchSessions.filter((session) => nonBillableAgents.has(session.agent)).reduce((total, session) => total + session.costUsd, 0),
+    billedCostUsd: branchSessions
+      .filter((session) => !nonBillableAgents.has(session.agent))
+      .reduce((total, session) => total + session.costUsd, 0),
+    nonBilledCostUsd: branchSessions
+      .filter((session) => nonBillableAgents.has(session.agent))
+      .reduce((total, session) => total + session.costUsd, 0),
     repoCovered,
   }));
 }
 
 function namedModels(sessions: readonly { models: string[] }[]): ModelUsage[] {
   const models = new Set<string>();
-  for (const session of sessions) for (const model of session.models) if (model !== "") models.add(model);
+  for (const session of sessions)
+    for (const model of session.models) if (model !== "") models.add(model);
   return [...models].sort().map((model) => ({
-    model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0,
-    cacheCreationTokens: 0, totalTokens: 0, costUsd: null, tokensKnown: false,
+    model,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    totalTokens: 0,
+    costUsd: null,
+    tokensKnown: false,
   }));
 }
 
@@ -1032,26 +1131,37 @@ function normalizeGithubHost(host: string, configuredGithubHost: string): string
   return host === "" ? configuredGithubHost : host.toLowerCase();
 }
 
-function listBranchDrives(sessions: readonly CodingAgentSession[], configuredGithubHost: string): ListBranchDrive[] {
+function listBranchDrives(
+  sessions: readonly CodingAgentSession[],
+  configuredGithubHost: string,
+): ListBranchDrive[] {
   const drives: ListBranchDrive[] = [];
   for (const session of sessions) {
     if (!session.repositoryOwner || !session.repositoryName) continue;
-    for (const headBranch of branchesOf(session)) drives.push({
-      sessionId: session.sessionId,
-      startedAtMs: session.startedAtMs,
-      repositoryHost: normalizeGithubHost(session.repositoryHost, configuredGithubHost),
-      repositoryFullName: `${session.repositoryOwner}/${session.repositoryName}`.toLowerCase(),
-      headBranch,
-    });
+    for (const headBranch of branchesOf(session))
+      drives.push({
+        sessionId: session.sessionId,
+        startedAtMs: session.startedAtMs,
+        repositoryHost: normalizeGithubHost(session.repositoryHost, configuredGithubHost),
+        repositoryFullName:
+          `${session.repositoryOwner}/${session.repositoryName}`.toLowerCase(),
+        headBranch,
+      });
   }
   return drives;
 }
 
 function uniqueBranchKeys(drives: readonly ListBranchDrive[]) {
-  const keys = new Map<string, { repositoryHost: string; repositoryFullName: string; headBranch: string }>();
-  for (const drive of drives) keys.set(`${drive.repositoryHost} ${drive.repositoryFullName} ${drive.headBranch}`, {
-    repositoryHost: drive.repositoryHost, repositoryFullName: drive.repositoryFullName, headBranch: drive.headBranch,
-  });
+  const keys = new Map<
+    string,
+    { repositoryHost: string; repositoryFullName: string; headBranch: string }
+  >();
+  for (const drive of drives)
+    keys.set(`${drive.repositoryHost} ${drive.repositoryFullName} ${drive.headBranch}`, {
+      repositoryHost: drive.repositoryHost,
+      repositoryFullName: drive.repositoryFullName,
+      headBranch: drive.headBranch,
+    });
   return [...keys.values()];
 }
 
@@ -1059,7 +1169,10 @@ function linkedListPullRequests(
   drives: readonly ListBranchDrive[],
   candidates: readonly GithubPullRequest[],
 ): Map<string, Array<{ number: number; url: string; title: string }>> {
-  const found = new Map<string, Map<number, { number: number; url: string; title: string }>>();
+  const found = new Map<
+    string,
+    Map<number, { number: number; url: string; title: string }>
+  >();
   const byRepository = new Map<string, ListBranchDrive[]>();
   for (const drive of drives) {
     const key = `${drive.repositoryHost.toLowerCase()} ${drive.repositoryFullName.toLowerCase()}`;
@@ -1068,8 +1181,11 @@ function linkedListPullRequests(
     byRepository.set(key, bucket);
   }
   for (const [bucket, bucketDrives] of byRepository) {
-    const bucketCandidates = candidates.filter((candidate) =>
-      `${candidate.repositoryHost.toLowerCase()} ${candidate.repositoryFullName.toLowerCase()}` === bucket);
+    const bucketCandidates = candidates.filter(
+      (candidate) =>
+        `${candidate.repositoryHost.toLowerCase()} ${candidate.repositoryFullName.toLowerCase()}` ===
+        bucket,
+    );
     const assignments = assignmentFor(
       bucketDrives.map((drive) => ({
         sessionId: `${drive.sessionId}\0${drive.headBranch}`,
@@ -1080,14 +1196,24 @@ function linkedListPullRequests(
       bucketCandidates,
     );
     for (const drive of bucketDrives) {
-      const candidate = bucketCandidates.find((row) =>
-        row.prNumber === assignments.get(`${drive.sessionId}\0${drive.headBranch}`));
+      const candidate = bucketCandidates.find(
+        (row) =>
+          row.prNumber === assignments.get(`${drive.sessionId}\0${drive.headBranch}`),
+      );
       if (!candidate) continue;
       const rows = found.get(drive.sessionId) ?? new Map();
-      rows.set(candidate.prNumber, { number: candidate.prNumber, url: candidate.htmlUrl, title: candidate.title });
+      rows.set(candidate.prNumber, {
+        number: candidate.prNumber,
+        url: candidate.htmlUrl,
+        title: candidate.title,
+      });
       found.set(drive.sessionId, rows);
     }
   }
-  return new Map([...found].map(([sessionId, rows]) =>
-    [sessionId, [...rows.values()].sort((a, b) => a.number - b.number)]));
+  return new Map(
+    [...found].map(([sessionId, rows]) => [
+      sessionId,
+      [...rows.values()].sort((a, b) => a.number - b.number),
+    ]),
+  );
 }

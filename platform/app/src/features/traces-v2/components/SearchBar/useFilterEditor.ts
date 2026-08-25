@@ -53,11 +53,7 @@ const COMMIT_SETTLE_MS = 250;
  * would feel broken. Strips a trailing or leading `AND`/`OR` so we don't
  * end up with `model:gpt AND ` orphaned at the end of the query.
  */
-function sliceFallbackTokenRange(
-  text: string,
-  start: number,
-  end: number,
-): string {
+function sliceFallbackTokenRange(text: string, start: number, end: number): string {
   if (start < 0 || end > text.length || start >= end) return text;
   const before = text.slice(0, start).replace(/\s+(AND|OR)\s*$/i, "");
   const after = text.slice(end).replace(/^\s*(AND|OR)\s+/i, "");
@@ -95,10 +91,7 @@ function suggestionStateEqual(a: SuggestionState, b: SuggestionState): boolean {
   return true;
 }
 
-function suggestionUIEqual(
-  a: SuggestionUIState,
-  b: SuggestionUIState,
-): boolean {
+function suggestionUIEqual(a: SuggestionUIState, b: SuggestionUIState): boolean {
   if (a === b) return true;
   if (a.selectedIndex !== b.selectedIndex) return false;
   if (a.itemCounts !== b.itemCounts) return false;
@@ -228,8 +221,7 @@ export function useFilterEditor({
   onAiShortcut,
   placeholder,
 }: UseFilterEditorParams): FilterEditorApi {
-  const [suggestion, setSuggestion] =
-    useState<SuggestionUIState>(CLOSED_SUGGESTION);
+  const [suggestion, setSuggestion] = useState<SuggestionUIState>(CLOSED_SUGGESTION);
   const [dropdownDismissed, setDropdownDismissed] = useState(false);
   const [cursorAnchorX, setCursorAnchorX] = useState(0);
   // Independent anchor that tracks the *end of the rendered content*,
@@ -253,9 +245,7 @@ export function useFilterEditor({
   const onAiShortcutRef = useLatestRef(onAiShortcut);
   // Read by the Placeholder extension through a function, so the label keeps
   // up with the caller (Ask AI ↔ Ask Langy) without re-initialising TipTap.
-  const placeholderRef = useLatestRef(
-    placeholder ?? searchBarPlaceholder("Ask AI"),
-  );
+  const placeholderRef = useLatestRef(placeholder ?? searchBarPlaceholder("Ask AI"));
   // Tracks last reported hasContent so we only fire onHasContentChange when
   // it actually flips (not on every keystroke that keeps the state).
   const lastHasContentRef = useRef<boolean>(queryText.length > 0);
@@ -354,9 +344,7 @@ export function useFilterEditor({
       // Escape is sticky for the session — `dismissedRef` only clears on
       // blur, reset, or a fresh `@` trigger.
       if (dismissedRef.current && state.open) {
-        setSuggestion((prev) =>
-          prev === CLOSED_SUGGESTION ? prev : CLOSED_SUGGESTION,
-        );
+        setSuggestion((prev) => (prev === CLOSED_SUGGESTION ? prev : CLOSED_SUGGESTION));
         return;
       }
       setSuggestion((prev) => {
@@ -369,23 +357,13 @@ export function useFilterEditor({
         // here — same render — instead of via a follow-up effect. Avoids a
         // second render per keystroke and the brief flash of static items.
         let next = base;
-        if (
-          base.state.open &&
-          base.state.mode === "value" &&
-          valueResolverRef.current
-        ) {
+        if (base.state.open && base.state.mode === "value" && valueResolverRef.current) {
           // Capture the field here, where the `mode === "value"` narrowing
           // still holds — it's lost inside the `.map` closure below.
           const valueField = base.state.field;
-          const dynamic = valueResolverRef.current(
-            valueField,
-            base.state.query,
-          );
+          const dynamic = valueResolverRef.current(valueField, base.state.query);
           if (dynamic && dynamic.items.length > 0) {
-            const selectedIndex = Math.min(
-              base.selectedIndex,
-              dynamic.items.length - 1,
-            );
+            const selectedIndex = Math.min(base.selectedIndex, dynamic.items.length - 1);
             // Dynamic value-mode rows have no group (values aren't grouped)
             // and aren't prefix entries — wrap the bare strings into the
             // SuggestionRow shape that the dropdown renderer expects.
@@ -564,8 +542,7 @@ export function useFilterEditor({
           // dismissal so the user can always re-arm the dropdown.
           setDropdownDismissed(false);
           const prev = cursorPos === 0 ? undefined : text[cursorPos - 1];
-          const isCleanStart =
-            prev === undefined || TRIGGER_PRECEDERS.has(prev);
+          const isCleanStart = prev === undefined || TRIGGER_PRECEDERS.has(prev);
           if (isCleanStart) {
             triggerPosRef.current = cursorPos;
             refreshSuggestion(target);
@@ -579,14 +556,10 @@ export function useFilterEditor({
 
         const trigger = triggerPosRef.current;
         const triggerState =
-          trigger !== null
-            ? suggestionFromTrigger(text, cursorPos, trigger)
-            : null;
+          trigger !== null ? suggestionFromTrigger(text, cursorPos, trigger) : null;
         const liveState = triggerState ?? getSuggestionState(text, cursorPos);
         const dismissed = dismissedRef.current;
-        const highlighted = dismissed
-          ? null
-          : highlightedRow(suggestionRef.current);
+        const highlighted = dismissed ? null : highlightedRow(suggestionRef.current);
         const action = handleKey(
           {
             text,
@@ -689,9 +662,7 @@ export function useFilterEditor({
       // decoration pass; the parent receives the click rect to anchor
       // the popover. Skip when no callback is wired so chip clicks
       // still place the cursor as before.
-      const chipEl = target?.closest(
-        "[data-filter-chip-start]",
-      ) as HTMLElement | null;
+      const chipEl = target?.closest("[data-filter-chip-start]") as HTMLElement | null;
       if (chipEl && onTokenClick) {
         event.preventDefault();
         event.stopPropagation();
@@ -714,9 +685,7 @@ export function useFilterEditor({
       // span carries the liqe-text coordinates as data attributes (set
       // by `filterHighlight`'s decoration pass) so we can flip without
       // re-parsing the AST here.
-      const opEl = target?.closest(
-        "[data-filter-op-start]",
-      ) as HTMLElement | null;
+      const opEl = target?.closest("[data-filter-op-start]") as HTMLElement | null;
       if (opEl) {
         event.preventDefault();
         event.stopPropagation();
@@ -799,9 +768,7 @@ export function useFilterEditor({
       const { text, cursorPos } = readEditorContext(editor);
       // Look up whether the clicked label corresponds to a prefix row so
       // the accept handler doesn't auto-append `:` to `trace.attribute.`.
-      const matched = suggestionRef.current.items.find(
-        (r) => r.value === label,
-      );
+      const matched = suggestionRef.current.items.find((r) => r.value === label);
       const action = handleKey(
         {
           text,

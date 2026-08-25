@@ -10,10 +10,7 @@ import type { LangwatchApiClient } from "@/internal/api/client";
 import { isLangWatchHandledError } from "@/internal/api/errors";
 import type { Logger } from "@/logger";
 import { Experiment } from "./experiment";
-import {
-  ExperimentsApiService,
-  toRunStartRequest,
-} from "./experiments-api.service";
+import { ExperimentsApiService, toRunStartRequest } from "./experiments-api.service";
 import type { ExperimentInitOptions } from "./types";
 import type {
   ExperimentRunResult,
@@ -77,10 +74,7 @@ export class ExperimentsFacade {
    * });
    * ```
    */
-  async init(
-    name: string,
-    options?: ExperimentInitOptions,
-  ): Promise<Experiment> {
+  async init(name: string, options?: ExperimentInitOptions): Promise<Experiment> {
     return Experiment.init(name, {
       apiClient: this.config.langwatchApiClient,
       endpoint: this.config.endpoint,
@@ -111,10 +105,7 @@ export class ExperimentsFacade {
    * result.printSummary();
    * ```
    */
-  async run(
-    slug: string,
-    options?: RunExperimentOptions,
-  ): Promise<ExperimentRunResult> {
+  async run(slug: string, options?: RunExperimentOptions): Promise<ExperimentRunResult> {
     this.config.logger.info(`Running platform experiment: ${slug}`);
     const result = await this.runWithPolling(slug, options);
     return result;
@@ -148,9 +139,7 @@ export class ExperimentsFacade {
     slug: string,
     options: RunWithResultsOptions = {},
   ): Promise<ExperimentRunWithResults> {
-    this.config.logger.info(
-      `Running platform experiment with results: ${slug}`,
-    );
+    this.config.logger.info(`Running platform experiment with results: ${slug}`);
 
     const body = toRunStartRequest({
       data: options.data,
@@ -175,8 +164,7 @@ export class ExperimentsFacade {
     // materialize. Retry both cases when the run reported rows, mirroring the
     // python SDK, instead of failing or returning an empty result.
     const results = await fetchResultsWithRetry({
-      getResults: () =>
-        this.apiService.getV3RunResults({ runId, experimentSlug: slug }),
+      getResults: () => this.apiService.getV3RunResults({ runId, experimentSlug: slug }),
       isEmpty: (r) => (r.dataset?.length ?? 0) === 0,
       expectsRows: (summary.totalCells ?? 0) > 0,
       delay: options.pollInterval ?? DEFAULT_POLL_INTERVAL,
@@ -187,9 +175,7 @@ export class ExperimentsFacade {
     // the start response and the summary carry the platform's own URL; whichever
     // is present gets its domain replaced. Mirrors the python SDK.
     const rawRunUrl = startResponse.runUrl ?? summary.runUrl;
-    const runUrl = rawRunUrl
-      ? rebaseUrlToEndpoint(rawRunUrl, this.config.endpoint)
-      : "";
+    const runUrl = rawRunUrl ? rebaseUrlToEndpoint(rawRunUrl, this.config.endpoint) : "";
 
     return {
       runId,
@@ -216,9 +202,7 @@ export class ExperimentsFacade {
 
     // Use the run URL from API but replace domain with configured endpoint
     const apiRunUrl = startResponse.runUrl ?? "";
-    const runUrl = apiRunUrl
-      ? rebaseUrlToEndpoint(apiRunUrl, this.config.endpoint)
-      : "";
+    const runUrl = apiRunUrl ? rebaseUrlToEndpoint(apiRunUrl, this.config.endpoint) : "";
 
     console.log(`Started experiment run: ${runId}`);
     if (runUrl) {
@@ -241,11 +225,7 @@ export class ExperimentsFacade {
       if (Date.now() - startTime > timeout) {
         console.log(); // Newline after progress
         const finalStatus = await this.getRunStatus(runId);
-        throw new ExperimentTimeoutError(
-          runId,
-          finalStatus.progress,
-          finalStatus.total,
-        );
+        throw new ExperimentTimeoutError(runId, finalStatus.progress, finalStatus.total);
       }
 
       await this.sleep(pollInterval);
@@ -256,9 +236,7 @@ export class ExperimentsFacade {
       // Update progress display if changed
       if (progress !== lastProgress && status.total > 0) {
         const percentage = Math.round((progress / status.total) * 100);
-        process.stdout.write(
-          `\rProgress: ${progress}/${status.total} (${percentage}%)`,
-        );
+        process.stdout.write(`\rProgress: ${progress}/${status.total} (${percentage}%)`);
         lastProgress = progress;
       }
 
@@ -272,10 +250,7 @@ export class ExperimentsFacade {
 
       if (status.status === "failed") {
         console.log(); // Newline after progress
-        throw new ExperimentRunFailedError(
-          runId,
-          status.error ?? "Unknown error",
-        );
+        throw new ExperimentRunFailedError(runId, status.error ?? "Unknown error");
       }
 
       if (status.status === "stopped") {
@@ -354,11 +329,7 @@ export class ExperimentsFacade {
     }
 
     if (response.error) {
-      this.handleRunStatusError(
-        runId,
-        response.error,
-        response.response.status,
-      );
+      this.handleRunStatusError(runId, response.error, response.response.status);
     }
 
     return response.data as {
@@ -370,11 +341,7 @@ export class ExperimentsFacade {
     };
   }
 
-  private handleStartRunError(
-    slug: string,
-    error: unknown,
-    status: number,
-  ): never {
+  private handleStartRunError(slug: string, error: unknown, status: number): never {
     if (status === 404) {
       throw new ExperimentNotFoundError(slug);
     }
@@ -393,11 +360,7 @@ export class ExperimentsFacade {
     throw new ExperimentsApiError(errorMessage, status);
   }
 
-  private handleRunStatusError(
-    runId: string,
-    error: unknown,
-    status: number,
-  ): never {
+  private handleRunStatusError(runId: string, error: unknown, status: number): never {
     if (status === 404) {
       throw new ExperimentsApiError(`Run not found: ${runId}`, 404);
     }
@@ -432,8 +395,7 @@ export class ExperimentsFacade {
     const totalPassed = summary.totalPassed ?? completedCells - failedCells;
     const totalFailed = summary.totalFailed ?? failedCells;
     const passRate =
-      summary.passRate ??
-      (completedCells > 0 ? (totalPassed / completedCells) * 100 : 0);
+      summary.passRate ?? (completedCells > 0 ? (totalPassed / completedCells) * 100 : 0);
 
     const result: ExperimentRunResult = {
       runId,

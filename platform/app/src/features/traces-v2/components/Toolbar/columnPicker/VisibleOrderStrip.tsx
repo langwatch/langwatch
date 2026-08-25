@@ -112,14 +112,8 @@ const SortableVisibleColumnRow: React.FC<{
   onMoveDown: () => void;
   onRemove: () => void;
 }> = ({ column, isFirst, isLast, onMoveUp, onMoveDown, onRemove }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: column.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: column.id });
   return (
     <HStack
       ref={setNodeRef}

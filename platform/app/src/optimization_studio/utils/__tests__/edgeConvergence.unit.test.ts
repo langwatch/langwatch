@@ -128,10 +128,7 @@ describe("guardsAreMutuallyExclusive", () => {
   describe("when two guard sets disagree on a gate side", () => {
     it("reports them as mutually exclusive", () => {
       expect(
-        guardsAreMutuallyExclusive(
-          new Set(["gate:true"]),
-          new Set(["gate:false"]),
-        ),
+        guardsAreMutuallyExclusive(new Set(["gate:true"]), new Set(["gate:false"])),
       ).toBe(true);
     });
 
@@ -148,10 +145,7 @@ describe("guardsAreMutuallyExclusive", () => {
   describe("when the guard sets can both hold", () => {
     it("treats identical guards as not exclusive", () => {
       expect(
-        guardsAreMutuallyExclusive(
-          new Set(["gate:true"]),
-          new Set(["gate:true"]),
-        ),
+        guardsAreMutuallyExclusive(new Set(["gate:true"]), new Set(["gate:true"])),
       ).toBe(false);
     });
 
@@ -160,9 +154,7 @@ describe("guardsAreMutuallyExclusive", () => {
     });
 
     it("treats a guarded node and an always-reachable node as not exclusive", () => {
-      expect(
-        guardsAreMutuallyExclusive(new Set(["gate:true"]), new Set()),
-      ).toBe(false);
+      expect(guardsAreMutuallyExclusive(new Set(["gate:true"]), new Set())).toBe(false);
     });
   });
 });
@@ -182,10 +174,7 @@ describe("canConvergeOnInput", () => {
 
   describe("when the existing source is on the opposite branch", () => {
     it("allows two mutually exclusive branches to converge", () => {
-      const edges = [
-        ...forkEdges,
-        edge("conv", "codeA", "out", "end", "answer"),
-      ];
+      const edges = [...forkEdges, edge("conv", "codeA", "out", "end", "answer")];
       expect(
         canConvergeOnInput({
           nodes: forkNodes,
@@ -222,10 +211,7 @@ describe("canConvergeOnInput", () => {
   describe("when both edges come from the same node", () => {
     /** @scenario Two outputs of the same node cannot converge on one input */
     it("rejects two outputs of one node on the same input", () => {
-      const edges = [
-        ...forkEdges,
-        edge("conv", "codeA", "out1", "end", "answer"),
-      ];
+      const edges = [...forkEdges, edge("conv", "codeA", "out1", "end", "answer")];
       expect(
         canConvergeOnInput({
           nodes: forkNodes,

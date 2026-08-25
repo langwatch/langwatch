@@ -11,13 +11,7 @@
  * - Boolean field selector for traces.error
  * - Collapsing back when removing custom preconditions
  */
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -40,9 +34,7 @@ import {
 
 // vi.mock() factories are hoisted above imports, so we use async + dynamic import
 vi.mock("~/utils/compat/next-router", async () =>
-  (
-    await import("./OnlineEvaluationDrawer.test-helpers.tsx")
-  ).createRouterMock(),
+  (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createRouterMock(),
 );
 vi.mock("~/utils/api", async () =>
   (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createApiMock(),
@@ -51,9 +43,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", async () =>
   (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createOrgMock(),
 );
 vi.mock("~/stores/upgradeModalStore", async () =>
-  (
-    await import("./OnlineEvaluationDrawer.test-helpers.tsx")
-  ).createUpgradeModalMock(),
+  (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createUpgradeModalMock(),
 );
 vi.mock("~/hooks/useLicenseEnforcement", async () =>
   (
@@ -82,18 +72,14 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
   /**
    * Helper to select evaluation level and evaluator so preconditions section is visible
    */
-  const setupWithEvaluator = async (
-    user: ReturnType<typeof userEvent.setup>,
-  ) => {
+  const setupWithEvaluator = async (user: ReturnType<typeof userEvent.setup>) => {
     const { rerender } = render(<OnlineEvaluationDrawer open={true} />, {
       wrapper: Wrapper,
     });
 
     // Select trace level
     await waitFor(() => {
-      expect(
-        screen.getByRole("radio", { name: /Trace Level/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /Trace Level/i })).toBeInTheDocument();
     });
     await user.click(screen.getByRole("radio", { name: /Trace Level/i }));
     await vi.advanceTimersByTimeAsync(50);
@@ -103,9 +89,7 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
       expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
     });
     await user.click(screen.getByText("Select Evaluator"));
-    await waitFor(() =>
-      expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
-    );
+    await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
     getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
     await vi.advanceTimersByTimeAsync(200);
 
@@ -134,9 +118,7 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(
-            "This evaluation will run on every application trace",
-          ),
+          screen.getByText("This evaluation will run on every application trace"),
         ).toBeInTheDocument();
       });
     });
@@ -156,9 +138,7 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(
-            "This evaluation will run on every application trace",
-          ),
+          screen.getByText("This evaluation will run on every application trace"),
         ).toBeInTheDocument();
       });
 
@@ -310,11 +290,7 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
       const booleanSelect = updatedComboboxes.find((select) => {
         const options = select.querySelectorAll("option");
         const texts = Array.from(options).map((o) => o.textContent);
-        return (
-          texts.includes("true") &&
-          texts.includes("false") &&
-          texts.length === 2
-        );
+        return texts.includes("true") && texts.includes("false") && texts.length === 2;
       });
       expect(booleanSelect).toBeDefined();
     });
@@ -351,9 +327,7 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
       // Should collapse back to summary
       await waitFor(() => {
         expect(
-          screen.getByText(
-            "This evaluation will run on every application trace",
-          ),
+          screen.getByText("This evaluation will run on every application trace"),
         ).toBeInTheDocument();
         expect(screen.queryByText("When")).not.toBeInTheDocument();
       });

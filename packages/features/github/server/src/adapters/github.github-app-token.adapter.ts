@@ -186,9 +186,7 @@ function readRateLimit(res: Response): GithubRateLimitedError | null {
   return new GithubRateLimitedError({
     retryAfterSec: hasRetryAfter ? retryAfterSec : null,
     resetAt:
-      resetSec != null && Number.isFinite(resetSec)
-        ? new Date(resetSec * 1000)
-        : null,
+      resetSec != null && Number.isFinite(resetSec) ? new Date(resetSec * 1000) : null,
   });
 }
 
@@ -274,10 +272,7 @@ export function computeRepoScopeKey({
     .map(([k, v]) => `${k}=${v}`)
     .sort()
     .join(",");
-  return createHash("sha256")
-    .update(`${repos}|${perms}`)
-    .digest("hex")
-    .slice(0, 16);
+  return createHash("sha256").update(`${repos}|${perms}`).digest("hex").slice(0, 16);
 }
 
 /**
@@ -344,9 +339,7 @@ export class GithubAppTokenService {
   }
 
   /** GET /app/installations/{id} — the account + repo-selection metadata. */
-  async getInstallation(
-    installationId: string,
-  ): Promise<GithubInstallationDetails> {
+  async getInstallation(installationId: string): Promise<GithubInstallationDetails> {
     const res = await this.githubFetch(
       `${getGithubApiBase(this.hostConfig)}/app/installations/${encodeURIComponent(installationId)}`,
       { headers: { Authorization: `Bearer ${this.signAppJwt()}` } },
@@ -389,9 +382,7 @@ export class GithubAppTokenService {
   // 5xx, rate limit) fails OPEN and sets a much shorter backoff marker, so an
   // outage costs at most one stalled probe per LIVENESS_FAILURE_BACKOFF_SEC
   // rather than one per turn.
-  private async assertInstallationStillExists(
-    installationId: string,
-  ): Promise<void> {
+  private async assertInstallationStillExists(installationId: string): Promise<void> {
     const markerKey = `${installationCacheKeyPrefix(installationId, this.hostConfig)}:liveness`;
     if (await this.redisGet(markerKey)) return;
 
@@ -451,11 +442,7 @@ export class GithubAppTokenService {
       if (fresh) return { token: fresh, expiresAt: "" };
 
       const minted = await this.mintAtGithub(args);
-      await this.redisSetEx(
-        cacheKey,
-        INSTALLATION_TOKEN_CACHE_TTL_SEC,
-        minted.token,
-      );
+      await this.redisSetEx(cacheKey, INSTALLATION_TOKEN_CACHE_TTL_SEC, minted.token);
       return minted;
     } finally {
       if (lock) await this.releaseLock(`${cacheKey}:lock`, lock);
@@ -502,9 +489,7 @@ export class GithubAppTokenService {
     if (!res.ok) {
       const rateLimited = readRateLimit(res);
       if (rateLimited) throw rateLimited;
-      throw new Error(
-        `GitHub GET /installation/repositories failed: ${res.status}`,
-      );
+      throw new Error(`GitHub GET /installation/repositories failed: ${res.status}`);
     }
     const body = (await res.json()) as {
       repositories?: { id: number; full_name: string }[];
@@ -588,10 +573,7 @@ export class GithubAppTokenService {
     const minted = await this.mintInstallationToken({
       installationId,
       repositoryIds: [repositoryId],
-      permissions: GITHUB_READ_PULL_PERMISSIONS as unknown as Record<
-        string,
-        string
-      >,
+      permissions: GITHUB_READ_PULL_PERMISSIONS as unknown as Record<string, string>,
     });
     const res = await this.githubFetch(
       `${getGithubApiBase(this.hostConfig)}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${path}`,
@@ -695,11 +677,7 @@ export class GithubAppTokenService {
     }
   }
 
-  private async redisSetEx(
-    key: string,
-    ttlSec: number,
-    value: string,
-  ): Promise<void> {
+  private async redisSetEx(key: string, ttlSec: number, value: string): Promise<void> {
     if (!this.redis) return;
     try {
       await this.redis.set(key, value, "EX", ttlSec);

@@ -53,8 +53,8 @@ export function DeadLettersEmpty() {
               No dead messages
             </Text>
             <Text textStyle="xs" color="fg.muted">
-              Every intent the substrate has emitted either dispatched or is
-              still being retried.
+              Every intent the substrate has emitted either dispatched or is still being
+              retried.
             </Text>
           </Box>
         </HStack>
@@ -91,8 +91,7 @@ export function DeadLetterSummary({
           </Box>
           <Text textStyle="sm" fontWeight="medium" data-testid="dead-total">
             {fleetTotal} dead {fleetTotal === 1 ? "message" : "messages"} across{" "}
-            {byProcess.length}{" "}
-            {byProcess.length === 1 ? "process" : "processes"}
+            {byProcess.length} {byProcess.length === 1 ? "process" : "processes"}
           </Text>
         </HStack>
         <HStack gap={2} flexWrap="wrap">
@@ -304,10 +303,7 @@ function DeadLetterRow({
                   <Labelled label="Trace" value={message.traceId} />
                 ) : null}
               </HStack>
-              <AttemptHistory
-                outboxId={message.id}
-                projectId={message.projectId}
-              />
+              <AttemptHistory outboxId={message.id} projectId={message.projectId} />
               <Box>
                 <Text textStyle="2xs" color="fg.muted" marginBottom={1}>
                   Payload
@@ -347,8 +343,8 @@ function AttemptHistory({
   if (rows.length === 0) {
     return (
       <Text textStyle="xs" color="fg.muted">
-        No recorded attempts — this message was retired before failures were
-        recorded per attempt.
+        No recorded attempts — this message was retired before failures were recorded per
+        attempt.
       </Text>
     );
   }

@@ -86,12 +86,7 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
           />
           {suiteName && (
             <>
-              <Text
-                fontSize="sm"
-                fontWeight="medium"
-                color="fg.default"
-                flexShrink={0}
-              >
+              <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
                 {suiteName}
               </Text>
               <Text fontSize="sm" color="fg.muted" flexShrink={0}>
@@ -104,12 +99,7 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
           </Text>
           <Box flex={1} />
           {/* Invisible spacer matching RunMetricsSummary pill height */}
-          <Box
-            paddingY={1}
-            paddingX={2}
-            borderRadius="lg"
-            border="1px solid transparent"
-          >
+          <Box paddingY={1} paddingX={2} borderRadius="lg" border="1px solid transparent">
             <Text fontSize="12px" visibility="hidden">
               &nbsp;
             </Text>
@@ -147,9 +137,7 @@ function RunRowData({
   );
 
   const cancellableCount = useMemo(
-    () =>
-      batchRun.scenarioRuns.filter((run) => isCancellableStatus(run.status))
-        .length,
+    () => batchRun.scenarioRuns.filter((run) => isCancellableStatus(run.status)).length,
     [batchRun.scenarioRuns],
   );
   const hasCancellableRuns = cancellableCount > 0;
@@ -207,12 +195,7 @@ function RunRowData({
           )}
           {suiteName && (
             <>
-              <Text
-                fontSize="sm"
-                fontWeight="medium"
-                color="fg.default"
-                flexShrink={0}
-              >
+              <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
                 {suiteName}
               </Text>
               <Text fontSize="sm" color="fg.muted" flexShrink={0}>
@@ -223,12 +206,11 @@ function RunRowData({
           <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
             {timeAgo}
           </Text>
-          {expectedJobCount != null &&
-            summary.totalCount < expectedJobCount && (
-              <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-                {summary.totalCount} of {expectedJobCount}
-              </Text>
-            )}
+          {expectedJobCount != null && summary.totalCount < expectedJobCount && (
+            <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+              {summary.totalCount} of {expectedJobCount}
+            </Text>
+          )}
           {onCancelAll && hasCancellableRuns && (
             <HStack
               as="span"
@@ -255,10 +237,7 @@ function RunRowData({
                 if (!isCancellingBatch) setIsCancelAllDialogOpen(true);
               }}
               onKeyDown={(e: React.KeyboardEvent) => {
-                if (
-                  !isCancellingBatch &&
-                  (e.key === "Enter" || e.key === " ")
-                ) {
+                if (!isCancellingBatch && (e.key === "Enter" || e.key === " ")) {
                   e.stopPropagation();
                   e.preventDefault();
                   setIsCancelAllDialogOpen(true);
@@ -312,15 +291,12 @@ function RunRowData({
             <Dialog.Body>
               <Text fontSize="sm" color="fg.muted">
                 This will cancel {cancellableCount} remaining{" "}
-                {cancellableCount === 1 ? "job" : "jobs"} in this batch run.
-                This action cannot be undone.
+                {cancellableCount === 1 ? "job" : "jobs"} in this batch run. This action
+                cannot be undone.
               </Text>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button
-                variant="outline"
-                onClick={() => setIsCancelAllDialogOpen(false)}
-              >
+              <Button variant="outline" onClick={() => setIsCancelAllDialogOpen(false)}>
                 Keep running
               </Button>
               <Button
@@ -331,8 +307,7 @@ function RunRowData({
                 }}
                 data-testid="confirm-cancel-all-button"
               >
-                Cancel {cancellableCount}{" "}
-                {cancellableCount === 1 ? "job" : "jobs"}
+                Cancel {cancellableCount} {cancellableCount === 1 ? "job" : "jobs"}
               </Button>
             </Dialog.Footer>
           </Dialog.Content>

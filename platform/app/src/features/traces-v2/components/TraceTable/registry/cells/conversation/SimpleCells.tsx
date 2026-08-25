@@ -88,10 +88,7 @@ export const SessionContextSizeCell: CellDef<ConversationGroup> = {
     // mark as "never reported".
     if (tokens == null) return <MonoCell>{dash}</MonoCell>;
     return (
-      <Tooltip
-        content={CONTEXT_SIZE_EXPLANATION}
-        positioning={{ placement: "top" }}
-      >
+      <Tooltip content={CONTEXT_SIZE_EXPLANATION} positioning={{ placement: "top" }}>
         <MonoCell>{tokens === 0 ? "0" : formatTokens(tokens)}</MonoCell>
       </Tooltip>
     );

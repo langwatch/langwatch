@@ -51,10 +51,9 @@ const fmtRelative = (date: Date | string | null): string => {
 function GovernanceTeamDetailPage() {
   const router = useRouter();
   const teamId = typeof router.query.id === "string" ? router.query.id : null;
-  const { organization, organizations, hasAnyPermission } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-    });
+  const { organization, organizations, hasAnyPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
   const orgId = organization?.id ?? "";
   const canReadActivity = hasAnyPermission("activityMonitor:view");
   // Resolve the team's first project slug for the bird's-eye drill-in
@@ -64,9 +63,8 @@ function GovernanceTeamDetailPage() {
   // PersonalSidebar via the v2 chrome retention discriminator (admin's
   // not a TeamUser → AdminViewingAsBanner fires from DashboardLayout).
   const teamProjectSlug =
-    organizations
-      ?.flatMap((org) => org.teams ?? [])
-      .find((t) => t.id === teamId)?.projects?.[0]?.slug ?? null;
+    organizations?.flatMap((org) => org.teams ?? []).find((t) => t.id === teamId)
+      ?.projects?.[0]?.slug ?? null;
 
   const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 500 },
@@ -96,9 +94,7 @@ function GovernanceTeamDetailPage() {
               width="14px"
               height="14px"
               borderRadius="full"
-              backgroundColor={
-                team ? getHexColorForString(team.teamName) : "fg.muted"
-              }
+              backgroundColor={team ? getHexColorForString(team.teamName) : "fg.muted"}
             />
             <Heading size="md">{team?.teamName ?? "Team not found"}</Heading>
           </HStack>
@@ -117,29 +113,18 @@ function GovernanceTeamDetailPage() {
         ) : teamsQuery.isLoading ? (
           <Spinner />
         ) : !team ? (
-          <Box
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            padding={5}
-          >
+          <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={5}>
             <Text fontSize="sm" color="fg.muted">
-              No spend data for this team in the last 30 days. The team may not
-              have any associated ingestion sources reporting activity yet.
+              No spend data for this team in the last 30 days. The team may not have any
+              associated ingestion sources reporting activity yet.
             </Text>
           </Box>
         ) : (
           <>
             <SimpleGrid columns={{ base: 1, md: 4 }} gap={3}>
               <Stat label="Spend (30 d)" value={fmtUsd(team.spendUsd)} />
-              <Stat
-                label="Requests"
-                value={numeral(team.requestCount).format("0,0")}
-              />
-              <Stat
-                label="Last active"
-                value={fmtRelative(team.lastActivityIso)}
-              />
+              <Stat label="Requests" value={numeral(team.requestCount).format("0,0")} />
+              <Stat label="Last active" value={fmtRelative(team.lastActivityIso)} />
               <Stat
                 label="Sources"
                 value={`${team.sourceCount} ${team.sourceCount === 1 ? "source" : "sources"}`}
@@ -156,8 +141,8 @@ function GovernanceTeamDetailPage() {
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend, per-user breakdown, and model mix for this team
-                will land here in a follow-up.
+                Per-day spend, per-user breakdown, and model mix for this team will land
+                here in a follow-up.
               </Text>
               {teamProjectSlug && (
                 <>
@@ -169,29 +154,18 @@ function GovernanceTeamDetailPage() {
                   >
                     View this team's workspace traces →
                   </Link>
-                  <Text
-                    fontSize="xs"
-                    color="fg.subtle"
-                    marginTop={1}
-                    marginBottom={3}
-                  >
-                    The trace explorer opens with the team's data. A 'Viewing as
-                    admin' banner stays present + the access is logged to
-                    /settings/audit-log.
+                  <Text fontSize="xs" color="fg.subtle" marginTop={1} marginBottom={3}>
+                    The trace explorer opens with the team's data. A 'Viewing as admin'
+                    banner stays present + the access is logged to /settings/audit-log.
                   </Text>
                 </>
               )}
-              <Link
-                href="/governance"
-                color="blue.600"
-                fontSize="sm"
-                fontWeight="medium"
-              >
+              <Link href="/governance" color="blue.600" fontSize="sm" fontWeight="medium">
                 See this team in the bird's-eye chart →
               </Link>
               <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-                The chart's {`'By Team'`} toggle exercises the same data through
-                one orthogonal lens until the dedicated drilldown ships.
+                The chart's {`'By Team'`} toggle exercises the same data through one
+                orthogonal lens until the dedicated drilldown ships.
               </Text>
             </Box>
           </>
@@ -203,12 +177,7 @@ function GovernanceTeamDetailPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={3}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
       <Text
         fontSize="xs"
         fontWeight="semibold"

@@ -54,9 +54,7 @@ describe("SpanCostService.extractTokenTiming", () => {
 
     it("prefers stream events over the langwatch.timestamps attribute", () => {
       const span = makeSpan({
-        events: [
-          { name: "gen_ai.content.chunk", timeUnixMs: 10_500, attributes: {} },
-        ],
+        events: [{ name: "gen_ai.content.chunk", timeUnixMs: 10_500, attributes: {} }],
         spanAttributes: {
           "langwatch.timestamps": { first_token_at: 10_800 },
         },

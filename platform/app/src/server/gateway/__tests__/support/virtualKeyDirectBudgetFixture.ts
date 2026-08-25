@@ -325,10 +325,7 @@ export async function teardownFixture(clickhouse: CommandRunner | null) {
   if (clickhouse) {
     // The rollup is a materialized-view target, so the source delete does
     // not cascade; both tables need the sweep.
-    for (const table of [
-      "gateway_budget_ledger_events",
-      "gateway_budget_scope_totals",
-    ]) {
+    for (const table of ["gateway_budget_ledger_events", "gateway_budget_scope_totals"]) {
       await clickhouse.command({
         query: `DELETE FROM ${table} WHERE TenantId = {tenantId:String}`,
         query_params: { tenantId: PROJECT_ID },

@@ -1,7 +1,4 @@
-import {
-  NullQueueAuditSink,
-  type QueueAuditSink,
-} from "./queue-audit.repository";
+import { NullQueueAuditSink, type QueueAuditSink } from "./queue-audit.repository";
 import type {
   BlockedSummary,
   DlqGroupInfo,
@@ -188,9 +185,7 @@ export class QueueService {
     return this.repo.unblockGroup(params);
   }
 
-  async unblockAll(params: {
-    queueName: string;
-  }): Promise<{ unblockedCount: number }> {
+  async unblockAll(params: { queueName: string }): Promise<{ unblockedCount: number }> {
     return this.repo.unblockAll(params);
   }
 
@@ -201,17 +196,11 @@ export class QueueService {
     return this.repo.drainGroup(params);
   }
 
-  async pausePipeline(params: {
-    queueName: string;
-    key: string;
-  }): Promise<void> {
+  async pausePipeline(params: { queueName: string; key: string }): Promise<void> {
     return this.repo.pausePipeline(params);
   }
 
-  async unpausePipeline(params: {
-    queueName: string;
-    key: string;
-  }): Promise<void> {
+  async unpausePipeline(params: { queueName: string; key: string }): Promise<void> {
     return this.repo.unpausePipeline(params);
   }
 
@@ -227,17 +216,11 @@ export class QueueService {
     return this.repo.listPausedKeys(params);
   }
 
-  async pauseTenant(params: {
-    queueName: string;
-    tenantId: string;
-  }): Promise<void> {
+  async pauseTenant(params: { queueName: string; tenantId: string }): Promise<void> {
     return this.repo.pauseTenant(params);
   }
 
-  async unpauseTenant(params: {
-    queueName: string;
-    tenantId: string;
-  }): Promise<void> {
+  async unpauseTenant(params: { queueName: string; tenantId: string }): Promise<void> {
     return this.repo.unpauseTenant(params);
   }
 

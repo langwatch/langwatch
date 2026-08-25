@@ -1,20 +1,9 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { formatTimeAgo } from "@langwatch/ops-web";
 import { PinnedAwareJsonView } from "~/features/traces-v2/components/TraceDrawer/JsonHighlight";
 import type { ProcessOutboxMessageView } from "~/server/app-layer/ops/repositories/process-ops.repository";
-import {
-  type GrafanaDeepLinkConfig,
-  grafanaTraceUrl,
-} from "~/utils/grafanaLinks";
+import { type GrafanaDeepLinkConfig, grafanaTraceUrl } from "~/utils/grafanaLinks";
 
 const NO_PINNED_KEYS: ReadonlySet<string> = new Set();
 
@@ -26,11 +15,7 @@ const STATUS_PALETTES: Record<ProcessOutboxMessageView["status"], string> = {
   discarded: "gray",
 };
 
-function StatusBadge({
-  status,
-}: {
-  status: ProcessOutboxMessageView["status"];
-}) {
+function StatusBadge({ status }: { status: ProcessOutboxMessageView["status"] }) {
   const palette = STATUS_PALETTES[status];
   return (
     <Badge size="xs" colorPalette={palette} variant="subtle">
@@ -52,12 +37,7 @@ function MessageHeaderRow({
 }) {
   return (
     <HStack gap={2}>
-      <Text
-        textStyle="xs"
-        fontFamily="mono"
-        truncate
-        title={message.messageKey}
-      >
+      <Text textStyle="xs" fontFamily="mono" truncate title={message.messageKey}>
         {message.intentType}
       </Text>
       <StatusBadge status={message.status} />
@@ -145,9 +125,7 @@ function MessageMetaRow({
           colorPalette="red"
           loading={actionPending}
           title="A mark, not a delete: the row is kept as the audit record and the message is never sent."
-          onClick={() =>
-            onDiscard({ id: message.id, intentType: message.intentType })
-          }
+          onClick={() => onDiscard({ id: message.id, intentType: message.intentType })}
         >
           Discard
         </Button>
@@ -200,9 +178,7 @@ export function OutboxMessageCard({
     message.leasedUntil !== null &&
     message.leasedUntil < now;
   const traceHref =
-    message.traceId && grafana
-      ? grafanaTraceUrl(message.traceId, grafana)
-      : null;
+    message.traceId && grafana ? grafanaTraceUrl(message.traceId, grafana) : null;
 
   return (
     <Card.Root variant="outline">

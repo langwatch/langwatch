@@ -32,14 +32,12 @@ vi.mock("langwatch", () => ({
 }));
 
 const { ClickHouseTraceService } = await import("../clickhouse-trace.service");
-const { RetentionPolicyCache } = await import(
-  "~/server/data-retention/retentionPolicyCache"
-);
+const { RetentionPolicyCache } =
+  await import("~/server/data-retention/retentionPolicyCache");
 
 /** The service keeps its floor service private; this is the wiring under test. */
 function retentionProviderOf(service: unknown) {
-  const floor = (service as { retentionFloor: { provider?: unknown } })
-    .retentionFloor;
+  const floor = (service as { retentionFloor: { provider?: unknown } }).retentionFloor;
   return (floor as { provider?: unknown }).provider;
 }
 

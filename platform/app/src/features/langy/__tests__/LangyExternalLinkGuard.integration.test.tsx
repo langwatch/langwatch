@@ -9,13 +9,7 @@
  * whose words say LangWatch and whose address does not.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -138,9 +132,7 @@ describe("given an answer linking somewhere that is not LangWatch", () => {
   describe("when the words on the link name a LangWatch address", () => {
     /** @scenario The dialog reads the address, never the link's words */
     it("names the host the address really points at", async () => {
-      renderAnswer(
-        "[https://docs.langwatch.ai/setup](https://evil.example/login)",
-      );
+      renderAnswer("[https://docs.langwatch.ai/setup](https://evil.example/login)");
       whenClicked("https://docs.langwatch.ai/setup");
 
       await theDialog();
@@ -149,9 +141,7 @@ describe("given an answer linking somewhere that is not LangWatch", () => {
 
     /** @scenario The dialog reads the address, never the link's words */
     it("does not repeat the words as if they were the destination", async () => {
-      renderAnswer(
-        "[https://docs.langwatch.ai/setup](https://evil.example/login)",
-      );
+      renderAnswer("[https://docs.langwatch.ai/setup](https://evil.example/login)");
       whenClicked("https://docs.langwatch.ai/setup");
 
       const dialog = await theDialog();
@@ -237,9 +227,7 @@ describe("given an answer linking somewhere that is not LangWatch", () => {
       whenClicked("Pricing");
 
       await theDialog();
-      fireEvent.click(
-        screen.getByRole("button", { name: /Open example\.com/ }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: /Open example\.com/ }));
 
       expect(window.open).toHaveBeenCalledWith(
         "https://example.com/pricing",
@@ -262,12 +250,8 @@ describe("given an answer linking somewhere that is not LangWatch", () => {
         .map((button) => button.textContent ?? "");
       expect(labels).toHaveLength(2);
       expect(labels).toContain("Stay here");
-      expect(labels.some((label) => label.startsWith("Open example.com"))).toBe(
-        true,
-      );
-      expect(labels.some((label) => /again|always|trust/i.test(label))).toBe(
-        false,
-      );
+      expect(labels.some((label) => label.startsWith("Open example.com"))).toBe(true);
+      expect(labels.some((label) => /again|always|trust/i.test(label))).toBe(false);
     });
   });
 });

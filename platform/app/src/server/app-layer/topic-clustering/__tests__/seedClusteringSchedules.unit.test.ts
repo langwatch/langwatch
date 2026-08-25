@@ -16,17 +16,19 @@ import {
 /** A fake project page source that serves `pages` in order, then empties. */
 const pagerOver = (pages: string[][]) => {
   const calls: { afterId: string | null; take: number }[] = [];
-  const findEligibleProjectsPage: BackfillDeps["findEligibleProjectsPage"] =
-    async ({ afterId, take }) => {
-      calls.push({ afterId, take });
-      const index = calls.length - 1;
-      return (pages[index] ?? []).map((id) => ({ id }));
-    };
+  const findEligibleProjectsPage: BackfillDeps["findEligibleProjectsPage"] = async ({
+    afterId,
+    take,
+  }) => {
+    calls.push({ afterId, take });
+    const index = calls.length - 1;
+    return (pages[index] ?? []).map((id) => ({ id }));
+  };
   return { findEligibleProjectsPage, calls };
 };
 
-const noneScheduled: BackfillDeps["findAlreadyScheduledProjectIds"] =
-  async () => new Set<string>();
+const noneScheduled: BackfillDeps["findAlreadyScheduledProjectIds"] = async () =>
+  new Set<string>();
 
 describe("backfillTopicClusteringSchedules", () => {
   describe("given every project bootstraps cleanly", () => {
@@ -68,9 +70,12 @@ describe("backfillTopicClusteringSchedules", () => {
           pageSize: 10,
         });
 
-        expect(
-          requestClustering.mock.calls.map(([args]) => args.projectId),
-        ).toEqual(["p1", "p2", "p3", "p4"]);
+        expect(requestClustering.mock.calls.map(([args]) => args.projectId)).toEqual([
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+        ]);
         expect(summary.scanned).toBe(4);
       });
 
@@ -116,9 +121,9 @@ describe("backfillTopicClusteringSchedules", () => {
           skipped: 2,
           scanned: 3,
         });
-        expect(
-          requestClustering.mock.calls.map(([args]) => args.projectId),
-        ).toEqual(["p2"]);
+        expect(requestClustering.mock.calls.map(([args]) => args.projectId)).toEqual([
+          "p2",
+        ]);
       });
     });
   });
@@ -136,9 +141,13 @@ describe("backfillTopicClusteringSchedules", () => {
         });
 
         expect(summary.succeeded).toBe(5);
-        expect(
-          requestClustering.mock.calls.map(([args]) => args.projectId),
-        ).toEqual(["p1", "p2", "p3", "p4", "p5"]);
+        expect(requestClustering.mock.calls.map(([args]) => args.projectId)).toEqual([
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+        ]);
       });
 
       it("advances the keyset cursor to the last id of the previous page", async () => {
@@ -184,9 +193,7 @@ describe("backfillTopicClusteringSchedules", () => {
         });
 
         expect(
-          findAlreadyScheduledProjectIds.mock.calls.map(
-            ([args]) => args.projectIds,
-          ),
+          findAlreadyScheduledProjectIds.mock.calls.map(([args]) => args.projectIds),
         ).toEqual([["p1", "p2"], ["p3"]]);
       });
     });
@@ -259,9 +266,7 @@ function fakeRedis() {
 }
 
 describe("seedClusteringSchedules", () => {
-  const oneProjectDeps = (
-    requestClustering = vi.fn().mockResolvedValue(undefined),
-  ) => ({
+  const oneProjectDeps = (requestClustering = vi.fn().mockResolvedValue(undefined)) => ({
     ...pagerOver([["p1"]]),
     findAlreadyScheduledProjectIds: noneScheduled,
     requestClustering,
@@ -336,22 +341,14 @@ describe("seedClusteringSchedules", () => {
         redis: redis as any,
       });
 
-      expect(redis.del).toHaveBeenCalledWith(
-        "topic-clustering:schedule-seed:v1",
-      );
+      expect(redis.del).toHaveBeenCalledWith("topic-clustering:schedule-seed:v1");
     });
   });
 
   describe("given another replica holds the claim", () => {
     it("skips the walk without touching the bootstrap command", async () => {
       const redis = fakeRedis();
-      await redis.set(
-        "topic-clustering:schedule-seed:v1",
-        "1",
-        "EX",
-        3600,
-        "NX",
-      );
+      await redis.set("topic-clustering:schedule-seed:v1", "1", "EX", 3600, "NX");
 
       const requestClustering = vi.fn();
       const summary = await seedClusteringSchedules({

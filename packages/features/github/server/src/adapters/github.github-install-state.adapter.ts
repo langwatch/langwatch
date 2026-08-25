@@ -39,9 +39,7 @@ export function signGithubInstallState(
   payload: GithubInstallStatePayload,
   signingKey: string,
 ): string {
-  const body = Buffer.from(JSON.stringify(payload), "utf8").toString(
-    "base64url",
-  );
+  const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
   const sig = createHmac("sha256", signingKey).update(body).digest("base64url");
   return `${body}.${sig}`;
 }

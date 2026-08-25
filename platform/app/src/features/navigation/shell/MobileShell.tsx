@@ -1,12 +1,6 @@
 import { Box, HStack, IconButton, Spacer, Text } from "@chakra-ui/react";
 import { Menu as MenuIcon, Settings as SettingsIcon, X } from "lucide-react";
-import {
-  type ReactNode,
-  type RefObject,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { AppHeaderUserMenu } from "~/components/AppHeaderUserMenu";
 import { LogoIcon } from "~/components/icons/LogoIcon";
 import { SideMenuDensityProvider } from "~/components/sidebar/sideMenuDensity";
@@ -112,8 +106,7 @@ function MobileTopBar({
   onMenuButtonPress: () => void;
   menuButtonRef?: RefObject<HTMLButtonElement | null>;
 }) {
-  const showsOwnScope =
-    activeProductId === "llm-ops" || activeProductId === "me";
+  const showsOwnScope = activeProductId === "llm-ops" || activeProductId === "me";
 
   return (
     <HStack
@@ -147,9 +140,7 @@ function MobileTopBar({
       </HStack>
       <IconButton
         ref={menuButtonRef}
-        aria-label={
-          isMenuOpen ? "Close navigation menu" : "Open navigation menu"
-        }
+        aria-label={isMenuOpen ? "Close navigation menu" : "Open navigation menu"}
         variant="ghost"
         size="sm"
         onClick={onMenuButtonPress}
@@ -275,9 +266,7 @@ function trapTab({
   const active = document.activeElement;
   if (!overlay || !active || !overlay.contains(active)) return;
 
-  const focusable = Array.from(
-    overlay.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-  );
+  const focusable = Array.from(overlay.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
   if (!first || !last) return;

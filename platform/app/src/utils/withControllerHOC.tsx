@@ -28,11 +28,7 @@ import type React from "react";
  * export default withController(MyComponent, useMyController);
  * ```
  */
-export function withController<
-  P extends object,
-  C,
-  ComponentProps extends P & C = P & C,
->(
+export function withController<P extends object, C, ComponentProps extends P & C = P & C>(
   Component: React.ComponentType<ComponentProps>,
   useController: (props: P) => C,
 ): React.ComponentType<P & Omit<ComponentProps, keyof (P & C)>> {

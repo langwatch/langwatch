@@ -16,6 +16,7 @@ description: Measure workflow quality using LangWatch’s evaluation tools to en
 ## The Importance of Evaluation
 
 Evaluators are essential tools for measuring LLM output quality. When you have a reliable way to measure quality, it becomes much easier to:
+
 - Compare different LLM models
 - Test prompt variations
 - Validate feature additions
@@ -26,21 +27,27 @@ Evaluators are essential tools for measuring LLM output quality. When you have a
 On the video, a few evaluators are introduced:
 
 ### Exact Match Evaluator [(0:56)](https://www.youtube.com/watch?v=-sQikz38yBI&t=56s)
+
 The simplest form of evaluation, perfect for classification tasks:
+
 - Compares LLM output directly with expected output
 - Uses straightforward string matching
 - Ideal for categorical outputs where precision is crucial
 - Works well when you need strict matching
 
 ### Answer Correctness Evaluator [(4:44)](https://www.youtube.com/watch?v=-sQikz38yBI&t=264s)
+
 Comparison with golden answers for factual accuracy:
+
 - Uses another LLM to assess if answers are factually equivalent
 - Looks beyond exact wording to evaluate semantic meaning
 - Particularly useful for QA systems and knowledge-based tasks
 - Can handle variations in phrasing while maintaining accuracy checking
 
 ### LLM as Judge Evaluator [(7:01)](https://www.youtube.com/watch?v=-sQikz38yBI&t=421s)
+
 Flexible evaluation for custom criteria:
+
 - Allows custom prompts to define evaluation criteria
 - Useful when you don't have expected outputs
 - Can evaluate subjective qualities (conciseness, tone, style)
@@ -49,21 +56,27 @@ Flexible evaluation for custom criteria:
 ## Working with Evaluators
 
 ### Setting Up Evaluators [(1:32)](https://www.youtube.com/watch?v=-sQikz38yBI&t=92s)
+
 To implement an evaluator:
+
 1. Drag and drop the desired evaluator onto your workflow
 2. Connect appropriate inputs (output from LLM, expected output from dataset)
 3. Configure any additional parameters or criteria
 4. Run evaluation on individual examples or full test sets
 
 ### Running Evaluations [(2:28)](https://www.youtube.com/watch?v=-sQikz38yBI&t=148s)
+
 The evaluation process:
+
 1. Select your test dataset
 2. Choose appropriate evaluator
 3. Run evaluation across all test examples
 4. Review accuracy scores and individual results
 
 ### Improving Results [(9:14)](https://www.youtube.com/watch?v=-sQikz38yBI&t=554s)
+
 After setting up evaluation:
+
 - Make incremental changes to your workflow
 - Test impact immediately through re-evaluation
 - Track improvements in accuracy scores

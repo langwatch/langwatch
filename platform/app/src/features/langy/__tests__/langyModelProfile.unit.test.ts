@@ -33,9 +33,7 @@ describe("profileLangyModel", () => {
   });
 
   it("does not invent capabilities for custom models", () => {
-    expect(
-      profileLangyModel({ modelId: "custom/my-model", isCustom: true }),
-    ).toEqual({
+    expect(profileLangyModel({ modelId: "custom/my-model", isCustom: true })).toEqual({
       group: "custom",
       isQuick: false,
       isLongRunning: false,

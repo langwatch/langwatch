@@ -146,8 +146,7 @@ const messageSchema = z
   })
   .transform(({ role, parts, content }) => ({
     role,
-    parts:
-      parts ?? (content === undefined ? [] : [{ type: "text", text: content }]),
+    parts: parts ?? (content === undefined ? [] : [{ type: "text", text: content }]),
   }));
 
 const turnBodySchema = z.object({
@@ -232,10 +231,7 @@ async function authorizeTurn(c: Context) {
     now: new Date(),
   });
   if (!actor.ok) {
-    throw new LangyApiIdentityDeniedError(
-      "langy_api_actor_missing",
-      actor.message,
-    );
+    throw new LangyApiIdentityDeniedError("langy_api_actor_missing", actor.message);
   }
 
   return {
@@ -278,8 +274,7 @@ function requestedWaitSeconds(c: Context): number | null {
  */
 async function parseTurnBody(c: Context, conversationId: string | null) {
   const parsed = turnBodySchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success)
-    throw new LangyApiRequestInvalidError(parsed.error.issues);
+  if (!parsed.success) throw new LangyApiRequestInvalidError(parsed.error.issues);
   if (parsed.data.adoptConversationId && !conversationId) {
     throw new LangyApiRequestInvalidError([
       {
@@ -374,10 +369,8 @@ async function startTurn({
 
 secured
   .access(langyTurnAuth)
-  .post(
-    "/conversations",
-    bodyLimit({ maxSize: MAX_TURN_BODY_BYTES }),
-    async (c) => startTurn({ c, conversationId: null }),
+  .post("/conversations", bodyLimit({ maxSize: MAX_TURN_BODY_BYTES }), async (c) =>
+    startTurn({ c, conversationId: null }),
   );
 
 secured
@@ -385,8 +378,7 @@ secured
   .post(
     "/conversations/:conversationId/messages",
     bodyLimit({ maxSize: MAX_TURN_BODY_BYTES }),
-    async (c) =>
-      startTurn({ c, conversationId: c.req.param("conversationId") }),
+    async (c) => startTurn({ c, conversationId: c.req.param("conversationId") }),
   );
 
 export const app = secured.hono;

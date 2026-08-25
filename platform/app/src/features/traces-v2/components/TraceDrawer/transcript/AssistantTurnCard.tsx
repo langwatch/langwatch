@@ -33,10 +33,7 @@ export function AssistantTurnCard({
     () => blocks.filter((b) => b.kind !== "text").length + toolCalls.length,
     [blocks, toolCalls],
   );
-  const hasOutputText = useMemo(
-    () => blocks.some((b) => b.kind === "text"),
-    [blocks],
-  );
+  const hasOutputText = useMemo(() => blocks.some((b) => b.kind === "text"), [blocks]);
   // Default: collapse operations whenever there's a final text reply, so the
   // assistant's actual message reads first. The header toggle expands the
   // chain on demand. When there's no final text (pure tool/thinking turn),
@@ -47,10 +44,7 @@ export function AssistantTurnCard({
   // skip every non-text block. Falls back to the full list when there's
   // nothing else to show (so the empty-state stays meaningful).
   const visibleBlocks = useMemo(
-    () =>
-      opsHidden && hasOutputText
-        ? blocks.filter((b) => b.kind === "text")
-        : blocks,
+    () => (opsHidden && hasOutputText ? blocks.filter((b) => b.kind === "text") : blocks),
     [opsHidden, hasOutputText, blocks],
   );
   const visibleToolCalls = opsHidden && hasOutputText ? [] : toolCalls;
@@ -118,9 +112,7 @@ export function AssistantTurnCard({
           <>
             {/* If the steps toggle wasn't rendered, push the chevron
                 to the right edge with our own spacer. */}
-            {!(!collapseTools && operationCount > 0 && hasOutputText) && (
-              <Box flex="1" />
-            )}
+            {!(!collapseTools && operationCount > 0 && hasOutputText) && <Box flex="1" />}
             <TurnCollapseChevron onClick={onCollapse} />
           </>
         )}

@@ -1,18 +1,10 @@
 import Parse from "papaparse";
 import type { SimulationExportRun } from "@langwatch/simulation-contract";
 import { describe, expect, it } from "vitest";
-import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
-import {
-  serializeRunsToCriteriaCsv,
-  serializeRunsToFullCsv,
-} from "../csv-serializer";
+import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
+import { serializeRunsToCriteriaCsv, serializeRunsToFullCsv } from "../csv-serializer";
 
-function buildRun(
-  overrides: Partial<SimulationExportRun> = {},
-): SimulationExportRun {
+function buildRun(overrides: Partial<SimulationExportRun> = {}): SimulationExportRun {
   return {
     scenarioRunId: "run_1",
     scenarioId: "scenario_1",
@@ -86,9 +78,7 @@ describe("scenario run CSV serializers", () => {
             header.findIndex((h) => h.replace(/^run_/, "") === c),
           ).filter((i) => i >= 0),
         );
-        const verdictAt = header.findIndex(
-          (h) => h.replace(/^run_/, "") === "verdict",
-        );
+        const verdictAt = header.findIndex((h) => h.replace(/^run_/, "") === "verdict");
         const reasoningAt = header.findIndex(
           (h) => h.replace(/^run_/, "") === "reasoning",
         );
@@ -124,10 +114,7 @@ describe("scenario run CSV serializers", () => {
   describe("when exporting in full mode", () => {
     it("writes one row per run when the run has no messages", () => {
       const csv = serializeRunsToFullCsv({
-        runs: [
-          buildRun({ scenarioRunId: "a" }),
-          buildRun({ scenarioRunId: "b" }),
-        ],
+        runs: [buildRun({ scenarioRunId: "a" }), buildRun({ scenarioRunId: "b" })],
         includeHeader: true,
       });
 
@@ -664,9 +651,7 @@ describe("scenario run CSV serializers", () => {
         }),
       );
 
-      const rows = parse(
-        serializeRunsToCriteriaCsv({ runs, includeHeader: true }),
-      );
+      const rows = parse(serializeRunsToCriteriaCsv({ runs, includeHeader: true }));
 
       const failuresOfTerse = rows.filter(
         (row) => row.criterion === terse && row.met === "false",
@@ -674,9 +659,7 @@ describe("scenario run CSV serializers", () => {
       expect(failuresOfTerse).toHaveLength(18);
       // Across 18 distinct scenarios, which is the part no per-scenario view
       // can show — the same rule breaking everywhere.
-      expect(new Set(failuresOfTerse.map((row) => row.scenario_id)).size).toBe(
-        18,
-      );
+      expect(new Set(failuresOfTerse.map((row) => row.scenario_id)).size).toBe(18);
     });
   });
 
@@ -700,9 +683,7 @@ describe("scenario run CSV serializers", () => {
       expect(rows).toHaveLength(2);
       expect(rows.map((r) => r.message_index)).toEqual(["0", "1"]);
       expect(rows.map((r) => r.message_role)).toEqual(["user", "assistant"]);
-      expect(new Set(rows.map((r) => r.run_scenario_run_id))).toEqual(
-        new Set(["run_1"]),
-      );
+      expect(new Set(rows.map((r) => r.run_scenario_run_id))).toEqual(new Set(["run_1"]));
     });
 
     it("carries the criteria that failed, not just how many", () => {
@@ -737,9 +718,7 @@ describe("scenario run CSV serializers", () => {
     /** @scenario A run with no messages still appears in Full mode */
     it("still writes one row for a run that produced no messages", () => {
       const csv = serializeRunsToFullCsv({
-        runs: [
-          buildRun({ messages: [] as SimulationExportRun["messages"] }),
-        ],
+        runs: [buildRun({ messages: [] as SimulationExportRun["messages"] })],
         includeHeader: true,
       });
 
@@ -755,9 +734,7 @@ describe("scenario run CSV serializers", () => {
       const csv = serializeRunsToFullCsv({
         runs: [
           buildRun({
-            messages: [
-              { role: "user", content },
-            ] as SimulationExportRun["messages"],
+            messages: [{ role: "user", content }] as SimulationExportRun["messages"],
           }),
         ],
         includeHeader: true,

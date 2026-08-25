@@ -48,9 +48,7 @@ const PROJECT_ID = "project-1";
 /** The inputs one consumer would send for `traceIds`, in call order. */
 function queryInputsFor(traceIds: string[]): CapturedQuery[] {
   mocks.captured = [];
-  renderHook(() =>
-    useAnnotationsByTraceIds({ projectId: PROJECT_ID, traceIds }),
-  );
+  renderHook(() => useAnnotationsByTraceIds({ projectId: PROJECT_ID, traceIds }));
   return mocks.captured;
 }
 
@@ -83,9 +81,7 @@ describe("given two consumers reading annotations for the same traces", () => {
       const inReverse = queryInputsFor(reversed);
 
       expect(inOrder).toHaveLength(3);
-      expect(inOrder.map((q) => q.traceIds)).toEqual(
-        inReverse.map((q) => q.traceIds),
-      );
+      expect(inOrder.map((q) => q.traceIds)).toEqual(inReverse.map((q) => q.traceIds));
     });
   });
 

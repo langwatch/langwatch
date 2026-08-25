@@ -43,23 +43,15 @@ export function TokenTimelineChart({
           {points.map((point) => {
             const total = totalOf(point);
             const fresh =
-              point.inputTokens +
-              point.outputTokens +
-              point.cacheCreationTokens;
+              point.inputTokens + point.outputTokens + point.cacheCreationTokens;
             const isRebuild = rebuiltAtMs.has(point.atMs);
-            const barPx = Math.max(
-              4,
-              Math.round((total / maxTotal) * CHART_HEIGHT_PX),
-            );
+            const barPx = Math.max(4, Math.round((total / maxTotal) * CHART_HEIGHT_PX));
             const freshPx =
               total === 0
                 ? barPx
                 : Math.min(
                     barPx,
-                    Math.max(
-                      fresh > 0 ? 1 : 0,
-                      Math.round((fresh / total) * barPx),
-                    ),
+                    Math.max(fresh > 0 ? 1 : 0, Math.round((fresh / total) * barPx)),
                   );
             const reusedPx = barPx - freshPx;
             const description = `Call ${point.index + 1} of ${points.length} · ${formatCompact(total)} tokens: ${formatCompact(point.cacheReadTokens)} from cache, ${formatCompact(fresh)} fresh${isRebuild ? ` · cache REBUILT (${formatCompact(point.cacheCreationTokens)})` : ""}`;
@@ -132,21 +124,14 @@ export function TokenTimelineChart({
       <HStack gap={4} flexWrap="wrap">
         <LegendSwatch color="blue.solid/25" label="reused from cache" />
         <LegendSwatch color="blue.solid/70" label="paid fresh" />
-        {rebuilds.length > 0 && (
-          <LegendSwatch color="red.solid" label="cache rebuild" />
-        )}
+        {rebuilds.length > 0 && <LegendSwatch color="red.solid" label="cache rebuild" />}
       </HStack>
 
       {rebuilds.length > 0 && (
         <VStack align="stretch" gap={1.5}>
           {rebuilds.slice(0, 3).map((rebuild, index) => (
             <HStack key={index} gap={2} align="baseline">
-              <Text
-                textStyle="xs"
-                color="red.fg"
-                fontWeight="medium"
-                flexShrink={0}
-              >
+              <Text textStyle="xs" color="red.fg" fontWeight="medium" flexShrink={0}>
                 {`Call ${rebuild.callIndex + 1} rebuilt ${formatCompact(rebuild.cacheCreationTokens)} tokens instead of reusing ${formatCompact(rebuild.previousContextTokens)}`}
               </Text>
               {rebuild.precedingPrompt && (

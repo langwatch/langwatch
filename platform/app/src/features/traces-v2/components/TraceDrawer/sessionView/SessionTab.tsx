@@ -19,11 +19,7 @@ interface SessionTabProps {
  * reader (the app, the CLI, the MCP server) re-walking hundreds of spans to
  * count the same things.
  */
-export function SessionTab({
-  projectId,
-  traceId,
-  occurredAtMs,
-}: SessionTabProps) {
+export function SessionTab({ projectId, traceId, occurredAtMs }: SessionTabProps) {
   const query = api.tracesV2.codingAgentSession.useQuery(
     { projectId, traceId },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
@@ -64,17 +60,15 @@ export function SessionTab({
             No usage summary for this session
           </Text>
           <Text textStyle="xs" color="fg.subtle">
-            Claude Code sessions get one shortly after the run finishes. Other
-            coding agents are not summarized yet.
+            Claude Code sessions get one shortly after the run finishes. Other coding
+            agents are not summarized yet.
           </Text>
         </VStack>
       </Centered>
     );
   }
 
-  return (
-    <SessionView session={query.data} entries={transcriptQuery.data?.entries} />
-  );
+  return <SessionView session={query.data} entries={transcriptQuery.data?.entries} />;
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

@@ -83,9 +83,7 @@ test.describe("Scenario Editor", () => {
    * This combines scenarios that would otherwise require seeded data
    * into a single self-contained workflow test.
    */
-  test("scenario lifecycle: create, view in list, edit, and verify", async ({
-    page,
-  }) => {
+  test("scenario lifecycle: create, view in list, edit, and verify", async ({ page }) => {
     // -------------------------------------------------------------------------
     // Scenario: Save new scenario
     // -------------------------------------------------------------------------
@@ -102,7 +100,7 @@ test.describe("Scenario Editor", () => {
     // And I fill in "Situation" with "User requests a refund for a defective product"
     await whenIFillInSituationWith(
       page,
-      "User requests a refund for a defective product"
+      "User requests a refund for a defective product",
     );
 
     // And I add criterion "Agent acknowledges the issue"

@@ -1,14 +1,7 @@
 import { createLogger } from "@langwatch/observability";
-import type {
-  DataPrivacyPolicy,
-  Prisma,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { DataPrivacyPolicy, Prisma, PrismaClient } from "~/generated/prisma/client";
 import { resolveOrganizationForScope } from "~/server/scopes/resolveOrganizationForScope";
-import {
-  type DataPrivacyConfig,
-  dataPrivacyConfigSchema,
-} from "./dataPrivacy.types";
+import { type DataPrivacyConfig, dataPrivacyConfigSchema } from "./dataPrivacy.types";
 import {
   buildDataPrivacyChain,
   type DataPrivacyRow,
@@ -99,9 +92,7 @@ export class DataPrivacyPolicyRepository {
    * longer parses (hand-edited JSON) are skipped with a warning rather than
    * failing the whole resolution.
    */
-  async findForProjectChain(
-    facts: DataPrivacyScopeFacts,
-  ): Promise<DataPrivacyRow[]> {
+  async findForProjectChain(facts: DataPrivacyScopeFacts): Promise<DataPrivacyRow[]> {
     const seen = new Set<string>();
     const pairs: { scopeType: DataPrivacyScopeTier; scopeId: string }[] = [];
     for (const { scopeType, scopeId } of buildDataPrivacyChain(facts)) {
@@ -191,9 +182,7 @@ export class DataPrivacyPolicyRepository {
    * DEPARTMENT resolves through its own table (the generic scope resolver
    * only knows the universal three tiers); everything else delegates to it.
    */
-  async findOrganizationForScope(
-    scope: DataPrivacyScope,
-  ): Promise<string | null> {
+  async findOrganizationForScope(scope: DataPrivacyScope): Promise<string | null> {
     if (scope.scopeType === "DEPARTMENT") {
       const department = await this.prisma.department.findUnique({
         where: { id: scope.scopeId },

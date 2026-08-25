@@ -11,12 +11,14 @@
 ## 1. Goals & non-goals
 
 **Goals**
+
 - nlpgo is the **only** NLP execution engine. It produces byte-equivalent results to the deleted Python `langwatch_nlp` for every supported workflow shape.
 - The playground proxy is a thin in-process dispatch in front of the Go AI Gateway (`services/aigateway/`). No LiteLLM.
 - The deployable artifact (self-hosted image + production Lambda) is Go-only at the application layer. No Python framework or service. The single remaining Python dependency is a minimal stdlib `python3` interpreter used to sandbox user code blocks (see §7).
 - DSPy and LiteLLM are gone entirely. The engine is plain Go structs + a stateless prompt builder; the proxy is plain HTTP.
 
 **Non-goals**
+
 - Rewriting topic clustering in Go. It stays on Python, hosted by **langevals** (the workspace member at `services/langevals/evaluators/topic_clustering/`). The TS app routes topic clustering unconditionally to `${LANGEVALS_ENDPOINT}/topics/{batch,incremental}_clustering`. `langevals` remains a separate Python service (evaluators + presidio PII + topic clustering); it is **not** in scope for this removal.
 - Backwards-incompatible URL or DSL changes for customers. The Studio JSON schema is frozen; only internal interfaces moved.
 - Removing the code-block feature. User code blocks keep working via the bundled stdlib `python3` sandbox (§7).
@@ -25,13 +27,13 @@
 
 ## 2. Service layout
 
-| Component | Repo | Path |
-|---|---|---|
-| Go NLP service (sole engine) | `langwatch` | `services/nlpgo/` (a subcommand of `cmd/service/main.go`) |
-| Self-hosted NLP image | `langwatch` | `infra/docker/Dockerfile.langwatch_nlp` (Go binary + slim stdlib `python3`) |
-| Helm | `langwatch` | `charts/langwatch/templates/langwatch_nlp/` (single Go container) |
-| BDD specs | `langwatch` | `specs/nlp-go/` |
-| Production Lambda artifact | `langwatch-saas` | `infrastructure/langwatch_nlp_lambda.tf` + saas runtime packaging |
+| Component                    | Repo             | Path                                                                        |
+| ---------------------------- | ---------------- | --------------------------------------------------------------------------- |
+| Go NLP service (sole engine) | `langwatch`      | `services/nlpgo/` (a subcommand of `cmd/service/main.go`)                   |
+| Self-hosted NLP image        | `langwatch`      | `infra/docker/Dockerfile.langwatch_nlp` (Go binary + slim stdlib `python3`) |
+| Helm                         | `langwatch`      | `charts/langwatch/templates/langwatch_nlp/` (single Go container)           |
+| BDD specs                    | `langwatch`      | `specs/nlp-go/`                                                             |
+| Production Lambda artifact   | `langwatch-saas` | `infrastructure/langwatch_nlp_lambda.tf` + saas runtime packaging           |
 
 The Python `langwatch_nlp/` directory has been **deleted**. The Go service mirrors `services/aigateway/` patterns: chi/v5 router, structured logging, env hydration, `pkg/lifecycle` graceful shutdown, OTel via the shared provider, panic recovery middleware.
 
@@ -83,6 +85,7 @@ The DSL is defined in `langwatch_nlp/langwatch_nlp/studio/types/dsl.py`. Go stru
 **Top-level:** `Workflow{ workflow_id, version_id, api_key, nodes: Node[], edges: Edge[], state: ExecutionState, ... }`.
 
 **Node kinds (v1 in scope):**
+
 - `entry` — Dataset entry point (records + train/test split + `entry_selection`).
 - `signature` — LLM call (Ash owns the executor).
 - `code` — User Python code, sandboxed (see §7).
@@ -91,6 +94,7 @@ The DSL is defined in `langwatch_nlp/langwatch_nlp/studio/types/dsl.py`. Go stru
 - `prompting_technique` — Decorator referenced by signature nodes (`ChainOfThought`, `MultiHop`, `ReAct`); v1 supports at minimum `ChainOfThought` (hidden `reasoning` field) — others tracked as follow-up.
 
 **Node kinds (v1 out of scope, return 501 if encountered):**
+
 - `agent`, `evaluator`, `retriever`, `custom`. Workflows containing these stay on the Python path (the TS-side feature-flag check returns false when any node kind is unsupported by Go).
 
 **Field types:** `str`, `image`, `float`, `int`, `bool`, `list[*]`, `dict`, `json_schema`, `chat_messages`, `signature`, `llm`, `dataset`, `code`. All must be parseable; `image`/`chat_messages` carry chat-history semantics (see §10).
@@ -103,12 +107,12 @@ The DSL is defined in `langwatch_nlp/langwatch_nlp/studio/types/dsl.py`. Go stru
 
 Server-Sent Events. Event shapes match `langwatch_nlp.studio.types.events.StudioServerEvent`:
 
-| event | data |
-|---|---|
-| `is_alive_response` | `{}` — heartbeat every `NLP_STREAM_HEARTBEAT_SECONDS` (default 15). Matches Python `IsAliveResponse.type`. |
+| event                    | data                                                                                                              |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `is_alive_response`      | `{}` — heartbeat every `NLP_STREAM_HEARTBEAT_SECONDS` (default 15). Matches Python `IsAliveResponse.type`.        |
 | `execution_state_change` | `{ trace_id, state: { status, nodes: { <node_id>: { status, inputs, outputs, error?, cost?, duration_ms? } } } }` |
-| `done` | `{ trace_id, status: "success" \| "error", result }` |
-| `error` | `{ trace_id, payload: { stack?, message } }` |
+| `done`                   | `{ trace_id, status: "success" \| "error", result }`                                                              |
+| `error`                  | `{ trace_id, payload: { stack?, message } }`                                                                      |
 
 - Idle timeout = `NLP_STREAM_IDLE_TIMEOUT_SECONDS` (default 900). On timeout, emit `error` then close.
 - Client cancellation: closing the connection MUST cancel in-flight node executions (cooperative; nodes check ctx).
@@ -142,11 +146,13 @@ sandboxing isolates user Python at the subprocess boundary (see §7), so the
 gateway library and the user's Python sandbox never share an address space.
 
 What the in-process dispatcher does NOT skip:
+
 - Provider routing through Bifrost (real provider HTTP calls).
 - Per-provider error classification + retry (Bifrost-internal).
 - Streaming pass-through with raw-byte preservation.
 
 What it does skip (vs. the HTTP `/v1/*` path used by SDK/CLI customers):
+
 - Virtual-key auth — nlpgo brings credentials per-call.
 - Rate limiting — internal traffic, not customer-facing.
 - Budget tracking — no VK to debit.
@@ -191,12 +197,14 @@ custom:    { api_key, api_base }
 ## 9. Provider credential injection — translation matrix
 
 Today the TS app injects credentials in two shapes:
+
 - **Studio runs:** baked into `workflow.nodes[*].data.parameters[*].value.litellm_params` by `prepareLitellmParams()`. DSPy/LiteLLM read them per-node.
 - **Proxy / playground:** passed as `x-litellm-*` request headers (`x-litellm-api_key`, `x-litellm-aws_access_key_id`, `x-litellm-vertex_credentials`, …).
 
 nlpgo's gateway client must accept **both shapes** and translate to gateway requests. The `litellm_params` translator (Ash, in `services/nlpgo/adapters/litellm/`) is the single point that knows about provider quirks: Azure `api_version`/`resource_name`, AWS Bedrock STS keys, Vertex SA JSON, custom `model_alias` mappings.
 
 Reasoning model rules (must be preserved):
+
 - Models matching `^(o1|o3|o4|o5|gpt-5)` force `temperature=1.0` and `max_tokens >= 16000`.
 - Anthropic temperature is clamped to `[0,1]`.
 - `reasoning|reasoning_effort|thinkingLevel|effort` are normalized to a single field.
@@ -207,6 +215,7 @@ Reasoning model rules (must be preserved):
 ## 10. Multi-turn chat preservation
 
 Workflows pass `chat_messages` between nodes. The engine MUST:
+
 - Preserve role+content+tool_calls across node boundaries (regression: commit `cb76144a6`).
 - Not collapse history; downstream nodes receive the full message list, not just the last assistant turn.
 - Serialize tool_call arguments as canonical JSON to avoid byte drift across the gateway.
@@ -259,15 +268,15 @@ or to the AI Gateway. nlpgo:
 
 ### Canonical origins
 
-| Origin             | Set by                                       |
-|--------------------|----------------------------------------------|
-| `workflow`         | `runWorkflow.ts` — Studio "Run" button       |
-| `evaluation`       | `runEvaluation.ts` — evaluation suite runs   |
-| `playground`       | `playground.ts` — Prompt Playground          |
-| `scenario`         | `scenarios/.../*-agent.adapter.ts`           |
-| `topic_clustering` | `topicClustering.ts` — worker batches        |
+| Origin             | Set by                                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `workflow`         | `runWorkflow.ts` — Studio "Run" button                                                                                   |
+| `evaluation`       | `runEvaluation.ts` — evaluation suite runs                                                                               |
+| `playground`       | `playground.ts` — Prompt Playground                                                                                      |
+| `scenario`         | `scenarios/.../*-agent.adapter.ts`                                                                                       |
+| `topic_clustering` | `topicClustering.ts` — worker batches                                                                                    |
 | `optimize`         | (LEGACY only) — DSPy optimization runs; never produced by Go engine. If observed in /go/* traffic, nlpgo logs a warning. |
-| `unknown`          | Default when no header is present            |
+| `unknown`          | Default when no header is present                                                                                        |
 
 Unknown values are not rejected — they are recorded verbatim. Operators can
 investigate via the access log's `missing_origin_header` warning.
@@ -283,6 +292,7 @@ investigate via the access log's `missing_origin_header` warning.
 ### Required attributes
 
 On every nlpgo + gateway span:
+
 - `langwatch.origin`
 - `langwatch.project_id`
 - `langwatch.request_id`
@@ -290,6 +300,7 @@ On every nlpgo + gateway span:
 - `langwatch.trace_id` (the LangWatch trace id, distinct from OTel trace id)
 
 On the LLM gateway-call span specifically:
+
 - `gen_ai.system` (provider id)
 - `gen_ai.request.model`
 - `gen_ai.usage.input_tokens`

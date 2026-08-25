@@ -130,10 +130,7 @@ function receiptEvidence({
   };
 }
 
-function withSlug(
-  receipt: BriefingReceipt,
-  slug: string | undefined,
-): BriefingReceipt {
+function withSlug(receipt: BriefingReceipt, slug: string | undefined): BriefingReceipt {
   if (!receipt.link || !receipt.context) return receipt;
   return {
     ...receipt,
@@ -149,9 +146,7 @@ function withSlug(
  * cross-trace signals, then a period-over-period latency regression. Raw totals
  * and one-off maxima deliberately do not become insight cards.
  */
-export function buildAttentionInbox(
-  signals: AttentionInboxSignals,
-): BriefingReceipt[] {
+export function buildAttentionInbox(signals: AttentionInboxSignals): BriefingReceipt[] {
   const currentShapes = aggregateShapes(signals.currentErrorShapes ?? []);
   const previousShapes = aggregateShapes(signals.previousErrorShapes ?? []);
   const previousByShape = new Map(
@@ -185,9 +180,7 @@ export function buildAttentionInbox(
       (value) => `errorMessage:${quoteQueryValue(value)}`,
     );
     const query =
-      shapeClauses.length === 1
-        ? shapeClauses[0]!
-        : `(${shapeClauses.join(" OR ")})`;
+      shapeClauses.length === 1 ? shapeClauses[0]! : `(${shapeClauses.join(" OR ")})`;
     const label = `${status === "observed" ? "Error" : `${status} error shape`}: ${displayShape}`;
     const evidence = receiptEvidence({
       id: `error-shape:${shape.key}`,
@@ -233,10 +226,7 @@ export function buildAttentionInbox(
   }
 
   const sharedTraceName = [...(signals.sharedTraceNames ?? [])]
-    .filter(
-      (signal) =>
-        signal.value.trim() && signal.count >= SHARED_SIGNAL_MIN_COUNT,
-    )
+    .filter((signal) => signal.value.trim() && signal.count >= SHARED_SIGNAL_MIN_COUNT)
     .sort((a, b) => b.count - a.count)[0];
   if (sharedTraceName) {
     const name = truncate(sharedTraceName.value, 60);
@@ -277,10 +267,7 @@ export function buildAttentionInbox(
   ) {
     const ratio = currentLatency / previousLatency;
     const delta = currentLatency - previousLatency;
-    if (
-      ratio >= LATENCY_REGRESSION_RATIO &&
-      delta >= LATENCY_REGRESSION_ABSOLUTE_MS
-    ) {
+    if (ratio >= LATENCY_REGRESSION_RATIO && delta >= LATENCY_REGRESSION_ABSOLUTE_MS) {
       const percent = Math.round((ratio - 1) * 100);
       const query = `duration:>${Math.round(currentLatency)}`;
       const evidence = receiptEvidence({

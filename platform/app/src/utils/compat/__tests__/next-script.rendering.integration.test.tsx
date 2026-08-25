@@ -29,11 +29,7 @@ describe("Script - rendered output", () => {
   describe("given a src prop (external script)", () => {
     it("sets src and async on the injected script", () => {
       render(
-        <Script
-          id="ext"
-          src="https://example.com/a.js"
-          strategy="beforeInteractive"
-        />,
+        <Script id="ext" src="https://example.com/a.js" strategy="beforeInteractive" />,
       );
 
       const script = getScript("ext");
@@ -43,11 +39,7 @@ describe("Script - rendered output", () => {
 
     it("does not set textContent even if children are also passed", () => {
       render(
-        <Script
-          id="ext"
-          src="https://example.com/a.js"
-          strategy="beforeInteractive"
-        >
+        <Script id="ext" src="https://example.com/a.js" strategy="beforeInteractive">
           {`should be ignored`}
         </Script>,
       );
@@ -74,11 +66,7 @@ describe("Script - rendered output", () => {
 
     it("does not set onload when onLoad is not provided", () => {
       render(
-        <Script
-          id="ext"
-          src="https://example.com/a.js"
-          strategy="beforeInteractive"
-        />,
+        <Script id="ext" src="https://example.com/a.js" strategy="beforeInteractive" />,
       );
 
       expect(getScript("ext")?.onload).toBeNull();
@@ -103,11 +91,7 @@ describe("Script - rendered output", () => {
 
     it("does not set onerror when onError is not provided", () => {
       render(
-        <Script
-          id="ext"
-          src="https://example.com/a.js"
-          strategy="beforeInteractive"
-        />,
+        <Script id="ext" src="https://example.com/a.js" strategy="beforeInteractive" />,
       );
 
       expect(getScript("ext")?.onerror).toBeNull();
@@ -122,9 +106,7 @@ describe("Script - rendered output", () => {
         </Script>,
       );
 
-      expect(getScript("inline")?.textContent).toBe(
-        `window.__critical = true;`,
-      );
+      expect(getScript("inline")?.textContent).toBe(`window.__critical = true;`);
     });
 
     it("does not set textContent for undefined children", () => {
@@ -184,9 +166,7 @@ describe("Script - rendered output", () => {
         </Script>,
       );
 
-      expect(getScript("dsih")?.getAttribute("dangerouslySetInnerHTML")).toBe(
-        null,
-      );
+      expect(getScript("dsih")?.getAttribute("dangerouslySetInnerHTML")).toBe(null);
     });
   });
 });

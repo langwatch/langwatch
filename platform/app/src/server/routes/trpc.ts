@@ -42,8 +42,7 @@ const JSONRPC_INTERNAL_ERROR = -32603;
  * @see langwatch#5219
  */
 function trpcErrorEnvelope(error: unknown) {
-  const message =
-    error instanceof Error ? error.message : "Internal server error";
+  const message = error instanceof Error ? error.message : "Internal server error";
 
   return {
     error: {
@@ -62,9 +61,7 @@ function trpcErrorEnvelope(error: unknown) {
 // Lazy-load appRouter to avoid circular dependency issues at startup.
 // The tRPC router imports templates that import UI components (DatasetTable etc.)
 // which cause "Cannot access before initialization" errors in Node/tsx.
-let _appRouter:
-  | Awaited<typeof import("~/server/api/root")>["appRouter"]
-  | null = null;
+let _appRouter: Awaited<typeof import("~/server/api/root")>["appRouter"] | null = null;
 async function getAppRouter() {
   if (!_appRouter) {
     const mod = await import("~/server/api/root");
@@ -89,9 +86,7 @@ function buildReqShim(req: Request): any {
   req.headers.forEach((value, key) => {
     const existing = headers[key];
     if (existing) {
-      headers[key] = Array.isArray(existing)
-        ? [...existing, value]
-        : [existing, value];
+      headers[key] = Array.isArray(existing) ? [...existing, value] : [existing, value];
     } else {
       headers[key] = value;
     }
@@ -133,9 +128,7 @@ function createHandler(app: App) {
           const reqShim = buildReqShim(req);
 
           const session = await getServerAuthSession({
-            req: req as unknown as Parameters<
-              typeof getServerAuthSession
-            >[0]["req"],
+            req: req as unknown as Parameters<typeof getServerAuthSession>[0]["req"],
           });
 
           return createInnerTRPCContext({

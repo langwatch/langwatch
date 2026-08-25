@@ -114,8 +114,7 @@ function Page() {
 
       toaster.create({
         title: `Evaluator deleted`,
-        description:
-          parts.length > 0 ? `Also deleted: ${parts.join(", ")}` : undefined,
+        description: parts.length > 0 ? `Also deleted: ${parts.join(", ")}` : undefined,
         type: "success",
       });
     },
@@ -216,8 +215,8 @@ function Page() {
               </EmptyState.Indicator>
               <EmptyState.Title>No evaluators yet</EmptyState.Title>
               <EmptyState.Description>
-                Create reusable scoring functions for experiments, online
-                evaluations, and guardrails.
+                Create reusable scoring functions for experiments, online evaluations, and
+                guardrails.
               </EmptyState.Description>
               <HStack gap={2}>
                 <PageLayout.HeaderButton onClick={handleCreateNewEvaluator}>
@@ -231,8 +230,8 @@ function Page() {
       ) : (
         <VStack gap={6} width="full" align="start" padding={6}>
           <Text color="fg.muted">
-            Evaluators are reusable scoring functions for experiments, online
-            evaluations, and guardrails.
+            Evaluators are reusable scoring functions for experiments, online evaluations,
+            and guardrails.
           </Text>
           <Grid
             templateColumns="repeat(auto-fill, minmax(300px, 1fr))"

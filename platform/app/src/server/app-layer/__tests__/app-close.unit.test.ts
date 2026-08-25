@@ -9,10 +9,7 @@ import type { AppDependencies } from "../dependencies";
  * of those fields, hence the proxy — it answers every command group with an
  * empty object so the test does not have to track that list as it grows.
  */
-const emptyCommands = new Proxy(
-  {},
-  { get: () => ({}) },
-) as AppDependencies["commands"];
+const emptyCommands = new Proxy({}, { get: () => ({}) }) as AppDependencies["commands"];
 
 function appWith({
   eventSourcingClose,
@@ -23,9 +20,7 @@ function appWith({
 }): App {
   return new App({
     commands: emptyCommands,
-    _eventSourcing: eventSourcingClose
-      ? { close: eventSourcingClose }
-      : undefined,
+    _eventSourcing: eventSourcingClose ? { close: eventSourcingClose } : undefined,
     _gracefulCloseables: closeables,
   } as unknown as AppDependencies);
 }

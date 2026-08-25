@@ -59,15 +59,13 @@ export function traced<T extends object>(instance: T, className: string): T {
       // iteration. `finally` covers all three ways a generator ends — drained,
       // thrown, or abandoned when a `for await` breaks and calls return().
       if (isAsyncGeneratorFunction(value)) {
-        const generatorWrapper = async function* (
-          this: unknown,
-          ...args: unknown[]
-        ) {
+        const generatorWrapper = async function* (this: unknown, ...args: unknown[]) {
           const span = tracer.startSpan(spanName);
           try {
-            yield* (
-              value as (...a: unknown[]) => AsyncGenerator<unknown>
-            ).apply(this ?? target, args);
+            yield* (value as (...a: unknown[]) => AsyncGenerator<unknown>).apply(
+              this ?? target,
+              args,
+            );
           } catch (error) {
             span.recordException(error as Error);
             span.setStatus({ code: SpanStatusCode.ERROR });
@@ -113,7 +111,6 @@ export function traced<T extends object>(instance: T, className: string): T {
  */
 function isAsyncGeneratorFunction(value: unknown): boolean {
   return (
-    typeof value === "function" &&
-    value.constructor?.name === "AsyncGeneratorFunction"
+    typeof value === "function" && value.constructor?.name === "AsyncGeneratorFunction"
   );
 }

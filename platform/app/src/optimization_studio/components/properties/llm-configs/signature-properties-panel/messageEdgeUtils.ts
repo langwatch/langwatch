@@ -50,9 +50,7 @@ export const computeMessageEdgeUpdate = ({
   const adjustedIndex =
     systemIndex >= 0 && formIndex > systemIndex ? formIndex - 1 : formIndex;
 
-  const messagesParam = nodeParameters.find(
-    (param) => param.identifier === "messages",
-  );
+  const messagesParam = nodeParameters.find((param) => param.identifier === "messages");
 
   if (!messagesParam || !Array.isArray(messagesParam.value)) {
     return {

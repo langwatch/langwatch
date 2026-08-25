@@ -44,9 +44,7 @@ interface CapturedTool {
   name: string;
   description: string;
   schema: unknown;
-  cb: (
-    args: any,
-  ) => Promise<{ content: Array<{ type: string; text: string }> }>;
+  cb: (args: any) => Promise<{ content: Array<{ type: string; text: string }> }>;
 }
 
 function mockMcpServer(): {

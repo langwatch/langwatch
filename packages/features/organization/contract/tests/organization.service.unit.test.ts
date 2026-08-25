@@ -12,9 +12,7 @@ import { describe, expect, it } from "vitest";
 
 describe("OrganizationService contract", () => {
   it("requires a non-empty organization id", () => {
-    expect(() =>
-      getOldestTeamInputSchema.parse({ organizationId: "" }),
-    ).toThrow();
+    expect(() => getOldestTeamInputSchema.parse({ organizationId: "" })).toThrow();
   });
 
   it("exposes a required non-null team lookup", () => {

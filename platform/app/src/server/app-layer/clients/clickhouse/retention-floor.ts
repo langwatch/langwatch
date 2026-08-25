@@ -30,8 +30,7 @@ class PlatformRetentionDaysProvider implements RetentionDaysProvider {
     tenantId: string;
     table: string;
   }): Promise<number | null> {
-    const category =
-      RETENTION_TABLE_CATEGORY_MAP[table as RetentionManagedTable];
+    const category = RETENTION_TABLE_CATEGORY_MAP[table as RetentionManagedTable];
     if (!category) return null;
 
     const resolved = await this.resolver.resolve(tenantId);
@@ -50,9 +49,7 @@ export function createRetentionFloorService(
 ): RetentionFloorService {
   return new RetentionFloorService({
     defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-    provider: resolver
-      ? new PlatformRetentionDaysProvider(resolver)
-      : undefined,
+    provider: resolver ? new PlatformRetentionDaysProvider(resolver) : undefined,
     logger,
   });
 }

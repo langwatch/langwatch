@@ -8,9 +8,7 @@ import type { CodingAgentSessionEventRecord } from "~/server/event-sourcing/pipe
 
 const TABLE_NAME = "coding_agent_session_events" as const;
 
-const logger = createLogger(
-  "langwatch:app-layer:coding-agent:session-events-repository",
-);
+const logger = createLogger("langwatch:app-layer:coding-agent:session-events-repository");
 
 /**
  * Persistence for the per-call fact table (migration 00073). One row per
@@ -21,10 +19,7 @@ const logger = createLogger(
  * practices warn about, because every column is a small scalar.
  */
 export interface CodingAgentSessionEventsRepository {
-  ensure(
-    records: CodingAgentSessionEventRecord[],
-    retentionDays?: number,
-  ): Promise<void>;
+  ensure(records: CodingAgentSessionEventRecord[], retentionDays?: number): Promise<void>;
 
   /**
    * One session's events in time order, keyset-paginated on
@@ -85,15 +80,10 @@ export interface SessionEventsCursor {
  * is already scoped to one tenant by the caller, so the SELECT never carries
  * the column back and the type must not claim a value the row does not hold.
  */
-export type CodingAgentSessionEventRow = Omit<
-  CodingAgentSessionEventRecord,
-  "tenantId"
->;
+export type CodingAgentSessionEventRow = Omit<CodingAgentSessionEventRecord, "tenantId">;
 
 /** No-op store for deployments without ClickHouse. */
-export class NullCodingAgentSessionEventsRepository
-  implements CodingAgentSessionEventsRepository
-{
+export class NullCodingAgentSessionEventsRepository implements CodingAgentSessionEventsRepository {
   async ensure(): Promise<void> {
     // no-op
   }
@@ -262,9 +252,7 @@ function toWriteRecord(
   };
 }
 
-export class CodingAgentSessionEventsClickHouseRepository
-  implements CodingAgentSessionEventsRepository
-{
+export class CodingAgentSessionEventsClickHouseRepository implements CodingAgentSessionEventsRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async ensure(
@@ -337,10 +325,7 @@ export class CodingAgentSessionEventsClickHouseRepository
     );
     const client = await this.resolveClient(tenantId);
 
-    const conditions = [
-      "TenantId = {tenantId:String}",
-      "SessionId = {sessionId:String}",
-    ];
+    const conditions = ["TenantId = {tenantId:String}", "SessionId = {sessionId:String}"];
     if (occurredAt) {
       conditions.push(
         "TimeUnixMs BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})",

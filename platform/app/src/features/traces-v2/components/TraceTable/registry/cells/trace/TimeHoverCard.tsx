@@ -32,13 +32,7 @@ import { useVerboseRelativeTime } from "../../../../../utils/useRelativeTime";
 interface TimeHoverCardProps {
   timestamp: number;
   children: React.ReactNode;
-  placement?:
-    | "top"
-    | "top-start"
-    | "top-end"
-    | "bottom"
-    | "bottom-start"
-    | "bottom-end";
+  placement?: "top" | "top-start" | "top-end" | "bottom" | "bottom-start" | "bottom-end";
 }
 
 export const TimeHoverCard: React.FC<TimeHoverCardProps> = ({
@@ -178,13 +172,7 @@ const Row: React.FC<{ label: string; value: string; mono?: boolean }> = ({
     paddingY={0.5}
     _notLast={{ borderBottomWidth: "1px", borderColor: "border.subtle" }}
   >
-    <Text
-      textStyle="2xs"
-      color="fg.muted"
-      fontWeight="500"
-      width="32px"
-      flexShrink={0}
-    >
+    <Text textStyle="2xs" color="fg.muted" fontWeight="500" width="32px" flexShrink={0}>
       {label}
     </Text>
     <Text

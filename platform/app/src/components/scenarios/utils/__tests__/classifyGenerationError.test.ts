@@ -23,10 +23,7 @@ describe("classifyGenerationError", () => {
     describe("when the code names a missing model provider", () => {
       it("asks the user to configure, whatever the message says", () => {
         const result = classifyGenerationError(
-          new ScenarioGenerationError(
-            "no_provider_configured",
-            "no_provider_configured",
-          ),
+          new ScenarioGenerationError("no_provider_configured", "no_provider_configured"),
         );
 
         expect(result.tier).toBe("config");
@@ -35,10 +32,7 @@ describe("classifyGenerationError", () => {
 
       it("takes its words from the registry rather than the wire message", () => {
         const result = classifyGenerationError(
-          new ScenarioGenerationError(
-            "no_provider_configured",
-            "no_provider_configured",
-          ),
+          new ScenarioGenerationError("no_provider_configured", "no_provider_configured"),
         );
 
         expect(result.title).toBe("No model provider configured");
@@ -99,10 +93,7 @@ describe("classifyGenerationError", () => {
     describe("when the code is one this client has no copy for", () => {
       it("degrades to the humanised code rather than the raw message", () => {
         const result = classifyGenerationError(
-          new ScenarioGenerationError(
-            "dataset_import_stalled",
-            "dataset_import_stalled",
-          ),
+          new ScenarioGenerationError("dataset_import_stalled", "dataset_import_stalled"),
         );
 
         expect(result.tier).toBe("unknown");
@@ -115,9 +106,7 @@ describe("classifyGenerationError", () => {
   describe("given a handled failure that arrived over tRPC", () => {
     describe("when the envelope carries the code", () => {
       it("classifies on the code, not on prose", () => {
-        const result = classifyGenerationError(
-          trpcHandledError("budget_exceeded"),
-        );
+        const result = classifyGenerationError(trpcHandledError("budget_exceeded"));
 
         expect(result.tier).toBe("rate-limit");
         expect(result.cta).toBe("configure-and-retry");

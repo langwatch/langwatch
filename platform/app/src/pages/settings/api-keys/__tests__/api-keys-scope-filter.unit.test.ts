@@ -20,9 +20,7 @@ describe("given the scope-filter feature is implemented", () => {
     /** @scenario The scope filter component is shared with the model-providers page */
     it("api-keys/ApiKeysSection imports ScopeFilter from the shared settings component", () => {
       // ApiKeysSection is the component that renders the table; it must import ScopeFilter
-      const apiKeysSection = readFile(
-        "src/pages/settings/api-keys/ApiKeysSection.tsx",
-      );
+      const apiKeysSection = readFile("src/pages/settings/api-keys/ApiKeysSection.tsx");
       // Accept both tilde alias and relative path forms — what matters is the
       // component file name, not the import style.
       const importsScopeFilter =
@@ -45,8 +43,7 @@ describe("given the scope-filter feature is implemented", () => {
       const settingsDir = path.join(LANGWATCH_ROOT, "src/components/settings");
       const files = fs.readdirSync(settingsDir);
       const scopeFilterFiles = files.filter(
-        (f) =>
-          f.toLowerCase().includes("scopefilter") && f !== "ScopeFilter.tsx",
+        (f) => f.toLowerCase().includes("scopefilter") && f !== "ScopeFilter.tsx",
       );
       expect(scopeFilterFiles).toHaveLength(0);
     });
@@ -55,9 +52,7 @@ describe("given the scope-filter feature is implemented", () => {
   describe("when checking that filterProvidersByScope is used directly — no wrapper", () => {
     /** @scenario API Keys page reuses filterProvidersByScope directly — no parallel helper */
     it("ApiKeysSection calls filterProvidersByScope from utils/filterProvidersByScope", () => {
-      const apiKeysSection = readFile(
-        "src/pages/settings/api-keys/ApiKeysSection.tsx",
-      );
+      const apiKeysSection = readFile("src/pages/settings/api-keys/ApiKeysSection.tsx");
       expect(apiKeysSection).toContain("filterProvidersByScope");
     });
 
@@ -70,10 +65,7 @@ describe("given the scope-filter feature is implemented", () => {
 
     /** @scenario API Keys page reuses filterProvidersByScope directly — no parallel helper */
     it("no filterKeysByScope function is defined anywhere in api-keys pages", () => {
-      const apiKeysDir = path.join(
-        LANGWATCH_ROOT,
-        "src/pages/settings/api-keys",
-      );
+      const apiKeysDir = path.join(LANGWATCH_ROOT, "src/pages/settings/api-keys");
       const allFiles = fs
         .readdirSync(apiKeysDir)
         .filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"))
@@ -98,9 +90,7 @@ describe("given the scope-filter feature is implemented", () => {
   describe("when checking that useAvailableScopes is shared", () => {
     /** @scenario The available-scopes derivation is shared between api-keys and model-providers */
     it("ApiKeysSection imports useAvailableScopes from the shared hook", () => {
-      const apiKeysSection = readFile(
-        "src/pages/settings/api-keys/ApiKeysSection.tsx",
-      );
+      const apiKeysSection = readFile("src/pages/settings/api-keys/ApiKeysSection.tsx");
       expect(apiKeysSection).toContain("useAvailableScopes");
     });
 

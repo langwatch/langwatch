@@ -1,12 +1,4 @@
-import {
-  Button,
-  Card,
-  Heading,
-  HStack,
-  Progress,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Card, Heading, HStack, Progress, Text, VStack } from "@chakra-ui/react";
 import type { MutationProgress } from "~/server/data-retention/retroactive/retroactiveUpdate.service";
 import { CATEGORY_LABELS } from "./constants";
 
@@ -27,8 +19,8 @@ export function RetroactiveProgressCard({
           Applying retention to existing data
         </Heading>
         <Text fontSize="sm" color="fg.muted">
-          ClickHouse rewrites the affected parts during background merges. Large
-          datasets can take a while; the count below is parts still pending.
+          ClickHouse rewrites the affected parts during background merges. Large datasets
+          can take a while; the count below is parts still pending.
         </Text>
       </Card.Header>
       <Card.Body>

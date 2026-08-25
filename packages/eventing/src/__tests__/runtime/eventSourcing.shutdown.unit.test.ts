@@ -121,9 +121,7 @@ describe("EventSourcing.close", () => {
 
     await es.close();
 
-    expect(() => es.getPipeline("to-clear")).toThrow(
-      'Pipeline "to-clear" not found',
-    );
+    expect(() => es.getPipeline("to-clear")).toThrow('Pipeline "to-clear" not found');
   });
 
   it("closes pipelines before global queue", async () => {

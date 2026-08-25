@@ -3,8 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "description": "Service framework for building versioned, typed API services on Hono",
+  "keywords": [
+    "api",
+    "hono",
+    "langwatch",
+    "service-framework"
+  ],
+  "license": "MIT",
   "type": "module",
-  "packageManager": "pnpm@10.24.0",
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -14,13 +20,6 @@
     "test": "vitest",
     "test:unit": "vitest run"
   },
-  "keywords": [
-    "langwatch",
-    "hono",
-    "api",
-    "service-framework"
-  ],
-  "license": "MIT",
   "dependencies": {
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
@@ -36,5 +35,6 @@
     "typescript": "^7.0.2",
     "vitest": "^4.1.9",
     "zod": "^4.4.3"
-  }
+  },
+  "packageManager": "pnpm@10.24.0"
 }

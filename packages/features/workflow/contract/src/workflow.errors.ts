@@ -1,6 +1,9 @@
 export class WorkflowNotFoundError extends Error {
   readonly code = "workflow_not_found" as const;
-  constructor(readonly workflowId: string, readonly projectId?: string) {
+  constructor(
+    readonly workflowId: string,
+    readonly projectId?: string,
+  ) {
     super(`Workflow ${workflowId} not found.`);
     this.name = "WorkflowNotFoundError";
   }

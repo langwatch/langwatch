@@ -22,10 +22,7 @@ interface Segment {
  * Reuses `buildDecorationPlan` from the editor's highlight extension so the
  * docs can never drift from what `liqe` actually parses.
  */
-export const QueryPreview: React.FC<QueryPreviewProps> = ({
-  query,
-  size = "sm",
-}) => {
+export const QueryPreview: React.FC<QueryPreviewProps> = ({ query, size = "sm" }) => {
   const segments = useMemo(() => buildSegments(query), [query]);
 
   return (

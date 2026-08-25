@@ -223,15 +223,9 @@ describe("correcting the trace's own fields in the summary", () => {
         expect(
           screen.queryByLabelText("Edit gen_ai.conversation.id"),
         ).not.toBeInTheDocument();
-        expect(
-          screen.queryByLabelText("Edit scenario.run_id"),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByLabelText("Edit langwatch.origin"),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.getByLabelText("Edit langwatch.labels"),
-        ).toBeInTheDocument();
+        expect(screen.queryByLabelText("Edit scenario.run_id")).not.toBeInTheDocument();
+        expect(screen.queryByLabelText("Edit langwatch.origin")).not.toBeInTheDocument();
+        expect(screen.getByLabelText("Edit langwatch.labels")).toBeInTheDocument();
       });
     });
   });

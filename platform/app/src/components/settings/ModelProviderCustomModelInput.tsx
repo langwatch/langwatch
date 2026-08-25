@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import type {
@@ -48,9 +40,7 @@ export const CustomModelInputSection = ({
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false);
   const [addEmbeddingsDialogOpen, setAddEmbeddingsDialogOpen] = useState(false);
   const [registryModalOpen, setRegistryModalOpen] = useState(false);
-  const [editingModel, setEditingModel] = useState<
-    CustomModelEntry | undefined
-  >();
+  const [editingModel, setEditingModel] = useState<CustomModelEntry | undefined>();
 
   const allCustomModels: CustomModelEntry[] = useMemo(
     () => [...state.customModels, ...state.customEmbeddingsModels],
@@ -121,10 +111,7 @@ export const CustomModelInputSection = ({
             </Button>
           </Menu.Trigger>
           <Menu.Content>
-            <Menu.Item
-              value="add-model"
-              onClick={() => setAddModelDialogOpen(true)}
-            >
+            <Menu.Item value="add-model" onClick={() => setAddModelDialogOpen(true)}>
               Add model
             </Menu.Item>
             <Menu.Item
@@ -223,9 +210,7 @@ export const CustomModelInputSection = ({
         open={addEmbeddingsDialogOpen}
         onClose={handleCloseEmbeddingsDialog}
         onSubmit={handleAddEmbeddingsModel}
-        initialValues={
-          editingModel?.mode === "embedding" ? editingModel : undefined
-        }
+        initialValues={editingModel?.mode === "embedding" ? editingModel : undefined}
         dialogBackground={dialogBackground}
       />
 

@@ -10,9 +10,7 @@ type ConfigData = PromptConfigFormValues["version"]["configData"];
  * structurally match; the init useEffect later re-merges server data over
  * the seed, so losing a malformed json_schema on first render is fine.
  */
-const normalizeOutputs = (
-  outputs: LocalPromptConfig["outputs"],
-): ConfigData["outputs"] =>
+const normalizeOutputs = (outputs: LocalPromptConfig["outputs"]): ConfigData["outputs"] =>
   outputs.map(({ json_schema, ...rest }) => {
     if (
       json_schema &&
@@ -22,8 +20,7 @@ const normalizeOutputs = (
     ) {
       return {
         ...rest,
-        json_schema:
-          json_schema as ConfigData["outputs"][number]["json_schema"],
+        json_schema: json_schema as ConfigData["outputs"][number]["json_schema"],
       };
     }
     return rest;

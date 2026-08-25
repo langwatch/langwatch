@@ -71,20 +71,15 @@ describe("useScenarioTabFollow", () => {
       renderAt("/acme/simulations/checkout?scenarioTab=machine-abc");
 
       await waitFor(() =>
-        expect(
-          window.sessionStorage.getItem("langwatch:scenario-tab-key"),
-        ).toBe("machine-abc"),
+        expect(window.sessionStorage.getItem("langwatch:scenario-tab-key")).toBe(
+          "machine-abc",
+        ),
       );
-      expect(
-        window.localStorage.getItem("langwatch:scenario-tab-key"),
-      ).toBeNull();
+      expect(window.localStorage.getItem("langwatch:scenario-tab-key")).toBeNull();
     });
 
     it("recovers the key after a reload, without the query param", async () => {
-      window.sessionStorage.setItem(
-        "langwatch:scenario-tab-key",
-        "machine-abc",
-      );
+      window.sessionStorage.setItem("langwatch:scenario-tab-key", "machine-abc");
 
       renderAt("/acme/simulations/checkout");
 
@@ -94,9 +89,7 @@ describe("useScenarioTabFollow", () => {
     });
 
     it("keeps the same tab id across re-renders", async () => {
-      const { unmount } = renderAt(
-        "/acme/simulations/checkout?scenarioTab=machine-abc",
-      );
+      const { unmount } = renderAt("/acme/simulations/checkout?scenarioTab=machine-abc");
       await waitFor(() =>
         expect(screen.getByTestId("tab-key")).toHaveTextContent("machine-abc"),
       );
@@ -108,9 +101,7 @@ describe("useScenarioTabFollow", () => {
         expect(screen.getByTestId("tab-key")).toHaveTextContent("machine-abc"),
       );
 
-      expect(window.sessionStorage.getItem("langwatch:scenario-tab-id")).toBe(
-        first,
-      );
+      expect(window.sessionStorage.getItem("langwatch:scenario-tab-id")).toBe(first);
       expect(first).toBeTruthy();
     });
   });

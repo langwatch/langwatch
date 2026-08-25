@@ -2,10 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation/canonicalizeSpanAttributesService";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 // Copilot CLI emits a root `invoke_agent` span whose gen_ai.usage.* is the
 // EXACT rollup of its `chat` children (verified on the 1.0.79 wire: one turn
@@ -18,10 +15,7 @@ describe("applySpanToSummary copilot rollup-usage handling", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    extractSpy = vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    );
+    extractSpy = vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan");
     extractSpy.mockReturnValue(null);
   });
 
@@ -43,9 +37,7 @@ describe("applySpanToSummary copilot rollup-usage handling", () => {
         statusMessage: null,
         statusCode: null,
         parentSpanId: null,
-      } as unknown as Parameters<
-        CanonicalizeSpanAttributesService["canonicalize"]
-      >[2],
+      } as unknown as Parameters<CanonicalizeSpanAttributesService["canonicalize"]>[2],
     ).attributes;
 
   describe("given a copilot turn whose invoke_agent root repeats its chat child's usage", () => {
@@ -68,12 +60,8 @@ describe("applySpanToSummary copilot rollup-usage handling", () => {
         });
 
         // The extractor — not the fixture — must have produced the marker.
-        expect(agentAttrs["langwatch.reserved.skip_token_accumulation"]).toBe(
-          "true",
-        );
-        expect(
-          chatAttrs["langwatch.reserved.skip_token_accumulation"],
-        ).toBeUndefined();
+        expect(agentAttrs["langwatch.reserved.skip_token_accumulation"]).toBe("true");
+        expect(chatAttrs["langwatch.reserved.skip_token_accumulation"]).toBeUndefined();
 
         let state = createInitState();
         state = applySpanToSummary({
@@ -103,9 +91,7 @@ describe("applySpanToSummary copilot rollup-usage handling", () => {
           "github.copilot.turn_id": "t1",
         });
 
-        expect(
-          agentAttrs["langwatch.reserved.skip_token_accumulation"],
-        ).toBeUndefined();
+        expect(agentAttrs["langwatch.reserved.skip_token_accumulation"]).toBeUndefined();
       });
     });
   });

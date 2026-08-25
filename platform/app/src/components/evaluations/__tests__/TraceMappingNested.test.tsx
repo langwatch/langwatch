@@ -11,10 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import {
-  type AvailableSource,
-  VariableMappingInput,
-} from "~/components/variables";
+import { type AvailableSource, VariableMappingInput } from "~/components/variables";
 import { TRACE_MAPPINGS } from "~/server/tracer/tracesMapping";
 
 // Import the actual function we want to test
@@ -113,9 +110,7 @@ describe("Trace mapping nested fields", () => {
 
     it("metadata field has children for common metadata keys", () => {
       const sources = getTraceAvailableSources();
-      const metadataField = sources[0]!.fields.find(
-        (f) => f.name === "metadata",
-      );
+      const metadataField = sources[0]!.fields.find((f) => f.name === "metadata");
 
       expect(metadataField).toBeDefined();
       expect(metadataField!.children).toBeDefined();
@@ -183,19 +178,13 @@ describe("Trace mapping nested fields", () => {
 
       // EXPECTED: metadata badge appears AND nested children are shown
       await waitFor(() => {
-        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
-          "metadata",
-        );
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("metadata");
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("field-option-thread_id"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("field-option-thread_id")).toBeInTheDocument();
         expect(screen.getByTestId("field-option-user_id")).toBeInTheDocument();
-        expect(
-          screen.getByTestId("field-option-customer_id"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("field-option-customer_id")).toBeInTheDocument();
       });
     });
 
@@ -220,9 +209,7 @@ describe("Trace mapping nested fields", () => {
 
       // EXPECTED: spans badge appears AND nested children are shown
       await waitFor(() => {
-        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
-          "spans",
-        );
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("spans");
       });
 
       await waitFor(() => {
@@ -255,9 +242,7 @@ describe("Trace mapping nested fields", () => {
 
       // Select thread_id
       await waitFor(() => {
-        expect(
-          screen.getByTestId("field-option-thread_id"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("field-option-thread_id")).toBeInTheDocument();
       });
       await user.click(screen.getByTestId("field-option-thread_id"));
 

@@ -100,9 +100,7 @@ describe("given default-model configs with scope attachments (real DB)", () => {
   // cleanupTestRows refuses an entry that identifies nothing, so the rows
   // are left untouched and the teardown throws instead. The scope rows
   // cascade on the config foreign key.
-  afterEach(() =>
-    cleanupTestRows(prisma, [["modelDefaultConfig", { organizationId }]]),
-  );
+  afterEach(() => cleanupTestRows(prisma, [["modelDefaultConfig", { organizationId }]]));
 
   afterAll(async () => {
     await cleanupTestRows(prisma, [
@@ -256,11 +254,7 @@ describe("given default-model configs with scope attachments (real DB)", () => {
       // (tRPC drawer save, REST create/update/delete) orders them. A
       // refactor that dropped the guard would create the row here.
       const save = async () => {
-        await assertCanWriteScope(
-          { prisma, session },
-          "ORGANIZATION",
-          organizationId,
-        );
+        await assertCanWriteScope({ prisma, session }, "ORGANIZATION", organizationId);
         await createConfig(ctx(), {
           config: { DEFAULT: "openai/gpt-5.5" },
           scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
@@ -275,9 +269,9 @@ describe("given default-model configs with scope attachments (real DB)", () => {
       });
 
       expect(await attachmentsAt("ORGANIZATION", organizationId)).toEqual([]);
-      expect(
-        await prisma.modelDefaultConfig.count({ where: { organizationId } }),
-      ).toBe(0);
+      expect(await prisma.modelDefaultConfig.count({ where: { organizationId } })).toBe(
+        0,
+      );
     });
   });
 });

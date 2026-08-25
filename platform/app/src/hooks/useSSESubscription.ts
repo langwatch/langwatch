@@ -15,16 +15,9 @@ interface SSESubscriptionOptions<TData, TError> {
   onDisconnected?: () => void;
 }
 
-export type ConnectionState =
-  | "connecting"
-  | "connected"
-  | "disconnected"
-  | "error";
+export type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
 
-export function useSSESubscription<
-  TData = unknown,
-  TInput = Record<string, unknown>,
->(
+export function useSSESubscription<TData = unknown, TInput = Record<string, unknown>>(
   subscription: {
     useSubscription: (
       input: TInput,

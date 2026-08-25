@@ -56,18 +56,14 @@ export const LangyMessageRecordedEventSchema = EventSchema.extend({
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.MESSAGE_RECORDED),
   data: langyMessageRecordedEventDataSchema,
 });
-export type LangyMessageRecordedEvent = z.infer<
-  typeof LangyMessageRecordedEventSchema
->;
+export type LangyMessageRecordedEvent = z.infer<typeof LangyMessageRecordedEventSchema>;
 
 export const LangyMessageImportedEventSchema = EventSchema.extend({
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_IMPORTED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.MESSAGE_IMPORTED),
   data: langyMessageImportedEventDataSchema,
 });
-export type LangyMessageImportedEvent = z.infer<
-  typeof LangyMessageImportedEventSchema
->;
+export type LangyMessageImportedEvent = z.infer<typeof LangyMessageImportedEventSchema>;
 
 export const LangyAgentTurnAcceptedEventSchema = EventSchema.extend({
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED),
@@ -101,9 +97,7 @@ export const LangyToolCallFailedEventSchema = EventSchema.extend({
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_FAILED),
   data: langyToolCallFailedEventDataSchema,
 });
-export type LangyToolCallFailedEvent = z.infer<
-  typeof LangyToolCallFailedEventSchema
->;
+export type LangyToolCallFailedEvent = z.infer<typeof LangyToolCallFailedEventSchema>;
 
 export const LangyPlanUpdatedEventSchema = EventSchema.extend({
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED),
@@ -132,9 +126,7 @@ export const LangyAgentRespondedEventSchema = EventSchema.extend({
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED),
   data: langyAgentRespondedEventDataSchema,
 });
-export type LangyAgentRespondedEvent = z.infer<
-  typeof LangyAgentRespondedEventSchema
->;
+export type LangyAgentRespondedEvent = z.infer<typeof LangyAgentRespondedEventSchema>;
 
 export const LangyConversationArchivedEventSchema = EventSchema.extend({
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED),
@@ -156,9 +148,7 @@ export type LangyConversationMetadataUpdatedEvent = z.infer<
 
 export const LangyConversationHandoffPendingEventSchema = EventSchema.extend({
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING),
-  version: z.literal(
-    LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_PENDING,
-  ),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_PENDING),
   data: langyConversationHandoffPendingEventDataSchema,
 });
 export type LangyConversationHandoffPendingEvent = z.infer<
@@ -167,9 +157,7 @@ export type LangyConversationHandoffPendingEvent = z.infer<
 
 export const LangyConversationHandoffConsumedEventSchema = EventSchema.extend({
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED),
-  version: z.literal(
-    LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_CONSUMED,
-  ),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_CONSUMED),
   data: langyConversationHandoffConsumedEventDataSchema,
 });
 export type LangyConversationHandoffConsumedEvent = z.infer<

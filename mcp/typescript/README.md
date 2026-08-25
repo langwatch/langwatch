@@ -22,15 +22,15 @@ In stdio mode the API key is required for observability and prompt tools, and do
 
 ## Configuration
 
-| Env Var | CLI Arg | Description |
-|---------|---------|-------------|
-| `LANGWATCH_API_KEY` | `--apiKey` | API key for authentication |
-| `LANGWATCH_ENDPOINT` | `--endpoint` | API endpoint (default: `https://app.langwatch.ai`) |
-| | `--http` | Serve over HTTP and SSE instead of stdio |
-| | `--port` | HTTP port (default: `3000`) |
-| `LANGWATCH_MCP_HTTP_HOST` | `--host` | HTTP listen address (default: `127.0.0.1`) |
-| `LANGWATCH_MCP_ALLOWED_ORIGINS` | `--allowedOrigin` | Browser origins allowed to call the HTTP server |
-| `LANGWATCH_MCP_TRUST_PROXY` | | Use `X-Forwarded-For` as the rate limit key (default: off) |
+| Env Var                         | CLI Arg           | Description                                                |
+| ------------------------------- | ----------------- | ---------------------------------------------------------- |
+| `LANGWATCH_API_KEY`             | `--apiKey`        | API key for authentication                                 |
+| `LANGWATCH_ENDPOINT`            | `--endpoint`      | API endpoint (default: `https://app.langwatch.ai`)         |
+|                                 | `--http`          | Serve over HTTP and SSE instead of stdio                   |
+|                                 | `--port`          | HTTP port (default: `3000`)                                |
+| `LANGWATCH_MCP_HTTP_HOST`       | `--host`          | HTTP listen address (default: `127.0.0.1`)                 |
+| `LANGWATCH_MCP_ALLOWED_ORIGINS` | `--allowedOrigin` | Browser origins allowed to call the HTTP server            |
+| `LANGWATCH_MCP_TRUST_PROXY`     |                   | Use `X-Forwarded-For` as the rate limit key (default: off) |
 
 ### HTTP mode
 
@@ -85,67 +85,67 @@ gets in. A spoofable rate limit does not let anyone authenticate.
 
 ### Documentation
 
-| Tool | Description |
-|------|-------------|
-| `fetch_langwatch_docs` | Fetch LangWatch integration docs |
-| `fetch_scenario_docs` | Fetch Scenario agent testing docs |
+| Tool                   | Description                       |
+| ---------------------- | --------------------------------- |
+| `fetch_langwatch_docs` | Fetch LangWatch integration docs  |
+| `fetch_scenario_docs`  | Fetch Scenario agent testing docs |
 
 ### Observability (requires API key)
 
-| Tool | Description |
-|------|-------------|
+| Tool              | Description                                                  |
+| ----------------- | ------------------------------------------------------------ |
 | `discover_schema` | Explore available filters, metrics, aggregations, and groups |
-| `search_traces` | Search traces with filters, text query, and date range |
-| `get_trace` | Get full trace details with AI-readable formatting |
-| `get_analytics` | Query timeseries analytics data |
+| `search_traces`   | Search traces with filters, text query, and date range       |
+| `get_trace`       | Get full trace details with AI-readable formatting           |
+| `get_analytics`   | Query timeseries analytics data                              |
 
 ### Prompts (requires API key)
 
-| Tool | Description |
-|------|-------------|
-| `platform_list_prompts` | List all prompts |
-| `platform_get_prompt` | Get prompt with messages and version history |
-| `platform_create_prompt` | Create a new prompt |
-| `platform_update_prompt` | Update prompt or create new version |
+| Tool                     | Description                                  |
+| ------------------------ | -------------------------------------------- |
+| `platform_list_prompts`  | List all prompts                             |
+| `platform_get_prompt`    | Get prompt with messages and version history |
+| `platform_create_prompt` | Create a new prompt                          |
+| `platform_update_prompt` | Update prompt or create new version          |
 
 ### Datasets (requires API key)
 
-| Tool | Description |
-|------|-------------|
-| `platform_list_datasets` | List all datasets with record counts |
-| `platform_get_dataset` | Get dataset metadata, columns, and record preview |
-| `platform_create_dataset` | Create a new dataset with optional column definitions |
-| `platform_update_dataset` | Update dataset name or column types |
-| `platform_delete_dataset` | Archive a dataset |
-| `platform_create_dataset_records` | Add records to a dataset (max 1000 per call) |
-| `platform_update_dataset_record` | Update a single record |
-| `platform_delete_dataset_records` | Delete records by IDs (max 1000 per call) |
+| Tool                              | Description                                           |
+| --------------------------------- | ----------------------------------------------------- |
+| `platform_list_datasets`          | List all datasets with record counts                  |
+| `platform_get_dataset`            | Get dataset metadata, columns, and record preview     |
+| `platform_create_dataset`         | Create a new dataset with optional column definitions |
+| `platform_update_dataset`         | Update dataset name or column types                   |
+| `platform_delete_dataset`         | Archive a dataset                                     |
+| `platform_create_dataset_records` | Add records to a dataset (max 1000 per call)          |
+| `platform_update_dataset_record`  | Update a single record                                |
+| `platform_delete_dataset_records` | Delete records by IDs (max 1000 per call)             |
 
 ### Scenarios (requires API key)
 
-| Tool | Description |
-|------|-------------|
-| `platform_list_scenarios` | List all scenarios |
-| `platform_get_scenario` | Get scenario details |
-| `platform_create_scenario` | Create a new scenario |
-| `platform_update_scenario` | Update a scenario |
-| `platform_archive_scenario` | Archive a scenario |
+| Tool                        | Description           |
+| --------------------------- | --------------------- |
+| `platform_list_scenarios`   | List all scenarios    |
+| `platform_get_scenario`     | Get scenario details  |
+| `platform_create_scenario`  | Create a new scenario |
+| `platform_update_scenario`  | Update a scenario     |
+| `platform_archive_scenario` | Archive a scenario    |
 
 ### Evaluators (requires API key)
 
-| Tool | Description |
-|------|-------------|
-| `platform_list_evaluators` | List all evaluators |
-| `platform_get_evaluator` | Get evaluator details |
+| Tool                        | Description            |
+| --------------------------- | ---------------------- |
+| `platform_list_evaluators`  | List all evaluators    |
+| `platform_get_evaluator`    | Get evaluator details  |
 | `platform_create_evaluator` | Create a new evaluator |
-| `platform_update_evaluator` | Update an evaluator |
+| `platform_update_evaluator` | Update an evaluator    |
 
 ### Model Providers (requires API key)
 
-| Tool | Description |
-|------|-------------|
+| Tool                            | Description                     |
+| ------------------------------- | ------------------------------- |
 | `platform_list_model_providers` | List configured model providers |
-| `platform_set_model_provider` | Configure a model provider |
+| `platform_set_model_provider`   | Configure a model provider      |
 
 ## Output Formats
 
@@ -203,8 +203,10 @@ Build and point your MCP client to the local dist:
       "command": "node",
       "args": [
         "/path/to/mcp-server/dist/index.js",
-        "--apiKey", "your-api-key",
-        "--endpoint", "http://localhost:5560"
+        "--apiKey",
+        "your-api-key",
+        "--endpoint",
+        "http://localhost:5560"
       ]
     }
   }

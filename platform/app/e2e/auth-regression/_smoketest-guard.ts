@@ -23,9 +23,7 @@ export function assertLocalhostDatabaseUrl(): void {
   try {
     hostname = new URL(raw).hostname;
   } catch {
-    console.error(
-      `REFUSING TO RUN: DATABASE_URL is not a parseable URL: ${raw}`,
-    );
+    console.error(`REFUSING TO RUN: DATABASE_URL is not a parseable URL: ${raw}`);
     process.exit(1);
   }
   const normalizedHost = hostname.toLowerCase();

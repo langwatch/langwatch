@@ -109,9 +109,7 @@ export function decideCredentialWrite({
  * credential, and treating it as one let a forced run replace a working key
  * with whitespace, which empties the column by another name.
  */
-function hasSomethingToWrite(
-  replacement: Record<string, unknown> | null,
-): boolean {
+function hasSomethingToWrite(replacement: Record<string, unknown> | null): boolean {
   return replacement !== null && hasAnyValue(replacement);
 }
 
@@ -121,9 +119,7 @@ function hasSomethingToWrite(
  * read, cannot serve a request and is skipped so no seeder enables it or
  * routes to it.
  */
-function decideWithoutReplacement(
-  stored: StoredCredential,
-): CredentialWriteDecision {
+function decideWithoutReplacement(stored: StoredCredential): CredentialWriteDecision {
   if (stored.state === "absent") {
     return { action: "skip", reason: "nothing to write" };
   }
@@ -197,9 +193,7 @@ export function describeStored(stored: StoredCredential): string {
 export function describeIncoming(keys: Record<string, unknown>): string {
   const entries = Object.entries(keys);
   if (entries.length === 0) return "(none)";
-  return entries
-    .map(([name, value]) => `${name}=${maskSecret(value)}`)
-    .join(" ");
+  return entries.map(([name, value]) => `${name}=${maskSecret(value)}`).join(" ");
 }
 
 /**

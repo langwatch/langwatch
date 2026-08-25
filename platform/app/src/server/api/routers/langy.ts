@@ -106,23 +106,21 @@ const langyDeleteProcedure = langyProcedure("langy:delete");
  * refused BEFORE reaching the app layer, so it never mints keys or dispatches a
  * turn — exactly the precedence the route enforced.
  */
-const langyTurnProcedure = langyCreateProcedure.use(
-  async ({ ctx, input, next }) => {
-    const rl = await checkLangyMessageRateLimit({
-      userId: ctx.session.user.id,
-      projectId: (input as { projectId: string }).projectId,
-    });
-    if (!rl.allowed) {
-      // Typed, not a bare TRPCError: ADR-045 names rate-limited as a handled
-      // condition, and only a handled error puts `data.error` on the wire. A
-      // raw TRPCError arrives with `data.error === null`, so the client's
-      // explainer cannot tell it from an internal crash and renders the generic
-      // "something went wrong" — telling a merely-throttled user Langy is broken.
-      throw new LangyRateLimitedError();
-    }
-    return next();
-  },
-);
+const langyTurnProcedure = langyCreateProcedure.use(async ({ ctx, input, next }) => {
+  const rl = await checkLangyMessageRateLimit({
+    userId: ctx.session.user.id,
+    projectId: (input as { projectId: string }).projectId,
+  });
+  if (!rl.allowed) {
+    // Typed, not a bare TRPCError: ADR-045 names rate-limited as a handled
+    // condition, and only a handled error puts `data.error` on the wire. A
+    // raw TRPCError arrives with `data.error === null`, so the client's
+    // explainer cannot tell it from an internal crash and renders the generic
+    // "something went wrong" — telling a merely-throttled user Langy is broken.
+    throw new LangyRateLimitedError();
+  }
+  return next();
+});
 
 /** One chat message on the wire — role + opaque parts (bounded downstream). */
 const langyTurnMessageSchema = z.object({
@@ -179,17 +177,13 @@ const langyTurnInputShape = {
    * Why the client is sending. `regenerate-message` RE-DRIVES the last turn
    * against the message already on record (so it is NOT re-posted).
    */
-  trigger: z
-    .enum(["submit-message", "regenerate-message", "resume-stream"])
-    .optional(),
+  trigger: z.enum(["submit-message", "regenerate-message", "resume-stream"]).optional(),
   // Composer context chips (page context + skills) — bounded + sanitised in
   // renderLangyTurnContext; refs are never resolved by the control plane.
   ...langyTurnContextSchema.shape,
 } as const;
 
-function toListItemDto(
-  item: ConversationListItem,
-): LangyConversationListItemDto {
+function toListItemDto(item: ConversationListItem): LangyConversationListItemDto {
   return {
     id: item.id,
     title: item.title,
@@ -232,9 +226,7 @@ async function canWatchTurn({
   const connection = tryGetApp()?.redis ?? null;
   if (connection) {
     const access = LangyTurnAccessStore.create({ redis: connection });
-    if (
-      await access.isTurnActor({ projectId, conversationId, turnId, userId })
-    ) {
+    if (await access.isTurnActor({ projectId, conversationId, turnId, userId })) {
       return true;
     }
   }
@@ -276,10 +268,7 @@ async function watchForMissedTerminal({
   turnId: string;
   userId: string;
   buffer: {
-    liveness(a: {
-      conversationId: string;
-      turnId: string;
-    }): Promise<{ stale: boolean }>;
+    liveness(a: { conversationId: string; turnId: string }): Promise<{ stale: boolean }>;
   };
   signal: AbortSignal;
 }): Promise<LangyStreamEntry | null> {
@@ -288,7 +277,7 @@ async function watchForMissedTerminal({
     if (!(await abortableDelay(SETTLEMENT_POLL_MS, signal))) return null;
     const [conversation, liveness] = await Promise.all([
       getApp()
-    .langy.getById({ id: conversationId, projectId, userId })
+        .langy.getById({ id: conversationId, projectId, userId })
         .catch(() => null),
       buffer.liveness({ conversationId, turnId }).catch(() => null),
     ]);
@@ -442,154 +431,148 @@ export const langyRouter = createTRPCRouter({
 
   detail: langyReadProcedure
     .input(z.object({ conversationId: z.string() }))
-    .query(
-      async ({ input, ctx }): Promise<LangyConversationDetailDto | null> => {
-        // A freshness poll of the OPEN conversation — which may be the one the
-        // user JUST started, whose fold has not been projected yet. So this is a
-        // caller for which absence is a real answer: `findByIdVisible`, not
-        // `getById`. Using the throwing form here would 500 the poll on every
-        // first turn.
-        const detail = await ctx.app.langy.tryFindByIdVisible({
-          id: input.conversationId,
-          projectId: input.projectId,
-          userId: ctx.session.user.id,
-        });
-        return detail ? toDetailDto(detail) : null;
-      },
-    ),
+    .query(async ({ input, ctx }): Promise<LangyConversationDetailDto | null> => {
+      // A freshness poll of the OPEN conversation — which may be the one the
+      // user JUST started, whose fold has not been projected yet. So this is a
+      // caller for which absence is a real answer: `findByIdVisible`, not
+      // `getById`. Using the throwing form here would 500 the poll on every
+      // first turn.
+      const detail = await ctx.app.langy.tryFindByIdVisible({
+        id: input.conversationId,
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+      });
+      return detail ? toDetailDto(detail) : null;
+    }),
 
   /**
    * Heavy on-demand message history for a single conversation. Split from
    * `list` so opening a conversation never re-fetches the slim list, and the
    * list never carries content.
    */
-  messages: langyReadProcedure
-    .input(z.object({ conversationId: z.string() }))
-    .query(
-      async ({
-        input,
-        ctx,
-      }): Promise<{
-        messages: LangyMessageDto[];
-        /**
-         * The last turn's failure, serialized (a domain-error kind + safe meta —
-         * never raw text). Null unless the conversation ended in one.
-         *
-         * Turn errors used to live ONLY in the browser's `useChat` state, so a
-         * refresh after a failed turn left the user's question sitting there with
-         * no answer and no explanation — the failure was real, durable, and on
-         * the fold the whole time; nobody read it back.
-         */
-        lastError: string | null;
-        /**
-         * Whether a turn is in flight RIGHT NOW, read off the fold, independent
-         * of any browser stream. "In flight" is the whole span from the moment
-         * the message is sent (`active`) through the agent responding
-         * (`running`) — deliberately NOT just `running`, because the fold only
-         * reaches `running` at `agent_turn_accepted`, i.e. AFTER the worker
-         * has cold-started (fork opencode, lay out the home, npm-install skills —
-         * minutes on a cold worker). That warm-up is exactly the window the UI
-         * must not go blank in, and there the status is still `active`.
-         *
-         * The client's live transport (`useChat`) only knows a turn is running
-         * while its `onTurnStream` subscription is open — and that closes the
-         * instant a silent worker stops pushing frames, long before the turn is
-         * over (the liveness subscriber keeps re-driving for its whole grace
-         * budget). The Postgres operational projection is the durable read
-         * model: it stays
-         * `active`/`running` until the turn finalizes (`idle`) or fails
-         * (`failed`), so the panel can hold a working state the whole time and
-         * never leave the user staring at just their own message.
-         */
-        isTurnInFlight: boolean;
-        /**
-         * WHICH turn is in flight — null when none is, and null in the brief
-         * window between a message being sent and its turn being accepted on
-         * the record (`CurrentTurnId` lands at `agent_turn_accepted`).
-         *
-         * The durable answer to "what would Stop stop?". A browser tab only
-         * learns a turn id from its OWN send, so a turn it merely adopted from
-         * this read — started in another tab, or rejoined after a refresh —
-         * used to offer a Stop button with no id behind it: the click moved the
-         * control to "Stopping" and dispatched nothing, while the agent kept
-         * running. A tab-to-tab message could not fix that, because the worst
-         * case is that no other tab exists; the record can, because it always
-         * knew.
-         */
-        inFlightTurnId: string | null;
-        /**
-         * Whether the panel should ask "How did Langy do?" under the latest
-         * answer — the backend-driven cadence (never a client heuristic; see
-         * specs/langy/langy-feedback.feature). False while a turn is in
-         * flight: the answer being rated must exist first.
-         */
-        shouldAskFeedback: boolean;
-        /**
-         * The projection's event cursor at this snapshot (ADR-059): the client
-         * seeds its local fold here and catches up by fetching
-         * `conversationEventsAfter` — never by replaying full history.
-         */
-        eventCursor: { acceptedAt: number; eventId: string } | null;
-        /** The turn in flight, or null — what a refresh reattaches to. */
-        currentTurnId: string | null;
-        /**
-         * The model the latest accepted turn ran on, or null before any turn
-         * recorded one. Opening a conversation seeds the composer's picker
-         * from it, so a conversation keeps the model it was last used with
-         * across tabs and reloads.
-         */
-        lastModel: string | null;
-      }> => {
-        // Both reads go through user-scoped application services. The message
-        // service performs its own visibility check; this detail read is also
-        // needed for the durable turn status returned alongside the transcript.
-        const conversation = await ctx.app.langy.getById({
-          id: input.conversationId,
-          projectId: input.projectId,
-          userId: ctx.session.user.id,
-        });
-        const rows = await ctx.app.langy.getAllByConversation({
-          conversationId: input.conversationId,
-          projectId: input.projectId,
-          userId: ctx.session.user.id,
-        });
-        const messages = rows.map<LangyMessageDto>((row) => ({
-          id: row.id,
-          role: langyMessageRoleSchema.catch("assistant").parse(row.role),
-          parts: Array.isArray(row.parts)
-            ? (row.parts as LangyMessageDto["parts"])
-            : [],
-          createdAtMs: row.createdAt.getTime(),
-        }));
-        const isTurnInFlight =
-          conversation.status === LANGY_CONVERSATION_STATUS.ACTIVE ||
-          conversation.status === LANGY_CONVERSATION_STATUS.RUNNING;
-        const shouldAskFeedback = isTurnInFlight
-          ? false
-          : await ctx.app.langy.shouldAskFeedback({
-              userId: ctx.session.user.id,
-              conversationId: input.conversationId,
-              assistantAnswerCount: messages.filter(
-                (message) => message.role === "assistant",
-              ).length,
-            });
-        return {
-          messages,
-          lastError:
-            conversation.status === LANGY_CONVERSATION_STATUS.FAILED
-              ? conversation.lastError
-              : null,
-          isTurnInFlight,
-          // Only ever the id of a turn that IS in flight: a cleared/stale id
-          // must never become a Stop target.
-          inFlightTurnId: isTurnInFlight ? conversation.currentTurnId : null,
-          shouldAskFeedback,
-          eventCursor: conversation.eventCursor,
-          currentTurnId: isTurnInFlight ? conversation.currentTurnId : null,
-          lastModel: conversation.lastModel,
-        };
-      },
-    ),
+  messages: langyReadProcedure.input(z.object({ conversationId: z.string() })).query(
+    async ({
+      input,
+      ctx,
+    }): Promise<{
+      messages: LangyMessageDto[];
+      /**
+       * The last turn's failure, serialized (a domain-error kind + safe meta —
+       * never raw text). Null unless the conversation ended in one.
+       *
+       * Turn errors used to live ONLY in the browser's `useChat` state, so a
+       * refresh after a failed turn left the user's question sitting there with
+       * no answer and no explanation — the failure was real, durable, and on
+       * the fold the whole time; nobody read it back.
+       */
+      lastError: string | null;
+      /**
+       * Whether a turn is in flight RIGHT NOW, read off the fold, independent
+       * of any browser stream. "In flight" is the whole span from the moment
+       * the message is sent (`active`) through the agent responding
+       * (`running`) — deliberately NOT just `running`, because the fold only
+       * reaches `running` at `agent_turn_accepted`, i.e. AFTER the worker
+       * has cold-started (fork opencode, lay out the home, npm-install skills —
+       * minutes on a cold worker). That warm-up is exactly the window the UI
+       * must not go blank in, and there the status is still `active`.
+       *
+       * The client's live transport (`useChat`) only knows a turn is running
+       * while its `onTurnStream` subscription is open — and that closes the
+       * instant a silent worker stops pushing frames, long before the turn is
+       * over (the liveness subscriber keeps re-driving for its whole grace
+       * budget). The Postgres operational projection is the durable read
+       * model: it stays
+       * `active`/`running` until the turn finalizes (`idle`) or fails
+       * (`failed`), so the panel can hold a working state the whole time and
+       * never leave the user staring at just their own message.
+       */
+      isTurnInFlight: boolean;
+      /**
+       * WHICH turn is in flight — null when none is, and null in the brief
+       * window between a message being sent and its turn being accepted on
+       * the record (`CurrentTurnId` lands at `agent_turn_accepted`).
+       *
+       * The durable answer to "what would Stop stop?". A browser tab only
+       * learns a turn id from its OWN send, so a turn it merely adopted from
+       * this read — started in another tab, or rejoined after a refresh —
+       * used to offer a Stop button with no id behind it: the click moved the
+       * control to "Stopping" and dispatched nothing, while the agent kept
+       * running. A tab-to-tab message could not fix that, because the worst
+       * case is that no other tab exists; the record can, because it always
+       * knew.
+       */
+      inFlightTurnId: string | null;
+      /**
+       * Whether the panel should ask "How did Langy do?" under the latest
+       * answer — the backend-driven cadence (never a client heuristic; see
+       * specs/langy/langy-feedback.feature). False while a turn is in
+       * flight: the answer being rated must exist first.
+       */
+      shouldAskFeedback: boolean;
+      /**
+       * The projection's event cursor at this snapshot (ADR-059): the client
+       * seeds its local fold here and catches up by fetching
+       * `conversationEventsAfter` — never by replaying full history.
+       */
+      eventCursor: { acceptedAt: number; eventId: string } | null;
+      /** The turn in flight, or null — what a refresh reattaches to. */
+      currentTurnId: string | null;
+      /**
+       * The model the latest accepted turn ran on, or null before any turn
+       * recorded one. Opening a conversation seeds the composer's picker
+       * from it, so a conversation keeps the model it was last used with
+       * across tabs and reloads.
+       */
+      lastModel: string | null;
+    }> => {
+      // Both reads go through user-scoped application services. The message
+      // service performs its own visibility check; this detail read is also
+      // needed for the durable turn status returned alongside the transcript.
+      const conversation = await ctx.app.langy.getById({
+        id: input.conversationId,
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+      });
+      const rows = await ctx.app.langy.getAllByConversation({
+        conversationId: input.conversationId,
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+      });
+      const messages = rows.map<LangyMessageDto>((row) => ({
+        id: row.id,
+        role: langyMessageRoleSchema.catch("assistant").parse(row.role),
+        parts: Array.isArray(row.parts) ? (row.parts as LangyMessageDto["parts"]) : [],
+        createdAtMs: row.createdAt.getTime(),
+      }));
+      const isTurnInFlight =
+        conversation.status === LANGY_CONVERSATION_STATUS.ACTIVE ||
+        conversation.status === LANGY_CONVERSATION_STATUS.RUNNING;
+      const shouldAskFeedback = isTurnInFlight
+        ? false
+        : await ctx.app.langy.shouldAskFeedback({
+            userId: ctx.session.user.id,
+            conversationId: input.conversationId,
+            assistantAnswerCount: messages.filter(
+              (message) => message.role === "assistant",
+            ).length,
+          });
+      return {
+        messages,
+        lastError:
+          conversation.status === LANGY_CONVERSATION_STATUS.FAILED
+            ? conversation.lastError
+            : null,
+        isTurnInFlight,
+        // Only ever the id of a turn that IS in flight: a cleared/stale id
+        // must never become a Stop target.
+        inFlightTurnId: isTurnInFlight ? conversation.currentTurnId : null,
+        shouldAskFeedback,
+        eventCursor: conversation.eventCursor,
+        currentTurnId: isTurnInFlight ? conversation.currentTurnId : null,
+        lastModel: conversation.lastModel,
+      };
+    },
+  ),
 
   /**
    * Soft-delete (archive) a conversation the current user owns.
@@ -634,8 +617,7 @@ export const langyRouter = createTRPCRouter({
       // practice this branch is unreachable. It stays because the return type
       // permits null and a silent `undefined` detail would be worse than a
       // redundant throw.
-      if (!detail)
-        throw new LangyConversationNotFoundError(input.conversationId);
+      if (!detail) throw new LangyConversationNotFoundError(input.conversationId);
       return toDetailDto(detail);
     }),
 
@@ -677,10 +659,7 @@ export const langyRouter = createTRPCRouter({
       }),
     )
     .mutation(
-      async ({
-        input,
-        ctx,
-      }): Promise<{ conversationId: string; turnId: string }> => {
+      async ({ input, ctx }): Promise<{ conversationId: string; turnId: string }> => {
         return acceptTurn({
           langy: ctx.app.langy,
           input: {
@@ -707,10 +686,7 @@ export const langyRouter = createTRPCRouter({
       }),
     )
     .mutation(
-      async ({
-        input,
-        ctx,
-      }): Promise<{ conversationId: string; turnId: string }> => {
+      async ({ input, ctx }): Promise<{ conversationId: string; turnId: string }> => {
         return acceptTurn({
           langy: ctx.app.langy,
           input: {
@@ -804,9 +780,7 @@ export const langyRouter = createTRPCRouter({
             projectId: input.projectId,
             session: ctx.session,
             requestedConversationId: input.conversationId ?? null,
-            ...(input.modelOverride
-              ? { modelOverride: input.modelOverride }
-              : {}),
+            ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
           });
         } catch (error) {
           // The service already swallows warm-path failures; this is the belt
@@ -834,10 +808,9 @@ export const langyRouter = createTRPCRouter({
    */
   modelsAllowed: langyReadProcedure.query(
     async ({ input, ctx }): Promise<{ modelsAllowed: string[] | null }> => {
-      const modelsAllowed =
-        await ctx.app.langy.tryGetModelsAllowedForProject(
-          input.projectId,
-        );
+      const modelsAllowed = await ctx.app.langy.tryGetModelsAllowedForProject(
+        input.projectId,
+      );
       return { modelsAllowed };
     },
   ),
@@ -1056,9 +1029,7 @@ export const langyRouter = createTRPCRouter({
       });
       // Tear down on client disconnect OR the hard per-turn deadline, whichever
       // comes first — a wedged turn must not hold a blocking connection forever.
-      const signals: AbortSignal[] = [
-        AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
-      ];
+      const signals: AbortSignal[] = [AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS)];
       if (opts.signal) signals.push(opts.signal);
       const signal = AbortSignal.any(signals);
 

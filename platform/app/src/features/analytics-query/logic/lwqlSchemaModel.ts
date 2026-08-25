@@ -104,20 +104,12 @@ export function lwqlSchemaModel(
       timeColumn: dataset.timeColumn,
       freshness: dataset.freshness,
       exampleSql: dataset.exampleSql,
-      columns: dataset.columns.map((column) =>
-        columnModel({ dataset, column }),
-      ),
+      columns: dataset.columns.map((column) => columnModel({ dataset, column })),
     })),
   };
 }
 
-function matches({
-  haystack,
-  needle,
-}: {
-  haystack: string;
-  needle: string;
-}): boolean {
+function matches({ haystack, needle }: { haystack: string; needle: string }): boolean {
   return haystack.toLowerCase().includes(needle);
 }
 
@@ -240,9 +232,7 @@ export function lwqlHoverFor({
   const wanted = identifier.trim().toLowerCase();
   if (wanted.length === 0) return undefined;
 
-  return (
-    hoverForDataset({ model, wanted }) ?? hoverForColumn({ model, wanted })
-  );
+  return hoverForDataset({ model, wanted }) ?? hoverForColumn({ model, wanted });
 }
 
 /** The dataset a member named, qualified or bare. */

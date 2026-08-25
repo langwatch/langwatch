@@ -6,7 +6,11 @@ sidebarTitle: Overview
 
 The **LangWatch AI Gateway** is a single OpenAI- and Anthropic-compatible endpoint that every application, SDK, or coding CLI in your organization can send LLM traffic to. The gateway applies organisation-wide policy, attribution, budget enforcement, caching, guardrails, and fallback in the path of every request, and emits per-tenant OpenTelemetry traces that land in each project's LangWatch workspace.
 
-<Info>**~11 µs of gateway-side overhead at 5k RPS sustained.** Written in Go with chi + in-process JWT verification. The hot path sits in front of every LLM call, it has to be close to free.</Info>
+<Info>
+  **~11 µs of gateway-side overhead at 5k RPS sustained.** Written in Go with chi +
+  in-process JWT verification. The hot path sits in front of every LLM call, it has to be
+  close to free.
+</Info>
 
 ## Try it in 30 seconds
 
@@ -120,14 +124,14 @@ The gateway is written in Go and embeds [`github.com/maximhq/bifrost/core`](http
 
 Both ship in LangWatch. They solve different problems:
 
-| Need | Use |
-|---|---|
-| "Trace my existing provider calls without changing credentials" | **LangWatch SDK**: point it at your app, it instruments. Keep your provider keys. |
-| "Give the marketing team an LLM key they can't leak, with a $500/month cap" | **AI Gateway**: mint a virtual key with a budget, share the VK. |
-| "Switch all internal apps from OpenAI to Anthropic for a week" | **AI Gateway**: flip `model_aliases` on the VKs involved. Zero code change. |
-| "Ship a coding CLI to every engineer with observability" | **AI Gateway + CLI integration**: set `OPENAI_BASE_URL` or `ANTHROPIC_BASE_URL` on every dev machine. |
-| "Guardrail the production chat surface for PII and prompt injection" | **AI Gateway** guardrail attachments, inline without touching application code. |
-| "Call 50+ providers from a single eval script" | **LangWatch SDK's existing litellm path** still works unchanged for playground/evaluators (not migrated to gateway in v1). |
+| Need                                                                        | Use                                                                                                                        |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| "Trace my existing provider calls without changing credentials"             | **LangWatch SDK**: point it at your app, it instruments. Keep your provider keys.                                          |
+| "Give the marketing team an LLM key they can't leak, with a $500/month cap" | **AI Gateway**: mint a virtual key with a budget, share the VK.                                                            |
+| "Switch all internal apps from OpenAI to Anthropic for a week"              | **AI Gateway**: flip `model_aliases` on the VKs involved. Zero code change.                                                |
+| "Ship a coding CLI to every engineer with observability"                    | **AI Gateway + CLI integration**: set `OPENAI_BASE_URL` or `ANTHROPIC_BASE_URL` on every dev machine.                      |
+| "Guardrail the production chat surface for PII and prompt injection"        | **AI Gateway** guardrail attachments, inline without touching application code.                                            |
+| "Call 50+ providers from a single eval script"                              | **LangWatch SDK's existing litellm path** still works unchanged for playground/evaluators (not migrated to gateway in v1). |
 
 The gateway and the existing LangWatch SDK live in the same project: the VK you mint in the gateway can reuse the same provider credentials configured under **Settings → Model Providers**. No duplication.
 

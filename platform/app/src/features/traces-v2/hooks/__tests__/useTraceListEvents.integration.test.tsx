@@ -24,9 +24,7 @@ vi.mock("~/utils/api", () => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: harness.projectId.value
-      ? { id: harness.projectId.value }
-      : undefined,
+    project: harness.projectId.value ? { id: harness.projectId.value } : undefined,
   }),
 }));
 
@@ -145,9 +143,7 @@ describe("useTraceListEvents", () => {
           isLoading: true,
         }));
 
-        const { result } = renderHook(() =>
-          useTraceListEvents({ rows: [row("t1")] }),
-        );
+        const { result } = renderHook(() => useTraceListEvents({ rows: [row("t1")] }));
 
         expect(result.current[0]?.eventsLoading).toBe(true);
         expect(result.current[0]?.events).toEqual(NO_TRACE_EVENTS);
@@ -170,9 +166,7 @@ describe("useTraceListEvents", () => {
           extra: { isPlaceholderData: true },
         });
 
-        const { result } = renderHook(() =>
-          useTraceListEvents({ rows: [row("t9")] }),
-        );
+        const { result } = renderHook(() => useTraceListEvents({ rows: [row("t9")] }));
 
         expect(result.current[0]?.eventsLoading).toBe(true);
         expect(result.current[0]?.events).toEqual(NO_TRACE_EVENTS);
@@ -262,9 +256,7 @@ describe("useTraceListEvents", () => {
         rerender();
 
         expect(lastOpts()).toEqual(expect.objectContaining({ enabled: true }));
-        expect(lastInput()).toEqual(
-          expect.objectContaining({ traceIds: ["t1"] }),
-        );
+        expect(lastInput()).toEqual(expect.objectContaining({ traceIds: ["t1"] }));
       });
     });
   });

@@ -74,13 +74,9 @@ vi.mock("~/hooks/useFeatureFlag", async () => {
     ...actual,
     useFeatureFlag: (flag: string) => ({
       enabled:
-        flag === "release_ui_navigation_v2_enabled"
-          ? mockNavigationV2FlagEnabled
-          : true,
+        flag === "release_ui_navigation_v2_enabled" ? mockNavigationV2FlagEnabled : true,
       isLoading:
-        flag === "release_ui_navigation_v2_enabled"
-          ? mockNavigationV2FlagLoading
-          : false,
+        flag === "release_ui_navigation_v2_enabled" ? mockNavigationV2FlagLoading : false,
     }),
   };
 });
@@ -364,9 +360,7 @@ describe("avatar menu navigation submenu", () => {
       renderLayout();
       await openAvatarMenu();
 
-      expect(
-        screen.getByText("Navigation (Old navigation)"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Navigation (Old navigation)")).toBeInTheDocument();
     });
 
     /** @scenario Picking a mode persists on the device */
@@ -381,16 +375,12 @@ describe("avatar menu navigation submenu", () => {
           screen.getByRole("menuitemradio", { name: "Icon rail" }),
         ).toBeInTheDocument();
       });
-      await user.click(
-        screen.getByRole("menuitemradio", { name: "Icon rail" }),
-      );
+      await user.click(screen.getByRole("menuitemradio", { name: "Icon rail" }));
 
       await waitFor(() => {
         expect(useNavigationModeStore.getState().storedMode).toBe("icon-rail");
       });
-      expect(localStorage.getItem("langwatch:navigation-mode:v1")).toBe(
-        "icon-rail",
-      );
+      expect(localStorage.getItem("langwatch:navigation-mode:v1")).toBe("icon-rail");
       expect(trackEventMock).toHaveBeenCalledWith("navigation_mode_change", {
         mode: "icon-rail",
       });

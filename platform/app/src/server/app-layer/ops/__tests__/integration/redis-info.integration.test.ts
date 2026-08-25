@@ -28,10 +28,8 @@ async function readRedisInfo(redis: Redis): Promise<{
     usedMemoryBytes: parseInt(get("used_memory"), 10) || 0,
     maxMemoryBytes: parseInt(get("maxmemory"), 10) || 0,
     connectedClients: parseInt(get("connected_clients"), 10) || 0,
-    usedCpuUserMainThreadSeconds:
-      parseFloat(get("used_cpu_user_main_thread")) || 0,
-    usedCpuSysMainThreadSeconds:
-      parseFloat(get("used_cpu_sys_main_thread")) || 0,
+    usedCpuUserMainThreadSeconds: parseFloat(get("used_cpu_user_main_thread")) || 0,
+    usedCpuSysMainThreadSeconds: parseFloat(get("used_cpu_sys_main_thread")) || 0,
   };
 }
 

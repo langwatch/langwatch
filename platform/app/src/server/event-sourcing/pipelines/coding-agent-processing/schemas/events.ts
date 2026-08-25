@@ -22,17 +22,13 @@ export const spanFactsContributedEventSchema = EventSchema.extend({
   type: z.literal(SPAN_FACTS_CONTRIBUTED_EVENT_TYPE),
   data: spanFactsContributionSchema,
 });
-export type SpanFactsContributedEvent = z.infer<
-  typeof spanFactsContributedEventSchema
->;
+export type SpanFactsContributedEvent = z.infer<typeof spanFactsContributedEventSchema>;
 
 export const logFactsContributedEventSchema = EventSchema.extend({
   type: z.literal(LOG_FACTS_CONTRIBUTED_EVENT_TYPE),
   data: logFactsContributionSchema,
 });
-export type LogFactsContributedEvent = z.infer<
-  typeof logFactsContributedEventSchema
->;
+export type LogFactsContributedEvent = z.infer<typeof logFactsContributedEventSchema>;
 
 export const metricFactsContributedEventSchema = EventSchema.extend({
   type: z.literal(METRIC_FACTS_CONTRIBUTED_EVENT_TYPE),
@@ -73,9 +69,7 @@ export const spanFactsLiftedPayloadSchema = z.object({
   metadata: EventMetadataBaseSchema.optional(),
   idempotencyKey: z.string().optional(),
 });
-export type SpanFactsLiftedPayload = z.infer<
-  typeof spanFactsLiftedPayloadSchema
->;
+export type SpanFactsLiftedPayload = z.infer<typeof spanFactsLiftedPayloadSchema>;
 
 /**
  * Discriminate-then-validate read of a staged payload, mirroring

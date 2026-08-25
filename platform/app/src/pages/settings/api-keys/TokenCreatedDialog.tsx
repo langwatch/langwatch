@@ -17,14 +17,7 @@
  * @see specs/api-keys/token-created-snippets.feature
  */
 
-import {
-  Alert,
-  Box,
-  createListCollection,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { Dialog } from "../../../components/ui/dialog";
 import { Select } from "../../../components/ui/select";
@@ -121,8 +114,7 @@ export const CODE_ASSISTANTS: CodeAssistant[] = [
   {
     key: "claude-desktop",
     label: "Claude Desktop",
-    configPath:
-      "~/Library/Application Support/Claude/claude_desktop_config.json",
+    configPath: "~/Library/Application Support/Claude/claude_desktop_config.json",
   },
 ];
 
@@ -139,13 +131,9 @@ export function TokenCreatedDialog({
   orgProjects: Array<{ id: string; name: string }>;
   onClose: () => void;
 }) {
-  const [assistantKey, setAssistantKey] = useState<string>(
-    CODE_ASSISTANTS[0]!.key,
-  );
+  const [assistantKey, setAssistantKey] = useState<string>(CODE_ASSISTANTS[0]!.key);
   const [codeTab, setCodeTab] = useState<CodeTab>("env");
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(
-    projectId ?? "",
-  );
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId ?? "");
 
   const activeProjectId = selectedProjectId || projectId;
   const maskedKey = maskApiKey(newToken ?? "");
@@ -418,8 +406,8 @@ export function TokenCreatedDialog({
                   tab looking broken next to one that offers a command. */}
               {!assistantCommand && newToken && (
                 <Text fontSize="xs" color="fg.muted">
-                  {activeAssistant.label} has no install command — paste the
-                  config below into{" "}
+                  {activeAssistant.label} has no install command — paste the config below
+                  into{" "}
                   <Text as="span" fontWeight="semibold" color="fg">
                     {activeAssistant.configPath}
                   </Text>
@@ -484,10 +472,7 @@ export function TokenCreatedDialog({
                           });
                         }}
                       >
-                        <button
-                          type="button"
-                          aria-label={`Copy ${ep.label} config path`}
-                        >
+                        <button type="button" aria-label={`Copy ${ep.label} config path`}>
                           <Text fontSize="2xs" fontWeight="medium" color="fg">
                             {ep.label}
                           </Text>

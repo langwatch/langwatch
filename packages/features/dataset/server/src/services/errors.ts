@@ -173,8 +173,7 @@ export class InvalidColumnError extends Error {
     datasetName: string;
     validColumns: string[];
   }) {
-    const validColumnsList =
-      validColumns.length > 0 ? validColumns.join(", ") : "(none)";
+    const validColumnsList = validColumns.length > 0 ? validColumns.join(", ") : "(none)";
     super(
       `Column "${columnName}" is not defined in the "${datasetName}" dataset schema. Valid columns: ${validColumnsList}`,
     );
@@ -190,9 +189,7 @@ export class InvalidColumnError extends Error {
  * to the backend multipart upload path.
  */
 export class DirectUploadUnavailableError extends Error {
-  constructor(
-    message = "Direct upload is unavailable; use the backend upload path",
-  ) {
+  constructor(message = "Direct upload is unavailable; use the backend upload path") {
     super(message);
     this.name = "DirectUploadUnavailableError";
   }
@@ -314,16 +311,8 @@ export class DatasetTooLargeToExportError extends Error {
   readonly sizeBytes: number;
   readonly maxBytes: number;
 
-  constructor({
-    sizeBytes,
-    maxBytes,
-  }: {
-    sizeBytes: number;
-    maxBytes: number;
-  }) {
-    super(
-      "This dataset is too large to export here; streaming export is coming",
-    );
+  constructor({ sizeBytes, maxBytes }: { sizeBytes: number; maxBytes: number }) {
+    super("This dataset is too large to export here; streaming export is coming");
     this.name = "DatasetTooLargeToExportError";
     this.sizeBytes = sizeBytes;
     this.maxBytes = maxBytes;
@@ -343,10 +332,7 @@ export class DatasetTooLargeToEditColumnsError extends Error {
   readonly sizeBytes: number;
   readonly maxBytes: number;
 
-  constructor({
-    sizeBytes,
-    maxBytes,
-  }: { sizeBytes: number; maxBytes: number }) {
+  constructor({ sizeBytes, maxBytes }: { sizeBytes: number; maxBytes: number }) {
     super(
       "This dataset is too large to change column types in place yet. Reduce its size or contact support.",
     );

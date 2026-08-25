@@ -7,5 +7,7 @@ import { test, expect } from "@playwright/test";
 test("seed", async ({ page }) => {
   await page.goto("/");
   // Wait for the main app to load by checking for navigation
-  await expect(page.locator("main, [role='main'], #__next")).toBeVisible({ timeout: 15000 });
+  await expect(page.locator("main, [role='main'], #__next")).toBeVisible({
+    timeout: 15000,
+  });
 });

@@ -19,9 +19,7 @@ describe("permissionGrantTiers", () => {
   describe("given an organization-only permission", () => {
     it("lists only the organization tier", () => {
       expect(permissionGrantTiers("governance:view")).toEqual(["organization"]);
-      expect(permissionGrantTiers("organization:manage")).toEqual([
-        "organization",
-      ]);
+      expect(permissionGrantTiers("organization:manage")).toEqual(["organization"]);
     });
   });
 
@@ -88,9 +86,7 @@ describe("declaredScopeId", () => {
 
   describe("when the input carries no id the permission can use", () => {
     it("returns null so the caller treats it as a wiring bug", () => {
-      expect(
-        declaredScopeId({ permission: "governance:view", input: {} }),
-      ).toBeNull();
+      expect(declaredScopeId({ permission: "governance:view", input: {} })).toBeNull();
       expect(
         declaredScopeId({
           permission: "governance:view",

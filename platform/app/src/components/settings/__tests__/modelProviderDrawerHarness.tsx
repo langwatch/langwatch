@@ -99,9 +99,7 @@ export function makePrimeQueries({
   projectListQuery: ReturnType<typeof vi.fn>;
 }) {
   return (rows: MaybeStoredModelProvider[]) => {
-    const collapsed = Object.fromEntries(
-      rows.map((row) => [row.provider, row]),
-    );
+    const collapsed = Object.fromEntries(rows.map((row) => [row.provider, row]));
     collapsedQuery.mockReturnValue(
       readyQueryResult({ providers: collapsed, modelMetadata: {} }),
     );
@@ -138,9 +136,7 @@ export function inputFor(labelText: string): HTMLInputElement {
  */
 export function isMarkedRequired(labelText: string): boolean {
   const wrapper = fieldWrapper(labelText);
-  const hasIndicator = !!wrapper.querySelector(
-    ".chakra-field__requiredIndicator",
-  );
+  const hasIndicator = !!wrapper.querySelector(".chakra-field__requiredIndicator");
   const inputIsRequired =
     wrapper.querySelector("input")?.hasAttribute("required") ?? false;
   if (hasIndicator !== inputIsRequired) {

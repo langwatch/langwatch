@@ -212,9 +212,7 @@ const STATUS_LABELS: Record<TraceStatus, string> = {
   ok: "OK",
 };
 
-export const StatusIndicator: React.FC<{ status: TraceStatus }> = ({
-  status,
-}) => (
+export const StatusIndicator: React.FC<{ status: TraceStatus }> = ({ status }) => (
   <HStack gap={1}>
     <StatusDot status={status} />
     <Text textStyle="xs" color="fg.muted">

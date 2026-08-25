@@ -5,9 +5,7 @@ import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
 import type { SimulationProcessingEvent } from "../schemas/events";
 import { isSimulationRunFinishedEvent } from "../schemas/typeGuards";
 
-const logger = createLogger(
-  "langwatch:simulation-processing:trace-metrics-sync",
-);
+const logger = createLogger("langwatch:simulation-processing:trace-metrics-sync");
 
 export interface TraceMetricsSyncSubscriberDeps {
   computeRunMetrics: (data: ComputeRunMetricsCommandData) => Promise<void>;

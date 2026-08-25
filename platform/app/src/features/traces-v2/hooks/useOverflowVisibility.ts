@@ -93,9 +93,7 @@ export function useOverflowVisibility({
     const root = scrollerRef.current;
     if (!root) return;
 
-    const els = Array.from(
-      root.querySelectorAll<HTMLElement>(`[${attribute}]`),
-    );
+    const els = Array.from(root.querySelectorAll<HTMLElement>(`[${attribute}]`));
     if (els.length === 0) return;
 
     const containerRect = root.getBoundingClientRect();
@@ -132,15 +130,7 @@ export function useOverflowVisibility({
     }
 
     if (next.size > 0) setHiddenIds(next);
-  }, [
-    measureSeq,
-    hiddenIds,
-    items,
-    scrollerRef,
-    activeId,
-    attribute,
-    reservePx,
-  ]);
+  }, [measureSeq, hiddenIds, items, scrollerRef, activeId, attribute, reservePx]);
 
   return hiddenIds;
 }

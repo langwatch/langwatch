@@ -7,14 +7,30 @@ import {
   ModelTranslationPort,
   PostgresModelProviderAdapter,
 } from "@langwatch/model-provider-server";
-import type { ModelCostRate, ModelDefaultFeature, ModelProviderApiKeyValidation, ModelProviderService, ModelProviderSummary } from "@langwatch/model-provider-contract";
+import type {
+  ModelCostRate,
+  ModelDefaultFeature,
+  ModelProviderApiKeyValidation,
+  ModelProviderService,
+  ModelProviderSummary,
+} from "@langwatch/model-provider-contract";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderAuthorization } from "@langwatch/model-provider-server";
 import { validateProviderApiKey } from "~/server/modelProviders/providerValidation";
-import { getProviderModelOptions, modelProviders } from "~/server/modelProviders/registry";
-import { allFeatures, MODEL_ROLES, featureByKey } from "~/server/modelProviders/featureRegistry";
-import { isModelAllowedAsRoleDefault, isModelAllowedForFeature } from "~/server/modelProviders/codexRestrictions";
+import {
+  getProviderModelOptions,
+  modelProviders,
+} from "~/server/modelProviders/registry";
+import {
+  allFeatures,
+  MODEL_ROLES,
+  featureByKey,
+} from "~/server/modelProviders/featureRegistry";
+import {
+  isModelAllowedAsRoleDefault,
+  isModelAllowedForFeature,
+} from "~/server/modelProviders/codexRestrictions";
 import { expandLatestAlias, isLatestAlias } from "~/server/modelProviders/latestAliases";
 import { buildSeedPlanForProvider } from "~/server/modelProviders/seedOnboardingDefaults";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
@@ -30,32 +46,52 @@ import {
 class AppModelProviderCatalog extends ModelProviderCatalog {
   constructor(
     private readonly managedProviders: ManagedProviderService,
-    private readonly systemProviderEnvironment: Readonly<Record<string, string | undefined>> = {},
+    private readonly systemProviderEnvironment: Readonly<
+      Record<string, string | undefined>
+    > = {},
     private readonly isSaas = false,
-  ) { super(); }
+  ) {
+    super();
+  }
 
-  exists(provider: string): boolean { return provider in modelProviders; }
+  exists(provider: string): boolean {
+    return provider in modelProviders;
+  }
 
   metadata(provider: string) {
     return {
       models: getProviderModelOptions(provider, "chat").map((model) => model.value),
-      embeddingsModels: getProviderModelOptions(provider, "embedding").map((model) => model.value),
-      disabledByDefault: modelProviders[provider as keyof typeof modelProviders]?.type === "safety",
+      embeddingsModels: getProviderModelOptions(provider, "embedding").map(
+        (model) => model.value,
+      ),
+      disabledByDefault:
+        modelProviders[provider as keyof typeof modelProviders]?.type === "safety",
     };
   }
 
   defaultFeatures(): ModelDefaultFeature[] {
-    return allFeatures().map(({ key, role, displayName, description }) => ({ key, role, displayName, description }));
+    return allFeatures().map(({ key, role, displayName, description }) => ({
+      key,
+      role,
+      displayName,
+      description,
+    }));
   }
 
   sanitizeDefaultConfig(input: Record<string, unknown>): Record<string, string> {
-    const valid = new Set<string>([...MODEL_ROLES, ...allFeatures().map((feature) => feature.key)]);
+    const valid = new Set<string>([
+      ...MODEL_ROLES,
+      ...allFeatures().map((feature) => feature.key),
+    ]);
     const clean: Record<string, string> = {};
     for (const [key, value] of Object.entries(input)) {
       if (!valid.has(key) || typeof value !== "string" || value.length === 0) continue;
       const allowed = MODEL_ROLES.includes(key as (typeof MODEL_ROLES)[number])
         ? isModelAllowedAsRoleDefault(value, key as (typeof MODEL_ROLES)[number])
-        : Boolean(featureByKey(key) && isModelAllowedForFeature({ modelId: value, featureKey: key }));
+        : Boolean(
+            featureByKey(key) &&
+            isModelAllowedForFeature({ modelId: value, featureKey: key }),
+          );
       if (!allowed) throw new Error(`Model is not allowed for default key: ${key}`);
       clean[key] = value;
     }
@@ -67,7 +103,10 @@ class AppModelProviderCatalog extends ModelProviderCatalog {
     if (isLatestAlias(input.model) && model === input.model) return null;
     const allowed = MODEL_ROLES.includes(input.key as (typeof MODEL_ROLES)[number])
       ? isModelAllowedAsRoleDefault(model, input.key as (typeof MODEL_ROLES)[number])
-      : Boolean(featureByKey(input.key) && isModelAllowedForFeature({ modelId: model, featureKey: input.key }));
+      : Boolean(
+          featureByKey(input.key) &&
+          isModelAllowedForFeature({ modelId: model, featureKey: input.key }),
+        );
     return allowed ? model : null;
   }
 
@@ -79,15 +118,23 @@ class AppModelProviderCatalog extends ModelProviderCatalog {
     return getStaticModelCosts();
   }
 
-  async systemProviders(_input: { projectId?: string; organizationId?: string }): Promise<ModelProviderSummary[]> {
+  async systemProviders(_input: {
+    projectId?: string;
+    organizationId?: string;
+  }): Promise<ModelProviderSummary[]> {
     const now = new Date(0);
-    const organizationId = _input.organizationId ?? `system:${_input.projectId ?? "global"}`;
+    const organizationId =
+      _input.organizationId ?? `system:${_input.projectId ?? "global"}`;
     return Object.entries(modelProviders)
       .filter(([, definition]) => definition.enabledSince)
       .map(([provider, definition]) => {
         const enabled = this.isSystemProviderEnabled(provider, definition.apiKey);
-        const models = getProviderModelOptions(provider, "chat").map((model) => model.value);
-        const embeddingsModels = getProviderModelOptions(provider, "embedding").map((model) => model.value);
+        const models = getProviderModelOptions(provider, "chat").map(
+          (model) => model.value,
+        );
+        const embeddingsModels = getProviderModelOptions(provider, "embedding").map(
+          (model) => model.value,
+        );
         return {
           id: `system_${provider}`,
           organizationId,
@@ -117,23 +164,40 @@ class AppModelProviderCatalog extends ModelProviderCatalog {
   }
 
   private isSystemProviderEnabled(provider: string, apiKey: string): boolean {
-    return this.isSaas && Boolean(this.systemProviderEnvironment[apiKey]) &&
-      (provider !== "vertex_ai" || Boolean(this.systemProviderEnvironment.VERTEXAI_PROJECT));
+    return (
+      this.isSaas &&
+      Boolean(this.systemProviderEnvironment[apiKey]) &&
+      (provider !== "vertex_ai" ||
+        Boolean(this.systemProviderEnvironment.VERTEXAI_PROJECT))
+    );
   }
 
-  async validateApiKey(provider: string, customKeys: Record<string, unknown>): Promise<ModelProviderApiKeyValidation> {
-    const result = await validateProviderApiKey(provider, customKeys as Record<string, string>);
+  async validateApiKey(
+    provider: string,
+    customKeys: Record<string, unknown>,
+  ): Promise<ModelProviderApiKeyValidation> {
+    const result = await validateProviderApiKey(
+      provider,
+      customKeys as Record<string, string>,
+    );
     return { valid: result.valid, message: result.valid ? undefined : result.outcome };
   }
 
-  async testConnection(provider: string, customKeys: Record<string, unknown>): Promise<{ connected: boolean }> {
+  async testConnection(
+    provider: string,
+    customKeys: Record<string, unknown>,
+  ): Promise<{ connected: boolean }> {
     const result = await this.validateApiKey(provider, customKeys);
     return { connected: result.valid };
   }
 
-  tryMaskCredentials(customKeys: Record<string, unknown> | null): Record<string, unknown> | null {
+  tryMaskCredentials(
+    customKeys: Record<string, unknown> | null,
+  ): Record<string, unknown> | null {
     if (!customKeys) return null;
-    return Object.fromEntries(Object.keys(customKeys).map((key) => [key, MASKED_KEY_PLACEHOLDER]));
+    return Object.fromEntries(
+      Object.keys(customKeys).map((key) => [key, MASKED_KEY_PLACEHOLDER]),
+    );
   }
 
   isManagedProvider(organizationId: string, provider: string): boolean {
@@ -171,9 +235,7 @@ class AppModelProviderCredentialPolicy extends ModelProviderCredentialPolicy {
     return mergeStoredCustomKeys(input);
   }
 
-  mask(
-    value: Record<string, unknown> | null,
-  ): Record<string, unknown> | null {
+  mask(value: Record<string, unknown> | null): Record<string, unknown> | null {
     if (value === null) return null;
     return Object.fromEntries(
       Object.entries(value).map(([key, field]) => [
@@ -186,9 +248,7 @@ class AppModelProviderCredentialPolicy extends ModelProviderCredentialPolicy {
   hasUsableReplacement(value: Record<string, unknown> | null): boolean {
     return Object.values(value ?? {}).some(
       (field) =>
-        typeof field === "string" &&
-        field.length > 0 &&
-        field !== MASKED_KEY_PLACEHOLDER,
+        typeof field === "string" && field.length > 0 && field !== MASKED_KEY_PLACEHOLDER,
     );
   }
 
@@ -217,30 +277,80 @@ class AppModelProviderCredentialPolicy extends ModelProviderCredentialPolicy {
 }
 
 class AppModelProviderAuthorization extends ModelProviderAuthorization {
-  constructor(private readonly permissions: AuthzService) { super(); }
-
-  canRead(input: { actorId: string; scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }): Promise<boolean> {
-    return this.check(input, input.scopeType === "PROJECT" ? "project:view" : input.scopeType === "TEAM" ? "team:view" : "organization:view");
+  constructor(private readonly permissions: AuthzService) {
+    super();
   }
 
-  canWrite(input: { actorId: string; scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }): Promise<boolean> {
-    return this.check(input, input.scopeType === "ORGANIZATION" ? "organization:manage" : input.scopeType === "TEAM" ? "team:manage" : "project:update");
+  canRead(input: {
+    actorId: string;
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }): Promise<boolean> {
+    return this.check(
+      input,
+      input.scopeType === "PROJECT"
+        ? "project:view"
+        : input.scopeType === "TEAM"
+          ? "team:view"
+          : "organization:view",
+    );
   }
 
-  private async check(input: { actorId: string; scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }, permission: "organization:view" | "team:view" | "project:view" | "organization:manage" | "team:manage" | "project:update"): Promise<boolean> {
-    const scope = input.scopeType === "PROJECT"
-      ? { tier: "project" as const, id: input.scopeId }
-      : input.scopeType === "TEAM"
-        ? { tier: "team" as const, id: input.scopeId }
-        : { tier: "organization" as const, id: input.scopeId };
-    return (await this.permissions.getDecision({ userId: input.actorId, permission, scope })).permitted;
+  canWrite(input: {
+    actorId: string;
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }): Promise<boolean> {
+    return this.check(
+      input,
+      input.scopeType === "ORGANIZATION"
+        ? "organization:manage"
+        : input.scopeType === "TEAM"
+          ? "team:manage"
+          : "project:update",
+    );
+  }
+
+  private async check(
+    input: {
+      actorId: string;
+      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+      scopeId: string;
+    },
+    permission:
+      | "organization:view"
+      | "team:view"
+      | "project:view"
+      | "organization:manage"
+      | "team:manage"
+      | "project:update",
+  ): Promise<boolean> {
+    const scope =
+      input.scopeType === "PROJECT"
+        ? { tier: "project" as const, id: input.scopeId }
+        : input.scopeType === "TEAM"
+          ? { tier: "team" as const, id: input.scopeId }
+          : { tier: "organization" as const, id: input.scopeId };
+    return (
+      await this.permissions.getDecision({ userId: input.actorId, permission, scope })
+    ).permitted;
   }
 }
 
 class AppModelTranslation extends ModelTranslationPort {
-  async translate(input: { projectId: string; text: string; model: string }): Promise<string> {
-    const model = await getVercelAIModel({ projectId: input.projectId, featureKey: "translate.text" });
-    const result = await generateText({ model, prompt: `Translate the following text to English only reply with the translated text, do not include any other text: ${input.text}` });
+  async translate(input: {
+    projectId: string;
+    text: string;
+    model: string;
+  }): Promise<string> {
+    const model = await getVercelAIModel({
+      projectId: input.projectId,
+      featureKey: "translate.text",
+    });
+    const result = await generateText({
+      model,
+      prompt: `Translate the following text to English only reply with the translated text, do not include any other text: ${input.text}`,
+    });
     return result.text;
   }
 }
@@ -271,7 +381,9 @@ export class AppModelProviderRuntime {
       managedProviders: this.options.managedProviders,
       credentials: new AppModelProviderCredentialCodec(),
       credentialPolicy: new AppModelProviderCredentialPolicy(),
-      authorization: this.options.permissions ? new AppModelProviderAuthorization(this.options.permissions) : undefined,
+      authorization: this.options.permissions
+        ? new AppModelProviderAuthorization(this.options.permissions)
+        : undefined,
       translation: new AppModelTranslation(),
     }).build();
   }

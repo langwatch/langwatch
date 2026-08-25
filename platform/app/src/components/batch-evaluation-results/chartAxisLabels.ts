@@ -38,10 +38,7 @@ const CHART_HEIGHT_ROTATED = 200;
 const CHART_HEIGHT_NORMAL = 150;
 
 /** Truncate a label and add ellipsis if too long. */
-export const truncateLabel = (
-  label: string,
-  maxLength = MAX_LABEL_LENGTH,
-): string => {
+export const truncateLabel = (label: string, maxLength = MAX_LABEL_LENGTH): string => {
   if (label.length <= maxLength) return label;
   return label.slice(0, maxLength - 1) + "…";
 };
@@ -91,9 +88,7 @@ export const commonLabelPrefix = (names: string[]): string => {
   const candidate = prefix.slice(0, cut);
   // Every name must keep a non-empty remainder, or the labels stop naming
   // anything at all.
-  return names.every((name) => name.slice(candidate.length).length > 0)
-    ? candidate
-    : "";
+  return names.every((name) => name.slice(candidate.length).length > 0) ? candidate : "";
 };
 
 /**
@@ -122,9 +117,7 @@ export const buildAxisLabels = (
   // nothing, because the names really are the same.
   const needsTrimming = names.some((name) => name.length > maxLength);
   const prefix = needsTrimming ? commonLabelPrefix(names) : "";
-  const stripped = prefix
-    ? names.map((name) => `…${name.slice(prefix.length)}`)
-    : names;
+  const stripped = prefix ? names.map((name) => `…${name.slice(prefix.length)}`) : names;
 
   const labels = stripped.map((name) => truncateLabel(name, maxLength));
 
@@ -171,6 +164,4 @@ export const axisLabelProps = (barCount: number) => {
  * the win-rate chart a 150px box to fit a 72px axis into. Pass the max.
  */
 export const chartHeightFor = (maxBarCount: number): number =>
-  maxBarCount >= ROTATE_LABELS_THRESHOLD
-    ? CHART_HEIGHT_ROTATED
-    : CHART_HEIGHT_NORMAL;
+  maxBarCount >= ROTATE_LABELS_THRESHOLD ? CHART_HEIGHT_ROTATED : CHART_HEIGHT_NORMAL;

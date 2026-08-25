@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Icon,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, Text, Textarea, VStack } from "@chakra-ui/react";
 import { MessageSquareText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Checkbox, CheckboxGroup } from "~/components/ui/checkbox";
@@ -63,9 +55,7 @@ export function ScoreFields({ state }: { state: AnnotationFormState }) {
 }
 
 /** How a rating reads on the chip itself, or nothing when there is none. */
-function describeScoreValue(
-  value: string | string[] | undefined,
-): string | null {
+function describeScoreValue(value: string | string[] | undefined): string | null {
   if (value == null || value === "") return null;
   if (!Array.isArray(value)) return String(value);
   const [first] = value;
@@ -252,11 +242,7 @@ function ScoreOptionList({
       >
         <VStack align="start" gap={1.5}>
           {options.map((opt) => (
-            <Checkbox
-              key={String(opt.value)}
-              value={String(opt.value)}
-              size="sm"
-            >
+            <Checkbox key={String(opt.value)} value={String(opt.value)} size="sm">
               {opt.label}
             </Checkbox>
           ))}

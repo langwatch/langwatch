@@ -1,9 +1,5 @@
 import { z } from "zod";
-import {
-	triggerActionSchema,
-	triggerKindSchema,
-	triggerSchema,
-} from "./trigger";
+import { triggerActionSchema, triggerKindSchema, triggerSchema } from "./trigger";
 import type { Trigger, TriggerAction, TriggerKind } from "./trigger";
 
 /** Compatibility aliases for callers that still use the old noun. The
@@ -19,20 +15,20 @@ export type AutomationAction = TriggerAction;
 export type AutomationKind = TriggerKind;
 
 export const emailSuppressionSchema = z.object({
-	id: z.string(),
-	projectId: z.string(),
-	email: z.string().email(),
-	triggerId: z.string().nullable(),
-	reason: z.string(),
-	createdAt: z.date(),
+  id: z.string(),
+  projectId: z.string(),
+  email: z.string().email(),
+  triggerId: z.string().nullable(),
+  reason: z.string(),
+  createdAt: z.date(),
 });
 export type EmailSuppression = z.infer<typeof emailSuppressionSchema>;
 
 export const triggerFireSchema = z.object({
-	id: z.string(),
-	projectId: z.string(),
-	triggerId: z.string(),
-	traceId: z.string().nullable(),
-	createdAt: z.date(),
-	status: z.string().optional(),
+  id: z.string(),
+  projectId: z.string(),
+  triggerId: z.string(),
+  traceId: z.string().nullable(),
+  createdAt: z.date(),
+  status: z.string().optional(),
 });

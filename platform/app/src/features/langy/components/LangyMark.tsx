@@ -48,11 +48,7 @@ const MARK_PATH =
  * without the class the `--langy-ai-*` vars would be undefined here and the
  * mark would fall back to its literal defaults.
  */
-export function LangyMarkGradientDefs({
-  id = LANGY_MARK_GRADIENT_ID,
-}: {
-  id?: string;
-}) {
+export function LangyMarkGradientDefs({ id = LANGY_MARK_GRADIENT_ID }: { id?: string }) {
   return (
     <svg
       className="langy-root"
@@ -65,10 +61,7 @@ export function LangyMarkGradientDefs({
         {/* Orange → purple, along the box's own isometric axis. */}
         <linearGradient id={id} x1="0%" y1="100%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="var(--chakra-colors-langy-ai-orange)" />
-          <stop
-            offset="100%"
-            stopColor="var(--chakra-colors-langy-ai-purple)"
-          />
+          <stop offset="100%" stopColor="var(--chakra-colors-langy-ai-purple)" />
         </linearGradient>
       </defs>
     </svg>

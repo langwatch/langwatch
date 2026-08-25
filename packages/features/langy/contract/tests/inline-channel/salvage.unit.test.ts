@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { salvageJsonText, salvageLangyDerivedCard } from "../../src/inline-channel/salvage";
+import {
+  salvageJsonText,
+  salvageLangyDerivedCard,
+} from "../../src/inline-channel/salvage";
 
 describe("salvageJsonText", () => {
   describe("given an undamaged document", () => {
@@ -98,9 +101,7 @@ describe("salvageLangyDerivedCard", () => {
   describe("when the salvaged JSON fails its kind's schema", () => {
     it("reports invalid, never a guessed card", () => {
       // Parses fine; `items` is missing, so stats does not validate.
-      const result = salvageLangyDerivedCard(
-        '{"kind": "stats", "blockId": "b1"}',
-      );
+      const result = salvageLangyDerivedCard('{"kind": "stats", "blockId": "b1"}');
       expect(result).toEqual({ ok: false, reason: "invalid" });
     });
 

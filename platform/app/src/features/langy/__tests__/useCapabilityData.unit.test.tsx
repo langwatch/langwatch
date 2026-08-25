@@ -114,18 +114,16 @@ describe("useCapabilityData", () => {
 
   describe("given an id-ref digest (the settled result)", () => {
     it("fetches each referenced trace and keeps id order", async () => {
-      headerFetch.mockImplementation(
-        async ({ traceId }: { traceId: string }) => ({
-          traceId,
-          timestamp: 1750000000000,
-          traceName: traceId,
-          durationMs: 500,
-          totalCost: 0.001,
-          status: "ok",
-          input: `question ${traceId}`,
-          output: "ok",
-        }),
-      );
+      headerFetch.mockImplementation(async ({ traceId }: { traceId: string }) => ({
+        traceId,
+        timestamp: 1750000000000,
+        traceName: traceId,
+        durationMs: 500,
+        totalCost: 0.001,
+        status: "ok",
+        input: `question ${traceId}`,
+        output: "ok",
+      }));
 
       const { result } = renderHook(
         () =>
@@ -142,10 +140,7 @@ describe("useCapabilityData", () => {
       );
 
       await waitFor(() => expect(result.current.status).toBe("hydrated"));
-      expect(result.current.rows.map((row) => row.id)).toEqual([
-        "trace_a",
-        "trace_b",
-      ]);
+      expect(result.current.rows.map((row) => row.id)).toEqual(["trace_a", "trace_b"]);
       expect(result.current.totalCount).toBe(34);
       expect(result.current.loadedCount).toBe(2);
     });

@@ -147,9 +147,7 @@ describe("deriveFollowUpChips", () => {
 
         expect(chips.length).toBeGreaterThan(0);
         expect(chips.every((chip) => !chip.carried)).toBe(true);
-        expect(chips.every((chip) => chip.label.startsWith("Open in "))).toBe(
-          true,
-        );
+        expect(chips.every((chip) => chip.label.startsWith("Open in "))).toBe(true);
       });
     });
 
@@ -213,9 +211,7 @@ describe("deriveFollowUpChips", () => {
           projectSlug: "demo",
         });
 
-        expect(chips.map((chip) => chip.label)).not.toContain(
-          "Open in Experiments",
-        );
+        expect(chips.map((chip) => chip.label)).not.toContain("Open in Experiments");
         expect(chips.map((chip) => chip.label)).not.toContain(
           "Open in Online Evaluations",
         );
@@ -228,17 +224,15 @@ describe("deriveFollowUpChips", () => {
       name: "langwatch.prompt.list",
       state: "output-available",
       input: { command: "langwatch prompt list" },
-      output: JSON.stringify([
-        { id: "prompt_1", handle: "demo-prompt", version: 3 },
-      ]),
+      output: JSON.stringify([{ id: "prompt_1", handle: "demo-prompt", version: 3 }]),
     };
 
     describe("when its consumers cannot carry the prompt across", () => {
       /** @scenario A prompts result earns no bare surface chips */
       it("offers no chip at all — no destination can receive a prompt", () => {
-        expect(
-          deriveFollowUpChips({ call: promptList, projectSlug: "demo" }),
-        ).toEqual([]);
+        expect(deriveFollowUpChips({ call: promptList, projectSlug: "demo" })).toEqual(
+          [],
+        );
       });
     });
   });

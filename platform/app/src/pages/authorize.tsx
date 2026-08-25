@@ -1,17 +1,6 @@
-import {
-  Card,
-  Container,
-  Heading,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Card, Container, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { CopyInput } from "../components/CopyInput";
-import {
-  DashboardLayout,
-  ProjectSelector,
-} from "../components/DashboardLayout";
+import { DashboardLayout, ProjectSelector } from "../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { trackEvent } from "../utils/tracking";
 
@@ -29,18 +18,15 @@ export default function Authorize() {
               </Heading>
               <Spacer />
               {organizations && project && (
-                <ProjectSelector
-                  organizations={organizations}
-                  project={project}
-                />
+                <ProjectSelector organizations={organizations} project={project} />
               )}
             </HStack>
           </Card.Header>
           <Card.Body>
             <VStack align="start" gap={6}>
               <Text>
-                Copy your LangWatch API key below and paste it into your command
-                line or notebook to authorize it.
+                Copy your LangWatch API key below and paste it into your command line or
+                notebook to authorize it.
               </Text>
               <APIKeyCopyInput />
             </VStack>

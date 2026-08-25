@@ -14,11 +14,7 @@
  * so the assignability failure the author reads names the problem in words
  * rather than a wall of conditional types.
  */
-import {
-  AUTHZ_RESOURCES,
-  type AuthzPermission,
-  type AuthzResource,
-} from "./registry";
+import { AUTHZ_RESOURCES, type AuthzPermission, type AuthzResource } from "./registry";
 import {
   BINDING_SCOPE_TIERS,
   type BindingScopeTier,
@@ -84,9 +80,7 @@ type FieldsForTiers<T> = T extends BindingScopeTier
  * cannot be granted at is fine alongside an allowed one — inputs routinely
  * carry child-tier ids as payload, and the runtime reads only allowed tiers.
  */
-type ValidateOne<P extends AuthzPermission, I> = [P] extends [
-  PlatformTierPermission,
-]
+type ValidateOne<P extends AuthzPermission, I> = [P] extends [PlatformTierPermission]
   ? DeclarationError<`'${P}' is platform-tier: declare it through the operator middleware, not a scoped input`>
   : [Extract<RequiredTiersIn<I>, PermissionGrantTiers<P>>] extends [never]
     ? DeclarationError<`'${P}' needs a required '${FieldsForTiers<PermissionGrantTiers<P>>}' in the procedure input`>
@@ -98,9 +92,7 @@ type ValidateOne<P extends AuthzPermission, I> = [P] extends [
  * error otherwise. `P & error` is uninhabited, so the call site fails with
  * the reason in its diagnostic.
  */
-export type ValidatePermissionForInput<P extends AuthzPermission, I> = [
-  I,
-] extends [never]
+export type ValidatePermissionForInput<P extends AuthzPermission, I> = [I] extends [never]
   ? DeclarationError<"the procedure declares no input to read a scope id from — call .input() first">
   : I extends unknown
     ? ValidateOne<P, I>
@@ -193,9 +185,7 @@ export type TierOfScopeArg<A> = A extends { projectId: string }
 // The same rules at runtime, so the middleware agrees with the types.
 
 /** The input-addressable tiers `permission` can be granted at, narrowest first. */
-export function permissionGrantTiers(
-  permission: AuthzPermission,
-): BindingScopeTier[] {
+export function permissionGrantTiers(permission: AuthzPermission): BindingScopeTier[] {
   const scopes = scopesOf(permission);
   return BINDING_SCOPE_TIERS.filter((tier) => scopes.includes(tier));
 }

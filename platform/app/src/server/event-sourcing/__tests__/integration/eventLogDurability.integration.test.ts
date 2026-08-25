@@ -246,8 +246,7 @@ describe.skipIf(!hasTestcontainers)(
       await startTestContainers();
       client = getTestClickHouseClient()!;
       const redis = getTestRedisConnection();
-      if (!redis)
-        throw new Error("Redis not available; testcontainers required.");
+      if (!redis) throw new Error("Redis not available; testcontainers required.");
       eventStore = new EventStoreClickHouse(
         new EventRepositoryClickHouse(async () => client),
       );
@@ -331,10 +330,7 @@ describe.skipIf(!hasTestcontainers)(
         await insertStoredSpansFor({ client, tenantId, traceId, spanIds });
 
         const eventLogBefore = await countEventLogForTenant(client, tenantId);
-        const storedSpansBefore = await countStoredSpansForTenant(
-          client,
-          tenantId,
-        );
+        const storedSpansBefore = await countStoredSpansForTenant(client, tenantId);
         expect(eventLogBefore).toBeGreaterThanOrEqual(3);
         expect(storedSpansBefore).toBeGreaterThanOrEqual(3);
 
@@ -342,10 +338,7 @@ describe.skipIf(!hasTestcontainers)(
         await new Promise((r) => setTimeout(r, 1500));
 
         const eventLogAfter = await countEventLogForTenant(client, tenantId);
-        const storedSpansAfter = await countStoredSpansForTenant(
-          client,
-          tenantId,
-        );
+        const storedSpansAfter = await countStoredSpansForTenant(client, tenantId);
 
         expect(eventLogAfter).toBe(eventLogBefore);
         expect(storedSpansAfter).toBeLessThan(storedSpansBefore);
@@ -460,12 +453,8 @@ describe.skipIf(!hasTestcontainers)(
 
         expect(eventsA.length).toBeGreaterThanOrEqual(1);
         expect(eventsB.length).toBeGreaterThanOrEqual(1);
-        expect(eventsA.some((e: any) => e.type === "SpanReceivedEvent")).toBe(
-          true,
-        );
-        expect(eventsB.some((e: any) => e.type === "SpanReceivedEvent")).toBe(
-          true,
-        );
+        expect(eventsA.some((e: any) => e.type === "SpanReceivedEvent")).toBe(true);
+        expect(eventsB.some((e: any) => e.type === "SpanReceivedEvent")).toBe(true);
       });
     });
 

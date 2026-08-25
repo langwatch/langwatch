@@ -1,10 +1,6 @@
 import { createShikiAdapter } from "@chakra-ui/react";
 import { useMemo } from "react";
-import {
-  bundledLanguagesInfo,
-  getSingletonHighlighter,
-  type Highlighter,
-} from "shiki";
+import { bundledLanguagesInfo, getSingletonHighlighter, type Highlighter } from "shiki";
 
 // Eager base: the languages that dominate trace payloads (JSON I/O,
 // attribute values, transcripts, markdown). Loaded with the singleton
@@ -84,9 +80,7 @@ export function isShikiLangReady(canonicalLang: string): boolean {
  * Safe to call repeatedly — concurrent callers share the in-flight promise.
  * No-op for already-loaded / plain / non-bundled languages.
  */
-export async function ensureShikiLangLoaded(
-  canonicalLang: string,
-): Promise<void> {
+export async function ensureShikiLangLoaded(canonicalLang: string): Promise<void> {
   if (loadedLangs.has(canonicalLang)) return;
   const loader = LANG_LOADERS.get(canonicalLang);
   if (!loader) return;

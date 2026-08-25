@@ -51,11 +51,7 @@ const DEFAULT_LIMIT = 8;
  * pre-fill with the same model rather than two functions disagreeing about
  * what "newest" means.
  */
-const FLAGSHIP_ALIASES = [
-  "openai/latest",
-  "anthropic/latest",
-  "gemini/latest",
-] as const;
+const FLAGSHIP_ALIASES = ["openai/latest", "anthropic/latest", "gemini/latest"] as const;
 
 /** The small, inexpensive pick per provider, same resolver. */
 const FAST_ALIASES = [
@@ -88,9 +84,7 @@ function isChatModel(entry: LLMModelEntry): boolean {
 
 function supportsReasoning(entry: LLMModelEntry): boolean {
   const supported = entry.supportedParameters ?? [];
-  return REASONING_PARAMETERS.some((parameter) =>
-    supported.includes(parameter),
-  );
+  return REASONING_PARAMETERS.some((parameter) => supported.includes(parameter));
 }
 
 /**
@@ -185,8 +179,7 @@ export function suggestTierTargets({
   limit = DEFAULT_LIMIT,
 }: SuggestTierTargetsInput): TierTargetSuggestion[] {
   const catalog = Object.values(llmModels.models).filter(
-    (entry) =>
-      isChatModel(entry) && providerAllowed({ entry, boundProviderTypes }),
+    (entry) => isChatModel(entry) && providerAllowed({ entry, boundProviderTypes }),
   );
   const byId = new Map(catalog.map((entry) => [entry.id, entry]));
 
@@ -196,9 +189,7 @@ export function suggestTierTargets({
 
   const rest = tierOrderedRest({ tier, catalog, exclude: new Set(leadingIds) });
 
-  const ordered = [...leadingIds.map((id) => byId.get(id)!), ...rest].map(
-    toSuggestion,
-  );
+  const ordered = [...leadingIds.map((id) => byId.get(id)!), ...rest].map(toSuggestion);
 
   if (ordered[0]) ordered[0].recommended = true;
   return ordered.slice(0, limit);
@@ -213,16 +204,12 @@ function tierOrderedRest({
   catalog: LLMModelEntry[];
   exclude: ReadonlySet<string>;
 }): LLMModelEntry[] {
-  const candidates = pricedCandidates(
-    catalog.filter((entry) => !exclude.has(entry.id)),
-  );
+  const candidates = pricedCandidates(catalog.filter((entry) => !exclude.has(entry.id)));
   if (tier === "reasoning") {
     // Most expensive first: within the models that reason, price tracks how
     // much thinking the model is built to do, and this tier is the one a
     // caller picks when they want that.
-    return candidates
-      .filter(supportsReasoning)
-      .sort((a, b) => priceOf(b) - priceOf(a));
+    return candidates.filter(supportsReasoning).sort((a, b) => priceOf(b) - priceOf(a));
   }
   if (tier === "fast") {
     return candidates.sort((a, b) => priceOf(a) - priceOf(b));
@@ -231,9 +218,7 @@ function tierOrderedRest({
   // the available proxy, with context length breaking ties between models
   // priced the same.
   return candidates.sort(
-    (a, b) =>
-      priceOf(b) - priceOf(a) ||
-      (b.contextLength ?? 0) - (a.contextLength ?? 0),
+    (a, b) => priceOf(b) - priceOf(a) || (b.contextLength ?? 0) - (a.contextLength ?? 0),
   );
 }
 

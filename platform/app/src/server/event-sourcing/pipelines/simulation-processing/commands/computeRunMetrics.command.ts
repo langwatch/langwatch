@@ -1,13 +1,5 @@
-import type {
-  Command,
-  CommandHandler,
-  FoldProjectionStore,
-} from "@langwatch/eventing";
-import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "@langwatch/eventing";
+import type { Command, CommandHandler, FoldProjectionStore } from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { ComputeRunMetricsCommandData } from "../schemas/commands";
@@ -23,9 +15,7 @@ import type {
   SimulationRunMetricsComputedEventData,
 } from "../schemas/events";
 
-const logger = createLogger(
-  "langwatch:simulation-processing:compute-run-metrics",
-);
+const logger = createLogger("langwatch:simulation-processing:compute-run-metrics");
 
 const MAX_RETRIES = 3;
 export const COMPUTE_METRICS_RETRY_DELAY_MS = 10_000;
@@ -67,13 +57,10 @@ const SCHEMA = defineCommandSchema(
  *
  * Uses constructor DI — instantiate with deps and pass via `.withCommandInstance()`.
  */
-export class ComputeRunMetricsCommand
-  implements
-    CommandHandler<
-      Command<ComputeRunMetricsCommandData>,
-      SimulationProcessingEvent
-    >
-{
+export class ComputeRunMetricsCommand implements CommandHandler<
+  Command<ComputeRunMetricsCommandData>,
+  SimulationProcessingEvent
+> {
   static readonly schema = SCHEMA;
 
   constructor(private readonly deps: ComputeRunMetricsDeps) {}
@@ -142,15 +129,13 @@ export class ComputeRunMetricsCommand
 
       // Role cost/latency are derived from stored_spans (not carried on the
       // summary anymore); totalCost is still a summary scalar.
-      const {
-        scenarioRoleCosts: roleCosts,
-        scenarioRoleLatencies: roleLatencies,
-      } = await this.deps.deriveScenarioRoleMetrics({
-        tenantId: tenantIdStr,
-        traceId,
-        occurredAtMs: traceSummary.occurredAt,
-        foldVersion: traceSummary.spanCount,
-      });
+      const { scenarioRoleCosts: roleCosts, scenarioRoleLatencies: roleLatencies } =
+        await this.deps.deriveScenarioRoleMetrics({
+          tenantId: tenantIdStr,
+          traceId,
+          occurredAtMs: traceSummary.occurredAt,
+          foldVersion: traceSummary.spanCount,
+        });
 
       // Summary exists but not yet populated (cost enrichment still in progress).
       // Treat like missing summary — schedule retry so we pick it up later.

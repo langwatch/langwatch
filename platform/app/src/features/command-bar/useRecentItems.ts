@@ -35,10 +35,7 @@ function getTimeGroup(timestamp: number): TimeGroup {
  * Items are stored with timestamps and grouped by time for display.
  */
 export function useRecentItems() {
-  const [recentItems, setRecentItems] = useLocalStorage<RecentItem[]>(
-    STORAGE_KEY,
-    [],
-  );
+  const [recentItems, setRecentItems] = useLocalStorage<RecentItem[]>(STORAGE_KEY, []);
 
   /**
    * Add an item to recent history.
@@ -85,9 +82,7 @@ export function useRecentItems() {
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
 
     // Filter out items older than 30 days
-    const validItems = safeItems.filter(
-      (item) => now - item.accessedAt < thirtyDaysMs,
-    );
+    const validItems = safeItems.filter((item) => now - item.accessedAt < thirtyDaysMs);
 
     const groups: GroupedRecentItems = {
       today: [],

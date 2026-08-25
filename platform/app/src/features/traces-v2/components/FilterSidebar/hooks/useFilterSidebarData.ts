@@ -7,10 +7,7 @@ import {
 } from "~/server/app-layer/traces/query-language/queries";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
 import { useDensityStore } from "../../../stores/densityStore";
-import {
-  applyLensOrder,
-  useFacetLensStore,
-} from "../../../stores/facetLensStore";
+import { applyLensOrder, useFacetLensStore } from "../../../stores/facetLensStore";
 import {
   selectVisibilityFor,
   useFacetVisibilityStore,
@@ -35,10 +32,7 @@ import {
   SPAN_ATTRIBUTES_SECTION_KEY,
   VIBRANT_FIELDS,
 } from "../constants";
-import {
-  computeDiscreteEligible,
-  resolveNumericModeByKey,
-} from "../discreteMode";
+import { computeDiscreteEligible, resolveNumericModeByKey } from "../discreteMode";
 import { routeToggleViaOrGroups } from "../routeToggleViaOrGroups";
 import type {
   AttributeKey,
@@ -57,15 +51,9 @@ export function useFilterSidebarData() {
   const storeExcludeFacet = useFilterStore((s) => s.excludeFacet);
   const storeSetRange = useFilterStore((s) => s.setRange);
   const storeRemoveRange = useFilterStore((s) => s.removeRange);
-  const toggleEvaluatorSubFilter = useFilterStore(
-    (s) => s.toggleEvaluatorSubFilter,
-  );
-  const setEvaluatorScoreRange = useFilterStore(
-    (s) => s.setEvaluatorScoreRange,
-  );
-  const removeEvaluatorScoreRange = useFilterStore(
-    (s) => s.removeEvaluatorScoreRange,
-  );
+  const toggleEvaluatorSubFilter = useFilterStore((s) => s.toggleEvaluatorSubFilter);
+  const setEvaluatorScoreRange = useFilterStore((s) => s.setEvaluatorScoreRange);
+  const removeEvaluatorScoreRange = useFilterStore((s) => s.removeEvaluatorScoreRange);
 
   // OR-group analysis, used only to route a same-field click into an
   // existing OR group (the third-and-beyond value of an already-grouped
@@ -130,9 +118,7 @@ export function useFilterSidebarData() {
   const showFacet = useFacetVisibilityStore((s) => s.showFacet);
   const hideFacet = useFacetVisibilityStore((s) => s.hideFacet);
   const resetAllVisibility = useFacetVisibilityStore((s) => s.resetAll);
-  const visibilityHydrate = useFacetVisibilityStore(
-    (s) => s.hydrateFromStorage,
-  );
+  const visibilityHydrate = useFacetVisibilityStore((s) => s.hydrateFromStorage);
   const visibilityPrefs = useFacetVisibilityStore((s) =>
     selectVisibilityFor(s, projectId),
   );
@@ -237,10 +223,7 @@ export function useFilterSidebarData() {
     if (!isPartitionEmpty(real)) {
       return { ...real, isSynthetic: false };
     }
-    const fallback = partitionDescriptors(
-      synthesizeDefaultDescriptors(),
-      activeFieldSet,
-    );
+    const fallback = partitionDescriptors(synthesizeDefaultDescriptors(), activeFieldSet);
     return { ...fallback, isSynthetic: true };
   }, [descriptors, activeFieldSet]);
 
@@ -310,12 +293,7 @@ export function useFilterSidebarData() {
       });
     }
     return sections;
-  }, [
-    metadataAttributeKeys,
-    traceAttributeKeys,
-    spanAttributeKeys,
-    eventAttributeKeys,
-  ]);
+  }, [metadataAttributeKeys, traceAttributeKeys, spanAttributeKeys, eventAttributeKeys]);
 
   const facetItems = useMemo(() => {
     const map = new Map<string, FacetItem[]>();
@@ -352,10 +330,7 @@ export function useFilterSidebarData() {
     // Discrete numeric facets render through FacetSection too — build their
     // tick-list items from the descriptor's distinct values.
     for (const [key, range] of discreteEligible) {
-      const baseItems = buildDiscreteFacetItems(
-        range,
-        range.synthetic ?? isSynthetic,
-      );
+      const baseItems = buildDiscreteFacetItems(range, range.synthetic ?? isSynthetic);
       // Same AST-extra handling as categoricals above: a selected discrete
       // value that discover dropped from the distinct set would otherwise
       // vanish from the sidebar while its filter stays active, leaving the
@@ -571,9 +546,7 @@ function partitionDescriptors(
  * which would otherwise leave a blank rail. The caller swaps in the
  * synthetic FACET_DEFAULTS set so the minimal facets always render.
  */
-function isPartitionEmpty(
-  partition: ReturnType<typeof partitionDescriptors>,
-): boolean {
+function isPartitionEmpty(partition: ReturnType<typeof partitionDescriptors>): boolean {
   return (
     partition.categoricals.length === 0 &&
     partition.ranges.length === 0 &&
@@ -656,10 +629,7 @@ function buildDiscreteFacetItems(
   }));
 }
 
-function buildFacetItems(
-  cat: CategoricalSection,
-  synthetic: boolean,
-): FacetItem[] {
+function buildFacetItems(cat: CategoricalSection, synthetic: boolean): FacetItem[] {
   const curatedColors = FACET_COLORS[cat.key];
   const dimmed = !VIBRANT_FIELDS.has(cat.key);
   const counts = new Map(cat.topValues.map((v) => [v.value, v.count]));
@@ -678,9 +648,7 @@ function buildFacetItems(
     fallback: cat.topValues.map((v) => v.value),
     keys: [...counts.keys()],
   });
-  const dotColorFor = curatedColors
-    ? (value: string) => curatedColors[value]
-    : hashColor;
+  const dotColorFor = curatedColors ? (value: string) => curatedColors[value] : hashColor;
 
   return orderedValues.map((value) => ({
     value,

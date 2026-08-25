@@ -219,9 +219,7 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   // the agent reached for. Deterministic — the identical request 404s
   // identically — so no auto-retry: the explainer's card points the user at
   // granting the app access, and they resend once it's granted.
-  langy_github_repo_not_accessible: terminal(
-    "langy_github_repo_not_accessible",
-  ),
+  langy_github_repo_not_accessible: terminal("langy_github_repo_not_accessible"),
 
   // Turn-START rejections from the control plane (LangyTurnService), not worker
   // failures: they reach the browser as coded TRPCErrors from the create/continue
@@ -259,9 +257,8 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
 };
 
 /** The kinds with an explicit, deliberate policy. Pinned by the unit test. */
-export const LANGY_RECOVERY_POLICIES: Readonly<
-  Record<string, LangyRecoveryPolicy>
-> = POLICIES;
+export const LANGY_RECOVERY_POLICIES: Readonly<Record<string, LangyRecoveryPolicy>> =
+  POLICIES;
 
 /**
  * The policy for an error kind. Anything unrecognised — including a kind the
@@ -304,19 +301,8 @@ export function canAutoRecover({
  * `delete_*` / `run_*` (see the system block in `routes/langy.ts`), plus the
  * GitHub PR path and the raw file/shell tools opencode exposes.
  */
-const MUTATING_TOOL_PREFIXES = [
-  "create_",
-  "update_",
-  "delete_",
-  "run_",
-] as const;
-const MUTATING_TOOL_NAMES = new Set([
-  "bash",
-  "write",
-  "edit",
-  "patch",
-  "multiedit",
-]);
+const MUTATING_TOOL_PREFIXES = ["create_", "update_", "delete_", "run_"] as const;
+const MUTATING_TOOL_NAMES = new Set(["bash", "write", "edit", "patch", "multiedit"]);
 
 /** Whether a tool call, by name, may have changed the project. */
 export function isMutatingLangyTool(toolName: string): boolean {
@@ -330,7 +316,4 @@ export function isMutatingLangyTool(toolName: string): boolean {
 }
 
 /** Every kind the explainer knows about — the guard test's input set. */
-export const RECOVERY_POLICY_KINDS = [
-  ...KNOWN_LANGY_ERROR_KINDS,
-  "unknown",
-] as const;
+export const RECOVERY_POLICY_KINDS = [...KNOWN_LANGY_ERROR_KINDS, "unknown"] as const;

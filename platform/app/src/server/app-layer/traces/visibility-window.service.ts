@@ -1,10 +1,5 @@
 import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
-import type {
-  ErrorCapture,
-  Span,
-  SpanInputOutput,
-  Trace,
-} from "~/server/tracer/types";
+import type { ErrorCapture, Span, SpanInputOutput, Trace } from "~/server/tracer/types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -56,9 +51,7 @@ const teaserOfSpanIO = (
   const teaserAsRaw = (): SpanInputOutput => ({
     type: "raw",
     value: teaserOf(
-      typeof io.value === "string"
-        ? io.value
-        : JSON.stringify(io.value ?? null),
+      typeof io.value === "string" ? io.value : JSON.stringify(io.value ?? null),
     ),
   });
   switch (io.type) {

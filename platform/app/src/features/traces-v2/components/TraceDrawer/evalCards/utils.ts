@@ -11,10 +11,7 @@ import type { EvalSummary } from "../../../types/trace";
  * chip, or the v3 EvaluatorChip — three surfaces that all need to
  * agree on "this verdict reads as X".
  */
-function buildStatusTone(
-  parsed: keyof typeof EVALUATION_STATUS_COLORS,
-  label: string,
-) {
+function buildStatusTone(parsed: keyof typeof EVALUATION_STATUS_COLORS, label: string) {
   return {
     color: EVALUATION_STATUS_COLORS[parsed],
     fg: EVALUATION_STATUS_TONES[parsed].fg,
@@ -106,8 +103,7 @@ export type EvalEntry = EvalSummary & {
 export function formatInputValue(value: unknown): string {
   if (value == null) return "—";
   if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean")
-    return String(value);
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
   try {
     return JSON.stringify(value, null, 2);
   } catch {

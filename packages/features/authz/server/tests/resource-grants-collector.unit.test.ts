@@ -258,9 +258,7 @@ describe("collector at the resource tier", () => {
     const now = new Date("2026-08-13T12:00:00.000Z");
     const collectAt = async (expiresAt: Date) => {
       const reader = makeReader({
-        findShareLinks: vi
-          .fn()
-          .mockResolvedValue([{ ...liveShareLinkRow, expiresAt }]),
+        findShareLinks: vi.fn().mockResolvedValue([{ ...liveShareLinkRow, expiresAt }]),
       });
       return AuthzCollectorService.create({
         reader,

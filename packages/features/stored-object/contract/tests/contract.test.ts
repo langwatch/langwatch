@@ -146,12 +146,8 @@ describe("Stored Objects IDs and references", () => {
   });
 
   it("maps only recognized legacy purposes to their closed audience", () => {
-    expect(audienceForLegacyStoredObjectPurpose("scenario_event")).toBe(
-      "scenarios:view",
-    );
-    expect(audienceForLegacyStoredObjectPurpose("trace_content")).toBe(
-      "traces:view",
-    );
+    expect(audienceForLegacyStoredObjectPurpose("scenario_event")).toBe("scenarios:view");
+    expect(audienceForLegacyStoredObjectPurpose("trace_content")).toBe("traces:view");
     expect(audienceForLegacyStoredObjectPurpose("evaluation_inputs")).toBe(
       "evaluations:view",
     );
@@ -161,15 +157,14 @@ describe("Stored Objects IDs and references", () => {
 
 describe("Stored Objects command and query contracts", () => {
   it("keeps all control RPCs POST-only with exact coarse permissions", () => {
-    expect(
-      Object.values(storedObjectsPublicRpc).map(({ method }) => method),
-    ).toEqual(["POST", "POST", "POST", "POST"]);
-    expect(storedObjectsPublicRpc.createUpload.permission).toBe(
-      "project:update",
-    );
-    expect(storedObjectsPublicRpc.confirmUpload.permission).toBe(
-      "project:update",
-    );
+    expect(Object.values(storedObjectsPublicRpc).map(({ method }) => method)).toEqual([
+      "POST",
+      "POST",
+      "POST",
+      "POST",
+    ]);
+    expect(storedObjectsPublicRpc.createUpload.permission).toBe("project:update");
+    expect(storedObjectsPublicRpc.confirmUpload.permission).toBe("project:update");
     expect(storedObjectsPublicRpc.get).toMatchObject({
       permission: "project:view",
       audienceProof: true,

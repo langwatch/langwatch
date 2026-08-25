@@ -38,11 +38,7 @@ const TRACK: Step[] = [
   { stage: "opened", label: "PR" },
 ];
 
-export function LangyGitHubProgressCard({
-  events,
-}: {
-  events: GithubProgressEvent[];
-}) {
+export function LangyGitHubProgressCard({ events }: { events: GithubProgressEvent[] }) {
   if (events.length === 0) return null;
   const reached = new Set(events.map((e) => e.stage));
   const latest = events[events.length - 1]?.detail;

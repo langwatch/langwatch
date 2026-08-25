@@ -48,8 +48,7 @@ export function usePersonalFeatureGate(feature: PersonalFeatureKey): {
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const isOnOwnPersonalProject =
-    !!team?.isPersonal && team.ownerUserId === userId;
+  const isOnOwnPersonalProject = !!team?.isPersonal && team.ownerUserId === userId;
 
   const featuresQuery = api.personalWorkspaceFeatures.get.useQuery(
     { projectId: project?.id ?? "" },
@@ -71,9 +70,9 @@ export function usePersonalFeatureGate(feature: PersonalFeatureKey): {
     },
   });
 
-  const [pendingResolve, setPendingResolve] = useState<
-    ((value: boolean) => void) | null
-  >(null);
+  const [pendingResolve, setPendingResolve] = useState<((value: boolean) => void) | null>(
+    null,
+  );
 
   const isGated = isOnOwnPersonalProject && !featureEnabled;
 

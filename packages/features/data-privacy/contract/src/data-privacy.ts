@@ -1,7 +1,4 @@
-import {
-  REDACTION_MARKER_ENTITIES,
-  SECRET_MARKER_ENTITY,
-} from "@langwatch/redaction";
+import { REDACTION_MARKER_ENTITIES, SECRET_MARKER_ENTITY } from "@langwatch/redaction";
 import { z } from "zod";
 
 export const DATA_PRIVACY_FEATURE_ID = "data-privacy" as const;

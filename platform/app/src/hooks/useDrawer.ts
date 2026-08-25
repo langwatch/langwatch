@@ -190,9 +190,7 @@ export const navigateToDrawer = (
   const currentQuery = Router.query;
   const newQuery = {
     ...Object.fromEntries(
-      Object.entries(currentQuery).filter(
-        ([key]) => !key.startsWith("drawer."),
-      ),
+      Object.entries(currentQuery).filter(([key]) => !key.startsWith("drawer.")),
     ),
     "drawer.open": drawer,
   };
@@ -223,10 +221,7 @@ export const navigateToDrawer = (
 export const useUpdateDrawerParams = () => {
   const router = useRouter();
   return useCallback(
-    (
-      updates: Record<string, string | undefined>,
-      options: { push?: boolean } = {},
-    ) => {
+    (updates: Record<string, string | undefined>, options: { push?: boolean } = {}) => {
       const push = options.push ?? true;
       const { path, queryString, hash } = splitAsPath(router.asPath);
       const parsed = qs.parse(queryString, URL_QS_PARSE_OPTIONS) as Record<
@@ -348,9 +343,7 @@ function isUrlSerializable(value: unknown): boolean {
   // Arrays of primitives can be comma-serialized by qs
   if (Array.isArray(value)) {
     return value.every(
-      (item) =>
-        item === null ||
-        (typeof item !== "object" && typeof item !== "function"),
+      (item) => item === null || (typeof item !== "object" && typeof item !== "function"),
     );
   }
 
@@ -473,11 +466,10 @@ export const useDrawer = () => {
       // The Trace Explorer drawer is where every trace open lands, from every
       // entry point — not only the call sites that go through
       // useTraceDetailsDrawer. See routeTraceDrawerForV2.
-      const { drawer: effectiveDrawer, props: effectiveProps } =
-        routeTraceDrawerForV2(
-          drawer,
-          props as Record<string, unknown> | undefined,
-        );
+      const { drawer: effectiveDrawer, props: effectiveProps } = routeTraceDrawerForV2(
+        drawer,
+        props as Record<string, unknown> | undefined,
+      );
 
       // Extract urlParams and merge with props
       const { urlParams, ...drawerProps } = effectiveProps ?? {};
@@ -487,9 +479,7 @@ export const useDrawer = () => {
       } as Record<string, unknown>;
 
       // Read currentDrawer from router.query directly to get latest value
-      const currentDrawerNow = router.query["drawer.open"] as
-        | DrawerType
-        | undefined;
+      const currentDrawerNow = router.query["drawer.open"] as DrawerType | undefined;
 
       // If the same drawer is already open, just update the URL params without modifying the stack
       if (currentDrawerNow === effectiveDrawer) {

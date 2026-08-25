@@ -27,9 +27,7 @@ export function ProcessesContent() {
       <ProcessFleetStrip rows={rows} />
       <ProcessFleetCard
         rows={rows}
-        onSelect={(name) =>
-          openDrawer("opsProcessInstances", { processName: name })
-        }
+        onSelect={(name) => openDrawer("opsProcessInstances", { processName: name })}
         onOpenAll={() => openDrawer("opsProcessInstances", {})}
       />
       <ProcessRecentActions />

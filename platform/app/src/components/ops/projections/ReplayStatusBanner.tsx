@@ -17,9 +17,7 @@ export function ReplayStatusBanner() {
   // Only show banner while actively running
   if (status?.state !== "running") return null;
 
-  const activeProjectionNames = parseActiveProjections(
-    status.currentProjection,
-  );
+  const activeProjectionNames = parseActiveProjections(status.currentProjection);
 
   return (
     <Card.Root borderColor="blue.200" borderWidth="1px">
@@ -45,9 +43,7 @@ export function ReplayStatusBanner() {
               <Button
                 size="xs"
                 variant="outline"
-                onClick={() =>
-                  void router.push(`/ops/projections/${status.runId}`)
-                }
+                onClick={() => void router.push(`/ops/projections/${status.runId}`)}
               >
                 View Progress
               </Button>

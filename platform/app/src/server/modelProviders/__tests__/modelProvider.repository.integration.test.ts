@@ -66,9 +66,9 @@ describe("ModelProviderRepository Integration", () => {
         const found = await repository.findById(created.id, projectId);
 
         expect(found).not.toBeNull();
-        expect(
-          (found!.customKeys as Record<string, unknown>).OPENAI_API_KEY,
-        ).toBe("sk-test-key-123");
+        expect((found!.customKeys as Record<string, unknown>).OPENAI_API_KEY).toBe(
+          "sk-test-key-123",
+        );
 
         // Read raw from prisma to verify DB value is encrypted
         const rawRow = await prisma.modelProvider.findFirst({
@@ -110,9 +110,9 @@ describe("ModelProviderRepository Integration", () => {
         const found = await repository.findByProvider("azure", projectId);
 
         expect(found).not.toBeNull();
-        expect(
-          (found!.customKeys as Record<string, unknown>).OPENAI_API_KEY,
-        ).toBe("sk-legacy-key");
+        expect((found!.customKeys as Record<string, unknown>).OPENAI_API_KEY).toBe(
+          "sk-legacy-key",
+        );
       });
     });
   });
@@ -196,20 +196,13 @@ describe("ModelProviderRepository Integration", () => {
         await main();
 
         // Read all through repository
-        const plaintextProvider = await repository.findById(
-          plaintextId,
-          projectId,
-        );
+        const plaintextProvider = await repository.findById(plaintextId, projectId);
         const nullProvider = await repository.findById(nullId, projectId);
-        const encryptedProvider = await repository.findById(
-          encryptedRow.id,
-          projectId,
-        );
+        const encryptedProvider = await repository.findById(encryptedRow.id, projectId);
 
         // Verify plaintext was migrated correctly
         expect(
-          (plaintextProvider!.customKeys as Record<string, unknown>)
-            .COHERE_API_KEY,
+          (plaintextProvider!.customKeys as Record<string, unknown>).COHERE_API_KEY,
         ).toBe("sk-plain");
 
         // Verify null stayed null
@@ -217,8 +210,7 @@ describe("ModelProviderRepository Integration", () => {
 
         // Verify already-encrypted stayed correct
         expect(
-          (encryptedProvider!.customKeys as Record<string, unknown>)
-            .ANTHROPIC_API_KEY,
+          (encryptedProvider!.customKeys as Record<string, unknown>).ANTHROPIC_API_KEY,
         ).toBe("sk-ant-already");
 
         // Verify raw DB: non-null customKeys are now encrypted strings

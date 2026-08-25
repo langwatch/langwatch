@@ -44,10 +44,7 @@ export function classifyMemberType(
   permissions: string[] | undefined,
 ): MemberType {
   // ADMIN or MEMBER roles are always FullMember
-  if (
-    role === OrganizationUserRole.ADMIN ||
-    role === OrganizationUserRole.MEMBER
-  ) {
+  if (role === OrganizationUserRole.ADMIN || role === OrganizationUserRole.MEMBER) {
     return "FullMember";
   }
 

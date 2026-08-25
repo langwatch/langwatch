@@ -49,8 +49,7 @@ export function useTraceListEvents({
     [traceIdsKey],
   );
 
-  const enabled =
-    !!project?.id && !isSamplePreview && needsEvents && traceIds.length > 0;
+  const enabled = !!project?.id && !isSamplePreview && needsEvents && traceIds.length > 0;
   const query = api.tracesV2.listEvents.useQuery(
     {
       projectId: project?.id ?? "",
@@ -117,11 +116,6 @@ export function mergeTraceEvents({
  * Whether anything on screen reads a row's events: the Events column, or the
  * Conversations grouping, whose group rows total their turns' events.
  */
-function rowsNeedEvents(state: {
-  columnOrder: string[];
-  grouping: string;
-}): boolean {
-  return (
-    state.columnOrder.includes("events") || state.grouping === "by-conversation"
-  );
+function rowsNeedEvents(state: { columnOrder: string[]; grouping: string }): boolean {
+  return state.columnOrder.includes("events") || state.grouping === "by-conversation";
 }

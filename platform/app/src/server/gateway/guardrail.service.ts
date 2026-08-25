@@ -104,18 +104,14 @@ export class GatewayGuardrailService {
 
   async update(input: UpdateGuardrailInput): Promise<GatewayGuardrail> {
     const existing = await this.requireOwn(input.id, input.projectId);
-    if (
-      input.evaluatorId !== undefined &&
-      input.evaluatorId !== existing.evaluatorId
-    ) {
+    if (input.evaluatorId !== undefined && input.evaluatorId !== existing.evaluatorId) {
       await this.assertEvaluatorInProject(input.evaluatorId, input.projectId);
     }
     const row = await this.prisma.gatewayGuardrail.update({
       where: { id: existing.id },
       data: {
         name: input.name ?? undefined,
-        description:
-          input.description === undefined ? undefined : input.description,
+        description: input.description === undefined ? undefined : input.description,
         evaluatorId: input.evaluatorId ?? undefined,
         direction: input.direction ?? undefined,
         failureMode: input.failureMode ?? undefined,
@@ -152,10 +148,7 @@ export class GatewayGuardrailService {
     });
   }
 
-  private async requireOwn(
-    id: string,
-    projectId: string,
-  ): Promise<GatewayGuardrail> {
+  private async requireOwn(id: string, projectId: string): Promise<GatewayGuardrail> {
     const row = await this.prisma.gatewayGuardrail.findFirst({
       where: { id, projectId, archivedAt: null },
     });

@@ -57,9 +57,7 @@ describe("Feature: Custom roles REST API", () => {
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
-          .mockResolvedValue(
-            ENTERPRISE_TEST_PLAN,
-          ) as PlanProvider["getActivePlan"],
+          .mockResolvedValue(ENTERPRISE_TEST_PLAN) as PlanProvider["getActivePlan"],
       }),
     });
 
@@ -205,9 +203,12 @@ describe("Feature: Custom roles REST API", () => {
         })
       ).json();
 
-      const response = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`, {
-        headers: authHeaders(),
-      });
+      const response = await app.request(
+        `/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`,
+        {
+          headers: authHeaders(),
+        },
+      );
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -221,9 +222,12 @@ describe("Feature: Custom roles REST API", () => {
 
     /** @scenario Fetching a role from another organization is refused */
     it("answers custom_role_not_found for another organization's role id", async () => {
-      const response = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/${otherOrgRoleId}`, {
-        headers: authHeaders(),
-      });
+      const response = await app.request(
+        `/api/roles/${MANAGEMENT_API_VERSION}/${otherOrgRoleId}`,
+        {
+          headers: authHeaders(),
+        },
+      );
 
       expect(response.status).toBe(404);
       expect((await response.json()).code).toBe("custom_role_not_found");
@@ -238,16 +242,22 @@ describe("Feature: Custom roles REST API", () => {
         })
       ).json();
 
-      const response = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`, {
-        method: "PATCH",
-        headers: authHeaders(),
-        body: JSON.stringify({ permissions: ["project:view"] }),
-      });
+      const response = await app.request(
+        `/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`,
+        {
+          method: "PATCH",
+          headers: authHeaders(),
+          body: JSON.stringify({ permissions: ["project:view"] }),
+        },
+      );
       expect(response.status).toBe(200);
 
-      const readBack = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`, {
-        headers: authHeaders(),
-      });
+      const readBack = await app.request(
+        `/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`,
+        {
+          headers: authHeaders(),
+        },
+      );
       expect((await readBack.json()).permissions).toEqual(["project:view"]);
     });
 
@@ -260,25 +270,34 @@ describe("Feature: Custom roles REST API", () => {
         })
       ).json();
 
-      const response = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
+      const response = await app.request(
+        `/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`,
+        {
+          method: "DELETE",
+          headers: authHeaders(),
+        },
+      );
       expect(response.status).toBe(200);
       expect((await response.json()).success).toBe(true);
 
-      const readBack = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`, {
-        headers: authHeaders(),
-      });
+      const readBack = await app.request(
+        `/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`,
+        {
+          headers: authHeaders(),
+        },
+      );
       expect(readBack.status).toBe(404);
       expect((await readBack.json()).code).toBe("custom_role_not_found");
     });
 
     /** @scenario The permission catalog lists organization-exclusive permissions */
     it("groups permissions by resource and marks the organization-exclusive ones", async () => {
-      const response = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/permissions`, {
-        headers: authHeaders(),
-      });
+      const response = await app.request(
+        `/api/roles/${MANAGEMENT_API_VERSION}/permissions`,
+        {
+          headers: authHeaders(),
+        },
+      );
 
       expect(response.status).toBe(200);
       const body = await response.json();

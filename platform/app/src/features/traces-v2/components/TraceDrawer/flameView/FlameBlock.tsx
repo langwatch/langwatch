@@ -58,15 +58,13 @@ export function FlameBlock({
   const { span } = node;
   const dur = viewport.endMs - viewport.startMs;
   const spanDur = span.endTimeMs - span.startTimeMs;
-  const leftPct =
-    dur > 0 ? ((span.startTimeMs - viewport.startMs) / dur) * 100 : 0;
+  const leftPct = dur > 0 ? ((span.startTimeMs - viewport.startMs) / dur) * 100 : 0;
   const widthPct = dur > 0 ? (spanDur / dur) * 100 : 100;
 
   // Skip ultra-narrow blocks at large traces (perf).
   if (widthPct < 0.05 && totalSpanCount > 200) return null;
 
-  const color =
-    (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+  const color = (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
   // `gray.solid` is too low-saturation for the white-on-fill recipe
   // every other palette uses — at 85% alpha on a white canvas the
   // result is a pale grey that white text dissolves into (operator
@@ -89,8 +87,7 @@ export function FlameBlock({
   const isAncestor = relatedSpanIds?.ancestors.has(span.spanId) ?? false;
   const isDirectChild = relatedSpanIds?.children.has(span.spanId) ?? false;
   const isDescendant = relatedSpanIds?.descendants.has(span.spanId) ?? false;
-  const isRelated =
-    isAncestor || isDescendant || isSelected || isHovered || isFocused;
+  const isRelated = isAncestor || isDescendant || isSelected || isHovered || isFocused;
   const isEmphasized = isSelected || isHovered || isFocused;
   const isDimmed = dimOnHover && !!relatedSpanIds && !isRelated;
   const bgAlphaPct = Math.round(
@@ -127,9 +124,7 @@ export function FlameBlock({
     ? node.parent.span.endTimeMs - node.parent.span.startTimeMs
     : null;
   const pctOfParent =
-    parentDurMs !== null && parentDurMs > 0
-      ? (spanDur / parentDurMs) * 100
-      : null;
+    parentDurMs !== null && parentDurMs > 0 ? (spanDur / parentDurMs) * 100 : null;
   const pctOfTrace = fullDur > 0 ? (spanDur / fullDur) * 100 : null;
 
   const tooltipLines = [
@@ -172,10 +167,7 @@ export function FlameBlock({
       : undefined;
 
   return (
-    <Tooltip
-      content={tooltipLines.join("\n")}
-      positioning={{ placement: "top" }}
-    >
+    <Tooltip content={tooltipLines.join("\n")} positioning={{ placement: "top" }}>
       <Box
         position="absolute"
         top={0}
@@ -215,8 +207,7 @@ export function FlameBlock({
         // (the hoveredSpanId state still drives the richer emphasis).
         _hover={{
           filter: "brightness(1.08)",
-          boxShadow:
-            "0 0 0 1px var(--chakra-colors-fg-muted), var(--chakra-shadows-sm)",
+          boxShadow: "0 0 0 1px var(--chakra-colors-fg-muted), var(--chakra-shadows-sm)",
           // Never demote a selected block below its resting priority —
           // the hover lift only applies to unselected blocks.
           zIndex: isSelected ? 3 : 2,
@@ -231,9 +222,7 @@ export function FlameBlock({
           // instead because grey.solid at 85% alpha is too pale for
           // white text — dark mode stays white because the canvas
           // already pushes the fill into a dark band.
-          color={
-            isLowContrastPalette ? { base: "fg", _dark: "white" } : "white"
-          }
+          color={isLowContrastPalette ? { base: "fg", _dark: "white" } : "white"}
           truncate
           lineHeight={1}
           // Dark drop-shadow lifts white text off the saturated fills.

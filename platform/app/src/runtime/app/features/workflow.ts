@@ -70,8 +70,7 @@ export class AppWorkflowRuntime {
   build(): WorkflowService {
     return PostgresWorkflowAdapter.create({
       ...this.options,
-      dslMigration:
-        this.options.dslMigration ?? AppWorkflowDslMigrationPort.create(),
+      dslMigration: this.options.dslMigration ?? AppWorkflowDslMigrationPort.create(),
     });
   }
 }

@@ -130,13 +130,10 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
       const v1 = await createRes.json();
 
       // Assign production tag to v1
-      const tagRes = await makeRequest(
-        `/api/prompts/${v1.handle}/tags/production`,
-        {
-          method: "PUT",
-          body: JSON.stringify({ versionId: v1.versionId }),
-        },
-      );
+      const tagRes = await makeRequest(`/api/prompts/${v1.handle}/tags/production`, {
+        method: "PUT",
+        body: JSON.stringify({ versionId: v1.versionId }),
+      });
       expect(tagRes.status).toBe(200);
 
       // Create v2 (which becomes the latest)
@@ -152,9 +149,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
       expect(v2.versionId).not.toBe(v1.versionId);
 
       // Resolve via shorthand — must return v1 (production), not v2 (latest)
-      const shorthandRes = await makeRequest(
-        "/api/prompts/pizza-prompt:production",
-      );
+      const shorthandRes = await makeRequest("/api/prompts/pizza-prompt:production");
       expect(shorthandRes.status).toBe(200);
       const body = await shorthandRes.json();
       expect(body.versionId).toBe(v1.versionId);
@@ -170,9 +165,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
       });
       expect(createRes.status).toBe(200);
 
-      const res = await makeRequest(
-        "/api/prompts/pizza-prompt:production?tag=staging",
-      );
+      const res = await makeRequest("/api/prompts/pizza-prompt:production?tag=staging");
       expect(res.status).toBe(422);
       const body = await res.json();
       expect(body.error).toMatch(/conflict/i);
@@ -222,13 +215,10 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
 
       // The tag-assignment route should NOT parse "pizza-prompt" as shorthand
       // It should treat it as a plain ID/handle
-      const tagRes = await makeRequest(
-        `/api/prompts/pizza-prompt/tags/production`,
-        {
-          method: "PUT",
-          body: JSON.stringify({ versionId: created.versionId }),
-        },
-      );
+      const tagRes = await makeRequest(`/api/prompts/pizza-prompt/tags/production`, {
+        method: "PUT",
+        body: JSON.stringify({ versionId: created.versionId }),
+      });
       expect(tagRes.status).toBe(200);
       const body = await tagRes.json();
       expect(body.tag).toBe("production");

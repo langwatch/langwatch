@@ -17,9 +17,7 @@ export class AppSuiteRuntime {
   }
 
   static eventingForReplay(options: {
-    resolveClient: NonNullable<
-      PostgresSuiteAdapterOptions["resolveClickHouseClient"]
-    >;
+    resolveClient: NonNullable<PostgresSuiteAdapterOptions["resolveClickHouseClient"]>;
     defaultRetentionDays: number;
   }): SuiteEventingCapabilities {
     return ClickHouseSuiteEventingAdapter.create(options).build();

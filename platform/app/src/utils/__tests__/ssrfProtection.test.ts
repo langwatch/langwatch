@@ -132,12 +132,12 @@ describe("validateUrlForSSRF", () => {
   });
 
   // URLs that should be blocked but error message varies (IPv6 edge cases)
-  it.each([
-    "http://[fd00:ec2::254]/latest/meta-data/",
-    "http://[::1]:8080/api",
-  ])("blocks %s (any error)", async (url) => {
-    await expect(blockingValidator(url)).rejects.toThrow();
-  });
+  it.each(["http://[fd00:ec2::254]/latest/meta-data/", "http://[::1]:8080/api"])(
+    "blocks %s (any error)",
+    async (url) => {
+      await expect(blockingValidator(url)).rejects.toThrow();
+    },
+  );
 
   it("allows public IP and returns resolved result", async () => {
     const result = await blockingValidator("http://8.8.8.8/dns");
@@ -149,9 +149,7 @@ describe("validateUrlForSSRF", () => {
   });
 
   it("allows googleapis.com (not blocked in AWS-only config)", async () => {
-    const result = await blockingValidator(
-      "http://storage.googleapis.com/bucket",
-    );
+    const result = await blockingValidator("http://storage.googleapis.com/bucket");
     expect(result.hostname).toBe("storage.googleapis.com");
   });
 
@@ -224,9 +222,9 @@ describe("createSSRFValidator (dependency injection)", () => {
     });
 
     // Metadata endpoints are always blocked, even if allowlisted
-    await expect(
-      validator("http://169.254.169.254/latest/meta-data/"),
-    ).rejects.toThrow("cloud metadata endpoints");
+    await expect(validator("http://169.254.169.254/latest/meta-data/")).rejects.toThrow(
+      "cloud metadata endpoints",
+    );
   });
 });
 

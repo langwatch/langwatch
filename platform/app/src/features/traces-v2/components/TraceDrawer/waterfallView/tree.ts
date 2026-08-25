@@ -13,9 +13,7 @@ import {
  * show it" so a wide drawer doesn't flash collapsed-then-expanded on mount.
  */
 export function shouldShowTimeline(containerWidthPx: number): boolean {
-  return (
-    containerWidthPx === 0 || containerWidthPx >= COLLAPSE_TIMELINE_BELOW_PX
-  );
+  return containerWidthPx === 0 || containerWidthPx >= COLLAPSE_TIMELINE_BELOW_PX;
 }
 
 export function buildTree(spans: SpanTreeNode[]): WaterfallTreeNode[] {
@@ -34,15 +32,11 @@ export function buildTree(spans: SpanTreeNode[]): WaterfallTreeNode[] {
     childrenMap.set(key, list);
   }
 
-  function buildNodes(
-    parentId: string | null,
-    depth: number,
-  ): WaterfallTreeNode[] {
+  function buildNodes(parentId: string | null, depth: number): WaterfallTreeNode[] {
     const children = childrenMap.get(parentId) ?? [];
     const sorted = [...children].sort((a, b) => a.startTimeMs - b.startTimeMs);
     return sorted.map((span) => {
-      const isOrphaned =
-        span.parentSpanId !== null && !byId.has(span.parentSpanId);
+      const isOrphaned = span.parentSpanId !== null && !byId.has(span.parentSpanId);
       return {
         span,
         children: buildNodes(span.spanId, depth + 1),

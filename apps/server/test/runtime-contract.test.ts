@@ -15,7 +15,9 @@ const ctx: RuntimeContext = {
 describe("placeholder runtime", () => {
   describe("when scaffoldEnv is called before julia ships services/runtime.ts", () => {
     it("throws a clear hand-off error pointing at the channel", async () => {
-      await expect(placeholderRuntime.scaffoldEnv(ctx)).rejects.toThrow(/services\/runtime\.ts not yet implemented/);
+      await expect(placeholderRuntime.scaffoldEnv(ctx)).rejects.toThrow(
+        /services\/runtime\.ts not yet implemented/,
+      );
       await expect(placeholderRuntime.scaffoldEnv(ctx)).rejects.toThrow(/scaffoldEnv/);
       await expect(placeholderRuntime.scaffoldEnv(ctx)).rejects.toThrow(/#langwatch-npx/);
     });

@@ -8,9 +8,7 @@ import {
   validateForm,
 } from "../cacheRule.form";
 
-function buildState(
-  overrides: Partial<CacheRuleFormState> = {},
-): CacheRuleFormState {
+function buildState(overrides: Partial<CacheRuleFormState> = {}): CacheRuleFormState {
   return { ...emptyFormState(), ...overrides };
 }
 
@@ -48,9 +46,7 @@ describe("cacheRule.form", () => {
           ),
         ).toMatchObject({
           field: "priority",
-          message: expect.stringContaining(
-            "Priority must be between 0 and 1000",
-          ),
+          message: expect.stringContaining("Priority must be between 0 and 1000"),
         });
       });
 
@@ -65,9 +61,7 @@ describe("cacheRule.form", () => {
           ),
         ).toMatchObject({
           field: "priority",
-          message: expect.stringContaining(
-            "Priority must be between 0 and 1000",
-          ),
+          message: expect.stringContaining("Priority must be between 0 and 1000"),
         });
       });
     });
@@ -210,9 +204,7 @@ describe("cacheRule.form", () => {
 
     describe("when at least one matcher is set", () => {
       it("accepts vk_id alone", () => {
-        expect(
-          validateForm(buildState({ name: "x", matchVkId: "vk_01" })),
-        ).toBeNull();
+        expect(validateForm(buildState({ name: "x", matchVkId: "vk_01" }))).toBeNull();
       });
 
       it("accepts vk_prefix alone", () => {
@@ -223,9 +215,7 @@ describe("cacheRule.form", () => {
 
       it("accepts vk_tags CSV alone", () => {
         expect(
-          validateForm(
-            buildState({ name: "x", matchVkTagsCsv: "tier=enterprise" }),
-          ),
+          validateForm(buildState({ name: "x", matchVkTagsCsv: "tier=enterprise" })),
         ).toBeNull();
       });
 

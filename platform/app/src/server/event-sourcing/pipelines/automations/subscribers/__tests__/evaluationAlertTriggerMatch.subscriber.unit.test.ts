@@ -18,9 +18,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-function evaluation(
-  overrides: Partial<EvaluationRunData> = {},
-): EvaluationRunData {
+function evaluation(overrides: Partial<EvaluationRunData> = {}): EvaluationRunData {
   return {
     evaluationId: "evaluation-1",
     evaluatorId: "evaluator-1",
@@ -84,9 +82,7 @@ function deps(triggerRows: TriggerSummary[] = [trigger()]) {
       getActiveTraceTriggersForProject: vi.fn().mockResolvedValue(triggerRows),
     },
     traceSummaryStore: {
-      get: vi
-        .fn()
-        .mockResolvedValue({ traceId: "trace-1" } as TraceSummaryData),
+      get: vi.fn().mockResolvedValue({ traceId: "trace-1" } as TraceSummaryData),
       store: vi.fn(),
     },
     recordTriggerMatch: { send: vi.fn().mockResolvedValue(undefined) },
@@ -157,19 +153,16 @@ describe("evaluation alert trigger match subscriber", () => {
 
         expect(dependencies.recordTriggerMatch.send).toHaveBeenCalledTimes(2);
         const [firstPayload, secondPayload] =
-          dependencies.recordTriggerMatch.send.mock.calls.map(
-            ([payload]) => payload,
-          );
+          dependencies.recordTriggerMatch.send.mock.calls.map(([payload]) => payload);
         expect(secondPayload).toEqual(firstPayload);
         expect(secondPayload.occurredAt).toBe(firstDeliveryAt);
 
         const idempotencyKeys = await Promise.all(
           [firstPayload, secondPayload].map(async (payload) => {
-            const [producedEvent] =
-              await new RecordTriggerMatchCommand().handle({
-                tenantId: payload.tenantId,
-                data: payload,
-              } as never);
+            const [producedEvent] = await new RecordTriggerMatchCommand().handle({
+              tenantId: payload.tenantId,
+              data: payload,
+            } as never);
             return producedEvent!.idempotencyKey;
           }),
         );
@@ -185,21 +178,13 @@ describe("evaluation alert trigger match subscriber", () => {
   });
 
   describe.each([
-    [
-      "a stale event",
-      event({ occurredAt: Date.now() - 60 * 60 * 1000 - 1 }),
-      context(),
-    ],
+    ["a stale event", event({ occurredAt: Date.now() - 60 * 60 * 1000 - 1 }), context()],
     [
       "an in-progress evaluation",
       event(),
       context(evaluation({ status: "in_progress" })),
     ],
-    [
-      "an evaluation without a trace",
-      event(),
-      context(evaluation({ traceId: null })),
-    ],
+    ["an evaluation without a trace", event(), context(evaluation({ traceId: null }))],
   ])("given %s", (_label, inputEvent, inputContext) => {
     it("does not read the trace or record a match", async () => {
       const dependencies = deps();

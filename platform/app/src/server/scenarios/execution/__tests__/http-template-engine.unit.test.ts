@@ -118,13 +118,10 @@ describe("body template JSON safety", () => {
     /** @scenario The default body template survives an awkward conversation */
     it("keeps the default threadId+messages template valid for awkward turns", () => {
       const input = inputWith("hi");
-      input.messages = [
-        { role: "user", content: 'multi\nline "quoted" \\slash' },
-      ];
+      input.messages = [{ role: "user", content: 'multi\nline "quoted" \\slash' }];
 
       const body = render({
-        template:
-          '{\n  "thread_id": "{{threadId}}",\n  "messages": {{messages}}\n}',
+        template: '{\n  "thread_id": "{{threadId}}",\n  "messages": {{messages}}\n}',
         input,
       });
 
@@ -330,9 +327,7 @@ describe("trace variables in the template context", () => {
       });
 
       expect(context.traceId).toBe(TRACE_ID);
-      expect((context.params as Record<string, unknown>).traceId).toBe(
-        "not-the-trace",
-      );
+      expect((context.params as Record<string, unknown>).traceId).toBe("not-the-trace");
     });
   });
 
@@ -450,9 +445,7 @@ describe("header template rendering", () => {
 
       expect(thrown).toBeInstanceOf(TemplateRenderError);
       expect((thrown as TemplateRenderError).field).toBe("headers");
-      expect((thrown as TemplateRenderError).message).toContain(
-        'header "X-Broken"',
-      );
+      expect((thrown as TemplateRenderError).message).toContain('header "X-Broken"');
     });
   });
 });

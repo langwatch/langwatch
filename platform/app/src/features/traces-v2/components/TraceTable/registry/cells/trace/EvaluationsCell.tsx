@@ -3,10 +3,7 @@ import type React from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
 import { useDrawer } from "~/hooks/useDrawer";
-import type {
-  TraceEvalResult,
-  TraceListItem,
-} from "../../../../../types/trace";
+import type { TraceEvalResult, TraceListItem } from "../../../../../types/trace";
 import { ioPreviewWillRenderFor } from "../../addons/trace/IOPreviewAddon";
 import { EvalChip } from "../../sharedChips";
 import type { CellDef } from "../../types";
@@ -114,19 +111,14 @@ const EvaluationsCellView: React.FC<{
   // lens omits `io-preview` entirely, so even rows with input+output
   // get the capped layout because no addon row is coming.
   const ioPreviewBelow =
-    enabledAddonIds.includes("io-preview") &&
-    ioPreviewWillRenderFor(row, isExpanded);
+    enabledAddonIds.includes("io-preview") && ioPreviewWillRenderFor(row, isExpanded);
   if (ioPreviewBelow) {
     const visible = evals.slice(0, MAX_EVALS_WHEN_WRAPPING);
     const overflow = evals.length - visible.length;
     return (
       <HStack gap={gap} flexWrap="wrap">
         {visible.map((ev, i) => (
-          <EvalChip
-            key={`${ev.evaluatorId}-${i}`}
-            eval_={ev}
-            {...decorate(ev)}
-          />
+          <EvalChip key={`${ev.evaluatorId}-${i}`} eval_={ev} {...decorate(ev)} />
         ))}
         {overflow > 0 && <MoreEvalsPill count={overflow} />}
       </HStack>
@@ -254,11 +246,7 @@ function CappedEvalChipsRow({ evals, gap, decorate }: CappedEvalChipsRowProps) {
         css={{ left: "-9999px", top: 0, gap: `${gapPx}px` }}
       >
         {evals.map((ev, i) => (
-          <EvalChip
-            key={`m-${ev.evaluatorId}-${i}`}
-            eval_={ev}
-            {...decorate(ev)}
-          />
+          <EvalChip key={`m-${ev.evaluatorId}-${i}`} eval_={ev} {...decorate(ev)} />
         ))}
         <MoreEvalsPill count={Math.max(evals.length, 1)} />
       </Box>
@@ -275,11 +263,7 @@ function CappedEvalChipsRow({ evals, gap, decorate }: CappedEvalChipsRowProps) {
         visibility={visibleCount === null ? "hidden" : "visible"}
       >
         {visible.map((ev, i) => (
-          <EvalChip
-            key={`${ev.evaluatorId}-${i}`}
-            eval_={ev}
-            {...decorate(ev)}
-          />
+          <EvalChip key={`${ev.evaluatorId}-${i}`} eval_={ev} {...decorate(ev)} />
         ))}
         {overflow > 0 && <MoreEvalsPill count={overflow} />}
       </HStack>

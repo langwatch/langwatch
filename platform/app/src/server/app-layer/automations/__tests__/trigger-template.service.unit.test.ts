@@ -94,12 +94,12 @@ describe("validateTemplateDraft", () => {
 
   describe("when the Slack template type is not recognised", () => {
     it("throws a validation error targeting slackTemplateType", () => {
-      expect(() =>
-        validateTemplateDraft({ slackTemplateType: "carousel" }),
-      ).toThrowError(TemplateValidationError);
-      expect(() =>
-        validateTemplateDraft({ slackTemplateType: "carousel" }),
-      ).toThrowError(expect.objectContaining({ field: "slackTemplateType" }));
+      expect(() => validateTemplateDraft({ slackTemplateType: "carousel" })).toThrowError(
+        TemplateValidationError,
+      );
+      expect(() => validateTemplateDraft({ slackTemplateType: "carousel" })).toThrowError(
+        expect.objectContaining({ field: "slackTemplateType" }),
+      );
     });
   });
 
@@ -427,13 +427,9 @@ describe("testFireTrigger", () => {
 
         expect(result.recipientCount).toBe(2);
         expect(sentEmails).toHaveLength(1);
-        expect(sentEmails[0]!.to).toMatch(
-          /^LangWatch Triggers <no-reply\+[a-f0-9]{12}@/,
-        );
+        expect(sentEmails[0]!.to).toMatch(/^LangWatch Triggers <no-reply\+[a-f0-9]{12}@/);
         expect(sentEmails[0]!.bcc).toEqual(["a@acme.test", "b@acme.test"]);
-        expect(sentEmails[0]!.subject).toContain(
-          TEST_FIRE_EMAIL_SUBJECT_PREFIX,
-        );
+        expect(sentEmails[0]!.subject).toContain(TEST_FIRE_EMAIL_SUBJECT_PREFIX);
         expect(sentEmails[0]!.html).toContain(TEST_FIRE_NOTICE);
       });
     });
@@ -473,12 +469,8 @@ describe("testFireTrigger", () => {
 
         expect(result.recipientCount).toBe(1);
         expect(sentSlack).toHaveLength(1);
-        expect(sentSlack[0]!.webhook).toBe(
-          "https://hooks.slack.com/services/T/B/X",
-        );
-        expect(JSON.stringify(sentSlack[0]!.payload)).toContain(
-          TEST_FIRE_NOTICE,
-        );
+        expect(sentSlack[0]!.webhook).toBe("https://hooks.slack.com/services/T/B/X");
+        expect(JSON.stringify(sentSlack[0]!.payload)).toContain(TEST_FIRE_NOTICE);
       });
     });
 
@@ -539,9 +531,7 @@ describe("testFireTrigger", () => {
 
         expect(result.usedDefault).toBe(false);
         expect(sentSlack).toHaveLength(1);
-        expect(JSON.stringify(sentSlack[0]!.payload)).toContain(
-          "Custom alert for Acme",
-        );
+        expect(JSON.stringify(sentSlack[0]!.payload)).toContain("Custom alert for Acme");
       });
     });
   });

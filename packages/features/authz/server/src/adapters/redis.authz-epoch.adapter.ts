@@ -15,9 +15,7 @@ export type RedisAuthzEpochAdapterOptions = {
 
 /** Redis-backed epoch; unavailable or malformed state disables caching. */
 export class RedisAuthzEpochAdapter extends AuthzEpochPort {
-  static create(
-    options: RedisAuthzEpochAdapterOptions,
-  ): RedisAuthzEpochAdapter {
+  static create(options: RedisAuthzEpochAdapterOptions): RedisAuthzEpochAdapter {
     return new RedisAuthzEpochAdapter(options.redis);
   }
 
@@ -25,11 +23,7 @@ export class RedisAuthzEpochAdapter extends AuthzEpochPort {
     super();
   }
 
-  async tryRead({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<number | null> {
+  async tryRead({ organizationId }: { organizationId: string }): Promise<number | null> {
     if (!this.redis) return null;
     try {
       const raw = await this.redis.get(`${EPOCH_KEY_PREFIX}${organizationId}`);

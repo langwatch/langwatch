@@ -79,10 +79,7 @@ export const TAMPERED_LICENSE_KEY =
 export const EMPTY_SIGNATURE_KEY =
   "eyJkYXRhIjp7ImxpY2Vuc2VJZCI6ImxpYy0wMDEiLCJ2ZXJzaW9uIjoxLCJvcmdhbml6YXRpb25OYW1lIjoiQWNtZSBDb3JwIiwiZW1haWwiOiJhZG1pbkBhY21lLmNvcnAiLCJpc3N1ZWRBdCI6IjIwMjQtMDEtMDFUMDA6MDA6MDBaIiwiZXhwaXJlc0F0IjoiMjAzMC0xMi0zMVQyMzo1OTo1OVoiLCJwbGFuIjp7InR5cGUiOiJQUk8iLCJuYW1lIjoiUHJvIiwibWF4TWVtYmVycyI6NSwibWF4UHJvamVjdHMiOjEwLCJtYXhNZXNzYWdlc1Blck1vbnRoIjo1MDAwMCwiZXZhbHVhdGlvbnNDcmVkaXQiOjEwMCwibWF4V29ya2Zsb3dzIjoyNSwiY2FuUHVibGlzaCI6dHJ1ZX19LCJzaWduYXR1cmUiOiIifQ==";
 
-export {
-  canonicalPemKey,
-  mangledPemPastes,
-} from "./fixtures/pem-pastes.fixture";
+export { canonicalPemKey, mangledPemPastes } from "./fixtures/pem-pastes.fixture";
 export {
   TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,

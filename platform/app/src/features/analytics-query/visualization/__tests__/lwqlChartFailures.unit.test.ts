@@ -9,10 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  lwqlEmptyEncodingFailure,
-  lwqlRenderFailure,
-} from "../lwqlChartFailures";
+import { lwqlEmptyEncodingFailure, lwqlRenderFailure } from "../lwqlChartFailures";
 import { LangWatchQLVegaLoadBlockedError } from "../noNetworkVegaLoader";
 
 describe("the refusals the chart layer raises", () => {

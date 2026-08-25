@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  formatLeaseLapse,
-  formatTtl,
-  sweepOutcomeLabel,
-} from "@langwatch/ops-web";
+import { formatLeaseLapse, formatTtl, sweepOutcomeLabel } from "@langwatch/ops-web";
 
 const NOW = new Date("2026-07-22T12:00:00.000Z");
 

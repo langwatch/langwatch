@@ -567,9 +567,7 @@ describe("Feature: Teams REST API", () => {
     it("refuses to archive a personal team and leaves it unarchived", async () => {
       const res = await api.delete(`/api/teams/${personalTeamId!}`);
       expect(res.status).toBe(403);
-      expect((await res.json()).error).toBe(
-        "personal_workspace_not_managed_here",
-      );
+      expect((await res.json()).error).toBe("personal_workspace_not_managed_here");
 
       const team = await prisma.team.findUnique({
         where: { id: personalTeamId! },
@@ -585,9 +583,7 @@ describe("Feature: Teams REST API", () => {
         role: TeamUserRole.MEMBER,
       });
       expect(res.status).toBe(403);
-      expect((await res.json()).error).toBe(
-        "personal_workspace_not_managed_here",
-      );
+      expect((await res.json()).error).toBe("personal_workspace_not_managed_here");
 
       const bindings = await prisma.roleBinding.findMany({
         where: {
@@ -602,13 +598,9 @@ describe("Feature: Teams REST API", () => {
 
     /** @scenario Refuses to remove a member from a personal team */
     it("refuses to remove the owner and leaves their binding in place", async () => {
-      const res = await api.delete(
-        `/api/teams/${personalTeamId!}/members/${userId}`,
-      );
+      const res = await api.delete(`/api/teams/${personalTeamId!}/members/${userId}`);
       expect(res.status).toBe(403);
-      expect((await res.json()).error).toBe(
-        "personal_workspace_not_managed_here",
-      );
+      expect((await res.json()).error).toBe("personal_workspace_not_managed_here");
 
       const binding = await prisma.roleBinding.findFirst({
         where: {

@@ -110,11 +110,7 @@ export function CascadeArchiveDialog({
       placement="center"
       initialFocusEl={() => inputRef.current}
     >
-      <Dialog.Content
-        bg="bg"
-        maxWidth="500px"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <Dialog.Content bg="bg" maxWidth="500px" onClick={(e) => e.stopPropagation()}>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
@@ -192,10 +188,7 @@ export function CascadeArchiveDialog({
                 onKeyDown={(e) => {
                   e.stopPropagation();
                   if (e.key === "Enter") {
-                    if (
-                      confirmationText.toLowerCase() === "delete" &&
-                      !isLoading
-                    ) {
+                    if (confirmationText.toLowerCase() === "delete" && !isLoading) {
                       onConfirm();
                     }
                   }
@@ -226,9 +219,7 @@ export function CascadeArchiveDialog({
               }
             }}
             disabled={
-              confirmationText.toLowerCase() !== "delete" ||
-              isLoading ||
-              isLoadingRelated
+              confirmationText.toLowerCase() !== "delete" || isLoading || isLoadingRelated
             }
             data-testid="cascade-archive-confirm-button"
           >

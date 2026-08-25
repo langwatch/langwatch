@@ -11,13 +11,23 @@ export type DoctorRow = {
   reason?: string;
 };
 
-export async function inspectPredeps({ version }: { version: string }): Promise<DoctorRow[]> {
+export async function inspectPredeps({
+  version,
+}: {
+  version: string;
+}): Promise<DoctorRow[]> {
   const predeps = predepRegistry({ version });
   const rows: DoctorRow[] = [];
   for (const p of predeps) {
     const det = await p.detect(paths);
     if (det.installed) {
-      rows.push({ id: p.id, label: p.label, installed: true, version: det.version, resolvedPath: det.resolvedPath });
+      rows.push({
+        id: p.id,
+        label: p.label,
+        installed: true,
+        version: det.version,
+        resolvedPath: det.resolvedPath,
+      });
     } else {
       rows.push({ id: p.id, label: p.label, installed: false, reason: det.reason });
     }
@@ -30,9 +40,13 @@ export function printDoctorTable(rows: DoctorRow[]): void {
   console.log(chalk.bold("Predeps"));
   for (const r of rows) {
     if (r.installed) {
-      console.log(`  ${chalk.green("✓")} ${r.id.padEnd(12)} ${r.version ?? ""} ${chalk.dim(r.resolvedPath ?? "")}`);
+      console.log(
+        `  ${chalk.green("✓")} ${r.id.padEnd(12)} ${r.version ?? ""} ${chalk.dim(r.resolvedPath ?? "")}`,
+      );
     } else {
-      console.log(`  ${chalk.red("✗")} ${r.id.padEnd(12)} ${chalk.dim(r.reason ?? "missing")}`);
+      console.log(
+        `  ${chalk.red("✗")} ${r.id.padEnd(12)} ${chalk.dim(r.reason ?? "missing")}`,
+      );
     }
   }
   console.log("");
@@ -40,6 +54,10 @@ export function printDoctorTable(rows: DoctorRow[]): void {
   if (missing.length === 0) {
     console.log(chalk.green("All predeps installed."));
   } else {
-    console.log(chalk.yellow(`${missing.length} predep(s) missing — run \`npx @langwatch/server install\` to fetch them.`));
+    console.log(
+      chalk.yellow(
+        `${missing.length} predep(s) missing — run \`npx @langwatch/server install\` to fetch them.`,
+      ),
+    );
   }
 }

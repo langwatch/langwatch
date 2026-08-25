@@ -17,8 +17,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const renderPicker = () =>
-  render(<AutomationTypePicker />, { wrapper: Wrapper });
+const renderPicker = () => render(<AutomationTypePicker />, { wrapper: Wrapper });
 
 describe("AutomationTypePicker", () => {
   beforeEach(() => {
@@ -32,15 +31,9 @@ describe("AutomationTypePicker", () => {
     it("shows Automation, Alert, and Schedule — never a Trace data card", () => {
       renderPicker();
 
-      expect(
-        screen.getByRole("button", { name: /Automation/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /Alert/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /Schedule/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Automation/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Alert/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Schedule/i })).toBeInTheDocument();
       expect(screen.queryByText("Trace data")).not.toBeInTheDocument();
     });
   });

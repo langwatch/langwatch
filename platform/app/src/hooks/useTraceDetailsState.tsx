@@ -6,8 +6,7 @@ import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 export function useTraceDetailsState(traceId: string) {
   const router = useRouter();
-  const spanId =
-    typeof router.query.span === "string" ? router.query.span : undefined;
+  const spanId = typeof router.query.span === "string" ? router.query.span : undefined;
   const openTab =
     typeof router.query.openTab === "string" ? router.query.openTab : undefined;
   const { project } = useOrganizationTeamProject();

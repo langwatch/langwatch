@@ -113,10 +113,7 @@ describe("Feature: Group endpoints behind the Enterprise gate", () => {
   afterAll(async () => {
     try {
       await cleanupTestRows(prisma, [
-        [
-          "groupMembership",
-          { group: { organizationId: testOrganization?.id } },
-        ],
+        ["groupMembership", { group: { organizationId: testOrganization?.id } }],
         ["roleBinding", { organizationId: testOrganization?.id }],
         ["group", { organizationId: testOrganization?.id }],
         ["apiKey", { organizationId: testOrganization?.id }],

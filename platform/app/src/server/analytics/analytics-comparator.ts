@@ -35,12 +35,7 @@ export class AnalyticsComparator {
   /**
    * Compare results from two backends and log discrepancies
    */
-  compare<T>(
-    operation: string,
-    input: unknown,
-    esResult: T,
-    chResult: T,
-  ): void {
+  compare<T>(operation: string, input: unknown, esResult: T, chResult: T): void {
     const discrepancies = this.findDiscrepancies(esResult, chResult);
 
     if (discrepancies.length > 0) {
@@ -69,25 +64,16 @@ export class AnalyticsComparator {
   findDiscrepancies<T>(esResult: T, chResult: T): string[] {
     const discrepancies: string[] = [];
 
-    if (
-      this.isTimeseriesResult(esResult) &&
-      this.isTimeseriesResult(chResult)
-    ) {
+    if (this.isTimeseriesResult(esResult) && this.isTimeseriesResult(chResult)) {
       this.compareTimeseriesResults(esResult, chResult, discrepancies);
-    } else if (
-      this.isFilterDataResult(esResult) &&
-      this.isFilterDataResult(chResult)
-    ) {
+    } else if (this.isFilterDataResult(esResult) && this.isFilterDataResult(chResult)) {
       this.compareFilterDataResults(esResult, chResult, discrepancies);
     } else if (
       this.isTopDocumentsResult(esResult) &&
       this.isTopDocumentsResult(chResult)
     ) {
       this.compareTopDocumentsResults(esResult, chResult, discrepancies);
-    } else if (
-      this.isFeedbacksResult(esResult) &&
-      this.isFeedbacksResult(chResult)
-    ) {
+    } else if (this.isFeedbacksResult(esResult) && this.isFeedbacksResult(chResult)) {
       this.compareFeedbacksResults(esResult, chResult, discrepancies);
     } else {
       this.logger.warn(
@@ -126,10 +112,7 @@ export class AnalyticsComparator {
       if (!esBucket || !chBucket) continue;
 
       // Use union of keys from both buckets to catch keys present only in one
-      const allKeys = new Set([
-        ...Object.keys(esBucket),
-        ...Object.keys(chBucket),
-      ]);
+      const allKeys = new Set([...Object.keys(esBucket), ...Object.keys(chBucket)]);
 
       for (const key of allKeys) {
         if (key === "date") continue;
@@ -139,23 +122,17 @@ export class AnalyticsComparator {
 
         // Report missing keys
         if (esValue === undefined && chValue !== undefined) {
-          discrepancies.push(
-            `Bucket ${i} key ${key}: missing in ES, CH=${chValue}`,
-          );
+          discrepancies.push(`Bucket ${i} key ${key}: missing in ES, CH=${chValue}`);
           continue;
         }
         if (chValue === undefined && esValue !== undefined) {
-          discrepancies.push(
-            `Bucket ${i} key ${key}: ES=${esValue}, missing in CH`,
-          );
+          discrepancies.push(`Bucket ${i} key ${key}: ES=${esValue}, missing in CH`);
           continue;
         }
 
         if (typeof esValue === "number" && typeof chValue === "number") {
           if (!this.valuesMatch(esValue, chValue)) {
-            discrepancies.push(
-              `Bucket ${i} key ${key}: ES=${esValue}, CH=${chValue}`,
-            );
+            discrepancies.push(`Bucket ${i} key ${key}: ES=${esValue}, CH=${chValue}`);
           }
         }
       }
@@ -180,10 +157,7 @@ export class AnalyticsComparator {
       if (!esBucket || !chBucket) continue;
 
       // Use union of keys from both buckets to catch keys present only in one
-      const allKeys = new Set([
-        ...Object.keys(esBucket),
-        ...Object.keys(chBucket),
-      ]);
+      const allKeys = new Set([...Object.keys(esBucket), ...Object.keys(chBucket)]);
 
       for (const key of allKeys) {
         if (key === "date") continue;
@@ -231,12 +205,8 @@ export class AnalyticsComparator {
     }
 
     // Compare counts for matching fields (both directions)
-    const esOptionMap = new Map(
-      esResult.options.map((o) => [o.field, o.count]),
-    );
-    const chOptionMap = new Map(
-      chResult.options.map((o) => [o.field, o.count]),
-    );
+    const esOptionMap = new Map(esResult.options.map((o) => [o.field, o.count]));
+    const chOptionMap = new Map(chResult.options.map((o) => [o.field, o.count]));
 
     // Check CH options against ES
     for (const chOption of chResult.options) {
@@ -335,24 +305,15 @@ export class AnalyticsComparator {
       );
     }
 
-    if (
-      !this.valuesMatch(
-        esResult.totalUniqueDocuments,
-        chResult.totalUniqueDocuments,
-      )
-    ) {
+    if (!this.valuesMatch(esResult.totalUniqueDocuments, chResult.totalUniqueDocuments)) {
       discrepancies.push(
         `Total unique documents: ES=${esResult.totalUniqueDocuments}, CH=${chResult.totalUniqueDocuments}`,
       );
     }
 
     // Compare counts for matching document IDs (both directions)
-    const esDocMap = new Map(
-      esResult.topDocuments.map((d) => [d.documentId, d.count]),
-    );
-    const chDocMap = new Map(
-      chResult.topDocuments.map((d) => [d.documentId, d.count]),
-    );
+    const esDocMap = new Map(esResult.topDocuments.map((d) => [d.documentId, d.count]));
+    const chDocMap = new Map(chResult.topDocuments.map((d) => [d.documentId, d.count]));
 
     // Check CH documents against ES
     for (const chDoc of chResult.topDocuments) {
@@ -451,8 +412,7 @@ export class AnalyticsComparator {
         optionCount: result.options.length,
         firstOptions: result.options.slice(0, 3).map((opt) => ({
           field: opt.field,
-          countBucket:
-            opt.count > 100 ? "100+" : opt.count > 10 ? "10-100" : "<10",
+          countBucket: opt.count > 100 ? "100+" : opt.count > 10 ? "10-100" : "<10",
         })),
       };
     }

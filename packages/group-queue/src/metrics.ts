@@ -180,8 +180,7 @@ export const gqJobDurationMilliseconds = new Histogram({
   help: "Duration of individual job processing in milliseconds",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
   buckets: [
-    1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000,
-    120000,
+    1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 120000,
   ],
 });
 
@@ -302,13 +301,7 @@ export const gqRetryEncodeFailuresTotal = new Counter({
 export const gqJobsDroppedTotal = new Counter({
   name: "gq_jobs_dropped_total",
   help: "Staged jobs discarded because they could not be decoded",
-  labelNames: [
-    "queue_name",
-    "pipeline_name",
-    "job_type",
-    "job_name",
-    "reason",
-  ] as const,
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name", "reason"] as const,
 });
 
 /**

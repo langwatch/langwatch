@@ -40,12 +40,7 @@ export function TerminalSkeleton() {
     >
       {/* The prompt is already there — a terminal always has one. */}
       <HStack align="baseline" gap={2}>
-        <Text
-          {...CELL}
-          color={TERMINAL_TOKENS.blue}
-          fontWeight="bold"
-          aria-hidden
-        >
+        <Text {...CELL} color={TERMINAL_TOKENS.blue} fontWeight="bold" aria-hidden>
           ❯
         </Text>
         <Cursor />

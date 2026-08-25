@@ -43,9 +43,7 @@ function resolveFieldValue({
   value: string;
 }): string | string[] | null | undefined {
   const matcher =
-    PRECONDITION_FIELD_MATCHERS[
-      field as keyof typeof PRECONDITION_FIELD_MATCHERS
-    ];
+    PRECONDITION_FIELD_MATCHERS[field as keyof typeof PRECONDITION_FIELD_MATCHERS];
 
   if (matcher == null) {
     // Key-selector or unavailable field — not matchable
@@ -101,9 +99,7 @@ function evaluateIsRule({
   if (fieldValue == null) return false;
 
   if (Array.isArray(fieldValue)) {
-    return fieldValue.some(
-      (item) => item.toLowerCase() === conditionValue.toLowerCase(),
-    );
+    return fieldValue.some((item) => item.toLowerCase() === conditionValue.toLowerCase());
   }
 
   return fieldValue.toLowerCase() === conditionValue.toLowerCase();
@@ -270,9 +266,7 @@ export function evaluatePreconditions({
  * Check if any preconditions reference event fields, requiring an
  * additional trace fetch to get event data.
  */
-export function preconditionsNeedEvents(
-  preconditions: CheckPreconditions,
-): boolean {
+export function preconditionsNeedEvents(preconditions: CheckPreconditions): boolean {
   return preconditions.some((p) => p.field.startsWith("events."));
 }
 
@@ -321,11 +315,8 @@ export function buildPreconditionTraceDataFromTrace({
     spanTypes: spans.map((span) => span.type),
     spanModels: spans
       .map((span) => (span as LLMSpan).model)
-      .filter(
-        (model): model is string => typeof model === "string" && model !== "",
-      ),
-    customMetadata:
-      Object.keys(customMetadata).length > 0 ? customMetadata : null,
+      .filter((model): model is string => typeof model === "string" && model !== ""),
+    customMetadata: Object.keys(customMetadata).length > 0 ? customMetadata : null,
     annotationIds: [], // Not available in legacy collector path
     events:
       events?.map((e) => ({
@@ -365,9 +356,7 @@ export function buildPreconditionTraceDataFromCommand({
       data.spanModels ??
       spans
         .map((span) => (span as LLMSpan).model)
-        .filter(
-          (model): model is string => typeof model === "string" && model !== "",
-        ),
+        .filter((model): model is string => typeof model === "string" && model !== ""),
     customMetadata: data.customMetadata ?? null,
     annotationIds: [], // Not available at command time
     events: events ?? null,

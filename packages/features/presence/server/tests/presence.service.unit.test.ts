@@ -59,9 +59,9 @@ describe("PresenceService", () => {
   it("uses the canonical Project service for the effective policy", async () => {
     const { service, projects } = createService();
     projects.enabled = false;
-    await expect(
-      service.isEnabledForProject({ projectId: "project-1" }),
-    ).resolves.toBe(false);
+    await expect(service.isEnabledForProject({ projectId: "project-1" })).resolves.toBe(
+      false,
+    );
   });
 
   it("persists and broadcasts the first session heartbeat", async () => {

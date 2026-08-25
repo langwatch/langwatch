@@ -23,9 +23,7 @@ export const openCommand = async (
 ): Promise<void> => {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    console.error(
-      chalk.yellow("Not logged in. Run `langwatch login` first."),
-    );
+    console.error(chalk.yellow("Not logged in. Run `langwatch login` first."));
     process.exit(1);
   }
 
@@ -45,8 +43,7 @@ export const openCommand = async (
 };
 
 async function openInBrowser(url: string, override?: string): Promise<void> {
-  const choice =
-    override ?? process.env.LANGWATCH_BROWSER ?? process.env.BROWSER ?? "";
+  const choice = override ?? process.env.LANGWATCH_BROWSER ?? process.env.BROWSER ?? "";
   if (choice === "none") return;
   try {
     if (!choice || choice === "default") {

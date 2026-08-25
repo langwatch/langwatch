@@ -86,9 +86,9 @@ describe("evalColumnLabel", () => {
 
   describe("when the evaluator name is unknown", () => {
     it("falls back to the raw key", () => {
-      expect(
-        evalColumnLabel({ field: "label", evaluatorKey: "typed-thing" }),
-      ).toBe("typed-thing · Label");
+      expect(evalColumnLabel({ field: "label", evaluatorKey: "typed-thing" })).toBe(
+        "typed-thing · Label",
+      );
     });
   });
 });
@@ -126,17 +126,13 @@ describe("latestEvalForKey", () => {
           passed: false,
         }),
       ]);
-      expect(latestEvalForKey({ row, evaluatorKey: "Toxicity" })?.passed).toBe(
-        false,
-      );
+      expect(latestEvalForKey({ row, evaluatorKey: "Toxicity" })?.passed).toBe(false);
     });
   });
 
   describe("when the evaluator has no run on the trace", () => {
     it("returns undefined", () => {
-      expect(
-        latestEvalForKey({ row: rowWith([]), evaluatorKey: "e1" }),
-      ).toBeUndefined();
+      expect(latestEvalForKey({ row: rowWith([]), evaluatorKey: "e1" })).toBeUndefined();
     });
   });
 });
@@ -167,9 +163,8 @@ describe("buildEvalColumnDef", () => {
     expect(def.enableSorting).toBe(false);
 
     const row = rowWith([evalResult({ evaluatorId: "e1", score: 8.2 })]);
-    const accessorFn = (
-      def as { accessorFn?: (r: TraceListItem, i: number) => unknown }
-    ).accessorFn;
+    const accessorFn = (def as { accessorFn?: (r: TraceListItem, i: number) => unknown })
+      .accessorFn;
     expect(accessorFn?.(row, 0)).toBe(8.2);
   });
 });

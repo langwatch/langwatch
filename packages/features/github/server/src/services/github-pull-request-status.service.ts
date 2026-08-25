@@ -215,11 +215,10 @@ export class GithubPullRequestStatusService {
     organizationId: string;
     ref: GithubPullRequestRef;
   }): Promise<GithubPullRequestSummary | null> {
-    const covering =
-      await this.deps.installations.tryResolveInstallationForRepository({
-        organizationId,
-        repositoryFullName: ref.repositoryFullName,
-      });
+    const covering = await this.deps.installations.tryResolveInstallationForRepository({
+      organizationId,
+      repositoryFullName: ref.repositoryFullName,
+    });
     if (!covering) return null;
     const [owner, repo] = ref.repositoryFullName.split("/");
     if (!owner || !repo) return null;
@@ -322,9 +321,7 @@ function assertValidRefs(refs: readonly GithubPullRequestRef[]): void {
     );
   }
   for (const ref of refs) {
-    const looksLikeRepository = /^[^/\s]+\/[^/\s]+$/.test(
-      ref.repositoryFullName,
-    );
+    const looksLikeRepository = /^[^/\s]+\/[^/\s]+$/.test(ref.repositoryFullName);
     if (!looksLikeRepository) {
       throw new ValidationError("repositoryFullName must be owner/name");
     }

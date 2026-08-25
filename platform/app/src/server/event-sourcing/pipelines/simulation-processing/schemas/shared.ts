@@ -19,11 +19,7 @@ export type SimulationRunStatus = (typeof SIMULATION_RUN_STATUS)[number];
  * Verdict values stored in ClickHouse.
  * Lowercase, matching the Verdict enum string values.
  */
-export const SIMULATION_VERDICT = [
-  "success",
-  "failure",
-  "inconclusive",
-] as const;
+export const SIMULATION_VERDICT = ["success", "failure", "inconclusive"] as const;
 export type SimulationVerdict = (typeof SIMULATION_VERDICT)[number];
 
 export const simulationMessageSchema = z

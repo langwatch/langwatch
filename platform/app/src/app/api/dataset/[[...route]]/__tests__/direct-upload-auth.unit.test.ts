@@ -23,8 +23,7 @@ vi.mock("~/server/auth", () => ({
 
 const probeProjectPermission = vi.fn();
 vi.mock("~/server/app-layer/permissions/imperative", () => ({
-  probeProjectPermission: (...args: unknown[]) =>
-    probeProjectPermission(...args),
+  probeProjectPermission: (...args: unknown[]) => probeProjectPermission(...args),
 }));
 
 const extractCredentials = vi.fn();
@@ -63,8 +62,7 @@ const makeContext = (headers: Record<string, string> = {}) =>
       raw: new Request("http://localhost/api/dataset/direct-upload"),
       header: (name: string) => headers[name],
     },
-    get: (name: string) =>
-      name === "langwatchApp" ? processApp : undefined,
+    get: (name: string) => (name === "langwatchApp" ? processApp : undefined),
   }) as never;
 
 beforeEach(() => {

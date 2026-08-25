@@ -51,9 +51,7 @@ function makeRecord(
   };
 }
 
-function makeHandoff(
-  overrides: Partial<LangyTurnHandoff> = {},
-): LangyTurnHandoff {
+function makeHandoff(overrides: Partial<LangyTurnHandoff> = {}): LangyTurnHandoff {
   return {
     projectId: "project_1",
     conversationId: "conv_1",
@@ -114,9 +112,7 @@ describe("agent turn liveness subscriber", () => {
     const deduplication = subscriber.options?.deduplication;
     expect(typeof deduplication).toBe("object");
     if (typeof deduplication === "object") {
-      expect(deduplication.makeId(event)).toBe(
-        "langy-liveness:project_2:conv_2:turn_1",
-      );
+      expect(deduplication.makeId(event)).toBe("langy-liveness:project_2:conv_2:turn_1");
       expect(deduplication.ttlMs).toBe(LANGY_HEARTBEAT_GRACE_MS * 2);
     }
   });
@@ -131,9 +127,7 @@ describe("agent turn liveness subscriber", () => {
       aggregateId: "conv_2",
     });
 
-    await expect(subscriber.handle(event, context)).rejects.toBeInstanceOf(
-      DispatchError,
-    );
+    await expect(subscriber.handle(event, context)).rejects.toBeInstanceOf(DispatchError);
 
     expect(deps.conversations.read).toHaveBeenCalledWith({
       projectId: "project_2",
@@ -174,9 +168,7 @@ describe("agent turn liveness subscriber", () => {
 
     expect(error).toBeInstanceOf(DispatchError);
     expect((error as DispatchError).retryable).toBe(true);
-    expect((error as DispatchError).retryAfterMs).toBe(
-      LANGY_HEARTBEAT_GRACE_MS,
-    );
+    expect((error as DispatchError).retryAfterMs).toBe(LANGY_HEARTBEAT_GRACE_MS);
     expect(deps.handoffStore.read).not.toHaveBeenCalled();
     expect(deps.worker.dispatch).not.toHaveBeenCalled();
     expect(deps.failTurn.failTurn).not.toHaveBeenCalled();
@@ -200,9 +192,9 @@ describe("agent turn liveness subscriber", () => {
     const deps = makeDeps({ handoff: makeHandoff() });
     const subscriber = createAgentTurnLivenessSubscriber(deps);
 
-    await expect(
-      subscriber.handle(makeEvent(), context),
-    ).rejects.toBeInstanceOf(DispatchError);
+    await expect(subscriber.handle(makeEvent(), context)).rejects.toBeInstanceOf(
+      DispatchError,
+    );
     expect(deps.worker.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         projectId: "project_1",

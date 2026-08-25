@@ -88,9 +88,7 @@ describe("needsGithubAuth", () => {
     // The skill's own steps chain commands, so a recogniser that only reads the
     // first word would sail straight past the push.
     it("finds it after &&", () => {
-      expect(needsGithubAuth("git add -A && git push -u origin HEAD")).toBe(
-        true,
-      );
+      expect(needsGithubAuth("git add -A && git push -u origin HEAD")).toBe(true);
     });
 
     it("finds it after a semicolon, a pipe, and a newline", () => {

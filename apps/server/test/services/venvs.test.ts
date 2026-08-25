@@ -6,12 +6,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const execCalls: Array<{ bin: string; args: string[] }> = [];
 
 vi.mock("../../src/services/_pipe-to-bus.ts", () => ({
-  execAndPipe: vi.fn(async (_bus: unknown, _name: string, bin: string, args: string[]) => {
-    execCalls.push({ bin, args });
-  }),
+  execAndPipe: vi.fn(
+    async (_bus: unknown, _name: string, bin: string, args: string[]) => {
+      execCalls.push({ bin, args });
+    },
+  ),
 }));
 
-vi.mock("../../src/services/app-dir.ts", () => ({ appRoot: () => "/tmp/langwatch-app-root" }));
+vi.mock("../../src/services/app-dir.ts", () => ({
+  appRoot: () => "/tmp/langwatch-app-root",
+}));
 
 const { syncVenvs } = await import("../../src/services/venvs.ts");
 
@@ -37,10 +41,7 @@ function extrasFrom(args: string[]): string[] {
 }
 
 describe("evaluator environment", () => {
-  const TOGGLE_KEYS = [
-    "LANGWATCH_ENABLE_PRESIDIO",
-    "LANGWATCH_ENABLE_LINGUA",
-  ];
+  const TOGGLE_KEYS = ["LANGWATCH_ENABLE_PRESIDIO", "LANGWATCH_ENABLE_LINGUA"];
 
   beforeEach(() => {
     execCalls.length = 0;

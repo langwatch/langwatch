@@ -18,9 +18,7 @@ export interface GraphAlertSweepState {
 }
 
 export interface GraphAlertSweepDeps {
-  decideSweepCandidates: (params: {
-    now: Date;
-  }) => Promise<GraphTriggerSweepCandidate[]>;
+  decideSweepCandidates: (params: { now: Date }) => Promise<GraphTriggerSweepCandidate[]>;
   evaluateGraphTrigger: (params: {
     triggerId: string;
     projectId: string;
@@ -37,14 +35,12 @@ type SweepIntents = {
   evaluateGraph: IntentSpec<typeof sweepSchema>;
 };
 
-export const graphAlertSweepWake: WakeHandler<
-  GraphAlertSweepState,
-  SweepIntents
-> = (_state, ctx) => ({
+export const graphAlertSweepWake: WakeHandler<GraphAlertSweepState, SweepIntents> = (
+  _state,
+  ctx,
+) => ({
   state: { lastSweepAt: ctx.at },
-  intents: [
-    ctx.intents.evaluateGraph(`sweep:${ctx.at}`, { scheduledFor: ctx.at }),
-  ],
+  intents: [ctx.intents.evaluateGraph(`sweep:${ctx.at}`, { scheduledFor: ctx.at })],
 });
 
 export function runGraphAlertSweep(deps: GraphAlertSweepDeps) {

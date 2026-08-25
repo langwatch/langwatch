@@ -20,18 +20,22 @@ description: "Resource requirements, size profiles, and scaling recommendations 
 
 These are the default resource requests and limits from the Helm chart (`values.yaml`):
 
-| Component | CPU Request | CPU Limit | Memory Request | Memory Limit | Storage |
-|-----------|-------------|-----------|----------------|--------------|---------|
-| LangWatch App | 250m | 1000m | 2Gi | 4Gi | --- |
-| LangWatch Workers | 250m | 1000m | 2Gi | 4Gi | --- |
-| LangWatch NLP | 250m | 1000m | 256Mi | 1Gi | --- |
-| LangEvals | 1000m | 2000m | 6Gi | 8Gi | --- |
-| PostgreSQL | 250m | 1000m | 512Mi | 1Gi | 20Gi |
-| ClickHouse | 2 cores | 2 cores | 4Gi | 4Gi | 50Gi |
-| Redis | 250m | 500m | 256Mi | 512Mi | 10Gi |
-| Prometheus | 200m | 500m | 512Mi | 2Gi | 6Gi |
+| Component         | CPU Request | CPU Limit | Memory Request | Memory Limit | Storage |
+| ----------------- | ----------- | --------- | -------------- | ------------ | ------- |
+| LangWatch App     | 250m        | 1000m     | 2Gi            | 4Gi          | ---     |
+| LangWatch Workers | 250m        | 1000m     | 2Gi            | 4Gi          | ---     |
+| LangWatch NLP     | 250m        | 1000m     | 256Mi          | 1Gi          | ---     |
+| LangEvals         | 1000m       | 2000m     | 6Gi            | 8Gi          | ---     |
+| PostgreSQL        | 250m        | 1000m     | 512Mi          | 1Gi          | 20Gi    |
+| ClickHouse        | 2 cores     | 2 cores   | 4Gi            | 4Gi          | 50Gi    |
+| Redis             | 250m        | 500m      | 256Mi          | 512Mi        | 10Gi    |
+| Prometheus        | 200m        | 500m      | 512Mi          | 2Gi          | 6Gi     |
 
-<Note>ClickHouse auto-tunes internal parameters (memory limits, thread pools, merge settings) based on the CPU and memory you allocate. You only need to set `clickhouse.cpu` and `clickhouse.memory`.</Note>
+<Note>
+  ClickHouse auto-tunes internal parameters (memory limits, thread pools, merge settings)
+  based on the CPU and memory you allocate. You only need to set `clickhouse.cpu` and
+  `clickhouse.memory`.
+</Note>
 
 ## Size Profiles
 
@@ -57,8 +61,8 @@ For development, demos and small teams.
 
 ```yaml
 helm install langwatch langwatch/langwatch \
-  -f examples/overlays/size-dev.yaml \
-  --set autogen.enabled=true
+-f examples/overlays/size-dev.yaml \
+--set autogen.enabled=true
 ```
 
 `examples/values-local.yaml` is the same sizing without Prometheus (~2.6 CPU, ~6.6 Gi), bundled with NodePort access and images pinned to a locally built `local` tag. That last part makes it Kind-only: see [Local Kubernetes](/self-hosting/deployment/kubernetes-local).
@@ -89,8 +93,8 @@ For production with single-node ClickHouse.
 
 ```yaml
 helm install langwatch langwatch/langwatch \
-  -f examples/overlays/size-prod.yaml \
-  -f examples/overlays/access-ingress.yaml
+-f examples/overlays/size-prod.yaml \
+-f examples/overlays/access-ingress.yaml
 ```
 
 ### High Availability (`size-ha.yaml`)
@@ -112,22 +116,22 @@ For production with replicated ClickHouse.
 
 ```yaml
 helm install langwatch langwatch/langwatch \
-  -f examples/overlays/size-ha.yaml \
-  -f examples/overlays/access-ingress.yaml \
-  -f examples/overlays/cold-storage-s3.yaml
+-f examples/overlays/size-ha.yaml \
+-f examples/overlays/access-ingress.yaml \
+-f examples/overlays/cold-storage-s3.yaml
 ```
 
 ## Scaling Guidelines
 
 ### What to scale first
 
-| Bottleneck | Component to Scale | How |
-|---|---|---|
-| Trace ingestion is slow, queue backlog | LangWatch Workers | Increase `workers.replicaCount` |
-| UI is slow, many concurrent users | LangWatch App | Increase `app.replicaCount` |
-| ClickHouse queries are slow | ClickHouse | Increase `clickhouse.cpu` and `clickhouse.memory` |
-| Evaluations are slow | LangEvals | Increase `langevals.replicaCount` |
-| Topic clustering is slow | LangEvals | Increase `langevals.replicaCount` |
+| Bottleneck                             | Component to Scale | How                                               |
+| -------------------------------------- | ------------------ | ------------------------------------------------- |
+| Trace ingestion is slow, queue backlog | LangWatch Workers  | Increase `workers.replicaCount`                   |
+| UI is slow, many concurrent users      | LangWatch App      | Increase `app.replicaCount`                       |
+| ClickHouse queries are slow            | ClickHouse         | Increase `clickhouse.cpu` and `clickhouse.memory` |
+| Evaluations are slow                   | LangEvals          | Increase `langevals.replicaCount`                 |
+| Topic clustering is slow               | LangEvals          | Increase `langevals.replicaCount`                 |
 
 ### Horizontal Pod Autoscaler (HPA)
 
@@ -180,10 +184,13 @@ spec:
 
 ## Cloud Instance Recommendations
 
-| Cloud | General Nodes | ClickHouse Nodes | Notes |
-|-------|--------------|------------------|-------|
-| AWS | m7g.xlarge (4 vCPU, 16 GB) | r7g.2xlarge (8 vCPU, 64 GB) | Graviton (ARM) for cost efficiency |
-| GCP | e2-standard-4 (4 vCPU, 16 GB) | n2-highmem-8 (8 vCPU, 64 GB) | |
-| Azure | Standard_D4s_v5 (4 vCPU, 16 GB) | Standard_E8s_v5 (8 vCPU, 64 GB) | |
+| Cloud | General Nodes                   | ClickHouse Nodes                | Notes                              |
+| ----- | ------------------------------- | ------------------------------- | ---------------------------------- |
+| AWS   | m7g.xlarge (4 vCPU, 16 GB)      | r7g.2xlarge (8 vCPU, 64 GB)     | Graviton (ARM) for cost efficiency |
+| GCP   | e2-standard-4 (4 vCPU, 16 GB)   | n2-highmem-8 (8 vCPU, 64 GB)    |                                    |
+| Azure | Standard_D4s_v5 (4 vCPU, 16 GB) | Standard_E8s_v5 (8 vCPU, 64 GB) |                                    |
 
-<Tip>For ClickHouse, prioritize memory over CPU. ClickHouse benefits from large memory for caching and merge operations.</Tip>
+<Tip>
+  For ClickHouse, prioritize memory over CPU. ClickHouse benefits from large memory for
+  caching and merge operations.
+</Tip>

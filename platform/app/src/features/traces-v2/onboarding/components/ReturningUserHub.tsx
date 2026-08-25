@@ -47,9 +47,7 @@ interface ReturningUserHubProps {
  * Three cards in a single row, icon + label only — descriptions and
  * arrow chrome were noise once the user already knows the product.
  */
-export function ReturningUserHub({
-  onJump,
-}: ReturningUserHubProps): React.ReactElement {
+export function ReturningUserHub({ onJump }: ReturningUserHubProps): React.ReactElement {
   return (
     <VStack align="center" gap={5} maxWidth="58ch" textAlign="center">
       <Heading

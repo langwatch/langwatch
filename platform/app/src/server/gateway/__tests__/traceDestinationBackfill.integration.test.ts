@@ -170,13 +170,7 @@ describe("the stored trace destination backfill against real PG", () => {
       ],
       [LIVE_A_ID, TEAM_ID, "application", null, null],
       [LIVE_B_ID, TEAM_ID, "application", null, null],
-      [
-        DELETED_ID,
-        TEAM_ID,
-        "application",
-        new Date("2026-01-01T00:00:00Z"),
-        null,
-      ],
+      [DELETED_ID, TEAM_ID, "application", new Date("2026-01-01T00:00:00Z"), null],
       [OTHER_PROJECT_ID, OTHER_TEAM_ID, "application", null, null],
     ] as const) {
       await prisma.project.create({
@@ -323,9 +317,7 @@ describe("the stored trace destination backfill against real PG", () => {
       ).rejects.toThrow("rollback");
 
       // The rollback held: no synthetic legacy row survived it.
-      expect(
-        await prisma.virtualKey.count({ where: { id: { in: keyIds } } }),
-      ).toBe(0);
+      expect(await prisma.virtualKey.count({ where: { id: { in: keyIds } } })).toBe(0);
     });
   });
 

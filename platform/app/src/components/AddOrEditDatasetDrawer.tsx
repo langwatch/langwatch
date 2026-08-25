@@ -14,11 +14,7 @@ import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import type { InMemoryDataset } from "~/components/datasets/editor/DatasetEditorTable";
 import { convertDatasetRecordsToColumnTypes } from "@langwatch/dataset-web";
-import {
-  describeError,
-  readHandledError,
-  showErrorToast,
-} from "~/features/errors";
+import { describeError, readHandledError, showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
@@ -116,11 +112,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       columnTypes: props.datasetToSave?.columnTypes ?? initialColumns,
     },
     resolver: async (data, context, options) => {
-      const result = await zodResolver(datasetRecordFormSchema)(
-        data,
-        context,
-        options,
-      );
+      const result = await zodResolver(datasetRecordFormSchema)(data, context, options);
 
       if (!data.name || data.name.trim() === "") {
         (result.errors as FieldErrors<DatasetRecordForm>).name = {
@@ -272,11 +264,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   };
 
   return (
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="xl"
-    >
+    <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()} size="xl">
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
@@ -331,9 +319,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                           placeholder="Column name"
                         />
                         <NativeSelect.Root>
-                          <NativeSelect.Field
-                            {...register(`columnTypes.${index}.type`)}
-                          >
+                          <NativeSelect.Field {...register(`columnTypes.${index}.type`)}>
                             <option value="string">string</option>
                             <option value="number">number</option>
                             <option value="boolean">boolean</option>
@@ -353,21 +339,13 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                             size="sm"
                             variant="ghost"
                             onClick={() =>
-                              props.columnVisibility?.onToggleVisibility(
-                                columnName,
-                              )
+                              props.columnVisibility?.onToggleVisibility(columnName)
                             }
                             color={isHidden ? "fg.subtle" : "fg.muted"}
-                            aria-label={
-                              isHidden ? "Show column" : "Hide column"
-                            }
+                            aria-label={isHidden ? "Show column" : "Hide column"}
                             title={isHidden ? "Show column" : "Hide column"}
                           >
-                            {isHidden ? (
-                              <EyeOff size={16} />
-                            ) : (
-                              <Eye size={16} />
-                            )}
+                            {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
                           </IconButton>
                         )}
                         {!props.isColumnsLocked && (
@@ -383,9 +361,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                       </HStack>
                     );
                   })}
-                  <Field.ErrorText>
-                    {errors.columnTypes?.message}
-                  </Field.ErrorText>
+                  <Field.ErrorText>{errors.columnTypes?.message}</Field.ErrorText>
                   {!props.isColumnsLocked && (
                     <Button
                       type="button"

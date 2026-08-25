@@ -23,8 +23,7 @@ import type {
  */
 export abstract class BaseMemoryProjectionStore<
   T extends Projection = Projection,
-> implements ProjectionStore<T>
-{
+> implements ProjectionStore<T> {
   protected readonly store = new Map<string, T>();
 
   /**

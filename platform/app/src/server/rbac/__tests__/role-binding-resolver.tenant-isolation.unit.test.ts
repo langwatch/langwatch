@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 
-import {
-  checkRoleBindingPermission,
-  type ScopeRef,
-} from "../role-binding-resolver";
+import { checkRoleBindingPermission, type ScopeRef } from "../role-binding-resolver";
 
 // The API-key ceiling path (resolveApiKeyPermission → checkRoleBindingPermission
 // for the owning user) resolves the user's bindings through collectBindingsForUser.

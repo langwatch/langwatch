@@ -1,10 +1,4 @@
-import {
-  createContext,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useState,
-} from "react";
+import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
 
 /**
  * Represents a submit action broadcast to all synced chats.
@@ -81,9 +75,7 @@ export function PromptPlaygroundChatProvider({
 }: PromptPlaygroundChatProviderProps) {
   const [syncedInput, setSyncedInput] = useState("");
   const [isSynced, setIsSynced] = useState(true);
-  const [submitTrigger, setSubmitTrigger] = useState<SubmitTrigger | null>(
-    null,
-  );
+  const [submitTrigger, setSubmitTrigger] = useState<SubmitTrigger | null>(null);
 
   /**
    * Broadcast a submit action to all synced chats.

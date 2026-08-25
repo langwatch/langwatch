@@ -14,15 +14,36 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 
 describe("Evaluator web primitives", () => {
   it("explains all missing code evaluator requirements", () => {
-    expect(codeEvaluatorDisabledReason({ hasName: false, hasCode: false, hasInput: false, isEditing: false })).toBe("Add a name, some code, and at least one input to create the evaluator.");
-    expect(codeEvaluatorDisabledReason({ hasName: true, hasCode: true, hasInput: true, isEditing: true })).toBeNull();
+    expect(
+      codeEvaluatorDisabledReason({
+        hasName: false,
+        hasCode: false,
+        hasInput: false,
+        isEditing: false,
+      }),
+    ).toBe("Add a name, some code, and at least one input to create the evaluator.");
+    expect(
+      codeEvaluatorDisabledReason({
+        hasName: true,
+        hasCode: true,
+        hasInput: true,
+        isEditing: true,
+      }),
+    ).toBeNull();
   });
 
   it("renders category choices and delegates their host-owned actions", async () => {
     const user = userEvent.setup();
     const onSelectCategory = vi.fn();
     const onSelectCode = vi.fn();
-    render(<EvaluatorCategoryPicker onSelectCategory={onSelectCategory} onSelectCode={onSelectCode} onSelectWorkflow={vi.fn()} />, { wrapper: Wrapper });
+    render(
+      <EvaluatorCategoryPicker
+        onSelectCategory={onSelectCategory}
+        onSelectCode={onSelectCode}
+        onSelectWorkflow={vi.fn()}
+      />,
+      { wrapper: Wrapper },
+    );
 
     await user.click(screen.getByTestId("evaluator-category-llm_judge"));
     await user.click(screen.getByTestId("evaluator-category-code"));

@@ -25,15 +25,11 @@ describe("looksLikeMarkdown", () => {
       });
 
       it("detects a link", () => {
-        expect(looksLikeMarkdown("read [the docs](https://x.dev) now")).toBe(
-          true,
-        );
+        expect(looksLikeMarkdown("read [the docs](https://x.dev) now")).toBe(true);
       });
 
       it("detects a table with a header rule", () => {
-        expect(looksLikeMarkdown("| a | b |\n| --- | --- |\n| 1 | 2 |")).toBe(
-          true,
-        );
+        expect(looksLikeMarkdown("| a | b |\n| --- | --- |\n| 1 | 2 |")).toBe(true);
       });
 
       it("detects bold emphasis", () => {
@@ -47,9 +43,9 @@ describe("looksLikeMarkdown", () => {
 
     describe("when the text is plain (not Markdown)", () => {
       it("treats prose as plain", () => {
-        expect(
-          looksLikeMarkdown("The quick brown fox jumps over the lazy dog."),
-        ).toBe(false);
+        expect(looksLikeMarkdown("The quick brown fox jumps over the lazy dog.")).toBe(
+          false,
+        );
       });
 
       it("treats a log dump as plain", () => {
@@ -62,9 +58,7 @@ describe("looksLikeMarkdown", () => {
 
       it("treats a stack trace as plain", () => {
         expect(
-          looksLikeMarkdown(
-            "Error: boom\n    at foo (a.ts:1:2)\n    at bar (b.ts:3:4)",
-          ),
+          looksLikeMarkdown("Error: boom\n    at foo (a.ts:1:2)\n    at bar (b.ts:3:4)"),
         ).toBe(false);
       });
 

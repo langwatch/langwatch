@@ -51,9 +51,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
     }
 
     const mastraType = ctx.bag.attrs.get(ATTR_KEYS.MASTRA_SPAN_TYPE);
-    const rawModelStepInput = ctx.bag.attrs.get(
-      ATTR_KEYS.MASTRA_MODEL_STEP_INPUT,
-    );
+    const rawModelStepInput = ctx.bag.attrs.get(ATTR_KEYS.MASTRA_MODEL_STEP_INPUT);
     const modelStepBody = extractBodyFromModelStepInput(rawModelStepInput);
 
     // Detect eval model_step: orphan (no parent) OR has response_format (structured output eval)
@@ -64,13 +62,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
     this.mapSpanType(ctx, mastraType, isEvalModelStep);
     const modelName = this.extractModelInfo(ctx, modelStepBody);
     this.extractIO(ctx, mastraType, isEvalModelStep, modelStepBody);
-    this.setDisplayName(
-      ctx,
-      mastraType,
-      modelName,
-      isEvalModelStep,
-      modelStepBody,
-    );
+    this.setDisplayName(ctx, mastraType, modelName, isEvalModelStep, modelStepBody);
     this.extractThreadId(ctx);
     this.mapTokenNames(ctx);
   }
@@ -113,10 +105,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
 
     if (modelStepBody) {
       // Extract model name from body.model
-      if (
-        typeof modelStepBody.model === "string" &&
-        modelStepBody.model.length > 0
-      ) {
+      if (typeof modelStepBody.model === "string" && modelStepBody.model.length > 0) {
         modelName = modelStepBody.model;
         if (
           !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) &&
@@ -124,9 +113,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
         ) {
           ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, modelName);
           ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, modelName);
-          ctx.recordRule(
-            `${this.id}:model_step.input.body.model->gen_ai.model`,
-          );
+          ctx.recordRule(`${this.id}:model_step.input.body.model->gen_ai.model`);
         }
       }
 
@@ -143,17 +130,10 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
           const chatMsgs = systemInstruction ? stripSystemMessages(msgs) : msgs;
           if (chatMsgs.length > 0) {
             ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
-            recordValueType(
-              ctx,
-              ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
-              "chat_messages",
-            );
+            recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
           }
           if (systemInstruction !== null) {
-            ctx.setAttrIfAbsent(
-              ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-              systemInstruction,
-            );
+            ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, systemInstruction);
           }
           ctx.recordRule(
             `${this.id}:model_step.input.body.messages->gen_ai.input.messages`,
@@ -197,9 +177,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
           const lastUserMessage = extractLastUserMessageText(rawInput);
           if (lastUserMessage) {
             ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, lastUserMessage);
-            ctx.recordRule(
-              `${this.id}:mastra.agent_run.input->langwatch.input`,
-            );
+            ctx.recordRule(`${this.id}:mastra.agent_run.input->langwatch.input`);
           }
         }
       }
@@ -210,9 +188,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
           const text = extractTextFromOutput(rawOutput);
           if (text) {
             ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
-            ctx.recordRule(
-              `${this.id}:mastra.agent_run.output->langwatch.output`,
-            );
+            ctx.recordRule(`${this.id}:mastra.agent_run.output->langwatch.output`);
           }
         }
       }
@@ -227,9 +203,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
           const evalOutput = extractEvalOutput(rawOutput);
           if (evalOutput != null) {
             ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, evalOutput);
-            ctx.recordRule(
-              `${this.id}:orphan.model_step.output->langwatch.output`,
-            );
+            ctx.recordRule(`${this.id}:orphan.model_step.output->langwatch.output`);
           }
         } else {
           const text = extractTextFromOutput(rawOutput);
@@ -242,15 +216,9 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
               ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
                 { role: "assistant", content: text },
               ]);
-              recordValueType(
-                ctx,
-                ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
-                "chat_messages",
-              );
+              recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
             }
-            ctx.recordRule(
-              `${this.id}:mastra.model_step.output->langwatch.output`,
-            );
+            ctx.recordRule(`${this.id}:mastra.model_step.output->langwatch.output`);
           }
         }
       }
@@ -297,16 +265,12 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
 
   /** Map non-standard cached_input_tokens to canonical cache_read.input_tokens. */
   private mapTokenNames(ctx: ExtractorContext): void {
-    const cachedTokens = ctx.bag.attrs.take(
-      ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS,
-    );
+    const cachedTokens = ctx.bag.attrs.take(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS);
     if (cachedTokens !== undefined) {
       const n = asNumber(cachedTokens);
       if (n !== null) {
         ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, n);
-        ctx.recordRule(
-          `${this.id}:cached_input_tokens->cache_read.input_tokens`,
-        );
+        ctx.recordRule(`${this.id}:cached_input_tokens->cache_read.input_tokens`);
       }
     }
   }
@@ -316,10 +280,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
  * Maps a Mastra span type to a canonical langwatch.span.type.
  * Uses only valid SpanTypes values from the type system.
  */
-function mastraSpanTypeToCanonical(
-  mastraType: unknown,
-  isOrphan: boolean,
-): string {
+function mastraSpanTypeToCanonical(mastraType: unknown, isOrphan: boolean): string {
   if (isOrphan) return "evaluation";
 
   switch (mastraType) {
@@ -388,9 +349,7 @@ function hasResponseFormat(body: Record<string, unknown> | null): boolean {
  * Extracts the body object from mastra.model_step.input.
  * Input format: {body: {model: string, messages: [...], ...}}
  */
-function extractBodyFromModelStepInput(
-  input: unknown,
-): Record<string, unknown> | null {
+function extractBodyFromModelStepInput(input: unknown): Record<string, unknown> | null {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return null;
   }
@@ -467,8 +426,7 @@ function normalizeContentToString(content: unknown): string | null {
   if (content && typeof content === "object") {
     const obj = content as Record<string, unknown>;
     if (typeof obj.text === "string" && obj.text.length > 0) return obj.text;
-    if (typeof obj.content === "string" && obj.content.length > 0)
-      return obj.content;
+    if (typeof obj.content === "string" && obj.content.length > 0) return obj.content;
   }
 
   return null;
@@ -513,9 +471,7 @@ function deriveDisplayName({
     if (systemPrompt) {
       // Take first ~60 chars of the system prompt as description
       const desc =
-        systemPrompt.length > 60
-          ? systemPrompt.slice(0, 57) + "..."
-          : systemPrompt;
+        systemPrompt.length > 60 ? systemPrompt.slice(0, 57) + "..." : systemPrompt;
       return `Eval: ${desc}`;
     }
     return modelName ? `Eval: ${modelName}` : "Eval";

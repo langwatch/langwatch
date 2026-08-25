@@ -1,4 +1,7 @@
-import type { ExecuteEvaluationCommand, UpsertEvaluationRunCommand } from "./evaluation.commands";
+import type {
+  ExecuteEvaluationCommand,
+  UpsertEvaluationRunCommand,
+} from "./evaluation.commands";
 import type {
   EvaluationExecutionResult,
   EvaluationRunData,
@@ -18,12 +21,12 @@ import type {
 } from "./evaluation.queries";
 
 export abstract class EvaluationService {
-  abstract executeForTrace(input: ExecuteEvaluationCommand): Promise<EvaluationExecutionResult>;
+  abstract executeForTrace(
+    input: ExecuteEvaluationCommand,
+  ): Promise<EvaluationExecutionResult>;
   abstract upsertRun(input: UpsertEvaluationRunCommand): Promise<void>;
   abstract upsertRuns(input: UpsertEvaluationRunCommand[]): Promise<void>;
-  abstract getRunByEvaluationId(
-    input: EvaluationRunLookup,
-  ): Promise<EvaluationRunData>;
+  abstract getRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData>;
   abstract tryGetRunByEvaluationId(
     input: EvaluationRunLookup,
   ): Promise<EvaluationRunData | null>;

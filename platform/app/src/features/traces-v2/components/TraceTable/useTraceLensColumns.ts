@@ -1,10 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 import { parseEvalColumnId } from "../../lens/evalColumnId";
-import {
-  timeColumnSizing,
-  useTimeFormatStore,
-} from "../../stores/timeFormatStore";
+import { timeColumnSizing, useTimeFormatStore } from "../../stores/timeFormatStore";
 import type { TraceListItem } from "../../types/trace";
 import { addColumnColumnDef } from "./AddColumnHeader";
 import { getTraceColumnDef } from "./columns";
@@ -58,9 +55,7 @@ export function useTraceLensColumns({
   // columnSizingStore) still wins for the rendered width.
   const timeFormat = useTimeFormatStore((s) => s.format);
   const columns = useMemo(() => {
-    const defs: Array<ColumnDef<TraceListItem, unknown>> = [
-      traceSelectColumnDef,
-    ];
+    const defs: Array<ColumnDef<TraceListItem, unknown>> = [traceSelectColumnDef];
     for (const id of logicalColumnIds) {
       const parsed = parseEvalColumnId(id);
       if (parsed) {
@@ -146,9 +141,7 @@ export function useTraceLensColumns({
     // gutter rather than its (larger) declared size.
     const total = columns.reduce((sum, c) => {
       if (c.id === traceSelectColumnDef.id) return sum;
-      return (
-        sum + widthFor(c as { size?: number; minSize?: number; meta?: unknown })
-      );
+      return sum + widthFor(c as { size?: number; minSize?: number; meta?: unknown });
     }, SELECT_COL_MIN_PX);
     return `${Math.max(total, MIN_WIDTH_FLOOR_PX)}px`;
   }, [columns]);

@@ -7,10 +7,7 @@ import {
 } from "../computeJudgeBiasChecks";
 import type { BatchResultRow } from "../types";
 
-const row = (
-  index: number,
-  outputs: Record<string, string | null>,
-): BatchResultRow => ({
+const row = (index: number, outputs: Record<string, string | null>): BatchResultRow => ({
   index,
   datasetEntry: {},
   targets: Object.fromEntries(

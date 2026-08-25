@@ -4,10 +4,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import {
-  resolveApiKeyPermission,
-  type ScopeRef,
-} from "../role-binding-resolver";
+import { resolveApiKeyPermission, type ScopeRef } from "../role-binding-resolver";
 
 /**
  * The API-key ceiling: `effective = ApiKey.bindings ∩ user.bindings`.
@@ -60,14 +57,12 @@ function makePrisma({
   /** Organization the legacy team actually belongs to. */
   legacyTeamOrgId = ORG_ID as string,
 } = {}) {
-  const findMany = vi.fn(
-    async ({ where }: { where: Record<string, unknown> }) => {
-      if (where.apiKeyId) return apiKeyBindings;
-      if (where.group) return groupBindings;
-      if (where.userId) return userBindings;
-      return [];
-    },
-  );
+  const findMany = vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
+    if (where.apiKeyId) return apiKeyBindings;
+    if (where.group) return groupBindings;
+    if (where.userId) return userBindings;
+    return [];
+  });
 
   return {
     prisma: {
@@ -232,9 +227,7 @@ describe("resolveApiKeyPermission()", () => {
 
         const queried = findMany.mock.calls.map(([args]) => args.where);
         expect(queried.some((where) => where.apiKeyId)).toBe(true);
-        expect(queried.some((where) => where.userId ?? where.group)).toBe(
-          false,
-        );
+        expect(queried.some((where) => where.userId ?? where.group)).toBe(false);
       });
     });
   });
@@ -254,9 +247,7 @@ describe("resolveApiKeyPermission()", () => {
         await expect(resolve({ prisma, userId: null })).resolves.toBe(true);
 
         const queried = findMany.mock.calls.map(([args]) => args.where);
-        expect(queried.some((where) => where.userId ?? where.group)).toBe(
-          false,
-        );
+        expect(queried.some((where) => where.userId ?? where.group)).toBe(false);
       });
     });
 

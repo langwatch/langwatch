@@ -36,9 +36,7 @@ const COMPACT_TOKENS = {
   errorDetailPaddingBottom: "4px",
 } as const;
 
-function cellContext(
-  row: ConversationGroup,
-): CellRenderContext<ConversationGroup> {
+function cellContext(row: ConversationGroup): CellRenderContext<ConversationGroup> {
   return {
     row,
     density: COMPACT_TOKENS,
@@ -92,13 +90,7 @@ function serverSession(
   });
 }
 
-function renderCell({
-  cellId,
-  row,
-}: {
-  cellId: string;
-  row: ConversationGroup;
-}) {
+function renderCell({ cellId, row }: { cellId: string; row: ConversationGroup }) {
   const cell = conversationCells[cellId];
   if (!cell) throw new Error(`No conversation cell registered for ${cellId}`);
   return render(
@@ -223,10 +215,7 @@ describe("sessions lens cells", () => {
 
       renderCell({ cellId: "pullRequest", row });
       const link = screen.getByText("#4218").closest("a");
-      expect(link).toHaveAttribute(
-        "href",
-        "https://github.com/acme/widgets/pull/4218",
-      );
+      expect(link).toHaveAttribute("href", "https://github.com/acme/widgets/pull/4218");
       expect(link).toHaveAttribute("target", "_blank");
     });
 

@@ -108,10 +108,7 @@ export function RunDetailSection({
         )}
       </Box>
       <Accordion.ItemContent>
-        <Box
-          paddingX={contentPadding ? 4 : 0}
-          paddingY={contentPadding ? 3 : 0}
-        >
+        <Box paddingX={contentPadding ? 4 : 0} paddingY={contentPadding ? 3 : 0}>
           {children}
         </Box>
       </Accordion.ItemContent>

@@ -4,9 +4,7 @@ import { MAX_DENSE_BUCKET_SPAN } from "../rollup/exponentialBuckets";
 import { point } from "./fixtures/metric-point.fixtures";
 
 /** At scale 0 the base is 2, so bucket i covers (2^i, 2^(i+1)]. */
-function exponential(
-  overrides: Parameters<typeof point>[0],
-): ReturnType<typeof point> {
+function exponential(overrides: Parameters<typeof point>[0]): ReturnType<typeof point> {
   return point({
     metricKind: "exponential_histogram",
     aggregationTemporality: "delta",

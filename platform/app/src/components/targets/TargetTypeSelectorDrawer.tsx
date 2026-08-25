@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { Bot, CheckCircle, FileText, Swords } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
@@ -164,16 +156,11 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
             <Heading>Add to Evaluation</Heading>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-        >
+        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-              Choose what you want to evaluate - a prompt from your library or a
-              custom agent.
+              Choose what you want to evaluate - a prompt from your library or a custom
+              agent.
             </Text>
 
             {/* Target type cards */}
@@ -264,12 +251,7 @@ function TargetTypeCard({
         data-testid={`target-type-${type}`}
       >
         <HStack gap={4} align="start">
-          <Box
-            padding={1}
-            borderRadius="md"
-            bg={iconBg}
-            color={`${iconColor}.fg`}
-          >
+          <Box padding={1} borderRadius="md" bg={iconBg} color={`${iconColor}.fg`}>
             <Icon size={16} />
           </Box>
           <VStack align="start" gap={1} flex={1}>

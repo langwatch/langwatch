@@ -20,9 +20,7 @@ export const PushToCopiesDialog = ({
 }) => {
   const { project } = useOrganizationTeamProject();
   const pushToCopies = usePushAgentToCopies();
-  const [selectedCopyIds, setSelectedCopyIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [selectedCopyIds, setSelectedCopyIds] = useState<Set<string>>(new Set());
 
   const {
     data: copies,
@@ -38,9 +36,7 @@ export const PushToCopiesDialog = ({
     },
   );
 
-  const [availableCopies, setAvailableCopies] = useState<
-    PushToCopiesCopyItem[]
-  >([]);
+  const [availableCopies, setAvailableCopies] = useState<PushToCopiesCopyItem[]>([]);
 
   useEffect(() => {
     if (!copies) return;

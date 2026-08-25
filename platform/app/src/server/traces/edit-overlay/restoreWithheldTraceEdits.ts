@@ -28,14 +28,11 @@ function withheldSpanFields({
 }): TraceEditSpanField[] {
   return TRACE_EDIT_SPAN_FIELDS.filter(
     (field) =>
-      storedSpan[field] !== undefined &&
-      readableSpan?.[field] !== storedSpan[field],
+      storedSpan[field] !== undefined && readableSpan?.[field] !== storedSpan[field],
   );
 }
 
-function indexBySpanId(
-  spans: TraceEditSpanPatch[],
-): Map<string, TraceEditSpanPatch> {
+function indexBySpanId(spans: TraceEditSpanPatch[]): Map<string, TraceEditSpanPatch> {
   return new Map(spans.map((spanPatch) => [spanPatch.spanId, spanPatch]));
 }
 
@@ -123,8 +120,7 @@ function metadataWithWithheld({
   }
   // The whole map was withheld, or the correction cleared it: nothing about it
   // could have been the viewer's decision.
-  if (stored === null || readable == null)
-    return { value: stored, isRestored: true };
+  if (stored === null || readable == null) return { value: stored, isRestored: true };
 
   const next: TraceMetadataEdits = { ...incoming };
   let isRestored = false;
@@ -133,9 +129,7 @@ function metadataWithWithheld({
     next[key] = value;
     isRestored = true;
   }
-  return isRestored
-    ? { value: next, isRestored }
-    : { value: incoming, isRestored };
+  return isRestored ? { value: next, isRestored } : { value: incoming, isRestored };
 }
 
 /** The saved trace-level edits with the withheld ones carried over. */
@@ -153,8 +147,7 @@ function traceEditsWithWithheld({
 
   for (const field of ["input", "output"] as const) {
     const storedValue = stored?.[field];
-    const isWithheld =
-      storedValue !== undefined && readable?.[field] !== storedValue;
+    const isWithheld = storedValue !== undefined && readable?.[field] !== storedValue;
     if (!isWithheld) continue;
     value[field] = storedValue;
     isRestored = true;
@@ -170,9 +163,7 @@ function traceEditsWithWithheld({
     isRestored = true;
   }
 
-  const carriesEdit = TRACE_EDIT_TRACE_FIELDS.some(
-    (field) => value[field] !== undefined,
-  );
+  const carriesEdit = TRACE_EDIT_TRACE_FIELDS.some((field) => value[field] !== undefined);
   return { value: carriesEdit ? value : void 0, isRestored };
 }
 

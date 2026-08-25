@@ -17,10 +17,7 @@ import {
 
 /** Which fields a parse rejected, so a refusal test can name the rule it
  *  meant rather than settling for "something threw". */
-function issuePaths(result: {
-  success: boolean;
-  error?: z.ZodError;
-}): string[] {
+function issuePaths(result: { success: boolean; error?: z.ZodError }): string[] {
   if (result.success) throw new Error("expected the parse to be refused");
   return (result.error?.issues ?? []).map((issue) => issue.path.join("."));
 }
@@ -37,10 +34,7 @@ describe("given the shared spend filter vocabulary", () => {
 
   describe("when a filter is repeated", () => {
     it("keeps every value it names", () => {
-      const parsed = spendFilterQueryShape.model.parse([
-        "gpt-5-mini",
-        "claude-opus-5",
-      ]);
+      const parsed = spendFilterQueryShape.model.parse(["gpt-5-mini", "claude-opus-5"]);
       expect(parsed).toEqual(["gpt-5-mini", "claude-opus-5"]);
     });
   });
@@ -56,9 +50,7 @@ describe("given the shared spend filter vocabulary", () => {
       // Two values for one key must OR. ANDing them would make
       // tier:gold + tier:silver match nothing, which reads to the caller as
       // "no such spend" rather than as an impossible question.
-      expect(
-        parseMetadataFilters(["tier:gold", "tier:silver", "region:eu"]),
-      ).toEqual([
+      expect(parseMetadataFilters(["tier:gold", "tier:silver", "region:eu"])).toEqual([
         { key: "tier", values: ["gold", "silver"] },
         { key: "region", values: ["eu"] },
       ]);
@@ -99,9 +91,9 @@ describe("given the shared spend filter vocabulary", () => {
         (_, index) => `m${index}`,
       );
       expect(() => spendFilterQueryShape.model.parse(tooMany)).toThrow();
-      expect(
-        issuePaths(spendFiltersSchema.safeParse({ models: tooMany })),
-      ).toEqual(["models"]);
+      expect(issuePaths(spendFiltersSchema.safeParse({ models: tooMany }))).toEqual([
+        "models",
+      ]);
     });
   });
 
@@ -160,9 +152,7 @@ describe("given the shared spend filter vocabulary", () => {
       const { clauses, params } = buildSpendFilterClauses({
         filters: { virtualKeyIds: [] },
       });
-      expect(clauses).toEqual([
-        "VirtualKeyId IN {virtualKeyIds:Array(String)}",
-      ]);
+      expect(clauses).toEqual(["VirtualKeyId IN {virtualKeyIds:Array(String)}"]);
       expect(params).toEqual({ virtualKeyIds: [] });
     });
 
@@ -220,9 +210,7 @@ describe("given the shared spend filter vocabulary", () => {
 
   describe("when a key is named directly and by external id", () => {
     it("intersects rather than widening", () => {
-      expect(intersectIds(["vk_1", "vk_2"], ["vk_2", "vk_3"])).toEqual([
-        "vk_2",
-      ]);
+      expect(intersectIds(["vk_1", "vk_2"], ["vk_2", "vk_3"])).toEqual(["vk_2"]);
     });
 
     it("treats an absent list as no opinion", () => {

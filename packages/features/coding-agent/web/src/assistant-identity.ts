@@ -35,9 +35,7 @@ const ASSISTANT_KIND_BY_AGENT: Readonly<Record<string, KnownAssistantKind>> = {
  * the agent. A caller that gets null shows the raw slug rather than inventing
  * an icon for something it cannot name.
  */
-export function assistantKindOfAgent(
-  agent: string,
-): KnownAssistantKind | null {
+export function assistantKindOfAgent(agent: string): KnownAssistantKind | null {
   const slug = agent.trim();
   if (slug.length === 0) return null;
   return ASSISTANT_KIND_BY_AGENT[slug] ?? null;

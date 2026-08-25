@@ -67,9 +67,7 @@ function serviceWith() {
   const service = new GithubPullRequestMappingService({
     repository: repository as never,
     installations: {
-      getByInstallationId: vi
-        .fn()
-        .mockResolvedValue({ organizationId: "org-1" }),
+      getByInstallationId: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
       resolveInstallationForRepository,
     } as never,
     appTokens: { listPullRequestsForHead } as never,
@@ -96,12 +94,9 @@ describe("given an instance bound to a GitHub Enterprise Server host", () => {
     it("stores it under the configured host, not github.com", async () => {
       const { service, repository } = serviceWith();
 
-      await expect(
-        service.applyPullRequestEvent(parsed(delivery())),
-      ).resolves.toBe(true);
+      await expect(service.applyPullRequestEvent(parsed(delivery()))).resolves.toBe(true);
 
-      const [written] =
-        repository.upsertPullRequests.mock.calls[0]![0].pullRequests;
+      const [written] = repository.upsertPullRequests.mock.calls[0]![0].pullRequests;
       expect(written).toMatchObject({
         organizationId: "org-1",
         repositoryHost: GHES,

@@ -34,10 +34,7 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMock,
 }));
 
-import {
-  platformSSOAllowed,
-  resolveAuthProvider,
-} from "~/runtime/app/features/sso";
+import { platformSSOAllowed, resolveAuthProvider } from "~/runtime/app/features/sso";
 import { env } from "~/env.mjs";
 import { auth } from "../index";
 
@@ -103,9 +100,7 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
         runBeforeHook(ctxFor("https://host/api/auth/sign-in/social/")),
       ).rejects.toMatchObject({ statusCode: 403 });
       await expect(
-        runBeforeHook(
-          ctxFor("https://host/api/auth/sign-in/oauth2/?providerId=auth0"),
-        ),
+        runBeforeHook(ctxFor("https://host/api/auth/sign-in/oauth2/?providerId=auth0")),
       ).rejects.toMatchObject({ statusCode: 403 });
     });
 
@@ -127,20 +122,14 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
     /** @scenario SSO sign-in routes are refused while the deployment is unlicensed */
     it("refuses the legacy provider callback paths as well", async () => {
       await expect(
-        runBeforeHook(
-          ctxFor("https://host/api/auth/callback/auth0?code=abc&state=xyz"),
-        ),
+        runBeforeHook(ctxFor("https://host/api/auth/callback/auth0?code=abc&state=xyz")),
+      ).rejects.toMatchObject({ statusCode: 403 });
+      await expect(
+        runBeforeHook(ctxFor("https://host/api/auth/callback/okta?code=abc&state=xyz")),
       ).rejects.toMatchObject({ statusCode: 403 });
       await expect(
         runBeforeHook(
-          ctxFor("https://host/api/auth/callback/okta?code=abc&state=xyz"),
-        ),
-      ).rejects.toMatchObject({ statusCode: 403 });
-      await expect(
-        runBeforeHook(
-          ctxFor(
-            "https://host/api/auth/oauth2/callback/some-provider?code=abc",
-          ),
+          ctxFor("https://host/api/auth/oauth2/callback/some-provider?code=abc"),
         ),
       ).rejects.toMatchObject({ statusCode: 403 });
     });
@@ -207,9 +196,7 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
         runBeforeHook(ctxFor("https://host/api/auth/sign-in/social")),
       ).resolves.toBeUndefined();
       await expect(
-        runBeforeHook(
-          ctxFor("https://host/api/auth/callback/auth0?code=abc&state=xyz"),
-        ),
+        runBeforeHook(ctxFor("https://host/api/auth/callback/auth0?code=abc&state=xyz")),
       ).resolves.toBeUndefined();
     });
 

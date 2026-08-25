@@ -73,12 +73,11 @@ function application(
   write(`apps/${role}/src/index.ts`, options.source ?? "export {};");
 }
 
-const ENTERPRISE_COMPOSITION_NAMES: Record<EnterpriseCompositionRole, string> =
-  {
-    api: "@langwatch/enterprise-api",
-    worker: "@langwatch/enterprise-worker",
-    web: "@langwatch/enterprise-web",
-  };
+const ENTERPRISE_COMPOSITION_NAMES: Record<EnterpriseCompositionRole, string> = {
+  api: "@langwatch/enterprise-api",
+  worker: "@langwatch/enterprise-worker",
+  web: "@langwatch/enterprise-web",
+};
 
 function enterpriseComposition(
   role: EnterpriseCompositionRole,
@@ -95,10 +94,7 @@ function enterpriseComposition(
   );
 }
 
-function enterpriseFeature(
-  feature: string,
-  role: "contract" | "server" | "web",
-): void {
+function enterpriseFeature(feature: string, role: "contract" | "server" | "web"): void {
   const featureRoot = `packages/enterprise/features/${feature}`;
   write(`${featureRoot}/feature.json`, JSON.stringify({ layoutVersion: 0 }));
   writeManifest(`${featureRoot}/${role}/package.json`, {
@@ -163,8 +159,7 @@ describe("application workspace classification", () => {
     application("api", { source: "export const runtime = true;" });
     application("ui", {
       dependencies: { "@langwatch/platform-api": "workspace:*" },
-      source:
-        'import { runtime } from "../../api/src/index"; export { runtime };',
+      source: 'import { runtime } from "../../api/src/index"; export { runtime };',
     });
 
     expect(policy("application-boundary").length).toBeGreaterThanOrEqual(2);
@@ -375,9 +370,7 @@ describe("shrinking legacy application boundary baseline", () => {
     });
 
     expect(
-      routine.filter((violation) =>
-        violation.policy.startsWith("application-migration"),
-      ),
+      routine.filter((violation) => violation.policy.startsWith("application-migration")),
     ).toEqual([]);
   });
 

@@ -288,10 +288,7 @@ export class BudgetOverviewService {
     organizationId: string,
   ): Promise<string> {
     if (!this.chRepo) return "0";
-    const tenantIds = await organizationSpendTenantIds(
-      this.prisma,
-      organizationId,
-    );
+    const tenantIds = await organizationSpendTenantIds(this.prisma, organizationId);
     if (tenantIds.length === 0) return "0";
     const now = new Date();
     try {
@@ -329,16 +326,10 @@ export class BudgetOverviewService {
 const UNRANKED_SCOPE = 99;
 
 function scopeRank(scopeType: string): number {
-  return (
-    BUDGET_SCOPE_RANK[scopeType as keyof typeof BUDGET_SCOPE_RANK] ??
-    UNRANKED_SCOPE
-  );
+  return BUDGET_SCOPE_RANK[scopeType as keyof typeof BUDGET_SCOPE_RANK] ?? UNRANKED_SCOPE;
 }
 
-function byMostBindingFirst(
-  a: BudgetOverviewItem,
-  b: BudgetOverviewItem,
-): number {
+function byMostBindingFirst(a: BudgetOverviewItem, b: BudgetOverviewItem): number {
   const rank = scopeRank(a.scopeType) - scopeRank(b.scopeType);
   if (rank !== 0) return rank;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
@@ -394,12 +385,8 @@ const SCOPE_CLASS_BY_TYPE = {
  * "whole organization budget" is the same mislabel, in the other
  * direction, that this service exists to remove.
  */
-function absoluteScopeClass(
-  scopeType: string,
-): BudgetOverviewScopeClass | null {
-  return (
-    SCOPE_CLASS_BY_TYPE[scopeType as keyof typeof SCOPE_CLASS_BY_TYPE] ?? null
-  );
+function absoluteScopeClass(scopeType: string): BudgetOverviewScopeClass | null {
+  return SCOPE_CLASS_BY_TYPE[scopeType as keyof typeof SCOPE_CLASS_BY_TYPE] ?? null;
 }
 
 /**

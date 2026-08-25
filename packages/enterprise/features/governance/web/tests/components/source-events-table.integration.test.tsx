@@ -12,13 +12,7 @@
  * sliced to limit, no total.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -119,9 +113,7 @@ describe("given a source with ingested events", () => {
       "Cost",
       "Tokens",
     ]) {
-      expect(
-        within(table).getByRole("columnheader", { name: header }),
-      ).toBeTruthy();
+      expect(within(table).getByRole("columnheader", { name: header })).toBeTruthy();
     }
     const rows = within(table).getAllByTestId("source-event-row");
     expect(rows).toHaveLength(2);
@@ -153,16 +145,12 @@ describe("given a source with ingested events", () => {
   it("says a pushed event's raw body was never stored instead of an empty panel", async () => {
     const user = userEvent.setup();
     renderTable({
-      fetchPage: fakeServer([
-        makeEvent({ id: "pushed", ts: BASE_TS, rawPayload: "" }),
-      ]),
+      fetchPage: fakeServer([makeEvent({ id: "pushed", ts: BASE_TS, rawPayload: "" })]),
       pageSize: 10,
     });
     await user.click(await screen.findByTestId("source-event-row"));
     expect(screen.getByText("Normalised (OCSF)")).toBeTruthy();
-    expect(
-      screen.getByText(/raw body is not stored for this source type/i),
-    ).toBeTruthy();
+    expect(screen.getByText(/raw body is not stored for this source type/i)).toBeTruthy();
   });
 
   /** @scenario "A row opens into raw + normalised detail" */

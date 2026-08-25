@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import {
   Bot,
@@ -25,11 +17,7 @@ import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
-import {
-  getComplexProps,
-  getFlowCallbacks,
-  useDrawer,
-} from "~/hooks/useDrawer";
+import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
@@ -65,8 +53,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
     props.onSelect ??
     flowCallbacks?.onSelect ??
     (complexProps.onSelect as AgentListDrawerProps["onSelect"]);
-  const onEdit =
-    props.onEdit ?? (complexProps.onEdit as AgentListDrawerProps["onEdit"]);
+  const onEdit = props.onEdit ?? (complexProps.onEdit as AgentListDrawerProps["onEdit"]);
   const onCreateNew =
     props.onCreateNew ??
     flowCallbacks?.onCreateNew ??
@@ -100,9 +87,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
 
       toaster.create({
         title: "Agent deleted",
-        description: result.archivedWorkflow
-          ? "Also deleted: 1 workflow"
-          : undefined,
+        description: result.archivedWorkflow ? "Also deleted: 1 workflow" : undefined,
         type: "success",
       });
     },
@@ -345,13 +330,7 @@ function AgentCard({ agent, onClick, onEdit, onDelete }: AgentCardProps) {
     >
       <HStack gap={3}>
         {/* Clickable area for selection */}
-        <Box
-          display="flex"
-          alignItems="center"
-          gap={3}
-          flex={1}
-          textAlign="left"
-        >
+        <Box display="flex" alignItems="center" gap={3} flex={1} textAlign="left">
           <Box color="blue.fg">
             <Icon size={20} />
           </Box>

@@ -23,10 +23,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import type { GroupInfo } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";
-import {
-  grafanaGroupLogsUrl,
-  grafanaGroupTracesUrl,
-} from "~/utils/grafanaLinks";
+import { grafanaGroupLogsUrl, grafanaGroupTracesUrl } from "~/utils/grafanaLinks";
 import { GroupStateBadge } from "./GroupStateBadge";
 import {
   classifyGroup,
@@ -121,9 +118,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
     queueName: string;
     groupId: string;
   } | null>(null);
-  const [drainTenantTarget, setDrainTenantTarget] = useState<string | null>(
-    null,
-  );
+  const [drainTenantTarget, setDrainTenantTarget] = useState<string | null>(null);
   const drainGroupMutation = api.ops.drainGroup.useMutation({
     onSuccess: (data) => {
       toaster.create({
@@ -166,8 +161,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   const copyGroupId = (groupId: string) => {
     navigator.clipboard.writeText(groupId).then(
       () => toaster.create({ title: "Group ID copied", type: "success" }),
-      () =>
-        toaster.create({ title: "Couldn't copy the group ID", type: "error" }),
+      () => toaster.create({ title: "Couldn't copy the group ID", type: "error" }),
     );
   };
 
@@ -254,53 +248,51 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
         <Card.Body padding={0}>
           {/* Paused-tenants banner: always visible when at least one tenant is paused so
               operators don't accidentally assume a tenant's silence means it's healthy. */}
-          {hasAccess &&
-            pausedTenantsQuery.data &&
-            pausedTenantsQuery.data.length > 0 && (
-              <HStack
-                paddingX={4}
-                paddingY={2}
-                borderBottom="1px solid"
-                borderBottomColor="border"
-                bg="yellow.subtle"
-                gap={2}
-                flexWrap="wrap"
-              >
-                <Text textStyle="xs" fontWeight="medium">
-                  Paused tenants:
-                </Text>
-                {pausedTenantsQuery.data.map((tid) => (
-                  <HStack key={tid} gap={1}>
-                    <Badge
-                      size="xs"
-                      colorPalette="yellow"
-                      variant="solid"
-                      fontFamily="mono"
-                    >
-                      {tid}
-                    </Badge>
-                    <Button
-                      size="2xs"
-                      variant="outline"
-                      colorPalette="green"
-                      onClick={() =>
-                        primaryQueue &&
-                        unpauseTenantMutation.mutate({
-                          queueName: primaryQueue,
-                          tenantId: tid,
-                        })
-                      }
-                      loading={
-                        unpauseTenantMutation.isPending &&
-                        unpauseTenantMutation.variables?.tenantId === tid
-                      }
-                    >
-                      Unpause
-                    </Button>
-                  </HStack>
-                ))}
-              </HStack>
-            )}
+          {hasAccess && pausedTenantsQuery.data && pausedTenantsQuery.data.length > 0 && (
+            <HStack
+              paddingX={4}
+              paddingY={2}
+              borderBottom="1px solid"
+              borderBottomColor="border"
+              bg="yellow.subtle"
+              gap={2}
+              flexWrap="wrap"
+            >
+              <Text textStyle="xs" fontWeight="medium">
+                Paused tenants:
+              </Text>
+              {pausedTenantsQuery.data.map((tid) => (
+                <HStack key={tid} gap={1}>
+                  <Badge
+                    size="xs"
+                    colorPalette="yellow"
+                    variant="solid"
+                    fontFamily="mono"
+                  >
+                    {tid}
+                  </Badge>
+                  <Button
+                    size="2xs"
+                    variant="outline"
+                    colorPalette="green"
+                    onClick={() =>
+                      primaryQueue &&
+                      unpauseTenantMutation.mutate({
+                        queueName: primaryQueue,
+                        tenantId: tid,
+                      })
+                    }
+                    loading={
+                      unpauseTenantMutation.isPending &&
+                      unpauseTenantMutation.variables?.tenantId === tid
+                    }
+                  >
+                    Unpause
+                  </Button>
+                </HStack>
+              ))}
+            </HStack>
+          )}
 
           <HStack
             paddingX={4}
@@ -443,29 +435,18 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                 variant="line"
                 css={{ "& tr:last-child td": { borderBottom: "none" } }}
               >
-                <Table.Header
-                  position="sticky"
-                  top={0}
-                  zIndex={1}
-                  bg="bg.panel"
-                >
+                <Table.Header position="sticky" top={0} zIndex={1} bg="bg.panel">
                   <Table.Row>
                     <Table.ColumnHeader>Group ID</Table.ColumnHeader>
-                    <Table.ColumnHeader width="140px">
-                      Pipeline
-                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="140px">Pipeline</Table.ColumnHeader>
                     <Table.ColumnHeader textAlign="end" width="60px">
                       Pending
                     </Table.ColumnHeader>
                     <Table.ColumnHeader textAlign="end" width="65px">
                       Attempts
                     </Table.ColumnHeader>
-                    <Table.ColumnHeader width="80px">
-                      Next run
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader width="85px">
-                      Oldest wait
-                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="80px">Next run</Table.ColumnHeader>
+                    <Table.ColumnHeader width="85px">Oldest wait</Table.ColumnHeader>
                     <Table.ColumnHeader width="70px">Status</Table.ColumnHeader>
                     {hasAccess && (
                       <Table.ColumnHeader width="44px">
@@ -487,8 +468,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                     renderRow={(i) => {
                       const group = filteredGroups[i]!;
                       const c = classifyGroup(group, now);
-                      const overdue =
-                        !group.isBlocked && isOverdue(group.oldestJobMs);
+                      const overdue = !group.isBlocked && isOverdue(group.oldestJobMs);
                       // The tint answers "what is wrong RIGHT NOW" at a glance:
                       // red for groups an operator must act on, orange for
                       // groups still failing on their own.
@@ -543,11 +523,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                           <Table.Cell>
                             <Text
                               textStyle="xs"
-                              color={
-                                c.state === "retrying"
-                                  ? "orange.500"
-                                  : "fg.muted"
-                              }
+                              color={c.state === "retrying" ? "orange.500" : "fg.muted"}
                             >
                               {describeNextRun(c, now)}
                             </Text>
@@ -564,9 +540,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                           </Table.Cell>
                           <Table.Cell
                             title={
-                              c.isFailing
-                                ? (group.errorMessage ?? undefined)
-                                : undefined
+                              c.isFailing ? (group.errorMessage ?? undefined) : undefined
                             }
                           >
                             <GroupStateBadge c={c} />
@@ -584,8 +558,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                                   </Button>
                                 </Menu.Trigger>
                                 <Menu.Content>
-                                  {(c.state === "blocked" ||
-                                    c.state === "stale") && (
+                                  {(c.state === "blocked" || c.state === "stale") && (
                                     <Menu.Item
                                       value="retry"
                                       onClick={(e) => {
@@ -612,10 +585,8 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                                     <Menu.Item value="grafana-traces" asChild>
                                       <a
                                         href={
-                                          grafanaGroupTracesUrl(
-                                            group.groupId,
-                                            grafana,
-                                          ) ?? undefined
+                                          grafanaGroupTracesUrl(group.groupId, grafana) ??
+                                          undefined
                                         }
                                         target="_blank"
                                         rel="noreferrer"
@@ -629,10 +600,8 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                                     <Menu.Item value="grafana-logs" asChild>
                                       <a
                                         href={
-                                          grafanaGroupLogsUrl(
-                                            group.groupId,
-                                            grafana,
-                                          ) ?? undefined
+                                          grafanaGroupLogsUrl(group.groupId, grafana) ??
+                                          undefined
                                         }
                                         target="_blank"
                                         rel="noreferrer"

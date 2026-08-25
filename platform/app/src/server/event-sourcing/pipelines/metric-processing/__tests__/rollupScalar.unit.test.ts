@@ -70,9 +70,9 @@ describe("gauge and sum rollups", () => {
       const late = delta(25_000, 5);
       const next = delta(35_000, 6);
 
-      expect([
-        ...affectedRollupBuckets({ points: [next], insertedPoint: late }),
-      ]).toEqual([0]);
+      expect([...affectedRollupBuckets({ points: [next], insertedPoint: late })]).toEqual(
+        [0],
+      );
     });
   });
 

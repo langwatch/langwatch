@@ -138,9 +138,7 @@ describe("<CheckConfigForm/>", () => {
         expect(
           screen.getByText("This evaluator is no longer available"),
         ).toBeInTheDocument();
-        expect(
-          screen.getByText(new RegExp(RETIRED_CHECK_TYPE)),
-        ).toBeInTheDocument();
+        expect(screen.getByText(new RegExp(RETIRED_CHECK_TYPE))).toBeInTheDocument();
       });
 
       /** @scenario An old evaluation that still names a retired evaluator offers a replacement */
@@ -148,9 +146,7 @@ describe("<CheckConfigForm/>", () => {
         renderForm(RETIRED_CHECK_TYPE);
 
         expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
-        expect(
-          screen.getByText("Prompt Injection Detection"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Prompt Injection Detection")).toBeInTheDocument();
       });
     });
   });

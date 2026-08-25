@@ -13,16 +13,16 @@ import type { RuntimeContext } from "../shared/runtime-contract.ts";
  * guess that the actual start-up might not honor.
  */
 export function scaffoldEnv(
-	ctx: RuntimeContext,
-	{ shouldReconcilePorts = true }: { shouldReconcilePorts?: boolean } = {},
+  ctx: RuntimeContext,
+  { shouldReconcilePorts = true }: { shouldReconcilePorts?: boolean } = {},
 ): {
-	written: boolean;
-	path: string;
-	reconciledKeys: string[];
+  written: boolean;
+  path: string;
+  reconciledKeys: string[];
 } {
-	return scaffoldEnvFile({
-		ports: ctx.ports,
-		path: ctx.envFile,
-		shouldReconcilePorts,
-	});
+  return scaffoldEnvFile({
+    ports: ctx.ports,
+    path: ctx.envFile,
+    shouldReconcilePorts,
+  });
 }

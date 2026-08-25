@@ -58,10 +58,7 @@ function turn(state: "input-available" | "output-available"): UIMessage {
   ]);
 }
 
-function renderTurn(
-  message: UIMessage,
-  { live = true }: { live?: boolean } = {},
-) {
+function renderTurn(message: UIMessage, { live = true }: { live?: boolean } = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <LangyToolActivity message={message} live={live} />
@@ -80,9 +77,7 @@ describe("a turn's activity cards", () => {
       it("draws it in the completed receipt", () => {
         renderTurn(turn("output-available"));
 
-        expect(
-          screen.getByRole("button", { name: /1 action completed/i }),
-        ).toBeTruthy();
+        expect(screen.getByRole("button", { name: /1 action completed/i })).toBeTruthy();
       });
 
       it("never draws it as a running card of its own", () => {
@@ -116,9 +111,7 @@ describe("a turn's activity cards", () => {
       const { container } = renderTurn(turn("output-available"));
 
       expect(container.textContent).toContain("Ran a command");
-      expect(
-        screen.queryByRole("button", { name: /action completed/i }),
-      ).toBeNull();
+      expect(screen.queryByRole("button", { name: /action completed/i })).toBeNull();
     });
 
     describe("when the reader opens the held card", () => {
@@ -140,9 +133,7 @@ describe("a turn's activity cards", () => {
         const disclosure = screen.getByRole("button", { expanded: false });
         fireEvent.click(disclosure);
 
-        expect(
-          screen.getByText("three findings, all in notes.md"),
-        ).toBeTruthy();
+        expect(screen.getByText("three findings, all in notes.md")).toBeTruthy();
       });
 
       /** @scenario An opened result names the command that produced it */
@@ -162,9 +153,7 @@ describe("a turn's activity cards", () => {
 
         fireEvent.click(screen.getByRole("button", { expanded: false }));
 
-        expect(
-          screen.getByText('$ langwatch trace search --limit "5"'),
-        ).toBeTruthy();
+        expect(screen.getByText('$ langwatch trace search --limit "5"')).toBeTruthy();
       });
 
       it("offers no disclosure when the call recorded no result", () => {
@@ -204,9 +193,7 @@ describe("a turn's activity cards", () => {
           ]),
         );
 
-        expect(
-          screen.getByRole("button", { name: /1 action completed/i }),
-        ).toBeTruthy();
+        expect(screen.getByRole("button", { name: /1 action completed/i })).toBeTruthy();
         expect(container.textContent).toContain("Searching the code…");
       });
     });
@@ -225,9 +212,7 @@ describe("a turn's activity cards", () => {
           ]),
         );
 
-        expect(
-          screen.getByRole("button", { name: /1 action completed/i }),
-        ).toBeTruthy();
+        expect(screen.getByRole("button", { name: /1 action completed/i })).toBeTruthy();
       });
     });
   });
@@ -236,9 +221,7 @@ describe("a turn's activity cards", () => {
     it("folds every action into the receipt, the last one included", () => {
       renderTurn(turn("output-available"));
 
-      expect(
-        screen.getByRole("button", { name: /1 action completed/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: /1 action completed/i })).toBeTruthy();
     });
 
     describe("when a call was still open at the end", () => {
@@ -250,9 +233,7 @@ describe("a turn's activity cards", () => {
 
         expect(container.textContent).toContain("Running a command");
         expect(container.textContent).not.toContain("Running a command…");
-        expect(container.textContent).toContain(
-          "Interrupted before it finished",
-        );
+        expect(container.textContent).toContain("Interrupted before it finished");
       });
     });
   });

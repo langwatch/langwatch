@@ -73,10 +73,7 @@ export function useTraceFacets() {
           pendingPollAttemptsRef.current = 0;
           return false;
         }
-        const delay = Math.min(
-          2000 * 2 ** pendingPollAttemptsRef.current,
-          15000,
-        );
+        const delay = Math.min(2000 * 2 ** pendingPollAttemptsRef.current, 15000);
         pendingPollAttemptsRef.current += 1;
         return delay;
       },
@@ -107,8 +104,7 @@ export function useTraceFacets() {
   // be skipped on every cold page load because the guard would treat
   // the very first render as a project mismatch.
   const isFromOtherProject =
-    dataProjectIdRef.current !== undefined &&
-    dataProjectIdRef.current !== projectId;
+    dataProjectIdRef.current !== undefined && dataProjectIdRef.current !== projectId;
 
   // Persist successful (non-pending, non-stale) discover payloads to
   // localStorage so subsequent visits can render the sidebar from the
@@ -144,8 +140,7 @@ export function useTraceFacets() {
   //   4. Fall through to the live response (which may still be
   //      `pending: true` and empty) so the existing skeleton / pending
   //      branch keeps firing for genuinely first-time users.
-  const liveSettled =
-    query.data && !query.data.pending ? query.data : undefined;
+  const liveSettled = query.data && !query.data.pending ? query.data : undefined;
   const result =
     isFromOtherProject && !cachedFacets
       ? EMPTY_RESULT

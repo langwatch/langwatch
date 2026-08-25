@@ -24,18 +24,15 @@ export const apiResponseModelProviderSchema = z.object({
   extraHeaders: z.array(extraHeaderSchema).nullable().optional(),
 });
 
-export type ApiResponseModelProvider = z.infer<
-  typeof apiResponseModelProviderSchema
->;
+export type ApiResponseModelProvider = z.infer<typeof apiResponseModelProviderSchema>;
 
 /**
  * Zod schema for the full model-providers response.
  * A record mapping provider keys to their configuration.
  */
 export const apiResponseModelProvidersSchema = z.record(
-  z.string(), apiResponseModelProviderSchema,
+  z.string(),
+  apiResponseModelProviderSchema,
 );
 
-export type ApiResponseModelProviders = z.infer<
-  typeof apiResponseModelProvidersSchema
->;
+export type ApiResponseModelProviders = z.infer<typeof apiResponseModelProvidersSchema>;

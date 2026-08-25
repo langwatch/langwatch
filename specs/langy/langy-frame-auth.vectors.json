@@ -38,8 +38,24 @@
   ],
   "fieldShift": {
     "runToken": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-    "a": { "projectId": "ab", "userId": "c", "conversationId": "", "turnId": "", "frameNonce": "", "payload": "", "mac": "590f0ea20ca2ced93c0531417d774ef8858a22f68073cf7049d00a8732ca8d52" },
-    "b": { "projectId": "a", "userId": "bc", "conversationId": "", "turnId": "", "frameNonce": "", "payload": "", "mac": "056fd5ade36b20c335eac1a2da8d285ea3276fe418606ce4a121238a3ec8afa2" },
+    "a": {
+      "projectId": "ab",
+      "userId": "c",
+      "conversationId": "",
+      "turnId": "",
+      "frameNonce": "",
+      "payload": "",
+      "mac": "590f0ea20ca2ced93c0531417d774ef8858a22f68073cf7049d00a8732ca8d52"
+    },
+    "b": {
+      "projectId": "a",
+      "userId": "bc",
+      "conversationId": "",
+      "turnId": "",
+      "frameNonce": "",
+      "payload": "",
+      "mac": "056fd5ade36b20c335eac1a2da8d285ea3276fe418606ce4a121238a3ec8afa2"
+    },
     "note": "Proves length-prefixing works: shifting one byte across the projectId/userId boundary yields a DIFFERENT mac. a.mac != b.mac."
   }
 }

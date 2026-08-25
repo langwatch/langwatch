@@ -14,9 +14,7 @@ const SKELETON_BAR_HEIGHT = "16px";
 const WIDTH_VARIANTS = ["38%", "55%", "72%", "46%", "82%", "60%", "70%"];
 
 const widthFor = (rowIdx: number, colIdx: number, lineIdx: number): string =>
-  WIDTH_VARIANTS[
-    (rowIdx * 7 + colIdx * 11 + lineIdx * 3) % WIDTH_VARIANTS.length
-  ]!;
+  WIDTH_VARIANTS[(rowIdx * 7 + colIdx * 11 + lineIdx * 3) % WIDTH_VARIANTS.length]!;
 
 interface SkeletonCellContentProps {
   meta: ColumnMeta | undefined;
@@ -76,9 +74,7 @@ const IO_SKELETON_MAX_WIDTH = "300px";
  * the ↑/↓ arrows added visual noise without telling the user
  * anything useful while loading.
  */
-export const SkeletonAddonRow: React.FC<SkeletonAddonRowProps> = ({
-  rowIdx,
-}) => {
+export const SkeletonAddonRow: React.FC<SkeletonAddonRowProps> = ({ rowIdx }) => {
   const inputWidth = widthFor(rowIdx, 1, 0);
   const outputWidth = widthFor(rowIdx, 2, 0);
   return (

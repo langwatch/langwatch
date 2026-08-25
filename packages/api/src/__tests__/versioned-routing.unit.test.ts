@@ -33,9 +33,7 @@ function event(
 
 describe("resolveVersions", () => {
   it("rejects invalid calendar dates", () => {
-    expect(() => resolveVersions([event("2025-02-30")])).toThrow(
-      /Invalid API version/,
-    );
+    expect(() => resolveVersions([event("2025-02-30")])).toThrow(/Invalid API version/);
   });
 
   it("resolves a single version and creates the latest alias", () => {
@@ -110,9 +108,7 @@ describe("resolveVersions", () => {
 
     expect(result.get("preview")).toHaveLength(1);
     expect(result.get("preview")![0]!.path).toBe("/things.beta");
-    expect(result.get("latest")!.map((ep) => ep.path)).not.toContain(
-      "/things.beta",
-    );
+    expect(result.get("latest")!.map((ep) => ep.path)).not.toContain("/things.beta");
   });
 
   it("applies a preview withdrawal within the preview namespace only", () => {
@@ -128,9 +124,7 @@ describe("resolveVersions", () => {
     expect(result.get("preview")![0]!.withdrawn).toBe(true);
     // The dated registration of the same path is untouched.
     const dated = result.get("2025-01-01")!;
-    expect(dated.find((ep) => ep.path === "/things.beta")!.withdrawn).not.toBe(
-      true,
-    );
+    expect(dated.find((ep) => ep.path === "/things.beta")!.withdrawn).not.toBe(true);
   });
 });
 
@@ -212,16 +206,14 @@ describe("explicit version namespaces", () => {
   it("keeps preview separate from latest", async () => {
     const app = buildRoutedService();
 
-    const underLatest = await app.request(
-      "/api/things/latest/things.experimental",
-      { method: "POST" },
-    );
+    const underLatest = await app.request("/api/things/latest/things.experimental", {
+      method: "POST",
+    });
     expect(underLatest.status).toBe(404);
 
-    const underPreview = await app.request(
-      "/api/things/preview/things.experimental",
-      { method: "POST" },
-    );
+    const underPreview = await app.request("/api/things/preview/things.experimental", {
+      method: "POST",
+    });
     expect(underPreview.status).toBe(200);
     expect(underPreview.headers.get("X-API-Version-Status")).toBe("preview");
   });
@@ -241,8 +233,7 @@ describe("explicit version namespaces", () => {
     expect(guards.length).toBeGreaterThan(0);
     expect(
       mounted.some(
-        (route) =>
-          !route.isNamespaceGuard && route.path === "/api/things/things.list",
+        (route) => !route.isNamespaceGuard && route.path === "/api/things/things.list",
       ),
     ).toBe(false);
     expect(res.headers.get("X-API-Version")).toBeNull();
@@ -319,8 +310,7 @@ describe("explicit version namespaces", () => {
         "things.create",
         "2026-01-15",
         async () => ({}),
-        (b) =>
-          b.withInput(z.object({ name: z.string() })).withOutput(z.object({})),
+        (b) => b.withInput(z.object({ name: z.string() })).withOutput(z.object({})),
       )
       .build();
 

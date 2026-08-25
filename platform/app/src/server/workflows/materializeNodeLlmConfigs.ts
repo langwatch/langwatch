@@ -74,10 +74,10 @@ export const materializeNodeLlmConfigs = async ({
   if (!fallback) {
     let resolvedModel: string | undefined;
     try {
-      const resolved = await resolveModelForFeature(
-        "workflows.create_default",
-        { prisma, projectId },
-      );
+      const resolved = await resolveModelForFeature("workflows.create_default", {
+        prisma,
+        projectId,
+      });
       resolvedModel = resolved.model;
     } catch (error) {
       // Only "nothing configured at any scope" falls back to the registry

@@ -94,10 +94,7 @@ async function main() {
         headers: { "Content-Type": "application/json", Origin: BASE_URL },
         data: { "0": { json: { accountId: id } } },
       });
-    const [r1, r2] = await Promise.all([
-      callUnlink(acct1.id),
-      callUnlink(acct2.id),
-    ]);
+    const [r1, r2] = await Promise.all([callUnlink(acct1.id), callUnlink(acct2.id)]);
     console.log(`     r1: HTTP ${r1.status()}`);
     console.log(`     r2: HTTP ${r2.status()}`);
 
@@ -145,9 +142,7 @@ async function main() {
     console.log(`✅ ALL CHECKS PASSED (${passes}/${passes})`);
     process.exit(0);
   } else {
-    console.log(
-      `❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`,
-    );
+    console.log(`❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`);
     process.exit(1);
   }
 }

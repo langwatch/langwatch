@@ -79,9 +79,7 @@ describe("given a deployment whose LangWatchQL objects are incomplete", () => {
     if (!harness) return;
     // The container is reused, so a suite that left its probe table behind
     // would surprise whichever suite ran next against it.
-    await harness.applyAsAdmin([
-      `DROP TABLE IF EXISTS ${database}.${UNGRANTED_TABLE}`,
-    ]);
+    await harness.applyAsAdmin([`DROP TABLE IF EXISTS ${database}.${UNGRANTED_TABLE}`]);
     await harness.stop();
   });
 
@@ -129,9 +127,7 @@ describe("given a deployment whose LangWatchQL objects are incomplete", () => {
      */
     it("fails with the same coded lwql_unavailable", async () => {
       expect(
-        await codeOfFailure(
-          `SELECT Probe FROM ${database}.${UNGRANTED_TABLE} LIMIT 1`,
-        ),
+        await codeOfFailure(`SELECT Probe FROM ${database}.${UNGRANTED_TABLE} LIMIT 1`),
       ).toBe("lwql_unavailable");
     });
   });

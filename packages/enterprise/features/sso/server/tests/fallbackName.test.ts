@@ -64,17 +64,13 @@ describe("fallbackName", () => {
 
   describe("when name is null but username is set (GitLab fallback)", () => {
     it("returns username", () => {
-      expect(fallbackName({ name: null, username: "alice-gl" })).toBe(
-        "alice-gl",
-      );
+      expect(fallbackName({ name: null, username: "alice-gl" })).toBe("alice-gl");
     });
   });
 
   describe("when name is null but preferred_username is set (OIDC)", () => {
     it("returns preferred_username", () => {
-      expect(fallbackName({ name: null, preferred_username: "alice" })).toBe(
-        "alice",
-      );
+      expect(fallbackName({ name: null, preferred_username: "alice" })).toBe("alice");
     });
   });
 
@@ -84,9 +80,7 @@ describe("fallbackName", () => {
     });
 
     it("handles multi-dot local parts", () => {
-      expect(fallbackName({ email: "alice.smith@example.com" })).toBe(
-        "alice.smith",
-      );
+      expect(fallbackName({ email: "alice.smith@example.com" })).toBe("alice.smith");
     });
   });
 
@@ -116,9 +110,7 @@ describe("fallbackName", () => {
       expect(fallbackName({ nickname: "B", displayName: "C" })).toBe("B");
       expect(fallbackName({ displayName: "C", login: "D" })).toBe("C");
       expect(fallbackName({ login: "D", username: "E" })).toBe("D");
-      expect(fallbackName({ username: "E", preferred_username: "F" })).toBe(
-        "E",
-      );
+      expect(fallbackName({ username: "E", preferred_username: "F" })).toBe("E");
       expect(
         fallbackName({
           preferred_username: "F",

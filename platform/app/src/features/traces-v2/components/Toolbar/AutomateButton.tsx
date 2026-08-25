@@ -14,9 +14,7 @@ import { getCurrentFilterText } from "../../stores/filterStore";
  * query on `Trigger.filterQuery`, and the dispatcher matches it in-memory
  * against every settling trace — no per-trace ClickHouse round-trip.
  */
-export const AutomateButton: React.FC<{ compact?: boolean }> = ({
-  compact = false,
-}) => {
+export const AutomateButton: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const { hasPermission } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
 

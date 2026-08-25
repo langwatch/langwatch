@@ -9,10 +9,7 @@ import { remediation } from "../error-remediation";
 export class EvaluationNotFoundError extends NotFoundError {
   declare readonly code: "evaluation_not_found";
 
-  constructor(
-    evaluationId: string,
-    options: { reasons?: readonly Error[] } = {},
-  ) {
+  constructor(evaluationId: string, options: { reasons?: readonly Error[] } = {}) {
     super("evaluation_not_found", "Evaluation", evaluationId, {
       meta: { evaluationId },
       ...remediation("evaluation_not_found"),
@@ -137,10 +134,7 @@ export class EvaluatorMissingFieldError extends HandledError {
 export class EvaluatorNotFoundError extends NotFoundError {
   declare readonly code: "evaluator_not_found";
 
-  constructor(
-    evaluatorType: string,
-    options: { reasons?: readonly Error[] } = {},
-  ) {
+  constructor(evaluatorType: string, options: { reasons?: readonly Error[] } = {}) {
     super("evaluator_not_found", "Evaluator", evaluatorType, {
       meta: { evaluatorType },
       ...remediation("evaluator_not_found"),

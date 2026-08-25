@@ -99,8 +99,7 @@ export function RoleChip({ role }: { role: string }) {
     isScenario && (role === "user" || role === "assistant")
       ? getDisplayRoleVisuals(role, { isScenario: true })
       : null;
-  const label =
-    scenarioVisuals?.label ?? ROLE_LABELS[role] ?? role.toUpperCase();
+  const label = scenarioVisuals?.label ?? ROLE_LABELS[role] ?? role.toUpperCase();
   // Key on the *display* role under scenario so the chip carries through
   // the same purple/blue the surrounding bubble/card is using.
   const colorKey = scenarioVisuals?.displayRole ?? role;

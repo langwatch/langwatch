@@ -92,8 +92,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const findAllByConversation = vi.fn(async () => [] as LangyMessageRow[]);
 
   const deps = {
-    conversations:
-      conversations as unknown as LangyTurnServiceDeps["conversations"],
+    conversations: conversations as unknown as LangyTurnServiceDeps["conversations"],
     credentials: credentials as unknown as LangyTurnServiceDeps["credentials"],
     resolveModel: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })),
     worker: { probe, dispatch },
@@ -170,9 +169,7 @@ describe("LangyTurnService.startConversationTurn", () => {
   });
 
   it("commits one atomic message + acceptance command and fast-dispatches it", async () => {
-    const result = await LangyTurnService.create(deps).startConversationTurn(
-      input(),
-    );
+    const result = await LangyTurnService.create(deps).startConversationTurn(input());
 
     expect(result).toEqual({ conversationId: "conv-1", turnId: TURN_ID });
     expect(mocks.grant).toHaveBeenCalledOnce();
@@ -233,9 +230,7 @@ describe("LangyTurnService.startConversationTurn", () => {
   });
 
   it("omits message_recorded when explicitly re-driving an existing message", async () => {
-    await LangyTurnService.create(deps).startConversationTurn(
-      input({ isRetry: true }),
-    );
+    await LangyTurnService.create(deps).startConversationTurn(input({ isRetry: true }));
 
     expect(mocks.acceptTurn).toHaveBeenCalledWith(
       expect.not.objectContaining({ userMessage: expect.anything() }),
@@ -279,9 +274,7 @@ describe("LangyTurnService.startConversationTurn", () => {
 
   it("finalizes the GitHub permit before probing the worker signature", async () => {
     const order: string[] = [];
-    (
-      deps.credentials.getOrProvision as ReturnType<typeof vi.fn>
-    ).mockResolvedValue({
+    (deps.credentials.getOrProvision as ReturnType<typeof vi.fn>).mockResolvedValue({
       organizationId: "org-1",
       githubToken: "gh-token",
       githubLogin: "octocat",
@@ -324,9 +317,9 @@ describe("LangyTurnService.startConversationTurn", () => {
   });
 
   it("keeps the projection guard only as rollout defence and aborts its claim", async () => {
-    (
-      deps.conversations.findByIdVisible as ReturnType<typeof vi.fn>
-    ).mockResolvedValue({ status: LANGY_CONVERSATION_STATUS.RUNNING });
+    (deps.conversations.findByIdVisible as ReturnType<typeof vi.fn>).mockResolvedValue({
+      status: LANGY_CONVERSATION_STATUS.RUNNING,
+    });
 
     await expect(
       LangyTurnService.create(deps).startConversationTurn(input()),
@@ -337,9 +330,9 @@ describe("LangyTurnService.startConversationTurn", () => {
   });
 
   it("rejects a disallowed model and releases the admission", async () => {
-    (
-      deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>
-    ).mockResolvedValue(["openai/gpt-5-mini"]);
+    (deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>).mockResolvedValue([
+      "openai/gpt-5-mini",
+    ]);
 
     await expect(
       LangyTurnService.create(deps).startConversationTurn(
@@ -361,18 +354,16 @@ describe("LangyTurnService.startConversationTurn", () => {
     "gemini/gemini-2.5-pro",
     "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0",
   ])("accepts and forwards the allowed model %s verbatim", async (model) => {
-    (
-      deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>
-    ).mockResolvedValue([model]);
+    (deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>).mockResolvedValue([
+      model,
+    ]);
 
     const result = await LangyTurnService.create(deps).startConversationTurn(
       input({ modelOverride: model }),
     );
 
     expect(result.conversationId).toBe("conv-1");
-    expect(mocks.probe).toHaveBeenCalledWith(
-      expect.objectContaining({ model }),
-    );
+    expect(mocks.probe).toHaveBeenCalledWith(expect.objectContaining({ model }));
     expect(mocks.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({ modelOverride: model }),
     );
@@ -380,9 +371,9 @@ describe("LangyTurnService.startConversationTurn", () => {
 
   /** @scenario A per-send override still wins over the configured Langy model */
   it("does not resolve an unused default model when an override is allowed", async () => {
-    (
-      deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>
-    ).mockResolvedValue(["openai/gpt-5-mini"]);
+    (deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>).mockResolvedValue([
+      "openai/gpt-5-mini",
+    ]);
 
     await LangyTurnService.create(deps).startConversationTurn(
       input({ modelOverride: "openai/gpt-5-mini" }),
@@ -419,9 +410,9 @@ describe("LangyTurnService.startConversationTurn", () => {
     (deps.resolveModel as ReturnType<typeof vi.fn>).mockResolvedValue({
       modelId: "anthropic/claude-opus-4-8",
     });
-    (
-      deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>
-    ).mockResolvedValue(["openai/gpt-5-mini"]);
+    (deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>).mockResolvedValue([
+      "openai/gpt-5-mini",
+    ]);
 
     await expect(
       LangyTurnService.create(deps).startConversationTurn(input()),
@@ -444,9 +435,10 @@ describe("LangyTurnService.startConversationTurn", () => {
   });
 
   it("revokes the key, releases the permit, and aborts when acceptance fails", async () => {
-    (
-      deps.credentials.getOrProvision as ReturnType<typeof vi.fn>
-    ).mockResolvedValue({ organizationId: "org-1", githubToken: "gh-token" });
+    (deps.credentials.getOrProvision as ReturnType<typeof vi.fn>).mockResolvedValue({
+      organizationId: "org-1",
+      githubToken: "gh-token",
+    });
     mocks.acceptTurn.mockRejectedValue(new Error("event store failed"));
 
     await expect(
@@ -491,9 +483,10 @@ describe("LangyTurnService.startConversationTurn", () => {
   });
 
   it("consumes a pending handoff in the same acceptance command", async () => {
-    (
-      deps.conversations.getPendingHandoff as ReturnType<typeof vi.fn>
-    ).mockResolvedValue({ turnId: "old-turn", token: "checkpoint" });
+    (deps.conversations.getPendingHandoff as ReturnType<typeof vi.fn>).mockResolvedValue({
+      turnId: "old-turn",
+      token: "checkpoint",
+    });
 
     await LangyTurnService.create(deps).startConversationTurn(input());
 
@@ -583,9 +576,7 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     await LangyTurnService.create(deps).startConversationTurn(
       input({
         turnContext: {
-          pageContext: [
-            { kind: "trace", ref: "trace-abc", label: "trace abc" },
-          ],
+          pageContext: [{ kind: "trace", ref: "trace-abc", label: "trace abc" }],
         },
       }),
     );
@@ -610,9 +601,7 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
       {
         id: "t1",
         role: "user",
-        parts: [
-          { type: "text", text: "my name is rogerio" },
-        ] as LangyMessageRow["parts"],
+        parts: [{ type: "text", text: "my name is rogerio" }] as LangyMessageRow["parts"],
         createdAt: new Date(),
       },
       {
@@ -631,9 +620,7 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     await LangyTurnService.create(deps).startConversationTurn(
       input({
         modelOverride: "anthropic/claude-haiku-4-5",
-        messages: [
-          { role: "user", parts: [{ type: "text", text: "what is my name?" }] },
-        ],
+        messages: [{ role: "user", parts: [{ type: "text", text: "what is my name?" }] }],
       }),
     );
 
@@ -654,9 +641,7 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     // The stash carries the same seed: an outbox or liveness re-dispatch to a
     // fresh worker continues the conversation too.
     const stashed = (
-      mocks.stash.mock.calls[0] as unknown as [
-        { system: string; historySeed?: string },
-      ]
+      mocks.stash.mock.calls[0] as unknown as [{ system: string; historySeed?: string }]
     )[0];
     expect(stashed.historySeed).toBe(historySeed);
     expect(stashed.system).toBe(system);
@@ -687,9 +672,7 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     await LangyTurnService.create(second.deps).startConversationTurn(
       input({
         idempotencyKey: "00000000-0000-4000-8000-000000000002",
-        messages: [
-          { role: "user", parts: [{ type: "text", text: "and again" }] },
-        ],
+        messages: [{ role: "user", parts: [{ type: "text", text: "and again" }] }],
       }),
     );
 
@@ -720,9 +703,7 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     const { deps, mocks } = makeDeps();
     mocks.findAllByConversation.mockRejectedValue(new Error("projection down"));
 
-    const result = await LangyTurnService.create(deps).startConversationTurn(
-      input(),
-    );
+    const result = await LangyTurnService.create(deps).startConversationTurn(input());
 
     expect(result).toMatchObject({ conversationId: "conv-1" });
     expect(mocks.dispatch).toHaveBeenCalledOnce();
@@ -811,9 +792,7 @@ describe("when the idempotency key is reused with different content", () => {
   it("rejects with the mismatch error instead of replaying the original send", async () => {
     const { deps } = makeDeps({
       admission: {
-        claim: vi.fn(
-          async () => ({ kind: "mismatch" }) as LangyTurnAdmissionClaim,
-        ),
+        claim: vi.fn(async () => ({ kind: "mismatch" }) as LangyTurnAdmissionClaim),
         commit: vi.fn(async () => {}),
         abort: vi.fn(async () => {}),
         release: vi.fn(async () => {}),
@@ -833,9 +812,7 @@ describe("when the send carries no usable text", () => {
     const service = LangyTurnService.create(deps);
 
     await expect(
-      service.startConversationTurn(
-        input({ messages: [{ role: "user", parts: [] }] }),
-      ),
+      service.startConversationTurn(input({ messages: [{ role: "user", parts: [] }] })),
     ).rejects.toMatchObject({ code: "langy_empty_message" });
     expect(mocks.claim).not.toHaveBeenCalled();
     expect(mocks.dispatch).not.toHaveBeenCalled();
@@ -861,8 +838,7 @@ describe("LangyTurnService.stopTurn", () => {
     }));
     const findByIdVisible = vi.fn(async () => ({
       isOwn: over.isOwn ?? true,
-      currentTurnId:
-        over.currentTurnId === undefined ? "turn-1" : over.currentTurnId,
+      currentTurnId: over.currentTurnId === undefined ? "turn-1" : over.currentTurnId,
     }));
     const isTurnActor = vi.fn(async () => over.isTurnActor ?? true);
     const markEnd = vi.fn(async () => {});
@@ -938,9 +914,7 @@ describe("LangyTurnService.stopTurn", () => {
       };
       expect(call.outcome).toBe("stopped");
       // The partial answer is the joined durable delta tail, preserved verbatim.
-      expect(call.parts.map((p) => p.text ?? "").join("")).toBe(
-        "half an answer",
-      );
+      expect(call.parts.map((p) => p.text ?? "").join("")).toBe("half an answer");
       expect(mocks.markEnd).toHaveBeenCalledTimes(1);
       expect(mocks.cancel).toHaveBeenCalledWith(
         expect.objectContaining({ conversationId: "conv-1", turnId: "turn-1" }),
@@ -1060,8 +1034,7 @@ describe("LangyTurnService.stopTurn", () => {
  */
 /** The `system` string the worker was dispatched with. */
 const systemOf = (dispatch: ReturnType<typeof vi.fn>): string =>
-  (dispatch.mock.calls[0]?.[0] as { system?: string } | undefined)?.system ??
-  "";
+  (dispatch.mock.calls[0]?.[0] as { system?: string } | undefined)?.system ?? "";
 
 describe("when the project holding Langy's versioned prompts is configured", () => {
   const PROJECT_ENV = "LANGY_PROMPT_PROJECT_ID";
@@ -1143,9 +1116,7 @@ describe("when the project holding Langy's versioned prompts is configured", () 
     // provider's cache prefix, so a swap changes the model's instructions
     // mid-conversation AND pays a full prefix rewrite at the write premium.
     expect(systemOf(second.mocks.dispatch)).toContain("REGISTRY OVERRIDE TEXT");
-    expect(systemOf(second.mocks.dispatch)).not.toContain(
-      LANGY_TURN_OVERRIDE_FALLBACK,
-    );
+    expect(systemOf(second.mocks.dispatch)).not.toContain(LANGY_TURN_OVERRIDE_FALLBACK);
   });
 
   // @scenario "Withdrawing a promoted version is not undone by a later read failure"
@@ -1206,9 +1177,7 @@ describe("when the harness flag resolves for the turn", () => {
 
     await LangyTurnService.create(deps).startConversationTurn(input());
 
-    expect(mocks.probe).toHaveBeenCalledWith(
-      expect.objectContaining({ harness: "pi" }),
-    );
+    expect(mocks.probe).toHaveBeenCalledWith(expect.objectContaining({ harness: "pi" }));
     expect(mocks.stash).toHaveBeenCalledWith(
       expect.objectContaining({
         credentials: expect.objectContaining({ harness: "pi" }),

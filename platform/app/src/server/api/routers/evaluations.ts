@@ -32,12 +32,8 @@ export const evaluationsRouter = createTRPCRouter({
       // project's azure_safety Model Provider. There is no process.env
       // fallback, so an unconfigured provider reports them as missing.
       // Computed once and reused for all three Azure evaluator types.
-      const azureSafetyEnv = await getAzureSafetyEnvFromProject(
-        input.projectId,
-      );
-      const azureMissingEnvVars = azureSafetyEnv
-        ? []
-        : [...AZURE_SAFETY_ENV_VARS];
+      const azureSafetyEnv = await getAzureSafetyEnvFromProject(input.projectId);
+      const azureMissingEnvVars = azureSafetyEnv ? [] : [...AZURE_SAFETY_ENV_VARS];
 
       return Object.fromEntries(
         Object.entries(AVAILABLE_EVALUATORS).map(([key, evaluator]) => [
@@ -118,13 +114,9 @@ export const evaluationsRouter = createTRPCRouter({
                 ? result.score
                 : undefined,
             passed:
-              result.status === "processed"
-                ? (result.passed ?? undefined)
-                : undefined,
+              result.status === "processed" ? (result.passed ?? undefined) : undefined,
             label:
-              result.status === "processed"
-                ? (result.label ?? undefined)
-                : undefined,
+              result.status === "processed" ? (result.label ?? undefined) : undefined,
             details:
               result.status === "error"
                 ? result.details
@@ -185,11 +177,7 @@ export const evaluationsRouter = createTRPCRouter({
     }),
 });
 
-export const getCustomEvaluators = async ({
-  projectId,
-}: {
-  projectId: string;
-}) => {
+export const getCustomEvaluators = async ({ projectId }: { projectId: string }) => {
   const workflows = await prisma.workflow.findMany({
     where: {
       projectId,
@@ -202,8 +190,6 @@ export const getCustomEvaluators = async ({
 
   return workflows.map((workflow) => ({
     ...workflow,
-    versions: workflow.versions.filter(
-      (version) => version.id === workflow.publishedId,
-    ),
+    versions: workflow.versions.filter((version) => version.id === workflow.publishedId),
   }));
 };

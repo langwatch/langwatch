@@ -42,12 +42,8 @@ describe("extensible scenario metadata", () => {
         const parsed = scenarioRunStartedSchema.parse(event);
         expect(parsed.metadata.name).toBe("Login flow");
         expect(parsed.metadata.description).toBe("Tests login");
-        expect((parsed.metadata as Record<string, unknown>).environment).toBe(
-          "staging",
-        );
-        expect((parsed.metadata as Record<string, unknown>).commit_sha).toBe(
-          "abc123",
-        );
+        expect((parsed.metadata as Record<string, unknown>).environment).toBe("staging");
+        expect((parsed.metadata as Record<string, unknown>).commit_sha).toBe("abc123");
       });
     });
 
@@ -181,8 +177,7 @@ describe("extensible scenario metadata", () => {
         };
 
         const parsed = scenarioEventSchema.parse(event);
-        const metadata = (parsed as { metadata: Record<string, unknown> })
-          .metadata;
+        const metadata = (parsed as { metadata: Record<string, unknown> }).metadata;
         expect(metadata.name).toBe("Login flow");
         expect(metadata.environment).toBe("staging");
         expect(metadata.commit_sha).toBe("abc123");

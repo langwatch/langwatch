@@ -93,19 +93,16 @@ export function ResizeRail() {
     [setWidthPx],
   );
 
-  const handlePointerUp = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      const drag = dragState.current;
-      if (!drag) return;
-      try {
-        (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
-      } catch {
-        // Best-effort release.
-      }
-      dragState.current = null;
-    },
-    [],
-  );
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragState.current;
+    if (!drag) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    } catch {
+      // Best-effort release.
+    }
+    dragState.current = null;
+  }, []);
 
   const handleDoubleClick = useCallback(() => {
     // Only toggle the snap if the user wasn't dragging — a drag that

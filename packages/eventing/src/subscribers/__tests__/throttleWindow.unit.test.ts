@@ -2,15 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { SubscriberJobPayload } from "../throttleWindow";
 import { throttledPerWindow } from "../throttleWindow";
 
-const makeJobId = (payload: SubscriberJobPayload) =>
-  `job:${payload.event.tenantId}`;
+const makeJobId = (payload: SubscriberJobPayload) => `job:${payload.event.tenantId}`;
 
 describe("throttledPerWindow", () => {
   describe("given a window", () => {
     it("delays dispatch by the window so events have something to collapse into", () => {
-      expect(throttledPerWindow({ makeJobId, windowMs: 5_000 }).delay).toBe(
-        5_000,
-      );
+      expect(throttledPerWindow({ makeJobId, windowMs: 5_000 }).delay).toBe(5_000);
     });
 
     it("defaults the dedup ttl to the window", () => {
@@ -39,15 +36,13 @@ describe("throttledPerWindow", () => {
       // aggregate receiving a continuous stream would defer its own job for
       // as long as the stream lasts and the subscriber would never fire.
       expect(
-        throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication
-          ?.extend,
+        throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication?.extend,
       ).toBe(false);
     });
 
     it("still carries the newest payload when it fires", () => {
       expect(
-        throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication
-          ?.replace,
+        throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication?.replace,
       ).toBe(true);
     });
   });

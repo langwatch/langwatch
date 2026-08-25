@@ -21,9 +21,7 @@ export function PipelineTreeCard({
   const { hasAccess } = useOpsPermission();
   const utils = api.useUtils();
   const [filter, setFilter] = useState("");
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set());
 
   const [showIdle, setShowIdle] = useState(false);
 
@@ -55,10 +53,7 @@ export function PipelineTreeCard({
     () => (showIdle ? [...working, ...idle] : working),
     [working, idle, showIdle],
   );
-  const idleNames = useMemo(
-    () => new Set(idle.map((node) => node.name)),
-    [idle],
-  );
+  const idleNames = useMemo(() => new Set(idle.map((node) => node.name)), [idle]);
 
   const filteredTree = useMemo(
     () => filterTree(visibleTree, filter),

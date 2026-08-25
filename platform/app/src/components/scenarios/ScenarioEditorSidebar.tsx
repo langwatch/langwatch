@@ -1,11 +1,5 @@
 import { Card, HStack, Icon, List, Text, VStack } from "@chakra-ui/react";
-import {
-  Check,
-  CircleDot,
-  MessageSquare,
-  TriangleAlert,
-  Users,
-} from "lucide-react";
+import { Check, CircleDot, MessageSquare, TriangleAlert, Users } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { ScenarioAIGeneration } from "./ScenarioAIGeneration";
 import type { ScenarioFormData } from "./ScenarioForm";
@@ -42,8 +36,8 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
                     Define Success Clearly
                   </Text>
                   <Text fontSize="xs" color="fg.muted">
-                    What does &apos;good&apos; look like? Be specific about
-                    expected outcomes.
+                    What does &apos;good&apos; look like? Be specific about expected
+                    outcomes.
                   </Text>
                 </VStack>
               </HStack>

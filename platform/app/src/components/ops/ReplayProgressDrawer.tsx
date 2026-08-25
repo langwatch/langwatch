@@ -52,9 +52,7 @@ export function ReplayProgressDrawer({
 
   const status = statusQuery.data;
   const isRunning = status?.state === "running";
-  const activeProjectionNames = parseActiveProjections(
-    status?.currentProjection,
-  );
+  const activeProjectionNames = parseActiveProjections(status?.currentProjection);
   const activeProjections = new Set(activeProjectionNames);
 
   const stateColor =
@@ -73,9 +71,7 @@ export function ReplayProgressDrawer({
 
   const throughputRate = useMemo(() => {
     if (!status?.startedAt || !status.eventsProcessed) return null;
-    const end = status.completedAt
-      ? new Date(status.completedAt).getTime()
-      : Date.now();
+    const end = status.completedAt ? new Date(status.completedAt).getTime() : Date.now();
     const elapsed = (end - new Date(status.startedAt).getTime()) / 1000;
     if (elapsed < 1) return null;
     return Math.round(status.eventsProcessed / elapsed);
@@ -122,9 +118,7 @@ export function ReplayProgressDrawer({
               {/* Current phase detail */}
               {status.currentPhase && (
                 <HStack gap={2}>
-                  <Text textStyle="lg">
-                    {PHASE_ICONS[status.currentPhase] ?? "·"}
-                  </Text>
+                  <Text textStyle="lg">{PHASE_ICONS[status.currentPhase] ?? "·"}</Text>
                   <VStack align="start" gap={0}>
                     <Text textStyle="sm" fontWeight="medium">
                       {PHASE_LABELS[status.currentPhase] ?? status.currentPhase}
@@ -149,8 +143,7 @@ export function ReplayProgressDrawer({
                     </Text>
                     <Text textStyle="xs" fontWeight="medium">
                       {status.aggregatesProcessed.toLocaleString()} /{" "}
-                      {status.aggregatesTotal.toLocaleString()} (
-                      {progressPercent}%)
+                      {status.aggregatesTotal.toLocaleString()} ({progressPercent}%)
                     </Text>
                   </HStack>
                   <Progress.Root
@@ -210,14 +203,10 @@ export function ReplayProgressDrawer({
                       key={name}
                       size="sm"
                       variant={
-                        isRunning && activeProjections.has(name)
-                          ? "solid"
-                          : "subtle"
+                        isRunning && activeProjections.has(name) ? "solid" : "subtle"
                       }
                       colorPalette={
-                        isRunning && activeProjections.has(name)
-                          ? "orange"
-                          : "gray"
+                        isRunning && activeProjections.has(name) ? "orange" : "gray"
                       }
                     >
                       {name}

@@ -10,11 +10,7 @@ import { EditableIOField } from "./EditableIOField";
  * input as well as its output, so a question the trace recorded badly has to be
  * correctable where the reviewer is reading it.
  */
-export function TraceEditableInput({
-  capturedText,
-}: {
-  capturedText: string | null;
-}) {
+export function TraceEditableInput({ capturedText }: { capturedText: string | null }) {
   const basePatch = useTraceEditStore((s) => s.basePatch);
   const draft = useTraceEditStore((s) => s.traceInputDraft);
   const setTraceInput = useTraceEditStore((s) => s.setTraceInput);

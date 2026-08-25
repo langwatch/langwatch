@@ -10,10 +10,7 @@ vi.mock("~/components/settings/ScopeChipPicker", () => ({
   ScopeChipPicker: () => <div data-testid="scope-chip-picker" />,
 }));
 
-import {
-  AddOverrideDrawer,
-  type RetentionEditTarget,
-} from "../AddOverrideDrawer";
+import { AddOverrideDrawer, type RetentionEditTarget } from "../AddOverrideDrawer";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -25,9 +22,7 @@ const available = {
   projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
 };
 
-function renderDrawer(
-  props: Partial<React.ComponentProps<typeof AddOverrideDrawer>>,
-) {
+function renderDrawer(props: Partial<React.ComponentProps<typeof AddOverrideDrawer>>) {
   return render(
     <Wrapper>
       <AddOverrideDrawer
@@ -80,9 +75,7 @@ describe("AddOverrideDrawer plan-gated behavior", () => {
       renderDrawer({ isEnterprise: false, editTarget: legacyTarget });
       // The label shows in both the selected-value readout and the option list,
       // so assert at least one occurrence rather than a unique match.
-      expect(
-        screen.getAllByText("Current: 371 days (legacy)").length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByText("Current: 371 days (legacy)").length).toBeGreaterThan(0);
       // Grandfathering: never coerce or silently shorten — Save stays disabled
       // while the read-only legacy value is selected.
       const save = screen.getByRole("button", {

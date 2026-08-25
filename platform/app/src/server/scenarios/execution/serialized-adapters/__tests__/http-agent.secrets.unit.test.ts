@@ -59,9 +59,8 @@ function requestedUrl(): string {
 }
 
 function requestedHeaders(): Record<string, string> {
-  return (
-    mockSsrfSafeFetch.mock.calls[0]![1] as { headers: Record<string, string> }
-  ).headers;
+  return (mockSsrfSafeFetch.mock.calls[0]![1] as { headers: Record<string, string> })
+    .headers;
 }
 
 function requestedBody(): string {
@@ -91,9 +90,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
       await adapter.call(input);
 
-      expect(requestedUrl()).toBe(
-        `https://api.example.com/${SECRET_VALUE}/chat`,
-      );
+      expect(requestedUrl()).toBe(`https://api.example.com/${SECRET_VALUE}/chat`);
     });
 
     /** @scenario "A secret reference in the url resolves to the project secret value" */
@@ -212,9 +209,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
       await adapter.call(input);
 
-      const expected = Buffer.from(`${SECRET_VALUE}:${SECRET_VALUE}`).toString(
-        "base64",
-      );
+      const expected = Buffer.from(`${SECRET_VALUE}:${SECRET_VALUE}`).toString("base64");
       expect(requestedHeaders().Authorization).toBe(`Basic ${expected}`);
     });
 
@@ -251,9 +246,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
       await adapter.call(input);
 
-      expect(requestedHeaders()["X-Agent-Key"]).toBe(
-        `${SECRET_VALUE}/eu-central`,
-      );
+      expect(requestedHeaders()["X-Agent-Key"]).toBe(`${SECRET_VALUE}/eu-central`);
     });
 
     /** @scenario "A secret reference in a header value survives rendering byte for byte" */
@@ -319,26 +312,20 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
       await adapter.call(input);
 
-      expect(requestedUrl()).toBe(
-        "https://api.example.com/{{ secrets.NOT_A_SECRET }}",
-      );
+      expect(requestedUrl()).toBe("https://api.example.com/{{ secrets.NOT_A_SECRET }}");
     });
 
     /** @scenario "A reference to a missing secret name stays verbatim in the request" */
     it("carries the reference exactly as written in a header value", async () => {
       const adapter = new SerializedHttpAgentAdapter({
         config: config({
-          headers: [
-            { key: "X-Agent-Key", value: "{{ secrets.NOT_A_SECRET }}" },
-          ],
+          headers: [{ key: "X-Agent-Key", value: "{{ secrets.NOT_A_SECRET }}" }],
         }),
       });
 
       await adapter.call(input);
 
-      expect(requestedHeaders()["X-Agent-Key"]).toBe(
-        "{{ secrets.NOT_A_SECRET }}",
-      );
+      expect(requestedHeaders()["X-Agent-Key"]).toBe("{{ secrets.NOT_A_SECRET }}");
     });
   });
 
@@ -350,9 +337,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
         status: 401,
         statusText: "Unauthorized",
         headers: new Headers(),
-        text: vi
-          .fn()
-          .mockResolvedValue(`{"error":"bad token ${SECRET_VALUE}"}`),
+        text: vi.fn().mockResolvedValue(`{"error":"bad token ${SECRET_VALUE}"}`),
         json: vi.fn(),
       } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
 
@@ -363,9 +348,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
       });
 
       await expect(adapter.call(input)).rejects.toThrow(/HTTP 401/);
-      await expect(adapter.call(input)).rejects.not.toThrow(
-        new RegExp(SECRET_VALUE),
-      );
+      await expect(adapter.call(input)).rejects.not.toThrow(new RegExp(SECRET_VALUE));
     });
 
     /** @scenario "A resolved secret value is scrubbed from error messages" */
@@ -373,9 +356,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
       const cause = new Error(
         `connect ECONNREFUSED for https://api.example.com/${SECRET_VALUE}`,
       );
-      mockSsrfSafeFetch.mockRejectedValue(
-        new TypeError("fetch failed", { cause }),
-      );
+      mockSsrfSafeFetch.mockRejectedValue(new TypeError("fetch failed", { cause }));
 
       const adapter = new SerializedHttpAgentAdapter({
         config: config({
@@ -495,9 +476,7 @@ describe("SerializedHttpAgentAdapter run secret parameters", () => {
       });
 
       await expect(adapter.call(input)).rejects.toThrow(/HTTP 401/);
-      await expect(adapter.call(input)).rejects.not.toThrow(
-        new RegExp(RUN_SECRET),
-      );
+      await expect(adapter.call(input)).rejects.not.toThrow(new RegExp(RUN_SECRET));
     });
   });
 });

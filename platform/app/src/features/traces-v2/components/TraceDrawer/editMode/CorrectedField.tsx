@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  chakra,
-  HoverCard,
-  HStack,
-  Portal,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Button, chakra, HoverCard, HStack, Portal, Text } from "@chakra-ui/react";
 import { type ReactNode, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useTraceEditStore } from "../../../stores/traceEditStore";
@@ -191,10 +183,7 @@ export function CorrectedScalar({
   children: ReactNode;
 }) {
   return (
-    <Tooltip
-      content={`Original: ${original}`}
-      positioning={{ placement: "top" }}
-    >
+    <Tooltip content={`Original: ${original}`} positioning={{ placement: "top" }}>
       <HStack
         gap={1.5}
         aria-label={`${label}, edited. Original: ${original}`}

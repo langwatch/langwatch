@@ -30,10 +30,7 @@ export class PrismaAgentRepository extends AgentRepository {
     super();
   }
 
-  async tryFindById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<Agent | null> {
+  async tryFindById(input: { id: string; projectId: string }): Promise<Agent | null> {
     const row = await this.database.agent.findFirst({
       where: { id: input.id, projectId: input.projectId, archivedAt: null },
     });

@@ -27,15 +27,7 @@ import { afterEach, describe, expect, it } from "vitest";
  * matching and not about a second reading of it.
  */
 
-const scriptPath = join(
-  __dirname,
-  "..",
-  "..",
-  "..",
-  "dev",
-  "scripts",
-  "pack-npm.sh",
-);
+const scriptPath = join(__dirname, "..", "..", "..", "dev", "scripts", "pack-npm.sh");
 
 let fixture: string | undefined;
 
@@ -121,13 +113,10 @@ function buildFixture(trackedPaths: string[]): string {
   return root;
 }
 
-function runCheck({
-  root,
-  extraArgs = [],
-}: {
-  root: string;
-  extraArgs?: string[];
-}): { code: number; output: string } {
+function runCheck({ root, extraArgs = [] }: { root: string; extraArgs?: string[] }): {
+  code: number;
+  output: string;
+} {
   const args = [
     join(root, "dev", "scripts", "pack-npm.sh"),
     "--check-filters",
@@ -154,13 +143,7 @@ function runCheck({
 }
 
 /** Whether a repo-relative path survived into the staged tree. */
-function staged({
-  stageDir,
-  relPath,
-}: {
-  stageDir: string;
-  relPath: string;
-}): boolean {
+function staged({ stageDir, relPath }: { stageDir: string; relPath: string }): boolean {
   return existsSync(join(stageDir, "app", relPath));
 }
 

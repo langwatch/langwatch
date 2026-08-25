@@ -1,7 +1,4 @@
-import {
-  canReadCapturedContent,
-  type Protections,
-} from "~/server/traces/protections";
+import { canReadCapturedContent, type Protections } from "~/server/traces/protections";
 
 /**
  * Viewer-scoped gates for the coding-agent read surfaces (the Sessions screen
@@ -68,8 +65,6 @@ export function gatePullRequestSessionTitles<
   contentProjectIds: ReadonlySet<string>;
 }): T[] {
   return sessions.map((session) =>
-    contentProjectIds.has(session.projectId)
-      ? session
-      : { ...session, title: null },
+    contentProjectIds.has(session.projectId) ? session : { ...session, title: null },
   );
 }

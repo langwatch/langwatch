@@ -36,8 +36,7 @@ const USER_ID = "local-dev-admin-user";
 const ORG_ID = "local-dev-organization";
 const target: CollectorTarget = {
   endpoint: process.env.HAVEN_SEED_ENDPOINT ?? "http://localhost:5560",
-  apiKey:
-    process.env.HAVEN_SEED_LANGWATCH_API_KEY ?? "sk-lw-local-development-key",
+  apiKey: process.env.HAVEN_SEED_LANGWATCH_API_KEY ?? "sk-lw-local-development-key",
 };
 const BASE_TIME = Date.UTC(2026, 6, 15, 10, 0, 0);
 const HISTORY_DAYS = 21;
@@ -61,9 +60,7 @@ interface HistoricalScenarioRun {
  * core scenario plus 0–2 deterministic reruns; pass rate trends upward over
  * the period while still retaining realistic failures and latency variance.
  */
-function buildHistoricalScenarioRuns(
-  now = Date.now(),
-): HistoricalScenarioRun[] {
+function buildHistoricalScenarioRuns(now = Date.now()): HistoricalScenarioRun[] {
   const lastCompletedDay = utcDayStart(now) - DAY_MS;
   const firstDay = lastCompletedDay - (HISTORY_DAYS - 1) * DAY_MS;
   const runs: HistoricalScenarioRun[] = [];
@@ -88,8 +85,7 @@ function buildHistoricalScenarioRuns(
         950 + random() * 3_800 + (passed ? 0 : random() * 2_500),
       );
       const startedAt =
-        dayStart +
-        (8 * 60 + ordinal * 115 + Math.floor(random() * 35)) * 60_000;
+        dayStart + (8 * 60 + ordinal * 115 + Math.floor(random() * 35)) * 60_000;
       const runId = `demo-scenario-history-${day}-${ordinal + 1}-${scenarioIndex + 1}`;
       const batchRunId = `demo-history-batch-${day}`;
       const traceId = `demo-platform-history-${day}-${ordinal + 1}-${scenarioIndex + 1}`;
@@ -115,12 +111,7 @@ function buildHistoricalScenarioRuns(
           cost: Number((0.0024 + random() * 0.0068).toFixed(6)),
           finishedAtMs: startedAt + latencyMs,
           metadata: {
-            labels: [
-              "demo-seed",
-              "scenario",
-              "historical",
-              passed ? "passed" : "failed",
-            ],
+            labels: ["demo-seed", "scenario", "historical", passed ? "passed" : "failed"],
             "scenario.run_id": runId,
             "scenario.id": scenario.scenarioId,
             "scenario.batch_run_id": batchRunId,
@@ -135,34 +126,28 @@ function buildHistoricalScenarioRuns(
   return runs;
 }
 
-function buildTraceFixtures(
-  historicalRuns: HistoricalScenarioRun[],
-): TraceFixture[] {
-  const experimentTraces = EXPERIMENT_VARIANTS.flatMap(
-    (variant, variantIndex) =>
-      EXPERIMENT_ROWS.map((row, index) => ({
-        traceId: `demo-platform-exp-${variant.name}-${index + 1}`,
-        userId: `demo-user-${["ines", "marcus", "priya"][index % 3]}`,
-        threadId: `demo-experiment-${variant.name}-${index + 1}`,
-        input: row.input,
-        output: variant.outputs[index]!,
-        model: variant.name === "baseline" ? "gpt-4.1-mini" : "gpt-5-mini",
-        latencyMs:
-          variant.name === "baseline" ? 1850 + index * 190 : 1220 + index * 130,
-        promptTokens: 75 + index * 9,
-        completionTokens: 38 + index * 7,
-        cost:
-          variant.name === "baseline"
-            ? 0.0038 + index * 0.0004
-            : 0.0029 + index * 0.0003,
-        metadata: {
-          labels: ["demo-seed", "experiment", variant.name],
-          "evaluation.run_id": variant.runId,
-          "langwatch.experiment_id": DEMO_PLATFORM_IDS.experiment,
-          "agent.id": DEMO_PLATFORM_IDS.agents.support,
-          "release.channel": variant.name,
-        },
-      })),
+function buildTraceFixtures(historicalRuns: HistoricalScenarioRun[]): TraceFixture[] {
+  const experimentTraces = EXPERIMENT_VARIANTS.flatMap((variant, variantIndex) =>
+    EXPERIMENT_ROWS.map((row, index) => ({
+      traceId: `demo-platform-exp-${variant.name}-${index + 1}`,
+      userId: `demo-user-${["ines", "marcus", "priya"][index % 3]}`,
+      threadId: `demo-experiment-${variant.name}-${index + 1}`,
+      input: row.input,
+      output: variant.outputs[index]!,
+      model: variant.name === "baseline" ? "gpt-4.1-mini" : "gpt-5-mini",
+      latencyMs: variant.name === "baseline" ? 1850 + index * 190 : 1220 + index * 130,
+      promptTokens: 75 + index * 9,
+      completionTokens: 38 + index * 7,
+      cost:
+        variant.name === "baseline" ? 0.0038 + index * 0.0004 : 0.0029 + index * 0.0003,
+      metadata: {
+        labels: ["demo-seed", "experiment", variant.name],
+        "evaluation.run_id": variant.runId,
+        "langwatch.experiment_id": DEMO_PLATFORM_IDS.experiment,
+        "agent.id": DEMO_PLATFORM_IDS.agents.support,
+        "release.channel": variant.name,
+      },
+    })),
   );
 
   const scenarioTraces = SCENARIO_FIXTURES.flatMap((scenario, scenarioIndex) =>
@@ -236,18 +221,13 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
         entry: {
           input: row.input,
           expected_output: row.expected,
-          category: [
-            "billing",
-            "onboarding",
-            "documentation",
-            "incident",
-            "escalation",
-          ][index],
+          category: ["billing", "onboarding", "documentation", "incident", "escalation"][
+            index
+          ],
         },
         predicted: { output: variant.outputs[index]! },
         cost: traces.find((trace) => trace.traceId === traceId)?.cost ?? null,
-        duration:
-          traces.find((trace) => trace.traceId === traceId)?.latencyMs ?? null,
+        duration: traces.find((trace) => trace.traceId === traceId)?.latencyMs ?? null,
         traceId,
       });
       const score = variant.scores[index]!;
@@ -263,12 +243,7 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
         status: "processed",
         score,
         passed: score >= 0.7,
-        label:
-          score >= 0.85
-            ? "excellent"
-            : score >= 0.7
-              ? "acceptable"
-              : "needs work",
+        label: score >= 0.85 ? "excellent" : score >= 0.7 ? "acceptable" : "needs work",
         details: `Seeded quality review scored ${Math.round(score * 100)}%.`,
         duration: 420 + index * 35,
         cost: 0.0008,
@@ -284,14 +259,8 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
         status: "processed",
         score,
         passed: score >= 0.7,
-        label:
-          score >= 0.85
-            ? "excellent"
-            : score >= 0.7
-              ? "acceptable"
-              : "needs work",
-        details:
-          "Evaluation emitted through the canonical event-sourcing command.",
+        label: score >= 0.85 ? "excellent" : score >= 0.7 ? "acceptable" : "needs work",
+        details: "Evaluation emitted through the canonical event-sourcing command.",
       });
     }
 
@@ -306,16 +275,12 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
 
   const suiteSetId = getSuiteSetId(DEMO_PLATFORM_IDS.suite);
   for (const [scenarioIndex, scenario] of SCENARIO_FIXTURES.entries()) {
-    for (const [variantIndex, variant] of (
-      ["baseline", "improved"] as const
-    ).entries()) {
+    for (const [variantIndex, variant] of (["baseline", "improved"] as const).entries()) {
       const runId = `demo-scenario-${scenarioIndex + 1}-${variant}`;
       const batchRunId = `demo-scenario-batch-${variant}`;
       const traceId = `demo-platform-sim-${scenarioIndex + 1}-${variant}`;
       const startedAt =
-        BASE_TIME +
-        (3 + variantIndex) * 60 * 60_000 +
-        scenarioIndex * 5 * 60_000;
+        BASE_TIME + (3 + variantIndex) * 60 * 60_000 + scenarioIndex * 5 * 60_000;
       const passed = variant === "improved";
       await app.simulations.startRun({
         tenantId: PROJECT_ID,
@@ -352,8 +317,7 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
         tenantId: PROJECT_ID,
         occurredAt: startedAt + 2_000,
         scenarioRunId: runId,
-        durationMs: traces.find((trace) => trace.traceId === traceId)
-          ?.latencyMs,
+        durationMs: traces.find((trace) => trace.traceId === traceId)?.latencyMs,
         status: passed ? "SUCCESS" : "FAILURE",
         results: {
           verdict: passed ? "success" : "failure",
@@ -407,8 +371,7 @@ async function projectionCounts(): Promise<ProjectionCounts> {
     query_params: { tenantId: PROJECT_ID },
     format: "JSONEachRow",
   });
-  const [row] =
-    await result.json<Record<keyof ProjectionCounts, string | number>>();
+  const [row] = await result.json<Record<keyof ProjectionCounts, string | number>>();
   if (!row) throw new Error("Projection count query returned no row");
   return {
     traces: Number(row.traces),
@@ -440,9 +403,7 @@ async function waitForProjections(): Promise<ProjectionCounts> {
     counts.experimentRuns < 2 ||
     counts.events < 20
   ) {
-    throw new Error(
-      `Timed out waiting for demo projections: ${JSON.stringify(counts)}`,
-    );
+    throw new Error(`Timed out waiting for demo projections: ${JSON.stringify(counts)}`);
   }
   return counts;
 }
@@ -467,9 +428,7 @@ async function main(): Promise<void> {
         fallbackFinishedAt: Date.now() - (traces.length - index) * 4 * 60_000,
       });
     }
-    console.log(
-      `🌱 Ingested ${traces.length} linked traces through ${target.endpoint}`,
-    );
+    console.log(`🌱 Ingested ${traces.length} linked traces through ${target.endpoint}`);
 
     await dispatchEventLifecycles(traces);
     const counts = await waitForProjections();

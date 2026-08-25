@@ -18,13 +18,7 @@
  * feature file whose scenarios are all untagged. Each of those exited 0.
  */
 
-import {
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -154,9 +148,7 @@ describe("isEntryModule", () => {
 
         // The lexical compare this replaced returned false here, so `main()`
         // never ran and the whole check exited 0 having measured nothing.
-        expect(isEntryModule({ invokedPath: link, modulePath: real })).toBe(
-          true,
-        );
+        expect(isEntryModule({ invokedPath: link, modulePath: real })).toBe(true);
       });
     });
   });
@@ -167,9 +159,7 @@ describe("isEntryModule", () => {
         const real = join(root, "check.ts");
         writeFileSync(real, "// script", "utf8");
 
-        expect(isEntryModule({ invokedPath: real, modulePath: real })).toBe(
-          true,
-        );
+        expect(isEntryModule({ invokedPath: real, modulePath: real })).toBe(true);
       });
     });
   });
@@ -182,9 +172,7 @@ describe("isEntryModule", () => {
         writeFileSync(real, "// script", "utf8");
         writeFileSync(other, "// other", "utf8");
 
-        expect(isEntryModule({ invokedPath: other, modulePath: real })).toBe(
-          false,
-        );
+        expect(isEntryModule({ invokedPath: other, modulePath: real })).toBe(false);
       });
     });
   });
@@ -239,9 +227,7 @@ describe("discoverFeatureFiles", () => {
         const notADir = join(root, "specs");
         writeFileSync(notADir, "", "utf8");
 
-        expect(() => discoverFeatureFiles([notADir])).toThrow(
-          /is not a directory/,
-        );
+        expect(() => discoverFeatureFiles([notADir])).toThrow(/is not a directory/);
       });
     });
   });

@@ -17,12 +17,8 @@ describe("BlobLeases", () => {
   describe("given a queue-scoped lease primitive", () => {
     describe("when a lease is taken", () => {
       it("uses tenant-namespaced lease and rolling-deploy guard keys", async () => {
-        const run = vi
-          .spyOn(CachedLuaScript.prototype, "run")
-          .mockResolvedValue(1);
-        const redis = {} as ConstructorParameters<
-          typeof BlobLeases
-        >[0]["redis"];
+        const run = vi.spyOn(CachedLuaScript.prototype, "run").mockResolvedValue(1);
+        const redis = {} as ConstructorParameters<typeof BlobLeases>[0]["redis"];
         const leases = new BlobLeases({
           redis,
           queueName: "{queue}",
@@ -50,12 +46,8 @@ describe("BlobLeases", () => {
 
     describe("when an S3-tier lease is released", () => {
       it("does not pass a blob key to the release script", async () => {
-        const run = vi
-          .spyOn(CachedLuaScript.prototype, "run")
-          .mockResolvedValue(0);
-        const redis = {} as ConstructorParameters<
-          typeof BlobLeases
-        >[0]["redis"];
+        const run = vi.spyOn(CachedLuaScript.prototype, "run").mockResolvedValue(0);
+        const redis = {} as ConstructorParameters<typeof BlobLeases>[0]["redis"];
         const leases = new BlobLeases({ redis, queueName: "{queue}" });
 
         await leases.release({
@@ -72,20 +64,14 @@ describe("BlobLeases", () => {
           "{queue}:gq:blobholders:project-1/hash-1",
           "holder-1",
         );
-        expect(run.mock.lastCall).not.toContain(
-          "{queue}:gq:blob:project-1/hash-1",
-        );
+        expect(run.mock.lastCall).not.toContain("{queue}:gq:blob:project-1/hash-1");
       });
     });
 
     describe("when a Redis-tier lease is released", () => {
       it("passes the blob key so the grace window can reach it", async () => {
-        const run = vi
-          .spyOn(CachedLuaScript.prototype, "run")
-          .mockResolvedValue(1);
-        const redis = {} as ConstructorParameters<
-          typeof BlobLeases
-        >[0]["redis"];
+        const run = vi.spyOn(CachedLuaScript.prototype, "run").mockResolvedValue(1);
+        const redis = {} as ConstructorParameters<typeof BlobLeases>[0]["redis"];
         const leases = new BlobLeases({ redis, queueName: "{queue}" });
 
         const graced = await leases.release({
@@ -110,9 +96,7 @@ describe("BlobLeases", () => {
     describe("when a release leaves other holders behind", () => {
       it("reports that no grace window was applied", async () => {
         vi.spyOn(CachedLuaScript.prototype, "run").mockResolvedValue(0);
-        const redis = {} as ConstructorParameters<
-          typeof BlobLeases
-        >[0]["redis"];
+        const redis = {} as ConstructorParameters<typeof BlobLeases>[0]["redis"];
         const leases = new BlobLeases({ redis, queueName: "{queue}" });
 
         const graced = await leases.release({
@@ -128,12 +112,8 @@ describe("BlobLeases", () => {
 
     describe("when a Redis-tier lease is renewed", () => {
       it("refreshes the lease and blob in one script", async () => {
-        const run = vi
-          .spyOn(CachedLuaScript.prototype, "run")
-          .mockResolvedValue(1);
-        const redis = {} as ConstructorParameters<
-          typeof BlobLeases
-        >[0]["redis"];
+        const run = vi.spyOn(CachedLuaScript.prototype, "run").mockResolvedValue(1);
+        const redis = {} as ConstructorParameters<typeof BlobLeases>[0]["redis"];
         const leases = new BlobLeases({ redis, queueName: "{queue}" });
 
         await leases.renew({

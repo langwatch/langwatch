@@ -9,10 +9,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
 import type { Entry, Field } from "@langwatch/workflow-contract";
-import {
-  store as storeCreator,
-  type WorkflowStore,
-} from "@langwatch/workflow-web";
+import { store as storeCreator, type WorkflowStore } from "@langwatch/workflow-web";
 
 function makeEntryNode({
   outputs = [],
@@ -119,10 +116,7 @@ describe("workflowStoreCore - entry dataset attach", () => {
         ]);
 
       const entry = store.getState().nodes[0]!.data as Entry;
-      expect(entry.outputs?.map((f) => f.identifier)).toEqual([
-        "query",
-        "context",
-      ]);
+      expect(entry.outputs?.map((f) => f.identifier)).toEqual(["query", "context"]);
       expect(entry.dataset?.id).toBe("dataset-2");
     });
   });

@@ -52,9 +52,7 @@ export function isTraceMetadataKeyEditable(key: string): boolean {
  * (`service.name`, `gen_ai.*`, `telemetry.*`) describes the run that produced
  * the trace rather than the trace, so it carries no correction.
  */
-export function traceMetadataKeyForAttribute(
-  attributeKey: string,
-): string | null {
+export function traceMetadataKeyForAttribute(attributeKey: string): string | null {
   const key = bareMetadataKey(attributeKey);
   if (key === null) return null;
   return isTraceMetadataKeyEditable(key) ? key : null;

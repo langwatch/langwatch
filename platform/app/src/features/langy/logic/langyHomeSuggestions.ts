@@ -89,9 +89,7 @@ export function selectLangySuggestions({
     evaluations: 2,
     traces: 1,
   };
-  const available = SUGGESTIONS.filter((suggestion) =>
-    met(suggestion.requires),
-  );
+  const available = SUGGESTIONS.filter((suggestion) => met(suggestion.requires));
   const ordered = available.toSorted(
     (a, b) => (rank[b.requires ?? ""] ?? 0) - (rank[a.requires ?? ""] ?? 0),
   );
@@ -101,8 +99,7 @@ export function selectLangySuggestions({
   // a gap — but only with the setup asks the project still needs.
   const topUp = SETUP_SUGGESTIONS.filter(
     (setup) =>
-      stillNeeded(setup) &&
-      !ordered.some((chosen) => chosen.label === setup.label),
+      stillNeeded(setup) && !ordered.some((chosen) => chosen.label === setup.label),
   );
   return [...ordered, ...topUp].slice(0, count);
 }

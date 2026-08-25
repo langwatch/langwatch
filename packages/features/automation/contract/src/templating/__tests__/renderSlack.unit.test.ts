@@ -105,9 +105,7 @@ describe("renderTriggerSlack", () => {
       const template = JSON.stringify([
         {
           type: "context",
-          elements: [
-            { type: "image", image_url: "https://tracker/p.png", alt_text: "" },
-          ],
+          elements: [{ type: "image", image_url: "https://tracker/p.png", alt_text: "" }],
         },
         {
           type: "rich_text",
@@ -127,9 +125,7 @@ describe("renderTriggerSlack", () => {
       const text = asText(slack.payload);
       expect(text).toContain("High latency");
       expect(slack.usedDefault).toBe(true);
-      expect(slack.errors).toEqual([
-        "Block Kit template produced no allowed blocks",
-      ]);
+      expect(slack.errors).toEqual(["Block Kit template produced no allowed blocks"]);
     });
   });
 

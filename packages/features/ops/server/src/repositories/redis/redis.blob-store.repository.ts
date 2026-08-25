@@ -144,12 +144,13 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
     const cursors: Record<string, string> = cursor
       ? (JSON.parse(cursor) as Record<string, string>)
       : {};
-    const nodes: Array<{ id: string; client: { scan: IORedis["scan"] } }> =
-      isCluster(this.redis)
-        ? this.redis
-            .nodes("master")
-            .map((node, index) => ({ id: String(index), client: node }))
-        : [{ id: "0", client: this.redis }];
+    const nodes: Array<{ id: string; client: { scan: IORedis["scan"] } }> = isCluster(
+      this.redis,
+    )
+      ? this.redis
+          .nodes("master")
+          .map((node, index) => ({ id: String(index), client: node }))
+      : [{ id: "0", client: this.redis }];
 
     const keys: string[] = [];
     const nextCursors: Record<string, string> = {};
@@ -181,9 +182,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
     return {
       facts: await this.describe(queueName, keys.slice(0, pageSize)),
       nextCursor:
-        Object.keys(nextCursors).length > 0
-          ? JSON.stringify(nextCursors)
-          : null,
+        Object.keys(nextCursors).length > 0 ? JSON.stringify(nextCursors) : null,
     };
   }
 
@@ -235,8 +234,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
     const now = Date.now();
     const byLapsedLease = (blob: BlobFacts): number =>
       // Future deadlines are live leases, not lapses; sort them last.
-      blob.earliestLeaseDeadlineMs === null ||
-      blob.earliestLeaseDeadlineMs > now
+      blob.earliestLeaseDeadlineMs === null || blob.earliestLeaseDeadlineMs > now
         ? Number.POSITIVE_INFINITY
         : blob.earliestLeaseDeadlineMs;
 
@@ -254,9 +252,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
         );
         break;
       case "unreferenced":
-        ranked.sort(
-          (a, b) => a.liveLeases - b.liveLeases || b.sizeBytes - a.sizeBytes,
-        );
+        ranked.sort((a, b) => a.liveLeases - b.liveLeases || b.sizeBytes - a.sizeBytes);
         break;
       case "oldest_lapsed_lease":
         ranked.sort((a, b) => byLapsedLease(a) - byLapsedLease(b));
@@ -297,10 +293,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
   }
 
   /** Batches the per-blob reads so a page of 200 is a handful of round trips, not 800. */
-  private async describe(
-    queueName: string,
-    keys: string[],
-  ): Promise<BlobFacts[]> {
+  private async describe(queueName: string, keys: string[]): Promise<BlobFacts[]> {
     if (keys.length === 0) return [];
     const prefix = redisBlobKeyPrefix(queueName);
     const parsed = keys
@@ -356,9 +349,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
         // The sentinel is bookkeeping, not a holder, so showing it would make
         // every blob look referenced by one phantom.
         holderTokens: Math.max(holders - 1, 0),
-        earliestLeaseDeadlineMs: Number.isFinite(earliestScore)
-          ? earliestScore
-          : null,
+        earliestLeaseDeadlineMs: Number.isFinite(earliestScore) ? earliestScore : null,
       });
     }
     return summaries;
@@ -424,11 +415,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
     }
   }
 
-  async findStats({
-    sampleLimit,
-  }: {
-    sampleLimit: number;
-  }): Promise<OpsBlobStoreStats> {
+  async findStats({ sampleLimit }: { sampleLimit: number }): Promise<OpsBlobStoreStats> {
     const queues: OpsBlobStoreStats["queues"] = [];
     for (const queueName of await this.findAllQueueNames()) {
       // Stats read counts and bytes, never the sweep verdict, so this stays on

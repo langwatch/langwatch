@@ -51,9 +51,7 @@ async function resolveDemoPersonas({
       },
     },
   });
-  const personalProjectIds = personalTeams.flatMap((t) =>
-    t.projects.map((p) => p.id),
-  );
+  const personalProjectIds = personalTeams.flatMap((t) => t.projects.map((p) => p.id));
   if (personalProjectIds.length === 0) return [];
 
   const personas: ResolvedPersona[] = [];

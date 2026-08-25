@@ -111,11 +111,7 @@ export function LangwatchSignalBadges({
       {ordered.map((bucket) => {
         const { icon, label, palette } = SIGNAL_DISPLAY[bucket];
         return (
-          <Tooltip
-            key={bucket}
-            content={label}
-            positioning={{ placement: "top" }}
-          >
+          <Tooltip key={bucket} content={label} positioning={{ placement: "top" }}>
             <Icon
               as={icon}
               boxSize={boxSize}

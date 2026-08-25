@@ -122,11 +122,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (ch) {
-    for (const table of [
-      "experiment_runs",
-      "experiment_run_items",
-      "trace_summaries",
-    ]) {
+    for (const table of ["experiment_runs", "experiment_run_items", "trace_summaries"]) {
       await ch.exec({
         query: `ALTER TABLE ${table} DELETE WHERE TenantId = {tenantId:String}`,
         query_params: { tenantId },

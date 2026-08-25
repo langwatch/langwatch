@@ -52,18 +52,16 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
     this.nlpServiceUrl = options.nlpServiceUrl;
     this.parameters = options.parameters ?? {};
     this.logger =
-      options.logger ??
-      createChildProcessLogger("langwatch:scenarios:prompt-adapter");
+      options.logger ?? createChildProcessLogger("langwatch:scenarios:prompt-adapter");
   }
 
   async call(input: AgentInput): Promise<string> {
-    const { context: templateContext, unboundInputs } =
-      buildPromptTemplateContext({
-        input,
-        inputs: this.config.inputs,
-        scenarioMappings: this.config.scenarioMappings,
-        parameters: this.parameters,
-      });
+    const { context: templateContext, unboundInputs } = buildPromptTemplateContext({
+      input,
+      inputs: this.config.inputs,
+      scenarioMappings: this.config.scenarioMappings,
+      parameters: this.parameters,
+    });
 
     if (unboundInputs.length > 0) {
       this.reportUnboundInputs(unboundInputs);
@@ -121,9 +119,7 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
    */
   private templateReadsConversation(): boolean {
     if (templateReferencesConversation(this.config.systemPrompt)) return true;
-    return this.config.messages.some((m) =>
-      templateReferencesConversation(m.content),
-    );
+    return this.config.messages.some((m) => templateReferencesConversation(m.content));
   }
 
   /**

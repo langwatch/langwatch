@@ -48,21 +48,19 @@ export const useRunEvalution = () => {
     allowSaveIfAutoSaveIsCurrentButNotLatest: true,
   });
 
-  const generateCommitMessage =
-    api.workflow.generateCommitMessage.useMutation();
+  const generateCommitMessage = api.workflow.generateCommitMessage.useMutation();
 
   // Cascade-resolved Fast model for commit-message autogen: null when
   // nothing is configured at any scope. Gates the generation call so a
   // missing model never auto-fires a doomed request (and its
   // missing-model toast) from a background autosave.
-  const resolvedCommitMessageModel =
-    api.modelProvider.getResolvedDefault.useQuery(
-      {
-        projectId: project?.id ?? "",
-        featureKey: "workflows.commit_message",
-      },
-      { enabled: !!project?.id },
-    );
+  const resolvedCommitMessageModel = api.modelProvider.getResolvedDefault.useQuery(
+    {
+      projectId: project?.id ?? "",
+      featureKey: "workflows.commit_message",
+    },
+    { enabled: !!project?.id },
+  );
 
   const trpc = api.useUtils();
 
@@ -92,9 +90,7 @@ export const useRunEvalution = () => {
       });
       toaster.create({
         title: `Timeout ${
-          triggerTimeout.timeout_on_status === "waiting"
-            ? "starting"
-            : "stopping"
+          triggerTimeout.timeout_on_status === "waiting" ? "starting" : "stopping"
         } evaluation execution`,
         type: "error",
         duration: 5000,
@@ -147,12 +143,11 @@ export const useRunEvalution = () => {
         let commitMessage = previousVersion ? "autosaved" : "first version";
         if (previousVersion?.dsl && resolvedCommitMessageModel.data != null) {
           try {
-            const commitMessageResponse =
-              await generateCommitMessage.mutateAsync({
-                projectId: project?.id ?? "",
-                prevDsl: previousVersion?.dsl,
-                newDsl: getWorkflow(),
-              });
+            const commitMessageResponse = await generateCommitMessage.mutateAsync({
+              projectId: project?.id ?? "",
+              prevDsl: previousVersion?.dsl,
+              newDsl: getWorkflow(),
+            });
             commitMessage = (commitMessageResponse as string) ?? "autosaved";
           } catch (err) {
             // Autogen is cosmetic sugar over the "autosaved" fallback;
@@ -274,7 +269,6 @@ export const useRunEvalution = () => {
   return {
     runEvaluation,
     stopEvaluation,
-    isLoading:
-      isLoading || generateCommitMessage.isPending || commitVersion.isPending,
+    isLoading: isLoading || generateCommitMessage.isPending || commitVersion.isPending,
   };
 };

@@ -1561,7 +1561,22 @@ jobs:
           path: vitest.durations.json
 
   langwatch-app-complete:
-    needs: [changes, typecheck, test-unit, test-component, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test, pack-filters]
+    needs:
+      [
+        changes,
+        typecheck,
+        test-unit,
+        test-component,
+        test-integration,
+        lint,
+        ast-grep,
+        feature-parity,
+        openapi-completeness,
+        build,
+        ci-scripts-test,
+        ci-self-test,
+        pack-filters,
+      ]
     if: always()
     runs-on: ubuntu-latest
     steps:

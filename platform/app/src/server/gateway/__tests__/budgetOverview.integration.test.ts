@@ -54,9 +54,7 @@ describe("budget overview (real PG + CH + Redis)", () => {
 
       expect(overview.gatewayAccess).toBe(true);
       const org = overview.budgets.find((b) => b.id === BUDGET_ORG_ID);
-      const personal = overview.budgets.find(
-        (b) => b.id === BUDGET_PRINCIPAL_ID,
-      );
+      const personal = overview.budgets.find((b) => b.id === BUDGET_PRINCIPAL_ID);
       expect(org).toBeDefined();
       expect(personal).toBeDefined();
 
@@ -73,12 +71,8 @@ describe("budget overview (real PG + CH + Redis)", () => {
 
       // Most binding first: the personal cap leads, the org pool trails.
       const ids = overview.budgets.map((b) => b.id);
-      expect(ids.indexOf(BUDGET_PRINCIPAL_ID)).toBeLessThan(
-        ids.indexOf(BUDGET_ORG_ID),
-      );
-      expect(ids.indexOf(BUDGET_GROUP_ID)).toBeLessThan(
-        ids.indexOf(BUDGET_ORG_ID),
-      );
+      expect(ids.indexOf(BUDGET_PRINCIPAL_ID)).toBeLessThan(ids.indexOf(BUDGET_ORG_ID));
+      expect(ids.indexOf(BUDGET_GROUP_ID)).toBeLessThan(ids.indexOf(BUDGET_ORG_ID));
     });
 
     /** @scenario "A provider-filtered budget names its provider" */
@@ -87,9 +81,7 @@ describe("budget overview (real PG + CH + Redis)", () => {
         organizationId: ORG_ID,
         userId: USER_ID,
       });
-      const filtered = overview.budgets.find(
-        (b) => b.id === BUDGET_PROVIDER_ID,
-      );
+      const filtered = overview.budgets.find((b) => b.id === BUDGET_PROVIDER_ID);
       expect(filtered).toBeDefined();
       expect(filtered!.providerLabel).toBe("OpenAI");
       expect(Number(filtered!.spentUsd)).toBeCloseTo(0.05, 6);
@@ -104,9 +96,7 @@ describe("budget overview (real PG + CH + Redis)", () => {
       const dept = overview.budgets.find((b) => b.id === BUDGET_GROUP_ID);
       expect(dept).toBeDefined();
       expect(dept!.scopeClass).toBe("department");
-      expect(dept!.scopePhrase).toBe(
-        `department budget (Engineering ${suffix})`,
-      );
+      expect(dept!.scopePhrase).toBe(`department budget (Engineering ${suffix})`);
       expect(dept!.isPerMember).toBe(true);
       // Their own $2.00, not the group's $11.00.
       expect(Number(dept!.spentUsd)).toBeCloseTo(2, 6);
@@ -179,14 +169,8 @@ describe("budget overview (real PG + CH + Redis)", () => {
 
       // The property the initiative exists for: one number, everywhere.
       expect(Number(trpcOrg!.spentUsd)).toBeCloseTo(2.43, 6);
-      expect(Number(restOrg!.spentUsd)).toBeCloseTo(
-        Number(trpcOrg!.spentUsd),
-        6,
-      );
-      expect(Number(viaSettings.spentUsd)).toBeCloseTo(
-        Number(trpcOrg!.spentUsd),
-        6,
-      );
+      expect(Number(restOrg!.spentUsd)).toBeCloseTo(Number(trpcOrg!.spentUsd), 6);
+      expect(Number(viaSettings.spentUsd)).toBeCloseTo(Number(trpcOrg!.spentUsd), 6);
       expect(restOrg!.scopePhrase).toBe(trpcOrg!.scopePhrase);
     });
   });
@@ -203,9 +187,7 @@ describe("budget overview (real PG + CH + Redis)", () => {
       const viaTrpc = await caller.user.budgetOverview({
         organizationId: ORG_ID,
       });
-      const trpcArchived = viaTrpc.budgets.find(
-        (b) => b.id === BUDGET_ARCHIVED_ID,
-      );
+      const trpcArchived = viaTrpc.budgets.find((b) => b.id === BUDGET_ARCHIVED_ID);
       expect(trpcArchived).toBeDefined();
 
       const { app } = await import("~/server/routes/auth-cli");
@@ -216,9 +198,7 @@ describe("budget overview (real PG + CH + Redis)", () => {
       const viaRest = (await res.json()) as {
         budgets: Array<{ id: string; spentUsd: string }>;
       };
-      const restArchived = viaRest.budgets.find(
-        (b) => b.id === BUDGET_ARCHIVED_ID,
-      );
+      const restArchived = viaRest.budgets.find((b) => b.id === BUDGET_ARCHIVED_ID);
       expect(restArchived).toBeDefined();
 
       const viaSettings = await caller.gatewayBudgets.get({

@@ -13,7 +13,10 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 const scopeTypeSchema = z.nativeEnum(RoleBindingScopeType);
 const roleSchema = z.nativeEnum(TeamUserRole);
 
-const roleBindingService = (prisma: PrismaClient, roleService: RoleService): RoleBindingService =>
+const roleBindingService = (
+  prisma: PrismaClient,
+  roleService: RoleService,
+): RoleBindingService =>
   new RoleBindingService({
     prisma,
     repo: new PrismaRoleBindingRepository(prisma),

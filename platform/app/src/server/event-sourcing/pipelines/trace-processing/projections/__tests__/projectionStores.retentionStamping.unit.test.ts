@@ -1,5 +1,8 @@
 import type { ProjectionStoreContext } from "@langwatch/eventing";
-import type { EvaluationService, EvaluationRunData } from "@langwatch/evaluation-contract";
+import type {
+  EvaluationService,
+  EvaluationRunData,
+} from "@langwatch/evaluation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";

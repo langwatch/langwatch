@@ -1,10 +1,7 @@
 import { createServer, type Server } from "http";
 import { afterAll, beforeAll, describe, expect, it, vi, beforeEach } from "vitest";
 import { initConfig } from "../config.js";
-import {
-  fetchDocumentation,
-  resolveDocumentationUrl,
-} from "../documentation-fetch.js";
+import { fetchDocumentation, resolveDocumentationUrl } from "../documentation-fetch.js";
 
 // --- Canned responses for every API endpoint ---
 
@@ -130,10 +127,7 @@ const CANNED_SCENARIOS_LIST = [
     id: "scen_abc123",
     name: "Login Flow Happy Path",
     situation: "User attempts to log in with valid credentials",
-    criteria: [
-      "Responds with a welcome message",
-      "Includes user name in greeting",
-    ],
+    criteria: ["Responds with a welcome message", "Includes user name in greeting"],
     labels: ["auth", "happy-path"],
   },
   {
@@ -149,10 +143,7 @@ const CANNED_SCENARIO_DETAIL = {
   id: "scen_abc123",
   name: "Login Flow Happy Path",
   situation: "User attempts to log in with valid credentials",
-  criteria: [
-    "Responds with a welcome message",
-    "Includes user name in greeting",
-  ],
+  criteria: ["Responds with a welcome message", "Includes user name in greeting"],
   labels: ["auth", "happy-path"],
 };
 
@@ -292,46 +283,148 @@ const CANNED_MODEL_PROVIDERS_LIST = {
 
 const CANNED_AGENTS_LIST = {
   data: [
-    { id: "agent_abc", name: "Test Agent", type: "http", config: { url: "http://example.com" }, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
+    {
+      id: "agent_abc",
+      name: "Test Agent",
+      type: "http",
+      config: { url: "http://example.com" },
+      createdAt: "2024-01-01T00:00:00Z",
+      updatedAt: "2024-01-01T00:00:00Z",
+    },
   ],
   pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
 };
 
 const CANNED_AGENT_DETAIL = {
-  id: "agent_abc", name: "Test Agent", type: "http", config: { url: "http://example.com" }, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
+  id: "agent_abc",
+  name: "Test Agent",
+  type: "http",
+  config: { url: "http://example.com" },
+  createdAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
 };
 
 const CANNED_SUITES_LIST = [
-  { id: "suite_abc", name: "Regression Suite", slug: "regression-suite", description: null, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 1, labels: [], createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
+  {
+    id: "suite_abc",
+    name: "Regression Suite",
+    slug: "regression-suite",
+    description: null,
+    scenarioIds: ["scen_abc123"],
+    targets: [{ type: "http", referenceId: "agent_abc" }],
+    repeatCount: 1,
+    labels: [],
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+  },
 ];
 
 const CANNED_SUITE_DETAIL = {
-  id: "suite_abc", name: "Regression Suite", slug: "regression-suite", description: "A test suite", scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 1, labels: [], createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
+  id: "suite_abc",
+  name: "Regression Suite",
+  slug: "regression-suite",
+  description: "A test suite",
+  scenarioIds: ["scen_abc123"],
+  targets: [{ type: "http", referenceId: "agent_abc" }],
+  repeatCount: 1,
+  labels: [],
+  createdAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
 };
 
 const CANNED_SUITE_CREATED = {
-  id: "suite_new", name: "New Suite", slug: "new-suite", description: null, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 1, labels: [], createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
+  id: "suite_new",
+  name: "New Suite",
+  slug: "new-suite",
+  description: null,
+  scenarioIds: ["scen_abc123"],
+  targets: [{ type: "http", referenceId: "agent_abc" }],
+  repeatCount: 1,
+  labels: [],
+  createdAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
 };
 
 const CANNED_SUITE_RUN = {
-  scheduled: true, batchRunId: "batch_123", setId: "set_456", jobCount: 1, skippedArchived: { scenarios: [], targets: [] }, items: [{ scenarioRunId: "run_1", scenarioId: "scen_abc123", target: { type: "http", referenceId: "agent_abc" }, name: "Test" }],
+  scheduled: true,
+  batchRunId: "batch_123",
+  setId: "set_456",
+  jobCount: 1,
+  skippedArchived: { scenarios: [], targets: [] },
+  items: [
+    {
+      scenarioRunId: "run_1",
+      scenarioId: "scen_abc123",
+      target: { type: "http", referenceId: "agent_abc" },
+      name: "Test",
+    },
+  ],
 };
 
 const CANNED_SIMULATION_RUNS = {
-  runs: [{ scenarioRunId: "run_abc", scenarioId: "scen_abc123", batchRunId: "batch_xyz", name: "Login Flow", status: "SUCCESS", durationInMs: 5200, totalCost: 0.0042, timestamp: 1700000000000, updatedAt: 1700000001000 }],
+  runs: [
+    {
+      scenarioRunId: "run_abc",
+      scenarioId: "scen_abc123",
+      batchRunId: "batch_xyz",
+      name: "Login Flow",
+      status: "SUCCESS",
+      durationInMs: 5200,
+      totalCost: 0.0042,
+      timestamp: 1700000000000,
+      updatedAt: 1700000001000,
+    },
+  ],
   hasMore: false,
 };
 
 const CANNED_SIMULATION_RUN_DETAIL = {
-  scenarioRunId: "run_abc", scenarioId: "scen_abc123", batchRunId: "batch_xyz", name: "Login Flow", status: "SUCCESS", durationInMs: 5200, totalCost: 0.0042, results: { verdict: "passed", reasoning: "All criteria met", metCriteria: ["Greets user"], unmetCriteria: [], error: null }, messages: [{ role: "user", content: "Hello" }, { role: "assistant", content: "Hi there!" }], timestamp: 1700000000000, updatedAt: 1700000001000,
+  scenarioRunId: "run_abc",
+  scenarioId: "scen_abc123",
+  batchRunId: "batch_xyz",
+  name: "Login Flow",
+  status: "SUCCESS",
+  durationInMs: 5200,
+  totalCost: 0.0042,
+  results: {
+    verdict: "passed",
+    reasoning: "All criteria met",
+    metCriteria: ["Greets user"],
+    unmetCriteria: [],
+    error: null,
+  },
+  messages: [
+    { role: "user", content: "Hello" },
+    { role: "assistant", content: "Hi there!" },
+  ],
+  timestamp: 1700000000000,
+  updatedAt: 1700000001000,
 };
 
 const CANNED_DASHBOARDS_LIST = {
-  data: [{ id: "dash_abc", name: "Main Dashboard", order: 0, graphCount: 3, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" }],
+  data: [
+    {
+      id: "dash_abc",
+      name: "Main Dashboard",
+      order: 0,
+      graphCount: 3,
+      createdAt: "2024-01-01T00:00:00Z",
+      updatedAt: "2024-01-01T00:00:00Z",
+    },
+  ],
 };
 
 const CANNED_WORKFLOWS_LIST = [
-  { id: "wf_abc", name: "Test Workflow", icon: null, description: "A workflow", isEvaluator: false, isComponent: false, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
+  {
+    id: "wf_abc",
+    name: "Test Workflow",
+    icon: null,
+    description: "A workflow",
+    isEvaluator: false,
+    isComponent: false,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+  },
 ];
 
 const CANNED_MODEL_PROVIDER_SET = {
@@ -391,10 +484,7 @@ function createMockServer(): Server {
       ) {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Trace not found" }));
-      } else if (
-        url.match(/^\/api\/traces\/[^/]+(\?|$)/) &&
-        method === "GET"
-      ) {
+      } else if (url.match(/^\/api\/traces\/[^/]+(\?|$)/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_TRACE_DETAIL));
       }
@@ -410,16 +500,10 @@ function createMockServer(): Server {
       } else if (url === "/api/prompts" && method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_CREATED));
-      } else if (
-        url.match(/^\/api\/prompts\/[^/]+$/) &&
-        method === "GET"
-      ) {
+      } else if (url.match(/^\/api\/prompts\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_DETAIL));
-      } else if (
-        url.match(/^\/api\/prompts\/[^/]+$/) &&
-        method === "PUT"
-      ) {
+      } else if (url.match(/^\/api\/prompts\/[^/]+$/) && method === "PUT") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
       }
@@ -436,22 +520,13 @@ function createMockServer(): Server {
       ) {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Scenario not found" }));
-      } else if (
-        url.match(/^\/api\/scenarios\/[^/]+$/) &&
-        method === "GET"
-      ) {
+      } else if (url.match(/^\/api\/scenarios\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_DETAIL));
-      } else if (
-        url.match(/^\/api\/scenarios\/[^/]+$/) &&
-        method === "PUT"
-      ) {
+      } else if (url.match(/^\/api\/scenarios\/[^/]+$/) && method === "PUT") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_UPDATED));
-      } else if (
-        url.match(/^\/api\/scenarios\/[^/]+$/) &&
-        method === "DELETE"
-      ) {
+      } else if (url.match(/^\/api\/scenarios\/[^/]+$/) && method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_ARCHIVED));
       }
@@ -468,16 +543,10 @@ function createMockServer(): Server {
       ) {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Evaluator not found" }));
-      } else if (
-        url.match(/^\/api\/evaluators\/[^/]+$/) &&
-        method === "GET"
-      ) {
+      } else if (url.match(/^\/api\/evaluators\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_EVALUATOR_DETAIL));
-      } else if (
-        url.match(/^\/api\/evaluators\/[^/]+$/) &&
-        method === "PUT"
-      ) {
+      } else if (url.match(/^\/api\/evaluators\/[^/]+$/) && method === "PUT") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_EVALUATOR_UPDATED));
       }
@@ -485,10 +554,7 @@ function createMockServer(): Server {
       else if (url === "/api/model-providers" && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_MODEL_PROVIDERS_LIST));
-      } else if (
-        url.match(/^\/api\/model-providers\/[^/]+$/) &&
-        method === "PUT"
-      ) {
+      } else if (url.match(/^\/api\/model-providers\/[^/]+$/) && method === "PUT") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_MODEL_PROVIDER_SET));
       }
@@ -571,68 +637,161 @@ function createMockServer(): Server {
       // --- Monitor endpoints ---
       else if (url === "/api/monitors" && method === "GET") {
         res.writeHead(200);
-        res.end(JSON.stringify([
-          { id: "mon_abc", name: "Toxicity Check", slug: "toxicity-check-x1y2z", checkType: "ragas/toxicity", enabled: true, executionMode: "ON_MESSAGE", sample: 1.0, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
-        ]));
+        res.end(
+          JSON.stringify([
+            {
+              id: "mon_abc",
+              name: "Toxicity Check",
+              slug: "toxicity-check-x1y2z",
+              checkType: "ragas/toxicity",
+              enabled: true,
+              executionMode: "ON_MESSAGE",
+              sample: 1.0,
+              level: "trace",
+              evaluatorId: null,
+              preconditions: [],
+              parameters: {},
+              mappings: {},
+              threadIdleTimeout: null,
+              createdAt: "2026-01-01T00:00:00Z",
+              updatedAt: "2026-01-01T00:00:00Z",
+            },
+          ]),
+        );
       } else if (url === "/api/monitors" && method === "POST") {
         res.writeHead(201);
-        res.end(JSON.stringify({ id: "mon_new", name: "New Monitor", slug: "new-monitor-abc12", checkType: "ragas/toxicity", enabled: true, executionMode: "ON_MESSAGE", sample: 1.0, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }));
+        res.end(
+          JSON.stringify({
+            id: "mon_new",
+            name: "New Monitor",
+            slug: "new-monitor-abc12",
+            checkType: "ragas/toxicity",
+            enabled: true,
+            executionMode: "ON_MESSAGE",
+            sample: 1.0,
+            level: "trace",
+            evaluatorId: null,
+            preconditions: [],
+            parameters: {},
+            mappings: {},
+            threadIdleTimeout: null,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+          }),
+        );
       } else if (url?.match(/^\/api\/monitors\/[^/]+\/toggle$/) && method === "POST") {
         const monitorId = url?.split("/")[3];
         res.writeHead(200);
         res.end(JSON.stringify({ id: monitorId, enabled: true }));
       } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
-        res.end(JSON.stringify({ id: "mon_abc", name: "Toxicity Check", slug: "toxicity-check-x1y2z", checkType: "ragas/toxicity", enabled: true, executionMode: "ON_MESSAGE", sample: 1.0, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }));
+        res.end(
+          JSON.stringify({
+            id: "mon_abc",
+            name: "Toxicity Check",
+            slug: "toxicity-check-x1y2z",
+            checkType: "ragas/toxicity",
+            enabled: true,
+            executionMode: "ON_MESSAGE",
+            sample: 1.0,
+            level: "trace",
+            evaluatorId: null,
+            preconditions: [],
+            parameters: {},
+            mappings: {},
+            threadIdleTimeout: null,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+          }),
+        );
       } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "PATCH") {
         res.writeHead(200);
-        res.end(JSON.stringify({ id: "mon_abc", name: "Updated Monitor", slug: "toxicity-check-x1y2z", checkType: "ragas/toxicity", enabled: false, executionMode: "ON_MESSAGE", sample: 0.5, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z" }));
+        res.end(
+          JSON.stringify({
+            id: "mon_abc",
+            name: "Updated Monitor",
+            slug: "toxicity-check-x1y2z",
+            checkType: "ragas/toxicity",
+            enabled: false,
+            executionMode: "ON_MESSAGE",
+            sample: 0.5,
+            level: "trace",
+            evaluatorId: null,
+            preconditions: [],
+            parameters: {},
+            mappings: {},
+            threadIdleTimeout: null,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-02T00:00:00Z",
+          }),
+        );
       } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "DELETE") {
         const monitorId = url?.split("/").pop();
         res.writeHead(200);
         res.end(JSON.stringify({ id: monitorId, deleted: true }));
       }
       // --- Secret endpoints ---
-      else if (
-        url === "/api/secrets/latest/secrets.list" &&
-        method === "POST"
-      ) {
+      else if (url === "/api/secrets/latest/secrets.list" && method === "POST") {
         res.writeHead(200);
-        res.end(JSON.stringify([
-          { id: "secret_abc", projectId: "proj_123", name: "MY_API_KEY", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
-          { id: "secret_def", projectId: "proj_123", name: "DB_PASSWORD", createdAt: "2026-01-02T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z" },
-        ]));
-      } else if (
-        url === "/api/secrets/latest/secrets.get" &&
-        method === "POST"
-      ) {
+        res.end(
+          JSON.stringify([
+            {
+              id: "secret_abc",
+              projectId: "proj_123",
+              name: "MY_API_KEY",
+              createdAt: "2026-01-01T00:00:00Z",
+              updatedAt: "2026-01-01T00:00:00Z",
+            },
+            {
+              id: "secret_def",
+              projectId: "proj_123",
+              name: "DB_PASSWORD",
+              createdAt: "2026-01-02T00:00:00Z",
+              updatedAt: "2026-01-02T00:00:00Z",
+            },
+          ]),
+        );
+      } else if (url === "/api/secrets/latest/secrets.get" && method === "POST") {
         res.writeHead(200);
-        res.end(JSON.stringify({ id: "secret_abc", projectId: "proj_123", name: "MY_API_KEY", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }));
-      } else if (
-        url === "/api/secrets/latest/secrets.create" &&
-        method === "POST"
-      ) {
+        res.end(
+          JSON.stringify({
+            id: "secret_abc",
+            projectId: "proj_123",
+            name: "MY_API_KEY",
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+          }),
+        );
+      } else if (url === "/api/secrets/latest/secrets.create" && method === "POST") {
         res.writeHead(201);
-        res.end(JSON.stringify({ id: "secret_new", projectId: "proj_123", name: "NEW_SECRET", createdAt: "2026-01-03T00:00:00Z", updatedAt: "2026-01-03T00:00:00Z" }));
-      } else if (
-        url === "/api/secrets/latest/secrets.update" &&
-        method === "POST"
-      ) {
+        res.end(
+          JSON.stringify({
+            id: "secret_new",
+            projectId: "proj_123",
+            name: "NEW_SECRET",
+            createdAt: "2026-01-03T00:00:00Z",
+            updatedAt: "2026-01-03T00:00:00Z",
+          }),
+        );
+      } else if (url === "/api/secrets/latest/secrets.update" && method === "POST") {
         res.writeHead(200);
-        res.end(JSON.stringify({ id: "secret_abc", projectId: "proj_123", name: "MY_API_KEY", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-03T00:00:00Z" }));
-      } else if (
-        url === "/api/secrets/latest/secrets.delete" &&
-        method === "POST"
-      ) {
+        res.end(
+          JSON.stringify({
+            id: "secret_abc",
+            projectId: "proj_123",
+            name: "MY_API_KEY",
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-03T00:00:00Z",
+          }),
+        );
+      } else if (url === "/api/secrets/latest/secrets.delete" && method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify({ id: "secret_abc", deleted: true }));
       }
       // --- Fallback ---
       else {
         res.writeHead(404);
-        res.end(
-          JSON.stringify({ message: `Not found: ${method} ${url}` }),
-        );
+        res.end(JSON.stringify({ message: `Not found: ${method} ${url}` }));
       }
     });
   });
@@ -677,15 +836,9 @@ describe("All MCP tools integration", () => {
     });
 
     it("fetches trusted docs without following redirects", async () => {
-      const mockFetch = vi.fn().mockResolvedValue(
-        new Response("# Integration Guide"),
-      );
+      const mockFetch = vi.fn().mockResolvedValue(new Response("# Integration Guide"));
 
-      const text = await fetchDocumentation(
-        "langwatch",
-        "integration",
-        mockFetch,
-      );
+      const text = await fetchDocumentation("langwatch", "integration", mockFetch);
 
       expect(text).toContain("Integration Guide");
       expect(mockFetch).toHaveBeenCalledWith(
@@ -722,9 +875,7 @@ describe("All MCP tools integration", () => {
     describe("when category is filters", () => {
       /** @scenario Agent discovers available filter fields */
       it("returns filter field documentation", async () => {
-        const { formatSchema } = await import(
-          "../tools/discover-schema.js"
-        );
+        const { formatSchema } = await import("../tools/discover-schema.js");
         const result = formatSchema("filters");
 
         expect(result).toContain("## Available Filter Fields");
@@ -735,9 +886,7 @@ describe("All MCP tools integration", () => {
     describe("when category is metrics", () => {
       /** @scenario Agent discovers available metrics with allowed aggregations */
       it("returns metric documentation", async () => {
-        const { formatSchema } = await import(
-          "../tools/discover-schema.js"
-        );
+        const { formatSchema } = await import("../tools/discover-schema.js");
         const result = formatSchema("metrics");
 
         expect(result).toContain("## Available Metrics");
@@ -746,9 +895,7 @@ describe("All MCP tools integration", () => {
 
     describe("when category is aggregations", () => {
       it("returns aggregation types", async () => {
-        const { formatSchema } = await import(
-          "../tools/discover-schema.js"
-        );
+        const { formatSchema } = await import("../tools/discover-schema.js");
         const result = formatSchema("aggregations");
 
         expect(result).toContain("## Available Aggregation Types");
@@ -761,9 +908,7 @@ describe("All MCP tools integration", () => {
     describe("when category is groups", () => {
       /** @scenario Agent discovers available group-by options */
       it("returns group-by options", async () => {
-        const { formatSchema } = await import(
-          "../tools/discover-schema.js"
-        );
+        const { formatSchema } = await import("../tools/discover-schema.js");
         const result = formatSchema("groups");
 
         expect(result).toContain("## Available Group-By Options");
@@ -772,9 +917,8 @@ describe("All MCP tools integration", () => {
 
     describe("when category is scenarios", () => {
       it("returns scenario schema documentation", async () => {
-        const { formatScenarioSchema } = await import(
-          "../tools/discover-scenario-schema.js"
-        );
+        const { formatScenarioSchema } =
+          await import("../tools/discover-scenario-schema.js");
         const result = formatScenarioSchema();
 
         expect(result).toContain("# Scenario Schema");
@@ -785,9 +929,8 @@ describe("All MCP tools integration", () => {
 
     describe("when category is evaluators", () => {
       it("returns evaluator type overview", async () => {
-        const { formatEvaluatorSchema } = await import(
-          "../tools/discover-evaluator-schema.js"
-        );
+        const { formatEvaluatorSchema } =
+          await import("../tools/discover-evaluator-schema.js");
         const result = formatEvaluatorSchema();
 
         expect(result).toContain("# Available Evaluator Types");
@@ -796,9 +939,8 @@ describe("All MCP tools integration", () => {
 
     describe("when category is evaluators with specific type", () => {
       it("returns detailed evaluator schema", async () => {
-        const { formatEvaluatorSchema } = await import(
-          "../tools/discover-evaluator-schema.js"
-        );
+        const { formatEvaluatorSchema } =
+          await import("../tools/discover-evaluator-schema.js");
         const result = formatEvaluatorSchema("langevals/llm_boolean");
 
         expect(result).toContain("langevals/llm_boolean");
@@ -808,21 +950,18 @@ describe("All MCP tools integration", () => {
 
     describe("when evaluator type is unknown", () => {
       it("returns an error message", async () => {
-        const { formatEvaluatorSchema } = await import(
-          "../tools/discover-evaluator-schema.js"
-        );
+        const { formatEvaluatorSchema } =
+          await import("../tools/discover-evaluator-schema.js");
         const result = formatEvaluatorSchema("nonexistent/type");
 
-        expect(result).toContain('Unknown evaluator type');
+        expect(result).toContain("Unknown evaluator type");
       });
     });
 
     describe("when category is all", () => {
       /** @scenario Agent discovers all schema information at once */
       it("returns all schema categories", async () => {
-        const { formatSchema } = await import(
-          "../tools/discover-schema.js"
-        );
+        const { formatSchema } = await import("../tools/discover-schema.js");
         const result = formatSchema("all");
 
         expect(result).toContain("## Available Filter Fields");
@@ -840,9 +979,7 @@ describe("All MCP tools integration", () => {
     describe("when traces are found", () => {
       /** @scenario Agent searches traces with a text query */
       it("returns formatted trace digests", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.js");
         const result = await handleSearchTraces({
           startDate: "24h",
           endDate: "now",
@@ -856,9 +993,7 @@ describe("All MCP tools integration", () => {
 
     describe("when no traces match", () => {
       it("returns a no-results message", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.js");
         const result = await handleSearchTraces({
           query: "__empty__",
         });
@@ -870,9 +1005,7 @@ describe("All MCP tools integration", () => {
     describe("when pagination token is present", () => {
       /** @scenario Agent paginates through trace results */
       it("includes scroll ID for next page", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.js");
         const result = await handleSearchTraces({
           pageSize: 5,
         });
@@ -883,9 +1016,7 @@ describe("All MCP tools integration", () => {
 
     describe("when format is json", () => {
       it("returns parseable JSON", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.js");
         const result = await handleSearchTraces({
           format: "json",
         });
@@ -900,9 +1031,7 @@ describe("All MCP tools integration", () => {
     describe("when filters are applied", () => {
       /** @scenario Agent searches traces filtered by user_id */
       it("passes filters to the API", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.js");
         await handleSearchTraces({
           filters: { "metadata.user_id": ["user-42"] },
         });
@@ -919,9 +1048,7 @@ describe("All MCP tools integration", () => {
     describe("given a trace has evaluation results", () => {
       /** @scenario Agent searches traces and sees evaluation results without a follow-up call */
       it("includes evaluation status in the digest without a follow-up call", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.js");
         const result = await handleSearchTraces({
           startDate: "24h",
           endDate: "now",
@@ -939,9 +1066,7 @@ describe("All MCP tools integration", () => {
     describe("when trace exists", () => {
       /** @scenario Agent gets a single trace by ID in AI-readable format */
       it("returns formatted trace with metadata and evaluations", async () => {
-        const { handleGetTrace } = await import(
-          "../tools/get-trace.js"
-        );
+        const { handleGetTrace } = await import("../tools/get-trace.js");
         const result = await handleGetTrace({ traceId: "trace-001" });
 
         expect(result).toContain("# Trace: trace-001");
@@ -957,21 +1082,17 @@ describe("All MCP tools integration", () => {
     describe("when trace does not exist", () => {
       /** @scenario Agent gets a trace that does not exist */
       it("propagates the 404 error", async () => {
-        const { handleGetTrace } = await import(
-          "../tools/get-trace.js"
-        );
+        const { handleGetTrace } = await import("../tools/get-trace.js");
 
-        await expect(
-          handleGetTrace({ traceId: "trace-nonexistent" }),
-        ).rejects.toThrow("404");
+        await expect(handleGetTrace({ traceId: "trace-nonexistent" })).rejects.toThrow(
+          "404",
+        );
       });
     });
 
     describe("when format is json", () => {
       it("returns parseable JSON with full trace data", async () => {
-        const { handleGetTrace } = await import(
-          "../tools/get-trace.js"
-        );
+        const { handleGetTrace } = await import("../tools/get-trace.js");
         const result = await handleGetTrace({
           traceId: "trace-001",
           format: "json",
@@ -991,9 +1112,7 @@ describe("All MCP tools integration", () => {
   describe("get_analytics", () => {
     describe("when data is available", () => {
       it("returns formatted analytics with markdown table", async () => {
-        const { handleGetAnalytics } = await import(
-          "../tools/get-analytics.js"
-        );
+        const { handleGetAnalytics } = await import("../tools/get-analytics.js");
         const result = await handleGetAnalytics({
           metric: "metadata.trace_id",
           aggregation: "cardinality",
@@ -1008,9 +1127,7 @@ describe("All MCP tools integration", () => {
 
     describe("when metric and aggregation are specified", () => {
       it("passes them through to the API", async () => {
-        const { handleGetAnalytics } = await import(
-          "../tools/get-analytics.js"
-        );
+        const { handleGetAnalytics } = await import("../tools/get-analytics.js");
         await handleGetAnalytics({
           metric: "performance.total_cost",
           aggregation: "sum",
@@ -1031,9 +1148,7 @@ describe("All MCP tools integration", () => {
   describe("platform_create_prompt", () => {
     describe("when valid data is provided", () => {
       it("returns success confirmation with prompt details", async () => {
-        const { handleCreatePrompt } = await import(
-          "../tools/create-prompt.js"
-        );
+        const { handleCreatePrompt } = await import("../tools/create-prompt.js");
         const result = await handleCreatePrompt({
           name: "New Prompt",
           messages: [{ role: "system", content: "You are helpful." }],
@@ -1054,9 +1169,7 @@ describe("All MCP tools integration", () => {
   describe("platform_list_prompts", () => {
     describe("when prompts exist", () => {
       it("returns formatted prompt list", async () => {
-        const { handleListPrompts } = await import(
-          "../tools/list-prompts.js"
-        );
+        const { handleListPrompts } = await import("../tools/list-prompts.js");
         const result = await handleListPrompts();
 
         expect(result).toContain("greeting-bot");
@@ -1074,9 +1187,7 @@ describe("All MCP tools integration", () => {
   describe("platform_get_prompt", () => {
     describe("when prompt exists", () => {
       it("returns formatted prompt details with messages and versions", async () => {
-        const { handleGetPrompt } = await import(
-          "../tools/get-prompt.js"
-        );
+        const { handleGetPrompt } = await import("../tools/get-prompt.js");
         const result = await handleGetPrompt({
           idOrHandle: "greeting-bot",
         });
@@ -1097,9 +1208,7 @@ describe("All MCP tools integration", () => {
   describe("platform_update_prompt", () => {
     describe("when updating a prompt", () => {
       it("returns success message", async () => {
-        const { handleUpdatePrompt } = await import(
-          "../tools/update-prompt.js"
-        );
+        const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
         const result = await handleUpdatePrompt({
           idOrHandle: "greeting-bot",
           model: "openai/gpt-4o-mini",
@@ -1118,9 +1227,7 @@ describe("All MCP tools integration", () => {
   describe("platform_create_scenario", () => {
     describe("when valid data is provided", () => {
       it("returns confirmation with new scenario ID", async () => {
-        const { handleCreateScenario } = await import(
-          "../tools/create-scenario.js"
-        );
+        const { handleCreateScenario } = await import("../tools/create-scenario.js");
         const result = await handleCreateScenario({
           name: "New Scenario",
           situation: "User does something",
@@ -1140,9 +1247,7 @@ describe("All MCP tools integration", () => {
   describe("platform_list_scenarios", () => {
     describe("when scenarios exist", () => {
       it("returns formatted scenario list", async () => {
-        const { handleListScenarios } = await import(
-          "../tools/list-scenarios.js"
-        );
+        const { handleListScenarios } = await import("../tools/list-scenarios.js");
         const result = await handleListScenarios({});
 
         expect(result).toContain("# Scenarios (2 total)");
@@ -1153,9 +1258,7 @@ describe("All MCP tools integration", () => {
 
     describe("when format is json", () => {
       it("returns parseable JSON matching API response", async () => {
-        const { handleListScenarios } = await import(
-          "../tools/list-scenarios.js"
-        );
+        const { handleListScenarios } = await import("../tools/list-scenarios.js");
         const result = await handleListScenarios({ format: "json" });
 
         expect(JSON.parse(result)).toEqual(CANNED_SCENARIOS_LIST);
@@ -1169,9 +1272,7 @@ describe("All MCP tools integration", () => {
   describe("platform_get_scenario", () => {
     describe("when the scenario exists", () => {
       it("returns formatted scenario details", async () => {
-        const { handleGetScenario } = await import(
-          "../tools/get-scenario.js"
-        );
+        const { handleGetScenario } = await import("../tools/get-scenario.js");
         const result = await handleGetScenario({
           scenarioId: "scen_abc123",
         });
@@ -1184,9 +1285,7 @@ describe("All MCP tools integration", () => {
 
     describe("when the scenario does not exist", () => {
       it("propagates the 404 error", async () => {
-        const { handleGetScenario } = await import(
-          "../tools/get-scenario.js"
-        );
+        const { handleGetScenario } = await import("../tools/get-scenario.js");
 
         await expect(
           handleGetScenario({ scenarioId: "scen_nonexistent" }),
@@ -1196,9 +1295,7 @@ describe("All MCP tools integration", () => {
 
     describe("when format is json", () => {
       it("returns parseable JSON", async () => {
-        const { handleGetScenario } = await import(
-          "../tools/get-scenario.js"
-        );
+        const { handleGetScenario } = await import("../tools/get-scenario.js");
         const result = await handleGetScenario({
           scenarioId: "scen_abc123",
           format: "json",
@@ -1215,9 +1312,7 @@ describe("All MCP tools integration", () => {
   describe("platform_update_scenario", () => {
     describe("when the scenario exists", () => {
       it("returns update confirmation with updated details", async () => {
-        const { handleUpdateScenario } = await import(
-          "../tools/update-scenario.js"
-        );
+        const { handleUpdateScenario } = await import("../tools/update-scenario.js");
         const result = await handleUpdateScenario({
           scenarioId: "scen_abc123",
           name: "Login Flow - Updated",
@@ -1235,9 +1330,7 @@ describe("All MCP tools integration", () => {
   describe("platform_archive_scenario", () => {
     describe("when the scenario exists", () => {
       it("returns confirmation that scenario was archived", async () => {
-        const { handleArchiveScenario } = await import(
-          "../tools/archive-scenario.js"
-        );
+        const { handleArchiveScenario } = await import("../tools/archive-scenario.js");
         const result = await handleArchiveScenario({
           scenarioId: "scen_abc123",
         });
@@ -1255,9 +1348,7 @@ describe("All MCP tools integration", () => {
   describe("platform_create_evaluator", () => {
     describe("when valid data is provided", () => {
       it("returns success confirmation with evaluator details", async () => {
-        const { handleCreateEvaluator } = await import(
-          "../tools/create-evaluator.js"
-        );
+        const { handleCreateEvaluator } = await import("../tools/create-evaluator.js");
         const result = await handleCreateEvaluator({
           name: "My LLM Judge",
           config: { evaluatorType: "langevals/llm_boolean" },
@@ -1277,9 +1368,7 @@ describe("All MCP tools integration", () => {
   describe("platform_list_evaluators", () => {
     describe("when evaluators exist", () => {
       it("returns formatted evaluator list", async () => {
-        const { handleListEvaluators } = await import(
-          "../tools/list-evaluators.js"
-        );
+        const { handleListEvaluators } = await import("../tools/list-evaluators.js");
         const result = await handleListEvaluators();
 
         expect(result).toContain("# Evaluators (2 total)");
@@ -1298,9 +1387,7 @@ describe("All MCP tools integration", () => {
   describe("platform_get_evaluator", () => {
     describe("when the evaluator exists", () => {
       it("returns formatted evaluator details with config and fields", async () => {
-        const { handleGetEvaluator } = await import(
-          "../tools/get-evaluator.js"
-        );
+        const { handleGetEvaluator } = await import("../tools/get-evaluator.js");
         const result = await handleGetEvaluator({
           idOrSlug: "evaluator_abc123",
         });
@@ -1318,9 +1405,7 @@ describe("All MCP tools integration", () => {
 
     describe("when the evaluator does not exist", () => {
       it("propagates the 404 error", async () => {
-        const { handleGetEvaluator } = await import(
-          "../tools/get-evaluator.js"
-        );
+        const { handleGetEvaluator } = await import("../tools/get-evaluator.js");
 
         await expect(
           handleGetEvaluator({ idOrSlug: "evaluator_nonexistent" }),
@@ -1335,9 +1420,7 @@ describe("All MCP tools integration", () => {
   describe("platform_update_evaluator", () => {
     describe("when the evaluator exists", () => {
       it("returns update confirmation", async () => {
-        const { handleUpdateEvaluator } = await import(
-          "../tools/update-evaluator.js"
-        );
+        const { handleUpdateEvaluator } = await import("../tools/update-evaluator.js");
         const result = await handleUpdateEvaluator({
           evaluatorId: "evaluator_abc123",
           name: "Updated Toxicity",
@@ -1356,9 +1439,7 @@ describe("All MCP tools integration", () => {
   describe("platform_set_model_provider", () => {
     describe("when setting a provider with API key", () => {
       it("returns success confirmation with provider details", async () => {
-        const { handleSetModelProvider } = await import(
-          "../tools/set-model-provider.js"
-        );
+        const { handleSetModelProvider } = await import("../tools/set-model-provider.js");
         const result = await handleSetModelProvider({
           provider: "openai",
           enabled: true,
@@ -1374,9 +1455,7 @@ describe("All MCP tools integration", () => {
 
     describe("when setting a default model", () => {
       it("shows the normalized model name with provider prefix", async () => {
-        const { handleSetModelProvider } = await import(
-          "../tools/set-model-provider.js"
-        );
+        const { handleSetModelProvider } = await import("../tools/set-model-provider.js");
         const result = await handleSetModelProvider({
           provider: "openai",
           enabled: true,
@@ -1394,9 +1473,8 @@ describe("All MCP tools integration", () => {
   describe("platform_list_model_providers", () => {
     describe("when providers exist", () => {
       it("returns formatted provider list with status and key info", async () => {
-        const { handleListModelProviders } = await import(
-          "../tools/list-model-providers.js"
-        );
+        const { handleListModelProviders } =
+          await import("../tools/list-model-providers.js");
         const result = await handleListModelProviders();
 
         expect(result).toContain("# Model Providers (2 total)");
@@ -1429,12 +1507,8 @@ describe("All MCP tools integration", () => {
         projectId: "proj_123",
       });
 
-      const { handleSearchTraces } = await import(
-        "../tools/search-traces.js"
-      );
-      await expect(
-        handleSearchTraces({ startDate: "24h" }),
-      ).rejects.toThrow("401");
+      const { handleSearchTraces } = await import("../tools/search-traces.js");
+      await expect(handleSearchTraces({ startDate: "24h" })).rejects.toThrow("401");
     });
 
     it("throws an error with 401 status for evaluator list", async () => {
@@ -1444,9 +1518,7 @@ describe("All MCP tools integration", () => {
         projectId: "proj_123",
       });
 
-      const { handleListEvaluators } = await import(
-        "../tools/list-evaluators.js"
-      );
+      const { handleListEvaluators } = await import("../tools/list-evaluators.js");
       await expect(handleListEvaluators()).rejects.toThrow("401");
     });
 
@@ -1457,9 +1529,8 @@ describe("All MCP tools integration", () => {
         projectId: "proj_123",
       });
 
-      const { handleListModelProviders } = await import(
-        "../tools/list-model-providers.js"
-      );
+      const { handleListModelProviders } =
+        await import("../tools/list-model-providers.js");
       await expect(handleListModelProviders()).rejects.toThrow("401");
     });
   });
@@ -1525,7 +1596,8 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("platform_list_simulation_runs", () => {
     it("returns formatted run list", async () => {
-      const { handleListSimulationRuns } = await import("../tools/list-simulation-runs.js");
+      const { handleListSimulationRuns } =
+        await import("../tools/list-simulation-runs.js");
       const result = await handleListSimulationRuns({});
 
       expect(result).toContain("Simulation Runs");
@@ -1570,7 +1642,10 @@ describe("All MCP tools integration", () => {
   describe("platform_create_monitor", () => {
     it("creates a monitor and returns metadata", async () => {
       const { createMonitor } = await import("../langwatch-api-monitors.js");
-      const monitor = await createMonitor({ name: "New Monitor", checkType: "ragas/toxicity" });
+      const monitor = await createMonitor({
+        name: "New Monitor",
+        checkType: "ragas/toxicity",
+      });
       expect(monitor.id).toBe("mon_new");
       expect(monitor.name).toBe("New Monitor");
     });

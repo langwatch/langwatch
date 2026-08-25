@@ -1,12 +1,4 @@
-import {
-  Box,
-  Heading,
-  HStack,
-  Tabs,
-  Tag,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Heading, HStack, Tabs, Tag, Text, VStack } from "@chakra-ui/react";
 import { Info } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import { EvaluationExecutionMode } from "~/generated/prisma/client";
@@ -44,8 +36,7 @@ export function EvaluationManualIntegration({
   const checkSlug = storeSettingsOnCode ? checkType : slug;
 
   const { project } = useOrganizationTeamProject();
-  const isOutputMandatory =
-    evaluatorDefinition.requiredFields.includes("output");
+  const isOutputMandatory = evaluatorDefinition.requiredFields.includes("output");
   const projectAPIKey = api.project.getProjectAPIKey.useQuery(
     {
       projectId: project?.id ?? "",
@@ -73,9 +64,7 @@ export function EvaluationManualIntegration({
     }
 
     if (evaluatorDefinition.requiredFields.includes("contexts")) {
-      dataFields.push(
-        `"contexts": ["retrieved snippet 1", "retrieved snippet 2"]`,
-      );
+      dataFields.push(`"contexts": ["retrieved snippet 1", "retrieved snippet 2"]`);
     } else if (evaluatorDefinition.optionalFields.includes("contexts")) {
       dataFields.push(
         `"contexts": ["retrieved snippet 1", "retrieved snippet 2"]  # optional`,
@@ -175,9 +164,7 @@ ${
     }
 
     if (evaluatorDefinition.requiredFields.includes("contexts")) {
-      dataFields.push(
-        `contexts: ["retrieved snippet 1", "retrieved snippet 2"]`,
-      );
+      dataFields.push(`contexts: ["retrieved snippet 1", "retrieved snippet 2"]`);
     } else if (evaluatorDefinition.optionalFields.includes("contexts")) {
       dataFields.push(
         `contexts: ["retrieved snippet 1", "retrieved snippet 2"] /* optional */`,
@@ -216,10 +203,7 @@ ${
       <VStack align="start" width="full" gap={3}>
         <Text fontSize="14px">
           First, set up your traces and spans capturing as explained in the{" "}
-          <Link
-            href="https://docs.langwatch.ai/integration/typescript/guide"
-            isExternal
-          >
+          <Link href="https://docs.langwatch.ai/integration/typescript/guide" isExternal>
             documentation
           </Link>
           .
@@ -287,9 +271,7 @@ ${
       <HStack>
         <Text fontSize="14px">
           This{" "}
-          {executionMode === EvaluationExecutionMode.MANUALLY
-            ? "evaluator"
-            : "guardrail"}{" "}
+          {executionMode === EvaluationExecutionMode.MANUALLY ? "evaluator" : "guardrail"}{" "}
           uses:
         </Text>
         {evaluatorDefinition.requiredFields
@@ -308,8 +290,8 @@ ${
       </HStack>
       <Text fontSize="14px">
         Follow the code example below to integrate this{" "}
-        {isGuardrail ? "guardrail" : "evaluator"} in your LLM pipeline, save
-        changes first for the {isGuardrail ? "guardrail" : "evaluator"} to work.
+        {isGuardrail ? "guardrail" : "evaluator"} in your LLM pipeline, save changes first
+        for the {isGuardrail ? "guardrail" : "evaluator"} to work.
       </Text>
       {form && (
         <HStack>

@@ -26,9 +26,7 @@ function runHelper(env: Record<string, string | undefined>): {
 } {
   const exports = Object.entries(env)
     .map(([k, v]) =>
-      v === undefined
-        ? `unset ${k}`
-        : `export ${k}='${v.replace(/'/g, "'\\''")}'`,
+      v === undefined ? `unset ${k}` : `export ${k}='${v.replace(/'/g, "'\\''")}'`,
     )
     .join("\n");
   const script = `
@@ -90,9 +88,7 @@ describe("sanitize-dev-env.sh (lw#3453)", () => {
         APP_PORT: "5562",
         NEXTAUTH_URL: "http://localhost:5560",
       });
-      expect(r.stdout).toMatch(
-        /rewriting stale NEXTAUTH_URL=http:\/\/localhost:5560/,
-      );
+      expect(r.stdout).toMatch(/rewriting stale NEXTAUTH_URL=http:\/\/localhost:5560/);
     });
   });
 

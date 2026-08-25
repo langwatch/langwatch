@@ -3,10 +3,7 @@ import { showErrorToast } from "~/features/errors";
 import type { TargetValue } from "../components/scenarios/TargetSelector";
 import { toaster } from "../components/ui/toaster";
 import { api } from "../utils/api";
-import {
-  type PollResult,
-  pollForScenarioRun,
-} from "../utils/pollForScenarioRun";
+import { type PollResult, pollForScenarioRun } from "../utils/pollForScenarioRun";
 import { useModelProvidersSettings } from "./useModelProvidersSettings";
 
 interface RunCompleteResult {
@@ -98,8 +95,7 @@ function buildRunOutcomeToast({
     // being navigated there.
     return {
       title: "Scenario did not pass",
-      description:
-        "The run finished. Open it to see the criteria and the reasoning.",
+      description: "The run finished. Open it to see the criteria and the reasoning.",
       type: "warning" as const,
       action: viewRunAction("View run"),
     };
@@ -150,11 +146,7 @@ export function useRunScenario({
           action: {
             label: "Configure model providers",
             onClick: () =>
-              window.open(
-                "/settings/model-providers",
-                "_blank",
-                "noopener,noreferrer",
-              ),
+              window.open("/settings/model-providers", "_blank", "noopener,noreferrer"),
           },
         });
         return;

@@ -1,1 +1,5 @@
-export { Checkbox, CheckboxGroup, type CheckboxProps } from "@langwatch/design-system/checkbox";
+export {
+  Checkbox,
+  CheckboxGroup,
+  type CheckboxProps,
+} from "@langwatch/design-system/checkbox";

@@ -56,11 +56,7 @@ export const thinkingShimmerStyles = {
  * via `stroke="url(#<id>)"`. Defined once at the root of a surface so the
  * gradient is available globally and the icons reuse the same paint server.
  */
-export function SparkleGradientDefs({
-  id = SPARKLE_GRADIENT_ID,
-}: {
-  id?: string;
-}) {
+export function SparkleGradientDefs({ id = SPARKLE_GRADIENT_ID }: { id?: string }) {
   return (
     <svg
       width="0"
@@ -91,9 +87,7 @@ export function GradientSparkle({
   size?: number;
   gradientId?: string;
 }) {
-  return (
-    <Sparkles size={size} stroke={`url(#${gradientId})`} strokeWidth={2} />
-  );
+  return <Sparkles size={size} stroke={`url(#${gradientId})`} strokeWidth={2} />;
 }
 
 /**

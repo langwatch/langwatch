@@ -7,10 +7,7 @@ import { HandledErrorState } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import OptimizationStudio from "../../../optimization_studio/components/OptimizationStudio";
 import { useLoadWorkflow } from "../../../optimization_studio/hooks/useLoadWorkflow";
-import {
-  _useWorkflowStore,
-  useWorkflowStore,
-} from "@langwatch/workflow-web";
+import { _useWorkflowStore, useWorkflowStore } from "@langwatch/workflow-web";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { api } from "../../../utils/api";
 

@@ -1,13 +1,6 @@
 import { Box, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  LuCheck,
-  LuCopy,
-  LuFilter,
-  LuMaximize,
-  LuMinus,
-  LuPlus,
-} from "react-icons/lu";
+import { LuCheck, LuCopy, LuFilter, LuMaximize, LuMinus, LuPlus } from "react-icons/lu";
 import { useColorMode } from "~/components/ui/color-mode";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -77,9 +70,8 @@ export function SequenceView({
 }: SequenceViewProps) {
   const { colorMode } = useColorMode();
 
-  const [selectedTypes, setSelectedTypes] = useState<SequenceSpanType[]>(
-    DEFAULT_SEQUENCE_TYPES,
-  );
+  const [selectedTypes, setSelectedTypes] =
+    useState<SequenceSpanType[]>(DEFAULT_SEQUENCE_TYPES);
 
   const easterEgg = useKonamiEasterEgg();
 
@@ -280,11 +272,7 @@ export function SequenceView({
             icon={LuPlus}
             onClick={() => handleZoomBtn(ZOOM_STEP)}
           />
-          <ZoomButton
-            label="Fit to screen"
-            icon={LuMaximize}
-            onClick={handleResetFit}
-          />
+          <ZoomButton label="Fit to screen" icon={LuMaximize} onClick={handleResetFit} />
           <CopySourceButton syntax={result.syntax} />
         </HStack>
 

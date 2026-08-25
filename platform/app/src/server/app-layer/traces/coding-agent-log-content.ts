@@ -56,9 +56,7 @@ const SESSION_FREE_TEXT: LogContentCategory = "both";
  * always trailing). Events absent here fall back to
  * {@link UNKNOWN_EVENT_CONTENT_KEYS}.
  */
-const CONTENT_KEYS_BY_EVENT: Readonly<
-  Record<string, readonly LogContentKey[]>
-> = {
+const CONTENT_KEYS_BY_EVENT: Readonly<Record<string, readonly LogContentKey[]>> = {
   // The user's own words. claude/codex/gemini all spell it `prompt`.
   user_prompt: [
     { key: "prompt", category: "input" },
@@ -127,9 +125,7 @@ const CONTENT_KEYS_BY_EVENT: Readonly<
  * category is only reachable by exact wire spelling, so anything that needs
  * to survive a namespace belongs in the canonical table above.
  */
-const CONTENT_KEYS_BY_RAW_EVENT: Readonly<
-  Record<string, readonly LogContentKey[]>
-> = {
+const CONTENT_KEYS_BY_RAW_EVENT: Readonly<Record<string, readonly LogContentKey[]>> = {
   api_request_body: [{ key: BODY_ATTR, category: "input" }],
 };
 
@@ -150,13 +146,12 @@ const ALL_CONTENT_KEYS: readonly string[] = [
  * through the gate untouched — the same bypass shape a namespaced event had.
  * The side is unknown, so every one of them needs BOTH categories.
  */
-const UNKNOWN_EVENT_CONTENT_KEYS: readonly LogContentKey[] =
-  ALL_CONTENT_KEYS.map((key) => ({ key, category: SESSION_FREE_TEXT }));
+const UNKNOWN_EVENT_CONTENT_KEYS: readonly LogContentKey[] = ALL_CONTENT_KEYS.map(
+  (key) => ({ key, category: SESSION_FREE_TEXT }),
+);
 
 /** The table entry for an event, or undefined when neither table places it. */
-function knownContentKeys(
-  eventName: string,
-): readonly LogContentKey[] | undefined {
+function knownContentKeys(eventName: string): readonly LogContentKey[] | undefined {
   const canonical = normalizeEventName(eventName);
   if (canonical !== null && CONTENT_KEYS_BY_EVENT[canonical]) {
     return CONTENT_KEYS_BY_EVENT[canonical];

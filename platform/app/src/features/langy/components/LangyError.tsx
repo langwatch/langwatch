@@ -35,9 +35,7 @@ export function LangyError({
   onAction,
 }: {
   presentation: LangyErrorPresentation;
-  onAction?: (
-    kind: NonNullable<LangyErrorPresentation["action"]>["kind"],
-  ) => void;
+  onAction?: (kind: NonNullable<LangyErrorPresentation["action"]>["kind"]) => void;
 }) {
   if (presentation.render === "suppress") return null;
 

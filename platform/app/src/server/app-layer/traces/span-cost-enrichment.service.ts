@@ -37,10 +37,7 @@ const MODEL_ATTRIBUTE_KEYS = [
  * that a dormant rule went live. So the loose key is scoped to the two spans
  * that need it.
  */
-const CODING_AGENT_MODEL_ATTRIBUTE_KEYS = [
-  ...MODEL_ATTRIBUTE_KEYS,
-  "model",
-] as const;
+const CODING_AGENT_MODEL_ATTRIBUTE_KEYS = [...MODEL_ATTRIBUTE_KEYS, "model"] as const;
 
 /**
  * The coding-agent spans that carry their model under a bare `model`. Both
@@ -56,9 +53,7 @@ const CODING_AGENT_MODEL_SPAN_NAMES: ReadonlySet<string> = new Set([
  * Dependencies for OtlpSpanCostEnrichmentService that can be injected for testing.
  */
 export interface OtlpSpanCostEnrichmentServiceDependencies {
-  getCustomModelCosts: (
-    projectId: string,
-  ) => Promise<MaybeStoredLLMModelCost[]>;
+  getCustomModelCosts: (projectId: string) => Promise<MaybeStoredLLMModelCost[]>;
 }
 
 /**

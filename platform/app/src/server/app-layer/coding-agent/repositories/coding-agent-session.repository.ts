@@ -140,9 +140,7 @@ export interface CodingAgentSessionRepository {
 }
 
 /** No-op store for deployments without ClickHouse. */
-export class NullCodingAgentSessionRepository
-  implements CodingAgentSessionRepository
-{
+export class NullCodingAgentSessionRepository implements CodingAgentSessionRepository {
   async upsert(): Promise<void> {
     // no-op
   }

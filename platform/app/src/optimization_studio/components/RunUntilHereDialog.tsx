@@ -1,12 +1,4 @@
-import {
-  Button,
-  Field,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Field, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -37,17 +29,14 @@ export function RunUntilHereDialog() {
   const { untilNodeId, close } = useRunUntilHereDialogStore(
     useShallow(({ untilNodeId, close }) => ({ untilNodeId, close })),
   );
-  const { nodes, setNode, deselectAllNodes, setPropertiesExpanded } =
-    useWorkflowStore(
-      useShallow(
-        ({ nodes, setNode, deselectAllNodes, setPropertiesExpanded }) => ({
-          nodes,
-          setNode,
-          deselectAllNodes,
-          setPropertiesExpanded,
-        }),
-      ),
-    );
+  const { nodes, setNode, deselectAllNodes, setPropertiesExpanded } = useWorkflowStore(
+    useShallow(({ nodes, setNode, deselectAllNodes, setPropertiesExpanded }) => ({
+      nodes,
+      setNode,
+      deselectAllNodes,
+      setPropertiesExpanded,
+    })),
+  );
   const { startWorkflowExecution } = useWorkflowExecution();
 
   const entryNode = nodes.find((node) => node.type === "entry");
@@ -60,9 +49,7 @@ export function RunUntilHereDialog() {
 
   const [view, setView] = useState<"fields" | "table">("fields");
   const [values, setValues] = useState<Record<string, string>>({});
-  const [selectedRowIndex, setSelectedRowIndex] = useState<number | undefined>(
-    undefined,
-  );
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number | undefined>(undefined);
   const userEditedValues = useRef(false);
 
   // useGetDatasetData returns a fresh `rows` array reference on every render
@@ -83,8 +70,7 @@ export function RunUntilHereDialog() {
       return;
     }
     if (userEditedValues.current) return;
-    const manualValues = (entryNode?.data as Entry | undefined)
-      ?.manual_run_values;
+    const manualValues = (entryNode?.data as Entry | undefined)?.manual_run_values;
     const firstRow = rows[0];
     setValues(
       Object.fromEntries(
@@ -134,10 +120,7 @@ export function RunUntilHereDialog() {
     if (!row) return;
     runWithValues(
       Object.fromEntries(
-        fields.map((field) => [
-          field.identifier,
-          stringifyValue(row[field.identifier]),
-        ]),
+        fields.map((field) => [field.identifier, stringifyValue(row[field.identifier])]),
       ),
     );
   };
@@ -180,11 +163,7 @@ export function RunUntilHereDialog() {
             <VStack width="full" align="start" gap={3}>
               {fields.map((field) => (
                 <Field.Root key={field.identifier} width="full">
-                  <Field.Label
-                    fontSize="12px"
-                    fontFamily="mono"
-                    color="fg.muted"
-                  >
+                  <Field.Label fontSize="12px" fontFamily="mono" color="fg.muted">
                     {field.identifier}
                   </Field.Label>
                   <Input

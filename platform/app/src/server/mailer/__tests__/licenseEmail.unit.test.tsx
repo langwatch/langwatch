@@ -85,9 +85,7 @@ describe("sendLicenseEmail", () => {
       const call = vi.mocked(sendEmail).mock.calls[0]!;
       expect(call[0].attachments).toBeDefined();
       expect(call[0].attachments).toHaveLength(1);
-      expect(call[0].attachments![0]!.filename).toBe(
-        "Acme_Corp.langwatch-license",
-      );
+      expect(call[0].attachments![0]!.filename).toBe("Acme_Corp.langwatch-license");
     });
 
     it("sanitizes dots in org name to avoid extension confusion", async () => {
@@ -97,9 +95,7 @@ describe("sendLicenseEmail", () => {
       });
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].attachments![0]!.filename).toBe(
-        "acme_corp_inc.langwatch-license",
-      );
+      expect(call[0].attachments![0]!.filename).toBe("acme_corp_inc.langwatch-license");
     });
 
     it("sanitizes filesystem-unsafe characters from org name", async () => {
@@ -121,27 +117,21 @@ describe("sendLicenseEmail", () => {
       });
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].attachments![0]!.filename).toBe(
-        "buyer@acme_com.langwatch-license",
-      );
+      expect(call[0].attachments![0]!.filename).toBe("buyer@acme_com.langwatch-license");
     });
 
     it("attaches the license key as file content", async () => {
       await sendLicenseEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].attachments![0]!.content).toBe(
-        "dGVzdC1saWNlbnNlLWtleS1jb250ZW50",
-      );
+      expect(call[0].attachments![0]!.content).toBe("dGVzdC1saWNlbnNlLWtleS1jb250ZW50");
     });
 
     it("uses application/octet-stream content type", async () => {
       await sendLicenseEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].attachments![0]!.contentType).toBe(
-        "application/octet-stream",
-      );
+      expect(call[0].attachments![0]!.contentType).toBe("application/octet-stream");
     });
 
     it("ensures filename always ends with .langwatch-license", async () => {

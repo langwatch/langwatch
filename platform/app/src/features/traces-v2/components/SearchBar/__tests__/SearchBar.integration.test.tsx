@@ -160,9 +160,7 @@ describe("<SearchBar /> wiring smoke", () => {
       useFilterStore.getState().applyQueryText("@status:error");
       renderSearchBar();
 
-      const placeholder = document.querySelector(
-        "[data-placeholder]",
-      ) as HTMLElement;
+      const placeholder = document.querySelector("[data-placeholder]") as HTMLElement;
       expect(placeholder.textContent).toContain("status:error");
     });
 
@@ -196,9 +194,7 @@ describe("<SearchBar /> ask affordance", () => {
     it("keeps the Ask AI placeholder wording", () => {
       renderSearchBar();
 
-      const placeholder = document.querySelector(
-        "[data-placeholder]",
-      ) as HTMLElement;
+      const placeholder = document.querySelector("[data-placeholder]") as HTMLElement;
       expect(placeholder.dataset.placeholder).toContain("Ask AI");
     });
   });
@@ -218,9 +214,7 @@ describe("<SearchBar /> ask affordance", () => {
     it("swaps the placeholder wording to Ask Langy", () => {
       renderSearchBar();
 
-      const placeholder = document.querySelector(
-        "[data-placeholder]",
-      ) as HTMLElement;
+      const placeholder = document.querySelector("[data-placeholder]") as HTMLElement;
       expect(placeholder.dataset.placeholder).toContain("Ask Langy");
     });
 
@@ -232,9 +226,7 @@ describe("<SearchBar /> ask affordance", () => {
 
         // The floating bar's input takes over; the structured bar steps back.
         expect(screen.getByRole("textbox")).toBeInTheDocument();
-        expect(
-          document.querySelector("[data-placeholder]"),
-        ).not.toBeInTheDocument();
+        expect(document.querySelector("[data-placeholder]")).not.toBeInTheDocument();
         expect(langyMock.open).not.toHaveBeenCalled();
         expect(langyMock.ask).not.toHaveBeenCalled();
       });
@@ -304,9 +296,7 @@ describe("<SearchBar /> ask affordance", () => {
           label: `filtered: ${applied}`,
         });
         // The structured search bar stays put — no floating composer.
-        expect(
-          document.querySelector("[data-placeholder]"),
-        ).toBeInTheDocument();
+        expect(document.querySelector("[data-placeholder]")).toBeInTheDocument();
       });
     });
   });

@@ -122,15 +122,11 @@ export class SimulationService extends SimulationServiceContract {
     );
   }
 
-  getLastUpdatedAt(
-    input: Parameters<SimulationRepository["findLastUpdatedAt"]>[0],
-  ) {
+  getLastUpdatedAt(input: Parameters<SimulationRepository["findLastUpdatedAt"]>[0]) {
     return this.repository.findLastUpdatedAt(input);
   }
 
-  getRunIdsForSet(
-    input: Parameters<SimulationRepository["findAllRunIdsForSet"]>[0],
-  ) {
+  getRunIdsForSet(input: Parameters<SimulationRepository["findAllRunIdsForSet"]>[0]) {
     return this.repository.findAllRunIdsForSet(input);
   }
 
@@ -140,9 +136,7 @@ export class SimulationService extends SimulationServiceContract {
     return this.repository.getDistinctExternalSetIds(input);
   }
 
-  countRunsForExport(
-    input: Parameters<SimulationRepository["countRunsForExport"]>[0],
-  ) {
+  countRunsForExport(input: Parameters<SimulationRepository["countRunsForExport"]>[0]) {
     return this.repository.countRunsForExport(input);
   }
 
@@ -164,28 +158,16 @@ export class SimulationService extends SimulationServiceContract {
     return this.execution.startRun(simulationStartRunSchema.parse(input));
   }
 
-  messageSnapshot(
-    input: Parameters<SimulationExecutionPort["messageSnapshot"]>[0],
-  ) {
-    return this.execution.messageSnapshot(
-      simulationMessageSnapshotSchema.parse(input),
-    );
+  messageSnapshot(input: Parameters<SimulationExecutionPort["messageSnapshot"]>[0]) {
+    return this.execution.messageSnapshot(simulationMessageSnapshotSchema.parse(input));
   }
 
-  textMessageStart(
-    input: Parameters<SimulationExecutionPort["textMessageStart"]>[0],
-  ) {
-    return this.execution.textMessageStart(
-      simulationTextMessageStartSchema.parse(input),
-    );
+  textMessageStart(input: Parameters<SimulationExecutionPort["textMessageStart"]>[0]) {
+    return this.execution.textMessageStart(simulationTextMessageStartSchema.parse(input));
   }
 
-  textMessageEnd(
-    input: Parameters<SimulationExecutionPort["textMessageEnd"]>[0],
-  ) {
-    return this.execution.textMessageEnd(
-      simulationTextMessageEndSchema.parse(input),
-    );
+  textMessageEnd(input: Parameters<SimulationExecutionPort["textMessageEnd"]>[0]) {
+    return this.execution.textMessageEnd(simulationTextMessageEndSchema.parse(input));
   }
 
   finishRun(input: Parameters<SimulationExecutionPort["finishRun"]>[0]) {
@@ -199,5 +181,4 @@ export class SimulationService extends SimulationServiceContract {
   deleteRun(input: Parameters<SimulationExecutionPort["deleteRun"]>[0]) {
     return this.execution.deleteRun(simulationDeleteRunSchema.parse(input));
   }
-
 }

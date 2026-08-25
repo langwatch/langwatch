@@ -11,14 +11,9 @@ import { useCallback, useMemo, useState } from "react";
 export function useScenarioSelection() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
-  const onRowSelectionChange: OnChangeFn<RowSelectionState> = useCallback(
-    (updater) => {
-      setRowSelection((prev) =>
-        typeof updater === "function" ? updater(prev) : updater,
-      );
-    },
-    [],
-  );
+  const onRowSelectionChange: OnChangeFn<RowSelectionState> = useCallback((updater) => {
+    setRowSelection((prev) => (typeof updater === "function" ? updater(prev) : updater));
+  }, []);
 
   const toggle = useCallback((id: string) => {
     setRowSelection((prev) => {

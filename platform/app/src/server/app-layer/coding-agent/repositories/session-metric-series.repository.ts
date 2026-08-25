@@ -18,10 +18,7 @@ const logger = createLogger(
  * never an increment on insert.
  */
 export interface SessionMetricSeriesRepository {
-  ensure(
-    records: SessionMetricSeriesRecord[],
-    retentionDays?: number,
-  ): Promise<void>;
+  ensure(records: SessionMetricSeriesRecord[], retentionDays?: number): Promise<void>;
 
   /**
    * Converged totals per (session, metric, bucket) across the deduplicated
@@ -46,9 +43,7 @@ export interface SessionMetricTotal {
 }
 
 /** No-op store for deployments without ClickHouse. */
-export class NullSessionMetricSeriesRepository
-  implements SessionMetricSeriesRepository
-{
+export class NullSessionMetricSeriesRepository implements SessionMetricSeriesRepository {
   async ensure(): Promise<void> {
     // no-op
   }
@@ -73,9 +68,7 @@ interface ClickHouseWriteRecord {
   _retention_days: number;
 }
 
-export class SessionMetricSeriesClickHouseRepository
-  implements SessionMetricSeriesRepository
-{
+export class SessionMetricSeriesClickHouseRepository implements SessionMetricSeriesRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async ensure(

@@ -49,10 +49,7 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
   // handing the rendered drawer a fresh props object each time and cascading
   // a re-render through its subtree even when nothing drawer-relevant changed.
   const queryDrawer = useMemo<DrawerProps | undefined>(() => {
-    const parsed = qs.parse(
-      queryString.replaceAll("%2C", ","),
-      URL_QS_PARSE_OPTIONS,
-    );
+    const parsed = qs.parse(queryString.replaceAll("%2C", ","), URL_QS_PARSE_OPTIONS);
     return parsed.drawer as DrawerProps | undefined;
   }, [queryString]);
 
@@ -62,9 +59,7 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
   // Instead of rendering the drawer, show the restriction modal
   // and clear the drawer from the URL. This protects ALL entry points:
   // direct clicks, command bar, deep links, and any future call sites.
-  const restrictedResource = drawerType
-    ? restrictedDrawers[drawerType]
-    : undefined;
+  const restrictedResource = drawerType ? restrictedDrawers[drawerType] : undefined;
   const isRestricted =
     !!restrictedResource && organizationRole === OrganizationUserRole.EXTERNAL;
 
@@ -82,9 +77,7 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
       "?" +
         qs.stringify(
           Object.fromEntries(
-            Object.entries(router.query).filter(
-              ([key]) => !key.startsWith("drawer."),
-            ),
+            Object.entries(router.query).filter(([key]) => !key.startsWith("drawer.")),
           ),
         ),
       undefined,
@@ -123,9 +116,7 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
   // 2. complexProps (per-drawer non-serializable props)
   // 3. flowCallbacks (persistent callbacks across navigation)
   const complexProps = getComplexProps();
-  const flowCallbacksForDrawer = drawerType
-    ? getFlowCallbacks(drawerType)
-    : undefined;
+  const flowCallbacksForDrawer = drawerType ? getFlowCallbacks(drawerType) : undefined;
 
   const offsetValue = useMemo(() => ({ marginTop }), [marginTop]);
 

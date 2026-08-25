@@ -102,10 +102,14 @@ describe("CLI doctor command", () => {
   describe("when run with `start --dry-run`", () => {
     it("prints the resolved port table and path schema, then exits 0 without writing anything", async () => {
       const home = await mkdtemp(join(tmpdir(), "langwatch-dryrun-"));
-      const result = await execa("node", [cliPath, "start", "--dry-run", "--port-base", "5570"], {
-        env: { ...process.env, LANGWATCH_HOME: home, NO_COLOR: "1" },
-        reject: false,
-      });
+      const result = await execa(
+        "node",
+        [cliPath, "start", "--dry-run", "--port-base", "5570"],
+        {
+          env: { ...process.env, LANGWATCH_HOME: home, NO_COLOR: "1" },
+          reject: false,
+        },
+      );
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("dry-run — no work performed");
       expect(result.stdout).toContain("port-base: 5570");

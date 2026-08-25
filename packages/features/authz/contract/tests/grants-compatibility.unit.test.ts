@@ -226,8 +226,7 @@ describe("AuthzGrantsService compatibility operations", () => {
       }).success,
     ).toBe(true);
     expect(
-      authzBindingFilterSchema.safeParse({ organizationId: "org_other" })
-        .success,
+      authzBindingFilterSchema.safeParse({ organizationId: "org_other" }).success,
     ).toBe(false);
     expect(
       authzBindingFilterSchema.safeParse({
@@ -300,9 +299,7 @@ describe("AuthzGrantsService compatibility operations", () => {
       (args: AuthzRevokeBindingsInput) => Promise<void>
     >();
     expectTypeOf<AuthzGrantsService["revokeBindingsWhere"]>().toEqualTypeOf<
-      (
-        args: AuthzRevokeBindingsWhereInput,
-      ) => Promise<AuthzRevokeBindingsWhereOutput>
+      (args: AuthzRevokeBindingsWhereInput) => Promise<AuthzRevokeBindingsWhereOutput>
     >();
     expectTypeOf<AuthzGrantsService["offboardMember"]>().toEqualTypeOf<
       (args: AuthzOffboardMemberInput) => Promise<void>

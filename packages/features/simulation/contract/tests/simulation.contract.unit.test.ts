@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  simulationAllSuitesRunDataSchema,
-  simulationRunDataSchema,
-} from "../src";
+import { simulationAllSuitesRunDataSchema, simulationRunDataSchema } from "../src";
 
 describe("Simulation contract", () => {
   it("accepts a stored run while preserving provider-specific message fields", () => {
@@ -48,8 +45,6 @@ describe("Simulation contract", () => {
     if (!page.changed) throw new Error("Expected changed suite history page");
 
     expect(page.scenarioSetIds.batch_1).toBe("suite_1");
-    expect(page.runs[0]?.metadata?.langwatch?.targetReferenceId).toBe(
-      "workflow_1",
-    );
+    expect(page.runs[0]?.metadata?.langwatch?.targetReferenceId).toBe("workflow_1");
   });
 });

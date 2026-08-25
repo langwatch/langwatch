@@ -111,10 +111,7 @@ export const studioBackendPostEvent = async ({
     ) {
       throw new Error("LangWatch NLP is unreachable");
     }
-    if (
-      (error as any)?.message === "fetch failed" &&
-      (error as any)?.cause.code
-    ) {
+    if ((error as any)?.message === "fetch failed" && (error as any)?.cause.code) {
       throw new Error((error as any)?.cause.code);
     }
     throw error;
@@ -139,8 +136,7 @@ export const studioBackendPostEvent = async ({
               return;
             }
           } catch (error) {
-            const message =
-              (error as Error).message ?? "Failed to parse server event";
+            const message = (error as Error).message ?? "Failed to parse server event";
             logger.error({ error, event }, message);
             throw error;
           }
@@ -185,8 +181,7 @@ export const studioBackendPostEvent = async ({
     }
   } catch (error) {
     logger.error({ error }, "Error reading stream");
-    const node_id =
-      "node_id" in message.payload ? message.payload.node_id : undefined;
+    const node_id = "node_id" in message.payload ? message.payload.node_id : undefined;
 
     if (node_id) {
       onEvent({

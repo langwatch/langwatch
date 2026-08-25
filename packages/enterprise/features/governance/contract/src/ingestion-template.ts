@@ -1,8 +1,4 @@
-import {
-  HandledError,
-  NotFoundError,
-  ValidationError,
-} from "@langwatch/handled-error";
+import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 import {
   DEFAULT_GOVERNANCE_SURFACE,
@@ -26,9 +22,7 @@ export const ingestionTemplateSchema = z
   .strict();
 export type IngestionTemplate = z.infer<typeof ingestionTemplateSchema>;
 
-export const ingestionTemplateSourceTypeSchema = z
-  .string()
-  .regex(/^[a-z0-9_]{1,40}$/);
+export const ingestionTemplateSourceTypeSchema = z.string().regex(/^[a-z0-9_]{1,40}$/);
 
 export const createIngestionTemplateInputSchema = z
   .object({
@@ -111,8 +105,7 @@ export type PlatformIngestionTemplateSyncResult = z.infer<
 >;
 
 /** The product currently ships no platform-owned ingestion templates. */
-export const PLATFORM_INGESTION_TEMPLATES: readonly PlatformIngestionTemplateSeed[] =
-  [];
+export const PLATFORM_INGESTION_TEMPLATES: readonly PlatformIngestionTemplateSeed[] = [];
 
 /** Platform rows retired from earlier releases. */
 export const RETIRED_PLATFORM_TEMPLATE_SLUGS = [
@@ -155,9 +148,7 @@ export class InvalidSourceTypeError extends ValidationError {
 export const defaultIngestionTemplateSurface = DEFAULT_GOVERNANCE_SURFACE;
 
 export abstract class IngestionTemplatesService {
-  abstract listForUser(input: {
-    organizationId: string;
-  }): Promise<IngestionTemplate[]>;
+  abstract listForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;
   abstract listForOrgAdmin(input: {
     organizationId: string;
   }): Promise<IngestionTemplate[]>;
@@ -175,9 +166,7 @@ export abstract class IngestionTemplatesService {
   abstract updateOttlRules(
     input: UpdateIngestionTemplateOttlInput,
   ): Promise<IngestionTemplate>;
-  abstract archiveOrgTemplate(
-    input: ArchiveIngestionTemplateInput,
-  ): Promise<void>;
+  abstract archiveOrgTemplate(input: ArchiveIngestionTemplateInput): Promise<void>;
   abstract cloneFromPlatform(
     input: CloneIngestionTemplateInput,
   ): Promise<IngestionTemplate>;

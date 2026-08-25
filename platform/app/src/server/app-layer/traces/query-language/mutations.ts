@@ -42,11 +42,7 @@ export function toggleFacetInQuery({
     value,
   });
   if (currentState === "neutral") {
-    return appendClause(
-      cleaned,
-      `${fieldName}:${escapeValue(value)}`,
-      combinator,
-    );
+    return appendClause(cleaned, `${fieldName}:${escapeValue(value)}`, combinator);
   }
   if (currentState === "include") {
     // Negation always combines with AND — "NOT foo OR bar" reads
@@ -163,11 +159,7 @@ function isInsideOrGroup(ast: LiqeQuery, start: number, end: number): boolean {
   const visit = (node: LiqeQuery, underOr: boolean): void => {
     if (inside) return;
     if (node.type === "Tag") {
-      if (
-        underOr &&
-        node.location.start === start &&
-        node.location.end === end
-      ) {
+      if (underOr && node.location.start === start && node.location.end === end) {
         inside = true;
       }
       return;
@@ -222,11 +214,7 @@ export function addToOrGroupAtLocation({
   const absEnd = leadingWs + groupEnd;
   if (absEnd <= leadingWs + groupStart) return currentQuery;
   const newClause = `${fieldName}:${escapeValue(value)}`;
-  return (
-    currentQuery.slice(0, absEnd) +
-    ` OR ${newClause}` +
-    currentQuery.slice(absEnd)
-  );
+  return currentQuery.slice(0, absEnd) + ` OR ${newClause}` + currentQuery.slice(absEnd);
 }
 
 /**

@@ -9,10 +9,7 @@
  * shell user expects `key=value`.
  */
 
-import {
-  commandValidationError,
-  reportCommandError,
-} from "./errorOutput";
+import { commandValidationError, reportCommandError } from "./errorOutput";
 
 /** The value types a run parameter may hold once read off the command line. */
 export type RunParameterValue = string | number | boolean;

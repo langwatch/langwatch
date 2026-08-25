@@ -6,7 +6,11 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("../../../utils/formatting", () => ({
@@ -24,8 +28,11 @@ describe("tagListCommand", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockListTags = vi.fn();
-    vi.mocked(PromptsApiService).mockImplementation(
-      function () { return ({ listTags: mockListTags }) as unknown as InstanceType<typeof PromptsApiService>; });
+    vi.mocked(PromptsApiService).mockImplementation(function () {
+      return { listTags: mockListTags } as unknown as InstanceType<
+        typeof PromptsApiService
+      >;
+    });
   });
 
   describe("when tags exist", () => {

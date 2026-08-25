@@ -7,10 +7,7 @@ import { LuGripVertical } from "react-icons/lu";
 import type { NodeWithOptionalPosition } from "~/types";
 import { HoverableBigText } from "../../../components/HoverableBigText";
 import { Tooltip } from "../../../components/ui/tooltip";
-import {
-  updateCodeClassName,
-  useWorkflowStore,
-} from "@langwatch/workflow-web";
+import { updateCodeClassName, useWorkflowStore } from "@langwatch/workflow-web";
 import type { Component, ComponentType } from "@langwatch/workflow-contract";
 import { findLowestAvailableName, nameToId } from "@langwatch/workflow-contract";
 import { ComponentIcon } from "../ColorfulBlockIcons";

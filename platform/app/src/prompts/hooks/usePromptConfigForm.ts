@@ -32,9 +32,7 @@ export const usePromptConfigForm = ({
   // Track whether we've received meaningful config values (not just empty defaults).
   // The forward sync must not push default form values onto a form that has already
   // been reset with real data by PromptEditorDrawer's init effect.
-  const hasReceivedConfigRef = useRef(
-    Object.keys(initialConfigValues).length > 0,
-  );
+  const hasReceivedConfigRef = useRef(Object.keys(initialConfigValues).length > 0);
   useEffect(() => {
     if (Object.keys(initialConfigValues).length > 0) {
       hasReceivedConfigRef.current = true;
@@ -85,9 +83,7 @@ export const usePromptConfigForm = ({
 
     // Clamp max_tokens to model limit when limits change (prevents validation error)
     if (modelLimits?.maxOutputTokens) {
-      const currentMaxTokens = methods.getValues(
-        "version.configData.llm.maxTokens",
-      );
+      const currentMaxTokens = methods.getValues("version.configData.llm.maxTokens");
       if (
         currentMaxTokens !== undefined &&
         currentMaxTokens > modelLimits.maxOutputTokens
@@ -120,9 +116,7 @@ export const usePromptConfigForm = ({
       const currentMessages = methods.getValues("version.configData.messages");
       if (!Array.isArray(currentMessages)) return;
 
-      const currentPrompt = currentMessages.find(
-        (msg) => msg.role === "system",
-      )?.content;
+      const currentPrompt = currentMessages.find((msg) => msg.role === "system")?.content;
       // Only sync when value differs; do not mark dirty for this derived update
       if (currentPrompt !== systemMessage) {
         methods.setValue(
@@ -161,9 +155,7 @@ export const usePromptConfigForm = ({
   }, [formData, methods]);
 
   // Track current version to detect external upgrades
-  const currentVersionRef = useRef(
-    parsedInitialValues?.versionMetadata?.versionNumber,
-  );
+  const currentVersionRef = useRef(parsedInitialValues?.versionMetadata?.versionNumber);
 
   // Provides forward sync of parent component to form values
   useEffect(() => {
@@ -196,8 +188,7 @@ export const usePromptConfigForm = ({
 
     disableOnChangeRef.current = true;
     const currentRuntimeParameters = methods.getValues("version.parameters");
-    const nextRuntimeParameters =
-      parsedInitialValues?.version?.parameters ?? {};
+    const nextRuntimeParameters = parsedInitialValues?.version?.parameters ?? {};
     if (!isEqual(currentRuntimeParameters, nextRuntimeParameters)) {
       methods.setValue("version.parameters", nextRuntimeParameters);
     }
@@ -205,9 +196,7 @@ export const usePromptConfigForm = ({
     for (const [key, value] of Object.entries(
       parsedInitialValues?.version?.configData ?? {},
     )) {
-      const currentValue = methods.getValues(
-        `version.configData.${key}` as any,
-      );
+      const currentValue = methods.getValues(`version.configData.${key}` as any);
       if (!isEqual(currentValue, value)) {
         methods.setValue(`version.configData.${key}` as any, value as any);
       }

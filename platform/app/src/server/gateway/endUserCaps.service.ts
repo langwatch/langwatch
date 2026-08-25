@@ -82,18 +82,10 @@ export async function applicableEndUserCaps({
       scopeId: bucketScopeId,
       window: t.window,
       match: "exact" as const,
-      periodFloorMs: bucketPeriodFloorMs(
-        t,
-        bucketBoundary?.periodStartedAt,
-        now,
-      ),
+      periodFloorMs: bucketPeriodFloorMs(t, bucketBoundary?.periodStartedAt, now),
     };
   });
-  const spends = await budgetCH.getSpendForTargetsAcrossTenants(
-    tenantIds,
-    targets,
-    now,
-  );
+  const spends = await budgetCH.getSpendForTargetsAcrossTenants(tenantIds, targets, now);
   const spentByBudget = new Map(spends.map((sp) => [sp.budgetId, sp.spentUsd]));
   return templates.map((t) => {
     const bucketBoundary = boundaryByKey.get(`${t.id}:${bucketFor(t)}`);

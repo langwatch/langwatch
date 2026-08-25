@@ -13,13 +13,7 @@
  * @see specs/api-keys/token-created-snippets.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { CODE_ASSISTANTS, TokenCreatedDialog } from "../TokenCreatedDialog";
@@ -42,16 +36,13 @@ function renderDialog() {
 
 /** The "Use with Code Assistants" block, tabs and body together. */
 function assistantSection(): HTMLElement {
-  return screen.getByText("Use with Code Assistants").closest("div")!
-    .parentElement!;
+  return screen.getByText("Use with Code Assistants").closest("div")!.parentElement!;
 }
 
 function selectAssistant(label: string) {
   // fireEvent, not a raw .click(): the latter dispatches the event but leaves
   // the resulting setState outside act(), so the tab never repaints.
-  fireEvent.click(
-    within(assistantSection()).getByRole("button", { name: label }),
-  );
+  fireEvent.click(within(assistantSection()).getByRole("button", { name: label }));
 }
 
 describe("given a token has just been minted", () => {
@@ -110,9 +101,7 @@ describe("given a token has just been minted", () => {
       // Claude Code is the default tab and also has a command, so starting
       // from a config-only assistant is what makes the selection measurable.
       selectAssistant("Cursor");
-      expect(
-        within(assistantSection()).queryByText("Run in your terminal"),
-      ).toBeNull();
+      expect(within(assistantSection()).queryByText("Run in your terminal")).toBeNull();
 
       selectAssistant("Codex");
       const codex = assistantSection().textContent ?? "";
@@ -145,14 +134,10 @@ describe("given a token has just been minted", () => {
       renderDialog();
       // The default tab has a command, so confirm the heading is there first —
       // otherwise its absence proves nothing about the selection.
-      expect(
-        within(assistantSection()).getByText("Run in your terminal"),
-      ).toBeTruthy();
+      expect(within(assistantSection()).getByText("Run in your terminal")).toBeTruthy();
 
       selectAssistant("Windsurf");
-      expect(
-        within(assistantSection()).queryByText("Run in your terminal"),
-      ).toBeNull();
+      expect(within(assistantSection()).queryByText("Run in your terminal")).toBeNull();
     });
   });
 });

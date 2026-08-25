@@ -16,10 +16,7 @@
  * sentence and cannot replace it.
  */
 
-import type {
-  CheaperAlternative,
-  LeaderboardVerdict,
-} from "./computeLeaderboardVerdict";
+import type { CheaperAlternative, LeaderboardVerdict } from "./computeLeaderboardVerdict";
 
 export type LeaderboardHeadline = {
   /** Sentence fragment naming the action, e.g. "Ship support-warm". */
@@ -30,10 +27,8 @@ export type LeaderboardHeadline = {
   tone: "positive" | "caution" | "neutral";
 };
 
-const nameOf = (
-  variantId: string,
-  variantNames: Record<string, string>,
-): string => variantNames[variantId] ?? variantId;
+const nameOf = (variantId: string, variantNames: Record<string, string>): string =>
+  variantNames[variantId] ?? variantId;
 
 export const formatCost = (value: number): string =>
   value >= 0.01 ? `$${value.toFixed(2)}` : `$${value.toFixed(4)}`;
@@ -79,9 +74,7 @@ export const formatLeaderboardHeadline = ({
     };
   }
 
-  const tiedNames = joinNames(
-    verdict.tiedIds.map((id) => nameOf(id, variantNames)),
-  );
+  const tiedNames = joinNames(verdict.tiedIds.map((id) => nameOf(id, variantNames)));
 
   // Deliberately NOT phrased as a tie, and deliberately offered no cheaper
   // alternative. A tie says the run looked and found no difference, which
@@ -102,15 +95,10 @@ export const formatLeaderboardHeadline = ({
     // Never round to 100: that reads as free, and the cheapest variant in a
     // real run costs something. A variant at $0.00004 against $0.012 is a
     // 99.7% saving, not a giveaway.
-    const percent = Math.min(
-      99,
-      Math.round(cheaperAlternative.savingRatio * 100),
-    );
+    const percent = Math.min(99, Math.round(cheaperAlternative.savingRatio * 100));
     const name = nameOf(cheaperAlternative.variantId, variantNames);
     const others =
-      verdict.tiedIds.length > 2
-        ? "the others it ties with"
-        : "the one it ties with";
+      verdict.tiedIds.length > 2 ? "the others it ties with" : "the one it ties with";
     const price = `${formatCost(cheaperAlternative.cost)} vs ${formatCost(
       cheaperAlternative.dearestCost,
     )} per row.`;

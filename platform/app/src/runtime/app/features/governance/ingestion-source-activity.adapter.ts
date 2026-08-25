@@ -32,9 +32,7 @@ class AppGovernanceClickHouseResolverPort extends GovernanceClickHouseResolverPo
   }
 
   static create(
-    resolveClient: (
-      organizationId: string,
-    ) => Promise<ClickHouseClient | null>,
+    resolveClient: (organizationId: string) => Promise<ClickHouseClient | null>,
   ): AppGovernanceClickHouseResolverPort {
     return new AppGovernanceClickHouseResolverPort(resolveClient);
   }
@@ -52,17 +50,13 @@ export class AppIngestionSourceActivityAdapter {
   private constructor(
     private readonly options: {
       database: object;
-      resolveClient: (
-        organizationId: string,
-      ) => Promise<ClickHouseClient | null>;
+      resolveClient: (organizationId: string) => Promise<ClickHouseClient | null>;
     },
   ) {}
 
   static create(options: {
     database: object;
-    resolveClient: (
-      organizationId: string,
-    ) => Promise<ClickHouseClient | null>;
+    resolveClient: (organizationId: string) => Promise<ClickHouseClient | null>;
   }): AppIngestionSourceActivityAdapter {
     return new AppIngestionSourceActivityAdapter(options);
   }
@@ -70,9 +64,7 @@ export class AppIngestionSourceActivityAdapter {
   build(): GovernanceActivityMonitorService {
     return PostgresIngestionSourceActivityAdapter.create({
       database: this.options.database,
-      clickhouse: AppGovernanceClickHouseResolverPort.create(
-        this.options.resolveClient,
-      ),
+      clickhouse: AppGovernanceClickHouseResolverPort.create(this.options.resolveClient),
     }).build();
   }
 }

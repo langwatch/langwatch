@@ -24,8 +24,7 @@ function message(errorText: string): UIMessage {
         toolCallId: "call-1",
         state: "output-error",
         input: {
-          command:
-            "langwatch trace search --has-error --start-date 24h --format json",
+          command: "langwatch trace search --has-error --start-date 24h --format json",
         },
         errorText,
       } as never,
@@ -86,12 +85,14 @@ describe("Langy tool failure card", () => {
     expect(alert.textContent).toContain("Searching traces failed");
     expect(alert.textContent).toContain("socket hang up");
     expect(alert.textContent).toContain(TRACE_ID);
-    expect(
-      screen.getByRole("link", { name: /open debug trace/i }),
-    ).toHaveAttribute("href", TRACE_URL);
-    expect(
-      screen.getByRole("link", { name: /open related logs/i }),
-    ).toHaveAttribute("href", LOGS_URL);
+    expect(screen.getByRole("link", { name: /open debug trace/i })).toHaveAttribute(
+      "href",
+      TRACE_URL,
+    );
+    expect(screen.getByRole("link", { name: /open related logs/i })).toHaveAttribute(
+      "href",
+      LOGS_URL,
+    );
     // URLs are actions, not an unreadable paragraph in the card.
     expect(alert.textContent).not.toContain(TRACE_URL);
     expect(alert.textContent).not.toContain(LOGS_URL);
@@ -106,12 +107,14 @@ describe("Langy tool failure card", () => {
     );
 
     expect(screen.getByRole("alert").textContent).toContain(TRACE_ID);
-    expect(
-      screen.getByRole("link", { name: /open debug trace/i }),
-    ).toHaveAttribute("href", TRACE_URL);
-    expect(
-      screen.getByRole("link", { name: /open related logs/i }),
-    ).toHaveAttribute("href", LOGS_URL);
+    expect(screen.getByRole("link", { name: /open debug trace/i })).toHaveAttribute(
+      "href",
+      TRACE_URL,
+    );
+    expect(screen.getByRole("link", { name: /open related logs/i })).toHaveAttribute(
+      "href",
+      LOGS_URL,
+    );
   });
 
   it("does not render a failed call as successful activity", () => {
@@ -147,9 +150,7 @@ describe("Langy tool failure card", () => {
       </ChakraProvider>,
     );
 
-    expect(screen.getByRole("alert").textContent).toContain(
-      "Failed to search traces",
-    );
+    expect(screen.getByRole("alert").textContent).toContain("Failed to search traces");
     expect(screen.getByRole("alert").textContent).not.toContain(
       "No traces were returned",
     );
@@ -163,9 +164,7 @@ describe("Langy tool failure card", () => {
     const value = message("psql: connection to server failed: no such host");
 
     const [failure] = toFailedToolCalls(value);
-    expect(failure?.presentation.message).toBe(
-      "This step couldn't be completed.",
-    );
+    expect(failure?.presentation.message).toBe("This step couldn't be completed.");
     expect(failure?.presentation.detail).toContain("connection to server");
     // It claims no code it was never given.
     expect(failure?.presentation.code).toBeUndefined();
@@ -181,9 +180,7 @@ describe("Langy tool failure card", () => {
     );
 
     expect(screen.getByRole("alert").textContent).toContain("network_error");
-    expect(
-      screen.getByRole("button", { name: /copy the error details/i }),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: /copy the error details/i })).toBeTruthy();
   });
 
   // The red card used to render ABOVE the receipt for the steps that ran BEFORE
@@ -272,8 +269,7 @@ describe("Langy tool failure card", () => {
           toolCallId: "call-grep",
           state: "output-available",
           input: { command: 'grep -rn "failed to" src/' },
-          output:
-            'src/server/queue.ts:44:    throw new Error("failed to connect");',
+          output: 'src/server/queue.ts:44:    throw new Error("failed to connect");',
         },
       ],
     } as UIMessage;
@@ -303,9 +299,7 @@ describe("Langy tool failure card", () => {
         </ChakraProvider>,
       );
 
-      expect(
-        screen.getByRole("button", { name: /1 action completed/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: /1 action completed/i })).toBeTruthy();
     });
   });
 

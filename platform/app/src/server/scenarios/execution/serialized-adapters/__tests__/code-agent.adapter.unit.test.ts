@@ -200,9 +200,7 @@ describe("SerializedCodeAgentAdapter", () => {
       await adapter.call(defaultInput);
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
-      const nodeIds = callBody.payload.workflow.nodes.map(
-        (n: { id: string }) => n.id,
-      );
+      const nodeIds = callBody.payload.workflow.nodes.map((n: { id: string }) => n.id);
       expect(nodeIds).toEqual(["entry", "code_agent", "end"]);
 
       const codeNode = callBody.payload.workflow.nodes.find(
@@ -507,9 +505,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
   describe("when scenarioOutputField is set", () => {
     it("extracts that specific field from result", async () => {
-      mockFetch.mockResolvedValue(
-        nlpResponse({ answer: "42", output: "ignored" }),
-      );
+      mockFetch.mockResolvedValue(nlpResponse({ answer: "42", output: "ignored" }));
       const config: CodeAgentData = {
         ...defaultConfig,
         outputs: [
@@ -530,9 +526,7 @@ describe("SerializedCodeAgentAdapter", () => {
     });
 
     it("stringifies a non-string value when the field is found", async () => {
-      mockFetch.mockResolvedValue(
-        nlpResponse({ structured: { key: "value" } }),
-      );
+      mockFetch.mockResolvedValue(nlpResponse({ structured: { key: "value" } }));
       const config: CodeAgentData = {
         ...defaultConfig,
         outputs: [{ identifier: "structured", type: "str" }],
@@ -673,9 +667,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
         const span = findExecuteSpan();
         const setAttrCalls = span!.span.setAttribute.mock.calls;
-        const httpStatusCall = setAttrCalls.find(
-          (c) => c[0] === "http.status_code",
-        );
+        const httpStatusCall = setAttrCalls.find((c) => c[0] === "http.status_code");
         expect(httpStatusCall?.[1]).toBe(200);
       });
     });
@@ -688,16 +680,12 @@ describe("SerializedCodeAgentAdapter", () => {
       const abortAwareFetch = (signal: AbortSignal) =>
         new Promise<Response>((_resolve, reject) => {
           if (signal.aborted) {
-            reject(
-              new DOMException("The operation was aborted.", "AbortError"),
-            );
+            reject(new DOMException("The operation was aborted.", "AbortError"));
             return;
           }
           const onAbort = () => {
             signal.removeEventListener("abort", onAbort);
-            reject(
-              new DOMException("The operation was aborted.", "AbortError"),
-            );
+            reject(new DOMException("The operation was aborted.", "AbortError"));
           };
           signal.addEventListener("abort", onAbort);
         });
@@ -807,9 +795,7 @@ describe("SerializedCodeAgentAdapter", () => {
         const span = findExecuteSpan();
         const setAttrCalls = span!.span.setAttribute.mock.calls;
         const errorKindCall = setAttrCalls.find((c) => c[0] === "error.kind");
-        const httpStatusCall = setAttrCalls.find(
-          (c) => c[0] === "http.status_code",
-        );
+        const httpStatusCall = setAttrCalls.find((c) => c[0] === "http.status_code");
         expect(errorKindCall?.[1]).toBe("http");
         expect(httpStatusCall?.[1]).toBe(503);
       });

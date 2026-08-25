@@ -29,6 +29,7 @@ Many features require existing data to be testable. The sub-agent should create 
 ### Common Seeding Patterns
 
 **Creating a suite:**
+
 1. Navigate to the Suites page from the sidebar
 2. Click the "Create Suite" (or "New Suite") button
 3. Fill in the suite name (e.g., "Test Suite") and any required fields
@@ -36,17 +37,20 @@ Many features require existing data to be testable. The sub-agent should create 
 5. Verify the suite appears in the list before proceeding
 
 **Triggering test runs / batch runs:**
+
 1. Open an existing suite
 2. Click "Run" or "Run All" to trigger execution
 3. Wait for the run status to change from "Running" to "Completed" — use `browser_wait_for` with a generous timeout (60-120s)
 4. Refresh or re-navigate if the status does not update automatically
 
 **Waiting for results to appear:**
+
 - After triggering runs or sending traces, data may take a few seconds to propagate
 - Use `browser_wait_for` with `text` matching (e.g., wait for "Completed" or a result count) rather than fixed sleeps
 - If results depend on background workers, allow up to 120s
 
 **Creating traces via the SDK or API:**
+
 - Use a quick Bash command to send traces when UI seeding is impractical. The payload below is illustrative — replace placeholders with valid values:
   ```bash
   curl -X POST http://localhost:<port>/api/collector \
@@ -57,6 +61,7 @@ Many features require existing data to be testable. The sub-agent should create 
 - Find the project API key on the project settings page in the UI
 
 **Creating evaluations:**
+
 - Evaluations typically require traces to already exist
 - Navigate to the Evaluations section, configure an evaluator, and run it against existing traces
 
@@ -93,10 +98,10 @@ See `browser-tests/proof-of-concept/` for a complete proof-of-concept run with s
 
 ## Known Issues
 
-| Issue | Workaround |
-|-------|-----------|
-| Orange compile bar stuck for >60s | Hard refresh: `browser_navigate` to the same URL |
-| Auth callback goes to wrong port | Ensure `NEXTAUTH_URL` matches actual port, or use Docker which overrides it |
-| "New Scenario" opens duplicate dialogs | Press Escape twice to close both |
-| Checkbox click intercepted by overlay | Click the label or img element next to the checkbox |
-| Page shows splash but queries all resolved | Wait longer — Turbopack is still compiling the page JS |
+| Issue                                      | Workaround                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------- |
+| Orange compile bar stuck for >60s          | Hard refresh: `browser_navigate` to the same URL                            |
+| Auth callback goes to wrong port           | Ensure `NEXTAUTH_URL` matches actual port, or use Docker which overrides it |
+| "New Scenario" opens duplicate dialogs     | Press Escape twice to close both                                            |
+| Checkbox click intercepted by overlay      | Click the label or img element next to the checkbox                         |
+| Page shows splash but queries all resolved | Wait longer — Turbopack is still compiling the page JS                      |

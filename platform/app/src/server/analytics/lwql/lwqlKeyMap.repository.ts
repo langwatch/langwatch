@@ -41,13 +41,7 @@ export class LwqlKeyMapClickHouseRepository implements LwqlKeyMapRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   /** @param table Already mode-qualified via `lwqlKeyMapTableQualifiedName`. */
-  async insertRow({
-    table,
-    row,
-  }: {
-    table: string;
-    row: LwqlKeyMapRow;
-  }): Promise<void> {
+  async insertRow({ table, row }: { table: string; row: LwqlKeyMapRow }): Promise<void> {
     const client = await this.resolveClient(row.TenantId);
     await client.insert({
       table,

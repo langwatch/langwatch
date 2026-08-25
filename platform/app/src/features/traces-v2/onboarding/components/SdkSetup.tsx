@@ -30,12 +30,9 @@ export function SdkSetup(): React.ReactElement | null {
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformKey | null>(
     initialPlatform,
   );
-  const [selectedFramework, setSelectedFramework] =
-    useState<FrameworkKey | null>(
-      initialPlatform
-        ? (FRAMEWORKS_BY_PLATFORM[initialPlatform]?.[0]?.key ?? null)
-        : null,
-    );
+  const [selectedFramework, setSelectedFramework] = useState<FrameworkKey | null>(
+    initialPlatform ? (FRAMEWORKS_BY_PLATFORM[initialPlatform]?.[0]?.key ?? null) : null,
+  );
 
   const hasFrameworks = selectedPlatform
     ? (FRAMEWORKS_BY_PLATFORM[selectedPlatform]?.length ?? 0) > 0
@@ -85,10 +82,7 @@ export function SdkSetup(): React.ReactElement | null {
         {selectedEntry?.customComponent ? (
           <>
             <selectedEntry.customComponent />
-            <DocsLinks
-              docs={selectedEntry?.docs}
-              label={selectedEntry?.label ?? ""}
-            />
+            <DocsLinks docs={selectedEntry?.docs} label={selectedEntry?.label ?? ""} />
           </>
         ) : (
           <>
@@ -98,15 +92,11 @@ export function SdkSetup(): React.ReactElement | null {
                 platform={selectedPlatform}
                 framework={selectedFramework as FrameworkKey}
                 languageIconUrl={
-                  PLATFORM_OPTIONS.find((p) => p.key === selectedPlatform)
-                    ?.iconUrl
+                  PLATFORM_OPTIONS.find((p) => p.key === selectedPlatform)?.iconUrl
                 }
               />
             </Box>
-            <DocsLinks
-              docs={selectedEntry?.docs}
-              label={selectedEntry?.label ?? ""}
-            />
+            <DocsLinks docs={selectedEntry?.docs} label={selectedEntry?.label ?? ""} />
           </>
         )}
       </VStack>

@@ -58,10 +58,7 @@ export interface MergedSession {
  */
 export function mergeSessionTurns(
   turns: readonly LoadedTurn[],
-  {
-    turnCount,
-    firstTurnNumber,
-  }: { turnCount: number; firstTurnNumber: number },
+  { turnCount, firstTurnNumber }: { turnCount: number; firstTurnNumber: number },
 ): MergedSession {
   const entries: TranscriptEntry[] = [];
   const rowKeys: string[] = [];

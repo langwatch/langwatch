@@ -90,9 +90,7 @@ describe("PrivacyDroppedNotice", () => {
           <PrivacyDroppedNotice categories={["input"]} />
         </Wrapper>,
       );
-      expect(
-        container.querySelector('a[href="/settings/data-privacy"]'),
-      ).toBeNull();
+      expect(container.querySelector('a[href="/settings/data-privacy"]')).toBeNull();
     });
   });
 });

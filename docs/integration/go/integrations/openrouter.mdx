@@ -20,7 +20,7 @@ export OPENROUTER_API_KEY="your-openrouter-api-key"
 ## Usage
 
 <Info>
-Set `LANGWATCH_API_KEY` and `OPENROUTER_API_KEY` environment variables before running.
+  Set `LANGWATCH_API_KEY` and `OPENROUTER_API_KEY` environment variables before running.
 </Info>
 
 The key difference with OpenRouter is the model name, which is prefixed with the provider (e.g., `anthropic/claude-sonnet-4-20250514`).
@@ -79,9 +79,12 @@ func main() {
 ```
 
 <Warning>
-The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+  The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory
+  will be lost when your application exits.
 </Warning>
 
 <Note>
-Using OpenRouter is a great way to experiment with different models without changing your core instrumentation logic. All calls will be traced by LangWatch, regardless of the underlying model you choose.
-</Note> 
+  Using OpenRouter is a great way to experiment with different models without changing
+  your core instrumentation logic. All calls will be traced by LangWatch, regardless of
+  the underlying model you choose.
+</Note>

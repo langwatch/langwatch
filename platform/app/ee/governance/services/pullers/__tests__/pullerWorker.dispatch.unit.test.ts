@@ -220,8 +220,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       // 3x 503 — exhausts the adapter's retry budget; runOnce returns
       // a PullResult with errorCount=1 (does NOT throw — adapter swallows
       // and surfaces via errorCount). The effect fails so the outbox retries.
-      const r503 = () =>
-        new Response(JSON.stringify({ error: "down" }), { status: 503 });
+      const r503 = () => new Response(JSON.stringify({ error: "down" }), { status: 503 });
       fetchStub.mockResolvedValueOnce(r503());
       fetchStub.mockResolvedValueOnce(r503());
       fetchStub.mockResolvedValueOnce(r503());

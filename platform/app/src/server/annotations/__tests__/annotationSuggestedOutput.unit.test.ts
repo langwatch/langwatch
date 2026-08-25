@@ -10,9 +10,7 @@ import { annotationSuggestedOutput } from "../annotationSuggestedOutput";
 const traceId = "trace-1";
 
 const suggestionOf = (
-  annotation: Parameters<
-    typeof annotationSuggestedOutput
-  >[0]["annotation"] = {},
+  annotation: Parameters<typeof annotationSuggestedOutput>[0]["annotation"] = {},
 ) => annotationSuggestedOutput({ annotation, traceId });
 
 describe("the expected output an annotation suggests", () => {

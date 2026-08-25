@@ -11,10 +11,7 @@ import { asJsonDocument } from "@langwatch/langy-contract";
 import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
 import { formatMoneyShort } from "../Money";
 import { StreamingStatCard } from "../StreamingStatCard";
-import {
-  type CapabilityCardInput,
-  extractToolText,
-} from "./capabilityRegistry";
+import { type CapabilityCardInput, extractToolText } from "./capabilityRegistry";
 import { LangyCapabilityCard } from "./LangyCapabilityCard";
 
 type ParsedAnalytics = {
@@ -45,8 +42,7 @@ function parseAnalyticsJson(output: unknown): ParsedAnalytics | null {
   }
   return {
     metric: typeof metadata.metric === "string" ? metadata.metric : null,
-    aggregation:
-      typeof metadata.aggregation === "string" ? metadata.aggregation : null,
+    aggregation: typeof metadata.aggregation === "string" ? metadata.aggregation : null,
     // A time-series card's primary number is the requested period total, not
     // its final partial bucket (which would make “77 traces” look like “2”).
     latest: values.reduce((sum, value) => sum + value, 0),
@@ -143,11 +139,7 @@ function asDay(value: unknown): string | undefined {
   return date.toISOString().slice(0, 10);
 }
 
-export function LangyMetricsCard({
-  input,
-  output,
-  projectSlug,
-}: CapabilityCardInput) {
+export function LangyMetricsCard({ input, output, projectSlug }: CapabilityCardInput) {
   const parsed = parseAnalytics(output);
   const { metric, aggregation, latest, points, empty } = parsed;
   const metricFromInput =

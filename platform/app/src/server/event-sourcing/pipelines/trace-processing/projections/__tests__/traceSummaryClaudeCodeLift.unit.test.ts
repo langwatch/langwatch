@@ -28,10 +28,7 @@ import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
 } from "../../schemas/constants";
-import type {
-  LogContributedEvent,
-  LogRecordReceivedEvent,
-} from "../../schemas/events";
+import type { LogContributedEvent, LogRecordReceivedEvent } from "../../schemas/events";
 import {
   applySpanToSummary,
   TraceSummaryFoldProjection,
@@ -248,9 +245,7 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
       expect(after.attributes["langwatch.output_tokens"]).toBe("47");
       expect(after.attributes["langwatch.cache_read_tokens"]).toBe("1200");
       expect(after.attributes["langwatch.thread.id"]).toBe("conv_abc");
-      expect(after.attributes["langwatch.principal.email"]).toBe(
-        "rogerio@langwatch.ai",
-      );
+      expect(after.attributes["langwatch.principal.email"]).toBe("rogerio@langwatch.ai");
     });
 
     it("does NOT set langwatch.cache_creation_tokens for codex (codex doesn't emit it)", () => {
@@ -268,9 +263,7 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
         ),
         state,
       );
-      expect(
-        after.attributes["langwatch.cache_creation_tokens"],
-      ).toBeUndefined();
+      expect(after.attributes["langwatch.cache_creation_tokens"]).toBeUndefined();
     });
   });
 
@@ -291,9 +284,7 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
         state,
       );
       expect(after.attributes["langwatch.model"]).toBe("gpt-5.5");
-      expect(after.attributes["langwatch.principal.email"]).toBe(
-        "rogerio@langwatch.ai",
-      );
+      expect(after.attributes["langwatch.principal.email"]).toBe("rogerio@langwatch.ai");
     });
   });
 
@@ -309,8 +300,7 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
             "gen_ai.usage.output_tokens": "30",
             "gen_ai.conversation.id": "conv_g",
             "gen_ai.input.messages": '[{"role":"user","content":"Hi"}]',
-            "gen_ai.output.messages":
-              '[{"role":"assistant","content":"Hello"}]',
+            "gen_ai.output.messages": '[{"role":"assistant","content":"Hello"}]',
             cached_content_token_count: "7",
           },
           { scopeName: "gen_ai", body: "gen_ai.event" },
@@ -428,9 +418,7 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
       expect(after.models).toEqual(state.models);
       expect(after.totalCost).toBe(state.totalCost);
       expect(after.totalPromptTokenCount).toBe(state.totalPromptTokenCount);
-      expect(after.totalCompletionTokenCount).toBe(
-        state.totalCompletionTokenCount,
-      );
+      expect(after.totalCompletionTokenCount).toBe(state.totalCompletionTokenCount);
     });
   });
 });
@@ -464,17 +452,14 @@ describe("TraceSummaryFoldProjection cache TTL split sums", () => {
         responseBodyEvent(36_610, 1_200),
         state,
       );
-      state = projection.handleTraceLogRecordReceived(
-        responseBodyEvent(1_024),
-        state,
-      );
+      state = projection.handleTraceLogRecordReceived(responseBodyEvent(1_024), state);
 
-      expect(
-        state.attributes["langwatch.reserved.cache_creation_1h_tokens"],
-      ).toBe("37634");
-      expect(
-        state.attributes["langwatch.reserved.cache_creation_5m_tokens"],
-      ).toBe("1200");
+      expect(state.attributes["langwatch.reserved.cache_creation_1h_tokens"]).toBe(
+        "37634",
+      );
+      expect(state.attributes["langwatch.reserved.cache_creation_5m_tokens"]).toBe(
+        "1200",
+      );
       // The per-call lift keys stay out of the merged attribute map: they
       // are per-event values, and a lingering last-call scalar would read
       // as a trace total.
@@ -560,14 +545,10 @@ describe("TraceSummaryFoldProjection context size", () => {
         }),
       });
 
-      expect(state.attributes["langwatch.reserved.context_size_tokens"]).toBe(
-        "156800",
-      );
+      expect(state.attributes["langwatch.reserved.context_size_tokens"]).toBe("156800");
       // The summed cache read keeps its own, much larger, number: the two
       // answer different questions and both stay available.
-      expect(state.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
-        "1050000",
-      );
+      expect(state.attributes["langwatch.reserved.cache_read_tokens"]).toBe("1050000");
     });
 
     /** @scenario "A later-arriving earlier call wins the context size" */
@@ -592,9 +573,7 @@ describe("TraceSummaryFoldProjection context size", () => {
         }),
       });
 
-      expect(state.attributes["langwatch.reserved.context_size_tokens"]).toBe(
-        "12500",
-      );
+      expect(state.attributes["langwatch.reserved.context_size_tokens"]).toBe("12500");
     });
   });
 
@@ -611,9 +590,7 @@ describe("TraceSummaryFoldProjection context size", () => {
         }),
       });
 
-      expect(
-        state.attributes["langwatch.reserved.context_size_tokens"],
-      ).toBeUndefined();
+      expect(state.attributes["langwatch.reserved.context_size_tokens"]).toBeUndefined();
     });
   });
 });

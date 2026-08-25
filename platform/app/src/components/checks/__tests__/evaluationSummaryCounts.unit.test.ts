@@ -58,9 +58,7 @@ describe("summarizeEvaluationsTag", () => {
 
   describe("when a processed run carries a fail verdict", () => {
     it("counts it as failed", () => {
-      const summary = summarizeEvaluationsTag([
-        makeEvaluation({ passed: false }),
-      ]);
+      const summary = summarizeEvaluationsTag([makeEvaluation({ passed: false })]);
       expect(summary.failed).toBe(1);
       expect(summary.passes).toBe(0);
     });
@@ -131,9 +129,7 @@ describe("evaluationsTagLabel", () => {
           passed: null,
         }),
       ]);
-      expect(evaluationsTagLabel(summary)).toBe(
-        "1 evaluation errored, 1 skipped",
-      );
+      expect(evaluationsTagLabel(summary)).toBe("1 evaluation errored, 1 skipped");
     });
   });
 

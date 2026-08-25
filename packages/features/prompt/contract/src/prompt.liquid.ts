@@ -89,9 +89,7 @@ export function tokenizeLiquidTemplate(text: string): LiquidToken[] {
 }
 
 /** Finds external inputs while excluding loop and assigned variables. */
-export function extractLiquidVariables(
-  text: string,
-): LiquidVariableExtractionResult {
+export function extractLiquidVariables(text: string): LiquidVariableExtractionResult {
   const inputVariables = new Set<string>();
   const loopVariables = new Set<string>();
   const assignedVariables = new Set<string>();

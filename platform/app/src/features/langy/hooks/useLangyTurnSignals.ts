@@ -60,9 +60,7 @@ export interface LangyTurnSignals {
  * status/progress alone. `isCatchingUp` is likewise unused now (the buffer's
  * tail replay is instant over the subscription).
  */
-export function useLangyTurnSignals(
-  _conversationId: string | null,
-): LangyTurnSignals {
+export function useLangyTurnSignals(_conversationId: string | null): LangyTurnSignals {
   const status = useLangyStore((s) => s.turnStatus);
   const statusIsReadiness = useLangyStore((s) => s.turnStatusIsReadiness);
   const progress = useLangyStore((s) => s.turnProgress);

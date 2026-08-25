@@ -32,8 +32,7 @@ export function mutationOutcomeHandlers({
         type: isApplied ? ("success" as const) : ("error" as const),
       });
     },
-    onError: (error: unknown) =>
-      showErrorToast({ error, fallbackTitle: failure }),
+    onError: (error: unknown) => showErrorToast({ error, fallbackTitle: failure }),
     onSettled,
   };
 }
@@ -59,8 +58,7 @@ export function countOutcomeHandlers({
       );
       toaster.create({ title: title(count ?? 0), type: "success" as const });
     },
-    onError: (error: unknown) =>
-      showErrorToast({ error, fallbackTitle: failure }),
+    onError: (error: unknown) => showErrorToast({ error, fallbackTitle: failure }),
     onSettled,
   };
 }

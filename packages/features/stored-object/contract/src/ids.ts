@@ -21,31 +21,19 @@ export type StoredObjectId = z.infer<typeof storedObjectIdSchema>;
 
 /** One write attempt. Several write operations may target one content ID. */
 export const storedObjectOperationIdSchema = opaqueIdSchema("operationId");
-export type StoredObjectOperationId = z.infer<
-  typeof storedObjectOperationIdSchema
->;
+export type StoredObjectOperationId = z.infer<typeof storedObjectOperationIdSchema>;
 
 /** One logical-delete command, distinct from the content generation it removes. */
 export const storedObjectDeletionIdSchema = opaqueIdSchema("deletionId");
-export type StoredObjectDeletionId = z.infer<
-  typeof storedObjectDeletionIdSchema
->;
+export type StoredObjectDeletionId = z.infer<typeof storedObjectDeletionIdSchema>;
 
 /** Identifies one short-lived service delivery capability without exposing its secret. */
 export const storedObjectCapabilityIdSchema = opaqueIdSchema("capabilityId");
-export type StoredObjectCapabilityId = z.infer<
-  typeof storedObjectCapabilityIdSchema
->;
+export type StoredObjectCapabilityId = z.infer<typeof storedObjectCapabilityIdSchema>;
 
 /** Monotonic lifecycle generation used to fence stale delivery and deletion work. */
-export const storedObjectGenerationSchema = z
-  .number()
-  .int()
-  .nonnegative()
-  .safe();
-export type StoredObjectGeneration = z.infer<
-  typeof storedObjectGenerationSchema
->;
+export const storedObjectGenerationSchema = z.number().int().nonnegative().safe();
+export type StoredObjectGeneration = z.infer<typeof storedObjectGenerationSchema>;
 
 /** A caller-stable key scoped to authenticated project and operation kind. */
 export const storedObjectIdempotencyKeySchema = z
@@ -55,9 +43,7 @@ export const storedObjectIdempotencyKeySchema = z
   .refine((value) => !hasControlCharacters(value), {
     message: "idempotencyKey must not contain control characters",
   });
-export type StoredObjectIdempotencyKey = z.infer<
-  typeof storedObjectIdempotencyKeySchema
->;
+export type StoredObjectIdempotencyKey = z.infer<typeof storedObjectIdempotencyKeySchema>;
 
 export const storedObjectIdentitySchema = z
   .object({

@@ -60,8 +60,7 @@ const REGISTRY: FeatureDescriptor[] = [
     key: "evaluator.create_default",
     role: "DEFAULT",
     displayName: "New evaluator model",
-    description:
-      "Model written into a freshly created LLM-as-a-judge evaluator.",
+    description: "Model written into a freshly created LLM-as-a-judge evaluator.",
   },
   {
     key: "scenarios.user_simulator",
@@ -73,8 +72,7 @@ const REGISTRY: FeatureDescriptor[] = [
     key: "scenarios.judge",
     role: "DEFAULT",
     displayName: "Scenario judge",
-    description:
-      "Model that judges whether a scenario met its success criteria.",
+    description: "Model that judges whether a scenario met its success criteria.",
   },
   {
     // DEFAULT-role (never codex-eligible) so a project whose FAST/coding
@@ -107,8 +105,7 @@ const REGISTRY: FeatureDescriptor[] = [
     key: "workflows.commit_message",
     role: "FAST",
     displayName: "Workflow commit messages",
-    description:
-      "Auto-generates a commit message when you save a workflow change.",
+    description: "Auto-generates a commit message when you save a workflow change.",
   },
   {
     key: "studio.autocomplete",
@@ -168,9 +165,7 @@ const REGISTRY: FeatureDescriptor[] = [
  * module load (below) and as the surface tests bind to so we can prove
  * the guard fires without monkey-patching the module system.
  */
-export function assertUniqueFeatureKeys(
-  features: readonly FeatureDescriptor[],
-): void {
+export function assertUniqueFeatureKeys(features: readonly FeatureDescriptor[]): void {
   const seen = new Set<string>();
   for (const f of features) {
     if (seen.has(f.key)) {

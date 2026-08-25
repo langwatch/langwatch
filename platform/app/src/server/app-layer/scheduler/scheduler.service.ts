@@ -5,10 +5,7 @@ import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { type ProcessRole, roleRunsWorkers } from "../config";
 import { computeCatchUp, computeNextRunAt } from "./nextRunAt";
 import type { SchedulerRegistry } from "./scheduler.registry";
-import type {
-  ScheduledJobRecord,
-  ScheduledJobStore,
-} from "./scheduler.types";
+import type { ScheduledJobRecord, ScheduledJobStore } from "./scheduler.types";
 
 /**
  * Best-effort cross-pod wake (ADR-044, user decision 2026-07-10). Postgres is

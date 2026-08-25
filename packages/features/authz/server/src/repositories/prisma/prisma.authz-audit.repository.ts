@@ -4,10 +4,7 @@ import {
 } from "../../adapters/eventing.authz-audit.adapter";
 
 type AuthzAuditDelegate = {
-  createMany(args: {
-    data: AuthzAuditRow[];
-    skipDuplicates: boolean;
-  }): Promise<unknown>;
+  createMany(args: { data: AuthzAuditRow[]; skipDuplicates: boolean }): Promise<unknown>;
 };
 
 /** Structural database capability for the insert-only AuthZ audit trail. */

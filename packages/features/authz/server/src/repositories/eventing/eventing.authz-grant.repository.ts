@@ -66,10 +66,7 @@ class AuthzGrantPortFailureMapper {
   }
 
   private static rethrow(error: unknown): never {
-    if (
-      error instanceof DuplicateBindingError ||
-      error instanceof BindingMissingError
-    ) {
+    if (error instanceof DuplicateBindingError || error instanceof BindingMissingError) {
       throw error;
     }
     if (AuthzLedgerMapper.isUniqueViolation(error)) {
@@ -107,12 +104,7 @@ type WriteDelegate = {
 
 export type AuthzGrantWriteDatabase = Omit<
   AuthzDatabase,
-  | "roleBinding"
-  | "grant"
-  | "groupMembership"
-  | "teamUser"
-  | "organizationUser"
-  | "user"
+  "roleBinding" | "grant" | "groupMembership" | "teamUser" | "organizationUser" | "user"
 > & {
   roleBinding: WriteDelegate;
   grant: WriteDelegate;
@@ -142,9 +134,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     return new EventingAuthzGrantRepository(options);
   }
 
-  private constructor(
-    private readonly options: EventingAuthzGrantRepositoryOptions,
-  ) {
+  private constructor(private readonly options: EventingAuthzGrantRepositoryOptions) {
     super();
     this.reads = PrismaAuthzGrantRepository.create(options.database);
   }
@@ -354,10 +344,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
       select: { id: true },
     });
     const revokedGrantIds = [
-      ...new Set([
-        ...bindings.map((row) => row.id),
-        ...grantHeads.map((row) => row.id),
-      ]),
+      ...new Set([...bindings.map((row) => row.id), ...grantHeads.map((row) => row.id)]),
     ];
     // The fact first (the ledger is the truth), enforcement with it — the
     // deny holds before the membership rows move.

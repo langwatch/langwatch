@@ -7,9 +7,7 @@ import { createSelfHostedPlanProvider } from "../self-hosted-plan-provider";
 const ORGANIZATION_ID = "org-123";
 
 /** An Enterprise plan as it comes back from a signed license today. */
-const enterpriseLicensePlan = (
-  overrides: Partial<PlanInfo> = {},
-): PlanInfo => ({
+const enterpriseLicensePlan = (overrides: Partial<PlanInfo> = {}): PlanInfo => ({
   planSource: "license",
   type: "ENTERPRISE",
   name: "Enterprise",

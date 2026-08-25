@@ -4,10 +4,7 @@ import type {
   EvaluatorResponse,
   UpdateEvaluatorBody,
 } from "./types";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import { EvaluatorsApiError } from "./errors";
 import {
@@ -28,9 +25,13 @@ export class EvaluatorsApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new EvaluatorsApiError(message, operation, error);
   }
 
@@ -47,17 +48,11 @@ export class EvaluatorsApiService {
    * Fetches a single evaluator by its ID or slug.
    */
   async get(idOrSlug: string): Promise<EvaluatorResponse> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/evaluators/{idOrSlug}",
-      {
-        params: { path: { idOrSlug } },
-      },
-    );
+    const { data, error } = await this.apiClient.GET("/api/evaluators/{idOrSlug}", {
+      params: { path: { idOrSlug } },
+    });
     if (error)
-      this.handleApiError(
-        `fetch evaluator with ID or slug "${idOrSlug}"`,
-        error,
-      );
+      this.handleApiError(`fetch evaluator with ID or slug "${idOrSlug}"`, error);
     return data;
   }
 
@@ -76,15 +71,11 @@ export class EvaluatorsApiService {
    * Updates an evaluator by its ID.
    */
   async update(id: string, params: UpdateEvaluatorBody): Promise<EvaluatorResponse> {
-    const { data, error } = await this.apiClient.PUT(
-      "/api/evaluators/{id}",
-      {
-        params: { path: { id } },
-        body: params,
-      },
-    );
-    if (error)
-      this.handleApiError(`update evaluator with ID "${id}"`, error);
+    const { data, error } = await this.apiClient.PUT("/api/evaluators/{id}", {
+      params: { path: { id } },
+      body: params,
+    });
+    if (error) this.handleApiError(`update evaluator with ID "${id}"`, error);
     return data;
   }
 
@@ -92,14 +83,10 @@ export class EvaluatorsApiService {
    * Deletes (archives) an evaluator by its ID.
    */
   async delete(id: string): Promise<DeleteEvaluatorResponse> {
-    const { data, error } = await this.apiClient.DELETE(
-      "/api/evaluators/{id}",
-      {
-        params: { path: { id } },
-      },
-    );
-    if (error)
-      this.handleApiError(`delete evaluator with ID "${id}"`, error);
+    const { data, error } = await this.apiClient.DELETE("/api/evaluators/{id}", {
+      params: { path: { id } },
+    });
+    if (error) this.handleApiError(`delete evaluator with ID "${id}"`, error);
     return data;
   }
 }

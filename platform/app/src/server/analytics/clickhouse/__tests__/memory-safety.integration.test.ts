@@ -14,10 +14,7 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import type {
-  FlattenAnalyticsMetricsEnum,
-  SeriesInputType,
-} from "../../registry";
+import type { FlattenAnalyticsMetricsEnum, SeriesInputType } from "../../registry";
 import type { AggregationTypes } from "../../types";
 import { buildTimeseriesQuery } from "../aggregation-builder";
 import { resetParamCounter } from "../filter-translator";
@@ -189,8 +186,7 @@ const REPRESENTATIVE_METRICS: Array<{
     label: "evaluations.evaluation_pass_rate (avg)",
     series: [
       {
-        metric:
-          "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+        metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
         aggregation: "avg" as AggregationTypes,
         key: "eval-1",
       },
@@ -209,8 +205,7 @@ const REPRESENTATIVE_METRICS: Array<{
     label: "threads.average_duration_per_thread (avg)",
     series: [
       {
-        metric:
-          "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
+        metric: "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
         aggregation: "avg" as AggregationTypes,
       },
     ],
@@ -337,12 +332,9 @@ describe("memory-safety integration", () => {
           });
           await result.json();
         } catch (error: unknown) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          const message = error instanceof Error ? error.message : String(error);
           if (message.includes("MEMORY_LIMIT_EXCEEDED")) {
-            expect.fail(
-              `Query "${label}" exceeded 50MB memory budget: ${message}`,
-            );
+            expect.fail(`Query "${label}" exceeded 50MB memory budget: ${message}`);
           }
           // Re-throw non-memory errors (these are real bugs)
           throw error;
@@ -476,8 +468,7 @@ describe("memory-safety integration", () => {
         timeScale: "full",
         series: [
           {
-            metric:
-              "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as AggregationTypes,
           },
         ],
@@ -516,8 +507,7 @@ describe("memory-safety integration", () => {
         timeScale: "full",
         series: [
           {
-            metric:
-              "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as AggregationTypes,
           },
         ],
@@ -537,8 +527,7 @@ describe("memory-safety integration", () => {
         timeScale: "full",
         series: [
           {
-            metric:
-              "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
             aggregation: "p95" as AggregationTypes,
           },
         ],
@@ -632,8 +621,7 @@ describe("memory-safety integration", () => {
         timeScale: "full",
         series: [
           {
-            metric:
-              "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as AggregationTypes,
           },
         ],

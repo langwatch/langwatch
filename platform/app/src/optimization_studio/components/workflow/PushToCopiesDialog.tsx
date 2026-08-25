@@ -20,9 +20,7 @@ export const PushToCopiesDialog = ({
   const { project } = useOrganizationTeamProject();
   const pushToCopies = api.workflow.pushToCopies.useMutation();
   const utils = api.useUtils();
-  const [selectedCopyIds, setSelectedCopyIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [selectedCopyIds, setSelectedCopyIds] = useState<Set<string>>(new Set());
 
   const {
     data: copies,
@@ -38,9 +36,7 @@ export const PushToCopiesDialog = ({
     },
   );
 
-  const [availableCopies, setAvailableCopies] = useState<
-    PushToCopiesCopyItem[]
-  >([]);
+  const [availableCopies, setAvailableCopies] = useState<PushToCopiesCopyItem[]>([]);
 
   useEffect(() => {
     if (!copies) return;
@@ -86,8 +82,7 @@ export const PushToCopiesDialog = ({
       emptyMessage={
         <>
           No replicas found. This may be because you don't have workflows:update
-          permission on the replica projects, or the replicas have been
-          archived.
+          permission on the replica projects, or the replicas have been archived.
         </>
       }
       onSuccess={() => setSelectedCopyIds(new Set())}

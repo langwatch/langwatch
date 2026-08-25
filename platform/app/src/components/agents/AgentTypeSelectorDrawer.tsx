@@ -34,8 +34,7 @@ const agentTypes: Array<{
     type: "code",
     icon: Code,
     title: "Code Agent",
-    description:
-      "Write custom Python code to process inputs and generate outputs",
+    description: "Write custom Python code to process inputs and generate outputs",
   },
   {
     type: "workflow",
@@ -56,8 +55,7 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
 
   const onClose = props.onClose ?? closeDrawer;
   const onSelect =
-    props.onSelect ??
-    (complexProps.onSelect as AgentTypeSelectorDrawerProps["onSelect"]);
+    props.onSelect ?? (complexProps.onSelect as AgentTypeSelectorDrawerProps["onSelect"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
   const handleSelectType = (type: AgentType) => {
@@ -106,12 +104,7 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
             <Heading>Choose Agent Type</Heading>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-        >
+        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
               Select the type of agent you want to create.

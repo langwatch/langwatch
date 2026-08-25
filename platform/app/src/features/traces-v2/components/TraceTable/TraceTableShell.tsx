@@ -1,10 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Icon,
-  type SystemStyleObject,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, type SystemStyleObject } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -311,8 +305,10 @@ function HeaderCell<T>({
   // the sidebar uses for SortableSection. We always call the hook so
   // its call order is stable; the returned props are simply unused
   // when `reorderable` is false.
-  const { listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: header.id, disabled: !reorderable });
+  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: header.id,
+    disabled: !reorderable,
+  });
   // Drag zone gets ONLY the pointer listeners. The sortable
   // `attributes` (role="button", tabIndex=0) are deliberately dropped:
   // they'd nest an interactive element inside the sort <Button>
@@ -391,8 +387,7 @@ function HeaderCell<T>({
   // Without this, dragging the trace column's grip updated state but
   // visually nothing happened because `width` stayed undefined.
   const isFlex = meta?.flex;
-  const wasResized =
-    isFlex && declaredSize !== undefined && size !== declaredSize;
+  const wasResized = isFlex && declaredSize !== undefined && size !== declaredSize;
   const useFixedWidth = !isFlex || wasResized;
   // Every column *title* is left-aligned for a consistent header row —
   // the previous mix (numeric columns right-aligned their headers via
@@ -569,11 +564,7 @@ function SortableHeaderButton({
       paddingX={0}
       paddingY={0}
       justifyContent={
-        align === "right"
-          ? "flex-end"
-          : align === "center"
-            ? "center"
-            : "flex-start"
+        align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start"
       }
       color="inherit"
       userSelect="none"
@@ -662,8 +653,7 @@ export function cellPropsFor(
   // header + body in lockstep on this is what makes the resize grip
   // affect the visible cell width.
   const isFlex = meta?.flex;
-  const wasResized =
-    isFlex && declaredSize !== undefined && size !== declaredSize;
+  const wasResized = isFlex && declaredSize !== undefined && size !== declaredSize;
   const useFixedWidth = !isFlex || wasResized;
   return {
     textAlign: meta?.align ?? "left",

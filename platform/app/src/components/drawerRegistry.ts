@@ -216,8 +216,7 @@ const DataPrivacyRuleDrawer = lazyDefault({
   key: "DataPrivacyRuleDrawer",
 });
 const RoutingPolicyDrawer = lazyDefault({
-  factory: () =>
-    import("./settings/governance/routingPolicies/RoutingPolicyDrawer"),
+  factory: () => import("./settings/governance/routingPolicies/RoutingPolicyDrawer"),
   key: "RoutingPolicyDrawer",
 });
 const DefaultModelOverrideDrawer = lazyDefault({
@@ -426,20 +425,20 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
 /**
  * Get the props type for a specific drawer.
  */
-export type DrawerProps<T extends DrawerType> = ComponentProps<
-  (typeof drawers)[T]
->;
+export type DrawerProps<T extends DrawerType> = ComponentProps<(typeof drawers)[T]>;
 
 /**
  * Extract only the callback (function) props from a drawer's props.
  * Used for type-safe flow callback registration.
  */
 export type DrawerCallbacks<T extends DrawerType> = {
-  [K in keyof DrawerProps<T> as DrawerProps<T>[K] extends
-    | ((...args: any[]) => any)
-    | undefined
-    ? K
-    : never]?: DrawerProps<T>[K];
+  [
+    K in keyof DrawerProps<T> as DrawerProps<T>[K] extends
+      | ((...args: any[]) => any)
+      | undefined
+      ? K
+      : never
+  ]?: DrawerProps<T>[K];
 };
 
 /**

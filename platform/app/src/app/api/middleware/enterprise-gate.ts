@@ -21,9 +21,7 @@ import {
  * shape, and the error carries meta.feature plus the remediation channel so a
  * CLI or agent can render upgrade guidance.
  */
-export function requireEnterprisePlanRest(
-  feature: EnterpriseFeature,
-): MiddlewareHandler {
+export function requireEnterprisePlanRest(feature: EnterpriseFeature): MiddlewareHandler {
   return async (c, next) => {
     const organization = c.get("organization") as Organization | undefined;
     if (!organization) {

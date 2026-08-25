@@ -38,19 +38,15 @@ describe("usePromptConfigForm", () => {
 
       expect(result.handle).toBe("test-handle");
       expect(result.version.configData.messages).toHaveLength(2);
-      expect(result.version.configData.messages[0]?.content).toBe(
-        "Test prompt",
-      );
+      expect(result.version.configData.messages[0]?.content).toBe("Test prompt");
     });
   });
 
   describe("when initialConfigValues are corrupted", () => {
     it("salvages valid parts and uses defaults for invalid parts", () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {
-          /* this is just a mock implementation for a spy */
-        });
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* this is just a mock implementation for a spy */
+      });
 
       const defaults = buildDefaultFormValues();
       const corruptedValues = {
@@ -76,9 +72,7 @@ describe("usePromptConfigForm", () => {
       // Should salvage valid parts
       expect(result.handle).toBe("valid-handle");
       expect(result.version.configData.messages).toHaveLength(2);
-      expect(result.version.configData.messages[0]?.content).toBe(
-        "Valid prompt text",
-      );
+      expect(result.version.configData.messages[0]?.content).toBe("Valid prompt text");
       expect(result.version.configData.outputs).toHaveLength(1);
       expect(result.version.configData.outputs[0]?.identifier).toBe("output");
 

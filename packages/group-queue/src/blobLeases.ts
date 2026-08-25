@@ -106,13 +106,7 @@ export class BlobLeases {
     this.leaseTtlSeconds = leaseTtlSeconds;
   }
 
-  private leaseKey({
-    projectId,
-    hash,
-  }: {
-    projectId: TenantId;
-    hash: string;
-  }): string {
+  private leaseKey({ projectId, hash }: { projectId: TenantId; hash: string }): string {
     return blobLeaseSetKey({ queueName: this.queueName, projectId, hash });
   }
 
@@ -290,11 +284,7 @@ export class BlobLeases {
     // Test-only inspection seam. This is deliberately not a passive read: the
     // Lua script prunes expired members and deletes an empty lease set.
     return Number(
-      await countLiveScript.run(
-        this.redis,
-        1,
-        this.leaseKey({ projectId, hash }),
-      ),
+      await countLiveScript.run(this.redis, 1, this.leaseKey({ projectId, hash })),
     );
   }
 }

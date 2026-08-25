@@ -10,14 +10,8 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { GatewayBudgetWithSeats } from "~/server/gateway/budget.service";
 import { effectiveBudgetPeriod } from "~/server/gateway/budgetPeriod";
-import {
-  providerLabelFor,
-  resolveProviderLabels,
-} from "~/server/gateway/providerLabels";
-import {
-  resolveScopeTargetsBatch,
-  scopeTargetKey,
-} from "~/server/gateway/scopeTargets";
+import { providerLabelFor, resolveProviderLabels } from "~/server/gateway/providerLabels";
+import { resolveScopeTargetsBatch, scopeTargetKey } from "~/server/gateway/scopeTargets";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -57,9 +51,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
       const { budgets, spendAvailable, scopeReach } =
-        await ctx.app.gateway.budgetDecisions.listWithHealth(
-          input.organizationId,
-        );
+        await ctx.app.gateway.budgetDecisions.listWithHealth(input.organizationId);
       const scopeTargets = await resolveScopeTargetsBatch(
         ctx.prisma,
         budgets,
@@ -75,8 +67,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
           ...toDto(b),
           spendAvailable,
           unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
-          scopeTarget:
-            scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
+          scopeTarget: scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
           providerLabel: providerLabelFor(providerLabels, b.providerKey),
         })),
       };
@@ -87,9 +78,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .permission("gatewayBudgets:view")
     .query(async ({ ctx, input }) => {
       const { budgets, spendAvailable, scopeReach } =
-        await ctx.app.gateway.budgetDecisions.listForProjectWithHealth(
-          input.projectId,
-        );
+        await ctx.app.gateway.budgetDecisions.listForProjectWithHealth(input.projectId);
       const project = await ctx.prisma.project.findUnique({
         where: { id: input.projectId },
         select: { team: { select: { organizationId: true } } },
@@ -109,8 +98,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
           ...toDto(b),
           spendAvailable,
           unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
-          scopeTarget:
-            scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
+          scopeTarget: scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
           providerLabel: providerLabelFor(providerLabels, b.providerKey),
         })),
       };
@@ -137,10 +125,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         spendAvailable: detail.spendAvailable,
         unreachableByAnyKey: detail.unreachableByAnyKey,
         scopeTarget: detail.scopeTarget,
-        providerLabel: providerLabelFor(
-          providerLabels,
-          detail.budget.providerKey,
-        ),
+        providerLabel: providerLabelFor(providerLabels, detail.budget.providerKey),
         recentLedger: detail.recentLedger.map((l) => ({
           id: l.id,
           virtualKeyId: l.virtualKeyId,
@@ -187,15 +172,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         scope: scopeSchema,
         name: z.string().min(1).max(128),
         description: z.string().optional(),
-        window: z.enum([
-          "MINUTE",
-          "HOUR",
-          "DAY",
-          "WEEK",
-          "MONTH",
-          "TOTAL",
-          "MANUAL",
-        ]),
+        window: z.enum(["MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "TOTAL", "MANUAL"]),
         limitUsd: z.number().positive().or(z.string()),
         onBreach: z.enum(["BLOCK", "WARN"]).optional(),
         timezone: z.string().nullable().optional(),

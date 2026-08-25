@@ -30,9 +30,7 @@ describe("skillInvocation", () => {
   describe("skillSlugFromInput", () => {
     describe("when the input carries a skill slug", () => {
       it("extracts the skill name", () => {
-        expect(skillSlugFromInput({ skill: "surf-pr", args: "" })).toBe(
-          "surf-pr",
-        );
+        expect(skillSlugFromInput({ skill: "surf-pr", args: "" })).toBe("surf-pr");
       });
 
       it("trims surrounding whitespace", () => {
@@ -42,9 +40,7 @@ describe("skillInvocation", () => {
       });
 
       it("honors the skill_name alias", () => {
-        expect(skillSlugFromInput({ skill_name: "code-review" })).toBe(
-          "code-review",
-        );
+        expect(skillSlugFromInput({ skill_name: "code-review" })).toBe("code-review");
       });
 
       it("honors the name alias", () => {
@@ -103,9 +99,9 @@ describe("skillInvocation", () => {
       });
 
       it("resolves with a null slug when the input has none", () => {
-        expect(
-          skillInvocationFromToolUse({ name: "Skill", input: {} }),
-        ).toEqual({ slug: null });
+        expect(skillInvocationFromToolUse({ name: "Skill", input: {} })).toEqual({
+          slug: null,
+        });
       });
     });
 

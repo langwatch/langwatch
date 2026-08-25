@@ -38,11 +38,7 @@
  */
 
 import type { EventSourcing } from "@langwatch/eventing";
-import {
-  defineAggregate,
-  defineEvents,
-  definePipeline,
-} from "@langwatch/eventing";
+import { defineAggregate, defineEvents, definePipeline } from "@langwatch/eventing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
@@ -276,26 +272,11 @@ describe.skipIf(!hasTestcontainers)(
           new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
         .withProjectionSubscriber("evaluationTrigger", fastSpec as any)
-        .withProjectionSubscriber(
-          "customEvaluationSync",
-          noopFoldSubscriber() as any,
-        )
-        .withProjectionSubscriber(
-          "traceUpdateBroadcast",
-          noopFoldSubscriber() as any,
-        )
-        .withProjectionSubscriber(
-          "simulationMetricsSync",
-          noopFoldSubscriber() as any,
-        )
-        .withProjectionSubscriber(
-          "projectMetadata",
-          noopFoldSubscriber() as any,
-        )
-        .withProjectionSubscriber(
-          "spanStorageBroadcast",
-          noopMapSubscriber() as any,
-        )
+        .withProjectionSubscriber("customEvaluationSync", noopFoldSubscriber() as any)
+        .withProjectionSubscriber("traceUpdateBroadcast", noopFoldSubscriber() as any)
+        .withProjectionSubscriber("simulationMetricsSync", noopFoldSubscriber() as any)
+        .withProjectionSubscriber("projectMetadata", noopFoldSubscriber() as any)
+        .withProjectionSubscriber("spanStorageBroadcast", noopMapSubscriber() as any)
         .withCommand("recordSpan", TestRecordSpanCommand as any)
         .withCommand("assignTopic", AssignTopicCommand as any)
         .build();
@@ -451,8 +432,7 @@ describe.skipIf(!hasTestcontainers)(
           // assertion stays as a post-condition: by the time the blocked
           // counter ticks the subscriber has decided not to dispatch.
           await waitFor(
-            async () =>
-              (await readBlockedCounter("depth_direct")) > beforeBlocked,
+            async () => (await readBlockedCounter("depth_direct")) > beforeBlocked,
             {
               timeoutMs: 20_000,
               label: "loop-blocked counter incremented for depth_direct",
@@ -524,13 +504,10 @@ describe.skipIf(!hasTestcontainers)(
               depth: 0,
             }),
           );
-          await waitFor(
-            () => dispatcher.captured.length >= dispatchesAfter1 + 1,
-            {
-              timeoutMs: 20_000,
-              label: "fresh depth=0 re-dispatched on the same trace",
-            },
-          );
+          await waitFor(() => dispatcher.captured.length >= dispatchesAfter1 + 1, {
+            timeoutMs: 20_000,
+            label: "fresh depth=0 re-dispatched on the same trace",
+          });
           expect(dispatcher.captured.length).toBe(dispatchesAfter1 + 1);
         });
       });
@@ -576,13 +553,10 @@ describe.skipIf(!hasTestcontainers)(
                 depth: 1,
               }),
             );
-            await waitFor(
-              () => dispatcher.captured.length >= dispatchesBefore + 1,
-              {
-                timeoutMs: 20_000,
-                label: "kill switch lets depth=1 dispatch through the queue",
-              },
-            );
+            await waitFor(() => dispatcher.captured.length >= dispatchesBefore + 1, {
+              timeoutMs: 20_000,
+              label: "kill switch lets depth=1 dispatch through the queue",
+            });
             expect(dispatcher.captured.length).toBe(dispatchesBefore + 1);
           } finally {
             if (prev === undefined) {

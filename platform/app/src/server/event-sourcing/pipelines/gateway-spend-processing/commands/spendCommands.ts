@@ -1,9 +1,5 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
-import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import {
   type AdmitSpendCommandData,
   admitSpendCommandDataSchema,
@@ -59,10 +55,10 @@ function idempotencyKey({
   return `${tenantId}:${gatewayRequestId}:${step}`;
 }
 
-export class AdmitSpendCommand
-  implements
-    CommandHandler<Command<AdmitSpendCommandData>, GatewaySpendAdmittedEvent>
-{
+export class AdmitSpendCommand implements CommandHandler<
+  Command<AdmitSpendCommandData>,
+  GatewaySpendAdmittedEvent
+> {
   static readonly schema = defineCommandSchema(
     ADMIT_SPEND_COMMAND_TYPE,
     admitSpendCommandDataSchema,
@@ -107,10 +103,10 @@ export class AdmitSpendCommand
   }
 }
 
-export class ConfirmSpendCommand
-  implements
-    CommandHandler<Command<ConfirmSpendCommandData>, GatewaySpendConfirmedEvent>
-{
+export class ConfirmSpendCommand implements CommandHandler<
+  Command<ConfirmSpendCommandData>,
+  GatewaySpendConfirmedEvent
+> {
   static readonly schema = defineCommandSchema(
     CONFIRM_SPEND_COMMAND_TYPE,
     confirmSpendCommandDataSchema,
@@ -155,10 +151,10 @@ export class ConfirmSpendCommand
   }
 }
 
-export class FailSpendCommand
-  implements
-    CommandHandler<Command<FailSpendCommandData>, GatewaySpendFailedEvent>
-{
+export class FailSpendCommand implements CommandHandler<
+  Command<FailSpendCommandData>,
+  GatewaySpendFailedEvent
+> {
   static readonly schema = defineCommandSchema(
     FAIL_SPEND_COMMAND_TYPE,
     failSpendCommandDataSchema,
@@ -202,10 +198,10 @@ export class FailSpendCommand
   }
 }
 
-export class SettleSpendCommand
-  implements
-    CommandHandler<Command<SettleSpendCommandData>, GatewaySpendSettledEvent>
-{
+export class SettleSpendCommand implements CommandHandler<
+  Command<SettleSpendCommandData>,
+  GatewaySpendSettledEvent
+> {
   static readonly schema = defineCommandSchema(
     SETTLE_SPEND_COMMAND_TYPE,
     settleSpendCommandDataSchema,

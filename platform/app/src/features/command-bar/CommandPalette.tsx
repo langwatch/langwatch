@@ -48,21 +48,15 @@ function handleTracesPageCommand(
 ) {
   switch (commandId) {
     case "page-traces-view-list":
-      void router.push(
-        { query: { ...router.query, view: "list" } },
-        undefined,
-        {
-          shallow: true,
-        },
-      );
+      void router.push({ query: { ...router.query, view: "list" } }, undefined, {
+        shallow: true,
+      });
       close();
       break;
     case "page-traces-view-table":
-      void router.push(
-        { query: { ...router.query, view: "table" } },
-        undefined,
-        { shallow: true },
-      );
+      void router.push({ query: { ...router.query, view: "table" } }, undefined, {
+        shallow: true,
+      });
       close();
       break;
     case "page-traces-date-7d": {
@@ -431,13 +425,7 @@ export function CommandPalette({
 
         handleCommandSelect(cmd, projectSlug, ctx, addRecentItem, openDrawer);
       } else if (item.type === "search") {
-        handleSearchResultSelect(
-          item.data,
-          projectSlug,
-          ctx,
-          addRecentItem,
-          openDrawer,
-        );
+        handleSearchResultSelect(item.data, projectSlug, ctx, addRecentItem, openDrawer);
       } else if (item.type === "recent") {
         handleRecentItemSelect(item.data, ctx, addRecentItem, openDrawer);
       } else if (item.type === "project") {
@@ -612,9 +600,7 @@ export function CommandPalette({
             // Capped to the room actually left below the field, so a long list
             // scrolls inside the panel instead of running off the page where
             // its last rows — and the footer's shortcuts — cannot be reached.
-            {...(panelMaxHeight !== null
-              ? { maxHeight: `${panelMaxHeight}px` }
-              : {})}
+            {...(panelMaxHeight !== null ? { maxHeight: `${panelMaxHeight}px` } : {})}
             display="flex"
             flexDirection="column"
           >

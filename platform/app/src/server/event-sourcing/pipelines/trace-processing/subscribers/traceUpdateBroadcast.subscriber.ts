@@ -4,9 +4,7 @@ import type { BroadcastService } from "../../../../app-layer/broadcast/broadcast
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
 
-const logger = createLogger(
-  "langwatch:trace-processing:trace-update-broadcast",
-);
+const logger = createLogger("langwatch:trace-processing:trace-update-broadcast");
 
 export interface TraceUpdateBroadcastSubscriberDeps {
   broadcast: BroadcastService;
@@ -43,11 +41,7 @@ export function createTraceUpdateBroadcastHandler(
         traceId,
       });
 
-      await deps.broadcast.broadcastToTenant(
-        tenantId,
-        payload,
-        "trace_updated",
-      );
+      await deps.broadcast.broadcastToTenant(tenantId, payload, "trace_updated");
 
       logger.debug({ tenantId, traceId }, "Broadcasted trace update");
     } catch (error) {

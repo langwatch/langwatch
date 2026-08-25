@@ -51,9 +51,7 @@ export function FlameBreadcrumbs({
             ? node.parent.span.endTimeMs - node.parent.span.startTimeMs
             : null;
           const pctOfParent =
-            parentDur !== null && parentDur > 0
-              ? (crumbDur / parentDur) * 100
-              : null;
+            parentDur !== null && parentDur > 0 ? (crumbDur / parentDur) * 100 : null;
           return (
             <HStack key={node.span.spanId} gap={0} minWidth={0}>
               <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
@@ -78,9 +76,7 @@ export function FlameBreadcrumbs({
                 </Text>
                 <Text textStyle="xs" color="fg.subtle" whiteSpace="nowrap">
                   {formatDuration(crumbDur)}
-                  {pctOfParent !== null
-                    ? ` · ${formatPercent(pctOfParent)}`
-                    : ""}
+                  {pctOfParent !== null ? ` · ${formatPercent(pctOfParent)}` : ""}
                 </Text>
               </HStack>
             </HStack>

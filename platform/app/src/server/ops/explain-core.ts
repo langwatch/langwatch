@@ -197,9 +197,7 @@ export function buildExplainQuery(
   // 502s. Expand it to the canonical form so callers can pass `INDEXES`
   // as a logical type without needing to know that wrinkle.
   const prefix =
-    type === "INDEXES"
-      ? "EXPLAIN PLAN indexes = 1, actions = 1"
-      : `EXPLAIN ${type}`;
+    type === "INDEXES" ? "EXPLAIN PLAN indexes = 1, actions = 1" : `EXPLAIN ${type}`;
   return { ok: true, wrapped: `${prefix} ${trimmed}`, type };
 }
 

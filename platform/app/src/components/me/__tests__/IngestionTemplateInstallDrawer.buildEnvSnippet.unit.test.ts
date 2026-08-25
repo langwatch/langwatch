@@ -88,9 +88,7 @@ describe("buildEnvSnippet", () => {
       expect(snippet).toContain("export GEMINI_TELEMETRY_USE_COLLECTOR=true");
       expect(snippet).toContain("export GEMINI_TELEMETRY_TRACES_ENABLED=true");
       expect(snippet).toContain("export GEMINI_TELEMETRY_OTLP_PROTOCOL=http");
-      expect(snippet).toContain(
-        `export GEMINI_TELEMETRY_OTLP_ENDPOINT="${ENDPOINT}"`,
-      );
+      expect(snippet).toContain(`export GEMINI_TELEMETRY_OTLP_ENDPOINT="${ENDPOINT}"`);
       expect(snippet).toContain("export GEMINI_TELEMETRY_LOG_PROMPTS=true");
     });
 

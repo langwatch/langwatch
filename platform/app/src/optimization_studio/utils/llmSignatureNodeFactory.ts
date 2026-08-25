@@ -3,9 +3,7 @@ import type { NodeWithOptionalPosition } from "../../types";
 
 type LlmSignatureNode = NodeWithOptionalPosition<LlmPromptConfigComponent>;
 
-const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
-  model: string,
-): LlmSignatureNode => ({
+const DEFAULT_SIGNATURE_NODE_PROPERTIES = (model: string): LlmSignatureNode => ({
   type: "signature",
   id: "llm_node",
   data: {

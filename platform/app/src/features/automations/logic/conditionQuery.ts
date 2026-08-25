@@ -18,21 +18,11 @@ import {
   SEARCH_FIELDS,
   type SearchFieldMeta,
 } from "~/server/app-layer/traces/query-language/metadata";
-import {
-  parse,
-  stripAtSigils,
-} from "~/server/app-layer/traces/query-language/parse";
+import { parse, stripAtSigils } from "~/server/app-layer/traces/query-language/parse";
 
 /** Comparators the builder exposes. Categorical / text / existence fields get
  *  `is` / `is_not`; range fields get the numeric comparators plus `between`. */
-export type ConditionOperator =
-  | "is"
-  | "is_not"
-  | "gt"
-  | "gte"
-  | "lt"
-  | "lte"
-  | "between";
+export type ConditionOperator = "is" | "is_not" | "gt" | "gte" | "lt" | "lte" | "between";
 
 export interface Condition {
   /** Stable key for React list rendering — never serialised. */
@@ -46,13 +36,7 @@ export interface Condition {
   valueTo?: string;
 }
 
-const RANGE_OPERATORS: ConditionOperator[] = [
-  "gt",
-  "gte",
-  "lt",
-  "lte",
-  "between",
-];
+const RANGE_OPERATORS: ConditionOperator[] = ["gt", "gte", "lt", "lte", "between"];
 const MEMBERSHIP_OPERATORS: ConditionOperator[] = ["is", "is_not"];
 
 /** Which comparators apply to a field, keyed off its value-type. Unknown
@@ -121,10 +105,7 @@ function serializeCondition(c: Condition): string {
 }
 
 export function serializeConditions(conditions: Condition[]): string {
-  return conditions
-    .filter(isConditionComplete)
-    .map(serializeCondition)
-    .join(" AND ");
+  return conditions.filter(isConditionComplete).map(serializeCondition).join(" AND ");
 }
 
 // ── parse ────────────────────────────────────────────────────────────────
@@ -140,11 +121,7 @@ interface Conjunct {
  * (which would need De Morgan to distribute), or free-text. Negation is only
  * accepted when it wraps a single tag directly.
  */
-function collectConjuncts(
-  node: ParserAst,
-  negated: boolean,
-  out: Conjunct[],
-): boolean {
+function collectConjuncts(node: ParserAst, negated: boolean, out: Conjunct[]): boolean {
   switch (node.type) {
     case "EmptyExpression":
       return true;
@@ -181,10 +158,7 @@ function tagToCondition(
   // `collectConjuncts` only admits Field tags, but re-narrow for the type
   // checker (and defence in depth).
   if (tag.field.type !== "Field") return null;
-  const field = normalized.slice(
-    tag.field.location.start,
-    tag.field.location.end,
-  );
+  const field = normalized.slice(tag.field.location.start, tag.field.location.end);
   if (!field) return null;
 
   const expr = tag.expression;
@@ -205,8 +179,7 @@ function tagToCondition(
 
   if (expr.type !== "LiteralExpression") return null; // regex / empty
 
-  const value =
-    typeof expr.value === "string" ? expr.value : String(expr.value);
+  const value = typeof expr.value === "string" ? expr.value : String(expr.value);
 
   const comparison = tag.operator.operator;
   if (

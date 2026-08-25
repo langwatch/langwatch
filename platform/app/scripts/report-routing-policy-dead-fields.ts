@@ -148,9 +148,7 @@ type AllowlistShape =
 function readAllowlist(raw: Prisma.JsonValue | null): AllowlistShape {
   if (raw === null || raw === undefined) return { kind: "absent" };
   if (!Array.isArray(raw)) return { kind: "malformed" };
-  const entries = raw.filter(
-    (item): item is string => typeof item === "string",
-  );
+  const entries = raw.filter((item): item is string => typeof item === "string");
   return { kind: "list", entries, skipped: raw.length - entries.length };
 }
 
@@ -202,10 +200,7 @@ function foldAllowlist(rows: PolicyRow[]): AllowlistCensus {
     } else {
       census.skippedEntries += shape.skipped;
       if (shape.entries.length === 0) census.empty += 1;
-      else
-        census.nonEmpty.push(
-          toAllowlistPolicy({ row, entries: shape.entries }),
-        );
+      else census.nonEmpty.push(toAllowlistPolicy({ row, entries: shape.entries }));
     }
   }
   return census;
@@ -232,9 +227,8 @@ function buildReport(rows: PolicyRow[]): Report {
     total: rows.length,
     allowlist,
     strategy: foldStrategy(rows),
-    both: allowlist.nonEmpty.filter(
-      (policy) => policy.strategy !== DEFAULT_STRATEGY,
-    ).length,
+    both: allowlist.nonEmpty.filter((policy) => policy.strategy !== DEFAULT_STRATEGY)
+      .length,
   };
 }
 
@@ -264,10 +258,7 @@ function reportSummary(report: Report): void {
   });
   count({
     label: "allowlist entries in total",
-    value: allowlist.nonEmpty.reduce(
-      (sum, policy) => sum + policy.entries.length,
-      0,
-    ),
+    value: allowlist.nonEmpty.reduce((sum, policy) => sum + policy.entries.length, 0),
   });
   if (allowlist.malformed > 0) {
     count({
@@ -307,9 +298,7 @@ function reportStrategySummary(report: Report): void {
 function reportPolicy(policy: AllowlistPolicy): void {
   const marker = policy.isDefault ? "  (organization default)" : "";
   console.log(`  ${policy.id}  ${policy.name}${marker}`);
-  console.log(
-    `    ${policy.entries.length} entries: ${policy.entries.join(", ")}`,
-  );
+  console.log(`    ${policy.entries.length} entries: ${policy.entries.join(", ")}`);
   if (policy.existingModelsAllow && policy.existingModelsAllow.length > 0) {
     console.log(
       `    policyRules.models.allow already enforces ${policy.existingModelsAllow.length}: ${policy.existingModelsAllow.join(
@@ -436,9 +425,7 @@ function reportSql(policies: AllowlistPolicy[]): void {
   if (policies.length === 0) {
     console.log("");
     console.log("-- No policy carries a non-empty modelAllowlist.");
-    console.log(
-      "-- There is nothing to fold into policyRules, and nothing to apply.",
-    );
+    console.log("-- There is nothing to fold into policyRules, and nothing to apply.");
     return;
   }
   for (const policy of policies) {

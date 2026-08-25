@@ -25,8 +25,7 @@ const { loggers } = vi.hoisted(() => ({ loggers: new Map<string, any>() }));
 // fresh pino instance per call, so there is no way to reach the one it kept.
 // Memoize by name: still the real logger, just observable.
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof import("@langwatch/observability")>();
   return {
     ...actual,
     createLogger: (name: string, options?: any) => {
@@ -61,10 +60,7 @@ const bootWithStaleEnvFile = () => {
   //    is deliberate, and it is also what reinstates the committed 5560 here.
   const dir = mkdtempSync(join(tmpdir(), "langwatch-auth-origin-"));
   const file = join(dir, ".env");
-  writeFileSync(
-    file,
-    `BASE_HOST=${COMMITTED_URL}\nNEXTAUTH_URL=${COMMITTED_URL}\n`,
-  );
+  writeFileSync(file, `BASE_HOST=${COMMITTED_URL}\nNEXTAUTH_URL=${COMMITTED_URL}\n`);
   dotenv.config({ path: file, override: true, quiet: true });
 
   expect(process.env.NEXTAUTH_URL).toBe(COMMITTED_URL);
@@ -141,11 +137,7 @@ describe("given a dev checkout running on a non-default port", () => {
   describe("when the browser posts a sign-in from that port", () => {
     /** @scenario Sign-in succeeds on a non-default port */
     it("signs the user in and hands back a session", async () => {
-      const response = await post(
-        app,
-        `http://localhost:${APP_PORT}`,
-        PASSWORD,
-      );
+      const response = await post(app, `http://localhost:${APP_PORT}`, PASSWORD);
 
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({

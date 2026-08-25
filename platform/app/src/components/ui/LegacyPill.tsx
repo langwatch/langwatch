@@ -1,12 +1,7 @@
 import { Badge, HStack } from "@chakra-ui/react";
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  PopoverAnchor,
-  PopoverBody,
-  PopoverContent,
-  PopoverRoot,
-} from "./popover";
+import { PopoverAnchor, PopoverBody, PopoverContent, PopoverRoot } from "./popover";
 
 /**
  * Flags a feature as legacy with an inline, dismissable explanation so we
@@ -102,10 +97,7 @@ export function LegacyPill({
           {label}
         </Badge>
       </PopoverAnchor>
-      <PopoverContent
-        onMouseEnter={handlePopoverEnter}
-        onMouseLeave={handlePopoverLeave}
-      >
+      <PopoverContent onMouseEnter={handlePopoverEnter} onMouseLeave={handlePopoverLeave}>
         <PopoverBody>{message}</PopoverBody>
       </PopoverContent>
     </PopoverRoot>

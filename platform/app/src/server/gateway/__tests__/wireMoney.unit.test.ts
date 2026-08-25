@@ -127,13 +127,9 @@ describe("decimalUsdToNanoUsd", () => {
   it("scales the decimal string exactly", () => {
     // 0.1 + 0.2 arithmetic is why this scales the STRING: `toNumber() * 1e9`
     // on these lands fractions of a cent away from the true integer.
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("25.500000"))).toBe(
-      25_500_000_000,
-    );
+    expect(decimalUsdToNanoUsd(new Prisma.Decimal("25.500000"))).toBe(25_500_000_000);
     expect(decimalUsdToNanoUsd(new Prisma.Decimal("0.000001"))).toBe(1_000);
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("0.070000"))).toBe(
-      70_000_000,
-    );
+    expect(decimalUsdToNanoUsd(new Prisma.Decimal("0.070000"))).toBe(70_000_000);
     expect(decimalUsdToNanoUsd(new Prisma.Decimal("0"))).toBe(0);
   });
 

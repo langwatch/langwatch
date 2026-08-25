@@ -4,18 +4,14 @@ export * from "./automation.errors";
 export * from "./automation.queries";
 export * from "./automation.service";
 export {
-	alertTypeSchema,
-	notificationCadenceSchema,
-	triggerActionSchema,
-	triggerKindSchema,
-	triggerSchema,
-	triggerTemplateSchema,
+  alertTypeSchema,
+  notificationCadenceSchema,
+  triggerActionSchema,
+  triggerKindSchema,
+  triggerSchema,
+  triggerTemplateSchema,
 } from "./trigger";
-export type {
-	Trigger,
-	TriggerKind,
-	TriggerTemplate,
-} from "./trigger";
+export type { Trigger, TriggerKind, TriggerTemplate } from "./trigger";
 export * from "./trigger.commands";
 export * from "./trigger.queries";
 export * from "./cadences";

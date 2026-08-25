@@ -1,11 +1,5 @@
-import type {
-  FoldProjectionOptions,
-  FoldProjectionStore,
-} from "@langwatch/eventing";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
+import type { FoldProjectionOptions, FoldProjectionStore } from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { trimAttributesForAnalytics } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/analytics-attribute-trim.service";
 import type {
@@ -102,8 +96,7 @@ const evaluationAnalyticsEvents = [
  *  instead. A bump here would only trigger a refold wave and reset the
  *  refoldOnStoreMiss deletion clock (dev/docs/adr/066, ADR-071) for no
  *  correctness gain. */
-export const EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST =
-  "2026-07-27" as const;
+export const EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-07-27" as const;
 
 /**
  * How far an evaluation's OccurredAt (the partition column) may sit from the
@@ -385,8 +378,13 @@ export function evaluationAnalyticsStateFromRow(
 }
 
 /** The valid `status` union values, for the read-back guard. */
-const EVALUATION_STATUS_VALUES: ReadonlySet<EvaluationAnalyticsData["status"]> =
-  new Set(["scheduled", "in_progress", "processed", "error", "skipped"]);
+const EVALUATION_STATUS_VALUES: ReadonlySet<EvaluationAnalyticsData["status"]> = new Set([
+  "scheduled",
+  "in_progress",
+  "processed",
+  "error",
+  "skipped",
+]);
 
 /**
  * Merge a passthrough event metadata bag into the slim attributes map.
@@ -438,8 +436,7 @@ export class EvaluationAnalyticsFoldProjection
     "updatedAt",
     "LastEventOccurredAt"
   >
-  implements
-    FoldEventHandlers<typeof evaluationAnalyticsEvents, EvaluationAnalyticsData>
+  implements FoldEventHandlers<typeof evaluationAnalyticsEvents, EvaluationAnalyticsData>
 {
   readonly name = "evaluationAnalytics";
   readonly version = EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST;

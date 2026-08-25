@@ -37,8 +37,7 @@ process.env.LANGWATCH_LICENSE_PUBLIC_KEY = TEST_PUBLIC_KEY;
 process.env.LW_VIRTUAL_KEY_PEPPER =
   process.env.LW_VIRTUAL_KEY_PEPPER ?? "unit-test-pepper-32-bytes-exactly!";
 process.env.LW_GATEWAY_INTERNAL_SECRET =
-  process.env.LW_GATEWAY_INTERNAL_SECRET ??
-  "unit-test-gateway-internal-secret-32b!";
+  process.env.LW_GATEWAY_INTERNAL_SECRET ?? "unit-test-gateway-internal-secret-32b!";
 process.env.LW_GATEWAY_JWT_SECRET =
   process.env.LW_GATEWAY_JWT_SECRET ?? "unit-test-gateway-jwt-secret-32-bytes!";
 // Disable the per-IP receiver rate-limit globally for integration tests.

@@ -10,10 +10,7 @@ export function latencyBucketField(durationMs: number): string {
   return "+Inf";
 }
 
-export function latencyMinuteBucketKey(
-  queueName: string,
-  nowMs: number,
-): string {
+export function latencyMinuteBucketKey(queueName: string, nowMs: number): string {
   return `${queueName}:gq:stats:lat-hist:m:${Math.floor(nowMs / 60_000)}`;
 }
 

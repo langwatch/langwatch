@@ -25,9 +25,7 @@ interface ModelProviderModelSettingsProps {
   onDefaultModelChange: (model: string | null) => void;
 }
 
-export const ModelProviderModelSettings: React.FC<
-  ModelProviderModelSettingsProps
-> = ({
+export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProps> = ({
   modelProviderKey,
   customModels,
   chatModelOptions,
@@ -161,8 +159,8 @@ export const ModelProviderModelSettings: React.FC<
               </Combobox.Input>
             </TagsInput.Control>
             <Field.HelperText>
-              Pre-populated with known models. Remove or add as needed. You can
-              update this later in the model provider settings.
+              Pre-populated with known models. Remove or add as needed. You can update
+              this later in the model provider settings.
             </Field.HelperText>
             <TagsInput.HiddenInput />
             <Combobox.Positioner>
@@ -211,9 +209,8 @@ export const ModelProviderModelSettings: React.FC<
           <NativeSelect.Indicator />
         </NativeSelect.Root>
         <Field.HelperText>
-          This model will be used for evaluations, prompt optimization, and
-          dataset generation. Change this anytime in the model provider
-          settings.
+          This model will be used for evaluations, prompt optimization, and dataset
+          generation. Change this anytime in the model provider settings.
         </Field.HelperText>
       </Field.Root>
     </VStack>

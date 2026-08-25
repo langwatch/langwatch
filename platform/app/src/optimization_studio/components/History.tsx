@@ -21,10 +21,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { serializeWorkflow, useWorkflowStore } from "@langwatch/workflow-web";
-import {
-  hasDSLChanged,
-  parseStudioWorkflow,
-} from "@langwatch/workflow-contract";
+import { hasDSLChanged, parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { NewVersionFields } from "./VersionToBeUsed";
 
 export function History() {
@@ -80,8 +77,10 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
     },
   });
 
-  const { versions, currentVersion, hasChanges, canSaveNewVersion } =
-    useVersionState({ project, form });
+  const { versions, currentVersion, hasChanges, canSaveNewVersion } = useVersionState({
+    project,
+    form,
+  });
 
   const commitVersion = api.workflow.commitVersion.useMutation();
   const restoreVersion = api.workflow.restoreVersion.useMutation();
@@ -209,23 +208,12 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
           </form>
         </FormProvider>
         <Separator />
-        <VStack
-          align="start"
-          width="full"
-          padding={5}
-          maxHeight="350px"
-          overflowY="auto"
-        >
+        <VStack align="start" width="full" padding={5} maxHeight="350px" overflowY="auto">
           <Text fontWeight={600} fontSize="16px" paddingTop={2}>
             Previous Versions
           </Text>
           {versions.data?.map((version) => (
-            <VStack
-              key={version.id}
-              width="full"
-              align="start"
-              paddingBottom={2}
-            >
+            <VStack key={version.id} width="full" align="start" paddingBottom={2}>
               <Separator marginBottom={2} />
               <HStack width="full" gap={3}>
                 <VersionBox version={version} minWidth="48px" />
@@ -338,15 +326,9 @@ export const useVersionState = ({
     },
     { enabled: !!project?.id && !!workflowId },
   );
-  const currentVersion = versions.data?.find(
-    (version) => version.isCurrentVersion,
-  );
-  const previousVersion = versions.data?.find(
-    (version) => version.isPreviousVersion,
-  );
-  const latestVersion = versions.data?.find(
-    (version) => version.isLatestVersion,
-  );
+  const currentVersion = versions.data?.find((version) => version.isCurrentVersion);
+  const previousVersion = versions.data?.find((version) => version.isPreviousVersion);
+  const latestVersion = versions.data?.find((version) => version.isLatestVersion);
   const hasChanges = autosavedWorkflow
     ? hasDSLChanged(getWorkflow(), autosavedWorkflow, false)
     : false;

@@ -5,7 +5,10 @@ keywords: langwatch, agent simulations, agent testing, agent development, voice 
 ---
 
 <Tip>
-  **Quick setup?** Paste the [Connect your agent prompt](/agent-simulations/connect-your-agent) into your coding agent to connect your agent's HTTP endpoint and run a first suite, or the [scenarios prompt](/skills/code-prompts#add-scenario-tests) to add code-first simulation tests.
+  **Quick setup?** Paste the [Connect your agent
+  prompt](/agent-simulations/connect-your-agent) into your coding agent to connect your
+  agent's HTTP endpoint and run a first suite, or the [scenarios
+  prompt](/skills/code-prompts#add-scenario-tests) to add code-first simulation tests.
 </Tip>
 
 # What are Agent Simulations?
@@ -21,25 +24,43 @@ Simulations run on the open-source **[Scenario](https://github.com/langwatch/sce
 Both share the same simulated user, the same judge, and the same results pages. They differ in where the scenarios live and who runs them.
 
 <CardGroup cols={2}>
-  <Card title="Run from the platform" icon="globe" href="/agent-simulations/connect-your-agent">
-    Connect your agent over HTTP and run scenario suites from the platform. Product people create, edit and run the tests, and the judge reads your agent's own traces. No test code in your repository.
+  <Card
+    title="Run from the platform"
+    icon="globe"
+    href="/agent-simulations/connect-your-agent"
+  >
+    Connect your agent over HTTP and run scenario suites from the platform. Product people
+    create, edit and run the tests, and the judge reads your agent's own traces. No test
+    code in your repository.
   </Card>
-  <Card title="Write scenarios in code" icon="code" href="/agent-simulations/getting-started">
-    Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner and in CI, and see every run in LangWatch.
+  <Card
+    title="Write scenarios in code"
+    icon="code"
+    href="/agent-simulations/getting-started"
+  >
+    Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test
+    runner and in CI, and see every run in LangWatch.
   </Card>
 </CardGroup>
 
 ## What you can test
 
 <CardGroup cols={2}>
-  <Card title="Conversational agents" icon="comments" href="/agent-simulations/getting-started">
-    Simulate real users across multi-turn conversations and judge behavior at any step: tool calls, recovery, and end-to-end outcomes.
+  <Card
+    title="Conversational agents"
+    icon="comments"
+    href="/agent-simulations/getting-started"
+  >
+    Simulate real users across multi-turn conversations and judge behavior at any step:
+    tool calls, recovery, and end-to-end outcomes.
   </Card>
   <Card title="Voice agents" icon="microphone" href="/agent-simulations/voice-agents">
-    Test over real audio through ElevenLabs, OpenAI Realtime, Twilio, Pipecat, and Gemini Live, with background noise, interruptions, and latency metrics.
+    Test over real audio through ElevenLabs, OpenAI Realtime, Twilio, Pipecat, and Gemini
+    Live, with background noise, interruptions, and latency metrics.
   </Card>
   <Card title="Red teaming" icon="shield-halved" href="/agent-simulations/red-teaming">
-    Run multi-turn adversarial attacks (Crescendo escalation, refusal detection, backtracking) to find security gaps before attackers do.
+    Run multi-turn adversarial attacks (Crescendo escalation, refusal detection,
+    backtracking) to find security gaps before attackers do.
   </Card>
 </CardGroup>
 

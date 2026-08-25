@@ -35,8 +35,7 @@ export function registerAnalyticsRoutes(
       responses: {
         ...baseResponses,
         200: {
-          description:
-            "Timeseries analytics data with current and previous periods",
+          description: "Timeseries analytics data with current and previous periods",
           content: {
             "application/json": {
               schema: resolver(

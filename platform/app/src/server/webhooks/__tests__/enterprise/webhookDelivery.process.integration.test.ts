@@ -21,15 +21,7 @@ import {
   ProcessManagerService,
 } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import {
@@ -47,8 +39,7 @@ import {
 import { WebhookHealthService } from "~/runtime/app/features/webhooks";
 
 vi.mock("~/server/webhooks/sendWebhook", async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import("~/server/webhooks/sendWebhook")>();
+  const original = await importOriginal<typeof import("~/server/webhooks/sendWebhook")>();
   return { ...original, sendWebhook: vi.fn() };
 });
 
@@ -110,10 +101,7 @@ function envelopeFor({
   };
 }
 
-function admittedEnvelope(
-  requestId: string,
-  inProject?: string,
-): ProcessEventEnvelope {
+function admittedEnvelope(requestId: string, inProject?: string): ProcessEventEnvelope {
   return envelopeFor({
     requestId,
     inProject,
@@ -139,10 +127,7 @@ function admittedEnvelope(
   });
 }
 
-function confirmedEnvelope(
-  requestId: string,
-  inProject?: string,
-): ProcessEventEnvelope {
+function confirmedEnvelope(requestId: string, inProject?: string): ProcessEventEnvelope {
   return envelopeFor({
     requestId,
     inProject,
@@ -424,9 +409,7 @@ describe("webhook delivery via the transactional inbox", () => {
       expect(body.batch[0]!.data.cost).toBeNull();
       expect(body.batch[0]!.data.usage).toBeNull();
       expect(body.batch[0]!.data.needs_reconciliation).toBe(true);
-      expect(body.batch[0]!.data.settle_reason).toBe(
-        "confirmation_deadline_expired",
-      );
+      expect(body.batch[0]!.data.settle_reason).toBe("confirmation_deadline_expired");
     } finally {
       await endpoints.update({
         organizationId: organization.id,
@@ -465,9 +448,7 @@ describe("webhook delivery via the transactional inbox", () => {
           ).batch[0]!,
       );
       const settled = bodies.find((b) => b.type === "gateway.request.settled")!;
-      const completed = bodies.find(
-        (b) => b.type === "gateway.request.completed",
-      )!;
+      const completed = bodies.find((b) => b.type === "gateway.request.completed")!;
       expect(settled).toBeDefined();
       expect(completed).toBeDefined();
       expect(settled.id).not.toBe(completed.id);

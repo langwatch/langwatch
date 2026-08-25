@@ -270,10 +270,7 @@ describe("gatewaySpend fold", () => {
       settled(),
       projection.handleGatewaySpendAdmitted(admitted(), initial()),
     );
-    const state = projection.handleGatewaySpendConfirmed(
-      confirmed(),
-      settledState,
-    );
+    const state = projection.handleGatewaySpendConfirmed(confirmed(), settledState);
     expect(state.status).toBe("confirmed");
     expect(state.needsReconciliation).toBe(false);
     expect(state.settleReason).toBe("");
@@ -286,20 +283,17 @@ describe("gatewaySpend fold", () => {
       confirmed(),
       projection.handleGatewaySpendAdmitted(admitted(), initial()),
     );
-    expect(
-      projection.handleGatewaySpendFailed(failed(), confirmedState),
-    ).toEqual(confirmedState);
-    expect(
-      projection.handleGatewaySpendSettled(settled(), confirmedState),
-    ).toEqual(confirmedState);
+    expect(projection.handleGatewaySpendFailed(failed(), confirmedState)).toEqual(
+      confirmedState,
+    );
+    expect(projection.handleGatewaySpendSettled(settled(), confirmedState)).toEqual(
+      confirmedState,
+    );
   });
 
   /** @scenario An outcome racing ahead of its admission keeps its status */
   it("a confirmed arriving before admitted is not downgraded by it", () => {
-    const early = projection.handleGatewaySpendConfirmed(
-      confirmed(),
-      initial(),
-    );
+    const early = projection.handleGatewaySpendConfirmed(confirmed(), initial());
     expect(early.status).toBe("confirmed");
     const afterAdmit = projection.handleGatewaySpendAdmitted(admitted(), early);
     expect(afterAdmit.status).toBe("confirmed");
@@ -382,9 +376,9 @@ describe("gatewaySpend fold", () => {
       T0,
     );
 
-    expect(
-      projection.handleGatewaySpendAdmitted(admitWithoutTrace, early).traceId,
-    ).toBe("trace-1");
+    expect(projection.handleGatewaySpendAdmitted(admitWithoutTrace, early).traceId).toBe(
+      "trace-1",
+    );
   });
 
   /** @scenario An outcome states the attribution its admission has not delivered */
@@ -404,8 +398,8 @@ describe("gatewaySpend fold", () => {
     expect(early.organizationId).toBe("org_stale");
 
     // Admission is the authority. The outcome only fills a gap.
-    expect(
-      projection.handleGatewaySpendAdmitted(admitted(), early).organizationId,
-    ).toBe("org_1");
+    expect(projection.handleGatewaySpendAdmitted(admitted(), early).organizationId).toBe(
+      "org_1",
+    );
   });
 });

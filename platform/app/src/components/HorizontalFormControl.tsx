@@ -97,9 +97,7 @@ export function HorizontalFormControl({
         {direction === "horizontal" && <Spacer />}
         <Box
           minWidth={
-            direction === "vertical"
-              ? "full"
-              : ["full", "full", inputWidth ?? "50%"]
+            direction === "vertical" ? "full" : ["full", "full", inputWidth ?? "50%"]
           }
         >
           {children}

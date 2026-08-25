@@ -8,10 +8,7 @@ import type {
   StoredProjection,
 } from "../../projections/stateProjection.types";
 import { StateProjectionExecutor } from "../../projections/stateProjectionExecutor";
-import type {
-  RetentionPolicy,
-  RetentionPolicyResolver,
-} from "../../runtime.types";
+import type { RetentionPolicy, RetentionPolicyResolver } from "../../runtime.types";
 import { StateAccumulator } from "../replayExecutor";
 
 interface CounterState {
@@ -230,9 +227,7 @@ describe("StateAccumulator", () => {
       await acc.flush();
 
       expect(writes).toHaveLength(2);
-      const byTenant = new Map(
-        writes.map((w) => [w.context.tenantId as string, w]),
-      );
+      const byTenant = new Map(writes.map((w) => [w.context.tenantId as string, w]));
       expect(byTenant.get("t-a")!.projection.state.count).toBe(1);
       expect(byTenant.get("t-a")!.context.key).toBe("conv-1");
       expect(byTenant.get("t-b")!.projection.state.count).toBe(10);
@@ -247,15 +242,9 @@ describe("StateAccumulator", () => {
         }),
       );
 
-      acc.apply(
-        makeEvent({ aggregateId: "conv-1", data: { amount: 1, group: "g1" } }),
-      );
-      acc.apply(
-        makeEvent({ aggregateId: "conv-2", data: { amount: 2, group: "g1" } }),
-      );
-      acc.apply(
-        makeEvent({ aggregateId: "conv-3", data: { amount: 4, group: "g2" } }),
-      );
+      acc.apply(makeEvent({ aggregateId: "conv-1", data: { amount: 1, group: "g1" } }));
+      acc.apply(makeEvent({ aggregateId: "conv-2", data: { amount: 2, group: "g1" } }));
+      acc.apply(makeEvent({ aggregateId: "conv-3", data: { amount: 4, group: "g2" } }));
       await acc.flush();
 
       const byKey = new Map(writes.map((w) => [w.context.key, w]));
@@ -331,9 +320,7 @@ describe("StateAccumulator", () => {
 
       expect(writes[0]!.context.retentionPolicy).toBe(resolved);
       // Resolved once per tenant, not once per event.
-      expect(
-        resolver.resolve as ReturnType<typeof vi.fn>,
-      ).toHaveBeenCalledTimes(1);
+      expect(resolver.resolve as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
     });
   });
 

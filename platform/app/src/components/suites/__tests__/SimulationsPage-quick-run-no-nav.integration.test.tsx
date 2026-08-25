@@ -85,9 +85,7 @@ vi.mock("~/utils/compat/next-router", () => ({
     replace: mockRouterReplace,
     query: {
       project: "test-project",
-      ...(routerQueryPath.current !== undefined
-        ? { path: routerQueryPath.current }
-        : {}),
+      ...(routerQueryPath.current !== undefined ? { path: routerQueryPath.current } : {}),
     },
     pathname: "/[project]/simulations/[[...path]]",
     asPath: routerQueryPath.current?.length
@@ -247,9 +245,8 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 
 async function renderSimulationsPage() {
   // Dynamic import ensures mocks are applied before the module is evaluated
-  const { default: SimulationsPage } = await import(
-    "~/components/suites/SimulationsPage"
-  );
+  const { default: SimulationsPage } =
+    await import("~/components/suites/SimulationsPage");
   render(<SimulationsPage />, { wrapper: Wrapper });
 }
 

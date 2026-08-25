@@ -144,9 +144,7 @@ function profileSettingsData(
     ...(input.traceSharingEnabled !== undefined
       ? { traceSharingEnabled: input.traceSharingEnabled }
       : {}),
-    ...(input.primaryIntent !== undefined
-      ? { primaryIntent: input.primaryIntent }
-      : {}),
+    ...(input.primaryIntent !== undefined ? { primaryIntent: input.primaryIntent } : {}),
   };
 }
 
@@ -167,9 +165,7 @@ function storageSettingsData(
     ...(input.s3SecretAccessKey !== undefined
       ? { s3SecretAccessKey: encryptedOrNull(input.s3SecretAccessKey) }
       : {}),
-    ...(input.s3Bucket !== undefined
-      ? { s3Bucket: input.s3Bucket || null }
-      : {}),
+    ...(input.s3Bucket !== undefined ? { s3Bucket: input.s3Bucket || null } : {}),
   };
 }
 
@@ -215,9 +211,7 @@ async function createProvisionedOrganization(
  */
 function namesSlug(target: unknown): boolean {
   if (Array.isArray(target)) {
-    return target.some(
-      (field) => typeof field === "string" && field === "slug",
-    );
+    return target.some((field) => typeof field === "string" && field === "slug");
   }
   return typeof target === "string" && target.includes("slug");
 }
@@ -419,9 +413,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return projects.map((p) => p.id);
   }
 
-  async findWithAdmins(
-    organizationId: string,
-  ): Promise<OrganizationWithAdmins | null> {
+  async findWithAdmins(organizationId: string): Promise<OrganizationWithAdmins | null> {
     return this.prisma.organization.findUnique({
       where: { id: organizationId },
       include: {
@@ -435,10 +427,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     }) as Promise<OrganizationWithAdmins | null>;
   }
 
-  async updateSentPlanLimitAlert(
-    organizationId: string,
-    timestamp: Date,
-  ): Promise<void> {
+  async updateSentPlanLimitAlert(organizationId: string, timestamp: Date): Promise<void> {
     await this.prisma.organization.update({
       where: { id: organizationId },
       data: { sentPlanLimitAlert: timestamp },
@@ -492,9 +481,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return org?.stripeCustomerId ?? null;
   }
 
-  async findByStripeCustomerId(
-    stripeCustomerId: string,
-  ): Promise<{ id: string } | null> {
+  async findByStripeCustomerId(stripeCustomerId: string): Promise<{ id: string } | null> {
     return this.prisma.organization.findFirst({
       where: { stripeCustomerId },
       select: { id: true },
@@ -542,9 +529,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async createAndAssign(
-    input: CreateAndAssignInput,
-  ): Promise<CreateAndAssignResult> {
+  async createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult> {
     const created = await this.prisma.$transaction(async (tx) => {
       const organization = await tx.organization.create({
         data: {
@@ -647,9 +632,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async findAllProvisioningSummaries(): Promise<
-    OrganizationProvisioningSummary[]
-  > {
+  async findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
     return this.prisma.organization.findMany({
       select: { id: true, name: true, slug: true, createdAt: true },
       orderBy: { createdAt: "desc" },
@@ -793,9 +776,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       },
       include: {
         members: {
-          ...(!includeDeactivated
-            ? { where: { user: { deactivatedAt: null } } }
-            : {}),
+          ...(!includeDeactivated ? { where: { user: { deactivatedAt: null } } } : {}),
           orderBy: [
             { user: { name: "asc" } },
             { user: { email: "asc" } },
@@ -978,9 +959,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async findSettingsById(
-    organizationId: string,
-  ): Promise<OrganizationSettings | null> {
+  async findSettingsById(organizationId: string): Promise<OrganizationSettings | null> {
     return this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: {
@@ -1128,10 +1107,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     organizationId: string;
     member: { role: OrganizationUserRole; disabledAt: Date | null };
   }): Promise<void> {
-    if (
-      member.role !== OrganizationUserRole.ADMIN ||
-      member.disabledAt !== null
-    ) {
+    if (member.role !== OrganizationUserRole.ADMIN || member.disabledAt !== null) {
       return;
     }
     const activeAdmins = await this.prisma.organizationUser.count({
@@ -1277,9 +1253,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     }
   }
 
-  async updateMemberRole(
-    input: UpdateMemberRoleInput,
-  ): Promise<UpdateMemberRoleResult> {
+  async updateMemberRole(input: UpdateMemberRoleInput): Promise<UpdateMemberRoleResult> {
     const { organizationId, userId, role, effectiveTeamRoleUpdates } = input;
 
     // Teams whose only team-scoped admin this seat change corrected away. Not a
@@ -1397,11 +1371,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       for (const [teamId, teamRoleUpdate] of dedupedTeamRoleUpdates.entries()) {
         const currentMembership = currentMembershipByTeamId.get(teamId);
         if (!currentMembership) {
-          throw new NotFoundError(
-            "team_membership_not_found",
-            "TeamMember",
-            userId,
-          );
+          throw new NotFoundError("team_membership_not_found", "TeamMember", userId);
         }
 
         if (
@@ -1410,9 +1380,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             teamRole: teamRoleUpdate.role as TeamRoleValue,
           })
         ) {
-          throw new LiteMemberViewerOnlyError(
-            await teamNameFor({ tx, teamId }),
-          );
+          throw new LiteMemberViewerOnlyError(await teamNameFor({ tx, teamId }));
         }
 
         const updateIsCustomRole = isCustomRole(teamRoleUpdate.role);
@@ -1470,9 +1438,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             // — so it goes through, and the team is reported so the admin who
             // did it is not left to discover this.
             if (teamRoleUpdate.origin === "requested") {
-              throw new TeamLastAdminRequiredError(
-                await teamNameFor({ tx, teamId }),
-              );
+              throw new TeamLastAdminRequiredError(await teamNameFor({ tx, teamId }));
             }
             teamsLeftWithoutAdmin.push({
               id: teamId,
@@ -1518,10 +1484,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             organizationId,
             userId,
             scopeType: RoleBindingScopeType.PROJECT,
-            OR: [
-              { role: { not: TeamUserRole.VIEWER } },
-              { customRoleId: { not: null } },
-            ],
+            OR: [{ role: { not: TeamUserRole.VIEWER } }, { customRoleId: { not: null } }],
           },
           select: { scopeId: true },
         });
@@ -1728,8 +1691,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         }
 
         const isTargetUserAdmin = targetUserBinding.role === TeamUserRole.ADMIN;
-        const wouldDemoteAdmin =
-          isTargetUserAdmin && role !== TeamUserRole.ADMIN;
+        const wouldDemoteAdmin = isTargetUserAdmin && role !== TeamUserRole.ADMIN;
 
         // Same rule as the custom-role branch above: only a save that demotes
         // an admin can shrink the admin set, so the projection is the whole
@@ -1807,9 +1769,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     }
 
     const where: Prisma.AuditLogWhereInput = {};
-    const andConditions: Prisma.AuditLogWhereInput[] = [
-      { OR: orgIdConditions },
-    ];
+    const andConditions: Prisma.AuditLogWhereInput[] = [{ OR: orgIdConditions }];
 
     if (userId) {
       andConditions.push({ userId });
@@ -1876,9 +1836,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       ...new Set(rows.map((r) => r.userId).filter((id): id is string => !!id)),
     ];
     const projectIds = [
-      ...new Set(
-        rows.map((r) => r.projectId).filter((id): id is string => !!id),
-      ),
+      ...new Set(rows.map((r) => r.projectId).filter((id): id is string => !!id)),
     ];
 
     const [users, projects] = await Promise.all([

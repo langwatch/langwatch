@@ -108,13 +108,10 @@ export function SuiteSidebar({
           s.scenarioSetId.toLowerCase().includes(searchQuery.toLowerCase()),
         )
       : externalSets;
-    return [...filtered].sort(
-      (a, b) => b.lastRunTimestamp - a.lastRunTimestamp,
-    );
+    return [...filtered].sort((a, b) => b.lastRunTimestamp - a.lastRunTimestamp);
   }, [externalSets, searchQuery]);
 
-  const hasNoResults =
-    filteredSuites.length === 0 && filteredExternalSets.length === 0;
+  const hasNoResults = filteredSuites.length === 0 && filteredExternalSets.length === 0;
 
   return (
     <VStack
@@ -197,16 +194,9 @@ export function SuiteSidebar({
                 <EmptyState.Indicator>
                   <FlaskConical size={22} />
                 </EmptyState.Indicator>
-                <EmptyState.Title fontSize="sm">
-                  No run plans yet
-                </EmptyState.Title>
-                <EmptyState.Description
-                  fontSize="xs"
-                  textAlign="center"
-                  maxWidth="180px"
-                >
-                  Group scenarios into a plan and run them together against your
-                  agent.
+                <EmptyState.Title fontSize="sm">No run plans yet</EmptyState.Title>
+                <EmptyState.Description fontSize="xs" textAlign="center" maxWidth="180px">
+                  Group scenarios into a plan and run them together against your agent.
                 </EmptyState.Description>
                 {onNewSuite && (
                   <Button size="xs" colorPalette="blue" onClick={onNewSuite}>
@@ -251,9 +241,7 @@ export function SuiteSidebar({
                     height="22px"
                     borderRadius="full"
                     bg={
-                      suite.slug === selectedSuiteSlug
-                        ? "transparent"
-                        : "bg.emphasized"
+                      suite.slug === selectedSuiteSlug ? "transparent" : "bg.emphasized"
                     }
                     fontSize="xs"
                     fontWeight="bold"
@@ -309,15 +297,12 @@ export function SuiteSidebar({
                     size="sm"
                     width="full"
                     variant={
-                      selectedSuiteSlug ===
-                      toExternalSetSelection(extSet.scenarioSetId)
+                      selectedSuiteSlug === toExternalSetSelection(extSet.scenarioSetId)
                         ? "solid"
                         : "ghost"
                     }
                     onClick={() =>
-                      onSelectSuite(
-                        toExternalSetSelection(extSet.scenarioSetId),
-                      )
+                      onSelectSuite(toExternalSetSelection(extSet.scenarioSetId))
                     }
                   >
                     <Center
@@ -325,8 +310,7 @@ export function SuiteSidebar({
                       height="22px"
                       borderRadius="full"
                       bg={
-                        selectedSuiteSlug ===
-                        toExternalSetSelection(extSet.scenarioSetId)
+                        selectedSuiteSlug === toExternalSetSelection(extSet.scenarioSetId)
                           ? "transparent"
                           : "bg.emphasized"
                       }
@@ -343,8 +327,7 @@ export function SuiteSidebar({
                   externalSet={extSet}
                   projectSlug={projectSlug}
                   isSelected={
-                    selectedSuiteSlug ===
-                    toExternalSetSelection(extSet.scenarioSetId)
+                    selectedSuiteSlug === toExternalSetSelection(extSet.scenarioSetId)
                   }
                   onSelect={() =>
                     onSelectSuite(toExternalSetSelection(extSet.scenarioSetId))
@@ -366,11 +349,7 @@ export function SuiteSidebar({
 
       {/* Toggle button — always the same DOM node */}
       <ShadowDivider />
-      <HStack
-        paddingX={isCollapsed ? 6 : 3}
-        paddingY={1.5}
-        justify="flex-start"
-      >
+      <HStack paddingX={isCollapsed ? 6 : 3} paddingY={1.5} justify="flex-start">
         <IconButton
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           size="sm"
@@ -378,11 +357,7 @@ export function SuiteSidebar({
           width={isCollapsed ? "full" : undefined}
           onClick={toggleCollapsed}
         >
-          {isCollapsed ? (
-            <PanelLeftOpen size={16} />
-          ) : (
-            <PanelRightOpen size={16} />
-          )}
+          {isCollapsed ? <PanelLeftOpen size={16} /> : <PanelRightOpen size={16} />}
         </IconButton>
       </HStack>
     </VStack>
@@ -450,11 +425,7 @@ function RunSummaryLine({
   return (
     <HStack gap={1} color="fg.muted">
       <PassRateCircle passRate={passRate} size="8px" />
-      <Text
-        fontSize="xs"
-        color={getPassRateGradientColor(passRate)}
-        fontWeight="medium"
-      >
+      <Text fontSize="xs" color={getPassRateGradientColor(passRate)} fontWeight="medium">
         {passRate === null ? "-" : `${Math.round(passRate)}%`}
       </Text>
       <Text fontSize="xs" color="gray.400">
@@ -551,12 +522,7 @@ function SuiteListItem({
           </Text>
           <Spacer />
           {runSummary?.lastRunTimestamp && (
-            <Text
-              fontSize="11px"
-              color="fg.subtle"
-              flexShrink={0}
-              whiteSpace="nowrap"
-            >
+            <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
               {formatTimeAgoCompact(runSummary.lastRunTimestamp, now)}
             </Text>
           )}
@@ -644,12 +610,7 @@ function ExternalSetListItem({
           </Text>
           <Spacer />
           {externalSet.lastRunTimestamp && (
-            <Text
-              fontSize="11px"
-              color="fg.subtle"
-              flexShrink={0}
-              whiteSpace="nowrap"
-            >
+            <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
               {formatTimeAgoCompact(externalSet.lastRunTimestamp, now)}
             </Text>
           )}

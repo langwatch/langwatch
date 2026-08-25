@@ -62,8 +62,7 @@ function RolesSettings() {
             <Alert.Content>
               <Alert.Title>Enterprise Feature</Alert.Title>
               <Alert.Description>
-                Custom roles are available on Enterprise plans. Contact sales to
-                upgrade.
+                Custom roles are available on Enterprise plans. Contact sales to upgrade.
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
@@ -77,10 +76,7 @@ function RolesSettings() {
 
   return (
     <SettingsLayout>
-      <RolesManagement
-        organizationId={organization.id}
-        hasPermission={hasPermission}
-      />
+      <RolesManagement organizationId={organization.id} hasPermission={hasPermission} />
     </SettingsLayout>
   );
 }
@@ -103,16 +99,8 @@ function RolesManagement({
   hasPermission: (permission: Permission) => boolean;
 }) {
   const { open, onOpen, onClose } = useDisclosure();
-  const {
-    open: editOpen,
-    onOpen: onEditOpen,
-    onClose: onEditClose,
-  } = useDisclosure();
-  const {
-    open: viewOpen,
-    onOpen: onViewOpen,
-    onClose: onViewClose,
-  } = useDisclosure();
+  const { open: editOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
+  const { open: viewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
   const {
     open: defaultViewOpen,
     onOpen: onDefaultViewOpen,
@@ -153,8 +141,7 @@ function RolesManagement({
       });
       onClose();
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't create role" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't create role" }),
   });
 
   const deleteRole = api.role.delete.useMutation({
@@ -165,8 +152,7 @@ function RolesManagement({
         type: "success",
       });
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't delete role" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't delete role" }),
   });
 
   const updateRole = api.role.update.useMutation({
@@ -179,8 +165,7 @@ function RolesManagement({
       onEditClose();
       setEditingRole(null);
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't update role" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't update role" }),
   });
 
   const handleEditRole = async (roleId: string) => {
@@ -261,8 +246,7 @@ function RolesManagement({
         <VStack align="start" gap={1}>
           <Heading as="h2">Roles & Permissions</Heading>
           <Text color="fg.muted" fontSize="sm">
-            Create custom roles and assign specific permissions to control
-            access
+            Create custom roles and assign specific permissions to control access
           </Text>
         </VStack>
         <Tooltip
@@ -302,9 +286,7 @@ function RolesManagement({
             isDefault
             permissionCount="All Permissions"
             icon={ShieldUser}
-            onViewPermissions={() =>
-              handleViewDefaultRole("Admin", TeamUserRole.ADMIN)
-            }
+            onViewPermissions={() => handleViewDefaultRole("Admin", TeamUserRole.ADMIN)}
           />
           <RoleCard
             hasPermission={hasPermission}
@@ -313,9 +295,7 @@ function RolesManagement({
             isDefault
             permissionCount="Most Permissions"
             icon={Users}
-            onViewPermissions={() =>
-              handleViewDefaultRole("Member", TeamUserRole.MEMBER)
-            }
+            onViewPermissions={() => handleViewDefaultRole("Member", TeamUserRole.MEMBER)}
           />
           <RoleCard
             hasPermission={hasPermission}
@@ -324,9 +304,7 @@ function RolesManagement({
             isDefault
             permissionCount="View Only"
             icon={Eye}
-            onViewPermissions={() =>
-              handleViewDefaultRole("Viewer", TeamUserRole.VIEWER)
-            }
+            onViewPermissions={() => handleViewDefaultRole("Viewer", TeamUserRole.VIEWER)}
           />
         </Box>
       </VStack>
@@ -338,8 +316,7 @@ function RolesManagement({
         <Box>
           <Heading as="h3">Custom Roles</Heading>
           <Text color="fg.muted" fontSize="sm">
-            Custom roles created for your organization with specific permission
-            sets.
+            Custom roles created for your organization with specific permission sets.
           </Text>
         </Box>
 
@@ -355,8 +332,7 @@ function RolesManagement({
               <VStack gap={2}>
                 <Shield size={48} color="gray" />
                 <Text color="fg.muted">
-                  No custom roles yet. Create your first custom role to get
-                  started.
+                  No custom roles yet. Create your first custom role to get started.
                 </Text>
               </VStack>
             </Card.Body>
@@ -442,16 +418,8 @@ function RolesManagement({
       />
 
       {/* View Permissions Dialog */}
-      <Dialog.Root
-        open={viewOpen}
-        onOpenChange={({ open }) => !open && onViewClose()}
-      >
-        <Dialog.Content
-          bg="bg"
-          maxWidth="600px"
-          maxHeight="80vh"
-          overflowY="auto"
-        >
+      <Dialog.Root open={viewOpen} onOpenChange={({ open }) => !open && onViewClose()}>
+        <Dialog.Content bg="bg" maxWidth="600px" maxHeight="80vh" overflowY="auto">
           <Dialog.Header>
             <Dialog.Title>View Permissions - {viewingRole?.name}</Dialog.Title>
           </Dialog.Header>
@@ -490,16 +458,9 @@ function RolesManagement({
         open={defaultViewOpen}
         onOpenChange={({ open }) => !open && onDefaultViewClose()}
       >
-        <Dialog.Content
-          bg="bg"
-          maxWidth="600px"
-          maxHeight="80vh"
-          overflowY="auto"
-        >
+        <Dialog.Content bg="bg" maxWidth="600px" maxHeight="80vh" overflowY="auto">
           <Dialog.Header>
-            <Dialog.Title>
-              View Permissions - {viewingDefaultRole?.name}
-            </Dialog.Title>
+            <Dialog.Title>View Permissions - {viewingDefaultRole?.name}</Dialog.Title>
           </Dialog.Header>
           <Dialog.Body>
             {viewingDefaultRole && (
@@ -515,9 +476,7 @@ function RolesManagement({
                   <Text fontWeight="semibold">
                     Permissions ({viewingDefaultRole.permissions.length}):
                   </Text>
-                  <PermissionViewer
-                    permissions={viewingDefaultRole.permissions}
-                  />
+                  <PermissionViewer permissions={viewingDefaultRole.permissions} />
                 </VStack>
               </VStack>
             )}

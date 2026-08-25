@@ -1,11 +1,4 @@
-import {
-  Center,
-  EmptyState,
-  Grid,
-  Skeleton,
-  Spacer,
-  VStack,
-} from "@chakra-ui/react";
+import { Center, EmptyState, Grid, Skeleton, Spacer, VStack } from "@chakra-ui/react";
 import { Bot, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { AgentCard } from "~/components/agents/AgentCard";
@@ -102,14 +95,11 @@ function Page() {
 
       toaster.create({
         title: `Agent deleted`,
-        description: result.archivedWorkflow
-          ? "Also deleted: 1 workflow"
-          : undefined,
+        description: result.archivedWorkflow ? "Also deleted: 1 workflow" : undefined,
         type: "success",
       });
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't delete agent" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't delete agent" }),
   });
 
   const handleEditAgent = (agent: TypedAgent) => {
@@ -167,9 +157,7 @@ function Page() {
       <PageLayout.Header>
         <PageLayout.Heading>Agents</PageLayout.Heading>
         <Spacer />
-        <PageLayout.HeaderButton
-          onClick={() => openDrawer("agentTypeSelector")}
-        >
+        <PageLayout.HeaderButton onClick={() => openDrawer("agentTypeSelector")}>
           <Plus size={16} /> New Agent
         </PageLayout.HeaderButton>
       </PageLayout.Header>
@@ -185,9 +173,7 @@ function Page() {
               <EmptyState.Description>
                 Create reusable agents for your evaluations.
               </EmptyState.Description>
-              <PageLayout.HeaderButton
-                onClick={() => openDrawer("agentTypeSelector")}
-              >
+              <PageLayout.HeaderButton onClick={() => openDrawer("agentTypeSelector")}>
                 <Plus size={16} /> Create your first agent
               </PageLayout.HeaderButton>
             </EmptyState.Content>
@@ -212,16 +198,10 @@ function Page() {
                 onEdit={() => handleEditAgent(agent)}
                 onDelete={() => handleDeleteAgent(agent)}
                 onOpenWorkflow={
-                  agent.type === "workflow"
-                    ? () => handleOpenWorkflow(agent)
-                    : undefined
+                  agent.type === "workflow" ? () => handleOpenWorkflow(agent) : undefined
                 }
-                onReplicate={() =>
-                  setAgentForCopy({ id: agent.id, name: agent.name })
-                }
-                onPushToCopies={() =>
-                  setAgentForPush({ id: agent.id, name: agent.name })
-                }
+                onReplicate={() => setAgentForCopy({ id: agent.id, name: agent.name })}
+                onPushToCopies={() => setAgentForPush({ id: agent.id, name: agent.name })}
                 onSyncFromSource={() => handleSyncFromSource(agent.id)}
                 onViewHistory={() =>
                   openDrawer("agentHistory", {

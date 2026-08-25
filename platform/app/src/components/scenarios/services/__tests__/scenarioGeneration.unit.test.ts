@@ -30,11 +30,7 @@ describe("generateScenarioWithAI()", () => {
         json: () => Promise.resolve({ scenario: mockScenario }),
       });
 
-      const result = await generateScenarioWithAI(
-        "test prompt",
-        "project-123",
-        null,
-      );
+      const result = await generateScenarioWithAI("test prompt", "project-123", null);
 
       expect(result).toEqual(mockScenario);
     });
@@ -70,11 +66,7 @@ describe("generateScenarioWithAI()", () => {
         criteria: ["existing"],
       };
 
-      await generateScenarioWithAI(
-        "refine this",
-        "project-123",
-        currentScenario,
-      );
+      await generateScenarioWithAI("refine this", "project-123", currentScenario);
 
       expect(global.fetch).toHaveBeenCalledWith("/api/scenario/generate", {
         method: "POST",

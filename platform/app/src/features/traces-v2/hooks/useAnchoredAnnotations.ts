@@ -32,11 +32,9 @@ export function traceAnchorKey(anchor: {
   anchorId?: string | null;
   anchorPath?: string | null;
 }): string {
-  return [
-    anchor.anchorKind ?? "",
-    anchor.anchorId ?? "",
-    anchor.anchorPath ?? "",
-  ].join("\u0000");
+  return [anchor.anchorKind ?? "", anchor.anchorId ?? "", anchor.anchorPath ?? ""].join(
+    "\u0000",
+  );
 }
 
 export interface AnchoredAnnotations {
@@ -72,10 +70,7 @@ export function useAnchoredAnnotations(): AnchoredAnnotations {
     projectId: project?.id ?? "",
     traceIds,
     enabled:
-      !!project?.id &&
-      !!traceId &&
-      !isReadOnly &&
-      hasPermission("annotations:view"),
+      !!project?.id && !!traceId && !isReadOnly && hasPermission("annotations:view"),
     anchor: "all",
   });
 

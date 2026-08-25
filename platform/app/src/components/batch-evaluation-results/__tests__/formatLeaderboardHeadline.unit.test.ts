@@ -48,9 +48,7 @@ describe("formatLeaderboardHeadline", () => {
       // run. The distinction matters here more than anywhere else in the
       // feature: this heading is the only string the compact card renders, so
       // it is the sentence most readers act on.
-      expect(headline.heading).toBe(
-        "Ship warm — not separated on quality, 75% cheaper",
-      );
+      expect(headline.heading).toBe("Ship warm — not separated on quality, 75% cheaper");
       expect(headline.detail).toContain("warm-premium and warm");
       expect(headline.tone).toBe("positive");
     });
@@ -76,9 +74,7 @@ describe("formatLeaderboardHeadline", () => {
         variantNames: NAMES,
       });
 
-      expect(headline.heading).toBe(
-        "Ship warm — top of the ranking and 75% cheaper",
-      );
+      expect(headline.heading).toBe("Ship warm — top of the ranking and 75% cheaper");
       expect(headline.tone).toBe("positive");
     });
   });
@@ -202,9 +198,7 @@ describe("formatLeaderboardHeadline — the mechanism it names must be the one u
       });
 
       expect(headline.detail).toContain("does not establish a winner");
-      expect(headline.detail).not.toContain(
-        "within each other's margin of error",
-      );
+      expect(headline.detail).not.toContain("within each other's margin of error");
     });
   });
 });

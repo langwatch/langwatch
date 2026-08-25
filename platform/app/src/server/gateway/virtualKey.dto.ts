@@ -151,10 +151,7 @@ const STATUS_BY_ROW: Record<
   REVOKED: "revoked",
 };
 
-function baseVk(
-  vk: VirtualKeyWithScopes,
-  facts: TraceDestinationFacts,
-): BaseVk {
+function baseVk(vk: VirtualKeyWithScopes, facts: TraceDestinationFacts): BaseVk {
   return {
     id: vk.id,
     organizationId: vk.organizationId,

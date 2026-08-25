@@ -266,8 +266,7 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
     return bindings
       .filter(
         (binding) =>
-          !binding.group ||
-          binding.group.organizationId === binding.organizationId,
+          !binding.group || binding.group.organizationId === binding.organizationId,
       )
       .map(({ group: _group, ...binding }) => binding);
   }
@@ -285,9 +284,7 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
 
   /** The relation predicate the whole-table and scope listings carry: a row
    * is listed only while its principal is still of this organization. */
-  private principalInOrganizationWhere(
-    organizationId: string,
-  ): Record<string, unknown> {
+  private principalInOrganizationWhere(organizationId: string): Record<string, unknown> {
     return {
       OR: [
         {

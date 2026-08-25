@@ -8,10 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { datasetSpanSchema } from "@langwatch/dataset-contract";
 import type { Span, Trace } from "~/server/tracer/types";
-import {
-  applyOverlayToTrace,
-  expandDeletedSpanIds,
-} from "../applyTraceEditOverlay";
+import { applyOverlayToTrace, expandDeletedSpanIds } from "../applyTraceEditOverlay";
 import {
   applyOverlayToSpanDetail,
   applyOverlayToSpanTreeNodes,
@@ -44,9 +41,7 @@ const trace = (spans: Span[], overrides: Partial<Trace> = {}): Trace =>
     ...overrides,
   }) as Trace;
 
-const patchOf = (
-  overrides: Partial<TraceEditOverlayPatch>,
-): TraceEditOverlayPatch => ({
+const patchOf = (overrides: Partial<TraceEditOverlayPatch>): TraceEditOverlayPatch => ({
   version: 1,
   spans: [],
   deletedSpanIds: [],
@@ -80,9 +75,7 @@ describe("applying a trace correction", () => {
         type: "text",
         value: "corrected output",
       });
-      expect(corrected.spans[0]?.timestamps).toEqual(
-        original.spans[0]?.timestamps,
-      );
+      expect(corrected.spans[0]?.timestamps).toEqual(original.spans[0]?.timestamps);
       expect(corrected.spans[0]?.metrics).toEqual(original.spans[0]?.metrics);
       expect(original.spans[0]?.output).toEqual({
         type: "text",
@@ -105,10 +98,7 @@ describe("applying a trace correction", () => {
         patch: patchOf({ deletedSpanIds: ["tool"] }),
       });
 
-      expect(corrected.spans.map((s) => s.span_id)).toEqual([
-        "root",
-        "sibling",
-      ]);
+      expect(corrected.spans.map((s) => s.span_id)).toEqual(["root", "sibling"]);
     });
 
     it("expands a deletion over a cyclic parent chain without hanging", () => {
@@ -161,20 +151,14 @@ describe("applying a trace correction", () => {
   describe("given a correction naming spans this trace does not have", () => {
     /** @scenario "Deleted span ids that are not in the trace are ignored" */
     it("returns every captured span", () => {
-      const original = trace([
-        span({ span_id: "span-1" }),
-        span({ span_id: "span-2" }),
-      ]);
+      const original = trace([span({ span_id: "span-1" }), span({ span_id: "span-2" })]);
 
       const corrected = applyOverlayToTrace({
         trace: original,
         patch: patchOf({ deletedSpanIds: ["span-from-another-trace"] }),
       });
 
-      expect(corrected.spans.map((s) => s.span_id)).toEqual([
-        "span-1",
-        "span-2",
-      ]);
+      expect(corrected.spans.map((s) => s.span_id)).toEqual(["span-1", "span-2"]);
     });
   });
 
@@ -192,13 +176,9 @@ describe("applying a trace correction", () => {
         }),
       ).toBe(original);
 
-      expect(applyOverlayToTrace({ trace: original, patch: null })).toBe(
-        original,
-      );
+      expect(applyOverlayToTrace({ trace: original, patch: null })).toBe(original);
 
-      expect(applyOverlayToTrace({ trace: original, patch: patchOf({}) })).toBe(
-        original,
-      );
+      expect(applyOverlayToTrace({ trace: original, patch: patchOf({}) })).toBe(original);
     });
   });
 
@@ -342,9 +322,7 @@ describe("applying a correction to the drawer views", () => {
       expect(corrected.spanCount).toBe(1);
 
       // The captured trace is counted as it was captured.
-      expect(
-        applyOverlayToTraceHeader({ header, patch: null, spans }).spanCount,
-      ).toBe(3);
+      expect(applyOverlayToTraceHeader({ header, patch: null, spans }).spanCount).toBe(3);
 
       // An id the correction lists that the trace does not have removes nothing
       // from the count.
@@ -415,9 +393,7 @@ describe("applying a correction to the drawer views", () => {
             "metadata.reviewer": "unassigned",
             "langwatch.labels": '["nightly"]',
           },
-        } as unknown as Parameters<
-          typeof applyOverlayToTraceHeader
-        >[0]["header"],
+        } as unknown as Parameters<typeof applyOverlayToTraceHeader>[0]["header"],
         patch: patchOf({
           trace: {
             metadata: {
@@ -462,10 +438,7 @@ describe("applying a correction to the drawer views", () => {
         deletedSpanIds: ["span-2"],
       });
 
-      expect(changedSpanFields({ patch, spanId: "span-1" })).toEqual([
-        "name",
-        "output",
-      ]);
+      expect(changedSpanFields({ patch, spanId: "span-1" })).toEqual(["name", "output"]);
       expect(changedSpanFields({ patch, spanId: "span-3" })).toEqual([]);
       // Removing a span replaces none of its fields, so it names none.
       expect(changedSpanFields({ patch, spanId: "span-2" })).toEqual([]);

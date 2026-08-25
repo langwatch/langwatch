@@ -91,9 +91,7 @@ export function LangyCard({
         aria-label={ariaLabel}
         color="fg.muted"
       >
-        {(showDot ?? true)
-          ? statusDotForInline(dotColor, pulseDot, reduce)
-          : null}
+        {(showDot ?? true) ? statusDotForInline(dotColor, pulseDot, reduce) : null}
         {overline ? (
           <Text as="span" {...TYPE.sectionLabel} color="fg.subtle">
             {overline}
@@ -116,12 +114,7 @@ export function LangyCard({
   const overlineColor =
     intent === "progress" || intent === "change" ? dotColor : "fg.subtle";
   const overlineRow = overline ? (
-    <HStack
-      gap={1.5}
-      align="center"
-      {...TYPE.sectionLabel}
-      color={overlineColor}
-    >
+    <HStack gap={1.5} align="center" {...TYPE.sectionLabel} color={overlineColor}>
       {statusDot}
       <Box as="span">{overline}</Box>
     </HStack>
@@ -202,11 +195,7 @@ export function LangyCard({
 }
 
 /** The inline (activity) dot: a touch smaller, matching the quiet line weight. */
-function statusDotForInline(
-  color: string,
-  pulse: boolean,
-  reduce: boolean,
-): ReactNode {
+function statusDotForInline(color: string, pulse: boolean, reduce: boolean): ReactNode {
   return (
     <Box
       width="5px"

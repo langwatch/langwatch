@@ -29,14 +29,8 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
-import {
-  type JobRegistryEntry,
-  QueueManager,
-} from "../../services/queues/queueManager";
-import type {
-  AppendStore,
-  MapProjectionDefinition,
-} from "../mapProjection.types";
+import { type JobRegistryEntry, QueueManager } from "../../services/queues/queueManager";
+import type { AppendStore, MapProjectionDefinition } from "../mapProjection.types";
 import { ProjectionRouter } from "../projectionRouter";
 
 const aggregateType = createTestAggregateType();
@@ -93,9 +87,7 @@ function makeProjection({
  * than Redis: what these tests measure is how many jobs the seam handed over,
  * which is decided before the queue implementation matters.
  */
-function makeQueuedRouter(
-  projection: MapProjectionDefinition<SeamRecord, Event>,
-) {
+function makeQueuedRouter(projection: MapProjectionDefinition<SeamRecord, Event>) {
   const sent: Event[][] = [];
   const globalQueue = {
     send: async (payload: Record<string, unknown>) => {
@@ -130,9 +122,7 @@ function makeQueuedRouter(
 }
 
 /** A router with no global queue: `hasHandlerQueues()` is false, so map runs inline. */
-function makeInlineRouter(
-  projection: MapProjectionDefinition<SeamRecord, Event>,
-) {
+function makeInlineRouter(projection: MapProjectionDefinition<SeamRecord, Event>) {
   const router = new ProjectionRouter<Event>(
     aggregateType,
     TEST_CONSTANTS.PIPELINE_NAME,
@@ -174,9 +164,7 @@ describe("map projection enqueue-time contract", () => {
           makeProjection({
             appended,
             filter: (event) =>
-              String((event.data as { marker?: string }).marker).startsWith(
-                "keep",
-              ),
+              String((event.data as { marker?: string }).marker).startsWith("keep"),
           }),
         );
 
@@ -191,10 +179,7 @@ describe("map projection enqueue-time contract", () => {
           readContext,
         );
 
-        expect(queued().map((event) => event.id)).toEqual([
-          "evt-keep-1",
-          "evt-keep-2",
-        ]);
+        expect(queued().map((event) => event.id)).toEqual(["evt-keep-1", "evt-keep-2"]);
         expect(await enqueueOutcomeCount("queued")).toBe(before.queued + 2);
         expect(await enqueueOutcomeCount("filtered")).toBe(before.filtered + 3);
       });
@@ -211,9 +196,7 @@ describe("map projection enqueue-time contract", () => {
         const projection = makeProjection({
           appended,
           filter: (event) =>
-            String((event.data as { marker?: string }).marker).startsWith(
-              "keep",
-            ),
+            String((event.data as { marker?: string }).marker).startsWith("keep"),
         });
         const router = makeInlineRouter({ ...projection, map });
 
@@ -259,19 +242,11 @@ describe("map projection enqueue-time contract", () => {
     describe("when declared event types are dispatched", () => {
       it("queues every event of its declared types, unchanged", async () => {
         const appended: SeamRecord[] = [];
-        const { router, queued } = makeQueuedRouter(
-          makeProjection({ appended }),
-        );
+        const { router, queued } = makeQueuedRouter(makeProjection({ appended }));
 
-        await router.dispatch(
-          [makeEvent("keep-1"), makeEvent("drop-1")],
-          readContext,
-        );
+        await router.dispatch([makeEvent("keep-1"), makeEvent("drop-1")], readContext);
 
-        expect(queued().map((event) => event.id)).toEqual([
-          "evt-keep-1",
-          "evt-drop-1",
-        ]);
+        expect(queued().map((event) => event.id)).toEqual(["evt-keep-1", "evt-drop-1"]);
       });
     });
   });

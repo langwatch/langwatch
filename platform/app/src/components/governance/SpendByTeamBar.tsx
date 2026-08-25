@@ -69,12 +69,7 @@ export function SpendByTeamBar({
           const color = getHexColorForString(t.teamName);
           return (
             <HStack key={t.teamId ?? t.teamName} gap={1.5}>
-              <Box
-                width="10px"
-                height="10px"
-                borderRadius="sm"
-                backgroundColor={color}
-              />
+              <Box width="10px" height="10px" borderRadius="sm" backgroundColor={color} />
               <Text color="fg" fontWeight="medium">
                 {t.teamName}
               </Text>

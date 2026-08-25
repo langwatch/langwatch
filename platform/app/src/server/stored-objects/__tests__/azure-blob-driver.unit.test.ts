@@ -20,8 +20,7 @@ const getAzureBlobTokenMock = vi.fn();
 const invalidateAzureBlobTokenMock = vi.fn();
 vi.mock("../azure-token-provider", () => ({
   getAzureBlobToken: (...args: unknown[]) => getAzureBlobTokenMock(...args),
-  invalidateAzureBlobToken: (...args: unknown[]) =>
-    invalidateAzureBlobTokenMock(...args),
+  invalidateAzureBlobToken: (...args: unknown[]) => invalidateAzureBlobTokenMock(...args),
 }));
 
 import { AzureBlobDriver } from "../azure-blob-driver";
@@ -29,9 +28,7 @@ import { ObjectNotFoundError } from "../errors";
 
 const ACCOUNT_NAME = "lwtestacct";
 // Base64-encoded 256-bit key — arbitrary fixed value for deterministic signature tests.
-const ACCOUNT_KEY = Buffer.from("01234567890123456789012345678901").toString(
-  "base64",
-);
+const ACCOUNT_KEY = Buffer.from("01234567890123456789012345678901").toString("base64");
 const CONTAINER = "stored-objects";
 const BLOB_PATH = "proj-1/abc123";
 const URI = `azure-blob://${ACCOUNT_NAME}/${CONTAINER}/${BLOB_PATH}`;
@@ -62,10 +59,7 @@ function newDriver() {
 }
 
 function newTokenModeDriver(
-  mode:
-    | "workloadIdentity"
-    | "managedIdentity"
-    | "azureCli" = "workloadIdentity",
+  mode: "workloadIdentity" | "managedIdentity" | "azureCli" = "workloadIdentity",
 ) {
   return new AzureBlobDriver({
     mode,
@@ -87,9 +81,7 @@ describe("AzureBlobDriver", () => {
       // Import lazily to keep the registry construction local to this test.
       const { StorageRegistry } = await import("../storage-registry");
       const { getUriScheme, mintAzureBlobUri } = await import("../uri");
-      const { LocalFilesystemDriver } = await import(
-        "../local-filesystem-driver"
-      );
+      const { LocalFilesystemDriver } = await import("../local-filesystem-driver");
       const { S3Driver } = await import("../s3-driver");
 
       // Scheme is in the supported set and is NOT s3/file.
@@ -166,9 +158,7 @@ describe("AzureBlobDriver", () => {
       );
       expect(init.method).toBe("GET");
       const headers = init.headers as Record<string, string>;
-      expect(headers.Authorization).toMatch(
-        new RegExp(`^SharedKey ${ACCOUNT_NAME}:`),
-      );
+      expect(headers.Authorization).toMatch(new RegExp(`^SharedKey ${ACCOUNT_NAME}:`));
       expect(headers["x-ms-date"]).toBeDefined();
       expect(headers["x-ms-version"]).toBe("2021-12-02");
 
@@ -196,9 +186,7 @@ describe("AzureBlobDriver", () => {
       fetchSpy.mockResolvedValueOnce(new Response("oops", { status: 503 }));
 
       await expect(driver.get(URI)).rejects.toThrow(/503/);
-      await expect(driver.get(URI)).rejects.not.toBeInstanceOf(
-        ObjectNotFoundError,
-      );
+      await expect(driver.get(URI)).rejects.not.toBeInstanceOf(ObjectNotFoundError);
     });
   });
 
@@ -223,9 +211,7 @@ describe("AzureBlobDriver", () => {
       // The SharedKey signature still covers the byte length, which matches
       // what undici puts on the wire.
       expect(headers["Content-Length"]).toBeUndefined();
-      expect(headers.Authorization).toMatch(
-        new RegExp(`^SharedKey ${ACCOUNT_NAME}:`),
-      );
+      expect(headers.Authorization).toMatch(new RegExp(`^SharedKey ${ACCOUNT_NAME}:`));
       // The body is the raw bytes, not a JSON envelope.
       expect(init.body).toBeInstanceOf(Uint8Array);
     });
@@ -255,9 +241,7 @@ describe("AzureBlobDriver", () => {
       const [, init] = fetchSpy.mock.calls[0]!;
       expect(init.method).toBe("DELETE");
       const headers = init.headers as Record<string, string>;
-      expect(headers.Authorization).toMatch(
-        new RegExp(`^SharedKey ${ACCOUNT_NAME}:`),
-      );
+      expect(headers.Authorization).toMatch(new RegExp(`^SharedKey ${ACCOUNT_NAME}:`));
     });
 
     it("treats a 404 as success because delete is idempotent", async () => {
@@ -302,9 +286,7 @@ describe("AzureBlobDriver", () => {
       );
       expect(init.method).toBe("PUT");
       const headers = init.headers as Record<string, string>;
-      expect(headers.Authorization).toMatch(
-        new RegExp(`^SharedKey ${ACCOUNT_NAME}:`),
-      );
+      expect(headers.Authorization).toMatch(new RegExp(`^SharedKey ${ACCOUNT_NAME}:`));
     });
 
     it("treats 409 (already exists) as success — idempotent", async () => {
@@ -426,9 +408,7 @@ describe("AzureBlobDriver", () => {
         .update(stringToSign, "utf8")
         .digest("base64");
 
-      expect(`SharedKey ${KAT_ACCOUNT_NAME}:${signature}`).toBe(
-        KAT_EXPECTED_AUTH,
-      );
+      expect(`SharedKey ${KAT_ACCOUNT_NAME}:${signature}`).toBe(KAT_EXPECTED_AUTH);
     });
   });
 
@@ -581,33 +561,32 @@ describe("AzureBlobDriver", () => {
       ["exists" as const, () => driverExists(), 200],
       ["head" as const, () => driverHead(), 200],
       ["ensureContainer" as const, () => driverEnsureContainer(), 201],
-    ])("%s carries a Bearer Authorization header, no SharedKey signature, and a supported storage API version", async (_op, run, status) => {
-      fetchSpy.mockResolvedValueOnce(
-        new Response(status === 200 ? "body" : "", {
-          status,
-          headers: status === 200 ? { "content-length": "4" } : undefined,
-        }),
-      );
+    ])(
+      "%s carries a Bearer Authorization header, no SharedKey signature, and a supported storage API version",
+      async (_op, run, status) => {
+        fetchSpy.mockResolvedValueOnce(
+          new Response(status === 200 ? "body" : "", {
+            status,
+            headers: status === 200 ? { "content-length": "4" } : undefined,
+          }),
+        );
 
-      await run();
+        await run();
 
-      expect(fetchSpy).toHaveBeenCalledOnce();
-      const [, init] = fetchSpy.mock.calls[0]!;
-      const headers = init.headers as Record<string, string>;
-      expect(headers.Authorization).toBe("Bearer bearer-token-value");
-      expect(headers.Authorization).not.toMatch(/^SharedKey/);
-      expect(headers["x-ms-version"]).toBe("2021-12-02");
-    });
+        expect(fetchSpy).toHaveBeenCalledOnce();
+        const [, init] = fetchSpy.mock.calls[0]!;
+        const headers = init.headers as Record<string, string>;
+        expect(headers.Authorization).toBe("Bearer bearer-token-value");
+        expect(headers.Authorization).not.toMatch(/^SharedKey/);
+        expect(headers["x-ms-version"]).toBe("2021-12-02");
+      },
+    );
 
     function driverGet() {
       return newTokenModeDriver().get(URI);
     }
     function driverPut() {
-      return newTokenModeDriver().put(
-        URI,
-        Buffer.from("x"),
-        "application/octet-stream",
-      );
+      return newTokenModeDriver().put(URI, Buffer.from("x"), "application/octet-stream");
     }
     function driverDelete() {
       return newTokenModeDriver().delete(URI);
@@ -645,22 +624,20 @@ describe("AzureBlobDriver", () => {
       ["get" as const, () => newTokenModeDriver().get(URI)],
       [
         "put" as const,
-        () =>
-          newTokenModeDriver().put(
-            URI,
-            Buffer.from("x"),
-            "application/octet-stream",
-          ),
+        () => newTokenModeDriver().put(URI, Buffer.from("x"), "application/octet-stream"),
       ],
       ["delete" as const, () => newTokenModeDriver().delete(URI)],
       ["exists" as const, () => newTokenModeDriver().exists(URI)],
       ["head" as const, () => newTokenModeDriver().head(URI)],
-    ])("%s rejects without ever reaching the network or building a shared-key signature", async (_op, run) => {
-      await expect(run()).rejects.toThrow(tokenFailure);
+    ])(
+      "%s rejects without ever reaching the network or building a shared-key signature",
+      async (_op, run) => {
+        await expect(run()).rejects.toThrow(tokenFailure);
 
-      // No fallback: nothing was sent at all, signed or unsigned.
-      expect(fetchSpy).not.toHaveBeenCalled();
-    });
+        // No fallback: nothing was sent at all, signed or unsigned.
+        expect(fetchSpy).not.toHaveBeenCalled();
+      },
+    );
 
     it("never constructs a SharedKey Authorization header as a fallback", async () => {
       await expect(newTokenModeDriver().get(URI)).rejects.toThrow();
@@ -670,9 +647,7 @@ describe("AzureBlobDriver", () => {
           (init?.headers as Record<string, string> | undefined)?.Authorization,
       );
       expect(sentAuthorizations).toHaveLength(0);
-      expect(sentAuthorizations.some((a) => a?.startsWith("SharedKey"))).toBe(
-        false,
-      );
+      expect(sentAuthorizations.some((a) => a?.startsWith("SharedKey"))).toBe(false);
     });
   });
 
@@ -686,15 +661,8 @@ describe("AzureBlobDriver", () => {
         accountName: ACCOUNT_NAME,
       });
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
-      await hostStyleDriver.put(
-        URI,
-        Buffer.from("x"),
-        "application/octet-stream",
-      );
-      const hostHeaders = fetchSpy.mock.calls[0]![1].headers as Record<
-        string,
-        string
-      >;
+      await hostStyleDriver.put(URI, Buffer.from("x"), "application/octet-stream");
+      const hostHeaders = fetchSpy.mock.calls[0]![1].headers as Record<string, string>;
 
       const pathStyleDriver = new AzureBlobDriver({
         mode: "workloadIdentity",
@@ -702,15 +670,8 @@ describe("AzureBlobDriver", () => {
         endpointBaseUrl: "http://127.0.0.1:10000/devstoreaccount1",
       });
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
-      await pathStyleDriver.put(
-        URI,
-        Buffer.from("x"),
-        "application/octet-stream",
-      );
-      const pathHeaders = fetchSpy.mock.calls[1]![1].headers as Record<
-        string,
-        string
-      >;
+      await pathStyleDriver.put(URI, Buffer.from("x"), "application/octet-stream");
+      const pathHeaders = fetchSpy.mock.calls[1]![1].headers as Record<string, string>;
 
       expect(hostHeaders.Authorization).toBe("Bearer same-bearer-token");
       expect(pathHeaders.Authorization).toBe("Bearer same-bearer-token");
@@ -756,9 +717,7 @@ describe("AzureBlobDriver", () => {
     /** @scenario "A permission rejection is not retried and names the missing role assignment" */
     it("does not acquire a new token or retry, and names the required role assignment and scope", async () => {
       getAzureBlobTokenMock.mockResolvedValue("token-without-permission");
-      fetchSpy.mockResolvedValueOnce(
-        new Response("Forbidden", { status: 403 }),
-      );
+      fetchSpy.mockResolvedValueOnce(new Response("Forbidden", { status: 403 }));
 
       let message = "";
       try {
@@ -834,11 +793,7 @@ describe("AzureBlobDriver", () => {
 
       let message = "";
       try {
-        await newDriver().put(
-          URI,
-          Buffer.from("x"),
-          "application/octet-stream",
-        );
+        await newDriver().put(URI, Buffer.from("x"), "application/octet-stream");
       } catch (error) {
         message = (error as Error).message;
       }

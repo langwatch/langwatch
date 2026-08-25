@@ -24,7 +24,9 @@ export async function handleListSuites(params: {
     lines.push(`**ID**: ${s.id}`);
     lines.push(`**Slug**: ${s.slug}`);
     lines.push(`**Scenarios**: ${s.scenarioIds.length}`);
-    lines.push(`**Targets**: ${s.targets.length} (${s.targets.map((t) => `${t.type}:${t.referenceId}`).join(", ")})`);
+    lines.push(
+      `**Targets**: ${s.targets.length} (${s.targets.map((t) => `${t.type}:${t.referenceId}`).join(", ")})`,
+    );
     lines.push(`**Repeat**: ${s.repeatCount}x`);
     if (s.description) {
       lines.push(`**Description**: ${s.description}`);
@@ -36,7 +38,7 @@ export async function handleListSuites(params: {
   }
 
   lines.push(
-    "> Use `platform_get_suite` with the ID to see full details, or `platform_run_suite` to trigger execution."
+    "> Use `platform_get_suite` with the ID to see full details, or `platform_run_suite` to trigger execution.",
   );
 
   return lines.join("\n");

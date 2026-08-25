@@ -18,10 +18,7 @@ export type AddRecentItem = (item: Omit<RecentItem, "accessedAt">) => void;
 /**
  * Drawer opening helper.
  */
-export type OpenDrawer = (
-  drawer: DrawerType,
-  params?: Record<string, string>,
-) => void;
+export type OpenDrawer = (drawer: DrawerType, params?: Record<string, string>) => void;
 
 /**
  * Create a navigation helper that handles tab behavior.

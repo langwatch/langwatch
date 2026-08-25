@@ -8,10 +8,7 @@ import {
   UserAvatarRateLimitedError,
 } from "@langwatch/user-contract";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
-import {
-  Auth0ApiError,
-  changeAuth0Password,
-} from "~/server/auth0/passwordService";
+import { Auth0ApiError, changeAuth0Password } from "~/server/auth0/passwordService";
 import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
@@ -93,8 +90,7 @@ export const userRouter = createTRPCRouter({
       if ((await resolveAuthProvider()) !== "email") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message:
-            "Direct registration is not available for this auth provider",
+          message: "Direct registration is not available for this auth provider",
         });
       }
 
@@ -263,9 +259,7 @@ export const userRouter = createTRPCRouter({
         // attacker can't change the password without knowing the
         // existing one.
         currentPassword: z.string().min(1, "Current password is required"),
-        newPassword: z
-          .string()
-          .min(8, "Password must be at least 8 characters"),
+        newPassword: z.string().min(8, "Password must be at least 8 characters"),
       }),
     )
     .noPermission({
@@ -386,8 +380,7 @@ export const userRouter = createTRPCRouter({
             }
             throw new TRPCError({
               code: "INTERNAL_SERVER_ERROR",
-              message:
-                "Could not update password with Auth0. Please try again later.",
+              message: "Could not update password with Auth0. Please try again later.",
             });
           }
           throw error;
@@ -468,10 +461,7 @@ export const userRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
-      if (
-        input.userId !== ctx.session.user.id &&
-        !checkIsAdmin({ email: user.email })
-      ) {
+      if (input.userId !== ctx.session.user.id && !checkIsAdmin({ email: user.email })) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -609,9 +599,9 @@ export const userRouter = createTRPCRouter({
 
       const defaultPolicy =
         await ctx.app.governance.routingPolicies.tryResolveDefaultForUser({
-        organizationId: input.organizationId,
-        personalTeamId: workspace.team.id,
-      });
+          organizationId: input.organizationId,
+          personalTeamId: workspace.team.id,
+        });
 
       return {
         workspace,
@@ -659,8 +649,7 @@ export const userRouter = createTRPCRouter({
       }
 
       // Find the user's personal project. If none yet, return empty-state.
-      const workspace =
-        await ctx.app.organizations.tryFindPersonalWorkspace({
+      const workspace = await ctx.app.organizations.tryFindPersonalWorkspace({
         userId,
         organizationId: input.organizationId,
       });
@@ -761,8 +750,7 @@ export const userRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
-      const workspace =
-        await ctx.app.organizations.tryFindPersonalWorkspace({
+      const workspace = await ctx.app.organizations.tryFindPersonalWorkspace({
         userId,
         organizationId: input.organizationId,
       });
@@ -985,12 +973,7 @@ export const userRouter = createTRPCRouter({
   setLastHomePath: protectedProcedure
     .input(
       z.object({
-        path: z
-          .string()
-          .min(1)
-          .max(1024)
-          .regex(/^\//, "must start with /")
-          .nullable(),
+        path: z.string().min(1).max(1024).regex(/^\//, "must start with /").nullable(),
       }),
     )
     .noPermission({

@@ -85,12 +85,8 @@ describe("readCodingAgentTranscriptWithProtections", () => {
       expect(transcript.sessionId).toBe("session-123");
       const kinds = transcript.entries.map((entry) => entry.kind);
       expect(kinds).toContain("user_prompt");
-      const prompt = transcript.entries.find(
-        (entry) => entry.kind === "user_prompt",
-      );
-      expect(prompt && "text" in prompt ? prompt.text : null).toBe(
-        "summarise the repo",
-      );
+      const prompt = transcript.entries.find((entry) => entry.kind === "user_prompt");
+      expect(prompt && "text" in prompt ? prompt.text : null).toBe("summarise the repo");
     });
   });
 

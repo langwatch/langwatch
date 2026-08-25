@@ -83,21 +83,18 @@ describe("useConversationAnnotations", () => {
 
     /** @scenario "A turn's annotation count counts what was said about the turn" */
     it("holds only what was said about the turn under the turn", () => {
-      const { result } = renderHook(() =>
-        useConversationAnnotations(["trace-1"]),
-      );
+      const { result } = renderHook(() => useConversationAnnotations(["trace-1"]));
 
       expect(result.current.byTrace.get("trace-1")).toHaveLength(1);
     });
 
     it("holds what was said about its parts apart from it", () => {
-      const { result } = renderHook(() =>
-        useConversationAnnotations(["trace-1"]),
-      );
+      const { result } = renderHook(() => useConversationAnnotations(["trace-1"]));
 
-      expect(
-        result.current.byAnchor.get("trace-1")?.map((a) => a.anchorId),
-      ).toEqual(["span-1", "span-2"]);
+      expect(result.current.byAnchor.get("trace-1")?.map((a) => a.anchorId)).toEqual([
+        "span-1",
+        "span-2",
+      ]);
     });
 
     it("reads every comment on the turns rather than only the ones about them", () => {
@@ -111,9 +108,7 @@ describe("useConversationAnnotations", () => {
     it("counts none of them against the conversation now open", () => {
       annotations.rows = [annotation("trace-1"), annotation("trace-2")];
 
-      const { result } = renderHook(() =>
-        useConversationAnnotations(["trace-9"]),
-      );
+      const { result } = renderHook(() => useConversationAnnotations(["trace-9"]));
 
       expect(result.current.all).toEqual([]);
       expect(result.current.hasAny).toBe(false);

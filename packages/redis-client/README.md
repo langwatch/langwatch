@@ -14,12 +14,12 @@ bundle or a test, opened a socket by being imported.
 Collaborators and the logger arrive once at construction; the methods take only
 what varies per call. Same idiom as `@langwatch/authz`.
 
-| Service | Holds | Answers |
-|---|---|---|
-| `RedisConfigService` | nothing — pure and stateless, like `AuthzEngine` | `resolve(env)`, `isConfigured(env)` |
+| Service                  | Holds                                            | Answers                                               |
+| ------------------------ | ------------------------------------------------ | ----------------------------------------------------- |
+| `RedisConfigService`     | nothing — pure and stateless, like `AuthzEngine` | `resolve(env)`, `isConfigured(env)`                   |
 | `RedisConnectionService` | a config service + the logger for what it builds | `connect(env)`, `connectStandalone({ url, dbIndex })` |
-| `RedisReadinessService` | a logger | `ping({ connection, timeoutMs, target })` |
-| `RedisShutdownService` | the close state for one owner | `shutdown(connection)` |
+| `RedisReadinessService`  | a logger                                         | `ping({ connection, timeoutMs, target })`             |
+| `RedisShutdownService`   | the close state for one owner                    | `shutdown(connection)`                                |
 
 ```text
   RedisEnvironment                  the raw env values, supplied by the caller
@@ -67,7 +67,7 @@ process and close what they open: `replayPreset` (which needs
 cluster) and the `migrateObjectStorage` task, which boots no App at all.
 
 For a decision that must be made before any connection exists — better-auth
-picks its session-storage strategy at module scope — ask the *configuration*,
+picks its session-storage strategy at module scope — ask the _configuration_,
 not a client:
 
 ```ts

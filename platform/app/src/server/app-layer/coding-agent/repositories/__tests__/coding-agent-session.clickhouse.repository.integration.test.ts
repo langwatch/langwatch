@@ -43,9 +43,7 @@ const tag = nanoid();
 const tenantId = `${tag}-project`;
 const baseMs = Date.now();
 
-function sessionRow(
-  over: Partial<CodingAgentSessionRow> = {},
-): CodingAgentSessionRow {
+function sessionRow(over: Partial<CodingAgentSessionRow> = {}): CodingAgentSessionRow {
   return {
     tenantId,
     sessionId: `${tag}-s`,
@@ -170,9 +168,7 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
   sessions = new CodingAgentSessionClickHouseRepository(async () => ch);
-  traceSessions = new CodingAgentTraceSessionClickHouseRepository(
-    async () => ch,
-  );
+  traceSessions = new CodingAgentTraceSessionClickHouseRepository(async () => ch);
   metricSeries = new SessionMetricSeriesClickHouseRepository(async () => ch);
 }, 60_000);
 
@@ -584,9 +580,7 @@ describe("coding_agent_sessions by repository branch", () => {
       startedAtFromMs: baseMs - 60_000,
     });
 
-    expect(listed.map((row) => row.sessionId).includes(`${tag}-moved`)).toBe(
-      true,
-    );
+    expect(listed.map((row) => row.sessionId).includes(`${tag}-moved`)).toBe(true);
   });
 
   it("leaves out a session that drove neither branch", async () => {
@@ -611,9 +605,7 @@ describe("coding_agent_sessions by repository branch", () => {
       startedAtFromMs: baseMs - 60_000,
     });
 
-    expect(
-      listed.map((row) => row.sessionId).includes(`${tag}-elsewhere`),
-    ).toBe(false);
+    expect(listed.map((row) => row.sessionId).includes(`${tag}-elsewhere`)).toBe(false);
   });
 });
 
@@ -716,9 +708,7 @@ describe("session_metric_series converged totals (migration 00052)", () => {
     });
 
     const linesAdded = totals.find(
-      (t) =>
-        t.metricName === "claude_code.lines_of_code.count" &&
-        t.bucket === "added",
+      (t) => t.metricName === "claude_code.lines_of_code.count" && t.bucket === "added",
     );
     const cost = totals.find((t) => t.metricName === "claude_code.cost.usage");
     // 10 + 5 across two delta units.

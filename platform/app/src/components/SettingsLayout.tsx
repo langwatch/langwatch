@@ -1,11 +1,4 @@
-import {
-  Box,
-  Collapsible,
-  Container,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Collapsible, Container, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { type PropsWithChildren, useEffect, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -36,11 +29,7 @@ function NavSection({
   }, [isActive]);
 
   return (
-    <Collapsible.Root
-      open={open}
-      onOpenChange={(e) => setOpen(e.open)}
-      width="full"
-    >
+    <Collapsible.Root open={open} onOpenChange={(e) => setOpen(e.open)} width="full">
       <VStack align="start" width="full" gap={0}>
         <Collapsible.Trigger asChild>
           <Box as="button" width="full" cursor="pointer">
@@ -132,12 +121,7 @@ export default function SettingsLayout({
       <PageLayout.Header>
         <PageLayout.Heading>Settings</PageLayout.Heading>
       </PageLayout.Header>
-      <HStack
-        align="start"
-        width="full"
-        height="calc(100vh - 56px - 48px)"
-        gap={0}
-      >
+      <HStack align="start" width="full" height="calc(100vh - 56px - 48px)" gap={0}>
         <VStack
           align="start"
           paddingX={2}
@@ -151,9 +135,7 @@ export default function SettingsLayout({
           display={isSubscription ? "none" : "flex"}
         >
           <MenuLink href="/settings">General Settings</MenuLink>
-          {!isLiteMember && (
-            <MenuLink href="/settings/api-keys">API Keys</MenuLink>
-          )}
+          {!isLiteMember && <MenuLink href="/settings/api-keys">API Keys</MenuLink>}
 
           <NavSection
             label="Models"
@@ -163,13 +145,9 @@ export default function SettingsLayout({
               "/settings/secrets",
             ]}
           >
-            <MenuLink href="/settings/model-providers">
-              Model Providers
-            </MenuLink>
+            <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
             <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
-            {!isLiteMember && (
-              <MenuLink href="/settings/secrets">Secrets</MenuLink>
-            )}
+            {!isLiteMember && <MenuLink href="/settings/secrets">Secrets</MenuLink>}
           </NavSection>
 
           <NavSection
@@ -202,11 +180,9 @@ export default function SettingsLayout({
             {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/role-bindings">Role Bindings</MenuLink>
             )}
-            {showEnterpriseNav &&
-              !isLiteMember &&
-              hasPermission("auditLog:view") && (
-                <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
-              )}
+            {showEnterpriseNav && !isLiteMember && hasPermission("auditLog:view") && (
+              <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
+            )}
           </NavSection>
 
           <NavSection
@@ -222,18 +198,12 @@ export default function SettingsLayout({
           >
             <MenuLink href="/settings/data-retention">Data Retention</MenuLink>
             {hasPermission("triggers:view") && (
-              <MenuLink href="/settings/email-suppressions">
-                Email Suppressions
-              </MenuLink>
+              <MenuLink href="/settings/email-suppressions">Email Suppressions</MenuLink>
             )}
             <MenuLink href="/settings/data-privacy">Data Privacy</MenuLink>
-            <MenuLink href="/settings/annotation-scores">
-              Annotation Scores
-            </MenuLink>
+            <MenuLink href="/settings/annotation-scores">Annotation Scores</MenuLink>
             {!isLiteMember && (
-              <MenuLink href="/settings/topic-clustering">
-                Topic Clustering
-              </MenuLink>
+              <MenuLink href="/settings/topic-clustering">Topic Clustering</MenuLink>
             )}
             <MenuLink href="/settings/integrations">Integrations</MenuLink>
           </NavSection>
@@ -241,16 +211,10 @@ export default function SettingsLayout({
           {!isLiteMember && (
             <NavSection
               label="Billing"
-              paths={[
-                "/settings/usage",
-                "/settings/subscription",
-                "/settings/license",
-              ]}
+              paths={["/settings/usage", "/settings/subscription", "/settings/license"]}
             >
               <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
-              {isSaaS && (
-                <MenuLink href="/settings/subscription">Subscription</MenuLink>
-              )}
+              {isSaaS && <MenuLink href="/settings/subscription">Subscription</MenuLink>}
               {!isSaaS && <MenuLink href="/settings/license">License</MenuLink>}
             </NavSection>
           )}
@@ -270,10 +234,7 @@ export default function SettingsLayout({
               <MenuLink href="/ops/dejaview" includePath="/ops/dejaview">
                 Deja View
               </MenuLink>
-              <MenuLink
-                href="/ops/feature-flags"
-                includePath="/ops/feature-flags"
-              >
+              <MenuLink href="/ops/feature-flags" includePath="/ops/feature-flags">
                 Feature Flags
               </MenuLink>
             </NavSection>
@@ -281,10 +242,7 @@ export default function SettingsLayout({
 
           {isAdminUser && (
             <NavSection label="Backoffice" paths={["/ops/backoffice"]}>
-              <MenuLink
-                href="/ops/backoffice/users"
-                includePath="/ops/backoffice/users"
-              >
+              <MenuLink href="/ops/backoffice/users" includePath="/ops/backoffice/users">
                 Users
               </MenuLink>
               <MenuLink

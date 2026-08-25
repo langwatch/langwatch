@@ -26,12 +26,7 @@ export function LangyRecoveringLine({ message }: { message: string }) {
 
   return (
     <HStack gap={2.5} alignSelf="flex-start" paddingY={0.5} paddingLeft={0.5}>
-      <Box
-        position="relative"
-        minHeight="1.5em"
-        display="flex"
-        alignItems="center"
-      >
+      <Box position="relative" minHeight="1.5em" display="flex" alignItems="center">
         {/* `mode="wait"` + a text key: the at-capacity countdown re-renders once
             a second, and a crossfade per tick would strobe. Keying on the whole
             line means the tick swaps in with the same blur-reveal every other
@@ -46,14 +41,10 @@ export function LangyRecoveringLine({ message }: { message: string }) {
             letterSpacing="-0.005em"
             lineHeight="1.5"
             css={shimmerCss}
-            initial={
-              reduceMotion ? false : { opacity: 0, filter: "blur(5px)", y: 5 }
-            }
+            initial={reduceMotion ? false : { opacity: 0, filter: "blur(5px)", y: 5 }}
             animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
             exit={
-              reduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, filter: "blur(5px)", y: -5 }
+              reduceMotion ? { opacity: 0 } : { opacity: 0, filter: "blur(5px)", y: -5 }
             }
             transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
           >

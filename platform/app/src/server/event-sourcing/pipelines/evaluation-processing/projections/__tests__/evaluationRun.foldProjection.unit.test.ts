@@ -113,10 +113,7 @@ describe("evaluationRun foldProjection", () => {
         });
         const state = createInitState();
         const afterStarted = projection.apply(state, createStartedEvent());
-        const afterCompleted = projection.apply(
-          afterStarted,
-          createCompletedEvent(),
-        );
+        const afterCompleted = projection.apply(afterStarted, createCompletedEvent());
 
         expect(afterCompleted.status).toBe("processed");
         expect(afterCompleted.score).toBe(0.9);
@@ -167,9 +164,7 @@ describe("evaluationRun foldProjection", () => {
         });
         const emptyState = createInitState();
 
-        expect(() =>
-          projection.apply(emptyState, createReportedEvent()),
-        ).not.toThrow();
+        expect(() => projection.apply(emptyState, createReportedEvent())).not.toThrow();
       });
 
       it("defaults optional fields to null or false", () => {

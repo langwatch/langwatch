@@ -14,15 +14,7 @@
  */
 
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../app-layer/app";
@@ -39,8 +31,7 @@ const { mockSendInviteEmail } = vi.hoisted(() => ({
 // real provider key. Only `sendInviteEmail` is replaced; the rest of the
 // module keeps its real exports.
 vi.mock("../../mailer/inviteEmail", async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import("../../mailer/inviteEmail")>();
+  const original = await importOriginal<typeof import("../../mailer/inviteEmail")>();
   return {
     ...original,
     sendInviteEmail: (...args: unknown[]) => mockSendInviteEmail(...args),
@@ -240,9 +231,7 @@ describe("InviteService.createInvites", () => {
             {
               email: `foreign-${ns}@test.com`,
               role: OrganizationUserRole.MEMBER,
-              teams: [
-                { teamId: "team_does_not_exist", role: TeamUserRole.MEMBER },
-              ],
+              teams: [{ teamId: "team_does_not_exist", role: TeamUserRole.MEMBER }],
             },
           ],
           validation: "strict",
@@ -262,9 +251,7 @@ describe("InviteService.createInvites", () => {
           {
             email: `foreign-lenient-${ns}@test.com`,
             role: OrganizationUserRole.MEMBER,
-            teams: [
-              { teamId: "team_does_not_exist", role: TeamUserRole.MEMBER },
-            ],
+            teams: [{ teamId: "team_does_not_exist", role: TeamUserRole.MEMBER }],
           },
         ],
         validation: "lenient",
@@ -345,9 +332,7 @@ describe("InviteService.createInvites", () => {
       });
 
       expect(result.invites).toHaveLength(1);
-      expect(result.invites[0]!.invite.email).toBe(
-        `fresh-lenient-${ns}@test.com`,
-      );
+      expect(result.invites[0]!.invite.email).toBe(`fresh-lenient-${ns}@test.com`);
     });
   });
 

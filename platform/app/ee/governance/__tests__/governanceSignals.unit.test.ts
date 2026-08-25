@@ -112,9 +112,7 @@ describe("budget crossing detection", () => {
     const cycleAnchorAt = new Date("2026-06-17T09:00:00.000Z");
     const at = new Date();
     await AppGovernanceSignalsService.create(
-      deps({ b_anchored: "120.000000" }, [
-        budget("b_anchored", { cycleAnchorAt }),
-      ]),
+      deps({ b_anchored: "120.000000" }, [budget("b_anchored", { cycleAnchorAt })]),
     ).detectBudgetCrossings([row("b_anchored", "vk_anchor:u1")]);
 
     // Exactly one: a second dispatch for the same anchored period would be

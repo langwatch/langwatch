@@ -42,12 +42,7 @@ function ConsoleTitleBar({ actions }: { actions?: ReactNode }) {
       >
         simulation-results.log
       </Text>
-      <HStack
-        width={TRAFFIC_LIGHTS_WIDTH}
-        flexShrink={0}
-        justify="flex-end"
-        gap={0}
-      >
+      <HStack width={TRAFFIC_LIGHTS_WIDTH} flexShrink={0} justify="flex-end" gap={0}>
         {actions}
       </HStack>
     </HStack>
@@ -73,8 +68,7 @@ export function SimulationConsole({
   titleBarActions?: ReactNode;
 }) {
   const isPending =
-    status === ScenarioRunStatus.IN_PROGRESS ||
-    status === ScenarioRunStatus.PENDING;
+    status === ScenarioRunStatus.IN_PROGRESS || status === ScenarioRunStatus.PENDING;
 
   return (
     <Box
@@ -117,9 +111,7 @@ export function SimulationConsole({
             )}
 
             {/* Error Details */}
-            {!isPending && results?.error && (
-              <ErrorDetails error={results.error} />
-            )}
+            {!isPending && results?.error && <ErrorDetails error={results.error} />}
           </VStack>
         </Code>
       </Box>

@@ -5,9 +5,7 @@
  * already computed by `compareConfigContent` so the message says what
  * actually changed instead of a generic "Updated from local file".
  */
-export function describeLocalFileUpdate(
-  differences: string[] | undefined,
-): string {
+export function describeLocalFileUpdate(differences: string[] | undefined): string {
   if (!differences?.length) {
     return "Updated from local file";
   }

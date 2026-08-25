@@ -1,14 +1,8 @@
 import type { SlackPayload } from "@langwatch/automation-contract";
 import { toDispatchError } from "@langwatch/eventing";
-import {
-  IncomingWebhook,
-  type IncomingWebhookSendArguments,
-} from "@slack/webhook";
+import { IncomingWebhook, type IncomingWebhookSendArguments } from "@slack/webhook";
 import { env } from "~/env.mjs";
-import {
-  type AlertType,
-  AlertType as AlertTypeEnum,
-} from "~/generated/prisma/client";
+import { type AlertType, AlertType as AlertTypeEnum } from "~/generated/prisma/client";
 import type { Trace } from "~/server/tracer/types";
 import { assertSlackWebhookUrl } from "./slackWebhookGuard";
 
@@ -104,16 +98,10 @@ export const sendSlackWebhook = async ({
           .map((event: any) => {
             return `\n*Event Type:* ${escapeMrkdwn(event.event_type)}
           ${Object.entries(event.metrics || {})
-            .map(
-              ([key, value]) =>
-                `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`,
-            )
+            .map(([key, value]) => `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`)
             .join("")}
           ${Object.entries(event.event_details || {})
-            .map(
-              ([key, value]) =>
-                `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`,
-            )
+            .map(([key, value]) => `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`)
             .join("")}
           \n-------------------`;
           })

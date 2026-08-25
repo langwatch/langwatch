@@ -15,9 +15,7 @@ type EvaluatorNodeDraggableProps = {
  * (via useEvaluatorPickerFlow) opens the evaluator list drawer so the user
  * can choose an existing evaluator or create a new one.
  */
-export function EvaluatorNodeDraggable({
-  onDragEnd,
-}: EvaluatorNodeDraggableProps) {
+export function EvaluatorNodeDraggable({ onDragEnd }: EvaluatorNodeDraggableProps) {
   const defaultEvaluator = MODULES.evaluators[0];
 
   if (!defaultEvaluator) {

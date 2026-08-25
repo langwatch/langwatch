@@ -53,14 +53,8 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
   if ("stringValue" in v && typeof v.stringValue === "string") {
     return v.stringValue;
   }
-  if (
-    "arrayValue" in v &&
-    v.arrayValue &&
-    Array.isArray(v.arrayValue?.values)
-  ) {
-    return JSON.stringify(
-      v.arrayValue.values.map((item) => scalar(item) ?? item),
-    );
+  if ("arrayValue" in v && v.arrayValue && Array.isArray(v.arrayValue?.values)) {
+    return JSON.stringify(v.arrayValue.values.map((item) => scalar(item) ?? item));
   }
   if ("bytesValue" in v && v.bytesValue) {
     if (typeof v.bytesValue === "string") {
@@ -110,9 +104,7 @@ const normalizeOtlpId = (id: string | Uint8Array): string => {
   return id;
 };
 
-const normalizeOtlpSpanIds = (
-  span: OtlpSpan,
-): { traceId: string; spanId: string } => {
+const normalizeOtlpSpanIds = (span: OtlpSpan): { traceId: string; spanId: string } => {
   const traceId = normalizeOtlpId(span.traceId);
   const spanId = normalizeOtlpId(span.spanId);
 
@@ -132,9 +124,7 @@ const normalizeOtlpUnixNano = (value: Fixed64): number => {
     const { high, low } = value;
 
     if (typeof high === "number" && typeof low === "number") {
-      const bigIntValue = Number(
-        (BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn),
-      );
+      const bigIntValue = Number((BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn));
 
       return bigIntValue;
     }
@@ -149,9 +139,7 @@ const normalizeOtlpParentAndTraceContext = (
   spanFlags: number | null | undefined,
 ): ParentContext => {
   const parsedTraceState = parseTraceState(traceState);
-  const parentSpanId = parentOtlpSpanId
-    ? normalizeOtlpId(parentOtlpSpanId)
-    : null;
+  const parentSpanId = parentOtlpSpanId ? normalizeOtlpId(parentOtlpSpanId) : null;
 
   const parsedTraceFlags = parseTraceFlags(spanFlags);
 
@@ -163,9 +151,7 @@ const normalizeOtlpParentAndTraceContext = (
   };
 };
 
-const normalizeOtlpSpanKind = (
-  kind: ESpanKind | string,
-): NormalizedSpanKind => {
+const normalizeOtlpSpanKind = (kind: ESpanKind | string): NormalizedSpanKind => {
   return match(kind)
     .with(ESpanKind.SPAN_KIND_UNSPECIFIED, () => NormalizedSpanKind.UNSPECIFIED)
     .with("SPAN_KIND_UNSPECIFIED", () => NormalizedSpanKind.UNSPECIFIED)
@@ -195,10 +181,7 @@ const normalizeOtlpStatusCode = (
     .otherwise(() => NormalizedStatusCode.UNSET);
 };
 
-const normalizeOtlpAnyValue = (
-  root: OtlpAnyValue,
-  rootKey?: string,
-): FlattenResult => {
+const normalizeOtlpAnyValue = (root: OtlpAnyValue, rootKey?: string): FlattenResult => {
   const out: FlattenResult = {};
 
   const set = (k: string | undefined | null, v: AttributeValue) => {
@@ -214,8 +197,7 @@ const normalizeOtlpAnyValue = (
     }
 
     if ("kvlistValue" in v && v.kvlistValue) {
-      for (const { key, value } of v.kvlistValue.values)
-        walk(value, join(prefix, key));
+      for (const { key, value } of v.kvlistValue.values) walk(value, join(prefix, key));
 
       return;
     }
@@ -227,9 +209,7 @@ const normalizeOtlpAnyValue = (
       if (vs.every(isScalar)) {
         set(
           prefix,
-          vs
-            .map((x) => scalar(x)!)
-            .filter((x): x is AttributeScalar => x !== void 0),
+          vs.map((x) => scalar(x)!).filter((x): x is AttributeScalar => x !== void 0),
         );
         return;
       }
@@ -351,9 +331,7 @@ const detectArrayPatterns = (
  * 1. Consecutive indices starting from 0
  * 2. Same set of relative keys across all items
  */
-const isValidArrayPattern = (
-  indexMap: Map<number, Map<string, unknown>>,
-): boolean => {
+const isValidArrayPattern = (indexMap: Map<number, Map<string, unknown>>): boolean => {
   const indices = Array.from(indexMap.keys()).sort((a, b) => a - b);
 
   // Must start at 0
@@ -385,9 +363,7 @@ const isValidArrayPattern = (
  * Returns:
  *   { message: { content: "hello", role: "user" } }
  */
-const unflattenObject = (
-  flatMap: Map<string, unknown>,
-): Record<string, unknown> => {
+const unflattenObject = (flatMap: Map<string, unknown>): Record<string, unknown> => {
   const record: Record<string, unknown> = Object.create(null);
   for (const [k, v] of flatMap) {
     record[k] = v;
@@ -530,9 +506,7 @@ export const parseJsonStringValues = (
   return result;
 };
 
-const normalizeOtlpAttributes = (
-  attributes: OtlpKeyValue[],
-): NormalizedAttributes => {
+const normalizeOtlpAttributes = (attributes: OtlpKeyValue[]): NormalizedAttributes => {
   const normalizedAttributes: NormalizedAttributes = {};
 
   for (const attr of attributes ?? []) {
@@ -562,9 +536,7 @@ const convertUnixNanoToUnixMs = (unixNano: number): number => {
  * @param spanFlags - The span flags.
  * @returns The trace flags info.
  */
-const parseTraceFlags = (
-  spanFlags: number | undefined | null,
-): TraceFlagsInfo => {
+const parseTraceFlags = (spanFlags: number | undefined | null): TraceFlagsInfo => {
   if (spanFlags === void 0 || spanFlags === null) {
     return {
       sampled: null,
@@ -596,9 +568,7 @@ const parseTraceFlags = (
  * @param traceState - The trace state string.
  * @returns The trace state info.
  */
-const parseTraceState = (
-  traceState: string | null | undefined,
-): TraceStateInfo => {
+const parseTraceState = (traceState: string | null | undefined): TraceStateInfo => {
   if (traceState === void 0 || traceState === null) {
     return {
       version: null,
@@ -622,18 +592,13 @@ const parseTraceState = (
  * Normalizes raw OTLP attribute arrays into serialized string maps.
  * Shared utility for log and metric collection services.
  */
-export function normalizeOtlpAttributeMap(
-  attributes: unknown,
-): Record<string, string> {
+export function normalizeOtlpAttributeMap(attributes: unknown): Record<string, string> {
   if (!Array.isArray(attributes)) return {};
 
   // Filter to only valid {key, value} entries to guard against malformed OTLP data
   const validEntries = attributes.filter(
     (attr): attr is OtlpKeyValue =>
-      typeof attr === "object" &&
-      attr !== null &&
-      "key" in attr &&
-      "value" in attr,
+      typeof attr === "object" && attr !== null && "key" in attr && "value" in attr,
   );
   const normalized = normalizeOtlpAttributes(validEntries);
   const result: Record<string, string> = {};

@@ -86,8 +86,7 @@ export function salvageValidData<T extends z.ZodObject<any>>(
       if (objectSchema instanceof z.ZodObject) {
         // Recursively salvage nested objects
         // Extract nested defaults if available
-        const nestedDefaults =
-          schemaDefaults[key as keyof typeof schemaDefaults];
+        const nestedDefaults = schemaDefaults[key as keyof typeof schemaDefaults];
 
         try {
           // Attempt to salvage the nested object
@@ -109,15 +108,9 @@ export function salvageValidData<T extends z.ZodObject<any>>(
               // This helps with optional nested objects that have required fields
               const constructedDefaults: Record<string, unknown> = {};
               for (const nestedKey of Object.keys(objectSchema.shape)) {
-                if (
-                  Object.prototype.hasOwnProperty.call(
-                    objectSchema.shape,
-                    nestedKey,
-                  )
-                ) {
+                if (Object.prototype.hasOwnProperty.call(objectSchema.shape, nestedKey)) {
                   const nestedFieldSchema = objectSchema.shape[nestedKey];
-                  const fieldDefaultResult =
-                    nestedFieldSchema.safeParse(undefined);
+                  const fieldDefaultResult = nestedFieldSchema.safeParse(undefined);
                   if (fieldDefaultResult.success) {
                     constructedDefaults[nestedKey] = fieldDefaultResult.data;
                   }
@@ -132,11 +125,7 @@ export function salvageValidData<T extends z.ZodObject<any>>(
 
           // Now try to salvage with whatever defaults we have
           if (isRecord(nestedDefaultValue)) {
-            salvaged[key] = salvageValidData(
-              objectSchema,
-              value,
-              nestedDefaultValue,
-            );
+            salvaged[key] = salvageValidData(objectSchema, value, nestedDefaultValue);
           } else {
             // No defaults at all - try direct parse
             const directParseResult = objectSchema.safeParse(value);

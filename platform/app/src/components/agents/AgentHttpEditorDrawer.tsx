@@ -124,10 +124,7 @@ export type AgentHttpEditorDrawerProps = {
   /** Current input mappings (from Evaluations V3) */
   inputMappings?: Record<string, FieldMapping>;
   /** Callback when input mappings change (for Evaluations V3) */
-  onInputMappingsChange?: (
-    identifier: string,
-    mapping: FieldMapping | undefined,
-  ) => void;
+  onInputMappingsChange?: (identifier: string, mapping: FieldMapping | undefined) => void;
 };
 
 // ============================================================================
@@ -152,9 +149,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     flowCallbacksForSave?.onSave ??
     (complexProps.onSave as AgentHttpEditorDrawerProps["onSave"]);
   const agentId =
-    props.agentId ??
-    drawerParams.agentId ??
-    (complexProps.agentId as string | undefined);
+    props.agentId ?? drawerParams.agentId ?? (complexProps.agentId as string | undefined);
   const isOpen = props.open !== false && props.open !== undefined;
 
   // Props from drawer params or direct props (for Evaluations V3)
@@ -171,9 +166,9 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange;
 
   // Local state for mappings (allows fast UI updates while persisting to store)
-  const [localMappings, setLocalMappings] = useState<
-    Record<string, FieldMapping>
-  >(initialInputMappings ?? {});
+  const [localMappings, setLocalMappings] = useState<Record<string, FieldMapping>>(
+    initialInputMappings ?? {},
+  );
 
   // Sync local mappings when initial mappings change (e.g., when drawer reopens)
   useEffect(() => {
@@ -214,13 +209,11 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   // Custom variables (in addition to fixed ones)
   const [customVariables, setCustomVariables] = useState<Variable[]>([]);
   // Scenario mappings (persisted on agent config, used by the HTTP adapter at runtime)
-  const [scenarioMappings, setScenarioMappings] = useState<
-    Record<string, FieldMapping>
-  >({});
-  // Default to variables tab when in evaluations context (has availableSources)
-  const [activeTab, setActiveTab] = useState(
-    showVariablesTab ? "variables" : "body",
+  const [scenarioMappings, setScenarioMappings] = useState<Record<string, FieldMapping>>(
+    {},
   );
+  // Default to variables tab when in evaluations context (has availableSources)
+  const [activeTab, setActiveTab] = useState(showVariablesTab ? "variables" : "body");
 
   // All variables = fixed + custom
   const variables = useMemo(() => {
@@ -308,9 +301,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       setOutputPath(DEFAULT_OUTPUT_PATH);
       setHeaders([]);
       setAuth({ type: "none" });
-      setScenarioMappings(
-        computeBestMatchMappings({ inputs: FIXED_VARIABLES }),
-      );
+      setScenarioMappings(computeBestMatchMappings({ inputs: FIXED_VARIABLES }));
       setHasUnsavedChanges(false);
       formInitializedRef.current = true;
     }
@@ -330,8 +321,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       onSave?.(agent);
       onClose();
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
   });
 
   const updateMutation = api.agents.update.useMutation({
@@ -344,8 +334,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       onSave?.(agent);
       onClose();
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't save agent" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save agent" }),
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -421,11 +410,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
 
   const handleClose = () => {
     if (hasUnsavedChanges) {
-      if (
-        !window.confirm(
-          "You have unsaved changes. Are you sure you want to close?",
-        )
-      ) {
+      if (!window.confirm("You have unsaved changes. Are you sure you want to close?")) {
         return;
       }
     }
@@ -468,9 +453,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                   <LuArrowLeft size={20} />
                 </Button>
               )}
-              <Heading>
-                {agentId ? "Edit HTTP Agent" : "New HTTP Agent"}
-              </Heading>
+              <Heading>{agentId ? "Edit HTTP Agent" : "New HTTP Agent"}</Heading>
             </HStack>
           </Drawer.Header>
           <Drawer.Body
@@ -534,11 +517,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                   overflow="hidden"
                   colorPalette="blue"
                 >
-                  <Tabs.List
-                    paddingX={6}
-                    borderBottomWidth="1px"
-                    borderColor="border"
-                  >
+                  <Tabs.List paddingX={6} borderBottomWidth="1px" borderColor="border">
                     <Tabs.Trigger value="body">Body</Tabs.Trigger>
                     {showVariablesTab && (
                       <Tabs.Trigger value="variables">Variables</Tabs.Trigger>
@@ -560,8 +539,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                       <Field.Root>
                         <Field.Label>Request Body Template</Field.Label>
                         <Text fontSize="sm" color="fg.muted" marginBottom={2}>
-                          JSON body with mustache variables. Variables are
-                          replaced at runtime.
+                          JSON body with mustache variables. Variables are replaced at
+                          runtime.
                         </Text>
                         <BodyTemplateEditor
                           value={bodyTemplate}
@@ -602,16 +581,11 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                       <VStack gap={4} align="stretch">
                         <Text fontSize="sm" color="fg.muted">
                           Define variables to use in your body template (e.g.,{" "}
-                          <Text
-                            as="span"
-                            fontFamily="mono"
-                            bg="bg.subtle"
-                            paddingX={1}
-                          >
+                          <Text as="span" fontFamily="mono" bg="bg.subtle" paddingX={1}>
                             {"{{input}}"}
                           </Text>
-                          ) and map them to your evaluation dataset. At least
-                          one variable must be mapped.
+                          ) and map them to your evaluation dataset. At least one variable
+                          must be mapped.
                         </Text>
                         <VariablesSection
                           title="Input Variables"

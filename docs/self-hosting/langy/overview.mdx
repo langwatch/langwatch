@@ -18,27 +18,34 @@ The GitHub App and outbound network egress are both optional and off until you c
 The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [opencode](/langy/how-langy-works) worker per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
 
 <Info>
-**Also check:** [Setup](/self-hosting/langy/setup), [Environment variables](/self-hosting/langy/environment-variables), [Networking and egress](/self-hosting/langy/networking-and-egress), [The sandbox](/langy/security/sandbox).
+  **Also check:** [Setup](/self-hosting/langy/setup), [Environment
+  variables](/self-hosting/langy/environment-variables), [Networking and
+  egress](/self-hosting/langy/networking-and-egress), [The
+  sandbox](/langy/security/sandbox).
 </Info>
 
 <Note>
-**Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every reference to it are removed on the next upgrade, and nothing else in the install changes. For opening Langy to a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is managed for you.
+  **Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every
+  reference to it are removed on the next upgrade, and nothing else in the install
+  changes. For opening Langy to a few projects before everyone, see [staged
+  rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is
+  managed for you.
 </Note>
 
 ## At a glance
 
-| | |
-|---|---|
-| Deployment | Separate `langyagent` Deployment + ConfigMap + Service + NetworkPolicy in the umbrella chart |
-| Default state | On (`langyagent.chartManaged: true`); disable with `chartManaged: false` |
-| Access | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead |
-| Replicas | 1 (render-time guard blocks more until conversation-sticky routing exists) |
-| Update strategy | `Recreate`, no HPA. Scale vertically. |
-| Sandbox | `runtimeClassName: gvisor` by default; unsandboxed only via explicit `acceptUnsandboxedRuntime: true` |
-| Sizing | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi |
-| Shared secret | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false` |
-| GitHub App | Optional, for bot-authored pull requests |
-| Outbound egress | Off by default (`networkPolicy.allowExternalHttps: false`) |
+|                 |                                                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Deployment      | Separate `langyagent` Deployment + ConfigMap + Service + NetworkPolicy in the umbrella chart                                  |
+| Default state   | On (`langyagent.chartManaged: true`); disable with `chartManaged: false`                                                      |
+| Access          | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead                                      |
+| Replicas        | 1 (render-time guard blocks more until conversation-sticky routing exists)                                                    |
+| Update strategy | `Recreate`, no HPA. Scale vertically.                                                                                         |
+| Sandbox         | `runtimeClassName: gvisor` by default; unsandboxed only via explicit `acceptUnsandboxedRuntime: true`                         |
+| Sizing          | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi                                                                      |
+| Shared secret   | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false` |
+| GitHub App      | Optional, for bot-authored pull requests                                                                                      |
+| Outbound egress | Off by default (`networkPolicy.allowExternalHttps: false`)                                                                    |
 
 ## Hard requirements
 
@@ -72,15 +79,29 @@ The control plane reaches the agent over cluster DNS at `http://<release>-langya
 
 <CardGroup cols={2}>
   <Card title="Setup" icon="ship" href="/self-hosting/langy/setup">
-    Deployed by default; the sandboxed runtime per cloud, egress, mirror, and staged rollout.
+    Deployed by default; the sandboxed runtime per cloud, egress, mirror, and staged
+    rollout.
   </Card>
-  <Card title="Register the GitHub App" icon="github" href="/self-hosting/langy/github-app">
-    Register the app, set the `GITHUB_LANGY_*` env vars, and install it on the repos Langy may touch.
+  <Card
+    title="Register the GitHub App"
+    icon="github"
+    href="/self-hosting/langy/github-app"
+  >
+    Register the app, set the `GITHUB_LANGY_*` env vars, and install it on the repos Langy
+    may touch.
   </Card>
-  <Card title="Environment variables" icon="rectangle-list" href="/self-hosting/langy/environment-variables">
+  <Card
+    title="Environment variables"
+    icon="rectangle-list"
+    href="/self-hosting/langy/environment-variables"
+  >
     The full `LANGY_*` and `GITHUB_LANGY_*` reference with defaults.
   </Card>
-  <Card title="Networking and egress" icon="network-wired" href="/self-hosting/langy/networking-and-egress">
+  <Card
+    title="Networking and egress"
+    icon="network-wired"
+    href="/self-hosting/langy/networking-and-egress"
+  >
     The NetworkPolicy, the FQDN floor, and the cooperative-vs-mandatory egress limit.
   </Card>
   <Card title="The sandbox" icon="shield-halved" href="/langy/security/sandbox">

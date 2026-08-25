@@ -44,10 +44,7 @@ import type {
 } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import {
-  estimateCost,
-  getMatchingLLMModelCost,
-} from "~/server/tracer/collector/cost";
+import { estimateCost, getMatchingLLMModelCost } from "~/server/tracer/collector/cost";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { generateOtelTraceId } from "~/utils/trace";
@@ -69,18 +66,12 @@ import {
   type ExecutionSummary,
   UNNAMED_FAILURE,
 } from "./types";
-import {
-  buildCellWorkflow,
-  buildEvaluatorCellWorkflow,
-} from "./workflowBuilder";
+import { buildCellWorkflow, buildEvaluatorCellWorkflow } from "./workflowBuilder";
 
 const logger = createLogger("experiments-v3:orchestrator");
 
 // Default concurrency limit (can be overridden via environment variable or request)
-const DEFAULT_CONCURRENCY = parseInt(
-  process.env.EVAL_V3_CONCURRENCY ?? "10",
-  10,
-);
+const DEFAULT_CONCURRENCY = parseInt(process.env.EVAL_V3_CONCURRENCY ?? "10", 10);
 
 /**
  * Input data required to run the orchestrator.
@@ -168,27 +159,18 @@ export const generateCells = (
   } = {},
 ): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
-  const datasetId =
-    state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+  const datasetId = state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
 
   // Handle evaluator-all-rows scope - run one evaluator across all rows with existing target outputs
   if (scope.type === "evaluator-all-rows") {
-    const targetConfig = state.targets.find(
-      (t: TargetConfig) => t.id === scope.targetId,
-    );
-    const evaluatorConfig = state.evaluators.find(
-      (e) => e.id === scope.evaluatorId,
-    );
+    const targetConfig = state.targets.find((t: TargetConfig) => t.id === scope.targetId);
+    const evaluatorConfig = state.evaluators.find((e) => e.id === scope.evaluatorId);
 
     // A comparison evaluator needs every variant's output, not one target's
     // — the same reason Phase 1 skips it (see the comparison-skip comment
     // below). Attaching it to a single-target cell here would silently
     // produce an empty input object rather than a real comparison run.
-    if (
-      !targetConfig ||
-      !evaluatorConfig ||
-      isComparisonEvaluator(evaluatorConfig)
-    )
+    if (!targetConfig || !evaluatorConfig || isComparisonEvaluator(evaluatorConfig))
       return cells;
 
     for (const [rowIndexStr, targetOutput] of Object.entries(
@@ -217,12 +199,8 @@ export const generateCells = (
 
   // Handle evaluator scope specially - single evaluator re-run with pre-computed target output
   if (scope.type === "evaluator") {
-    const targetConfig = state.targets.find(
-      (t: TargetConfig) => t.id === scope.targetId,
-    );
-    const evaluatorConfig = state.evaluators.find(
-      (e) => e.id === scope.evaluatorId,
-    );
+    const targetConfig = state.targets.find((t: TargetConfig) => t.id === scope.targetId);
+    const evaluatorConfig = state.evaluators.find((e) => e.id === scope.evaluatorId);
     const datasetEntry = datasetRows[scope.rowIndex];
 
     // See the matching guard in the evaluator-all-rows branch above — a
@@ -273,9 +251,7 @@ export const generateCells = (
   const expandComparisonDeps = (id: string): string[] => {
     const t = state.targets.find((tg: TargetConfig) => tg.id === id);
     if (t?.type !== "evaluator") return [id];
-    const deps = (toComparisonConfig(t)?.variants ?? []).filter(
-      (v): v is string => !!v,
-    );
+    const deps = (toComparisonConfig(t)?.variants ?? []).filter((v): v is string => !!v);
     if (deps.length === 0) return [id];
     return Array.from(new Set([...deps, id]));
   };
@@ -326,19 +302,14 @@ export const generateCells = (
         continue;
       }
 
-      const targetConfig = state.targets.find(
-        (t: TargetConfig) => t.id === targetId,
-      );
+      const targetConfig = state.targets.find((t: TargetConfig) => t.id === targetId);
       if (!targetConfig) continue;
 
       // Skip column-style comparison targets (pairwise #5100, N-way #5101)
       // in Phase 1 — they need every variant's output, which is not yet
       // available in a single per-target cell. Picked up by
       // generateComparisonCells in Phase 2.
-      if (
-        targetConfig.type === "evaluator" &&
-        isComparisonEvaluator(targetConfig)
-      ) {
+      if (targetConfig.type === "evaluator" && isComparisonEvaluator(targetConfig)) {
         continue;
       }
 
@@ -350,9 +321,7 @@ export const generateCells = (
         // once every variant's output exists — they would crash here because
         // the other candidates' outputs are not available within a single
         // per-target cell. See generateComparisonCells.
-        evaluatorConfigs: state.evaluators.filter(
-          (e) => !isComparisonEvaluator(e),
-        ),
+        evaluatorConfigs: state.evaluators.filter((e) => !isComparisonEvaluator(e)),
         datasetEntry: {
           _datasetId: datasetId,
           ...datasetEntry,
@@ -458,10 +427,8 @@ export const generateComparisonCells = ({
 }): { cells: ExecutionCell[]; skipReasons: ComparisonSkipReason[] } => {
   const cells: ExecutionCell[] = [];
   const skipReasons: ComparisonSkipReason[] = [];
-  const datasetId =
-    state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
-  const rowsInScope =
-    scopedRowIndices ?? datasetRows.map((_, rowIndex) => rowIndex);
+  const datasetId = state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+  const rowsInScope = scopedRowIndices ?? datasetRows.map((_, rowIndex) => rowIndex);
 
   /**
    * Structured-output narrowing: when the comparison config carries an output
@@ -474,11 +441,7 @@ export const generateComparisonCells = ({
     if (!path || path.length === 0) return output;
     let cursor: unknown = output;
     for (const segment of path) {
-      if (
-        cursor === null ||
-        typeof cursor !== "object" ||
-        Array.isArray(cursor)
-      ) {
+      if (cursor === null || typeof cursor !== "object" || Array.isArray(cursor)) {
         // LangWatch's runtime unwraps a single-output-field target's dict
         // back to a scalar at storage time, so a target declared with one
         // `output` field ends up stored as the plain string value. The
@@ -504,13 +467,8 @@ export const generateComparisonCells = ({
    * serializing the output a second time itself — `toCandidateText` is the one
    * place that turns an output into judge-readable text, structured or not.
    */
-  const evaluatorScoresBlock = (
-    rowIndex: number,
-    variantId: string,
-  ): string => {
-    const scores = completedTargetEvaluatorScores?.get(
-      `${rowIndex}:${variantId}`,
-    );
+  const evaluatorScoresBlock = (rowIndex: number, variantId: string): string => {
+    const scores = completedTargetEvaluatorScores?.get(`${rowIndex}:${variantId}`);
     if (!scores?.length) return "";
     const lines = scores
       .map((s) => {
@@ -586,15 +544,11 @@ export const generateComparisonCells = ({
    * detectComparisonColumns both accept target.id as a label, so it round-trips;
    * the handle is still shown as the display name via useTargetName.
    */
-  const buildVariantIdentifiers = (
-    resolvedVariants: TargetConfig[],
-  ): string[] => {
+  const buildVariantIdentifiers = (resolvedVariants: TargetConfig[]): string[] => {
     const raw = resolvedVariants.map(variantIdentifierFor);
     const counts = new Map<string, number>();
     for (const id of raw) counts.set(id, (counts.get(id) ?? 0) + 1);
-    return raw.map((id, i) =>
-      (counts.get(id) ?? 0) > 1 ? resolvedVariants[i]!.id : id,
-    );
+    return raw.map((id, i) => ((counts.get(id) ?? 0) > 1 ? resolvedVariants[i]!.id : id));
   };
 
   /**
@@ -627,9 +581,8 @@ export const generateComparisonCells = ({
    * twice reads as "support-detailed (1)" / "(2)" in the skip message, matching
    * the variant cards, instead of two identical names or two raw ids.
    */
-  const buildVariantDisplayNames = (
-    resolvedVariants: TargetConfig[],
-  ): string[] => disambiguateNames(resolvedVariants.map(variantDisplayNameFor));
+  const buildVariantDisplayNames = (resolvedVariants: TargetConfig[]): string[] =>
+    disambiguateNames(resolvedVariants.map(variantDisplayNameFor));
 
   /**
    * Resolve configured variant ids to their TargetConfigs, or null if
@@ -662,9 +615,7 @@ export const generateComparisonCells = ({
       );
       return null;
     }
-    const resolved = cfg.variants.map((id) =>
-      state.targets.find((t) => t.id === id),
-    );
+    const resolved = cfg.variants.map((id) => state.targets.find((t) => t.id === id));
     if (resolved.some((t) => !t)) {
       logger.warn(
         { ownerId, variants: cfg.variants },
@@ -698,9 +649,7 @@ export const generateComparisonCells = ({
    * (no `loadedEvaluators`, or the id isn't in it) — the safe default that
    * matches this function's pre-existing behavior.
    */
-  const isLegacyPairwiseBacked = (
-    dbEvaluatorId: string | undefined,
-  ): boolean => {
+  const isLegacyPairwiseBacked = (dbEvaluatorId: string | undefined): boolean => {
     if (!dbEvaluatorId) return false;
     const dbConfig = loadedEvaluators?.get(dbEvaluatorId)?.config as
       | { evaluatorType?: string }
@@ -762,9 +711,7 @@ export const generateComparisonCells = ({
     // skip the row silently; surface it as a skip reason instead, so a renamed
     // output field doesn't turn into a verdict computed from one fewer
     // candidate (or a bare "no verdict" for a two-way).
-    const empty = variantDisplayNames.filter(
-      (_, i) => candidates[i]!.output === "",
-    );
+    const empty = variantDisplayNames.filter((_, i) => candidates[i]!.output === "");
     if (empty.length > 0) return { empty };
 
     return { candidates: { candidates } };
@@ -849,8 +796,7 @@ export const generateComparisonCells = ({
     // isLegacyPairwiseBacked's JSDoc for why this can't just read
     // COMPARISON_EVALUATOR_TYPE off the target/cfg.
     const legacyPairwise =
-      isLegacyPairwiseBacked(target.targetEvaluatorId) &&
-      variantIds.length === 2;
+      isLegacyPairwiseBacked(target.targetEvaluatorId) && variantIds.length === 2;
 
     for (const rowIndex of rowsInScope) {
       const datasetEntry = datasetRows[rowIndex];
@@ -884,11 +830,7 @@ export const generateComparisonCells = ({
         (cfg.inputField ? datasetEntry[cfg.inputField] : undefined) ??
         datasetEntry.input ??
         (cfg.goldenField ? datasetEntry[cfg.goldenField] : undefined);
-      if (
-        resolvedInput === undefined &&
-        !cfg.hasGoldenAnswer &&
-        rowIndex === 0
-      ) {
+      if (resolvedInput === undefined && !cfg.hasGoldenAnswer && rowIndex === 0) {
         logger.debug(
           { targetId: target.id },
           "Comparison column-target: no 'input' dataset column and no golden field to fall back on (has_golden_answer is off) — judge prompt will render an empty task/input",
@@ -1118,12 +1060,9 @@ const evaluatorErrorResult = ({
   result: {
     status: "error",
     error_type: "EvaluatorError",
-    details:
-      error instanceof Error ? error.message : "Evaluator execution failed",
+    details: error instanceof Error ? error.message : "Evaluator execution failed",
     traceback: [],
-    ...(HandledError.isHandled(error)
-      ? { domainError: error.serialize() }
-      : {}),
+    ...(HandledError.isHandled(error) ? { domainError: error.serialize() } : {}),
   },
 });
 
@@ -1147,9 +1086,7 @@ async function* runCellEvaluators({
 }): AsyncGenerator<EvaluationV3Event> {
   const { cell, isAborted } = context;
 
-  for (const [evaluatorId, evaluatorNodeId] of Object.entries(
-    evaluatorNodeIds,
-  )) {
+  for (const [evaluatorId, evaluatorNodeId] of Object.entries(evaluatorNodeIds)) {
     if (isAborted && (await isAborted())) {
       logger.debug(
         { cell: cell.rowIndex, evaluatorId },
@@ -1215,9 +1152,7 @@ export async function* executeCell(
     const cellConfig: ResultMapperConfig = {
       ...resultMapperConfig,
       evaluatorTargetNodeIds:
-        cell.targetConfig.type === "evaluator"
-          ? new Set([cell.targetId])
-          : undefined,
+        cell.targetConfig.type === "evaluator" ? new Set([cell.targetId]) : undefined,
     };
 
     // Generate OTEL-compliant trace ID for this cell execution
@@ -1242,8 +1177,7 @@ export async function* executeCell(
         targetOutput = cell.precomputedTargetOutput as Record<string, unknown>;
       } else {
         // If it's a primitive value, wrap it in the expected output field
-        const outputField =
-          cell.targetConfig.outputs?.[0]?.identifier ?? "output";
+        const outputField = cell.targetConfig.outputs?.[0]?.identifier ?? "output";
         targetOutput = { [outputField]: cell.precomputedTargetOutput };
       }
     } else {
@@ -1333,11 +1267,7 @@ export async function* executeCell(
     }
 
     // Execute evaluators if target succeeded and we have evaluators
-    if (
-      !targetFailed &&
-      targetOutput &&
-      Object.keys(evaluatorNodeIds).length > 0
-    ) {
+    if (!targetFailed && targetOutput && Object.keys(evaluatorNodeIds).length > 0) {
       yield* runCellEvaluators({
         cell,
         projectId,
@@ -1494,10 +1424,7 @@ export async function* executeWorkflowCell({
       const { component_id, execution_state } = event.payload;
       if (!execution_state) continue;
 
-      if (
-        typeof execution_state.cost === "number" &&
-        execution_state.cost > 0
-      ) {
+      if (typeof execution_state.cost === "number" && execution_state.cost > 0) {
         totalCost += execution_state.cost;
         sawCost = true;
       } else {
@@ -1512,8 +1439,7 @@ export async function* executeWorkflowCell({
 
       if (
         evaluatorNodeNames.has(component_id) &&
-        (execution_state.status === "success" ||
-          execution_state.status === "error")
+        (execution_state.status === "success" || execution_state.status === "error")
       ) {
         evaluatorEvents.push(
           mapWorkflowEvaluatorResult(
@@ -1549,9 +1475,7 @@ export async function* executeWorkflowCell({
       // The engine's own words when it gave any; otherwise the marker, so the
       // client's fallback copy owns what the customer reads rather than a
       // sentence written here.
-      error: targetFailed
-        ? (targetFailure?.error ?? UNNAMED_FAILURE)
-        : undefined,
+      error: targetFailed ? (targetFailure?.error ?? UNNAMED_FAILURE) : undefined,
       ...(targetFailed && targetFailure?.errorType
         ? {
             domainError: nodeErrorToDomainError({
@@ -1572,11 +1496,7 @@ export async function* executeWorkflowCell({
     // part of the workflow and so did not run with it. Only reached when the
     // workflow produced a result: grading a row that never produced one would
     // score the absence of an answer rather than an answer.
-    if (
-      !targetFailed &&
-      targetOutputRecord &&
-      cell.evaluatorConfigs.length > 0
-    ) {
+    if (!targetFailed && targetOutputRecord && cell.evaluatorConfigs.length > 0) {
       const { workflow, evaluatorNodeIds } = buildEvaluatorCellWorkflow({
         projectId,
         cell,
@@ -1678,10 +1598,7 @@ export const buildEvaluatorInputs = (
     // Golden is optional (#5378). Only send it when the user opted into
     // golden-answer comparison AND picked a column. Missing either → the
     // judge sees no reference and compares candidates on their own merits.
-    if (
-      comparisonConfig.hasGoldenAnswer !== false &&
-      comparisonConfig.goldenField
-    ) {
+    if (comparisonConfig.hasGoldenAnswer !== false && comparisonConfig.goldenField) {
       inputs.golden = cell.datasetEntry[comparisonConfig.goldenField];
     }
 
@@ -1749,10 +1666,7 @@ export const buildEvaluatorInputs = (
       if (mapping.source === "dataset") {
         // From dataset entry - uses column name as key
         inputs[inputField] = cell.datasetEntry[mapping.sourceField];
-      } else if (
-        mapping.source === "target" &&
-        mapping.sourceId === cell.targetId
-      ) {
+      } else if (mapping.source === "target" && mapping.sourceId === cell.targetId) {
         // From target output
         inputs[inputField] = targetOutput[mapping.sourceField];
       }
@@ -1842,11 +1756,8 @@ export const buildTargetMetadata = ({
       // recorded one is what feeds the leaderboard's self-preference check,
       // so it would report independence from a model that never judged.
       const settings =
-        (
-          t.localEvaluatorConfig as
-            | { settings?: { model?: unknown } }
-            | undefined
-        )?.settings ??
+        (t.localEvaluatorConfig as { settings?: { model?: unknown } } | undefined)
+          ?.settings ??
         (
           loadedEvaluators?.get(t.targetEvaluatorId)?.config as
             | { settings?: { model?: unknown } }
@@ -1936,11 +1847,7 @@ export const buildTargetResultDispatch = ({
     };
   }
 
-  if (
-    event.type === "error" &&
-    event.rowIndex !== undefined &&
-    event.targetId
-  ) {
+  if (event.type === "error" && event.rowIndex !== undefined && event.targetId) {
     return {
       tenantId,
       runId,
@@ -2157,10 +2064,7 @@ export async function* runOrchestrator(
       });
     } catch (err) {
       chDispatchFailures++;
-      logger.error(
-        { err, runId },
-        "Failed to dispatch startExperimentRun to CH",
-      );
+      logger.error({ err, runId }, "Failed to dispatch startExperimentRun to CH");
       await abortManager.clearRunning(runId);
       throw err;
     }
@@ -2191,9 +2095,7 @@ export async function* runOrchestrator(
     // Dispatch to evaluation processing pipeline for per-trace eval CH writes.
     if (event.type === "evaluator_result") {
       const evalResult = event.result as SingleEvaluationResult;
-      const evaluatorConfig = state.evaluators.find(
-        (e) => e.id === event.evaluatorId,
-      );
+      const evaluatorConfig = state.evaluators.find((e) => e.id === event.evaluatorId);
 
       // Cache per-(row, target) evaluator scores so the Phase 2 comparison
       // judge can see what each variant already scored on its per-row
@@ -2276,9 +2178,7 @@ export async function* runOrchestrator(
               experimentId,
               event,
               datasetEntry:
-                event.rowIndex !== undefined
-                  ? (datasetRows[event.rowIndex] ?? {})
-                  : {},
+                event.rowIndex !== undefined ? (datasetRows[event.rowIndex] ?? {}) : {},
               occurredAt: Date.now(),
             })
           : null;
@@ -2287,16 +2187,11 @@ export async function* runOrchestrator(
         chDispatchTotal++;
         await commands.recordTargetResult(targetResultDispatch).catch((err) => {
           chDispatchFailures++;
-          logger.warn(
-            { err, runId },
-            "Failed to dispatch recordTargetResult to CH",
-          );
+          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
         });
       } else if (event.type === "evaluator_result") {
         const result = event.result as SingleEvaluationResult;
-        const evaluatorConfig = state.evaluators.find(
-          (e) => e.id === event.evaluatorId,
-        );
+        const evaluatorConfig = state.evaluators.find((e) => e.id === event.evaluatorId);
         const dbEvaluator = evaluatorConfig?.dbEvaluatorId
           ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
           : null;
@@ -2317,10 +2212,7 @@ export async function* runOrchestrator(
           )
           .catch((err) => {
             chDispatchFailures++;
-            logger.warn(
-              { err, runId },
-              "Failed to dispatch recordEvaluatorResult to CH",
-            );
+            logger.warn({ err, runId }, "Failed to dispatch recordEvaluatorResult to CH");
           });
       }
     }
@@ -2736,10 +2628,7 @@ export async function* runOrchestrator(
 
     // Emit stopped event if aborted
     if (aborted) {
-      logger.info(
-        { runId, completedCells, totalCells },
-        "Emitting stopped event",
-      );
+      logger.info({ runId, completedCells, totalCells }, "Emitting stopped event");
       yield {
         type: "stopped",
         reason: "user",
@@ -2769,10 +2658,7 @@ export async function* runOrchestrator(
         })
         .catch((err) => {
           chDispatchFailures++;
-          logger.warn(
-            { err, runId },
-            "Failed to dispatch completeExperimentRun to CH",
-          );
+          logger.warn({ err, runId }, "Failed to dispatch completeExperimentRun to CH");
         });
     }
   }
@@ -2850,12 +2736,9 @@ const getLoadedDataForTarget = (
       // workflow's own id (see loadPublishedWorkflow in dataLoader.ts).
       if (agent.type === "workflow") {
         const linkedWorkflowId =
-          agent.workflowId ??
-          (agent.config as { workflow_id?: string }).workflow_id;
+          agent.workflowId ?? (agent.config as { workflow_id?: string }).workflow_id;
         const workflow = linkedWorkflowId
-          ? loadedWorkflows?.get(
-              workflowLoadKey({ workflowId: linkedWorkflowId }),
-            )
+          ? loadedWorkflows?.get(workflowLoadKey({ workflowId: linkedWorkflowId }))
           : undefined;
         return { agent, workflow };
       }

@@ -22,21 +22,16 @@ vi.mock("~/utils/compat/next-router", () => ({
     query: routerState.query,
     pathname: "/onboarding/product",
     asPath: "/onboarding/product",
-    push: vi.fn(
-      (to: string | { pathname?: string; query?: Record<string, unknown> }) => {
-        // Mirror the real router: the pushed query becomes the next
-        // router.query, so the flow's URL-sync effects see their own writes.
-        if (typeof to === "object" && to.query) {
-          routerState.query = Object.fromEntries(
-            Object.entries(to.query).map(([key, value]) => [
-              key,
-              String(value),
-            ]),
-          );
-        }
-        return Promise.resolve(true);
-      },
-    ),
+    push: vi.fn((to: string | { pathname?: string; query?: Record<string, unknown> }) => {
+      // Mirror the real router: the pushed query becomes the next
+      // router.query, so the flow's URL-sync effects see their own writes.
+      if (typeof to === "object" && to.query) {
+        routerState.query = Object.fromEntries(
+          Object.entries(to.query).map(([key, value]) => [key, String(value)]),
+        );
+      }
+      return Promise.resolve(true);
+    }),
   }),
 }));
 

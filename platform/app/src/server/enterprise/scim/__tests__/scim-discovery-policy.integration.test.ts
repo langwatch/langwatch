@@ -30,22 +30,23 @@ const DISCOVERY_PATHS = [
 describe("Feature: SCIM 2.0 is published in the API reference", () => {
   describe("given the SCIM discovery endpoints", () => {
     /** @scenario "SCIM discovery endpoints declare an honest public policy" */
-    it.each(
-      DISCOVERY_PATHS,
-    )("answers %s without credentials, and declares itself public", async (path) => {
-      const response = await app.request(path);
+    it.each(DISCOVERY_PATHS)(
+      "answers %s without credentials, and declares itself public",
+      async (path) => {
+        const response = await app.request(path);
 
-      expect(response.status).toBe(200);
-      const body = (await response.json()) as { schemas: string[] };
-      expect(body.schemas[0]).toMatch(/^urn:ietf:params:scim:/);
+        expect(response.status).toBe(200);
+        const body = (await response.json()) as { schemas: string[] };
+        expect(body.schemas[0]).toMatch(/^urn:ietf:params:scim:/);
 
-      const policy = getRoutePolicy("GET", path)?.policy;
-      expect(policy, `${path} must declare an access policy`).toBeDefined();
-      expect(policy?.kind).toBe("public");
-      expect(policy?.kind === "public" ? policy.reason : "").toBe(
-        "SCIM discovery metadata is served without a credential so identity providers can negotiate capabilities before a token exists",
-      );
-    });
+        const policy = getRoutePolicy("GET", path)?.policy;
+        expect(policy, `${path} must declare an access policy`).toBeDefined();
+        expect(policy?.kind).toBe("public");
+        expect(policy?.kind === "public" ? policy.reason : "").toBe(
+          "SCIM discovery metadata is served without a credential so identity providers can negotiate capabilities before a token exists",
+        );
+      },
+    );
 
     it("keeps the provisioning routes declared internal in the registry", () => {
       // The counterpart the public declaration is only safe next to: opening
@@ -60,9 +61,7 @@ describe("Feature: SCIM 2.0 is published in the API reference", () => {
       const response = await app.request("/api/scim/v2/Users");
 
       expect(response.status).toBe(401);
-      expect(response.headers.get("content-type")).toContain(
-        "application/scim+json",
-      );
+      expect(response.headers.get("content-type")).toContain("application/scim+json");
     });
   });
 });

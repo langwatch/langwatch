@@ -54,16 +54,12 @@ describe("generateEvaluatorSlug", () => {
 
   /** @scenario Handle empty or whitespace-only names */
   it("throws error for empty name", () => {
-    expect(() => generateEvaluatorSlug("")).toThrow(
-      "Evaluator name cannot be empty",
-    );
+    expect(() => generateEvaluatorSlug("")).toThrow("Evaluator name cannot be empty");
   });
 
   /** @scenario Handle empty or whitespace-only names */
   it("throws error for whitespace-only name", () => {
-    expect(() => generateEvaluatorSlug("   ")).toThrow(
-      "Evaluator name cannot be empty",
-    );
+    expect(() => generateEvaluatorSlug("   ")).toThrow("Evaluator name cannot be empty");
   });
 
   /** @scenario Handle very long names */

@@ -7,9 +7,12 @@ describe("StoredObjectsPublicApi", () => {
   it("registers one rate-limited RPC family with explicit permissions", () => {
     const mounted: MountedRoute[] = [];
     const service = {} as StoredObjectServiceContract;
-    const builder = createService<unknown, {
-      storedObjects: StoredObjectServiceContract;
-    }>({
+    const builder = createService<
+      unknown,
+      {
+        storedObjects: StoredObjectServiceContract;
+      }
+    >({
       name: "stored-objects",
       basePath: "/api/stored-objects",
       app: () => ({ storedObjects: service }),

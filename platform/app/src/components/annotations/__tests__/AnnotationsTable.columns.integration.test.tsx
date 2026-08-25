@@ -2,13 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -117,13 +111,9 @@ vi.mock("~/features/langy/components/LangyContextTarget", () => ({
 // Kept as a marker rather than removed: whether the reviewer's own permissions
 // let them read the content is the point of the wrapper being there at all.
 vi.mock("~/components/ui/RedactedField", () => ({
-  RedactedField: ({
-    field,
-    children,
-  }: {
-    field: string;
-    children: React.ReactNode;
-  }) => <div data-testid={`redacted-${field}`}>{children}</div>,
+  RedactedField: ({ field, children }: { field: string; children: React.ReactNode }) => (
+    <div data-testid={`redacted-${field}`}>{children}</div>
+  ),
 }));
 vi.mock("~/components/me/PersonalFeatureGateDialog", () => ({
   PersonalFeatureGateDialog: () => null,
@@ -140,14 +130,9 @@ vi.mock("~/utils/downloadCsv", () => ({
 }));
 
 import { AnnotationsTable } from "../AnnotationsTable";
-import {
-  type AnnotationWithUser,
-  groupedAnnotationsToRows,
-} from "../annotationRow";
+import { type AnnotationWithUser, groupedAnnotationsToRows } from "../annotationRow";
 
-const annotation = (
-  overrides: Partial<AnnotationWithUser> = {},
-): AnnotationWithUser => ({
+const annotation = (overrides: Partial<AnnotationWithUser> = {}): AnnotationWithUser => ({
   id: "annotation-1",
   comment: null,
   expectedOutput: null,
@@ -222,9 +207,7 @@ const columnHeaders = () =>
 
 const openRowMenu = async (traceId: string) => {
   const user = userEvent.setup({ pointerEventsCheck: 0 });
-  await user.click(
-    screen.getByRole("button", { name: `Actions for trace ${traceId}` }),
-  );
+  await user.click(screen.getByRole("button", { name: `Actions for trace ${traceId}` }));
   return user;
 };
 
@@ -317,9 +300,7 @@ describe("AnnotationsTable columns and row actions", () => {
 
     /** @scenario "A finished queue item opens the trace drawer" */
     it("takes a finished row to the trace drawer", () => {
-      setItems([
-        { id: "item-1", traceId: "trace-1", doneAt: new Date("2026-08-03") },
-      ]);
+      setItems([{ id: "item-1", traceId: "trace-1", doneAt: new Date("2026-08-03") }]);
       renderQueuePage();
 
       fireEvent.click(screen.getByText("the question"));
@@ -380,15 +361,13 @@ describe("AnnotationsTable columns and row actions", () => {
       const scrollers = screen.getAllByTestId("annotations-table-scroll");
       expect(scrollers).toHaveLength(1);
       const scroller = scrollers[0]!;
-      expect(
-        scroller.contains(screen.getByRole("button", { name: /Status/ })),
-      ).toBe(false);
-      expect(
-        scroller.contains(screen.getByRole("button", { name: /Export/ })),
-      ).toBe(false);
-      expect(scroller.contains(screen.getByTestId("period-selector"))).toBe(
+      expect(scroller.contains(screen.getByRole("button", { name: /Status/ }))).toBe(
         false,
       );
+      expect(scroller.contains(screen.getByRole("button", { name: /Export/ }))).toBe(
+        false,
+      );
+      expect(scroller.contains(screen.getByTestId("period-selector"))).toBe(false);
     });
 
     /** @scenario "A queue page lists every pending item until a range is picked" */
@@ -398,9 +377,7 @@ describe("AnnotationsTable columns and row actions", () => {
       expect(mocks.queueReadArgs?.startDate).toBeUndefined();
       expect(mocks.queueReadArgs?.endDate).toBeUndefined();
       expect(screen.getByText("the question")).toBeInTheDocument();
-      expect(screen.getByTestId("period-selector")).toHaveTextContent(
-        "All time",
-      );
+      expect(screen.getByTestId("period-selector")).toHaveTextContent("All time");
     });
 
     describe("when the reviewer picks a date range", () => {
@@ -410,9 +387,7 @@ describe("AnnotationsTable columns and row actions", () => {
 
         expect(mocks.queueReadArgs?.startDate).toEqual(mocks.period.startDate);
         expect(mocks.queueReadArgs?.endDate).toEqual(mocks.period.endDate);
-        expect(screen.getByTestId("period-selector")).toHaveTextContent(
-          "Last 30 days",
-        );
+        expect(screen.getByTestId("period-selector")).toHaveTextContent("Last 30 days");
       });
 
       /** @scenario "A queue page can be put back to All time" */
@@ -569,24 +544,16 @@ describe("AnnotationsTable columns and row actions", () => {
 
       await user.hover(screen.getByTestId("annotation-comments-chip"));
 
-      expect(
-        await screen.findByText("still the reviewer's words"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText("Span span-abc123 · Input"),
-      ).not.toBeInTheDocument();
+      expect(await screen.findByText("still the reviewer's words")).toBeInTheDocument();
+      expect(screen.queryByText("Span span-abc123 · Input")).not.toBeInTheDocument();
     });
 
     /** @scenario "A row with no comments shows no chip" */
     it("shows no chip when nothing was said", () => {
-      setItems([
-        { id: "item-1", traceId: "trace-1", annotations: [annotation()] },
-      ]);
+      setItems([{ id: "item-1", traceId: "trace-1", annotations: [annotation()] }]);
       renderQueuePage();
 
-      expect(
-        screen.queryByTestId("annotation-comments-chip"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("annotation-comments-chip")).not.toBeInTheDocument();
     });
   });
 
@@ -604,9 +571,7 @@ describe("AnnotationsTable columns and row actions", () => {
       expect(headers).toContain("Helpfulness");
       expect(headers).toContain("Tone");
       expect(headers).not.toContain("Retired");
-      expect(screen.getAllByRole("row")[1]!.children).toHaveLength(
-        headers.length,
-      );
+      expect(screen.getAllByRole("row")[1]!.children).toHaveLength(headers.length);
     });
 
     /** @scenario "Score types that are all inactive add no columns" */
@@ -619,9 +584,7 @@ describe("AnnotationsTable columns and row actions", () => {
 
       const headers = columnHeaders();
       expect(headers).not.toContain("Retired");
-      expect(screen.getAllByRole("row")[1]!.children).toHaveLength(
-        headers.length,
-      );
+      expect(screen.getAllByRole("row")[1]!.children).toHaveLength(headers.length);
     });
   });
 
@@ -658,9 +621,7 @@ describe("AnnotationsTable columns and row actions", () => {
       await user.hover(chip);
 
       expect(await screen.findByText("a better answer")).toBeInTheDocument();
-      expect(
-        screen.getByText("thirty days, not thirty weeks"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("thirty days, not thirty weeks")).toBeInTheDocument();
       expect(screen.getByText("Bo")).toBeInTheDocument();
       expect(screen.getByText("Span span-abc123 · Output")).toBeInTheDocument();
     });
@@ -676,12 +637,8 @@ describe("AnnotationsTable columns and row actions", () => {
       ]);
       renderQueuePage();
 
-      expect(
-        screen.queryByTestId("annotation-suggestions-chip"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.getByTestId("annotation-comments-chip"),
-      ).toBeInTheDocument();
+      expect(screen.queryByTestId("annotation-suggestions-chip")).not.toBeInTheDocument();
+      expect(screen.getByTestId("annotation-comments-chip")).toBeInTheDocument();
     });
 
     /** @scenario "A queue page exports the rows on screen" */
@@ -744,21 +701,15 @@ describe("AnnotationsTable columns and row actions", () => {
     it("names its own window and offers no All time choice", () => {
       render(allPage([{ traceId: "trace-1", annotations: [] }]));
 
-      expect(screen.getByTestId("period-selector")).toHaveTextContent(
-        "Last 30 days",
-      );
-      expect(
-        screen.queryByRole("button", { name: "All time" }),
-      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("period-selector")).toHaveTextContent("Last 30 days");
+      expect(screen.queryByRole("button", { name: "All time" })).not.toBeInTheDocument();
     });
 
     /** @scenario "The all annotations page has no status filter" */
     it("offers no status filter", () => {
       render(allPage([{ traceId: "trace-1", annotations: [] }]));
 
-      expect(
-        screen.queryByRole("button", { name: /Status/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Status/ })).not.toBeInTheDocument();
     });
 
     /** @scenario "A row on the all annotations page opens the trace drawer" */

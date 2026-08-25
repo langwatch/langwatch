@@ -189,9 +189,7 @@ vi.mock("~/components/suites/SuiteDetailPanel", () => ({
   SuiteDetailPanel: ({ suite }: { suite: { name: string } }) => (
     <div data-testid="suite-detail-panel">{suite.name} details</div>
   ),
-  SuiteEmptyState: () => (
-    <div data-testid="suite-empty-state">No run plan selected</div>
-  ),
+  SuiteEmptyState: () => <div data-testid="suite-empty-state">No run plan selected</div>,
 }));
 
 vi.mock("~/components/suites/ExternalSetDetailPanel", () => ({

@@ -43,9 +43,7 @@ const { deniedRestore } = vi.hoisted(() => ({
 
 vi.mock("node:fs/promises", async () => {
   const actual =
-    await vi.importActual<typeof import("node:fs/promises")>(
-      "node:fs/promises",
-    );
+    await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
   return {
     ...actual,
     rename: async (from: string, to: string) => {
@@ -174,9 +172,7 @@ describe("given a stale lock several callers arrive at together", () => {
       };
 
       await Promise.all(
-        Array.from({ length: 4 }, () =>
-          withReplayLock({ database: key, run: body }),
-        ),
+        Array.from({ length: 4 }, () => withReplayLock({ database: key, run: body })),
       );
 
       expect(maxInside).toBe(1);
@@ -200,9 +196,7 @@ describe("given a holder whose lock was broken and taken by somebody else", () =
         },
       });
 
-      await expect(readFile(lockPath, "utf-8")).resolves.toBe(
-        "replacement-owner",
-      );
+      await expect(readFile(lockPath, "utf-8")).resolves.toBe("replacement-owner");
       await rm(lockPath, { force: true });
     });
   });

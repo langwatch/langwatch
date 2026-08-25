@@ -202,8 +202,7 @@ vi.mock("~/server/app-layer/app", async () => {
   const app = () => ({
     clickhouse: {
       enabled: true,
-      resolveClient: (tenantId: string) =>
-        clients.getClickHouseClientForTenant(tenantId),
+      resolveClient: (tenantId: string) => clients.getClickHouseClientForTenant(tenantId),
       resolveOrganizationClient: async () => {
         throw new Error("no organization client in this suite");
       },
@@ -238,15 +237,11 @@ async function projectedSearch({
   dateField?: "occurred" | "updated";
 }) {
   const compiled = compileProjection({ from, select, protections });
-  const results = await service.getAllTracesForProject(
-    makeQueryInput(),
-    protections,
-    {
-      downloadMode: true,
-      projection: compiled.plan,
-      dateField,
-    },
-  );
+  const results = await service.getAllTracesForProject(makeQueryInput(), protections, {
+    downloadMode: true,
+    projection: compiled.plan,
+    dateField,
+  });
   expect(results).not.toBeNull();
   const enriched = enrichTracesWithEvaluations({
     traces: results!.groups.flat(),
@@ -264,9 +259,7 @@ beforeAll(async () => {
   annotationFindMany = vi.mocked(prisma.annotation.findMany);
   annotationScoreFindMany = vi.mocked(prisma.annotationScore.findMany);
   service = new ClickHouseTraceService({
-    prisma: prisma as ConstructorParameters<
-      typeof ClickHouseTraceService
-    >[0]["prisma"],
+    prisma: prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]["prisma"],
   });
 
   await insert({
@@ -313,18 +306,12 @@ beforeAll(async () => {
       createdAt: new Date(now),
     },
   ]);
-  annotationScoreFindMany.mockResolvedValue([
-    { id: QUALITY_SCORE_ID, name: "quality" },
-  ]);
+  annotationScoreFindMany.mockResolvedValue([{ id: QUALITY_SCORE_ID, name: "quality" }]);
 }, 60_000);
 
 afterAll(async () => {
   if (ch) {
-    for (const table of [
-      "trace_summaries",
-      "stored_spans",
-      "evaluation_runs",
-    ]) {
+    for (const table of ["trace_summaries", "stored_spans", "evaluation_runs"]) {
       await ch.exec({
         query: `ALTER TABLE ${table} DELETE WHERE TenantId = {tenantId:String}`,
         query_params: { tenantId },
@@ -356,12 +343,7 @@ describe("trace search projection (integration)", () => {
       /** @scenario "Projected event details are redacted when captured input is not visible" */
       it("redacts event detail values but keeps types and metrics", async () => {
         const rows = await projectedSearch({
-          select: [
-            "trace_id",
-            "events.type",
-            "events.metrics",
-            "events.details",
-          ],
+          select: ["trace_id", "events.type", "events.metrics", "events.details"],
           protections: {
             canSeeCosts: true,
             canSeeCapturedInput: false,
@@ -389,11 +371,7 @@ describe("trace search projection (integration)", () => {
       /** @scenario "Select annotation fields returned as nested array" */
       it("returns annotations joined from Postgres as a nested array", async () => {
         const rows = await projectedSearch({
-          select: [
-            "trace_id",
-            "annotations.is_thumbs_up",
-            "annotations.scores",
-          ],
+          select: ["trace_id", "annotations.is_thumbs_up", "annotations.scores"],
         });
 
         const row = rows.find((r) => r.trace_id === traceId);
@@ -419,9 +397,7 @@ describe("trace search projection (integration)", () => {
         });
 
         const row = rows.find((r) => r.trace_id === traceId);
-        expect(row?.evaluations).toEqual([
-          { name: "Faithfulness", score: 0.91 },
-        ]);
+        expect(row?.evaluations).toEqual([{ name: "Faithfulness", score: 0.91 }]);
       });
     });
   });

@@ -69,9 +69,7 @@ describe("given an instant to hand the database", () => {
     /** @scenario "The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant" */
     it("spells it as a space-separated UTC date-time with no zone designator", () => {
       expect(
-        formatLangWatchQLDateTimeParameter(
-          new Date("2026-02-20T12:34:56.000Z"),
-        ),
+        formatLangWatchQLDateTimeParameter(new Date("2026-02-20T12:34:56.000Z")),
       ).toBe("2026-02-20 12:34:56");
     });
 
@@ -88,27 +86,19 @@ describe("given an instant to hand the database", () => {
       );
       // The same instant written the way `toISOString` would: the `T` and the
       // `Z` are exactly what the DateTime binding does not read.
-      expect(formatLangWatchQLDateTimeParameter(acrossMidnight)).not.toContain(
-        "T",
-      );
-      expect(formatLangWatchQLDateTimeParameter(acrossMidnight)).not.toContain(
-        "Z",
-      );
+      expect(formatLangWatchQLDateTimeParameter(acrossMidnight)).not.toContain("T");
+      expect(formatLangWatchQLDateTimeParameter(acrossMidnight)).not.toContain("Z");
     });
 
     /** @scenario "The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant" */
     it("truncates below the second and pads every field to its width", () => {
       expect(
-        formatLangWatchQLDateTimeParameter(
-          new Date("2026-02-03T04:05:06.789Z"),
-        ),
+        formatLangWatchQLDateTimeParameter(new Date("2026-02-03T04:05:06.789Z")),
       ).toBe("2026-02-03 04:05:06");
     });
 
     it("refuses an invalid date rather than spelling it as text", () => {
-      expect(() =>
-        formatLangWatchQLDateTimeParameter(new Date("nonsense")),
-      ).toThrow();
+      expect(() => formatLangWatchQLDateTimeParameter(new Date("nonsense"))).toThrow();
     });
   });
 });
@@ -125,13 +115,7 @@ describe("given a declared parameter type", () => {
       ]) {
         expect(isLangWatchQLDateTimeParameterType(type), type).toBe(true);
       }
-      for (const type of [
-        "String",
-        "UInt64",
-        "Date",
-        "Date32",
-        "Nullable(DateTime)",
-      ]) {
+      for (const type of ["String", "UInt64", "Date", "Date32", "Nullable(DateTime)"]) {
         expect(isLangWatchQLDateTimeParameterType(type), type).toBe(false);
       }
     });
@@ -216,8 +200,7 @@ describe("given a statement and the window a surface is showing", () => {
 
     it("leaves an unparameterised statement with no parameters at all", () => {
       expect(
-        resolveLangWatchQLTimeWindow({ declared: [], timeWindow: WINDOW })
-          .parameters,
+        resolveLangWatchQLTimeWindow({ declared: [], timeWindow: WINDOW }).parameters,
       ).toBeUndefined();
     });
   });
@@ -269,10 +252,7 @@ describe("given a statement and the window a surface is showing", () => {
     it("defers the declared reserved names rather than refusing them", () => {
       const resolved = resolveLangWatchQLTimeWindow({ declared: PERIOD });
 
-      expect(resolved.awaitingTimeWindow).toEqual([
-        "period_end",
-        "period_start",
-      ]);
+      expect(resolved.awaitingTimeWindow).toEqual(["period_end", "period_start"]);
       expect(resolved.followsTimeWindow).toBe(true);
       expect(resolved.parameters).toBeUndefined();
     });

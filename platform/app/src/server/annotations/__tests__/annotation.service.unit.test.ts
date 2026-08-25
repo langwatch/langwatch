@@ -23,15 +23,9 @@ function createMockRepository(overrides?: {
   };
 
   return {
-    create: vi
-      .fn()
-      .mockResolvedValue(overrides?.createResult ?? defaultAnnotation),
-    update: vi
-      .fn()
-      .mockResolvedValue(overrides?.updateResult ?? defaultAnnotation),
-    delete: vi
-      .fn()
-      .mockResolvedValue(overrides?.deleteResult ?? defaultAnnotation),
+    create: vi.fn().mockResolvedValue(overrides?.createResult ?? defaultAnnotation),
+    update: vi.fn().mockResolvedValue(overrides?.updateResult ?? defaultAnnotation),
+    delete: vi.fn().mockResolvedValue(overrides?.deleteResult ?? defaultAnnotation),
   } as unknown as AnnotationRepository;
 }
 

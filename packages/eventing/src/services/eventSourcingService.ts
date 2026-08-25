@@ -7,14 +7,8 @@ import { createTenantId } from "../domain/tenantId";
 import type { Event, Projection } from "../domain/types";
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import { ProjectionRouter } from "../projections/projectionRouter";
-import type {
-  DeduplicationConfig,
-  EventSourcedQueueProcessor,
-} from "../queues";
-import type {
-  EventStore,
-  EventStoreReadContext,
-} from "../stores/eventStore.types";
+import type { DeduplicationConfig, EventSourcedQueueProcessor } from "../queues";
+import type { EventStore, EventStoreReadContext } from "../stores/eventStore.types";
 import { EventUtils } from "../utils/event.utils";
 import type {
   EventSourcingOptions,
@@ -30,10 +24,7 @@ import { QueueManager } from "./queues/queueManager";
  */
 export class EventSourcingService<
   EventType extends Event = Event,
-  ProjectionTypes extends Record<string, Projection> = Record<
-    string,
-    Projection
-  >,
+  ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
 > {
   private readonly tracer = getLangWatchTracer(
     "langwatch.trace-processing.event-sourcing-service",
@@ -83,8 +74,7 @@ export class EventSourcingService<
     this.eventStore = eventStore;
     this.options = serviceOptions ?? {};
     this.logger =
-      logger ??
-      createLogger("langwatch.trace-processing.event-sourcing-service");
+      logger ?? createLogger("langwatch.trace-processing.event-sourcing-service");
     this.globalRegistry = globalRegistry;
     this.prepareEventForProjection = prepareEventForProjection ?? ((event) => event);
     this.metrics = metrics;
@@ -138,9 +128,7 @@ export class EventSourcingService<
               capturedAggregateType,
               ctx.occurredAtMs,
             );
-            return [...events].sort(
-              (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
-            );
+            return [...events].sort((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
           };
         }
         // Companion loader for refoldOnStoreMiss: history up to AND including
@@ -161,9 +149,7 @@ export class EventSourcingService<
               capturedAggregateType,
               ctx.upToEvent as EventType,
             );
-            return [...events].sort(
-              (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
-            );
+            return [...events].sort((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
           };
         }
         // Paginated companion loader for the store-miss re-fold streaming path.
@@ -171,11 +157,7 @@ export class EventSourcingService<
         // through it so a huge aggregate's history never lands in memory whole.
         // No occurredAt re-sort: the streaming path is used only for
         // order-insensitive folds, where page order is immaterial.
-        if (
-          !fold.eventLoaderUpToPaged &&
-          eventStore &&
-          eventStore.getEventsUpToPaged
-        ) {
+        if (!fold.eventLoaderUpToPaged && eventStore && eventStore.getEventsUpToPaged) {
           const capturedAggregateType = aggregateType;
           const capturedEventStore = eventStore;
           fold.eventLoaderUpToPaged = async (ctx: {
@@ -228,9 +210,7 @@ export class EventSourcingService<
               capturedAggregateType,
               ctx.upToEvent as EventType,
             );
-            return [...events].sort(
-              (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
-            );
+            return [...events].sort((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
           };
         }
         this.router.registerMapProjection(mapProj);
@@ -284,11 +264,7 @@ export class EventSourcingService<
     }
 
     // Command queues always initialize — they're needed for dispatching
-    if (
-      globalQueue &&
-      commandRegistrations &&
-      commandRegistrations.length > 0
-    ) {
+    if (globalQueue && commandRegistrations && commandRegistrations.length > 0) {
       this.queueManager.initializeCommandQueues(
         commandRegistrations,
         this.storeEvents.bind(this),
@@ -336,8 +312,7 @@ export class EventSourcingService<
         }
 
         // Pre-fetch traceparent once for the batch
-        const currentTraceparent =
-          EventUtils.getCurrentTraceparentFromActiveSpan();
+        const currentTraceparent = EventUtils.getCurrentTraceparentFromActiveSpan();
 
         // Enrich events with trace context if missing (for debugging)
         const enrichedEvents: EventType[] = events.map((event) => {
@@ -362,11 +337,7 @@ export class EventSourcingService<
         });
 
         span.addEvent("event_store.store.start");
-        await this.eventStore.storeEvents(
-          enrichedEvents,
-          context,
-          this.aggregateType,
-        );
+        await this.eventStore.storeEvents(enrichedEvents, context, this.aggregateType);
         span.addEvent("event_store.store.complete");
 
         // ADR-022: Derive lean shapes for projection dispatch.
@@ -390,8 +361,7 @@ export class EventSourcingService<
             span.addEvent("projection.dispatch.complete");
           } catch (error) {
             span.addEvent("projection.dispatch.error", {
-              "error.message":
-                error instanceof Error ? error.message : String(error),
+              "error.message": error instanceof Error ? error.message : String(error),
             });
             if (this.logger) {
               const subErrors =
@@ -426,8 +396,7 @@ export class EventSourcingService<
             span.addEvent("global_projection.dispatch.complete");
           } catch (error) {
             span.addEvent("global_projection.dispatch.error", {
-              "error.message":
-                error instanceof Error ? error.message : String(error),
+              "error.message": error instanceof Error ? error.message : String(error),
             });
             this.logger.error(
               {
@@ -442,10 +411,7 @@ export class EventSourcingService<
 
         // Record throughput and duration metrics
         this.metrics?.eventsStored(this.pipelineName, enrichedEvents.length);
-        this.metrics?.storeDuration(
-          this.pipelineName,
-          performance.now() - storeStart,
-        );
+        this.metrics?.storeDuration(this.pipelineName, performance.now() - storeStart);
       },
     );
   }
@@ -453,28 +419,19 @@ export class EventSourcingService<
   /**
    * Gets a specific fold projection by name for a given aggregate.
    */
-  async getProjectionByName<
-    ProjectionName extends keyof ProjectionTypes & string,
-  >(
+  async getProjectionByName<ProjectionName extends keyof ProjectionTypes & string>(
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
     options?: { key?: string },
   ): Promise<ProjectionTypes[ProjectionName] | null> {
-    return this.router.getProjectionByName(
-      projectionName,
-      aggregateId,
-      context,
-      options,
-    );
+    return this.router.getProjectionByName(projectionName, aggregateId, context, options);
   }
 
   /**
    * Checks if a specific fold projection exists for a given aggregate.
    */
-  async hasProjectionByName<
-    ProjectionName extends keyof ProjectionTypes & string,
-  >(
+  async hasProjectionByName<ProjectionName extends keyof ProjectionTypes & string>(
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,

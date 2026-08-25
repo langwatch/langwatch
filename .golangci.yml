@@ -17,49 +17,49 @@ linters:
   # ── Additional linters, grouped by intent ──────────────────────────────
   enable:
     # Bug prevention — these catch real production issues.
-    - bodyclose        # unclosed HTTP response bodies leak file descriptors
-    - durationcheck    # duration × duration is always wrong
-    - exhaustive       # missing enum cases in switches
-    - fatcontext       # context.WithValue in a loop leaks memory
-    - nilerr           # returning nil when err != nil
-    - nilnesserr       # checking err but returning a different nil
-    - noctx            # HTTP requests without context.Context
-    - spancheck        # OTel spans not ended or status not set
-    - sqlclosecheck    # unclosed sql.Rows / Stmt
+    - bodyclose # unclosed HTTP response bodies leak file descriptors
+    - durationcheck # duration × duration is always wrong
+    - exhaustive # missing enum cases in switches
+    - fatcontext # context.WithValue in a loop leaks memory
+    - nilerr # returning nil when err != nil
+    - nilnesserr # checking err but returning a different nil
+    - noctx # HTTP requests without context.Context
+    - spancheck # OTel spans not ended or status not set
+    - sqlclosecheck # unclosed sql.Rows / Stmt
 
     # Code quality — reduces accidental complexity.
-    - gocritic         # broad opinionated diagnostics
-    - unconvert        # useless type conversions
-    - unparam          # unused function parameters (dead API surface)
-    - wastedassign     # writes never read
-    - recvcheck        # mixed pointer/value receivers on same type
-    - errorlint        # correct use of errors.Is/As
+    - gocritic # broad opinionated diagnostics
+    - unconvert # useless type conversions
+    - unparam # unused function parameters (dead API surface)
+    - wastedassign # writes never read
+    - recvcheck # mixed pointer/value receivers on same type
+    - errorlint # correct use of errors.Is/As
 
     # Security — static analysis for vulnerabilities.
-    - gosec            # inspects source code for security problems
+    - gosec # inspects source code for security problems
 
     # House rules — the SRP limits /.coderabbit.yaml states as prose in its
     # AC7 block. These carry a pre-existing baseline, so go-ci gates them via
     # `--new-from-merge-base` (new and changed lines only), not the full tree.
     # Delete the matching FAIL clauses from .coderabbit.yaml as each lands, or
     # every violation gets reported twice — once here, once by the reviewer.
-    - funlen           # 60-line / 40-statement function cap
-    - gocognit         # cognitive complexity > 10
-    - revive           # argument-limit + doc comments on exported symbols
+    - funlen # 60-line / 40-statement function cap
+    - gocognit # cognitive complexity > 10
+    - revive # argument-limit + doc comments on exported symbols
 
     # Hygiene — keeps the codebase tidy.
-    - dupword          # repeated words in comments
-    - misspell         # typos in identifiers and comments
-    - nolintlint       # nolint directives must be specific + explained
-    - predeclared      # shadowing builtins (nil, len, cap, etc.)
-    - tagalign         # aligned, consistently ordered struct tags
-    - usestdlibvars    # http.MethodGet instead of "GET", etc.
-    - whitespace       # stray blank lines at start/end of blocks
+    - dupword # repeated words in comments
+    - misspell # typos in identifiers and comments
+    - nolintlint # nolint directives must be specific + explained
+    - predeclared # shadowing builtins (nil, len, cap, etc.)
+    - tagalign # aligned, consistently ordered struct tags
+    - usestdlibvars # http.MethodGet instead of "GET", etc.
+    - whitespace # stray blank lines at start/end of blocks
 
     # Testing — better assertions and helpers.
-    - testifylint      # idiomatic testify usage
-    - thelper          # test helpers missing t.Helper()
-    - usetesting       # prefer testing pkg equivalents
+    - testifylint # idiomatic testify usage
+    - thelper # test helpers missing t.Helper()
+    - usetesting # prefer testing pkg equivalents
 
   settings:
     gocritic:
@@ -67,8 +67,8 @@ linters:
         - diagnostic
         - performance
       disabled-checks:
-        - ifElseChain       # style preference, not a defect
-        - hugeParam         # too noisy with domain structs
+        - ifElseChain # style preference, not a defect
+        - hugeParam # too noisy with domain structs
 
     exhaustive:
       default-signifies-exhaustive: true
@@ -96,7 +96,7 @@ linters:
           arguments: ["sayRepetitiveInsteadOfStutters"]
 
     errorlint:
-      asserts: false  # type assertions on error are fine internally
+      asserts: false # type assertions on error are fine internally
 
     misspell:
       locale: US
@@ -115,12 +115,12 @@ linters:
 
     gosec:
       excludes:
-        - G101  # false positives on OTel attribute names and test tokens
-        - G104  # already covered by errcheck
-        - G115  # integer narrowing — reviewed case-by-case
-        - G304  # file path from variable is fine in a server
-        - G602  # slice bounds — guarded by upstream length checks
-        - G705  # XSS — gateway proxies JSON/SSE, not HTML
+        - G101 # false positives on OTel attribute names and test tokens
+        - G104 # already covered by errcheck
+        - G115 # integer narrowing — reviewed case-by-case
+        - G304 # file path from variable is fine in a server
+        - G602 # slice bounds — guarded by upstream length checks
+        - G705 # XSS — gateway proxies JSON/SSE, not HTML
 
     tagalign:
       align: true

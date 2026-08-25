@@ -128,12 +128,8 @@ export async function startReplicaPair({
   try {
     for (let i = 0; i < 2; i++) {
       const handler = createMcpHandler();
-      const server = createServer((req, res) =>
-        handler.handleRequest(req, res),
-      );
-      await new Promise<void>((resolve) =>
-        server.listen(0, "127.0.0.1", resolve),
-      );
+      const server = createServer((req, res) => handler.handleRequest(req, res));
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
       const address = server.address();
       if (typeof address !== "object" || !address) {
         throw new Error("a replica reported no address after listening");
@@ -235,8 +231,7 @@ export async function openSseStream({
 
           const data = /^data:\s*(.*)$/m.exec(frame)?.[1]?.trim();
           if (data === undefined) continue;
-          const event =
-            /^event:\s*(.*)$/m.exec(frame)?.[1]?.trim() ?? "message";
+          const event = /^event:\s*(.*)$/m.exec(frame)?.[1]?.trim() ?? "message";
           if (event === "endpoint") {
             resolveEndpoint(data);
             continue;

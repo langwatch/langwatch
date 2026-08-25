@@ -138,23 +138,19 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.queryByTestId("charts-container")).toBeInTheDocument();
     });
 
     it("renders charts for single run with multiple targets", () => {
-      const comparisonData = [
-        createMockRunData("run-1", Date.now(), { targetCount: 2 }),
-      ];
+      const comparisonData = [createMockRunData("run-1", Date.now(), { targetCount: 2 })];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.queryByTestId("charts-container")).toBeInTheDocument();
     });
@@ -187,10 +183,7 @@ describe("ComparisonCharts", () => {
       };
 
       const { container } = render(
-        <ComparisonCharts
-          comparisonData={[singleTargetRun]}
-          isVisible={true}
-        />,
+        <ComparisonCharts comparisonData={[singleTargetRun]} isVisible={true} />,
         { wrapper: Wrapper },
       );
 
@@ -205,10 +198,9 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now(), { hasScores: true }),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       // Should have a chart for "Accuracy" evaluator score
       expect(screen.getByTestId("chart-score-accuracy")).toBeInTheDocument();
@@ -221,10 +213,9 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now(), { hasPassRates: true }),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       // Should have a chart for "Exact Match" evaluator pass rate
       expect(screen.getByTestId("chart-pass-exact_match")).toBeInTheDocument();
@@ -237,10 +228,9 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       // Recharts legend elements should not be present
       const _charts = screen.queryAllByRole("img"); // Recharts uses role="img" for some legend items
@@ -256,10 +246,9 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByTestId("metrics-selector-button")).toBeInTheDocument();
     });
@@ -271,10 +260,9 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByTestId("metrics-selector-button"));
 
@@ -288,10 +276,9 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByTestId("metrics-selector-button"));
 
@@ -300,12 +287,8 @@ describe("ComparisonCharts", () => {
       // Should list cost, latency, and per-evaluator metrics
       expect(within(dropdown).getByText("Total Cost")).toBeInTheDocument();
       expect(within(dropdown).getByText("Avg Latency")).toBeInTheDocument();
-      expect(
-        within(dropdown).getByText("Accuracy (Score)"),
-      ).toBeInTheDocument();
-      expect(
-        within(dropdown).getByText("Exact Match (Pass Rate)"),
-      ).toBeInTheDocument();
+      expect(within(dropdown).getByText("Accuracy (Score)")).toBeInTheDocument();
+      expect(within(dropdown).getByText("Exact Match (Pass Rate)")).toBeInTheDocument();
     });
 
     it("hides chart when metric is deselected", async () => {
@@ -315,10 +298,9 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       // Cost chart should be visible initially
       expect(screen.getByTestId("chart-cost")).toBeInTheDocument();
@@ -340,10 +322,9 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByTestId("xaxis-selector")).toBeInTheDocument();
       expect(screen.getByTestId("group-by-button")).toBeInTheDocument();
@@ -356,10 +337,9 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now(), { targetCount: 2 }),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       // Open dropdown
       await user.click(screen.getByTestId("group-by-button"));
@@ -374,10 +354,9 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       // Open dropdown
       await user.click(screen.getByTestId("group-by-button"));
@@ -388,9 +367,7 @@ describe("ComparisonCharts", () => {
       await user.click(targetButton);
 
       // Dropdown should close, button should now say "Group by: Target"
-      expect(screen.getByTestId("group-by-button")).toHaveTextContent(
-        "Group by: Target",
-      );
+      expect(screen.getByTestId("group-by-button")).toHaveTextContent("Group by: Target");
 
       // Open dropdown again
       await user.click(screen.getByTestId("group-by-button"));
@@ -398,26 +375,19 @@ describe("ComparisonCharts", () => {
       // Click back to Runs
       await user.click(screen.getByTestId("xaxis-option-runs"));
 
-      expect(screen.getByTestId("group-by-button")).toHaveTextContent(
-        "Group by: Runs",
-      );
+      expect(screen.getByTestId("group-by-button")).toHaveTextContent("Group by: Runs");
     });
 
     it("defaults to target X-axis for single run with multiple targets", async () => {
       const user = userEvent.setup();
-      const comparisonData = [
-        createMockRunData("run-1", Date.now(), { targetCount: 3 }),
-      ];
+      const comparisonData = [createMockRunData("run-1", Date.now(), { targetCount: 3 })];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       // Should default to "Target" for single run with multiple targets
-      expect(screen.getByTestId("group-by-button")).toHaveTextContent(
-        "Group by: Target",
-      );
+      expect(screen.getByTestId("group-by-button")).toHaveTextContent("Group by: Target");
 
       // Open dropdown - Target option should be available
       await user.click(screen.getByTestId("group-by-button"));
@@ -462,10 +432,7 @@ describe("ComparisonCharts", () => {
           };
 
           render(
-            <ComparisonCharts
-              comparisonData={[evaluatorOnlyRun]}
-              isVisible={true}
-            />,
+            <ComparisonCharts comparisonData={[evaluatorOnlyRun]} isVisible={true} />,
             { wrapper: Wrapper },
           );
 
@@ -510,10 +477,7 @@ describe("ComparisonCharts", () => {
           };
 
           render(
-            <ComparisonCharts
-              comparisonData={[virtualEvalRun]}
-              isVisible={true}
-            />,
+            <ComparisonCharts comparisonData={[virtualEvalRun]} isVisible={true} />,
             { wrapper: Wrapper },
           );
 
@@ -535,10 +499,9 @@ describe("ComparisonCharts", () => {
         }),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       // Open dropdown
       await user.click(screen.getByTestId("group-by-button"));
@@ -558,10 +521,9 @@ describe("ComparisonCharts", () => {
         }),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       // Open dropdown
       await user.click(screen.getByTestId("group-by-button"));
@@ -569,9 +531,7 @@ describe("ComparisonCharts", () => {
       // Should show Prompt option (version is no longer separate)
       expect(screen.getByTestId("xaxis-option-prompt")).toBeInTheDocument();
       // Version should NOT be a separate option
-      expect(
-        screen.queryByTestId("xaxis-option-version"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("xaxis-option-version")).not.toBeInTheDocument();
     });
 
     it("shows custom metadata keys as group by options", async () => {
@@ -585,21 +545,16 @@ describe("ComparisonCharts", () => {
         }),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       // Open dropdown
       await user.click(screen.getByTestId("group-by-button"));
 
       // Should show custom metadata keys as options
-      expect(
-        screen.getByTestId("xaxis-option-custom_field"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByTestId("xaxis-option-another_key"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("xaxis-option-custom_field")).toBeInTheDocument();
+      expect(screen.getByTestId("xaxis-option-another_key")).toBeInTheDocument();
     });
 
     it("can switch group by to Model and back", async () => {
@@ -613,27 +568,22 @@ describe("ComparisonCharts", () => {
         }),
       ];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       // Open dropdown and select Model
       await user.click(screen.getByTestId("group-by-button"));
       await user.click(screen.getByTestId("xaxis-option-model"));
 
       // Should now show "Group by: Model"
-      expect(screen.getByTestId("group-by-button")).toHaveTextContent(
-        "Group by: Model",
-      );
+      expect(screen.getByTestId("group-by-button")).toHaveTextContent("Group by: Model");
 
       // Switch back to Runs
       await user.click(screen.getByTestId("group-by-button"));
       await user.click(screen.getByTestId("xaxis-option-runs"));
 
-      expect(screen.getByTestId("group-by-button")).toHaveTextContent(
-        "Group by: Runs",
-      );
+      expect(screen.getByTestId("group-by-button")).toHaveTextContent("Group by: Runs");
     });
   });
 
@@ -646,10 +596,9 @@ describe("ComparisonCharts", () => {
       // Pass in reverse order (newer first)
       const comparisonData = [newerRun, olderRun];
 
-      render(
-        <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+        wrapper: Wrapper,
+      });
 
       // The component should internally sort by createdAt
       // Charts should render successfully
@@ -876,20 +825,11 @@ describe("ComparisonCharts", () => {
         const rows = createMultiTargetRows();
 
         // GPT-4: 0.01 + 0.01 = 0.02
-        expect(computeTargetMetrics(rows, "gpt-4").totalCost).toBeCloseTo(
-          0.02,
-          4,
-        );
+        expect(computeTargetMetrics(rows, "gpt-4").totalCost).toBeCloseTo(0.02, 4);
         // GPT-3.5: 0.002 + 0.002 = 0.004
-        expect(computeTargetMetrics(rows, "gpt-3.5").totalCost).toBeCloseTo(
-          0.004,
-          4,
-        );
+        expect(computeTargetMetrics(rows, "gpt-3.5").totalCost).toBeCloseTo(0.004, 4);
         // Claude-3: 0.005 + 0.005 = 0.01
-        expect(computeTargetMetrics(rows, "claude-3").totalCost).toBeCloseTo(
-          0.01,
-          4,
-        );
+        expect(computeTargetMetrics(rows, "claude-3").totalCost).toBeCloseTo(0.01, 4);
       });
 
       it("computes correct average latency for each target", () => {
@@ -1038,54 +978,52 @@ describe("ComparisonCharts", () => {
     });
 
     describe("Component integration", () => {
-      const createMultiTargetRunWithDifferentScores =
-        (): ComparisonRunData => ({
+      const createMultiTargetRunWithDifferentScores = (): ComparisonRunData => ({
+        runId: "multi-target-run",
+        runName: "Multi Target Run",
+        color: "#3182ce",
+        isLoading: false,
+        data: {
           runId: "multi-target-run",
-          runName: "Multi Target Run",
-          color: "#3182ce",
-          isLoading: false,
-          data: {
-            runId: "multi-target-run",
-            experimentId: "exp-1",
-            projectId: "project-1",
-            createdAt: Date.now(),
-            datasetColumns: [{ name: "input", hasImages: false }],
-            targetColumns: [
-              {
-                id: "gpt-4",
-                name: "GPT-4",
-                type: "custom" as const,
-                outputFields: ["output"],
-                metadata: { model: "openai/gpt-4" },
-              },
-              {
-                id: "gpt-3.5",
-                name: "GPT-3.5",
-                type: "custom" as const,
-                outputFields: ["output"],
-                metadata: { model: "openai/gpt-3.5-turbo" },
-              },
-              {
-                id: "claude-3",
-                name: "Claude-3",
-                type: "custom" as const,
-                outputFields: ["output"],
-                metadata: { model: "anthropic/claude-3-sonnet" },
-              },
-            ],
-            evaluatorIds: ["response_quality"],
-            evaluatorNames: { response_quality: "Response Quality" },
-            rows: createMultiTargetRows(),
-          },
-        });
+          experimentId: "exp-1",
+          projectId: "project-1",
+          createdAt: Date.now(),
+          datasetColumns: [{ name: "input", hasImages: false }],
+          targetColumns: [
+            {
+              id: "gpt-4",
+              name: "GPT-4",
+              type: "custom" as const,
+              outputFields: ["output"],
+              metadata: { model: "openai/gpt-4" },
+            },
+            {
+              id: "gpt-3.5",
+              name: "GPT-3.5",
+              type: "custom" as const,
+              outputFields: ["output"],
+              metadata: { model: "openai/gpt-3.5-turbo" },
+            },
+            {
+              id: "claude-3",
+              name: "Claude-3",
+              type: "custom" as const,
+              outputFields: ["output"],
+              metadata: { model: "anthropic/claude-3-sonnet" },
+            },
+          ],
+          evaluatorIds: ["response_quality"],
+          evaluatorNames: { response_quality: "Response Quality" },
+          rows: createMultiTargetRows(),
+        },
+      });
 
       it("renders score chart when grouped by target", () => {
         const comparisonData = [createMultiTargetRunWithDifferentScores()];
 
-        render(
-          <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
-          { wrapper: Wrapper },
-        );
+        render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
+          wrapper: Wrapper,
+        });
 
         // For single run with multiple targets, defaults to "Target" grouping
         expect(screen.getByTestId("group-by-button")).toHaveTextContent(
@@ -1093,12 +1031,8 @@ describe("ComparisonCharts", () => {
         );
 
         // Charts should render
-        expect(
-          screen.getByTestId("chart-score-response_quality"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByTestId("chart-pass-response_quality"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("chart-score-response_quality")).toBeInTheDocument();
+        expect(screen.getByTestId("chart-pass-response_quality")).toBeInTheDocument();
         expect(screen.getByTestId("chart-latency")).toBeInTheDocument();
         expect(screen.getByTestId("chart-cost")).toBeInTheDocument();
       });

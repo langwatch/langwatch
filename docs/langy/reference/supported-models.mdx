@@ -9,21 +9,21 @@ Langy runs on the model providers your project has enabled. Every provider excep
 
 ## Providers
 
-| Provider | How you configure it | Notes |
-|---|---|---|
-| OpenAI | API key | `gpt-5.6` family and others. |
-| Anthropic | API key | `claude-opus-4-8` family and others. |
-| Codex | Sign in with your OpenAI account (OAuth device code) | The only provider you connect by signing in, not by pasting a key. Restricted to the Langy and Fast roles. See [Codex](/langy/codex). |
-| Gemini | API key | |
-| Azure OpenAI | API key | |
-| Amazon Bedrock | API key or credentials | |
-| Google Vertex | API key or credentials | |
-| DeepSeek | API key | |
-| xAI | API key | |
-| Cerebras | API key | |
-| Groq | API key | |
-| Voyage | API key | Embeddings. |
-| Custom (LiteLLM) | API key or endpoint | Any provider reachable through LiteLLM. |
+| Provider         | How you configure it                                 | Notes                                                                                                                                 |
+| ---------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| OpenAI           | API key                                              | `gpt-5.6` family and others.                                                                                                          |
+| Anthropic        | API key                                              | `claude-opus-4-8` family and others.                                                                                                  |
+| Codex            | Sign in with your OpenAI account (OAuth device code) | The only provider you connect by signing in, not by pasting a key. Restricted to the Langy and Fast roles. See [Codex](/langy/codex). |
+| Gemini           | API key                                              |                                                                                                                                       |
+| Azure OpenAI     | API key                                              |                                                                                                                                       |
+| Amazon Bedrock   | API key or credentials                               |                                                                                                                                       |
+| Google Vertex    | API key or credentials                               |                                                                                                                                       |
+| DeepSeek         | API key                                              |                                                                                                                                       |
+| xAI              | API key                                              |                                                                                                                                       |
+| Cerebras         | API key                                              |                                                                                                                                       |
+| Groq             | API key                                              |                                                                                                                                       |
+| Voyage           | API key                                              | Embeddings.                                                                                                                           |
+| Custom (LiteLLM) | API key or endpoint                                  | Any provider reachable through LiteLLM.                                                                                               |
 
 You add these in model-provider settings, the same drawer the rest of LangWatch uses. Keys are stored encrypted at rest. See [Models and bring your own key](/langy/models).
 
@@ -31,12 +31,12 @@ You add these in model-provider settings, the same drawer the rest of LangWatch 
 
 A role decides which configured model runs for a given kind of work. Langy uses four roles.
 
-| Role | What it drives |
-|---|---|
-| Default | The general-purpose model for standard work. |
-| Fast | Lighter, quicker assists. |
-| Langy | Langy's own chat and coding model. |
-| Embeddings | Vector embeddings. |
+| Role       | What it drives                               |
+| ---------- | -------------------------------------------- |
+| Default    | The general-purpose model for standard work. |
+| Fast       | Lighter, quicker assists.                    |
+| Langy      | Langy's own chat and coding model.           |
+| Embeddings | Vector embeddings.                           |
 
 ## The model picker
 
@@ -48,7 +48,10 @@ In the Langy composer the picker shows a short shortlist by default, then a **Mo
 Named model families, available when the matching provider is enabled, include `gpt-5.6-terra` (the default), `gpt-5.6-sol`, `gpt-5.6-luna` (fast), and `claude-opus-4-8`.
 
 <Note>
-Codex models appear in the picker only for the Langy and Fast roles. OpenAI's terms scope the Codex subscription path to coding-assistant harnesses and light AI assists, so Codex is offered for Langy and Fast but not for the playground, evaluations, or workflows. See [Codex](/langy/codex).
+  Codex models appear in the picker only for the Langy and Fast roles. OpenAI's terms
+  scope the Codex subscription path to coding-assistant harnesses and light AI assists, so
+  Codex is offered for Langy and Fast but not for the playground, evaluations, or
+  workflows. See [Codex](/langy/codex).
 </Note>
 
 ## Bring your own key
@@ -56,7 +59,8 @@ Codex models appear in the picker only for the Langy and Fast roles. OpenAI's te
 Every provider except Codex is bring-your-own-key: you paste your own API key and Langy runs on your account. There is no LangWatch-provided default key for Langy models. For who pays and how to see the spend, see [Token usage and cost](/langy/token-usage-and-cost).
 
 <Info>
-**Also check:** [Models and bring your own key](/langy/models), [Codex](/langy/codex), [Token usage and cost](/langy/token-usage-and-cost).
+  **Also check:** [Models and bring your own key](/langy/models), [Codex](/langy/codex),
+  [Token usage and cost](/langy/token-usage-and-cost).
 </Info>
 
 ## Reference

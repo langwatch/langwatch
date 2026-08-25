@@ -60,9 +60,10 @@ describe("AttributeTable", () => {
         expect(trigger).toHaveTextContent("Flat");
 
         await user.click(trigger);
-        expect(
-          (await findAllByRole("menuitem")).map((i) => i.textContent),
-        ).toEqual(["Flat", "JSON"]);
+        expect((await findAllByRole("menuitem")).map((i) => i.textContent)).toEqual([
+          "Flat",
+          "JSON",
+        ]);
       });
     });
   });
@@ -106,9 +107,7 @@ describe("AttributeTable", () => {
 
       // service.name does not match `app.billing.*`, so it gets no marker.
       expect(queryByLabelText(/^Restricted attribute/)).toBeInTheDocument();
-      const markers = document.querySelectorAll(
-        '[aria-label^="Restricted attribute"]',
-      );
+      const markers = document.querySelectorAll('[aria-label^="Restricted attribute"]');
       expect(markers).toHaveLength(1);
     });
   });

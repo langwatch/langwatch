@@ -36,13 +36,7 @@ export type ResolvedEndpoint =
     };
 
 /** A composite key for de-duplicating endpoints within a version. */
-function endpointKey({
-  method,
-  path,
-}: {
-  method: string;
-  path: string;
-}): string {
+function endpointKey({ method, path }: { method: string; path: string }): string {
   const normalized = method === "sse" ? "get" : method;
   const normalizedPath = path === "" ? "/" : path;
   return `${normalized}:${normalizedPath}`;
@@ -101,9 +95,9 @@ function applyEvents({
 export function resolveVersions(
   events: RegistrationEvent[],
 ): Map<string, ResolvedEndpoint[]> {
-  const datedVersions = [
-    ...new Set(events.map((event) => event.version)),
-  ].filter((version) => version !== VERSION_PREVIEW);
+  const datedVersions = [...new Set(events.map((event) => event.version))].filter(
+    (version) => version !== VERSION_PREVIEW,
+  );
 
   for (const version of datedVersions) {
     if (!isDateVersion(version)) {
@@ -136,9 +130,7 @@ export function resolveVersions(
   }
 
   // `preview` endpoints are separate
-  const previewEvents = events.filter(
-    (event) => event.version === VERSION_PREVIEW,
-  );
+  const previewEvents = events.filter((event) => event.version === VERSION_PREVIEW);
   if (previewEvents.length > 0) {
     const previewMap = new Map<string, ResolvedEndpoint>();
     applyEvents({ target: previewMap, events: previewEvents });

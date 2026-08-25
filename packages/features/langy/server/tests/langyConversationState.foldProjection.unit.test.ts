@@ -150,10 +150,7 @@ describe("LangyConversationStateFoldProjection", () => {
       it("keeps the original owner and title but still counts the message", () => {
         const state = fold.apply(
           owned,
-          messageSent(
-            { userId: "mallory", messageId: "m2", title: "hijack" },
-            2000,
-          ),
+          messageSent({ userId: "mallory", messageId: "m2", title: "hijack" }, 2000),
         );
 
         expect(state.UserId).toBe("alice");
@@ -346,10 +343,7 @@ describe("LangyConversationStateFoldProjection", () => {
 
     describe("when a stray later message arrives", () => {
       it("stays archived (a late event cannot un-archive)", () => {
-        const state = fold.apply(
-          archived,
-          messageSent({ messageId: "m9" }, 4000),
-        );
+        const state = fold.apply(archived, messageSent({ messageId: "m9" }, 4000));
         expect(state.Status).toBe(LANGY_CONVERSATION_STATUS.ARCHIVED);
       });
     });
@@ -405,10 +399,7 @@ describe("LangyConversationStateFoldProjection", () => {
 
     describe("when the first message carries no title text", () => {
       it("leaves the title unset but still derived-eligible", () => {
-        const state = fold.apply(
-          fold.init(),
-          messageSent({ title: null }, 1000),
-        );
+        const state = fold.apply(fold.init(), messageSent({ title: null }, 1000));
         expect(state.Title).toBeNull();
         expect(state.TitleSource).toBe(LANGY_TITLE_SOURCE.DERIVED);
       });
@@ -431,10 +422,7 @@ describe("LangyConversationStateFoldProjection", () => {
 
     describe("when the owner renames by hand", () => {
       it("marks the source user (sticky)", () => {
-        const base = fold.apply(
-          fold.init(),
-          messageSent({ title: "placeholder" }, 1000),
-        );
+        const base = fold.apply(fold.init(), messageSent({ title: "placeholder" }, 1000));
         const state = fold.apply(
           base,
           event(

@@ -71,8 +71,7 @@ describe("Langy current-surfaces coverage", () => {
       const result = await runScenarioAndLog(
         {
           name: "AI Gateway usage report",
-          description:
-            "The user wants a quick summary of their AI Gateway usage/cost.",
+          description: "The user wants a quick summary of their AI Gateway usage/cost.",
           agents: [
             langy,
             scenario.userSimulatorAgent({ model }),
@@ -235,8 +234,7 @@ describe("Langy current-surfaces coverage", () => {
       const result = await runScenarioAndLog(
         {
           name: "list annotations",
-          description:
-            "The user wants to see the annotations left on their traces.",
+          description: "The user wants to see the annotations left on their traces.",
           agents: [
             langy,
             scenario.userSimulatorAgent({ model }),

@@ -46,10 +46,8 @@ function parseArgs(argv: string[]): Args {
     else if (argv[i] === "--model") out.model = argv[++i];
     else if (argv[i] === "--prompt") out.prompt = argv[++i];
     else if (argv[i] === "--base-url") out.baseUrl = argv[++i];
-    else if (argv[i] === "--provider")
-      out.provider = argv[++i] as Args["provider"];
-    else if (argv[i] === "--max-tokens")
-      out.maxTokens = parseInt(argv[++i] ?? "200", 10);
+    else if (argv[i] === "--provider") out.provider = argv[++i] as Args["provider"];
+    else if (argv[i] === "--max-tokens") out.maxTokens = parseInt(argv[++i] ?? "200", 10);
   }
   if (!out.vk) throw new Error("--vk is required (personal VK secret)");
   if (!out.model) throw new Error("--model is required (e.g. claude-sonnet-4)");
@@ -140,9 +138,7 @@ async function main() {
     `[fire-completion] base=${args.baseUrl} provider=${args.provider} model=${args.model}\n`,
   );
   const result =
-    args.provider === "anthropic"
-      ? await fireAnthropic(args)
-      : await fireOpenAi(args);
+    args.provider === "anthropic" ? await fireAnthropic(args) : await fireOpenAi(args);
   process.stdout.write(JSON.stringify(result) + "\n");
 }
 

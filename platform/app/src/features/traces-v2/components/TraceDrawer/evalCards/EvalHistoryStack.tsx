@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Circle,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuArrowRight } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -48,10 +40,7 @@ export function EvalHistoryStack({
         <VStack align="stretch" gap={1} paddingTop={1.5}>
           {entries.map((e, i) => (
             <EvalHistoryRow
-              key={
-                e.evaluationId ??
-                `${e.evaluatorId ?? e.name}:${e.timestamp ?? i}`
-              }
+              key={e.evaluationId ?? `${e.evaluatorId ?? e.name}:${e.timestamp ?? i}`}
               entry={e}
               onSelectSpan={onSelectSpan}
             />
@@ -71,9 +60,7 @@ function EvalHistoryRow({
 }) {
   const status = STATUS[entry.status as keyof typeof STATUS] ?? STATUS.warning;
   const noVerdict = isNoVerdict(entry.status);
-  const time = entry.timestamp
-    ? new Date(entry.timestamp).toLocaleTimeString()
-    : null;
+  const time = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : null;
   const scoreLabel = noVerdict
     ? null
     : typeof entry.score === "boolean"
@@ -93,12 +80,7 @@ function EvalHistoryRow({
       _hover={{ bg: "bg.muted" }}
     >
       <Circle size="6px" bg={status.color} flexShrink={0} />
-      <Text
-        textStyle="2xs"
-        color={status.fg}
-        fontWeight="medium"
-        flexShrink={0}
-      >
+      <Text textStyle="2xs" color={status.fg} fontWeight="medium" flexShrink={0}>
         {status.label}
       </Text>
       {scoreLabel !== null && (

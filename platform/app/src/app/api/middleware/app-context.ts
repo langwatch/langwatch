@@ -25,11 +25,7 @@ export function appContextBindingsFor(app: App): AppContextBindings {
 
 function appFromBindings(c: Context): App | undefined {
   const bindings: unknown = c.env;
-  if (
-    !bindings ||
-    typeof bindings !== "object" ||
-    !(APP_CONTEXT_KEY in bindings)
-  ) {
+  if (!bindings || typeof bindings !== "object" || !(APP_CONTEXT_KEY in bindings)) {
     return undefined;
   }
   return bindings[APP_CONTEXT_KEY] as App;

@@ -68,17 +68,12 @@ function renderChips({ conversationId }: { conversationId: string | null }) {
   } as unknown as TraceHeader;
   return render(
     <ChakraProvider value={defaultSystem}>
-      <TraceHeaderChips
-        trace={trace}
-        onSelectSpan={vi.fn()}
-        onOpenPromptsTab={vi.fn()}
-      />
+      <TraceHeaderChips trace={trace} onSelectSpan={vi.fn()} onOpenPromptsTab={vi.fn()} />
     </ChakraProvider>,
   );
 }
 
-const annotationsChip = () =>
-  screen.getByRole("button", { name: /Annotations/ });
+const annotationsChip = () => screen.getByRole("button", { name: /Annotations/ });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -90,9 +85,7 @@ describe("given a conversation nobody has annotated", () => {
   it("shows no annotations chip", () => {
     renderChips({ conversationId: "thread-1" });
 
-    expect(
-      screen.queryByRole("button", { name: /Annotations/ }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Annotations/ })).not.toBeInTheDocument();
   });
 });
 

@@ -48,9 +48,7 @@ const STATEMENT_ID = "stmt-abc";
 const WAREHOUSE_ID = "095eb666b2ed2762";
 /** The whole hour an instant falls in, as the workspace would report it. */
 function usageHourOf(atMs: number): string {
-  return new Date(
-    Math.floor(atMs / (60 * 60 * 1000)) * (60 * 60 * 1000),
-  ).toISOString();
+  return new Date(Math.floor(atMs / (60 * 60 * 1000)) * (60 * 60 * 1000)).toISOString();
 }
 
 /**
@@ -153,9 +151,7 @@ beforeEach(async () => {
     }
     if (url.pathname === `/api/2.0/genie/spaces/${SPACE_ID}/conversations`) {
       return send({
-        conversations: [
-          { conversation_id: CONVERSATION_ID, title: "How many?" },
-        ],
+        conversations: [{ conversation_id: CONVERSATION_ID, title: "How many?" }],
       });
     }
     if (
@@ -197,9 +193,7 @@ beforeEach(async () => {
       let raw = "";
       req.on("data", (chunk) => (raw += chunk));
       req.on("end", () => {
-        statementBodies.push(
-          JSON.parse(raw || "{}") as Record<string, unknown>,
-        );
+        statementBodies.push(JSON.parse(raw || "{}") as Record<string, unknown>);
         // Queued plans answer one call each, then `costPlan` answers the rest.
         // Only tests about WHICH day was unpriced need this; the rest set one
         // plan and mean it for every window.
@@ -412,12 +406,8 @@ describe("a source that names a warehouse", () => {
     expect(callsCarrying(earlierHour)).toBe(1);
     expect(callsCarrying(USAGE_HOUR)).toBe(1);
     expect(
-      servedRows.findIndex((rows) =>
-        rows.some((row) => row[1] === earlierHour),
-      ),
-    ).not.toBe(
-      servedRows.findIndex((rows) => rows.some((row) => row[1] === USAGE_HOUR)),
-    );
+      servedRows.findIndex((rows) => rows.some((row) => row[1] === earlierHour)),
+    ).not.toBe(servedRows.findIndex((rows) => rows.some((row) => row[1] === USAGE_HOUR)));
 
     // $6 from the earlier hour and $1 from the later one, exactly.
     expect(hintOf(result).costUsd).toBe("7");
@@ -499,9 +489,7 @@ describe("a source that names a warehouse", () => {
     // bound matters more than naming the alias: bucketing every statement back
     // into its start hour would keep all the aliases below and change only
     // this line, which is exactly the defect this test exists to catch.
-    expect(sql).toMatch(
-      /explode\(\s*sequence\(\s*date_trunc\('HOUR',\s*r\.start_time\)/,
-    );
+    expect(sql).toMatch(/explode\(\s*sequence\(\s*date_trunc\('HOUR',\s*r\.start_time\)/);
 
     // And the share's numerator is the part of the runtime inside THAT hour,
     // divided with `div`. Spark's `/` returns a DOUBLE; a float here is money
@@ -579,9 +567,7 @@ describe("a source that names a warehouse", () => {
     // not the one the connector holds `CAN USE` on — pricing only the executor
     // would return an empty answer and call it a cost of nothing.
     expect(body.parameters).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ name: "warehouse_id" }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ name: "warehouse_id" })]),
     );
     expect(String(body.statement)).not.toContain(":warehouse_id");
     expect(String(body.statement)).not.toContain(WAREHOUSE_ID);
@@ -884,9 +870,7 @@ describe("a source that names a warehouse", () => {
       name: string;
       value: string;
     }>;
-    const askedAboutFirst = refusedFrom.find(
-      (p) => p.name === "from_ts",
-    )!.value;
+    const askedAboutFirst = refusedFrom.find((p) => p.name === "from_ts")!.value;
 
     statementBodies.length = 0;
     costPlan = {
@@ -939,9 +923,7 @@ describe("a source that names a warehouse", () => {
     // A null SKU in the last column is exactly what the LEFT JOIN produces for
     // an unbilled hour.
     costPlan = {
-      rows: [
-        [STATEMENT_ID, USAGE_HOUR, "3600000", "3600000", null, null, null],
-      ],
+      rows: [[STATEMENT_ID, USAGE_HOUR, "3600000", "3600000", null, null, null]],
     };
 
     const result = await pull({ warehouseId: WAREHOUSE_ID });
@@ -1081,9 +1063,7 @@ describe("a source that names a warehouse", () => {
     const second = await runFrom(first.cursor!);
 
     expect(second.events).toHaveLength(1);
-    expect(second.events[0]?.source_event_id).toBe(
-      first.events[0]?.source_event_id,
-    );
+    expect(second.events[0]?.source_event_id).toBe(first.events[0]?.source_event_id);
     expect(hintOf(second).costUsd).toBe("6");
   });
 
@@ -1103,8 +1083,7 @@ describe("a source that names a warehouse", () => {
       {
         cursor: JSON.stringify({
           sinceMs: stuckSinceMs,
-          costHeldSinceMs:
-            Date.now() - WAREHOUSE_COST_MAX_HOLD_MS - 60 * 60 * 1000,
+          costHeldSinceMs: Date.now() - WAREHOUSE_COST_MAX_HOLD_MS - 60 * 60 * 1000,
         }),
         credentials: { token: "dapi-fixture" },
       },
@@ -1159,9 +1138,7 @@ describe("a source that names a warehouse", () => {
     expect(hintOf(second).costUsd).toBe("6");
     // Same question, so the same record — the ledger replaces on these
     // coordinates rather than adding a second row for one question.
-    expect(second.events[0]?.source_event_id).toBe(
-      first.events[0]?.source_event_id,
-    );
+    expect(second.events[0]?.source_event_id).toBe(first.events[0]?.source_event_id);
     expect(
       (
         second.events[0]?.extra?.[PULLED_USAGE_HINT_KEY] as {
@@ -1300,9 +1277,9 @@ describe("a source that names a warehouse", () => {
     expect(hintOf(result).costUsd).toBe("6");
     // The window it asked billing about reaches back at least as far.
     const from = String(
-      (
-        statementBodies[0]!.parameters as { name: string; value: string }[]
-      ).find((p) => p.name === "from_ts")?.value,
+      (statementBodies[0]!.parameters as { name: string; value: string }[]).find(
+        (p) => p.name === "from_ts",
+      )?.value,
     );
     expect(Date.parse(from)).toBeLessThanOrEqual(
       Date.now() - WAREHOUSE_COST_SETTLING_LAG_MS + 60_000,
@@ -1486,22 +1463,17 @@ describe("a period with more statements than one answer can carry", () => {
     // answered perfectly well their cost figure, and later runs never look at
     // them again.
     expect(cursor.sinceMs).toBeLessThan(Date.now() - 27 * 24 * 60 * 60 * 1000);
-    expect(cursor.sinceMs).toBeGreaterThan(
-      Date.now() - 29 * 24 * 60 * 60 * 1000,
-    );
+    expect(cursor.sinceMs).toBeGreaterThan(Date.now() - 29 * 24 * 60 * 60 * 1000);
 
     // And the narrower questions were actually asked: a day at most, where the
     // refused one covered a week.
     const spanOf = (body: Record<string, unknown>) => {
       const p = body.parameters as Array<{ name: string; value: string }>;
-      const at = (name: string) =>
-        Date.parse(p.find((x) => x.name === name)!.value);
+      const at = (name: string) => Date.parse(p.find((x) => x.name === name)!.value);
       return at("to_ts") - at("from_ts");
     };
     expect(spanOf(statementBodies[0]!)).toBeGreaterThan(24 * 60 * 60 * 1000);
-    expect(spanOf(statementBodies[1]!)).toBeLessThanOrEqual(
-      24 * 60 * 60 * 1000,
-    );
+    expect(spanOf(statementBodies[1]!)).toBeLessThanOrEqual(24 * 60 * 60 * 1000);
   });
 
   /** @scenario "A statement is held when an hour it ran through has no bill yet" */
@@ -1553,8 +1525,6 @@ describe("a period with more statements than one answer can carry", () => {
     // And the hold still holds: the watermark stays at the owed piece rather
     // than moving past the unbilled hour.
     expect(cursor.sinceMs).toBeLessThan(Date.now() - 28 * 24 * 60 * 60 * 1000);
-    expect(cursor.sinceMs).toBeGreaterThan(
-      Date.now() - 30 * 24 * 60 * 60 * 1000,
-    );
+    expect(cursor.sinceMs).toBeGreaterThan(Date.now() - 30 * 24 * 60 * 60 * 1000);
   });
 });

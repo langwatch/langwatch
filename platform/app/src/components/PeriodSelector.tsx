@@ -8,12 +8,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import {
-  differenceInCalendarDays,
-  format,
-  startOfDay,
-  subDays,
-} from "date-fns";
+import { differenceInCalendarDays, format, startOfDay, subDays } from "date-fns";
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { LuCalendar } from "react-icons/lu";
@@ -52,8 +47,7 @@ const RELATIVE_PRESETS_BY_KEY = new Map(
 );
 
 const isRelativePresetKey = (value: unknown): value is RelativePresetKey =>
-  typeof value === "string" &&
-  RELATIVE_PRESETS_BY_KEY.has(value as RelativePresetKey);
+  typeof value === "string" && RELATIVE_PRESETS_BY_KEY.has(value as RelativePresetKey);
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
@@ -143,14 +137,10 @@ export const usePeriodSelector = (defaultNDays = 30) => {
   const setPeriod = useCallback(
     (startDate: Date, endDate: Date) => {
       const validEndDate =
-        endDate instanceof Date && !isNaN(endDate.getTime())
-          ? endDate
-          : new Date();
+        endDate instanceof Date && !isNaN(endDate.getTime()) ? endDate : new Date();
 
       let validStartDate =
-        startDate instanceof Date && !isNaN(startDate.getTime())
-          ? startDate
-          : new Date();
+        startDate instanceof Date && !isNaN(startDate.getTime()) ? startDate : new Date();
 
       if (validStartDate > validEndDate) {
         validStartDate = validEndDate;
@@ -258,12 +248,8 @@ export function PeriodSelector({
       const matchedByDays = getPresetForRange(startDate, endDate, new Date());
       if (matchedByDays) return matchedByDays.label;
 
-      const minutes = Math.round(
-        (endDate.getTime() - startDate.getTime()) / 60000,
-      );
-      const subDay = RELATIVE_PRESETS.find(
-        (preset) => preset.minutes === minutes,
-      );
+      const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+      const subDay = RELATIVE_PRESETS.find((preset) => preset.minutes === minutes);
       if (subDay) return subDay.label;
     }
 
@@ -278,12 +264,7 @@ export function PeriodSelector({
       size="sm"
     >
       <Popover.Trigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          minWidth="fit-content"
-          onClick={onOpen}
-        >
+        <Button variant="outline" size="sm" minWidth="fit-content" onClick={onOpen}>
           <LuCalendar />
           <Text>{label ?? getDateRangeLabel()}</Text>
           <Box>
@@ -313,9 +294,7 @@ export function PeriodSelector({
                 <Input
                   type="datetime-local"
                   value={format(endDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) =>
-                    setPeriod(startDate, new Date(e.target.value))
-                  }
+                  onChange={(e) => setPeriod(startDate, new Date(e.target.value))}
                 />
               </Field.Root>
             </VStack>

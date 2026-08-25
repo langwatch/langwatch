@@ -156,12 +156,7 @@ export function ProcessInstanceDrawer({
   };
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="lg"
-      onOpenChange={() => closeDrawer()}
-    >
+    <Drawer.Root open={true} placement="end" size="lg" onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <InstanceDrawerTitle

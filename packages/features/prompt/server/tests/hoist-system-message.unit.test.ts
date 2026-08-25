@@ -25,9 +25,7 @@ describe("hoistSystemMessage", () => {
         ],
       });
 
-      expect(result.messages).toEqual([
-        { role: "user", content: "{{question}}" },
-      ]);
+      expect(result.messages).toEqual([{ role: "user", content: "{{question}}" }]);
     });
   });
 
@@ -61,9 +59,7 @@ describe("hoistSystemMessage", () => {
       });
 
       expect(result.prompt).toBe("You are a support bot.");
-      expect(result.messages).toEqual([
-        { role: "user", content: "{{question}}" },
-      ]);
+      expect(result.messages).toEqual([{ role: "user", content: "{{question}}" }]);
     });
   });
 

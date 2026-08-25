@@ -26,8 +26,7 @@ const base = {
   eventId: "evt_fixed",
 };
 
-const sentHeaders = () =>
-  mockedSend.mock.calls[0]![0].headers as Record<string, string>;
+const sentHeaders = () => mockedSend.mock.calls[0]![0].headers as Record<string, string>;
 
 beforeEach(() => {
   mockedSend.mockReset();

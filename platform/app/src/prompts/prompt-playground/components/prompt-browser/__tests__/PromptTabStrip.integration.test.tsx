@@ -24,11 +24,7 @@ import { useIsOverflowing } from "../useIsOverflowing";
 vi.mock("../useIsOverflowing", () => ({ useIsOverflowing: vi.fn() }));
 
 vi.mock("../switcher/PromptTabSwitcher", () => ({
-  PromptTabSwitcher: ({
-    isStripOverflowing,
-  }: {
-    isStripOverflowing: boolean;
-  }) => (
+  PromptTabSwitcher: ({ isStripOverflowing }: { isStripOverflowing: boolean }) => (
     <div data-testid="switcher" data-overflowing={String(isStripOverflowing)} />
   ),
 }));
@@ -50,10 +46,7 @@ function renderStrip({ isStripOverflowing }: { isStripOverflowing: boolean }) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <DraggableTabsBrowser.Root onTabMove={vi.fn()}>
-        <DraggableTabsBrowser.Window
-          windowId="window-1"
-          activeTabId="summarizer"
-        >
+        <DraggableTabsBrowser.Window windowId="window-1" activeTabId="summarizer">
           <DraggableTabsBrowser.TabBar tabIds={TABS.map((tab) => tab.id)}>
             <PromptTabStrip
               tabs={TABS}
@@ -106,10 +99,7 @@ describe("PromptTabStrip", () => {
     it("tells the switcher the strip is overflowing", () => {
       renderStrip({ isStripOverflowing: true });
 
-      expect(screen.getByTestId("switcher")).toHaveAttribute(
-        "data-overflowing",
-        "true",
-      );
+      expect(screen.getByTestId("switcher")).toHaveAttribute("data-overflowing", "true");
     });
   });
 
@@ -124,10 +114,7 @@ describe("PromptTabStrip", () => {
     it("tells the switcher the strip is not overflowing", () => {
       renderStrip({ isStripOverflowing: false });
 
-      expect(screen.getByTestId("switcher")).toHaveAttribute(
-        "data-overflowing",
-        "false",
-      );
+      expect(screen.getByTestId("switcher")).toHaveAttribute("data-overflowing", "false");
     });
   });
 });

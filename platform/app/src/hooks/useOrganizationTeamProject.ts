@@ -145,9 +145,7 @@ export function selectAmbientTeam<
     candidates.find((team) => team.projects.length > 0) ??
     candidates[0];
 
-  const own = userId
-    ? teams.filter((team) => userBelongsToTeam(team, userId))
-    : teams;
+  const own = userId ? teams.filter((team) => userBelongsToTeam(team, userId)) : teams;
 
   return byPreference(own) ?? byPreference(teams);
 }
@@ -170,9 +168,7 @@ export function resolveProjectRedirectSubPath({
     return rest;
   };
 
-  return (
-    matchSegmentPrefix(decodedPrefix) ?? matchSegmentPrefix(encodedPrefix) ?? ""
-  );
+  return matchSegmentPrefix(decodedPrefix) ?? matchSegmentPrefix(encodedPrefix) ?? "";
 }
 
 export const useOrganizationTeamProject = (
@@ -263,7 +259,7 @@ export const useOrganizationTeamProject = (
 
   const isDemo = Boolean(
     publicEnv.data?.DEMO_PROJECT_SLUG &&
-      router.query.project === publicEnv.data.DEMO_PROJECT_SLUG,
+    router.query.project === publicEnv.data.DEMO_PROJECT_SLUG,
   );
 
   const organizations = api.organization.getAll.useQuery(
@@ -292,8 +288,10 @@ export const useOrganizationTeamProject = (
     "selectedTeamId",
     "",
   );
-  const [localStorageProjectSlug, setLocalStorageProjectSlug] =
-    useLocalStorage<string>("selectedProjectSlug", "");
+  const [localStorageProjectSlug, setLocalStorageProjectSlug] = useLocalStorage<string>(
+    "selectedProjectSlug",
+    "",
+  );
   const [lastVisitedHomeKind, setLastVisitedHomeKind] = useLocalStorage<
     "" | "project" | "personal"
   >("lastVisitedHomeKind", "");
@@ -314,8 +312,7 @@ export const useOrganizationTeamProject = (
 
   const projectSlug = projectSlugFromUrl ?? localStorageProjectSlug;
 
-  const teamSlug =
-    typeof router.query.team == "string" ? router.query.team : undefined;
+  const teamSlug = typeof router.query.team == "string" ? router.query.team : undefined;
 
   const teamsMatchingSlug = teamSlug
     ? organizations.data?.flatMap((organization) =>
@@ -413,9 +410,8 @@ export const useOrganizationTeamProject = (
       : resolvedSlugMatch
         ? resolvedSlugMatch.organization
         : organizations.data
-          ? (organizations.data.find(
-              (org) => org.id == localStorageOrganizationId,
-            ) ?? organizations.data[0])
+          ? (organizations.data.find((org) => org.id == localStorageOrganizationId) ??
+            organizations.data[0])
           : undefined;
 
   // The personal workspace itself, on the pages that are about it. Checked
@@ -434,9 +430,7 @@ export const useOrganizationTeamProject = (
   // every other caller (settings pages, project-slug pages, demo mode) is
   // unaffected.
   const ownPersonalTeam = isPersonalScopeRoute
-    ? organization?.teams.find(
-        (team) => team.isPersonal && team.ownerUserId === userId,
-      )
+    ? organization?.teams.find((team) => team.isPersonal && team.ownerUserId === userId)
     : undefined;
 
   // The remembered selection carries the same test as the ambient pick below.
@@ -458,24 +452,20 @@ export const useOrganizationTeamProject = (
 
   const team = isDemo
     ? (organization?.teams.find((t) =>
-        t.projects.some(
-          (project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
-        ),
+        t.projects.some((project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG),
       ) ?? selectAmbientTeam({ teams: organization?.teams ?? [], userId })) // The team holding the demo project, else the ambient one
     : resolvedSlugMatch
       ? resolvedSlugMatch.team
       : ownPersonalTeam
         ? ownPersonalTeam
         : organization
-          ? (rememberedTeam ??
-            selectAmbientTeam({ teams: organization.teams, userId }))
+          ? (rememberedTeam ?? selectAmbientTeam({ teams: organization.teams, userId }))
           : undefined;
 
   // For demo mode, find the project with the demo slug
   const project = isDemo
-    ? (team?.projects.find(
-        (p) => p.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
-      ) ?? team?.projects[0]) // Find demo project by slug, or fallback to first
+    ? (team?.projects.find((p) => p.slug === publicEnv.data?.DEMO_PROJECT_SLUG) ??
+      team?.projects[0]) // Find demo project by slug, or fallback to first
     : team
       ? (resolvedSlugMatch?.project ?? team.projects[0])
       : undefined;
@@ -632,8 +622,7 @@ export const useOrganizationTeamProject = (
     }
 
     if (redirectToProjectOnboarding && !teamsWithProjectsOnAnyOrg.length) {
-      const firstTeamSlug = organizations.data.flatMap((org) => org.teams)[0]
-        ?.slug;
+      const firstTeamSlug = organizations.data.flatMap((org) => org.teams)[0]?.slug;
       void router.push(`/onboarding/${firstTeamSlug}/project${returnTo}`);
       return;
     }
@@ -699,10 +688,7 @@ export const useOrganizationTeamProject = (
     if (isOrgScopedPermission(permission)) {
       // Only check organization role - team admins do NOT get automatic organization permissions
       if (organizationRole) {
-        const orgResult = organizationRoleHasPermission(
-          organizationRole,
-          permission,
-        );
+        const orgResult = organizationRoleHasPermission(organizationRole, permission);
         if (orgResult) return true;
       }
       return false;
@@ -724,19 +710,14 @@ export const useOrganizationTeamProject = (
         | string[]
         | null
         | undefined;
-      const userPermissions = Array.isArray(rawPermissions)
-        ? rawPermissions
-        : [];
+      const userPermissions = Array.isArray(rawPermissions) ? rawPermissions : [];
 
       return hasPermissionWithHierarchy(userPermissions, permission);
     }
 
     // EXTERNAL users get restricted defaults instead of full team role permissions
     if (organizationRole === OrganizationUserRole.EXTERNAL) {
-      return hasPermissionWithHierarchy(
-        EXTERNAL_MEMBER_PERMISSIONS,
-        permission,
-      );
+      return hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission);
     }
 
     // Only fall back to built-in team role if NO custom role exists
@@ -750,10 +731,7 @@ export const useOrganizationTeamProject = (
   const hasOrgPermission = (permission: Permission) => {
     // Only check organization role - team admins do NOT get automatic organization permissions
     if (organizationRole) {
-      const orgResult = organizationRoleHasPermission(
-        organizationRole,
-        permission,
-      );
+      const orgResult = organizationRoleHasPermission(organizationRole, permission);
 
       if (orgResult) return true;
     }
@@ -770,9 +748,7 @@ export const useOrganizationTeamProject = (
   const hasAnyPermission = (permission: Permission) => {
     // Determine if this is an organization permission or team permission
     const isOrgPermission = permission.startsWith("organization:");
-    return isOrgPermission
-      ? hasOrgPermission(permission)
-      : hasPermission(permission);
+    return isOrgPermission ? hasOrgPermission(permission) : hasPermission(permission);
   };
 
   return {

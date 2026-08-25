@@ -1,8 +1,5 @@
 import type { AuthzService } from "@langwatch/authz-contract";
-import {
-  type PrismaClient,
-  RoleBindingScopeType,
-} from "~/generated/prisma/client";
+import { type PrismaClient, RoleBindingScopeType } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { ScopeNotInOrganizationError } from "~/server/role-bindings/errors";
 import type {

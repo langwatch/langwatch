@@ -39,8 +39,7 @@ export const GovernSection = React.memo(function GovernSection({
     },
   );
 
-  const showGatewayEntry =
-    gatewayMenuEnabled && hasPermission("virtualKeys:view");
+  const showGatewayEntry = gatewayMenuEnabled && hasPermission("virtualKeys:view");
   const showGovernanceEntry =
     governancePreviewEnabled && hasPermission("governance:view");
 
@@ -50,8 +49,7 @@ export const GovernSection = React.memo(function GovernSection({
     router.pathname.startsWith("/gateway") ||
     router.pathname === "/settings/model-providers";
   const isGovernanceActive =
-    router.pathname === "/governance" ||
-    router.pathname.startsWith("/governance/");
+    router.pathname === "/governance" || router.pathname.startsWith("/governance/");
 
   return (
     <SidebarSection

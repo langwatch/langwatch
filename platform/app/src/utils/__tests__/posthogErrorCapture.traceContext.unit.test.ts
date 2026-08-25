@@ -22,15 +22,7 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { StackContextManager } from "@opentelemetry/sdk-trace-web";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // `vi.hoisted` so the spy exists before the hoisted `vi.mock` factory and
 // before the module under test is imported below — a plain `const` would be
@@ -98,9 +90,7 @@ describe("captureException trace context", () => {
           return started;
         });
 
-      expect(propertiesOfLastCapture()?.trace_id).toBe(
-        span.spanContext().traceId,
-      );
+      expect(propertiesOfLastCapture()?.trace_id).toBe(span.spanContext().traceId);
     });
   });
 

@@ -8,13 +8,13 @@
 
 ## 1. Repo & service layout
 
-| Component | Repo | Path |
-|---|---|---|
-| Go gateway service (data plane) | `langwatch-saas` | `services/gateway/` (new standalone `go.mod`) |
-| Platform control-plane (VK CRUD, budgets, RBAC, provider-settings cohesion, drawers) | `langwatch` (open-source) | `langwatch/platform/app/src/...` |
-| BDD specs | `langwatch` | `specs/ai-gateway/` |
-| Docs | `langwatch` | `docs/docs/ai-gateway/` |
-| Helm chart (self-host) | `langwatch-saas` | `infrastructure/charts/` (existing chart, new `gateway` sub-chart) |
+| Component                                                                            | Repo                      | Path                                                               |
+| ------------------------------------------------------------------------------------ | ------------------------- | ------------------------------------------------------------------ |
+| Go gateway service (data plane)                                                      | `langwatch-saas`          | `services/gateway/` (new standalone `go.mod`)                      |
+| Platform control-plane (VK CRUD, budgets, RBAC, provider-settings cohesion, drawers) | `langwatch` (open-source) | `langwatch/platform/app/src/...`                                   |
+| BDD specs                                                                            | `langwatch`               | `specs/ai-gateway/`                                                |
+| Docs                                                                                 | `langwatch`               | `docs/docs/ai-gateway/`                                            |
+| Helm chart (self-host)                                                               | `langwatch-saas`          | `infrastructure/charts/` (existing chart, new `gateway` sub-chart) |
 
 Deployment: separate pod, separate container. Load balancer routes `/v1/**` path → gateway service; everything else → main app. URL is `gateway.langwatch.ai` (dedicated) with legacy path-routing on `app.langwatch.ai/v1/**` kept for CLI integrations that pin base URLs without subdomain flexibility.
 
@@ -51,23 +51,24 @@ The gateway accepts all three and normalises internally.
 
 All routes on `gateway.langwatch.ai` (or `app.langwatch.ai/v1/**`).
 
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/v1/chat/completions` | OpenAI-compatible chat completions (streaming + non-streaming). Used by Codex, opencode, most SDKs. |
-| POST | `/v1/messages` | Anthropic-compatible messages endpoint. Used by Claude Code, native Anthropic SDKs. Tool-call streaming deltas preserved byte-for-byte (Nexos docs: coding CLIs are picky here). |
-| POST | `/v1/embeddings` | OpenAI-compatible embeddings |
-| POST | `/v1/images/generations` | OpenAI-compatible image generation |
-| POST | `/v1/audio/transcriptions` | OpenAI-compatible transcription |
-| POST | `/v1/audio/speech` | OpenAI-compatible TTS |
-| POST | `/v1/moderations` | OpenAI-compatible moderation |
-| GET | `/v1/models` | Lists models allowed for the current VK |
-| GET | `/v1/models/:model` | Model metadata |
-| POST | `/v1/responses` | OpenAI Responses API (for Codex CLI compat) |
-| GET | `/healthz` | Liveness (always 200 if process alive) |
-| GET | `/readyz` | Readiness (bifrost OK + control-plane reachable + key-cache warm) |
-| GET | `/metrics` | Prometheus metrics |
+| Method | Path                       | Purpose                                                                                                                                                                          |
+| ------ | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/v1/chat/completions`     | OpenAI-compatible chat completions (streaming + non-streaming). Used by Codex, opencode, most SDKs.                                                                              |
+| POST   | `/v1/messages`             | Anthropic-compatible messages endpoint. Used by Claude Code, native Anthropic SDKs. Tool-call streaming deltas preserved byte-for-byte (Nexos docs: coding CLIs are picky here). |
+| POST   | `/v1/embeddings`           | OpenAI-compatible embeddings                                                                                                                                                     |
+| POST   | `/v1/images/generations`   | OpenAI-compatible image generation                                                                                                                                               |
+| POST   | `/v1/audio/transcriptions` | OpenAI-compatible transcription                                                                                                                                                  |
+| POST   | `/v1/audio/speech`         | OpenAI-compatible TTS                                                                                                                                                            |
+| POST   | `/v1/moderations`          | OpenAI-compatible moderation                                                                                                                                                     |
+| GET    | `/v1/models`               | Lists models allowed for the current VK                                                                                                                                          |
+| GET    | `/v1/models/:model`        | Model metadata                                                                                                                                                                   |
+| POST   | `/v1/responses`            | OpenAI Responses API (for Codex CLI compat)                                                                                                                                      |
+| GET    | `/healthz`                 | Liveness (always 200 if process alive)                                                                                                                                           |
+| GET    | `/readyz`                  | Readiness (bifrost OK + control-plane reachable + key-cache warm)                                                                                                                |
+| GET    | `/metrics`                 | Prometheus metrics                                                                                                                                                               |
 
 Routing pattern:
+
 - Incoming `model` field can be:
   - `<alias>` (e.g. `gpt-4o`, `claude`) — resolved via VK config `model_aliases`. **Aliases always win** if defined; they are the VK owner's explicit redirect.
   - `<provider>/<model>` explicit form (e.g. `openai/gpt-5-mini`, `bedrock/anthropic.claude-haiku-4-5-20251001`, `azure/my-deployment`) — bypasses aliases and addresses the provider directly. Still subject to `models_allowed` allowlist.
@@ -130,11 +131,13 @@ Other shared env vars referenced across the contract:
 Pull-all-active-VKs bulk endpoint. Used by the gateway on startup when `LW_GATEWAY_BOOTSTRAP_PULL=true` (enterprise opt-in; see §9). Returns a paginated stream of resolve-key + config payloads.
 
 Request:
+
 ```
 GET /api/internal/gateway/bootstrap?page_token=<opaque>
 ```
 
 Response:
+
 ```json
 {
   "keys": [
@@ -151,11 +154,13 @@ After bootstrap, the gateway calls `/changes?since=<current_revision>` to stream
 ### 4.1 `POST /api/internal/gateway/resolve-key`
 
 Request:
+
 ```json
 { "key_presented": "vk-lw-01HZX...", "gateway_node_id": "gw-eks-abc" }
 ```
 
 Response (200):
+
 ```json
 {
   "jwt": "<HS256 signed, TTL 15m or the key's expiry, whichever is sooner>",
@@ -166,6 +171,7 @@ Response (200):
 ```
 
 JWT claims (short, hot-path-verified):
+
 ```
 {
   "vk_id":         "vk_01HZX...",
@@ -222,9 +228,9 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
              custom_openai:  { "base_url": "https://...", "api_key": "..." }  */
         "api_key": "sk-proj-..."
       },
-      "base_url": "https://api.openai.com/v1",  // optional, type-specific
-      "region": null,                            // optional, type-specific
-      "config": { /* per-provider tuning: deployment_name, rate_limit, health, etc */ }
+      "base_url": "https://api.openai.com/v1", // optional, type-specific
+      "region": null, // optional, type-specific
+      "config": {/* per-provider tuning: deployment_name, rate_limit, health, etc */}
     }
   ],
   /* `chain` is the ordered provider slots; `max_attempts` bounds the walk.
@@ -234,7 +240,10 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
     "chain": ["pc_primary", "pc_secondary", "pc_tertiary"],
     "max_attempts": 3
   },
-  "model_aliases": { "gpt-4o": "azure/my-deployment", "claude": "anthropic/claude-haiku-4-5-20251001" },
+  "model_aliases": {
+    "gpt-4o": "azure/my-deployment",
+    "claude": "anthropic/claude-haiku-4-5-20251001"
+  },
   "models_allowed": ["gpt-5-mini", "claude-haiku-*", "gemini-2.5-flash"],
   /* Provider allowlist. `null` means every provider the key reaches through
      its scope graph, INCLUDING providers added after the key was created;
@@ -276,8 +285,10 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
        + OTel attribute `langwatch.guardrail.fail_open=true`. */
     "request_fail_open": false,
     "response_fail_open": false,
-    "pre":  [{"id": "guard_01HZ...", "evaluator": "evaluators/pii-check-abc12"}],
-    "post": [{"id": "guard_01HZ...", "evaluator": "evaluators/hallucination-check-def34"}],
+    "pre": [{ "id": "guard_01HZ...", "evaluator": "evaluators/pii-check-abc12" }],
+    "post": [
+      { "id": "guard_01HZ...", "evaluator": "evaluators/hallucination-check-def34" }
+    ],
     "stream_chunk": []
   },
   "policy_rules": {
@@ -290,9 +301,9 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
        glob `models_allowed` allowlist; both compose (request passes only
        if both allow), and both judge the RESOLVED model, in either
        spelling, so an alias cannot route around either (§11b). */
-    "tools":  { "deny": ["^shell\\.", "^filesystem\\.write$"], "allow": null },
-    "mcp":    { "deny": ["^.*@mcp/unverified.*$"], "allow": null },
-    "urls":   { "deny": [], "allow": ["^https?://allowed\\.example\\.com/.*"] },
+    "tools": { "deny": ["^shell\\.", "^filesystem\\.write$"], "allow": null },
+    "mcp": { "deny": ["^.*@mcp/unverified.*$"], "allow": null },
+    "urls": { "deny": [], "allow": ["^https?://allowed\\.example\\.com/.*"] },
     "models": { "deny": ["^gpt-4(-turbo)?$"], "allow": null }
   },
   "rate_limits": { "rpm": null, "tpm": null, "rpd": null },
@@ -310,28 +321,59 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
      is enforced. */
   "budgets": [
     {
-      "scope": "virtual_key", "scope_id": "vk_01HZ...", "provider_key": null,
-      "window": "day", "limit_usd": 25.00,
-      "spent_usd": 4.12, "remaining_usd": 20.88, "resets_at": "2026-04-19T00:00:00Z",
+      "scope": "virtual_key",
+      "scope_id": "vk_01HZ...",
+      "provider_key": null,
+      "window": "day",
+      "limit_usd": 25.0,
+      "spent_usd": 4.12,
+      "remaining_usd": 20.88,
+      "resets_at": "2026-04-19T00:00:00Z",
       "on_breach": "block"
     },
-    { "scope": "project", "scope_id": "proj_01HZ...", "provider_key": "mp_01HZ...",
-      "window": "month", "limit_usd": 1000.00,
-      "spent_usd": 437.55, "remaining_usd": 562.45, "resets_at": "2026-05-01T00:00:00Z",
-      "on_breach": "block" },
-    { "scope": "team", "scope_id": "team_01HZ...", "provider_key": null,
-      "window": "month", "limit_usd": 5000.00,
-      "spent_usd": 3210.00, "remaining_usd": 1790.00, "resets_at": "2026-05-01T00:00:00Z",
-      "on_breach": "warn" },
+    {
+      "scope": "project",
+      "scope_id": "proj_01HZ...",
+      "provider_key": "mp_01HZ...",
+      "window": "month",
+      "limit_usd": 1000.0,
+      "spent_usd": 437.55,
+      "remaining_usd": 562.45,
+      "resets_at": "2026-05-01T00:00:00Z",
+      "on_breach": "block"
+    },
+    {
+      "scope": "team",
+      "scope_id": "team_01HZ...",
+      "provider_key": null,
+      "window": "month",
+      "limit_usd": 5000.0,
+      "spent_usd": 3210.0,
+      "remaining_usd": 1790.0,
+      "resets_at": "2026-05-01T00:00:00Z",
+      "on_breach": "warn"
+    },
     /* A group budget is per member: one budget row materialises one
        bucket per member, so `scope_id` is `<groupId>:<userId>` and
        `principal_id` names the member. Two members never share a pot. */
-    { "scope": "group", "scope_id": "grp_01HZ...:user_01HZ...", "principal_id": "user_01HZ...",
-      "provider_key": null, "window": "month", "limit_usd": 50.00,
-      "spent_usd": 12.40, "remaining_usd": 37.60, "resets_at": "2026-05-01T00:00:00Z",
-      "on_breach": "block" }
+    {
+      "scope": "group",
+      "scope_id": "grp_01HZ...:user_01HZ...",
+      "principal_id": "user_01HZ...",
+      "provider_key": null,
+      "window": "month",
+      "limit_usd": 50.0,
+      "spent_usd": 12.4,
+      "remaining_usd": 37.6,
+      "resets_at": "2026-05-01T00:00:00Z",
+      "on_breach": "block"
+    }
   ],
-  "metadata": { "label": "dev/codex", "tags": ["coding-cli"], "created_by": "user_01HZ..." },
+  "metadata": {
+    "label": "dev/codex",
+    "tags": ["coding-cli"],
+    "created_by": "user_01HZ..."
+  },
   /* The key's own expiration date in unix seconds, null for a key that never
      expires. ALWAYS present: the gateway reads an explicit null as "this key
      has no date" and an absent field as "an older control plane said nothing,
@@ -361,8 +403,8 @@ Returns array of diffs:
   "current_revision": 145,
   "changes": [
     { "kind": "vk_config_updated", "vk_id": "vk_01HZ...", "revision": 143 },
-    { "kind": "vk_revoked",        "vk_id": "vk_01HZ...", "revision": 144 },
-    { "kind": "vk_created",        "vk_id": "vk_01HZ...", "revision": 145 }
+    { "kind": "vk_revoked", "vk_id": "vk_01HZ...", "revision": 144 },
+    { "kind": "vk_created", "vk_id": "vk_01HZ...", "revision": 145 }
   ]
 }
 ```
@@ -483,16 +525,16 @@ request, which is why there is exactly one.
 
 The Postgres `GatewayBudgetLedger` table is deprecated — the schema remains
 for rollback safety but no code writes to it. `GatewayBudget` (the budget
-*definition*) stays authoritative for limits/windows/on_breach.
+_definition_) stays authoritative for limits/windows/on_breach.
 
 **Buckets.** The ledger accumulates by `(Scope, ScopeId)`, so anything that
 must accrue separately is separate in `ScopeId`:
 
-| Budget | `ScopeId` written |
-|---|---|
-| Plain | the target id |
-| Provider-filtered | `<targetId>\|provider:<modelProviderId>` |
-| Group (per member) | `<groupId>:<userId>` |
+| Budget                   | `ScopeId` written                                |
+| ------------------------ | ------------------------------------------------ |
+| Plain                    | the target id                                    |
+| Provider-filtered        | `<targetId>\|provider:<modelProviderId>`         |
+| Group (per member)       | `<groupId>:<userId>`                             |
 | Group, provider-filtered | `<groupId>:<userId>\|provider:<modelProviderId>` |
 
 Two budgets on the same target, one counting everything and one counting one
@@ -572,6 +614,7 @@ bundle): a request can never dispatch to a provider outside
 Inline guardrail call. Gateway pipelines multiple guardrails in parallel and aggregates.
 
 Request:
+
 ```json
 {
   "vk_id": "vk_01HZ...",
@@ -591,6 +634,7 @@ Request:
 ```
 
 Response:
+
 ```json
 {
   "decision": "allow | block | modify",
@@ -609,6 +653,7 @@ Connectivity probe backing the gateway's public `GET /health` status-page endpoi
 Riding the signed channel is the point: a 200 proves DNS/TCP/TLS, the app being up, and the shared HMAC secret matching. The gateway only reads the status code.
 
 Response (200):
+
 ```json
 { "status": "ok" }
 ```
@@ -624,36 +669,36 @@ All errors OpenAI-compatible:
 ```json
 {
   "error": {
-    "type":    "<type>",
-    "code":    "<code>",
+    "type": "<type>",
+    "code": "<code>",
     "message": "<human-readable>",
-    "param":   "<optional field name>"
+    "param": "<optional field name>"
   }
 }
 ```
 
 **Type enum (authoritative):**
 
-| `type` | HTTP | When |
-|---|---|---|
-| `invalid_api_key` | 401 | Unknown, malformed, or non-existent VK |
-| `virtual_key_revoked` | 403 | VK exists but is revoked. Terminal: revocation is one-way |
-| `virtual_key_disabled` | 403 | VK exists but is disabled, the reversible stop. An administrator re-enables it and the same secret works again |
-| `virtual_key_expired` | 403 | VK exists, is ACTIVE, and its `expires_at` has passed. The key material is intact: extending the date puts it straight back in service |
-| `model_not_allowed` | 403 | VK has `models_allowed` glob allowlist and requested model is not in it, **or** matched `policy_rules.models` deny regex (or fell outside its allow regex); also when no alias/explicit form resolves to a configured provider |
-| `permission_denied` | 403 | Principal lacks RBAC permission for endpoint |
-| `budget_exceeded` | 402 | Any hard-cap budget scope is over limit |
-| `rate_limit_exceeded` | 429 | VK / project / org rate limit hit |
-| `guardrail_blocked` | 403 | Pre- or post-call guardrail returned `block` (post-block also records a zero-cost `blocked_by_guardrail` debit) |
-| `guardrail_upstream_unavailable` | 503 | Guardrail evaluator service unreachable/errored; VK is fail-closed by default. Opt into fail-open per direction via `guardrails.{request,response}_fail_open: true` |
-| `tool_not_allowed` | 403 | Requested tool/MCP matches VK `policy_rules.tools` or `policy_rules.mcp` (deny-wins, RE2) |
-| `url_not_allowed` | 403 | Any `http(s)://` URL extracted from the request body matches VK `policy_rules.urls` deny (or falls outside a non-null `allow`) — extraction is permissive: user messages / tool args / system prompts / anywhere |
-| `cache_override_invalid` | 400 | `X-LangWatch-Cache` header malformed or unknown mode |
-| `cache_override_not_implemented` | 400 | `X-LangWatch-Cache` named a valid-but-v1.1 mode (`force` / `ttl=NNN`). v1 ships `respect` + `disable` only. |
-| `provider_error` | 502 | Upstream provider returned error after fallback exhaustion |
-| `upstream_timeout` | 504 | Upstream timed out after fallback exhaustion |
-| `bad_request` | 400 | Validation error on incoming payload |
-| `internal_error` | 500 | Unclassified gateway error |
+| `type`                           | HTTP | When                                                                                                                                                                                                                           |
+| -------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `invalid_api_key`                | 401  | Unknown, malformed, or non-existent VK                                                                                                                                                                                         |
+| `virtual_key_revoked`            | 403  | VK exists but is revoked. Terminal: revocation is one-way                                                                                                                                                                      |
+| `virtual_key_disabled`           | 403  | VK exists but is disabled, the reversible stop. An administrator re-enables it and the same secret works again                                                                                                                 |
+| `virtual_key_expired`            | 403  | VK exists, is ACTIVE, and its `expires_at` has passed. The key material is intact: extending the date puts it straight back in service                                                                                         |
+| `model_not_allowed`              | 403  | VK has `models_allowed` glob allowlist and requested model is not in it, **or** matched `policy_rules.models` deny regex (or fell outside its allow regex); also when no alias/explicit form resolves to a configured provider |
+| `permission_denied`              | 403  | Principal lacks RBAC permission for endpoint                                                                                                                                                                                   |
+| `budget_exceeded`                | 402  | Any hard-cap budget scope is over limit                                                                                                                                                                                        |
+| `rate_limit_exceeded`            | 429  | VK / project / org rate limit hit                                                                                                                                                                                              |
+| `guardrail_blocked`              | 403  | Pre- or post-call guardrail returned `block` (post-block also records a zero-cost `blocked_by_guardrail` debit)                                                                                                                |
+| `guardrail_upstream_unavailable` | 503  | Guardrail evaluator service unreachable/errored; VK is fail-closed by default. Opt into fail-open per direction via `guardrails.{request,response}_fail_open: true`                                                            |
+| `tool_not_allowed`               | 403  | Requested tool/MCP matches VK `policy_rules.tools` or `policy_rules.mcp` (deny-wins, RE2)                                                                                                                                      |
+| `url_not_allowed`                | 403  | Any `http(s)://` URL extracted from the request body matches VK `policy_rules.urls` deny (or falls outside a non-null `allow`) — extraction is permissive: user messages / tool args / system prompts / anywhere               |
+| `cache_override_invalid`         | 400  | `X-LangWatch-Cache` header malformed or unknown mode                                                                                                                                                                           |
+| `cache_override_not_implemented` | 400  | `X-LangWatch-Cache` named a valid-but-v1.1 mode (`force` / `ttl=NNN`). v1 ships `respect` + `disable` only.                                                                                                                    |
+| `provider_error`                 | 502  | Upstream provider returned error after fallback exhaustion                                                                                                                                                                     |
+| `upstream_timeout`               | 504  | Upstream timed out after fallback exhaustion                                                                                                                                                                                   |
+| `bad_request`                    | 400  | Validation error on incoming payload                                                                                                                                                                                           |
+| `internal_error`                 | 500  | Unclassified gateway error                                                                                                                                                                                                     |
 
 **Response headers (all requests):**
 
@@ -747,6 +792,7 @@ Documented here so Go code + infra agree:
 1. **L1 in-memory LRU:** 10k entries by default (`Options.LRUSize`; the chart's `cache.lruSize` is not wired yet). Resolved JWT cached by SHA-256(vk_plain). Zero-RTT hot path. One per pod, shared with nothing: a cross-node tier buys a warm start that a rolling deploy pays for anyway, and costs an invalidation path that has to reach it.
 
    JWT `exp` bounds normal freshness, it is not the eviction point. Past `exp` an entry is refreshed before it serves, and if that refresh fails for transport reasons the entry keeps serving while its soft expiry is bumped, up to a hard cap of `exp + LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 6h, negative disables the grace entirely). An auth-class rejection evicts immediately at any point.
+
 2. **Bootstrap-pull (enterprise opt-in):** on startup, gateway calls `GET /api/internal/gateway/bootstrap` → paginated stream of all non-revoked VKs' JWTs. Enables gateway to serve traffic when control-plane is offline. Flag: `LW_GATEWAY_BOOTSTRAP_PULL=true`, the same name §6 uses. Nothing reads it yet, so it is a name this document reserves rather than one the binary honors.
 
 Background refresh: single goroutine long-polls `/api/internal/gateway/changes?since=<rev>` with 25s timeout. On diff → re-fetch affected VK configs and invalidate the matching L1 entries.
@@ -834,14 +880,14 @@ The gateway sits in the critical path of every LLM call. Without trace propagati
 
 To avoid this, the gateway **honours incoming trace context** on every request:
 
-| Header | Meaning |
-|---|---|
+| Header                            | Meaning                                                                                                                           |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `traceparent` (W3C Trace Context) | Standard `00-<trace_id>-<parent_span_id>-<flags>`. If valid, gateway emits its span as a child of `parent_span_id` on `trace_id`. |
-| `tracestate` (W3C) | Carried through verbatim to upstream OTel export. |
-| `X-LangWatch-Trace-Id` | LangWatch-native trace id override. Wins over `traceparent` if both set. |
-| `X-LangWatch-Parent-Span-Id` | LangWatch-native parent span id. |
-| `X-LangWatch-Thread-Id` | Optional conversation thread id; carried on the span as `langwatch.thread_id`. |
-| `X-LangWatch-Trace-Metadata` | JSON object merged into the span's custom metadata. |
+| `tracestate` (W3C)                | Carried through verbatim to upstream OTel export.                                                                                 |
+| `X-LangWatch-Trace-Id`            | LangWatch-native trace id override. Wins over `traceparent` if both set.                                                          |
+| `X-LangWatch-Parent-Span-Id`      | LangWatch-native parent span id.                                                                                                  |
+| `X-LangWatch-Thread-Id`           | Optional conversation thread id; carried on the span as `langwatch.thread_id`.                                                    |
+| `X-LangWatch-Trace-Metadata`      | JSON object merged into the span's custom metadata.                                                                               |
 
 If **no** trace headers are present, the gateway creates a new trace and emits **`X-LangWatch-Trace-Id: <trace_id>`** and **`X-LangWatch-Gateway-Request-Id: req_…`** on the response so the caller can stitch later if desired.
 
@@ -877,34 +923,34 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 
 **Endpoints (canonical shapes):**
 
-| Method | Path | Purpose | Permission |
-|---|---|---|---|
-| `GET` | `/api/gateway/v1/virtual-keys` | List VKs in a project | `virtualKeys:view` |
-| `POST` | `/api/gateway/v1/virtual-keys` | Create VK (returns full secret once) | `virtualKeys:create` |
-| `GET` | `/api/gateway/v1/virtual-keys/:id` | Get VK (secret not returned) | `virtualKeys:view` |
-| `PATCH` | `/api/gateway/v1/virtual-keys/:id` | Update config (aliases, budgets, guardrails, providers) | `virtualKeys:update` |
-| `POST` | `/api/gateway/v1/virtual-keys/:id/rotate` | Rotate secret (returns new secret once) | `virtualKeys:rotate` |
-| `POST` | `/api/gateway/v1/virtual-keys/:id/revoke` | Revoke | `virtualKeys:delete` |
-| `GET` | `/api/gateway/v1/budgets` | List budgets | `gatewayBudgets:view` |
-| `POST` | `/api/gateway/v1/budgets` | Create budget | `gatewayBudgets:create` |
-| `PATCH` | `/api/gateway/v1/budgets/:id` | Update | `gatewayBudgets:update` |
-| `DELETE` | `/api/gateway/v1/budgets/:id` | Delete | `gatewayBudgets:delete` |
-| `GET` `POST` | `/api/gateway/v1/providers` | Tombstone. Gateway provider bindings folded into ModelProvider in iter 110, so all four answer `410 Gone` with `gateway_provider_bindings_gone` and point at `/api/model-providers` | n/a |
-| `PATCH` `DELETE` | `/api/gateway/v1/providers/:id` | Tombstone, same as above | n/a |
-| `POST` | `/api/gateway/v1/virtual-keys/:id/disable` | Reversible stop (distinct `virtual_key_disabled` on use; grace preserved) | `virtualKeys:update` |
-| `POST` | `/api/gateway/v1/virtual-keys/:id/enable` | Reverse of disable; restores the key exactly as it was | `virtualKeys:update` |
-| `GET` | `/api/gateway/v1/virtual-keys/:id/spend` | Per-key spend + request count over a window | `gatewayUsage:view` |
-| `POST` | `/api/gateway/v1/budgets/:id/reset` | Move the period boundary; never mutates recorded spend; `?end_user_id=` for one template bucket | `gatewayBudgets:update` |
-| `GET` | `/api/gateway/v1/end-users/:id/spend` | Rolling-window usage rollup + the applicable template caps at their current-period spend; org key, billing surface | `gatewaySpend:view` |
-| `GET` | `/api/gateway/v1/cache-rules` | List cache rules, cursor-paged | `gatewayCacheRules:view` |
-| `POST` | `/api/gateway/v1/cache-rules` | Create a cache rule | `gatewayCacheRules:create` |
-| `GET` | `/api/gateway/v1/cache-rules/:id` | Get one cache rule | `gatewayCacheRules:view` |
-| `PATCH` | `/api/gateway/v1/cache-rules/:id` | Update a cache rule | `gatewayCacheRules:update` |
-| `DELETE` | `/api/gateway/v1/cache-rules/:id` | Delete a cache rule | `gatewayCacheRules:delete` |
-| `GET` | `/api/gateway/v1/spend-events` | Read the spend event log, cursor-paged and filterable by key, end user, model, and status | `gatewaySpend:view` |
-| `POST` | `/api/gateway/v1/spend-events/replay` | Re-deliver a window of spend events to the subscribed webhook endpoints | `gatewaySpend:manage` |
-| `GET` | `/api/gateway/v1/spend-summaries` | Aggregated spend over a window, grouped by the requested dimension | `gatewaySpend:view` |
-| `GET` | `/api/gateway/v1/openapi.json` | This API's OpenAPI description | none, deliberately public |
+| Method           | Path                                       | Purpose                                                                                                                                                                             | Permission                 |
+| ---------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `GET`            | `/api/gateway/v1/virtual-keys`             | List VKs in a project                                                                                                                                                               | `virtualKeys:view`         |
+| `POST`           | `/api/gateway/v1/virtual-keys`             | Create VK (returns full secret once)                                                                                                                                                | `virtualKeys:create`       |
+| `GET`            | `/api/gateway/v1/virtual-keys/:id`         | Get VK (secret not returned)                                                                                                                                                        | `virtualKeys:view`         |
+| `PATCH`          | `/api/gateway/v1/virtual-keys/:id`         | Update config (aliases, budgets, guardrails, providers)                                                                                                                             | `virtualKeys:update`       |
+| `POST`           | `/api/gateway/v1/virtual-keys/:id/rotate`  | Rotate secret (returns new secret once)                                                                                                                                             | `virtualKeys:rotate`       |
+| `POST`           | `/api/gateway/v1/virtual-keys/:id/revoke`  | Revoke                                                                                                                                                                              | `virtualKeys:delete`       |
+| `GET`            | `/api/gateway/v1/budgets`                  | List budgets                                                                                                                                                                        | `gatewayBudgets:view`      |
+| `POST`           | `/api/gateway/v1/budgets`                  | Create budget                                                                                                                                                                       | `gatewayBudgets:create`    |
+| `PATCH`          | `/api/gateway/v1/budgets/:id`              | Update                                                                                                                                                                              | `gatewayBudgets:update`    |
+| `DELETE`         | `/api/gateway/v1/budgets/:id`              | Delete                                                                                                                                                                              | `gatewayBudgets:delete`    |
+| `GET` `POST`     | `/api/gateway/v1/providers`                | Tombstone. Gateway provider bindings folded into ModelProvider in iter 110, so all four answer `410 Gone` with `gateway_provider_bindings_gone` and point at `/api/model-providers` | n/a                        |
+| `PATCH` `DELETE` | `/api/gateway/v1/providers/:id`            | Tombstone, same as above                                                                                                                                                            | n/a                        |
+| `POST`           | `/api/gateway/v1/virtual-keys/:id/disable` | Reversible stop (distinct `virtual_key_disabled` on use; grace preserved)                                                                                                           | `virtualKeys:update`       |
+| `POST`           | `/api/gateway/v1/virtual-keys/:id/enable`  | Reverse of disable; restores the key exactly as it was                                                                                                                              | `virtualKeys:update`       |
+| `GET`            | `/api/gateway/v1/virtual-keys/:id/spend`   | Per-key spend + request count over a window                                                                                                                                         | `gatewayUsage:view`        |
+| `POST`           | `/api/gateway/v1/budgets/:id/reset`        | Move the period boundary; never mutates recorded spend; `?end_user_id=` for one template bucket                                                                                     | `gatewayBudgets:update`    |
+| `GET`            | `/api/gateway/v1/end-users/:id/spend`      | Rolling-window usage rollup + the applicable template caps at their current-period spend; org key, billing surface                                                                  | `gatewaySpend:view`        |
+| `GET`            | `/api/gateway/v1/cache-rules`              | List cache rules, cursor-paged                                                                                                                                                      | `gatewayCacheRules:view`   |
+| `POST`           | `/api/gateway/v1/cache-rules`              | Create a cache rule                                                                                                                                                                 | `gatewayCacheRules:create` |
+| `GET`            | `/api/gateway/v1/cache-rules/:id`          | Get one cache rule                                                                                                                                                                  | `gatewayCacheRules:view`   |
+| `PATCH`          | `/api/gateway/v1/cache-rules/:id`          | Update a cache rule                                                                                                                                                                 | `gatewayCacheRules:update` |
+| `DELETE`         | `/api/gateway/v1/cache-rules/:id`          | Delete a cache rule                                                                                                                                                                 | `gatewayCacheRules:delete` |
+| `GET`            | `/api/gateway/v1/spend-events`             | Read the spend event log, cursor-paged and filterable by key, end user, model, and status                                                                                           | `gatewaySpend:view`        |
+| `POST`           | `/api/gateway/v1/spend-events/replay`      | Re-deliver a window of spend events to the subscribed webhook endpoints                                                                                                             | `gatewaySpend:manage`      |
+| `GET`            | `/api/gateway/v1/spend-summaries`          | Aggregated spend over a window, grouped by the requested dimension                                                                                                                  | `gatewaySpend:view`        |
+| `GET`            | `/api/gateway/v1/openapi.json`             | This API's OpenAPI description                                                                                                                                                      | none, deliberately public  |
 
 **Response shape convention:** snake_case (`virtual_key_id`, `created_at`) to match the OpenAI / Anthropic API aesthetic that external integrations already expect.
 

@@ -129,9 +129,7 @@ export function postgresEngineTableStatement({
     );
   }
   const columnList = columns
-    .map(
-      (column) => `${assertIdentifier(column.name, "column")} ${column.type}`,
-    )
+    .map((column) => `${assertIdentifier(column.name, "column")} ${column.type}`)
     .join(", ");
   return (
     `CREATE TABLE IF NOT EXISTS ${qualified(names, table)} (${columnList}) ` +

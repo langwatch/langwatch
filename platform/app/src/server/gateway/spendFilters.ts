@@ -77,9 +77,7 @@ const LEGACY_STATUS_ALIASES = new Map<string, SpendEventStatus>([
  * pass `spendStatusFilter` and then throw here, turning a validated request
  * into a 500.
  */
-export function normalizeStatusFilter(
-  status: string,
-): SpendEventStatus | undefined {
+export function normalizeStatusFilter(status: string): SpendEventStatus | undefined {
   if (status === "") return undefined;
   const alias = LEGACY_STATUS_ALIASES.get(status);
   if (alias !== undefined) return alias;
@@ -185,9 +183,7 @@ export const spendFilterQueryShape = {
 } as const;
 
 /** The parsed shape of {@link spendFilterQueryShape}. */
-export type SpendFilterQuery = z.infer<
-  z.ZodObject<typeof spendFilterQueryShape>
->;
+export type SpendFilterQuery = z.infer<z.ZodObject<typeof spendFilterQueryShape>>;
 
 /**
  * Group repeated pairs by key: repeating a key widens that key (any of the
@@ -256,9 +252,7 @@ export function spendFiltersFromQuery({
     requestTypes: query.request_type,
     labels: query.label,
     metadata:
-      query.metadata === undefined
-        ? undefined
-        : parseMetadataFilters(query.metadata),
+      query.metadata === undefined ? undefined : parseMetadataFilters(query.metadata),
     status: query.status,
   };
 }
@@ -274,10 +268,7 @@ export const spendFiltersSchema = z.object({
   principalUserIds: z.array(id).max(MAX_FILTER_VALUES).optional(),
   models: z.array(z.string().min(1).max(200)).max(MAX_FILTER_VALUES).optional(),
   providerKeys: z.array(id).max(MAX_FILTER_VALUES).optional(),
-  requestTypes: z
-    .array(z.string().min(1).max(50))
-    .max(MAX_FILTER_VALUES)
-    .optional(),
+  requestTypes: z.array(z.string().min(1).max(50)).max(MAX_FILTER_VALUES).optional(),
   labels: z.array(z.string().min(1).max(200)).max(MAX_FILTER_VALUES).optional(),
   metadata: z
     .array(
@@ -295,10 +286,7 @@ export const spendFiltersSchema = z.object({
         // Non-empty for the same reason the query spelling is: ClickHouse
         // answers a missing Map key with the type default, so an empty value
         // matches every row that lacks the key.
-        values: z
-          .array(z.string().min(1).max(512))
-          .min(1)
-          .max(MAX_FILTER_VALUES),
+        values: z.array(z.string().min(1).max(512)).min(1).max(MAX_FILTER_VALUES),
       }),
     )
     .max(MAX_FILTER_VALUES)
@@ -329,11 +317,10 @@ const IN_COLUMNS: ReadonlyArray<readonly [keyof SpendFilters, string]> = [
  * absent predicate and hand back the organization's entire spend under a
  * narrowing the caller asked for.
  */
-export function buildSpendFilterClauses({
-  filters,
-}: {
-  filters: SpendFilters;
-}): { clauses: string[]; params: Record<string, unknown> } {
+export function buildSpendFilterClauses({ filters }: { filters: SpendFilters }): {
+  clauses: string[];
+  params: Record<string, unknown>;
+} {
   const clauses: string[] = [];
   const params: Record<string, unknown> = {};
 
@@ -358,9 +345,7 @@ export function buildSpendFilterClauses({
   });
 
   const status =
-    filters.status !== undefined
-      ? normalizeStatusFilter(filters.status)
-      : undefined;
+    filters.status !== undefined ? normalizeStatusFilter(filters.status) : undefined;
   if (status !== undefined) {
     clauses.push("Status = {status:String}");
     params.status = status;

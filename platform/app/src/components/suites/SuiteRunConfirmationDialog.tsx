@@ -49,8 +49,7 @@ export function SuiteRunConfirmationDialog({
   // dialog holds the run here rather than sending it to be rejected.
   const missingSecrets = parameters.some(
     (parameter) =>
-      parameter.secret === true &&
-      (parameterValues[parameter.name] ?? "") === "",
+      parameter.secret === true && (parameterValues[parameter.name] ?? "") === "",
   );
 
   return (
@@ -61,11 +60,7 @@ export function SuiteRunConfirmationDialog({
       }}
       placement="center"
     >
-      <Dialog.Content
-        bg="bg"
-        maxWidth="500px"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <Dialog.Content bg="bg" maxWidth="500px" onClick={(e) => e.stopPropagation()}>
         {!isLoading && <Dialog.CloseTrigger />}
         <Dialog.Header>
           <Dialog.Title>{suiteName}</Dialog.Title>
@@ -74,8 +69,7 @@ export function SuiteRunConfirmationDialog({
           <VStack align="stretch" gap={4}>
             <Text fontWeight="semibold">
               {" "}
-              Run {estimatedJobs}{" "}
-              {estimatedJobs === 1 ? "simulation" : "simulations"}?
+              Run {estimatedJobs} {estimatedJobs === 1 ? "simulation" : "simulations"}?
             </Text>
             <HStack gap={6}>
               <VStack gap={0} align="start">
@@ -225,12 +219,7 @@ function RunParameterField({
       <HStack gap={2}>
         <HStack gap={0} width="180px" flexShrink={0} minWidth={0}>
           {isSecret && <Lock size={12} color="var(--chakra-colors-fg-muted)" />}
-          <Text
-            fontSize="sm"
-            fontFamily="mono"
-            truncate
-            paddingLeft={isSecret ? 1 : 0}
-          >
+          <Text fontSize="sm" fontFamily="mono" truncate paddingLeft={isSecret ? 1 : 0}>
             {parameter.name}
           </Text>
           {parameter.description && (

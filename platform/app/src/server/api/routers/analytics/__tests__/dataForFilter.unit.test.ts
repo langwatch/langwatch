@@ -19,9 +19,7 @@ vi.mock("../../../rbac", async (importOriginal) => {
 // hands out. Mocking `getApp` is therefore what standing in for the store
 // looks like from here.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   return {
     // Consumers that degrade without Redis read through this one.
     tryGetApp: () => null,
@@ -58,9 +56,7 @@ const baseInput = {
 describe("dataForFilter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getFilterOptions.mockResolvedValue([
-      { field: "opt", label: "Opt", count: 1 },
-    ]);
+    getFilterOptions.mockResolvedValue([{ field: "opt", label: "Opt", count: 1 }]);
     mockedGetApp.mockReturnValue({
       permissions: appPermissionsService(),
       filters: { options: { getFilterOptions } },

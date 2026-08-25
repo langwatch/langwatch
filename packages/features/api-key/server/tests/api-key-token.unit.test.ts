@@ -112,14 +112,18 @@ describe("verifySecret", () => {
         .createHash("sha256")
         .update(secret)
         .digest("hex");
-      expect(ApiKeyTokenAdapter.verifyApiKeySecret(secret, legacyHash, PEPPER)).toBe("match_legacy");
+      expect(ApiKeyTokenAdapter.verifyApiKeySecret(secret, legacyHash, PEPPER)).toBe(
+        "match_legacy",
+      );
     });
   });
 
   describe("when secret does not match", () => {
     it("returns no_match", () => {
       const hashed = ApiKeyTokenAdapter.hashApiKeySecret("correct", PEPPER);
-      expect(ApiKeyTokenAdapter.verifyApiKeySecret("wrong", hashed, PEPPER)).toBe("no_match");
+      expect(ApiKeyTokenAdapter.verifyApiKeySecret("wrong", hashed, PEPPER)).toBe(
+        "no_match",
+      );
     });
   });
 });

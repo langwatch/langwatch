@@ -12,15 +12,7 @@
  * standing up the whole dependency graph.
  */
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
@@ -54,14 +46,12 @@ vi.mock("~/server/app-layer/app", () => ({
 // replaced with a passthrough. Project resolution from the API key stays real,
 // which is what these tests are actually about.
 vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
   return {
     ...actual,
-    requirePermission:
-      () => async (_c: unknown, next: () => Promise<unknown>) => {
-        await next();
-      },
+    requirePermission: () => async (_c: unknown, next: () => Promise<unknown>) => {
+      await next();
+    },
   };
 });
 
@@ -83,8 +73,7 @@ let orgId: string;
 let teamId: string;
 let previousBaseHost: string | undefined;
 
-const registered: Array<{ projectId: string; tabKey: string; tabId: string }> =
-  [];
+const registered: Array<{ projectId: string; tabKey: string; tabId: string }> = [];
 
 async function registerTab(params: {
   projectId: string;
@@ -156,9 +145,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await Promise.all(
-    registered.map((entry) => scenarioTabRegistry.unregister(entry)),
-  );
+  await Promise.all(registered.map((entry) => scenarioTabRegistry.unregister(entry)));
 
   await cleanupTestRows(prisma, [
     ["project", { id: { in: [projectId, otherProjectId] } }],
@@ -243,9 +230,9 @@ describe("POST /api/scenario-events/browser-tab", () => {
       });
 
       expect(res.status).toBe(200);
-      const payload = JSON.parse(
-        mockBroadcastToTenant.mock.calls[0]![1] as string,
-      ) as { url: string };
+      const payload = JSON.parse(mockBroadcastToTenant.mock.calls[0]![1] as string) as {
+        url: string;
+      };
       expect(payload.url).toBe(
         `${BASE_HOST}/${projectSlug}/simulations/checkout-flow/batch-8`,
       );

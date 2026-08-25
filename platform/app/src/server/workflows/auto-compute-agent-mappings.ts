@@ -32,29 +32,22 @@ function extractVariablesFromDSL({ dsl }: { dsl: WorkflowDSL }): {
 } {
   const rawInputs = getMappingSurfaceInputs(dsl.edges, dsl.nodes);
 
-  const inputs = rawInputs.flatMap(
-    (i): Array<{ identifier: string }> =>
-      typeof i.identifier === "string" ? [{ identifier: i.identifier }] : [],
+  const inputs = rawInputs.flatMap((i): Array<{ identifier: string }> =>
+    typeof i.identifier === "string" ? [{ identifier: i.identifier }] : [],
   );
 
-  const endNodeData = dsl.nodes.find(
-    (n) => n.type === "end" || n.id === "end",
-  )?.data;
+  const endNodeData = dsl.nodes.find((n) => n.type === "end" || n.id === "end")?.data;
   const rawOutputs: unknown[] = Array.isArray(
     (endNodeData as { inputs?: unknown } | undefined)?.inputs,
   )
     ? (endNodeData as { inputs: unknown[] }).inputs
     : [];
 
-  const outputs = rawOutputs.flatMap(
-    (o: unknown): Array<{ identifier: string }> => {
-      if (typeof o !== "object" || o === null) return [];
-      const field = o as { identifier?: unknown };
-      return typeof field.identifier === "string"
-        ? [{ identifier: field.identifier }]
-        : [];
-    },
-  );
+  const outputs = rawOutputs.flatMap((o: unknown): Array<{ identifier: string }> => {
+    if (typeof o !== "object" || o === null) return [];
+    const field = o as { identifier?: unknown };
+    return typeof field.identifier === "string" ? [{ identifier: field.identifier }] : [];
+  });
 
   return { inputs, outputs };
 }
@@ -147,9 +140,7 @@ export async function autoComputeAgentMappings({
 
       // Preserve mappings whose keys are still valid workflow inputs; drop stale ones.
       const preservedMappings = Object.fromEntries(
-        Object.entries(currentMappings).filter(([key]) =>
-          inputIdentifiers.has(key),
-        ),
+        Object.entries(currentMappings).filter(([key]) => inputIdentifiers.has(key)),
       );
 
       // Fill in auto-computed best-match defaults only for inputs the user has
@@ -203,9 +194,7 @@ export async function autoComputeAgentMappings({
 
       const baseConfig = shouldRemoveOutputField
         ? Object.fromEntries(
-            Object.entries(config).filter(
-              ([key]) => key !== "scenarioOutputField",
-            ),
+            Object.entries(config).filter(([key]) => key !== "scenarioOutputField"),
           )
         : config;
 

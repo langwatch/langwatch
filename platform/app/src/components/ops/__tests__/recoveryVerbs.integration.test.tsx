@@ -78,9 +78,7 @@ describe("dead-letter recovery vocabulary", () => {
           />,
         );
 
-        const outboxButtons = screen
-          .getAllByRole("button")
-          .map((b) => b.textContent);
+        const outboxButtons = screen.getAllByRole("button").map((b) => b.textContent);
         expect(outboxButtons).toContain("Redrive");
         expect(outboxButtons).toContain("Discard");
         expect(outboxButtons.join(" ")).not.toMatch(/Replay/);
@@ -94,9 +92,7 @@ describe("dead-letter recovery vocabulary", () => {
           </Table.Root>,
         );
 
-        const queueButtons = screen
-          .getAllByRole("button")
-          .map((b) => b.textContent);
+        const queueButtons = screen.getAllByRole("button").map((b) => b.textContent);
         expect(queueButtons).toContain("Redrive");
         expect(queueButtons).toContain("Discard");
         expect(queueButtons.join(" ")).not.toMatch(/Replay/);
@@ -134,9 +130,7 @@ describe("dead-letter recovery vocabulary", () => {
           </Table.Root>,
         );
         expect(screen.queryAllByRole("button")).toHaveLength(0);
-        expect(
-          within(screen.getByRole("row")).queryByText("Discard"),
-        ).toBeNull();
+        expect(within(screen.getByRole("row")).queryByText("Discard")).toBeNull();
       });
     });
   });

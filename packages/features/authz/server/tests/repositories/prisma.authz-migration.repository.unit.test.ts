@@ -71,10 +71,7 @@ class StubAuthzMigrationDatabase implements AuthzMigrationDatabase {
   ) {
     this.roleBinding = new StubFindManyDelegate(options.bindings);
     this.grant = new StubFindManyDelegate(options.grants);
-    this.grantUsage = new StubGrantUsageDelegate(
-      options.usages,
-      options.updateError,
-    );
+    this.grantUsage = new StubGrantUsageDelegate(options.usages, options.updateError);
   }
 }
 
@@ -150,9 +147,7 @@ describe("PrismaAuthzMigrationRepository", () => {
       organizationId: "org_1",
     });
 
-    expect(
-      rows.map(({ grantId, viewCount }) => ({ grantId, viewCount })),
-    ).toEqual([
+    expect(rows.map(({ grantId, viewCount }) => ({ grantId, viewCount }))).toEqual([
       { grantId: "grant_1", viewCount: 7 },
       { grantId: "grant_2", viewCount: 0 },
     ]);

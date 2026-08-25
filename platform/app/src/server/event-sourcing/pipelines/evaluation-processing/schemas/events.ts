@@ -37,9 +37,7 @@ export const evaluationScheduledEventSchema = EventSchema.extend({
 export type EvaluationScheduledEventData = z.infer<
   typeof evaluationScheduledEventDataSchema
 >;
-export type EvaluationScheduledEvent = z.infer<
-  typeof evaluationScheduledEventSchema
->;
+export type EvaluationScheduledEvent = z.infer<typeof evaluationScheduledEventSchema>;
 
 /**
  * Evaluation started event - emitted when an evaluation execution begins.
@@ -59,12 +57,8 @@ export const evaluationStartedEventSchema = EventSchema.extend({
   metadata: evaluationEventMetadataSchema.optional(),
 });
 
-export type EvaluationStartedEventData = z.infer<
-  typeof evaluationStartedEventDataSchema
->;
-export type EvaluationStartedEvent = z.infer<
-  typeof evaluationStartedEventSchema
->;
+export type EvaluationStartedEventData = z.infer<typeof evaluationStartedEventDataSchema>;
+export type EvaluationStartedEvent = z.infer<typeof evaluationStartedEventSchema>;
 
 /**
  * Evaluation completed event - emitted when an evaluation execution finishes.
@@ -91,9 +85,7 @@ export const evaluationCompletedEventSchema = EventSchema.extend({
 export type EvaluationCompletedEventData = z.infer<
   typeof evaluationCompletedEventDataSchema
 >;
-export type EvaluationCompletedEvent = z.infer<
-  typeof evaluationCompletedEventSchema
->;
+export type EvaluationCompletedEvent = z.infer<typeof evaluationCompletedEventSchema>;
 
 /**
  * Evaluation reported event - emitted when a custom SDK evaluation is reported atomically.
@@ -127,9 +119,7 @@ export const evaluationReportedEventSchema = EventSchema.extend({
 export type EvaluationReportedEventData = z.infer<
   typeof evaluationReportedEventDataSchema
 >;
-export type EvaluationReportedEvent = z.infer<
-  typeof evaluationReportedEventSchema
->;
+export type EvaluationReportedEvent = z.infer<typeof evaluationReportedEventSchema>;
 
 /**
  * Union of all evaluation processing event types.

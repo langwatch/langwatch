@@ -2,10 +2,7 @@ import { Box, HStack, Text } from "@chakra-ui/react";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { ElasticSearchEvaluation } from "../server/tracer/types";
-import {
-  CheckStatusIcon,
-  evaluationStatusColor,
-} from "./checks/EvaluationStatus";
+import { CheckStatusIcon, evaluationStatusColor } from "./checks/EvaluationStatus";
 import { formatEvaluationScore } from "./traces/EvaluationStatusItem";
 
 export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {

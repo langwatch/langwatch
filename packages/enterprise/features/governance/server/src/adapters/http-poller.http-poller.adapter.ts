@@ -113,10 +113,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
     return httpPollingConfigSchema.parse(config);
   }
 
-  async runOnce(
-    options: PullRunOptions,
-    config: HttpPollingConfig,
-  ): Promise<PullResult> {
+  async runOnce(options: PullRunOptions, config: HttpPollingConfig): Promise<PullResult> {
     const allEvents: NormalizedPullEvent[] = [];
     let cursor = options.cursor;
     let pageCount = 0;
@@ -164,15 +161,12 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
     // Hit the page cap — surface the cursor so the next run picks
     // up from here, but log a warning since this likely indicates a
     // misconfigured cursor or pathological response shape.
-    this.diagnostics.warn(
-      "HttpPollingPullerAdapter: hit MAX_PAGES_PER_RUN safety cap",
-      {
-        adapter: this.id,
-        url: config.url,
-        pageCount,
-        cursor,
-      },
-    );
+    this.diagnostics.warn("HttpPollingPullerAdapter: hit MAX_PAGES_PER_RUN safety cap", {
+      adapter: this.id,
+      url: config.url,
+      pageCount,
+      cursor,
+    });
     return { events: allEvents, cursor, errorCount: 0 };
   }
 
@@ -202,10 +196,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
         // Two independent bounds: this request's own timeout, and the run's
         // deadline. Either one firing must unwind the call.
         const signal = options.signal
-          ? AbortSignal.any([
-              options.signal,
-              AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-            ])
+          ? AbortSignal.any([options.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
           : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
         const response = await this.http.fetch(url, {
           method: config.method,
@@ -215,14 +206,10 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
         });
         if (response.status >= 500) {
           // Retryable — fall through to the retry-delay branch
-          lastError = new Error(
-            `HTTP ${response.status} ${response.statusText}`,
-          );
+          lastError = new Error(`HTTP ${response.status} ${response.statusText}`);
         } else if (response.status >= 400) {
           // 4xx fails fast — no retry
-          throw new Error(
-            `HTTP ${response.status} ${response.statusText} (${url})`,
-          );
+          throw new Error(`HTTP ${response.status} ${response.statusText} (${url})`);
         } else {
           return response;
         }
@@ -350,10 +337,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
     return eventsValue.map((evt) => this.mapEvent(evt, config));
   }
 
-  private mapEvent(
-    rawEvent: unknown,
-    config: HttpPollingConfig,
-  ): NormalizedPullEvent {
+  private mapEvent(rawEvent: unknown, config: HttpPollingConfig): NormalizedPullEvent {
     const get = (path: string | undefined): unknown =>
       path === undefined
         ? undefined

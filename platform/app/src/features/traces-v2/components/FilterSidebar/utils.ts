@@ -76,9 +76,7 @@ export function formatCount(count: number): string {
  * has traces. The zero-count rows stay in the list — this only changes the
  * tally. The "(none)" toggle row isn't a FacetItem, so it's never counted.
  */
-export function countPresentValues(
-  items: readonly { count: number }[],
-): number {
+export function countPresentValues(items: readonly { count: number }[]): number {
   return items.reduce((n, item) => (item.count > 0 ? n + 1 : n), 0);
 }
 

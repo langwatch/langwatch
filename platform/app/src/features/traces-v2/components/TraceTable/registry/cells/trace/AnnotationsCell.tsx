@@ -69,10 +69,7 @@ const AnnotationCounts: React.FC<{ row: TraceListItem; density: Density }> = ({
   return (
     <HStack gap={density === "compact" ? 1 : 1.5} flexWrap="wrap">
       <AnnotationCommentsChip annotations={annotations} traceId={row.traceId} />
-      <AnnotationSuggestionsChip
-        annotations={annotations}
-        traceId={row.traceId}
-      />
+      <AnnotationSuggestionsChip annotations={annotations} traceId={row.traceId} />
       <AnnotationScoresChip
         annotations={annotations}
         traceId={row.traceId}
@@ -125,7 +122,5 @@ export const AnnotationsCell = {
   id: "annotations",
   label: "Annotations",
   render: ({ row }) => <AnnotationsCellView row={row} density="compact" />,
-  renderComfortable: ({ row }) => (
-    <AnnotationsCellView row={row} density="comfortable" />
-  ),
+  renderComfortable: ({ row }) => <AnnotationsCellView row={row} density="comfortable" />,
 } as const satisfies CellDef<TraceListItem>;

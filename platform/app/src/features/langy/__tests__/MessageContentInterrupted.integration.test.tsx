@@ -151,9 +151,7 @@ describe("the store's interruption record", () => {
       useLangyStore.getState().requestStop();
       expect(useLangyStore.getState().interruptedConversationId).toBe("conv-1");
 
-      useLangyStore
-        .getState()
-        .beginTurn({ conversationId: "conv-1", turnId: "turn-2" });
+      useLangyStore.getState().beginTurn({ conversationId: "conv-1", turnId: "turn-2" });
       expect(useLangyStore.getState().interruptedConversationId).toBeNull();
     });
   });

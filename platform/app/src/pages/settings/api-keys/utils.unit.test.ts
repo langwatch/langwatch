@@ -262,17 +262,17 @@ describe("roleSummary()", () => {
 
   describe("when given a single VIEWER on TEAM", () => {
     it("returns 'Team'", () => {
-      expect(
-        roleSummary([{ role: "VIEWER", scopeType: "TEAM", scopeId: "t1" }]),
-      ).toBe("Team");
+      expect(roleSummary([{ role: "VIEWER", scopeType: "TEAM", scopeId: "t1" }])).toBe(
+        "Team",
+      );
     });
   });
 
   describe("when given a single ADMIN on PROJECT", () => {
     it("returns 'Project'", () => {
-      expect(
-        roleSummary([{ role: "ADMIN", scopeType: "PROJECT", scopeId: "p1" }]),
-      ).toBe("Project");
+      expect(roleSummary([{ role: "ADMIN", scopeType: "PROJECT", scopeId: "p1" }])).toBe(
+        "Project",
+      );
     });
   });
 
@@ -334,9 +334,9 @@ describe("scopeLabel()", () => {
   describe("when scopeType is PROJECT with name", () => {
     /** @scenario scopeLabel formats project scope correctly */
     it("returns 'Project: My Project'", () => {
-      expect(
-        scopeLabel({ scopeType: "PROJECT", scopeName: "My Project" }),
-      ).toBe("Project: My Project");
+      expect(scopeLabel({ scopeType: "PROJECT", scopeName: "My Project" })).toBe(
+        "Project: My Project",
+      );
     });
   });
 
@@ -459,12 +459,7 @@ describe("bindingsToSelections()", () => {
     getTeamRolePermissions: (role: string) => {
       if (role === "MEMBER") return ["traces:view", "scenarios:view"];
       if (role === "ADMIN")
-        return [
-          "traces:view",
-          "traces:create",
-          "scenarios:view",
-          "scenarios:manage",
-        ];
+        return ["traces:view", "traces:create", "scenarios:view", "scenarios:manage"];
       return [];
     },
   };
@@ -600,9 +595,7 @@ describe("getUserPermissionsAtScope()", () => {
   describe("when no bindings match the scope", () => {
     it("returns empty array", () => {
       const result = getUserPermissionsAtScope({
-        myBindings: [
-          { scopeType: "PROJECT", scopeId: "other-proj", role: "ADMIN" },
-        ],
+        myBindings: [{ scopeType: "PROJECT", scopeId: "other-proj", role: "ADMIN" }],
         scopeType: "PROJECT",
         scopeId: "proj-1",
         organizationId: "org-1",
@@ -632,9 +625,7 @@ describe("getUserPermissionsAtScope()", () => {
   describe("when exact scope matches", () => {
     it("returns permissions for the matched role", () => {
       const result = getUserPermissionsAtScope({
-        myBindings: [
-          { scopeType: "PROJECT", scopeId: "proj-1", role: "MEMBER" },
-        ],
+        myBindings: [{ scopeType: "PROJECT", scopeId: "proj-1", role: "MEMBER" }],
         scopeType: "PROJECT",
         scopeId: "proj-1",
         organizationId: "org-1",
@@ -649,9 +640,7 @@ describe("getUserPermissionsAtScope()", () => {
   describe("when an org-level ADMIN binding covers a project scope", () => {
     it("returns everything grantable, not the team-role bag", () => {
       const result = getUserPermissionsAtScope({
-        myBindings: [
-          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" },
-        ],
+        myBindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" }],
         scopeType: "PROJECT",
         scopeId: "proj-1",
         organizationId: "org-1",
@@ -668,9 +657,7 @@ describe("getUserPermissionsAtScope()", () => {
   describe("when an org-level non-ADMIN binding covers a project scope", () => {
     it("returns the team-role bag", () => {
       const result = getUserPermissionsAtScope({
-        myBindings: [
-          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" },
-        ],
+        myBindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" }],
         scopeType: "PROJECT",
         scopeId: "proj-1",
         organizationId: "org-1",

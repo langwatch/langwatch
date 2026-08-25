@@ -17,13 +17,7 @@ import {
   type Table as TanstackTable,
   useReactTable,
 } from "@tanstack/react-table";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";

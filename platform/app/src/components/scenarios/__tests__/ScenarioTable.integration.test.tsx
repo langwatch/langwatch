@@ -193,12 +193,8 @@ describe("<ScenarioTable/>", () => {
       });
 
       // Only "Angry double-charge refund" should be visible
-      expect(
-        screen.getByText("Angry double-charge refund"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText("Cross-doc synthesis question"),
-      ).not.toBeInTheDocument();
+      expect(screen.getByText("Angry double-charge refund")).toBeInTheDocument();
+      expect(screen.queryByText("Cross-doc synthesis question")).not.toBeInTheDocument();
 
       const selectAll = screen.getByLabelText("Select all");
       await user.click(selectAll);
@@ -271,9 +267,7 @@ describe("<ScenarioTable/>", () => {
       const onSelectionChange = vi.fn();
       renderTable({ onRowSelectionChange: onSelectionChange });
 
-      const checkbox = screen.getByLabelText(
-        "Select SaaS documentation guidance",
-      );
+      const checkbox = screen.getByLabelText("Select SaaS documentation guidance");
       await user.click(checkbox);
 
       expect(onSelectionChange).toHaveBeenCalledWith(
@@ -378,9 +372,7 @@ describe("<ScenarioArchiveDialog/>", () => {
   });
 
   describe("when archiving a single scenario", () => {
-    const singleScenario = [
-      { id: "scen_4", name: "Angry double-charge refund" },
-    ];
+    const singleScenario = [{ id: "scen_4", name: "Angry double-charge refund" }];
 
     it("displays 'Archive scenario?' as the title", async () => {
       render(
@@ -410,9 +402,7 @@ describe("<ScenarioArchiveDialog/>", () => {
       );
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Angry double-charge refund"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Angry double-charge refund")).toBeInTheDocument();
       });
     });
 
@@ -429,9 +419,7 @@ describe("<ScenarioArchiveDialog/>", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(
-            "Archived scenarios will no longer appear in the library.",
-          ),
+          screen.getByText("Archived scenarios will no longer appear in the library."),
         ).toBeInTheDocument();
       });
     });
@@ -555,12 +543,8 @@ describe("<ScenarioArchiveDialog/>", () => {
       );
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Cross-doc synthesis question"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText("Failed booking escalation"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Cross-doc synthesis question")).toBeInTheDocument();
+        expect(screen.getByText("Failed booking escalation")).toBeInTheDocument();
       });
     });
 
@@ -577,9 +561,7 @@ describe("<ScenarioArchiveDialog/>", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(
-            "Archived scenarios will no longer appear in the library.",
-          ),
+          screen.getByText("Archived scenarios will no longer appear in the library."),
         ).toBeInTheDocument();
       });
     });

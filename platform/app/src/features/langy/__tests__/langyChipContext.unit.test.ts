@@ -27,9 +27,7 @@ describe("describeChipContext", () => {
         // the query: Langy can run it, so it gets the rows too, plus the ability
         // to widen or narrow it. Handing over rows alone would keep only the
         // part it could have derived for itself.
-        const explanation = describeChipContext(
-          filterContextChip('status:"error"')!,
-        );
+        const explanation = describeChipContext(filterContextChip('status:"error"')!);
 
         expect(explanation.action).toBe(
           "Langy gets the search itself, so it can run it, narrow it, or count what it matches.",
@@ -37,9 +35,9 @@ describe("describeChipContext", () => {
       });
 
       it("shows the search that will be handed over", () => {
-        expect(
-          describeChipContext(filterContextChip('status:"error"')!).payload,
-        ).toBe('status:"error"');
+        expect(describeChipContext(filterContextChip('status:"error"')!).payload).toBe(
+          'status:"error"',
+        );
       });
     });
 
@@ -61,9 +59,7 @@ describe("describeChipContext", () => {
           traceIds: new Set(["aaaaaaaaaaaa", "bbbbbbbbbbbb", "cccccccccccc"]),
         })!;
 
-        expect(describeChipContext(chip).payload).toBe(
-          "aaaaaa…aa, bbbbbb…bb, cccccc…cc",
-        );
+        expect(describeChipContext(chip).payload).toBe("aaaaaa…aa, bbbbbb…bb, cccccc…cc");
       });
 
       it("collapses a long list rather than spilling a hundred ids into a tooltip", () => {

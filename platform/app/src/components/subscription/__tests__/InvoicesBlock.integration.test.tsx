@@ -49,10 +49,7 @@ const renderInvoicesBlock = ({
   onViewAllInStripe?: () => void;
 } = {}) => {
   return render(
-    <InvoicesBlock
-      organizationId="test-org-id"
-      onViewAllInStripe={onViewAllInStripe}
-    />,
+    <InvoicesBlock organizationId="test-org-id" onViewAllInStripe={onViewAllInStripe} />,
     { wrapper: Wrapper },
   );
 };
@@ -205,9 +202,7 @@ describe("<InvoicesBlock/>", () => {
         isError: false,
       };
       renderInvoicesBlock({ onViewAllInStripe: vi.fn() });
-      expect(
-        screen.queryByTestId("view-all-invoices-link"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("view-all-invoices-link")).not.toBeInTheDocument();
     });
 
     it("calls onViewAllInStripe callback when clicked", () => {

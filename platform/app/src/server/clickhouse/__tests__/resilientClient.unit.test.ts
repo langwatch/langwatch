@@ -18,8 +18,7 @@ const { mockQueryLogger, mockLogger } = vi.hoisted(() => ({
 }));
 
 vi.mock("@langwatch/observability", () => ({
-  createLogger: (name: string) =>
-    name.includes("query") ? mockQueryLogger : mockLogger,
+  createLogger: (name: string) => (name.includes("query") ? mockQueryLogger : mockLogger),
 }));
 
 import { createResilientClickHouseClient } from "../managedClient";
@@ -126,9 +125,7 @@ describe("createResilientClickHouseClient()", () => {
         baseDelayMs: 1,
       });
 
-      await expect(
-        client.query({ query: "SELECT 1" } as any),
-      ).rejects.toThrow();
+      await expect(client.query({ query: "SELECT 1" } as any)).rejects.toThrow();
       expect(mock.query).toHaveBeenCalledTimes(3);
     });
   });
@@ -248,10 +245,7 @@ describe("createResilientClickHouseClient()", () => {
         "Syntax error in query",
       );
 
-      const loggedObj = mockQueryLogger.warn.mock.calls[0]![0] as Record<
-        string,
-        unknown
-      >;
+      const loggedObj = mockQueryLogger.warn.mock.calls[0]![0] as Record<string, unknown>;
       expect(loggedObj[QUERY_CAUSE_FIELD]).toBe(err);
     });
 
@@ -271,9 +265,7 @@ describe("createResilientClickHouseClient()", () => {
         "Syntax error in query",
       );
 
-      expect(mockQueryLogger.warn.mock.calls[0]![0]).not.toHaveProperty(
-        "error",
-      );
+      expect(mockQueryLogger.warn.mock.calls[0]![0]).not.toHaveProperty("error");
     });
   });
 
@@ -293,10 +285,7 @@ describe("createResilientClickHouseClient()", () => {
       );
       const result = { data: [{ ok: 1 }] };
       const mock = makeMockClient({
-        query: vi
-          .fn()
-          .mockRejectedValueOnce(overload)
-          .mockResolvedValueOnce(result),
+        query: vi.fn().mockRejectedValueOnce(overload).mockResolvedValueOnce(result),
       });
 
       const client = fastRetryClient(mock);
@@ -306,9 +295,7 @@ describe("createResilientClickHouseClient()", () => {
 
     /** @scenario A read that keeps failing transiently eventually surfaces the error */
     it("surfaces the error only after retries are exhausted", async () => {
-      const overload = new Error(
-        "Too many simultaneous queries. Maximum: 100. ",
-      );
+      const overload = new Error("Too many simultaneous queries. Maximum: 100. ");
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(overload),
       });
@@ -422,8 +409,7 @@ describe("createResilientClickHouseClient()", () => {
       const client = createResilientClickHouseClient({ client: mock });
 
       await client.query({
-        query:
-          "SELECT SpanId FROM stored_spans WHERE TenantId = {tenantId:String}",
+        query: "SELECT SpanId FROM stored_spans WHERE TenantId = {tenantId:String}",
       });
 
       expect(mockQueryLogger.warn).toHaveBeenCalledWith(
@@ -491,9 +477,7 @@ describe("query error translation after retries are exhausted", () => {
       baseDelayMs: 1,
     });
 
-    const { QueryMemoryExceededError } = await import(
-      "~/server/app-layer/traces/errors"
-    );
+    const { QueryMemoryExceededError } = await import("~/server/app-layer/traces/errors");
     const rejection = await client.query({ query: "SELECT 1" }).catch((e) => e);
 
     expect(rejection).toBeInstanceOf(QueryMemoryExceededError);

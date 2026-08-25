@@ -64,9 +64,7 @@ vi.mock("~/components/WithPermissionGuard", () => ({
 }));
 
 vi.mock("../../components/DashboardLayout", () => ({
-  DashboardLayout: ({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  ),
+  DashboardLayout: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("~/components/SetupWithAgentButton", () => ({
@@ -74,9 +72,7 @@ vi.mock("~/components/SetupWithAgentButton", () => ({
 }));
 
 vi.mock("~/features/langy/components/LangyContextTarget", () => ({
-  LangyContextTarget: ({ children }: { children?: ReactNode }) => (
-    <>{children}</>
-  ),
+  LangyContextTarget: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
 
 vi.mock("../../components/AddOrEditDatasetDrawer", () => ({

@@ -1,17 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AnalyticsApiError } from "@/client-sdk/services/analytics/analytics-api.service";
 
-vi.mock("@/client-sdk/services/analytics/analytics-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    AnalyticsApiService: vi.fn(),
-  };
-});
+vi.mock(
+  "@/client-sdk/services/analytics/analytics-api.service",
+  async (importOriginal) => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+    const actual = (await importOriginal()) as Record<string, unknown>;
+    return {
+      ...actual,
+      AnalyticsApiService: vi.fn(),
+    };
+  },
+);
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -47,9 +54,11 @@ describe("queryAnalyticsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockTimeseries = vi.fn();
-    vi.mocked(AnalyticsApiService).mockImplementation(function () { return ({
-      timeseries: mockTimeseries,
-    }) as unknown as AnalyticsApiService; });
+    vi.mocked(AnalyticsApiService).mockImplementation(function () {
+      return {
+        timeseries: mockTimeseries,
+      } as unknown as AnalyticsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

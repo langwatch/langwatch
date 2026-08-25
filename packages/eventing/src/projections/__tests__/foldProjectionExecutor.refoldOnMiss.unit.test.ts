@@ -29,10 +29,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
   const init = (): CountState => ({ ids: [], LastEventOccurredAt: 0 });
   const apply = (state: CountState, event: Event): CountState => ({
     ids: [...state.ids, event.id],
-    LastEventOccurredAt: Math.max(
-      state.LastEventOccurredAt,
-      event.occurredAt ?? 0,
-    ),
+    LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt ?? 0),
   });
 
   const context: ProjectionStoreContext = {
@@ -73,11 +70,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       });
       foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([e1, e2]);
 
-      const result = (await executor.execute(
-        foldDef,
-        e2,
-        context,
-      )) as CountState;
+      const result = (await executor.execute(foldDef, e2, context)) as CountState;
 
       // History (e1) is included — NOT just the delivered e2.
       expect(result.ids).toEqual(["e1", "e2"]);
@@ -105,11 +98,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       });
       foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([e1]);
 
-      const result = (await executor.execute(
-        foldDef,
-        e1,
-        context,
-      )) as CountState;
+      const result = (await executor.execute(foldDef, e1, context)) as CountState;
 
       expect(result.ids).toEqual(["e1"]);
     });
@@ -129,11 +118,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       // e2 was persisted but the event-log read hasn't caught up to it.
       foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([e1]);
 
-      const result = (await executor.execute(
-        foldDef,
-        e2,
-        context,
-      )) as CountState;
+      const result = (await executor.execute(foldDef, e2, context)) as CountState;
 
       expect(result.ids).toEqual(["e1", "e2"]);
     });
@@ -151,11 +136,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       });
       foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([]);
 
-      const result = (await executor.execute(
-        foldDef,
-        e1,
-        context,
-      )) as CountState;
+      const result = (await executor.execute(foldDef, e1, context)) as CountState;
 
       expect(result.ids).toEqual(["e1"]);
       expect(store.store).toHaveBeenCalled();
@@ -202,11 +183,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       });
       foldDef.eventLoaderUpTo = vi.fn();
 
-      const result = (await executor.execute(
-        foldDef,
-        e2,
-        context,
-      )) as CountState;
+      const result = (await executor.execute(foldDef, e2, context)) as CountState;
 
       expect(result.ids).toEqual(["e1", "e2"]);
       expect(foldDef.eventLoaderUpTo).not.toHaveBeenCalled();
@@ -231,11 +208,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       });
       foldDef.eventLoaderUpTo = vi.fn();
 
-      const result = (await executor.execute(
-        foldDef,
-        e2,
-        context,
-      )) as CountState;
+      const result = (await executor.execute(foldDef, e2, context)) as CountState;
 
       expect(result.ids).toEqual(["e2"]);
       expect(foldDef.eventLoaderUpTo).not.toHaveBeenCalled();
@@ -260,11 +233,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       });
       foldDef.eventLoaderUpTo = undefined;
 
-      const result = (await executor.execute(
-        foldDef,
-        e2,
-        context,
-      )) as CountState;
+      const result = (await executor.execute(foldDef, e2, context)) as CountState;
 
       expect(result.ids).toEqual(["e2"]);
       expect(store.store).toHaveBeenCalledTimes(1);
@@ -357,16 +326,10 @@ describe("FoldProjectionExecutor refoldOnStoreMiss instrumentation", () => {
   const init = (): CountState => ({ ids: [], LastEventOccurredAt: 0 });
   const apply = (state: CountState, event: Event): CountState => ({
     ids: [...state.ids, event.id],
-    LastEventOccurredAt: Math.max(
-      state.LastEventOccurredAt,
-      event.occurredAt ?? 0,
-    ),
+    LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt ?? 0),
   });
 
-  async function refoldCount(
-    projectionName: string,
-    outcome: string,
-  ): Promise<number> {
+  async function refoldCount(projectionName: string, outcome: string): Promise<number> {
     const metric = register.getSingleMetric("es_fold_refold_on_miss_total");
     if (!metric) return 0;
     const snapshot = await metric.get();
@@ -410,9 +373,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss instrumentation", () => {
 
         await executor.execute(foldDef, event, context);
 
-        expect(await refoldCount("counted-performed", "performed")).toBe(
-          before + 1,
-        );
+        expect(await refoldCount("counted-performed", "performed")).toBe(before + 1);
       });
     });
   });

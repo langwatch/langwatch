@@ -70,8 +70,7 @@ export const loadDatasets = async (
               ...node.data.dataset,
               inline: {
                 ...node.data.dataset.inline,
-                records:
-                  transpostRowsFirstToColumnsFirstWithoutId(selectedRecords),
+                records: transpostRowsFirstToColumnsFirstWithoutId(selectedRecords),
               },
             },
           },

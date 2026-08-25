@@ -3,16 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "description": "Browser-safe Prompt UI primitives and presentation helpers.",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": ["src"],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -25,15 +27,15 @@
     "react-icons": "^5.5.0"
   },
   "devDependencies": {
-    "@testing-library/react": "^16.3.2",
     "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "jsdom": "^30.0.1",
     "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.9",
-    "vite": "^8.1.2"
+    "vite": "^8.1.2",
+    "vitest": "^4.1.9"
   }
 }

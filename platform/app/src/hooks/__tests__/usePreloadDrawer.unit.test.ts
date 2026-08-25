@@ -65,9 +65,7 @@ describe("usePreloadDrawer", () => {
     describe("when the screen closes before the browser is idle", () => {
       /** @scenario "Leaving the screen cancels a warm-up that has not started" */
       it("fetches no code", () => {
-        const { unmount } = renderHook(() =>
-          usePreloadDrawer("scenarioEditor"),
-        );
+        const { unmount } = renderHook(() => usePreloadDrawer("scenarioEditor"));
 
         unmount();
         becomeIdle();
@@ -80,9 +78,7 @@ describe("usePreloadDrawer", () => {
   describe("given a screen that warms two drawers", () => {
     describe("when the browser becomes idle", () => {
       it("fetches both", () => {
-        renderHook(() =>
-          usePreloadDrawer("scenarioEditor", "scenarioRunDetail"),
-        );
+        renderHook(() => usePreloadDrawer("scenarioEditor", "scenarioRunDetail"));
 
         becomeIdle();
 

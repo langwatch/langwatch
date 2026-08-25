@@ -22,8 +22,7 @@ vi.mock("@clickhouse/client", () => ({
 const registered = vi.hoisted(() => ({ instances: [] as string[] }));
 
 vi.mock("~/server/clickhouse/metrics", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/clickhouse/metrics")>();
+  const actual = await importOriginal<typeof import("~/server/clickhouse/metrics")>();
   return {
     ...actual,
     registerClickHouseLimiter: (instance: string, probe: unknown) => {
@@ -82,17 +81,10 @@ describe("createManagedClickHouseClient", () => {
         createManagedClickHouseClient({ url: "http://b:8123", instance: "b" });
         const second = driver.lastOptions;
 
-        for (const key of [
-          "clickhouse_settings",
-          "keep_alive",
-          "max_open_connections",
-        ]) {
+        for (const key of ["clickhouse_settings", "keep_alive", "max_open_connections"]) {
           // Presence first: comparing the two alone also passes when the
           // setting is absent from both, which is the regression worth having.
-          expect(
-            first?.[key],
-            `every managed client sets ${key}`,
-          ).toBeDefined();
+          expect(first?.[key], `every managed client sets ${key}`).toBeDefined();
           expect(second?.[key]).toEqual(first?.[key]);
         }
       });

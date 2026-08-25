@@ -308,8 +308,7 @@ export const mapEvaluatorResult = (
     executionState.error ??
     (executionState.outputs?.details as string | undefined) ??
     "Unknown evaluator error";
-  const classifiedDomainError =
-    classifyEvaluatorExecutionError(rawErrorDetails);
+  const classifiedDomainError = classifyEvaluatorExecutionError(rawErrorDetails);
 
   const result: SingleEvaluationResult & {
     domainError?: ReturnType<EvaluatorExecutionError["serialize"]>;
@@ -393,10 +392,7 @@ export const mapNlpEvent = ({
   const { component_id, execution_state } = event.payload;
 
   // Skip if not a success or error state
-  if (
-    execution_state?.status !== "success" &&
-    execution_state?.status !== "error"
-  ) {
+  if (execution_state?.status !== "success" && execution_state?.status !== "error") {
     return null;
   }
 
@@ -537,8 +533,7 @@ export const mapWorkflowEvaluatorResult = (
 ): EvaluationV3Event => {
   const hasExecutionError = !!executionState.error;
   const hasEvaluatorError =
-    executionState.status === "error" ||
-    executionState.outputs?.status === "error";
+    executionState.status === "error" || executionState.outputs?.status === "error";
 
   // A coded engine failure travels the handled channel, exactly as on the
   // target side (`mapTargetResult`): the client renders registry copy for the

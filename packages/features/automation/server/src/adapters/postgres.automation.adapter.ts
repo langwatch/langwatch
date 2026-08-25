@@ -16,50 +16,47 @@ import { PrismaWebhookDeliveryRepository } from "../repositories/prisma/prisma.w
 /** Canonical process binding. The app supplies its already-created database
  * capability; this adapter never reaches for a global Prisma client. */
 export class PostgresAutomationAdapter {
-	private constructor(
-		private readonly input: {
-			database: object;
-			verifier: UnsubscribeTokenVerifier;
-			jobs: ScheduledJobStore;
-			clock: AutomationClock;
-			wake: SchedulerWake;
-		},
-	) {}
+  private constructor(
+    private readonly input: {
+      database: object;
+      verifier: UnsubscribeTokenVerifier;
+      jobs: ScheduledJobStore;
+      clock: AutomationClock;
+      wake: SchedulerWake;
+    },
+  ) {}
 
-	static create(input: {
-		database: object;
-		verifier: UnsubscribeTokenVerifier;
-		jobs: ScheduledJobStore;
-		clock: AutomationClock;
-		wake: SchedulerWake;
-	}): PostgresAutomationAdapter {
-		return new PostgresAutomationAdapter(input);
-	}
+  static create(input: {
+    database: object;
+    verifier: UnsubscribeTokenVerifier;
+    jobs: ScheduledJobStore;
+    clock: AutomationClock;
+    wake: SchedulerWake;
+  }): PostgresAutomationAdapter {
+    return new PostgresAutomationAdapter(input);
+  }
 
-	build(): AutomationCapability {
-		const { verifier } = this.input;
-		const database = PrismaAutomationDatabaseRepository.create(
-			this.input.database,
-		).build();
-		const triggerRepository = PrismaTriggerRepository.create(
-			database,
-			this.input.clock,
-		);
-		const history = PrismaTriggerFireHistoryRepository.create(database);
-		return AutomationService.create({
-			triggers: triggerRepository,
-			history,
-			suppressions: PrismaEmailSuppressionRepository.create(database),
-			names: PrismaEmailSuppressionNameRepository.create(database),
-			verifier,
-			reportSchedules: ReportScheduleService.create({
-				jobs: this.input.jobs,
-				clock: this.input.clock,
-				wake: this.input.wake,
-			}),
-			clock: this.input.clock,
-			customGraphs: PrismaCustomGraphRepository.create(database),
-			webhookDeliveries: PrismaWebhookDeliveryRepository.create(database),
-		});
-	}
+  build(): AutomationCapability {
+    const { verifier } = this.input;
+    const database = PrismaAutomationDatabaseRepository.create(
+      this.input.database,
+    ).build();
+    const triggerRepository = PrismaTriggerRepository.create(database, this.input.clock);
+    const history = PrismaTriggerFireHistoryRepository.create(database);
+    return AutomationService.create({
+      triggers: triggerRepository,
+      history,
+      suppressions: PrismaEmailSuppressionRepository.create(database),
+      names: PrismaEmailSuppressionNameRepository.create(database),
+      verifier,
+      reportSchedules: ReportScheduleService.create({
+        jobs: this.input.jobs,
+        clock: this.input.clock,
+        wake: this.input.wake,
+      }),
+      clock: this.input.clock,
+      customGraphs: PrismaCustomGraphRepository.create(database),
+      webhookDeliveries: PrismaWebhookDeliveryRepository.create(database),
+    });
+  }
 }

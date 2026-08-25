@@ -2,8 +2,7 @@ export type ResourceCloser = () => void | Promise<void>;
 
 /** Owns process resources and closes them once in reverse registration order. */
 export class ResourceScope {
-  private readonly resources: Array<{ name: string; close: ResourceCloser }> =
-    [];
+  private readonly resources: Array<{ name: string; close: ResourceCloser }> = [];
   private closeResult: Promise<void> | undefined;
 
   own(name: string, close: ResourceCloser): void {

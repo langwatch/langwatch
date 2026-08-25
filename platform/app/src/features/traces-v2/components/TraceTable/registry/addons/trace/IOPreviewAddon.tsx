@@ -19,9 +19,7 @@ export const RESERVED_PREVIEW_COLUMN_IDS = [
   "events",
 ] as const;
 
-const RESERVED_PREVIEW_COLUMN_SET = new Set<string>(
-  RESERVED_PREVIEW_COLUMN_IDS,
-);
+const RESERVED_PREVIEW_COLUMN_SET = new Set<string>(RESERVED_PREVIEW_COLUMN_IDS);
 
 /**
  * The column index the IO preview content cell must stop at (its right edge):
@@ -35,9 +33,7 @@ export function ioPreviewContentBoundary({
   visibleColumnIds: readonly string[];
   colCount: number;
 }): number {
-  const idx = visibleColumnIds.findIndex((id) =>
-    RESERVED_PREVIEW_COLUMN_SET.has(id),
-  );
+  const idx = visibleColumnIds.findIndex((id) => RESERVED_PREVIEW_COLUMN_SET.has(id));
   return idx >= 0 ? idx : colCount;
 }
 
@@ -89,10 +85,7 @@ function splitColumnsAround({
  * absorb their rowSpan or not — keeping the two predicates in sync
  * is the whole point of pulling this out.
  */
-export function ioPreviewWillRenderFor(
-  row: TraceListItem,
-  isExpanded: boolean,
-): boolean {
+export function ioPreviewWillRenderFor(row: TraceListItem, isExpanded: boolean): boolean {
   // One recorded side is enough: a coding-agent turn often has an input but
   // no summarised output (or vice versa), and hiding the whole preview made
   // those rows read as content-free. The preview itself renders a muted
@@ -107,16 +100,8 @@ export const __splitColumnsAroundForTest = splitColumnsAround;
 export const IOPreviewAddon: AddonDef<TraceListItem> = {
   id: "io-preview",
   label: "I/O preview",
-  shouldRender: ({ row, isExpanded }) =>
-    ioPreviewWillRenderFor(row, isExpanded),
-  render: ({
-    row,
-    density,
-    colSpan,
-    style,
-    rowSpanClaimedIndices,
-    tanstackRow,
-  }) => {
+  shouldRender: ({ row, isExpanded }) => ioPreviewWillRenderFor(row, isExpanded),
+  render: ({ row, density, colSpan, style, rowSpanClaimedIndices, tanstackRow }) => {
     const contentBoundary = ioPreviewContentBoundary({
       visibleColumnIds: tanstackRow.getVisibleCells().map((c) => c.column.id),
       colCount: colSpan,

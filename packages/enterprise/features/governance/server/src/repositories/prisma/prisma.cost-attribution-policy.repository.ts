@@ -25,9 +25,7 @@ export class PrismaCostAttributionPolicyRepository extends CostAttributionPolicy
     );
   }
 
-  async enabledCodingAssistantConfigs(
-    organizationId: string,
-  ): Promise<unknown[]> {
+  async enabledCodingAssistantConfigs(organizationId: string): Promise<unknown[]> {
     const rows = await this.client.aiToolEntry.findMany({
       where: {
         organizationId,

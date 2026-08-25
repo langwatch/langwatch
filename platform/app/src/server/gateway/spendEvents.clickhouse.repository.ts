@@ -89,9 +89,7 @@ export type SpendEventRow = {
 export function parseSummedNanoUsd(value: unknown): number {
   const asBig = BigInt(String(value ?? 0));
   if (asBig > BigInt(Number.MAX_SAFE_INTEGER) || asBig < 0n) {
-    throw new Error(
-      `Summed nano-USD value ${asBig} exceeds the safe integer range`,
-    );
+    throw new Error(`Summed nano-USD value ${asBig} exceeds the safe integer range`);
   }
   return Number(asBig);
 }
@@ -250,9 +248,7 @@ function summariesWalkClause({
   });
   return {
     clause:
-      dimensions.length === 1
-        ? `AND ${left} > ${right}`
-        : `AND (${left}) > (${right})`,
+      dimensions.length === 1 ? `AND ${left} > ${right}` : `AND (${left}) > (${right})`,
     params,
   };
 }
@@ -358,10 +354,7 @@ function usageColumns(usage: SpendUsage | null): Record<string, number> {
  * character-priced call has zero tokens and 4000 characters, and reading it
  * back as "no usage" would drop them.
  */
-function foldUsage(
-  row: SpendEventRow,
-  raw: Record<string, unknown>,
-): SpendUsage | null {
+function foldUsage(row: SpendEventRow, raw: Record<string, unknown>): SpendUsage | null {
   const quantity = (column: string): number => Number(raw[column] ?? 0);
   const measured = [
     row.tokensInput,
@@ -812,9 +805,7 @@ export class GatewaySpendEventsRepository {
     const last = raw[raw.length - 1];
     const nextCursor =
       raw.length === limit && last
-        ? encodeSpendSummariesCursor(
-            dimensions.map((d) => String(last[d.alias] ?? "")),
-          )
+        ? encodeSpendSummariesCursor(dimensions.map((d) => String(last[d.alias] ?? "")))
         : null;
     const rows = raw.map((r) => mapSummaryRow({ raw: r, groupBy, bucket }));
     return { rows, nextCursor };
@@ -855,9 +846,7 @@ export class GatewaySpendEventsRepository {
     if (tenantIds.length === 0) return empty;
     const client = await this.resolveClient(tenantIds[0]!);
     const vkClause =
-      virtualKeyId !== undefined
-        ? "AND VirtualKeyId = {virtualKeyId:String}"
-        : "";
+      virtualKeyId !== undefined ? "AND VirtualKeyId = {virtualKeyId:String}" : "";
     const result = await client.query({
       query: `
         SELECT
@@ -964,9 +953,7 @@ function asGroupKeyParts(raw: string): string[] | null {
   return parsed as string[];
 }
 
-export function decodeSpendEventsCursor(
-  encoded: string,
-): SpendEventsCursor | null {
+export function decodeSpendEventsCursor(encoded: string): SpendEventsCursor | null {
   try {
     const raw = Buffer.from(encoded, "base64url").toString("utf8");
     const sep = raw.indexOf(":");

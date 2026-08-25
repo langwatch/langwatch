@@ -79,9 +79,7 @@ describe("summarizeLogEvent", () => {
 
   describe("given an event name we don't recognise", () => {
     it("returns null so the caller falls back to a generic view", () => {
-      const summary = summarizeLogEvent(
-        log({ "event.name": "some_future_event" }),
-      );
+      const summary = summarizeLogEvent(log({ "event.name": "some_future_event" }));
       expect(summary).toBeNull();
     });
   });
@@ -131,9 +129,9 @@ describe("logEventTone", () => {
   });
 
   it("leaves a successful tool result neutral", () => {
-    expect(
-      logEventTone(log({ "event.name": "tool_result", tool_name: "Read" })),
-    ).toBe("neutral");
+    expect(logEventTone(log({ "event.name": "tool_result", tool_name: "Read" }))).toBe(
+      "neutral",
+    );
   });
 
   it("flags an api_error as danger", () => {
@@ -145,8 +143,6 @@ describe("logEventTone", () => {
   });
 
   it("is neutral for an event we don't recognise", () => {
-    expect(logEventTone(log({ "event.name": "some_future_event" }))).toBe(
-      "neutral",
-    );
+    expect(logEventTone(log({ "event.name": "some_future_event" }))).toBe("neutral");
   });
 });

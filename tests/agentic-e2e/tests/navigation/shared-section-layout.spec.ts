@@ -92,12 +92,8 @@ test("complex product areas share one local navigation layout", async ({
   expect(measurements.map(({ navigationWidth }) => navigationWidth)).toEqual([
     220, 220, 220,
   ]);
-  expect(
-    new Set(measurements.map(({ containerWidth }) => containerWidth)).size,
-  ).toBe(1);
-  expect(new Set(measurements.map(({ borderColor }) => borderColor)).size).toBe(
-    1,
-  );
+  expect(new Set(measurements.map(({ containerWidth }) => containerWidth)).size).toBe(1);
+  expect(new Set(measurements.map(({ borderColor }) => borderColor)).size).toBe(1);
   for (const { borderColor } of measurements) {
     expect(borderColor).not.toBe("rgb(0, 0, 0)");
     expect(borderColor).not.toBe("rgba(0, 0, 0, 0)");
@@ -106,9 +102,7 @@ test("complex product areas share one local navigation layout", async ({
   const governanceNavigation = page.getByRole("navigation", {
     name: "AI Governance navigation",
   });
-  await governanceNavigation
-    .getByRole("link", { name: "Catalog", exact: true })
-    .click();
+  await governanceNavigation.getByRole("link", { name: "Catalog", exact: true }).click();
   await expect(page).toHaveURL("/governance/ingestion-sources");
 
   // The URL flips synchronously on pushState, but the router only commits the

@@ -114,9 +114,7 @@ export function QuietHeadline() {
   }, [step, reduceMotion]);
 
   const action = ACTIONS[step.index % ACTIONS.length]!;
-  const typed = reduceMotion
-    ? action.phrase
-    : action.phrase.slice(0, step.length);
+  const typed = reduceMotion ? action.phrase : action.phrase.slice(0, step.length);
 
   // Native anchor behavior (cmd/ctrl/shift-click, middle-click) belongs to
   // the browser: intercept ONLY an unmodified primary click, so open-in-a-tab
@@ -214,9 +212,7 @@ export function QuietHeadline() {
           type="button"
           onClick={onPhrase}
           aria-label={
-            canAsk
-              ? `Ask Langy: ${action.phrase}`
-              : `Learn more: ${action.phrase}`
+            canAsk ? `Ask Langy: ${action.phrase}` : `Learn more: ${action.phrase}`
           }
           fontFamily="mono"
           fontSize="12px"
@@ -258,10 +254,7 @@ export function QuietHeadline() {
           Learn more →
         </chakra.a>
         {canAsk ? (
-          <LangyHandOff
-            label="Do it with Langy"
-            onClick={() => askLangy(action.ask)}
-          />
+          <LangyHandOff label="Do it with Langy" onClick={() => askLangy(action.ask)} />
         ) : null}
       </HStack>
     </chakra.div>

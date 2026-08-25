@@ -11,10 +11,7 @@ import {
   applySpanToSummary,
   TraceSummaryFoldProjection,
 } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 function makeTraceNameChangedEvent({
   newName,
@@ -49,10 +46,9 @@ describe("applySpanToSummary() trace name extraction", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(99999);
-    vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    ).mockReturnValue(null);
+    vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan").mockReturnValue(
+      null,
+    );
   });
 
   afterEach(() => {

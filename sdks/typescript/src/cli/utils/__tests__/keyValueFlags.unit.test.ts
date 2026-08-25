@@ -63,9 +63,7 @@ describe("coerceParameterValue()", () => {
       expect(coerceParameterValue("1.50")).toBe("1.50");
       expect(coerceParameterValue("0x10")).toBe("0x10");
       expect(coerceParameterValue("1e5")).toBe("1e5");
-      expect(coerceParameterValue("12345678901234567890")).toBe(
-        "12345678901234567890",
-      );
+      expect(coerceParameterValue("12345678901234567890")).toBe("12345678901234567890");
       expect(coerceParameterValue(" 5")).toBe(" 5");
       expect(coerceParameterValue("")).toBe("");
       expect(coerceParameterValue("Infinity")).toBe("Infinity");
@@ -83,9 +81,7 @@ describe("parseRunParameterFlags()", () => {
 
   describe("given a value containing an equals sign", () => {
     it("splits on the first one, so the value keeps the rest", () => {
-      expect(
-        parseRunParameterFlags({ pairs: ["query=a=b"] }),
-      ).toEqual({ query: "a=b" });
+      expect(parseRunParameterFlags({ pairs: ["query=a=b"] })).toEqual({ query: "a=b" });
     });
   });
 
@@ -156,9 +152,9 @@ describe("parseKeyValueFlags()", () => {
 
   describe("given an empty value", () => {
     it("ends the command, since it would match every request lacking the key", () => {
-      expect(() =>
-        parseKeyValueFlags({ pairs: ["tier="], flag: "--metadata" }),
-      ).toThrow(ProcessExitError);
+      expect(() => parseKeyValueFlags({ pairs: ["tier="], flag: "--metadata" })).toThrow(
+        ProcessExitError,
+      );
     });
   });
 

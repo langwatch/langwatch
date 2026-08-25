@@ -23,9 +23,7 @@ import type {
   UpsertGithubInstallationInput,
 } from "../repositories/github-installations.repository";
 
-function makeRepo(
-  rows: GithubInstallationRow[] = [],
-): GithubInstallationsRepository & {
+function makeRepo(rows: GithubInstallationRow[] = []): GithubInstallationsRepository & {
   upsert: ReturnType<typeof vi.fn>;
   insertOrGetExisting: ReturnType<typeof vi.fn>;
   deleteByInstallationId: ReturnType<typeof vi.fn>;
@@ -139,9 +137,7 @@ describe("recordInstallation", () => {
     it("rejects the rebind and never upserts (cross-tenant takeover guard)", async () => {
       // inst-1 already belongs to org-1; a /setup call bound to org-2 (an
       // attacker's own org, with a valid signed state) must not steal it.
-      const repo = makeRepo([
-        row({ installationId: "inst-1", organizationId: "org-1" }),
-      ]);
+      const repo = makeRepo([row({ installationId: "inst-1", organizationId: "org-1" })]);
       const svc = new GithubInstallationsService(repo, makeAppTokens());
 
       await expect(
@@ -209,9 +205,7 @@ describe("recordInstallation", () => {
 
   describe("when the same organization re-installs the same installation", () => {
     it("upserts cleanly (no conflict on a genuine re-install)", async () => {
-      const repo = makeRepo([
-        row({ installationId: "inst-1", organizationId: "org-1" }),
-      ]);
+      const repo = makeRepo([row({ installationId: "inst-1", organizationId: "org-1" })]);
       const svc = new GithubInstallationsService(repo, makeAppTokens());
 
       await svc.recordInstallation({
@@ -234,11 +228,7 @@ describe("the installation-recorded hook", () => {
     it("is told which installation landed, after the row is committed", async () => {
       const repo = makeRepo();
       const onRecorded = vi.fn();
-      const svc = new GithubInstallationsService(
-        repo,
-        makeAppTokens(),
-        onRecorded,
-      );
+      const svc = new GithubInstallationsService(repo, makeAppTokens(), onRecorded);
 
       await svc.recordInstallation({
         installationId: "inst-1",
@@ -276,9 +266,9 @@ describe("listRepositoriesForOrganization", () => {
       const repo = makeRepo([row({ suspendedAt: new Date() })]);
       const svc = new GithubInstallationsService(repo, makeAppTokens());
 
-      await expect(
-        svc.listRepositoriesForOrganization("org-1"),
-      ).rejects.toMatchObject({ code: "github_installation_suspended" });
+      await expect(svc.listRepositoriesForOrganization("org-1")).rejects.toMatchObject({
+        code: "github_installation_suspended",
+      });
     });
   });
 
@@ -297,9 +287,9 @@ describe("listRepositoriesForOrganization", () => {
         }),
       );
 
-      await expect(
-        svc.listRepositoriesForOrganization("org-1"),
-      ).rejects.toMatchObject({ code: "github_rate_limited" });
+      await expect(svc.listRepositoriesForOrganization("org-1")).rejects.toMatchObject({
+        code: "github_rate_limited",
+      });
     });
   });
 
@@ -450,9 +440,7 @@ describe("mintTurnToken", () => {
         repositoryFullName: "acme/service-x",
       });
       expect(result?.token).toBe("ghs_one");
-      expect(result?.repoScopeKey).toBe(
-        computeRepoScopeKey({ repositoryIds: ["77"] }),
-      );
+      expect(result?.repoScopeKey).toBe(computeRepoScopeKey({ repositoryIds: ["77"] }));
       expect(mint).toHaveBeenCalledWith({
         installationId: "inst-1",
         repositoryIds: ["77"],
@@ -491,14 +479,12 @@ describe("mintTurnToken", () => {
         row({ installationId: "inst-dead", createdAt: new Date("2020-01-01") }),
         row({ installationId: "inst-live", createdAt: new Date("2020-01-02") }),
       ]);
-      const mint = vi.fn(
-        async ({ installationId }: { installationId: string }) => {
-          if (installationId === "inst-dead") {
-            throw new GithubInstallationNotFoundError(installationId);
-          }
-          return { token: "ghs_live", expiresAt: "" };
-        },
-      );
+      const mint = vi.fn(async ({ installationId }: { installationId: string }) => {
+        if (installationId === "inst-dead") {
+          throw new GithubInstallationNotFoundError(installationId);
+        }
+        return { token: "ghs_live", expiresAt: "" };
+      });
       const svc = new GithubInstallationsService(
         repo,
         makeAppTokens({ mintInstallationToken: mint }),
@@ -563,14 +549,12 @@ describe("mintTurnToken", () => {
           repositories: [{ id: "77", fullName: "acme/service-x" }],
         }),
       ]);
-      const mint = vi.fn(
-        async ({ installationId }: { installationId: string }) => {
-          if (installationId === "inst-dead") {
-            throw new GithubInstallationNotFoundError(installationId);
-          }
-          return { token: "ghs_live", expiresAt: "" };
-        },
-      );
+      const mint = vi.fn(async ({ installationId }: { installationId: string }) => {
+        if (installationId === "inst-dead") {
+          throw new GithubInstallationNotFoundError(installationId);
+        }
+        return { token: "ghs_live", expiresAt: "" };
+      });
       const svc = new GithubInstallationsService(
         repo,
         makeAppTokens({ mintInstallationToken: mint }),
@@ -605,14 +589,12 @@ describe("mintTurnToken", () => {
       // resolveRepositoryId has no cache to consult for inst-dead ("all"
       // selection), so it falls through to listInstallationRepositories —
       // which itself mints a token first, surfacing the same 404.
-      const listInstallationRepositories = vi.fn(
-        async (installationId: string) => {
-          if (installationId === "inst-dead") {
-            throw new GithubInstallationNotFoundError(installationId);
-          }
-          return [{ id: "77", fullName: "acme/service-x" }];
-        },
-      );
+      const listInstallationRepositories = vi.fn(async (installationId: string) => {
+        if (installationId === "inst-dead") {
+          throw new GithubInstallationNotFoundError(installationId);
+        }
+        return [{ id: "77", fullName: "acme/service-x" }];
+      });
       const mint = vi.fn(async () => ({ token: "ghs_live", expiresAt: "" }));
       const svc = new GithubInstallationsService(
         repo,

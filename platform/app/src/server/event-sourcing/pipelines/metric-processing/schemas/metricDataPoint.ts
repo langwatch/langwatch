@@ -14,9 +14,7 @@ export const aggregationTemporalitySchema = z.enum([
   "delta",
   "cumulative",
 ]);
-export type AggregationTemporality = z.infer<
-  typeof aggregationTemporalitySchema
->;
+export type AggregationTemporality = z.infer<typeof aggregationTemporalitySchema>;
 
 /**
  * Event payload and projection record for one canonical OTLP data point.
@@ -80,9 +78,7 @@ export const canonicalMetricDataPointSchema = z.object({
   acceptedAt: z.number().int().nonnegative(),
 });
 
-export type CanonicalMetricDataPoint = z.infer<
-  typeof canonicalMetricDataPointSchema
->;
+export type CanonicalMetricDataPoint = z.infer<typeof canonicalMetricDataPointSchema>;
 
 export interface MetricTraceCorrelation {
   tenantId: string;

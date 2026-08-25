@@ -12,8 +12,7 @@ const jsonResponse = (body: unknown, init?: ResponseInit): Response =>
     ...init,
   });
 
-const requestAt = (call: number): Request =>
-  mockFetch.mock.calls[call]![0] as Request;
+const requestAt = (call: number): Request => mockFetch.mock.calls[call]![0] as Request;
 
 const ENDPOINT = "https://api.langwatch.test";
 
@@ -104,17 +103,13 @@ describe("WorkflowsApiService.run", () => {
         // 1) evaluate
         const startReq = requestAt(0);
         expect(startReq.method).toBe("POST");
-        expect(startReq.url).toBe(
-          `${ENDPOINT}/api/workflows/workflow_123/evaluate`,
-        );
+        expect(startReq.url).toBe(`${ENDPOINT}/api/workflows/workflow_123/evaluate`);
         expect(await startReq.clone().json()).toEqual({
           data: [{ input: "ping" }],
         });
 
         // 2) poll v3 run status
-        expect(requestAt(1).url).toBe(
-          `${ENDPOINT}/api/evaluations/v3/runs/run_42`,
-        );
+        expect(requestAt(1).url).toBe(`${ENDPOINT}/api/evaluations/v3/runs/run_42`);
 
         // 3) results
         expect(requestAt(2).url).toBe(
@@ -186,10 +181,7 @@ describe("WorkflowsApiService.run", () => {
     describe("when the evaluate call returns 400", () => {
       it("throws a WorkflowsApiError", async () => {
         mockFetch.mockResolvedValueOnce(
-          jsonResponse(
-            { error: "No committed version to evaluate" },
-            { status: 400 },
-          ),
+          jsonResponse({ error: "No committed version to evaluate" }, { status: 400 }),
         );
 
         const service = makeService();

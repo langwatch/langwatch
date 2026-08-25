@@ -71,18 +71,14 @@ describe("child-logger", () => {
     describe("when the child requests its base logger", () => {
       /** @scenario child process tolerates invalid context JSON */
       it("returns a logger without bindings and emits a warning", () => {
-        const stderr = vi
-          .spyOn(process.stderr, "write")
-          .mockImplementation(() => true);
+        const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 
         const logger = createChildProcessLogger("test", {
           [SCENARIO_LOG_CONTEXT_ENV]: "{not valid json",
         });
 
         expect(logger).toBeDefined();
-        expect(stderr).toHaveBeenCalledWith(
-          expect.stringContaining("not valid JSON"),
-        );
+        expect(stderr).toHaveBeenCalledWith(expect.stringContaining("not valid JSON"));
 
         stderr.mockRestore();
       });

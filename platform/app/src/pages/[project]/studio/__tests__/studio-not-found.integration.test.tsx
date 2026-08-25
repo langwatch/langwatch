@@ -42,12 +42,9 @@ vi.mock("../../../../optimization_studio/hooks/useLoadWorkflow", () => ({
   useLoadWorkflow: () => ({ workflow: workflowRef.current }),
 }));
 
-vi.mock(
-  "../../../../optimization_studio/components/OptimizationStudio",
-  () => ({
-    default: () => <div data-testid="studio-canvas" />,
-  }),
-);
+vi.mock("../../../../optimization_studio/components/OptimizationStudio", () => ({
+  default: () => <div data-testid="studio-canvas" />,
+}));
 
 vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: () => ({
@@ -104,9 +101,7 @@ describe("Studio page", () => {
       expect(screen.getByTestId("dashboard-layout")).toBeTruthy();
       expect(screen.queryByTestId("studio-canvas")).toBeNull();
       // A dead end needs a way out of it, not just a sentence about it.
-      expect(
-        screen.getByRole("link", { name: /back to workflows/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("link", { name: /back to workflows/i })).toBeTruthy();
     });
   });
 

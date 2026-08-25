@@ -37,12 +37,7 @@ import { enforceWorkbenchEnabled } from "./workbenchAccessMiddleware";
  * anything structured would be one whose shape a ClickHouse type cannot
  * describe.
  */
-const parameterValueSchema = z.union([
-  z.string(),
-  z.number(),
-  z.boolean(),
-  z.null(),
-]);
+const parameterValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
 const projectScopeSchema = z.object({ projectId: z.string() });
 

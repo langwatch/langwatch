@@ -15,13 +15,7 @@ import type { StageId } from "./onboardingJourneyConfig";
  * a sentence: greet, match prefs, teach filtering, watch data land,
  * dig into one trace, wrap up.
  */
-export type ChapterId =
-  | "welcome"
-  | "density"
-  | "slice"
-  | "arrivals"
-  | "drawer"
-  | "outro";
+export type ChapterId = "welcome" | "density" | "slice" | "arrivals" | "drawer" | "outro";
 
 export interface Chapter {
   id: ChapterId;

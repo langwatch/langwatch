@@ -20,10 +20,7 @@ const DAY_MS = 86_400_000;
 const EXPIRE_SECONDS = 90_000;
 
 /** Plan resolution is a two-hop DB read; the answer changes on the order of days. */
-const capCache = new TtlCache<number>(
-  10 * 60 * 1000,
-  "ttlcache:persist-daily-cap:",
-);
+const capCache = new TtlCache<number>(10 * 60 * 1000, "ttlcache:persist-daily-cap:");
 
 /**
  * Plans that get the enterprise ceiling. Everything else that is not free gets
@@ -48,9 +45,7 @@ const FREE_PLAN_TYPES = new Set<string>([PlanTypes.FREE, PlanTypes.LAUNCH]);
  * matches terminally, on the strength of one failed read. Uncached, the guess
  * costs one dispatch and the next one resolves the real ceiling.
  */
-export async function resolvePersistDailyCap(
-  projectId: string,
-): Promise<number> {
+export async function resolvePersistDailyCap(projectId: string): Promise<number> {
   const cached = await capCache.get(projectId);
   if (cached !== undefined) return cached;
 
@@ -65,9 +60,7 @@ export async function resolvePersistDailyCap(
       return env.TRIGGER_PERSIST_DAILY_CAP_PAID;
     }
 
-    const cap = capForPlan(
-      await getApp().planProvider.getActivePlan({ organizationId }),
-    );
+    const cap = capForPlan(await getApp().planProvider.getActivePlan({ organizationId }));
     await capCache.set(projectId, cap);
     return cap;
   } catch (error) {
@@ -398,9 +391,7 @@ async function inChunks<T, R>(
 ): Promise<R[]> {
   const results: R[] = [];
   for (let start = 0; start < items.length; start += size) {
-    results.push(
-      ...(await Promise.all(items.slice(start, start + size).map(each))),
-    );
+    results.push(...(await Promise.all(items.slice(start, start + size).map(each))));
   }
   return results;
 }
@@ -453,9 +444,7 @@ export async function readPersistCapCounts({
   } else {
     raw = keys.map((key) => {
       const entry = memoryStore.get(key);
-      return entry && entry.expiresAt > now.getTime()
-        ? String(entry.count)
-        : null;
+      return entry && entry.expiresAt > now.getTime() ? String(entry.count) : null;
     });
   }
 

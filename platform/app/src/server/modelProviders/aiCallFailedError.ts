@@ -103,10 +103,7 @@ export async function wrapAiCall<T>(
     const message = err instanceof Error ? err.message : String(err);
     // The provider's own words are diagnostic, not copy: they go in the log
     // line, correlated by trace id, and nowhere a customer can read them.
-    logger.error(
-      { featureKey: feature.key, role: feature.role, err },
-      "AI call failed",
-    );
+    logger.error({ featureKey: feature.key, role: feature.role, err }, "AI call failed");
     // Truncate: `originalErrorMessage` still travels on the legacy tRPC
     // `data.cause` sidecar until that block is retired, and a stack-laden
     // provider error should not be dragged along wholesale.

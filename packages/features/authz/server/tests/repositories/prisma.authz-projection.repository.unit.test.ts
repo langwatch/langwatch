@@ -67,9 +67,7 @@ function build() {
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     $executeRaw: executeRaw,
-    $transaction: vi.fn(async (ops: unknown[]) =>
-      ops.map(() => ({ count: 1 })),
-    ),
+    $transaction: vi.fn(async (ops: unknown[]) => ops.map(() => ({ count: 1 }))),
   } as never;
   const mocks = prisma as unknown as {
     grant: { updateMany: Mock; findUnique: Mock };
@@ -110,9 +108,7 @@ describe("PrismaAuthzProjectionRepository", () => {
 
       const sql = sqlFrom(executeRaw);
       expect(sql).toContain('"Grant"."occurredAt" < EXCLUDED."occurredAt"');
-      expect(sql).not.toContain(
-        '"Grant"."occurredAt" <= EXCLUDED."occurredAt"',
-      );
+      expect(sql).not.toContain('"Grant"."occurredAt" <= EXCLUDED."occurredAt"');
     });
 
     /** A re-applied attach must never un-revoke a grant: the row's own

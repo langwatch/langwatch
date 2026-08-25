@@ -71,9 +71,7 @@ function renderPane(state: LangWatchQLRequestState, chartSlot?: ReactNode) {
       <LangWatchQLResultPane
         state={state}
         onRun={vi.fn()}
-        {...(chartSlot === undefined
-          ? {}
-          : { renderChartArea: () => chartSlot })}
+        {...(chartSlot === undefined ? {} : { renderChartArea: () => chartSlot })}
       />
     </ChakraProvider>,
   );
@@ -157,9 +155,7 @@ describe("the LangWatchQL result pane", () => {
           }),
         );
 
-        expect(
-          screen.queryByTestId("lwql-stale-notice"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("lwql-stale-notice")).not.toBeInTheDocument();
         // Each statistic is a value element beside a caption element, so the
         // concatenated text content carries no space between the two.
         expect(screen.getByTestId("lwql-result-summary")).toHaveTextContent(
@@ -206,14 +202,10 @@ describe("the LangWatchQL result pane", () => {
         const copy = renderedCopy(error);
         expect(copy.titleOnScreen).toBeInTheDocument();
         // The earlier rows are gone rather than left standing as the answer.
-        expect(
-          screen.queryByTestId("lwql-result-summary"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("lwql-result-summary")).not.toBeInTheDocument();
         // And nothing is labelled stale, because the failure IS the current
         // answer for the current draft.
-        expect(
-          screen.queryByTestId("lwql-stale-notice"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("lwql-stale-notice")).not.toBeInTheDocument();
       });
     });
   });
@@ -309,9 +301,7 @@ describe("the LangWatchQL result pane", () => {
           screen.getByText("The dataset `system.parts` is not available here."),
         ).toBeInTheDocument();
         expect(
-          screen.getByText(
-            "The column `total_cost` needs the costs permission.",
-          ),
+          screen.getByText("The column `total_cost` needs the costs permission."),
         ).toBeInTheDocument();
       });
     });
@@ -484,17 +474,13 @@ describe("the LangWatchQL result pane", () => {
 
         expect(screen.getByRole("tab", { name: "Table" })).toBeInTheDocument();
         expect(screen.getByRole("tab", { name: "Chart" })).toBeInTheDocument();
-        expect(
-          screen.getByRole("tab", { name: "Specification" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("tab", { name: "Specification" })).toBeInTheDocument();
 
         await selectResultMode("Chart");
         expect(screen.getByTestId("chart-slot")).toBeInTheDocument();
         // One mounted area serves Chart and Specification, so the
         // specification is a single piece of state however it is viewed.
-        await userEvent.click(
-          screen.getByRole("tab", { name: "Specification" }),
-        );
+        await userEvent.click(screen.getByRole("tab", { name: "Specification" }));
         expect(screen.getAllByTestId("chart-slot")).toHaveLength(1);
       });
     });
@@ -609,9 +595,7 @@ describe("the LangWatchQL result pane", () => {
     describe("when the truncated state renders", () => {
       /** @scenario "The truncation banner tells the truth about how much arrived" */
       it("cites the rows that actually arrived", () => {
-        renderPane(
-          stateWith({ answer: { kind: "result", result: truncatedResult() } }),
-        );
+        renderPane(stateWith({ answer: { kind: "result", result: truncatedResult() } }));
 
         expect(screen.getByTestId("lwql-truncation-banner")).toHaveTextContent(
           "Showing the first 412 rows",
@@ -620,9 +604,7 @@ describe("the LangWatchQL result pane", () => {
 
       /** @scenario "The truncation banner tells the truth about how much arrived" */
       it("never claims a row limit that was not the cause", () => {
-        renderPane(
-          stateWith({ answer: { kind: "result", result: truncatedResult() } }),
-        );
+        renderPane(stateWith({ answer: { kind: "result", result: truncatedResult() } }));
 
         // The byte ceiling bit at 412 rows. Naming the row ceiling would send
         // the member looking for ten thousand rows that were never coming.
@@ -633,9 +615,7 @@ describe("the LangWatchQL result pane", () => {
 
       /** @scenario "The table has intentional loading, empty, error, stale, and truncated states" */
       it("marks the result as partial rather than showing it as whole", () => {
-        renderPane(
-          stateWith({ answer: { kind: "result", result: truncatedResult() } }),
-        );
+        renderPane(stateWith({ answer: { kind: "result", result: truncatedResult() } }));
 
         expect(screen.getByTestId("lwql-truncation-banner")).toHaveTextContent(
           "Partial result",
@@ -711,9 +691,7 @@ describe("the LangWatchQL result pane", () => {
         );
 
         const messagesOnScreen = () =>
-          screen
-            .getAllByTestId("lwql-diagnostic")
-            .map((alert) => alert.textContent);
+          screen.getAllByTestId("lwql-diagnostic").map((alert) => alert.textContent);
         const expected = everyDiagnostic.map((one) => one.message);
 
         for (const message of expected) {

@@ -98,9 +98,7 @@ export function collectorHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     "content-type": "application/json",
   };
-  for (const pair of (process.env.OTEL_EXPORTER_OTLP_HEADERS ?? "").split(
-    ",",
-  )) {
+  for (const pair of (process.env.OTEL_EXPORTER_OTLP_HEADERS ?? "").split(",")) {
     const separator = pair.indexOf("=");
     if (separator <= 0) continue;
     const name = pair.slice(0, separator).trim();
@@ -228,8 +226,7 @@ export function assertWalkableExport(resourceSpans: unknown[]): void {
       const { attributes } = resource;
       if (attributes !== void 0) {
         if (!Array.isArray(attributes)) throw invalid();
-        if (attributes.some((attribute) => !isObject(attribute)))
-          throw invalid();
+        if (attributes.some((attribute) => !isObject(attribute))) throw invalid();
       }
     }
 
@@ -346,10 +343,7 @@ async function forwardToCollector({
     });
 
     if (!response.ok) {
-      logger.warn(
-        { status: response.status },
-        "collector rejected browser telemetry",
-      );
+      logger.warn({ status: response.status }, "collector rejected browser telemetry");
     }
   } catch (error) {
     logger.warn({ error }, "could not forward browser telemetry");

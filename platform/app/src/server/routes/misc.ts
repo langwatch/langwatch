@@ -27,11 +27,7 @@ import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { env } from "~/env.mjs";
 import type { Project } from "~/generated/prisma/client";
-import {
-  AlertType,
-  ExperimentType,
-  TriggerAction,
-} from "~/generated/prisma/client";
+import { AlertType, ExperimentType, TriggerAction } from "~/generated/prisma/client";
 import { getOAuthClient } from "~/mcp/oauthClientRegistry";
 import { isAllowedRedirectScheme } from "~/mcp/redirectSchemes";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
@@ -200,8 +196,7 @@ secured.access(analyticsViewAuth).post(
     },
     responses: {
       200: {
-        description:
-          "Timeseries data for the requested range and the one before it",
+        description: "Timeseries data for the requested range and the one before it",
         content: {
           "application/json": {
             schema: resolver(analyticsTimeseriesResponseSchema),
@@ -251,9 +246,7 @@ secured.access(analyticsViewAuth).post(
 
     let params: TimeseriesInputType;
     try {
-      params = sharedFiltersInputSchema
-        .extend(timeseriesSeriesInput.shape)
-        .parse(input);
+      params = sharedFiltersInputSchema.extend(timeseriesSeriesInput.shape).parse(input);
     } catch (error) {
       return c.json({ error: zodErrorMessage(error) }, 400);
     }
@@ -296,8 +289,7 @@ const guestQueries = [
 const HOTEL_SYSTEM_PROMPT =
   "Imagine you're in a bustling hotel lobby, serving as the knowledgeable and friendly concierge. You're the go-to person for guests seeking recommendations, assistance with reservations, or information about local attractions. How would you welcome guests and ensure their stay is memorable? Think about how you'd provide personalized recommendations, handle inquiries efficiently, and maintain a professional yet friendly demeanor.";
 
-const RAG_SYSTEM_PROMPT =
-  "You are a restaurant expert knowing the best around town.";
+const RAG_SYSTEM_PROMPT = "You are a restaurant expert knowing the best around town.";
 
 // NOTE: /demo/hotel_bot is intentionally NOT migrated to the unified
 // extractCredentials + ApiKeyService + enforceApiKeyCeiling pipeline. It is a
@@ -545,10 +537,7 @@ secured.access(experimentsManageAuth).post(
           });
           return c.json(
             {
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Internal server error",
+              error: error instanceof Error ? error.message : "Internal server error",
             },
             500,
           );
@@ -567,11 +556,7 @@ const dspyInitParamsSchema = z
   .object({
     experiment_id: z.string().optional().nullable(),
     experiment_slug: z.string().optional().nullable(),
-    experiment_type: z.enum([
-      "DSPY",
-      "BATCH_EVALUATION",
-      "BATCH_EVALUATION_V2",
-    ]),
+    experiment_type: z.enum(["DSPY", "BATCH_EVALUATION", "BATCH_EVALUATION_V2"]),
     experiment_name: z.string().optional(),
     workflowId: z.string().optional(),
   })
@@ -606,8 +591,7 @@ secured.access(experimentsManageAuth).post(
               },
               experiment_id: {
                 type: "string",
-                description:
-                  "Existing experiment id, as an alternative to the slug",
+                description: "Existing experiment id, as an alternative to the slug",
               },
               experiment_type: {
                 type: "string",
@@ -617,23 +601,18 @@ secured.access(experimentsManageAuth).post(
               },
               experiment_name: {
                 type: "string",
-                description:
-                  "Display name, used only when the experiment is created",
+                description: "Display name, used only when the experiment is created",
               },
               workflowId: {
                 type: "string",
-                description:
-                  "Optimization Studio workflow this experiment belongs to",
+                description: "Optimization Studio workflow this experiment belongs to",
               },
             },
             required: ["experiment_type"],
             // `anyOf`, not `oneOf`: the handler's refine only asks that at
             // least one identifier is present, and sending both is accepted.
             // `oneOf` would document exactly-one and reject a valid body.
-            anyOf: [
-              { required: ["experiment_slug"] },
-              { required: ["experiment_id"] },
-            ],
+            anyOf: [{ required: ["experiment_slug"] }, { required: ["experiment_id"] }],
           },
         },
       },
@@ -691,10 +670,7 @@ secured.access(experimentsManageAuth).post(
     try {
       params = dspyInitParamsSchema.parse(body);
     } catch (error) {
-      logger.error(
-        { error, body, projectId: project.id },
-        "invalid init data received",
-      );
+      logger.error({ error, body, projectId: project.id }, "invalid init data received");
       captureException(toError(error), { extra: { projectId: project.id } });
       return c.json({ error: zodErrorMessage(error) }, 400);
     }
@@ -791,10 +767,7 @@ secured
     } = body;
 
     if (!projectId || !redirect_uri || !client_id) {
-      return c.json(
-        { error: "projectId, redirect_uri and client_id are required" },
-        400,
-      );
+      return c.json({ error: "projectId, redirect_uri and client_id are required" }, 400);
     }
 
     try {
@@ -1062,11 +1035,7 @@ secured.access(workflowsManageAuth).post(
     // (below) — this route used to duplicate that logic with its own
     // catch-and-flatten-to-500, which had drifted to disagree with the
     // canonical route on the status code for identical failures.
-    return handleWorkflowRun(
-      c,
-      c.req.param("workflowId"),
-      c.req.param("versionId"),
-    );
+    return handleWorkflowRun(c, c.req.param("workflowId"), c.req.param("versionId"));
   },
 );
 
@@ -1240,10 +1209,7 @@ function toVerdict(result: {
 }): TrackUsageRateLimitVerdict {
   return {
     allowed: result.allowed,
-    retryAfterSeconds: Math.max(
-      1,
-      Math.ceil((result.resetAt - Date.now()) / 1000),
-    ),
+    retryAfterSeconds: Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000)),
   };
 }
 
@@ -1342,15 +1308,9 @@ const filterSchema = z
   .default({});
 
 const slackTriggerBodySchema = z.object({
-  slack_webhook: z
-    .string()
-    .url()
-    .describe("Incoming webhook URL the alert is posted to"),
+  slack_webhook: z.string().url().describe("Incoming webhook URL the alert is posted to"),
   name: z.string().describe("How the trigger is listed in the app"),
-  message: z
-    .string()
-    .optional()
-    .describe("Extra line included with each alert"),
+  message: z.string().optional().describe("Extra line included with each alert"),
   filters: filterSchema.describe(
     "Which traces the trigger fires on. An empty object fires on all of them.",
   ),
@@ -1441,10 +1401,7 @@ secured.access(triggersManageAuth).post(
       return c.json({ message: "Slack trigger created successfully" });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return c.json(
-          { message: "Invalid request data", errors: error.issues },
-          400,
-        );
+        return c.json({ message: "Invalid request data", errors: error.issues }, 400);
       }
 
       logger.error({ error }, "Error creating trigger");
@@ -1487,11 +1444,7 @@ secured.access(workflowsManageAuth).post(
   authMiddleware,
   requireWorkflowsManage,
   async (c) => {
-    return handleWorkflowRun(
-      c,
-      c.req.param("workflowId"),
-      c.req.param("versionId"),
-    );
+    return handleWorkflowRun(c, c.req.param("workflowId"), c.req.param("versionId"));
   },
 );
 
@@ -1612,8 +1565,7 @@ const extractLLMCallInfo =
     ) {
       const model = call.response?.model;
       const llmModelCost =
-        model &&
-        matchModelCostWithFallbacks(call.response.model, llmModelCosts);
+        model && matchModelCostWithFallbacks(call.response.model, llmModelCosts);
       const promptTokens = call.response?.usage?.prompt_tokens;
       const completionTokens = call.response?.usage?.completion_tokens;
       const cost =
@@ -1815,8 +1767,7 @@ const userResponse = async (userInput: string, chatResponse: string) => {
 };
 
 const getInitialMessage = async () => {
-  const randomGuestQuery =
-    guestQueries[Math.floor(Math.random() * guestQueries.length)];
+  const randomGuestQuery = guestQueries[Math.floor(Math.random() * guestQueries.length)];
   const completion = await hotelBotOpenai.chat.completions.create({
     messages: [
       { role: "system", content: HOTEL_SYSTEM_PROMPT },
@@ -1850,8 +1801,7 @@ const ragMessage = async (authToken: string) => {
           messages: [
             {
               role: "system",
-              content:
-                "Invent a restaurant name and a short google maps review of it",
+              content: "Invent a restaurant name and a short google maps review of it",
             },
           ],
         }),
@@ -1905,13 +1855,7 @@ const secondChatMessage = async (
     ],
     model: "gpt-3.5-turbo",
   });
-  await langwatchAPI(
-    completion,
-    expectedUserResponse ?? "",
-    authToken,
-    threadId,
-    userId,
-  );
+  await langwatchAPI(completion, expectedUserResponse ?? "", authToken, threadId, userId);
   return completion.choices[0]!.message.content;
 };
 

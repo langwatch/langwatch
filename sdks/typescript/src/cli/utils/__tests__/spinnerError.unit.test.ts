@@ -50,9 +50,7 @@ describe("failSpinner", () => {
       const err = new SomeApiError("boom");
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "reticulate splines" });
-      expect(stripAnsi(String(calls[0]))).toBe(
-        "Failed to reticulate splines: boom",
-      );
+      expect(stripAnsi(String(calls[0]))).toBe("Failed to reticulate splines: boom");
     });
   });
 
@@ -61,9 +59,7 @@ describe("failSpinner", () => {
       const err = new Error("fetch failed");
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "list monitors" });
-      expect(stripAnsi(String(calls[0]))).toBe(
-        "Failed to list monitors: fetch failed",
-      );
+      expect(stripAnsi(String(calls[0]))).toBe("Failed to list monitors: fetch failed");
     });
   });
 

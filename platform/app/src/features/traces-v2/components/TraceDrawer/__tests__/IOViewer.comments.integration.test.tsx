@@ -41,12 +41,9 @@ vi.mock("~/components/me/PersonalFeatureGateDialog", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
-vi.mock(
-  "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground",
-  () => ({
-    useGoToSpanInPlaygroundTabUrlBuilder: () => ({ buildUrl: () => null }),
-  }),
-);
+vi.mock("~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground", () => ({
+  useGoToSpanInPlaygroundTabUrlBuilder: () => ({ buildUrl: () => null }),
+}));
 
 // The drawer drives redaction off the read's own flags, so the per-field query
 // behind the shared marker is never consulted here.
@@ -60,9 +57,7 @@ vi.mock("~/hooks/useFieldRedaction", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useQueries: () => [
-      { data: mocks.storedComments, isLoading: false, isError: false },
-    ],
+    useQueries: () => [{ data: mocks.storedComments, isLoading: false, isError: false }],
     useUtils: () => ({
       annotation: {
         getByTraceId: { invalidate: vi.fn() },
@@ -152,9 +147,7 @@ describe("given a reader on a span's output", () => {
       { wrapper },
     );
 
-    expect(
-      screen.getByRole("button", { name: "1 comment" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1 comment" })).toBeInTheDocument();
   });
 
   it("offers the correction the comment is asking for beside it", () => {
@@ -169,9 +162,7 @@ describe("given a reader on a span's output", () => {
       { wrapper },
     );
 
-    expect(
-      screen.getByRole("button", { name: "Suggest edit" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Suggest edit" })).toBeInTheDocument();
   });
 });
 
@@ -179,18 +170,12 @@ describe("given a reader on the trace's own input", () => {
   /** @scenario "A suggestion on the trace's own input becomes the corrected trace input" */
   it("offers the correction the trace input carries alongside a comment", () => {
     render(
-      <IOViewer
-        label="Input"
-        content="check on shipment 4417"
-        traceId={TRACE_ID}
-      />,
+      <IOViewer label="Input" content="check on shipment 4417" traceId={TRACE_ID} />,
       { wrapper },
     );
 
     expect(screen.getByRole("button", { name: "Comment" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Suggest edit" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Suggest edit" })).toBeInTheDocument();
   });
 });
 
@@ -210,8 +195,6 @@ describe("given a span whose input is hidden from the reader", () => {
     );
 
     expect(screen.getByText("Redacted")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Comment" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Comment" })).not.toBeInTheDocument();
   });
 });

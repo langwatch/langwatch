@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type {
-  FlattenAnalyticsMetricsEnum,
-  SeriesInputType,
-} from "../../registry";
+import type { FlattenAnalyticsMetricsEnum, SeriesInputType } from "../../registry";
 import { buildTimeseriesQuery } from "../aggregation-builder";
 import { buildMetricAlias } from "../metric-translator";
 
@@ -27,11 +24,7 @@ describe("result-parsing", () => {
       };
 
       // This is the alias used when parsing results (always index 0 for first series)
-      const parsingAlias = buildMetricAlias(
-        0,
-        series.metric,
-        series.aggregation,
-      );
+      const parsingAlias = buildMetricAlias(0, series.metric, series.aggregation);
 
       // Build a query with this metric
       const input = {
@@ -50,8 +43,7 @@ describe("result-parsing", () => {
 
       // The SQL should contain the alias (possibly quoted with backticks)
       const aliasInSql =
-        result.sql.includes(parsingAlias) ||
-        result.sql.includes(`\`${parsingAlias}\``);
+        result.sql.includes(parsingAlias) || result.sql.includes(`\`${parsingAlias}\``);
       expect(aliasInSql).toBe(true);
     });
 
@@ -91,8 +83,7 @@ describe("result-parsing", () => {
       ];
 
       for (const alias of expectedAliases) {
-        const found =
-          result.sql.includes(alias) || result.sql.includes(`\`${alias}\``);
+        const found = result.sql.includes(alias) || result.sql.includes(`\`${alias}\``);
         expect(found).toBe(true);
       }
     });
@@ -111,8 +102,7 @@ describe("result-parsing", () => {
           pipeline: { field: "user_id" as const, aggregation: "avg" as const },
         },
         {
-          metric:
-            "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
+          metric: "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
           aggregation: "avg",
           pipeline: { field: "user_id" as const, aggregation: "avg" as const },
         },
@@ -240,8 +230,7 @@ describe("result-parsing", () => {
           pipeline: { field: "user_id" as const, aggregation: "avg" as const },
         },
         {
-          metric:
-            "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
+          metric: "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
           aggregation: "avg",
           pipeline: { field: "user_id" as const, aggregation: "avg" as const },
         },
@@ -282,16 +271,16 @@ describe("result-parsing", () => {
       // Verify all values were correctly parsed
       expect(results.current!["0__metadata_thread_id__cardinality"]).toBe(150);
       expect(results.current!["1__metadata_thread_id__cardinality"]).toBe(3.5);
-      expect(
-        results.current!["2__threads_average_duration_per_thread__avg"],
-      ).toBe(8280000);
+      expect(results.current!["2__threads_average_duration_per_thread__avg"]).toBe(
+        8280000,
+      );
       expect(results.current!["3__metadata_trace_id__cardinality"]).toBe(25.5);
 
       expect(results.previous!["0__metadata_thread_id__cardinality"]).toBe(120);
       expect(results.previous!["1__metadata_thread_id__cardinality"]).toBe(3.2);
-      expect(
-        results.previous!["2__threads_average_duration_per_thread__avg"],
-      ).toBe(7200000);
+      expect(results.previous!["2__threads_average_duration_per_thread__avg"]).toBe(
+        7200000,
+      );
       expect(results.previous!["3__metadata_trace_id__cardinality"]).toBe(22.0);
     });
   });
@@ -324,8 +313,7 @@ describe("result-parsing", () => {
         const period = row.period as string;
         const dateKey = "full";
 
-        const targetMap =
-          period === "current" ? bucketMap.current : bucketMap.previous;
+        const targetMap = period === "current" ? bucketMap.current : bucketMap.previous;
 
         let bucket = targetMap.get(dateKey);
         if (!bucket) {
@@ -339,10 +327,7 @@ describe("result-parsing", () => {
           if (!bucket[groupBy]) {
             bucket[groupBy] = {};
           }
-          const groupData = bucket[groupBy] as Record<
-            string,
-            Record<string, number>
-          >;
+          const groupData = bucket[groupBy] as Record<string, Record<string, number>>;
           if (!groupData[groupKey]) {
             groupData[groupKey] = {};
           }
@@ -357,9 +342,7 @@ describe("result-parsing", () => {
               seriesItem.subkey,
             );
             const aggregation =
-              seriesItem.aggregation === "terms"
-                ? "cardinality"
-                : seriesItem.aggregation;
+              seriesItem.aggregation === "terms" ? "cardinality" : seriesItem.aggregation;
             const seriesName = seriesItem.pipeline
               ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.pipeline.field}/${seriesItem.pipeline.aggregation}`
               : seriesItem.key
@@ -382,9 +365,7 @@ describe("result-parsing", () => {
               seriesItem.subkey,
             );
             const aggregation =
-              seriesItem.aggregation === "terms"
-                ? "cardinality"
-                : seriesItem.aggregation;
+              seriesItem.aggregation === "terms" ? "cardinality" : seriesItem.aggregation;
             const seriesName = seriesItem.pipeline
               ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.pipeline.field}/${seriesItem.pipeline.aggregation}`
               : seriesItem.key
@@ -447,32 +428,26 @@ describe("result-parsing", () => {
       const currentBucket = currentPeriod[0]!;
       expect(currentBucket["evaluations.evaluation_label"]).toBeDefined();
 
-      const currentGroupData = currentBucket[
-        "evaluations.evaluation_label"
-      ] as Record<string, Record<string, number>>;
+      const currentGroupData = currentBucket["evaluations.evaluation_label"] as Record<
+        string,
+        Record<string, number>
+      >;
 
       // cat_a gets its value under the series name key
-      expect(currentGroupData.cat_a!["0/metadata.trace_id/cardinality"]).toBe(
-        150,
-      );
+      expect(currentGroupData.cat_a!["0/metadata.trace_id/cardinality"]).toBe(150);
       // cat_b gets its value under the series name key
-      expect(currentGroupData.cat_b!["0/metadata.trace_id/cardinality"]).toBe(
-        160,
-      );
+      expect(currentGroupData.cat_b!["0/metadata.trace_id/cardinality"]).toBe(160);
 
       // Verify nested structure exists for previous period
       expect(previousPeriod).toHaveLength(1);
       const previousBucket = previousPeriod[0]!;
-      const previousGroupData = previousBucket[
-        "evaluations.evaluation_label"
-      ] as Record<string, Record<string, number>>;
+      const previousGroupData = previousBucket["evaluations.evaluation_label"] as Record<
+        string,
+        Record<string, number>
+      >;
 
-      expect(previousGroupData.cat_a!["0/metadata.trace_id/cardinality"]).toBe(
-        100,
-      );
-      expect(previousGroupData.cat_b!["0/metadata.trace_id/cardinality"]).toBe(
-        110,
-      );
+      expect(previousGroupData.cat_a!["0/metadata.trace_id/cardinality"]).toBe(100);
+      expect(previousGroupData.cat_b!["0/metadata.trace_id/cardinality"]).toBe(110);
     });
 
     it("produces flat structure when no groupBy for summary rows", () => {
@@ -545,12 +520,12 @@ describe("result-parsing", () => {
       >;
 
       // Each group key gets its own metric value under the pipeline series name
-      expect(
-        groupData.group_x!["0/metadata.thread_id/cardinality/user_id/avg"],
-      ).toBe(3.5);
-      expect(
-        groupData.group_y!["0/metadata.thread_id/cardinality/user_id/avg"],
-      ).toBe(7.2);
+      expect(groupData.group_x!["0/metadata.thread_id/cardinality/user_id/avg"]).toBe(
+        3.5,
+      );
+      expect(groupData.group_y!["0/metadata.thread_id/cardinality/user_id/avg"]).toBe(
+        7.2,
+      );
     });
 
     it("handles empty group_key values by including them in the nested structure", () => {
@@ -581,16 +556,15 @@ describe("result-parsing", () => {
       );
 
       expect(currentPeriod).toHaveLength(1);
-      const groupData = currentPeriod[0]![
-        "evaluations.evaluation_label"
-      ] as Record<string, Record<string, number>>;
+      const groupData = currentPeriod[0]!["evaluations.evaluation_label"] as Record<
+        string,
+        Record<string, number>
+      >;
 
       // Empty string group_key is treated as a valid key (String("") === "")
       expect(groupData[""]!["0/metadata.trace_id/cardinality"]).toBe(42);
       // Non-empty key is also preserved
-      expect(groupData.known_label!["0/metadata.trace_id/cardinality"]).toBe(
-        88,
-      );
+      expect(groupData.known_label!["0/metadata.trace_id/cardinality"]).toBe(88);
     });
   });
 });

@@ -13,10 +13,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import type { Event } from "../../domain/types";
 import { buildProcessManager } from "../../pipeline/processBuilder";
-import type {
-  ProcessDefinition,
-  ProcessEventEnvelope,
-} from "../processManager.types";
+import type { ProcessDefinition, ProcessEventEnvelope } from "../processManager.types";
 import { ProcessManagerService } from "../processManagerService";
 import { buildProcessDefinition } from "../processRuntime";
 import { InMemoryProcessStore } from "../stores/inMemoryProcessStore";
@@ -75,13 +72,7 @@ function probeHandler(
 let store: InMemoryProcessStore;
 let service: ProcessManagerService<ProbeState>;
 
-function envelope({
-  mode,
-  key,
-}: {
-  mode: ProbeMode;
-  key: string;
-}): ProcessEventEnvelope {
+function envelope({ mode, key }: { mode: ProbeMode; key: string }): ProcessEventEnvelope {
   return {
     eventId: `${mode}:${key}`,
     eventType: PROBE_EVENT,
@@ -138,13 +129,9 @@ describe("transient process commits", () => {
       expect(second.outcome).toBe("committed");
       if (second.outcome === "committed") {
         expect(second.insertedMessageKeys).toEqual([]);
-        expect(second.duplicateMessageKeys).toEqual([
-          "process:req-2:act:noted",
-        ]);
+        expect(second.duplicateMessageKeys).toEqual(["process:req-2:act:noted"]);
       }
-      expect(
-        await store.findMessagesByRef({ ref: refFor("req-2") }),
-      ).toHaveLength(1);
+      expect(await store.findMessagesByRef({ ref: refFor("req-2") })).toHaveLength(1);
       expect(await store.findByRef({ ref: refFor("req-2") })).toBeNull();
     });
 
@@ -163,9 +150,7 @@ describe("transient process commits", () => {
       });
 
       expect(await store.findByRef({ ref: refFor("req-3") })).toBeNull();
-      expect(
-        await store.findMessagesByRef({ ref: refFor("req-3") }),
-      ).toHaveLength(0);
+      expect(await store.findMessagesByRef({ ref: refFor("req-3") })).toHaveLength(0);
     });
   });
 
@@ -248,11 +233,7 @@ describe("transient process commits", () => {
           applier: (pm) =>
             pm
               .state<ProbeState>(INITIAL)
-              .intent(
-                "act",
-                z.object({ id: z.string() }),
-                async () => undefined,
-              )
+              .intent("act", z.object({ id: z.string() }), async () => undefined)
               .on(PROBE_EVENT, (state) => ({ state }))
               .transient()
               .schedule({ everyMs: 1_000 }) as never,

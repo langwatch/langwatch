@@ -31,44 +31,54 @@ export const langyConversationMessageRoleSchema = z.enum([
   "tool",
 ]);
 
-export const langyMessageSchema = z.object({
-  id: langyMessageIdSchema,
-  conversationId: langyConversationIdSchema,
-  role: langyConversationMessageRoleSchema,
-  parts: z.array(z.unknown()),
-  createdAt: z.number().int().nonnegative(),
-}).strict();
+export const langyMessageSchema = z
+  .object({
+    id: langyMessageIdSchema,
+    conversationId: langyConversationIdSchema,
+    role: langyConversationMessageRoleSchema,
+    parts: z.array(z.unknown()),
+    createdAt: z.number().int().nonnegative(),
+  })
+  .strict();
 export type LangyMessage = z.infer<typeof langyMessageSchema>;
 
-export const langyConversationSchema = z.object({
-  id: langyConversationIdSchema,
-  projectId: z.string().min(1),
-  userId: z.string().min(1),
-  title: z.string().nullable(),
-  isShared: z.boolean(),
-  status: z.string(),
-  currentTurnId: langyTurnIdSchema.nullable(),
-  lastError: z.string().nullable(),
-  lastModel: z.string().nullable(),
-  messageCount: z.number().int().nonnegative(),
-  lastActivityAt: z.number().int().nonnegative(),
-}).strict();
+export const langyConversationSchema = z
+  .object({
+    id: langyConversationIdSchema,
+    projectId: z.string().min(1),
+    userId: z.string().min(1),
+    title: z.string().nullable(),
+    isShared: z.boolean(),
+    status: z.string(),
+    currentTurnId: langyTurnIdSchema.nullable(),
+    lastError: z.string().nullable(),
+    lastModel: z.string().nullable(),
+    messageCount: z.number().int().nonnegative(),
+    lastActivityAt: z.number().int().nonnegative(),
+  })
+  .strict();
 export type LangyConversation = z.infer<typeof langyConversationSchema>;
 
-export const langyCreateConversationInputSchema = z.object({
-  projectId: z.string().min(1),
-  userId: z.string().min(1),
-  conversationId: langyConversationIdSchema.optional(),
-}).strict();
-export type LangyCreateConversationInput = z.infer<typeof langyCreateConversationInputSchema>;
+export const langyCreateConversationInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    userId: z.string().min(1),
+    conversationId: langyConversationIdSchema.optional(),
+  })
+  .strict();
+export type LangyCreateConversationInput = z.infer<
+  typeof langyCreateConversationInputSchema
+>;
 
-export const langyConversationListInputSchema = z.object({
-  projectId: z.string().min(1),
-  userId: z.string().min(1),
-  limit: z.number().int().positive().max(100).default(50),
-  cursor: z.string().max(500).optional(),
-  query: z.string().max(200).optional(),
-}).strict();
+export const langyConversationListInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    userId: z.string().min(1),
+    limit: z.number().int().positive().max(100).default(50),
+    cursor: z.string().max(500).optional(),
+    query: z.string().max(200).optional(),
+  })
+  .strict();
 export type LangyConversationListInput = z.input<typeof langyConversationListInputSchema>;
 export const langyConversationInputSchema = z
   .object({
@@ -79,12 +89,14 @@ export const langyConversationInputSchema = z
   .strict();
 export type LangyConversationInput = z.infer<typeof langyConversationInputSchema>;
 
-export const langyTurnInputSchema = langyConversationInputSchema.extend({
-  turnId: langyTurnIdSchema,
-  idempotencyKey: z.string().min(1).max(256),
-  messages: z.array(z.unknown()).min(1),
-  model: z.string().min(1).optional(),
-}).strict();
+export const langyTurnInputSchema = langyConversationInputSchema
+  .extend({
+    turnId: langyTurnIdSchema,
+    idempotencyKey: z.string().min(1).max(256),
+    messages: z.array(z.unknown()).min(1),
+    model: z.string().min(1).optional(),
+  })
+  .strict();
 export type LangyTurnInput = z.infer<typeof langyTurnInputSchema>;
 export const langyMessageInputSchema = langyConversationInputSchema
   .extend({ messageId: langyMessageIdSchema })
@@ -164,9 +176,7 @@ export const langyWorkerCredentialsSchema = z
     harness: z.enum(["opencode", "pi"]).optional(),
   })
   .strict();
-export type LangyWorkerCredentials = z.infer<
-  typeof langyWorkerCredentialsSchema
->;
+export type LangyWorkerCredentials = z.infer<typeof langyWorkerCredentialsSchema>;
 export type LangyCredentials = LangyWorkerCredentials;
 export type LangyConversationPage = {
   items: LangyConversation[];

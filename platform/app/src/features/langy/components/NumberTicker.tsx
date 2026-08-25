@@ -49,9 +49,7 @@ export function NumberTicker({
   // A caller that passes `format` owns the presentation entirely and gets the
   // real value. Only the bare path rounds, and it rounds for DISPLAY of a
   // counter — and even then it keeps fractions that would otherwise vanish.
-  const display = useTransform(spring, (v) =>
-    format ? format(v) : defaultFormat(v),
-  );
+  const display = useTransform(spring, (v) => (format ? format(v) : defaultFormat(v)));
 
   useEffect(() => {
     motionValue.set(value);

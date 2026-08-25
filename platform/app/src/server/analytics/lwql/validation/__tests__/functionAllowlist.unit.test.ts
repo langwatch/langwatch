@@ -36,9 +36,8 @@ function codesOf(result: LangWatchQLValidation): LangWatchQLViolationCode[] {
 function functionRefusalMessage(result: LangWatchQLValidation): string {
   if (result.ok) return "";
   return (
-    result.violations.find(
-      (violation) => violation.code === "FUNCTION_NOT_ALLOWED",
-    )?.message ?? ""
+    result.violations.find((violation) => violation.code === "FUNCTION_NOT_ALLOWED")
+      ?.message ?? ""
   );
 }
 
@@ -180,15 +179,13 @@ describe("the LangWatchQL function allowlist", () => {
       expect(codesOf(result)).toEqual(["FUNCTION_NOT_ALLOWED"]);
       // The control: the same query shape with an allowlisted call passes, so
       // the refusal is attributable to the function and to nothing else.
-      expect(codesOf(validate("SELECT now() AS value FROM traces"))).toEqual(
-        [],
-      );
+      expect(codesOf(validate("SELECT now() AS value FROM traces"))).toEqual([]);
     });
 
     it("names the function in the refusal, so the caller knows what to change", () => {
-      expect(
-        functionRefusalMessage(validate("SELECT hostName() FROM traces")),
-      ).toContain("hostName");
+      expect(functionRefusalMessage(validate("SELECT hostName() FROM traces"))).toContain(
+        "hostName",
+      );
     });
 
     it("refuses it in whatever case it was written", () => {
@@ -208,10 +205,7 @@ describe("the LangWatchQL function allowlist", () => {
       ["a URL fetch", "url('http://169.254.169.254/')"],
       ["object storage", "s3('https://bucket/k', 'CSV')"],
       ["another server", "remote('other-host', 'db', 'tbl')"],
-      [
-        "a dictionary, which no row policy covers",
-        "dictGet('d', 'k', TraceId)",
-      ],
+      ["a dictionary, which no row policy covers", "dictGet('d', 'k', TraceId)"],
       ["a JDBC bridge", "jdbc('ds', 'SELECT 1')"],
       [
         "encryption over a key the caller names",
@@ -262,15 +256,9 @@ describe("the LangWatchQL function allowlist", () => {
     it.each([
       ["conditional aggregation", "countIf(ContainsErrorStatus)"],
       ["conditional summation", "sumIf(TotalCost, ContainsErrorStatus)"],
-      [
-        "a conditional argument aggregate",
-        "argMaxIf(TraceId, TotalCost, SpanCount > 1)",
-      ],
+      ["a conditional argument aggregate", "argMaxIf(TraceId, TotalCost, SpanCount > 1)"],
       ["a distinct aggregate", "sumDistinct(TotalDurationMs)"],
-      [
-        "two combinators at once",
-        "sumIfDistinct(TotalDurationMs, SpanCount > 1)",
-      ],
+      ["two combinators at once", "sumIfDistinct(TotalDurationMs, SpanCount > 1)"],
     ])("accepts %s, because it is one of the allowed aggregates", (_case, call) => {
       expect(codesOf(validate(`SELECT ${call} FROM traces`))).toEqual([]);
     });
@@ -291,9 +279,7 @@ describe("the LangWatchQL function allowlist", () => {
       expect(codesOf(validate(`SELECT ${call} FROM traces`))).toEqual([
         "FUNCTION_NOT_ALLOWED",
       ]);
-      expect(codesOf(validate("SELECT sum(TotalCost) FROM traces"))).toEqual(
-        [],
-      );
+      expect(codesOf(validate("SELECT sum(TotalCost) FROM traces"))).toEqual([]);
     });
 
     it("refuses a combinator hung on a function that is not an aggregate", () => {
@@ -316,10 +302,7 @@ describe("the LangWatchQL function allowlist", () => {
         "a join condition",
         "SELECT t.TraceId FROM traces AS t JOIN spans AS s ON t.TraceId = s.TraceId AND currentUser() != ''",
       ],
-      [
-        "a window partition",
-        "SELECT count() OVER (PARTITION BY hostName()) FROM traces",
-      ],
+      ["a window partition", "SELECT count() OVER (PARTITION BY hostName()) FROM traces"],
       [
         "a subquery",
         "SELECT TraceId FROM traces WHERE TraceId IN (SELECT getSetting('x') FROM spans)",
@@ -347,9 +330,9 @@ describe("the LangWatchQL function allowlist", () => {
      * a call, which a check hung on the `Function` node alone would step over.
      */
     it("refuses one outside the allowlist", () => {
-      expect(codesOf(validate("SELECT * APPLY(hostName) FROM traces"))).toEqual(
-        ["FUNCTION_NOT_ALLOWED"],
-      );
+      expect(codesOf(validate("SELECT * APPLY(hostName) FROM traces"))).toEqual([
+        "FUNCTION_NOT_ALLOWED",
+      ]);
     });
 
     it("accepts one inside it, so the refusal above is about the name", () => {
@@ -357,9 +340,9 @@ describe("the LangWatchQL function allowlist", () => {
     });
 
     it("still walks an APPLY written as a lambda", () => {
-      expect(
-        codesOf(validate("SELECT * APPLY(x -> hostName()) FROM traces")),
-      ).toEqual(["FUNCTION_NOT_ALLOWED"]);
+      expect(codesOf(validate("SELECT * APPLY(x -> hostName()) FROM traces"))).toEqual([
+        "FUNCTION_NOT_ALLOWED",
+      ]);
     });
   });
 

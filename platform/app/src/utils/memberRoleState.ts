@@ -34,9 +34,7 @@ export type TeamMembershipWithRole = TeamUser & {
 };
 
 /** Resolves the effective team role value for display/comparison, handling CUSTOM roles. */
-export function resolveTeamRoleValue(
-  membership: TeamMembershipWithRole,
-): TeamRoleValue {
+export function resolveTeamRoleValue(membership: TeamMembershipWithRole): TeamRoleValue {
   if (membership.role === TeamUserRole.CUSTOM) {
     return membership.assignedRole
       ? `custom:${membership.assignedRole.id}`
@@ -46,14 +44,11 @@ export function resolveTeamRoleValue(
 }
 
 /** Returns a human-readable display name for a team membership's role. */
-export function getTeamRoleDisplayName(
-  membership: TeamMembershipWithRole,
-): string {
+export function getTeamRoleDisplayName(membership: TeamMembershipWithRole): string {
   if (membership.role === "CUSTOM") {
     return membership.assignedRole?.name ?? "Custom";
   }
-  const option =
-    teamRolesOptions[membership.role as keyof typeof teamRolesOptions];
+  const option = teamRolesOptions[membership.role as keyof typeof teamRolesOptions];
   return option?.label ?? membership.role;
 }
 
@@ -70,8 +65,7 @@ export function buildInitialPendingTeamRoles(params: {
         tm.teamId,
         {
           role: resolveTeamRoleValue(tm),
-          customRoleId:
-            tm.role === TeamUserRole.CUSTOM ? tm.assignedRole?.id : undefined,
+          customRoleId: tm.role === TeamUserRole.CUSTOM ? tm.assignedRole?.id : undefined,
         },
       ]),
   );
@@ -142,8 +136,7 @@ export function hasPendingRoleChanges(params: {
 
     return (
       pending.role !== currentRole ||
-      (pending.customRoleId ?? null) !==
-        (teamMembership.assignedRole?.id ?? null)
+      (pending.customRoleId ?? null) !== (teamMembership.assignedRole?.id ?? null)
     );
   });
 }

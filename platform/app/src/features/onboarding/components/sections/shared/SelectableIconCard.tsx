@@ -2,10 +2,7 @@ import { Box, type IconProps, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useColorModeValue } from "../../../../../components/ui/color-mode";
 import { Tooltip } from "../../../../../components/ui/tooltip";
-import {
-  type IconSizeKey,
-  iconSizeToPixels,
-} from "../../../../../utils/iconSize";
+import { type IconSizeKey, iconSizeToPixels } from "../../../../../utils/iconSize";
 import type { IconData } from "../../../regions/shared/types";
 import { SELECTED_SURFACE_BG, SELECTED_SURFACE_BORDER } from "./accent-surface";
 
@@ -21,9 +18,7 @@ interface SelectableIconCardProps {
   badge?: string;
 }
 
-export function SelectableIconCard(
-  props: SelectableIconCardProps,
-): React.ReactElement {
+export function SelectableIconCard(props: SelectableIconCardProps): React.ReactElement {
   const {
     label,
     size = "md",
@@ -38,8 +33,7 @@ export function SelectableIconCard(
   const actualIcon = icon?.type === "with-label" ? icon.icon : icon;
   const iconLabel = icon?.type === "with-label" ? icon.label : undefined;
 
-  const resolvedSize =
-    iconSizeToPixels[(iconSize ?? "md") as IconSizeKey] ?? "24px";
+  const resolvedSize = iconSizeToPixels[(iconSize ?? "md") as IconSizeKey] ?? "24px";
 
   const themedIconSrc = useColorModeValue(
     actualIcon?.type === "themed" ? actualIcon.lightSrc : "",
@@ -55,8 +49,7 @@ export function SelectableIconCard(
   );
   const isDark = useColorModeValue(false, true);
 
-  const iconSrc =
-    actualIcon?.type === "themed" ? themedIconSrc : actualIcon?.src;
+  const iconSrc = actualIcon?.type === "themed" ? themedIconSrc : actualIcon?.src;
   const iconAlt = actualIcon?.alt;
 
   const cardSize = size === "sm" ? "72px" : "96px";
@@ -179,12 +172,7 @@ export function SelectableIconCard(
               )}
             </>
           ) : (
-            <Text
-              textStyle="sm"
-              fontWeight="normal"
-              color="fg.muted"
-              textAlign="center"
-            >
+            <Text textStyle="sm" fontWeight="normal" color="fg.muted" textAlign="center">
               {label}
             </Text>
           )}

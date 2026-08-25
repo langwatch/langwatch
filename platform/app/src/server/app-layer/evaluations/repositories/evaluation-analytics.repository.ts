@@ -66,9 +66,7 @@ export interface EvaluationAnalyticsRepository {
 }
 
 /** No-op implementation for tests and ClickHouse-less environments. */
-export class NullEvaluationAnalyticsRepository
-  implements EvaluationAnalyticsRepository
-{
+export class NullEvaluationAnalyticsRepository implements EvaluationAnalyticsRepository {
   async upsert(
     _row: EvaluationAnalyticsRow,
     _retentionDays?: number,

@@ -34,9 +34,7 @@ export abstract class ExperimentRepository {
     take: number;
   }): Promise<Experiment[]>;
   abstract count(input: { projectId: string }): Promise<number>;
-  abstract tryFindLatest(input: {
-    projectId: string;
-  }): Promise<Experiment | null>;
+  abstract tryFindLatest(input: { projectId: string }): Promise<Experiment | null>;
   abstract tryFindForWorkflow(input: {
     projectId: string;
     workflowId: string;
@@ -58,9 +56,11 @@ export abstract class ExperimentRepository {
     projectId: string;
   }): Promise<Array<{ name: string | null }>>;
   abstract findAllSlugs(input: { projectId: string }): Promise<string[]>;
-  abstract saveActive(input: SaveExperimentInput & {
-    slug: string;
-  }): Promise<Experiment>;
+  abstract saveActive(
+    input: SaveExperimentInput & {
+      slug: string;
+    },
+  ): Promise<Experiment>;
   abstract updateWorkbenchState(input: {
     projectId: string;
     id: string;

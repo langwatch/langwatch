@@ -21,10 +21,7 @@ export interface ShareViewDedupeService {
    * link for the first time in the window; false when the same viewer is
    * re-reading (a refresh, a restored tab, a second render).
    */
-  isNewViewing(params: {
-    shareId: string;
-    viewerKey: string;
-  }): Promise<boolean>;
+  isNewViewing(params: { shareId: string; viewerKey: string }): Promise<boolean>;
 }
 
 /** No Redis (tests, SKIP_REDIS, dev without Redis): every open is a new viewing. */

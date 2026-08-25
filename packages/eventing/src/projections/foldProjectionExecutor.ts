@@ -10,10 +10,7 @@ import {
 import type { Event } from "../domain/types";
 import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry";
 import type { FoldProjectionDefinition } from "./foldProjection.types";
-import {
-  type ProjectionStoreContext,
-  readWindowAround,
-} from "./projectionStoreContext";
+import { type ProjectionStoreContext, readWindowAround } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:fold-executor");
 
@@ -390,16 +387,8 @@ export class FoldProjectionExecutor {
       incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
     }
 
-    if (
-      loaded === null &&
-      !absentTrusted &&
-      this.shouldRefoldOnMiss(projection)
-    ) {
-      const refolded = await this.refoldUpToDelivered(
-        projection,
-        [event],
-        context,
-      );
+    if (loaded === null && !absentTrusted && this.shouldRefoldOnMiss(projection)) {
+      const refolded = await this.refoldUpToDelivered(projection, [event], context);
       // The ADR-066 transitional net, made observable: its deletion condition is
       // "it stopped firing", which is otherwise indistinguishable from a
       // regression to the pre-ADR-066 steady state of refolding on every miss.
@@ -441,9 +430,7 @@ export class FoldProjectionExecutor {
 
     // Capture the highest occurredAt before applying the new event.
     const prevLastOccurred =
-      (loadedState as Record<string, unknown>)[
-        projection.LastEventOccurredAtKey
-      ] ?? 0;
+      (loadedState as Record<string, unknown>)[projection.LastEventOccurredAtKey] ?? 0;
 
     let state = projection.apply(loadedState, event);
 
@@ -521,9 +508,7 @@ export class FoldProjectionExecutor {
     events: E[],
     context: ProjectionStoreContext,
   ): Promise<State> {
-    const matching = events.filter((event) =>
-      this.matchesEventTypes(projection, event),
-    );
+    const matching = events.filter((event) => this.matchesEventTypes(projection, event));
     if (matching.length === 0) {
       return projection.init();
     }
@@ -534,9 +519,7 @@ export class FoldProjectionExecutor {
     // Most folds follow business time. Lifecycle folds may instead select the
     // canonical accepted cursor so a backdated transition cannot jump ahead of
     // an event the log accepted first.
-    const ordered = [...matching].sort((a, b) =>
-      compareFoldEvents(projection, a, b),
-    );
+    const ordered = [...matching].sort((a, b) => compareFoldEvents(projection, a, b));
 
     const key = context.key ?? context.aggregateId;
     // Anchor the read to the batch's earliest event (any event in the batch is
@@ -566,16 +549,8 @@ export class FoldProjectionExecutor {
       incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
     }
 
-    if (
-      loaded === null &&
-      !absentTrusted &&
-      this.shouldRefoldOnMiss(projection)
-    ) {
-      const refolded = await this.refoldUpToDelivered(
-        projection,
-        ordered,
-        context,
-      );
+    if (loaded === null && !absentTrusted && this.shouldRefoldOnMiss(projection)) {
+      const refolded = await this.refoldUpToDelivered(projection, ordered, context);
       // Counted as on the single-event path above.
       incrementEsFoldRefoldOnMissTotal(
         projection.name,
@@ -613,9 +588,7 @@ export class FoldProjectionExecutor {
     const loadedState = loaded ?? projection.init();
 
     const prevLastOccurred =
-      (loadedState as Record<string, unknown>)[
-        projection.LastEventOccurredAtKey
-      ] ?? 0;
+      (loadedState as Record<string, unknown>)[projection.LastEventOccurredAtKey] ?? 0;
     const earliestOccurredAt = (fresh[0] as Record<string, unknown>).occurredAt;
 
     // Out-of-order vs the persisted checkpoint: the batch starts earlier than
@@ -688,8 +661,7 @@ export class FoldProjectionExecutor {
     event: E,
   ): boolean {
     return (
-      projection.eventTypes.length === 0 ||
-      projection.eventTypes.includes(event.type)
+      projection.eventTypes.length === 0 || projection.eventTypes.includes(event.type)
     );
   }
 
@@ -805,12 +777,7 @@ export class FoldProjectionExecutor {
       projection.eventLoaderUpToPaged &&
       projection.options?.refoldOnOutOfOrder === false
     ) {
-      return this.streamRefoldUpToDelivered(
-        projection,
-        delivered,
-        context,
-        upToEvent,
-      );
+      return this.streamRefoldUpToDelivered(projection, delivered, context, upToEvent);
     }
 
     const history = await projection.eventLoaderUpTo!({

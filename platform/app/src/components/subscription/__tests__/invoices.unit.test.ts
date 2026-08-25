@@ -57,9 +57,7 @@ describe("formatInvoiceDate", () => {
 describe("formatInvoiceAmount", () => {
   describe("when given USD cents", () => {
     it("formats to dollar amount", () => {
-      expect(formatInvoiceAmount({ amountCents: 5000, currency: "usd" })).toBe(
-        "$50.00",
-      );
+      expect(formatInvoiceAmount({ amountCents: 5000, currency: "usd" })).toBe("$50.00");
     });
   });
 
@@ -75,9 +73,7 @@ describe("formatInvoiceAmount", () => {
 
   describe("when given zero amount", () => {
     it("formats to zero", () => {
-      expect(formatInvoiceAmount({ amountCents: 0, currency: "usd" })).toBe(
-        "$0.00",
-      );
+      expect(formatInvoiceAmount({ amountCents: 0, currency: "usd" })).toBe("$0.00");
     });
   });
 });

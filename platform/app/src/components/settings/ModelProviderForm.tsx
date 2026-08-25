@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Field,
-  HStack,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import {
@@ -77,8 +69,7 @@ export const EditModelProviderForm = ({
   const { providers: allProviders, isReady: isAllProvidersReady } =
     useAllModelProvidersList();
   const { closeDrawer } = useDrawer();
-  const { project, team, organization, hasPermission } =
-    useOrganizationTeamProject();
+  const { project, team, organization, hasPermission } = useOrganizationTeamProject();
   const canManageOrganization = hasPermission("organization:manage");
   const canManageTeam = hasPermission("team:manage");
 
@@ -90,8 +81,7 @@ export const EditModelProviderForm = ({
       (p) => p.enabled,
     ).length;
     // If the current provider is not already enabled, add 1 since it will be enabled when saved
-    const isCurrentProviderAlreadyEnabled =
-      providers[providerKey]?.enabled ?? false;
+    const isCurrentProviderAlreadyEnabled = providers[providerKey]?.enabled ?? false;
     return isCurrentProviderAlreadyEnabled
       ? currentlyEnabledCount
       : currentlyEnabledCount + 1;
@@ -113,9 +103,7 @@ export const EditModelProviderForm = ({
   );
   const [advancedDraft, setAdvancedDraft] =
     useState<ModelProviderAdvancedDraft>(EMPTY_ADVANCED_DRAFT);
-  const [advancedJsonError, setAdvancedJsonError] = useState<string | null>(
-    null,
-  );
+  const [advancedJsonError, setAdvancedJsonError] = useState<string | null>(null);
 
   // Find the row this form is editing. Three inputs to the lookup:
   //   - `modelProviderId === "new"` → always blank, never pre-fill from
@@ -199,17 +187,13 @@ export const EditModelProviderForm = ({
     }
     setAdvancedDraft(
       draftFromProvider({
-        rateLimitRpm:
-          (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
-        rateLimitTpm:
-          (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
-        rateLimitRpd:
-          (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
+        rateLimitRpm: (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
+        rateLimitTpm: (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
+        rateLimitRpd: (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
         fallbackPriorityGlobal:
           (provider as { fallbackPriorityGlobal?: number | null })
             .fallbackPriorityGlobal ?? null,
-        providerConfig: (provider as { providerConfig?: unknown })
-          .providerConfig,
+        providerConfig: (provider as { providerConfig?: unknown }).providerConfig,
       }),
     );
     setAdvancedJsonError(null);
@@ -224,15 +208,12 @@ export const EditModelProviderForm = ({
   const initialAdvancedDraft = useMemo<ModelProviderAdvancedDraft>(() => {
     if (!gatewayMenuEnabled) return EMPTY_ADVANCED_DRAFT;
     return draftFromProvider({
-      rateLimitRpm:
-        (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
-      rateLimitTpm:
-        (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
-      rateLimitRpd:
-        (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
+      rateLimitRpm: (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
+      rateLimitTpm: (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
+      rateLimitRpd: (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
       fallbackPriorityGlobal:
-        (provider as { fallbackPriorityGlobal?: number | null })
-          .fallbackPriorityGlobal ?? null,
+        (provider as { fallbackPriorityGlobal?: number | null }).fallbackPriorityGlobal ??
+        null,
       providerConfig: (provider as { providerConfig?: unknown }).providerConfig,
     });
   }, [gatewayMenuEnabled, provider]);
@@ -242,9 +223,7 @@ export const EditModelProviderForm = ({
   // Controlled accordion state: collapsed by default, but expands
   // automatically when the user clicks Save with malformed JSON so the
   // inline error is actually visible.
-  const [advancedAccordionValue, setAdvancedAccordionValue] = useState<
-    string[]
-  >([]);
+  const [advancedAccordionValue, setAdvancedAccordionValue] = useState<string[]>([]);
 
   const getAdvancedPayload = useCallback(() => {
     if (!gatewayMenuEnabled) return null;
@@ -281,9 +260,7 @@ export const EditModelProviderForm = ({
   });
 
   const providerDefinition =
-    modelProvidersRegistry[
-      provider.provider as keyof typeof modelProvidersRegistry
-    ];
+    modelProvidersRegistry[provider.provider as keyof typeof modelProvidersRegistry];
 
   const isLlmProvider = providerDefinition?.type === "llm";
 
@@ -303,11 +280,8 @@ export const EditModelProviderForm = ({
   // `satisfies`, so widen to read the optional authFlow: same pattern
   // as CredentialsSection's optionalKeys read.)
   const isOAuthDeviceProvider =
-    (
-      providerDefinition as
-        | { authFlow?: "api-key" | "oauth-device" }
-        | undefined
-    )?.authFlow === "oauth-device";
+    (providerDefinition as { authFlow?: "api-key" | "oauth-device" } | undefined)
+      ?.authFlow === "oauth-device";
 
   const {
     validate: validateApiKey,
@@ -430,8 +404,8 @@ export const EditModelProviderForm = ({
     <VStack gap={4} align="start" width="full">
       {isStaleMiss && (
         <Text color="red.500" fontSize="sm">
-          This provider configuration no longer exists. It may have been deleted
-          from another session.
+          This provider configuration no longer exists. It may have been deleted from
+          another session.
         </Text>
       )}
       <VStack align="start" width="full" gap={4}>
@@ -450,8 +424,7 @@ export const EditModelProviderForm = ({
             />
           </Box>
           <Field.HelperText>
-            Distinguish multiple instances (e.g. "OpenAI – EU prod" vs "OpenAI –
-            Dev").
+            Distinguish multiple instances (e.g. "OpenAI – EU prod" vs "OpenAI – Dev").
           </Field.HelperText>
         </Field.Root>
 
@@ -509,9 +482,7 @@ export const EditModelProviderForm = ({
               });
               toaster.create({
                 title: "Codex connected",
-                description: account.email
-                  ? `Signed in as ${account.email}`
-                  : undefined,
+                description: account.email ? `Signed in as ${account.email}` : undefined,
                 type: "success",
               });
               closeDrawer();
@@ -531,11 +502,7 @@ export const EditModelProviderForm = ({
           />
         )}
 
-        <ExtraHeadersSection
-          state={state}
-          actions={actions}
-          provider={provider}
-        />
+        <ExtraHeadersSection state={state} actions={actions} provider={provider} />
 
         {isLlmProvider && (
           <ModelProviderRoutingSection
@@ -546,11 +513,7 @@ export const EditModelProviderForm = ({
         )}
 
         {isLlmProvider && !isOAuthDeviceProvider && (
-          <CustomModelInputSection
-            state={state}
-            actions={actions}
-            provider={provider}
-          />
+          <CustomModelInputSection state={state} actions={actions} provider={provider} />
         )}
 
         {gatewayMenuEnabled && (
@@ -565,8 +528,7 @@ export const EditModelProviderForm = ({
             accordionValue={advancedAccordionValue}
             onAccordionValueChange={setAdvancedAccordionValue}
             initial={{
-              healthStatus: (provider as { healthStatus?: string | null })
-                .healthStatus,
+              healthStatus: (provider as { healthStatus?: string | null }).healthStatus,
               circuitOpenedAt: (
                 provider as {
                   circuitOpenedAt?: Date | string | null;
@@ -577,8 +539,7 @@ export const EditModelProviderForm = ({
                   lastHealthCheckAt?: Date | string | null;
                 }
               ).lastHealthCheckAt,
-              disabledAt: (provider as { disabledAt?: Date | string | null })
-                .disabledAt,
+              disabledAt: (provider as { disabledAt?: Date | string | null }).disabledAt,
             }}
           />
         )}
@@ -588,9 +549,7 @@ export const EditModelProviderForm = ({
             size="sm"
             colorPalette="orange"
             loading={state.isSaving || isValidatingApiKey}
-            disabled={
-              cannotResolveTarget || (!state.isDirty && !isAdvancedDirty)
-            }
+            disabled={cannotResolveTarget || (!state.isDirty && !isAdvancedDirty)}
             onClick={handleSave}
           >
             {saveLabel}

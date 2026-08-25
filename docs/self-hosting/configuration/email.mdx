@@ -9,17 +9,20 @@ Until a gateway is configured, those messages are not sent, and the places that 
 
 ## Choosing a Gateway
 
-| Gateway | `EMAIL_PROVIDER` | Choose it when |
-|---------|------------------|----------------|
-| SMTP | `smtp` | Your network only allows mail out through an internal relay, or your vendor gives you an SMTP endpoint. Covers Azure Communication Services, Office 365, Google Workspace, Postmark, Mailgun and Brevo |
-| AWS SES | `ses` | You are already on AWS and want the pod's IAM role to carry the credentials |
-| SendGrid | `sendgrid` | You have a SendGrid account |
-| Resend | `resend` | You have a Resend account |
+| Gateway  | `EMAIL_PROVIDER` | Choose it when                                                                                                                                                                                         |
+| -------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| SMTP     | `smtp`           | Your network only allows mail out through an internal relay, or your vendor gives you an SMTP endpoint. Covers Azure Communication Services, Office 365, Google Workspace, Postmark, Mailgun and Brevo |
+| AWS SES  | `ses`            | You are already on AWS and want the pod's IAM role to carry the credentials                                                                                                                            |
+| SendGrid | `sendgrid`       | You have a SendGrid account                                                                                                                                                                            |
+| Resend   | `resend`         | You have a Resend account                                                                                                                                                                              |
 
 SMTP is the one to reach for when nothing else fits. Any gateway that speaks it works.
 
 <Note>
-`EMAIL_PROVIDER` decides which gateway runs, and no other gateway is tried if it fails. Leave it unset and the gateway is inferred from whichever credentials are present, `USE_AWS_SES` first and then `SENDGRID_API_KEY`. `smtp` and `resend` are only ever used when named.
+  `EMAIL_PROVIDER` decides which gateway runs, and no other gateway is tried if it fails.
+  Leave it unset and the gateway is inferred from whichever credentials are present,
+  `USE_AWS_SES` first and then `SENDGRID_API_KEY`. `smtp` and `resend` are only ever used
+  when named.
 </Note>
 
 ## Sender Address
@@ -61,14 +64,14 @@ app:
             key: smtpPassword
 ```
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SMTP_URL` | Full connection URL, e.g. `smtps://user:pass@relay.internal:465` | - |
-| `SMTP_HOST` | Relay hostname | - |
-| `SMTP_PORT` | Relay port | `587` |
-| `SMTP_SECURE` | `true` for implicit TLS, `false` to start plaintext and upgrade with STARTTLS | `true` on port 465, otherwise `false` |
-| `SMTP_USER` | Username. Omit for an unauthenticated internal relay | - |
-| `SMTP_PASSWORD` | Password | - |
+| Variable        | Description                                                                   | Default                               |
+| --------------- | ----------------------------------------------------------------------------- | ------------------------------------- |
+| `SMTP_URL`      | Full connection URL, e.g. `smtps://user:pass@relay.internal:465`              | -                                     |
+| `SMTP_HOST`     | Relay hostname                                                                | -                                     |
+| `SMTP_PORT`     | Relay port                                                                    | `587`                                 |
+| `SMTP_SECURE`   | `true` for implicit TLS, `false` to start plaintext and upgrade with STARTTLS | `true` on port 465, otherwise `false` |
+| `SMTP_USER`     | Username. Omit for an unauthenticated internal relay                          | -                                     |
+| `SMTP_PASSWORD` | Password                                                                      | -                                     |
 
 Omitting `SMTP_USER` sends unauthenticated. Use that when your relay accepts mail without credentials.
 
@@ -84,16 +87,17 @@ app:
         region: eu-central-1
 ```
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `USE_AWS_SES` | `true` to send through SES | `false` |
-| `AWS_REGION` | Region the SES identity lives in | - |
+| Variable           | Description                                                                         | Default                  |
+| ------------------ | ----------------------------------------------------------------------------------- | ------------------------ |
+| `USE_AWS_SES`      | `true` to send through SES                                                          | `false`                  |
+| `AWS_REGION`       | Region the SES identity lives in                                                    | -                        |
 | `AWS_SES_ENDPOINT` | Send to a VPC endpoint or an internal relay instead of the public regional endpoint | public regional endpoint |
 
 Credentials come from the standard AWS chain, so a pod with an IRSA role needs no keys in the chart. If you are not using a role, supply `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` through both `app.extraEnvs` and `workers.extraEnvs`, since each Deployment reads only its own extra environment and both send mail.
 
 <Note>
-A SES account still in the sandbox can only send to verified addresses, which includes the address alerts are delivered to. Request production access before relying on it.
+  A SES account still in the sandbox can only send to verified addresses, which includes
+  the address alerts are delivered to. Request production access before relying on it.
 </Note>
 
 ### SendGrid
@@ -111,8 +115,8 @@ app:
             key: sendgridApiKey
 ```
 
-| Variable | Description |
-|----------|-------------|
+| Variable           | Description      |
+| ------------------ | ---------------- |
 | `SENDGRID_API_KEY` | SendGrid API key |
 
 ### Resend
@@ -130,8 +134,8 @@ app:
             key: resendApiKey
 ```
 
-| Variable | Description |
-|----------|-------------|
+| Variable         | Description    |
+| ---------------- | -------------- |
 | `RESEND_API_KEY` | Resend API key |
 
 ## Sending Through an Outbound Proxy

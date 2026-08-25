@@ -6,10 +6,7 @@ import {
   type OrganizationTeam,
   type OrganizationTeamPage,
 } from "@langwatch/organization-contract";
-import {
-  Prisma,
-  type PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { TeamRepository } from "../team.repository";
 
 const teamSelect = {

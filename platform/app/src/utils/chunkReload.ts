@@ -25,9 +25,7 @@ export const RELOAD_AT_KEY = "chunk-reload-at";
  * (Chrome/Firefox/Safari), so we match all known variants.
  */
 export function isChunkLoadError(err: unknown): boolean {
-  const msg = (
-    err instanceof Error ? err.message : String(err ?? "")
-  ).toLowerCase();
+  const msg = (err instanceof Error ? err.message : String(err ?? "")).toLowerCase();
   return (
     msg.includes("loading chunk") ||
     msg.includes("dynamically imported module") ||
@@ -85,9 +83,7 @@ const warmupFailures = new WeakSet<object>();
  * this function claims. The next import of that chunk still recovers, at the
  * point where somebody is waiting for it.
  */
-export async function warmChunk(
-  load: () => Promise<unknown>,
-): Promise<boolean> {
+export async function warmChunk(load: () => Promise<unknown>): Promise<boolean> {
   warmupsInFlight += 1;
   try {
     await load();
@@ -139,9 +135,7 @@ export function registerChunkReloadListener(): void {
     const { payload } = event as { payload?: unknown };
     setTimeout(() => {
       const claimed =
-        typeof payload === "object" &&
-        payload !== null &&
-        warmupFailures.has(payload);
+        typeof payload === "object" && payload !== null && warmupFailures.has(payload);
       if (!claimed) forceReloadOnce();
     }, 0);
   });

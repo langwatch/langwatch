@@ -137,9 +137,7 @@ export const scimCreateGroupRequestSchema = z.object({
   members: z.array(scimGroupMemberSchema).optional(),
 });
 
-export type ScimCreateGroupRequest = z.infer<
-  typeof scimCreateGroupRequestSchema
->;
+export type ScimCreateGroupRequest = z.infer<typeof scimCreateGroupRequestSchema>;
 
 export const scimReplaceGroupRequestSchema = z.object({
   schemas: z.array(z.string()),
@@ -147,9 +145,7 @@ export const scimReplaceGroupRequestSchema = z.object({
   members: z.array(scimGroupMemberSchema).optional(),
 });
 
-export type ScimReplaceGroupRequest = z.infer<
-  typeof scimReplaceGroupRequestSchema
->;
+export type ScimReplaceGroupRequest = z.infer<typeof scimReplaceGroupRequestSchema>;
 
 /**
  * Type guard that checks whether a value is a SCIM 2.0 Error response.
@@ -161,7 +157,6 @@ export function isScimError(value: unknown): value is ScimError {
     value !== null &&
     "schemas" in value &&
     Array.isArray((value as ScimError).schemas) &&
-    (value as ScimError).schemas[0] ===
-      "urn:ietf:params:scim:api:messages:2.0:Error"
+    (value as ScimError).schemas[0] === "urn:ietf:params:scim:api:messages:2.0:Error"
   );
 }

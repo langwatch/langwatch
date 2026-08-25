@@ -14,9 +14,7 @@ interface MessageCommentScopeValue {
   commentsAt: (anchor: TraceAnchor) => AnnotationByTrace[];
 }
 
-const MessageCommentContext = createContext<MessageCommentScopeValue | null>(
-  null,
-);
+const MessageCommentContext = createContext<MessageCommentScopeValue | null>(null);
 
 /**
  * Which trace the transcript underneath belongs to, so a message inside it can
@@ -42,13 +40,7 @@ export function MessageCommentScope({
   return <ScopeProvider traceId={traceId}>{children}</ScopeProvider>;
 }
 
-function ScopeProvider({
-  traceId,
-  children,
-}: {
-  traceId: string;
-  children: ReactNode;
-}) {
+function ScopeProvider({ traceId, children }: { traceId: string; children: ReactNode }) {
   const annotations = useAnchoredAnnotations();
   const value = useMemo(
     () => ({ traceId, commentsAt: annotations.commentsAt }),
@@ -83,12 +75,7 @@ export function CommentableBlock({
   const scope = useContext(MessageCommentContext);
   if (!scope) return <>{children}</>;
   return (
-    <HStack
-      align="flex-start"
-      gap={1}
-      width="full"
-      className={MESSAGE_BLOCK_CLASS}
-    >
+    <HStack align="flex-start" gap={1} width="full" className={MESSAGE_BLOCK_CLASS}>
       <Box flex={1} minWidth={0}>
         {children}
       </Box>

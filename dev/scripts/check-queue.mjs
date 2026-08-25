@@ -126,8 +126,7 @@ function resolvePressure(env) {
   const swap = probe("sysctl", ["-n", "vm.swapusage"]);
   const total = /total = ([\d.]+)([MG])/.exec(swap);
   const used = /used = ([\d.]+)([MG])/.exec(swap);
-  const inBytes = (m) =>
-    Number.parseFloat(m[1]) * (m[2] === "G" ? 2 ** 30 : 2 ** 20);
+  const inBytes = (m) => Number.parseFloat(m[1]) * (m[2] === "G" ? 2 ** 30 : 2 ** 20);
   if (total && used && inBytes(total) > 0) {
     swapFraction = inBytes(used) / inBytes(total);
   }
@@ -175,9 +174,7 @@ function resolveSlots(env, pressure = "green") {
     }
     const parsed = Number.parseInt(raw, 10);
     if (Number.isNaN(parsed) || parsed < 0) {
-      stderr(
-        `${PREFIX} ignoring CHECK_SLOTS=${raw}, expected a non-negative integer\n`,
-      );
+      stderr(`${PREFIX} ignoring CHECK_SLOTS=${raw}, expected a non-negative integer\n`);
     } else {
       return { slots: parsed, source: "CHECK_SLOTS" };
     }
@@ -300,8 +297,7 @@ function readEntries(dir) {
       // A .tmp left behind by a process that died mid-write. Entries are only
       // ever written under the lock, so anything this old is abandoned.
       const staleTmp =
-        name.endsWith(".tmp") &&
-        now - (statMtimeMs(file) ?? now) > LOCK_STALE_MS;
+        name.endsWith(".tmp") && now - (statMtimeMs(file) ?? now) > LOCK_STALE_MS;
       if (staleTmp) fs.rmSync(file, { force: true });
       continue;
     }
@@ -362,14 +358,7 @@ function describeActive(entries, now) {
  * Blocks until this run may proceed. Returns how long it waited, whether it
  * announced itself, and whether it gave up on the queue and started anyway.
  */
-async function waitForTurn({
-  dir,
-  ticket,
-  slots,
-  pollMs,
-  maxWaitMs,
-  heartbeatMs,
-}) {
+async function waitForTurn({ dir, ticket, slots, pollMs, maxWaitMs, heartbeatMs }) {
   const queuedAt = Date.now();
   let announced = false;
   let lastBeat = 0;
@@ -384,9 +373,7 @@ async function waitForTurn({
       const running = entries.filter(
         (e) => e.state === "running" && e.token !== ticket.token,
       );
-      const waiting = entries
-        .filter((e) => e.state === "waiting")
-        .sort(byArrival);
+      const waiting = entries.filter((e) => e.state === "waiting").sort(byArrival);
       const position = waiting.findIndex((e) => e.token === ticket.token);
       if (position >= 0 && position < slots - running.length) {
         ticket.state = "running";
@@ -701,9 +688,7 @@ async function main(argv, env) {
       );
     }
   } catch (err) {
-    stderr(
-      `${PREFIX} queue unavailable (${err.message}), running without a slot\n`,
-    );
+    stderr(`${PREFIX} queue unavailable (${err.message}), running without a slot\n`);
   }
 
   try {

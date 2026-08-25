@@ -43,10 +43,7 @@ import {
   redactQueryForAudit,
 } from "~/server/ops/explain-core";
 
-function bearerTokenMatches(
-  headerValue: string | undefined,
-  expected: string,
-): boolean {
+function bearerTokenMatches(headerValue: string | undefined, expected: string): boolean {
   if (!headerValue) return false;
   const m = /^Bearer\s+(.+)$/i.exec(headerValue.trim());
   if (!m?.[1]) return false;
@@ -89,10 +86,7 @@ secured
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
       const path = issue?.path?.length ? `${issue.path.join(".")}: ` : "";
-      return c.json(
-        { message: `${path}${issue?.message ?? "invalid body"}` },
-        400,
-      );
+      return c.json({ message: `${path}${issue?.message ?? "invalid body"}` }, 400);
     }
 
     const built = buildExplainQuery(parsed.data.query, parsed.data.type);
@@ -117,10 +111,7 @@ secured
           503,
         );
       case "unavailable":
-        return c.json(
-          { message: "ClickHouse is not configured on this instance" },
-          503,
-        );
+        return c.json({ message: "ClickHouse is not configured on this instance" }, 503);
       case "error":
         return c.json({ message: `ClickHouse error: ${outcome.message}` }, 502);
       case "ok":

@@ -107,9 +107,7 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
 
   afterAll(async () => {
     await resetApp();
-    await prisma.project
-      .deleteMany({ where: { id: PROJECT_ID } })
-      .catch(() => {});
+    await prisma.project.deleteMany({ where: { id: PROJECT_ID } }).catch(() => {});
     await prisma.teamUser
       .deleteMany({ where: { userId: USER_ID, teamId: TEAM_ID } })
       .catch(() => {});
@@ -118,9 +116,7 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
       .catch(() => {});
     await prisma.user.deleteMany({ where: { id: USER_ID } }).catch(() => {});
     await prisma.team.deleteMany({ where: { id: TEAM_ID } }).catch(() => {});
-    await prisma.organization
-      .deleteMany({ where: { id: ORG_ID } })
-      .catch(() => {});
+    await prisma.organization.deleteMany({ where: { id: ORG_ID } }).catch(() => {});
     await stopTestContainers().catch(() => {});
   });
 

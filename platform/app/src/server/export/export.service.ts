@@ -56,9 +56,8 @@ export class ExportService {
    * that would break unit tests which only inject mocks.
    */
   static async create(prisma?: PrismaClient): Promise<ExportService> {
-    const { TraceService: TraceServiceImpl } = await import(
-      "~/server/traces/trace.service"
-    );
+    const { TraceService: TraceServiceImpl } =
+      await import("~/server/traces/trace.service");
     const resolvedPrisma = prisma ?? (await import("~/server/db")).prisma;
     // Export is a content-consuming read: wire blob-resolution deps so a full
     // export reads the whole IO value, not the 64 KB preview (#4991 AC1).
@@ -327,15 +326,10 @@ function serializeJsonBatch({
   switch (request.mode) {
     case "summary":
       return (
-        traces
-          .map((trace) => serializeTraceToSummaryJson({ trace }))
-          .join("\n") + "\n"
+        traces.map((trace) => serializeTraceToSummaryJson({ trace })).join("\n") + "\n"
       );
     case "full":
-      return (
-        traces.map((trace) => serializeTraceToFullJson({ trace })).join("\n") +
-        "\n"
-      );
+      return traces.map((trace) => serializeTraceToFullJson({ trace })).join("\n") + "\n";
     default: {
       const _exhaustive: never = request.mode;
       throw new Error(`Unsupported mode: ${_exhaustive}`);

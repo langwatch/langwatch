@@ -32,12 +32,7 @@ import { CARDS_BY_RESOURCE, cardKindFor } from "./registry.js";
 /** How many ids a digest carries at most — a reference, not an export. */
 export const MAX_DIGEST_IDS = 25;
 
-export const DIGEST_STRATEGIES = [
-  "id-ref",
-  "query-ref",
-  "reduced",
-  "text",
-] as const;
+export const DIGEST_STRATEGIES = ["id-ref", "query-ref", "reduced", "text"] as const;
 
 export type DigestStrategy = (typeof DIGEST_STRATEGIES)[number];
 
@@ -95,13 +90,7 @@ function singularIdKeys(resource: string): string[] {
  * The id keys checked for a resource, in priority order: the resource's own
  * `ref` hint first, then the conventions every endpoint roughly follows.
  */
-function idKeysFor({
-  resource,
-  verb,
-}: {
-  resource: string;
-  verb: string;
-}): string[] {
+function idKeysFor({ resource, verb }: { resource: string; verb: string }): string[] {
   const hinted = CARDS_BY_RESOURCE[resource]?.ref?.idKeys ?? [];
   const runKeys = cardKindFor({ resource, verb }) === "evalRun" ? RUN_ID_KEYS : [];
   return [...hinted, "id", "slug", ...singularIdKeys(resource), ...runKeys];
@@ -139,9 +128,9 @@ function collectionRowsOf(document: unknown): unknown[] | null {
   const raw = Array.isArray(document)
     ? document
     : document && typeof document === "object"
-      ? COLLECTION_KEYS.map(
-          (key) => (document as Record<string, unknown>)[key],
-        ).find(Array.isArray) ?? null
+      ? (COLLECTION_KEYS.map((key) => (document as Record<string, unknown>)[key]).find(
+          Array.isArray,
+        ) ?? null)
       : null;
   if (!raw) return null;
   return raw.filter((row) => !!row && typeof row === "object");

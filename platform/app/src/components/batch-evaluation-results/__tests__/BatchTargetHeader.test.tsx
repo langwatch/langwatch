@@ -108,9 +108,7 @@ describe("BatchTargetHeader", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.queryByTestId("target-summary-badge"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("target-summary-badge")).not.toBeInTheDocument();
     });
 
     it("does not render summary when no results", () => {
@@ -125,9 +123,7 @@ describe("BatchTargetHeader", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.queryByTestId("target-summary-badge"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("target-summary-badge")).not.toBeInTheDocument();
     });
 
     it("renders summary badge when there are completed rows", () => {

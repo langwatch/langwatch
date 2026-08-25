@@ -118,9 +118,7 @@ describe("given several processes want the schema lock at once", () => {
         `11111111-2222-3333-4444-555555555555 ${deadPid} ${new Date().toISOString()}\n`,
       );
 
-      await Promise.all(
-        ["a", "b"].map((id) => startContender({ id, holdMs: 40 })),
-      );
+      await Promise.all(["a", "b"].map((id) => startContender({ id, holdMs: 40 })));
 
       const journal = readFileSync(journalPath, "utf-8");
       expect(overlappingHolders(journal)).toEqual([]);

@@ -43,10 +43,7 @@ import {
 import { CollectorSpanUtils } from "../src/server/traces/collectorSpan.utils";
 import { buildMassMetrics, MASS_METRICS_SCOPE } from "./seed-lib/mass-metrics";
 import { buildMassTimeline, type MassTimeline } from "./seed-lib/mass-timeline";
-import {
-  EXPERIMENT_ROWS,
-  SCENARIO_FIXTURES,
-} from "./seed-lib/platform-fixtures";
+import { EXPERIMENT_ROWS, SCENARIO_FIXTURES } from "./seed-lib/platform-fixtures";
 import { applySeedRetention, seededRetentionDays } from "./seed-lib/retention";
 import {
   assertLocalUrl,
@@ -64,8 +61,7 @@ const USER_ID = "local-dev-admin-user";
 const ORG_ID = "local-dev-organization";
 const target: CollectorTarget = {
   endpoint: process.env.HAVEN_SEED_ENDPOINT ?? "http://localhost:5560",
-  apiKey:
-    process.env.HAVEN_SEED_LANGWATCH_API_KEY ?? "sk-lw-local-development-key",
+  apiKey: process.env.HAVEN_SEED_LANGWATCH_API_KEY ?? "sk-lw-local-development-key",
 };
 const MONTHS = Math.max(1, Number(process.env.HAVEN_SEED_MONTHS ?? 3) || 3);
 
@@ -100,8 +96,7 @@ async function dispatchDeepTrace({
       ([key]) => !(key in reservedTraceMetadataSchema.shape),
     ),
   );
-  const customMetadata: CustomMetadata =
-    customMetadataSchema.parse(remainingMetadata);
+  const customMetadata: CustomMetadata = customMetadataSchema.parse(remainingMetadata);
   const resource = CollectorSpanUtils.buildResource({
     reservedTraceMetadata,
     customMetadata,
@@ -174,9 +169,7 @@ async function dispatchTimeline({
         reasoning: run.passed
           ? "The response stayed within policy and supplied a safe next step."
           : "The response made an unsupported promise or invented a fact.",
-        metCriteria: run.passed
-          ? [...scenario.criteria]
-          : [scenario.criteria[0]],
+        metCriteria: run.passed ? [...scenario.criteria] : [scenario.criteria[0]],
         unmetCriteria: run.passed ? [] : scenario.criteria.slice(1),
       },
     });
@@ -191,9 +184,7 @@ async function dispatchTimeline({
       evaluatorType:
         run.scenarioIndex === 1 ? "ragas/faithfulness" : "langevals/llm_score",
       evaluatorName:
-        run.scenarioIndex === 1
-          ? "Documentation Groundedness"
-          : "Support Answer Quality",
+        run.scenarioIndex === 1 ? "Documentation Groundedness" : "Support Answer Quality",
       traceId: run.trace.traceId,
       status: "processed",
       score: run.score,
@@ -248,12 +239,7 @@ async function dispatchTimeline({
         status: "processed",
         score,
         passed: score >= 0.7,
-        label:
-          score >= 0.85
-            ? "excellent"
-            : score >= 0.7
-              ? "acceptable"
-              : "needs work",
+        label: score >= 0.85 ? "excellent" : score >= 0.7 ? "acceptable" : "needs work",
         details: `Weekly regression scored ${Math.round(score * 100)}%.`,
         duration: 420 + index * 35,
         cost: 0.0008,
@@ -309,8 +295,7 @@ async function projectionCounts(window: SeedWindow): Promise<ProjectionCounts> {
     },
     format: "JSONEachRow",
   });
-  const [row] =
-    await result.json<Record<keyof ProjectionCounts, string | number>>();
+  const [row] = await result.json<Record<keyof ProjectionCounts, string | number>>();
   if (!row) throw new Error("Projection count query returned no row");
   return {
     simulations: Number(row.simulations),
@@ -387,12 +372,10 @@ async function main(): Promise<void> {
     // command seam with backdated occurredAt.
     const collectorCutoff = now - TRACE_WINDOW_DAYS * DAY_MS;
     const windowed = traces.filter(
-      (trace) =>
-        (trace.finishedAtMs ?? now) - trace.latencyMs >= collectorCutoff,
+      (trace) => (trace.finishedAtMs ?? now) - trace.latencyMs >= collectorCutoff,
     );
     const deep = traces.filter(
-      (trace) =>
-        (trace.finishedAtMs ?? now) - trace.latencyMs < collectorCutoff,
+      (trace) => (trace.finishedAtMs ?? now) - trace.latencyMs < collectorCutoff,
     );
     console.log(
       `🌱 Mass seed: ${timeline.days} days — ${timeline.scenarioRuns.length} scenario runs, ${timeline.experimentRuns.length} experiment runs, ${traces.length} traces (${windowed.length} via collector, ${deep.length} via pipeline), ${metrics.totalPoints} metric points`,

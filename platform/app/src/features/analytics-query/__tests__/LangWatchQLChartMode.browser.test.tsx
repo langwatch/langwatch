@@ -95,9 +95,7 @@ function ChartModeHost({ view }: { view: "chart" | "specification" }) {
 }
 
 function chartView(): HTMLElement | null {
-  return document.querySelector<HTMLElement>(
-    '[data-testid="lwql-vega-chart-view"]',
-  );
+  return document.querySelector<HTMLElement>('[data-testid="lwql-vega-chart-view"]');
 }
 
 /** The drawn bars: one SVG path per row, inside Vega's rect mark group. */
@@ -168,9 +166,7 @@ describe("LangWatchQL chart mode in real Chromium", () => {
             '[data-testid="lwql-vega-chart-view"] svg g.mark-text text',
           ),
         ).map((label) => label.textContent);
-        const categoryAxis = document.querySelector(
-          '[aria-roledescription="axis"]',
-        );
+        const categoryAxis = document.querySelector('[aria-roledescription="axis"]');
         expect(categoryAxis).not.toBeNull();
         const categoryAxisName = categoryAxis?.getAttribute("aria-label") ?? "";
         for (const row of RESULT.rows) {

@@ -18,16 +18,13 @@ const llmSchema = z.object({
   maxTokens: latestConfigVersionSchema.shape.configData.shape.max_tokens,
   // Traditional sampling parameters
   topP: latestConfigVersionSchema.shape.configData.shape.top_p,
-  frequencyPenalty:
-    latestConfigVersionSchema.shape.configData.shape.frequency_penalty,
-  presencePenalty:
-    latestConfigVersionSchema.shape.configData.shape.presence_penalty,
+  frequencyPenalty: latestConfigVersionSchema.shape.configData.shape.frequency_penalty,
+  presencePenalty: latestConfigVersionSchema.shape.configData.shape.presence_penalty,
   // Other sampling parameters
   seed: latestConfigVersionSchema.shape.configData.shape.seed,
   topK: latestConfigVersionSchema.shape.configData.shape.top_k,
   minP: latestConfigVersionSchema.shape.configData.shape.min_p,
-  repetitionPenalty:
-    latestConfigVersionSchema.shape.configData.shape.repetition_penalty,
+  repetitionPenalty: latestConfigVersionSchema.shape.configData.shape.repetition_penalty,
   // Reasoning parameter (canonical/unified field)
   reasoning: latestConfigVersionSchema.shape.configData.shape.reasoning,
   verbosity: latestConfigVersionSchema.shape.configData.shape.verbosity,
@@ -50,18 +47,14 @@ const baseFormSchema = z.object({
     // default at its transport boundaries without widening the form input.
     parameters: runtimeParametersSchema.removeDefault(),
     configData: z.object({
-      messages:
-        latestConfigVersionSchema.shape.configData.shape.messages.removeDefault(),
-      inputs:
-        latestConfigVersionSchema.shape.configData.shape.inputs.removeDefault(),
+      messages: latestConfigVersionSchema.shape.configData.shape.messages.removeDefault(),
+      inputs: latestConfigVersionSchema.shape.configData.shape.inputs.removeDefault(),
       outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
       llm: llmSchema,
-      demonstrations:
-        latestConfigVersionSchema.shape.configData.shape.demonstrations,
+      demonstrations: latestConfigVersionSchema.shape.configData.shape.demonstrations,
       promptingTechnique:
         latestConfigVersionSchema.shape.configData.shape.prompting_technique,
-      responseFormat:
-        latestConfigVersionSchema.shape.configData.shape.response_format,
+      responseFormat: latestConfigVersionSchema.shape.configData.shape.response_format,
     }),
   }),
 });
@@ -97,9 +90,7 @@ function baseFormSchemaWithModelLimits(
   }
 
   const maxTokenLimit =
-    modelLimits?.maxOutputTokens ??
-    modelLimits?.maxTokens ??
-    FALLBACK_MAX_TOKENS;
+    modelLimits?.maxOutputTokens ?? modelLimits?.maxTokens ?? FALLBACK_MAX_TOKENS;
 
   // Only refine if the limit is different from fallback
   if (maxTokenLimit === FALLBACK_MAX_TOKENS) {
@@ -156,9 +147,7 @@ export const hasNonEmptySystemMessage = (
 ): boolean =>
   !!messages?.some(
     (m) =>
-      m?.role === "system" &&
-      typeof m?.content === "string" &&
-      m.content.trim() !== "",
+      m?.role === "system" && typeof m?.content === "string" && m.content.trim() !== "",
   );
 
 /**
@@ -169,15 +158,11 @@ export const hasNonEmptySystemMessage = (
  */
 function withSystemPromptRequired<T extends z.ZodTypeAny>(schema: T) {
   return schema.superRefine((values, ctx) => {
-    const messages = (
-      values as { version?: { configData?: { messages?: unknown } } }
-    ).version?.configData?.messages;
+    const messages = (values as { version?: { configData?: { messages?: unknown } } })
+      .version?.configData?.messages;
     if (
       !hasNonEmptySystemMessage(
-        messages as
-          | readonly { role: string; content: string }[]
-          | undefined
-          | null,
+        messages as readonly { role: string; content: string }[] | undefined | null,
       )
     ) {
       ctx.addIssue({

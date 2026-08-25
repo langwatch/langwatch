@@ -34,9 +34,7 @@ describe("WorkflowBuilder", () => {
     outputs: [{ identifier: "output", type: "str" }],
   });
 
-  const createBasicTargetConfig = (
-    overrides?: Partial<TargetConfig>,
-  ): TargetConfig => ({
+  const createBasicTargetConfig = (overrides?: Partial<TargetConfig>): TargetConfig => ({
     id: "target-1",
     type: "prompt",
     inputs: [{ identifier: "input", type: "str" }],
@@ -83,9 +81,7 @@ describe("WorkflowBuilder", () => {
     },
   });
 
-  const createBasicCell = (
-    overrides?: Partial<ExecutionCell>,
-  ): ExecutionCell => ({
+  const createBasicCell = (overrides?: Partial<ExecutionCell>): ExecutionCell => ({
     rowIndex: 0,
     targetId: "target-1",
     targetConfig: createBasicTargetConfig(),
@@ -227,9 +223,9 @@ describe("WorkflowBuilder", () => {
         cell,
       });
 
-      const instructionsParam = (
-        node.data as LlmPromptConfigComponent
-      ).parameters.find((p) => p.identifier === "instructions");
+      const instructionsParam = (node.data as LlmPromptConfigComponent).parameters.find(
+        (p) => p.identifier === "instructions",
+      );
       expect(instructionsParam?.value).toBe("You are a helpful assistant.");
     });
 
@@ -246,9 +242,9 @@ describe("WorkflowBuilder", () => {
         cell,
       });
 
-      const messagesParam = (
-        node.data as LlmPromptConfigComponent
-      ).parameters.find((p) => p.identifier === "messages");
+      const messagesParam = (node.data as LlmPromptConfigComponent).parameters.find(
+        (p) => p.identifier === "messages",
+      );
       expect(messagesParam?.value).toEqual([
         { role: "user", content: "Answer: {{input}}" },
       ]);
@@ -344,13 +340,7 @@ describe("WorkflowBuilder", () => {
       const evaluator = createBasicEvaluatorConfig();
       const cell = createBasicCell();
 
-      const node = buildEvaluatorNode(
-        evaluator,
-        "target-1.eval-1",
-        "target-1",
-        cell,
-        0,
-      );
+      const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
 
       expect(node.id).toBe("target-1.eval-1");
       expect(node.type).toBe("evaluator");
@@ -361,13 +351,7 @@ describe("WorkflowBuilder", () => {
       const evaluator = createBasicEvaluatorConfig();
       const cell = createBasicCell();
 
-      const node = buildEvaluatorNode(
-        evaluator,
-        "target-1.eval-1",
-        "target-1",
-        cell,
-        0,
-      );
+      const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
 
       // Full evaluator type including namespace
       expect(node.data.evaluator).toBe("langevals/exact_match");
@@ -377,13 +361,7 @@ describe("WorkflowBuilder", () => {
       const evaluator = createBasicEvaluatorConfig();
       const cell = createBasicCell();
 
-      const node = buildEvaluatorNode(
-        evaluator,
-        "target-1.eval-1",
-        "target-1",
-        cell,
-        0,
-      );
+      const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
 
       expect(node.data.inputs).toHaveLength(2);
       expect(node.data.inputs?.map((i) => i.identifier)).toEqual([
@@ -396,13 +374,7 @@ describe("WorkflowBuilder", () => {
       const evaluator = createBasicEvaluatorConfig();
       const cell = createBasicCell();
 
-      const node = buildEvaluatorNode(
-        evaluator,
-        "target-1.eval-1",
-        "target-1",
-        cell,
-        0,
-      );
+      const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
 
       expect(node.data.outputs?.map((o) => o.identifier)).toEqual([
         "passed",
@@ -470,9 +442,7 @@ describe("WorkflowBuilder", () => {
       const input = createBasicInput({ cell });
       const result = buildCellWorkflow(input, {});
 
-      const evaluatorNodes = result.workflow.nodes.filter(
-        (n) => n.type === "evaluator",
-      );
+      const evaluatorNodes = result.workflow.nodes.filter((n) => n.type === "evaluator");
       expect(evaluatorNodes).toHaveLength(2);
       expect(evaluatorNodes.map((n) => n.id)).toEqual([
         "target-1.eval-1",
@@ -514,12 +484,7 @@ describe("WorkflowBuilder", () => {
       });
       const cell = createBasicCell({ targetConfig });
 
-      const node = buildCodeNodeFromAgent(
-        "test-node",
-        agent,
-        targetConfig,
-        cell,
-      );
+      const node = buildCodeNodeFromAgent("test-node", agent, targetConfig, cell);
 
       expect(node.id).toBe("test-node");
       expect(node.type).toBe("code");
@@ -535,12 +500,7 @@ describe("WorkflowBuilder", () => {
       });
       const cell = createBasicCell({ targetConfig });
 
-      const node = buildCodeNodeFromAgent(
-        "test-node",
-        agent,
-        targetConfig,
-        cell,
-      );
+      const node = buildCodeNodeFromAgent("test-node", agent, targetConfig, cell);
 
       expect(node.data.inputs).toHaveLength(1);
       expect(node.data.inputs?.[0]?.identifier).toBe("input");
@@ -557,12 +517,7 @@ describe("WorkflowBuilder", () => {
       });
       const cell = createBasicCell({ targetConfig });
 
-      const node = buildCodeNodeFromAgent(
-        "test-node",
-        agent,
-        targetConfig,
-        cell,
-      );
+      const node = buildCodeNodeFromAgent("test-node", agent, targetConfig, cell);
 
       expect(node.data.parameters).toBeDefined();
       expect(node.data.parameters?.length).toBeGreaterThan(0);

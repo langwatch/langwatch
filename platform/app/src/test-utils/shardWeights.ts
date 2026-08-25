@@ -55,17 +55,11 @@ export function loadDurationManifest(manifestPath: string): DurationManifest {
   }
 
   const manifest: DurationManifest = {};
-  for (const [file, duration] of Object.entries(
-    parsed as Record<string, unknown>,
-  )) {
+  for (const [file, duration] of Object.entries(parsed as Record<string, unknown>)) {
     // Only finite positive numbers are usable as weights. A zero or a negative
     // would let a file sink to the front of every bin and unbalance the split
     // in the direction this exists to fix.
-    if (
-      typeof duration === "number" &&
-      Number.isFinite(duration) &&
-      duration > 0
-    ) {
+    if (typeof duration === "number" && Number.isFinite(duration) && duration > 0) {
       manifest[file] = duration;
     }
   }
@@ -105,8 +99,7 @@ export function createWeigher({
 
   // With nothing measured, bytes are the weight and the scale is irrelevant —
   // every file goes through the same multiplication.
-  const msPerByte =
-    knownByteTotal > 0 ? knownDurationTotal / knownByteTotal : 1;
+  const msPerByte = knownByteTotal > 0 ? knownDurationTotal / knownByteTotal : 1;
 
   return (moduleId: string): number => {
     const relative = path.relative(root, moduleId);

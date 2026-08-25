@@ -5,11 +5,11 @@ description: "Backup and restore strategies for LangWatch data stores"
 
 LangWatch stores data across three systems. Each requires its own backup strategy:
 
-| Data Store | What It Stores | Backup Priority |
-|------------|---------------|-----------------|
-| **PostgreSQL** | Users, teams, projects, configurations, prompt versions | Critical |
-| **ClickHouse** | Traces, spans, evaluations, experiments, analytics | High |
-| **S3** | Datasets, ClickHouse cold data | Medium |
+| Data Store     | What It Stores                                          | Backup Priority |
+| -------------- | ------------------------------------------------------- | --------------- |
+| **PostgreSQL** | Users, teams, projects, configurations, prompt versions | Critical        |
+| **ClickHouse** | Traces, spans, evaluations, experiments, analytics      | High            |
+| **S3**         | Datasets, ClickHouse cold data                          | Medium          |
 
 ## PostgreSQL Backups
 
@@ -38,7 +38,8 @@ For production, use your cloud provider's built-in backup features:
 - **Azure Database**: Enable geo-redundant backups
 
 <Tip>
-Always test your restore procedure before you need it. Schedule a quarterly restore drill to validate your backups.
+  Always test your restore procedure before you need it. Schedule a quarterly restore
+  drill to validate your backups.
 </Tip>
 
 ## ClickHouse Backups
@@ -55,16 +56,16 @@ clickhouse:
   objectStorage:
     bucket: "my-langwatch-backups"
     region: "us-east-1"
-    useEnvironmentCredentials: true  # IRSA / workload identity
+    useEnvironmentCredentials: true # IRSA / workload identity
 
   backup:
     enabled: true
     database: "langwatch"
     user: "default"
     full:
-      schedule: "0 */12 * * *"     # Full backup every 12 hours
+      schedule: "0 */12 * * *" # Full backup every 12 hours
     incremental:
-      schedule: "0 * * * *"        # Incremental every hour
+      schedule: "0 * * * *" # Incremental every hour
 ```
 
 Or use the `cold-storage-s3.yaml` overlay which enables both cold storage and backups:
@@ -96,17 +97,17 @@ clickhouse:
     useEnvironmentCredentials: false
     credentials:
       secretKeyRef:
-        name: clickhouse-s3-creds    # K8s secret name
+        name: clickhouse-s3-creds # K8s secret name
         accessKeyKey: "accessKey"
         secretKeyKey: "secretKey"
 ```
 
 ### Backup Schedule
 
-| Backup Type | Default Schedule | Description |
-|-------------|-----------------|-------------|
-| Full | `0 */12 * * *` (every 12h) | Complete database backup |
-| Incremental | `0 * * * *` (every 1h) | Only changes since last full backup |
+| Backup Type | Default Schedule           | Description                         |
+| ----------- | -------------------------- | ----------------------------------- |
+| Full        | `0 */12 * * *` (every 12h) | Complete database backup            |
+| Incremental | `0 * * * *` (every 1h)     | Only changes since last full backup |
 
 Both are implemented as Kubernetes CronJobs that run `clickhouse-client` commands inside the ClickHouse pod.
 
@@ -125,7 +126,8 @@ kubectl exec -n langwatch langwatch-clickhouse-0 -- \
 ```
 
 <Warning>
-Restoring a backup overwrites existing data in the target database. Always verify you're restoring to the correct environment.
+  Restoring a backup overwrites existing data in the target database. Always verify you're
+  restoring to the correct environment.
 </Warning>
 
 ## ClickHouse Cold Storage
@@ -150,22 +152,24 @@ clickhouse:
 
   cold:
     enabled: true
-    defaultTtlDays: 49  # Data older than 49 days moves to S3
+    defaultTtlDays: 49 # Data older than 49 days moves to S3
 ```
 
 <Note>
-We recommend setting the TTL to a multiple of 7 (e.g., 7, 14, 28, 49) to align with ClickHouse's weekly partition boundaries for more efficient data management. The default of 49 days means data stays on fast local storage for ~7 weeks before moving to S3.
+  We recommend setting the TTL to a multiple of 7 (e.g., 7, 14, 28, 49) to align with
+  ClickHouse's weekly partition boundaries for more efficient data management. The default
+  of 49 days means data stays on fast local storage for ~7 weeks before moving to S3.
 </Note>
 
 ### Cost Savings
 
 Cold storage can reduce storage costs significantly:
 
-| Storage Type | Approximate Cost | Speed |
-|-------------|-----------------|-------|
-| gp3 SSD (hot) | ~$0.08/GB/month | Fast |
-| S3 Standard (cold) | ~$0.023/GB/month | Slower (cached) |
-| S3 Infrequent Access | ~$0.0125/GB/month | Slower |
+| Storage Type         | Approximate Cost  | Speed           |
+| -------------------- | ----------------- | --------------- |
+| gp3 SSD (hot)        | ~$0.08/GB/month   | Fast            |
+| S3 Standard (cold)   | ~$0.023/GB/month  | Slower (cached) |
+| S3 Infrequent Access | ~$0.0125/GB/month | Slower          |
 
 For a deployment with 150 GB/month of trace data, cold storage can save ~$500/year.
 

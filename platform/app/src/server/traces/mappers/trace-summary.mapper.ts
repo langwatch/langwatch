@@ -53,9 +53,7 @@ export function mapAttributesToMetadata(
   const metadata: TraceMetadata = {};
 
   // Map known attributes to reserved fields (primary — last-wins within this set)
-  for (const [attrKey, metadataKey] of Object.entries(
-    RESERVED_ATTRIBUTE_MAPPINGS,
-  )) {
+  for (const [attrKey, metadataKey] of Object.entries(RESERVED_ATTRIBUTE_MAPPINGS)) {
     const value = attributes[attrKey];
     if (value !== void 0) {
       metadata[metadataKey] = value;
@@ -63,9 +61,7 @@ export function mapAttributesToMetadata(
   }
 
   // Map fallback attributes (only if target field not already set)
-  for (const [attrKey, metadataKey] of Object.entries(
-    FALLBACK_ATTRIBUTE_MAPPINGS,
-  )) {
+  for (const [attrKey, metadataKey] of Object.entries(FALLBACK_ATTRIBUTE_MAPPINGS)) {
     const value = attributes[attrKey];
     if (value !== void 0 && metadata[metadataKey] === undefined) {
       metadata[metadataKey] = value;
@@ -145,9 +141,7 @@ export function mapAttributesToMetadata(
   for (const [key, value] of Object.entries(attributes)) {
     if (knownKeys.has(key)) continue;
     // Strip internal metadata. prefix so API returns bare keys (e.g., "user" not "metadata.user")
-    const bareKey = key.startsWith("metadata.")
-      ? key.slice("metadata.".length)
-      : key;
+    const bareKey = key.startsWith("metadata.") ? key.slice("metadata.".length) : key;
     if (bareKey && metadata[bareKey] === undefined) metadata[bareKey] = value;
   }
 
@@ -168,10 +162,7 @@ function addOtelLogRecordCountAlias(
   attributes: Record<string, string>,
 ): void {
   const logRecordCount = attributes["langwatch.reserved.log_record_count"];
-  if (
-    logRecordCount !== undefined &&
-    metadata.otel_log_record_count === undefined
-  ) {
+  if (logRecordCount !== undefined && metadata.otel_log_record_count === undefined) {
     metadata.otel_log_record_count = logRecordCount;
   }
 }
@@ -191,16 +182,13 @@ const RESERVED_TOKEN_METRIC_ATTRIBUTES = {
   cache_creation_1h_input_tokens: "langwatch.reserved.cache_creation_1h_tokens",
   reasoning_tokens: "langwatch.reserved.reasoning_tokens",
   context_size_tokens: "langwatch.reserved.context_size_tokens",
-} as const satisfies Partial<
-  Record<keyof NonNullable<Trace["metrics"]>, string>
->;
+} as const satisfies Partial<Record<keyof NonNullable<Trace["metrics"]>, string>>;
 
 function tokenMetricsFromAttributes(
   attributes: Record<string, string>,
 ): Partial<Record<keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, number>> {
-  const metrics: Partial<
-    Record<keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, number>
-  > = {};
+  const metrics: Partial<Record<keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, number>> =
+    {};
   for (const [metricKey, attrKey] of Object.entries(
     RESERVED_TOKEN_METRIC_ATTRIBUTES,
   ) as Array<[keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, string]>) {
@@ -292,9 +280,7 @@ function extractTextFromStateObject(
  * Type guard for LangWatch structured value format.
  * Used by DSPy, LangGraph, and other frameworks.
  */
-function isStructuredValue(
-  data: unknown,
-): data is { type: string; value: unknown } {
+function isStructuredValue(data: unknown): data is { type: string; value: unknown } {
   return (
     typeof data === "object" &&
     data !== null &&
@@ -335,12 +321,8 @@ function extractTextFromMessages(
 
     if (type === "json" && typeof value === "object" && value !== null) {
       // Extract text from state object using common field names
-      const fieldNames =
-        mode === "input" ? INPUT_FIELD_NAMES : OUTPUT_FIELD_NAMES;
-      return extractTextFromStateObject(
-        value as Record<string, unknown>,
-        fieldNames,
-      );
+      const fieldNames = mode === "input" ? INPUT_FIELD_NAMES : OUTPUT_FIELD_NAMES;
+      return extractTextFromStateObject(value as Record<string, unknown>, fieldNames);
     }
 
     // For other types, try to extract from the value
@@ -525,9 +507,7 @@ export function extractEventsFromSpans({
     const metrics: Record<string, number> = {};
     const rawMetrics = eventRecord.metrics;
     if (typeof rawMetrics === "object" && rawMetrics !== null) {
-      for (const [key, value] of Object.entries(
-        rawMetrics as Record<string, unknown>,
-      )) {
+      for (const [key, value] of Object.entries(rawMetrics as Record<string, unknown>)) {
         const num = Number(value);
         if (Number.isFinite(num)) {
           metrics[key] = num;
@@ -538,9 +518,7 @@ export function extractEventsFromSpans({
     const eventDetails: Record<string, string> = {};
     const rawDetails = eventRecord.details;
     if (typeof rawDetails === "object" && rawDetails !== null) {
-      for (const [key, value] of Object.entries(
-        rawDetails as Record<string, unknown>,
-      )) {
+      for (const [key, value] of Object.entries(rawDetails as Record<string, unknown>)) {
         if (typeof value === "string") {
           eventDetails[key] = value;
         }
@@ -597,9 +575,7 @@ export function mapTraceSummaryToTrace(
       // rendered as 1970 in the drawer and the list. The anchor is the time that
       // trace's first signal was accepted, which is the honest answer.
       started_at:
-        summary.occurredAt > 0
-          ? summary.occurredAt
-          : (summary.storageAnchorMs ?? 0),
+        summary.occurredAt > 0 ? summary.occurredAt : (summary.storageAnchorMs ?? 0),
       inserted_at: summary.createdAt,
       updated_at: summary.updatedAt,
     },

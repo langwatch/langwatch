@@ -26,14 +26,8 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import type {
-  DatasetColumns,
-  DatasetRecordEntry,
-} from "@langwatch/dataset-contract";
-import {
-  MAX_FILE_SIZE_BYTES,
-  MAX_ROWS_LIMIT,
-} from "@langwatch/dataset-contract";
+import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
 import {
   type AddDatasetDrawerProps,
   AddOrEditDatasetDrawer,
@@ -85,9 +79,9 @@ export function UploadCSVDrawer({
 
   const addDatasetDrawer = useDisclosure();
   const [localIsOpen, setLocalIsOpen] = useState(isOpen);
-  const [uploadedDataset, setUploadedDataset] = useState<
-    InMemoryDataset | undefined
-  >(undefined);
+  const [uploadedDataset, setUploadedDataset] = useState<InMemoryDataset | undefined>(
+    undefined,
+  );
   // Confirm-columns step (ADR-032 v19): when the form requests it, hold the
   // parsed columns + the resume callback and render the confirm drawer. Null
   // when no confirm is in progress (so the drawer — and its hooks — only mount
@@ -95,18 +89,13 @@ export function UploadCSVDrawer({
   const [columnConfirm, setColumnConfirm] = useState<{
     columns: DatasetColumns;
     proposedName: string;
-    onConfirmed: (confirmed: {
-      name: string;
-      columnTypes: DatasetColumns;
-    }) => void;
+    onConfirmed: (confirmed: { name: string; columnTypes: DatasetColumns }) => void;
   } | null>(null);
   // Direct-upload (ADR-032 D4) processing stays IN this drawer: once the raw
   // file is streamed + finalized, the dataset normalizes server-side. We hold
   // its id and poll its status here instead of navigating to the dataset page,
   // so the whole async flow is observable without leaving the drawer.
-  const [processingDatasetId, setProcessingDatasetId] = useState<string | null>(
-    null,
-  );
+  const [processingDatasetId, setProcessingDatasetId] = useState<string | null>(null);
 
   const uploadCSVData = () => {
     setLocalIsOpen(false);
@@ -230,11 +219,7 @@ export function DatasetUploadProcessing({
 }: {
   projectId: string;
   datasetId: string;
-  onReady: (dataset: {
-    id: string;
-    name: string;
-    columnTypes: unknown;
-  }) => void;
+  onReady: (dataset: { id: string; name: string; columnTypes: unknown }) => void;
   onViewDataset: () => void;
 }) {
   const [isRetrying, setIsRetrying] = useState(false);
@@ -340,9 +325,9 @@ export function InlineUploadCSVForm({
   onSuccess: AddDatasetDrawerProps["onSuccess"];
 }) {
   const addDatasetDrawer = useDisclosure();
-  const [uploadedDataset, setUploadedDataset] = useState<
-    InMemoryDataset | undefined
-  >(undefined);
+  const [uploadedDataset, setUploadedDataset] = useState<InMemoryDataset | undefined>(
+    undefined,
+  );
 
   return (
     <>
@@ -399,10 +384,7 @@ export function UploadCSVForm({
   requestColumnConfirm?: (params: {
     columns: DatasetColumns;
     proposedName: string;
-    onConfirmed: (confirmed: {
-      name: string;
-      columnTypes: DatasetColumns;
-    }) => void;
+    onConfirmed: (confirmed: { name: string; columnTypes: DatasetColumns }) => void;
   }) => void;
 }) {
   const { project } = useOrganizationTeamProject();
@@ -421,9 +403,7 @@ export function UploadCSVForm({
   // without a confirm step) and the proposed dataset name. The host renders the
   // confirm drawer (see `requestColumnConfirm`); the user corrects names + types
   // before the upload starts.
-  const [parsedColumns, setParsedColumns] = useState<DatasetColumns | null>(
-    null,
-  );
+  const [parsedColumns, setParsedColumns] = useState<DatasetColumns | null>(null);
   const [proposedName, setProposedName] = useState<string>("");
   // The header parse runs async on file pick; Upload must wait for it so a fast
   // click can't bypass the confirm step. A monotonic token discards a stale
@@ -576,10 +556,7 @@ export function UploadCSVForm({
             projectId,
             datasetId: strandedId,
           }).catch((cleanupError) => {
-            logger.error(
-              { error: cleanupError },
-              "Failed to clean up cancelled upload",
-            );
+            logger.error({ error: cleanupError }, "Failed to clean up cancelled upload");
           });
         }
         return;
@@ -595,10 +572,7 @@ export function UploadCSVForm({
         try {
           await abortPendingUpload({ projectId, datasetId: pendingDatasetId });
         } catch (cleanupError) {
-          logger.error(
-            { error: cleanupError },
-            "Failed to clean up pending upload",
-          );
+          logger.error({ error: cleanupError }, "Failed to clean up pending upload");
         }
       }
       // No browser-reachable storage at all (DirectUploadUnavailable): the
@@ -659,11 +633,9 @@ export function UploadCSVForm({
     const pendingId = pendingDatasetIdRef.current;
     pendingDatasetIdRef.current = null;
     if (pendingId && projectId) {
-      void abortPendingUpload({ projectId, datasetId: pendingId }).catch(
-        (error) => {
-          logger.error({ error }, "Failed to clean up cancelled upload");
-        },
-      );
+      void abortPendingUpload({ projectId, datasetId: pendingId }).catch((error) => {
+        logger.error({ error }, "Failed to clean up cancelled upload");
+      });
     }
     setIsUploading(false);
   };
@@ -731,12 +703,7 @@ export function UploadCSVForm({
    * all-`string` columns as before.
    */
   const handleUploadClick = () => {
-    if (
-      enableDirectUpload &&
-      rawFile &&
-      parsedColumns &&
-      requestColumnConfirm
-    ) {
+    if (enableDirectUpload && rawFile && parsedColumns && requestColumnConfirm) {
       requestColumnConfirm({
         columns: parsedColumns,
         proposedName,
@@ -783,9 +750,7 @@ export function UploadCSVForm({
         // Direct path: capture only the raw File (no parse). Fallback/picker
         // path: parse immediately for synchronous columns/records.
         parse={!enableDirectUpload}
-        uploadStatus={
-          isUploading && enableDirectUpload ? "uploading" : undefined
-        }
+        uploadStatus={isUploading && enableDirectUpload ? "uploading" : undefined}
         fileError={fileError}
         onCancel={handleCancelUpload}
         onUploadAccepted={handleUploadAccepted}
@@ -817,10 +782,7 @@ export function UploadCSVForm({
               } catch (error) {
                 // Best-effort: an unreadable header just skips the confirm step
                 // (parsedColumns stays null → upload proceeds, normalize derives).
-                logger.error(
-                  { error },
-                  "Failed to parse dataset header columns",
-                );
+                logger.error({ error }, "Failed to parse dataset header columns");
               } finally {
                 if (parseHeaderTokenRef.current === token) {
                   setIsParsingHeader(false);
@@ -1086,9 +1048,7 @@ function buildDatasetFromRows(data: string[][], name: string): InMemoryDataset {
  */
 async function parseFileToRows(file: File): Promise<string[][]> {
   const isJson = file.name.endsWith(".jsonl") || file.name.endsWith(".json");
-  const csvString = isJson
-    ? jsonFileTextToCSV(await file.text())
-    : await file.text();
+  const csvString = isJson ? jsonFileTextToCSV(await file.text()) : await file.text();
 
   return new Promise<string[][]>((resolve, reject) => {
     papaparseReadString<string[]>(csvString, {
@@ -1130,9 +1090,7 @@ function jsonToCSV(jsonContents: object[]): string {
       }),
     );
   });
-  const columns = new Set(
-    stringifiedNestedValues.flatMap((item) => Object.keys(item)),
-  );
+  const columns = new Set(stringifiedNestedValues.flatMap((item) => Object.keys(item)));
 
   return papaparseJsonToCSV(stringifiedNestedValues, {
     columns: Array.from(columns),

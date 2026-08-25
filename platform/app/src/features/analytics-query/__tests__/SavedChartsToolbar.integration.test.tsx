@@ -28,9 +28,7 @@ const CHARTS = [
   { id: "chart-2", name: "Errors by model" },
 ];
 
-function mount(
-  overrides: Partial<Parameters<typeof SavedChartsToolbar>[0]> = {},
-) {
+function mount(overrides: Partial<Parameters<typeof SavedChartsToolbar>[0]> = {}) {
   const handlers = {
     onSave: vi.fn(),
     onOpen: vi.fn(),
@@ -60,9 +58,7 @@ describe("the saved chart toolbar", () => {
         const user = userEvent.setup();
         const handlers = mount();
 
-        expect(screen.getByTestId("save-chart")).toHaveTextContent(
-          "Save chart",
-        );
+        expect(screen.getByTestId("save-chart")).toHaveTextContent("Save chart");
         await user.click(screen.getByTestId("save-chart"));
 
         const field = await screen.findByLabelText("Chart name");
@@ -88,14 +84,9 @@ describe("the saved chart toolbar", () => {
         mount();
 
         await user.click(screen.getByTestId("save-chart"));
-        await user.type(
-          await screen.findByLabelText("Chart name"),
-          "Half a thought",
-        );
+        await user.type(await screen.findByLabelText("Chart name"), "Half a thought");
         await user.click(screen.getByRole("button", { name: "Close" }));
-        await waitFor(() =>
-          expect(screen.queryByLabelText("Chart name")).toBeNull(),
-        );
+        await waitFor(() => expect(screen.queryByLabelText("Chart name")).toBeNull());
 
         await user.click(screen.getByTestId("save-chart"));
 

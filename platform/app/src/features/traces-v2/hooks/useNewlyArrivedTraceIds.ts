@@ -16,9 +16,7 @@ export function useNewlyArrivedTraceIds(traces: TraceListItem[]): Set<string> {
   const mountedAtRef = useRef(Date.now());
   // Insertion-ordered Map used as a bounded FIFO set.
   const seenIdsRef = useRef<Map<string, true>>(new Map());
-  const expiryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
-    new Map(),
-  );
+  const expiryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [newIds, setNewIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {

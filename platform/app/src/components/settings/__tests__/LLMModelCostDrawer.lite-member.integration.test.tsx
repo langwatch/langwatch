@@ -80,10 +80,7 @@ vi.mock("~/utils/api", () => ({
       },
       createOrUpdate: {
         useMutation: () => ({
-          mutate: (
-            data: unknown,
-            options: { onError?: (error: unknown) => void },
-          ) => {
+          mutate: (data: unknown, options: { onError?: (error: unknown) => void }) => {
             mockCreateOrUpdateMutate(data, options);
 
             if (mockMutationError.current) {
@@ -116,14 +113,11 @@ vi.mock("~/utils/api", () => ({
 }));
 
 vi.mock("~/utils/trpcError", () => ({
-  isHandledByGlobalHandler: (error: unknown) =>
-    mockIsHandledByGlobalHandler(error),
+  isHandledByGlobalHandler: (error: unknown) => mockIsHandledByGlobalHandler(error),
 }));
 
 // Lazy imports to ensure mocks are set up first
-const { LLMModelCostDrawer } = await import(
-  "~/components/settings/LLMModelCostDrawer"
-);
+const { LLMModelCostDrawer } = await import("~/components/settings/LLMModelCostDrawer");
 
 const Wrapper = ({ children }: { children?: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

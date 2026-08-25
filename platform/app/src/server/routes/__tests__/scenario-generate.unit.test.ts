@@ -20,14 +20,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mockGetServerAuthSession = vi.fn();
 vi.mock("~/server/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/server/auth")>()),
-  getServerAuthSession: (...args: unknown[]) =>
-    mockGetServerAuthSession(...args),
+  getServerAuthSession: (...args: unknown[]) => mockGetServerAuthSession(...args),
 }));
 
 const mockHasProjectPermission = vi.fn();
 vi.mock("~/server/app-layer/permissions/imperative", () => ({
-  probeProjectPermission: (...args: unknown[]) =>
-    mockHasProjectPermission(...args),
+  probeProjectPermission: (...args: unknown[]) => mockHasProjectPermission(...args),
 }));
 
 const mockGetVercelAIModel = vi.fn();
@@ -130,9 +128,7 @@ describe("POST /api/scenario/generate — gateway-failure resilience (#5758)", (
                 reject(abortSignal.reason);
                 return;
               }
-              abortSignal?.addEventListener("abort", () =>
-                reject(abortSignal.reason),
-              );
+              abortSignal?.addEventListener("abort", () => reject(abortSignal.reason));
             }),
         }),
       );

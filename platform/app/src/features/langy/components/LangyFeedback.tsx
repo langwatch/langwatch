@@ -219,12 +219,7 @@ export function LangyFeedback({
   // swallow the acknowledgement in the same breath.
   if (done) {
     return (
-      <Text
-        textStyle="2xs"
-        color="fg.subtle"
-        alignSelf="flex-start"
-        paddingY={1}
-      >
+      <Text textStyle="2xs" color="fg.subtle" alignSelf="flex-start" paddingY={1}>
         Thanks, noted.
       </Text>
     );
@@ -241,9 +236,7 @@ export function LangyFeedback({
       style={{ width: "100%" }}
       initial={reduce ? false : { opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={
-        reduce ? { duration: 0 } : { duration: 0.28, ease: [0.32, 0.72, 0, 1] }
-      }
+      transition={reduce ? { duration: 0 } : { duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
     >
       <VStack
         align="stretch"
@@ -265,12 +258,7 @@ export function LangyFeedback({
             now" button) keeps the rating rail below it unbroken and reads as the
             same dismiss gesture used everywhere else in the panel. */}
         <HStack gap={2} width="full" align="center">
-          <Text
-            textStyle="2xs"
-            color="fg.muted"
-            letterSpacing="-0.005em"
-            flex={1}
-          >
+          <Text textStyle="2xs" color="fg.muted" letterSpacing="-0.005em" flex={1}>
             {promptFor(sentiment)}
           </Text>
           <chakra.button
@@ -307,9 +295,7 @@ export function LangyFeedback({
           </Text>
           <Input
             value={typed}
-            onChange={(e) =>
-              setTyped(e.target.value.replace(/[^\d]/g, "").slice(0, 1))
-            }
+            onChange={(e) => setTyped(e.target.value.replace(/[^\d]/g, "").slice(0, 1))}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();

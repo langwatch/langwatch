@@ -50,9 +50,7 @@ export const TableCell = <TData extends DatasetTableRowData>({
   // Cells without meta just render normally
   if (!meta) {
     return (
-      <td key={cell.id}>
-        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-      </td>
+      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
     );
   }
 

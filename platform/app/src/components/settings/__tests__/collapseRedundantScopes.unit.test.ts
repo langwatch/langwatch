@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  collapseRedundantScopes,
-  type ScopeChipPickerEntry,
-} from "../ScopeChipPicker";
+import { collapseRedundantScopes, type ScopeChipPickerEntry } from "../ScopeChipPicker";
 
 const ORG: ScopeChipPickerEntry = {
   scopeType: "ORGANIZATION",
@@ -66,19 +63,13 @@ describe("given the user is editing a multi-scope selection", () => {
       const next = [...prev, TEAM_A];
       // Org gone (TEAM_A narrows it), projects under team-a gone,
       // proj-b1 (different team) survives.
-      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([
-        PROJ_B1,
-        TEAM_A,
-      ]);
+      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([PROJ_B1, TEAM_A]);
     });
 
     it("leaves sibling teams alone", () => {
       const prev = [TEAM_B];
       const next = [TEAM_B, TEAM_A];
-      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([
-        TEAM_B,
-        TEAM_A,
-      ]);
+      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([TEAM_B, TEAM_A]);
     });
   });
 
@@ -93,10 +84,7 @@ describe("given the user is editing a multi-scope selection", () => {
       const prev = [TEAM_A, TEAM_B];
       const next = [TEAM_A, TEAM_B, PROJ_B1];
       // PROJ_B1's parent is TEAM_B → TEAM_B goes. TEAM_A survives.
-      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([
-        TEAM_A,
-        PROJ_B1,
-      ]);
+      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([TEAM_A, PROJ_B1]);
     });
 
     it("is a no-op when neither parent is selected", () => {
@@ -116,10 +104,7 @@ describe("given the user is editing a multi-scope selection", () => {
     it("leaves sibling departments alone (a tile can target several)", () => {
       const prev = [DEPT_Y];
       const next = [DEPT_Y, DEPT_X];
-      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([
-        DEPT_Y,
-        DEPT_X,
-      ]);
+      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([DEPT_Y, DEPT_X]);
     });
   });
 

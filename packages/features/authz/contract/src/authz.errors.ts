@@ -76,11 +76,10 @@ export class LiteMemberRestrictedError extends HandledError {
   declare readonly code: "lite_member_restricted";
 
   constructor(resource: string) {
-    super(
-      "lite_member_restricted",
-      "This feature is not available for your account",
-      { meta: { resource }, httpStatus: 401 },
-    );
+    super("lite_member_restricted", "This feature is not available for your account", {
+      meta: { resource },
+      httpStatus: 401,
+    });
     this.name = "LiteMemberRestrictedError";
   }
 }
@@ -115,11 +114,10 @@ export class DuplicateGrantError extends HandledError {
   declare readonly code: "role_binding_already_exists";
 
   constructor(meta: Record<string, unknown> = {}) {
-    super(
-      "role_binding_already_exists",
-      "An identical role binding already exists",
-      { httpStatus: 409, meta },
-    );
+    super("role_binding_already_exists", "An identical role binding already exists", {
+      httpStatus: 409,
+      meta,
+    });
     this.name = "DuplicateGrantError";
   }
 }

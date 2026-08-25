@@ -394,8 +394,7 @@ function refuseUnrecognised({ ctx, frame, node }: NodeArgs): void {
 // The walk
 // ---------------------------------------------------------------------------
 
-const TOO_DEEP_MESSAGE =
-  "This query nests too deeply. Flatten it and try again.";
+const TOO_DEEP_MESSAGE = "This query nests too deeply. Flatten it and try again.";
 
 /** The rule for a node kind, or `undefined` — which is the refusal. */
 function ruleFor(type: string): NodeRule | undefined {
@@ -428,17 +427,10 @@ function walkNode(node: SqlAstNode, frame: Frame, ctx: WalkContext): void {
 }
 
 /** Every field the node carries, each against the rule that names it — or none. */
-function walkFields({
-  rule,
-  node,
-  frame,
-  ctx,
-}: NodeArgs & { rule: NodeRule }): void {
+function walkFields({ rule, node, frame, ctx }: NodeArgs & { rule: NodeRule }): void {
   for (const [field, value] of Object.entries(node)) {
     if (METADATA_FIELDS.has(field) || value === undefined) continue;
-    const fieldRule = Object.hasOwn(rule.fields, field)
-      ? rule.fields[field]
-      : undefined;
+    const fieldRule = Object.hasOwn(rule.fields, field) ? rule.fields[field] : undefined;
     if (fieldRule) applyFieldRule({ rule: fieldRule, value, node, frame, ctx });
     else refuseUnrecognised({ node, frame, ctx });
   }
@@ -491,11 +483,7 @@ function checkEnumValue({
  * reference, so the content gate deliberately does not apply to it.
  */
 function checkIdentifierRef({ value, node, frame, ctx }: FieldArgs): void {
-  if (
-    isNode(value) &&
-    value.type === "Identifier" &&
-    typeof value.name === "string"
-  ) {
+  if (isNode(value) && value.type === "Identifier" && typeof value.name === "string") {
     return;
   }
   refuseUnrecognised({ node, frame, ctx });
@@ -578,10 +566,7 @@ function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
       refuseUnrecognised({ node, frame: projection, ctx });
       continue;
     }
-    if (
-      ctx.policy.gatedColumns.size > 0 &&
-      UNRESOLVABLE_COLUMN_SETS.has(element.type)
-    ) {
+    if (ctx.policy.gatedColumns.size > 0 && UNRESOLVABLE_COLUMN_SETS.has(element.type)) {
       report({
         ctx,
         frame: projection,
@@ -665,11 +650,7 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
   if (!Array.isArray(node.with)) return { ...frame, block };
   const ctes = new Set(frame.ctes);
   for (const item of node.with) {
-    if (
-      isNode(item) &&
-      item.type === "WithElement" &&
-      typeof item.name === "string"
-    ) {
+    if (isNode(item) && item.type === "WithElement" && typeof item.name === "string") {
       ctes.add(item.name.trim().toLowerCase());
     }
   }
@@ -750,10 +731,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
 
   // A `WITH` name resolves to its own subquery, which is validated on its own
   // terms; it is not a table reference and never was.
-  if (
-    database === undefined &&
-    frame.ctes.has(reference.name.trim().toLowerCase())
-  ) {
+  if (database === undefined && frame.ctes.has(reference.name.trim().toLowerCase())) {
     return frame;
   }
 
@@ -845,13 +823,7 @@ function collectUsingEdges({
  * Bounded by {@link MAX_JOIN_KEY_SCAN_NODES}: the condition is caller-written,
  * so the descent needs a ceiling that does not depend on it being reasonable.
  */
-function collectOnEdges({
-  on,
-  block,
-}: {
-  on: unknown;
-  block: BlockAccumulator;
-}): void {
+function collectOnEdges({ on, block }: { on: unknown; block: BlockAccumulator }): void {
   const pending: unknown[] = [on];
   let visited = 0;
   while (pending.length > 0 && visited < MAX_JOIN_KEY_SCAN_NODES) {
@@ -883,9 +855,7 @@ function conjunctArguments(node: unknown): unknown[] | null {
  * not a key two datasets line up on, and recording half of one would claim a
  * match that was never written.
  */
-function readEqualityEdge(
-  node: unknown,
-): { left: string; right: string } | null {
+function readEqualityEdge(node: unknown): { left: string; right: string } | null {
   if (!isNode(node) || node.type !== "Function") return null;
   if (node.name !== "equals" || !Array.isArray(node.arguments)) return null;
   if (node.arguments.length !== 2) return null;
@@ -917,11 +887,7 @@ function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
     reportRefusedFunction({ name, node, frame, ctx });
     return frame;
   }
-  if (
-    frame.block &&
-    isLangWatchQLAggregateFunction(name) &&
-    !isWindowCall(node)
-  ) {
+  if (frame.block && isLangWatchQLAggregateFunction(name) && !isWindowCall(node)) {
     frame.block.isAggregated = true;
   }
   return frame;
@@ -982,10 +948,7 @@ function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   // parameter in identifier position rather than a string — which would let a
   // caller name a field the gate never sees.
   if (nameParts !== undefined) {
-    if (
-      !Array.isArray(nameParts) ||
-      nameParts.some((part) => typeof part !== "string")
-    ) {
+    if (!Array.isArray(nameParts) || nameParts.some((part) => typeof part !== "string")) {
       report({
         ctx,
         frame,
@@ -1010,13 +973,7 @@ function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
  * column filtered", and `t.OccurredAt`, `OccurredAt` and
  * `analytics.traces.OccurredAt` are all the same answer to it.
  */
-function noteColumnPosition({
-  name,
-  frame,
-}: {
-  name: string;
-  frame: Frame;
-}): void {
+function noteColumnPosition({ name, frame }: { name: string; frame: Frame }): void {
   const { block, clause } = frame;
   if (!block) return;
   if (clause !== "filter" && clause !== "group") return;
@@ -1420,8 +1377,7 @@ export function validateLangWatchQL({
   const ctx = createWalkContext(resolveLangWatchQLPolicy(policy));
   walkNode(screened.statement, ROOT_FRAME, ctx);
 
-  if (ctx.violations.length > 0)
-    return { ok: false, violations: ctx.violations };
+  if (ctx.violations.length > 0) return { ok: false, violations: ctx.violations };
   return {
     ok: true,
     tables: [...ctx.tables],
@@ -1477,8 +1433,7 @@ function screenSubmission(
   if (!parsed.ok) {
     return statementRejection({
       code: "PARSE_FAILED",
-      message:
-        "This is not valid ClickHouse SQL. Check the syntax and try again.",
+      message: "This is not valid ClickHouse SQL. Check the syntax and try again.",
       at: parsed.at,
     });
   }

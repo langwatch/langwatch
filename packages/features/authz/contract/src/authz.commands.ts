@@ -15,8 +15,7 @@ import {
 } from "./authz-grant.events";
 
 export const ATTACH_GRANT_COMMAND_TYPE = "lw.authz_grant.attach" as const;
-export const CHANGE_GRANT_ROLE_COMMAND_TYPE =
-  "lw.authz_grant.change_role" as const;
+export const CHANGE_GRANT_ROLE_COMMAND_TYPE = "lw.authz_grant.change_role" as const;
 export const REVOKE_GRANT_COMMAND_TYPE = "lw.authz_grant.revoke" as const;
 export const DEFINE_ROLE_COMMAND_TYPE = "lw.authz_role.define" as const;
 export const CHANGE_ROLE_PERMISSIONS_COMMAND_TYPE =
@@ -56,8 +55,7 @@ function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
       return identity.tenantId === identity.organizationId;
     },
     {
-      message:
-        "tenantId must equal organizationId: one grants ledger per organization",
+      message: "tenantId must equal organizationId: one grants ledger per organization",
       path: ["tenantId"],
     },
   );
@@ -85,9 +83,7 @@ export type AttachGrantEntry = z.infer<typeof attachGrantEntrySchema>;
 export const attachGrantCommandDataSchema = commandDataSchema({
   grant: attachGrantEntrySchema,
 });
-export type AttachGrantCommandData = z.infer<
-  typeof attachGrantCommandDataSchema
->;
+export type AttachGrantCommandData = z.infer<typeof attachGrantCommandDataSchema>;
 
 export const changeGrantRoleCommandDataSchema = commandDataSchema({
   grantId: z.string().min(1),
@@ -96,9 +92,7 @@ export const changeGrantRoleCommandDataSchema = commandDataSchema({
   actor: grantsLedgerActorSchema,
   occurredAtMs: z.number().int().nonnegative(),
 });
-export type ChangeGrantRoleCommandData = z.infer<
-  typeof changeGrantRoleCommandDataSchema
->;
+export type ChangeGrantRoleCommandData = z.infer<typeof changeGrantRoleCommandDataSchema>;
 
 export const revokeGrantCommandDataSchema = commandDataSchema({
   grantId: z.string().min(1),
@@ -106,9 +100,7 @@ export const revokeGrantCommandDataSchema = commandDataSchema({
   actor: grantsLedgerActorSchema,
   occurredAtMs: z.number().int().nonnegative(),
 });
-export type RevokeGrantCommandData = z.infer<
-  typeof revokeGrantCommandDataSchema
->;
+export type RevokeGrantCommandData = z.infer<typeof revokeGrantCommandDataSchema>;
 
 export const defineRoleEntrySchema = z
   .object({
@@ -154,9 +146,7 @@ export const authzLedgerWriteSourceSchema = z.enum([
   "invite",
   "read-through-mint",
 ]);
-export type AuthzLedgerWriteSource = z.infer<
-  typeof authzLedgerWriteSourceSchema
->;
+export type AuthzLedgerWriteSource = z.infer<typeof authzLedgerWriteSourceSchema>;
 
 export const authzLedgerBindingPrincipalSchema = z.union([
   z.object({ userId: z.string().min(1) }).strict(),
@@ -177,9 +167,7 @@ export const authzLedgerBindingAttachSchema = z
     scopeId: z.string().min(1),
   })
   .strict();
-export type AuthzLedgerBindingAttach = z.infer<
-  typeof authzLedgerBindingAttachSchema
->;
+export type AuthzLedgerBindingAttach = z.infer<typeof authzLedgerBindingAttachSchema>;
 
 /** Stable identity shared by compatibility reconcilers and the server ledger. */
 export function authzBindingIdentityKey({
@@ -226,9 +214,7 @@ export const authzAttachBindingsInputSchema = z
     awaitProjection: z.boolean().optional(),
   })
   .strict();
-export type AuthzAttachBindingsInput = z.infer<
-  typeof authzAttachBindingsInputSchema
->;
+export type AuthzAttachBindingsInput = z.infer<typeof authzAttachBindingsInputSchema>;
 export const authzAttachBindingsOutputSchema = authzAttachOutcomeSchema;
 export type AuthzAttachBindingsOutput = AuthzAttachOutcome;
 
@@ -272,9 +258,7 @@ export const authzLedgerResourceTermsSchema = z
     createdByUserId: z.string().min(1).optional(),
   })
   .strict();
-export type AuthzLedgerResourceTerms = z.infer<
-  typeof authzLedgerResourceTermsSchema
->;
+export type AuthzLedgerResourceTerms = z.infer<typeof authzLedgerResourceTermsSchema>;
 
 export const authzAttachResourceGrantInputSchema = z
   .object({
@@ -337,17 +321,11 @@ export const authzRevokeBindingsInputSchema = z
     reason: z.string().min(1).optional(),
   })
   .strict();
-export type AuthzRevokeBindingsInput = z.infer<
-  typeof authzRevokeBindingsInputSchema
->;
+export type AuthzRevokeBindingsInput = z.infer<typeof authzRevokeBindingsInputSchema>;
 export const authzRevokeBindingsOutputSchema = z.void();
-export type AuthzRevokeBindingsOutput = z.infer<
-  typeof authzRevokeBindingsOutputSchema
->;
+export type AuthzRevokeBindingsOutput = z.infer<typeof authzRevokeBindingsOutputSchema>;
 
-const authzStringSetFilterSchema = z
-  .object({ in: z.array(z.string().min(1)) })
-  .strict();
+const authzStringSetFilterSchema = z.object({ in: z.array(z.string().min(1)) }).strict();
 const authzBindingIdFilterSchema = z
   .object({
     in: z.array(z.string().min(1)).optional(),
@@ -363,9 +341,7 @@ export const authzBindingFilterSchema = z
     userId: z.string().min(1).optional(),
     groupId: z.string().min(1).optional(),
     apiKeyId: z.string().min(1).optional(),
-    customRoleId: z
-      .union([z.string().min(1), authzStringSetFilterSchema])
-      .optional(),
+    customRoleId: z.union([z.string().min(1), authzStringSetFilterSchema]).optional(),
     scopeType: roleBindingScopeTypeSchema.optional(),
     scopeId: z.string().min(1).optional(),
     id: z.union([z.string().min(1), authzBindingIdFilterSchema]).optional(),
@@ -384,10 +360,7 @@ export const authzRevokeBindingsWhereInputSchema = z
 export type AuthzRevokeBindingsWhereInput = z.infer<
   typeof authzRevokeBindingsWhereInputSchema
 >;
-export const authzRevokeBindingsWhereOutputSchema = z
-  .number()
-  .int()
-  .nonnegative();
+export const authzRevokeBindingsWhereOutputSchema = z.number().int().nonnegative();
 export type AuthzRevokeBindingsWhereOutput = z.infer<
   typeof authzRevokeBindingsWhereOutputSchema
 >;
@@ -400,13 +373,9 @@ export const authzOffboardMemberInputSchema = z
     actor: grantsLedgerActorSchema,
   })
   .strict();
-export type AuthzOffboardMemberInput = z.infer<
-  typeof authzOffboardMemberInputSchema
->;
+export type AuthzOffboardMemberInput = z.infer<typeof authzOffboardMemberInputSchema>;
 export const authzOffboardMemberOutputSchema = z.void();
-export type AuthzOffboardMemberOutput = z.infer<
-  typeof authzOffboardMemberOutputSchema
->;
+export type AuthzOffboardMemberOutput = z.infer<typeof authzOffboardMemberOutputSchema>;
 
 export const authzDefineRoleInputSchema = z
   .object({
@@ -435,9 +404,7 @@ export type AuthzDeleteRoleInput = z.infer<typeof authzDeleteRoleInputSchema>;
 export const authzDeleteRoleOutputSchema = z.void();
 export type AuthzDeleteRoleOutput = z.infer<typeof authzDeleteRoleOutputSchema>;
 
-export const authzGrantActorSchema = z
-  .object({ userId: z.string().min(1) })
-  .strict();
+export const authzGrantActorSchema = z.object({ userId: z.string().min(1) }).strict();
 export type AuthzGrantActor = z.infer<typeof authzGrantActorSchema>;
 
 export const grantPrincipalSchema = z.discriminatedUnion("type", [
@@ -496,9 +463,7 @@ export const authzReplaceGrantInputSchema = z
     role: grantRoleSchema,
   })
   .strict();
-export type AuthzReplaceGrantInput = z.infer<
-  typeof authzReplaceGrantInputSchema
->;
+export type AuthzReplaceGrantInput = z.infer<typeof authzReplaceGrantInputSchema>;
 
 export const authzOffboardInputSchema = z
   .object({
@@ -525,12 +490,8 @@ export const authzOffboardOutputSchema = z
     removed: offboardCountsSchema,
     needsHumanDecision: z
       .object({
-        ownedApiKeys: z.array(
-          z.object({ id: z.string(), name: z.string() }).strict(),
-        ),
-        personalTeams: z.array(
-          z.object({ id: z.string(), name: z.string() }).strict(),
-        ),
+        ownedApiKeys: z.array(z.object({ id: z.string(), name: z.string() }).strict()),
+        personalTeams: z.array(z.object({ id: z.string(), name: z.string() }).strict()),
       })
       .strict(),
   })

@@ -64,8 +64,7 @@ function eventsSummary(enabledEvents: string[]) {
 function useWebhookDialogs() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<EndpointView | null>(null);
-  const [viewingDeliveries, setViewingDeliveries] =
-    useState<EndpointView | null>(null);
+  const [viewingDeliveries, setViewingDeliveries] = useState<EndpointView | null>(null);
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
   const [rollingSecret, setRollingSecret] = useState<EndpointView | null>(null);
   const [deleting, setDeleting] = useState<EndpointView | null>(null);
@@ -175,9 +174,9 @@ function WebhooksUpsell() {
         <Alert.Content>
           <Alert.Title>Enterprise Feature</Alert.Title>
           <Alert.Description>
-            Webhook endpoints stream signed events (gateway billing, budgets,
-            key lifecycle) to your systems with durable retries and delivery
-            history. Available on Enterprise plans.
+            Webhook endpoints stream signed events (gateway billing, budgets, key
+            lifecycle) to your systems with durable retries and delivery history.
+            Available on Enterprise plans.
           </Alert.Description>
         </Alert.Content>
       </Alert.Root>
@@ -225,9 +224,7 @@ function WebhookStatusMenuItem({
   return (
     <Menu.Item
       value="enable"
-      onClick={() =>
-        mutations.enable.mutate({ organizationId, endpointId: endpoint.id })
-      }
+      onClick={() => mutations.enable.mutate({ organizationId, endpointId: endpoint.id })}
     >
       <Play size={14} /> Enable
     </Menu.Item>
@@ -242,10 +239,7 @@ function WebhookManageMenuItems(props: EndpointActionProps) {
       <Menu.Item value="edit" onClick={() => dialogs.openEdit(endpoint)}>
         <Pencil size={14} /> Edit
       </Menu.Item>
-      <Menu.Item
-        value="roll-secret"
-        onClick={() => dialogs.setRollingSecret(endpoint)}
-      >
+      <Menu.Item value="roll-secret" onClick={() => dialogs.setRollingSecret(endpoint)}>
         <RotateCw size={14} /> Roll secret
       </Menu.Item>
       <WebhookStatusMenuItem {...props} />
@@ -506,10 +500,7 @@ function WebhooksManager({
   canManage: boolean;
 }) {
   const dialogs = useWebhookDialogs();
-  const endpoints = api.webhookEndpoints.list.useQuery(
-    { organizationId },
-    { enabled },
-  );
+  const endpoints = api.webhookEndpoints.list.useQuery({ organizationId }, { enabled });
   const eventTypes = api.webhookEndpoints.eventTypes.useQuery(
     { organizationId },
     { enabled },

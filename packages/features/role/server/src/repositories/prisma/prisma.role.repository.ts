@@ -29,9 +29,7 @@ type StoredRole = {
 
 const asPermissions = (value: unknown): string[] =>
   Array.isArray(value)
-    ? value.filter(
-        (permission): permission is string => typeof permission === "string",
-      )
+    ? value.filter((permission): permission is string => typeof permission === "string")
     : [];
 
 const toRole = (value: unknown): Role => {
@@ -139,9 +137,7 @@ export class PrismaRoleRepository extends RoleRepository {
         candidate.scopeId === input.teamId &&
         candidate.customRoleId !== null,
     );
-    return binding?.customRoleId
-      ? { customRoleId: binding.customRoleId }
-      : null;
+    return binding?.customRoleId ? { customRoleId: binding.customRoleId } : null;
   }
 
   findAssignable(
@@ -183,9 +179,7 @@ export class PrismaRoleRepository extends RoleRepository {
     const bindings = await this.access.listOrganizationBindings({
       organizationId: input.organizationId,
     });
-    return bindings.filter(
-      (binding) => binding.customRoleId === input.roleId,
-    ).length;
+    return bindings.filter((binding) => binding.customRoleId === input.roleId).length;
   }
 
   countAssignedUsers(roleId: string): Promise<number> {
@@ -204,23 +198,14 @@ export class PrismaRoleRepository extends RoleRepository {
     if (row && row.id !== exceptRoleId) throw new RoleDuplicateNameError();
   }
 
-  async create(input: {
-    role: RoleCreate;
-    actor: LedgerActor;
-  }): Promise<Role> {
-    await this.assertNameFree(
-      input.role.organizationId,
-      input.role.name,
-      null,
-    );
+  async create(input: { role: RoleCreate; actor: LedgerActor }): Promise<Role> {
+    await this.assertNameFree(input.role.organizationId, input.role.name, null);
     const roleId = nanoid();
     await this.writer.defineRole({
       organizationId: input.role.organizationId,
       roleId,
       name: input.role.name,
-      ...(input.role.description != null
-        ? { description: input.role.description }
-        : {}),
+      ...(input.role.description != null ? { description: input.role.description } : {}),
       permissions: input.role.permissions,
       kind: ROLE_KIND.CUSTOM,
       actor: input.actor,
@@ -355,11 +340,7 @@ export class PrismaRoleRepository extends RoleRepository {
     return this.replaceTeamGrant(input);
   }
 
-  remove(input: {
-    userId: string;
-    teamId: string;
-    actor: LedgerActor;
-  }): Promise<void> {
+  remove(input: { userId: string; teamId: string; actor: LedgerActor }): Promise<void> {
     return this.replaceTeamGrant({ ...input, customRoleId: null });
   }
 
@@ -409,8 +390,7 @@ export class PrismaRoleRepository extends RoleRepository {
       ]);
       const otherBindings = bindings.filter(
         (binding) =>
-          binding.customRoleId === roleId &&
-          binding.apiKeyId !== input.apiKeyId,
+          binding.customRoleId === roleId && binding.apiKeyId !== input.apiKeyId,
       ).length;
       if (otherBindings > 0 || assignedUsers > 0) continue;
       await this.writer.deleteRole({

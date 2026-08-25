@@ -203,15 +203,11 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
    * exactly that member so the writer cannot quietly grow a dependency on
    * the projection store's fold-side surface.
    */
-  static create(
-    options: EventingAuthzLedgerAdapterOptions,
-  ): EventingAuthzLedgerAdapter {
+  static create(options: EventingAuthzLedgerAdapterOptions): EventingAuthzLedgerAdapter {
     return new EventingAuthzLedgerAdapter(options);
   }
 
-  private constructor(
-    private readonly options: EventingAuthzLedgerAdapterOptions,
-  ) {
+  private constructor(private readonly options: EventingAuthzLedgerAdapterOptions) {
     super();
   }
 
@@ -342,9 +338,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     // One command per grant, and a command id derived from the batch's own
     // so a retry of the same attach dedupes per grant at the event store.
     const batchId =
-      commandId ??
-      this.options.newCommandId?.() ??
-      AuthzLedgerMapper.newCommandId();
+      commandId ?? this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId();
     const senders = (await this.commands()).commands;
     await Promise.all(
       fresh.map((binding) =>
@@ -414,9 +408,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
       // A repeat inside the same batch counts as a duplicate of itself, and
       // answers with the id the batch itself minted — the row is not in
       // storage yet, so there is none to name.
-      const existingId = seen.has(key)
-        ? binding.bindingId
-        : existingByIdentity.get(key);
+      const existingId = seen.has(key) ? binding.bindingId : existingByIdentity.get(key);
       if (existingId !== undefined) {
         if (onDuplicate === "reject") {
           throw new DuplicateBindingError();
@@ -539,8 +531,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
       try {
         await this.options.database.roleBinding.create({ data });
       } catch (error) {
-        if (AuthzLedgerMapper.isUniqueViolation(error))
-          throw new DuplicateBindingError();
+        if (AuthzLedgerMapper.isUniqueViolation(error)) throw new DuplicateBindingError();
         throw error;
       }
     }
@@ -605,9 +596,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
           userId: resource.createdByUserId ?? null,
           visibility,
           expiresAt:
-            resource.expiresAtMs === undefined
-              ? null
-              : new Date(resource.expiresAtMs),
+            resource.expiresAtMs === undefined ? null : new Date(resource.expiresAtMs),
           maxViews: resource.maxViews ?? null,
         },
       });
@@ -620,9 +609,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
       tenantId: organizationId,
       organizationId,
       commandId:
-        commandId ??
-        this.options.newCommandId?.() ??
-        AuthzLedgerMapper.newCommandId(),
+        commandId ?? this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
       grant: {
         grantId,
         principal,
@@ -719,8 +706,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     // so resolving "every grant this principal holds" into ids is the
     // caller's job now, and the deny below is what makes that safe.
     const revokedAtMs = this.now();
-    const batchId =
-      this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId();
+    const batchId = this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId();
     const senders = (await this.commands()).commands;
     await Promise.all(
       bindingIds.map((grantId) => {
@@ -882,8 +868,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     ).commands.changeGrantRole.send({
       tenantId: organizationId,
       organizationId,
-      commandId:
-        this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
+      commandId: this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
       grantId: bindingId,
       from,
       to,
@@ -943,8 +928,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     ).commands.attachGrant.send({
       tenantId: organizationId,
       organizationId,
-      commandId:
-        this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
+      commandId: this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
       grant: {
         grantId: row.id,
         principal: AuthzLedgerMapper.principalForWhere(
@@ -1012,8 +996,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
       if (updated.count === 0) throw new BindingMissingError();
     } catch (error) {
       if (error instanceof BindingMissingError) throw error;
-      if (AuthzLedgerMapper.isUniqueViolation(error))
-        throw new DuplicateBindingError();
+      if (AuthzLedgerMapper.isUniqueViolation(error)) throw new DuplicateBindingError();
       throw error;
     }
     await this.recordLegacyAudit({
@@ -1238,8 +1221,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     // own: a person is not an aggregate here, and an event that named one
     // would have to straddle every grant they hold.
     const offboardedAtMs = this.now();
-    const batchId =
-      this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId();
+    const batchId = this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId();
     const senders = (await this.commands()).commands;
     await Promise.all(
       revokedGrantIds.map((grantId) =>
@@ -1312,8 +1294,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     ).commands.defineRole.send({
       tenantId: organizationId,
       organizationId,
-      commandId:
-        this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
+      commandId: this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
       role,
       actor,
     });
@@ -1467,8 +1448,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     ).commands.deleteRole.send({
       tenantId: organizationId,
       organizationId,
-      commandId:
-        this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
+      commandId: this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
       roleId,
       actor,
       occurredAtMs: this.now(),

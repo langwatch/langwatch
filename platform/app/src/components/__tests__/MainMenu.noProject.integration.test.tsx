@@ -86,9 +86,7 @@ const expandSimulations = async (user: ReturnType<typeof userEvent.setup>) => {
 
 /** Every real anchor the rail renders, with the destination it points at. */
 const anchorHrefs = () =>
-  Array.from(document.querySelectorAll("a")).map((anchor) =>
-    anchor.getAttribute("href"),
-  );
+  Array.from(document.querySelectorAll("a")).map((anchor) => anchor.getAttribute("href"));
 
 describe("<MainMenu />", () => {
   afterEach(() => {
@@ -142,9 +140,7 @@ describe("<MainMenu />", () => {
 
     it("renders the grouped destinations without duplicate React keys", async () => {
       const user = userEvent.setup();
-      const consoleError = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => undefined);
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
       renderMenu();
       await expandSimulations(user);
@@ -194,9 +190,9 @@ describe("<MainMenu />", () => {
     it("leaves the destinations enabled", () => {
       renderMenu();
 
-      expect(
-        screen.getByRole("link", { name: "Trace Explorer" }),
-      ).not.toHaveAttribute("aria-disabled");
+      expect(screen.getByRole("link", { name: "Trace Explorer" })).not.toHaveAttribute(
+        "aria-disabled",
+      );
     });
   });
 });

@@ -35,10 +35,7 @@ function fixture(contract: string): string {
     }),
   );
   write("packages/features/project/contract/src/index.ts", "export {};\n");
-  write(
-    "packages/features/project/contract/src/project.service.ts",
-    contract,
-  );
+  write("packages/features/project/contract/src/project.service.ts", contract);
   write(
     "packages/features/project/server/package.json",
     JSON.stringify({

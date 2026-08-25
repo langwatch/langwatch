@@ -1,11 +1,4 @@
-import {
-  Box,
-  createListCollection,
-  Field,
-  HStack,
-  Input,
-  Text,
-} from "@chakra-ui/react";
+import { Box, createListCollection, Field, HStack, Input, Text } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
@@ -15,10 +8,7 @@ import {
   resolveLatestAlias,
 } from "../../server/modelProviders/latestAliases";
 import { titleCase } from "../../utils/stringCasing";
-import {
-  MODEL_ICON_SIZE,
-  MODEL_ICON_SIZE_SM,
-} from "../llmPromptConfigs/constants";
+import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "../llmPromptConfigs/constants";
 import { InputGroup } from "../ui/input-group";
 import { Select } from "../ui/select";
 
@@ -95,12 +85,10 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     () =>
       options.map((modelValue) => {
         const modelProvider = modelValue.split("/")[0] ?? "";
-        const icon =
-          modelProviderIcons[modelProvider as keyof typeof modelProviderIcons];
+        const icon = modelProviderIcons[modelProvider as keyof typeof modelProviderIcons];
         if (isLatestAlias(modelValue)) {
           const suffix = modelValue.split("/")[1] ?? "";
-          const aliasLabel =
-            suffix === "latest" ? "Latest" : "Latest smaller model";
+          const aliasLabel = suffix === "latest" ? "Latest" : "Latest smaller model";
           const resolved = resolveLatestAlias(modelValue);
           return {
             label: aliasLabel,
@@ -232,15 +220,12 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
           wordBreak="break-all"
           color={isUnknown ? "gray.500" : undefined}
         >
-          {selectedItem?.label ??
-            modelDisplayLabel({ fullModelId: model, displayNames })}
+          {selectedItem?.label ?? modelDisplayLabel({ fullModelId: model, displayNames })}
         </Box>
       </HStack>
     );
 
-  const [highlightedValue, setHighlightedValue] = useState<string | null>(
-    model,
-  );
+  const [highlightedValue, setHighlightedValue] = useState<string | null>(model);
 
   useEffect(() => {
     const highlightedItem = modelCollection.items.find(
@@ -323,43 +308,36 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
             </InputGroup>
           </Box>
         </Field.Root>
-        {inheritOption && inheritItem && (
-          // Free-standing item at the top of the dropdown — no group
-          // wrapper, no label. The prior "Cascade" group header was
-          // jargon ("cascade" is implementation talk, not a thing
-          // users think about); leaving the Inherit row to read on
-          // its own is enough context.
-          <Select.Item
-            item={inheritItem}
-            data-testid="provider-model-selector-inherit"
-          >
-            <HStack gap={2}>
-              {inheritIcon && (
-                <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-                  {inheritIcon}
-                </Box>
-              )}
-              <Box>
-                <Text fontSize="sm" fontWeight="medium">
-                  {inheritOption.label}
-                </Text>
-                {inheritOption.model && (
-                  <Text
-                    fontSize="xs"
-                    color="fg.muted"
-                    fontFamily="mono"
-                    lineClamp={1}
-                  >
-                    {modelDisplayLabel({
-                      fullModelId: inheritOption.model,
-                      displayNames,
-                    })}
-                  </Text>
+        {inheritOption &&
+          inheritItem && (
+            // Free-standing item at the top of the dropdown — no group
+            // wrapper, no label. The prior "Cascade" group header was
+            // jargon ("cascade" is implementation talk, not a thing
+            // users think about); leaving the Inherit row to read on
+            // its own is enough context.
+            <Select.Item item={inheritItem} data-testid="provider-model-selector-inherit">
+              <HStack gap={2}>
+                {inheritIcon && (
+                  <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+                    {inheritIcon}
+                  </Box>
                 )}
-              </Box>
-            </HStack>
-          </Select.Item>
-        )}
+                <Box>
+                  <Text fontSize="sm" fontWeight="medium">
+                    {inheritOption.label}
+                  </Text>
+                  {inheritOption.model && (
+                    <Text fontSize="xs" color="fg.muted" fontFamily="mono" lineClamp={1}>
+                      {modelDisplayLabel({
+                        fullModelId: inheritOption.model,
+                        displayNames,
+                      })}
+                    </Text>
+                  )}
+                </Box>
+              </HStack>
+            </Select.Item>
+          )}
         {filteredGroups.map((group) => (
           <Select.ItemGroup
             key={group.provider}

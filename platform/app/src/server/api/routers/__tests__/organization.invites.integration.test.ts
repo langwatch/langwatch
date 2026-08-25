@@ -8,15 +8,7 @@
  */
 
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -292,9 +284,7 @@ describe("Organization Invites Integration", () => {
       it("creates invitation with WAITING_APPROVAL status", async () => {
         const results = await memberCaller.organization.createInviteRequest({
           organizationId,
-          invites: [
-            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-          ],
+          invites: [{ email: "user@example.com", role: "MEMBER", teamIds: teamId }],
         });
 
         expect(results[0]!.invite.status).toBe("WAITING_APPROVAL");
@@ -304,9 +294,7 @@ describe("Organization Invites Integration", () => {
       it("sets requestedBy to the requesting user's ID", async () => {
         const results = await memberCaller.organization.createInviteRequest({
           organizationId,
-          invites: [
-            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-          ],
+          invites: [{ email: "user@example.com", role: "MEMBER", teamIds: teamId }],
         });
 
         expect(results[0]!.invite.requestedBy).toBe(memberUserId);
@@ -316,9 +304,7 @@ describe("Organization Invites Integration", () => {
       it("creates invitation with null expiration", async () => {
         const results = await memberCaller.organization.createInviteRequest({
           organizationId,
-          invites: [
-            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-          ],
+          invites: [{ email: "user@example.com", role: "MEMBER", teamIds: teamId }],
         });
 
         expect(results[0]!.invite.expiration).toBeNull();
@@ -328,9 +314,7 @@ describe("Organization Invites Integration", () => {
       it("does not send invitation email", async () => {
         await memberCaller.organization.createInviteRequest({
           organizationId,
-          invites: [
-            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-          ],
+          invites: [{ email: "user@example.com", role: "MEMBER", teamIds: teamId }],
         });
 
         expect(mockSendInviteEmail).not.toHaveBeenCalled();
@@ -368,9 +352,7 @@ describe("Organization Invites Integration", () => {
           }),
         ).rejects.toMatchObject({
           code: "BAD_REQUEST",
-          message: expect.stringContaining(
-            "Duplicate emails in request payload",
-          ),
+          message: expect.stringContaining("Duplicate emails in request payload"),
         });
 
         const persistedInvites = await prisma.organizationInvite.findMany({
@@ -389,9 +371,7 @@ describe("Organization Invites Integration", () => {
         // Create initial WAITING_APPROVAL invite
         await memberCaller.organization.createInviteRequest({
           organizationId,
-          invites: [
-            { email: "existing@example.com", role: "MEMBER", teamIds: teamId },
-          ],
+          invites: [{ email: "existing@example.com", role: "MEMBER", teamIds: teamId }],
         });
 
         // Try to create another for the same email
@@ -425,9 +405,7 @@ describe("Organization Invites Integration", () => {
         // Create WAITING_APPROVAL invite
         const results = await memberCaller.organization.createInviteRequest({
           organizationId,
-          invites: [
-            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-          ],
+          invites: [{ email: "user@example.com", role: "MEMBER", teamIds: teamId }],
         });
 
         const result = await adminCaller.organization.approveInvite({
@@ -443,9 +421,7 @@ describe("Organization Invites Integration", () => {
 
         const results = await memberCaller.organization.createInviteRequest({
           organizationId,
-          invites: [
-            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-          ],
+          invites: [{ email: "user@example.com", role: "MEMBER", teamIds: teamId }],
         });
 
         const result = await adminCaller.organization.approveInvite({
@@ -465,9 +441,7 @@ describe("Organization Invites Integration", () => {
       it("sends invitation email", async () => {
         const results = await memberCaller.organization.createInviteRequest({
           organizationId,
-          invites: [
-            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-          ],
+          invites: [{ email: "user@example.com", role: "MEMBER", teamIds: teamId }],
         });
 
         await adminCaller.organization.approveInvite({
@@ -621,10 +595,9 @@ describe("Organization Invites Integration", () => {
           },
         });
 
-        const invites =
-          await adminCaller.organization.getOrganizationPendingInvites({
-            organizationId,
-          });
+        const invites = await adminCaller.organization.getOrganizationPendingInvites({
+          organizationId,
+        });
 
         const emails = invites.map((i) => i.email);
         expect(emails.includes("pending@example.com")).toBe(true);
@@ -645,14 +618,11 @@ describe("Organization Invites Integration", () => {
           },
         });
 
-        const invites =
-          await adminCaller.organization.getOrganizationPendingInvites({
-            organizationId,
-          });
+        const invites = await adminCaller.organization.getOrganizationPendingInvites({
+          organizationId,
+        });
 
-        const waitingInvite = invites.find(
-          (i) => i.email === "waiting-req@example.com",
-        );
+        const waitingInvite = invites.find((i) => i.email === "waiting-req@example.com");
         expect(waitingInvite?.requestedByUser).toBeDefined();
         expect(waitingInvite?.requestedByUser?.name).toBe("Invite Member");
       });
@@ -734,9 +704,7 @@ describe("Organization Invites Integration", () => {
         expect(failedResult?.emailNotSent).toBe(true);
 
         // The successful one has emailNotSent = false
-        const okResult = results.find(
-          (r) => r.invite.email === "ok-email@example.com",
-        );
+        const okResult = results.find((r) => r.invite.email === "ok-email@example.com");
         expect(okResult?.emailNotSent).toBe(false);
       });
     });
@@ -753,15 +721,11 @@ describe("Organization Invites Integration", () => {
         // Create WAITING_APPROVAL invite
         const results = await memberCaller.organization.createInviteRequest({
           organizationId,
-          invites: [
-            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-          ],
+          invites: [{ email: "user@example.com", role: "MEMBER", teamIds: teamId }],
         });
 
         // Make email sending fail
-        mockSendInviteEmail.mockRejectedValue(
-          new Error("Email service unavailable"),
-        );
+        mockSendInviteEmail.mockRejectedValue(new Error("Email service unavailable"));
 
         const result = await adminCaller.organization.approveInvite({
           inviteId: results[0]!.invite.id,
@@ -781,14 +745,10 @@ describe("Organization Invites Integration", () => {
       it("returns emailNotSent as fallback indicator", async () => {
         const results = await memberCaller.organization.createInviteRequest({
           organizationId,
-          invites: [
-            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-          ],
+          invites: [{ email: "user@example.com", role: "MEMBER", teamIds: teamId }],
         });
 
-        mockSendInviteEmail.mockRejectedValue(
-          new Error("Email service unavailable"),
-        );
+        mockSendInviteEmail.mockRejectedValue(new Error("Email service unavailable"));
 
         const result = await adminCaller.organization.approveInvite({
           inviteId: results[0]!.invite.id,
@@ -866,9 +826,7 @@ describe("Organization Invites Integration", () => {
         await expect(
           memberCaller.organization.createInviteRequest({
             organizationId,
-            invites: [
-              { email: "new@example.com", role: "MEMBER", teamIds: teamId },
-            ],
+            invites: [{ email: "new@example.com", role: "MEMBER", teamIds: teamId }],
           }),
         ).rejects.toMatchObject({
           code: "FORBIDDEN",

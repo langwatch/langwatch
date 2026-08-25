@@ -32,7 +32,6 @@ export function shellContentMaxWidth({
   railWidth: string | null;
 }): string {
   const inset =
-    Number.parseInt(menuWidth, 10) +
-    (railWidth ? Number.parseInt(railWidth, 10) : 0);
+    Number.parseInt(menuWidth, 10) + (railWidth ? Number.parseInt(railWidth, 10) : 0);
   return `calc(100vw - ${inset}px)`;
 }

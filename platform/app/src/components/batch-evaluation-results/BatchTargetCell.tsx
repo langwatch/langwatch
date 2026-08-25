@@ -31,9 +31,7 @@ type BatchTargetCellProps = {
   /** Target output data for this row */
   targetOutput: BatchTargetOutput;
   /** Callback to get result object for an evaluator */
-  getEvaluatorResult?: (
-    evaluatorId: string,
-  ) => BatchEvaluatorResult | undefined;
+  getEvaluatorResult?: (evaluatorId: string) => BatchEvaluatorResult | undefined;
   /**
    * Evaluator ids we shouldn't render generic score chips for — comparison
    * evaluators surface via the dedicated Winner column (#5100 follow-up),
@@ -62,11 +60,7 @@ const MetricBadge = ({
   tooltipLabel: string;
   children: ReactNode;
 }) => (
-  <Tooltip
-    content={tooltipLabel}
-    positioning={{ placement: "top" }}
-    openDelay={100}
-  >
+  <Tooltip content={tooltipLabel} positioning={{ placement: "top" }} openDelay={100}>
     <Text
       fontSize="11px"
       color="fg.muted"
@@ -160,9 +154,7 @@ export function BatchTargetCell({
   const rawOutput = formatTargetOutput(targetOutput.output);
 
   const isTruncated = rawOutput.length > MAX_DISPLAY_CHARS;
-  const displayOutput = isTruncated
-    ? rawOutput.slice(0, MAX_DISPLAY_CHARS)
-    : rawOutput;
+  const displayOutput = isTruncated ? rawOutput.slice(0, MAX_DISPLAY_CHARS) : rawOutput;
 
   // Use a heuristic to determine if content likely overflows
   // This avoids useEffect + scrollHeight measurement which causes flicker during virtualization
@@ -192,11 +184,7 @@ export function BatchTargetCell({
           <VStack align="start" gap={0.5}>
             <Text lineClamp={expanded ? undefined : 2}>{failure.title}</Text>
             {failure.description && (
-              <Text
-                fontSize="12px"
-                color="fg.muted"
-                lineClamp={expanded ? undefined : 2}
-              >
+              <Text fontSize="12px" color="fg.muted" lineClamp={expanded ? undefined : 2}>
                 {failure.description}
               </Text>
             )}
@@ -220,11 +208,7 @@ export function BatchTargetCell({
               gap={1}
               data-testid={`error-tooltip-${targetOutput.targetId}`}
             >
-              <Text
-                fontSize="13px"
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-              >
+              <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
                 {failure.description
                   ? `${failure.title}. ${failure.description}`
                   : failure.title}
@@ -389,11 +373,7 @@ export function BatchTargetCell({
       )}
       {/* Trace link button */}
       {showOutput && targetOutput.traceId && (
-        <Tooltip
-          content="View trace"
-          positioning={{ placement: "top" }}
-          openDelay={100}
-        >
+        <Tooltip content="View trace" positioning={{ placement: "top" }} openDelay={100}>
           <Button
             size="xs"
             variant="ghost"

@@ -43,7 +43,9 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return new PrismaDashboardRepository(prisma);
   }
 
-  async findAllDashboards(input: { projectId: string }): Promise<DashboardSummaryRecord[]> {
+  async findAllDashboards(input: {
+    projectId: string;
+  }): Promise<DashboardSummaryRecord[]> {
     const rows = await this.prisma.dashboard.findMany({
       where: { projectId: input.projectId },
       orderBy: { order: "asc" },
@@ -58,7 +60,12 @@ export class PrismaDashboardRepository extends DashboardRepository {
   }): Promise<(DashboardRecord & { graphs: GraphRecord[] }) | null> {
     const row = await this.prisma.dashboard.findFirst({
       where: { id: input.dashboardId, projectId: input.projectId },
-      include: { graphs: { where: { kind: "builder" }, orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }] } },
+      include: {
+        graphs: {
+          where: { kind: "builder" },
+          orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
+        },
+      },
     });
     if (!row) return null;
     return {
@@ -67,17 +74,30 @@ export class PrismaDashboardRepository extends DashboardRepository {
     };
   }
 
-  async tryFindFirstDashboard(input: { projectId: string }): Promise<DashboardRecord | null> {
-    const row = await this.prisma.dashboard.findFirst({ where: { projectId: input.projectId }, orderBy: { order: "asc" } });
+  async tryFindFirstDashboard(input: {
+    projectId: string;
+  }): Promise<DashboardRecord | null> {
+    const row = await this.prisma.dashboard.findFirst({
+      where: { projectId: input.projectId },
+      orderBy: { order: "asc" },
+    });
     return row ? toDashboard(row) : null;
   }
 
-  async tryFindLastDashboard(input: { projectId: string }): Promise<DashboardRecord | null> {
-    const row = await this.prisma.dashboard.findFirst({ where: { projectId: input.projectId }, orderBy: { order: "desc" } });
+  async tryFindLastDashboard(input: {
+    projectId: string;
+  }): Promise<DashboardRecord | null> {
+    const row = await this.prisma.dashboard.findFirst({
+      where: { projectId: input.projectId },
+      orderBy: { order: "desc" },
+    });
     return row ? toDashboard(row) : null;
   }
 
-  async findDashboardIds(input: { projectId: string; dashboardIds: string[] }): Promise<string[]> {
+  async findDashboardIds(input: {
+    projectId: string;
+    dashboardIds: string[];
+  }): Promise<string[]> {
     const rows = await this.prisma.dashboard.findMany({
       where: { id: { in: input.dashboardIds }, projectId: input.projectId },
       select: { id: true },
@@ -85,24 +105,43 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return rows.map((row) => row.id);
   }
 
-  async createDashboard(input: { id: string; projectId: string; name: string; order: number }): Promise<DashboardRecord> {
+  async createDashboard(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    order: number;
+  }): Promise<DashboardRecord> {
     return toDashboard(await this.prisma.dashboard.create({ data: input }));
   }
 
-  async updateDashboard(input: { projectId: string; dashboardId: string; data: { name: string } }): Promise<DashboardRecord> {
-    return toDashboard(await this.prisma.dashboard.update({
-      where: { id: input.dashboardId, projectId: input.projectId },
-      data: input.data,
-    }));
+  async updateDashboard(input: {
+    projectId: string;
+    dashboardId: string;
+    data: { name: string };
+  }): Promise<DashboardRecord> {
+    return toDashboard(
+      await this.prisma.dashboard.update({
+        where: { id: input.dashboardId, projectId: input.projectId },
+        data: input.data,
+      }),
+    );
   }
 
-  async deleteDashboard(input: { projectId: string; dashboardId: string }): Promise<DashboardRecord> {
-    return toDashboard(await this.prisma.dashboard.delete({
-      where: { id: input.dashboardId, projectId: input.projectId },
-    }));
+  async deleteDashboard(input: {
+    projectId: string;
+    dashboardId: string;
+  }): Promise<DashboardRecord> {
+    return toDashboard(
+      await this.prisma.dashboard.delete({
+        where: { id: input.dashboardId, projectId: input.projectId },
+      }),
+    );
   }
 
-  async updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void> {
+  async updateDashboardOrder(input: {
+    projectId: string;
+    dashboardIds: string[];
+  }): Promise<void> {
     await this.prisma.$transaction(
       input.dashboardIds.map((dashboardId, order) =>
         this.prisma.dashboard.update({
@@ -113,7 +152,10 @@ export class PrismaDashboardRepository extends DashboardRepository {
     );
   }
 
-  async findAllGraphs(input: { projectId: string; dashboardId?: string }): Promise<GraphRecord[]> {
+  async findAllGraphs(input: {
+    projectId: string;
+    dashboardId?: string;
+  }): Promise<GraphRecord[]> {
     const rows = await this.prisma.customGraph.findMany({
       where: {
         projectId: input.projectId,
@@ -127,7 +169,10 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return rows.map((row) => this.toGraph(row));
   }
 
-  async tryFindGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord | null> {
+  async tryFindGraph(input: {
+    projectId: string;
+    graphId: string;
+  }): Promise<GraphRecord | null> {
     const row = await this.prisma.customGraph.findFirst({
       where: {
         id: input.graphId,
@@ -138,7 +183,10 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return row ? this.toGraph(row) : null;
   }
 
-  async tryFindLastGraphGridRow(input: { projectId: string; dashboardId: string }): Promise<number | null> {
+  async tryFindLastGraphGridRow(input: {
+    projectId: string;
+    dashboardId: string;
+  }): Promise<number | null> {
     const row = await this.prisma.customGraph.findFirst({
       where: {
         projectId: input.projectId,
@@ -150,7 +198,15 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return row?.gridRow ?? null;
   }
 
-  async createGraph(input: { id: string; projectId: string; name: string; graph: Record<string, unknown>; filters: Record<string, unknown>; dashboardId: string | null; layout: GraphLayout }): Promise<GraphRecord> {
+  async createGraph(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    graph: Record<string, unknown>;
+    filters: Record<string, unknown>;
+    dashboardId: string | null;
+    layout: GraphLayout;
+  }): Promise<GraphRecord> {
     const row = await this.prisma.customGraph.create({
       data: {
         id: input.id,
@@ -166,7 +222,13 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return this.toGraph(row);
   }
 
-  async updateGraph(input: { projectId: string; graphId: string; name?: string; graph?: Record<string, unknown>; filters?: Record<string, unknown> }): Promise<GraphRecord> {
+  async updateGraph(input: {
+    projectId: string;
+    graphId: string;
+    name?: string;
+    graph?: Record<string, unknown>;
+    filters?: Record<string, unknown>;
+  }): Promise<GraphRecord> {
     const row = await this.prisma.customGraph.update({
       where: {
         id: input.graphId,
@@ -197,7 +259,11 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return this.toGraph(row);
   }
 
-  async updateGraphLayout(input: { projectId: string; graphId: string; layout: GraphLayout }): Promise<GraphRecord> {
+  async updateGraphLayout(input: {
+    projectId: string;
+    graphId: string;
+    layout: GraphLayout;
+  }): Promise<GraphRecord> {
     const row = await this.prisma.customGraph.update({
       where: {
         id: input.graphId,
@@ -209,7 +275,10 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return this.toGraph(row);
   }
 
-  async updateGraphLayouts(input: { projectId: string; layouts: Array<{ graphId: string; layout: GraphLayout }> }): Promise<void> {
+  async updateGraphLayouts(input: {
+    projectId: string;
+    layouts: Array<{ graphId: string; layout: GraphLayout }>;
+  }): Promise<void> {
     await this.prisma.$transaction(
       input.layouts.map((item) =>
         this.prisma.customGraph.update({
@@ -224,7 +293,9 @@ export class PrismaDashboardRepository extends DashboardRepository {
     );
   }
 
-  async findAllSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChartRecord[]> {
+  async findAllSavedWorkbenchCharts(input: {
+    projectId: string;
+  }): Promise<SavedWorkbenchChartRecord[]> {
     const rows = await this.prisma.customGraph.findMany({
       where: {
         projectId: input.projectId,
@@ -235,7 +306,10 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return rows.map((row) => this.toSavedWorkbenchChart(row));
   }
 
-  async tryFindSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<SavedWorkbenchChartRecord | null> {
+  async tryFindSavedWorkbenchChart(input: {
+    projectId: string;
+    chartId: string;
+  }): Promise<SavedWorkbenchChartRecord | null> {
     const row = await this.prisma.customGraph.findFirst({
       where: {
         id: input.chartId,
@@ -246,7 +320,12 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return row ? this.toSavedWorkbenchChart(row) : null;
   }
 
-  async createSavedWorkbenchChart(input: { id: string; projectId: string; name: string; definition: SavedWorkbenchChartDefinition }): Promise<SavedWorkbenchChartRecord> {
+  async createSavedWorkbenchChart(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    definition: SavedWorkbenchChartDefinition;
+  }): Promise<SavedWorkbenchChartRecord> {
     const row = await this.prisma.customGraph.create({
       data: {
         id: input.id,
@@ -259,7 +338,12 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return this.toSavedWorkbenchChart(row);
   }
 
-  async tryUpdateSavedWorkbenchChart(input: { projectId: string; chartId: string; name?: string; definition?: SavedWorkbenchChartDefinition }): Promise<SavedWorkbenchChartRecord | null> {
+  async tryUpdateSavedWorkbenchChart(input: {
+    projectId: string;
+    chartId: string;
+    name?: string;
+    definition?: SavedWorkbenchChartDefinition;
+  }): Promise<SavedWorkbenchChartRecord | null> {
     const rows = await this.prisma.customGraph.updateManyAndReturn({
       where: {
         id: input.chartId,
@@ -277,7 +361,10 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return row ? this.toSavedWorkbenchChart(row) : null;
   }
 
-  async deleteSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<number> {
+  async deleteSavedWorkbenchChart(input: {
+    projectId: string;
+    chartId: string;
+  }): Promise<number> {
     const result = await this.prisma.customGraph.deleteMany({
       where: {
         id: input.chartId,
@@ -288,7 +375,20 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return result.count;
   }
 
-  private toGraph(row: { id: string; projectId: string; name: string; graph: unknown; filters: unknown; dashboardId: string | null; gridColumn: number; gridRow: number; colSpan: number; rowSpan: number; createdAt: Date; updatedAt: Date }): GraphRecord {
+  private toGraph(row: {
+    id: string;
+    projectId: string;
+    name: string;
+    graph: unknown;
+    filters: unknown;
+    dashboardId: string | null;
+    gridColumn: number;
+    gridRow: number;
+    colSpan: number;
+    rowSpan: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }): GraphRecord {
     return graphSchema.parse({
       id: row.id,
       projectId: row.projectId,
@@ -305,7 +405,14 @@ export class PrismaDashboardRepository extends DashboardRepository {
     });
   }
 
-  private toSavedWorkbenchChart(row: { id: string; projectId: string; name: string; graph: unknown; createdAt: Date; updatedAt: Date }): SavedWorkbenchChartRecord {
+  private toSavedWorkbenchChart(row: {
+    id: string;
+    projectId: string;
+    name: string;
+    graph: unknown;
+    createdAt: Date;
+    updatedAt: Date;
+  }): SavedWorkbenchChartRecord {
     return savedWorkbenchChartSchema.parse({
       id: row.id,
       projectId: row.projectId,

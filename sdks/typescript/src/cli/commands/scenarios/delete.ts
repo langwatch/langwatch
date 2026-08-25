@@ -5,7 +5,9 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
-export const deleteScenarioCommand = async (id: string): Promise<CommandResult | void> => {
+export const deleteScenarioCommand = async (
+  id: string,
+): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new ScenariosApiService();
@@ -30,9 +32,7 @@ export const deleteScenarioCommand = async (id: string): Promise<CommandResult |
 
   try {
     await service.delete(id);
-    deleteSpinner.succeed(
-      `Archived scenario "${chalk.cyan(scenarioName)}"`,
-    );
+    deleteSpinner.succeed(`Archived scenario "${chalk.cyan(scenarioName)}"`);
   } catch (error) {
     failSpinner({
       spinner: deleteSpinner,

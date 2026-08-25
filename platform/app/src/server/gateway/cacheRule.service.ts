@@ -124,11 +124,7 @@ function validateMatchers(matchers: CacheRuleMatchers): void {
 }
 
 function validateAction(action: CacheRuleAction): void {
-  if (
-    action.mode !== "respect" &&
-    action.mode !== "force" &&
-    action.mode !== "disable"
-  ) {
+  if (action.mode !== "respect" && action.mode !== "force" && action.mode !== "disable") {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: `Unknown cache-rule action mode: ${String(action.mode)}`,
@@ -205,10 +201,7 @@ export class GatewayCacheRuleService {
     });
   }
 
-  async get(
-    id: string,
-    organizationId: string,
-  ): Promise<GatewayCacheRule | null> {
+  async get(id: string, organizationId: string): Promise<GatewayCacheRule | null> {
     return this.prisma.gatewayCacheRule.findFirst({
       where: { id, organizationId, archivedAt: null },
     });
@@ -268,9 +261,7 @@ export class GatewayCacheRuleService {
         data: {
           name: input.name ?? existing.name,
           description:
-            input.description === undefined
-              ? existing.description
-              : input.description,
+            input.description === undefined ? existing.description : input.description,
           priority: input.priority ?? existing.priority,
           enabled: input.enabled ?? existing.enabled,
           matchers:

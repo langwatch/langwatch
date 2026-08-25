@@ -144,13 +144,7 @@ export class PrismaShareRepository implements ShareRepository {
     }
   }
 
-  async deleteById({
-    id,
-    projectId,
-  }: {
-    id: string;
-    projectId: string;
-  }): Promise<void> {
+  async deleteById({ id, projectId }: { id: string; projectId: string }): Promise<void> {
     await this.prisma.shareLink.deleteMany({ where: { id, projectId } });
   }
 

@@ -118,11 +118,7 @@ type TableProps = React.ComponentProps<typeof ComparisonTable>;
 
 const renderTable = (props: Partial<TableProps> = {}) =>
   render(
-    <ComparisonTable
-      comparisonData={TWO_RUN_FIXTURE}
-      disableVirtualization
-      {...props}
-    />,
+    <ComparisonTable comparisonData={TWO_RUN_FIXTURE} disableVirtualization {...props} />,
     { wrapper: Wrapper },
   );
 
@@ -233,20 +229,20 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
         renderGroupedByCity();
         // Berlin means:  run-1 = (0.9 + 0.8)/2 = 0.85
         //                run-2 = (0.7 + 0.6)/2 = 0.65
-        expect(
-          screen.getByTestId("group-mean-Berlin-run-1-accuracy"),
-        ).toHaveTextContent(/0\.85/);
-        expect(
-          screen.getByTestId("group-mean-Berlin-run-2-accuracy"),
-        ).toHaveTextContent(/0\.65/);
+        expect(screen.getByTestId("group-mean-Berlin-run-1-accuracy")).toHaveTextContent(
+          /0\.85/,
+        );
+        expect(screen.getByTestId("group-mean-Berlin-run-2-accuracy")).toHaveTextContent(
+          /0\.65/,
+        );
         // Lisbon means: run-1 = (0.5 + 0.4)/2 = 0.45
         //               run-2 = (0.3 + 0.2)/2 = 0.25
-        expect(
-          screen.getByTestId("group-mean-Lisbon-run-1-accuracy"),
-        ).toHaveTextContent(/0\.45/);
-        expect(
-          screen.getByTestId("group-mean-Lisbon-run-2-accuracy"),
-        ).toHaveTextContent(/0\.25/);
+        expect(screen.getByTestId("group-mean-Lisbon-run-1-accuracy")).toHaveTextContent(
+          /0\.45/,
+        );
+        expect(screen.getByTestId("group-mean-Lisbon-run-2-accuracy")).toHaveTextContent(
+          /0\.25/,
+        );
       });
     });
 
@@ -291,12 +287,8 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
         await user.click(screen.getByTestId("group-by-row-button"));
         await user.click(screen.getByTestId("group-by-row-option-none"));
 
-        expect(
-          screen.queryByTestId("group-header-Berlin"),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByTestId("group-header-Lisbon"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("group-header-Berlin")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("group-header-Lisbon")).not.toBeInTheDocument();
         // Every row is still present, just no longer sectioned.
         for (const input of ["q0", "q1", "q2", "q3"]) {
           expect(screen.getByText(input)).toBeInTheDocument();
@@ -337,10 +329,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
         const headers = screen
           .getAllByTestId(/^group-header-/)
           .filter(
-            (el) =>
-              !el
-                .getAttribute("data-testid")
-                ?.startsWith("group-header-toggle-"),
+            (el) => !el.getAttribute("data-testid")?.startsWith("group-header-toggle-"),
           );
         const ids = headers.map((h) => h.getAttribute("data-testid"));
         expect(ids).toContain("group-header-Unspecified");

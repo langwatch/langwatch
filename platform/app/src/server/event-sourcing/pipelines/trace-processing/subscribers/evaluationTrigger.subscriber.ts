@@ -12,18 +12,14 @@ import {
   MAX_PROCESSED_SPANS,
   type TraceSummaryData,
 } from "../projections/traceSummary.foldProjection";
-import {
-  isSpanReceivedEvent,
-  type TraceProcessingEvent,
-} from "../schemas/events";
+import { isSpanReceivedEvent, type TraceProcessingEvent } from "../schemas/events";
 import {
   defineOriginGuardedTraceSubscriber,
   type TraceSummarySubscriber,
 } from "./_originGuardedSubscriber";
 import { DEFERRED_CHECK_DELAY_MS } from "./originGate.subscriber";
 
-const CAUSALITY_LOOP_GUARD_DISABLED_FLAG =
-  "ops_es_causality_loop_guard_disabled";
+const CAUSALITY_LOOP_GUARD_DISABLED_FLAG = "ops_es_causality_loop_guard_disabled";
 
 const logger = createLogger("langwatch:trace-processing:evaluation-trigger");
 
@@ -52,9 +48,7 @@ function isDispatchableEvaluationEvent(event: TraceProcessingEvent): boolean {
   // do not contribute to fold IO and must not re-trigger ON_MESSAGE evaluator runs. We
   // share `SYNTHETIC_SPAN_NAMES` with the trace-summary fold (foldProjection.ts:88) so a
   // future synthetic name updates both sites at once.
-  return !(
-    isSpanReceivedEvent(event) && SYNTHETIC_SPAN_NAMES.has(event.data.span.name)
-  );
+  return !(isSpanReceivedEvent(event) && SYNTHETIC_SPAN_NAMES.has(event.data.span.name));
 }
 
 /**
@@ -217,11 +211,7 @@ function readNumericAttrValue(value: unknown): number | undefined {
   if (value && typeof value === "object") {
     // Handle OTLP AnyValue: { intValue?, stringValue?, doubleValue? }
     const anyValue = value as Record<string, unknown>;
-    raw =
-      anyValue.intValue ??
-      anyValue.stringValue ??
-      anyValue.doubleValue ??
-      value;
+    raw = anyValue.intValue ?? anyValue.stringValue ?? anyValue.doubleValue ?? value;
   }
   const n =
     typeof raw === "number"

@@ -28,11 +28,13 @@ The OpenInference Vertex AI instrumentation automatically captures:
 ### Prerequisites
 
 1. **Install the OpenInference Vertex AI instrumentor**:
+
    ```bash
    pip install openinference-instrumentation-vertexai
    ```
 
 2. **Install LangWatch SDK**:
+
    ```bash
    pip install langwatch
    ```
@@ -45,7 +47,8 @@ The OpenInference Vertex AI instrumentation automatically captures:
    ```
 
 <Info>
-The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment
+  variable.
 </Info>
 
 ### Basic Setup
@@ -133,4 +136,5 @@ if __name__ == "__main__":
 - **Direct OpenTelemetry Setup** is useful when you need fine-grained control over the tracing configuration or are already using OpenTelemetry extensively
 
 Both approaches effectively send Vertex AI call data to LangWatch for monitoring and analysis.
-</Note> 
+
+</Note>

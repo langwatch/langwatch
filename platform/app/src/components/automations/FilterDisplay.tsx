@@ -35,18 +35,11 @@ const FilterContainer = ({
 const FilterLabel = ({ children }: { children: React.ReactNode }) => {
   const text = String(children)
     .split(".")
-    .filter(
-      (word, index) => index !== 0 || word.toLowerCase() === "evaluations",
-    )
+    .filter((word, index) => index !== 0 || word.toLowerCase() === "evaluations")
     .join(" ");
 
   return (
-    <Box
-      padding={1}
-      fontWeight="500"
-      textTransform="capitalize"
-      color="fg.subtle"
-    >
+    <Box padding={1} fontWeight="500" textTransform="capitalize" color="fg.subtle">
       {text.replace("_", " ")}
     </Box>
   );
@@ -62,10 +55,7 @@ const FilterValue = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export const FilterDisplay = ({
-  filters,
-  hasBorder = false,
-}: FilterDisplayProps) => {
+export const FilterDisplay = ({ filters, hasBorder = false }: FilterDisplayProps) => {
   const applyFilters = (filters: string | Record<string, any>) => {
     const obj = typeof filters === "string" ? JSON.parse(filters) : filters;
     const result = [];
@@ -87,9 +77,7 @@ export const FilterDisplay = ({
             // Handle double-nested objects (e.g., evaluations.passed)
             for (const [subKey, subValue] of Object.entries(nestedValue)) {
               if (Array.isArray(subValue)) {
-                nestedResult.push(
-                  `${nestedKey} → ${subKey}: ${subValue.join(", ")}`,
-                );
+                nestedResult.push(`${nestedKey} → ${subKey}: ${subValue.join(", ")}`);
               }
             }
           } else {

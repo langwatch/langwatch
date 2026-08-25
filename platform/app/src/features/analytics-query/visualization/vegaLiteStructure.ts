@@ -13,19 +13,12 @@ export const JSON_POINTER_ROOT = "/";
 const TEXT_ENCODER = new TextEncoder();
 
 /** Keys whose values are arrays of child specs in the Vega-Lite composition tree. */
-const COMPOSITION_ARRAY_KEYS = [
-  "layer",
-  "hconcat",
-  "vconcat",
-  "concat",
-] as const;
+const COMPOSITION_ARRAY_KEYS = ["layer", "hconcat", "vconcat", "concat"] as const;
 
 /** Keys whose presence makes `spec` a single child view template. */
 const COMPOSITION_WRAPPER_KEYS = ["facet", "repeat"] as const;
 
-export function isPlainObject(
-  value: unknown,
-): value is Record<string, unknown> {
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -63,9 +56,7 @@ export function measureSpecBytes(spec: unknown): number | null {
  * document costs no more than a shallow one to refuse.
  */
 export function measureJsonDepth(root: unknown, ceiling: number): number {
-  const stack: { value: unknown; depth: number }[] = [
-    { value: root, depth: 1 },
-  ];
+  const stack: { value: unknown; depth: number }[] = [{ value: root, depth: 1 }];
   let deepest = 0;
 
   while (stack.length > 0) {
@@ -294,9 +285,7 @@ function collectFrom({
 /** The dataset a node names itself, or `null` when its `data` names none. */
 function declaredDatasetNameOf(node: Record<string, unknown>): string | null {
   const data = node.data;
-  return isPlainObject(data) && typeof data.name === "string"
-    ? data.name
-    : null;
+  return isPlainObject(data) && typeof data.name === "string" ? data.name : null;
 }
 
 function extendContext({
@@ -311,9 +300,7 @@ function extendContext({
   const declaresData = isPlainObject(node.data);
 
   return {
-    datasetName: declaresData
-      ? declaredDatasetNameOf(node)
-      : inherited.datasetName,
+    datasetName: declaresData ? declaredDatasetNameOf(node) : inherited.datasetName,
     dataPath: declaresData ? joinPointer(path, "data") : inherited.dataPath,
     repeatFields: {
       ...inherited.repeatFields,
@@ -387,10 +374,7 @@ export function countUnitViews(spec: unknown): number {
   for (const key of COMPOSITION_ARRAY_KEYS) {
     const list = spec[key];
     if (Array.isArray(list)) {
-      total += list.reduce<number>(
-        (sum, child) => sum + countUnitViews(child),
-        0,
-      );
+      total += list.reduce<number>((sum, child) => sum + countUnitViews(child), 0);
     }
   }
 
@@ -407,8 +391,6 @@ export function repeatMultiplier(repeat: unknown): number {
 
   return ["row", "column", "layer"].reduce((product, variable) => {
     const list = repeat[variable];
-    return Array.isArray(list) && list.length > 0
-      ? product * list.length
-      : product;
+    return Array.isArray(list) && list.length > 0 ? product * list.length : product;
   }, 1);
 }

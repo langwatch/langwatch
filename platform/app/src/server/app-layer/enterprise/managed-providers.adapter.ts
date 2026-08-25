@@ -11,7 +11,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 const logger = createLogger("langwatch:managed-providers:bedrock");
 
 class AppManagedProviderConfigurationReporter extends ManagedProviderConfigurationReporter {
-  private constructor() { super(); }
+  private constructor() {
+    super();
+  }
 
   static create(): AppManagedProviderConfigurationReporter {
     return new AppManagedProviderConfigurationReporter();

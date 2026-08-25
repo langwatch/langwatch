@@ -60,15 +60,9 @@ describe("the shared queue's handler wrappers", () => {
     it("forwards the delivery to the entry", async () => {
       const { eventSourcing, entry } = createWithEntry();
 
-      await captured.definition!.process(
-        { ...ROUTING, value: "a" },
-        { attempt: 3 },
-      );
+      await captured.definition!.process({ ...ROUTING, value: "a" }, { attempt: 3 });
 
-      expect(entry.process).toHaveBeenCalledWith(
-        { value: "a" },
-        { attempt: 3 },
-      );
+      expect(entry.process).toHaveBeenCalledWith({ value: "a" }, { attempt: 3 });
       await eventSourcing.close();
     });
   });
@@ -85,10 +79,10 @@ describe("the shared queue's handler wrappers", () => {
         { attempt: 2, isContinuation: true },
       );
 
-      expect(entry.processBatch).toHaveBeenCalledWith(
-        [{ value: "a" }, { value: "b" }],
-        { attempt: 2, isContinuation: true },
-      );
+      expect(entry.processBatch).toHaveBeenCalledWith([{ value: "a" }, { value: "b" }], {
+        attempt: 2,
+        isContinuation: true,
+      });
       await eventSourcing.close();
     });
   });

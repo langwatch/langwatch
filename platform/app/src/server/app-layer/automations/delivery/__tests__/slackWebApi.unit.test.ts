@@ -61,33 +61,25 @@ describe("postSlackChatMessage", () => {
   describe("when Slack rate-limits (ok:false, rate_limited)", () => {
     it("throws retryable", async () => {
       respond(200, { ok: false, error: "rate_limited" });
-      expect(((await call().catch((e) => e)) as DispatchError).retryable).toBe(
-        true,
-      );
+      expect(((await call().catch((e) => e)) as DispatchError).retryable).toBe(true);
     });
   });
 
   describe("when a bad token is used (ok:false, invalid_auth)", () => {
     it("throws non-retryable", async () => {
       respond(200, { ok: false, error: "invalid_auth" });
-      expect(((await call().catch((e) => e)) as DispatchError).retryable).toBe(
-        false,
-      );
+      expect(((await call().catch((e) => e)) as DispatchError).retryable).toBe(false);
     });
   });
 
   describe("when the transport returns 5xx / 429", () => {
     it("throws retryable on 500", async () => {
       respond(500, "");
-      expect(((await call().catch((e) => e)) as DispatchError).retryable).toBe(
-        true,
-      );
+      expect(((await call().catch((e) => e)) as DispatchError).retryable).toBe(true);
     });
     it("throws retryable on 429", async () => {
       respond(429, "");
-      expect(((await call().catch((e) => e)) as DispatchError).retryable).toBe(
-        true,
-      );
+      expect(((await call().catch((e) => e)) as DispatchError).retryable).toBe(true);
     });
   });
 
@@ -104,13 +96,7 @@ describe("postSlackChatMessage", () => {
 });
 
 /** One conversations.list page: `count` channels and an optional next cursor. */
-function channelPage({
-  ids,
-  nextCursor,
-}: {
-  ids: string[];
-  nextCursor?: string;
-}) {
+function channelPage({ ids, nextCursor }: { ids: string[]; nextCursor?: string }) {
   return {
     ok: true,
     channels: ids.map((id) => ({
@@ -171,9 +157,7 @@ describe("listSlackChannels", () => {
         .mockResolvedValueOnce({
           responseHeaders: {},
           status: 200,
-          body: JSON.stringify(
-            channelPage({ ids: ["C3"], nextCursor: "cursor-3" }),
-          ),
+          body: JSON.stringify(channelPage({ ids: ["C3"], nextCursor: "cursor-3" })),
         })
         .mockResolvedValueOnce({
           responseHeaders: {},
@@ -185,12 +169,7 @@ describe("listSlackChannels", () => {
 
       expect(mockedSend).toHaveBeenCalledTimes(3);
       expect(result.error).toBeNull();
-      expect(result.channels.map((c) => c.id)).toEqual([
-        "C1",
-        "C2",
-        "C3",
-        "C4",
-      ]);
+      expect(result.channels.map((c) => c.id)).toEqual(["C1", "C2", "C3", "C4"]);
     });
 
     it("sends the cursor Slack handed back on the next request", async () => {
@@ -198,9 +177,7 @@ describe("listSlackChannels", () => {
         .mockResolvedValueOnce({
           responseHeaders: {},
           status: 200,
-          body: JSON.stringify(
-            channelPage({ ids: ["C1"], nextCursor: "dGVhbTpDMDYx" }),
-          ),
+          body: JSON.stringify(channelPage({ ids: ["C1"], nextCursor: "dGVhbTpDMDYx" })),
         })
         .mockResolvedValueOnce({
           responseHeaders: {},
@@ -223,9 +200,7 @@ describe("listSlackChannels", () => {
       mockedSend.mockResolvedValue({
         responseHeaders: {},
         status: 200,
-        body: JSON.stringify(
-          channelPage({ ids: ["C1"], nextCursor: "never-ends" }),
-        ),
+        body: JSON.stringify(channelPage({ ids: ["C1"], nextCursor: "never-ends" })),
       });
 
       const result = await listSlackChannels("xoxb-test");
@@ -238,9 +213,7 @@ describe("listSlackChannels", () => {
       mockedSend.mockResolvedValue({
         responseHeaders: {},
         status: 200,
-        body: JSON.stringify(
-          channelPage({ ids: ["C1"], nextCursor: "never-ends" }),
-        ),
+        body: JSON.stringify(channelPage({ ids: ["C1"], nextCursor: "never-ends" })),
       });
 
       const result = await listSlackChannels("xoxb-test");
@@ -269,9 +242,7 @@ describe("listSlackChannels", () => {
         .mockResolvedValueOnce({
           responseHeaders: {},
           status: 200,
-          body: JSON.stringify(
-            channelPage({ ids: ["C1"], nextCursor: "cursor-2" }),
-          ),
+          body: JSON.stringify(channelPage({ ids: ["C1"], nextCursor: "cursor-2" })),
         })
         .mockRejectedValueOnce(
           new DispatchError({ message: "timeout", retryable: true }),

@@ -74,9 +74,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 const { AnnotationComment } = await import("../AnnotationComment");
-const { useAnnotationCommentStore } = await import(
-  "~/hooks/useAnnotationCommentStore"
-);
+const { useAnnotationCommentStore } = await import("~/hooks/useAnnotationCommentStore");
 
 const TRACE = "trace-1";
 
@@ -92,10 +90,7 @@ function renderComment() {
 }
 
 /** Save the card and let the mutation report success the way the server would. */
-async function saveAndSucceed(
-  buttonName: string,
-  mutation: typeof mocks.create,
-) {
+async function saveAndSucceed(buttonName: string, mutation: typeof mocks.create) {
   renderComment();
   fireEvent.click(screen.getByRole("button", { name: buttonName }));
   // The card submits through react-hook-form, so the mutation is a tick away.
@@ -123,9 +118,7 @@ describe("given a reviewer writing a comment that carries a suggestion", () => {
     it("makes the trace's stored correction stale", async () => {
       await saveAndSucceed("Save", mocks.create);
 
-      expect(mocks.invalidateOverlay).toHaveBeenCalledWith(
-        THIS_TRACES_CORRECTION,
-      );
+      expect(mocks.invalidateOverlay).toHaveBeenCalledWith(THIS_TRACES_CORRECTION);
     });
 
     /** @scenario "Saving, updating, or deleting an annotation refreshes the batched annotation feed" */
@@ -152,9 +145,7 @@ describe("given a comment the reviewer is editing", () => {
     it("makes the trace's stored correction stale", async () => {
       await saveAndSucceed("Update", mocks.update);
 
-      expect(mocks.invalidateOverlay).toHaveBeenCalledWith(
-        THIS_TRACES_CORRECTION,
-      );
+      expect(mocks.invalidateOverlay).toHaveBeenCalledWith(THIS_TRACES_CORRECTION);
     });
   });
 });

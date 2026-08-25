@@ -54,11 +54,7 @@ export abstract class GovernanceOcsfEventPort {
 }
 
 export abstract class GovernanceSubscriberDiagnosticsPort {
-  abstract warn(input: {
-    code: string;
-    tenantId: string;
-    traceId: string;
-  }): void;
+  abstract warn(input: { code: string; tenantId: string; traceId: string }): void;
   abstract capture(error: unknown): void;
 }
 

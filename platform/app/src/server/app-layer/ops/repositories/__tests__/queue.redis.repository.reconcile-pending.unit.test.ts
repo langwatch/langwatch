@@ -140,11 +140,7 @@ class FakeRedis {
     return this.page(this.sets.get(key) ?? [], cursor, count);
   }
 
-  private page(
-    members: string[],
-    cursor: string,
-    count: number,
-  ): [string, string[]] {
+  private page(members: string[], cursor: string, count: number): [string, string[]] {
     const offset = Number(cursor);
     const page = members.slice(offset, offset + count);
     const next = offset + page.length;
@@ -389,9 +385,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
       it("re-arms the single-flight marker after each ZCARD batch", async () => {
         await repo.reconcileTotalPending(QUEUE_NAME);
 
-        const batches = redis.events.filter(
-          (event) => event === "zcard-batch",
-        ).length;
+        const batches = redis.events.filter((event) => event === "zcard-batch").length;
         expect(batches).toBe(3);
 
         // One re-arm per batch, each landing after its batch.
@@ -403,9 +397,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         const leaseRefreshes = redis.evalshaCalls.filter(
           (call) => call.ttlMs === LEASE_MS,
         );
-        expect(leaseRefreshes.every((call) => call.key === MARKER_KEY)).toBe(
-          true,
-        );
+        expect(leaseRefreshes.every((call) => call.key === MARKER_KEY)).toBe(true);
       });
 
       it("re-arms the single-flight marker while paging the indexes, before any ZCARD runs", async () => {
@@ -495,9 +487,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         // Ownership is the claim, not the call count: every re-arm has to find
         // this pass's own token still on the marker. A count-only assertion
         // could not fail for the reason this test exists.
-        const refreshes = redis.evalshaCalls.filter(
-          (call) => call.ttlMs === LEASE_MS,
-        );
+        const refreshes = redis.evalshaCalls.filter((call) => call.ttlMs === LEASE_MS);
         expect(refreshes.length).toBeGreaterThan(0);
         expect(refreshes.every((call) => call.isHeldByCaller)).toBe(true);
       });
@@ -643,9 +633,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         expect(result?.groundTruth).toBe(4);
         // Adopted on first sight, so later passes no longer depend on reading the
         // lifecycle indexes in sequence to find it.
-        expect(redis.sets.get(`${PREFIX}pending-groups`)).toContain(
-          "tenant-a/legacy",
-        );
+        expect(redis.sets.get(`${PREFIX}pending-groups`)).toContain("tenant-a/legacy");
       });
     });
   });
@@ -672,9 +660,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
         expect(result?.groundTruth).toBe(5);
-        expect(redis.sets.get(`${PREFIX}pending-groups`)).toContain(
-          "tenant-a/mover",
-        );
+        expect(redis.sets.get(`${PREFIX}pending-groups`)).toContain("tenant-a/mover");
       });
     });
   });
@@ -767,9 +753,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         // That sweep adopted, so the next pass sweeps again without waiting.
         await repo.reconcileTotalPending(QUEUE_NAME, 0);
 
-        expect(redis.scan.mock.calls.length).toBeGreaterThan(
-          afterAdoptingSweep,
-        );
+        expect(redis.scan.mock.calls.length).toBeGreaterThan(afterAdoptingSweep);
       });
     });
 

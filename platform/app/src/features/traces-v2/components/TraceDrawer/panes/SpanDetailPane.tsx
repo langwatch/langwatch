@@ -1,10 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { memo } from "react";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
-import type {
-  SpanTreeNode,
-  TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { SpanTabBar } from "../SpanTabBar";
 import { TraceAccordions } from "../traceAccordions";

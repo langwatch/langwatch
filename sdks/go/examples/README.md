@@ -14,6 +14,7 @@ Demonstrates all span filtering capabilities:
 - **Semantics**: AND between filters, OR within matchers
 
 Run it:
+
 ```bash
 cd filtering
 go run main.go

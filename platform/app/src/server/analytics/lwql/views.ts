@@ -292,11 +292,7 @@ function sourceRelation({
  * ship that tenant's rows, and the caller receives zero — see
  * `__tests__/postgresEngineIsolation.integration.test.ts`.
  */
-function postgresTenantPredicate({
-  names,
-}: {
-  names: LangWatchQLNames;
-}): string {
+function postgresTenantPredicate({ names }: { names: LangWatchQLNames }): string {
   // The key map is aliased and the inner reference qualified because the two
   // relations name their tenant column the same way: written bare, the
   // identifier could bind to the outer scope and turn this into a correlated
@@ -354,10 +350,7 @@ function dedupStrategyFor({
  * pair is returned as two rows — rare, visible as a duplicate, and a far smaller
  * error than `FINAL`'s silent double-count of every multi-version row.
  */
-function dedupPredicate(
-  view: LangWatchQLViewDefinition,
-  relation: string,
-): string {
+function dedupPredicate(view: LangWatchQLViewDefinition, relation: string): string {
   const { versionColumn } = view.dedup;
   if (!versionColumn) {
     // Refuse at provisioning time rather than emit a view that collapses
@@ -467,17 +460,13 @@ export function lwqlViewStatement({
     .join(",\n");
   const aliased = `${relation} AS ${SOURCE_ALIAS}`;
   const from =
-    strategy === "final" && !postgres && !grouped
-      ? `${aliased} FINAL`
-      : aliased;
+    strategy === "final" && !postgres && !grouped ? `${aliased} FINAL` : aliased;
   const where = postgres
     ? `\n${postgresTenantPredicate({ names })}`
     : strategy === "in-tuple"
       ? `\n${dedupPredicate(view, relation)}`
       : "";
-  const groupBy = grouped
-    ? `\nGROUP BY ${grain.map(sourceColumn).join(", ")}`
-    : "";
+  const groupBy = grouped ? `\nGROUP BY ${grain.map(sourceColumn).join(", ")}` : "";
   return (
     `CREATE OR REPLACE VIEW ` +
     `${assertIdentifier(names.database, "database")}.${assertIdentifier(view.name, "view")}\n` +
@@ -642,8 +631,7 @@ export function lwqlPostgresReaderConnectionLimit({
   headroom?: number;
 } = {}): number {
   return (
-    lwqlPostgresViews(views).length * connectionPoolSize * concurrentCatalogs +
-    headroom
+    lwqlPostgresViews(views).length * connectionPoolSize * concurrentCatalogs + headroom
   );
 }
 
@@ -691,13 +679,8 @@ export function lwqlPostgresEngineTableStatements({
  * is granted and what the catalog exposes are the same list rather than two
  * lists that have to agree.
  */
-function singleSourceColumn(
-  view: LangWatchQLViewDefinition,
-  columnName: string,
-): string {
-  const column = view.columns.find(
-    (candidate) => candidate.name === columnName,
-  );
+function singleSourceColumn(view: LangWatchQLViewDefinition, columnName: string): string {
+  const column = view.columns.find((candidate) => candidate.name === columnName);
   const [only] = column?.sourceColumns ?? [];
   if (!only || column?.sourceColumns.length !== 1) {
     throw new Error(
@@ -738,9 +721,7 @@ export function lwqlViewSetupStatements({
   dedup: LangWatchQLDedupStrategy;
 }): string[] {
   return [
-    ...views.map((view) =>
-      lwqlViewStatement({ names, sourceDatabase, view, dedup }),
-    ),
+    ...views.map((view) => lwqlViewStatement({ names, sourceDatabase, view, dedup })),
     // A fact table carries far more than the catalog exposes, so its grant is
     // column-scoped. A PostgreSQL-engine table was *created from* the catalog
     // and its whole column list is the exposed surface, so it takes the

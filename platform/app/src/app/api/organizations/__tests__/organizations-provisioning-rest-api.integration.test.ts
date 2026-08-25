@@ -10,15 +10,7 @@
  * the credential is not configured or the deployment is cloud.
  */
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { app as organizationApp } from "~/app/api/organization/[[...route]]/app";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -203,9 +195,7 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
         slug: `prov-comp-${ns}`,
       });
       expect(retried.status).toBe(201);
-      expect((await retried.clone().json()).organization.slug).toBe(
-        `prov-comp-${ns}`,
-      );
+      expect((await retried.clone().json()).organization.slug).toBe(`prov-comp-${ns}`);
     });
 
     /** @scenario Listing organizations requires the instance key */
@@ -244,10 +234,9 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
         expect.arrayContaining([orgA.organization.id, orgB.organization.id]),
       );
 
-      const byId = await app.request(
-        `/api/organizations/${orgA.organization.id}`,
-        { headers: instanceHeaders() },
-      );
+      const byId = await app.request(`/api/organizations/${orgA.organization.id}`, {
+        headers: instanceHeaders(),
+      });
       expect(byId.status).toBe(200);
       expect((await byId.json()).organization).toMatchObject({
         id: orgA.organization.id,
@@ -276,10 +265,9 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
 
     /** @scenario Fetching an unknown organization id is not found */
     it("answers 404 for an id that names no organization", async () => {
-      const response = await app.request(
-        `/api/organizations/org_missing-${ns}`,
-        { headers: instanceHeaders() },
-      );
+      const response = await app.request(`/api/organizations/org_missing-${ns}`, {
+        headers: instanceHeaders(),
+      });
 
       expect(response.status).toBe(404);
     });

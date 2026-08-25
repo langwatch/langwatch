@@ -23,11 +23,7 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { Currency, PricingModel } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
-import {
-  dateInputToISO,
-  EmptyCell,
-  formatDate,
-} from "@langwatch/ops-web";
+import { dateInputToISO, EmptyCell, formatDate } from "@langwatch/ops-web";
 import { BackofficeTable } from "../BackofficeTable";
 import { useAdminList, useAdminUpdate } from "../useAdminResource";
 
@@ -134,12 +130,7 @@ export default function OrganizationsView() {
                 <Table.Cell>{org.ssoDomain ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>{formatDate(org.createdAt)}</Table.Cell>
                 <Table.Cell textAlign="right">
-                  <Box
-                    width="full"
-                    height="full"
-                    display="flex"
-                    justifyContent="end"
-                  >
+                  <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>
                       <Menu.Trigger>
                         <MoreVertical size={16} />
@@ -159,10 +150,7 @@ export default function OrganizationsView() {
         </Table.Root>
       </BackofficeTable>
 
-      <OrganizationEditDrawer
-        organization={editing}
-        onClose={() => setEditing(null)}
-      />
+      <OrganizationEditDrawer organization={editing} onClose={() => setEditing(null)} />
     </>
   );
 }
@@ -223,8 +211,7 @@ function OrganizationEditDrawer({
       phoneNumber: organization.phoneNumber ?? "",
       ssoDomain: organization.ssoDomain ?? "",
       ssoProvider: organization.ssoProvider ?? "",
-      usageSpendingMaxLimit:
-        organization.usageSpendingMaxLimit?.toString() ?? "",
+      usageSpendingMaxLimit: organization.usageSpendingMaxLimit?.toString() ?? "",
       signedDPA: !!organization.signedDPA,
       promoCode: organization.promoCode ?? "",
       stripeCustomerId: organization.stripeCustomerId ?? "",
@@ -262,8 +249,7 @@ function OrganizationEditDrawer({
     if (nextLimit !== organization.usageSpendingMaxLimit) {
       data.usageSpendingMaxLimit = nextLimit;
     }
-    if (form.signedDPA !== !!organization.signedDPA)
-      data.signedDPA = form.signedDPA;
+    if (form.signedDPA !== !!organization.signedDPA) data.signedDPA = form.signedDPA;
     if (form.promoCode !== (organization.promoCode ?? ""))
       data.promoCode = nullIfEmpty(form.promoCode);
     if (form.stripeCustomerId !== (organization.stripeCustomerId ?? ""))
@@ -283,8 +269,7 @@ function OrganizationEditDrawer({
     // never echoes the stored value. Only forward fields the user typed
     // into; an empty input is treated as "leave the stored secret alone".
     if (form.s3Endpoint.trim() !== "") data.s3Endpoint = form.s3Endpoint;
-    if (form.s3AccessKeyId.trim() !== "")
-      data.s3AccessKeyId = form.s3AccessKeyId;
+    if (form.s3AccessKeyId.trim() !== "") data.s3AccessKeyId = form.s3AccessKeyId;
     if (form.s3SecretAccessKey.trim() !== "")
       data.s3SecretAccessKey = form.s3SecretAccessKey;
     if (form.s3Bucket.trim() !== "") data.s3Bucket = form.s3Bucket;
@@ -371,9 +356,7 @@ function OrganizationEditDrawer({
                   <EnumSelect
                     value={form.pricingModel}
                     options={Object.values(PricingModel)}
-                    onChange={(v) =>
-                      setField("pricingModel", v as PricingModel)
-                    }
+                    onChange={(v) => setField("pricingModel", v as PricingModel)}
                   />
                 </Field.Root>
               </HStack>
@@ -396,9 +379,7 @@ function OrganizationEditDrawer({
                 <Input
                   type="number"
                   value={form.usageSpendingMaxLimit}
-                  onChange={(e) =>
-                    setField("usageSpendingMaxLimit", e.target.value)
-                  }
+                  onChange={(e) => setField("usageSpendingMaxLimit", e.target.value)}
                   placeholder="Leave empty for no cap"
                 />
               </Field.Root>
@@ -418,8 +399,8 @@ function OrganizationEditDrawer({
                   placeholder="e.g. acme.com"
                 />
                 <Field.HelperText>
-                  Lowercased server-side. Users with this email domain can sign
-                  in via SSO.
+                  Lowercased server-side. Users with this email domain can sign in via
+                  SSO.
                 </Field.HelperText>
               </Field.Root>
               <Field.Root>
@@ -452,8 +433,8 @@ function OrganizationEditDrawer({
 
               <SectionHeading>Custom S3</SectionHeading>
               <Text fontSize="xs" color="fg.muted">
-                Credentials below are write-only — the server never reads them
-                back. Leave blank to keep the stored value; type to replace.
+                Credentials below are write-only — the server never reads them back. Leave
+                blank to keep the stored value; type to replace.
               </Text>
               <ToggleRow
                 label="Use custom S3"
@@ -496,9 +477,7 @@ function OrganizationEditDrawer({
                 <Input
                   type="password"
                   value={form.s3SecretAccessKey}
-                  onChange={(e) =>
-                    setField("s3SecretAccessKey", e.target.value)
-                  }
+                  onChange={(e) => setField("s3SecretAccessKey", e.target.value)}
                   placeholder="Leave blank to keep current"
                   autoComplete="new-password"
                   disabled={!form.useCustomS3}
@@ -559,10 +538,7 @@ function EnumSelect({
 }) {
   return (
     <NativeSelect.Root size="sm" width="full">
-      <NativeSelect.Field
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
+      <NativeSelect.Field value={value} onChange={(e) => onChange(e.target.value)}>
         {options.map((opt) => (
           <option key={opt} value={opt}>
             {opt}
@@ -597,10 +573,7 @@ function ToggleRow({
           )}
         </VStack>
         <Spacer />
-        <Switch
-          checked={checked}
-          onCheckedChange={(e) => onChange(e.checked)}
-        />
+        <Switch checked={checked} onCheckedChange={(e) => onChange(e.checked)} />
       </HStack>
     </Field.Root>
   );

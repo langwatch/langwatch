@@ -151,9 +151,7 @@ describe("ScimService department auto-assignment", () => {
 
       const patch: ScimPatchRequest = {
         schemas: [PATCH_SCHEMA],
-        Operations: [
-          { op: "remove", path: `${SCIM_ENTERPRISE_USER_SCHEMA}:costCenter` },
-        ],
+        Operations: [{ op: "remove", path: `${SCIM_ENTERPRISE_USER_SCHEMA}:costCenter` }],
       };
       await scim().updateUser({
         id: user.id,

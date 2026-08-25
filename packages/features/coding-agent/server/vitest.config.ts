@@ -1,8 +1,10 @@
 export default {
   resolve: {
     alias: {
-      "@langwatch/coding-agent-contract":
-        new URL("../contract/src/index.ts", import.meta.url).pathname,
+      "@langwatch/coding-agent-contract": new URL(
+        "../contract/src/index.ts",
+        import.meta.url,
+      ).pathname,
       "@langwatch/github-contract": new URL(
         "../../github/contract/src/index.ts",
         import.meta.url,

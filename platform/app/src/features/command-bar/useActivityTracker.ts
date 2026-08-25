@@ -46,9 +46,7 @@ function parseEntityUrl(path: string, projectSlug: string): EntityMatch | null {
   // Legacy span page: /[project]/messages/[traceId]/[tab]/[spanId]. That path
   // now redirects, but history entries recorded before the redirect landed
   // still name it.
-  const spanMatch = relativePath.match(
-    /^\/messages\/([^/]+)\/([^/]+)\/([^/]+)$/,
-  );
+  const spanMatch = relativePath.match(/^\/messages\/([^/]+)\/([^/]+)\/([^/]+)$/);
   if (spanMatch) {
     return {
       type: "span",
@@ -91,9 +89,7 @@ function parseEntityUrl(path: string, projectSlug: string): EntityMatch | null {
   // We handle this separately when we have access to full URL
 
   // Simulation run: /[project]/simulations/[scenarioSetId]/[batchRunId]/[scenarioRunId]
-  const simRunMatch = relativePath.match(
-    /^\/simulations\/([^/]+)\/([^/]+)\/([^/]+)$/,
-  );
+  const simRunMatch = relativePath.match(/^\/simulations\/([^/]+)\/([^/]+)\/([^/]+)$/);
   if (simRunMatch) {
     return {
       type: "simulation-run",
@@ -109,10 +105,7 @@ function parseEntityUrl(path: string, projectSlug: string): EntityMatch | null {
 /**
  * Parse drawer-based entity access from URL query params.
  */
-function parseDrawerEntity(
-  fullUrl: string,
-  projectSlug: string,
-): EntityMatch | null {
+function parseDrawerEntity(fullUrl: string, projectSlug: string): EntityMatch | null {
   try {
     const url = new URL(fullUrl, "http://localhost");
     const drawerOpen = url.searchParams.get("drawer.open");

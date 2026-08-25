@@ -5,10 +5,7 @@ export type OtlpAnyValue = {
   boolValue?: boolean | null;
 };
 export type OtlpKeyValue = { key?: string; value?: OtlpAnyValue };
-export type OtlpFixed64 =
-  | string
-  | number
-  | { low: number; high: number };
+export type OtlpFixed64 = string | number | { low: number; high: number };
 export type OtlpLogRecord = {
   attributes?: OtlpKeyValue[];
   timeUnixNano?: OtlpFixed64;
@@ -72,13 +69,9 @@ export class CanonicalCostExtractorService {
       if (value.stringValue !== undefined) result[item.key] = value.stringValue;
       else if (value.intValue !== undefined) {
         result[item.key] =
-          typeof value.intValue === "string"
-            ? Number(value.intValue)
-            : value.intValue;
-      } else if (value.doubleValue !== undefined)
-        result[item.key] = value.doubleValue;
-      else if (value.boolValue !== undefined)
-        result[item.key] = value.boolValue;
+          typeof value.intValue === "string" ? Number(value.intValue) : value.intValue;
+      } else if (value.doubleValue !== undefined) result[item.key] = value.doubleValue;
+      else if (value.boolValue !== undefined) result[item.key] = value.boolValue;
     }
     return result;
   }
@@ -116,8 +109,7 @@ export class CanonicalCostExtractorService {
   }
 
   private tryCost(value: unknown): string | null {
-    if (typeof value === "number" && Number.isFinite(value))
-      return String(value);
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
     if (typeof value !== "string" || value.trim() === "") return null;
     return Number.isFinite(Number(value)) ? value.trim() : null;
   }
@@ -130,8 +122,7 @@ export class CanonicalCostExtractorService {
     } else if (typeof value === "number") {
       nanos = BigInt(Math.floor(value));
     } else {
-      nanos =
-        (BigInt(value.high >>> 0) << 32n) | BigInt(value.low >>> 0);
+      nanos = (BigInt(value.high >>> 0) << 32n) | BigInt(value.low >>> 0);
     }
     return new Date(Number(nanos / 1_000_000n));
   }

@@ -12,11 +12,7 @@ import type { CellDef } from "../../types";
 // cache read + cache write) is one hover away — Anthropic reports input as the
 // NON-cached portion, so the cache counts are additive, not a subset.
 function totalWithCacheOf(row: TraceListItem): number {
-  return (
-    row.totalTokens +
-    (row.cacheReadTokens ?? 0) +
-    (row.cacheCreationTokens ?? 0)
-  );
+  return row.totalTokens + (row.cacheReadTokens ?? 0) + (row.cacheCreationTokens ?? 0);
 }
 
 // Suppress the "estimated" caveat when we have concrete input AND output

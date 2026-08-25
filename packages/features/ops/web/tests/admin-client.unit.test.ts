@@ -1,12 +1,4 @@
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { adminClient, impersonateUser } from "../src";
 
 /**
@@ -150,8 +142,7 @@ describe("impersonateUser", () => {
 
   beforeEach(() => {
     fetchMock = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ message: "ok" }), { status: 200 }),
+      async () => new Response(JSON.stringify({ message: "ok" }), { status: 200 }),
     );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
   });

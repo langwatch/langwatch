@@ -1,10 +1,7 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type {
-  SpanReceivedEvent,
-  TraceProcessingEvent,
-} from "../../schemas/events";
+import type { SpanReceivedEvent, TraceProcessingEvent } from "../../schemas/events";
 import type { OtlpSpan } from "../../schemas/otlp";
 import {
   type CustomEvaluationSyncSubscriberDeps,
@@ -42,9 +39,7 @@ function makeOtlpSpan(evalPayloads: Record<string, unknown>[]): OtlpSpan {
   } as unknown as OtlpSpan;
 }
 
-function createFoldState(
-  overrides: Partial<TraceSummaryData> = {},
-): TraceSummaryData {
+function createFoldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {
     traceId: "trace-1",
     traceName: "",
@@ -130,9 +125,7 @@ function createNonSpanEvent(): TraceProcessingEvent {
   } as unknown as TraceProcessingEvent;
 }
 
-function createContext(
-  state: TraceSummaryData,
-): TriggerContext<TraceSummaryData> {
+function createContext(state: TraceSummaryData): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "tenant-1",
     aggregateId: "trace-1",
@@ -143,9 +136,7 @@ function createContext(
 describe("extractEvaluationsFromSpan", () => {
   describe("when span has evaluation events", () => {
     it("extracts evaluation data from json_encoded_event attributes", () => {
-      const span = makeOtlpSpan([
-        { name: "toxicity", score: 0.1, passed: true },
-      ]);
+      const span = makeOtlpSpan([{ name: "toxicity", score: 0.1, passed: true }]);
 
       const result = extractEvaluationsFromSpan(span);
 
@@ -227,10 +218,7 @@ describe("customEvaluationSync subscriber", () => {
       const span = makeOtlpSpan([]);
       span.events = [];
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       expect(deps.reportEvaluation).not.toHaveBeenCalled();
     });
@@ -244,10 +232,7 @@ describe("customEvaluationSync subscriber", () => {
         { name: "relevance", score: 0.9, passed: true, label: "good" },
       ]);
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       expect(deps.reportEvaluation).toHaveBeenCalledTimes(2);
     });
@@ -256,10 +241,7 @@ describe("customEvaluationSync subscriber", () => {
       const handler = createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.evaluationId).toMatch(/^eval_md5_[a-f0-9]{32}$/);
@@ -269,10 +251,7 @@ describe("customEvaluationSync subscriber", () => {
       const handler = createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "My Custom Eval", score: 0.5 }]);
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.evaluatorId).toMatch(/^customeval_/);
@@ -282,10 +261,7 @@ describe("customEvaluationSync subscriber", () => {
       const handler = createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.evaluatorType).toBe("custom");
@@ -295,10 +271,7 @@ describe("customEvaluationSync subscriber", () => {
       const handler = createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.traceId).toBe("trace-1");
@@ -317,10 +290,7 @@ describe("customEvaluationSync subscriber", () => {
         },
       ]);
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.score).toBe(0.1);
@@ -334,10 +304,7 @@ describe("customEvaluationSync subscriber", () => {
       const handler = createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.status).toBe("processed");
@@ -355,10 +322,7 @@ describe("customEvaluationSync subscriber", () => {
         },
       ]);
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.status).toBe("error");
@@ -374,10 +338,7 @@ describe("customEvaluationSync subscriber", () => {
         { evaluation_id: "my-eval-1", name: "toxicity", score: 0.1 },
       ]);
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.evaluationId).toBe("my-eval-1");
@@ -389,10 +350,7 @@ describe("customEvaluationSync subscriber", () => {
         { evaluator_id: "my-evaluator", name: "toxicity", score: 0.1 },
       ]);
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.evaluatorId).toBe("my-evaluator");
@@ -438,10 +396,7 @@ describe("customEvaluationSync subscriber", () => {
         },
       ]);
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.status).toBe("error");
@@ -463,10 +418,7 @@ describe("customEvaluationSync subscriber", () => {
       ]);
 
       await expect(
-        handler(
-          createSpanReceivedEvent(span),
-          createContext(createFoldState()),
-        ),
+        handler(createSpanReceivedEvent(span), createContext(createFoldState())),
       ).rejects.toThrow("network error");
 
       expect(deps.reportEvaluation).toHaveBeenCalledTimes(2);
@@ -482,10 +434,8 @@ describe("customEvaluationSync subscriber", () => {
       await handler(event, createContext(createFoldState()));
       await handler(event, createContext(createFoldState()));
 
-      const id1 = vi.mocked(deps.reportEvaluation).mock.calls[0]![0]
-        .evaluationId;
-      const id2 = vi.mocked(deps.reportEvaluation).mock.calls[1]![0]
-        .evaluationId;
+      const id1 = vi.mocked(deps.reportEvaluation).mock.calls[0]![0].evaluationId;
+      const id2 = vi.mocked(deps.reportEvaluation).mock.calls[1]![0].evaluationId;
       expect(id1).toBe(id2);
     });
   });
@@ -497,10 +447,7 @@ describe("customEvaluationSync subscriber", () => {
         { name: "content filter", score: 1.0, is_guardrail: true },
       ]);
 
-      await handler(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.isGuardrail).toBe(true);
@@ -512,9 +459,7 @@ describe("customEvaluationSync subscriber", () => {
       it("returns true", () => {
         const span = makeOtlpSpan([{ name: "quality", score: 0.9 }]);
 
-        expect(hasSyncableEvaluations(createSpanReceivedEvent(span))).toBe(
-          true,
-        );
+        expect(hasSyncableEvaluations(createSpanReceivedEvent(span))).toBe(true);
       });
     });
 
@@ -522,9 +467,7 @@ describe("customEvaluationSync subscriber", () => {
       it("returns false", () => {
         const span = makeOtlpSpan([]);
 
-        expect(hasSyncableEvaluations(createSpanReceivedEvent(span))).toBe(
-          false,
-        );
+        expect(hasSyncableEvaluations(createSpanReceivedEvent(span))).toBe(false);
       });
     });
 

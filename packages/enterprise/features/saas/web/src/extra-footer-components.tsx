@@ -79,7 +79,8 @@ export function SignedInExtraFooterComponents(
       !props.project ||
       hasUpdatedLastLogin.current ||
       props.user.impersonator
-    ) return;
+    )
+      return;
     hasUpdatedLastLogin.current = true;
     props.runtime.updateLastLogin();
   }, [props.organization?.id, props.project?.id, props.runtime, props.user.impersonator]);
@@ -92,7 +93,13 @@ export function SignedInExtraFooterComponents(
       project: props.project,
       environment: props.environment,
     });
-  }, [props.analytics, props.environment, props.organization?.id, props.project?.id, props.user]);
+  }, [
+    props.analytics,
+    props.environment,
+    props.organization?.id,
+    props.project?.id,
+    props.user,
+  ]);
 
   useEffect(() => {
     if (!props.user.impersonator) {

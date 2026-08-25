@@ -23,9 +23,7 @@ export const secretValueSchema = z
   .min(1, "Secret value is required")
   .max(MAX_SECRET_VALUE_LENGTH, "Secret value is too long");
 
-export const secretActorSchema = z
-  .object({ name: z.string().nullable() })
-  .strict();
+export const secretActorSchema = z.object({ name: z.string().nullable() }).strict();
 
 /** Safe metadata. The encrypted value is deliberately absent. */
 export const secretSchema = z

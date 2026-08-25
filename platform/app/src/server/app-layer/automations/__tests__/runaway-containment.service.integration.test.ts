@@ -9,15 +9,7 @@
 
 import { nanoid } from "nanoid";
 import { register } from "prom-client";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
   type Project,
@@ -109,8 +101,7 @@ describe("Feature: runaway automation containment", () => {
         projectId: projectId(),
         action: TriggerAction.ADD_TO_DATASET,
         actionParams: {},
-        filters:
-          overrides.filters ?? JSON.stringify({ "metadata.labels": ["prod"] }),
+        filters: overrides.filters ?? JSON.stringify({ "metadata.labels": ["prod"] }),
         filterQuery: overrides.filterQuery ?? null,
         triggerKind: TriggerKind.AUTOMATION,
       },
@@ -223,9 +214,7 @@ describe("Feature: runaway automation containment", () => {
 
       await handlePersistCapBreach(deps(), breach(summary(row), 150));
 
-      expect(sentEmails.map((email) => email.kind)).toEqual([
-        "ceiling_reached",
-      ]);
+      expect(sentEmails.map((email) => email.kind)).toEqual(["ceiling_reached"]);
     });
 
     /** @scenario "The customer is emailed once on the first day a trigger breaches" */
@@ -266,9 +255,7 @@ describe("Feature: runaway automation containment", () => {
       mailFails = false;
       await handlePersistCapBreach(sharedDeps, breach(summary(row), 102));
 
-      expect(sentEmails.map((email) => email.kind)).toEqual([
-        "ceiling_reached",
-      ]);
+      expect(sentEmails.map((email) => email.kind)).toEqual(["ceiling_reached"]);
 
       // And once it has landed, the claim holds again for the rest of the day.
       claimed.delete(checkClaim);
@@ -288,10 +275,7 @@ describe("Feature: runaway automation containment", () => {
       };
 
       for (let index = 0; index < 5; index++) {
-        await handlePersistCapBreach(
-          sharedDeps,
-          breach(summary(row), 101 + index),
-        );
+        await handlePersistCapBreach(sharedDeps, breach(summary(row), 101 + index));
       }
 
       // The pause decision costs a ClickHouse distinct-count over 24h of
@@ -338,10 +322,7 @@ describe("Feature: runaway automation containment", () => {
       // is the shape of the automation itself.
       projectTraces24h = 1_000_000;
 
-      await handlePersistCapBreach(
-        deps(),
-        breach(summary(row, { filters: {} }), 150),
-      );
+      await handlePersistCapBreach(deps(), breach(summary(row, { filters: {} }), 150));
 
       const after = await prisma.trigger.findUniqueOrThrow({
         where: { id: row.id, projectId: projectId() },
@@ -360,10 +341,7 @@ describe("Feature: runaway automation containment", () => {
         ),
       ).toContain(row.id);
 
-      await handlePersistCapBreach(
-        deps(),
-        breach(summary(row, { filters: {} }), 150),
-      );
+      await handlePersistCapBreach(deps(), breach(summary(row, { filters: {} }), 150));
 
       // The pause invalidates the cache, so the subscriber stops recording
       // matches immediately rather than after the TTL expires.
@@ -419,10 +397,7 @@ describe("Feature: runaway automation containment", () => {
         projectTraces24h = 1_000_000;
         pauseFails = true;
 
-        await handlePersistCapBreach(
-          deps(),
-          breach(summary(row, { filters: {} }), 150),
-        );
+        await handlePersistCapBreach(deps(), breach(summary(row, { filters: {} }), 150));
 
         // Telling a customer we paused something we did not pause is worse
         // than telling them nothing.
@@ -462,9 +437,7 @@ describe("Feature: runaway automation containment", () => {
       const metric = await register.getSingleMetric(name)!.get();
       const sample = labels
         ? metric.values.find((value) =>
-            Object.entries(labels).every(
-              ([key, want]) => value.labels[key] === want,
-            ),
+            Object.entries(labels).every(([key, want]) => value.labels[key] === want),
           )
         : metric.values[0];
       return sample?.value ?? 0;
@@ -479,9 +452,7 @@ describe("Feature: runaway automation containment", () => {
 
       await handlePersistCapBreach(deps(), breach(summary(row), 150));
 
-      expect(
-        (await counterValue("automation_ceiling_breach_total")) - before,
-      ).toBe(1);
+      expect((await counterValue("automation_ceiling_breach_total")) - before).toBe(1);
     });
 
     it("counts an auto-pause under its reason", async () => {
@@ -491,10 +462,7 @@ describe("Feature: runaway automation containment", () => {
         reason: RUNAWAY_PAUSE_REASON,
       });
 
-      await handlePersistCapBreach(
-        deps(),
-        breach(summary(row, { filters: {} }), 150),
-      );
+      await handlePersistCapBreach(deps(), breach(summary(row, { filters: {} }), 150));
 
       expect(
         (await counterValue("automation_auto_paused_total", {

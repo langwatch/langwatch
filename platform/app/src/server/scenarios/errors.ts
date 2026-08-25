@@ -1,7 +1,4 @@
-import {
-  HandledError,
-  type HandledErrorOptions,
-} from "@langwatch/handled-error";
+import { HandledError, type HandledErrorOptions } from "@langwatch/handled-error";
 
 import type { AppErrorCode } from "~/features/errors/logic/codes";
 import { remediation } from "~/server/app-layer/error-remediation";
@@ -101,13 +98,7 @@ export class ScenarioParameterUnknownError extends ScenarioParameterError {
 export class ScenarioParameterMissingError extends ScenarioParameterError {
   declare readonly code: "scenario_parameter_missing";
 
-  constructor({
-    names,
-    field,
-  }: {
-    names: string[];
-    field: ScenarioContentField;
-  }) {
+  constructor({ names, field }: { names: string[]; field: ScenarioContentField }) {
     super({
       message: `No value for scenario parameters referenced in ${field}: ${names.join(", ")}`,
       code: "scenario_parameter_missing",
@@ -171,13 +162,7 @@ export class ScenarioSecretParameterConflictError extends ScenarioParameterError
 export class ScenarioSecretParameterInTextError extends ScenarioParameterError {
   declare readonly code: "scenario_secret_parameter_in_text";
 
-  constructor({
-    names,
-    field,
-  }: {
-    names: string[];
-    field: ScenarioContentField;
-  }) {
+  constructor({ names, field }: { names: string[]; field: ScenarioContentField }) {
     super({
       message: `A secret parameter cannot be read from scenario text. ${field} reads: ${names.join(", ")}`,
       code: "scenario_secret_parameter_in_text",

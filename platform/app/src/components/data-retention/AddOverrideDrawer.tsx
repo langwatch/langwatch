@@ -126,10 +126,7 @@ export function AddOverrideDrawer({
 }) {
   // The retention menu is plan-gated: paid orgs get a fixed short pair, while
   // enterprise/self-hosted get the full list plus a custom field.
-  const presets = useMemo(
-    () => retentionPresetsForTier(isEnterprise),
-    [isEnterprise],
-  );
+  const presets = useMemo(() => retentionPresetsForTier(isEnterprise), [isEnterprise]);
   const defaultPreset = presets[0]?.value ?? CUSTOM_PRESET_VALUE;
 
   const [scopes, setScopes] = useState<ScopeTriadEntry[]>([]);
@@ -349,13 +346,9 @@ export function AddOverrideDrawer({
                   ? "Data will be kept indefinitely — exempt from automatic deletion."
                   : preset === LEGACY_PRESET_VALUE
                     ? "This length isn't available on your plan. Pick an option above to change it — leaving it keeps the current value."
-                    : preset === CUSTOM_PRESET_VALUE &&
-                        customAmount &&
-                        daysValid
+                    : preset === CUSTOM_PRESET_VALUE && customAmount && daysValid
                       ? `Stored as ${resolvedDays} days.`
-                      : preset === CUSTOM_PRESET_VALUE &&
-                          customAmount &&
-                          !daysValid
+                      : preset === CUSTOM_PRESET_VALUE && customAmount && !daysValid
                         ? `Must be between ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS} days, in whole weeks.`
                         : isEnterprise
                           ? `Custom values start at ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} days (7 weeks) and round to whole weeks.`
@@ -366,17 +359,15 @@ export function AddOverrideDrawer({
             <HStack gap={3} align="start">
               <Switch
                 checked={applyToExisting}
-                onCheckedChange={({ checked }) =>
-                  setApplyToExisting(checked === true)
-                }
+                onCheckedChange={({ checked }) => setApplyToExisting(checked === true)}
               />
               <VStack align="start" gap={0}>
                 <Text fontWeight="600" fontSize="sm">
                   Apply this change to existing data
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
-                  Rewrites this project's existing rows so the new retention
-                  takes effect immediately, not just for new ingestion.
+                  Rewrites this project's existing rows so the new retention takes effect
+                  immediately, not just for new ingestion.
                 </Text>
               </VStack>
             </HStack>

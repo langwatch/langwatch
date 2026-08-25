@@ -73,9 +73,7 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       });
       if (facts === null) return;
 
-      const resourceAttributes = parseFlatAttributes(
-        record.resourceAttributesFlatJson,
-      );
+      const resourceAttributes = parseFlatAttributes(record.resourceAttributesFlatJson);
       const rawServiceName = resourceAttributes?.["service.name"];
       const serviceName =
         typeof rawServiceName === "string" && rawServiceName.length > 0
@@ -99,8 +97,7 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       if (agent === null) return;
 
       const sessionKey =
-        resolveConversationKey(attributes) ??
-        (record.providerSessionId || null);
+        resolveConversationKey(attributes) ?? (record.providerSessionId || null);
       const correlationTraceId =
         record.correlationSource !== "none" && record.correlationTraceId
           ? record.correlationTraceId
@@ -110,8 +107,7 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       // gets no trace fallback: a keyless record of theirs is ambient
       // process telemetry — an auth refresh, not a session — and keying it
       // on the trace would mint an empty one-record session.
-      if (sessionKey === null && LOGS_REQUIRE_SESSION_KEY_AGENT_IDS.has(agent))
-        return;
+      if (sessionKey === null && LOGS_REQUIRE_SESSION_KEY_AGENT_IDS.has(agent)) return;
 
       // No session key and no correlation: there is nothing to aggregate
       // under. The canonical row still holds the record.
@@ -222,11 +218,7 @@ function parseFlatAttributes(json: string): Record<string, unknown> | null {
   if (!json) return null;
   try {
     const parsed: unknown = JSON.parse(json);
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      Array.isArray(parsed)
-    ) {
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       return null;
     }
     return parsed as Record<string, unknown>;

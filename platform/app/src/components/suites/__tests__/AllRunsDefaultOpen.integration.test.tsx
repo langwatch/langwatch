@@ -6,13 +6,7 @@
  * @see specs/features/suites/all-runs-default-open.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -191,16 +185,13 @@ describe("All Runs default selection (Issue #1771)", () => {
     it("selects 'All Runs' as the default sidebar item and displays the All Runs panel", async () => {
       mockRouterQuery = { project: "my-project" };
 
-      const { default: SimulationsPage } = await import(
-        "~/components/suites/SimulationsPage"
-      );
+      const { default: SimulationsPage } =
+        await import("~/components/suites/SimulationsPage");
 
       render(<SimulationsPage />, { wrapper: Wrapper });
 
       expect(screen.getByTestId("all-runs-panel")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("suite-detail-panel"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("suite-detail-panel")).not.toBeInTheDocument();
       expect(screen.queryByTestId("suite-empty-state")).not.toBeInTheDocument();
     });
   });
@@ -214,9 +205,8 @@ describe("All Runs default selection (Issue #1771)", () => {
         path: ["run-plans", "my-suite"],
       };
 
-      const { default: SimulationsPage } = await import(
-        "~/components/suites/SimulationsPage"
-      );
+      const { default: SimulationsPage } =
+        await import("~/components/suites/SimulationsPage");
 
       render(<SimulationsPage />, { wrapper: Wrapper });
 

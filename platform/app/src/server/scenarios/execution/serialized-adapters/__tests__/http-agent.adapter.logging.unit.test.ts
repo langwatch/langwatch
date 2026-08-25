@@ -93,9 +93,7 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
         const adapter = new SerializedHttpAgentAdapter({
           config: defaultConfig,
           logger: logger as unknown as NonNullable<
-            ConstructorParameters<
-              typeof SerializedHttpAgentAdapter
-            >[0]["logger"]
+            ConstructorParameters<typeof SerializedHttpAgentAdapter>[0]["logger"]
           >,
         });
 
@@ -129,15 +127,11 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
         const adapter = new SerializedHttpAgentAdapter({
           config: {
             ...defaultConfig,
-            headers: [
-              { key: "X-Custom-Token", value: "{{ secrets.AGENT_TOKEN }}" },
-            ],
+            headers: [{ key: "X-Custom-Token", value: "{{ secrets.AGENT_TOKEN }}" }],
             secrets: { AGENT_TOKEN: "tok-live-abc123" },
           },
           logger: logger as unknown as NonNullable<
-            ConstructorParameters<
-              typeof SerializedHttpAgentAdapter
-            >[0]["logger"]
+            ConstructorParameters<typeof SerializedHttpAgentAdapter>[0]["logger"]
           >,
         });
 
@@ -170,9 +164,7 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
         const adapter = new SerializedHttpAgentAdapter({
           config: defaultConfig,
           logger: logger as unknown as NonNullable<
-            ConstructorParameters<
-              typeof SerializedHttpAgentAdapter
-            >[0]["logger"]
+            ConstructorParameters<typeof SerializedHttpAgentAdapter>[0]["logger"]
           >,
         });
 
@@ -201,15 +193,11 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
         const adapter = new SerializedHttpAgentAdapter({
           config: defaultConfig,
           logger: logger as unknown as NonNullable<
-            ConstructorParameters<
-              typeof SerializedHttpAgentAdapter
-            >[0]["logger"]
+            ConstructorParameters<typeof SerializedHttpAgentAdapter>[0]["logger"]
           >,
         });
 
-        await expect(adapter.call(defaultInput)).rejects.toThrow(
-          "ECONNREFUSED",
-        );
+        await expect(adapter.call(defaultInput)).rejects.toThrow("ECONNREFUSED");
 
         expect(logger.error).toHaveBeenCalledWith(
           expect.objectContaining({

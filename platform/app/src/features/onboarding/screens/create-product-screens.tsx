@@ -46,11 +46,7 @@ export const useCreateProductScreens = ({
   const BoundProductSelectionScreen = useMemo<React.FC>(
     () =>
       function BoundProductSelectionScreen() {
-        return (
-          <ProductSelectionScreenWithAnalytics
-            onSelectProduct={onSelectProduct}
-          />
-        );
+        return <ProductSelectionScreenWithAnalytics onSelectProduct={onSelectProduct} />;
       },
     [onSelectProduct],
   );
@@ -67,9 +63,7 @@ export const useCreateProductScreens = ({
   const BoundModelProviderStepScreen = useMemo<React.FC>(
     () =>
       function BoundModelProviderStepScreen() {
-        return (
-          <ModelProviderStepScreen onContinue={() => onContinueRef.current()} />
-        );
+        return <ModelProviderStepScreen onContinue={() => onContinueRef.current()} />;
       },
     [],
   );
@@ -80,16 +74,14 @@ export const useCreateProductScreens = ({
         id: "product-selection",
         required: false,
         heading: "Pick your flavour",
-        subHeading:
-          "Choose a starting point. You can explore the rest anytime.",
+        subHeading: "Choose a starting point. You can explore the rest anytime.",
         component: BoundProductSelectionScreen,
       },
       [ProductScreenIndex.VIA_CLAUDE_CODE]: {
         id: "via-claude-code",
         required: false,
         heading: "Via Coding Agent",
-        subHeading:
-          "Pick how you want to work with LangWatch in your coding agent",
+        subHeading: "Pick how you want to work with LangWatch in your coding agent",
         widthVariant: "full",
         component: ViaClaudeCodeScreen,
       },
@@ -97,8 +89,7 @@ export const useCreateProductScreens = ({
         id: "via-platform",
         required: false,
         heading: "Via the Platform",
-        subHeading:
-          "Configure everything from the dashboard, no code changes needed",
+        subHeading: "Configure everything from the dashboard, no code changes needed",
         widthVariant: "full",
         component: ViaPlatformScreen,
       },

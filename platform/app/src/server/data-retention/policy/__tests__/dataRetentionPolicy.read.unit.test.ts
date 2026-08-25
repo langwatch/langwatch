@@ -133,17 +133,15 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
     // Caller is a project-only user, no org/team management.
     rbacMocks.probeOrganizationPermission.mockResolvedValue(false);
     rbacMocks.probeProjectPermission.mockResolvedValue(true);
-    rbacMocks.batchScopePermissions.mockImplementation(
-      async (_ctx: any, args: any) => {
-        const teams = new Map<string, boolean>();
-        const projects = new Map<string, boolean>();
-        for (const id of args.teamIds) teams.set(id, false);
-        for (const id of args.projectIds) {
-          projects.set(id, id === "project_a");
-        }
-        return { teams, projects };
-      },
-    );
+    rbacMocks.batchScopePermissions.mockImplementation(async (_ctx: any, args: any) => {
+      const teams = new Map<string, boolean>();
+      const projects = new Map<string, boolean>();
+      for (const id of args.teamIds) teams.set(id, false);
+      for (const id of args.projectIds) {
+        projects.set(id, id === "project_a");
+      }
+      return { teams, projects };
+    });
   });
 
   describe("when caller has project:update on one project only", () => {
@@ -153,9 +151,7 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
         { projectId: "project_a" },
       );
 
-      const scopeKeys = snapshot.rules.map(
-        (r) => `${r.scopeType}:${r.scopeId}`,
-      );
+      const scopeKeys = snapshot.rules.map((r) => `${r.scopeType}:${r.scopeId}`);
 
       // Caller-readable: only their own project rule.
       expect(scopeKeys).toContain("PROJECT:project_a");
@@ -177,9 +173,7 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
         { projectId: "project_a" },
       );
 
-      const scopeKeys = snapshot.rules.map(
-        (r) => `${r.scopeType}:${r.scopeId}`,
-      );
+      const scopeKeys = snapshot.rules.map((r) => `${r.scopeType}:${r.scopeId}`);
 
       expect(scopeKeys).toContain("ORGANIZATION:org_1");
       expect(scopeKeys).toContain("PROJECT:project_a");
@@ -196,9 +190,7 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
 
       expect(snapshot.available.organization).toBeNull();
       expect(snapshot.available.teams).toEqual([]);
-      expect(snapshot.available.projects.map((p) => p.id)).toEqual([
-        "project_a",
-      ]);
+      expect(snapshot.available.projects.map((p) => p.id)).toEqual(["project_a"]);
     });
 
     it("omits an archived project from `available` even when writable", async () => {
@@ -226,9 +218,7 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
         { projectId: "project_a" },
       );
 
-      expect(snapshot.available.projects.map((p) => p.id)).toEqual([
-        "project_a",
-      ]);
+      expect(snapshot.available.projects.map((p) => p.id)).toEqual(["project_a"]);
     });
   });
 });

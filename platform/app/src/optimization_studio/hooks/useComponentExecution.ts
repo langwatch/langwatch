@@ -76,13 +76,7 @@ export const useComponentExecution = () => {
   }, [socketStatus]);
 
   const startComponentExecution = useCallback(
-    ({
-      node,
-      inputs,
-    }: {
-      node: Node<Component>;
-      inputs?: Record<string, string>;
-    }) => {
+    ({ node, inputs }: { node: Node<Component>; inputs?: Record<string, string> }) => {
       if (!socketAvailable()) {
         return;
       }
@@ -106,10 +100,7 @@ export const useComponentExecution = () => {
       }
 
       const trace_id = generateOtelTraceId();
-      logger.info(
-        { nodeId: node.id, trace_id },
-        "component execution starting",
-      );
+      logger.info({ nodeId: node.id, trace_id }, "component execution starting");
 
       setComponentExecutionState(node.id, {
         status: "waiting",
@@ -169,10 +160,7 @@ export const useComponentExecution = () => {
         return;
       }
 
-      logger.info(
-        { nodeId: node_id, trace_id },
-        "component execution stopping",
-      );
+      logger.info({ nodeId: node_id, trace_id }, "component execution stopping");
 
       if (current_state?.status === "waiting") {
         setComponentExecutionState(node_id, {
@@ -212,11 +200,8 @@ export function getInputsForExecution({
   node: Node<Component>;
   inputs?: Record<string, string>;
 }): { missingFields: Field[]; inputs: Record<string, string> } {
-  const allFields = new Set(
-    node.data.inputs?.map((field) => field.identifier) ?? [],
-  );
-  const requiredFields =
-    node.data.inputs?.filter((field) => !field.optional) ?? [];
+  const allFields = new Set(node.data.inputs?.map((field) => field.identifier) ?? []);
+  const requiredFields = node.data.inputs?.filter((field) => !field.optional) ?? [];
   const defaultValues = node.data.inputs?.reduce(
     (acc, field) => {
       if (field.value !== undefined) {

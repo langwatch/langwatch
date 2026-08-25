@@ -89,9 +89,7 @@ describe("sharedTrace share-safe gates", () => {
         // Spend is the only field the gate touches. Asserting the whole row
         // rather than one survivor is what catches a rollup column added
         // later being mangled on its way through.
-        expect(out).toEqual(
-          sessions.map((session) => ({ ...session, totalCost: 0 })),
-        );
+        expect(out).toEqual(sessions.map((session) => ({ ...session, totalCost: 0 })));
       });
     });
   });
@@ -142,9 +140,9 @@ describe("sharedTrace share-safe gates", () => {
     describe("when gating a session with no coding-agent row", () => {
       it("passes it through untouched", () => {
         const sessions = [{ conversationId: "s-2", codingAgent: null }];
-        expect(
-          gateSessionTitle({ sessions, protections: anonProtections }),
-        ).toEqual(sessions);
+        expect(gateSessionTitle({ sessions, protections: anonProtections })).toEqual(
+          sessions,
+        );
       });
     });
 
@@ -182,9 +180,7 @@ describe("sharedTrace share-safe gates", () => {
         protections: memberProtections,
       });
 
-      expect(out[0]!.codingAgent!.title).toBe(
-        "Fix the flaky session fold test",
-      );
+      expect(out[0]!.codingAgent!.title).toBe("Fix the flaky session fold test");
       expect(out[0]!.codingAgent!.titleRedacted).toBe(false);
       expect(out[0]!.codingAgent!.gitBranch).toBe("feat/git-context");
     });
@@ -194,23 +190,20 @@ describe("sharedTrace share-safe gates", () => {
     /** @scenario A member resolving a scoped link sees costs only if they may in-app */
     it("leaves header spend untouched", () => {
       const header = { totalCost: 1.23, nonBilledCost: 0.4 } as TraceHeader;
-      expect(
-        gateHeaderCost({ header, protections: memberProtections }).totalCost,
-      ).toBe(1.23);
+      expect(gateHeaderCost({ header, protections: memberProtections }).totalCost).toBe(
+        1.23,
+      );
     });
 
     it("leaves span-tree cost untouched", () => {
       const nodes = [{ spanId: "a", cost: 0.1 }] as SpanTreeNode[];
-      expect(
-        gateTreeCost({ nodes, protections: memberProtections })[0]?.cost,
-      ).toBe(0.1);
+      expect(gateTreeCost({ nodes, protections: memberProtections })[0]?.cost).toBe(0.1);
     });
 
     it("leaves Sessions lens spend untouched", () => {
       const sessions = [{ conversationId: "s-1", totalCost: 4.2 }];
       expect(
-        gateSessionCost({ sessions, protections: memberProtections })[0]
-          ?.totalCost,
+        gateSessionCost({ sessions, protections: memberProtections })[0]?.totalCost,
       ).toBe(4.2);
     });
   });
@@ -266,16 +259,12 @@ describe("sharedTrace share-safe gates", () => {
         resources,
         protections: {
           ...anonProtections,
-          hiddenAttributes: [
-            { pattern: "*", visibleTo: "members of this project" },
-          ],
+          hiddenAttributes: [{ pattern: "*", visibleTo: "members of this project" }],
         },
       });
       expect(out.resourceAttributes["service.name"]).not.toBe("api");
       expect(out.resourceAttributes["customer.id"]).not.toBe("acme");
-      expect(out.spans[0]?.resourceAttributes["deployment.env"]).not.toBe(
-        "prod",
-      );
+      expect(out.spans[0]?.resourceAttributes["deployment.env"]).not.toBe("prod");
     });
 
     it("leaves attributes untouched when no hidden rules apply", () => {
@@ -323,9 +312,7 @@ describe("sharedTrace share-safe gates", () => {
       it("keeps attributes but applies restricted-attribute rules", () => {
         const out = applyDerivedTraceEventProtections(events, {
           ...memberProtections,
-          hiddenAttributes: [
-            { pattern: "exception.message", visibleTo: "Admins" },
-          ],
+          hiddenAttributes: [{ pattern: "exception.message", visibleTo: "Admins" }],
         });
         expect(out[0]?.attributes["exception.type"]).toBe("Err");
         expect(out[0]?.attributes["exception.message"]).not.toBe("secret");

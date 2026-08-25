@@ -43,9 +43,7 @@ function checkRow(over: Partial<GithubBranchCheckRow>): GithubBranchCheckRow {
  * caller asks for, so what the test proves is the WINDOW the sweep passes, not
  * a filter the fake invented.
  */
-function repositoryHolding(
-  rows: GithubBranchCheckRow[],
-): GithubPullRequestsRepository {
+function repositoryHolding(rows: GithubBranchCheckRow[]): GithubPullRequestsRepository {
   return {
     upsertPullRequests: vi.fn(),
     findAllByBranches: vi.fn(),
@@ -181,9 +179,7 @@ describe("runBranchRetentionPrune", () => {
      */
     it("prunes at the same horizon the sweep stops sweeping at", async () => {
       const repository = repositoryHolding([]);
-      repository.deleteStaleBefore = vi
-        .fn()
-        .mockResolvedValue({ branchChecks: 7 });
+      repository.deleteStaleBefore = vi.fn().mockResolvedValue({ branchChecks: 7 });
 
       const pruned = await runBranchRetentionPrune({
         repository,

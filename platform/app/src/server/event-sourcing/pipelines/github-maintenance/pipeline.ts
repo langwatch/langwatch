@@ -39,9 +39,7 @@ export interface GithubMaintenancePipelineDeps {
  * event handlers registers no subscriber, so this costs nothing beyond the
  * scheduled wake it exists for.
  */
-export function createGithubMaintenancePipeline(
-  deps: GithubMaintenancePipelineDeps,
-) {
+export function createGithubMaintenancePipeline(deps: GithubMaintenancePipelineDeps) {
   return definePipeline<Event>({
     name: "github_maintenance",
     aggregate: defineAggregate({

@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { env } from "../../../env.mjs";
-import {
-  signUnsubscribeToken,
-  verifyUnsubscribeToken,
-} from "../unsubscribeToken";
+import { signUnsubscribeToken, verifyUnsubscribeToken } from "../unsubscribeToken";
 
 describe("unsubscribeToken", () => {
   describe("given NEXTAUTH_SECRET is empty", () => {

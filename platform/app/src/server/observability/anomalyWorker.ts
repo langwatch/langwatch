@@ -26,11 +26,7 @@ export function startAnomalyWorker(): AnomalyWorkerHandle | undefined {
     return undefined;
   }
 
-  const rateTracker = new TenantRateTracker(
-    connection,
-    Date.now,
-    featureFlagService,
-  );
+  const rateTracker = new TenantRateTracker(connection, Date.now, featureFlagService);
   const anomalyState = new AnomalyStateStore(connection);
   const detector = new AnomalyDetector({
     rateTracker,

@@ -232,9 +232,7 @@ describe("templateReferencesVariable", () => {
   describe("given the variable appears inside a Liquid expression", () => {
     /** @scenario "A template that reads the conversation places it itself" */
     it("reports the reference for an output tag", () => {
-      expect(
-        templateReferencesVariable("History: {{messages}}", "messages"),
-      ).toBe(true);
+      expect(templateReferencesVariable("History: {{messages}}", "messages")).toBe(true);
     });
 
     /** @scenario "A loop over the conversation counts as reading it" */
@@ -263,12 +261,10 @@ describe("templateReferencesVariable", () => {
   describe("given the word appears only as a quoted literal", () => {
     /** @scenario "A quoted literal is not a reference to the conversation" */
     it("does not report a reference", () => {
-      expect(templateReferencesVariable('{{ "messages" }}', "messages")).toBe(
+      expect(templateReferencesVariable('{{ "messages" }}', "messages")).toBe(false);
+      expect(templateReferencesVariable("{% assign x = 'messages' %}", "messages")).toBe(
         false,
       );
-      expect(
-        templateReferencesVariable("{% assign x = 'messages' %}", "messages"),
-      ).toBe(false);
     });
   });
 });

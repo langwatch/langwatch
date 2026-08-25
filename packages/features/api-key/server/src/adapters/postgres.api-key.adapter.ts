@@ -3,7 +3,10 @@ import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ApiKeyDiagnosticsPort } from "../ports/api-key-diagnostics.port";
-import { PrismaApiKeyRepository, type PrismaApiKeyDatabase } from "../repositories/prisma/prisma.api-key.repository";
+import {
+  PrismaApiKeyRepository,
+  type PrismaApiKeyDatabase,
+} from "../repositories/prisma/prisma.api-key.repository";
 import { ApiKeyService } from "../services/api-key.service";
 import {
   LegacyApiKeyGrantService,
@@ -12,18 +15,22 @@ import {
 import { ApiKeyTokenAdapter } from "./api-key-token.api-key-token.adapter";
 
 export class PostgresApiKeyAdapter {
-  private constructor(private readonly options: {
-    database: PrismaApiKeyDatabase;
-    pepper: string;
-    authz: AuthzService;
-    grants: AuthzGrantsService;
-    organizations: OrganizationService;
-    projects: ProjectService;
-    newBindingId: () => string;
-    deriveBindingId: AuthzBindingIdDeriver;
-    diagnostics: ApiKeyDiagnosticsPort;
-  }) {}
-  static create(options: PostgresApiKeyAdapter["options"]): PostgresApiKeyAdapter { return new PostgresApiKeyAdapter(options); }
+  private constructor(
+    private readonly options: {
+      database: PrismaApiKeyDatabase;
+      pepper: string;
+      authz: AuthzService;
+      grants: AuthzGrantsService;
+      organizations: OrganizationService;
+      projects: ProjectService;
+      newBindingId: () => string;
+      deriveBindingId: AuthzBindingIdDeriver;
+      diagnostics: ApiKeyDiagnosticsPort;
+    },
+  ) {}
+  static create(options: PostgresApiKeyAdapter["options"]): PostgresApiKeyAdapter {
+    return new PostgresApiKeyAdapter(options);
+  }
   build(): ApiKeyCapability {
     return ApiKeyService.create({
       repository: PrismaApiKeyRepository.create(this.options.database),

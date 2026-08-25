@@ -118,9 +118,8 @@ export function redactObject<T>(object: T, redactions: Set<string>): T {
       } catch {
         // Not valid Python repr either
       }
-      return Array.from(redactions).filter((redaction) =>
-        object.includes(redaction),
-      ).length > 0
+      return Array.from(redactions).filter((redaction) => object.includes(redaction))
+        .length > 0
         ? ("[REDACTED]" as T)
         : object;
     }
@@ -156,9 +155,7 @@ export function extractRedactionsFromAllSpanInputs(spans: Span[]): string[] {
  * @returns Array of strings that should be redacted
  */
 export function extractRedactionsFromAllSpanOutputs(spans: Span[]): string[] {
-  return spans.flatMap((span) =>
-    extractRedactionsForObject(span.output?.value),
-  );
+  return spans.flatMap((span) => extractRedactionsForObject(span.output?.value));
 }
 
 /**
@@ -299,10 +296,8 @@ export function applyDerivedTraceEventProtections(
     return {
       ...event,
       attributes:
-        redactHiddenAttributes(
-          event.attributes,
-          protections.hiddenAttributes,
-        ) ?? event.attributes,
+        redactHiddenAttributes(event.attributes, protections.hiddenAttributes) ??
+        event.attributes,
     };
   });
 }
@@ -314,10 +309,7 @@ export function applyDerivedTraceEventProtections(
  * @param protections - The protection settings
  * @returns The trace with protections applied
  */
-export function applyTraceProtections(
-  trace: Trace,
-  protections: Protections,
-): Trace {
+export function applyTraceProtections(trace: Trace, protections: Protections): Trace {
   // Build redaction set from trace input/output if not visible
   let redactions = new Set<string>([
     ...(!protections.canSeeCapturedInput

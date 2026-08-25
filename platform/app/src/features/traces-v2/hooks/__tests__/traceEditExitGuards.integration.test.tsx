@@ -7,13 +7,7 @@
  * See specs/traces-v2/trace-edit-mode.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -61,18 +55,12 @@ vi.mock("~/utils/api", () => ({
 vi.mock("~/components/ui/toaster", () => ({ toaster: { create: vi.fn() } }));
 vi.mock("~/features/errors", () => ({ showErrorToast: vi.fn() }));
 
-const { EditModeBar } = await import(
-  "../../components/TraceDrawer/editMode/EditModeBar"
-);
+const { EditModeBar } = await import("../../components/TraceDrawer/editMode/EditModeBar");
 const { useDrawerStore } = await import("../../stores/drawerStore");
 const { useTraceEditStore } = await import("../../stores/traceEditStore");
 const { guardTraceEditExit } = await import("../../utils/traceEditMode");
-const { useTraceDrawerNavigation } = await import(
-  "../useTraceDrawerNavigation"
-);
-const { useTraceDrawerUrlHydrator } = await import(
-  "../useTraceDrawerUrlHydrator"
-);
+const { useTraceDrawerNavigation } = await import("../useTraceDrawerNavigation");
+const { useTraceDrawerUrlHydrator } = await import("../useTraceDrawerUrlHydrator");
 
 const TRACE = "trace-1";
 const EARLIER_TRACE = "trace-0";
@@ -147,9 +135,7 @@ describe("given a correction with unsaved changes", () => {
         guardTraceEditExit(close);
       });
 
-      expect(
-        await screen.findByText("Discard trace corrections?"),
-      ).toBeVisible();
+      expect(await screen.findByText("Discard trace corrections?")).toBeVisible();
       expect(close).not.toHaveBeenCalled();
     });
 
@@ -161,9 +147,7 @@ describe("given a correction with unsaved changes", () => {
         guardTraceEditExit(close);
       });
 
-      fireEvent.click(
-        await screen.findByRole("button", { name: "Discard corrections" }),
-      );
+      fireEvent.click(await screen.findByRole("button", { name: "Discard corrections" }));
 
       expect(close).toHaveBeenCalledTimes(1);
       expect(useTraceEditStore.getState().spanDrafts).toEqual({});
@@ -183,9 +167,7 @@ describe("given a correction with unsaved changes", () => {
         });
       });
 
-      expect(
-        await screen.findByText("Discard trace corrections?"),
-      ).toBeVisible();
+      expect(await screen.findByText("Discard trace corrections?")).toBeVisible();
       expect(mocks.openDrawer).not.toHaveBeenCalled();
       expect(useDrawerStore.getState().traceId).toBe(TRACE);
     });
@@ -204,9 +186,7 @@ describe("given a correction with unsaved changes", () => {
 
       act(() => navigation.goBack());
 
-      expect(
-        await screen.findByText("Discard trace corrections?"),
-      ).toBeVisible();
+      expect(await screen.findByText("Discard trace corrections?")).toBeVisible();
       expect(mocks.openDrawer).not.toHaveBeenCalled();
       expect(useDrawerStore.getState().traceId).toBe(TRACE);
       // The history entry is still there for the reviewer to come back to.
@@ -218,9 +198,7 @@ describe("given a correction with unsaved changes", () => {
       renderHarness();
       act(() => navigation.goBack());
 
-      fireEvent.click(
-        await screen.findByRole("button", { name: "Discard corrections" }),
-      );
+      fireEvent.click(await screen.findByRole("button", { name: "Discard corrections" }));
 
       expect(mocks.openDrawer).toHaveBeenCalledWith(
         "traceV2Details",
@@ -234,9 +212,7 @@ describe("given a correction with unsaved changes", () => {
 
       act(() => navigation.goBackTo(0));
 
-      expect(
-        await screen.findByText("Discard trace corrections?"),
-      ).toBeVisible();
+      expect(await screen.findByText("Discard trace corrections?")).toBeVisible();
       expect(mocks.openDrawer).not.toHaveBeenCalled();
       expect(useDrawerStore.getState().traceBackStack).toHaveLength(1);
     });
@@ -254,9 +230,7 @@ describe("given a correction with unsaved changes", () => {
         "search the web",
       );
       expect(useDrawerStore.getState().traceId).toBe(TRACE);
-      expect(
-        await screen.findByText("Discard trace corrections?"),
-      ).toBeVisible();
+      expect(await screen.findByText("Discard trace corrections?")).toBeVisible();
     });
 
     /** @scenario "Browser back with unsaved changes keeps the correction" */
@@ -276,9 +250,7 @@ describe("given a correction with unsaved changes", () => {
       const { followUrl } = renderHarness({ hydrate: true });
       browserLeavesTheDrawer(followUrl);
 
-      fireEvent.click(
-        await screen.findByRole("button", { name: "Discard corrections" }),
-      );
+      fireEvent.click(await screen.findByRole("button", { name: "Discard corrections" }));
 
       expect(useDrawerStore.getState().traceId).toBeNull();
       expect(useTraceEditStore.getState().editingTraceId).toBeNull();

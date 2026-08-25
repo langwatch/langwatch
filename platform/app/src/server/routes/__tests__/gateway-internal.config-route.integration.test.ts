@@ -67,9 +67,7 @@ function signedRequest(path: string, ifNoneMatch?: string) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const bodyHash = createHash("sha256").update("").digest("hex");
   const canonical = `GET\n${path}\n${timestamp}\n${bodyHash}`;
-  const signature = createHmac("sha256", SECRET)
-    .update(canonical)
-    .digest("hex");
+  const signature = createHmac("sha256", SECRET).update(canonical).digest("hex");
   return new Request(`http://localhost${path}`, {
     method: "GET",
     headers: {
@@ -243,9 +241,7 @@ describe("GET /api/internal/gateway/config/:vk_id", () => {
         data: { customKeys: { OPENAI_API_KEY: "fake-after-rotation" } },
       });
 
-      const afterRotation = await app.fetch(
-        signedRequest(path, coldETag ?? ""),
-      );
+      const afterRotation = await app.fetch(signedRequest(path, coldETag ?? ""));
       expect(afterRotation.status).toBe(200);
       expect(afterRotation.headers.get("ETag")).not.toBe(coldETag);
       expect(await apiKeyOnBundle(afterRotation)).toBe("fake-after-rotation");
@@ -257,9 +253,7 @@ describe("GET /api/internal/gateway/config/:vk_id", () => {
    *  the key never expires, the second says an older control plane answered
    *  nothing and the gateway must keep the date it holds. */
   async function fetchConfig(vkId: string) {
-    const res = await app.fetch(
-      signedRequest(`/api/internal/gateway/config/${vkId}`),
-    );
+    const res = await app.fetch(signedRequest(`/api/internal/gateway/config/${vkId}`));
     const text = await res.text();
     return {
       status: res.status,
@@ -274,9 +268,7 @@ describe("GET /api/internal/gateway/config/:vk_id", () => {
     it("carries the date in unix seconds, and an explicit null for a key that never expires", async () => {
       const expiring = await fetchConfig(VK_EXPIRING_ID);
       expect(expiring.status).toBe(200);
-      expect(expiring.body?.expires_at).toBe(
-        Math.floor(EXPIRES_AT.getTime() / 1000),
-      );
+      expect(expiring.body?.expires_at).toBe(Math.floor(EXPIRES_AT.getTime() / 1000));
 
       const never = await fetchConfig(VK_ID);
       expect(never.status).toBe(200);
@@ -298,18 +290,14 @@ describe("GET /api/internal/gateway/config/:vk_id", () => {
 
       const after = await fetchConfig(VK_EXPIRING_ID);
       expect(after.etag).not.toBe(before.etag);
-      expect(after.body?.expires_at).toBe(
-        Math.floor(shortened.getTime() / 1000),
-      );
+      expect(after.body?.expires_at).toBe(Math.floor(shortened.getTime() / 1000));
 
       // The token the gateway held is the one its staleness refresh revalidates
       // with. It has to come back 200 with the new date, not 304, or a shortened
       // date would sit behind the old config until something else evicted the
       // entry.
       const path = `/api/internal/gateway/config/${VK_EXPIRING_ID}`;
-      const revalidated = await app.fetch(
-        signedRequest(path, before.etag ?? ""),
-      );
+      const revalidated = await app.fetch(signedRequest(path, before.etag ?? ""));
       expect(revalidated.status).toBe(200);
       const payload = (await revalidated.json()) as { expires_at: number };
       expect(payload.expires_at).toBe(Math.floor(shortened.getTime() / 1000));

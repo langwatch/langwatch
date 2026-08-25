@@ -17,9 +17,7 @@ describe("buildSharedTraceCacheKey", () => {
 
   describe("given the same token and the same protections", () => {
     it("builds the same key", () => {
-      expect(
-        buildSharedTraceCacheKey({ token: "tok", protections: anonymous }),
-      ).toBe(
+      expect(buildSharedTraceCacheKey({ token: "tok", protections: anonymous })).toBe(
         buildSharedTraceCacheKey({ token: "tok", protections: anonymous }),
       );
     });
@@ -32,9 +30,7 @@ describe("buildSharedTraceCacheKey", () => {
         canSeeCosts: false,
       };
 
-      expect(
-        buildSharedTraceCacheKey({ token: "tok", protections: reordered }),
-      ).toBe(
+      expect(buildSharedTraceCacheKey({ token: "tok", protections: reordered })).toBe(
         buildSharedTraceCacheKey({ token: "tok", protections: anonymous }),
       );
     });
@@ -45,9 +41,7 @@ describe("buildSharedTraceCacheKey", () => {
     it("builds different keys for a cost-visible viewer", () => {
       const withCosts = { ...anonymous, canSeeCosts: true };
 
-      expect(
-        buildSharedTraceCacheKey({ token: "tok", protections: withCosts }),
-      ).not.toBe(
+      expect(buildSharedTraceCacheKey({ token: "tok", protections: withCosts })).not.toBe(
         buildSharedTraceCacheKey({ token: "tok", protections: anonymous }),
       );
     });
@@ -57,17 +51,13 @@ describe("buildSharedTraceCacheKey", () => {
 
       expect(
         buildSharedTraceCacheKey({ token: "tok", protections: withContent }),
-      ).not.toBe(
-        buildSharedTraceCacheKey({ token: "tok", protections: anonymous }),
-      );
+      ).not.toBe(buildSharedTraceCacheKey({ token: "tok", protections: anonymous }));
     });
 
     it("builds different keys for a narrower visibility window", () => {
       const windowed = { ...anonymous, visibilityCutoffMs: 1_700_000_000_000 };
 
-      expect(
-        buildSharedTraceCacheKey({ token: "tok", protections: windowed }),
-      ).not.toBe(
+      expect(buildSharedTraceCacheKey({ token: "tok", protections: windowed })).not.toBe(
         buildSharedTraceCacheKey({ token: "tok", protections: anonymous }),
       );
     });
@@ -77,9 +67,7 @@ describe("buildSharedTraceCacheKey", () => {
     it("builds different keys", () => {
       expect(
         buildSharedTraceCacheKey({ token: "tok_a", protections: anonymous }),
-      ).not.toBe(
-        buildSharedTraceCacheKey({ token: "tok_b", protections: anonymous }),
-      );
+      ).not.toBe(buildSharedTraceCacheKey({ token: "tok_b", protections: anonymous }));
     });
   });
 });

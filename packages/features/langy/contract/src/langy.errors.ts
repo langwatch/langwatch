@@ -40,11 +40,9 @@ export class LangyNotEnabledError extends HandledError {
   declare readonly code: "langy_not_enabled";
 
   constructor() {
-    super(
-      "langy_not_enabled",
-      "Langy is not currently enabled for this account.",
-      { httpStatus: 404 },
-    );
+    super("langy_not_enabled", "Langy is not currently enabled for this account.", {
+      httpStatus: 404,
+    });
     this.name = "LangyNotEnabledError";
   }
 }
@@ -53,20 +51,12 @@ export class LangyNotEnabledError extends HandledError {
 export class LangyConversationNotFoundError extends NotFoundError {
   declare readonly code: "langy_conversation_not_found";
 
-  constructor(
-    conversationId: string,
-    options: { reasons?: readonly Error[] } = {},
-  ) {
-    super(
-      "langy_conversation_not_found",
-      "Langy conversation",
-      conversationId,
-      {
-        meta: { conversationId },
-        ...remediation("langy_conversation_not_found"),
-        ...options,
-      },
-    );
+  constructor(conversationId: string, options: { reasons?: readonly Error[] } = {}) {
+    super("langy_conversation_not_found", "Langy conversation", conversationId, {
+      meta: { conversationId },
+      ...remediation("langy_conversation_not_found"),
+      ...options,
+    });
     this.name = "LangyConversationNotFoundError";
   }
 }
@@ -80,15 +70,11 @@ export class LangyConversationNotOwnedError extends HandledError {
   declare readonly code: "langy_conversation_not_owned";
 
   constructor(public readonly conversationId: string) {
-    super(
-      "langy_conversation_not_owned",
-      "This conversation belongs to another user.",
-      {
-        meta: { conversationId },
-        httpStatus: 403,
-        ...remediation("langy_conversation_not_owned"),
-      },
-    );
+    super("langy_conversation_not_owned", "This conversation belongs to another user.", {
+      meta: { conversationId },
+      httpStatus: 403,
+      ...remediation("langy_conversation_not_owned"),
+    });
     this.name = "LangyConversationNotOwnedError";
   }
 }
@@ -131,15 +117,11 @@ export class LangyConversationIdUnadoptableError extends HandledError {
 export class LangyModelNotConfiguredError extends HandledError {
   declare readonly code: "langy_model_not_configured";
   constructor(options: { reasons?: readonly Error[] } = {}) {
-    super(
-      "langy_model_not_configured",
-      "No model configured for this project.",
-      {
-        httpStatus: 409,
-        ...remediation("langy_model_not_configured"),
-        reasons: options.reasons,
-      },
-    );
+    super("langy_model_not_configured", "No model configured for this project.", {
+      httpStatus: 409,
+      ...remediation("langy_model_not_configured"),
+      reasons: options.reasons,
+    });
     this.name = "LangyModelNotConfiguredError";
   }
 }
@@ -320,9 +302,7 @@ export class LangyDispatchRejectedError extends HandledError {
 /** The agent/transport is temporarily unavailable (HTTP 503). */
 export class LangyAgentUnavailableError extends HandledError {
   declare readonly code: "langy_agent_unavailable";
-  constructor(
-    message = "Agent is temporarily unavailable. Please try again shortly.",
-  ) {
+  constructor(message = "Agent is temporarily unavailable. Please try again shortly.") {
     super("langy_agent_unavailable", message, {
       httpStatus: 503,
       fault: "platform",

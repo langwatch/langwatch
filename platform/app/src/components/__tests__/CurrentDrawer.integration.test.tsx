@@ -215,9 +215,7 @@ describe("<CurrentDrawer/>", () => {
 
     it("recovers and renders the new drawer", () => {
       // Suppress console.error from ErrorBoundary catching the crash
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       // First: render a crashing drawer
       shouldCrash = true;

@@ -1,8 +1,5 @@
 import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   EvaluatorResultEvent,
@@ -100,12 +97,8 @@ const experimentRunEvents = [
  * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
 export class ExperimentRunStateFoldProjection
-  extends AbstractFoldProjection<
-    ExperimentRunStateData,
-    typeof experimentRunEvents
-  >
-  implements
-    FoldEventHandlers<typeof experimentRunEvents, ExperimentRunStateData>
+  extends AbstractFoldProjection<ExperimentRunStateData, typeof experimentRunEvents>
+  implements FoldEventHandlers<typeof experimentRunEvents, ExperimentRunStateData>
 {
   readonly name = "experimentRunState";
   readonly version = EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE;
@@ -236,8 +229,7 @@ export class ExperimentRunStateFoldProjection
       totalCost = (totalCost ?? 0) + event.data.cost;
     }
 
-    const avgScoreBps =
-      scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;
+    const avgScoreBps = scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;
     const passRateBps =
       gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
 

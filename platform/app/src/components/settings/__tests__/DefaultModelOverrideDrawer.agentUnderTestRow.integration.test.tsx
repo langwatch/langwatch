@@ -16,19 +16,10 @@
  * @see specs/model-providers/model-default-config-cascade.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  featureByKey,
-  featuresByRole,
-} from "~/server/modelProviders/featureRegistry";
+import { featureByKey, featuresByRole } from "~/server/modelProviders/featureRegistry";
 import { DefaultModelOverrideDrawer } from "../DefaultModelOverrideDrawer";
 
 const mockCloseDrawer = vi.fn();
@@ -181,9 +172,7 @@ describe("<DefaultModelOverrideDrawer/> — scenarios.agent_under_test row", () 
       it("renders the registry's displayName as the row label", () => {
         expandDefaultRole();
 
-        const row = screen.getByTestId(
-          "feature-row-scenarios.agent_under_test",
-        );
+        const row = screen.getByTestId("feature-row-scenarios.agent_under_test");
         expect(within(row).getByText(feature!.displayName)).toBeInTheDocument();
       });
     });

@@ -65,21 +65,14 @@ const harness = vi.hoisted(() => {
   const monaco = {
     MarkerSeverity: { Error: 8 },
     editor: {
-      setModelMarkers: (
-        _model: unknown,
-        _owner: string,
-        markers: unknown[],
-      ) => {
+      setModelMarkers: (_model: unknown, _owner: string, markers: unknown[]) => {
         slots.markers = markers;
       },
     },
     languages: {
       CompletionItemKind: { Struct: 1, Field: 2, Keyword: 3, Function: 4 },
       CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
-      registerCompletionItemProvider: (
-        _language: string,
-        provider: unknown,
-      ) => {
+      registerCompletionItemProvider: (_language: string, provider: unknown) => {
         slots.completion = provider;
         return { dispose: () => slots.disposed.push("completion") };
       },
@@ -174,10 +167,10 @@ describe("the LangWatchQL editor", () => {
         await renderEditor();
 
         const completion = harness.slots.completion as CompletionProvider;
-        const { suggestions } = completion.provideCompletionItems(
-          harness.model,
-          { lineNumber: 1, column: 1 },
-        );
+        const { suggestions } = completion.provideCompletionItems(harness.model, {
+          lineNumber: 1,
+          column: 1,
+        });
 
         // Every identifier is the response's own; the only additions are the
         // static keyword and function lists, which name no dataset or column.
@@ -188,9 +181,9 @@ describe("the LangWatchQL editor", () => {
             ...LWQL_LANGUAGE_ITEMS.map((item) => item.label),
           ].sort(),
         );
-        expect(
-          suggestions.find((item) => item.label === "latency_ms")?.detail,
-        ).toBe("Float64");
+        expect(suggestions.find((item) => item.label === "latency_ms")?.detail).toBe(
+          "Float64",
+        );
       });
 
       /** @scenario "Typing a keyword offers the keyword" */
@@ -198,10 +191,10 @@ describe("the LangWatchQL editor", () => {
         await renderEditor();
 
         const completion = harness.slots.completion as CompletionProvider;
-        const { suggestions } = completion.provideCompletionItems(
-          harness.model,
-          { lineNumber: 1, column: 1 },
-        );
+        const { suggestions } = completion.provideCompletionItems(harness.model, {
+          lineNumber: 1,
+          column: 1,
+        });
 
         const select = suggestions.find((item) => item.label === "SELECT");
         expect(select?.insertText).toBe("SELECT");
@@ -221,9 +214,7 @@ describe("the LangWatchQL editor", () => {
           column: 8,
         });
 
-        const text = (answer?.contents ?? [])
-          .map((entry) => entry.value)
-          .join("\n");
+        const text = (answer?.contents ?? []).map((entry) => entry.value).join("\n");
         expect(text).toContain("analytics.traces_daily.latency_ms");
         expect(text).toContain("Float64");
         expect(text).toContain("End to end latency of the trace.");

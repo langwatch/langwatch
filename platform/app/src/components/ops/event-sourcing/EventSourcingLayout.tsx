@@ -1,12 +1,5 @@
 import { Badge } from "@chakra-ui/react";
-import {
-  Activity,
-  CalendarClock,
-  Layers,
-  Radio,
-  Skull,
-  Workflow,
-} from "lucide-react";
+import { Activity, CalendarClock, Layers, Radio, Skull, Workflow } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
 import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigationLayout";

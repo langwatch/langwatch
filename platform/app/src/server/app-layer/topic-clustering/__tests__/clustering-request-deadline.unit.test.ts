@@ -34,9 +34,7 @@ vi.mock("~/server/embeddings", () => ({
 }));
 
 vi.mock("~/server/api/routers/modelProviders.utils", () => ({
-  getProjectModelProviders: vi
-    .fn()
-    .mockResolvedValue({ openai: { enabled: true } }),
+  getProjectModelProviders: vi.fn().mockResolvedValue({ openai: { enabled: true } }),
   prepareLitellmParams: vi.fn().mockResolvedValue({ model: "gpt-5-mini" }),
 }));
 
@@ -60,18 +58,13 @@ import {
   fetchTopicsIncrementalClustering,
   TOPIC_CLUSTERING_REQUEST_DEADLINE_MS,
 } from "../clustering";
-import {
-  CLUSTERING_ERROR_CODES,
-  classifyClusteringError,
-} from "../clustering-error";
+import { CLUSTERING_ERROR_CODES, classifyClusteringError } from "../clustering-error";
 
 const batchParams = {
   project_id: "proj-1",
   litellm_params: { model: "gpt-5-mini" },
   embeddings_litellm_params: { model: "text-embedding-3-small" },
-  traces: [
-    { trace_id: "t-1", input: "hello", topic_id: null, subtopic_id: null },
-  ],
+  traces: [{ trace_id: "t-1", input: "hello", topic_id: null, subtopic_id: null }],
 } as any;
 
 const incrementalParams = { ...batchParams, topics: [], subtopics: [] } as any;
@@ -111,8 +104,7 @@ describe("topic clustering langevals requests", () => {
       // The remainder has to cover response handling, storeResults, and the
       // outcome write — a deadline that only just fits leaves no room.
       expect(
-        TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS -
-          TOPIC_CLUSTERING_REQUEST_DEADLINE_MS,
+        TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS - TOPIC_CLUSTERING_REQUEST_DEADLINE_MS,
       ).toBeGreaterThanOrEqual(5 * 60 * 1000);
     });
   });
@@ -128,8 +120,7 @@ describe("topic clustering langevals requests", () => {
         await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
         await settled;
 
-        const signal = stagedLangevalsFetchMock.mock.calls[0]?.[0]
-          ?.signal as AbortSignal;
+        const signal = stagedLangevalsFetchMock.mock.calls[0]?.[0]?.signal as AbortSignal;
         expect(signal).toBeInstanceOf(AbortSignal);
         expect(signal.aborted).toBe(true);
       });
@@ -228,9 +219,9 @@ describe("topic clustering langevals requests", () => {
           json: () => Promise.resolve(body),
         });
 
-        await expect(
-          fetchTopicsBatchClustering("proj-1", batchParams),
-        ).resolves.toEqual(body);
+        await expect(fetchTopicsBatchClustering("proj-1", batchParams)).resolves.toEqual(
+          body,
+        );
       });
 
       it("does not leave the deadline abort pending against a finished call", async () => {
@@ -246,12 +237,9 @@ describe("topic clustering langevals requests", () => {
         });
 
         await fetchTopicsBatchClustering("proj-1", batchParams);
-        await vi.advanceTimersByTimeAsync(
-          TOPIC_CLUSTERING_REQUEST_DEADLINE_MS * 2,
-        );
+        await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS * 2);
 
-        const signal = stagedLangevalsFetchMock.mock.calls[0]?.[0]
-          ?.signal as AbortSignal;
+        const signal = stagedLangevalsFetchMock.mock.calls[0]?.[0]?.signal as AbortSignal;
         expect(signal.aborted).toBe(false);
       });
     });

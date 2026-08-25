@@ -83,11 +83,9 @@ async function freePort(): Promise<number> {
  * missing both tools fails the suite instead of passing it vacuously.
  */
 function listening(port: number): boolean {
-  const viaLsof = spawnSync(
-    "lsof",
-    ["-t", "-a", `-iTCP:${port}`, "-sTCP:LISTEN"],
-    { encoding: "utf8" },
-  );
+  const viaLsof = spawnSync("lsof", ["-t", "-a", `-iTCP:${port}`, "-sTCP:LISTEN"], {
+    encoding: "utf8",
+  });
   if (viaLsof.error === undefined) return (viaLsof.stdout ?? "").trim() !== "";
 
   const viaSs = spawnSync("ss", ["-ltnH", `( sport = :${port} )`], {
@@ -113,9 +111,7 @@ function liveMembers(pgid: number): number {
   return (result.stdout ?? "")
     .split("\n")
     .map((line) => line.trim().split(/\s+/))
-    .filter(
-      ([group, state]) => group === String(pgid) && !state?.startsWith("Z"),
-    ).length;
+    .filter(([group, state]) => group === String(pgid) && !state?.startsWith("Z")).length;
 }
 
 /**
@@ -268,8 +264,7 @@ function startInOwnGroup(command: string, args: string[]): number {
   return child.pid as number;
 }
 
-const strangerReadyFile = (named: string) =>
-  path.join(scratch, `${named}-is-up`);
+const strangerReadyFile = (named: string) => path.join(scratch, `${named}-is-up`);
 
 /**
  * A listener that is emphatically not one of ours: the same node binary,
@@ -423,9 +418,9 @@ describe("clearing the dev ports", () => {
         const stack = startInOwnGroup("bash", [writeRestartingStack(ours)]);
         expect(await laneIsUp()).toBe(true);
         const stranger = startStranger({ port: theirs });
-        expect(
-          await waitUntil(() => existsSync(strangerReadyFile("dev-listener"))),
-        ).toBe(true);
+        expect(await waitUntil(() => existsSync(strangerReadyFile("dev-listener")))).toBe(
+          true,
+        );
 
         const result = clearPorts(`${ours},${theirs}`, {
           KILL_DEV_TREE_GRACE: "2",

@@ -4,7 +4,11 @@ description: Receiver works on the Generic OTel path; Cowork-specific attribute 
 sidebarTitle: Anthropic Claude (Cowork)
 ---
 
-<Info>**Pairs with:** [AI Gateway → Anthropic provider](/ai-gateway/providers/anthropic). Direct Anthropic API traffic flows through the gateway data plane; Cowork tool-use telemetry is a separate OTLP feed routed through this ingestion source.</Info>
+<Info>
+  **Pairs with:** [AI Gateway → Anthropic provider](/ai-gateway/providers/anthropic).
+  Direct Anthropic API traffic flows through the gateway data plane; Cowork tool-use
+  telemetry is a separate OTLP feed routed through this ingestion source.
+</Info>
 
 Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts traffic; the per-attribute mapping that turns Cowork's `tool_use` taxonomy into precise governance KPI fields is the next step on the [adapter roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
 
@@ -21,16 +25,16 @@ Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts
 
 The composer collects:
 
-| Field | Required | Stored |
-|---|---|---|
-| Anthropic workspace ID (`wsp_...`) | yes | `IngestionSource.payloadConfig.workspaceId`, used for correlation with Anthropic's admin console; the receiver itself doesn't enforce it today |
+| Field                              | Required | Stored                                                                                                                                         |
+| ---------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Anthropic workspace ID (`wsp_...`) | yes      | `IngestionSource.payloadConfig.workspaceId`, used for correlation with Anthropic's admin console; the receiver itself doesn't enforce it today |
 
 The one-time-reveal modal exposes:
 
-| Field | Value |
-|---|---|
-| OTLP URL | `https://<your-langwatch>/api/ingest/otel/<sourceId>` |
-| Bearer secret | `lw_is_<base64url>` |
+| Field         | Value                                                 |
+| ------------- | ----------------------------------------------------- |
+| OTLP URL      | `https://<your-langwatch>/api/ingest/otel/<sourceId>` |
+| Bearer secret | `lw_is_<base64url>`                                   |
 
 In Anthropic's admin console: **Workspace → Telemetry**, paste the OTLP URL + the bearer header. Cowork starts pushing.
 

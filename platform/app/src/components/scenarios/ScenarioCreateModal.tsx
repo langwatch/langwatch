@@ -57,10 +57,7 @@ const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
  * Opens the ScenarioFormDrawer with initial data via complexProps.
  * No DB record is created until the user clicks "Save" in the drawer.
  */
-export function ScenarioCreateModal({
-  open,
-  onClose,
-}: ScenarioCreateModalProps) {
+export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
 
@@ -103,10 +100,7 @@ export function ScenarioCreateModal({
       }
 
       try {
-        const generatedData = await generateScenarioWithAI(
-          description,
-          project.id,
-        );
+        const generatedData = await generateScenarioWithAI(description, project.id);
         storePromptForScenario(description);
         openEditorWithData(generatedData);
       } catch (error) {

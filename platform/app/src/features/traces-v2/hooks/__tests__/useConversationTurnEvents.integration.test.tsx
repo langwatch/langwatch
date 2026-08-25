@@ -23,9 +23,7 @@ vi.mock("~/utils/api", () => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: harness.projectId.value
-      ? { id: harness.projectId.value }
-      : undefined,
+    project: harness.projectId.value ? { id: harness.projectId.value } : undefined,
   }),
 }));
 
@@ -106,9 +104,7 @@ describe("useConversationTurnEvents", () => {
     });
 
     it("asks once for every turn in the thread", () => {
-      renderHook(() =>
-        useConversationTurnEvents([turn("t-2", 20), turn("t-1", 10)]),
-      );
+      renderHook(() => useConversationTurnEvents([turn("t-2", 20), turn("t-1", 10)]));
 
       expect(lastInput()).toMatchObject({
         projectId: "proj-1",
@@ -118,10 +114,7 @@ describe("useConversationTurnEvents", () => {
 
     it("reads over the span the turns themselves cover", () => {
       renderHook(() =>
-        useConversationTurnEvents([
-          turn("t-1", 10_000_000),
-          turn("t-2", 20_000_000),
-        ]),
+        useConversationTurnEvents([turn("t-1", 10_000_000), turn("t-2", 20_000_000)]),
       );
 
       const { timeRange } = lastInput() as {
@@ -138,9 +131,7 @@ describe("useConversationTurnEvents", () => {
     it("leaves every turn reporting no events", () => {
       resolveWith({ data: undefined, extra: { isLoading: true } });
 
-      const { result } = renderHook(() =>
-        useConversationTurnEvents([turn("t-1", 10)]),
-      );
+      const { result } = renderHook(() => useConversationTurnEvents([turn("t-1", 10)]));
 
       expect(result.current[0]!.events).toEqual(NO_TRACE_EVENTS);
       expect(result.current[0]!.eventsLoading).toBe(true);
@@ -154,9 +145,7 @@ describe("useConversationTurnEvents", () => {
         extra: { isPlaceholderData: true },
       });
 
-      const { result } = renderHook(() =>
-        useConversationTurnEvents([turn("t-1", 10)]),
-      );
+      const { result } = renderHook(() => useConversationTurnEvents([turn("t-1", 10)]));
 
       expect(result.current[0]!.events).toEqual(NO_TRACE_EVENTS);
       expect(result.current[0]!.eventsLoading).toBe(true);
@@ -167,9 +156,7 @@ describe("useConversationTurnEvents", () => {
     it("says the events are unavailable rather than claiming none", () => {
       resolveWith({ data: undefined, extra: { isError: true } });
 
-      const { result } = renderHook(() =>
-        useConversationTurnEvents([turn("t-1", 10)]),
-      );
+      const { result } = renderHook(() => useConversationTurnEvents([turn("t-1", 10)]));
 
       expect(result.current[0]!.eventsUnavailable).toBe(true);
     });

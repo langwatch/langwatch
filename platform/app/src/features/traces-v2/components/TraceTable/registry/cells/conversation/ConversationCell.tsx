@@ -48,9 +48,7 @@ const ExpandToggle: React.FC<{
       actions.onToggleExpand?.();
     }}
   >
-    <Icon boxSize={boxSize}>
-      {isExpanded ? <ChevronDown /> : <ChevronRight />}
-    </Icon>
+    <Icon boxSize={boxSize}>{isExpanded ? <ChevronDown /> : <ChevronRight />}</Icon>
   </chakra.button>
 );
 
@@ -175,16 +173,8 @@ export const ConversationCell: CellDef<ConversationGroup> = {
   },
 };
 
-const ConversationSummaryChips: React.FC<{ group: ConversationGroup }> = ({
-  group,
-}) => (
-  <HStack
-    gap={2}
-    flexShrink={0}
-    textStyle="2xs"
-    color="fg.subtle"
-    marginTop="2px"
-  >
+const ConversationSummaryChips: React.FC<{ group: ConversationGroup }> = ({ group }) => (
+  <HStack gap={2} flexShrink={0} textStyle="2xs" color="fg.subtle" marginTop="2px">
     {group.errorCount > 0 && (
       <HStack gap={0.5}>
         <Icon boxSize="10px" color="red.fg">

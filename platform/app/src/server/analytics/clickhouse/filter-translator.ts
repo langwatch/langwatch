@@ -79,8 +79,7 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
   "topics.subtopics": (values) => translateSubtopicFilter(values),
 
   // Metadata Filters
-  "metadata.user_id": (values) =>
-    translateMetadataFilter("langwatch.user_id", values),
+  "metadata.user_id": (values) => translateMetadataFilter("langwatch.user_id", values),
   "metadata.thread_id": (values) =>
     translateMetadataFilter("gen_ai.conversation.id", values),
   "metadata.customer_id": (values) =>
@@ -114,14 +113,10 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
       values,
       "AND Label IS NOT NULL AND Label != '' AND Label NOT IN ('succeeded', 'failed')",
     ),
-  "evaluations.passed": (values, key) =>
-    translateEvaluationPassedFilter(values, key),
-  "evaluations.score": (values, key) =>
-    translateEvaluationScoreFilter(values, key),
-  "evaluations.label": (values, key) =>
-    translateEvaluationLabelFilter(values, key),
-  "evaluations.state": (values, key) =>
-    translateEvaluationStateFilter(values, key),
+  "evaluations.passed": (values, key) => translateEvaluationPassedFilter(values, key),
+  "evaluations.score": (values, key) => translateEvaluationScoreFilter(values, key),
+  "evaluations.label": (values, key) => translateEvaluationLabelFilter(values, key),
+  "evaluations.state": (values, key) => translateEvaluationStateFilter(values, key),
 
   // Event Filters
   "events.event_type": (values, _key, _subkey, spanTime) =>
@@ -244,10 +239,7 @@ function translateMetadataKeyFilter(values: string[]): FilterTranslation {
 /**
  * Translate metadata value filter (requires key)
  */
-function translateMetadataValueFilter(
-  values: string[],
-  key?: string,
-): FilterTranslation {
+function translateMetadataValueFilter(values: string[], key?: string): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   if (!key) {
     return { whereClause: "1=1", requiredJoins: [], params: {} };
@@ -303,9 +295,7 @@ function translateOriginFilter(values: string[]): FilterTranslation {
 
   if (otherValues.length > 0) {
     const paramName = genParamName("originValues");
-    parts.push(
-      `${ts}.Attributes['langwatch.origin'] IN ({${paramName}:Array(String)})`,
-    );
+    parts.push(`${ts}.Attributes['langwatch.origin'] IN ({${paramName}:Array(String)})`);
     params[paramName] = otherValues;
   }
 
@@ -764,9 +754,7 @@ function translateAnnotationFilter(values: string[]): FilterTranslation {
  * with unnecessary conditions. This also makes the generated SQL more readable
  * for debugging and performance analysis.
  */
-export function combineFilters(
-  translations: FilterTranslation[],
-): FilterTranslation {
+export function combineFilters(translations: FilterTranslation[]): FilterTranslation {
   const nonTrivial = translations.filter((t) => t.whereClause !== "1=1");
 
   if (nonTrivial.length === 0) {
@@ -798,9 +786,7 @@ export function translateAllFilters(
   filters: Partial<
     Record<
       FilterField,
-      | string[]
-      | Record<string, string[]>
-      | Record<string, Record<string, string[]>>
+      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
     >
   >,
   spanTimePredicate?: string,

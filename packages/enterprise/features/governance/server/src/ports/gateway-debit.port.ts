@@ -1,13 +1,9 @@
 import type { Event } from "@langwatch/eventing";
 
-export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE =
-  "lw.gateway.spend.admitted" as const;
-export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE =
-  "lw.gateway.spend.confirmed" as const;
-export const GATEWAY_SPEND_FAILED_EVENT_TYPE =
-  "lw.gateway.spend.failed" as const;
-export const GATEWAY_SPEND_SETTLED_EVENT_TYPE =
-  "lw.gateway.spend.settled" as const;
+export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as const;
+export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE = "lw.gateway.spend.confirmed" as const;
+export const GATEWAY_SPEND_FAILED_EVENT_TYPE = "lw.gateway.spend.failed" as const;
+export const GATEWAY_SPEND_SETTLED_EVENT_TYPE = "lw.gateway.spend.settled" as const;
 
 export type GatewaySpendUsage = {
   input_tokens: number;
@@ -145,13 +141,9 @@ export abstract class GatewayDebitPort {
 
   abstract insert(rows: GatewayBudgetDebitRow[]): Promise<void>;
 
-  abstract detectCrossings(
-    rows: GatewayBudgetCrossingCandidate[],
-  ): Promise<void>;
+  abstract detectCrossings(rows: GatewayBudgetCrossingCandidate[]): Promise<void>;
 
-  abstract shouldEmitBudgetUpdated(input: {
-    projectId: string;
-  }): Promise<boolean>;
+  abstract shouldEmitBudgetUpdated(input: { projectId: string }): Promise<boolean>;
 
   abstract emitBudgetUpdated(input: {
     organizationId: string;

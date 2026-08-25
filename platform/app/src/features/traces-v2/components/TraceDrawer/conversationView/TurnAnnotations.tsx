@@ -164,9 +164,7 @@ export function TurnAnnotationBadges({
           <Text textStyle="2xs" fontWeight="600">
             {annotationCount}
           </Text>
-          {hasCorrection && (
-            <Icon as={Lightbulb} boxSize={3} color="yellow.fg" />
-          )}
+          {hasCorrection && <Icon as={Lightbulb} boxSize={3} color="yellow.fg" />}
         </Button>
       </Popover.Trigger>
       <Popover.Content
@@ -256,11 +254,7 @@ function AnnotationListRow({
 }
 
 /** Who left the annotation, when, whether it corrects the turn, and what it says. */
-function AnnotationListRowSummary({
-  annotation,
-}: {
-  annotation: AnnotationItem;
-}) {
+function AnnotationListRowSummary({ annotation }: { annotation: AnnotationItem }) {
   return (
     <HStack gap={2} align="start">
       <UserAvatar

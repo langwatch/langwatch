@@ -2,11 +2,7 @@ import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { unsupportedGovernanceValue } from "./governance.errors";
 
-export const ANOMALY_RULE_SEVERITIES = [
-  "critical",
-  "warning",
-  "info",
-] as const;
+export const ANOMALY_RULE_SEVERITIES = ["critical", "warning", "info"] as const;
 export const ANOMALY_RULE_SCOPES = [
   "organization",
   "team",
@@ -56,9 +52,7 @@ export const createAnomalyRuleInputSchema = z.object({
   status: anomalyRuleStatusSchema.optional(),
   actorUserId: z.string(),
 });
-export type CreateAnomalyRuleInput = z.infer<
-  typeof createAnomalyRuleInputSchema
->;
+export type CreateAnomalyRuleInput = z.infer<typeof createAnomalyRuleInputSchema>;
 
 export const updateAnomalyRuleInputSchema = z.object({
   id: z.string(),
@@ -73,9 +67,7 @@ export const updateAnomalyRuleInputSchema = z.object({
   destinationConfig: z.record(z.string(), z.unknown()).optional(),
   status: anomalyRuleStatusSchema.optional(),
 });
-export type UpdateAnomalyRuleInput = z.infer<
-  typeof updateAnomalyRuleInputSchema
->;
+export type UpdateAnomalyRuleInput = z.infer<typeof updateAnomalyRuleInputSchema>;
 
 export class AnomalyRuleNotFoundError extends NotFoundError {
   constructor(ruleId: string) {
@@ -104,8 +96,7 @@ export const destinationConfigSchema = z
   .object({ destinations: z.array(anomalyDestinationSchema).max(10) })
   .strict();
 
-export type SupportedDestinationType =
-  (typeof SUPPORTED_DESTINATION_TYPES)[number];
+export type SupportedDestinationType = (typeof SUPPORTED_DESTINATION_TYPES)[number];
 export type WebhookDestination = z.infer<typeof webhookDestinationSchema>;
 export type AnomalyDestination = z.infer<typeof anomalyDestinationSchema>;
 export type DestinationConfig = z.infer<typeof destinationConfigSchema>;
@@ -119,10 +110,7 @@ export function validateDestinationConfig(config: unknown): DestinationConfig {
 export function safeParseDestinationConfig(
   config: unknown,
 ): { ok: true; data: DestinationConfig } | { ok: false; error: z.ZodError } {
-  if (
-    !config ||
-    (typeof config === "object" && Object.keys(config).length === 0)
-  ) {
+  if (!config || (typeof config === "object" && Object.keys(config).length === 0)) {
     return { ok: true, data: { destinations: [] } };
   }
   const result = destinationConfigSchema.safeParse(config);
@@ -149,9 +137,7 @@ export const spendSpikeThresholdConfigSchema = z
     minBaselineUsd: z.number().nonnegative(),
   })
   .strict();
-export type SpendSpikeThresholdConfig = z.infer<
-  typeof spendSpikeThresholdConfigSchema
->;
+export type SpendSpikeThresholdConfig = z.infer<typeof spendSpikeThresholdConfigSchema>;
 export type SpendSpikeThresholdConfigParsed = SpendSpikeThresholdConfig;
 
 export function validateThresholdConfig(input: {
@@ -173,9 +159,7 @@ export function validateThresholdConfig(input: {
 
 export function safeParseSpendSpikeThresholdConfig(
   config: unknown,
-):
-  | { ok: true; data: SpendSpikeThresholdConfig }
-  | { ok: false; error: z.ZodError } {
+): { ok: true; data: SpendSpikeThresholdConfig } | { ok: false; error: z.ZodError } {
   const result = spendSpikeThresholdConfigSchema.safeParse(config);
   return result.success
     ? { ok: true, data: result.data }
@@ -208,9 +192,7 @@ export const spendSpikeEvaluationInputSchema = z.object({
   windowStart: z.date(),
   windowEnd: z.date(),
 });
-export type SpendSpikeEvaluationInput = z.infer<
-  typeof spendSpikeEvaluationInputSchema
->;
+export type SpendSpikeEvaluationInput = z.infer<typeof spendSpikeEvaluationInputSchema>;
 
 export const spendSpikeEvaluationResultSchema = z.object({
   ruleId: z.string(),
@@ -222,9 +204,7 @@ export const spendSpikeEvaluationResultSchema = z.object({
   windowStart: z.date(),
   windowEnd: z.date(),
 });
-export type SpendSpikeEvaluationResult = z.infer<
-  typeof spendSpikeEvaluationResultSchema
->;
+export type SpendSpikeEvaluationResult = z.infer<typeof spendSpikeEvaluationResultSchema>;
 
 export const anomalyAlertDispatchRuleSchema = z.object({
   id: z.string(),
@@ -234,9 +214,7 @@ export const anomalyAlertDispatchRuleSchema = z.object({
   organizationId: z.string(),
   destinationConfig: z.record(z.string(), z.unknown()),
 });
-export type AnomalyAlertDispatchRule = z.infer<
-  typeof anomalyAlertDispatchRuleSchema
->;
+export type AnomalyAlertDispatchRule = z.infer<typeof anomalyAlertDispatchRuleSchema>;
 
 export const anomalyAlertDispatchRecordSchema = z.object({
   id: z.string(),
@@ -247,34 +225,27 @@ export const anomalyAlertDispatchRecordSchema = z.object({
   detail: z.unknown(),
   detectedAt: z.date(),
 });
-export type AnomalyAlertDispatchRecord = z.infer<
-  typeof anomalyAlertDispatchRecordSchema
->;
+export type AnomalyAlertDispatchRecord = z.infer<typeof anomalyAlertDispatchRecordSchema>;
 
 export const anomalyAlertDispatchInputSchema = z.object({
   rule: anomalyAlertDispatchRuleSchema,
   alert: anomalyAlertDispatchRecordSchema,
 });
-export type AnomalyAlertDispatchInput = z.infer<
-  typeof anomalyAlertDispatchInputSchema
->;
+export type AnomalyAlertDispatchInput = z.infer<typeof anomalyAlertDispatchInputSchema>;
 
-export const anomalyAlertDispatchOutcomeSchema = z.discriminatedUnion(
-  "status",
-  [
-    z.object({
-      destinationIndex: z.number().int().nonnegative(),
-      type: z.literal("webhook"),
-      status: z.literal("succeeded"),
-    }),
-    z.object({
-      destinationIndex: z.number().int().nonnegative(),
-      type: z.literal("webhook"),
-      status: z.literal("failed"),
-      reason: z.string(),
-    }),
-  ],
-);
+export const anomalyAlertDispatchOutcomeSchema = z.discriminatedUnion("status", [
+  z.object({
+    destinationIndex: z.number().int().nonnegative(),
+    type: z.literal("webhook"),
+    status: z.literal("succeeded"),
+  }),
+  z.object({
+    destinationIndex: z.number().int().nonnegative(),
+    type: z.literal("webhook"),
+    status: z.literal("failed"),
+    reason: z.string(),
+  }),
+]);
 export type AnomalyAlertDispatchOutcome = z.infer<
   typeof anomalyAlertDispatchOutcomeSchema
 >;
@@ -283,9 +254,7 @@ export const anomalyAlertDispatchResultSchema = z.object({
   dispatchTag: z.string(),
   outcomes: z.array(anomalyAlertDispatchOutcomeSchema),
 });
-export type AnomalyAlertDispatchResult = z.infer<
-  typeof anomalyAlertDispatchResultSchema
->;
+export type AnomalyAlertDispatchResult = z.infer<typeof anomalyAlertDispatchResultSchema>;
 
 export function evaluateSpendSpike(
   input: SpendSpikeEvaluationInput,

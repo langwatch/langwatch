@@ -122,10 +122,7 @@ export function buildGatewayCanonicalString(input: {
 }
 
 /** hex(hmac_sha256(secret, canonical)) */
-export function computeGatewaySignature(
-  secret: string,
-  canonical: string,
-): string {
+export function computeGatewaySignature(secret: string, canonical: string): string {
   return createHmac("sha256", secret).update(canonical).digest("hex");
 }
 
@@ -178,8 +175,7 @@ function logAuthDecision(
 }
 
 async function verifyGatewaySignature(c: Context, next: Next) {
-  const secret =
-    process.env.LW_GATEWAY_INTERNAL_SECRET ?? env.LW_GATEWAY_INTERNAL_SECRET;
+  const secret = process.env.LW_GATEWAY_INTERNAL_SECRET ?? env.LW_GATEWAY_INTERNAL_SECRET;
   if (!secret) {
     logAuthDecision(c, "gateway_internal_secret_missing", 500);
     return c.json(
@@ -379,8 +375,7 @@ function virtualKeyStatusRejection({
       status: 403,
       type: "virtual_key_disabled",
       code: "virtual_key_disabled",
-      message:
-        "virtual key is disabled; it can be re-enabled by an administrator",
+      message: "virtual key is disabled; it can be re-enabled by an administrator",
     };
   }
   if (expiresAt && expiresAt.getTime() <= Date.now()) {
@@ -388,8 +383,7 @@ function virtualKeyStatusRejection({
       status: 403,
       type: "virtual_key_expired",
       code: "virtual_key_expired",
-      message:
-        "virtual key has expired; extend its expiration or mint a new one",
+      message: "virtual key has expired; extend its expiration or mint a new one",
     };
   }
   return null;
@@ -421,9 +415,7 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   }
 
   const service = VirtualKeyService.create(prisma);
-  const vk = await service.getByHashedSecretInternal(
-    hashVirtualKeySecret(presented),
-  );
+  const vk = await service.getByHashedSecretInternal(hashVirtualKeySecret(presented));
   if (!vk) {
     logAuthDecision(c, "virtual_key_not_found", 401);
     return c.json(
@@ -874,11 +866,7 @@ const spendCommandBatchSchema = z.object({
 type SpendCommandName = z.infer<typeof spendCommandWireSchema>["command"];
 type SpendCommandRecord = z.infer<typeof spendCommandWireSchema>;
 
-const SPEND_COMMAND_NAMES = [
-  "admitSpend",
-  "confirmSpend",
-  "failSpend",
-] as const;
+const SPEND_COMMAND_NAMES = ["admitSpend", "confirmSpend", "failSpend"] as const;
 
 const SPEND_COMMAND_SCHEMAS = {
   admitSpend: admitSpendWireSchema,
@@ -914,9 +902,7 @@ function spendPipeline() {
  * once dispatch settled it, the requested one before that), which is the
  * identity the ledger stores for the request.
  */
-function pricedOutcomeData(
-  data: Record<string, unknown>,
-): Record<string, unknown> {
+function pricedOutcomeData(data: Record<string, unknown>): Record<string, unknown> {
   const outcome = data as unknown as {
     model: string;
     usage: SpendUsage;
@@ -1268,9 +1254,7 @@ async function sendSpendCommands(
  * lets the drainer come back rather than appending a guess.
  */
 secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
-  const parsed = spendCommandBatchSchema.safeParse(
-    await c.req.json().catch(() => null),
-  );
+  const parsed = spendCommandBatchSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json(
       {
@@ -1291,8 +1275,7 @@ secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
         error: {
           type: "unavailable",
           code: "spend_pipeline_disabled",
-          message:
-            "gateway spend pipeline is not registered (ClickHouse disabled)",
+          message: "gateway spend pipeline is not registered (ClickHouse disabled)",
         },
       },
       503,
@@ -1430,58 +1413,56 @@ secured.access(gatewayPolicy()).post("/realtime-sessions", async (c) => {
  * Records the vendor's own conversation id on a booked session, or closes a
  * booking whose mint never produced a credential.
  */
-secured
-  .access(gatewayPolicy())
-  .patch("/realtime-sessions/:session_id", async (c) => {
-    const parsed = patchRealtimeSessionSchema.safeParse(
-      await c.req.json().catch(() => null),
-    );
-    if (!parsed.success) {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "invalid_session_patch",
-            message:
-              "project_id is required, with a vendor_conversation_id or a terminal status",
-          },
+secured.access(gatewayPolicy()).patch("/realtime-sessions/:session_id", async (c) => {
+  const parsed = patchRealtimeSessionSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "invalid_session_patch",
+          message:
+            "project_id is required, with a vendor_conversation_id or a terminal status",
         },
-        400,
-      );
-    }
-    const sessionId = c.req.param("session_id");
-    const body = parsed.data;
-    let applied = false;
-    if (body.vendor_conversation_id) {
-      applied = await correlateRealtimeSession({
+      },
+      400,
+    );
+  }
+  const sessionId = c.req.param("session_id");
+  const body = parsed.data;
+  let applied = false;
+  if (body.vendor_conversation_id) {
+    applied = await correlateRealtimeSession({
+      sessionId,
+      projectId: body.project_id,
+      vendorConversationId: body.vendor_conversation_id,
+    });
+  }
+  if (body.status) {
+    applied =
+      (await releaseRealtimeSession({
         sessionId,
         projectId: body.project_id,
-        vendorConversationId: body.vendor_conversation_id,
-      });
-    }
-    if (body.status) {
-      applied =
-        (await releaseRealtimeSession({
-          sessionId,
-          projectId: body.project_id,
-          status: body.status,
-          reason: body.reason ?? "released by the gateway",
-        })) || applied;
-    }
-    if (!applied) {
-      return c.json(
-        {
-          error: {
-            type: "not_found",
-            code: "realtime_session_not_found",
-            message: "no session with that id belongs to this project",
-          },
+        status: body.status,
+        reason: body.reason ?? "released by the gateway",
+      })) || applied;
+  }
+  if (!applied) {
+    return c.json(
+      {
+        error: {
+          type: "not_found",
+          code: "realtime_session_not_found",
+          message: "no session with that id belongs to this project",
         },
-        404,
-      );
-    }
-    return c.json({ session_id: sessionId, updated: true });
-  });
+      },
+      404,
+    );
+  }
+  return c.json({ session_id: sessionId, updated: true });
+});
 
 /**
  * Closes an OpenAI voice session with the usage its socket reported.

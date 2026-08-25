@@ -14,10 +14,7 @@
  * against are the two things worth pinning.
  */
 import type { LedgerActor } from "@langwatch/actor";
-import {
-  BindingMissingError,
-  DuplicateBindingError,
-} from "@langwatch/authz-contract";
+import { BindingMissingError, DuplicateBindingError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { EventingAuthzLedgerAdapter } from "../../src/adapters/eventing.authz-ledger.adapter";
 import type { AuthzReadRepository } from "../../src/repositories/authz-read.repository";
@@ -115,9 +112,7 @@ describe("given a role change on a row that is gone", () => {
   describe("when a sibling already holds the target role", () => {
     it("keeps the duplicate answer", async () => {
       const { repository } = harness({
-        changeBindingRole: vi
-          .fn()
-          .mockRejectedValue(new DuplicateBindingError()),
+        changeBindingRole: vi.fn().mockRejectedValue(new DuplicateBindingError()),
       } as Partial<EventingAuthzLedgerAdapter>);
 
       await expect(
@@ -252,12 +247,8 @@ function buildRepository({
     grant: { count: vi.fn().mockResolvedValue(survivingGrantRows) },
     roleBinding: { count: vi.fn().mockResolvedValue(survivingBindingRows) },
   };
-  const roleBindingFindMany = vi
-    .fn()
-    .mockResolvedValue(bindingIds.map((id) => ({ id })));
-  const grantFindMany = vi
-    .fn()
-    .mockResolvedValue(grantIds.map((id) => ({ id })));
+  const roleBindingFindMany = vi.fn().mockResolvedValue(bindingIds.map((id) => ({ id })));
+  const grantFindMany = vi.fn().mockResolvedValue(grantIds.map((id) => ({ id })));
   const prisma = {
     roleBinding: { findMany: roleBindingFindMany },
     grant: { findMany: grantFindMany },

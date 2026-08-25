@@ -3,10 +3,7 @@ import {
   getStatusCodeFromError,
   logHttpRequest,
 } from "@langwatch/observability";
-import {
-  runWithContext,
-  updateCurrentContext,
-} from "@langwatch/observability/context";
+import { runWithContext, updateCurrentContext } from "@langwatch/observability/context";
 import {
   context as otContext,
   propagation,
@@ -67,9 +64,7 @@ export function tracerMiddleware(options?: { name?: string }) {
         spanName,
         {
           kind: SpanKind.SERVER,
-          attributes: options?.name
-            ? { "service.name": options.name }
-            : undefined,
+          attributes: options?.name ? { "service.name": options.name } : undefined,
         },
         async (span) => {
           let requestError: unknown;
@@ -171,9 +166,7 @@ export function loggerMiddleware(options?: { name?: string }) {
           const requestError = resolved ? resolved.error : error || c.error;
           const statusCode =
             resolved?.status ??
-            (requestError
-              ? getStatusCodeFromError(requestError)
-              : c.res.status);
+            (requestError ? getStatusCodeFromError(requestError) : c.res.status);
 
           // This is the only error record written per failed request. The
           // error handler deliberately does not log its own copy.

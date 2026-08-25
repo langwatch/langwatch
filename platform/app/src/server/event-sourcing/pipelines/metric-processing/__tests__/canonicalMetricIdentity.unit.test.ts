@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { prepareMetricDataPoints } from "../canonicalMetric";
-import {
-  prepare,
-  requestForMetric,
-} from "./fixtures/canonical-metric.fixtures";
+import { prepare, requestForMetric } from "./fixtures/canonical-metric.fixtures";
 
 const a = { key: "a", value: { stringValue: "one" } };
 const b = { key: "b", value: { intValue: "2" } };
@@ -30,9 +27,7 @@ function identityRequest({
         ],
       },
     },
-    resourceAttributes: [
-      { key: "service.name", value: { stringValue: resourceValue } },
-    ],
+    resourceAttributes: [{ key: "service.name", value: { stringValue: resourceValue } }],
   });
 }
 
@@ -196,10 +191,7 @@ describe("canonical metric identity", () => {
                               key: "array",
                               value: {
                                 arrayValue: {
-                                  values: [
-                                    { stringValue: "secret" },
-                                    { intValue: "7" },
-                                  ],
+                                  values: [{ stringValue: "secret" }, { intValue: "7" }],
                                 },
                               },
                             },
@@ -249,9 +241,7 @@ describe("canonical metric identity", () => {
               ],
             },
           },
-          resourceAttributes: [
-            { key: "service.name", value: { stringValue: "api" } },
-          ],
+          resourceAttributes: [{ key: "service.name", value: { stringValue: "api" } }],
         }) as never,
         piiRedactionLevel: "STRICT",
         redactionService,
@@ -265,9 +255,9 @@ describe("canonical metric identity", () => {
       expect(result.accepted[0]!.dataPoint.resourceAttributesJson).toContain(
         "api-redacted",
       );
-      expect(
-        result.accepted[1]!.dataPoint.resourceAttributesJson,
-      ).not.toContain("api-redacted-redacted");
+      expect(result.accepted[1]!.dataPoint.resourceAttributesJson).not.toContain(
+        "api-redacted-redacted",
+      );
     });
   });
 });

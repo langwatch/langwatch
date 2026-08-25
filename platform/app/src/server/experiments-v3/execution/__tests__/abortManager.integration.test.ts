@@ -1,7 +1,4 @@
-import {
-  type RedisConnection,
-  RedisConnectionService,
-} from "@langwatch/redis-client";
+import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
@@ -154,9 +151,7 @@ describe("AbortManager Integration", () => {
       const runId = createTestRunId();
       await abortManager.setRunning(runId, "project_owner");
 
-      expect(await abortManager.getRunningProjectId(runId)).toBe(
-        "project_owner",
-      );
+      expect(await abortManager.getRunningProjectId(runId)).toBe("project_owner");
     });
 
     it("returns null when the run is not running", async () => {

@@ -120,9 +120,7 @@ describe("siblingGroupKey", () => {
 
   describe("given two groups differing only by span type", () => {
     it("produces distinct keys", () => {
-      expect(siblingGroupKey(base)).not.toBe(
-        siblingGroupKey({ ...base, type: "span" }),
-      );
+      expect(siblingGroupKey(base)).not.toBe(siblingGroupKey({ ...base, type: "span" }));
     });
   });
 
@@ -211,9 +209,7 @@ describe("flattenTree", () => {
           new Set([siblingGroupKey(groups[0]!)]),
         );
         const spanRows = expanded.filter((r) => !("count" in r));
-        const expandedIds = spanRows.map((r) =>
-          "node" in r ? r.node.span.spanId : "",
-        );
+        const expandedIds = spanRows.map((r) => ("node" in r ? r.node.span.spanId : ""));
         expect(expandedIds).toContain("bash-0");
         expect(expandedIds).not.toContain("search-0");
       });
@@ -236,17 +232,13 @@ describe("isTwoLineSpan", () => {
 
   describe("given a named tool span", () => {
     it("renders two lines, matching TreeRow's taller row", () => {
-      expect(
-        isTwoLineSpan({ type: "tool", model: null, toolName: "Bash" }),
-      ).toBe(true);
+      expect(isTwoLineSpan({ type: "tool", model: null, toolName: "Bash" })).toBe(true);
     });
   });
 
   describe("given an ordinary span", () => {
     it("stays single-line", () => {
-      expect(isTwoLineSpan({ type: "span", model: null, toolName: null })).toBe(
-        false,
-      );
+      expect(isTwoLineSpan({ type: "span", model: null, toolName: null })).toBe(false);
     });
   });
 });

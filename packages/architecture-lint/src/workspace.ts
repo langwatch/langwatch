@@ -12,11 +12,7 @@ import type {
   PackageManifest,
 } from "./types";
 
-const FEATURE_ROLES = new Set<FeaturePackageRole>([
-  "contract",
-  "server",
-  "web",
-]);
+const FEATURE_ROLES = new Set<FeaturePackageRole>(["contract", "server", "web"]);
 
 const APPLICATION_PACKAGES: ReadonlyArray<{
   role: ApplicationPackageRole;
@@ -53,8 +49,7 @@ function readFeatureConfiguration(
     violations.push({
       policy: "feature-source-layout",
       file: path,
-      message:
-        "Feature ownership roots must declare a layoutVersion in feature.json.",
+      message: "Feature ownership roots must declare a layoutVersion in feature.json.",
       allowed: "Use layoutVersion 0, the initial strict feature layout.",
     });
     return { layoutVersion: undefined };
@@ -91,8 +86,10 @@ function readFeatureConfiguration(
     violations.push({
       policy: "feature-source-subject",
       file: path,
-      message: "feature.json may only select layoutVersion; feature ownership is declared centrally.",
-      allowed: "Change packages/features/catalogue.json and the owning ADR/spec to expand feature ownership.",
+      message:
+        "feature.json may only select layoutVersion; feature ownership is declared centrally.",
+      allowed:
+        "Change packages/features/catalogue.json and the owning ADR/spec to expand feature ownership.",
     });
   }
   return { layoutVersion };
@@ -121,17 +118,15 @@ export function discoverClassifiedPackages(root: string): {
   const discoverFeatures = (featuresRoot: string, enterprise: boolean) => {
     for (const feature of directories(featuresRoot)) {
       const featureRoot = join(featuresRoot, feature);
-      const { layoutVersion } = readFeatureConfiguration(
-        featureRoot,
-        violations,
-      );
+      const { layoutVersion } = readFeatureConfiguration(featureRoot, violations);
       const catalogueEntry = catalogueByRoot.get(featureRoot);
       if (!catalogueEntry) {
         violations.push({
           policy: "feature-catalogue",
           file: featureRoot,
           message: `Feature root ${JSON.stringify(feature)} is not registered in packages/features/catalogue.json.`,
-          allowed: "Use the singular catalogue identifier and record new ownership in its ADR and specification.",
+          allowed:
+            "Use the singular catalogue identifier and record new ownership in its ADR and specification.",
         });
       } else if ((catalogueEntry.classification === "enterprise") !== enterprise) {
         violations.push({
@@ -209,11 +204,7 @@ export function discoverClassifiedPackages(root: string): {
   const applicationsRoot = join(root, "apps");
   for (const directory of directories(applicationsRoot)) {
     if (APPLICATION_PACKAGES.some(({ path }) => path === directory)) continue;
-    const unexpectedManifest = join(
-      applicationsRoot,
-      directory,
-      "package.json",
-    );
+    const unexpectedManifest = join(applicationsRoot, directory, "package.json");
     if (!existsSync(unexpectedManifest) || directory === "shared") continue;
     violations.push({
       policy: "application-layout",
@@ -343,11 +334,7 @@ export function discoverClassifiedPackages(root: string): {
   }
 
   for (const composition of ENTERPRISE_COMPOSITION_PACKAGES) {
-    const compositionRoot = join(
-      enterpriseRoot,
-      "composition",
-      composition.role,
-    );
+    const compositionRoot = join(enterpriseRoot, "composition", composition.role);
     const manifestPath = join(compositionRoot, "package.json");
     if (!existsSync(manifestPath)) continue;
     const manifest = readManifest(manifestPath);
@@ -372,11 +359,7 @@ export function discoverClassifiedPackages(root: string): {
   if (existsSync(enterpriseRoot)) {
     for (const directory of directories(enterpriseRoot)) {
       if (directory === "composition" || directory === "features") continue;
-      const unexpectedManifest = join(
-        enterpriseRoot,
-        directory,
-        "package.json",
-      );
+      const unexpectedManifest = join(enterpriseRoot, directory, "package.json");
       if (!existsSync(unexpectedManifest)) continue;
       violations.push({
         policy: "enterprise-layout",
@@ -388,16 +371,10 @@ export function discoverClassifiedPackages(root: string): {
     }
     const compositionRoot = join(enterpriseRoot, "composition");
     for (const directory of directories(compositionRoot)) {
-      if (
-        ENTERPRISE_COMPOSITION_PACKAGES.some(({ role }) => role === directory)
-      ) {
+      if (ENTERPRISE_COMPOSITION_PACKAGES.some(({ role }) => role === directory)) {
         continue;
       }
-      const unexpectedManifest = join(
-        compositionRoot,
-        directory,
-        "package.json",
-      );
+      const unexpectedManifest = join(compositionRoot, directory, "package.json");
       if (!existsSync(unexpectedManifest)) continue;
       violations.push({
         policy: "enterprise-layout",
@@ -445,8 +422,7 @@ export function discoverClassifiedPackages(root: string): {
       violations.push({
         policy: "feature-layout",
         file: designSystemManifest,
-        message:
-          'The design-system package must be named "@langwatch/design-system".',
+        message: 'The design-system package must be named "@langwatch/design-system".',
       });
     }
     packages.push({

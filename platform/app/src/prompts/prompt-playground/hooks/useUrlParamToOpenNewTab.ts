@@ -70,9 +70,7 @@ export function useUrlParamToOpenNewTab() {
       });
     }
 
-    void openNewTab().catch((error) =>
-      logger.error({ error }, "Error opening new tab"),
-    );
+    void openNewTab().catch((error) => logger.error({ error }, "Error opening new tab"));
   }, [
     addTab,
     resolvedDefaultModel,

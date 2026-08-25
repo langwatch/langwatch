@@ -6,10 +6,7 @@
  * it hit and a reviewer can see the whole envelope in one place.
  */
 
-import {
-  EXPRESSION_BEARING_KEYS,
-  screenVegaExpression,
-} from "./vegaLiteExpressions";
+import { EXPRESSION_BEARING_KEYS, screenVegaExpression } from "./vegaLiteExpressions";
 import {
   collectViewNodes,
   countUnitViews,
@@ -215,8 +212,9 @@ const RULE_CATALOGUE: Record<
 };
 
 /** The full rule list, for review and for the tests that must cover each one. */
-export const LWQL_VEGA_RULES: readonly LangWatchQLVegaRule[] =
-  LWQL_VEGA_RULE_IDS.map((id) => ({ id, ...RULE_CATALOGUE[id] }));
+export const LWQL_VEGA_RULES: readonly LangWatchQLVegaRule[] = LWQL_VEGA_RULE_IDS.map(
+  (id) => ({ id, ...RULE_CATALOGUE[id] }),
+);
 
 /** Builds a refusal, taking its presentation code from the rule catalogue. */
 export function lwqlVegaError({
@@ -383,9 +381,7 @@ function refuseCallerDatasets(spec: unknown): VegaValidationError[] {
  * mark config definitions, so position-by-position rules would leak; the blanket
  * rule cannot, and no LangWatchQL chart has a legitimate URL in it.
  */
-function refuseUrlProperties(
-  objects: readonly JsonObjectNode[],
-): VegaValidationError[] {
+function refuseUrlProperties(objects: readonly JsonObjectNode[]): VegaValidationError[] {
   return objects
     .filter(({ node }) => "url" in node)
     .map(({ path }) => {
@@ -405,14 +401,9 @@ function urlRuleFor(parentPath: string): LangWatchQLVegaRuleId {
   return "resource.url-property";
 }
 
-function refuseEmbedOptions(
-  objects: readonly JsonObjectNode[],
-): VegaValidationError[] {
+function refuseEmbedOptions(objects: readonly JsonObjectNode[]): VegaValidationError[] {
   return objects
-    .filter(
-      ({ parentKey, node }) =>
-        parentKey === "usermeta" && "embedOptions" in node,
-    )
+    .filter(({ parentKey, node }) => parentKey === "usermeta" && "embedOptions" in node)
     .map(({ path }) =>
       lwqlVegaError({
         rule: "runtime.embed-options",
@@ -446,9 +437,7 @@ function refuseStringResourceProperties(
   return errors;
 }
 
-function refuseImageMarks(
-  objects: readonly JsonObjectNode[],
-): VegaValidationError[] {
+function refuseImageMarks(objects: readonly JsonObjectNode[]): VegaValidationError[] {
   return objects
     .filter(({ node }) => isImageMark(node.mark))
     .map(({ path }) =>
@@ -576,10 +565,7 @@ function checkCompositionLimits({
 
   for (const { path, node } of objects) {
     const layers = node.layer;
-    if (
-      !Array.isArray(layers) ||
-      layers.length <= LWQL_VEGA_LIMITS.maxLayersPerView
-    ) {
+    if (!Array.isArray(layers) || layers.length <= LWQL_VEGA_LIMITS.maxLayersPerView) {
       continue;
     }
     errors.push(
@@ -605,16 +591,13 @@ function transformStepsOf(
     if (!Array.isArray(list)) continue;
     const listPath = joinPointer(path, "transform");
     list.forEach((step, index) => {
-      if (isPlainObject(step))
-        steps.push({ path: joinPointer(listPath, index), step });
+      if (isPlainObject(step)) steps.push({ path: joinPointer(listPath, index), step });
     });
   }
   return steps;
 }
 
-function checkTransforms(
-  objects: readonly JsonObjectNode[],
-): VegaValidationError[] {
+function checkTransforms(objects: readonly JsonObjectNode[]): VegaValidationError[] {
   const steps = transformStepsOf(objects);
   const errors: VegaValidationError[] = [];
 
@@ -649,12 +632,8 @@ function checkTransforms(
  * more than one — a step carrying two signature keys is refused rather than
  * guessed at.
  */
-export function identifyTransform(
-  step: Record<string, unknown>,
-): string | null {
-  const matched = Object.keys(step).filter((key) =>
-    ALLOWED_TRANSFORM_SET.has(key),
-  );
+export function identifyTransform(step: Record<string, unknown>): string | null {
+  const matched = Object.keys(step).filter((key) => ALLOWED_TRANSFORM_SET.has(key));
   return matched.length === 1 ? (matched[0] ?? null) : null;
 }
 
@@ -679,9 +658,7 @@ function expressionStringsOf(
   return found;
 }
 
-function checkExpressions(
-  objects: readonly JsonObjectNode[],
-): VegaValidationError[] {
+function checkExpressions(objects: readonly JsonObjectNode[]): VegaValidationError[] {
   const errors: VegaValidationError[] = [];
   let totalBytes = 0;
 
@@ -723,8 +700,7 @@ function screenOneExpression({
   path: string;
   expression: string;
 }): VegaValidationError[] {
-  const { forbiddenIdentifiers, forbiddenConstructs } =
-    screenVegaExpression(expression);
+  const { forbiddenIdentifiers, forbiddenConstructs } = screenVegaExpression(expression);
   const refused = [...forbiddenIdentifiers, ...forbiddenConstructs];
   if (refused.length === 0) return [];
 

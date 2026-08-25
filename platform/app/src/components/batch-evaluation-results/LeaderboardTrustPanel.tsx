@@ -111,10 +111,7 @@ const buildComparabilityCheck = (
 const buildSampleSizeCheck = ({
   leaderboard,
   warnThreshold,
-}: Pick<
-  LeaderboardTrustPanelProps,
-  "leaderboard" | "warnThreshold"
->): TrustCheck => ({
+}: Pick<LeaderboardTrustPanelProps, "leaderboard" | "warnThreshold">): TrustCheck => ({
   label: "Enough comparisons",
   tone: leaderboard.minMatchups >= warnThreshold ? "ok" : "warn",
   detail:
@@ -141,10 +138,7 @@ const buildSweepCheck = (leaderboard: BTLeaderboard): TrustCheck => ({
  */
 const buildSettledCheck = (leaderboard: BTLeaderboard): TrustCheck => ({
   label: "Ranking settled",
-  tone:
-    leaderboard.didConverge && leaderboard.comparability.identifiable
-      ? "ok"
-      : "warn",
+  tone: leaderboard.didConverge && leaderboard.comparability.identifiable ? "ok" : "warn",
   detail: !leaderboard.comparability.identifiable
     ? "The ranking cannot settle across groups the run never connected, so treat gaps that span them as unmeasured."
     : leaderboard.didConverge
@@ -393,15 +387,12 @@ const buildJudgeIndependenceCheck = (
   }
 
   if (sharedFamilyVariantIds.length > 0) {
-    const names = joinNames(
-      sharedFamilyVariantIds.map((id) => nameOf(id, variantNames)),
-    );
+    const names = joinNames(sharedFamilyVariantIds.map((id) => nameOf(id, variantNames)));
     // "discount that variant's lead" was said whoever the shared variant was,
     // including one sitting at the bottom of the table with no lead to
     // discount. Self-preference inflates a score wherever it sits; only when
     // the affected variant is on top is there a lead in the first place.
-    const affectsLeader =
-      leaderId !== null && sharedFamilyVariantIds.includes(leaderId);
+    const affectsLeader = leaderId !== null && sharedFamilyVariantIds.includes(leaderId);
     return {
       label: "Judge independence",
       tone: "warn",
@@ -420,12 +411,11 @@ const buildJudgeIndependenceCheck = (
   };
 };
 
-const TONE_STYLES: Record<TrustTone, { color: string; icon: typeof LuCheck }> =
-  {
-    ok: { color: "green.fg", icon: LuCheck },
-    warn: { color: "orange.fg", icon: LuTriangleAlert },
-    note: { color: "fg.muted", icon: LuInfo },
-  };
+const TONE_STYLES: Record<TrustTone, { color: string; icon: typeof LuCheck }> = {
+  ok: { color: "green.fg", icon: LuCheck },
+  warn: { color: "orange.fg", icon: LuTriangleAlert },
+  note: { color: "fg.muted", icon: LuInfo },
+};
 
 export function LeaderboardTrustPanel(props: LeaderboardTrustPanelProps) {
   const checks = buildTrustChecks(props);
@@ -438,8 +428,7 @@ export function LeaderboardTrustPanel(props: LeaderboardTrustPanelProps) {
           verdict, so with four variants these are four-way calls, not pairs.
           The pairwise matchups are derived from them and counted separately.
         */}
-        Based on {props.leaderboard.comparisonCount} comparisons the judge
-        resolved.
+        Based on {props.leaderboard.comparisonCount} comparisons the judge resolved.
       </Text>
       {checks.map((check) => {
         const style = TONE_STYLES[check.tone];

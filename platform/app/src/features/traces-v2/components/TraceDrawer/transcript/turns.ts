@@ -15,9 +15,7 @@ import type { ChatMessage, ContentBlock, ConversationTurn } from "./types";
  * tool_use + …) render together inside that message's turn — that's the
  * shape the model emitted, and it should be obvious in the UI.
  */
-export function groupMessagesIntoTurns(
-  messages: ChatMessage[],
-): ConversationTurn[] {
+export function groupMessagesIntoTurns(messages: ChatMessage[]): ConversationTurn[] {
   const turns: ConversationTurn[] = [];
 
   // Fold a user-role message into the preceding assistant turn when every
@@ -34,10 +32,7 @@ export function groupMessagesIntoTurns(
   const isAssistantOperationEcho = (blocks: ContentBlock[]) =>
     blocks.length > 0 &&
     blocks.every(
-      (b) =>
-        b.kind === "tool_result" ||
-        b.kind === "tool_use" ||
-        b.kind === "thinking",
+      (b) => b.kind === "tool_result" || b.kind === "tool_use" || b.kind === "thinking",
     );
 
   const appendToAssistant = (msg: ChatMessage, blocks: ContentBlock[]) => {
@@ -107,45 +102,36 @@ export function groupMessagesIntoTurns(
 export function summarizeTurn(turn: ConversationTurn): string {
   if (turn.kind === "user") {
     const text = turn.blocks
-      .filter(
-        (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
-      )
+      .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
       .map((b) => b.text)
       .join(" ");
     if (text.trim()) return text.replace(/\s+/g, " ").trim().slice(0, 140);
     const tu = turn.blocks.find(
-      (b): b is Extract<ContentBlock, { kind: "tool_use" }> =>
-        b.kind === "tool_use",
+      (b): b is Extract<ContentBlock, { kind: "tool_use" }> => b.kind === "tool_use",
     );
     if (tu) return `Tool · ${tu.name}`;
     return "—";
   }
   if (turn.kind === "system") {
     const text = turn.blocks
-      .filter(
-        (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
-      )
+      .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
       .map((b) => b.text)
       .join(" ");
     return text.replace(/\s+/g, " ").trim().slice(0, 140) || "—";
   }
   const text = turn.blocks
-    .filter(
-      (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
-    )
+    .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
     .map((b) => b.text)
     .join(" ");
   if (text.trim()) return text.replace(/\s+/g, " ").trim().slice(0, 140);
   const thinking = turn.blocks.find(
-    (b): b is Extract<ContentBlock, { kind: "thinking" }> =>
-      b.kind === "thinking",
+    (b): b is Extract<ContentBlock, { kind: "thinking" }> => b.kind === "thinking",
   );
   if (thinking) {
     return `Thinking — ${thinking.text.replace(/\s+/g, " ").trim().slice(0, 100)}`;
   }
   const tu = turn.blocks.find(
-    (b): b is Extract<ContentBlock, { kind: "tool_use" }> =>
-      b.kind === "tool_use",
+    (b): b is Extract<ContentBlock, { kind: "tool_use" }> => b.kind === "tool_use",
   );
   if (tu) return `Tool · ${tu.name}`;
   if (turn.toolCalls.length > 0) {

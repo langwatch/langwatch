@@ -257,9 +257,7 @@ describe("LangyConversationProcess", () => {
 
       const messages = await store.findMessagesByRef({ ref });
       expect(messages).toHaveLength(1);
-      expect(messages[0]?.intentType).toBe(
-        LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH,
-      );
+      expect(messages[0]?.intentType).toBe(LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH);
       const intentTypes = Object.values(LANGY_PROCESS_INTENT_TYPES);
       expect(intentTypes.some((t) => t.includes("fail"))).toBe(false);
     });

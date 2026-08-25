@@ -19,9 +19,7 @@
  * 40%. A hard cap and a soft cap on one key is the standard way to provision
  * one, so this is the shape that has to stay correct.
  */
-import {
-  type WriteGatewayDebitsPayload,
-} from "@langwatch/enterprise-governance-server";
+import { type WriteGatewayDebitsPayload } from "@langwatch/enterprise-governance-server";
 import { AppGatewayDebitAdapter } from "~/runtime/app/features/governance/gateway-debit.adapter";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -218,14 +216,7 @@ beforeAll(async () => {
     data: { id: USER_ID, email: `${suffix}@acme.test`, name: "ACME Admin" },
   });
 
-  for (const vk of [
-    PAIR_VK,
-    TRIO_VK,
-    WINDOWS_VK,
-    MANUAL_VK,
-    SEATS_VK,
-    ANCHOR_VK,
-  ]) {
+  for (const vk of [PAIR_VK, TRIO_VK, WINDOWS_VK, MANUAL_VK, SEATS_VK, ANCHOR_VK]) {
     await createVirtualKey(vk);
   }
 
@@ -355,10 +346,7 @@ describe("given a hard cap and a soft cap on the same virtual key", () => {
 
   /** @scenario "The budget list shows a shared key's budgets undoubled" */
   it("renders the same undoubled figure in the list view", async () => {
-    expect(await listedSpentUsdFor([hardId, softId])).toEqual([
-      "0.001",
-      "0.001",
-    ]);
+    expect(await listedSpentUsdFor([hardId, softId])).toEqual(["0.001", "0.001"]);
   });
 
   /** @scenario "A hard cap sharing a key does not block at half its limit" */
@@ -378,9 +366,7 @@ describe("given a hard cap and a soft cap on the same virtual key", () => {
     expect(decision.blockedBy).toHaveLength(0);
     // The decision payload is the gateway's own reconciliation contract and
     // keeps its fixed six decimals; only the published figures changed unit.
-    expect(decision.scopes.find((s) => s.scopeId === PAIR_VK)?.spentUsd).toBe(
-      "0.001000",
-    );
+    expect(decision.scopes.find((s) => s.scopeId === PAIR_VK)?.spentUsd).toBe("0.001000");
   });
 });
 
@@ -391,11 +377,7 @@ describe("given three budgets on the same virtual key", () => {
   it("reports one request's cost against each of the three", async () => {
     await writeDebits(servedRequest({ virtualKeyId: TRIO_VK }));
 
-    expect(await spentUsdFor({ budgetIds: ids })).toEqual([
-      "0.001",
-      "0.001",
-      "0.001",
-    ]);
+    expect(await spentUsdFor({ budgetIds: ids })).toEqual(["0.001", "0.001", "0.001"]);
   });
 });
 
@@ -482,17 +464,13 @@ describe("given two per-seat templates anchored on the same virtual key", () => 
 
   /** @scenario "Two per-seat templates on one key each see the seat's own spend" */
   it("reports the seat's true spend under each template", async () => {
-    await writeDebits(
-      servedRequest({ virtualKeyId: SEATS_VK, endUserId: END_USER }),
-    );
+    await writeDebits(servedRequest({ virtualKeyId: SEATS_VK, endUserId: END_USER }));
 
     const breakdowns = await Promise.all(
       [seatAId, seatBId].map(async (id) => {
         const budget = (await prisma.gatewayBudget.findUniqueOrThrow({
           where: { id },
-        })) as Parameters<
-          typeof chRepo.getBucketSpendBreakdownForBudget
-        >[0]["budget"];
+        })) as Parameters<typeof chRepo.getBucketSpendBreakdownForBudget>[0]["budget"];
         return await chRepo.getBucketSpendBreakdownForBudget({
           budget,
           tenantIds: [PROJECT_ID],

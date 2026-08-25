@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  type BillableEventsRepository,
-  BillableEventsQueryService,
-} from "../src/index";
+import { type BillableEventsRepository, BillableEventsQueryService } from "../src/index";
 
 const { findTraceSummariesTotalUniq } = vi.hoisted(() => ({
   findTraceSummariesTotalUniq: vi.fn(),
@@ -37,8 +34,7 @@ describe("billingMonthDateRange", () => {
 
   describe("when checking the range shape", () => {
     it("produces a half-open range ending exactly at the next month boundary", () => {
-      const [start, end] =
-        BillableEventsQueryService.billingMonthDateRange("2026-01");
+      const [start, end] = BillableEventsQueryService.billingMonthDateRange("2026-01");
       expect(start).toBe("2026-01-01 00:00:00.000");
       // End is the *exclusive* boundary — the first millisecond of February,
       // to be used with `< endDate`, never `<=`.

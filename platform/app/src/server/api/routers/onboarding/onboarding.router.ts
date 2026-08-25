@@ -199,9 +199,7 @@ export const onboardingRouter = createTRPCRouter({
       reason: "onboarding runs before the user belongs to any organization",
     })
     .mutation(async ({ ctx, input }) => {
-      const traitValue = mapProductSelectionToIntegrationMethod(
-        input.integrationMethod,
-      );
+      const traitValue = mapProductSelectionToIntegrationMethod(input.integrationMethod);
 
       fireIntegrationMethodNurturing({
         userId: ctx.session.user.id,

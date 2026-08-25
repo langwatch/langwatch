@@ -30,9 +30,7 @@ export function buildTraceSummariesConditions(
 /**
  * Build common WHERE conditions for stored_spans queries.
  */
-export function buildStoredSpansConditions(
-  _params: ClickHouseFilterQueryParams,
-): string {
+export function buildStoredSpansConditions(_params: ClickHouseFilterQueryParams): string {
   const conditions: string[] = [
     "TenantId = {tenantId:String}",
     "StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})",
@@ -72,13 +70,11 @@ export function buildQueryFilter(
  * Standard result extractor for field/label/count rows.
  */
 export function extractStandardResults(rows: unknown[]): FilterOption[] {
-  return (rows as Array<{ field: string; label: string; count: string }>).map(
-    (row) => ({
-      field: row.field,
-      label: row.label,
-      count: parseInt(row.count, 10),
-    }),
-  );
+  return (rows as Array<{ field: string; label: string; count: string }>).map((row) => ({
+    field: row.field,
+    label: row.label,
+    count: parseInt(row.count, 10),
+  }));
 }
 
 /**
@@ -112,9 +108,7 @@ export function buildScopeConditions(
   // Prefix param references in SQL - sort by length desc for safety
   // to ensure longer keys are processed first (avoids partial replacements)
   let sql = result.conditions.join(" AND ");
-  const sortedKeys = Object.keys(result.params).sort(
-    (a, b) => b.length - a.length,
-  );
+  const sortedKeys = Object.keys(result.params).sort((a, b) => b.length - a.length);
   for (const key of sortedKeys) {
     sql = sql.replaceAll(`{${key}:`, `{${scopeParamPrefix}_${key}:`);
   }

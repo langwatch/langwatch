@@ -37,8 +37,7 @@ const mocks = vi.hoisted(() => ({
   conversationTurnsLoading: false,
 }));
 
-const conversationProps = () =>
-  mocks.conversationProps as ConversationViewProps;
+const conversationProps = () => mocks.conversationProps as ConversationViewProps;
 
 vi.mock("~/hooks/useAnnotationQueues", () => ({
   useAnnotationQueues: () => ({
@@ -68,9 +67,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 }));
 
 vi.mock("~/components/DashboardLayout", () => ({
-  DashboardLayout: ({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  ),
+  DashboardLayout: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("~/components/AnnotationsLayout", () => ({
@@ -98,12 +95,9 @@ vi.mock("~/features/traces-v2/components/TraceDrawer/conversationView", () => ({
 
 // The real adapter loads Shiki's grammars and themes, which the mocked
 // conversation above never highlights with.
-vi.mock(
-  "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter",
-  () => ({
-    useShikiAdapter: () => ({ getHighlighter: () => () => null }),
-  }),
-);
+vi.mock("~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter", () => ({
+  useShikiAdapter: () => ({ getHighlighter: () => () => null }),
+}));
 
 vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
@@ -141,9 +135,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-const { default: MyQueuePage } = await import(
-  "~/pages/[project]/annotations/my-queue"
-);
+const { default: MyQueuePage } = await import("~/pages/[project]/annotations/my-queue");
 
 const TRACE_STARTED_AT = 1_700_000_000_000;
 
@@ -328,9 +320,7 @@ describe("given a reviewer walking their annotation queue", () => {
       const user = userEvent.setup();
       renderPage();
 
-      await user.click(
-        screen.getByRole("button", { name: "pick another turn" }),
-      );
+      await user.click(screen.getByRole("button", { name: "pick another turn" }));
 
       expect(mocks.openDrawer).toHaveBeenCalledWith("traceV2Details", {
         traceId: OTHER_TURN.traceId,
@@ -366,9 +356,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(
         screen.queryByText(/Pass the thread_id on your integration/),
       ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("link", { name: "docs" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "docs" })).not.toBeInTheDocument();
     });
   });
 });

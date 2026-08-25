@@ -83,9 +83,7 @@ describe("reportSchedule", () => {
       ],
     ];
 
-    it.each(
-      roundTrips,
-    )("parses %s back to the friendly parts", (cron, parts) => {
+    it.each(roundTrips)("parses %s back to the friendly parts", (cron, parts) => {
       expect(partsFromCron(cron)).toEqual(parts);
     });
 
@@ -209,11 +207,7 @@ describe("reportSchedule", () => {
       ]);
 
       expect(grouped[0]).toEqual({ region: "General", zones: ["UTC"] });
-      expect(grouped.map((g) => g.region)).toEqual([
-        "General",
-        "America",
-        "Europe",
-      ]);
+      expect(grouped.map((g) => g.region)).toEqual(["General", "America", "Europe"]);
       expect(grouped[2]?.zones).toEqual(["Europe/Berlin", "Europe/Paris"]);
     });
   });

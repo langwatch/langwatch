@@ -25,10 +25,7 @@ const DEFAULT_ROWS = 480;
 
 export const seedBirdEye: SeedAction = {
   name: "seedBirdEye",
-  async run({
-    organization,
-    execute,
-  }: SeedActionContext): Promise<SeedActionOutcome> {
+  async run({ organization, execute }: SeedActionContext): Promise<SeedActionOutcome> {
     if (!execute) {
       return {
         status: "skipped",

@@ -36,9 +36,8 @@ function closeWithRecording() {
     releaseQueueDrain = resolve;
   });
 
-  const eventSourcing = Object.create(
-    EventSourcing.prototype,
-  ) as EventSourcing & Record<string, unknown>;
+  const eventSourcing = Object.create(EventSourcing.prototype) as EventSourcing &
+    Record<string, unknown>;
 
   Object.assign(eventSourcing, {
     _processRuntimeInstance: undefined,

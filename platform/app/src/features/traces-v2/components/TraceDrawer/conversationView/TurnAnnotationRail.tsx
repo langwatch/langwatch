@@ -84,8 +84,7 @@ export function TurnAnnotationRail({
   // the end instead when there is no card to take the place of: a new
   // annotation, or one this feed has not caught up with yet.
   const isEditorReplacingACard =
-    !!turnDraft?.annotationId &&
-    cards.some((a) => a.id === turnDraft.annotationId);
+    !!turnDraft?.annotationId && cards.some((a) => a.id === turnDraft.annotationId);
 
   const startAnnotation = () => {
     if (!canManage || turnDraft) return;
@@ -134,10 +133,7 @@ export function TurnAnnotationRail({
       )}
 
       {canManage && !turnDraft && (
-        <AddAnnotationButton
-          isRailEmpty={cards.length === 0}
-          onStart={startAnnotation}
-        />
+        <AddAnnotationButton isRailEmpty={cards.length === 0} onStart={startAnnotation} />
       )}
     </VStack>
   );

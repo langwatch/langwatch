@@ -100,9 +100,7 @@ export function CommandBarProvider({ children }: CommandBarProviderProps) {
     <CommandBarContext.Provider value={value}>
       {children}
       {/* Only render command bar if user is logged in AND not in /admin or /onboarding pages */}
-      {session && !pathname?.match(/^\/(admin|onboarding)(\/|$)/) && (
-        <CommandBar />
-      )}
+      {session && !pathname?.match(/^\/(admin|onboarding)(\/|$)/) && <CommandBar />}
     </CommandBarContext.Provider>
   );
 }

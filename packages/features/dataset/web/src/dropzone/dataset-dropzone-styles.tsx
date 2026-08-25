@@ -12,8 +12,7 @@ import { CloudUpload } from "lucide-react";
 // it composes over the theme-aware background color; `border` follows the
 // active color mode.
 export const DROPZONE_DOTTED_STYLE: React.CSSProperties = {
-  backgroundImage:
-    "radial-gradient(var(--chakra-colors-border) 1px, transparent 1px)",
+  backgroundImage: "radial-gradient(var(--chakra-colors-border) 1px, transparent 1px)",
   backgroundSize: "16px 16px",
 };
 

@@ -26,9 +26,7 @@ function stripProviderPrefix(modelId: string): string {
   return slashIndex === -1 ? modelId : modelId.slice(slashIndex + 1);
 }
 
-async function callAnthropicApi(
-  model: string,
-): Promise<AnthropicMessagesResponse> {
+async function callAnthropicApi(model: string): Promise<AnthropicMessagesResponse> {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -54,9 +52,7 @@ async function callAnthropicApi(
 describe("Model ID Boundary - Anthropic API", () => {
   describe.skipIf(!apiKey)("alias expansion", () => {
     it("accepts claude-sonnet-4 translated to claude-sonnet-4-20250514", async () => {
-      const translated = translateModelIdForLitellm(
-        "anthropic/claude-sonnet-4",
-      );
+      const translated = translateModelIdForLitellm("anthropic/claude-sonnet-4");
       const modelName = stripProviderPrefix(translated);
 
       const response = await callAnthropicApi(modelName);
@@ -67,9 +63,7 @@ describe("Model ID Boundary - Anthropic API", () => {
 
   describe.skipIf(!apiKey)("dot-to-dash conversion", () => {
     it("accepts claude-3.5-haiku translated to claude-3-5-haiku-latest", async () => {
-      const translated = translateModelIdForLitellm(
-        "anthropic/claude-3.5-haiku",
-      );
+      const translated = translateModelIdForLitellm("anthropic/claude-3.5-haiku");
       const modelName = stripProviderPrefix(translated) + "-latest";
 
       const response = await callAnthropicApi(modelName);

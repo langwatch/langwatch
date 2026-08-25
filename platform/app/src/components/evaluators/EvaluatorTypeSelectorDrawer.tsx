@@ -20,9 +20,7 @@ export type EvaluatorTypeSelectorDrawerProps = {
  * Drawer for selecting a specific evaluator type within a category.
  * Shows a list of evaluators for the selected category.
  */
-export function EvaluatorTypeSelectorDrawer(
-  props: EvaluatorTypeSelectorDrawerProps,
-) {
+export function EvaluatorTypeSelectorDrawer(props: EvaluatorTypeSelectorDrawerProps) {
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
@@ -60,17 +58,10 @@ export function EvaluatorTypeSelectorDrawer(
                 <LuArrowLeft size={20} />
               </Button>
             )}
-            <Heading>
-              {category ? categoryNames[category] : "Select Evaluator"}
-            </Heading>
+            <Heading>{category ? categoryNames[category] : "Select Evaluator"}</Heading>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-        >
+        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           <EvaluatorTypeSelectorContent
             category={category}
             onSelect={onSelect}

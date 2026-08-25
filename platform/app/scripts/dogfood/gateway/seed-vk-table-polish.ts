@@ -109,10 +109,7 @@ async function purgePrevious(target: SeedTarget) {
         `refusing to delete ${previous.length} previous fixture key(s): no ClickHouse client for ${target.projectId}, so their ledger and rollup rows would be stranded`,
       );
     }
-    for (const table of [
-      "gateway_budget_ledger_events",
-      "gateway_budget_scope_totals",
-    ]) {
+    for (const table of ["gateway_budget_ledger_events", "gateway_budget_scope_totals"]) {
       await client.command({
         query: `DELETE FROM ${table} WHERE TenantId = {tenantId:String} AND ScopeId IN ({ids:Array(String)})`,
         query_params: {
@@ -209,9 +206,7 @@ async function createInheritedBudgets(target: SeedTarget) {
  */
 function writeSecrets(secrets: Map<string, string>) {
   mkdirSync(dirname(SECRETS_FILE), { recursive: true });
-  const body = [...secrets]
-    .map(([name, value]) => `${name}=${value}`)
-    .join("\n");
+  const body = [...secrets].map(([name, value]) => `${name}=${value}`).join("\n");
   writeFileSync(SECRETS_FILE, `${body}\n`, { mode: 0o600 });
   chmodSync(SECRETS_FILE, 0o600);
 

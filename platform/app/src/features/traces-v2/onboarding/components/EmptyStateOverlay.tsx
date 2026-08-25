@@ -1,9 +1,6 @@
 import { Box, Flex } from "@chakra-ui/react";
 import { OnboardingMeshBackground } from "~/features/onboarding/components/OnboardingMeshBackground";
-import {
-  findStageDef,
-  type HeroLayout,
-} from "../chapters/onboardingJourneyConfig";
+import { findStageDef, type HeroLayout } from "../chapters/onboardingJourneyConfig";
 import { useEdgeGripAnchor } from "../hooks/useEdgeGripAnchor";
 import { useOnboardingStore } from "../store/onboardingStore";
 import { TracesEmptyOnboarding } from "./TracesEmptyOnboarding";
@@ -47,9 +44,7 @@ export const EmptyStateOverlay = () => {
           typewriter starts. The outro chapter also drops the mesh
           so the live table reads as the user's space, with only the
           thin top banner left as onboarding chrome. */}
-      {stage !== "settle" && heroLayout !== "topBanner" && (
-        <OnboardingMeshBackground />
-      )}
+      {stage !== "settle" && heroLayout !== "topBanner" && <OnboardingMeshBackground />}
       {/* Hero band — full-width horizontal fade. Sticks regardless
           of where the hero is anchored, because once the user is
           past the table-centric beats (drawer open, sidebar open)

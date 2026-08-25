@@ -38,8 +38,7 @@ describe("serviceVersionField", () => {
     });
 
     it("is not fooled by another key ending in the same word", () => {
-      process.env.OTEL_RESOURCE_ATTRIBUTES =
-        "app.version=1.2.3,service.version=git-abc";
+      process.env.OTEL_RESOURCE_ATTRIBUTES = "app.version=1.2.3,service.version=git-abc";
 
       expect(serviceVersionField()).toEqual({ "service.version": "git-abc" });
     });

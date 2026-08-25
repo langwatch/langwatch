@@ -13,12 +13,10 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { defaultRunawayContainmentDeps } from "../runaway-containment.deps";
 import type { AutomationService } from "@langwatch/automation-contract";
 
-const resolveOrganizationId =
-  vi.fn<(projectId: string) => Promise<string | undefined>>();
+const resolveOrganizationId = vi.fn<(projectId: string) => Promise<string | undefined>>();
 
 vi.mock("~/server/organizations/resolveOrganizationId", () => ({
-  resolveOrganizationId: (projectId: string) =>
-    resolveOrganizationId(projectId),
+  resolveOrganizationId: (projectId: string) => resolveOrganizationId(projectId),
 }));
 
 // A mutable holder read by `makeDeps()`, so a test can pick the path it

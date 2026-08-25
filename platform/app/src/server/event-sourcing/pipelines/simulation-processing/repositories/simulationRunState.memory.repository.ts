@@ -3,8 +3,8 @@ import { BaseMemoryProjectionStore } from "@langwatch/eventing";
 import type { SimulationRunStateRepository } from "./simulationRunState.repository";
 
 export class SimulationRunStateRepositoryMemory<
-    ProjectionType extends Projection = Projection,
-  >
+  ProjectionType extends Projection = Projection,
+>
   extends BaseMemoryProjectionStore<ProjectionType>
   implements SimulationRunStateRepository<ProjectionType>
 {

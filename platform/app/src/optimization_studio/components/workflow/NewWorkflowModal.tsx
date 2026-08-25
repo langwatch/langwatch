@@ -123,9 +123,7 @@ export const NewWorkflowModal = ({
             // This failure never crossed the wire, so the message is a local
             // parser's, not a code slug. See above.
             description: // no-raw-error-toast-ok
-              readFailure instanceof Error
-                ? readFailure.message
-                : String(readFailure),
+              readFailure instanceof Error ? readFailure.message : String(readFailure),
             type: "error",
           });
         }
@@ -146,11 +144,7 @@ export const NewWorkflowModal = ({
   } = useFileDrop(handleFileUpload);
 
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="xl"
-    >
+    <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()} size="xl">
       <Dialog.Content bg="bg" paddingX={0}>
         <Dialog.Header>
           <HStack gap={2}>
@@ -212,9 +206,7 @@ export const NewWorkflowModal = ({
               <WorkflowCard
                 data-testid="new-workflow-card-import"
                 name="From Export"
-                icon={
-                  <Upload color="var(--chakra-colors-fg-muted)" size={16} />
-                }
+                icon={<Upload color="var(--chakra-colors-fg-muted)" size={16} />}
                 description="Import a workflow from an exported JSON file"
                 onClick={handleClick}
                 onDragOver={handleDragOver}

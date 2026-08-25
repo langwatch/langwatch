@@ -19,10 +19,7 @@ interface TraceNewCountResult {
   acknowledge: () => void;
 }
 
-function nextBackoffInterval(
-  consecutiveZeros: number,
-  current: number,
-): number {
+function nextBackoffInterval(consecutiveZeros: number, current: number): number {
   if (consecutiveZeros >= BACKOFF_THRESHOLD * 2 && current < IDLE_MS) {
     return IDLE_MS;
   }
@@ -102,14 +99,7 @@ export function useTraceNewCount(): TraceNewCountResult {
   const prevCountRef = useRef<number | null>(null);
   useEffect(() => {
     prevCountRef.current = null;
-  }, [
-    project?.id,
-    timeRange.from,
-    timeRange.to,
-    timeRange.label,
-    since,
-    queryText,
-  ]);
+  }, [project?.id, timeRange.from, timeRange.to, timeRange.label, since, queryText]);
 
   const query = api.tracesV2.newCount.useQuery(
     {

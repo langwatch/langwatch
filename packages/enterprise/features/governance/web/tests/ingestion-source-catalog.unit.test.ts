@@ -51,10 +51,7 @@ describe("given the ingestion-source catalog", () => {
 
     /** @scenario "The configured-source list groups under the same two headings" */
     it("titles exactly two groups in plain language", () => {
-      expect(Object.keys(SOURCE_GROUP_META).sort()).toEqual([
-        "realtime",
-        "scheduled",
-      ]);
+      expect(Object.keys(SOURCE_GROUP_META).sort()).toEqual(["realtime", "scheduled"]);
       expect(SOURCE_GROUP_META.realtime.title).toBe("Real-time streams");
       expect(SOURCE_GROUP_META.scheduled.title).toBe("Synced on a schedule");
     });
@@ -62,9 +59,7 @@ describe("given the ingestion-source catalog", () => {
     /** @scenario "Add source menu lists every type by vendor, grouped in plain language" */
     it("keeps the internal mode words out of every group heading and blurb", () => {
       for (const meta of Object.values(SOURCE_GROUP_META)) {
-        expect(`${meta.title} ${meta.blurb}`).not.toMatch(
-          /\b(push|pull|s3)\b/i,
-        );
+        expect(`${meta.title} ${meta.blurb}`).not.toMatch(/\b(push|pull|s3)\b/i);
       }
     });
   });

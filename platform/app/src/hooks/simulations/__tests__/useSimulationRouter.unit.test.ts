@@ -49,9 +49,7 @@ describe("useSimulationRouter", () => {
 
         result.current.goToSimulationSet("test-set-123");
 
-        expect(mockPush).toHaveBeenCalledWith(
-          "/my-project/simulations/test-set-123",
-        );
+        expect(mockPush).toHaveBeenCalledWith("/my-project/simulations/test-set-123");
         expect(mockPush).toHaveBeenCalledTimes(1);
       });
 

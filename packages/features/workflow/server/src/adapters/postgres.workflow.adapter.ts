@@ -4,7 +4,10 @@ import type {
   WorkflowDslMigrationPort,
   WorkflowExecutionPort,
 } from "../ports/workflow.port";
-import { PrismaWorkflowRepository, type WorkflowDatabase } from "../repositories/prisma/prisma.workflow.repository";
+import {
+  PrismaWorkflowRepository,
+  type WorkflowDatabase,
+} from "../repositories/prisma/prisma.workflow.repository";
 import { WorkflowService } from "../services/workflow.service";
 
 export type PostgresWorkflowAdapterOptions = {

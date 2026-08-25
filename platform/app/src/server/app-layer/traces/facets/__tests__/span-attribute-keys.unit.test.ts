@@ -113,9 +113,7 @@ describe("buildSpanAttributeKeysFacetQuery", () => {
     });
 
     it("adds a case-insensitive prefix predicate against the key", () => {
-      expect(query.sql).toContain(
-        "lower(key) ILIKE concat({prefix:String}, '%')",
-      );
+      expect(query.sql).toContain("lower(key) ILIKE concat({prefix:String}, '%')");
     });
 
     it("binds the prefix as a separate param (no string interpolation)", () => {
@@ -153,9 +151,7 @@ describe("buildSpanAttributeKeysFacetQuery", () => {
       const outerWhereIdx = query.sql.lastIndexOf("WHERE key");
       expect(outerWhereIdx).toBeGreaterThan(-1);
       const outerWhere = query.sql.slice(outerWhereIdx);
-      expect(outerWhere).toContain(
-        "NOT startsWith(key, 'langwatch.reserved.')",
-      );
+      expect(outerWhere).toContain("NOT startsWith(key, 'langwatch.reserved.')");
     });
   });
 

@@ -71,8 +71,7 @@ function GroupsSettings() {
             <Alert.Content>
               <Alert.Title>Enterprise Feature</Alert.Title>
               <Alert.Description>
-                Groups are available on Enterprise plans. Contact sales to
-                upgrade.
+                Groups are available on Enterprise plans. Contact sales to upgrade.
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
@@ -91,8 +90,8 @@ function GroupsSettings() {
           <VStack align="start" gap={1}>
             <Heading as="h2">Groups</Heading>
             <Text color="fg.muted" fontSize="sm">
-              Assign access to many people at once. SCIM-synced groups are
-              managed by your identity provider.
+              Assign access to many people at once. SCIM-synced groups are managed by your
+              identity provider.
             </Text>
           </VStack>
         </HStack>
@@ -108,12 +107,8 @@ function GroupsSettings() {
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader>Group</Table.ColumnHeader>
-                    <Table.ColumnHeader width="120px">
-                      Source
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader textAlign="right">
-                      Access
-                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="120px">Source</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
                     <Table.ColumnHeader width="80px" textAlign="right">
                       Members
                     </Table.ColumnHeader>
@@ -144,25 +139,17 @@ function GroupsSettings() {
                         <VStack gap={1} align="end">
                           {g.bindings.map((b, i) => (
                             <HStack key={i} gap={1} fontSize="xs">
-                              <Badge
-                                colorPalette={roleBadgeColor(b.role)}
-                                size="sm"
-                              >
+                              <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
                                 {b.customRoleName ?? b.role}
                               </Badge>
                               <Text color="fg.muted">on</Text>
                               <Badge colorPalette="purple" size="sm">
-                                {scopeTypeLabel(b.scopeType)}{" "}
-                                {b.scopeName ?? b.scopeId}
+                                {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
                               </Badge>
                             </HStack>
                           ))}
                           {g.bindings.length === 0 && (
-                            <Text
-                              fontSize="xs"
-                              color="fg.subtle"
-                              textAlign="right"
-                            >
+                            <Text fontSize="xs" color="fg.subtle" textAlign="right">
                               No access configured
                             </Text>
                           )}

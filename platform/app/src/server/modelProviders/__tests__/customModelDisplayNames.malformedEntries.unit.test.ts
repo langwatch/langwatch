@@ -153,10 +153,7 @@ describe("given a row whose custom entry has a whitespace-only model id, alongsi
       // Asserts the whole key space positively rather than probing the ghost
       // keys for absence: a bare `toBeUndefined()` would also pass against a
       // map that came back empty for some unrelated reason.
-      expect(Object.keys(result).sort()).toEqual([
-        "mp_ws/aurora-8",
-        "vendorQ/aurora-8",
-      ]);
+      expect(Object.keys(result).sort()).toEqual(["mp_ws/aurora-8", "vendorQ/aurora-8"]);
     });
   });
 });

@@ -128,11 +128,7 @@ function groupsOf(
   groupBy: string,
 ): Record<string, Record<string, number>> | undefined {
   const groupData = entry[groupBy];
-  if (
-    typeof groupData !== "object" ||
-    groupData === null ||
-    Array.isArray(groupData)
-  ) {
+  if (typeof groupData !== "object" || groupData === null || Array.isArray(groupData)) {
     return undefined;
   }
   return groupData as Record<string, Record<string, number>>;

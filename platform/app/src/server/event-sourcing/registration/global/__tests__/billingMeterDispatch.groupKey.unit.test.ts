@@ -99,9 +99,7 @@ describe("billingMeterDispatch lane wiring", () => {
 
       expect(
         groupKeyFn(payloadFor({ tenantId: "project_x", aggregateId: "t1" })),
-      ).not.toBe(
-        groupKeyFn(payloadFor({ tenantId: "project_y", aggregateId: "t1" })),
-      );
+      ).not.toBe(groupKeyFn(payloadFor({ tenantId: "project_y", aggregateId: "t1" })));
     });
   });
 

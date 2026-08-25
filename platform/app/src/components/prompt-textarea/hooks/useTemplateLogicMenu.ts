@@ -40,9 +40,7 @@ export const useTemplateLogicMenu = ({
   const filteredConstructs = useMemo(() => {
     if (!menuQuery) return TEMPLATE_LOGIC_CONSTRUCTS;
     const lowerQuery = menuQuery.toLowerCase();
-    return TEMPLATE_LOGIC_CONSTRUCTS.filter((c) =>
-      c.keyword.startsWith(lowerQuery),
-    );
+    return TEMPLATE_LOGIC_CONSTRUCTS.filter((c) => c.keyword.startsWith(lowerQuery));
   }, [menuQuery]);
 
   const optionCount = filteredConstructs.length;
@@ -99,8 +97,7 @@ export const useTemplateLogicMenu = ({
 
       if (pipeIndex >= 0) {
         // Remove the pipe and calculate cursor position
-        insertText =
-          template.substring(0, pipeIndex) + template.substring(pipeIndex + 1);
+        insertText = template.substring(0, pipeIndex) + template.substring(pipeIndex + 1);
         newCursorPos = before.length + pipeIndex;
       } else {
         insertText = template;

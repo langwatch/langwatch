@@ -1,7 +1,7 @@
 import {
-	DEFAULT_TRACE_DEBOUNCE_MS,
-	reportSourceSchema,
-	type NotificationCadence,
+  DEFAULT_TRACE_DEBOUNCE_MS,
+  reportSourceSchema,
+  type NotificationCadence,
 } from "@langwatch/automation-contract";
 import {
   type AllSlices,
@@ -171,10 +171,7 @@ export const INITIAL_DRAFT: AutomationDraft = {
   slices: initialSlices(),
 };
 
-export function reducer(
-  state: AutomationDraft,
-  action: DraftAction,
-): AutomationDraft {
+export function reducer(state: AutomationDraft, action: DraftAction): AutomationDraft {
   switch (action.type) {
     case "HYDRATE":
       return action.value;
@@ -198,8 +195,7 @@ export function reducer(
           filters: {},
           filterQuery: null,
           action:
-            state.action === "SEND_EMAIL" ||
-            state.action === "SEND_SLACK_MESSAGE"
+            state.action === "SEND_EMAIL" || state.action === "SEND_SLACK_MESSAGE"
               ? state.action
               : null,
         };
@@ -220,8 +216,7 @@ export function reducer(
           customGraphId: null,
           alertType: null,
           action:
-            state.action === "SEND_EMAIL" ||
-            state.action === "SEND_SLACK_MESSAGE"
+            state.action === "SEND_EMAIL" || state.action === "SEND_SLACK_MESSAGE"
               ? state.action
               : null,
         };
@@ -257,9 +252,7 @@ export function reducer(
         cadenceConfirmed: true,
       };
     case "CONFIRM_CADENCE":
-      return state.cadenceConfirmed
-        ? state
-        : { ...state, cadenceConfirmed: true };
+      return state.cadenceConfirmed ? state : { ...state, cadenceConfirmed: true };
     case "SET_SLICE":
       return {
         ...state,
@@ -290,10 +283,7 @@ export interface PresetLabels {
  * REPORT as trace data — the visible bug where the drawer said "New report"
  * yet the save button read "Create automation" (field-5015).
  */
-export function presetLabels(
-  source: ConditionSource,
-  isEdit: boolean,
-): PresetLabels {
+export function presetLabels(source: ConditionSource, isEdit: boolean): PresetLabels {
   switch (source) {
     case "customGraph":
       return {
@@ -440,9 +430,7 @@ export function filtersAreSet(filters: AutomationDraft["filters"]): boolean {
  */
 export function subjectIsSet(draft: AutomationDraft): boolean {
   if (draft.source === "customGraph") {
-    return (
-      draft.customGraphId !== null && draft.graphAlert.seriesName.length > 0
-    );
+    return draft.customGraphId !== null && draft.graphAlert.seriesName.length > 0;
   }
   if (draft.source === "report") {
     const r = draft.report;
@@ -545,9 +533,7 @@ export function isNotifyAction(draft: AutomationDraft): boolean {
  *  graph alert or the JSON shape is unexpected (legacy / hand-edited rows).
  *  The drawer relies on this on edit hydration so the threshold fields
  *  pre-populate. */
-export function extractGraphAlertFromTriggerRow(
-  actionParams: unknown,
-): GraphAlertDraft {
+export function extractGraphAlertFromTriggerRow(actionParams: unknown): GraphAlertDraft {
   // Delegate to the SSOT parser on the server side. `parseGraphAlertRow`
   // uses the same Zod schema the writer produces (`graphAlertActionParamsSchema`),
   // so the drawer's edit-hydration path can never drift from the row shape.
@@ -579,9 +565,7 @@ export function extractGraphAlertFromTriggerRow(
  * cron rehydrates into the field, shows its error, and blocks Save until the
  * author fixes it. Seeded defaults fill only what the row doesn't carry.
  */
-export function extractReportFromTriggerRow(
-  actionParams: unknown,
-): ReportDraft {
+export function extractReportFromTriggerRow(actionParams: unknown): ReportDraft {
   if (typeof actionParams !== "object" || actionParams === null) {
     return INITIAL_REPORT_DRAFT;
   }
@@ -591,10 +575,7 @@ export function extractReportFromTriggerRow(
   };
   const draft: ReportDraft = {
     ...INITIAL_REPORT_DRAFT,
-    cron:
-      typeof schedule?.cron === "string"
-        ? schedule.cron
-        : INITIAL_REPORT_DRAFT.cron,
+    cron: typeof schedule?.cron === "string" ? schedule.cron : INITIAL_REPORT_DRAFT.cron,
     timezone:
       typeof schedule?.timezone === "string" && schedule.timezone.trim() !== ""
         ? schedule.timezone
@@ -606,11 +587,9 @@ export function extractReportFromTriggerRow(
   return {
     ...draft,
     sourceKind: content.kind,
-    customGraphId:
-      content.kind === "customGraph" ? content.customGraphId : null,
+    customGraphId: content.kind === "customGraph" ? content.customGraphId : null,
     dashboardId: content.kind === "dashboard" ? content.dashboardId : null,
-    topN:
-      content.kind === "traceQuery" ? content.topN : INITIAL_REPORT_DRAFT.topN,
+    topN: content.kind === "traceQuery" ? content.topN : INITIAL_REPORT_DRAFT.topN,
   };
 }
 

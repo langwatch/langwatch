@@ -38,9 +38,7 @@ const prismaWith = () => {
   };
   return {
     prisma,
-    repository: PrismaAuthzListingRepository.create(
-      prisma as unknown as AuthzDatabase,
-    ),
+    repository: PrismaAuthzListingRepository.create(prisma as unknown as AuthzDatabase),
   };
 };
 
@@ -89,10 +87,7 @@ describe("PrismaAuthzListingRepository", () => {
       expect(prisma.roleBinding.findMany).toHaveBeenCalledWith({
         where: {
           organizationId: "org-1",
-          OR: [
-            { userId: "alice" },
-            { groupId: { in: ["group-1", "group-2"] } },
-          ],
+          OR: [{ userId: "alice" }, { groupId: { in: ["group-1", "group-2"] } }],
         },
         include: DECORATION,
         orderBy: { createdAt: "asc" },

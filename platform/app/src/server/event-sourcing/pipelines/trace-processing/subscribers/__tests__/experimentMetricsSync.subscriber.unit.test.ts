@@ -118,10 +118,7 @@ describe("experimentMetricsSync subscriber (trace-side ECST publisher)", () => {
         state,
       });
 
-      expect(deps.lookupExperimentId).toHaveBeenCalledWith(
-        TEST_TENANT_ID,
-        "run-1",
-      );
+      expect(deps.lookupExperimentId).toHaveBeenCalledWith(TEST_TENANT_ID, "run-1");
       expect(deps.computeExperimentRunMetrics).toHaveBeenCalledWith({
         tenantId: TEST_TENANT_ID,
         experimentId: "exp-1",
@@ -216,9 +213,7 @@ describe("experimentMetricsSync subscriber (trace-side ECST publisher)", () => {
   describe("when computeExperimentRunMetrics fails", () => {
     it("logs warning and does not throw", async () => {
       const deps = createDeps();
-      deps.computeExperimentRunMetrics.mockRejectedValue(
-        new Error("Dispatch error"),
-      );
+      deps.computeExperimentRunMetrics.mockRejectedValue(new Error("Dispatch error"));
       const subscriber = createExperimentMetricsSyncHandler(deps);
 
       const state = createTraceSummaryState({

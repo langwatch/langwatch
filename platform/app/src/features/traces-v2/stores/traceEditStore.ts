@@ -15,9 +15,7 @@ import {
 export type TraceOverlayView = "edited" | "original";
 
 /** The trace-metadata half of a correction: an overlay, a clear, or nothing. */
-type TraceMetadataEdits = NonNullable<
-  TraceEditOverlayPatch["trace"]
->["metadata"];
+type TraceMetadataEdits = NonNullable<TraceEditOverlayPatch["trace"]>["metadata"];
 
 /**
  * One edited input or output. The drawer only ever sees a rendered string, so
@@ -121,10 +119,7 @@ interface TraceEditState {
    * it. Ignored once a baseline is set, so a refetch can never move the ground
    * under an edit in progress.
    */
-  adoptBasePatch: (params: {
-    traceId: string;
-    basePatch: TraceEditOverlayPatch;
-  }) => void;
+  adoptBasePatch: (params: { traceId: string; basePatch: TraceEditOverlayPatch }) => void;
   /**
    * Moves the session onto the correction as it stands right now, however far
    * the session had already got. Used immediately before a save so a correction
@@ -149,11 +144,7 @@ interface TraceEditState {
    * touched it, so typing a change and undoing it leaves no draft behind rather
    * than storing a correction that changes nothing.
    */
-  setSpanName: (params: {
-    spanId: string;
-    name: string;
-    baselineName: string;
-  }) => void;
+  setSpanName: (params: { spanId: string; name: string; baselineName: string }) => void;
   setSpanType: (params: {
     spanId: string;
     type: SpanTypes;
@@ -180,15 +171,9 @@ interface TraceEditState {
   deleteSpan: (spanId: string) => void;
   restoreSpan: (spanId: string) => void;
 
-  setTraceInput: (params: {
-    text: string;
-    baselineText: string | null;
-  }) => void;
+  setTraceInput: (params: { text: string; baselineText: string | null }) => void;
   resetTraceInput: () => void;
-  setTraceOutput: (params: {
-    text: string;
-    baselineText: string | null;
-  }) => void;
+  setTraceOutput: (params: { text: string; baselineText: string | null }) => void;
   resetTraceOutput: () => void;
 
   setTraceMetadata: (params: {
@@ -268,10 +253,7 @@ function rebasedParams(
   return next ?? drafts;
 }
 
-function sameEntries(
-  a: Record<string, unknown>,
-  b: Record<string, unknown>,
-): boolean {
+function sameEntries(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
   const keys = Object.keys(a);
   if (keys.length !== Object.keys(b).length) return false;
   return keys.every((key) => key in b && deepEqual(a[key], b[key]));
@@ -301,10 +283,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
  */
 function valuesAgree(baseline: unknown, value: unknown): boolean {
   if (deepEqual(baseline, value)) return true;
-  return (
-    typeof baseline === "string" &&
-    deepEqual(parsedOrUndefined(baseline), value)
-  );
+  return typeof baseline === "string" && deepEqual(parsedOrUndefined(baseline), value);
 }
 
 /** Reads the value a nested attribute path holds, or undefined when it has none. */
@@ -383,10 +362,7 @@ function ioTextIsUnchanged({
 }
 
 /** Drops one field from a draft, leaving the rest of it alone. */
-function withoutField(
-  draft: SpanEditDraft,
-  field: SpanDraftField,
-): SpanEditDraft {
+function withoutField(draft: SpanEditDraft, field: SpanDraftField): SpanEditDraft {
   const { [field]: _dropped, ...rest } = draft;
   return rest;
 }
@@ -460,9 +436,7 @@ const sessionActions = (set: SetTraceEditState) => ({
 
   dropSessionForOtherTrace: (traceId: string) =>
     set((s) =>
-      s.editingTraceId !== null && s.editingTraceId !== traceId
-        ? CLEARED_SESSION
-        : {},
+      s.editingTraceId !== null && s.editingTraceId !== traceId ? CLEARED_SESSION : {},
     ),
 });
 
@@ -486,9 +460,7 @@ const spanFieldActions = (set: SetTraceEditState) => ({
   }) =>
     set((s) => ({
       spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) =>
-        name === baselineName
-          ? withoutField(draft, "name")
-          : { ...draft, name },
+        name === baselineName ? withoutField(draft, "name") : { ...draft, name },
       ),
     })),
 
@@ -503,9 +475,7 @@ const spanFieldActions = (set: SetTraceEditState) => ({
   }) =>
     set((s) => ({
       spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) =>
-        type === baselineType
-          ? withoutField(draft, "type")
-          : { ...draft, type },
+        type === baselineType ? withoutField(draft, "type") : { ...draft, type },
       ),
     })),
 
@@ -528,13 +498,7 @@ const spanFieldActions = (set: SetTraceEditState) => ({
       ),
     })),
 
-  resetSpanField: ({
-    spanId,
-    field,
-  }: {
-    spanId: string;
-    field: SpanDraftField;
-  }) =>
+  resetSpanField: ({ spanId, field }: { spanId: string; field: SpanDraftField }) =>
     set((s) => ({
       spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) =>
         withoutField(draft, field),
@@ -685,8 +649,7 @@ export function selectSpanEditBaseline({
   const baseline: EffectiveSpanEdit = {};
   if (base.name != null) baseline.name = base.name;
   if (base.type !== undefined) baseline.type = base.type;
-  if (base.input !== undefined)
-    baseline.input = stringifySpanIO(base.input) ?? "";
+  if (base.input !== undefined) baseline.input = stringifySpanIO(base.input) ?? "";
   if (base.output !== undefined) {
     baseline.output = stringifySpanIO(base.output) ?? "";
   }
@@ -733,10 +696,7 @@ export function selectTraceMetadataBaseline({
 
 /** True when this span is removed by the correction as it currently stands. */
 export function selectIsSpanDeleted(
-  state: Pick<
-    TraceEditState,
-    "basePatch" | "deletedSpanIds" | "restoredSpanIds"
-  >,
+  state: Pick<TraceEditState, "basePatch" | "deletedSpanIds" | "restoredSpanIds">,
   spanId: string,
 ): boolean {
   if (state.deletedSpanIds.includes(spanId)) return true;
@@ -779,9 +739,7 @@ function draftFieldCount(draft: SpanEditDraft): number {
  * of the count: the reviewer is being told what they are about to add, not
  * what somebody already saved.
  */
-export function summarizeTraceEdit(
-  state: TraceEditDraftState,
-): TraceEditSummary {
+export function summarizeTraceEdit(state: TraceEditDraftState): TraceEditSummary {
   const deleted = new Set(state.deletedSpanIds);
   let changedFields = 0;
   if (state.traceInputDraft) changedFields++;
@@ -813,9 +771,7 @@ export function selectIsTraceEditDirty(state: TraceEditDraftState): boolean {
  * however the reviewer rewrites it; anything else lets the encoder decide from
  * the new text.
  */
-function baselineShapeHint(
-  baselineText: string | null,
-): SpanInputOutput | null {
+function baselineShapeHint(baselineText: string | null): SpanInputOutput | null {
   if (baselineText === null) return null;
   const trimmed = baselineText.trim();
   if (trimmed.length === 0) return null;
@@ -941,9 +897,7 @@ function mergeSpanPatch({
  * server uses, so the drawer and the suggestion flow agree on what a given
  * piece of text means.
  */
-export function buildTraceEditPatch(
-  state: TraceEditDraftState,
-): TraceEditOverlayPatch {
+export function buildTraceEditPatch(state: TraceEditDraftState): TraceEditOverlayPatch {
   const deletedSpanIds = mergeDeletedSpanIds(state);
   const trace = mergeTracePatch(state);
 
@@ -1012,9 +966,7 @@ function mergeTraceMetadata(state: TraceEditDraftState): TraceMetadataEdits {
 }
 
 /** The trace's own corrected input, output and metadata, when any has one. */
-function mergeTracePatch(
-  state: TraceEditDraftState,
-): TraceEditOverlayPatch["trace"] {
+function mergeTracePatch(state: TraceEditDraftState): TraceEditOverlayPatch["trace"] {
   const base = state.basePatch?.trace;
   const input = state.traceInputDraft
     ? { value: state.traceInputDraft.text }

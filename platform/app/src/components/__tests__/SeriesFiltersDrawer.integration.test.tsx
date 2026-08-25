@@ -60,9 +60,7 @@ import type { FilterParam } from "../../hooks/useFilterParams";
 import type { FilterField } from "../../server/filters/types";
 import { SeriesFiltersDrawer } from "../SeriesFilterDrawer";
 
-function renderDrawer(
-  props: Partial<Parameters<typeof SeriesFiltersDrawer>[0]> = {},
-) {
+function renderDrawer(props: Partial<Parameters<typeof SeriesFiltersDrawer>[0]> = {}) {
   const defaultProps = {
     filters: {} as Record<FilterField, FilterParam>,
     onChange: vi.fn(),

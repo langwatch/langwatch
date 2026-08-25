@@ -184,10 +184,7 @@ export class ShareService {
     maxViews?: number | null;
     userId?: string | null;
   }): Promise<ShareLink> {
-    if (
-      resourceType === "TRACE" &&
-      !(await this.deps.isTraceSharingEnabled(projectId))
-    ) {
+    if (resourceType === "TRACE" && !(await this.deps.isTraceSharingEnabled(projectId))) {
       throw new TraceSharingDisabledError();
     }
 
@@ -231,13 +228,7 @@ export class ShareService {
   }
 
   /** Revoke a single link. Auto-unpins only when it was the trace's last share. */
-  async revokeById({
-    id,
-    projectId,
-  }: {
-    id: string;
-    projectId: string;
-  }): Promise<void> {
+  async revokeById({ id, projectId }: { id: string; projectId: string }): Promise<void> {
     const share = await this.repo.findById({ id, projectId });
     if (!share) return;
 

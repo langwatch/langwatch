@@ -78,8 +78,7 @@ describe("PrismaOrganizationRepository.deleteMember", () => {
       ]);
 
       const refused = outcomes.filter(
-        (outcome): outcome is PromiseRejectedResult =>
-          outcome.status === "rejected",
+        (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
       );
       expect(refused).toHaveLength(1);
       expect(refused[0]!.reason).toMatchObject({

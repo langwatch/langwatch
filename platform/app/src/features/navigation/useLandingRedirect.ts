@@ -182,8 +182,9 @@ function useReplaceOnce(): (destination: string | null) => void {
  *        specs/navigation/navigation-v2-landing.feature
  */
 export function useLandingRedirect(): void {
-  const { project, organization, organizations, isLoading } =
-    useOrganizationTeamProject({ redirectToOnboarding: false });
+  const { project, organization, organizations, isLoading } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
   const resolved = api.governance.resolveHome.useQuery(
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization?.id, staleTime: 60_000, retry: false },
@@ -198,12 +199,12 @@ export function useLandingRedirect(): void {
   );
   const navigationResolution = useNavigationMode();
   const isV2 =
-    navigationResolution.status === "ready" &&
-    navigationResolution.mode !== "legacy";
+    navigationResolution.status === "ready" && navigationResolution.mode !== "legacy";
   // Legacy mode never reads the product list, and must not pay for the
   // flag queries behind it.
-  const { reachableProducts, isLoading: isReachableLoading } =
-    useReachableProducts({ enabled: isV2 });
+  const { reachableProducts, isLoading: isReachableLoading } = useReachableProducts({
+    enabled: isV2,
+  });
   const llmOpsProjectSlug = useLlmOpsProjectSlug();
   const replaceOnce = useReplaceOnce();
 
@@ -220,8 +221,7 @@ export function useLandingRedirect(): void {
           : null,
         projectSlug: project?.slug ?? null,
         projectHomeSlug: llmOpsProjectSlug,
-        isOrgless:
-          !isLoading && !organization && (organizations?.length ?? 0) === 0,
+        isOrgless: !isLoading && !organization && (organizations?.length ?? 0) === 0,
         lastVisitedHomeKind,
       }),
     );

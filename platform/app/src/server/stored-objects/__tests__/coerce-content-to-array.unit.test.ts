@@ -12,18 +12,14 @@ describe("coerceContentToArray", () => {
   describe("when content is a JSON-encoded array string", () => {
     it("parses and returns the array", () => {
       const json = '[{"type":"text","text":"hi"}]';
-      expect(coerceContentToArray(json)).toEqual([
-        { type: "text", text: "hi" },
-      ]);
+      expect(coerceContentToArray(json)).toEqual([{ type: "text", text: "hi" }]);
     });
   });
 
   describe("when content is a Python-repr array string", () => {
     it("converts single quotes and parses", () => {
       const repr = "[{'type': 'text', 'text': 'hi'}]";
-      expect(coerceContentToArray(repr)).toEqual([
-        { type: "text", text: "hi" },
-      ]);
+      expect(coerceContentToArray(repr)).toEqual([{ type: "text", text: "hi" }]);
     });
 
     it("handles None, True, False", () => {
@@ -134,9 +130,7 @@ describe("coerceContentToArray", () => {
 
     it("translates \\xHH inside a python double-quoted string", () => {
       const repr = "[{'type': 'text', 'text': \"i'm\\x07ok\"}]";
-      expect(coerceContentToArray(repr)).toEqual([
-        { type: "text", text: "i'mok" },
-      ]);
+      expect(coerceContentToArray(repr)).toEqual([{ type: "text", text: "i'mok" }]);
     });
   });
 });

@@ -48,9 +48,7 @@ export const messageSnapshotCommandDataSchema = z.object({
   status: z.string().optional(),
   occurredAt: z.number(),
 });
-export type MessageSnapshotCommandData = z.infer<
-  typeof messageSnapshotCommandDataSchema
->;
+export type MessageSnapshotCommandData = z.infer<typeof messageSnapshotCommandDataSchema>;
 
 export const finishRunCommandDataSchema = z.object({
   tenantId: z.string(),
@@ -102,9 +100,7 @@ export const textMessageEndCommandDataSchema = z.object({
   messageIndex: z.number().optional(),
   occurredAt: z.number(),
 });
-export type TextMessageEndCommandData = z.infer<
-  typeof textMessageEndCommandDataSchema
->;
+export type TextMessageEndCommandData = z.infer<typeof textMessageEndCommandDataSchema>;
 
 export const computeRunMetricsCommandDataSchema = z.object({
   tenantId: z.string(),

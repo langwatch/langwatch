@@ -107,10 +107,7 @@ describe("extractDigest, given a collection read", () => {
         resource: "trace",
         verb: "search",
         output: JSON.stringify({
-          traces: [
-            { trace_id: "trace_1" },
-            "… 40 more items truncated",
-          ],
+          traces: [{ trace_id: "trace_1" }, "… 40 more items truncated"],
           pagination: { totalHits: 41 },
         }),
       });

@@ -40,6 +40,4 @@ export const evaluationExecutionResultSchema = z.object({
   inputs: z.record(z.string(), z.any()).optional(),
 });
 
-export type EvaluationExecutionResult = z.infer<
-  typeof evaluationExecutionResultSchema
->;
+export type EvaluationExecutionResult = z.infer<typeof evaluationExecutionResultSchema>;

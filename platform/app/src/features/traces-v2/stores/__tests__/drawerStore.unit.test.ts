@@ -46,9 +46,9 @@ describe("drawerStore.setWidthPx", () => {
       it("persists to localStorage", () => {
         useDrawerStore.getState().setWidthPx(900);
         expect(useDrawerStore.getState().widthPx).toBe(900);
-        expect(
-          localStorage.getItem("langwatch:traces-v2:drawer-width-px:v1"),
-        ).toBe("900");
+        expect(localStorage.getItem("langwatch:traces-v2:drawer-width-px:v1")).toBe(
+          "900",
+        );
       });
     });
   });
@@ -59,9 +59,7 @@ describe("drawerStore.setWidthPx", () => {
         useDrawerStore.getState().setWidthPx(900);
         useDrawerStore.getState().setWidthPx(null);
         expect(useDrawerStore.getState().widthPx).toBeNull();
-        expect(
-          localStorage.getItem("langwatch:traces-v2:drawer-width-px:v1"),
-        ).toBeNull();
+        expect(localStorage.getItem("langwatch:traces-v2:drawer-width-px:v1")).toBeNull();
       });
     });
   });
@@ -108,9 +106,7 @@ describe("drawerStore.toggleSnapMaximize", () => {
         // narrower than the default so restore never lands wider than
         // the snap target.
         const snapWidth = VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX;
-        expect(state.widthPx).toBe(
-          Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth),
-        );
+        expect(state.widthPx).toBe(Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth));
       });
     });
   });
@@ -122,9 +118,7 @@ describe("drawerStore pane controls", () => {
     describe("when togglePaneCollapsed fires", () => {
       it("flips the collapsed flag and persists to localStorage", () => {
         useDrawerStore.getState().togglePaneCollapsed("visualization");
-        expect(
-          useDrawerStore.getState().paneState.visualization.collapsed,
-        ).toBe(true);
+        expect(useDrawerStore.getState().paneState.visualization.collapsed).toBe(true);
         expect(
           localStorage.getItem("langwatch:traces-v2:drawer-pane-state:v2"),
         ).not.toBeNull();
@@ -163,15 +157,11 @@ describe("drawerStore pane controls", () => {
         useDrawerStore.getState().selectSpan("span-abc");
         expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
         useDrawerStore.getState().togglePaneCollapsed("spanDetail");
-        expect(useDrawerStore.getState().paneState.spanDetail.collapsed).toBe(
-          true,
-        );
+        expect(useDrawerStore.getState().paneState.spanDetail.collapsed).toBe(true);
         // Collapse alone must NOT touch the selection.
         expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
         useDrawerStore.getState().togglePaneCollapsed("spanDetail");
-        expect(useDrawerStore.getState().paneState.spanDetail.collapsed).toBe(
-          false,
-        );
+        expect(useDrawerStore.getState().paneState.spanDetail.collapsed).toBe(false);
         expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
       });
     });

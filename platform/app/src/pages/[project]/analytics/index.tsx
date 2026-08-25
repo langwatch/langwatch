@@ -70,10 +70,7 @@ function AnalyticsContent() {
 
 function DocumentsMetrics() {
   const { filterParams, queryOpts } = useFilterParams();
-  const documents = api.analytics.topUsedDocuments.useQuery(
-    filterParams,
-    queryOpts,
-  );
+  const documents = api.analytics.topUsedDocuments.useQuery(filterParams, queryOpts);
 
   const count = documents.data?.totalUniqueDocuments;
 
@@ -92,11 +89,7 @@ function DocumentsMetrics() {
         <Card.Body>
           <Tabs.Root variant="plain" defaultValue="total-documents">
             <Tabs.List gap={12}>
-              <Tabs.Trigger
-                value="total-documents"
-                paddingX={0}
-                paddingBottom={4}
-              >
+              <Tabs.Trigger value="total-documents" paddingX={0} paddingBottom={4}>
                 <VStack align="start">
                   <Text color="fg">Total documents</Text>
                   <Box textStyle="2xl" color="fg" fontWeight="bold">
@@ -147,8 +140,7 @@ function CustomReportsSection({ slug }: { slug: string }) {
                   Build your own dashboard
                 </Text>
                 <Text textStyle="xs" color="fg.muted">
-                  Drag and drop charts to track the metrics that matter most to
-                  your team.
+                  Drag and drop charts to track the metrics that matter most to your team.
                 </Text>
               </VStack>
               <Link

@@ -15,15 +15,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
 import type * as TracesApiModule from "@/client-sdk/services/traces/traces-api.service";
 
-vi.mock(
-  "@/client-sdk/services/traces/traces-api.service",
-  async (importOriginal) => {
-    const actual = await importOriginal<typeof TracesApiModule>();
-    return { ...actual, TracesApiService: vi.fn() };
-  },
-);
+vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof TracesApiModule>();
+  return { ...actual, TracesApiService: vi.fn() };
+});
 
-vi.mock("../../utils/apiKey", () => ({ resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })) }));
+vi.mock("../../utils/apiKey", () => ({
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
+}));
 
 const spinnerFail = vi.fn();
 vi.mock("ora", () => ({

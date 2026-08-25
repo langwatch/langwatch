@@ -93,9 +93,7 @@ describe("Pre-compiled Scenario Child Process", () => {
         timeout: 30000,
       });
 
-      expect(boot.stdout?.toString() ?? "").toContain(
-        "Failed to parse job data",
-      );
+      expect(boot.stdout?.toString() ?? "").toContain("Failed to parse job data");
     }, 35000);
 
     /** @scenario 'A simulation still reports its spans' */

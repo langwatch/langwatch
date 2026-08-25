@@ -46,9 +46,7 @@ describe("Pagination", () => {
       expect(screen.getByTestId("pagination-page-1")).toBeInTheDocument();
       expect(screen.getByTestId("pagination-page-3")).toBeInTheDocument();
       expect(screen.getByTestId("pagination-page-100")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("pagination-page-50"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("pagination-page-50")).not.toBeInTheDocument();
       expect(screen.getByText("…")).toBeInTheDocument();
     });
 
@@ -85,9 +83,7 @@ describe("Pagination", () => {
         "aria-current",
         "page",
       );
-      expect(screen.getByTestId("pagination-page-2")).not.toHaveAttribute(
-        "aria-current",
-      );
+      expect(screen.getByTestId("pagination-page-2")).not.toHaveAttribute("aria-current");
     });
 
     /** @scenario "Back is unavailable on the first page" */
@@ -175,12 +171,10 @@ describe("Pagination", () => {
       it("offers no rows-per-page control when the table cannot change it", () => {
         renderPagination({ onPageSizeChange: undefined });
 
-        expect(
-          screen.queryByTestId("pagination-page-size"),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.getByTestId("pagination-indicator"),
-        ).not.toHaveTextContent("per page");
+        expect(screen.queryByTestId("pagination-page-size")).not.toBeInTheDocument();
+        expect(screen.getByTestId("pagination-indicator")).not.toHaveTextContent(
+          "per page",
+        );
       });
     });
   });
@@ -230,9 +224,7 @@ describe("Pagination", () => {
 
       expect(screen.getByTestId("pagination")).toBeInTheDocument();
       expect(screen.getByTestId("pagination-placeholder")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("pagination-indicator"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("pagination-indicator")).not.toBeInTheDocument();
       expect(screen.getByTestId("pagination-prev")).toBeDisabled();
       expect(screen.getByTestId("pagination-next")).toBeDisabled();
     });

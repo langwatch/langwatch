@@ -37,16 +37,16 @@ describe("scenario-run-status-config", () => {
         }
       });
 
-      it.each(
-        allStatuses,
-      )("has colorPalette, label, isComplete, and fgColor for %s", (status) => {
-        const config: ScenarioRunStatusConfig =
-          SCENARIO_RUN_STATUS_CONFIG[status];
-        expect(typeof config.colorPalette).toBe("string");
-        expect(typeof config.label).toBe("string");
-        expect(typeof config.isComplete).toBe("boolean");
-        expect(typeof config.fgColor).toBe("string");
-      });
+      it.each(allStatuses)(
+        "has colorPalette, label, isComplete, and fgColor for %s",
+        (status) => {
+          const config: ScenarioRunStatusConfig = SCENARIO_RUN_STATUS_CONFIG[status];
+          expect(typeof config.colorPalette).toBe("string");
+          expect(typeof config.label).toBe("string");
+          expect(typeof config.isComplete).toBe("boolean");
+          expect(typeof config.fgColor).toBe("string");
+        },
+      );
     });
   });
 
@@ -55,9 +55,7 @@ describe("scenario-run-status-config", () => {
       it("returns the PENDING icon and PENDING fgColor", () => {
         const result = getIconAndColor(undefined);
 
-        expect(result.icon).toBe(
-          SCENARIO_RUN_STATUS_ICONS[ScenarioRunStatus.PENDING],
-        );
+        expect(result.icon).toBe(SCENARIO_RUN_STATUS_ICONS[ScenarioRunStatus.PENDING]);
         expect(result.color).toBe(
           SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.PENDING].fgColor,
         );
@@ -68,9 +66,7 @@ describe("scenario-run-status-config", () => {
       it("returns the matching icon and fgColor", () => {
         const result = getIconAndColor(ScenarioRunStatus.SUCCESS);
 
-        expect(result.icon).toBe(
-          SCENARIO_RUN_STATUS_ICONS[ScenarioRunStatus.SUCCESS],
-        );
+        expect(result.icon).toBe(SCENARIO_RUN_STATUS_ICONS[ScenarioRunStatus.SUCCESS]);
         expect(result.color).toBe(
           SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor,
         );

@@ -20,10 +20,7 @@ import { api } from "~/utils/api";
 import { linkAccount } from "~/utils/auth-client";
 import { titleCase } from "~/utils/stringCasing";
 
-const getProviderDisplayName = (
-  provider: string,
-  providerAccountId: string,
-) => {
+const getProviderDisplayName = (provider: string, providerAccountId: string) => {
   if (provider === "auth0") {
     const [actualProvider] = providerAccountId.split("|");
 
@@ -34,10 +31,7 @@ const getProviderDisplayName = (
       github: "GitHub",
     };
 
-    return (
-      providerMap[actualProvider ?? ""] ??
-      titleCase(actualProvider ?? "unknown")
-    );
+    return providerMap[actualProvider ?? ""] ?? titleCase(actualProvider ?? "unknown");
   }
   return titleCase(provider);
 };
@@ -86,8 +80,7 @@ export function SignInMethodsSection() {
     );
   }
 
-  const canChangePassword =
-    isAuthProvider === "email" || isAuthProvider === "auth0";
+  const canChangePassword = isAuthProvider === "email" || isAuthProvider === "auth0";
   const isEmailMode = isAuthProvider === "email";
 
   const handleLinkProvider = () => {
@@ -157,8 +150,8 @@ export function SignInMethodsSection() {
     <VStack align="stretch" gap={3}>
       {hasSSOProvider && (
         <Text fontSize="xs" color="fg.muted">
-          You sign in via your company&apos;s SSO provider. Additional sign-in
-          methods can&apos;t be linked.
+          You sign in via your company&apos;s SSO provider. Additional sign-in methods
+          can&apos;t be linked.
         </Text>
       )}
 
@@ -170,10 +163,7 @@ export function SignInMethodsSection() {
             <HStack key={account.id} width="full" gap={2}>
               <LuKeyRound />
               <Text fontSize="sm">
-                {getProviderDisplayName(
-                  account.provider,
-                  account.providerAccountId,
-                )}
+                {getProviderDisplayName(account.provider, account.providerAccountId)}
               </Text>
               <Spacer />
               {credential && canChangePassword && (

@@ -8,20 +8,12 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
   const contexts = span.rag?.contexts ?? [];
 
   function updateContext(index: number, partial: Partial<RAGContext>) {
-    const updated = contexts.map((c, i) =>
-      i === index ? { ...c, ...partial } : c,
-    );
+    const updated = contexts.map((c, i) => (i === index ? { ...c, ...partial } : c));
     updateSpan(span.id, { rag: { contexts: updated } });
   }
 
   return (
-    <Box
-      rounded="lg"
-      border="1px solid"
-      borderColor="teal.500/20"
-      bg="teal.500/5"
-      p={4}
-    >
+    <Box rounded="lg" border="1px solid" borderColor="teal.500/20" bg="teal.500/5" p={4}>
       <Text fontSize="sm" fontWeight="semibold" color="teal.400" mb={3}>
         RAG Contexts
       </Text>
@@ -58,9 +50,7 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
                 size="sm"
                 flex={1}
                 value={ctx.document_id}
-                onChange={(e) =>
-                  updateContext(i, { document_id: e.target.value })
-                }
+                onChange={(e) => updateContext(i, { document_id: e.target.value })}
                 placeholder="Document ID"
               />
               <Input
@@ -87,10 +77,7 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
           onClick={() =>
             updateSpan(span.id, {
               rag: {
-                contexts: [
-                  ...contexts,
-                  { document_id: "", chunk_id: "", content: "" },
-                ],
+                contexts: [...contexts, { document_id: "", chunk_id: "", content: "" }],
               },
             })
           }

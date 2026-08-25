@@ -116,9 +116,7 @@ export function hasPriorReply(messages: ThinkingMessage[]): boolean {
 }
 
 /** The last tool call that has NOT settled — the one actually running now. */
-export function runningTool(
-  message: ThinkingMessage | undefined,
-): ToolPart | null {
+export function runningTool(message: ThinkingMessage | undefined): ToolPart | null {
   if (!message?.parts) return null;
   const running = message.parts.findLast(
     (part) =>
@@ -142,9 +140,7 @@ export function settledTool(message: ThinkingMessage | undefined): boolean {
 
 /** Has the model actually produced any prose yet? */
 export function hasTokens(message: ThinkingMessage | undefined): boolean {
-  return !!message?.parts?.some(
-    (part) => part.type === "text" && !!part.text?.trim(),
-  );
+  return !!message?.parts?.some((part) => part.type === "text" && !!part.text?.trim());
 }
 
 /**

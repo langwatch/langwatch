@@ -1,9 +1,5 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
-import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { buildFailureResults } from "~/server/scenarios/scenario-failure-results";
@@ -49,9 +45,7 @@ const SCHEMA = defineCommandSchema(
  * Collects traceIds from prior events, deduplicated in first-seen order:
  * MessageSnapshot `data.traceIds` arrays and TextMessageEnd `data.traceId`.
  */
-function collectTraceIds(
-  events: readonly SimulationProcessingEvent[],
-): string[] {
+function collectTraceIds(events: readonly SimulationProcessingEvent[]): string[] {
   const seen = new Set<string>();
   const traceIds: string[] = [];
   const push = (traceId: string | undefined) => {
@@ -88,10 +82,10 @@ function collectTraceIds(
  * switches to `.withCommandInstance(...)`; without deps the handler emits
  * exactly what the caller supplied, with no backfill.
  */
-export class FinishRunCommand
-  implements
-    CommandHandler<Command<FinishRunCommandData>, SimulationProcessingEvent>
-{
+export class FinishRunCommand implements CommandHandler<
+  Command<FinishRunCommandData>,
+  SimulationProcessingEvent
+> {
   static readonly schema = SCHEMA;
 
   constructor(private readonly deps?: FinishRunDeps) {}

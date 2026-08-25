@@ -108,8 +108,7 @@ export const lambdaFetch = async <T>(
     let staged: StagedObject | null = null;
     if (projectId !== undefined && init?.body !== undefined) {
       const threshold =
-        env.LANGEVALS_STAGING_THRESHOLD_BYTES ??
-        INVOKE_STAGING_THRESHOLD_BYTES_DEFAULT;
+        env.LANGEVALS_STAGING_THRESHOLD_BYTES ?? INVOKE_STAGING_THRESHOLD_BYTES_DEFAULT;
       if (Buffer.byteLength(invokeBody, "utf-8") > threshold) {
         staged = await stagePayloadToS3({
           projectId,
@@ -160,8 +159,7 @@ export const lambdaFetch = async <T>(
       ? Buffer.from(response.Payload).toString("utf-8")
       : "";
 
-    const actualBody =
-      responsePayload.split("\u0000").filter(Boolean).pop() ?? "";
+    const actualBody = responsePayload.split("\u0000").filter(Boolean).pop() ?? "";
 
     const statusCode = response.StatusCode ?? 200;
 

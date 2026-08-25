@@ -26,11 +26,7 @@ function normalizeOption(option: Option): SegmentedOption {
  * (trace/spans, edited/original). View *formats* are picked through
  * `<FormatSelect>` instead, which compresses them into one control.
  */
-export function SegmentedToggle({
-  value,
-  onChange,
-  options,
-}: SegmentedToggleProps) {
+export function SegmentedToggle({ value, onChange, options }: SegmentedToggleProps) {
   return (
     <HStack gap={0.5} flexShrink={0} height="26px" padding={0.5}>
       {options.map((rawOption) => {

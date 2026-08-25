@@ -26,15 +26,11 @@ describe("public application config", () => {
       /<meta name="langwatch-public-config" content="([A-Za-z0-9_-]+)">/,
     )?.[1];
 
-    expect(html).not.toContain(
-      `script data-${PUBLIC_APP_CONFIG_META_NAME}`,
-    );
+    expect(html).not.toContain(`script data-${PUBLIC_APP_CONFIG_META_NAME}`);
     expect(
       readPublicAppConfig({
         querySelector: () =>
-          content
-            ? ({ getAttribute: () => content } as unknown as Element)
-            : null,
+          content ? ({ getAttribute: () => content } as unknown as Element) : null,
       }),
     ).toEqual(config);
   });
@@ -48,7 +44,7 @@ describe("public application config", () => {
       },
     });
 
-    expect(html).not.toContain('<script>bad</script>');
+    expect(html).not.toContain("<script>bad</script>");
     const payload = html.match(/content="([A-Za-z0-9_-]+)"/)?.[1];
     expect(payload).toMatch(/^[A-Za-z0-9_-]+$/);
   });

@@ -57,8 +57,7 @@ const turnStore: StateProjectionStore<LangyConversationTurnData> = {
   tryLoad: async () => null,
 };
 
-const hasRunTokenKey = (o: object) =>
-  Object.keys(o).some((k) => /run.?token/i.test(k));
+const hasRunTokenKey = (o: object) => Object.keys(o).some((k) => /run.?token/i.test(k));
 
 describe("runToken projection exclusion", () => {
   describe("given a conversation created with a runToken", () => {

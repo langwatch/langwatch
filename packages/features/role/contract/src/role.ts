@@ -9,11 +9,7 @@ export const ROLE_KIND = {
 export const roleKindSchema = z.enum(ROLE_KIND);
 export type RoleKind = z.infer<typeof roleKindSchema>;
 
-export const roleBindingScopeTypeSchema = z.enum([
-  "ORGANIZATION",
-  "TEAM",
-  "PROJECT",
-]);
+export const roleBindingScopeTypeSchema = z.enum(["ORGANIZATION", "TEAM", "PROJECT"]);
 export type RoleBindingScopeType = z.infer<typeof roleBindingScopeTypeSchema>;
 
 export const roleSchema = z

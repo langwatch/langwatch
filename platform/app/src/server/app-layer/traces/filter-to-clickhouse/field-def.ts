@@ -56,9 +56,7 @@ export type CategoricalRead = (
 ) => string | string[] | null | Unsupported;
 
 /** In-memory accessor mirroring a range field's ClickHouse `expression`. */
-export type RangeRead = (
-  trace: InMemoryTrace,
-) => number | number[] | null | Unsupported;
+export type RangeRead = (trace: InMemoryTrace) => number | number[] | null | Unsupported;
 
 /**
  * A single filter field, declaring BOTH sides so they cannot drift: the

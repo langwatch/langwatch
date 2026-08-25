@@ -175,7 +175,6 @@ export function getDataCaptureMode(): DataCaptureMode {
       return config.dataCapture;
     }
 
-
     getObservabilitySdkLogger().warn(
       `Invalid data capture mode: ${config.dataCapture}. Using default: "all"`,
     );
@@ -183,7 +182,11 @@ export function getDataCaptureMode(): DataCaptureMode {
     return "all";
   }
 
-  if (typeof config.dataCapture === "object" && config.dataCapture.mode &&validateDataCaptureMode(config.dataCapture.mode)) {
+  if (
+    typeof config.dataCapture === "object" &&
+    config.dataCapture.mode &&
+    validateDataCaptureMode(config.dataCapture.mode)
+  ) {
     return config.dataCapture.mode;
   }
 

@@ -61,11 +61,9 @@ export const WaterfallView = memo(function WaterfallView({
 
   const { isEditing, deletedSpanIds, draftNames, toggleSpanDeleted } =
     useWaterfallEditing(spans);
-  const { correctedSpanIds, deletedByCorrectionSpanIds } =
-    useCorrectionMarks(spans);
+  const { correctedSpanIds, deletedByCorrectionSpanIds } = useCorrectionMarks(spans);
 
-  const { signalsBySpanId, isFetched: signalsFetched } =
-    useSpanLangwatchSignals();
+  const { signalsBySpanId, isFetched: signalsFetched } = useSpanLangwatchSignals();
   const hasAnySignals = signalsBySpanId.size > 0;
   const { logsBySpanId } = useSpanLogs();
 
@@ -112,9 +110,7 @@ export const WaterfallView = memo(function WaterfallView({
       let cursor: SpanTreeNode | undefined = span;
       while (cursor && !kept.has(cursor.spanId)) {
         kept.add(cursor.spanId);
-        cursor = cursor.parentSpanId
-          ? byId.get(cursor.parentSpanId)
-          : undefined;
+        cursor = cursor.parentSpanId ? byId.get(cursor.parentSpanId) : undefined;
       }
     }
     return spans.filter((s) => kept.has(s.spanId));
@@ -160,10 +156,7 @@ export const WaterfallView = memo(function WaterfallView({
     () => getTraceRange(filteredSpans),
     [filteredSpans],
   );
-  const timeMarkers = useMemo(
-    () => getTimeMarkers(rootDuration),
-    [rootDuration],
-  );
+  const timeMarkers = useMemo(() => getTimeMarkers(rootDuration), [rootDuration]);
 
   // Drop interior markers when the timeline panel is narrow enough
   // that adjacent labels would collide. Always keep the first + last
@@ -181,9 +174,7 @@ export const WaterfallView = memo(function WaterfallView({
     timelineObserverRef.current = null;
     if (!el) return;
     setTimelinePanelWidth(el.clientWidth);
-    const observer = new ResizeObserver(() =>
-      setTimelinePanelWidth(el.clientWidth),
-    );
+    const observer = new ResizeObserver(() => setTimelinePanelWidth(el.clientWidth));
     observer.observe(el);
     timelineObserverRef.current = observer;
   }, []);
@@ -192,10 +183,7 @@ export const WaterfallView = memo(function WaterfallView({
     // Reserve ~60px per label so neighbours don't touch even at the
     // longest "00.0s" duration string. Always show first + last.
     const PER_LABEL_PX = 60;
-    const maxLabels = Math.max(
-      2,
-      Math.floor(timelinePanelWidth / PER_LABEL_PX),
-    );
+    const maxLabels = Math.max(2, Math.floor(timelinePanelWidth / PER_LABEL_PX));
     if (timeMarkers.length <= maxLabels) return timeMarkers;
     const last = timeMarkers.length - 1;
     const interiorBudget = Math.max(0, maxLabels - 2);
@@ -412,10 +400,7 @@ export const WaterfallView = memo(function WaterfallView({
       if (!isDraggingDivider.current || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
-      const pct = Math.min(
-        0.7,
-        Math.max(MIN_TREE_WIDTH / rect.width, x / rect.width),
-      );
+      const pct = Math.min(0.7, Math.max(MIN_TREE_WIDTH / rect.width, x / rect.width));
       setTreePct(pct);
     };
 
@@ -601,17 +586,12 @@ export const WaterfallView = memo(function WaterfallView({
                     isCollapsed={collapsedIds.has(node.span.spanId)}
                     hasChildren={node.children.length > 0}
                     hiddenDescendantCount={
-                      collapsedIds.has(node.span.spanId)
-                        ? countDescendants(node)
-                        : 0
+                      collapsedIds.has(node.span.spanId) ? countDescendants(node) : 0
                     }
                     isDimmed={
-                      selectedSpanId !== null &&
-                      node.span.spanId !== selectedSpanId
+                      selectedSpanId !== null && node.span.spanId !== selectedSpanId
                     }
-                    signals={
-                      signalsBySpanId.get(node.span.spanId) ?? EMPTY_SIGNALS
-                    }
+                    signals={signalsBySpanId.get(node.span.spanId) ?? EMPTY_SIGNALS}
                     traceId={rowTraceId}
                     comments={commentsFor(node.span.spanId)}
                     isEditing={isEditing}
@@ -746,8 +726,7 @@ export const WaterfallView = memo(function WaterfallView({
                   zIndex={0}
                 >
                   {visibleTimeMarkers.map((ms, idx) => {
-                    const pct =
-                      rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
+                    const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
                     return (
                       <Box
                         key={idx}
@@ -803,8 +782,7 @@ export const WaterfallView = memo(function WaterfallView({
                         rowHeight={virtualRow.size}
                         isSelected={node.span.spanId === selectedSpanId}
                         isDimmed={
-                          selectedSpanId !== null &&
-                          node.span.spanId !== selectedSpanId
+                          selectedSpanId !== null && node.span.spanId !== selectedSpanId
                         }
                         onSelect={handleSelectSpan}
                       />

@@ -73,12 +73,7 @@ function PageSizeField({
   onPageSizeChange: (size: number) => void;
 }) {
   return (
-    <NativeSelect.Root
-      size="xs"
-      width="auto"
-      flexShrink={0}
-      disabled={disabled}
-    >
+    <NativeSelect.Root size="xs" width="auto" flexShrink={0} disabled={disabled}>
       <NativeSelect.Field
         aria-label="Rows per page"
         data-testid="pagination-page-size"
@@ -118,9 +113,7 @@ function PageSummary({
   disabled: boolean;
   onPageSizeChange?: (size: number) => void;
 }) {
-  const segments = unitLabel
-    ? [`${totalCount.toLocaleString()} ${unitLabel}`]
-    : [];
+  const segments = unitLabel ? [`${totalCount.toLocaleString()} ${unitLabel}`] : [];
   segments.push(`showing ${rangeStart}–${rangeEnd}`);
   if (onPageSizeChange) segments.push("per page");
 

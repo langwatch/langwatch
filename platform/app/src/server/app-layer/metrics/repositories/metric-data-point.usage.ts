@@ -99,8 +99,6 @@ export async function queryMetricUsageEstimates({
     activeSeriesHours: Number(row.ActiveSeriesHours ?? 0),
     acceptedPoints: Number(row.AcceptedPoints ?? 0),
     canonicalRetainedBytes: Number(row.CanonicalRetainedBytes ?? 0),
-    projectedEventEquivalentUsage: Number(
-      row.ProjectedEventEquivalentUsage ?? 0,
-    ),
+    projectedEventEquivalentUsage: Number(row.ProjectedEventEquivalentUsage ?? 0),
   }));
 }

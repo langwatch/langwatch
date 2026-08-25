@@ -41,10 +41,7 @@ const labelList = (value: unknown): string[] =>
     ? value.filter((label): label is string => typeof label === "string")
     : parseJsonStringArray(typeof value === "string" ? value : void 0);
 
-const unionLabelsInto = (
-  result: Record<string, string>,
-  labels: string[],
-): void => {
+const unionLabelsInto = (result: Record<string, string>, labels: string[]): void => {
   if (labels.length === 0) return;
   const existing = parseJsonStringArray(result[ATTR_KEYS.LANGWATCH_LABELS]);
   result[ATTR_KEYS.LANGWATCH_LABELS] = JSON.stringify([
@@ -87,10 +84,7 @@ export const SPAN_ATTR_MAPPINGS = [
   // from the reasoning TOKEN count. Hoisted to the trace attribute map so
   // the drawer header can show it next to the model — the same lift that
   // surfaces the conversation id. First non-empty span value wins.
-  [
-    ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
-    "gen_ai.request.reasoning_effort",
-  ],
+  [ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, "gen_ai.request.reasoning_effort"],
   [ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID, "langgraph.thread_id"],
   // AI Gateway markers — stamped on every gateway-emitted customer span by
   // services/aigateway/adapters/customertracebridge/emitter.go. They are
@@ -120,10 +114,7 @@ export const SPAN_ATTR_MAPPINGS = [
     "langwatch.ingestion_source.organization_id",
     "langwatch.ingestion_source.organization_id",
   ],
-  [
-    "langwatch.ingestion_source.source_type",
-    "langwatch.ingestion_source.source_type",
-  ],
+  ["langwatch.ingestion_source.source_type", "langwatch.ingestion_source.source_type"],
 ] as const;
 
 /**
@@ -216,8 +207,7 @@ export const STANDARD_RESOURCE_PREFIXES = [
  */
 export const STAMPED_MODEL_ATTRIBUTE = "metadata.model";
 export const STAMPED_MODELS_ATTRIBUTE = "metadata.models";
-export const MODEL_METADATA_STAMPED_MARKER =
-  "langwatch.reserved.model_metadata_stamped";
+export const MODEL_METADATA_STAMPED_MARKER = "langwatch.reserved.model_metadata_stamped";
 
 /**
  * Extracts per-span attributes and merges them into trace-level attributes,
@@ -286,11 +276,9 @@ export class TraceAttributeAccumulationService {
     // documented REST endpoints actually reach the trace's attribute map
     // and the labels facet SQL. Mirrors the tag.tags handling below.
     const labels =
-      spanAttrs[ATTR_KEYS.LANGWATCH_LABELS] ??
-      resourceAttrs[ATTR_KEYS.LANGWATCH_LABELS];
+      spanAttrs[ATTR_KEYS.LANGWATCH_LABELS] ?? resourceAttrs[ATTR_KEYS.LANGWATCH_LABELS];
     if (typeof labels === "string") result["langwatch.labels"] = labels;
-    else if (Array.isArray(labels))
-      result["langwatch.labels"] = JSON.stringify(labels);
+    else if (Array.isArray(labels)) result["langwatch.labels"] = JSON.stringify(labels);
 
     // `tag.tags` is the reserved labels key of the legacy OTLP path
     // (otel.traces.ts maps it to reservedTraceMetadata.labels) and what the
@@ -326,8 +314,7 @@ export class TraceAttributeAccumulationService {
       if (!key.startsWith("metadata.")) continue;
       if (typeof value === "string") result[key] = value;
       else if (value !== null && value !== undefined) {
-        result[key] =
-          typeof value === "object" ? JSON.stringify(value) : String(value);
+        result[key] = typeof value === "object" ? JSON.stringify(value) : String(value);
       }
     }
 
@@ -415,8 +402,7 @@ export class TraceAttributeAccumulationService {
           ...(newPromptId ? [newPromptId] : []),
         ]),
       ];
-      if (union.length > 0)
-        merged["langwatch.prompt_ids"] = JSON.stringify(union);
+      if (union.length > 0) merged["langwatch.prompt_ids"] = JSON.stringify(union);
     }
     // Remove the per-span key so it doesn't leak into trace-level attributes
     delete merged["langwatch.prompt.id"];

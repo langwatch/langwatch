@@ -91,11 +91,10 @@ export interface LangyErrorPresentation {
  * representation — Langy is the one surface that renders reasons (in a card,
  * for an engineer debugging an agent turn) rather than hiding them.
  */
-export interface LangyDomainError
-  extends Omit<
-    HandledErrorShape,
-    "reasons" | "traceId" | "fault" | "tips" | "docsUrl"
-  > {
+export interface LangyDomainError extends Omit<
+  HandledErrorShape,
+  "reasons" | "traceId" | "fault" | "tips" | "docsUrl"
+> {
   traceId?: string;
   reasons?: LangySerializedReason[];
   // Optional, unlike the shared shape: Langy also builds this type by hand for
@@ -164,9 +163,7 @@ export const KNOWN_LANGY_ERROR_KINDS = [
  * sniffing message strings — so the panel renders the re-authenticate card /
  * the plan-limit explanation instead of a generic "reply failed".
  */
-export function promoteCodexAgentError(
-  domain: LangyDomainError,
-): LangyDomainError {
+export function promoteCodexAgentError(domain: LangyDomainError): LangyDomainError {
   if (domain.code !== "langy_agent_errored") return domain;
   const flat: LangySerializedReason[] = [];
   const walk = (reasons?: LangySerializedReason[]) => {
@@ -431,9 +428,7 @@ export function isStaleLangyHistoryRead({
   );
 }
 
-export function explainLangyError(
-  received: LangyDomainError,
-): LangyErrorPresentation {
+export function explainLangyError(received: LangyDomainError): LangyErrorPresentation {
   const domain = promoteCodexAgentError(received);
   // Always carried through for debugging, regardless of the matched case.
   const debug = {
@@ -630,8 +625,7 @@ export function explainLangyError(
         kind: domain.code,
         title: isRegistered ? title : "Langy couldn't finish that",
         description:
-          description ||
-          "The request was rejected. Try rephrasing or start again.",
+          description || "The request was rejected. Try rephrasing or start again.",
         render: "card",
         action: retry,
         traceId: domain.traceId,

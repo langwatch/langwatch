@@ -16,8 +16,7 @@ export type UseCustomModelsActions = {
   reset: (provider: MaybeStoredModelProvider) => void;
 };
 
-export type UseCustomModelsReturn = UseCustomModelsState &
-  UseCustomModelsActions;
+export type UseCustomModelsReturn = UseCustomModelsState & UseCustomModelsActions;
 
 export function useCustomModels({
   provider,
@@ -54,9 +53,7 @@ export function useCustomModels({
   }, []);
 
   const removeCustomEmbeddingsModel = useCallback((modelId: string) => {
-    setCustomEmbeddingsModelsState((prev) =>
-      prev.filter((m) => m.modelId !== modelId),
-    );
+    setCustomEmbeddingsModelsState((prev) => prev.filter((m) => m.modelId !== modelId));
   }, []);
 
   const reset = useCallback((nextProvider: MaybeStoredModelProvider) => {

@@ -50,11 +50,7 @@ export function LabelFilterDropdown({
           ) : (
             <VStack align="stretch" gap={2}>
               {allLabels.map((label) => (
-                <HStack
-                  key={label}
-                  cursor="pointer"
-                  onClick={() => onToggle(label)}
-                >
+                <HStack key={label} cursor="pointer" onClick={() => onToggle(label)}>
                   <Checkbox checked={activeLabels.includes(label)} />
                   <Text fontSize="sm">{label}</Text>
                 </HStack>

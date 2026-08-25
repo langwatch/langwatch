@@ -57,8 +57,7 @@ vi.mock("~/server/app-layer/app", () => ({
 // Mock encryption — use identity functions so tests can inspect values
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,
-  decrypt: (text: string) =>
-    text.startsWith("encrypted:") ? text.slice(10) : text,
+  decrypt: (text: string) => (text.startsWith("encrypted:") ? text.slice(10) : text),
 }));
 
 // ---------------------------------------------------------------------------
@@ -122,11 +121,7 @@ function stubDocsFetch(): MockInstance {
     .spyOn(globalThis, "fetch")
     .mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const requestUrl =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url;
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (requestUrl.includes("langwatch.ai")) {
         return Promise.resolve(
           new Response(DOCS_PAGE_FIXTURE, {
@@ -163,9 +158,7 @@ function parseSseBody(raw: string): unknown[] {
  */
 function createPkceChallenge() {
   const codeVerifier = randomUUID() + randomUUID();
-  const codeChallenge = createHash("sha256")
-    .update(codeVerifier)
-    .digest("base64url");
+  const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
   return { codeVerifier, codeChallenge };
 }
 
@@ -334,9 +327,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRedis.get.mockImplementation((key: string) =>
-      redisGetWithRegisteredClient(key),
-    );
+    mockRedis.get.mockImplementation((key: string) => redisGetWithRegisteredClient(key));
     mockRedis.set.mockResolvedValue("OK");
     mockRedis.del.mockResolvedValue(1);
     mockRedis.expire.mockResolvedValue(1);
@@ -777,37 +768,37 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
     describe("when the protected resource metadata is fetched at the resource path", () => {
       /** @scenario Protected resource metadata is served for the path-suffixed form */
-      it.each([
-        "/sse",
-        "/mcp",
-      ])("describes %s and its authorization server", async (resource) => {
-        const res = await getDiscovery(
-          `/.well-known/oauth-protected-resource${resource}`,
-        );
+      it.each(["/sse", "/mcp"])(
+        "describes %s and its authorization server",
+        async (resource) => {
+          const res = await getDiscovery(
+            `/.well-known/oauth-protected-resource${resource}`,
+          );
 
-        expect(res.status).toBe(200);
-        expect(res.contentType).toContain("application/json");
-        expect(res.body.resource).toContain(resource);
-        expect(res.body.authorization_servers.length).toBeGreaterThan(0);
-      });
+          expect(res.status).toBe(200);
+          expect(res.contentType).toContain("application/json");
+          expect(res.body.resource).toContain(resource);
+          expect(res.body.authorization_servers.length).toBeGreaterThan(0);
+        },
+      );
     });
 
     describe("when the authorization server metadata is fetched at the resource path", () => {
       /** @scenario Authorization server metadata is served for the path-suffixed form */
-      it.each([
-        "/sse",
-        "/mcp",
-      ])("advertises the authorization, token and registration endpoints for %s", async (resource) => {
-        const res = await getDiscovery(
-          `/.well-known/oauth-authorization-server${resource}`,
-        );
+      it.each(["/sse", "/mcp"])(
+        "advertises the authorization, token and registration endpoints for %s",
+        async (resource) => {
+          const res = await getDiscovery(
+            `/.well-known/oauth-authorization-server${resource}`,
+          );
 
-        expect(res.status).toBe(200);
-        expect(res.contentType).toContain("application/json");
-        expect(res.body.authorization_endpoint).toContain("/mcp/authorize");
-        expect(res.body.token_endpoint).toContain("/oauth/token");
-        expect(res.body.registration_endpoint).toContain("/oauth/register");
-      });
+          expect(res.status).toBe(200);
+          expect(res.contentType).toContain("application/json");
+          expect(res.body.authorization_endpoint).toContain("/mcp/authorize");
+          expect(res.body.token_endpoint).toContain("/oauth/token");
+          expect(res.body.registration_endpoint).toContain("/oauth/register");
+        },
+      );
     });
 
     describe("when a discovery document that does not exist is fetched", () => {
@@ -1126,15 +1117,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.headers["access-control-allow-origin"]).toBe("*");
-      expect(res.headers["access-control-allow-headers"]).toContain(
-        "Authorization",
-      );
-      expect(res.headers["access-control-allow-headers"]).toContain(
-        "mcp-session-id",
-      );
-      expect(res.headers["access-control-expose-headers"]).toContain(
-        "mcp-session-id",
-      );
+      expect(res.headers["access-control-allow-headers"]).toContain("Authorization");
+      expect(res.headers["access-control-allow-headers"]).toContain("mcp-session-id");
+      expect(res.headers["access-control-expose-headers"]).toContain("mcp-session-id");
     });
   });
 
@@ -1258,13 +1243,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
 
     /** Posts a token request, optionally claiming a caller address. */
-    async function tokenRequest({
-      code,
-      callerIp,
-    }: {
-      code: string;
-      callerIp?: string;
-    }) {
+    async function tokenRequest({ code, callerIp }: { code: string; callerIp?: string }) {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       const headers: Record<string, string> = {
@@ -1354,10 +1333,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // from the main app (~/server/db, ~/server/app-layer, etc.)
       const fs = await import("node:fs");
       const path = await import("node:path");
-      const mcpServerDir = path.resolve(
-        __dirname,
-        "../../../../../mcp/typescript/src",
-      );
+      const mcpServerDir = path.resolve(__dirname, "../../../../../mcp/typescript/src");
       const createMcpServerSrc = fs.readFileSync(
         path.join(mcpServerDir, "create-mcp-server.ts"),
         "utf-8",

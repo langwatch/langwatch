@@ -35,11 +35,9 @@ export const ModelProviderScreen: React.FC<ModelProviderScreenProps> = ({
   // The surface's leading provider is the default selection — on surfaces
   // with a recommended provider (Codex on Langy setup / onboarding) that is
   // the recommendation itself.
-  const [modelProviderKey, setSelectedModelProviderKey] =
-    useState<ModelProviderKey>(
-      () =>
-        initialProviderKey ?? providersForSurface(variant)[0]?.key ?? "open_ai",
-    );
+  const [modelProviderKey, setSelectedModelProviderKey] = useState<ModelProviderKey>(
+    () => initialProviderKey ?? providersForSurface(variant)[0]?.key ?? "open_ai",
+  );
 
   // In the Langy panel the screen lives in a narrow scrolling column, and the
   // credential form sits below the fold of the provider grid: picking a

@@ -28,10 +28,7 @@ import { useLlmOpsProjectSlug } from "../useLlmOpsProjectSlug";
 import { useReachableProducts } from "../useReachableProducts";
 import { isSettingsMenuItemActive, useSettingsMenu } from "../useSettingsMenu";
 import { QUIET_SIDEBAR_CHIP } from "./quietChipStyle";
-import {
-  SHELL_SIDEBAR_WIDTH_COMPACT,
-  SHELL_SIDEBAR_WIDTH_EXPANDED,
-} from "./shellLayout";
+import { SHELL_SIDEBAR_WIDTH_COMPACT, SHELL_SIDEBAR_WIDTH_EXPANDED } from "./shellLayout";
 
 export type SidebarSurface = ProductId | "settings";
 
@@ -263,14 +260,10 @@ function ProductSidebarBody({
     );
   }
   if (surface === "gateway") {
-    return (
-      <SectionItemsNav items={gatewayNavItems} showExpanded={showExpanded} />
-    );
+    return <SectionItemsNav items={gatewayNavItems} showExpanded={showExpanded} />;
   }
   if (surface === "governance") {
-    return (
-      <SectionItemsNav items={governanceNavItems} showExpanded={showExpanded} />
-    );
+    return <SectionItemsNav items={governanceNavItems} showExpanded={showExpanded} />;
   }
   return (
     <MainMenuSections
@@ -411,9 +404,7 @@ export function ProductSidebar({
           top={0}
           left={0}
           width={
-            showExpanded
-              ? SHELL_SIDEBAR_WIDTH_EXPANDED
-              : SHELL_SIDEBAR_WIDTH_COMPACT
+            showExpanded ? SHELL_SIDEBAR_WIDTH_EXPANDED : SHELL_SIDEBAR_WIDTH_COMPACT
           }
           height={fullHeight}
           background="bg.page"

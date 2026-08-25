@@ -95,11 +95,7 @@ function singleTraceLines(output: unknown): string[] | null {
       ? textValue((error as { message?: unknown }).message)
       : textValue(error);
 
-  const lines = [
-    textValue(record.input),
-    textValue(record.output),
-    errorMessage,
-  ]
+  const lines = [textValue(record.input), textValue(record.output), errorMessage]
     .filter((line): line is string => !!line)
     .map((line) => truncate(line, SNIPPET_MAX * 2));
 
@@ -271,13 +267,7 @@ export function LangyTracesCard({
  * should be able to read it before they do. A truncated one still reads as a
  * query; a button labelled only "Open" asks them to take it on faith.
  */
-function OpenSearchButton({
-  query,
-  onOpen,
-}: {
-  query: string;
-  onOpen: () => void;
-}) {
+function OpenSearchButton({ query, onOpen }: { query: string; onOpen: () => void }) {
   return (
     <Button
       size="2xs"

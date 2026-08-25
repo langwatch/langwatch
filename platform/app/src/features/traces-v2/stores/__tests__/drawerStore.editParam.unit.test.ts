@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  parseEditParam,
-  useDrawerStore,
-  viewModeForEditState,
-} from "../drawerStore";
+import { parseEditParam, useDrawerStore, viewModeForEditState } from "../drawerStore";
 import { selectIsTraceEditDirty, useTraceEditStore } from "../traceEditStore";
 
 describe("drawer.edit URL parameter", () => {
@@ -23,9 +19,7 @@ describe("drawer.edit URL parameter", () => {
     describe("when it points at a sample preview trace", () => {
       /** @scenario "Annotation mode is dropped from a link to a preview trace" */
       it("opens the trace without annotation mode", () => {
-        expect(parseEditParam({ raw: "1", traceId: "lw-preview-chat" })).toBe(
-          false,
-        );
+        expect(parseEditParam({ raw: "1", traceId: "lw-preview-chat" })).toBe(false);
       });
     });
   });
@@ -34,9 +28,7 @@ describe("drawer.edit URL parameter", () => {
     describe("when the drawer reads it", () => {
       /** @scenario "A deep link into annotation mode starts the drawer in it" */
       it("opens the trace for reading", () => {
-        expect(parseEditParam({ raw: undefined, traceId: "trace-1" })).toBe(
-          false,
-        );
+        expect(parseEditParam({ raw: undefined, traceId: "trace-1" })).toBe(false);
         expect(parseEditParam({ raw: "0", traceId: "trace-1" })).toBe(false);
         expect(parseEditParam({ raw: "1", traceId: null })).toBe(false);
       });
@@ -48,9 +40,7 @@ describe("drawer.edit URL parameter", () => {
       /** @scenario "A link naming annotation mode and a view the pass cannot act on opens on the trace" */
       it("opens on the trace view", () => {
         for (const viewMode of ["terminal", "session"] as const) {
-          expect(viewModeForEditState({ viewMode, isEditing: true })).toBe(
-            "trace",
-          );
+          expect(viewModeForEditState({ viewMode, isEditing: true })).toBe("trace");
         }
       });
 
@@ -64,9 +54,9 @@ describe("drawer.edit URL parameter", () => {
       });
 
       it("keeps a view the pass can act on", () => {
-        expect(
-          viewModeForEditState({ viewMode: "summary", isEditing: true }),
-        ).toBe("summary");
+        expect(viewModeForEditState({ viewMode: "summary", isEditing: true })).toBe(
+          "summary",
+        );
       });
     });
   });
@@ -75,9 +65,9 @@ describe("drawer.edit URL parameter", () => {
     describe("when the drawer reads it", () => {
       /** @scenario "A link asking to annotate on the conversation view opens on the conversation" */
       it("opens on the conversation view", () => {
-        expect(
-          viewModeForEditState({ viewMode: "conversation", isEditing: true }),
-        ).toBe("conversation");
+        expect(viewModeForEditState({ viewMode: "conversation", isEditing: true })).toBe(
+          "conversation",
+        );
       });
     });
   });

@@ -20,10 +20,7 @@
  * See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
  */
 
-import {
-  type NavigationSpanHandle,
-  startNavigationSpan,
-} from "@langwatch/react-rum";
+import { type NavigationSpanHandle, startNavigationSpan } from "@langwatch/react-rum";
 import { useEffect, useRef } from "react";
 import { useLocation, useMatches, useNavigation } from "react-router";
 import { usePublicEnv } from "./usePublicEnv";
@@ -117,10 +114,7 @@ export function useNavigationTracing(): void {
     spanRef.current = span;
 
     span.commit({
-      route: routePatternOf(
-        location.pathname,
-        matches[matches.length - 1]?.params ?? {},
-      ),
+      route: routePatternOf(location.pathname, matches[matches.length - 1]?.params ?? {}),
     });
     fromPathRef.current = location.pathname;
     settle(span);

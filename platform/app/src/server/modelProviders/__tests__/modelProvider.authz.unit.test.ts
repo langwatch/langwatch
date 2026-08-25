@@ -8,8 +8,7 @@ vi.mock("~/server/app-layer/permissions/imperative", () => ({
   probeOrganizationPermission: (...args: unknown[]) =>
     hasOrganizationPermissionMock(...args),
   probeTeamPermission: (...args: unknown[]) => hasTeamPermissionMock(...args),
-  probeProjectPermission: (...args: unknown[]) =>
-    hasProjectPermissionMock(...args),
+  probeProjectPermission: (...args: unknown[]) => hasProjectPermissionMock(...args),
 }));
 
 import { ModelProviderScopeForbiddenError } from "../errors";
@@ -33,9 +32,7 @@ beforeEach(() => {
 
 describe("requiredManagePermission", () => {
   it("maps each scope tier to its manage permission", () => {
-    expect(requiredManagePermission("ORGANIZATION")).toBe(
-      "organization:manage",
-    );
+    expect(requiredManagePermission("ORGANIZATION")).toBe("organization:manage");
     expect(requiredManagePermission("TEAM")).toBe("team:manage");
     expect(requiredManagePermission("PROJECT")).toBe("project:manage");
   });

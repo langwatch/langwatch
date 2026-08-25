@@ -1,8 +1,5 @@
 import { compareOrdinal } from "@langwatch/eventing";
-import type {
-  OtlpAnyValue,
-  OtlpKeyValue,
-} from "../../trace-processing/schemas/otlp";
+import type { OtlpAnyValue, OtlpKeyValue } from "../../trace-processing/schemas/otlp";
 import { integerDecimal } from "./numbers";
 import { isRecord, stableStringify, type UnknownRecord } from "./serialization";
 
@@ -49,9 +46,7 @@ export function canonicalAnyValue(
     return { type: "bytes", value: Buffer.from(bytes).toString("base64") };
   }
   if (value.arrayValue && isRecord(value.arrayValue)) {
-    const values = Array.isArray(value.arrayValue.values)
-      ? value.arrayValue.values
-      : [];
+    const values = Array.isArray(value.arrayValue.values) ? value.arrayValue.values : [];
     return {
       type: "array",
       value: values.map((item) => canonicalAnyValue(item as OtlpAnyValue)),

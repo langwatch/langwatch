@@ -1,8 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type {
-  Organization,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import type { Organization, PrismaClient } from "@langwatch/prisma-client/generated";
 import { DemoOrgScope } from "../_lib/scopeGuard";
 import type { SeedActionContext } from "../_lib/seedRunner";
 
@@ -32,9 +29,7 @@ describe("seedBirdEye SeedAction", () => {
 
   beforeAll(async () => {
     const seedMod = await import("../seed-bird-eye");
-    runSeedBirdEyeMock = seedMod.runSeedBirdEye as unknown as ReturnType<
-      typeof vi.fn
-    >;
+    runSeedBirdEyeMock = seedMod.runSeedBirdEye as unknown as ReturnType<typeof vi.fn>;
     const actionMod = await import("../_actions/seedBirdEye");
     seedBirdEye = actionMod.seedBirdEye;
   });

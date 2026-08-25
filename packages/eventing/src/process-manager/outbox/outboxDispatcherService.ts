@@ -42,9 +42,7 @@ export interface DispatchableMessage {
  * markDispatched redelivers the same messageKey, so handlers must be
  * idempotent on it.
  */
-export type IntentHandler = (params: {
-  message: DispatchableMessage;
-}) => Promise<void>;
+export type IntentHandler = (params: { message: DispatchableMessage }) => Promise<void>;
 
 export interface OutboxDispatcherServiceOptions {
   store: ProcessStore;
@@ -201,18 +199,13 @@ export class OutboxDispatcherService {
     this.processNames = options.processNames;
     this.concurrency = Math.max(1, options.concurrency ?? 1);
     this.clock = options.clock ?? Date.now;
-    this.leaseSafetyMarginMs =
-      this.leaseDurationMs * LEASE_SAFETY_MARGIN_FRACTION;
-    this.tracer =
-      options.tracer ?? trace.getTracer("langwatch.process-manager");
+    this.leaseSafetyMarginMs = this.leaseDurationMs * LEASE_SAFETY_MARGIN_FRACTION;
+    this.tracer = options.tracer ?? trace.getTracer("langwatch.process-manager");
     this.logger =
       options.logger ?? createLogger("langwatch:event-sourcing:process-outbox");
   }
 
-  async runOnce(params: {
-    now: number;
-    limit?: number;
-  }): Promise<DispatchReport> {
+  async runOnce(params: { now: number; limit?: number }): Promise<DispatchReport> {
     // The store anchors `leasedUntil` at `now`, which is captured BEFORE the
     // lease query runs, so the budget clock starts before it too: a slow
     // lease query (degraded Postgres is exactly when this matters) spends
@@ -457,9 +450,7 @@ export class OutboxDispatcherService {
         intentType: message.intentType,
         attempt: message.attempts,
         phase,
-        ...(durationMs !== undefined
-          ? { durationMs: Math.round(durationMs) }
-          : {}),
+        ...(durationMs !== undefined ? { durationMs: Math.round(durationMs) } : {}),
       },
       "Process-manager outbox acknowledgement was fenced by a lapsed lease — " +
         "another dispatcher superseded it and the effect may have run more " +
@@ -478,10 +469,7 @@ export class OutboxDispatcherService {
     // this delivery's 1-based attempt number.
     const attempt = message.attempts;
     const identity = identityOf(message);
-    const remoteParent = propagation.extract(
-      ROOT_CONTEXT,
-      message.traceCarrier,
-    );
+    const remoteParent = propagation.extract(ROOT_CONTEXT, message.traceCarrier);
 
     await this.tracer.startActiveSpan(
       `process ${message.processName} dispatch ${message.intentType}`,

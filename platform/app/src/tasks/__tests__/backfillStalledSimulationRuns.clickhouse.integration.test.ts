@@ -60,10 +60,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function insertRows(
-  ch: ClickHouseClient,
-  rows: ReturnType<typeof makeRow>[],
-) {
+async function insertRows(ch: ClickHouseClient, rows: ReturnType<typeof makeRow>[]) {
   await ch.insert({
     table: "simulation_runs",
     values: rows,
@@ -151,9 +148,7 @@ describe("ClickHouseStalledRunFinder.findStalledRuns (integration)", () => {
       expect(ids).not.toContain("already-finished");
       expect(ids).not.toContain("archived-run");
 
-      const abandonedRow = mine.find(
-        (r) => r.scenarioRunId === "abandoned-started",
-      );
+      const abandonedRow = mine.find((r) => r.scenarioRunId === "abandoned-started");
       expect(abandonedRow).toEqual({
         tenantId,
         scenarioRunId: "abandoned-started",

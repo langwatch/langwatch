@@ -18,9 +18,7 @@ export class EnterpriseApiComposition {
     readonly scimTokens: ScimTokenCapability | undefined,
   ) {}
 
-  static create(
-    options: EnterpriseApiCompositionOptions = {},
-  ): EnterpriseApiComposition {
+  static create(options: EnterpriseApiCompositionOptions = {}): EnterpriseApiComposition {
     return new EnterpriseApiComposition(
       EnterpriseCatalogue.create(),
       options.licensing,

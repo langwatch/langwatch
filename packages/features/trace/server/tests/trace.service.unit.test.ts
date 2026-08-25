@@ -63,27 +63,69 @@ class FakeModelProviderService extends ModelProviderService {
     super();
   }
 
-  estimateCost(): number { return this.cost; }
-  listForProject(): Promise<[]> { return Promise.resolve([]); }
-  listForOrganization(): Promise<[]> { return Promise.resolve([]); }
-  getForProject(): Promise<Record<string, never>> { return Promise.resolve({}); }
-  upsert(): Promise<never> { throw new Error("not used"); }
-  delete(): Promise<void> { return Promise.resolve(); }
-  validateApiKey(): Promise<never> { throw new Error("not used"); }
-  testConnection(): Promise<{ connected: boolean }> { return Promise.resolve({ connected: false }); }
-  getCodexStatus(): Promise<never> { throw new Error("not used"); }
-  isManagedProvider(): boolean { return false; }
-  getDefaultSnapshot(): Promise<never> { throw new Error("not used"); }
-  getInheritedValues(): Promise<never> { throw new Error("not used"); }
-  tryGetResolvedDefault(): Promise<null> { return Promise.resolve(null); }
-  setDefault(): Promise<void> { return Promise.resolve(); }
-  saveDefaultConfig(): Promise<never> { throw new Error("not used"); }
-  tryGetDefaultConfig(): Promise<null> { return Promise.resolve(null); }
-  deleteDefaultConfig(): Promise<void> { return Promise.resolve(); }
-  listCosts(): Promise<[]> { return Promise.resolve([]); }
-  upsertCost(): Promise<never> { throw new Error("not used"); }
-  deleteCost(): Promise<void> { return Promise.resolve(); }
-  translate(): Promise<never> { throw new Error("not used"); }
+  estimateCost(): number {
+    return this.cost;
+  }
+  listForProject(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+  listForOrganization(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+  getForProject(): Promise<Record<string, never>> {
+    return Promise.resolve({});
+  }
+  upsert(): Promise<never> {
+    throw new Error("not used");
+  }
+  delete(): Promise<void> {
+    return Promise.resolve();
+  }
+  validateApiKey(): Promise<never> {
+    throw new Error("not used");
+  }
+  testConnection(): Promise<{ connected: boolean }> {
+    return Promise.resolve({ connected: false });
+  }
+  getCodexStatus(): Promise<never> {
+    throw new Error("not used");
+  }
+  isManagedProvider(): boolean {
+    return false;
+  }
+  getDefaultSnapshot(): Promise<never> {
+    throw new Error("not used");
+  }
+  getInheritedValues(): Promise<never> {
+    throw new Error("not used");
+  }
+  tryGetResolvedDefault(): Promise<null> {
+    return Promise.resolve(null);
+  }
+  setDefault(): Promise<void> {
+    return Promise.resolve();
+  }
+  saveDefaultConfig(): Promise<never> {
+    throw new Error("not used");
+  }
+  tryGetDefaultConfig(): Promise<null> {
+    return Promise.resolve(null);
+  }
+  deleteDefaultConfig(): Promise<void> {
+    return Promise.resolve();
+  }
+  listCosts(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+  upsertCost(): Promise<never> {
+    throw new Error("not used");
+  }
+  deleteCost(): Promise<void> {
+    return Promise.resolve();
+  }
+  translate(): Promise<never> {
+    throw new Error("not used");
+  }
 }
 
 const service = (rows: SpanTreeNode[] = [node]) =>

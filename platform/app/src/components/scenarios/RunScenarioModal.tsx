@@ -23,8 +23,7 @@ export function RunScenarioModal({
   initialTarget = null,
   isLoading = false,
 }: RunScenarioModalProps) {
-  const [selectedTarget, setSelectedTarget] =
-    useState<TargetValue>(initialTarget);
+  const [selectedTarget, setSelectedTarget] = useState<TargetValue>(initialTarget);
   const [rememberSelection, setRememberSelection] = useState(true);
 
   const handleRun = () => {
@@ -43,10 +42,7 @@ export function RunScenarioModal({
         <Dialog.Body>
           <VStack gap={4} align="stretch">
             <Text>Select a target to run this scenario:</Text>
-            <TargetSelector
-              value={selectedTarget}
-              onChange={setSelectedTarget}
-            />
+            <TargetSelector value={selectedTarget} onChange={setSelectedTarget} />
             <Checkbox.Root
               checked={rememberSelection}
               onCheckedChange={(e) => setRememberSelection(!!e.checked)}

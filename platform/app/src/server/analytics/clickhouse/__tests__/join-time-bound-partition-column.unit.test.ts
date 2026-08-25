@@ -3,10 +3,7 @@ import { TIME_PARTITIONED_TABLES } from "~/server/app-layer/clients/clickhouse/c
 import type { FilterField } from "../../../filters/types";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import type { AggregationTypes } from "../../types";
-import {
-  buildDataForFilterQuery,
-  buildTimeseriesQuery,
-} from "../aggregation-builder";
+import { buildDataForFilterQuery, buildTimeseriesQuery } from "../aggregation-builder";
 import { resetParamCounter } from "../filter-translator";
 
 /**
@@ -193,10 +190,7 @@ function partitionBoundViolations(sql: string): string[] {
     )[table];
     if (!partitionColumns) continue;
 
-    const prunable = [
-      ...partitionColumns,
-      ...(LEGACY_PARTITION_COLUMNS[table] ?? []),
-    ];
+    const prunable = [...partitionColumns, ...(LEGACY_PARTITION_COLUMNS[table] ?? [])];
     if (prunable.includes(column)) continue;
 
     const consequence = isQualified
@@ -349,9 +343,7 @@ describe("analytics JOIN time bounds", () => {
       const sql =
         "SELECT 1 FROM evaluation_runs WHERE ts.OccurredAt >= {startDate:DateTime64(3)}";
 
-      expect(
-        rangeBoundColumnsByTable(sql).get("evaluation_runs"),
-      ).toBeUndefined();
+      expect(rangeBoundColumnsByTable(sql).get("evaluation_runs")).toBeUndefined();
     });
   });
 

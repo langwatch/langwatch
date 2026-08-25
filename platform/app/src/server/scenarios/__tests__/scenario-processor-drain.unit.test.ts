@@ -54,8 +54,7 @@ describe("drainInFlightRuns", () => {
     mockEnsureFailureEventsEmitted = vi.fn().mockResolvedValue(undefined);
     deps = {
       scenarioLookup: {
-        getById:
-          mockGetById as ProcessorDependencies["scenarioLookup"]["getById"],
+        getById: mockGetById as ProcessorDependencies["scenarioLookup"]["getById"],
       },
       failureEmitter: {
         ensureFailureEventsEmitted:

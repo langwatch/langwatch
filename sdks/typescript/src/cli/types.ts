@@ -73,9 +73,7 @@ export type PromptsLock = {
 };
 
 // Parse npm-style version specifications like "foo@latest" or "bar@5"
-export const parsePromptSpec = (
-  spec: string,
-): { name: string; version: string } => {
+export const parsePromptSpec = (spec: string): { name: string; version: string } => {
   const atIndex = spec.lastIndexOf("@");
   if (atIndex === -1) {
     return { name: spec, version: "latest" };

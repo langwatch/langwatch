@@ -30,10 +30,7 @@ function markdownFiles(path: string): string[] {
 function sectionBody(content: string, section: string): string | undefined {
   const escaped = section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = content.match(
-    new RegExp(
-      `^#{2,3} ${escaped}\\s*$([\\s\\S]*?)(?=^#{2,3} |(?![\\s\\S]))`,
-      "m",
-    ),
+    new RegExp(`^#{2,3} ${escaped}\\s*$([\\s\\S]*?)(?=^#{2,3} |(?![\\s\\S]))`, "m"),
   );
   return match?.[1];
 }
@@ -65,16 +62,14 @@ export function lintArchitectureRecords(
       violations.push({
         policy: "architecture-record",
         file: index,
-        message:
-          "Every governed package ownership root must have an ADR index.",
+        message: "Every governed package ownership root must have an ADR index.",
       });
     }
     if (records.length === 0) {
       violations.push({
         policy: "architecture-record",
         file: adrs,
-        message:
-          "Every governed package ownership root must have a boundary ADR.",
+        message: "Every governed package ownership root must have a boundary ADR.",
       });
       continue;
     }
@@ -82,8 +77,7 @@ export function lintArchitectureRecords(
       violations.push({
         policy: "architecture-record",
         file: specs,
-        message:
-          "Every documented feature boundary must own at least one Gherkin spec.",
+        message: "Every documented feature boundary must own at least one Gherkin spec.",
       });
     }
 

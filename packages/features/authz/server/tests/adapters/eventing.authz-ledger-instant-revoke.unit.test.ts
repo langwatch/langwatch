@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { RedisAuthzEpochAdapter } from "../../src/adapters/redis.authz-epoch.adapter";
-import {
-  ACTOR,
-  ORG_ID,
-  harness,
-} from "../support/eventing.authz-ledger-fork.harness";
+import { ACTOR, ORG_ID, harness } from "../support/eventing.authz-ledger-fork.harness";
 
 describe("EventingAuthzLedgerAdapter instant revocation", () => {
   /** @scenario "A revocation holds before the revoke call returns, with Redis stopped" */

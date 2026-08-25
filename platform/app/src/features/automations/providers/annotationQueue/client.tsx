@@ -16,26 +16,20 @@ function isComplete(slice: AnnotationQueueSlice): boolean {
   return slice.annotators.length > 0;
 }
 
-function summary(
-  slice: AnnotationQueueSlice,
-  identity: SummaryIdentity,
-): string {
+function summary(slice: AnnotationQueueSlice, identity: SummaryIdentity): string {
   const name = identity.name || "(unnamed)";
   const count = slice.annotators.length;
   return `${name} → ${count} annotator${count === 1 ? "" : "s"}`;
 }
 
 function fromTriggerRow(row: SavedTriggerRow): AnnotationQueueSlice {
-  const params = (row.actionParams ??
-    {}) as Partial<AnnotationQueueActionParams>;
+  const params = (row.actionParams ?? {}) as Partial<AnnotationQueueActionParams>;
   return {
     annotators: Array.isArray(params.annotators) ? params.annotators : [],
   };
 }
 
-function toActionParams(
-  slice: AnnotationQueueSlice,
-): AnnotationQueueActionParams {
+function toActionParams(slice: AnnotationQueueSlice): AnnotationQueueActionParams {
   return { annotators: slice.annotators };
 }
 

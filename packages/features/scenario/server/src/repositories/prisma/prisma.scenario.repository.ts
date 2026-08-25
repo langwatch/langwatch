@@ -30,10 +30,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     );
   }
 
-  async tryFindById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<Scenario | null> {
+  async tryFindById(input: { id: string; projectId: string }): Promise<Scenario | null> {
     const row = await this.prisma.scenario.findFirst({
       where: { ...input, archivedAt: null },
     });

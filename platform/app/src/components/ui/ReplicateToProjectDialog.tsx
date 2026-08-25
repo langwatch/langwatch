@@ -1,10 +1,4 @@
-import {
-  Button,
-  createListCollection,
-  Field,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { showErrorToast } from "~/features/errors";
@@ -116,9 +110,7 @@ export function ReplicateToProjectDialog({
                 collection={projectCollection}
                 value={selectedProjectId}
                 onValueChange={(e) => {
-                  const selectedProject = projects.find(
-                    (p) => p.value === e.value[0],
-                  );
+                  const selectedProject = projects.find((p) => p.value === e.value[0]);
                   if (selectedProject?.hasCreatePermission) {
                     setSelectedProjectId(e.value);
                   }

@@ -129,9 +129,7 @@ describe("evaluation processing live FIFO", () => {
       globalJobRegistry: registry,
     });
 
-    const runEntry = registry.get(
-      "evaluation_processing:projection:evaluationRun",
-    );
+    const runEntry = registry.get("evaluation_processing:projection:evaluationRun");
     const analyticsEntry = registry.get(
       "evaluation_processing:projection:evaluationAnalytics",
     );
@@ -194,9 +192,7 @@ describe("evaluation processing live FIFO", () => {
       "evaluation_processing",
     );
 
-    const startEntry = registry.get(
-      "evaluation_processing:command:startEvaluation",
-    );
+    const startEntry = registry.get("evaluation_processing:command:startEvaluation");
     const completeEntry = registry.get(
       "evaluation_processing:command:completeEvaluation",
     );
@@ -247,10 +243,7 @@ describe("evaluation processing live FIFO", () => {
     });
 
     expect(
-      pipeline.commands.map(({ name, options }) => [
-        name,
-        options?.serializeByAggregate,
-      ]),
+      pipeline.commands.map(({ name, options }) => [name, options?.serializeByAggregate]),
     ).toEqual([
       ["executeEvaluation", true],
       ["startEvaluation", true],

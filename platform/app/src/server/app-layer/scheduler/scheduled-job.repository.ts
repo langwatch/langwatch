@@ -2,10 +2,7 @@
 
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { toPgTimestampUtc } from "~/server/utils/pgTimestamp";
-import type {
-  ScheduledJobRecord,
-  ScheduledJobStore,
-} from "./scheduler.types";
+import type { ScheduledJobRecord, ScheduledJobStore } from "./scheduler.types";
 
 /**
  * Prisma-backed `ScheduledJob` repository (ADR-044 §4). The durable Postgres
@@ -254,11 +251,7 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
     });
   }
 
-  async listForOps({
-    limit,
-  }: {
-    limit: number;
-  }): Promise<ScheduledJobRecord[]> {
+  async listForOps({ limit }: { limit: number }): Promise<ScheduledJobRecord[]> {
     // Cross-tenant operator read (all projects): active jobs first, then by
     // soonest next fire. The `-- @tenancy:` marker is the guard's sanctioned
     // opt-out for a system-owned cross-tenant view (read-only, never fires).
@@ -305,11 +298,7 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
 
   // ── Operator control (ADR-091) ────────────────────────────────────────
 
-  async findByIdForOps({
-    id,
-  }: {
-    id: string;
-  }): Promise<ScheduledJobRecord | null> {
+  async findByIdForOps({ id }: { id: string }): Promise<ScheduledJobRecord | null> {
     const rows = await this.prisma.$queryRaw<ScheduledJobRecord[]>`
       SELECT "id", "projectId", "targetType", "targetId", "cron", "timezone",
              "nextRunAt", "lastSlot", "currentSlot", "attempts", "lastError",

@@ -84,12 +84,7 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
               {displayLabel ?? attrKey}
             </Text>
             {activeCount > 0 && (
-              <Badge
-                variant="solid"
-                size="xs"
-                colorPalette="blue"
-                borderRadius="full"
-              >
+              <Badge variant="solid" size="xs" colorPalette="blue" borderRadius="full">
                 {activeCount}
               </Badge>
             )}

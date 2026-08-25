@@ -349,9 +349,7 @@ describe("SessionView", () => {
       });
 
       expect(screen.getByText("Context noise")).toBeTruthy();
-      expect(
-        screen.getByText("Compacted 2× — 180k → 40k tokens."),
-      ).toBeTruthy();
+      expect(screen.getByText("Compacted 2× — 180k → 40k tokens.")).toBeTruthy();
     });
   });
 
@@ -363,8 +361,7 @@ describe("SessionView", () => {
       const mcpLabel = screen.getByText("MCP servers");
       // DOCUMENT_POSITION_FOLLOWING means skillsLabel comes BEFORE mcpLabel.
       expect(
-        skillsLabel.compareDocumentPosition(mcpLabel) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        skillsLabel.compareDocumentPosition(mcpLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
       expect(screen.getByText("code-review")).toBeTruthy();
     });

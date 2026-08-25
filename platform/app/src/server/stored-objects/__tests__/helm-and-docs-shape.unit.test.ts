@@ -56,9 +56,7 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when localFilesystem.enabled is combined with multi-replica", () => {
     /** @scenario "Single-replica helm install can opt into a PVC-backed local-FS storage path" */
     it("renders a PVC bound to LANGWATCH_LOCAL_STORAGE_PATH and refuses multi-replica", () => {
-      const pvc = readRepoFile(
-        "charts/langwatch/templates/app/stored-objects-pvc.yaml",
-      );
+      const pvc = readRepoFile("charts/langwatch/templates/app/stored-objects-pvc.yaml");
       const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
 
       // PVC template is gated on the "local-FS is the active backend" helper
@@ -71,9 +69,7 @@ describe("Helm chart deployment surface for stored-objects", () => {
 
       // The helper itself is the single source of truth for the active-backend
       // condition: localFilesystem.enabled AND NOT dataplane.enabled.
-      expect(helpers).toContain(
-        ".Values.app.storedObjects.localFilesystem.enabled",
-      );
+      expect(helpers).toContain(".Values.app.storedObjects.localFilesystem.enabled");
       expect(helpers).toContain("not .Values.app.dataplane.enabled");
 
       // The validation block rejects localFilesystem + replicaCount > 1
@@ -86,26 +82,19 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when dataplane is enabled alongside localFilesystem default-on", () => {
     /** @scenario "Multi-replica install with dataplane on does NOT create the local-FS PVC, even when localFilesystem.enabled defaults to true" */
     it("PVC and volume mount only render when dataplane is OFF", () => {
-      const pvc = readRepoFile(
-        "charts/langwatch/templates/app/stored-objects-pvc.yaml",
-      );
-      const deployment = readRepoFile(
-        "charts/langwatch/templates/app/deployment.yaml",
-      );
+      const pvc = readRepoFile("charts/langwatch/templates/app/stored-objects-pvc.yaml");
+      const deployment = readRepoFile("charts/langwatch/templates/app/deployment.yaml");
 
       // Both the PVC and the volume mount must go through the
       // "localFilesystemIsActive" helper so multi-replica + dataplane.enabled
       // does NOT mount a single-attach RWO PVC into multiple pods.
       expect(pvc).toContain("langwatch.storedObjects.localFilesystemIsActive");
-      expect(deployment).toContain(
-        "langwatch.storedObjects.localFilesystemIsActive",
-      );
+      expect(deployment).toContain("langwatch.storedObjects.localFilesystemIsActive");
 
       // Anti-regression: neither template gates only on the raw enabled toggle
       // (the bug Sergio caught — dataplane=true + localFS=true would still mount).
       const rawToggleRefsInPvc = (
-        pvc.match(/\.Values\.app\.storedObjects\.localFilesystem\.enabled/g) ||
-        []
+        pvc.match(/\.Values\.app\.storedObjects\.localFilesystem\.enabled/g) || []
       ).length;
       expect(rawToggleRefsInPvc).toBe(0);
     });
@@ -155,9 +144,7 @@ describe("Helm chart exposes an Azure Blob dataplane provider (AC37, issue #4133
     it("emits STORED_OBJECTS_BACKEND=azure and the AZURE_BLOB_* env vars on the deployment", () => {
       const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
 
-      expect(helpers).toMatch(
-        /eq \.Values\.app\.dataplane\.provider "azureBlob"/,
-      );
+      expect(helpers).toMatch(/eq \.Values\.app\.dataplane\.provider "azureBlob"/);
       expect(helpers).toContain("STORED_OBJECTS_BACKEND");
       expect(helpers).toMatch(/value:\s*"azure"/);
       expect(helpers).toContain("AZURE_BLOB_ACCOUNT_NAME");
@@ -254,9 +241,7 @@ describe("Self-hosting docs cover the stored-objects deployment surface", () => 
       // The label was reframed during PR #4058 review from "scenario media"
       // to "externalized byte content" so the docs accurately name S3 as
       // the general file-storage layer.
-      expect(overview).toMatch(
-        /App\s*-->\s*\|"externalized byte content[^"]*"\|\s*S3/,
-      );
+      expect(overview).toMatch(/App\s*-->\s*\|"externalized byte content[^"]*"\|\s*S3/);
     });
   });
 });
@@ -349,9 +334,7 @@ describe("Route handlers delegate to the service and never touch the repository 
         "platform/app/src/app/api/scenario-events/[[...route]]/app.ts",
       );
 
-      expect(route).toContain(
-        'from "~/server/stored-objects/stored-objects-factory"',
-      );
+      expect(route).toContain('from "~/server/stored-objects/stored-objects-factory"');
       // Direct repository import would be a layering violation
       expect(route).not.toContain(
         'from "~/server/stored-objects/stored-objects.repository"',
@@ -362,13 +345,9 @@ describe("Route handlers delegate to the service and never touch the repository 
   describe("when /api/files/:id route imports are inspected", () => {
     /** @scenario "Route handlers delegate to the service and never touch the repository directly" */
     it("imports the service factory and does not import the repository", () => {
-      const route = readRepoFile(
-        "platform/app/src/app/api/files/[[...route]]/app.ts",
-      );
+      const route = readRepoFile("platform/app/src/app/api/files/[[...route]]/app.ts");
 
-      expect(route).toContain(
-        'from "~/server/stored-objects/stored-objects-factory"',
-      );
+      expect(route).toContain('from "~/server/stored-objects/stored-objects-factory"');
       expect(route).not.toContain(
         'from "~/server/stored-objects/stored-objects.repository"',
       );

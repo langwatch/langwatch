@@ -16,10 +16,7 @@ import type {
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
 
-export type WorkflowEvaluationParameters = Record<
-  string,
-  string | number | boolean
->;
+export type WorkflowEvaluationParameters = Record<string, string | number | boolean>;
 
 export class WorkflowNotFoundError extends Error {
   constructor(workflowId: string) {
@@ -120,9 +117,7 @@ export class WorkflowEvaluationService {
     }
 
     const dsl = version.dsl as unknown as WorkflowDSL;
-    const entry = dsl.nodes.find((n) => n.type === "entry")?.data as
-      | Entry
-      | undefined;
+    const entry = dsl.nodes.find((n) => n.type === "entry")?.data as Entry | undefined;
     const entryFields: Field[] = entry?.outputs ?? [];
 
     // A parameter the workflow does not already declare as an entry field still
@@ -173,13 +168,11 @@ export class WorkflowEvaluationService {
       if (entry?.dataset?.id && !entry.dataset.inline) {
         resolvedDatasetId = entry.dataset.id;
       } else if (entry?.dataset?.inline) {
-        const columns: DatasetColumn[] = entry.dataset.inline.columnTypes.map(
-          (c) => ({
-            id: c.name,
-            name: c.name,
-            type: c.type,
-          }),
-        );
+        const columns: DatasetColumn[] = entry.dataset.inline.columnTypes.map((c) => ({
+          id: c.name,
+          name: c.name,
+          type: c.type,
+        }));
         datasetRef = {
           id: WORKFLOW_DATASET_ID,
           name: entry.dataset.name ?? workflow.name,
@@ -193,13 +186,11 @@ export class WorkflowEvaluationService {
       }
     }
 
-    const dataResult = await loadExecutionData(
-      projectId,
-      datasetRef,
-      [target],
-      [],
-      { data, datasetId: resolvedDatasetId, parameters },
-    );
+    const dataResult = await loadExecutionData(projectId, datasetRef, [target], [], {
+      data,
+      datasetId: resolvedDatasetId,
+      parameters,
+    });
     if ("error" in dataResult) {
       throw new EvaluationInputError(dataResult.error, dataResult.status);
     }

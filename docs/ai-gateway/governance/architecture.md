@@ -164,27 +164,27 @@ Closed SaaS (Cowork / Copilot / Workato / OpenAI / Claude / S3)
 
 ### Postgres (Prisma)
 
-| Table | Purpose | Notes |
-|---|---|---|
-| `Organization` | Billing entity / tenant boundary | Top of hierarchy |
-| `Team` (`isPersonal`) | Grouping unit | `isPersonal=true` for auto-created personal teams |
-| `Project` (`isPersonal`) | Work artifact: agents, datasets, evals | `isPersonal=true` for personal projects |
-| `User`, `OrganizationUser`, `RoleBinding` | Identity + RBAC | RoleBindings replacing legacy TeamUser |
-| `RoutingPolicy` | Provider chain template | Org-scoped; hierarchical via `scope`+`scopeId` |
-| `VirtualKey` | The actual credential issued to a caller | `organizationId` + `VirtualKeyScope[]` (multi-scope at ORG/TEAM/PROJECT); references RoutingPolicy; optional `principalUserId` for personal VKs |
-| `VirtualKeyScope` | One scope row per VK (1:N) | Cascade upward to derive eligible ModelProviders |
-| `ModelProvider` | Upstream LLM API key (basic creds) + Gateway-only fields (RPM/TPM/RPD, fallback priority, providerConfig) on the **Advanced (Gateway)** tab | Scoped to ORGANIZATION/TEAM/PROJECT; one record per credential, no separate gateway binding |
-| `GatewayBudget` | Spend limit | Scope = ORG / TEAM / PROJECT / VK / PRINCIPAL |
-| `IngestionSource` | Per-platform fleet config | Org-scoped; carries ingestSecret + parserConfig |
+| Table                                     | Purpose                                                                                                                                     | Notes                                                                                                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Organization`                            | Billing entity / tenant boundary                                                                                                            | Top of hierarchy                                                                                                                                |
+| `Team` (`isPersonal`)                     | Grouping unit                                                                                                                               | `isPersonal=true` for auto-created personal teams                                                                                               |
+| `Project` (`isPersonal`)                  | Work artifact: agents, datasets, evals                                                                                                      | `isPersonal=true` for personal projects                                                                                                         |
+| `User`, `OrganizationUser`, `RoleBinding` | Identity + RBAC                                                                                                                             | RoleBindings replacing legacy TeamUser                                                                                                          |
+| `RoutingPolicy`                           | Provider chain template                                                                                                                     | Org-scoped; hierarchical via `scope`+`scopeId`                                                                                                  |
+| `VirtualKey`                              | The actual credential issued to a caller                                                                                                    | `organizationId` + `VirtualKeyScope[]` (multi-scope at ORG/TEAM/PROJECT); references RoutingPolicy; optional `principalUserId` for personal VKs |
+| `VirtualKeyScope`                         | One scope row per VK (1:N)                                                                                                                  | Cascade upward to derive eligible ModelProviders                                                                                                |
+| `ModelProvider`                           | Upstream LLM API key (basic creds) + Gateway-only fields (RPM/TPM/RPD, fallback priority, providerConfig) on the **Advanced (Gateway)** tab | Scoped to ORGANIZATION/TEAM/PROJECT; one record per credential, no separate gateway binding                                                     |
+| `GatewayBudget`                           | Spend limit                                                                                                                                 | Scope = ORG / TEAM / PROJECT / VK / PRINCIPAL                                                                                                   |
+| `IngestionSource`                         | Per-platform fleet config                                                                                                                   | Org-scoped; carries ingestSecret + parserConfig                                                                                                 |
 
 ### ClickHouse
 
-| Table | Purpose | New columns for governance |
-|---|---|---|
-| `trace_summaries` | One row per trace | `SourceType` (LowCardinality), `SourceId` (String), `OrganizationId` (bloom-indexed) |
-| `stored_spans` | Span-level detail | inherited TenantId scoping unchanged |
-| `event_log` | Event-sourced audit trail | inherited |
-| `gateway_budget_ledger_events` | Per-trace spend per applicable budget | `principal_user_id` already first-class |
+| Table                          | Purpose                               | New columns for governance                                                           |
+| ------------------------------ | ------------------------------------- | ------------------------------------------------------------------------------------ |
+| `trace_summaries`              | One row per trace                     | `SourceType` (LowCardinality), `SourceId` (String), `OrganizationId` (bloom-indexed) |
+| `stored_spans`                 | Span-level detail                     | inherited TenantId scoping unchanged                                                 |
+| `event_log`                    | Event-sourced audit trail             | inherited                                                                            |
+| `gateway_budget_ledger_events` | Per-trace spend per applicable budget | `principal_user_id` already first-class                                              |
 
 Every table keeps the `TenantId = projectId` invariant.
 `OrganizationId` is a **query dimension** for cross-project rollup,
@@ -214,17 +214,17 @@ OCSF.
 
 ## Stop/observe matrix per platform
 
-| Platform | Tier | Real-time stop | Triggered admin action | Alert-only |
-|---|---|---|---|---|
-| Claude Code / Codex CLI / Cursor / custom agent | A | ✅ via Gateway | n/a | n/a |
-| Workato (BYOK route) | A/B | ✅ | n/a | n/a |
-| Workato (audit log push) | C | ❌ | ✅ pause recipe via Platform API | n/a |
-| Cowork desktop | C/D | ❌ | ✅ revoke workspace key via Anthropic Admin | n/a |
-| Copilot Studio | C | ❌ | ✅ disable agent via Power Platform admin | n/a |
-| ChatGPT Enterprise / Codex (cloud) | C | ❌ | ✅ revoke key via OpenAI Compliance | n/a |
-| Claude Enterprise / Cowork (cloud) | C/D | ❌ | ✅ revoke workspace key | n/a |
-| Gemini for Workspace | C | ❌ | ✅ via Google Workspace admin | n/a |
-| Salesforce Einstein / Slack AI / Notion AI | n/a | ❌ | ❌ | ✅ alert only |
+| Platform                                        | Tier | Real-time stop | Triggered admin action                      | Alert-only    |
+| ----------------------------------------------- | ---- | -------------- | ------------------------------------------- | ------------- |
+| Claude Code / Codex CLI / Cursor / custom agent | A    | ✅ via Gateway | n/a                                         | n/a           |
+| Workato (BYOK route)                            | A/B  | ✅             | n/a                                         | n/a           |
+| Workato (audit log push)                        | C    | ❌             | ✅ pause recipe via Platform API            | n/a           |
+| Cowork desktop                                  | C/D  | ❌             | ✅ revoke workspace key via Anthropic Admin | n/a           |
+| Copilot Studio                                  | C    | ❌             | ✅ disable agent via Power Platform admin   | n/a           |
+| ChatGPT Enterprise / Codex (cloud)              | C    | ❌             | ✅ revoke key via OpenAI Compliance         | n/a           |
+| Claude Enterprise / Cowork (cloud)              | C/D  | ❌             | ✅ revoke workspace key                     | n/a           |
+| Gemini for Workspace                            | C    | ❌             | ✅ via Google Workspace admin               | n/a           |
+| Salesforce Einstein / Slack AI / Notion AI      | n/a  | ❌             | ❌                                          | ✅ alert only |
 
 The Activity Monitor lists these actions per anomaly in its "actions
 available" UI, and this matrix sets the order in which we ship the
@@ -254,6 +254,7 @@ gating contract.
 ## Roadmap to full vision
 
 What's on this branch today:
+
 - ✅ Personal Workspace (Team+Project, `isPersonal` flag)
 - ✅ RoutingPolicy admin UI + provider-cred org validation
 - ✅ Personal VirtualKeys + admin catalog
@@ -266,12 +267,14 @@ What's on this branch today:
 - ✅ This architecture doc + activity-monitor + ingestion-sources specs
 
 What this iteration adds (D2 foundation):
+
 - 🚧 `IngestionSource` table + `trace_summaries.SourceType`/`SourceId` columns
 - 🚧 Generic OTel passthrough receiver (`/api/ingest/otel/<sourceId>`)
 - 🚧 Generic webhook receiver (`/api/ingest/webhook/<sourceId>`)
 - 🚧 OCSF normalisation contract + skeleton adapter
 
 Deferred to follow-up iterations:
+
 - Cowork OTel adapter (depends on Anthropic Admin Console UX)
 - Workato webhook adapter
 - Copilot Studio / OpenAI / Claude Compliance pullers

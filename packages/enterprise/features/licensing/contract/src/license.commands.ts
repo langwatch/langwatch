@@ -29,6 +29,4 @@ export const generateLicenseOutputSchema = z.object({
   licenseKey: z.string().min(1),
   licenseData: licenseDataSchema,
 });
-export type GenerateLicenseOutput = z.infer<
-  typeof generateLicenseOutputSchema
->;
+export type GenerateLicenseOutput = z.infer<typeof generateLicenseOutputSchema>;

@@ -13,9 +13,7 @@ import { execWithNoScriptRecovery } from "../repositories/queue.redis.repository
  * intermittently. The behaviour under test is entirely in the recovery
  * function, so a fake pipeline pins it deterministically and harms nobody.
  */
-function pipelineReturning(
-  results: Array<[Error | null, unknown]>,
-): ChainableCommander {
+function pipelineReturning(results: Array<[Error | null, unknown]>): ChainableCommander {
   return { exec: async () => results } as unknown as ChainableCommander;
 }
 

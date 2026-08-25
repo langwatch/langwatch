@@ -69,9 +69,7 @@ describe("DrawerContent transparency", () => {
 
       // Scope to the drawer content panel's OWN generated class so an
       // unrelated rule referencing these variables can't keep the test green.
-      const content = document.querySelector(
-        "[data-part='content']",
-      ) as HTMLElement;
+      const content = document.querySelector("[data-part='content']") as HTMLElement;
       const contentCss = cssRulesForElement(content);
       expect(contentCss).toContain("--lw-backdrop-blur");
       expect(contentCss).toContain("--lw-panel-alpha");

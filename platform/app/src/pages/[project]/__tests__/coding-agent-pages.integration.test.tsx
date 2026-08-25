@@ -35,9 +35,7 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
 }));
 
 vi.mock("~/components/DashboardLayout", () => ({
-  DashboardLayout: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  DashboardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("~/components/LoadingScreen", () => ({

@@ -40,15 +40,9 @@ export class CapabilityRegistry {
 
   private constructor() {}
 
-  provide<Value>(
-    token: Capability<Value>,
-    value: Value,
-    provider: string,
-  ): void {
+  provide<Value>(token: Capability<Value>, value: Value, provider: string): void {
     if (this.sealed) {
-      throw new Error(
-        `Capability registry is sealed; cannot provide "${token.key}".`,
-      );
+      throw new Error(`Capability registry is sealed; cannot provide "${token.key}".`);
     }
     const existing = this.installed.get(token.key);
     if (existing) {

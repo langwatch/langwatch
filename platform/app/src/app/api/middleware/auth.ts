@@ -42,8 +42,9 @@ export const authMiddleware: MiddlewareHandler = createUnifiedAuthMiddleware({})
  * family's own error handler, so a canonical family needs its 401s rendered
  * canonically here rather than as the flat legacy body.
  */
-export const canonicalAuthMiddleware: MiddlewareHandler =
-  createUnifiedAuthMiddleware({ errorEnvelope: "canonical" });
+export const canonicalAuthMiddleware: MiddlewareHandler = createUnifiedAuthMiddleware({
+  errorEnvelope: "canonical",
+});
 
 /**
  * Per-endpoint RBAC middleware. Legacy project keys always pass through;

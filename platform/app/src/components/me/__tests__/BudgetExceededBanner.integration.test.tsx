@@ -37,9 +37,7 @@ describe("BudgetExceededBanner", () => {
       // across nodes — assert against the alert's full textContent instead
       // of using a single getByText regex.
       const alertText = screen.getByRole("alert").textContent ?? "";
-      expect(alertText).toMatch(
-        /of your\s+\$500\.00\s+monthly personal budget/i,
-      );
+      expect(alertText).toMatch(/of your\s+\$500\.00\s+monthly personal budget/i);
     });
 
     it("uses role=alert + aria-live=assertive so screen readers announce it", () => {

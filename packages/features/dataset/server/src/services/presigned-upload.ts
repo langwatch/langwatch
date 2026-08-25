@@ -58,10 +58,7 @@ export const STALE_PROCESSING_TTL_SECONDS = 60 * 60;
  * presign is bound to exactly this key, so a client can only write this one
  * object under its own project prefix.
  */
-export const stagingUploadKey = (
-  projectId: string,
-  uploadId: string,
-): string => {
+export const stagingUploadKey = (projectId: string, uploadId: string): string => {
   assertNoTraversal(projectId, uploadId);
   return `staging/${projectId}/${uploadId}`;
 };
@@ -75,10 +72,7 @@ export const stagingUploadKey = (
  * → no credentials). Shared by `LocalDatasetStorage.createPresignedUpload` (mints
  * it) and the `/direct-upload/staging/:uploadId` route (serves it).
  */
-export const localStagingUploadPath = (
-  projectId: string,
-  uploadId: string,
-): string => {
+export const localStagingUploadPath = (projectId: string, uploadId: string): string => {
   assertNoTraversal(projectId, uploadId);
   return `/api/dataset/direct-upload/staging/${uploadId}?projectId=${encodeURIComponent(
     projectId,

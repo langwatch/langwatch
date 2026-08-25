@@ -110,9 +110,9 @@ describe("credentialClassFor", () => {
           policy: requires("gatewaySpend:view"),
         }),
       ).toBe("organization_api_key");
-      expect(
-        credentialClassFor({ scope: "service", policy: anyAuthenticated() }),
-      ).toBe("internal");
+      expect(credentialClassFor({ scope: "service", policy: anyAuthenticated() })).toBe(
+        "internal",
+      );
     });
 
     it("says session when the handler authenticates a browser session", () => {
@@ -141,9 +141,7 @@ describe("credentialClassFor", () => {
       expect(
         credentialClassFor({
           scope: "project",
-          policy: internalSecret(
-            "the collector authenticates by shared secret",
-          ),
+          policy: internalSecret("the collector authenticates by shared secret"),
         }),
       ).toBe("internal");
     });
@@ -189,15 +187,14 @@ describe("credentialClassFor", () => {
       { scope: "service", credential: "both", expected: "project_api_key" },
       { scope: "session", credential: "apiKey", expected: "project_api_key" },
       { scope: "session", credential: "both", expected: "project_api_key" },
-    ] as const)("a $scope app taking $credential publishes $expected", ({
-      scope,
-      credential,
-      expected,
-    }) => {
-      expect(
-        credentialClassFor({ scope, policy: handlerManaged(credential) }),
-      ).toBe(expected);
-    });
+    ] as const)(
+      "a $scope app taking $credential publishes $expected",
+      ({ scope, credential, expected }) => {
+        expect(credentialClassFor({ scope, policy: handlerManaged(credential) })).toBe(
+          expected,
+        );
+      },
+    );
   });
 });
 
@@ -220,13 +217,7 @@ describe("isHttpMethod", () => {
       // `servers` and `parameters` are arrays, so a walker that decides by
       // `typeof === "object"` treats them as operations and stamps `security`
       // onto them, which is a document that no longer validates.
-      for (const member of [
-        "servers",
-        "parameters",
-        "summary",
-        "description",
-        "$ref",
-      ]) {
+      for (const member of ["servers", "parameters", "summary", "description", "$ref"]) {
         expect(isHttpMethod(member)).toBe(false);
       }
     });
@@ -246,15 +237,13 @@ describe("documentedPathOf", () => {
       // The whole reason the eight prompt and evaluator operations went
       // unstamped: `{.+}` is matcher syntax, and carrying it through produced
       // a path no documented operation is keyed by.
-      expect(documentedPathOf("/api/prompts/:id{.+}")).toBe(
-        "/api/prompts/{id}",
-      );
+      expect(documentedPathOf("/api/prompts/:id{.+}")).toBe("/api/prompts/{id}");
       expect(documentedPathOf("/api/prompts/:id{.+?}/versions")).toBe(
         "/api/prompts/{id}/versions",
       );
-      expect(
-        documentedPathOf("/api/prompts/:id{.+?}/versions/:versionId/restore"),
-      ).toBe("/api/prompts/{id}/versions/{versionId}/restore");
+      expect(documentedPathOf("/api/prompts/:id{.+?}/versions/:versionId/restore")).toBe(
+        "/api/prompts/{id}/versions/{versionId}/restore",
+      );
       expect(documentedPathOf("/api/evaluators/:idOrSlug{.+}")).toBe(
         "/api/evaluators/{idOrSlug}",
       );
@@ -263,9 +252,7 @@ describe("documentedPathOf", () => {
     it("consumes a quantifier inside the pattern rather than stopping at it", () => {
       // A pattern may carry braces of its own. Stopping at the first `}` would
       // leave the remainder in the path and reintroduce the same mismatch.
-      expect(documentedPathOf("/api/things/:code{[0-9]{3}}")).toBe(
-        "/api/things/{code}",
-      );
+      expect(documentedPathOf("/api/things/:code{[0-9]{3}}")).toBe("/api/things/{code}");
     });
 
     it("leaves a path without parameters alone", () => {
@@ -339,9 +326,7 @@ describe("the published API description", () => {
       const operations = publicOperations();
       const wrong = operations
         .filter(
-          (op) =>
-            JSON.stringify(op.published) !==
-            JSON.stringify([{ [op.scheme]: [] }]),
+          (op) => JSON.stringify(op.published) !== JSON.stringify([{ [op.scheme]: [] }]),
         )
         .map(
           (op) =>
@@ -358,10 +343,7 @@ describe("the published API description", () => {
       // Both families are present, which is the whole point: the document
       // used to answer project_api_key for every operation, including the
       // organization-scoped ones a project key can never reach.
-      expect([...seenSchemes].sort()).toEqual([
-        "admin_api_key",
-        "project_api_key",
-      ]);
+      expect([...seenSchemes].sort()).toEqual(["admin_api_key", "project_api_key"]);
     });
 
     it("gives the spend and webhook routes the organization key", () => {
@@ -372,9 +354,7 @@ describe("the published API description", () => {
         "/api/gateway/v1/spend-events",
         "/api/webhooks/v1/endpoints",
       ]) {
-        expect(document.paths[path]?.get?.security).toEqual([
-          { admin_api_key: [] },
-        ]);
+        expect(document.paths[path]?.get?.security).toEqual([{ admin_api_key: [] }]);
       }
     });
   });

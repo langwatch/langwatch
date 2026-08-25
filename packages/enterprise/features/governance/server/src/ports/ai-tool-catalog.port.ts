@@ -35,9 +35,7 @@ export abstract class AiToolCatalogRepository {
     values: SeedAiToolStarterPackInput;
     tiles: readonly AiToolStarterTile[];
   }): Promise<{ created: number; updated: number; skipped: number }>;
-  abstract listConfiguredProvidersForUser(
-    input: AiToolMemberInput,
-  ): Promise<string[]>;
+  abstract listConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]>;
   abstract listConfiguredProvidersForOrganization(
     organizationId: string,
   ): Promise<string[]>;

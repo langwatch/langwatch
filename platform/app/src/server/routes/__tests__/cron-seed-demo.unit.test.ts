@@ -1,12 +1,4 @@
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SeedRunReport } from "../../../../scripts/dogfood/governance/_lib/seedRunner";
 
 vi.mock("../../../../scripts/dogfood/governance/seed-demo", () => ({
@@ -15,9 +7,7 @@ vi.mock("../../../../scripts/dogfood/governance/seed-demo", () => ({
 
 const KEY = "test-cron-secret";
 
-function makeReport(
-  outcome: "succeeded" | "failed" = "succeeded",
-): SeedRunReport {
+function makeReport(outcome: "succeeded" | "failed" = "succeeded"): SeedRunReport {
   return {
     startedAt: "2026-05-09T00:00:00.000Z",
     completedAt: "2026-05-09T00:00:01.000Z",
@@ -48,12 +38,8 @@ describe("/api/cron/seed_demo", () => {
   beforeAll(async () => {
     const cronMod = await import("../cron");
     app = cronMod.app;
-    const seedMod = await import(
-      "../../../../scripts/dogfood/governance/seed-demo"
-    );
-    runSeedDemoMock = seedMod.runSeedDemo as unknown as ReturnType<
-      typeof vi.fn
-    >;
+    const seedMod = await import("../../../../scripts/dogfood/governance/seed-demo");
+    runSeedDemoMock = seedMod.runSeedDemo as unknown as ReturnType<typeof vi.fn>;
   }, 30_000);
 
   beforeEach(() => {

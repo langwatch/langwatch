@@ -36,10 +36,7 @@ export function QueryFilterInput({
   const [open, setOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const state = useMemo(
-    () => getSuggestionState(value, cursor),
-    [value, cursor],
-  );
+  const state = useMemo(() => getSuggestionState(value, cursor), [value, cursor]);
 
   const ui = useMemo(
     () =>
@@ -96,14 +93,10 @@ export function QueryFilterInput({
     if (!showDropdown) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex(
-        navigateSuggestion({ ui, direction: "down" }).selectedIndex,
-      );
+      setSelectedIndex(navigateSuggestion({ ui, direction: "down" }).selectedIndex);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedIndex(
-        navigateSuggestion({ ui, direction: "up" }).selectedIndex,
-      );
+      setSelectedIndex(navigateSuggestion({ ui, direction: "up" }).selectedIndex);
     } else if (e.key === "Enter" || e.key === "Tab") {
       e.preventDefault();
       const row = highlightedRow(ui);
@@ -139,9 +132,7 @@ export function QueryFilterInput({
         // Delay close so a mousedown on a dropdown row still registers.
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
-      {showDropdown ? (
-        <SuggestionDropdown ui={ui} onSelect={acceptByValue} />
-      ) : null}
+      {showDropdown ? <SuggestionDropdown ui={ui} onSelect={acceptByValue} /> : null}
       <SyntaxHelpDrawerHost />
     </Box>
   );

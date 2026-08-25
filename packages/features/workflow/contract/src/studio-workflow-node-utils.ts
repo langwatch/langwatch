@@ -88,9 +88,7 @@ export const getEntryInputs = (
         self.findIndex((e) => e.sourceHandle === edge.sourceHandle) === index,
     )
     .map((edge) => {
-      if (
-        !evaluators?.some((evaluator) => evaluator.id === edge.target)
-      ) {
+      if (!evaluators?.some((evaluator) => evaluator.id === edge.target)) {
         return edge;
       }
       return {
@@ -124,11 +122,12 @@ export const getMappingSurfaceInputs = (
   type: Field["type"];
   optional?: boolean;
 }> => {
-  const entryNode = nodes.find(
-    (node) => node.type === "entry" || node.id === "entry",
-  );
-  const declaredOutputs: Array<Pick<Field, "identifier" | "type">> =
-    Array.isArray(entryNode?.data?.outputs) ? entryNode.data.outputs : [];
+  const entryNode = nodes.find((node) => node.type === "entry" || node.id === "entry");
+  const declaredOutputs: Array<Pick<Field, "identifier" | "type">> = Array.isArray(
+    entryNode?.data?.outputs,
+  )
+    ? entryNode.data.outputs
+    : [];
 
   if (declaredOutputs.length === 0) {
     // fallback for legacy DSLs without a declared entry node — should be unreachable for current schemas
@@ -144,9 +143,7 @@ export const getMappingSurfaceInputs = (
 
   return declaredOutputs.map(({ identifier, type }) => {
     const fieldEdges = edges.filter(
-      (edge) =>
-        edge.source === "entry" &&
-        edge.sourceHandle === `outputs.${identifier}`,
+      (edge) => edge.source === "entry" && edge.sourceHandle === `outputs.${identifier}`,
     );
 
     const hasNonEvaluatorTarget = fieldEdges.some(
@@ -172,9 +169,8 @@ export const getInputsOutputs = (edges: StudioEdge[], nodes: StudioNode[]) => {
     ...(edge.optional ? { optional: true } : {}),
   }));
 
-  const outputs = nodes.find(
-    (node) => node.type === "end" || node.id === "end",
-  )?.data.inputs;
+  const outputs = nodes.find((node) => node.type === "end" || node.id === "end")?.data
+    .inputs;
 
   return { inputs, outputs };
 };

@@ -12,8 +12,7 @@ import type { MountedRoute } from "../types.js";
 // every reported endpoint mount names its version namespace.
 // ---------------------------------------------------------------------------
 
-const GUARD_PATH =
-  "/api/test/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
+const GUARD_PATH = "/api/test/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
 const GUARD_WILDCARD_PATH = `${GUARD_PATH}/*`;
 
 type Summary = Pick<
@@ -140,9 +139,7 @@ describe("onRouteMounted", () => {
           .sort(bySummary),
       ).toEqual([...expected].sort(bySummary));
 
-      const discoverMounts = mounted.filter(
-        (route) => route.isDiscoverEndpoint,
-      );
+      const discoverMounts = mounted.filter((route) => route.isDiscoverEndpoint);
       expect(discoverMounts.map((route) => route.path).sort()).toEqual([
         "/api/test/2025-03-15/rpc.discover",
         "/api/test/latest/rpc.discover",
@@ -200,9 +197,7 @@ describe("onRouteMounted", () => {
         )
         .build();
 
-      const table = new Set(
-        app.routes.map((route) => `${route.method} ${route.path}`),
-      );
+      const table = new Set(app.routes.map((route) => `${route.method} ${route.path}`));
       const reported = new Set(
         mounted.map((route) => `${route.method.toUpperCase()} ${route.path}`),
       );
@@ -264,9 +259,7 @@ describe("onRouteMounted", () => {
         expect(route.config?.meta).toEqual(meta);
       }
 
-      const live = mounted.find(
-        (route) => route.path === "/api/test/2025-01-01/old",
-      );
+      const live = mounted.find((route) => route.path === "/api/test/2025-01-01/old");
       expect(live?.withdrawn).toBe(false);
     });
   });
@@ -297,9 +290,7 @@ describe("onRouteMounted", () => {
 
       expect(
         mounted
-          .filter(
-            (route) => route.status === "preview" && !route.isDiscoverEndpoint,
-          )
+          .filter((route) => route.status === "preview" && !route.isDiscoverEndpoint)
           .map(({ method, path, version }) => ({ method, path, version })),
       ).toEqual([
         {

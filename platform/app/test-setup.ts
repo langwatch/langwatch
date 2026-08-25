@@ -159,16 +159,13 @@ import {
 } from "node:stream/web";
 
 if (typeof globalThis.TransformStream === "undefined") {
-  globalThis.TransformStream =
-    NodeTransformStream as unknown as typeof TransformStream;
+  globalThis.TransformStream = NodeTransformStream as unknown as typeof TransformStream;
 }
 if (typeof globalThis.ReadableStream === "undefined") {
-  globalThis.ReadableStream =
-    NodeReadableStream as unknown as typeof ReadableStream;
+  globalThis.ReadableStream = NodeReadableStream as unknown as typeof ReadableStream;
 }
 if (typeof globalThis.WritableStream === "undefined") {
-  globalThis.WritableStream =
-    NodeWritableStream as unknown as typeof WritableStream;
+  globalThis.WritableStream = NodeWritableStream as unknown as typeof WritableStream;
 }
 
 // Mock recharts to avoid ESM/CJS compatibility issues with @reduxjs/toolkit in vmThreads pool.

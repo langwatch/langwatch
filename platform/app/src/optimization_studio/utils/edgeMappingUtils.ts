@@ -22,9 +22,7 @@ export function buildAvailableSources({
     if (!currentNode || downstreamNodes.has(currentNode)) continue;
     downstreamNodes.add(currentNode);
     toVisit.push(
-      ...edges
-        .filter((edge) => edge.source === currentNode)
-        .map((edge) => edge.target),
+      ...edges.filter((edge) => edge.source === currentNode).map((edge) => edge.target),
     );
   }
 
@@ -96,8 +94,7 @@ export function applyMappingChangeToEdges({
 }): Edge[] {
   // Remove existing edge for this input
   const filteredEdges = currentEdges.filter(
-    (edge) =>
-      !(edge.target === nodeId && edge.targetHandle === `inputs.${identifier}`),
+    (edge) => !(edge.target === nodeId && edge.targetHandle === `inputs.${identifier}`),
   );
 
   if (mapping && mapping.type === "source") {
@@ -148,11 +145,7 @@ export function buildInputMappings({
 
   // Value mappings from field.value (for inputs without an edge)
   inputs.forEach((input) => {
-    if (
-      input.value != null &&
-      input.value !== "" &&
-      !mappings[input.identifier]
-    ) {
+    if (input.value != null && input.value !== "" && !mappings[input.identifier]) {
       mappings[input.identifier] = {
         type: "value",
         value: String(input.value),
@@ -183,8 +176,7 @@ export function applyMappingChange({
 }): { edges: Edge[]; inputs: Field[] } {
   // Remove existing edge for this input
   const filteredEdges = currentEdges.filter(
-    (edge) =>
-      !(edge.target === nodeId && edge.targetHandle === `inputs.${identifier}`),
+    (edge) => !(edge.target === nodeId && edge.targetHandle === `inputs.${identifier}`),
   );
 
   // Update field.value on the matching input

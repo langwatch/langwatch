@@ -76,8 +76,7 @@ function dataPointEvent({
       pointAttributesJson: encodeAttributes(attributes),
       resourceAttributesJson: encodeAttributes(resourceAttributes),
       timeUnixMs: 1_500,
-      valueType:
-        valueDouble !== null ? "double" : valueInt !== null ? "int" : "none",
+      valueType: valueDouble !== null ? "double" : valueInt !== null ? "int" : "none",
       valueDouble,
       valueInt,
     },

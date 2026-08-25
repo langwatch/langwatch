@@ -4,15 +4,9 @@ import {
   OrganizationApiService,
   type InviteInput,
 } from "@/client-sdk/services/organization/organization-api.service";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { formatTable } from "../../utils/formatting";
-import {
-  composeInvitesFromFlags,
-  parseInvitesJson,
-} from "../../utils/managementInvites";
+import { composeInvitesFromFlags, parseInvitesJson } from "../../utils/managementInvites";
 import type { CommandResult } from "../../utils/output";
 import { counted, runManagement, withParsedFlags } from "../management/_shared";
 
@@ -41,17 +35,13 @@ const readStdin = (): Promise<string> =>
  * roles. Both produce the same request, so a run that started as flags can be
  * captured as JSON without changing what happens.
  */
-const resolveInvites = async (
-  options: CreateInvitesOptions,
-): Promise<InviteInput[]> => {
+const resolveInvites = async (options: CreateInvitesOptions): Promise<InviteInput[]> => {
   const jsonSources = [options.json, options.file, options.readFromStdin].filter(
     (source) => source !== undefined && source !== false,
   );
   if (jsonSources.length > 1) {
     reportCommandError({
-      error: commandValidationError(
-        "Pass only one of --json, --file or --stdin.",
-      ),
+      error: commandValidationError("Pass only one of --json, --file or --stdin."),
     });
     process.exit(1);
   }

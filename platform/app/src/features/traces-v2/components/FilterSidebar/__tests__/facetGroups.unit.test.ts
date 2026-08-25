@@ -30,10 +30,7 @@ describe("FACET_GROUPS configuration", () => {
       }
     }
     const duplicates = [...occurrences.entries()].filter(([, n]) => n > 1);
-    expect(
-      duplicates,
-      `keys appearing in multiple groups: ${duplicates}`,
-    ).toEqual([]);
+    expect(duplicates, `keys appearing in multiple groups: ${duplicates}`).toEqual([]);
   });
 
   it("orders the groups as the default Observability perspective", () => {
@@ -138,14 +135,7 @@ describe("FACET_GROUPS configuration", () => {
 
   it("does NOT keep the legacy group ids", () => {
     const ids = FACET_GROUPS.map((g) => g.id);
-    for (const legacy of [
-      "trace",
-      "evaluators",
-      "metrics",
-      "span",
-      "origin",
-      "events",
-    ]) {
+    for (const legacy of ["trace", "evaluators", "metrics", "span", "origin", "events"]) {
       expect(ids).not.toContain(legacy as FacetGroupDef["id"]);
     }
   });
@@ -176,9 +166,7 @@ describe("facet perspectives", () => {
     const allKeys = [...SECTION_ORDER].sort();
     for (const p of FACET_PERSPECTIVES) {
       const keys = sectionOrderForPerspective(p.id);
-      expect(new Set(keys).size, `perspective ${p.id} duplicates`).toBe(
-        keys.length,
-      );
+      expect(new Set(keys).size, `perspective ${p.id} duplicates`).toBe(keys.length);
       expect([...keys].sort(), `perspective ${p.id}`).toEqual(allKeys);
     }
   });

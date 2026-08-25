@@ -1,10 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
-import type {
-  AuthzGrantsService,
-  AuthzService,
-} from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { PresenceService } from "@langwatch/presence-contract";
@@ -53,7 +50,10 @@ import type { GatewayBudgetService } from "~/server/gateway/budget.service";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import type { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
-import type { NotificationService, NurturingService } from "~/runtime/app/features/billing";
+import type {
+  NotificationService,
+  NurturingService,
+} from "~/runtime/app/features/billing";
 import type { UsageLimitService } from "./billing/enterprise/usage-limit.service";
 import type { WebhookService } from "./billing/enterprise/webhook.service";
 import type { GovernanceKpisClickHouseRepository } from "~/runtime/app/features/governance/governance-kpis.clickhouse.repository";
@@ -237,14 +237,10 @@ export interface AppDependencies {
     resolveClient: ClickHouseClientResolver;
     /** Per-organization resolution, for aggregates keyed by organization
      *  rather than project (usage rollups, the grants ledger). */
-    resolveOrganizationClient: (
-      organizationId: string,
-    ) => Promise<ClickHouseClient>;
+    resolveOrganizationClient: (organizationId: string) => Promise<ClickHouseClient>;
     /** Every configured instance - shared plus private - for fleet sweeps
      *  and admin surfaces that legitimately touch all of them. */
-    allInstances: () => Promise<
-      Array<{ target: string; client: ClickHouseClient }>
-    >;
+    allInstances: () => Promise<Array<{ target: string; client: ClickHouseClient }>>;
   };
   /**
    * The process's one Redis connection, owned by the composition root and

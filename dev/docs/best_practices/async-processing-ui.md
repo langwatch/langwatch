@@ -24,9 +24,7 @@ const datasetQuery = api.dataset.getById.useQuery(
   {
     enabled: !!project && !!datasetId,
     refetchInterval: (data) =>
-      data?.status === "processing" || data?.status === "uploading"
-        ? 3000
-        : false,
+      data?.status === "processing" || data?.status === "uploading" ? 3000 : false,
   },
 );
 ```
@@ -46,24 +44,34 @@ message and a **Retry** affordance. Use Chakra `Alert.Root` /
 (`src/components/experiments/DSPyExperiment.tsx`).
 
 ```tsx
-{(status === "uploading" || status === "processing") && (
-  <Alert.Root status="info">
-    <Alert.Indicator><Spinner size="sm" /></Alert.Indicator>
-    <Alert.Content>
-      <Alert.Title>Preparing your dataset, this can take a few minutes</Alert.Title>
-    </Alert.Content>
-  </Alert.Root>
-)}
-{status === "failed" && (
-  <Alert.Root status="error">
-    <Alert.Indicator />
-    <Alert.Content>
-      <Alert.Title>We could not prepare your dataset</Alert.Title>
-      <Alert.Description>{statusError ?? "Something went wrong. You can retry."}</Alert.Description>
-    </Alert.Content>
-    <Button loading={isRetrying} onClick={handleRetry}>Retry</Button>
-  </Alert.Root>
-)}
+{
+  (status === "uploading" || status === "processing") && (
+    <Alert.Root status="info">
+      <Alert.Indicator>
+        <Spinner size="sm" />
+      </Alert.Indicator>
+      <Alert.Content>
+        <Alert.Title>Preparing your dataset, this can take a few minutes</Alert.Title>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+{
+  status === "failed" && (
+    <Alert.Root status="error">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>We could not prepare your dataset</Alert.Title>
+        <Alert.Description>
+          {statusError ?? "Something went wrong. You can retry."}
+        </Alert.Description>
+      </Alert.Content>
+      <Button loading={isRetrying} onClick={handleRetry}>
+        Retry
+      </Button>
+    </Alert.Root>
+  );
+}
 ```
 
 Retry calls the backend's re-enqueue endpoint and then refetches the status
@@ -78,7 +86,7 @@ once the status settles:
 ```tsx
 const isReady = status === "ready" || status == null;
 // ...
-<DatasetEditorTable datasetId={datasetId} readEnabled={isReady} />
+<DatasetEditorTable datasetId={datasetId} readEnabled={isReady} />;
 // inside the table:
 api.datasetRecord.getAll.useQuery(args, {
   enabled: !!project && !!datasetId && readEnabled,

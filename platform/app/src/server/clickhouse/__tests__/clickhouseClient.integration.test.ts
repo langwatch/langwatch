@@ -29,9 +29,7 @@ const PRIVATE_ORG_ID = privateRouteOrgId("test-private-org");
 const SHARED_ORG_ID = privateRouteOrgId("test-shared-org");
 // An organization that owns no project, because it is the tenant itself: the
 // grants ledger's aggregate is one organization (ADR-092 §13).
-const PRIVATE_ORG_ID_WITHOUT_PROJECTS = privateRouteOrgId(
-  "test-private-org-tenant",
-);
+const PRIVATE_ORG_ID_WITHOUT_PROJECTS = privateRouteOrgId("test-private-org-tenant");
 
 // Table names stay unqualified throughout: each endpoint's client carries its
 // own database in the connection URL, and that is precisely the separation
@@ -142,9 +140,8 @@ describe("ClickHouse routing via env vars", () => {
 
     // Set the private CH env var BEFORE importing clickhouseClient
     process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`] = privateUrl;
-    process.env[
-      `CLICKHOUSE_URL__grantsledger__${PRIVATE_ORG_ID_WITHOUT_PROJECTS}`
-    ] = privateUrl;
+    process.env[`CLICKHOUSE_URL__grantsledger__${PRIVATE_ORG_ID_WITHOUT_PROJECTS}`] =
+      privateUrl;
 
     sharedClient = createClient({
       url: sharedUrl,
@@ -156,16 +153,12 @@ describe("ClickHouse routing via env vars", () => {
       clickhouse_settings: { date_time_input_format: "best_effort" },
     });
 
-    await Promise.all([
-      setupTestSchema(sharedClient),
-      setupTestSchema(privateClient),
-    ]);
+    await Promise.all([setupTestSchema(sharedClient), setupTestSchema(privateClient)]);
   }, 300_000);
 
   afterAll(async () => {
-    const { clearCustomClientCache, clearTenantOrgCache } = await import(
-      "../clickhouseClient"
-    );
+    const { clearCustomClientCache, clearTenantOrgCache } =
+      await import("../clickhouseClient");
     await clearCustomClientCache();
     clearTenantOrgCache();
 
@@ -198,15 +191,12 @@ describe("ClickHouse routing via env vars", () => {
     /** @scenario Project in a standard org routes to the shared instance */
     /** @scenario Data written for a standard org does not appear in private */
     it("returns the shared (default) client", async () => {
-      const { getClickHouseClientForTenant } = await import(
-        "../clickhouseClient"
-      );
+      const { getClickHouseClientForTenant } = await import("../clickhouseClient");
 
-      const { projectId, organizationId, teamId } =
-        await createTestOrgWithProject({
-          namespace: "no-custom",
-          organizationId: SHARED_ORG_ID,
-        });
+      const { projectId, organizationId, teamId } = await createTestOrgWithProject({
+        namespace: "no-custom",
+        organizationId: SHARED_ORG_ID,
+      });
       createdProjectIds.push(projectId);
       createdTeamIds.push(teamId);
       createdOrgIds.push(organizationId);
@@ -240,15 +230,12 @@ describe("ClickHouse routing via env vars", () => {
     /** @scenario Project in a private-CH org routes to the private instance */
     /** @scenario Data written for a private-CH org does not appear in shared */
     it("returns a client connected to the private instance", async () => {
-      const { getClickHouseClientForTenant } = await import(
-        "../clickhouseClient"
-      );
+      const { getClickHouseClientForTenant } = await import("../clickhouseClient");
 
-      const { projectId, organizationId, teamId } =
-        await createTestOrgWithProject({
-          namespace: "with-private",
-          organizationId: PRIVATE_ORG_ID,
-        });
+      const { projectId, organizationId, teamId } = await createTestOrgWithProject({
+        namespace: "with-private",
+        organizationId: PRIVATE_ORG_ID,
+      });
       createdProjectIds.push(projectId);
       createdTeamIds.push(teamId);
       createdOrgIds.push(organizationId);
@@ -281,9 +268,7 @@ describe("ClickHouse routing via env vars", () => {
   describe("when the tenant is an organization rather than a project", () => {
     /** @scenario An organization is a tenant in its own right */
     it("routes by that organization, with no project of that id", async () => {
-      const { getClickHouseClientForTenant } = await import(
-        "../clickhouseClient"
-      );
+      const { getClickHouseClientForTenant } = await import("../clickhouseClient");
 
       // The grants ledger's aggregate is an organization, so this is the id
       // its event-store writes arrive with — no project carries it, and the
@@ -324,15 +309,11 @@ describe("ClickHouse routing via env vars", () => {
   describe("when the tenant names neither a project nor an organization", () => {
     /** @scenario A tenant that names neither a project nor an organization is refused */
     it("refuses rather than falling back to the shared client", async () => {
-      const { getClickHouseClientForTenant } = await import(
-        "../clickhouseClient"
-      );
+      const { getClickHouseClientForTenant } = await import("../clickhouseClient");
 
       const strangerId = `not-a-tenant-${nanoid(8)}`;
 
-      await expect(getClickHouseClientForTenant(strangerId)).rejects.toThrow(
-        strangerId,
-      );
+      await expect(getClickHouseClientForTenant(strangerId)).rejects.toThrow(strangerId);
     });
   });
 
@@ -353,9 +334,7 @@ describe("ClickHouse routing via env vars", () => {
 
   describe("when getClickHouseClientForOrganization is called", () => {
     it("routes to the private instance without any DB query", async () => {
-      const { getClickHouseClientForOrganization } = await import(
-        "../clickhouseClient"
-      );
+      const { getClickHouseClientForOrganization } = await import("../clickhouseClient");
 
       const client = await getClickHouseClientForOrganization(PRIVATE_ORG_ID);
       expect(client).not.toBeNull();

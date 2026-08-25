@@ -25,9 +25,7 @@ type HandledLicenseError = Error & {
   serialize(): unknown;
 };
 
-const createTestLicenseData = (
-  overrides: Partial<LicenseData> = {},
-): LicenseData => ({
+const createTestLicenseData = (overrides: Partial<LicenseData> = {}): LicenseData => ({
   licenseId: "test-lic-001",
   version: 1,
   organizationName: "Test Org",
@@ -184,28 +182,25 @@ describe("signLicense, given a key it cannot sign with", () => {
     });
 
     it("distinguishes input that is not a PEM key", () => {
-      expect(() =>
-        signLicense(createTestLicenseData(), "not-a-valid-key"),
-      ).toThrow(LicenseSigningKeyNotPemError);
+      expect(() => signLicense(createTestLicenseData(), "not-a-valid-key")).toThrow(
+        LicenseSigningKeyNotPemError,
+      );
     });
 
     it("distinguishes a passphrase-protected key", () => {
-      expect(() =>
-        signLicense(createTestLicenseData(), encryptedKey()),
-      ).toThrow(LicenseSigningKeyEncryptedError);
+      expect(() => signLicense(createTestLicenseData(), encryptedKey())).toThrow(
+        LicenseSigningKeyEncryptedError,
+      );
     });
 
     it("distinguishes a well-formed key OpenSSL refuses to sign with", () => {
-      expect(() =>
-        signLicense(createTestLicenseData(), TEST_PUBLIC_KEY),
-      ).toThrow(LicenseSigningFailedError);
+      expect(() => signLicense(createTestLicenseData(), TEST_PUBLIC_KEY)).toThrow(
+        LicenseSigningFailedError,
+      );
     });
 
     it("rejects a key whose body was corrupted, rather than repairing it", () => {
-      const corrupted = TEST_PRIVATE_KEY.replace(
-        /^([A-Za-z0-9+/]{10})/m,
-        "AAAAAAAAAA",
-      );
+      const corrupted = TEST_PRIVATE_KEY.replace(/^([A-Za-z0-9+/]{10})/m, "AAAAAAAAAA");
 
       expect(() => signLicense(createTestLicenseData(), corrupted)).toThrow(
         LicenseSigningFailedError,
@@ -232,9 +227,7 @@ describe("signLicense, given a key it cannot sign with, what the failure carries
         signLicense(createTestLicenseData(), TEST_PUBLIC_KEY);
         expect.unreachable("signing with a public key should throw");
       } catch (error) {
-        const serialized = JSON.stringify(
-          (error as HandledLicenseError).serialize(),
-        );
+        const serialized = JSON.stringify((error as HandledLicenseError).serialize());
 
         expect((error as Error).message).not.toContain(publicKeyBody);
         expect(serialized).not.toContain(publicKeyBody);

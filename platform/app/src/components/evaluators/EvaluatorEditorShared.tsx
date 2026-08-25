@@ -81,9 +81,7 @@ const EMPTY_COMPARISON_CONFIG: ComparisonEvaluatorConfig = {
  * config is normalized to the comparison shape on load, so the only thing its
  * evaluatorType still selects is which judge endpoint runs it.
  */
-const isComparisonEvaluatorType = (
-  evaluatorType: string | undefined,
-): boolean =>
+const isComparisonEvaluatorType = (evaluatorType: string | undefined): boolean =>
   evaluatorType === COMPARISON_EVALUATOR_TYPE ||
   evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
 
@@ -91,10 +89,7 @@ export type EvaluatorMappingsConfig = {
   level?: "trace" | "thread";
   availableSources?: AvailableSource[];
   initialMappings: Record<string, UIFieldMapping>;
-  onMappingChange?: (
-    identifier: string,
-    mapping: UIFieldMapping | undefined,
-  ) => void;
+  onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
 };
 
 export type EvaluatorEditorDrawerProps = {
@@ -111,10 +106,7 @@ export type EvaluatorEditorDrawerProps = {
   mappingsConfig?: EvaluatorMappingsConfig;
   saveButtonText?: string;
   onLocalConfigChange?: (config: LocalEvaluatorConfig | undefined) => void;
-  onMappingChange?: (
-    identifier: string,
-    mapping: UIFieldMapping | undefined,
-  ) => void;
+  onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
   initialLocalConfig?: LocalEvaluatorConfig;
   /**
    * Comparison drawer context. Non-serializable; flows through complexProps.
@@ -186,9 +178,7 @@ export type EvaluatorEditorController = {
   /** The live comparison draft, mirrored from ComparisonConfigForm. */
   comparison: ComparisonEvaluatorConfig;
   onComparisonChange: ((config: ComparisonEvaluatorConfig) => void) | undefined;
-  onLocalConfigChange:
-    | ((config: LocalEvaluatorConfig | undefined) => void)
-    | undefined;
+  onLocalConfigChange: ((config: LocalEvaluatorConfig | undefined) => void) | undefined;
   title: string;
   handleSave: () => void;
   handleClose: () => void;
@@ -297,12 +287,8 @@ export function useEvaluatorEditorController(
   const effectiveEvaluatorDef = useMemo(() => {
     const fields = evaluatorQuery.data?.fields;
     if (fields && fields.length > 0) {
-      const requiredFields = fields
-        .filter((f) => !f.optional)
-        .map((f) => f.identifier);
-      const optionalFields = fields
-        .filter((f) => f.optional)
-        .map((f) => f.identifier);
+      const requiredFields = fields.filter((f) => !f.optional).map((f) => f.identifier);
+      const optionalFields = fields.filter((f) => f.optional).map((f) => f.identifier);
       return { requiredFields, optionalFields };
     }
     return evaluatorDef;
@@ -310,8 +296,7 @@ export function useEvaluatorEditorController(
 
   const settingsSchema = useMemo(() => {
     if (!evaluatorType) return undefined;
-    return evaluatorsSchema.shape[evaluatorType as EvaluatorTypes]?.shape
-      ?.settings;
+    return evaluatorsSchema.shape[evaluatorType as EvaluatorTypes]?.shape?.settings;
   }, [evaluatorType]);
 
   // Pull the cascade-resolved defaults so the form's initial model /
@@ -322,14 +307,13 @@ export function useEvaluatorEditorController(
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
     { enabled: !!project?.id && isOpen },
   );
-  const resolvedDefaultEmbeddings =
-    api.modelProvider.getResolvedDefault.useQuery(
-      {
-        projectId: project?.id ?? "",
-        featureKey: "analytics.topic_clustering_embeddings",
-      },
-      { enabled: !!project?.id && isOpen },
-    );
+  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
+    {
+      projectId: project?.id ?? "",
+      featureKey: "analytics.topic_clustering_embeddings",
+    },
+    { enabled: !!project?.id && isOpen },
+  );
 
   const defaultSettings = useMemo(() => {
     if (!evaluatorDef || !project) return {};
@@ -441,8 +425,7 @@ export function useEvaluatorEditorController(
       if (saved) {
         const nameChanged = formValues.name?.trim() !== saved.name.trim();
         const settingsChanged =
-          JSON.stringify(formValues.settings) !==
-          JSON.stringify(saved.settings);
+          JSON.stringify(formValues.settings) !== JSON.stringify(saved.settings);
         isUnsaved = nameChanged || settingsChanged;
       } else {
         isUnsaved = true;
@@ -454,9 +437,7 @@ export function useEvaluatorEditorController(
         if (isUnsaved) {
           debouncedUpdateLocalConfig({
             name: formValues.name ?? "",
-            settings: formValues.settings as
-              | Record<string, unknown>
-              | undefined,
+            settings: formValues.settings as Record<string, unknown> | undefined,
           });
         } else {
           debouncedUpdateLocalConfig.cancel();
@@ -489,8 +470,7 @@ export function useEvaluatorEditorController(
       }
     },
     onError: (error) => {
-      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
-        return;
+      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
       showErrorToast({ error, fallbackTitle: "Couldn't create evaluator" });
     },
   });
@@ -524,8 +504,7 @@ export function useEvaluatorEditorController(
       }
     },
     onError: (error) => {
-      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
-        return;
+      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
       showErrorToast({ error, fallbackTitle: "Couldn't save evaluator" });
     },
   });
@@ -563,8 +542,7 @@ export function useEvaluatorEditorController(
           name: newName,
         });
       } else {
-        const freshOnSave =
-          getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
+        const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
         const handledNavigation = freshOnSave?.({
           id: evaluatorId,
           name: evaluatorQuery.data?.name ?? "",
@@ -626,11 +604,7 @@ export function useEvaluatorEditorController(
         onClose();
         return;
       }
-      if (
-        !window.confirm(
-          "You have unsaved changes. Are you sure you want to close?",
-        )
-      ) {
+      if (!window.confirm("You have unsaved changes. Are you sure you want to close?")) {
         return;
       }
     }
@@ -673,8 +647,7 @@ export function useEvaluatorEditorController(
   }, [debouncedUpdateLocalConfig]);
 
   const hasSettings =
-    settingsSchema instanceof z.ZodObject &&
-    Object.keys(settingsSchema.shape).length > 0;
+    settingsSchema instanceof z.ZodObject && Object.keys(settingsSchema.shape).length > 0;
 
   const title = evaluatorDef?.name ?? "Configure Evaluator";
 
@@ -793,14 +766,7 @@ export function EvaluatorEditorBody({
 
   return (
     <FormProvider {...form}>
-      <VStack
-        gap={4}
-        align="stretch"
-        flex={1}
-        paddingX={6}
-        paddingY={4}
-        overflowY="auto"
-      >
+      <VStack gap={4} align="stretch" flex={1} paddingX={6} paddingY={4} overflowY="auto">
         <FormServerError form={form} />
 
         {evaluatorDef?.description && (
@@ -816,9 +782,7 @@ export function EvaluatorEditorBody({
             placeholder="Enter evaluator name"
             data-testid="evaluator-name-input"
           />
-          <Field.ErrorText>
-            {form.formState.errors.name?.message}
-          </Field.ErrorText>
+          <Field.ErrorText>{form.formState.errors.name?.message}</Field.ErrorText>
         </Field.Root>
 
         {hasSettings && evaluatorType && settingsSchema && (
@@ -856,8 +820,8 @@ export function EvaluatorEditorBody({
         {isWorkflowEvaluator && workflowCard && (
           <VStack gap={4} paddingTop={4} align="stretch">
             <Text fontSize="sm" color="fg.muted">
-              This evaluator is powered by a workflow. Click below to open the
-              workflow editor:
+              This evaluator is powered by a workflow. Click below to open the workflow
+              editor:
             </Text>
             <Link
               href={`/${projectSlug}/studio/${workflowCard.workflowId}`}
@@ -868,12 +832,7 @@ export function EvaluatorEditorBody({
                 name={workflowCard.workflowName ?? "Workflow"}
                 icon={workflowCard.workflowIcon}
                 updatedAt={workflowCard.updatedAt}
-                action={
-                  <ExternalLink
-                    size={16}
-                    color="var(--chakra-colors-fg-muted)"
-                  />
-                }
+                action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
                 width="300px"
               />
             </Link>

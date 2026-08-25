@@ -40,9 +40,7 @@ describe("Optimization Studio Registry", () => {
       );
 
       expect(messagesParam).toBeDefined();
-      expect(messagesParam?.value).toEqual([
-        { role: "user", content: "{{input}}" },
-      ]);
+      expect(messagesParam?.value).toEqual([{ role: "user", content: "{{input}}" }]);
     });
   });
 
@@ -74,9 +72,7 @@ describe("Optimization Studio Registry", () => {
       expect(codeParam).toBeDefined();
       // Inputs default to None so an unconnected handle does not raise a
       // missing-argument error at run time.
-      expect(codeParam?.value).toContain(
-        "def __call__(self, input: str = None)",
-      );
+      expect(codeParam?.value).toContain("def __call__(self, input: str = None)");
     });
 
     it("has code parameter returning output key", () => {
@@ -127,9 +123,7 @@ describe("Optimization Studio Registry", () => {
 
     /** @scenario If/Else node has one condition and two output branches */
     it("ships a condition parameter and the fixed branch outputs", () => {
-      const conditionParam = ifElse.parameters?.find(
-        (p) => p.identifier === "condition",
-      );
+      const conditionParam = ifElse.parameters?.find((p) => p.identifier === "condition");
       expect(conditionParam).toBeDefined();
       expect(conditionParam?.type).toBe("str");
 
@@ -151,12 +145,8 @@ describe("Optimization Studio Registry", () => {
       expect(signature.outputs).toBeDefined();
       expect(code.outputs).toBeDefined();
 
-      expect(signature.inputs?.[0]?.identifier).toBe(
-        code.inputs?.[0]?.identifier,
-      );
-      expect(signature.outputs?.[0]?.identifier).toBe(
-        code.outputs?.[0]?.identifier,
-      );
+      expect(signature.inputs?.[0]?.identifier).toBe(code.inputs?.[0]?.identifier);
+      expect(signature.outputs?.[0]?.identifier).toBe(code.outputs?.[0]?.identifier);
     });
   });
 });

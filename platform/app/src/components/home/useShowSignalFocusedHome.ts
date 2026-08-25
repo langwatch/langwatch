@@ -7,8 +7,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
  * every project keeps the classic home until the flag is explicitly turned
  * on for a project, an organization, or a user.
  */
-export const SIGNAL_FOCUSED_HOME_FLAG =
-  "release_ui_home_signal_focused_enabled" as const;
+export const SIGNAL_FOCUSED_HOME_FLAG = "release_ui_home_signal_focused_enabled" as const;
 
 /**
  * The home composition gate — "does this user get the signal-focused home?"
@@ -43,16 +42,13 @@ export function useSignalFocusedHomeVisibility(): {
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const { enabled, isLoading: flagLoading } = useFeatureFlag(
-    SIGNAL_FOCUSED_HOME_FLAG,
-    {
-      projectId: project?.id,
-      // Without the organization, an org-targeted rollout rule can never
-      // match and the whole org silently stays on the classic home.
-      organizationId: organization?.id,
-      enabled: !!project,
-    },
-  );
+  const { enabled, isLoading: flagLoading } = useFeatureFlag(SIGNAL_FOCUSED_HOME_FLAG, {
+    projectId: project?.id,
+    // Without the organization, an org-targeted rollout rule can never
+    // match and the whole org silently stays on the classic home.
+    organizationId: organization?.id,
+    enabled: !!project,
+  });
   return {
     show: enabled,
     // A reader with no project is decided, not pending — the flag query is

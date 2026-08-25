@@ -10,9 +10,7 @@ export const usePromptIdQueryParam = () => {
 
   // Get selected prompt ID from URL query params
   const selectedPromptId = useMemo(() => {
-    return typeof router.query.promptId === "string"
-      ? router.query.promptId
-      : null;
+    return typeof router.query.promptId === "string" ? router.query.promptId : null;
   }, [router.query.promptId]);
 
   // Function to set selected prompt ID in URL

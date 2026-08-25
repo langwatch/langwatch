@@ -48,9 +48,7 @@ export function useSuiteRunFreshness({
     },
     {
       enabled: !!project && enabled,
-      refetchInterval: sseConnected
-        ? false
-        : getAdaptivePollingInterval({ runs }),
+      refetchInterval: sseConnected ? false : getAdaptivePollingInterval({ runs }),
       trpc: { context: { skipBatch: true } },
     },
   );

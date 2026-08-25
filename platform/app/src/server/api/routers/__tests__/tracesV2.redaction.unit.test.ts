@@ -90,9 +90,7 @@ describe("redactV2Content", () => {
           events: Array<{ attributes: Record<string, unknown> }>;
         }
       ).events[0]!;
-      expect(event.attributes["app.billing.plan"]).toBe(
-        "[REDACTED] (visible to Admins)",
-      );
+      expect(event.attributes["app.billing.plan"]).toBe("[REDACTED] (visible to Admins)");
       expect(event.attributes.keep).toBe("yes");
     });
 
@@ -193,12 +191,8 @@ describe("redactV2Content", () => {
         // The whole point: the /api/files URLs are fetchable on their own, so
         // they must not ride along in the payload for redacted content.
         expect(out.inputMediaRefs).toBeUndefined();
-        expect(
-          out.attributes?.["langwatch.reserved.media_refs.input"],
-        ).toBeUndefined();
-        expect(out.outputMediaRefs).toEqual([
-          { kind: "audio", url: "/api/files/p1/a2" },
-        ]);
+        expect(out.attributes?.["langwatch.reserved.media_refs.input"]).toBeUndefined();
+        expect(out.outputMediaRefs).toEqual([{ kind: "audio", url: "/api/files/p1/a2" }]);
         expect(out.attributes?.["langwatch.reserved.media_refs.output"]).toBe(
           `[{"kind":"audio","url":"/api/files/p1/a2"}]`,
         );
@@ -214,12 +208,8 @@ describe("redactV2Content", () => {
         });
 
         expect(out.outputMediaRefs).toBeUndefined();
-        expect(
-          out.attributes?.["langwatch.reserved.media_refs.output"],
-        ).toBeUndefined();
-        expect(out.inputMediaRefs).toEqual([
-          { kind: "audio", url: "/api/files/p1/a1" },
-        ]);
+        expect(out.attributes?.["langwatch.reserved.media_refs.output"]).toBeUndefined();
+        expect(out.inputMediaRefs).toEqual([{ kind: "audio", url: "/api/files/p1/a1" }]);
       });
     });
 
@@ -232,12 +222,8 @@ describe("redactV2Content", () => {
 
         expect(out.inputMediaRefs).toBeDefined();
         expect(out.outputMediaRefs).toBeDefined();
-        expect(
-          out.attributes?.["langwatch.reserved.media_refs.input"],
-        ).toBeDefined();
-        expect(
-          out.attributes?.["langwatch.reserved.media_refs.output"],
-        ).toBeDefined();
+        expect(out.attributes?.["langwatch.reserved.media_refs.input"]).toBeDefined();
+        expect(out.attributes?.["langwatch.reserved.media_refs.output"]).toBeDefined();
       });
     });
   });
@@ -289,9 +275,7 @@ describe("redactV2Content", () => {
         gen_ai: { system_instructions: string };
         model: string;
       };
-      expect(params.gen_ai.system_instructions).toBe(
-        "[REDACTED] (visible to Admins)",
-      );
+      expect(params.gen_ai.system_instructions).toBe("[REDACTED] (visible to Admins)");
       expect(params.model).toBe("gpt-5-mini");
     });
   });
@@ -394,10 +378,7 @@ describe("buildContentPrivacy", () => {
   });
 
   it("leaves plainly captured content unmarked", () => {
-    const privacy = buildContentPrivacy(
-      { contentCategories: cats() },
-      new Set(),
-    );
+    const privacy = buildContentPrivacy({ contentCategories: cats() }, new Set());
     expect(privacy.output).toEqual({ state: "visible", visibleTo: null });
   });
 
@@ -491,16 +472,10 @@ describe("redactTraceLogContent", () => {
 
       expect(out.attributes.body).toBeUndefined();
       expect(out.attributes["langwatch.gen_ai.output.text"]).toBeUndefined();
-      expect(
-        out.attributes["langwatch.gen_ai.output.tool_calls"],
-      ).toBeUndefined();
-      expect(
-        out.attributes["langwatch.gen_ai.output.tool_call_count"],
-      ).toBeUndefined();
+      expect(out.attributes["langwatch.gen_ai.output.tool_calls"]).toBeUndefined();
+      expect(out.attributes["langwatch.gen_ai.output.tool_call_count"]).toBeUndefined();
       // Operational metadata, not content — passes through like cost_usd.
-      expect(out.attributes["langwatch.gen_ai.response.stop_reason"]).toBe(
-        "tool_use",
-      );
+      expect(out.attributes["langwatch.gen_ai.response.stop_reason"]).toBe("tool_use");
       expect(out.bodyRedacted).toBe(true);
       expect(JSON.stringify(out)).not.toContain("Here is the secret summary.");
     });
@@ -509,9 +484,7 @@ describe("redactTraceLogContent", () => {
       const out = redactTraceLogContent(apiRequestBody, blind);
 
       expect(out.attributes.body).toBeUndefined();
-      expect(
-        out.attributes["langwatch.gen_ai.input.message_count"],
-      ).toBeUndefined();
+      expect(out.attributes["langwatch.gen_ai.input.message_count"]).toBeUndefined();
       expect(JSON.stringify(out)).not.toContain("summarise the private repo");
     });
 
@@ -582,9 +555,9 @@ describe("redactTraceLogContent", () => {
     };
 
     it("reveals the prompt but withholds the response", () => {
-      expect(
-        redactTraceLogContent(userPrompt, inputOnly).attributes.prompt,
-      ).toBe("summarise the private repo");
+      expect(redactTraceLogContent(userPrompt, inputOnly).attributes.prompt).toBe(
+        "summarise the private repo",
+      );
       expect(
         redactTraceLogContent(assistantResponse, inputOnly).attributes.response,
       ).toBeUndefined();
@@ -623,17 +596,14 @@ describe("redactTraceLogContent", () => {
     const geminiResponse = logRow({
       "event.name": "gemini_cli.api_response",
       role: "main",
-      response_text:
-        '{"candidates":[{"content":{"parts":[{"text":"secret"}]}}]}',
+      response_text: '{"candidates":[{"content":{"parts":[{"text":"secret"}]}}]}',
     });
 
     it("withholds a codex prompt behind captured-input visibility", () => {
-      expect(
-        redactTraceLogContent(codexPrompt, blind).attributes.prompt,
-      ).toBeUndefined();
-      expect(
-        redactTraceLogContent(codexPrompt, inputOnly).attributes.prompt,
-      ).toBe("summarise the private repo");
+      expect(redactTraceLogContent(codexPrompt, blind).attributes.prompt).toBeUndefined();
+      expect(redactTraceLogContent(codexPrompt, inputOnly).attributes.prompt).toBe(
+        "summarise the private repo",
+      );
     });
 
     it("withholds a gemini reply behind captured-output visibility", () => {
@@ -641,12 +611,10 @@ describe("redactTraceLogContent", () => {
         redactTraceLogContent(geminiResponse, blind).attributes.response_text,
       ).toBeUndefined();
       expect(
-        redactTraceLogContent(geminiResponse, inputOnly).attributes
-          .response_text,
+        redactTraceLogContent(geminiResponse, inputOnly).attributes.response_text,
       ).toBeUndefined();
       expect(
-        redactTraceLogContent(geminiResponse, outputOnly).attributes
-          .response_text,
+        redactTraceLogContent(geminiResponse, outputOnly).attributes.response_text,
       ).toBe('{"candidates":[{"content":{"parts":[{"text":"secret"}]}}]}');
     });
 
@@ -657,9 +625,7 @@ describe("redactTraceLogContent", () => {
      */
     it("gates a codex tool run's arguments and output independently", () => {
       const hidOutput = redactTraceLogContent(codexToolResult, inputOnly);
-      expect(hidOutput.attributes.arguments).toBe(
-        '{"command":"cat /etc/private"}',
-      );
+      expect(hidOutput.attributes.arguments).toBe('{"command":"cat /etc/private"}');
       expect(hidOutput.attributes.output).toBeUndefined();
       // The flag is what makes the UI say "content withheld" rather than
       // render an empty record as "nothing happened here".
@@ -764,9 +730,9 @@ describe("gateTraceLogVisibility", () => {
     );
 
     it("falls through to the viewer's captured-content permission", () => {
-      expect(
-        gateTraceLogVisibility(fresh, full, CUTOFF).attributes.response,
-      ).toBe("recent answer");
+      expect(gateTraceLogVisibility(fresh, full, CUTOFF).attributes.response).toBe(
+        "recent answer",
+      );
       expect(
         gateTraceLogVisibility(
           fresh,
@@ -779,14 +745,9 @@ describe("gateTraceLogVisibility", () => {
 
   describe("given a paid plan with no window (cutoff null)", () => {
     it("leaves the permission gate in sole control, even for an old record", () => {
-      const old = logRow(
-        { "event.name": "assistant_response", response: "answer" },
-        1,
-      );
+      const old = logRow({ "event.name": "assistant_response", response: "answer" }, 1);
 
-      expect(gateTraceLogVisibility(old, full, null).attributes.response).toBe(
-        "answer",
-      );
+      expect(gateTraceLogVisibility(old, full, null).attributes.response).toBe("answer");
     });
   });
 });
@@ -844,9 +805,7 @@ describe("contentSearchTermsForViewer", () => {
     // viewer who may see everything.
     /** @scenario A viewer who cannot read captured content cannot search it */
     it("drops the terms when the flags were never set", () => {
-      expect(
-        contentSearchTermsForViewer({ terms: TERMS, protections: {} }),
-      ).toEqual([]);
+      expect(contentSearchTermsForViewer({ terms: TERMS, protections: {} })).toEqual([]);
     });
   });
 
@@ -895,9 +854,7 @@ describe("contentSearchTermsForViewer", () => {
             canSeeCapturedInput: true,
             canSeeCapturedOutput: true,
             contentCategories: cats(),
-            hiddenAttributes: [
-              { pattern: "app.billing.*", visibleTo: "Admins" },
-            ],
+            hiddenAttributes: [{ pattern: "app.billing.*", visibleTo: "Admins" }],
           },
         }),
       ).toEqual([]);

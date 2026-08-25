@@ -29,10 +29,7 @@ const extractMessages = (
   ruleId: string,
   config: ExtractMessagesConfig,
 ): boolean => {
-  if (
-    ctx.bag.attrs.has(config.attrKey) ||
-    ctx.out[config.attrKey] !== undefined
-  ) {
+  if (ctx.bag.attrs.has(config.attrKey) || ctx.out[config.attrKey] !== undefined) {
     return false;
   }
 
@@ -46,12 +43,9 @@ const extractMessages = (
           if (!msgs) continue;
 
           if (config.extractSystemInstructions) {
-            const systemInstruction =
-              extractSystemInstructionFromMessages(msgs);
+            const systemInstruction = extractSystemInstructionFromMessages(msgs);
             // Strip system messages — they go to gen_ai.system_instructions
-            const chatMsgs = systemInstruction
-              ? stripSystemMessages(msgs)
-              : msgs;
+            const chatMsgs = systemInstruction ? stripSystemMessages(msgs) : msgs;
             if (chatMsgs.length > 0) {
               ctx.setAttr(config.attrKey, chatMsgs);
             }
@@ -208,8 +202,7 @@ export const extractUsageTokens = (
   }
 
   if (inTok !== null) ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, inTok);
-  if (outTok !== null)
-    ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, outTok);
+  if (outTok !== null) ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, outTok);
   if (inTok !== null || outTok !== null) ctx.recordRule(ruleId);
 };
 
@@ -227,9 +220,7 @@ export const recordValueType = (
   if (Array.isArray(existing) && existing.every((x) => typeof x === "string")) {
     existing.push(`${attrKey}=${type}`);
   } else {
-    ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES, [
-      `${attrKey}=${type}`,
-    ]);
+    ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES, [`${attrKey}=${type}`]);
   }
 };
 
@@ -248,11 +239,9 @@ export const extractErrorInfo = (ctx: ExtractorContext): void => {
   const statusMsg = attrs.get(ATTR_KEYS.STATUS_MESSAGE);
 
   const spanErrorHas =
-    attrs.get(ATTR_KEYS.SPAN_ERROR_HAS_ERROR) ??
-    attrs.get(ATTR_KEYS.ERROR_HAS_ERROR);
+    attrs.get(ATTR_KEYS.SPAN_ERROR_HAS_ERROR) ?? attrs.get(ATTR_KEYS.ERROR_HAS_ERROR);
   const spanErrorMsg =
-    attrs.get(ATTR_KEYS.SPAN_ERROR_MESSAGE) ??
-    attrs.get(ATTR_KEYS.ERROR_MESSAGE);
+    attrs.get(ATTR_KEYS.SPAN_ERROR_MESSAGE) ?? attrs.get(ATTR_KEYS.ERROR_MESSAGE);
 
   // Priority 1: Explicit span error flag with message
   if (
@@ -324,9 +313,7 @@ export const inferSpanTypeIfAbsent = (
  * Normalizes Vercel AI SDK model object to "provider/model" string.
  * Example: { id: "gpt-4", provider: "openai.chat" } → "openai/gpt-4"
  */
-export const normaliseModelFromAiModelObject = (
-  aiModel: unknown,
-): string | null => {
+export const normaliseModelFromAiModelObject = (aiModel: unknown): string | null => {
   if (!isRecord(aiModel)) return null;
 
   const id = (aiModel as Record<string, unknown>).id;

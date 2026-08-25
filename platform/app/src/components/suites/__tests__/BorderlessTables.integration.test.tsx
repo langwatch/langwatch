@@ -35,9 +35,7 @@ function makeGroup(overrides: Partial<RunGroup> = {}): RunGroup {
   };
 }
 
-function makeGroupSummary(
-  overrides: Partial<RunGroupSummary> = {},
-): RunGroupSummary {
+function makeGroupSummary(overrides: Partial<RunGroupSummary> = {}): RunGroupSummary {
   return {
     passRate: 100,
     passedCount: 1,
@@ -101,9 +99,7 @@ describe("<RunRow/> borderless styling", () => {
 
       const header = screen.getByRole("button", { name: /Run from/ });
       // The sticky position is on the parent wrapper Box, not the button itself
-      expect(
-        header.closest('[style*="sticky"]') ?? header.parentElement,
-      ).toBeTruthy();
+      expect(header.closest('[style*="sticky"]') ?? header.parentElement).toBeTruthy();
     });
   });
 

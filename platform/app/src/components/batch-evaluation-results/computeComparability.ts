@@ -57,9 +57,7 @@ export type Comparability = {
 };
 
 /** Index of the group holding each variant. */
-export const groupIndexOf = (
-  comparability: Comparability,
-): Record<string, number> => {
+export const groupIndexOf = (comparability: Comparability): Record<string, number> => {
   const index: Record<string, number> = {};
   comparability.groups.forEach((group, i) => {
     for (const id of group) index[id] = i;
@@ -205,8 +203,7 @@ const retreat = (t: Tarjan, v: number): void => {
   }
   t.work.pop();
   const parent = t.work[t.work.length - 1];
-  if (parent)
-    t.lowlink[parent[0]] = Math.min(t.lowlink[parent[0]]!, t.lowlink[v]!);
+  if (parent) t.lowlink[parent[0]] = Math.min(t.lowlink[parent[0]]!, t.lowlink[v]!);
 };
 
 /** Walk everything reachable from `root` that has not been numbered yet. */

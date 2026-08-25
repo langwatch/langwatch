@@ -51,10 +51,7 @@ function policyRestricting(args: {
   input?: { disposition: Disposition; audience?: Audience };
   output?: { disposition: Disposition; audience?: Audience };
 }): ResolvedDataPrivacy {
-  const toCategory = (setting?: {
-    disposition: Disposition;
-    audience?: Audience;
-  }) =>
+  const toCategory = (setting?: { disposition: Disposition; audience?: Audience }) =>
     setting
       ? {
           disposition: setting.disposition,
@@ -100,9 +97,7 @@ describe("getUserProtectionsForProject", () => {
 
   describe("when the user has a team RoleBinding", () => {
     beforeEach(() => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.MEMBER },
-      ]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([{ role: TeamUserRole.MEMBER }]);
     });
 
     it("grants visibility for captured content (platform default)", async () => {
@@ -138,9 +133,7 @@ describe("getUserProtectionsForProject", () => {
 
   describe("when the user has an ADMIN team RoleBinding", () => {
     beforeEach(() => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.ADMIN },
-      ]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([{ role: TeamUserRole.ADMIN }]);
     });
 
     it("shows input restricted to admins", async () => {

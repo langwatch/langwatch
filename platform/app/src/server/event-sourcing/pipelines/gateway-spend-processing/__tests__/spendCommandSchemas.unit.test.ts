@@ -77,9 +77,7 @@ describe("the spend quantity vocabulary", () => {
     describe("when it is read back", () => {
       /** @scenario A quantity added to the vocabulary defaults on records written before it */
       it("defaults every quantity it never carried", () => {
-        const parsed = confirmSpendWireSchema.parse(
-          wireConfirmationBeforeAudio,
-        );
+        const parsed = confirmSpendWireSchema.parse(wireConfirmationBeforeAudio);
 
         expect(parsed.usage).toEqual({
           input_tokens: 869,

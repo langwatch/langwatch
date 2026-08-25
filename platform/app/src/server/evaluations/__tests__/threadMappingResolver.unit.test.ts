@@ -17,9 +17,9 @@ describe("hasThreadMappings", () => {
 
   describe("when mappingState.mapping is empty", () => {
     it("returns false", () => {
-      expect(
-        hasThreadMappings({ mapping: {}, expansions: [] } as MappingState),
-      ).toBe(false);
+      expect(hasThreadMappings({ mapping: {}, expansions: [] } as MappingState)).toBe(
+        false,
+      );
     });
   });
 

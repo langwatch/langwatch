@@ -77,14 +77,12 @@ export function useLangyVisibility(): LangyVisibility {
   const isDemoProject =
     !!publicEnv.data?.DEMO_PROJECT_SLUG &&
     publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;
-  const isOnOwnPersonalProject =
-    !!team?.isPersonal && team.ownerUserId === user?.id;
+  const isOnOwnPersonalProject = !!team?.isPersonal && team.ownerUserId === user?.id;
   const userIsPartOfTeam =
     isOnOwnPersonalProject ||
     (team?.members?.some((member) => member.userId === user?.id) ?? false) ||
     organizationRole === OrganizationUserRole.ADMIN;
-  const mayReadLangy =
-    userIsPartOfTeam && !isDemoProject && hasPermission("langy:view");
+  const mayReadLangy = userIsPartOfTeam && !isDemoProject && hasPermission("langy:view");
 
   // Skip the flag query entirely for callers who are already excluded; the
   // answer is decided without a round-trip. Forward BOTH project and org ids,
@@ -105,9 +103,7 @@ export function useLangyVisibility(): LangyVisibility {
   // no project at all is DECIDED (they cannot have Langy), not pending. Only
   // the three things that are genuinely in flight count.
   const isResolving =
-    sessionStatus === "loading" ||
-    contextLoading ||
-    (mayReadLangy && flagLoading);
+    sessionStatus === "loading" || contextLoading || (mayReadLangy && flagLoading);
 
   return { show: mayReadLangy && releaseLangy, isResolving };
 }

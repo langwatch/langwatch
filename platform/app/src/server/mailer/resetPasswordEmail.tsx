@@ -26,8 +26,8 @@ export const sendResetPasswordEmail = async ({
         />
         <Heading as="h1">Reset your password</Heading>
         <p>
-          We received a request to reset the password for your LangWatch account
-          (<b>{email}</b>). Click the button below to choose a new password:
+          We received a request to reset the password for your LangWatch account (
+          <b>{email}</b>). Click the button below to choose a new password:
         </p>
         <Button
           href={resetUrl}
@@ -42,8 +42,8 @@ export const sendResetPasswordEmail = async ({
           Reset password
         </Button>
         <p>
-          This link expires in 1 hour. If you did not request a password reset,
-          you can safely ignore this email and your password will stay the same.
+          This link expires in 1 hour. If you did not request a password reset, you can
+          safely ignore this email and your password will stay the same.
         </p>
       </Container>
     </Html>,

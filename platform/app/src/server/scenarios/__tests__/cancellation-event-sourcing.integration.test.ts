@@ -10,14 +10,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 let _testRedis: any = null;
 
@@ -33,10 +26,7 @@ import type {
   CancellationMessage,
   CancellationSubscriber,
 } from "../cancellation-channel";
-import {
-  publishCancellation,
-  subscribeToCancellations,
-} from "../cancellation-channel";
+import { publishCancellation, subscribeToCancellations } from "../cancellation-channel";
 import { ScenarioExecutionPool } from "../execution/execution-pool";
 import type { ProcessorDependencies } from "../scenario.processor";
 import { startScenarioProcessor } from "../scenario.processor";
@@ -412,8 +402,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       // If no Redis in test env, skip (testContainers provides it)
       if (!testConnection) {
         // Fallback: wire manually with test redis to prove the flow
-        const subscriber =
-          redis.duplicate() as unknown as CancellationSubscriber;
+        const subscriber = redis.duplicate() as unknown as CancellationSubscriber;
         const unsubscribe = await subscribeToCancellations({
           subscriber,
           onCancel: (message: CancellationMessage) => {

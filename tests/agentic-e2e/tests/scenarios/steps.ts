@@ -55,18 +55,14 @@ export async function givenIAmOnTheSimulationsPage(page: Page) {
  */
 export async function thenISeeTheScenariosListPage(page: Page) {
   await expect(page).toHaveURL(/simulations\/scenarios/);
-  await expect(
-    page.getByRole("heading", { name: /scenario library/i })
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: /scenario library/i })).toBeVisible();
 }
 
 /**
  * Then I see a "New Scenario" button
  */
 export async function thenISeeNewScenarioButton(page: Page) {
-  await expect(
-    page.getByRole("button", { name: /new scenario/i })
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /new scenario/i })).toBeVisible();
 }
 
 // =============================================================================
@@ -127,7 +123,7 @@ export async function whenIClickNewScenario(page: Page) {
 export async function thenISeeTheScenarioEditor(page: Page) {
   // Chakra renders duplicate dialogs - use .last() for the visible one
   await expect(
-    page.getByRole("heading", { name: /create scenario/i }).last()
+    page.getByRole("heading", { name: /create scenario/i }).last(),
   ).toBeVisible();
 }
 
@@ -139,21 +135,17 @@ export async function thenISeeScenarioFormFields(page: Page) {
   // ARIA name association; match by placeholder instead. .last() picks the
   // visible dialog when Chakra renders duplicates (same reason as the sibling
   // fill/assert helpers in this file).
-  await expect(
-    page.getByPlaceholder(/angry refund request/i).last()
-  ).toBeVisible();
+  await expect(page.getByPlaceholder(/angry refund request/i).last()).toBeVisible();
 
   // Situation field
   await expect(
-    page.getByPlaceholder(/a frustrated premium subscriber/i).last()
+    page.getByPlaceholder(/a frustrated premium subscriber/i).last(),
   ).toBeVisible();
 
   // Criteria field — CriteriaInput mounts the entry textarea only after the
   // add button is clicked (isAddingNew), so assert the reveal control instead
   // of the not-yet-rendered placeholder textarea.
-  await expect(
-    page.getByRole("button", { name: /add.*criteria/i }).last()
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /add.*criteria/i }).last()).toBeVisible();
 }
 
 /**
@@ -184,10 +176,11 @@ export async function whenIAddCriterion(page: Page, criterion: string) {
   // CriteriaInput hides the entry textarea behind an "Add ... criteria" button
   // (label is "Add the first criteria" when empty, "Add criteria" otherwise);
   // the textarea only mounts once adding starts (isAddingNew).
-  await page.getByRole("button", { name: /add.*criteria/i }).last().click();
-  const input = page
-    .getByPlaceholder(/must apologize for the inconvenience/i)
-    .last();
+  await page
+    .getByRole("button", { name: /add.*criteria/i })
+    .last()
+    .click();
+  const input = page.getByPlaceholder(/must apologize for the inconvenience/i).last();
   await input.fill(criterion);
   // Enter commits the new criterion (handleAddKeyDown → handleSaveNew).
   await input.press("Enter");
@@ -210,9 +203,7 @@ export async function thenCriterionAppearsInList(page: Page, criterion: string) 
  * Handles the "Save and Run" popover by clicking "Save without running"
  */
 export async function whenIClickSave(page: Page) {
-  const saveButton = page
-    .getByRole("button", { name: /save and run/i })
-    .last();
+  const saveButton = page.getByRole("button", { name: /save and run/i }).last();
   await saveButton.click();
 
   // Popover opens - click "Save without running"
@@ -238,7 +229,7 @@ export async function whenICloseTheEditor(page: Page) {
 
   // Wait for dialog to close
   await expect(
-    page.getByRole("heading", { name: /create scenario|edit scenario/i }).last()
+    page.getByRole("heading", { name: /create scenario|edit scenario/i }).last(),
   ).not.toBeVisible({ timeout: 5000 });
 }
 
@@ -258,9 +249,7 @@ export async function whenIClickOnScenarioInList(page: Page, name: string) {
  */
 export async function thenFormIsPopulatedWithName(page: Page, name: string) {
   // SectionHeader is a <p> not <label> — no accessible name; use placeholder.
-  const nameField = page
-    .getByPlaceholder(/angry refund request/i)
-    .last();
+  const nameField = page.getByPlaceholder(/angry refund request/i).last();
   await expect(nameField).toHaveValue(name);
 }
 
@@ -269,9 +258,7 @@ export async function thenFormIsPopulatedWithName(page: Page, name: string) {
  */
 export async function whenIChangeNameTo(page: Page, name: string) {
   // SectionHeader is a <p> not <label> — no accessible name; use placeholder.
-  const nameField = page
-    .getByPlaceholder(/angry refund request/i)
-    .last();
+  const nameField = page.getByPlaceholder(/angry refund request/i).last();
   await nameField.clear();
   await nameField.fill(name);
 }
@@ -338,7 +325,9 @@ export async function thenTheRunStarts(page: Page) {
  */
 export async function thenISeeTheConversation(page: Page) {
   // Conversation messages appear in the run visualization
-  const messageContainer = page.getByRole("log").or(page.locator("[data-testid='conversation']"));
+  const messageContainer = page
+    .getByRole("log")
+    .or(page.locator("[data-testid='conversation']"));
   await expect(messageContainer).toBeVisible({ timeout: 30000 });
 }
 
@@ -378,7 +367,9 @@ export async function givenIAmViewingAScenarioRun(page: Page) {
       const firstRunCard = page.locator("[data-testid='scenario-run-card']").first();
       if (await firstRunCard.isVisible({ timeout: 5000 }).catch(() => false)) {
         await firstRunCard.click();
-        await expect(page).toHaveURL(/simulations\/[^/]+\/[^/]+\/[^/]+/, { timeout: 10000 });
+        await expect(page).toHaveURL(/simulations\/[^/]+\/[^/]+\/[^/]+/, {
+          timeout: 10000,
+        });
       }
     }
   }
@@ -397,7 +388,9 @@ export async function whenIClickRunAgain(page: Page) {
  * Then I see the target selection modal
  */
 export async function thenISeeTargetSelectionModal(page: Page) {
-  const modal = page.getByRole("dialog").filter({ hasText: /select.*target|run.*scenario/i });
+  const modal = page
+    .getByRole("dialog")
+    .filter({ hasText: /select.*target|run.*scenario/i });
   await expect(modal).toBeVisible({ timeout: 10000 });
 }
 
@@ -405,9 +398,14 @@ export async function thenISeeTargetSelectionModal(page: Page) {
  * Then the new run is in the same scenario set
  * Verifies the URL contains the original setId after running again
  */
-export async function thenTheNewRunIsInSameScenarioSet(page: Page, expectedSetId: string) {
+export async function thenTheNewRunIsInSameScenarioSet(
+  page: Page,
+  expectedSetId: string,
+) {
   // After run completes, URL should contain the same setId
-  await expect(page).toHaveURL(new RegExp(`simulations/${expectedSetId}/`), { timeout: 60000 });
+  await expect(page).toHaveURL(new RegExp(`simulations/${expectedSetId}/`), {
+    timeout: 60000,
+  });
 }
 
 /**

@@ -118,18 +118,15 @@ describe("Secret API composition", () => {
   });
 
   it("serves the modern RPC API from the same App service", async () => {
-    const response = await app.request(
-      "/api/secrets/latest/secrets.create",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: "project-1",
-          name: "MY_SECRET",
-          value: "secret-value",
-        }),
-      },
-    );
+    const response = await app.request("/api/secrets/latest/secrets.create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: "project-1",
+        name: "MY_SECRET",
+        value: "secret-value",
+      }),
+    });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -147,18 +144,15 @@ describe("Secret API composition", () => {
   it("requires a real user actor only when a modern write asks for it", async () => {
     authenticatedUserId = undefined;
 
-    const response = await app.request(
-      "/api/secrets/latest/secrets.create",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: "project-1",
-          name: "MY_SECRET",
-          value: "secret-value",
-        }),
-      },
-    );
+    const response = await app.request("/api/secrets/latest/secrets.create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: "project-1",
+        name: "MY_SECRET",
+        value: "secret-value",
+      }),
+    });
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({
@@ -168,14 +162,11 @@ describe("Secret API composition", () => {
   });
 
   it("rejects a requested project different from the authenticated project", async () => {
-    const response = await app.request(
-      "/api/secrets/latest/secrets.list",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: "another-project" }),
-      },
-    );
+    const response = await app.request("/api/secrets/latest/secrets.list", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId: "another-project" }),
+    });
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({

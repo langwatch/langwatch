@@ -39,8 +39,7 @@ export function useTraceTableVirtualizer({
   const scrollEl = useTraceTableScrollElement();
   const density = useDensityStore((s) => s.density);
 
-  const baseEstimate =
-    ESTIMATE_PER_DENSITY[density] + addonCount * ESTIMATE_PER_ADDON;
+  const baseEstimate = ESTIMATE_PER_DENSITY[density] + addonCount * ESTIMATE_PER_ADDON;
 
   const getScrollElement = useCallback(() => scrollEl, [scrollEl]);
   const estimateSize = useCallback(() => baseEstimate, [baseEstimate]);

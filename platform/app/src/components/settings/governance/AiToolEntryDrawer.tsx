@@ -136,8 +136,7 @@ function formFromEntry(entry: AiToolEntry): FormState {
     return typeof v === "string" ? v : "";
   };
   if (entry.type === "coding_assistant") {
-    const rawKind =
-      typeof cfg.assistantKind === "string" ? cfg.assistantKind : "";
+    const rawKind = typeof cfg.assistantKind === "string" ? cfg.assistantKind : "";
     const kind = isAssistantKind(rawKind) ? rawKind : "custom";
     const boolOr = (key: string, fallback: boolean): boolean =>
       typeof cfg[key] === "boolean" ? (cfg[key] as boolean) : fallback;
@@ -151,8 +150,7 @@ function formFromEntry(entry: AiToolEntry): FormState {
       allowVk: boolOr("allowVk", true),
       // Cursor is GUI-only - direct OTLP never applies, regardless of a
       // stored value. Force it off so the toggle reads honestly.
-      allowOtelDirect:
-        kind === "cursor" ? false : boolOr("allowOtelDirect", true),
+      allowOtelDirect: kind === "cursor" ? false : boolOr("allowOtelDirect", true),
       bundledPlan: boolOr("bundledPlan", true),
     };
   }
@@ -181,23 +179,18 @@ function configFromForm(form: FormState): Record<string, unknown> {
       assistantKind: form.assistantKind,
       setupCommand: form.setupCommand.trim(),
       ...(form.helperText.trim() ? { helperText: form.helperText.trim() } : {}),
-      ...(form.setupDocsUrl.trim()
-        ? { setupDocsUrl: form.setupDocsUrl.trim() }
-        : {}),
+      ...(form.setupDocsUrl.trim() ? { setupDocsUrl: form.setupDocsUrl.trim() } : {}),
       // CLI path policy folded into the tile. Cursor is GUI-only, so its
       // OTLP-direct path is always false regardless of the toggle state.
       allowVk: form.allowVk,
-      allowOtelDirect:
-        form.assistantKind === "cursor" ? false : form.allowOtelDirect,
+      allowOtelDirect: form.assistantKind === "cursor" ? false : form.allowOtelDirect,
       bundledPlan: form.bundledPlan,
     };
   }
   if (form.type === "model_provider") {
     return {
       providerKey: form.providerKey.trim(),
-      ...(form.defaultLabel.trim()
-        ? { defaultLabel: form.defaultLabel.trim() }
-        : {}),
+      ...(form.defaultLabel.trim() ? { defaultLabel: form.defaultLabel.trim() } : {}),
       ...(form.suggestedRoutingPolicyId.trim()
         ? { suggestedRoutingPolicyId: form.suggestedRoutingPolicyId.trim() }
         : {}),
@@ -280,9 +273,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   useEffect(() => {
     if (!state) return;
     const nextForm =
-      state.mode === "edit"
-        ? formFromEntry(state.entry)
-        : blankForm(state.type);
+      state.mode === "edit" ? formFromEntry(state.entry) : blankForm(state.type);
     setForm(nextForm);
     setScopes(
       state.mode === "edit"
@@ -303,8 +294,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   // back to ids. ORGANIZATION and DEPARTMENT are mutually exclusive in the
   // picker (collapseRedundantScopes enforces it), so this is unambiguous.
   const departmentIds = useMemo(
-    () =>
-      scopes.filter((s) => s.scopeType === "DEPARTMENT").map((s) => s.scopeId),
+    () => scopes.filter((s) => s.scopeType === "DEPARTMENT").map((s) => s.scopeId),
     [scopes],
   );
 
@@ -428,8 +418,8 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
             <FormSection label="Type">
               {isEdit ? (
                 <Text fontSize="sm" color="fg.muted">
-                  {TILE_TYPE_OPTIONS.find((o) => o.value === form.type)?.label}{" "}
-                  (locked on edit)
+                  {TILE_TYPE_OPTIONS.find((o) => o.value === form.type)?.label} (locked on
+                  edit)
                 </Text>
               ) : (
                 <HStack gap={3}>
@@ -469,8 +459,8 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
               />
               {departments.length === 0 && (
                 <Text fontSize="xs" color="fg.muted">
-                  No departments yet. The tile stays visible to every member.
-                  Create departments under{" "}
+                  No departments yet. The tile stays visible to every member. Create
+                  departments under{" "}
                   <Link href="/governance/departments" color="blue.600">
                     Governance → Departments
                   </Link>{" "}
@@ -484,9 +474,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
                 size="sm"
                 placeholder="e.g. Claude Code"
                 value={form.displayName}
-                onChange={(e) =>
-                  setForm({ ...form, displayName: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, displayName: e.target.value })}
               />
             </FormSection>
 
@@ -506,9 +494,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
                 providerOptions={providerOptionsQuery.data}
                 providerOptionsLoading={providerOptionsQuery.isLoading}
                 routingPolicyOptions={routingPolicyOptionsQuery.data}
-                routingPolicyOptionsLoading={
-                  routingPolicyOptionsQuery.isLoading
-                }
+                routingPolicyOptionsLoading={routingPolicyOptionsQuery.isLoading}
               />
             )}
             {form.type === "external_tool" && (
@@ -522,11 +508,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
 
             <HStack gap={2} marginTop={4}>
               <Spacer />
-              <Button
-                size="sm"
-                onClick={onSave}
-                disabled={!canSave || isPending}
-              >
+              <Button size="sm" onClick={onSave} disabled={!canSave || isPending}>
                 {isPending ? "Saving…" : isEdit ? "Save changes" : "Save tile"}
               </Button>
             </HStack>
@@ -627,13 +609,7 @@ function IconPreview({
   }
   if (iconAsset?.startsWith(DATA_URL_PREFIX)) {
     return (
-      <Image
-        src={iconAsset}
-        alt=""
-        width="32px"
-        height="32px"
-        objectFit="contain"
-      />
+      <Image src={iconAsset} alt="" width="32px" height="32px" objectFit="contain" />
     );
   }
   return <>{fallback}</>;
@@ -685,11 +661,7 @@ function IconUploadButton({
           e.target.value = "";
         }}
       />
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => inputRef.current?.click()}
-      >
+      <Button size="sm" variant="outline" onClick={() => inputRef.current?.click()}>
         {label}
       </Button>
     </>
@@ -741,11 +713,7 @@ function CodingAssistantFields({
               label={iconAsset ? "Replace icon" : "Upload icon (SVG / PNG)"}
             />
             {iconAsset?.startsWith(DATA_URL_PREFIX) && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onIconAssetChange(null)}
-              >
+              <Button size="sm" variant="ghost" onClick={() => onIconAssetChange(null)}>
                 Clear
               </Button>
             )}
@@ -807,15 +775,13 @@ function CostAttributionSection({
         <VStack align="start" gap={0}>
           <Text fontSize="sm">Bundled subscription (not billed per token)</Text>
           <Text fontSize="xs" color="fg.muted">
-            Direct-OTLP usage is included in a flat plan, so its cost is shown
-            as theoretical rather than counted as real spend.
+            Direct-OTLP usage is included in a flat plan, so its cost is shown as
+            theoretical rather than counted as real spend.
           </Text>
         </VStack>
         <Switch
           checked={form.bundledPlan}
-          onCheckedChange={({ checked }) =>
-            setForm({ ...form, bundledPlan: checked })
-          }
+          onCheckedChange={({ checked }) => setForm({ ...form, bundledPlan: checked })}
         />
       </HStack>
     </FormSection>
@@ -852,9 +818,7 @@ function CliPathsSection({
           </VStack>
           <Switch
             checked={form.allowVk}
-            onCheckedChange={({ checked }) =>
-              setForm({ ...form, allowVk: checked })
-            }
+            onCheckedChange={({ checked }) => setForm({ ...form, allowVk: checked })}
           />
         </HStack>
         <HStack justify="space-between">
@@ -912,9 +876,7 @@ function ModelProviderFields({
             onChange={(e) => setForm({ ...form, providerKey: e.target.value })}
           >
             <option value="">
-              {providerOptionsLoading
-                ? "Loading providers…"
-                : "- select a provider -"}
+              {providerOptionsLoading ? "Loading providers…" : "- select a provider -"}
             </option>
             {(providerOptions ?? []).map((p) => (
               <option key={p.providerKey} value={p.providerKey}>
@@ -931,8 +893,8 @@ function ModelProviderFields({
             <Alert.Content>
               <Alert.Title>Provider not configured</Alert.Title>
               <Alert.Description fontSize="xs">
-                This provider has no enabled credential yet. Tiles will publish
-                but VK issuance will 502 until you{" "}
+                This provider has no enabled credential yet. Tiles will publish but VK
+                issuance will 502 until you{" "}
                 <Link href="/settings/model-providers" color="orange.600">
                   configure it
                 </Link>
@@ -981,9 +943,7 @@ function ModelProviderFields({
           rows={2}
           placeholder="Building an application for your team? Consider creating a project instead."
           value={form.projectSuggestionText}
-          onChange={(e) =>
-            setForm({ ...form, projectSuggestionText: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, projectSuggestionText: e.target.value })}
         />
       </FormSection>
     </>
@@ -1003,10 +963,7 @@ function ExternalToolFields({
 }) {
   return (
     <>
-      <FormSection
-        label="Icon"
-        hint="Pick a built-in icon or upload your own SVG / PNG."
-      >
+      <FormSection label="Icon" hint="Pick a built-in icon or upload your own SVG / PNG.">
         <VStack align="stretch" gap={2}>
           <HStack gap={2} flexWrap="wrap">
             {TOOL_KINDS.map((kind) => {
@@ -1039,10 +996,7 @@ function ExternalToolFields({
             })}
           </HStack>
           <HStack gap={2} align="center">
-            <IconPreview
-              iconAsset={iconAsset}
-              fallback={<Wrench size={28} />}
-            />
+            <IconPreview iconAsset={iconAsset} fallback={<Wrench size={28} />} />
             <IconUploadButton
               onUploaded={onIconAssetChange}
               label={
@@ -1074,9 +1028,7 @@ function ExternalToolFields({
             "Microsoft's low-code agent builder...\n\n# Getting started\n- Request access in #..."
           }
           value={form.descriptionMarkdown}
-          onChange={(e) =>
-            setForm({ ...form, descriptionMarkdown: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, descriptionMarkdown: e.target.value })}
         />
       </FormSection>
       <FormSection label="Link URL">

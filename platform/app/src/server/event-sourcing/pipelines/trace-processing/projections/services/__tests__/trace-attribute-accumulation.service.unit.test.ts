@@ -28,9 +28,7 @@ function makeService() {
 }
 
 function makeSpan(
-  overrides: Partial<
-    Pick<NormalizedSpan, "spanAttributes" | "resourceAttributes">
-  > = {},
+  overrides: Partial<Pick<NormalizedSpan, "spanAttributes" | "resourceAttributes">> = {},
 ): NormalizedSpan {
   return {
     spanAttributes: {},
@@ -54,11 +52,7 @@ describe("TraceAttributeAccumulationService.extractAttributes", () => {
       const result = makeService().extractAttributes(
         makeSpan({ spanAttributes: { "tag.tags": "langy, prod , beta" } }),
       );
-      expect(JSON.parse(result["langwatch.labels"]!)).toEqual([
-        "langy",
-        "prod",
-        "beta",
-      ]);
+      expect(JSON.parse(result["langwatch.labels"]!)).toEqual(["langy", "prod", "beta"]);
     });
   });
 
@@ -143,9 +137,7 @@ describe("TraceAttributeAccumulationService.extractAttributes", () => {
           },
         }),
       );
-      expect(JSON.parse(result["langwatch.labels"]!).sort()).toEqual(
-        ["a", "b"].sort(),
-      );
+      expect(JSON.parse(result["langwatch.labels"]!).sort()).toEqual(["a", "b"].sort());
     });
   });
 
@@ -175,10 +167,7 @@ describe("TraceAttributeAccumulationService and the Vercel AI SDK metadata chann
           },
         }),
       );
-      expect(JSON.parse(result["langwatch.labels"]!)).toEqual([
-        "checkout",
-        "beta",
-      ]);
+      expect(JSON.parse(result["langwatch.labels"]!)).toEqual(["checkout", "beta"]);
     });
 
     /** @scenario "Vercel labels join labels sent by another span of the same trace" */
@@ -302,9 +291,9 @@ describe("TraceAttributeAccumulationService and the Vercel AI SDK metadata chann
         }),
       );
       expect(result["metadata.functionId"]).toBeUndefined();
-      expect(
-        Object.keys(result).filter((key) => key.startsWith("metadata.")),
-      ).toEqual([]);
+      expect(Object.keys(result).filter((key) => key.startsWith("metadata."))).toEqual(
+        [],
+      );
     });
   });
 });

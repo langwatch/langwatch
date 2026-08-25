@@ -89,9 +89,7 @@ export function OttlEditor({
   starterStatements,
   validationClient,
 }: OttlEditorProps) {
-  const [validationStatus, setValidationStatus] = useState<
-    PerStatementStatus[]
-  >([]);
+  const [validationStatus, setValidationStatus] = useState<PerStatementStatus[]>([]);
   const [validating, setValidating] = useState(false);
   /** The failure that stopped validation running at all, if any. */
   const [validationError, setValidationError] = useState<unknown>(null);
@@ -131,8 +129,7 @@ export function OttlEditor({
           setDeferredReason(null);
           const errsByIdx = new Map<number, string>();
           for (const err of result.errors) {
-            const where =
-              err.line > 0 ? ` (line ${err.line}, col ${err.col})` : "";
+            const where = err.line > 0 ? ` (line ${err.line}, col ${err.col})` : "";
             errsByIdx.set(err.statementIndex, `${err.message}${where}`);
           }
           setValidationStatus(
@@ -210,8 +207,8 @@ export function OttlEditor({
           </Text>
           <Text fontSize="xs" color="fg.muted">
             Each line maps an upstream OTLP attribute onto the canonical{" "}
-            <code>langwatch.*</code> namespace. The aigateway evaluates them in
-            order via embedded <code>pkg/ottl</code>.
+            <code>langwatch.*</code> namespace. The aigateway evaluates them in order via
+            embedded <code>pkg/ottl</code>.
           </Text>
         </VStack>
         <Spacer />
@@ -240,8 +237,8 @@ export function OttlEditor({
                 Template available for this source type
               </Text>
               <Text fontSize="xs" color="fg.muted">
-                Loads the canonical extraction statements maintained by
-                LangWatch. You can customize them after loading.
+                Loads the canonical extraction statements maintained by LangWatch. You can
+                customize them after loading.
               </Text>
             </VStack>
             <Button size="sm" colorPalette="orange" onClick={useTemplate}>
@@ -276,8 +273,7 @@ export function OttlEditor({
               <Info size={14} aria-hidden="true" />
             </Box>
             <Text fontSize="xs" color="fg.muted">
-              {DEFERRED_NOTE[deferredReason] ??
-                "These statements haven't been checked."}
+              {DEFERRED_NOTE[deferredReason] ?? "These statements haven't been checked."}
             </Text>
           </HStack>
         </Box>
@@ -335,12 +331,7 @@ export function OttlEditor({
                 </IconButton>
               </HStack>
               {showError && (
-                <Text
-                  fontSize="xs"
-                  color="red.600"
-                  marginLeft="14px"
-                  marginTop={0.5}
-                >
+                <Text fontSize="xs" color="red.600" marginLeft="14px" marginTop={0.5}>
                   {status.message}
                 </Text>
               )}

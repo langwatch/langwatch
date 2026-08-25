@@ -93,9 +93,7 @@ export function useProjectPickItems({
       groups
         .map((group) => ({
           team: group.team,
-          items: filteredItems.filter(
-            (item) => item.teamId === group.team.teamId,
-          ),
+          items: filteredItems.filter((item) => item.teamId === group.team.teamId),
         }))
         .filter((group) => group.items.length > 0),
     [groups, filteredItems],

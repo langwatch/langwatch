@@ -27,11 +27,7 @@ import {
   authzShareAudience,
 } from "@langwatch/authz-contract";
 import { nanoid } from "nanoid";
-import type {
-  Prisma,
-  PrismaClient,
-  ShareLink,
-} from "~/generated/prisma/client";
+import type { Prisma, PrismaClient, ShareLink } from "~/generated/prisma/client";
 import type {
   CreateShareLinkParams,
   ShareRepository,
@@ -146,9 +142,7 @@ export class LedgerShareRepository implements ShareRepository {
         token: params.token,
         permission: AUTHZ_SHARE_PERMISSION,
         kind: params.resourceType === "THREAD" ? "thread" : "trace",
-        ...(params.expiresAt
-          ? { expiresAtMs: params.expiresAt.getTime() }
-          : {}),
+        ...(params.expiresAt ? { expiresAtMs: params.expiresAt.getTime() } : {}),
         ...(params.maxViews != null ? { maxViews: params.maxViews } : {}),
         ...(params.userId ? { createdByUserId: params.userId } : {}),
       },
@@ -191,13 +185,7 @@ export class LedgerShareRepository implements ShareRepository {
    * appended either way, and it sits after the mint in stream order, so the
    * fold can never redo the mint without also folding the revoke.
    */
-  async deleteById({
-    id,
-    projectId,
-  }: {
-    id: string;
-    projectId: string;
-  }): Promise<void> {
+  async deleteById({ id, projectId }: { id: string; projectId: string }): Promise<void> {
     const organizationId = await this.revocationOrganizationFor(projectId);
     if (!organizationId) return this.legacy.deleteById({ id, projectId });
 
@@ -272,8 +260,7 @@ export class LedgerShareRepository implements ShareRepository {
       projectId,
       resourceKind: resourceType,
       resourceId,
-      sweep: () =>
-        this.legacy.deleteByResource({ projectId, resourceType, resourceId }),
+      sweep: () => this.legacy.deleteByResource({ projectId, resourceType, resourceId }),
     });
   }
 
@@ -367,9 +354,7 @@ export class LedgerShareRepository implements ShareRepository {
     // rows as P2025. The project predicate is part of the row's tenancy, not
     // decoration: it is what the resource fact is anchored to, and every
     // other query in this repository already fences on it.
-    const increment = async (
-      db: Prisma.TransactionClient,
-    ): Promise<boolean> => {
+    const increment = async (db: Prisma.TransactionClient): Promise<boolean> => {
       try {
         await db.grantUsage.update({
           where: {
@@ -542,9 +527,7 @@ export class LedgerShareRepository implements ShareRepository {
    * organization has not been cut over. One indexed read plus the gate's
    * cached answer, per write call.
    */
-  private async ledgerOrganizationFor(
-    projectId: string,
-  ): Promise<string | null> {
+  private async ledgerOrganizationFor(projectId: string): Promise<string | null> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { team: { select: { organizationId: true } } },
@@ -577,9 +560,7 @@ export class LedgerShareRepository implements ShareRepository {
    * stands behind changes nothing) and is the only correct one when it is
    * not.
    */
-  private async revocationOrganizationFor(
-    projectId: string,
-  ): Promise<string | null> {
+  private async revocationOrganizationFor(projectId: string): Promise<string | null> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { team: { select: { organizationId: true } } },

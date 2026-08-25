@@ -2,10 +2,22 @@
   "name": "@langwatch/api-key-server",
   "version": "0.1.0",
   "private": true,
+  "files": [
+    "src"
+  ],
   "type": "module",
-  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
-  "main": "./src/index.ts", "types": "./src/index.ts", "files": ["src"],
-  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run" },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
   "dependencies": {
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
@@ -13,5 +25,9 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*"
   },
-  "devDependencies": { "@types/node": "^26.0.1", "typescript": "^7.0.2", "vitest": "^4.1.9" }
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
 }

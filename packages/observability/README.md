@@ -72,12 +72,12 @@ logHttpRequest(logger, {
 
 ## Environment variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `PINO_LOG_LEVEL` | `debug` in Node.js, `info` in browser | Base logger level |
-| `LOG_CONSOLE_LEVEL` | `info` | Console level (`PINO_CONSOLE_LEVEL` is the compatibility fallback) |
-| `LOG_OTEL_LEVEL` | `debug` | OTel level (`PINO_OTEL_LEVEL` is the compatibility fallback) |
-| `PINO_OTEL_ENABLED` | `false` | Set to `true` to enable OTel log export |
+| Variable            | Default                               | Description                                                        |
+| ------------------- | ------------------------------------- | ------------------------------------------------------------------ |
+| `PINO_LOG_LEVEL`    | `debug` in Node.js, `info` in browser | Base logger level                                                  |
+| `LOG_CONSOLE_LEVEL` | `info`                                | Console level (`PINO_CONSOLE_LEVEL` is the compatibility fallback) |
+| `LOG_OTEL_LEVEL`    | `debug`                               | OTel level (`PINO_OTEL_LEVEL` is the compatibility fallback)       |
+| `PINO_OTEL_ENABLED` | `false`                               | Set to `true` to enable OTel log export                            |
 
 ## Testing
 

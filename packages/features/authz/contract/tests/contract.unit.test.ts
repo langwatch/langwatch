@@ -39,9 +39,7 @@ describe("the portable AuthZ contract", () => {
   it("derives runtime permission validation from the append-only registry", () => {
     expect(authzPermissionSchema.options).toEqual(ALL_PERMISSIONS);
     expect(authzPermissionSchema.safeParse("traces:view").success).toBe(true);
-    expect(authzPermissionSchema.safeParse("traces:rotate").success).toBe(
-      false,
-    );
+    expect(authzPermissionSchema.safeParse("traces:rotate").success).toBe(false);
   });
 
   it("keeps tenant identity and grant shape invariants at command boundaries", () => {

@@ -32,10 +32,7 @@ describe("drawer warm-up", () => {
   /** A promise built in another realm, plus the resolve handle for it. */
   const foreignPromise = () => {
     const context: { resolve?: () => void; promise?: PromiseLike<void> } = {};
-    runInNewContext(
-      "promise = new Promise((r) => { resolve = r; })",
-      context as never,
-    );
+    runInNewContext("promise = new Promise((r) => { resolve = r; })", context as never);
     return { promise: context.promise!, resolve: context.resolve! };
   };
 

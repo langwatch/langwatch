@@ -1,9 +1,5 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
-import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import {
   type RecordBudgetCrossingCommandData,
   type RecordVkLifecycleCommandData,
@@ -35,13 +31,10 @@ import type {
  * rule at the store, with the process manager's state as the second lock.
  */
 
-export class RecordVkLifecycleCommand
-  implements
-    CommandHandler<
-      Command<RecordVkLifecycleCommandData>,
-      GovernanceVkLifecycleEvent
-    >
-{
+export class RecordVkLifecycleCommand implements CommandHandler<
+  Command<RecordVkLifecycleCommandData>,
+  GovernanceVkLifecycleEvent
+> {
   static readonly schema = defineCommandSchema(
     RECORD_VK_LIFECYCLE_COMMAND_TYPE,
     recordVkLifecycleCommandDataSchema,
@@ -72,13 +65,10 @@ export class RecordVkLifecycleCommand
   }
 }
 
-export class RecordBudgetCrossingCommand
-  implements
-    CommandHandler<
-      Command<RecordBudgetCrossingCommandData>,
-      GovernanceBudgetCrossingEvent
-    >
-{
+export class RecordBudgetCrossingCommand implements CommandHandler<
+  Command<RecordBudgetCrossingCommandData>,
+  GovernanceBudgetCrossingEvent
+> {
   static readonly schema = defineCommandSchema(
     RECORD_BUDGET_CROSSING_COMMAND_TYPE,
     recordBudgetCrossingCommandDataSchema,

@@ -3,10 +3,7 @@ import { partitionStreamingText } from "../components/StreamingText";
 
 describe("partitionStreamingText", () => {
   it("keeps a long answer's animated DOM bounded while preserving every character", () => {
-    const text = Array.from(
-      { length: 120 },
-      (_, index) => `word-${index}`,
-    ).join(" ");
+    const text = Array.from({ length: 120 }, (_, index) => `word-${index}`).join(" ");
 
     const result = partitionStreamingText(text);
 

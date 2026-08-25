@@ -2,8 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/enterprise-billing-contract", async (importOriginal) => ({
   ...(await importOriginal()),
-  isGrowthSeatEventPlan: (planType: string) =>
-    planType.startsWith("GROWTH_SEAT_"),
+  isGrowthSeatEventPlan: (planType: string) => planType.startsWith("GROWTH_SEAT_"),
 }));
 
 import { resolveCurrentComparisonPlan } from "../planCurrentResolver";
@@ -35,9 +34,9 @@ describe("resolveCurrentComparisonPlan()", () => {
     });
 
     it('returns "free" when free flag is true regardless of type', () => {
-      expect(
-        resolveCurrentComparisonPlan({ type: "SOMETHING", free: true }),
-      ).toBe("free");
+      expect(resolveCurrentComparisonPlan({ type: "SOMETHING", free: true })).toBe(
+        "free",
+      );
     });
   });
 
@@ -51,42 +50,38 @@ describe("resolveCurrentComparisonPlan()", () => {
     });
 
     it('returns "growth" for GROWTH_SEAT_EUR_MONTHLY variant', () => {
-      expect(
-        resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_EUR_MONTHLY" }),
-      ).toBe("growth");
+      expect(resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_EUR_MONTHLY" })).toBe(
+        "growth",
+      );
     });
 
     it('returns "growth" for GROWTH_SEAT_EUR_ANNUAL variant', () => {
-      expect(
-        resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_EUR_ANNUAL" }),
-      ).toBe("growth");
+      expect(resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_EUR_ANNUAL" })).toBe(
+        "growth",
+      );
     });
 
     it('returns "growth" for GROWTH_SEAT_USD_MONTHLY variant', () => {
-      expect(
-        resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_USD_MONTHLY" }),
-      ).toBe("growth");
+      expect(resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_USD_MONTHLY" })).toBe(
+        "growth",
+      );
     });
 
     it('returns "growth" for GROWTH_SEAT_USD_ANNUAL variant', () => {
-      expect(
-        resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_USD_ANNUAL" }),
-      ).toBe("growth");
+      expect(resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_USD_ANNUAL" })).toBe(
+        "growth",
+      );
     });
   });
 
   describe("when activePlan is an enterprise plan", () => {
     /** @scenario A licensed deployment is still shown the tier its license names */
     it('returns "enterprise" when type is "ENTERPRISE"', () => {
-      expect(resolveCurrentComparisonPlan({ type: "ENTERPRISE" })).toBe(
-        "enterprise",
-      );
+      expect(resolveCurrentComparisonPlan({ type: "ENTERPRISE" })).toBe("enterprise");
     });
 
     it('returns "enterprise" when type is lowercase "enterprise"', () => {
-      expect(resolveCurrentComparisonPlan({ type: "enterprise" })).toBe(
-        "enterprise",
-      );
+      expect(resolveCurrentComparisonPlan({ type: "enterprise" })).toBe("enterprise");
     });
   });
 
@@ -120,15 +115,11 @@ describe("resolveCurrentComparisonPlan()", () => {
 
   describe("when activePlan has null fields", () => {
     it("returns null when type is null and free is null", () => {
-      expect(
-        resolveCurrentComparisonPlan({ type: null, free: null }),
-      ).toBeNull();
+      expect(resolveCurrentComparisonPlan({ type: null, free: null })).toBeNull();
     });
 
     it("returns null when type is null and free is false", () => {
-      expect(
-        resolveCurrentComparisonPlan({ type: null, free: false }),
-      ).toBeNull();
+      expect(resolveCurrentComparisonPlan({ type: null, free: false })).toBeNull();
     });
   });
 });

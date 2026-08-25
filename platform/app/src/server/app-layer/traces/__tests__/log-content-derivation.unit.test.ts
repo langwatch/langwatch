@@ -7,10 +7,7 @@
  * the data becomes queryable as ordinary log attributes.
  */
 import { describe, expect, it } from "vitest";
-import {
-  DERIVED_ATTRS,
-  deriveLogContentAttributes,
-} from "../log-content-derivation";
+import { DERIVED_ATTRS, deriveLogContentAttributes } from "../log-content-derivation";
 
 const CLAUDE_SCOPE = "com.anthropic.claude_code.events";
 
@@ -46,15 +43,11 @@ describe("deriveLogContentAttributes", () => {
     });
 
     it("lifts the assistant's reply text", () => {
-      expect(derived[DERIVED_ATTRS.OUTPUT_TEXT]).toBe(
-        "Let me check the tests.",
-      );
+      expect(derived[DERIVED_ATTRS.OUTPUT_TEXT]).toBe("Let me check the tests.");
     });
 
     it("lifts which tools it called, so tool usage is queryable", () => {
-      expect(
-        JSON.parse(derived[DERIVED_ATTRS.OUTPUT_TOOL_CALLS] ?? "[]"),
-      ).toEqual([
+      expect(JSON.parse(derived[DERIVED_ATTRS.OUTPUT_TOOL_CALLS] ?? "[]")).toEqual([
         { id: "toolu_1", name: "Bash" },
         { id: "toolu_2", name: "Read" },
       ]);
@@ -98,9 +91,7 @@ describe("deriveLogContentAttributes", () => {
   describe("given a record we have no derivation for", () => {
     it("derives nothing, so the common path pays nothing", () => {
       expect(derive({ "event.name": "user_prompt", prompt: "hi" })).toEqual({});
-      expect(derive({ "event.name": "api_request", cost_usd: "0.1" })).toEqual(
-        {},
-      );
+      expect(derive({ "event.name": "api_request", cost_usd: "0.1" })).toEqual({});
       expect(
         derive(
           { "event.name": "api_response_body", body: RESPONSE_BODY },

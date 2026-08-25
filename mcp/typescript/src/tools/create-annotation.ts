@@ -12,7 +12,8 @@ export async function handleCreateAnnotation(params: {
     email: params.email,
   });
 
-  const rating = params.isThumbsUp === true ? " 👍" : params.isThumbsUp === false ? " 👎" : "";
+  const rating =
+    params.isThumbsUp === true ? " 👍" : params.isThumbsUp === false ? " 👎" : "";
 
   return `Annotation created successfully!${rating}\n\n**ID**: ${annotation.id ?? "—"}\n**Trace ID**: ${params.traceId}${params.comment ? `\n**Comment**: ${params.comment}` : ""}`;
 }

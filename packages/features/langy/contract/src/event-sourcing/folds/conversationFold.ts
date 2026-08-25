@@ -197,25 +197,19 @@ export type LangyConversationStateEvent =
  * An archived conversation stays archived regardless of what a later event
  * proposes — replay determinism, and a stray late message can't un-archive.
  */
-function nextStatus(
-  state: LangyConversationStateFoldState,
-  proposed: string,
-): string {
-  return state.ArchivedAt != null
-    ? LANGY_CONVERSATION_STATUS.ARCHIVED
-    : proposed;
+function nextStatus(state: LangyConversationStateFoldState, proposed: string): string {
+  return state.ArchivedAt != null ? LANGY_CONVERSATION_STATUS.ARCHIVED : proposed;
 }
 
 /** Fold ONE spine event onto the conversation state. Pure and total. */
-export function foldLangyConversationState<
-  S extends LangyConversationStateFoldState,
->(state: S, event: LangyConversationStateEvent): S {
+export function foldLangyConversationState<S extends LangyConversationStateFoldState>(
+  state: S,
+  event: LangyConversationStateEvent,
+): S {
   switch (event.type) {
     case LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED: {
       const initialTitle =
-        event.data.title && event.data.title.length > 0
-          ? event.data.title
-          : null;
+        event.data.title && event.data.title.length > 0 ? event.data.title : null;
       // First writer wins for owner/title; an explicit creation seeds them
       // before any message, but never demotes an existing title source.
       const title = state.Title ?? initialTitle;
@@ -244,8 +238,7 @@ export function foldLangyConversationState<
         Title: state.Title ?? event.data.title,
         // A fork title is chosen as part of the user's explicit fork action.
         // Keep it sticky so the title process cannot later rename the copy.
-        TitleSource:
-          state.Title == null ? LANGY_TITLE_SOURCE.USER : state.TitleSource,
+        TitleSource: state.Title == null ? LANGY_TITLE_SOURCE.USER : state.TitleSource,
         Status: nextStatus(state, LANGY_CONVERSATION_STATUS.IDLE),
         LastActivityAt: state.LastActivityAt ?? event.occurredAt,
         RunToken: state.RunToken ?? event.data.runToken,
@@ -253,9 +246,7 @@ export function foldLangyConversationState<
     }
     case LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED: {
       const derivedTitle =
-        event.data.title && event.data.title.length > 0
-          ? event.data.title
-          : null;
+        event.data.title && event.data.title.length > 0 ? event.data.title : null;
       // First non-empty title wins (a placeholder from the first message).
       const title = state.Title ?? derivedTitle;
       // Only stamp `derived` when THIS message is the one that first set the
@@ -338,9 +329,7 @@ export function foldLangyConversationState<
         MessageCount: state.MessageCount + 1,
         Status: nextStatus(
           state,
-          failed
-            ? LANGY_CONVERSATION_STATUS.FAILED
-            : LANGY_CONVERSATION_STATUS.IDLE,
+          failed ? LANGY_CONVERSATION_STATUS.FAILED : LANGY_CONVERSATION_STATUS.IDLE,
         ),
         CurrentTurnId: null,
         LastError: failed ? (event.data.error ?? "unknown error") : null,

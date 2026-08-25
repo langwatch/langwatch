@@ -85,9 +85,7 @@ export class LangWatchQLNotPermittedError extends HandledError {
  * caller to "check the syntax" of syntactically perfect SQL sends them looking
  * in the wrong place.
  */
-export function lwqlValidationError(
-  rejection: RejectedLangWatchQL,
-): HandledError {
+export function lwqlValidationError(rejection: RejectedLangWatchQL): HandledError {
   const unparseable = rejection.violations.every(
     (violation) => violation.code === "PARSE_FAILED",
   );

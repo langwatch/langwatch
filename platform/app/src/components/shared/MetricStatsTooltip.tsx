@@ -25,18 +25,14 @@ export type MetricStats = {
 /**
  * Computes percentile from a sorted array using linear interpolation.
  */
-const computePercentile = (
-  sortedValues: number[],
-  percentile: number,
-): number => {
+const computePercentile = (sortedValues: number[], percentile: number): number => {
   if (sortedValues.length === 0) return 0;
   const index = (percentile / 100) * (sortedValues.length - 1);
   const lower = Math.floor(index);
   const upper = Math.ceil(index);
   if (lower === upper) return sortedValues[lower]!;
   return (
-    sortedValues[lower]! +
-    (sortedValues[upper]! - sortedValues[lower]!) * (index - lower)
+    sortedValues[lower]! + (sortedValues[upper]! - sortedValues[lower]!) * (index - lower)
   );
 };
 
@@ -72,10 +68,7 @@ type MetricStatsTooltipProps = {
 /**
  * Generic statistical breakdown tooltip content.
  */
-export const MetricStatsTooltip = ({
-  stats,
-  formatValue,
-}: MetricStatsTooltipProps) => (
+export const MetricStatsTooltip = ({ stats, formatValue }: MetricStatsTooltipProps) => (
   <VStack align="stretch" gap={1} fontSize="11px" minWidth="140px">
     <HStack justify="space-between">
       <Text color="fg.muted">Min</Text>

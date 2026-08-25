@@ -287,7 +287,8 @@ function pointsAtOwnedRepo(value: unknown): boolean {
   const scp = /^git@([^:]+):(.+)$/.exec(lowered);
   if (scp) {
     return (
-      OWNED_HOSTS.has(scp[1]!) && stripRepoPath(scp[2]!) === CLAUDE_PLUGIN_MARKETPLACE_REPO
+      OWNED_HOSTS.has(scp[1]!) &&
+      stripRepoPath(scp[2]!) === CLAUDE_PLUGIN_MARKETPLACE_REPO
     );
   }
 
@@ -307,7 +308,10 @@ function pointsAtOwnedRepo(value: unknown): boolean {
 
 /** `/langwatch/agent-plugin.git/` and friends down to `langwatch/agent-plugin`. */
 function stripRepoPath(value: string): string {
-  return value.replace(/^\/+/, "").replace(/\/+$/, "").replace(/\.git$/, "");
+  return value
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "")
+    .replace(/\.git$/, "");
 }
 
 function sourcePointsAtLangwatch(source: unknown): boolean {
@@ -465,7 +469,9 @@ export function updateLangwatchClaudePlugin({
       timeoutMs: UPDATE_TIMEOUT_MS,
     });
     const refreshFailure =
-      refresh.status === 0 ? null : `the marketplace listing could not be refreshed: ${refresh.detail}`;
+      refresh.status === 0
+        ? null
+        : `the marketplace listing could not be refreshed: ${refresh.detail}`;
     if (refreshFailure) debugLog(refreshFailure);
 
     const installed = readInstalledPluginVersion();
@@ -628,7 +634,11 @@ function marketplaceListingDir(): string {
     path.join(claudePluginsDir(), "known_marketplaces.json"),
   );
   const entry = marketplaces[CLAUDE_PLUGIN_MARKETPLACE];
-  if (isPlainObject(entry) && typeof entry.installLocation === "string" && entry.installLocation) {
+  if (
+    isPlainObject(entry) &&
+    typeof entry.installLocation === "string" &&
+    entry.installLocation
+  ) {
     return entry.installLocation;
   }
   return path.join(claudePluginsDir(), "marketplaces", CLAUDE_PLUGIN_MARKETPLACE);
@@ -682,11 +692,7 @@ function stampUpdateCheck(): boolean {
   }
 }
 
-export type ClaudePluginRemovalAction =
-  | "uninstalled"
-  | "disabled"
-  | "absent"
-  | "failed";
+export type ClaudePluginRemovalAction = "uninstalled" | "disabled" | "absent" | "failed";
 
 export interface ClaudePluginRemovalResult {
   action: ClaudePluginRemovalAction;
@@ -785,7 +791,9 @@ function disableInSettings(): boolean {
     writeAppSettingsFile({ filePath, settings });
     return true;
   } catch (err) {
-    debugLog(`could not disable the plugin in the settings file: ${(err as Error).message}`);
+    debugLog(
+      `could not disable the plugin in the settings file: ${(err as Error).message}`,
+    );
     return false;
   }
 }

@@ -40,12 +40,7 @@ describe("coerceToChatMessages", () => {
       it("drops the non-objects and keeps the role/content-bearing messages", () => {
         const envelope = {
           type: "chat_messages",
-          value: [
-            "not a message",
-            42,
-            null,
-            { content: "only content, no role" },
-          ],
+          value: ["not a message", 42, null, { content: "only content, no role" }],
         };
 
         const result = coerceToChatMessages(envelope);
@@ -304,9 +299,7 @@ describe("chat text leaves (translation splice)", () => {
         "1.0": "It is raining",
       });
 
-      const coerced = coerceToChatMessages(
-        JSON.parse(JSON.stringify(translated)),
-      );
+      const coerced = coerceToChatMessages(JSON.parse(JSON.stringify(translated)));
       expect(coerced).toHaveLength(3);
       expect(coerced?.[0]).toMatchObject({
         role: "user",

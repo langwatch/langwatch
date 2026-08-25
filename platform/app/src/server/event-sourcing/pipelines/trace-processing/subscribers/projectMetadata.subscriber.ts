@@ -204,8 +204,7 @@ async function markFirstMessage({
   project: { firstMessage: boolean; integrated: boolean };
   attrs: Record<string, string>;
 }): Promise<void> {
-  const isOptimizationStudio =
-    attrs["langwatch.platform"] === "optimization_studio";
+  const isOptimizationStudio = attrs["langwatch.platform"] === "optimization_studio";
 
   await deps.projects.updateMetadata({
     id: tenantId,

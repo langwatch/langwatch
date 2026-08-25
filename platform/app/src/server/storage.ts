@@ -1,8 +1,4 @@
-import {
-  GetObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import fs from "fs/promises";
 import path from "path";
 import { env } from "../env.mjs";
@@ -13,9 +9,7 @@ export class StorageService {
   private async getLocalStoragePath(projectId: string, key: string) {
     // Make sure projectId and key don't contain path traversal characters
     if (projectId.includes("..") || key.includes("..")) {
-      throw new Error(
-        "Invalid projectId or key: path traversal attempt detected",
-      );
+      throw new Error("Invalid projectId or key: path traversal attempt detected");
     }
     const storageDir =
       process.env.LOCAL_STORAGE_PATH ?? path.resolve(process.cwd(), "storage");
@@ -159,8 +153,7 @@ export const createS3Client = async (projectId: string) => {
   // ONLY when an explicit access-key + secret pair is present, letting the
   // SDK fall back through its default chain for keyless modes.
   const accessKeyId = privateConfig?.accessKeyId ?? env.S3_ACCESS_KEY_ID;
-  const secretAccessKey =
-    privateConfig?.secretAccessKey ?? env.S3_SECRET_ACCESS_KEY;
+  const secretAccessKey = privateConfig?.secretAccessKey ?? env.S3_SECRET_ACCESS_KEY;
   const sessionToken = env.S3_SESSION_TOKEN;
   const hasExplicitKeys = !!(accessKeyId && secretAccessKey);
 

@@ -87,13 +87,13 @@ await transcribe("What does the caller ask for?", "call.wav");
 
 Send any of these and the recording is captured.
 
-| Source | Shape |
-|---|---|
-| OpenAI | `{ type: "input_audio", input_audio: { data: "<base64>", format: "wav" } }` |
-| Vercel AI SDK | `{ type: "file", mediaType: "audio/wav", data: "<base64>" }` |
-| OpenAI | `{ type: "file", file: { filename: "call.wav", file_data: "<base64>" } }` |
-| Google Gemini and Vertex | `{ inlineData: { mimeType: "audio/wav", data: "..." } }` |
-| AG-UI | `{ type: "audio", source: { type: "data", value: "...", mimeType: "audio/wav" } }` |
+| Source                   | Shape                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| OpenAI                   | `{ type: "input_audio", input_audio: { data: "<base64>", format: "wav" } }`        |
+| Vercel AI SDK            | `{ type: "file", mediaType: "audio/wav", data: "<base64>" }`                       |
+| OpenAI                   | `{ type: "file", file: { filename: "call.wav", file_data: "<base64>" } }`          |
+| Google Gemini and Vertex | `{ inlineData: { mimeType: "audio/wav", data: "..." } }`                           |
+| AG-UI                    | `{ type: "audio", source: { type: "data", value: "...", mimeType: "audio/wav" } }` |
 
 An OpenAI Realtime session sends its turns in the same `input_audio` shape.
 

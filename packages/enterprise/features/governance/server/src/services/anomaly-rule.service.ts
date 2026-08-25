@@ -26,20 +26,14 @@ export class AnomalyRuleService {
     repository: AnomalyRuleRepository;
     now?: () => Date;
   }): AnomalyRuleService {
-    return new AnomalyRuleService(
-      options.repository,
-      options.now ?? (() => new Date()),
-    );
+    return new AnomalyRuleService(options.repository, options.now ?? (() => new Date()));
   }
 
   async list(organizationId: string): Promise<AnomalyRule[]> {
     return this.repository.list(organizationId);
   }
 
-  async tryFindById(
-    id: string,
-    organizationId: string,
-  ): Promise<AnomalyRule | null> {
+  async tryFindById(id: string, organizationId: string): Promise<AnomalyRule | null> {
     const row = await this.repository.tryFindById(id);
     if (!row || row.organizationId !== organizationId) return null;
     return row;
@@ -51,10 +45,7 @@ export class AnomalyRuleService {
    * Which org asked is a debugging detail — it goes to the log, not into an
    * error a customer reads (see {@link AnomalyRuleNotFoundError}).
    */
-  async getById(
-    id: string,
-    organizationId: string,
-  ): Promise<AnomalyRule> {
+  async getById(id: string, organizationId: string): Promise<AnomalyRule> {
     const existing = await this.tryFindById(id, organizationId);
     if (!existing) {
       throw new AnomalyRuleNotFoundError(id);
@@ -146,10 +137,7 @@ export class AnomalyRuleService {
         config: input.thresholdConfig,
       });
       changes.thresholdConfig = input.thresholdConfig;
-    } else if (
-      input.ruleType !== undefined &&
-      input.ruleType !== existing.ruleType
-    ) {
+    } else if (input.ruleType !== undefined && input.ruleType !== existing.ruleType) {
       // Switching ruleType without supplying a matching config would
       // leave a row whose ruleType + thresholdConfig disagree. Reject
       // up-front so the admin supplies the right shape.

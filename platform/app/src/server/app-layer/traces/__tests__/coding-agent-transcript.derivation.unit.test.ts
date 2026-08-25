@@ -38,13 +38,7 @@ function toolSpan({
   } as unknown as SpanDetail;
 }
 
-function modelSpan({
-  atMs,
-  cost = 0.5,
-}: {
-  atMs: number;
-  cost?: number;
-}): SpanDetail {
+function modelSpan({ atMs, cost = 0.5 }: { atMs: number; cost?: number }): SpanDetail {
   return {
     spanId: `llm-${atMs}`,
     name: "claude_code.llm_request",
@@ -69,10 +63,7 @@ describe("buildCodingAgentTranscript", () => {
       // Spans and logs arrive on separate exporters and separate batches, so the
       // order they are handed to us says nothing about what happened first.
       const transcript = buildCodingAgentTranscript({
-        spans: [
-          toolSpan({ name: "Bash", atMs: 3_000 }),
-          modelSpan({ atMs: 2_000 }),
-        ],
+        spans: [toolSpan({ name: "Bash", atMs: 3_000 }), modelSpan({ atMs: 2_000 })],
         logs: [
           log({ "event.name": "assistant_response", response: "Done." }, 4_000),
           log({ "event.name": "user_prompt", prompt: "fix the build" }, 1_000),
@@ -209,9 +200,7 @@ describe("buildCodingAgentTranscript", () => {
       });
 
       expect(transcript.entries).toHaveLength(3);
-      expect(transcript.subAgents).toEqual([
-        { agentId: "agent-7", toolCalls: 2 },
-      ]);
+      expect(transcript.subAgents).toEqual([{ agentId: "agent-7", toolCalls: 2 }]);
       expect(transcript.totals.toolCalls).toBe(3);
     });
   });
@@ -219,9 +208,7 @@ describe("buildCodingAgentTranscript", () => {
   describe("given an MCP tool", () => {
     it("names the server it came from", () => {
       const transcript = buildCodingAgentTranscript({
-        spans: [
-          toolSpan({ name: "mcp__claude-in-chrome__navigate", atMs: 1_000 }),
-        ],
+        spans: [toolSpan({ name: "mcp__claude-in-chrome__navigate", atMs: 1_000 })],
         logs: [],
       });
 
@@ -344,9 +331,7 @@ describe("buildCodingAgentTranscript", () => {
         logs: [],
       });
 
-      expect(transcript.entries).toMatchObject([
-        { kind: "tool", name: "search_docs" },
-      ]);
+      expect(transcript.entries).toMatchObject([{ kind: "tool", name: "search_docs" }]);
       expect(transcript.totals.toolCalls).toBe(1);
     });
   });
@@ -379,9 +364,7 @@ describe("buildCodingAgentTranscript", () => {
       });
 
       expect(transcript.totals.toolCalls).toBe(1);
-      expect(
-        transcript.entries.filter((entry) => entry.kind === "tool"),
-      ).toHaveLength(1);
+      expect(transcript.entries.filter((entry) => entry.kind === "tool")).toHaveLength(1);
     });
   });
 
@@ -399,10 +382,7 @@ describe("buildCodingAgentTranscript", () => {
             2_000,
           ),
           log({ "event.name": "claude_code.commit" }, 3_000),
-          log(
-            { "event.name": "claude_code.skill_activated", skill_name: "pdf" },
-            4_000,
-          ),
+          log({ "event.name": "claude_code.skill_activated", skill_name: "pdf" }, 4_000),
         ],
       });
 
@@ -486,9 +466,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
           role: "utility_router",
           model: "gemini-3.1-flash-lite",
           response_text: JSON.stringify({
-            candidates: [
-              { content: { parts: [{ text: '{"complexity":"trivial"}' }] } },
-            ],
+            candidates: [{ content: { parts: [{ text: '{"complexity":"trivial"}' }] } }],
           }),
         },
         950,
@@ -524,9 +502,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
         text: "pong",
         model: "gemini-3.5-flash",
       });
-      expect(JSON.stringify(transcript.entries)).not.toContain(
-        "Thinking it over",
-      );
+      expect(JSON.stringify(transcript.entries)).not.toContain("Thinking it over");
       expect(JSON.stringify(transcript.entries)).not.toContain("complexity");
     });
 
@@ -536,9 +512,11 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
       expect(
         transcript.entries.find((entry) => entry.kind === "user_prompt"),
       ).toMatchObject({ text: "reply with the single word pong" });
-      expect(
-        transcript.entries.find((entry) => entry.kind === "tool"),
-      ).toMatchObject({ name: "read_file", durationMs: 42, failed: false });
+      expect(transcript.entries.find((entry) => entry.kind === "tool")).toMatchObject({
+        name: "read_file",
+        durationMs: 42,
+        failed: false,
+      });
       expect(transcript.totals.modelCalls).toBe(1);
       expect(transcript.agent).toBe("gemini_cli");
     });
@@ -569,10 +547,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
       const replies = transcript.entries.filter(
         (entry) => entry.kind === "assistant_message",
       );
-      expect(replies.map((reply) => reply.text)).toEqual([
-        "pong",
-        "second answer",
-      ]);
+      expect(replies.map((reply) => reply.text)).toEqual(["pong", "second answer"]);
     });
   });
 
@@ -597,9 +572,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
       });
 
       expect(transcript.totals.modelCalls).toBe(1);
-      const call = transcript.entries.find(
-        (entry) => entry.kind === "model_call",
-      );
+      const call = transcript.entries.find((entry) => entry.kind === "model_call");
       expect(call).toMatchObject({
         tokens: 12_902,
         inputTokens: 2_913,
@@ -725,9 +698,9 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
         output: "1:def welcome(name):",
         failed: false,
       });
-      expect(
-        transcript.entries.findIndex((e) => e.kind === "user_prompt"),
-      ).toBeLessThan(transcript.entries.findIndex((e) => e.kind === "tool"));
+      expect(transcript.entries.findIndex((e) => e.kind === "user_prompt")).toBeLessThan(
+        transcript.entries.findIndex((e) => e.kind === "tool"),
+      );
     });
 
     it("marks a failed tool_result as failed", () => {
@@ -818,9 +791,7 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
       });
 
       expect(transcript.totals.modelCalls).toBe(1);
-      expect(
-        transcript.entries.find((e) => e.kind === "model_call"),
-      ).toMatchObject({
+      expect(transcript.entries.find((e) => e.kind === "model_call")).toMatchObject({
         inputTokens: 13_005,
         outputTokens: 10,
         cacheReadTokens: 12_032,
@@ -894,9 +865,7 @@ describe("buildCodingAgentTranscript session system context", () => {
         ],
       });
 
-      const systemEntries = transcript.entries.filter(
-        (e) => e.kind === "system_prompt",
-      );
+      const systemEntries = transcript.entries.filter((e) => e.kind === "system_prompt");
       expect(systemEntries).toHaveLength(1);
       expect(systemEntries[0]).toMatchObject({
         text: "You are Claude Code. CLAUDE.md says X.",
@@ -911,9 +880,7 @@ describe("buildCodingAgentTranscript session system context", () => {
         spans: [modelSpan({ atMs: 2_000 })],
         logs: [],
       });
-      expect(transcript.entries.some((e) => e.kind === "system_prompt")).toBe(
-        false,
-      );
+      expect(transcript.entries.some((e) => e.kind === "system_prompt")).toBe(false);
     });
   });
 });
@@ -929,9 +896,7 @@ describe("buildCodingAgentTranscript injected session context", () => {
         },
       ]);
       const transcript = buildCodingAgentTranscript({
-        spans: [
-          { ...modelSpan({ atMs: 2_000 }), input } as unknown as SpanDetail,
-        ],
+        spans: [{ ...modelSpan({ atMs: 2_000 }), input } as unknown as SpanDetail],
         logs: [],
       });
 
@@ -955,15 +920,12 @@ describe("buildCodingAgentTranscript injected session context", () => {
           { role: "system", content: "You are Claude Code." },
           {
             role: "user",
-            content:
-              "<system-reminder>MCP tools: grafana</system-reminder>\n\nhi",
+            content: "<system-reminder>MCP tools: grafana</system-reminder>\n\nhi",
           },
         ],
       });
       const transcript = buildCodingAgentTranscript({
-        spans: [
-          { ...modelSpan({ atMs: 2_000 }), input } as unknown as SpanDetail,
-        ],
+        spans: [{ ...modelSpan({ atMs: 2_000 }), input } as unknown as SpanDetail],
         logs: [],
       });
 
@@ -979,18 +941,12 @@ describe("buildCodingAgentTranscript injected session context", () => {
 
   describe("given a plain conversation with no injected context", () => {
     it("emits no session context entry", () => {
-      const input = JSON.stringify([
-        { role: "user", content: "just a question" },
-      ]);
+      const input = JSON.stringify([{ role: "user", content: "just a question" }]);
       const transcript = buildCodingAgentTranscript({
-        spans: [
-          { ...modelSpan({ atMs: 2_000 }), input } as unknown as SpanDetail,
-        ],
+        spans: [{ ...modelSpan({ atMs: 2_000 }), input } as unknown as SpanDetail],
         logs: [],
       });
-      expect(transcript.entries.some((e) => e.kind === "system_prompt")).toBe(
-        false,
-      );
+      expect(transcript.entries.some((e) => e.kind === "system_prompt")).toBe(false);
     });
   });
 });
@@ -1071,9 +1027,7 @@ describe("given a codex trace whose conversation was recovered", () => {
         logs: [],
       });
 
-      const readable = transcript.entries.filter(
-        (e) => e.kind !== "model_call",
-      );
+      const readable = transcript.entries.filter((e) => e.kind !== "model_call");
       expect(readable.map((e) => e.kind)).toEqual(
         expect.arrayContaining([
           "system_prompt",
@@ -1088,9 +1042,7 @@ describe("given a codex trace whose conversation was recovered", () => {
       });
       const tool = readable.find((e) => e.kind === "tool");
       expect(tool).toMatchObject({ name: "exec", output: "papaya-toolcall" });
-      const reply = readable
-        .filter((e) => e.kind === "assistant_message")
-        .at(-1);
+      const reply = readable.filter((e) => e.kind === "assistant_message").at(-1);
       expect(reply).toMatchObject({
         text: "It printed exactly: papaya-toolcall",
       });
@@ -1137,9 +1089,7 @@ describe("given a codex session of two turns, where each turn re-sends the whole
       });
 
       const texts = transcript.entries.flatMap((e) =>
-        e.kind === "user_prompt" || e.kind === "assistant_message"
-          ? [e.text]
-          : [],
+        e.kind === "user_prompt" || e.kind === "assistant_message" ? [e.text] : [],
       );
       expect(texts.filter((t) => t === "first question")).toHaveLength(1);
       expect(texts.filter((t) => t === "first answer")).toHaveLength(1);
@@ -1172,17 +1122,13 @@ describe("given a recovered codex turn whose first user message is the agent's o
         logs: [],
       });
 
-      const prompts = transcript.entries.filter(
-        (e) => e.kind === "user_prompt",
-      );
+      const prompts = transcript.entries.filter((e) => e.kind === "user_prompt");
       expect(prompts).toHaveLength(1);
       expect(prompts[0]).toMatchObject({
         text: "echo papaya and tell me the output",
       });
 
-      const context = transcript.entries.find(
-        (e) => e.kind === "system_prompt",
-      );
+      const context = transcript.entries.find((e) => e.kind === "system_prompt");
       expect(context?.kind === "system_prompt" && context.text).toContain(
         "recommended_plugins",
       );
@@ -1227,9 +1173,7 @@ describe("given the two recovered turns arrive newest-first", () => {
       });
 
       const texts = transcript.entries.flatMap((e) =>
-        e.kind === "user_prompt" || e.kind === "assistant_message"
-          ? [e.text]
-          : [],
+        e.kind === "user_prompt" || e.kind === "assistant_message" ? [e.text] : [],
       );
       expect(texts.filter((t) => t === "first question")).toHaveLength(1);
       expect(texts.filter((t) => t === "second question")).toHaveLength(1);
@@ -1306,9 +1250,7 @@ describe("given a codex trace whose recovered conversation and tool spans descri
     it("renders that call once and counts it once", () => {
       const transcript = transcriptOfAllThreeSignals();
 
-      expect(
-        transcript.entries.filter((entry) => entry.kind === "tool"),
-      ).toHaveLength(1);
+      expect(transcript.entries.filter((entry) => entry.kind === "tool")).toHaveLength(1);
       expect(transcript.totals.toolCalls).toBe(1);
     });
 
@@ -1316,18 +1258,20 @@ describe("given a codex trace whose recovered conversation and tool spans descri
     it("fills the one entry with the timing the span measured", () => {
       const transcript = transcriptOfAllThreeSignals();
 
-      expect(
-        transcript.entries.find((entry) => entry.kind === "tool"),
-      ).toMatchObject({ name: "exec", output: "papaya", durationMs: 500 });
+      expect(transcript.entries.find((entry) => entry.kind === "tool")).toMatchObject({
+        name: "exec",
+        output: "papaya",
+        durationMs: 500,
+      });
     });
 
     /** @scenario "The shown tool call keeps the timing and status only the span measured" */
     it("marks the call failed when the span is the only signal saying so", () => {
       const transcript = transcriptOfAllThreeSignals({ spanFailed: true });
 
-      expect(
-        transcript.entries.find((entry) => entry.kind === "tool"),
-      ).toMatchObject({ failed: true });
+      expect(transcript.entries.find((entry) => entry.kind === "tool")).toMatchObject({
+        failed: true,
+      });
     });
   });
 });
@@ -1364,9 +1308,7 @@ describe("given a codex trace whose recovered conversation and prompt event desc
         logs: [redactedPromptEvent()],
       });
 
-      const prompts = transcript.entries.filter(
-        (entry) => entry.kind === "user_prompt",
-      );
+      const prompts = transcript.entries.filter((entry) => entry.kind === "user_prompt");
       expect(prompts).toHaveLength(1);
       expect(prompts[0]).toMatchObject({
         text: "echo papaya and tell me the output",
@@ -1380,9 +1322,7 @@ describe("given a codex trace whose recovered conversation and prompt event desc
         logs: [redactedPromptEvent()],
       });
 
-      const prompts = transcript.entries.filter(
-        (entry) => entry.kind === "user_prompt",
-      );
+      const prompts = transcript.entries.filter((entry) => entry.kind === "user_prompt");
       expect(prompts).toHaveLength(1);
       // The sentinel stays visible (it is the only record a prompt happened)
       // and the chars are the prompt's real length, not the sentinel's.
@@ -1421,9 +1361,7 @@ describe("given a codex trace whose recovered conversation and prompt event desc
         ],
       });
 
-      const prompts = transcript.entries.filter(
-        (entry) => entry.kind === "user_prompt",
-      );
+      const prompts = transcript.entries.filter((entry) => entry.kind === "user_prompt");
       expect(prompts).toHaveLength(2);
       expect(prompts.map((entry) => entry.text)).toEqual([
         "echo papaya and tell me the output",
@@ -1472,9 +1410,7 @@ describe("given a codex trace whose recovered conversation and prompt event desc
         ],
       });
 
-      const prompts = transcript.entries.filter(
-        (entry) => entry.kind === "user_prompt",
-      );
+      const prompts = transcript.entries.filter((entry) => entry.kind === "user_prompt");
       expect(prompts).toHaveLength(2);
       // The unrecovered turn keeps its stub, in its own place in time, and the
       // recovered turn is shown once with its words.
@@ -1517,15 +1453,10 @@ describe("given a codex trace whose recovered conversation and prompt event desc
         ],
       });
 
-      const prompts = transcript.entries.filter(
-        (entry) => entry.kind === "user_prompt",
-      );
+      const prompts = transcript.entries.filter((entry) => entry.kind === "user_prompt");
       // Both survive: the old turn keeps its record, and the recovered turn
       // is shown with its words.
-      expect(prompts.map((entry) => entry.text)).toEqual([
-        "[REDACTED]",
-        prompt,
-      ]);
+      expect(prompts.map((entry) => entry.text)).toEqual(["[REDACTED]", prompt]);
     });
   });
 });
@@ -1573,8 +1504,8 @@ function isTagsOnlyByBacktrackingStrip(content: string): boolean {
   if (!trimmed.startsWith("<")) return false;
   if (trimmed.length > 64_000) return false;
   return (
-    trimmed.replace(/<([A-Za-z_][\w.-]*)(\s[^>]*)?>[\s\S]*?<\/\1>/g, "").trim()
-      .length === 0
+    trimmed.replace(/<([A-Za-z_][\w.-]*)(\s[^>]*)?>[\s\S]*?<\/\1>/g, "").trim().length ===
+    0
   );
 }
 
@@ -1667,13 +1598,9 @@ describe("given a recovered reply longer than the producer writes to the span", 
         logs: [],
       });
 
-      const replies = transcript.entries.filter(
-        (e) => e.kind === "assistant_message",
-      );
+      const replies = transcript.entries.filter((e) => e.kind === "assistant_message");
       expect(
-        replies.filter(
-          (r) => r.kind === "assistant_message" && r.text === longReply,
-        ),
+        replies.filter((r) => r.kind === "assistant_message" && r.text === longReply),
       ).toHaveLength(0);
     });
   });

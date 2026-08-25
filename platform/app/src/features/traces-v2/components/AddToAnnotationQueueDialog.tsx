@@ -160,9 +160,7 @@ export function AddToAnnotationQueueDialog({
   const router = useRouter();
   const utils = api.useUtils();
   const newQueueDrawer = useDisclosure();
-  const [annotators, setAnnotators] = useState<Annotator[]>(
-    initialAnnotators ?? [],
-  );
+  const [annotators, setAnnotators] = useState<Annotator[]>(initialAnnotators ?? []);
 
   // The picker reads the same query, so this shares its cache rather than
   // costing a second round trip.

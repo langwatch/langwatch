@@ -16,9 +16,7 @@ import {
   type EvaluationClickHouseResolver,
   type EvaluationRetentionFloorPort,
 } from "../../ports/evaluation.port";
-import {
-  EvaluationRunRepository,
-} from "../evaluation.repository";
+import { EvaluationRunRepository } from "../evaluation.repository";
 
 const TABLE_NAME = "evaluation_runs" as const;
 const PROJECTION_VERSION = "2025-01-14" as const;
@@ -48,12 +46,9 @@ const TRACE_EVALUATION_COLUMNS_LIGHT = [
   "LastProcessedEventId",
   "UpdatedAt",
 ].join(", ");
-const TRACE_EVALUATION_COLUMNS_WITH_INPUTS =
-  `${TRACE_EVALUATION_COLUMNS_LIGHT}, Inputs`;
+const TRACE_EVALUATION_COLUMNS_WITH_INPUTS = `${TRACE_EVALUATION_COLUMNS_LIGHT}, Inputs`;
 
-const logger = createLogger(
-  "langwatch:evaluation:clickhouse.evaluation.repository",
-);
+const logger = createLogger("langwatch:evaluation:clickhouse.evaluation.repository");
 
 interface ClickHouseEvaluationRunRecord {
   ProjectionId: string;
@@ -85,7 +80,8 @@ interface ClickHouseEvaluationRunRecord {
   _retention_days: number;
 }
 
-type ClickHouseWriteRecord = Omit<ClickHouseEvaluationRunRecord,
+type ClickHouseWriteRecord = Omit<
+  ClickHouseEvaluationRunRecord,
   | "CreatedAt"
   | "UpdatedAt"
   | "ArchivedAt"
@@ -103,7 +99,9 @@ type ClickHouseWriteRecord = Omit<ClickHouseEvaluationRunRecord,
   LastEventOccurredAt: Date;
 };
 
-const capInputs = (serialized: string | null): {
+const capInputs = (
+  serialized: string | null,
+): {
   value: string | null;
   truncated: boolean;
   originalBytes: number;
@@ -119,7 +117,9 @@ const capInputs = (serialized: string | null): {
   };
 };
 
-const capText = (value: string | null): {
+const capText = (
+  value: string | null,
+): {
   value: string | null;
   truncated: boolean;
   originalBytes: number;
@@ -127,7 +127,8 @@ const capText = (value: string | null): {
   const cap = 256 * 1024;
   if (value === null) return { value: null, truncated: false, originalBytes: 0 };
   const bytes = Buffer.from(value, "utf8");
-  if (bytes.length <= cap) return { value, truncated: false, originalBytes: bytes.length };
+  if (bytes.length <= cap)
+    return { value, truncated: false, originalBytes: bytes.length };
   return {
     value: `${bytes.subarray(0, cap).toString("utf8")}…[lw-truncated]`,
     truncated: true,
@@ -226,7 +227,9 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
       const client = await this.options.resolveClient(input.tenantId);
       await client.insert({
         table: TABLE_NAME,
-        values: [this.toClickHouseRecord(input.data, input.tenantId, input.retentionDays)],
+        values: [
+          this.toClickHouseRecord(input.data, input.tenantId, input.retentionDays),
+        ],
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
@@ -455,10 +458,7 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
     traceIds: string[];
   }): Promise<Record<string, TraceEvaluationData[]>> {
     if (input.traceIds.length === 0) return {};
-    validateTenant(
-      input.tenantId,
-      "ClickHouseEvaluationRepository.findTraceEvaluations",
-    );
+    validateTenant(input.tenantId, "ClickHouseEvaluationRepository.findTraceEvaluations");
     const client = await this.options.resolveClient(input.tenantId);
     try {
       return await this.queryTraceEvaluations({
@@ -492,10 +492,7 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
     tenantId: string;
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {
-    validateTenant(
-      input.tenantId,
-      "ClickHouseEvaluationRepository.tryFindInputs",
-    );
+    validateTenant(input.tenantId, "ClickHouseEvaluationRepository.tryFindInputs");
     let client: EvaluationClickHouseClient;
     try {
       client = await this.options.resolveClient(input.tenantId);
@@ -666,7 +663,12 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
     const details = capText(data.details);
     const error = capText(data.error);
     const errorDetails = capText(data.errorDetails);
-    if (inputs.truncated || details.truncated || error.truncated || errorDetails.truncated) {
+    if (
+      inputs.truncated ||
+      details.truncated ||
+      error.truncated ||
+      errorDetails.truncated
+    ) {
       logger.warn(
         {
           tenantId,

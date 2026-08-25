@@ -165,9 +165,7 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
             AZURE_OPENAI_API_KEY: `sk-project-${ns}`,
             AZURE_OPENAI_ENDPOINT: "https://old-resource.openai.azure.com",
           },
-          customModels: [
-            { modelId: "gpt-4o", displayName: "gpt-4o", mode: "chat" },
-          ],
+          customModels: [{ modelId: "gpt-4o", displayName: "gpt-4o", mode: "chat" }],
           scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
         },
         ctx(),
@@ -337,9 +335,7 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
           provider: "groq",
           enabled: true,
           customKeys: { GROQ_API_KEY: `sk-groq-shared-${ns}` },
-          customModels: [
-            { modelId: "groq-x", displayName: "groq-x", mode: "chat" },
-          ],
+          customModels: [{ modelId: "groq-x", displayName: "groq-x", mode: "chat" }],
           scopes: [
             { scopeType: "ORGANIZATION", scopeId: organizationId },
             { scopeType: "PROJECT", scopeId: otherProjectId },
@@ -353,9 +349,7 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
           provider: "groq",
           enabled: true,
           customKeys: { GROQ_API_KEY: `sk-groq-current-${ns}` },
-          customModels: [
-            { modelId: "groq-x", displayName: "groq-x", mode: "chat" },
-          ],
+          customModels: [{ modelId: "groq-x", displayName: "groq-x", mode: "chat" }],
           scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
         },
         ctx(),
@@ -546,11 +540,7 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
 
     /** @scenario Evaluations accept a model served only by a wider-scope row */
     it("builds the evaluator env with the serving row's credentials instead of rejecting", async () => {
-      const env = await setupModelEnv(
-        `gemini/eval-custom-${ns}`,
-        false,
-        projectId,
-      );
+      const env = await setupModelEnv(`gemini/eval-custom-${ns}`, false, projectId);
       expect(env.X_LITELLM_api_key).toBe(`sk-gemini-org-${ns}`);
     });
 

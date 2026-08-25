@@ -100,8 +100,7 @@ function renderView({
 }
 
 /** The frame drawn around the turn under review, if there is one. */
-const focusedFrames = () =>
-  document.querySelectorAll('[data-focused-turn="true"]');
+const focusedFrames = () => document.querySelectorAll('[data-focused-turn="true"]');
 
 /** The turn under review, while it is blinking. */
 const blinkingTurns = () =>
@@ -217,11 +216,7 @@ describe("given the thread is still laying out when the reader arrives", () => {
     cleanup();
     vi.useRealTimers();
     if (originalOffsetTop) {
-      Object.defineProperty(
-        HTMLElement.prototype,
-        "offsetTop",
-        originalOffsetTop,
-      );
+      Object.defineProperty(HTMLElement.prototype, "offsetTop", originalOffsetTop);
     } else {
       Reflect.deleteProperty(HTMLElement.prototype, "offsetTop");
     }
@@ -238,16 +233,12 @@ describe("given the thread is still laying out when the reader arrives", () => {
     restIsOver();
 
     expect(scrollTo).toHaveBeenCalledTimes(1);
-    expect(scrollTo).toHaveBeenLastCalledWith(
-      expect.objectContaining({ top: 100 }),
-    );
+    expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ top: 100 }));
 
     mockOffsetTop = 420;
     advance(120);
 
-    expect(scrollTo).toHaveBeenLastCalledWith(
-      expect.objectContaining({ top: 420 }),
-    );
+    expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ top: 420 }));
 
     advance(3000);
     const settledCalls = scrollTo.mock.calls.length;

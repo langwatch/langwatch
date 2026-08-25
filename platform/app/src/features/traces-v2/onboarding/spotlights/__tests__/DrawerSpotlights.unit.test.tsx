@@ -4,13 +4,7 @@
  * Unit tests for the show-once drawer spotlight queue.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -98,9 +92,7 @@ describe("<DrawerSpotlights />", () => {
           expect(screen.getByText("Input & output")).toBeInTheDocument(),
         );
         expect(mockMarkDrawerSpotlightSeen).toHaveBeenCalledWith("drawer-io");
-        expect(mockMarkDrawerSpotlightSeen).not.toHaveBeenCalledWith(
-          "drawer-events",
-        );
+        expect(mockMarkDrawerSpotlightSeen).not.toHaveBeenCalledWith("drawer-events");
       });
     });
 
@@ -112,25 +104,17 @@ describe("<DrawerSpotlights />", () => {
         );
         expect(mockMarkDrawerSpotlightSeen).toHaveBeenCalledWith("drawer-io");
         fireEvent.click(nextBtn);
-        await waitFor(() =>
-          expect(screen.getByText("Events")).toBeInTheDocument(),
-        );
-        expect(mockMarkDrawerSpotlightSeen).toHaveBeenCalledWith(
-          "drawer-events",
-        );
+        await waitFor(() => expect(screen.getByText("Events")).toBeInTheDocument());
+        expect(mockMarkDrawerSpotlightSeen).toHaveBeenCalledWith("drawer-events");
       });
 
       it("persists dismissal when the user finishes the final step", async () => {
         renderDrawerSpotlights();
         fireEvent.click(
-          await waitFor(() =>
-            screen.getByRole("button", { name: /next spotlight/i }),
-          ),
+          await waitFor(() => screen.getByRole("button", { name: /next spotlight/i })),
         );
         fireEvent.click(
-          await waitFor(() =>
-            screen.getByRole("button", { name: /finish tour/i }),
-          ),
+          await waitFor(() => screen.getByRole("button", { name: /finish tour/i })),
         );
 
         expect(mockPersistDismissal).toHaveBeenCalledOnce();
@@ -145,13 +129,9 @@ describe("<DrawerSpotlights />", () => {
         );
         fireEvent.click(dismissBtn);
         await waitFor(() =>
-          expect(
-            screen.queryByTestId("spotlight-popover"),
-          ).not.toBeInTheDocument(),
+          expect(screen.queryByTestId("spotlight-popover")).not.toBeInTheDocument(),
         );
-        expect(mockMarkDrawerSpotlightSeen).not.toHaveBeenCalledWith(
-          "drawer-events",
-        );
+        expect(mockMarkDrawerSpotlightSeen).not.toHaveBeenCalledWith("drawer-events");
         expect(mockPersistDismissal).toHaveBeenCalledOnce();
       });
     });
@@ -164,9 +144,7 @@ describe("<DrawerSpotlights />", () => {
         );
         fireEvent.keyDown(window, { key: "Escape" });
         await waitFor(() =>
-          expect(
-            screen.queryByTestId("spotlight-popover"),
-          ).not.toBeInTheDocument(),
+          expect(screen.queryByTestId("spotlight-popover")).not.toBeInTheDocument(),
         );
         expect(mockPersistDismissal).toHaveBeenCalledOnce();
       });
@@ -183,9 +161,7 @@ describe("<DrawerSpotlights />", () => {
     describe("when the drawer mounts", () => {
       it("shows only the Events spotlight", async () => {
         renderDrawerSpotlights();
-        await waitFor(() =>
-          expect(screen.getByText("Events")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByText("Events")).toBeInTheDocument());
         expect(screen.queryByText("Input & output")).not.toBeInTheDocument();
       });
     });
@@ -202,9 +178,7 @@ describe("<DrawerSpotlights />", () => {
       it("renders nothing", async () => {
         renderDrawerSpotlights();
         await new Promise((r) => setTimeout(r, 25));
-        expect(
-          screen.queryByTestId("spotlight-popover"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("spotlight-popover")).not.toBeInTheDocument();
         expect(mockMarkDrawerSpotlightSeen).not.toHaveBeenCalled();
       });
     });
@@ -220,9 +194,7 @@ describe("<DrawerSpotlights />", () => {
       it("renders no automatic drawer spotlight", async () => {
         renderDrawerSpotlights();
         await new Promise((resolve) => setTimeout(resolve, 25));
-        expect(
-          screen.queryByTestId("spotlight-popover"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("spotlight-popover")).not.toBeInTheDocument();
         expect(mockMarkDrawerSpotlightSeen).not.toHaveBeenCalled();
       });
     });
@@ -233,9 +205,7 @@ describe("<DrawerSpotlights />", () => {
       it("renders nothing and marks nothing seen", async () => {
         renderDrawerSpotlights();
         await new Promise((r) => setTimeout(r, 25));
-        expect(
-          screen.queryByTestId("spotlight-popover"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("spotlight-popover")).not.toBeInTheDocument();
         expect(mockMarkDrawerSpotlightSeen).not.toHaveBeenCalled();
       });
     });

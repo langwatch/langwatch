@@ -69,12 +69,7 @@ function parseArgs(argv) {
    * @returns {string}
    */
   const requireVal = (flag, val) => {
-    if (
-      val === undefined ||
-      valueFlags.has(val) ||
-      val === "--help" ||
-      val === "-h"
-    ) {
+    if (val === undefined || valueFlags.has(val) || val === "--help" || val === "-h") {
       process.stderr.write(`Missing value for ${flag}\n`);
       process.exit(1);
     }

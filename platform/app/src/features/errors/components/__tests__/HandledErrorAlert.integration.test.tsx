@@ -60,9 +60,7 @@ describe("<HandledErrorAlert />", () => {
       });
 
       expect(screen.getByText("This search took too long")).toBeInTheDocument();
-      expect(
-        screen.queryByText("Couldn't load the chart"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Couldn't load the chart")).not.toBeInTheDocument();
     });
 
     /** @scenario "A recognised code is described by the registry, never by the wire" */
@@ -83,9 +81,7 @@ describe("<HandledErrorAlert />", () => {
         fallbackTitle: "Couldn't load the replicas",
       });
 
-      expect(
-        screen.getByText("Couldn't load the replicas"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Couldn't load the replicas")).toBeInTheDocument();
     });
 
     /** @scenario "Remediation reaches the customer when we have nothing better" */
@@ -114,9 +110,7 @@ describe("<HandledErrorAlert />", () => {
       });
 
       expect(
-        screen.getByText(
-          "Narrow the time range or add a filter, then try again.",
-        ),
+        screen.getByText("Narrow the time range or add a filter, then try again."),
       ).toBeInTheDocument();
       expect(
         screen.queryByText("Narrow the time range or add a filter"),
@@ -134,9 +128,7 @@ describe("<HandledErrorAlert />", () => {
         }),
       });
 
-      expect(
-        screen.getByRole("link", { name: /read the docs/i }),
-      ).toHaveAttribute(
+      expect(screen.getByRole("link", { name: /read the docs/i })).toHaveAttribute(
         "href",
         "https://docs.langwatch.ai/errors/query-timeout",
       );

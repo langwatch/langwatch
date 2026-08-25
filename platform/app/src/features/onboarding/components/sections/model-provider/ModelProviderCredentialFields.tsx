@@ -38,10 +38,7 @@ export const ModelProviderCredentialFields: React.FC<
   onOpenAiValidationClear,
   onApiKeyValidationClear,
 }: ModelProviderCredentialFieldsProps) => {
-  const credentialKeys = useMemo(
-    () => Object.keys(displayKeys ?? {}),
-    [displayKeys],
-  );
+  const credentialKeys = useMemo(() => Object.keys(displayKeys ?? {}), [displayKeys]);
 
   if (credentialKeys.length === 0) {
     return null;
@@ -108,9 +105,7 @@ export const ModelProviderCredentialFields: React.FC<
                 ariaLabel={key}
                 invalid={Boolean(fieldErrors[key])}
               />
-              {fieldErrors[key] && (
-                <Field.ErrorText>{fieldErrors[key]}</Field.ErrorText>
-              )}
+              {fieldErrors[key] && <Field.ErrorText>{fieldErrors[key]}</Field.ErrorText>}
             </Field.Root>
           );
         })}

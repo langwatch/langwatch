@@ -69,9 +69,7 @@ function toClickHouseRecord(
   };
 }
 
-export class TraceAnalyticsRollupClickHouseRepository
-  implements TraceAnalyticsRollupRepository
-{
+export class TraceAnalyticsRollupClickHouseRepository implements TraceAnalyticsRollupRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async insertRow(

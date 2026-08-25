@@ -353,8 +353,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
     const rows = await result.json<ClickHouseSummaryRow>();
     const countRows = await countResult.json<{ totalHits: number | string }>();
-    const totalHits =
-      countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
+    const totalHits = countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
 
     return {
       rows: rows.map((row) => this.toTraceSummaryData(row)),
@@ -705,9 +704,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       query_params: params.query.params,
       // Per-query guard (e.g. the key-discovery facets' memory ceiling); absent
       // for facets that don't set one.
-      ...(params.query.settings
-        ? { clickhouse_settings: params.query.settings }
-        : {}),
+      ...(params.query.settings ? { clickhouse_settings: params.query.settings } : {}),
       format: "JSONEachRow",
     });
 
@@ -809,10 +806,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             // Tuple-typed arrayJoin packs every facet into a single row stream.
             // Each (key, expression) pair becomes one (key, value) tuple per row.
             const tupleArray = params.categoricalSpecs
-              .map(
-                (s) =>
-                  `(${this.quoteIdentifier(s.key)}, toString(${s.expression}))`,
-              )
+              .map((s) => `(${this.quoteIdentifier(s.key)}, toString(${s.expression}))`)
               .join(", ");
 
             const query = `
@@ -1147,9 +1141,7 @@ function extractFacetAggregates(r: FacetRow): {
 // (parameterised + aliased per key) over re-introducing the full
 // Attributes Map projection — that read is what this change exists to
 // avoid.
-function buildListAttributes(
-  row: ClickHouseSummaryRow,
-): Record<string, string> {
+function buildListAttributes(row: ClickHouseSummaryRow): Record<string, string> {
   const attributes: Record<string, string> = {};
   if (row.AttrSpanName) attributes["langwatch.span.name"] = row.AttrSpanName;
   if (row.AttrServiceName) attributes["service.name"] = row.AttrServiceName;
@@ -1165,26 +1157,22 @@ function buildListAttributes(
   // the "Cache read" / "Cache write" / reasoning rows (the raw per-span
   // gen_ai.usage.cache_* values never reach the trace attribute map).
   if (row.AttrCacheReadTokens) {
-    attributes["langwatch.reserved.cache_read_tokens"] =
-      row.AttrCacheReadTokens;
+    attributes["langwatch.reserved.cache_read_tokens"] = row.AttrCacheReadTokens;
   }
   if (row.AttrInputMediaRefs) {
     attributes["langwatch.reserved.media_refs.input"] = row.AttrInputMediaRefs;
   }
   if (row.AttrOutputMediaRefs) {
-    attributes["langwatch.reserved.media_refs.output"] =
-      row.AttrOutputMediaRefs;
+    attributes["langwatch.reserved.media_refs.output"] = row.AttrOutputMediaRefs;
   }
   if (row.AttrCacheCreationTokens) {
-    attributes["langwatch.reserved.cache_creation_tokens"] =
-      row.AttrCacheCreationTokens;
+    attributes["langwatch.reserved.cache_creation_tokens"] = row.AttrCacheCreationTokens;
   }
   if (row.AttrReasoningTokens) {
     attributes["langwatch.reserved.reasoning_tokens"] = row.AttrReasoningTokens;
   }
   if (row.AttrContextSizeTokens) {
-    attributes["langwatch.reserved.context_size_tokens"] =
-      row.AttrContextSizeTokens;
+    attributes["langwatch.reserved.context_size_tokens"] = row.AttrContextSizeTokens;
   }
   // JSON-encoded array of trace labels (e.g. '["prod","beta"]'). Preserve the
   // raw string here because TraceSummaryData.attributes is string-valued; the

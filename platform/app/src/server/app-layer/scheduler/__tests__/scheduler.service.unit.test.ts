@@ -3,10 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computeNextRunAt } from "../nextRunAt";
 import { SchedulerRegistry } from "../scheduler.registry";
 import { SchedulerService } from "../scheduler.service";
-import type {
-  ScheduledJobRecord,
-  ScheduledJobStore,
-} from "../scheduler.types";
+import type { ScheduledJobRecord, ScheduledJobStore } from "../scheduler.types";
 
 // The abandon path must be OBSERVABLE — assert captureException fires.
 const captureException = vi.fn();
@@ -45,9 +42,7 @@ function makeLogger(): { logger: Logger; error: ReturnType<typeof vi.fn> } {
   return { logger, error };
 }
 
-function makeJob(
-  overrides: Partial<ScheduledJobRecord> = {},
-): ScheduledJobRecord {
+function makeJob(overrides: Partial<ScheduledJobRecord> = {}): ScheduledJobRecord {
   return {
     id: "job-1",
     projectId: "project-1",
@@ -108,10 +103,7 @@ function makeRepo(job: ScheduledJobRecord): {
   return { repo, settleClaim, claim };
 }
 
-async function waitFor(
-  predicate: () => boolean,
-  timeoutMs = 2_000,
-): Promise<void> {
+async function waitFor(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) return;
@@ -197,9 +189,7 @@ describe("SchedulerService lease-and-retry (ADR-044 P1)", () => {
         // Retried, NOT abandoned: the calendar did NOT jump to the next cron
         // instant — it re-armed a near-future backoff instead.
         expect(settle.nextRunAt.getTime()).not.toBe(NEXT_CRON.getTime());
-        expect(settle.nextRunAt.getTime()).toBeLessThan(
-          Date.now() + 5 * 60_000,
-        );
+        expect(settle.nextRunAt.getTime()).toBeLessThan(Date.now() + 5 * 60_000);
         expect(settle.nextRunAt.getTime()).toBeGreaterThan(Date.now() - 1_000);
 
         // lastSlot NOT advanced past the slot → the slot is still "undelivered".
@@ -363,13 +353,9 @@ describe("SchedulerService lease-and-retry (ADR-044 P1)", () => {
       let job = { ...initial };
       const repo: ScheduledJobStore = {
         findDue: vi.fn(async ({ now }: { now: Date }) =>
-          job.active && job.nextRunAt.getTime() <= now.getTime()
-            ? [{ ...job }]
-            : [],
+          job.active && job.nextRunAt.getTime() <= now.getTime() ? [{ ...job }] : [],
         ),
-        earliestActiveNextRunAt: vi.fn(async () =>
-          job.active ? job.nextRunAt : null,
-        ),
+        earliestActiveNextRunAt: vi.fn(async () => (job.active ? job.nextRunAt : null)),
         claim: vi.fn(
           async ({
             expectedNextRunAt,

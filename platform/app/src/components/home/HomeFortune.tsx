@@ -25,9 +25,7 @@ const FORTUNES: string[] = [
 
 export function HomeFortune() {
   const reduceMotion = useReducedMotion();
-  const [index, setIndex] = useState(() =>
-    Math.floor(Math.random() * FORTUNES.length),
-  );
+  const [index, setIndex] = useState(() => Math.floor(Math.random() * FORTUNES.length));
 
   const reroll = () =>
     setIndex((current) => {
@@ -81,18 +79,11 @@ export function HomeFortune() {
             blurred and lifted for a beat, then sharp. */}
         <motion.div
           key={index}
-          initial={
-            reduceMotion ? false : { opacity: 0, y: 6, filter: "blur(4px)" }
-          }
+          initial={reduceMotion ? false : { opacity: 0, y: 6, filter: "blur(4px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.35, ease: "easeOut" }}
         >
-          <Text
-            fontFamily="mono"
-            fontSize="12px"
-            color="fg.muted"
-            lineHeight="1.6"
-          >
+          <Text fontFamily="mono" fontSize="12px" color="fg.muted" lineHeight="1.6">
             {FORTUNES[index]}
           </Text>
         </motion.div>

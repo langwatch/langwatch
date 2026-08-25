@@ -38,8 +38,7 @@ type PresentScopeId = { tier: BindingScopeTier; id: string };
 /** Widest tier last, matching BINDING_SCOPE_TIERS' most-specific-first order. */
 function widestOf(entries: readonly PresentScopeId[]): PresentScopeId {
   return [...entries].sort(
-    (a, b) =>
-      BINDING_SCOPE_TIERS.indexOf(b.tier) - BINDING_SCOPE_TIERS.indexOf(a.tier),
+    (a, b) => BINDING_SCOPE_TIERS.indexOf(b.tier) - BINDING_SCOPE_TIERS.indexOf(a.tier),
   )[0]!;
 }
 

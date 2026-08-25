@@ -2,14 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 
@@ -105,9 +98,7 @@ describe("EditModeBar", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-        expect(
-          screen.queryByText("Discard trace corrections?"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText("Discard trace corrections?")).not.toBeInTheDocument();
         expect(useDrawerStore.getState().isEditing).toBe(false);
         expect(useTraceEditStore.getState().editingTraceId).toBeNull();
       });
@@ -121,9 +112,7 @@ describe("EditModeBar", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-        expect(
-          screen.queryByText("Discard trace corrections?"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText("Discard trace corrections?")).not.toBeInTheDocument();
         expect(useDrawerStore.getState().isEditing).toBe(false);
       });
     });
@@ -184,9 +173,7 @@ describe("EditModeBar", () => {
       it("reports one changed field and one deleted span", () => {
         renderBar();
 
-        expect(
-          screen.getByText("1 field changed, 1 span deleted"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("1 field changed, 1 span deleted")).toBeInTheDocument();
       });
     });
 
@@ -354,9 +341,7 @@ describe("EditModeBar", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-        expect(
-          await screen.findByText("Discard trace corrections?"),
-        ).toBeInTheDocument();
+        expect(await screen.findByText("Discard trace corrections?")).toBeInTheDocument();
         expect(
           screen.getByText(
             "Your corrections to this trace have not been saved. Comments are saved as you write them and are not discarded.",
@@ -370,9 +355,7 @@ describe("EditModeBar", () => {
         renderBar();
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-        fireEvent.click(
-          await screen.findByRole("button", { name: "Keep annotating" }),
-        );
+        fireEvent.click(await screen.findByRole("button", { name: "Keep annotating" }));
 
         expect(useDrawerStore.getState().isEditing).toBe(true);
         expect(useTraceEditStore.getState().spanDrafts["span-1"]?.name).toBe(

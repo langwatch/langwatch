@@ -16,10 +16,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-} from "../RunHistoryFilters";
+import { RunHistoryFilters, type RunHistoryFilterValues } from "../RunHistoryFilters";
 import { ScenarioRunExportDialog } from "../ScenarioRunExportDialog";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -76,9 +73,7 @@ describe("<ScenarioRunExportDialog/> and its trigger", () => {
       const user = userEvent.setup();
       render(<ExportSurface runCount={1234} />, { wrapper: Wrapper });
 
-      expect(
-        screen.queryByText("Export Scenario Runs"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Export Scenario Runs")).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /export csv/i }));
 
@@ -102,9 +97,7 @@ describe("<ScenarioRunExportDialog/> and its trigger", () => {
       expect(screen.getByText("Full")).toBeInTheDocument();
       expect(screen.getByText(/one row per message/i)).toBeInTheDocument();
       expect(screen.getByText("Criteria")).toBeInTheDocument();
-      expect(
-        screen.getByText(/one row per checklist item/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/one row per checklist item/i)).toBeInTheDocument();
     });
 
     it("exports in the depth that was chosen", async () => {
@@ -140,9 +133,7 @@ describe("<ScenarioRunExportDialog/> and its trigger", () => {
     it("renders the button disabled", () => {
       render(<ExportSurface runCount={0} />, { wrapper: Wrapper });
 
-      expect(
-        screen.getByRole("button", { name: /export csv/i }),
-      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: /export csv/i })).toBeDisabled();
     });
 
     it("leaves it clickable as soon as there are runs", () => {
@@ -177,12 +168,8 @@ describe("<ScenarioRunExportDialog/> and its trigger", () => {
       expect(
         screen.queryByRole("button", { name: /export csv/i }),
       ).not.toBeInTheDocument();
-      expect(
-        screen.getByText(/exporting 1,200 of 5,000 runs/i),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /cancel/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/exporting 1,200 of 5,000 runs/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
     });
 
     /** @scenario Cancelling an in-flight export stops it */

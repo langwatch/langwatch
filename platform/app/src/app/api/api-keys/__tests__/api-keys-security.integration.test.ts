@@ -71,13 +71,7 @@ describe("Feature: API keys management REST API", () => {
       headers: headersFor(token),
     });
 
-  const createOwnedKey = async ({
-    userId,
-    name,
-  }: {
-    userId: string;
-    name: string;
-  }) =>
+  const createOwnedKey = async ({ userId, name }: { userId: string; name: string }) =>
     apiKeyService.create({
       name,
       userId,
@@ -441,9 +435,7 @@ describe("Feature: API keys management REST API", () => {
       const res = await post(adminToken, {
         keyType: "personal",
         name,
-        bindings: [
-          { role: "ADMIN", scopeType: "TEAM", scopeId: personalTeam.id },
-        ],
+        bindings: [{ role: "ADMIN", scopeType: "TEAM", scopeId: personalTeam.id }],
       });
 
       expect(res.status).toBe(403);
@@ -510,9 +502,7 @@ describe("Feature: API keys management REST API", () => {
           callerUserId: adminUserId,
           callerIsAdmin: true,
           organizationId: testOrganization.id,
-          bindings: [
-            { role: "ADMIN", scopeType: "TEAM", scopeId: personalTeam.id },
-          ],
+          bindings: [{ role: "ADMIN", scopeType: "TEAM", scopeId: personalTeam.id }],
         }),
       ).rejects.toMatchObject({
         code: "personal_workspace_not_managed_here",

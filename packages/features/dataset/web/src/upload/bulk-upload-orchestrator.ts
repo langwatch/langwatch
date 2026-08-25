@@ -43,9 +43,8 @@ export async function runWithConcurrency<T>(
     await worker(items[index]!, index);
     return pump();
   };
-  const lanes = Array.from(
-    { length: Math.max(1, Math.min(cap, items.length)) },
-    () => pump(),
+  const lanes = Array.from({ length: Math.max(1, Math.min(cap, items.length)) }, () =>
+    pump(),
   );
   await Promise.all(lanes);
 }
@@ -121,9 +120,7 @@ export async function uploadSingleFile(
     try {
       await deps.putFileToPresignedUrl(uploadUrl, file, signal);
     } catch (error) {
-      await deps
-        .abortPendingUpload({ projectId, datasetId })
-        .catch(() => undefined);
+      await deps.abortPendingUpload({ projectId, datasetId }).catch(() => undefined);
       throw error;
     }
 

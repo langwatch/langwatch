@@ -9,9 +9,7 @@ export interface SpanWithChildren extends SpanTreeNode {
  * twice: first to seed every node, then to attach children to their
  * parent. Orphans (parent missing from the input set) stay as roots.
  */
-export function buildSpanTree(
-  spans: SpanTreeNode[],
-): Record<string, SpanWithChildren> {
+export function buildSpanTree(spans: SpanTreeNode[]): Record<string, SpanWithChildren> {
   const lookup: Record<string, SpanWithChildren> = {};
   for (const span of spans) {
     lookup[span.spanId] = { ...span, children: [] };

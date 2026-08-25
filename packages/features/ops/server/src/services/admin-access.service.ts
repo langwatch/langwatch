@@ -30,5 +30,4 @@ export class AdminAccessService implements AdminAccess {
     if (!identity.email) return false;
     return this.normalizedEmails.includes(identity.email.trim().toLowerCase());
   }
-
 }

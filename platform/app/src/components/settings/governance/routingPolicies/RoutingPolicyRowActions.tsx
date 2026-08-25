@@ -24,11 +24,7 @@ export function RoutingPolicyRowActions({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Button
-          size="xs"
-          variant="ghost"
-          aria-label={`Actions for ${policyName}`}
-        >
+        <Button size="xs" variant="ghost" aria-label={`Actions for ${policyName}`}>
           <MoreVertical size={14} />
         </Button>
       </Menu.Trigger>

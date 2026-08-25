@@ -14,10 +14,8 @@ import type { PromptConfigFormValues } from "~/prompts/types";
 export const getSaveBlockerMessage = (
   methods: UseFormReturn<PromptConfigFormValues>,
 ): string => {
-  const messagesError = methods.formState.errors.version?.configData
-    ?.messages as { message?: string } | undefined;
-  return (
-    messagesError?.message ??
-    "Please fix the configuration errors before saving"
-  );
+  const messagesError = methods.formState.errors.version?.configData?.messages as
+    | { message?: string }
+    | undefined;
+  return messagesError?.message ?? "Please fix the configuration errors before saving";
 };

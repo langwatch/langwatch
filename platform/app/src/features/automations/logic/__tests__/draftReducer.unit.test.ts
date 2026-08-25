@@ -24,9 +24,7 @@ import {
 } from "../draftReducer";
 
 const emailWith = (members: string[]): EmailSlice => ({
-  ...(CLIENT_PROVIDERS[
-    TriggerAction.SEND_EMAIL
-  ].client.initialSlice() as EmailSlice),
+  ...(CLIENT_PROVIDERS[TriggerAction.SEND_EMAIL].client.initialSlice() as EmailSlice),
   members,
 });
 
@@ -52,8 +50,7 @@ describe("draftReducer", () => {
       expect(next.action).toBe(TriggerAction.SEND_SLACK_MESSAGE);
       // The email slice we set is still intact — switching type doesn't wipe it.
       expect(
-        (next.slices[TriggerAction.SEND_EMAIL] as { members: string[] })
-          .members,
+        (next.slices[TriggerAction.SEND_EMAIL] as { members: string[] }).members,
       ).toEqual(["a@acme.test"]);
       expect(next.name).toBe("High latency");
     });
@@ -361,8 +358,7 @@ describe("SET_FILTER_QUERY", () => {
       value: "status:error",
     });
     expect(
-      reducer(withQuery, { type: "SET_SOURCE", value: "customGraph" })
-        .filterQuery,
+      reducer(withQuery, { type: "SET_SOURCE", value: "customGraph" }).filterQuery,
     ).toBeNull();
   });
 
@@ -373,9 +369,9 @@ describe("SET_FILTER_QUERY", () => {
     });
     // A trace-query report is scoped by exactly this query — clearing it here
     // left the report sending the newest traces instead of the matching ones.
-    expect(
-      reducer(withQuery, { type: "SET_SOURCE", value: "report" }).filterQuery,
-    ).toBe("status:error");
+    expect(reducer(withQuery, { type: "SET_SOURCE", value: "report" }).filterQuery).toBe(
+      "status:error",
+    );
   });
 });
 
@@ -433,9 +429,7 @@ describe("extractGraphAlertFromTriggerRow", () => {
   });
 
   it("falls back to defaults for a malformed row", () => {
-    expect(extractGraphAlertFromTriggerRow(null)).toEqual(
-      INITIAL_GRAPH_ALERT_DRAFT,
-    );
+    expect(extractGraphAlertFromTriggerRow(null)).toEqual(INITIAL_GRAPH_ALERT_DRAFT);
     expect(
       extractGraphAlertFromTriggerRow({
         operator: "between",
@@ -491,18 +485,16 @@ describe("templatesFromDraft", () => {
 describe("notifyChannel + isNotifyAction", () => {
   it("returns the channel for notify providers and null otherwise", () => {
     expect(notifyChannel(SAMPLE)).toBe("email");
-    expect(
-      notifyChannel({ ...SAMPLE, action: TriggerAction.SEND_SLACK_MESSAGE }),
-    ).toBe("slack");
-    expect(
-      notifyChannel({ ...SAMPLE, action: TriggerAction.ADD_TO_DATASET }),
-    ).toBeNull();
+    expect(notifyChannel({ ...SAMPLE, action: TriggerAction.SEND_SLACK_MESSAGE })).toBe(
+      "slack",
+    );
+    expect(notifyChannel({ ...SAMPLE, action: TriggerAction.ADD_TO_DATASET })).toBeNull();
   });
   it("isNotifyAction agrees", () => {
     expect(isNotifyAction(SAMPLE)).toBe(true);
-    expect(
-      isNotifyAction({ ...SAMPLE, action: TriggerAction.ADD_TO_DATASET }),
-    ).toBe(false);
+    expect(isNotifyAction({ ...SAMPLE, action: TriggerAction.ADD_TO_DATASET })).toBe(
+      false,
+    );
     expect(isNotifyAction({ ...SAMPLE, action: null })).toBe(false);
   });
 });

@@ -1,8 +1,5 @@
 import type { AppendStore } from "@langwatch/eventing";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import {
   type EvaluationCompletedEvent,
   type EvaluationReportedEvent,
@@ -114,11 +111,7 @@ function scoreOf({
   scoreSum: number;
   scoreCount: number;
 } {
-  if (
-    status !== "processed" ||
-    typeof score !== "number" ||
-    !Number.isFinite(score)
-  ) {
+  if (status !== "processed" || typeof score !== "number" || !Number.isFinite(score)) {
     return { scoreSum: 0, scoreCount: 0 };
   }
   return { scoreSum: score, scoreCount: 1 };
@@ -162,10 +155,7 @@ export class EvaluationAnalyticsRollupMapProjection
     typeof evaluationRollupEvents
   >
   implements
-    MapEventHandlers<
-      typeof evaluationRollupEvents,
-      EvaluationAnalyticsRollupRow
-    >
+    MapEventHandlers<typeof evaluationRollupEvents, EvaluationAnalyticsRollupRow>
 {
   readonly name = "evaluationAnalyticsRollup";
   readonly store: AppendStore<EvaluationAnalyticsRollupRow>;
@@ -187,9 +177,7 @@ export class EvaluationAnalyticsRollupMapProjection
     this.store = deps.store;
   }
 
-  mapEvaluationCompleted(
-    event: EvaluationCompletedEvent,
-  ): EvaluationAnalyticsRollupRow {
+  mapEvaluationCompleted(event: EvaluationCompletedEvent): EvaluationAnalyticsRollupRow {
     const { score, passed, status } = event.data;
     const { scoreSum, scoreCount } = scoreOf({ status, score });
     const { passCount, failCount } = passFailOf({ status, passed });
@@ -215,9 +203,7 @@ export class EvaluationAnalyticsRollupMapProjection
     };
   }
 
-  mapEvaluationReported(
-    event: EvaluationReportedEvent,
-  ): EvaluationAnalyticsRollupRow {
+  mapEvaluationReported(event: EvaluationReportedEvent): EvaluationAnalyticsRollupRow {
     const { score, passed, status, evaluatorType } = event.data;
     const { scoreSum, scoreCount } = scoreOf({ status, score });
     const { passCount, failCount } = passFailOf({ status, passed });

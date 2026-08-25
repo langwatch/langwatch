@@ -35,10 +35,8 @@ export const LANGY_CONVERSATION_EVENT_TYPES = {
   // opaque, worker-authored resume token for the next turn to pick up
   // (CONVERSATION_HANDOFF_PENDING); the next turn threaded it to a fresh worker
   // and cleared it (CONVERSATION_HANDOFF_CONSUMED).
-  CONVERSATION_HANDOFF_PENDING:
-    "lw.langy_conversation.conversation_handoff_pending",
-  CONVERSATION_HANDOFF_CONSUMED:
-    "lw.langy_conversation.conversation_handoff_consumed",
+  CONVERSATION_HANDOFF_PENDING: "lw.langy_conversation.conversation_handoff_pending",
+  CONVERSATION_HANDOFF_CONSUMED: "lw.langy_conversation.conversation_handoff_consumed",
   // An auto title produced at the first successful agent-response boundary.
   // Distinct from METADATA_UPDATED (a manual, sticky rename): a title_generated
   // event updates the title ONLY when it has not been set by the user.

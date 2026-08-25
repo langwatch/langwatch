@@ -22,13 +22,9 @@ export abstract class AuthzCompatibilityLedgerPort {
     args: AuthzAttachBindingsInput,
   ): Promise<AuthzAttachBindingsOutput>;
 
-  abstract attachResourceGrant(
-    args: AuthzAttachResourceGrantInput,
-  ): Promise<void>;
+  abstract attachResourceGrant(args: AuthzAttachResourceGrantInput): Promise<void>;
 
-  abstract revokeResourceGrants(
-    args: AuthzRevokeResourceGrantsInput,
-  ): Promise<void>;
+  abstract revokeResourceGrants(args: AuthzRevokeResourceGrantsInput): Promise<void>;
 
   abstract changeBindingRole(args: AuthzChangeBindingRoleInput): Promise<void>;
 

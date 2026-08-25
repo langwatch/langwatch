@@ -92,10 +92,7 @@ export function selectionToAudience(values: string[]): AudienceFormState {
  * other group, so picking it replaces the whole selection, and picking
  * anything narrower drops it.
  */
-export function applyAudienceSelection(
-  previous: string[],
-  next: string[],
-): string[] {
+export function applyAudienceSelection(previous: string[], next: string[]): string[] {
   const pickedAllMembers =
     next.includes(ALL_MEMBERS_VALUE) && !previous.includes(ALL_MEMBERS_VALUE);
   if (pickedAllMembers) return [ALL_MEMBERS_VALUE];
@@ -143,8 +140,7 @@ export function validCustomAttributeRows(
   return rows
     .map((row) => ({ ...row, pattern: row.pattern.trim() }))
     .filter(
-      (row) =>
-        row.pattern.length > 0 && row.pattern.replaceAll("*", "").length > 0,
+      (row) => row.pattern.length > 0 && row.pattern.replaceAll("*", "").length > 0,
     );
 }
 
@@ -273,9 +269,7 @@ export function inheritedBaselineForScope({
   effectiveOrganization: ResolvedDataPrivacy | null;
 }): ResolvedDataPrivacy {
   if (scopeType === "PROJECT") {
-    return (
-      effectiveTeam ?? effectiveOrganization ?? PLATFORM_DEFAULT_DATA_PRIVACY
-    );
+    return effectiveTeam ?? effectiveOrganization ?? PLATFORM_DEFAULT_DATA_PRIVACY;
   }
   if (scopeType === "TEAM" || scopeType === "DEPARTMENT") {
     return effectiveOrganization ?? PLATFORM_DEFAULT_DATA_PRIVACY;
@@ -318,11 +312,7 @@ export function configToFormState(config: DataPrivacyConfig): RuleFormState {
     piiChoice: config.pii?.level ?? "inherit",
     piiEntities: [...(config.pii?.entities ?? [])],
     piiExceptPatterns: [...(config.pii?.exceptPatterns ?? [])],
-    secretsChoice: config.secrets
-      ? config.secrets.enabled
-        ? "on"
-        : "off"
-      : "inherit",
+    secretsChoice: config.secrets ? (config.secrets.enabled ? "on" : "off") : "inherit",
     secretsPatterns: [...(config.secrets?.customPatterns ?? [])],
     customAttributes: (config.customAttributes ?? []).map((rule) => ({
       pattern: rule.pattern,
@@ -369,36 +359,26 @@ export function ruleSummary(config: DataPrivacyConfig): string {
   const attributeRules = config.customAttributes?.length ?? 0;
   if (attributeRules > 0) {
     parts.push(
-      attributeRules === 1
-        ? "1 attribute rule"
-        : `${attributeRules} attribute rules`,
+      attributeRules === 1 ? "1 attribute rule" : `${attributeRules} attribute rules`,
     );
   }
   if (config.pii) {
     if (config.pii.level === "custom") {
       const count = config.pii.entities?.length ?? 0;
-      parts.push(
-        count === 1 ? "Custom PII (1 type)" : `Custom PII (${count} types)`,
-      );
+      parts.push(count === 1 ? "Custom PII (1 type)" : `Custom PII (${count} types)`);
     } else {
       parts.push(PII_SUMMARY_LABELS[config.pii.level]);
     }
     const exceptions = config.pii.exceptPatterns?.length ?? 0;
     if (exceptions > 0) {
-      parts.push(
-        exceptions === 1 ? "1 PII exception" : `${exceptions} PII exceptions`,
-      );
+      parts.push(exceptions === 1 ? "1 PII exception" : `${exceptions} PII exceptions`);
     }
   }
   if (config.secrets) {
-    parts.push(
-      config.secrets.enabled ? "Secrets redaction" : "Secrets redaction off",
-    );
+    parts.push(config.secrets.enabled ? "Secrets redaction" : "Secrets redaction off");
     const patterns = config.secrets.customPatterns?.length ?? 0;
     if (patterns > 0) {
-      parts.push(
-        patterns === 1 ? "1 secret pattern" : `${patterns} secret patterns`,
-      );
+      parts.push(patterns === 1 ? "1 secret pattern" : `${patterns} secret patterns`);
     }
   }
   return parts.length > 0 ? parts.join(" · ") : "Inherits everything";
@@ -414,20 +394,14 @@ export function isEmptyRuleConfig(config: DataPrivacyConfig): boolean {
  * edit: the button enables only when the built config differs from the rule it
  * is editing.
  */
-export function configsEqual(
-  a: DataPrivacyConfig,
-  b: DataPrivacyConfig,
-): boolean {
+export function configsEqual(a: DataPrivacyConfig, b: DataPrivacyConfig): boolean {
   const canonical = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(canonical);
     if (value && typeof value === "object") {
       return Object.fromEntries(
         Object.keys(value as Record<string, unknown>)
           .sort()
-          .map((key) => [
-            key,
-            canonical((value as Record<string, unknown>)[key]),
-          ]),
+          .map((key) => [key, canonical((value as Record<string, unknown>)[key])]),
       );
     }
     return value;

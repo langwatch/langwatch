@@ -13,10 +13,7 @@ import { parseIssuerUrl } from "../src/adapters/better-auth.better-auth.adapter"
 describe("parseIssuerUrl", () => {
   describe("when given a URL with https scheme", () => {
     it("parses without modification", () => {
-      const url = parseIssuerUrl(
-        "https://tenant.us.auth0.com/",
-        "auth0Issuer",
-      );
+      const url = parseIssuerUrl("https://tenant.us.auth0.com/", "auth0Issuer");
       expect(url.host).toBe("tenant.us.auth0.com");
       expect(url.protocol).toBe("https:");
     });
@@ -45,15 +42,13 @@ describe("parseIssuerUrl", () => {
 
   describe("when given a genuinely unparseable input", () => {
     it("throws a descriptive error mentioning the env var name", () => {
-      expect(() =>
-        parseIssuerUrl("not a url at all !!!", "auth0Issuer"),
-      ).toThrow(/Invalid auth0Issuer.*not a url at all/);
+      expect(() => parseIssuerUrl("not a url at all !!!", "auth0Issuer")).toThrow(
+        /Invalid auth0Issuer.*not a url at all/,
+      );
     });
 
     it("includes a hint about the expected format", () => {
-      expect(() => parseIssuerUrl("@@@", "oktaIssuer")).toThrow(
-        /tenant\.us\.auth0\.com/,
-      );
+      expect(() => parseIssuerUrl("@@@", "oktaIssuer")).toThrow(/tenant\.us\.auth0\.com/);
     });
   });
 });

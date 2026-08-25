@@ -11,22 +11,11 @@ import {
 } from "react";
 import { formatDurationSeconds } from "@langwatch/coding-agent-web";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
-import {
-  formatCost,
-  formatDuration,
-  formatTokens,
-} from "../../../utils/formatters";
-import {
-  type CacheRebuildEvent,
-  findCacheRebuilds,
-} from "../sessionView/tokenTimeline";
+import { formatCost, formatDuration, formatTokens } from "../../../utils/formatters";
+import { type CacheRebuildEvent, findCacheRebuilds } from "../sessionView/tokenTimeline";
 import { toolResultBodyToString } from "../transcript";
 import { classifyPromptText } from "./injectedNotice";
-import {
-  CLAUDE_MARK_GRADIENT,
-  TERMINAL_FONT_STACK,
-  TERMINAL_TOKENS,
-} from "./palette";
+import { CLAUDE_MARK_GRADIENT, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./palette";
 import { SyntaxHighlightedCode } from "./SyntaxHighlightedCode";
 import type { SessionBanner } from "./sessionBanner";
 import type { TurnDivider } from "./sessionScrollback";
@@ -113,9 +102,7 @@ const CONTEXT_HEAT_BANDS = [
 function contextHeatBand(
   contextTokens: number,
 ): (typeof CONTEXT_HEAT_BANDS)[number] | null {
-  return (
-    CONTEXT_HEAT_BANDS.find((band) => contextTokens >= band.minTokens) ?? null
-  );
+  return CONTEXT_HEAT_BANDS.find((band) => contextTokens >= band.minTokens) ?? null;
 }
 
 /** A note inserted into the transcript at a model call, not a beat of its own. */
@@ -434,17 +421,13 @@ export const TerminalView = memo(function TerminalView({
   const screenRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const setRowRef = useCallback(
-    (fullIndex: number, node: HTMLDivElement | null) => {
-      if (node) rowRefs.current.set(fullIndex, node);
-      else rowRefs.current.delete(fullIndex);
-    },
-    [],
-  );
+  const setRowRef = useCallback((fullIndex: number, node: HTMLDivElement | null) => {
+    if (node) rowRefs.current.set(fullIndex, node);
+    else rowRefs.current.delete(fullIndex);
+  }, []);
 
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const [trackedFullIndex, setTrackedFullIndex] =
-    useState(lastVisibleFullIndex);
+  const [trackedFullIndex, setTrackedFullIndex] = useState(lastVisibleFullIndex);
 
   // What the screen measured last, so a prepend can be told apart from a
   // resize and undone by exactly the height that arrived above the reader.
@@ -468,9 +451,7 @@ export const TerminalView = memo(function TerminalView({
       const node = rowRefs.current.get(fullIndex);
       const rowKey = node?.dataset.rowKey;
       anchorRef.current =
-        node && rowKey
-          ? { rowKey, offsetFromTop: node.offsetTop - el.scrollTop }
-          : null;
+        node && rowKey ? { rowKey, offsetFromTop: node.offsetTop - el.scrollTop } : null;
     },
     [],
   );
@@ -627,8 +608,7 @@ export const TerminalView = memo(function TerminalView({
   // the transcript renders nothing at all (an agent that reported economics
   // and no content), there is no row to stand on and the bar counts the whole
   // loaded window, which is what the message on screen calls real.
-  const barIndex =
-    visibleIndices.length === 0 ? entries.length - 1 : trackedFullIndex;
+  const barIndex = visibleIndices.length === 0 ? entries.length - 1 : trackedFullIndex;
   const point = timeline[barIndex];
   const modelAtScroll = useMemo(
     () => modelAt({ entries, fullIndex: barIndex }) ?? banner?.model ?? null,
@@ -643,12 +623,7 @@ export const TerminalView = memo(function TerminalView({
 
   if (entries.length === 0) {
     return (
-      <VStack
-        align="center"
-        justify="center"
-        height="full"
-        bg={TERMINAL_TOKENS.screenBg}
-      >
+      <VStack align="center" justify="center" height="full" bg={TERMINAL_TOKENS.screenBg}>
         <Text {...CELL} color={TERMINAL_TOKENS.faint}>
           No terminal session recorded for this trace
         </Text>
@@ -657,13 +632,7 @@ export const TerminalView = memo(function TerminalView({
   }
 
   return (
-    <VStack
-      align="stretch"
-      gap={0}
-      height="full"
-      minHeight={0}
-      position="relative"
-    >
+    <VStack align="stretch" gap={0} height="full" minHeight={0} position="relative">
       <Box
         ref={screenRef}
         data-testid="terminal-screen"
@@ -693,8 +662,8 @@ export const TerminalView = memo(function TerminalView({
           />
           {visibleIndices.length === 0 && entries.length > 0 && (
             <Text {...CELL} color={TERMINAL_TOKENS.faint}>
-              This agent reported tokens and timing only: its telemetry carries
-              no conversation content to replay. The totals below are real.
+              This agent reported tokens and timing only: its telemetry carries no
+              conversation content to replay. The totals below are real.
             </Text>
           )}
           {visibleIndices.map((fullIndex) => {
@@ -703,23 +672,15 @@ export const TerminalView = memo(function TerminalView({
               <Fragment key={rowKeys?.[fullIndex] ?? fullIndex}>
                 {divider && <TurnDividerLine divider={divider} />}
                 {contextMarkers.get(fullIndex)?.map((marker, i) => (
-                  <ContextMarkerLine
-                    key={`${fullIndex}-marker-${i}`}
-                    marker={marker}
-                  />
+                  <ContextMarkerLine key={`${fullIndex}-marker-${i}`} marker={marker} />
                 ))}
                 <Box
                   // The row's identity, which the scroll anchor follows across
                   // a prepend that moves every index down.
                   data-row-key={rowKeys?.[fullIndex]}
-                  ref={(node: HTMLDivElement | null) =>
-                    setRowRef(fullIndex, node)
-                  }
+                  ref={(node: HTMLDivElement | null) => setRowRef(fullIndex, node)}
                 >
-                  <EntryLine
-                    entry={entries[fullIndex]!}
-                    toolSpans={toolSpans}
-                  />
+                  <EntryLine entry={entries[fullIndex]!} toolSpans={toolSpans} />
                 </Box>
               </Fragment>
             );
@@ -851,8 +812,7 @@ function columnColoredMark(
     rows: rows.map((row) =>
       [...row].map((char, column) => ({
         text: char,
-        color:
-          columnColors[column] ?? columnColors[columnColors.length - 1] ?? "",
+        color: columnColors[column] ?? columnColors[columnColors.length - 1] ?? "",
       })),
     ),
   };
@@ -962,10 +922,7 @@ const CODEX_MARK: MarkSpec = {
  * can't identify gets a monochrome, armless cousin of the claude creature
  * rather than wearing another agent's badge.
  */
-const AGENT_BANNERS: Record<
-  SessionBanner["agent"],
-  { name: string; mark: MarkSpec }
-> = {
+const AGENT_BANNERS: Record<SessionBanner["agent"], { name: string; mark: MarkSpec }> = {
   claude_code: { name: "Claude Code", mark: claudeGradientMark(MARK_ROWS) },
   claude_cowork: { name: "Claude Cowork", mark: claudeGradientMark(MARK_ROWS) },
   opencode: { name: "opencode", mark: OPENCODE_MARK },
@@ -991,9 +948,7 @@ function TerminalBanner({ banner }: { banner?: SessionBanner }) {
       <AgentMark mark={identity.mark} />
       <VStack align="stretch" gap={0} minWidth={0}>
         <Text {...CELL} color={TERMINAL_TOKENS.screenFg} fontWeight="semibold">
-          {banner.version
-            ? `${identity.name} v${banner.version}`
-            : identity.name}
+          {banner.version ? `${identity.name} v${banner.version}` : identity.name}
         </Text>
         {banner.model && (
           <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate>
@@ -1038,9 +993,7 @@ function ScrollbackTop({
         <TerminalBanner banner={banner} />
         {/* Only worth saying once the reader has walked back far enough to
             wonder whether there is more above them. */}
-        {status === "start" && loadedTurnCount > 1 && (
-          <RuleLine label="session start" />
-        )}
+        {status === "start" && loadedTurnCount > 1 && <RuleLine label="session start" />}
       </>
     );
   }
@@ -1152,25 +1105,14 @@ function TurnDividerLine({ divider }: { divider: TurnDivider }) {
 function RuleLine({ label }: { label: string }) {
   const rule = "─".repeat(400);
   return (
-    <HStack
-      gap={2}
-      align="center"
-      overflow="hidden"
-      color={TERMINAL_TOKENS.faint}
-    >
+    <HStack gap={2} align="center" overflow="hidden" color={TERMINAL_TOKENS.faint}>
       <Text {...CELL} flexShrink={0} aria-hidden>
         ──
       </Text>
       <Text {...CELL} flexShrink={0}>
         {label}
       </Text>
-      <Text
-        {...CELL}
-        flex={1}
-        overflow="hidden"
-        whiteSpace="nowrap"
-        aria-hidden
-      >
+      <Text {...CELL} flex={1} overflow="hidden" whiteSpace="nowrap" aria-hidden>
         {rule}
       </Text>
     </HStack>
@@ -1187,13 +1129,7 @@ function clockTime(atMs: number): string {
 /** The startup mark, drawn from its precomputed per-row color segments. */
 function AgentMark({ mark }: { mark: MarkSpec }) {
   return (
-    <VStack
-      align="flex-start"
-      gap={0}
-      flexShrink={0}
-      aria-hidden
-      userSelect="none"
-    >
+    <VStack align="flex-start" gap={0} flexShrink={0} aria-hidden userSelect="none">
       {mark.rows.map((segments, rowIndex) => (
         <Text
           key={rowIndex}
@@ -1244,9 +1180,7 @@ function EntryLine({
     case "assistant_message":
       return <AssistantLine text={entry.text} />;
     case "tool":
-      return (
-        <ToolCall entry={entry} ran={toolSpans.get(entry.spanId) ?? null} />
-      );
+      return <ToolCall entry={entry} ran={toolSpans.get(entry.spanId) ?? null} />;
     case "tool_rejected":
       return <RejectedLine name={entry.name} reason={entry.reason} />;
     case "note":
@@ -1283,9 +1217,8 @@ function SystemContextLine({ text, chars }: { text: string; chars: number }) {
             minWidth={0}
             textAlign="start"
           >
-            session context: {chars.toLocaleString("en-US")} chars of system
-            prompt and tools{" "}
-            {expanded ? "(click to collapse)" : "(click to expand)"}
+            session context: {chars.toLocaleString("en-US")} chars of system prompt and
+            tools {expanded ? "(click to collapse)" : "(click to expand)"}
           </Text>
         </button>
       </HStack>
@@ -1447,9 +1380,7 @@ function ToolCall({
   // the tool's own `old_string` → `new_string` when that patch isn't there.
   const patch = parsePatchHunks(ran?.diff ?? null);
   const synthesizedDiff =
-    patch === null && isDiffTool(name)
-      ? extractDiffFromToolInput(entry.input)
-      : null;
+    patch === null && isDiffTool(name) ? extractDiffFromToolInput(entry.input) : null;
 
   // Bash stdout / a file's content, as it actually came back — not the capped
   // echo the model was handed. Falls back to the transcript's own output.
@@ -1521,13 +1452,7 @@ function ToolCall({
  * A tool the human turned down. It never ran, so there is no span and no
  * output — only that it was asked for and refused.
  */
-function RejectedLine({
-  name,
-  reason,
-}: {
-  name: string | null;
-  reason: string | null;
-}) {
+function RejectedLine({ name, reason }: { name: string | null; reason: string | null }) {
   const verb = reason === "user_abort" ? "aborted" : "denied";
   return (
     <HStack align="flex-start" gap={2}>
@@ -1559,17 +1484,8 @@ function NoteLine({
         : TERMINAL_TOKENS.faint;
   return (
     <HStack align="flex-start" gap={2}>
-      <Glyph
-        char={level === "error" ? GLYPH.bullet : GLYPH.note}
-        color={color}
-      />
-      <Text
-        {...CELL}
-        color={color}
-        flex={1}
-        minWidth={0}
-        wordBreak="break-word"
-      >
+      <Glyph char={level === "error" ? GLYPH.bullet : GLYPH.note} color={color} />
+      <Text {...CELL} color={color} flex={1} minWidth={0} wordBreak="break-word">
         {text}
       </Text>
     </HStack>
@@ -1596,13 +1512,7 @@ function ContextMarkerLine({ marker }: { marker: ContextMarker }) {
   return (
     <HStack align="flex-start" gap={2}>
       <Glyph char={GLYPH.note} color={color} />
-      <Text
-        {...CELL}
-        color={color}
-        flex={1}
-        minWidth={0}
-        wordBreak="break-word"
-      >
+      <Text {...CELL} color={color} flex={1} minWidth={0} wordBreak="break-word">
         {text}
       </Text>
     </HStack>
@@ -1618,13 +1528,7 @@ function ContextMarkerLine({ marker }: { marker: ContextMarker }) {
 function ResultLine({ children }: { children: React.ReactNode }) {
   return (
     <HStack align="flex-start" gap={2}>
-      <Text
-        {...CELL}
-        whiteSpace="pre"
-        flexShrink={0}
-        userSelect="none"
-        aria-hidden
-      >
+      <Text {...CELL} whiteSpace="pre" flexShrink={0} userSelect="none" aria-hidden>
         {"  "}
       </Text>
       <Glyph char={GLYPH.elbow} color={TERMINAL_TOKENS.faint} />
@@ -1639,15 +1543,7 @@ function ResultLine({ children }: { children: React.ReactNode }) {
  * A leading glyph. Fixed-width and unselectable so copying the screen yields
  * clean text rather than a column of bullets.
  */
-function Glyph({
-  char,
-  color,
-  bold,
-}: {
-  char: string;
-  color: string;
-  bold?: boolean;
-}) {
+function Glyph({ char, color, bold }: { char: string; color: string; bold?: boolean }) {
   return (
     <Text
       {...CELL}
@@ -1677,13 +1573,7 @@ function AsciiBox({ children }: { children: React.ReactNode }) {
         <Text {...CELL} flexShrink={0} aria-hidden>
           ╭
         </Text>
-        <Text
-          {...CELL}
-          overflow="hidden"
-          whiteSpace="nowrap"
-          flex={1}
-          aria-hidden
-        >
+        <Text {...CELL} overflow="hidden" whiteSpace="nowrap" flex={1} aria-hidden>
           {rule}
         </Text>
         <Text {...CELL} flexShrink={0} aria-hidden>
@@ -1711,13 +1601,7 @@ function AsciiBox({ children }: { children: React.ReactNode }) {
         <Text {...CELL} flexShrink={0} aria-hidden>
           ╰
         </Text>
-        <Text
-          {...CELL}
-          overflow="hidden"
-          whiteSpace="nowrap"
-          flex={1}
-          aria-hidden
-        >
+        <Text {...CELL} overflow="hidden" whiteSpace="nowrap" flex={1} aria-hidden>
           {rule}
         </Text>
         <Text {...CELL} flexShrink={0} aria-hidden>
@@ -1781,13 +1665,7 @@ function StatusLine({
           >
             ❯
           </Text>
-          <Text
-            {...CELL}
-            color={TERMINAL_TOKENS.faint}
-            truncate
-            minWidth={0}
-            flex={1}
-          >
+          <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate minWidth={0} flex={1}>
             {sessionName ?? "Untitled session"}
           </Text>
         </HStack>
@@ -1795,12 +1673,7 @@ function StatusLine({
 
       <HStack gap={2} justify="space-between" flexWrap="wrap">
         <HStack gap={2} minWidth={0}>
-          <Text
-            {...CELL}
-            color={TERMINAL_TOKENS.accent}
-            flexShrink={0}
-            aria-hidden
-          >
+          <Text {...CELL} color={TERMINAL_TOKENS.accent} flexShrink={0} aria-hidden>
             ⏵⏵
           </Text>
           <Text {...CELL} color={TERMINAL_TOKENS.faint} flexShrink={0}>
@@ -1811,9 +1684,7 @@ function StatusLine({
           {model && <Stat label={model} />}
           {/* Session-scale time: the clock is anchored at the session's first
               turn, so it runs into hours and reads as a person says it. */}
-          {elapsedMs > 0 && (
-            <Stat label={formatDurationSeconds(elapsedMs / 1000)} />
-          )}
+          {elapsedMs > 0 && <Stat label={formatDurationSeconds(elapsedMs / 1000)} />}
           {tokens !== null && tokens > 0 && (
             <Stat label={`${formatTokens(tokens)} tokens`} />
           )}
@@ -1841,8 +1712,7 @@ export function statusLineCostLabel({
   sessionCostUsd: number | null;
 }): string | null {
   const running = costUsd !== null && costUsd > 0 ? costUsd : null;
-  const session =
-    sessionCostUsd !== null && sessionCostUsd > 0 ? sessionCostUsd : null;
+  const session = sessionCostUsd !== null && sessionCostUsd > 0 ? sessionCostUsd : null;
   if (running === null) return session === null ? null : formatCost(session);
   if (session === null || session <= running + 0.01) {
     return formatCost(running);

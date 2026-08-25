@@ -18,9 +18,7 @@ describe("redaction markers", () => {
         ...ESSENTIAL_PII_ENTITIES,
         SECRET_MARKER_ENTITY,
       ]);
-      expect([...REDACTION_MARKER_ENTITIES].sort()).toEqual(
-        [...expected].sort(),
-      );
+      expect([...REDACTION_MARKER_ENTITIES].sort()).toEqual([...expected].sort());
     });
 
     it("keeps the native essential set a subset of the markers (no native entity is unrenderable)", () => {
@@ -41,9 +39,7 @@ describe("redaction markers", () => {
     });
 
     it("ignores bracketed text that is not a known entity", () => {
-      expect(
-        findRedactionMarkers("[INFO] starting <html> [REDACTED]").size,
-      ).toBe(0);
+      expect(findRedactionMarkers("[INFO] starting <html> [REDACTED]").size).toBe(0);
       expect(hasRedactionMarker("[INFO] nothing here")).toBe(false);
     });
   });

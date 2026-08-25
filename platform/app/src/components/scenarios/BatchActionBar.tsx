@@ -31,12 +31,7 @@ export function BatchActionBar({
         <Text whiteSpace="nowrap" fontSize="sm" fontWeight="medium">
           {selectedCount} selected
         </Text>
-        <Button
-          size="sm"
-          variant="outline"
-          colorPalette="orange"
-          onClick={onArchive}
-        >
+        <Button size="sm" variant="outline" colorPalette="orange" onClick={onArchive}>
           <Archive size={14} />
           Archive
         </Button>

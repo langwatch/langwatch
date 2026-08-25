@@ -7,14 +7,7 @@
  * for email/credential mode, hidden for Auth0 mode).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -146,9 +139,7 @@ describe("<AuthenticationSettings/>", () => {
     it("does not render the form by default — only a Change Password button next to the linked identity", () => {
       renderPage();
       expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
-      expect(
-        screen.getByRole("button", { name: /Change Password/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Change Password/i })).toBeTruthy();
     });
 
     describe("when the user clicks Change Password", () => {
@@ -159,9 +150,7 @@ describe("<AuthenticationSettings/>", () => {
         renderPage();
 
         await act(async () => {
-          fireEvent.click(
-            screen.getByRole("button", { name: /Change Password/i }),
-          );
+          fireEvent.click(screen.getByRole("button", { name: /Change Password/i }));
         });
         // Dialog now visible — and includes Current Password (re-verified
         // server-side via Auth0 ROPG).
@@ -222,9 +211,7 @@ describe("<AuthenticationSettings/>", () => {
         renderPage();
 
         await act(async () => {
-          fireEvent.click(
-            screen.getByRole("button", { name: /Change Password/i }),
-          );
+          fireEvent.click(screen.getByRole("button", { name: /Change Password/i }));
         });
         await waitFor(() => {
           expect(screen.getByLabelText(/Current Password/i)).toBeTruthy();
@@ -269,9 +256,7 @@ describe("<AuthenticationSettings/>", () => {
         renderPage();
 
         await act(async () => {
-          fireEvent.click(
-            screen.getByRole("button", { name: /Change Password/i }),
-          );
+          fireEvent.click(screen.getByRole("button", { name: /Change Password/i }));
         });
         await waitFor(() => {
           expect(screen.getByLabelText(/Current Password/i)).toBeTruthy();
@@ -317,9 +302,7 @@ describe("<AuthenticationSettings/>", () => {
         renderPage();
 
         await act(async () => {
-          fireEvent.click(
-            screen.getByRole("button", { name: /Change Password/i }),
-          );
+          fireEvent.click(screen.getByRole("button", { name: /Change Password/i }));
         });
         await waitFor(() => {
           expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
@@ -339,9 +322,7 @@ describe("<AuthenticationSettings/>", () => {
         renderPage();
 
         await act(async () => {
-          fireEvent.click(
-            screen.getByRole("button", { name: /Change Password/i }),
-          );
+          fireEvent.click(screen.getByRole("button", { name: /Change Password/i }));
         });
         await waitFor(() => {
           expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
@@ -358,9 +339,7 @@ describe("<AuthenticationSettings/>", () => {
 
         // Reopen
         await act(async () => {
-          fireEvent.click(
-            screen.getByRole("button", { name: /Change Password/i }),
-          );
+          fireEvent.click(screen.getByRole("button", { name: /Change Password/i }));
         });
         await waitFor(() => {
           expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
@@ -384,9 +363,7 @@ describe("<AuthenticationSettings/>", () => {
           },
         ];
         renderPage();
-        expect(
-          screen.queryByRole("button", { name: /Change Password/i }),
-        ).toBeNull();
+        expect(screen.queryByRole("button", { name: /Change Password/i })).toBeNull();
       });
     });
   });
@@ -396,9 +373,7 @@ describe("<AuthenticationSettings/>", () => {
     it("renders a dedicated Change Password section with a button (no inline form)", () => {
       publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
       renderPage();
-      expect(
-        screen.getByRole("button", { name: /Change Password/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Change Password/i })).toBeTruthy();
       // The form fields are NOT visible until the dialog opens.
       expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
     });
@@ -408,9 +383,7 @@ describe("<AuthenticationSettings/>", () => {
         publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
         renderPage();
         await act(async () => {
-          fireEvent.click(
-            screen.getByRole("button", { name: /Change Password/i }),
-          );
+          fireEvent.click(screen.getByRole("button", { name: /Change Password/i }));
         });
         await waitFor(() => {
           expect(screen.getByLabelText(/Current Password/i)).toBeTruthy();
@@ -432,9 +405,7 @@ describe("<AuthenticationSettings/>", () => {
         },
       ];
       renderPage();
-      expect(
-        screen.queryByRole("button", { name: /Change Password/i }),
-      ).toBeNull();
+      expect(screen.queryByRole("button", { name: /Change Password/i })).toBeNull();
     });
   });
 });

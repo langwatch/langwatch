@@ -42,9 +42,7 @@ function legacySecretActorId(context: Context): string {
 const legacy = createProjectApp({ basePath: "/api/secrets" });
 legacy.use(legacyDeprecationWarning);
 legacy.hono.onError((error, context) => {
-  if (
-    error instanceof SecretNotFoundError
-  ) {
+  if (error instanceof SecretNotFoundError) {
     return context.json({ error: "Secret not found" }, 404);
   }
   if (error instanceof SecretDuplicateError) {
@@ -76,38 +74,42 @@ legacy.access(requires("secrets:view")).get("/:id", async (context) => {
   return context.json(toSecretPublic(secret));
 });
 
-legacy.access(requires("secrets:manage")).post(
-  "/",
-  hiddenValidator("json", secretPublicCreateInputSchema.omit({ projectId: true })),
-  async (context) => {
-    const project = context.get("project");
-    const input = context.req.valid("json");
-    const secret = await context.app.secrets.create({
-      projectId: project.id,
-      actorId: legacySecretActorId(context),
-      ...input,
-    });
-    return context.json(toSecretPublic(secret), 201);
-  },
-);
+legacy
+  .access(requires("secrets:manage"))
+  .post(
+    "/",
+    hiddenValidator("json", secretPublicCreateInputSchema.omit({ projectId: true })),
+    async (context) => {
+      const project = context.get("project");
+      const input = context.req.valid("json");
+      const secret = await context.app.secrets.create({
+        projectId: project.id,
+        actorId: legacySecretActorId(context),
+        ...input,
+      });
+      return context.json(toSecretPublic(secret), 201);
+    },
+  );
 
-legacy.access(requires("secrets:manage")).put(
-  "/:id",
-  hiddenValidator(
-    "json",
-    secretPublicUpdateInputSchema.omit({ id: true, projectId: true }),
-  ),
-  async (context) => {
-    const project = context.get("project");
-    const secret = await context.app.secrets.update({
-      projectId: project.id,
-      id: context.req.param("id"),
-      value: context.req.valid("json").value,
-      actorId: legacySecretActorId(context),
-    });
-    return context.json(toSecretPublic(secret));
-  },
-);
+legacy
+  .access(requires("secrets:manage"))
+  .put(
+    "/:id",
+    hiddenValidator(
+      "json",
+      secretPublicUpdateInputSchema.omit({ id: true, projectId: true }),
+    ),
+    async (context) => {
+      const project = context.get("project");
+      const secret = await context.app.secrets.update({
+        projectId: project.id,
+        id: context.req.param("id"),
+        value: context.req.valid("json").value,
+        actorId: legacySecretActorId(context),
+      });
+      return context.json(toSecretPublic(secret));
+    },
+  );
 
 legacy.access(requires("secrets:manage")).delete("/:id", async (context) => {
   const project = context.get("project");
@@ -121,8 +123,6 @@ const rpcBuilder = createProjectApiService({
   basePath: "/api/secrets",
   openapiUrl: "/api/openapi.json",
 });
-const rpc = AppSecretApi.create()
-  .install(rpcBuilder)
-  .build();
+const rpc = AppSecretApi.create().install(rpcBuilder).build();
 
 export const app = new Hono().route("/", legacy.hono).route("/", rpc);

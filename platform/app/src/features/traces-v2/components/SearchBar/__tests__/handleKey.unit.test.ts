@@ -17,10 +17,7 @@ describe("handleKey", () => {
   describe("given Enter is pressed", () => {
     describe("when the dropdown is closed and there is text", () => {
       it("returns submit with the current text", () => {
-        const action = handleKey(
-          ctx({ text: "@status:error", cursorPos: 13 }),
-          "Enter",
-        );
+        const action = handleKey(ctx({ text: "@status:error", cursorPos: 13 }), "Enter");
         expect(action).toEqual<KeyAction>({
           kind: "submit",
           text: "@status:error",
@@ -176,10 +173,7 @@ describe("handleKey", () => {
 
     describe("when the dropdown is closed", () => {
       it("returns noop so the browser handles default tab behaviour (which blurs)", () => {
-        const action = handleKey(
-          ctx({ text: "@status:error", cursorPos: 13 }),
-          "Tab",
-        );
+        const action = handleKey(ctx({ text: "@status:error", cursorPos: 13 }), "Tab");
         expect(action).toEqual<KeyAction>({ kind: "noop" });
       });
     });
@@ -210,10 +204,7 @@ describe("handleKey", () => {
 
     describe("when the dropdown is closed", () => {
       it("blurs the editor", () => {
-        const action = handleKey(
-          ctx({ text: "@status:error", cursorPos: 13 }),
-          "Escape",
-        );
+        const action = handleKey(ctx({ text: "@status:error", cursorPos: 13 }), "Escape");
         expect(action).toEqual<KeyAction>({ kind: "blur" });
       });
     });

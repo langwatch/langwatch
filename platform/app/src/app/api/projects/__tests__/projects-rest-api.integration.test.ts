@@ -402,12 +402,8 @@ describe("Feature: Projects REST API", () => {
         });
         expect(res.status).toBe(400);
 
-        await prisma.team
-          .delete({ where: { id: otherTeam.id } })
-          .catch(() => {});
-        await prisma.organization
-          .delete({ where: { id: otherOrg.id } })
-          .catch(() => {});
+        await prisma.team.delete({ where: { id: otherTeam.id } }).catch(() => {});
+        await prisma.organization.delete({ where: { id: otherOrg.id } }).catch(() => {});
       });
 
       /** @scenario PATCH with teamId and name is atomic */
@@ -587,13 +583,9 @@ describe("Feature: Projects REST API", () => {
       expect(res.status).toBe(404);
       expect(await res.text()).not.toContain(foreign.apiKey);
 
-      await prisma.project
-        .delete({ where: { id: foreign.id } })
-        .catch(() => {});
+      await prisma.project.delete({ where: { id: foreign.id } }).catch(() => {});
       await prisma.team.delete({ where: { id: otherTeam.id } }).catch(() => {});
-      await prisma.organization
-        .delete({ where: { id: otherOrg.id } })
-        .catch(() => {});
+      await prisma.organization.delete({ where: { id: otherOrg.id } }).catch(() => {});
     });
   });
 });

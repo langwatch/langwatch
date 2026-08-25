@@ -2,7 +2,7 @@ id: no-export-star-shim-tsx
 snapshots:
   export * from "./Button";:
     labels:
-    - source: export * from "./Button";
-      style: primary
-      start: 0
-      end: 25
+      - source: export * from "./Button";
+        style: primary
+        start: 0
+        end: 25

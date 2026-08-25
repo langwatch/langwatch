@@ -60,21 +60,15 @@ type AnyAggregateDefinition = AggregateDefinition<
 >;
 
 export class EventCatalogue {
-  private readonly aggregatesByType = new Map<
-    AggregateType,
-    AnyAggregateDefinition
-  >();
+  private readonly aggregatesByType = new Map<AggregateType, AnyAggregateDefinition>();
   private readonly aggregateByEventType = new Map<EventType, AggregateType>();
 
   constructor(aggregates: readonly AnyAggregateDefinition[]) {
     for (const aggregate of aggregates) {
-      const existingAggregateDefinition = this.aggregatesByType.get(
-        aggregate.type,
-      );
+      const existingAggregateDefinition = this.aggregatesByType.get(aggregate.type);
       if (
         existingAggregateDefinition &&
-        (existingAggregateDefinition.events.length > 0 ||
-          aggregate.events.length > 0)
+        (existingAggregateDefinition.events.length > 0 || aggregate.events.length > 0)
       ) {
         throw new Error(`Aggregate type \"${aggregate.type}\" is registered twice`);
       }

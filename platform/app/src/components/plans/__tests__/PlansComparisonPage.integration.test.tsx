@@ -33,14 +33,11 @@ describe("<PlansComparisonPage/>", () => {
     /** @scenario 'Member compares plans on the plans page' */
     /** @scenario 'Non-admin members can access plans comparison' */
     it("shows the plans comparison layout with three plan columns", () => {
-      render(
-        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
-        { wrapper: Wrapper },
-      );
+      render(<PlansComparisonPage activePlan={{ type: "FREE", free: true }} />, {
+        wrapper: Wrapper,
+      });
 
-      expect(
-        screen.getByRole("heading", { name: "Plans" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Plans" })).toBeInTheDocument();
       expect(screen.getByTestId("plan-column-free")).toBeInTheDocument();
       expect(screen.getByTestId("plan-column-growth")).toBeInTheDocument();
       expect(screen.getByTestId("plan-column-enterprise")).toBeInTheDocument();
@@ -49,10 +46,9 @@ describe("<PlansComparisonPage/>", () => {
 
     /** @scenario 'Plan usage lines link to the list of billable events' */
     it("points the event-counting question at the public docs in a new tab", () => {
-      render(
-        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
-        { wrapper: Wrapper },
-      );
+      render(<PlansComparisonPage activePlan={{ type: "FREE", free: true }} />, {
+        wrapper: Wrapper,
+      });
 
       const link = screen.getByTestId("billable-events-docs-link");
       expect(link).toHaveTextContent(/what counts as an event/i);
@@ -67,20 +63,18 @@ describe("<PlansComparisonPage/>", () => {
 
   describe("when organization is on the Free plan", () => {
     it("marks the Free column as current", () => {
-      render(
-        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
-        { wrapper: Wrapper },
-      );
+      render(<PlansComparisonPage activePlan={{ type: "FREE", free: true }} />, {
+        wrapper: Wrapper,
+      });
 
       const freeColumn = screen.getByTestId("plan-column-free");
       expect(within(freeColumn).getByText("Current")).toBeInTheDocument();
     });
 
     it("routes growth upgrade action to subscription page", () => {
-      render(
-        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
-        { wrapper: Wrapper },
-      );
+      render(<PlansComparisonPage activePlan={{ type: "FREE", free: true }} />, {
+        wrapper: Wrapper,
+      });
 
       const growthColumn = screen.getByTestId("plan-column-growth");
       const upgradeLink = within(growthColumn).getByRole("link", {
@@ -106,9 +100,7 @@ describe("<PlansComparisonPage/>", () => {
         within(screen.getByTestId("plan-column-free")).queryByText("Current"),
       ).not.toBeInTheDocument();
       expect(
-        within(screen.getByTestId("plan-column-enterprise")).queryByText(
-          "Current",
-        ),
+        within(screen.getByTestId("plan-column-enterprise")).queryByText("Current"),
       ).not.toBeInTheDocument();
     });
 
@@ -130,12 +122,9 @@ describe("<PlansComparisonPage/>", () => {
 
   describe("when organization is on the Enterprise plan", () => {
     it("marks the Enterprise column as current", () => {
-      render(
-        <PlansComparisonPage
-          activePlan={{ type: "ENTERPRISE", free: false }}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<PlansComparisonPage activePlan={{ type: "ENTERPRISE", free: false }} />, {
+        wrapper: Wrapper,
+      });
 
       const enterpriseColumn = screen.getByTestId("plan-column-enterprise");
       expect(within(enterpriseColumn).getByText("Current")).toBeInTheDocument();
@@ -151,10 +140,9 @@ describe("<PlansComparisonPage/>", () => {
   describe("when organization is on a legacy tier plan", () => {
     /** @scenario 'Legacy tier organizations show no current plan in comparison' */
     it("shows no current plan badge in comparison columns", () => {
-      render(
-        <PlansComparisonPage activePlan={{ type: "LAUNCH", free: false }} />,
-        { wrapper: Wrapper },
-      );
+      render(<PlansComparisonPage activePlan={{ type: "LAUNCH", free: false }} />, {
+        wrapper: Wrapper,
+      });
 
       expect(
         within(screen.getByTestId("plan-column-free")).queryByText("Current"),
@@ -163,9 +151,7 @@ describe("<PlansComparisonPage/>", () => {
         within(screen.getByTestId("plan-column-growth")).queryByText("Current"),
       ).not.toBeInTheDocument();
       expect(
-        within(screen.getByTestId("plan-column-enterprise")).queryByText(
-          "Current",
-        ),
+        within(screen.getByTestId("plan-column-enterprise")).queryByText("Current"),
       ).not.toBeInTheDocument();
     });
 
@@ -198,9 +184,7 @@ describe("<PlansComparisonPage/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.queryByTestId("tiered-discontinued-notice"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("tiered-discontinued-notice")).not.toBeInTheDocument();
     });
 
     it("does not show discontinued pricing notice for SEAT_EVENT organizations", () => {
@@ -212,23 +196,18 @@ describe("<PlansComparisonPage/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.queryByTestId("tiered-discontinued-notice"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("tiered-discontinued-notice")).not.toBeInTheDocument();
     });
   });
 
   describe("when comparing enterprise plan options", () => {
     it("shows enterprise commercial highlights and sales action", () => {
-      render(
-        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
-        { wrapper: Wrapper },
-      );
+      render(<PlansComparisonPage activePlan={{ type: "FREE", free: true }} />, {
+        wrapper: Wrapper,
+      });
 
       const enterpriseColumn = screen.getByTestId("plan-column-enterprise");
-      expect(
-        within(enterpriseColumn).getByText("Custom pricing"),
-      ).toBeInTheDocument();
+      expect(within(enterpriseColumn).getByText("Custom pricing")).toBeInTheDocument();
       expect(
         within(enterpriseColumn).getByRole("link", { name: "Contact Sales" }),
       ).toBeInTheDocument();

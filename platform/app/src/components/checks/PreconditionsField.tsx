@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { X } from "react-feather";
 import { useFormContext } from "react-hook-form";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
@@ -49,9 +41,7 @@ export const PreconditionsField = ({
 
   const handleFieldChange = (index: number, newField: string) => {
     const typedField = newField as CheckPreconditionFields;
-    const currentRule = preconditions[index]?.rule as
-      | CheckPreconditionRule
-      | undefined;
+    const currentRule = preconditions[index]?.rule as CheckPreconditionRule | undefined;
 
     // If current rule is not allowed for the new field, reset to first allowed rule
     if (currentRule && !isRuleAllowedForField(typedField, currentRule)) {
@@ -118,15 +108,13 @@ export const PreconditionsField = ({
             >
               <Text>Requires Expected Contexts</Text>
               <Text color="fg.muted" fontStyle="italic">
-                This evaluator will only run if the expected contexts are
-                provided
+                This evaluator will only run if the expected contexts are provided
               </Text>
             </VStack>
           </Box>
         )}
         {fields.map((field, index) => {
-          const currentField = preconditions[index]
-            ?.field as CheckPreconditionFields;
+          const currentField = preconditions[index]?.field as CheckPreconditionFields;
           const allowedRules = getAllowedRulesForField(currentField);
           const valueType = getFieldValueType(currentField);
           const keyInfo = fieldRequiresKey(currentField);
@@ -221,9 +209,7 @@ export const PreconditionsField = ({
                       <Input
                         {...control.register(`preconditions.${index}.value`)}
                         placeholder={
-                          preconditions[index]?.rule.includes("regex")
-                            ? "regex"
-                            : "text"
+                          preconditions[index]?.rule.includes("regex") ? "regex" : "text"
                         }
                       />
                       {preconditions[index]?.rule.includes("regex") && (
@@ -235,10 +221,7 @@ export const PreconditionsField = ({
               </VStack>
               {(formState.errors.preconditions as any)?.[index]?.value && (
                 <Text color="red.500" fontSize="12px" paddingLeft={4}>
-                  {
-                    (formState.errors.preconditions as any)?.[index]?.value
-                      .message
-                  }
+                  {(formState.errors.preconditions as any)?.[index]?.value.message}
                 </Text>
               )}
             </Box>

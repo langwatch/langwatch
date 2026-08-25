@@ -152,9 +152,7 @@ export function ScenarioMessageRenderer({
         // right, agent → left). Mirrored into data-media-align because
         // jsdom cannot read the compiled flex styles.
         const innerAlign =
-          item.part.type === "binary"
-            ? alignForRole(item.role)
-            : ("stretch" as const);
+          item.part.type === "binary" ? alignForRole(item.role) : ("stretch" as const);
         return (
           <VStack
             key={item.id}
@@ -172,9 +170,7 @@ export function ScenarioMessageRenderer({
                 part={item.part}
                 projectId={projectId}
                 audioPlayback={
-                  item.part.type === "audio"
-                    ? getAudioProps(item.id)
-                    : undefined
+                  item.part.type === "audio" ? getAudioProps(item.id) : undefined
                 }
               />
               {item.transcript && (
@@ -270,10 +266,7 @@ export function ScenarioMessageRenderer({
         : turns.map((turn) => (
             <VStack key={turn.key} align="stretch" gap={4} width="100%">
               {turn.traceId && turn.turnNumber != null && (
-                <RunTurnSeparator
-                  index={turn.turnNumber}
-                  traceId={turn.traceId}
-                />
+                <RunTurnSeparator index={turn.turnNumber} traceId={turn.traceId} />
               )}
               {turn.items.map(renderItem)}
             </VStack>
@@ -311,9 +304,7 @@ function flattenMessages(
             kind: "tool_call",
             id: `${msg.id ?? ""}-tool-${tc.function?.name ?? "unknown"}`,
             name: tc.function?.name ?? "unknown",
-            arguments: safeJsonParseOrStringFallback(
-              tc.function?.arguments ?? "{}",
-            ),
+            arguments: safeJsonParseOrStringFallback(tc.function?.arguments ?? "{}"),
             traceId: msg.trace_id,
           });
         }
@@ -354,9 +345,7 @@ function flattenContent(msg: RawMessage): DisplayItem[] {
   if (coerced) return flattenMixed(coerced, msg);
 
   const raw =
-    typeof msg.content === "string"
-      ? msg.content
-      : JSON.stringify(msg.content ?? {});
+    typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content ?? {});
 
   if (msg.content && msg.content !== "None") {
     return [

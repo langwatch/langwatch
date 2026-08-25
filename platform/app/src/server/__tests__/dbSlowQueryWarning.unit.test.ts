@@ -123,9 +123,7 @@ describe("the Postgres slow-query warning", () => {
     describe("when the same operation instead succeeds over the budget", () => {
       /** @scenario "A query over the budget is warned about" */
       it("warns, which is what makes the rejecting case above non-vacuous", async () => {
-        vi.spyOn(performance, "now")
-          .mockReturnValueOnce(0)
-          .mockReturnValueOnce(900);
+        vi.spyOn(performance, "now").mockReturnValueOnce(0).mockReturnValueOnce(900);
 
         await expect(
           withQueryTiming({
@@ -167,10 +165,7 @@ describe("the Postgres slow-query warning", () => {
       it("names the operation as raw and reports no argument keys", () => {
         reportQueryDuration({
           action: "queryRaw",
-          args: [
-            ['SELECT * FROM "User" WHERE email = $1'],
-            "someone@acme.example",
-          ],
+          args: [['SELECT * FROM "User" WHERE email = $1'], "someone@acme.example"],
           durationMs: 900,
           budgetMs: BUDGET_MS,
           now: 0,
@@ -253,17 +248,13 @@ describe("the slow-query budget", () => {
 
   describe("when the environment sets one", () => {
     it("uses it", () => {
-      expect(resolveSlowQueryBudgetMs({ POSTGRES_SLOW_QUERY_MS: "1200" })).toBe(
-        1200,
-      );
+      expect(resolveSlowQueryBudgetMs({ POSTGRES_SLOW_QUERY_MS: "1200" })).toBe(1200);
     });
   });
 
   describe("when the environment sets something unparseable", () => {
     it("keeps the default rather than disabling the warning", () => {
-      expect(resolveSlowQueryBudgetMs({ POSTGRES_SLOW_QUERY_MS: "soon" })).toBe(
-        500,
-      );
+      expect(resolveSlowQueryBudgetMs({ POSTGRES_SLOW_QUERY_MS: "soon" })).toBe(500);
     });
   });
 });

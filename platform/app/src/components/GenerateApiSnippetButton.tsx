@@ -13,9 +13,7 @@ export function GenerateApiSnippetButton({
   return (
     <Tooltip
       content={
-        hasHandle
-          ? "Show API code snippet"
-          : "Save the prompt to call it from the API"
+        hasHandle ? "Show API code snippet" : "Save the prompt to call it from the API"
       }
       positioning={{ placement: "top" }}
       openDelay={0}

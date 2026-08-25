@@ -56,11 +56,11 @@ Family entries cover dynamically-generated key shapes. Today the only family is 
 
 ## Storage
 
-| Layer | Backend | TTL | Purpose |
-|-------|---------|-----|---------|
-| In-process | `Map` | 5 s | Absorbs per-event subscriber reads on the hot path |
-| Shared | Redis (via `TtlCache`) | 60 s | Cross-pod cache sharing |
-| Source of truth | Prisma `FeatureFlag` table | n/a | Operator-set overrides only; absence = registry default |
+| Layer           | Backend                    | TTL  | Purpose                                                 |
+| --------------- | -------------------------- | ---- | ------------------------------------------------------- |
+| In-process      | `Map`                      | 5 s  | Absorbs per-event subscriber reads on the hot path      |
+| Shared          | Redis (via `TtlCache`)     | 60 s | Cross-pod cache sharing                                 |
+| Source of truth | Prisma `FeatureFlag` table | n/a  | Operator-set overrides only; absence = registry default |
 
 The `FeatureFlag` table is cluster-wide (no `projectId` column); it's exempted from `dbMultiTenancyProtection` in `EXEMPT_MODELS` because it does not represent project-scoped data.
 
@@ -130,21 +130,22 @@ Set `POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS` to lower the poll interval if yo
 
 Pattern: `{type}_{area}_{feature}_{descriptor}`
 
-| Type | Purpose |
-|------|---------|
-| `release` | New feature rollout |
-| `experiment` | A/B test |
-| `permission` | Access control |
-| `ops` | Operational / kill switch (typically SYSTEM scope) |
+| Type         | Purpose                                            |
+| ------------ | -------------------------------------------------- |
+| `release`    | New feature rollout                                |
+| `experiment` | A/B test                                           |
+| `permission` | Access control                                     |
+| `ops`        | Operational / kill switch (typically SYSTEM scope) |
 
-| Area | System part |
-|------|-------------|
-| `ui` | Frontend / UI features |
-| `api` | API endpoints |
-| `es` | Event sourcing |
-| `worker` | Background workers |
+| Area     | System part            |
+| -------- | ---------------------- |
+| `ui`     | Frontend / UI features |
+| `api`    | API endpoints          |
+| `es`     | Event sourcing         |
+| `worker` | Background workers     |
 
 Examples:
+
 - `release_ui_simulations_menu_enabled` (PRODUCT): UI feature rollout
 - `ops_es_causality_loop_guard_disabled` (SYSTEM): emergency kill switch
 - `es-trace-projection-traceSummary-killswitch` (SYSTEM via family): auto-generated per-component kill switch
@@ -153,25 +154,28 @@ Examples:
 
 The `isEnabled` method accepts a `defaultValue` parameter (overridden by registry default when a key is registered):
 
-| Default | Use case |
-|---------|----------|
-| `false` (fail-closed) | New features, experimental UI, paid features |
-| `true` (fail-open) | Kill switches that disable functionality when enabled |
+| Default               | Use case                                              |
+| --------------------- | ----------------------------------------------------- |
+| `false` (fail-closed) | New features, experimental UI, paid features          |
+| `true` (fail-open)    | Kill switches that disable functionality when enabled |
 
 Registry default wins for registered flags. The `defaultValue` argument is only consulted for unregistered keys passing through the legacy PostHog/memory path.
 
 ## Trade-offs
 
 **Why a registry instead of pure PostHog:**
+
 - Hot-path SYSTEM flags don't cost PostHog requests.
 - Operators can flip kill switches from the Ops UI on self-hosted installs without PostHog configured.
 - Type-checked keys (`FeatureFlagKey`) catch typos at compile time.
 
 **Why families for `es-*-killswitch`:**
+
 - ~10s of pipeline components × dozens of tenants = unmanageable to register each explicit key.
 - One family entry covers the entire generated key shape, the pipeline registry enumerates the live set for the Ops UI.
 
 **Trade-offs accepted:**
+
 - SYSTEM flag changes propagate cluster-wide within the cache TTL (max 60 s) rather than instantly.
 - Adding a new flag requires a code change (the registry entry), not just a PostHog dashboard edit. This is intentional: it keeps the SYSTEM-vs-PRODUCT scope decision visible in code review.
 

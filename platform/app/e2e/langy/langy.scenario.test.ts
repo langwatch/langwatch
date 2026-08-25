@@ -51,8 +51,7 @@ async function deleteAllTestDatasets() {
       }
     }),
   );
-  if (test.length)
-    console.log(`[setup] Deleted ${test.length} stale test datasets`);
+  if (test.length) console.log(`[setup] Deleted ${test.length} stale test datasets`);
 }
 
 const model = openai("gpt-5-mini");
@@ -95,8 +94,7 @@ describe("Langy via HTTP wrapper", () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
         name: "ask for cost",
-        description:
-          "The user wants the current cost of their LangWatch usage.",
+        description: "The user wants the current cost of their LangWatch usage.",
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
@@ -109,11 +107,7 @@ describe("Langy via HTTP wrapper", () => {
             ],
           }),
         ],
-        script: [
-          scenario.user("what's my cost"),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        script: [scenario.user("what's my cost"), scenario.agent(), scenario.judge()],
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
@@ -327,8 +321,7 @@ describe("Langy via HTTP wrapper", () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
         name: "list evaluators",
-        description:
-          "The user wants to see what evaluators they have configured.",
+        description: "The user wants to see what evaluators they have configured.",
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
@@ -366,11 +359,7 @@ describe("Langy via HTTP wrapper", () => {
             ],
           }),
         ],
-        script: [
-          scenario.user("list my datasets"),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        script: [scenario.user("list my datasets"), scenario.agent(), scenario.judge()],
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
@@ -380,8 +369,7 @@ describe("Langy via HTTP wrapper", () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
         name: "list scenarios",
-        description:
-          "The user wants to see their existing LangWatch scenario tests.",
+        description: "The user wants to see their existing LangWatch scenario tests.",
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
@@ -407,8 +395,7 @@ describe("Langy via HTTP wrapper", () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
         name: "list agents",
-        description:
-          "The user wants to see the agents registered in LangWatch.",
+        description: "The user wants to see the agents registered in LangWatch.",
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
@@ -420,11 +407,7 @@ describe("Langy via HTTP wrapper", () => {
             ],
           }),
         ],
-        script: [
-          scenario.user("show me my agents"),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        script: [scenario.user("show me my agents"), scenario.agent(), scenario.judge()],
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
@@ -434,8 +417,7 @@ describe("Langy via HTTP wrapper", () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
         name: "list prompts",
-        description:
-          "The user wants to see their versioned prompts in LangWatch.",
+        description: "The user wants to see their versioned prompts in LangWatch.",
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
@@ -501,11 +483,7 @@ describe("Langy via HTTP wrapper", () => {
             ],
           }),
         ],
-        script: [
-          scenario.user("show my dashboards"),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        script: [scenario.user("show my dashboards"), scenario.agent(), scenario.judge()],
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
@@ -617,9 +595,7 @@ describe("Langy via HTTP wrapper", () => {
           }),
         ],
         script: [
-          scenario.user(
-            `create a dataset called "${datasetName}" with 2 example rows`,
-          ),
+          scenario.user(`create a dataset called "${datasetName}" with 2 example rows`),
           scenario.agent(),
           scenario.judge(),
         ],
@@ -737,9 +713,7 @@ describe("Langy via HTTP wrapper", () => {
           }),
         ],
         script: [
-          scenario.user(
-            `create a hallucination evaluator called "${evaluatorName}"`,
-          ),
+          scenario.user(`create a hallucination evaluator called "${evaluatorName}"`),
           scenario.agent(),
           scenario.judge(),
         ],
@@ -811,9 +785,7 @@ describe("Langy via HTTP wrapper", () => {
       const monitorName = `langy-test-monitor-${Date.now()}`;
       const before = await listMonitors();
       const beforeIds = new Set(before.map((m) => m.id));
-      const beforeEvaluatorIds = new Set(
-        (await listEvaluators()).map((e) => e.id),
-      );
+      const beforeEvaluatorIds = new Set((await listEvaluators()).map((e) => e.id));
 
       try {
         const result = await runScenarioAndLog({
@@ -857,9 +829,7 @@ describe("Langy via HTTP wrapper", () => {
         // allSettled and log, never throw: this is a finally block, so a throw
         // here REPLACES the assertion failure the test was about to report,
         // and one failed delete must not stop the rest of the sweep.
-        const leftover = (await listMonitors()).filter(
-          (m) => !beforeIds.has(m.id),
-        );
+        const leftover = (await listMonitors()).filter((m) => !beforeIds.has(m.id));
         const monitorResults = await Promise.allSettled(
           leftover.map((m) => deleteMonitor(m.id)),
         );
@@ -1099,9 +1069,7 @@ describe("Langy via HTTP wrapper", () => {
 
       const after = await listDatasets();
       const created = after.find((d) => !beforeIds.has(d.id));
-      console.log(
-        `Layer 2 multistep dataset: ${created ? created.name : "NOT FOUND"}`,
-      );
+      console.log(`Layer 2 multistep dataset: ${created ? created.name : "NOT FOUND"}`);
       expect(created).toBeTruthy();
     });
   });
@@ -1175,8 +1143,7 @@ describe("Langy via HTTP wrapper", () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
         name: "scenarios surface location",
-        description:
-          "The user asks where to view scenario tests in the LangWatch UI.",
+        description: "The user asks where to view scenario tests in the LangWatch UI.",
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
@@ -1320,9 +1287,7 @@ describe("Langy via HTTP wrapper", () => {
           }),
         ],
         script: [
-          scenario.user(
-            `create a dataset "${datasetName}" with 2 example Q&A rows`,
-          ),
+          scenario.user(`create a dataset "${datasetName}" with 2 example Q&A rows`),
           scenario.agent(),
           scenario.user(
             "add another row to it: 'What's the capital of Italy?' -> 'Rome'",
@@ -1351,8 +1316,7 @@ describe("Langy via HTTP wrapper", () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
         name: "ambiguous followup",
-        description:
-          "Turn 1: vague ask 'how's my agent doing?'. Turn 2: 'I mean cost'.",
+        description: "Turn 1: vague ask 'how's my agent doing?'. Turn 2: 'I mean cost'.",
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
@@ -1608,9 +1572,7 @@ describe("Langy via HTTP wrapper", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "fix the prompt drift in acme/service-x and open a PR for it",
-          ),
+          scenario.user("fix the prompt drift in acme/service-x and open a PR for it"),
           scenario.agent(),
           scenario.judge(),
         ],

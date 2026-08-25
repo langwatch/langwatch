@@ -7,10 +7,7 @@ import {
   QuarantineTraceActivityPort,
 } from "@langwatch/enterprise-governance-server";
 import { createLogger } from "@langwatch/observability";
-import {
-  PROJECT_KIND,
-  type ProjectService,
-} from "@langwatch/project-contract";
+import { PROJECT_KIND, type ProjectService } from "@langwatch/project-contract";
 import type { GovernanceTraceActivityClickHouseRepository } from "./governance-trace-activity.clickhouse.repository";
 
 const logger = createLogger("langwatch:governance:quarantine-fill-evaluator");

@@ -175,9 +175,8 @@ describe("Suites Page Layout (Issue #1671)", () => {
   describe("when rendering the suites page", () => {
     it("renders PageLayout.Header with a 'Simulations' heading", async () => {
       // Dynamic import to ensure mocks are applied
-      const { default: SimulationsPage } = await import(
-        "~/components/suites/SimulationsPage"
-      );
+      const { default: SimulationsPage } =
+        await import("~/components/suites/SimulationsPage");
 
       render(<SimulationsPage />, { wrapper: Wrapper });
 
@@ -187,9 +186,8 @@ describe("Suites Page Layout (Issue #1671)", () => {
 
     it("does not render DashboardLayout twice", async () => {
       dashboardLayoutRenderCount = 0;
-      const { default: SimulationsPage } = await import(
-        "~/components/suites/SimulationsPage"
-      );
+      const { default: SimulationsPage } =
+        await import("~/components/suites/SimulationsPage");
 
       render(<SimulationsPage />, { wrapper: Wrapper });
 

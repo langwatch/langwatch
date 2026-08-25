@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  CONTACT_SALES_URL,
-  FREE_PLAN,
-  LICENSE_ERRORS,
-  UNLIMITED_PLAN,
-} from "../src";
+import { CONTACT_SALES_URL, FREE_PLAN, LICENSE_ERRORS, UNLIMITED_PLAN } from "../src";
 import { licenseValidationError } from "../src";
 
 /**
@@ -17,9 +12,7 @@ import { licenseValidationError } from "../src";
 describe("licenseValidationError", () => {
   describe("given a verdict from validateLicense", () => {
     it("maps an expired licence to license_expired", () => {
-      expect(licenseValidationError(LICENSE_ERRORS.EXPIRED).code).toBe(
-        "license_expired",
-      );
+      expect(licenseValidationError(LICENSE_ERRORS.EXPIRED).code).toBe("license_expired");
     });
 
     it("maps a malformed key to license_key_invalid", () => {
@@ -29,20 +22,16 @@ describe("licenseValidationError", () => {
     });
 
     it("maps a bad signature to license_key_invalid", () => {
-      expect(
-        licenseValidationError(LICENSE_ERRORS.INVALID_SIGNATURE).code,
-      ).toBe("license_key_invalid");
+      expect(licenseValidationError(LICENSE_ERRORS.INVALID_SIGNATURE).code).toBe(
+        "license_key_invalid",
+      );
     });
   });
 
   describe("when the verdict is one nothing here recognises", () => {
     it("still rejects the licence rather than failing open", () => {
-      expect(licenseValidationError("something new").code).toBe(
-        "license_key_invalid",
-      );
-      expect(licenseValidationError(undefined).code).toBe(
-        "license_key_invalid",
-      );
+      expect(licenseValidationError("something new").code).toBe("license_key_invalid");
+      expect(licenseValidationError(undefined).code).toBe("license_key_invalid");
     });
   });
 });

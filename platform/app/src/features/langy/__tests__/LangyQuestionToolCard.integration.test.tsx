@@ -39,8 +39,7 @@ import { questionToolCardParts } from "../logic/langyQuestionTool";
 afterEach(cleanup);
 
 /** The frame the choices card renders inside — the ADR-060 provenance mark. */
-const derivedFrames = () =>
-  document.querySelectorAll("[data-derived-by-langy]");
+const derivedFrames = () => document.querySelectorAll("[data-derived-by-langy]");
 
 /** A `question` tool part exactly as the stream delivers one — and leaves it. */
 function questionToolPart(over: Record<string, unknown> = {}) {
@@ -144,9 +143,7 @@ describe("the question tool card", () => {
           blockId: "question:call-q1:0",
           optionIds: ["opt-1"],
         });
-        expect(card.question).toBe(
-          "Which agent should the scenario run against?",
-        );
+        expect(card.question).toBe("Which agent should the scenario run against?");
       });
     });
   });
@@ -176,9 +173,10 @@ describe("the question tool card", () => {
       fireEvent.click(screen.getByText("Staging agent"));
 
       expect(onChoiceSelect).not.toHaveBeenCalled();
-      expect(
-        screen.getByText("Staging agent").closest("button"),
-      ).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByText("Staging agent").closest("button")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
     });
   });
 
@@ -231,9 +229,7 @@ describe("questionToolCardParts", () => {
       const [part] = questionToolCardParts(
         questionToolPart({
           input: {
-            questions: [
-              { header: "Agent", options: [{ label: "Staging agent" }] },
-            ],
+            questions: [{ header: "Agent", options: [{ label: "Staging agent" }] }],
           },
         }),
       );

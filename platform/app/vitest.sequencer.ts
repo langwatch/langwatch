@@ -3,10 +3,7 @@ import { join } from "node:path";
 import { BaseSequencer, type TestSpecification } from "vitest/node";
 
 import { recordShardSelection } from "./src/test-utils/shardFailureReporter";
-import {
-  createWeigher,
-  loadDurationManifest,
-} from "./src/test-utils/shardWeights";
+import { createWeigher, loadDurationManifest } from "./src/test-utils/shardWeights";
 
 /** This file sits at the app root, which is what manifest paths are relative to. */
 const APP_ROOT = __dirname;
@@ -60,14 +57,10 @@ export default class WeightBalancedSequencer extends BaseSequencer {
     const weighted = specs
       .map((spec) => ({ spec, weight: weigh(spec.moduleId) }))
       .sort(
-        (a, b) =>
-          b.weight - a.weight || (a.spec.moduleId < b.spec.moduleId ? -1 : 1),
+        (a, b) => b.weight - a.weight || (a.spec.moduleId < b.spec.moduleId ? -1 : 1),
       );
 
-    const buckets: TestSpecification[][] = Array.from(
-      { length: count },
-      () => [],
-    );
+    const buckets: TestSpecification[][] = Array.from({ length: count }, () => []);
     const totals = new Array<number>(count).fill(0);
 
     for (const { spec, weight } of weighted) {

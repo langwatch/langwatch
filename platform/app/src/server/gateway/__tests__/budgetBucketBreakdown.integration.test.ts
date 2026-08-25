@@ -18,10 +18,7 @@
 
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type {
-  GatewayBudget,
-  GatewayBudgetWindow,
-} from "~/generated/prisma/client";
+import type { GatewayBudget, GatewayBudgetWindow } from "~/generated/prisma/client";
 import { Prisma } from "~/generated/prisma/client";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
@@ -117,8 +114,7 @@ async function debit(args: {
 
 /** The over-cap count the display derives, with the gateway's comparator. */
 function overCap(buckets: BucketSpend[], limitUsd = Number(LIMIT_USD)): number {
-  return buckets.filter((b) => Number.parseFloat(b.spentUsd) >= limitUsd)
-    .length;
+  return buckets.filter((b) => Number.parseFloat(b.spentUsd) >= limitUsd).length;
 }
 
 // Held for the whole file. The rollup this suite writes to and reads back is
@@ -244,9 +240,7 @@ describe("given per-user buckets recorded against attributed-user templates", ()
 
     /** @scenario "A per-person template counts an unpriced user but not a user who only ever failed" */
     it("leaves out the end user whose every request failed", () => {
-      expect(buckets.map((b) => b.scopeId)).not.toContain(
-        `${anchorId}:onlyfailed`,
-      );
+      expect(buckets.map((b) => b.scopeId)).not.toContain(`${anchorId}:onlyfailed`);
       expect(overCap(buckets)).toBe(0);
     });
   });
@@ -340,9 +334,7 @@ describe("given per-user buckets recorded against attributed-user templates", ()
 
     /** @scenario "A provider-filtered template and its unfiltered twin never count each other's people" */
     it("counts only unsuffixed buckets for the unfiltered template", () => {
-      expect(unfilteredBuckets.map((b) => b.scopeId)).toEqual([
-        `${anchorId}:plainuser`,
-      ]);
+      expect(unfilteredBuckets.map((b) => b.scopeId)).toEqual([`${anchorId}:plainuser`]);
       expect(overCap(unfilteredBuckets)).toBe(1);
     });
 
@@ -386,9 +378,7 @@ describe("given per-user buckets recorded against attributed-user templates", ()
 
     /** @scenario "Resetting one end user's period drops them from the count until they spend again" */
     it("drops the reset end user from the count entirely", () => {
-      expect(buckets.map((b) => b.scopeId)).not.toContain(
-        `${anchorId}:resetuser`,
-      );
+      expect(buckets.map((b) => b.scopeId)).not.toContain(`${anchorId}:resetuser`);
     });
 
     /** @scenario "Resetting one end user's period drops them from the count until they spend again" */

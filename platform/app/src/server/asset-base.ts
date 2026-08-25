@@ -143,13 +143,7 @@ export function injectAssetBaseIntoHtml({
  * Vite's injected entry scripts), else after `<html>`, else after the doctype,
  * else at the very start.
  */
-function insertBootstrap({
-  html,
-  snippet,
-}: {
-  html: string;
-  snippet: string;
-}): string {
+function insertBootstrap({ html, snippet }: { html: string; snippet: string }): string {
   for (const anchor of [/<head[^>]*>/i, /<html[^>]*>/i, /<!doctype[^>]*>/i]) {
     const match = anchor.exec(html);
     if (match) {

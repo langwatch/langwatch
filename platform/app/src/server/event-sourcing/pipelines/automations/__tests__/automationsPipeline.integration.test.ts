@@ -6,15 +6,7 @@ import {
   mapCommands,
 } from "@langwatch/eventing";
 import type { Redis } from "ioredis";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { TriggerAction } from "~/generated/prisma/client";
 import {
   getTestRedisConnection,
@@ -25,10 +17,7 @@ import {
   cleanupTestDataForTenant,
   getTenantIdString,
 } from "../../../__tests__/integration/testHelpers";
-import {
-  type AutomationsPipelineDeps,
-  createAutomationsPipeline,
-} from "../pipeline";
+import { type AutomationsPipelineDeps, createAutomationsPipeline } from "../pipeline";
 import type { SettlementState } from "../process-manager/triggerSettlement.process";
 import type { TriggerSettlementDispatchDeps } from "../process-manager/triggerSettlementIntentHandlers";
 import { TRIGGER_MATCH_COALESCE_MAX_BATCH } from "../schemas/constants";
@@ -52,11 +41,7 @@ const pipelineDeps = (): AutomationsPipelineDeps => ({
   },
 });
 
-const command = (
-  traceId: string,
-  occurredAt: number,
-  triggerId = "trigger-1",
-) => ({
+const command = (traceId: string, occurredAt: number, triggerId = "trigger-1") => ({
   tenantId,
   occurredAt,
   triggerId,
@@ -101,9 +86,7 @@ describe("automations pipeline", () => {
 
         expect(events).toHaveLength(1);
         expect(events[0]?.idempotencyKey).toBe("trigger-1:trace-1:30000-0");
-        expect(Object.keys(process?.state.pendingMatches ?? {})).toEqual([
-          "trace-1",
-        ]);
+        expect(Object.keys(process?.state.pendingMatches ?? {})).toEqual(["trace-1"]);
       });
     });
   });
@@ -137,9 +120,9 @@ describe("automations pipeline", () => {
           "trigger-1:trace-1:30000-1",
         ]);
         // The second round re-armed the same trace in the later window.
-        expect(
-          process?.state.pendingMatches["trace-1"]?.settleWindowBucket,
-        ).toBe("30000-1");
+        expect(process?.state.pendingMatches["trace-1"]?.settleWindowBucket).toBe(
+          "30000-1",
+        );
       });
     });
   });
@@ -222,9 +205,7 @@ describe("automations pipeline", () => {
     it("keeps their process-outbox identities isolated", async () => {
       const processStore = new InMemoryProcessStore();
       eventSourcing = new EventSourcing({ processStore });
-      const pipeline = eventSourcing.register(
-        createAutomationsPipeline(pipelineDeps()),
-      );
+      const pipeline = eventSourcing.register(createAutomationsPipeline(pipelineDeps()));
       const commands = mapCommands(pipeline.commands);
 
       await commands.recordTriggerMatch(command("trace-1", 1_000, "trigger-1"));
@@ -245,9 +226,7 @@ describe("automations pipeline", () => {
       // Each trigger owns its own process instance; the shared trace lands
       // in both pending sets without cross-talk.
       expect(
-        processes.map((process) =>
-          Object.keys(process?.state.pendingMatches ?? {}),
-        ),
+        processes.map((process) => Object.keys(process?.state.pendingMatches ?? {})),
       ).toEqual([["trace-1"], ["trace-1"]]);
     });
   });

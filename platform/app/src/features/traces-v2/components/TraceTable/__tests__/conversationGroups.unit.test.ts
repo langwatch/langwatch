@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LENS_CAPABILITIES } from "../../../lens/capabilities";
 import type { TraceListItem } from "../../../types/trace";
-import {
-  type ConversationGroup,
-  sortConversationGroups,
-} from "../conversationGroups";
+import { type ConversationGroup, sortConversationGroups } from "../conversationGroups";
 
 /**
  * Regression coverage for the conversation lens sort. `manualSorting` means

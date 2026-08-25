@@ -120,11 +120,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       const innerMessages = [{ role: "user", content: "What time is it?" }];
       const wrapped = JSON.stringify({ messages: innerMessages });
 
-      const result = service.canonicalize(
-        { "gen_ai.prompt": wrapped },
-        [],
-        stubSpan,
-      );
+      const result = service.canonicalize({ "gen_ai.prompt": wrapped }, [], stubSpan);
 
       expect(result.attributes["gen_ai.input.messages"]).toEqual(innerMessages);
     });
@@ -196,9 +192,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
         stubSpan,
       );
 
-      expect(result.attributes["gen_ai.system_instructions"]).toBe(
-        "You are a pirate.",
-      );
+      expect(result.attributes["gen_ai.system_instructions"]).toBe("You are a pirate.");
     });
 
     it("extracts from structured content blocks [{type: text, text: ...}]", () => {
@@ -219,9 +213,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
         stubSpan,
       );
 
-      expect(result.attributes["gen_ai.system_instructions"]).toBe(
-        "Part A. Part B.",
-      );
+      expect(result.attributes["gen_ai.system_instructions"]).toBe("Part A. Part B.");
     });
 
     it("extracts from Vercel parts [{type: text, content: ...}]", () => {
@@ -239,9 +231,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
         stubSpan,
       );
 
-      expect(result.attributes["gen_ai.system_instructions"]).toBe(
-        "Be helpful.",
-      );
+      expect(result.attributes["gen_ai.system_instructions"]).toBe("Be helpful.");
     });
 
     it("does not extract when first message is not system role", () => {
@@ -285,9 +275,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       expect(result.attributes["gen_ai.input.messages"]).toEqual([
         { role: "user", content: "Hello" },
       ]);
-      expect(result.attributes["gen_ai.system_instructions"]).toBe(
-        "Be helpful.",
-      );
+      expect(result.attributes["gen_ai.system_instructions"]).toBe("Be helpful.");
     });
 
     it("gen_ai.input.messages already set blocks llm.input_messages extraction", () => {
@@ -304,9 +292,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       );
 
       // gen_ai.input.messages was already present, llm.input_messages should not overwrite
-      expect(result.attributes["gen_ai.input.messages"]).toEqual(
-        existingMessages,
-      );
+      expect(result.attributes["gen_ai.input.messages"]).toEqual(existingMessages);
     });
   });
 });

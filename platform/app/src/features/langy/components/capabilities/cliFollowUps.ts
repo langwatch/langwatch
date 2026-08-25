@@ -31,10 +31,7 @@
  * @see specs/langy/langy-followup-suggestions.feature
  */
 
-import {
-  featureForCliToolName,
-  featuresConsuming,
-} from "~/shared/langy/featureMap";
+import { featureForCliToolName, featuresConsuming } from "~/shared/langy/featureMap";
 import { countResults } from "./cliResultDocument";
 
 /** A settled tool call from the turn, as the UI already models it. */
@@ -94,10 +91,7 @@ export const SUGGESTION_LABEL: Record<string, string> = {
  * Scenarios" chips that had nothing to do with what was asked. Delete a kind
  * from this set the day a destination learns to carry it.
  */
-const UNOFFERABLE_KINDS: ReadonlySet<string> = new Set([
-  "evaluators",
-  "prompts",
-]);
+const UNOFFERABLE_KINDS: ReadonlySet<string> = new Set(["evaluators", "prompts"]);
 
 /**
  * The offers one settled tool result justifies: every feature that consumes a
@@ -107,9 +101,7 @@ const UNOFFERABLE_KINDS: ReadonlySet<string> = new Set([
  * Nothing is offered on a failed call, a call still in flight, or a result that
  * found nothing — there is no "these" to act on.
  */
-export function followUpsForResult(
-  result: SettledToolResult,
-): FollowUpSuggestion[] {
+export function followUpsForResult(result: SettledToolResult): FollowUpSuggestion[] {
   if (result.state !== "output-available") return [];
 
   const source = featureForCliToolName(result.name);

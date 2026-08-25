@@ -20,7 +20,7 @@ import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experim
 const modelSchema = z
   .string()
   .describe(
-    'Model in "provider/model-name" format, e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4-5-20250929"'
+    'Model in "provider/model-name" format, e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4-5-20250929"',
   );
 
 /**
@@ -73,13 +73,13 @@ function registerTools(server: McpServer): void {
         .string()
         .optional()
         .describe(
-          "The full url of the specific doc page. If not provided, the docs index will be fetched."
+          "The full url of the specific doc page. If not provided, the docs index will be fetched.",
         ),
     },
     withToolLogging("fetch_langwatch_docs", async ({ url }) => {
       const text = await fetchDocumentation("langwatch", url);
       return { content: [{ type: "text", text }] };
-    })
+    }),
   );
 
   server.tool(
@@ -89,20 +89,20 @@ function registerTools(server: McpServer): void {
       user_approved: z
         .boolean()
         .describe(
-          "Must be true, and only after the user explicitly agreed to send this report to LangWatch"
+          "Must be true, and only after the user explicitly agreed to send this report to LangWatch",
         ),
       title: z.string().max(300).describe("One-line description of the issue"),
       summary: z
         .string()
         .optional()
         .describe(
-          "What you were trying to do, what went wrong (verbatim errors), and what you had to figure out the hard way"
+          "What you were trying to do, what went wrong (verbatim errors), and what you had to figure out the hard way",
         ),
       session_content: z
         .string()
         .optional()
         .describe(
-          "Optional raw session transcript or log excerpt (JSONL or plain text); redacted locally before sending"
+          "Optional raw session transcript or log excerpt (JSONL or plain text); redacted locally before sending",
         ),
       contact_email: z
         .string()
@@ -118,7 +118,7 @@ function registerTools(server: McpServer): void {
       return {
         content: [{ type: "text", text: await handleReportIssue(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -129,13 +129,13 @@ function registerTools(server: McpServer): void {
         .string()
         .optional()
         .describe(
-          "The full url of the specific doc page. If not provided, the docs index will be fetched."
+          "The full url of the specific doc page. If not provided, the docs index will be fetched.",
         ),
     },
     withToolLogging("fetch_scenario_docs", async ({ url }) => {
       const text = await fetchDocumentation("scenario", url);
       return { content: [{ type: "text", text }] };
-    })
+    }),
   );
 
   // --- Observability Tools (require API key) ---
@@ -159,42 +159,36 @@ function registerTools(server: McpServer): void {
         .string()
         .optional()
         .describe(
-          "When category is 'evaluators', provide a specific evaluator type (e.g. 'langevals/llm_boolean') to get its full schema details"
+          "When category is 'evaluators', provide a specific evaluator type (e.g. 'langevals/llm_boolean') to get its full schema details",
         ),
     },
     async ({ category, evaluatorType }) => {
       if (category === "scenarios") {
-        const { formatScenarioSchema } = await import(
-          "./tools/discover-scenario-schema.js"
-        );
+        const { formatScenarioSchema } =
+          await import("./tools/discover-scenario-schema.js");
         return {
           content: [{ type: "text", text: formatScenarioSchema() }],
         };
       }
       if (category === "evaluators") {
-        const { formatEvaluatorSchema } = await import(
-          "./tools/discover-evaluator-schema.js"
-        );
+        const { formatEvaluatorSchema } =
+          await import("./tools/discover-evaluator-schema.js");
         return {
-          content: [
-            { type: "text", text: formatEvaluatorSchema(evaluatorType) },
-          ],
+          content: [{ type: "text", text: formatEvaluatorSchema(evaluatorType) }],
         };
       }
       const { formatSchema } = await import("./tools/discover-schema.js");
       let text = formatSchema(category);
       if (category === "all") {
-        const { formatScenarioSchema } = await import(
-          "./tools/discover-scenario-schema.js"
-        );
+        const { formatScenarioSchema } =
+          await import("./tools/discover-scenario-schema.js");
         text += "\n\n" + formatScenarioSchema();
-        const { formatEvaluatorSchema } = await import(
-          "./tools/discover-evaluator-schema.js"
-        );
+        const { formatEvaluatorSchema } =
+          await import("./tools/discover-evaluator-schema.js");
         text += "\n\n" + formatEvaluatorSchema();
       }
       return { content: [{ type: "text", text }] };
-    }
+    },
   );
 
   server.tool(
@@ -206,13 +200,13 @@ function registerTools(server: McpServer): void {
         .record(z.string(), z.array(z.string()))
         .optional()
         .describe(
-          'Filter traces. Format: {"field": ["value"]}. Use discover_schema for field names.'
+          'Filter traces. Format: {"field": ["value"]}. Use discover_schema for field names.',
         ),
       startDate: z
         .string()
         .optional()
         .describe(
-          'Start date: ISO string or relative like "24h", "7d", "30d". Default: 24h ago'
+          'Start date: ISO string or relative like "24h", "7d", "30d". Default: 24h ago',
         ),
       endDate: z
         .string()
@@ -222,15 +216,12 @@ function registerTools(server: McpServer): void {
         .number()
         .optional()
         .describe("Results per page (default: 25, max: 1000)"),
-      scrollId: z
-        .string()
-        .optional()
-        .describe("Pagination token from previous search"),
+      scrollId: z.string().optional().describe("Pagination token from previous search"),
       format: z
         .enum(["digest", "json"])
         .optional()
         .describe(
-          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)",
         ),
     },
     withToolLogging("search_traces", async (params) => {
@@ -239,7 +230,7 @@ function registerTools(server: McpServer): void {
       return {
         content: [{ type: "text", text: await handleSearchTraces(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -251,7 +242,7 @@ function registerTools(server: McpServer): void {
         .enum(["digest", "json"])
         .optional()
         .describe(
-          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)",
         ),
     },
     withToolLogging("get_trace", async (params) => {
@@ -260,7 +251,7 @@ function registerTools(server: McpServer): void {
       return {
         content: [{ type: "text", text: await handleGetTrace(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -270,20 +261,18 @@ function registerTools(server: McpServer): void {
       metric: z
         .string()
         .describe(
-          'Metric in "category.name" format, e.g., "metadata.trace_id", "performance.total_cost"'
+          'Metric in "category.name" format, e.g., "metadata.trace_id", "performance.total_cost"',
         ),
       aggregation: z
         .string()
         .optional()
         .describe(
-          "Aggregation type: avg, sum, min, max, median, p90, p95, p99, cardinality, terms. Default: avg"
+          "Aggregation type: avg, sum, min, max, median, p90, p95, p99, cardinality, terms. Default: avg",
         ),
       startDate: z
         .string()
         .optional()
-        .describe(
-          'Start date: ISO or relative ("7d", "30d"). Default: 7 days ago'
-        ),
+        .describe('Start date: ISO or relative ("7d", "30d"). Default: 7 days ago'),
       endDate: z.string().optional().describe("End date. Default: now"),
       timeZone: z.string().optional().describe("Timezone. Default: UTC"),
       groupBy: z
@@ -301,7 +290,7 @@ function registerTools(server: McpServer): void {
       return {
         content: [{ type: "text", text: await handleGetAnalytics(params) }],
       };
-    })
+    }),
   );
 
   // --- Platform Prompt Tools (require API key) ---
@@ -323,24 +312,23 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       handle: z
         .string()
         .optional()
-        .describe(
-          "URL-friendly handle (auto-generated from name if omitted)"
-        ),
+        .describe("URL-friendly handle (auto-generated from name if omitted)"),
       messages: z
         .array(
           z.object({
-            role: z
-              .enum(["system", "user", "assistant"])
-              .describe("Message role"),
+            role: z.enum(["system", "user", "assistant"]).describe("Message role"),
             content: z.string().describe("Message content"),
-          })
+          }),
         )
         .describe("Prompt messages"),
       model: modelSchema,
-      tags: z.array(z.string()).optional().describe(
-        'Tags to assign to the initial version (e.g., ["production", "staging"]). ' +
-        'Built-in tags: "latest" (auto-assigned), "production", "staging". Custom tags must be created first.'
-      ),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Tags to assign to the initial version (e.g., ["production", "staging"]). ' +
+            'Built-in tags: "latest" (auto-assigned), "production", "staging". Custom tags must be created first.',
+        ),
     },
     withToolLogging("platform_create_prompt", async (params) => {
       requireApiKey();
@@ -348,7 +336,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       return {
         content: [{ type: "text", text: await handleCreatePrompt(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -361,7 +349,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       return {
         content: [{ type: "text", text: await handleListPrompts() }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -373,15 +361,20 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         .number()
         .optional()
         .describe("Specific version number (default: latest)"),
-      tag: z.string().optional().describe(
-        'Fetch the version pointed to by this tag (e.g., "production", "staging"). ' +
-        'Alternatively, use shorthand in idOrHandle: "pizza-prompt:production"'
-      ),
+      tag: z
+        .string()
+        .optional()
+        .describe(
+          'Fetch the version pointed to by this tag (e.g., "production", "staging"). ' +
+            'Alternatively, use shorthand in idOrHandle: "pizza-prompt:production"',
+        ),
     },
     withToolLogging("platform_get_prompt", async (params) => {
       if (params.version != null && params.tag) {
         return {
-          content: [{ type: "text", text: "Error: Provide either 'version' or 'tag', not both." }],
+          content: [
+            { type: "text", text: "Error: Provide either 'version' or 'tag', not both." },
+          ],
           isError: true,
         };
       }
@@ -390,7 +383,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       return {
         content: [{ type: "text", text: await handleGetPrompt(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -403,17 +396,16 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
           z.object({
             role: z.enum(["system", "user", "assistant"]),
             content: z.string(),
-          })
+          }),
         )
         .optional()
         .describe("Updated messages"),
       model: modelSchema.optional(),
-      commitMessage: z
-        .string()
-        .describe("Commit message describing the change"),
-      tags: z.array(z.string()).optional().describe(
-        'Tags to assign to the new version created by this update.'
-      ),
+      commitMessage: z.string().describe("Commit message describing the change"),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe("Tags to assign to the new version created by this update."),
     },
     withToolLogging("platform_update_prompt", async (params) => {
       requireApiKey();
@@ -421,13 +413,13 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       return {
         content: [{ type: "text", text: await handleUpdatePrompt(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
     "platform_assign_prompt_tag",
     'Assign a tag (e.g. "production") to a specific version of a prompt. ' +
-    'Use this to "deploy" a version by promoting it to the production tag.',
+      'Use this to "deploy" a version by promoting it to the production tag.',
     {
       idOrHandle: z.string().describe("Prompt ID or handle"),
       tag: z.string().describe('Tag name (e.g., "production", "staging")'),
@@ -439,13 +431,13 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       return {
         content: [{ type: "text", text: await handleAssignPromptTag(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
     "platform_list_prompt_tags",
     "List all prompt tag definitions for the organization. " +
-    "Shows built-in tags (latest, production, staging) and any custom tags.",
+      "Shows built-in tags (latest, production, staging) and any custom tags.",
     {},
     withToolLogging("platform_list_prompt_tags", async () => {
       requireApiKey();
@@ -453,13 +445,13 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       return {
         content: [{ type: "text", text: await handleListPromptTags() }],
       };
-    })
+    }),
   );
 
   server.tool(
     "platform_create_prompt_tag",
     "Create a custom prompt tag definition for the organization. " +
-    'Tag names must be non-numeric and not "latest".',
+      'Tag names must be non-numeric and not "latest".',
     {
       name: z.string().describe("Tag name to create"),
     },
@@ -469,7 +461,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       return {
         content: [{ type: "text", text: await handleCreatePromptTag(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -485,7 +477,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       return {
         content: [{ type: "text", text: await handleRenamePromptTag(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -500,7 +492,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       return {
         content: [{ type: "text", text: await handleDeletePromptTag(params) }],
       };
-    })
+    }),
   );
 
   // --- Platform Scenario Tools (require API key) ---
@@ -521,15 +513,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       name: z.string().describe("Scenario name"),
       situation: z
         .string()
-        .describe(
-          "The context or setup describing what the user/agent is doing"
-        ),
+        .describe("The context or setup describing what the user/agent is doing"),
       criteria: z
         .array(z.string())
         .optional()
-        .describe(
-          "Pass/fail conditions the agent's response must satisfy"
-        ),
+        .describe("Pass/fail conditions the agent's response must satisfy"),
       labels: z
         .array(z.string())
         .optional()
@@ -537,15 +525,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_create_scenario", async (params) => {
       requireApiKey();
-      const { handleCreateScenario } = await import(
-        "./tools/create-scenario.js"
-      );
+      const { handleCreateScenario } = await import("./tools/create-scenario.js");
       return {
-        content: [
-          { type: "text", text: await handleCreateScenario(params) },
-        ],
+        content: [{ type: "text", text: await handleCreateScenario(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -556,20 +540,16 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .enum(["digest", "json"])
         .optional()
         .describe(
-          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)",
         ),
     },
     withToolLogging("platform_list_scenarios", async (params) => {
       requireApiKey();
-      const { handleListScenarios } = await import(
-        "./tools/list-scenarios.js"
-      );
+      const { handleListScenarios } = await import("./tools/list-scenarios.js");
       return {
-        content: [
-          { type: "text", text: await handleListScenarios(params) },
-        ],
+        content: [{ type: "text", text: await handleListScenarios(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -581,7 +561,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .enum(["digest", "json"])
         .optional()
         .describe(
-          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)",
         ),
     },
     withToolLogging("platform_get_scenario", async (params) => {
@@ -590,7 +570,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleGetScenario(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -600,26 +580,16 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       scenarioId: z.string().describe("The scenario ID to update"),
       name: z.string().optional().describe("Updated scenario name"),
       situation: z.string().optional().describe("Updated situation"),
-      criteria: z
-        .array(z.string())
-        .optional()
-        .describe("Updated criteria"),
-      labels: z
-        .array(z.string())
-        .optional()
-        .describe("Updated labels"),
+      criteria: z.array(z.string()).optional().describe("Updated criteria"),
+      labels: z.array(z.string()).optional().describe("Updated labels"),
     },
     withToolLogging("platform_update_scenario", async (params) => {
       requireApiKey();
-      const { handleUpdateScenario } = await import(
-        "./tools/update-scenario.js"
-      );
+      const { handleUpdateScenario } = await import("./tools/update-scenario.js");
       return {
-        content: [
-          { type: "text", text: await handleUpdateScenario(params) },
-        ],
+        content: [{ type: "text", text: await handleUpdateScenario(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -630,15 +600,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_archive_scenario", async (params) => {
       requireApiKey();
-      const { handleArchiveScenario } = await import(
-        "./tools/archive-scenario.js"
-      );
+      const { handleArchiveScenario } = await import("./tools/archive-scenario.js");
       return {
-        content: [
-          { type: "text", text: await handleArchiveScenario(params) },
-        ],
+        content: [{ type: "text", text: await handleArchiveScenario(params) }],
       };
-    })
+    }),
   );
 
   // --- Platform Suite / Run Plan Tools (require API key) ---
@@ -659,7 +625,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleListSuites(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -678,7 +644,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleGetSuite(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -688,8 +654,15 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       name: z.string().describe("Suite name"),
       description: z.string().optional().describe("Suite description"),
       scenarioIds: z.array(z.string()).describe("Array of scenario IDs to include"),
-      targets: z.string().describe('JSON array of target objects, e.g. [{"type":"http","referenceId":"agent_abc"}]'),
-      repeatCount: z.number().optional().describe("Number of times to repeat each scenario-target pair (default: 1)"),
+      targets: z
+        .string()
+        .describe(
+          'JSON array of target objects, e.g. [{"type":"http","referenceId":"agent_abc"}]',
+        ),
+      repeatCount: z
+        .number()
+        .optional()
+        .describe("Number of times to repeat each scenario-target pair (default: 1)"),
       labels: z.array(z.string()).optional().describe("Tags for organizing suites"),
     },
     withToolLogging("platform_create_suite", async (params) => {
@@ -698,7 +671,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleCreateSuite(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -719,7 +692,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleUpdateSuite(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -734,7 +707,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleRunSuite(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -749,7 +722,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleArchiveSuite(params) }],
       };
-    })
+    }),
   );
 
   // --- Platform Simulation Run Tools (require API key) ---
@@ -766,11 +739,12 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_list_simulation_runs", async (params) => {
       requireApiKey();
-      const { handleListSimulationRuns } = await import("./tools/list-simulation-runs.js");
+      const { handleListSimulationRuns } =
+        await import("./tools/list-simulation-runs.js");
       return {
         content: [{ type: "text", text: await handleListSimulationRuns(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -786,7 +760,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleGetSimulationRun(params) }],
       };
-    })
+    }),
   );
 
   // --- Platform Evaluator Tools (require API key) ---
@@ -800,20 +774,16 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       config: z
         .record(z.string(), z.unknown())
         .describe(
-          'Evaluator config object. Must include "evaluatorType" (e.g. "langevals/llm_boolean") and optional "settings" overrides.'
+          'Evaluator config object. Must include "evaluatorType" (e.g. "langevals/llm_boolean") and optional "settings" overrides.',
         ),
     },
     withToolLogging("platform_create_evaluator", async (params) => {
       requireApiKey();
-      const { handleCreateEvaluator } = await import(
-        "./tools/create-evaluator.js"
-      );
+      const { handleCreateEvaluator } = await import("./tools/create-evaluator.js");
       return {
-        content: [
-          { type: "text", text: await handleCreateEvaluator(params) },
-        ],
+        content: [{ type: "text", text: await handleCreateEvaluator(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -822,32 +792,26 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     {},
     withToolLogging("platform_list_evaluators", async () => {
       requireApiKey();
-      const { handleListEvaluators } = await import(
-        "./tools/list-evaluators.js"
-      );
+      const { handleListEvaluators } = await import("./tools/list-evaluators.js");
       return {
         content: [{ type: "text", text: await handleListEvaluators() }],
       };
-    })
+    }),
   );
 
   server.tool(
     "platform_get_evaluator",
     "Get full details of an evaluator on the LangWatch platform by ID or slug, including config, input fields, and output fields.",
     {
-      idOrSlug: z
-        .string()
-        .describe("The evaluator ID or slug to retrieve"),
+      idOrSlug: z.string().describe("The evaluator ID or slug to retrieve"),
     },
     withToolLogging("platform_get_evaluator", async (params) => {
       requireApiKey();
-      const { handleGetEvaluator } = await import(
-        "./tools/get-evaluator.js"
-      );
+      const { handleGetEvaluator } = await import("./tools/get-evaluator.js");
       return {
         content: [{ type: "text", text: await handleGetEvaluator(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -860,20 +824,16 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .record(z.string(), z.unknown())
         .optional()
         .describe(
-          "Updated config settings. Note: evaluatorType cannot be changed after creation."
+          "Updated config settings. Note: evaluatorType cannot be changed after creation.",
         ),
     },
     withToolLogging("platform_update_evaluator", async (params) => {
       requireApiKey();
-      const { handleUpdateEvaluator } = await import(
-        "./tools/update-evaluator.js"
-      );
+      const { handleUpdateEvaluator } = await import("./tools/update-evaluator.js");
       return {
-        content: [
-          { type: "text", text: await handleUpdateEvaluator(params) },
-        ],
+        content: [{ type: "text", text: await handleUpdateEvaluator(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -888,7 +848,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleDeleteEvaluator(params) }],
       };
-    })
+    }),
   );
 
   // --- Platform Model Provider Tools (require API key) ---
@@ -900,32 +860,23 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     {
       provider: z
         .string()
-        .describe(
-          'Provider name, e.g., "openai", "anthropic", "azure", "custom"'
-        ),
+        .describe('Provider name, e.g., "openai", "anthropic", "azure", "custom"'),
       enabled: z.boolean().describe("Whether the provider is enabled"),
       customKeys: z
         .record(z.string(), z.unknown())
         .optional()
         .describe(
-          'API key configuration, e.g. { "OPENAI_API_KEY": "sk-..." }. Omit to keep existing keys.'
+          'API key configuration, e.g. { "OPENAI_API_KEY": "sk-..." }. Omit to keep existing keys.',
         ),
-      defaultModel: z
-        .string()
-        .optional()
-        .describe("Set as project default model"),
+      defaultModel: z.string().optional().describe("Set as project default model"),
     },
     withToolLogging("platform_set_model_provider", async (params) => {
       requireApiKey();
-      const { handleSetModelProvider } = await import(
-        "./tools/set-model-provider.js"
-      );
+      const { handleSetModelProvider } = await import("./tools/set-model-provider.js");
       return {
-        content: [
-          { type: "text", text: await handleSetModelProvider(params) },
-        ],
+        content: [{ type: "text", text: await handleSetModelProvider(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -934,13 +885,12 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     {},
     withToolLogging("platform_list_model_providers", async () => {
       requireApiKey();
-      const { handleListModelProviders } = await import(
-        "./tools/list-model-providers.js"
-      );
+      const { handleListModelProviders } =
+        await import("./tools/list-model-providers.js");
       return {
         content: [{ type: "text", text: await handleListModelProviders() }],
       };
-    })
+    }),
   );
 
   // --- Platform Agent Tools (require API key) ---
@@ -955,7 +905,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleListAgents() }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -970,7 +920,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleGetAgent(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -979,16 +929,26 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     {
       name: z.string().describe("Agent name"),
       type: z.enum(["signature", "code", "workflow", "http"]).describe("Agent type"),
-      config: z.string().optional().describe("Agent configuration as JSON string (will be parsed)"),
+      config: z
+        .string()
+        .optional()
+        .describe("Agent configuration as JSON string (will be parsed)"),
     },
     withToolLogging("platform_create_agent", async (params) => {
       requireApiKey();
       const { handleCreateAgent } = await import("./tools/create-agent.js");
-      const parsedConfig = params.config ? JSON.parse(params.config) as Record<string, unknown> : undefined;
+      const parsedConfig = params.config
+        ? (JSON.parse(params.config) as Record<string, unknown>)
+        : undefined;
       return {
-        content: [{ type: "text", text: await handleCreateAgent({ ...params, config: parsedConfig }) }],
+        content: [
+          {
+            type: "text",
+            text: await handleCreateAgent({ ...params, config: parsedConfig }),
+          },
+        ],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -997,17 +957,30 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     {
       id: z.string().describe("The agent ID"),
       name: z.string().optional().describe("New agent name"),
-      type: z.string().optional().describe("New agent type: signature, code, workflow, or http"),
-      config: z.string().optional().describe("Updated configuration as JSON string (will be parsed)"),
+      type: z
+        .string()
+        .optional()
+        .describe("New agent type: signature, code, workflow, or http"),
+      config: z
+        .string()
+        .optional()
+        .describe("Updated configuration as JSON string (will be parsed)"),
     },
     withToolLogging("platform_update_agent", async (params) => {
       requireApiKey();
       const { handleUpdateAgent } = await import("./tools/update-agent.js");
-      const parsedConfig = params.config ? JSON.parse(params.config) as Record<string, unknown> : undefined;
+      const parsedConfig = params.config
+        ? (JSON.parse(params.config) as Record<string, unknown>)
+        : undefined;
       return {
-        content: [{ type: "text", text: await handleUpdateAgent({ ...params, config: parsedConfig }) }],
+        content: [
+          {
+            type: "text",
+            text: await handleUpdateAgent({ ...params, config: parsedConfig }),
+          },
+        ],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1022,7 +995,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleDeleteAgent(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1038,7 +1011,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleRunAgent(params) }],
       };
-    })
+    }),
   );
 
   // --- Platform Dashboard Tools (require API key) ---
@@ -1053,7 +1026,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleListDashboards() }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1068,7 +1041,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleGetDashboard(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1083,7 +1056,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleCreateDashboard(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1098,7 +1071,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleDeleteDashboard(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1113,9 +1086,14 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       const { renameDashboard } = await import("./langwatch-api-dashboards.js");
       const result = await renameDashboard(params.id, { name: params.name });
       return {
-        content: [{ type: "text", text: `Dashboard "${result.name}" renamed successfully (ID: ${result.id}).` }],
+        content: [
+          {
+            type: "text",
+            text: `Dashboard "${result.name}" renamed successfully (ID: ${result.id}).`,
+          },
+        ],
       };
-    })
+    }),
   );
 
   // --- Platform Workflow Tools (require API key) ---
@@ -1130,7 +1108,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleListWorkflows() }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1145,7 +1123,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleGetWorkflow(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1160,7 +1138,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleDeleteWorkflow(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1176,7 +1154,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleRunWorkflow(params) }],
       };
-    })
+    }),
   );
 
   // --- Platform Annotation Tools (require API key) ---
@@ -1193,7 +1171,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleListAnnotations(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1202,7 +1180,10 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     {
       traceId: z.string().describe("The trace ID to annotate"),
       comment: z.string().optional().describe("Annotation comment"),
-      isThumbsUp: z.boolean().optional().describe("True for positive feedback, false for negative"),
+      isThumbsUp: z
+        .boolean()
+        .optional()
+        .describe("True for positive feedback, false for negative"),
       email: z.string().optional().describe("Email of the annotator"),
     },
     withToolLogging("platform_create_annotation", async (params) => {
@@ -1211,7 +1192,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleCreateAnnotation(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1226,7 +1207,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleDeleteAnnotation(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1249,7 +1230,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: lines.join("\n") }],
       };
-    })
+    }),
   );
 
   // --- Platform Trigger/Automation Tools (require API key) ---
@@ -1268,7 +1249,14 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         return { content: [{ type: "text", text: JSON.stringify(triggers, null, 2) }] };
       }
       if (triggers.length === 0) {
-        return { content: [{ type: "text", text: "No triggers found. Use `platform_create_trigger` to create one." }] };
+        return {
+          content: [
+            {
+              type: "text",
+              text: "No triggers found. Use `platform_create_trigger` to create one.",
+            },
+          ],
+        };
       }
       const lines = [`# Triggers (${triggers.length} total)\n`];
       for (const t of triggers) {
@@ -1280,7 +1268,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         lines.push("");
       }
       return { content: [{ type: "text", text: lines.join("\n") }] };
-    })
+    }),
   );
 
   server.tool(
@@ -1288,18 +1276,33 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     "Create a new trigger (automation) that fires when conditions are met.",
     {
       name: z.string().describe("Trigger name"),
-      action: z.enum(["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE"]).describe("Action to take when triggered"),
+      action: z
+        .enum([
+          "SEND_EMAIL",
+          "ADD_TO_DATASET",
+          "ADD_TO_ANNOTATION_QUEUE",
+          "SEND_SLACK_MESSAGE",
+        ])
+        .describe("Action to take when triggered"),
       filters: z.string().optional().describe("Filter conditions as JSON string"),
       message: z.string().optional().describe("Custom alert message"),
-      alertType: z.enum(["CRITICAL", "WARNING", "INFO"]).optional().describe("Alert severity"),
+      alertType: z
+        .enum(["CRITICAL", "WARNING", "INFO"])
+        .optional()
+        .describe("Alert severity"),
     },
     withToolLogging("platform_create_trigger", async (params) => {
       requireApiKey();
       const { createTrigger } = await import("./langwatch-api-triggers.js");
       let filters: Record<string, unknown> = {};
       if (params.filters) {
-        try { filters = JSON.parse(params.filters) as Record<string, unknown>; }
-        catch { return { content: [{ type: "text", text: "Error: filters must be valid JSON" }] }; }
+        try {
+          filters = JSON.parse(params.filters) as Record<string, unknown>;
+        } catch {
+          return {
+            content: [{ type: "text", text: "Error: filters must be valid JSON" }],
+          };
+        }
       }
       const trigger = await createTrigger({
         name: params.name,
@@ -1308,8 +1311,15 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         message: params.message,
         alertType: params.alertType,
       });
-      return { content: [{ type: "text", text: `Trigger "${trigger.name}" created (ID: ${trigger.id}, Action: ${trigger.action}).` }] };
-    })
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Trigger "${trigger.name}" created (ID: ${trigger.id}, Action: ${trigger.action}).`,
+          },
+        ],
+      };
+    }),
   );
 
   server.tool(
@@ -1320,14 +1330,24 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       name: z.string().optional().describe("New name"),
       active: z.boolean().optional().describe("Enable or disable"),
       message: z.string().optional().describe("New alert message"),
-      alertType: z.enum(["CRITICAL", "WARNING", "INFO"]).optional().describe("New alert severity"),
+      alertType: z
+        .enum(["CRITICAL", "WARNING", "INFO"])
+        .optional()
+        .describe("New alert severity"),
     },
     withToolLogging("platform_update_trigger", async (params) => {
       requireApiKey();
       const { updateTrigger } = await import("./langwatch-api-triggers.js");
       const trigger = await updateTrigger(params);
-      return { content: [{ type: "text", text: `Trigger "${trigger.name}" updated (active: ${trigger.active}).` }] };
-    })
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Trigger "${trigger.name}" updated (active: ${trigger.active}).`,
+          },
+        ],
+      };
+    }),
   );
 
   server.tool(
@@ -1341,7 +1361,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       const { deleteTrigger } = await import("./langwatch-api-triggers.js");
       const result = await deleteTrigger(params.id);
       return { content: [{ type: "text", text: `Trigger ${result.id} deleted.` }] };
-    })
+    }),
   );
 
   // --- Platform Monitor Tools (require API key) ---
@@ -1359,7 +1379,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       }
       const lines = monitors.map(
         (m) =>
-          `• ${m.name} (id: ${m.id}, type: ${m.checkType}, ${m.enabled ? "enabled" : "disabled"}, mode: ${m.executionMode}, sample: ${Math.round(m.sample * 100)}%)`
+          `• ${m.name} (id: ${m.id}, type: ${m.checkType}, ${m.enabled ? "enabled" : "disabled"}, mode: ${m.executionMode}, sample: ${Math.round(m.sample * 100)}%)`,
       );
       return {
         content: [
@@ -1369,7 +1389,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           },
         ],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1393,7 +1413,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         `- Created: ${m.createdAt}`,
       ].filter(Boolean);
       return { content: [{ type: "text", text: lines.join("\n") }] };
-    })
+    }),
   );
 
   server.tool(
@@ -1414,10 +1434,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .max(1)
         .optional()
         .describe("Sampling rate 0.0-1.0 (default: 1.0)"),
-      evaluatorId: z
-        .string()
-        .optional()
-        .describe("Link to a saved evaluator by ID"),
+      evaluatorId: z.string().optional().describe("Link to a saved evaluator by ID"),
     },
     withToolLogging("platform_create_monitor", async (params) => {
       requireApiKey();
@@ -1431,7 +1448,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           },
         ],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1459,7 +1476,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           },
         ],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1473,11 +1490,9 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       const { deleteMonitor } = await import("./langwatch-api-monitors.js");
       const result = await deleteMonitor(params.id);
       return {
-        content: [
-          { type: "text", text: `Monitor ${result.id} deleted.` },
-        ],
+        content: [{ type: "text", text: `Monitor ${result.id} deleted.` }],
       };
-    })
+    }),
   );
 
   // --- Platform Secret Tools (require API key) ---
@@ -1494,7 +1509,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         return { content: [{ type: "text", text: "No secrets found." }] };
       }
       const lines = secrets.map(
-        (s) => `• ${s.name} (id: ${s.id}, updated: ${s.updatedAt})`
+        (s) => `• ${s.name} (id: ${s.id}, updated: ${s.updatedAt})`,
       );
       return {
         content: [
@@ -1504,7 +1519,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           },
         ],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1526,7 +1541,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           },
         ],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1548,7 +1563,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           },
         ],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1562,7 +1577,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       const { deleteSecret } = await import("./langwatch-api-secrets.js");
       const result = await deleteSecret(params.id);
       return { content: [{ type: "text", text: `Secret ${result.id} deleted.` }] };
-    })
+    }),
   );
 
   // --- Platform Experiment Execution Tools (require API key) ---
@@ -1578,7 +1593,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleRunExperiment(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1598,7 +1613,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleExperimentStatus(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1620,7 +1635,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleExperimentList(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1629,34 +1644,28 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     {
       experimentSlug: z
         .string()
-        .describe(
-          "Experiment slug from platform_experiment_list (e.g. 'checkout-flow')",
-        ),
+        .describe("Experiment slug from platform_experiment_list (e.g. 'checkout-flow')"),
       limit: z
         .number()
         .int()
         .positive()
         .max(100)
         .optional()
-        .describe(
-          "Maximum number of runs to include (default 25, hard-capped at 100)",
-        ),
+        .describe("Maximum number of runs to include (default 25, hard-capped at 100)"),
     },
     withToolLogging("platform_experiment_list_runs", async (params) => {
       requireApiKey();
       return {
         content: [{ type: "text", text: await handleExperimentListRuns(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
     "platform_experiment_results",
     "Fetch per-row results for an experiment run so you can debug evaluator scores and missed rows. Serves partial results for runs that are still running or were interrupted (it does not require a completed run), with the run status noted in the output. Returns a markdown report: per-evaluator averages plus row-by-row scores and failure details. Output is capped at 50 rows to protect the agent's context window — narrow with `filter: 'failed'` or `evaluator` to see what matters.",
     {
-      runId: z
-        .string()
-        .describe("The run ID returned from platform_run_experiment"),
+      runId: z.string().describe("The run ID returned from platform_run_experiment"),
       experimentSlug: z
         .string()
         .optional()
@@ -1686,11 +1695,9 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     withToolLogging("platform_experiment_results", async (params) => {
       requireApiKey();
       return {
-        content: [
-          { type: "text", text: await handleExperimentResults(params) },
-        ],
+        content: [{ type: "text", text: await handleExperimentResults(params) }],
       };
-    })
+    }),
   );
 
   // --- Platform Dataset Tools (require API key) ---
@@ -1704,19 +1711,17 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .enum(["digest", "json"])
         .optional()
         .describe(
-          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)",
         ),
     },
     async (params) => {
       const { requireApiKey } = await import("./config.js");
       requireApiKey();
-      const { handleListDatasets } = await import(
-        "./tools/list-datasets.js"
-      );
+      const { handleListDatasets } = await import("./tools/list-datasets.js");
       return {
         content: [{ type: "text", text: await handleListDatasets(params) }],
       };
-    }
+    },
   );
 
   server.tool(
@@ -1728,7 +1733,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .enum(["digest", "json"])
         .optional()
         .describe(
-          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)",
         ),
     },
     async (params) => {
@@ -1738,7 +1743,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleGetDataset(params) }],
       };
-    }
+    },
   );
 
   server.tool(
@@ -1748,13 +1753,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     async (params) => {
       const { requireApiKey } = await import("./config.js");
       requireApiKey();
-      const { handleCreateDataset } = await import(
-        "./tools/create-dataset.js"
-      );
+      const { handleCreateDataset } = await import("./tools/create-dataset.js");
       return {
         content: [{ type: "text", text: await handleCreateDataset(params) }],
       };
-    }
+    },
   );
 
   server.tool(
@@ -1771,13 +1774,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     async (params) => {
       const { requireApiKey } = await import("./config.js");
       requireApiKey();
-      const { handleUpdateDataset } = await import(
-        "./tools/update-dataset.js"
-      );
+      const { handleUpdateDataset } = await import("./tools/update-dataset.js");
       return {
         content: [{ type: "text", text: await handleUpdateDataset(params) }],
       };
-    }
+    },
   );
 
   server.tool(
@@ -1789,28 +1790,19 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     async (params) => {
       const { requireApiKey } = await import("./config.js");
       requireApiKey();
-      const { handleDeleteDataset } = await import(
-        "./tools/delete-dataset.js"
-      );
+      const { handleDeleteDataset } = await import("./tools/delete-dataset.js");
       return {
         content: [{ type: "text", text: await handleDeleteDataset(params) }],
       };
-    }
+    },
   );
 
   server.tool(
     "platform_list_dataset_records",
     "List records in a dataset on the LangWatch platform with pagination.",
     {
-      slugOrId: z
-        .string()
-        .describe("The dataset slug or ID to list records from"),
-      page: z
-        .number()
-        .int()
-        .min(1)
-        .optional()
-        .describe("Page number (default: 1)"),
+      slugOrId: z.string().describe("The dataset slug or ID to list records from"),
+      page: z.number().int().min(1).optional().describe("Page number (default: 1)"),
       limit: z
         .number()
         .int()
@@ -1821,56 +1813,50 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       format: z
         .enum(["digest", "json"])
         .optional()
-        .describe("Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"),
+        .describe(
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)",
+        ),
     },
     async (params) => {
       const { requireApiKey } = await import("./config.js");
       requireApiKey();
-      const { handleListDatasetRecords } = await import(
-        "./tools/list-dataset-records.js"
-      );
+      const { handleListDatasetRecords } =
+        await import("./tools/list-dataset-records.js");
       return {
-        content: [
-          { type: "text", text: await handleListDatasetRecords(params) },
-        ],
+        content: [{ type: "text", text: await handleListDatasetRecords(params) }],
       };
-    }
+    },
   );
 
   server.tool(
     "platform_create_dataset_records",
     "Add records to a dataset on the LangWatch platform in batch (max 1000 per call).",
     {
-      slugOrId: z
-        .string()
-        .describe("The dataset slug or ID to add records to"),
+      slugOrId: z.string().describe("The dataset slug or ID to add records to"),
       entries: z
         .array(z.record(z.string(), z.unknown()))
         .min(1)
         .max(1000)
-        .describe("Array of record entries to create (key-value objects matching dataset columns)"),
+        .describe(
+          "Array of record entries to create (key-value objects matching dataset columns)",
+        ),
     },
     async (params) => {
       const { requireApiKey } = await import("./config.js");
       requireApiKey();
-      const { handleCreateDatasetRecords } = await import(
-        "./tools/create-dataset-records.js"
-      );
+      const { handleCreateDatasetRecords } =
+        await import("./tools/create-dataset-records.js");
       return {
-        content: [
-          { type: "text", text: await handleCreateDatasetRecords(params) },
-        ],
+        content: [{ type: "text", text: await handleCreateDatasetRecords(params) }],
       };
-    }
+    },
   );
 
   server.tool(
     "platform_update_dataset_record",
     "Update a single record in a dataset on the LangWatch platform.",
     {
-      slugOrId: z
-        .string()
-        .describe("The dataset slug or ID containing the record"),
+      slugOrId: z.string().describe("The dataset slug or ID containing the record"),
       recordId: z.string().describe("The record ID to update"),
       entry: z
         .record(z.string(), z.unknown())
@@ -1879,24 +1865,19 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     async (params) => {
       const { requireApiKey } = await import("./config.js");
       requireApiKey();
-      const { handleUpdateDatasetRecord } = await import(
-        "./tools/update-dataset-record.js"
-      );
+      const { handleUpdateDatasetRecord } =
+        await import("./tools/update-dataset-record.js");
       return {
-        content: [
-          { type: "text", text: await handleUpdateDatasetRecord(params) },
-        ],
+        content: [{ type: "text", text: await handleUpdateDatasetRecord(params) }],
       };
-    }
+    },
   );
 
   server.tool(
     "platform_delete_dataset_records",
     "Delete records from a dataset on the LangWatch platform by their IDs.",
     {
-      slugOrId: z
-        .string()
-        .describe("The dataset slug or ID containing the records"),
+      slugOrId: z.string().describe("The dataset slug or ID containing the records"),
       recordIds: z
         .array(z.string())
         .min(1)
@@ -1906,15 +1887,12 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     async (params) => {
       const { requireApiKey } = await import("./config.js");
       requireApiKey();
-      const { handleDeleteDatasetRecords } = await import(
-        "./tools/delete-dataset-records.js"
-      );
+      const { handleDeleteDatasetRecords } =
+        await import("./tools/delete-dataset-records.js");
       return {
-        content: [
-          { type: "text", text: await handleDeleteDatasetRecords(params) },
-        ],
+        content: [{ type: "text", text: await handleDeleteDatasetRecords(params) }],
       };
-    }
+    },
   );
 
   // --- Platform Project Tools ---
@@ -1926,7 +1904,13 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     "List all projects in your LangWatch organization. Requires an org-level API key.",
     {
       page: z.number().int().positive().optional().describe("Page number (default: 1)"),
-      limit: z.number().int().positive().max(1000).optional().describe("Results per page (default: 100)"),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .max(1000)
+        .optional()
+        .describe("Results per page (default: 100)"),
     },
     withToolLogging("platform_list_projects", async (params) => {
       requireApiKey();
@@ -1934,7 +1918,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleListProjects(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1949,7 +1933,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleGetProject(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1961,8 +1945,14 @@ You must provide either teamId (to add the project to an existing team) or newTe
       name: z.string().describe("Project name"),
       language: z.string().describe('Programming language (e.g. "python", "typescript")'),
       framework: z.string().describe('Framework (e.g. "openai", "langchain", "custom")'),
-      teamId: z.string().optional().describe("ID of an existing team to add the project to"),
-      newTeamName: z.string().optional().describe("Name for a new team to create for this project"),
+      teamId: z
+        .string()
+        .optional()
+        .describe("ID of an existing team to add the project to"),
+      newTeamName: z
+        .string()
+        .optional()
+        .describe("Name for a new team to create for this project"),
     },
     withToolLogging("platform_create_project", async (params) => {
       requireApiKey();
@@ -1970,7 +1960,7 @@ You must provide either teamId (to add the project to an existing team) or newTe
       return {
         content: [{ type: "text", text: await handleCreateProject(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -1981,7 +1971,10 @@ You must provide either teamId (to add the project to an existing team) or newTe
       name: z.string().optional().describe("New project name"),
       language: z.string().optional().describe("New programming language"),
       framework: z.string().optional().describe("New framework"),
-      piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]).optional().describe("PII redaction level"),
+      piiRedactionLevel: z
+        .enum(["STRICT", "ESSENTIAL", "DISABLED"])
+        .optional()
+        .describe("PII redaction level"),
     },
     withToolLogging("platform_update_project", async (params) => {
       requireApiKey();
@@ -1989,7 +1982,7 @@ You must provide either teamId (to add the project to an existing team) or newTe
       return {
         content: [{ type: "text", text: await handleUpdateProject(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -2004,7 +1997,7 @@ You must provide either teamId (to add the project to an existing team) or newTe
       return {
         content: [{ type: "text", text: await handleArchiveProject(params) }],
       };
-    })
+    }),
   );
 
   // --- Platform API Key Tools (require org-level API key) ---
@@ -2020,7 +2013,7 @@ You must provide either teamId (to add the project to an existing team) or newTe
       return {
         content: [{ type: "text", text: await handleListApiKeys() }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -2032,16 +2025,26 @@ You must provide either teamId (to add the project to an existing team) or newTe
 
 The token is returned once and cannot be retrieved again.`,
     {
-      keyType: z.enum(["personal", "service"]).describe("Key type: 'personal' (user-tied) or 'service' (headless)"),
+      keyType: z
+        .enum(["personal", "service"])
+        .describe("Key type: 'personal' (user-tied) or 'service' (headless)"),
       name: z.string().describe("Key name (max 100 chars)"),
       description: z.string().optional().describe("Key description (max 500 chars)"),
       expiresAt: z.string().optional().describe("Expiration date (ISO string)"),
-      bindings: z.array(z.object({
-        role: z.enum(["ADMIN", "MEMBER", "VIEWER"]).describe("Role"),
-        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]).describe("Scope type"),
-        scopeId: z.string().describe("Scope ID (org, team, or project ID)"),
-      })).optional().describe("Role bindings (required for personal keys)"),
-      projectIds: z.array(z.string()).optional().describe("Project IDs for service keys (creates ADMIN bindings per project)"),
+      bindings: z
+        .array(
+          z.object({
+            role: z.enum(["ADMIN", "MEMBER", "VIEWER"]).describe("Role"),
+            scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]).describe("Scope type"),
+            scopeId: z.string().describe("Scope ID (org, team, or project ID)"),
+          }),
+        )
+        .optional()
+        .describe("Role bindings (required for personal keys)"),
+      projectIds: z
+        .array(z.string())
+        .optional()
+        .describe("Project IDs for service keys (creates ADMIN bindings per project)"),
     },
     withToolLogging("platform_create_api_key", async (params) => {
       requireApiKey();
@@ -2049,7 +2052,7 @@ The token is returned once and cannot be retrieved again.`,
       return {
         content: [{ type: "text", text: await handleCreateApiKey(params) }],
       };
-    })
+    }),
   );
 
   server.tool(
@@ -2064,6 +2067,6 @@ The token is returned once and cannot be retrieved again.`,
       return {
         content: [{ type: "text", text: await handleRevokeApiKey(params) }],
       };
-    })
+    }),
   );
 }

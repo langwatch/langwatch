@@ -39,8 +39,7 @@ const envFor = (provider: string) => ({
   oktaIssuer: "https://acme.okta.com",
   cognitoClientId: "id",
   cognitoClientSecret: "secret",
-  cognitoIssuer:
-    "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123",
+  cognitoIssuer: "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123",
   oneLoginClientId: "id",
   oneLoginClientSecret: "secret",
   oneLoginIssuer: "https://acme.onelogin.com/oidc/2",
@@ -58,18 +57,17 @@ const pinsTheLegacyPath = (providerId: string): boolean => {
     (c) => (c as { providerId?: string }).providerId === providerId,
   ) as { redirectURI?: string } | undefined;
 
-  return (
-    config?.redirectURI === legacyCallbackUrl({ baseUrl: BASE_URL, providerId })
-  );
+  return config?.redirectURI === legacyCallbackUrl({ baseUrl: BASE_URL, providerId });
 };
 
 describe("legacy callback rewrites", () => {
   describe("given the generic-OAuth providers this build ships", () => {
-    it.each([
-      ...LEGACY_CALLBACK_PROVIDER_IDS,
-    ])("pins %s to the legacy callback path, so its rewrite is the one that serves it", (providerId) => {
-      expect(pinsTheLegacyPath(providerId)).toBe(true);
-    });
+    it.each([...LEGACY_CALLBACK_PROVIDER_IDS])(
+      "pins %s to the legacy callback path, so its rewrite is the one that serves it",
+      (providerId) => {
+        expect(pinsTheLegacyPath(providerId)).toBe(true);
+      },
+    );
 
     /**
      * The inverse: a provider that builds a config but is missing from the
@@ -112,9 +110,9 @@ describe("legacy callback rewrites", () => {
 
   describe("given a provider id", () => {
     it("builds the callback URL the self-hosting docs tell operators to register", () => {
-      expect(
-        legacyCallbackUrl({ baseUrl: BASE_URL, providerId: "cognito" }),
-      ).toBe("https://langwatch.acme.test/api/auth/callback/cognito");
+      expect(legacyCallbackUrl({ baseUrl: BASE_URL, providerId: "cognito" })).toBe(
+        "https://langwatch.acme.test/api/auth/callback/cognito",
+      );
     });
   });
 });

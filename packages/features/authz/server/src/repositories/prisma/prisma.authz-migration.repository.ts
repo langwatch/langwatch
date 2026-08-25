@@ -46,9 +46,7 @@ const BUDGET_RAISE_CONCURRENCY = 25;
 
 /** Prisma-compatible adapter; generated Prisma values never cross this seam. */
 export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
-  static create(
-    database: AuthzMigrationDatabase,
-  ): PrismaAuthzMigrationRepository {
+  static create(database: AuthzMigrationDatabase): PrismaAuthzMigrationRepository {
     return new PrismaAuthzMigrationRepository(database);
   }
 
@@ -317,11 +315,7 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
       })),
       skipDuplicates: true,
     });
-    for (
-      let offset = 0;
-      offset < seeds.length;
-      offset += BUDGET_RAISE_CONCURRENCY
-    ) {
+    for (let offset = 0; offset < seeds.length; offset += BUDGET_RAISE_CONCURRENCY) {
       await Promise.all(
         seeds
           .slice(offset, offset + BUDGET_RAISE_CONCURRENCY)
@@ -419,9 +413,7 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
       where: { organizationId, grantId: { in: rows.map((row) => row.id) } },
       select: { grantId: true, viewCount: true },
     });
-    const viewCounts = new Map(
-      usages.map((usage) => [usage.grantId, usage.viewCount]),
-    );
+    const viewCounts = new Map(usages.map((usage) => [usage.grantId, usage.viewCount]));
     return rows.map((row) => ({
       grantId: row.id,
       source: row.source,

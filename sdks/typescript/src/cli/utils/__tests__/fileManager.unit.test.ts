@@ -31,9 +31,7 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
       fs.mkdirSync(sub);
       process.chdir(sub);
 
-      expect(FileManager.getPromptsConfigPath()).toBe(
-        path.join(sub, "prompts.json"),
-      );
+      expect(FileManager.getPromptsConfigPath()).toBe(path.join(sub, "prompts.json"));
     });
   });
 
@@ -64,9 +62,7 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
       fs.mkdirSync(sub);
       process.chdir(sub);
 
-      expect(FileManager.getPromptsConfigPath()).toBe(
-        path.join(project, "prompts.json"),
-      );
+      expect(FileManager.getPromptsConfigPath()).toBe(path.join(project, "prompts.json"));
     });
   });
 
@@ -77,9 +73,7 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
       fs.mkdirSync(sub);
       process.chdir(sub);
 
-      expect(FileManager.getPromptsConfigPath()).toBe(
-        path.join(sub, "prompts.json"),
-      );
+      expect(FileManager.getPromptsConfigPath()).toBe(path.join(sub, "prompts.json"));
     });
   });
 
@@ -104,9 +98,7 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
         fs.mkdirSync(second);
 
         process.chdir(first);
-        expect(FileManager.getPromptsConfigPath()).toBe(
-          path.join(first, "prompts.json"),
-        );
+        expect(FileManager.getPromptsConfigPath()).toBe(path.join(first, "prompts.json"));
 
         process.chdir(second);
         expect(FileManager.getPromptsConfigPath()).toBe(

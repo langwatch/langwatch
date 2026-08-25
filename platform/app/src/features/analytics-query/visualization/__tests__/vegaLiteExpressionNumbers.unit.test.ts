@@ -26,9 +26,7 @@ import { screenVegaExpression } from "../vegaLiteExpressions";
 
 describe("numeric literals", () => {
   it("accepts scientific notation", () => {
-    expect(
-      screenVegaExpression("datum.value > 1e6").forbiddenIdentifiers,
-    ).toEqual([]);
+    expect(screenVegaExpression("datum.value > 1e6").forbiddenIdentifiers).toEqual([]);
   });
 
   it("accepts the uppercase, signed and fractional exponent forms", () => {
@@ -47,14 +45,12 @@ describe("numeric literals", () => {
   });
 
   it("keeps refusing hex literals, which Vega cannot parse", () => {
-    expect(
-      screenVegaExpression("datum.value > 0x1f").forbiddenIdentifiers,
-    ).toContain("x1f");
+    expect(screenVegaExpression("datum.value > 0x1f").forbiddenIdentifiers).toContain(
+      "x1f",
+    );
   });
 
   it("leaves an identifier that contains a digit intact", () => {
-    expect(screenVegaExpression("value1 > 2").forbiddenIdentifiers).toEqual([
-      "value1",
-    ]);
+    expect(screenVegaExpression("value1 > 2").forbiddenIdentifiers).toEqual(["value1"]);
   });
 });

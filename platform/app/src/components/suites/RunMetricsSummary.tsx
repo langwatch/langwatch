@@ -35,8 +35,7 @@ function buildCompletedDetail(summary: RunGroupSummary): string | null {
   const parts: string[] = [];
   if (summary.failedCount > 0) parts.push(`${summary.failedCount} failed`);
   if (summary.stalledCount > 0) parts.push(`${summary.stalledCount} stalled`);
-  if (summary.cancelledCount > 0)
-    parts.push(`${summary.cancelledCount} cancelled`);
+  if (summary.cancelledCount > 0) parts.push(`${summary.cancelledCount} cancelled`);
   return parts.length > 0 ? `(${parts.join(", ")})` : null;
 }
 
@@ -51,13 +50,8 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
           <Text color="fg.muted">Pass</Text>
           <HStack gap={1.5}>
             <PassRateCircle passRate={summary.passRate} />
-            <Text
-              fontWeight="medium"
-              color={getPassRateGradientColor(summary.passRate)}
-            >
-              {summary.passRate === null
-                ? "-"
-                : `${Math.round(summary.passRate)}%`}
+            <Text fontWeight="medium" color={getPassRateGradientColor(summary.passRate)}>
+              {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
             </Text>
           </HStack>
         </HStack>
@@ -133,9 +127,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
             >
               <Text color="fg.muted">Avg Agent Cost</Text>
               <HStack gap={1}>
-                <Text fontWeight="medium">
-                  {formatCost(summary.averageAgentCost)}
-                </Text>
+                <Text fontWeight="medium">{formatCost(summary.averageAgentCost)}</Text>
                 <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
               </HStack>
             </HStack>
@@ -146,9 +138,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
         {summary.totalDurationMs !== null && (
           <HStack justify="space-between">
             <Text color="fg.muted">Total Duration</Text>
-            <Text fontWeight="medium">
-              {formatLatency(summary.totalDurationMs)}
-            </Text>
+            <Text fontWeight="medium">{formatLatency(summary.totalDurationMs)}</Text>
           </HStack>
         )}
 
@@ -165,8 +155,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
 }
 
 export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
-  const { isOpen, handleMouseEnter, handleMouseLeave } =
-    useInteractiveTooltip(150);
+  const { isOpen, handleMouseEnter, handleMouseLeave } = useInteractiveTooltip(150);
 
   const isRunning = summary.inProgressCount > 0 || summary.queuedCount > 0;
 
@@ -218,9 +207,7 @@ export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
                 color={getPassRateGradientColor(summary.passRate)}
                 fontWeight="medium"
               >
-                {summary.passRate === null
-                  ? "-"
-                  : `${Math.round(summary.passRate)}%`}
+                {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
               </Text>
             </HStack>
           </>
@@ -234,9 +221,7 @@ export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
                 color={getPassRateGradientColor(summary.passRate)}
                 fontWeight="medium"
               >
-                {summary.passRate === null
-                  ? "-"
-                  : `${Math.round(summary.passRate)}%`}
+                {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
               </Text>
             </HStack>
           </>
@@ -246,9 +231,7 @@ export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
         {summary.totalDurationMs !== null && (
           <HStack gap={1}>
             <Icon as={LuClock} boxSize={3} />
-            <Text fontWeight="medium">
-              {formatLatency(summary.totalDurationMs)}
-            </Text>
+            <Text fontWeight="medium">{formatLatency(summary.totalDurationMs)}</Text>
           </HStack>
         )}
 

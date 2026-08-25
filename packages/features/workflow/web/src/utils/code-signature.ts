@@ -47,8 +47,7 @@ export const rewriteCodeSignature = (
     (_match, methodName: string, returnType: string | undefined) =>
       `def ${methodName}(self, ${inputs
         .map(
-          (i) =>
-            `${i.identifier}: ${typesMap[i.type as Field["type"]] ?? "Any"} = None`,
+          (i) => `${i.identifier}: ${typesMap[i.type as Field["type"]] ?? "Any"} = None`,
         )
         .join(", ")})${returnType ?? ""}:`,
   );

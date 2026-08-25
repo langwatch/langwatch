@@ -45,12 +45,23 @@ export const listVirtualKeysCommand = async (): Promise<CommandResult | void> =>
           Scopes: vk.scopes.map(formatScope).join(", ") || chalk.gray("—"),
           Routing: vk.routing_mode,
           Purpose: vk.purpose === "langy" ? chalk.magenta("langy") : "user",
-          "Last used": vk.last_used_at ? new Date(vk.last_used_at).toLocaleDateString() : chalk.gray("—"),
+          "Last used": vk.last_used_at
+            ? new Date(vk.last_used_at).toLocaleDateString()
+            : chalk.gray("—"),
         }));
 
         formatTable({
           data: tableData,
-          headers: ["ID", "Name", "Status", "Prefix", "Scopes", "Routing", "Purpose", "Last used"],
+          headers: [
+            "ID",
+            "Name",
+            "Status",
+            "Prefix",
+            "Scopes",
+            "Routing",
+            "Purpose",
+            "Last used",
+          ],
           colorMap: {
             Name: chalk.cyan,
             ID: chalk.gray,

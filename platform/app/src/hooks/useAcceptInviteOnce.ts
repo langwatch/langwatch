@@ -54,9 +54,7 @@ export function _resetSubmittedInviteCodesForTests(): void {
   inviteOutcomes.clear();
 }
 
-type AcceptInviteMutation = ReturnType<
-  typeof api.organization.acceptInvite.useMutation
->;
+type AcceptInviteMutation = ReturnType<typeof api.organization.acceptInvite.useMutation>;
 type AcceptInviteMutationResult = Pick<
   AcceptInviteMutation,
   "isPending" | "isSuccess" | "isError" | "error"

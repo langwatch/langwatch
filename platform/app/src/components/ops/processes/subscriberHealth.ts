@@ -47,10 +47,7 @@ export function joinSubscriberHealth({
   pausedKeys: string[];
 }): SubscriberHealthRow[] {
   const paused = new Set(pausedKeys);
-  const live = new Map<
-    string,
-    { pending: number; active: number; blocked: number }
-  >();
+  const live = new Map<string, { pending: number; active: number; blocked: number }>();
   for (const pipeline of pipelineTree) {
     for (const typeNode of pipeline.children) {
       if (typeNode.name !== "subscriber") continue;

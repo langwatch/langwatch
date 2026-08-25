@@ -183,15 +183,11 @@ describe("rpc.discover", () => {
     const spec = await generateSpecs(app, { excludeStaticFile: false });
 
     const documented = Object.keys(spec.paths ?? {});
-    expect(documented.filter((path) => path.includes("rpc.discover"))).toEqual(
-      [],
-    );
+    expect(documented.filter((path) => path.includes("rpc.discover"))).toEqual([]);
 
     for (const namespace of ["2026-01-15", "latest"]) {
       const { body } = await discover(app, namespace);
-      expect(body.operations.map((op) => op.name)).not.toContain(
-        "rpc.discover",
-      );
+      expect(body.operations.map((op) => op.name)).not.toContain("rpc.discover");
     }
   });
 

@@ -16,11 +16,7 @@ describe("defineCommandSchema", () => {
     it("preserves the description when provided", () => {
       const zodSchema = z.string();
       const description = "Test command schema description";
-      const schema = defineCommandSchema(
-        TEST_COMMAND_TYPES[0],
-        zodSchema,
-        description,
-      );
+      const schema = defineCommandSchema(TEST_COMMAND_TYPES[0], zodSchema, description);
 
       expect(schema.description).toBe(description);
     });
@@ -77,10 +73,7 @@ describe("defineCommandSchema", () => {
         data: z.array(z.number()),
       });
 
-      const schema = defineCommandSchema(
-        TEST_COMMAND_TYPES[0],
-        complexPayloadSchema,
-      );
+      const schema = defineCommandSchema(TEST_COMMAND_TYPES[0], complexPayloadSchema);
 
       const validPayload = { id: "test-id", data: [1, 2, 3] };
       const invalidPayload = { id: "test-id" };

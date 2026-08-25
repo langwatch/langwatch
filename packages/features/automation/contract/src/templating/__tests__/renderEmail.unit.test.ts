@@ -21,9 +21,7 @@ describe("renderTriggerEmail", () => {
         bodyTemplate: null,
         context: makeContext(),
       });
-      expect(email.html).toContain(
-        'href="https://app.langwatch.ai/acme/traces/trace_1"',
-      );
+      expect(email.html).toContain('href="https://app.langwatch.ai/acme/traces/trace_1"');
     });
 
     it("renders the chrome footer with the project + edit-automation links", async () => {
@@ -67,14 +65,11 @@ describe("renderTriggerEmail", () => {
     it("renders the Markdown to HTML", async () => {
       const email = await renderTriggerEmail({
         subjectTemplate: null,
-        bodyTemplate:
-          "## {{ trigger.name }}\n\n[trace]({{ matches[0].trace.url }})",
+        bodyTemplate: "## {{ trigger.name }}\n\n[trace]({{ matches[0].trace.url }})",
         context: makeContext(),
       });
       expect(email.html).toContain("<h2>High latency</h2>");
-      expect(email.html).toContain(
-        'href="https://app.langwatch.ai/acme/traces/trace_1"',
-      );
+      expect(email.html).toContain('href="https://app.langwatch.ai/acme/traces/trace_1"');
     });
   });
 
@@ -174,9 +169,7 @@ describe("renderTriggerEmail", () => {
         context: makeContext(),
         testFire: true,
       });
-      expect(email.subject.startsWith(TEST_FIRE_EMAIL_SUBJECT_PREFIX)).toBe(
-        true,
-      );
+      expect(email.subject.startsWith(TEST_FIRE_EMAIL_SUBJECT_PREFIX)).toBe(true);
       expect(email.html).toContain(TEST_FIRE_NOTICE);
     });
   });

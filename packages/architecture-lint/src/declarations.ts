@@ -20,9 +20,7 @@ const FORBIDDEN_DECLARATION = [
 function publicSourceTargets(value: unknown): string[] {
   if (typeof value === "string") return [value];
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  return Object.values(value as Record<string, unknown>).flatMap(
-    publicSourceTargets,
-  );
+  return Object.values(value as Record<string, unknown>).flatMap(publicSourceTargets);
 }
 
 function publicDeclarationFiles(pkg: ClassifiedPackage): Set<string> {
@@ -34,11 +32,7 @@ function publicDeclarationFiles(pkg: ClassifiedPackage): Set<string> {
 }
 
 function declarationAt(path: string, outputs: Map<string, string>): string | undefined {
-  for (const candidate of [
-    path,
-    `${path}.d.ts`,
-    join(path, "index.d.ts"),
-  ]) {
+  for (const candidate of [path, `${path}.d.ts`, join(path, "index.d.ts")]) {
     if (outputs.has(candidate)) return candidate;
   }
   return undefined;
@@ -57,19 +51,14 @@ function reachableDeclarations(
     const source = outputs.get(file) ?? "";
     for (const imported of ts.preProcessFile(source, true, true).importedFiles) {
       if (!imported.fileName.startsWith(".")) continue;
-      const target = declarationAt(
-        resolve(dirname(file), imported.fileName),
-        outputs,
-      );
+      const target = declarationAt(resolve(dirname(file), imported.fileName), outputs);
       if (target && !reachable.has(target)) pending.push(target);
     }
   }
   return reachable;
 }
 
-export function lintDeclarations(
-  packages: ClassifiedPackage[],
-): ArchitectureViolation[] {
+export function lintDeclarations(packages: ClassifiedPackage[]): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   for (const pkg of packages) {
     const tsconfigPath = join(pkg.root, "tsconfig.json");

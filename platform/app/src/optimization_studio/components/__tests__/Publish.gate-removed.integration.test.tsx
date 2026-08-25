@@ -177,13 +177,7 @@ vi.mock("~/components/ui/dialog", () => ({
 }));
 
 vi.mock("~/components/ui/tooltip", () => ({
-  Tooltip: ({
-    content,
-    children,
-  }: {
-    content?: ReactNode;
-    children?: ReactNode;
-  }) => (
+  Tooltip: ({ content, children }: { content?: ReactNode; children?: ReactNode }) => (
     <span data-tooltip-content={typeof content === "string" ? content : ""}>
       {children}
     </span>
@@ -258,9 +252,7 @@ describe("given the studio Publish menu is rendered", () => {
     /** @scenario Publish.tsx does not query plan.canPublish to gate the menu */
     it("does not redirect to plan management or fire subscription tracking when Publish is clicked", () => {
       renderPublish();
-      const publishButton = screen
-        .getByText(/Publish workflow/i)
-        .closest("button");
+      const publishButton = screen.getByText(/Publish workflow/i).closest("button");
       expect(publishButton).not.toBeNull();
       fireEvent.click(publishButton!);
 

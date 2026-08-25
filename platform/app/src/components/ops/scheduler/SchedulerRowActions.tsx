@@ -50,12 +50,8 @@ export function SchedulerRowActions({
     },
   });
 
-  const setActive = api.ops.setScheduleActive.useMutation(
-    settle("Schedule updated"),
-  );
-  const clearSlot = api.ops.clearScheduleSlot.useMutation(
-    settle("Slot cleared"),
-  );
+  const setActive = api.ops.setScheduleActive.useMutation(settle("Schedule updated"));
+  const clearSlot = api.ops.clearScheduleSlot.useMutation(settle("Slot cleared"));
   const runNow = api.ops.runScheduleNow.useMutation(settle("Run requested"));
 
   const isPaused = status === "paused";

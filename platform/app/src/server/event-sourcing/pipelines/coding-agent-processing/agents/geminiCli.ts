@@ -7,8 +7,7 @@ import { type CodingAgentDefinition, signalSays } from "./_types";
  */
 export const geminiCliAgent: CodingAgentDefinition = {
   id: "gemini_cli",
-  matches: (signal) =>
-    signalSays(signal, "gemini_cli") || signalSays(signal, "gemini"),
+  matches: (signal) => signalSays(signal, "gemini_cli") || signalSays(signal, "gemini"),
   namePrefixes: ["gemini_cli."],
 
   eventAliases: {

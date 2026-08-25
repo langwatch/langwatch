@@ -54,9 +54,8 @@ async function main() {
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
   });
   process.env.LANGWATCH_LICENSE_PUBLIC_KEY = publicKey;
-  const { NodeLicenseCryptographyAdapter } = await import(
-    "@langwatch/enterprise-licensing-server"
-  );
+  const { NodeLicenseCryptographyAdapter } =
+    await import("@langwatch/enterprise-licensing-server");
   const licenseCryptography = NodeLicenseCryptographyAdapter.create();
   process.env.LANGWATCH_LICENSE_KEY = licenseCryptography.encodeLicenseKey(
     licenseCryptography.signLicense(
@@ -79,12 +78,9 @@ async function main() {
     ),
   );
 
-  const { afterUserCreate, beforeAccountCreate } = await import(
-    "../../src/server/better-auth/hooks"
-  );
-  const { __resetSsoGateForTests } = await import(
-    "../../src/runtime/app/features/sso"
-  );
+  const { afterUserCreate, beforeAccountCreate } =
+    await import("../../src/server/better-auth/hooks");
+  const { __resetSsoGateForTests } = await import("../../src/runtime/app/features/sso");
   const { env: appEnv } = await import("../../src/env.mjs");
 
   // ─────────────────────────────────────────────────────────────────
@@ -204,19 +200,13 @@ async function main() {
   const bobOrgs = await prisma.organizationUser.findMany({
     where: { userId: "sso_smoke_newuser2" },
   });
-  check(
-    "bob has no org memberships",
-    bobOrgs.length === 0,
-    `found ${bobOrgs.length}`,
-  );
+  check("bob has no org memberships", bobOrgs.length === 0, `found ${bobOrgs.length}`);
 
   // ─────────────────────────────────────────────────────────────────
   // [3] Existing user + correct Google provider → clears pendingSsoSetup
   // ─────────────────────────────────────────────────────────────────
 
-  console.log(
-    "\n[3] Existing user + correct Google provider → clears pendingSsoSetup",
-  );
+  console.log("\n[3] Existing user + correct Google provider → clears pendingSsoSetup");
   await prisma.user.create({
     data: {
       id: "sso_smoke_existing1",
@@ -319,8 +309,7 @@ async function main() {
       },
     });
   } catch (err) {
-    hardBlockThrew =
-      err instanceof Error && /SSO_PROVIDER_NOT_ALLOWED/.test(err.message);
+    hardBlockThrew = err instanceof Error && /SSO_PROVIDER_NOT_ALLOWED/.test(err.message);
   }
   check(
     "throws SSO_PROVIDER_NOT_ALLOWED for first-time signup with wrong provider",
@@ -392,9 +381,7 @@ async function main() {
   });
   check(
     "stale google account deleted",
-    frankAccounts.every(
-      (a) => a.providerAccountId !== "google-oauth2|frank-OLD-id",
-    ),
+    frankAccounts.every((a) => a.providerAccountId !== "google-oauth2|frank-OLD-id"),
   );
 
   // ─────────────────────────────────────────────────────────────────
@@ -449,10 +436,7 @@ async function main() {
   const helen = await prisma.user.findUnique({
     where: { id: "sso_smoke_noorg" },
   });
-  check(
-    "pendingSsoSetup untouched for non-SSO user",
-    helen?.pendingSsoSetup === false,
-  );
+  check("pendingSsoSetup untouched for non-SSO user", helen?.pendingSsoSetup === false);
 
   // ─────────────────────────────────────────────────────────────────
   // [8.5] Case-insensitive email domain matching
@@ -488,8 +472,7 @@ async function main() {
   // ─────────────────────────────────────────────────────────────────
 
   console.log("\n[8.6] Unlicensed deployment: auto-join is skipped");
-  (appEnv as { LANGWATCH_LICENSE_KEY?: string }).LANGWATCH_LICENSE_KEY =
-    undefined;
+  (appEnv as { LANGWATCH_LICENSE_KEY?: string }).LANGWATCH_LICENSE_KEY = undefined;
   __resetSsoGateForTests();
   await prisma.user.create({
     data: {
@@ -509,10 +492,7 @@ async function main() {
   const deniedOrg = await prisma.organizationUser.findFirst({
     where: { userId: "sso_smoke_denied" },
   });
-  check(
-    "denied gate: matching-domain user NOT auto-joined",
-    deniedOrg === null,
-  );
+  check("denied gate: matching-domain user NOT auto-joined", deniedOrg === null);
   (appEnv as { LANGWATCH_LICENSE_KEY?: string }).LANGWATCH_LICENSE_KEY =
     process.env.LANGWATCH_LICENSE_KEY;
   __resetSsoGateForTests();
@@ -552,9 +532,7 @@ async function main() {
       `    ⚠  second afterUserCreate did NOT throw — alice now has ${aliceMemberships.length} memberships`,
     );
     if (aliceMemberships.length > 1) {
-      console.log(
-        "    ⚠  DUPLICATE MEMBERSHIP BUG: afterUserCreate is not idempotent",
-      );
+      console.log("    ⚠  DUPLICATE MEMBERSHIP BUG: afterUserCreate is not idempotent");
     }
   }
 

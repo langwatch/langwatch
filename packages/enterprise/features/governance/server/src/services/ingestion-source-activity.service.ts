@@ -28,21 +28,15 @@ export class ActivityMonitorService extends GovernanceActivityMonitorService {
     return this.repository.summary(input);
   }
 
-  spendByUser(
-    input: ActivityMonitorPagedWindowQuery,
-  ): Promise<SpendByUserRow[]> {
+  spendByUser(input: ActivityMonitorPagedWindowQuery): Promise<SpendByUserRow[]> {
     return this.repository.spendByUser(input);
   }
 
-  spendByTeam(
-    input: ActivityMonitorPagedWindowQuery,
-  ): Promise<SpendByTeamRow[]> {
+  spendByTeam(input: ActivityMonitorPagedWindowQuery): Promise<SpendByTeamRow[]> {
     return this.repository.spendByTeam(input);
   }
 
-  spendByDepartment(
-    input: ActivityMonitorWindowQuery,
-  ): Promise<SpendByDepartmentRow[]> {
+  spendByDepartment(input: ActivityMonitorWindowQuery): Promise<SpendByDepartmentRow[]> {
     return this.repository.spendByDepartment(input);
   }
 

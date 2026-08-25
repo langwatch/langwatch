@@ -46,10 +46,7 @@ void (async () => {
   await page.waitForSelector('[data-tile-slug="claude_code"]', {
     timeout: 30_000,
   });
-  await page
-    .locator('[data-tile-slug="claude_code"]')
-    .first()
-    .scrollIntoViewIfNeeded();
+  await page.locator('[data-tile-slug="claude_code"]').first().scrollIntoViewIfNeeded();
   await page.waitForTimeout(1500);
   await shoot(page, "01-me-trace-ingest");
 
@@ -89,9 +86,7 @@ void (async () => {
   // Click "Use this template" OR "Rotate token" — scoped to the drawer
   const installBtn = page
     .locator('div[role="dialog"]')
-    .locator(
-      'button:has-text("Rotate token"), button:has-text("Use this template")',
-    )
+    .locator('button:has-text("Rotate token"), button:has-text("Use this template")')
     .first();
   if ((await installBtn.count()) === 0) {
     console.error("[fail] no Install button in drawer");
@@ -109,9 +104,7 @@ void (async () => {
     .catch(() => null);
   await installBtn.click({ force: true });
   const resp = await respPromise;
-  console.log(
-    `[mutation] response received: ${resp?.status() ?? "no-response"}`,
-  );
+  console.log(`[mutation] response received: ${resp?.status() ?? "no-response"}`);
   await page.waitForTimeout(2000);
   await shoot(page, "03-install-drawer-after-click");
 

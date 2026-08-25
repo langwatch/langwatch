@@ -38,10 +38,7 @@ import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
-import {
-  sendRenderedTriggerEmail,
-  sendTriggerEmail,
-} from "~/server/mailer/triggerEmail";
+import { sendRenderedTriggerEmail, sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { incrementAutomationOverflowFlushTotal } from "~/server/metrics";
 import type { Trace } from "~/server/tracer/types";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -232,8 +229,7 @@ export function createPersistMatchHandler(
   deps: TriggerSettlementDispatchDeps,
 ): IntentExecutor<PersistMatchIntent> {
   return async (payload, context) => {
-    const traceIds =
-      "traceIds" in payload ? payload.traceIds : [payload.traceId];
+    const traceIds = "traceIds" in payload ? payload.traceIds : [payload.traceId];
     try {
       await dispatchPersistMatchPage({
         deps,
@@ -299,8 +295,7 @@ async function dispatchNotifyDigest({
   // writing it pre-send would defeat outbox retry (a retryable provider
   // failure would see claim=true on retry and silently no-op the resend).
   const brandedTenantId = createTenantId(projectId);
-  const candidates: Array<{ traceId: string; foldState: TraceSummaryData }> =
-    [];
+  const candidates: Array<{ traceId: string; foldState: TraceSummaryData }> = [];
   for (const traceId of new Set(traceIds)) {
     const foldState = await deps.traceSummaryStore.get(traceId, {
       tenantId: brandedTenantId,
@@ -359,8 +354,7 @@ async function dispatchNotifyDigest({
   );
 
   const t = trigger.templates;
-  const hasCustomEmail =
-    t.emailSubjectTemplate != null || t.emailBodyTemplate != null;
+  const hasCustomEmail = t.emailSubjectTemplate != null || t.emailBodyTemplate != null;
   const hasCustomSlack = t.slackTemplate != null;
 
   const buildContext = () => {
@@ -530,8 +524,7 @@ async function dispatchNotifyDigest({
           });
         }
         const rendered = await renderTriggerSlack({
-          templateType:
-            t.slackTemplateType === "block_kit" ? "block_kit" : "string",
+          templateType: t.slackTemplateType === "block_kit" ? "block_kit" : "string",
           template: t.slackTemplate,
           context: buildContext(),
           allowGatedBlocks: true,
@@ -553,8 +546,7 @@ async function dispatchNotifyDigest({
       }
       if (hasCustomSlack) {
         const rendered = await renderTriggerSlack({
-          templateType:
-            t.slackTemplateType === "block_kit" ? "block_kit" : "string",
+          templateType: t.slackTemplateType === "block_kit" ? "block_kit" : "string",
           template: t.slackTemplate,
           context: buildContext(),
         });
@@ -606,8 +598,7 @@ async function dispatchNotifyDigest({
       // receiver-facing id from it keeps the id stable when a crash after a
       // partial claim causes the retry's surviving candidate set to shrink.
       const webhookEventId =
-        "evt_" +
-        createHash("sha256").update(messageKey).digest("hex").slice(0, 32);
+        "evt_" + createHash("sha256").update(messageKey).digest("hex").slice(0, 32);
       await deliverWebhook({
         recorder: deps.recordWebhookDelivery,
         projectId,
@@ -643,8 +634,7 @@ async function dispatchNotifyDigest({
           projectId,
           triggerId,
           traceId,
-          error:
-            claimErr instanceof Error ? claimErr.message : String(claimErr),
+          error: claimErr instanceof Error ? claimErr.message : String(claimErr),
         },
         "claimSend failed post-dispatch — swallowing to avoid double-send on retry",
       );
@@ -683,8 +673,7 @@ async function dispatchNotifyDigest({
       {
         projectId,
         triggerId,
-        error:
-          lastRunErr instanceof Error ? lastRunErr.message : String(lastRunErr),
+        error: lastRunErr instanceof Error ? lastRunErr.message : String(lastRunErr),
       },
       "updateLastRunAt failed post-dispatch — swallowing to avoid double-send on retry",
     );
@@ -798,9 +787,7 @@ interface PersistPageContext {
   project: NonNullable<
     Awaited<ReturnType<TriggerSettlementDispatchDeps["projects"]["tryGetById"]>>
   >;
-  cap: Awaited<
-    ReturnType<TriggerSettlementDispatchDeps["resolvePersistDailyCap"]>
-  >;
+  cap: Awaited<ReturnType<TriggerSettlementDispatchDeps["resolvePersistDailyCap"]>>;
   brandedTenantId: ReturnType<typeof createTenantId>;
   claimBreachReport: () => boolean;
   /**
@@ -847,8 +834,7 @@ async function claimPersistDispatch(
           triggerId,
           traceId,
           attempts,
-          error:
-            claimErr instanceof Error ? claimErr.message : String(claimErr),
+          error: claimErr instanceof Error ? claimErr.message : String(claimErr),
         },
         "claimSend failed on every attempt after a persist dispatch. The " +
           "side effect landed and no claim records it, so a retry of the " +
@@ -985,8 +971,7 @@ function throwIfPageShouldRetry(params: {
   retryableFailures: unknown[];
   unclaimed: string[];
 }): void {
-  const { projectId, triggerId, pageSize, retryableFailures, unclaimed } =
-    params;
+  const { projectId, triggerId, pageSize, retryableFailures, unclaimed } = params;
   if (retryableFailures.length === 0) return;
 
   if (unclaimed.length > 0) {
@@ -1002,18 +987,15 @@ function throwIfPageShouldRetry(params: {
         "Those traces can run their side effect again on the retry, which " +
         "is accepted so the traces that failed are not lost.",
     );
-    captureException(
-      new Error("Persist page retry re-runs traces that hold no claim"),
-      {
-        extra: {
-          projectId,
-          triggerId,
-          pageSize,
-          unclaimed,
-          phase: "persist-page-retry-unclaimed",
-        },
+    captureException(new Error("Persist page retry re-runs traces that hold no claim"), {
+      extra: {
+        projectId,
+        triggerId,
+        pageSize,
+        unclaimed,
+        phase: "persist-page-retry-unclaimed",
       },
-    );
+    });
   }
 
   const representative = retryableFailures[0];
@@ -1028,13 +1010,9 @@ function throwIfPageShouldRetry(params: {
       // without this line a page that retries to its attempt ceiling reports
       // "failed: 1" and nothing an operator can act on.
       errorType:
-        representative instanceof Error
-          ? representative.name
-          : typeof representative,
+        representative instanceof Error ? representative.name : typeof representative,
       errorMessage:
-        representative instanceof Error
-          ? representative.message
-          : String(representative),
+        representative instanceof Error ? representative.message : String(representative),
     },
     "Persist page had retryable failures. Retrying the page; claimed traces no-op on the retry",
   );
@@ -1078,9 +1056,7 @@ async function dispatchPersistMatchPage({
     traceIds: uniqueTraceIds,
     projectId,
   });
-  const remaining = uniqueTraceIds.filter(
-    (traceId) => !alreadySent.has(traceId),
-  );
+  const remaining = uniqueTraceIds.filter((traceId) => !alreadySent.has(traceId));
   if (remaining.length === 0) return;
 
   const cap = await deps.resolvePersistDailyCap(projectId);

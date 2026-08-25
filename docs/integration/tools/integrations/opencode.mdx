@@ -26,15 +26,16 @@ langwatch opencode
 
 The first run asks one question:
 
-| Answer | What it does |
-| --- | --- |
-| **Using your own opencode plan** | opencode keeps its own providers and its own keys. LangWatch receives telemetry only. |
-| **Using an API key** | opencode calls travel through the LangWatch gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
+| Answer                           | What it does                                                                                                                                    |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Using your own opencode plan** | opencode keeps its own providers and its own keys. LangWatch receives telemetry only.                                                           |
+| **Using an API key**             | opencode calls travel through the LangWatch gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch opencode` accepts the same flags as `opencode` and returns the same exit code.
 
 <Note>
-  A virtual key is created the first time you choose the gateway, not at login. If you always keep your own providers, LangWatch never creates one for you.
+  A virtual key is created the first time you choose the gateway, not at login. If you
+  always keep your own providers, LangWatch never creates one for you.
 </Note>
 
 To route the model calls themselves through the gateway with a service key, and to read the provider and model options, see [opencode on the AI Gateway](/ai-gateway/cli/opencode).
@@ -55,19 +56,20 @@ The command writes two things:
 Open a new terminal after the command, or read the start file again, so the function is in place.
 
 <Note>
-  The shell function needs zsh, bash or fish. On Windows, start opencode with `langwatch opencode` each time instead.
+  The shell function needs zsh, bash or fish. On Windows, start opencode with `langwatch
+  opencode` each time instead.
 </Note>
 
 ### Choose where the telemetry goes
 
 Pass one scope flag, and one only.
 
-| Command | Destination | Needs a login |
-| --- | --- | --- |
-| `langwatch instrument opencode` | Your personal workspace | Yes |
-| `langwatch instrument opencode --project <id-or-slug>` | A team project | Yes |
-| `langwatch instrument opencode --key <ingest-key>` | The project that owns the key | No |
-| `langwatch instrument opencode --personal` | Back to your personal workspace | Yes |
+| Command                                                | Destination                     | Needs a login |
+| ------------------------------------------------------ | ------------------------------- | ------------- |
+| `langwatch instrument opencode`                        | Your personal workspace         | Yes           |
+| `langwatch instrument opencode --project <id-or-slug>` | A team project                  | Yes           |
+| `langwatch instrument opencode --key <ingest-key>`     | The project that owns the key   | No            |
+| `langwatch instrument opencode --personal`             | Back to your personal workspace | Yes           |
 
 ### Send the telemetry to a team project
 
@@ -144,15 +146,19 @@ Your agent can read all of this back. See [Explore your usage with your own agen
     Open a new terminal. The `opencode` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
 
     Then check that `experimental.openTelemetry` is `true` in `~/.config/opencode/opencode.jsonc`. opencode accepts the LangWatch settings and reports nothing while that flag is off.
+
   </Accordion>
 
-  <Accordion title="The command reports that it could not write the shell start file">
-    The shell is not zsh, bash or fish. Start opencode with `langwatch opencode` each time, which needs no start file.
-  </Accordion>
+<Accordion title="The command reports that it could not write the shell start file">
+  The shell is not zsh, bash or fish. Start opencode with `langwatch opencode` each time,
+  which needs no start file.
+</Accordion>
 
-  <Accordion title="The OpenTelemetry flag stays off">
-    You set `experimental.openTelemetry` to `false` yourself at some point. LangWatch never overrides that choice. Set it to `true` in `~/.config/opencode/opencode.jsonc`, or remove the line and run `langwatch instrument opencode` again.
-  </Accordion>
+<Accordion title="The OpenTelemetry flag stays off">
+  You set `experimental.openTelemetry` to `false` yourself at some point. LangWatch never
+  overrides that choice. Set it to `true` in `~/.config/opencode/opencode.jsonc`, or
+  remove the line and run `langwatch instrument opencode` again.
+</Accordion>
 
   <Accordion title="The telemetry goes to the wrong workspace">
     Run `langwatch instrument opencode --project <id-or-slug>` to move it to a team project, or `langwatch instrument opencode --personal` to move it back to your own.
@@ -162,6 +168,7 @@ Your agent can read all of this back. See [Explore your usage with your own agen
     Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
 
     On a machine with a login, run `langwatch login --device` again to refresh the session.
+
   </Accordion>
 </AccordionGroup>
 
@@ -202,18 +209,19 @@ For a self-hosted instance, replace the endpoint with the address of your instan
 <Warning>
   A plain `export` applies the key to every program the shell starts, not to opencode alone. To keep it to opencode, put the variables in a shell function. This is the function `langwatch instrument opencode` writes to your shell rc file:
 
-  ```bash
-  opencode() {
-      OTEL_TRACES_EXPORTER=otlp \
-      OTEL_LOGS_EXPORTER=otlp \
-      OTEL_METRICS_EXPORTER=otlp \
-      OTEL_EXPORTER_OTLP_PROTOCOL=http/json \
-      OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel \
-      OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer ik-lw-your-ingest-key' \
-      OTEL_RESOURCE_ATTRIBUTES=service.name=opencode \
-      command opencode "$@"
-  }
-  ```
+```bash
+opencode() {
+    OTEL_TRACES_EXPORTER=otlp \
+    OTEL_LOGS_EXPORTER=otlp \
+    OTEL_METRICS_EXPORTER=otlp \
+    OTEL_EXPORTER_OTLP_PROTOCOL=http/json \
+    OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel \
+    OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer ik-lw-your-ingest-key' \
+    OTEL_RESOURCE_ATTRIBUTES=service.name=opencode \
+    command opencode "$@"
+}
+```
 
-  On fish, the same block is a function with `set -lx` for each variable.
+On fish, the same block is a function with `set -lx` for each variable.
+
 </Warning>

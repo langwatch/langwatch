@@ -4,16 +4,18 @@
   "private": true,
   "description": "Browser-safe LangWatch Enterprise governance view logic.",
   "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": ["src"],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -23,12 +25,6 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "lucide-react": "^1.22.0"
-  },
-  "peerDependencies": {
-    "@chakra-ui/react": "^3.36.0",
-    "@emotion/react": "^11.14.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",
@@ -42,5 +38,11 @@
     "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }

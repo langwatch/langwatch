@@ -1,7 +1,4 @@
-import type {
-  FoldProjectionStore,
-  ProjectionStoreContext,
-} from "@langwatch/eventing";
+import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
@@ -10,30 +7,21 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
  * Thin FoldProjectionStore adapter for trace summaries.
  * Delegates directly to TraceSummaryRepository (no mapper needed — projection uses camelCase types).
  */
-export class TraceSummaryStore
-  implements FoldProjectionStore<TraceSummaryData>
-{
+export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> {
   constructor(private readonly repo: TraceSummaryRepository) {}
 
   /**
    * Persists a single trace summary. Skips empty traces (spanCount 0) and
    * backfills the traceId from the aggregate id when the state omits it.
    */
-  async store(
-    state: TraceSummaryData,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
+  async store(state: TraceSummaryData, context: ProjectionStoreContext): Promise<void> {
     if (!hasPersistableSignal(state)) return;
     const stateWithId = state.traceId
       ? state
       : { ...state, traceId: String(context.aggregateId) };
     const retentionDays =
       context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    await this.repo.upsert(
-      stateWithId,
-      String(context.tenantId),
-      retentionDays,
-    );
+    await this.repo.upsert(stateWithId, String(context.tenantId), retentionDays);
   }
 
   /**
@@ -50,12 +38,9 @@ export class TraceSummaryStore
     const batchEntries = entries
       .filter(({ state }) => hasPersistableSignal(state))
       .map(({ state, context }) => ({
-        data: state.traceId
-          ? state
-          : { ...state, traceId: String(context.aggregateId) },
+        data: state.traceId ? state : { ...state, traceId: String(context.aggregateId) },
         tenantId: String(context.tenantId),
-        retentionDays:
-          context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+        retentionDays: context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
       }));
 
     if (batchEntries.length === 0) return;
@@ -86,9 +71,7 @@ export class TraceSummaryStore
     return await this.repo.findByTraceId(
       String(context.tenantId),
       aggregateId,
-      context.readWindow !== undefined
-        ? { window: context.readWindow }
-        : undefined,
+      context.readWindow !== undefined ? { window: context.readWindow } : undefined,
     );
   }
 }

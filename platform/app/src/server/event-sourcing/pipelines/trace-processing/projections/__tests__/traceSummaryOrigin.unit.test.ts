@@ -1,19 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary() langwatch.origin hoisting", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(99999);
-    vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    ).mockReturnValue(null);
+    vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan").mockReturnValue(
+      null,
+    );
   });
 
   afterEach(() => {
@@ -300,9 +296,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
       });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
-      const labels = JSON.parse(
-        state.attributes["langwatch.labels"] ?? "[]",
-      ) as string[];
+      const labels = JSON.parse(state.attributes["langwatch.labels"] ?? "[]") as string[];
       expect(labels).not.toContain("scenario-runner");
       expect(labels).toContain("regression");
     });
@@ -580,10 +574,9 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(99999);
-    vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    ).mockReturnValue(null);
+    vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan").mockReturnValue(
+      null,
+    );
   });
 
   afterEach(() => {

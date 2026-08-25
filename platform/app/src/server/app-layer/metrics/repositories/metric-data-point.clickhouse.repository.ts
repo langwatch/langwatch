@@ -38,9 +38,7 @@ import {
 } from "./metric-data-point.rows";
 import { queryMetricUsageEstimates } from "./metric-data-point.usage";
 
-const logger = createLogger(
-  "langwatch:app-layer:metrics:metric-data-point-repository",
-);
+const logger = createLogger("langwatch:app-layer:metrics:metric-data-point-repository");
 
 const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
 
@@ -299,9 +297,7 @@ interface SeriesSpan {
   last: CanonicalMetricDataPoint;
 }
 
-function seriesSpans(
-  points: readonly CanonicalMetricDataPoint[],
-): SeriesSpan[] {
+function seriesSpans(points: readonly CanonicalMetricDataPoint[]): SeriesSpan[] {
   return [...groupBySeries(points)].map(([seriesId, seriesPoints]) => {
     const sorted = [...seriesPoints].sort(comparePoints);
     return {
@@ -452,9 +448,7 @@ function successorIn({
   return sorted[lo];
 }
 
-export class MetricDataPointClickHouseRepository
-  implements MetricDataPointRepository
-{
+export class MetricDataPointClickHouseRepository implements MetricDataPointRepository {
   /**
    * Both resolvers are required on purpose. The organization-wide usage query
    * relies on its client being resolved from the organization — that is what
@@ -560,9 +554,7 @@ export class MetricDataPointClickHouseRepository
     const client = await this.resolveClient(points[0]!.tenantId);
     await client.insert({
       table: "metric_series",
-      values: [...latest.values()].map((point) =>
-        seriesRow({ point, retentionDays }),
-      ),
+      values: [...latest.values()].map((point) => seriesRow({ point, retentionDays })),
       format: "JSONEachRow",
       clickhouse_settings: INSERT_SETTINGS,
     });
@@ -709,10 +701,7 @@ export class MetricDataPointClickHouseRepository
       // an attribute-less point rather than throw away the whole read.
       let pointAttributes: Record<string, string> = {};
       try {
-        pointAttributes = JSON.parse(row.PointAttributesJson) as Record<
-          string,
-          string
-        >;
+        pointAttributes = JSON.parse(row.PointAttributesJson) as Record<string, string>;
       } catch {
         pointAttributes = {};
       }
@@ -789,9 +778,7 @@ export class MetricDataPointClickHouseRepository
     retentionDays: number;
   }): Promise<Map<string, CanonicalMetricDataPoint[]>> {
     const seeks = [...affectedBySeries].flatMap(([seriesId, buckets]) =>
-      [...buckets]
-        .sort((a, b) => a - b)
-        .map((start) => ({ seriesId, start }) as const),
+      [...buckets].sort((a, b) => a - b).map((start) => ({ seriesId, start }) as const),
     );
     const found = new Map<string, CanonicalMetricDataPoint[]>();
     if (seeks.length === 0) return found;
@@ -852,9 +839,7 @@ export class MetricDataPointClickHouseRepository
         query_params: params,
         format: "JSONEachRow",
       });
-      for (const row of await result.json<
-        Omit<RawMetricRow, "CanonicalPayload">
-      >()) {
+      for (const row of await result.json<Omit<RawMetricRow, "CanonicalPayload">>()) {
         unique.set(
           `${row.SeriesId}\u0000${row.PointId}`,
           fromRaw({ row, organizationId }),

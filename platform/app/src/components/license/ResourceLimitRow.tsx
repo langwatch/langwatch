@@ -7,11 +7,7 @@ export interface ResourceLimitRowProps {
   max?: number;
 }
 
-export function ResourceLimitRow({
-  label,
-  current,
-  max,
-}: ResourceLimitRowProps) {
+export function ResourceLimitRow({ label, current, max }: ResourceLimitRowProps) {
   return (
     <VStack
       align="start"

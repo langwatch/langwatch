@@ -68,9 +68,10 @@ function resolverFor(policy: ResolvedDataPrivacy): DataPrivacyResolver {
 }
 
 function spanWith(attributes: Record<string, string>): OtlpSpan {
-  const attrs: OtlpKeyValue[] = Object.entries(attributes).map(
-    ([key, value]) => ({ key, value: { stringValue: value } }),
-  );
+  const attrs: OtlpKeyValue[] = Object.entries(attributes).map(([key, value]) => ({
+    key,
+    value: { stringValue: value },
+  }));
   return {
     traceId: "abc123",
     spanId: "def456",
@@ -89,9 +90,7 @@ function spanWith(attributes: Record<string, string>): OtlpSpan {
 }
 
 function attr(span: OtlpSpan, key: string): string | undefined {
-  return (
-    span.attributes.find((a) => a.key === key)?.value.stringValue ?? undefined
-  );
+  return span.attributes.find((a) => a.key === key)?.value.stringValue ?? undefined;
 }
 
 function makeService(policy: ResolvedDataPrivacy) {
@@ -260,9 +259,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
   describe("given the strict PII level", () => {
     /** @scenario Strict level redacts names using the analysis service */
     it("sends content to the analysis-service batch", async () => {
-      const { service, batchSpy } = makeService(
-        mkPolicy({ piiLevel: "strict" }),
-      );
+      const { service, batchSpy } = makeService(mkPolicy({ piiLevel: "strict" }));
       const span = spanWith({ input: "My name is Alexander Hamilton." });
 
       await service.redactSpan(span, null, "ESSENTIAL", TENANT);
@@ -286,8 +283,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
         dataPrivacyResolver: resolverFor(mkPolicy({ piiLevel: "strict" })),
       });
       const span = spanWith({
-        input:
-          "email jane@example.com card 4242424242424242 name Alexander Hamilton",
+        input: "email jane@example.com card 4242424242424242 name Alexander Hamilton",
       });
 
       await service.redactSpan(span, null, "ESSENTIAL", TENANT);
@@ -305,9 +301,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
   describe("given PII redaction disabled", () => {
     /** @scenario Disabling PII keeps personal data */
     it("keeps an email address while secrets stay scrubbed", async () => {
-      const { service, batchSpy } = makeService(
-        mkPolicy({ piiLevel: "disabled" }),
-      );
+      const { service, batchSpy } = makeService(mkPolicy({ piiLevel: "disabled" }));
       const span = spanWith({ input: "contact jane@example.com please" });
 
       await service.redactSpan(span, null, "ESSENTIAL", TENANT);
@@ -470,9 +464,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       });
       const span = spanWith({ input: "mail a@b.com" });
 
-      await expect(
-        service.redactSpan(span, null, "STRICT", TENANT),
-      ).rejects.toThrow();
+      await expect(service.redactSpan(span, null, "STRICT", TENANT)).rejects.toThrow();
       expect(attr(span, PII_INCOMPLETE)).toBeUndefined();
     });
   });
@@ -482,9 +474,7 @@ describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
   describe("given an essential policy with an exception for a business number format", () => {
     /** @scenario An exception pattern keeps a business identifier while other PII is still redacted */
     it("keeps the excepted number and still redacts the email next to it", async () => {
-      const { service } = makeService(
-        mkPolicy({ piiExceptPatterns: ["00\\d{12}"] }),
-      );
+      const { service } = makeService(mkPolicy({ piiExceptPatterns: ["00\\d{12}"] }));
       const span = spanWith({
         "gen_ai.prompt": "reservation 00528000043000 for test@example.com",
       });
@@ -517,9 +507,7 @@ describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
 
   describe("given a strict policy without exceptions", () => {
     it("keeps the full strict entity list for the analysis batch", async () => {
-      const { service, batchSpy } = makeService(
-        mkPolicy({ piiLevel: "strict" }),
-      );
+      const { service, batchSpy } = makeService(mkPolicy({ piiLevel: "strict" }));
       const span = spanWith({ "gen_ai.prompt": "hello there" });
       await service.redactSpan(span, null, "STRICT", TENANT);
 
@@ -609,9 +597,7 @@ describe("OtlpSpanPiiRedactionService, given path-keyed log attributes", () => {
       const { service } = makeService(mkPolicy({}));
       const log = pathKeyed();
       await service.redactLog(log, "ESSENTIAL", TENANT);
-      expect(log.attributes["log.0.value.stringValue"]).toBe(
-        "key_abc123def456",
-      );
+      expect(log.attributes["log.0.value.stringValue"]).toBe("key_abc123def456");
     });
 
     it("leaves an ordinary attribute alone", async () => {
@@ -695,8 +681,6 @@ describe("OtlpSpanPiiRedactionService strict-only exception scoping", () => {
     });
     await service.redactSpan(span, null, "STRICT", TENANT);
 
-    expect(attr(span, "conversation.text")).toBe(
-      "reservation 00528000043000 confirmed",
-    );
+    expect(attr(span, "conversation.text")).toBe("reservation 00528000043000 confirmed");
   });
 });

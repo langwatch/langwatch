@@ -22,9 +22,7 @@ export function validateInternalSecret(c: Context): boolean {
  * destructive jobs (retention cleanup, lambda deletion, check re-runs). The
  * comparison is constant-time to avoid leaking the secret through timing.
  */
-export function isInternalSecretValid(
-  authorizationHeader: string | undefined,
-): boolean {
+export function isInternalSecretValid(authorizationHeader: string | undefined): boolean {
   const expected = process.env.CRON_API_KEY;
   if (!expected) return false;
 

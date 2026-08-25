@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BTLeaderboard } from "../computeBTLeaderboard";
-import type {
-  JudgeIndependence,
-  VerbosityProfile,
-} from "../computeJudgeBiasChecks";
+import type { JudgeIndependence, VerbosityProfile } from "../computeJudgeBiasChecks";
 import type { SampleAdequacy } from "../computeSampleAdequacy";
 import {
   buildTrustChecks,
@@ -12,9 +9,7 @@ import {
 } from "../LeaderboardTrustPanel";
 import { DEFAULT_WARN_THRESHOLD } from "../PairwiseLeaderboard";
 
-const leaderboard = (
-  overrides: Partial<BTLeaderboard> = {},
-): BTLeaderboard => ({
+const leaderboard = (overrides: Partial<BTLeaderboard> = {}): BTLeaderboard => ({
   entries: [],
   winMatrix: {},
   comparisonCount: 60,
@@ -39,9 +34,7 @@ const adequacy = (overrides: Partial<SampleAdequacy> = {}): SampleAdequacy => ({
   ...overrides,
 });
 
-const verbosity = (
-  overrides: Partial<VerbosityProfile> = {},
-): VerbosityProfile => ({
+const verbosity = (overrides: Partial<VerbosityProfile> = {}): VerbosityProfile => ({
   meanLengthByVariant: {},
   leaderRatio: 1.05,
   leaderMeanLength: 1000,
@@ -50,9 +43,7 @@ const verbosity = (
   ...overrides,
 });
 
-const independence = (
-  overrides: Partial<JudgeIndependence> = {},
-): JudgeIndependence => ({
+const independence = (overrides: Partial<JudgeIndependence> = {}): JudgeIndependence => ({
   judgeModel: "anthropic/claude-sonnet-5",
   judgeFamily: "anthropic",
   sharedFamilyVariantIds: [],
@@ -164,9 +155,7 @@ describe("buildTrustChecks", () => {
     it("says the comparison could not be made rather than staying silent", () => {
       const checks = build({ verbosity: verbosity({ leaderRatio: null }) });
 
-      expect(find(checks, "Answer length").detail).toContain(
-        "Not enough output text",
-      );
+      expect(find(checks, "Answer length").detail).toContain("Not enough output text");
     });
   });
 
@@ -365,9 +354,9 @@ describe("buildTrustChecks — margins of error built from unsettled fits", () =
         leaderboard: leaderboard({ bootstrapNonConvergence: 0.01 }),
       });
 
-      expect(
-        checks.some((c) => c.label === "Margins of error are approximate"),
-      ).toBe(false);
+      expect(checks.some((c) => c.label === "Margins of error are approximate")).toBe(
+        false,
+      );
     });
   });
 
@@ -377,9 +366,9 @@ describe("buildTrustChecks — margins of error built from unsettled fits", () =
         leaderboard: leaderboard({ bootstrapNonConvergence: null }),
       });
 
-      expect(
-        checks.some((c) => c.label === "Margins of error are approximate"),
-      ).toBe(false);
+      expect(checks.some((c) => c.label === "Margins of error are approximate")).toBe(
+        false,
+      );
     });
   });
 });
@@ -418,9 +407,7 @@ describe("buildTrustChecks — reasons that must be the actual reason", () => {
         }),
       });
 
-      expect(find(checks, "Answer length").detail).toContain(
-        "Not enough output text",
-      );
+      expect(find(checks, "Answer length").detail).toContain("Not enough output text");
     });
   });
 

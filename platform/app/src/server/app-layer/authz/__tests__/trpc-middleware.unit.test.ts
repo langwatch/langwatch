@@ -25,11 +25,9 @@ const hasOrganizationPermission = vi.fn();
 const resolveProjectPermissionAny = vi.fn();
 
 vi.mock("~/server/api/rbac", () => ({
-  resolveProjectPermission: (...args: unknown[]) =>
-    resolveProjectPermission(...args),
+  resolveProjectPermission: (...args: unknown[]) => resolveProjectPermission(...args),
   resolveTeamPermission: (...args: unknown[]) => resolveTeamPermission(...args),
-  hasOrganizationPermission: (...args: unknown[]) =>
-    hasOrganizationPermission(...args),
+  hasOrganizationPermission: (...args: unknown[]) => hasOrganizationPermission(...args),
   resolveProjectPermissionAny: (...args: unknown[]) =>
     resolveProjectPermissionAny(...args),
 }));
@@ -37,9 +35,7 @@ vi.mock("~/server/api/rbac", () => ({
 // The seam resolves its service from the App; this fake App runs the REAL
 // service + repository over the rbac stubs above.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
 
@@ -102,9 +98,7 @@ describe("checkDeclaredPermission", () => {
         teamId: "team-1",
         organizationId: "org-1",
       });
-      await checkDeclaredPermission({ permission: "traces:view" })(
-        params as any,
-      );
+      await checkDeclaredPermission({ permission: "traces:view" })(params as any);
       expect(resolveProjectPermission).toHaveBeenCalledWith(
         expect.objectContaining({
           session: { user: { id: "alice" }, expires: "" },
@@ -123,9 +117,7 @@ describe("checkDeclaredPermission", () => {
         projectId: "proj-1",
         organizationId: "org-1",
       });
-      await checkDeclaredPermission({ permission: "organization:manage" })(
-        params as any,
-      );
+      await checkDeclaredPermission({ permission: "organization:manage" })(params as any);
       expect(hasOrganizationPermission).toHaveBeenCalledWith(
         expect.objectContaining({
           session: { user: { id: "alice" }, expires: "" },
@@ -168,9 +160,7 @@ describe("checkDeclaredPermission", () => {
         permissions: { getDecision },
       };
 
-      await checkDeclaredPermission({ permission: "traces:view" })(
-        params as any,
-      );
+      await checkDeclaredPermission({ permission: "traces:view" })(params as any);
 
       expect(getDecision).toHaveBeenCalledWith({
         userId: "alice",
@@ -198,9 +188,7 @@ describe("checkDeclaredPermission", () => {
     /** @scenario "Declaring a permission with no usable scope id in the input fails to compile" */
     it("fails loudly as a wiring bug, not a denial", async () => {
       const error = await rejection(() =>
-        checkDeclaredPermission({ permission: "traces:view" })(
-          paramsFor({}) as any,
-        ),
+        checkDeclaredPermission({ permission: "traces:view" })(paramsFor({}) as any),
       );
       expect(error.code).toBe("INTERNAL_SERVER_ERROR");
     });
@@ -238,9 +226,7 @@ describe("checkDeclaredPermission", () => {
           paramsFor({ projectId: "does-not-exist" }) as any,
         ),
       );
-      expect((denied.cause as PermissionDeniedError).code).toBe(
-        "permission_denied",
-      );
+      expect((denied.cause as PermissionDeniedError).code).toBe("permission_denied");
       expect(denied.message).not.toContain("does-not-exist");
     });
 
@@ -265,9 +251,7 @@ describe("checkDeclaredPermission", () => {
           paramsFor({ organizationId: "org-1" }) as any,
         ),
       );
-      expect((error.cause as PermissionDeniedError).code).toBe(
-        "permission_denied",
-      );
+      expect((error.cause as PermissionDeniedError).code).toBe("permission_denied");
     });
   });
 });
@@ -276,9 +260,7 @@ describe("checkDeclaredPermissionAny", () => {
   /** @scenario "Any one of several declared permissions is enough" */
   it("permits on the resolver's any-of answer and names the first permission when denied", async () => {
     const params = paramsFor({ projectId: "proj-1" });
-    await checkDeclaredPermissionAny(["traces:view", "scenarios:view"])(
-      params as any,
-    );
+    await checkDeclaredPermissionAny(["traces:view", "scenarios:view"])(params as any);
     expect(resolveProjectPermissionAny).toHaveBeenCalledWith(
       expect.objectContaining({
         session: { user: { id: "alice" }, expires: "" },
@@ -321,9 +303,9 @@ describe("declaredNoPermission", () => {
   /** @scenario "An opted-out procedure cannot silently read scoped input" */
   it("still refuses an unallowed scope id at runtime, defense in depth", async () => {
     const middleware = declaredNoPermission({ reason: "nothing scoped" });
-    await expect(
-      middleware(paramsFor({ projectId: "proj-1" }) as any),
-    ).rejects.toThrow("projectId is not allowed");
+    await expect(middleware(paramsFor({ projectId: "proj-1" }) as any)).rejects.toThrow(
+      "projectId is not allowed",
+    );
     await expect(
       declaredNoPermission({
         reason: "creation flow",

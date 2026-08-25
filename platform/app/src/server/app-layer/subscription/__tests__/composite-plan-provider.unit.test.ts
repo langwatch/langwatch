@@ -82,9 +82,7 @@ describe("createCompositePlanProvider", () => {
 
   describe("when valid license exists", () => {
     beforeEach(() => {
-      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(
-        ENTERPRISE_LICENSE_PLAN,
-      );
+      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(ENTERPRISE_LICENSE_PLAN);
     });
 
     it("selects license plan over SaaS plan", async () => {
@@ -178,9 +176,7 @@ describe("createCompositePlanProvider", () => {
     });
 
     it("recomputes override even when license plan is selected", async () => {
-      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(
-        ENTERPRISE_LICENSE_PLAN,
-      );
+      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(ENTERPRISE_LICENSE_PLAN);
 
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,
@@ -208,9 +204,7 @@ describe("createCompositePlanProvider", () => {
       });
 
       // License is valid — composite should select license
-      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(
-        ENTERPRISE_LICENSE_PLAN,
-      );
+      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(ENTERPRISE_LICENSE_PLAN);
 
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,
@@ -230,9 +224,7 @@ describe("createCompositePlanProvider", () => {
 
   describe("select-one completeness", () => {
     it("returns all fields from the selected license plan", async () => {
-      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(
-        ENTERPRISE_LICENSE_PLAN,
-      );
+      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(ENTERPRISE_LICENSE_PLAN);
 
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,

@@ -9,12 +9,7 @@ import { canonicalAttributes } from "./attributes";
 import { correlations } from "./correlations";
 import { aggregation } from "./kinds";
 import { integerDecimal, timestampDecimal, timestampMs } from "./numbers";
-import {
-  isRecord,
-  sha256,
-  stableStringify,
-  type UnknownRecord,
-} from "./serialization";
+import { isRecord, sha256, stableStringify, type UnknownRecord } from "./serialization";
 import { validatePointShape } from "./validate";
 import { canonicalPointValues, canonicalValueSection } from "./values";
 
@@ -76,8 +71,7 @@ export function buildPoint(args: {
   const name = typeof metric.name === "string" ? metric.name : "";
   if (!name) throw new Error("metric is missing name");
   const unit = typeof metric.unit === "string" ? metric.unit : "";
-  const description =
-    typeof metric.description === "string" ? metric.description : "";
+  const description = typeof metric.description === "string" ? metric.description : "";
 
   const resource = isRecord(args.resourceMetric.resource)
     ? args.resourceMetric.resource
@@ -102,9 +96,7 @@ export function buildPoint(args: {
     },
     scope: {
       schemaUrl:
-        typeof args.scopeMetric.schemaUrl === "string"
-          ? args.scopeMetric.schemaUrl
-          : "",
+        typeof args.scopeMetric.schemaUrl === "string" ? args.scopeMetric.schemaUrl : "",
       name: typeof scope.name === "string" ? scope.name : "",
       version: typeof scope.version === "string" ? scope.version : "",
       attributes: scopeAttributes,

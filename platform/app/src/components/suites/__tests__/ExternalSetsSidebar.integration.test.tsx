@@ -89,9 +89,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.queryByTestId("external-sets-header"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("external-sets-header")).not.toBeInTheDocument();
     });
   });
 
@@ -154,9 +152,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
-            externalSets={[
-              makeExternalSet({ passedCount: 10, totalCount: 10 }),
-            ]}
+            externalSets={[makeExternalSet({ passedCount: 10, totalCount: 10 })]}
           />,
           { wrapper: Wrapper },
         );
@@ -256,11 +252,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         const user = userEvent.setup();
 
         render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            externalSets={externalSets}
-          />,
+          <SuiteSidebar {...defaultProps} suites={suites} externalSets={externalSets} />,
           { wrapper: Wrapper },
         );
 
@@ -272,11 +264,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         const user = userEvent.setup();
 
         render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            externalSets={externalSets}
-          />,
+          <SuiteSidebar {...defaultProps} suites={suites} externalSets={externalSets} />,
           { wrapper: Wrapper },
         );
 
@@ -290,23 +278,14 @@ describe("<SuiteSidebar/> External Sets", () => {
         const user = userEvent.setup();
 
         render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            externalSets={externalSets}
-          />,
+          <SuiteSidebar {...defaultProps} suites={suites} externalSets={externalSets} />,
           { wrapper: Wrapper },
         );
 
-        await user.type(
-          screen.getByPlaceholderText("Search..."),
-          "zzz-no-match",
-        );
+        await user.type(screen.getByPlaceholderText("Search..."), "zzz-no-match");
         expect(screen.queryByText("Billing Tests")).not.toBeInTheDocument();
         expect(screen.queryByText("billing-ci")).not.toBeInTheDocument();
-        expect(
-          screen.queryByTestId("external-sets-header"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("external-sets-header")).not.toBeInTheDocument();
         expect(screen.getByText("No matching run plans")).toBeInTheDocument();
       });
     });

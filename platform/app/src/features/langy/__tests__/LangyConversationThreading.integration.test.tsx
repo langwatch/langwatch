@@ -85,11 +85,9 @@ vi.mock("@paper-design/shaders-react", () => ({
 }));
 
 const mutation = vi.fn();
-const subscription = vi.fn(
-  (_path: string, _input: unknown, _options: unknown) => ({
-    unsubscribe: vi.fn(),
-  }),
-);
+const subscription = vi.fn((_path: string, _input: unknown, _options: unknown) => ({
+  unsubscribe: vi.fn(),
+}));
 
 vi.mock("~/utils/api", async () => {
   const { modelProviderRouter } = await import("./support/langyApiMock");
@@ -98,12 +96,10 @@ vi.mock("~/utils/api", async () => {
     trpcClient: {
       langy: {
         createConversation: {
-          mutate: (input: unknown) =>
-            mutation("langy.createConversation", input),
+          mutate: (input: unknown) => mutation("langy.createConversation", input),
         },
         continueConversation: {
-          mutate: (input: unknown) =>
-            mutation("langy.continueConversation", input),
+          mutate: (input: unknown) => mutation("langy.continueConversation", input),
         },
         onTurnStream: {
           subscribe: (input: unknown, options: unknown) =>
@@ -245,9 +241,7 @@ function renderPanel() {
 }
 
 const transportSendOptions = {
-  messages: [
-    { id: "message-1", role: "user", parts: [{ type: "text", text: "hi" }] },
-  ],
+  messages: [{ id: "message-1", role: "user", parts: [{ type: "text", text: "hi" }] }],
 } as unknown as Parameters<ChatTransport<UIMessage>["sendMessages"]>[0];
 
 beforeEach(() => {
@@ -285,9 +279,7 @@ describe("Langy conversation threading", () => {
           useLangyStore.getState().selectConversation("conv-active");
         });
         await waitFor(() => {
-          expect(useLangyStore.getState().activeConversationId).toBe(
-            "conv-active",
-          );
+          expect(useLangyStore.getState().activeConversationId).toBe("conv-active");
         });
         await act(async () => {
           await transportRef.current!.sendMessages(transportSendOptions);
@@ -315,9 +307,7 @@ describe("Langy conversation threading", () => {
           await transportRef.current!.sendMessages(transportSendOptions);
         });
         expect(mutation.mock.calls[0]?.[0]).toBe("langy.createConversation");
-        expect(mutation.mock.calls[0]?.[1]).not.toHaveProperty(
-          "conversationId",
-        );
+        expect(mutation.mock.calls[0]?.[1]).not.toHaveProperty("conversationId");
         await waitFor(() => {
           expect(useLangyStore.getState().activeConversationId).toBe(
             "conv-created-by-server",

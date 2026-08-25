@@ -36,11 +36,12 @@ interface GraphicsQualityOverrideState {
   setOverride: (override: GraphicsQualityOverride) => void;
 }
 
-export const useGraphicsQualityOverrideStore =
-  create<GraphicsQualityOverrideState>((set) => ({
+export const useGraphicsQualityOverrideStore = create<GraphicsQualityOverrideState>(
+  (set) => ({
     override: load(),
     setOverride: (override) => {
       persist(override);
       set({ override });
     },
-  }));
+  }),
+);

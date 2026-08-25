@@ -67,9 +67,9 @@ describe("usePromptConfigForm", () => {
       });
 
       // Verify the form reflects the user's selection
-      expect(
-        result.current.methods.getValues("version.configData.llm.model"),
-      ).toBe("openai/gpt-5-mini");
+      expect(result.current.methods.getValues("version.configData.llm.model")).toBe(
+        "openai/gpt-5-mini",
+      );
 
       // The reverse sync fires and sets disableNodeSyncRef=true, then schedules a 1ms
       // release. Advance past the 1ms guard release — now disableNodeSyncRef=false again.
@@ -104,9 +104,9 @@ describe("usePromptConfigForm", () => {
       });
 
       // The form model must still be the user's selection, not the stale node value
-      expect(
-        result.current.methods.getValues("version.configData.llm.model"),
-      ).toBe("openai/gpt-5-mini");
+      expect(result.current.methods.getValues("version.configData.llm.model")).toBe(
+        "openai/gpt-5-mini",
+      );
     });
   });
 });

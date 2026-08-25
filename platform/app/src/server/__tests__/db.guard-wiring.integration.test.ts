@@ -21,9 +21,7 @@ describe("the tenancy guard chain on the exported client", () => {
   describe("when a project-scoped model is queried without a tenant filter", () => {
     /** @scenario "A project-scoped query without a tenant filter is refused" */
     it("refuses the query before it reaches the database", async () => {
-      await expect(prisma.dataset.findMany({ where: {} })).rejects.toThrow(
-        /projectId/,
-      );
+      await expect(prisma.dataset.findMany({ where: {} })).rejects.toThrow(/projectId/);
     });
   });
 
@@ -37,9 +35,9 @@ describe("the tenancy guard chain on the exported client", () => {
   describe("when a deleteMany names an empty where clause", () => {
     /** @scenario "A mass delete without the safe word is refused" */
     it("refuses the query and names the safe word", async () => {
-      await expect(
-        prisma.verificationToken.deleteMany({ where: {} }),
-      ).rejects.toThrow(/FORCE_DELETE_ALL/);
+      await expect(prisma.verificationToken.deleteMany({ where: {} })).rejects.toThrow(
+        /FORCE_DELETE_ALL/,
+      );
     });
   });
 
@@ -63,9 +61,7 @@ describe("the tenancy guard chain on the exported client", () => {
       // two rows went, and none survived. A dropped rewrite would instead
       // delete zero rows (no row's id is the safe word) and fail both checks.
       expect(count).toBeGreaterThanOrEqual(2);
-      expect(
-        await prisma.verificationToken.count({ where: { identifier } }),
-      ).toBe(0);
+      expect(await prisma.verificationToken.count({ where: { identifier } })).toBe(0);
     });
   });
 

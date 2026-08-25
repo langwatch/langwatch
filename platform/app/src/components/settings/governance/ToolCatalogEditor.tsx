@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -62,11 +54,7 @@ interface Props {
   onEditTile: (entry: AiToolEntry) => void;
 }
 
-export function ToolCatalogEditor({
-  organizationId,
-  onAddTile,
-  onEditTile,
-}: Props) {
+export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Props) {
   const utils = api.useUtils();
 
   // Delete is permanent, so it routes through a confirm dialog. `null`
@@ -153,9 +141,7 @@ export function ToolCatalogEditor({
   // ever adds starter tiles the catalog never had.
   const [showImport, setShowImport] = useState(false);
   const starterTiles = starterPackQuery.data ?? [];
-  const selectedSlugs = starterTiles
-    .filter((t) => !unchecked[t.slug])
-    .map((t) => t.slug);
+  const selectedSlugs = starterTiles.filter((t) => !unchecked[t.slug]).map((t) => t.slug);
 
   if (adminListQuery.isLoading) {
     return (
@@ -180,47 +166,47 @@ export function ToolCatalogEditor({
     grouped[t].sort((a, b) => a.order - b.order);
   }
 
-  const handleSectionDragEnd =
-    (type: AiToolEntry["type"]) => (event: DragEndEvent) => {
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
+  const handleSectionDragEnd = (type: AiToolEntry["type"]) => (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-      const items = grouped[type];
-      const oldIndex = items.findIndex((e) => e.id === active.id);
-      const newIndex = items.findIndex((e) => e.id === over.id);
-      if (oldIndex === -1 || newIndex === -1) return;
+    const items = grouped[type];
+    const oldIndex = items.findIndex((e) => e.id === active.id);
+    const newIndex = items.findIndex((e) => e.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
 
-      const reorderedSection = arrayMove(items, oldIndex, newIndex).map(
-        (e, idx) => ({ ...e, order: idx }),
-      );
+    const reorderedSection = arrayMove(items, oldIndex, newIndex).map((e, idx) => ({
+      ...e,
+      order: idx,
+    }));
 
-      const previous = entries;
-      const next: AiToolEntry[] = entries.map((e) => {
-        if (e.type !== type) return e;
-        const updated = reorderedSection.find((r) => r.id === e.id);
-        return updated ?? e;
-      });
+    const previous = entries;
+    const next: AiToolEntry[] = entries.map((e) => {
+      if (e.type !== type) return e;
+      const updated = reorderedSection.find((r) => r.id === e.id);
+      return updated ?? e;
+    });
 
-      utils.aiTools.adminList.setData(
-        { organizationId },
-        next as unknown as typeof adminListQuery.data,
-      );
+    utils.aiTools.adminList.setData(
+      { organizationId },
+      next as unknown as typeof adminListQuery.data,
+    );
 
-      reorderMutation.mutate(
-        {
-          organizationId,
-          updates: reorderedSection.map((e) => ({ id: e.id, order: e.order })),
+    reorderMutation.mutate(
+      {
+        organizationId,
+        updates: reorderedSection.map((e) => ({ id: e.id, order: e.order })),
+      },
+      {
+        onError: () => {
+          utils.aiTools.adminList.setData(
+            { organizationId },
+            previous as unknown as typeof adminListQuery.data,
+          );
         },
-        {
-          onError: () => {
-            utils.aiTools.adminList.setData(
-              { organizationId },
-              previous as unknown as typeof adminListQuery.data,
-            );
-          },
-        },
-      );
-    };
+      },
+    );
+  };
 
   const isCatalogEmpty = entries.length === 0;
 
@@ -228,11 +214,7 @@ export function ToolCatalogEditor({
     <VStack align="stretch" gap={6} width="full">
       {!isCatalogEmpty && (
         <HStack justifyContent="flex-end">
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => setShowImport((v) => !v)}
-          >
+          <Button size="xs" variant="outline" onClick={() => setShowImport((v) => !v)}>
             <PackageOpen size={14} /> Import starter pack
           </Button>
         </HStack>
@@ -270,11 +252,7 @@ export function ToolCatalogEditor({
                   if (tiles.length === 0) return null;
                   return (
                     <VStack key={type} align="start" gap={1}>
-                      <Text
-                        fontSize="xs"
-                        fontWeight="semibold"
-                        color="fg.muted"
-                      >
+                      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                         {SECTION_LABELS[type]}
                       </Text>
                       {tiles.map((tile) => (
@@ -309,8 +287,7 @@ export function ToolCatalogEditor({
                     )
                   }
                 >
-                  <PackageOpen size={14} /> Import selected (
-                  {selectedSlugs.length})
+                  <PackageOpen size={14} /> Import selected ({selectedSlugs.length})
                 </Button>
               </HStack>
             </VStack>
@@ -388,9 +365,9 @@ export function ToolCatalogEditor({
             </Dialog.Header>
             <Dialog.Body>
               <Text fontSize="sm" color="fg.muted">
-                This permanently removes the tile from the catalog and from
-                every member&apos;s /me portal. It cannot be undone. To hide it
-                without losing its configuration, use Disable instead.
+                This permanently removes the tile from the catalog and from every
+                member&apos;s /me portal. It cannot be undone. To hide it without losing
+                its configuration, use Disable instead.
               </Text>
             </Dialog.Body>
             <Dialog.Footer>
@@ -481,14 +458,8 @@ function SortableCatalogRow({
   onDelete: () => void;
   isPending: boolean;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: entry.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: entry.id });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -585,10 +556,7 @@ function CatalogRow({
       <Text fontSize="sm" flex={1} fontWeight="medium">
         {entry.displayName}
       </Text>
-      <ProviderScopeChips
-        size="xs"
-        scopes={scopeChipsFor(entry, departmentNameById)}
-      />
+      <ProviderScopeChips size="xs" scopes={scopeChipsFor(entry, departmentNameById)} />
       <Menu.Root>
         <Menu.Trigger asChild>
           <Button variant="ghost" size="xs" aria-label="Tile actions">

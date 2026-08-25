@@ -25,9 +25,9 @@ describe("trace metadata editable keys", () => {
       /** @scenario "Which metadata keys a reviewer may correct is one rule" */
       it("refuses everything the platform stamps itself", () => {
         expect(isTraceMetadataKeyEditable("langwatch.origin")).toBe(false);
-        expect(
-          isTraceMetadataKeyEditable("langwatch.reserved.log_record_count"),
-        ).toBe(false);
+        expect(isTraceMetadataKeyEditable("langwatch.reserved.log_record_count")).toBe(
+          false,
+        );
       });
 
       /** @scenario "Which metadata keys a reviewer may correct is one rule" */
@@ -47,12 +47,8 @@ describe("trace metadata editable keys", () => {
     describe("when it is a key the caller sent", () => {
       /** @scenario "Which metadata keys a reviewer may correct is one rule" */
       it("corrects the bare metadata key underneath it", () => {
-        expect(traceMetadataKeyForAttribute("metadata.environment")).toBe(
-          "environment",
-        );
-        expect(traceMetadataKeyForAttribute("metadata.review.note")).toBe(
-          "review.note",
-        );
+        expect(traceMetadataKeyForAttribute("metadata.environment")).toBe("environment");
+        expect(traceMetadataKeyForAttribute("metadata.review.note")).toBe("review.note");
       });
     });
 
@@ -67,9 +63,7 @@ describe("trace metadata editable keys", () => {
       /** @scenario "Which metadata keys a reviewer may correct is one rule" */
       it("corrects nothing", () => {
         expect(traceMetadataKeyForAttribute("service.name")).toBeNull();
-        expect(
-          traceMetadataKeyForAttribute("gen_ai.conversation.id"),
-        ).toBeNull();
+        expect(traceMetadataKeyForAttribute("gen_ai.conversation.id")).toBeNull();
         expect(traceMetadataKeyForAttribute("langwatch.user_id")).toBeNull();
         expect(traceMetadataKeyForAttribute("scenario.run_id")).toBeNull();
         expect(traceMetadataKeyForAttribute("thread_id")).toBeNull();
@@ -89,9 +83,7 @@ describe("trace metadata editable keys", () => {
     describe("when the drawer looks for the row it reads on", () => {
       /** @scenario "Which metadata keys a reviewer may correct is one rule" */
       it("finds the row it was read from", () => {
-        expect(traceAttributeKeyForMetadata("environment")).toBe(
-          "metadata.environment",
-        );
+        expect(traceAttributeKeyForMetadata("environment")).toBe("metadata.environment");
         expect(traceAttributeKeyForMetadata("labels")).toBe("langwatch.labels");
       });
     });

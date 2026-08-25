@@ -67,9 +67,7 @@ describe("given an annotation with a comment", () => {
     renderCard();
 
     expect(screen.getByText("Ada")).toBeInTheDocument();
-    expect(
-      screen.getByText("the model invented a policy number"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("the model invented a policy number")).toBeInTheDocument();
     expect(
       screen.getByText(new Date("2026-08-01T10:30:00Z").toLocaleString()),
     ).toBeInTheDocument();
@@ -129,9 +127,7 @@ describe("given an annotation carrying scores", () => {
       item: annotation({ scoreOptions: { "score-1": { value: "good" } } }),
     });
 
-    expect(
-      screen.queryByLabelText("Reason for Helpfulness"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Reason for Helpfulness")).not.toBeInTheDocument();
   });
 
   it("joins a multi-value score into one readable value", () => {
@@ -204,9 +200,7 @@ describe("given an annotation with a suggested output", () => {
     });
 
     expect(screen.getByText("correction")).toBeInTheDocument();
-    expect(
-      screen.getByText("Policy 4471 covers water damage."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Policy 4471 covers water damage.")).toBeInTheDocument();
   });
 });
 
@@ -382,9 +376,6 @@ describe("given a turn's trace carries a comment about one of its spans", () => 
       }),
     });
 
-    expect(screen.getByTestId("annotation-anchor")).not.toHaveAttribute(
-      "type",
-      "button",
-    );
+    expect(screen.getByTestId("annotation-anchor")).not.toHaveAttribute("type", "button");
   });
 });

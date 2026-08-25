@@ -21,21 +21,21 @@ rules that apply to both file types are split into `_ts` / `_tsx` siblings.
 
 ## Rules
 
-| Rule | Forbids | Scope |
-|---|---|---|
-| `no-explicit-any` + `-tsx` | `: any`, `as any` | `platform/app/src/**/*.{ts,tsx}` |
-| `no-inline-dynamic-import` + `-tsx` | inline `import(...)` outside `routes.tsx` / `pages/**` | `platform/app/src/**/*.{ts,tsx}` |
-| `no-form-watch-in-child` | `$form.watch()` in a child receiving `form` as a prop | `platform/app/src/components/**/*.tsx` |
-| `no-export-star-shim` + `-tsx` | `export * from "..."`. Disable inline with `// ast-grep-ignore: no-export-star-shim-{ts,tsx}` | `platform/app/src/**/*.{ts,tsx}` |
-| `no-localhost-fallback` + `-tsx` | `?? "http://localhost..."` and template-literal variants | `platform/app/src/**/*.{ts,tsx}` |
-| `no-form-disable-on-isvalid` | `disabled={!form.formState.isValid}` on submit buttons | `platform/app/src/**/*.tsx` |
-| `require-bdd-describe-context` + `-tsx` | nested `describe` that names a topic instead of a `given`/`when` condition | test files under `platform/app/**`, `sdks/typescript/**` |
-| `require-boolean-name-prefix` | `foo: boolean` without an `is`/`has`/`should`/`can`/`will` prefix or a domain-adjective equivalent | `platform/app/{src,ee}/**/*.ts` |
-| `require-fetch-timeout` + `-tsx` | `fetch(...)` with no `signal` — a hung peer hangs the caller | `platform/app/src/**`, `sdks/typescript/src/**` |
-| `no-test-without-assertion` + `-tsx` | a test whose inline body contains no `expect`/`assert` — passes unless the code throws | test files |
-| `use-action-based-test-name` + `-tsx` | `it("should …")`, and names carrying no behaviour (`works`, `renders`, `test`) | test files |
-| `no-tautological-assertion` + `-tsx` | `expect(X).toBe(X)` — an assertion that cannot fail | test files |
-| `no-empty-test` + `-tsx` | `it("…", () => {})` — always green, counts as coverage | test files |
+| Rule                                    | Forbids                                                                                            | Scope                                                    |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `no-explicit-any` + `-tsx`              | `: any`, `as any`                                                                                  | `platform/app/src/**/*.{ts,tsx}`                         |
+| `no-inline-dynamic-import` + `-tsx`     | inline `import(...)` outside `routes.tsx` / `pages/**`                                             | `platform/app/src/**/*.{ts,tsx}`                         |
+| `no-form-watch-in-child`                | `$form.watch()` in a child receiving `form` as a prop                                              | `platform/app/src/components/**/*.tsx`                   |
+| `no-export-star-shim` + `-tsx`          | `export * from "..."`. Disable inline with `// ast-grep-ignore: no-export-star-shim-{ts,tsx}`      | `platform/app/src/**/*.{ts,tsx}`                         |
+| `no-localhost-fallback` + `-tsx`        | `?? "http://localhost..."` and template-literal variants                                           | `platform/app/src/**/*.{ts,tsx}`                         |
+| `no-form-disable-on-isvalid`            | `disabled={!form.formState.isValid}` on submit buttons                                             | `platform/app/src/**/*.tsx`                              |
+| `require-bdd-describe-context` + `-tsx` | nested `describe` that names a topic instead of a `given`/`when` condition                         | test files under `platform/app/**`, `sdks/typescript/**` |
+| `require-boolean-name-prefix`           | `foo: boolean` without an `is`/`has`/`should`/`can`/`will` prefix or a domain-adjective equivalent | `platform/app/{src,ee}/**/*.ts`                          |
+| `require-fetch-timeout` + `-tsx`        | `fetch(...)` with no `signal` — a hung peer hangs the caller                                       | `platform/app/src/**`, `sdks/typescript/src/**`          |
+| `no-test-without-assertion` + `-tsx`    | a test whose inline body contains no `expect`/`assert` — passes unless the code throws             | test files                                               |
+| `use-action-based-test-name` + `-tsx`   | `it("should …")`, and names carrying no behaviour (`works`, `renders`, `test`)                     | test files                                               |
+| `no-tautological-assertion` + `-tsx`    | `expect(X).toBe(X)` — an assertion that cannot fail                                                | test files                                               |
+| `no-empty-test` + `-tsx`                | `it("…", () => {})` — always green, counts as coverage                                             | test files                                               |
 
 The BDD/boolean/fetch trio was added because they were the three largest
 mechanically preventable clusters in a 50-PR sample of CodeRabbit comments —

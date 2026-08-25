@@ -34,7 +34,6 @@ export function deriveSeriesIdentifier(
       : typeof s.metric === "string"
         ? s.metric
         : "value";
-  const aggregationPart =
-    typeof s.aggregation === "string" ? s.aggregation : "count";
+  const aggregationPart = typeof s.aggregation === "string" ? s.aggregation : "count";
   return `${index}/${keyPart}/${aggregationPart}`;
 }

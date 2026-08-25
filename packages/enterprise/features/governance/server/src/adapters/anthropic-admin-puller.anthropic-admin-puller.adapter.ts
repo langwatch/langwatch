@@ -233,8 +233,7 @@ function staleCursorRestart({
       (candidate) => candidate !== null && !Number.isNaN(Date.parse(candidate)),
     );
     return {
-      startingAt:
-        resumeFrom ?? config.startingAt ?? defaultStartingAt(config.report),
+      startingAt: resumeFrom ?? config.startingAt ?? defaultStartingAt(config.report),
       page: null,
       watermark: null,
     };
@@ -295,9 +294,7 @@ const MAX_ERROR_BODY_BYTES = 4_096;
  * Best-effort read of a non-OK response body, bounded so an unexpectedly
  * large payload doesn't blow up logs or memory.
  */
-async function safeResponseText(response: {
-  text(): Promise<string>;
-}): Promise<string> {
+async function safeResponseText(response: { text(): Promise<string> }): Promise<string> {
   try {
     const raw = await response.text();
     if (raw.length <= MAX_ERROR_BODY_BYTES) return raw;
@@ -313,9 +310,7 @@ async function fetchPageError(
 ): Promise<Error> {
   const detail = await safeResponseText(response);
   const suffix = detail ? `: ${detail}` : "";
-  return new Error(
-    `HTTP ${response.status} (anthropic ${report}_report)${suffix}`,
-  );
+  return new Error(`HTTP ${response.status} (anthropic ${report}_report)${suffix}`);
 }
 
 /** One group-by row inside a usage bucket. Unknown fields are tolerated. */
@@ -384,9 +379,7 @@ const costResultSchema = z
  * permanently. Same blast-radius call as the non-USD skip in `costEvent`.
  */
 function centsToUsd(amount: string): string | null {
-  const match = /^([+-]?)(\d+)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(
-    amount.trim(),
-  );
+  const match = /^([+-]?)(\d+)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(amount.trim());
   if (!match) {
     return null;
   }
@@ -402,9 +395,7 @@ function centsToUsd(amount: string): string | null {
       // there — treat it as malformed.
       return null;
     }
-    return `${sign}${wholeRaw}${fraction ? `.${fraction}` : ""}e${
-      exponentValue - 2
-    }`;
+    return `${sign}${wholeRaw}${fraction ? `.${fraction}` : ""}e${exponentValue - 2}`;
   }
   // Three digits guarantee a whole part survives the two-digit shift.
   const whole = wholeRaw.padStart(3, "0");
@@ -624,9 +615,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
         `anthropic ${config.report}_report reported has_more with no next_page; advancing the watermark here would drop the rest of the window`,
       );
     }
-    const events = parsed.data.flatMap((bucket) =>
-      this.bucketEvents({ bucket, config }),
-    );
+    const events = parsed.data.flatMap((bucket) => this.bucketEvents({ bucket, config }));
     return {
       ok: true,
       events,
@@ -655,10 +644,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
 
     const url = reportUrl({ config, startingAt, page });
     const signal = options.signal
-      ? AbortSignal.any([
-          options.signal,
-          AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        ])
+      ? AbortSignal.any([options.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
       : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
 
     const response = await this.http.fetch(url.toString(), {

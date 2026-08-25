@@ -4,10 +4,7 @@
  * Centralizes makeScenarioRunData, makeBatchRun, and makeSummary
  * to avoid duplication across unit and integration tests.
  */
-import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { BatchRun, BatchRunSummary } from "../run-history-transforms";
 
@@ -54,9 +51,7 @@ export function makeBatchRun(overrides: Partial<BatchRun> = {}): BatchRun {
   };
 }
 
-export function makeSummary(
-  overrides: Partial<BatchRunSummary> = {},
-): BatchRunSummary {
+export function makeSummary(overrides: Partial<BatchRunSummary> = {}): BatchRunSummary {
   return {
     passRate: 100,
     passedCount: 2,

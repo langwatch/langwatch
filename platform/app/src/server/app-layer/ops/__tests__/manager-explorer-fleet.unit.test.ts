@@ -23,10 +23,7 @@ function counts(
   };
 }
 
-function serviceWithCounts(
-  rows: ProcessNameCounts[],
-  registryNames: string[] = [],
-) {
+function serviceWithCounts(rows: ProcessNameCounts[], registryNames: string[] = []) {
   const fleet = new NullProcessOpsRepository();
   fleet.countByProcessName = async () => rows;
   return new ManagerExplorerService({
@@ -89,9 +86,7 @@ describe("ManagerExplorerService fleet summary", () => {
 
   describe("given rows the pipeline registry does not know", () => {
     it("still shows them, naming the registry gap", async () => {
-      const service = serviceWithCounts([
-        counts("retired.process", { deadMessages: 2 }),
-      ]);
+      const service = serviceWithCounts([counts("retired.process", { deadMessages: 2 })]);
       const rows = await service.getFleetSummary();
       const retired = rows.find((r) => r.processName === "retired.process");
       expect(retired?.pipelineName).toBe("(not registered)");

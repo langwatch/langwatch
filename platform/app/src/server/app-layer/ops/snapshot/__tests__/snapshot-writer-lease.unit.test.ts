@@ -64,9 +64,7 @@ const FLEET_STATE = {
 const makeQueueRepo = () => ({
   discoverQueueNames: vi.fn().mockResolvedValue(["trace_processing"]),
   scanQueues: vi.fn().mockResolvedValue([]),
-  getBlockedSummary: vi
-    .fn()
-    .mockResolvedValue({ totalBlocked: 0, clusters: [] }),
+  getBlockedSummary: vi.fn().mockResolvedValue({ totalBlocked: 0, clusters: [] }),
   enumerateParkedTenants: vi.fn().mockResolvedValue({ tenants: [], total: 0 }),
   reconcileTotalPending: vi.fn().mockResolvedValue(null),
 });
@@ -162,8 +160,8 @@ describe("snapshot writer lease gate", () => {
       await collector.discoverQueues();
       await collector.collect();
 
-      const published = (snapshotRepo.writeLive as ReturnType<typeof vi.fn>)
-        .mock.calls[0]?.[0].snapshot;
+      const published = (snapshotRepo.writeLive as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[0].snapshot;
       expect(published.peakCompletedPerSec).toBe(999);
       expect(published.peakLatencyP99Ms).toBe(900);
       // The restored point is still there, with this cycle's appended after it
@@ -208,9 +206,7 @@ describe("snapshot writer lease gate", () => {
       // Adopting it would have the collector report a detail artifact that
       // exists nowhere but in its own memory.
       const snapshotRepo = makeSnapshotRepo(true);
-      (snapshotRepo.writeDetail as ReturnType<typeof vi.fn>).mockResolvedValue(
-        false,
-      );
+      (snapshotRepo.writeDetail as ReturnType<typeof vi.fn>).mockResolvedValue(false);
       const collector = new OpsMetricsCollector({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         redis: redisStub as any,

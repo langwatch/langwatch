@@ -179,8 +179,7 @@ export async function runSeedAnomalyFixture(
 
 // CLI bootstrap — only fires when this file is the entry point.
 const isCliInvocation =
-  typeof process.argv[1] === "string" &&
-  import.meta.url === `file://${process.argv[1]}`;
+  typeof process.argv[1] === "string" && import.meta.url === `file://${process.argv[1]}`;
 
 if (isCliInvocation) {
   const args = parseArgs(process.argv.slice(2));

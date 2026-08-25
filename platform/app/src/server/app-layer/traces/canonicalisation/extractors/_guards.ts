@@ -25,8 +25,7 @@ export interface MessageLike {
 
 export const isMessageLike = (v: unknown): v is MessageLike =>
   isRecord(v) &&
-  (typeof (v as MessageLike).role === "string" ||
-    (v as MessageLike).role === undefined);
+  (typeof (v as MessageLike).role === "string" || (v as MessageLike).role === undefined);
 
 export const asNumber = (v: unknown): number | null => {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -74,8 +73,7 @@ export const safeJsonParse = (v: unknown): unknown => {
   if (s.length < 2) return v;
 
   const looksJson =
-    (s.startsWith("{") && s.endsWith("}")) ||
-    (s.startsWith("[") && s.endsWith("]"));
+    (s.startsWith("{") && s.endsWith("}")) || (s.startsWith("[") && s.endsWith("]"));
 
   if (!looksJson) return v;
 

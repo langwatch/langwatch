@@ -28,10 +28,7 @@ interface RetentionAwareEnsurePort<TRecord> {
 class EnsureAppendStore<TRecord> implements AppendStore<TRecord> {
   constructor(private readonly repository: RetentionAwareEnsurePort<TRecord>) {}
 
-  async append(
-    record: TRecord,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
+  async append(record: TRecord, context: ProjectionStoreContext): Promise<void> {
     await this.bulkAppend([record], context);
   }
 

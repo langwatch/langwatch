@@ -8,13 +8,7 @@
  * The actual table implementations are in separate files for better maintainability.
  */
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import {
-  Columns3,
-  HelpCircle,
-  ListTree,
-  Rows3,
-  SlidersHorizontal,
-} from "lucide-react";
+import { Columns3, HelpCircle, ListTree, Rows3, SlidersHorizontal } from "lucide-react";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
   PopoverArrow,
@@ -27,16 +21,8 @@ import { Radio, RadioGroup } from "~/components/ui/radio";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ComparisonTable } from "./ComparisonTable";
 import { SingleRunTable } from "./SingleRunTable";
-import {
-  DEFAULT_ROW_HEIGHT,
-  ROW_HEIGHT_OPTIONS,
-  type RowHeight,
-} from "./tableUtils";
-import type {
-  BatchDatasetColumn,
-  BatchEvaluationData,
-  ComparisonRunData,
-} from "./types";
+import { DEFAULT_ROW_HEIGHT, ROW_HEIGHT_OPTIONS, type RowHeight } from "./tableUtils";
+import type { BatchDatasetColumn, BatchEvaluationData, ComparisonRunData } from "./types";
 import type { ResultField } from "./useResultDisplayPreferences";
 
 type BatchEvaluationResultsTableProps = {
@@ -90,11 +76,7 @@ export const ColumnVisibilityButton = ({
   return (
     <PopoverRoot>
       <PopoverTrigger asChild>
-        <Button
-          size="sm"
-          variant="outline"
-          aria-label="Toggle column visibility"
-        >
+        <Button size="sm" variant="outline" aria-label="Toggle column visibility">
           <Columns3 size={16} />
           Columns
         </Button>
@@ -256,11 +238,7 @@ export const GroupRowsButton = ({
                 <Text fontSize="sm">No grouping</Text>
               </Radio>
               {availableKeys.map((key) => (
-                <Radio
-                  key={key}
-                  value={key}
-                  data-testid={`group-by-row-option-${key}`}
-                >
+                <Radio key={key} value={key} data-testid={`group-by-row-option-${key}`}>
                   <Text fontSize="sm">{key}</Text>
                 </Radio>
               ))}

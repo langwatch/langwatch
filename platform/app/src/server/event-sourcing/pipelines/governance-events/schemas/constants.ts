@@ -1,5 +1,4 @@
-export const GOVERNANCE_EVENTS_PIPELINE_NAME =
-  "governance_events_processing" as const;
+export const GOVERNANCE_EVENTS_PIPELINE_NAME = "governance_events_processing" as const;
 export const GOVERNANCE_EVENTS_AGGREGATE_TYPE = "governance_subject" as const;
 
 export const RECORD_VK_LIFECYCLE_COMMAND_TYPE =
@@ -7,8 +6,7 @@ export const RECORD_VK_LIFECYCLE_COMMAND_TYPE =
 export const RECORD_BUDGET_CROSSING_COMMAND_TYPE =
   "lw.governance.record_budget_crossing" as const;
 
-export const GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE =
-  "lw.governance.vk_lifecycle" as const;
+export const GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE = "lw.governance.vk_lifecycle" as const;
 export const GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE =
   "lw.governance.budget_crossing" as const;
 

@@ -13,31 +13,27 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const {
-  mockIsLiteMemberRef,
-  mockScoresList,
-  mockToggleMutate,
-  mockDeleteMutate,
-} = vi.hoisted(() => {
-  return {
-    mockIsLiteMemberRef: {
-      current: false,
-    },
-    mockScoresList: {
-      current: [] as Array<{
-        id: string;
-        name: string;
-        description: string;
-        dataType: string;
-        options: Array<{ label: string; value: number }>;
-        active: boolean;
-        projectId: string;
-      }>,
-    },
-    mockToggleMutate: vi.fn(),
-    mockDeleteMutate: vi.fn(),
-  };
-});
+const { mockIsLiteMemberRef, mockScoresList, mockToggleMutate, mockDeleteMutate } =
+  vi.hoisted(() => {
+    return {
+      mockIsLiteMemberRef: {
+        current: false,
+      },
+      mockScoresList: {
+        current: [] as Array<{
+          id: string;
+          name: string;
+          description: string;
+          dataType: string;
+          options: Array<{ label: string; value: number }>;
+          active: boolean;
+          projectId: string;
+        }>,
+      },
+      mockToggleMutate: vi.fn(),
+      mockDeleteMutate: vi.fn(),
+    };
+  });
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -213,9 +209,8 @@ vi.mock("~/generated/prisma/client", () => ({
 }));
 
 // Lazy import to ensure mocks are set up first
-const { default: AnnotationScorePage } = await import(
-  "~/pages/settings/annotation-scores"
-);
+const { default: AnnotationScorePage } =
+  await import("~/pages/settings/annotation-scores");
 
 function renderPage() {
   return render(

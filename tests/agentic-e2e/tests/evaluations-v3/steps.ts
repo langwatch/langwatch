@@ -89,7 +89,7 @@ export async function whenIConfigureHTTPAgent(
     url: string;
     bodyTemplate: string;
     outputPath: string;
-  }
+  },
 ) {
   // Fill in agent name
   const nameInput = page.locator('[data-testid="agent-name-input"]').last();
@@ -136,12 +136,12 @@ export async function whenIAddDatasetRow(
   page: Page,
   rowIndex: number,
   input: string,
-  expectedOutput: string
+  expectedOutput: string,
 ) {
   // Click on input cell
   const inputCell = page
     .locator(
-      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="input"]`
+      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="input"]`,
     )
     .last();
   await inputCell.click();
@@ -154,7 +154,7 @@ export async function whenIAddDatasetRow(
   // Click on expected_output cell
   const expectedCell = page
     .locator(
-      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="expected_output"]`
+      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="expected_output"]`,
     )
     .last();
   await expectedCell.click();
@@ -174,15 +174,11 @@ export async function whenIAddDatasetRow(
  */
 export async function whenIAddExactMatchEvaluator(page: Page) {
   // Click Add Evaluator button
-  const addEvaluatorButton = page
-    .getByRole("button", { name: /add.*evaluator/i })
-    .last();
+  const addEvaluatorButton = page.getByRole("button", { name: /add.*evaluator/i }).last();
   await addEvaluatorButton.click();
 
   // Select exact_match from list
-  const exactMatchOption = page
-    .getByText("exact_match", { exact: true })
-    .last();
+  const exactMatchOption = page.getByText("exact_match", { exact: true }).last();
   await exactMatchOption.click();
 }
 
@@ -191,7 +187,7 @@ export async function whenIAddExactMatchEvaluator(page: Page) {
  */
 export async function whenIConfigureEvaluatorMappings(
   page: Page,
-  config: { output: string; expected: string }
+  config: { output: string; expected: string },
 ) {
   // This would configure the evaluator to compare target.output vs dataset.expected_output
   // Implementation depends on actual UI - may need to select from dropdowns
@@ -210,24 +206,19 @@ export async function whenIConfigureEvaluatorMappings(
  * When I click "Evaluate" button
  */
 export async function whenIClickEvaluate(page: Page) {
-  const evaluateButton = page
-    .getByRole("button", { name: /^evaluate$/i })
-    .last();
+  const evaluateButton = page.getByRole("button", { name: /^evaluate$/i }).last();
   await evaluateButton.click();
 }
 
 /**
  * When I wait for evaluation to complete
  */
-export async function whenIWaitForEvaluationComplete(
-  page: Page,
-  rowCount: number
-) {
+export async function whenIWaitForEvaluationComplete(page: Page, rowCount: number) {
   // Wait for all rows to complete execution
   for (let i = 0; i < rowCount; i++) {
     // Wait for loading skeletons to disappear
     const loadingIndicator = page.locator(
-      `[data-row="${i}"] [data-testid="loading-skeleton"]`
+      `[data-row="${i}"] [data-testid="loading-skeleton"]`,
     );
     await expect(loadingIndicator).not.toBeVisible({ timeout: 30000 });
   }
@@ -239,11 +230,11 @@ export async function whenIWaitForEvaluationComplete(
 export async function whenIClickPlayButtonOnCell(
   page: Page,
   rowIndex: number,
-  columnId: string
+  columnId: string,
 ) {
   const cell = page
     .locator(
-      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${columnId}"]`
+      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${columnId}"]`,
     )
     .last();
   await cell.hover();
@@ -258,11 +249,11 @@ export async function whenIClickPlayButtonOnCell(
 export async function whenIModifyDatasetRowInput(
   page: Page,
   rowIndex: number,
-  newInput: string
+  newInput: string,
 ) {
   const inputCell = page
     .locator(
-      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="input"]`
+      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="input"]`,
     )
     .last();
   await inputCell.click();
@@ -283,12 +274,12 @@ export async function whenIModifyDatasetRowInput(
 export async function thenTargetCellsShowOutput(
   page: Page,
   targetColumnId: string,
-  expectedOutputs: string[]
+  expectedOutputs: string[],
 ) {
   for (let i = 0; i < expectedOutputs.length; i++) {
     const cell = page
       .locator(
-        `[data-testid="spreadsheet-cell"][data-row="${i}"][data-column="${targetColumnId}"]`
+        `[data-testid="spreadsheet-cell"][data-row="${i}"][data-column="${targetColumnId}"]`,
       )
       .last();
     await expect(cell).toContainText(expectedOutputs[i], { timeout: 15000 });
@@ -301,17 +292,17 @@ export async function thenTargetCellsShowOutput(
 export async function thenEvaluatorCellsShowPass(
   page: Page,
   evaluatorColumnId: string,
-  rowCount: number
+  rowCount: number,
 ) {
   for (let i = 0; i < rowCount; i++) {
     // Look for green checkmark or "pass" indicator
     const cell = page
       .locator(
-        `[data-testid="spreadsheet-cell"][data-row="${i}"][data-column="${evaluatorColumnId}"]`
+        `[data-testid="spreadsheet-cell"][data-row="${i}"][data-column="${evaluatorColumnId}"]`,
       )
       .last();
     const passIndicator = cell.locator(
-      '[data-testid="evaluation-pass"], .chakra-icon[data-status="pass"]'
+      '[data-testid="evaluation-pass"], .chakra-icon[data-status="pass"]',
     );
     await expect(passIndicator).toBeVisible({ timeout: 15000 });
   }
@@ -322,7 +313,7 @@ export async function thenEvaluatorCellsShowPass(
  */
 export async function thenTargetHeaderShowsPassRate(
   page: Page,
-  expectedRate: string | RegExp
+  expectedRate: string | RegExp,
 ) {
   const headerPassRate = page.getByText(expectedRate);
   await expect(headerPassRate).toBeVisible({ timeout: 10000 });
@@ -345,13 +336,13 @@ export async function thenOtherRowsRemainUnchanged(
   page: Page,
   unchangedRows: number[],
   columnId: string,
-  expectedOutputs: string[]
+  expectedOutputs: string[],
 ) {
   for (let i = 0; i < unchangedRows.length; i++) {
     const rowIndex = unchangedRows[i];
     const cell = page
       .locator(
-        `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${columnId}"]`
+        `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${columnId}"]`,
       )
       .last();
     await expect(cell).toContainText(expectedOutputs[i], { timeout: 5000 });
@@ -365,11 +356,11 @@ export async function thenCellShowsOutput(
   page: Page,
   rowIndex: number,
   columnId: string,
-  expectedOutput: string
+  expectedOutput: string,
 ) {
   const cell = page
     .locator(
-      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${columnId}"]`
+      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${columnId}"]`,
     )
     .last();
   await expect(cell).toContainText(expectedOutput, { timeout: 15000 });
@@ -381,15 +372,15 @@ export async function thenCellShowsOutput(
 export async function thenEvaluatorShowsFailForRow(
   page: Page,
   rowIndex: number,
-  evaluatorColumnId: string
+  evaluatorColumnId: string,
 ) {
   const cell = page
     .locator(
-      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${evaluatorColumnId}"]`
+      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${evaluatorColumnId}"]`,
     )
     .last();
   const failIndicator = cell.locator(
-    '[data-testid="evaluation-fail"], .chakra-icon[data-status="fail"]'
+    '[data-testid="evaluation-fail"], .chakra-icon[data-status="fail"]',
   );
   await expect(failIndicator).toBeVisible({ timeout: 15000 });
 }

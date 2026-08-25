@@ -61,8 +61,7 @@ function readCapturedReturn(): CapturedReturn | null {
     const { organizationId, pathname, search } = parsed as CapturedReturn;
     if (typeof pathname !== "string") return null;
     return {
-      organizationId:
-        typeof organizationId === "string" ? organizationId : null,
+      organizationId: typeof organizationId === "string" ? organizationId : null,
       pathname,
       search: typeof search === "string" ? search : "",
     };

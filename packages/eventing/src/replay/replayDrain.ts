@@ -49,13 +49,7 @@ async function hasActiveGroups({
     const pattern = `${GQ_KEY_PREFIX}group:${tenantId}/${scannedGroupPath}/${projectionName}/*:active`;
     let cursor = "0";
     do {
-      const [nextCursor, keys] = await redis.scan(
-        cursor,
-        "MATCH",
-        pattern,
-        "COUNT",
-        500,
-      );
+      const [nextCursor, keys] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 500);
       if (keys.length > 0) return true;
       cursor = nextCursor;
     } while (cursor !== "0");

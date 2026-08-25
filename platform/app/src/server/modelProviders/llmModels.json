@@ -86,10 +86,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -133,10 +130,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -958,10 +952,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -1009,10 +1000,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -1062,10 +1050,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -1112,10 +1097,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -2211,10 +2193,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -2325,10 +2304,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -2374,10 +2350,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -3040,11 +3013,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -3092,11 +3061,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -3142,11 +3107,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -3281,10 +3242,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -3333,10 +3291,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -3382,11 +3337,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -3511,10 +3462,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -3563,10 +3511,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -4847,11 +4792,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -4897,11 +4838,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -5995,10 +5932,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -6078,10 +6012,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -6302,10 +6233,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -6349,13 +6277,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high",
-          "xhigh"
-        ],
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
         "defaultValue": "none",
         "canDisable": true
       }
@@ -6439,10 +6361,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -6490,10 +6409,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -6844,11 +6760,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -6896,11 +6808,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -7119,11 +7027,7 @@
       },
       "contextLength": 65536,
       "maxCompletionTokens": 2048,
-      "supportedParameters": [
-        "max_tokens",
-        "temperature",
-        "top_p"
-      ],
+      "supportedParameters": ["max_tokens", "temperature", "top_p"],
       "defaultParameters": {
         "temperature": 1,
         "topP": 0.95,
@@ -7147,13 +7051,7 @@
       },
       "contextLength": 1040000,
       "maxCompletionTokens": 8192,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature",
-        "top_k",
-        "top_p"
-      ],
+      "supportedParameters": ["max_tokens", "stop", "temperature", "top_k", "top_p"],
       "defaultParameters": {
         "temperature": null,
         "topP": null,
@@ -7330,13 +7228,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high",
-          "xhigh"
-        ],
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
         "defaultValue": "none",
         "canDisable": true
       }
@@ -7544,10 +7436,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -7595,10 +7484,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -7683,13 +7569,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high",
-          "xhigh"
-        ],
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
         "defaultValue": "none",
         "canDisable": true
       }
@@ -7731,9 +7611,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "high"
-        ],
+        "allowedValues": ["high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -7775,9 +7653,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "high"
-        ],
+        "allowedValues": ["high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -7821,13 +7697,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high",
-          "xhigh"
-        ],
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
         "defaultValue": "none",
         "canDisable": true
       }
@@ -7870,13 +7740,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high",
-          "xhigh"
-        ],
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
         "defaultValue": "none",
         "canDisable": true
       }
@@ -8016,13 +7880,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high",
-          "xhigh"
-        ],
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
         "defaultValue": "none",
         "canDisable": true
       }
@@ -8297,11 +8155,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -8347,11 +8201,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -8438,10 +8288,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -8524,12 +8371,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["none", "low", "medium", "high"],
         "defaultValue": "none",
         "canDisable": true
       }
@@ -8572,12 +8414,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["none", "low", "medium", "high"],
         "defaultValue": "none",
         "canDisable": true
       }
@@ -8620,12 +8457,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["none", "low", "medium", "high"],
         "defaultValue": "none",
         "canDisable": true
       }
@@ -8668,12 +8500,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["none", "low", "medium", "high"],
         "defaultValue": "none",
         "canDisable": true
       }
@@ -9024,11 +8851,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -9239,11 +9062,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -9289,11 +9108,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "none",
-          "low",
-          "high"
-        ],
+        "allowedValues": ["none", "low", "high"],
         "defaultValue": "low",
         "canDisable": true
       }
@@ -9418,9 +9233,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "high"
-        ],
+        "allowedValues": ["high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -9462,9 +9275,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "high"
-        ],
+        "allowedValues": ["high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -9687,11 +9498,7 @@
       },
       "contextLength": 256000,
       "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "max_tokens",
-        "seed",
-        "stop"
-      ],
+      "supportedParameters": ["max_tokens", "seed", "stop"],
       "defaultParameters": {
         "temperature": null,
         "topP": null,
@@ -9909,11 +9716,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -10435,11 +10238,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -10482,11 +10281,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -10530,11 +10325,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -10577,11 +10368,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -10625,11 +10412,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -10672,11 +10455,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -10814,11 +10593,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -10863,11 +10638,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -11216,11 +10987,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "none",
-          "low",
-          "high"
-        ],
+        "allowedValues": ["none", "low", "high"],
         "defaultValue": "low",
         "canDisable": true
       }
@@ -11268,11 +11035,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "none",
-          "low",
-          "high"
-        ],
+        "allowedValues": ["none", "low", "high"],
         "defaultValue": "low",
         "canDisable": true
       }
@@ -11448,11 +11211,7 @@
       },
       "contextLength": 81920,
       "maxCompletionTokens": 38000,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature"
-      ],
+      "supportedParameters": ["max_tokens", "stop", "temperature"],
       "defaultParameters": {
         "temperature": null,
         "topP": null,
@@ -11620,11 +11379,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "none",
-          "low",
-          "high"
-        ],
+        "allowedValues": ["none", "low", "high"],
         "defaultValue": "low",
         "canDisable": true
       }
@@ -11672,11 +11427,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "none",
-          "low",
-          "high"
-        ],
+        "allowedValues": ["none", "low", "high"],
         "defaultValue": "low",
         "canDisable": true
       }
@@ -11725,10 +11476,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -11776,10 +11524,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -11820,11 +11565,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -11865,11 +11606,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -11914,10 +11651,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -11969,11 +11703,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -12017,11 +11747,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "high",
         "canDisable": false
       }
@@ -12176,10 +11902,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "low",
-          "high"
-        ],
+        "allowedValues": ["low", "high"],
         "defaultValue": "low",
         "canDisable": false
       }
@@ -12548,11 +12271,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -12590,11 +12309,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -12991,11 +12706,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -13030,11 +12741,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -13458,11 +13165,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -13505,11 +13208,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -13524,11 +13223,7 @@
       },
       "contextLength": 32768,
       "maxCompletionTokens": 32768,
-      "supportedParameters": [
-        "max_tokens",
-        "temperature",
-        "top_p"
-      ],
+      "supportedParameters": ["max_tokens", "temperature", "top_p"],
       "defaultParameters": {},
       "modality": "text->text",
       "mode": "chat",
@@ -13648,11 +13343,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -13694,11 +13385,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -13804,11 +13491,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -13855,11 +13538,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -13874,11 +13553,7 @@
       },
       "contextLength": 1000192,
       "maxCompletionTokens": 1000192,
-      "supportedParameters": [
-        "max_tokens",
-        "temperature",
-        "top_p"
-      ],
+      "supportedParameters": ["max_tokens", "temperature", "top_p"],
       "defaultParameters": {
         "temperature": null,
         "topP": null,
@@ -14032,11 +13707,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }
@@ -14078,11 +13749,7 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "low",
-          "medium",
-          "high"
-        ],
+        "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
       }

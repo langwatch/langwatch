@@ -6,15 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CopyEvaluatorDialog } from "../CopyEvaluatorDialog";
 
 const SOURCE_PROJECT_ID = "test-project-id";
@@ -166,9 +158,7 @@ describe("CopyEvaluatorDialog", () => {
     await user.click(options[0]!);
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /replicate/i }),
-      ).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: /replicate/i })).not.toBeDisabled();
     });
     await user.click(screen.getByRole("button", { name: /replicate/i }));
 

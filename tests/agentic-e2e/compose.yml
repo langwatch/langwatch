@@ -26,7 +26,7 @@ services:
   langwatch_nlp:
     image: langwatch/langwatch_nlp:latest
     ports:
-      - "5563:5561"  # Test port (dev uses 5561)
+      - "5563:5561" # Test port (dev uses 5561)
     restart: always
     environment:
       - LANGWATCH_ENDPOINT=http://host.docker.internal:5570
@@ -34,7 +34,7 @@ services:
   langevals:
     image: langwatch/langevals:latest
     ports:
-      - "5564:5562"  # Test port (dev uses 5562)
+      - "5564:5562" # Test port (dev uses 5562)
     restart: always
     environment:
       - DISABLE_EVALUATORS_PRELOAD=true
@@ -47,7 +47,7 @@ services:
       POSTGRES_USER: prisma
       POSTGRES_PASSWORD: prisma
     ports:
-      - "5433:5432"  # Test port (dev uses 5432)
+      - "5433:5432" # Test port (dev uses 5432)
     volumes:
       - test-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -59,7 +59,7 @@ services:
   redis:
     image: redis:alpine
     ports:
-      - "6380:6379"  # Test port (dev uses 6379)
+      - "6380:6379" # Test port (dev uses 6379)
     volumes:
       - test-redis-data:/data
     healthcheck:
@@ -86,7 +86,7 @@ services:
         soft: 65536
         hard: 65536
     ports:
-      - "9201:9200"  # Test port (dev uses 9200)
+      - "9201:9200" # Test port (dev uses 9200)
       - "9601:9600"
     volumes:
       - test-opensearch-data:/usr/share/opensearch/data

@@ -22,9 +22,7 @@ describe("LLM_PARAMETER_MAP", () => {
 
   describe("when checking known parameters", () => {
     it("includes temperature", () => {
-      const entry = LLM_PARAMETER_MAP.find(
-        (p) => p.formField === "temperature",
-      );
+      const entry = LLM_PARAMETER_MAP.find((p) => p.formField === "temperature");
       expect(entry).toBeDefined();
       expect(entry!.otelAttr).toBe("gen_ai.request.temperature");
       expect(entry!.coercion).toBe("number");

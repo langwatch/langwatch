@@ -1,13 +1,5 @@
 import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
-import {
-  BookText,
-  ChevronDown,
-  Code,
-  Globe,
-  Play,
-  Plus,
-  Save,
-} from "lucide-react";
+import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
@@ -58,8 +50,7 @@ export function SaveAndRunMenu({
   const filteredPrompts = useMemo(() => {
     const publishedPrompts = prompts?.filter((p) => p.version > 0) ?? [];
     const sorted = [...publishedPrompts].sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
     if (!searchValue) return sorted;
     return sorted.filter((p) =>
@@ -168,8 +159,7 @@ export function SaveAndRunMenu({
                     paddingY={2}
                     cursor="pointer"
                     bg={
-                      isAgentTarget(selectedTarget) &&
-                      selectedTarget.id === agent.id
+                      isAgentTarget(selectedTarget) && selectedTarget.id === agent.id
                         ? "blue.subtle"
                         : "transparent"
                     }
@@ -237,15 +227,12 @@ export function SaveAndRunMenu({
                     paddingY={2}
                     cursor="pointer"
                     bg={
-                      selectedTarget?.type === "prompt" &&
-                      selectedTarget.id === prompt.id
+                      selectedTarget?.type === "prompt" && selectedTarget.id === prompt.id
                         ? "blue.subtle"
                         : "transparent"
                     }
                     _hover={{ bg: "bg.muted" }}
-                    onClick={() =>
-                      handleSelectAndRun({ type: "prompt", id: prompt.id })
-                    }
+                    onClick={() => handleSelectAndRun({ type: "prompt", id: prompt.id })}
                   >
                     <BookText size={14} color="var(--chakra-colors-fg-muted)" />
                     <Text fontSize="sm" flex={1}>

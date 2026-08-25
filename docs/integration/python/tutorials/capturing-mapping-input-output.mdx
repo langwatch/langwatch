@@ -9,17 +9,18 @@ keywords: langwatch, python, input, output, capture, mapping, data, tracing, spa
 Effectively capturing the inputs and outputs of your LLM application's operations is crucial for observability. LangWatch provides flexible ways to manage this data, whether you prefer automatic capture or explicit control to map complex objects, format data, or redact sensitive information.
 
 This tutorial covers how to:
-*   Understand automatic input/output capture.
-*   Explicitly set inputs and outputs for traces and spans.
-*   Dynamically update this data on active traces/spans.
-*   Handle different data formats, especially for chat messages.
+
+- Understand automatic input/output capture.
+- Explicitly set inputs and outputs for traces and spans.
+- Dynamically update this data on active traces/spans.
+- Handle different data formats, especially for chat messages.
 
 ## Automatic Input and Output Capture
 
 By default, when you use `@langwatch.trace()` or `@langwatch.span()` as decorators on functions, the SDK attempts to automatically capture:
 
-*   **Inputs**: The arguments passed to the decorated function.
-*   **Outputs**: The value returned by the decorated function.
+- **Inputs**: The arguments passed to the decorated function.
+- **Outputs**: The value returned by the decorated function.
 
 This behavior can be controlled using the `capture_input` and `capture_output` boolean parameters.
 
@@ -54,7 +55,11 @@ main_flow()
 ```
 
 <Note>
-  Refer to the API reference for [`@langwatch.trace()`](/integration/python/reference#%40langwatch-trace-%2F-langwatch-trace) and [`@langwatch.span()`](/integration/python/reference#%40langwatch-span-%2F-langwatch-span) for more details on `capture_input` and `capture_output` parameters.
+  Refer to the API reference for
+  [`@langwatch.trace()`](/integration/python/reference#%40langwatch-trace-%2F-langwatch-trace)
+  and
+  [`@langwatch.span()`](/integration/python/reference#%40langwatch-span-%2F-langwatch-span)
+  for more details on `capture_input` and `capture_output` parameters.
 </Note>
 
 ## Explicitly Setting Inputs and Outputs
@@ -62,10 +67,11 @@ main_flow()
 You often need more control over what data is recorded. You can explicitly set inputs and outputs using the `input` and `output` parameters when initiating a trace or span, or by using the `update()` method on the respective objects.
 
 This is useful for:
-*   Capturing only specific parts of complex objects.
-*   Formatting data in a more readable or structured way (e.g., as a list of `ChatMessage` objects).
-*   Redacting sensitive information before it's sent to LangWatch.
-*   Providing inputs/outputs when not using decorators (e.g., with context managers for parts of a function).
+
+- Capturing only specific parts of complex objects.
+- Formatting data in a more readable or structured way (e.g., as a list of `ChatMessage` objects).
+- Redacting sensitive information before it's sent to LangWatch.
+- Providing inputs/outputs when not using decorators (e.g., with context managers for parts of a function).
 
 ### At Initialization
 
@@ -77,18 +83,16 @@ import langwatch
 import os
 
 # Assume we have already setup LangWatch
+
 # langwatch.setup()
 
 @langwatch.trace(
-    name="UserIntentProcessing",
-    input={"user_query": "Book a flight to London"},
-    # Output can be set later via update() if determined by function logic
+name="UserIntentProcessing",
+input={"user_query": "Book a flight to London"}, # Output can be set later via update() if determined by function logic
 )
-def process_user_intent(raw_query_data: dict):
-    # raw_query_data might be large or contain sensitive info
-    # The 'input' parameter above provides a clean version.
-    intent = "book_flight"
-    entities = {"destination": "London"}
+def process_user_intent(raw_query_data: dict): # raw_query_data might be large or contain sensitive info # The 'input' parameter above provides a clean version.
+intent = "book_flight"
+entities = {"destination": "London"}
 
     # Explicitly set the output for the root span of the trace
     current_trace = langwatch.get_current_trace()
@@ -98,7 +102,8 @@ def process_user_intent(raw_query_data: dict):
     return {"status": "success", "intent": intent} # Actual function return
 
 process_user_intent({"query": "Book a flight to London", "user_id": "123"})
-```
+
+````
 
 ```python Span with explicit input/output
 import langwatch
@@ -128,7 +133,8 @@ def handle_chat():
     print("Chat finished.")
 
 handle_chat()
-```
+````
+
 </CodeGroup>
 
 If you provide `input` or `output` directly, it overrides what might have been automatically captured for that field.
@@ -166,16 +172,20 @@ run_pipeline({"a": 1, "b": None, "c": 3})
 ```
 
 <Note>
-  The `update()` method on `LangWatchTrace` and `LangWatchSpan` objects is versatile. See the reference for [`LangWatchTrace` methods](/integration/python/reference#%40langwatch-trace-%2F-langwatch-trace) and [`LangWatchSpan` methods](/integration/python/reference#%40langwatch-span-%2F-langwatch-span).
+  The `update()` method on `LangWatchTrace` and `LangWatchSpan` objects is versatile. See
+  the reference for [`LangWatchTrace`
+  methods](/integration/python/reference#%40langwatch-trace-%2F-langwatch-trace) and
+  [`LangWatchSpan`
+  methods](/integration/python/reference#%40langwatch-span-%2F-langwatch-span).
 </Note>
 
 ## Handling Different Data Formats
 
 LangWatch can store various types of input and output data:
 
-*   **Strings**: Simple text.
-*   **Dictionaries**: Automatically serialized as JSON. This is useful for structured data.
-*   **Lists of `ChatMessage` objects**: The standard way to represent conversations for LLM interactions. This ensures proper display and analysis in the LangWatch UI.
+- **Strings**: Simple text.
+- **Dictionaries**: Automatically serialized as JSON. This is useful for structured data.
+- **Lists of `ChatMessage` objects**: The standard way to represent conversations for LLM interactions. This ensures proper display and analysis in the LangWatch UI.
 
 ### Capturing Chat Messages
 
@@ -238,15 +248,17 @@ advanced_chat_example()
 ```
 
 <Note>
-  For the detailed structure of `ChatMessage`, `ToolCall`, and other related types, please refer to the [Core Data Types section in the API Reference](/integration/python/reference#core-data-types).
+  For the detailed structure of `ChatMessage`, `ToolCall`, and other related types, please
+  refer to the [Core Data Types section in the API
+  Reference](/integration/python/reference#core-data-types).
 </Note>
 
 ## Use Cases and Best Practices
 
-*   **Redacting Sensitive Information**: If your function arguments or return values contain sensitive data (PII, API keys), disable automatic capture (`capture_input=False`, `capture_output=False`) and explicitly set sanitized versions using `input`/`output` parameters or `update()`.
-*   **Mapping Complex Objects**: If your inputs/outputs are complex Python objects, map them to a dictionary or a simplified string representation for clearer display in LangWatch.
-*   **Improving Readability**: For long text inputs/outputs (e.g., full documents), consider capturing a summary or metadata instead of the entire content to reduce noise, unless the full content is essential for debugging or evaluating.
-*   **Clearing Captured Data**: You can set `input=None` or `output=None` via the `update()` method to remove previously captured (or auto-captured) data if it's no longer relevant or was captured in error.
+- **Redacting Sensitive Information**: If your function arguments or return values contain sensitive data (PII, API keys), disable automatic capture (`capture_input=False`, `capture_output=False`) and explicitly set sanitized versions using `input`/`output` parameters or `update()`.
+- **Mapping Complex Objects**: If your inputs/outputs are complex Python objects, map them to a dictionary or a simplified string representation for clearer display in LangWatch.
+- **Improving Readability**: For long text inputs/outputs (e.g., full documents), consider capturing a summary or metadata instead of the entire content to reduce noise, unless the full content is essential for debugging or evaluating.
+- **Clearing Captured Data**: You can set `input=None` or `output=None` via the `update()` method to remove previously captured (or auto-captured) data if it's no longer relevant or was captured in error.
 
 ```python
 import langwatch

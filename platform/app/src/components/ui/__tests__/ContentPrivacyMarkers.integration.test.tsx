@@ -7,10 +7,7 @@ import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ContentPrivacy } from "~/server/api/routers/tracesV2.schemas";
-import {
-  ContentPrivacyMarkers,
-  PiiIncompleteNotice,
-} from "../ContentPrivacyMarkers";
+import { ContentPrivacyMarkers, PiiIncompleteNotice } from "../ContentPrivacyMarkers";
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ hasPermission: () => true }),
@@ -72,9 +69,7 @@ describe("ContentPrivacyMarkers", () => {
           />
         </Wrapper>,
       );
-      expect(container.textContent).toContain(
-        "Tool calls hidden (visible to Admins)",
-      );
+      expect(container.textContent).toContain("Tool calls hidden (visible to Admins)");
     });
   });
 
@@ -126,9 +121,7 @@ describe("ContentPrivacyMarkers", () => {
           />
         </Wrapper>,
       );
-      expect(container.textContent).toContain(
-        "Tool calls hidden (visible to Admins)",
-      );
+      expect(container.textContent).toContain("Tool calls hidden (visible to Admins)");
       // The outer wrapper carries a border so the block reads as a panel.
       const panel = container.firstElementChild as HTMLElement | null;
       expect(panel).not.toBeNull();
@@ -171,9 +164,7 @@ describe("PiiIncompleteNotice", () => {
           <PiiIncompleteNotice incomplete />
         </Wrapper>,
       );
-      expect(container.textContent).toContain(
-        "may still contain names or locations",
-      );
+      expect(container.textContent).toContain("may still contain names or locations");
     });
   });
 });

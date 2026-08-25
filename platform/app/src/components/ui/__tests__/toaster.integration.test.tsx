@@ -8,13 +8,7 @@
  * UX contract: specs/components/toasts.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { showErrorToast } from "~/features/errors/logic/showErrorToast";
@@ -89,16 +83,17 @@ describe("given the application renders the shared Toaster", () => {
         },
       });
 
-      const toastEl = (
-        await screen.findByText("This search took too long")
-      ).closest('[data-part="root"]') as HTMLElement;
+      const toastEl = (await screen.findByText("This search took too long")).closest(
+        '[data-part="root"]',
+      ) as HTMLElement;
       expect(closeTriggerOf(toastEl)).not.toBeNull();
       // jsdom has no clipboard API, so ErrorActions falls back from the
       // "Copy error ID" button to showing the id as selectable text.
       expect(screen.getByText("Error ID: trace_123")).toBeInTheDocument();
-      expect(
-        screen.getByRole("link", { name: /Read the docs/ }),
-      ).toHaveAttribute("href", "https://docs.langwatch.ai/support");
+      expect(screen.getByRole("link", { name: /Read the docs/ })).toHaveAttribute(
+        "href",
+        "https://docs.langwatch.ai/support",
+      );
     });
   });
 

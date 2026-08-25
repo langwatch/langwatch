@@ -69,8 +69,7 @@ describe("renderScenarioContent", () => {
 
       it("renders a numeric and a boolean value the same way", async () => {
         const result = await renderScenarioContent({
-          situation:
-            "Retries: {{ params.retries }}, verbose: {{ params.verbose }}",
+          situation: "Retries: {{ params.retries }}, verbose: {{ params.verbose }}",
           criteria: [],
           parameters: { retries: 3, verbose: false },
         });

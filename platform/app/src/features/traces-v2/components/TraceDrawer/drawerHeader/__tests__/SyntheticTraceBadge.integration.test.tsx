@@ -64,18 +64,14 @@ describe("<SyntheticTraceBadge />", () => {
   describe("given an ordinary trace", () => {
     it("renders nothing", () => {
       renderBadge({ "service.name": "my-app" });
-      expect(
-        screen.queryByText("Grouped by LangWatch"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Grouped by LangWatch")).not.toBeInTheDocument();
     });
   });
 
   describe("given only the per-record span-level synthetic marker", () => {
     it("renders nothing (a real trace must not read as synthetic)", () => {
       renderBadge({ "langwatch.span.synthetic": "true" });
-      expect(
-        screen.queryByText("Grouped by LangWatch"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Grouped by LangWatch")).not.toBeInTheDocument();
     });
   });
 });

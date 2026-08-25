@@ -49,9 +49,7 @@ function afterCursor(
   };
 }
 
-export class PrismaLangyConversationRepository
-  extends LangyConversationRepository
-{
+export class PrismaLangyConversationRepository extends LangyConversationRepository {
   constructor(private readonly prisma: PrismaClient) {
     super();
   }
@@ -127,9 +125,7 @@ export class PrismaLangyConversationRepository
         projectId,
         ArchivedAt: null,
         OR: [{ UserId: userId }, { IsShared: true }],
-        ...(query
-          ? { Title: { contains: query, mode: "insensitive" as const } }
-          : {}),
+        ...(query ? { Title: { contains: query, mode: "insensitive" as const } } : {}),
         ...(cursor ? { AND: [afterCursor(cursor)] } : {}),
       },
       orderBy: [

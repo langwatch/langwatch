@@ -1,5 +1,7 @@
 <Note>
-On short-live environments like Lambdas or Serverless Functions, be sure to call <br /> `await trace.sendSpans();` to wait for all pending requests to be sent before the runtime is destroyed.
+  On short-live environments like Lambdas or Serverless Functions, be sure to call <br />{" "}
+  `await trace.sendSpans();` to wait for all pending requests to be sent before the
+  runtime is destroyed.
 </Note>
 
 ## Capture a RAG Span
@@ -31,6 +33,6 @@ import TypeScriptExceptions from "/snippets/typescript-exceptions.mdx";
 [LangWatch Evaluators](/evaluations/evaluators/list) can run automatically on your traces, but if you have an in-house custom evaluator, you can also capture the evaluation
 results of your custom evaluator on the current trace or span by using the `.addEvaluation` method:
 
-import TypeScriptCustomEvaluation from "/snippets/typescript-custom-evaluation.mdx"
+import TypeScriptCustomEvaluation from "/snippets/typescript-custom-evaluation.mdx";
 
 <TypeScriptCustomEvaluation />

@@ -26,8 +26,7 @@ export function clampRangeToBounds(
   min: number,
   max: number,
 ): [number, number] {
-  const clamp = (v: number) =>
-    Math.min(Math.max(Number.isFinite(v) ? v : min, min), max);
+  const clamp = (v: number) => Math.min(Math.max(Number.isFinite(v) ? v : min, min), max);
   return [clamp(value[0]), clamp(value[1])];
 }
 

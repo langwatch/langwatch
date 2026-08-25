@@ -1,10 +1,4 @@
-import {
-  type DragEvent,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type DragEvent, useCallback, useEffect, useRef, useState } from "react";
 import { BORDERLESS_LINE_HEIGHT, setTextareaValueUndoable } from "../utils";
 
 type UseParagraphDragDropProps = {
@@ -31,13 +25,9 @@ export const useParagraphDragDrop = ({
   borderless,
 }: UseParagraphDragDropProps) => {
   const [hoveredParagraph, setHoveredParagraph] = useState<number | null>(null);
-  const [gripHoveredParagraph, setGripHoveredParagraph] = useState<
-    number | null
-  >(null);
+  const [gripHoveredParagraph, setGripHoveredParagraph] = useState<number | null>(null);
   const [draggedParagraph, setDraggedParagraph] = useState<number | null>(null);
-  const [dropTargetParagraph, setDropTargetParagraph] = useState<number | null>(
-    null,
-  );
+  const [dropTargetParagraph, setDropTargetParagraph] = useState<number | null>(null);
 
   // Store paragraph positions in a ref to avoid re-renders during typing
   const paragraphPositionsRef = useRef<
@@ -107,14 +97,11 @@ export const useParagraphDragDrop = ({
   }, [borderless, calculateParagraphPositions]);
 
   // Handle paragraph drag start
-  const handleParagraphDragStart = useCallback(
-    (e: DragEvent, paragraphIndex: number) => {
-      setDraggedParagraph(paragraphIndex);
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", String(paragraphIndex));
-    },
-    [],
-  );
+  const handleParagraphDragStart = useCallback((e: DragEvent, paragraphIndex: number) => {
+    setDraggedParagraph(paragraphIndex);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(paragraphIndex));
+  }, []);
 
   // Handle paragraph drag over
   const handleParagraphDragOver = useCallback(

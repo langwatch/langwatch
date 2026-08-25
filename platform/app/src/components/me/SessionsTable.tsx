@@ -87,13 +87,7 @@ export function SessionsTable({
     );
   }
 
-  return (
-    <ListedSessions
-      projectId={projectId}
-      projectSlug={projectSlug}
-      rows={rows}
-    />
-  );
+  return <ListedSessions projectId={projectId} projectSlug={projectSlug} rows={rows} />;
 }
 
 /** The rows themselves, narrowed and ordered, one page at a time. */
@@ -105,8 +99,7 @@ const ListedSessions: React.FC<{
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");
-  const [periodSelection, setPeriodSelection] =
-    useState<PeriodSelection | null>(null);
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection | null>(null);
 
   const filteredRows = useMemo(
     () =>
@@ -207,14 +200,8 @@ const OnePageOfSessions: React.FC<{
 }) => {
   const replay = useTerminalReplay({ projectId, projectSlug });
   const { openDrawer } = useDrawer();
-  const largestTotal = rows.reduce(
-    (max, row) => Math.max(max, row.totalTokens),
-    0,
-  );
-  const largestCost = rows.reduce(
-    (max, row) => Math.max(max, row.costUsd ?? 0),
-    0,
-  );
+  const largestTotal = rows.reduce((max, row) => Math.max(max, row.totalTokens), 0);
+  const largestCost = rows.reduce((max, row) => Math.max(max, row.costUsd ?? 0), 0);
 
   return (
     <>

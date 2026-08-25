@@ -188,9 +188,7 @@ describe("Default Models visibility for role-binding-only members (real DB)", ()
         projectId: projectAId,
       });
 
-      const scopedProjectIds = snapshot.configs.flatMap((c) =>
-        c.scopes.map((s) => s.id),
-      );
+      const scopedProjectIds = snapshot.configs.flatMap((c) => c.scopes.map((s) => s.id));
       expect(scopedProjectIds).toContain(projectAId);
       expect(scopedProjectIds).toContain(projectBId);
       expect(snapshot.configs.length).toBeGreaterThanOrEqual(2);

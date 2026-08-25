@@ -10,7 +10,9 @@ Better Agents is a CLI tool and a set of standards for building **reliable, test
 Use your preferred stack: Agno, Mastra, Vercel AI, Google ADK, or anything else. Better Agents adds project structure, tests, and prompt versioning on top of it.
 
 <Note>
-  **Already have an agent?** You don't need Better Agents -- go to [LangWatch Skills](/skills/directory) to add tracing, evaluations, scenarios, and prompt versioning to your existing project.
+  **Already have an agent?** You don't need Better Agents -- go to [LangWatch
+  Skills](/skills/directory) to add tracing, evaluations, scenarios, and prompt versioning
+  to your existing project.
 </Note>
 
 ## Quick Start
@@ -40,6 +42,7 @@ better-agents init .
 # In a new directory
 better-agents init my-better-agent
 ```
+
 The CLI will guide you through selecting your programming language, agent framework, coding assistant, LLM provider, and API keys.
 
 ### Create Your First Project
@@ -92,7 +95,8 @@ npm test
 </Tabs>
 
 <Check>
-Once you run your first scenario, you'll see results appear in your LangWatch project dashboard under the Simulations section.
+  Once you run your first scenario, you'll see results appear in your LangWatch project
+  dashboard under the Simulations section.
 </Check>
 
 ## Project Structure
@@ -107,7 +111,7 @@ Your actual agent code, written using your chosen framework. This is where you i
 
 **The core of real agent reliability.** These are conversational test cases that simulate real tasks and validate agent behavior across iterations, updates, or model swaps.
 
-Scenarios answer one question: *Does the agent still behave the way we expect?*
+Scenarios answer one question: _Does the agent still behave the way we expect?_
 
 Example scenario structure:
 
@@ -120,8 +124,8 @@ import scenario
 @pytest.mark.agent_test
 @pytest.mark.asyncio
 async def test_customer_support_refund():
-    """Test that agent handles refund requests correctly."""
-    
+"""Test that agent handles refund requests correctly."""
+
     # Run the scenario
     result = await scenario.run(
         name="refund request",
@@ -144,9 +148,10 @@ async def test_customer_support_refund():
             scenario.judge(),
         ],
     )
-    
+
     assert result.success, result.reasoning
-```
+
+````
 </Tab>
 
 <Tab title="TypeScript">
@@ -176,11 +181,12 @@ describe("Customer Support Agent", () => {
         scenario.succeed("Agent correctly handled refund request"),
       ],
     });
-    
+
     expect(result.success).toBe(true);
   });
 });
-```
+````
+
 </Tab>
 </Tabs>
 
@@ -189,7 +195,8 @@ describe("Customer Support Agent", () => {
 Structured benchmarking for components like RAG correctness, retrieval F1 score, classification accuracy, and routing accuracy. LangWatch provides an extensive library of evaluators including answer correctness, LLM-as-judge, RAG quality metrics, safety checks, and more.
 
 <Note>
-See the complete list of available evaluators in [Evaluators List](/evaluations/evaluators/list).
+  See the complete list of available evaluators in [Evaluators
+  List](/evaluations/evaluators/list).
 </Note>
 
 Evaluation notebooks allow teams to quantitatively test individual components:
@@ -219,12 +226,12 @@ scope: PROJECT
 model: openai/gpt-4o-mini
 prompt: |
   You are a helpful customer support agent.
-  
+
   User inquiry: {{user_message}}
-  
+
   Context:
   {{context}}
-  
+
   Instructions:
   - Be polite and professional
   - Resolve the issue efficiently
@@ -259,7 +266,8 @@ Scenarios are end-to-end conversational tests that validate agent behavior in re
 Scenarios complement evaluations by testing the **agent as a whole system** rather than isolated parts.
 
 <Note>
-For detailed scenario testing documentation, see [Agent Simulations](/agent-simulations/introduction).
+  For detailed scenario testing documentation, see [Agent
+  Simulations](/agent-simulations/introduction).
 </Note>
 
 ### Evaluations
@@ -273,9 +281,7 @@ Evaluations provide structured benchmarking for specific components of your agen
 
 LangWatch offers an extensive library of evaluators covering answer correctness, LLM-as-judge metrics, RAG quality, safety checks, format validation, and more. See the [complete evaluators list](/evaluations/evaluators/list) for all available options.
 
-<Note>
-Learn more about evaluations in [LLM Evaluation](/evaluations/overview).
-</Note>
+<Note>Learn more about evaluations in [LLM Evaluation](/evaluations/overview).</Note>
 
 ### Prompt Versioning
 
@@ -289,16 +295,15 @@ With Better Agents, prompts become:
 This enables prompt management workflows similar to dependency management in traditional software.
 
 <Note>
-For comprehensive prompt management features, see [Prompt Management](/prompt-management/overview).
+  For comprehensive prompt management features, see [Prompt
+  Management](/prompt-management/overview).
 </Note>
 
 ### MCP Integration
 
 The `.mcp.json` configuration enables your coding assistant to understand your agent framework and Better Agents standards.
 
-<Note>
-Learn more about MCP integration in [LangWatch MCP](/integration/mcp).
-</Note>
+<Note>Learn more about MCP integration in [LangWatch MCP](/integration/mcp).</Note>
 
 ## Next Steps
 
@@ -308,4 +313,3 @@ Learn more about MCP integration in [LangWatch MCP](/integration/mcp).
 - [LangWatch MCP](/integration/mcp)
 - [GitHub Repository](https://github.com/langwatch/better-agents)
 - [Discord Community](https://discord.com/invite/kT4PhDS2gH)
-

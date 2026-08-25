@@ -85,16 +85,12 @@ describe("Annotations REST API", () => {
       expect(all).toHaveLength(4);
       expect(all.filter((row) => row.anchorKind === "span")).toHaveLength(3);
 
-      const traceOnly = await get(
-        `/api/annotations/trace/${traceId}?anchor=trace`,
-      );
+      const traceOnly = await get(`/api/annotations/trace/${traceId}?anchor=trace`);
       expect(traceOnly.status).toBe(200);
       const { data: traceLevel } = (await traceOnly.json()) as {
         data: { comment: string }[];
       };
-      expect(traceLevel.map((row) => row.comment)).toEqual([
-        "the whole trace is off",
-      ]);
+      expect(traceLevel.map((row) => row.comment)).toEqual(["the whole trace is off"]);
     });
 
     it("lists every comment across the project", async () => {
@@ -109,9 +105,7 @@ describe("Annotations REST API", () => {
       const { data } = (await response.json()) as {
         data: { comment: string }[];
       };
-      expect(data.map((row) => row.comment)).toEqual([
-        "the whole trace is off",
-      ]);
+      expect(data.map((row) => row.comment)).toEqual(["the whole trace is off"]);
     });
 
     it("refuses a scope it does not recognise", async () => {

@@ -231,9 +231,7 @@ describe("codingAgentLogFactsDispatch", () => {
       );
 
       expect(dispatched).toHaveLength(1);
-      expect(dispatched[0]!.sessionId).toBe(
-        "01a00987-1926-7d31-a000-000000000001",
-      );
+      expect(dispatched[0]!.sessionId).toBe("01a00987-1926-7d31-a000-000000000001");
       expect(dispatched[0]!.sessionKeySource).toBe("provider");
     });
 
@@ -305,31 +303,29 @@ describe("codingAgentLogFactsDispatch", () => {
       expect(contribution!.agent).toBe("claude_code");
       expect(contribution!.sessionId).toBe("sess-ctx-1");
       expect(contribution!.facts["vcs.repository.owner"]).toBe("acme");
-      expect(contribution!.facts["vcs.ref.head.name"]).toBe(
-        "feat/session-git-context",
-      );
+      expect(contribution!.facts["vcs.ref.head.name"]).toBe("feat/session-git-context");
       expect(contribution!.facts["vcs.worktree.name"]).toBe("widgets-feat");
     });
 
-    it.each([
-      "codex",
-      "opencode",
-    ])("labels a %s declaration the same way, with no vendor scope of its own", async (agent) => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it.each(["codex", "opencode"])(
+      "labels a %s declaration the same way, with no vendor scope of its own",
+      async (agent) => {
+        const { subscriber, dispatched } = makeSubscriber();
 
-      await subscriber.handle(
-        canonicalLogEvent({
-          attributes: contextAttributes({ "coding_agent.name": agent }),
-          scopeName: HOOK_SCOPE,
-          resourceAttributes: { "service.name": "langwatch-hook" },
-        }),
-        context,
-      );
+        await subscriber.handle(
+          canonicalLogEvent({
+            attributes: contextAttributes({ "coding_agent.name": agent }),
+            scopeName: HOOK_SCOPE,
+            resourceAttributes: { "service.name": "langwatch-hook" },
+          }),
+          context,
+        );
 
-      expect(dispatched).toHaveLength(1);
-      expect(dispatched[0]!.agent).toBe(agent);
-      expect(dispatched[0]!.facts["vcs.repository.owner"]).toBe("acme");
-    });
+        expect(dispatched).toHaveLength(1);
+        expect(dispatched[0]!.agent).toBe(agent);
+        expect(dispatched[0]!.facts["vcs.repository.owner"]).toBe("acme");
+      },
+    );
 
     /** @scenario A declared agent outside the registry contributes nothing */
     it("drops a declaration naming an agent LangWatch does not know", async () => {
@@ -414,9 +410,7 @@ describe("codingAgentLogFactsDispatch", () => {
         context,
       );
 
-      expect(String(cappedOut[0]!.facts[SESSION_TITLE_FACT_KEY])).toHaveLength(
-        512,
-      );
+      expect(String(cappedOut[0]!.facts[SESSION_TITLE_FACT_KEY])).toHaveLength(512);
     });
 
     /** @scenario A conversational response body sets no title */
@@ -492,9 +486,7 @@ describe("codingAgentLogFactsDispatch", () => {
       );
 
       expect(dispatched).toHaveLength(1);
-      expect(
-        dispatched[0]!.facts[SESSION_TITLE_FALLBACK_FACT_KEY],
-      ).toBeUndefined();
+      expect(dispatched[0]!.facts[SESSION_TITLE_FALLBACK_FACT_KEY]).toBeUndefined();
     });
 
     /** @scenario A machine-injected first prompt does not name the session */
@@ -504,9 +496,7 @@ describe("codingAgentLogFactsDispatch", () => {
       await subscriber.handle(promptEvent("[REDACTED]"), context);
 
       expect(dispatched).toHaveLength(1);
-      expect(
-        dispatched[0]!.facts[SESSION_TITLE_FALLBACK_FACT_KEY],
-      ).toBeUndefined();
+      expect(dispatched[0]!.facts[SESSION_TITLE_FALLBACK_FACT_KEY]).toBeUndefined();
     });
   });
 

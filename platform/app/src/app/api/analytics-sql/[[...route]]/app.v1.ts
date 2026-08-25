@@ -54,12 +54,7 @@ const logger = createLogger("langwatch:api:analytics-sql");
  * Scalars only: a parameter is a *value*, and anything structured would be a
  * value whose shape the declared ClickHouse type cannot describe.
  */
-const parameterValueSchema = z.union([
-  z.string(),
-  z.number(),
-  z.boolean(),
-  z.null(),
-]);
+const parameterValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
 const lwqlQuerySchema = z.object({
   // Deliberately not `.trim()`: the statement the database runs must be the one
@@ -157,8 +152,7 @@ export function registerLangWatchQLRoutes(
         // would read is not allowed. QueryScanLimitExceededError carries 422.
         ...canonicalUnprocessableResponses,
         200: {
-          description:
-            "The query ran, and the result is scoped to the caller's project",
+          description: "The query ran, and the result is scoped to the caller's project",
           content: {
             "application/json": { schema: resolver(lwqlResultSchema) },
           },
@@ -201,8 +195,7 @@ export function registerLangWatchQLRoutes(
       responses: {
         ...canonicalBaseResponses,
         200: {
-          description:
-            "The LangWatchQL schema, scoped to the caller's permissions",
+          description: "The LangWatchQL schema, scoped to the caller's permissions",
           content: {
             "application/json": { schema: resolver(lwqlSchemaSchema) },
           },

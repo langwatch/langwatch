@@ -25,6 +25,7 @@ The rebuild scope: new frontend + new API layer, both behind a feature flag. Cli
 Seven competitors analyzed (Braintrust, Datadog, Grafana, Laminar, Langfuse, LangSmith, Maxim). All have converged on the same product: three-pane IDE layout, hierarchical tree/waterfall, LLM metrics (tokens, cost, latency, model), "Open in Playground" button. The market has commoditized the trace viewer.
 
 Universal gaps across all competitors:
+
 - No real-time collaboration features (cursor presence, comments, tagging) across any vendor. Braintrust has shared/saved views but no multiplayer.
 - No non-engineer access patterns (every vendor assumes developer)
 - No intelligent trace summarization
@@ -37,15 +38,15 @@ Universal gaps across all competitors:
 
 The core insight: everything is trace data underneath, but six+ different people walk into the same room of data needing completely different views.
 
-| Persona | What they want to see | The "lens" |
-|---|---|---|
-| Product owner | Conversations, frustration, user sentiment | Conversation lens |
-| Engineer | System performance, service health, spans | Engineering lens |
-| Data scientist | Prompt performance across all interactions | Prompt/model lens |
-| QA | Real customer messages for quality checks | Message lens |
-| Compliance | Messages filtered for policy violations | Compliance lens |
-| Finance | Cost by conversation, by operation, by model | Cost lens |
-| Senior engineer | LLM performance, latency, token efficiency | Performance lens |
+| Persona         | What they want to see                        | The "lens"        |
+| --------------- | -------------------------------------------- | ----------------- |
+| Product owner   | Conversations, frustration, user sentiment   | Conversation lens |
+| Engineer        | System performance, service health, spans    | Engineering lens  |
+| Data scientist  | Prompt performance across all interactions   | Prompt/model lens |
+| QA              | Real customer messages for quality checks    | Message lens      |
+| Compliance      | Messages filtered for policy violations      | Compliance lens   |
+| Finance         | Cost by conversation, by operation, by model | Cost lens         |
+| Senior engineer | LLM performance, latency, token efficiency   | Performance lens  |
 
 The trace is the atom. Conversations, evaluations, simulations, cost reports, compliance audits are all lenses on that atom. The product is not a trace viewer. It is a trace data engine with pluggable lenses.
 
@@ -80,27 +81,34 @@ Prototype suggestion: lead with conversations (group by session), not traces. Th
 ## Approaches Considered
 
 ### Approach A: Lens Engine First
+
 Build the dynamic lens/view engine as the core primitive. A lens defines: columns, grouping, default filters, sort order. Ship 3-4 hardcoded lenses then open it up for custom lenses.
+
 - Effort: L
 - Risk: Medium (over-engineering before knowing what lenses people want)
 - Pros: Maximum flexibility, persona problem solved architecturally
 - Cons: Slower to first visible value, risk of generic tool nobody loves
 
 ### Approach B: Conversation-First, Expand Out
+
 Build the best conversation/session viewer on the market first. Group traces by session, render as chat transcripts, show frustration signals, cost per conversation. Add other views later.
+
 - Effort: M
 - Risk: Low
 - Pros: Fast to first "wow" moment, validates thesis
 - Cons: Breaks down at scale (5+ conversations/second — nobody scrolls through that). Individual conversations aren't useful without aggregation. Other personas wait.
 
 ### Approach C: Trace Drawer + Multiple Entry Points
+
 Build the trace detail drawer first. Make it world-class with multiple viz modes. Then build lightweight list views that all open this same drawer.
+
 - Effort: M-L
 - Risk: Low-Medium
 - Pros: Drawer is the constant across all views, reusable
 - Cons: Lists feel thin initially
 
 ### Approach D: Foundation + Intelligence Spikes (CHOSEN)
+
 Hybrid of A and C with experimental intelligence features built in parallel.
 
 ## Recommended Approach
@@ -110,6 +118,7 @@ Hybrid of A and C with experimental intelligence features built in parallel.
 The foundation gives you something to put behind the feature flag immediately. The intelligence spikes give you the story — the thing that makes people say "this is different from every other trace viewer."
 
 ### Phase 1: Onboarding + Trace Drawer
+
 - Empty state / onboarding view: what does this look like when you have no data? Educate users on what the product does and what they'll see when data flows in. This view adapts based on what the user wants from the product.
 - Trace detail drawer: three visualization modes (Waterfall, Flame Graph, Span List — see ADR-001). Tab model for span selection (Trace Summary tab + ephemeral span tab). Rich metadata panel. This is the constant — every persona, every entry point opens this same drawer. Make it beautiful.
 - Acceptance criteria for these surfaces live in `specs/traces-v2/` at the repo root.
@@ -125,6 +134,7 @@ Queried the dev ClickHouse instance. Results:
 **Data volume (dev):** 70,721 trace summaries, 177,212 spans, 12,073 simulation runs, 18,511 evaluation runs.
 
 **Grouping capabilities — all supported:**
+
 - **By session/thread:** `ThreadId` in `analytics_trace_facts` (low usage in dev: 3 distinct threads, 6 traces). `gen_ai.conversation.id` in span attributes is richer: 19,052 spans across 1,908 distinct conversations.
 - **By user:** `UserId` in `analytics_trace_facts` + `langwatch.user.id` in span attributes (14,830 spans, 20 distinct users in dev).
 - **By service:** `ServiceName` in `stored_spans` — 60 distinct services (including integration tests, parity checks, real apps like `mastra-app`, `openai-agents-app`, `chainlit`).
@@ -132,6 +142,7 @@ Queried the dev ClickHouse instance. Results:
 - **By prompt template:** Not a first-class column. Would need to extract from span attributes or add as metadata.
 
 **Filterable dimensions with cardinality:**
+
 - `ServiceName`: 60 values (LowCardinality)
 - `SpanName`: 5,632 values (LowCardinality)
 - `langwatch.span.type`: 15 values (llm: 63K, tool: 19K, span: 18K, evaluation: 15K, chain: 13K, agent: 12K, module: 11K, rag: 6K, etc.)
@@ -150,6 +161,7 @@ Queried the dev ClickHouse instance. Results:
 **Verdict: Phase 2 is fully buildable on the current schema.** Session grouping uses `ThreadId` or `gen_ai.conversation.id`. Service grouping uses `ServiceName`. Model grouping uses `ModelNames`. Error filtering uses `ContainsError`. Cost filtering uses `TotalCost`. The only gap is prompt template as a first-class grouping dimension.
 
 ### Phase 2: Lens Engine (mock data, this repo)
+
 - User-configurable views: save, edit, delete, rename custom views
 - Column configuration: show/hide, drag-to-reorder, resize
 - Grouping engine: group traces by session, service, user, or model (accordion groups)
@@ -159,17 +171,20 @@ Queried the dev ClickHouse instance. Results:
 - Acceptance criteria for each component live in `specs/traces-v2/` at the repo root.
 
 ### Phase 3A: App Networking Layer (production repo)
+
 - State management: TanStack Query (server state via @trpc/tanstack-query) + Zustand with 4 slices (filter, view, drawer, UI)
 - Progressive data loading: 5-level model (table -> drawer header -> span skeleton -> span detail -> accordion detail)
 - Filter state machine: AST as source of truth, two-way sync between search bar and facets
 - Mock data hooks replaced with real tRPC calls. Components stay untouched.
 
 ### Phase 3B: tRPC Backend (production repo)
+
 - New API layer connecting the frontend to ClickHouse
 - Replaces the existing backend
 - Design to be done when Phase 3A is underway
 
 ### Phase 4+: Intelligence Features (production repo, future)
+
 - **"What went wrong?" button:** One click on any trace. AI walks the execution tree, finds the decision point where things diverged from expected, returns a 3-sentence diagnosis. Not a summary, a diagnosis.
 - **AI-generated views:** The UI includes a text box: "What are you investigating?" AI generates a LensConfig (columns, filters, grouping, visualization mode). The lens engine renders it. Users never configure anything manually.
 - **Frustration detection:** Sentiment analysis on conversation traces. Detect patterns like repeated questions, "that's not what I asked," escalation language. Similar to Datadog's frustrated clicks, but for AI conversations.
@@ -178,11 +193,13 @@ Queried the dev ClickHouse instance. Results:
 **Fallback behavior:** When AI diagnosis times out or returns low-confidence results, show "Diagnosis unavailable, view raw trace" with a direct link to the trace drawer. When AI-generated views produce a bad config, show the default "All Traces" view with a message "Couldn't generate a view for that query, try rephrasing or use a view." Include a thumbs-up/down feedback mechanism on all AI outputs to measure quality and build training signal.
 
 ### Future: Multiplayer (separate scope, post-v2 launch)
+
 - Cursor presence (see which traces teammates are looking at), comments, tagging (notifications to Slack)
 - Requires separate real-time infrastructure (WebSocket/Liveblocks layer outside ClickHouse)
 - This is effectively a second product layer and should be scoped independently
 
 ### Future: Aggregate Intelligence
+
 - Trend views above the individual-record level
 - Cost anomaly attribution
 - Semantic search over trace content
@@ -195,6 +212,7 @@ Queried the dev ClickHouse instance. Results:
 **Observability that thinks for you.** Not a dashboard you configure. Not a trace viewer you read. A system that understands your agents, answers your questions, and shows you the proof.
 
 Three pillars:
+
 1. **Ask, don't configure.** Tell the product what you're investigating. It assembles the right view.
 2. **Diagnose, don't display.** One click: here's what went wrong, here's the decision point, here's the proof.
 3. **Compare, don't guess.** Show the delta between real and expected. Simulations aren't a separate product — they're the other half of observability.

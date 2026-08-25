@@ -12,10 +12,7 @@ import {
   type TabData,
 } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { TabIdProvider } from "../../prompt-browser/ui/TabContext";
-import {
-  PromptPlaygroundChat,
-  persistedMessagesKey,
-} from "../PromptPlaygroundChat";
+import { PromptPlaygroundChat, persistedMessagesKey } from "../PromptPlaygroundChat";
 import { PromptPlaygroundChatProvider } from "../PromptPlaygroundChatContext";
 import { SyncedChatInput } from "../SyncedChatInput";
 
@@ -62,9 +59,7 @@ vi.mock("@copilotkit/react-ui", () => ({
     return <div data-testid="copilot-chat" />;
   },
   AssistantMessage: (props: Record<string, any>) => (
-    <div data-testid="assistant-message">
-      {props.rawData?.content?.toString() ?? ""}
-    </div>
+    <div data-testid="assistant-message">{props.rawData?.content?.toString() ?? ""}</div>
   ),
   UserMessage: () => <div data-testid="user-message" />,
 }));
@@ -188,9 +183,7 @@ describe("PromptPlaygroundChat ref methods", () => {
         { id: "u-1", role: "user" as const, content: "hey" },
         { id: "a-1", role: "assistant" as const, content: "hi" },
       ];
-      expect(persistedMessagesKey(messages)).toBe(
-        persistedMessagesKey(messages),
-      );
+      expect(persistedMessagesKey(messages)).toBe(persistedMessagesKey(messages));
     });
 
     it("changes when a new message is appended", () => {
@@ -273,9 +266,7 @@ describe("PromptPlaygroundChat ref methods", () => {
             '[ERROR]{"type":"auth","message":"Incorrect API key provided: sk-proj-NOT-A-REAL-KEY"}',
         });
 
-        expect(
-          screen.getByText(/rejected our credentials/i),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/rejected our credentials/i)).toBeInTheDocument();
         expect(document.body.textContent).not.toContain("sk-proj-");
       });
     });

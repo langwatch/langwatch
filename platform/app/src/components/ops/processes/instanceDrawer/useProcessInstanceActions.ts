@@ -15,9 +15,7 @@ export interface ProcessInstanceTarget {
 
 /** Acts on the instance as a whole, both behind the footer's confirmations. */
 function useInstanceWideActions(onSettled: () => void) {
-  const [confirmAction, setConfirmAction] = useState<"wake" | "redrive" | null>(
-    null,
-  );
+  const [confirmAction, setConfirmAction] = useState<"wake" | "redrive" | null>(null);
   const settle = () => {
     setConfirmAction(null);
     onSettled();
@@ -26,9 +24,7 @@ function useInstanceWideActions(onSettled: () => void) {
   const wakeMutation = api.ops.processWakeNow.useMutation({
     onSuccess: (data) => {
       toaster.create({
-        title: data.woke
-          ? "Wake scheduled for now"
-          : "Instance no longer exists",
+        title: data.woke ? "Wake scheduled for now" : "Instance no longer exists",
         type: data.woke ? "success" : "error",
       });
     },
@@ -37,15 +33,14 @@ function useInstanceWideActions(onSettled: () => void) {
     onSettled: settle,
   });
 
-  const redriveInstanceMutation =
-    api.ops.processRedriveDeadInstance.useMutation(
-      countOutcomeHandlers({
-        onSettled: settle,
-        title: (n) =>
-          n > 0 ? `Redrove ${n} dead messages` : "No dead messages to redrive",
-        failure: "Couldn't redrive the dead messages",
-      }),
-    );
+  const redriveInstanceMutation = api.ops.processRedriveDeadInstance.useMutation(
+    countOutcomeHandlers({
+      onSettled: settle,
+      title: (n) =>
+        n > 0 ? `Redrove ${n} dead messages` : "No dead messages to redrive",
+      failure: "Couldn't redrive the dead messages",
+    }),
+  );
 
   return {
     confirmAction,

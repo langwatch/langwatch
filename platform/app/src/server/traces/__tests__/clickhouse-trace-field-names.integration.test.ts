@@ -97,10 +97,7 @@ function makeSpanRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function insertSpans(
-  ch: ClickHouseClient,
-  rows: ReturnType<typeof makeSpanRow>[],
-) {
+async function insertSpans(ch: ClickHouseClient, rows: ReturnType<typeof makeSpanRow>[]) {
   await ch.insert({
     table: "stored_spans",
     values: rows,
@@ -173,8 +170,7 @@ vi.mock("~/server/app-layer/app", async () => {
   const app = () => ({
     clickhouse: {
       enabled: true,
-      resolveClient: (tenantId: string) =>
-        clients.getClickHouseClientForTenant(tenantId),
+      resolveClient: (tenantId: string) => clients.getClickHouseClientForTenant(tenantId),
       resolveOrganizationClient: async () => {
         throw new Error("no organization client in this suite");
       },
@@ -201,9 +197,7 @@ beforeAll(async () => {
 
   const { prisma } = await import("~/server/db");
   service = new ClickHouseTraceService({
-    prisma: prisma as ConstructorParameters<
-      typeof ClickHouseTraceService
-    >[0]["prisma"],
+    prisma: prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]["prisma"],
   });
 }, 60_000);
 
@@ -325,9 +319,7 @@ describe("ClickHouse field-name queries (integration)", () => {
         expect(ids.has(`evaluator-${pad(LARGE_NAME_COUNT - 1)}`)).toBe(true);
         expect(ids.has("evaluator-0000")).toBe(true);
         // The key is the evaluator id, the label its human-readable name.
-        expect(labels.has(`evaluator-name-${pad(LARGE_NAME_COUNT - 1)}`)).toBe(
-          true,
-        );
+        expect(labels.has(`evaluator-name-${pad(LARGE_NAME_COUNT - 1)}`)).toBe(true);
       });
     });
   });
@@ -376,9 +368,7 @@ describe("ClickHouse field-name queries (integration)", () => {
 
         const spanNames = new Set(spans.map((s) => s.name));
         // The last span by StartTime is what the old LIMIT 200 BY dropped.
-        expect(spanNames.has(`bigspan-${pad(LARGE_SPAN_COUNT - 1)}`)).toBe(
-          true,
-        );
+        expect(spanNames.has(`bigspan-${pad(LARGE_SPAN_COUNT - 1)}`)).toBe(true);
       });
     });
   });

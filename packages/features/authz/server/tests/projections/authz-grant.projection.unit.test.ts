@@ -7,10 +7,7 @@ import {
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
 } from "@langwatch/authz-contract";
-import {
-  createTenantId,
-  type ProjectionStoreContext,
-} from "@langwatch/eventing";
+import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import type { AuthzGrantsEvent } from "../../src/adapters/eventing.authz.adapter";
 import {
@@ -48,9 +45,7 @@ function event(
   } as unknown as AuthzGrantsEvent;
 }
 
-const projection = AuthzGrantProjection.create(
-  new NullGrantProjectionWriteStore(),
-);
+const projection = AuthzGrantProjection.create(new NullGrantProjectionWriteStore());
 
 describe("AuthzGrantProjection", () => {
   it("takes grant and role ownership from tenantId, never aggregateId", () => {
@@ -159,12 +154,7 @@ describe("AuthzGrantProjection", () => {
         ),
       ),
       projection.map(
-        event(
-          ROLE_DELETED_EVENT_TYPE,
-          { roleId: "role_1", actor: ACTOR },
-          "role_1",
-          6,
-        ),
+        event(ROLE_DELETED_EVENT_TYPE, { roleId: "role_1", actor: ACTOR }, "role_1", 6),
       ),
     ];
 

@@ -64,11 +64,7 @@ function parseArgs({ argv }: { argv: string[] }): Args {
 
 const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
-function assertLocalDatabase({
-  allowRemoteDb,
-}: {
-  allowRemoteDb: boolean;
-}): void {
+function assertLocalDatabase({ allowRemoteDb }: { allowRemoteDb: boolean }): void {
   if (allowRemoteDb) return;
   let host = "";
   try {

@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  type Dataset,
-  type DatasetRecord,
-  Prisma,
-} from "~/generated/prisma/client";
+import { type Dataset, type DatasetRecord, Prisma } from "~/generated/prisma/client";
 
 // `execute()` touches the real prisma client + storage accessors only AFTER the
 // SKIP guard. The SKIP test asserts the guard returns first, so the db module is
@@ -85,9 +81,7 @@ const makePrisma = (row: Dataset | null) => {
 
 const makeStorage = (
   writeChunks: ReturnType<typeof vi.fn>,
-  deleteChunksFrom: ReturnType<typeof vi.fn> = vi
-    .fn()
-    .mockResolvedValue(undefined),
+  deleteChunksFrom: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined),
 ) => ({
   writeChunks,
   deleteChunksFrom,
@@ -114,9 +108,7 @@ const makeDeps = (overrides: Partial<BackfillDeps> = {}): BackfillDeps => {
     // tests that exercise the guard override this with differing values.
     recordRepository: {
       findDatasetRecordsPage: vi.fn().mockResolvedValue([]),
-      countAndMaxUpdatedAt: vi
-        .fn()
-        .mockResolvedValue({ count: 0, maxUpdatedAt: null }),
+      countAndMaxUpdatedAt: vi.fn().mockResolvedValue({ count: 0, maxUpdatedAt: null }),
       ...(recordOverride ?? {}),
     } as never,
     resolveStorage: vi.fn().mockResolvedValue({ kind: "s3", bucket: "b" }),
@@ -156,10 +148,7 @@ describe("backfillDatasetContentToS3", () => {
           getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
         });
 
-        const outcome = await migrateDatasetToS3(
-          { dataset: row, projectId: "p1" },
-          deps,
-        );
+        const outcome = await migrateDatasetToS3({ dataset: row, projectId: "p1" }, deps);
 
         expect(outcome).toBe("migrated");
         // Advisory lock taken inside the transaction.
@@ -192,9 +181,7 @@ describe("backfillDatasetContentToS3", () => {
       it("deletes orphan chunks from the written count upward (defensive, I-IDEM)", async () => {
         const row = makeDataset({ contentLayout: "postgres" });
         const { prisma } = makePrisma(row);
-        const findDatasetRecordsPage = pagedRecords([
-          makeRecord("rec_a", { q: "1" }),
-        ]);
+        const findDatasetRecordsPage = pagedRecords([makeRecord("rec_a", { q: "1" })]);
         const writeChunks = vi.fn().mockResolvedValue([
           { index: 0, rowCount: 1, byteSize: 20, startRow: 0, endRow: 1 },
           { index: 1, rowCount: 1, byteSize: 20, startRow: 1, endRow: 2 },
@@ -256,10 +243,7 @@ describe("backfillDatasetContentToS3", () => {
           getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
         });
 
-        const outcome = await migrateDatasetToS3(
-          { dataset: row, projectId: "p1" },
-          deps,
-        );
+        const outcome = await migrateDatasetToS3({ dataset: row, projectId: "p1" }, deps);
 
         expect(outcome).toBe("skipped-concurrent-write");
         // Crucially: the dataset is NOT flipped (no stale snapshot committed).
@@ -269,9 +253,7 @@ describe("backfillDatasetContentToS3", () => {
       it("skips the flip when a row is edited in place during migration (same count, newer updatedAt)", async () => {
         const row = makeDataset({ contentLayout: "postgres" });
         const { prisma, update } = makePrisma(row);
-        const findDatasetRecordsPage = pagedRecords([
-          makeRecord("rec_a", { q: "1" }),
-        ]);
+        const findDatasetRecordsPage = pagedRecords([makeRecord("rec_a", { q: "1" })]);
         const writeChunks = vi
           .fn()
           .mockResolvedValue([
@@ -298,10 +280,7 @@ describe("backfillDatasetContentToS3", () => {
           getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
         });
 
-        const outcome = await migrateDatasetToS3(
-          { dataset: row, projectId: "p1" },
-          deps,
-        );
+        const outcome = await migrateDatasetToS3({ dataset: row, projectId: "p1" }, deps);
 
         expect(outcome).toBe("skipped-concurrent-write");
         expect(update).not.toHaveBeenCalled();
@@ -384,10 +363,7 @@ describe("backfillDatasetContentToS3", () => {
           getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
         });
 
-        const outcome = await migrateDatasetToS3(
-          { dataset: row, projectId: "p1" },
-          deps,
-        );
+        const outcome = await migrateDatasetToS3({ dataset: row, projectId: "p1" }, deps);
 
         expect(outcome).toBe("migrated");
         // Read three times: page 1 (no cursor), page 2 (cursor = page 1's last
@@ -405,9 +381,7 @@ describe("backfillDatasetContentToS3", () => {
           cursorId: "rec_d",
         });
         // All four rows reached the writer, in order, ids preserved.
-        const allWritten = writeChunks.mock.calls.flatMap(
-          (call) => call[0].records,
-        );
+        const allWritten = writeChunks.mock.calls.flatMap((call) => call[0].records);
         expect(allWritten).toEqual([
           { id: "rec_a", entry: { n: 1 } },
           { id: "rec_b", entry: { n: 2 } },
@@ -420,9 +394,7 @@ describe("backfillDatasetContentToS3", () => {
         const row = makeDataset({ contentLayout: "postgres" });
         const { prisma } = makePrisma(row);
         const deleteMany = vi.fn();
-        const findDatasetRecordsPage = pagedRecords([
-          makeRecord("rec_a", { q: "1" }),
-        ]);
+        const findDatasetRecordsPage = pagedRecords([makeRecord("rec_a", { q: "1" })]);
         const writeChunks = vi
           .fn()
           .mockResolvedValue([
@@ -490,10 +462,7 @@ describe("backfillDatasetContentToS3", () => {
           getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
         });
 
-        const outcome = await migrateDatasetToS3(
-          { dataset: row, projectId: "p1" },
-          deps,
-        );
+        const outcome = await migrateDatasetToS3({ dataset: row, projectId: "p1" }, deps);
 
         expect(outcome).toBe("already-migrated");
         expect(findDatasetRecordsPage).not.toHaveBeenCalled();
@@ -506,9 +475,7 @@ describe("backfillDatasetContentToS3", () => {
       it("migrates the dataset to the local backend (S3 preferred, local fallback)", async () => {
         const row = makeDataset({ contentLayout: "postgres" });
         const { prisma, executeRaw } = makePrisma(row);
-        const findDatasetRecordsPage = pagedRecords([
-          makeRecord("rec_a", { q: "1" }),
-        ]);
+        const findDatasetRecordsPage = pagedRecords([makeRecord("rec_a", { q: "1" })]);
         const writeChunks = vi
           .fn()
           .mockResolvedValue([
@@ -517,16 +484,11 @@ describe("backfillDatasetContentToS3", () => {
         const deps = makeDeps({
           prisma: prisma as never,
           recordRepository: { findDatasetRecordsPage } as never,
-          resolveStorage: vi
-            .fn()
-            .mockResolvedValue({ kind: "file", root: "/x" }),
+          resolveStorage: vi.fn().mockResolvedValue({ kind: "file", root: "/x" }),
           getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
         });
 
-        const outcome = await migrateDatasetToS3(
-          { dataset: row, projectId: "p1" },
-          deps,
-        );
+        const outcome = await migrateDatasetToS3({ dataset: row, projectId: "p1" }, deps);
 
         expect(outcome).toBe("migrated");
         expect(writeChunks).toHaveBeenCalled();
@@ -729,16 +691,12 @@ describe("backfillDatasetContentToS3", () => {
           recordRepository: {
             findDatasetRecordsPage: pagedRecords([makeRecord("r", { a: 1 })]),
           } as never,
-          resolveStorage: vi
-            .fn()
-            .mockResolvedValue({ kind: "s3", bucket: "b" }),
+          resolveStorage: vi.fn().mockResolvedValue({ kind: "s3", bucket: "b" }),
           // The S3 write (now OUTSIDE the lock) fails for this dataset.
           getStorage: vi
             .fn()
             .mockResolvedValue(
-              makeStorage(
-                vi.fn().mockRejectedValue(new Error("S3 write failed")),
-              ),
+              makeStorage(vi.fn().mockRejectedValue(new Error("S3 write failed"))),
             ),
         });
 

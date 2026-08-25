@@ -5,8 +5,7 @@ const build = <Infrastructure>(
   features: readonly FeatureDefinition<Infrastructure>[],
   infrastructure: Infrastructure,
   target: "app" | "worker" = "app",
-) =>
-  FeatureRuntimeBuilder.create({ infrastructure }).build({ features, target });
+) => FeatureRuntimeBuilder.create({ infrastructure }).build({ features, target });
 
 describe("runtime feature composition", () => {
   /** @scenario Missing feature requirements fail during build */

@@ -5,8 +5,8 @@ import { SlugAlert } from "./slug-alert";
 export function SlugChangeWarningAlert(props: Alert.RootProps) {
   return (
     <SlugAlert {...props}>
-      Warning: this will break external references to this dataset. Please
-      update your references to the new slug after saving.
+      Warning: this will break external references to this dataset. Please update your
+      references to the new slug after saving.
     </SlugAlert>
   );
 }

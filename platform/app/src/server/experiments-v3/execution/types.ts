@@ -94,12 +94,8 @@ export const executionRequestSchema = z
         })
         .optional(),
       datasetId: z.string().optional(),
-      columns: z.array(
-        z.object({ id: z.string(), name: z.string(), type: z.string() }),
-      ),
-      savedRecords: z
-        .array(z.object({ id: z.string() }).passthrough())
-        .optional(),
+      columns: z.array(z.object({ id: z.string(), name: z.string(), type: z.string() })),
+      savedRecords: z.array(z.object({ id: z.string() }).passthrough()).optional(),
     }),
     // Use shared schemas to avoid duplication and ensure consistency
     targets: z.array(targetConfigSchema),
@@ -409,9 +405,7 @@ export const getCellKey = (rowIndex: number, targetId: string): string =>
 /**
  * Parse a cell key back to its components.
  */
-export const parseCellKey = (
-  key: string,
-): { rowIndex: number; targetId: string } => {
+export const parseCellKey = (key: string): { rowIndex: number; targetId: string } => {
   const dashIndex = key.indexOf("-");
   return {
     rowIndex: parseInt(key.substring(0, dashIndex), 10),

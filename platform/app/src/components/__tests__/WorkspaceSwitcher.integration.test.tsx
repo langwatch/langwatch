@@ -6,10 +6,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  WorkspaceSwitcher,
-  type WorkspaceSwitcherProps,
-} from "../WorkspaceSwitcher";
+import { WorkspaceSwitcher, type WorkspaceSwitcherProps } from "../WorkspaceSwitcher";
 
 const mockPush = vi.fn();
 let mockPathname = "/";
@@ -161,9 +158,7 @@ describe("WorkspaceSwitcher", () => {
         onCreateProjectForTeam,
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
       const addButton = await screen.findByRole("button", {
         name: /create project in acme engineering/i,
       });
@@ -186,9 +181,7 @@ describe("WorkspaceSwitcher", () => {
         onCreateProjectForTeam: vi.fn(),
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
       expect(await screen.findByText("Acme Engineering")).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /create project in/i }),
@@ -206,9 +199,7 @@ describe("WorkspaceSwitcher", () => {
         onCreateProjectForTeam: vi.fn(),
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
       // The IconButton itself must still be reachable (aria-label).
       expect(
         await screen.findByRole("button", {
@@ -232,9 +223,7 @@ describe("WorkspaceSwitcher", () => {
         onCreateProjectForTeam: vi.fn(),
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
       const addButton = await screen.findByRole("button", {
         name: /create project in acme engineering/i,
       });
@@ -257,9 +246,7 @@ describe("WorkspaceSwitcher", () => {
         onCreateProjectForTeam: vi.fn(),
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
       const addButton = await screen.findByRole("button", {
         name: /create project in acme engineering/i,
       });
@@ -299,9 +286,7 @@ describe("WorkspaceSwitcher", () => {
           onCreateProjectForTeam,
         });
 
-        await user.click(
-          screen.getByRole("button", { name: /switch workspace/i }),
-        );
+        await user.click(screen.getByRole("button", { name: /switch workspace/i }));
         expect(await screen.findByText("Acme Engineering")).toBeInTheDocument();
 
         const addButton = await screen.findByRole("button", {
@@ -328,9 +313,7 @@ describe("WorkspaceSwitcher", () => {
           onCreateProjectForTeam: vi.fn(),
         });
 
-        await user.click(
-          screen.getByRole("button", { name: /switch workspace/i }),
-        );
+        await user.click(screen.getByRole("button", { name: /switch workspace/i }));
         // The org header confirms the dropdown opened before we assert absence.
         expect(await screen.findByText("Acme")).toBeInTheDocument();
         expect(screen.queryByText("Acme Engineering")).not.toBeInTheDocument();
@@ -351,9 +334,7 @@ describe("WorkspaceSwitcher", () => {
         current: { kind: "team", teamId: "team_a" },
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
       // "Foo Project" is unique to the open dropdown (the trigger shows the
       // current team), so finding it confirms the menu opened.
       expect(await screen.findByText("Foo Project")).toBeInTheDocument();
@@ -370,12 +351,8 @@ describe("WorkspaceSwitcher", () => {
         current: { kind: "team", teamId: "team_a" },
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
-      expect(
-        (await screen.findAllByText("My Workspace")).length,
-      ).toBeGreaterThan(0);
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
+      expect((await screen.findAllByText("My Workspace")).length).toBeGreaterThan(0);
     });
   });
 
@@ -579,9 +556,7 @@ describe("WorkspaceSwitcher", () => {
         onSwitchOrganization,
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
       await user.click(await screen.findByText("Globex"));
 
       expect(onSwitchOrganization).toHaveBeenCalledWith("org_globex");
@@ -598,9 +573,7 @@ describe("WorkspaceSwitcher", () => {
         onSwitchOrganization: vi.fn(),
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
       // The personal + project entries are reachable, but there is no
       // "Organizations" switch group when the user belongs to one org.
       await screen.findByText("Foo Project");
@@ -671,9 +644,7 @@ describe("WorkspaceSwitcher", () => {
 
       // Chakra v3 Menu (Ark) needs the full pointer chain to open in jsdom;
       // native Element.click() leaves it data-state="closed".
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
 
       // Both org names render as section headers, disambiguating the
       // identical "Default Team" rows that would otherwise look duplicated.
@@ -690,9 +661,7 @@ describe("WorkspaceSwitcher", () => {
         current: { kind: "personal" },
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
 
       // The generic header is only used in single-org mode; with multiple
       // orgs each org name is its own header. Wait for an org header to
@@ -727,9 +696,7 @@ describe("WorkspaceSwitcher", () => {
       });
 
       const user = userEvent.setup();
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
 
       // Two orgs both named "Acme" should be distinguishable in the dropdown.
       expect(await screen.findByText("Acme · acme")).toBeInTheDocument();
@@ -748,9 +715,7 @@ describe("WorkspaceSwitcher", () => {
         current: { kind: "project", projectId: "project_foo" },
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
 
       // The team row is unique to the open dropdown (the trigger shows the
       // current project), so finding it confirms the menu opened.
@@ -783,9 +748,7 @@ describe("WorkspaceSwitcher", () => {
         current: { kind: "personal", orgId: "org_acme" },
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
 
       // The org name renders as a section header even with a single org, so it
       // never disappears. ("Acme" is the org; the team is "Acme Engineering".)
@@ -900,9 +863,7 @@ describe("WorkspaceSwitcher", () => {
         projects: [projectAlpha, projectBeta],
         current: { kind: "personal", orgId: "org_alpha" },
       });
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
       // One "My Workspace" row per governance org, both org headers present.
       await screen.findAllByText("My Workspace");
       expect(hrefsFor("My Workspace").length).toBe(2);
@@ -919,9 +880,7 @@ describe("WorkspaceSwitcher", () => {
         projects: [projectAlpha, projectBeta],
         current: { kind: "personal", orgId: "org_alpha" },
       });
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
       await screen.findAllByText("My Workspace");
       const hrefs = hrefsFor("My Workspace");
       expect(hrefs).toContain("/me?org=alpha");
@@ -937,9 +896,7 @@ describe("WorkspaceSwitcher", () => {
         projects: [projectAlpha, projectBeta, projectGamma],
         current: { kind: "personal", orgId: "org_alpha" },
       });
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
       // Two governance orgs → two My Workspace rows; Gamma (no governance)
       // shows its team but contributes no personal entry.
       await screen.findAllByText("My Workspace");
@@ -958,9 +915,7 @@ describe("WorkspaceSwitcher", () => {
         projects: [projectAlpha],
         current: { kind: "personal", orgId: "org_alpha" },
       });
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /switch workspace/i }));
       await screen.findAllByText("My Workspace");
       expect(hrefsFor("My Workspace")).toEqual(["/me"]);
     });

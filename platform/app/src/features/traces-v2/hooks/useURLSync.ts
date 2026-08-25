@@ -343,11 +343,7 @@ export function useURLSync(): void {
     // No need to also check that a cursor survived for the current page: the
     // flat list reads by position when `pageCursors[page]` is missing, so the
     // page number stands on its own.
-    if (
-      !isFirstApply &&
-      targetLens &&
-      canonicalBody(applied) === liveBody(live)
-    ) {
+    if (!isFirstApply && targetLens && canonicalBody(applied) === liveBody(live)) {
       return;
     }
 

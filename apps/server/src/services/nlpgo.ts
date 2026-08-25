@@ -65,6 +65,10 @@ export async function startNlpgo(
     await handle.stop();
     throw new Error(`nlpgo did not become healthy: ${ready.reason}`);
   }
-  bus.emit({ type: "healthy", service: "nlpgo" as never, durationMs: Date.now() - start });
+  bus.emit({
+    type: "healthy",
+    service: "nlpgo" as never,
+    durationMs: Date.now() - start,
+  });
   return handle;
 }

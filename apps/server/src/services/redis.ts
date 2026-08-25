@@ -6,7 +6,10 @@ import { execCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
-export async function startRedis(ctx: RuntimeContext, bus: EventBus): Promise<SupervisedHandle> {
+export async function startRedis(
+  ctx: RuntimeContext,
+  bus: EventBus,
+): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "redis" });
   const start = Date.now();
 

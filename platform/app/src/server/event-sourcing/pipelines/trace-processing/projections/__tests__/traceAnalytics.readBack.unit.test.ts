@@ -122,9 +122,7 @@ describe("traceAnalytics read-back (fromRow)", () => {
         JSON.stringify(["alpha", "beta"]),
       );
       // Reserved accumulators survive the trim by contract.
-      expect(decoded.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
-        "500",
-      );
+      expect(decoded.attributes["langwatch.reserved.cache_read_tokens"]).toBe("500");
     });
 
     it("does not carry payload keys the trim drops back into state", () => {
@@ -202,10 +200,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
     it("reads the state and the durable watermark back", async () => {
       const { store } = storeOver(project(committedState()));
 
-      const { state, appliedEventIds } = await store.getWithApplied(
-        "trace-rb",
-        context,
-      );
+      const { state, appliedEventIds } = await store.getWithApplied("trace-rb", context);
 
       expect(state?.spanCount).toBe(7);
       expect(state?.traceNameUserOverridden).toBe(true);
@@ -271,9 +266,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       // The 196952 row this whole change exists to rescue. It carries 0, which
       // is right twice over — no span was ever folded, and an unusable anchor
       // is what lets the next contribution freeze a real one.
-      const state = traceAnalyticsStateFromRow(
-        preSplitRow({ occurredAtMs: 0 }),
-      );
+      const state = traceAnalyticsStateFromRow(preSplitRow({ occurredAtMs: 0 }));
 
       expect(state.storageAnchorMs).toBe(0);
       expect(state.occurredAt).toBe(0);
@@ -396,10 +389,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       });
 
     const renamed = () =>
-      projection.apply(
-        { ...projection.init(), traceId: "trace-rb" },
-        renameEvent,
-      );
+      projection.apply({ ...projection.init(), traceId: "trace-rb" }, renameEvent);
 
     describe("when a late span that would otherwise supply a name arrives", () => {
       /** @scenario a user-visible name survives a late unrelated contribution */
@@ -424,10 +414,8 @@ describe("TraceAnalyticsStore read-back version gate", () => {
 
         // Read back, that row's own decoding lets the late span take the name.
         expect(
-          projection.apply(
-            traceAnalyticsStateFromRow(olderShape),
-            lateNamingSpan(),
-          ).traceName,
+          projection.apply(traceAnalyticsStateFromRow(olderShape), lateNamingSpan())
+            .traceName,
         ).toBe("llm-call");
 
         // Which is why the store never hands it to the fold at all.
@@ -514,9 +502,7 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
         // A loader that fails the test if the executor still replays history:
         // the whole point of the always-write row is that it never needs to.
         fold.eventLoaderUpTo = async () => {
-          throw new Error(
-            "event_log must not be read: the row carries the state",
-          );
+          throw new Error("event_log must not be read: the row carries the state");
         };
         const executor = new FoldProjectionExecutor();
 

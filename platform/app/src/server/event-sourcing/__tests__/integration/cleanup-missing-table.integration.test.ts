@@ -38,9 +38,7 @@ describe("cleanupTestData benign missing-table log-noise (#5308)", () => {
           query: `DROP TABLE IF EXISTS "${TEST_DATABASE}".test_event_handler_log`,
         });
 
-        const errorSpy = vi
-          .spyOn(console, "error")
-          .mockImplementation(() => {});
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
         let loggedArgs: string[] = [];
         try {
           await cleanupTestData("noise-guard-tenant");

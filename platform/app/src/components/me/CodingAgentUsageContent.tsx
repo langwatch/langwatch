@@ -73,19 +73,10 @@ export function CodingAgentUsageContent({ projectId }: { projectId: string }) {
   return (
     <VStack align="stretch" gap={3}>
       <SimpleGrid columns={{ base: 2, md: 4 }} gap={3}>
-        <Stat
-          label="Sessions"
-          value={numeral(totals.sessionCount).format("0,0")}
-        />
+        <Stat label="Sessions" value={numeral(totals.sessionCount).format("0,0")} />
         <Stat label="Cost" value={formatBudgetUsd(totals.costUsd)} />
-        <Stat
-          label="Tokens"
-          value={numeral(totals.totalTokens).format("0,0")}
-        />
-        <Stat
-          label="Active time"
-          value={formatDurationSeconds(totals.activeTimeSec)}
-        />
+        <Stat label="Tokens" value={numeral(totals.totalTokens).format("0,0")} />
+        <Stat label="Active time" value={formatDurationSeconds(totals.activeTimeSec)} />
       </SimpleGrid>
       {produced.length > 0 && (
         <Text fontSize="xs" color="fg.muted">

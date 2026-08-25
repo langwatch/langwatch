@@ -10,7 +10,7 @@
 
 Re-scoped 2026-05-06 after Drew's clarification:
 
-> *"default to remote" really just means "default to whatever is in `.env`, everything else is an override." Profiles are URL-rewrite overrides on top of the contributor's existing `.env`. There is no shared remote dev backend to stand up — that was a misread of the spec.*
+> _"default to remote" really just means "default to whatever is in `.env`, everything else is an override." Profiles are URL-rewrite overrides on top of the contributor's existing `.env`. There is no shared remote dev backend to stand up — that was a misread of the spec._
 
 So #3860 AC2 / AC3 / AC6 are **back in scope**. The mental model:
 
@@ -22,19 +22,20 @@ Implementation: a `.env.dev-up` overlay file is loaded LAST as `env_file` in the
 
 Mode → (services, URL overrides):
 
-| Mode | Compose services | URL overrides written to `.env.dev-up` |
-|---|---|---|
-| `frontend-only` | (no compose) | (none — pure `pnpm dev` against `.env`) |
-| `backend-shared` | postgres + redis + clickhouse + app + init | `DATABASE_URL`, `REDIS_URL`, `CLICKHOUSE_URL` |
-| `migration` | postgres + clickhouse (host-ports exposed) | `DATABASE_URL`, `CLICKHOUSE_URL` (localhost forms) |
-| `nlp` | + langwatch_nlp + langevals | + `LANGWATCH_NLP_SERVICE`, `LANGEVALS_ENDPOINT` |
-| `full-local` | `--profile full` (everything) | all five |
+| Mode             | Compose services                           | URL overrides written to `.env.dev-up`             |
+| ---------------- | ------------------------------------------ | -------------------------------------------------- |
+| `frontend-only`  | (no compose)                               | (none — pure `pnpm dev` against `.env`)            |
+| `backend-shared` | postgres + redis + clickhouse + app + init | `DATABASE_URL`, `REDIS_URL`, `CLICKHOUSE_URL`      |
+| `migration`      | postgres + clickhouse (host-ports exposed) | `DATABASE_URL`, `CLICKHOUSE_URL` (localhost forms) |
+| `nlp`            | + langwatch_nlp + langevals                | + `LANGWATCH_NLP_SERVICE`, `LANGEVALS_ENDPOINT`    |
+| `full-local`     | `--profile full` (everything)              | all five                                           |
 
 Migration mode uses a `dev/compose.dev.migration.yml` overlay that adds host port mappings to postgres + clickhouse so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
 
 `make quickstart` accepts a positional mode arg for non-interactive usage: `make quickstart frontend-only`, `make quickstart backend-shared`, etc. `make quickstart help` continues to print the mode reference.
 
 Deprecated targets (`make dev*` / `make dev-up`) become thin shims onto the new modes:
+
 - `make dev` → `backend-shared`
 - `make dev-nlp` → `nlp`
 - `make dev-scenarios` → `full-local`
@@ -52,23 +53,23 @@ Deprecated targets (`make dev*` / `make dev-up`) become thin shims onto the new 
 
 ### #3891 — dev/boxd.mk
 
-| Deliverable | File |
-|---|---|
-| Make targets | `dev/boxd.mk` (new), `Makefile` (include) |
-| Pure shell helpers (slug, env discovery, hostname rewrite) | `dev/scripts/boxd-fork.sh` (new) |
-| Unit + integration tests for helpers | `dev/scripts/__tests__/boxd-fork.unit.bats` (new), `dev/scripts/__tests__/boxd-fork.integration.bats` (new) |
-| Docs (philosophy, target reference, troubleshooting, threat model) | `dev/docs/boxd-makefile.md` (new) |
-| BDD spec for verifiable behavior | `specs/setup/boxd-fork-vm.feature` (new, `@unimplemented` per repo convention) |
+| Deliverable                                                        | File                                                                                                        |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Make targets                                                       | `dev/boxd.mk` (new), `Makefile` (include)                                                                   |
+| Pure shell helpers (slug, env discovery, hostname rewrite)         | `dev/scripts/boxd-fork.sh` (new)                                                                            |
+| Unit + integration tests for helpers                               | `dev/scripts/__tests__/boxd-fork.unit.bats` (new), `dev/scripts/__tests__/boxd-fork.integration.bats` (new) |
+| Docs (philosophy, target reference, troubleshooting, threat model) | `dev/docs/boxd-makefile.md` (new)                                                                           |
+| BDD spec for verifiable behavior                                   | `specs/setup/boxd-fork-vm.feature` (new, `@unimplemented` per repo convention)                              |
 
 ### #3860 — quickstart rework (subset)
 
-| Deliverable | File |
-|---|---|
-| Stable named volumes for stateful services + singleton redis with host port | `dev/compose.dev.yml` (edit) |
-| `quickstart help` non-interactive mode + per-mode hint + fail-fast on env mismatch + idempotency notes | `dev/scripts/dev.sh` (edit) |
-| Deprecation wrappers around `make dev*` and `make dev-up` | `Makefile` (edit) |
-| Updated dev section + new entry point | `CLAUDE.md` (edit), `dev/docs/adr/004-docker-dev-environment.md` (amendment) |
-| BDD spec for new behavior | `specs/setup/quickstart-entry-point.feature` (new, `@unimplemented`) |
+| Deliverable                                                                                            | File                                                                         |
+| ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Stable named volumes for stateful services + singleton redis with host port                            | `dev/compose.dev.yml` (edit)                                                 |
+| `quickstart help` non-interactive mode + per-mode hint + fail-fast on env mismatch + idempotency notes | `dev/scripts/dev.sh` (edit)                                                  |
+| Deprecation wrappers around `make dev*` and `make dev-up`                                              | `Makefile` (edit)                                                            |
+| Updated dev section + new entry point                                                                  | `CLAUDE.md` (edit), `dev/docs/adr/004-docker-dev-environment.md` (amendment) |
+| BDD spec for new behavior                                                                              | `specs/setup/quickstart-entry-point.feature` (new, `@unimplemented`)         |
 
 ## dev/boxd.mk design
 
@@ -106,6 +107,7 @@ boxd_slug() {
 ```
 
 Examples (asserted in unit tests):
+
 - `feat/Foo Bar!` → `feat-foo-bar`
 - `issue3891/boxd-mk-and-quickstart-rework` → `issue3891-boxd-mk-and-quickstart-rework`
 - 60-char input → truncated to ≤40, no trailing `-`.
@@ -114,12 +116,12 @@ Distinct from `dev/scripts/worktree.sh::generate_slug` (50 chars, word-boundary 
 
 ### Naming
 
-| Target | VM name | tmux session |
-|---|---|---|
-| `boxd-golden` | `<namespace>--langwatch-golden` (namespace from `BOXD_NAMESPACE` → `gh api user` → `whoami`) | n/a |
-| `boxd-fork-pr PR=N` | `langwatch-<branch_slug(PR.head)>` | `claude-<branch_slug>` |
-| `boxd-fork-branch BRANCH=B` | `langwatch-<branch_slug(B)>` | `claude-<branch_slug>` |
-| `boxd-fork-issue ISSUE=N` | **always** `langwatch-issue<N>` (literal) | `claude-issue<N>` |
+| Target                      | VM name                                                                                      | tmux session           |
+| --------------------------- | -------------------------------------------------------------------------------------------- | ---------------------- |
+| `boxd-golden`               | `<namespace>--langwatch-golden` (namespace from `BOXD_NAMESPACE` → `gh api user` → `whoami`) | n/a                    |
+| `boxd-fork-pr PR=N`         | `langwatch-<branch_slug(PR.head)>`                                                           | `claude-<branch_slug>` |
+| `boxd-fork-branch BRANCH=B` | `langwatch-<branch_slug(B)>`                                                                 | `claude-<branch_slug>` |
+| `boxd-fork-issue ISSUE=N`   | **always** `langwatch-issue<N>` (literal)                                                    | `claude-issue<N>`      |
 
 Collision rule (AC#14): `fork-branch BRANCH=issue42/foo` produces `langwatch-issue42-foo`, distinct from `fork-issue ISSUE=42` (`langwatch-issue42`). If a branch slug starts with `issue<N>-`, the target prints a friendly nudge to use `fork-issue` instead, but doesn't block.
 
@@ -136,7 +138,7 @@ boxd_env_files() {
 }
 ```
 
-Using `git ls-files -co --exclude-standard` instead of `find` so we honour `.gitignore`. `.env` itself is gitignored by repo convention but `-c` (cached) catches anything tracked, `-o` (other) catches untracked-but-not-ignored — wait, `.env` is git-ignored. Need `-co --exclude-standard` *plus* explicit `--others --include=.env` semantics. Actually simpler: `find . -name '.env' -not -path '*/node_modules/*' …` — same idea with explicit excludes per AC#24.
+Using `git ls-files -co --exclude-standard` instead of `find` so we honour `.gitignore`. `.env` itself is gitignored by repo convention but `-c` (cached) catches anything tracked, `-o` (other) catches untracked-but-not-ignored — wait, `.env` is git-ignored. Need `-co --exclude-standard` _plus_ explicit `--others --include=.env` semantics. Actually simpler: `find . -name '.env' -not -path '*/node_modules/*' …` — same idea with explicit excludes per AC#24.
 
 Decision: use `find` with explicit excludes, since `.env` files are gitignored and would not show up in `git ls-files`.
 
@@ -152,13 +154,15 @@ boxd_env_files() {
 ### Hostname rewrite
 
 Allowlist (AC#26):
+
 - Exact key match: `NEXTAUTH_URL`, `BASE_HOST`, `LW_GATEWAY_BASE_URL`
 - Value pattern match: `localhost:<port>` and `127.0.0.1:<port>`
 
 For `langwatch-issue3891`:
+
 - `NEXTAUTH_URL`/`BASE_HOST` → `https://langwatch-issue3891.boxd.sh`
 - `LW_GATEWAY_BASE_URL` → `https://aigw.langwatch-issue3891.boxd.sh`
-- Any `localhost:<port>` value → `https://<port-subdomain>.langwatch-issue3891.boxd.sh` *only if a corresponding port mapping exists*; otherwise leave alone with a warning.
+- Any `localhost:<port>` value → `https://<port-subdomain>.langwatch-issue3891.boxd.sh` _only if a corresponding port mapping exists_; otherwise leave alone with a warning.
 
 Implementation: pure-bash awk-style line filter, applied to each `.env` file before it's `boxd cp`-ed.
 
@@ -166,12 +170,12 @@ Implementation: pure-bash awk-style line filter, applied to each `.env` file bef
 
 Per AC#27 + extension informed by #3860's port discussion:
 
-| Subdomain | Internal port | Source |
-|---|---|---|
-| (default proxy) | 5560 | langwatch app (compose) |
-| `aigw.<vm>` | 5563 | AI gateway (Go service) |
-| `bullboard.<vm>` | 6380 | bullboard |
-| `ai-server.<vm>` | 3456 | ai test server |
+| Subdomain        | Internal port | Source                  |
+| ---------------- | ------------- | ----------------------- |
+| (default proxy)  | 5560          | langwatch app (compose) |
+| `aigw.<vm>`      | 5563          | AI gateway (Go service) |
+| `bullboard.<vm>` | 6380          | bullboard               |
+| `ai-server.<vm>` | 3456          | ai test server          |
 
 `boxd-fork-*` calls `boxd proxy set-port --port=5560` once + `boxd proxy new <name> --port=<n>` for each subdomain. Idempotent — `proxy new` on existing returns success.
 
@@ -194,6 +198,7 @@ boxd-connect-issue:
 ```
 
 `BOXD_CONNECT` is a function in `dev/scripts/boxd-fork.sh` that:
+
 1. Checks VM exists (`boxd list --json | jq …`); error+exit if not (AC#19)
 2. If suspended, runs `boxd resume <vm>` and waits for ready (AC#20)
 3. SSHes via `boxd connect <vm>` and runs `tmux attach -t <tmux>` — with a fallback if the session isn't there (AC#18: clear message + nonzero exit, no attach into nothing)
@@ -220,10 +225,11 @@ volumes:
   goose_bin:
     name: ${VOLUME_PREFIX:-langwatch}-goose-bin
   pnpm_store:
-    name: langwatch-pnpm-store    # already shared
+    name: langwatch-pnpm-store # already shared
 ```
 
 Plus expose redis on a fixed host port (AC5):
+
 ```yaml
 redis:
   ports:
@@ -232,11 +238,11 @@ redis:
 
 ### Cross-worktree collision (AC4)
 
-Two worktrees can both `up` postgres simultaneously — they'd both bind the container to the same volume, but only one can have the container *up* at a time per the AC ("Only one worktree can have a given stateful container `up` at a time"). Compose project name (`COMPOSE_PROJECT_NAME`) is still per-worktree, so the *container* name is unique, but the underlying volume is shared.
+Two worktrees can both `up` postgres simultaneously — they'd both bind the container to the same volume, but only one can have the container _up_ at a time per the AC ("Only one worktree can have a given stateful container `up` at a time"). Compose project name (`COMPOSE_PROJECT_NAME`) is still per-worktree, so the _container_ name is unique, but the underlying volume is shared.
 
 Wait — that's wrong. If two compose projects both create a container named `langwatch-issue123-postgres` and `langwatch-issue456-postgres`, both binding `/var/lib/postgresql/data` to volume `langwatch-db-data`, postgres will refuse to start the second one (lock file). That's actually the desired behavior — the second `quickstart` errors clearly.
 
-`dev/scripts/dev.sh` adds detection: before `up`, check if any container named `*-postgres` is running with the shared volume mounted. If yes, print a clear message: *"postgres is already up in another worktree (project=<other>). Stop it first or reuse it."*
+`dev/scripts/dev.sh` adds detection: before `up`, check if any container named `*-postgres` is running with the shared volume mounted. If yes, print a clear message: _"postgres is already up in another worktree (project=<other>). Stop it first or reuse it."_
 
 ### Quickstart help
 
@@ -288,65 +294,65 @@ fi
 
 ### #3891 (boxd Makefile) — 29 ACs
 
-| AC | Where addressed |
-|---|---|
-| 1 (dev/boxd.mk + include) | `dev/boxd.mk`, `Makefile` |
-| 2 (target list) | `dev/boxd.mk` |
-| 3 (philosophy line in help) | `dev/boxd.mk` `help` target |
-| 4 (each target prints intent + confirm destructive) | `dev/boxd.mk` per-target |
-| 5 (golden VM pre-warmed) | `boxd-golden` calls `make dev-full` inside the VM via `boxd exec` |
-| 6 (golden-reset) | `dev/boxd.mk` |
-| 7 (seed hook) | `dev/boxd.mk` defines empty `seed-golden:` target documented as override-me |
-| 8 (staleness ops doc) | `dev/docs/boxd-makefile.md` |
-| 9 (naming convention) | `dev/scripts/boxd-fork.sh` |
-| 10 (single fork primitive) | `_boxd-fork-impl` make target shared across pr/branch/issue |
-| 11 (fork has branch checked out + ready) | impl |
-| 12 (fork-issue creates worktree branch + tmux+claude inside VM) | impl |
-| 13 (slugifier spec) | `dev/scripts/boxd-fork.sh::boxd_slug` + bats tests |
-| 14 (collision rule) | impl + warning |
-| 15 (existing-worktree behavior) | impl: idempotent reuse, error on existing VM |
-| 16 (cross-fork PRs via gh) | impl |
-| 17 (connect targets share resolution) | shared functions |
-| 18 (clear msg if tmux missing) | impl |
-| 19 (clear msg if VM missing) | impl |
-| 20 (wake suspended VM) | impl: `boxd resume` + readiness wait |
-| 21 (single source of truth resolution) | shared `boxd_vm_name`, `boxd_tmux_name` functions |
-| 22 (CLAUDE_CREDS path param) | impl |
-| 23 (git auth via boxd credential helper) | confirmed; documented |
-| 24 (env glob excludes) | impl, tested |
-| 25 (same-key precedence: each .env separate) | impl: cp preserves paths |
-| 26 (hostname-rewrite allowlist) | impl, tested |
-| 27 (ports 3000, 5563, others) | impl |
-| 28 (dev/docs/ entry) | `dev/docs/boxd-makefile.md` |
-| 29 (make help grep-able) | `dev/boxd.mk` `help` target |
+| AC                                                              | Where addressed                                                             |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 1 (dev/boxd.mk + include)                                       | `dev/boxd.mk`, `Makefile`                                                   |
+| 2 (target list)                                                 | `dev/boxd.mk`                                                               |
+| 3 (philosophy line in help)                                     | `dev/boxd.mk` `help` target                                                 |
+| 4 (each target prints intent + confirm destructive)             | `dev/boxd.mk` per-target                                                    |
+| 5 (golden VM pre-warmed)                                        | `boxd-golden` calls `make dev-full` inside the VM via `boxd exec`           |
+| 6 (golden-reset)                                                | `dev/boxd.mk`                                                               |
+| 7 (seed hook)                                                   | `dev/boxd.mk` defines empty `seed-golden:` target documented as override-me |
+| 8 (staleness ops doc)                                           | `dev/docs/boxd-makefile.md`                                                 |
+| 9 (naming convention)                                           | `dev/scripts/boxd-fork.sh`                                                  |
+| 10 (single fork primitive)                                      | `_boxd-fork-impl` make target shared across pr/branch/issue                 |
+| 11 (fork has branch checked out + ready)                        | impl                                                                        |
+| 12 (fork-issue creates worktree branch + tmux+claude inside VM) | impl                                                                        |
+| 13 (slugifier spec)                                             | `dev/scripts/boxd-fork.sh::boxd_slug` + bats tests                          |
+| 14 (collision rule)                                             | impl + warning                                                              |
+| 15 (existing-worktree behavior)                                 | impl: idempotent reuse, error on existing VM                                |
+| 16 (cross-fork PRs via gh)                                      | impl                                                                        |
+| 17 (connect targets share resolution)                           | shared functions                                                            |
+| 18 (clear msg if tmux missing)                                  | impl                                                                        |
+| 19 (clear msg if VM missing)                                    | impl                                                                        |
+| 20 (wake suspended VM)                                          | impl: `boxd resume` + readiness wait                                        |
+| 21 (single source of truth resolution)                          | shared `boxd_vm_name`, `boxd_tmux_name` functions                           |
+| 22 (CLAUDE_CREDS path param)                                    | impl                                                                        |
+| 23 (git auth via boxd credential helper)                        | confirmed; documented                                                       |
+| 24 (env glob excludes)                                          | impl, tested                                                                |
+| 25 (same-key precedence: each .env separate)                    | impl: cp preserves paths                                                    |
+| 26 (hostname-rewrite allowlist)                                 | impl, tested                                                                |
+| 27 (ports 3000, 5563, others)                                   | impl                                                                        |
+| 28 (dev/docs/ entry)                                            | `dev/docs/boxd-makefile.md`                                                 |
+| 29 (make help grep-able)                                        | `dev/boxd.mk` `help` target                                                 |
 
 ### #3860 (quickstart) — 10 ACs
 
-| AC | Where addressed | Status |
-|---|---|---|
-| 1 (single entry point) | `Makefile` deprecation wrappers, `CLAUDE.md`, `ADR-004` | done |
-| 2 (intent-based prompting) | `dev/scripts/dev.sh` 5-mode prompt | done |
-| 3 (default = fastest path) | `frontend-only` mode = no compose, ~instant | done |
-| 4 (stateful shared volumes + collision detection) | `dev/compose.dev.yml`, `dev/scripts/dev.sh` | done |
-| 5 (redis singleton + host port) | `dev/compose.dev.yml` | done |
-| 6 (URL rewrite on profile flip) | `dev/scripts/dev.sh` writes `.env.dev-up` per mode; `dev/compose.dev.yml` honours it via env_file overlay | done |
-| 7 (idempotent + fail-fast IS_SAAS guard) | `dev/scripts/dev.sh` | done |
-| 8 (per-mode hints + `quickstart help`) | `dev/scripts/dev.sh` | done |
-| 9 (deprecation warnings on old paths) | `Makefile`, `CLAUDE.md`, `ADR-004` | done |
-| 10 (no CI regressions, `pnpm test:*` pass) | verified by running typecheck + test:unit | gate |
+| AC                                                | Where addressed                                                                                           | Status |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------ |
+| 1 (single entry point)                            | `Makefile` deprecation wrappers, `CLAUDE.md`, `ADR-004`                                                   | done   |
+| 2 (intent-based prompting)                        | `dev/scripts/dev.sh` 5-mode prompt                                                                        | done   |
+| 3 (default = fastest path)                        | `frontend-only` mode = no compose, ~instant                                                               | done   |
+| 4 (stateful shared volumes + collision detection) | `dev/compose.dev.yml`, `dev/scripts/dev.sh`                                                               | done   |
+| 5 (redis singleton + host port)                   | `dev/compose.dev.yml`                                                                                     | done   |
+| 6 (URL rewrite on profile flip)                   | `dev/scripts/dev.sh` writes `.env.dev-up` per mode; `dev/compose.dev.yml` honours it via env_file overlay | done   |
+| 7 (idempotent + fail-fast IS_SAAS guard)          | `dev/scripts/dev.sh`                                                                                      | done   |
+| 8 (per-mode hints + `quickstart help`)            | `dev/scripts/dev.sh`                                                                                      | done   |
+| 9 (deprecation warnings on old paths)             | `Makefile`, `CLAUDE.md`, `ADR-004`                                                                        | done   |
+| 10 (no CI regressions, `pnpm test:*` pass)        | verified by running typecheck + test:unit                                                                 | gate   |
 
 ## Risk register
 
-| Risk | Likelihood | Mitigation |
-|---|---|---|
-| Stable shared `db-data` volume conflicts with someone's existing per-worktree volume | High (everyone has stale `lw-<hash>-db-data`) | Migration note in ADR-004 amendment + `make quickstart` prints warning if old volumes detected |
-| `dev/boxd.mk` external-vs-internal CLI surface drift (issue calls out both) | Med | Use only commands that exist in both: `info`, `list`, `new`, `fork`, `exec`, `cp`, `proxy`, `connect`, `pause`, `resume`, `destroy`. No `local` / `auto-suspend` calls |
-| Bats tests don't run in CI (no workflow runs them) | Low | They run locally for the slugifier + env helpers; integration via @unimplemented spec for parity tracking |
-| Fork pruning is out of scope but the user's quota fills up | Low | Documented in `dev/docs/boxd-makefile.md`; follow-up issue filed |
-| `make dev` deprecation warning breaks someone's muscle-memory workflow | Med | Warning is on stderr only; command still works for one release |
-| Compose project name collision between worktrees with shared db-data | Med (this is the AC) | Detect via `docker ps` + clear error in `dev.sh`. Document in CLAUDE.md |
-| The `boxd-fork-issue` flow assumes the developer's laptop has `worktree.sh` and the repo cloned | Low | This is the existing dev environment — same precondition as `make worktree` already imposes |
-| Time pressure compresses #3860 scope further | Med | The deferred slice is documented in PR body + a follow-up issue is filed |
+| Risk                                                                                            | Likelihood                                    | Mitigation                                                                                                                                                             |
+| ----------------------------------------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stable shared `db-data` volume conflicts with someone's existing per-worktree volume            | High (everyone has stale `lw-<hash>-db-data`) | Migration note in ADR-004 amendment + `make quickstart` prints warning if old volumes detected                                                                         |
+| `dev/boxd.mk` external-vs-internal CLI surface drift (issue calls out both)                     | Med                                           | Use only commands that exist in both: `info`, `list`, `new`, `fork`, `exec`, `cp`, `proxy`, `connect`, `pause`, `resume`, `destroy`. No `local` / `auto-suspend` calls |
+| Bats tests don't run in CI (no workflow runs them)                                              | Low                                           | They run locally for the slugifier + env helpers; integration via @unimplemented spec for parity tracking                                                              |
+| Fork pruning is out of scope but the user's quota fills up                                      | Low                                           | Documented in `dev/docs/boxd-makefile.md`; follow-up issue filed                                                                                                       |
+| `make dev` deprecation warning breaks someone's muscle-memory workflow                          | Med                                           | Warning is on stderr only; command still works for one release                                                                                                         |
+| Compose project name collision between worktrees with shared db-data                            | Med (this is the AC)                          | Detect via `docker ps` + clear error in `dev.sh`. Document in CLAUDE.md                                                                                                |
+| The `boxd-fork-issue` flow assumes the developer's laptop has `worktree.sh` and the repo cloned | Low                                           | This is the existing dev environment — same precondition as `make worktree` already imposes                                                                            |
+| Time pressure compresses #3860 scope further                                                    | Med                                           | The deferred slice is documented in PR body + a follow-up issue is filed                                                                                               |
 
 ## Test strategy
 

@@ -14,11 +14,7 @@ import { Link } from "~/components/ui/link";
  * operator's own vocabulary from the pause control, so they are shown as
  * written rather than resolved against the registry.
  */
-export function PausedSubscribersSection({
-  pausedKeys,
-}: {
-  pausedKeys: string[];
-}) {
+export function PausedSubscribersSection({ pausedKeys }: { pausedKeys: string[] }) {
   if (pausedKeys.length === 0) return null;
 
   return (
@@ -30,11 +26,7 @@ export function PausedSubscribersSection({
         <Text textStyle="xs" color="fg.muted">
           events are queueing behind these until they are resumed
         </Text>
-        <Link
-          href="/ops/event-sourcing/subscribers"
-          fontSize="xs"
-          color="fg.muted"
-        >
+        <Link href="/ops/event-sourcing/subscribers" fontSize="xs" color="fg.muted">
           Subscribers
         </Link>
       </HStack>

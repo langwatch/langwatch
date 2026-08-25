@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
-import {
-  checkRoleBindingPermission,
-  type ScopeRef,
-} from "../role-binding-resolver";
+import { checkRoleBindingPermission, type ScopeRef } from "../role-binding-resolver";
 
 // ============================================================================
 // Prisma mock factory
@@ -41,9 +38,7 @@ function makePrisma({
       findFirst: vi
         .fn()
         .mockResolvedValue(
-          customRolePermissions !== null
-            ? { permissions: customRolePermissions }
-            : null,
+          customRolePermissions !== null ? { permissions: customRolePermissions } : null,
         ),
     },
   } as unknown as Parameters<typeof checkRoleBindingPermission>[0]["prisma"];

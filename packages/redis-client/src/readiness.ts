@@ -62,10 +62,7 @@ export interface RedisPingOptions {
 function withoutCredentials(target: string): string {
   if (!target.includes("://")) return target;
 
-  const withoutUserinfo = target.replace(
-    /^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i,
-    "$1",
-  );
+  const withoutUserinfo = target.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i, "$1");
   const query = withoutUserinfo.indexOf("?");
   return query === -1 ? withoutUserinfo : withoutUserinfo.slice(0, query);
 }

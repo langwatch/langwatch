@@ -1,12 +1,6 @@
-import {
-  extractGraphAlertFromTriggerRow as extractPortableGraphAlert,
-} from "@langwatch/automation-contract";
+import { extractGraphAlertFromTriggerRow as extractPortableGraphAlert } from "@langwatch/automation-contract";
 import type { GraphAlertActionParams } from "@langwatch/automation-contract";
-import type {
-  AlertType,
-  Prisma,
-  TriggerAction,
-} from "~/generated/prisma/client";
+import type { AlertType, Prisma, TriggerAction } from "~/generated/prisma/client";
 
 /**
  * Builder for the `Trigger` row that represents a custom-graph threshold
@@ -24,7 +18,10 @@ import type {
  * trigger row.
  */
 
-export { GRAPH_ALERT_OPERATORS, GRAPH_ALERT_TIME_PERIODS } from "@langwatch/automation-contract";
+export {
+  GRAPH_ALERT_OPERATORS,
+  GRAPH_ALERT_TIME_PERIODS,
+} from "@langwatch/automation-contract";
 export type {
   GraphAlertActionParams,
   GraphAlertOperator,
@@ -36,7 +33,10 @@ export type {
  *  The dispatcher accepts any positive integer, but the UI is constrained
  *  to this set so the validator can reject typos / hostile input on the
  *  wire. */
-export { graphAlertOperatorSchema, graphAlertTimePeriodSchema } from "@langwatch/automation-contract";
+export {
+  graphAlertOperatorSchema,
+  graphAlertTimePeriodSchema,
+} from "@langwatch/automation-contract";
 // Keep the literals in sync with GRAPH_ALERT_TIME_PERIODS above. Spelling
 // them out (instead of casting `.map(z.literal)` to a tuple) means a
 // mismatch surfaces as a type error rather than being silently swallowed by

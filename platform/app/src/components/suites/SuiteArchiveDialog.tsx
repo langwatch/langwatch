@@ -25,11 +25,7 @@ export function SuiteArchiveDialog({
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onClose} placement="center">
-      <Dialog.Content
-        bg="bg"
-        maxWidth="500px"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <Dialog.Content bg="bg" maxWidth="500px" onClick={(e) => e.stopPropagation()}>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
@@ -44,8 +40,8 @@ export function SuiteArchiveDialog({
               </Text>
             </Text>
             <Text color="fg.muted" fontSize="sm">
-              Archived run plans will no longer appear in the sidebar. Test runs
-              are preserved.
+              Archived run plans will no longer appear in the sidebar. Test runs are
+              preserved.
             </Text>
           </VStack>
         </Dialog.Body>

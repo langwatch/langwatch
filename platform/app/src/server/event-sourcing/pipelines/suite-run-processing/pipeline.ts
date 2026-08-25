@@ -36,9 +36,7 @@ export interface SuiteRunProcessingPipelineDeps {
  *
  * No subscriber on this pipeline — cross-pipeline subscribers live on the simulation pipeline.
  */
-export function createSuiteRunProcessingPipeline(
-  deps: SuiteRunProcessingPipelineDeps,
-) {
+export function createSuiteRunProcessingPipeline(deps: SuiteRunProcessingPipelineDeps) {
   return definePipeline<SuiteRunProcessingEvent>({
     name: "suite_run_processing",
     aggregate: defineAggregate({

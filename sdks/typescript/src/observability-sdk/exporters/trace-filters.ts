@@ -38,7 +38,7 @@ export type TraceFilter =
  */
 export function applyFilters(
   filters: TraceFilter[] | undefined,
-  spans: ReadableSpan[]
+  spans: ReadableSpan[],
 ): ReadableSpan[] {
   if (!filters || filters.length === 0) return spans;
   return filters.reduce((current, rule) => applyFilterRule(rule, current), spans);
@@ -70,11 +70,15 @@ export function applyFilters(
  * );
  * ```
  */
-export function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): ReadableSpan[] {
+export function applyFilterRule(
+  rule: TraceFilter,
+  spans: ReadableSpan[],
+): ReadableSpan[] {
   if ("preset" in rule && rule.preset) {
     return applyPreset(
-      (rule as { preset: TraceFilter extends { preset: infer P } ? P : never }).preset as any,
-      spans
+      (rule as { preset: TraceFilter extends { preset: infer P } ? P : never })
+        .preset as any,
+      spans,
     );
   }
 
@@ -114,7 +118,7 @@ export function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): Reada
  */
 export function applyPreset(
   preset: "vercelAIOnly" | "excludeHttpRequests",
-  spans: ReadableSpan[]
+  spans: ReadableSpan[],
 ): ReadableSpan[] {
   if (preset === "vercelAIOnly") return spans.filter((s) => isVercelAiSpan(s));
   if (preset === "excludeHttpRequests") return spans.filter((s) => !isHttpRequestSpan(s));

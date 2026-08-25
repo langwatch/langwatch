@@ -8,12 +8,16 @@ import { supervise, type SupervisedHandle } from "./spawn.ts";
 
 const DB_NAME = "langwatch";
 
-export async function startClickhouse(ctx: RuntimeContext, bus: EventBus): Promise<SupervisedHandle> {
+export async function startClickhouse(
+  ctx: RuntimeContext,
+  bus: EventBus,
+): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "clickhouse" });
   const start = Date.now();
 
   const resolvedPath = ctx.predeps.clickhouse?.resolvedPath;
-  if (!resolvedPath) throw new Error("clickhouse predep not resolved — run install first");
+  if (!resolvedPath)
+    throw new Error("clickhouse predep not resolved — run install first");
   const sp = servicePaths(ctx.paths);
   const configFile = join(sp.clickhouseConfigDir, "config.xml");
 
@@ -46,7 +50,9 @@ export async function startClickhouse(ctx: RuntimeContext, bus: EventBus): Promi
   if (!ready.ok) {
     await handle.stop();
     const hint = diagnoseClickhouseFailure(ctx);
-    throw new Error(`clickhouse did not become ready: ${ready.reason}${hint ? `\n${hint}` : ""}`);
+    throw new Error(
+      `clickhouse did not become ready: ${ready.reason}${hint ? `\n${hint}` : ""}`,
+    );
   }
 
   await ensureDatabase(ctx);
@@ -56,9 +62,9 @@ export async function startClickhouse(ctx: RuntimeContext, bus: EventBus): Promi
 }
 
 async function ensureDatabase(ctx: RuntimeContext): Promise<void> {
-  const url = `http://127.0.0.1:${ctx.ports.clickhouseHttp}/?query=` + encodeURIComponent(
-    `CREATE DATABASE IF NOT EXISTS ${DB_NAME}`,
-  );
+  const url =
+    `http://127.0.0.1:${ctx.ports.clickhouseHttp}/?query=` +
+    encodeURIComponent(`CREATE DATABASE IF NOT EXISTS ${DB_NAME}`);
   const res = await fetch(url, { method: "POST" });
   if (!res.ok) {
     const body = await res.text();
@@ -135,7 +141,9 @@ function diagnoseClickhouseFailure(ctx: RuntimeContext): string | null {
   } catch {
     return null;
   }
-  const portMatch = tail.match(/Listen \[127\.0\.0\.1\]:(\d+) failed: Address already in use/);
+  const portMatch = tail.match(
+    /Listen \[127\.0\.0\.1\]:(\d+) failed: Address already in use/,
+  );
   if (portMatch) {
     const port = portMatch[1];
     return (

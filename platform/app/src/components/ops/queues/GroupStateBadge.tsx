@@ -23,11 +23,7 @@ export function GroupStateBadge({ c }: { c: GroupClassification }) {
       );
     case "active":
       return (
-        <Badge
-          size="xs"
-          colorPalette={c.isFailing ? "orange" : "green"}
-          variant="subtle"
-        >
+        <Badge size="xs" colorPalette={c.isFailing ? "orange" : "green"} variant="subtle">
           Active
         </Badge>
       );

@@ -13,7 +13,7 @@ ordinary multi-agent work:
 - a whole-tree `typecheck:tests` run peaking at **10.0 GiB RSS**;
 - a second whole-tree run at 2.5–7.4 GiB running **concurrently** — allowed,
   because the check-queue's slot policy (ADR-090 era, `dev/scripts/check-queue.mjs`)
-  bounds *concurrency* (2 slots on this machine), not *memory*, and its sizing
+  bounds _concurrency_ (2 slots on this machine), not _memory_, and its sizing
   formula assumes ~3–4 GiB per run;
 - long-lived `tsgo --lsp` instances of ~2.5 GiB each, one per worktree the
   tslsp daemon has ever served, parented to PID 1 and **exempt from every

@@ -98,22 +98,16 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${apiKey}"`
       )}
 
       <Text fontSize="xs" color="fg.muted">
-        For ad-hoc / custom telemetry. Spans land as-emitted; cost / tokens /
-        model are not auto-populated unless your spans already follow{" "}
-        <code>gen_ai.*</code> conventions. For tool-specific auto-shape, use the
-        catalog tiles on /me when available.
+        For ad-hoc / custom telemetry. Spans land as-emitted; cost / tokens / model are
+        not auto-populated unless your spans already follow <code>gen_ai.*</code>{" "}
+        conventions. For tool-specific auto-shape, use the catalog tiles on /me when
+        available.
       </Text>
     </VStack>
   );
 }
 
-function Row({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <HStack alignItems="center" gap={3}>
       <Text fontSize="sm" color="fg.muted" minWidth="80px">

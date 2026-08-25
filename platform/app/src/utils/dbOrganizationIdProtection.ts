@@ -101,9 +101,7 @@ const isElapsedExpiryBound = (value: unknown): boolean => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const bound = value as Record<string, unknown>;
   return (
-    Object.keys(bound).length === 2 &&
-    bound.not === null &&
-    bound.lte instanceof Date
+    Object.keys(bound).length === 2 && bound.not === null && bound.lte instanceof Date
   );
 };
 
@@ -216,9 +214,7 @@ const hasCompositeOrgKey = (clause: any): boolean => {
   return Object.keys(clause).some((key) => {
     const value = (clause as any)[key];
     return (
-      value &&
-      typeof value === "object" &&
-      key.split("_").includes("organizationId")
+      value && typeof value === "object" && key.split("_").includes("organizationId")
     );
   });
 };
@@ -227,8 +223,7 @@ const hasCompositeOrgKey = (clause: any): boolean => {
 // id (a team or project id), so it resolves to exactly one organization.
 const hasInlineScope = (clause: any): boolean =>
   typeof clause?.scopeType === "string" &&
-  (typeof clause?.scopeId === "string" ||
-    isNonEmptyStringList(clause?.scopeId));
+  (typeof clause?.scopeId === "string" || isNonEmptyStringList(clause?.scopeId));
 
 const boundsToSingleOrg = (clause: any): boolean =>
   hasOrganizationId(clause) || hasRowId(clause) || hasCompositeOrgKey(clause);
@@ -248,8 +243,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it
     // names belongs to exactly one organization.
-    extraBound: ({ clause }) =>
-      typeof clauseField(clause, "inviteCode") === "string",
+    extraBound: ({ clause }) => typeof clauseField(clause, "inviteCode") === "string",
   },
   // Org-scoped RBAC + config models, audited to already carry a bounded
   // predicate (organizationId, a row id, a compound org key, a parent FK, or
@@ -302,8 +296,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // a bare token would still cross tenants (the ApiKey hatch above scopes
     // its own widening the same way).
     extraBound: ({ clause, action }) =>
-      READ_ACTIONS.has(action) &&
-      typeof clauseField(clause, "token") === "string",
+      READ_ACTIONS.has(action) && typeof clauseField(clause, "token") === "string",
   },
   // ShareService's view accounting for resource grants (delivery-plan
   // decision 22). Keyed by grantId - a ledger-derived id, globally unique
@@ -355,8 +348,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       const budgetId = clauseField(clause, "budgetId");
       return (
         typeof budgetId === "string" ||
-        (budgetId != null &&
-          Array.isArray((budgetId as { in?: unknown }).in)) ||
+        (budgetId != null && Array.isArray((budgetId as { in?: unknown }).in)) ||
         clauseField(clause, "budgetId_bucketScopeId") !== undefined
       );
     },
@@ -365,8 +357,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // or the globally-unique installationId (webhook + mint paths). Spec:
   // specs/integrations/github-connection.feature.
   GithubInstallation: {
-    extraBound: ({ clause }) =>
-      typeof clauseField(clause, "installationId") === "string",
+    extraBound: ({ clause }) => typeof clauseField(clause, "installationId") === "string",
   },
   // Pull requests discovered through that connection, and the per-branch
   // bookkeeping behind the lookup. Both are reached by organizationId, or by
@@ -458,8 +449,7 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "Subscription",
 ];
 
-export const ORG_SCOPED_MODEL_NAMES: readonly string[] =
-  Object.keys(ORG_SCOPED_MODELS);
+export const ORG_SCOPED_MODEL_NAMES: readonly string[] = Object.keys(ORG_SCOPED_MODELS);
 
 /**
  * Every model that carries an organizationId column: the union of the guarded
@@ -487,10 +477,7 @@ const collectOrganizationIds = (where: any, acc: Set<string>): void => {
   }
 };
 
-const validateRecursive = (
-  where: any,
-  passes: (clause: any) => boolean,
-): boolean => {
+const validateRecursive = (where: any, passes: (clause: any) => boolean): boolean => {
   if (!where || typeof where !== "object") return false;
   if (passes(where)) return true;
   if (Array.isArray(where.AND)) {

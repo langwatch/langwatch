@@ -61,8 +61,8 @@ export function WebhookSecretDialog({
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Description>
-                  Copy this secret now. It is shown only once; if it is lost,
-                  roll the secret to get a new one.
+                  Copy this secret now. It is shown only once; if it is lost, roll the
+                  secret to get a new one.
                 </Alert.Description>
               </Alert.Content>
             </Alert.Root>

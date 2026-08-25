@@ -23,12 +23,8 @@ export const STORED_OBJECT_PROBLEM_CODES = [
   "idempotency_conflict",
 ] as const;
 
-export const storedObjectProblemCodeSchema = z.enum(
-  STORED_OBJECT_PROBLEM_CODES,
-);
-export type StoredObjectProblemCode = z.infer<
-  typeof storedObjectProblemCodeSchema
->;
+export const storedObjectProblemCodeSchema = z.enum(STORED_OBJECT_PROBLEM_CODES);
+export type StoredObjectProblemCode = z.infer<typeof storedObjectProblemCodeSchema>;
 
 /** Client-safe problem envelope consumed by REST, RPC, tRPC, and byte delivery. */
 export const storedObjectProblemSchema = z
@@ -235,11 +231,9 @@ export class StoredObjectUnavailableError extends StoredObjectHandledError {
     readonly projectId: StoredObjectProjectId,
     readonly objectId: StoredObjectId,
   ) {
-    super(
-      "stored_object_unavailable",
-      "The stored object is not currently available.",
-      { meta: { projectId, objectId } },
-    );
+    super("stored_object_unavailable", "The stored object is not currently available.", {
+      meta: { projectId, objectId },
+    });
   }
 }
 

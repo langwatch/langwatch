@@ -35,8 +35,7 @@ export function useSpanLogs() {
   // The origin fallback covers coding-agent traces whose logs predate the
   // summary fold's count stamping — exactly the traces where logs carry the
   // transcript and tool activity, so failing open for them is the right bias.
-  const mayHaveLogs =
-    logRecordCount > 0 || header.data?.origin === "coding_agent";
+  const mayHaveLogs = logRecordCount > 0 || header.data?.origin === "coding_agent";
 
   const query = api.tracesV2.traceLogs.useQuery(queryArgs, {
     enabled: isReady && mayHaveLogs,
@@ -44,10 +43,7 @@ export function useSpanLogs() {
     refetchOnWindowFocus: false,
   });
 
-  const logsBySpanId = useMemo(
-    () => groupLogsBySpanId(query.data ?? []),
-    [query.data],
-  );
+  const logsBySpanId = useMemo(() => groupLogsBySpanId(query.data ?? []), [query.data]);
 
   return { ...query, logsBySpanId };
 }

@@ -4,9 +4,7 @@ import type { CommandResult } from "../../utils/output";
 import { asDate, printFacts, runManagement } from "../management/_shared";
 
 /** Archive a team. Soft-delete: the team stops being listed, nothing is lost. */
-export const archiveTeamCommand = async (
-  id: string,
-): Promise<CommandResult | void> =>
+export const archiveTeamCommand = async (id: string): Promise<CommandResult | void> =>
   runManagement({
     action: "archive team",
     pending: `Archiving team "${id}"...`,

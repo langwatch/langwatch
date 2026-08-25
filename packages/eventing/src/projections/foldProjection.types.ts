@@ -281,10 +281,7 @@ export interface FoldProjectionStore<State> {
   ): Promise<void>;
 
   /** Retrieves the stored state for an aggregate, or null if not found. */
-  get(
-    aggregateId: string,
-    context: ProjectionStoreContext,
-  ): Promise<State | null>;
+  get(aggregateId: string, context: ProjectionStoreContext): Promise<State | null>;
 
   /**
    * Retrieves the stored state together with the ids of the events already

@@ -12,11 +12,7 @@ Queue does not depend on Eventing.
 ## Define a pipeline
 
 ```ts
-import {
-  defineAggregate,
-  defineEvents,
-  definePipeline,
-} from "@langwatch/eventing";
+import { defineAggregate, defineEvents, definePipeline } from "@langwatch/eventing";
 
 export const orders = definePipeline<OrderEvent>({
   name: "orders",

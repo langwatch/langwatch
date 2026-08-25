@@ -12,23 +12,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  DatabaseBackup,
-  MoreVertical,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AddOverrideDrawer,
   type RetentionEditTarget,
 } from "~/components/data-retention/AddOverrideDrawer";
 import { ApplyToExistingConfirmDialog } from "~/components/data-retention/ApplyToExistingConfirmDialog";
-import {
-  BINDING_SCOPE_TIERS,
-  SCOPE_ICON,
-} from "~/components/data-retention/constants";
+import { BINDING_SCOPE_TIERS, SCOPE_ICON } from "~/components/data-retention/constants";
 import { formatDays } from "~/components/data-retention/format";
 import {
   groupRulesByScope,
@@ -54,10 +45,7 @@ import {
   type RetentionCategory,
 } from "~/server/data-retention/retentionPolicy.schema";
 import { api } from "~/utils/api";
-import {
-  isScopeInFilter,
-  resolveScopeFilter,
-} from "~/utils/filterProvidersByScope";
+import { isScopeInFilter, resolveScopeFilter } from "~/utils/filterProvidersByScope";
 
 function DataRetentionSettings() {
   const { project, organization, team } = useOrganizationTeamProject();
@@ -161,17 +149,12 @@ function DataRetentionPage({
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   // When set, the Add drawer opens in edit mode locked to this scope's policy.
-  const [editTarget, setEditTarget] = useState<RetentionEditTarget | null>(
-    null,
-  );
+  const [editTarget, setEditTarget] = useState<RetentionEditTarget | null>(null);
   // The scope-group pending removal — drives the confirm dialog so deletion is
   // a deliberate, explained action instead of a one-click trash button.
-  const [removeTarget, setRemoveTarget] = useState<RetentionScopeGroup | null>(
-    null,
-  );
+  const [removeTarget, setRemoveTarget] = useState<RetentionScopeGroup | null>(null);
 
-  const invalidate = () =>
-    utils.dataRetention.getRules.invalidate({ projectId });
+  const invalidate = () => utils.dataRetention.getRules.invalidate({ projectId });
 
   // Per-call toasts are intentionally omitted — the Add-policy drawer fans
   // out one setForScope per (scope × category) pair and stacks the toaster
@@ -201,8 +184,7 @@ function DataRetentionPage({
 
   // Poll system.mutations while a retroactive apply is in flight, then idle.
   const projectIsWritable =
-    rulesQuery.data?.available.projects.some((p) => p.id === projectId) ??
-    false;
+    rulesQuery.data?.available.projects.some((p) => p.id === projectId) ?? false;
   const [pollMs, setPollMs] = useState<number | false>(false);
   const progressQuery = api.dataRetention.getMutationProgress.useQuery(
     { projectId },
@@ -260,9 +242,9 @@ function DataRetentionPage({
       available.projects.length > 0);
 
   const removeScopeGroup = async (group: RetentionScopeGroup) => {
-    const categories = (
-      Object.keys(group.byCategory) as RetentionCategory[]
-    ).filter((c) => group.byCategory[c] !== undefined);
+    const categories = (Object.keys(group.byCategory) as RetentionCategory[]).filter(
+      (c) => group.byCategory[c] !== undefined,
+    );
     const results = await Promise.all(
       categories.map((category) =>
         removeForScope
@@ -281,16 +263,11 @@ function DataRetentionPage({
     const failed = results.filter((r) => !r.ok);
     if (failed.length === 0) {
       toaster.create({
-        title:
-          categories.length === 1
-            ? "Override removed"
-            : "Retention policy removed",
+        title: categories.length === 1 ? "Override removed" : "Retention policy removed",
         type: "success",
       });
     } else {
-      const firstError = failed.find(
-        (r): r is { ok: false; error: Error } => !r.ok,
-      );
+      const firstError = failed.find((r): r is { ok: false; error: Error } => !r.ok);
       showErrorToast({
         error: firstError?.error,
         fallbackTitle: "Couldn't remove the retention policy",
@@ -361,13 +338,10 @@ function DataRetentionPage({
           <Alert.Root status="info">
             <Alert.Indicator />
             <Alert.Content>
-              <Alert.Title>
-                Configurable retention is a paid-plan feature
-              </Alert.Title>
+              <Alert.Title>Configurable retention is a paid-plan feature</Alert.Title>
               <Alert.Description>
-                Your plan applies the platform default to every project. Upgrade
-                to configure per-organization, per-team, or per-project
-                retention overrides.
+                Your plan applies the platform default to every project. Upgrade to
+                configure per-organization, per-team, or per-project retention overrides.
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
@@ -394,8 +368,8 @@ function DataRetentionPage({
                     <VStack textAlign="center" gap={1}>
                       <EmptyState.Title>No retention policies</EmptyState.Title>
                       <EmptyState.Description>
-                        Add a retention policy to override the platform default
-                        of {PLATFORM_DEFAULT_RETENTION_DAYS} days.
+                        Add a retention policy to override the platform default of{" "}
+                        {PLATFORM_DEFAULT_RETENTION_DAYS} days.
                       </EmptyState.Description>
                     </VStack>
                     {canWrite && (
@@ -412,9 +386,7 @@ function DataRetentionPage({
               </EmptyState.Root>
             </Card.Body>
           </Card.Root>
-        ) : snapshot &&
-          snapshot.rules.length > 0 &&
-          scopeGroups.length === 0 ? (
+        ) : snapshot && snapshot.rules.length > 0 && scopeGroups.length === 0 ? (
           <Card.Root width="full">
             <Card.Body>
               <Text fontSize="sm" color="fg.muted" textAlign="center">
@@ -449,9 +421,7 @@ function DataRetentionPage({
                               </Badge>
                             </HStack>
                           </Table.Cell>
-                          <Table.Cell>
-                            {renderPolicyValue(group.byCategory)}
-                          </Table.Cell>
+                          <Table.Cell>{renderPolicyValue(group.byCategory)}</Table.Cell>
                           <Table.Cell textAlign="end">
                             {canWrite && (
                               <Menu.Root>
@@ -494,9 +464,7 @@ function DataRetentionPage({
 
         <RetroactiveProgressCard
           mutations={activeMutations}
-          onCancel={(mutationId) =>
-            killMutation.mutate({ projectId, mutationId })
-          }
+          onCancel={(mutationId) => killMutation.mutate({ projectId, mutationId })}
           isCancelling={killMutation.isPending}
         />
 
@@ -602,9 +570,7 @@ function DataRetentionPage({
                   const status = reportSaveResults(result);
 
                   const succeededCategories = Array.from(
-                    new Set(
-                      result.results.filter((r) => r.ok).map((r) => r.category),
-                    ),
+                    new Set(result.results.filter((r) => r.ok).map((r) => r.category)),
                   );
                   if (succeededCategories.length > 0) {
                     // The server uses the cascade-aware resolver
@@ -638,9 +604,7 @@ function DataRetentionPage({
                       const appliedValues = Array.from(
                         new Set(
                           triggerResults
-                            .filter(
-                              (r): r is { ok: true; applied: number } => r.ok,
-                            )
+                            .filter((r): r is { ok: true; applied: number } => r.ok)
                             .map((r) => r.applied),
                         ),
                       );

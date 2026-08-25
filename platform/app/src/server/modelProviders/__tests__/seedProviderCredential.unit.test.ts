@@ -101,26 +101,25 @@ describe("decideCredentialWrite", () => {
     { label: "an empty string", replacement: { OPENAI_API_KEY: "" } },
     { label: "whitespace", replacement: { OPENAI_API_KEY: "   " } },
     { label: "a null value", replacement: { OPENAI_API_KEY: null } },
-  ])("keeps a stored credential when the replacement is $label, even forced", ({
-    replacement,
-  }) => {
-    expect(
-      decideCredentialWrite({
-        stored: { state: "present", keys: { OPENAI_API_KEY: "fake-working" } },
-        replacement,
-        shouldForce: true,
-      }),
-    ).toEqual({ action: "keep", reason: "a credential is already stored" });
-  });
+  ])(
+    "keeps a stored credential when the replacement is $label, even forced",
+    ({ replacement }) => {
+      expect(
+        decideCredentialWrite({
+          stored: { state: "present", keys: { OPENAI_API_KEY: "fake-working" } },
+          replacement,
+          shouldForce: true,
+        }),
+      ).toEqual({ action: "keep", reason: "a credential is already stored" });
+    },
+  );
 
   // Forcing swaps one key for another. It is never a way to empty the column,
   // and an unset environment variable is the common way to arrive here.
   it.each([
     { label: "null", replacement: null },
     { label: "an empty record", replacement: {} },
-  ])("keeps a stored credential when the replacement is $label", ({
-    replacement,
-  }) => {
+  ])("keeps a stored credential when the replacement is $label", ({ replacement }) => {
     expect(
       decideCredentialWrite({
         stored: { state: "present", keys: { K: "v" } },
@@ -247,9 +246,9 @@ describe("maskSecret", () => {
     const secret = "fake-proj-THIS-MUST-NOT-APPEAR-IN-LOGS";
 
     expect(maskSecret(secret)).not.toContain("MUST-NOT-APPEAR");
-    expect(
-      describeStored({ state: "present", keys: { K: secret } }),
-    ).not.toContain("MUST-NOT-APPEAR");
+    expect(describeStored({ state: "present", keys: { K: secret } })).not.toContain(
+      "MUST-NOT-APPEAR",
+    );
   });
 });
 

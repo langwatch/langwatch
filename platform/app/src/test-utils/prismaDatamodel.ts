@@ -15,10 +15,7 @@ export interface PrismaDatamodelModel {
  */
 export function parsePrismaDatamodel(): PrismaDatamodelModel[] {
   const schema = readFileSync(
-    resolve(
-      process.cwd(),
-      "../../packages/prisma-client/prisma/schema.prisma",
-    ),
+    resolve(process.cwd(), "../../packages/prisma-client/prisma/schema.prisma"),
     "utf8",
   );
   const models: PrismaDatamodelModel[] = [];

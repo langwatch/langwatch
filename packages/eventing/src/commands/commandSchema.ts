@@ -18,9 +18,7 @@ export interface CommandSchema<Payload, Type extends CommandType> {
    * Validation function that checks if a payload matches the expected type.
    * Should return true if valid, false otherwise.
    */
-  readonly validate: (
-    payload: unknown,
-  ) => z.ZodSafeParseResult<Payload>;
+  readonly validate: (payload: unknown) => z.ZodSafeParseResult<Payload>;
   /**
    * Optional description of the command for documentation.
    */

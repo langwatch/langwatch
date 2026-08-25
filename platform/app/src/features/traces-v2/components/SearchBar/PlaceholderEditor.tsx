@@ -6,11 +6,7 @@ import {
   swapOperatorAtLocation,
 } from "~/server/app-layer/traces/query-language/mutations";
 import { useFacetValueLabelResolver } from "../../hooks/useFacetValueLabels";
-import {
-  buildDecorationPlan,
-  chipOverlayLabel,
-  type TokenRef,
-} from "./filterHighlight";
+import { buildDecorationPlan, chipOverlayLabel, type TokenRef } from "./filterHighlight";
 
 /**
  * The search bar's at-rest invitation, parameterised on who answers the ask —

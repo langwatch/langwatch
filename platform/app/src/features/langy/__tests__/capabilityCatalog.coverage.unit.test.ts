@@ -22,10 +22,7 @@ import {
 } from "../components/capabilities/capabilityRegistry";
 
 const CLI_PROGRAM_PATH = fileURLToPath(
-  new URL(
-    "../../../../../../sdks/typescript/src/cli/program.ts",
-    import.meta.url,
-  ),
+  new URL("../../../../../../sdks/typescript/src/cli/program.ts", import.meta.url),
 );
 
 /**
@@ -173,9 +170,7 @@ describe("the capability catalog, given the CLI's real command tree", () => {
       const strategies = new Set<string>(DIGEST_STRATEGIES);
       const undeclared = Object.entries(CAPABILITY_CATALOG).filter(
         ([, entry]) =>
-          !strategies.has(
-            (entry as { digestStrategy?: string }).digestStrategy ?? "",
-          ),
+          !strategies.has((entry as { digestStrategy?: string }).digestStrategy ?? ""),
       );
       expect(
         undeclared.map(([resource]) => resource),
@@ -191,8 +186,7 @@ describe("the capability catalog, given the CLI's real command tree", () => {
   describe("when every catalog surface is checked against the view binding", () => {
     it("resolves each entry's surface to a label and a path", () => {
       const broken = Object.entries(CAPABILITY_CATALOG).filter(
-        ([, entry]) =>
-          !SURFACE_LABEL[entry.surface] || !SURFACE_PATH[entry.surface],
+        ([, entry]) => !SURFACE_LABEL[entry.surface] || !SURFACE_PATH[entry.surface],
       );
       expect(
         broken.map(([resource, entry]) => `${resource} -> ${entry.surface}`),

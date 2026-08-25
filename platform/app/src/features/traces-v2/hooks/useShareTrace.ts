@@ -127,9 +127,7 @@ function useShareLinkMutations({
     isCreating: createMutation.isPending,
     revokeLink,
     /** Which link is being revoked, so only that row shows a spinner. */
-    revokingId: revokeMutation.isPending
-      ? (revokeMutation.variables?.id ?? null)
-      : null,
+    revokingId: revokeMutation.isPending ? (revokeMutation.variables?.id ?? null) : null,
   };
 }
 

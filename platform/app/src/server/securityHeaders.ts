@@ -2,11 +2,7 @@ import { buildStorageConnectSrc } from "./buildStorageConnectSrc";
 
 type SecurityHeaderEnvironment = Partial<
   Record<
-    | "AWS_REGION"
-    | "AZURE_BLOB_ENDPOINT"
-    | "S3_BUCKET_NAME"
-    | "S3_ENDPOINT"
-    | "S3_REGION",
+    "AWS_REGION" | "AZURE_BLOB_ENDPOINT" | "S3_BUCKET_NAME" | "S3_ENDPOINT" | "S3_REGION",
     string
   >
 >;
@@ -48,8 +44,7 @@ export function buildSecurityHeaders({
   return {
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
-    "Permissions-Policy":
-      "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
     ...(!dev ? { "Content-Security-Policy": cspHeader } : {}),
     ...(!dev
       ? {

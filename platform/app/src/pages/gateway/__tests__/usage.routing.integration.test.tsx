@@ -129,9 +129,7 @@ describe("Gateway usage page filter routing", () => {
 
     await user.click(screen.getByRole("button", { name: "Last 7 days" }));
 
-    expect(screen.getByTestId("probe-pathname")).toHaveTextContent(
-      "/gateway/usage",
-    );
+    expect(screen.getByTestId("probe-pathname")).toHaveTextContent("/gateway/usage");
     const search = new URLSearchParams(
       screen.getByTestId("probe-search").textContent ?? "",
     );
@@ -149,9 +147,7 @@ describe("Gateway usage page filter routing", () => {
     );
     await user.click(screen.getByRole("button", { name: "Clear key filter" }));
 
-    expect(screen.getByTestId("probe-pathname")).toHaveTextContent(
-      "/gateway/usage",
-    );
+    expect(screen.getByTestId("probe-pathname")).toHaveTextContent("/gateway/usage");
     const search = new URLSearchParams(
       screen.getByTestId("probe-search").textContent ?? "",
     );

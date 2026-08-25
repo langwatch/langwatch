@@ -18,10 +18,7 @@ import { TraceOriginService } from "../trace-origin.service";
 
 function makeSpan(
   overrides: Partial<
-    Pick<
-      NormalizedSpan,
-      "spanAttributes" | "resourceAttributes" | "parentSpanId"
-    >
+    Pick<NormalizedSpan, "spanAttributes" | "resourceAttributes" | "parentSpanId">
   > = {},
 ): NormalizedSpan {
   return {

@@ -141,9 +141,7 @@ describe("the workbench feature's source", () => {
 
   describe("given the scan itself is put in front of the promise it makes", () => {
     it("catches a timer that reschedules itself", () => {
-      expect(offencesInSource("setTimeout(() => poll(), 1000);")).not.toEqual(
-        [],
-      );
+      expect(offencesInSource("setTimeout(() => poll(), 1000);")).not.toEqual([]);
     });
 
     it("catches a refetch the member did not ask for", () => {

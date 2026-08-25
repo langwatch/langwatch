@@ -1,11 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  NativeSelect,
-  Spacer,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, NativeSelect, Spacer, Text } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
@@ -233,9 +226,7 @@ export function AddRowsFromCSVModal({
           </Button>
           <Button
             colorPalette="blue"
-            disabled={
-              recordEntries.length === 0 || !canUpload || hasErrors.length > 0
-            }
+            disabled={recordEntries.length === 0 || !canUpload || hasErrors.length > 0}
             onClick={uploadCSVData}
             loading={uploadRecords.isPending}
           >

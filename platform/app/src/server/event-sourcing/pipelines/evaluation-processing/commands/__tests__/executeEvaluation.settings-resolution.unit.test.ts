@@ -100,8 +100,7 @@ async function executeWith(
   const deps = buildDeps({ monitor, isSettingsRecoveryDisabled });
   const command = new ExecuteEvaluationCommand(deps);
   await command.handle(buildCommand());
-  const executeForTrace = deps.evaluations
-    .executeForTrace as ReturnType<typeof vi.fn>;
+  const executeForTrace = deps.evaluations.executeForTrace as ReturnType<typeof vi.fn>;
   expect(executeForTrace).toHaveBeenCalledTimes(1);
   return executeForTrace.mock.calls[0]?.[0] as Record<string, unknown>;
 }
@@ -243,9 +242,7 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
         // (the prompt reaches the judge), not by reading a flag value. A
         // flag-state assertion would pass even if production resolved the flag
         // somewhere else and shipped this fix inert.
-        const call = await executeWith(
-          buildMonitor({ evaluator: topLevelConfig }),
-        );
+        const call = await executeWith(buildMonitor({ evaluator: topLevelConfig }));
 
         expect(call.settings).toMatchObject({
           prompt: "the evaluator's own prompt",
@@ -254,9 +251,8 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
 
       /** @scenario The new settings resolution can be switched off for rollback */
       it("falls back to the previous behaviour when an operator disables it", async () => {
-        const call = await executeWith(
-          buildMonitor({ evaluator: topLevelConfig }),
-          () => Promise.resolve(true),
+        const call = await executeWith(buildMonitor({ evaluator: topLevelConfig }), () =>
+          Promise.resolve(true),
         );
 
         expect(call.settings).toEqual(MONITOR_PARAMETERS);
@@ -330,9 +326,8 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
 
       /** @scenario The rollback flag failing to answer leaves recovery active */
       it("stays on the shipped behaviour when the lookup rejects", async () => {
-        const call = await executeWith(
-          buildMonitor({ evaluator: topLevelConfig }),
-          () => Promise.reject(new Error("flag service unreachable")),
+        const call = await executeWith(buildMonitor({ evaluator: topLevelConfig }), () =>
+          Promise.reject(new Error("flag service unreachable")),
         );
 
         expect(call.settings).toMatchObject({

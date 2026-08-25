@@ -4,19 +4,16 @@ import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 
-vi.mock(
-  "~/server/app-layer/events/track-event.service",
-  async (importOriginal) => {
-    const actual =
-      await importOriginal<
-        typeof import("~/server/app-layer/events/track-event.service")
-      >();
-    return {
-      ...actual,
-      recordTrackedEventSpan: vi.fn().mockResolvedValue(void 0),
-    };
-  },
-);
+vi.mock("~/server/app-layer/events/track-event.service", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("~/server/app-layer/events/track-event.service")
+    >();
+  return {
+    ...actual,
+    recordTrackedEventSpan: vi.fn().mockResolvedValue(void 0),
+  };
+});
 
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";

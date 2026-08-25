@@ -286,13 +286,9 @@ describe("VercelExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(
-        12629,
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(12629);
       // a zero read count is not surfaced as a redundant gen_ai attr
-      expect(
-        ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
-      ).toBeUndefined();
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBeUndefined();
       // the canonical input is rewritten to the fresh remainder so the
       // cache-write bucket adds on top instead of being counted twice
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(371);
@@ -316,9 +312,7 @@ describe("VercelExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
-        12629,
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(12629);
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(371);
     });
 
@@ -340,9 +334,7 @@ describe("VercelExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
-        8745,
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(8745);
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(255);
     });
 
@@ -362,9 +354,7 @@ describe("VercelExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
-        20000,
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(20000);
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(5449);
     });
 
@@ -388,9 +378,7 @@ describe("VercelExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(
-        ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
-      ).toBeUndefined();
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBeUndefined();
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBeUndefined();
     });
 
@@ -434,13 +422,9 @@ describe("VercelExtractor", () => {
       expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("tool");
       expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_NAME]).toBe("bash");
       expect(ctx.out[ATTR_KEYS.LANGWATCH_INPUT]).toBe('{"command":"ls -la"}');
-      expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS]).toBe(
-        '{"command":"ls -la"}',
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS]).toBe('{"command":"ls -la"}');
       expect(ctx.out[ATTR_KEYS.LANGWATCH_OUTPUT]).toBe("total 4\ndrwxr-xr-x");
-      expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT]).toBe(
-        "total 4\ndrwxr-xr-x",
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT]).toBe("total 4\ndrwxr-xr-x");
     });
 
     it("detects the tool span even though the scope is not 'ai'", () => {

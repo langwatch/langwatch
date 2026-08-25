@@ -59,9 +59,7 @@ export const simulationRunMetadataSchema = z
   })
   .nullable()
   .optional();
-export type SimulationRunMetadata = z.infer<
-  typeof simulationRunMetadataSchema
->;
+export type SimulationRunMetadata = z.infer<typeof simulationRunMetadataSchema>;
 
 export const simulationRunDataSchema = z.object({
   scenarioId: z.string(),
@@ -146,23 +144,18 @@ export const simulationBatchRunDataSchema = z.discriminatedUnion("changed", [
 export type SimulationBatchRunData = z.infer<typeof simulationBatchRunDataSchema>;
 
 /** Conditional run-history page for every suite in a project. */
-export const simulationAllSuitesRunDataSchema = z.discriminatedUnion(
-  "changed",
-  [
-    z.object({ changed: z.literal(false), lastUpdatedAt: z.number() }),
-    z.object({
-      changed: z.literal(true),
-      lastUpdatedAt: z.number(),
-      runs: z.array(simulationRunDataSchema),
-      scenarioSetIds: z.record(z.string(), z.string()),
-      nextCursor: z.string().optional(),
-      hasMore: z.boolean(),
-    }),
-  ],
-);
-export type SimulationAllSuitesRunData = z.infer<
-  typeof simulationAllSuitesRunDataSchema
->;
+export const simulationAllSuitesRunDataSchema = z.discriminatedUnion("changed", [
+  z.object({ changed: z.literal(false), lastUpdatedAt: z.number() }),
+  z.object({
+    changed: z.literal(true),
+    lastUpdatedAt: z.number(),
+    runs: z.array(simulationRunDataSchema),
+    scenarioSetIds: z.record(z.string(), z.string()),
+    nextCursor: z.string().optional(),
+    hasMore: z.boolean(),
+  }),
+]);
+export type SimulationAllSuitesRunData = z.infer<typeof simulationAllSuitesRunDataSchema>;
 
 export const simulationExternalSetSummarySchema = z.object({
   scenarioSetId: z.string(),

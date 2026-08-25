@@ -46,9 +46,7 @@ export const generateAsciiTree = (spans: Span[]): string => {
     {} as Record<string, Span>,
   );
 
-  const rootSpans = spans.filter(
-    (s) => !s.parent_id || !spansById[s.parent_id],
-  );
+  const rootSpans = spans.filter((s) => !s.parent_id || !spansById[s.parent_id]);
 
   let result = ".\n";
 
@@ -118,20 +116,14 @@ export function formatTraceSummaryDigest(trace: {
  * Convert a Trace to an LLM-friendly format with human-readable timestamps
  * and an ASCII tree representation.
  */
-export const toLLMModeTrace = (
-  trace: Trace,
-  asciiTree?: string,
-): LLMModeTrace => {
+export const toLLMModeTrace = (trace: Trace, asciiTree?: string): LLMModeTrace => {
   return {
     ...trace,
     ascii_tree: asciiTree ?? generateAsciiTree(trace.spans),
     timestamps: {
-      started_at:
-        formatTimeAgo(new Date(trace.timestamps?.started_at).getTime()) ?? "",
-      inserted_at:
-        formatTimeAgo(new Date(trace.timestamps?.inserted_at).getTime()) ?? "",
-      updated_at:
-        formatTimeAgo(new Date(trace.timestamps?.updated_at).getTime()) ?? "",
+      started_at: formatTimeAgo(new Date(trace.timestamps?.started_at).getTime()) ?? "",
+      inserted_at: formatTimeAgo(new Date(trace.timestamps?.inserted_at).getTime()) ?? "",
+      updated_at: formatTimeAgo(new Date(trace.timestamps?.updated_at).getTime()) ?? "",
     },
   };
 };

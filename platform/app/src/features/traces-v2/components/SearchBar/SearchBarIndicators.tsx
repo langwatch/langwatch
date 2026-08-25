@@ -11,9 +11,7 @@ import { useUIStore } from "../../stores/uiStore";
  * different the user often missed the warning entirely. One indicator
  * component, one colour palette per severity.
  */
-export type SearchBarStatus =
-  | { kind: "ok" }
-  | { kind: "error"; message: string };
+export type SearchBarStatus = { kind: "ok" } | { kind: "error"; message: string };
 
 const STATUS_PALETTE: Record<
   "error",

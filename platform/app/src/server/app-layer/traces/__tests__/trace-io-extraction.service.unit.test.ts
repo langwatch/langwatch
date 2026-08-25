@@ -9,9 +9,7 @@ import { TraceIOExtractionService } from "../trace-io-extraction.service";
 
 const service = new TraceIOExtractionService();
 
-function createTestSpan(
-  overrides: Partial<NormalizedSpan> = {},
-): NormalizedSpan {
+function createTestSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
   return {
     id: "span-1",
     traceId: "trace-1",

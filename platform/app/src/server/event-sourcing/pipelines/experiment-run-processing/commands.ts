@@ -39,8 +39,7 @@ export const RecordTargetResultCommand = defineCommand({
   schema: targetResultEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
   groupKey: (d) => `${d.experimentId}:${d.runId}:item:${d.index}`,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.runId}:target:${d.targetId}:${d.index}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.runId}:target:${d.targetId}:${d.index}`,
   spanAttributes: (d) => ({
     "payload.run.id": d.runId,
     "payload.experiment.id": d.experimentId,
@@ -58,16 +57,14 @@ export const RecordEvaluatorResultCommand = defineCommand({
   schema: evaluatorResultEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
   groupKey: (d) => `${d.experimentId}:${d.runId}:item:${d.index}`,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.runId}:evaluator:${d.evaluatorId}:${d.index}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.runId}:evaluator:${d.evaluatorId}:${d.index}`,
   spanAttributes: (d) => ({
     "payload.run.id": d.runId,
     "payload.experiment.id": d.experimentId,
     "payload.evaluator.id": d.evaluatorId,
     "payload.index": d.index,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.runId}:evaluator:${d.evaluatorId}:${d.index}`,
+  makeJobId: (d) => `${d.tenantId}:${d.runId}:evaluator:${d.evaluatorId}:${d.index}`,
 });
 
 export const ComputeExperimentRunMetricsCommand = defineCommand({

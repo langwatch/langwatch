@@ -1,9 +1,6 @@
 import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   SuiteRunItemCompletedEvent,
@@ -101,8 +98,7 @@ export class SuiteRunStateFoldProjection
     event: SuiteRunItemCompletedEvent,
     state: SuiteRunStateData,
   ): SuiteRunStateData {
-    const isFailure =
-      event.data.status === "FAILURE" || event.data.status === "ERROR";
+    const isFailure = event.data.status === "FAILURE" || event.data.status === "ERROR";
 
     let completedCount = state.CompletedCount;
     let failedCount = state.FailedCount;

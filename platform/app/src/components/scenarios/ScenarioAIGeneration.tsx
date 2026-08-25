@@ -84,11 +84,7 @@ export function useScenarioGeneration(projectId: string | undefined) {
       setStatus("generating");
 
       try {
-        const scenario = await generateScenarioWithAI(
-          prompt,
-          projectId,
-          currentScenario,
-        );
+        const scenario = await generateScenarioWithAI(prompt, projectId, currentScenario);
         setStatus("done");
         return scenario;
       } catch (error) {
@@ -192,8 +188,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
       logger.error({ error }, "Error generating scenario");
       const classified = classifyGenerationError(error);
       const needsConfiguration =
-        classified.cta === "configure" ||
-        classified.cta === "configure-and-retry";
+        classified.cta === "configure" || classified.cta === "configure-and-retry";
       toaster.create({
         title: classified.title,
         description: classified.copy,
@@ -207,15 +202,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
           : undefined,
       });
     }
-  }, [
-    input,
-    project?.id,
-    form,
-    hasExistingContent,
-    hasHistory,
-    generate,
-    addPrompt,
-  ]);
+  }, [input, project?.id, form, hasExistingContent, hasHistory, generate, addPrompt]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -355,11 +342,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                 </Text>
               </Box>
             </HStack>
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={() => setViewMode("prompt")}
-            >
+            <Button variant="ghost" size="xs" onClick={() => setViewMode("prompt")}>
               <ArrowLeft size={14} />
               Back
             </Button>
@@ -391,8 +374,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
           {defaultModelState.ok === false &&
             defaultModelState.reason === "stale-default" && (
               <DefaultModelErrorBanner>
-                Your default model&apos;s provider is disabled. Configure a new
-                default in{" "}
+                Your default model&apos;s provider is disabled. Configure a new default in{" "}
                 <Link
                   href="/settings/model-providers"
                   target="_blank"

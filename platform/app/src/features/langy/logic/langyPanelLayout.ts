@@ -94,10 +94,7 @@ export function resolveFloatingPanelWidth(viewportWidth: number): number {
 
   return Math.min(
     FLOATING_PANEL_MAX_WIDTH,
-    Math.max(
-      FLOATING_PANEL_MIN_WIDTH,
-      viewportWidth * FLOATING_PANEL_VIEWPORT_SHARE,
-    ),
+    Math.max(FLOATING_PANEL_MIN_WIDTH, viewportWidth * FLOATING_PANEL_VIEWPORT_SHARE),
     Math.max(0, viewportWidth - FLOATING_PANEL_VIEWPORT_GUTTER),
   );
 }

@@ -83,10 +83,7 @@ const OFF_CATALOG_COLUMN = "ProjectionId";
 const GATED_COLUMN_POSITIONS = (database: string) =>
   [
     ["projection", `SELECT CapturedInput FROM ${database}.traces`],
-    [
-      "filter",
-      `SELECT TraceId FROM ${database}.traces WHERE CapturedInput != ''`,
-    ],
+    ["filter", `SELECT TraceId FROM ${database}.traces WHERE CapturedInput != ''`],
     ["group", `SELECT count() FROM ${database}.traces GROUP BY CapturedInput`],
     ["order", `SELECT TraceId FROM ${database}.traces ORDER BY CapturedInput`],
     [
@@ -201,9 +198,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           `SELECT name, type FROM system.columns ` +
             `WHERE database = '${database}' AND table = '${view.name}'`,
         );
-        const byName = new Map(
-          actual.map((column) => [column.name, column.type]),
-        );
+        const byName = new Map(actual.map((column) => [column.name, column.type]));
         expect(
           actual.length,
           `${view.name} exposes ${actual.length} columns, the catalog declares ${view.columns.length}` +
@@ -474,9 +469,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         tenantA,
         `SELECT DISTINCT TenantId FROM ${facts}.trace_summaries`,
       );
-      expect(rows.map((row) => row.TenantId)).toEqual([
-        harness.tenantA.tenantId,
-      ]);
+      expect(rows.map((row) => row.TenantId)).toEqual([harness.tenantA.tenantId]);
     });
   });
 
@@ -502,10 +495,9 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         `SELECT SpanCount FROM ${database}.traces WHERE TraceId = '${traceId}'`,
       );
       expect(deduped).toHaveLength(1);
-      expect(
-        Number(deduped[0]!.SpanCount),
-        "the view returned the stale version",
-      ).toBe(DEDUP_FIXTURE.latestSpanCount);
+      expect(Number(deduped[0]!.SpanCount), "the view returned the stale version").toBe(
+        DEDUP_FIXTURE.latestSpanCount,
+      );
     });
 
     /**
@@ -777,10 +769,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       ] as const) {
         await expectClickHouseError(
           () =>
-            selectRows(
-              tenantA,
-              `SELECT \`${column}\` FROM ${facts}.${table} LIMIT 1`,
-            ),
+            selectRows(tenantA, `SELECT \`${column}\` FROM ${facts}.${table} LIMIT 1`),
           CLICKHOUSE_ERROR_CODE.ACCESS_DENIED,
           `off-catalog column ${table}.${column}`,
         );
@@ -840,20 +829,14 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       const [trace] = await selectRows<{
         CapturedInput: string;
         CapturedOutput: string;
-      }>(
-        tenantA,
-        `SELECT CapturedInput, CapturedOutput FROM ${database}.traces LIMIT 1`,
-      );
+      }>(tenantA, `SELECT CapturedInput, CapturedOutput FROM ${database}.traces LIMIT 1`);
       expect(trace!.CapturedInput).toContain(SEEDED_CONTENT.traceInput);
       expect(trace!.CapturedOutput).toContain(SEEDED_CONTENT.traceOutput);
 
       const [span] = await selectRows<{
         CapturedInput: string;
         CapturedOutput: string;
-      }>(
-        tenantA,
-        `SELECT CapturedInput, CapturedOutput FROM ${database}.spans LIMIT 1`,
-      );
+      }>(tenantA, `SELECT CapturedInput, CapturedOutput FROM ${database}.spans LIMIT 1`);
       expect(span!.CapturedInput).toBe(SEEDED_CONTENT.spanInput);
       expect(span!.CapturedOutput).toBe(SEEDED_CONTENT.spanOutput);
     });
@@ -906,9 +889,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       };
       for (const [position, sql] of GATED_COLUMN_POSITIONS(database)) {
         const result = validateLangWatchQL({ sql, ...policy });
-        expect(result.ok, `${position}: a gated field was accepted`).toBe(
-          false,
-        );
+        expect(result.ok, `${position}: a gated field was accepted`).toBe(false);
         expect(
           result.ok ? [] : result.violations.map((violation) => violation.code),
           `${position}: refused for the wrong reason`,
@@ -977,14 +958,10 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       // one, the PostgreSQL-engine tables beside the views in the other — so
       // where to look for each comes from the catalog rather than being assumed.
       for (const source of sources) {
-        expect(audited).toContain(
-          `${source.database ?? database}.${source.table}`,
-        );
+        expect(audited).toContain(`${source.database ?? database}.${source.table}`);
       }
       const physical = new Set(
-        sources.map(
-          (source) => `${source.database ?? database}.${source.table}`,
-        ),
+        sources.map((source) => `${source.database ?? database}.${source.table}`),
       );
       for (const row of coverage.filter((entry) =>
         physical.has(`${entry.database}.${entry.table}`),

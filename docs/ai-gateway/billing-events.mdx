@@ -14,7 +14,10 @@ Three properties make the feed billing-grade:
 - **Push and pull agree.** The pull surface serves the same canonical envelopes the webhooks deliver, from the same ledger, so a checksum mismatch means something real.
 
 <Note>
-The billing surface (webhook delivery and the pull APIs) is an **Enterprise** capability, gated by the same plan flag as webhook endpoints. Reads require `gatewaySpend:view`; replay requires `gatewaySpend:manage`. Both are organization-tier permissions carried by an organization API key.
+  The billing surface (webhook delivery and the pull APIs) is an **Enterprise**
+  capability, gated by the same plan flag as webhook endpoints. Reads require
+  `gatewaySpend:view`; replay requires `gatewaySpend:manage`. Both are organization-tier
+  permissions carried by an organization API key.
 </Note>
 
 <Warning>
@@ -116,6 +119,7 @@ One resolver feeds both metering and [per-end-user budget enforcement](/ai-gatew
 **`end_user_id` is whatever you send.** The gateway stores and echoes it verbatim, so if your application passes a raw email address in the OpenAI `user` field, that address is what lands in webhook payloads, ledger rows, and the reconciliation pull, and it stays there for the 13-month retention window.
 
 Pass a **stable pseudonymous id** instead, such as a hash of the account id, whenever you would rather not have personal data in those places. It has to be stable, because it is the identity budgets and rollups group by; a value that changes per session bills the same person as many.
+
 </Note>
 
 ## Reconciliation: two grains, one ledger
@@ -175,12 +179,20 @@ const from = Date.parse("2026-07-01T00:00:00Z");
 const to = Date.parse("2026-08-01T00:00:00Z");
 
 // Checksums first, one row per key.
-for await (const row of langwatch.spendEvents.iterSummaries({ groupBy: "virtual_key", from, to })) {
+for await (const row of langwatch.spendEvents.iterSummaries({
+  groupBy: "virtual_key",
+  from,
+  to,
+})) {
   compareWithYourLedger(row.key, row.event_count, row.cost.nano_usd);
 }
 
 // Item diff only where a checksum disagreed.
-for await (const event of langwatch.spendEvents.iterate({ from, to, virtualKeyId: "vk_01HZX..." })) {
+for await (const event of langwatch.spendEvents.iterate({
+  from,
+  to,
+  virtualKeyId: "vk_01HZX...",
+})) {
   reconcile(event.gateway_request_id, event);
 }
 ```
@@ -210,7 +222,6 @@ Both grains take the same filters, so a divergence can be walked on exactly the 
 
 The window below is the closed month declared above, which matters: grouping by `model` or `provider`, or into time buckets, is refused on a window recent enough that outcomes can still arrive. Reconcile closed periods and you never meet it; for a live view, opt out and read the result as approximate: `allow_unstable=true` over REST, `allowUnstable` from the TypeScript SDK, `allow_unstable` from Python.
 
-
 <CodeGroup>
 
 ```typescript TypeScript
@@ -218,7 +229,8 @@ for await (const row of langwatch.spendEvents.iterSummaries({
   groupBy: ["model", "end_user"],
   bucket: "day",
   timezone: "Europe/Amsterdam",
-  from, to,
+  from,
+  to,
   model: ["gpt-5-mini", "claude-opus-5"],
   metadata: { customer_tier: "gold" },
 })) {

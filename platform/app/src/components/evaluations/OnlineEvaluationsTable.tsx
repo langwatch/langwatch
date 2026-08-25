@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  HStack,
-  IconButton,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, HStack, IconButton, Table, Text, VStack } from "@chakra-ui/react";
 import {
   LuChartNoAxesCombined,
   LuCopy,
@@ -53,9 +45,7 @@ type OnlineEvaluationsTableProps = {
 };
 
 const analyticsHref = (projectSlug: string, monitorId: string) =>
-  `/${projectSlug}/analytics/evaluations?evaluationId=${encodeURIComponent(
-    monitorId,
-  )}`;
+  `/${projectSlug}/analytics/evaluations?evaluationId=${encodeURIComponent(monitorId)}`;
 
 export const OnlineEvaluationsTable = ({
   projectSlug,
@@ -73,9 +63,7 @@ export const OnlineEvaluationsTable = ({
         <Table.ColumnHeader width="32%">Online evaluation</Table.ColumnHeader>
         <Table.ColumnHeader width="15%">Mode</Table.ColumnHeader>
         <Table.ColumnHeader width="13%">Status</Table.ColumnHeader>
-        <Table.ColumnHeader width="35%">
-          Performance, last 7 days
-        </Table.ColumnHeader>
+        <Table.ColumnHeader width="35%">Performance, last 7 days</Table.ColumnHeader>
         <Table.ColumnHeader width="5%" />
       </Table.Row>
     </Table.Header>
@@ -103,14 +91,10 @@ export const OnlineEvaluationsTable = ({
             </Table.Cell>
             <Table.Cell>
               <Badge
-                colorPalette={
-                  row.executionMode === "AS_GUARDRAIL" ? "blue" : "teal"
-                }
+                colorPalette={row.executionMode === "AS_GUARDRAIL" ? "blue" : "teal"}
                 variant="subtle"
               >
-                {row.executionMode === "AS_GUARDRAIL"
-                  ? "Guardrail"
-                  : "Online evaluation"}
+                {row.executionMode === "AS_GUARDRAIL" ? "Guardrail" : "Online evaluation"}
               </Badge>
             </Table.Cell>
             <Table.Cell>
@@ -181,17 +165,11 @@ export const OnlineEvaluationsTable = ({
                           <LuPencil />
                           Edit
                         </Menu.Item>
-                        <Menu.Item
-                          value="replicate"
-                          onClick={() => onReplicate(row.id)}
-                        >
+                        <Menu.Item value="replicate" onClick={() => onReplicate(row.id)}>
                           <LuCopy />
                           Replicate to another project
                         </Menu.Item>
-                        <Menu.Item
-                          value="toggle"
-                          onClick={() => onToggle(row.id)}
-                        >
+                        <Menu.Item value="toggle" onClick={() => onToggle(row.id)}>
                           {row.enabled ? <LuPause /> : <LuPlay />}
                           {row.enabled ? "Disable" : "Enable"}
                         </Menu.Item>

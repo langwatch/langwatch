@@ -1,11 +1,4 @@
-import {
-  Box,
-  HStack,
-  Link,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HStack, Link, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 import {
@@ -13,10 +6,7 @@ import {
   type Evaluator,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-import {
-  langwatchEndpoint,
-  langwatchEndpointEnv,
-} from "../code/langwatchEndpointEnv";
+import { langwatchEndpoint, langwatchEndpointEnv } from "../code/langwatchEndpointEnv";
 import { RenderCode } from "../code/RenderCode";
 import {
   DialogBody,
@@ -76,8 +66,7 @@ export function EvaluatorApiUsageDialog({
       .map((field) => {
         if (field === "output") return `            "${field}": output,`;
         if (field === "input") return `            "${field}": row["input"],`;
-        if (field === "contexts")
-          return `            "${field}": row["contexts"],`;
+        if (field === "contexts") return `            "${field}": row["contexts"],`;
         if (field === "expected_output")
           return `            "${field}": row["expected_output"],`;
         if (field === "expected_contexts")
@@ -154,9 +143,7 @@ export function EvaluatorApiUsageDialog({
     "output": "output content"`;
     }
 
-    return allFields
-      .map((field) => `"${field}": "your ${field}"`)
-      .join(",\n    ");
+    return allFields.map((field) => `"${field}": "your ${field}"`).join(",\n    ");
   };
 
   // ============================================================================
@@ -321,11 +308,7 @@ EOF
       : "https://docs.langwatch.ai/evaluations/online-evaluation/overview";
 
   return (
-    <DialogRoot
-      open={open}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="xl"
-    >
+    <DialogRoot open={open} onOpenChange={({ open }) => !open && onClose()} size="xl">
       <DialogContent maxWidth="800px">
         <DialogHeader>
           <DialogTitle>Use via API</DialogTitle>
@@ -386,8 +369,8 @@ EOF
             {/* Help text */}
             <VStack align="start" gap={2}>
               <Text fontSize="sm" color="fg.muted">
-                Set the <code>LANGWATCH_API_KEY</code> environment variable with
-                your API key.{" "}
+                Set the <code>LANGWATCH_API_KEY</code> environment variable with your API
+                key.{" "}
                 <Link
                   href={apiKeyLink}
                   color="blue.500"

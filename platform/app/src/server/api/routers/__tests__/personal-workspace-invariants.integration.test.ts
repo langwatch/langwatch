@@ -269,9 +269,7 @@ function movingThePersonalProjectIntoTheSharedTeam() {
       }),
     ).rejects.toMatchObject({
       code: "FORBIDDEN",
-      message: expect.stringContaining(
-        "Personal workspace projects cannot be moved",
-      ),
+      message: expect.stringContaining("Personal workspace projects cannot be moved"),
     });
   });
 
@@ -344,9 +342,7 @@ function movingASharedProjectIntoThePersonalTeam() {
       }),
     ).rejects.toMatchObject({
       code: "FORBIDDEN",
-      message: expect.stringContaining(
-        "cannot be moved into a personal workspace",
-      ),
+      message: expect.stringContaining("cannot be moved into a personal workspace"),
     });
   });
 
@@ -642,9 +638,7 @@ function creatingASecondProjectInThePersonalTeam() {
       }),
     ).rejects.toMatchObject({
       code: "FORBIDDEN",
-      message: expect.stringContaining(
-        "cannot be created in a personal workspace",
-      ),
+      message: expect.stringContaining("cannot be created in a personal workspace"),
     });
   });
 
@@ -897,18 +891,14 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
       setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL),
     ).resolves.toMatchObject({ success: true });
 
-    await expect(orgRoleOfSeatUser()).resolves.toBe(
-      OrganizationUserRole.EXTERNAL,
-    );
+    await expect(orgRoleOfSeatUser()).resolves.toBe(OrganizationUserRole.EXTERNAL);
   });
 
   /** @scenario Moving a member who has a personal workspace to Lite Member succeeds */
   it("corrects their role on the shared team to viewer", async () => {
     await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
 
-    await expect(teamBindingRoles(sharedTeamId)).resolves.toEqual([
-      TeamUserRole.VIEWER,
-    ]);
+    await expect(teamBindingRoles(sharedTeamId)).resolves.toEqual([TeamUserRole.VIEWER]);
   });
 
   /** @scenario Moving a member who has a personal workspace to Lite Member succeeds */
@@ -949,11 +939,7 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
     await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
 
     await expect(
-      hasProjectPermission(
-        rbacCtxForSeatUser(),
-        seatPersonalProjectId,
-        "datasets:view",
-      ),
+      hasProjectPermission(rbacCtxForSeatUser(), seatPersonalProjectId, "datasets:view"),
     ).resolves.toBe(true);
   });
 
@@ -991,9 +977,7 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
       userId: seatUserId,
     });
 
-    expect(bindings.map((binding) => binding.scopeId)).not.toContain(
-      seatPersonalTeamId,
-    );
+    expect(bindings.map((binding) => binding.scopeId)).not.toContain(seatPersonalTeamId);
     // The shared team is still there: this hides what cannot be managed, not
     // everything about the member.
     expect(bindings.map((binding) => binding.scopeId)).toContain(sharedTeamId);
@@ -1005,12 +989,8 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
       organizationId,
     });
 
-    expect(bindings.map((binding) => binding.scopeId)).not.toContain(
-      seatPersonalTeamId,
-    );
-    expect(bindings.map((binding) => binding.scopeId)).not.toContain(
-      personalTeamId,
-    );
+    expect(bindings.map((binding) => binding.scopeId)).not.toContain(seatPersonalTeamId);
+    expect(bindings.map((binding) => binding.scopeId)).not.toContain(personalTeamId);
   });
 }
 
@@ -1077,14 +1057,8 @@ describe("given a personal workspace beside a shared team in one organization", 
     "when the owner creates a second project in their personal team",
     creatingASecondProjectInThePersonalTeam,
   );
-  describe(
-    "when the owner archives the personal project",
-    archivingThePersonalProject,
-  );
-  describe(
-    "when the owner archives the personal team",
-    archivingThePersonalTeam,
-  );
+  describe("when the owner archives the personal project", archivingThePersonalProject);
+  describe("when the owner archives the personal team", archivingThePersonalTeam);
 
   // The one decision that has to go through rather than be refused.
   describe(

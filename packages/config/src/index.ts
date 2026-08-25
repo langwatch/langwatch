@@ -1,10 +1,6 @@
 import { z } from "zod/v4";
 
-export const nodeEnvironmentSchema = z.enum([
-  "development",
-  "test",
-  "production",
-]);
+export const nodeEnvironmentSchema = z.enum(["development", "test", "production"]);
 
 export const environmentBooleanSchema = z
   .union([
@@ -14,9 +10,7 @@ export const environmentBooleanSchema = z
     z.literal("1"),
     z.literal("0"),
   ])
-  .transform(
-    (value) => value === true || value === "true" || value === "1",
-  );
+  .transform((value) => value === true || value === "true" || value === "1");
 
 export const portSchema = z.coerce.number().int().min(1).max(65_535);
 
@@ -82,27 +76,24 @@ type ConfigDefinitionNode =
   | string;
 
 /** Resolves a semantic configuration definition to its value shape. */
-export type ConfigValue<Definition> = Definition extends ConfigLeaf<
-  infer Value
->
-  ? Value
-  : Definition extends readonly unknown[]
-    ? Definition
-    : Definition extends string
-      ? string
-      : Definition extends number
-        ? number
-        : Definition extends boolean
-          ? boolean
-          : Definition extends Record<string, unknown>
-            ? {
-                [Key in keyof Definition]: ConfigValue<Definition[Key]>;
-              }
-            : Definition;
+export type ConfigValue<Definition> =
+  Definition extends ConfigLeaf<infer Value>
+    ? Value
+    : Definition extends readonly unknown[]
+      ? Definition
+      : Definition extends string
+        ? string
+        : Definition extends number
+          ? number
+          : Definition extends boolean
+            ? boolean
+            : Definition extends Record<string, unknown>
+              ? {
+                  [Key in keyof Definition]: ConfigValue<Definition[Key]>;
+                }
+              : Definition;
 
-type DefinitionRuntimeConfigOptions<
-  Definition extends RuntimeConfigDefinition,
-> = {
+type DefinitionRuntimeConfigOptions<Definition extends RuntimeConfigDefinition> = {
   name: string;
   definition: Definition;
   source: Readonly<Record<string, unknown>>;
@@ -154,11 +145,7 @@ export class RuntimeConfig<Value extends Record<string, unknown>> {
 }
 
 function deepFreeze<T>(value: T): T {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    Object.isFrozen(value)
-  ) {
+  if (typeof value !== "object" || value === null || Object.isFrozen(value)) {
     return value;
   }
 
@@ -179,9 +166,7 @@ function isConfigLeaf(value: unknown): value is ConfigLeaf<unknown> {
 
 function envName(path: readonly string[]): string {
   return path
-    .flatMap((part) =>
-      part.replace(/([a-z\d])([A-Z])/g, "$1_$2").split("."),
-    )
+    .flatMap((part) => part.replace(/([a-z\d])([A-Z])/g, "$1_$2").split("."))
     .join("_")
     .toUpperCase();
 }
@@ -189,10 +174,7 @@ function envName(path: readonly string[]): string {
 function compileDefinition(definition: RuntimeConfigDefinition): z.ZodTypeAny {
   const seen = new Set<string>();
 
-  const compile = (
-    node: RuntimeConfigDefinition,
-    path: string[],
-  ): z.ZodTypeAny => {
+  const compile = (node: RuntimeConfigDefinition, path: string[]): z.ZodTypeAny => {
     const shape: Record<string, z.ZodTypeAny> = {};
 
     for (const [key, value] of Object.entries(node)) {
@@ -201,9 +183,7 @@ function compileDefinition(definition: RuntimeConfigDefinition): z.ZodTypeAny {
       if (isConfigLeaf(value)) {
         const binding = value.env ?? envName(nextPath);
         if (seen.has(binding)) {
-          throw new Error(
-            `Duplicate configuration environment binding: ${binding}.`,
-          );
+          throw new Error(`Duplicate configuration environment binding: ${binding}.`);
         }
         seen.add(binding);
         shape[key] = value.schema;
@@ -212,14 +192,10 @@ function compileDefinition(definition: RuntimeConfigDefinition): z.ZodTypeAny {
       } else {
         const binding = envName(nextPath);
         if (seen.has(binding)) {
-          throw new Error(
-            `Duplicate configuration environment binding: ${binding}.`,
-          );
+          throw new Error(`Duplicate configuration environment binding: ${binding}.`);
         }
         seen.add(binding);
-        shape[key] = primitiveSchema(
-          value as boolean | number | string,
-        );
+        shape[key] = primitiveSchema(value as boolean | number | string);
       }
     }
 
@@ -229,9 +205,7 @@ function compileDefinition(definition: RuntimeConfigDefinition): z.ZodTypeAny {
   return compile(definition, []);
 }
 
-export function compileRuntimeConfig<
-  const Definition extends RuntimeConfigDefinition,
->(
+export function compileRuntimeConfig<const Definition extends RuntimeConfigDefinition>(
   definition: Definition,
 ): z.ZodType<ConfigValue<Definition>> {
   return compileDefinition(definition) as z.ZodType<ConfigValue<Definition>>;
@@ -257,8 +231,7 @@ function resolveDefinition(
   for (const [key, value] of Object.entries(definition)) {
     if (isConfigLeaf(value)) {
       const binding = value.env ?? envName([...path, key]);
-      result[key] =
-        source[binding] === undefined ? undefined : source[binding];
+      result[key] = source[binding] === undefined ? undefined : source[binding];
     } else if (typeof value === "object" && value !== null) {
       result[key] = resolveDefinition(value, source, [...path, key]);
     } else {
@@ -270,10 +243,7 @@ function resolveDefinition(
   return result;
 }
 
-function configValue<T>(
-  value: z.ZodType<T>,
-  options?: { env?: string },
-): ConfigLeaf<T>;
+function configValue<T>(value: z.ZodType<T>, options?: { env?: string }): ConfigLeaf<T>;
 function configValue<const T extends boolean | number | string>(
   value: T,
   options?: { env?: string },
@@ -298,10 +268,7 @@ type WidenPrimitive<Value> = Value extends string
       ? boolean
       : Value;
 
-function configUrl(options?: {
-  env?: string;
-  optional?: false;
-}): ConfigLeaf<string>;
+function configUrl(options?: { env?: string; optional?: false }): ConfigLeaf<string>;
 function configUrl(options: {
   env?: string;
   optional: true;
@@ -325,10 +292,7 @@ function configUrl(options?: {
   };
 }
 
-function configSecret(options?: {
-  env?: string;
-  optional?: false;
-}): ConfigLeaf<string>;
+function configSecret(options?: { env?: string; optional?: false }): ConfigLeaf<string>;
 function configSecret(options: {
   env?: string;
   optional: true;
@@ -357,8 +321,7 @@ function configInteger(
   options?: { env?: string },
 ): ConfigLeaf<number> {
   const base = z.coerce.number().int();
-  const schema =
-    defaultValue === undefined ? base : base.default(defaultValue);
+  const schema = defaultValue === undefined ? base : base.default(defaultValue);
   return { _configLeaf: true, schema, env: options?.env };
 }
 
@@ -382,15 +345,11 @@ export const Config = {
 };
 
 function isSchema<T>(value: unknown): value is z.ZodType<T> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "safeParse" in value
-  );
+  return typeof value === "object" && value !== null && "safeParse" in value;
 }
 
-export function defineRuntimeConfig<
-  const Definition extends RuntimeConfigDefinition,
->(definition: Definition): Definition {
+export function defineRuntimeConfig<const Definition extends RuntimeConfigDefinition>(
+  definition: Definition,
+): Definition {
   return definition;
 }

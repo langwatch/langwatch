@@ -45,11 +45,7 @@ function SpanNode({ data }: { data: SpanNodeData }) {
         borderRadius="lg"
         borderWidth="1px"
         borderColor={
-          data.isSelected
-            ? "orange.400"
-            : data.status === "error"
-              ? "red.600"
-              : "border"
+          data.isSelected ? "orange.400" : data.status === "error" ? "red.600" : "border"
         }
         bg={
           data.isSelected

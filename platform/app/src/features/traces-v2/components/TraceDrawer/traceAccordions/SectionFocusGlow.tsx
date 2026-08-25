@@ -26,9 +26,7 @@ export function SectionFocusGlow({
   nonce: number;
   onDone: () => void;
 }) {
-  const [rect, setRect] = useState<DOMRect>(() =>
-    target.getBoundingClientRect(),
-  );
+  const [rect, setRect] = useState<DOMRect>(() => target.getBoundingClientRect());
 
   useEffect(() => {
     setRect(target.getBoundingClientRect());

@@ -79,13 +79,10 @@ function validateExplicitHistogram(point: UnknownRecord): void {
   }
 }
 
-function exponentialBuckets({
-  value,
-  label,
-}: {
-  value: unknown;
-  label: string;
-}): { offset: bigint; total: bigint } {
+function exponentialBuckets({ value, label }: { value: unknown; label: string }): {
+  offset: bigint;
+  total: bigint;
+} {
   const buckets = isRecord(value) ? value : {};
   const offset = checkedInteger({
     value: buckets.offset ?? 0,
@@ -152,9 +149,7 @@ function validateExponentialHistogram(point: UnknownRecord): void {
     label: "exponential histogram negative",
   });
   if (positive.total + negative.total + zeroCount !== count) {
-    throw new Error(
-      "exponential histogram buckets and zeroCount must sum to count",
-    );
+    throw new Error("exponential histogram buckets and zeroCount must sum to count");
   }
 }
 

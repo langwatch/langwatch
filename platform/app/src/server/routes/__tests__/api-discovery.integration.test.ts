@@ -90,12 +90,8 @@ describe("API discovery", () => {
         const operations = (document: Record<string, unknown>) =>
           Object.keys(document.paths ?? {}).sort();
 
-        expect(operations(underApi.document)).toEqual(
-          operations(wellKnown.document),
-        );
-        expect(operations(canonical.document)).toEqual(
-          operations(wellKnown.document),
-        );
+        expect(operations(underApi.document)).toEqual(operations(wellKnown.document));
+        expect(operations(canonical.document)).toEqual(operations(wellKnown.document));
       });
 
       /** @scenario "The canonical gateway location keeps answering" */
@@ -225,9 +221,7 @@ describe("API discovery", () => {
        */
       /** @scenario "A caller that already holds the document is told so" */
       it("recognises the tag in a list and behind a weak prefix", async () => {
-        const etag = (await rootApp.request(WELL_KNOWN)).headers.get(
-          "etag",
-        ) as string;
+        const etag = (await rootApp.request(WELL_KNOWN)).headers.get("etag") as string;
 
         for (const header of [`W/${etag}`, `"other", ${etag}`, "*"]) {
           const res = await rootApp.request(WELL_KNOWN, {
@@ -303,8 +297,7 @@ describe("API discovery", () => {
       });
 
       it("and the service catalogue it points at answers", async () => {
-        const { app: rolesApp } =
-          await import("~/app/api/roles/[[...route]]/app");
+        const { app: rolesApp } = await import("~/app/api/roles/[[...route]]/app");
 
         const res = await rolesApp.request("/api/roles/latest/rpc.discover", {
           method: "POST",

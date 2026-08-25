@@ -29,10 +29,7 @@ import {
   isSlimEligibleTraceMetricKey,
   type SlimTraceMetricKey,
 } from "../routing/route-table";
-import type {
-  AnalyticsTimeseriesBuilderInput,
-  BuiltAnalyticsQuery,
-} from "../types";
+import type { AnalyticsTimeseriesBuilderInput, BuiltAnalyticsQuery } from "../types";
 import {
   collectStringValues,
   dateTrunc,
@@ -245,9 +242,10 @@ const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTim
  * Filter values pass through ClickHouse parameter placeholders to avoid
  * injection (same shape as the legacy translator's parameterised reads).
  */
-function buildSlimFilterClauses(
-  filters: AnalyticsTimeseriesBuilderInput["filters"],
-): { whereClause: string; params: Record<string, unknown> } {
+function buildSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["filters"]): {
+  whereClause: string;
+  params: Record<string, unknown>;
+} {
   if (!filters) return { whereClause: "", params: {} };
 
   const clauses: string[] = [];
@@ -423,8 +421,9 @@ export function buildSlimTimeseriesQuery(
   if (typeof input.timeScale === "number") groupByExprs.push("date");
   if (groupByColumn) groupByExprs.push("group_key");
 
-  const { whereClause: filterWhere, params: filterParams } =
-    buildSlimFilterClauses(input.filters);
+  const { whereClause: filterWhere, params: filterParams } = buildSlimFilterClauses(
+    input.filters,
+  );
 
   // Mirror the legacy builder's `handlesUnknown` contract
   // (`aggregation-builder.ts` → `buildGroupKeyHavingClause`): a group-by whose

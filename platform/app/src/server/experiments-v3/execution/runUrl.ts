@@ -8,7 +8,6 @@ export const getRunUrl = (
   experimentSlug: string,
   runId: string,
 ): string => {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL ?? "https://app.langwatch.ai";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "https://app.langwatch.ai";
   return `${baseUrl}/${projectSlug}/experiments/${experimentSlug}?runId=${runId}`;
 };

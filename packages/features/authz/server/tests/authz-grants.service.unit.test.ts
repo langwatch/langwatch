@@ -1,7 +1,4 @@
-import {
-  GrantValidationError,
-  OffboardIncompleteError,
-} from "@langwatch/authz-contract";
+import { GrantValidationError, OffboardIncompleteError } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { EventingAuthzLedgerAdapter } from "../src/adapters/eventing.authz-ledger.adapter";
 import {
@@ -48,9 +45,7 @@ const OFFBOARD_COUNTS = {
   organizationMembership: true,
 };
 
-function makeRepository(
-  overrides: Partial<RepositoryStub> = {},
-): RepositoryStub {
+function makeRepository(overrides: Partial<RepositoryStub> = {}): RepositoryStub {
   return {
     createBinding: vi.fn().mockResolvedValue(undefined),
     updateBindingRole: vi.fn().mockResolvedValue(undefined),
@@ -94,10 +89,7 @@ const actor = { userId: "admin-1" };
 
 const WRITE_ACTOR = { type: "user", id: "admin-1" };
 
-function makeService(
-  repository: RepositoryStub,
-  ledger: LedgerStub = makeLedger(),
-) {
+function makeService(repository: RepositoryStub, ledger: LedgerStub = makeLedger()) {
   const epoch = new StubAuthzEpoch();
   const service = AuthzGrantsService.create({
     repository: repository as unknown as AuthzGrantRepository,
@@ -212,9 +204,7 @@ describe("AuthzGrantsService.attach", () => {
   describe("when the team is not in the target organization", () => {
     it("rejects the attach", async () => {
       const repository = makeRepository({
-        tryFindTeamOrganization: vi
-          .fn()
-          .mockResolvedValue({ organizationId: OTHER_ORG }),
+        tryFindTeamOrganization: vi.fn().mockResolvedValue({ organizationId: OTHER_ORG }),
       });
       const { service } = makeService(repository);
 
@@ -256,9 +246,7 @@ describe("AuthzGrantsService.attach", () => {
       // reconstructs from a serialised error crossing a worker or a bundle
       // boundary. `rethrowKnownWriteFailure` must still translate it.
       const repository = makeRepository({
-        createBinding: vi
-          .fn()
-          .mockRejectedValue({ code: "role_binding_already_exists" }),
+        createBinding: vi.fn().mockRejectedValue({ code: "role_binding_already_exists" }),
       });
       const { service, bumpEpoch } = makeService(repository);
       await expect(
@@ -334,9 +322,7 @@ describe("AuthzGrantsService.update", () => {
   describe("when the role change collides with a sibling binding", () => {
     it("answers the REST contract's own conflict code", async () => {
       const repository = makeRepository({
-        updateBindingRole: vi
-          .fn()
-          .mockRejectedValue(new DuplicateBindingError()),
+        updateBindingRole: vi.fn().mockRejectedValue(new DuplicateBindingError()),
       });
       const { service, bumpEpoch } = makeService(repository);
       await expect(
@@ -465,9 +451,7 @@ describe("AuthzGrantsService.offboard", () => {
   describe("when every grant source deletes cleanly", () => {
     it("returns the removal counts, the manifest, and bumps the epoch", async () => {
       const repository = makeRepository({
-        findOwnedApiKeys: vi
-          .fn()
-          .mockResolvedValue([{ id: "key-1", name: "ci key" }]),
+        findOwnedApiKeys: vi.fn().mockResolvedValue([{ id: "key-1", name: "ci key" }]),
         findPersonalTeams: vi
           .fn()
           .mockResolvedValue([{ id: "team-p", name: "Dave's workspace" }]),
@@ -707,9 +691,7 @@ describe("AuthzGrantsService compatibility operations", () => {
         [method]: vi.fn().mockResolvedValue(output),
       });
       const { service } = makeService(makeRepository(), ledger);
-      const invoke = service[method] as unknown as (
-        args: unknown,
-      ) => Promise<unknown>;
+      const invoke = service[method] as unknown as (args: unknown) => Promise<unknown>;
 
       await expect(invoke.call(service, input)).resolves.toBe(output);
       expect(ledger[method]).toHaveBeenCalledOnce();
@@ -727,9 +709,7 @@ describe("AuthzGrantsService compatibility operations", () => {
         [method]: vi.fn().mockRejectedValue(error),
       });
       const { service } = makeService(makeRepository(), ledger);
-      const invoke = service[method] as unknown as (
-        args: unknown,
-      ) => Promise<unknown>;
+      const invoke = service[method] as unknown as (args: unknown) => Promise<unknown>;
 
       const raised = await invoke.call(service, input).catch((value) => value);
       expect(raised).toBe(error);

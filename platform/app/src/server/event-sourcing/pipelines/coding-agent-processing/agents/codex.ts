@@ -57,9 +57,7 @@ export const codexAgent: CodingAgentDefinition = {
   sessionKeyFromSpan: ({ name, attrs }) => {
     if (name !== "session_task.turn") return null;
     const threadId = attrs["thread.id"];
-    return typeof threadId === "string" && threadId.includes("-")
-      ? threadId
-      : null;
+    return typeof threadId === "string" && threadId.includes("-") ? threadId : null;
   },
 
   eventAliases: {

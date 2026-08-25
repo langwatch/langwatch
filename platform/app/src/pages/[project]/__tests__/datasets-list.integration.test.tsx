@@ -82,9 +82,7 @@ vi.mock("~/hooks/useDeleteDatasetConfirmation", () => ({
 }));
 
 vi.mock("~/components/DashboardLayout", () => ({
-  DashboardLayout: ({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  ),
+  DashboardLayout: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -194,9 +192,7 @@ describe("Datasets list page", () => {
       await user.type(screen.getByTestId("datasets-search"), "offline");
 
       await waitFor(() => {
-        expect(
-          screen.queryByText("production samples"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText("production samples")).not.toBeInTheDocument();
       });
       expect(screen.getByText("offline evals")).toBeInTheDocument();
     });
@@ -207,9 +203,7 @@ describe("Datasets list page", () => {
 
       await user.type(screen.getByTestId("datasets-search"), "zzz");
 
-      expect(
-        await screen.findByText(/No datasets match "zzz"/i),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(/No datasets match "zzz"/i)).toBeInTheDocument();
     });
 
     /** @scenario Open a dataset */
@@ -241,9 +235,7 @@ describe("Datasets list page", () => {
       await user.click(screen.getByTestId("empty-state-create-dataset"));
       // The CTA is a dropdown: "Create empty dataset" opens the create drawer.
       await user.click(await screen.findByText("Create empty dataset"));
-      expect(
-        await screen.findByTestId("add-edit-dataset-drawer"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("add-edit-dataset-drawer")).toBeInTheDocument();
     });
 
     /** @scenario Empty-state CTA can launch the bulk upload flow */
@@ -253,9 +245,7 @@ describe("Datasets list page", () => {
 
       await user.click(screen.getByTestId("empty-state-create-dataset"));
       await user.click(await screen.findByText("Upload datasets"));
-      expect(
-        await screen.findByTestId("bulk-upload-drawer"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("bulk-upload-drawer")).toBeInTheDocument();
     });
   });
 });

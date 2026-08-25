@@ -130,12 +130,10 @@ describe("HTTP agent body JSON safety (n8n regression)", () => {
       it("sends a body the server can JSON-parse (no HTTP 422)", async () => {
         const adapter = new SerializedHttpAgentAdapter({
           config: config({
-            bodyTemplate:
-              '{"chatInput": "{{ input }}", "sessionId": "{{ threadId }}"}',
+            bodyTemplate: '{"chatInput": "{{ input }}", "sessionId": "{{ threadId }}"}',
           }),
         });
-        const awkward =
-          'Please summarize:\n\n"Q3 results"\nwith a path C:\\reports\\q3';
+        const awkward = 'Please summarize:\n\n"Q3 results"\nwith a path C:\\reports\\q3';
 
         const result = await adapter.call(input(awkward));
 

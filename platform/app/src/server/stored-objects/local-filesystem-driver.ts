@@ -41,9 +41,7 @@ const logger = createLogger("langwatch:stored-objects:local-filesystem-driver");
 function parseFileUri(uri: string): string {
   const scheme = getUriScheme(uri);
   if (scheme !== "file") {
-    throw new Error(
-      `LocalFilesystemDriver only handles file: URIs, got: "${uri}"`,
-    );
+    throw new Error(`LocalFilesystemDriver only handles file: URIs, got: "${uri}"`);
   }
   const parsed = new URL(uri);
   const decoded = decodeURIComponent(parsed.pathname);

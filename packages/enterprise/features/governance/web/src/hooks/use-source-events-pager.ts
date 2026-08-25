@@ -67,9 +67,7 @@ type PagerAction<R extends PagerRow> =
   | ({ type: "fetchFailed"; error: unknown } & WalkOutcome)
   | { type: "show"; page: number };
 
-const initPagerState = <R extends PagerRow>(
-  pageSize: number,
-): PagerState<R> => ({
+const initPagerState = <R extends PagerRow>(pageSize: number): PagerState<R> => ({
   pages: null,
   page: 1,
   pageSize,
@@ -117,9 +115,7 @@ const isCurrentWalk = <R extends PagerRow>({
 }: {
   state: PagerState<R>;
   action: WalkOutcome;
-}) =>
-  action.generation === state.generation &&
-  action.walkId === state.activeWalkId;
+}) => action.generation === state.generation && action.walkId === state.activeWalkId;
 
 function pagerReducer<R extends PagerRow>(
   state: PagerState<R>,
@@ -207,12 +203,7 @@ function presentPager<R extends PagerRow>({
     // A failure with pages on screen is not the table's whole story:
     // "error" is reserved for a walk that never loaded anything. A
     // mid-walk failure keeps status "ready" and travels in `error`.
-    status:
-      state.pages === null
-        ? state.error !== null
-          ? "error"
-          : "loading"
-        : "ready",
+    status: state.pages === null ? (state.error !== null ? "error" : "loading") : "ready",
     error: state.error,
     page: state.page,
     pageSize: state.pageSize,
@@ -236,8 +227,7 @@ export function useSourceEventsPager<R extends PagerRow>({
   fetchPage: (request: PageRequest) => Promise<R[]>;
 }): SourceEventsPager<R> {
   const [state, dispatch] = useReducer(
-    (current: PagerState<R>, action: PagerAction<R>) =>
-      pagerReducer(current, action),
+    (current: PagerState<R>, action: PagerAction<R>) => pagerReducer(current, action),
     initialPageSize,
     initPagerState<R>,
   );
@@ -287,8 +277,7 @@ export function useSourceEventsPager<R extends PagerRow>({
   }, [fetchPage]);
 
   useEffect(() => {
-    const untouched =
-      state.pages === null && state.error === null && !state.isFetching;
+    const untouched = state.pages === null && state.error === null && !state.isFetching;
     if (enabled && untouched) startFetch({ snapshot: state });
   }, [enabled, state, startFetch]);
 

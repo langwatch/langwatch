@@ -100,9 +100,7 @@ function SelectCheckbox({
       // click and Space/Enter handling for free.
       role="checkbox"
       aria-label={ariaLabel}
-      aria-checked={
-        checked === true ? "true" : checked === false ? "false" : "mixed"
-      }
+      aria-checked={checked === true ? "true" : checked === false ? "false" : "mixed"}
       display="flex"
       alignItems="center"
       justifyContent="center"
@@ -130,8 +128,7 @@ function SelectCheckbox({
 function useListPaging() {
   const router = useRouter();
   const pageOffset = parseInt(router.query.pageOffset as string) || 0;
-  const pageSize =
-    parseInt(router.query.pageSize as string) || DEFAULT_PAGE_SIZE;
+  const pageSize = parseInt(router.query.pageSize as string) || DEFAULT_PAGE_SIZE;
   const page = Math.floor(pageOffset / pageSize) + 1;
 
   const push = useCallback(
@@ -142,9 +139,7 @@ function useListPaging() {
           pathname: router.pathname,
           query: {
             ...rest,
-            ...(next.pageOffset !== 0
-              ? { pageOffset: String(next.pageOffset) }
-              : {}),
+            ...(next.pageOffset !== 0 ? { pageOffset: String(next.pageOffset) } : {}),
             ...(next.pageSize !== DEFAULT_PAGE_SIZE
               ? { pageSize: String(next.pageSize) }
               : {}),
@@ -186,9 +181,7 @@ const scoreValuesFor = (
     if (!score?.value) return [];
     const value = Array.isArray(score.value) ? score.value : [score.value];
     if (value.length === 0) return [];
-    return [
-      { annotationId: annotation.id, value, reason: score.reason ?? null },
-    ];
+    return [{ annotationId: annotation.id, value, reason: score.reason ?? null }];
   });
 
 export type AnnotationsTableProps = {
@@ -286,15 +279,13 @@ export const AnnotationsTable = ({
     });
   }, [router]);
 
-  const { assignedQueueItems, queuesLoading, totalCount } = useAnnotationQueues(
-    {
-      selectedAnnotations: statusFilter,
-      queueId,
-      showQueueAndUser,
-      ...queuedRange,
-      enabled: !isPageProvidedRows,
-    },
-  );
+  const { assignedQueueItems, queuesLoading, totalCount } = useAnnotationQueues({
+    selectedAnnotations: statusFilter,
+    queueId,
+    showQueueAndUser,
+    ...queuedRange,
+    enabled: !isPageProvidedRows,
+  });
 
   const scoreTypes = api.annotationScore.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -329,13 +320,7 @@ export const AnnotationsTable = ({
   // paging or switching queue swaps those rows out, so the picks go with them.
   useEffect(() => {
     setRowSelection({});
-  }, [
-    statusFilter,
-    queueId,
-    paging.pageOffset,
-    paging.pageSize,
-    queuedRangeKey,
-  ]);
+  }, [statusFilter, queueId, paging.pageOffset, paging.pageSize, queuedRangeKey]);
 
   const datasetGate = usePersonalFeatureGate("datasets");
 
@@ -368,9 +353,7 @@ export const AnnotationsTable = ({
     (row: AnnotationRow) => {
       openDrawer("traceV2Details", {
         traceId: row.traceId,
-        ...(row.occurredAtMs !== undefined
-          ? { t: String(row.occurredAtMs) }
-          : {}),
+        ...(row.occurredAtMs !== undefined ? { t: String(row.occurredAtMs) } : {}),
       });
     },
     [openDrawer],
@@ -378,8 +361,7 @@ export const AnnotationsTable = ({
 
   const openRow = useCallback(
     (row: AnnotationRow) => {
-      const stillWaiting =
-        rowTarget === "queueItem" && !!row.queueItemId && !row.doneAt;
+      const stillWaiting = rowTarget === "queueItem" && !!row.queueItemId && !row.doneAt;
       if (stillWaiting) {
         void router.push(
           `/${project?.slug}/annotations/my-queue?queue-item=${row.queueItemId}&trace=${row.traceId}`,
@@ -421,9 +403,7 @@ export const AnnotationsTable = ({
           return (
             <SelectCheckbox
               ariaLabel="Select all on this page"
-              checked={
-                allSelected ? true : someSelected ? "indeterminate" : false
-              }
+              checked={allSelected ? true : someSelected ? "indeterminate" : false}
               onToggle={() => table.toggleAllPageRowsSelected(!allSelected)}
             />
           );
@@ -537,20 +517,18 @@ export const AnnotationsTable = ({
           header: scoreType.name,
           cell: ({ row }) => (
             <VStack align="start" gap={2}>
-              {scoreValuesFor(row.original.annotations, scoreType.id).map(
-                (score) => (
-                  <HStack key={score.annotationId} gap={1} wrap="wrap">
-                    {score.value.map((value) => (
-                      <Badge key={value}>{value}</Badge>
-                    ))}
-                    {score.reason && (
-                      <Tooltip content={score.reason}>
-                        <MessageCircle size={14} />
-                      </Tooltip>
-                    )}
-                  </HStack>
-                ),
-              )}
+              {scoreValuesFor(row.original.annotations, scoreType.id).map((score) => (
+                <HStack key={score.annotationId} gap={1} wrap="wrap">
+                  {score.value.map((value) => (
+                    <Badge key={value}>{value}</Badge>
+                  ))}
+                  {score.reason && (
+                    <Tooltip content={score.reason}>
+                      <MessageCircle size={14} />
+                    </Tooltip>
+                  )}
+                </HStack>
+              ))}
             </VStack>
           ),
         }),
@@ -669,9 +647,7 @@ export const AnnotationsTable = ({
         .filter(Boolean)
         .join("\n"),
       row.annotations
-        .map((annotation) =>
-          suggestionExportLine({ annotation, traceId: row.traceId }),
-        )
+        .map((annotation) => suggestionExportLine({ annotation, traceId: row.traceId }))
         .filter(Boolean)
         .join("\n"),
       ...activeScoreTypes.map((scoreType) =>
@@ -798,10 +774,7 @@ export const AnnotationsTable = ({
                         }
                         paddingX={header.id === "select" ? 0 : undefined}
                       >
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
+                        {flexRender(header.column.columnDef.header, header.getContext())}
                       </Table.ColumnHeader>
                     ))}
                   </Table.Row>
@@ -819,9 +792,7 @@ export const AnnotationsTable = ({
                     <Table.Row
                       cursor="pointer"
                       _hover={{ bg: "bg.emphasized" }}
-                      backgroundColor={
-                        row.original.doneAt ? "bg.subtle" : "bg.panel"
-                      }
+                      backgroundColor={row.original.doneAt ? "bg.subtle" : "bg.panel"}
                       onClick={() => openRow(row.original)}
                     >
                       {row.getVisibleCells().map((cell) => (
@@ -830,10 +801,7 @@ export const AnnotationsTable = ({
                           paddingX={cell.column.id === "select" ? 0 : undefined}
                           verticalAlign="top"
                         >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </Table.Cell>
                       ))}
                     </Table.Row>
@@ -920,11 +888,7 @@ function SelectionActions({
           <Database size={14} />
           Add to dataset
         </Button>
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={() => setQueueDialogOpen(true)}
-        >
+        <Button size="xs" variant="outline" onClick={() => setQueueDialogOpen(true)}>
           <Inbox size={14} />
           {pageQueue ? "Move to queue" : "Add to queue"}
         </Button>
@@ -950,9 +914,7 @@ function SelectionActions({
           traceIds={selectedTraceIds}
           intent={pageQueue ? "move" : "add"}
           initialAnnotators={
-            pageQueue
-              ? [{ id: pageQueue.annotatorId, name: pageQueue.name }]
-              : undefined
+            pageQueue ? [{ id: pageQueue.annotatorId, name: pageQueue.name }] : undefined
           }
           onQueued={onQueued}
         />

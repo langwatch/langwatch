@@ -423,10 +423,7 @@ export class ModelProviderRepository {
     return this.prisma.$transaction(runUpdate);
   }
 
-  async delete(
-    id: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<ModelProvider> {
+  async delete(id: string, tx?: Prisma.TransactionClient): Promise<ModelProvider> {
     const client = tx ?? this.prisma;
     return client.modelProvider.delete({
       where: { id },
@@ -465,10 +462,7 @@ export class ModelProviderRepository {
     const client = tx ?? this.prisma;
     return client.modelProvider.deleteMany({
       where: {
-        AND: [
-          { id: { in: ids } },
-          byProviderInProject({ provider, projectId }),
-        ],
+        AND: [{ id: { in: ids } }, byProviderInProject({ provider, projectId })],
       },
     });
   }
@@ -526,9 +520,7 @@ export class ModelProviderRepository {
    * gateway hands back the row id it was configured with) — tenant scoping
    * happened when the row id entered the gateway config.
    */
-  async findByIdWithDecryptedKeys(
-    id: string,
-  ): Promise<ModelProviderWithScopes | null> {
+  async findByIdWithDecryptedKeys(id: string): Promise<ModelProviderWithScopes | null> {
     const provider = await this.prisma.modelProvider.findUnique({
       where: { id },
       include: { scopes: true },
@@ -580,14 +572,11 @@ export class ModelProviderRepository {
    * `customKeysUnreadable` carries the difference for the callers that have to
    * act on it.
    */
-  private withDecryptedKeys(
-    provider: ModelProviderWithScopes,
-  ): ModelProviderWithScopes {
+  private withDecryptedKeys(provider: ModelProviderWithScopes): ModelProviderWithScopes {
     const read = readCustomKeys(provider.customKeys);
     return {
       ...provider,
-      customKeys:
-        read.state === "read" ? (read.keys as Prisma.JsonValue) : null,
+      customKeys: read.state === "read" ? (read.keys as Prisma.JsonValue) : null,
       customKeysUnreadable: read.state === "unreadable",
     };
   }

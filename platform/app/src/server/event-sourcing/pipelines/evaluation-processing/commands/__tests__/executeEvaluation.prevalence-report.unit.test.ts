@@ -59,9 +59,7 @@ function buildMonitor({
     preconditions: [],
     mappings: null,
     parameters: null,
-    evaluator: config
-      ? { id: "evaluator_1", type: evaluatorRecordType, config }
-      : null,
+    evaluator: config ? { id: "evaluator_1", type: evaluatorRecordType, config } : null,
   } as Record<string, unknown>;
 }
 
@@ -101,9 +99,10 @@ async function execute({
     },
   } as unknown as Command<ExecuteEvaluationCommandData>);
 
-  return loggerSpy.info.mock.calls.filter(
-    (call) => call[1] === REPORT_MESSAGE,
-  ) as [Record<string, unknown>, string][];
+  return loggerSpy.info.mock.calls.filter((call) => call[1] === REPORT_MESSAGE) as [
+    Record<string, unknown>,
+    string,
+  ][];
 }
 
 describe("ExecuteEvaluationCommand prevalence reporting", () => {
@@ -188,10 +187,7 @@ describe("ExecuteEvaluationCommand prevalence reporting", () => {
       it("reports nothing, so the count is not inflated by an unaffected type", async () => {
         const reports = await execute({
           evaluatorRecordType: "code",
-          config: DEFAULT_CODE_EVALUATOR_CONFIG as unknown as Record<
-            string,
-            unknown
-          >,
+          config: DEFAULT_CODE_EVALUATOR_CONFIG as unknown as Record<string, unknown>,
         });
 
         expect(reports).toHaveLength(0);

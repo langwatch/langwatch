@@ -56,9 +56,7 @@ function resolve({
 describe("resolveLlmOpsProjectSlug", () => {
   describe("given the reader is on an LLM Ops page", () => {
     it("opens the project that page is about", () => {
-      expect(resolve({ ambientProject: { slug: "acme-labs" } })).toBe(
-        "acme-labs",
-      );
+      expect(resolve({ ambientProject: { slug: "acme-labs" } })).toBe("acme-labs");
     });
   });
 
@@ -83,9 +81,7 @@ describe("resolveLlmOpsProjectSlug", () => {
 
   describe("given the remembered project is one the reader cannot open", () => {
     it("ignores it and opens a team they are on", () => {
-      expect(resolve({ rememberedProjectSlug: "platform-app" })).toBe(
-        "acme-app",
-      );
+      expect(resolve({ rememberedProjectSlug: "platform-app" })).toBe("acme-app");
     });
 
     it("keeps it for an organization admin, who can open every team", () => {
@@ -100,17 +96,13 @@ describe("resolveLlmOpsProjectSlug", () => {
 
   describe("given the remembered project is the personal one", () => {
     it("opens a project of the organization instead", () => {
-      expect(resolve({ rememberedProjectSlug: "personal-mia-abc123" })).toBe(
-        "acme-app",
-      );
+      expect(resolve({ rememberedProjectSlug: "personal-mia-abc123" })).toBe("acme-app");
     });
   });
 
   describe("given no team the reader can open holds a project", () => {
     it("reports no home, so the product can be greyed out", () => {
-      expect(
-        resolve({ teams: [OTHER_TEAM, { ...OWN_TEAM, projects: [] }] }),
-      ).toBeNull();
+      expect(resolve({ teams: [OTHER_TEAM, { ...OWN_TEAM, projects: [] }] })).toBeNull();
     });
 
     it("reports no home when the organization has no team at all", () => {

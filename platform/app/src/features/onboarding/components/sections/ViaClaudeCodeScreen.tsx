@@ -182,11 +182,7 @@ function PromptRow({ skill }: { skill: SkillItem }): React.ReactElement {
       cursor="pointer"
       {...glassCard()}
     >
-      <button
-        type="button"
-        onClick={() => void handleCopy()}
-        aria-label="Copy prompt"
-      >
+      <button type="button" onClick={() => void handleCopy()} aria-label="Copy prompt">
         <Text
           fontSize="sm"
           color="fg"
@@ -345,13 +341,7 @@ function QuickCommand({
   const { emit } = useAnalytics();
 
   return (
-    <HStack
-      justify="space-between"
-      align="center"
-      px={4}
-      py={3}
-      {...glassCard()}
-    >
+    <HStack justify="space-between" align="center" px={4} py={3} {...glassCard()}>
       <HStack gap={2.5} align="center" minW={0}>
         <Box flexShrink={0} display="flex" alignItems="center">
           <Terminal size={13} color="var(--chakra-colors-fg-muted)" />
@@ -360,12 +350,7 @@ function QuickCommand({
           <Text fontSize="xs" fontWeight="semibold" color="fg">
             {label}
           </Text>
-          <Text
-            fontSize="xs"
-            fontFamily="mono"
-            color="fg.muted"
-            wordBreak="break-all"
-          >
+          <Text fontSize="xs" fontFamily="mono" color="fg.muted" wordBreak="break-all">
             {accentCredentialSegments(displayCommand)}
           </Text>
         </VStack>
@@ -402,12 +387,8 @@ function McpTab({
   // before `--`) so the MCP server inherits it via its environment, with
   // no dependency on a `--project-id` CLI flag we don't control. Codex
   // already uses --env consistently, so we just append.
-  const projectIdEnvBefore = projectId
-    ? ` --env LANGWATCH_PROJECT_ID=${projectId}`
-    : "";
-  const projectIdEnvAfter = projectId
-    ? ` --env LANGWATCH_PROJECT_ID=${projectId}`
-    : "";
+  const projectIdEnvBefore = projectId ? ` --env LANGWATCH_PROJECT_ID=${projectId}` : "";
+  const projectIdEnvAfter = projectId ? ` --env LANGWATCH_PROJECT_ID=${projectId}` : "";
 
   return (
     <VStack align="stretch" gap={4}>
@@ -494,10 +475,7 @@ function McpTab({
                 });
               }}
             >
-              <button
-                type="button"
-                aria-label={`Copy ${ep.editor} config path`}
-              >
+              <button type="button" aria-label={`Copy ${ep.editor} config path`}>
                 <Text fontSize="2xs" fontWeight="medium" color="fg">
                   {ep.editor}
                 </Text>
@@ -659,8 +637,8 @@ export function ViaClaudeCodeScreen({
                 <Text as="span" fontWeight="semibold" color="fg">
                   Zero setup.
                 </Text>{" "}
-                Copy a prompt, paste it into your coding agent, and it handles
-                everything from there.
+                Copy a prompt, paste it into your coding agent, and it handles everything
+                from there.
               </Text>
             )}
             {activeTab === "skill" && (
@@ -669,12 +647,7 @@ export function ViaClaudeCodeScreen({
                   Install once, reuse anytime.
                 </Text>{" "}
                 Run the install command, then type{" "}
-                <Text
-                  as="span"
-                  fontFamily="mono"
-                  fontWeight="semibold"
-                  color="orange.fg"
-                >
+                <Text as="span" fontFamily="mono" fontWeight="semibold" color="orange.fg">
                   /command
                 </Text>{" "}
                 in your coding agent whenever you need it.

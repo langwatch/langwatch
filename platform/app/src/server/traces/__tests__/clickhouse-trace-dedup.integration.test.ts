@@ -115,10 +115,7 @@ async function insertTraceSummary(
   });
 }
 
-async function insertSpan(
-  ch: ClickHouseClient,
-  row: ReturnType<typeof makeSpanRow>,
-) {
+async function insertSpan(ch: ClickHouseClient, row: ReturnType<typeof makeSpanRow>) {
   await ch.insert({
     table: "stored_spans",
     values: [row],
@@ -159,8 +156,7 @@ vi.mock("~/server/app-layer/app", async () => {
   const app = () => ({
     clickhouse: {
       enabled: true,
-      resolveClient: (tenantId: string) =>
-        clients.getClickHouseClientForTenant(tenantId),
+      resolveClient: (tenantId: string) => clients.getClickHouseClientForTenant(tenantId),
       resolveOrganizationClient: async () => {
         throw new Error("no organization client in this suite");
       },
@@ -188,17 +184,13 @@ beforeAll(async () => {
 
   // Wire up the mock to return the test container's client
   const chModule = await import("~/server/clickhouse/clickhouseClient");
-  getClickHouseClientForTenant = vi.mocked(
-    chModule.getClickHouseClientForTenant,
-  );
+  getClickHouseClientForTenant = vi.mocked(chModule.getClickHouseClientForTenant);
   getClickHouseClientForTenant.mockResolvedValue(ch);
 
   // Import the mocked prisma and build the shared service instance
   const { prisma } = await import("~/server/db");
   service = new ClickHouseTraceService({
-    prisma: prisma as ConstructorParameters<
-      typeof ClickHouseTraceService
-    >[0]["prisma"],
+    prisma: prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]["prisma"],
   });
 }, 60_000);
 
@@ -294,16 +286,12 @@ describe("ClickHouse trace dedup (integration)", () => {
         expect(trace!.input).not.toBeNull();
         // The input should be from the latest version
         const parsedInput =
-          typeof trace!.input === "string"
-            ? JSON.parse(trace!.input)
-            : trace!.input;
+          typeof trace!.input === "string" ? JSON.parse(trace!.input) : trace!.input;
         expect(parsedInput.value).toContain("latest version input");
 
         expect(trace!.output).not.toBeNull();
         const parsedOutput =
-          typeof trace!.output === "string"
-            ? JSON.parse(trace!.output)
-            : trace!.output;
+          typeof trace!.output === "string" ? JSON.parse(trace!.output) : trace!.output;
         expect(parsedOutput.value).toContain("latest version output");
       });
     });
@@ -466,9 +454,7 @@ describe("ClickHouse trace dedup (integration)", () => {
         expect(span.params).toBeDefined();
         const params = span.params as Record<string, unknown>;
         // Dot-notation keys get unflattened: "llm.model" -> { llm: { model: "gpt-5-mini" } }
-        expect((params.llm as Record<string, string>)?.model).toBe(
-          "gpt-5-mini",
-        );
+        expect((params.llm as Record<string, string>)?.model).toBe("gpt-5-mini");
         expect(params.payload).toContain("a".repeat(100));
       });
 
@@ -483,16 +469,12 @@ describe("ClickHouse trace dedup (integration)", () => {
 
         expect(trace.input).not.toBeNull();
         const parsedInput =
-          typeof trace.input === "string"
-            ? JSON.parse(trace.input)
-            : trace.input;
+          typeof trace.input === "string" ? JSON.parse(trace.input) : trace.input;
         expect(parsedInput.value).toContain("latest input with heavy payload");
 
         expect(trace.output).not.toBeNull();
         const parsedOutput =
-          typeof trace.output === "string"
-            ? JSON.parse(trace.output)
-            : trace.output;
+          typeof trace.output === "string" ? JSON.parse(trace.output) : trace.output;
         expect(parsedOutput.value).toContain("latest output");
       });
 
@@ -561,12 +543,8 @@ describe("ClickHouse trace dedup (integration)", () => {
           // A cheap resolve (min/max OccurredAt) runs, then the heavy summary
           // read (ts_ComputedInput columns) is partition-bounded on OccurredAt
           // instead of scanning every weekly part.
-          const resolveQuery = queries.find((q) =>
-            q.includes("min(OccurredAt)"),
-          );
-          const heavyQuery = queries.find((q) =>
-            q.includes("ts_ComputedInput"),
-          );
+          const resolveQuery = queries.find((q) => q.includes("min(OccurredAt)"));
+          const heavyQuery = queries.find((q) => q.includes("ts_ComputedInput"));
           expect(resolveQuery).toBeDefined();
           expect(heavyQuery).toBeDefined();
           expect(heavyQuery!).toContain("OccurredAt >=");
@@ -588,9 +566,7 @@ describe("ClickHouse trace dedup (integration)", () => {
 
           // Resolve found nothing (epoch default), so the heavy summary read
           // keeps its previous unbounded behaviour rather than guessing.
-          const heavyQuery = queries.find((q) =>
-            q.includes("ts_ComputedInput"),
-          );
+          const heavyQuery = queries.find((q) => q.includes("ts_ComputedInput"));
           expect(heavyQuery).toBeDefined();
           expect(heavyQuery!).not.toContain("OccurredAt >=");
         });

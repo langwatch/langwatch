@@ -22,9 +22,7 @@ export function buildDedupedRunItemsWhere({
 }: {
   extraFilters?: string[];
 } = {}): string {
-  const extra = extraFilters
-    .map((filter) => `\n          AND ${filter}`)
-    .join("");
+  const extra = extraFilters.map((filter) => `\n          AND ${filter}`).join("");
 
   return `WHERE ${RUN_ITEMS_SCOPE}${extra}
           AND (${RUN_ITEMS_DEDUP_KEY}, OccurredAt) IN (
@@ -61,10 +59,7 @@ export function computeOccurredAtRangeForRuns(
 }
 
 function formatClickHouseDateTime(milliseconds: number): string {
-  return new Date(milliseconds)
-    .toISOString()
-    .replace("T", " ")
-    .replace("Z", "");
+  return new Date(milliseconds).toISOString().replace("T", " ").replace("Z", "");
 }
 
 function parseClickHouseDateTime(value: string): number {

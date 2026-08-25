@@ -13,9 +13,7 @@ import { workflowRouter } from "../workflows";
 const mockGetVercelAIModel = vi.fn();
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
 
@@ -76,10 +74,7 @@ describe("workflowRouter.generateCommitMessage()", () => {
       });
 
       expect(mockGenerateText).toHaveBeenCalledTimes(1);
-      const callArg = mockGenerateText.mock.calls[0]![0] as Record<
-        string,
-        unknown
-      >;
+      const callArg = mockGenerateText.mock.calls[0]![0] as Record<string, unknown>;
       // The combination that gpt-5 rejects on /v1/chat/completions is exactly
       // function tools + reasoning_effort. No tools here, so it never trips.
       expect(callArg).not.toHaveProperty("tools");

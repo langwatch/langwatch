@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type {
-  GovernanceIngestionSourceService,
-} from "@langwatch/enterprise-governance-contract";
+import type { GovernanceIngestionSourceService } from "@langwatch/enterprise-governance-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
   GovernanceDiagnosticsPort,
@@ -31,9 +29,7 @@ class AppIngestionSourceEntitlementsPort extends IngestionSourceEntitlementsPort
   }
 
   async hasEnterprisePlan(organizationId: string): Promise<boolean> {
-    return (
-      await this.plans.getActivePlan({ organizationId })
-    ).type === "ENTERPRISE";
+    return (await this.plans.getActivePlan({ organizationId })).type === "ENTERPRISE";
   }
 }
 
@@ -50,9 +46,7 @@ class AppIngestionSourceLifecyclePort extends IngestionSourceLifecyclePort {
     return new AppIngestionSourceLifecyclePort(lifecycle);
   }
 
-  sync(
-    source: Parameters<IngestionSourceLifecyclePort["sync"]>[0],
-  ): Promise<void> {
+  sync(source: Parameters<IngestionSourceLifecyclePort["sync"]>[0]): Promise<void> {
     return this.lifecycle.sync(source);
   }
 }
@@ -89,13 +83,9 @@ export class AppIngestionSourceAdapter {
     return PostgresIngestionSourceAdapter.create({
       database: this.options.database,
       projects: this.options.projects,
-      entitlements: AppIngestionSourceEntitlementsPort.create(
-        this.options.plans,
-      ),
+      entitlements: AppIngestionSourceEntitlementsPort.create(this.options.plans),
       lifecycle: AppIngestionSourceLifecyclePort.create(this.options.lifecycle),
-      credentials: IngestionCredentialsService.create(
-        new AppGovernanceEncryptionPort(),
-      ),
+      credentials: IngestionCredentialsService.create(new AppGovernanceEncryptionPort()),
       secrets: IngestionSecretService.create(
         IngestionSecretConfiguration.create({
           pepper: this.options.secretPepper,

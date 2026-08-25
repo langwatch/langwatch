@@ -34,9 +34,7 @@ describe("<SearchInput/>", () => {
     });
 
     it("displays the placeholder text", () => {
-      expect(
-        screen.getByPlaceholderText("Search suites..."),
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Search suites...")).toBeInTheDocument();
     });
 
     it("renders the input with searchbox role", () => {

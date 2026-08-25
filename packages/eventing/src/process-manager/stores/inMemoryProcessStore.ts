@@ -66,8 +66,7 @@ function isRequeueTarget(
   if (message.processKey !== target.processKey) return false;
   if (message.status !== "dead") return false;
   return (
-    !target.messageKeyPrefix ||
-    message.messageKey.startsWith(target.messageKeyPrefix)
+    !target.messageKeyPrefix || message.messageKey.startsWith(target.messageKeyPrefix)
   );
 }
 
@@ -98,15 +97,10 @@ export class InMemoryProcessStore implements ProcessStore {
     return this.inbox.has(inboxKey(params));
   }
 
-  async commit<State = unknown>(
-    commit: ProcessCommit<State>,
-  ): Promise<CommitResult> {
+  async commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult> {
     const { ref, sourceEventId } = commit;
 
-    if (
-      sourceEventId !== null &&
-      this.inbox.has(inboxKey({ ref, sourceEventId }))
-    ) {
+    if (sourceEventId !== null && this.inbox.has(inboxKey({ ref, sourceEventId }))) {
       return { outcome: "duplicateEvent" };
     }
 
@@ -209,9 +203,7 @@ export class InMemoryProcessStore implements ProcessStore {
     return { insertedMessageKeys, duplicateMessageKeys };
   }
 
-  async findMessagesByRef(params: {
-    ref: ProcessRef;
-  }): Promise<OutboxMessageRecord[]> {
+  async findMessagesByRef(params: { ref: ProcessRef }): Promise<OutboxMessageRecord[]> {
     return [...this.messages.values()].filter(
       (message) =>
         message.processName === params.ref.processName &&
@@ -230,10 +222,7 @@ export class InMemoryProcessStore implements ProcessStore {
     for (const message of this.messages.values()) {
       if (leased.length >= params.limit) break;
       if (message.status !== "pending") continue;
-      if (
-        params.processNames &&
-        !params.processNames.includes(message.processName)
-      )
+      if (params.processNames && !params.processNames.includes(message.processName))
         continue;
       if (message.nextAttemptAt > params.now) continue;
       if (message.leasedUntil > params.now) continue;
@@ -319,9 +308,7 @@ export class InMemoryProcessStore implements ProcessStore {
     processNames?: readonly string[];
   }): Promise<DueWake[]> {
     if (params.processNames && params.processNames.length === 0) return [];
-    const allowed = params.processNames
-      ? new Set(params.processNames)
-      : undefined;
+    const allowed = params.processNames ? new Set(params.processNames) : undefined;
     const due: DueWake[] = [];
     for (const instance of this.instances.values()) {
       if (due.length >= params.limit) break;
@@ -346,10 +333,7 @@ export class InMemoryProcessStore implements ProcessStore {
     for (const [key, message] of this.messages) {
       if (message.processName !== params.processName) continue;
       if (message.status !== "dispatched") continue;
-      if (
-        message.dispatchedAt === null ||
-        message.dispatchedAt >= params.before
-      )
+      if (message.dispatchedAt === null || message.dispatchedAt >= params.before)
         continue;
       this.deleteMessage(key);
       deleted++;

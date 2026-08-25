@@ -4,10 +4,7 @@ import {
   type ExperimentType,
   type SaveExperimentInput,
 } from "@langwatch/experiment-contract";
-import {
-  Prisma,
-  type PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   ArchivedExperimentWriteError,
   ExperimentRepository,
@@ -76,9 +73,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     });
   }
 
-  async tryFindLatest(input: {
-    projectId: string;
-  }): Promise<Experiment | null> {
+  async tryFindLatest(input: { projectId: string }): Promise<Experiment | null> {
     const row = await this.database.experiment.findFirst({
       where: { projectId: input.projectId, archivedAt: null },
       orderBy: { createdAt: "desc" },
@@ -164,9 +159,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     return rows.map((row) => row.slug);
   }
 
-  async saveActive(
-    input: SaveExperimentInput & { slug: string },
-  ): Promise<Experiment> {
+  async saveActive(input: SaveExperimentInput & { slug: string }): Promise<Experiment> {
     const row = await this.database.$transaction(async (transaction) => {
       const existing = await transaction.experiment.findUnique({
         where: { id: input.id, projectId: input.projectId },

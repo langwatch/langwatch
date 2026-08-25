@@ -154,9 +154,7 @@ describe("field reference validation", () => {
           ).ok,
         ).toBe(true);
         expect(
-          validate(
-            bar({ encoding: { x: { field: "payload[0]", type: "nominal" } } }),
-          ).ok,
+          validate(bar({ encoding: { x: { field: "payload[0]", type: "nominal" } } })).ok,
         ).toBe(true);
         expect(
           validate(
@@ -209,9 +207,7 @@ describe("field reference validation", () => {
       it("warns instead of refusing, and says why", () => {
         const result = validate(
           bar({
-            transform: [
-              { pivot: "series", value: "total", groupby: ["bucket"] },
-            ],
+            transform: [{ pivot: "series", value: "total", groupby: ["bucket"] }],
             encoding: {
               y: { field: "whichever_series_value", type: "quantitative" },
             },

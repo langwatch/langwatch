@@ -184,9 +184,7 @@ async function ensureProvider({
       },
     },
   });
-  process.stderr.write(
-    `[seed-audio] created ${provider} provider ${created.id}\n`,
-  );
+  process.stderr.write(`[seed-audio] created ${provider} provider ${created.id}\n`);
   return { id: created.id, usable: true };
 }
 
@@ -227,9 +225,7 @@ async function main() {
         orgs.map((o) => `${o.name} [${o.id}]`).join(", "),
     );
   }
-  process.stderr.write(
-    `[seed-audio] user=${user.id} org=${org.id} (${org.name})\n`,
-  );
+  process.stderr.write(`[seed-audio] user=${user.id} org=${org.id} (${org.name})\n`);
 
   // A skipped row stays out of the policy, so the chain never carries a
   // provider the gateway cannot build a credential for. Its id is remembered

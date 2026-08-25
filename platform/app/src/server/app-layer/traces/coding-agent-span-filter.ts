@@ -29,10 +29,7 @@ export const OPENCODE_SCOPE = "opencode";
 /** The per-turn rollup span codex emits (model + tokens + cost + reasoning). */
 const CODEX_TURN_SPAN = "session_task.turn";
 
-const CODEX_SCOPES: ReadonlySet<string> = new Set([
-  CODEX_SCOPE,
-  CODEX_EXEC_SCOPE,
-]);
+const CODEX_SCOPES: ReadonlySet<string> = new Set([CODEX_SCOPE, CODEX_EXEC_SCOPE]);
 
 const CODING_AGENT_SCOPES: ReadonlySet<string> = new Set([
   CODEX_SCOPE,
@@ -41,9 +38,7 @@ const CODING_AGENT_SCOPES: ReadonlySet<string> = new Set([
 ]);
 
 /** Whether spans under this scope are subject to the coding-agent filter. */
-export function isCodingAgentNoiseScope(
-  scopeName: string | null | undefined,
-): boolean {
+export function isCodingAgentNoiseScope(scopeName: string | null | undefined): boolean {
   return typeof scopeName === "string" && CODING_AGENT_SCOPES.has(scopeName);
 }
 

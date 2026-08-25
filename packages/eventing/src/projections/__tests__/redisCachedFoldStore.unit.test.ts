@@ -9,8 +9,7 @@ import { RedisCachedFoldStore } from "../redisCachedFoldStore";
 // warn (once), while leaving every other observability export intact.
 const { warnSpy } = vi.hoisted(() => ({ warnSpy: vi.fn() }));
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof import("@langwatch/observability")>();
   return {
     ...actual,
     createLogger: () => ({
@@ -27,9 +26,7 @@ interface TestState {
   UpdatedAt: number;
 }
 
-function createInnerStore(
-  durable: TestState | null = { count: 1, UpdatedAt: 100 },
-) {
+function createInnerStore(durable: TestState | null = { count: 1, UpdatedAt: 100 }) {
   const calls = {
     get: [] as string[],
     store: [] as TestState[],
@@ -82,27 +79,21 @@ function createDurableInnerStore({
  * nothing and pass regardless.
  */
 async function dedupUnavailableCount(reason: string): Promise<number> {
-  const metric = await register
-    .getSingleMetric("es_fold_dedup_unavailable_total")
-    ?.get();
+  const metric = await register.getSingleMetric("es_fold_dedup_unavailable_total")?.get();
   return (
     metric?.values.find(
-      (v) =>
-        v.labels.projection_name === "test_table" && v.labels.reason === reason,
+      (v) => v.labels.projection_name === "test_table" && v.labels.reason === reason,
     )?.value ?? 0
   );
 }
 
 /** The Redis-operation error counter for `test_table`, read off the registry. */
 async function redisErrorCount(operation: string): Promise<number> {
-  const metric = await register
-    .getSingleMetric("es_fold_cache_redis_error_total")
-    ?.get();
+  const metric = await register.getSingleMetric("es_fold_cache_redis_error_total")?.get();
   return (
     metric?.values.find(
       (v) =>
-        v.labels.projection_name === "test_table" &&
-        v.labels.operation === operation,
+        v.labels.projection_name === "test_table" && v.labels.operation === operation,
     )?.value ?? 0
   );
 }
@@ -112,8 +103,7 @@ async function cacheTotalCount(result: string): Promise<number> {
   const metric = await register.getSingleMetric("es_fold_cache_total")?.get();
   return (
     metric?.values.find(
-      (v) =>
-        v.labels.projection_name === "test_table" && v.labels.result === result,
+      (v) => v.labels.projection_name === "test_table" && v.labels.result === result,
     )?.value ?? 0
   );
 }
@@ -124,12 +114,10 @@ function createRedis() {
   return {
     values,
     get: vi.fn(async (key: string) => values.get(key)?.value ?? null),
-    set: vi.fn(
-      async (key: string, value: string, _mode: string, ttlSeconds: number) => {
-        values.set(key, { value, ttlSeconds });
-        return "OK";
-      },
-    ),
+    set: vi.fn(async (key: string, value: string, _mode: string, ttlSeconds: number) => {
+      values.set(key, { value, ttlSeconds });
+      return "OK";
+    }),
   };
 }
 
@@ -470,9 +458,7 @@ describe("RedisCachedFoldStore", () => {
     });
 
     async function freshStore(redis: ReturnType<typeof createRedis>) {
-      const { RedisCachedFoldStore: Fresh } = await import(
-        "../redisCachedFoldStore"
-      );
+      const { RedisCachedFoldStore: Fresh } = await import("../redisCachedFoldStore");
       return new Fresh<TestState>(createInnerStore().store, redis as never, {
         keyPrefix: "test_table",
       });
@@ -496,9 +482,7 @@ describe("RedisCachedFoldStore", () => {
 
       it("warns only once even when several stores resolve a clamped TTL", async () => {
         process.env[ENV] = "30";
-        const { RedisCachedFoldStore: Fresh } = await import(
-          "../redisCachedFoldStore"
-        );
+        const { RedisCachedFoldStore: Fresh } = await import("../redisCachedFoldStore");
 
         new Fresh<TestState>(createInnerStore().store, createRedis() as never, {
           keyPrefix: "test_table",

@@ -6,15 +6,9 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { Checkbox } from "../../../../components/ui/checkbox";
 import { toaster } from "../../../../components/ui/toaster";
 import { useEvaluatorOptions } from "../../hooks/useEvaluatorOptions";
-import {
-  LENS_CAPABILITIES,
-  type LensColumnOption,
-} from "../../lens/capabilities";
+import { LENS_CAPABILITIES, type LensColumnOption } from "../../lens/capabilities";
 import { isEvalColumnId, parseEvalColumnId } from "../../lens/evalColumnId";
-import {
-  type TimeColumnFormat,
-  useTimeFormatStore,
-} from "../../stores/timeFormatStore";
+import { type TimeColumnFormat, useTimeFormatStore } from "../../stores/timeFormatStore";
 import { useViewStore } from "../../stores/viewStore";
 import { evalColumnLabel } from "../TraceTable/evalColumns";
 import {
@@ -221,9 +215,7 @@ export const ColumnPickerContent: React.FC = () => {
   );
 };
 
-const SectionLabel: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => (
+const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Text
     textStyle="2xs"
     fontWeight="semibold"

@@ -18,9 +18,7 @@ class FixedTenantPort extends QuarantineTenantPort {
 }
 
 class StubTraceActivityPort extends QuarantineTraceActivityPort {
-  constructor(
-    private readonly rows: Array<{ sourceId: string; spanCount: number }>,
-  ) {
+  constructor(private readonly rows: Array<{ sourceId: string; spanCount: number }>) {
     super();
   }
 
@@ -89,9 +87,7 @@ describe("QuarantineFillEvaluatorService", () => {
     ).evaluate({ organizationId: ORGANIZATION_ID });
 
     expect(stats.spanCount).toBe(40);
-    expect(stats.perSource).toEqual([
-      { ingestionSourceId: "source", spanCount: 40 },
-    ]);
+    expect(stats.perSource).toEqual([{ ingestionSourceId: "source", spanCount: 40 }]);
   });
 
   it("fail-safes to zero stats when ClickHouse rejects the query", async () => {

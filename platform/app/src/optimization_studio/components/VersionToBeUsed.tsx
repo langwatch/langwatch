@@ -1,11 +1,4 @@
-import {
-  Field,
-  HStack,
-  IconButton,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Field, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { useFormContext } from "react-hook-form";
@@ -94,17 +87,11 @@ export function NewVersionFields({
   );
 
   const defaultModel = resolvedDefault.data?.model ?? "";
-  const { modelOption } = useModelSelectionOptions(
-    allModelOptions,
-    defaultModel,
-    "chat",
-  );
+  const { modelOption } = useModelSelectionOptions(allModelOptions, defaultModel, "chat");
   const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
-  const isModelConfigured =
-    resolvedDefault.data != null && !isDefaultModelDisabled;
+  const isModelConfigured = resolvedDefault.data != null && !isDefaultModelDisabled;
 
-  const generateCommitMessage =
-    api.workflow.generateCommitMessage.useMutation();
+  const generateCommitMessage = api.workflow.generateCommitMessage.useMutation();
 
   const userEditedCommitMessage = useRef(false);
   const hasTriggeredGeneration = useRef(false);
@@ -112,9 +99,9 @@ export function NewVersionFields({
   // on a re-run. The handle therefore lives on a ref and is only dropped on
   // unmount; clearing it per effect run would swallow the generation whenever
   // the deps changed before the timeout fired.
-  const generateCommitMessageTimerRef = useRef<ReturnType<
-    typeof setTimeout
-  > | null>(null);
+  const generateCommitMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const generateCommitMessageCallback = useCallback(
     (prevDsl: StudioWorkflow, newDsl: StudioWorkflow, options?: { force?: boolean }) => {
@@ -181,12 +168,7 @@ export function NewVersionFields({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    canSave,
-    previousVersion?.dsl,
-    resolvedDefault.isFetched,
-    isModelConfigured,
-  ]);
+  }, [canSave, previousVersion?.dsl, resolvedDefault.isFetched, isModelConfigured]);
 
   useEffect(
     () => () => {
@@ -238,9 +220,7 @@ export function NewVersionFields({
             endElement={
               generateCommitMessage.isPending ? (
                 <AISparklesLoader />
-              ) : canSave &&
-                resolvedDefault.isFetched &&
-                previousVersion?.dsl ? (
+              ) : canSave && resolvedDefault.isFetched && previousVersion?.dsl ? (
                 // Always offer an explicit generate affordance: a manual retry
                 // after a failed autogen, a re-roll of a description the user
                 // does not like, or (with no model configured) the trigger that
@@ -255,11 +235,9 @@ export function NewVersionFields({
                   data-testid="generate-commit-message-button"
                   onClick={() => {
                     userEditedCommitMessage.current = false;
-                    generateCommitMessageCallback(
-                      previousVersion.dsl!,
-                      getWorkflow(),
-                      { force: true },
-                    );
+                    generateCommitMessageCallback(previousVersion.dsl!, getWorkflow(), {
+                      force: true,
+                    });
                   }}
                 >
                   <Sparkles size={16} />

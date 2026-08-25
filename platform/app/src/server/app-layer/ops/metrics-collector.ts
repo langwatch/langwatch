@@ -13,16 +13,10 @@ import {
   windowPercentiles,
 } from "~/shared/ops/latency";
 import { normalizeErrorMessage } from "./normalize-error-message";
-import {
-  computeEngineCpuPercent,
-  type RedisCpuSample,
-} from "./redis-engine-cpu";
+import { computeEngineCpuPercent, type RedisCpuSample } from "./redis-engine-cpu";
 import type { QueueRepository } from "./repositories/queue.repository";
 import type { SnapshotRepository } from "./snapshot/snapshot.repository";
-import {
-  type DetailSnapshot,
-  SNAPSHOT_VERSION,
-} from "./snapshot/snapshot.types";
+import { type DetailSnapshot, SNAPSHOT_VERSION } from "./snapshot/snapshot.types";
 import type {
   DashboardData,
   JobNameMetrics,
@@ -118,11 +112,7 @@ export function mapJobTypeToPhase(
 ): "commands" | "projections" | "reactions" {
   if (!jobType) return "commands";
   const lower = jobType.toLowerCase();
-  if (
-    lower === "projection" ||
-    lower === "handler" ||
-    lower === "stateprojection"
-  )
+  if (lower === "projection" || lower === "handler" || lower === "stateprojection")
     return "projections";
   if (lower === "reactor" || lower === "reaction") return "reactions";
   return "commands";
@@ -152,10 +142,7 @@ interface PeakBucket {
 }
 
 /** Field-wise max, so neither side of a handover loses a peak it observed. */
-function mergePeakBucket(
-  mine: PeakBucket | undefined,
-  theirs: PeakBucket,
-): PeakBucket {
+function mergePeakBucket(mine: PeakBucket | undefined, theirs: PeakBucket): PeakBucket {
   if (!mine) return { ...theirs };
   return {
     completedPerSec: Math.max(mine.completedPerSec, theirs.completedPerSec),
@@ -182,8 +169,7 @@ function mergeThroughput({
   for (const point of mine) byTimestamp.set(point.timestamp, point);
   for (const point of theirs) byTimestamp.set(point.timestamp, point);
 
-  const cutoff =
-    Date.now() - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
+  const cutoff = Date.now() - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
   return Array.from(byTimestamp.values())
     .filter((point) => point.timestamp > cutoff)
     .sort((a, b) => a.timestamp - b.timestamp)
@@ -199,10 +185,7 @@ export function buildPipelineTree({
 }): PipelineNode[] {
   const pipelineMap = new Map<
     string,
-    Map<
-      string,
-      Map<string, { pending: number; active: number; blocked: number }>
-    >
+    Map<string, Map<string, { pending: number; active: number; blocked: number }>>
   >();
 
   const ensurePath = (pName: string, jType?: string, jName?: string) => {
@@ -426,10 +409,7 @@ export class OpsMetricsCollector {
     // Kick off the first collect without blocking start(); the interval below
     // will keep collecting on schedule. Errors are caught inside collect().
     void this.collect();
-    this.collectInterval = setInterval(
-      () => this.collect(),
-      METRICS_COLLECT_INTERVAL_MS,
-    );
+    this.collectInterval = setInterval(() => this.collect(), METRICS_COLLECT_INTERVAL_MS);
     this.discoveryInterval = setInterval(
       () => this.discoverQueues(),
       QUEUE_DISCOVERY_INTERVAL_MS,
@@ -483,10 +463,7 @@ export class OpsMetricsCollector {
     try {
       this.groupQueueNames = await this.queueRepo.discoverQueueNames();
     } catch (err) {
-      logger.warn(
-        { error: err },
-        "Queue discovery failed, keeping existing names",
-      );
+      logger.warn({ error: err }, "Queue discovery failed, keeping existing names");
     }
   }
 
@@ -567,8 +544,7 @@ export class OpsMetricsCollector {
         const existing = errorMap.get(key);
         if (existing) {
           existing.count++;
-          if (existing.sampleGroupIds.length < 5)
-            existing.sampleGroupIds.push(g.groupId);
+          if (existing.sampleGroupIds.length < 5) existing.sampleGroupIds.push(g.groupId);
         } else {
           errorMap.set(key, {
             normalizedMessage: normalized,
@@ -810,10 +786,7 @@ export class OpsMetricsCollector {
     for (const queueName of this.groupQueueNames) {
       for (let i = 0; i < 60; i++) {
         pipeline.hgetall(
-          latencyMinuteBucketKey(
-            queueName,
-            nowMs - i * LATENCY_MINUTE_BUCKET_MS,
-          ),
+          latencyMinuteBucketKey(queueName, nowMs - i * LATENCY_MINUTE_BUCKET_MS),
         );
         plan.push("minute");
       }
@@ -976,20 +949,11 @@ export class OpsMetricsCollector {
     if (latencies.length > 0) {
       latencies.sort((a, b) => a - b);
       const p50Idx = Math.floor(latencies.length * 0.5);
-      const p99Idx = Math.min(
-        latencies.length - 1,
-        Math.floor(latencies.length * 0.99),
-      );
+      const p99Idx = Math.min(latencies.length - 1, Math.floor(latencies.length * 0.99));
       this.currentLatencyP50Ms = latencies[p50Idx]!;
       this.currentLatencyP99Ms = latencies[p99Idx]!;
-      this.peakLatencyP50Ms = Math.max(
-        this.peakLatencyP50Ms,
-        this.currentLatencyP50Ms,
-      );
-      this.peakLatencyP99Ms = Math.max(
-        this.peakLatencyP99Ms,
-        this.currentLatencyP99Ms,
-      );
+      this.peakLatencyP50Ms = Math.max(this.peakLatencyP50Ms, this.currentLatencyP50Ms);
+      this.peakLatencyP99Ms = Math.max(this.peakLatencyP99Ms, this.currentLatencyP99Ms);
     }
 
     for (const key of ["commands", "projections", "reactions"] as const) {
@@ -1001,10 +965,7 @@ export class OpsMetricsCollector {
     }
     this.currentPhases = phases;
 
-    this.currentJobNameMetrics = await this.computeJobNameThroughput(
-      queues,
-      elapsed,
-    );
+    this.currentJobNameMetrics = await this.computeJobNameThroughput(queues, elapsed);
 
     return { newCompleted, newFailed };
   }
@@ -1024,9 +985,7 @@ export class OpsMetricsCollector {
     const dedupedJobNames: string[] = [];
     for (const jobName of uniqueJobNames) {
       for (const queueName of this.groupQueueNames) {
-        jobNameCounterPipeline.get(
-          `${queueName}:gq:stats:completed:${jobName}`,
-        );
+        jobNameCounterPipeline.get(`${queueName}:gq:stats:completed:${jobName}`);
         jobNameCounterPipeline.get(`${queueName}:gq:stats:failed:${jobName}`);
       }
       dedupedJobNames.push(jobName);
@@ -1034,10 +993,7 @@ export class OpsMetricsCollector {
     const jobNameCounterResults =
       dedupedJobNames.length > 0 ? await jobNameCounterPipeline.exec() : [];
 
-    const jobNameTotals = new Map<
-      string,
-      { completed: number; failed: number }
-    >();
+    const jobNameTotals = new Map<string, { completed: number; failed: number }>();
     if (jobNameCounterResults) {
       for (let i = 0; i < dedupedJobNames.length; i++) {
         let completed = 0;
@@ -1126,32 +1082,20 @@ export class OpsMetricsCollector {
         this.peakCompletedPerSec,
         state.peakCompletedPerSec,
       );
-      this.peakFailedPerSec = Math.max(
-        this.peakFailedPerSec,
-        state.peakFailedPerSec,
-      );
+      this.peakFailedPerSec = Math.max(this.peakFailedPerSec, state.peakFailedPerSec);
       this.peakIngestedPerSec = Math.max(
         this.peakIngestedPerSec,
         state.peakIngestedPerSec,
       );
-      this.peakLatencyP50Ms = Math.max(
-        this.peakLatencyP50Ms,
-        state.peakLatencyP50Ms,
-      );
-      this.peakLatencyP99Ms = Math.max(
-        this.peakLatencyP99Ms,
-        state.peakLatencyP99Ms,
-      );
+      this.peakLatencyP50Ms = Math.max(this.peakLatencyP50Ms, state.peakLatencyP50Ms);
+      this.peakLatencyP99Ms = Math.max(this.peakLatencyP99Ms, state.peakLatencyP99Ms);
 
       for (const [key, value] of Object.entries(state.peakPhases)) {
         this.peakPhases[key] = mergePeakBucket(this.peakPhases[key], value);
       }
 
       for (const [key, value] of state.peakJobNames) {
-        this.peakJobNames.set(
-          key,
-          mergePeakBucket(this.peakJobNames.get(key), value),
-        );
+        this.peakJobNames.set(key, mergePeakBucket(this.peakJobNames.get(key), value));
       }
 
       // Backfill parkedCount on points persisted before the Parked series
@@ -1172,10 +1116,7 @@ export class OpsMetricsCollector {
         this.latestTotalCompleted,
         state.latestTotalCompleted,
       );
-      this.latestTotalFailed = Math.max(
-        this.latestTotalFailed,
-        state.latestTotalFailed,
-      );
+      this.latestTotalFailed = Math.max(this.latestTotalFailed, state.latestTotalFailed);
     } catch (err) {
       logger.warn(
         { error: err },
@@ -1220,10 +1161,8 @@ export class OpsMetricsCollector {
       peakMemoryBytes: parseInt(get("used_memory_peak"), 10) || 0,
       maxMemoryBytes: parseInt(get("maxmemory"), 10) || 0,
       connectedClients: parseInt(get("connected_clients"), 10) || 0,
-      usedCpuUserMainThreadSeconds:
-        parseFloat(get("used_cpu_user_main_thread")) || 0,
-      usedCpuSysMainThreadSeconds:
-        parseFloat(get("used_cpu_sys_main_thread")) || 0,
+      usedCpuUserMainThreadSeconds: parseFloat(get("used_cpu_user_main_thread")) || 0,
+      usedCpuSysMainThreadSeconds: parseFloat(get("used_cpu_sys_main_thread")) || 0,
     };
   }
 
@@ -1319,11 +1258,7 @@ export class OpsMetricsCollector {
         for (const path of discoveredPaths) {
           pipelineBatch.zadd(KNOWN_PIPELINES_KEY, timestamp, path);
         }
-        pipelineBatch.zremrangebyscore(
-          KNOWN_PIPELINES_KEY,
-          0,
-          timestamp - 86400 * 1000,
-        );
+        pipelineBatch.zremrangebyscore(KNOWN_PIPELINES_KEY, 0, timestamp - 86400 * 1000);
         await pipelineBatch.exec();
       }
       const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, 9999);
@@ -1349,10 +1284,8 @@ export class OpsMetricsCollector {
       this.latestTotalFailed += newFailed;
 
       if (this.hasBaseline && elapsed > 0) {
-        this.currentCompletedPerSec =
-          Math.round((newCompleted / elapsed) * 100) / 100;
-        this.currentFailedPerSec =
-          Math.round((newFailed / elapsed) * 100) / 100;
+        this.currentCompletedPerSec = Math.round((newCompleted / elapsed) * 100) / 100;
+        this.currentFailedPerSec = Math.round((newFailed / elapsed) * 100) / 100;
 
         const ingestedDelta =
           totalInFlight - this.lastTotalInFlight + newCompleted + newFailed;
@@ -1363,10 +1296,7 @@ export class OpsMetricsCollector {
           this.peakCompletedPerSec,
           this.currentCompletedPerSec,
         );
-        this.peakFailedPerSec = Math.max(
-          this.peakFailedPerSec,
-          this.currentFailedPerSec,
-        );
+        this.peakFailedPerSec = Math.max(this.peakFailedPerSec, this.currentFailedPerSec);
         this.peakIngestedPerSec = Math.max(
           this.peakIngestedPerSec,
           this.currentIngestedPerSec,
@@ -1417,10 +1347,7 @@ export class OpsMetricsCollector {
         this.maybePublishDetail(queues);
       }
     } catch (err) {
-      logger.warn(
-        { error: err },
-        "Metrics collection failed, retrying next interval",
-      );
+      logger.warn({ error: err }, "Metrics collection failed, retrying next interval");
     } finally {
       this.isCollecting = false;
     }

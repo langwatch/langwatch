@@ -59,8 +59,8 @@ function EmailSuppressionsPage({
             Email Suppressions
           </Heading>
           <Text color="fg.muted">
-            Recipients who unsubscribed from this project&apos;s trigger
-            notifications. Removing an entry resumes delivery to that address.
+            Recipients who unsubscribed from this project&apos;s trigger notifications.
+            Removing an entry resumes delivery to that address.
           </Text>
         </VStack>
 
@@ -92,8 +92,7 @@ function EmailSuppressionsPage({
                   </EmptyState.Indicator>
                   <EmptyState.Title>No suppressions yet</EmptyState.Title>
                   <EmptyState.Description>
-                    When a recipient unsubscribes from a notification, they
-                    appear here.
+                    When a recipient unsubscribes from a notification, they appear here.
                   </EmptyState.Description>
                 </EmptyState.Content>
               </EmptyState.Root>
@@ -128,13 +127,8 @@ function EmailSuppressionsPage({
                           <Button
                             size="xs"
                             variant="ghost"
-                            loading={
-                              remove.isPending &&
-                              remove.variables?.id === row.id
-                            }
-                            onClick={() =>
-                              remove.mutate({ projectId, id: row.id })
-                            }
+                            loading={remove.isPending && remove.variables?.id === row.id}
+                            onClick={() => remove.mutate({ projectId, id: row.id })}
                             aria-label="Remove suppression"
                           >
                             <Trash2 size={14} />

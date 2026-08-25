@@ -1,7 +1,4 @@
-import type {
-  ModelDefaultScopeType,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { ModelDefaultScopeType, PrismaClient } from "~/generated/prisma/client";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
@@ -232,11 +229,7 @@ export async function getDefaultModelsSnapshot(
       .map(({ id, name, teamId: tid }) => ({ id, name, teamId: tid }));
   } else {
     // Personal-account project (no org/team): only project scope.
-    const writable = await probeProjectPermission(
-      ctx,
-      projectId,
-      "project:update",
-    );
+    const writable = await probeProjectPermission(ctx, projectId, "project:update");
     if (writable) {
       const refName =
         (
@@ -245,9 +238,7 @@ export async function getDefaultModelsSnapshot(
             select: { name: true },
           })
         )?.name ?? projectId;
-      writableProjects = [
-        { id: projectId, name: refName, teamId: teamId ?? "" },
-      ];
+      writableProjects = [{ id: projectId, name: refName, teamId: teamId ?? "" }];
     }
   }
   const available: ScopeAvailable = {
@@ -584,9 +575,7 @@ export async function getInheritedValuesForScopes(
       ? await ctx.prisma.modelDefaultConfig.findMany({
           where: {
             AND: [
-              params.excludeConfigId
-                ? { id: { not: params.excludeConfigId } }
-                : {},
+              params.excludeConfigId ? { id: { not: params.excludeConfigId } } : {},
               { scopes: { some: { OR: tierScopeIds } } },
             ],
           },
@@ -614,9 +603,7 @@ export async function getInheritedValuesForScopes(
     for (const t of tiers) {
       const attached = candidateConfigs
         .filter((c) =>
-          c.scopes.some(
-            (s) => s.scopeType === t.scopeType && s.scopeId === t.scopeId,
-          ),
+          c.scopes.some((s) => s.scopeType === t.scopeType && s.scopeId === t.scopeId),
         )
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       for (const c of attached) {
@@ -671,9 +658,7 @@ export async function getInheritedValuesForScopes(
       inherited[role] = hit;
       continue;
     }
-    const inferredModel = (inferencePlan as Record<string, string | undefined>)[
-      role
-    ];
+    const inferredModel = (inferencePlan as Record<string, string | undefined>)[role];
     if (inferredModel && inferenceProvider) {
       inherited[role] = {
         model: inferredModel,

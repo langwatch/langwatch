@@ -148,8 +148,7 @@ describe("reserveLangyGithubPrPermit", () => {
 
   describe("when Redis is unavailable", () => {
     it("fails open — does not strip GitHub from every connected user", async () => {
-      const { reserveLangyGithubPrPermit, LANGY_GITHUB_PRS_PER_DAY } =
-        await load();
+      const { reserveLangyGithubPrPermit, LANGY_GITHUB_PRS_PER_DAY } = await load();
       const out = await reserveLangyGithubPrPermit({ userId: "u1" });
       expect(out).toMatchObject({
         allowed: true,
@@ -193,9 +192,7 @@ describe("releaseLangyGithubPrPermit", () => {
   describe("when Redis is unavailable", () => {
     it("is a no-op (best-effort fairness, not a correctness boundary)", async () => {
       const { releaseLangyGithubPrPermit } = await load();
-      await expect(
-        releaseLangyGithubPrPermit({ userId: "u1" }),
-      ).resolves.toBeUndefined();
+      await expect(releaseLangyGithubPrPermit({ userId: "u1" })).resolves.toBeUndefined();
     });
   });
 });

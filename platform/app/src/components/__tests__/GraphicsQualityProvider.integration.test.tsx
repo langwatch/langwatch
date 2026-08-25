@@ -115,9 +115,7 @@ describe("<GraphicsQualityProvider/>", () => {
       advanceIdleGap(1000);
       runWindow({ windowMs: 1000, frames: 2 });
 
-      expect(
-        document.documentElement.getAttribute("data-reduced-graphics"),
-      ).toBe("true");
+      expect(document.documentElement.getAttribute("data-reduced-graphics")).toBe("true");
       expect(screen.getByTestId("consumer").textContent).toBe("true");
     });
 
@@ -131,9 +129,7 @@ describe("<GraphicsQualityProvider/>", () => {
       // 90 frames over 1000ms => ~90fps, comfortably above the floor.
       runWindow({ windowMs: 1000, frames: 90 });
 
-      expect(
-        document.documentElement.hasAttribute("data-reduced-graphics"),
-      ).toBe(false);
+      expect(document.documentElement.hasAttribute("data-reduced-graphics")).toBe(false);
       expect(screen.getByTestId("consumer").textContent).toBe("false");
     });
 
@@ -206,9 +202,7 @@ describe("<GraphicsQualityProvider/>", () => {
       advanceIdleGap(1000);
       runWindow({ windowMs: 1000, frames: 90 });
 
-      expect(
-        document.documentElement.hasAttribute("data-reduced-graphics"),
-      ).toBe(false);
+      expect(document.documentElement.hasAttribute("data-reduced-graphics")).toBe(false);
       expect(screen.getByTestId("consumer").textContent).toBe("false");
     });
   });
@@ -247,9 +241,7 @@ describe("<GraphicsQualityProvider/>", () => {
       advanceIdleGap(100);
       runWindow({ windowMs: 1000, frames: 90 });
 
-      expect(
-        document.documentElement.hasAttribute("data-reduced-graphics"),
-      ).toBe(false);
+      expect(document.documentElement.hasAttribute("data-reduced-graphics")).toBe(false);
       expect(screen.getByTestId("consumer").textContent).toBe("false");
     });
   });
@@ -301,9 +293,7 @@ describe("<GraphicsQualityProvider/>", () => {
       );
 
       expect(screen.getByTestId("consumer").textContent).toBe("true");
-      expect(
-        document.documentElement.getAttribute("data-reduced-graphics"),
-      ).toBe("true");
+      expect(document.documentElement.getAttribute("data-reduced-graphics")).toBe("true");
       // The probe is paused while overridden — nothing to measure, no
       // point spending rAF cycles on a result that would be discarded.
       expect(pendingCallback).toBeNull();
@@ -322,9 +312,7 @@ describe("<GraphicsQualityProvider/>", () => {
       );
 
       expect(screen.getByTestId("consumer").textContent).toBe("false");
-      expect(
-        document.documentElement.hasAttribute("data-reduced-graphics"),
-      ).toBe(false);
+      expect(document.documentElement.hasAttribute("data-reduced-graphics")).toBe(false);
       expect(pendingCallback).toBeNull();
     });
 

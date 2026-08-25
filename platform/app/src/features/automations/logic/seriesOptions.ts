@@ -18,9 +18,7 @@ export interface GraphSeriesOption {
  * list so callers still render without crashing — the series picker just
  * shows no options and the summary falls back to the raw key.
  */
-export function deriveSeriesOptionsFromGraph(
-  graph: unknown,
-): GraphSeriesOption[] {
+export function deriveSeriesOptionsFromGraph(graph: unknown): GraphSeriesOption[] {
   if (!graph || typeof graph !== "object") return [];
   const candidate = (graph as { series?: unknown }).series;
   if (!Array.isArray(candidate)) return [];
@@ -44,13 +42,9 @@ export function deriveSeriesOptionsFromGraph(
  * its series (deleted / re-ordered series) — callers fall back to the raw
  * key or their own placeholder copy.
  */
-export function resolveSeriesLabel(
-  graph: unknown,
-  seriesKey: string,
-): string | null {
+export function resolveSeriesLabel(graph: unknown, seriesKey: string): string | null {
   if (!seriesKey) return null;
   return (
-    deriveSeriesOptionsFromGraph(graph).find((o) => o.key === seriesKey)
-      ?.label ?? null
+    deriveSeriesOptionsFromGraph(graph).find((o) => o.key === seriesKey)?.label ?? null
   );
 }

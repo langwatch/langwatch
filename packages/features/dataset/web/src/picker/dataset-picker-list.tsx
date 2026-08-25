@@ -4,15 +4,7 @@
  * dataset node. Renders search, loading, empty states, and one card per
  * dataset with entry/column counts and last-edit date.
  */
-import {
-  Box,
-  chakra,
-  HStack,
-  Input,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, chakra, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { useMemo, useState } from "react";
 import { Database, Search } from "lucide-react";
@@ -52,9 +44,7 @@ export function DatasetPickerList({
     );
     const query = searchQuery.toLowerCase().trim();
     if (!query) return ready;
-    return ready.filter((dataset) =>
-      dataset.name.toLowerCase().includes(query),
-    );
+    return ready.filter((dataset) => dataset.name.toLowerCase().includes(query));
   }, [datasets, searchQuery]);
 
   return (
@@ -70,8 +60,8 @@ export function DatasetPickerList({
             {isError || datasets === undefined
               ? "Could not load datasets"
               : searchQuery
-              ? "No datasets match your search"
-              : "No datasets found in this project"}
+                ? "No datasets match your search"
+                : "No datasets found in this project"}
           </Box>
         ) : (
           filteredDatasets.map((dataset) => (
@@ -168,8 +158,7 @@ function DatasetCard({
             <Text>{columnCount} columns</Text>
             <Text>•</Text>
             <Text>
-              Updated{" "}
-              {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
+              Updated {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
             </Text>
           </HStack>
         </VStack>

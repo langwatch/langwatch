@@ -81,9 +81,7 @@ describe("the optional pair", () => {
   describe("given a value that was typed", () => {
     it("round-trips back to the same text", () => {
       for (const text of ["eu-central", "007", "12", "true", '"7"']) {
-        expect(displayOptionalValue(serializeOptionalScalarValue(text))).toBe(
-          text,
-        );
+        expect(displayOptionalValue(serializeOptionalScalarValue(text))).toBe(text);
       }
     });
   });

@@ -144,9 +144,7 @@ function getAnnotatedType(
  *    e.g. Copilot CLI — whose ingest path never lifted them into
  *    langwatch.input)
  */
-function extractInput(
-  spanAttributes: NormalizedAttributes,
-): SpanInputOutput | null {
+function extractInput(spanAttributes: NormalizedAttributes): SpanInputOutput | null {
   // Priority 1: gen_ai.input.messages → always chat_messages
   const genAiInputMessages = spanAttributes["gen_ai.input.messages"];
   if (genAiInputMessages !== undefined) {
@@ -185,8 +183,7 @@ function extractInput(
       // ClickHouse deserializeAttributes() may parse JSON-like strings back to
       // objects/arrays (e.g. "[{\"role\":...}]" → Array). Re-stringify to avoid
       // String([object Object]).
-      const textValue =
-        typeof lwInput === "string" ? lwInput : JSON.stringify(lwInput);
+      const textValue = typeof lwInput === "string" ? lwInput : JSON.stringify(lwInput);
       return { type: "text", value: textValue };
     }
     return {
@@ -231,9 +228,7 @@ function parseJsonOrText(value: unknown): SpanInputOutput {
  * 2. langwatch.output (text/json/structured)
  * 3. gen_ai.tool.call.result (tool spans from semconv-native emitters)
  */
-function extractOutput(
-  spanAttributes: NormalizedAttributes,
-): SpanInputOutput | null {
+function extractOutput(spanAttributes: NormalizedAttributes): SpanInputOutput | null {
   // Priority 1: gen_ai.output.messages → always chat_messages
   const genAiOutputMessages = spanAttributes["gen_ai.output.messages"];
   if (genAiOutputMessages !== undefined) {
@@ -268,10 +263,7 @@ function extractOutput(
         value: toJsonSerializable(lwOutput) as ChatMessage[],
       };
     }
-    if (
-      annotatedType === "evaluation_result" ||
-      annotatedType === "guardrail_result"
-    ) {
+    if (annotatedType === "evaluation_result" || annotatedType === "guardrail_result") {
       return {
         type: annotatedType,
         value: toJsonSerializable(lwOutput),
@@ -302,9 +294,7 @@ function extractOutput(
  * After canonicalization, tokens are at gen_ai.usage.input_tokens/output_tokens.
  * Falls back to gen_ai.usage.prompt_tokens/completion_tokens for compat.
  */
-function extractMetrics(
-  spanAttributes: NormalizedAttributes,
-): SpanMetrics | null {
+function extractMetrics(spanAttributes: NormalizedAttributes): SpanMetrics | null {
   const promptTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.input_tokens"] ??
       spanAttributes["gen_ai.usage.prompt_tokens"],
@@ -315,9 +305,7 @@ function extractMetrics(
       spanAttributes["gen_ai.usage.completion_tokens"],
   );
 
-  const reasoningTokens = coerceToNumber(
-    spanAttributes["gen_ai.usage.reasoning_tokens"],
-  );
+  const reasoningTokens = coerceToNumber(spanAttributes["gen_ai.usage.reasoning_tokens"]);
   const tokensEstimated = spanAttributes["langwatch.tokens.estimated"];
 
   // Canonical name with Mastra non-standard fallback
@@ -355,8 +343,7 @@ function extractMetrics(
     cache_read_input_tokens: cacheReadInputTokens,
     cache_creation_input_tokens: cacheCreationInputTokens,
     cost: cost,
-    tokens_estimated:
-      typeof tokensEstimated === "boolean" ? tokensEstimated : null,
+    tokens_estimated: typeof tokensEstimated === "boolean" ? tokensEstimated : null,
   };
 }
 
@@ -366,8 +353,7 @@ function extractMetrics(
  */
 function extractModel(spanAttributes: NormalizedAttributes): string | null {
   const model =
-    spanAttributes["gen_ai.response.model"] ??
-    spanAttributes["gen_ai.request.model"];
+    spanAttributes["gen_ai.response.model"] ?? spanAttributes["gen_ai.request.model"];
 
   return typeof model === "string" ? model : null;
 }
@@ -387,9 +373,7 @@ function extractVendor(spanAttributes: NormalizedAttributes): string | null {
  * Extracts RAG contexts from canonical span attributes only.
  * After canonicalization, RAG contexts are at langwatch.rag.contexts.
  */
-function extractContexts(
-  spanAttributes: NormalizedAttributes,
-): RAGChunk[] | undefined {
+function extractContexts(spanAttributes: NormalizedAttributes): RAGChunk[] | undefined {
   let contexts = spanAttributes["langwatch.rag.contexts"];
 
   // ClickHouse Map(String, String) stores arrays as JSON strings
@@ -412,8 +396,7 @@ function extractContexts(
     if (typeof ctx === "object" && ctx !== null) {
       const obj = ctx as Record<string, unknown>;
       return {
-        document_id:
-          typeof obj.document_id === "string" ? obj.document_id : null,
+        document_id: typeof obj.document_id === "string" ? obj.document_id : null,
         chunk_id: typeof obj.chunk_id === "string" ? obj.chunk_id : null,
         content: obj.content ?? obj,
       };
@@ -449,9 +432,7 @@ function extractError(
 
   const exceptionEvents = events.filter((e) => e.name === "exception");
   const latestExceptionEvent =
-    exceptionEvents.length > 0
-      ? exceptionEvents[exceptionEvents.length - 1]
-      : undefined;
+    exceptionEvents.length > 0 ? exceptionEvents[exceptionEvents.length - 1] : undefined;
 
   const eventMessage = latestExceptionEvent?.attributes["exception.message"];
   const attrMessage = spanAttributes["exception.message"];
@@ -466,14 +447,12 @@ function extractError(
     statusMessage ??
     "Unknown error";
 
-  const eventStacktrace =
-    latestExceptionEvent?.attributes["exception.stacktrace"];
+  const eventStacktrace = latestExceptionEvent?.attributes["exception.stacktrace"];
   const attrStacktrace = spanAttributes["exception.stacktrace"];
   const stacktrace =
     (typeof eventStacktrace === "string" ? eventStacktrace : undefined) ??
     (typeof attrStacktrace === "string" ? attrStacktrace : undefined);
-  const stacktraceArray =
-    typeof stacktrace === "string" ? stacktrace.split("\n") : [];
+  const stacktraceArray = typeof stacktrace === "string" ? stacktrace.split("\n") : [];
 
   return {
     has_error: true,
@@ -517,9 +496,7 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
     timestamps.first_token_at = firstTokenEvent.timeUnixMs;
   }
 
-  const spanType = normalizedSpan.spanAttributes[
-    "langwatch.span.type"
-  ] as SpanTypes;
+  const spanType = normalizedSpan.spanAttributes["langwatch.span.type"] as SpanTypes;
 
   const baseSpan: BaseSpan = {
     span_id: normalizedSpan.spanId,
@@ -565,8 +542,6 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
 /**
  * Maps multiple NormalizedSpans to legacy Span format.
  */
-export function mapNormalizedSpansToSpans(
-  normalizedSpans: NormalizedSpan[],
-): Span[] {
+export function mapNormalizedSpansToSpans(normalizedSpans: NormalizedSpan[]): Span[] {
   return normalizedSpans.map(mapNormalizedSpanToSpan);
 }

@@ -201,10 +201,7 @@ export class AppGovernanceOttlGateway extends GovernanceOttlGateway {
     }
     const timestamp = Math.floor(this.now() / 1_000).toString();
     const bodyJson = JSON.stringify(body);
-    const signature = sign(
-      this.secret,
-      canonical("POST", path, timestamp, bodyJson),
-    );
+    const signature = sign(this.secret, canonical("POST", path, timestamp, bodyJson));
     return await this.request(`${this.baseUrl.replace(/\/$/, "")}${path}`, {
       method: "POST",
       headers: {

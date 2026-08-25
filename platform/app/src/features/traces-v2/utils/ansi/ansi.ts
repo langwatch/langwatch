@@ -407,8 +407,7 @@ function scanCsi(
   const hasValidFinalByte = finalCode >= 0x40 && finalCode <= 0x7e;
   return {
     next: hasValidFinalByte ? j + 1 : j,
-    sgrParams:
-      hasValidFinalByte && input[j] === "m" ? input.slice(start + 2, j) : null,
+    sgrParams: hasValidFinalByte && input[j] === "m" ? input.slice(start + 2, j) : null,
   };
 }
 

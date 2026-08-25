@@ -7,10 +7,7 @@
  * list that could drift into agreement with a bug.
  */
 
-import type {
-  LangWatchQLQueryResult,
-  LangWatchQLSchema,
-} from "~/server/analytics/lwql";
+import type { LangWatchQLQueryResult, LangWatchQLSchema } from "~/server/analytics/lwql";
 
 /**
  * A response with two datasets, a gated column, units, join keys and example
@@ -97,11 +94,8 @@ export const SCHEMA_COLUMN_NAMES = SCHEMA_RESPONSE.datasets.flatMap((dataset) =>
 );
 
 /** Every column name the response marks available to this member. */
-export const SCHEMA_AVAILABLE_COLUMN_NAMES = SCHEMA_RESPONSE.datasets.flatMap(
-  (dataset) =>
-    dataset.columns
-      .filter((column) => column.available)
-      .map((column) => column.name),
+export const SCHEMA_AVAILABLE_COLUMN_NAMES = SCHEMA_RESPONSE.datasets.flatMap((dataset) =>
+  dataset.columns.filter((column) => column.available).map((column) => column.name),
 );
 
 export function lwqlResult(

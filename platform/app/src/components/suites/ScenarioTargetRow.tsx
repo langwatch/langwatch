@@ -44,11 +44,7 @@ const STATUS_CIRCLE_COLORS: Record<string, string> = {
   [ScenarioRunStatus.RUNNING]: "orange.400",
 };
 
-function MetricsTooltipContent({
-  scenarioRun,
-}: {
-  scenarioRun: ScenarioRunData;
-}) {
+function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
   const roleCosts = scenarioRun.roleCosts ?? {};
   const roleLatencies = scenarioRun.roleLatencies ?? {};
   const latencyRoles = Object.keys(roleLatencies).filter(
@@ -65,9 +61,7 @@ function MetricsTooltipContent({
         {scenarioRun.durationInMs > 0 && (
           <HStack justify="space-between">
             <Text color="fg.muted">Duration</Text>
-            <Text fontWeight="medium">
-              {formatLatency(scenarioRun.durationInMs)}
-            </Text>
+            <Text fontWeight="medium">{formatLatency(scenarioRun.durationInMs)}</Text>
           </HStack>
         )}
 
@@ -82,24 +76,15 @@ function MetricsTooltipContent({
         {/* Latency per role */}
         {latencyRoles.length > 0 && (
           <>
-            <Box
-              borderTopWidth="1px"
-              borderColor="border.emphasized"
-              marginX={-2}
-            />
+            <Box borderTopWidth="1px" borderColor="border.emphasized" marginX={-2} />
             <Text color="fg" fontWeight="semibold">
               Latency
             </Text>
             {latencyRoles.map((role) => {
               const latencies = roleLatencies[role]!;
-              const avg =
-                latencies.reduce((a, b) => a + b, 0) / latencies.length;
+              const avg = latencies.reduce((a, b) => a + b, 0) / latencies.length;
               return (
-                <HStack
-                  key={`lat-${role}`}
-                  justify="space-between"
-                  paddingLeft={2}
-                >
+                <HStack key={`lat-${role}`} justify="space-between" paddingLeft={2}>
                   <Text color="fg.muted">{role}</Text>
                   <Text fontWeight="medium">{formatLatency(avg)}</Text>
                 </HStack>
@@ -112,11 +97,7 @@ function MetricsTooltipContent({
         {costRoles.length > 0 && (
           <>
             {latencyRoles.length === 0 && (
-              <Box
-                borderTopWidth="1px"
-                borderColor="border.emphasized"
-                marginX={-2}
-              />
+              <Box borderTopWidth="1px" borderColor="border.emphasized" marginX={-2} />
             )}
             <Text color="fg" fontWeight="semibold">
               Cost
@@ -125,11 +106,7 @@ function MetricsTooltipContent({
               const costs = roleCosts[role]!;
               const total = costs.reduce((a, b) => a + b, 0);
               return (
-                <HStack
-                  key={`cost-${role}`}
-                  justify="space-between"
-                  paddingLeft={2}
-                >
+                <HStack key={`cost-${role}`} justify="space-between" paddingLeft={2}>
                   <Text color="fg.muted">{role}</Text>
                   <Text fontWeight="medium">{formatCost(total)}</Text>
                 </HStack>
@@ -143,10 +120,7 @@ function MetricsTooltipContent({
 }
 
 function StatusCircle({ status }: { status: ScenarioRunStatus }) {
-  if (
-    status === ScenarioRunStatus.QUEUED ||
-    status === ScenarioRunStatus.RUNNING
-  ) {
+  if (status === ScenarioRunStatus.QUEUED || status === ScenarioRunStatus.RUNNING) {
     return <Spinner size="xs" data-testid="queued-spinner" />;
   }
 
@@ -179,8 +153,7 @@ export function ScenarioTargetRow({
   const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
 
   const hasCancelButton = onCancel && isCancellableStatus(scenarioRun.status);
-  const hasMetrics =
-    scenarioRun.durationInMs > 0 || scenarioRun.totalCost != null;
+  const hasMetrics = scenarioRun.durationInMs > 0 || scenarioRun.totalCost != null;
   const prefetchRunState = usePrefetchRunState();
   const handlePrefetch = () => prefetchRunState(scenarioRun.scenarioRunId);
 
@@ -253,9 +226,7 @@ export function ScenarioTargetRow({
               opacity={isCancelling ? 0.6 : 1}
               flexShrink={0}
               _hover={
-                isCancelling
-                  ? undefined
-                  : { bg: "gray.100", borderColor: "gray.400" }
+                isCancelling ? undefined : { bg: "gray.100", borderColor: "gray.400" }
               }
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
@@ -286,16 +257,12 @@ export function ScenarioTargetRow({
             >
               <HStack gap={2} flexShrink={0} color="fg.subtle">
                 {scenarioRun.durationInMs > 0 && (
-                  <Text fontSize="11px">
-                    {formatLatency(scenarioRun.durationInMs)}
-                  </Text>
+                  <Text fontSize="11px">{formatLatency(scenarioRun.durationInMs)}</Text>
                 )}
                 {scenarioRun.totalCost != null && (
                   <>
                     <Text color="gray.300">{"⋅"}</Text>
-                    <Text fontSize="xs">
-                      {formatCost(scenarioRun.totalCost)}
-                    </Text>
+                    <Text fontSize="xs">{formatCost(scenarioRun.totalCost)}</Text>
                   </>
                 )}
               </HStack>

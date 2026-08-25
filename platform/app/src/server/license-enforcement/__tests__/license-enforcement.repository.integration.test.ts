@@ -106,11 +106,9 @@ describe("LicenseEnforcementRepository Integration", () => {
     await prisma.team.delete({ where: { id: team.id } }).catch(() => {
       /* ignore */
     });
-    await prisma.organization
-      .delete({ where: { id: organization.id } })
-      .catch(() => {
-        /* ignore */
-      });
+    await prisma.organization.delete({ where: { id: organization.id } }).catch(() => {
+      /* ignore */
+    });
   });
 
   // Helper to create a user with organization membership
@@ -160,9 +158,7 @@ describe("LicenseEnforcementRepository Integration", () => {
 
     it("returns zero when no Lite Member users exist", async () => {
       // Count before creating any more users
-      const externalCountBefore = await repository.getMembersLiteCount(
-        organization.id,
-      );
+      const externalCountBefore = await repository.getMembersLiteCount(organization.id);
 
       // Given: only ADMIN and MEMBER users (no additional Lite Member)
       await createOrgUser(OrganizationUserRole.ADMIN);

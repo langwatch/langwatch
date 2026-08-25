@@ -21,9 +21,7 @@ export interface StoredObjectsPublicApp {
 
 /** Thin public REST/RPC registration over the contract service capability. */
 export class StoredObjectsPublicApi {
-  static create(
-    options: StoredObjectsPublicApiOptions,
-  ): StoredObjectsPublicApi {
+  static create(options: StoredObjectsPublicApiOptions): StoredObjectsPublicApi {
     return new StoredObjectsPublicApi(options);
   }
 
@@ -32,16 +30,12 @@ export class StoredObjectsPublicApi {
     context.header("Cache-Control", "private, no-store");
   };
 
-  private constructor(
-    private readonly options: StoredObjectsPublicApiOptions,
-  ) {}
+  private constructor(private readonly options: StoredObjectsPublicApiOptions) {}
 
   install<TProject, TVariables extends Record<string, unknown>>(
     api: ServiceBuilder<TProject, TVariables, StoredObjectsPublicApp>,
   ): ServiceBuilder<TProject, TVariables, StoredObjectsPublicApp> {
-    const contract = createStoredObjectsPublicRpc(
-      this.options.maximumUploadBytes,
-    );
+    const contract = createStoredObjectsPublicRpc(this.options.maximumUploadBytes);
     const group = api.group("storedObjects", (builder) =>
       builder
         .withDocs({ tags: ["Stored Objects"] })

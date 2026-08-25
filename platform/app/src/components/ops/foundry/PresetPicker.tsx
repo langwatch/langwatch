@@ -127,12 +127,7 @@ export function PresetPicker() {
       </Button>
       {isOpen && (
         <>
-          <Box
-            position="fixed"
-            inset={0}
-            zIndex={40}
-            onClick={() => setIsOpen(false)}
-          />
+          <Box position="fixed" inset={0} zIndex={40} onClick={() => setIsOpen(false)} />
           <Box
             position="absolute"
             right={0}
@@ -160,13 +155,7 @@ export function PresetPicker() {
                 Mashup (random spans from all presets)
               </Button>
             </Flex>
-            <Text
-              fontSize="xs"
-              fontWeight="medium"
-              color="fg.muted"
-              px={2}
-              py={1}
-            >
+            <Text fontSize="xs" fontWeight="medium" color="fg.muted" px={2} py={1}>
               Built-in Presets
             </Text>
             {builtIn.map((preset) => (
@@ -225,11 +214,7 @@ export function PresetPicker() {
                     onClick={() => loadPreset(preset.id)}
                   >
                     <Flex w="full" justify="space-between" align="center">
-                      <Text
-                        fontSize="sm"
-                        fontWeight="medium"
-                        color="fg.default"
-                      >
+                      <Text fontSize="sm" fontWeight="medium" color="fg.default">
                         {preset.name}
                       </Text>
                       <Badge colorPalette="purple" size="sm">

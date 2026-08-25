@@ -166,9 +166,7 @@ export function resolveEligible({
 }): EligibleModelProvider[] {
   if (scopes.length === 0 || providers.length === 0) return [];
   const allowed =
-    providersAllowed && providersAllowed.length > 0
-      ? new Set(providersAllowed)
-      : null;
+    providersAllowed && providersAllowed.length > 0 ? new Set(providersAllowed) : null;
   const matchesScope = (
     mpScope: ModelProviderScopeEntry,
     vkScope: VirtualKeyScopeEntry,
@@ -178,15 +176,12 @@ export function resolveEligible({
     }
     if (mpScope.scopeType === "TEAM") {
       if (vkScope.scopeType === "ORGANIZATION") return false;
-      if (vkScope.scopeType === "TEAM")
-        return mpScope.scopeId === vkScope.scopeId;
+      if (vkScope.scopeType === "TEAM") return mpScope.scopeId === vkScope.scopeId;
       const teamOfVkProject = hierarchy.teamOfProject.get(vkScope.scopeId);
       return mpScope.scopeId === teamOfVkProject;
     }
     if (mpScope.scopeType === "PROJECT") {
-      return (
-        vkScope.scopeType === "PROJECT" && mpScope.scopeId === vkScope.scopeId
-      );
+      return vkScope.scopeType === "PROJECT" && mpScope.scopeId === vkScope.scopeId;
     }
     return false;
   };
@@ -228,8 +223,7 @@ export function resolveEligible({
   }
   return Array.from(result.values()).sort(
     (a, b) =>
-      scopeBreadthRank(a.definedAt.scopeType) -
-        scopeBreadthRank(b.definedAt.scopeType) ||
+      scopeBreadthRank(a.definedAt.scopeType) - scopeBreadthRank(b.definedAt.scopeType) ||
       a.label.localeCompare(b.label),
   );
 }

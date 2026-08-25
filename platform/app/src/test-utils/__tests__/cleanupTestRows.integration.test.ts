@@ -109,9 +109,7 @@ describe("cleanupTestRows (real DB)", () => {
       let neverAssignedFlagKey!: string;
 
       await expect(
-        cleanupTestRows(prisma, [
-          ["featureFlag", { key: neverAssignedFlagKey }],
-        ]),
+        cleanupTestRows(prisma, [["featureFlag", { key: neverAssignedFlagKey }]]),
       ).rejects.toThrow(/featureFlag\[0\]\.where\.key is undefined/);
 
       expect(
@@ -166,9 +164,7 @@ describe("cleanupTestRows (real DB)", () => {
         cleanupTestRows(prisma, [["organization", { id: ownId }]]),
       ).resolves.toBeUndefined();
 
-      expect(
-        await prisma.organization.findUnique({ where: { id: ownId } }),
-      ).toBeNull();
+      expect(await prisma.organization.findUnique({ where: { id: ownId } })).toBeNull();
       expect(
         await prisma.organization.findUnique({
           where: { id: bystanderOrgId },

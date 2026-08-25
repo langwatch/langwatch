@@ -158,9 +158,7 @@ function resolvePullConfig(
   // generic adapter can run unmodified. The locked-shape reference pullers
   // (copilot_studio / openai_compliance / claude_compliance) only need the
   // adapter id - their validateConfig override returns the frozen config.
-  const builders: Partial<
-    Record<SourceType, [() => unknown | null, string, string]>
-  > = {
+  const builders: Partial<Record<SourceType, [() => unknown | null, string, string]>> = {
     http_custom: [
       () => buildHttpCustomPullConfig(composer),
       "Missing required HTTP source fields",
@@ -212,9 +210,9 @@ function IngestionSourcesHeader({
           </Badge>
         </HStack>
         <Text color="fg.muted" fontSize="sm" maxW="3xl">
-          Configure cross-platform feeds for the activity monitor. Each source
-          maps an external AI platform into the normalised activity stream via
-          OTel push, webhook, or S3 audit drops.{" "}
+          Configure cross-platform feeds for the activity monitor. Each source maps an
+          external AI platform into the normalised activity stream via OTel push, webhook,
+          or S3 audit drops.{" "}
           <Link href="/governance" color="blue.600">
             Back to governance
           </Link>
@@ -269,12 +267,7 @@ function SourceGroupSection({
 }) {
   const { title, blurb } = SOURCE_GROUP_META[group];
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
       <HStack alignItems="start" marginBottom={3}>
         <VStack align="start" gap={0}>
           <Text fontSize="sm" fontWeight="semibold">
@@ -352,10 +345,7 @@ function IngestionSourceList({
           render "No sources configured here yet." off an empty `?? []`,
           which tells an admin their entire ingest fleet is gone when all
           that actually happened was a 403 or a DB blip. */}
-      <HandledErrorAlert
-        error={error}
-        fallbackTitle="Couldn't load ingestion sources"
-      />
+      <HandledErrorAlert error={error} fallbackTitle="Couldn't load ingestion sources" />
 
       {canRead &&
         (["realtime", "scheduled"] as const).map((group) => (
@@ -409,9 +399,7 @@ export function buildCreateInput({
     parserConfig: buildParserConfig(composer),
     pullConfig: resolved.pullConfig,
     pullSchedule: pullAdapter
-      ? composer.pullSchedule.trim() ||
-        PULL_SCHEDULE_DEFAULTS[pullAdapter] ||
-        null
+      ? composer.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS[pullAdapter] || null
       : null,
   };
 }
@@ -521,8 +509,7 @@ function useIngestionSourcesPage() {
     { enabled: !!orgId && canRead, refetchOnWindowFocus: false },
   );
   const utils = api.useUtils();
-  const refetch = () =>
-    utils.ingestionSources.list.invalidate({ organizationId: orgId });
+  const refetch = () => utils.ingestionSources.list.invalidate({ organizationId: orgId });
 
   const [composing, setComposing] = useState(false);
   const [composer, setComposer] = useState<ComposerState>(blankComposer());
@@ -623,12 +610,8 @@ function IngestionSourcesPage() {
           rotatingId={pendingId(mutations.rotate)}
           archivingId={pendingId(mutations.archive)}
           onEdit={setEditingSourceId}
-          onRotate={(id) =>
-            mutations.rotate.mutate({ organizationId: orgId, id })
-          }
-          onArchive={(id) =>
-            mutations.archive.mutate({ organizationId: orgId, id })
-          }
+          onRotate={(id) => mutations.rotate.mutate({ organizationId: orgId, id })}
+          onArchive={(id) => mutations.archive.mutate({ organizationId: orgId, id })}
         />
       </VStack>
 
@@ -659,8 +642,7 @@ function AddSourceControl({
   sourceCount: number;
   onAdd: (sourceType: SourceType) => void;
 }) {
-  const atCap =
-    !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP;
+  const atCap = !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP;
   return (
     <AddIngestionSourceMenu
       isEnterprise={isEnterprise}
@@ -703,8 +685,7 @@ function SourceRow({
   onArchive: () => void;
   canManage: boolean;
 }) {
-  const status =
-    STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
+  const status = STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
   const StatusIcon = status.icon;
   const typeLabel =
     SOURCE_TYPE_LABEL[source.sourceType as SourceType] ?? source.sourceType;
@@ -835,9 +816,7 @@ function SourceComposerDrawer({
               <Input
                 size="sm"
                 value={composer.name}
-                onChange={(e) =>
-                  setComposer({ ...composer, name: e.target.value })
-                }
+                onChange={(e) => setComposer({ ...composer, name: e.target.value })}
                 placeholder="Display name for this source"
               />
             </VStack>
@@ -864,27 +843,21 @@ function SourceComposerDrawer({
             <ParserConfigFields
               sourceType={composer.sourceType}
               values={composer.parserConfig}
-              onChange={(parserConfig) =>
-                setComposer({ ...composer, parserConfig })
-              }
+              onChange={(parserConfig) => setComposer({ ...composer, parserConfig })}
             />
 
             <OttlEditor
               organizationId={organizationId}
               sourceType={composer.sourceType}
               statements={composer.ottlStatements}
-              onChange={(ottlStatements) =>
-                setComposer({ ...composer, ottlStatements })
-              }
+              onChange={(ottlStatements) => setComposer({ ...composer, ottlStatements })}
               enabled={isOttlEnabledSourceType(composer.sourceType)}
             />
 
             <PullCadenceField
               sourceType={composer.sourceType}
               value={composer.pullSchedule}
-              onChange={(pullSchedule) =>
-                setComposer({ ...composer, pullSchedule })
-              }
+              onChange={(pullSchedule) => setComposer({ ...composer, pullSchedule })}
             />
           </VStack>
         </Drawer.Body>
@@ -958,9 +931,7 @@ function SourceEditDrawer({
     const parser = (source.parserConfig as Record<string, unknown>) ?? {};
     const raw = parser.ottlStatements;
     setStatements(
-      Array.isArray(raw)
-        ? raw.filter((s): s is string => typeof s === "string")
-        : [],
+      Array.isArray(raw) ? raw.filter((s): s is string => typeof s === "string") : [],
     );
   }, [source?.id]);
 
@@ -1017,11 +988,7 @@ function SourceEditDrawer({
               <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                 Display name
               </Text>
-              <Input
-                size="sm"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
+              <Input size="sm" value={name} onChange={(e) => setName(e.target.value)} />
             </VStack>
             <VStack align="stretch" gap={1}>
               <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -1044,9 +1011,8 @@ function SourceEditDrawer({
             />
 
             <Text fontSize="xs" color="fg.muted">
-              Source type and ingest secret are immutable after create. Use
-              “Rotate secret” for the secret; archive + recreate to change
-              source type.
+              Source type and ingest secret are immutable after create. Use “Rotate
+              secret” for the secret; archive + recreate to change source type.
             </Text>
           </VStack>
         </Drawer.Body>
@@ -1406,9 +1372,7 @@ export function isSecretFieldKey(key: string): boolean {
  * required-field markers rather than fire a dispatch that the worker
  * would reject at validateConfig time.
  */
-function buildHttpCustomPullConfig(
-  c: ComposerState,
-): Record<string, unknown> | null {
+function buildHttpCustomPullConfig(c: ComposerState): Record<string, unknown> | null {
   const p = c.parserConfig;
   const url = (p.url ?? "").trim();
   const headerName = (p.authHeaderName ?? "Authorization").trim();
@@ -1418,14 +1382,7 @@ function buildHttpCustomPullConfig(
   const cursorPath = (p.cursorJsonPath ?? "").trim();
   const cursorParam = (p.cursorQueryParam ?? "").trim() || "cursor";
   const mappingDsl = (p.eventMappingDsl ?? "").trim();
-  if (
-    !url ||
-    !headerValue ||
-    !token ||
-    !eventsPath ||
-    !cursorPath ||
-    !mappingDsl
-  ) {
+  if (!url || !headerValue || !token || !eventsPath || !cursorPath || !mappingDsl) {
     return null;
   }
   const eventMapping: Record<string, string> = {};
@@ -1449,9 +1406,7 @@ function buildHttpCustomPullConfig(
     cursorQueryParam: cursorParam,
     eventsJsonPath: eventsPath,
     schedule:
-      c.pullSchedule.trim() ||
-      PULL_SCHEDULE_DEFAULTS.http_polling ||
-      "*/15 * * * *",
+      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.http_polling || "*/15 * * * *",
     eventMapping,
     // Per HttpPollingPullerAdapter contract: caller-supplied secrets land
     // on `pullConfig.credentials.*` and the adapter substitutes them into
@@ -1488,9 +1443,7 @@ export function buildAnthropicAdminPullConfig(
     ...(bucketWidth ? { bucketWidth } : {}),
     ...(startingAt ? { startingAt } : {}),
     schedule:
-      c.pullSchedule.trim() ||
-      PULL_SCHEDULE_DEFAULTS.anthropic_admin ||
-      "0 * * * *",
+      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.anthropic_admin || "0 * * * *",
     credentials: { token },
   };
 }
@@ -1510,10 +1463,7 @@ function trimmedField(p: Record<string, string>, key: string): string {
  *
  * Empty yields undefined (the field is optional); rejected yields null.
  */
-function validBucketWidth(
-  raw: string,
-  report: string,
-): string | null | undefined {
+function validBucketWidth(raw: string, report: string): string | null | undefined {
   if (!raw) return undefined;
   if (report !== "usage") return null;
   return ["1m", "1h", "1d"].includes(raw) ? raw : null;
@@ -1555,9 +1505,7 @@ function normalizeStartingAt(raw: string): string | null | undefined {
 
   const match = STARTING_AT.exec(raw);
   if (!match) return null;
-  if (
-    !isRealCalendarDate(Number(match[1]), Number(match[2]), Number(match[3]))
-  ) {
+  if (!isRealCalendarDate(Number(match[1]), Number(match[2]), Number(match[3]))) {
     return null;
   }
 
@@ -1593,9 +1541,7 @@ function buildDatabricksGeniePullConfig(
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
     schedule:
-      c.pullSchedule.trim() ||
-      PULL_SCHEDULE_DEFAULTS.databricks_genie ||
-      "*/15 * * * *",
+      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.databricks_genie || "*/15 * * * *",
     // Omitted rather than sent empty: the adapter reads "no warehouse named" as
     // "do not price these questions", and an empty string is a warehouse id it
     // would then ask the workspace about.
@@ -1611,9 +1557,7 @@ function buildDatabricksGeniePullConfig(
  * signing in is complete — half of the service principal pair is not one,
  * and accepting it would save a source that cannot run.
  */
-function genieCredentialsFrom(
-  p: Record<string, string>,
-): Record<string, string> | null {
+function genieCredentialsFrom(p: Record<string, string>): Record<string, string> | null {
   const token = (p.credentialsToken ?? "").trim();
   const clientId = (p.credentialsClientId ?? "").trim();
   const clientSecret = (p.credentialsClientSecret ?? "").trim();
@@ -1692,12 +1636,7 @@ export function ParserConfigFields({
         Source-specific configuration
       </Text>
       {primaryFields.map((f) => (
-        <ParserConfigField
-          key={f.key}
-          field={f}
-          values={values}
-          onChange={onChange}
-        />
+        <ParserConfigField key={f.key} field={f} values={values} onChange={onChange} />
       ))}
       {advancedFields.length > 0 && (
         // Unmounted while closed so the collapsed state genuinely holds
@@ -1738,18 +1677,17 @@ export function ParserConfigFields({
  * schema, so the string would win and the source would fail validation at pull
  * time — a broken source that looked fine when it was saved.
  */
-const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
-  {
-    // `report`/`bucketWidth` pass through unchanged, but `startingAt` is
-    // normalized to an ISO instant by the builder — the raw form value
-    // winning the merge would fail the adapter's `.datetime()` check at
-    // pull time.
-    anthropic_admin: ["report", "bucketWidth", "startingAt"],
-    // `warehouseId` is here because the builder DROPS it when empty. Left to
-    // the merge, the raw form value would persist `warehouseId: ""`, which the
-    // adapter reads as a warehouse to go ask the workspace about.
-    databricks_genie: ["workspaceUrl", "spaceIds", "warehouseId"],
-  };
+const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> = {
+  // `report`/`bucketWidth` pass through unchanged, but `startingAt` is
+  // normalized to an ISO instant by the builder — the raw form value
+  // winning the merge would fail the adapter's `.datetime()` check at
+  // pull time.
+  anthropic_admin: ["report", "bucketWidth", "startingAt"],
+  // `warehouseId` is here because the builder DROPS it when empty. Left to
+  // the merge, the raw form value would persist `warehouseId: ""`, which the
+  // adapter reads as a warehouse to go ask the workspace about.
+  databricks_genie: ["workspaceUrl", "spaceIds", "warehouseId"],
+};
 
 // Skip sentinel for a parserConfig entry that must not be persisted, kept
 // distinct from a legitimately-falsy value an admin typed.
@@ -1991,10 +1929,9 @@ function SecretGraceNotice() {
       borderRadius="sm"
     >
       <Text fontSize="xs" color="amber.900">
-        <strong>Important:</strong> the secret above will not be shown again. We
-        retained the prior secret&apos;s hash for a 24h grace window if
-        you&apos;re rotating, so you have time to roll the new value through
-        every upstream client.
+        <strong>Important:</strong> the secret above will not be shown again. We retained
+        the prior secret&apos;s hash for a 24h grace window if you&apos;re rotating, so
+        you have time to roll the new value through every upstream client.
       </Text>
     </Box>
   );
@@ -2022,11 +1959,10 @@ function OtlpEndpointPanel({
         </Button>
       </HStack>
       <Text fontSize="xs" color="fg.muted">
-        Spans push into the LangWatch trace store with this source&apos;s origin
-        tag and become viewable in the trace viewer. If you are sending agent
-        traces from your own LangWatch SDK, use{" "}
-        <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key
-        - different auth, same trace store. See{" "}
+        Spans push into the LangWatch trace store with this source&apos;s origin tag and
+        become viewable in the trace viewer. If you are sending agent traces from your own
+        LangWatch SDK, use <Code fontSize="xs">/api/otel/v1/traces</Code> with your
+        project API key - different auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
           color="blue.600"
@@ -2057,13 +1993,7 @@ function ClaudeCodeEnvBlockPanel({
           <Copy size={12} /> Copy block
         </Button>
       </HStack>
-      <Code
-        padding={3}
-        fontSize="xs"
-        whiteSpace="pre"
-        display="block"
-        overflowX="auto"
-      >
+      <Code padding={3} fontSize="xs" whiteSpace="pre" display="block" overflowX="auto">
         {envBlock}
       </Code>
       <Text fontSize="xs" color="fg.muted">
@@ -2079,13 +2009,13 @@ function ClaudeCodeEnvBlockPanel({
         <Code fontSize="xs" backgroundColor="transparent">
           /v1/metrics
         </Code>{" "}
-        itself off the base endpoint. To attribute spend to a specific team or
-        department, also export{" "}
+        itself off the base endpoint. To attribute spend to a specific team or department,
+        also export{" "}
         <Code fontSize="xs" backgroundColor="transparent">
           OTEL_RESOURCE_ATTRIBUTES=team.id=…,department=…
         </Code>{" "}
-        - those land as resource attributes and slot into /governance&apos;s
-        spendByTeam without further config.
+        - those land as resource attributes and slot into /governance&apos;s spendByTeam
+        without further config.
       </Text>
     </VStack>
   );
@@ -2107,13 +2037,7 @@ function TestCurlPanel({
         Test it now - paste this into a terminal
       </Text>
       <Box position="relative">
-        <Code
-          display="block"
-          padding={3}
-          fontSize="xs"
-          whiteSpace="pre"
-          overflowX="auto"
-        >
+        <Code display="block" padding={3} fontSize="xs" whiteSpace="pre" overflowX="auto">
           {curl}
         </Code>
         <Button
@@ -2128,9 +2052,9 @@ function TestCurlPanel({
         </Button>
       </Box>
       <Text fontSize="xs" color="fg.muted">
-        Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success.
-        If you get <Code fontSize="xs">events: 0</Code> with a hint, the body
-        shape didn&apos;t parse - check the docs.
+        Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success. If you get{" "}
+        <Code fontSize="xs">events: 0</Code> with a hint, the body shape didn&apos;t parse
+        - check the docs.
       </Text>
     </VStack>
   );
@@ -2139,14 +2063,10 @@ function TestCurlPanel({
 /** The endpoints and source-type flags a secret reveal is rendered against. */
 function secretModalTargets(details: SecretDetails | null) {
   const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://langwatch.invalid";
+    typeof window !== "undefined" ? window.location.origin : "https://langwatch.invalid";
   return {
     otlpUrl: details ? `${baseUrl}/api/ingest/otel/${details.sourceId}` : "",
-    webhookUrl: details
-      ? `${baseUrl}/api/ingest/webhook/${details.sourceId}`
-      : "",
+    webhookUrl: details ? `${baseUrl}/api/ingest/webhook/${details.sourceId}` : "",
     usesPushUrl:
       details?.sourceType === "otel_generic" ||
       details?.sourceType === "claude_cowork" ||
@@ -2168,10 +2088,7 @@ function SecretModal({
     secretModalTargets(details);
 
   const claudeCodeEnvBlock = useMemo(
-    () =>
-      isClaudeCode && details
-        ? buildClaudeCodeEnvBlock({ details, otlpUrl })
-        : "",
+    () => (isClaudeCode && details ? buildClaudeCodeEnvBlock({ details, otlpUrl }) : ""),
     [isClaudeCode, details, otlpUrl],
   );
 
@@ -2216,9 +2133,9 @@ function SecretModal({
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              This is the only time we&apos;ll show this secret. Save it
-              somewhere safe and paste it into the upstream platform&apos;s
-              admin console. We store only its hash.
+              This is the only time we&apos;ll show this secret. Save it somewhere safe
+              and paste it into the upstream platform&apos;s admin console. We store only
+              its hash.
             </Text>
             <VStack align="stretch" gap={1}>
               <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -2231,26 +2148,15 @@ function SecretModal({
                 </Badge>
               </Text>
             </VStack>
-            <IngestSecretPanel
-              secret={details.secret}
-              copied={copied}
-              onCopy={copy}
-            />
-            {usesPushUrl && (
-              <OtlpEndpointPanel otlpUrl={otlpUrl} onCopy={copy} />
-            )}
+            <IngestSecretPanel secret={details.secret} copied={copied} onCopy={copy} />
+            {usesPushUrl && <OtlpEndpointPanel otlpUrl={otlpUrl} onCopy={copy} />}
             {usesWebhookUrl && (
               <WebhookEndpointPanel webhookUrl={webhookUrl} onCopy={copy} />
             )}
             {isClaudeCode && (
-              <ClaudeCodeEnvBlockPanel
-                envBlock={claudeCodeEnvBlock}
-                onCopy={copy}
-              />
+              <ClaudeCodeEnvBlockPanel envBlock={claudeCodeEnvBlock} onCopy={copy} />
             )}
-            {testCurl && (
-              <TestCurlPanel curl={testCurl} copied={copied} onCopy={copy} />
-            )}
+            {testCurl && <TestCurlPanel curl={testCurl} copied={copied} onCopy={copy} />}
             <SecretGraceNotice />
           </VStack>
         </DialogBody>

@@ -41,9 +41,7 @@ export function WebhookDestinationCell({
 }: {
   endpoint: WebhookDestinationSummary;
 }) {
-  const address = endpoint.sqs
-    ? queueLabel(endpoint.sqs)
-    : (endpoint.url ?? "");
+  const address = endpoint.sqs ? queueLabel(endpoint.sqs) : (endpoint.url ?? "");
   const fullAddress = endpoint.sqs?.queueUrl ?? endpoint.url ?? "";
   return (
     <Table.Cell maxWidth="360px">

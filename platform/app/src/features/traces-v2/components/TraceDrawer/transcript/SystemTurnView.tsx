@@ -15,9 +15,7 @@ export function SystemTurnView({
   onCollapse?: () => void;
 }) {
   const text = blocks
-    .filter(
-      (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
-    )
+    .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
     .map((b) => b.text)
     .join("\n");
   return (
@@ -28,11 +26,7 @@ export function SystemTurnView({
       </Flex>
       <Box textStyle="xs" color="fg.muted">
         {text ? (
-          <RenderedMarkdown
-            markdown={asMarkdownBody(text)}
-            paddingX={0}
-            paddingY={0}
-          />
+          <RenderedMarkdown markdown={asMarkdownBody(text)} paddingX={0} paddingY={0} />
         ) : (
           <Text>—</Text>
         )}

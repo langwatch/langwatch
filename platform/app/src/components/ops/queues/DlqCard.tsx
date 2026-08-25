@@ -178,9 +178,7 @@ function DlqToolbar({
           type="number"
           value={canaryCount}
           onChange={(e) =>
-            onCanaryCountChange(
-              Math.max(1, Math.min(100, parseInt(e.target.value) || 5)),
-            )
+            onCanaryCountChange(Math.max(1, Math.min(100, parseInt(e.target.value) || 5)))
           }
           width="50px"
         />
@@ -321,9 +319,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
             canaryCount={canaryCount}
             onCanaryCountChange={setCanaryCount}
             onBulk={(kind, queueName) =>
-              actions.setPending(
-                bulkActionFor({ kind, queueName, shownGroups }),
-              )
+              actions.setPending(bulkActionFor({ kind, queueName, shownGroups }))
             }
             onCanary={actions.setCanaryTarget}
           />
@@ -464,9 +460,7 @@ function DlqTable({
             <Table.ColumnHeader textAlign="end" width="50px">
               Jobs
             </Table.ColumnHeader>
-            {canManage && (
-              <Table.ColumnHeader width="130px">Actions</Table.ColumnHeader>
-            )}
+            {canManage && <Table.ColumnHeader width="130px">Actions</Table.ColumnHeader>}
           </Table.Row>
         </Table.Header>
         <Table.Body>
@@ -480,11 +474,7 @@ function DlqTable({
               return `${g.queueName}:${g.groupId}`;
             }}
             renderRow={(i) => (
-              <DlqRow
-                group={shownGroups[i]!}
-                canManage={canManage}
-                onAct={onAct}
-              />
+              <DlqRow group={shownGroups[i]!} canManage={canManage} onAct={onAct} />
             )}
           />
         </Table.Body>

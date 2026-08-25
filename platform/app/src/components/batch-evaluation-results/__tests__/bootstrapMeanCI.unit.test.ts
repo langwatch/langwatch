@@ -87,9 +87,7 @@ describe("bootstrapMeanCI", () => {
       // The reason this is a bootstrap and not mean ± 1.96·SE. Costs pile up
       // near a floor with a long tail, and the normal approximation happily
       // puts the lower bound below zero, which is not a possible cost.
-      const skewed = [
-        0.0001, 0.0001, 0.0002, 0.0001, 0.0002, 0.0001, 0.0001, 0.05,
-      ];
+      const skewed = [0.0001, 0.0001, 0.0002, 0.0001, 0.0002, 0.0001, 0.0001, 0.05];
       const ci = bootstrapMeanCI({ values: skewed })!;
 
       expect(ci[0]).toBeGreaterThan(0);

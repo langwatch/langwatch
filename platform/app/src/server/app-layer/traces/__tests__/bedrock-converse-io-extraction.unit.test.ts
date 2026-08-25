@@ -111,9 +111,7 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
             "gen_ai.prompt": JSON.stringify([
               {
                 role: "user",
-                content: [
-                  { type: "text", text: "summarise this shipping manifest" },
-                ],
+                content: [{ type: "text", text: "summarise this shipping manifest" }],
               },
             ]),
             "gen_ai.completion": JSON.stringify([
@@ -205,9 +203,7 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
             "gen_ai.completion": JSON.stringify([
               {
                 role: "assistant",
-                content: [
-                  { toolUse: { toolUseId: "tool-1", name: "lookup_order" } },
-                ],
+                content: [{ toolUse: { toolUseId: "tool-1", name: "lookup_order" } }],
               },
             ]),
           },

@@ -62,13 +62,7 @@ function extractTextParts(parts: unknown[]): string {
  * user turns in blue on the right, agent turns muted on the left,
  * each with the speaker-side corner clipped.
  */
-function PreviewBubble({
-  isUser,
-  children,
-}: {
-  isUser: boolean;
-  children: ReactNode;
-}) {
+function PreviewBubble({ isUser, children }: { isUser: boolean; children: ReactNode }) {
   return (
     <Box
       bg={isUser ? "blue.subtle" : "bg.muted"}
@@ -115,22 +109,16 @@ function TypingIndicator() {
   );
 }
 
-export function MessagePreview({
-  messages,
-  streamingMessages,
-}: MessagePreviewProps) {
+export function MessagePreview({ messages, streamingMessages }: MessagePreviewProps) {
   // Build set of server message IDs for deduplication
-  const serverMessageIds = new Set(
-    (messages ?? []).map((m) => m.id).filter(Boolean),
-  );
+  const serverMessageIds = new Set((messages ?? []).map((m) => m.id).filter(Boolean));
 
   // Filter streaming messages not yet in server data
   const pendingStreaming = (streamingMessages ?? []).filter(
     (sm) => !serverMessageIds.has(sm.messageId),
   );
 
-  const allEmpty =
-    (!messages || messages.length === 0) && pendingStreaming.length === 0;
+  const allEmpty = (!messages || messages.length === 0) && pendingStreaming.length === 0;
 
   if (allEmpty) {
     return (
@@ -193,34 +181,26 @@ export function MessagePreview({
         const toolCalls =
           "tool_calls" in message && message.tool_calls
             ? message.tool_calls
-            : "toolCalls" in message &&
-                (message as Record<string, unknown>).toolCalls
+            : "toolCalls" in message && (message as Record<string, unknown>).toolCalls
               ? ((message as Record<string, unknown>).toolCalls as Array<{
                   function?: { name?: string };
                 }>)
               : null;
         if (toolCalls) {
-          return toolCalls.map(
-            (tc: { function?: { name?: string } }, tcIdx: number) => (
-              <HStack
-                key={`${message.id ?? index}-tc-${tcIdx}`}
-                alignSelf="flex-start"
-                gap={1}
-              >
-                <Box color="orange.fg">
-                  <Settings size={10} />
-                </Box>
-                <Text
-                  fontSize="2xs"
-                  color="orange.fg"
-                  fontWeight="medium"
-                  lineClamp={1}
-                >
-                  {tc.function?.name ?? "tool"}
-                </Text>
-              </HStack>
-            ),
-          );
+          return toolCalls.map((tc: { function?: { name?: string } }, tcIdx: number) => (
+            <HStack
+              key={`${message.id ?? index}-tc-${tcIdx}`}
+              alignSelf="flex-start"
+              gap={1}
+            >
+              <Box color="orange.fg">
+                <Settings size={10} />
+              </Box>
+              <Text fontSize="2xs" color="orange.fg" fontWeight="medium" lineClamp={1}>
+                {tc.function?.name ?? "tool"}
+              </Text>
+            </HStack>
+          ));
         }
 
         // Tool results
@@ -228,11 +208,7 @@ export function MessagePreview({
           const resultText = textContent(message.content);
           if (!resultText) return null;
           return (
-            <Box
-              key={message.id ?? index}
-              alignSelf="flex-start"
-              maxWidth="85%"
-            >
+            <Box key={message.id ?? index} alignSelf="flex-start" maxWidth="85%">
               <Box
                 bg="bg.subtle"
                 borderRadius="lg"

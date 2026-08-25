@@ -62,13 +62,10 @@ const apiResponseVersionOutputSchema = z.object({
  *
  * Includes llm config + version data
  */
-export const apiResponsePromptWithVersionDataSchema =
-  apiResponsePromptSchemaBase.merge(
-    apiResponseVersionOutputSchema.omit({
-      configId: true,
-    }),
-  );
+export const apiResponsePromptWithVersionDataSchema = apiResponsePromptSchemaBase.merge(
+  apiResponseVersionOutputSchema.omit({
+    configId: true,
+  }),
+);
 
-export type ApiResponsePrompt = z.infer<
-  typeof apiResponsePromptWithVersionDataSchema
->;
+export type ApiResponsePrompt = z.infer<typeof apiResponsePromptWithVersionDataSchema>;

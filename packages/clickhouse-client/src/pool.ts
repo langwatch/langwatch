@@ -138,13 +138,8 @@ function isUsableInteger(value: number | undefined): value is number {
  * of shrinking it - the opposite of what the safety factor is for. Anything
  * that is not a positive integer falls back to the default.
  */
-function positiveIntegerOr(
-  value: number | undefined,
-  fallback: number,
-): number {
-  return value !== undefined && Number.isInteger(value) && value > 0
-    ? value
-    : fallback;
+function positiveIntegerOr(value: number | undefined, fallback: number): number {
+  return value !== undefined && Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
 /**
@@ -165,17 +160,12 @@ function rawFleetPoolCeiling(input: PoolSizingInput): number | null {
     input.serverMaxConcurrentQueries,
     DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
   );
-  const clients = positiveIntegerOr(
-    input.clientsPerProcess,
-    DEFAULT_CLIENTS_PER_PROCESS,
-  );
+  const clients = positiveIntegerOr(input.clientsPerProcess, DEFAULT_CLIENTS_PER_PROCESS);
   const nodes = positiveIntegerOr(input.serverNodes, DEFAULT_SERVER_NODES);
 
   // serverMax is per node, so the cluster's budget is the per-node allowance
   // times the nodes the fleet can reach.
-  return Math.floor(
-    (serverMax * nodes * FLEET_SAFETY_FACTOR) / (replicas * clients),
-  );
+  return Math.floor((serverMax * nodes * FLEET_SAFETY_FACTOR) / (replicas * clients));
 }
 
 /**
@@ -194,9 +184,7 @@ export function deriveFleetPoolCeiling(input: PoolSizingInput): number | null {
  * than a number so the caller owns the reporting, and so a conflict between an
  * override and the fleet budget is visible instead of silent.
  */
-export function resolvePoolSize(
-  input: PoolSizingInput = {},
-): PoolSizingDecision {
+export function resolvePoolSize(input: PoolSizingInput = {}): PoolSizingDecision {
   const raw = rawFleetPoolCeiling(input);
   const derivedCeiling =
     raw === null ? null : Math.min(MAX_POOL_SIZE, Math.max(MIN_POOL_SIZE, raw));
@@ -212,8 +200,7 @@ export function resolvePoolSize(
       source: "override",
       derivedCeiling,
       exceedsBudget:
-        infeasible ||
-        (derivedCeiling !== null && input.override > derivedCeiling),
+        infeasible || (derivedCeiling !== null && input.override > derivedCeiling),
       rejectedOverride: undefined,
     };
   }

@@ -58,9 +58,9 @@ describe("PromptTagAssignmentRepository", () => {
           projectId: "project-1",
           promptTag: { id: "ptag_production", name: "production" },
         };
-        (
-          prisma.promptTagAssignment.upsert as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(mockTag);
+        (prisma.promptTagAssignment.upsert as ReturnType<typeof vi.fn>).mockResolvedValue(
+          mockTag,
+        );
         const repo = new PromptTagAssignmentRepository(prisma);
 
         const result = await repo.assignTag({

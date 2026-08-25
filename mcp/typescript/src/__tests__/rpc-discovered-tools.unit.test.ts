@@ -42,16 +42,13 @@ const LIST_OPERATION = {
   status: 200,
 };
 
-function indexResponse(services = [
-  { name: "things", discover: "/api/things/latest/rpc.discover" },
-]) {
+function indexResponse(
+  services = [{ name: "things", discover: "/api/things/latest/rpc.discover" }],
+) {
   return { openapi: "/.well-known/openapi", services };
 }
 
-function catalogueResponse(operations: unknown[] = [
-  CREATE_OPERATION,
-  LIST_OPERATION,
-]) {
+function catalogueResponse(operations: unknown[] = [CREATE_OPERATION, LIST_OPERATION]) {
   return { openapi: "/.well-known/openapi", operations };
 }
 
@@ -174,10 +171,8 @@ describe("rpc.discover-driven tools", () => {
   describe("when a tool is called", () => {
     async function registeredHandlerFor(toolName: string) {
       mockCatalogueFetch();
-      const {
-        discoverRpcTools,
-        registerDiscoveredRpcTools,
-      } = await import("../tools/rpc-discovered.js");
+      const { discoverRpcTools, registerDiscoveredRpcTools } =
+        await import("../tools/rpc-discovered.js");
       const tools = await discoverRpcTools();
 
       const registered = new Map<string, unknown>();
@@ -185,11 +180,7 @@ describe("rpc.discover-driven tools", () => {
         registerTool: (name: string, _config: unknown, handler: unknown) =>
           registered.set(name, handler),
       };
-      registerDiscoveredRpcTools(
-        fakeServer as never,
-        tools,
-        () => undefined,
-      );
+      registerDiscoveredRpcTools(fakeServer as never, tools, () => undefined);
       const handler = registered.get(toolName);
       expect(handler).toBeDefined();
       return handler as (args: unknown) => Promise<{
@@ -250,10 +241,8 @@ describe("rpc.discover-driven tools", () => {
 
   it("registers the discovered tools on the real MCP server", async () => {
     mockCatalogueFetch();
-    const {
-      discoverRpcTools,
-      setDiscoveredRpcTools,
-    } = await import("../tools/rpc-discovered.js");
+    const { discoverRpcTools, setDiscoveredRpcTools } =
+      await import("../tools/rpc-discovered.js");
     setDiscoveredRpcTools(await discoverRpcTools());
 
     const { createMcpServer } = await import("../create-mcp-server.js");

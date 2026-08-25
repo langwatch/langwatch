@@ -229,10 +229,7 @@ export const getModelMetadata = (
 /**
  * Get model options for a specific provider and mode
  */
-export const getProviderModelOptions = (
-  provider: string,
-  mode: "chat" | "embedding",
-) => {
+export const getProviderModelOptions = (provider: string, mode: "chat" | "embedding") => {
   return Object.entries(llmModels.models)
     .filter(([_, model]) => model.provider === provider && model.mode === mode)
     .map(([_, model]) => ({
@@ -245,9 +242,7 @@ export const getProviderModelOptions = (
  * Get all models for a provider
  */
 export const getModelsForProvider = (provider: string): LLMModelEntry[] => {
-  return Object.values(llmModels.models).filter(
-    (model) => model.provider === provider,
-  );
+  return Object.values(llmModels.models).filter((model) => model.provider === provider);
 };
 
 /**
@@ -292,10 +287,7 @@ export function isElevenLabsHost(value: string | null | undefined): boolean {
   }
   if (url.protocol !== "https:") return false;
   const host = url.hostname.toLowerCase();
-  return (
-    host === ELEVENLABS_HOST_SUFFIX ||
-    host.endsWith(`.${ELEVENLABS_HOST_SUFFIX}`)
-  );
+  return host === ELEVENLABS_HOST_SUFFIX || host.endsWith(`.${ELEVENLABS_HOST_SUFFIX}`);
 }
 
 // ============================================================================
@@ -351,8 +343,7 @@ export const modelProviders = {
           // as guidance rather than as a schema complaint.
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message:
-              "Add an API key, or a base URL if your endpoint does not need one.",
+            message: "Add an API key, or a base URL if your endpoint does not need one.",
           });
         }
       }),
@@ -383,8 +374,7 @@ export const modelProviders = {
           // as guidance rather than as a schema complaint.
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message:
-              "Add an API key, or a base URL if your endpoint does not need one.",
+            message: "Add an API key, or a base URL if your endpoint does not need one.",
           });
         }
       }),
@@ -439,9 +429,7 @@ export const modelProviders = {
         if (!!data.GEMINI_PROJECT !== !!data.GEMINI_LOCATION) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            path: data.GEMINI_PROJECT
-              ? ["GEMINI_LOCATION"]
-              : ["GEMINI_PROJECT"],
+            path: data.GEMINI_PROJECT ? ["GEMINI_LOCATION"] : ["GEMINI_PROJECT"],
             message:
               "Fill in both the project and the location, or leave both empty for an AI Studio key.",
           });
@@ -495,19 +483,14 @@ export const modelProviders = {
       // both send the customer's xi-api-key to this host, and the gateway's
       // endpoint policy only refuses private addresses, so without this any
       // public host would be a place to have the key delivered.
-      ELEVENLABS_BASE_URL: z
-        .string()
-        .nullable()
-        .optional()
-        .refine(isElevenLabsHost, {
-          message:
-            "must be an https URL on elevenlabs.io, for example https://api.elevenlabs.io or a residency host such as https://api.eu.residency.elevenlabs.io",
-        }),
+      ELEVENLABS_BASE_URL: z.string().nullable().optional().refine(isElevenLabsHost, {
+        message:
+          "must be an https URL on elevenlabs.io, for example https://api.elevenlabs.io or a residency host such as https://api.eu.residency.elevenlabs.io",
+      }),
     }),
     optionalKeys: ["ELEVENLABS_WEBHOOK_SECRET", "ELEVENLABS_BASE_URL"],
     enabledSince: new Date("2026-07-25"),
-    blurb:
-      "Voice models for lifelike text to speech and accurate transcription.",
+    blurb: "Voice models for lifelike text to speech and accurate transcription.",
   },
   azure: {
     name: "Azure OpenAI",
@@ -720,14 +703,12 @@ export function hasVariantSuffix(modelId: string): boolean {
  * Maps to the new registry format
  * Excludes models with variant suffixes (:free, :thinking, etc.)
  */
-export const allLitellmModels: Record<
-  string,
-  { mode: "chat" | "embedding" | "audio" }
-> = Object.fromEntries(
-  Object.entries(llmModels.models)
-    .filter(([id]) => !hasVariantSuffix(id))
-    .map(([id, model]) => [id, { mode: model.mode }]),
-);
+export const allLitellmModels: Record<string, { mode: "chat" | "embedding" | "audio" }> =
+  Object.fromEntries(
+    Object.entries(llmModels.models)
+      .filter(([id]) => !hasVariantSuffix(id))
+      .map(([id, model]) => [id, { mode: model.mode }]),
+  );
 
 // ============================================================================
 // Utility Functions

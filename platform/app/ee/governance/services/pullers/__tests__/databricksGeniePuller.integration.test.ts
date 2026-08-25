@@ -236,10 +236,7 @@ async function seedSource(params: {
       parserConfig: params.pullConfig,
     },
   });
-  const govProject = await ensureHiddenGovernanceProject(
-    prisma,
-    organization.id,
-  );
+  const govProject = await ensureHiddenGovernanceProject(prisma, organization.id);
   return {
     organizationId: organization.id,
     teamId: team.id,
@@ -249,10 +246,7 @@ async function seedSource(params: {
 }
 
 async function dropTenant(tenantId: string): Promise<void> {
-  for (const table of [
-    "governance_ocsf_events",
-    "gateway_budget_ledger_events",
-  ]) {
+  for (const table of ["governance_ocsf_events", "gateway_budget_ledger_events"]) {
     await ch
       .command({
         query: `DELETE FROM ${table} WHERE TenantId = {tenantId:String}`,
@@ -624,14 +618,14 @@ async function startFixtureServer(params: {
       return;
     }
 
-    const conversations =
-      /^\/api\/2\.0\/genie\/spaces\/([^/]+)\/conversations$/.exec(url.pathname);
+    const conversations = /^\/api\/2\.0\/genie\/spaces\/([^/]+)\/conversations$/.exec(
+      url.pathname,
+    );
     if (conversations) {
       const spaceId = conversations[1]!;
       params.onBeforeSpace?.(spaceId);
       conversationRequests.push(url.search);
-      if (!url.searchParams.get("page_token"))
-        conversationSpaceIds.push(spaceId);
+      if (!url.searchParams.get("page_token")) conversationSpaceIds.push(spaceId);
 
       const forcedConversations = params.conversationsStatus?.(spaceId);
       if (forcedConversations !== undefined) {
@@ -694,9 +688,7 @@ async function startFixtureServer(params: {
       return;
     }
 
-    const scim = /^\/api\/2\.0\/preview\/scim\/v2\/Users\/([^/]+)$/.exec(
-      url.pathname,
-    );
+    const scim = /^\/api\/2\.0\/preview\/scim\/v2\/Users\/([^/]+)$/.exec(url.pathname);
     if (scim) {
       const forced = params.onScim?.(scim[1]!);
       if (forced !== undefined) {
@@ -805,9 +797,7 @@ describe("given a Genie workspace the credential can fully read", () => {
 
       expect(alpha.ActionName).toBe("genie_query");
       expect(alpha.TargetName).toBe("ACME Revenue Analyst");
-      expect(extra.question).toBe(
-        "What are the top 5 products by quantity sold?",
-      );
+      expect(extra.question).toBe("What are the top 5 products by quantity sold?");
       expect(extra.generatedSql).toContain("`acme`.`sales`.`orders`");
       expect(extra.statementId).toBe("stmt-msg-alpha-1");
       expect(extra.rowCount).toBe(5);
@@ -831,9 +821,7 @@ describe("given a Genie workspace the credential can fully read", () => {
         rows.find((r) => r.EventId.endsWith("msg-alpha-1"))!,
       );
 
-      expect(withObjectId.actorKey).toBe(
-        "11111111-2222-3333-4444-555555555555",
-      );
+      expect(withObjectId.actorKey).toBe("11111111-2222-3333-4444-555555555555");
       expect(withObjectId.actorEmail).toBe("dana.hoffman@acme.test");
     });
 
@@ -989,9 +977,7 @@ describe("given someone asks a question while a sweep is running", () => {
       // first's, so this message arrived twice. It must still be ONE record —
       // the sinks dedup on the message id, which is what makes an overlapping
       // window safe to re-read in the first place.
-      const reRead = rowsAfterBothSweeps.filter((r) =>
-        r.EventId.endsWith("msg-beta-1"),
-      );
+      const reRead = rowsAfterBothSweeps.filter((r) => r.EventId.endsWith("msg-beta-1"));
       expect(reRead).toHaveLength(1);
     });
   });
@@ -1090,9 +1076,7 @@ describe("given a list endpoint whose page token never advances", () => {
       // requests getting there, which is what makes a broken workspace look
       // like a merely large one.
       const requests =
-        fixture.requestCounts.get(
-          "/api/2.0/genie/spaces/space-loop/conversations",
-        ) ?? 0;
+        fixture.requestCounts.get("/api/2.0/genie/spaces/space-loop/conversations") ?? 0;
       expect(requests).toBeGreaterThan(0);
       expect(requests).toBeLessThan(5);
 
@@ -1140,9 +1124,8 @@ describe("given messages by an author the directory no longer has", () => {
       // A deleted account 404s every time, so a lookup per message would turn
       // one departed analyst into a lookup per question they ever asked.
       const lookups =
-        fixture.requestCounts.get(
-          `/api/2.0/preview/scim/v2/Users/${DELETED_USER_ID}`,
-        ) ?? 0;
+        fixture.requestCounts.get(`/api/2.0/preview/scim/v2/Users/${DELETED_USER_ID}`) ??
+        0;
       expect(lookups).toBe(1);
 
       // The questions still land. A missing author must cost the attribution,
@@ -1210,10 +1193,7 @@ describe("given a sweep too large for one run's budget", () => {
       await new Promise((resolve) => setTimeout(resolve, 1_500));
 
       const beforeSecondRun = Date.now();
-      const second = await adapter.runOnce(
-        { cursor: first.cursor, credentials },
-        config,
-      );
+      const second = await adapter.runOnce({ cursor: first.cursor, credentials }, config);
 
       const done = decodeCursor(second.cursor);
 
@@ -1223,12 +1203,8 @@ describe("given a sweep too large for one run's budget", () => {
       // Anchored to run two, it lands at least the 1.5s gap beyond that, and
       // everything asked in space-alpha during the gap is filtered out for
       // good.
-      expect(done.sinceMs).toBeGreaterThanOrEqual(
-        beforeFirstRun - WATERMARK_LAG_MS,
-      );
-      expect(done.sinceMs).toBeLessThanOrEqual(
-        afterFirstRun - WATERMARK_LAG_MS,
-      );
+      expect(done.sinceMs).toBeGreaterThanOrEqual(beforeFirstRun - WATERMARK_LAG_MS);
+      expect(done.sinceMs).toBeLessThanOrEqual(afterFirstRun - WATERMARK_LAG_MS);
       expect(done.sinceMs).toBeLessThan(beforeSecondRun - WATERMARK_LAG_MS);
 
       // The sweep drained, so the in-flight anchor is released.
@@ -1288,9 +1264,7 @@ describe("given a sweep too large for one run's budget", () => {
         // Before the fix this read "space-beta" and space-alpha's tail was gone.
         expect(firstCursor.spaceId).toBe("space-alpha");
         // Cut mid-space, so the window is held where it started.
-        expect(firstCursor.sinceMs).toBe(
-          Date.parse("2020-01-01T00:00:00.000Z"),
-        );
+        expect(firstCursor.sinceMs).toBe(Date.parse("2020-01-01T00:00:00.000Z"));
 
         // Run two, no deadline: resumes at space-alpha, re-reads its tail, and
         // drains the rest.
@@ -1305,12 +1279,7 @@ describe("given a sweep too large for one run's budget", () => {
         );
         // The whole workspace, with nothing dropped at the cut. msg-alpha-2 and
         // msg-alpha-3 are the tail of the cut space that used to vanish.
-        for (const id of [
-          "msg-alpha-1",
-          "msg-alpha-2",
-          "msg-alpha-3",
-          "msg-beta-1",
-        ]) {
+        for (const id of ["msg-alpha-1", "msg-alpha-2", "msg-alpha-3", "msg-beta-1"]) {
           expect(emitted).toContain(id);
         }
         // Only now that everything was read does the sweep finish and release.
@@ -1463,8 +1432,7 @@ describe("given the sweep walked past something it could not read", () => {
       cursor = result.cursor;
       const decoded = decodeCursor(cursor);
       params.seen?.push(decoded);
-      if (decoded.spaceId === null)
-        return { drained: decoded, cursor: cursor! };
+      if (decoded.spaceId === null) return { drained: decoded, cursor: cursor! };
     }
     throw new Error("sweep never drained");
   }
@@ -1505,9 +1473,7 @@ describe("given the sweep walked past something it could not read", () => {
         // is the field doing the work. Asserting it on the drained cursor
         // proves nothing, since a finished sweep always clears it.
         expect(seen.length).toBeGreaterThan(1);
-        expect(seen.some((c) => c.spaceId !== null && c.sweepHadGap)).toBe(
-          true,
-        );
+        expect(seen.some((c) => c.spaceId !== null && c.sweepHadGap)).toBe(true);
 
         // The assertion that bites. The sweep finished, but it never read
         // conv-s-2 — moving the window here would drop that message for good.
@@ -1545,8 +1511,7 @@ describe("given the sweep walked past something it could not read", () => {
       const fixture = await startFixtureServer({
         workspace,
         // space-alpha sorts first and never recovers.
-        conversationsStatus: (spaceId) =>
-          spaceId === "space-alpha" ? 403 : undefined,
+        conversationsStatus: (spaceId) => (spaceId === "space-alpha" ? 403 : undefined),
       });
 
       try {
@@ -1619,9 +1584,7 @@ describe("given a cursor carrying a position but no sweep anchor", () => {
           config,
         );
 
-        const emitted = new Set(
-          result.events.map((event) => event.source_event_id),
-        );
+        const emitted = new Set(result.events.map((event) => event.source_event_id));
         // space-alpha sorts BEFORE the stale position. Honouring the position
         // would skip it entirely and the completing sweep would then move the
         // window past its messages.
@@ -1677,9 +1640,7 @@ describe("given the workspace lists its spaces in a different order each run", (
         expect(walked).toEqual([...walked].sort());
         // ...and the server really did hand them over in the other order, so
         // the sort above is what produced this and not the fixture.
-        expect(fixture.spacesServed).toEqual(
-          [...fixture.spacesServed].sort().reverse(),
-        );
+        expect(fixture.spacesServed).toEqual([...fixture.spacesServed].sort().reverse());
       } finally {
         await fixture.close();
       }
@@ -1816,9 +1777,7 @@ describe("given one space too large for a single run's budget", () => {
         expect(final.conversationId).toBeNull();
         expect(final.sweepStartedAtMs).toBeNull();
         // A drained sweep is a complete sweep, so the window finally moves.
-        expect(final.sinceMs).toBeGreaterThan(
-          Date.parse("2020-01-01T00:00:00.000Z"),
-        );
+        expect(final.sinceMs).toBeGreaterThan(Date.parse("2020-01-01T00:00:00.000Z"));
       } finally {
         await fixture.close();
       }
@@ -1849,8 +1808,7 @@ describe("given Databricks stamps created_timestamp in seconds", () => {
     // One message restamped in the wire format the docs publish. Everything
     // else in the fixture stays in milliseconds, so this run proves the two
     // units survive side by side rather than proving a global switch.
-    workspace.messages["conv-beta-1"]![0]!.created_timestamp =
-      DOCUMENTED_SECONDS;
+    workspace.messages["conv-beta-1"]![0]!.created_timestamp = DOCUMENTED_SECONDS;
     fixture = await startFixtureServer({ workspace });
   });
 
@@ -1877,9 +1835,7 @@ describe("given Databricks stamps created_timestamp in seconds", () => {
         config,
       );
 
-      const beta = result.events.find(
-        (e) => e.source_event_id === "msg-beta-1",
-      );
+      const beta = result.events.find((e) => e.source_event_id === "msg-beta-1");
       // The assertion that bites: on the old code there is no event at all,
       // because 1.7e9 milliseconds is behind the configured watermark.
       expect(beta).toBeDefined();
@@ -1925,16 +1881,11 @@ describe("given a message still being answered when the sweep reads it", () => {
       });
       const credentials = { token: "fixture-token" };
 
-      const first = await adapter.runOnce(
-        { cursor: null, credentials },
-        config,
-      );
+      const first = await adapter.runOnce({ cursor: null, credentials }, config);
 
       // The record lands immediately — a question asked is a governance fact
       // whether or not the warehouse has answered — but with no SQL on it.
-      const early = first.events.find(
-        (e) => e.source_event_id === "msg-beta-1",
-      );
+      const early = first.events.find((e) => e.source_event_id === "msg-beta-1");
       expect(early).toBeDefined();
       expect(early!.extra?.generatedSql).toBe("");
 
@@ -1952,24 +1903,15 @@ describe("given a message still being answered when the sweep reads it", () => {
         sqlAttachment("late-beta-1", "SELECT `pickup_zip` FROM `trips`", 9),
       ];
 
-      const second = await adapter.runOnce(
-        { cursor: first.cursor, credentials },
-        config,
-      );
+      const second = await adapter.runOnce({ cursor: first.cursor, credentials }, config);
 
-      const corrected = second.events.find(
-        (e) => e.source_event_id === "msg-beta-1",
-      );
+      const corrected = second.events.find((e) => e.source_event_id === "msg-beta-1");
       expect(corrected).toBeDefined();
-      expect(corrected!.extra?.generatedSql).toBe(
-        "SELECT `pickup_zip` FROM `trips`",
-      );
+      expect(corrected!.extra?.generatedSql).toBe("SELECT `pickup_zip` FROM `trips`");
 
       // Nothing is unsettled any more, so the window is finally allowed to move.
       const done = decodeCursor(second.cursor);
-      expect(done.sinceMs).toBeGreaterThan(
-        Date.parse("2020-01-01T00:00:00.000Z"),
-      );
+      expect(done.sinceMs).toBeGreaterThan(Date.parse("2020-01-01T00:00:00.000Z"));
     }, 60_000);
   });
 
@@ -2002,10 +1944,7 @@ describe("given a message still being answered when the sweep reads it", () => {
         });
         const credentials = { token: "fixture-token" };
 
-        const first = await adapter.runOnce(
-          { cursor: null, credentials },
-          config,
-        );
+        const first = await adapter.runOnce({ cursor: null, credentials }, config);
 
         // That one settles, and a newer question is asked and is still being
         // answered when the next sweep arrives. This is steady state, not an
@@ -2061,99 +2000,96 @@ describe("given a message still being answered when the sweep reads it", () => {
 const liveToken = process.env.DATABRICKS_GENIE_TOKEN;
 const liveUrl = process.env.DATABRICKS_GENIE_URL;
 
-describe.skipIf(!liveToken || !liveUrl)(
-  "given the live Databricks workspace",
-  () => {
-    let seeded: Awaited<ReturnType<typeof seedSource>>;
+describe.skipIf(!liveToken || !liveUrl)("given the live Databricks workspace", () => {
+  let seeded: Awaited<ReturnType<typeof seedSource>>;
 
-    beforeAll(async () => {
-      seeded = await seedSource({
-        slug: `live-${ns}`,
-        pullConfig: {
-          adapter: DATABRICKS_GENIE_ADAPTER_ID,
-          workspaceUrl: liveUrl,
-          // Empty: discover every space the credential can see, which is the
-          // configuration a customer would actually run.
-          spaceIds: [],
-          // Wide enough to sweep the whole recorded history in one run.
-          startingAt: "2020-01-01T00:00:00.000Z",
-          schedule: "*/15 * * * *",
-          credentials: { token: liveToken },
-        },
+  beforeAll(async () => {
+    seeded = await seedSource({
+      slug: `live-${ns}`,
+      pullConfig: {
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: liveUrl,
+        // Empty: discover every space the credential can see, which is the
+        // configuration a customer would actually run.
+        spaceIds: [],
+        // Wide enough to sweep the whole recorded history in one run.
+        startingAt: "2020-01-01T00:00:00.000Z",
+        schedule: "*/15 * * * *",
+        credentials: { token: liveToken },
+      },
+    });
+  });
+
+  afterAll(async () => {
+    // An evidence run is worth inspecting after the fact. `KEEP=1` leaves
+    // the landed rows in place so a human can query them; the default still
+    // cleans up, so a repeated run never reads the last one's leftovers.
+    if (process.env.DATABRICKS_GENIE_KEEP === "1") {
+      console.log(`[genie-live] kept tenant ${seeded.govProjectId}`);
+      return;
+    }
+    await dropTenant(seeded.govProjectId);
+    await cleanupOrg(seeded.organizationId);
+  });
+
+  describe("when the puller sweeps every space it can see", () => {
+    it("lands a visibility record for every Genie message in the workspace", async () => {
+      const outcome = await pullThroughTheRealPipeline({
+        sourceId: seeded.sourceId,
+        cursor: null,
       });
-    });
+      expect(outcome.eventCount).toBeGreaterThan(0);
 
-    afterAll(async () => {
-      // An evidence run is worth inspecting after the fact. `KEEP=1` leaves
-      // the landed rows in place so a human can query them; the default still
-      // cleans up, so a repeated run never reads the last one's leftovers.
-      if (process.env.DATABRICKS_GENIE_KEEP === "1") {
-        console.log(`[genie-live] kept tenant ${seeded.govProjectId}`);
-        return;
+      const rows = await ocsfRowsFor(seeded.govProjectId);
+      expect(rows).toHaveLength(outcome.eventCount);
+
+      const totals = await pulledTotalsFor({
+        tenantId: seeded.govProjectId,
+        scopeIds: [seeded.teamId, seeded.organizationId],
+      });
+      expect(totals.items).toBe(outcome.eventCount);
+      // Genie bills nothing per message, and the record must not invent one.
+      expect(totals.spentNanoUsd).toBe(0);
+
+      // Every message resolved to a person and carries a question. The SQL
+      // is not asserted per row: a message can be answered in prose alone.
+      for (const row of rows) {
+        const extra = extensionOf(row);
+        expect(extra.question).not.toBe("");
+        expect(extra.actorKey).not.toBe("");
       }
-      await dropTenant(seeded.govProjectId);
-      await cleanupOrg(seeded.organizationId);
-    });
 
-    describe("when the puller sweeps every space it can see", () => {
-      it("lands a visibility record for every Genie message in the workspace", async () => {
-        const outcome = await pullThroughTheRealPipeline({
-          sourceId: seeded.sourceId,
-          cursor: null,
-        });
-        expect(outcome.eventCount).toBeGreaterThan(0);
+      // A complete sweep of a healthy workspace must drain, not stop early.
+      const cursor = decodeCursor(outcome.nextCursor);
+      expect(cursor.spaceId).toBeNull();
+      expect(cursor.sinceMs).toBeGreaterThan(0);
 
-        const rows = await ocsfRowsFor(seeded.govProjectId);
-        expect(rows).toHaveLength(outcome.eventCount);
-
-        const totals = await pulledTotalsFor({
-          tenantId: seeded.govProjectId,
-          scopeIds: [seeded.teamId, seeded.organizationId],
-        });
-        expect(totals.items).toBe(outcome.eventCount);
-        // Genie bills nothing per message, and the record must not invent one.
-        expect(totals.spentNanoUsd).toBe(0);
-
-        // Every message resolved to a person and carries a question. The SQL
-        // is not asserted per row: a message can be answered in prose alone.
-        for (const row of rows) {
-          const extra = extensionOf(row);
-          expect(extra.question).not.toBe("");
-          expect(extra.actorKey).not.toBe("");
-        }
-
-        // A complete sweep of a healthy workspace must drain, not stop early.
-        const cursor = decodeCursor(outcome.nextCursor);
-        expect(cursor.spaceId).toBeNull();
-        expect(cursor.sinceMs).toBeGreaterThan(0);
-
-        const perSpace = new Map<string, number>();
-        const identityShapes = { objectId: 0, loginFallback: 0 };
-        for (const row of rows) {
-          const extra = extensionOf(row);
-          const title = String(extra.spaceTitle || extra.spaceId);
-          perSpace.set(title, (perSpace.get(title) ?? 0) + 1);
-          if (extra.actorExternalId) identityShapes.objectId += 1;
-          else identityShapes.loginFallback += 1;
-        }
-        console.log(
-          `[genie-live] ${rows.length} records across ${perSpace.size} spaces:`,
-          Object.fromEntries(perSpace),
-        );
-        console.log("[genie-live] identity resolution:", identityShapes);
-        const sample = extensionOf(rows[0]!);
-        console.log("[genie-live] sample record:", {
-          actorKey: sample.actorKey,
-          actorEmail: sample.actorEmail,
-          space: sample.spaceTitle,
-          question: sample.question,
-          sql: String(sample.generatedSql).slice(0, 160),
-          costNanoUsd: 0,
-        });
-      }, 180_000);
-    });
-  },
-);
+      const perSpace = new Map<string, number>();
+      const identityShapes = { objectId: 0, loginFallback: 0 };
+      for (const row of rows) {
+        const extra = extensionOf(row);
+        const title = String(extra.spaceTitle || extra.spaceId);
+        perSpace.set(title, (perSpace.get(title) ?? 0) + 1);
+        if (extra.actorExternalId) identityShapes.objectId += 1;
+        else identityShapes.loginFallback += 1;
+      }
+      console.log(
+        `[genie-live] ${rows.length} records across ${perSpace.size} spaces:`,
+        Object.fromEntries(perSpace),
+      );
+      console.log("[genie-live] identity resolution:", identityShapes);
+      const sample = extensionOf(rows[0]!);
+      console.log("[genie-live] sample record:", {
+        actorKey: sample.actorKey,
+        actorEmail: sample.actorEmail,
+        space: sample.spaceTitle,
+        question: sample.question,
+        sql: String(sample.generatedSql).slice(0, 160),
+        costNanoUsd: 0,
+      });
+    }, 180_000);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // @rule A source can sign in for itself, so a schedule outlives a pasted token
@@ -2164,10 +2100,7 @@ describe.skipIf(!liveToken || !liveUrl)(
 // ---------------------------------------------------------------------------
 
 /** A pull that only needs to be observed for its outcome, not its records. */
-async function pullExpectingOutcome(params: {
-  sourceId: string;
-  cursor: string | null;
-}) {
+async function pullExpectingOutcome(params: { sourceId: string; cursor: string | null }) {
   const pulledUsage: PulledUsageDispatcher = {
     recordPulledUsage: async () => {
       // The credential tests assert on the run's outcome, not the ledger, and
@@ -2232,9 +2165,7 @@ describe("given a source that signs in with a service principal", () => {
       // The sweep reads several pages across several spaces; a token minted
       // per request would multiply this by the whole walk.
       expect(fixture.requestCounts.get("/oidc/v1/token")).toBe(1);
-      expect(
-        fixture.requestCounts.get("/api/2.0/genie/spaces") ?? 0,
-      ).toBeGreaterThan(0);
+      expect(fixture.requestCounts.get("/api/2.0/genie/spaces") ?? 0).toBeGreaterThan(0);
     });
 
     it("presents the minted token on the Genie calls", () => {
@@ -2376,9 +2307,9 @@ describe("given a source that cannot sign in", () => {
       oauth: { status: 401 },
     });
     expect(error).not.toBeNull();
-    expect(
-      JSON.stringify(error, Object.getOwnPropertyNames(error)),
-    ).not.toContain("super-secret-value");
+    expect(JSON.stringify(error, Object.getOwnPropertyNames(error))).not.toContain(
+      "super-secret-value",
+    );
   }, 120_000);
 
   /** @scenario "A sign-in answered with no token fails the run" */

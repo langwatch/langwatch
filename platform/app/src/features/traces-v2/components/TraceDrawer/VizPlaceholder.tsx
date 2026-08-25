@@ -1,21 +1,5 @@
-import {
-  Box,
-  Flex,
-  HStack,
-  Icon,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { Box, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LuChartGantt,
   LuChevronDown,
@@ -41,10 +25,7 @@ import {
   selectPeersMatching,
   usePresenceStore,
 } from "~/features/presence/stores/presenceStore";
-import type {
-  SpanTreeNode,
-  TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { useDrawerStore, type VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "../../utils/formatters";
@@ -92,13 +73,7 @@ const EXPANDED_HEIGHT = 480;
 const MAX_HEIGHT = 700;
 const STORAGE_KEY = "langwatch:traces-v2:viz-height";
 
-function VizTabPresenceDot({
-  traceId,
-  panel,
-}: {
-  traceId: string;
-  panel: VizTab;
-}) {
+function VizTabPresenceDot({ traceId, panel }: { traceId: string; panel: VizTab }) {
   const peers = usePresenceStore(
     useShallow((s) =>
       selectPeersMatching(
@@ -110,9 +85,7 @@ function VizTabPresenceDot({
     ),
   );
   if (peers.length === 0) return null;
-  return (
-    <PresenceMarker peers={peers} size={16} tooltipSuffix={`${panel} panel`} />
-  );
+  return <PresenceMarker peers={peers} size={16} tooltipSuffix={`${panel} panel`} />;
 }
 
 interface VizTabDef {
@@ -131,13 +104,7 @@ interface VizTabDef {
  * is folded out of sight — the user sees the same affordance either
  * way.
  */
-function VizTabContent({
-  tab,
-  traceId,
-}: {
-  tab: VizTabDef;
-  traceId: string | null;
-}) {
+function VizTabContent({ tab, traceId }: { tab: VizTabDef; traceId: string | null }) {
   return (
     <>
       <Icon as={tab.icon} boxSize={3.5} />
@@ -145,9 +112,7 @@ function VizTabContent({
         {tab.label}
       </Text>
       <Kbd>{tab.shortcut}</Kbd>
-      {traceId ? (
-        <VizTabPresenceDot traceId={traceId} panel={tab.value} />
-      ) : null}
+      {traceId ? <VizTabPresenceDot traceId={traceId} panel={tab.value} /> : null}
     </>
   );
 }
@@ -240,9 +205,7 @@ export function VizPlaceholder({
   // click a span. The detail pane also auto-reopens whenever a span is
   // selected (see `drawerStore.selectSpan`); this is the manual escape
   // for when the user wants to see the trace summary again.
-  const detailCollapsed = useDrawerStore(
-    (s) => s.paneState.spanDetail.collapsed,
-  );
+  const detailCollapsed = useDrawerStore((s) => s.paneState.spanDetail.collapsed);
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
 
   // Overflow detection for the viz tab row — when the container is
@@ -278,9 +241,7 @@ export function VizPlaceholder({
   // available space. We coerce them to false so all the conditional
   // rendering below behaves as if the panel were at its normal height.
   const isMinimized = fillParent ? false : height === 0;
-  const isCollapsed = fillParent
-    ? false
-    : !isMinimized && height <= MIN_HEIGHT + 20;
+  const isCollapsed = fillParent ? false : !isMinimized && height <= MIN_HEIGHT + 20;
 
   const persistHeight = useCallback((h: number) => {
     localStorage.setItem(STORAGE_KEY, String(h));
@@ -354,9 +315,7 @@ export function VizPlaceholder({
       const delta = clientY - dragStartY.current;
       const raw = dragStartHeight.current + delta;
       const next =
-        raw < MIN_HEIGHT / 2
-          ? 0
-          : Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, raw));
+        raw < MIN_HEIGHT / 2 ? 0 : Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, raw));
       setHeight(next);
     };
 
@@ -494,11 +453,7 @@ export function VizPlaceholder({
             <HStack gap={1.5}>
               <Tooltip
                 content={
-                  isMinimized
-                    ? "Show"
-                    : height >= EXPANDED_HEIGHT
-                      ? "Minimize"
-                      : "Expand"
+                  isMinimized ? "Show" : height >= EXPANDED_HEIGHT ? "Minimize" : "Expand"
                 }
                 positioning={{ placement: "top" }}
               >
@@ -559,11 +514,7 @@ export function VizPlaceholder({
                 onClick={() => togglePaneCollapsed("spanDetail")}
               >
                 <Icon
-                  as={
-                    paneLayout === "horizontal"
-                      ? LuPanelRightOpen
-                      : LuPanelBottomOpen
-                  }
+                  as={paneLayout === "horizontal" ? LuPanelRightOpen : LuPanelBottomOpen}
                   boxSize={3.5}
                 />
               </Flex>
@@ -580,11 +531,7 @@ export function VizPlaceholder({
             minHeight={0}
             overflow={fillParent ? "auto" : "hidden"}
             transition={
-              fillParent
-                ? undefined
-                : isDragging.current
-                  ? "none"
-                  : "height 0.2s ease"
+              fillParent ? undefined : isDragging.current ? "none" : "height 0.2s ease"
             }
             onClick={isCollapsed ? handleExpandFromCollapsed : undefined}
             cursor={isCollapsed ? "pointer" : "default"}
@@ -757,8 +704,7 @@ function CollapsedOverview({ spans }: { spans: SpanTreeNode[] }) {
             ((span.endTimeMs - span.startTimeMs) / totalDuration) * 100,
           );
           const isError = span.status === "error";
-          const color =
-            (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+          const color = (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
 
           return (
             <Box
@@ -776,13 +722,7 @@ function CollapsedOverview({ spans }: { spans: SpanTreeNode[] }) {
           );
         })}
       </Box>
-      <Text
-        textStyle="xs"
-        color="fg.subtle"
-        position="absolute"
-        bottom={1}
-        right={4}
-      >
+      <Text textStyle="xs" color="fg.subtle" position="absolute" bottom={1} right={4}>
         Click to expand
       </Text>
     </Flex>

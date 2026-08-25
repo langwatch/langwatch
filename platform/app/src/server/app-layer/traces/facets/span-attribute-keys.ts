@@ -1,8 +1,4 @@
-import type {
-  DynamicKeysDef,
-  FacetQuery,
-  FacetQueryContext,
-} from "../facet-registry";
+import type { DynamicKeysDef, FacetQuery, FacetQueryContext } from "../facet-registry";
 import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
 
 /**
@@ -30,9 +26,7 @@ import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
  * through `filter-to-clickhouse/ast.ts` — this facet only feeds the
  * discovery list.
  */
-export function buildSpanAttributeKeysFacetQuery(
-  ctx: FacetQueryContext,
-): FacetQuery {
+export function buildSpanAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
   const where = buildTimeWhere("StartTime");
   const prefixFilter = ctx.prefix
     ? "AND lower(key) ILIKE concat({prefix:String}, '%')"

@@ -10,10 +10,7 @@
  * generated tRPC type.
  */
 
-export type AiToolTileType =
-  | "coding_assistant"
-  | "model_provider"
-  | "external_tool";
+export type AiToolTileType = "coding_assistant" | "model_provider" | "external_tool";
 
 export type AiToolScope = "organization" | "department" | "team";
 

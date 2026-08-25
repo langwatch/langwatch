@@ -15,11 +15,7 @@ export interface NumericModeState {
   byProject: Record<string, Record<string, NumericMode>>;
   hydrateFromStorage: (projectId: string) => void;
   /** Override a facet's presentation. */
-  setMode: (params: {
-    projectId: string;
-    field: string;
-    mode: NumericMode;
-  }) => void;
+  setMode: (params: { projectId: string; field: string; mode: NumericMode }) => void;
 }
 
 const STORAGE_PREFIX = "langwatch:traces-v2:numeric-mode:v1:";

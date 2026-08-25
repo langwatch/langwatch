@@ -47,7 +47,8 @@ You hold an Anthropic API key and pay per request. This path routes every Claude
 Open **Settings → Model providers** (URL: `/settings/model-providers`), click the **Anthropic** tile, paste your `sk-ant-` key.
 
 <Frame caption="Model providers screen with Anthropic configured. The sk-ant- key stays on the LangWatch side.">
-  ![Model providers configured](/images/ai-governance/post-bypass/15-model-providers-configured.png)
+  ![Model providers
+  configured](/images/ai-governance/post-bypass/15-model-providers-configured.png)
 </Frame>
 
 ### 1.2 Install the CLI
@@ -65,7 +66,8 @@ langwatch login --device
 Browser opens with an approval code. Approve it. The CLI caches your refresh token at `~/.langwatch/config.json`. Your Virtual Key is issued the first time you pick the gateway, not now.
 
 <Frame caption="`langwatch login --device` pairs the CLI with your account.">
-  ![langwatch login device flow](/images/ai-governance/cli-flow/01-cli-login-device-flow.png)
+  ![langwatch login device
+  flow](/images/ai-governance/cli-flow/01-cli-login-device-flow.png)
 </Frame>
 
 ### 1.4 Run Claude Code through the wrapper
@@ -79,7 +81,8 @@ The first run asks how to connect. Pick **Using an API key** for this path. The 
 That spawns Claude Code with `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` set so every request goes through the gateway. UX is identical to `claude` on its own: same REPL, same keybinds, same agent loop.
 
 <Frame caption="Interactive Claude Code session via the wrapper. The wrapper injects the gateway env and gets out of the way.">
-  ![langwatch claude tmux](/images/ai-governance/cli-flow/06-tmux-langwatch-claude-real.png)
+  ![langwatch claude
+  tmux](/images/ai-governance/cli-flow/06-tmux-langwatch-claude-real.png)
 </Frame>
 
 ### 1.5 Open `/me`
@@ -97,7 +100,8 @@ Within a few seconds:
 Click **Traces** in the sidebar for the per-request view. Each turn lands as a `gen_ai.*` span with prompt, response, model, tokens, and dollar cost.
 
 <Frame caption="Trace detail for one Claude Code turn through the gateway. Prompt and response inline, tokens split between cache_creation and cache_read, exact cost.">
-  ![Path 1 trace detail](/images/ai-governance/cli-flow/07-trace-detail-pong-via-gateway.png)
+  ![Path 1 trace
+  detail](/images/ai-governance/cli-flow/07-trace-detail-pong-via-gateway.png)
 </Frame>
 
 That is the loop. Every future `langwatch claude` session writes here. Skip to [What you can do with this](#what-you-can-do-with-this).
@@ -123,7 +127,8 @@ langwatch login --device
 Same browser approval as Path 1; no API key needed.
 
 <Frame caption="`langwatch login --device` paired with your account.">
-  ![langwatch login device flow](/images/ai-governance/cli-flow/01-cli-login-device-flow.png)
+  ![langwatch login device
+  flow](/images/ai-governance/cli-flow/01-cli-login-device-flow.png)
 </Frame>
 
 ### 2.3 Run Claude Code through the wrapper
@@ -135,7 +140,8 @@ langwatch claude
 Pick **Using a Claude subscription** when the wrapper asks. Your Claude Code session keeps using your Max plan unchanged. LangWatch reads the OTel log records Claude Code emits and renders them.
 
 <Frame caption="Interactive Claude Code session under the subscription path. Same wrapper, no API key.">
-  ![langwatch claude tmux path 2](/images/ai-governance/cli-flow/08-tmux-claude-pathb-otel-real.png)
+  ![langwatch claude tmux path
+  2](/images/ai-governance/cli-flow/08-tmux-claude-pathb-otel-real.png)
 </Frame>
 
 ### 2.4 Open `/me`
@@ -151,7 +157,8 @@ Within ~30 seconds of your first turn:
 </Frame>
 
 <Frame caption="Trace detail under the subscription path. Model, input tokens, output tokens, cache_creation_tokens, cache_read_tokens, cost_usd, and the prompt body all rendered from Claude Code's OTel log records.">
-  ![Path 2 trace detail](/images/ai-governance/post-bypass/14-claude-pathb-trace-detail-storegate-fix.png)
+  ![Path 2 trace
+  detail](/images/ai-governance/post-bypass/14-claude-pathb-trace-detail-storegate-fix.png)
 </Frame>
 
 ## Headless machines and team projects
@@ -164,11 +171,11 @@ langwatch instrument claude
 
 By default the telemetry goes to your personal workspace, which needs `langwatch login --device`. Pass one scope flag to change that:
 
-| Command | Destination | Needs a login |
-| --- | --- | --- |
-| `langwatch instrument claude --project <id-or-slug>` | A team project | Yes |
-| `langwatch instrument claude --key ik-lw-...` | The project that owns the key | No |
-| `langwatch instrument claude --personal` | Back to your personal workspace | Yes |
+| Command                                              | Destination                     | Needs a login |
+| ---------------------------------------------------- | ------------------------------- | ------------- |
+| `langwatch instrument claude --project <id-or-slug>` | A team project                  | Yes           |
+| `langwatch instrument claude --key ik-lw-...`        | The project that owns the key   | No            |
+| `langwatch instrument claude --personal`             | Back to your personal workspace | Yes           |
 
 `--project` creates an ingest key for this device and holds Claude Code to that project. LangWatch creates one key per device and never replaces the key of another device, so a whole fleet can report to one project:
 
@@ -186,7 +193,10 @@ Use this when you have both work and personal repos on the same machine, want te
 
 This is a **delivery method**, not a third billing path. It works under either Path 1 or Path 2's billing model. Instead of the `langwatch claude` wrapper injecting environment variables at spawn time, Claude Code reads them from `.claude/settings.json` in your project root at launch. The LangWatch-specific wiring connects to the **project** OTLP endpoint (`/api/otel/v1/traces`). For why the project endpoint is the correct home for Claude Code's own usage telemetry (versus the governance IngestionSource plane), see [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion). For how Claude Code's `env` block works and its settings-precedence rules, see the [Claude Code settings reference](https://code.claude.com/docs/en/settings). This section documents only the LangWatch wiring.
 
-<Info>A repo with no `.claude/settings.json` `env` block, run with plain `claude`, emits zero telemetry to LangWatch.</Info>
+<Info>
+  A repo with no `.claude/settings.json` `env` block, run with plain `claude`, emits zero
+  telemetry to LangWatch.
+</Info>
 
 ### Get your project key
 
@@ -202,7 +212,17 @@ Commit `.claude/settings.json` with the exporter wiring, and keep the bearer tok
 
 The committed file decides the shape of the export. What that export carries is decided by five flags, and they stay out of the repository so each person turns them on for themselves: `OTEL_LOG_USER_PROMPTS` puts prompt text on the wire, `OTEL_LOG_TOOL_DETAILS` and `OTEL_LOG_TOOL_CONTENT` put the input and output of every tool call on it, `OTEL_LOG_RAW_API_BODIES` puts the Messages API request and response JSON on it, and `OTEL_LOG_ASSISTANT_RESPONSES` puts just the assistant's response text on it without the rest of the body. Inline bodies are truncated at 60 KB (`CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises the limit, `file:<dir>` writes untruncated bodies to disk instead) and extended thinking is redacted.
 
-<Warning>Those five flags are what put your session content in LangWatch: prompt text, the input and output of every tool call, including file contents, the model request and response bodies of every turn, and the assistant's response text on its own. A committed content flag does not switch telemetry on by itself, because Claude Code exports nothing until `CLAUDE_CODE_ENABLE_TELEMETRY` is set. It does not have to be set in the repository for that to happen, though: a managed settings file, a shell export, or a contributor's own `~/.claude/settings.json` can each turn telemetry on, and from that moment a content flag sitting in the committed file applies to everyone who cloned the repo. That is why the recipe keeps all five in each person's own gitignored file.</Warning>
+<Warning>
+  Those five flags are what put your session content in LangWatch: prompt text, the input
+  and output of every tool call, including file contents, the model request and response
+  bodies of every turn, and the assistant's response text on its own. A committed content
+  flag does not switch telemetry on by itself, because Claude Code exports nothing until
+  `CLAUDE_CODE_ENABLE_TELEMETRY` is set. It does not have to be set in the repository for
+  that to happen, though: a managed settings file, a shell export, or a contributor's own
+  `~/.claude/settings.json` can each turn telemetry on, and from that moment a content
+  flag sitting in the committed file applies to everyone who cloned the repo. That is why
+  the recipe keeps all five in each person's own gitignored file.
+</Warning>
 
 `settings.local.json`'s `env` merges per-key with `settings.json`'s `env`, so the local flags combine with the committed ones rather than replacing them.
 
@@ -224,7 +244,13 @@ The committed file decides the shape of the export. What that export carries is 
 }
 ```
 
-<Info>**`CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is an experimental Claude Code flag, and it is the one that turns spans on.** Without it `OTEL_TRACES_EXPORTER` does nothing and `OTEL_LOG_TOOL_CONTENT` has no span events to write to, so you get flat log records instead of a trace: no tool call tree, no latencies, and every subagent folded into the main session rather than branching off it. Keep it when you trim the rest of the block.</Info>
+<Info>
+  **`CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is an experimental Claude Code flag, and it is
+  the one that turns spans on.** Without it `OTEL_TRACES_EXPORTER` does nothing and
+  `OTEL_LOG_TOOL_CONTENT` has no span events to write to, so you get flat log records
+  instead of a trace: no tool call tree, no latencies, and every subagent folded into the
+  main session rather than branching off it. Keep it when you trim the rest of the block.
+</Info>
 
 The two export intervals set how often Claude Code flushes; the defaults are 5 seconds for logs and 60 seconds for metrics, which is long enough that a first check looks like a failure.
 
@@ -247,7 +273,13 @@ For self-hosted (`npx @langwatch/server`), replace the endpoint with `http://loc
 }
 ```
 
-<Warning>**`OTEL_RESOURCE_ATTRIBUTES` is not merged across files. The higher-precedence file fully replaces it.** `settings.local.json` wins over `settings.json`, so if you set `OTEL_RESOURCE_ATTRIBUTES` in both, the local file's value completely replaces the committed one. Carry all three attributes (`project.repo`, `cost_center`, `enduser.id`) together in the local file, or `project.repo` is silently dropped from every span.</Warning>
+<Warning>
+  **`OTEL_RESOURCE_ATTRIBUTES` is not merged across files. The higher-precedence file
+  fully replaces it.** `settings.local.json` wins over `settings.json`, so if you set
+  `OTEL_RESOURCE_ATTRIBUTES` in both, the local file's value completely replaces the
+  committed one. Carry all three attributes (`project.repo`, `cost_center`, `enduser.id`)
+  together in the local file, or `project.repo` is silently dropped from every span.
+</Warning>
 
 ### Verify
 
@@ -316,14 +348,14 @@ Point Claude Code (or any agent) at LangWatch's [skills directory](https://langw
 
 Same pattern works for the other agent CLIs you might be running. Each wrapper asks the same question on its first run, and `langwatch instrument <tool>` writes the subscription-path wiring without starting anything.
 
-| Command | Using an API key | Using your own subscription |
-|---|---|---|
-| `langwatch claude` | gateway via `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | OTLP via `CLAUDE_CODE_ENABLE_TELEMETRY` + `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` (spans, and with them the tool call tree and subagent attribution) + an ingest key on `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-…"` + the four `OTEL_LOG_*` content knobs (`USER_PROMPTS`, `TOOL_DETAILS`, `TOOL_CONTENT`, `RAW_API_BODIES`) so user prompt text, tool input and output content, and assistant response text all land on the wire, with bodies truncated at 60 KB and extended thinking redacted. See [Claude Code](/integration/tools/integrations/claude-code) |
-| `langwatch codex` | gateway via `OPENAI_BASE_URL` + `OPENAI_API_KEY` | OTLP via the `[otel]` block in `~/.codex/config.toml`, plus a turn program that recovers the conversation Codex never exports. See [OpenAI Codex](/integration/tools/integrations/openai-codex) |
-| `langwatch copilot` | gateway via `COPILOT_PROVIDER_*` keys, which moves the spend off your Copilot seat | OTLP via `COPILOT_OTEL_ENABLED` and a scoped shell function. See [GitHub Copilot](/integration/tools/integrations/github-copilot-cli) |
-| `langwatch code` | not available for Copilot Chat | OTLP for the Copilot Chat extension in Visual Studio Code. See [GitHub Copilot](/integration/tools/integrations/github-copilot-cli) |
-| `langwatch gemini` | gateway via `GOOGLE_GEMINI_BASE_URL` + `GEMINI_API_KEY` | OTLP with native `gen_ai.*` attributes |
-| `langwatch opencode` | gateway via `OPENAI_*` + `ANTHROPIC_*` env pairs | OTLP for the model calls and the tool calls, with opencode's own internal spans filtered out. See [opencode](/integration/tools/integrations/opencode) |
+| Command              | Using an API key                                                                   | Using your own subscription                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `langwatch claude`   | gateway via `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN`                          | OTLP via `CLAUDE_CODE_ENABLE_TELEMETRY` + `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` (spans, and with them the tool call tree and subagent attribution) + an ingest key on `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-…"` + the four `OTEL_LOG_*` content knobs (`USER_PROMPTS`, `TOOL_DETAILS`, `TOOL_CONTENT`, `RAW_API_BODIES`) so user prompt text, tool input and output content, and assistant response text all land on the wire, with bodies truncated at 60 KB and extended thinking redacted. See [Claude Code](/integration/tools/integrations/claude-code) |
+| `langwatch codex`    | gateway via `OPENAI_BASE_URL` + `OPENAI_API_KEY`                                   | OTLP via the `[otel]` block in `~/.codex/config.toml`, plus a turn program that recovers the conversation Codex never exports. See [OpenAI Codex](/integration/tools/integrations/openai-codex)                                                                                                                                                                                                                                                                                                                                                                                |
+| `langwatch copilot`  | gateway via `COPILOT_PROVIDER_*` keys, which moves the spend off your Copilot seat | OTLP via `COPILOT_OTEL_ENABLED` and a scoped shell function. See [GitHub Copilot](/integration/tools/integrations/github-copilot-cli)                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `langwatch code`     | not available for Copilot Chat                                                     | OTLP for the Copilot Chat extension in Visual Studio Code. See [GitHub Copilot](/integration/tools/integrations/github-copilot-cli)                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `langwatch gemini`   | gateway via `GOOGLE_GEMINI_BASE_URL` + `GEMINI_API_KEY`                            | OTLP with native `gen_ai.*` attributes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `langwatch opencode` | gateway via `OPENAI_*` + `ANTHROPIC_*` env pairs                                   | OTLP for the model calls and the tool calls, with opencode's own internal spans filtered out. See [opencode](/integration/tools/integrations/opencode)                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ## Privacy
 

@@ -6,13 +6,7 @@ import { LuFilter } from "react-icons/lu";
 import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 
-export type ChipTone =
-  | "neutral"
-  | "purple"
-  | "blue"
-  | "green"
-  | "yellow"
-  | "red";
+export type ChipTone = "neutral" | "purple" | "blue" | "green" | "yellow" | "red";
 
 interface ToneStyle {
   bg: string;
@@ -143,12 +137,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
       {dot && <Circle size="8px" bg={dot} flexShrink={0} />}
       {icon && <Icon as={icon} boxSize={3} color={style.fg} flexShrink={0} />}
       {label && (
-        <Text
-          textStyle="2xs"
-          color={style.fg}
-          fontWeight="medium"
-          flexShrink={0}
-        >
+        <Text textStyle="2xs" color={style.fg} fontWeight="medium" flexShrink={0}>
           {label}
         </Text>
       )}
@@ -209,11 +198,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
     // close leaks an invisible floating layer that the audit caught
     // as "6 popovers mounted simultaneously".
     return (
-      <Popover.Root
-        positioning={{ placement: "bottom-start" }}
-        lazyMount
-        unmountOnExit
-      >
+      <Popover.Root positioning={{ placement: "bottom-start" }} lazyMount unmountOnExit>
         <Popover.Trigger asChild>{body}</Popover.Trigger>
         <Popover.Content width="360px">
           <Popover.Body padding={0}>{popover}</Popover.Body>

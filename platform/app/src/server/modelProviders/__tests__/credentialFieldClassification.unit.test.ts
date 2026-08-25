@@ -36,10 +36,9 @@ describe("credential field classification", () => {
       // cannot unwrap, which would make every assertion below vacuous.
       for (const [provider, definition] of Object.entries(modelProviders)) {
         const fields = Object.keys(getSchemaShape(definition.keysSchema));
-        expect(
-          fields.length,
-          `${provider} yielded no credential fields`,
-        ).toBeGreaterThan(0);
+        expect(fields.length, `${provider} yielded no credential fields`).toBeGreaterThan(
+          0,
+        );
       }
     });
 
@@ -59,9 +58,7 @@ describe("credential field classification", () => {
   describe("when a field is not named in the public list", () => {
     /** @scenario Credential fields are secret unless the registry declares them public */
     it("treats it as a secret", () => {
-      expect(isSecretCredentialField("SOME_PROVIDER_NEW_CREDENTIAL")).toBe(
-        true,
-      );
+      expect(isSecretCredentialField("SOME_PROVIDER_NEW_CREDENTIAL")).toBe(true);
       expect(isSecretCredentialField("")).toBe(true);
     });
   });
@@ -77,9 +74,7 @@ describe("credential field classification", () => {
       expect(oauthProviders.length).toBeGreaterThan(0);
 
       for (const [provider, definition] of oauthProviders) {
-        for (const field of Object.keys(
-          getSchemaShape(definition.keysSchema),
-        )) {
+        for (const field of Object.keys(getSchemaShape(definition.keysSchema))) {
           expect(
             isSecretCredentialField(field),
             `${provider}.${field} must never be serialized`,
@@ -111,10 +106,7 @@ describe("credential field classification", () => {
       registryFields.add("MANAGED");
 
       for (const field of PUBLIC_CREDENTIAL_FIELDS) {
-        expect(
-          registryFields.has(field),
-          `${field} is not in the registry`,
-        ).toBe(true);
+        expect(registryFields.has(field), `${field} is not in the registry`).toBe(true);
       }
     });
 
@@ -131,10 +123,9 @@ describe("credential field classification", () => {
         "GEMINI_PROJECT",
         "GEMINI_LOCATION",
       ]) {
-        expect(
-          isSecretCredentialField(field),
-          `${field} should stay visible`,
-        ).toBe(false);
+        expect(isSecretCredentialField(field), `${field} should stay visible`).toBe(
+          false,
+        );
       }
     });
   });

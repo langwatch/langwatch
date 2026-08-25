@@ -13,10 +13,7 @@ import crypto from "crypto";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import {
-  LicenseGenerationService,
-  NodeLicenseCryptographyAdapter,
-} from "../src";
+import { LicenseGenerationService, NodeLicenseCryptographyAdapter } from "../src";
 import { buildMintedPlan } from "@langwatch/enterprise-licensing-contract";
 
 /**
@@ -122,9 +119,7 @@ describe("generateLicenseKey", () => {
       });
 
       // Decoded the way an older deployment decodes it: base64 to JSON.
-      const decoded = JSON.parse(
-        Buffer.from(licenseKey, "base64").toString("utf-8"),
-      );
+      const decoded = JSON.parse(Buffer.from(licenseKey, "base64").toString("utf-8"));
 
       // The parse is the assertion: the released schema rejects a payload
       // missing maxProjects or maxWorkflows, which is what drops an older

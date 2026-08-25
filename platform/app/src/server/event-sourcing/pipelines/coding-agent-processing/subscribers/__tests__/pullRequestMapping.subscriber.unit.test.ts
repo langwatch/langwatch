@@ -19,9 +19,7 @@ import {
   shouldMapPullRequests,
 } from "../pullRequestMapping.subscriber";
 
-function foldState(
-  over: Partial<CodingAgentSessionState> = {},
-): CodingAgentSessionState {
+function foldState(over: Partial<CodingAgentSessionState> = {}): CodingAgentSessionState {
   return {
     repositoryHost: "github.com",
     repositoryOwner: "acme",
@@ -45,9 +43,7 @@ function contextFor(state: CodingAgentSessionState) {
 }
 
 /** The REAL pipeline registration — `build()` only stores references. */
-function registrationWith(
-  requestBranchMapping: (params: never) => Promise<void>,
-) {
+function registrationWith(requestBranchMapping: (params: never) => Promise<void>) {
   const store = {} as never;
   const deps = {
     codingAgentSessionStore: store,
@@ -101,9 +97,7 @@ describe("pullRequestMapping subscriber", () => {
     });
 
     it("treats an unreported host as github.com", () => {
-      expect(shouldMapPullRequests(foldState({ repositoryHost: "" }))).toBe(
-        true,
-      );
+      expect(shouldMapPullRequests(foldState({ repositoryHost: "" }))).toBe(true);
     });
 
     // A session records whatever casing its git remote carries, and every
@@ -112,9 +106,9 @@ describe("pullRequestMapping subscriber", () => {
     // ever wrote, and the branch reads as having no pull request forever.
     /** @scenario "A session whose remote host casing differs still finds its pull request" */
     it("treats a differently cased github.com as github.com", () => {
-      expect(
-        shouldMapPullRequests(foldState({ repositoryHost: "GitHub.com" })),
-      ).toBe(true);
+      expect(shouldMapPullRequests(foldState({ repositoryHost: "GitHub.com" }))).toBe(
+        true,
+      );
     });
   });
 
@@ -138,9 +132,7 @@ describe("pullRequestMapping subscriber", () => {
           .mockRejectedValue(new Error("GitHub rate limit reached")),
       });
 
-      await expect(
-        handler(event, contextFor(foldState())),
-      ).resolves.toBeUndefined();
+      await expect(handler(event, contextFor(foldState()))).resolves.toBeUndefined();
     });
   });
 
@@ -219,9 +211,7 @@ describe("pullRequestMapping subscriber", () => {
       // The dedup id embeds the same branch key the group is keyed on — the
       // subscriber prefix on the dedup id changes the string, never the unit
       // of work the two describe.
-      expect(registration.options?.makeJobId?.(first)).toContain(
-        groupKey!(first),
-      );
+      expect(registration.options?.makeJobId?.(first)).toContain(groupKey!(first));
     });
 
     it("keeps a different branch in its own group", () => {

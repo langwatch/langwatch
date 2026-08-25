@@ -21,11 +21,7 @@ type WireDirection = "pre" | "post" | "stream_chunk";
 
 type GuardrailAttachment = { direction: WireDirection; guardrailIds: string[] };
 
-const DIRECTION_ORDER: GuardrailDirectionEnum[] = [
-  "PRE",
-  "POST",
-  "STREAM_CHUNK",
-];
+const DIRECTION_ORDER: GuardrailDirectionEnum[] = ["PRE", "POST", "STREAM_CHUNK"];
 
 const DIRECTION_META: Record<
   GuardrailDirectionEnum,
@@ -86,10 +82,7 @@ export function GuardrailAttachmentsSection({
   canAttach: boolean;
   onSaved: () => void;
 }) {
-  const serverAttachedIds = useMemo(
-    () => flattenAttachedIds(attachments),
-    [attachments],
-  );
+  const serverAttachedIds = useMemo(() => flattenAttachedIds(attachments), [attachments]);
   const [checked, setChecked] = useState<Set<string>>(serverAttachedIds);
 
   useEffect(() => {
@@ -121,8 +114,8 @@ export function GuardrailAttachmentsSection({
     return (
       <SectionShell>
         <Text fontSize="sm" color="fg.muted">
-          Guardrails are project-scoped. Scope this key to a single project to
-          attach the project's guardrails.
+          Guardrails are project-scoped. Scope this key to a single project to attach the
+          project's guardrails.
         </Text>
       </SectionShell>
     );
@@ -143,11 +136,7 @@ export function GuardrailAttachmentsSection({
         <Text fontSize="sm" color="fg.muted">
           No guardrails defined in this project yet.{" "}
           {projectSlug ? (
-            <Link
-              href="/gateway/guardrails"
-              color="blue.500"
-              fontWeight="medium"
-            >
+            <Link href="/gateway/guardrails" color="blue.500" fontWeight="medium">
               Create one
             </Link>
           ) : (
@@ -239,8 +228,8 @@ export function GuardrailAttachmentsSection({
         ))}
         {!canAttach && (
           <Text fontSize="xs" color="fg.subtle">
-            You need the gatewayGuardrails:attach permission in this project to
-            change attachments.
+            You need the gatewayGuardrails:attach permission in this project to change
+            attachments.
           </Text>
         )}
         <HStack justifyContent="flex-end">

@@ -10,9 +10,7 @@ export class PullDestinationService {
     return new PullDestinationService();
   }
 
-  assertAllowed(
-    parserConfig: Record<string, unknown> | null | undefined,
-  ): void {
+  assertAllowed(parserConfig: Record<string, unknown> | null | undefined): void {
     if (!parserConfig || typeof parserConfig !== "object") return;
     if (parserConfig.adapter !== DATABRICKS_GENIE_ADAPTER_ID) return;
     if (

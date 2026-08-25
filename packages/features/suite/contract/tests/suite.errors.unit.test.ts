@@ -28,7 +28,9 @@ describe("Suite errors", () => {
       "suite_all_targets_archived",
       "suite_name_taken",
     ]);
-    expect(errors.map((error) => error.httpStatus)).toEqual([404, 422, 422, 422, 422, 409]);
+    expect(errors.map((error) => error.httpStatus)).toEqual([
+      404, 422, 422, 422, 422, 409,
+    ]);
     expect(errors.every(HandledError.isHandled)).toBe(true);
   });
 

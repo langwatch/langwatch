@@ -6,12 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type {
-  Evaluation,
-  LLMSpan,
-  RAGSpan,
-  Trace,
-} from "~/server/tracer/types";
+import type { Evaluation, LLMSpan, RAGSpan, Trace } from "~/server/tracer/types";
 import {
   serializeTraceToFullJson,
   serializeTraceToSummaryJson,
@@ -99,9 +94,7 @@ function buildRAGSpan(overrides?: Partial<RAGSpan>): RAGSpan {
     trace_id: "trace-1",
     type: "rag",
     name: "Retrieval",
-    contexts: [
-      { document_id: "doc-1", chunk_id: "chunk-1", content: "Some context" },
-    ],
+    contexts: [{ document_id: "doc-1", chunk_id: "chunk-1", content: "Some context" }],
     input: { type: "text", value: "search query" },
     output: { type: "text", value: "retrieved results" },
     timestamps: {

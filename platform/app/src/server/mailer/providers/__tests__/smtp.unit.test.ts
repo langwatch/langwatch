@@ -1,13 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockEnv, sendMailMock, closeMock, createTransportMock } = vi.hoisted(
-  () => ({
-    mockEnv: {} as Record<string, unknown>,
-    sendMailMock: vi.fn(),
-    closeMock: vi.fn(),
-    createTransportMock: vi.fn(),
-  }),
-);
+const { mockEnv, sendMailMock, closeMock, createTransportMock } = vi.hoisted(() => ({
+  mockEnv: {} as Record<string, unknown>,
+  sendMailMock: vi.fn(),
+  closeMock: vi.fn(),
+  createTransportMock: vi.fn(),
+}));
 
 vi.mock("../../../../env.mjs", () => ({ env: mockEnv }));
 
@@ -106,9 +104,7 @@ describe("buildSmtpTransportOptions", () => {
     it("fails with an actionable error", () => {
       setEnv({});
 
-      expect(() => buildSmtpTransportOptions()).toThrow(
-        EmailProviderConfigurationError,
-      );
+      expect(() => buildSmtpTransportOptions()).toThrow(EmailProviderConfigurationError);
     });
   });
 
@@ -270,9 +266,7 @@ describe("smtpProvider.send", () => {
         defaultFrom: "noreply@langwatch.ai",
       });
 
-      expect(sentMessage().headers["X-Custom"]).toBe(
-        "value Bcc: attacker@evil.com",
-      );
+      expect(sentMessage().headers["X-Custom"]).toBe("value Bcc: attacker@evil.com");
     });
   });
 

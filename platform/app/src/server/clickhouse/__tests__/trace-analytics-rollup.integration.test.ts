@@ -65,10 +65,7 @@ interface SpanFixture {
  * to '' so the (TenantId, BucketStart, Model, SpanType) tuple collapses to a
  * single group per test, the way the prior MV would over a same-bucket trace.
  */
-function makeRow(
-  tenant: string,
-  fixture: SpanFixture,
-): TraceAnalyticsRollupRow {
+function makeRow(tenant: string, fixture: SpanFixture): TraceAnalyticsRollupRow {
   return {
     tenantId: tenant,
     bucketStart,
@@ -126,9 +123,7 @@ async function readRollupForTenant(tenant: string): Promise<{
       query_params: { tenantId: tenant },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<
-      Record<string, number | string>
-    >;
+    const rows = (await result.json()) as Array<Record<string, number | string>>;
     // The fixtures land in one (Model, SpanType) group so we get exactly one row.
     const row = rows[0] ?? {};
     const read = {
@@ -152,10 +147,7 @@ async function readRollupForTenant(tenant: string): Promise<{
  * metricsSync.convergence uses; a genuinely lost insert still fails, loudly,
  * after the deadline.
  */
-async function waitForSpanCount(
-  tenant: string,
-  expected: number,
-): Promise<void> {
+async function waitForSpanCount(tenant: string, expected: number): Promise<void> {
   const deadline = Date.now() + 15_000;
   for (;;) {
     const result = await ch.query({

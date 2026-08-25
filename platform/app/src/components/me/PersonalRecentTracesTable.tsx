@@ -1,10 +1,6 @@
 import { Box, HStack, Spinner } from "@chakra-ui/react";
 import { keepPreviousData } from "@tanstack/react-query";
-import {
-  type ColumnDef,
-  getCoreRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
+import { type ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { useMemo } from "react";
 import { PersonalTracesEmptyState } from "~/components/me/PersonalTracesEmptyState";
 import { buildTraceColumns } from "~/features/traces-v2/components/TraceTable/columns";

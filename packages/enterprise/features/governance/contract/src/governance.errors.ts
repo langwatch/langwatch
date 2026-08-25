@@ -1,8 +1,4 @@
-import {
-  HandledError,
-  NotFoundError,
-  ValidationError,
-} from "@langwatch/handled-error";
+import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
 
 export class GovernanceValidationError extends ValidationError {
   constructor(

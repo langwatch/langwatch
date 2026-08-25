@@ -11,10 +11,7 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "./connection";
-import {
-  type PrismaDriverAdapter,
-  PrismaDriverAdapterFactory,
-} from "./driver-adapter";
+import { type PrismaDriverAdapter, PrismaDriverAdapterFactory } from "./driver-adapter";
 import type { PrismaClient } from "./generated/client";
 import {
   PrismaMigrationExecutor,
@@ -182,9 +179,9 @@ describe("explicit Prisma lifecycle", () => {
       pool: fakePool(end),
     });
 
-    await expect(
-      PrismaShutdownService.create().shutdown(connection),
-    ).rejects.toThrow("disconnect failed");
+    await expect(PrismaShutdownService.create().shutdown(connection)).rejects.toThrow(
+      "disconnect failed",
+    );
     expect(end).toHaveBeenCalledOnce();
   });
 
@@ -195,9 +192,7 @@ describe("explicit Prisma lifecycle", () => {
     });
 
     expect(executor.requests).toHaveLength(1);
-    expect(executor.requests[0]?.databaseUrl).toBe(
-      "postgresql://localhost/langwatch",
-    );
+    expect(executor.requests[0]?.databaseUrl).toBe("postgresql://localhost/langwatch");
     expect(executor.requests[0]?.schemaPath.pathname).toMatch(
       /packages\/prisma-client\/prisma\/schema\.prisma$/,
     );

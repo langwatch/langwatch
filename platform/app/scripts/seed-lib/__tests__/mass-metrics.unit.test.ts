@@ -14,8 +14,7 @@ type MetricByName = Record<
 
 function metricsByName(batch: MassMetricsBatch): MetricByName {
   const byName: MetricByName = {};
-  for (const metric of batch.request.resourceMetrics[0]!.scopeMetrics[0]!
-    .metrics) {
+  for (const metric of batch.request.resourceMetrics[0]!.scopeMetrics[0]!.metrics) {
     byName[metric.name] = metric;
   }
   return byName;
@@ -28,8 +27,7 @@ function statusTotal(batch: MassMetricsBatch, status: string): number {
     .filter((point) =>
       point.attributes.some(
         (attr) =>
-          attr.key === "http.response.status_code" &&
-          attr.value.stringValue === status,
+          attr.key === "http.response.status_code" && attr.value.stringValue === status,
       ),
     )
     .reduce((total, point) => total + Number(point.asInt), 0);
@@ -58,9 +56,9 @@ describe("buildMassMetrics", () => {
       for (const point of tokens.sum.dataPoints) {
         expect(point.asInt).toMatch(/^\d+$/);
         expect(point.startTimeUnixNano).toMatch(/^\d+$/);
-        expect(
-          Number(BigInt(point.timeUnixNano) / 1_000_000n),
-        ).toBeLessThanOrEqual(metrics.batches[0]!.dayStart + DAY_MS);
+        expect(Number(BigInt(point.timeUnixNano) / 1_000_000n)).toBeLessThanOrEqual(
+          metrics.batches[0]!.dayStart + DAY_MS,
+        );
       }
 
       const requests = first["app.requests"]!;
@@ -77,13 +75,8 @@ describe("buildMassMetrics", () => {
         throw new Error("operation.duration must be a histogram");
       }
       for (const point of duration.histogram.dataPoints) {
-        expect(point.bucketCounts).toHaveLength(
-          point.explicitBounds.length + 1,
-        );
-        const total = point.bucketCounts.reduce(
-          (sum, count) => sum + Number(count),
-          0,
-        );
+        expect(point.bucketCounts).toHaveLength(point.explicitBounds.length + 1);
+        const total = point.bucketCounts.reduce((sum, count) => sum + Number(count), 0);
         expect(total).toBe(Number(point.count));
         expect(point.sum).toBeGreaterThan(0);
       }
@@ -98,21 +91,15 @@ describe("buildMassMetrics", () => {
           statusTotal(batch, "429") +
           statusTotal(batch, "500"));
       expect(share(lastDay)).toBeLessThan(share(firstDay));
-      expect(statusTotal(lastDay, "200")).toBeGreaterThan(
-        statusTotal(firstDay, "200"),
-      );
+      expect(statusTotal(lastDay, "200")).toBeGreaterThan(statusTotal(firstDay, "200"));
     });
 
     it("is deterministic and counts its own points honestly", () => {
       expect(buildMassMetrics({ months: 3, now: NOW })).toEqual(metrics);
-      const counted = metrics.batches.reduce(
-        (sum, batch) => sum + batch.pointCount,
-        0,
-      );
+      const counted = metrics.batches.reduce((sum, batch) => sum + batch.pointCount, 0);
       expect(counted).toBe(metrics.totalPoints);
       const actual = metrics.batches.reduce((sum, batch) => {
-        for (const metric of batch.request.resourceMetrics[0]!.scopeMetrics[0]!
-          .metrics) {
+        for (const metric of batch.request.resourceMetrics[0]!.scopeMetrics[0]!.metrics) {
           if ("sum" in metric) sum += metric.sum.dataPoints.length;
           else if ("gauge" in metric) sum += metric.gauge.dataPoints.length;
           else sum += metric.histogram.dataPoints.length;

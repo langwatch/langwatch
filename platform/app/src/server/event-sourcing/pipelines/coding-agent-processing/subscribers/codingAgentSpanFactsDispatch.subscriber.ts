@@ -28,9 +28,7 @@ import {
 } from "../services/coding-agent-normalization";
 import { isCodingAgentSessionSpan } from "../services/coding-agent-session.derivation";
 
-const logger = createLogger(
-  "langwatch:coding-agent-processing:span-facts-dispatch",
-);
+const logger = createLogger("langwatch:coding-agent-processing:span-facts-dispatch");
 
 /**
  * The span→session dispatcher (ADR-056 §2): a subscriber on trace-processing's
@@ -98,15 +96,12 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
    * only a bare DECLARED name (codex's `session_task.turn`) additionally
    * asks the scope, so a foreign span reusing it never mints a session.
    */
-  const isCodingAgentSpan = (
-    event: TraceProcessingEvent,
-  ): event is SpanReceivedEvent => {
+  const isCodingAgentSpan = (event: TraceProcessingEvent): event is SpanReceivedEvent => {
     if (!isSpanReceivedEvent(event)) return false;
     const rawName = (event.data.span as { name?: unknown } | undefined)?.name;
     if (typeof rawName !== "string") return false;
-    const rawScope = (
-      event.data.instrumentationScope as { name?: unknown } | undefined
-    )?.name;
+    const rawScope = (event.data.instrumentationScope as { name?: unknown } | undefined)
+      ?.name;
     return isCodingAgentSessionSpan({
       name: rawName,
       scopeName: typeof rawScope === "string" ? rawScope : null,
@@ -219,9 +214,7 @@ async function handleFullEvent({
 }: {
   event: TraceProcessingEvent;
   normalization: SpanNormalizationPipelineService;
-  isCodingAgentSpan: (
-    event: TraceProcessingEvent,
-  ) => event is SpanReceivedEvent;
+  isCodingAgentSpan: (event: TraceProcessingEvent) => event is SpanReceivedEvent;
   contributeSpanFacts: (data: ContributeSpanFactsCommandData) => Promise<void>;
 }): Promise<void> {
   // Before treating this as a full event, establish that it IS one: a payload

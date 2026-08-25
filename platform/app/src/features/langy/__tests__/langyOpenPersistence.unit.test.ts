@@ -133,14 +133,10 @@ describe("Langy conversation restoration", () => {
     /** @scenario Nothing follows me into another organization */
     it("starts clean", () => {
       const scope = { userId: "user-1", projectId: "project-a" };
-      useLangyStore
-        .getState()
-        .resetForScope({ ...scope, organizationId: "org-1" });
+      useLangyStore.getState().resetForScope({ ...scope, organizationId: "org-1" });
       useLangyStore.getState().selectConversation("conv-1");
 
-      useLangyStore
-        .getState()
-        .resetForScope({ ...scope, organizationId: "org-2" });
+      useLangyStore.getState().resetForScope({ ...scope, organizationId: "org-2" });
 
       expect(useLangyStore.getState().activeConversationId).toBeNull();
     });

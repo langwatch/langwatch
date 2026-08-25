@@ -90,11 +90,7 @@ export function DepartmentEditDrawer({
         <Drawer.Footer>
           <HStack width="full">
             <Spacer />
-            <Button
-              variant="ghost"
-              onClick={close}
-              disabled={renameMutation.isPending}
-            >
+            <Button variant="ghost" onClick={close} disabled={renameMutation.isPending}>
               Cancel
             </Button>
             <Button

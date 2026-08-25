@@ -18,9 +18,7 @@ function listMarkdown(dir: string): string[] {
 }
 
 function stripCode(markdown: string): string {
-  return markdown
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/`[^`\n]*`/g, "");
+  return markdown.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
 }
 
 function extractLinks(markdown: string): { text: string; url: string }[] {
@@ -75,24 +73,35 @@ describe("sync publishes self-contained skills", () => {
         }
       }
     }
-    expect(offenders, `local links must be inlined, not published as-is:\n  ${offenders.join("\n  ")}`).toEqual([]);
+    expect(
+      offenders,
+      `local links must be inlined, not published as-is:\n  ${offenders.join("\n  ")}`,
+    ).toEqual([]);
   });
 
   it("contains no leftover MDX syntax or unresolved partial markers", () => {
     for (const file of listMarkdown(tmpDir)) {
       // Strip fenced code blocks so we don't trip on Python/TS imports in examples.
       const content = stripCode(fs.readFileSync(file, "utf8"));
-      expect(content, `${path.relative(tmpDir, file)} still contains an ESM import`)
-        .not.toMatch(/^import\s+\w+\s+from\s+['"][^'"]+\.mdx?['"]/m);
+      expect(
+        content,
+        `${path.relative(tmpDir, file)} still contains an ESM import`,
+      ).not.toMatch(/^import\s+\w+\s+from\s+['"][^'"]+\.mdx?['"]/m);
       // Block-level JSX self-closing element like `<Component />` on its own line.
-      expect(content, `${path.relative(tmpDir, file)} still contains an unrendered JSX component`)
-        .not.toMatch(/^<[A-Z]\w*\s*\/>\s*$/m);
+      expect(
+        content,
+        `${path.relative(tmpDir, file)} still contains an unrendered JSX component`,
+      ).not.toMatch(/^<[A-Z]\w*\s*\/>\s*$/m);
       // The original publish bug: an unresolved `_shared/...` reference or a
       // `[Reference: ...]` placeholder making it into the published output.
-      expect(content, `${path.relative(tmpDir, file)} still contains a _shared reference`)
-        .not.toContain("_shared/");
-      expect(content, `${path.relative(tmpDir, file)} still contains an unresolved [Reference:] stub`)
-        .not.toMatch(/\[Reference:\s*[^\]]+\]/);
+      expect(
+        content,
+        `${path.relative(tmpDir, file)} still contains a _shared reference`,
+      ).not.toContain("_shared/");
+      expect(
+        content,
+        `${path.relative(tmpDir, file)} still contains an unresolved [Reference:] stub`,
+      ).not.toMatch(/\[Reference:\s*[^\]]+\]/);
     }
   });
 
@@ -112,8 +121,10 @@ describe("sync publishes self-contained skills", () => {
     // to `LANGWATCH\_API\_KEY` by default. inlineMdx unescapes them.
     for (const file of listMarkdown(tmpDir)) {
       const content = fs.readFileSync(file, "utf8");
-      expect(content, `${path.relative(tmpDir, file)} contains over-escaped underscore`)
-        .not.toMatch(/[A-Za-z]\\_[A-Za-z]/);
+      expect(
+        content,
+        `${path.relative(tmpDir, file)} contains over-escaped underscore`,
+      ).not.toMatch(/[A-Za-z]\\_[A-Za-z]/);
     }
   });
 });

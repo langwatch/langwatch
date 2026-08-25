@@ -91,9 +91,7 @@ describe("useLangyWarmWorker", () => {
         opts.onSuccess?.({ conversationId: "conv-warmed", warmed: true });
       });
 
-      expect(useLangyStore.getState().pendingConversationId).toBe(
-        "conv-warmed",
-      );
+      expect(useLangyStore.getState().pendingConversationId).toBe("conv-warmed");
       expect(useLangyStore.getState().activeConversationId).toBeNull();
     });
 
@@ -322,9 +320,7 @@ describe("useLangyWarmWorker", () => {
         first.onSuccess?.({ conversationId: "conv-stale", warmed: true });
       });
 
-      expect(useLangyStore.getState().pendingConversationId).toBe(
-        "conv-newest",
-      );
+      expect(useLangyStore.getState().pendingConversationId).toBe("conv-newest");
     });
   });
 

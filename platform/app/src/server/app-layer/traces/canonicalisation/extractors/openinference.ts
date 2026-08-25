@@ -33,10 +33,7 @@ export class OpenInferenceExtractor implements CanonicalAttributesExtractor {
     // Skip if explicit type is already set
     // ─────────────────────────────────────────────────────────────────────────
     const explicitType = attrs.get(ATTR_KEYS.SPAN_TYPE);
-    if (
-      typeof explicitType === "string" &&
-      ALLOWED_SPAN_TYPES.has(explicitType)
-    ) {
+    if (typeof explicitType === "string" && ALLOWED_SPAN_TYPES.has(explicitType)) {
       // Don't return early — still process user.id, session.id, tag.tags
     } else {
       const rawKind = attrs.take(ATTR_KEYS.OPENINFERENCE_SPAN_KIND);
@@ -44,9 +41,7 @@ export class OpenInferenceExtractor implements CanonicalAttributesExtractor {
 
       if (kind && ALLOWED_SPAN_TYPES.has(kind)) {
         ctx.setAttr(ATTR_KEYS.SPAN_TYPE, kind);
-        ctx.recordRule(
-          `${this.id}:openinference.span.kind->langwatch.span.type`,
-        );
+        ctx.recordRule(`${this.id}:openinference.span.kind->langwatch.span.type`);
       }
     }
 
@@ -91,9 +86,7 @@ export class OpenInferenceExtractor implements CanonicalAttributesExtractor {
     // token counts under this namespace. Map them to canonical gen_ai.usage.*
     // so downstream cost computation picks them up.
     // ─────────────────────────────────────────────────────────────────────────
-    const prompt = asNumber(
-      attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT),
-    );
+    const prompt = asNumber(attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT));
     if (prompt !== null) {
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, prompt);
     }
@@ -108,34 +101,22 @@ export class OpenInferenceExtractor implements CanonicalAttributesExtractor {
     attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_TOTAL);
 
     const reasoning = asNumber(
-      attrs.take(
-        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION_DETAILS_REASONING,
-      ),
+      attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION_DETAILS_REASONING),
     );
     if (reasoning !== null) {
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, reasoning);
     }
     const cacheRead = asNumber(
-      attrs.take(
-        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_READ,
-      ),
+      attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_READ),
     );
     if (cacheRead !== null) {
-      ctx.setAttrIfAbsent(
-        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-        cacheRead,
-      );
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cacheRead);
     }
     const cacheWrite = asNumber(
-      attrs.take(
-        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_WRITE,
-      ),
+      attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_WRITE),
     );
     if (cacheWrite !== null) {
-      ctx.setAttrIfAbsent(
-        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-        cacheWrite,
-      );
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cacheWrite);
     }
     if (
       prompt !== null ||

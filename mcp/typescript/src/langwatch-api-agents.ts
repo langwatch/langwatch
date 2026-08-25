@@ -101,8 +101,8 @@ export async function runAgent(
 }
 
 export async function deleteAgent(id: string): Promise<{ id: string; name: string }> {
-  return makeRequest(
-    "DELETE",
-    `/api/agents/${encodeURIComponent(id)}`,
-  ) as Promise<{ id: string; name: string }>;
+  return makeRequest("DELETE", `/api/agents/${encodeURIComponent(id)}`) as Promise<{
+    id: string;
+    name: string;
+  }>;
 }

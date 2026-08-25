@@ -27,11 +27,10 @@ function ProjectSessionsPage() {
         <VStack align="start" gap={0}>
           <PageLayout.Heading>Sessions</PageLayout.Heading>
           <Text color="fg.muted" fontSize="sm">
-            Every coding-agent session this project recorded over the last
-            ninety days, with the context it carried, how often it compacted,
-            how long it worked against how long it waited on a person, and the
-            pull requests it drove. Choosing a session replays it in the
-            terminal.
+            Every coding-agent session this project recorded over the last ninety days,
+            with the context it carried, how often it compacted, how long it worked
+            against how long it waited on a person, and the pull requests it drove.
+            Choosing a session replays it in the terminal.
           </Text>
         </VStack>
 

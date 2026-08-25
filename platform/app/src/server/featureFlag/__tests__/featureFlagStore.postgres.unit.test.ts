@@ -24,8 +24,7 @@ const { table, findUnique, upsert } = vi.hoisted(() => {
   return {
     table,
     findUnique: vi.fn(
-      async ({ where }: { where: { key: string } }) =>
-        table.get(where.key) ?? null,
+      async ({ where }: { where: { key: string } }) => table.get(where.key) ?? null,
     ),
     upsert: vi.fn(
       async ({

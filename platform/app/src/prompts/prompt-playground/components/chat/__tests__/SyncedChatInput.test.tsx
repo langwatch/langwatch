@@ -66,10 +66,7 @@ type RenderOptions = {
   inProgress?: boolean;
 };
 
-const renderSyncedChatInput = ({
-  tabId,
-  inProgress = false,
-}: RenderOptions) => {
+const renderSyncedChatInput = ({ tabId, inProgress = false }: RenderOptions) => {
   const onSend = vi.fn().mockResolvedValue(undefined);
   const onStop = vi.fn();
 
@@ -158,9 +155,7 @@ describe("SyncedChatInput", () => {
 
       renderSyncedChatInput({ tabId: tabId! });
 
-      expect(
-        screen.getByPlaceholderText(/type your message/i),
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/type your message/i)).toBeInTheDocument();
     });
 
     it("keeps textarea enabled when inProgress to allow typing next message", () => {
@@ -205,9 +200,7 @@ describe("SyncedChatInput", () => {
 
       // Find the button (there's only one button when no checkbox)
       const buttons = screen.getAllByRole("button");
-      const sendButton = buttons.find(
-        (btn) => btn.getAttribute("type") === "button",
-      );
+      const sendButton = buttons.find((btn) => btn.getAttribute("type") === "button");
       expect(sendButton).toBeDisabled();
     });
   });

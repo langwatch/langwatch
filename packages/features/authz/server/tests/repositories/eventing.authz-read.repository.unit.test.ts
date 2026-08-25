@@ -12,8 +12,7 @@ import { EventingAuthzReadRepository } from "../../src/repositories/eventing/eve
  * facts a cut-over organization stores but does not yet act on (lite-member
  * and friends) are skipped rather than translated into a decision.
  */
-const clientFor = (models: Record<string, unknown>) =>
-  models as unknown as AuthzDatabase;
+const clientFor = (models: Record<string, unknown>) => models as unknown as AuthzDatabase;
 
 const member = () =>
   vi.fn().mockResolvedValue({ userId: "alice" }) as ReturnType<typeof vi.fn>;
@@ -568,9 +567,7 @@ describe("EventingAuthzReadRepository", () => {
 
   describe("when findShareLinks resolves a share token", () => {
     const lineageStub = () =>
-      vi
-        .fn()
-        .mockResolvedValue({ team: { id: "team-1", organizationId: "org-1" } });
+      vi.fn().mockResolvedValue({ team: { id: "team-1", organizationId: "org-1" } });
 
     it("filters by presented token AND the resource links, organization-anchored", async () => {
       const grantFindMany = vi.fn().mockResolvedValue([]);
@@ -684,9 +681,7 @@ describe("EventingAuthzReadRepository", () => {
             ]),
           },
           grantUsage: {
-            findMany: vi
-              .fn()
-              .mockResolvedValue([{ grantId: "grant-1", viewCount: 3 }]),
+            findMany: vi.fn().mockResolvedValue([{ grantId: "grant-1", viewCount: 3 }]),
           },
         }),
       );
@@ -865,9 +860,10 @@ describe("EventingAuthzReadRepository", () => {
         clientFor({ project: { findUnique } }),
       );
 
-      expect(
-        await repository.tryFindProjectLineage({ projectId: "proj-1" }),
-      ).toEqual({ teamId: "team-1", organizationId: "org-1" });
+      expect(await repository.tryFindProjectLineage({ projectId: "proj-1" })).toEqual({
+        teamId: "team-1",
+        organizationId: "org-1",
+      });
       expect(
         await repository.tryFindProjectLineage({ projectId: "proj-ghost" }),
       ).toBeNull();
@@ -884,9 +880,9 @@ describe("EventingAuthzReadRepository", () => {
         clientFor({ team: { findUnique } }),
       );
 
-      expect(
-        await repository.tryFindTeamOrganization({ teamId: "team-1" }),
-      ).toEqual({ organizationId: "org-1" });
+      expect(await repository.tryFindTeamOrganization({ teamId: "team-1" })).toEqual({
+        organizationId: "org-1",
+      });
       expect(
         await repository.tryFindTeamOrganization({ teamId: "team-ghost" }),
       ).toBeNull();

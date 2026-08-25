@@ -34,19 +34,14 @@ async function main() {
         isCustom: true,
         url,
         method: "POST",
-        bodyTemplate:
-          '{"thread": "{{ threadId }}", "messages": {{ messages }}}',
+        bodyTemplate: '{"thread": "{{ threadId }}", "messages": {{ messages }}}',
         outputPath: "$.answer",
       },
     },
   });
 
   console.log(
-    JSON.stringify(
-      { projectSlug: project.slug, agentId: agent.id, url },
-      null,
-      2,
-    ),
+    JSON.stringify({ projectSlug: project.slug, agentId: agent.id, url }, null, 2),
   );
 }
 

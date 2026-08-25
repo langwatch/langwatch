@@ -94,10 +94,7 @@ describe("readCustomKeys", () => {
       readCustomKeys(stored);
 
       expect(warn).toHaveBeenCalledTimes(1);
-      const [fields, message] = warn.mock.calls[0] as [
-        Record<string, unknown>,
-        string,
-      ];
+      const [fields, message] = warn.mock.calls[0] as [Record<string, unknown>, string];
       expect(fields).toEqual({
         errorName: "SyntaxError",
         encryptedLength: stored.length,
@@ -115,19 +112,15 @@ describe("readCustomKeys", () => {
   describe("given valid JSON that is not a credential bag", () => {
     // A caller indexing one of these throws where it expected a missing key,
     // so none of them may read as `read`.
-    it.each([
-      "null",
-      "[]",
-      '["OPENAI_API_KEY"]',
-      '"sk-secret"',
-      "42",
-      "true",
-    ])("reads encrypted %s as unreadable", (json) => {
-      expect(readCustomKeys(encrypt(json))).toEqual({
-        state: "unreadable",
-        keys: {},
-      });
-    });
+    it.each(["null", "[]", '["OPENAI_API_KEY"]', '"sk-secret"', "42", "true"])(
+      "reads encrypted %s as unreadable",
+      (json) => {
+        expect(readCustomKeys(encrypt(json))).toEqual({
+          state: "unreadable",
+          keys: {},
+        });
+      },
+    );
 
     it("reads a plaintext array as unreadable", () => {
       expect(readCustomKeys(["OPENAI_API_KEY"])).toEqual({

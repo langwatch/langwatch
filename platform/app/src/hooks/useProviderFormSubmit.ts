@@ -133,8 +133,7 @@ export function useProviderFormSubmit({
           enabled: newEnabled,
           customKeys: snapshot.provider.customKeys as any,
           customModels: snapshot.provider.customModels ?? [],
-          customEmbeddingsModels:
-            snapshot.provider.customEmbeddingsModels ?? [],
+          customEmbeddingsModels: snapshot.provider.customEmbeddingsModels ?? [],
         });
         await invalidateModelProviderQueries(utils);
         broadcastModelProvidersUpdated();
@@ -180,8 +179,7 @@ export function useProviderFormSubmit({
     try {
       // Check if user modified non-API-key fields (like URLs) when using env vars
       const hasNonApiKeyChanges =
-        isUsingEnvVars &&
-        hasUserModifiedNonApiKeyFields(customKeys, initialKeys);
+        isUsingEnvVars && hasUserModifiedNonApiKeyFields(customKeys, initialKeys);
 
       // Validate if not using env vars, OR if using env vars but has non-API-key changes
       if (!isUsingEnvVars || hasNonApiKeyChanges) {
@@ -226,8 +224,8 @@ export function useProviderFormSubmit({
         }
         if (mismatched.length > 0) {
           const providerDisplayName =
-            modelProviders[provider.provider as keyof typeof modelProviders]
-              ?.name ?? provider.provider;
+            modelProviders[provider.provider as keyof typeof modelProviders]?.name ??
+            provider.provider;
           toaster.create({
             title:
               mismatched.length === 1
@@ -236,9 +234,7 @@ export function useProviderFormSubmit({
             description: `${mismatched.join(" and ")} ${
               mismatched.length === 1 ? "belongs" : "belong"
             } to a different provider. Pick a model from ${providerDisplayName}${
-              provider.provider === "azure"
-                ? " (or add a custom deployment)"
-                : ""
+              provider.provider === "azure" ? " (or add a custom deployment)" : ""
             } before saving.`,
             type: "error",
             duration: 5000,
@@ -287,10 +283,7 @@ export function useProviderFormSubmit({
       // object, send `undefined` so the server treats it as "no key change"
       // and preserves the stored key, rather than validating `{}` against the
       // provider's keysSchema.
-      if (
-        customKeysToSend !== undefined &&
-        Object.keys(customKeysToSend).length === 0
-      ) {
+      if (customKeysToSend !== undefined && Object.keys(customKeysToSend).length === 0) {
         customKeysToSend = undefined;
       }
 

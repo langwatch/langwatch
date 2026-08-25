@@ -2,9 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { StalledHistoricalRun } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/stalledSimulationRuns.clickhouse.repository";
 import { backfillStalledRuns } from "../backfillStalledSimulationRuns";
 
-function makeRun(
-  overrides: Partial<StalledHistoricalRun> = {},
-): StalledHistoricalRun {
+function makeRun(overrides: Partial<StalledHistoricalRun> = {}): StalledHistoricalRun {
   return {
     tenantId: "tenant-1",
     scenarioRunId: "run-1",

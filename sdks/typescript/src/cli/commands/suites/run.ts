@@ -39,14 +39,21 @@ export const runSuiteCommand = async ({
       return;
     }
 
-    if (result.skippedArchived.scenarios.length > 0 || result.skippedArchived.targets.length > 0) {
+    if (
+      result.skippedArchived.scenarios.length > 0 ||
+      result.skippedArchived.targets.length > 0
+    ) {
       console.log();
       console.log(chalk.yellow("  Skipped archived references:"));
       if (result.skippedArchived.scenarios.length > 0) {
-        console.log(chalk.yellow(`    Scenarios: ${result.skippedArchived.scenarios.join(", ")}`));
+        console.log(
+          chalk.yellow(`    Scenarios: ${result.skippedArchived.scenarios.join(", ")}`),
+        );
       }
       if (result.skippedArchived.targets.length > 0) {
-        console.log(chalk.yellow(`    Targets: ${result.skippedArchived.targets.join(", ")}`));
+        console.log(
+          chalk.yellow(`    Targets: ${result.skippedArchived.targets.join(", ")}`),
+        );
       }
     }
 
@@ -56,14 +63,10 @@ export const runSuiteCommand = async ({
       console.log(`  ${chalk.gray("Jobs:")}         ${result.jobCount}`);
       console.log();
       console.log(
-        chalk.gray(
-          `View results in the LangWatch dashboard under Simulations.`,
-        ),
+        chalk.gray(`View results in the LangWatch dashboard under Simulations.`),
       );
       console.log(
-        chalk.gray(
-          `Or re-run with ${chalk.cyan("--wait")} to poll for completion.`,
-        ),
+        chalk.gray(`Or re-run with ${chalk.cyan("--wait")} to poll for completion.`),
       );
       return;
     }

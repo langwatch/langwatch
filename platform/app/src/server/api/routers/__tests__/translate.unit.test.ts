@@ -15,9 +15,7 @@ import { translateRouter } from "../translate";
 const mockGetVercelAIModel = vi.fn();
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
 

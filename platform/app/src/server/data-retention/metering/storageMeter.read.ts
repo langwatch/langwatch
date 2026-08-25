@@ -87,7 +87,6 @@ export async function resolveScopeStorageUsage(
     .map((p) => p.id)
     .filter((id) => projects.get(id) === true);
 
-  const totalBytes =
-    await metering.getTotalStorageBytesForTenants(authorizedIds);
+  const totalBytes = await metering.getTotalStorageBytesForTenants(authorizedIds);
   return { totalBytes, projectCount: authorizedIds.length };
 }

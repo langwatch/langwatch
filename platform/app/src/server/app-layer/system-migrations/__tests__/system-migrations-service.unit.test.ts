@@ -41,9 +41,7 @@ function migrationOf({
 
 function enrollmentStoreStub() {
   return {
-    findAll: vi
-      .fn<SystemMigrationEnrollmentStore["findAll"]>()
-      .mockResolvedValue([]),
+    findAll: vi.fn<SystemMigrationEnrollmentStore["findAll"]>().mockResolvedValue([]),
     findOrganizationById: vi
       .fn<SystemMigrationEnrollmentStore["findOrganizationById"]>()
       .mockResolvedValue({ id: "org_acme", name: "Acme" }),
@@ -107,11 +105,7 @@ function serviceWith({
   waitingReports?: Record<string, (report: unknown) => boolean>;
   rollbackEffects?: Record<
     string,
-    (args: {
-      tenantId: string;
-      actorUserId: string;
-      decidedAt: string;
-    }) => Promise<void>
+    (args: { tenantId: string; actorUserId: string; decidedAt: string }) => Promise<void>
   >;
   rollbackGuards?: Record<
     string,
@@ -396,9 +390,7 @@ describe("SystemMigrationsService.rollBack", () => {
     describe("when the operator retries it", () => {
       it("re-runs the effect instead of refusing the already pinned record", async () => {
         const { call, effect, upserts } = serviceWhoseEffectFailsOnce();
-        await expect(call()).rejects.toThrow(
-          "the ledger refused the rollback command",
-        );
+        await expect(call()).rejects.toThrow("the ledger refused the rollback command");
 
         await call();
 
@@ -412,9 +404,7 @@ describe("SystemMigrationsService.rollBack", () => {
 
       it("hands the effect the moment the rollback was decided, unchanged", async () => {
         const { call, decisions, upserts } = serviceWhoseEffectFailsOnce();
-        await expect(call()).rejects.toThrow(
-          "the ledger refused the rollback command",
-        );
+        await expect(call()).rejects.toThrow("the ledger refused the rollback command");
 
         await call();
 
@@ -459,14 +449,10 @@ describe("SystemMigrationsService.rollBack", () => {
       await expect(attempt).rejects.toThrow(
         MigrationRollbackRequiresMigratedOrFinalizedError,
       );
-      await attempt.catch(
-        (error: MigrationRollbackRequiresMigratedOrFinalizedError) => {
-          expect(error.code).toBe(
-            "migration_rollback_requires_migrated_or_finalized",
-          );
-          expect(error.meta).toMatchObject({ status: "parked" });
-        },
-      );
+      await attempt.catch((error: MigrationRollbackRequiresMigratedOrFinalizedError) => {
+        expect(error.code).toBe("migration_rollback_requires_migrated_or_finalized");
+        expect(error.meta).toMatchObject({ status: "parked" });
+      });
       expect(upserts).toHaveLength(0);
     });
   });
@@ -530,11 +516,9 @@ describe("SystemMigrationsService enrollment", () => {
         await expect(attempt).rejects.toThrow(
           MigrationEnrollmentOrganizationNotFoundError,
         );
-        await attempt.catch(
-          (error: MigrationEnrollmentOrganizationNotFoundError) => {
-            expect(error.code).toBe("organization_not_found");
-          },
-        );
+        await attempt.catch((error: MigrationEnrollmentOrganizationNotFoundError) => {
+          expect(error.code).toBe("organization_not_found");
+        });
         expect(enrollments.create).not.toHaveBeenCalled();
       });
     });
@@ -744,9 +728,7 @@ describe("SystemMigrationsService enrollment", () => {
     /** @scenario "The page shows how many organizations each migration could still enroll" */
     it("gauges each migration's enrolled and not-enrolled organizations", async () => {
       const enrollments = enrollmentStoreStub();
-      enrollments.countEnrolledByMigration.mockResolvedValue(
-        new Map([[MIGRATION, 1]]),
-      );
+      enrollments.countEnrolledByMigration.mockResolvedValue(new Map([[MIGRATION, 1]]));
       enrollments.countOrganizations.mockResolvedValue(3);
       const { service } = serviceWith({ record: null, enrollments });
 
@@ -832,9 +814,7 @@ describe("SystemMigrationsService.runForOrganization", () => {
         actorUserId: "user_alex",
       });
 
-      await expect(attempt).rejects.toThrow(
-        MigrationRunRequiresEnrollmentError,
-      );
+      await expect(attempt).rejects.toThrow(MigrationRunRequiresEnrollmentError);
       expect(runTargetedPass).not.toHaveBeenCalled();
     });
   });

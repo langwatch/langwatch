@@ -6,10 +6,7 @@ import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 import { readCodingAgentTranscriptWithProtections } from "~/server/api/routers/tracesV2";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
-import {
-  RequestValidationError,
-  validator as zValidator,
-} from "~/server/api/validation";
+import { RequestValidationError, validator as zValidator } from "~/server/api/validation";
 import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
@@ -25,10 +22,7 @@ import {
   ProjectionValidationError,
   projectionRequestSchema,
 } from "~/server/traces/projection";
-import {
-  AmbiguousTraceIdPrefixError,
-  TraceService,
-} from "~/server/traces/trace.service";
+import { AmbiguousTraceIdPrefixError, TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import {
   formatTraceSummaryDigest,
@@ -381,10 +375,7 @@ export function registerTracesRoutes(
       const project = c.get("project");
       const { traceId } = c.req.param();
 
-      logger.info(
-        { projectId: project.id, traceId },
-        "Getting trace transcript",
-      );
+      logger.info({ projectId: project.id, traceId }, "Getting trace transcript");
 
       const protections = await getProtectionsForProject(prisma, {
         projectId: project.id,

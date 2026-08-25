@@ -1297,10 +1297,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           },
           "raw_response": { "$ref": "#/components/schemas/AWSPIIEntityResults" }
         },
@@ -1311,9 +1308,7 @@
       "AWSComprehendPIIDetectionSettings": {
         "properties": {
           "entity_types": {
-            "allOf": [
-              { "$ref": "#/components/schemas/AWSComprehendEntityTypes" }
-            ],
+            "allOf": [{ "$ref": "#/components/schemas/AWSComprehendEntityTypes" }],
             "description": "The types of PII to check for in the input.",
             "default": {
               "BANK_ACCOUNT_NUMBER": true,
@@ -1540,10 +1535,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -1560,9 +1552,7 @@
             "default": 1
           },
           "categories": {
-            "allOf": [
-              { "$ref": "#/components/schemas/AzureContentSafetyCategories" }
-            ],
+            "allOf": [{ "$ref": "#/components/schemas/AzureContentSafetyCategories" }],
             "description": "The categories of moderation to check for.",
             "default": {
               "Hate": true,
@@ -1613,10 +1603,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -1668,10 +1655,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -1723,10 +1707,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -1800,10 +1781,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -1889,10 +1867,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -1984,10 +1959,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -2004,12 +1976,7 @@
           },
           "rule": {
             "type": "string",
-            "enum": [
-              "contains",
-              "not_contains",
-              "matches_regex",
-              "not_matches_regex"
-            ],
+            "enum": ["contains", "not_contains", "matches_regex", "not_matches_regex"],
             "title": "Rule"
           },
           "value": { "type": "string", "title": "Value" }
@@ -2084,10 +2051,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -2179,10 +2143,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -2269,10 +2230,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -2301,10 +2259,7 @@
           },
           "embedding_model": {
             "type": "string",
-            "enum": [
-              "openai/text-embedding-3-small",
-              "azure/text-embedding-ada-002"
-            ],
+            "enum": ["openai/text-embedding-3-small", "azure/text-embedding-ada-002"],
             "title": "Embedding Model",
             "default": "openai/text-embedding-3-small"
           }
@@ -2391,10 +2346,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -2491,10 +2443,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           },
           "raw_response": { "type": "object", "title": "Raw Response" }
         },
@@ -2505,9 +2454,7 @@
       "GoogleCloudDLPPIIDetectionSettings": {
         "properties": {
           "info_types": {
-            "allOf": [
-              { "$ref": "#/components/schemas/GoogleCloudDLPInfoTypes" }
-            ],
+            "allOf": [{ "$ref": "#/components/schemas/GoogleCloudDLPInfoTypes" }],
             "description": "The types of PII to check for in the input.",
             "default": {
               "phone_number": true,
@@ -2522,13 +2469,7 @@
           },
           "min_likelihood": {
             "type": "string",
-            "enum": [
-              "VERY_UNLIKELY",
-              "UNLIKELY",
-              "POSSIBLE",
-              "LIKELY",
-              "VERY_LIKELY"
-            ],
+            "enum": ["VERY_UNLIKELY", "UNLIKELY", "POSSIBLE", "LIKELY", "VERY_LIKELY"],
             "title": "Min Likelihood",
             "description": "The minimum confidence required for failing the evaluation on a PII match.",
             "default": "POSSIBLE"
@@ -2582,10 +2523,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -2673,10 +2611,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           },
           "raw_response": {
             "$ref": "#/components/schemas/LinguaLanguageDetectionRawResponse"
@@ -2837,10 +2772,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -2916,10 +2848,7 @@
             "default": "1.0 confidence that the actual intent is other"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -3066,10 +2995,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -3086,9 +3012,7 @@
             "default": "text-moderation-stable"
           },
           "categories": {
-            "allOf": [
-              { "$ref": "#/components/schemas/OpenAIModerationCategories" }
-            ],
+            "allOf": [{ "$ref": "#/components/schemas/OpenAIModerationCategories" }],
             "description": "The categories of content to check for moderation.",
             "default": {
               "harassment": true,
@@ -3139,10 +3063,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           },
           "raw_response": {
             "type": "string",
@@ -3255,10 +3176,7 @@
             "description": "Short human-readable description of the result"
           },
           "cost": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Money" },
-              { "type": "null" }
-            ]
+            "anyOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }]
           }
         },
         "type": "object",
@@ -3287,10 +3205,7 @@
           },
           "embeddings_model": {
             "type": "string",
-            "enum": [
-              "openai/text-embedding-ada-002",
-              "azure/text-embedding-ada-002"
-            ],
+            "enum": ["openai/text-embedding-ada-002", "azure/text-embedding-ada-002"],
             "title": "Embeddings Model",
             "description": "The model to use for embeddings.",
             "default": "azure/text-embedding-ada-002"

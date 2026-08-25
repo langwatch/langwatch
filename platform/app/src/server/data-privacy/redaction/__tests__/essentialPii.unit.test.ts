@@ -18,9 +18,7 @@ describe("redactEssentialPiiInText", () => {
 
   describe("given IP addresses", () => {
     it("redacts an IPv4 address", () => {
-      expect(redact("from 192.168.0.1 today").text).toBe(
-        "from [IP_ADDRESS] today",
-      );
+      expect(redact("from 192.168.0.1 today").text).toBe("from [IP_ADDRESS] today");
     });
 
     it("redacts an IPv6 address", () => {
@@ -38,9 +36,7 @@ describe("redactEssentialPiiInText", () => {
 
   describe("given a credit card number", () => {
     it("redacts a Luhn-valid number", () => {
-      expect(redact("card 4111111111111111 ok").text).toBe(
-        "card [CREDIT_CARD] ok",
-      );
+      expect(redact("card 4111111111111111 ok").text).toBe("card [CREDIT_CARD] ok");
     });
 
     it("leaves a Luhn-invalid 16-digit order id intact", () => {
@@ -94,15 +90,11 @@ describe("redactEssentialPiiInText", () => {
       expect(redact("ref 2026081209 checkpoint").text).toBe(
         "ref [PHONE_NUMBER] checkpoint",
       );
-      expect(redact("call 2026081209 now").text).toBe(
-        "call [PHONE_NUMBER] now",
-      );
+      expect(redact("call 2026081209 now").text).toBe("call [PHONE_NUMBER] now");
     });
 
     it("still redacts a digit run split by a separator, with no letters around", () => {
-      expect(redact("dial 20260812-09 please").text).toBe(
-        "dial [PHONE_NUMBER] please",
-      );
+      expect(redact("dial 20260812-09 please").text).toBe("dial [PHONE_NUMBER] please");
     });
 
     it("still redacts a spaced international number after a letter run", () => {
@@ -112,12 +104,8 @@ describe("redactEssentialPiiInText", () => {
     });
 
     it("still redacts a number carried by minified JSON, and keeps an id in the same payload", () => {
-      const { text } = redact(
-        '{"id":"hosted-eu-20260812-09","phone":"+14155552671"}',
-      );
-      expect(text).toBe(
-        '{"id":"hosted-eu-20260812-09","phone":"[PHONE_NUMBER]"}',
-      );
+      const { text } = redact('{"id":"hosted-eu-20260812-09","phone":"+14155552671"}');
+      expect(text).toBe('{"id":"hosted-eu-20260812-09","phone":"[PHONE_NUMBER]"}');
     });
 
     it("still redacts a number in a URL path", () => {
@@ -142,9 +130,7 @@ describe("redactEssentialPiiInText", () => {
 
   describe("given a crypto wallet address", () => {
     it("redacts an Ethereum address", () => {
-      const { text } = redact(
-        "to 0x52908400098527886E0F7030069857D2E4169EE7 now",
-      );
+      const { text } = redact("to 0x52908400098527886E0F7030069857D2E4169EE7 now");
       expect(text).toContain("[CRYPTO]");
     });
   });
@@ -215,9 +201,7 @@ describe("redactEssentialPiiInText", () => {
       const { text, redactedCount } = redact(
         "mail test@example.com ip 10.0.0.1 card 4111111111111111",
       );
-      expect(text).toBe(
-        "mail [EMAIL_ADDRESS] ip [IP_ADDRESS] card [CREDIT_CARD]",
-      );
+      expect(text).toBe("mail [EMAIL_ADDRESS] ip [IP_ADDRESS] card [CREDIT_CARD]");
       expect(redactedCount).toBe(3);
     });
   });
@@ -248,9 +232,7 @@ describe("redactEssentialPiiInText", () => {
         text: "mail test@example.com cpf 529.982.247-25 card 4111111111111111",
         entities: ["EMAIL_ADDRESS", "BR_CPF"],
       });
-      expect(text).toBe(
-        "mail [EMAIL_ADDRESS] cpf [BR_CPF] card 4111111111111111",
-      );
+      expect(text).toBe("mail [EMAIL_ADDRESS] cpf [BR_CPF] card 4111111111111111");
     });
 
     it("does not run phone detection when PHONE_NUMBER is not selected", () => {
@@ -263,9 +245,7 @@ describe("redactEssentialPiiInText", () => {
     });
 
     it("redacts everything native when no filter is given", () => {
-      const { redactedCount } = redact(
-        "mail test@example.com cpf 529.982.247-25",
-      );
+      const { redactedCount } = redact("mail test@example.com cpf 529.982.247-25");
       expect(redactedCount).toBe(2);
     });
   });
@@ -295,20 +275,17 @@ describe("redactEssentialPiiInText", () => {
       });
 
       it("still redacts an email address that holds digits", () => {
-        expect(asValue("jane.doe1985@example.com").text).toBe(
-          "[EMAIL_ADDRESS]",
-        );
+        expect(asValue("jane.doe1985@example.com").text).toBe("[EMAIL_ADDRESS]");
       });
     });
 
     describe("given a value with no letters in it", () => {
-      it.each([
-        "+31 6 12345678",
-        "20260812-09",
-        "2026081209",
-      ])("still redacts %s", (value) => {
-        expect(asValue(value).text).toBe("[PHONE_NUMBER]");
-      });
+      it.each(["+31 6 12345678", "20260812-09", "2026081209"])(
+        "still redacts %s",
+        (value) => {
+          expect(asValue(value).text).toBe("[PHONE_NUMBER]");
+        },
+      );
     });
 
     describe("given a value that is a sentence rather than one token", () => {
@@ -339,9 +316,7 @@ describe("redactEssentialPiiInText with exception patterns", () => {
     });
 
     it("still redacts a card number the exception does not cover", () => {
-      const { text } = withExceptions("card 4111111111111111 ok", [
-        "00\\d{12}",
-      ]);
+      const { text } = withExceptions("card 4111111111111111 ok", ["00\\d{12}"]);
       expect(text).toBe("card [CREDIT_CARD] ok");
     });
   });
@@ -349,9 +324,7 @@ describe("redactEssentialPiiInText with exception patterns", () => {
   describe("given an exception matching only part of the detected value", () => {
     /** @scenario An exception must cover the whole detected value */
     it("redacts anyway, since exceptions must cover the whole match", () => {
-      const { text } = withExceptions("reservation 00528000043000 here", [
-        "00\\d{6}",
-      ]);
+      const { text } = withExceptions("reservation 00528000043000 here", ["00\\d{6}"]);
       expect(text).toBe("reservation [CREDIT_CARD] here");
     });
   });

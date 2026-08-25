@@ -168,9 +168,7 @@ function LogEntry({
       rounded="sm"
       cursor={canCopy ? "pointer" : "default"}
       bg={copied ? "green.500/10" : "transparent"}
-      _hover={
-        canCopy ? { bg: copied ? "green.500/10" : "bg.subtle" } : undefined
-      }
+      _hover={canCopy ? { bg: copied ? "green.500/10" : "bg.subtle" } : undefined}
       transition="background 0.15s"
       onClick={() => {
         if (!canCopy) return;
@@ -180,21 +178,13 @@ function LogEntry({
       }}
     >
       <Text flexShrink={0}>
-        {entry.status === "pending"
-          ? "⏳"
-          : entry.status === "success"
-            ? "✅"
-            : "❌"}
+        {entry.status === "pending" ? "⏳" : entry.status === "success" ? "✅" : "❌"}
       </Text>
       <Text flex={1} truncate fontFamily="mono" color="fg.muted">
         {entry.traceId}
       </Text>
       {canCopy && (
-        <Text
-          fontSize="10px"
-          color={copied ? "green.400" : "fg.muted"}
-          flexShrink={0}
-        >
+        <Text fontSize="10px" color={copied ? "green.400" : "fg.muted"} flexShrink={0}>
           {copied ? "Copied!" : "Copy ID"}
         </Text>
       )}

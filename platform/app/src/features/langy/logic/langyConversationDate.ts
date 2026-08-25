@@ -27,8 +27,6 @@ export function formatLangyConversationDate(
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",
-    ...(date.getFullYear() === now.getFullYear()
-      ? {}
-      : { year: "numeric" as const }),
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" as const }),
   }).format(date);
 }

@@ -136,26 +136,20 @@ describe("Feature: role router caller authorization", () => {
       await prisma.teamUser
         .deleteMany({ where: { team: { organizationId: orgId } } })
         .catch(() => {});
-      await prisma.team
-        .deleteMany({ where: { organizationId: orgId } })
-        .catch(() => {});
+      await prisma.team.deleteMany({ where: { organizationId: orgId } }).catch(() => {});
       await prisma.organizationUser
         .deleteMany({ where: { organizationId: orgId } })
         .catch(() => {});
-      await prisma.organization
-        .delete({ where: { id: orgId } })
-        .catch(() => {});
+      await prisma.organization.delete({ where: { id: orgId } }).catch(() => {});
     }
-    await prisma.user
-      .deleteMany({ where: { email: { contains: ns } } })
-      .catch(() => {});
+    await prisma.user.deleteMany({ where: { email: { contains: ns } } }).catch(() => {});
   });
 
   describe("given a caller who can only view the organization", () => {
     it("refuses to list the organization's roles", async () => {
-      await expect(
-        memberCaller.role.getAll({ organizationId }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(memberCaller.role.getAll({ organizationId })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
     });
 
     /** A member who could mint roles could mint themselves any permission. */

@@ -38,8 +38,8 @@ interface AnnotationQueueSessionState {
  * is walked and is dropped the moment the queue is left. A set carried over
  * from last week silently feeding a dataset would be worse than re-ticking.
  */
-export const useAnnotationQueueSessionStore =
-  create<AnnotationQueueSessionState>((set) => ({
+export const useAnnotationQueueSessionStore = create<AnnotationQueueSessionState>(
+  (set) => ({
     active: false,
     marks: {},
     handoff: "idle",
@@ -69,7 +69,8 @@ export const useAnnotationQueueSessionStore =
     noteHandoffOpened: () => set({ handoff: "open" }),
     noteHandoffAdded: () => set({ handoff: "added" }),
     resetHandoff: () => set({ handoff: "idle" }),
-  }));
+  }),
+);
 
 /** The traces the sitting counts, in the order they were counted. */
 export function sessionTraceIds(marks: Record<string, SessionMark>): string[] {

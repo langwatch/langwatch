@@ -192,13 +192,9 @@ function pickDaysAgo(maxDays: number): number {
 function synthTrace(args: Args): SyntheticTrace {
   const model = pickModel();
   const promptTokens = rand(model.promptRange[0], model.promptRange[1]);
-  const completionTokens = rand(
-    model.completionRange[0],
-    model.completionRange[1],
-  );
+  const completionTokens = rand(model.completionRange[0], model.completionRange[1]);
   const costUsd =
-    promptTokens * model.costPerInputToken +
-    completionTokens * model.costPerOutputToken;
+    promptTokens * model.costPerInputToken + completionTokens * model.costPerOutputToken;
   const durationMs = rand(400, 6000);
   const daysAgo = pickDaysAgo(args.days);
   const hour = rand(0, 24);
@@ -229,9 +225,7 @@ function synthTrace(args: Args): SyntheticTrace {
  * Caller (CLI bootstrap or SeedAction wrapper) is responsible for
  * resolving inputs.
  */
-export async function runSeedHeavyUsage(
-  args: Args,
-): Promise<SeedHeavyUsageSummary> {
+export async function runSeedHeavyUsage(args: Args): Promise<SeedHeavyUsageSummary> {
   process.stderr.write(
     `[seed-heavy-usage] tenant=${args.personalProject} vk=${args.virtualKey} budget=${args.budget ?? "(none)"} window=${args.days}d rows=${args.rows}\n`,
   );
@@ -262,9 +256,7 @@ export async function runSeedHeavyUsage(
     TotalDurationMs: t.durationMs,
     TokensPerSecond:
       t.durationMs > 0
-        ? Math.round(
-            ((t.promptTokens + t.completionTokens) * 1000) / t.durationMs,
-          )
+        ? Math.round(((t.promptTokens + t.completionTokens) * 1000) / t.durationMs)
         : 0,
     SpanCount: 1,
     ContainsErrorStatus: false,
@@ -383,16 +375,13 @@ export async function runSeedHeavyUsage(
 
 // CLI bootstrap — only fires when this file is the entry point.
 const isCliInvocation =
-  typeof process.argv[1] === "string" &&
-  import.meta.url === `file://${process.argv[1]}`;
+  typeof process.argv[1] === "string" && import.meta.url === `file://${process.argv[1]}`;
 
 if (isCliInvocation) {
   const args = parseArgs(process.argv.slice(2));
   runSeedHeavyUsage(args)
     .catch((err) => {
-      process.stderr.write(
-        `[seed-heavy-usage] ERROR: ${err.message}\n${err.stack}\n`,
-      );
+      process.stderr.write(`[seed-heavy-usage] ERROR: ${err.message}\n${err.stack}\n`);
       process.exit(1);
     })
     .finally(() => {

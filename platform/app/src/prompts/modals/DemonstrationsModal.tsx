@@ -8,8 +8,7 @@ import {
   transpostRowsFirstToColumnsFirstWithoutId,
 } from "../../optimization_studio/utils/datasetUtils";
 
-type Demonstrations =
-  PromptConfigFormValues["version"]["configData"]["demonstrations"];
+type Demonstrations = PromptConfigFormValues["version"]["configData"]["demonstrations"];
 
 export function DemonstrationsModal({
   open,

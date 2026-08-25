@@ -37,9 +37,7 @@ describe("filterBlockKit", () => {
         { type: "markdown", text: "hi <!channel> & <https://evil|click>" },
       ]);
       expect(block?.type).toBe("markdown");
-      expect(block?.text).toBe(
-        "hi &lt;!channel&gt; &amp; &lt;https://evil|click&gt;",
-      );
+      expect(block?.text).toBe("hi &lt;!channel&gt; &amp; &lt;https://evil|click&gt;");
     });
 
     it("leaves ordinary markdown untouched", () => {
@@ -186,9 +184,7 @@ describe("filterBlockKit", () => {
       const blocks = filterBlockKit([
         {
           type: "context",
-          elements: [
-            { type: "image", image_url: "https://tracker/", alt_text: "z" },
-          ],
+          elements: [{ type: "image", image_url: "https://tracker/", alt_text: "z" }],
         },
         { type: "section", text: { type: "mrkdwn", text: "keep me" } },
       ]);
@@ -308,9 +304,7 @@ describe("filterBlockKit", () => {
           elements: [
             {
               type: "rich_text_section",
-              elements: [
-                { type: "text", text: "Input", style: { bold: true } },
-              ],
+              elements: [{ type: "text", text: "Input", style: { bold: true } }],
             },
             {
               type: "rich_text_quote",
@@ -475,10 +469,7 @@ describe("filterBlockKit", () => {
         {
           type: "data_table",
           caption: "c",
-          rows: [
-            [{ type: "raw_text", text: "H" }],
-            [{ type: "raw_text", text: "v" }],
-          ],
+          rows: [[{ type: "raw_text", text: "H" }], [{ type: "raw_text", text: "v" }]],
         },
         { type: "section", text: { type: "mrkdwn", text: "keep me" } },
       ]);

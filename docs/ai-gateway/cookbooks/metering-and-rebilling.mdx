@@ -7,8 +7,17 @@ keywords: rebilling, metering, multi-tenant billing, spend events, webhooks, bud
 
 A platform whose customers consume LLMs through it can meter and rebill that usage. This cookbook wires that end to end on LangWatch: one virtual key per tenant, caps for the tenant and for each of their end users, signed spend events into your billing ledger, reconciliation, breach handling, and period close. Your product keeps zero metering code of its own.
 
-<Card title="The runnable reference: agent-billing-demo" icon="github" href="https://github.com/langwatch/agent-billing-demo">
-  A tiny open-source agent-platform SaaS implementing every step below: sign-up provisions a real tenant key and real caps, chat rides the gateway, and the meters on screen are driven by the signed events its own receiver ingests. The webhook receiver, ledger, reconciliation loop, and provisioning exist in **both TypeScript and Python**. Point your coding agent at that repo as the canonical integration example; every file is written to be copied from.
+<Card
+  title="The runnable reference: agent-billing-demo"
+  icon="github"
+  href="https://github.com/langwatch/agent-billing-demo"
+>
+  A tiny open-source agent-platform SaaS implementing every step below: sign-up provisions
+  a real tenant key and real caps, chat rides the gateway, and the meters on screen are
+  driven by the signed events its own receiver ingests. The webhook receiver, ledger,
+  reconciliation loop, and provisioning exist in **both TypeScript and Python**. Point
+  your coding agent at that repo as the canonical integration example; every file is
+  written to be copied from.
 </Card>
 
 ## What you need
@@ -110,7 +119,9 @@ response = client.chat.completions.create(
 That is the whole integration on the request side. The `user` field (or the `x-langwatch-end-user-id` header, which wins over the body) is what the per-user template enforces on and what `end_user_id` carries on every spend event. The metadata echo is how your billing joins events back to your own records without lookups.
 
 <Warning>
-With an attributed-user template active, a request that carries **no** end-user id is rejected with `error.code = "end_user_required"` rather than passing uncapped. A cap evadable by omitting a field is not a cap. Send the id from day one.
+  With an attributed-user template active, a request that carries **no** end-user id is
+  rejected with `error.code = "end_user_required"` rather than passing uncapped. A cap
+  evadable by omitting a field is not a cap. Send the id from day one.
 </Warning>
 
 ## 4. Receive, verify, ingest
@@ -178,6 +189,7 @@ curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=model,end_user\
 Grouping by `model` or `provider`, or into time buckets, is refused with `gateway_spend_group_by_unstable` on a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were **asked for**, and they are replaced by the ones that actually served it. A page walk over a group that can move counts some requests twice and misses others, which is the one failure a reconciliation cannot detect on its own.
 
 Reconcile closed periods and this never fires. For a live dashboard where an approximate shape is enough, send `allow_unstable=true`. The refusal carries `meta.settles_at`, so a scheduler can wait rather than guess.
+
 </Warning>
 
 ## 6. Breach handling and period close
@@ -190,7 +202,11 @@ When a cap is hit, the request is rejected with `402` and machine-readable meta:
     "type": "budget_exceeded",
     "code": "budget_exceeded",
     "message": "The end-user spending limit (per month) has been reached. Contact your LangWatch admin to raise it.",
-    "meta": {"budget_id": "bgt_...", "budget_scope": "attributed_user", "budget_window": "month"}
+    "meta": {
+      "budget_id": "bgt_...",
+      "budget_scope": "attributed_user",
+      "budget_window": "month"
+    }
   }
 }
 ```

@@ -43,12 +43,10 @@ export function useWorkspaceData(): Pick<
   WorkspaceSwitcherProps,
   "personals" | "teams" | "projects" | "onCreateProjectForTeam"
 > {
-  const { organizations, project: currentProject } = useOrganizationTeamProject(
-    {
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    },
-  );
+  const { organizations, project: currentProject } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const { data: session } = useRequiredSession();
   const userId = session?.user?.id;
   const { openDrawer } = useDrawer();
@@ -119,8 +117,7 @@ export function useWorkspaceData(): Pick<
           OrganizationUserRole.ADMIN;
         return (org.teams ?? []).filter(isVisibleTeam).map((team) => {
           const isTeamAdmin =
-            team.members?.find((m) => m.userId === userId)?.role ===
-            TeamUserRole.ADMIN;
+            team.members?.find((m) => m.userId === userId)?.role === TeamUserRole.ADMIN;
           return {
             kind: "team" as const,
             teamId: team.id,
@@ -161,9 +158,7 @@ export function useWorkspaceData(): Pick<
   // users keep a single entry (their only context). When more than one org has
   // governance, each entry targets `/me?org=<slug>` so landing selects that org
   // (see useOrgQueryParamSelection); a single governance org targets `/me`.
-  const personals = useMemo<
-    NonNullable<WorkspaceSwitcherProps["personals"]>
-  >(() => {
+  const personals = useMemo<NonNullable<WorkspaceSwitcherProps["personals"]>>(() => {
     const subtitle = "Personal usage, personal budget";
     if (organizationIds.length === 0) {
       return [
@@ -177,18 +172,14 @@ export function useWorkspaceData(): Pick<
       ];
     }
     const enabledByOrg = governanceQuery.data?.enabledByOrganizationId ?? {};
-    const governanceOrgs = (organizations ?? []).filter(
-      (org) => enabledByOrg[org.id],
-    );
+    const governanceOrgs = (organizations ?? []).filter((org) => enabledByOrg[org.id]);
     const multipleGovernanceOrgs = governanceOrgs.length > 1;
     return governanceOrgs.map((org) => ({
       kind: "personal" as const,
       orgId: org.id,
       orgName: org.name,
       orgSlug: org.slug,
-      href: multipleGovernanceOrgs
-        ? `/me?org=${encodeURIComponent(org.slug)}`
-        : "/me",
+      href: multipleGovernanceOrgs ? `/me?org=${encodeURIComponent(org.slug)}` : "/me",
       label: "My Workspace",
       subtitle,
     }));

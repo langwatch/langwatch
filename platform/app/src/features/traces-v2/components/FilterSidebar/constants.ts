@@ -302,13 +302,7 @@ export const FACET_GROUPS: FacetGroupDef[] = [
   {
     id: "cost",
     label: "Cost",
-    keys: [
-      "cost",
-      "tokens",
-      "promptTokens",
-      "completionTokens",
-      "tokensEstimated",
-    ],
+    keys: ["cost", "tokens", "promptTokens", "completionTokens", "tokensEstimated"],
   },
   // "Which model is this?" — the routing axis.
   {
@@ -455,9 +449,7 @@ export const FACET_PERSPECTIVES: FacetPerspectiveDef[] = [
 const PERSPECTIVE_BY_ID = new Map(FACET_PERSPECTIVES.map((p) => [p.id, p]));
 
 export function isFacetPerspectiveId(x: unknown): x is FacetPerspectiveId {
-  return (
-    typeof x === "string" && PERSPECTIVE_BY_ID.has(x as FacetPerspectiveId)
-  );
+  return typeof x === "string" && PERSPECTIVE_BY_ID.has(x as FacetPerspectiveId);
 }
 
 export function perspectiveById(id: FacetPerspectiveId): FacetPerspectiveDef {
@@ -468,9 +460,7 @@ export function perspectiveById(id: FacetPerspectiveId): FacetPerspectiveDef {
  * The perspective's group order, completed with any registry groups it
  * didn't mention (appended in FACET_GROUPS order) so the set is exhaustive.
  */
-export function groupOrderForPerspective(
-  id: FacetPerspectiveId,
-): FacetGroupDef["id"][] {
+export function groupOrderForPerspective(id: FacetPerspectiveId): FacetGroupDef["id"][] {
   const order = perspectiveById(id).groupOrder;
   const seen = new Set(order);
   const rest = FACET_GROUPS.map((g) => g.id).filter((gid) => !seen.has(gid));
@@ -478,9 +468,7 @@ export function groupOrderForPerspective(
 }
 
 /** Group defs in this perspective's order — drives the facet manager. */
-export function orderedGroupDefsForPerspective(
-  id: FacetPerspectiveId,
-): FacetGroupDef[] {
+export function orderedGroupDefsForPerspective(id: FacetPerspectiveId): FacetGroupDef[] {
   const byId = new Map(FACET_GROUPS.map((g) => [g.id, g] as const));
   return groupOrderForPerspective(id)
     .map((gid) => byId.get(gid))

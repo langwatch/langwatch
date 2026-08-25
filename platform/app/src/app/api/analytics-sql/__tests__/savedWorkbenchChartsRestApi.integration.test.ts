@@ -33,15 +33,7 @@
  */
 
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
 import {
@@ -130,9 +122,7 @@ describe("given the saved workbench chart REST endpoints", () => {
     app.request(options.path, {
       method: options.method ?? "GET",
       headers: { "Content-Type": "application/json", ...options.auth },
-      ...(options.body === undefined
-        ? {}
-        : { body: JSON.stringify(options.body) }),
+      ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
     });
 
   /** Runs a request expected to succeed, and returns its parsed body. */
@@ -149,9 +139,7 @@ describe("given the saved workbench chart REST endpoints", () => {
   };
 
   /** Runs a request expected to be refused, and returns its parsed body. */
-  const refused = async (
-    options: Parameters<typeof call>[0],
-  ): Promise<Body> => {
+  const refused = async (options: Parameters<typeof call>[0]): Promise<Body> => {
     const response = await call(options);
     const body = (await response.json()) as Body;
     expect(
@@ -174,9 +162,7 @@ describe("given the saved workbench chart REST endpoints", () => {
       body: {
         name: overrides.name ?? "Traces per day",
         definition:
-          overrides.definition === undefined
-            ? DEFINITION
-            : overrides.definition,
+          overrides.definition === undefined ? DEFINITION : overrides.definition,
       },
     });
 
@@ -282,9 +268,7 @@ describe("given the saved workbench chart REST endpoints", () => {
   afterEach(async () => {
     // `.filter(Boolean)` for the same reason as `afterAll` below: a setup
     // failure must not be buried under teardown TypeErrors.
-    for (const project of [openProject, gatedProject, otherProject].filter(
-      Boolean,
-    )) {
+    for (const project of [openProject, gatedProject, otherProject].filter(Boolean)) {
       await prisma.customGraph.deleteMany({ where: { projectId: project.id } });
     }
   });
@@ -378,9 +362,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         },
       });
 
-      expect(body.error.code).toBe(
-        "saved_workbench_chart_specification_refused",
-      );
+      expect(body.error.code).toBe("saved_workbench_chart_specification_refused");
       // The refusal's `meta` reaches the wire under the envelope's own `meta`;
       // what matters is that the rule and the JSON path survive, so an author
       // can repair the offending part rather than re-reading it all.
@@ -405,9 +387,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         auth: asProject(openProject),
         body: { definition: { ...DEFINITION, vegaLiteSpec: NETWORK_SPEC } },
       });
-      expect(body.error.code).toBe(
-        "saved_workbench_chart_specification_refused",
-      );
+      expect(body.error.code).toBe("saved_workbench_chart_specification_refused");
 
       const after = await succeeds({
         path: chartPath(openProject, created.id),
@@ -624,15 +604,11 @@ describe("given the saved workbench chart REST endpoints", () => {
 
     /** @scenario "The API's switch is decided for the project's organization" */
     it("still refuses a project whose organization holds no grant", async () => {
-      const response = await withOrganizationRule(
-        otherOrganization.id,
-        async () =>
-          call({ path: chartsPath(openProject), auth: asProject(openProject) }),
+      const response = await withOrganizationRule(otherOrganization.id, async () =>
+        call({ path: chartsPath(openProject), auth: asProject(openProject) }),
       );
       expect(response.status).toBe(403);
-      expect(((await response.json()) as Body).error.code).toBe(
-        "lwql_not_enabled",
-      );
+      expect(((await response.json()) as Body).error.code).toBe("lwql_not_enabled");
     });
   });
 
@@ -652,9 +628,7 @@ describe("given the saved workbench chart REST endpoints", () => {
           auth: asProject(otherProject),
           ...(body === undefined ? {} : { body }),
         });
-        expect(refusal.error.code, method).toBe(
-          "saved_workbench_chart_not_found",
-        );
+        expect(refusal.error.code, method).toBe("saved_workbench_chart_not_found");
       }
 
       // An id that never existed answers identically, so the refusal above
@@ -702,9 +676,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         path: chartsPath(openProject),
         auth: asViewOnly(openProject),
       });
-      expect((listed.data as Body[]).map((chart) => chart.id)).toEqual([
-        existing.id,
-      ]);
+      expect((listed.data as Body[]).map((chart) => chart.id)).toEqual([existing.id]);
       const read = await succeeds({
         path: chartPath(openProject, existing.id),
         auth: asViewOnly(openProject),
@@ -754,10 +726,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         },
       });
 
-      for (const path of [
-        chartPath(openProject, stored.id),
-        chartsPath(openProject),
-      ]) {
+      for (const path of [chartPath(openProject, stored.id), chartsPath(openProject)]) {
         const response = await call({ path, auth: asProject(openProject) });
         const body = (await response.json()) as Body;
         expect(response.status, path).toBe(500);

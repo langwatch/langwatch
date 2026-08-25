@@ -19,10 +19,7 @@ describe("<SimulationCard /> completion colors", () => {
   /** @scenario Light mode restores the full-card completion wash */
   it("renders a completed card title in white above the status wash", () => {
     render(
-      <SimulationCard
-        title="Completed scenario"
-        status={ScenarioRunStatus.SUCCESS}
-      >
+      <SimulationCard title="Completed scenario" status={ScenarioRunStatus.SUCCESS}>
         <Text>Conversation preview</Text>
       </SimulationCard>,
       { wrapper: Wrapper },
@@ -35,10 +32,7 @@ describe("<SimulationCard /> completion colors", () => {
 
   it("keeps an unfinished card title on the normal foreground color", () => {
     render(
-      <SimulationCard
-        title="Running scenario"
-        status={ScenarioRunStatus.RUNNING}
-      >
+      <SimulationCard title="Running scenario" status={ScenarioRunStatus.RUNNING}>
         <Text>Conversation preview</Text>
       </SimulationCard>,
       { wrapper: Wrapper },

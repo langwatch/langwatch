@@ -98,9 +98,7 @@ describe("renderLiquid", () => {
         template: "{{ value | mrkdwn_escape }}",
         context: { value: "<https://evil|click> <!channel> & x" },
       });
-      expect(output).toBe(
-        "&lt;https://evil|click&gt; &lt;!channel&gt; &amp; x",
-      );
+      expect(output).toBe("&lt;https://evil|click&gt; &lt;!channel&gt; &amp; x");
     });
   });
 });

@@ -95,8 +95,7 @@ export function mapClickHouseRowToScenarioRunData(
   const startedAt = row.StartedAt != null ? Number(row.StartedAt) : null;
   const createdAt = Number(row.CreatedAt);
   const finishedAt = row.FinishedAt != null ? Number(row.FinishedAt) : null;
-  const durationMs =
-    row.DurationMs != null ? parseInt(row.DurationMs, 10) : null;
+  const durationMs = row.DurationMs != null ? parseInt(row.DurationMs, 10) : null;
   // Use StartedAt for duration calculation (CreatedAt is CH insertion time, which can be after FinishedAt)
   const startTimestamp = startedAt ?? createdAt;
 
@@ -113,29 +112,31 @@ export function mapClickHouseRowToScenarioRunData(
   // and the flat Messages.Content column is empty — surface the parts array
   // to the renderer instead.
   const roles = row["Messages.Role"] ?? [];
-  const messages = simulationMessageSchema.array().parse(roles.map((role, i) => {
-    const restStr = row["Messages.Rest"]?.[i];
-    const restFields = restStr
-      ? (() => {
-          try {
-            return JSON.parse(restStr) as Record<string, unknown>;
-          } catch {
-            return {};
-          }
-        })()
-      : {};
-    const { content: restContent, ...restWithoutContent } = restFields;
-    const content = Array.isArray(restContent)
-      ? restContent
-      : (row["Messages.Content"]?.[i] ?? null);
-    return {
-      ...restWithoutContent,
-      id: row["Messages.Id"]?.[i] || undefined,
-      role,
-      content,
-      trace_id: row["Messages.TraceId"]?.[i] || undefined,
-    };
-  }));
+  const messages = simulationMessageSchema.array().parse(
+    roles.map((role, i) => {
+      const restStr = row["Messages.Rest"]?.[i];
+      const restFields = restStr
+        ? (() => {
+            try {
+              return JSON.parse(restStr) as Record<string, unknown>;
+            } catch {
+              return {};
+            }
+          })()
+        : {};
+      const { content: restContent, ...restWithoutContent } = restFields;
+      const content = Array.isArray(restContent)
+        ? restContent
+        : (row["Messages.Content"]?.[i] ?? null);
+      return {
+        ...restWithoutContent,
+        id: row["Messages.Id"]?.[i] || undefined,
+        role,
+        content,
+        trace_id: row["Messages.TraceId"]?.[i] || undefined,
+      };
+    }),
+  );
 
   const metCriteria = row.MetCriteria ?? [];
   const unmetCriteria = row.UnmetCriteria ?? [];
@@ -155,19 +156,17 @@ export function mapClickHouseRowToScenarioRunData(
     ? (() => {
         try {
           const parsed: unknown = JSON.parse(row.Metadata);
-          if (
-            parsed == null ||
-            typeof parsed !== "object" ||
-            Array.isArray(parsed)
-          ) {
+          if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
             return null;
           }
           // A run's secret parameter values never belong in a stored row, and
           // the fold projection keeps them out. Dropped again on the way out
           // so a row written by another path cannot serve one. The names, on
           // `secretParameterNames`, stay.
-          const { secretParameters: _secretParameters, ...rest } =
-            parsed as Record<string, unknown>;
+          const { secretParameters: _secretParameters, ...rest } = parsed as Record<
+            string,
+            unknown
+          >;
           return rest;
         } catch {
           return null;
@@ -193,14 +192,10 @@ export function mapClickHouseRowToScenarioRunData(
     updatedAt,
     durationInMs:
       durationMs ??
-      (finishedAt != null
-        ? finishedAt - startTimestamp
-        : updatedAt - startTimestamp),
+      (finishedAt != null ? finishedAt - startTimestamp : updatedAt - startTimestamp),
     totalCost: row.TotalCost ?? undefined,
     roleCosts:
-      row.RoleCosts && Object.keys(row.RoleCosts).length > 0
-        ? row.RoleCosts
-        : undefined,
+      row.RoleCosts && Object.keys(row.RoleCosts).length > 0 ? row.RoleCosts : undefined,
     roleLatencies:
       row.RoleLatencies && Object.keys(row.RoleLatencies).length > 0
         ? row.RoleLatencies

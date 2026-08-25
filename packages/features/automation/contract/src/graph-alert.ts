@@ -14,80 +14,77 @@ const EQ_EPSILON = 0.0001;
 
 /** Pure threshold evaluation shared by event and heartbeat dispatch paths. */
 export function evaluateCustomGraphThreshold({
-	value,
-	threshold,
-	operator,
+  value,
+  threshold,
+  operator,
 }: {
-	value: number;
-	threshold: number;
-	operator: string;
+  value: number;
+  threshold: number;
+  operator: string;
 }): { breached: boolean } {
-	switch (operator) {
-		case "gt":
-			return { breached: value > threshold };
-		case "gte":
-			return { breached: value >= threshold };
-		case "lt":
-			return { breached: value < threshold };
-		case "lte":
-			return { breached: value <= threshold };
-		case "eq":
-			return { breached: Math.abs(value - threshold) < EQ_EPSILON };
-		default:
-			return { breached: false };
-	}
+  switch (operator) {
+    case "gt":
+      return { breached: value > threshold };
+    case "gte":
+      return { breached: value >= threshold };
+    case "lt":
+      return { breached: value < threshold };
+    case "lte":
+      return { breached: value <= threshold };
+    case "eq":
+      return { breached: Math.abs(value - threshold) < EQ_EPSILON };
+    default:
+      return { breached: false };
+  }
 }
 
 /** Whether a threshold breaches on total silence (zero current value). */
 export function isNoDataPredicate({
-	operator,
-	threshold,
+  operator,
+  threshold,
 }: {
-	operator: string;
-	threshold: number;
+  operator: string;
+  threshold: number;
 }): boolean {
-	return evaluateCustomGraphThreshold({ value: 0, threshold, operator })
-		.breached;
+  return evaluateCustomGraphThreshold({ value: 0, threshold, operator }).breached;
 }
 
 /** Parse the watched series index from `<index>/<key>/<aggregation>`. */
 export function parseSeriesIndex(seriesName?: string | null): number {
-	if (!seriesName) return 0;
-	const [indexStr] = seriesName.split("/");
-	return Number.parseInt(indexStr ?? "0", 10);
+  if (!seriesName) return 0;
+  const [indexStr] = seriesName.split("/");
+  return Number.parseInt(indexStr ?? "0", 10);
 }
 
 export const graphAlertOperatorSchema = z.enum(GRAPH_ALERT_OPERATORS);
 export const graphAlertTimePeriodSchema = z.union([
-	z.literal(1),
-	z.literal(5),
-	z.literal(15),
-	z.literal(30),
-	z.literal(60),
-	z.literal(1440),
+  z.literal(1),
+  z.literal(5),
+  z.literal(15),
+  z.literal(30),
+  z.literal(60),
+  z.literal(1440),
 ]);
 
 /** Threshold fields are independent of the destination provider fields. */
 export const graphAlertActionParamsSchema = z.object({
-	threshold: z.number().finite(),
-	operator: graphAlertOperatorSchema,
-	timePeriod: graphAlertTimePeriodSchema,
-	seriesName: z.string().min(1, "Pick a series to monitor."),
+  threshold: z.number().finite(),
+  operator: graphAlertOperatorSchema,
+  timePeriod: graphAlertTimePeriodSchema,
+  seriesName: z.string().min(1, "Pick a series to monitor."),
 });
 
-export type GraphAlertActionParams = z.infer<
-	typeof graphAlertActionParamsSchema
->;
+export type GraphAlertActionParams = z.infer<typeof graphAlertActionParamsSchema>;
 
 /** Parses an existing row while preserving provider destination keys. */
 export function extractGraphAlertFromTriggerRow(
-	actionParams: unknown,
+  actionParams: unknown,
 ): (GraphAlertActionParams & Record<string, unknown>) | null {
-	if (typeof actionParams !== "object" || actionParams === null) return null;
-	const parsed = graphAlertActionParamsSchema.safeParse(actionParams);
-	if (!parsed.success) return null;
-	return {
-		...(actionParams as Record<string, unknown>),
-		...parsed.data,
-	};
+  if (typeof actionParams !== "object" || actionParams === null) return null;
+  const parsed = graphAlertActionParamsSchema.safeParse(actionParams);
+  if (!parsed.success) return null;
+  return {
+    ...(actionParams as Record<string, unknown>),
+    ...parsed.data,
+  };
 }

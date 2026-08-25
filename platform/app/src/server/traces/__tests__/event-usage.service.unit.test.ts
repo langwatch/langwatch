@@ -21,8 +21,7 @@ vi.mock("~/server/app-layer/app", () => {
     },
     billingQueries: {
       queryBillableEventsTotalUniq: mockQueryBillableEventsTotalUniq,
-      queryBillableEventsByProjectApprox:
-        mockQueryBillableEventsByProjectApprox,
+      queryBillableEventsByProjectApprox: mockQueryBillableEventsByProjectApprox,
     },
   });
   return { getApp: app, tryGetApp: app };

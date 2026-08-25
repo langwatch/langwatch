@@ -33,9 +33,7 @@ export const experimentRunStartedEventSchema = EventSchema.extend({
 export type ExperimentRunStartedEventData = z.infer<
   typeof experimentRunStartedEventDataSchema
 >;
-export type ExperimentRunStartedEvent = z.infer<
-  typeof experimentRunStartedEventSchema
->;
+export type ExperimentRunStartedEvent = z.infer<typeof experimentRunStartedEventSchema>;
 
 /**
  * Target result event - emitted when a target execution completes for a row.
@@ -108,9 +106,7 @@ export const evaluatorResultEventSchema = EventSchema.extend({
   metadata: experimentRunEventMetadataSchema.optional(),
 });
 
-export type EvaluatorResultEventData = z.infer<
-  typeof evaluatorResultEventDataSchema
->;
+export type EvaluatorResultEventData = z.infer<typeof evaluatorResultEventDataSchema>;
 export type EvaluatorResultEvent = z.infer<typeof evaluatorResultEventSchema>;
 
 /**
@@ -133,9 +129,7 @@ export const traceMetricsComputedEventSchema = EventSchema.extend({
 export type TraceMetricsComputedEventData = z.infer<
   typeof traceMetricsComputedEventDataSchema
 >;
-export type TraceMetricsComputedEvent = z.infer<
-  typeof traceMetricsComputedEventSchema
->;
+export type TraceMetricsComputedEvent = z.infer<typeof traceMetricsComputedEventSchema>;
 
 /**
  * Experiment run completed event - emitted when an experiment run finishes.

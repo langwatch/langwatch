@@ -10,10 +10,7 @@ interface VirtualSpacerProps {
  * Empty <tbody> row used by the virtualizer to take up the offset above and
  * below the visible window. Multiple <tbody> elements per <table> are valid HTML.
  */
-export const VirtualSpacer: React.FC<VirtualSpacerProps> = ({
-  height,
-  colSpan,
-}) => {
+export const VirtualSpacer: React.FC<VirtualSpacerProps> = ({ height, colSpan }) => {
   if (height <= 0) return null;
   return (
     <Tbody aria-hidden="true">

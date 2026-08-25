@@ -13,14 +13,8 @@ import type React from "react";
 import { useState } from "react";
 import type { IconType } from "react-icons";
 import { LuCircleAlert, LuCircleSlash } from "react-icons/lu";
-import {
-  type EvalChipDisplay,
-  getEvalChipDisplay,
-} from "~/utils/evaluationResults";
-import type {
-  TraceEvalResult,
-  TraceListEventGroup,
-} from "../../../types/trace";
+import { type EvalChipDisplay, getEvalChipDisplay } from "~/utils/evaluationResults";
+import type { TraceEvalResult, TraceListEventGroup } from "../../../types/trace";
 
 /**
  * Re-exported for callers that already imported from this module — the
@@ -90,13 +84,7 @@ function VerdictSlot({ display }: { display: EvalChipDisplay }) {
   return null;
 }
 
-function NoVerdictBadge({
-  label,
-  icon: Icon,
-}: {
-  label: string;
-  icon: IconType;
-}) {
+function NoVerdictBadge({ label, icon: Icon }: { label: string; icon: IconType }) {
   return (
     <HStack
       gap={1}
@@ -158,9 +146,7 @@ export const EvalChip: React.FC<{
           bg="bg.panel"
           cursor={onFilter ? "pointer" : "help"}
           flexShrink={0}
-          {...(onFilter
-            ? { title: `Filter by evaluator "${display.displayName}"` }
-            : {})}
+          {...(onFilter ? { title: `Filter by evaluator "${display.displayName}"` } : {})}
           onClick={(e: React.MouseEvent) => {
             if (!onFilter) return;
             e.stopPropagation();
@@ -240,11 +226,7 @@ export const EvalChip: React.FC<{
                 <Text textStyle="2xs" color="fg.muted">
                   Status
                 </Text>
-                <Text
-                  textStyle="2xs"
-                  fontWeight="semibold"
-                  color={display.color}
-                >
+                <Text textStyle="2xs" fontWeight="semibold" color={display.color}>
                   {display.statusLabel}
                 </Text>
               </HStack>
@@ -288,9 +270,7 @@ export const EvalChip: React.FC<{
  * than repeating it — an agent turn can retry a tool hundreds of times, and
  * "tool.output 237" says all of it in one chip.
  */
-export const EventBadge: React.FC<{ event: TraceListEventGroup }> = ({
-  event,
-}) => (
+export const EventBadge: React.FC<{ event: TraceListEventGroup }> = ({ event }) => (
   <HStack
     gap={1}
     paddingX={2}
@@ -305,18 +285,10 @@ export const EventBadge: React.FC<{ event: TraceListEventGroup }> = ({
     // vs `:687`), so every pixel clipped early costs a distinction.
     maxWidth="100%"
     minWidth={0}
-    title={
-      event.count > 1 ? `${event.name} — ${event.count} times` : event.name
-    }
+    title={event.count > 1 ? `${event.name} — ${event.count} times` : event.name}
   >
     <Circle size="6px" bg="blue.solid" flexShrink={0} />
-    <Text
-      textStyle="2xs"
-      fontWeight="medium"
-      color="fg"
-      truncate
-      lineHeight="1.2"
-    >
+    <Text textStyle="2xs" fontWeight="medium" color="fg" truncate lineHeight="1.2">
       {event.name}
     </Text>
     {event.count > 1 && (

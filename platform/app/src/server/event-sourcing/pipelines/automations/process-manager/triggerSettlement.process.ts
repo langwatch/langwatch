@@ -69,10 +69,7 @@ export function addPending(
       (left, right) =>
         pendingMatches[left]!.settleDueAt - pendingMatches[right]!.settleDueAt,
     );
-    for (const traceId of oldestFirst.slice(
-      0,
-      traceIds.length - MAX_PENDING_MATCHES,
-    )) {
+    for (const traceId of oldestFirst.slice(0, traceIds.length - MAX_PENDING_MATCHES)) {
       flushed.push({ traceId, match: pendingMatches[traceId]! });
       delete pendingMatches[traceId];
     }
@@ -91,10 +88,7 @@ export function settleBoundary(state: SettlementState): number | null {
 }
 
 export function digestBatchKey(traceIds: readonly string[]): string {
-  return createHash("sha256")
-    .update(traceIds.join("\0"))
-    .digest("hex")
-    .slice(0, 16);
+  return createHash("sha256").update(traceIds.join("\0")).digest("hex").slice(0, 16);
 }
 
 /** One persist-match outbox message: a bounded page of settled traces. */

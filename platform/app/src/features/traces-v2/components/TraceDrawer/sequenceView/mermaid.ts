@@ -30,10 +30,7 @@ const MAX_MESSAGES = 400;
 function getParticipantId(span: SpanTreeNode): string | null {
   if (span.type === "agent" && span.name) {
     return sanitiseMermaidId(
-      span.name
-        .replace(".call", "")
-        .replace(".run", "")
-        .replace("invoke_agent ", ""),
+      span.name.replace(".call", "").replace(".run", "").replace("invoke_agent ", ""),
     );
   }
   if (span.type === "llm" && span.model) {
@@ -136,14 +133,10 @@ function processSpan(
   // Tool spans render as self-calls on the parent participant.
   if (type === "tool" && parentParticipant && span.name) {
     const label = escapeLabel(
-      `tool: ${span.name} · ${formatDuration(duration)}${
-        isError ? " · error" : ""
-      }`,
+      `tool: ${span.name} · ${formatDuration(duration)}${isError ? " · error" : ""}`,
     );
     if (isError) ctx.messages.push("    rect rgba(248, 113, 113, 0.12)");
-    ctx.messages.push(
-      `    ${parentParticipant}->>${parentParticipant}: ${label}`,
-    );
+    ctx.messages.push(`    ${parentParticipant}->>${parentParticipant}: ${label}`);
     if (isError) ctx.messages.push("    end");
     span.children
       .slice()
@@ -180,9 +173,7 @@ function processSpan(
     label = escapeLabel(label);
 
     if (isError) ctx.messages.push("    rect rgba(248, 113, 113, 0.12)");
-    ctx.messages.push(
-      `    ${parentParticipant}->>${currentParticipant}: ${label}`,
-    );
+    ctx.messages.push(`    ${parentParticipant}->>${currentParticipant}: ${label}`);
     ctx.messages.push(`    activate ${currentParticipant}`);
   }
 

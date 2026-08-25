@@ -4,16 +4,10 @@ import {
   PrismaExperimentRepository,
   type ExperimentDatabase,
 } from "../repositories/prisma/prisma.experiment.repository";
-import {
-  ClickHouseExperimentRunRepository,
-} from "../repositories/clickhouse/clickhouse.experiment-run.repository";
-import {
-  ClickHouseExperimentDspyRepository,
-} from "../repositories/clickhouse/clickhouse.experiment-dspy.repository";
+import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository";
+import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository";
 import type { ExperimentDspyRetentionPort } from "../ports/experiment-dspy-retention.port";
-import {
-  UnavailableExperimentExecutionPort,
-} from "../execution/experiment-execution.port";
+import { UnavailableExperimentExecutionPort } from "../execution/experiment-execution.port";
 import { ExperimentService } from "../services/experiment.service";
 
 export type PostgresExperimentAdapterOptions = {
@@ -143,9 +137,7 @@ export type PostgresExperimentAdapterOptions = {
 };
 
 export class PostgresExperimentAdapter {
-  static create(
-    options: PostgresExperimentAdapterOptions,
-  ): ExperimentServiceContract {
+  static create(options: PostgresExperimentAdapterOptions): ExperimentServiceContract {
     return ExperimentService.create({
       ...options,
       repository: PrismaExperimentRepository.create(options.database),
@@ -160,8 +152,7 @@ export class PostgresExperimentAdapter {
         retention: options.dspyRetention,
         telemetry: options.runHistoryTelemetry,
       }),
-      execution:
-        options.execution ?? new UnavailableExperimentExecutionPort(),
+      execution: options.execution ?? new UnavailableExperimentExecutionPort(),
     });
   }
 }

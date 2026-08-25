@@ -89,11 +89,7 @@ export interface EmitVendorLogInput {
  * emitted, which is what lets a caller assert the drop without reaching into
  * the sink.
  */
-export function emitVendorLog({
-  sink,
-  level,
-  record,
-}: EmitVendorLogInput): boolean {
+export function emitVendorLog({ sink, level, record }: EmitVendorLogInput): boolean {
   const decision = decideVendorLog({ level, record });
   if (decision === null) return false;
   sink[decision.level](decision.fields, decision.message);

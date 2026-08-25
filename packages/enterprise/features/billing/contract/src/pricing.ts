@@ -12,10 +12,9 @@ function getUnitAmountCents(name: StripePriceName, prices: StripePriceMap): numb
 }
 
 /** Seat prices from Stripe catalog in CENTS (integer-safe arithmetic) */
-export function getGrowthSeatPriceCents(prices: StripePriceMap): Record<
-  Currency,
-  { monthly: number; annual: number }
-> {
+export function getGrowthSeatPriceCents(
+  prices: StripePriceMap,
+): Record<Currency, { monthly: number; annual: number }> {
   return {
     [Currency.EUR]: {
       monthly: getUnitAmountCents("GROWTH_SEAT_EUR_MONTHLY", prices),
@@ -29,11 +28,12 @@ export function getGrowthSeatPriceCents(prices: StripePriceMap): Record<
 }
 
 /** Annual discount % derived from catalog (e.g. 8) */
-export function getAnnualDiscountPercent(currency: Currency, prices: StripePriceMap): number {
+export function getAnnualDiscountPercent(
+  currency: Currency,
+  prices: StripePriceMap,
+): number {
   const p = getGrowthSeatPriceCents(prices);
-  return Math.round(
-    (1 - p[currency].annual / (p[currency].monthly * 12)) * 100,
-  );
+  return Math.round((1 - p[currency].annual / (p[currency].monthly * 12)) * 100);
 }
 
 /**

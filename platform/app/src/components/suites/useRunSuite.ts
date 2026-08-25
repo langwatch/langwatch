@@ -60,9 +60,7 @@ function unionParameterDefinitions({
   const inRun = new Set(scenarioIds);
   const declared = scenarios
     .filter((scenario) => inRun.has(scenario.id))
-    .flatMap((scenario) =>
-      parseScenarioParameterDefinitions(scenario.parameters),
-    );
+    .flatMap((scenario) => parseScenarioParameterDefinitions(scenario.parameters));
 
   const union = new Map<string, ScenarioParameterDefinition>();
   for (const definition of declared) {
@@ -116,16 +114,12 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  const [pendingSuite, setPendingSuite] = useState<SimulationSuite | null>(
-    null,
-  );
-  const [pendingBatchRunId, setPendingBatchRunId] = useState<string | null>(
-    null,
-  );
+  const [pendingSuite, setPendingSuite] = useState<SimulationSuite | null>(null);
+  const [pendingBatchRunId, setPendingBatchRunId] = useState<string | null>(null);
   /** Only the names typed over in the confirmation, keyed by name. */
-  const [parameterOverrides, setParameterOverrides] = useState<
-    Record<string, string>
-  >({});
+  const [parameterOverrides, setParameterOverrides] = useState<Record<string, string>>(
+    {},
+  );
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
@@ -251,13 +245,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
         values: parameterValues,
       }),
     });
-  }, [
-    project,
-    pendingSuite,
-    runMutation,
-    parameterDefinitions,
-    parameterValues,
-  ]);
+  }, [project, pendingSuite, runMutation, parameterDefinitions, parameterValues]);
 
   const cancelRun = useCallback(() => {
     if (runMutation.isPending) return;
@@ -266,8 +254,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   }, [runMutation.isPending]);
 
   const activeScenarioCount = useMemo(() => {
-    if (!pendingSuite || !allScenarios)
-      return pendingSuite?.scenarioIds.length ?? 0;
+    if (!pendingSuite || !allScenarios) return pendingSuite?.scenarioIds.length ?? 0;
     const activeIds = new Set(allScenarios.map((s) => s.id));
     return pendingSuite.scenarioIds.filter((id) => activeIds.has(id)).length;
   }, [pendingSuite, allScenarios]);

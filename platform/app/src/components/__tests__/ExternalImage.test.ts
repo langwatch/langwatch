@@ -37,15 +37,15 @@ describe("getImageUrl", () => {
 
   describe("when URL is from a known Google image host", () => {
     it("accepts subdomains of googleusercontent.com", () => {
-      expect(
-        getImageUrl("https://lh3.googleusercontent.com/some/path/to/image"),
-      ).toBe("https://lh3.googleusercontent.com/some/path/to/image");
+      expect(getImageUrl("https://lh3.googleusercontent.com/some/path/to/image")).toBe(
+        "https://lh3.googleusercontent.com/some/path/to/image",
+      );
     });
 
     it("accepts subdomains of gstatic.com", () => {
-      expect(
-        getImageUrl("https://encrypted-tbn0.gstatic.com/images?q=some-hash"),
-      ).toBe("https://encrypted-tbn0.gstatic.com/images?q=some-hash");
+      expect(getImageUrl("https://encrypted-tbn0.gstatic.com/images?q=some-hash")).toBe(
+        "https://encrypted-tbn0.gstatic.com/images?q=some-hash",
+      );
     });
 
     it("rejects domains that merely end with gstatic.com but are not subdomains", () => {
@@ -53,9 +53,7 @@ describe("getImageUrl", () => {
     });
 
     it("rejects domains that merely end with googleusercontent.com but are not subdomains", () => {
-      expect(
-        getImageUrl("https://evil-googleusercontent.com/image.php"),
-      ).toBeNull();
+      expect(getImageUrl("https://evil-googleusercontent.com/image.php")).toBeNull();
     });
   });
 

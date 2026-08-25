@@ -25,9 +25,7 @@ export async function ingestTailCommand(
 ): Promise<void> {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    process.stderr.write(
-      "Not logged in. Run `langwatch login --device` first.\n",
-    );
+    process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
     process.exit(1);
   }
 
@@ -129,8 +127,7 @@ export function pickFreshEvents(
     .filter(
       (e) =>
         e.eventTimestampIso > state.cursorIso ||
-        (e.eventTimestampIso === state.cursorIso &&
-          !state.seen.has(e.eventId)),
+        (e.eventTimestampIso === state.cursorIso && !state.seen.has(e.eventId)),
     )
     .slice()
     .reverse();

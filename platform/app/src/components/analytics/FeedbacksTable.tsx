@@ -19,10 +19,7 @@ export const FeedbacksTable = () => {
       <Table.Root variant="line" padding={0} margin={0}>
         <Table.Header>
           <Table.Row>
-            <Table.ColumnHeader
-              width="48px"
-              paddingLeft={0}
-            ></Table.ColumnHeader>
+            <Table.ColumnHeader width="48px" paddingLeft={0}></Table.ColumnHeader>
             <Table.ColumnHeader>Feedback</Table.ColumnHeader>
             <Table.ColumnHeader width="250px">Date</Table.ColumnHeader>
             <Table.ColumnHeader width="180px" textAlign="center">
@@ -48,9 +45,7 @@ export const FeedbacksTable = () => {
           )}
 
           {feedbacks.data?.events.map((event, index) => {
-            const vote = event.metrics?.find(
-              (metric) => metric.key === "vote",
-            )?.value;
+            const vote = event.metrics?.find((metric) => metric.key === "vote")?.value;
             const feedback = event.event_details?.find(
               (detail) => detail.key === "feedback",
             )?.value;
@@ -106,10 +101,7 @@ export const FeedbacksTable = () => {
 
 export const DocumentsCountsSummary = () => {
   const { filterParams, queryOpts } = useFilterParams();
-  const documents = api.analytics.topUsedDocuments.useQuery(
-    filterParams,
-    queryOpts,
-  );
+  const documents = api.analytics.topUsedDocuments.useQuery(filterParams, queryOpts);
 
   const count = documents.data?.totalUniqueDocuments;
 

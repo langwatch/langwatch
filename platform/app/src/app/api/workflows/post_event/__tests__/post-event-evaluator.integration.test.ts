@@ -169,9 +169,7 @@ afterAll(async () => {
       // group already gone
     }
     const exited = await Promise.race([
-      new Promise<boolean>((resolve) =>
-        nlpgoProcess!.once("exit", () => resolve(true)),
-      ),
+      new Promise<boolean>((resolve) => nlpgoProcess!.once("exit", () => resolve(true))),
       sleep(2000).then(() => false),
     ]);
     if (!exited) {
@@ -392,12 +390,8 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
       // the amount on `execution_state.cost` for the workflow-level
       // total accumulator.
       const componentChanges = events.filter(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > => e.type === "component_state_change",
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
+          e.type === "component_state_change",
       );
       const finalEvalChange = [...componentChanges]
         .reverse()
@@ -410,8 +404,7 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
         finalEvalChange,
         `expected a final success component_state_change for 'eval'; events=${JSON.stringify(componentChanges)}`,
       ).toBeDefined();
-      const evalOutputs = (finalEvalChange?.payload.execution_state as any)
-        ?.outputs;
+      const evalOutputs = (finalEvalChange?.payload.execution_state as any)?.outputs;
       expect(evalOutputs).toBeDefined();
       expect(evalOutputs.score).toBeCloseTo(0.91, 5);
       expect(evalOutputs.passed).toBe(true);
@@ -420,9 +413,10 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
       // The workflow-level cost field on execution_state surfaces the
       // numeric amount so trace + billing aggregators don't have to
       // unpack the {currency, amount} dict.
-      expect(
-        (finalEvalChange?.payload.execution_state as any)?.cost,
-      ).toBeCloseTo(0.000123, 9);
+      expect((finalEvalChange?.payload.execution_state as any)?.cost).toBeCloseTo(
+        0.000123,
+        9,
+      );
 
       // End node must produce the same score/passed/details/cost as
       // outputs (proves the edge wiring of all four evaluator → end
@@ -431,8 +425,7 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
         .reverse()
         .find((e) => e.payload.component_id === "end");
       expect(finalEndChange).toBeDefined();
-      const endOutputs = (finalEndChange?.payload.execution_state as any)
-        ?.outputs;
+      const endOutputs = (finalEndChange?.payload.execution_state as any)?.outputs;
       expect(endOutputs.score).toBeCloseTo(0.91, 5);
       expect(endOutputs.passed).toBe(true);
       expect(endOutputs.cost).toEqual({ currency: "USD", amount: 0.000123 });
@@ -449,9 +442,7 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
       expect(call.traceId).toBe("ts-eval-e2e-trace");
       expect(call.origin).toBe("workflow");
       expect(call.body.name).toBe("strict-match");
-      expect((call.body.settings as Record<string, unknown>).mode).toBe(
-        "exact",
-      );
+      expect((call.body.settings as Record<string, unknown>).mode).toBe("exact");
       const data = call.body.data as Record<string, unknown>;
       expect(data.expected_output).toBe("9");
       // The signature's answer ought to mention the digit 9.

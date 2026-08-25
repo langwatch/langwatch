@@ -65,8 +65,7 @@ export function ProviderCredentialPicker({
     () => activeAvailable.filter((c) => !selectedIds.includes(c.id)),
     [activeAvailable, selectedIds],
   );
-  const hasOnlyDisabledProviders =
-    available.length > 0 && activeAvailable.length === 0;
+  const hasOnlyDisabledProviders = available.length > 0 && activeAvailable.length === 0;
 
   const { removeAt, swap, addById } = orderedListHandlers({
     selectedIds,
@@ -234,9 +233,7 @@ function SelectedProviders({
             </Text>
             <VStack align="start" gap={0} flex={1} minWidth={0}>
               <Text fontSize="sm" fontWeight="medium">
-                {option
-                  ? formatLabel(option)
-                  : "This provider is no longer configured"}
+                {option ? formatLabel(option) : "This provider is no longer configured"}
               </Text>
               {option?.disabledAt && (
                 <Text fontSize="xs" color="orange.600">
@@ -286,15 +283,9 @@ function orderedListHandlers({
   onChange: (next: string[]) => void;
 }) {
   return {
-    removeAt: (index: number) =>
-      onChange(selectedIds.filter((_, at) => at !== index)),
+    removeAt: (index: number) => onChange(selectedIds.filter((_, at) => at !== index)),
     swap: (a: number, b: number) => {
-      if (
-        a < 0 ||
-        b < 0 ||
-        a >= selectedIds.length ||
-        b >= selectedIds.length
-      ) {
+      if (a < 0 || b < 0 || a >= selectedIds.length || b >= selectedIds.length) {
         return;
       }
       const next = selectedIds.slice();

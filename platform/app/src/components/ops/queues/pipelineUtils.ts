@@ -19,17 +19,11 @@ export function isNodePaused(
   return false;
 }
 
-export function isNodeDirectlyPaused(
-  nodePath: string,
-  pausedKeys: Set<string>,
-): boolean {
+export function isNodeDirectlyPaused(nodePath: string, pausedKeys: Set<string>): boolean {
   return pausedKeys.has(nodePath);
 }
 
-export function filterTree(
-  nodes: PipelineNode[],
-  query: string,
-): PipelineNode[] | null {
+export function filterTree(nodes: PipelineNode[], query: string): PipelineNode[] | null {
   if (!query.trim()) return nodes;
   const lower = query.toLowerCase();
 
@@ -89,23 +83,13 @@ const FAILING_ERROR_MAX_AGE_MS = 15 * 60 * 1000;
  * "waiting out backoff" (the re-stage keeps it alive for the backoff window),
  * which is why the retry check outranks it.
  */
-function hasUnclearedError(
-  g: GroupInfo,
-  attempt: number,
-  now: number,
-): boolean {
+function hasUnclearedError(g: GroupInfo, attempt: number, now: number): boolean {
   if (g.errorMessage === null) return false;
   if (attempt > 0) return true;
-  return (
-    g.errorTimestamp !== null &&
-    now - g.errorTimestamp < FAILING_ERROR_MAX_AGE_MS
-  );
+  return g.errorTimestamp !== null && now - g.errorTimestamp < FAILING_ERROR_MAX_AGE_MS;
 }
 
-export function classifyGroup(
-  g: GroupInfo,
-  now = Date.now(),
-): GroupClassification {
+export function classifyGroup(g: GroupInfo, now = Date.now()): GroupClassification {
   const attempt = g.retryCount ?? 0;
   const isFailing = hasUnclearedError(g, attempt, now);
   const deferredUntilMs = g.score > now ? g.score : null;
@@ -157,10 +141,7 @@ export function sortGroupsBySeverity<T extends GroupInfo>(
 }
 
 /** The "Next run" cell: when the dispatcher will next touch this group. */
-export function describeNextRun(
-  c: GroupClassification,
-  now = Date.now(),
-): string {
+export function describeNextRun(c: GroupClassification, now = Date.now()): string {
   switch (c.state) {
     case "active":
       return "running";
@@ -190,10 +171,7 @@ export function matchesStatusFilter(
   switch (filter) {
     case "ok":
       return (
-        !isFailing &&
-        state !== "blocked" &&
-        state !== "stale" &&
-        state !== "retrying"
+        !isFailing && state !== "blocked" && state !== "stale" && state !== "retrying"
       );
     case "blocked":
       return state === "blocked";
@@ -203,8 +181,7 @@ export function matchesStatusFilter(
     // been given up on, whether it is waiting out backoff or mid-reattempt.
     case "retrying":
       return (
-        state === "retrying" ||
-        (isFailing && state !== "blocked" && state !== "stale")
+        state === "retrying" || (isFailing && state !== "blocked" && state !== "stale")
       );
     case "active":
       return state === "active";

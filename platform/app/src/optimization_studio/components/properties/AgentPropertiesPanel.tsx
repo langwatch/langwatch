@@ -174,15 +174,10 @@ function DbAgentPanel({
   const httpSnapshot = readHttpSnapshot(node.data);
   const httpConfig =
     agentType === "http" && dbConfig ? getHttpConfig(dbConfig) : undefined;
-  const localSettings = localConfig?.settings as
-    | Record<string, unknown>
-    | undefined;
+  const localSettings = localConfig?.settings as Record<string, unknown> | undefined;
 
   const [url, setUrl] = useState(
-    (localSettings?.url as string) ??
-      httpSnapshot?.url ??
-      httpConfig?.url ??
-      "",
+    (localSettings?.url as string) ?? httpSnapshot?.url ?? httpConfig?.url ?? "",
   );
   const [method, setMethod] = useState<HttpMethod>(
     (localSettings?.method as HttpMethod) ??
@@ -358,8 +353,7 @@ function DbAgentPanel({
       bodyTemplate !== (baseline.bodyTemplate ?? "") ||
       outputPath !== (baseline.outputPath ?? "") ||
       JSON.stringify(headers) !== JSON.stringify(baseline.headers ?? []) ||
-      JSON.stringify(auth) !==
-        JSON.stringify(baseline.auth ?? { type: "none" });
+      JSON.stringify(auth) !== JSON.stringify(baseline.auth ?? { type: "none" });
 
     if (changed) {
       persistLocalSettings({
@@ -448,9 +442,7 @@ function DbAgentPanel({
     (newVariables: Variable[]) => {
       const existingInputs = node.data.inputs ?? [];
       const newInputs: DslField[] = newVariables.map((v) => {
-        const existing = existingInputs.find(
-          (i) => i.identifier === v.identifier,
-        );
+        const existing = existingInputs.find((i) => i.identifier === v.identifier);
         return {
           identifier: v.identifier,
           type: v.type as DslField["type"],
@@ -485,14 +477,7 @@ function DbAgentPanel({
 
     let config: AgentComponentConfig | undefined;
     if (agentType === "http") {
-      config = buildHttpConfig(
-        url,
-        method,
-        bodyTemplate,
-        outputPath,
-        headers,
-        auth,
-      );
+      config = buildHttpConfig(url, method, bodyTemplate, outputPath, headers, auth);
     } else if (agentType === "code") {
       config = buildCodeConfig({
         code,
@@ -530,10 +515,7 @@ function DbAgentPanel({
             name: updatedAgent.name,
             config: updatedAgent.config,
           });
-          trpcContext.agents.getById.setData(
-            { id: agentId, projectId },
-            updatedAgent,
-          );
+          trpcContext.agents.getById.setData({ id: agentId, projectId }, updatedAgent);
           setNode({
             id: node.id,
             data: {
@@ -656,13 +638,7 @@ function DbAgentPanel({
         </Button>
       </HStack>
     ),
-    [
-      hasLocalChanges,
-      handleDiscard,
-      handleApply,
-      handleSave,
-      updateMutation.isPending,
-    ],
+    [hasLocalChanges, handleDiscard, handleApply, handleSave, updateMutation.isPending],
   );
   useRegisterDrawerFooter(footerContent);
 
@@ -687,13 +663,7 @@ function DbAgentPanel({
           : "Agent";
 
   return (
-    <BasePropertiesPanel
-      node={node}
-      hideParameters
-      hideInputs
-      hideOutputs
-      paddingX={0}
-    >
+    <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs paddingX={0}>
       {/* Agent name + type badge */}
       <VStack align="stretch" gap={2} width="full" paddingX={4}>
         <HStack>
@@ -733,8 +703,8 @@ function DbAgentPanel({
           <Field.Root>
             <Field.Label fontSize="sm">Python Code</Field.Label>
             <Text fontSize="xs" color="fg.muted" marginBottom={1}>
-              Define a Python class with a `__call__` method that takes inputs
-              and returns outputs.
+              Define a Python class with a `__call__` method that takes inputs and returns
+              outputs.
             </Text>
             <CodeBlockEditor
               code={code}
@@ -750,8 +720,8 @@ function DbAgentPanel({
       {agentType === "workflow" && (
         <Box paddingX={4}>
           <Text fontSize="sm" color="fg.muted">
-            This agent is backed by a workflow. Edit the workflow in Studio to
-            modify its behavior.
+            This agent is backed by a workflow. Edit the workflow in Studio to modify its
+            behavior.
           </Text>
         </Box>
       )}

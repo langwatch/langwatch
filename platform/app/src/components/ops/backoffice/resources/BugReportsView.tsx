@@ -78,10 +78,7 @@ export default function BugReportsView() {
         <BugReportsTable reports={list.data?.reports} onOpen={setOpenReport} />
       </BackofficeTable>
 
-      <BugReportDrawer
-        reportId={openReportId}
-        onClose={() => setOpenReport(null)}
-      />
+      <BugReportDrawer reportId={openReportId} onClose={() => setOpenReport(null)} />
     </>
   );
 }
@@ -122,8 +119,8 @@ function BugReportsTable({
           <Table.Row>
             <Table.Cell colSpan={7}>
               <Text color="fg.muted" paddingY={6} textAlign="center">
-                No reports yet. They arrive here when a customer's coding agent
-                runs `langwatch report`.
+                No reports yet. They arrive here when a customer's coding agent runs
+                `langwatch report`.
               </Text>
             </Table.Cell>
           </Table.Row>
@@ -155,11 +152,7 @@ function BugReportsTable({
               </Button>
             </Table.Cell>
             <Table.Cell>
-              <Badge
-                colorPalette={
-                  report.kind === "full_session" ? "purple" : "gray"
-                }
-              >
+              <Badge colorPalette={report.kind === "full_session" ? "purple" : "gray"}>
                 {kindLabel[report.kind] ?? report.kind}
               </Badge>
             </Table.Cell>
@@ -227,23 +220,15 @@ function BugReportDrawer({
           {report.data && (
             <VStack align="stretch" gap={6}>
               <SimpleGrid columns={2} gap={3}>
-                <Fact label="Received">
-                  {formatDateTime(report.data.createdAt)}
-                </Fact>
+                <Fact label="Received">{formatDateTime(report.data.createdAt)}</Fact>
                 <Fact label="Kind">
                   {kindLabel[report.data.kind] ?? report.data.kind}
                 </Fact>
                 <Fact label="Source">{report.data.source}</Fact>
                 <Fact label="Agent">{report.data.agent ?? "unknown"}</Fact>
-                <Fact label="CLI version">
-                  {report.data.cliVersion ?? "unknown"}
-                </Fact>
-                <Fact label="Project">
-                  {report.data.linkedProjectId ?? "not linked"}
-                </Fact>
-                <Fact label="Contact">
-                  {report.data.contactEmail ?? "none"}
-                </Fact>
+                <Fact label="CLI version">{report.data.cliVersion ?? "unknown"}</Fact>
+                <Fact label="Project">{report.data.linkedProjectId ?? "not linked"}</Fact>
+                <Fact label="Contact">{report.data.contactEmail ?? "none"}</Fact>
                 <Fact label="Transcript">
                   {report.data.sessionData
                     ? report.data.sessionTruncated
@@ -275,18 +260,10 @@ function BugReportDrawer({
                 <Box>
                   <HStack marginBottom={2}>
                     <Text fontWeight="semibold">Session transcript</Text>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      onClick={copyTranscript}
-                    >
+                    <Button size="xs" variant="outline" onClick={copyTranscript}>
                       <Copy size={12} /> Copy
                     </Button>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      onClick={downloadTranscript}
-                    >
+                    <Button size="xs" variant="outline" onClick={downloadTranscript}>
                       <Download size={12} /> Download .jsonl
                     </Button>
                   </HStack>
@@ -313,13 +290,7 @@ function BugReportDrawer({
   );
 }
 
-function Fact({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <Box>
       <Text fontSize="xs" color="fg.muted">

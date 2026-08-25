@@ -183,8 +183,7 @@ describe("IngestionSource failure paths", () => {
         // the half something reads — the registry's `validation_error` copy
         // renders it when the field name isn't one it can name, which
         // `pullSchedule` is not.
-        const formErrors = (error as { meta: { formErrors?: unknown } }).meta
-          .formErrors;
+        const formErrors = (error as { meta: { formErrors?: unknown } }).meta.formErrors;
         expect(Array.isArray(formErrors)).toBe(true);
         expect(formErrors as string[]).not.toHaveLength(0);
       });
@@ -280,9 +279,7 @@ describe("IngestionSource failure paths", () => {
 
     it("raises the same error when the service is called directly", async () => {
       const service = IngestionSourceService.create(prisma);
-      await expect(
-        service.archive(missingId, organizationId),
-      ).rejects.toMatchObject({
+      await expect(service.archive(missingId, organizationId)).rejects.toMatchObject({
         code: "ingestion_source_not_found",
         httpStatus: 404,
         meta: { id: missingId },

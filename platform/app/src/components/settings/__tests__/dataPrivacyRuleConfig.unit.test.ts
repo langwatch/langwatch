@@ -77,9 +77,7 @@ function withCategory(
   return { ...inheritDispositions, [category]: choice };
 }
 
-function resolved(
-  overrides: Partial<ResolvedDataPrivacy> = {},
-): ResolvedDataPrivacy {
+function resolved(overrides: Partial<ResolvedDataPrivacy> = {}): ResolvedDataPrivacy {
   const cat = () => ({
     disposition: "capture" as const,
     audience: { ...EMPTY_AUDIENCE },
@@ -147,8 +145,7 @@ describe("buildRuleConfig", () => {
         level: "disabled",
       });
       expect(
-        build({ piiChoice: "custom", piiEntities: ["BR_CPF", "EMAIL_ADDRESS"] })
-          .pii,
+        build({ piiChoice: "custom", piiEntities: ["BR_CPF", "EMAIL_ADDRESS"] }).pii,
       ).toEqual({ level: "custom", entities: ["BR_CPF", "EMAIL_ADDRESS"] });
     });
   });
@@ -229,9 +226,10 @@ describe("audienceConfig", () => {
       allMembers: true,
     });
     expect(audienceConfig(audience())).toEqual({});
-    expect(
-      audienceConfig(audience({ projectOwner: true, groupIds: ["g1"] })),
-    ).toEqual({ projectOwner: true, groupIds: ["g1"] });
+    expect(audienceConfig(audience({ projectOwner: true, groupIds: ["g1"] }))).toEqual({
+      projectOwner: true,
+      groupIds: ["g1"],
+    });
   });
 });
 
@@ -253,12 +251,10 @@ describe("configToFormState", () => {
 
   describe("given a config that disables secrets", () => {
     it("reads secrets as explicitly off, not inherit", () => {
-      expect(
-        configToFormState({ secrets: { enabled: false } }).secretsChoice,
-      ).toBe("off");
-      expect(
-        configToFormState({ secrets: { enabled: true } }).secretsChoice,
-      ).toBe("on");
+      expect(configToFormState({ secrets: { enabled: false } }).secretsChoice).toBe(
+        "off",
+      );
+      expect(configToFormState({ secrets: { enabled: true } }).secretsChoice).toBe("on");
     });
   });
 
@@ -427,10 +423,7 @@ describe("audience selection", () => {
       ]);
       expect(collapsed).toEqual([ALL_MEMBERS_VALUE]);
 
-      const widened = applyAudienceSelection(collapsed, [
-        ...collapsed,
-        "group:security",
-      ]);
+      const widened = applyAudienceSelection(collapsed, [...collapsed, "group:security"]);
       expect(widened).toEqual(["group:security"]);
     });
   });
@@ -482,9 +475,7 @@ describe("PII exception patterns in the rule form", () => {
 
   it("counts exceptions in the rule summary", () => {
     expect(
-      ruleSummary(
-        build({ piiChoice: "essential", piiExceptPatterns: ["a", "b"] }),
-      ),
+      ruleSummary(build({ piiChoice: "essential", piiExceptPatterns: ["a", "b"] })),
     ).toContain("2 PII exceptions");
   });
 });

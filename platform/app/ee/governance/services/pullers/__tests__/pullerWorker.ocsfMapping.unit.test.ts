@@ -58,9 +58,7 @@ describe("PullerWorker — OCSF mapping (semantic contract)", () => {
       sourceType: string;
     }) {
       const eventTime = new Date(event.event_timestamp);
-      const safeEventTime = Number.isFinite(eventTime.getTime())
-        ? eventTime
-        : new Date();
+      const safeEventTime = Number.isFinite(eventTime.getTime()) ? eventTime : new Date();
       const eventId = `${sourceType}:${ingestionSourceId}:${event.source_event_id}`;
       return {
         tenantId,

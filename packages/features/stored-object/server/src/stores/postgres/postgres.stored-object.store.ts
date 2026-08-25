@@ -142,9 +142,7 @@ export class PostgresStoredObjectStore extends StoredObjectStore {
           ? { provider, destinationId, relativeId }
           : null,
       generation: Number(row.generation),
-      audiences: this.stringArray(
-        row.audiences,
-      ) as StoredObjectDeliveryAudience[],
+      audiences: this.stringArray(row.audiences) as StoredObjectDeliveryAudience[],
       expiresAt: this.tryDate(row.expiresAt),
       availableAt: this.tryDate(row.availableAt),
       deletedAt: this.tryDate(row.deletedAt),
@@ -188,8 +186,6 @@ export class PostgresStoredObjectStore extends StoredObjectStore {
   }
 
   private tryDate(value: unknown): Date | null {
-    return value === null || value === undefined
-      ? null
-      : this.date(value, "date");
+    return value === null || value === undefined ? null : this.date(value, "date");
   }
 }

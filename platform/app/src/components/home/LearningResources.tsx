@@ -39,17 +39,13 @@ export function LearningResources({ trailing }: { trailing?: ReactNode }) {
           Go SDK
         </ColophonLink>
         <ColophonDot />
-        <ColophonLink href="https://scenario.langwatch.ai">
-          Scenario
-        </ColophonLink>
+        <ColophonLink href="https://scenario.langwatch.ai">Scenario</ColophonLink>
         <ColophonDot />
         <ColophonLink href="https://docs.langwatch.ai/integration/rest-api">
           REST API
         </ColophonLink>
         <ColophonDot />
-        <ColophonLink href="https://github.com/langwatch/langwatch">
-          GitHub
-        </ColophonLink>
+        <ColophonLink href="https://github.com/langwatch/langwatch">GitHub</ColophonLink>
         <ColophonDot />
         <ColophonLink href="https://status.langwatch.ai">Status</ColophonLink>
         <ColophonDot />
@@ -77,13 +73,7 @@ function ColophonDot() {
   );
 }
 
-function ColophonLink({
-  href,
-  children,
-}: {
-  href: string;
-  children: ReactNode;
-}) {
+function ColophonLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
       href={href}

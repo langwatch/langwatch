@@ -28,10 +28,7 @@ import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 import { createChildProcessLogger } from "./child-logger";
 import { selectRoleModelParams } from "./job-model-params";
-import {
-  createJudgeModelFromParams,
-  createModelFromParams,
-} from "./model.factory";
+import { createJudgeModelFromParams, createModelFromParams } from "./model.factory";
 import { buildRemoteTraceRunConfig } from "./remote-trace-run-config";
 import { createAdapter } from "./serialized-adapter.registry";
 import { type ChildProcessJobData, ChildProcessJobDataSchema } from "./types";
@@ -206,10 +203,9 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
 
   // Output JSON result to stdout for parent process to parse
   // Only stdout contains the JSON result; all other output goes to stderr
-  const outputResult: { success: boolean; reasoning?: string; error?: string } =
-    {
-      success: result.success,
-    };
+  const outputResult: { success: boolean; reasoning?: string; error?: string } = {
+    success: result.success,
+  };
   if (result.reasoning) {
     outputResult.reasoning = result.reasoning;
   }
@@ -268,9 +264,7 @@ function formatErrorWithCauses(error: unknown): string {
     if (current instanceof Error) {
       const code = (current as { code?: unknown }).code;
       parts.push(
-        typeof code === "string"
-          ? `${current.message} (${code})`
-          : current.message,
+        typeof code === "string" ? `${current.message} (${code})` : current.message,
       );
       current = (current as { cause?: unknown }).cause;
     } else {
@@ -287,8 +281,6 @@ main().catch(async (error) => {
   // Still flush traces on error so we capture what happened
   await flushOtelTraces();
   // Output JSON error result to stdout for parent process to parse
-  process.stdout.write(
-    JSON.stringify({ success: false, error: errorMessage }) + "\n",
-  );
+  process.stdout.write(JSON.stringify({ success: false, error: errorMessage }) + "\n");
   process.exit(1);
 });

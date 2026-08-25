@@ -49,10 +49,7 @@ import {
   stopAzurite,
 } from "../../server/stored-objects/__tests__/azurite-test-support";
 import { resolveProjectStorageDestination } from "../../server/stored-objects/project-storage-destination";
-import {
-  type BackfillDeps,
-  migrateDatasetToS3,
-} from "../backfillDatasetContentToS3";
+import { type BackfillDeps, migrateDatasetToS3 } from "../backfillDatasetContentToS3";
 
 const datasetStorageResolver = new AppDatasetStorageResolver();
 
@@ -145,10 +142,7 @@ describe("migrateDatasetToS3 onto the Azure Blob backend", () => {
         getStorage: datasetStorageResolver.forProject.bind(datasetStorageResolver),
       };
 
-      const outcome = await migrateDatasetToS3(
-        { dataset, projectId: project.id },
-        deps,
-      );
+      const outcome = await migrateDatasetToS3({ dataset, projectId: project.id }, deps);
 
       expect(outcome).toBe("migrated");
 

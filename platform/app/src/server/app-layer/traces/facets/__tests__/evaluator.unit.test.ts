@@ -47,9 +47,7 @@ describe("buildEvaluatorFacetQuery", () => {
         // sumMap tallies Label -> count in one pass; the empty bucket is
         // filtered, ranked by count desc, and capped (top-10) so the discover
         // payload can't balloon for a label-happy evaluator.
-        expect(sql).toMatch(
-          /sumMap\(\[ifNull\(Label, ''\)\], \[toUInt64\(1\)\]\)/,
-        );
+        expect(sql).toMatch(/sumMap\(\[ifNull\(Label, ''\)\], \[toUInt64\(1\)\]\)/);
         expect(sql).toMatch(/arrayFilter\(\s*x -> x\.1 != ''/);
         expect(sql).toMatch(/arrayReverseSort\(/);
         expect(sql).toMatch(/AS label_values/);

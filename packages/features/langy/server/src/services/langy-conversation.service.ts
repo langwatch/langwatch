@@ -114,9 +114,7 @@ const DISPATCH_LAG_RETRY_MS = 400;
  */
 const DISPATCH_HANDOFF_GRACE_ATTEMPTS = 3;
 
-const conversationServiceLogger = createLogger(
-  "langwatch:langy:conversation-service",
-);
+const conversationServiceLogger = createLogger("langwatch:langy:conversation-service");
 
 /** List-item shape the sidebar renders. Named for the domain, not the column. */
 export type ConversationListItem = {
@@ -176,10 +174,7 @@ export interface LangyConversationCommands {
   importMessage: Dispatch<LangyMessageImportedEventData>;
   acceptAgentTurn: Dispatch<
     LangyAgentTurnAcceptedEventData & {
-      conversationStart?: Omit<
-        LangyConversationStartedEventData,
-        "conversationId"
-      >;
+      conversationStart?: Omit<LangyConversationStartedEventData, "conversationId">;
       userMessage?: Omit<LangyMessageRecordedEventData, "conversationId">;
       consumeHandoffTurnId?: string;
     }
@@ -229,10 +224,7 @@ function adoptConversationId(
   ownership: "archived" | "missing",
 ): { id: string; isNew: boolean } {
   if (!ADOPTABLE_CONVERSATION_ID.test(conversationId)) {
-    throw new LangyConversationIdUnadoptableError(
-      conversationId,
-      "invalid_shape",
-    );
+    throw new LangyConversationIdUnadoptableError(conversationId, "invalid_shape");
   }
   if (ownership === "archived") {
     throw new LangyConversationIdUnadoptableError(conversationId, "archived");
@@ -255,10 +247,7 @@ function turnMessageId(turnId: string): string {
  * it: it is sync and its results are spread/mapped — an async wrapper would
  * silently turn them into Promises.
  */
-function toListItem(
-  row: LangyConversationRow,
-  userId: string,
-): ConversationListItem {
+function toListItem(row: LangyConversationRow, userId: string): ConversationListItem {
   return {
     id: row.id,
     title: row.title,
@@ -325,9 +314,7 @@ export class LangyConversationService {
       if (!handoff && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) return null;
 
       if (attempt === DISPATCH_LAG_ATTEMPTS) return null;
-      await new Promise((resolve) =>
-        setTimeout(resolve, DISPATCH_LAG_RETRY_MS),
-      );
+      await new Promise((resolve) => setTimeout(resolve, DISPATCH_LAG_RETRY_MS));
     }
     return null;
   }
@@ -433,8 +420,7 @@ export class LangyConversationService {
 
     const turnTypes: readonly string[] = LANGY_CONVERSATION_TURN_EVENT_TYPES;
     const tail = all.filter(
-      (event) =>
-        turnTypes.includes(event.type) && !cursorHasReachedEvent(after, event),
+      (event) => turnTypes.includes(event.type) && !cursorHasReachedEvent(after, event),
     );
 
     const truncated = tail.length > CONVERSATION_EVENT_TAIL_LIMIT;
@@ -444,9 +430,7 @@ export class LangyConversationService {
         "Langy event tail exceeded the response ceiling — serving a truncated page",
       );
     }
-    const page = truncated
-      ? tail.slice(0, CONVERSATION_EVENT_TAIL_LIMIT)
-      : tail;
+    const page = truncated ? tail.slice(0, CONVERSATION_EVENT_TAIL_LIMIT) : tail;
 
     const events = page.map((event) =>
       langyConversationTurnEventSchema.parse({
@@ -545,9 +529,7 @@ export class LangyConversationService {
     return {
       items: pageRows.map((row) => toListItem(row, userId)),
       nextCursor:
-        hasMore && last
-          ? { lastActivityAtMs: rawCursorActivity, id: last.id }
-          : null,
+        hasMore && last ? { lastActivityAtMs: rawCursorActivity, id: last.id } : null,
     };
   }
 
@@ -808,10 +790,7 @@ export class LangyConversationService {
     /** The model this turn runs on — the fold keeps the latest as `LastModel`. */
     model?: string;
     /** Optional first-event marker, committed atomically before acceptance. */
-    conversationStart?: Omit<
-      LangyConversationStartedEventData,
-      "conversationId"
-    >;
+    conversationStart?: Omit<LangyConversationStartedEventData, "conversationId">;
     /** Optional user message, committed atomically before acceptance. */
     userMessage?: Omit<LangyMessageRecordedEventData, "conversationId">;
     /** Prior checkpoint-producing turn consumed atomically with this start. */
@@ -854,8 +833,7 @@ export class LangyConversationService {
     command?: string;
     input?: unknown;
   }): Promise<void> {
-    const jsonInput =
-      input === undefined ? undefined : langyJsonValueSchema.parse(input);
+    const jsonInput = input === undefined ? undefined : langyJsonValueSchema.parse(input);
     await this.commands.initiateToolCall({
       tenantId: projectId,
       occurredAt: this.runtime.now(),
@@ -898,8 +876,7 @@ export class LangyConversationService {
     durationMs?: number;
     errorText?: string;
   }): Promise<void> {
-    const jsonInput =
-      input === undefined ? undefined : langyJsonValueSchema.parse(input);
+    const jsonInput = input === undefined ? undefined : langyJsonValueSchema.parse(input);
     const shared = {
       tenantId: projectId,
       occurredAt: this.runtime.now(),

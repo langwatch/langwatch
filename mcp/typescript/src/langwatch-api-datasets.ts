@@ -90,9 +90,7 @@ export async function listDatasets(params?: {
 }
 
 /** Retrieves a single dataset by slug or ID, including records. */
-export async function getDataset(
-  slugOrId: string,
-): Promise<DatasetDetailResponse> {
+export async function getDataset(slugOrId: string): Promise<DatasetDetailResponse> {
   return makeRequest(
     "GET",
     `/api/dataset/${encodeURIComponent(slugOrId)}`,
@@ -104,11 +102,7 @@ export async function createDataset(data: {
   name: string;
   columnTypes?: DatasetColumnType[];
 }): Promise<DatasetMutationResponse> {
-  return makeRequest(
-    "POST",
-    "/api/dataset",
-    data,
-  ) as Promise<DatasetMutationResponse>;
+  return makeRequest("POST", "/api/dataset", data) as Promise<DatasetMutationResponse>;
 }
 
 /** Updates an existing dataset by slug or ID. */
@@ -126,9 +120,7 @@ export async function updateDataset(params: {
 }
 
 /** Archives (soft-deletes) a dataset by slug or ID. */
-export async function deleteDataset(
-  slugOrId: string,
-): Promise<DatasetArchiveResponse> {
+export async function deleteDataset(slugOrId: string): Promise<DatasetArchiveResponse> {
   return makeRequest(
     "DELETE",
     `/api/dataset/${encodeURIComponent(slugOrId)}`,
@@ -141,11 +133,9 @@ export async function createDatasetRecords(params: {
   entries: Record<string, unknown>[];
 }): Promise<BatchCreateRecordsResponse> {
   const { slugOrId, entries } = params;
-  return makeRequest(
-    "POST",
-    `/api/dataset/${encodeURIComponent(slugOrId)}/records`,
-    { entries },
-  ) as Promise<BatchCreateRecordsResponse>;
+  return makeRequest("POST", `/api/dataset/${encodeURIComponent(slugOrId)}/records`, {
+    entries,
+  }) as Promise<BatchCreateRecordsResponse>;
 }
 
 /** Updates or creates a single record in a dataset. */
@@ -168,11 +158,9 @@ export async function deleteDatasetRecords(params: {
   recordIds: string[];
 }): Promise<DeleteRecordsResponse> {
   const { slugOrId, recordIds } = params;
-  return makeRequest(
-    "DELETE",
-    `/api/dataset/${encodeURIComponent(slugOrId)}/records`,
-    { recordIds },
-  ) as Promise<DeleteRecordsResponse>;
+  return makeRequest("DELETE", `/api/dataset/${encodeURIComponent(slugOrId)}/records`, {
+    recordIds,
+  }) as Promise<DeleteRecordsResponse>;
 }
 
 /** Lists records in a dataset (paginated). */

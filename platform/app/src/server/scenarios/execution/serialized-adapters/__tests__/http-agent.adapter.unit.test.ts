@@ -392,8 +392,7 @@ describe("SerializedHttpAgentAdapter", () => {
         const config: HttpAgentData = {
           ...defaultConfig,
           url: "https://api.example.com/t/{{ traceId }}",
-          bodyTemplate:
-            '{"trace": "{{ traceId }}", "parent": "{{ traceparent }}"}',
+          bodyTemplate: '{"trace": "{{ traceId }}", "parent": "{{ traceparent }}"}',
         };
         const adapter = new SerializedHttpAgentAdapter({ config });
 
@@ -468,9 +467,7 @@ describe("SerializedHttpAgentAdapter", () => {
         };
         const adapter = new SerializedHttpAgentAdapter({ config });
 
-        await expect(adapter.call(defaultInput)).rejects.toThrow(
-          TemplateRenderError,
-        );
+        await expect(adapter.call(defaultInput)).rejects.toThrow(TemplateRenderError);
         await expect(adapter.call(defaultInput)).rejects.toMatchObject({
           field: "headers",
           message: expect.stringContaining('header "X-Broken"'),
@@ -608,34 +605,31 @@ describe("SerializedHttpAgentAdapter", () => {
 
     describe("SSRF regression", () => {
       beforeEach(() => {
-        mockSsrfSafeFetch.mockRejectedValue(
-          new Error("Access to private IP denied"),
-        );
+        mockSsrfSafeFetch.mockRejectedValue(new Error("Access to private IP denied"));
       });
 
-      it.each([
-        ["localhost"],
-        ["127.0.0.1"],
-        ["169.254.169.254"],
-      ])("passes the %s-resolved url (post-render) to ssrfSafeFetch", async (host) => {
-        const config: HttpAgentData = {
-          ...defaultConfig,
-          url: "https://{{input | raw}}/path",
-        };
-        const input: AgentInput = {
-          ...defaultInput,
-          messages: [{ role: "user", content: host }],
-          newMessages: [{ role: "user", content: host }],
-        };
-        const adapter = new SerializedHttpAgentAdapter({ config });
+      it.each([["localhost"], ["127.0.0.1"], ["169.254.169.254"]])(
+        "passes the %s-resolved url (post-render) to ssrfSafeFetch",
+        async (host) => {
+          const config: HttpAgentData = {
+            ...defaultConfig,
+            url: "https://{{input | raw}}/path",
+          };
+          const input: AgentInput = {
+            ...defaultInput,
+            messages: [{ role: "user", content: host }],
+            newMessages: [{ role: "user", content: host }],
+          };
+          const adapter = new SerializedHttpAgentAdapter({ config });
 
-        await expect(adapter.call(input)).rejects.toThrow();
+          await expect(adapter.call(input)).rejects.toThrow();
 
-        expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
-          `https://${host}/path`,
-          expect.any(Object),
-        );
-      });
+          expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+            `https://${host}/path`,
+            expect.any(Object),
+          );
+        },
+      );
     });
 
     describe("when url template is malformed", () => {
@@ -646,9 +640,7 @@ describe("SerializedHttpAgentAdapter", () => {
         };
         const adapter = new SerializedHttpAgentAdapter({ config });
 
-        await expect(adapter.call(defaultInput)).rejects.toThrow(
-          TemplateRenderError,
-        );
+        await expect(adapter.call(defaultInput)).rejects.toThrow(TemplateRenderError);
 
         await expect(adapter.call(defaultInput)).rejects.toMatchObject({
           field: "url",

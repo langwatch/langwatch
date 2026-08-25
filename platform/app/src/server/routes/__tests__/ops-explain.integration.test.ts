@@ -52,11 +52,7 @@ const API_KEY = "integration-test-key";
 let DB: string;
 let router: ReturnType<typeof createApiRouter>;
 
-async function post(
-  path: string,
-  body: unknown,
-  headers: Record<string, string> = {},
-) {
+async function post(path: string, body: unknown, headers: Record<string, string> = {}) {
   return router.request(path, {
     method: "POST",
     headers: {

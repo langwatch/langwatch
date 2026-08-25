@@ -27,9 +27,7 @@ export function AgentCard({ agent, ...callbacks }: AgentCardProps) {
     >
       <PresentationalAgentCard
         agent={presentationalAgent}
-        updatedAtLabel={
-          formatTimeAgo(new Date(agent.updatedAt).getTime()) ?? ""
-        }
+        updatedAtLabel={formatTimeAgo(new Date(agent.updatedAt).getTime()) ?? ""}
         {...callbacks}
       />
     </LangyContextTarget>

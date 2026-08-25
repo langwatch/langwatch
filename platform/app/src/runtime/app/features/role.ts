@@ -1,7 +1,4 @@
-import type {
-  AuthzGrantsService,
-  AuthzService,
-} from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { RoleService } from "@langwatch/role-contract";
 import { PostgresRoleAdapter } from "@langwatch/role-server";
 import { generate } from "@langwatch/ksuid";
@@ -23,11 +20,7 @@ export class AppRoleRuntime {
     grants: AuthzGrantsService;
     permissions: AuthzService;
   }): AppRoleRuntime {
-    return new AppRoleRuntime(
-      options.database,
-      options.grants,
-      options.permissions,
-    );
+    return new AppRoleRuntime(options.database, options.grants, options.permissions);
   }
 
   build(): RoleService {
@@ -35,8 +28,7 @@ export class AppRoleRuntime {
       database: this.database,
       grants: this.grants,
       permissions: this.permissions,
-      newBindingId: () =>
-        generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
       scope: {
         assertNoPersonalTeamScope: ({ scopes }) =>
           assertNoPersonalTeamScope({ client: this.database, scopes }),

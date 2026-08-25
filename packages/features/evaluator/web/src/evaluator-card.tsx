@@ -51,22 +51,18 @@ export function EvaluatorCard({
   onViewHistory,
 }: EvaluatorCardProps) {
   const Icon =
-    evaluatorTypeIcons[evaluator.type as keyof typeof evaluatorTypeIcons] ??
-    CheckSquare;
+    evaluatorTypeIcons[evaluator.type as keyof typeof evaluatorTypeIcons] ?? CheckSquare;
   const typeLabel =
     evaluatorTypeLabels[evaluator.type as keyof typeof evaluatorTypeLabels] ??
     evaluator.type;
-  const evaluatorType = (
-    evaluator.config as { evaluatorType?: string } | null
-  )?.evaluatorType;
+  const evaluatorType = (evaluator.config as { evaluatorType?: string } | null)
+    ?.evaluatorType;
   const isCopiedEvaluator = Boolean(evaluator.copiedFromEvaluatorId);
-  const hasCopies =
-    (evaluator.copyCount ?? evaluator._count?.copiedEvaluators ?? 0) > 0;
-  const stop =
-    (callback: () => void) => (event: MouseEvent) => {
-      event.stopPropagation();
-      callback();
-    };
+  const hasCopies = (evaluator.copyCount ?? evaluator._count?.copiedEvaluators ?? 0) > 0;
+  const stop = (callback: () => void) => (event: MouseEvent) => {
+    event.stopPropagation();
+    callback();
+  };
 
   return (
     <Card.Root

@@ -98,8 +98,7 @@ function responseFor(
   rule: EndpointRule,
   body: Record<string, unknown>,
 ): { status: number; payload: unknown; raw?: string } {
-  const hasTools =
-    Array.isArray(body.tools) && (body.tools as unknown[]).length > 0;
+  const hasTools = Array.isArray(body.tools) && (body.tools as unknown[]).length > 0;
 
   if (rule === "reject-unrelated") {
     return { status: 400, payload: UNRELATED_REJECTION };
@@ -156,9 +155,7 @@ export async function startEndpoint(
     });
   });
 
-  await new Promise<void>((resolve) =>
-    server.listen(0, "127.0.0.1", () => resolve()),
-  );
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
   const { port } = server.address() as { port: number };
 
   return {

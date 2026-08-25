@@ -175,9 +175,7 @@ describe("ScenarioExecutionPool", () => {
         const inFlightIds = pool.inFlightJobs.map((j) => j.scenarioRunId);
 
         expect(inFlightIds).toHaveLength(3);
-        expect(inFlightIds).toEqual(
-          expect.arrayContaining(["run-1", "run-2", "run-3"]),
-        );
+        expect(inFlightIds).toEqual(expect.arrayContaining(["run-1", "run-2", "run-3"]));
       });
     });
 

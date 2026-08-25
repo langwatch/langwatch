@@ -134,10 +134,7 @@ class RecordingGovernanceWebhookPort extends GovernanceWebhookPort {
   activeEndpointIds(): Promise<string[]> {
     return Promise.resolve(this.endpointIds);
   }
-  sendBatch(
-    payload: GovernanceWebhookSendBatch,
-    _context: IntentContext,
-  ): Promise<void> {
+  sendBatch(payload: GovernanceWebhookSendBatch, _context: IntentContext): Promise<void> {
     this.batches.push(payload);
     return Promise.resolve();
   }
@@ -199,8 +196,7 @@ describe("governance Eventing adapters", () => {
   });
 
   it("keeps pulled corrections on one stream with distinct observation keys", async () => {
-    const Handler =
-      PulledUsageEventingAdapter.commandHandlers().recordPulledUsage;
+    const Handler = PulledUsageEventingAdapter.commandHandlers().recordPulledUsage;
     const observation = (costNanoUsd: number, observedAtMs: number) => ({
       tenantId: createTenantId("project-1"),
       occurredAt: 1_000,
@@ -340,10 +336,7 @@ describe("ingestion pull process and projection", () => {
         eventCount: 1,
       },
     });
-    const live = projection.apply(
-      projection.apply(projection.init(), configured),
-      newer,
-    );
+    const live = projection.apply(projection.apply(projection.init(), configured), newer);
     expect(projection.apply(live, older)).toMatchObject({
       Cursor: "B",
       LastRunEventCount: 5,
@@ -460,24 +453,23 @@ describe("governance webhook delivery", () => {
   it("uses deterministic envelopes and redelivery commits one endpoint send", async () => {
     const port = new RecordingGovernanceWebhookPort();
     const intent = GovernanceEventDeliveryIntent.create(port);
-    const envelope =
-      GovernanceEventDeliveryProcess.budgetCrossingEnvelope({
-        tenantId: "project-1",
-        organization_id: "org-1",
-        budget_id: "budget-1",
-        kind: "breached",
-        scope_type: "PROJECT",
-        bucket_scope_id: "project-1",
-        end_user_id: null,
-        virtual_key_id: null,
-        anchor_project_id: "project-1",
-        window: "MONTH",
-        period_started_at_ms: 1_000,
-        limit_usd: "10",
-        spent_usd: "12",
-        on_breach: "block",
-        occurred_at: 2_000,
-      });
+    const envelope = GovernanceEventDeliveryProcess.budgetCrossingEnvelope({
+      tenantId: "project-1",
+      organization_id: "org-1",
+      budget_id: "budget-1",
+      kind: "breached",
+      scope_type: "PROJECT",
+      bucket_scope_id: "project-1",
+      end_user_id: null,
+      virtual_key_id: null,
+      anchor_project_id: "project-1",
+      window: "MONTH",
+      period_started_at_ms: 1_000,
+      limit_usd: "10",
+      spent_usd: "12",
+      on_breach: "block",
+      occurred_at: 2_000,
+    });
     const payload = {
       organization_id: "org-1",
       project_id: "project-1",

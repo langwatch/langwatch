@@ -23,13 +23,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -100,14 +94,8 @@ function renderApp() {
           <Routes>
             <Route element={<PanelLayout />}>
               <Route path="/demo/messages" element={<div>messages page</div>} />
-              <Route
-                path="/demo/analytics"
-                element={<div>analytics page</div>}
-              />
-              <Route
-                path="/demo/annotations"
-                element={<div>annotations page</div>}
-              />
+              <Route path="/demo/analytics" element={<div>analytics page</div>} />
+              <Route path="/demo/annotations" element={<div>annotations page</div>} />
               <Route path="/demo/traces" element={<div>traces page</div>} />
             </Route>
           </Routes>
@@ -147,9 +135,7 @@ describe("a card's footer chips under the real app router", () => {
       // rule: a real navigation would tear down the app and the conversation.
       expect(event.defaultPrevented).toBe(true);
       // …and the SPA actually went there.
-      expect(screen.getByTestId("pathname")).toHaveTextContent(
-        "/demo/analytics",
-      );
+      expect(screen.getByTestId("pathname")).toHaveTextContent("/demo/analytics");
       expect(screen.getByText("analytics page")).toBeInTheDocument();
       // The layout — the panel's home — never unmounted, so the conversation
       // (here: the card and its chips) is still on screen.
@@ -160,9 +146,7 @@ describe("a card's footer chips under the real app router", () => {
       renderApp();
 
       expect(click(chip("Open in Annotations")).defaultPrevented).toBe(true);
-      expect(screen.getByTestId("pathname")).toHaveTextContent(
-        "/demo/annotations",
-      );
+      expect(screen.getByTestId("pathname")).toHaveTextContent("/demo/annotations");
     });
 
     it("the carried alert chip arrives with the automation drawer's subject prefilled", () => {
@@ -188,12 +172,8 @@ describe("a card's footer chips under the real app router", () => {
     it("stays a real anchor whose address can be copied", () => {
       renderApp();
 
-      expect(chip("Open in Analytics").getAttribute("href")).toBe(
-        "/demo/analytics",
-      );
-      expect(chip("Open in Annotations").getAttribute("href")).toBe(
-        "/demo/annotations",
-      );
+      expect(chip("Open in Analytics").getAttribute("href")).toBe("/demo/analytics");
+      expect(chip("Open in Annotations").getAttribute("href")).toBe("/demo/annotations");
       // No --start-date/--end-date in the fixture's command, so the search
       // covered the CLI's own default last-24h window — carried here as a
       // rolling `preset=24h` rather than silently dropped (traceExplorerLink.ts).
@@ -208,9 +188,7 @@ describe("a card's footer chips under the real app router", () => {
       const event = click(chip("Open in Analytics"), { metaKey: true });
 
       expect(event.defaultPrevented).toBe(false);
-      expect(screen.getByTestId("pathname")).toHaveTextContent(
-        "/demo/messages",
-      );
+      expect(screen.getByTestId("pathname")).toHaveTextContent("/demo/messages");
     });
   });
 });

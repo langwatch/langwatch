@@ -33,12 +33,7 @@ export type DatasetTableContextValue = {
   expandedCells: Set<string>;
   editingCell: CellPosition | undefined;
   selectedCell: CellPosition | undefined;
-  setCellValue: (
-    datasetId: string,
-    row: number,
-    columnId: string,
-    value: string,
-  ) => void;
+  setCellValue: (datasetId: string, row: number, columnId: string, value: string) => void;
   setEditingCell: (cell: CellPosition | undefined) => void;
   setSelectedCell: (cell: CellPosition | undefined) => void;
   toggleCellExpanded: (row: number, columnId: string) => void;
@@ -50,18 +45,14 @@ export type DatasetTableContextValue = {
   editorPortalRef?: RefObject<HTMLDivElement | null>;
 };
 
-const DatasetTableContext = createContext<DatasetTableContextValue | null>(
-  null,
-);
+const DatasetTableContext = createContext<DatasetTableContextValue | null>(null);
 
 export const DatasetTableProvider = DatasetTableContext.Provider;
 
 export function useDatasetTable(): DatasetTableContextValue {
   const ctx = useContext(DatasetTableContext);
   if (!ctx) {
-    throw new Error(
-      "useDatasetTable must be used inside a DatasetTableProvider",
-    );
+    throw new Error("useDatasetTable must be used inside a DatasetTableProvider");
   }
   return ctx;
 }

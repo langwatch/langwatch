@@ -65,10 +65,9 @@ describe("TraceIdPeek", () => {
   describe("given an occurredAtMs hint is supplied", () => {
     describe("when the eye icon is clicked", () => {
       it("forwards the hint to the drawer as the `t` partition param", async () => {
-        render(
-          <TraceIdPeek traceId="trace-1" occurredAtMs={1_700_000_000_000} />,
-          { wrapper: Wrapper },
-        );
+        render(<TraceIdPeek traceId="trace-1" occurredAtMs={1_700_000_000_000} />, {
+          wrapper: Wrapper,
+        });
 
         await userEvent.click(screen.getByRole("button"));
 
@@ -81,10 +80,9 @@ describe("TraceIdPeek", () => {
 
     describe("when the trigger is hovered", () => {
       it("forwards the hint to the peek summary fetch", async () => {
-        render(
-          <TraceIdPeek traceId="trace-1" occurredAtMs={1_700_000_000_000} />,
-          { wrapper: Wrapper },
-        );
+        render(<TraceIdPeek traceId="trace-1" occurredAtMs={1_700_000_000_000} />, {
+          wrapper: Wrapper,
+        });
 
         await userEvent.hover(screen.getByRole("button"));
 
@@ -117,9 +115,7 @@ describe("TraceIdPeek", () => {
 
         await userEvent.hover(screen.getByRole("button"));
 
-        await waitFor(() =>
-          expect(capturedHeaderInputs.length).toBeGreaterThan(0),
-        );
+        await waitFor(() => expect(capturedHeaderInputs.length).toBeGreaterThan(0));
         expect(lastHeaderInput().occurredAtMs).toBeUndefined();
       });
     });

@@ -213,9 +213,7 @@ describe("stagedLangevalsFetch", () => {
           TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: 500_000,
         },
       }));
-      const { stagedLangevalsFetch: optInFetch } = await import(
-        "../stagedFetch"
-      );
+      const { stagedLangevalsFetch: optInFetch } = await import("../stagedFetch");
 
       const big = { traces: "x".repeat(20_000) };
 

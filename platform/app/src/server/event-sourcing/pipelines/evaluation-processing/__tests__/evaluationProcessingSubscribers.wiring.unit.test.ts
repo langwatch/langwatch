@@ -117,10 +117,7 @@ describe("evaluation processing pipeline subscriber wiring", () => {
       const entry = pipeline.eventSubscribers.get("graphTriggerActivity");
       expect(entry).toBeDefined();
       expect([...(entry?.eventTypes ?? [])].sort()).toEqual(
-        [
-          EVALUATION_COMPLETED_EVENT_TYPE,
-          EVALUATION_REPORTED_EVENT_TYPE,
-        ].sort(),
+        [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE].sort(),
       );
       expect(entry?.options?.delay).toBe(GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS);
     });
@@ -140,9 +137,7 @@ describe("evaluation processing pipeline subscriber wiring", () => {
       expect(dedup?.ttlMs).toBe(GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS);
       expect(dedup?.extend).toBe(false);
       expect(dedup?.replace).toBe(false);
-      expect(dedup?.makeId(completedEvent())).toBe(
-        `graph-trigger-activity:${tenantId}`,
-      );
+      expect(dedup?.makeId(completedEvent())).toBe(`graph-trigger-activity:${tenantId}`);
     });
 
     it("delegates to automations.graphActivityHandler with the tenant and aggregate id", async () => {

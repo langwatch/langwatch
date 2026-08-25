@@ -35,9 +35,7 @@ describe("TraceUsageService", () => {
 
   describe("getCurrentMonthCount", () => {
     beforeEach(() => {
-      vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
-        "proj-1",
-      ]);
+      vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue(["proj-1"]);
     });
 
     it("queries ClickHouse for trace summaries total", async () => {

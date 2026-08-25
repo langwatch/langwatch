@@ -282,7 +282,5 @@ export function changedSpanFields({
   if (!patch) return [];
   const spanPatch = patch.spans.find((entry) => entry.spanId === spanId);
   if (!spanPatch) return [];
-  return TRACE_EDIT_SPAN_FIELDS.filter(
-    (field) => spanPatch[field] !== undefined,
-  );
+  return TRACE_EDIT_SPAN_FIELDS.filter((field) => spanPatch[field] !== undefined);
 }

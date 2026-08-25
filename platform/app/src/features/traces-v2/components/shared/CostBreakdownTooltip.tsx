@@ -51,10 +51,7 @@ export function CostBreakdownTooltipContent({
         </>
       ) : (
         <>
-          <TooltipRow
-            label="Total"
-            value={formatCost(grandCost, tokensEstimated)}
-          />
+          <TooltipRow label="Total" value={formatCost(grandCost, tokensEstimated)} />
           {estimatedNote && (
             <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
               Cost is estimated from token counts

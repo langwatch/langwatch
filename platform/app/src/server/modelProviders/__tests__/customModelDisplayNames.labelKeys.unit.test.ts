@@ -90,9 +90,7 @@ describe("given an entry whose display name is only whitespace, with no other ro
     it("falls back to the model id's family part instead of the whitespace", () => {
       const row = makeProvider({
         provider: "vendorL",
-        customModels: [
-          { modelId: "nimbus-1", displayName: "   ", mode: "chat" },
-        ],
+        customModels: [{ modelId: "nimbus-1", displayName: "   ", mode: "chat" }],
       });
 
       const displayNames = buildCustomModelDisplayNames([row]);

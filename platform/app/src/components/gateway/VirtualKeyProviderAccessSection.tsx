@@ -202,9 +202,7 @@ export function VirtualKeyProviderAccessSection({
             <Checkbox
               size="sm"
               checked={value.allProviders}
-              onCheckedChange={(d: { checked: unknown }) =>
-                toggleAll(d.checked === true)
-              }
+              onCheckedChange={(d: { checked: unknown }) => toggleAll(d.checked === true)}
               inputProps={{ "aria-label": "All providers" }}
               data-testid="vk-providers-all"
             >
@@ -229,11 +227,7 @@ export function VirtualKeyProviderAccessSection({
             />
           ))}
           {invalidReason && (
-            <Text
-              fontSize="xs"
-              color="red.600"
-              data-testid="vk-providers-invalid"
-            >
+            <Text fontSize="xs" color="red.600" data-testid="vk-providers-invalid">
               {invalidReason}
             </Text>
           )}

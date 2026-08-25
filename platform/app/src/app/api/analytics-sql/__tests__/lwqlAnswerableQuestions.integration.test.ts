@@ -245,14 +245,7 @@ interface SpanSeed {
 
 function spanRow(
   tenantId: string,
-  {
-    traceId,
-    spanId,
-    spanName,
-    startTime,
-    durationMs = 250,
-    statusCode = 1,
-  }: SpanSeed,
+  { traceId, spanId, spanName, startTime, durationMs = 250, statusCode = 1 }: SpanSeed,
 ): Record<string, unknown> {
   return {
     ProjectionId: `${tenantId}/${spanId}`,
@@ -745,11 +738,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
    * against an empty second tenant the asserted numbers would be right for the
    * wrong reason.
    */
-  const foreignRowCount = async (
-    table: string,
-    timeColumn: string,
-    day: string,
-  ) => {
+  const foreignRowCount = async (table: string, timeColumn: string, day: string) => {
     const result = await harness.admin.query({
       query:
         `SELECT count() AS value FROM ${facts}.${table} ` +
@@ -998,9 +987,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       expect(body.rows.map((row: any) => row.rolling_error_rate)).toEqual([
         0, 0.1, 0.2, 0.3,
       ]);
-      expect(body.rows.map((row: any) => Number(row.traces))).toEqual([
-        5, 5, 5, 5,
-      ]);
+      expect(body.rows.map((row: any) => Number(row.traces))).toEqual([5, 5, 5, 5]);
       expect(codes(body)).toEqual([]);
     });
   });
@@ -1020,11 +1007,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       );
 
       expect(
-        body.rows.map((row: any) => [
-          row.model,
-          Number(row.prompt_version),
-          row.spend,
-        ]),
+        body.rows.map((row: any) => [row.model, Number(row.prompt_version), row.spend]),
       ).toEqual([
         [SECOND_MODEL, 1, 0.1],
         [PRIMARY_MODEL, 1, 0.2],
@@ -1083,9 +1066,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       // repeated once per fact row — and none of them bears on whether the
       // answer above is right. See the report accompanying this change for the
       // noise this raises on healthy dimension joins.
-      expect(
-        codes(body).every((code: string) => code !== "RESULT_TRUNCATED"),
-      ).toBe(true);
+      expect(codes(body).every((code: string) => code !== "RESULT_TRUNCATED")).toBe(true);
     });
   });
 
@@ -1176,9 +1157,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
          ORDER BY TraceId`,
       );
 
-      expect(body.rows.map((row: any) => row.TraceId)).toEqual([
-        `${asking.id}-order-ab`,
-      ]);
+      expect(body.rows.map((row: any) => row.TraceId)).toEqual([`${asking.id}-order-ab`]);
       expect(codes(body)).toEqual([]);
     });
   });
@@ -1308,11 +1287,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       ).toBe(annotatedTraceIds(asking.id).length);
       expect(Number(row.agreed)).toBe(EXPECTED_AGREEMENTS);
       expect(Number(row.agreement_rate)).toBe(
-        Number(
-          (EXPECTED_AGREEMENTS / annotatedTraceIds(asking.id).length).toFixed(
-            4,
-          ),
-        ),
+        Number((EXPECTED_AGREEMENTS / annotatedTraceIds(asking.id).length).toFixed(4)),
       );
     });
 
@@ -1330,9 +1305,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
         "the other tenant has no annotations — the isolation claim below is vacuous",
       ).toBeGreaterThan(0);
 
-      const body = await ask(
-        `SELECT DISTINCT TenantId FROM ${database}.annotations`,
-      );
+      const body = await ask(`SELECT DISTINCT TenantId FROM ${database}.annotations`);
       expect(body.rows.map((row: any) => row.TenantId)).toEqual([asking.id]);
     });
   });
@@ -1390,9 +1363,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
          ORDER BY bucket`,
       );
 
-      expect(body.rows.map((row: any) => Number(row.traces))).toEqual([
-        1, 1, 1,
-      ]);
+      expect(body.rows.map((row: any) => Number(row.traces))).toEqual([1, 1, 1]);
       expect(codes(body)).toEqual(["MISSING_TIME_BUCKETS"]);
       expect(diagnostic(body, "MISSING_TIME_BUCKETS").meta).toMatchObject({
         timeColumn: "bucket",
@@ -1445,9 +1416,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
 
         expect(body.rows).toHaveLength(3);
         expect(codes(body)).toEqual(["INCOMPLETE_COMPARISON_PERIOD"]);
-        expect(
-          diagnostic(body, "INCOMPLETE_COMPARISON_PERIOD").meta,
-        ).toMatchObject({
+        expect(diagnostic(body, "INCOMPLETE_COMPARISON_PERIOD").meta).toMatchObject({
           reason: "unfinished_newest_period",
           newestPeriodStart: `${DAY.unfinishedPeriod}T12:00:00.000Z`,
         });

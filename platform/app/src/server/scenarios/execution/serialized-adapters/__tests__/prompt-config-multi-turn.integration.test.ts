@@ -62,8 +62,7 @@ async function startEchoingModel(): Promise<StubModel> {
         model: string;
         messages: Array<{ role: string; content: string }>;
       };
-      const systemPrompt =
-        body.messages.find((m) => m.role === "system")?.content ?? "";
+      const systemPrompt = body.messages.find((m) => m.role === "system")?.content ?? "";
       systemPrompts.push(systemPrompt);
 
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -86,9 +85,7 @@ async function startEchoingModel(): Promise<StubModel> {
     });
   });
 
-  await new Promise<void>((resolve) =>
-    server.listen(0, "127.0.0.1", () => resolve()),
-  );
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
   const { port } = server.address() as { port: number };
 
   return {
@@ -179,16 +176,14 @@ describe("prompt agent over four turns", () => {
         const prompts = model.systemPrompts();
         expect(prompts).toHaveLength(4);
         for (const [index, prompt] of prompts.entries()) {
-          expect(
-            prompt,
-            `turn ${index + 1} carries a JSON message array`,
-          ).not.toMatch(/"role"\s*:/);
+          expect(prompt, `turn ${index + 1} carries a JSON message array`).not.toMatch(
+            /"role"\s*:/,
+          );
           // An escaped quote is the tell of a payload nested inside a payload:
           // it is what the escape depth climbed through on `main`, turn by turn.
-          expect(
-            prompt,
-            `turn ${index + 1} nests an escaped payload`,
-          ).not.toContain('\\"');
+          expect(prompt, `turn ${index + 1} nests an escaped payload`).not.toContain(
+            '\\"',
+          );
         }
       });
 
@@ -314,16 +309,11 @@ describe("prompt agent over four turns", () => {
         );
 
         expect(warn).toHaveBeenCalledTimes(1);
-        const [fields, message] = warn.mock.calls[0] as [
-          Record<string, unknown>,
-          string,
-        ];
+        const [fields, message] = warn.mock.calls[0] as [Record<string, unknown>, string];
         expect(fields.unboundInputs).toEqual(["customer_tier"]);
         expect(fields.promptId).toBe("prompt_repro");
         // Names only — the bound values never reach the log line.
-        expect(JSON.stringify([fields, message])).not.toContain(
-          "I need a refund",
-        );
+        expect(JSON.stringify([fields, message])).not.toContain("I need a refund");
         // The rendered prompt shows the placeholder where the value would be.
         expect(model.systemPrompts()[0]).toContain(
           "tier: [unbound input: customer_tier]",

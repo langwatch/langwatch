@@ -81,11 +81,8 @@ export function SubscriptionPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [plannedUsers, setPlannedUsers] = useState<PlannedUser[]>([]);
   const [deletedSeatCount, setDeletedSeatCount] = useState(0);
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(
-    null,
-  );
-  const [billingPeriod, setBillingPeriod] =
-    useState<BillingInterval>("monthly");
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<BillingInterval>("monthly");
   const [showSuccess, setShowSuccess] = useState(false);
   const [showUpgradeCredit, setShowUpgradeCredit] = useState(false);
 
@@ -125,11 +122,10 @@ export function SubscriptionPage() {
     );
 
   // Fetch pending invites for seat counting
-  const pendingInvites =
-    api.organization.getOrganizationPendingInvites.useQuery(
-      { organizationId: organization?.id ?? "" },
-      { enabled: !!organization },
-    );
+  const pendingInvites = api.organization.getOrganizationPendingInvites.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization },
+  );
 
   // Mutation for sending invites to already-paid seats
   const createInvitesMutation = api.organization.createInvites.useMutation();
@@ -152,17 +148,13 @@ export function SubscriptionPage() {
   const plan = activePlan.data;
   const isDeveloperPlan = plan?.free ?? true;
   const isLicenseOverride = plan?.planSource === "license";
-  const isTieredPricingModel =
-    organization?.pricingModel === PricingModel.TIERED;
+  const isTieredPricingModel = organization?.pricingModel === PricingModel.TIERED;
   // An enterprise plan is an enterprise plan whichever leg resolved it. Tying
   // this to the subscription leg made every licensed enterprise customer an
   // upgrade candidate for a smaller plan they already exceed.
   const isEnterprisePlan = plan?.type === "ENTERPRISE";
   const isTieredLegacyPaidPlan =
-    isTieredPricingModel &&
-    !isDeveloperPlan &&
-    !isEnterprisePlan &&
-    !isLicenseOverride;
+    isTieredPricingModel && !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride;
 
   useEffect(() => {
     if (isTieredLegacyPaidPlan && plan && isAnnualTieredPlan(plan.type)) {
@@ -174,9 +166,7 @@ export function SubscriptionPage() {
   const effectiveBillingPeriod: BillingInterval = parsedPlan
     ? parsedPlan.billingInterval
     : billingPeriod;
-  const effectiveCurrency: Currency = parsedPlan
-    ? parsedPlan.currency
-    : currency;
+  const effectiveCurrency: Currency = parsedPlan ? parsedPlan.currency : currency;
 
   // Classify and map pending invites to include in billing calculation
   const pendingInvitesWithMemberType = useMemo(() => {
@@ -198,21 +188,16 @@ export function SubscriptionPage() {
   const seatUsageN = existingCoreMembers + plannedCoreSeatCount;
   const seatUsageM = plan?.maxMembers;
 
-  const {
-    seatPricePerPeriodCents,
-    periodSuffix,
-    totalFullMembers,
-    monthlyEquivalent,
-  } = useBillingPricing({
-    currency: effectiveCurrency,
-    billingPeriod: effectiveBillingPeriod,
-    users,
-    plannedUsers: allPlannedUsers,
-  });
+  const { seatPricePerPeriodCents, periodSuffix, totalFullMembers, monthlyEquivalent } =
+    useBillingPricing({
+      currency: effectiveCurrency,
+      billingPeriod: effectiveBillingPeriod,
+      users,
+      plannedUsers: allPlannedUsers,
+    });
 
   // Free/license-override: baseline of 1 seat (Math.max with totalFullMembers below ensures actual count is the floor); paid plan: use plan capacity
-  const effectiveMaxSeats =
-    isDeveloperPlan || isLicenseOverride ? 1 : seatUsageM;
+  const effectiveMaxSeats = isDeveloperPlan || isLicenseOverride ? 1 : seatUsageM;
 
   // Manual planned seats only (NOT pending invites — they're already in maxMembers)
   const newPlannedFullMembers = countFullMembers(plannedUsers);
@@ -239,8 +224,7 @@ export function SubscriptionPage() {
 
   const billingPriceCents = billingSeats * seatPricePerPeriodCents;
   const billingPriceFormatted = `${formatPrice({ cents: billingPriceCents, currency: effectiveCurrency })}${periodSuffix}`;
-  const upgradeBillingPriceCents =
-    upgradeBillingSeats * seatPricePerPeriodCents;
+  const upgradeBillingPriceCents = upgradeBillingSeats * seatPricePerPeriodCents;
   const upgradeBillingPriceFormatted = `${formatPrice({ cents: upgradeBillingPriceCents, currency: effectiveCurrency })}${periodSuffix}`;
 
   const handleDrawerSave = (result: DrawerSaveResult) => {
@@ -284,17 +268,12 @@ export function SubscriptionPage() {
     }
 
     // 4. Free plan or license override: auto-fill rows with email go to plannedUsers (for upgrade flow)
-    if (
-      (isDeveloperPlan || isLicenseOverride) &&
-      result.inviteEmails.length > 0
-    ) {
-      const inviteAsPlanned: PlannedUser[] = result.inviteEmails.map(
-        (email, i) => ({
-          id: `invite-${Date.now()}-${i}`,
-          email,
-          memberType: "FullMember" as MemberType,
-        }),
-      );
+    if ((isDeveloperPlan || isLicenseOverride) && result.inviteEmails.length > 0) {
+      const inviteAsPlanned: PlannedUser[] = result.inviteEmails.map((email, i) => ({
+        id: `invite-${Date.now()}-${i}`,
+        email,
+        memberType: "FullMember" as MemberType,
+      }));
       setPlannedUsers((prev) => [...prev, ...inviteAsPlanned]);
     }
   };
@@ -401,13 +380,7 @@ export function SubscriptionPage() {
 
   return (
     <SettingsLayout>
-      <VStack
-        gap={6}
-        width="full"
-        align="stretch"
-        maxWidth="900px"
-        marginX="auto"
-      >
+      <VStack gap={6} width="full" align="stretch" maxWidth="900px" marginX="auto">
         {/* Header */}
         <Flex justifyContent="space-between" alignItems="flex-start">
           <VStack align="start" gap={1}>
@@ -486,13 +459,9 @@ export function SubscriptionPage() {
                 </Text>
               </HStack>
               {showUpgradeCredit && (
-                <Text
-                  fontSize="sm"
-                  color="green.fg"
-                  data-testid="credit-notice"
-                >
-                  Your previous plan has been prorated. Any unused credit has
-                  been applied to your account and will offset future invoices.
+                <Text fontSize="sm" color="green.fg" data-testid="credit-notice">
+                  Your previous plan has been prorated. Any unused credit has been applied
+                  to your account and will offset future invoices.
                 </Text>
               )}
             </VStack>
@@ -518,9 +487,7 @@ export function SubscriptionPage() {
           // Sales has nothing to sell a customer already holding a signed
           // enterprise contract, so they get no upgrade call to action.
           contactSalesUrl={
-            isEnterprisePlan && !isLicenseOverride
-              ? CONTACT_SALES_URL
-              : undefined
+            isEnterprisePlan && !isLicenseOverride ? CONTACT_SALES_URL : undefined
           }
         />
 

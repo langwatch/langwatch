@@ -1,11 +1,4 @@
-import {
-  Alert,
-  Button,
-  HStack,
-  Progress,
-  Spacer,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Button, HStack, Progress, Spacer, VStack } from "@chakra-ui/react";
 import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluationV2/EvaluationProgressBar";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";

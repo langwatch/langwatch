@@ -114,18 +114,31 @@ export type WebhookDispatchResult = {
 };
 
 export interface WebhookDeliveryEndpointService {
-  getActiveByOrganization(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
-  tryGetDeliverable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView | null>;
-  getSigningSecrets(input: { organizationId: string; endpointId: string }): Promise<string[]>;
-  getDestinationConfig(input: { organizationId: string; endpointId: string }): Promise<WebhookDestinationConfig>;
-  recordDeliveryAttempt(input: Record<string, unknown> & {
+  getActiveByOrganization(input: {
+    organizationId: string;
+  }): Promise<WebhookEndpointView[]>;
+  tryGetDeliverable(input: {
     organizationId: string;
     endpointId: string;
-    dispatchId: string;
-    attempt: number;
-    eventCount: number;
-    outcome: "success" | "retryable" | "terminal";
-  }): Promise<void>;
+  }): Promise<WebhookEndpointView | null>;
+  getSigningSecrets(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<string[]>;
+  getDestinationConfig(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookDestinationConfig>;
+  recordDeliveryAttempt(
+    input: Record<string, unknown> & {
+      organizationId: string;
+      endpointId: string;
+      dispatchId: string;
+      attempt: number;
+      eventCount: number;
+      outcome: "success" | "retryable" | "terminal";
+    },
+  ): Promise<void>;
   pruneDeliveries(now?: Date): Promise<number>;
 }
 
@@ -303,9 +316,7 @@ export const deliverSchema = z.object({
   cost_nano_usd: z.number().int().min(0),
   rate_version: z.string(),
   duration_ms: z.number().int().min(0),
-  error: z
-    .object({ type: z.string(), http_status: z.number().int() })
-    .nullable(),
+  error: z.object({ type: z.string(), http_status: z.number().int() }).nullable(),
   settle_reason: z.string().nullable(),
 });
 export type DeliverPayload = z.infer<typeof deliverSchema>;
@@ -348,9 +359,7 @@ export interface WebhookDeliveryProcessDeps {
     signingSecrets: string[];
   }) => Promise<WebhookDispatchResult>;
   /** Resolves the org's active plan for the enterprise gate. */
-  getPlan: (
-    organizationId: string,
-  ) => Promise<{ webhookEndpointsEnabled?: boolean }>;
+  getPlan: (organizationId: string) => Promise<{ webhookEndpointsEnabled?: boolean }>;
   now?: () => number;
 }
 
@@ -521,10 +530,7 @@ function nextStreamWakeAt({
   const oldest = remaining[0];
   if (!oldest) return null;
   if (inFlight >= endpoint.maxInFlight) return now + WEBHOOK_FLUSH_RECHECK_MS;
-  return Math.max(
-    coalescingDeadline(oldest, endpoint),
-    now + WEBHOOK_FLUSH_RECHECK_MS,
-  );
+  return Math.max(coalescingDeadline(oldest, endpoint), now + WEBHOOK_FLUSH_RECHECK_MS);
 }
 
 /**
@@ -575,9 +581,7 @@ async function flushEndpointStream({
     pending.push(item);
   }
 
-  const outstanding = (
-    await deps.processStore.findMessagesByRef({ ref })
-  ).filter(
+  const outstanding = (await deps.processStore.findMessagesByRef({ ref })).filter(
     (m) => m.intentType === "sendBatch" && m.status === "pending",
   ).length;
 
@@ -612,9 +616,7 @@ async function flushEndpointStream({
  *  to completed never receives one, and a family or match-all subscription
  *  receives both. */
 function deliveryEventType(status: DeliverPayload["status"]): string {
-  return status === "settled"
-    ? "gateway.request.settled"
-    : "gateway.request.completed";
+  return status === "settled" ? "gateway.request.settled" : "gateway.request.completed";
 }
 
 /** The org's ACTIVE endpoints whose subscription covers this outcome. */
@@ -628,9 +630,9 @@ async function endpointsSubscribedTo({
   status: DeliverPayload["status"];
 }): Promise<WebhookEndpointView[]> {
   const eventType = deliveryEventType(status);
-  return (
-    await deps.endpoints.getActiveByOrganization({ organizationId })
-  ).filter((e) => eventMatches(e.enabledEvents, eventType));
+  return (await deps.endpoints.getActiveByOrganization({ organizationId })).filter((e) =>
+    eventMatches(e.enabledEvents, eventType),
+  );
 }
 
 /**
@@ -639,10 +641,7 @@ async function endpointsSubscribedTo({
  * append and any due batches commit atomically per endpoint.
  */
 function runDeliver(deps: WebhookDeliveryProcessDeps) {
-  return async (
-    payload: DeliverPayload,
-    _context: IntentContext,
-  ): Promise<void> => {
+  return async (payload: DeliverPayload, _context: IntentContext): Promise<void> => {
     const organizationId = payload.attribution?.organization_id ?? "";
     if (!organizationId) {
       logger.warn(
@@ -743,9 +742,7 @@ function runFlushEndpoint(deps: WebhookDeliveryProcessDeps) {
  * so exactly one pod runs each hourly sweep. The in-process throttle keeps
  * the hot deliver path from probing the row more than once a minute.
  */
-async function runMaintenanceIfDue(
-  deps: WebhookDeliveryProcessDeps,
-): Promise<void> {
+async function runMaintenanceIfDue(deps: WebhookDeliveryProcessDeps): Promise<void> {
   const now = (deps.now ?? Date.now)();
   if (now - maintenanceLastCheckedMs < 60_000) return;
   maintenanceLastCheckedMs = now;
@@ -852,8 +849,7 @@ async function dispatchWebhookBatch({
       eventCount: payload.envelopes.length,
       outcome: retryable ? "retryable" : "terminal",
       latencyMs: (deps.now ?? Date.now)() - startedAt,
-      error:
-        error instanceof Error ? error.message.slice(0, 500) : String(error),
+      error: error instanceof Error ? error.message.slice(0, 500) : String(error),
     });
     throw error;
   }
@@ -945,10 +941,7 @@ async function recordWebhookBatchOutcome({
  * transport it named, and record what came back.
  */
 function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
-  return async (
-    payload: SendBatchPayload,
-    context: IntentContext,
-  ): Promise<void> => {
+  return async (payload: SendBatchPayload, context: IntentContext): Promise<void> => {
     // The service's deliverable read owns the liveness predicate. A deleted
     // or disabled endpoint drains its queue without delivering: the spend
     // record keeps the events, re-enable plus replay covers the gap.
@@ -1017,10 +1010,7 @@ interface DeliverInstance {
  *  not carry stay at the log's empty values, so the envelope mapper never
  *  special-cases a missing one. */
 function deliverPayloadFor(
-  outcome: Pick<
-    DeliverPayload,
-    "status" | "gateway_request_id" | "occurred_at"
-  > &
+  outcome: Pick<DeliverPayload, "status" | "gateway_request_id" | "occurred_at"> &
     Partial<DeliverPayload>,
   instance: DeliverInstance,
 ): DeliverPayload {
@@ -1111,8 +1101,7 @@ function withStashedOutcome(
   state: WebhookDeliveryState,
   incoming: DeliverPayload,
 ): WebhookDeliveryState {
-  const keepStashed =
-    incoming.status === "settled" && state.pendingOutcome !== null;
+  const keepStashed = incoming.status === "settled" && state.pendingOutcome !== null;
   return {
     ...state,
     pendingOutcome: keepStashed ? state.pendingOutcome : incoming,
@@ -1170,10 +1159,7 @@ interface DeliverOutcomeContext<Intent> {
  */
 function onSpendOutcome<
   Intent,
-  Data extends
-    | ConfirmSpendCommandData
-    | FailSpendCommandData
-    | SettleSpendCommandData,
+  Data extends ConfirmSpendCommandData | FailSpendCommandData | SettleSpendCommandData,
 >({
   state,
   ctx,

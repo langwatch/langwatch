@@ -52,9 +52,7 @@ describe("applyParametersToRows", () => {
           parameters: { feature_flag: "on", threshold: 5, enabled: true },
         });
 
-        expect(rows).toEqual([
-          { feature_flag: "on", threshold: 5, enabled: true },
-        ]);
+        expect(rows).toEqual([{ feature_flag: "on", threshold: 5, enabled: true }]);
       });
     });
   });

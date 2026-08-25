@@ -30,11 +30,7 @@ const logger = createLogger("langwatch:gateway:guardrail-evaluation");
  * not the Prisma enum values: the wire contract and the storage enum are
  * separate vocabularies and conflating them is what broke this endpoint before.
  */
-export const GUARDRAIL_WIRE_DIRECTIONS = [
-  "request",
-  "response",
-  "stream_chunk",
-] as const;
+export const GUARDRAIL_WIRE_DIRECTIONS = ["request", "response", "stream_chunk"] as const;
 
 export type GuardrailWireDirection = (typeof GUARDRAIL_WIRE_DIRECTIONS)[number];
 
@@ -179,8 +175,7 @@ export class GatewayGuardrailEvaluationService {
           // mode decides, rather than silently allowing.
           return this.onFailure({
             guardrail,
-            reason:
-              "guardrail evaluator is not enabled for guardrail execution",
+            reason: "guardrail evaluator is not enabled for guardrail execution",
           });
         }
         return this.runOne({ guardrail, monitor, data, projectId });
@@ -198,9 +193,7 @@ export class GatewayGuardrailEvaluationService {
           .filter(Boolean)
           .join("; ") || null,
       modified_content: null,
-      policies_triggered: blocked.flatMap(
-        (verdict) => verdict.policies_triggered,
-      ),
+      policies_triggered: blocked.flatMap((verdict) => verdict.policies_triggered),
     };
   }
 

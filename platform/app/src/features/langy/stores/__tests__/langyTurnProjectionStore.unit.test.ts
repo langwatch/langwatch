@@ -78,9 +78,7 @@ describe("the turn projection in the store", () => {
 
   describe("when the folded tail reaches a terminal", () => {
     it("settles the phase machine — recorded truth ends the turn", () => {
-      useLangyStore
-        .getState()
-        .beginTurn({ conversationId: "conv-1", turnId: "turn-1" });
+      useLangyStore.getState().beginTurn({ conversationId: "conv-1", turnId: "turn-1" });
       useLangyStore
         .getState()
         .applyTurnEvents([
@@ -109,9 +107,7 @@ describe("the turn projection in the store", () => {
 
   describe("when a NEW foreign turn starts after this tab settled its own", () => {
     it("adopts it — the old settle marker gags only its own turn's re-assertion", () => {
-      useLangyStore
-        .getState()
-        .beginTurn({ conversationId: "conv-1", turnId: "turn-1" });
+      useLangyStore.getState().beginTurn({ conversationId: "conv-1", turnId: "turn-1" });
       useLangyStore
         .getState()
         .applyTurnEvents([
@@ -132,9 +128,7 @@ describe("the turn projection in the store", () => {
 
   describe("when a new chat starts", () => {
     it("drops the projection with the rest of the conversation state", () => {
-      useLangyStore
-        .getState()
-        .applyTurnEvents([accepted({ id: "e1", createdAt: 100 })]);
+      useLangyStore.getState().applyTurnEvents([accepted({ id: "e1", createdAt: 100 })]);
       useLangyStore.getState().startNewConversation();
       expect(useLangyStore.getState().turnProjection).toEqual({
         cursor: null,

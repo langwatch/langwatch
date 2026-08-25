@@ -1,8 +1,5 @@
 import type { ProcessDefinition } from "@langwatch/eventing";
-import {
-  buildProcessDefinition,
-  buildProcessManager,
-} from "@langwatch/eventing";
+import { buildProcessDefinition, buildProcessManager } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { topicClusteringPM } from "~/server/event-sourcing/pipelines/topic-clustering-processing/pipeline";
 import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
@@ -201,9 +198,7 @@ describe("topicClustering process (runtime-built definition)", () => {
         updatedAtMs: scheduledFor,
         startedAtMs: scheduledFor,
       });
-      expect(evolution.nextWakeAt).toBe(
-        nextDailySlot(PROJECT_ID, scheduledFor),
-      );
+      expect(evolution.nextWakeAt).toBe(nextDailySlot(PROJECT_ID, scheduledFor));
     });
   });
 
@@ -223,9 +218,7 @@ describe("topicClustering process (runtime-built definition)", () => {
 
       expect(evolution.intents).toEqual([]);
       expect(evolution.state.currentRun).toEqual(state.currentRun);
-      expect(evolution.nextWakeAt).toBe(
-        nextDailySlot(PROJECT_ID, scheduledFor),
-      );
+      expect(evolution.nextWakeAt).toBe(nextDailySlot(PROJECT_ID, scheduledFor));
     });
   });
 
@@ -309,9 +302,7 @@ describe("topicClustering process (runtime-built definition)", () => {
       // silent day-long wedge during which "Run now" also no-ops.
       expect(slotWake.intents).toHaveLength(1);
       expect(slotWake.state.currentRun?.runId).not.toBe(catchUpRunId);
-      expect(slotWake.intents[0]!.messageKey).not.toBe(
-        catchUp.intents[0]!.messageKey,
-      );
+      expect(slotWake.intents[0]!.messageKey).not.toBe(catchUp.intents[0]!.messageKey);
     });
   });
 

@@ -105,8 +105,7 @@ async function readCappedBody({
       if (!value) continue;
 
       const remaining = maxBytes - received;
-      const chunk =
-        value.length > remaining ? value.subarray(0, remaining) : value;
+      const chunk = value.length > remaining ? value.subarray(0, remaining) : value;
       received += chunk.length;
       text += decoder.decode(chunk, { stream: true });
     }

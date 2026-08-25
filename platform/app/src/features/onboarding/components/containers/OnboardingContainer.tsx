@@ -1,11 +1,4 @@
-import {
-  Box,
-  Center,
-  Container,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Center, Container, IconButton, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft, ArrowRight, LogOut } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useAnalytics } from "react-contextual-analytics";
@@ -215,9 +208,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         pt={isLogoInside ? (compressedHeader ? "8vh" : "14vh") : undefined}
         pb={16}
         maxW={
-          isFullWidth
-            ? { base: "100%", "2xl": "1440px" }
-            : { base: "100%", md: "540px" }
+          isFullWidth ? { base: "100%", "2xl": "1440px" } : { base: "100%", md: "540px" }
         }
         px={isFullWidth ? { base: 5, md: 10 } : { base: 4, md: 0 }}
         {...(isFullWidth ? { fluid: true } : {})}

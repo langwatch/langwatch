@@ -91,10 +91,7 @@ export function estimateCost({
   // the remainder short-lived. Clamping keeps a malformed pair (1h above the
   // total) from producing a negative charge.
   const cacheWrite1h = Math.max(0, cacheCreation1hTokens ?? 0);
-  const cacheWriteTotal = Math.max(
-    Math.max(0, cacheCreationTokens ?? 0),
-    cacheWrite1h,
-  );
+  const cacheWriteTotal = Math.max(Math.max(0, cacheCreationTokens ?? 0), cacheWrite1h);
   const cacheWriteCost =
     cacheWrite1h * cacheCreation1hRate +
     (cacheWriteTotal - cacheWrite1h) * cacheCreationRate;
@@ -118,14 +115,7 @@ const VENDOR_MAPPINGS: Record<string, string> = {
   "zhipu-ai/": "z-ai/",
 };
 
-const QUANTIZATION_SUFFIXES = [
-  "-fp8",
-  "-gptq",
-  "-awq",
-  "-gguf",
-  "-int4",
-  "-int8",
-];
+const QUANTIZATION_SUFFIXES = ["-fp8", "-gptq", "-awq", "-gguf", "-int4", "-int8"];
 
 /**
  * Normalize model name for better matching:
@@ -226,16 +216,12 @@ export function normalizeBedrockModelId(model: string): string {
   // 3. Strip cross-region inference prefix (`eu.`, `us.`, `apac.`,
   //    `ap.`, `eu-west-*.`, ...). Only the leading region segment;
   //    vendor segment keeps its own dots untouched.
-  normalized = normalized.replace(
-    /^[a-z]{2,}(?:-[a-z0-9]+)*\.(?=[a-z]+\.)/i,
-    "",
-  );
+  normalized = normalized.replace(/^[a-z]{2,}(?:-[a-z0-9]+)*\.(?=[a-z]+\.)/i, "");
   // 4. Vendor-dot → vendor-slash. First dot only — any dots in the
   //    vendor-model half (e.g. `claude-opus-4.5`) stay.
   const firstDot = normalized.indexOf(".");
   if (firstDot > 0 && !normalized.slice(0, firstDot).includes("/")) {
-    normalized =
-      normalized.slice(0, firstDot) + "/" + normalized.slice(firstDot + 1);
+    normalized = normalized.slice(0, firstDot) + "/" + normalized.slice(firstDot + 1);
   }
   return normalized;
 }
@@ -294,9 +280,7 @@ const findModelCost = (
   model: string,
   llmModelCosts: MaybeStoredLLMModelCost[],
 ): MaybeStoredLLMModelCost | undefined => {
-  const match = llmModelCosts.find((entry) =>
-    safeRegexTest(entry.regex, model),
-  );
+  const match = llmModelCosts.find((entry) => safeRegexTest(entry.regex, model));
 
   if (!match && model.includes("/")) {
     const stripped = model.substring(model.indexOf("/") + 1);
@@ -305,10 +289,7 @@ const findModelCost = (
   return match;
 };
 
-export const getMatchingLLMModelCost = async (
-  projectId: string,
-  model: string,
-) => {
+export const getMatchingLLMModelCost = async (projectId: string, model: string) => {
   const llmModelCosts = await getLLMModelCosts({ projectId });
   return matchModelCostWithFallbacks(model, llmModelCosts);
 };

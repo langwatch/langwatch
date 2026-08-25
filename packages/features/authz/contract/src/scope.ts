@@ -69,32 +69,22 @@ export function audienceMatches({
     case "anyone":
       return true;
     case "user":
-      return (
-        grants.principal.type === "user" && grants.principal.id === audience.id
-      );
+      return grants.principal.type === "user" && grants.principal.id === audience.id;
     case "apiKey":
-      return (
-        grants.principal.type === "apiKey" &&
-        grants.principal.id === audience.id
-      );
+      return grants.principal.type === "apiKey" && grants.principal.id === audience.id;
     case "group":
-      return grants.bindings.some(
-        (binding) => binding.viaGroupId === audience.id,
-      );
+      return grants.bindings.some((binding) => binding.viaGroupId === audience.id);
     case "organization":
       return grants.isOrgMember && grants.organizationId === audience.id;
     case "team":
       return (
         grants.bindings.some(
-          (binding) =>
-            binding.scopeType === "TEAM" && binding.scopeId === audience.id,
-        ) ||
-        grants.legacyTeamMemberships.some((row) => row.teamId === audience.id)
+          (binding) => binding.scopeType === "TEAM" && binding.scopeId === audience.id,
+        ) || grants.legacyTeamMemberships.some((row) => row.teamId === audience.id)
       );
     case "project":
       return grants.bindings.some(
-        (binding) =>
-          binding.scopeType === "PROJECT" && binding.scopeId === audience.id,
+        (binding) => binding.scopeType === "PROJECT" && binding.scopeId === audience.id,
       );
   }
 }

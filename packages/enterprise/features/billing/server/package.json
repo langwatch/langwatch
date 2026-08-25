@@ -4,10 +4,23 @@
   "private": true,
   "description": "Server-side LangWatch Enterprise billing services and adapters.",
   "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
   "type": "module",
-  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
-  "main": "./src/index.ts", "types": "./src/index.ts", "files": ["src"],
-  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run", "test:unit": "vitest run" },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
   "dependencies": {
     "@clickhouse/client": "^1.23.0",
     "@langwatch/clickhouse-client": "workspace:*",
@@ -19,12 +32,16 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@slack/webhook": "^7.0.6",
     "geoip-country": "^5.0.202607010001",
     "nanoid": "^5.1.6",
     "posthog-node": "^5.39.4",
-    "@slack/webhook": "^7.0.6",
     "stripe": "^15.12.0",
     "zod": "^4.4.3"
   },
-  "devDependencies": { "@types/node": "^24.0.0", "typescript": "^7.0.2", "vitest": "^4.1.9" }
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
 }

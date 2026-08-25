@@ -82,10 +82,7 @@ export function topicClusteringPM(
         createTopicClusteringRunHandler(dispatch),
       )
       .on(TOPIC_CLUSTERING_EVENT_TYPES.REQUESTED, handleClusteringRequested)
-      .on(
-        TOPIC_CLUSTERING_EVENT_TYPES.RUN_COMPLETED,
-        handleClusteringRunCompleted,
-      )
+      .on(TOPIC_CLUSTERING_EVENT_TYPES.RUN_COMPLETED, handleClusteringRunCompleted)
       .on(TOPIC_CLUSTERING_EVENT_TYPES.RUN_FAILED, handleClusteringRunFailed)
       .onWake(topicClusteringWake)
       .toPayload(buildProcessEventView)
@@ -146,18 +143,10 @@ export function createTopicClusteringProcessingPipeline(
         store: deps.topicClusteringRunHistoryStore,
       }),
     )
-    .withPostgresProjection(
-      new TopicModelFoldProjection({ store: deps.topicModelStore }),
-    )
+    .withPostgresProjection(new TopicModelFoldProjection({ store: deps.topicModelStore }))
     .withCommand("requestClustering", RequestTopicClusteringCommand)
-    .withCommand(
-      "recordClusteringRunStarted",
-      RecordClusteringRunStartedCommand,
-    )
-    .withCommand(
-      "recordClusteringRunCompleted",
-      RecordClusteringRunCompletedCommand,
-    )
+    .withCommand("recordClusteringRunStarted", RecordClusteringRunStartedCommand)
+    .withCommand("recordClusteringRunCompleted", RecordClusteringRunCompletedCommand)
     .withCommand("recordClusteringRunFailed", RecordClusteringRunFailedCommand)
     .withCommand("recordTopics", RecordTopicsCommand, {
       // Suppress duplicate appends for the same dedupeKey at enqueue (the
@@ -169,9 +158,6 @@ export function createTopicClusteringProcessingPipeline(
         ttlMs: 60_000,
       },
     })
-    .withProcessManager(
-      TOPIC_CLUSTERING_PROCESS_NAME,
-      topicClusteringPM(deps.dispatch),
-    )
+    .withProcessManager(TOPIC_CLUSTERING_PROCESS_NAME, topicClusteringPM(deps.dispatch))
     .build();
 }

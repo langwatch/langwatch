@@ -168,9 +168,7 @@ describe("scanTestSourceForUnsafeDeleteMany", () => {
         ].join("\n"),
       );
 
-      expect(violations).toEqual([
-        expect.objectContaining({ variable: "teamId" }),
-      ]);
+      expect(violations).toEqual([expect.objectContaining({ variable: "teamId" })]);
     });
   });
 

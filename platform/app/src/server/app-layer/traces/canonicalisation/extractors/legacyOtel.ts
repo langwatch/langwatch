@@ -46,10 +46,7 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
       // Direct type attribute (legacy)
       const directType =
         attrs.take(ATTR_KEYS.TYPE) ?? attrs.take(ATTR_KEYS.LANGWATCH_TYPE);
-      if (
-        typeof directType === "string" &&
-        ALLOWED_SPAN_TYPES.has(directType)
-      ) {
+      if (typeof directType === "string" && ALLOWED_SPAN_TYPES.has(directType)) {
         ctx.setAttr(ATTR_KEYS.SPAN_TYPE, directType);
         ctx.recordRule(`${this.id}:type(direct)`);
       }
@@ -82,10 +79,7 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
 
       // Tool call detection from operation name or explicit attribute
       const operationName = attrs.get(ATTR_KEYS.OPERATION_NAME);
-      if (
-        operationName === "ai.toolCall" ||
-        attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME)
-      ) {
+      if (operationName === "ai.toolCall" || attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME)) {
         ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "tool");
         ctx.recordRule(`${this.id}:toolcall->tool`);
       }
@@ -96,12 +90,8 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
     // Maps input.value/input → langwatch.input
     // Maps output.value/output → langwatch.output
     // ─────────────────────────────────────────────────────────────────────────
-    const inputValue =
-      attrs.take(ATTR_KEYS.INPUT_VALUE) ?? attrs.take(ATTR_KEYS.INPUT);
-    if (
-      inputValue !== undefined &&
-      ctx.out[ATTR_KEYS.LANGWATCH_INPUT] === undefined
-    ) {
+    const inputValue = attrs.take(ATTR_KEYS.INPUT_VALUE) ?? attrs.take(ATTR_KEYS.INPUT);
+    if (inputValue !== undefined && ctx.out[ATTR_KEYS.LANGWATCH_INPUT] === undefined) {
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_INPUT, inputValue);
       ctx.recordRule(`${this.id}:input->langwatch.input`);
       recordValueType(
@@ -113,10 +103,7 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
 
     const outputValue =
       attrs.take(ATTR_KEYS.OUTPUT_VALUE) ?? attrs.take(ATTR_KEYS.OUTPUT);
-    if (
-      outputValue !== undefined &&
-      ctx.out[ATTR_KEYS.LANGWATCH_OUTPUT] === undefined
-    ) {
+    if (outputValue !== undefined && ctx.out[ATTR_KEYS.LANGWATCH_OUTPUT] === undefined) {
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_OUTPUT, outputValue);
       ctx.recordRule(`${this.id}:output->langwatch.output`);
       recordValueType(
@@ -131,10 +118,7 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
     // Surface ai.toolCall.args as langwatch.input for tool spans
     // ─────────────────────────────────────────────────────────────────────────
     const toolArgs = attrs.take(ATTR_KEYS.AI_TOOL_CALL_ARGS);
-    if (
-      toolArgs !== undefined &&
-      ctx.out[ATTR_KEYS.LANGWATCH_INPUT] === undefined
-    ) {
+    if (toolArgs !== undefined && ctx.out[ATTR_KEYS.LANGWATCH_INPUT] === undefined) {
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_INPUT, toolArgs);
       ctx.recordRule(`${this.id}:ai.toolCall.args->langwatch.input`);
       recordValueType(

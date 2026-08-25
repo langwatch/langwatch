@@ -8,14 +8,8 @@ import { Box, HStack, Text } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
 import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { modelDisplayLabel } from "~/server/modelProviders/customModelDisplayNames";
-import {
-  isLatestAlias,
-  resolveLatestAlias,
-} from "~/server/modelProviders/latestAliases";
-import {
-  MODEL_ICON_SIZE,
-  MODEL_ICON_SIZE_SM,
-} from "../llmPromptConfigs/constants";
+import { isLatestAlias, resolveLatestAlias } from "~/server/modelProviders/latestAliases";
+import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "../llmPromptConfigs/constants";
 import { Tooltip } from "../ui/tooltip";
 
 interface Props {
@@ -47,8 +41,7 @@ export function ModelChip({
   // carry any display name, and branching on it would let one named
   // "latest" masquerade as the alias (and vice versa).
   const idFamily = model.split("/").slice(1).join("/");
-  const icon =
-    modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
+  const icon = modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
   const iconSlot = size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE;
   // Alias rendering: `openai/latest` shows as "Latest (gpt-5.5)" with
   // the resolved concrete id inline in muted text so the table reads
@@ -83,11 +76,7 @@ export function ModelChip({
             {aliasLabel}
           </Text>
           {aliasResolved && (
-            <Text
-              as="span"
-              color={invalid ? undefined : "fg.muted"}
-              fontFamily="mono"
-            >
+            <Text as="span" color={invalid ? undefined : "fg.muted"} fontFamily="mono">
               {" "}
               ({aliasResolved.split("/").slice(1).join("/")})
             </Text>

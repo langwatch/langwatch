@@ -14,12 +14,10 @@ import { buildProgram } from "../program";
  */
 const renderHelp = (args: string[]): string => {
   let out = "";
-  const writeSpy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk) => {
-      out += String(chunk);
-      return true;
-    });
+  const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    out += String(chunk);
+    return true;
+  });
   const program = buildProgram();
   program.exitOverride();
   for (const command of program.commands) command.exitOverride();

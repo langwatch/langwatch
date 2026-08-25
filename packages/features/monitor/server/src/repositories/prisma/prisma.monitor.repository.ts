@@ -33,9 +33,8 @@ function normalizeRow(row: unknown): unknown {
   if (row === null || typeof row !== "object" || !("mappings" in row)) {
     return row;
   }
-  const mappings = row.mappings === null
-    ? null
-    : monitorMappingsInputSchema.parse(row.mappings);
+  const mappings =
+    row.mappings === null ? null : monitorMappingsInputSchema.parse(row.mappings);
   return { ...row, mappings };
 }
 
@@ -71,7 +70,10 @@ export class PrismaMonitorRepository extends MonitorRepository {
     return rows.map(mapSummary);
   }
 
-  async tryFindById(input: { id: string; projectId: string }): Promise<MonitorWithEvaluator | null> {
+  async tryFindById(input: {
+    id: string;
+    projectId: string;
+  }): Promise<MonitorWithEvaluator | null> {
     const row = await this.database.monitor.findFirst({
       where: { id: input.id, projectId: input.projectId },
       include: { evaluator: true },
@@ -79,7 +81,10 @@ export class PrismaMonitorRepository extends MonitorRepository {
     return row ? mapMonitorWithEvaluator(row) : null;
   }
 
-  async findAllByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]> {
+  async findAllByIds(input: {
+    monitorIds: string[];
+    projectId: string;
+  }): Promise<Monitor[]> {
     if (input.monitorIds.length === 0) return [];
     const rows = await this.database.monitor.findMany({
       where: { id: { in: input.monitorIds }, projectId: input.projectId },
@@ -95,7 +100,11 @@ export class PrismaMonitorRepository extends MonitorRepository {
   }
 
   async create(
-    input: MonitorCreateInput & { id: string; slug: string; mappings: MonitorMappingState },
+    input: MonitorCreateInput & {
+      id: string;
+      slug: string;
+      mappings: MonitorMappingState;
+    },
   ): Promise<Monitor> {
     const row = await this.database.monitor.create({
       data: {
@@ -130,7 +139,7 @@ export class PrismaMonitorRepository extends MonitorRepository {
         mappings:
           input.mappings === null
             ? Prisma.JsonNull
-            : input.mappings as Prisma.InputJsonValue,
+            : (input.mappings as Prisma.InputJsonValue),
         sample: input.sample,
         enabled: input.enabled,
         executionMode: input.executionMode,
@@ -169,7 +178,9 @@ export class PrismaMonitorRepository extends MonitorRepository {
   }
 
   async delete(input: { id: string; projectId: string }): Promise<void> {
-    await this.database.monitor.delete({ where: { id: input.id, projectId: input.projectId } });
+    await this.database.monitor.delete({
+      where: { id: input.id, projectId: input.projectId },
+    });
   }
 
   async deleteForExperiment(input: {

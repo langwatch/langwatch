@@ -26,10 +26,7 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
-import {
-  revokeAllSessionsForUser,
-  revokeOtherSessionsForUser,
-} from "../revokeSessions";
+import { revokeAllSessionsForUser, revokeOtherSessionsForUser } from "../revokeSessions";
 
 const makePrismaMock = (sessionTokens: string[] = []): PrismaClient =>
   ({
@@ -37,9 +34,7 @@ const makePrismaMock = (sessionTokens: string[] = []): PrismaClient =>
       findUnique: vi.fn(),
       findMany: vi
         .fn()
-        .mockResolvedValue(
-          sessionTokens.map((sessionToken) => ({ sessionToken })),
-        ),
+        .mockResolvedValue(sessionTokens.map((sessionToken) => ({ sessionToken }))),
       deleteMany: vi.fn().mockResolvedValue({ count: sessionTokens.length }),
     },
   }) as unknown as PrismaClient;
@@ -71,9 +66,7 @@ describe("revokeAllSessionsForUser", () => {
       expect(mockRedisDel).toHaveBeenCalledWith("better-auth:token_a");
       expect(mockRedisDel).toHaveBeenCalledWith("better-auth:token_b");
       // The active-sessions index should be deleted
-      expect(mockRedisDel).toHaveBeenCalledWith(
-        "better-auth:active-sessions-user_1",
-      );
+      expect(mockRedisDel).toHaveBeenCalledWith("better-auth:active-sessions-user_1");
       // The DB rows should be deleted
       expect(prisma.session.deleteMany).toHaveBeenCalledWith({
         where: { userId: "user_1" },
@@ -145,9 +138,7 @@ describe("revokeOtherSessionsForUser", () => {
 
       const prisma = {
         session: {
-          findUnique: vi
-            .fn()
-            .mockResolvedValue({ sessionToken: "current_token" }),
+          findUnique: vi.fn().mockResolvedValue({ sessionToken: "current_token" }),
           findMany: vi
             .fn()
             .mockResolvedValue([
@@ -168,9 +159,7 @@ describe("revokeOtherSessionsForUser", () => {
       expect(mockRedisDel).toHaveBeenCalledWith("better-auth:old_device_token");
       expect(mockRedisDel).toHaveBeenCalledWith("better-auth:stolen_token");
       // The CURRENT token cache key should NOT be deleted
-      expect(mockRedisDel).not.toHaveBeenCalledWith(
-        "better-auth:current_token",
-      );
+      expect(mockRedisDel).not.toHaveBeenCalledWith("better-auth:current_token");
       // The DB delete should exclude the current session
       expect(prisma.session.deleteMany).toHaveBeenCalledWith({
         where: { userId: "user_1", NOT: { id: "current_session_id" } },
@@ -182,9 +171,7 @@ describe("revokeOtherSessionsForUser", () => {
     it("does not delete anything from Redis or DB beyond the empty NOT-id query", async () => {
       mockRedisGet.mockImplementation(async (key: string) => {
         if (key === "better-auth:active-sessions-solo_user") {
-          return JSON.stringify([
-            { token: "only_token", expiresAt: Date.now() + 60000 },
-          ]);
+          return JSON.stringify([{ token: "only_token", expiresAt: Date.now() + 60000 }]);
         }
         return null;
       });

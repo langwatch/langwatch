@@ -8,8 +8,7 @@ import { api } from "../../utils/api";
 // Constants
 export const TRACE_QUERY_CONFIG = {
   retry: 10,
-  retryDelay: (attemptIndex: number) =>
-    Math.min(2000 * 2 ** attemptIndex, 60000),
+  retryDelay: (attemptIndex: number) => Math.min(2000 * 2 ** attemptIndex, 60000),
   // Traces are immutable once written, so caching forever is correct.
   staleTime: Infinity,
   gcTime: Infinity,
@@ -38,10 +37,7 @@ export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
 }
 
 // Success state component
-function TraceSuccessState({
-  traceId,
-  ...props
-}: { traceId: string } & StackProps) {
+function TraceSuccessState({ traceId, ...props }: { traceId: string } & StackProps) {
   // useTraceDetailsDrawer opens the Trace Explorer drawer. The hover-peek
   // popover is unaffected.
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
@@ -53,10 +49,7 @@ function TraceSuccessState({
           Click still opens the trace drawer; hover shows the same
           compact summary popover. */}
       <TracePreviewHoverCard traceId={traceId}>
-        <Button
-          colorPalette="gray"
-          onClick={() => openTraceDetailsDrawer({ traceId })}
-        >
+        <Button colorPalette="gray" onClick={() => openTraceDetailsDrawer({ traceId })}>
           <LuListTree />
           View Trace
         </Button>

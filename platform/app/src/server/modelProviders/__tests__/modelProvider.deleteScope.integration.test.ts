@@ -154,10 +154,7 @@ describe.skipIf(!hasCredentialsSecret)(
         ["modelProvider", { organizationId: otherOrgId }],
         ["roleBinding", { organizationId: orgId }],
         ["organizationUser", { organizationId: { in: [orgId, otherOrgId] } }],
-        [
-          "project",
-          { id: { in: [projectAId, siblingProjectId, otherProjectId] } },
-        ],
+        ["project", { id: { in: [projectAId, siblingProjectId, otherProjectId] } }],
         ["team", { id: { in: [teamId, otherTeamId] } }],
         ["organization", { id: { in: [orgId, otherOrgId] } }],
         ["user", { email: `del-org-admin-${ns}@example.com` }],

@@ -157,10 +157,7 @@ export function registerLiquidLanguage(monaco: Monaco): void {
           [/[,:]/, "delimiter"],
           [/"/, { token: "string.quote", next: "@string" }],
           [/-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/, "number"],
-          [
-            /[a-zA-Z_]\w*/,
-            { cases: { "@keywords": "keyword", "@default": "" } },
-          ],
+          [/[a-zA-Z_]\w*/, { cases: { "@keywords": "keyword", "@default": "" } }],
           [/\s+/, "white"],
         ],
         string: [
@@ -343,9 +340,7 @@ export function detectUnknownVariables(
     }
 
     const tokenOffset =
-      match[0].indexOf(expr) +
-      expr.indexOf(firstPart) +
-      firstPart.indexOf(token);
+      match[0].indexOf(expr) + expr.indexOf(firstPart) + firstPart.indexOf(token);
     found.push({ root, token, index: match.index + tokenOffset, knownRoots });
   }
 
@@ -379,10 +374,7 @@ export function validateLiquidModel(
   monaco.editor.setModelMarkers(model, MARKER_OWNER, markers);
 }
 
-export function clearLiquidMarkers(
-  monaco: Monaco,
-  model: MonacoTextModel,
-): void {
+export function clearLiquidMarkers(monaco: Monaco, model: MonacoTextModel): void {
   monaco.editor.setModelMarkers(model, MARKER_OWNER, []);
 }
 
@@ -458,10 +450,7 @@ export function positionInsideLiquid(text: string, offset: number): boolean {
 
 const COMPLETION_TRIGGER_CHARACTERS = ['"', ":", ",", " ", "[", "{"];
 
-function convertCompletionKind(
-  monaco: Monaco,
-  kind: number | undefined,
-): number {
+function convertCompletionKind(monaco: Monaco, kind: number | undefined): number {
   // vscode-languageserver-types CompletionItemKind → Monaco kind. The numeric
   // values diverge between the two; map the ones the JSON service emits.
   const k = monaco.languages.CompletionItemKind;
@@ -497,10 +486,7 @@ function registerLiquidJsonBridges(monaco: Monaco): void {
 
   monaco.languages.registerCompletionItemProvider(LIQUID_JSON_LANGUAGE_ID, {
     triggerCharacters: COMPLETION_TRIGGER_CHARACTERS,
-    provideCompletionItems: async (
-      model: editor.ITextModel,
-      position: Position,
-    ) => {
+    provideCompletionItems: async (model: editor.ITextModel, position: Position) => {
       const offset = model.getOffsetAt(position);
       if (positionInsideLiquid(model.getValue(), offset)) return null;
 
@@ -626,9 +612,7 @@ export function setupLiquidJsonSchema(params: {
   // separators while a plain `*` does not, so `**/<basename>` is the right
   // shape. Basenames must be unique per editor — that's the caller's
   // responsibility (different editors must use different shadow URIs).
-  registerJsonSchema(monaco, shadowUri, schema, [
-    `**/${basenameOfUri(shadowUri)}`,
-  ]);
+  registerJsonSchema(monaco, shadowUri, schema, [`**/${basenameOfUri(shadowUri)}`]);
   const shadowResource = monaco.Uri.parse(shadowUri);
   // Re-mount safety: another instance with the same shadow URI may have left
   // a model behind if it was disposed mid-update.
@@ -648,16 +632,14 @@ export function setupLiquidJsonSchema(params: {
     const shadowMarkers = monaco.editor.getModelMarkers({
       resource: shadowResource,
     });
-    const mapped: editor.IMarkerData[] = shadowMarkers.map(
-      (m: editor.IMarker) => ({
-        severity: m.severity,
-        message: m.message,
-        startLineNumber: m.startLineNumber,
-        startColumn: m.startColumn,
-        endLineNumber: m.endLineNumber,
-        endColumn: m.endColumn,
-      }),
-    );
+    const mapped: editor.IMarkerData[] = shadowMarkers.map((m: editor.IMarker) => ({
+      severity: m.severity,
+      message: m.message,
+      startLineNumber: m.startLineNumber,
+      startColumn: m.startColumn,
+      endLineNumber: m.endLineNumber,
+      endColumn: m.endColumn,
+    }));
     monaco.editor.setModelMarkers(realModel, SCHEMA_MARKER_OWNER, mapped);
   };
 

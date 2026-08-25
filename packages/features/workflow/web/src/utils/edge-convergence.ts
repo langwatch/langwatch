@@ -29,10 +29,7 @@ type Guard = string;
 const IF_ELSE = "if_else";
 const BRANCH_HANDLES = new Set(["true", "false"]);
 
-function stripPrefix(
-  handle: string | null | undefined,
-  prefix: string,
-): string {
+function stripPrefix(handle: string | null | undefined, prefix: string): string {
   if (!handle) return "";
   return handle.startsWith(prefix) ? handle.slice(prefix.length) : handle;
 }
@@ -131,10 +128,7 @@ export function computeNodeGuards({
  * on a gate: one requires the `true` side and the other the `false` side,
  * so they can never both produce a value in the same run.
  */
-export function guardsAreMutuallyExclusive(
-  a: Set<Guard>,
-  b: Set<Guard>,
-): boolean {
+export function guardsAreMutuallyExclusive(a: Set<Guard>, b: Set<Guard>): boolean {
   for (const g of a) {
     const sep = g.lastIndexOf(":");
     const gate = g.slice(0, sep);
@@ -163,9 +157,7 @@ export function canConvergeOnInput({
   if (!connection.source) return false;
   const existingSources = edges
     .filter(
-      (e) =>
-        e.target === connection.target &&
-        e.targetHandle === connection.targetHandle,
+      (e) => e.target === connection.target && e.targetHandle === connection.targetHandle,
     )
     .map((e) => e.source)
     .filter((s): s is string => Boolean(s));

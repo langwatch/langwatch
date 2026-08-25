@@ -2,13 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -24,9 +18,7 @@ import {
   OutputsSection,
 } from "../OutputsSection";
 
-const renderComponent = (
-  props: Partial<Parameters<typeof OutputsSection>[0]> = {},
-) => {
+const renderComponent = (props: Partial<Parameters<typeof OutputsSection>[0]> = {}) => {
   const defaultProps = {
     outputs: [],
     onChange: vi.fn(),
@@ -217,9 +209,7 @@ describe("OutputsSection", () => {
       const removeButton = screen.getByTestId("remove-output-output2");
       await user.click(removeButton);
 
-      expect(onChange).toHaveBeenCalledWith([
-        { identifier: "output1", type: "str" },
-      ]);
+      expect(onChange).toHaveBeenCalledWith([{ identifier: "output1", type: "str" }]);
     });
 
     it("disables remove button for last output", () => {
@@ -321,9 +311,7 @@ describe("OutputsSection", () => {
       ];
       renderComponent({ outputs, readOnly: true });
 
-      expect(
-        screen.queryByTestId("remove-output-output1"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("remove-output-output1")).not.toBeInTheDocument();
     });
   });
 

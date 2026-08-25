@@ -1,7 +1,4 @@
-import type {
-  Graph,
-  SavedWorkbenchChartDefinition,
-} from "@langwatch/dashboard-contract";
+import type { Graph, SavedWorkbenchChartDefinition } from "@langwatch/dashboard-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   DashboardIdGenerator,
@@ -38,10 +35,18 @@ const graph: Graph = {
 };
 
 class FakeDashboardRepository extends DashboardRepository {
-  findAllDashboards = vi.fn<() => Promise<DashboardSummaryRecord[]>>().mockResolvedValue([{ ...dashboard, graphCount: 1 }]);
-  tryFindDashboard = vi.fn<() => Promise<(DashboardRecord & { graphs: Graph[] }) | null>>().mockResolvedValue({ ...dashboard, graphs: [graph] });
-  tryFindFirstDashboard = vi.fn<() => Promise<DashboardRecord | null>>().mockResolvedValue(dashboard);
-  tryFindLastDashboard = vi.fn<() => Promise<DashboardRecord | null>>().mockResolvedValue(dashboard);
+  findAllDashboards = vi
+    .fn<() => Promise<DashboardSummaryRecord[]>>()
+    .mockResolvedValue([{ ...dashboard, graphCount: 1 }]);
+  tryFindDashboard = vi
+    .fn<() => Promise<(DashboardRecord & { graphs: Graph[] }) | null>>()
+    .mockResolvedValue({ ...dashboard, graphs: [graph] });
+  tryFindFirstDashboard = vi
+    .fn<() => Promise<DashboardRecord | null>>()
+    .mockResolvedValue(dashboard);
+  tryFindLastDashboard = vi
+    .fn<() => Promise<DashboardRecord | null>>()
+    .mockResolvedValue(dashboard);
   findDashboardIds = vi.fn<() => Promise<string[]>>().mockResolvedValue(["dashboard_1"]);
   createDashboard = vi.fn<() => Promise<DashboardRecord>>().mockResolvedValue(dashboard);
   updateDashboard = vi.fn<() => Promise<DashboardRecord>>().mockResolvedValue(dashboard);
@@ -55,8 +60,12 @@ class FakeDashboardRepository extends DashboardRepository {
   deleteGraph = vi.fn<() => Promise<Graph>>().mockResolvedValue(graph);
   updateGraphLayout = vi.fn<() => Promise<Graph>>().mockResolvedValue(graph);
   updateGraphLayouts = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-  findAllSavedWorkbenchCharts = vi.fn<() => Promise<SavedWorkbenchChartRecord[]>>().mockResolvedValue([]);
-  tryFindSavedWorkbenchChart = vi.fn<() => Promise<SavedWorkbenchChartRecord | null>>().mockResolvedValue(null);
+  findAllSavedWorkbenchCharts = vi
+    .fn<() => Promise<SavedWorkbenchChartRecord[]>>()
+    .mockResolvedValue([]);
+  tryFindSavedWorkbenchChart = vi
+    .fn<() => Promise<SavedWorkbenchChartRecord | null>>()
+    .mockResolvedValue(null);
   createSavedWorkbenchChart = vi.fn<() => Promise<SavedWorkbenchChartRecord>>();
   tryUpdateSavedWorkbenchChart = vi.fn<() => Promise<SavedWorkbenchChartRecord | null>>();
   deleteSavedWorkbenchChart = vi.fn<() => Promise<number>>();
@@ -98,7 +107,11 @@ describe("DashboardService", () => {
     const repository = new FakeDashboardRepository();
     repository.tryFindDashboard.mockResolvedValue(null);
     await expect(
-      serviceWith(repository).service.rename({ projectId: "project_1", dashboardId: "dashboard_2", name: "Nope" }),
+      serviceWith(repository).service.rename({
+        projectId: "project_1",
+        dashboardId: "dashboard_2",
+        name: "Nope",
+      }),
     ).rejects.toThrow("Dashboard not found");
   });
 
@@ -106,7 +119,10 @@ describe("DashboardService", () => {
     const repository = new FakeDashboardRepository();
     repository.findDashboardIds.mockResolvedValue(["dashboard_1"]);
     await expect(
-      serviceWith(repository).service.reorder({ projectId: "project_1", dashboardIds: ["dashboard_1", "dashboard_2"] }),
+      serviceWith(repository).service.reorder({
+        projectId: "project_1",
+        dashboardIds: ["dashboard_1", "dashboard_2"],
+      }),
     ).rejects.toMatchObject({ missingIds: ["dashboard_2"] });
     expect(repository.updateDashboardOrder).not.toHaveBeenCalled();
   });
@@ -141,7 +157,12 @@ describe("DashboardService", () => {
       sql: "SELECT 1",
       parameters: {},
     };
-    await service.createSavedWorkbenchChart({ projectId: "project_1", name: "Saved", definition, id: "chart_1" });
+    await service.createSavedWorkbenchChart({
+      projectId: "project_1",
+      name: "Saved",
+      definition,
+      id: "chart_1",
+    });
     expect(policy.validate).toHaveBeenCalledWith({ projectId: "project_1", definition });
   });
 
@@ -156,7 +177,10 @@ describe("DashboardService", () => {
       updatedAt: new Date("2026-01-01"),
     });
     await expect(
-      serviceWith(repository).service.getSavedWorkbenchChart({ projectId: "project_1", chartId: "chart_1" }),
+      serviceWith(repository).service.getSavedWorkbenchChart({
+        projectId: "project_1",
+        chartId: "chart_1",
+      }),
     ).rejects.toThrow("Saved workbench chart definition is invalid");
   });
 });

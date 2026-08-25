@@ -197,9 +197,7 @@ export function useProjectedProgress({
       receivedAtMs: sample.receivedAtMs,
       itemsPerMs,
     };
-    setDisplayed((value) =>
-      sameOperation ? Math.max(value, confirmed) : confirmed,
-    );
+    setDisplayed((value) => (sameOperation ? Math.max(value, confirmed) : confirmed));
   }, [confirmed, sample]);
 
   useEffect(() => {
@@ -212,8 +210,7 @@ export function useProjectedProgress({
       const observation = estimate.current;
       if (observation.total <= 0 || observation.itemsPerMs <= 0) return;
       const elapsedMs = Math.max(0, Date.now() - observation.receivedAtMs);
-      const projectedItems =
-        observation.current + elapsedMs * observation.itemsPerMs;
+      const projectedItems = observation.current + elapsedMs * observation.itemsPerMs;
       const projectedPercent = Math.min(
         MAX_UNCONFIRMED_PERCENT,
         (projectedItems / observation.total) * 100,
@@ -274,12 +271,7 @@ export function StreamingStatusLine({
           paddingLeft={STATUS_LINE_ROW.paddingLeft}
         >
           {isObserving ? <LangyObserverGlyph /> : <StatusOrb />}
-          <Text
-            {...STATUS_LINE_TEXT}
-            color="fg.muted"
-            role="status"
-            aria-live="polite"
-          >
+          <Text {...STATUS_LINE_TEXT} color="fg.muted" role="status" aria-live="polite">
             {status}
           </Text>
         </HStack>
@@ -302,9 +294,7 @@ export function StreamingStatusLine({
               initial={false}
               animate={{ width: `${percent}%` }}
               transition={
-                reduce
-                  ? { duration: 0 }
-                  : { type: "spring", stiffness: 120, damping: 24 }
+                reduce ? { duration: 0 } : { type: "spring", stiffness: 120, damping: 24 }
               }
             />
           </Box>

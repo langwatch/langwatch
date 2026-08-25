@@ -147,8 +147,7 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
         automation: triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => clickHouseStub.client,
-        lookupTriggerSource: async ({ triggerId }) =>
-          sourceByTrigger[triggerId],
+        lookupTriggerSource: async ({ triggerId }) => sourceByTrigger[triggerId],
       };
 
       const requests = await decideGraphTriggerHeartbeat({
@@ -202,12 +201,8 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
 
       expect(requests).toHaveLength(1);
       expect(clickHouseStub.calls).toHaveLength(1);
-      expect(clickHouseStub.calls[0]?.query).toContain(
-        "FROM evaluation_analytics",
-      );
-      expect(clickHouseStub.calls[0]?.query).not.toContain(
-        "FROM trace_analytics",
-      );
+      expect(clickHouseStub.calls[0]?.query).toContain("FROM evaluation_analytics");
+      expect(clickHouseStub.calls[0]?.query).not.toContain("FROM trace_analytics");
     });
   });
 

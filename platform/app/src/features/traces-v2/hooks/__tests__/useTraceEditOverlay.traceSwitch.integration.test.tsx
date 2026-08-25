@@ -39,10 +39,7 @@ vi.mock("../useTraceQueryArgs", () => ({
 
 import { useDrawerStore } from "../../stores/drawerStore";
 import { useTraceEditStore } from "../../stores/traceEditStore";
-import {
-  useAppliedTraceEditPatch,
-  useTraceEditOverlay,
-} from "../useTraceEditOverlay";
+import { useAppliedTraceEditPatch, useTraceEditOverlay } from "../useTraceEditOverlay";
 
 const patch = (name: string): TraceEditOverlayPatch => ({
   version: 1,

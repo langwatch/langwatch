@@ -38,8 +38,7 @@ export const featureFlagRouter = createTRPCRouter({
       }),
     )
     .noPermission({
-      reason:
-        "feature flags are read per authenticated user; no tenant data is exposed",
+      reason: "feature flags are read per authenticated user; no tenant data is exposed",
       allow: {
         projectId: "for PostHog targeting, not resource access",
         organizationId: "for PostHog targeting, not resource access",
@@ -62,20 +61,14 @@ export const featureFlagRouter = createTRPCRouter({
       // (a subset of registered PRODUCT keys), so the cast is safe;
       // FRONTEND_FEATURE_FLAGS is wider than the inferred zod enum value
       // type, hence the explicit FeatureFlagKey narrowing.
-      const enabled = await featureFlagService.isEnabled(
-        input.flag as FeatureFlagKey,
-        {
-          distinctId: userId,
-          defaultValue: false,
-          projectId: input.projectId,
-          organizationId: input.organizationId,
-        },
-      );
+      const enabled = await featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
+        distinctId: userId,
+        defaultValue: false,
+        projectId: input.projectId,
+        organizationId: input.organizationId,
+      });
 
-      logger.debug(
-        { userId, flag: input.flag, enabled },
-        "Feature flag check result",
-      );
+      logger.debug({ userId, flag: input.flag, enabled }, "Feature flag check result");
 
       return { enabled };
     }),
@@ -111,8 +104,7 @@ export const featureFlagRouter = createTRPCRouter({
     // rbac middleware's sensitive-key guard does not cover plural
     // targeting params and is not relevant here.
     .noPermission({
-      reason:
-        "feature flags are read per authenticated user; no tenant data is exposed",
+      reason: "feature flags are read per authenticated user; no tenant data is exposed",
     })
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
@@ -178,8 +170,7 @@ export const featureFlagRouter = createTRPCRouter({
       }),
     )
     .noPermission({
-      reason:
-        "feature flags are read per authenticated user; no tenant data is exposed",
+      reason: "feature flags are read per authenticated user; no tenant data is exposed",
     })
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
@@ -201,23 +192,18 @@ export const featureFlagRouter = createTRPCRouter({
         .map((m) => m.organizationId);
 
       const entries = await Promise.all(
-        allowedOrganizationIds.map(
-          async (organizationId): Promise<[string, boolean]> => [
+        allowedOrganizationIds.map(async (organizationId): Promise<[string, boolean]> => [
+          organizationId,
+          await featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
+            distinctId: userId,
+            defaultValue: false,
             organizationId,
-            await featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
-              distinctId: userId,
-              defaultValue: false,
-              organizationId,
-            }),
-          ],
-        ),
+          }),
+        ]),
       );
 
       return {
-        enabledByOrganizationId: Object.fromEntries(entries) as Record<
-          string,
-          boolean
-        >,
+        enabledByOrganizationId: Object.fromEntries(entries) as Record<string, boolean>,
       };
     }),
 });

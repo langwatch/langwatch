@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 describe("traceSummary span flags", () => {
   describe("rootSpanType", () => {

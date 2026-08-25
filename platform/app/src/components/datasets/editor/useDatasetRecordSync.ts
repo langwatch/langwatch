@@ -176,10 +176,7 @@ export const useDatasetRecordSync = ({
 
         for (const recordId of recordsToUpdate) {
           // Send the full record: the backend replaces the entire entry
-          const fullRecord = resolveFullRecordRef.current(
-            dbDatasetId,
-            recordId,
-          );
+          const fullRecord = resolveFullRecordRef.current(dbDatasetId, recordId);
           if (!fullRecord) continue;
 
           const { id: _id, ...recordData } = fullRecord;

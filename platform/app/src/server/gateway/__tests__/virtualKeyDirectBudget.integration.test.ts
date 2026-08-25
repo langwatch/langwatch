@@ -88,25 +88,14 @@ describe("direct budget per virtual key (real PG + real CH)", () => {
     it("dates the reset at the end of the period the spend was measured over", async () => {
       const budgets = await load();
       const expectedDay = new Date(
-        Date.UTC(
-          NOW.getUTCFullYear(),
-          NOW.getUTCMonth(),
-          NOW.getUTCDate() + 1,
-          0,
-          0,
-          0,
-        ),
+        Date.UTC(NOW.getUTCFullYear(), NOW.getUTCMonth(), NOW.getUTCDate() + 1, 0, 0, 0),
       );
-      expect(budgets.get(VK_DAILY_ID)?.resetsAt).toBe(
-        expectedDay.toISOString(),
-      );
+      expect(budgets.get(VK_DAILY_ID)?.resetsAt).toBe(expectedDay.toISOString());
 
       const expectedMonth = new Date(
         Date.UTC(NOW.getUTCFullYear(), NOW.getUTCMonth() + 1, 1, 0, 0, 0),
       );
-      expect(budgets.get(VK_STANDALONE_ID)?.resetsAt).toBe(
-        expectedMonth.toISOString(),
-      );
+      expect(budgets.get(VK_STANDALONE_ID)?.resetsAt).toBe(expectedMonth.toISOString());
     });
   });
 

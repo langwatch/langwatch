@@ -69,9 +69,7 @@ export const createSubscriptionRouter = () => {
       )
       .permission("organization:manage")
       .mutation(async ({ input, ctx }) => {
-        const { customerService, subscriptionService } = requireSaasBilling(
-          ctx.app,
-        );
+        const { customerService, subscriptionService } = requireSaasBilling(ctx.app);
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
           organizationId: input.organizationId,
@@ -93,9 +91,7 @@ export const createSubscriptionRouter = () => {
       .input(z.object({ organizationId: z.string(), baseUrl: z.string() }))
       .permission("organization:manage")
       .mutation(async ({ input, ctx }) => {
-        const { customerService, subscriptionService } = requireSaasBilling(
-          ctx.app,
-        );
+        const { customerService, subscriptionService } = requireSaasBilling(ctx.app);
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
           organizationId: input.organizationId,
@@ -152,9 +148,7 @@ export const createSubscriptionRouter = () => {
       )
       .permission("organization:manage")
       .mutation(async ({ input, ctx }) => {
-        const { customerService, subscriptionService } = requireSaasBilling(
-          ctx.app,
-        );
+        const { customerService, subscriptionService } = requireSaasBilling(ctx.app);
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
           organizationId: input.organizationId,

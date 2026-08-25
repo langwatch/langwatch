@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { getFreePlanLimits, PLAN_LIMITS } from "@langwatch/enterprise-billing-contract";
-import {
-  NUMERIC_OVERRIDE_FIELDS,
-  SaaSPlanProviderService,
-} from "../src/index";
+import { NUMERIC_OVERRIDE_FIELDS, SaaSPlanProviderService } from "../src/index";
 import { PrismaSubscriptionRepository } from "../src/repositories/prisma/prisma.subscription.repository";
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 
@@ -210,9 +207,7 @@ describe("createSaaSPlanProvider", () => {
 
         expect(plan.type).toBe(PlanTypes.LAUNCH);
         expect(plan.maxMembers).toBe(10);
-        expect(plan.maxMembersLite).toBe(
-          PLAN_LIMITS[PlanTypes.LAUNCH].maxMembersLite,
-        );
+        expect(plan.maxMembersLite).toBe(PLAN_LIMITS[PlanTypes.LAUNCH].maxMembersLite);
       });
 
       describe("when valid subscription exists for SEAT_EVENT org", () => {
@@ -264,9 +259,10 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           maxMembersLite: 25,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map(
-              (f) => [f, null],
-            ),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map((f) => [
+              f,
+              null,
+            ]),
           ),
         };
 
@@ -288,10 +284,7 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           [field]: value,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== field).map((f) => [
-              f,
-              null,
-            ]),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== field).map((f) => [f, null]),
           ),
         };
 
@@ -311,9 +304,10 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           maxMembersLite: 50,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map(
-              (f) => [f, null],
-            ),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map((f) => [
+              f,
+              null,
+            ]),
           ),
         };
 
@@ -333,9 +327,9 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           maxMessagesPerMonth: 500_000,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter(
-              (f) => f !== "maxMessagesPerMonth",
-            ).map((f) => [f, null]),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMessagesPerMonth").map(
+              (f) => [f, null],
+            ),
           ),
         };
 
@@ -360,9 +354,10 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           ...overrides,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => !(f in overrides)).map(
-              (f) => [f, null],
-            ),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => !(f in overrides)).map((f) => [
+              f,
+              null,
+            ]),
           ),
         };
 
@@ -427,9 +422,10 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           maxMembersLite: 50,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map(
-              (f) => [f, null],
-            ),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map((f) => [
+              f,
+              null,
+            ]),
           ),
         };
 
@@ -446,9 +442,7 @@ describe("createSaaSPlanProvider", () => {
           const subscription = {
             plan: "NONEXISTENT_PLAN",
             status: SubscriptionStatus.ACTIVE,
-            ...Object.fromEntries(
-              NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
-            ),
+            ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
           };
 
           const db = createMockDb({
@@ -470,9 +464,10 @@ describe("createSaaSPlanProvider", () => {
             status: SubscriptionStatus.ACTIVE,
             maxMembers: 15,
             ...Object.fromEntries(
-              NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembers").map(
-                (f) => [f, null],
-              ),
+              NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembers").map((f) => [
+                f,
+                null,
+              ]),
             ),
           };
 
@@ -607,8 +602,7 @@ describe("createSaaSPlanProvider subscription selection", () => {
     };
 
     const planFrom = async (rows: ActiveRow[]) =>
-      (await createSaaSPlanProvider(dbHolding(rows)).getActivePlan("org_1"))
-        .type;
+      (await createSaaSPlanProvider(dbHolding(rows)).getActivePlan("org_1")).type;
 
     it("reads the newest contract, not whichever row the database lists first", async () => {
       // Handed over oldest-first, which is what a query with no ordering can

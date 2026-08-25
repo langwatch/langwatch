@@ -129,9 +129,7 @@ afterAll(async () => {
     // group already gone — nothing to do
   }
   const exited = await Promise.race([
-    new Promise<boolean>((resolve) =>
-      nlpgoProcess!.once("exit", () => resolve(true)),
-    ),
+    new Promise<boolean>((resolve) => nlpgoProcess!.once("exit", () => resolve(true))),
     sleep(2000).then(() => false),
   ]);
   if (!exited) {
@@ -259,20 +257,14 @@ describe("studioBackendPostEvent FF-gated SSE routing to nlpgo", () => {
       // the digit we asked for. Loose match: the actual response often
       // includes trailing whitespace or punctuation.
       const componentChanges = events.filter(
-        (
-          e,
-        ): e is Extract<
-          StudioServerEvent,
-          { type: "component_state_change" }
-        > => e.type === "component_state_change",
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
+          e.type === "component_state_change",
       );
       const lastEndChange = [...componentChanges]
         .reverse()
         .find((e) => e.payload.component_id === "end");
       expect(lastEndChange, JSON.stringify(events)).toBeDefined();
-      const stringified = JSON.stringify(
-        lastEndChange?.payload.execution_state,
-      );
+      const stringified = JSON.stringify(lastEndChange?.payload.execution_state);
       expect(stringified).toContain("7");
     },
     60_000,

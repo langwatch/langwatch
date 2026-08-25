@@ -77,11 +77,7 @@ export const traceConfigJsonSchema = {
         attributes: {
           type: "object",
           additionalProperties: {
-            oneOf: [
-              { type: "string" },
-              { type: "number" },
-              { type: "boolean" },
-            ],
+            oneOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }],
           },
           description: "Custom span attributes",
         },

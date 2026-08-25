@@ -82,9 +82,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
-          .mockResolvedValue(
-            FREE_PLAN,
-          ) as unknown as PlanProvider["getActivePlan"],
+          .mockResolvedValue(FREE_PLAN) as unknown as PlanProvider["getActivePlan"],
       }),
       usageLimits: {
         notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
@@ -189,9 +187,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     }
     userIds.length = 0;
     for (const id of orgIds) {
-      await prisma.organization
-        .delete({ where: { id } })
-        .catch(() => undefined);
+      await prisma.organization.delete({ where: { id } }).catch(() => undefined);
     }
     orgIds.length = 0;
   });
@@ -219,19 +215,16 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     //    keys). The audit row's userId resolves to the PAT's user; the
     //    @audit-uniform contract only locks the payload SHAPE (keys minus
     //    surface), not the actor, so the cross-surface comparison holds.
-    const honoRes = await governanceApp.request(
-      "/api/governance/ingestion-templates",
-      {
-        method: "POST",
-        headers: patHeaders(),
-        body: JSON.stringify({
-          source_type: SHARED_INPUT.sourceType,
-          display_name: SHARED_INPUT.displayName,
-          description: SHARED_INPUT.description,
-          ottl_rules: SHARED_INPUT.ottlRules,
-        }),
-      },
-    );
+    const honoRes = await governanceApp.request("/api/governance/ingestion-templates", {
+      method: "POST",
+      headers: patHeaders(),
+      body: JSON.stringify({
+        source_type: SHARED_INPUT.sourceType,
+        display_name: SHARED_INPUT.displayName,
+        description: SHARED_INPUT.description,
+        ottl_rules: SHARED_INPUT.ottlRules,
+      }),
+    });
     expect(honoRes.status).toBe(201);
     const honoBody = (await honoRes.json()) as {
       ingestion_template: { id: string };
@@ -261,19 +254,16 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     //    sends per Alexis's CLI scaffold at ed51b0ea1. In-process
     //    spoofing of trpc/mcp via this header is BLOCKED by the
     //    enum filter — only "cli" is honored over the wire.
-    const cliRes = await governanceApp.request(
-      "/api/governance/ingestion-templates",
-      {
-        method: "POST",
-        headers: { ...patHeaders(), "X-LangWatch-Surface": "cli" },
-        body: JSON.stringify({
-          source_type: SHARED_INPUT.sourceType,
-          display_name: SHARED_INPUT.displayName,
-          description: SHARED_INPUT.description,
-          ottl_rules: SHARED_INPUT.ottlRules,
-        }),
-      },
-    );
+    const cliRes = await governanceApp.request("/api/governance/ingestion-templates", {
+      method: "POST",
+      headers: { ...patHeaders(), "X-LangWatch-Surface": "cli" },
+      body: JSON.stringify({
+        source_type: SHARED_INPUT.sourceType,
+        display_name: SHARED_INPUT.displayName,
+        description: SHARED_INPUT.description,
+        ottl_rules: SHARED_INPUT.ottlRules,
+      }),
+    });
     expect(cliRes.status).toBe(201);
     const cliBody = (await cliRes.json()) as {
       ingestion_template: { id: string };
@@ -296,12 +286,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
       const md = row.metadata as { surface?: string } | null;
       if (md?.surface) bySurface[md.surface] = row;
     }
-    expect(Object.keys(bySurface).sort()).toEqual([
-      "cli",
-      "hono",
-      "mcp",
-      "trpc",
-    ]);
+    expect(Object.keys(bySurface).sort()).toEqual(["cli", "hono", "mcp", "trpc"]);
 
     // Per umbrella spec @audit-uniform: identical payload shapes apart
     // from the surface field. We compare:
@@ -320,9 +305,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
       const keysWithoutSurface = Object.keys(md ?? {})
         .filter((k) => k !== "surface")
         .sort();
-      expect(keysWithoutSurface).toEqual(
-        ["displayName", "slug", "sourceType"].sort(),
-      );
+      expect(keysWithoutSurface).toEqual(["displayName", "slug", "sourceType"].sort());
       expect(md?.sourceType).toBe(SHARED_INPUT.sourceType);
       expect(md?.displayName).toBe(SHARED_INPUT.displayName);
       // Slug is server-generated with a random suffix per row, so the
@@ -360,18 +343,15 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     } as const;
 
     for (const spoofValue of ["trpc", "mcp", "evil"] as const) {
-      const res = await governanceApp.request(
-        "/api/governance/ingestion-templates",
-        {
-          method: "POST",
-          headers: { ...patHeaders(), "X-LangWatch-Surface": spoofValue },
-          body: JSON.stringify({
-            source_type: inputBase.sourceType,
-            display_name: `${inputBase.displayName}-${spoofValue}`,
-            ottl_rules: inputBase.ottlRules,
-          }),
-        },
-      );
+      const res = await governanceApp.request("/api/governance/ingestion-templates", {
+        method: "POST",
+        headers: { ...patHeaders(), "X-LangWatch-Surface": spoofValue },
+        body: JSON.stringify({
+          source_type: inputBase.sourceType,
+          display_name: `${inputBase.displayName}-${spoofValue}`,
+          ottl_rules: inputBase.ottlRules,
+        }),
+      });
       expect(res.status).toBe(201);
       const body = (await res.json()) as {
         ingestion_template: { id: string };

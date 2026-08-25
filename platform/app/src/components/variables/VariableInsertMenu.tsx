@@ -6,16 +6,9 @@ import {
   ComponentIcon,
 } from "~/optimization_studio/components/ColorfulBlockIcons";
 import type { ComponentType } from "@langwatch/workflow-contract";
-import {
-  VariableTypeBadge,
-  VariableTypeIcon,
-} from "@langwatch/prompt-web";
+import { VariableTypeBadge, VariableTypeIcon } from "@langwatch/prompt-web";
 import { Popover } from "../ui/popover";
-import type {
-  AvailableSource,
-  FieldType,
-  SourceType,
-} from "./VariableMappingInput";
+import type { AvailableSource, FieldType, SourceType } from "./VariableMappingInput";
 
 // ============================================================================
 // Types
@@ -67,11 +60,7 @@ type VariableInsertMenuProps = {
 const SourceTypeIconSmall = ({ type }: { type: SourceType }) => {
   if (type === "dataset") {
     return (
-      <ColorfulBlockIcon
-        color="blue.solid"
-        size="xs"
-        icon={<Database size={12} />}
-      />
+      <ColorfulBlockIcon color="blue.solid" size="xs" icon={<Database size={12} />} />
     );
   }
   return <ComponentIcon type={type as ComponentType} size="xs" />;
@@ -157,9 +146,7 @@ export const VariableInsertMenu = ({
   const hasExactMatch = useMemo(
     () =>
       filteredSources.some((source) =>
-        source.fields.some(
-          (field) => field.name.toLowerCase() === normalizedQuery,
-        ),
+        source.fields.some((field) => field.name.toLowerCase() === normalizedQuery),
       ),
     [filteredSources, normalizedQuery],
   );
@@ -168,8 +155,7 @@ export const VariableInsertMenu = ({
   // 1. There's a query to create
   // 2. No exact match exists (so we're not duplicating)
   // 3. onCreateVariable callback is provided
-  const canCreateVariable =
-    normalizedQuery && !hasExactMatch && onCreateVariable;
+  const canCreateVariable = normalizedQuery && !hasExactMatch && onCreateVariable;
 
   // Flatten for keyboard navigation - fields FIRST, then "create" LAST
   const flattenedOptions = useMemo(() => {
@@ -198,9 +184,7 @@ export const VariableInsertMenu = ({
   }, [filteredSources, canCreateVariable, normalizedQuery]);
 
   // The index for the "create" option (if it exists)
-  const createOptionIndex = canCreateVariable
-    ? flattenedOptions.length - 1
-    : -1;
+  const createOptionIndex = canCreateVariable ? flattenedOptions.length - 1 : -1;
 
   // Handle selection
   const handleSelect = useCallback(
@@ -233,9 +217,7 @@ export const VariableInsertMenu = ({
   }, [highlightedIndex, onHighlightChange]);
 
   const _moveHighlightDown = useCallback(() => {
-    onHighlightChange(
-      Math.min(highlightedIndex + 1, flattenedOptions.length - 1),
-    );
+    onHighlightChange(Math.min(highlightedIndex + 1, flattenedOptions.length - 1));
   }, [highlightedIndex, flattenedOptions.length, onHighlightChange]);
 
   // Attach keyboard handlers to parent (via ref or expose)
@@ -376,10 +358,7 @@ export const VariableInsertMenu = ({
                         borderRadius="4px"
                         background={isHighlighted ? "blue.50" : undefined}
                         onMouseMove={() => {
-                          if (
-                            isKeyboardNav ||
-                            highlightedIndex !== optionIndex
-                          ) {
+                          if (isKeyboardNav || highlightedIndex !== optionIndex) {
                             setIsKeyboardNav(false);
                             onHighlightChange(optionIndex);
                           }
@@ -406,15 +385,10 @@ export const VariableInsertMenu = ({
                   cursor="pointer"
                   borderRadius="4px"
                   background={
-                    highlightedIndex === createOptionIndex
-                      ? "blue.50"
-                      : undefined
+                    highlightedIndex === createOptionIndex ? "blue.50" : undefined
                   }
                   onMouseMove={() => {
-                    if (
-                      isKeyboardNav ||
-                      highlightedIndex !== createOptionIndex
-                    ) {
+                    if (isKeyboardNav || highlightedIndex !== createOptionIndex) {
                       setIsKeyboardNav(false);
                       onHighlightChange(createOptionIndex);
                     }

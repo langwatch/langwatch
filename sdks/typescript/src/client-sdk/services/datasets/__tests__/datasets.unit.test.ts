@@ -7,7 +7,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { LangWatch } from "@/client-sdk";
 import { DatasetService } from "../dataset.service";
-import { DatasetNotFoundError, DatasetApiError, DatasetValidationError, DatasetPlanLimitError } from "../errors";
+import {
+  DatasetNotFoundError,
+  DatasetApiError,
+  DatasetValidationError,
+  DatasetPlanLimitError,
+} from "../errors";
 import { NoOpLogger } from "@/logger";
 
 const createMockApiClient = () => {
@@ -60,7 +65,10 @@ describe("Feature: Dataset TypeScript SDK", () => {
         it("forwards pagination parameters to the API client", async () => {
           const mockClient = createMockApiClient();
           mockClient.GET.mockResolvedValue({
-            data: { data: [], pagination: { page: 2, limit: 10, total: 0, totalPages: 0 } },
+            data: {
+              data: [],
+              pagination: { page: 2, limit: 10, total: 0, totalPages: 0 },
+            },
             error: null,
             response: { status: 200 },
           });
@@ -192,7 +200,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
             response: { status: 404 },
           });
 
-          const error = await service.getDataset("my-missing-dataset").catch((e: unknown) => e);
+          const error = await service
+            .getDataset("my-missing-dataset")
+            .catch((e: unknown) => e);
           expect(error).toBeInstanceOf(DatasetNotFoundError);
           expect((error as DatasetNotFoundError).message).toContain("my-missing-dataset");
         });
@@ -210,10 +220,14 @@ describe("Feature: Dataset TypeScript SDK", () => {
             response: { status: 409 },
           });
 
-          const error = await service.createDataset({ name: "duplicate" }).catch((e: unknown) => e);
+          const error = await service
+            .createDataset({ name: "duplicate" })
+            .catch((e: unknown) => e);
           expect(error).toBeInstanceOf(DatasetApiError);
           expect((error as DatasetApiError).status).toBe(409);
-          expect((error as DatasetApiError).message).toContain("A dataset with this slug already exists");
+          expect((error as DatasetApiError).message).toContain(
+            "A dataset with this slug already exists",
+          );
         });
       });
 
@@ -224,7 +238,8 @@ describe("Feature: Dataset TypeScript SDK", () => {
             data: null,
             error: {
               error: "limit_exceeded",
-              message: "Free plan limit of 5 datasets reached. To increase your limits, upgrade your plan at https://app.langwatch.ai/settings/subscription",
+              message:
+                "Free plan limit of 5 datasets reached. To increase your limits, upgrade your plan at https://app.langwatch.ai/settings/subscription",
               limitType: "datasets",
               current: 5,
               max: 5,
@@ -232,7 +247,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
             response: { status: 403 },
           });
 
-          const error = await service.getDataset("restricted-dataset").catch((e: unknown) => e);
+          const error = await service
+            .getDataset("restricted-dataset")
+            .catch((e: unknown) => e);
           expect(error).toBeInstanceOf(DatasetPlanLimitError);
           expect((error as DatasetPlanLimitError).message).toContain("upgrade your plan");
           expect((error as DatasetPlanLimitError).limitType).toBe("datasets");
@@ -249,7 +266,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
             response: { status: 500 },
           });
 
-          const error = await service.getDataset("broken-dataset").catch((e: unknown) => e);
+          const error = await service
+            .getDataset("broken-dataset")
+            .catch((e: unknown) => e);
           expect(error).toBeInstanceOf(DatasetApiError);
           expect((error as DatasetApiError).status).toBe(500);
         });
@@ -268,7 +287,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when creating a dataset with empty name", () => {
       /** @scenario "Create a dataset with empty name throws validation error" */
       it("throws a DatasetValidationError indicating name is required", () => {
-        expect(() => langwatch.datasets.create({ name: "" })).toThrow(DatasetValidationError);
+        expect(() => langwatch.datasets.create({ name: "" })).toThrow(
+          DatasetValidationError,
+        );
         expect(() => langwatch.datasets.create({ name: "   " })).toThrow(
           expect.objectContaining({ message: expect.stringContaining("name") }),
         );
@@ -278,14 +299,18 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when updating a dataset with no fields", () => {
       /** @scenario "Update a dataset with no fields throws validation error" */
       it("throws a DatasetValidationError indicating at least one field is required", () => {
-        expect(() => langwatch.datasets.update("my-data", {})).toThrow(DatasetValidationError);
+        expect(() => langwatch.datasets.update("my-data", {})).toThrow(
+          DatasetValidationError,
+        );
       });
     });
 
     describe("when creating records with empty entries", () => {
       /** @scenario "Batch create records with empty entries throws validation error" */
       it("throws a DatasetValidationError indicating entries must not be empty", () => {
-        expect(() => langwatch.datasets.createRecords("my-data", [])).toThrow(DatasetValidationError);
+        expect(() => langwatch.datasets.createRecords("my-data", [])).toThrow(
+          DatasetValidationError,
+        );
       });
     });
   });

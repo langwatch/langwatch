@@ -38,9 +38,7 @@ export function useCorrectionMarks(spans: SpanTreeNode[]): {
   // a row it already changed still reads as edited, so a second pass never looks
   // like it lost the first one. It is adopted a beat after editing starts, and
   // the read it comes from stands in until then.
-  const patch = isEditing
-    ? (basePatch ?? overlay.data?.patch)
-    : overlay.data?.patch;
+  const patch = isEditing ? (basePatch ?? overlay.data?.patch) : overlay.data?.patch;
 
   return useMemo(() => {
     if (!patch) return NO_MARKS;

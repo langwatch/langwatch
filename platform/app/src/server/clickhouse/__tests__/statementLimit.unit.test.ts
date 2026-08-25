@@ -15,8 +15,7 @@ import {
  * nothing ever waits.
  */
 function deferrableClient() {
-  const pending: Array<{ resolve: () => void; reject: (e: Error) => void }> =
-    [];
+  const pending: Array<{ resolve: () => void; reject: (e: Error) => void }> = [];
   let started = 0;
 
   const settle = (params: unknown) => {
@@ -225,9 +224,9 @@ describe("withStatementLimit", () => {
         await settleMicrotasks();
 
         const startedBeforeShed = driver.started;
-        await expect(
-          limited.query({ query: "SELECT shed" }),
-        ).rejects.toBeInstanceOf(ClickHouseOverloadedError);
+        await expect(limited.query({ query: "SELECT shed" })).rejects.toBeInstanceOf(
+          ClickHouseOverloadedError,
+        );
 
         expect(driver.started).toBe(startedBeforeShed);
 
@@ -301,9 +300,7 @@ describe("withStatementLimit", () => {
 
       it("keeps the production bound well inside the request timeout", () => {
         // The two limits compound: a statement pays the wait and then the wire.
-        expect(STATEMENT_WAIT_TIMEOUT_MS).toBeLessThan(
-          CLICKHOUSE_REQUEST_TIMEOUT_MS,
-        );
+        expect(STATEMENT_WAIT_TIMEOUT_MS).toBeLessThan(CLICKHOUSE_REQUEST_TIMEOUT_MS);
       });
     });
 
@@ -374,9 +371,7 @@ describe("withStatementLimit", () => {
           instance,
         });
 
-        await expect(limited.query({ query: "SELEKT 1" })).rejects.toBe(
-          failure,
-        );
+        await expect(limited.query({ query: "SELEKT 1" })).rejects.toBe(failure);
       });
 
       it("frees the slot it held", async () => {

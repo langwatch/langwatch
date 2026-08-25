@@ -31,9 +31,7 @@ function renderOpenDialog(extra?: Parameters<typeof Dialog.Content>[0]) {
 }
 
 function getBackdrop(): HTMLElement {
-  const backdrop = document.querySelector<HTMLElement>(
-    "[data-part='backdrop']",
-  );
+  const backdrop = document.querySelector<HTMLElement>("[data-part='backdrop']");
   if (!backdrop) throw new Error("backdrop not found");
   return backdrop;
 }
@@ -56,9 +54,7 @@ describe("Dialog backdrop", () => {
       // anyone removes the transparency override, this attribute is
       // removed alongside it and the test fails. The visual contract
       // itself is verified in the browser-QA pr-screenshots.
-      expect(backdrop.getAttribute("data-lw-transparent-backdrop")).toBe(
-        "true",
-      );
+      expect(backdrop.getAttribute("data-lw-transparent-backdrop")).toBe("true");
     });
   });
 
@@ -74,13 +70,10 @@ describe("Dialog backdrop", () => {
         >[0]["backdropProps"],
       });
       const backdrop = getBackdrop();
-      const inlineBg =
-        backdrop.style.background || backdrop.style.backgroundColor;
+      const inlineBg = backdrop.style.background || backdrop.style.backgroundColor;
       expect(inlineBg).not.toMatch(/blackalpha|rgba\(0,\s*0,\s*0,/i);
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "backdropProps.bg/background/backgroundColor is ignored",
-        ),
+        expect.stringContaining("backdropProps.bg/background/backgroundColor is ignored"),
       );
       warn.mockRestore();
     });
@@ -97,9 +90,7 @@ describe("Dialog backdrop", () => {
       const backdrop = getBackdrop();
       expect(backdrop.style.backgroundColor).toBe("transparent");
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "backdropProps.bg/background/backgroundColor is ignored",
-        ),
+        expect.stringContaining("backdropProps.bg/background/backgroundColor is ignored"),
       );
       warn.mockRestore();
     });
@@ -125,9 +116,7 @@ describe("Dialog backdrop", () => {
   describe("when consumers reach for the Dialog namespace", () => {
     /** @scenario Dialog.Backdrop is not exposed as a public sub-component */
     it("does not expose a Backdrop sub-component", () => {
-      expect((Dialog as unknown as Record<string, unknown>).Backdrop).toBe(
-        undefined,
-      );
+      expect((Dialog as unknown as Record<string, unknown>).Backdrop).toBe(undefined);
     });
   });
 });

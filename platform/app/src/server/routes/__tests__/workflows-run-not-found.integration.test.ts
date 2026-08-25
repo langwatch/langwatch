@@ -12,15 +12,7 @@
  * Requires: PostgreSQL database (Prisma)
  */
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "~/server/db";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
@@ -122,17 +114,14 @@ describe("POST /api/workflows/:workflowId/run", () => {
   it("returns 422 for a workflow that has never been published", async () => {
     const { app } = await import("../misc");
 
-    const res = await app.request(
-      `/api/workflows/${unpublishedWorkflowId}/run`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Auth-Token": apiKey,
-        },
-        body: JSON.stringify({}),
+    const res = await app.request(`/api/workflows/${unpublishedWorkflowId}/run`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Auth-Token": apiKey,
       },
-    );
+      body: JSON.stringify({}),
+    });
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { error: string; message: string };
@@ -155,17 +144,14 @@ describe("POST /api/workflows/:workflowId/run", () => {
       }));
       const { app } = await import("../misc");
 
-      const res = await app.request(
-        `/api/workflows/${unpublishedWorkflowId}/run`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Auth-Token": apiKey,
-          },
-          body: JSON.stringify({}),
+      const res = await app.request(`/api/workflows/${unpublishedWorkflowId}/run`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Auth-Token": apiKey,
         },
-      );
+        body: JSON.stringify({}),
+      });
 
       expect(res.status).toBe(500);
       const body = (await res.json()) as { error: string; message: string };

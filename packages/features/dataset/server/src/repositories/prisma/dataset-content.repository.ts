@@ -212,10 +212,7 @@ export class DatasetContentRepository {
    * keys in inline mode. Returns the rows claimed (1 = won, 0 = a concurrent
    * finalize already moved it).
    */
-  async claimForProcessing(input: {
-    id: string;
-    projectId: string;
-  }): Promise<number> {
+  async claimForProcessing(input: { id: string; projectId: string }): Promise<number> {
     const { count } = await this.prisma.dataset.updateMany({
       where: {
         id: input.id,
@@ -322,9 +319,7 @@ export class DatasetContentRepository {
   /**
    * Finds all dataset slugs in a project (for name conflict checking).
    */
-  async findAllSlugs(input: {
-    projectId: string;
-  }): Promise<Array<{ slug: string }>> {
+  async findAllSlugs(input: { projectId: string }): Promise<Array<{ slug: string }>> {
     return await this.prisma.dataset.findMany({
       where: { projectId: input.projectId },
       select: { slug: true },
@@ -350,11 +345,7 @@ export class DatasetContentRepository {
   /**
    * Lists non-archived datasets for a project with pagination and record counts.
    */
-  async listPaginated(input: {
-    projectId: string;
-    skip: number;
-    take: number;
-  }): Promise<{
+  async listPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
     datasets: Array<Dataset & { _count: { datasetRecords: number } }>;
     total: number;
   }> {

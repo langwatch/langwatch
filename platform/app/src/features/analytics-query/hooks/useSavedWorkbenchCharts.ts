@@ -12,13 +12,7 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import {
-  type Dispatch,
-  type SetStateAction,
-  useCallback,
-  useRef,
-  useState,
-} from "react";
+import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react";
 
 import { api } from "~/utils/api";
 
@@ -51,10 +45,7 @@ export interface UseSavedWorkbenchCharts {
   readonly openedChartName: string | null;
   readonly isSaving: boolean;
   /** Writes to the open chart, or creates one under `name`. */
-  readonly save: (input: {
-    draft: WorkbenchChartDraft;
-    name?: string;
-  }) => Promise<void>;
+  readonly save: (input: { draft: WorkbenchChartDraft; name?: string }) => Promise<void>;
   /** Loads a saved chart and hands its definition to the caller to apply. */
   readonly open: (chartId: string) => Promise<void>;
   readonly rename: (input: { id: string; name: string }) => Promise<void>;
@@ -259,15 +250,7 @@ function useSaveChart({
         inFlight.current = false;
       }
     },
-    [
-      opened,
-      projectId,
-      createChart,
-      updateChart,
-      setOpened,
-      refreshList,
-      onError,
-    ],
+    [opened, projectId, createChart, updateChart, setOpened, refreshList, onError],
   );
 }
 
@@ -311,17 +294,13 @@ function useRenameChart({
   onError,
   updateChart,
 }: ChartWriteContext & {
-  updateChart: ReturnType<
-    typeof api.analytics.savedWorkbenchCharts.update.useMutation
-  >;
+  updateChart: ReturnType<typeof api.analytics.savedWorkbenchCharts.update.useMutation>;
 }) {
   return useCallback(
     async ({ id, name }: { id: string; name: string }) => {
       try {
         await updateChart.mutateAsync({ projectId, id, name });
-        setOpened((current) =>
-          current && current.id === id ? { id, name } : current,
-        );
+        setOpened((current) => (current && current.id === id ? { id, name } : current));
       } catch (error) {
         onError(error, "Couldn't rename the chart");
         return;
@@ -346,9 +325,7 @@ function useRemoveChart({
   onError,
   deleteChart,
 }: ChartWriteContext & {
-  deleteChart: ReturnType<
-    typeof api.analytics.savedWorkbenchCharts.delete.useMutation
-  >;
+  deleteChart: ReturnType<typeof api.analytics.savedWorkbenchCharts.delete.useMutation>;
 }) {
   return useCallback(
     async (chartId: string) => {

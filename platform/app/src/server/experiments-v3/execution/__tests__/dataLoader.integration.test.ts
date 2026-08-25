@@ -32,10 +32,7 @@ describe("loadExecutionData", () => {
   afterAll(async () => {
     await cleanupTestRows(prisma, [
       ["agent", { id: { in: cleanupAgentIds }, projectId }],
-      [
-        "workflowVersion",
-        { workflowId: { in: cleanupWorkflowIds }, projectId },
-      ],
+      ["workflowVersion", { workflowId: { in: cleanupWorkflowIds }, projectId }],
       ["workflow", { id: { in: cleanupWorkflowIds }, projectId }],
     ]);
   });
@@ -108,9 +105,7 @@ describe("loadExecutionData", () => {
         throw new Error(`loadExecutionData failed: ${result.error}`);
       }
 
-      const loadedWorkflow = result.loadedWorkflows.get(
-        workflowLoadKey({ workflowId }),
-      );
+      const loadedWorkflow = result.loadedWorkflows.get(workflowLoadKey({ workflowId }));
       expect(loadedWorkflow).toBeDefined();
       expect(loadedWorkflow?.id).toBe(workflowId);
       expect(loadedWorkflow?.versionId).toBe(versionId);

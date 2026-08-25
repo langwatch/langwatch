@@ -34,11 +34,7 @@ function findFiles(dir: string, pattern: RegExp): string[] {
 
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const fullPath = path.join(dir, entry.name);
-    if (
-      entry.isDirectory() &&
-      entry.name !== "node_modules" &&
-      entry.name !== ".venv"
-    ) {
+    if (entry.isDirectory() && entry.name !== "node_modules" && entry.name !== ".venv") {
       results.push(...findFiles(fullPath, pattern));
     } else if (entry.isFile() && pattern.test(entry.name)) {
       results.push(fullPath);
@@ -52,7 +48,7 @@ describe("Prompts Skill", () => {
     "versions prompts in a Python OpenAI bot with LangWatch Prompts CLI",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-prompt-versioning-py-")
+        path.join(os.tmpdir(), "langwatch-skill-prompt-versioning-py-"),
       );
 
       copyFixtureToWorkDir({
@@ -78,32 +74,29 @@ describe("Prompts Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "version my agent prompts with langwatch"
-          ),
+          scenario.user("version my agent prompts with langwatch"),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "prompts");
 
             // Verify the agent modified main.py to use langwatch prompts
-            const mainPy = fs.readFileSync(
-              path.join(tempFolder, "main.py"),
-              "utf8"
-            );
+            const mainPy = fs.readFileSync(path.join(tempFolder, "main.py"), "utf8");
             expect(mainPy).toContain("langwatch");
 
             // Check for prompt management setup — either CLI artifacts or manual prompt files
             const hasPromptsJson = fs.existsSync(path.join(tempFolder, "prompts.json"));
             const promptsDir = path.join(tempFolder, "prompts");
             const hasPromptsDir = fs.existsSync(promptsDir);
-            const promptYamlFiles = hasPromptsDir ? findFiles(promptsDir, /\.ya?ml$/) : [];
+            const promptYamlFiles = hasPromptsDir
+              ? findFiles(promptsDir, /\.ya?ml$/)
+              : [];
 
             // At least one of: prompts.json, prompt yaml files, or code referencing prompts.get
             const codeUsesPromptsGet = /prompts?\.(get|pull|compile)/.test(mainPy);
             expect(
               hasPromptsJson || promptYamlFiles.length > 0 || codeUsesPromptsGet,
-              "Expected prompt management setup: prompts.json, prompt YAML files, or code using prompts.get()"
+              "Expected prompt management setup: prompts.json, prompt YAML files, or code using prompts.get()",
             ).toBe(true);
           },
           scenario.judge(),
@@ -112,14 +105,14 @@ describe("Prompts Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "versions prompts in a TypeScript Vercel AI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-prompts-ts-")
+        path.join(os.tmpdir(), "langwatch-skill-prompts-ts-"),
       );
       copyFixtureToWorkDir({
         fixtureSubpath: "typescript-vercel",
@@ -144,31 +137,20 @@ describe("Prompts Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "version my agent prompts with langwatch"
-          ),
+          scenario.user("version my agent prompts with langwatch"),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "prompts");
-            const indexTs = fs.readFileSync(
-              `${tempFolder}/index.ts`,
-              "utf8"
-            );
+            const indexTs = fs.readFileSync(`${tempFolder}/index.ts`, "utf8");
             expect(indexTs).toContain("langwatch");
             // Check for prompt management setup
-            const hasPromptsJson = fs.existsSync(
-              path.join(tempFolder, "prompts.json")
-            );
-            const hasPromptsDir = fs.existsSync(
-              path.join(tempFolder, "prompts")
-            );
-            const codeUsesPrompts = /prompts?\.(get|pull|compile)/.test(
-              indexTs
-            );
+            const hasPromptsJson = fs.existsSync(path.join(tempFolder, "prompts.json"));
+            const hasPromptsDir = fs.existsSync(path.join(tempFolder, "prompts"));
+            const codeUsesPrompts = /prompts?\.(get|pull|compile)/.test(indexTs);
             expect(
               hasPromptsJson || hasPromptsDir || codeUsesPrompts,
-              "Expected prompt management setup"
+              "Expected prompt management setup",
             ).toBe(true);
           },
           scenario.judge(),
@@ -176,14 +158,14 @@ describe("Prompts Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "versions prompts in a Python LangGraph agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-prompts-langgraph-")
+        path.join(os.tmpdir(), "langwatch-skill-prompts-langgraph-"),
       );
       copyFixtureToWorkDir({
         fixtureSubpath: "python-langgraph",
@@ -207,34 +189,25 @@ describe("Prompts Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "version my agent prompts with langwatch"
-          ),
+          scenario.user("version my agent prompts with langwatch"),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "prompts");
 
-            const mainPy = fs.readFileSync(
-              path.join(tempFolder, "main.py"),
-              "utf8"
-            );
+            const mainPy = fs.readFileSync(path.join(tempFolder, "main.py"), "utf8");
             expect(mainPy).toContain("langwatch");
 
-            const hasPromptsJson = fs.existsSync(
-              path.join(tempFolder, "prompts.json")
-            );
+            const hasPromptsJson = fs.existsSync(path.join(tempFolder, "prompts.json"));
             const promptsDir = path.join(tempFolder, "prompts");
             const hasPromptsDir = fs.existsSync(promptsDir);
             const promptYamlFiles = hasPromptsDir
               ? findFiles(promptsDir, /\.ya?ml$/)
               : [];
-            const codeUsesPromptsGet = /prompts?\.(get|pull|compile)/.test(
-              mainPy
-            );
+            const codeUsesPromptsGet = /prompts?\.(get|pull|compile)/.test(mainPy);
             expect(
               hasPromptsJson || promptYamlFiles.length > 0 || codeUsesPromptsGet,
-              "Expected prompt management setup: prompts.json, prompt YAML files, or code using prompts.get()"
+              "Expected prompt management setup: prompts.json, prompt YAML files, or code using prompts.get()",
             ).toBe(true);
           },
           scenario.judge(),
@@ -242,14 +215,14 @@ describe("Prompts Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "versions prompts in a TypeScript Mastra agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-prompts-mastra-")
+        path.join(os.tmpdir(), "langwatch-skill-prompts-mastra-"),
       );
       copyFixtureToWorkDir({
         fixtureSubpath: "typescript-mastra",
@@ -260,8 +233,7 @@ describe("Prompts Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Mastra prompt versioning",
-        description:
-          "Setting up prompt versioning in a TypeScript Mastra agent project.",
+        description: "Setting up prompt versioning in a TypeScript Mastra agent project.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -273,32 +245,21 @@ describe("Prompts Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "version my agent prompts with langwatch"
-          ),
+          scenario.user("version my agent prompts with langwatch"),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "prompts");
 
-            const indexTs = fs.readFileSync(
-              `${tempFolder}/index.ts`,
-              "utf8"
-            );
+            const indexTs = fs.readFileSync(`${tempFolder}/index.ts`, "utf8");
             expect(indexTs).toContain("langwatch");
 
-            const hasPromptsJson = fs.existsSync(
-              path.join(tempFolder, "prompts.json")
-            );
-            const hasPromptsDir = fs.existsSync(
-              path.join(tempFolder, "prompts")
-            );
-            const codeUsesPrompts = /prompts?\.(get|pull|compile)/.test(
-              indexTs
-            );
+            const hasPromptsJson = fs.existsSync(path.join(tempFolder, "prompts.json"));
+            const hasPromptsDir = fs.existsSync(path.join(tempFolder, "prompts"));
+            const codeUsesPrompts = /prompts?\.(get|pull|compile)/.test(indexTs);
             expect(
               hasPromptsJson || hasPromptsDir || codeUsesPrompts,
-              "Expected prompt management setup"
+              "Expected prompt management setup",
             ).toBe(true);
           },
           scenario.judge(),
@@ -306,14 +267,14 @@ describe("Prompts Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "creates a new prompt version for a specific use case",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-prompts-targeted-")
+        path.join(os.tmpdir(), "langwatch-skill-prompts-targeted-"),
       );
       copyFixtureToWorkDir({
         fixtureSubpath: "python-openai",
@@ -339,7 +300,7 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "add a new prompt version for handling customer refund requests, it should be empathetic and follow our refund policy, use langwatch prompts CLI to version it"
+            "add a new prompt version for handling customer refund requests, it should be empathetic and follow our refund policy, use langwatch prompts CLI to version it",
           ),
           scenario.agent(),
           (state) => {
@@ -347,9 +308,7 @@ describe("Prompts Skill", () => {
             assertSkillWasRead(state, "prompts");
             const mainPy = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             // Either the code was updated to use langwatch prompts, or prompt files were created
-            const hasPromptsJson = fs.existsSync(
-              path.join(tempFolder, "prompts.json")
-            );
+            const hasPromptsJson = fs.existsSync(path.join(tempFolder, "prompts.json"));
             const promptsDir = path.join(tempFolder, "prompts");
             const hasPromptsDir = fs.existsSync(promptsDir);
             const hasYaml =
@@ -360,7 +319,7 @@ describe("Prompts Skill", () => {
             const codeUsesPrompts = /langwatch/.test(mainPy);
             expect(
               hasPromptsJson || hasYaml || codeUsesPrompts,
-              "Expected some form of prompt management setup"
+              "Expected some form of prompt management setup",
             ).toBe(true);
           },
           scenario.judge(),
@@ -368,14 +327,14 @@ describe("Prompts Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "guides tag-based deployment workflow for Python",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-prompts-tags-py-")
+        path.join(os.tmpdir(), "langwatch-skill-prompts-tags-py-"),
       );
 
       copyFixtureToWorkDir({
@@ -403,24 +362,24 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "set up tag-based deployment for my prompts so I can use production and staging versions separately. Update main.py end-to-end: initialize the prompts project, create a managed prompt for the system message, and update the OpenAI call so it fetches that prompt by tag (production)."
+            "set up tag-based deployment for my prompts so I can use production and staging versions separately. Update main.py end-to-end: initialize the prompts project, create a managed prompt for the system message, and update the OpenAI call so it fetches that prompt by tag (production).",
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "prompts");
 
-            const mainPy = fs.readFileSync(
-              path.join(tempFolder, "main.py"),
-              "utf8"
-            );
+            const mainPy = fs.readFileSync(path.join(tempFolder, "main.py"), "utf8");
 
             // Code should reference tag-based fetching
-            const usesTagFetch = /tag\s*=\s*["']production["']|tag\s*=\s*["']staging["']|{\s*tag:/.test(mainPy);
+            const usesTagFetch =
+              /tag\s*=\s*["']production["']|tag\s*=\s*["']staging["']|{\s*tag:/.test(
+                mainPy,
+              );
 
             expect(
               usesTagFetch,
-              "Expected code to fetch prompts by tag (e.g., tag='production' or tag='staging')"
+              "Expected code to fetch prompts by tag (e.g., tag='production' or tag='staging')",
             ).toBe(true);
           },
           scenario.judge(),
@@ -429,6 +388,6 @@ describe("Prompts Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 });

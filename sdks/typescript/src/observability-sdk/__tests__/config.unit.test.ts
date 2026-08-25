@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { type Logger } from '../../logger';
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { type Logger } from "../../logger";
 
 class MockLogger implements Logger {
   debug = vi.fn();
@@ -8,7 +8,7 @@ class MockLogger implements Logger {
   error = vi.fn();
 }
 
-describe('config.ts', () => {
+describe("config.ts", () => {
   let originalConsoleError: any;
   beforeEach(() => {
     vi.resetModules();
@@ -20,8 +20,8 @@ describe('config.ts', () => {
     vi.unstubAllEnvs();
   });
 
-  it('initializeObservabilitySdkConfig sets config any number of times', async () => {
-    const config = await import('../config.js');
+  it("initializeObservabilitySdkConfig sets config any number of times", async () => {
+    const config = await import("../config.js");
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
     const logger = new MockLogger();
@@ -34,8 +34,8 @@ describe('config.ts', () => {
     expect(config.getObservabilitySdkLogger()).toBe(logger2);
   });
 
-  it('getObservabilitySdkLogger works after config is set', async () => {
-    const config = await import('../config.js');
+  it("getObservabilitySdkLogger works after config is set", async () => {
+    const config = await import("../config.js");
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
     const logger = new MockLogger();
@@ -43,25 +43,27 @@ describe('config.ts', () => {
     expect(config.getObservabilitySdkLogger()).toBe(logger);
   });
 
-  it('getObservabilitySdkConfig throws error when not initialized and throwOnUninitialized is true', async () => {
-    const config = await import('../config.js');
+  it("getObservabilitySdkConfig throws error when not initialized and throwOnUninitialized is true", async () => {
+    const config = await import("../config.js");
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
     expect(() => {
       config.getObservabilitySdkConfig({ throwOnUninitialized: true });
-    }).toThrow('Please call setupObservability() before using the Observability SDK');
+    }).toThrow("Please call setupObservability() before using the Observability SDK");
   });
 
-  it('getObservabilitySdkConfig returns default when not initialized and throwOnUninitialized is false', async () => {
-    const config = await import('../config.js');
+  it("getObservabilitySdkConfig returns default when not initialized and throwOnUninitialized is false", async () => {
+    const config = await import("../config.js");
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
     const result = config.getObservabilitySdkConfig({ throwOnUninitialized: false });
-    expect(result.logger).toBeInstanceOf((await import('../../logger/index.js')).NoOpLogger);
+    expect(result.logger).toBeInstanceOf(
+      (await import("../../logger/index.js")).NoOpLogger,
+    );
   });
 
-  it('getObservabilitySdkConfig returns actual config when initialized', async () => {
-    const config = await import('../config.js');
+  it("getObservabilitySdkConfig returns actual config when initialized", async () => {
+    const config = await import("../config.js");
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
     const logger = new MockLogger();
@@ -71,26 +73,28 @@ describe('config.ts', () => {
     expect(result.logger).toBe(logger);
   });
 
-  describe('when NODE_ENV is development and the SDK is not initialized', () => {
+  describe("when NODE_ENV is development and the SDK is not initialized", () => {
     beforeEach(() => {
-      vi.stubEnv('NODE_ENV', 'development');
+      vi.stubEnv("NODE_ENV", "development");
     });
 
-    it('getObservabilitySdkConfig with no options still throws', async () => {
-      const config = await import('../config.js');
+    it("getObservabilitySdkConfig with no options still throws", async () => {
+      const config = await import("../config.js");
       config.resetObservabilitySdkConfig();
 
       expect(() => {
         config.getObservabilitySdkConfig();
-      }).toThrow('Please call setupObservability() before using the Observability SDK');
+      }).toThrow("Please call setupObservability() before using the Observability SDK");
     });
 
-    it('an explicit throwOnUninitialized: false wins over development mode', async () => {
-      const config = await import('../config.js');
+    it("an explicit throwOnUninitialized: false wins over development mode", async () => {
+      const config = await import("../config.js");
       config.resetObservabilitySdkConfig();
 
       const result = config.getObservabilitySdkConfig({ throwOnUninitialized: false });
-      expect(result.logger).toBeInstanceOf((await import('../../logger/index.js')).NoOpLogger);
+      expect(result.logger).toBeInstanceOf(
+        (await import("../../logger/index.js")).NoOpLogger,
+      );
     });
 
     // Regression: `langwatch prompt push` crashed with "Please call
@@ -98,14 +102,14 @@ describe('config.ts', () => {
     // tracing decorators ask shouldCaptureInput() on every call. Passive
     // capture reads must degrade to the defaults, never throw.
     it('getDataCaptureMode falls back to "all" instead of throwing', async () => {
-      const config = await import('../config.js');
+      const config = await import("../config.js");
       config.resetObservabilitySdkConfig();
 
-      expect(config.getDataCaptureMode()).toBe('all');
+      expect(config.getDataCaptureMode()).toBe("all");
     });
 
-    it('shouldCaptureInput and shouldCaptureOutput answer instead of throwing', async () => {
-      const config = await import('../config.js');
+    it("shouldCaptureInput and shouldCaptureOutput answer instead of throwing", async () => {
+      const config = await import("../config.js");
       config.resetObservabilitySdkConfig();
 
       expect(config.shouldCaptureInput()).toBe(true);

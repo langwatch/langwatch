@@ -21,9 +21,7 @@ export function SharedTraceProvider({
   children: ReactNode;
 }) {
   return (
-    <SharedTraceContext.Provider value={value}>
-      {children}
-    </SharedTraceContext.Provider>
+    <SharedTraceContext.Provider value={value}>{children}</SharedTraceContext.Provider>
   );
 }
 

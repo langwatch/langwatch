@@ -30,12 +30,7 @@ function ComparisonBar({
 }) {
   if (!hasStats || value <= 0) {
     return (
-      <Box
-        width={BAR_WIDTH}
-        height={BAR_HEIGHT}
-        bg="border.subtle"
-        borderRadius="full"
-      />
+      <Box width={BAR_WIDTH} height={BAR_HEIGHT} bg="border.subtle" borderRadius="full" />
     );
   }
   const ratio = value / p95;

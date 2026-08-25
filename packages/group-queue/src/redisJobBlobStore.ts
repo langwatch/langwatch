@@ -17,13 +17,7 @@ export class RedisJobBlobStore implements JobBlobStore {
   private readonly redis: IORedis | Cluster;
   private readonly keyPrefix: string;
 
-  constructor({
-    redis,
-    queueName,
-  }: {
-    redis: IORedis | Cluster;
-    queueName: string;
-  }) {
+  constructor({ redis, queueName }: { redis: IORedis | Cluster; queueName: string }) {
     this.redis = redis;
     this.keyPrefix = redisBlobKeyPrefix(queueName);
   }

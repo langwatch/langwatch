@@ -73,20 +73,16 @@ export class VirtualKeyExpiryInPastError extends HandledError {
   declare readonly code: "virtual_key_expiry_in_past";
 
   constructor() {
-    super(
-      "virtual_key_expiry_in_past",
-      "The expiration date has already passed",
-      {
-        meta: {
-          fieldErrors: {
-            expiresAt: ["Pick a date in the future"],
-            expires_at: ["Pick a date in the future"],
-          },
+    super("virtual_key_expiry_in_past", "The expiration date has already passed", {
+      meta: {
+        fieldErrors: {
+          expiresAt: ["Pick a date in the future"],
+          expires_at: ["Pick a date in the future"],
         },
-        httpStatus: 400,
-        fault: "customer",
       },
-    );
+      httpStatus: 400,
+      fault: "customer",
+    });
     this.name = "VirtualKeyExpiryInPastError";
   }
 }
@@ -431,13 +427,7 @@ export class GatewayBudgetScopeUnreachableError extends HandledError {
 export class GatewaySpendGroupByUnstableError extends HandledError {
   declare readonly code: "gateway_spend_group_by_unstable";
 
-  constructor({
-    groupBy,
-    settlesAtMs,
-  }: {
-    groupBy: string[];
-    settlesAtMs: number;
-  }) {
+  constructor({ groupBy, settlesAtMs }: { groupBy: string[]; settlesAtMs: number }) {
     super(
       "gateway_spend_group_by_unstable",
       "That grouping can still change over this window, so the page walk would not be exact",

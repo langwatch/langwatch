@@ -1,17 +1,13 @@
 import { manifestDependencies } from "./manifests";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types";
 
-export function lintCycles(
-  packages: ClassifiedPackage[],
-): ArchitectureViolation[] {
+export function lintCycles(packages: ClassifiedPackage[]): ArchitectureViolation[] {
   const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
   const graph = new Map<string, string[]>();
   for (const pkg of packages) {
     graph.set(
       pkg.name,
-      Object.keys(manifestDependencies(pkg.manifest)).filter((name) =>
-        byName.has(name),
-      ),
+      Object.keys(manifestDependencies(pkg.manifest)).filter((name) => byName.has(name)),
     );
   }
   const active = new Set<string>();
@@ -35,8 +31,7 @@ export function lintCycles(
   for (const name of graph.keys()) visit(name);
   return [...cycles].sort().map((cycle) => ({
     policy: "package-cycle",
-    file:
-      byName.get(cycle.split(" -> ")[0] ?? "")?.manifestPath ?? "package.json",
+    file: byName.get(cycle.split(" -> ")[0] ?? "")?.manifestPath ?? "package.json",
     message: `Feature package dependency cycle: ${cycle}`,
   }));
 }

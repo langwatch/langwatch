@@ -34,13 +34,7 @@ export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
 
   constructor(private readonly redis: Redis | Cluster | null) {}
 
-  async acquire({
-    name,
-    ttlMs,
-  }: {
-    name: string;
-    ttlMs: number;
-  }): Promise<boolean> {
+  async acquire({ name, ttlMs }: { name: string; ttlMs: number }): Promise<boolean> {
     if (!this.redis) return false;
     try {
       const result = await this.redis.set(
@@ -65,13 +59,7 @@ export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
     }
   }
 
-  async renew({
-    name,
-    ttlMs,
-  }: {
-    name: string;
-    ttlMs: number;
-  }): Promise<boolean> {
+  async renew({ name, ttlMs }: { name: string; ttlMs: number }): Promise<boolean> {
     if (!this.redis) return false;
     try {
       const result = await this.redis.eval(
@@ -96,12 +84,7 @@ export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
   async release({ name }: { name: string }): Promise<void> {
     if (!this.redis) return;
     try {
-      await this.redis.eval(
-        RELEASE_SCRIPT,
-        1,
-        `${KEY_PREFIX}${name}`,
-        this.token,
-      );
+      await this.redis.eval(RELEASE_SCRIPT, 1, `${KEY_PREFIX}${name}`, this.token);
     } catch {
       // Best-effort: an unreleased lease expires on its own TTL.
     }

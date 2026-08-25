@@ -38,9 +38,7 @@ class AppAdminWorkspaceViewDiagnostics extends GovernanceDiagnosticsPort {
 }
 
 class AppAdminWorkspaceViewOcsf extends AdminWorkspaceViewOcsfPort {
-  constructor(
-    private readonly repository: GovernanceOcsfEventsClickHouseRepository,
-  ) {
+  constructor(private readonly repository: GovernanceOcsfEventsClickHouseRepository) {
     super();
   }
 
@@ -57,9 +55,7 @@ class AppAdminWorkspaceViewOcsf extends AdminWorkspaceViewOcsfPort {
       traceId: "",
       sourceId: input.view.targetTeamId,
       sourceType:
-        input.view.kind === "personal"
-          ? "personal_workspace"
-          : "team_workspace",
+        input.view.kind === "personal" ? "personal_workspace" : "team_workspace",
       activityId: OCSF_ACTIVITY.READ,
       severityId: OCSF_SEVERITY.INFO,
       eventTime: new Date(input.createdAtMs),
@@ -87,9 +83,7 @@ class AppAdminWorkspaceViewOcsf extends AdminWorkspaceViewOcsfPort {
 export class AppAdminWorkspaceViewAuditAdapter {
   private constructor(private readonly deps: AdminWorkspaceViewAuditDeps) {}
 
-  static create(
-    deps: AdminWorkspaceViewAuditDeps,
-  ): AppAdminWorkspaceViewAuditAdapter {
+  static create(deps: AdminWorkspaceViewAuditDeps): AppAdminWorkspaceViewAuditAdapter {
     return new AppAdminWorkspaceViewAuditAdapter(deps);
   }
 

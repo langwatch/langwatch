@@ -19,9 +19,7 @@ describe("latencyBucketField", () => {
       const largest =
         LATENCY_HISTOGRAM_BOUNDS_MS[LATENCY_HISTOGRAM_BOUNDS_MS.length - 1]!;
       expect(latencyBucketField(largest)).toBe(String(largest));
-      expect(latencyBucketField(largest + 1)).toBe(
-        LATENCY_HISTOGRAM_OVERFLOW_FIELD,
-      );
+      expect(latencyBucketField(largest + 1)).toBe(LATENCY_HISTOGRAM_OVERFLOW_FIELD);
     });
   });
 

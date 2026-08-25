@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  hasLangyBlockParts,
-  langyAnswerSegments,
-} from "../langyAnswerSegments";
+import { hasLangyBlockParts, langyAnswerSegments } from "../langyAnswerSegments";
 
 const text = (t: string) => ({ type: "text", text: t });
 const cardPart = {
@@ -35,11 +32,7 @@ describe("hasLangyBlockParts", () => {
 describe("langyAnswerSegments", () => {
   describe("given prose around a stamped block", () => {
     it("keeps the card where the block sat in the reply's flow", () => {
-      const segments = langyAnswerSegments([
-        text("before"),
-        cardPart,
-        text("after"),
-      ]);
+      const segments = langyAnswerSegments([text("before"), cardPart, text("after")]);
       expect(segments.map((s) => s.type)).toEqual(["text", "card", "text"]);
       expect(segments[0]).toEqual({ type: "text", text: "before" });
       expect(segments[1]).toMatchObject({
@@ -51,11 +44,7 @@ describe("langyAnswerSegments", () => {
 
   describe("given consecutive text parts", () => {
     it("joins them with a paragraph break so a headline can never glue to the reply", () => {
-      const segments = langyAnswerSegments([
-        text("one "),
-        text("two"),
-        cardPart,
-      ]);
+      const segments = langyAnswerSegments([text("one "), text("two"), cardPart]);
       expect(segments[0]).toEqual({ type: "text", text: "one \n\ntwo" });
     });
   });
@@ -100,11 +89,7 @@ describe("langyAnswerSegments", () => {
 
   describe("given whitespace-only prose between blocks", () => {
     it("drops the empty segment", () => {
-      const segments = langyAnswerSegments([
-        cardPart,
-        text("\n\n"),
-        failedPart,
-      ]);
+      const segments = langyAnswerSegments([cardPart, text("\n\n"), failedPart]);
       expect(segments.map((s) => s.type)).toEqual(["card", "failed"]);
     });
   });

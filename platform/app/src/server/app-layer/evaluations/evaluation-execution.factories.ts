@@ -14,12 +14,7 @@ import type { ModelEnvResolver } from "./evaluation-execution.service";
 
 export function createDefaultModelEnvResolver(): ModelEnvResolver {
   return {
-    async resolveForEvaluator({
-      evaluatorType,
-      evaluator,
-      projectId,
-      settings,
-    }) {
+    async resolveForEvaluator({ evaluatorType, evaluator, projectId, settings }) {
       // Hard cutover: Azure Content Safety evaluators never read from process.env.
       // They require a per-project `azure_safety` Model Provider, resolved here.
       // Phase 5 gates runtime execution so unresolved credentials turn into a
@@ -30,10 +25,7 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
         evaluatorEnv = azureEnv ?? {};
       } else {
         evaluatorEnv = Object.fromEntries(
-          (evaluator.envVars ?? []).map((envVar) => [
-            envVar,
-            process.env[envVar]!,
-          ]),
+          (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
         );
       }
 
@@ -43,12 +35,7 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
         typeof settings.model === "string" &&
         evaluatorType !== "openai/moderation"
       ) {
-        const modelEnv = await setupModelEnv(
-          settings.model,
-          false,
-          projectId,
-          settings,
-        );
+        const modelEnv = await setupModelEnv(settings.model, false, projectId, settings);
         evaluatorEnv = { ...evaluatorEnv, ...modelEnv };
       }
 
@@ -98,9 +85,7 @@ export async function setupModelEnv(
   }
 
   const modelName = model.split("/").slice(1).join("/");
-  const modelList = embeddings
-    ? modelProvider.embeddingsModels
-    : modelProvider.models;
+  const modelList = embeddings ? modelProvider.embeddingsModels : modelProvider.models;
 
   const customModelList = embeddings
     ? modelProvider.customEmbeddingsModels
@@ -122,9 +107,7 @@ export async function setupModelEnv(
     // than masking it behind an infrastructure error.
     let servingRow = null;
     try {
-      servingRow = await ModelProviderService.create(
-        prisma,
-      ).findRowServingModel({
+      servingRow = await ModelProviderService.create(prisma).findRowServingModel({
         projectId,
         provider,
         bareModel: modelName,
@@ -171,9 +154,7 @@ export async function setupModelEnv(
       if (param === "max_tokens" && typeof value === "number") {
         value = clampMaxTokens(value, maxTokensCeiling);
       }
-      const envKey = embeddings
-        ? `X_LITELLM_EMBEDDINGS_${param}`
-        : `X_LITELLM_${param}`;
+      const envKey = embeddings ? `X_LITELLM_EMBEDDINGS_${param}` : `X_LITELLM_${param}`;
       envResult[envKey] = String(value);
     }
   }

@@ -109,16 +109,14 @@ describe("scanning the values a chart will encode", () => {
     /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
     it("reports that there is nothing to draw", () => {
       expect(
-        scan([{ model: null }, { model: "" }, {}], ["model"])
-          .allEncodedValuesEmpty,
+        scan([{ model: null }, { model: "" }, {}], ["model"]).allEncodedValuesEmpty,
       ).toBe(true);
       expect(scan([], ["model"]).allEncodedValuesEmpty).toBe(true);
     });
 
     it("does not report it when one encoded column has values", () => {
       expect(
-        scan([{ model: null, latency: 3 }], ["model", "latency"])
-          .allEncodedValuesEmpty,
+        scan([{ model: null, latency: 3 }], ["model", "latency"]).allEncodedValuesEmpty,
       ).toBe(false);
     });
 

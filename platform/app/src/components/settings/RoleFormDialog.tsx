@@ -87,12 +87,7 @@ export function RoleFormDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content
-        bg="bg"
-        maxWidth="900px"
-        maxHeight="90vh"
-        overflowY="auto"
-      >
+      <Dialog.Content bg="bg" maxWidth="900px" maxHeight="90vh" overflowY="auto">
         <Dialog.Header>
           <Dialog.Title>{title}</Dialog.Title>
         </Dialog.Header>
@@ -112,16 +107,12 @@ export function RoleFormDialog({
                   })}
                   placeholder="e.g., Data Analyst"
                 />
-                {errors.name && (
-                  <Field.ErrorText>{errors.name.message}</Field.ErrorText>
-                )}
+                {errors.name && <Field.ErrorText>{errors.name.message}</Field.ErrorText>}
               </Field.Root>
 
               <Field.Root>
                 <Field.Label>Description</Field.Label>
-                <Field.HelperText>
-                  Describe what this role is for
-                </Field.HelperText>
+                <Field.HelperText>Describe what this role is for</Field.HelperText>
                 <Textarea
                   {...register("description")}
                   placeholder="e.g., Can view and analyze data but cannot modify settings"
@@ -139,9 +130,7 @@ export function RoleFormDialog({
 
                 <PermissionSelector
                   selectedPermissions={selectedPermissions}
-                  onChange={(permissions) =>
-                    setValue("permissions", permissions)
-                  }
+                  onChange={(permissions) => setValue("permissions", permissions)}
                 />
               </VStack>
             </VStack>

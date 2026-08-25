@@ -28,13 +28,21 @@ This example demonstrates how to evaluate a customer support agent.
 1. Navigate to the [experiments page](https://app.langwatch.ai/@project/experiments) and click "New Experiment":
 
 <Frame>
-<img src="/images/offline-evaluation/image_psd_2.png" alt="" style={{ maxWidth: '400px' }} />
+  <img
+    src="/images/offline-evaluation/image_psd_2.png"
+    alt=""
+    style={{ maxWidth: "400px" }}
+  />
 </Frame>
 
 2. Choose Experiment:
 
 <Frame>
-<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.26.31_1.png" alt="" style={{ maxWidth: '400px' }} />
+  <img
+    src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.26.31_1.png"
+    alt=""
+    style={{ maxWidth: "400px" }}
+  />
 </Frame>
 
 3. Select a sample dataset. You can generate a new dataset with AI or use the provided Customer Support Agent example dataset: [Download Dataset](https://huggingface.co/datasets/MakTek/Customer_support_faqs_dataset/resolve/main/train_expanded.json)
@@ -42,13 +50,17 @@ This example demonstrates how to evaluate a customer support agent.
 4. Choose "Upload CSV" and select the dataset file:
 
 <Frame>
-<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.26.31_2.png" alt="" style={{ maxWidth: '400px' }} />
+  <img
+    src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.26.31_2.png"
+    alt=""
+    style={{ maxWidth: "400px" }}
+  />
 </Frame>
 
 5. Save the dataset. You should see all 200 examples displayed:
 
 <Frame>
-<img src="/images/offline-evaluation/image.png" alt="" style={{ maxWidth: '400px' }} />
+  <img src="/images/offline-evaluation/image.png" alt="" style={{ maxWidth: "400px" }} />
 </Frame>
 
 6. Click "Next". Select an executor to run your examples. This can be an API endpoint from your application, a Python code block, or a prompt.
@@ -56,7 +68,11 @@ This example demonstrates how to evaluate a customer support agent.
 For this example, select "Create a prompt":
 
 <Frame>
-<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.26.31_3.png" alt="" style={{ maxWidth: '400px' }} />
+  <img
+    src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.26.31_3.png"
+    alt=""
+    style={{ maxWidth: "400px" }}
+  />
 </Frame>
 
 7. Paste the following sample Customer Service prompt:
@@ -145,31 +161,47 @@ For this example, select "Create a prompt":
 8. Select the LLM to execute this evaluation. This example uses gemini-2.0-flash-lite:
 
 <Frame>
-<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.52.21.png" alt="" style={{ maxWidth: '400px' }} />
+  <img
+    src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.52.21.png"
+    alt=""
+    style={{ maxWidth: "400px" }}
+  />
 </Frame>
 
 9. Select an evaluator based on your use case. Since this example has expected answers beforehand, select "Expected Answer Evaluation":
 
 <Frame>
-<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png" alt="" style={{ maxWidth: '400px' }} />
+  <img
+    src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png"
+    alt=""
+    style={{ maxWidth: "400px" }}
+  />
 </Frame>
 
 10. Select "LLM Answer Match". This evaluator uses an LLM to compare the generated answer (output) with the gold standard answer (expected_output) to verify semantic equivalence, even when phrased differently:
 
 <Frame>
-<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.54.59.png" alt="" style={{ maxWidth: '400px' }} />
+  <img
+    src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.54.59.png"
+    alt=""
+    style={{ maxWidth: "400px" }}
+  />
 </Frame>
 
 11. Click "Next". Provide a name for your evaluation and click "Run Evaluation":
 
 <Frame>
-<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.26.31_4.png" alt="" style={{ maxWidth: '400px' }} />
+  <img
+    src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.26.31_4.png"
+    alt=""
+    style={{ maxWidth: "400px" }}
+  />
 </Frame>
 
 12. Review the results. This evaluation achieved a 95% pass rate, with only a few answers requiring refinement.
 
 <Frame>
-<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_17.12.05.png" />
+  <img src="/images/offline-evaluation/Screenshot_2025-04-17_at_17.12.05.png" />
 </Frame>
 
 You can now iterate on the prompt to address the failing questions. After making adjustments, run the evaluation again to ensure no regressions occur in previously passing examples.

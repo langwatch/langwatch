@@ -56,10 +56,7 @@ interface SpecSchemaNode {
 }
 
 interface SpecOperation {
-  responses?: Record<
-    string,
-    { content?: Record<string, { schema?: SpecSchemaNode }> }
-  >;
+  responses?: Record<string, { content?: Record<string, { schema?: SpecSchemaNode }> }>;
 }
 
 let organization: Organization;
@@ -74,13 +71,7 @@ let callerPersonalProjectId: string;
 /** A user-bound key for the caller, carrying an org-wide admin binding. */
 let callerToken: string;
 
-const authHeaders = ({
-  apiKey,
-  projectId,
-}: {
-  apiKey: string;
-  projectId: string;
-}) => ({
+const authHeaders = ({ apiKey, projectId }: { apiKey: string; projectId: string }) => ({
   Authorization: `Bearer ${apiKey}`,
   "X-Project-Id": projectId,
 });
@@ -361,8 +352,7 @@ describe("Feature: Pull request usage REST API", () => {
       }
 
       const properties =
-        operation.responses?.["200"]?.content?.["application/json"]?.schema
-          ?.properties;
+        operation.responses?.["200"]?.content?.["application/json"]?.schema?.properties;
       if (!properties) {
         throw new Error(
           `GET ${USAGE_SPEC_PATH} publishes no 200 JSON schema in the generated OpenAPI document`,
@@ -376,11 +366,7 @@ describe("Feature: Pull request usage REST API", () => {
         expect.arrayContaining(["billedCostUsd", "nonBilledCostUsd"]),
       );
       expect(answer().totals?.required).toEqual(
-        expect.arrayContaining([
-          "costUsd",
-          "billedCostUsd",
-          "nonBilledCostUsd",
-        ]),
+        expect.arrayContaining(["costUsd", "billedCostUsd", "nonBilledCostUsd"]),
       );
     });
 
@@ -406,9 +392,7 @@ describe("Feature: Pull request usage REST API", () => {
     });
 
     it("keeps the pull request's own title out of the answer", () => {
-      expect(Object.keys(answer().pullRequest?.properties ?? {})).not.toContain(
-        "title",
-      );
+      expect(Object.keys(answer().pullRequest?.properties ?? {})).not.toContain("title");
     });
   });
 });

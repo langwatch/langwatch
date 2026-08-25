@@ -43,10 +43,10 @@ type CommandBase = z.infer<typeof CommandSchema>;
  * Generic command type with type-safe payload and metadata.
  * Commands represent intent to change system state and are processed by command handlers to produce events.
  */
-export type Command<
-  Payload = unknown,
-  Metadata = Record<string, unknown>,
-> = Omit<CommandBase, "data" | "metadata"> & {
+export type Command<Payload = unknown, Metadata = Record<string, unknown>> = Omit<
+  CommandBase,
+  "data" | "metadata"
+> & {
   /**
    * Command-specific payload.
    * Commands should be explicit, stable contracts between callers and handlers.
@@ -105,9 +105,7 @@ export interface CommandHandler<
  * @returns The validated command
  * @throws {z.ZodError} If the command is invalid
  */
-export function validateCommand(
-  command: unknown,
-): z.infer<typeof CommandSchema> {
+export function validateCommand(command: unknown): z.infer<typeof CommandSchema> {
   return CommandSchema.parse(command);
 }
 
@@ -124,10 +122,7 @@ export function validateCommand(
  * @param metadata - Optional metadata (e.g., correlation IDs, trace context)
  * @returns A new command object
  */
-export function createCommand<
-  Payload = unknown,
-  Metadata = Record<string, unknown>,
->(
+export function createCommand<Payload = unknown, Metadata = Record<string, unknown>>(
   tenantId: TenantId,
   aggregateId: string,
   type: CommandType,

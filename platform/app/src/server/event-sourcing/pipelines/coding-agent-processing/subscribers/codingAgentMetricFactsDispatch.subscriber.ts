@@ -30,9 +30,7 @@ const logger = createLogger("langwatch:coding-agent:metric-facts-dispatch");
  * contributes nothing here.
  */
 export function createCodingAgentMetricFactsDispatchSubscriber(deps: {
-  contributeMetricFacts: (
-    data: ContributeMetricFactsCommandData,
-  ) => Promise<void>;
+  contributeMetricFacts: (data: ContributeMetricFactsCommandData) => Promise<void>;
 }): EventSubscriberDefinition<MetricProcessingEvent> {
   return {
     name: "codingAgentMetricFactsDispatch",
@@ -128,7 +126,5 @@ function parsePointAttributes(
 function serviceNameFromResource(json: string): string | null {
   const resource = parsePointAttributes(json);
   const serviceName = resource?.["service.name"];
-  return typeof serviceName === "string" && serviceName.length > 0
-    ? serviceName
-    : null;
+  return typeof serviceName === "string" && serviceName.length > 0 ? serviceName : null;
 }

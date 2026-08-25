@@ -14,12 +14,10 @@ export interface ConversationExpandState {
   shouldExpandAll: boolean;
 }
 
-export const ConversationExpandContext = createContext<ConversationExpandState>(
-  {
-    isExpandable: false,
-    shouldExpandAll: false,
-  },
-);
+export const ConversationExpandContext = createContext<ConversationExpandState>({
+  isExpandable: false,
+  shouldExpandAll: false,
+});
 
 export const useConversationExpand = (): ConversationExpandState =>
   useContext(ConversationExpandContext);

@@ -6,14 +6,11 @@ const mockObserveQueryDuration = vi.fn();
 const mockIncrementQueryCount = vi.fn();
 
 vi.mock("~/server/clickhouse/metrics", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/clickhouse/metrics")>();
+  const actual = await importOriginal<typeof import("~/server/clickhouse/metrics")>();
   return {
     ...actual,
-    observeClickHouseQueryDuration: (...args: any[]) =>
-      mockObserveQueryDuration(...args),
-    incrementClickHouseQueryCount: (...args: any[]) =>
-      mockIncrementQueryCount(...args),
+    observeClickHouseQueryDuration: (...args: any[]) => mockObserveQueryDuration(...args),
+    incrementClickHouseQueryCount: (...args: any[]) => mockIncrementQueryCount(...args),
   };
 });
 
@@ -149,8 +146,7 @@ describe("createResilientClickHouseClient()", () => {
     const transientCases = [
       {
         label: "TOO_MANY_SIMULTANEOUS_QUERIES (overload, message-only)",
-        message:
-          "Code: 202. DB::Exception: Too many simultaneous queries. Maximum: 100.",
+        message: "Code: 202. DB::Exception: Too many simultaneous queries. Maximum: 100.",
       },
       {
         label: "MEMORY_LIMIT_EXCEEDED (overload, message-only)",
@@ -159,8 +155,7 @@ describe("createResilientClickHouseClient()", () => {
       },
       {
         label: "QUERY_WAS_CANCELLED (CH replica graceful shutdown)",
-        message:
-          "Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED)",
+        message: "Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED)",
       },
       {
         label: "TABLE_IS_READ_ONLY (ZK session lost)",
@@ -200,10 +195,7 @@ describe("createResilientClickHouseClient()", () => {
         await wrapper.query({ query: "SELECT 1" } as any);
 
         expect(query).toHaveBeenCalledTimes(2);
-        expect(mockIncrementQueryCount).toHaveBeenCalledWith(
-          "SELECT",
-          "success",
-        );
+        expect(mockIncrementQueryCount).toHaveBeenCalledWith("SELECT", "success");
       });
     }
 
@@ -216,9 +208,7 @@ describe("createResilientClickHouseClient()", () => {
         const insert = vi
           .fn()
           .mockRejectedValue(
-            new Error(
-              "Code: 202. DB::Exception: Too many simultaneous queries.",
-            ),
+            new Error("Code: 202. DB::Exception: Too many simultaneous queries."),
           );
         const client = {
           query: vi.fn(),

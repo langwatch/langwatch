@@ -15,9 +15,7 @@ describe("presence contract", () => {
   };
 
   it("validates a portable location and durable snapshot", () => {
-    expect(presenceLocationSchema.parse(session.location)).toEqual(
-      session.location,
-    );
+    expect(presenceLocationSchema.parse(session.location)).toEqual(session.location);
     expect(
       presenceEventSchema.parse({ kind: "snapshot", sessions: [session] }),
     ).toMatchObject({ kind: "snapshot" });

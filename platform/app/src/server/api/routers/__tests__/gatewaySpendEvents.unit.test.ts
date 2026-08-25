@@ -45,14 +45,10 @@ const readSpendEventsPage = vi.hoisted(() => vi.fn());
 // between the repository and undefined to stand in for a deployment
 // without ClickHouse.
 const spendEventsRepository = vi.hoisted(() => ({
-  current: undefined as
-    | { readSpendEventsPage: typeof readSpendEventsPage }
-    | undefined,
+  current: undefined as { readSpendEventsPage: typeof readSpendEventsPage } | undefined,
 }));
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   return {
     // Consumers that degrade without Redis read through this one.
     tryGetApp: () => null,
@@ -104,14 +100,10 @@ function buildCaller() {
   });
   ctx.prisma = {
     project: {
-      findUnique: vi
-        .fn()
-        .mockResolvedValue({ team: { organizationId: "org_1" } }),
+      findUnique: vi.fn().mockResolvedValue({ team: { organizationId: "org_1" } }),
     },
     virtualKey: {
-      findMany: vi
-        .fn()
-        .mockResolvedValue([{ id: "vk_1", name: "Customer A key" }]),
+      findMany: vi.fn().mockResolvedValue([{ id: "vk_1", name: "Customer A key" }]),
     },
   } as unknown as PrismaClient;
   return gatewaySpendEventsRouter.createCaller(ctx);
@@ -197,9 +189,7 @@ describe("gatewaySpendEventsRouter", () => {
   it("denies without the gateway usage view scope", async () => {
     denied.add("gatewayUsage:view");
     const caller = buildCaller();
-    await expect(caller.list(BASE_INPUT)).rejects.toThrow(
-      "You do not have permission",
-    );
+    await expect(caller.list(BASE_INPUT)).rejects.toThrow("You do not have permission");
     expect(readSpendEventsPage).not.toHaveBeenCalled();
   });
 });

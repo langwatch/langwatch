@@ -14,15 +14,10 @@ import { ColumnPickerContent } from "./ColumnPickerContent";
  * `compact` drops the dropdown chevron when the toolbar is squeezed, leaving
  * just the columns glyph (the tooltip + click behaviour are unchanged).
  */
-export const ColumnsDropdown: React.FC<{ compact?: boolean }> = ({
-  compact = false,
-}) => {
+export const ColumnsDropdown: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   return (
     <Popover.Root positioning={{ placement: "bottom-end" }}>
-      <Tooltip
-        content="Show or hide columns"
-        positioning={{ placement: "bottom" }}
-      >
+      <Tooltip content="Show or hide columns" positioning={{ placement: "bottom" }}>
         <TriggerAnchor>
           <Popover.Trigger asChild>
             <Button

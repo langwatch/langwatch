@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  VStack,
-  Wrap,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Spacer, Text, VStack, Wrap } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 import type {
   CustomModelEntry,
@@ -80,12 +71,10 @@ export function AddCustomModelDialog({
   const [modelId, setModelId] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [maxTokens, setMaxTokens] = useState(String(DEFAULT_MAX_TOKENS));
-  const [supportedParameters, setSupportedParameters] = useState<
-    SupportedParameter[]
-  >([...DEFAULT_PARAMETERS]);
-  const [multimodalInputs, setMultimodalInputs] = useState<MultimodalInput[]>(
-    [],
-  );
+  const [supportedParameters, setSupportedParameters] = useState<SupportedParameter[]>([
+    ...DEFAULT_PARAMETERS,
+  ]);
+  const [multimodalInputs, setMultimodalInputs] = useState<MultimodalInput[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const displayNameTouched = useRef(false);
   const initialized = useRef(false);
@@ -150,13 +139,10 @@ export function AddCustomModelDialog({
       modelId: modelId.trim(),
       displayName: displayName.trim(),
       mode: "chat",
-      maxTokens: Number.isNaN(parsedMaxTokens)
-        ? DEFAULT_MAX_TOKENS
-        : parsedMaxTokens,
+      maxTokens: Number.isNaN(parsedMaxTokens) ? DEFAULT_MAX_TOKENS : parsedMaxTokens,
       supportedParameters:
         supportedParameters.length > 0 ? supportedParameters : undefined,
-      multimodalInputs:
-        multimodalInputs.length > 0 ? multimodalInputs : undefined,
+      multimodalInputs: multimodalInputs.length > 0 ? multimodalInputs : undefined,
     };
 
     const result = customModelEntrySchema.safeParse(entry);
@@ -187,14 +173,8 @@ export function AddCustomModelDialog({
   ]);
 
   return (
-    <DialogRoot
-      open={open}
-      onOpenChange={(e) => !e.open && handleClose()}
-      size="md"
-    >
-      <DialogContent
-        {...(dialogBackground ? { background: dialogBackground } : {})}
-      >
+    <DialogRoot open={open} onOpenChange={(e) => !e.open && handleClose()} size="md">
+      <DialogContent {...(dialogBackground ? { background: dialogBackground } : {})}>
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Model" : "Add Model"}</DialogTitle>
         </DialogHeader>
@@ -265,11 +245,7 @@ export function AddCustomModelDialog({
               borderBottomWidth="1px"
               paddingY={5}
             >
-              <HStack
-                width="full"
-                flexDirection={["column", "column", "row"]}
-                gap={4}
-              >
+              <HStack width="full" flexDirection={["column", "column", "row"]} gap={4}>
                 <VStack align="start" gap={1} width="full">
                   <Text fontWeight="medium">Supported Parameters</Text>
                   <Text fontSize="13px" color="fg.muted">
@@ -295,11 +271,7 @@ export function AddCustomModelDialog({
             </Box>
 
             <Box role="group" aria-label="Multimodal Support" paddingY={5}>
-              <HStack
-                width="full"
-                flexDirection={["column", "column", "row"]}
-                gap={4}
-              >
+              <HStack width="full" flexDirection={["column", "column", "row"]} gap={4}>
                 <VStack align="start" gap={1} width="full">
                   <Text fontWeight="medium">Multimodal Support</Text>
                   <Text fontSize="13px" color="fg.muted">

@@ -40,11 +40,11 @@ Code is organized into three layers. The **domain layer** (Service + Repository)
 
 ## When to Use
 
-| Layer | Responsibility | Examples |
-|-------|----------------|----------|
-| Router | Request/response handling, auth. Lets domain errors through untouched | `suite.router.ts`, `dataset.router.ts` |
-| Service | Business logic, orchestration, validation | `DatasetService`, `SuiteService` |
-| Repository | Pure data access (CRUD), no business logic | `DatasetRepository`, `SuiteRepository` |
+| Layer      | Responsibility                                                        | Examples                               |
+| ---------- | --------------------------------------------------------------------- | -------------------------------------- |
+| Router     | Request/response handling, auth. Lets domain errors through untouched | `suite.router.ts`, `dataset.router.ts` |
+| Service    | Business logic, orchestration, validation                             | `DatasetService`, `SuiteService`       |
+| Repository | Pure data access (CRUD), no business logic                            | `DatasetRepository`, `SuiteRepository` |
 
 ## Repository Layer
 
@@ -68,6 +68,7 @@ export class DatasetRepository {
 ```
 
 **Repository rules:**
+
 - Constructor takes only database client
 - Methods are simple CRUD operations
 - No default resolution or business validation
@@ -97,13 +98,15 @@ export class DatasetService {
 
   async upsertDataset(params: UpsertDatasetParams) {
     // Business logic: resolve name, check conflicts, migrate columns
-    const resolvedName = name ?? (await this.resolveExperimentName(projectId, experimentId));
+    const resolvedName =
+      name ?? (await this.resolveExperimentName(projectId, experimentId));
     // ... orchestrate repositories
   }
 }
 ```
 
 **Service rules:**
+
 - Use `static create()` factory method for instantiation
 - Orchestrate multiple repositories
 - Apply business rules, validation, default resolution
@@ -114,7 +117,7 @@ export class DatasetService {
 Services throw framework-agnostic errors from a per-domain `errors.ts`. **Read
 [`error-handling.md`](./error-handling.md) and
 [ADR-045](../adr/045-domain-errors-handled-boundary.md) before adding one** —
-they own the decision of *when* an error is a `HandledError` and what goes on it.
+they own the decision of _when_ an error is a `HandledError` and what goes on it.
 The short version, and the part that concerns this pattern:
 
 A failure the caller can act on is a `HandledError` subclass with a stable
@@ -142,7 +145,7 @@ does not rebuild a `TRPCError` around the caught message. That older shape
 router) is exactly what ADR-045 replaced: it puts server prose on the wire as if
 it were API copy, and it has to be rewritten at every call site that rethrows.
 
-Anything you *cannot* name — a dropped connection, a bug — stays a plain `Error`
+Anything you _cannot_ name — a dropped connection, a bug — stays a plain `Error`
 and correctly degrades to "unknown" at the boundary. Do not dress it up.
 
 Adding a handled code is three edits, not one: the subclass here, the code in
@@ -189,23 +192,23 @@ export { suiteTargetSchema, type SuiteTarget } from "~/server/suites/types";
 
 ## Decision Checklist
 
-| Question | Answer |
-|----------|--------|
-| Is it storage/retrieval? | Repository |
+| Question                                   | Answer            |
+| ------------------------------------------ | ----------------- |
+| Is it storage/retrieval?                   | Repository        |
 | Is it exposing functionality (HTTP, tRPC)? | Router/Controller |
-| Is it unique business logic? | Service |
-| Need CRUD only? | Repository |
-| Need default resolution? | Service |
-| Need to orchestrate multiple entities? | Service |
-| Need validation beyond schema? | Service |
+| Is it unique business logic?               | Service           |
+| Need CRUD only?                            | Repository        |
+| Need default resolution?                   | Service           |
+| Need to orchestrate multiple entities?     | Service           |
+| Need validation beyond schema?             | Service           |
 
 ## Testing
 
 Follow the [Testing Philosophy](../TESTING_PHILOSOPHY.md):
 
-| Test Type | What to Test | Database |
-|-----------|--------------|----------|
-| **Integration** | Service + Repository together | Real (testcontainers) |
-| **Unit** | Pure logic only (e.g., `resolveDefaults`) | None needed |
+| Test Type       | What to Test                              | Database              |
+| --------------- | ----------------------------------------- | --------------------- |
+| **Integration** | Service + Repository together             | Real (testcontainers) |
+| **Unit**        | Pure logic only (e.g., `resolveDefaults`) | None needed           |
 
 **Avoid mocking repositories** - it tests implementation details. If the service works with a real database, it works.

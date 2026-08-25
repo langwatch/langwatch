@@ -1,8 +1,5 @@
 import type { ProcessManagerDefinition } from "@langwatch/eventing";
-import {
-  type AutomationsPipelineDeps,
-  createAutomationsPipeline,
-} from "../pipeline";
+import { type AutomationsPipelineDeps, createAutomationsPipeline } from "../pipeline";
 
 /** Pull one process-manager definition out of the real automations pipeline
  *  with inert stub deps — the PM topology lives inline in `pipeline.ts`

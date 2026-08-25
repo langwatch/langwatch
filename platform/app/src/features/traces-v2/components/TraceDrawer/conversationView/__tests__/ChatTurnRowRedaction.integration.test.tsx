@@ -12,9 +12,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 vi.mock("../../scenarioRoles", async () => {
-  const actual = await vi.importActual<typeof import("../../scenarioRoles")>(
-    "../../scenarioRoles",
-  );
+  const actual =
+    await vi.importActual<typeof import("../../scenarioRoles")>("../../scenarioRoles");
   return { ...actual, useIsScenarioRole: () => false };
 });
 
@@ -129,9 +128,7 @@ describe("ChatTurnRow redaction", () => {
         { assistant: "the answer" },
       );
       expect(screen.getByText("Redacted")).toBeInTheDocument();
-      expect(
-        screen.getByText(/hidden by privacy settings/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/hidden by privacy settings/i)).toBeInTheDocument();
     });
   });
 

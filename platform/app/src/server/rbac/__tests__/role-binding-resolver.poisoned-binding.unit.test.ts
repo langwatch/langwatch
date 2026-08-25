@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
-import {
-  checkRoleBindingPermission,
-  type ScopeRef,
-} from "../role-binding-resolver";
+import { checkRoleBindingPermission, type ScopeRef } from "../role-binding-resolver";
 
 const ORG_ID = "org_a";
 const OTHER_ORG_ID = "org_b";
@@ -60,10 +57,7 @@ const exclusivityMatches = (
   clause: ExclusivityClause,
 ): boolean => {
   const owner = clause.roleBindings?.every?.apiKeyId;
-  if (
-    owner !== undefined &&
-    !(role.boundApiKeyIds ?? []).every((id) => id === owner)
-  ) {
+  if (owner !== undefined && !(role.boundApiKeyIds ?? []).every((id) => id === owner)) {
     return false;
   }
   if (clause.assignedUsers?.none && (role.assignedUserCount ?? 0) > 0) {
@@ -79,17 +73,11 @@ function makePrisma({
   bindings: StoredBinding[];
   customRoles: StoredCustomRole[];
 }) {
-  const matches = (
-    role: StoredCustomRole,
-    where: Record<string, unknown>,
-  ): boolean => {
+  const matches = (role: StoredCustomRole, where: Record<string, unknown>): boolean => {
     if (
       !fieldMatches(role.id, where.id) ||
       !fieldMatches(role.organizationId, where.organizationId) ||
-      !kindMatches(
-        role.kind,
-        where.kind as string | { not?: string } | undefined,
-      )
+      !kindMatches(role.kind, where.kind as string | { not?: string } | undefined)
     ) {
       return false;
     }

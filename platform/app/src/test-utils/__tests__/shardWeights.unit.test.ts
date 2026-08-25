@@ -3,9 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import DurationManifestReporter, {
-  mergeDurations,
-} from "../durationManifestReporter";
+import DurationManifestReporter, { mergeDurations } from "../durationManifestReporter";
 import { createWeigher, loadDurationManifest } from "../shardWeights";
 
 /** A vitest TestModule, as much of one as the reporter actually reads. */
@@ -93,9 +91,7 @@ describe("shard weights", () => {
         root,
       });
 
-      expect(weigh(path.join(root, "does-not-exist.test.ts"))).toBeGreaterThan(
-        0,
-      );
+      expect(weigh(path.join(root, "does-not-exist.test.ts"))).toBeGreaterThan(0);
     });
   });
 
@@ -219,11 +215,7 @@ describe("shard weights", () => {
         measured: { "a.test.ts": 3 },
       });
 
-      expect(Object.keys(merged)).toEqual([
-        "a.test.ts",
-        "m.test.ts",
-        "z.test.ts",
-      ]);
+      expect(Object.keys(merged)).toEqual(["a.test.ts", "m.test.ts", "z.test.ts"]);
     });
   });
 });

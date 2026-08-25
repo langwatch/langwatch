@@ -19,9 +19,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
  * transactionally, so a replayed or redelivered event converges instead of
  * duplicating.
  */
-export class PrismaTopicModelProjectionRepository
-  implements StateProjectionStore<TopicModelData>
-{
+export class PrismaTopicModelProjectionRepository implements StateProjectionStore<TopicModelData> {
   constructor(private readonly prisma: PrismaClient) {}
 
   async load(
@@ -83,10 +81,7 @@ export class PrismaTopicModelProjectionRepository
       AcceptedAt: projection.cursor.acceptedAt,
       LastEventId: projection.cursor.eventId,
       ProjectionVersion: projection.version,
-    } satisfies Omit<
-      Prisma.TopicModelProjectionUncheckedCreateInput,
-      "id" | "projectId"
-    >;
+    } satisfies Omit<Prisma.TopicModelProjectionUncheckedCreateInput, "id" | "projectId">;
 
     // Parents before subtopics — LOAD-BEARING: relationMode = "prisma"
     // makes the client emulate the Topic self-relation (no DB FK), so a

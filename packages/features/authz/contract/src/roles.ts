@@ -163,10 +163,7 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
   "gatewaySpend:manage",
 ];
 
-const ORG_MEMBER: readonly AuthzPermission[] = [
-  "organization:view",
-  "aiTools:view",
-];
+const ORG_MEMBER: readonly AuthzPermission[] = ["organization:view", "aiTools:view"];
 
 const ROLE_PERMISSION_SETS: Record<BuiltinRoleKey, ReadonlySet<string>> = {
   viewer: new Set(VIEWER),
@@ -178,9 +175,7 @@ const ROLE_PERMISSION_SETS: Record<BuiltinRoleKey, ReadonlySet<string>> = {
   "org-member": new Set(ORG_MEMBER),
 };
 
-export function builtinRolePermissions(
-  role: BuiltinRoleKey,
-): ReadonlySet<string> {
+export function builtinRolePermissions(role: BuiltinRoleKey): ReadonlySet<string> {
   return ROLE_PERMISSION_SETS[role];
 }
 

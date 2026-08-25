@@ -84,9 +84,7 @@ export function FieldInfoTooltip({
   const isHover = trigger === "hover";
 
   const [open, setOpen] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  );
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pointerOverTrigger = useRef(false);
 
   const cancelClose = useCallback(() => {
@@ -161,9 +159,7 @@ export function FieldInfoTooltip({
       </Popover.Trigger>
       <Popover.Content
         maxWidth="sm"
-        {...(isHover
-          ? { onMouseEnter: cancelClose, onMouseLeave: closeSoon }
-          : {})}
+        {...(isHover ? { onMouseEnter: cancelClose, onMouseLeave: closeSoon } : {})}
       >
         <Popover.Arrow>
           <Popover.ArrowTip />

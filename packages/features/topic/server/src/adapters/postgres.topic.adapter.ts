@@ -1,5 +1,8 @@
 import type { TopicService as TopicServiceContract } from "@langwatch/topic-contract";
-import { PrismaTopicRepository, type TopicDatabase } from "../repositories/prisma/prisma.topic.repository";
+import {
+  PrismaTopicRepository,
+  type TopicDatabase,
+} from "../repositories/prisma/prisma.topic.repository";
 import { TopicService } from "../services/topic.service";
 import type { TopicClusteringSchedulePort } from "../ports/topic-clustering-schedule.port";
 

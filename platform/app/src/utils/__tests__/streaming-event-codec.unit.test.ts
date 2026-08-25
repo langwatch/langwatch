@@ -16,9 +16,7 @@ describe("streaming-event-codec", () => {
   describe("encodeStart()", () => {
     describe("when messageIndex is not provided", () => {
       it("produces JSON with e='S' and no i key", () => {
-        const result = JSON.parse(
-          encodeStart({ ...baseFields, role: "assistant" }),
-        );
+        const result = JSON.parse(encodeStart({ ...baseFields, role: "assistant" }));
 
         expect(result).toEqual({
           e: "S",
@@ -62,9 +60,7 @@ describe("streaming-event-codec", () => {
   describe("encodeContent()", () => {
     describe("when delta is a simple string", () => {
       it("produces JSON with e='C' and delta preserved exactly", () => {
-        const result = JSON.parse(
-          encodeContent({ ...baseFields, delta: "hello" }),
-        );
+        const result = JSON.parse(encodeContent({ ...baseFields, delta: "hello" }));
 
         expect(result).toEqual({
           e: "C",
@@ -111,9 +107,7 @@ describe("streaming-event-codec", () => {
 
     describe("when content is provided", () => {
       it("includes the c key with the content value", () => {
-        const result = JSON.parse(
-          encodeEnd({ ...baseFields, content: "full message" }),
-        );
+        const result = JSON.parse(encodeEnd({ ...baseFields, content: "full message" }));
 
         expect(result).toEqual({
           e: "E",
@@ -139,25 +133,19 @@ describe("streaming-event-codec", () => {
   describe("isCompactStreamingEvent()", () => {
     describe("when parsed has e='S'", () => {
       it("returns true", () => {
-        expect(
-          isCompactStreamingEvent({ e: "S", r: "r", b: "b", m: "m" }),
-        ).toBe(true);
+        expect(isCompactStreamingEvent({ e: "S", r: "r", b: "b", m: "m" })).toBe(true);
       });
     });
 
     describe("when parsed has e='C'", () => {
       it("returns true", () => {
-        expect(
-          isCompactStreamingEvent({ e: "C", r: "r", b: "b", m: "m" }),
-        ).toBe(true);
+        expect(isCompactStreamingEvent({ e: "C", r: "r", b: "b", m: "m" })).toBe(true);
       });
     });
 
     describe("when parsed has e='E'", () => {
       it("returns true", () => {
-        expect(
-          isCompactStreamingEvent({ e: "E", r: "r", b: "b", m: "m" }),
-        ).toBe(true);
+        expect(isCompactStreamingEvent({ e: "E", r: "r", b: "b", m: "m" })).toBe(true);
       });
     });
 

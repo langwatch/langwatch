@@ -18,30 +18,26 @@ function projectId(): string {
 }
 
 export async function listSecrets(): Promise<SecretSummary[]> {
-  return makeRequest(
-    "POST",
-    "/api/secrets/latest/secrets.list",
-    { projectId: projectId() },
-  ) as Promise<SecretSummary[]>;
+  return makeRequest("POST", "/api/secrets/latest/secrets.list", {
+    projectId: projectId(),
+  }) as Promise<SecretSummary[]>;
 }
 
 export async function getSecret(id: string): Promise<SecretSummary> {
-  return makeRequest(
-    "POST",
-    "/api/secrets/latest/secrets.get",
-    { projectId: projectId(), id },
-  ) as Promise<SecretSummary>;
+  return makeRequest("POST", "/api/secrets/latest/secrets.get", {
+    projectId: projectId(),
+    id,
+  }) as Promise<SecretSummary>;
 }
 
 export async function createSecret(data: {
   name: string;
   value: string;
 }): Promise<SecretSummary> {
-  return makeRequest(
-    "POST",
-    "/api/secrets/latest/secrets.create",
-    { projectId: projectId(), ...data },
-  ) as Promise<SecretSummary>;
+  return makeRequest("POST", "/api/secrets/latest/secrets.create", {
+    projectId: projectId(),
+    ...data,
+  }) as Promise<SecretSummary>;
 }
 
 export async function updateSecret(params: {
@@ -57,7 +53,7 @@ export async function updateSecret(params: {
 }
 
 export async function deleteSecret(
-  id: string
+  id: string,
 ): Promise<{ id: string; deleted: boolean }> {
   return makeRequest("POST", "/api/secrets/latest/secrets.delete", {
     projectId: projectId(),

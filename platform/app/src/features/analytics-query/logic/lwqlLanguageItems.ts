@@ -124,18 +124,14 @@ const FUNCTIONS: readonly string[] = [
  * Static by construction — nothing here reads the schema or the network.
  */
 export const LWQL_LANGUAGE_ITEMS: readonly LangWatchQLLanguageItem[] = [
-  ...KEYWORDS.map(
-    (label): LangWatchQLLanguageItem => ({
-      label,
-      kind: "keyword",
-      detail: "keyword",
-    }),
-  ),
-  ...FUNCTIONS.map(
-    (label): LangWatchQLLanguageItem => ({
-      label,
-      kind: "function",
-      detail: "function",
-    }),
-  ),
+  ...KEYWORDS.map((label): LangWatchQLLanguageItem => ({
+    label,
+    kind: "keyword",
+    detail: "keyword",
+  })),
+  ...FUNCTIONS.map((label): LangWatchQLLanguageItem => ({
+    label,
+    kind: "function",
+    detail: "function",
+  })),
 ];

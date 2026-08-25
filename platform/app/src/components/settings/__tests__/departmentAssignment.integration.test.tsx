@@ -16,41 +16,39 @@ import DepartmentsPage from "~/pages/governance/departments";
 import { DepartmentPicker } from "../DepartmentPicker";
 import { useDepartmentColumn } from "../useDepartmentColumn";
 
-const { ffEnabled, departmentList, assignments, mutations } = vi.hoisted(
-  () => ({
-    ffEnabled: { current: true },
-    departmentList: {
-      current: [{ id: "dept_mkt", name: "Marketing" }] as Array<{
+const { ffEnabled, departmentList, assignments, mutations } = vi.hoisted(() => ({
+  ffEnabled: { current: true },
+  departmentList: {
+    current: [{ id: "dept_mkt", name: "Marketing" }] as Array<{
+      id: string;
+      name: string;
+    }>,
+  },
+  assignments: {
+    current: {
+      users: [] as Array<{
         id: string;
         name: string;
+        departmentId: string | null;
+      }>,
+      teams: [] as Array<{
+        id: string;
+        name: string;
+        departmentId: string | null;
+      }>,
+      projects: [] as Array<{
+        id: string;
+        name: string;
+        departmentId: string | null;
       }>,
     },
-    assignments: {
-      current: {
-        users: [] as Array<{
-          id: string;
-          name: string;
-          departmentId: string | null;
-        }>,
-        teams: [] as Array<{
-          id: string;
-          name: string;
-          departmentId: string | null;
-        }>,
-        projects: [] as Array<{
-          id: string;
-          name: string;
-          departmentId: string | null;
-        }>,
-      },
-    },
-    mutations: {
-      assignUser: vi.fn(async () => ({})),
-      assignTeam: vi.fn(async () => ({})),
-      assignProject: vi.fn(async () => ({})),
-    },
-  }),
-);
+  },
+  mutations: {
+    assignUser: vi.fn(async () => ({})),
+    assignTeam: vi.fn(async () => ({})),
+    assignProject: vi.fn(async () => ({})),
+  },
+}));
 
 vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: ffEnabled.current, isLoading: false }),
@@ -157,17 +155,17 @@ describe("department assignment UI", () => {
       renderWithChakra(<DepartmentsPage />);
 
       expect(screen.getByText("Create a department")).toBeDefined();
-      expect(
-        screen.getByRole("link", { name: /People/i }).getAttribute("href"),
-      ).toBe("/settings/members");
+      expect(screen.getByRole("link", { name: /People/i }).getAttribute("href")).toBe(
+        "/settings/members",
+      );
       // Anchored to the link title: the Projects link now also mentions the
       // "teams page" in its description and points to /settings/teams too.
-      expect(
-        screen.getByRole("link", { name: /^Teams/i }).getAttribute("href"),
-      ).toBe("/settings/teams");
-      expect(
-        screen.getByRole("link", { name: /^Projects/i }).getAttribute("href"),
-      ).toBe("/settings/teams");
+      expect(screen.getByRole("link", { name: /^Teams/i }).getAttribute("href")).toBe(
+        "/settings/teams",
+      );
+      expect(screen.getByRole("link", { name: /^Projects/i }).getAttribute("href")).toBe(
+        "/settings/teams",
+      );
       // The per-person assignment list is gone: no <select> on the page.
       expect(document.querySelector("select")).toBeNull();
     });

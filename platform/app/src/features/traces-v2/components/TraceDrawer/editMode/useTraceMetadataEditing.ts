@@ -90,9 +90,7 @@ export function useTraceMetadataEditing({
 
   const editing = useMemo(
     () =>
-      enabled
-        ? { edits, onEditAttribute, onResetAttribute, isKeyEditable }
-        : undefined,
+      enabled ? { edits, onEditAttribute, onResetAttribute, isKeyEditable } : undefined,
     [enabled, edits, onEditAttribute, onResetAttribute, isKeyEditable],
   );
 

@@ -35,12 +35,7 @@ function CountBadge({
     <Tooltip content={tooltip}>
       <HStack gap="4px" paddingX="8px" paddingY="2px" borderRadius="md" bg={bg}>
         <Icon size={12} style={{ color: `var(--chakra-colors-${color})` }} />
-        <Text
-          fontSize="xs"
-          fontWeight="semibold"
-          color={color}
-          whiteSpace="nowrap"
-        >
+        <Text fontSize="xs" fontWeight="semibold" color={color} whiteSpace="nowrap">
           {count} {label}
         </Text>
       </HStack>

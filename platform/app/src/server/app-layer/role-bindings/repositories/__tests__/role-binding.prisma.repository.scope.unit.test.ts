@@ -7,10 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  type PrismaClient,
-  RoleBindingScopeType,
-} from "~/generated/prisma/client";
+import { type PrismaClient, RoleBindingScopeType } from "~/generated/prisma/client";
 import { PrismaRoleBindingRepository } from "../role-binding.prisma.repository";
 
 const teamFindFirst = vi.fn();

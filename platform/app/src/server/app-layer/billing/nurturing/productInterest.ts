@@ -9,11 +9,7 @@ import type { CioPersonTraits } from "@langwatch/enterprise-billing-contract";
  * screen ("Pick your flavour") uses different UI keys; the mapping below
  * translates from those UI keys to these trait values.
  */
-export type IntegrationMethodValue =
-  | "coding_agent"
-  | "platform"
-  | "mcp"
-  | "manual_sdk";
+export type IntegrationMethodValue = "coding_agent" | "platform" | "mcp" | "manual_sdk";
 
 /**
  * Maps the UI product selection key to the Customer.io integration_method trait value.

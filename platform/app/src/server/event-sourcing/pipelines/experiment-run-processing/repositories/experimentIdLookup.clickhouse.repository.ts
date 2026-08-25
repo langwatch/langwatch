@@ -5,10 +5,7 @@ const TABLE_NAME = "experiment_runs" as const;
 /** Looks up the experiment a run belongs to, for cross-pipeline wiring. */
 export interface ExperimentIdLookup {
   /** The run's ExperimentId, or null if the run has no row yet. */
-  findExperimentId(input: {
-    tenantId: string;
-    runId: string;
-  }): Promise<string | null>;
+  findExperimentId(input: { tenantId: string; runId: string }): Promise<string | null>;
 }
 
 /**
@@ -17,9 +14,7 @@ export interface ExperimentIdLookup {
  * the `experimentId` it belongs to, and only `experiment_runs` carries that
  * mapping.
  */
-export class ExperimentIdLookupClickHouseRepository
-  implements ExperimentIdLookup
-{
+export class ExperimentIdLookupClickHouseRepository implements ExperimentIdLookup {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async findExperimentId({

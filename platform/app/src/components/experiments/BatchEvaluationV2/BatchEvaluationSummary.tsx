@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Separator,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Separator, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -42,8 +34,7 @@ export function BatchEvaluationV2EvaluationSummary({
 
   const runtime = Math.max(
     run.timestamps.createdAt
-      ? (finishedAt ?? currentTimestamp) -
-          new Date(run.timestamps.createdAt).getTime()
+      ? (finishedAt ?? currentTimestamp) - new Date(run.timestamps.createdAt).getTime()
       : 0,
     0,
   );
@@ -78,11 +69,7 @@ export function BatchEvaluationV2EvaluationSummary({
           return (
             <React.Fragment key={evaluation.name}>
               <VStack align="start" gap={1}>
-                <HoverableBigText
-                  fontWeight="500"
-                  lineClamp={2}
-                  expandable={false}
-                >
+                <HoverableBigText fontWeight="500" lineClamp={2} expandable={false}>
                   {evaluation.name}
                 </HoverableBigText>
                 <HoverableBigText lineClamp={1} expandable={false}>
@@ -175,10 +162,7 @@ export function BatchEvaluationV2EvaluationSummary({
           </HoverableBigText>
           <Box lineClamp={1} whiteSpace="nowrap">
             <FormatMoney
-              amount={
-                (run.summary.datasetCost ?? 0) +
-                (run.summary.evaluationsCost ?? 0)
-              }
+              amount={(run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0)}
               currency="USD"
               format="$0.00[00]"
               tooltip={
@@ -225,12 +209,7 @@ export function BatchEvaluationV2EvaluationSummary({
           <>
             <Spacer />
             <HStack>
-              <Box
-                width="12px"
-                height="12px"
-                background="red.500"
-                borderRadius="full"
-              />
+              <Box width="12px" height="12px" background="red.500" borderRadius="full" />
               <Text>Stopped</Text>
             </HStack>
           </>
@@ -279,10 +258,7 @@ export const getFinishedAt = (
   if (timestamps.finishedAt) {
     return timestamps.finishedAt;
   }
-  if (
-    currentTimestamp - new Date(timestamps.updatedAt).getTime() >
-    2 * 60 * 1000
-  ) {
+  if (currentTimestamp - new Date(timestamps.updatedAt).getTime() > 2 * 60 * 1000) {
     return new Date(timestamps.updatedAt).getTime();
   }
   return undefined;
@@ -300,8 +276,6 @@ export const formatEvaluationSummary = (
         (short ? " " : " pass") +
         (short || evaluation.averagePassed == evaluation.averageScore
           ? ""
-          : ` (${numeral(evaluation.averageScore).format(
-              "0.0[0]",
-            )} avg. score)`)
+          : ` (${numeral(evaluation.averageScore).format("0.0[0]")} avg. score)`)
     : numeral(evaluation.averageScore).format("0.[00]");
 };

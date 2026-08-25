@@ -2,10 +2,7 @@ import { Box, Grid, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { getRegistryEntry } from "../../regions/observability/codegen/registry";
-import type {
-  FrameworkKey,
-  PlatformKey,
-} from "../../regions/observability/types";
+import type { FrameworkKey, PlatformKey } from "../../regions/observability/types";
 import {
   FRAMEWORKS_BY_PLATFORM,
   PLATFORM_OPTIONS,
@@ -19,10 +16,8 @@ import { PlatformGrid } from "./observability/PlatformGrid";
 import { WaitingForTracesChip } from "./observability/WaitingForTracesChip";
 
 export function ObservabilityScreen(): React.ReactElement {
-  const [selectedPlatform, setSelectedPlatform] =
-    useState<PlatformKey>("typescript");
-  const [selectedFramework, setSelectedFramework] =
-    useState<FrameworkKey>("vercel_ai");
+  const [selectedPlatform, setSelectedPlatform] = useState<PlatformKey>("typescript");
+  const [selectedFramework, setSelectedFramework] = useState<FrameworkKey>("vercel_ai");
 
   function handleSelectLanguage(lang: PlatformKey): void {
     setSelectedPlatform(lang);
@@ -74,10 +69,7 @@ export function ObservabilityScreen(): React.ReactElement {
           {selectedEntry?.customComponent ? (
             <>
               <selectedEntry.customComponent />
-              <DocsLinks
-                docs={selectedEntry?.docs}
-                label={selectedEntry?.label ?? ""}
-              />
+              <DocsLinks docs={selectedEntry?.docs} label={selectedEntry?.label ?? ""} />
             </>
           ) : (
             <VStack align="stretch" gap={3} minW={0} w="full">
@@ -87,15 +79,11 @@ export function ObservabilityScreen(): React.ReactElement {
                   platform={selectedPlatform}
                   framework={selectedFramework}
                   languageIconUrl={
-                    PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)
-                      ?.iconUrl
+                    PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)?.iconUrl
                   }
                 />
               </Box>
-              <DocsLinks
-                docs={selectedEntry?.docs}
-                label={selectedEntry?.label ?? ""}
-              />
+              <DocsLinks docs={selectedEntry?.docs} label={selectedEntry?.label ?? ""} />
             </VStack>
           )}
         </VStack>

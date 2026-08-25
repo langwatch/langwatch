@@ -21,10 +21,7 @@ export class DefaultGovernanceOcsfExportService extends GovernanceOcsfExportServ
     repository: GovernanceOcsfExportRepository;
     events?: GovernanceOcsfEventsReaderPort;
   }): DefaultGovernanceOcsfExportService {
-    return new DefaultGovernanceOcsfExportService(
-      options.repository,
-      options.events,
-    );
+    return new DefaultGovernanceOcsfExportService(options.repository, options.events);
   }
 
   async list(input: GovernanceOcsfExportInput): Promise<GovernanceOcsfExportPage> {

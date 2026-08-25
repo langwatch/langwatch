@@ -17,13 +17,7 @@ type Density = "compact" | "comfortable";
  * shown (labels are the whole point of the column); they wrap within the
  * cell rather than collapsing behind a "+N" the way the Model column does.
  */
-function renderLabels({
-  row,
-  density,
-}: {
-  row: TraceListItem;
-  density: Density;
-}) {
+function renderLabels({ row, density }: { row: TraceListItem; density: Density }) {
   // Defensive default: a row that bypassed `mapTraceListPayload` (cached
   // legacy payload, optimistic placeholder) can arrive without `labels`.
   const labels = row.labels ?? [];

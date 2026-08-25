@@ -4,7 +4,11 @@ description: Setup contract only, workspace API key captured; the compliance API
 sidebarTitle: Anthropic Compliance
 ---
 
-<Info>**Pairs with:** [AI Gateway → Anthropic provider](/ai-gateway/providers/anthropic). Direct Anthropic API traffic flows through the gateway data plane; Anthropic Enterprise Compliance API exports are a separate bulk feed routed through this ingestion source.</Info>
+<Info>
+  **Pairs with:** [AI Gateway → Anthropic provider](/ai-gateway/providers/anthropic).
+  Direct Anthropic API traffic flows through the gateway data plane; Anthropic Enterprise
+  Compliance API exports are a separate bulk feed routed through this ingestion source.
+</Info>
 
 `claude_compliance` polls Anthropic's compliance API with a workspace API key. Today the source can be created and the workspace API key is persisted server-side, but the cron worker that calls Anthropic hasn't shipped, events do not flow yet.
 
@@ -22,10 +26,10 @@ The configuration contract below lets admins pre-stage workspace keys; the match
 
 The composer collects:
 
-| Field | Required | Stored | Used by |
-|---|---|---|---|
-| Workspace API key | yes | `IngestionSource.payloadConfig.workspaceApiKey` (hashed server-side) | (future poller) |
-| Polling cadence (seconds) | no | `payloadConfig.pollEverySec` (default 300) | (future poller) |
+| Field                     | Required | Stored                                                               | Used by         |
+| ------------------------- | -------- | -------------------------------------------------------------------- | --------------- |
+| Workspace API key         | yes      | `IngestionSource.payloadConfig.workspaceApiKey` (hashed server-side) | (future poller) |
+| Polling cadence (seconds) | no       | `payloadConfig.pollEverySec` (default 300)                           | (future poller) |
 
 In Anthropic's admin console: **Compliance → Workspace API Keys → Generate**, paste the value into the LangWatch composer.
 

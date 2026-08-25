@@ -17,7 +17,5 @@ export default defineConfig({
   // `env("DATABASE_URL")` resolves eagerly at config load, which would make
   // even `prisma generate` demand a database URL. Only the migrate/db
   // commands need a datasource, so it is attached only when the URL exists.
-  ...(process.env.DATABASE_URL
-    ? { datasource: { url: process.env.DATABASE_URL } }
-    : {}),
+  ...(process.env.DATABASE_URL ? { datasource: { url: process.env.DATABASE_URL } } : {}),
 });

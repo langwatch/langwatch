@@ -25,13 +25,11 @@ type PromptSelection = {
  */
 export function usePromptPickerFlow() {
   const { openDrawer, closeDrawer } = useDrawer();
-  const { setNode, deleteNode, setSelectedNode } = useWorkflowStore(
-    (state) => ({
-      setNode: state.setNode,
-      deleteNode: state.deleteNode,
-      setSelectedNode: state.setSelectedNode,
-    }),
-  );
+  const { setNode, deleteNode, setSelectedNode } = useWorkflowStore((state) => ({
+    setNode: state.setNode,
+    deleteNode: state.deleteNode,
+    setSelectedNode: state.setSelectedNode,
+  }));
 
   const pendingPromptRef = useRef<string | null>(null);
 

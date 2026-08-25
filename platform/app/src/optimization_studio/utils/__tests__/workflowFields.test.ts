@@ -25,11 +25,7 @@ describe("workflowFields", () => {
         data: { behave_as: behaveAs },
       }) as Node<Component>;
 
-    const createEdge = (
-      source: string,
-      target: string,
-      sourceHandle: string,
-    ): Edge => ({
+    const createEdge = (source: string, target: string, sourceHandle: string): Edge => ({
       id: `${source}-${target}`,
       source,
       target,
@@ -127,9 +123,9 @@ describe("workflowFields", () => {
       // "input" connects to signature (non-evaluator) - should be included
       expect(isOutputConnectedToNonEvaluator("input", edges, nodes)).toBe(true);
       // "expected_output" only connects to evaluator - should be excluded
-      expect(
-        isOutputConnectedToNonEvaluator("expected_output", edges, nodes),
-      ).toBe(false);
+      expect(isOutputConnectedToNonEvaluator("expected_output", edges, nodes)).toBe(
+        false,
+      );
     });
   });
 

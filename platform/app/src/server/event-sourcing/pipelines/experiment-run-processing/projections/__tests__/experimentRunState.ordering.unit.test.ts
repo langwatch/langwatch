@@ -14,10 +14,7 @@
  *   have nearly identical or even inverted occurredAt timestamps
  */
 
-import type {
-  FoldProjectionStore,
-  ProjectionStoreContext,
-} from "@langwatch/eventing";
+import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import {
@@ -57,9 +54,7 @@ function createReplacingMergeTreeStore(): FoldProjectionStore<ExperimentRunState
       _ctx: ProjectionStoreContext,
     ): Promise<ExperimentRunStateData | null> {
       if (rows.length === 0) return null;
-      return rows.reduce((best, row) =>
-        row.UpdatedAt > best.UpdatedAt ? row : best,
-      );
+      return rows.reduce((best, row) => (row.UpdatedAt > best.UpdatedAt ? row : best));
     },
   };
 }
@@ -84,10 +79,7 @@ function createStartedEvent(occurredAt: number): ExperimentRunStartedEvent {
   };
 }
 
-function createTargetResultEvent(
-  index: number,
-  occurredAt: number,
-): TargetResultEvent {
+function createTargetResultEvent(index: number, occurredAt: number): TargetResultEvent {
   return {
     id: `evt-target-${index}`,
     aggregateId: "run-1",
@@ -203,30 +195,16 @@ describe("experiment run fold — event ordering invariants", () => {
   const store = createReplacingMergeTreeStore();
   const projection = new ExperimentRunStateFoldProjection({ store });
 
-  function assertCorrectFinalState(
-    state: ExperimentRunStateData,
-    label: string,
-  ) {
+  function assertCorrectFinalState(state: ExperimentRunStateData, label: string) {
     expect(state.FinishedAt, `${label}: FinishedAt must be set`).not.toBeNull();
     expect(state.RunId, `${label}: RunId must be set`).toBe("run-1");
-    expect(state.ExperimentId, `${label}: ExperimentId must be set`).toBe(
-      "experiment-1",
-    );
+    expect(state.ExperimentId, `${label}: ExperimentId must be set`).toBe("experiment-1");
     expect(state.CompletedCount, `${label}: CompletedCount must be 3`).toBe(3);
     expect(state.Progress, `${label}: Progress must be 3`).toBe(3);
-    expect(
-      state.TotalCost,
-      `${label}: TotalCost must be computed`,
-    ).toBeGreaterThan(0);
+    expect(state.TotalCost, `${label}: TotalCost must be computed`).toBeGreaterThan(0);
     expect(state.ScoreCount, `${label}: ScoreCount must be 3`).toBe(3);
-    expect(
-      state.AvgScoreBps,
-      `${label}: AvgScoreBps must be computed`,
-    ).not.toBeNull();
-    expect(
-      state.PassRateBps,
-      `${label}: PassRateBps must be computed`,
-    ).not.toBeNull();
+    expect(state.AvgScoreBps, `${label}: AvgScoreBps must be computed`).not.toBeNull();
+    expect(state.PassRateBps, `${label}: PassRateBps must be computed`).not.toBeNull();
   }
 
   // Production pattern: all events bulk-inserted with same timestamp.
@@ -244,10 +222,7 @@ describe("experiment run fold — event ordering invariants", () => {
       createCompletedEvent(TS),
     ];
 
-    const allPerms = permutations(afterStarted).map((perm) => [
-      started,
-      ...perm,
-    ]);
+    const allPerms = permutations(afterStarted).map((perm) => [started, ...perm]);
 
     describe(`started first, then ${afterStarted.length} events in all ${allPerms.length} orderings`, () => {
       it.each(

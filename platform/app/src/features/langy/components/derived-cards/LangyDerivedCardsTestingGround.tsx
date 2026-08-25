@@ -62,10 +62,7 @@ const TIMESERIES: LangyDerivedCard = {
     baselineLabel: "Last week",
     baseline: 1.37,
   },
-  hints: [
-    { type: "explore", query: { query: "checkout" } },
-    { type: "verify" },
-  ],
+  hints: [{ type: "explore", query: { query: "checkout" } }, { type: "verify" }],
 };
 
 const TABLE: LangyDerivedCard = {
@@ -183,11 +180,7 @@ function StreamingPlayground() {
   return (
     <VStack align="stretch" gap={2}>
       <HStack gap={1.5}>
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={() => setPlaying((p) => !p)}
-        >
+        <Button size="xs" variant="outline" onClick={() => setPlaying((p) => !p)}>
           {playing ? <Pause size={12} /> : <Play size={12} />}
           {playing ? "Pause" : "Play"}
         </Button>
@@ -258,9 +251,7 @@ function ChoicesPlayground({
     ? {
         status: "answered",
         optionIds: selection.optionIds,
-        ...(selection.otherText !== undefined
-          ? { otherText: selection.otherText }
-          : {}),
+        ...(selection.otherText !== undefined ? { otherText: selection.otherText } : {}),
       }
     : movedOn
       ? { status: "superseded" }
@@ -370,11 +361,7 @@ export function LangyDerivedCardsTestingGround() {
       </Labeled>
 
       <Labeled label="Choices — forming (never answerable mid-stream)">
-        <LangyChoicesCard
-          card={CHOICES}
-          lockState={{ status: "open" }}
-          forming
-        />
+        <LangyChoicesCard card={CHOICES} lockState={{ status: "open" }} forming />
       </Labeled>
     </VStack>
   );
@@ -393,8 +380,8 @@ function VerifyDemo() {
       {sent ? (
         <HStack gap={1.5}>
           <Text textStyle="2xs" color="green.fg">
-            Would send: &quot;Verify &quot;Cost per day — derived from the
-            dataset&quot; with a real analytics query…&quot;
+            Would send: &quot;Verify &quot;Cost per day — derived from the dataset&quot;
+            with a real analytics query…&quot;
           </Text>
           <Button size="xs" variant="ghost" onClick={() => setSent(false)}>
             <RotateCcw size={12} /> Reset

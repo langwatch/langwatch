@@ -187,9 +187,7 @@ describe("buildTimeseriesQuery()", () => {
         );
 
         expect(mapped.length).toBeGreaterThan(0);
-        expect([...new Set(mapped)].sort()).toEqual(
-          [...new Set(hoisted)].sort(),
-        );
+        expect([...new Set(mapped)].sort()).toEqual([...new Set(hoisted)].sort());
       });
     });
   });

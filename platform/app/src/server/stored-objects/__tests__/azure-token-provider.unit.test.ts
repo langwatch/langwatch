@@ -125,9 +125,7 @@ describe("getAzureBlobToken", () => {
         tenantId: "tenant-id-from-webhook",
         clientId: "client-id-from-webhook",
       });
-      expect(workloadGetToken).toHaveBeenCalledWith(
-        "https://storage.azure.us/.default",
-      );
+      expect(workloadGetToken).toHaveBeenCalledWith("https://storage.azure.us/.default");
     });
 
     it("scopes to the public-cloud audience when no audience is configured, not the sovereign endpoint's default", async () => {
@@ -140,9 +138,7 @@ describe("getAzureBlobToken", () => {
 
       await getAzureBlobToken(credentialsWithOnlyAuthority);
 
-      expect(workloadGetToken).toHaveBeenCalledWith(
-        "https://storage.azure.com/.default",
-      );
+      expect(workloadGetToken).toHaveBeenCalledWith("https://storage.azure.com/.default");
     });
   });
 
@@ -256,8 +252,7 @@ describe("getAzureBlobToken", () => {
   describe("given workloadIdentity mode and the projected token has rotated on disk", () => {
     /** @scenario "The federated assertion is re-read for every token exchange" */
     it("passes the CURRENT AZURE_FEDERATED_TOKEN_FILE path fresh on every exchange rather than caching content itself", async () => {
-      process.env.AZURE_FEDERATED_TOKEN_FILE =
-        "/var/run/secrets/tokens/original";
+      process.env.AZURE_FEDERATED_TOKEN_FILE = "/var/run/secrets/tokens/original";
       workloadGetToken.mockResolvedValueOnce(futureToken("token-1", 60 * 1000));
 
       await getAzureBlobToken(workloadIdentityCredentials);
@@ -266,8 +261,7 @@ describe("getAzureBlobToken", () => {
       // path, but for a long-running worker the env var itself could also
       // be re-pointed across a pod restart. Change it and force a refresh
       // (the token above is within the safety margin already).
-      process.env.AZURE_FEDERATED_TOKEN_FILE =
-        "/var/run/secrets/tokens/rotated";
+      process.env.AZURE_FEDERATED_TOKEN_FILE = "/var/run/secrets/tokens/rotated";
       workloadGetToken.mockResolvedValueOnce(futureToken("token-2"));
 
       await getAzureBlobToken(workloadIdentityCredentials);
@@ -287,17 +281,15 @@ describe("getAzureBlobToken", () => {
     it("identifies the token exchange as the failure and leaks no credential material", async () => {
       class FakeSdkError extends Error {
         constructor() {
-          super(
-            "CredentialUnavailableError: assertion eyJhbGciOiJSUzI1NiIs... rejected",
-          );
+          super("CredentialUnavailableError: assertion eyJhbGciOiJSUzI1NiIs... rejected");
           this.name = "CredentialUnavailableError";
         }
       }
       workloadGetToken.mockRejectedValue(new FakeSdkError());
 
-      await expect(
-        getAzureBlobToken(workloadIdentityCredentials),
-      ).rejects.toBeInstanceOf(AzureTokenExchangeError);
+      await expect(getAzureBlobToken(workloadIdentityCredentials)).rejects.toBeInstanceOf(
+        AzureTokenExchangeError,
+      );
 
       let thrown: unknown;
       try {
@@ -315,9 +307,9 @@ describe("getAzureBlobToken", () => {
         .mockRejectedValueOnce(new Error("temporary failure"))
         .mockResolvedValueOnce(futureToken("recovered-token"));
 
-      await expect(
-        getAzureBlobToken(workloadIdentityCredentials),
-      ).rejects.toBeInstanceOf(AzureTokenExchangeError);
+      await expect(getAzureBlobToken(workloadIdentityCredentials)).rejects.toBeInstanceOf(
+        AzureTokenExchangeError,
+      );
 
       const recovered = await getAzureBlobToken(workloadIdentityCredentials);
       expect(recovered).toBe("recovered-token");
@@ -365,9 +357,9 @@ describe("getAzureBlobToken", () => {
       });
       workloadGetToken.mockRejectedValueOnce(throttled);
 
-      await expect(
-        getAzureBlobToken(workloadIdentityCredentials),
-      ).rejects.toBeInstanceOf(AzureTokenExchangeError);
+      await expect(getAzureBlobToken(workloadIdentityCredentials)).rejects.toBeInstanceOf(
+        AzureTokenExchangeError,
+      );
 
       // Exactly one attempt: the library owns backoff, we own not compounding it.
       expect(workloadGetToken).toHaveBeenCalledTimes(1);

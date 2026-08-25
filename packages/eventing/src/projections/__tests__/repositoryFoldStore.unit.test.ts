@@ -284,10 +284,7 @@ describe("RepositoryFoldStore", () => {
       repo.getResult = null;
       const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
-      await store.get(
-        "agg-1",
-        makeContext({ tenantId: "tenant-99" as TenantId }),
-      );
+      await store.get("agg-1", makeContext({ tenantId: "tenant-99" as TenantId }));
 
       expect(repo.getProjection).toHaveBeenCalledWith(
         "agg-1",

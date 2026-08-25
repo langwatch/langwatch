@@ -25,13 +25,7 @@ function SeparatorLine() {
   );
 }
 
-function SeparatorLabel({
-  index,
-  hasTrace,
-}: {
-  index: number;
-  hasTrace: boolean;
-}) {
+function SeparatorLabel({ index, hasTrace }: { index: number; hasTrace: boolean }) {
   return (
     <HStack gap={1.5} flexShrink={0}>
       <Text
@@ -65,13 +59,7 @@ function SeparatorLabel({
   );
 }
 
-export function RunTurnSeparator({
-  index,
-  traceId,
-}: {
-  index: number;
-  traceId: string;
-}) {
+export function RunTurnSeparator({ index, traceId }: { index: number; traceId: string }) {
   const { project } = useOrganizationTeamProject();
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
 
@@ -135,7 +123,5 @@ export function RunTurnSeparator({
   );
 
   if (!hasTrace) return separator;
-  return (
-    <TracePreviewHoverCard traceId={traceId}>{separator}</TracePreviewHoverCard>
-  );
+  return <TracePreviewHoverCard traceId={traceId}>{separator}</TracePreviewHoverCard>;
 }

@@ -475,9 +475,7 @@ describe("Global mutation error handler", () => {
 
     it("marks error as handled but skips modal when already open", () => {
       // Pre-open the modal
-      useUpgradeModalStore
-        .getState()
-        .openLiteMemberRestriction({ resource: "prompts" });
+      useUpgradeModalStore.getState().openLiteMemberRestriction({ resource: "prompts" });
 
       const error = new TRPCClientError("Unauthorized", {
         result: {

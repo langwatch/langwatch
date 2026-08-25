@@ -35,9 +35,7 @@ vi.mock("../../../rateLimit", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../rateLimit")>();
   return {
     ...actual,
-    rateLimit: vi
-      .fn()
-      .mockResolvedValue({ allowed: true, resetAt: Date.now() }),
+    rateLimit: vi.fn().mockResolvedValue({ allowed: true, resetAt: Date.now() }),
   };
 });
 
@@ -51,8 +49,7 @@ function createTestCaller(overrides?: { email?: string | null }) {
     session: {
       user: {
         id: "user_test_123",
-        email:
-          overrides && "email" in overrides ? overrides.email : SESSION_EMAIL,
+        email: overrides && "email" in overrides ? overrides.email : SESSION_EMAIL,
       },
       expires: "2099-01-01",
     },

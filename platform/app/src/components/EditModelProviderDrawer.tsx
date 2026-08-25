@@ -18,9 +18,7 @@ type EditModelProviderDrawerProps = {
   providerKey: string;
 };
 
-export const EditModelProviderDrawer = (
-  props: EditModelProviderDrawerProps,
-) => {
+export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => {
   const { projectId, organizationId, modelProviderId, providerKey } = props;
   const { closeDrawer } = useDrawer();
   const { providers, isLoading } = useModelProvidersSettings({ projectId });
@@ -49,8 +47,7 @@ export const EditModelProviderDrawer = (
   // Get provider name for the title
   let providerName = "";
   if (provider) {
-    const providerDef =
-      modelProviders[provider.provider as keyof typeof modelProviders];
+    const providerDef = modelProviders[provider.provider as keyof typeof modelProviders];
     providerName = providerDef?.name || provider.provider;
   }
 
@@ -89,11 +86,7 @@ export const EditModelProviderDrawer = (
           <HStack gap={3}>
             {provider && (
               <Box width="28px" height="28px">
-                {
-                  modelProviderIcons[
-                    provider.provider as keyof typeof modelProviderIcons
-                  ]
-                }
+                {modelProviderIcons[provider.provider as keyof typeof modelProviderIcons]}
               </Box>
             )}
             <Heading as="h2">{title}</Heading>

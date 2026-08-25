@@ -1,11 +1,7 @@
 import { z } from "zod";
 import { organizationIdSchema } from "./organization";
 
-export const organizationTeamRoleSchema = z.enum([
-  "ADMIN",
-  "MEMBER",
-  "VIEWER",
-]);
+export const organizationTeamRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER"]);
 export type OrganizationTeamRole = z.infer<typeof organizationTeamRoleSchema>;
 
 export const organizationLedgerActorSchema = z
@@ -14,9 +10,7 @@ export const organizationLedgerActorSchema = z
     id: z.string().nullable(),
   })
   .strict();
-export type OrganizationLedgerActor = z.infer<
-  typeof organizationLedgerActorSchema
->;
+export type OrganizationLedgerActor = z.infer<typeof organizationLedgerActorSchema>;
 
 export const organizationTeamSchema = z
   .object({
@@ -39,9 +33,7 @@ export const getOrganizationTeamInputSchema = z
     teamId: z.string().min(1),
   })
   .strict();
-export type GetOrganizationTeamInput = z.infer<
-  typeof getOrganizationTeamInputSchema
->;
+export type GetOrganizationTeamInput = z.infer<typeof getOrganizationTeamInputSchema>;
 
 export const listOrganizationTeamsInputSchema = z
   .object({
@@ -50,9 +42,7 @@ export const listOrganizationTeamsInputSchema = z
     limit: z.number().int().positive().max(1_000),
   })
   .strict();
-export type ListOrganizationTeamsInput = z.infer<
-  typeof listOrganizationTeamsInputSchema
->;
+export type ListOrganizationTeamsInput = z.infer<typeof listOrganizationTeamsInputSchema>;
 
 export const organizationTeamPageSchema = z
   .object({
@@ -116,9 +106,7 @@ export const organizationTeamMemberRoleSchema = z.enum([
   "VIEWER",
   "CUSTOM",
 ]);
-export type OrganizationTeamMemberRole = z.infer<
-  typeof organizationTeamMemberRoleSchema
->;
+export type OrganizationTeamMemberRole = z.infer<typeof organizationTeamMemberRoleSchema>;
 
 export const organizationTeamMemberInputSchema = z
   .object({
@@ -159,9 +147,7 @@ export const organizationTeamMemberUserSchema = z
     image: z.string().nullable(),
   })
   .strict();
-export type OrganizationTeamMemberUser = z.infer<
-  typeof organizationTeamMemberUserSchema
->;
+export type OrganizationTeamMemberUser = z.infer<typeof organizationTeamMemberUserSchema>;
 
 export const organizationTeamAssignedRoleSchema = z
   .object({
@@ -190,9 +176,7 @@ export const organizationTeamMemberSchema = z
     user: organizationTeamMemberUserSchema,
   })
   .strict();
-export type OrganizationTeamMember = z.infer<
-  typeof organizationTeamMemberSchema
->;
+export type OrganizationTeamMember = z.infer<typeof organizationTeamMemberSchema>;
 
 export const organizationTeamWithMembersSchema = organizationTeamSchema.extend({
   members: z.array(organizationTeamMemberSchema),
@@ -326,13 +310,12 @@ export type OrganizationProjectOnlyAccess = z.infer<
   typeof organizationProjectOnlyAccessSchema
 >;
 
-export const organizationProjectAccessMemberSchema =
-  organizationTeamAccessMemberSchema
-    .omit({ viaGroupId: true })
-    .extend({
-      source: z.enum(["team", "direct", "override"]),
-      teamRole: organizationTeamMemberRoleSchema.optional(),
-    });
+export const organizationProjectAccessMemberSchema = organizationTeamAccessMemberSchema
+  .omit({ viaGroupId: true })
+  .extend({
+    source: z.enum(["team", "direct", "override"]),
+    teamRole: organizationTeamMemberRoleSchema.optional(),
+  });
 export type OrganizationProjectAccessMember = z.infer<
   typeof organizationProjectAccessMemberSchema
 >;
@@ -345,12 +328,7 @@ export const organizationTeamAccessSchema = z
     projects: z.array(organizationTeamAccessProjectSchema),
     directMembers: z.array(organizationTeamAccessMemberSchema),
     projectOnlyAccess: z.array(organizationProjectOnlyAccessSchema),
-    projectAccess: z.record(
-      z.string(),
-      z.array(organizationProjectAccessMemberSchema),
-    ),
+    projectAccess: z.record(z.string(), z.array(organizationProjectAccessMemberSchema)),
   })
   .strict();
-export type OrganizationTeamAccess = z.infer<
-  typeof organizationTeamAccessSchema
->;
+export type OrganizationTeamAccess = z.infer<typeof organizationTeamAccessSchema>;

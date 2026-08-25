@@ -101,28 +101,23 @@ export class IngestionPullProcess {
           nextWakeAt: null,
           intents: [],
         }))
-        .on(
-          INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED,
-          (state, data, context) => {
-            const current = state.currentRun?.runId === data.runId;
-            return this.settle({
-              state: {
-                ...state,
-                cursor: current ? data.nextCursor : state.cursor,
-                currentRun: current ? null : state.currentRun,
-              },
-              after: this.schedulingReference(context),
-            });
-          },
-        )
+        .on(INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED, (state, data, context) => {
+          const current = state.currentRun?.runId === data.runId;
+          return this.settle({
+            state: {
+              ...state,
+              cursor: current ? data.nextCursor : state.cursor,
+              currentRun: current ? null : state.currentRun,
+            },
+            after: this.schedulingReference(context),
+          });
+        })
         .on(INGESTION_PULL_EVENT_TYPES.RUN_FAILED, (state, data, context) =>
           this.settle({
             state: {
               ...state,
               currentRun:
-                state.currentRun?.runId === data.runId
-                  ? null
-                  : state.currentRun,
+                state.currentRun?.runId === data.runId ? null : state.currentRun,
             },
             after: this.schedulingReference(context),
           }),

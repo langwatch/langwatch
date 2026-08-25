@@ -20,9 +20,7 @@
  */
 import { langyDerivedCardSchema, type LangyDerivedCard } from "../cards/derived-safe.js";
 
-export type LangySalvageResult =
-  | { ok: true; value: unknown }
-  | { ok: false };
+export type LangySalvageResult = { ok: true; value: unknown } | { ok: false };
 
 /** How one tolerant parse step ended. */
 type Step =

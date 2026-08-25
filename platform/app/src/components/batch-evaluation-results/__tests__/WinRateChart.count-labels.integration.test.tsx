@@ -22,19 +22,14 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BatchComparisonColumn } from "../types";
-import {
-  COUNT_LABEL_FONT_SIZE,
-  COUNT_LABEL_OFFSET,
-  WinRateChart,
-} from "../WinRateChart";
+import { COUNT_LABEL_FONT_SIZE, COUNT_LABEL_OFFSET, WinRateChart } from "../WinRateChart";
 
 // recharts lays its chart out from measurements jsdom cannot produce, so the
 // mock surfaces the geometry the component hands it instead. `margin.top` is
 // the reserve under test; before the fix the chart passed no `top` at all and
 // this reads NaN.
 vi.mock("recharts", () => {
-  const MockComponent = ({ children }: { children?: ReactNode }) =>
-    children ?? null;
+  const MockComponent = ({ children }: { children?: ReactNode }) => children ?? null;
   return {
     ResponsiveContainer: MockComponent,
     BarChart: ({
@@ -109,9 +104,7 @@ describe("WinRateChart count labels", () => {
   describe("given a run where one candidate leads", () => {
     /** @scenario "The leading candidate's win count stays legible" */
     it("reserves room above the plot area for the count over the tallest bar", () => {
-      expect(reservedRoomFor([14, 10, 4])).toBeGreaterThanOrEqual(
-        ROOM_A_COUNT_NEEDS,
-      );
+      expect(reservedRoomFor([14, 10, 4])).toBeGreaterThanOrEqual(ROOM_A_COUNT_NEEDS);
     });
   });
 
@@ -130,9 +123,7 @@ describe("WinRateChart count labels", () => {
 
   describe("given nobody has won a row yet", () => {
     it("still reserves the room, so the first count is not clipped", () => {
-      expect(reservedRoomFor([0, 0])).toBeGreaterThanOrEqual(
-        ROOM_A_COUNT_NEEDS,
-      );
+      expect(reservedRoomFor([0, 0])).toBeGreaterThanOrEqual(ROOM_A_COUNT_NEEDS);
     });
   });
 });

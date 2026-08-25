@@ -28,10 +28,7 @@
 
 import { useMemo } from "react";
 
-import {
-  computeVariantMetrics,
-  type VariantMetrics,
-} from "./computeVariantMetrics";
+import { computeVariantMetrics, type VariantMetrics } from "./computeVariantMetrics";
 import type { BatchResultRow } from "./types";
 
 /** Bounded, because a content key has nothing to collect it. */

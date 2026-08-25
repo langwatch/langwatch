@@ -11,7 +11,9 @@ import type {
 } from "@langwatch/suite-contract";
 
 /** Private persistence port for both the Suite fold and its read model. */
-export abstract class SuiteRunRepository implements ProjectionStore<Projection<SuiteRunStateData>> {
+export abstract class SuiteRunRepository implements ProjectionStore<
+  Projection<SuiteRunStateData>
+> {
   abstract getProjection(
     aggregateId: string,
     context: ProjectionStoreReadContext,

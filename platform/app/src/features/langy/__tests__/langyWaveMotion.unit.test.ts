@@ -29,9 +29,7 @@ const assistant = (parts: unknown[]) => ({
 });
 const user = { role: "user", parts: [{ type: "text", text: "hi" }] };
 
-const derive = (
-  overrides: Partial<Parameters<typeof deriveWaveActivity>[0]> = {},
-) =>
+const derive = (overrides: Partial<Parameters<typeof deriveWaveActivity>[0]> = {}) =>
   deriveWaveActivity({
     turnInFlight: false,
     isSettling: false,
@@ -50,9 +48,9 @@ describe("deriveWaveActivity", () => {
   describe("given a turn in flight", () => {
     describe("when nothing has reached the wire", () => {
       it("waits — it never claims work that isn't happening", () => {
-        expect(
-          derive({ turnInFlight: true, messages: [user, assistant([])] }),
-        ).toBe("waiting");
+        expect(derive({ turnInFlight: true, messages: [user, assistant([])] })).toBe(
+          "waiting",
+        );
       });
     });
 
@@ -102,10 +100,7 @@ describe("deriveWaveActivity", () => {
             turnInFlight: true,
             messages: [
               user,
-              assistant([
-                { type: "text", text: "Let me check" },
-                runningToolPart,
-              ]),
+              assistant([{ type: "text", text: "Let me check" }, runningToolPart]),
             ],
           }),
         ).toBe("tool");
@@ -143,9 +138,9 @@ describe("deriveWaveActivity", () => {
 
 describe("WAVE_MOTION_TARGETS", () => {
   it("keeps streaming the most energetic and fastest state", () => {
-    const others = (
-      Object.keys(WAVE_MOTION_TARGETS) as LangyWaveActivity[]
-    ).filter((s) => s !== "streaming");
+    const others = (Object.keys(WAVE_MOTION_TARGETS) as LangyWaveActivity[]).filter(
+      (s) => s !== "streaming",
+    );
     for (const state of others) {
       expect(WAVE_MOTION_TARGETS.streaming.energy).toBeGreaterThan(
         WAVE_MOTION_TARGETS[state].energy,
@@ -173,9 +168,9 @@ describe("WAVE_MOTION_TARGETS", () => {
   });
 
   it("keeps the settling state the stillest", () => {
-    const others = (
-      Object.keys(WAVE_MOTION_TARGETS) as LangyWaveActivity[]
-    ).filter((s) => s !== "settling");
+    const others = (Object.keys(WAVE_MOTION_TARGETS) as LangyWaveActivity[]).filter(
+      (s) => s !== "settling",
+    );
     for (const state of others) {
       expect(WAVE_MOTION_TARGETS.settling.energy).toBeLessThan(
         WAVE_MOTION_TARGETS[state].energy,
@@ -221,9 +216,7 @@ describe("stepWaveMotion", () => {
       const dt = 1 / 60;
       for (let t = 0; t < 5; t += dt) {
         motion = stepWaveMotion({ current: motion, activity: "streaming", dt });
-        expect(motion.energy).toBeLessThanOrEqual(
-          WAVE_MOTION_TARGETS.streaming.energy,
-        );
+        expect(motion.energy).toBeLessThanOrEqual(WAVE_MOTION_TARGETS.streaming.energy);
       }
     });
   });
@@ -233,14 +226,10 @@ describe("stepWaveMotion", () => {
       const busy = { ...WAVE_MOTION_TARGETS.streaming };
       // After a quarter second it is still visibly above idle — no snap.
       const shortly = run(busy, "idle", 0.25);
-      expect(shortly.energy).toBeGreaterThan(
-        WAVE_MOTION_TARGETS.idle.energy + 0.1,
-      );
+      expect(shortly.energy).toBeGreaterThan(WAVE_MOTION_TARGETS.idle.energy + 0.1);
       // By two seconds it has, for the eye, settled.
       const settled = run(busy, "idle", 2);
-      expect(settled.energy).toBeLessThan(
-        WAVE_MOTION_TARGETS.idle.energy + 0.05,
-      );
+      expect(settled.energy).toBeLessThan(WAVE_MOTION_TARGETS.idle.energy + 0.05);
     });
   });
 
@@ -254,9 +243,7 @@ describe("stepWaveMotion", () => {
         for (let t = 0; t < 0.2; t += dt) {
           motion = stepWaveMotion({ current: motion, activity, dt });
           // Per-frame movement stays a whisper — no visible jumps.
-          expect(Math.abs(motion.flutter - previous.flutter)).toBeLessThan(
-            0.05,
-          );
+          expect(Math.abs(motion.flutter - previous.flutter)).toBeLessThan(0.05);
           expect(Math.abs(motion.pulse - previous.pulse)).toBeLessThan(0.05);
           previous = motion;
         }

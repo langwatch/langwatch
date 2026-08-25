@@ -28,11 +28,7 @@ import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
 import type { LangWatchQLViewDefinition } from "./catalog/types";
 import { isPostgresResident } from "./catalog/types";
 import type { LangWatchQLConnection } from "./executor";
-import {
-  KEY_MAP_COLUMNS,
-  type LangWatchQLNames,
-  qualified,
-} from "./provisioning";
+import { KEY_MAP_COLUMNS, type LangWatchQLNames, qualified } from "./provisioning";
 import { postgresLiteral, postgresQuoted } from "./sqlText";
 import {
   lwqlApprovedPostgresViewNames,
@@ -224,9 +220,7 @@ export function productionPostgresReaderGrantStatements({
   return [
     `DO $$\nBEGIN\n` +
       `  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(role)}) THEN\n` +
-      grants
-        .map((grant) => `    EXECUTE ${postgresLiteral(grant)};\n`)
-        .join("") +
+      grants.map((grant) => `    EXECUTE ${postgresLiteral(grant)};\n`).join("") +
       `  END IF;\nEND\n$$`,
   ];
 }

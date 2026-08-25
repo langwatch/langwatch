@@ -184,10 +184,7 @@ function nowMs(deps: { now?: () => number }): number {
 }
 
 function backoffMsFor(attempts: number): number {
-  const index = Math.min(
-    Math.max(attempts - 1, 0),
-    EMPTY_BACKOFF_MS.length - 1,
-  );
+  const index = Math.min(Math.max(attempts - 1, 0), EMPTY_BACKOFF_MS.length - 1);
   return EMPTY_BACKOFF_MS[index]!;
 }
 
@@ -306,9 +303,7 @@ export class GithubPullRequestMappingService {
    * (its `recheckAfter` is null), and for one with no bookkeeping row at all,
    * which `mapBranch` is about to create.
    */
-  private async bringRecheckForward(
-    target: BranchMappingTarget,
-  ): Promise<void> {
+  private async bringRecheckForward(target: BranchMappingTarget): Promise<void> {
     const scope = branchScopeFor(target);
     if (!scope) return;
     await this.deps.repository.bringBranchRecheckForward({
@@ -390,11 +385,10 @@ export class GithubPullRequestMappingService {
     const scope = branchScopeFor(target);
     if (!scope) return;
 
-    const covering =
-      await this.deps.installations.tryResolveInstallationForRepository({
-        organizationId: scope.organizationId,
-        repositoryFullName: scope.repositoryFullName,
-      });
+    const covering = await this.deps.installations.tryResolveInstallationForRepository({
+      organizationId: scope.organizationId,
+      repositoryFullName: scope.repositoryFullName,
+    });
     // No installation reaches this repository. Nothing is written, which is why
     // this is resolved BEFORE the claim: a bookkeeping row here would arm a
     // backoff against a branch we never actually asked GitHub about, and the
@@ -539,11 +533,7 @@ export class GithubPullRequestMappingService {
     session: BackfillSessionRow;
   }): BranchMappingTarget | null {
     if (!isMappableGithubHost(session.repositoryHost, this.deps.hostConfig)) return null;
-    if (
-      !session.repositoryOwner ||
-      !session.repositoryName ||
-      !session.gitBranch
-    ) {
+    if (!session.repositoryOwner || !session.repositoryName || !session.gitBranch) {
       return null;
     }
     return {
@@ -565,17 +555,12 @@ export class GithubPullRequestMappingService {
     };
   }
 
-  private async mapAllWithConcurrency(
-    targets: BranchMappingTarget[],
-  ): Promise<void> {
+  private async mapAllWithConcurrency(targets: BranchMappingTarget[]): Promise<void> {
     for (let i = 0; i < targets.length; i += BACKFILL_CONCURRENCY) {
       await Promise.all(
         targets.slice(i, i + BACKFILL_CONCURRENCY).map((target) =>
           this.mapBranch(target).catch((error: unknown) => {
-            logger.warn(
-              { error, ...target },
-              "backfill could not map a branch",
-            );
+            logger.warn({ error, ...target }, "backfill could not map a branch");
           }),
         ),
       );
@@ -651,9 +636,7 @@ export class GithubPullRequestMappingService {
     const now = new Date(nowMs(this.deps));
     if (pullRequests.length > 0) {
       await this.deps.repository.upsertPullRequests({
-        pullRequests: pullRequests.map((pull) =>
-          toUpsertInput({ scope, pull }),
-        ),
+        pullRequests: pullRequests.map((pull) => toUpsertInput({ scope, pull })),
       });
       await this.recordProjectPullRequestActivity({
         projectId: originProjectId,
@@ -661,7 +644,7 @@ export class GithubPullRequestMappingService {
       });
     }
 
-      const existing = await this.deps.repository.tryFindBranchCheck(scope);
+    const existing = await this.deps.repository.tryFindBranchCheck(scope);
     const hasPullRequests = pullRequests.length > 0;
     const attempts = hasPullRequests ? 0 : (existing?.attempts ?? 0) + 1;
     await this.deps.repository.upsertBranchCheck({
@@ -761,9 +744,7 @@ interface BranchScope {
  * connection can answer for. Every write in this service goes through it, so
  * the host fold and the owner/name/branch completeness check happen once.
  */
-function branchScopeFor(
-  target: Omit<BranchMappingTarget, "origin">,
-): BranchScope | null {
+function branchScopeFor(target: Omit<BranchMappingTarget, "origin">): BranchScope | null {
   if (!isMappableGithubHost(target.repositoryHost)) return null;
   if (!target.headBranch || !target.repositoryOwner || !target.repositoryName) {
     return null;

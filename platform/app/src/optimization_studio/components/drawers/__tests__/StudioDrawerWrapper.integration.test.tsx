@@ -92,9 +92,7 @@ describe("StudioDrawerWrapper node action menu", () => {
       renderDrawer(node);
 
       await user.click(screen.getByLabelText("Node actions"));
-      await user.click(
-        await screen.findByRole("menuitem", { name: "Duplicate" }),
-      );
+      await user.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
 
       expect(mockDuplicateNode).toHaveBeenCalledWith(node.id);
     });

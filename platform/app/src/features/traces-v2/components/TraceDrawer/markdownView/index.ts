@@ -1,7 +1,4 @@
-export {
-  buildTraceMarkdown,
-  splitTraceMarkdown,
-} from "./buildTraceMarkdown";
+export { buildTraceMarkdown, splitTraceMarkdown } from "./buildTraceMarkdown";
 export { MarkdownConfigurePopover } from "./MarkdownConfigurePopover";
 export { MarkdownCopyButton } from "./MarkdownCopyButton";
 export { RenderedMarkdown } from "./RenderedMarkdown";

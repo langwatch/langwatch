@@ -7,15 +7,7 @@
  * nothing recorded that the request had happened at all.
  */
 import { createServer, type Server } from "node:http";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const VALID_API_KEY = "lw_logging_key";
 
@@ -81,9 +73,7 @@ describe("Feature: MCP request logging", () => {
   beforeAll(async () => {
     handler = createMcpHandler();
     server = createServer((req, res) => handler.handleRequest(req, res));
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     const port = typeof address === "object" && address ? address.port : 0;
     baseUrl = `http://127.0.0.1:${port}`;

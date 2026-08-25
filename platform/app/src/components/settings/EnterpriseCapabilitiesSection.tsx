@@ -10,13 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { LucideIcon } from "lucide-react";
-import {
-  ExternalLink,
-  FileClock,
-  KeyRound,
-  TriangleAlert,
-  Users,
-} from "lucide-react";
+import { ExternalLink, FileClock, KeyRound, TriangleAlert, Users } from "lucide-react";
 
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
@@ -163,9 +157,7 @@ function SsoConfiguredButNotInUseNotice() {
       borderRadius="lg"
       padding={4}
       width="full"
-      data-testid={
-        unlicensed ? "sso-unlicensed-notice" : "sso-not-started-notice"
-      }
+      data-testid={unlicensed ? "sso-unlicensed-notice" : "sso-not-started-notice"}
       _dark={{ backgroundColor: "orange.950", borderColor: "orange.700" }}
     >
       <HStack align="start" gap={3}>
@@ -182,14 +174,14 @@ function SsoConfiguredButNotInUseNotice() {
             This deployment is set up for <b>{gate.configuredProvider}</b>,{" "}
             {unlicensed ? (
               <>
-                so everyone is signing in by email until a license is activated.
-                Activate one and restart the server to switch single sign-on on.
+                so everyone is signing in by email until a license is activated. Activate
+                one and restart the server to switch single sign-on on.
               </>
             ) : (
               <>
-                but it could not be started, so everyone is signing in by email.
-                Check that the provider name is one LangWatch supports and that
-                its client credentials are set, then restart the server.
+                but it could not be started, so everyone is signing in by email. Check
+                that the provider name is one LangWatch supports and that its client
+                credentials are set, then restart the server.
               </>
             )}
           </Text>
@@ -209,12 +201,7 @@ export function EnterpriseCapabilitiesSection() {
   return (
     <>
       <Separator />
-      <VStack
-        align="start"
-        gap={4}
-        width="full"
-        data-testid="enterprise-capabilities"
-      >
+      <VStack align="start" gap={4} width="full" data-testid="enterprise-capabilities">
         <SsoConfiguredButNotInUseNotice />
 
         <VStack align="start" gap={1}>

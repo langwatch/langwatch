@@ -16,9 +16,10 @@ import { DashboardLayout } from "~/components/DashboardLayout";
  *       specs/ai-gateway/governance/persona-aware-chrome.feature
  */
 export default function MyLayout({ children }: PropsWithChildren) {
-  const [, setLastVisitedHomeKind] = useLocalStorage<
-    "" | "project" | "personal"
-  >("lastVisitedHomeKind", "");
+  const [, setLastVisitedHomeKind] = useLocalStorage<"" | "project" | "personal">(
+    "lastVisitedHomeKind",
+    "",
+  );
 
   // Visiting any /me/* page marks the implicit home preference as
   // "personal". Pairs with the "project" marker written from

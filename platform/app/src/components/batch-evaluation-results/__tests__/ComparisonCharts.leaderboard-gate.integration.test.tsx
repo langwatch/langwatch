@@ -148,9 +148,7 @@ describe("the comparison leaderboard's visibility gates", () => {
         within(menu).queryByText("Comparison (Leaderboard)"),
       ).not.toBeInTheDocument();
       // The win-rate chart is a different feature and is not gated with it.
-      expect(
-        within(menu).getByText("Comparison (Win Rate)"),
-      ).toBeInTheDocument();
+      expect(within(menu).getByText("Comparison (Win Rate)")).toBeInTheDocument();
     });
   });
 
@@ -159,17 +157,11 @@ describe("the comparison leaderboard's visibility gates", () => {
     it("renders it beside the win-rate chart at three variants", async () => {
       renderCharts(THREE_VARIANTS);
 
-      expect(
-        screen.getByTestId(`chart-leaderboard-${EVALUATOR_ID}`),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByTestId(`chart-comparison-${EVALUATOR_ID}`),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId(`chart-leaderboard-${EVALUATOR_ID}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`chart-comparison-${EVALUATOR_ID}`)).toBeInTheDocument();
 
       const menu = await openMetricsMenu();
-      expect(
-        within(menu).getByText("Comparison (Leaderboard)"),
-      ).toBeInTheDocument();
+      expect(within(menu).getByText("Comparison (Leaderboard)")).toBeInTheDocument();
     });
 
     /** @scenario "Two variants is a plain win-rate story, not a leaderboard" */
@@ -179,9 +171,7 @@ describe("the comparison leaderboard's visibility gates", () => {
       expect(
         screen.queryByTestId(`chart-leaderboard-${EVALUATOR_ID}`),
       ).not.toBeInTheDocument();
-      expect(
-        screen.getByTestId(`chart-comparison-${EVALUATOR_ID}`),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId(`chart-comparison-${EVALUATOR_ID}`)).toBeInTheDocument();
 
       const menu = await openMetricsMenu();
       expect(

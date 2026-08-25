@@ -72,14 +72,10 @@ export function mergeStoredLogRows(
   const sorted = [...deduped.values()].sort(
     (left, right) => left.timeUnixMs - right.timeUnixMs,
   );
-  return typeof limit === "number" && limit > 0
-    ? sorted.slice(0, limit)
-    : sorted;
+  return typeof limit === "number" && limit > 0 ? sorted.slice(0, limit) : sorted;
 }
 
-export class NullLogRecordStorageRepository
-  implements LogRecordStorageRepository
-{
+export class NullLogRecordStorageRepository implements LogRecordStorageRepository {
   async getLogsByTraceId(
     _tenantId: string,
     _traceId: string,

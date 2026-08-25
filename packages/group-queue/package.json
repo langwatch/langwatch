@@ -4,7 +4,12 @@
   "private": true,
   "description": "Typed Redis-backed queues with per-group FIFO ordering and independent producer and consumer capabilities.",
   "license": "MIT",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -15,11 +20,6 @@
       "default": "./src/operational.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": [
-    "src"
-  ],
   "scripts": {
     "typecheck": "tsc --noEmit && tsc -p tsconfig.type-tests.json",
     "test": "vitest run",

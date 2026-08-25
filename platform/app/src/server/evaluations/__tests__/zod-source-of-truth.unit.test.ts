@@ -24,18 +24,14 @@ describe("given Zod schemas are the single source of truth", () => {
         readFileSync(resolve(LANGWATCH_ROOT, "package.json"), "utf8"),
       );
 
-      expect(pkg.scripts["start:prepare:files"]).not.toContain(
-        "types:zod:generate",
-      );
+      expect(pkg.scripts["start:prepare:files"]).not.toContain("types:zod:generate");
       expect(pkg.scripts["types:zod:generate"]).toBeUndefined();
       expect(pkg.devDependencies?.["ts-to-zod"]).toBeUndefined();
       expect(pkg.dependencies?.["ts-to-zod"]).toBeUndefined();
-      expect(
-        existsSync(resolve(LANGWATCH_ROOT, "scripts/generate-zod-types.sh")),
-      ).toBe(false);
-      expect(existsSync(resolve(LANGWATCH_ROOT, "ts-to-zod.config.js"))).toBe(
+      expect(existsSync(resolve(LANGWATCH_ROOT, "scripts/generate-zod-types.sh"))).toBe(
         false,
       );
+      expect(existsSync(resolve(LANGWATCH_ROOT, "ts-to-zod.config.js"))).toBe(false);
     });
   });
 
@@ -52,9 +48,9 @@ describe("given Zod schemas are the single source of truth", () => {
     /** @scenario The collector validates an incoming trace against the span schema */
     it("accepts a well-formed span and rejects one missing required fields", () => {
       expect(spanSchema.safeParse(validSpan).success).toBe(true);
-      expect(
-        collectorRESTParamsSchema.safeParse({ spans: [validSpan] }).success,
-      ).toBe(true);
+      expect(collectorRESTParamsSchema.safeParse({ spans: [validSpan] }).success).toBe(
+        true,
+      );
       // span_id is required
       expect(
         spanSchema.safeParse({
@@ -88,9 +84,10 @@ describe("given Zod schemas are the single source of truth", () => {
     it("preserves `content` instead of dropping it via the union order", () => {
       // A text part carrying only `content` must not be silently stripped to
       // `{ type: "text" }` by an earlier union branch that only knows `text`.
-      expect(
-        chatRichContentSchema.parse({ type: "text", content: "hi" }),
-      ).toEqual({ type: "text", content: "hi" });
+      expect(chatRichContentSchema.parse({ type: "text", content: "hi" })).toEqual({
+        type: "text",
+        content: "hi",
+      });
       // A part carrying both keeps both.
       expect(
         chatRichContentSchema.parse({ type: "text", text: "a", content: "b" }),
@@ -106,21 +103,15 @@ describe("given Zod schemas are the single source of truth", () => {
       });
       expect(parsed.settings.rules[0]?.value).toBe("artificial intelligence");
 
-      const invalid = evaluatorsSchema.shape["langevals/llm_boolean"].safeParse(
-        {
-          settings: { max_tokens: "lots" },
-        },
-      );
+      const invalid = evaluatorsSchema.shape["langevals/llm_boolean"].safeParse({
+        settings: { max_tokens: "lots" },
+      });
       expect(invalid.success).toBe(false);
     });
 
     it("accepts catalog and custom evaluator type identifiers", () => {
-      expect(evaluatorTypesSchema.safeParse("langevals/basic").success).toBe(
-        true,
-      );
-      expect(evaluatorTypesSchema.safeParse("custom/my_eval").success).toBe(
-        true,
-      );
+      expect(evaluatorTypesSchema.safeParse("langevals/basic").success).toBe(true);
+      expect(evaluatorTypesSchema.safeParse("custom/my_eval").success).toBe(true);
       expect(evaluatorTypesSchema.safeParse(123).success).toBe(false);
     });
   });
@@ -153,11 +144,7 @@ describe("given Zod schemas are the single source of truth", () => {
 
       const answerMatch = AVAILABLE_EVALUATORS["langevals/llm_answer_match"];
       expect(answerMatch.requiredFields).toEqual([]);
-      expect(answerMatch.optionalFields).toEqual([
-        "input",
-        "output",
-        "expected_output",
-      ]);
+      expect(answerMatch.optionalFields).toEqual(["input", "output", "expected_output"]);
 
       // The fix only relaxes fields the service marks optional — it does not
       // blanket-empty every catalog entry; evaluators with genuinely required

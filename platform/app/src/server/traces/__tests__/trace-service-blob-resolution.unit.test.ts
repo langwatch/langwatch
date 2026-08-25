@@ -200,11 +200,7 @@ describe("TraceService.getTracesWithSpans() — ADR-022 blob resolution pipeline
       it("returns an empty array without errors", async () => {
         mockGetTracesWithSpansCH.mockResolvedValue([]);
 
-        const traces = await service.getTracesWithSpans(
-          "proj-1",
-          [],
-          protections,
-        );
+        const traces = await service.getTracesWithSpans("proj-1", [], protections);
 
         expect(traces).toEqual([]);
       });

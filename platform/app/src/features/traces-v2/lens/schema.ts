@@ -77,9 +77,7 @@ export function isLensDraftValid(draft: LensDraft): boolean {
 }
 
 /** Cheap sanity guard that doesn't run the full schema. */
-export function isKnownGrouping(
-  value: unknown,
-): value is keyof typeof LENS_CAPABILITIES {
+export function isKnownGrouping(value: unknown): value is keyof typeof LENS_CAPABILITIES {
   return (
     typeof value === "string" &&
     Object.prototype.hasOwnProperty.call(LENS_CAPABILITIES, value)

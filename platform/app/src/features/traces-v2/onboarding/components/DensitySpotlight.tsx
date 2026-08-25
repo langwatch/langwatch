@@ -1,12 +1,4 @@
-import {
-  Box,
-  chakra,
-  HStack,
-  Icon,
-  SimpleGrid,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, chakra, HStack, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { AArrowDown, AArrowUp, Check } from "lucide-react";
 import type React from "react";
 import { type Density, useDensityStore } from "../../stores/densityStore";
@@ -120,10 +112,7 @@ export function DensitySpotlight({
             <VStack align="stretch" gap={2}>
               <HStack justify="space-between" align="center">
                 <HStack gap={2}>
-                  <Icon
-                    boxSize={3.5}
-                    color={isActive ? "orange.fg" : "fg.muted"}
-                  >
+                  <Icon boxSize={3.5} color={isActive ? "orange.fg" : "fg.muted"}>
                     <choice.icon />
                   </Icon>
                   <Text textStyle="sm" fontWeight={500} color="fg">
@@ -185,10 +174,7 @@ interface DensityRowsPreviewProps {
   active: boolean;
 }
 
-const DensityRowsPreview: React.FC<DensityRowsPreviewProps> = ({
-  choice,
-  active,
-}) => (
+const DensityRowsPreview: React.FC<DensityRowsPreviewProps> = ({ choice, active }) => (
   <Box
     borderRadius="md"
     borderWidth="1px"
@@ -209,12 +195,7 @@ const DensityRowsPreview: React.FC<DensityRowsPreviewProps> = ({
             bg="border.emphasized"
             opacity={0.7}
           />
-          <Box
-            height={choice.rowHeight}
-            flex={1}
-            borderRadius="sm"
-            bg="border.muted"
-          />
+          <Box height={choice.rowHeight} flex={1} borderRadius="sm" bg="border.muted" />
           <Box
             height={choice.rowHeight}
             width="14%"

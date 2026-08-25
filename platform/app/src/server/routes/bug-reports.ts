@@ -75,10 +75,7 @@ secured
 
     const parsed = bugReportBodySchema.safeParse(json);
     if (!parsed.success) {
-      return c.json(
-        { error: "Invalid report", details: parsed.error.flatten() },
-        400,
-      );
+      return c.json({ error: "Invalid report", details: parsed.error.flatten() }, 400);
     }
 
     const credentials = extractCredentials((name) => c.req.header(name));

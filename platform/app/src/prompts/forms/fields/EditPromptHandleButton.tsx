@@ -12,9 +12,7 @@ import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prom
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";
 
-const logger = createLogger(
-  "langwatch:prompt-configs:edit-prompt-handle-button",
-);
+const logger = createLogger("langwatch:prompt-configs:edit-prompt-handle-button");
 
 /**
  * EditPromptHandleButton component
@@ -55,9 +53,7 @@ export function EditPromptHandleButton() {
     }
 
     const onSuccess = (prompt: VersionedPrompt) => {
-      form.reset(
-        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
-      );
+      form.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
       toaster.create({
         title: "Prompt handle changed",
         description: `Prompt handle has been changed to ${prompt.handle}`,

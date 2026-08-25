@@ -47,8 +47,7 @@ function renderSwitcher(
   props: Partial<React.ComponentProps<typeof PromptTabSwitcher>> = {},
 ) {
   const onSelect = props.onSelect ?? vi.fn();
-  const scrollerRef =
-    props.scrollerRef ?? React.createRef<HTMLDivElement | null>();
+  const scrollerRef = props.scrollerRef ?? React.createRef<HTMLDivElement | null>();
   const utils = render(
     <ChakraProvider value={defaultSystem}>
       <PromptTabSwitcher
@@ -221,10 +220,7 @@ describe("PromptTabSwitcher", () => {
 
         const menu = await openSwitcher(2);
 
-        expect(rowFor(menu, "summarizer")).toHaveAttribute(
-          "aria-current",
-          "true",
-        );
+        expect(rowFor(menu, "summarizer")).toHaveAttribute("aria-current", "true");
         expect(rowFor(menu, "classifier")).not.toHaveAttribute("aria-current");
       });
 
@@ -337,9 +333,7 @@ describe("PromptTabSwitcher", () => {
 
         const menu = await openSwitcher(2);
 
-        expect(
-          within(rowFor(menu, "summarizer")).getByText("v2"),
-        ).toBeInTheDocument();
+        expect(within(rowFor(menu, "summarizer")).getByText("v2")).toBeInTheDocument();
         expect(
           within(rowFor(menu, "classifier")).queryByText(/^v\d+$/),
         ).not.toBeInTheDocument();

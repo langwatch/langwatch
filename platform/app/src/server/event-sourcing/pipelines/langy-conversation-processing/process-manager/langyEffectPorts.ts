@@ -1,18 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import { LangyDispatchRejectedError } from "@langwatch/langy-contract";
 import { serializeLangyTurnError } from "@langwatch/langy-server";
-import type {
-  LangyEffectPorts,
-} from "@langwatch/langy-server";
+import type { LangyEffectPorts } from "@langwatch/langy-server";
 import type { LangyTitleGenerator } from "~/server/app-layer/langy/langy-title-generation.service";
 import { LangyTurnDispatchRetry } from "~/server/app-layer/langy/langy-turn-retry.error";
-import {
-  type LangyWorkerPort,
-} from "~/server/app-layer/langy/langyWorker";
-import type {
-  LangyTurnHandoff,
-  LangyTurnHandoffStore,
-} from "@langwatch/langy-server";
+import { type LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
+import type { LangyTurnHandoff, LangyTurnHandoffStore } from "@langwatch/langy-server";
 import type { LangyFailTurnCommandPort } from "@langwatch/langy-server";
 
 import type {
@@ -42,10 +35,7 @@ export interface CreateLangyEffectPortsOptions {
     projectId: string;
     organizationId: string;
   }) => Promise<{ token: string; apiKeyId: string }>;
-  revokeSessionKey: (args: {
-    apiKeyId: string;
-    projectId: string;
-  }) => Promise<void>;
+  revokeSessionKey: (args: { apiKeyId: string; projectId: string }) => Promise<void>;
   /** Terminalizes a permanently rejected turn — same port liveness uses. */
   failTurn: LangyFailTurnCommandPort;
   /** Client-visible error frame for the stream tail. Best-effort. */
@@ -135,16 +125,12 @@ export function createLangyEffectPorts(
             // The seed rides the re-drive too: this is exactly the path where
             // a probe-hit turn lands on a worker that has since died, and the
             // fresh session it spawns must still get the conversation so far.
-            ...(candidate.historySeed
-              ? { historySeed: candidate.historySeed }
-              : {}),
+            ...(candidate.historySeed ? { historySeed: candidate.historySeed } : {}),
             credentials: candidate.credentials,
             ...(candidate.modelOverride
               ? { modelOverride: candidate.modelOverride }
               : {}),
-            ...(candidate.resumeToken
-              ? { resumeToken: candidate.resumeToken }
-              : {}),
+            ...(candidate.resumeToken ? { resumeToken: candidate.resumeToken } : {}),
           });
 
         let outcome = await dispatch(dispatchHandoff);
@@ -200,12 +186,8 @@ export function createLangyEffectPorts(
             { projectId, conversationId, turnId },
             "langy dispatch permanently rejected; terminalizing the turn",
           );
-          const error = serializeLangyTurnError(
-            new LangyDispatchRejectedError(),
-          );
-          await deps
-            .markError({ conversationId, turnId, error })
-            .catch(() => undefined);
+          const error = serializeLangyTurnError(new LangyDispatchRejectedError());
+          await deps.markError({ conversationId, turnId, error }).catch(() => undefined);
           await deps.failTurn.failTurn({
             projectId,
             conversationId,
@@ -221,11 +203,7 @@ export function createLangyEffectPorts(
       },
     },
     titleGeneration: {
-      async generateTitle({
-        projectId,
-        conversationId,
-        turnId,
-      }): Promise<void> {
+      async generateTitle({ projectId, conversationId, turnId }): Promise<void> {
         const generated = await deps.titleGenerator({
           projectId,
           conversationId,

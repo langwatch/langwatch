@@ -21,14 +21,8 @@ import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
-const WORKFLOW = path.join(
-  REPO_ROOT,
-  ".github/workflows/sdk-javascript-ci.yml",
-);
-const DETECTOR = path.join(
-  REPO_ROOT,
-  ".github/actions/detect-changes/action.yml",
-);
+const WORKFLOW = path.join(REPO_ROOT, ".github/workflows/sdk-javascript-ci.yml");
+const DETECTOR = path.join(REPO_ROOT, ".github/actions/detect-changes/action.yml");
 
 interface WorkflowStep {
   id?: string;
@@ -188,10 +182,7 @@ describe("the sdk-javascript-ci path filters", () => {
 
     it("points every pattern at something that exists in the repo", () => {
       for (const { key, pattern } of EVERY_PATTERN) {
-        expect(
-          isLive(pattern),
-          `${key} pattern ${pattern} matches nothing`,
-        ).toBe(true);
+        expect(isLive(pattern), `${key} pattern ${pattern} matches nothing`).toBe(true);
       }
     });
   });
@@ -226,20 +217,15 @@ describe("the sdk-javascript-ci path filters", () => {
   describe("given every filter key the workflow consumes", () => {
     /** @scenario "Every path filter the SDK workflow reads is declared by the change detector" */
     it("finds it declared by the change detector and forced true off the diff path", () => {
-      const forceRun =
-        detector.runs.steps.find((s) => s.id === "force")?.run ?? "";
+      const forceRun = detector.runs.steps.find((s) => s.id === "force")?.run ?? "";
 
       for (const key of Object.keys(filters)) {
         expect(
           Object.keys(detector.outputs),
           `filter ${key} is consumed but not declared, so it resolves to an empty string`,
         ).toContain(key);
-        expect(detector.outputs[key]!.value).toContain(
-          `steps.filter.outputs.${key}`,
-        );
-        expect(detector.outputs[key]!.value).toContain(
-          `steps.force.outputs.${key}`,
-        );
+        expect(detector.outputs[key]!.value).toContain(`steps.filter.outputs.${key}`);
+        expect(detector.outputs[key]!.value).toContain(`steps.force.outputs.${key}`);
         expect(forceRun).toContain(`${key}=true`);
         expect(workflow.jobs.changes!.outputs?.[key]).toContain(
           `steps.detect.outputs.${key}`,

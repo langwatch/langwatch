@@ -95,13 +95,8 @@ export const apiKeyRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
 
-      const {
-        orgName,
-        teamName,
-        activeProjectIds,
-        projectName,
-        customRoleName,
-      } = await apiKeyService.enrichBindingsWithNames({ bindings });
+      const { orgName, teamName, activeProjectIds, projectName, customRoleName } =
+        await apiKeyService.enrichBindingsWithNames({ bindings });
 
       return bindings
         .filter(
@@ -220,9 +215,7 @@ export const apiKeyRouter = createTRPCRouter({
         permissionMode: apiKey.permissionMode,
         userId: apiKey.userId,
         userName: apiKey.userId ? (userName.get(apiKey.userId) ?? null) : null,
-        userEmail: apiKey.userId
-          ? (userEmail.get(apiKey.userId) ?? null)
-          : null,
+        userEmail: apiKey.userId ? (userEmail.get(apiKey.userId) ?? null) : null,
         createdByUserId: apiKey.createdByUserId,
         createdByUserName: apiKey.createdByUserId
           ? (userName.get(apiKey.createdByUserId) ?? null)
@@ -294,8 +287,7 @@ export const apiKeyRouter = createTRPCRouter({
       // Service keys and assigning to another user both require admin
       if (
         isService ||
-        (input.assignedToUserId &&
-          input.assignedToUserId !== ctx.session.user.id)
+        (input.assignedToUserId && input.assignedToUserId !== ctx.session.user.id)
       ) {
         const callerIsAdmin = await apiKeyService.isOrgAdmin({
           userId: ctx.session.user.id,

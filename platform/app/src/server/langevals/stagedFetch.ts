@@ -77,9 +77,7 @@ function maxBytesForKind(kind: LangevalsCallKind): number {
  * Returns the raw Response so callers keep full control over status / body
  * handling — same contract as a plain fetch().
  */
-export async function stagedLangevalsFetch(
-  opts: StagedFetchOptions,
-): Promise<Response> {
+export async function stagedLangevalsFetch(opts: StagedFetchOptions): Promise<Response> {
   const { url, body, projectId, kind, headers = {}, signal } = opts;
 
   const serialized = Buffer.from(JSON.stringify(body), "utf-8");

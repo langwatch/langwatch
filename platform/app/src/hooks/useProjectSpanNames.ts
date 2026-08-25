@@ -25,10 +25,7 @@ export function useProjectSpanNames({
 }) {
   // Use last 30 days as default date range
   const endDate = useMemo(() => Date.now(), []);
-  const startDate = useMemo(
-    () => endDate - 30 * 24 * 60 * 60 * 1000,
-    [endDate],
-  );
+  const startDate = useMemo(() => endDate - 30 * 24 * 60 * 60 * 1000, [endDate]);
 
   const fieldNames = api.traces.getFieldNames.useQuery(
     {

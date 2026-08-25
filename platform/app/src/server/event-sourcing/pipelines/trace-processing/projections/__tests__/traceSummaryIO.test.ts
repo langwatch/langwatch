@@ -2,19 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { NormalizedSpan } from "../../schemas/spans";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary I/O logic", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    extractSpy = vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    );
+    extractSpy = vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan");
   });
 
   afterEach(() => {
@@ -420,26 +414,22 @@ describe("applySpanToSummary I/O logic", () => {
       extractSpy.mockReturnValue(null);
       const fallbackSpy = vi
         .spyOn(TraceIOExtractionService.prototype, "extractFallbackIOFromSpan")
-        .mockImplementation(
-          (_span: NormalizedSpan, direction: "input" | "output") => {
-            if (direction === "output")
-              return {
-                raw: { data: { nested: "stuff" } },
-                text: '{"data":{"nested":"stuff"}}',
-                source: "langwatch",
-              };
-            return null;
-          },
-        );
+        .mockImplementation((_span: NormalizedSpan, direction: "input" | "output") => {
+          if (direction === "output")
+            return {
+              raw: { data: { nested: "stuff" } },
+              text: '{"data":{"nested":"stuff"}}',
+              source: "langwatch",
+            };
+          return null;
+        });
 
       let state = applySpanToSummary({
         state: createInitState(),
         span: fallbackSpan,
       });
       expect(state.computedOutput).toBe('{"data":{"nested":"stuff"}}');
-      expect(state.attributes["langwatch.reserved.output_is_fallback"]).toBe(
-        "true",
-      );
+      expect(state.attributes["langwatch.reserved.output_is_fallback"]).toBe("true");
 
       // Second span: genuine semantic gen_ai output with EARLIER endTime.
       const semanticSpan = createTestSpan({
@@ -464,9 +454,7 @@ describe("applySpanToSummary I/O logic", () => {
 
       state = applySpanToSummary({ state, span: semanticSpan });
       expect(state.computedOutput).toBe("real answer");
-      expect(
-        state.attributes["langwatch.reserved.output_is_fallback"],
-      ).toBeUndefined();
+      expect(state.attributes["langwatch.reserved.output_is_fallback"]).toBeUndefined();
     });
 
     it("semantic input overrides a stringified fallback input", () => {
@@ -480,26 +468,22 @@ describe("applySpanToSummary I/O logic", () => {
       extractSpy.mockReturnValue(null);
       const fallbackSpy = vi
         .spyOn(TraceIOExtractionService.prototype, "extractFallbackIOFromSpan")
-        .mockImplementation(
-          (_span: NormalizedSpan, direction: "input" | "output") => {
-            if (direction === "input")
-              return {
-                raw: { data: { q: "x" } },
-                text: '{"data":{"q":"x"}}',
-                source: "langwatch",
-              };
-            return null;
-          },
-        );
+        .mockImplementation((_span: NormalizedSpan, direction: "input" | "output") => {
+          if (direction === "input")
+            return {
+              raw: { data: { q: "x" } },
+              text: '{"data":{"q":"x"}}',
+              source: "langwatch",
+            };
+          return null;
+        });
 
       let state = applySpanToSummary({
         state: createInitState(),
         span: fallbackSpan,
       });
       expect(state.computedInput).toBe('{"data":{"q":"x"}}');
-      expect(state.attributes["langwatch.reserved.input_is_fallback"]).toBe(
-        "true",
-      );
+      expect(state.attributes["langwatch.reserved.input_is_fallback"]).toBe("true");
 
       const semanticSpan = createTestSpan({
         id: "semantic-1",
@@ -522,9 +506,7 @@ describe("applySpanToSummary I/O logic", () => {
 
       state = applySpanToSummary({ state, span: semanticSpan });
       expect(state.computedInput).toBe("what is 2+2?");
-      expect(
-        state.attributes["langwatch.reserved.input_is_fallback"],
-      ).toBeUndefined();
+      expect(state.attributes["langwatch.reserved.input_is_fallback"]).toBeUndefined();
     });
   });
 

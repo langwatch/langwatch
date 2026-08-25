@@ -8,12 +8,7 @@ import {
   resolveLandingDestination,
 } from "../resolveLandingDestination";
 
-const ALL_PRODUCTS: readonly ProductId[] = [
-  "me",
-  "llm-ops",
-  "gateway",
-  "governance",
-];
+const ALL_PRODUCTS: readonly ProductId[] = ["me", "llm-ops", "gateway", "governance"];
 
 function input(
   overrides: Partial<LandingDestinationInput> = {},
@@ -100,23 +95,15 @@ describe("resolveLandingDestination", () => {
     /** @scenario A first visit follows the organization intent */
     it("follows the server home resolver", () => {
       expect(
-        resolveLandingDestination(
-          input({ serverHomeDestination: "/governance" }),
-        ),
+        resolveLandingDestination(input({ serverHomeDestination: "/governance" })),
       ).toBe("/governance");
     });
 
     /** @scenario With nothing to go on the safety nets decide */
     it("falls back to the known project, then Me, then nothing", () => {
-      expect(resolveLandingDestination(input({ projectSlug: "demo" }))).toBe(
-        "/demo",
-      );
-      expect(
-        resolveLandingDestination(input({ reachableProducts: ["me"] })),
-      ).toBe("/me");
-      expect(
-        resolveLandingDestination(input({ reachableProducts: [] })),
-      ).toBeNull();
+      expect(resolveLandingDestination(input({ projectSlug: "demo" }))).toBe("/demo");
+      expect(resolveLandingDestination(input({ reachableProducts: ["me"] }))).toBe("/me");
+      expect(resolveLandingDestination(input({ reachableProducts: [] }))).toBeNull();
     });
   });
 });

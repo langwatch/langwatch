@@ -176,9 +176,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     return new LegacyImportAuthzGrantMigration(options);
   }
 
-  private constructor(
-    private readonly deps: LegacyImportAuthzGrantMigrationOptions,
-  ) {}
+  private constructor(private readonly deps: LegacyImportAuthzGrantMigrationOptions) {}
 
   async migrateTenant({
     tenantId,
@@ -499,13 +497,10 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     // A drifted role is restated WHOLE: `defineRole` at today's business
     // time wins the head's strictly-newer guard and carries every field —
     // name, description, permissions, kind — in one mechanism.
-    const roleHeadById = new Map(
-      heads.roleHeads.map((head) => [head.id, head]),
-    );
+    const roleHeadById = new Map(heads.roleHeads.map((head) => [head.id, head]));
     const redefines = expected.roles.flatMap((role) => {
       const head = roleHeadById.get(role.roleId);
-      if (!head || !AuthzMigrationProofMapper.roleDrifted({ role, head }))
-        return [];
+      if (!head || !AuthzMigrationProofMapper.roleDrifted({ role, head })) return [];
       return [{ ...role, occurredAtMs }];
     });
     await this.each({
@@ -574,9 +569,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
   }): Promise<void> {
     for (let i = 0; i < items.length; i += SEND_CONCURRENCY) {
       if (signal?.aborted) {
-        throw new Error(
-          "authz-engine migration aborted; organization parked for retry",
-        );
+        throw new Error("authz-engine migration aborted; organization parked for retry");
       }
       await Promise.all(items.slice(i, i + SEND_CONCURRENCY).map(send));
     }
@@ -657,8 +650,7 @@ class AuthzBindingCoverageMapper {
     return ({ row, userId }) => {
       if (row.userId === userId) return true;
       return (
-        row.groupId !== null &&
-        (groupsByUser.get(userId)?.has(row.groupId) ?? false)
+        row.groupId !== null && (groupsByUser.get(userId)?.has(row.groupId) ?? false)
       );
     };
   }
@@ -735,18 +727,14 @@ export class AuthzExpectedFactsMapper {
     const credentialFacts = inventory.credentials
       .slice()
       .sort((a, b) => a.projectId.localeCompare(b.projectId))
-      .map((credential) =>
-        this.credentialToFact({ organizationId, credential }),
-      );
+      .map((credential) => this.credentialToFact({ organizationId, credential }));
     const shareLinks = inventory.shareLinkRows
       .slice()
       .sort((a, b) => a.id.localeCompare(b.id))
-      .map(
-        (row): ExpectedShareLink => ({
-          row,
-          fact: this.shareLinkToFact({ organizationId, row }),
-        }),
-      );
+      .map((row): ExpectedShareLink => ({
+        row,
+        fact: this.shareLinkToFact({ organizationId, row }),
+      }));
 
     const nonResourceFacts = [
       ...bindingFacts,
@@ -809,11 +797,7 @@ export class AuthzExpectedFactsMapper {
    * whenever the custom role's permission list is empty, and dropping it would
    * turn an ADMIN with an empty custom role into a viewer.
    */
-  private static bindingToFact({
-    row,
-  }: {
-    row: LegacyBindingRow;
-  }): GrantFact | null {
+  private static bindingToFact({ row }: { row: LegacyBindingRow }): GrantFact | null {
     const principal = this.bindingPrincipal(row);
     if (!principal) return null;
     const fact: GrantFact = {
@@ -831,9 +815,7 @@ export class AuthzExpectedFactsMapper {
     return fact;
   }
 
-  private static bindingPrincipal(
-    row: LegacyBindingRow,
-  ): LedgerPrincipal | null {
+  private static bindingPrincipal(row: LegacyBindingRow): LedgerPrincipal | null {
     if (row.userId !== null) return { type: "user", id: row.userId };
     if (row.groupId !== null) return { type: "group", id: row.groupId };
     if (row.apiKeyId !== null) return { type: "apiKey", id: row.apiKeyId };
@@ -867,25 +849,17 @@ export class AuthzExpectedFactsMapper {
     bindingRows: LegacyBindingRow[];
     covers: BindingCoverage;
   }): GrantFact[] {
-    const suppressed = ({
-      userId,
-      teamId,
-    }: {
-      userId: string;
-      teamId: string;
-    }) =>
+    const suppressed = ({ userId, teamId }: { userId: string; teamId: string }) =>
       bindingRows.some((row) => {
         const inPlay =
-          (row.scopeType === "ORGANIZATION" &&
-            row.scopeId === organizationId) ||
+          (row.scopeType === "ORGANIZATION" && row.scopeId === organizationId) ||
           (row.scopeType === "TEAM" && row.scopeId === teamId);
         return inPlay && covers({ row, userId });
       });
     return teamRows
       .slice()
       .sort(
-        (a, b) =>
-          a.teamId.localeCompare(b.teamId) || a.userId.localeCompare(b.userId),
+        (a, b) => a.teamId.localeCompare(b.teamId) || a.userId.localeCompare(b.userId),
       )
       .flatMap((row) => {
         if (row.role === "CUSTOM") return [];
@@ -967,8 +941,7 @@ export class AuthzExpectedFactsMapper {
       if (member.role !== "ADMIN") continue;
       // "No binding anywhere" reads group-held bindings too — the same
       // predicate the team-membership suppression uses.
-      if (bindingRows.some((row) => covers({ row, userId: member.userId })))
-        continue;
+      if (bindingRows.some((row) => covers({ row, userId: member.userId }))) continue;
       const principal = { type: "user" as const, id: member.userId };
       facts.push({
         grantId: deriveGrantId({
@@ -1167,12 +1140,8 @@ export class AuthzMigrationProofMapper {
   }): CheckResult {
     const outstanding: string[] = [];
     const diffs: AuthzEngineDiff[] = [];
-    const headById = new Map(
-      heads.resourceRows.map((row) => [row.grantId, row]),
-    );
-    const expectedLinkIds = new Set(
-      expected.shareLinks.map((link) => link.row.id),
-    );
+    const headById = new Map(heads.resourceRows.map((row) => [row.grantId, row]));
+    const expectedLinkIds = new Set(expected.shareLinks.map((link) => link.row.id));
     for (const link of expected.shareLinks) {
       const head = headById.get(link.row.id);
       if (!head) {
@@ -1197,20 +1166,13 @@ export class AuthzMigrationProofMapper {
     return { outstanding, diffs };
   }
 
-  static roleDrifted({
-    role,
-    head,
-  }: {
-    role: RoleFact;
-    head: RoleHeadRow;
-  }): boolean {
+  static roleDrifted({ role, head }: { role: RoleFact; head: RoleHeadRow }): boolean {
     return (
       head.name !== role.name ||
       (head.description ?? null) !== (role.description ?? null) ||
       AuthzExpectedFactsMapper.permissionStrings(head.permissions).join(",") !==
         role.permissions.join(",") ||
-      (head.kind === "system_api_key" ? "system_api_key" : "custom") !==
-        role.kind
+      (head.kind === "system_api_key" ? "system_api_key" : "custom") !== role.kind
     );
   }
 
@@ -1224,11 +1186,7 @@ export class AuthzMigrationProofMapper {
     head: GrantHeadRow;
   }): AuthzEngineDiff[] {
     const compared: Array<[string, string | null, string | null]> = [
-      [
-        "principalType",
-        PRINCIPAL_TO_DB[fact.principal.type],
-        head.principalType,
-      ],
+      ["principalType", PRINCIPAL_TO_DB[fact.principal.type], head.principalType],
       ["principalId", fact.principal.id, head.principalId],
       ["roleKey", fact.roleKey, head.roleKey],
       ["legacyRole", fact.legacyRole ?? null, head.legacyRole],
@@ -1265,11 +1223,7 @@ export class AuthzMigrationProofMapper {
         role.permissions.join(","),
         AuthzExpectedFactsMapper.permissionStrings(head.permissions).join(","),
       ],
-      [
-        "kind",
-        role.kind,
-        head.kind === "system_api_key" ? "system_api_key" : "custom",
-      ],
+      ["kind", role.kind, head.kind === "system_api_key" ? "system_api_key" : "custom"],
     ];
     return compared.flatMap(([field, expected, actual]) =>
       expected === actual
@@ -1320,16 +1274,8 @@ export class AuthzMigrationProofMapper {
       projectId: row.projectId,
     });
     const compared: Array<[string, string | null, string | null]> = [
-      [
-        "token",
-        this.tokenFingerprint(row.token),
-        this.tokenFingerprint(head.token),
-      ],
-      [
-        "kind",
-        row.resourceType,
-        (head.resourceKind ?? "").toUpperCase() || null,
-      ],
+      ["token", this.tokenFingerprint(row.token), this.tokenFingerprint(head.token)],
+      ["kind", row.resourceType, (head.resourceKind ?? "").toUpperCase() || null],
       ["resourceId", row.resourceId, head.resourceId],
       ["projectId", row.projectId, head.projectId],
       ["principalType", PRINCIPAL_TO_DB[principal.type], head.principalType],
@@ -1339,11 +1285,7 @@ export class AuthzMigrationProofMapper {
         this.numberField(row.expiresAtMs),
         this.numberField(head.expiresAtMs),
       ],
-      [
-        "maxViews",
-        this.numberField(row.maxViews),
-        this.numberField(head.maxViews),
-      ],
+      ["maxViews", this.numberField(row.maxViews), this.numberField(head.maxViews)],
     ];
     if (head.viewCount > row.viewCount) {
       compared.push([

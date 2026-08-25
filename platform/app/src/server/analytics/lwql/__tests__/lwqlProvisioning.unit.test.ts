@@ -56,9 +56,9 @@ describe("given the LangWatchQL settings profile statement", () => {
       ["bytes scanned", "max_bytes_to_read = 333000 CONST"],
       ["scan overflow", "read_overflow_mode = 'throw' CONST"],
     ])("pins the %s ceiling", (_label, expected) => {
-      expect(
-        lwqlSettingsProfileStatement({ names: NAMES, limits: LIMITS }),
-      ).toContain(expected);
+      expect(lwqlSettingsProfileStatement({ names: NAMES, limits: LIMITS })).toContain(
+        expected,
+      );
     });
 
     /**
@@ -74,9 +74,7 @@ describe("given the LangWatchQL settings profile statement", () => {
         limits: LIMITS,
       });
 
-      expect(statement).toContain(
-        `${NAMES.tenantSetting} = '' CHANGEABLE_IN_READONLY`,
-      );
+      expect(statement).toContain(`${NAMES.tenantSetting} = '' CHANGEABLE_IN_READONLY`);
       expect(
         statement.match(/CHANGEABLE_IN_READONLY/g),
         "exactly one setting may be changed per query",
@@ -91,9 +89,7 @@ describe("given the LangWatchQL settings profile statement", () => {
       );
       // A ceiling of zero is ClickHouse's "unlimited", so a default that
       // drifted to 0 would read as configured while bounding nothing.
-      expect(
-        DEFAULT_LWQL_RESOURCE_LIMITS.maxConcurrentQueriesForUser,
-      ).toBeGreaterThan(0);
+      expect(DEFAULT_LWQL_RESOURCE_LIMITS.maxConcurrentQueriesForUser).toBeGreaterThan(0);
     });
   });
 });
@@ -140,9 +136,9 @@ describe("given the LangWatchQL row policy", () => {
       // holds exactly one distinct tenant. Asserting the order catches a
       // rewrite that keeps the aggregate but drops the guard.
       expect(statement.indexOf("any(TenantId)")).toBeGreaterThan(-1);
-      expect(
-        statement.indexOf("HAVING uniqExact(TenantId) = 1"),
-      ).toBeGreaterThan(statement.indexOf("any(TenantId)"));
+      expect(statement.indexOf("HAVING uniqExact(TenantId) = 1")).toBeGreaterThan(
+        statement.indexOf("any(TenantId)"),
+      );
     });
   });
 

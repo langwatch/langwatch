@@ -114,9 +114,7 @@ export interface LangWatchQLExecutionResult {
 
 /** The narrow seam the service depends on. */
 export interface LangWatchQLExecutor {
-  execute(
-    request: LangWatchQLExecutionRequest,
-  ): Promise<LangWatchQLExecutionResult>;
+  execute(request: LangWatchQLExecutionRequest): Promise<LangWatchQLExecutionResult>;
   /**
    * Releases whatever transport this executor holds.
    *
@@ -329,8 +327,7 @@ export function lwqlConnectionFromEnv(): LangWatchQLConnection | null {
   // Re-checked rather than asserted: `absent` is computed by a callback, which
   // TypeScript cannot use to narrow these five, and reaching for `!` here would
   // silently outlive someone editing the list above.
-  if (!url || !username || !password || !database || !tenantSetting)
-    return null;
+  if (!url || !username || !password || !database || !tenantSetting) return null;
 
   return { url, username, password, database, tenantSetting };
 }

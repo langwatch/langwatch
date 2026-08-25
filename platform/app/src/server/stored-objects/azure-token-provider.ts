@@ -125,18 +125,14 @@ function buildCredential(credentials: TokenModeCredentials): TokenCredential {
     case "managedIdentity":
       return new ManagedIdentityCredential({
         authorityHost: credentials.authorityHost,
-        ...(process.env.AZURE_CLIENT_ID
-          ? { clientId: process.env.AZURE_CLIENT_ID }
-          : {}),
+        ...(process.env.AZURE_CLIENT_ID ? { clientId: process.env.AZURE_CLIENT_ID } : {}),
       });
     case "azureCli":
       return new AzureCliCredential();
   }
 }
 
-async function exchangeToken(
-  credentials: TokenModeCredentials,
-): Promise<ExchangeResult> {
+async function exchangeToken(credentials: TokenModeCredentials): Promise<ExchangeResult> {
   const credential = buildCredential(credentials);
   let accessToken;
   try {
@@ -160,10 +156,7 @@ async function exchangeToken(
   };
 }
 
-function startExchange(
-  key: string,
-  credentials: TokenModeCredentials,
-): CacheEntry {
+function startExchange(key: string, credentials: TokenModeCredentials): CacheEntry {
   const entry: CacheEntry = {
     promise: undefined as unknown as Promise<ExchangeResult>,
   };
@@ -216,9 +209,7 @@ export async function getAzureBlobToken(
  * 401 so the retry acquires a fresh token instead of replaying the one that
  * was just rejected.
  */
-export function invalidateAzureBlobToken(
-  credentials: TokenModeCredentials,
-): void {
+export function invalidateAzureBlobToken(credentials: TokenModeCredentials): void {
   tokenCache.delete(cacheKey(credentials));
 }
 

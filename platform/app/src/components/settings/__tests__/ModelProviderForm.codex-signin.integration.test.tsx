@@ -19,13 +19,7 @@
  * endpoints so the real component renders.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type {
@@ -57,8 +51,7 @@ const {
 }));
 
 vi.mock("../../../hooks/useModelProviderForm", () => ({
-  useModelProviderForm: (...args: unknown[]) =>
-    mockUseModelProviderForm(...args),
+  useModelProviderForm: (...args: unknown[]) => mockUseModelProviderForm(...args),
 }));
 
 vi.mock("../../../hooks/useModelProvidersSettings", () => ({
@@ -287,9 +280,7 @@ describe("Feature: Codex model provider form rendering", () => {
       });
 
       it("renders the sign-in-with-OpenAI flow in place of credential fields", () => {
-        expect(
-          screen.getByRole("button", { name: /sign in with openai/i }),
-        ).toBeTruthy();
+        expect(screen.getByRole("button", { name: /sign in with openai/i })).toBeTruthy();
       });
 
       it("does not render the API-key credential inputs", () => {
@@ -325,9 +316,7 @@ describe("Feature: Codex model provider form rendering", () => {
     });
 
     describe("when the sign-in completes inside the drawer", () => {
-      const codexScopes = [
-        { scopeType: "PROJECT" as const, scopeId: "proj-1" },
-      ];
+      const codexScopes = [{ scopeType: "PROJECT" as const, scopeId: "proj-1" }];
 
       beforeEach(async () => {
         // A full device sign-in, driven for real through the hook: start
@@ -352,9 +341,7 @@ describe("Feature: Codex model provider form rendering", () => {
         });
         renderForm("openai_codex");
 
-        fireEvent.click(
-          screen.getByRole("button", { name: /sign in with openai/i }),
-        );
+        fireEvent.click(screen.getByRole("button", { name: /sign in with openai/i }));
         await waitFor(() => expect(mockCodexSignInPoll).toHaveBeenCalled());
       });
 
@@ -366,9 +353,7 @@ describe("Feature: Codex model provider form rendering", () => {
       /** @scenario Connecting Codex from settings finishes the drawer's job */
       it("mounts no coding-defaults dialog inside the drawer", async () => {
         await waitFor(() => expect(mockCloseDrawer).toHaveBeenCalled());
-        expect(
-          screen.queryByText("Set Codex as your coding default?"),
-        ).toBeNull();
+        expect(screen.queryByText("Set Codex as your coding default?")).toBeNull();
       });
 
       /** @scenario Connecting Codex from settings asks before touching defaults */

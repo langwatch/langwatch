@@ -10,14 +10,7 @@
  *
  * Requires `pnpm build` (like the other CLI integration tests in this package).
  */
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as http from "node:http";
@@ -82,8 +75,7 @@ const runViaDaemon = (
   args: string[],
   env: Record<string, string> = {},
   cwd: string = workDir,
-): Promise<RunResult> =>
-  run(args, { ...env, LANGWATCH_NO_DAEMON: "0" }, cwd);
+): Promise<RunResult> => run(args, { ...env, LANGWATCH_NO_DAEMON: "0" }, cwd);
 
 const daemonStatus = async (): Promise<{
   running: boolean;
@@ -96,9 +88,7 @@ const daemonStatus = async (): Promise<{
   return JSON.parse(result.stdout) as { running: boolean; served?: number };
 };
 
-const startDaemon = async (
-  env: Record<string, string> = {},
-): Promise<void> => {
+const startDaemon = async (env: Record<string, string> = {}): Promise<void> => {
   await run(["daemon", "start"], { LANGWATCH_NO_DAEMON: "0", ...env });
   // Poll the daemon's own status rather than sleeping: it is up when it answers.
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -139,9 +129,7 @@ describe("the CLI served by a daemon", () => {
         res.end(JSON.stringify({ error: "not found" }));
       });
     });
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
     // A short socket dir: unix sockets cap out around 104 bytes of path, and the
@@ -278,7 +266,11 @@ describe("the CLI served by a daemon", () => {
           JSON.stringify({ prompts: {} }),
         );
 
-        const inProcess = await run(["prompt", "list", "--format", "json"], {}, callerDir);
+        const inProcess = await run(
+          ["prompt", "list", "--format", "json"],
+          {},
+          callerDir,
+        );
         const served = await runViaDaemon(
           ["prompt", "list", "--format", "json"],
           {},

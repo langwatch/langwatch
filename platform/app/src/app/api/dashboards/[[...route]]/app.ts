@@ -25,9 +25,7 @@ const renameDashboardSchema = z.object({
 });
 
 const reorderDashboardsSchema = z.object({
-  dashboardIds: z
-    .array(z.string().min(1))
-    .min(1, "dashboardIds must not be empty"),
+  dashboardIds: z.array(z.string().min(1)).min(1, "dashboardIds must not be empty"),
 });
 
 function mapDashboardNotFoundError(error: unknown): never {
@@ -186,7 +184,11 @@ secured.access(requires("analytics:update")).patch(
     const service = c.get("dashboardService");
 
     try {
-      const dashboard = await service.rename({ projectId: project.id, dashboardId: id, name });
+      const dashboard = await service.rename({
+        projectId: project.id,
+        dashboardId: id,
+        name,
+      });
       return c.json({
         id: dashboard.id,
         name: dashboard.name,

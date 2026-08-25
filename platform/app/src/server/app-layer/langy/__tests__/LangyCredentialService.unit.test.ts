@@ -142,8 +142,7 @@ describe("LangyCredentialService", () => {
         // is a raw, haven-assigned loopback port the worker process cannot reach,
         // so the stable LANGWATCH_ENDPOINT hostname must win — otherwise the relay
         // is silently disabled and the turn stalls with no live edge and no error.
-        process.env.LANGWATCH_ENDPOINT =
-          "https://app.stack.langwatch.localhost";
+        process.env.LANGWATCH_ENDPOINT = "https://app.stack.langwatch.localhost";
         const prisma = makePrisma({
           projectSecret: {
             findFirst: vi
@@ -159,9 +158,7 @@ describe("LangyCredentialService", () => {
           session: SESSION,
         });
 
-        expect(creds.langwatchEndpoint).toBe(
-          "https://app.stack.langwatch.localhost",
-        );
+        expect(creds.langwatchEndpoint).toBe("https://app.stack.langwatch.localhost");
       });
 
       it("appends /v1 when LW_GATEWAY_BASE_URL lacks it (the dev-cluster bug)", async () => {
@@ -299,9 +296,7 @@ describe("LangyCredentialService", () => {
         ).rejects.toThrowError(
           expect.objectContaining({
             name: "LangyCredentialResolutionError",
-            message: expect.stringMatching(
-              /Failed to mint a Langy session key/,
-            ),
+            message: expect.stringMatching(/Failed to mint a Langy session key/),
           }),
         );
       });
@@ -543,9 +538,7 @@ describe("LangyCredentialService", () => {
         } as any;
         const svc = new LangyCredentialService(prisma);
 
-        expect(
-          await svc.getEgressAllowlist({ projectId: "missing" }),
-        ).toBeNull();
+        expect(await svc.getEgressAllowlist({ projectId: "missing" })).toBeNull();
       });
     });
 
@@ -554,9 +547,7 @@ describe("LangyCredentialService", () => {
         const prisma = makePrismaWithProject("attacker.example.com");
         const svc = new LangyCredentialService(prisma);
 
-        await expect(
-          svc.getEgressAllowlist({ projectId: "p1" }),
-        ).rejects.toThrow();
+        await expect(svc.getEgressAllowlist({ projectId: "p1" })).rejects.toThrow();
       });
     });
 
@@ -565,9 +556,7 @@ describe("LangyCredentialService", () => {
         const prisma = makePrismaWithProject(["not a host!!"]);
         const svc = new LangyCredentialService(prisma);
 
-        await expect(
-          svc.getEgressAllowlist({ projectId: "p1" }),
-        ).rejects.toThrow();
+        await expect(svc.getEgressAllowlist({ projectId: "p1" })).rejects.toThrow();
       });
     });
   });

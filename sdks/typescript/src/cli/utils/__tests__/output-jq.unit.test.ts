@@ -56,7 +56,9 @@ describe("applyJq", () => {
       [".traces + 1"],
       [".traces(x)"],
     ])("throws rather than answering null for %s", (expression) => {
-      expect(() => applyJq(expression, DATA)).toThrow(/unsupported syntax|must start with/);
+      expect(() => applyJq(expression, DATA)).toThrow(
+        /unsupported syntax|must start with/,
+      );
     });
   });
 

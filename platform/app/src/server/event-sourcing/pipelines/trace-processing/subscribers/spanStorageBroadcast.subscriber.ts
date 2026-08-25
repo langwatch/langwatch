@@ -3,9 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { BroadcastService } from "../../../../app-layer/broadcast/broadcast.service";
 import type { TraceProcessingEvent } from "../schemas/events";
 
-const logger = createLogger(
-  "langwatch:trace-processing:span-storage-broadcast",
-);
+const logger = createLogger("langwatch:trace-processing:span-storage-broadcast");
 
 export const SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS = 15_000; // Debounce — notification only, frontend refetches
 
@@ -23,10 +21,7 @@ export interface SpanStorageBroadcastSubscriberDeps {
  */
 export function createSpanStorageBroadcastHandler(
   deps: SpanStorageBroadcastSubscriberDeps,
-): (
-  event: TraceProcessingEvent,
-  context: TriggerContext<unknown>,
-) => Promise<void> {
+): (event: TraceProcessingEvent, context: TriggerContext<unknown>) => Promise<void> {
   return async (event) => {
     const tenantId = event.tenantId;
     const traceId = String(event.aggregateId);
@@ -37,16 +32,9 @@ export function createSpanStorageBroadcastHandler(
         traceId,
       });
 
-      await deps.broadcast.broadcastToTenant(
-        tenantId,
-        payload,
-        "trace_updated",
-      );
+      await deps.broadcast.broadcastToTenant(tenantId, payload, "trace_updated");
 
-      logger.debug(
-        { tenantId, traceId },
-        "Broadcasted trace update after span storage",
-      );
+      logger.debug({ tenantId, traceId }, "Broadcasted trace update after span storage");
     } catch (error) {
       logger.warn(
         {

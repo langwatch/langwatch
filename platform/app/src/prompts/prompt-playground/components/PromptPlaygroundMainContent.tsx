@@ -16,8 +16,7 @@ export function PromptPlaygroundMainContent() {
    */
   useLoadSpanIntoPromptPlayground();
   const hasNoTabs = useDraggableTabsBrowserStore(
-    ({ windows }) =>
-      windows.length === 0 || windows.every((w) => w.tabs.length === 0),
+    ({ windows }) => windows.length === 0 || windows.every((w) => w.tabs.length === 0),
   );
 
   if (hasNoTabs) return <MainContentEmptyState />;

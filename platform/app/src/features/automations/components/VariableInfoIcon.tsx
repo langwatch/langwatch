@@ -1,12 +1,4 @@
-import {
-  Box,
-  chakra,
-  HoverCard,
-  HStack,
-  Portal,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, chakra, HoverCard, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { Info } from "lucide-react";
 import type { VariableInfo } from "~/features/automations/editors/liquidMonaco";
 
@@ -56,11 +48,7 @@ export function VariableInfoIcon({ variables }: { variables: VariableInfo[] }) {
               {variables.map((variable) => (
                 <Box key={variable.path}>
                   <HStack gap={2} align="baseline">
-                    <Text
-                      textStyle="xs"
-                      fontFamily="mono"
-                      fontWeight="semibold"
-                    >
+                    <Text textStyle="xs" fontFamily="mono" fontWeight="semibold">
                       {variable.path}
                     </Text>
                     <Text textStyle="xs" color="fg.muted">

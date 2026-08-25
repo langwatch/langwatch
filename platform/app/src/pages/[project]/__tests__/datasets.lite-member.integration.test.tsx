@@ -12,32 +12,30 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockIsLiteMemberRef, mockDatasetsList, mockDeleteMutate } = vi.hoisted(
-  () => {
-    return {
-      mockIsLiteMemberRef: {
-        current: false,
-      },
-      mockDatasetsList: {
-        current: [] as Array<{
-          id: string;
-          slug: string;
-          name: string;
-          schema: null;
-          columnTypes: Array<{ name: string }>;
-          createdAt: Date;
-          updatedAt: Date;
-          archivedAt: null;
-          projectId: string;
-          useS3?: boolean;
-          s3RecordCount?: number;
-          _count: { datasetRecords: number };
-        }>,
-      },
-      mockDeleteMutate: vi.fn(),
-    };
-  },
-);
+const { mockIsLiteMemberRef, mockDatasetsList, mockDeleteMutate } = vi.hoisted(() => {
+  return {
+    mockIsLiteMemberRef: {
+      current: false,
+    },
+    mockDatasetsList: {
+      current: [] as Array<{
+        id: string;
+        slug: string;
+        name: string;
+        schema: null;
+        columnTypes: Array<{ name: string }>;
+        createdAt: Date;
+        updatedAt: Date;
+        archivedAt: null;
+        projectId: string;
+        useS3?: boolean;
+        s3RecordCount?: number;
+        _count: { datasetRecords: number };
+      }>,
+    },
+    mockDeleteMutate: vi.fn(),
+  };
+});
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -84,9 +82,7 @@ vi.mock("~/hooks/useDeleteDatasetConfirmation", () => ({
 }));
 
 vi.mock("~/components/DashboardLayout", () => ({
-  DashboardLayout: ({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  ),
+  DashboardLayout: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -148,12 +144,8 @@ vi.mock("~/components/ui/layouts/PageLayout", () => ({
   PageLayout: {
     Header: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Heading: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    HeaderButton: ({ children }: { children?: ReactNode }) => (
-      <div>{children}</div>
-    ),
-    Container: ({ children }: { children?: ReactNode }) => (
-      <div>{children}</div>
-    ),
+    HeaderButton: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Container: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Content: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   },
 }));
@@ -163,13 +155,9 @@ vi.mock("~/components/ui/menu", () => ({
     Root: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Trigger: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Content: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    Item: ({
-      children,
-      ...props
-    }: {
-      children?: ReactNode;
-      [key: string]: any;
-    }) => <div {...props}>{children}</div>,
+    Item: ({ children, ...props }: { children?: ReactNode; [key: string]: any }) => (
+      <div {...props}>{children}</div>
+    ),
   },
 }));
 

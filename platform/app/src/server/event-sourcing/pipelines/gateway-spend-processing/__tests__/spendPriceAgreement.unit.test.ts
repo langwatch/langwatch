@@ -37,17 +37,12 @@ let catalog: MaybeStoredLLMModelCost[] = CHEAP_CATALOG;
 
 vi.mock("~/server/modelProviders/llmModelCost", async (importOriginal) => {
   const original =
-    await importOriginal<
-      typeof import("~/server/modelProviders/llmModelCost")
-    >();
+    await importOriginal<typeof import("~/server/modelProviders/llmModelCost")>();
   return { ...original, getStaticModelCosts: () => catalog };
 });
 
 import { AppGatewayDebitAdapter } from "~/runtime/app/features/governance/gateway-debit.adapter";
-import {
-  deliverPayloadToRow,
-  webhookDeliveryPM,
-} from "~/runtime/app/features/webhooks";
+import { deliverPayloadToRow, webhookDeliveryPM } from "~/runtime/app/features/webhooks";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import {
@@ -165,11 +160,7 @@ function intentPayloadFor(
     ADMITTED,
     ctx,
   );
-  handlers.get(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE)!(
-    admitted.state,
-    confirmed,
-    ctx,
-  );
+  handlers.get(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE)!(admitted.state, confirmed, ctx);
   if (captured.length !== 1) {
     throw new Error(
       `the confirmed outcome produced ${captured.length} ${intentName} intents; the harness expects exactly one`,
@@ -178,9 +169,7 @@ function intentPayloadFor(
   return captured[0] as Record<string, unknown>;
 }
 
-function confirmedEvent(
-  data: ConfirmSpendCommandData,
-): GatewaySpendConfirmedEvent {
+function confirmedEvent(data: ConfirmSpendCommandData): GatewaySpendConfirmedEvent {
   return EventUtils.createEvent({
     aggregateType: GATEWAY_SPEND_AGGREGATE_TYPE,
     aggregateId: REQUEST,
@@ -235,18 +224,15 @@ describe("one price per gateway request", () => {
     // The ledger folds it first.
     const ledger = new GatewaySpendFoldProjection({
       store: {} as FoldProjectionStore<GatewaySpendState>,
-    }).handleGatewaySpendConfirmed(
-      confirmedEvent(confirmed),
-      {} as GatewaySpendState,
-    );
+    }).handleGatewaySpendConfirmed(confirmedEvent(confirmed), {} as GatewaySpendState);
 
     // A catalog deploy lands before the other two consumers run. Rating
     // now really would answer differently, so the assertions below are not
     // vacuous.
     catalog = EXPENSIVE_CATALOG;
-    expect(
-      rateSpendNanoUsd({ model: MODEL, usage: USAGE }).costNanoUsd,
-    ).not.toBe(priced.costNanoUsd);
+    expect(rateSpendNanoUsd({ model: MODEL, usage: USAGE }).costNanoUsd).not.toBe(
+      priced.costNanoUsd,
+    );
 
     const debit = intentPayloadFor(
       (builder) =>

@@ -97,9 +97,7 @@ describe("VirtualKeyService product-managed guard", () => {
       // everything: a USER key gets as far as the write transaction.
       const sut = VirtualKeyService.create(mockPrisma(vkRow("USER")));
 
-      await expect(sut.revoke(mutationInput)).rejects.toThrow(
-        REACHED_TRANSACTION,
-      );
+      await expect(sut.revoke(mutationInput)).rejects.toThrow(REACHED_TRANSACTION);
     });
   });
 

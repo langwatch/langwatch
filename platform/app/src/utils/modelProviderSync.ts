@@ -16,14 +16,10 @@ import type { api } from "./api";
  * refresh (#5827). Posting here on save lets every other open tab
  * invalidate immediately, focus or no focus.
  */
-const MODEL_PROVIDER_SYNC_CHANNEL =
-  "langwatch:model-providers-updated" as const;
+const MODEL_PROVIDER_SYNC_CHANNEL = "langwatch:model-providers-updated" as const;
 
 function getChannel(): BroadcastChannel | null {
-  if (
-    typeof window === "undefined" ||
-    typeof BroadcastChannel === "undefined"
-  ) {
+  if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") {
     return null;
   }
   try {
@@ -51,19 +47,14 @@ export function broadcastModelProvidersUpdated() {
 /** Subscribes `onUpdate` to saves broadcast by other tabs. Returns a cleanup
  *  function (or a no-op where BroadcastChannel isn't available) — call from
  *  a `useEffect`. */
-export function subscribeToModelProvidersUpdated(
-  onUpdate: () => void,
-): () => void {
+export function subscribeToModelProvidersUpdated(onUpdate: () => void): () => void {
   const channel = getChannel();
   if (!channel) return () => {};
   channel.onmessage = onUpdate;
   return () => channel.close();
 }
 
-type ModelProviderUtils = Pick<
-  ReturnType<typeof api.useUtils>,
-  "modelProvider"
->;
+type ModelProviderUtils = Pick<ReturnType<typeof api.useUtils>, "modelProvider">;
 
 /** Every tRPC query surface whose freshness depends on the stored
  *  ModelProvider/ModelDefault rows. Shared by the same-tab mutation success

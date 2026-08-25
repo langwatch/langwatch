@@ -50,9 +50,10 @@ describe("resolveFirstTracePolling", () => {
 
     /** @scenario "First-trace polling only runs while the page is visible and stops at the timeout" */
     it("stops while the redirect is underway and never runs without a project", () => {
-      expect(
-        resolveFirstTracePolling({ ...base, isRedirecting: true }),
-      ).toEqual({ enabled: false, refetchInterval: false });
+      expect(resolveFirstTracePolling({ ...base, isRedirecting: true })).toEqual({
+        enabled: false,
+        refetchInterval: false,
+      });
       expect(resolveFirstTracePolling({ ...base, hasProject: false })).toEqual({
         enabled: false,
         refetchInterval: false,

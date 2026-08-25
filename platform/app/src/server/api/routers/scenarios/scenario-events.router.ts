@@ -106,10 +106,7 @@ export const scenarioEventsRouter = createTRPCRouter({
     .input(projectSchema.extend(dateRangeFields))
     .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
-      logger.debug(
-        { projectId: input.projectId },
-        "Fetching scenario sets data",
-      );
+      logger.debug({ projectId: input.projectId }, "Fetching scenario sets data");
       const dates = resolveDateRange(input);
       return ctx.app.simulations.getScenarioSetsData({
         projectId: input.projectId,
@@ -210,11 +207,7 @@ export const scenarioEventsRouter = createTRPCRouter({
    * @deprecated Use getSuiteRunData instead. Kept for backward compatibility.
    */
   getAllScenarioSetRunData: protectedProcedure
-    .input(
-      projectSchema
-        .extend({ scenarioSetId: z.string() })
-        .extend(dateRangeFields),
-    )
+    .input(projectSchema.extend({ scenarioSetId: z.string() }).extend(dateRangeFields))
     .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
@@ -263,11 +256,7 @@ export const scenarioEventsRouter = createTRPCRouter({
 
   // Get total count of batch runs for a scenario set (for pagination)
   getScenarioSetBatchRunCount: protectedProcedure
-    .input(
-      projectSchema
-        .extend({ scenarioSetId: z.string() })
-        .extend(dateRangeFields),
-    )
+    .input(projectSchema.extend({ scenarioSetId: z.string() }).extend(dateRangeFields))
     .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
@@ -350,10 +339,7 @@ export const scenarioEventsRouter = createTRPCRouter({
     .input(projectSchema.extend(dateRangeFields))
     .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
-      logger.debug(
-        { projectId: input.projectId },
-        "Fetching external set summaries",
-      );
+      logger.debug({ projectId: input.projectId }, "Fetching external set summaries");
       const dates = resolveDateRange(input);
       return ctx.app.simulations.getExternalSetSummaries({
         projectId: input.projectId,
@@ -428,8 +414,7 @@ export const scenarioEventsRouter = createTRPCRouter({
       // signal rides in on the context. Without it a disconnected client keeps
       // this generator suspended, its emitter listener attached, and its tab
       // registered forever.
-      const signal =
-        opts.ctx.signal ?? (opts.signal as AbortSignal | undefined);
+      const signal = opts.ctx.signal ?? (opts.signal as AbortSignal | undefined);
 
       try {
         for await (const eventArgs of on(emitter, "simulation_updated", {

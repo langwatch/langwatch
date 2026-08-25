@@ -3,15 +3,10 @@ import type {
   StoredObjectLifecycleStatus,
   StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
-import {
-  StoredObjectStore,
-  type StoredObjectRecord,
-} from "./stores/stored-object.store";
+import { StoredObjectStore, type StoredObjectRecord } from "./stores/stored-object.store";
 
 export class InMemoryStoredObjectStore extends StoredObjectStore {
-  static create(
-    values: readonly StoredObjectRecord[] = [],
-  ): InMemoryStoredObjectStore {
+  static create(values: readonly StoredObjectRecord[] = []): InMemoryStoredObjectStore {
     return new InMemoryStoredObjectStore(values);
   }
 
@@ -42,10 +37,7 @@ export class InMemoryStoredObjectStore extends StoredObjectStore {
     );
     return {
       activeObjectCount: active.length,
-      activeByteLength: active.reduce(
-        (total, value) => total + value.byteLength,
-        0,
-      ),
+      activeByteLength: active.reduce((total, value) => total + value.byteLength, 0),
     };
   }
 
@@ -63,8 +55,7 @@ export class InMemoryStoredObjectStore extends StoredObjectStore {
           (!input.afterId || value.id > input.afterId) &&
           (!input.status || value.status === input.status) &&
           (!input.expiresBefore ||
-            (value.expiresAt !== null &&
-              value.expiresAt <= input.expiresBefore)),
+            (value.expiresAt !== null && value.expiresAt <= input.expiresBefore)),
       )
       .sort((left, right) => left.id.localeCompare(right.id))
       .slice(0, input.limit);

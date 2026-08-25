@@ -9,6 +9,7 @@
 
 The current spec/contract assumes HTTP-with-HMAC-and-inline-credentials. rchaves
 challenged this on three grounds:
+
 1. Lambda is in an isolated VPC with no path back to the cluster — the gateway
    would have to be reached over a public hop, which is silly.
 2. He doesn't want a fourth server in the deployment topology.
@@ -16,8 +17,9 @@ challenged this on three grounds:
    gateway disappears entirely.
 
 **Proposed pivot (ash, 2026-04-25):** flip to library. Reasons:
+
 - The "untrusted user code shares memory with provider keys" concern was wrong —
-  per contract.md §7 the code block runs as a Python *subprocess* (stdin/stdout,
+  per contract.md §7 the code block runs as a Python _subprocess_ (stdin/stdout,
   no network), so the Go process is a clean key boundary.
 - nlpgo imports `services/aigateway/dispatcher` (a new in-process surface that
   exposes the provider router with a BYO-credentials entry-point); skips VK
@@ -38,11 +40,13 @@ in nlpgo (Studio UI concern, not gateway concern).
 **Open: TS → nlpgo HMAC.** rchaves implied the internal secret could "go away
 completely". Today's Python NLP path has no auth (Function URL + URL secrecy).
 Adding HMAC only on `/go/*` is asymmetric. Two options:
+
 - Drop the HMAC entirely; match today's no-auth posture for nlpgo.
 - Keep HMAC for `/go/*` only as defense in depth (current spec/code).
-Awaiting rchaves's confirmation before ripping out `LW_NLPGO_INTERNAL_SECRET`.
+  Awaiting rchaves's confirmation before ripping out `LW_NLPGO_INTERNAL_SECRET`.
 
 **What lands once confirmed:**
+
 - contract.md §8/§9 rewrite (gateway = library; provider quirks at gateway).
 - llm-block.feature + proxy.feature scenarios drop inline-creds header steps.
 - specs/ai-gateway/provider-quirks.feature added (model-id, temp clamps,
@@ -56,6 +60,7 @@ Awaiting rchaves's confirmation before ripping out `LW_NLPGO_INTERNAL_SECRET`.
 **Status (2026-04-25, end of multi-iteration session):**
 
 Architectural pivots that landed (per rchaves's loop guidance):
+
 - **library not HTTP** for nlpgo→aigateway (Lambda VPC isolation forces it)
 - **drop LW_NLPGO_INTERNAL_SECRET** + all HMAC bridges (matches today's
   no-auth Python posture; library mode obviates the need)
@@ -69,6 +74,7 @@ Architectural pivots that landed (per rchaves's loop guidance):
   place, langwatch_nlp deletable)
 
 Commits on `feat/nlp-go-migration`:
+
 - ✅ `27238ce28` server-side optimize 410 guard (UI hide already wired)
 - ✅ `0954724bd` evaluation runs tagged origin=evaluation (was misattributed)
 - ✅ `fea1e5151` (sarah) drop HMAC bridge end-to-end + revert topic-naming gateway path
@@ -78,10 +84,12 @@ Commits on `feat/nlp-go-migration`:
 - ✅ `922de1ec6` TS topic-clustering flag-fork to langevals when flag on
 
 External PR:
+
 - ✅ langwatch-saas#459 — fix(model-registry): normalize Anthropic version
   dots at ingest. https://github.com/langwatch/langwatch-saas/pull/459
 
 In progress / queued:
+
 - ⏳ sarah — C consumer swap: replace nlpgo's HTTP gatewayclient with a
   thin adapter over the new dispatcher pkg (~20min ETA at last check)
 - ⏳ ash — port topic_clustering tests from langwatch_nlp/tests/ to
@@ -93,6 +101,7 @@ In progress / queued:
   langevals, then push the PR for CodeRabbit review
 
 Open questions for next iteration:
+
 - Is dispatcher.Dispatcher's interface stable now that sarah's adapter swap
   is landing? need to verify the matrix tests still pass after the swap
 - LANGEVALS_ENDPOINT env in production points where today? Need to confirm
@@ -100,7 +109,8 @@ Open questions for next iteration:
   evaluationsWorker.ts:652 pattern), but topic_clustering paths /topics/*
   need to be added to langevals_api_gateway.tf path-routing
 
-The PR is *not* ready to ship until:
+The PR is _not_ ready to ship until:
+
 - All tests green (Go matrix + ts unit + langevals package)
 - A live QA run end-to-end through a flag-on project
 - Screenshots in the PR description (per orchestrate skill)
@@ -137,7 +147,7 @@ topic clustering on Python. Roll out per-project via feature flag.
 6. **Streaming.** SSE pass-through with no buffering, idle timeouts, heartbeats,
    and client-cancellation propagation.
 7. **Telemetry with correct origin.** Every span tagged with `langwatch.origin ∈
-   {workflow, evaluation, playground, topic_clustering}`. Origin is set at the
+{workflow, evaluation, playground, topic_clustering}`. Origin is set at the
    request boundary and propagates to every child span (engine, block, gateway
    call, code-sandbox subprocess). See `telemetry.feature`.
 8. **Optimization is dead.** When `release_nlp_go_engine_enabled` is on for a
@@ -182,18 +192,19 @@ topic clustering on Python. Roll out per-project via feature flag.
 
 ## Auth model
 
-| Hop                       | Mechanism                                          |
-|---------------------------|----------------------------------------------------|
-| TS app → nlpgo `/go/*`    | HMAC over canonical request, `LW_NLPGO_INTERNAL_SECRET` |
-| TS app → uvicorn (legacy) | unsigned (today's behavior, retrofit out of scope) |
+| Hop                       | Mechanism                                                      |
+| ------------------------- | -------------------------------------------------------------- |
+| TS app → nlpgo `/go/*`    | HMAC over canonical request, `LW_NLPGO_INTERNAL_SECRET`        |
+| TS app → uvicorn (legacy) | unsigned (today's behavior, retrofit out of scope)             |
 | nlpgo → AI Gateway        | HMAC + inline-credentials header, `LW_GATEWAY_INTERNAL_SECRET` |
-| AI Gateway public surface | unchanged: VK / Bearer (or x-api-key, x-goog-api-key) |
+| AI Gateway public surface | unchanged: VK / Bearer (or x-api-key, x-goog-api-key)          |
 
 ## Status checklist
 
 > Update on each iteration.
 
 ### Phase 0 — alignment + scaffolding
+
 - [x] Findings docs (ash + sarah) — `/tmp/nlp-go-migration/` and committed via specs
 - [x] `_shared/contract.md` — wire-level decisions (sarah)
 - [x] `_shared/progress.md` — this doc (ash)
@@ -204,6 +215,7 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [x] `services/nlpgo/app/ports.go` interfaces (sarah) — `GatewayClient`, `LLMClient`, `LLMRequest`/`LLMResponse`, `ChatMessage`, `Tool`, `CodeRunner`, `CodeRequest`/`CodeResult`, `ChildHealth`, `ChildProxy`, `ChildManager`, `SecretsResolver`. Translator maps Provider/Model + Origin + reasoning_effort. `go build ./services/nlpgo/... ./cmd/service/...` clean.
 
 ### Phase 1 — engine + gateway client
+
 - [x] DSL parser + Go structs (sarah)
 - [x] Engine: topo sort + node executor (sarah) — orchestrator with planner-driven layered execution + per-layer goroutine fan-out
 - [x] Dataset block (sarah) — column-oriented materialization, deterministic split
@@ -215,6 +227,7 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [x] LLM block (ash, depends on engine ports + gateway client) — `llmexecutor` adapter, 14 unit tests
 
 ### Phase 2 — TS app integration
+
 - [x] Feature flag `release_nlp_go_engine_enabled` wired in `runWorkflow.ts` (ash, via `nlpgoFetch`)
 - [ ] Same wiring for `playground.ts` (Vercel AI SDK custom-fetch — follow-up)
 - [x] **HMAC removed entirely** (sarah, fea1e5151) — library pivot eliminated the TS→nlpgo HTTP signing requirement; matches today's no-auth posture for the legacy `/studio/*` path. No `LW_NLPGO_INTERNAL_SECRET`, no `sign.ts`, no inline-creds bridge.
@@ -223,6 +236,7 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [x] Telemetry origin header set in runWorkflow (ash) — propagated through engine ctx → dispatcher
 
 ### Phase 3 — deployment (Go-only end state)
+
 - [x] Self-hosted `infra/docker/Dockerfile.langwatch_nlp` rewritten distroless Go-only (sarah) — distroless/python3 + the static Go binary + a curated code-block sandbox (requests/httpx/pydantic/langwatch); ~136MB, no uvicorn/litellm/dspy/langwatch_nlp.
 - [x] Monorepo `infra/docker/Dockerfile.langwatch_nlp.lambda` DELETED (sarah) — it was an orphan (only consumer was a CI build smoke). The prod per-tenant lambda image is owned entirely by the langwatch-saas runtime Dockerfile (langwatch-saas#570).
 - [x] uvicorn child + `NLPGO_BYPASS` / `NLPGO_CHILD_*` removed entirely (sarah) — nlpgo is unconditionally go-only; any non-`/go/*` path returns a typed 502.
@@ -230,6 +244,7 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [x] Terraform memory right-sized for the Go service (ash, langwatch-saas#570) — 4Gi → 1–2Gi.
 
 ### Phase 4 — tests + QA
+
 - [x] Provider matrix tests **removed** (sarah, ba6d13353) — duplicated `services/aigateway/tests/matrix/` per rchaves's direction. Wire-format bugs they caught (prefix stripping, max_completion_tokens, Credential.ID, field-name mapping, DeploymentMap) are now protected by the e2e tests below + the `dispatcheradapter` unit tests.
 - [x] Engine integration tests through real chi router via httptest (sarah) — 8 sync workflow tests + 2 SSE streaming tests + 5 proxypass round-trip tests + 3 realistic code-block tests (stdlib + missing-import UX + urllib network) + 12 dispatcheradapter credential tests. All green.
 - [x] **Real workflow end-to-end against live OpenAI** (sarah, 2f4e7087a) — `TestSync_RealWorkflowEndToEnd_OpenAI`, gated by `live_openai`. Posts a Studio-shape DSL through `/go/studio/execute_sync`, signature node hits real OpenAI gpt-5-mini via in-process dispatcher.
@@ -240,6 +255,7 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [ ] **Browser dogfood — deferred to a focused follow-up iter.** Local pnpm dev wedged in this worktree (CH bootstrap completes, app server bg task exits 1). The TS integration test above proves the same chain headlessly with a real subprocess + real OpenAI; the browser screenshot is purely visual confirmation of the Optimize-button hide.
 
 ### Phase 5 — review-ready (this PR)
+
 - [x] PR description rewritten with QA evidence table (20 proof points + file links + execution times)
 - [x] No new env vars / secrets / helm values vs today's config
 - [x] All Go tests green (127/127); TS integration test green (1/1)
@@ -248,10 +264,12 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [ ] Mark PR ready-for-review when CI clears
 
 ### Status snapshot per iteration
+
 - 2026-04-25 iter1: scaffolding + DSL + planner + dataset/code/HTTP blocks + engine orchestrator + handler wiring + 7 integration tests (sarah). gateway inline-creds + gatewayclient + litellm translator + llmexecutor (ash). PR #3483 opened draft. 143/143 nlpgo tests + 13 new aigateway tests green.
 - 2026-04-25 iter1 cont: TS app `nlpgoFetch` + `runWorkflow.ts` switch + Optimize button hide (ash). Provider matrix tests (ash). Lambda Dockerfile bundles Go binary with NLPGO_BYPASS entrypoint (ash). 8 e2e tests (sarah added edge-handle-rename). CI lint fix on internal_auth.go (sarah).
 
 ## Open questions / risks
+
 - Gateway inline-creds auth path is a precondition for everything in the Go
   studio path. If that lands stuck, the whole thing stalls. **Land first.**
 - DSPy `prompting_technique` → only `ChainOfThought` is in v1 scope. Pull

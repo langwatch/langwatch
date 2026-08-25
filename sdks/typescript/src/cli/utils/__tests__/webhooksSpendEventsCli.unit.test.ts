@@ -42,7 +42,12 @@ describe("Feature: CLI families for webhooks and spend events", () => {
 
   /** @scenario The spend-events family covers pull and rollup */
   it("registers spend-events list and by-user", async () => {
-    expect((await commandPaths("spend-events")).sort()).toEqual(["by-user", "list", "replay", "summary"]);
+    expect((await commandPaths("spend-events")).sort()).toEqual([
+      "by-user",
+      "list",
+      "replay",
+      "summary",
+    ]);
   });
 
   /** @scenario Org-anchored commands resolve the organization API key */
@@ -53,19 +58,13 @@ describe("Feature: CLI families for webhooks and spend events", () => {
     expect(checkOrgApiKey()).toBe("sk-lw-key");
 
     vi.stubEnv("LANGWATCH_API_KEY", "");
-    const exit = vi
-      .spyOn(process, "exit")
-      .mockImplementation((() => {
-        throw new Error("exit");
-      }) as never);
-    const stderr = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("exit");
+    }) as never);
+    const stderr = vi.spyOn(console, "error").mockImplementation(() => undefined);
     expect(() => checkOrgApiKey()).toThrow("exit");
     expect(
-      stderr.mock.calls.flat().some((line) =>
-        String(line).includes("LANGWATCH_API_KEY"),
-      ),
+      stderr.mock.calls.flat().some((line) => String(line).includes("LANGWATCH_API_KEY")),
     ).toBe(true);
     exit.mockRestore();
     stderr.mockRestore();

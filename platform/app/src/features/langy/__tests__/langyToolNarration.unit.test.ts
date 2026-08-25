@@ -56,18 +56,16 @@ describe("stripToolNarration", () => {
     describe("when the reply stacks several openers", () => {
       it("drops all of them", () => {
         expect(
-          strip(
-            "Using the GitHub skill.\n\nNow I'll open the PR.\n\nOpened PR #42.",
-          ),
+          strip("Using the GitHub skill.\n\nNow I'll open the PR.\n\nOpened PR #42."),
         ).toBe("Opened PR #42.");
       });
     });
 
     describe("when the reply echoes the command back", () => {
       it("drops the echoed invocation", () => {
-        expect(
-          strip("`langwatch trace search --format json`\n3 traces matched."),
-        ).toBe("3 traces matched.");
+        expect(strip("`langwatch trace search --format json`\n3 traces matched.")).toBe(
+          "3 traces matched.",
+        );
       });
     });
 

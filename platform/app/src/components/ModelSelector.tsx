@@ -28,10 +28,7 @@ import type { MaybeStoredModelProvider } from "../server/modelProviders/registry
 import { allLitellmModels } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
 import { titleCase } from "../utils/stringCasing";
-import {
-  MODEL_ICON_SIZE,
-  MODEL_ICON_SIZE_SM,
-} from "./llmPromptConfigs/constants";
+import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "./llmPromptConfigs/constants";
 import { NoModelsConfiguredCallout } from "./NoModelsConfiguredCallout";
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
@@ -47,21 +44,17 @@ export type ModelOption = {
   isCustom?: boolean;
 };
 
-export const modelSelectorOptions: ModelOption[] = Object.entries(
-  allLitellmModels,
-).map(([key, value]) => ({
-  label: key,
-  value: key,
-  icon: modelProviderIcons[
-    key.split("/")[0] as keyof typeof modelProviderIcons
-  ],
-  isDisabled: false,
-  mode: value.mode as "chat" | "embedding",
-}));
-
-export const allModelOptions = modelSelectorOptions.map(
-  (option) => option.value,
+export const modelSelectorOptions: ModelOption[] = Object.entries(allLitellmModels).map(
+  ([key, value]) => ({
+    label: key,
+    value: key,
+    icon: modelProviderIcons[key.split("/")[0] as keyof typeof modelProviderIcons],
+    isDisabled: false,
+    mode: value.mode as "chat" | "embedding",
+  }),
 );
+
+export const allModelOptions = modelSelectorOptions.map((option) => option.value);
 
 export type ModelOptionGroup = {
   provider: string;
@@ -207,11 +200,10 @@ export const useModelSelectionOptions = (
   // provider whose API key is present in the server's process env),
   // which made unrelated providers like Gemini show up in the picker
   // for a project that only stored Anthropic/OpenAI.
-  const modelProviders =
-    api.modelProvider.listAllForProjectForFrontend.useQuery(
-      { projectId: project?.id ?? "" },
-      { enabled: !!project?.id },
-    );
+  const modelProviders = api.modelProvider.listAllForProjectForFrontend.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
 
   // Memoized as one block: the derivation runs on data changes, not on every
   // render of the caller. Without this, each render handed back fresh
@@ -241,18 +233,14 @@ export const useModelSelectionOptions = (
     // credential cannot run would recreate the selectable-but-always-fails
     // class this fold removed. Explicit custom models stay — they are the
     // customer's own claim about what their endpoint serves.
-    const withoutRegistryModels = providersWithoutRegistryModels(
-      providers ?? [],
-      mode,
-    );
+    const withoutRegistryModels = providersWithoutRegistryModels(providers ?? [], mode);
 
     const allModels = filterRestrictedModels({
       models: getCustomModels(providersByKey, options, mode),
       featureKey,
     }).filter(
       (model) =>
-        customModelIdSet.has(model) ||
-        !withoutRegistryModels.has(model.split("/")[0]!),
+        customModelIdSet.has(model) || !withoutRegistryModels.has(model.split("/")[0]!),
     );
 
     const displayNames = buildCustomModelDisplayNames(providers ?? []);
@@ -287,10 +275,7 @@ export const useModelSelectionOptions = (
       provider,
       icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
       // Custom models first, then registry models
-      models: [
-        ...models.filter((m) => m.isCustom),
-        ...models.filter((m) => !m.isCustom),
-      ],
+      models: [...models.filter((m) => m.isCustom), ...models.filter((m) => !m.isCustom)],
     }));
 
     return { selectOptions, groupedByProvider };
@@ -405,9 +390,7 @@ export const ModelSelector = React.memo(function ModelSelector({
         fontFamily="mono"
         lineClamp={1}
         wordBreak="break-all"
-        color={
-          isProviderMissing ? "red.600" : isUnknown ? "gray.500" : undefined
-        }
+        color={isProviderMissing ? "red.600" : isUnknown ? "gray.500" : undefined}
         textDecoration={isProviderMissing ? "line-through" : undefined}
       >
         {selectedItem?.label ?? model}
@@ -434,9 +417,7 @@ export const ModelSelector = React.memo(function ModelSelector({
     </HStack>
   );
 
-  const [highlightedValue, setHighlightedValue] = useState<string | null>(
-    model,
-  );
+  const [highlightedValue, setHighlightedValue] = useState<string | null>(model);
 
   useEffect(() => {
     const highlightedItem = allFilteredModels.find(
@@ -469,12 +450,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   // System fallback string ("openai/gpt-5.2") in gray, which looked
   // like a real selection but errored at runtime.
   if (isEmpty) {
-    return (
-      <NoModelsConfiguredCallout
-        size={size}
-        forFeatureLabel={forFeatureLabel}
-      />
-    );
+    return <NoModelsConfiguredCallout size={size} forFeatureLabel={forFeatureLabel} />;
   }
 
   return (
@@ -555,10 +531,7 @@ export const ModelSelector = React.memo(function ModelSelector({
                 // Add a subtle divider between custom and registry models
                 const prevItem = group.models[itemIndex - 1];
                 const showDivider =
-                  hasCustom &&
-                  hasRegistry &&
-                  !item.isCustom &&
-                  prevItem?.isCustom;
+                  hasCustom && hasRegistry && !item.isCustom && prevItem?.isCustom;
 
                 return (
                   <React.Fragment key={item.value}>
@@ -575,9 +548,7 @@ export const ModelSelector = React.memo(function ModelSelector({
                         {item.icon && (
                           <ProviderIconGlyph
                             provider={
-                              item.value.split(
-                                "/",
-                              )[0] as keyof typeof modelProviderIcons
+                              item.value.split("/")[0] as keyof typeof modelProviderIcons
                             }
                             size={MODEL_ICON_SIZE}
                           />
@@ -625,9 +596,7 @@ export const ModelSelector = React.memo(function ModelSelector({
                 onClick={(e) => e.stopPropagation()}
               >
                 <LuSettings2 />
-                <Text fontSize={size === "sm" ? 12 : 14}>
-                  Configure available models
-                </Text>
+                <Text fontSize={size === "sm" ? 12 : 14}>Configure available models</Text>
               </Link>
             </Button>
           </Box>

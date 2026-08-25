@@ -2,13 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -114,9 +108,7 @@ describe("EvaluatorListDrawer", () => {
     it("does not select the card on Enter from the menu trigger", async () => {
       renderDrawer();
 
-      const menuTrigger = await screen.findByTestId(
-        `evaluator-menu-${mockEvaluator.id}`,
-      );
+      const menuTrigger = await screen.findByTestId(`evaluator-menu-${mockEvaluator.id}`);
       fireEvent.keyDown(menuTrigger, { key: "Enter" });
       fireEvent.keyDown(menuTrigger, { key: " " });
 
@@ -128,9 +120,7 @@ describe("EvaluatorListDrawer", () => {
     it("selects the evaluator on Enter", async () => {
       renderDrawer();
 
-      const card = await screen.findByTestId(
-        `evaluator-card-${mockEvaluator.id}`,
-      );
+      const card = await screen.findByTestId(`evaluator-card-${mockEvaluator.id}`);
       fireEvent.keyDown(card, { key: "Enter" });
 
       expect(onSelect).toHaveBeenCalledWith(
@@ -145,17 +135,12 @@ describe("EvaluatorListDrawer", () => {
       const confirmSpy = vi.spyOn(window, "confirm");
       // The component closes the dialog when the mutation settles.
       deleteMutate.mockImplementation(
-        (_vars: unknown, opts?: { onSettled?: () => void }) =>
-          opts?.onSettled?.(),
+        (_vars: unknown, opts?: { onSettled?: () => void }) => opts?.onSettled?.(),
       );
       renderDrawer();
 
-      await user.click(
-        await screen.findByTestId(`evaluator-menu-${mockEvaluator.id}`),
-      );
-      await user.click(
-        await screen.findByTestId(`evaluator-delete-${mockEvaluator.id}`),
-      );
+      await user.click(await screen.findByTestId(`evaluator-menu-${mockEvaluator.id}`));
+      await user.click(await screen.findByTestId(`evaluator-delete-${mockEvaluator.id}`));
 
       // The reusable modal is shown, not the native confirm dialog.
       await waitFor(() => {
@@ -185,12 +170,8 @@ describe("EvaluatorListDrawer", () => {
       const user = userEvent.setup();
       renderDrawer();
 
-      await user.click(
-        await screen.findByTestId(`evaluator-menu-${mockEvaluator.id}`),
-      );
-      await user.click(
-        await screen.findByTestId(`evaluator-delete-${mockEvaluator.id}`),
-      );
+      await user.click(await screen.findByTestId(`evaluator-menu-${mockEvaluator.id}`));
+      await user.click(await screen.findByTestId(`evaluator-delete-${mockEvaluator.id}`));
 
       await user.click(await screen.findByRole("button", { name: "Cancel" }));
 
@@ -213,9 +194,7 @@ describe("EvaluatorListDrawer", () => {
         screen.queryByTestId(`evaluator-card-${mockComparisonEvaluator.id}`),
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByTestId(
-          `evaluator-card-${mockLegacyPairwiseEvaluator.id}`,
-        ),
+        screen.queryByTestId(`evaluator-card-${mockLegacyPairwiseEvaluator.id}`),
       ).not.toBeInTheDocument();
     });
   });
@@ -235,9 +214,7 @@ describe("EvaluatorListDrawer", () => {
         screen.queryByTestId(`evaluator-card-${mockEvaluator.id}`),
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByTestId(
-          `evaluator-card-${mockLegacyPairwiseEvaluator.id}`,
-        ),
+        screen.queryByTestId(`evaluator-card-${mockLegacyPairwiseEvaluator.id}`),
       ).not.toBeInTheDocument();
     });
 
@@ -272,18 +249,18 @@ describe("EvaluatorListDrawer", () => {
       expect(
         await screen.findByText("Create your first comparison to get started"),
       ).toBeInTheDocument();
-      expect(
-        screen.getByTestId("create-first-evaluator-button"),
-      ).toHaveTextContent("Create your first comparison");
+      expect(screen.getByTestId("create-first-evaluator-button")).toHaveTextContent(
+        "Create your first comparison",
+      );
     });
 
     it("leaves the header create button on the caller's wording", async () => {
       evaluatorsData = [];
       renderDrawer({ createLabel: "Add comparison", itemLabel: "comparison" });
 
-      expect(
-        await screen.findByTestId("new-evaluator-button"),
-      ).toHaveTextContent("Add comparison");
+      expect(await screen.findByTestId("new-evaluator-button")).toHaveTextContent(
+        "Add comparison",
+      );
     });
   });
 });

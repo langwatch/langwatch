@@ -101,9 +101,7 @@ describe("callerTraceContext", () => {
      * so this path has to stay non-throwing.
      */
     it("survives a missing req", () => {
-      expect(() =>
-        callerTraceContext({ req: void 0, type: "query" }),
-      ).not.toThrow();
+      expect(() => callerTraceContext({ req: void 0, type: "query" })).not.toThrow();
     });
 
     it("survives a req with no headers", () => {
@@ -132,9 +130,7 @@ describe("callerTraceContext", () => {
             type: "query",
           });
 
-          expect(spanContextOf(parent)?.spanId).toBe(
-            httpSpan.spanContext().spanId,
-          );
+          expect(spanContextOf(parent)?.spanId).toBe(httpSpan.spanContext().spanId);
           expect(spanContextOf(parent)?.spanId).not.toBe(REMOTE_SPAN_ID);
         });
       } finally {

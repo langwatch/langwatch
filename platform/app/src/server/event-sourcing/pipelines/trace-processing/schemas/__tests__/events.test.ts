@@ -1,9 +1,6 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import {
-  SPAN_RECEIVED_EVENT_TYPE,
-  TOPIC_ASSIGNED_EVENT_TYPE,
-} from "../constants";
+import { SPAN_RECEIVED_EVENT_TYPE, TOPIC_ASSIGNED_EVENT_TYPE } from "../constants";
 import {
   isSpanReceivedEvent,
   isTopicAssignedEvent,
@@ -40,9 +37,7 @@ describe("events schemas", () => {
       });
 
       it("round-trips the pinned literal fixture through the parse unchanged", () => {
-        expect(parseSpanReferencedPayload(pinnedWireJob())).toEqual(
-          pinnedWireJob(),
-        );
+        expect(parseSpanReferencedPayload(pinnedWireJob())).toEqual(pinnedWireJob());
       });
 
       it("returns null for any other staged type so callers fall through", () => {
@@ -166,9 +161,7 @@ describe("events schemas", () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.metadata.processingTraceparent).toBe(
-          "00-abc123-def456-01",
-        );
+        expect(result.data.metadata.processingTraceparent).toBe("00-abc123-def456-01");
       }
     });
   });

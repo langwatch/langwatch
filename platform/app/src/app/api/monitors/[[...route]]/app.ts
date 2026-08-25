@@ -311,8 +311,7 @@ secured.access(requires("evaluations:update")).patch(
       executionMode: body.executionMode ?? existing.executionMode,
       preconditions: body.preconditions ?? existing.preconditions,
       parameters: body.parameters ?? existing.parameters,
-      mappings:
-        body.mappings !== undefined ? body.mappings : existing.mappings,
+      mappings: body.mappings !== undefined ? body.mappings : existing.mappings,
       sample: body.sample ?? existing.sample,
       enabled: body.enabled,
       evaluatorId: body.evaluatorId,
@@ -345,9 +344,7 @@ secured.access(requires("evaluations:update")).post(
         description: "Monitor toggled",
         content: {
           "application/json": {
-            schema: resolver(
-              z.object({ id: z.string(), enabled: z.boolean() }),
-            ),
+            schema: resolver(z.object({ id: z.string(), enabled: z.boolean() })),
           },
         },
       },
@@ -364,10 +361,7 @@ secured.access(requires("evaluations:update")).post(
     const project = c.get("project");
     const { id } = c.req.param();
     const { enabled } = c.req.valid("json");
-    logger.info(
-      { projectId: project.id, monitorId: id, enabled },
-      "Toggling monitor",
-    );
+    logger.info({ projectId: project.id, monitorId: id, enabled }, "Toggling monitor");
 
     const existing = await c.app.monitors.tryGetMonitorById({
       id,
@@ -400,9 +394,7 @@ secured.access(requires("evaluations:manage")).delete(
         description: "Monitor deleted",
         content: {
           "application/json": {
-            schema: resolver(
-              z.object({ id: z.string(), deleted: z.boolean() }),
-            ),
+            schema: resolver(z.object({ id: z.string(), deleted: z.boolean() })),
           },
         },
       },

@@ -307,13 +307,8 @@ async function listChannelsForTypes(
  * retry public-only. An app with just `channels:read` then still gets its public
  * channels; only an app missing `channels:read` too ends up with `missing_scope`.
  */
-export async function listSlackChannels(
-  token: string,
-): Promise<SlackChannelListing> {
-  const withPrivate = await listChannelsForTypes(
-    token,
-    "public_channel,private_channel",
-  );
+export async function listSlackChannels(token: string): Promise<SlackChannelListing> {
+  const withPrivate = await listChannelsForTypes(token, "public_channel,private_channel");
   if (withPrivate.error !== "missing_scope") return withPrivate;
   // Missing `groups:read` (private) — fall back to public channels only. The
   // retry succeeds, so without recording the gap the caller would see a clean

@@ -49,9 +49,7 @@ describe("Feature: SCIM tokens REST API", () => {
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
-          .mockResolvedValue(
-            ENTERPRISE_TEST_PLAN,
-          ) as PlanProvider["getActivePlan"],
+          .mockResolvedValue(ENTERPRISE_TEST_PLAN) as PlanProvider["getActivePlan"],
       }),
     });
 
@@ -92,19 +90,14 @@ describe("Feature: SCIM tokens REST API", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      const entry = body.tokens.find(
-        (token: { id: string }) => token.id === created.id,
-      );
+      const entry = body.tokens.find((token: { id: string }) => token.id === created.id);
       expect(entry).toMatchObject({ description: `List Secrets ${ns}` });
       expect(entry).toHaveProperty("createdAt");
       expect(entry).toHaveProperty("lastUsedAt");
 
       const raw = JSON.stringify(body);
       expect(raw).not.toContain(created.token);
-      const hash = crypto
-        .createHash("sha256")
-        .update(created.token)
-        .digest("hex");
+      const hash = crypto.createHash("sha256").update(created.token).digest("hex");
       expect(raw).not.toContain(hash);
     });
 
@@ -142,19 +135,25 @@ describe("Feature: SCIM tokens REST API", () => {
 
       expect((await scimUsersWith(created.token)).status).toBe(200);
 
-      const revoke = await app.request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/${created.id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
+      const revoke = await app.request(
+        `/api/scim-tokens/${MANAGEMENT_API_VERSION}/${created.id}`,
+        {
+          method: "DELETE",
+          headers: authHeaders(),
+        },
+      );
       expect(revoke.status).toBe(200);
       expect((await revoke.json()).success).toBe(true);
 
       expect((await scimUsersWith(created.token)).status).toBe(401);
 
-      const again = await app.request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/${created.id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
+      const again = await app.request(
+        `/api/scim-tokens/${MANAGEMENT_API_VERSION}/${created.id}`,
+        {
+          method: "DELETE",
+          headers: authHeaders(),
+        },
+      );
       expect(again.status).toBe(404);
       expect((await again.json()).code).toBe("scim_token_not_found");
     });

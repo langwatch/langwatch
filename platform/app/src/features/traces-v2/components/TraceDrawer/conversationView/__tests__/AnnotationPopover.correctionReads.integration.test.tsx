@@ -10,22 +10,8 @@
  * specs/traces-v2/annotations.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  renderHook,
-  screen,
-} from "@testing-library/react";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  vi,
-} from "vitest";
+import { cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 type MutationOptions = { onSuccess?: () => void; onError?: () => void };
@@ -134,9 +120,7 @@ describe("given a reviewer suggesting a correction on a trace", () => {
       await submitAndSucceed({ buttonName: "Save", mutation: mocks.create });
 
       expect(mocks.invalidateAnnotations).toHaveBeenCalled();
-      expect(mocks.invalidateOverlay).toHaveBeenCalledWith(
-        THIS_TRACES_CORRECTION,
-      );
+      expect(mocks.invalidateOverlay).toHaveBeenCalledWith(THIS_TRACES_CORRECTION);
     });
 
     /** @scenario "Saving, updating, or deleting an annotation refreshes the batched annotation feed" */
@@ -179,9 +163,7 @@ describe("given an annotation opened for editing before its read settles", () =>
   it("says so on the save control", async () => {
     renderSuggest({ annotationId: "annotation-1" });
 
-    expect(
-      await screen.findByRole("button", { name: "Update" }),
-    ).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Update" })).toBeDisabled();
   });
 });
 
@@ -207,9 +189,7 @@ describe("given a suggestion the reviewer had already made", () => {
       });
 
       expect(mocks.invalidateAnnotations).toHaveBeenCalled();
-      expect(mocks.invalidateOverlay).toHaveBeenCalledWith(
-        THIS_TRACES_CORRECTION,
-      );
+      expect(mocks.invalidateOverlay).toHaveBeenCalledWith(THIS_TRACES_CORRECTION);
     });
 
     /** @scenario "Saving, updating, or deleting an annotation refreshes the batched annotation feed" */
@@ -234,9 +214,7 @@ describe("given a suggestion the reviewer had already made", () => {
       });
 
       expect(mocks.invalidateAnnotations).toHaveBeenCalled();
-      expect(mocks.invalidateOverlay).toHaveBeenCalledWith(
-        THIS_TRACES_CORRECTION,
-      );
+      expect(mocks.invalidateOverlay).toHaveBeenCalledWith(THIS_TRACES_CORRECTION);
     });
 
     /** @scenario "Saving, updating, or deleting an annotation refreshes the batched annotation feed" */

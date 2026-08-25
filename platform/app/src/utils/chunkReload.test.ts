@@ -24,12 +24,10 @@ const preloadErrorEvent = (payload: Error) =>
     payload,
   });
 
-const staleChunkError = () =>
-  new Error("Failed to fetch dynamically imported module");
+const staleChunkError = () => new Error("Failed to fetch dynamically imported module");
 
 /** Let the listener's deferred reload decision run. */
-const settleDeferredReload = () =>
-  new Promise((resolve) => setTimeout(resolve, 0));
+const settleDeferredReload = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("isChunkLoadError", () => {
   describe("when the message is a Vite dynamic-import failure", () => {
@@ -49,17 +47,17 @@ describe("isChunkLoadError", () => {
 
   describe("when the message is a module-script import failure", () => {
     it("classifies it as a chunk-load error", () => {
-      expect(
-        isChunkLoadError(new Error("error importing a module script failed")),
-      ).toBe(true);
+      expect(isChunkLoadError(new Error("error importing a module script failed"))).toBe(
+        true,
+      );
     });
   });
 
   describe("when the error is an ordinary runtime error", () => {
     it("does not classify it as a chunk-load error", () => {
-      expect(
-        isChunkLoadError(new Error("Cannot read properties of undefined")),
-      ).toBe(false);
+      expect(isChunkLoadError(new Error("Cannot read properties of undefined"))).toBe(
+        false,
+      );
     });
   });
 
@@ -115,9 +113,7 @@ describe("reloadOnChunkError", () => {
   describe("when the error is a chunk error", () => {
     it("reloads and reports it handled the error", () => {
       expect(
-        reloadOnChunkError(
-          new Error("Failed to fetch dynamically imported module"),
-        ),
+        reloadOnChunkError(new Error("Failed to fetch dynamically imported module")),
       ).toBe(true);
       expect(reloaded()).toBe(true);
     });

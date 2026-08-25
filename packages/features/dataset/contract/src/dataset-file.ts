@@ -3,7 +3,8 @@ import type { DatasetColumns } from "./dataset";
 
 const getSafeColumnName = (columnName: string, existingNames: Set<string>): string => {
   const reserved = (value: string) => value === "id" || value === "selected";
-  if (!reserved(columnName.toLowerCase()) && !existingNames.has(columnName)) return columnName;
+  if (!reserved(columnName.toLowerCase()) && !existingNames.has(columnName))
+    return columnName;
   let candidate = `${columnName}_`;
   let counter = 0;
   while (reserved(candidate.toLowerCase()) || existingNames.has(candidate)) {
@@ -32,9 +33,7 @@ export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 // any null bytes that survive parsing (e.g. `\u0000` JSON escapes
 // resolved to a real null after JSON.parse).
 function stripRawNullBytes(content: string): string {
-  return content.includes("\u0000")
-    ? content.replaceAll("\u0000", "")
-    : content;
+  return content.includes("\u0000") ? content.replaceAll("\u0000", "") : content;
 }
 
 export type FileFormat = "csv" | "json" | "jsonl";
@@ -190,17 +189,9 @@ export function convertValueToColumnType(
     const strValue = `${value ?? ""}`.toLowerCase();
     if (["true", "1", "yes", "y", "on", "ok"].includes(strValue)) return true;
     if (
-      [
-        "false",
-        "0",
-        "null",
-        "undefined",
-        "nan",
-        "inf",
-        "no",
-        "n",
-        "off",
-      ].includes(strValue)
+      ["false", "0", "null", "undefined", "nan", "inf", "no", "n", "off"].includes(
+        strValue,
+      )
     ) {
       return false;
     }
@@ -264,10 +255,10 @@ export function convertRowsToColumnTypes(
  * broken CSV exports). The dataset-record sanitiser still runs later to
  * catch null bytes that appear via JSON escape sequences.
  */
-export function parseFileContent(params: {
-  content: string;
-  format: FileFormat;
-}): { headers: string[]; rows: Record<string, unknown>[] } {
+export function parseFileContent(params: { content: string; format: FileFormat }): {
+  headers: string[];
+  rows: Record<string, unknown>[];
+} {
   const { content, format } = params;
   const cleanContent = stripRawNullBytes(content);
 

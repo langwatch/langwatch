@@ -18,9 +18,7 @@ import type { SessionModelTotalsRow } from "../repositories/coding-agent-session
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 5, 1);
 
-function pullRequestRow(
-  over: Partial<GithubPullRequestRow> = {},
-): GithubPullRequestRow {
+function pullRequestRow(over: Partial<GithubPullRequestRow> = {}): GithubPullRequestRow {
   return {
     organizationId: "org-1",
     repositoryHost: "github.com",
@@ -72,9 +70,7 @@ function sessionRow(
 
 /** One row of the personal page's own session read, as ClickHouse returns it. */
 function personalSessionRow(
-  over: Partial<
-    Awaited<ReturnType<PersonalSessionLookup["listRecent"]>>[number]
-  > = {},
+  over: Partial<Awaited<ReturnType<PersonalSessionLookup["listRecent"]>>[number]> = {},
 ): Awaited<ReturnType<PersonalSessionLookup["listRecent"]>>[number] {
   return {
     sessionId: "session-a",
@@ -237,9 +233,7 @@ function personalServiceWith({
   }) => Promise<boolean>;
   findAllByBranches?: ReturnType<typeof vi.fn>;
 }) {
-  const listByRepositoryBranch = vi
-    .fn()
-    .mockResolvedValue(organizationSessions);
+  const listByRepositoryBranch = vi.fn().mockResolvedValue(organizationSessions);
   const service = new PullRequestUsageService({
     pullRequests: { findByNumber: vi.fn(), findAllByBranches } as never,
     sessions: { listByRepositoryBranch } as never,
@@ -346,15 +340,13 @@ describe("PullRequestUsageService", () => {
 
       const usage = await service.getPullRequestUsage(QUERY);
 
-      expect(
-        usage.rows.map((row) => [row.contributorLabel, row.agent]),
-      ).toEqual([
+      expect(usage.rows.map((row) => [row.contributorLabel, row.agent])).toEqual([
         ["Riley Chase", "claude_code"],
         ["Riley Chase", "codex"],
       ]);
-      expect(
-        usage.rows.find((row) => row.agent === "claude_code")?.sessionsCount,
-      ).toBe(3);
+      expect(usage.rows.find((row) => row.agent === "claude_code")?.sessionsCount).toBe(
+        3,
+      );
       expect(JSON.stringify(usage)).not.toContain("user-abc");
       expect(usage.totals.sessionsCount).toBe(4);
       expect(usage.totals.totalTokens).toBe(4 * 180);
@@ -650,9 +642,7 @@ describe("PullRequestUsageService", () => {
         organizationSessions: [
           sessionRow({ sessionId: "mine", models: ["claude-opus-5"] }),
         ],
-        modelTotals: [
-          modelTotalsRow({ sessionId: "mine", model: "claude-opus-5" }),
-        ],
+        modelTotals: [modelTotalsRow({ sessionId: "mine", model: "claude-opus-5" })],
       });
 
       const usage = await service.getForPersonalProject(PERSONAL_QUERY);
@@ -679,18 +669,17 @@ describe("PullRequestUsageService", () => {
 
       const usage = await service.getForPersonalProject(PERSONAL_QUERY);
 
-      expect(
-        usage.unlinked[0]?.modelBreakdown.map((each) => each.model),
-      ).toEqual(["claude-haiku-4-5-20251001", "claude-opus-5"]);
+      expect(usage.unlinked[0]?.modelBreakdown.map((each) => each.model)).toEqual([
+        "claude-haiku-4-5-20251001",
+        "claude-opus-5",
+      ]);
     });
 
     /** @scenario "A branch whose sessions recorded no model reports none" */
     it("reports no models when its sessions recorded none", async () => {
       const { service } = personalServiceWith({
         pullRequests: [],
-        personalSessions: [
-          personalSessionRow({ sessionId: "mine", models: [] }),
-        ],
+        personalSessions: [personalSessionRow({ sessionId: "mine", models: [] })],
       });
 
       const usage = await service.getForPersonalProject(PERSONAL_QUERY);
@@ -767,9 +756,7 @@ describe("PullRequestUsageService", () => {
         personalSessions: [personalSessionRow({ sessionId: "mine" })],
         // The read is scoped to the permitted projects, so a hidden project's
         // sessions never come back at all.
-        organizationSessions: [
-          sessionRow({ sessionId: "mine", tenantId: "project-1" }),
-        ],
+        organizationSessions: [sessionRow({ sessionId: "mine", tenantId: "project-1" })],
       });
 
       const usage = await service.getForPersonalProject(PERSONAL_QUERY);
@@ -1140,10 +1127,7 @@ describe("PullRequestUsageService", () => {
     it("names each session by its title, alongside its facts", async () => {
       const { service } = serviceWith({
         pullRequests: [pullRequestRow()],
-        sessions: [
-          sessionRow(),
-          sessionRow({ sessionId: "session-b", title: "" }),
-        ],
+        sessions: [sessionRow(), sessionRow({ sessionId: "session-b", title: "" })],
       });
 
       const detail = await service.getPullRequestDetail(QUERY);

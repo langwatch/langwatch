@@ -137,12 +137,8 @@ describe("Evaluator editor body — field-mapping render (issue #950)", () => {
       render(<Harness onMappingChange={undefined} />, { wrapper: Wrapper });
 
       // This is the #950 symptom: the drawer opens but there is nothing to map.
-      expect(
-        screen.queryByTestId("mapping-input-contexts"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("mapping-input-output"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("mapping-input-contexts")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("mapping-input-output")).not.toBeInTheDocument();
     });
   });
 });

@@ -17,9 +17,7 @@ describe("mapZodIssuesToLogContext", () => {
       { path: [], code: "custom", message: "Top-level error" },
     ]);
 
-    expect(result).toEqual([
-      { path: "", code: "custom", message: "Top-level error" },
-    ]);
+    expect(result).toEqual([{ path: "", code: "custom", message: "Top-level error" }]);
   });
 
   it("preserves code and message fields", () => {

@@ -101,9 +101,7 @@ const buildColumns = ({
   // verdict as `<target_XYZ> 1.00`, which reads as noise to users (dogfood
   // report). Suppressing them in the target cell keeps the Winner column
   // the single source of the comparison result.
-  const comparisonEvaluatorIds = new Set(
-    comparisonColumns.map((p) => p.evaluatorId),
-  );
+  const comparisonEvaluatorIds = new Set(comparisonColumns.map((p) => p.evaluatorId));
   const columns = [];
 
   // Row number column
@@ -113,12 +111,7 @@ const buildColumns = ({
       header: "",
       size: 32,
       cell: ({ row }) => (
-        <Text
-          fontSize="12px"
-          color="fg.muted"
-          textAlign="right"
-          paddingRight={1}
-        >
+        <Text fontSize="12px" color="fg.muted" textAlign="right" paddingRight={1}>
           {row.index + 1}
         </Text>
       ),
@@ -189,17 +182,14 @@ const buildColumns = ({
   // can render the winner cell (badge + winning output + reasoning) INSIDE
   // the comparison column's own cell — the user wants everything in one
   // place, not split across a target column and a trailing Winner column.
-  const comparisonByTargetId = new Map(
-    comparisonColumns.map((p) => [p.evaluatorId, p]),
-  );
+  const comparisonByTargetId = new Map(comparisonColumns.map((p) => [p.evaluatorId, p]));
 
   // Target columns with headers that include summary.
   // Skip a column entirely when no target field is shown — unless it hosts
   // a comparison verdict (Winner cell), which is independent of the field
   // toggles and would otherwise vanish along with them, silently dropping
   // the comparison result.
-  const showTargetColumns =
-    showOutputs || showEvaluations || showCostAndLatency;
+  const showTargetColumns = showOutputs || showEvaluations || showCostAndLatency;
   for (const targetCol of targetColumns) {
     const comparisonMeta = comparisonByTargetId.get(targetCol.id);
     if (!showTargetColumns && !comparisonMeta) continue;
@@ -258,10 +248,7 @@ const buildColumns = ({
   // A comparison wired as an evaluator chip rather than as its own column has
   // no target column to render its verdict inside, and its chip is suppressed
   // above. Without a trailing Winner column the verdict would be invisible.
-  for (const column of trailingComparisonColumns(
-    comparisonColumns,
-    targetColumns,
-  )) {
+  for (const column of trailingComparisonColumns(comparisonColumns, targetColumns)) {
     columns.push(
       columnHelper.display({
         id: `comparison_${column.evaluatorId}`,
@@ -360,9 +347,7 @@ export function SingleRunTable({
   });
 
   // State for scroll container - using state triggers re-render when mounted
-  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(
-    null,
-  );
+  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
 
   // Callback ref to set the scroll container
   const scrollContainerRef = useCallback((node: HTMLDivElement | null) => {
@@ -374,15 +359,9 @@ export function SingleRunTable({
   // const rowCount = table.getRowModel().rows.length;
 
   // Stable callbacks for virtualizer
-  const getScrollElement = useCallback(
-    () => scrollContainer,
-    [scrollContainer],
-  );
+  const getScrollElement = useCallback(() => scrollContainer, [scrollContainer]);
   const estimatedRowHeight = ESTIMATED_ROW_HEIGHT_PX[rowHeight];
-  const estimateSize = useCallback(
-    () => estimatedRowHeight,
-    [estimatedRowHeight],
-  );
+  const estimateSize = useCallback(() => estimatedRowHeight, [estimatedRowHeight]);
 
   // Set up row virtualization with dynamic measurement
   const rowVirtualizer = useVirtualizer({
@@ -394,8 +373,7 @@ export function SingleRunTable({
     // Enable dynamic measurement - measures actual row heights as they render
     measureElement:
       typeof window !== "undefined"
-        ? (element) =>
-            element?.getBoundingClientRect().height ?? estimatedRowHeight
+        ? (element) => element?.getBoundingClientRect().height ?? estimatedRowHeight
         : undefined,
   });
 
@@ -423,8 +401,7 @@ export function SingleRunTable({
   const comparisonTargetIds = new Set(
     (data.comparisonColumns ?? []).map((p) => p.evaluatorId),
   );
-  const showTargetColumns =
-    showOutputs || showEvaluations || showCostAndLatency;
+  const showTargetColumns = showOutputs || showEvaluations || showCostAndLatency;
   const targetColCount = showTargetColumns
     ? data.targetColumns.length
     : data.targetColumns.filter((t) => comparisonTargetIds.has(t.id)).length;
@@ -471,10 +448,7 @@ export function SingleRunTable({
                 <th key={header.id} style={{ width: `${header.getSize()}px` }}>
                   {header.isPlaceholder
                     ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
+                    : flexRender(header.column.columnDef.header, header.getContext())}
                 </th>
               ))}
             </tr>
@@ -514,14 +488,8 @@ export function SingleRunTable({
                     ref={rowVirtualizer.measureElement}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        style={{ width: cell.column.getSize() }}
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
+                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
                   </tr>

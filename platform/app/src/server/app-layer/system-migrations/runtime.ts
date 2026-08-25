@@ -18,10 +18,7 @@ import { env } from "~/env.mjs";
 import { getPrivateClickHouseUrls } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { tryGetApp } from "../app";
-import {
-  migrationRunsOnThisInstallation,
-  organizationMigrates,
-} from "./cohort";
+import { migrationRunsOnThisInstallation, organizationMigrates } from "./cohort";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
 import { PrismaSystemMigrationEnrollmentRepository } from "./repositories/system-migration-enrollment.prisma.repository";
@@ -38,9 +35,7 @@ const logger = createLogger("langwatch:system-migrations:runtime");
 /** The runner and the ops service both write through this instance. */
 const systemMigrationState = new PrismaSystemMigrationStateRepository(prisma);
 
-const enrollmentRepository = new PrismaSystemMigrationEnrollmentRepository(
-  prisma,
-);
+const enrollmentRepository = new PrismaSystemMigrationEnrollmentRepository(prisma);
 
 /**
  * What the ops dashboard talks to. The route calls this and never the state
@@ -94,9 +89,7 @@ export function registeredMigrations(
     ...additionalMigrations,
   ];
   return [
-    ...new Map(
-      migrations.map((migration) => [migration.name, migration]),
-    ).values(),
+    ...new Map(migrations.map((migration) => [migration.name, migration])).values(),
   ];
 }
 
@@ -174,8 +167,7 @@ export async function runSystemMigrationTargetedPass({
     state: systemMigrationState,
     lease: new RedisMigrationLeaseRepository(redis),
     tenants: {
-      findTenantIdsAfter: async ({ cursor }) =>
-        cursor === null ? [organizationId] : [],
+      findTenantIdsAfter: async ({ cursor }) => (cursor === null ? [organizationId] : []),
     },
     cohort: await migrationPassCohort(),
     migrations: registeredMigrations().filter(
@@ -183,8 +175,7 @@ export async function runSystemMigrationTargetedPass({
         migration.name === migrationName &&
         migrationRunsOnThisInstallation({
           isSaaS: env.IS_SAAS === true,
-          runsAutomaticallyOnSelfHosted:
-            migration.runsAutomaticallyOnSelfHosted,
+          runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
         }),
     ),
   });
@@ -209,13 +200,11 @@ export async function runSystemMigrationPass(args?: {
     lease: new RedisMigrationLeaseRepository(redis),
     tenants: new PrismaOrganizationTenantSource(prisma),
     cohort: await migrationPassCohort(),
-    migrations: registeredMigrations(args?.additionalMigrations).filter(
-      (migration) =>
-        migrationRunsOnThisInstallation({
-          isSaaS: env.IS_SAAS === true,
-          runsAutomaticallyOnSelfHosted:
-            migration.runsAutomaticallyOnSelfHosted,
-        }),
+    migrations: registeredMigrations(args?.additionalMigrations).filter((migration) =>
+      migrationRunsOnThisInstallation({
+        isSaaS: env.IS_SAAS === true,
+        runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
+      }),
     ),
   });
   return runner.runPass({ signal: args?.signal });

@@ -9,11 +9,11 @@ import {
   type SlackTemplateType,
 } from "@langwatch/automation-contract";
 import {
-	buildReportTemplateContext,
-	type ReportChart,
-	type ReportTraceRow,
-	type ReportSource,
-	extractReportFromTriggerRow,
+  buildReportTemplateContext,
+  type ReportChart,
+  type ReportTraceRow,
+  type ReportSource,
+  extractReportFromTriggerRow,
 } from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
 import { Cron } from "croner";
@@ -27,10 +27,7 @@ import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 const logger = createLogger("langwatch:report-dispatch");
 
 export interface ReportDispatchDeps {
-  loadTrigger(params: {
-    projectId: string;
-    triggerId: string;
-  }): Promise<Trigger | null>;
+  loadTrigger(params: { projectId: string; triggerId: string }): Promise<Trigger | null>;
   loadProject(projectId: string): Promise<Project | null>;
   sendEmail: typeof sendRenderedTriggerEmail;
   sendSlack: typeof sendRenderedSlackMessage;
@@ -238,10 +235,7 @@ export async function dispatchScheduledReport({
     trigger: { id: trigger.id, name: trigger.name },
     report: {
       sourceLabel: sourceLabel(report.source),
-      scheduleLabel: scheduleLabel(
-        report.schedule.cron,
-        report.schedule.timezone,
-      ),
+      scheduleLabel: scheduleLabel(report.schedule.cron, report.schedule.timezone),
       sourceKind: report.source.kind,
     },
     viewUrl: viewUrl(report.source, deps.baseHost, project.slug),

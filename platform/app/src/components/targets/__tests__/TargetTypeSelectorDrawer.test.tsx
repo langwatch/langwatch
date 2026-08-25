@@ -84,9 +84,7 @@ describe("TargetTypeSelectorDrawer", () => {
       await waitFor(() => {
         expect(screen.getByText("Agent")).toBeInTheDocument();
         expect(
-          screen.getByText(
-            "Integrate with your existing agent or create a workflow",
-          ),
+          screen.getByText("Integrate with your existing agent or create a workflow"),
         ).toBeInTheDocument();
       });
     });
@@ -131,11 +129,7 @@ describe("TargetTypeSelectorDrawer", () => {
 
       await user.click(screen.getByTestId("target-type-prompt"));
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith(
-        "promptList",
-        {},
-        { replace: true },
-      );
+      expect(mockOpenDrawer).toHaveBeenCalledWith("promptList", {}, { replace: true });
     });
 
     it("opens agentList drawer when selecting Agent", async () => {
@@ -148,11 +142,7 @@ describe("TargetTypeSelectorDrawer", () => {
 
       await user.click(screen.getByTestId("target-type-agent"));
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith(
-        "agentList",
-        {},
-        { replace: true },
-      );
+      expect(mockOpenDrawer).toHaveBeenCalledWith("agentList", {}, { replace: true });
     });
   });
 

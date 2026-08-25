@@ -32,7 +32,6 @@ export function useVersionDrift(node: Node<LlmPromptConfigComponent>) {
     latestPromptVersion: latestPrompt?.version,
     isOutdated:
       !isSaving &&
-      (latestPrompt?.version ?? 0) >
-        (node.data.versionMetadata?.versionNumber ?? 0),
+      (latestPrompt?.version ?? 0) > (node.data.versionMetadata?.versionNumber ?? 0),
   };
 }

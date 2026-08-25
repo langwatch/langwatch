@@ -47,14 +47,20 @@ export const postgresPredep: Predep = {
     // dev machines, GitHub runners) — without this we'd always reuse the
     // host install and never test the bundled lifecycle. Empty / unset /
     // "0" / "false" all mean default behavior.
-    const forceBundled = /^(1|true|yes)$/i.test(process.env.LANGWATCH_FORCE_BUNDLED_POSTGRES ?? "");
+    const forceBundled = /^(1|true|yes)$/i.test(
+      process.env.LANGWATCH_FORCE_BUNDLED_POSTGRES ?? "",
+    );
     const bundled = join(paths.bin, "postgres", "bin", "postgres");
     if (existsSync(bundled)) {
       const v = await resolveVersion(bundled);
       if (v) return { installed: true, version: v, resolvedPath: bundled };
     }
     if (forceBundled) {
-      return { installed: false, reason: "LANGWATCH_FORCE_BUNDLED_POSTGRES=1 — skipping system postgres; bundled tarball will be downloaded" };
+      return {
+        installed: false,
+        reason:
+          "LANGWATCH_FORCE_BUNDLED_POSTGRES=1 — skipping system postgres; bundled tarball will be downloaded",
+      };
     }
     try {
       const { stdout } = await execa("which", ["postgres"], { reject: false });
@@ -73,7 +79,10 @@ export const postgresPredep: Predep = {
     } catch {
       // ignore
     }
-    return { installed: false, reason: "postgres not on PATH or in ~/.langwatch/bin/postgres" };
+    return {
+      installed: false,
+      reason: "postgres not on PATH or in ~/.langwatch/bin/postgres",
+    };
   },
 
   async install({ platform, paths, task }) {
@@ -87,7 +96,9 @@ export const postgresPredep: Predep = {
     task.output = "verifying sha256";
     const expectedRes = await fetch(`${url}.sha256`);
     if (!expectedRes.ok) {
-      throw new Error(`postgres sha256 sidecar missing (${url}.sha256): HTTP ${expectedRes.status}`);
+      throw new Error(
+        `postgres sha256 sidecar missing (${url}.sha256): HTTP ${expectedRes.status}`,
+      );
     }
     // sidecar format: "<hex>  <filename>\n" (sha256sum default), tolerate
     // bare hex too in case the publish workflow ever drops the filename.
@@ -108,7 +119,9 @@ export const postgresPredep: Predep = {
     tar.x({ sync: true, file: tmp, cwd: target });
     const bin = join(target, "bin", "postgres");
     if (!existsSync(bin)) {
-      throw new Error(`postgres tarball ${url} extracted incompletely — ${bin} not found after extract`);
+      throw new Error(
+        `postgres tarball ${url} extracted incompletely — ${bin} not found after extract`,
+      );
     }
     const version = (await resolveVersion(bin)) ?? "unknown";
     return { version, resolvedPath: bin };

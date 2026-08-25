@@ -159,9 +159,7 @@ export type CheaperAlternative = {
  * whole condition to false and wave the recommendation through, which is the
  * opposite of how `scoreSeparation` guards this exact shape one file over.
  */
-const pairedSavingIsEstablished = (
-  interval: [number, number] | undefined,
-): boolean => {
+const pairedSavingIsEstablished = (interval: [number, number] | undefined): boolean => {
   if (!interval) return true;
   if (!interval.every((bound) => Number.isFinite(bound))) return false;
   // cheapest minus baseline: a real saving sits entirely below zero.
@@ -259,9 +257,7 @@ export const findCheaperTiedAlternative = ({
   // the mean gap remains the best answer available.
   if (
     !pairedSavingIsEstablished(
-      variantMetrics[cheapest.variantId]?.costDifferenceCI?.[
-        baseline.variantId
-      ],
+      variantMetrics[cheapest.variantId]?.costDifferenceCI?.[baseline.variantId],
     )
   ) {
     return null;

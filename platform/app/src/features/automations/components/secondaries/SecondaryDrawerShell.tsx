@@ -54,12 +54,7 @@ export function SecondaryDrawerShell({
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack width="full" gap={3}>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label="Back"
-              onClick={onClose}
-            >
+            <Button variant="ghost" size="sm" aria-label="Back" onClick={onClose}>
               <ArrowLeft size={16} />
             </Button>
             <Heading size="md">{title}</Heading>
@@ -79,11 +74,7 @@ export function SecondaryDrawerShell({
         <Drawer.Footer>
           <HStack width="full">
             <Spacer />
-            <Button
-              colorPalette="orange"
-              onClick={onDone}
-              disabled={doneDisabled}
-            >
+            <Button colorPalette="orange" onClick={onDone} disabled={doneDisabled}>
               Done
             </Button>
           </HStack>

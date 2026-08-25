@@ -5,10 +5,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LocalPromptConfig, TargetConfig } from "~/experiments-v3/types";
-import {
-  createInitialState,
-  type DatasetReference,
-} from "~/experiments-v3/types";
+import { createInitialState, type DatasetReference } from "~/experiments-v3/types";
 import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import { inferAllTargetMappings } from "~/experiments-v3/utils/mappingInference";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -26,9 +23,7 @@ import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/Drag
  * Converts a playground tab's form values to a LocalPromptConfig.
  * Used when a prompt has unsaved changes or is brand new.
  */
-const convertToLocalPromptConfig = (
-  tabData: TabData,
-): LocalPromptConfig | undefined => {
+const convertToLocalPromptConfig = (tabData: TabData): LocalPromptConfig | undefined => {
   const configData = tabData.form.currentValues.version?.configData;
   if (!configData) return undefined;
 
@@ -161,9 +156,7 @@ const convertTabToTarget = (
     promptVersionId: versionId ?? undefined,
     promptVersionNumber: configId ? tabData.meta.versionNumber : undefined,
     // Only include localPromptConfig if there are unsaved changes
-    localPromptConfig: hasChanges
-      ? convertToLocalPromptConfig(tabData)
-      : undefined,
+    localPromptConfig: hasChanges ? convertToLocalPromptConfig(tabData) : undefined,
     inputs,
     outputs,
     mappings: {},
@@ -198,20 +191,14 @@ export function ExperimentFromPlaygroundButton({
   const utils = api.useUtils();
 
   // Get all tabs from all windows
-  const { isComparing, allTabs, activeTab } = useDraggableTabsBrowserStore(
-    (state) => {
-      const activeWindow = state.windows.find(
-        (w) => w.id === state.activeWindowId,
-      );
-      return {
-        isComparing: state.windows.length > 1,
-        allTabs: state.windows.flatMap((w) => w.tabs),
-        activeTab: activeWindow?.tabs.find(
-          (t) => t.id === activeWindow?.activeTabId,
-        ),
-      };
-    },
-  );
+  const { isComparing, allTabs, activeTab } = useDraggableTabsBrowserStore((state) => {
+    const activeWindow = state.windows.find((w) => w.id === state.activeWindowId);
+    return {
+      isComparing: state.windows.length > 1,
+      allTabs: state.windows.flatMap((w) => w.tabs),
+      activeTab: activeWindow?.tabs.find((t) => t.id === activeWindow?.activeTabId),
+    };
+  });
 
   const promptCount = allTabs.length;
   const isDisabled = promptCount === 0 || !hasPermission("evaluations:manage");
@@ -292,12 +279,7 @@ export function ExperimentFromPlaygroundButton({
       (tab, index) => {
         const configId = tab.data.form.currentValues.configId;
         const savedPrompt = configId ? savedPromptsMap.get(configId) : null;
-        return convertTabToTarget(
-          tab.data,
-          index,
-          initialState.datasets,
-          savedPrompt,
-        );
+        return convertTabToTarget(tab.data, index, initialState.datasets, savedPrompt);
       },
     );
     initialState.targets = targets;
@@ -321,19 +303,14 @@ export function ExperimentFromPlaygroundButton({
         <PageLayout.HeaderButton
           onClick={() => setIsDialogOpen(true)}
           disabled={isDisabled}
-          title={
-            isDisabled ? "Open a prompt to create an experiment" : undefined
-          }
+          title={isDisabled ? "Open a prompt to create an experiment" : undefined}
         >
           <FlaskConical size="18px" />
           {!iconOnly && "Experiment"}
         </PageLayout.HeaderButton>
       </Tooltip>
 
-      <Dialog.Root
-        open={isDialogOpen}
-        onOpenChange={({ open }) => setIsDialogOpen(open)}
-      >
+      <Dialog.Root open={isDialogOpen} onOpenChange={({ open }) => setIsDialogOpen(open)}>
         <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>Create Experiment</Dialog.Title>

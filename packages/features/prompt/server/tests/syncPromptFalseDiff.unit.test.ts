@@ -31,24 +31,20 @@ describe("compareConfigContent()", () => {
               properties: {
                 requirement_property_name: {
                   type: "string",
-                  description:
-                    "The requirement property to use for this mapping",
+                  description: "The requirement property to use for this mapping",
                 },
                 column_id: {
                   type: "string",
-                  description:
-                    "The ID of the column the requirement is mapped to",
+                  description: "The ID of the column the requirement is mapped to",
                 },
                 column_name: {
                   type: "string",
-                  description:
-                    "The name of the column the requirement is mapped to",
+                  description: "The name of the column the requirement is mapped to",
                 },
                 cell_value_field_name: {
                   type: "string",
                   enum: ["Boolean", "String", "Datetime", "Decimal"],
-                  description:
-                    "The field type of the cell value used for mapping",
+                  description: "The field type of the cell value used for mapping",
                 },
               },
               required: [
@@ -95,10 +91,7 @@ describe("compareConfigContent()", () => {
         // Server's syncPrompt builds remoteConfigData WITHOUT response_format
         const remoteConfigData = { ...baseConfig };
 
-        const result = repository.compareConfigContent(
-          localConfigData,
-          remoteConfigData,
-        );
+        const result = repository.compareConfigContent(localConfigData, remoteConfigData);
 
         expect(result.isEqual).toBe(true);
       });
@@ -111,10 +104,7 @@ describe("compareConfigContent()", () => {
         const localConfigData = { ...baseConfig };
         const remoteConfigData = { ...baseConfig };
 
-        const result = repository.compareConfigContent(
-          localConfigData,
-          remoteConfigData,
-        );
+        const result = repository.compareConfigContent(localConfigData, remoteConfigData);
 
         expect(result.isEqual).toBe(true);
       });
@@ -148,10 +138,7 @@ describe("compareConfigContent()", () => {
         };
 
         // Second sync sends the same data
-        const result = repository.compareConfigContent(
-          cliConfigData,
-          remoteConfigData,
-        );
+        const result = repository.compareConfigContent(cliConfigData, remoteConfigData);
 
         expect(result.isEqual).toBe(true);
       });
@@ -196,10 +183,7 @@ describe("compareConfigContent()", () => {
 
         const remoteConfigData = { ...baseConfig };
 
-        const result = repository.compareConfigContent(
-          localConfigData,
-          remoteConfigData,
-        );
+        const result = repository.compareConfigContent(localConfigData, remoteConfigData);
 
         expect(result.isEqual).toBe(false);
         expect(result.differences).toContain("prompt content differs");

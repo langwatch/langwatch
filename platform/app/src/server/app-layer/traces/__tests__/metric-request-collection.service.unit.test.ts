@@ -22,9 +22,7 @@ function makeService(
   ) => Promise<void> = async () => {},
 ) {
   const recordDataPoints =
-    vi.fn<(data: CanonicalMetricDataPoint[]) => Promise<void>>(
-      recordDataPointsImpl,
-    );
+    vi.fn<(data: CanonicalMetricDataPoint[]) => Promise<void>>(recordDataPointsImpl);
   const recordMetricCorrelations = vi.fn<
     (data: RecordMetricCorrelationCommandData[]) => Promise<void>
   >(async () => {});
@@ -57,15 +55,11 @@ function gaugeRequest(args: {
                 name: "requests.active",
                 unit: "{request}",
                 gauge: {
-                  dataPoints: (args.values ?? [args.value ?? 1]).map(
-                    (value, index) => ({
-                      timeUnixNano: String(
-                        1_700_000_000_000_000_000n + BigInt(index),
-                      ),
-                      asInt: value,
-                      attributes: args.pointAttributes ?? [],
-                    }),
-                  ),
+                  dataPoints: (args.values ?? [args.value ?? 1]).map((value, index) => ({
+                    timeUnixNano: String(1_700_000_000_000_000_000n + BigInt(index)),
+                    asInt: value,
+                    attributes: args.pointAttributes ?? [],
+                  })),
                 },
               },
             ],
@@ -84,8 +78,7 @@ const requestContext = {
 
 describe("MetricRequestCollectionService", () => {
   it("keeps a standalone gauge as one canonical integer data point", async () => {
-    const { service, recordDataPoints, recordMetricCorrelations } =
-      makeService();
+    const { service, recordDataPoints, recordMetricCorrelations } = makeService();
 
     const result = await service.handleOtlpMetricRequest({
       ...requestContext,
@@ -155,8 +148,7 @@ describe("MetricRequestCollectionService", () => {
   });
 
   it("rejects an oversized sibling while accepting and correlating a valid point", async () => {
-    const { service, recordDataPoints, recordMetricCorrelations } =
-      makeService();
+    const { service, recordDataPoints, recordMetricCorrelations } = makeService();
     const traceId = "0123456789abcdef0123456789abcdef";
     const spanId = "0123456789abcdef";
 
@@ -190,22 +182,14 @@ describe("MetricRequestCollectionService", () => {
                             {
                               timeUnixNano: "1700000030000000000",
                               asDouble: 2.5,
-                              traceId: Buffer.from(traceId, "hex").toString(
-                                "base64",
-                              ),
-                              spanId: Buffer.from(spanId, "hex").toString(
-                                "base64",
-                              ),
+                              traceId: Buffer.from(traceId, "hex").toString("base64"),
+                              spanId: Buffer.from(spanId, "hex").toString("base64"),
                             },
                             {
                               timeUnixNano: "1700000030000000001",
                               asDouble: 3,
-                              traceId: Buffer.from(traceId, "hex").toString(
-                                "base64",
-                              ),
-                              spanId: Buffer.from(spanId, "hex").toString(
-                                "base64",
-                              ),
+                              traceId: Buffer.from(traceId, "hex").toString("base64"),
+                              spanId: Buffer.from(spanId, "hex").toString("base64"),
                             },
                             {
                               timeUnixNano: "1700000030000000002",

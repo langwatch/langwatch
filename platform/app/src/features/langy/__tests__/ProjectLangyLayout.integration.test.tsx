@@ -65,8 +65,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", async () => {
         },
         organization: { id: "org-1" },
         organizationRole: "MEMBER",
-        hasPermission: (permission: string) =>
-          gate.permissions.includes(permission),
+        hasPermission: (permission: string) => gate.permissions.includes(permission),
       };
     },
   };

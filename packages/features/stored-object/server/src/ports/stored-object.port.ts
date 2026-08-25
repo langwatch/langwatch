@@ -114,7 +114,6 @@ export abstract class StoredObjectLegacyWriterDrainPort {
   abstract get(input: {
     organizationId: string;
   }): Promise<
-    | { valid: true; minimumWriterGeneration: string; assertedAt: Date }
-    | { valid: false }
+    { valid: true; minimumWriterGeneration: string; assertedAt: Date } | { valid: false }
   >;
 }

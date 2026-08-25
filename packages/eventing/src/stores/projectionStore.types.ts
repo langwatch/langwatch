@@ -85,9 +85,7 @@ export type ProjectionStoreWriteContext = ProjectionStoreReadContext;
  * conflict resolution strategies. However, this adds complexity and may not be
  * necessary if queue-level ordering (GroupQueue) is used at the service level (see EventSourcingService).
  */
-export interface ProjectionStore<
-  ProjectionType extends Projection = Projection,
-> {
+export interface ProjectionStore<ProjectionType extends Projection = Projection> {
   /**
    * Retrieves a projection for a given aggregate.
    *

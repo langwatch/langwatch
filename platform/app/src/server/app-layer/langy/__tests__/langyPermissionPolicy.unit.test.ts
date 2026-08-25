@@ -69,24 +69,19 @@ describe("classifyForLangy", () => {
       it("refuses it, even on a family Langy is otherwise trusted with", () => {
         // `prompts` is fully delegable for view/create/update.
         expect(classifyForLangy("prompts:purge").disposition).toBe("excluded");
-        expect(classifyForLangy("prompts:exfiltrate").disposition).toBe(
-          "excluded",
-        );
+        expect(classifyForLangy("prompts:exfiltrate").disposition).toBe("excluded");
       });
     });
   });
 
   describe("given the destructive actions", () => {
     describe("when they are classified", () => {
-      it.each(
-        DESTRUCTIVE_GRAINS,
-      )("refuses %s, with the reason stated", (permission) => {
+      it.each(DESTRUCTIVE_GRAINS)("refuses %s, with the reason stated", (permission) => {
         const verdict = classifyForLangy(permission);
 
-        expect(
-          verdict.disposition,
-          `${permission} must never be delegable`,
-        ).toBe("excluded");
+        expect(verdict.disposition, `${permission} must never be delegable`).toBe(
+          "excluded",
+        );
         // Narrows for the assertion below without a branch — a branch here
         // would silently pass on the `granted` verdict this test exists to
         // catch.
@@ -98,14 +93,15 @@ describe("classifyForLangy", () => {
 
   describe("given the reads Langy is meant to have", () => {
     describe("when they are classified", () => {
-      it.each(
-        DELEGABLE_READS,
-      )("grants %s, so the policy is not vacuously strict", (permission) => {
-        expect(
-          classifyForLangy(permission).disposition,
-          `${permission} should be delegable`,
-        ).toBe("granted");
-      });
+      it.each(DELEGABLE_READS)(
+        "grants %s, so the policy is not vacuously strict",
+        (permission) => {
+          expect(
+            classifyForLangy(permission).disposition,
+            `${permission} should be delegable`,
+          ).toBe("granted");
+        },
+      );
     });
   });
 

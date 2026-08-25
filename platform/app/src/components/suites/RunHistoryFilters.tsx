@@ -76,9 +76,7 @@ export function RunHistoryFilters({
         <NativeSelect.Root size="sm" width="auto" minWidth="150px">
           <NativeSelect.Field
             value={filters.scenarioId}
-            onChange={(e) =>
-              onFiltersChange({ ...filters, scenarioId: e.target.value })
-            }
+            onChange={(e) => onFiltersChange({ ...filters, scenarioId: e.target.value })}
             aria-label="Filter by scenario"
           >
             <option value="">All Scenarios</option>
@@ -167,9 +165,7 @@ export function RunHistoryFilters({
             <NativeSelect.Root size="sm" width="auto" minWidth="120px">
               <NativeSelect.Field
                 value={groupBy ?? "none"}
-                onChange={(e) =>
-                  onGroupByChange(e.target.value as RunGroupType)
-                }
+                onChange={(e) => onGroupByChange(e.target.value as RunGroupType)}
                 aria-label="Group by"
               >
                 {groupByOptions.map((opt) => (

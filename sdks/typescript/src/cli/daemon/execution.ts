@@ -114,8 +114,7 @@ export class ExecutionContext {
     // multibyte character split across writes is reassembled, not corrupted.
     const held = this.pendingEscape[stream];
     let text =
-      (held === null ? "" : held.toString("utf8")) +
-      this.decoders[stream].write(chunk);
+      (held === null ? "" : held.toString("utf8")) + this.decoders[stream].write(chunk);
     this.pendingEscape[stream] = null;
 
     const partial = PARTIAL_SGR_AT_END.exec(text);
@@ -160,17 +159,12 @@ const storage = new AsyncLocalStorage<ExecutionContext>();
  * its stdout/stderr routing and two concurrent requests cannot clobber each
  * other's error format or colour.
  */
-export function withExecutionContext<T>(
-  context: ExecutionContext,
-  fn: () => T,
-): T {
+export function withExecutionContext<T>(context: ExecutionContext, fn: () => T): T {
   // A fresh credential holder per request: the resolver fills it later and the
   // request's own services read it, so a resolved device-session key never
   // reaches the shared env where a concurrent request could pick it up
   // (internal/credentialContext.ts).
-  return storage.run(context, () =>
-    withOutputScope(() => runWithCredentialHolder(fn)),
-  );
+  return storage.run(context, () => withOutputScope(() => runWithCredentialHolder(fn)));
 }
 
 let installed = false;
@@ -216,9 +210,7 @@ export function installProcessInterceptors(): () => void {
       const encoding =
         typeof encodingOrCallback === "string" ? encodingOrCallback : "utf8";
       const buffer =
-        typeof chunk === "string"
-          ? Buffer.from(chunk, encoding)
-          : Buffer.from(chunk);
+        typeof chunk === "string" ? Buffer.from(chunk, encoding) : Buffer.from(chunk);
       context.write(stream, buffer);
 
       // Honour whichever of the two overloads the caller used, or the stream

@@ -68,22 +68,16 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   onFocusChange,
   placeholder,
 }) => {
-  const {
-    editor,
-    suggestion,
-    acceptSuggestion,
-    cursorAnchorX,
-    endAnchorX,
-    isFocused,
-  } = useFilterEditor({
-    queryText,
-    applyQueryText,
-    onHasContentChange,
-    valueResolver,
-    onTokenClick,
-    onAiShortcut,
-    placeholder,
-  });
+  const { editor, suggestion, acceptSuggestion, cursorAnchorX, endAnchorX, isFocused } =
+    useFilterEditor({
+      queryText,
+      applyQueryText,
+      onHasContentChange,
+      valueResolver,
+      onTokenClick,
+      onAiShortcut,
+      placeholder,
+    });
 
   useGlobalSlashFocus(editor);
 
@@ -100,9 +94,7 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   // dropdown never overlap.
   useEffect(() => {
     if (!onSuggestionOpenChange) return;
-    onSuggestionOpenChange(
-      suggestion.state.open && suggestion.items.length > 0,
-    );
+    onSuggestionOpenChange(suggestion.state.open && suggestion.items.length > 0);
   }, [suggestion.state.open, suggestion.items.length, onSuggestionOpenChange]);
 
   useEffect(() => {

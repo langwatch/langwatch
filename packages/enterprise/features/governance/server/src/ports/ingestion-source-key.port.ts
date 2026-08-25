@@ -31,9 +31,7 @@ export abstract class IngestionKeyIssuerPort {
     organizationId: string;
     permissionMode: "restricted";
     permissions: readonly ["traces:create"];
-    bindings: readonly [
-      { role: "CUSTOM"; scopeType: "PROJECT"; scopeId: string },
-    ];
+    bindings: readonly [{ role: "CUSTOM"; scopeType: "PROJECT"; scopeId: string }];
     ingestSourceType: string;
     ingestionTemplateId: string | null;
     createdByDeviceLabel: string | null;
@@ -49,7 +47,5 @@ export abstract class IngestionKeyIssuerPort {
 }
 
 export abstract class IngestionKeyCapability {
-  abstract ensureForProject(
-    input: IngestionKeyMintCommand,
-  ): Promise<IssuedIngestionKey>;
+  abstract ensureForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey>;
 }

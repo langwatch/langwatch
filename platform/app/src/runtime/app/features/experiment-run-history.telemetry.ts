@@ -27,9 +27,7 @@ export class AppExperimentRunHistoryTelemetry {
   }
 
   private readonly logger = createLogger("langwatch:experiment-runs:service");
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.experiment-runs.service",
-  );
+  private readonly tracer = getLangWatchTracer("langwatch.experiment-runs.service");
 
   private constructor() {}
 

@@ -149,10 +149,7 @@ export function createLangyConversationProcessingPipeline(
     .withCommand("failAgentResponse", FailAgentResponseCommand)
     .withCommand("recordAgentResponse", RecordAgentResponseCommand)
     .withCommand("archiveConversation", ArchiveConversationCommand)
-    .withCommand(
-      "updateConversationMetadata",
-      UpdateConversationMetadataCommand,
-    )
+    .withCommand("updateConversationMetadata", UpdateConversationMetadataCommand)
     .withCommand("recordTurnHandoff", RecordTurnHandoffCommand)
     .withCommand("consumeTurnHandoff", ConsumeTurnHandoffCommand)
     .withCommand("generateConversationTitle", GenerateConversationTitleCommand)

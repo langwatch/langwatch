@@ -20,8 +20,7 @@ const logRecords: {
 }[] = [];
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof import("@langwatch/observability")>();
   const record =
     (level: string) => (payload: Record<string, unknown>, message: string) => {
       logRecords.push({ level, payload, message });
@@ -38,17 +37,16 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 });
 
 const { createService: createRawService } = await import("../builder.js");
-const createService: typeof createRawService = ((config: Parameters<
-  typeof createRawService
->[0]) =>
+const createService: typeof createRawService = ((
+  config: Parameters<typeof createRawService>[0],
+) =>
   createRawService(config).withoutPermission(
     "framework test endpoint",
   )) as typeof createRawService;
 
 const requestRecords = () =>
   logRecords.filter(
-    (r) =>
-      r.message === "error handling request" || r.message === "request handled",
+    (r) => r.message === "error handling request" || r.message === "request handled",
   );
 
 const routeOf = (index = 0) => requestRecords()[index]?.payload.route;

@@ -86,11 +86,7 @@ describe("<ExportConfigDialog/>", () => {
   describe("when isSelectedExport is true", () => {
     it("displays 'X selected traces' in the subtitle", () => {
       render(
-        <ExportConfigDialog
-          {...defaultProps}
-          traceCount={5}
-          isSelectedExport={true}
-        />,
+        <ExportConfigDialog {...defaultProps} traceCount={5} isSelectedExport={true} />,
         { wrapper: Wrapper },
       );
 

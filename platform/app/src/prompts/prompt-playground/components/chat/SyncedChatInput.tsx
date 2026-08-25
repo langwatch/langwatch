@@ -34,9 +34,7 @@ export function SyncedChatInput({
     triggerSubmit,
   } = usePromptPlaygroundChatSync();
   const tabId = useTabId();
-  const windowCount = useDraggableTabsBrowserStore(
-    (state) => state.windows.length,
-  );
+  const windowCount = useDraggableTabsBrowserStore((state) => state.windows.length);
   const [localInput, setLocalInput] = useState("");
   const [isHovered, setIsHovered] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -148,12 +146,7 @@ export function SyncedChatInput({
           ref={textareaRef}
           data-tab-id={tabId}
         />
-        <HStack
-          width="full"
-          justify="space-between"
-          padding={2}
-          position="relative"
-        >
+        <HStack width="full" justify="space-between" padding={2} position="relative">
           {/* Bottom left - Sync checkbox (shows on hover, only if multiple windows/splits) */}
           {windowCount > 1 && (
             <ChatSyncCheckbox

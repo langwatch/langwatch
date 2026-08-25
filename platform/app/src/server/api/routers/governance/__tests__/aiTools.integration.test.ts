@@ -224,9 +224,7 @@ describe("aiToolsRouter integration", () => {
   describe("RBAC", () => {
     it("MEMBER can list but cannot create", async () => {
       const memberCaller = callerFor(memberPlatformUserId);
-      await expect(
-        memberCaller.aiTools.list({ organizationId }),
-      ).resolves.toBeDefined();
+      await expect(memberCaller.aiTools.list({ organizationId })).resolves.toBeDefined();
 
       await expect(
         memberCaller.aiTools.create({
@@ -314,9 +312,9 @@ describe("aiToolsRouter integration", () => {
         organizationId,
       });
       expect(platformList.some((e) => e.id === created.id)).toBe(true);
-      expect(
-        platformList.find((e) => e.id === created.id)?.departmentIds,
-      ).toEqual([deptPlatformId]);
+      expect(platformList.find((e) => e.id === created.id)?.departmentIds).toEqual([
+        deptPlatformId,
+      ]);
 
       const orphanList = await callerFor(memberOrphanUserId).aiTools.list({
         organizationId,
@@ -364,9 +362,7 @@ describe("aiToolsRouter integration", () => {
       });
       const platformMatches = platformList.filter((e) => e.slug === sharedSlug);
       expect(platformMatches).toHaveLength(1);
-      expect(platformMatches[0]?.displayName).toBe(
-        "OpenAI - Platform override",
-      );
+      expect(platformMatches[0]?.displayName).toBe("OpenAI - Platform override");
 
       const orphanList = await callerFor(memberOrphanUserId).aiTools.list({
         organizationId,
@@ -439,10 +435,7 @@ describe("aiToolsRouter integration", () => {
           "user",
           {
             email: {
-              in: [
-                `aitp-in-${pol}@example.com`,
-                `aitp-orphan-${pol}@example.com`,
-              ],
+              in: [`aitp-in-${pol}@example.com`, `aitp-orphan-${pol}@example.com`],
             },
           },
         ],
@@ -957,8 +950,7 @@ describe("aiToolsRouter integration", () => {
         expect(after).toHaveLength(STARTER_PACK_TILES.length); // no duplicate row created
 
         const claudeRows = after.filter(
-          (e) =>
-            e.type === "coding_assistant" && e.displayName === "Claude Code",
+          (e) => e.type === "coding_assistant" && e.displayName === "Claude Code",
         );
         expect(claudeRows).toHaveLength(1);
         expect(claudeRows[0]!.id).toBe(adminClaudeRow.id);
@@ -1023,9 +1015,7 @@ describe("aiToolsRouter integration", () => {
       const adminAfter = await adminCaller.aiTools.adminList({
         organizationId,
       });
-      expect(
-        adminAfter.some((e) => e.id === entry.id && e.enabled === false),
-      ).toBe(true);
+      expect(adminAfter.some((e) => e.id === entry.id && e.enabled === false)).toBe(true);
     });
 
     /** @scenario "Deleted entries are removed from both lists" */
@@ -1150,18 +1140,14 @@ describe("aiToolsRouter integration", () => {
         expect(platform.configuredProviders).not.toContain("azure");
 
         // memberOrphan belongs to no team - only org-wide providers count.
-        const orphan = await callerFor(
-          memberOrphanUserId,
-        ).aiTools.providerAvailability({ organizationId });
+        const orphan = await callerFor(memberOrphanUserId).aiTools.providerAvailability({
+          organizationId,
+        });
         expect(orphan.configuredProviders).toContain("anthropic");
         expect(orphan.configuredProviders).not.toContain("openai");
         expect(orphan.configuredProviders).not.toContain("azure");
       } finally {
-        const ids = [
-          orgProvider.id,
-          ownTeamProvider.id,
-          foreignTeamProvider.id,
-        ];
+        const ids = [orgProvider.id, ownTeamProvider.id, foreignTeamProvider.id];
         await prisma.modelProviderScope.deleteMany({
           where: { modelProviderId: { in: ids } },
         });
@@ -1341,9 +1327,7 @@ describe("aiToolsRouter integration", () => {
       });
 
       try {
-        const result = await callerFor(
-          adminUserId,
-        ).aiTools.routingPolicyOptions({
+        const result = await callerFor(adminUserId).aiTools.routingPolicyOptions({
           organizationId,
         });
         expect(result.some((r) => r.id === policy.id)).toBe(true);

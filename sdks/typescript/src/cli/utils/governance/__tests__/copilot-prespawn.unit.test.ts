@@ -78,10 +78,7 @@ describe("copilotPrespawnWarnings()", () => {
 
     it("ignores a managed file that does not touch otel config", () => {
       const managed = path.join(tmpDir, "managed-settings.json");
-      fs.writeFileSync(
-        managed,
-        `{"permissions":{"disableBypassPermissionsMode":true}}`,
-      );
+      fs.writeFileSync(managed, `{"permissions":{"disableBypassPermissionsMode":true}}`);
       const warnings = copilotPrespawnWarnings({
         managedPaths: [managed],
         readVersionImpl: versionOk,

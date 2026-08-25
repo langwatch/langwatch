@@ -30,9 +30,7 @@ describe("ensureJsonSafe", () => {
 
   describe("given a value JSON.stringify would silently mangle", () => {
     it("rejects undefined nested inside an object", () => {
-      expect(() => ensureJsonSafe({ a: { b: undefined } })).toThrow(
-        JsonSafetyError,
-      );
+      expect(() => ensureJsonSafe({ a: { b: undefined } })).toThrow(JsonSafetyError);
     });
 
     it("rejects undefined at the root", () => {
@@ -46,9 +44,7 @@ describe("ensureJsonSafe", () => {
     });
 
     it("rejects Date instances", () => {
-      expect(() => ensureJsonSafe({ at: new Date(0) })).toThrow(
-        JsonSafetyError,
-      );
+      expect(() => ensureJsonSafe({ at: new Date(0) })).toThrow(JsonSafetyError);
     });
 
     it("rejects Map, Set, and other non-plain object instances", () => {
@@ -71,9 +67,7 @@ describe("ensureJsonSafe", () => {
     });
 
     it("rejects symbol-keyed properties", () => {
-      expect(() => ensureJsonSafe({ [Symbol("hidden")]: 1 })).toThrow(
-        JsonSafetyError,
-      );
+      expect(() => ensureJsonSafe({ [Symbol("hidden")]: 1 })).toThrow(JsonSafetyError);
     });
 
     it("rejects circular references", () => {

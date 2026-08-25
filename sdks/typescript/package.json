@@ -2,14 +2,16 @@
   "name": "langwatch",
   "version": "1.8.0",
   "description": "LangWatch TypeScript/JavaScript SDK. Interact with the full LangWatch API and use the LangWatch OpenTelemetry SDK to instrument your application. For more information, see https://docs.langwatch.ai/integration/typescript/guide",
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
-  "types": "dist/index.d.ts",
-  "author": "LangWatch",
   "license": "MIT",
-  "engines": {
-    "node": ">=20",
-    "pnpm": ">=8"
+  "author": "LangWatch",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/langwatch/langwatch.git",
+    "directory": "typescript-sdk"
+  },
+  "bin": {
+    "langwatch": "./dist/cli/index.js",
+    "lw": "./dist/cli/index.js"
   },
   "files": [
     "dist",
@@ -19,10 +21,9 @@
     "README.md",
     "LICENSE"
   ],
-  "bin": {
-    "lw": "./dist/cli/index.js",
-    "langwatch": "./dist/cli/index.js"
-  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -45,11 +46,6 @@
       "import": "./dist/observability-sdk/instrumentation/langchain/index.mjs"
     }
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/langwatch/langwatch.git",
-    "directory": "typescript-sdk"
-  },
   "scripts": {
     "generate": "pnpm run generate:server-types && pnpm run generate:openapi-types",
     "cli": "node dist/cli/index.js",
@@ -71,6 +67,33 @@
     "prepublish": "pnpm run build",
     "generate:openapi-types": "pnpm exec openapi-typescript ../../platform/app/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts && node scripts/patch-generated-openapi.mjs",
     "generate:server-types": "./copy-types.sh"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/api-logs": "0.221.0",
+    "@opentelemetry/core": "^2.0.1",
+    "@opentelemetry/exporter-logs-otlp-http": "0.221.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.221.0",
+    "@opentelemetry/instrumentation": "0.221.0",
+    "@opentelemetry/resources": "^2.0.1",
+    "@opentelemetry/sdk-logs": "0.221.0",
+    "@opentelemetry/sdk-metrics": "^2.0.1",
+    "@opentelemetry/sdk-node": "^0.221.0",
+    "@opentelemetry/sdk-trace-base": "^2.0.1",
+    "@opentelemetry/semantic-conventions": "^1.36.0",
+    "chalk": "^6.0.0",
+    "cloudflared": "0.7.1",
+    "commander": "^15.0.0",
+    "dotenv": "^17.3.1",
+    "js-yaml": "^5.2.0",
+    "jsonc-parser": "^3.3.1",
+    "liquidjs": "^10.27.0",
+    "open": "^11.0.0",
+    "openapi-fetch": "^0.17.0",
+    "ora": "^9.3.0",
+    "prompts": "^2.4.2",
+    "xksuid": "^0.0.4",
+    "zod": "^4.0.14"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
@@ -103,33 +126,6 @@
     "vitest": "^4.1.0",
     "vitest-mock-extended": "^5.1.1",
     "yaml": "^2.8.1"
-  },
-  "dependencies": {
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/api-logs": "0.221.0",
-    "@opentelemetry/core": "^2.0.1",
-    "@opentelemetry/exporter-logs-otlp-http": "0.221.0",
-    "@opentelemetry/exporter-trace-otlp-http": "0.221.0",
-    "@opentelemetry/instrumentation": "0.221.0",
-    "@opentelemetry/resources": "^2.0.1",
-    "@opentelemetry/sdk-logs": "0.221.0",
-    "@opentelemetry/sdk-metrics": "^2.0.1",
-    "@opentelemetry/sdk-node": "^0.221.0",
-    "@opentelemetry/sdk-trace-base": "^2.0.1",
-    "@opentelemetry/semantic-conventions": "^1.36.0",
-    "chalk": "^6.0.0",
-    "cloudflared": "0.7.1",
-    "commander": "^15.0.0",
-    "dotenv": "^17.3.1",
-    "js-yaml": "^5.2.0",
-    "jsonc-parser": "^3.3.1",
-    "liquidjs": "^10.27.0",
-    "open": "^11.0.0",
-    "openapi-fetch": "^0.17.0",
-    "ora": "^9.3.0",
-    "prompts": "^2.4.2",
-    "xksuid": "^0.0.4",
-    "zod": "^4.0.14"
   },
   "peerDependencies": {
     "@ai-sdk/openai": ">=2.0.0 <5.0.0",
@@ -166,5 +162,9 @@
     "langchain": {
       "optional": true
     }
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=8"
   }
 }

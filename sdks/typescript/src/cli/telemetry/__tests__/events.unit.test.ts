@@ -50,10 +50,7 @@ import {
   redactSecrets,
   resolveTransport,
 } from "../events";
-import {
-  LANGWATCH_EVENT_ATTRIBUTES as ATTR,
-  LANGWATCH_EVENTS,
-} from "../attributes";
+import { LANGWATCH_EVENT_ATTRIBUTES as ATTR, LANGWATCH_EVENTS } from "../attributes";
 
 const ENABLED_ENV = {
   LANGWATCH_OTEL_EVENTS: "1",
@@ -462,10 +459,13 @@ describe("the IPC transport", () => {
         // The socket write is async; give the server a tick to drain it.
         await vi.waitFor(() => expect(received.length).toBe(3));
 
-        const records = received.map((line) => JSON.parse(line) as {
-          event: string;
-          attributes: Record<string, unknown>;
-        });
+        const records = received.map(
+          (line) =>
+            JSON.parse(line) as {
+              event: string;
+              attributes: Record<string, unknown>;
+            },
+        );
 
         expect(records.map((r) => r.event)).toEqual([
           LANGWATCH_EVENTS.started,
@@ -566,9 +566,9 @@ describe("redactSecrets()", () => {
 
   describe("given a message quoting a credential this process never held", () => {
     it("still redacts it on shape alone", () => {
-      expect(redactSecrets("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9", {})).not.toContain(
-        "eyJhbGciOiJIUzI1NiJ9",
-      );
+      expect(
+        redactSecrets("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9", {}),
+      ).not.toContain("eyJhbGciOiJIUzI1NiJ9");
       expect(redactSecrets("used sk-proj-AbCdEfGh12345678", {})).not.toContain(
         "sk-proj-AbCdEfGh12345678",
       );
@@ -603,7 +603,9 @@ describe("areEventsEnabled()", () => {
       expect(areEventsEnabled(collector)).toBe(false);
       expect(areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "" })).toBe(false);
       expect(areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "0" })).toBe(false);
-      expect(areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "false" })).toBe(false);
+      expect(areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "false" })).toBe(
+        false,
+      );
     });
   });
 });

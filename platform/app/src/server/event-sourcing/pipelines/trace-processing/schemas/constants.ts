@@ -1,9 +1,7 @@
 export const SPAN_RECEIVED_EVENT_TYPE = "lw.obs.trace.span_received" as const;
 export const SPAN_RECEIVED_EVENT_VERSION_LATEST = "2025-12-14" as const;
 
-export const SPAN_RECEIVED_EVENT_VERSIONS = [
-  SPAN_RECEIVED_EVENT_VERSION_LATEST,
-] as const;
+export const SPAN_RECEIVED_EVENT_VERSIONS = [SPAN_RECEIVED_EVENT_VERSION_LATEST] as const;
 
 /**
  * The claim-check twin of `span_received` (ADR-069): staged onto a
@@ -23,8 +21,7 @@ export const SPAN_RECEIVED_EVENT_VERSIONS = [
  * reference's shape — or the contract of the store it resolves through —
  * changes incompatibly.
  */
-export const SPAN_REFERENCED_PAYLOAD_TYPE =
-  "lw.obs.trace.span_referenced" as const;
+export const SPAN_REFERENCED_PAYLOAD_TYPE = "lw.obs.trace.span_referenced" as const;
 export const SPAN_REFERENCED_PAYLOAD_VERSION_LATEST = "2026-07-24" as const;
 
 export const SPAN_REFERENCED_PAYLOAD_VERSIONS = [
@@ -44,22 +41,19 @@ export const TOPIC_ASSIGNED_EVENT_VERSIONS = [
  * only log write path) — kept so historical `event_log` replays of the trace
  * folds still reproduce pre-cutover log contributions.
  */
-export const LOG_RECORD_RECEIVED_EVENT_TYPE =
-  "lw.obs.trace.log_record_received" as const;
+export const LOG_RECORD_RECEIVED_EVENT_TYPE = "lw.obs.trace.log_record_received" as const;
 export const LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST = "2026-03-08" as const;
 
 export const LOG_RECORD_RECEIVED_EVENT_VERSIONS = [
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
 ] as const;
 
-export const LOG_CONTRIBUTED_EVENT_TYPE =
-  "lw.obs.trace.log_contributed" as const;
+export const LOG_CONTRIBUTED_EVENT_TYPE = "lw.obs.trace.log_contributed" as const;
 export const LOG_CONTRIBUTED_EVENT_VERSION_LATEST = "2026-07-17" as const;
 
 export const METRIC_DATA_POINT_CORRELATED_EVENT_TYPE =
   "lw.obs.trace.metric_data_point_correlated" as const;
-export const METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST =
-  "2026-07-15" as const;
+export const METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST = "2026-07-15" as const;
 
 /**
  * How many metric exemplars correlate to a trace — NOT how many metric data
@@ -71,24 +65,21 @@ export const METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST =
 export const METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE =
   "langwatch.reserved.metric_exemplar_correlation_count" as const;
 
-export const ORIGIN_RESOLVED_EVENT_TYPE =
-  "lw.obs.trace.origin_resolved" as const;
+export const ORIGIN_RESOLVED_EVENT_TYPE = "lw.obs.trace.origin_resolved" as const;
 export const ORIGIN_RESOLVED_EVENT_VERSION_LATEST = "2026-03-13" as const;
 
 export const ORIGIN_RESOLVED_EVENT_VERSIONS = [
   ORIGIN_RESOLVED_EVENT_VERSION_LATEST,
 ] as const;
 
-export const ANNOTATION_ADDED_EVENT_TYPE =
-  "lw.obs.trace.annotation_added" as const;
+export const ANNOTATION_ADDED_EVENT_TYPE = "lw.obs.trace.annotation_added" as const;
 export const ANNOTATION_ADDED_EVENT_VERSION_LATEST = "2026-03-25" as const;
 
 export const ANNOTATION_ADDED_EVENT_VERSIONS = [
   ANNOTATION_ADDED_EVENT_VERSION_LATEST,
 ] as const;
 
-export const ANNOTATION_REMOVED_EVENT_TYPE =
-  "lw.obs.trace.annotation_removed" as const;
+export const ANNOTATION_REMOVED_EVENT_TYPE = "lw.obs.trace.annotation_removed" as const;
 export const ANNOTATION_REMOVED_EVENT_VERSION_LATEST = "2026-03-25" as const;
 
 export const ANNOTATION_REMOVED_EVENT_VERSIONS = [
@@ -97,15 +88,13 @@ export const ANNOTATION_REMOVED_EVENT_VERSIONS = [
 
 export const ANNOTATIONS_BULK_SYNCED_EVENT_TYPE =
   "lw.obs.trace.annotations_bulk_synced" as const;
-export const ANNOTATIONS_BULK_SYNCED_EVENT_VERSION_LATEST =
-  "2026-03-25" as const;
+export const ANNOTATIONS_BULK_SYNCED_EVENT_VERSION_LATEST = "2026-03-25" as const;
 
 export const ANNOTATIONS_BULK_SYNCED_EVENT_VERSIONS = [
   ANNOTATIONS_BULK_SYNCED_EVENT_VERSION_LATEST,
 ] as const;
 
-export const TRACE_NAME_CHANGED_EVENT_TYPE =
-  "lw.obs.trace.trace_name_changed" as const;
+export const TRACE_NAME_CHANGED_EVENT_TYPE = "lw.obs.trace.trace_name_changed" as const;
 export const TRACE_NAME_CHANGED_EVENT_VERSION_LATEST = "2026-05-07" as const;
 
 export const TRACE_NAME_CHANGED_EVENT_VERSIONS = [
@@ -125,8 +114,7 @@ export const TRACE_PROCESSING_EVENT_TYPES = [
   TRACE_NAME_CHANGED_EVENT_TYPE,
 ] as const;
 
-export type TraceProcessingEventType =
-  (typeof TRACE_PROCESSING_EVENT_TYPES)[number];
+export type TraceProcessingEventType = (typeof TRACE_PROCESSING_EVENT_TYPES)[number];
 
 export const RECORD_SPAN_COMMAND_TYPE = "lw.obs.trace.record_span" as const;
 export const ASSIGN_TOPIC_COMMAND_TYPE = "lw.obs.trace.assign_topic" as const;
@@ -134,16 +122,12 @@ export const RECORD_LOG_CONTRIBUTION_COMMAND_TYPE =
   "lw.obs.trace.record_log_contribution" as const;
 export const RECORD_METRIC_CORRELATION_COMMAND_TYPE =
   "lw.obs.trace.record_metric_correlation" as const;
-export const RESOLVE_ORIGIN_COMMAND_TYPE =
-  "lw.obs.trace.resolve_origin" as const;
-export const ADD_ANNOTATION_COMMAND_TYPE =
-  "lw.obs.trace.add_annotation" as const;
-export const REMOVE_ANNOTATION_COMMAND_TYPE =
-  "lw.obs.trace.remove_annotation" as const;
+export const RESOLVE_ORIGIN_COMMAND_TYPE = "lw.obs.trace.resolve_origin" as const;
+export const ADD_ANNOTATION_COMMAND_TYPE = "lw.obs.trace.add_annotation" as const;
+export const REMOVE_ANNOTATION_COMMAND_TYPE = "lw.obs.trace.remove_annotation" as const;
 export const BULK_SYNC_ANNOTATIONS_COMMAND_TYPE =
   "lw.obs.trace.bulk_sync_annotations" as const;
-export const CHANGE_TRACE_NAME_COMMAND_TYPE =
-  "lw.obs.trace.change_trace_name" as const;
+export const CHANGE_TRACE_NAME_COMMAND_TYPE = "lw.obs.trace.change_trace_name" as const;
 
 export const TRACE_PROCESSING_COMMAND_TYPES = [
   RECORD_SPAN_COMMAND_TYPE,
@@ -165,8 +149,7 @@ export const TRACE_PROCESSING_COMMAND_TYPES = [
 export const TRACE_NAME_MIN_LENGTH = 1;
 export const TRACE_NAME_MAX_LENGTH = 200;
 
-export type TraceProcessingCommandType =
-  (typeof TRACE_PROCESSING_COMMAND_TYPES)[number];
+export type TraceProcessingCommandType = (typeof TRACE_PROCESSING_COMMAND_TYPES)[number];
 
 /**
  * The stamp immediately before the storage-anchor split - DECODED, not refused.
@@ -195,8 +178,7 @@ export type TraceProcessingCommandType =
  * Rows older than this stamp (`2026-04-23`) took the same OccurredAt meaning, so
  * the decoder's single "not the latest stamp" branch is correct for them too.
  */
-export const TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR =
-  "2026-05-07" as const;
+export const TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR = "2026-05-07" as const;
 
 /**
  * Schema-snapshot version (calendar date). Bump when the trace-summary fold's

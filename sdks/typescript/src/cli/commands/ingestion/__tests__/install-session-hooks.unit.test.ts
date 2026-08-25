@@ -49,15 +49,12 @@ const { spawnSyncMock } = vi.hoisted(() => ({
   spawnSyncMock: vi.fn(() => ({ status: 1, stdout: "", stderr: "unknown" })),
 }));
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 
 const entryFor = (tool: "claude_code" | "codex") => ({
-  hooks: [
-    { type: "command", command: sessionContextHookCommand(tool), timeout: 10 },
-  ],
+  hooks: [{ type: "command", command: sessionContextHookCommand(tool), timeout: 10 }],
 });
 
 const ourEntry = entryFor("claude_code");
@@ -160,9 +157,7 @@ describe("the claude_code ingestion install", () => {
 
       stdoutSpy.mockClear();
       await runInstall();
-      expect(stdout()).toContain(
-        `${settingsPath} session hooks already up to date`,
-      );
+      expect(stdout()).toContain(`${settingsPath} session hooks already up to date`);
     });
 
     it("carries the action in the json report", async () => {
@@ -226,9 +221,7 @@ describe("the codex ingestion install", () => {
         SessionStart: [entryFor("codex")],
         Stop: [entryFor("codex")],
       });
-      expect(sessionContextHookCommand("codex")).toBe(
-        "langwatch ingest hook codex",
-      );
+      expect(sessionContextHookCommand("codex")).toBe("langwatch ingest hook codex");
     });
 
     /** @scenario "The codex install tells the user Codex asks for review once" */
@@ -267,14 +260,9 @@ describe("the opencode ingestion install", () => {
       await runOpencodeInstall();
       await runOpencodeInstall();
 
-      expect(fs.readdirSync(opencodePluginDir)).toEqual([
-        OPENCODE_PLUGIN_FILE_NAME,
-      ]);
+      expect(fs.readdirSync(opencodePluginDir)).toEqual([OPENCODE_PLUGIN_FILE_NAME]);
       expect(
-        fs.readFileSync(
-          path.join(opencodePluginDir, OPENCODE_PLUGIN_FILE_NAME),
-          "utf8",
-        ),
+        fs.readFileSync(path.join(opencodePluginDir, OPENCODE_PLUGIN_FILE_NAME), "utf8"),
       ).toContain(JSON.stringify(OPENCODE_HOOK_COMMAND.split(" ")));
     });
 

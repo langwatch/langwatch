@@ -103,11 +103,7 @@ function AvatarPhotoDialog({
   onCancel: () => void;
 }) {
   return (
-    <Dialog.Root
-      open={isOpen}
-      onOpenChange={(e) => onOpenChange(e.open)}
-      size="sm"
-    >
+    <Dialog.Root open={isOpen} onOpenChange={(e) => onOpenChange(e.open)} size="sm">
       <Dialog.Content bg="bg">
         <Dialog.Header>
           <Dialog.Title>Profile photo</Dialog.Title>
@@ -153,11 +149,7 @@ function AvatarPhotoDialog({
                   Remove
                 </Button>
               )}
-              <Button
-                colorPalette="orange"
-                onClick={onChange}
-                disabled={isBusy}
-              >
+              <Button colorPalette="orange" onClick={onChange} disabled={isBusy}>
                 {hasImage ? "Change photo" : "Upload photo"}
               </Button>
             </HStack>
@@ -178,11 +170,7 @@ function AvatarPhotoDialog({
  *
  * Spec: specs/settings/user-avatar.feature
  */
-export function AvatarUploadControl({
-  organizationId,
-}: {
-  organizationId: string;
-}) {
+export function AvatarUploadControl({ organizationId }: { organizationId: string }) {
   const session = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -199,8 +187,7 @@ export function AvatarUploadControl({
       setIsOpen(false);
       toaster.create({ title: "Photo updated", type: "success" });
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't update photo" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't update photo" }),
   });
 
   const removeAvatar = api.user.removeAvatar.useMutation({
@@ -209,8 +196,7 @@ export function AvatarUploadControl({
       setPreview(null);
       toaster.create({ title: "Photo removed", type: "success" });
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't remove photo" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't remove photo" }),
   });
 
   const isBusy = isProcessing || setAvatar.isPending || removeAvatar.isPending;
@@ -274,8 +260,7 @@ export function AvatarUploadControl({
         onChange={() => fileInputRef.current?.click()}
         onRemove={() => removeAvatar.mutate({})}
         onSave={() => {
-          if (preview)
-            setAvatar.mutate({ organizationId, imageDataUrl: preview });
+          if (preview) setAvatar.mutate({ organizationId, imageDataUrl: preview });
         }}
         onCancel={() => setPreview(null)}
       />

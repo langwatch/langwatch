@@ -90,9 +90,7 @@ describe("ModelProviderStepScreen", () => {
       // provider sales pitch that used to trail the description is gone.
       renderStep();
       expect(
-        screen.getByText(
-          /The model LangWatch's AI assistant and AI assists run on/,
-        ),
+        screen.getByText(/The model LangWatch's AI assistant and AI assists run on/),
       ).toBeInTheDocument();
       expect(
         screen.queryByText(/Codex is recommended if you have a paid OpenAI/),
@@ -111,9 +109,7 @@ describe("ModelProviderStepScreen", () => {
     it("advances the flow without another click", () => {
       const { onContinue } = renderStep();
 
-      fireEvent.click(
-        screen.getByRole("button", { name: "finish-provider-setup" }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: "finish-provider-setup" }));
 
       expect(onContinue).toHaveBeenCalledTimes(1);
     });

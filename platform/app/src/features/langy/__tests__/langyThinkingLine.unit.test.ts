@@ -100,11 +100,7 @@ describe("langyThinkingLine", () => {
     });
 
     it("still escalates a follow-up that stays silent too long", () => {
-      const messages = [
-        user,
-        assistant([{ type: "text", text: "Sure." }]),
-        user,
-      ];
+      const messages = [user, assistant([{ type: "text", text: "Sure." }]), user];
       const slow = langyThinkingLine({
         messages,
         elapsedMs: THINKING_SLOW_MS,
@@ -161,9 +157,7 @@ describe("langyThinkingLine", () => {
         THINKING_STILL_STARTING_MS,
         THINKING_SLOW_MS,
         THINKING_STUCK_MS,
-      ].map(
-        (elapsedMs) => langyThinkingLine({ messages: [user], elapsedMs })?.tone,
-      );
+      ].map((elapsedMs) => langyThinkingLine({ messages: [user], elapsedMs })?.tone);
       expect(tones).toEqual(["waiting", "waiting", "waiting", "stuck"]);
     });
   });
@@ -238,10 +232,7 @@ describe("langyThinkingLine", () => {
       // second row under it read as the panel still waiting for the reply
       // that was visibly arriving.
       const line = langyThinkingLine({
-        messages: [
-          user,
-          assistant([{ type: "text", text: "Here are 4 traces" }]),
-        ],
+        messages: [user, assistant([{ type: "text", text: "Here are 4 traces" }])],
         elapsedMs: 5_000,
       });
       expect(line).toBeNull();

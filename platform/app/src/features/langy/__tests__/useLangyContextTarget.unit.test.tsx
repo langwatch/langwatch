@@ -250,9 +250,7 @@ describe("useLangyContextTarget", () => {
       it("desyncs its shimmer from its neighbours with a stable phase offset", () => {
         render(<HostRow onOpen={() => undefined} />);
 
-        expect(row().style.getPropertyValue("--langy-target-delay")).toMatch(
-          /^-\d+ms$/,
-        );
+        expect(row().style.getPropertyValue("--langy-target-delay")).toMatch(/^-\d+ms$/);
       });
 
       it("can be dragged onto the panel", () => {

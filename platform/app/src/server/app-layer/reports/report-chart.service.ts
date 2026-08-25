@@ -1,10 +1,7 @@
 import type { ReportChart } from "@langwatch/automation-contract";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import type { CustomGraph } from "~/generated/prisma/client";
-import type {
-  SeriesInputType,
-  TimeseriesInputType,
-} from "~/server/analytics/registry";
+import type { SeriesInputType, TimeseriesInputType } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import { buildSeriesName } from "@langwatch/analytics-contract";
 import {
@@ -40,9 +37,7 @@ export interface ReportChartDeps {
 
 /** Slack renders four chart types; a graph can be any of eleven. Map onto the
  *  nearest one so a stacked bar still arrives as a bar rather than nothing. */
-function chartTypeOf(
-  graphType: CustomGraphInput["graphType"],
-): ReportChart["type"] {
+function chartTypeOf(graphType: CustomGraphInput["graphType"]): ReportChart["type"] {
   switch (graphType) {
     case "pie":
     case "donnut":
@@ -234,9 +229,7 @@ async function buildChart({
   // Result buckets key each series by `buildSeriesName(input, queryIndex)`, NOT
   // by the series' display name — the two encodings differ, and reading by the
   // display name silently yields zeroes.
-  const bucketKeys = seriesInputs.map((input, index) =>
-    buildSeriesName(input, index),
-  );
+  const bucketKeys = seriesInputs.map((input, index) => buildSeriesName(input, index));
 
   if (type === "pie") {
     const segments = pieSegments({
@@ -263,14 +256,12 @@ async function buildChart({
   );
   const series = seriesInputs.map((input, index) => ({
     name: graphData.series?.[index]?.name ?? bucketKeys[index]!,
-    data: extractSeriesPoints(
-      buckets,
-      bucketKeys[index]!,
-      graphData.groupBy,
-    ).map((point, pointIndex) => ({
-      label: categories[pointIndex] ?? point.timestamp,
-      value: point.value,
-    })),
+    data: extractSeriesPoints(buckets, bucketKeys[index]!, graphData.groupBy).map(
+      (point, pointIndex) => ({
+        label: categories[pointIndex] ?? point.timestamp,
+        value: point.value,
+      }),
+    ),
   }));
 
   const primary = series[0];
@@ -285,9 +276,7 @@ async function buildChart({
     categories,
     series,
     total,
-    isEmpty: series.every((one) =>
-      one.data.every((point) => point.value === 0),
-    ),
+    isEmpty: series.every((one) => one.data.every((point) => point.value === 0)),
   };
 }
 
@@ -318,9 +307,7 @@ function pieSegments({
     .map((input, index) => ({
       label: names?.[index]?.name ?? bucketKeys[index]!,
       value: aggregateSeriesValues(
-        extractSeriesPoints(buckets, bucketKeys[index]!).map(
-          (point) => point.value,
-        ),
+        extractSeriesPoints(buckets, bucketKeys[index]!).map((point) => point.value),
         String(input.aggregation),
         buckets.length,
       ),

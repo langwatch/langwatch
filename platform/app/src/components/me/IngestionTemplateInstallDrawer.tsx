@@ -24,11 +24,7 @@ import { HandledErrorAlert } from "~/features/errors";
 
 const SECRET_MASK = "•".repeat(48);
 
-export function buildEnvSnippet(
-  slug: string,
-  endpoint: string,
-  token: string,
-): string {
+export function buildEnvSnippet(slug: string, endpoint: string, token: string): string {
   const base = `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   if (slug === "claude_code") {
@@ -250,8 +246,8 @@ export function IngestionTemplateInstallDrawer({
         <DrawerBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              Cost, tokens, and model are picked up automatically on every
-              request, no change to how you call the API.
+              Cost, tokens, and model are picked up automatically on every request, no
+              change to how you call the API.
             </Text>
 
             {!!installError && (
@@ -270,8 +266,8 @@ export function IngestionTemplateInstallDrawer({
                     <Alert.Indicator />
                     <Alert.Content>
                       <Text fontSize="sm">
-                        An ingestion key already exists for this source.
-                        Rotating will invalidate the existing token immediately.
+                        An ingestion key already exists for this source. Rotating will
+                        invalidate the existing token immediately.
                       </Text>
                     </Alert.Content>
                   </Alert.Root>
@@ -299,8 +295,7 @@ export function IngestionTemplateInstallDrawer({
                   </Alert.Indicator>
                   <Alert.Content>
                     <Text fontSize="sm" fontWeight="medium">
-                      Ingestion key issued. Copy the token now, it won't be
-                      shown again.
+                      Ingestion key issued. Copy the token now, it won't be shown again.
                     </Text>
                   </Alert.Content>
                 </Alert.Root>
@@ -346,12 +341,7 @@ export function IngestionTemplateInstallDrawer({
                       <Copy size={12} /> Copy
                     </Button>
                   </HStack>
-                  <Box
-                    as="pre"
-                    fontSize="xs"
-                    fontFamily="mono"
-                    whiteSpace="pre-wrap"
-                  >
+                  <Box as="pre" fontSize="xs" fontFamily="mono" whiteSpace="pre-wrap">
                     {envVarsSnippet}
                   </Box>
                 </Box>
@@ -367,17 +357,13 @@ export function IngestionTemplateInstallDrawer({
 
                 <Text fontSize="xs" color="fg.muted">
                   To keep this across new terminals, add these lines to your{" "}
-                  <code>~/.zshrc</code> (or <code>~/.bashrc</code>), then open a
-                  new shell.
+                  <code>~/.zshrc</code> (or <code>~/.bashrc</code>), then open a new
+                  shell.
                 </Text>
 
                 <HStack>
                   <Spacer />
-                  <Button
-                    onClick={onMarkInstalled}
-                    colorPalette="green"
-                    variant="solid"
-                  >
+                  <Button onClick={onMarkInstalled} colorPalette="green" variant="solid">
                     <Check size={14} /> Mark as installed
                   </Button>
                 </HStack>

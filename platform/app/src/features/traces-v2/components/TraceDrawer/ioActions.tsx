@@ -1,11 +1,6 @@
 import { useMemo } from "react";
 import type { IconType } from "react-icons";
-import {
-  LuLanguages,
-  LuLightbulb,
-  LuMessageSquare,
-  LuPlay,
-} from "react-icons/lu";
+import { LuLanguages, LuLightbulb, LuMessageSquare, LuPlay } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import {
@@ -78,9 +73,7 @@ function buildIOActions({
       id: "comment",
       menuLabel: "Comment",
       menuIcon: LuMessageSquare,
-      render: () => (
-        <FieldCommentButton traceId={traceId} anchor={fieldAnchor} />
-      ),
+      render: () => <FieldCommentButton traceId={traceId} anchor={fieldAnchor} />,
     });
   }
 

@@ -38,9 +38,7 @@ import type {
 } from "../schemas/events";
 import { verdictPassedOf, verdictScoreOf } from "../verdictGate";
 
-const logger = createLogger(
-  "langwatch:evaluation-processing:execute-evaluation",
-);
+const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");
 
 /**
  * A failure the customer can resolve themselves (provider disabled, missing
@@ -93,9 +91,7 @@ export interface ExecuteEvaluationCommandDeps {
    * configured — the command then emits a "skipped" status instead of
    * running the evaluator. Injected for testability.
    */
-  azureSafetyEnvResolver?: (
-    projectId: string,
-  ) => Promise<Record<string, string> | null>;
+  azureSafetyEnvResolver?: (projectId: string) => Promise<Record<string, string> | null>;
   /**
    * Emergency rollback for the langwatch#6397 settings recovery
    * (`ops_evaluator_settings_recovery_disabled`, SYSTEM scope). Absent means
@@ -252,13 +248,10 @@ export function resolveEvaluatorSettingsWithSource({
  *
  * Uses constructor DI — instantiate with deps and pass via `.withCommandInstance()`.
  */
-export class ExecuteEvaluationCommand
-  implements
-    CommandHandler<
-      Command<ExecuteEvaluationCommandData>,
-      EvaluationProcessingEvent
-    >
-{
+export class ExecuteEvaluationCommand implements CommandHandler<
+  Command<ExecuteEvaluationCommandData>,
+  EvaluationProcessingEvent
+> {
   static readonly schema = SCHEMA;
 
   constructor(private readonly deps: ExecuteEvaluationCommandDeps) {}
@@ -279,11 +272,7 @@ export class ExecuteEvaluationCommand
   }
 
   static makeJobId(payload: ExecuteEvaluationCommandData): string {
-    if (
-      payload.threadIdleTimeout &&
-      payload.threadIdleTimeout > 0 &&
-      payload.threadId
-    ) {
+    if (payload.threadIdleTimeout && payload.threadIdleTimeout > 0 && payload.threadId) {
       return `exec:${payload.tenantId}:thread:${payload.threadId}:${payload.evaluatorId}`;
     }
     return `exec:${payload.tenantId}:${payload.traceId}:${payload.evaluatorId}`;
@@ -450,13 +439,12 @@ export class ExecuteEvaluationCommand
     }
 
     // 4. Run evaluation via app-layer service
-    const { settings, source: settingsSource } =
-      resolveEvaluatorSettingsWithSource({
-        config: monitor.evaluator?.config as Record<string, unknown> | null,
-        parameters: monitor.parameters as Record<string, unknown> | null,
-        evaluatorRecordType: monitor.evaluator?.type,
-        recoveryDisabled: await this.readSettingsRecoveryFlag(),
-      });
+    const { settings, source: settingsSource } = resolveEvaluatorSettingsWithSource({
+      config: monitor.evaluator?.config as Record<string, unknown> | null,
+      parameters: monitor.parameters as Record<string, unknown> | null,
+      evaluatorRecordType: monitor.evaluator?.type,
+      recoveryDisabled: await this.readSettingsRecoveryFlag(),
+    });
 
     // AC0d wants the PREVALENCE of configs in the losing shape, and a prod SQL
     // read was never available. This is the same number from the running system.
@@ -491,9 +479,7 @@ export class ExecuteEvaluationCommand
     }
 
     const workflowId =
-      monitor.evaluator?.type === "workflow"
-        ? monitor.evaluator.workflowId
-        : undefined;
+      monitor.evaluator?.type === "workflow" ? monitor.evaluator.workflowId : undefined;
 
     try {
       const result = await this.deps.evaluations.executeForTrace({

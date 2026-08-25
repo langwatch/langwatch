@@ -51,10 +51,7 @@ describe("sendWebhook dispatch orchestration", () => {
         projectId: "proj_1",
         eventId: "evt_stable",
       });
-      const headers = mockedSend.mock.calls[0]![0].headers as Record<
-        string,
-        string
-      >;
+      const headers = mockedSend.mock.calls[0]![0].headers as Record<string, string>;
       expect(headers["X-LangWatch-Event-Id"]).toBe("evt_stable");
       expect(result.eventId).toBe("evt_stable");
     });
@@ -64,10 +61,7 @@ describe("sendWebhook dispatch orchestration", () => {
     it("generates a fresh one so the header is always present", async () => {
       sendResolves();
       const result = await sendWebhook({ ...base, testFire: true });
-      const headers = mockedSend.mock.calls[0]![0].headers as Record<
-        string,
-        string
-      >;
+      const headers = mockedSend.mock.calls[0]![0].headers as Record<string, string>;
       expect(headers["X-LangWatch-Event-Id"]).toBe(result.eventId);
       expect(result.eventId).toMatch(/[0-9a-f-]{36}/);
     });

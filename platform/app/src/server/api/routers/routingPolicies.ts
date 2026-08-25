@@ -126,10 +126,7 @@ export const routingPoliciesRouter = createTRPCRouter({
         description: z.string().nullable().optional(),
         modelProviderIds: z
           .array(z.string())
-          .min(
-            1,
-            "Routing policy must reference at least one provider credential",
-          ),
+          .min(1, "Routing policy must reference at least one provider credential"),
         isDefault: z.boolean().default(false),
         modelAliases: aliasesSchema,
         defaultModel: defaultModelSchema,
@@ -165,10 +162,7 @@ export const routingPoliciesRouter = createTRPCRouter({
         description: z.string().nullable().optional(),
         modelProviderIds: z
           .array(z.string())
-          .min(
-            1,
-            "Routing policy must reference at least one provider credential",
-          )
+          .min(1, "Routing policy must reference at least one provider credential")
           .optional(),
         modelAliases: aliasesSchema,
         defaultModel: defaultModelSchema,

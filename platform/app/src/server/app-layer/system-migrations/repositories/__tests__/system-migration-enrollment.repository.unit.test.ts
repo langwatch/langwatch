@@ -122,14 +122,10 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
           ]),
         },
         organization: {
-          findMany: vi
-            .fn()
-            .mockResolvedValue([{ id: "org_acme", name: "Acme" }]),
+          findMany: vi.fn().mockResolvedValue([{ id: "org_acme", name: "Acme" }]),
         },
         user: {
-          findMany: vi
-            .fn()
-            .mockResolvedValue([{ id: "user_alex", name: "Alex" }]),
+          findMany: vi.fn().mockResolvedValue([{ id: "user_alex", name: "Alex" }]),
         },
       });
 
@@ -161,9 +157,7 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
     it("excludes enrolled ids, the caller's exclusions and active enterprise plans", async () => {
       const { prisma, repository } = repositoryWith({
         enrollment: {
-          findMany: vi
-            .fn()
-            .mockResolvedValue([{ organizationId: "org_enrolled" }]),
+          findMany: vi.fn().mockResolvedValue([{ organizationId: "org_enrolled" }]),
         },
         organization: {
           findMany: vi.fn().mockResolvedValue([{ id: "org_a", name: "A" }]),
@@ -194,11 +188,10 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
     it("pools from the predecessor's enrollment when one is named", async () => {
       const findMany = vi
         .fn()
-        .mockImplementation(
-          async ({ where }: { where: { migrationName: string } }) =>
-            where.migrationName === "authz-grants-genesis-import"
-              ? [{ organizationId: "org_enrolled" }]
-              : [{ organizationId: "org_first_step" }],
+        .mockImplementation(async ({ where }: { where: { migrationName: string } }) =>
+          where.migrationName === "authz-grants-genesis-import"
+            ? [{ organizationId: "org_enrolled" }]
+            : [{ organizationId: "org_first_step" }],
         );
       const { prisma, repository } = repositoryWith({
         enrollment: { findMany },
@@ -262,9 +255,7 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
         enrolledByUserId: "user_ops",
       });
 
-      expect(
-        prisma.systemMigrationEnrollment.createMany,
-      ).not.toHaveBeenCalled();
+      expect(prisma.systemMigrationEnrollment.createMany).not.toHaveBeenCalled();
     });
   });
 
@@ -289,8 +280,7 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
         },
       });
 
-      const enrolled =
-        await repository.findEnrolledOrganizationIdsByMigration();
+      const enrolled = await repository.findEnrolledOrganizationIdsByMigration();
 
       expect(enrolled).toEqual(
         new Map([
@@ -337,10 +327,7 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
       expect(findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            OR: [
-              { name: { contains: "acme", mode: "insensitive" } },
-              { id: "acme" },
-            ],
+            OR: [{ name: { contains: "acme", mode: "insensitive" } }, { id: "acme" }],
           },
           take: 10,
         }),

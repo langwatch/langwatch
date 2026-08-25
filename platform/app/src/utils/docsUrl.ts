@@ -54,8 +54,7 @@ export function getDocsBaseUrl({
   isDev?: boolean;
 } = {}): string {
   const inBrowser = typeof window !== "undefined";
-  const resolvedHostname =
-    hostname ?? (inBrowser ? window.location.hostname : undefined);
+  const resolvedHostname = hostname ?? (inBrowser ? window.location.hostname : undefined);
   const resolvedIsDev = isDev ?? (inBrowser ? import.meta.env.DEV : false);
   if (resolvedIsDev && resolvedHostname && LOCAL_HOSTS.has(resolvedHostname)) {
     return LOCAL_DOCS_URL;

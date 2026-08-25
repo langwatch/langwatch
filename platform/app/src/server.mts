@@ -48,10 +48,8 @@ void (async () => {
     compose: async (config, resources) => {
       // Keep all env-reading legacy imports behind the explicit config phase.
       const { createApp } = await import("./runtime/app");
-      const {
-        initializeInProcessApp,
-        initializeWebApp,
-      } = await import("./server/app-layer/presets");
+      const { initializeInProcessApp, initializeWebApp } =
+        await import("./server/app-layer/presets");
       const appRuntime = await createApp({
         initializeLegacy: config.workersInProcess
           ? initializeInProcessApp
@@ -59,9 +57,7 @@ void (async () => {
         resources,
       });
       const { startApp } = await import("./start");
-      const { PublicAppConfigService } = await import(
-        "./runtime/public-config.server"
-      );
+      const { PublicAppConfigService } = await import("./runtime/public-config.server");
       const publicConfig = new PublicAppConfigService().resolve(environment);
       return {
         // startApp owns the single AppRuntime.start call and binds HTTP only
@@ -76,7 +72,7 @@ void (async () => {
 
   await appBoot.boot(process.env);
 })().catch((error: unknown) => {
-  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
   process.stderr.write(`[langwatch:server] fatal boot failure: ${message}\n`);
   process.exitCode = 1;
 });

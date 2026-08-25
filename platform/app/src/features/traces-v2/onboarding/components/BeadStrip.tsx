@@ -28,10 +28,7 @@ interface BeadStripProps {
  * Tooltip on hover/focus surfaces the chapter label + one-line hint
  * so the dots still earn their semantic weight.
  */
-export function BeadStrip({
-  stage,
-  onJump,
-}: BeadStripProps): React.ReactElement {
+export function BeadStrip({ stage, onJump }: BeadStripProps): React.ReactElement {
   const currentIdx = chapterIndex(stage);
   const total = CHAPTERS.length;
   const currentChapter = CHAPTERS[currentIdx];
@@ -82,12 +79,7 @@ export function BeadStrip({
         />
         {/* Beads sit on top of the connector. Equal flex slots so the
             spacing stays even regardless of chapter count. */}
-        <HStack
-          gap={0}
-          justify="space-between"
-          position="relative"
-          width="full"
-        >
+        <HStack gap={0} justify="space-between" position="relative" width="full">
           {CHAPTERS.map((chapter, i) => {
             const isCurrent = i === currentIdx;
             const isPast = i < currentIdx;
@@ -115,13 +107,9 @@ export function BeadStrip({
                 borderRadius="full"
                 background={isCurrent || isPast ? "orange.solid" : "bg.surface"}
                 borderWidth="1px"
-                borderColor={
-                  isCurrent || isPast ? "orange.solid" : "border.muted"
-                }
+                borderColor={isCurrent || isPast ? "orange.solid" : "border.muted"}
                 boxShadow={
-                  isCurrent
-                    ? "0 0 0 3px var(--chakra-colors-orange-muted)"
-                    : undefined
+                  isCurrent ? "0 0 0 3px var(--chakra-colors-orange-muted)" : undefined
                 }
                 transition="all 220ms cubic-bezier(0.16, 1, 0.3, 1)"
                 _hover={onJump ? { background: "orange.solid" } : undefined}

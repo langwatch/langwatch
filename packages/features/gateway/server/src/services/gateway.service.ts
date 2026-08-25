@@ -22,15 +22,11 @@ import type { GatewayBudgetScopeType } from "@langwatch/prisma-client/generated"
 
 /** The singular process-owned Gateway service for the full budget lifecycle. */
 export class GatewayService extends GatewayServiceContract {
-  private constructor(
-    private readonly repository: PrismaGatewayBudgetRepository,
-  ) {
+  private constructor(private readonly repository: PrismaGatewayBudgetRepository) {
     super();
   }
 
-  static create(options: {
-    repository: PrismaGatewayBudgetRepository;
-  }): GatewayService {
+  static create(options: { repository: PrismaGatewayBudgetRepository }): GatewayService {
     return new GatewayService(options.repository);
   }
 

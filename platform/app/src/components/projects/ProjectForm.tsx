@@ -13,12 +13,7 @@ import {
 import { Plus } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import {
-  type Control,
-  Controller,
-  type SubmitHandler,
-  useForm,
-} from "react-hook-form";
+import { type Control, Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { applyHandledErrorToForm, HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -36,9 +31,7 @@ export interface ProjectFormData {
 }
 
 export interface ProjectFormProps {
-  onSubmit: (
-    data: ProjectFormData & { language: string; framework: string },
-  ) => void;
+  onSubmit: (data: ProjectFormData & { language: string; framework: string }) => void;
   isLoading?: boolean;
   /** The submit mutation's error, passed straight through — handled or not. */
   error?: unknown;
@@ -119,8 +112,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     if (teams.data && teams.data.length > 0 && !teamId) {
       // Use defaultTeamId if provided and valid, otherwise use first team
       const teamIdToUse =
-        defaultTeamId &&
-        teams.data.some((t: { id: string }) => t.id === defaultTeamId)
+        defaultTeamId && teams.data.some((t: { id: string }) => t.id === defaultTeamId)
           ? defaultTeamId
           : (teams.data[0]?.id ?? "");
 
@@ -136,9 +128,8 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
   };
 
   const showTeamSelector =
-    teams.data?.some(
-      (team: { projects: unknown[] }) => team.projects.length > 0,
-    ) ?? false;
+    teams.data?.some((team: { projects: unknown[] }) => team.projects.length > 0) ??
+    false;
 
   const teamOptions = useMemo(() => {
     return (
@@ -159,9 +150,9 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     <form onSubmit={handleSubmit(onSubmit)}>
       <VStack align="stretch" gap={6}>
         <Text fontSize="sm" color="fg.muted">
-          You can set up separate projects for each service or LLM feature of
-          your application (for example, one for your ChatBot, another for that
-          Content Generation feature).
+          You can set up separate projects for each service or LLM feature of your
+          application (for example, one for your ChatBot, another for that Content
+          Generation feature).
         </Text>
 
         <Field.Root invalid={!!errors.name}>
@@ -173,9 +164,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
             })}
             placeholder="AI Project"
           />
-          {errors.name && (
-            <Field.ErrorText>{errors.name.message}</Field.ErrorText>
-          )}
+          {errors.name && <Field.ErrorText>{errors.name.message}</Field.ErrorText>}
         </Field.Root>
 
         {showTeamSelector && (
@@ -199,9 +188,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
                   placeholder="Engineering Team"
                 />
                 {errors.newTeamName && (
-                  <Field.ErrorText>
-                    {errors.newTeamName.message}
-                  </Field.ErrorText>
+                  <Field.ErrorText>{errors.newTeamName.message}</Field.ErrorText>
                 )}
               </Field.Root>
             )}

@@ -12,7 +12,10 @@ export type AppComposition = {
 };
 
 export type AppBootOptions = {
-  compose(config: AppBootConfig, resources: ResourceScope): AppComposition | Promise<AppComposition>;
+  compose(
+    config: AppBootConfig,
+    resources: ResourceScope,
+  ): AppComposition | Promise<AppComposition>;
   checkReadiness?: (app: AppComposition, config: AppBootConfig) => void | Promise<void>;
   config?: AppBootConfigService;
 };
@@ -24,7 +27,8 @@ export class AppBoot {
   constructor(options: AppBootOptions) {
     this.runtime = new RuntimeBoot({
       config: options.config ?? new AppBootConfigService(),
-      createApplication: (config, _infrastructure, resources) => options.compose(config, resources),
+      createApplication: (config, _infrastructure, resources) =>
+        options.compose(config, resources),
       checkReadiness: (app, config) => options.checkReadiness?.(app, config),
       startTransport: async (app) => {
         await app.start();
@@ -32,7 +36,9 @@ export class AppBoot {
     });
   }
 
-  boot(source: Readonly<Record<string, unknown>>): Promise<BootedRuntime<AppBootConfig, AppComposition>> {
+  boot(
+    source: Readonly<Record<string, unknown>>,
+  ): Promise<BootedRuntime<AppBootConfig, AppComposition>> {
     return this.runtime.boot(source);
   }
 }

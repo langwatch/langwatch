@@ -374,9 +374,7 @@ const SUMMED_COLUMN_TYPE = /^(?:U?Int(?:8|16|32|64|128|256)|Float(?:32|64))$/;
  * what the dataset calls a row. Read by the fanout diagnostic and by the
  * `in-tuple` view body, so both mean the same thing by construction.
  */
-export function lwqlGrainColumns(
-  view: LangWatchQLViewDefinition,
-): readonly string[] {
+export function lwqlGrainColumns(view: LangWatchQLViewDefinition): readonly string[] {
   return view.grainColumns ?? view.dedup.keyColumns;
 }
 
@@ -534,9 +532,7 @@ export function lwqlGatedColumns({
  * `getUserProtectionsForProject` returns when the policy resolver is down
  * grants nothing.
  */
-function heldPermissions(
-  protections: Protections,
-): ReadonlySet<FieldProtection> {
+function heldPermissions(protections: Protections): ReadonlySet<FieldProtection> {
   const held = new Set<FieldProtection>();
   if (protections.canSeeCapturedInput === true) held.add("input");
   if (protections.canSeeCapturedOutput === true) held.add("output");

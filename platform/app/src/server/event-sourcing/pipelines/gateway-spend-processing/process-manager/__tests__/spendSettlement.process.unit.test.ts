@@ -179,15 +179,11 @@ describe("spend settlement sweeper", () => {
     /** @scenario The sweeper re-arms itself after every wake */
     it("re-arms the next sweep from the present", async () => {
       await armSchedule();
-      expect((await instance())?.nextWakeAt).toBe(
-        T0 + SETTLEMENT_SWEEP_INTERVAL_MS,
-      );
+      expect((await instance())?.nextWakeAt).toBe(T0 + SETTLEMENT_SWEEP_INTERVAL_MS);
 
       clock = T0 + SETTLEMENT_SWEEP_INTERVAL_MS + 1;
       expect(await fireWake()).toBe(true);
-      expect((await instance())?.nextWakeAt).toBe(
-        clock + SETTLEMENT_SWEEP_INTERVAL_MS,
-      );
+      expect((await instance())?.nextWakeAt).toBe(clock + SETTLEMENT_SWEEP_INTERVAL_MS);
     });
   });
 

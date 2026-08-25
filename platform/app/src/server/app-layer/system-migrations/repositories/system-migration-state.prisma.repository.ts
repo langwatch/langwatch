@@ -26,9 +26,7 @@ function parseStatus(raw: string): TenantMigrationStatus {
  * on purpose (the runner is generic over tenants), so every query here keys
  * by migration name first.
  */
-export class PrismaSystemMigrationStateRepository
-  implements SystemMigrationStateRepository
-{
+export class PrismaSystemMigrationStateRepository implements SystemMigrationStateRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findRecord({
@@ -56,9 +54,7 @@ export class PrismaSystemMigrationStateRepository
     // no-report case has to be written, and for a nullable Json column
     // that means the DbNull sentinel rather than a bare null.
     const report =
-      record.report == null
-        ? Prisma.DbNull
-        : (record.report as Prisma.InputJsonValue);
+      record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);
     // The transition's own business time, stamped by the writer. It is what
     // the grants-ledger projection orders folded transitions against, and it
     // has to be written here too: a direct write that left the column alone
@@ -95,13 +91,9 @@ export class PrismaSystemMigrationStateRepository
    * operator can only pin an EXISTING record), so the collision is read as
    * the pin standing and answered `false`.
    */
-  async upsertRecordUnlessRolledBack(
-    record: TenantMigrationRecord,
-  ): Promise<boolean> {
+  async upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean> {
     const report =
-      record.report == null
-        ? Prisma.DbNull
-        : (record.report as Prisma.InputJsonValue);
+      record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);
     const occurredAt = new Date();
     const updated = await this.prisma.systemMigrationTenantState.updateMany({
       where: {

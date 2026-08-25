@@ -11,9 +11,13 @@ You are an org admin on a fresh LangWatch deployment. By the end of this page yo
 - Imported the [AI Tools Portal](/ai-governance/personal-portal/admin-catalog#starter-pack) starter pack so every developer's `/me` page renders a real catalog instead of an empty state.
 - Invited a colleague through `/settings/members`, watched their first request land in `/governance`, and written a [`spend_spike`](/ai-governance/anomaly-rules) rule that will alert when their daily spend doubles.
 
-If you are a developer trying to *use* the org as a developer (not configure it), jump to the [developer walkthrough](/ai-governance/getting-started-developer) instead.
+If you are a developer trying to _use_ the org as a developer (not configure it), jump to the [developer walkthrough](/ai-governance/getting-started-developer) instead.
 
-<Info>**Pairs with:** [Overview](/ai-governance/overview) for the bigger picture (license tiers, two personas, mermaid architecture) and [Control plane & integration tiers](/ai-governance/control-plane) for the navigation map across surfaces.</Info>
+<Info>
+  **Pairs with:** [Overview](/ai-governance/overview) for the bigger picture (license
+  tiers, two personas, mermaid architecture) and [Control plane & integration
+  tiers](/ai-governance/control-plane) for the navigation map across surfaces.
+</Info>
 
 ## Step 1: Sign in as the first admin
 
@@ -30,7 +34,7 @@ HTTP 409, error: "no_default_routing_policy"
 Ask your admin to publish a default routing policy at Gateway → Routing Policies.
 ```
 
-Publish at least one policy *before* opening CLI sign-in to your team:
+Publish at least one policy _before_ opening CLI sign-in to your team:
 
 1. Navigate to **Gateway → Routing Policies** (`/gateway/routing-policies`).
 2. Click **+ New routing policy**.
@@ -120,7 +124,7 @@ The deep reference for budget shape, fallback semantics, and the WARN response t
 
 ## Step 8: Write your first anomaly rule
 
-Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach (spend spike, geo-mismatch, off-hours usage). The detector evaluates `spend_spike` rules live today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) marks which is which).
+Budgets enforce _at_ the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect _before_ it, the patterns that precede a breach (spend spike, geo-mismatch, off-hours usage). The detector evaluates `spend_spike` rules live today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) marks which is which).
 
 Write a starter `spend_spike` rule:
 
@@ -153,10 +157,10 @@ The detector starts evaluating from the next ingest event. When today's 24h spen
 
 ## Common first-day errors
 
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| Developer sees `409 no_default_routing_policy` on `langwatch login` | Step 2 skipped or no policy marked default | [Routing Policies](/ai-gateway/governance/routing-policies): pick one, tick **Mark as default**. |
-| `/me` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/governance/tool-catalog` → **Import starter pack**. |
-| Ingestion source sits at `awaiting_first_event` forever | Source-type doesn't have a wired adapter yet | [Ingestion Sources index → State of each receiver](/ai-governance/ingestion-sources/index#state-of-each-receiver--at-a-glance): three rows are setup-contract-only as of this release. |
-| `/governance` doesn't appear in your sidebar | Org's [setup-state OR-of-flags](/ai-governance/control-plane#persona-based-home-routing--the-setup-state-signal) hasn't tripped yet | Need any 3 of 5: Personal VKs, Routing Policies, Ingestion Sources, Anomaly Rules, Recent activity (30d). After Steps 2–7 above, you'll have 4. |
-| Member colleague got an `Access Restricted` page on `/settings/audit-log` | Working as designed, audit log is admin-only | Either elevate them to `Admin` or grant a custom role with `organization:manage` (delegable via the `CustomRolePermissions` JSON column). |
+| Symptom                                                                   | Likely cause                                                                                                                        | Fix                                                                                                                                                                                    |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Developer sees `409 no_default_routing_policy` on `langwatch login`       | Step 2 skipped or no policy marked default                                                                                          | [Routing Policies](/ai-gateway/governance/routing-policies): pick one, tick **Mark as default**.                                                                                       |
+| `/me` shows "your IT team is still setting things up" empty state         | Step 4 skipped                                                                                                                      | Open `/governance/tool-catalog` → **Import starter pack**.                                                                                                                             |
+| Ingestion source sits at `awaiting_first_event` forever                   | Source-type doesn't have a wired adapter yet                                                                                        | [Ingestion Sources index → State of each receiver](/ai-governance/ingestion-sources/index#state-of-each-receiver--at-a-glance): three rows are setup-contract-only as of this release. |
+| `/governance` doesn't appear in your sidebar                              | Org's [setup-state OR-of-flags](/ai-governance/control-plane#persona-based-home-routing--the-setup-state-signal) hasn't tripped yet | Need any 3 of 5: Personal VKs, Routing Policies, Ingestion Sources, Anomaly Rules, Recent activity (30d). After Steps 2–7 above, you'll have 4.                                        |
+| Member colleague got an `Access Restricted` page on `/settings/audit-log` | Working as designed, audit log is admin-only                                                                                        | Either elevate them to `Admin` or grant a custom role with `organization:manage` (delegable via the `CustomRolePermissions` JSON column).                                              |

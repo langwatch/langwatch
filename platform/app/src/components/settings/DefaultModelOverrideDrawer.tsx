@@ -42,10 +42,7 @@ import {
 import { buildCustomModelDisplayNames } from "~/server/modelProviders/customModelDisplayNames";
 import { LATEST_ALIAS_PROVIDERS } from "~/server/modelProviders/latestAliases";
 import { api, type RouterOutputs } from "~/utils/api";
-import {
-  INHERIT_SENTINEL,
-  ProviderModelSelector,
-} from "./ProviderModelSelector";
+import { INHERIT_SENTINEL, ProviderModelSelector } from "./ProviderModelSelector";
 import { ScopeChipPicker, type ScopeTriadEntry } from "./ScopeChipPicker";
 
 type Payload = RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
@@ -236,18 +233,18 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   // Voyage / Gemini / Perplexity embeddings just because those env
   // vars are set on the host. `listAllForProjectForFrontend` returns
   // stored rows only.
-  const projectProviders =
-    api.modelProvider.listAllForProjectForFrontend.useQuery(
-      { projectId: project?.id ?? "" },
-      { enabled: !!project?.id && open, refetchOnMount: false },
-    );
+  const projectProviders = api.modelProvider.listAllForProjectForFrontend.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id && open, refetchOnMount: false },
+  );
 
   const modelOptionsByRole = useMemo(() => {
     const isLoading = projectProviders.isLoading;
     const hasProviderLoadError = projectProviders.isError;
     const providers = projectProviders.data?.providers ?? [];
-    const enabledEntries: Array<[string, (typeof providers)[number]]> =
-      providers.filter((p) => p.enabled === true).map((p) => [p.provider, p]);
+    const enabledEntries: Array<[string, (typeof providers)[number]]> = providers
+      .filter((p) => p.enabled === true)
+      .map((p) => [p.provider, p]);
     const enabledKeys = new Set(enabledEntries.map(([k]) => k));
     // Build the alias entries for enabled providers that support them.
     // Aliases sit at the TOP of the chat list (DEFAULT + FAST) so the
@@ -268,9 +265,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       // has zero enabled providers (or the query errored) - return an
       // empty list so the picker doesn't lie about what's available.
       if (isLoading) {
-        return modelSelectorOptions
-          .filter((o) => o.mode === mode)
-          .map((o) => o.value);
+        return modelSelectorOptions.filter((o) => o.mode === mode).map((o) => o.value);
       }
       if (hasProviderLoadError || enabledEntries.length === 0) return [];
       // Registry chat/embedding models from any enabled provider. This
@@ -340,8 +335,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   // deriving the id from an unsettled query silently turned edits
   // into creates.
   const hasAnyKey = Object.keys(config).length > 0;
-  const canSave =
-    scopes.length > 0 && !busy && (editingId ? !!editing : hasAnyKey);
+  const canSave = scopes.length > 0 && !busy && (editingId ? !!editing : hasAnyKey);
 
   const handleSave = useCallback(async () => {
     if (!canSave) return;
@@ -397,10 +391,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       }}
       size="md"
     >
-      <Drawer.Content
-        data-testid="default-model-override-drawer"
-        portalled={false}
-      >
+      <Drawer.Content data-testid="default-model-override-drawer" portalled={false}>
         <Drawer.Header>
           <Drawer.Title>
             {editing ? "Edit default models" : "Add default models"}
@@ -409,11 +400,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={5}>
-            <ScopeSection
-              scopes={scopes}
-              onChange={setScopes}
-              available={available}
-            />
+            <ScopeSection scopes={scopes} onChange={setScopes} available={available} />
             <ReplacedConfigsNote
               scopes={scopes}
               configs={dataQuery.data?.configs ?? []}
@@ -513,12 +500,7 @@ function RoleRow({
       width="full"
       data-unsupported-at-scope={unsupportedAtScope || undefined}
     >
-      <HStack
-        gap={2}
-        align="center"
-        paddingY={1}
-        opacity={unsupportedAtScope ? 0.55 : 1}
-      >
+      <HStack gap={2} align="center" paddingY={1} opacity={unsupportedAtScope ? 0.55 : 1}>
         {/* Row reads: [label] ··············· [model selector] ▶
             Label hugs the left, big flex spacer eats the middle, the
             model selector + expand chevron live tight to the right. */}
@@ -569,8 +551,8 @@ function RoleRow({
           data-testid="role-row-embeddings-unsupported-hint"
         >
           No provider configured at this scope ships an embedding API. Add an
-          embedding-capable provider (OpenAI, Voyage, Cohere) to unlock topic
-          clustering and semantic search.
+          embedding-capable provider (OpenAI, Voyage, Cohere) to unlock topic clustering
+          and semantic search.
         </Text>
       )}
       {canExpand && expanded && (
@@ -636,8 +618,7 @@ function FeatureRow({
     };
   } else {
     inheritOption =
-      inheritHitOption(inheritedForFeature) ??
-      buildInheritOption(inheritedForRole);
+      inheritHitOption(inheritedForFeature) ?? buildInheritOption(inheritedForRole);
   }
   return (
     <HStack gap={2} align="center" data-testid={`feature-row-${feature.key}`}>
@@ -712,9 +693,7 @@ function saveOutcomeCopy({
  * Showing it as a ghost value gave the contradictory read that
  * something was set when nothing was.
  */
-export function inheritHitOption(
-  entry: InheritedEntry,
-): InheritOptionShape | undefined {
+export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | undefined {
   if (!entry || entry.source === "inferred") return undefined;
   return {
     model: entry.model,
@@ -787,8 +766,8 @@ function ReplacedConfigsNote({
       role="status"
       data-testid="replaced-configs-note"
     >
-      {replacedNames.join(", ")} already {isSingle ? "has" : "have"} default
-      models. Saving replaces {isSingle ? "that config" : "those configs"}.
+      {replacedNames.join(", ")} already {isSingle ? "has" : "have"} default models.
+      Saving replaces {isSingle ? "that config" : "those configs"}.
     </Text>
   );
 }

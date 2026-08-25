@@ -40,9 +40,7 @@ const SCHEMA = "public";
 function createdRelation(statement: string): string {
   const match = /^CREATE OR REPLACE VIEW "[^"]+"\."([^"]+)"/.exec(statement);
   if (!match?.[1]) {
-    throw new Error(
-      `not an approved-view statement: ${statement.slice(0, 80)}`,
-    );
+    throw new Error(`not an approved-view statement: ${statement.slice(0, 80)}`);
   }
   return match[1];
 }
@@ -69,9 +67,7 @@ describe("given the LangWatchQL approved PostgreSQL views", () => {
       const granted = lwqlApprovedPostgresViewNames();
       expect(granted.length).toBe(lwqlPostgresViews(LWQL_VIEW_CATALOG).length);
       for (const name of granted) {
-        expect(name.startsWith(GRANTED_PREFIX), `${name} is ungranted`).toBe(
-          true,
-        );
+        expect(name.startsWith(GRANTED_PREFIX), `${name} is ungranted`).toBe(true);
       }
     });
   });
@@ -109,9 +105,7 @@ describe("given the LangWatchQL approved PostgreSQL views", () => {
         views: [renamed],
       });
       expect(statement).toBeDefined();
-      expect(createdRelation(statement!).startsWith(GRANTED_PREFIX)).toBe(
-        false,
-      );
+      expect(createdRelation(statement!).startsWith(GRANTED_PREFIX)).toBe(false);
     });
   });
 });

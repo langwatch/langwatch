@@ -32,9 +32,7 @@ export interface BlobMaintenancePipelineDeps {
  * one commit wins and the losers stand down. There is deliberately no Redis
  * leader lock.
  */
-export function createBlobMaintenancePipeline(
-  deps: BlobMaintenancePipelineDeps,
-) {
+export function createBlobMaintenancePipeline(deps: BlobMaintenancePipelineDeps) {
   return definePipeline<Event>({
     name: "blob_maintenance",
     aggregate: defineAggregate({

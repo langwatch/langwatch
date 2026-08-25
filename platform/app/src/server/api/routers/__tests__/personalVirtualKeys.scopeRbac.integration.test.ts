@@ -81,10 +81,7 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
     });
   }
 
-  async function seedPersonalVk(
-    principalUserId: string,
-    name: string,
-  ): Promise<string> {
+  async function seedPersonalVk(principalUserId: string, name: string): Promise<string> {
     const vk = await prisma.virtualKey.create({
       data: {
         organizationId: ORG_ID,

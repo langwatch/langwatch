@@ -3,11 +3,7 @@ import type { AggregateType } from "../../domain/aggregateType";
 import { createTenantId } from "../../domain/tenantId";
 import { TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers";
 import type { Event } from "../../domain/types";
-import {
-  deduplicateEvents,
-  eventToRecord,
-  recordToEvent,
-} from "../eventStoreUtils";
+import { deduplicateEvents, eventToRecord, recordToEvent } from "../eventStoreUtils";
 import type { EventRecord } from "../repositories/eventRepository.types";
 
 const tenantId = createTenantId("test-tenant");
@@ -87,13 +83,7 @@ describe("deduplicateEvents", () => {
       });
       const unique = makeEvent({ id: "event_z", data: { v: 5 } });
 
-      const result = deduplicateEvents([
-        legacy1,
-        legacy2,
-        keyed1,
-        keyed2,
-        unique,
-      ]);
+      const result = deduplicateEvents([legacy1, legacy2, keyed1, keyed2, unique]);
       expect(result).toHaveLength(3);
       expect(result.map((e) => e.id)).toEqual(["dup_id", "event_x", "event_z"]);
     });

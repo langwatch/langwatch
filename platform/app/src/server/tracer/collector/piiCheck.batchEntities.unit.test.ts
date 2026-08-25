@@ -16,20 +16,18 @@ describe("batchPresidioClearPII", () => {
   let capturedBody: { settings: { entities: Record<string, boolean> } };
 
   beforeEach(() => {
-    vi.spyOn(global, "fetch").mockImplementation(
-      async (_url: unknown, init: unknown) => {
-        const body = (init as { body: string }).body;
-        capturedBody = JSON.parse(body);
-        return {
-          ok: true,
-          status: 200,
-          text: async () => "",
-          json: async () => [
-            { status: "processed", raw_response: { anonymized: "scrubbed" } },
-          ],
-        } as unknown as Response;
-      },
-    );
+    vi.spyOn(global, "fetch").mockImplementation(async (_url: unknown, init: unknown) => {
+      const body = (init as { body: string }).body;
+      capturedBody = JSON.parse(body);
+      return {
+        ok: true,
+        status: 200,
+        text: async () => "",
+        json: async () => [
+          { status: "processed", raw_response: { anonymized: "scrubbed" } },
+        ],
+      } as unknown as Response;
+    });
   });
 
   afterEach(() => {

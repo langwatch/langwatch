@@ -76,9 +76,11 @@ describe("the Sessions table order", () => {
         row({ gitBranch: "middle", lastUpdateAtMs: 2_000 }),
       ];
 
-      expect(
-        orderOf(sortSessionRows({ rows, sort: DEFAULT_SESSIONS_SORT })),
-      ).toEqual(["newest", "middle", "oldest"]);
+      expect(orderOf(sortSessionRows({ rows, sort: DEFAULT_SESSIONS_SORT }))).toEqual([
+        "newest",
+        "middle",
+        "oldest",
+      ]);
     });
   });
 
@@ -106,10 +108,7 @@ describe("the Sessions table order", () => {
       ];
       const sort = afterClicks({ column: "compactions", clicks: 1 });
 
-      expect(orderOf(sortSessionRows({ rows, sort }))).toEqual([
-        "churned",
-        "calm",
-      ]);
+      expect(orderOf(sortSessionRows({ rows, sort }))).toEqual(["churned", "calm"]);
     });
 
     it("leads with the longest working session", () => {
@@ -119,10 +118,7 @@ describe("the Sessions table order", () => {
       ];
       const sort = afterClicks({ column: "activeTime", clicks: 1 });
 
-      expect(orderOf(sortSessionRows({ rows, sort }))).toEqual([
-        "long-haul",
-        "quick",
-      ]);
+      expect(orderOf(sortSessionRows({ rows, sort }))).toEqual(["long-haul", "quick"]);
     });
   });
 
@@ -150,10 +146,7 @@ describe("the Sessions table order", () => {
       ];
       const sort = afterClicks({ column: "session", clicks: 1 });
 
-      expect(orderOf(sortSessionRows({ rows, sort }))).toEqual([
-        "aardvark",
-        "zebra",
-      ]);
+      expect(orderOf(sortSessionRows({ rows, sort }))).toEqual(["aardvark", "zebra"]);
     });
   });
 
@@ -171,9 +164,7 @@ describe("the Sessions table order", () => {
           lastUpdateAtMs: 1_000,
         }),
       ];
-      const opening = orderOf(
-        sortSessionRows({ rows, sort: DEFAULT_SESSIONS_SORT }),
-      );
+      const opening = orderOf(sortSessionRows({ rows, sort: DEFAULT_SESSIONS_SORT }));
 
       const first = afterClicks({ column: "context", clicks: 1 });
       expect(orderOf(sortSessionRows({ rows, sort: first }))).toEqual([
@@ -276,9 +267,7 @@ describe("the Sessions table order", () => {
         ),
       ).toEqual(["dear", "cheap", "unpriced"]);
       expect(
-        orderOf(
-          sortSessionRows({ rows, sort: { column: "cost", direction: "asc" } }),
-        ),
+        orderOf(sortSessionRows({ rows, sort: { column: "cost", direction: "asc" } })),
       ).toEqual(["cheap", "dear", "unpriced"]);
     });
 

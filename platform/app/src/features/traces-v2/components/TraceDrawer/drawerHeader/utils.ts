@@ -38,8 +38,7 @@ export function formatPinValue({
   }
 
   if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean")
-    return String(value);
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
   try {
     return JSON.stringify(value);
   } catch {

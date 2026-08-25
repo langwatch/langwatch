@@ -106,15 +106,12 @@ export const Annotations = ({
                             API
                           </Box>
                           <Text color="fg.muted" fontSize="sm">
-                            -{" "}
-                            {annotation.email ? annotation.email : "anonymous"}
+                            - {annotation.email ? annotation.email : "anonymous"}
                           </Text>
                         </HStack>
                       )}
                     </Text>
-                    <Text fontSize="xs">
-                      {annotation.createdAt.toLocaleString()}
-                    </Text>
+                    <Text fontSize="xs">{annotation.createdAt.toLocaleString()}</Text>
                   </VStack>
                   <Spacer />
                   {isCurrentUser && (
@@ -136,55 +133,50 @@ export const Annotations = ({
                 <HStack align="start" gap={2} wrap="wrap" divideY="1px">
                   {annotation.scoreOptions &&
                     typeof annotation.scoreOptions === "object" &&
-                    Object.entries(annotation.scoreOptions).map(
-                      ([key, scoreOption]) => {
-                        if (
-                          !scoreOption ||
-                          typeof scoreOption !== "object" ||
-                          !("value" in scoreOption)
+                    Object.entries(annotation.scoreOptions).map(([key, scoreOption]) => {
+                      if (
+                        !scoreOption ||
+                        typeof scoreOption !== "object" ||
+                        !("value" in scoreOption)
+                      )
+                        return null;
+                      const name = scoreOptions.data?.find(
+                        (option) => option.id === key,
+                      )?.name;
+                      if (!name || !scoreOption.value) return null;
+                      return (
+                        name && (
+                          <Text key={key} fontSize={"sm"}>
+                            <VStack align="start" gap={0}>
+                              <Text fontSize="xs" fontWeight="500">
+                                {name}:
+                              </Text>
+                              {typeof scoreOption === "object" &&
+                                "value" in scoreOption && (
+                                  <HStack gap={1} wrap="wrap">
+                                    <Text fontSize="xs">
+                                      {Array.isArray(scoreOption.value)
+                                        ? scoreOption.value.join(",")
+                                        : String(scoreOption.value ?? "")}
+                                    </Text>
+                                    {scoreOption.reason && (
+                                      <Tooltip
+                                        content={
+                                          typeof scoreOption.reason === "object"
+                                            ? JSON.stringify(scoreOption.reason)
+                                            : scoreOption.reason
+                                        }
+                                      >
+                                        <MessageCircle size={"12px"} />
+                                      </Tooltip>
+                                    )}
+                                  </HStack>
+                                )}
+                            </VStack>
+                          </Text>
                         )
-                          return null;
-                        const name = scoreOptions.data?.find(
-                          (option) => option.id === key,
-                        )?.name;
-                        if (!name || !scoreOption.value) return null;
-                        return (
-                          name && (
-                            <Text key={key} fontSize={"sm"}>
-                              <VStack align="start" gap={0}>
-                                <Text fontSize="xs" fontWeight="500">
-                                  {name}:
-                                </Text>
-                                {typeof scoreOption === "object" &&
-                                  "value" in scoreOption && (
-                                    <HStack gap={1} wrap="wrap">
-                                      <Text fontSize="xs">
-                                        {Array.isArray(scoreOption.value)
-                                          ? scoreOption.value.join(",")
-                                          : String(scoreOption.value ?? "")}
-                                      </Text>
-                                      {scoreOption.reason && (
-                                        <Tooltip
-                                          content={
-                                            typeof scoreOption.reason ===
-                                            "object"
-                                              ? JSON.stringify(
-                                                  scoreOption.reason,
-                                                )
-                                              : scoreOption.reason
-                                          }
-                                        >
-                                          <MessageCircle size={"12px"} />
-                                        </Tooltip>
-                                      )}
-                                    </HStack>
-                                  )}
-                              </VStack>
-                            </Text>
-                          )
-                        );
-                      },
-                    )}
+                      );
+                    })}
                 </HStack>
               </VStack>
             </Card.Body>

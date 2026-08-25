@@ -18,10 +18,7 @@ import {
   clearFlowCallbacks,
   getFlowCallbacks,
 } from "~/hooks/useDrawer";
-import {
-  clearGuardrailsDrawerState,
-  GuardrailsDrawer,
-} from "../GuardrailsDrawer";
+import { clearGuardrailsDrawerState, GuardrailsDrawer } from "../GuardrailsDrawer";
 
 // Standard evaluator output fields
 const standardOutputFields = [
@@ -98,9 +95,7 @@ vi.mock("~/utils/compat/next-router", () => ({
     query: mockQuery,
     pathname: "",
     asPath:
-      Object.keys(mockQuery).length > 0
-        ? "/test?" + qs.stringify(mockQuery)
-        : "/test",
+      Object.keys(mockQuery).length > 0 ? "/test?" + qs.stringify(mockQuery) : "/test",
     push: mockPush,
     replace: mockPush,
   }),
@@ -269,8 +264,7 @@ describe("GuardrailsDrawer + EvaluatorListDrawer Integration", () => {
     const isGuardrailsOpen = () =>
       mockQuery["drawer.open"] === "guardrailsDrawer" ||
       mockQuery["drawer.open"] === undefined;
-    const isEvaluatorListOpen = () =>
-      mockQuery["drawer.open"] === "evaluatorList";
+    const isEvaluatorListOpen = () => mockQuery["drawer.open"] === "evaluatorList";
 
     // Start with guardrails drawer open
     mockQuery = { "drawer.open": "guardrailsDrawer" };
@@ -413,8 +407,7 @@ describe("GuardrailsDrawer", () => {
 
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalled();
-        const lastCall =
-          mockPush.mock.calls[mockPush.mock.calls.length - 1]?.[0];
+        const lastCall = mockPush.mock.calls[mockPush.mock.calls.length - 1]?.[0];
         expect(lastCall).toContain("drawer.open=evaluatorList");
       });
     });

@@ -117,11 +117,7 @@ function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
     [spans],
   );
   const resolvable = useMemo(
-    () =>
-      new Set<string>([
-        trace.traceId,
-        ...(spans ?? []).map((span) => span.spanId),
-      ]),
+    () => new Set<string>([trace.traceId, ...(spans ?? []).map((span) => span.spanId)]),
     [trace.traceId, spans],
   );
 
@@ -137,9 +133,7 @@ function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
     priority: 1,
     // A threadless trace has no conversation to switch to; the popover list
     // is all there is.
-    onClick: trace.conversationId
-      ? () => setViewMode("conversation")
-      : undefined,
+    onClick: trace.conversationId ? () => setViewMode("conversation") : undefined,
     popover: (
       <TraceCommentList
         traceId={trace.traceId}
@@ -256,9 +250,7 @@ function buildSdkChipDef(sdk: SdkInfoLike): ChipDef {
           {sdk.scenario && (
             <SdkRow
               label="Scenario"
-              value={
-                sdk.scenario.version ? `SDK ${sdk.scenario.version}` : "active"
-              }
+              value={sdk.scenario.version ? `SDK ${sdk.scenario.version}` : "active"}
             />
           )}
         </VStack>
@@ -285,8 +277,8 @@ function buildSelectedPromptChipDef(
           {selectedId}
         </Text>
         <Text textStyle="2xs" color="fg.muted">
-          Pin set on the span. Resolved to a different concrete prompt at
-          runtime — see the &ldquo;last used&rdquo; chip for what actually ran.
+          Pin set on the span. Resolved to a different concrete prompt at runtime — see
+          the &ldquo;last used&rdquo; chip for what actually ran.
         </Text>
       </VStack>
     ),
@@ -360,8 +352,8 @@ function buildLastUsedPromptChipDef({
         </HStack>
         {state.missing ? (
           <Text textStyle="2xs" color="fg.muted">
-            Prompt no longer exists in this project. The trace still shows what
-            ran at the time.
+            Prompt no longer exists in this project. The trace still shows what ran at the
+            time.
           </Text>
         ) : (
           <HStack gap={1}>
@@ -440,11 +432,7 @@ function EvalChipVerdict({ display }: { display: EvalChipDisplay }) {
     );
   if (display.passLabel)
     return (
-      <Text
-        textStyle="2xs"
-        fontWeight="semibold"
-        color={display.passLabel.color}
-      >
+      <Text textStyle="2xs" fontWeight="semibold" color={display.passLabel.color}>
         {display.passLabel.text}
       </Text>
     );
@@ -598,12 +586,7 @@ function NoVerdictMicroBadge({
       lineHeight="1"
     >
       <Icon as={icon} boxSize={2.5} color="fg.muted" />
-      <Text
-        textStyle="2xs"
-        fontWeight="bold"
-        color="fg.muted"
-        letterSpacing="0.04em"
-      >
+      <Text textStyle="2xs" fontWeight="bold" color="fg.muted" letterSpacing="0.04em">
         {label}
       </Text>
     </HStack>

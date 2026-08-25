@@ -310,8 +310,7 @@ function renderOpenPanel() {
   return render(<LangySidecar />, { wrapper: Wrapper });
 }
 
-const failureCard = () =>
-  screen.queryByText(/this conversation isn't loading/i);
+const failureCard = () => screen.queryByText(/this conversation isn't loading/i);
 const staleNote = () => screen.queryByTestId("langy-history-stale");
 
 describe("a failed read of an open conversation's history", () => {
@@ -344,9 +343,7 @@ describe("a failed read of an open conversation's history", () => {
     describe("when a background refetch fails", () => {
       it("keeps the transcript instead of replacing it with a failure card", async () => {
         renderOpenPanel();
-        await waitFor(() =>
-          expect(document.body.textContent).toContain(QUESTION),
-        );
+        await waitFor(() => expect(document.body.textContent).toContain(QUESTION));
 
         setHistory({ errored: true });
 
@@ -356,9 +353,7 @@ describe("a failed read of an open conversation's history", () => {
 
       it("says the column is stale, quietly, rather than saying nothing", async () => {
         renderOpenPanel();
-        await waitFor(() =>
-          expect(document.body.textContent).toContain(QUESTION),
-        );
+        await waitFor(() => expect(document.body.textContent).toContain(QUESTION));
 
         setHistory({ errored: true });
 
@@ -368,9 +363,7 @@ describe("a failed read of an open conversation's history", () => {
 
       it("drops the stale note again once the read recovers", async () => {
         renderOpenPanel();
-        await waitFor(() =>
-          expect(document.body.textContent).toContain(QUESTION),
-        );
+        await waitFor(() => expect(document.body.textContent).toContain(QUESTION));
         setHistory({ errored: true });
         await waitFor(() => expect(staleNote()).toBeTruthy());
 
@@ -393,17 +386,13 @@ describe("a failed read of an open conversation's history", () => {
     describe("when a read of it fails", () => {
       it("offers a retry that reads the conversation again", async () => {
         renderOpenPanel();
-        await waitFor(() =>
-          expect(document.body.textContent).toContain(QUESTION),
-        );
+        await waitFor(() => expect(document.body.textContent).toContain(QUESTION));
 
         setHistory({ errored: true });
         await waitFor(() => expect(staleNote()).toBeTruthy());
 
         historyRefetch.mockClear();
-        fireEvent.click(
-          within(staleNote()!).getByRole("button", { name: /try again/i }),
-        );
+        fireEvent.click(within(staleNote()!).getByRole("button", { name: /try again/i }));
 
         expect(historyRefetch).toHaveBeenCalled();
       });
@@ -416,9 +405,7 @@ describe("a failed read of an open conversation's history", () => {
         historyState.turnInFlight = true;
 
         renderOpenPanel();
-        await waitFor(() =>
-          expect(document.body.textContent).toContain(QUESTION),
-        );
+        await waitFor(() => expect(document.body.textContent).toContain(QUESTION));
 
         setHistory({ errored: true });
         await waitFor(() => expect(staleNote()).toBeTruthy());
@@ -463,9 +450,7 @@ describe("a failed read of an open conversation's history", () => {
         // one-line footnote and left the reader working through a transcript
         // that no longer exists, with no retry and no way forward.
         renderOpenPanel();
-        await waitFor(() =>
-          expect(document.body.textContent).toContain(QUESTION),
-        );
+        await waitFor(() => expect(document.body.textContent).toContain(QUESTION));
 
         setHistory({
           errored: true,
@@ -486,9 +471,7 @@ describe("a failed read of an open conversation's history", () => {
     describe("when the poll answers not-owned", () => {
       it("hands the column to the card, not the stale line", async () => {
         renderOpenPanel();
-        await waitFor(() =>
-          expect(document.body.textContent).toContain(QUESTION),
-        );
+        await waitFor(() => expect(document.body.textContent).toContain(QUESTION));
 
         setHistory({
           errored: true,
@@ -496,9 +479,7 @@ describe("a failed read of an open conversation's history", () => {
         });
 
         await waitFor(() =>
-          expect(
-            screen.queryByText(/only the owner can continue them/i),
-          ).toBeTruthy(),
+          expect(screen.queryByText(/only the owner can continue them/i)).toBeTruthy(),
         );
         expect(staleNote()).toBeNull();
       });

@@ -6,9 +6,7 @@ import { apiKeyRouter } from "../apiKey";
 
 vi.mock("nanoid", () => ({
   nanoid: vi.fn(() => "mock-nano-id"),
-  customAlphabet: vi.fn(
-    () => () => "mock48characterrandomstringforapikeygeneration",
-  ),
+  customAlphabet: vi.fn(() => () => "mock48characterrandomstringforapikeygeneration"),
 }));
 
 vi.mock("../../rbac", async (importOriginal) => {
@@ -37,9 +35,7 @@ vi.mock("~/server/rbac/role-binding-resolver", () => ({
 
 vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
   const actual =
-    await importOriginal<
-      typeof import("~/server/rbac/custom-role-permissions")
-    >();
+    await importOriginal<typeof import("~/server/rbac/custom-role-permissions")>();
   return {
     ...actual,
     parseCustomRolePermissions: vi
@@ -344,9 +340,7 @@ describe("apiKey router — restricted permissions", () => {
         // where the key held new permissions with stale binding state. The
         // orphan cleanup after replaceRoleBindings deletes the superseded
         // role.
-        (prisma.apiKey.findUnique as unknown as Mock).mockResolvedValue(
-          restrictedKey,
-        );
+        (prisma.apiKey.findUnique as unknown as Mock).mockResolvedValue(restrictedKey);
 
         await caller.update({
           organizationId: ORG_ID,
@@ -374,9 +368,7 @@ describe("apiKey router — restricted permissions", () => {
 
     describe("when updating restricted key with camelCase permissions", () => {
       it("accepts auditLog:view without malformed error", async () => {
-        (prisma.apiKey.findUnique as unknown as Mock).mockResolvedValue(
-          existingKey,
-        );
+        (prisma.apiKey.findUnique as unknown as Mock).mockResolvedValue(existingKey);
         (prisma.customRole.findFirst as unknown as Mock).mockResolvedValue({
           id: CUSTOM_ROLE_ID,
           name: "API Key: Old Key",

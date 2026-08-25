@@ -35,59 +35,58 @@ interface DialogContentProps extends ChakraDialog.ContentProps {
   errorScope?: string;
 }
 
-export const DialogContent = React.forwardRef<
-  HTMLDivElement,
-  DialogContentProps
->(function DialogContent(props, ref) {
-  const {
-    children,
-    portalled = true,
-    portalRef,
-    backdrop = true,
-    backdropProps,
-    positionerProps,
-    withErrorBoundary = true,
-    errorScope,
-    ...rest
-  } = props;
+export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
+  function DialogContent(props, ref) {
+    const {
+      children,
+      portalled = true,
+      portalRef,
+      backdrop = true,
+      backdropProps,
+      positionerProps,
+      withErrorBoundary = true,
+      errorScope,
+      ...rest
+    } = props;
 
-  // Crash inside the dialog body should NOT close the dialog. Wrap the
-  // children so a render error renders an inline error panel within the
-  // dialog frame instead.
-  const safeChildren = withErrorBoundary ? (
-    <IsolatedErrorBoundary scope={errorScope}>{children}</IsolatedErrorBoundary>
-  ) : (
-    children
-  );
+    // Crash inside the dialog body should NOT close the dialog. Wrap the
+    // children so a render error renders an inline error panel within the
+    // dialog frame instead.
+    const safeChildren = withErrorBoundary ? (
+      <IsolatedErrorBoundary scope={errorScope}>{children}</IsolatedErrorBoundary>
+    ) : (
+      children
+    );
 
-  // Strip background overrides defensively at runtime in addition to the
-  // type-level Omit, in case a caller widens the type with `as any`.
-  const safeBackdropProps = stripBackdropBg(backdropProps);
+    // Strip background overrides defensively at runtime in addition to the
+    // type-level Omit, in case a caller widens the type with `as any`.
+    const safeBackdropProps = stripBackdropBg(backdropProps);
 
-  return (
-    <Portal disabled={!portalled} container={portalRef}>
-      {backdrop && (
-        <ChakraDialog.Backdrop
-          backdropFilter="var(--lw-backdrop-blur, blur(8px))"
-          {...safeBackdropProps}
-          bg="transparent"
-          // Stable DOM signal that the wrapper's transparency contract is
-          // active. Tests assert on this attribute because Chakra resolves
-          // the `bg` prop through a CSS class which jsdom cannot compute,
-          // so checking computed/inline styles is unreliable. If anyone
-          // removes the `bg="transparent"` line above, this attribute
-          // should be removed too — the test then fails.
-          data-lw-transparent-backdrop="true"
-        />
-      )}
-      <ChakraDialog.Positioner {...positionerProps}>
-        <ChakraDialog.Content ref={ref} {...rest} asChild={false}>
-          {safeChildren}
-        </ChakraDialog.Content>
-      </ChakraDialog.Positioner>
-    </Portal>
-  );
-});
+    return (
+      <Portal disabled={!portalled} container={portalRef}>
+        {backdrop && (
+          <ChakraDialog.Backdrop
+            backdropFilter="var(--lw-backdrop-blur, blur(8px))"
+            {...safeBackdropProps}
+            bg="transparent"
+            // Stable DOM signal that the wrapper's transparency contract is
+            // active. Tests assert on this attribute because Chakra resolves
+            // the `bg` prop through a CSS class which jsdom cannot compute,
+            // so checking computed/inline styles is unreliable. If anyone
+            // removes the `bg="transparent"` line above, this attribute
+            // should be removed too — the test then fails.
+            data-lw-transparent-backdrop="true"
+          />
+        )}
+        <ChakraDialog.Positioner {...positionerProps}>
+          <ChakraDialog.Content ref={ref} {...rest} asChild={false}>
+            {safeChildren}
+          </ChakraDialog.Content>
+        </ChakraDialog.Positioner>
+      </Portal>
+    );
+  },
+);
 
 export const DialogCloseTrigger = React.forwardRef<
   HTMLButtonElement,

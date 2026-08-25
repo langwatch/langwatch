@@ -33,8 +33,7 @@ export class SecretService extends SecretServiceContract {
   private constructor(private readonly options: SecretServiceOptions) {
     super();
     this.reservedNames = new Set(options.reservedNames);
-    this.maximumPerProject =
-      options.maximumPerProject ?? MAX_SECRETS_PER_PROJECT;
+    this.maximumPerProject = options.maximumPerProject ?? MAX_SECRETS_PER_PROJECT;
   }
 
   static create(options: SecretServiceOptions): SecretService {
@@ -58,8 +57,7 @@ export class SecretService extends SecretServiceContract {
       throw new SecretReservedNameError(parsed.name);
     }
     if (
-      (await this.options.repository.count(parsed.projectId)) >=
-      this.maximumPerProject
+      (await this.options.repository.count(parsed.projectId)) >= this.maximumPerProject
     ) {
       throw new SecretLimitReachedError(this.maximumPerProject);
     }
@@ -92,10 +90,7 @@ export class SecretService extends SecretServiceContract {
     projectId: string;
     id: string;
   }): Promise<Secret> {
-    const secret = await this.options.repository.get(
-      input.projectId,
-      input.id,
-    );
+    const secret = await this.options.repository.get(input.projectId, input.id);
     if (this.reservedNames.has(secret.name)) {
       throw new SecretNotFoundError();
     }

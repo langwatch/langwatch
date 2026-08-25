@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { UNLIMITED_PLAN } from "../src";
-import {
-  applyPlanTypeEntitlements,
-  ENTITLEMENTS_BY_PLAN_TYPE,
-} from "../src";
+import { applyPlanTypeEntitlements, ENTITLEMENTS_BY_PLAN_TYPE } from "../src";
 import type { PlanInfo } from "../src";
 
 /**
@@ -95,13 +92,8 @@ describe("applyPlanTypeEntitlements", () => {
     });
 
     it("entitles webhook endpoints on enterprise and on nothing else", () => {
-      expect(Object.keys(ENTITLEMENTS_BY_PLAN_TYPE)).toEqual([
-        "ENTERPRISE",
-      ]);
-      expect(
-        ENTITLEMENTS_BY_PLAN_TYPE["ENTERPRISE"]
-          ?.webhookEndpointsEnabled,
-      ).toBe(true);
+      expect(Object.keys(ENTITLEMENTS_BY_PLAN_TYPE)).toEqual(["ENTERPRISE"]);
+      expect(ENTITLEMENTS_BY_PLAN_TYPE["ENTERPRISE"]?.webhookEndpointsEnabled).toBe(true);
     });
   });
 });

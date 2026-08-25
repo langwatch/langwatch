@@ -1,8 +1,5 @@
 import type { AppendStore, Event } from "@langwatch/eventing";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import { CODING_AGENT_MAP_COALESCE_MAX_BATCH } from "../schemas/constants";
 import type { ContributionFacts } from "../schemas/contributions";
 import {
@@ -238,10 +235,7 @@ function bare(rawName: string): string {
  * (sub-agent lifecycle events carry one), else parsed off an `agent:*` query
  * source (`agent:builtin:general-purpose` is a sub-agent's own model call).
  */
-function resolveAgentType(
-  facts: ContributionFacts,
-  querySource: string,
-): string {
+function resolveAgentType(facts: ContributionFacts, querySource: string): string {
   const explicit = str(facts.agent_type) || str(facts.subagent_type);
   if (explicit !== "") return explicit;
   if (querySource.startsWith("agent:")) {
@@ -270,10 +264,7 @@ function nat(value: string | number | boolean | undefined): number {
   return parsed > 0 ? Math.round(parsed) : 0;
 }
 
-function int(
-  value: string | number | boolean | undefined,
-  absent: number,
-): number {
+function int(value: string | number | boolean | undefined, absent: number): number {
   if (value === undefined) return absent;
   const parsed = num(value);
   return Number.isInteger(parsed) ? parsed : absent;

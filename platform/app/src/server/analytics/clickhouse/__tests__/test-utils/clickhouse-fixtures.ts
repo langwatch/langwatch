@@ -26,10 +26,7 @@ interface SeedSpansOptions {
 /**
  * Generate a Map of string attributes with the specified number of keys and value sizes.
  */
-function generateAttributes(
-  keyCount: number,
-  valueSize: number,
-): Record<string, string> {
+function generateAttributes(keyCount: number, valueSize: number): Record<string, string> {
   const attrs: Record<string, string> = {};
   const padding = "x".repeat(Math.max(0, valueSize - 10));
   for (let i = 0; i < keyCount; i++) {

@@ -65,10 +65,7 @@ export function FeatureFlagsContent() {
       showErrorToast({ error, fallbackTitle: "Couldn't clear the override" }),
   });
 
-  const grouped = useMemo(
-    () => groupByScope(query.data?.flags ?? []),
-    [query.data],
-  );
+  const grouped = useMemo(() => groupByScope(query.data?.flags ?? []), [query.data]);
 
   if (query.isLoading) {
     return (
@@ -93,9 +90,9 @@ export function FeatureFlagsContent() {
     <Stack gap={8} paddingY={4} maxWidth="1200px">
       <Box>
         <Text fontSize="sm" color="fg.muted">
-          System-scoped flags are kill switches and pipeline toggles served from
-          this LangWatch postgres database. They never round-trip to PostHog, so
-          flipping them is fast and free.{" "}
+          System-scoped flags are kill switches and pipeline toggles served from this
+          LangWatch postgres database. They never round-trip to PostHog, so flipping them
+          is fast and free.{" "}
           {isSaas
             ? "Product-scoped flags still resolve through PostHog for user targeting and A/B tests; postgres values here only apply as an emergency override."
             : "Product-scoped flags fall back to this postgres store when PostHog is not configured."}
@@ -140,8 +137,8 @@ export function FeatureFlagsContent() {
             Flag families
           </Heading>
           <Text fontSize="xs" color="fg.muted" mb={3}>
-            Dynamically-named flags that share a key prefix. Individual
-            instances appear inline above once a postgres row exists.
+            Dynamically-named flags that share a key prefix. Individual instances appear
+            inline above once a postgres row exists.
           </Text>
           <Table.Root size="sm" variant="line">
             <Table.Header>
@@ -295,9 +292,7 @@ function FlagRowView({
   const enabledEveryoneViaRule = everyoneViaRule === true;
   const partialEnabled =
     !effective &&
-    (enabledEveryoneViaRule ||
-      enabledOrgIds.size > 0 ||
-      enabledProjectIds.size > 0);
+    (enabledEveryoneViaRule || enabledOrgIds.size > 0 || enabledProjectIds.size > 0);
   const targetingSummary = enabledEveryoneViaRule
     ? "Enabled for everyone via rule"
     : [

@@ -217,8 +217,7 @@ function buildOtlpJsonBody(): ArrayBuffer {
       },
     ],
   };
-  return new TextEncoder().encode(JSON.stringify(payload))
-    .buffer as ArrayBuffer;
+  return new TextEncoder().encode(JSON.stringify(payload)).buffer as ArrayBuffer;
 }
 
 function callerFor(userId: string) {
@@ -248,17 +247,14 @@ describe("end-to-end customer dogfood smoke (Phase 5 cross-lane)", () => {
 
   it("receiver: bearer for orgA hands the trace off to the gov-project pipeline", async () => {
     handleTraceSpy.mockClear();
-    const res = await ingestApp.request(
-      `/api/ingest/otel/${orgA!.ingestionSourceId}`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${orgA!.ingestSecret}`,
-        },
-        body: buildOtlpJsonBody(),
+    const res = await ingestApp.request(`/api/ingest/otel/${orgA!.ingestionSourceId}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${orgA!.ingestSecret}`,
       },
-    );
+      body: buildOtlpJsonBody(),
+    });
     expect(res.status).toBe(202);
     expect(handleTraceSpy).toHaveBeenCalledTimes(1);
     const [tenantId, request] = handleTraceSpy.mock.calls[0]!;

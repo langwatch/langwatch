@@ -152,10 +152,7 @@ function typedSource(
 }
 
 /** The first of the named keys holding a string, or undefined when none does. */
-function firstString(
-  o: Record<string, unknown>,
-  ...keys: string[]
-): string | undefined {
+function firstString(o: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const key of keys) {
     const value = o[key];
     if (typeof value === "string") return value;
@@ -344,9 +341,7 @@ export function visitContentPart<R>(
   // references a provider-hosted file with no bytes, so it falls through to
   // `unknown` and passes along unchanged.
   if (o.type === "file" && typeof o.file === "object" && o.file !== null) {
-    const binPart = openAiFilePayloadToBinaryPart(
-      o.file as Record<string, unknown>,
-    );
+    const binPart = openAiFilePayloadToBinaryPart(o.file as Record<string, unknown>);
     if (binPart?.mimeType.startsWith("audio/")) {
       return visitor.inputAudio
         ? visitor.inputAudio({
@@ -541,9 +536,7 @@ export async function visitContentPartAsync<R>(
   // references a provider-hosted file with no bytes, so it falls through to
   // `unknown` and passes along unchanged.
   if (o.type === "file" && typeof o.file === "object" && o.file !== null) {
-    const binPart = openAiFilePayloadToBinaryPart(
-      o.file as Record<string, unknown>,
-    );
+    const binPart = openAiFilePayloadToBinaryPart(o.file as Record<string, unknown>);
     if (binPart?.mimeType.startsWith("audio/")) {
       return visitor.inputAudio
         ? visitor.inputAudio({
@@ -644,14 +637,10 @@ export function parseBase64DataUri(
  * or the data URI is malformed, so the caller can fall through to `unknown`
  * and pass the part along unchanged.
  */
-function openAiFilePayloadToBinaryPart(
-  file: Record<string, unknown>,
-): BinaryPart | null {
-  const fileData =
-    typeof file.file_data === "string" ? file.file_data : undefined;
+function openAiFilePayloadToBinaryPart(file: Record<string, unknown>): BinaryPart | null {
+  const fileData = typeof file.file_data === "string" ? file.file_data : undefined;
   if (!fileData) return null;
-  const filename =
-    typeof file.filename === "string" ? file.filename : undefined;
+  const filename = typeof file.filename === "string" ? file.filename : undefined;
 
   if (fileData.startsWith("data:")) {
     const parsed = parseBase64DataUri(fileData);

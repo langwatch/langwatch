@@ -58,17 +58,16 @@ export interface CommandSerializationOptions<Payload = any> {
 /**
  * Options for configuring a command handler in a static pipeline definition.
  */
-export interface CommandHandlerOptions<Payload = any>
-  extends CommandSerializationOptions<Payload> {
+export interface CommandHandlerOptions<
+  Payload = any,
+> extends CommandSerializationOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   makeJobId?: (payload: Payload) => string;
   delay?: number;
   concurrency?: number;
   deduplication?: DeduplicationStrategy<Payload>;
-  spanAttributes?: (
-    payload: Payload,
-  ) => Record<string, string | number | boolean>;
+  spanAttributes?: (payload: Payload) => Record<string, string | number | boolean>;
 }
 
 /**
@@ -103,10 +102,7 @@ export type NoCommands = never;
  */
 export interface StaticPipelineDefinition<
   EventType extends Event = Event,
-  _ProjectionTypes extends Record<string, Projection> = Record<
-    string,
-    Projection
-  >,
+  _ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
   RegisteredCommands extends RegisteredCommand = NoCommands,
 > {
   /** The aggregate and complete event vocabulary owned by this pipeline. */
@@ -141,10 +137,7 @@ export interface StaticPipelineDefinition<
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
     /** Pre-constructed instance — when provided, queueManager uses this instead of `new handlerClass()`. */
-    handlerInstance?: import("../commands/command").CommandHandler<
-      any,
-      EventType
-    >;
+    handlerInstance?: import("../commands/command").CommandHandler<any, EventType>;
     options?: CommandHandlerOptions;
   }>;
 

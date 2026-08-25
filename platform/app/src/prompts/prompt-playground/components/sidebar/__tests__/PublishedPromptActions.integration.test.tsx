@@ -122,10 +122,7 @@ describe("PublishedPromptActions", () => {
     describe("when the menu is closed", () => {
       it("does not enable the resolved-default model query", () => {
         renderWithChakra(
-          <PublishedPromptActions
-            promptId="prompt-1"
-            promptHandle="test-prompt"
-          />,
+          <PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />,
         );
 
         expect(mockGetResolvedDefault).toHaveBeenCalledWith(
@@ -136,10 +133,7 @@ describe("PublishedPromptActions", () => {
 
       it("does not enable the modify-permission query", () => {
         renderWithChakra(
-          <PublishedPromptActions
-            promptId="prompt-1"
-            promptHandle="test-prompt"
-          />,
+          <PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />,
         );
 
         expect(mockCheckModifyPermission).toHaveBeenCalledWith(
@@ -153,10 +147,7 @@ describe("PublishedPromptActions", () => {
       it("enables the resolved-default model query", async () => {
         const user = userEvent.setup();
         renderWithChakra(
-          <PublishedPromptActions
-            promptId="prompt-1"
-            promptHandle="test-prompt"
-          />,
+          <PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />,
         );
 
         const trigger = screen.getByRole("button");
@@ -171,10 +162,7 @@ describe("PublishedPromptActions", () => {
       it("enables the modify-permission query", async () => {
         const user = userEvent.setup();
         renderWithChakra(
-          <PublishedPromptActions
-            promptId="prompt-1"
-            promptHandle="test-prompt"
-          />,
+          <PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />,
         );
 
         const trigger = screen.getByRole("button");
@@ -192,17 +180,12 @@ describe("PublishedPromptActions", () => {
         // permission is undefined. Delete must NOT be enabled in that window.
         mockCheckModifyPermission.mockReturnValue({ data: undefined });
         renderWithChakra(
-          <PublishedPromptActions
-            promptId="prompt-1"
-            promptHandle="test-prompt"
-          />,
+          <PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />,
         );
 
         await user.click(screen.getByRole("button"));
 
-        const deleteItem = screen
-          .getByText("Delete prompt")
-          .closest('[role="menuitem"]');
+        const deleteItem = screen.getByText("Delete prompt").closest('[role="menuitem"]');
         expect(deleteItem).toHaveAttribute("data-disabled");
       });
 
@@ -212,17 +195,12 @@ describe("PublishedPromptActions", () => {
           data: { hasPermission: true },
         });
         renderWithChakra(
-          <PublishedPromptActions
-            promptId="prompt-1"
-            promptHandle="test-prompt"
-          />,
+          <PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />,
         );
 
         await user.click(screen.getByRole("button"));
 
-        const deleteItem = screen
-          .getByText("Delete prompt")
-          .closest('[role="menuitem"]');
+        const deleteItem = screen.getByText("Delete prompt").closest('[role="menuitem"]');
         expect(deleteItem).not.toHaveAttribute("data-disabled");
       });
     });
@@ -231,10 +209,7 @@ describe("PublishedPromptActions", () => {
       it("duplicates the prompt inside the project it belongs to", async () => {
         const user = userEvent.setup();
         renderWithChakra(
-          <PublishedPromptActions
-            promptId="prompt-1"
-            promptHandle="test-prompt"
-          />,
+          <PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />,
         );
 
         await clickDuplicate(user);
@@ -248,10 +223,7 @@ describe("PublishedPromptActions", () => {
       it("refreshes the prompt list so the duplicate shows up", async () => {
         const user = userEvent.setup();
         renderWithChakra(
-          <PublishedPromptActions
-            promptId="prompt-1"
-            promptHandle="test-prompt"
-          />,
+          <PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />,
         );
 
         await clickDuplicate(user);
@@ -262,10 +234,7 @@ describe("PublishedPromptActions", () => {
       it("tells the user what the duplicate was named", async () => {
         const user = userEvent.setup();
         renderWithChakra(
-          <PublishedPromptActions
-            promptId="prompt-1"
-            promptHandle="test-prompt"
-          />,
+          <PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />,
         );
 
         await clickDuplicate(user);
@@ -284,10 +253,7 @@ describe("PublishedPromptActions", () => {
         const user = userEvent.setup();
         mockDuplicate.mockRejectedValue(new Error("Prompt not found"));
         renderWithChakra(
-          <PublishedPromptActions
-            promptId="prompt-1"
-            promptHandle="test-prompt"
-          />,
+          <PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />,
         );
 
         await clickDuplicate(user);
@@ -308,16 +274,11 @@ describe("PublishedPromptActions", () => {
 
       it("stays quiet when the prompt-limit dialog already told the user", async () => {
         const user = userEvent.setup();
-        const limitError = new Error(
-          "You have reached the maximum number of prompts",
-        );
+        const limitError = new Error("You have reached the maximum number of prompts");
         markAsHandledByLicenseHandler(limitError);
         mockDuplicate.mockRejectedValue(limitError);
         renderWithChakra(
-          <PublishedPromptActions
-            promptId="prompt-1"
-            promptHandle="test-prompt"
-          />,
+          <PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />,
         );
 
         await clickDuplicate(user);

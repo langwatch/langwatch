@@ -45,8 +45,7 @@ export function ConversationTurnsList({
   collapseTools = false,
   maxHeightPx,
 }: ConversationTurnsListProps) {
-  const canCollapseEarlier =
-    layout === "thread" && turns.length > COLLAPSE_EARLIER_AT;
+  const canCollapseEarlier = layout === "thread" && turns.length > COLLAPSE_EARLIER_AT;
   const [showEarlier, setShowEarlier] = useState(false);
   const hiddenCount =
     canCollapseEarlier && !showEarlier
@@ -169,11 +168,7 @@ function EarlierTurnsExpander({
 
 function CollapseEarlierToggle({ onClick }: { onClick: () => void }) {
   return (
-    <EarlierTurnsHeader
-      icon={LuChevronUp}
-      label="Hide earlier turns"
-      onClick={onClick}
-    />
+    <EarlierTurnsHeader icon={LuChevronUp} label="Hide earlier turns" onClick={onClick} />
   );
 }
 
@@ -277,11 +272,7 @@ function VirtualizedList({
         "&::-webkit-scrollbar-track": { background: "transparent" },
       }}
     >
-      <Box
-        height={`${virtualizer.getTotalSize()}px`}
-        width="full"
-        position="relative"
-      >
+      <Box height={`${virtualizer.getTotalSize()}px`} width="full" position="relative">
         {virtualizer.getVirtualItems().map((row) => {
           const turn = turns[row.index]!;
           return (

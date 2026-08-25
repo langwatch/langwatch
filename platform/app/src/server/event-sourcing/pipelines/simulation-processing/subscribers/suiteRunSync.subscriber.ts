@@ -54,9 +54,7 @@ export function createSuiteRunSyncSubscriber(
   fold?: never;
   map?: never;
 } {
-  const handleStarted = async (
-    event: SimulationRunStartedEvent,
-  ): Promise<void> => {
+  const handleStarted = async (event: SimulationRunStartedEvent): Promise<void> => {
     const tenantId = String(event.tenantId);
     const { scenarioSetId, batchRunId, scenarioRunId, scenarioId } = event.data;
 
@@ -79,9 +77,7 @@ export function createSuiteRunSyncSubscriber(
     );
   };
 
-  const handleFinished = async (
-    event: SimulationRunFinishedEvent,
-  ): Promise<void> => {
+  const handleFinished = async (event: SimulationRunFinishedEvent): Promise<void> => {
     const tenantId = String(event.tenantId);
     const { data } = event;
 
@@ -125,10 +121,7 @@ export function createSuiteRunSyncSubscriber(
   };
 
   return {
-    events: [
-      SIMULATION_RUN_EVENT_TYPES.STARTED,
-      SIMULATION_RUN_EVENT_TYPES.FINISHED,
-    ],
+    events: [SIMULATION_RUN_EVENT_TYPES.STARTED, SIMULATION_RUN_EVENT_TYPES.FINISHED],
 
     async handler(event: SimulationProcessingEvent): Promise<void> {
       if (isSimulationRunStartedEvent(event)) {

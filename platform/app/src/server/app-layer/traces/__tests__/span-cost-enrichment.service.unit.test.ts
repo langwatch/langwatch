@@ -244,15 +244,9 @@ describe("OtlpSpanCostEnrichmentService", () => {
         await service.enrichSpan(span, "project-1");
 
         const cacheKeys = span.attributes.map((a) => a.key);
-        expect(cacheKeys).not.toContain(
-          "langwatch.model.cacheReadCostPerToken",
-        );
-        expect(cacheKeys).not.toContain(
-          "langwatch.model.cacheCreationCostPerToken",
-        );
-        expect(cacheKeys).not.toContain(
-          "langwatch.model.cacheCreation1hCostPerToken",
-        );
+        expect(cacheKeys).not.toContain("langwatch.model.cacheReadCostPerToken");
+        expect(cacheKeys).not.toContain("langwatch.model.cacheCreationCostPerToken");
+        expect(cacheKeys).not.toContain("langwatch.model.cacheCreation1hCostPerToken");
       });
     });
 
@@ -474,9 +468,7 @@ describe("createCostEnrichmentDeps", () => {
         outputCostPerToken: 0.000015,
       });
       const { prisma, findMany } = createPrismaMock([orgRow]);
-      const service = new OtlpSpanCostEnrichmentService(
-        createCostEnrichmentDeps(prisma),
-      );
+      const service = new OtlpSpanCostEnrichmentService(createCostEnrichmentDeps(prisma));
       const span = createTestSpan([
         {
           key: "gen_ai.request.model",
@@ -524,9 +516,7 @@ describe("createCostEnrichmentDeps", () => {
       });
       // Org row first: tier sorting, not row order, must decide the winner.
       const { prisma } = createPrismaMock([orgRow, projectRow]);
-      const service = new OtlpSpanCostEnrichmentService(
-        createCostEnrichmentDeps(prisma),
-      );
+      const service = new OtlpSpanCostEnrichmentService(createCostEnrichmentDeps(prisma));
       const span = createTestSpan([
         {
           key: "gen_ai.request.model",
@@ -551,9 +541,7 @@ describe("createCostEnrichmentDeps", () => {
     it("returns no custom costs and leaves the span untouched", async () => {
       const { prisma, findUnique, findMany } = createPrismaMock([]);
       findUnique.mockResolvedValue(null);
-      const service = new OtlpSpanCostEnrichmentService(
-        createCostEnrichmentDeps(prisma),
-      );
+      const service = new OtlpSpanCostEnrichmentService(createCostEnrichmentDeps(prisma));
       const span = createTestSpan([
         { key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } },
       ]);
@@ -568,9 +556,7 @@ describe("createCostEnrichmentDeps", () => {
 
 describe("stripProviderSubtype", () => {
   it("strips subtype from provider prefix", () => {
-    expect(stripProviderSubtype("openai.responses/gpt-5-mini")).toBe(
-      "openai/gpt-5-mini",
-    );
+    expect(stripProviderSubtype("openai.responses/gpt-5-mini")).toBe("openai/gpt-5-mini");
   });
 
   it("strips subtype from azure.chat prefix", () => {
@@ -609,20 +595,14 @@ describe("matchModelCostWithFallbacks", () => {
 
   describe("when model has provider subtype only", () => {
     it("matches openai.responses/gpt-5-mini via subtype stripping", () => {
-      const result = matchModelCostWithFallbacks(
-        "openai.responses/gpt-5-mini",
-        costs,
-      );
+      const result = matchModelCostWithFallbacks("openai.responses/gpt-5-mini", costs);
       expect(result?.model).toBe("openai/gpt-5-mini");
     });
   });
 
   describe("when model has date suffix only", () => {
     it("matches gpt-5-mini-2025-08-07 via prefix regex", () => {
-      const result = matchModelCostWithFallbacks(
-        "gpt-5-mini-2025-08-07",
-        costs,
-      );
+      const result = matchModelCostWithFallbacks("gpt-5-mini-2025-08-07", costs);
       expect(result?.model).toBe("openai/gpt-5-mini");
     });
   });
@@ -659,19 +639,13 @@ describe("matchModelCostWithFallbacks", () => {
     });
 
     it("matches dated model already in registry without date stripping", () => {
-      const result = matchModelCostWithFallbacks(
-        "gpt-4o-2024-11-20",
-        realCosts,
-      );
+      const result = matchModelCostWithFallbacks("gpt-4o-2024-11-20", realCosts);
       expect(result?.model).toBe("openai/gpt-4o-2024-11-20");
     });
 
     describe("when model has non-standard date suffixes (@regression)", () => {
       it("matches gpt-5.2-20260315 (YYYYMMDD) to openai/gpt-5.2", () => {
-        const result = matchModelCostWithFallbacks(
-          "gpt-5.2-20260315",
-          realCosts,
-        );
+        const result = matchModelCostWithFallbacks("gpt-5.2-20260315", realCosts);
         expect(result?.model).toBe("openai/gpt-5.2");
       });
 
@@ -686,10 +660,7 @@ describe("matchModelCostWithFallbacks", () => {
       });
 
       it("matches mistral-small-2603 (YYMM) to mistralai/mistral-small-2603", () => {
-        const result = matchModelCostWithFallbacks(
-          "mistral-small-2603",
-          realCosts,
-        );
+        const result = matchModelCostWithFallbacks("mistral-small-2603", realCosts);
         expect(result?.model).toBe("mistralai/mistral-small-2603");
       });
     });

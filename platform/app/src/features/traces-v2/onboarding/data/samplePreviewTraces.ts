@@ -691,8 +691,7 @@ export const SAMPLE_PREVIEW_TRACES: readonly TraceListItem[] = [
     outputTokens: 461,
     totalCost: 0.020548,
     spanCount: 2,
-    input:
-      "Add a debounced version of useSearchQuery that respects the cancel signal.",
+    input: "Add a debounced version of useSearchQuery that respects the cancel signal.",
     output:
       "Wrapped the existing hook in a 250ms debounce using a stable AbortController. New behaviour: keystrokes within the debounce window cancel the in-flight request before issuing the next one. Tests added in useSearchQuery.test.ts.",
     userId: "user-19",
@@ -1113,8 +1112,7 @@ const RICH_ARRIVAL_SPAN_DETAILS: SpanDetail[] = [
     status: "ok",
     model: null,
     vendor: null,
-    input:
-      '{"window":"prev_24h","services":["checkout","payments","email-jobs"]}',
+    input: '{"window":"prev_24h","services":["checkout","payments","email-jobs"]}',
     output:
       '{"events":[{"ts":"08:30Z","service":"email-jobs","action":"paused","reason":"db migration","author":"alex"},{"ts":"09:14Z","service":"checkout","action":"rollout_100","version":"v2.4.0","notes":"open issue #4421 — paypal redirect ios safari"},{"ts":"11:02Z","service":"payments","action":"config_change","field":"3ds_threshold","from":"50","to":"75"}]}',
     error: null,
@@ -1474,8 +1472,7 @@ function buildRichArrivalConversationContext(): RichArrivalConversationContext {
         name: "mastra.agent.run",
         rootSpanType: "agent",
         status: "ok",
-        input:
-          "Re-enable the email-jobs runner now and ping me when it's caught up.",
+        input: "Re-enable the email-jobs runner now and ping me when it's caught up.",
         output:
           "Done — email-jobs is unpaused as of 09:42 UTC. Backlog is ~4,800 abandonment emails; estimated catch-up in 12 minutes. I'll ping you the moment the queue drains.",
         totalTokens: 2_310,
@@ -1639,8 +1636,7 @@ function buildPreviewSpanDetail(trace: TraceListItem): SpanDetail {
     startTimeMs: trace.timestamp,
     endTimeMs: trace.timestamp + trace.durationMs,
     durationMs: trace.durationMs,
-    status:
-      trace.status === "warning" ? "ok" : (trace.status as "ok" | "error"),
+    status: trace.status === "warning" ? "ok" : (trace.status as "ok" | "error"),
     model: trace.models?.[0] ?? null,
     vendor: null,
     input: trace.input,
@@ -1666,8 +1662,7 @@ function buildPreviewSpanTreeNode(trace: TraceListItem): SpanTreeNode {
     startTimeMs: trace.timestamp,
     endTimeMs: trace.timestamp + trace.durationMs,
     durationMs: trace.durationMs,
-    status:
-      trace.status === "warning" ? "ok" : (trace.status as "ok" | "error"),
+    status: trace.status === "warning" ? "ok" : (trace.status as "ok" | "error"),
     model: trace.models?.[0] ?? null,
   };
 }
@@ -1739,9 +1734,7 @@ function buildPreviewConversation(
   };
 }
 
-export function buildPreviewTraceDetail(
-  trace: TraceListItem,
-): RichArrivalTraceDetail {
+export function buildPreviewTraceDetail(trace: TraceListItem): RichArrivalTraceDetail {
   const rootSpan = buildPreviewSpanDetail(trace);
   return {
     header: buildPreviewHeader(trace),

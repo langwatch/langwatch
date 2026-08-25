@@ -84,10 +84,7 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
       limit: 50,
     });
 
-    expect(rows.map((row) => row.eventId)).toEqual([
-      "pulled-event",
-      "pushed-trace",
-    ]);
+    expect(rows.map((row) => row.eventId)).toEqual(["pulled-event", "pushed-trace"]);
     expect(rows[0]).toEqual(
       expect.objectContaining({
         eventType: "anthropic_admin",

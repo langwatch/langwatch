@@ -4,9 +4,7 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { ComputeRunMetricsCommandData } from "../../simulation-processing/schemas/commands";
 import type { TraceProcessingEvent } from "../schemas/events";
 
-const logger = createLogger(
-  "langwatch:trace-processing:simulation-metrics-publisher",
-);
+const logger = createLogger("langwatch:trace-processing:simulation-metrics-publisher");
 
 export const SIMULATION_METRICS_SYNC_DELAY_MS = 60_000;
 export const SIMULATION_METRICS_SYNC_DEDUP_TTL_MS = 60_000;

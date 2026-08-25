@@ -13,9 +13,7 @@ describe("buildTriggerNoReplyAddress", () => {
         defaultFrom: "LangWatch <contact@langwatch.ai>",
         triggerId: "trigger_abc123",
       });
-      expect(addr).toMatch(
-        /^LangWatch Triggers <no-reply\+[a-f0-9]{12}@langwatch\.ai>$/,
-      );
+      expect(addr).toMatch(/^LangWatch Triggers <no-reply\+[a-f0-9]{12}@langwatch\.ai>$/);
     });
   });
 

@@ -46,11 +46,7 @@ export function CurrentPlanBlock({
   contactSalesUrl?: string;
 }) {
   return (
-    <Card.Root
-      data-testid="current-plan-block"
-      borderWidth={1}
-      borderColor="border"
-    >
+    <Card.Root data-testid="current-plan-block" borderWidth={1} borderColor="border">
       <Card.Body paddingY={5} paddingX={6}>
         <VStack align="stretch" gap={5}>
           <Flex justifyContent="space-between" alignItems="flex-start">
@@ -102,11 +98,7 @@ export function CurrentPlanBlock({
                   _hover={{ color: "blue.fg", cursor: "pointer" }}
                   color="fg"
                 >
-                  <Text
-                    fontWeight="semibold"
-                    fontSize="lg"
-                    data-testid="user-count-link"
-                  >
+                  <Text fontWeight="semibold" fontSize="lg" data-testid="user-count-link">
                     {maxSeats != null ? `${userCount}/${maxSeats}` : userCount}
                   </Text>
                 </Box>

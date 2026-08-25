@@ -134,13 +134,7 @@ const SELECT_STYLE = {
 } as const;
 
 /** A refusal about named parameters, said where those parameters are edited. */
-function ParameterAlert({
-  title,
-  names,
-}: {
-  title: string;
-  names: readonly string[];
-}) {
+function ParameterAlert({ title, names }: { title: string; names: readonly string[] }) {
   if (names.length === 0) return null;
 
   return (
@@ -223,9 +217,7 @@ function ParameterRowFields({
           aria-label="Parameter type"
           value={row.kind}
           {...SELECT_STYLE}
-          onChange={(event) =>
-            onPatch({ kind: event.target.value as ParameterKind })
-          }
+          onChange={(event) => onPatch({ kind: event.target.value as ParameterKind })}
         >
           {KIND_LABELS.map((kind) => (
             <option key={kind.value} value={kind.value}>
@@ -319,9 +311,7 @@ export function LangWatchQLParametersEditor({
       setRows(next);
       onChange({
         parameters: recordOf(next),
-        sendable: next.every(
-          (row) => rowProblem({ row, rows: next }) === undefined,
-        ),
+        sendable: next.every((row) => rowProblem({ row, rows: next }) === undefined),
       });
     },
     [onChange],
@@ -359,10 +349,7 @@ export function LangWatchQLParametersEditor({
         )}
       </HStack>
 
-      <ParameterAlert
-        title="Give these parameters a value"
-        names={missingParameters}
-      />
+      <ParameterAlert title="Give these parameters a value" names={missingParameters} />
       <ParameterAlert
         title="Remove these — the time window above sets them"
         names={reservedParameters}
@@ -376,9 +363,7 @@ export function LangWatchQLParametersEditor({
               row={row}
               rows={rows}
               onPatch={(changes) => patch(row.id, changes)}
-              onRemove={() =>
-                update(rows.filter((other) => other.id !== row.id))
-              }
+              onRemove={() => update(rows.filter((other) => other.id !== row.id))}
             />
           ))}
 

@@ -64,10 +64,9 @@ function DepartmentsPage() {
           </Text>
           <Heading size="md">Departments</Heading>
           <Text color="fg.muted" fontSize="sm" maxW="2xl">
-            A department is an accounting label for spend. Assign people, teams,
-            and projects to one, and spend rolls up by department across the
-            org, including personal AI use. Departments never grant or restrict
-            access.
+            A department is an accounting label for spend. Assign people, teams, and
+            projects to one, and spend rolls up by department across the org, including
+            personal AI use. Departments never grant or restrict access.
           </Text>
         </VStack>
 
@@ -124,12 +123,7 @@ function CreateDepartmentBox({
   };
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
       <Text fontWeight="semibold" fontSize="sm" marginBottom={2}>
         Create a department
       </Text>
@@ -185,8 +179,8 @@ function AssignmentGuide() {
           Assigning departments
         </Text>
         <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-          Assign people and teams to a department where you already manage them.
-          Spend rolls up by department, including personal AI use.
+          Assign people and teams to a department where you already manage them. Spend
+          rolls up by department, including personal AI use.
         </Text>
       </Box>
       <AssignmentLink

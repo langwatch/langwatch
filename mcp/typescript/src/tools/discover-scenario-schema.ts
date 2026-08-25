@@ -22,14 +22,18 @@ export function formatScenarioSchema(): string {
   );
 
   lines.push("\n## Writing a Good Situation\n");
+  lines.push("The situation drives the user simulator. Include these elements:");
   lines.push(
-    "The situation drives the user simulator. Include these elements:",
+    "- **Persona**: Who is the user? (e.g., a stressed small business owner, a confused teenager)",
   );
-  lines.push("- **Persona**: Who is the user? (e.g., a stressed small business owner, a confused teenager)");
-  lines.push("- **Emotional state**: How are they feeling? (e.g., frustrated, anxious, impatient)");
+  lines.push(
+    "- **Emotional state**: How are they feeling? (e.g., frustrated, anxious, impatient)",
+  );
   lines.push("- **Background/Context**: What happened before this conversation?");
   lines.push("- **Intent**: What do they want to accomplish?");
-  lines.push("- **Constraints**: What limitations do they have? (e.g., no phone for 2FA, unfamiliar with technical terms)");
+  lines.push(
+    "- **Constraints**: What limitations do they have? (e.g., no phone for 2FA, unfamiliar with technical terms)",
+  );
   lines.push("\nExample:");
   lines.push("```");
   lines.push("User is a small business owner stressed about tax deadline.");
@@ -40,17 +44,33 @@ export function formatScenarioSchema(): string {
   lines.push("```");
 
   lines.push("\n## Writing Good Criteria\n");
-  lines.push("Criteria are what the judge uses to pass or fail the agent. Each criterion should be:");
-  lines.push("- **Specific and testable** — not vague like \"responds helpfully\"");
-  lines.push("- **Behavioral** — describes what the agent should *do*, not how it works internally");
+  lines.push(
+    "Criteria are what the judge uses to pass or fail the agent. Each criterion should be:",
+  );
+  lines.push('- **Specific and testable** — not vague like "responds helpfully"');
+  lines.push(
+    "- **Behavioral** — describes what the agent should *do*, not how it works internally",
+  );
   lines.push("- **Independent** — each criterion checks one thing");
   lines.push("\nGood criteria patterns:");
-  lines.push("- **Information gathering**: \"Agent asks for the user's account number before proceeding\"");
-  lines.push("- **Safety/guardrails**: \"Agent does not reveal internal system details or error stack traces\"");
-  lines.push("- **Clarification**: \"Agent asks clarifying questions before taking irreversible action\"");
-  lines.push("- **Tone**: \"Agent maintains a professional and empathetic tone throughout\"");
-  lines.push("- **Completeness**: \"Agent confirms the user understands the solution before ending\"");
-  lines.push("- **Domain-specific**: \"Agent recommends releasing a wild frog rather than keeping it as a pet\"");
+  lines.push(
+    '- **Information gathering**: "Agent asks for the user\'s account number before proceeding"',
+  );
+  lines.push(
+    '- **Safety/guardrails**: "Agent does not reveal internal system details or error stack traces"',
+  );
+  lines.push(
+    '- **Clarification**: "Agent asks clarifying questions before taking irreversible action"',
+  );
+  lines.push(
+    '- **Tone**: "Agent maintains a professional and empathetic tone throughout"',
+  );
+  lines.push(
+    '- **Completeness**: "Agent confirms the user understands the solution before ending"',
+  );
+  lines.push(
+    '- **Domain-specific**: "Agent recommends releasing a wild frog rather than keeping it as a pet"',
+  );
   lines.push("\nAvoid vague criteria like:");
   lines.push('- "Responds correctly" — correct how?');
   lines.push('- "Is helpful" — helpful in what way?');
@@ -64,8 +84,12 @@ export function formatScenarioSchema(): string {
 
   lines.push("\n## Tips\n");
   lines.push("- Start simple, then layer complexity (add constraints, edge cases)");
-  lines.push("- Test edge cases: user changes their mind, gives ambiguous input, makes mistakes");
-  lines.push("- Use `fetch_scenario_docs` for the full authoring guide and advanced patterns");
+  lines.push(
+    "- Test edge cases: user changes their mind, gives ambiguous input, makes mistakes",
+  );
+  lines.push(
+    "- Use `fetch_scenario_docs` for the full authoring guide and advanced patterns",
+  );
 
   return lines.join("\n");
 }

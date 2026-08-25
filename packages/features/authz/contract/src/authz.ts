@@ -1,17 +1,9 @@
 import { z } from "zod";
 import { authzPermissionSchema, shareableResourceKindSchema } from "./registry";
-import {
-  bindingScopeTierSchema,
-  storedBindingScopeTierSchema,
-} from "./vocabulary";
+import { bindingScopeTierSchema, storedBindingScopeTierSchema } from "./vocabulary";
 
 /** Portable AuthZ vocabulary. Persisted and transport values validate here. */
-export const teamUserRoleSchema = z.enum([
-  "ADMIN",
-  "MEMBER",
-  "VIEWER",
-  "CUSTOM",
-]);
+export const teamUserRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type TeamUserRole = z.infer<typeof teamUserRoleSchema>;
 
 export const organizationRoleSchema = z.enum(["ADMIN", "MEMBER", "EXTERNAL"]);
@@ -46,9 +38,7 @@ export const grantableAuthzScopeRefSchema = z.discriminatedUnion("type", [
   teamScopeRefSchema,
   organizationScopeRefSchema,
 ]);
-export type GrantableAuthzScopeRef = z.infer<
-  typeof grantableAuthzScopeRefSchema
->;
+export type GrantableAuthzScopeRef = z.infer<typeof grantableAuthzScopeRefSchema>;
 
 const resourceParentSchema = z
   .object({ kind: shareableResourceKindSchema, id: z.string() })
@@ -135,9 +125,7 @@ export type LegacyTeamMembership = z.infer<typeof legacyTeamMembershipSchema>;
 
 const customRolePermissionsSchema = z
   .map(z.string(), z.array(z.string()).readonly())
-  .transform(
-    (permissions): ReadonlyMap<string, readonly string[]> => permissions,
-  );
+  .transform((permissions): ReadonlyMap<string, readonly string[]> => permissions);
 
 export const collectedGrantsSchema = z
   .object({

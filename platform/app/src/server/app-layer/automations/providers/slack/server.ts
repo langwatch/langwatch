@@ -68,9 +68,7 @@ export function persistSlackActionParams({
 
 /** Replace the stored ciphertext with a boolean flag before the row is sent to
  *  the browser — the token (encrypted or not) must never reach the client. */
-export function redactSlackActionParams(
-  params: SlackActionParams,
-): SlackActionParams {
+export function redactSlackActionParams(params: SlackActionParams): SlackActionParams {
   if (!params.slackBotToken) return params;
   const { slackBotToken: _drop, ...rest } = params;
   return { ...rest, slackBotTokenSet: true };
@@ -86,10 +84,7 @@ export function decryptSlackBotToken(
 
 const def: ServerDef = {
   action: TriggerAction.SEND_SLACK_MESSAGE,
-  persistActionParams: async ({
-    incoming,
-    loadExisting,
-  }: PersistActionParamsArgs) => {
+  persistActionParams: async ({ incoming, loadExisting }: PersistActionParamsArgs) => {
     const params = incoming as SlackActionParams;
     const existing =
       slackDeliveryMethodOf(params) === "bot"

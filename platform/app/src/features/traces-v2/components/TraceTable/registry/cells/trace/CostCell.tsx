@@ -67,12 +67,7 @@ export const CostCell = {
   renderComfortable: ({ row }) =>
     isBundled(row) ? (
       <BundledCostTooltip row={row}>
-        <Text
-          textStyle="sm"
-          color="purple.fg"
-          fontWeight="medium"
-          textAlign="right"
-        >
+        <Text textStyle="sm" color="purple.fg" fontWeight="medium" textAlign="right">
           Bundled
         </Text>
       </BundledCostTooltip>

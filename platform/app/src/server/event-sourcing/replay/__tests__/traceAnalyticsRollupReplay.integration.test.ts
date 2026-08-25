@@ -349,9 +349,7 @@ describe("given span events in event_log for a tenant whose rollup is empty", ()
       // Parity with the projection's direct output: replay must feed the map
       // handler the same events live dispatch would, so summing the rows the
       // projection emits for the same fixture reproduces the table exactly.
-      const direct = buildEvents().map((event) =>
-        projection.mapTraceSpanReceived(event),
-      );
+      const direct = buildEvents().map((event) => projection.mapTraceSpanReceived(event));
       expect(additiveTotals(rows)).toEqual(additiveTotals(direct));
     });
   });

@@ -78,8 +78,7 @@ export class CopilotExtractor implements CanonicalAttributesExtractor {
     // instrumentation scope or a github.copilot.* attribute.
     const scopeName = ctx.span.instrumentationScope?.name ?? "";
     const hasCopilotProvenance =
-      COPILOT_SCOPES.includes(scopeName) ||
-      attrs.hasByPrefix(COPILOT_ATTR_PREFIX);
+      COPILOT_SCOPES.includes(scopeName) || attrs.hasByPrefix(COPILOT_ATTR_PREFIX);
     if (!hasCopilotProvenance) return;
 
     if (typeof operation === "string" && OPERATION_TO_SPAN_TYPE[operation]) {
@@ -128,9 +127,7 @@ export class CopilotExtractor implements CanonicalAttributesExtractor {
       ctx.recordRule(`${this.id}:user.pseudo_id`);
     }
 
-    const premiumRequests = attrs.take(
-      `${COPILOT_ATTR_PREFIX}total_premium_requests`,
-    );
+    const premiumRequests = attrs.take(`${COPILOT_ATTR_PREFIX}total_premium_requests`);
     if (premiumRequests !== undefined && premiumRequests !== null) {
       ctx.setAttr("metadata.copilot_premium_requests", String(premiumRequests));
       ctx.recordRule(`${this.id}:premium_requests`);

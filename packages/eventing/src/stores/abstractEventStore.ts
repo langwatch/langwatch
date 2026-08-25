@@ -14,10 +14,7 @@ import {
   validateEventTenant,
 } from "./eventStoreUtils";
 import { rehydrationLowerBoundMs } from "./rehydrationWindow";
-import type {
-  EventRecord,
-  EventRepository,
-} from "./repositories/eventRepository.types";
+import type { EventRecord, EventRepository } from "./repositories/eventRepository.types";
 
 /**
  * Abstract base class for EventStore implementations using the Template Method pattern.
@@ -32,9 +29,9 @@ import type {
  * - `logError`: structured error logging
  * - `onStoreSuccess`: log or notify after successful writes
  */
-export abstract class AbstractEventStore<EventType extends Event = Event>
-  implements BaseEventStore<EventType>
-{
+export abstract class AbstractEventStore<
+  EventType extends Event = Event,
+> implements BaseEventStore<EventType> {
   constructor(protected readonly repository: EventRepository) {}
 
   // ---------------------------------------------------------------------------
@@ -156,10 +153,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
       aggregateId,
       context,
       aggregateType,
-      occurredAtFromMs: rehydrationLowerBoundMs(
-        aggregateType,
-        anchorOccurredAtMs,
-      ),
+      occurredAtFromMs: rehydrationLowerBoundMs(aggregateType, anchorOccurredAtMs),
     });
   }
 
@@ -261,10 +255,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
     aggregateType: AggregateType,
     upToEvent: EventType,
   ): Promise<readonly EventType[]> {
-    EventUtils.validateTenantId(
-      context,
-      `${this.constructor.name}.getEventsUpTo`,
-    );
+    EventUtils.validateTenantId(context, `${this.constructor.name}.getEventsUpTo`);
 
     if (this.hasMissingAggregateId(aggregateId)) {
       this.logWarning(
@@ -337,10 +328,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
     limit: number;
   }): Promise<readonly EventType[]> {
     const { aggregateId, context, aggregateType } = request;
-    EventUtils.validateTenantId(
-      context,
-      `${this.constructor.name}.getEventsUpToPaged`,
-    );
+    EventUtils.validateTenantId(context, `${this.constructor.name}.getEventsUpToPaged`);
 
     if (this.hasMissingAggregateId(aggregateId)) {
       this.logWarning(
@@ -377,8 +365,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
       limit: number;
     },
   ): Promise<readonly EventType[]> {
-    const { aggregateId, context, aggregateType, upToEvent, after, limit } =
-      request;
+    const { aggregateId, context, aggregateType, upToEvent, after, limit } = request;
     return await this.instrument(
       `${this.constructor.name}.getEventsUpToPaged`,
       {
@@ -445,10 +432,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
     beforeTimestamp: number,
     beforeEventId: string,
   ): Promise<number> {
-    EventUtils.validateTenantId(
-      context,
-      `${this.constructor.name}.countEventsBefore`,
-    );
+    EventUtils.validateTenantId(context, `${this.constructor.name}.countEventsBefore`);
 
     if (this.hasMissingAggregateId(aggregateId)) {
       this.logWarning(
@@ -509,10 +493,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
       },
       async () => {
         try {
-          EventUtils.validateTenantId(
-            context,
-            `${this.constructor.name}.storeEvents`,
-          );
+          EventUtils.validateTenantId(context, `${this.constructor.name}.storeEvents`);
 
           if (events.length === 0) {
             return;
@@ -544,10 +525,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
           // Transform events to records, then apply optional per-batch
           // enrichment (e.g. retention stamping) before handing to the repo.
           const baseRecords = events.map((event) => eventToRecord(event));
-          const records = await this.enrichRecordsForStorage(
-            baseRecords,
-            context,
-          );
+          const records = await this.enrichRecordsForStorage(baseRecords, context);
 
           // Delegate to repository
           await this.repository.insertEventRecords(records);
@@ -559,9 +537,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
             {
               tenantId: context.tenantId,
               eventCount: events.length,
-              aggregateIds: [
-                ...new Set(events.map((e) => String(e.aggregateId))),
-              ],
+              aggregateIds: [...new Set(events.map((e) => String(e.aggregateId)))],
             },
             error,
           );

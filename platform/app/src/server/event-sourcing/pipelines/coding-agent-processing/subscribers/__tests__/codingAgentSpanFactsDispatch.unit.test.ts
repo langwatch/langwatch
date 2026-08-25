@@ -157,14 +157,10 @@ function storeReadBackFrom(event: SpanReceivedEvent): NormalizedSpan {
     NonBilledCost: span.nonBilledCost ?? null,
     Events_Timestamp: span.events.map((event) => event.timeUnixMs),
     Events_Name: span.events.map((event) => event.name),
-    Events_Attributes: span.events.map((event) =>
-      serializeAttributes(event.attributes),
-    ),
+    Events_Attributes: span.events.map((event) => serializeAttributes(event.attributes)),
     Links_TraceId: span.links.map((link) => link.traceId),
     Links_SpanId: span.links.map((link) => link.spanId),
-    Links_Attributes: span.links.map((link) =>
-      serializeAttributes(link.attributes),
-    ),
+    Links_Attributes: span.links.map((link) => serializeAttributes(link.attributes)),
   }) as NormalizedSpan;
 }
 
@@ -550,9 +546,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         const payload = subscriber.options?.enqueue?.stage?.(event);
 
         expect(parseSpanFactsLiftedPayload(payload)).toBeNull();
-        expect((payload as { type?: string }).type).toBe(
-          SPAN_RECEIVED_EVENT_TYPE,
-        );
+        expect((payload as { type?: string }).type).toBe(SPAN_RECEIVED_EVENT_TYPE);
       });
 
       // The staged fallback is only safe if the handler can actually finish it.
@@ -565,9 +559,7 @@ describe("codingAgentSpanFactsDispatch", () => {
       /** @scenario an event the subscriber declines is still completed quietly */
       it("completes the staged fallback instead of retrying it into a blocked group", async () => {
         const { subscriber, dispatched, reads } = makeSubscriber();
-        const payload = subscriber.options?.enqueue?.stage?.(
-          unliftableSpanEvent(),
-        );
+        const payload = subscriber.options?.enqueue?.stage?.(unliftableSpanEvent());
 
         await expect(
           subscriber.handle(staged(payload), context),
@@ -610,9 +602,7 @@ describe("codingAgentSpanFactsDispatch", () => {
           attributes: { tool_name: "Bash" },
           traceId: `${TRACE_ID}-other`,
         });
-        expect(dedup.makeId(sameSpanIdOtherTrace)).not.toBe(
-          dedup.makeId(event),
-        );
+        expect(dedup.makeId(sameSpanIdOtherTrace)).not.toBe(dedup.makeId(event));
       });
     });
 
@@ -632,9 +622,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         }
 
         expect(
-          dedup.makeId(
-            makeSpanReferencedPayload(event) as TraceProcessingEvent,
-          ),
+          dedup.makeId(makeSpanReferencedPayload(event) as TraceProcessingEvent),
         ).toBe(dedup.makeId(event));
       });
     });
@@ -673,9 +661,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         // shape the seam happened to stage.
         expect(
           dedup.makeId(
-            makeSpanReferencedPayload(
-              first as SpanReceivedEvent,
-            ) as TraceProcessingEvent,
+            makeSpanReferencedPayload(first as SpanReceivedEvent) as TraceProcessingEvent,
           ),
         ).toBe(dedup.makeId(first));
       });
@@ -734,9 +720,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         }) as SpanReceivedEvent;
         const event = { ...base, tenantId: createTenantId("tenant-other") };
 
-        const { subscriber, reads } = makeSubscriber(async () =>
-          normalizedFrom(event),
-        );
+        const { subscriber, reads } = makeSubscriber(async () => normalizedFrom(event));
         await subscriber.handle(
           makeSpanReferencedPayload(event) as TraceProcessingEvent,
           context,
@@ -798,9 +782,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         // which is outside a fixed window centered on ingest time.
         const event = { ...base, occurredAt: startMs + threeDays };
 
-        const { subscriber, reads } = makeSubscriber(async () =>
-          normalizedFrom(event),
-        );
+        const { subscriber, reads } = makeSubscriber(async () => normalizedFrom(event));
         await subscriber.handle(
           makeSpanReferencedPayload(event) as TraceProcessingEvent,
           context,
@@ -837,9 +819,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         };
         const event = { ...base, occurredAt: startMs + threeDays };
 
-        const { subscriber, reads } = makeSubscriber(async () =>
-          normalizedFrom(event),
-        );
+        const { subscriber, reads } = makeSubscriber(async () => normalizedFrom(event));
         await subscriber.handle(
           makeSpanReferencedPayload(event) as TraceProcessingEvent,
           context,
@@ -863,9 +843,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         span.startTimeUnixNano = "0";
         const event = { ...base, occurredAt: 5_000 };
 
-        const { subscriber, dispatched, reads } = makeSubscriber(
-          async () => null,
-        );
+        const { subscriber, dispatched, reads } = makeSubscriber(async () => null);
         await subscriber.handle(
           makeSpanReferencedPayload(event) as TraceProcessingEvent,
           context,
@@ -913,10 +891,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         const { subscriber } = makeSubscriber(async () => null);
 
         const failure: unknown = await subscriber
-          .handle(
-            makeSpanReferencedPayload(event) as TraceProcessingEvent,
-            context,
-          )
+          .handle(makeSpanReferencedPayload(event) as TraceProcessingEvent, context)
           .then(
             () => null,
             (error: unknown) => error,
@@ -948,12 +923,10 @@ describe("codingAgentSpanFactsDispatch", () => {
         // A bare `toThrow()` would green on a fixture typo or a stub fault as
         // readily as on the version gate. Pin the failure to the gate itself:
         // a schema rejection whose issue is the `version` field.
-        const failure: unknown = await subscriber
-          .handle(staged(future), context)
-          .then(
-            () => null,
-            (error: unknown) => error,
-          );
+        const failure: unknown = await subscriber.handle(staged(future), context).then(
+          () => null,
+          (error: unknown) => error,
+        );
         expect(failure).toBeInstanceOf(ZodError);
         expect(
           (failure as ZodError).issues.map((issue) => issue.path.join(".")),
@@ -1054,9 +1027,7 @@ describe("codingAgentSpanFactsDispatch", () => {
       });
 
       it("round-trips the pinned fixture through the parse unchanged", () => {
-        expect(parseSpanFactsLiftedPayload(pinnedWireJob())).toEqual(
-          pinnedWireJob(),
-        );
+        expect(parseSpanFactsLiftedPayload(pinnedWireJob())).toEqual(pinnedWireJob());
       });
 
       /** @scenario work carrying its finished result completes without reading anything back */
@@ -1103,12 +1074,10 @@ describe("codingAgentSpanFactsDispatch", () => {
           version: "2199-01-01",
         };
 
-        const failure: unknown = await subscriber
-          .handle(staged(future), context)
-          .then(
-            () => null,
-            (error: unknown) => error,
-          );
+        const failure: unknown = await subscriber.handle(staged(future), context).then(
+          () => null,
+          (error: unknown) => error,
+        );
 
         expect(failure).toBeInstanceOf(ZodError);
         expect(
@@ -1139,9 +1108,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         const fromReference = makeId.makeId(
           makeSpanReferencedPayload(event) as TraceProcessingEvent,
         );
-        const fromLifted = makeId.makeId(
-          staged(liftedPayload({ spanId: "tool-key" })),
-        );
+        const fromLifted = makeId.makeId(staged(liftedPayload({ spanId: "tool-key" })));
 
         expect(fromReference).toBe(fromFull);
         expect(fromLifted).toBe(fromFull);

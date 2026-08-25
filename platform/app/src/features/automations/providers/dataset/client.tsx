@@ -6,10 +6,7 @@ import { useEffect } from "react";
 import { DatasetSelector } from "~/components/datasets/DatasetSelector";
 import type { Dataset } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
-import {
-  type DatasetColumns,
-  datasetColumnsSchema,
-} from "@langwatch/dataset-contract";
+import { type DatasetColumns, datasetColumnsSchema } from "@langwatch/dataset-contract";
 import { api } from "~/utils/api";
 import { keepDraftOnSubFlowReturn } from "../../state/subFlow";
 import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../types";
@@ -73,9 +70,7 @@ function entryForColumn(name: string): TraceMappingEntry {
 /** Build a complete `{ source, key, subkey }` mapping from a dataset's
  *  columns. Guarantees a non-empty mapping whenever the dataset has columns,
  *  so records persisted by an authored trigger carry those columns. */
-export function deriveMappingFromColumns(
-  columns: DatasetColumns,
-): DatasetMapping {
+export function deriveMappingFromColumns(columns: DatasetColumns): DatasetMapping {
   return {
     mapping: Object.fromEntries(
       columns.map((column) => [column.name, entryForColumn(column.name)]),
@@ -131,11 +126,7 @@ function toActionParams(slice: DatasetSlice): DatasetActionParams {
   };
 }
 
-function DatasetConfigForm({
-  slice,
-  onChange,
-  ctx,
-}: ConfigFormProps<DatasetSlice>) {
+function DatasetConfigForm({ slice, onChange, ctx }: ConfigFormProps<DatasetSlice>) {
   const datasets = api.dataset.getAll.useQuery(
     { projectId: ctx.projectId },
     { enabled: !!ctx.projectId, refetchOnWindowFocus: false },
@@ -182,8 +173,8 @@ function DatasetConfigForm({
         onCreateNew={openDatasetCreation}
       />
       <Text color="fg.muted" textStyle="xs">
-        Columns map to the matching trace fields automatically; refine the
-        mapping from the dataset view after creating.
+        Columns map to the matching trace fields automatically; refine the mapping from
+        the dataset view after creating.
       </Text>
     </VStack>
   );

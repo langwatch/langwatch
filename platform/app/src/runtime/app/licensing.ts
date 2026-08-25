@@ -63,10 +63,7 @@ class PrismaLicenseRepository extends LicenseRepository {
     );
   }
 
-  async storeLicense(
-    organizationId: string,
-    license: StoredLicense,
-  ): Promise<void> {
+  async storeLicense(organizationId: string, license: StoredLicense): Promise<void> {
     await this.prismaClient.organization.update({
       where: { id: organizationId },
       data: {

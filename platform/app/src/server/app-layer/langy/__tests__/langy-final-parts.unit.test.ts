@@ -16,9 +16,7 @@ describe("buildFinalAssistantParts", () => {
   describe("given text and no tool calls", () => {
     it("returns a single assistant text part", () => {
       const parts = buildFinalAssistantParts({ text: "hello world" });
-      expect(parts).toEqual([
-        { type: "text", text: "hello world", role: "assistant" },
-      ]);
+      expect(parts).toEqual([{ type: "text", text: "hello world", role: "assistant" }]);
     });
   });
 
@@ -26,9 +24,7 @@ describe("buildFinalAssistantParts", () => {
     it("places the tool parts BEFORE the text so a reload replays cards then prose", () => {
       const parts = buildFinalAssistantParts({
         text: "done",
-        toolCalls: [
-          { id: "t1", name: "search", input: { q: "x" }, output: "found" },
-        ],
+        toolCalls: [{ id: "t1", name: "search", input: { q: "x" }, output: "found" }],
       });
       expect(parts).toEqual([
         {
@@ -192,13 +188,9 @@ describe("buildFinalAssistantParts", () => {
 
   describe("given a block that validates nowhere", () => {
     it("records a langy-card-failed part carrying the raw text — never silent", () => {
-      const bad = [
-        "before",
-        "```langy-card",
-        "this is not json",
-        "```",
-        "after",
-      ].join("\n");
+      const bad = ["before", "```langy-card", "this is not json", "```", "after"].join(
+        "\n",
+      );
       const parts = buildFinalAssistantParts({ text: bad });
       expect(parts).toEqual([
         { type: "text", text: "before", role: "assistant" },
@@ -237,10 +229,7 @@ describe("buildFinalAssistantParts", () => {
       const first = buildFinalAssistantParts({ text: twoBad });
       const second = buildFinalAssistantParts({ text: twoBad });
       expect(first).toEqual(second);
-      expect(first.map((p) => p.blockId)).toEqual([
-        "failed-block-1",
-        "failed-block-2",
-      ]);
+      expect(first.map((p) => p.blockId)).toEqual(["failed-block-1", "failed-block-2"]);
     });
   });
 
@@ -248,9 +237,7 @@ describe("buildFinalAssistantParts", () => {
     it("keeps it as raw text in the tool part — tool results are never scanned", () => {
       const parts = buildFinalAssistantParts({
         text: "summary",
-        toolCalls: [
-          { id: "t1", name: "bash", output: `tenant data:\n${statsFence}` },
-        ],
+        toolCalls: [{ id: "t1", name: "bash", output: `tenant data:\n${statsFence}` }],
       });
       expect(parts).toEqual([
         {
@@ -270,9 +257,7 @@ describe("buildFinalAssistantParts", () => {
       expect(buildFinalAssistantParts({ text: "" })).toEqual([
         { type: "text", text: "", role: "assistant" },
       ]);
-      expect(
-        buildFinalAssistantParts({ text: "plain prose\nwith lines" }),
-      ).toEqual([
+      expect(buildFinalAssistantParts({ text: "plain prose\nwith lines" })).toEqual([
         { type: "text", text: "plain prose\nwith lines", role: "assistant" },
       ]);
     });

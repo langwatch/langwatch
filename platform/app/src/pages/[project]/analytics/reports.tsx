@@ -1,12 +1,4 @@
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
@@ -48,9 +40,7 @@ function ReportsContent() {
     { enabled: !!projectId },
   );
 
-  const currentDashboard = dashboardsQuery.data?.find(
-    (d) => d.id === activeDashboardId,
-  );
+  const currentDashboard = dashboardsQuery.data?.find((d) => d.id === activeDashboardId);
   const dashboardTitle = currentDashboard?.name ?? "Reports";
 
   // Graphs for the active dashboard
@@ -211,8 +201,8 @@ function ReportsContent() {
             <Alert.Title>Add your custom graphs here</Alert.Title>
             <Alert.Description>
               <Text as="span">
-                You haven{"'"}t set up any custom graphs yet. Click + Add chart
-                to get started.
+                You haven{"'"}t set up any custom graphs yet. Click + Add chart to get
+                started.
               </Text>
             </Alert.Description>
           </VStack>
@@ -233,9 +223,7 @@ function ReportsContent() {
               onGraphSizeChange={handleGraphSizeChange}
               onGraphsReorder={handleGraphsReorder}
               deletingGraphId={
-                deleteGraph.isPending
-                  ? (deleteGraph.variables?.id ?? null)
-                  : null
+                deleteGraph.isPending ? (deleteGraph.variables?.id ?? null) : null
               }
             />
           )}

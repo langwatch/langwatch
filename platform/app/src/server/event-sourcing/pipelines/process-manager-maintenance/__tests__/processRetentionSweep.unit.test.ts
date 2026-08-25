@@ -88,9 +88,7 @@ describe("processRetentionSweep", () => {
         expect(retentionSweepBatchBudget(2)).toBe(
           RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE * 4,
         );
-        expect(retentionSweepBatchBudget(50)).toBe(
-          RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
-        );
+        expect(retentionSweepBatchBudget(50)).toBe(RETENTION_SWEEP_MAX_BATCHES_PER_WAKE);
       });
 
       it("counts the wakes it has scheduled so the ramp survives a restart", () => {
@@ -140,17 +138,14 @@ describe("processRetentionSweep", () => {
 
       /** @scenario "A wake stops at its batch budget" */
       it("deletes at most the per-wake budget and leaves the rest", async () => {
-        const budget =
-          RETENTION_SWEEP_BATCH_SIZE * RETENTION_SWEEP_MAX_BATCHES_PER_WAKE;
+        const budget = RETENTION_SWEEP_BATCH_SIZE * RETENTION_SWEEP_MAX_BATCHES_PER_WAKE;
         const dispatched = backlog(budget + RETENTION_SWEEP_BATCH_SIZE);
 
-        await runProcessRetentionSweep(
-          deps({ deleteDispatchedOutboxBatch: dispatched }),
-        )(payload());
-
-        expect(dispatched).toHaveBeenCalledTimes(
-          RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
+        await runProcessRetentionSweep(deps({ deleteDispatchedOutboxBatch: dispatched }))(
+          payload(),
         );
+
+        expect(dispatched).toHaveBeenCalledTimes(RETENTION_SWEEP_MAX_BATCHES_PER_WAKE);
         const deleted = (
           await Promise.all(dispatched.mock.results.map((r) => r.value))
         ).reduce((sum: number, count: number) => sum + count, 0);
@@ -161,9 +156,9 @@ describe("processRetentionSweep", () => {
       it("stops asking for batches once one comes back short", async () => {
         const dispatched = backlog(RETENTION_SWEEP_BATCH_SIZE - 1);
 
-        await runProcessRetentionSweep(
-          deps({ deleteDispatchedOutboxBatch: dispatched }),
-        )(payload());
+        await runProcessRetentionSweep(deps({ deleteDispatchedOutboxBatch: dispatched }))(
+          payload(),
+        );
 
         expect(dispatched).toHaveBeenCalledTimes(1);
       });
@@ -176,13 +171,11 @@ describe("processRetentionSweep", () => {
         // it and nobody watching.
         const inbox = backlog(Number.MAX_SAFE_INTEGER);
 
-        await runProcessRetentionSweep(
-          deps({ deleteConsumedInboxBatch: inbox }),
-        )(payload(retentionSweepBatchBudget(0)));
-
-        expect(inbox).toHaveBeenCalledTimes(
-          RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE,
+        await runProcessRetentionSweep(deps({ deleteConsumedInboxBatch: inbox }))(
+          payload(retentionSweepBatchBudget(0)),
         );
+
+        expect(inbox).toHaveBeenCalledTimes(RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE);
       });
 
       /** @scenario "The sweep pauses between delete statements" */
@@ -210,21 +203,19 @@ describe("processRetentionSweep", () => {
       it("holds a payload asking for more than the ceiling down to it", async () => {
         const inbox = backlog(Number.MAX_SAFE_INTEGER);
 
-        await runProcessRetentionSweep(
-          deps({ deleteConsumedInboxBatch: inbox }),
-        )(payload(RETENTION_SWEEP_MAX_BATCHES_PER_WAKE * 10));
-
-        expect(inbox).toHaveBeenCalledTimes(
-          RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
+        await runProcessRetentionSweep(deps({ deleteConsumedInboxBatch: inbox }))(
+          payload(RETENTION_SWEEP_MAX_BATCHES_PER_WAKE * 10),
         );
+
+        expect(inbox).toHaveBeenCalledTimes(RETENTION_SWEEP_MAX_BATCHES_PER_WAKE);
       });
 
       it("issues no second statement for a family that was already empty", async () => {
         const inbox = backlog(0);
 
-        await runProcessRetentionSweep(
-          deps({ deleteConsumedInboxBatch: inbox }),
-        )(payload());
+        await runProcessRetentionSweep(deps({ deleteConsumedInboxBatch: inbox }))(
+          payload(),
+        );
 
         expect(inbox).toHaveBeenCalledTimes(1);
       });
@@ -357,9 +348,7 @@ describe("processRetentionSweep", () => {
         )(payload());
 
         const after = await familyCounts(counter);
-        expect(
-          (after.dispatched_outbox ?? 0) - (before.dispatched_outbox ?? 0),
-        ).toBe(3);
+        expect((after.dispatched_outbox ?? 0) - (before.dispatched_outbox ?? 0)).toBe(3);
         expect((after.inbox ?? 0) - (before.inbox ?? 0)).toBe(7);
       });
     });

@@ -1,7 +1,4 @@
-import type {
-  Prisma,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   anomalyRuleSchema,
   type AnomalyRule,
@@ -46,10 +43,7 @@ export class PrismaAnomalyRuleRepository extends AnomalyRuleRepository {
     );
   }
 
-  async update(
-    id: string,
-    changes: AnomalyRuleChanges,
-  ): Promise<AnomalyRule> {
+  async update(id: string, changes: AnomalyRuleChanges): Promise<AnomalyRule> {
     const data: Prisma.AnomalyRuleUpdateInput = {};
     if (changes.name !== undefined) data.name = changes.name;
     if (changes.description !== undefined) {
@@ -67,12 +61,9 @@ export class PrismaAnomalyRuleRepository extends AnomalyRuleRepository {
       data.thresholdConfig = changes.thresholdConfig as Prisma.InputJsonValue;
     }
     if (changes.destinationConfig !== undefined) {
-      data.destinationConfig =
-        changes.destinationConfig as Prisma.InputJsonValue;
+      data.destinationConfig = changes.destinationConfig as Prisma.InputJsonValue;
     }
-    return toAnomalyRule(
-      await this.prisma.anomalyRule.update({ where: { id }, data }),
-    );
+    return toAnomalyRule(await this.prisma.anomalyRule.update({ where: { id }, data }));
   }
 }
 

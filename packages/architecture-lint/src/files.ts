@@ -10,10 +10,7 @@ const IGNORED_DIRECTORIES = new Set([
   "node_modules",
 ]);
 
-export function walkFiles(
-  root: string,
-  accept: (path: string) => boolean,
-): string[] {
+export function walkFiles(root: string, accept: (path: string) => boolean): string[] {
   const found: string[] = [];
 
   const visit = (directory: string) => {

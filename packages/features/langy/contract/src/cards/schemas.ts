@@ -56,9 +56,7 @@ export const traceSummarySchema = z.looseObject({
   traceId: z.string().optional(),
   input: textValueSchema.optional(),
   output: textValueSchema.optional(),
-  timestamps: z
-    .looseObject({ started_at: z.number().optional() })
-    .optional(),
+  timestamps: z.looseObject({ started_at: z.number().optional() }).optional(),
   error: z.unknown().optional(),
 });
 
@@ -113,13 +111,7 @@ export const metricsCardSchema = z.looseObject({
  */
 
 /** How to format values. Drives the axis, the tooltip and the comparison. */
-export const timeseriesUnitSchema = z.enum([
-  "usd",
-  "count",
-  "ms",
-  "percent",
-  "tokens",
-]);
+export const timeseriesUnitSchema = z.enum(["usd", "count", "ms", "percent", "tokens"]);
 
 /** One plotted point: x (ISO date, bucket label, or epoch) and value. */
 export const timeseriesPointFields = {
@@ -137,12 +129,7 @@ export const timeseriesComparisonFields = {
 } as const;
 
 /** A table cell is a JSON primitive — never a nested structure to render. */
-export const tableCellSchema = z.union([
-  z.string(),
-  z.number(),
-  z.boolean(),
-  z.null(),
-]);
+export const tableCellSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
 /**
  * `table` — named columns, rows of primitive cells.
@@ -310,13 +297,7 @@ export const resourceCardSchema = z.union([
 const RESOURCE_NAME_KEYS = ["id", "slug", "name", "title", "key", "handle"];
 
 /** Keys an endpoint may return its rows under. Mirrors the digest's list. */
-const RESOURCE_COLLECTION_KEYS = [
-  "traces",
-  "data",
-  "items",
-  "results",
-  "records",
-];
+const RESOURCE_COLLECTION_KEYS = ["traces", "data", "items", "results", "records"];
 
 const isNamedValue = (value: unknown): boolean =>
   (typeof value === "string" && value.trim().length > 0) ||
@@ -353,14 +334,17 @@ export const namesCreatedResource = (payload: unknown): boolean => {
 
   const record = payload as Record<string, unknown>;
   const isLocalFileScaffold =
-    typeof record.dependency === "string" &&
-    record.dependency.startsWith("file:");
+    typeof record.dependency === "string" && record.dependency.startsWith("file:");
 
   for (const [key, value] of Object.entries(record)) {
     if (/(^|_)id$|Id$/.test(key) && isNamedValue(value)) return true;
     if (isLocalFileScaffold) continue;
     if (RESOURCE_NAME_KEYS.includes(key) && isNamedValue(value)) return true;
-    if (RESOURCE_COLLECTION_KEYS.includes(key) && Array.isArray(value) && value.length > 0) {
+    if (
+      RESOURCE_COLLECTION_KEYS.includes(key) &&
+      Array.isArray(value) &&
+      value.length > 0
+    ) {
       return true;
     }
   }
@@ -375,10 +359,9 @@ export const namesCreatedResource = (payload: unknown): boolean => {
  * payload that names nothing must not parse as one. The panel then renders the
  * outcome as unconfirmed instead of manufacturing a success out of `[]`.
  */
-export const createdResourceCardSchema = resourceCardSchema.refine(
-  namesCreatedResource,
-  { message: "a created-resource result must name the resource it created" },
-);
+export const createdResourceCardSchema = resourceCardSchema.refine(namesCreatedResource, {
+  message: "a created-resource result must name the resource it created",
+});
 
 /**
  * `virtual-keys get|list`, `gateway-budgets list`, and ANY result whose rows

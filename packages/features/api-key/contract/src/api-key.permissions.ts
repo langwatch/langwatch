@@ -8,11 +8,7 @@ import {
 } from "@langwatch/authz-contract";
 import { z } from "zod";
 
-export const API_KEY_PERMISSION_MODES = [
-  "all",
-  "readonly",
-  "restricted",
-] as const;
+export const API_KEY_PERMISSION_MODES = ["all", "readonly", "restricted"] as const;
 
 export function refineRestrictedPermissions(
   data: {
@@ -26,11 +22,25 @@ export function refineRestrictedPermissions(
   const hasCustomBinding = data.bindings?.some((b) => b.role === "CUSTOM") ?? false;
   const hasPermissions = Boolean(data.permissions?.length);
   if (!isRestricted && !hasCustomBinding && !hasPermissions) return;
-  if (!isRestricted) ctx.addIssue({ code: "custom", message: "CUSTOM permissions require permissionMode 'restricted'", path: ["permissionMode"] });
-  if (!hasCustomBinding) ctx.addIssue({ code: "custom", message: "restricted mode requires at least one CUSTOM binding", path: ["bindings"] });
-  if (!hasPermissions) ctx.addIssue({ code: "custom", message: "restricted mode requires at least one permission", path: ["permissions"] });
+  if (!isRestricted)
+    ctx.addIssue({
+      code: "custom",
+      message: "CUSTOM permissions require permissionMode 'restricted'",
+      path: ["permissionMode"],
+    });
+  if (!hasCustomBinding)
+    ctx.addIssue({
+      code: "custom",
+      message: "restricted mode requires at least one CUSTOM binding",
+      path: ["bindings"],
+    });
+  if (!hasPermissions)
+    ctx.addIssue({
+      code: "custom",
+      message: "restricted mode requires at least one permission",
+      path: ["permissions"],
+    });
 }
-
 
 export type AccessLevel = "read" | "write";
 
@@ -255,8 +265,7 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
  */
 export function categorizablePermissions(): AuthzPermission[] {
   return [...ALL_PERMISSIONS].filter((permission) => {
-    const def =
-      AUTHZ_RESOURCES[permissionResource(permission) as AuthzResource];
+    const def = AUTHZ_RESOURCES[permissionResource(permission) as AuthzResource];
     return !(def.scopes as readonly string[]).includes("platform");
   }) as AuthzPermission[];
 }
@@ -281,9 +290,7 @@ export function categoryPermissions({
 }): AuthzPermission[] {
   const category = PERMISSION_CATEGORIES.find((c) => c.key === key);
   if (!category) return [];
-  return level === "write"
-    ? category.writePermissions
-    : category.readPermissions;
+  return level === "write" ? category.writePermissions : category.readPermissions;
 }
 
 export function computePermissionsFromSelections(

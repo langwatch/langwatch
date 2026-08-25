@@ -31,8 +31,7 @@ function coarsenExplicit({
   const out = Array.from({ length: targetBounds.length + 1 }, () => 0n);
   let targetIndex = 0;
   for (let sourceIndex = 0; sourceIndex < sourceCounts.length; sourceIndex++) {
-    const sourceUpper =
-      point.explicitBounds[sourceIndex] ?? Number.POSITIVE_INFINITY;
+    const sourceUpper = point.explicitBounds[sourceIndex] ?? Number.POSITIVE_INFINITY;
     while (
       targetIndex < targetBounds.length &&
       sourceUpper > targetBounds[targetIndex]!
@@ -99,19 +98,14 @@ function differenceHistogramPoint({
     targetBounds: bounds,
   });
   const currentCounts = coarsenExplicit({ point, targetBounds: bounds });
-  const deltaCounts = currentCounts.map(
-    (value, i) => value - previousCounts[i]!,
-  );
+  const deltaCounts = currentCounts.map((value, i) => value - previousCounts[i]!);
   if (deltaCounts.some((value) => value < 0n)) return null;
   const deltaCount = bigint(point.count) - bigint(previous.count);
   if (deltaCount < 0n) return null;
   return {
     counts: deltaCounts,
     count: deltaCount,
-    sum:
-      previous.sum !== null && point.sum !== null
-        ? point.sum - previous.sum
-        : null,
+    sum: previous.sum !== null && point.sum !== null ? point.sum - previous.sum : null,
   };
 }
 
@@ -158,8 +152,7 @@ export function buildHistogramRow({
       }
     }
 
-    const coarsened =
-      coarsenedCounts ?? coarsenExplicit({ point, targetBounds: bounds });
+    const coarsened = coarsenedCounts ?? coarsenExplicit({ point, targetBounds: bounds });
     coarsened.forEach((value, i) => (merged[i]! += value));
     totalCount += count;
     if (sum !== null) {

@@ -109,40 +109,41 @@ checkpoint. See the parent design discussion (sections 14–15) for the
 full story.
 
 Done:
+
 - [x] Step 1 — skeleton + this README
 - [x] Step 2 — move `samplePreviewTraces.ts` to `data/`
 - [x] Step 3 — consolidate stores (onboardingStageStore + onboarding fields
-  from uiStore → `store/onboardingStore.ts`; journey config moved to
-  `chapters/onboardingJourneyConfig.ts`)
+      from uiStore → `store/onboardingStore.ts`; journey config moved to
+      `chapters/onboardingJourneyConfig.ts`)
 - [x] Step 4 — hero sub-components extracted (`TypewriterHero`,
-  `StaticHero`, `DensitySpotlight`, `ReturningUserHub`)
+      `StaticHero`, `DensitySpotlight`, `ReturningUserHub`)
 - [x] Step 5 — public-API hooks (`useOnboardingActive`,
-  `useSamplePreview`, `useTourEntryPoints`)
+      `useSamplePreview`, `useTourEntryPoints`)
 - [x] Step 6 — `useTraceListQuery` consumes `useSamplePreview`
 - [x] Step 7 — `Toolbar` consumes `useTourEntryPoints` for the Tour
-  button. The What's-new button is left in place for now and retires
-  in Step 9 once the OutroPanel absorbs its content. SDK-pending
-  button intentionally not re-added — the no-traces empty state's
-  rewatch link covers that path.
+      button. The What's-new button is left in place for now and retires
+      in Step 9 once the OutroPanel absorbs its content. SDK-pending
+      button intentionally not re-added — the no-traces empty state's
+      rewatch link covers that path.
 - [x] Step 8 — `OnboardingHost` mounts `BodyStageAttribute`,
-  `DrawerGlow`, and `RichRowGlow`. `OnboardingAurora` is a self-
-  gating component invoked from `EmptyResultsPane`. Aurora is *not*
-  hoisted into the host because the ribbon is positioned within the
-  table-area subtree; mounting it from the host would require either
-  a render slot or a portal anchor. Calling it from
-  `EmptyResultsPane` keeps the structural placement intact while
-  ownership stays inside the onboarding module.
+      `DrawerGlow`, and `RichRowGlow`. `OnboardingAurora` is a self-
+      gating component invoked from `EmptyResultsPane`. Aurora is _not_
+      hoisted into the host because the ribbon is positioned within the
+      table-area subtree; mounting it from the host would require either
+      a render slot or a portal anchor. Calling it from
+      `EmptyResultsPane` keeps the structural placement intact while
+      ownership stays inside the onboarding module.
 - [x] Step 9 — `welcomeStore.ts`, `WelcomeScreen.tsx` (+ the
-  `Welcome/` dir), `useAutoOpenWelcome.ts`, the `welcomeBoom`
-  plumbing in `RefreshProgressBar.tsx`, and the `WELCOME_SEEN_KEY`
-  shim in `SampleDataBanner.tsx` are all gone. Toolbar's What's-new
-  button removed. `DashboardLayout` no longer mounts `WelcomeScreen`.
-  All post-tour content lives in the `OutroPanel`.
+      `Welcome/` dir), `useAutoOpenWelcome.ts`, the `welcomeBoom`
+      plumbing in `RefreshProgressBar.tsx`, and the `WELCOME_SEEN_KEY`
+      shim in `SampleDataBanner.tsx` are all gone. Toolbar's What's-new
+      button removed. `DashboardLayout` no longer mounts `WelcomeScreen`.
+      All post-tour content lives in the `OutroPanel`.
 - [x] Step 10 — drawer-as-finale arc per §14. Chapters are now
-  `welcome → density → slice → arrivals → drawer → outro`. The
-  `tourGate` stage is gone (drawer is the climax, not an optional
-  detour). `serviceSegue` + `facetsReveal` make the `slice`
-  chapter, presented before arrivals so the user understands "I can
-  filter this" before data lands. `BeadStrip` shows progress.
-  `OutroPanel` is the terminal chapter and absorbs the What's-new
-  content (multiplayer, shortcuts, integrate).
+      `welcome → density → slice → arrivals → drawer → outro`. The
+      `tourGate` stage is gone (drawer is the climax, not an optional
+      detour). `serviceSegue` + `facetsReveal` make the `slice`
+      chapter, presented before arrivals so the user understands "I can
+      filter this" before data lands. `BeadStrip` shows progress.
+      `OutroPanel` is the terminal chapter and absorbs the What's-new
+      content (multiplayer, shortcuts, integrate).

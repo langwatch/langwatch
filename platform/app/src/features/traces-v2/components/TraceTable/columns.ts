@@ -301,10 +301,7 @@ const traceColumnDefs = {
  */
 export type TraceColumnId = keyof typeof traceColumnDefs;
 
-const conversationColumnDefs: Record<
-  string,
-  ColumnDef<ConversationGroup, any>
-> = {
+const conversationColumnDefs: Record<string, ColumnDef<ConversationGroup, any>> = {
   conversation: convCol.accessor("conversationId", {
     id: "conversation",
     header: "Conversation",
@@ -496,9 +493,7 @@ const traceColumnDefsByString = traceColumnDefs as Record<
   ColumnDef<TraceListItem, any> | undefined
 >;
 
-export function buildTraceColumns(
-  ids: string[],
-): Array<ColumnDef<TraceListItem, any>> {
+export function buildTraceColumns(ids: string[]): Array<ColumnDef<TraceListItem, any>> {
   return ids
     .map((id) => traceColumnDefsByString[id])
     .filter((def): def is ColumnDef<TraceListItem, any> => Boolean(def));

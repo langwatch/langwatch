@@ -199,9 +199,7 @@ export class OpsSnapshotReader {
 
 let singleton: OpsSnapshotReader | null = null;
 
-export function getOpsSnapshotReader(
-  repo: SnapshotRepository,
-): OpsSnapshotReader {
+export function getOpsSnapshotReader(repo: SnapshotRepository): OpsSnapshotReader {
   if (!singleton) {
     singleton = new OpsSnapshotReader(repo);
     singleton.start().catch((err) => {

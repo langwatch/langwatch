@@ -235,8 +235,7 @@ describe("register", () => {
           "things.get",
           "2026-08-07",
           async (_c, input: { id: string }) => input.id,
-          (b) =>
-            b.withInput(z.object({ id: z.string() })).withOutput(z.string()),
+          (b) => b.withInput(z.object({ id: z.string() })).withOutput(z.string()),
         ),
       ).not.toThrow();
     });

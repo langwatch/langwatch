@@ -163,13 +163,7 @@ export async function consumeEmailCapSlot({
     try {
       // Claim this dispatch first. SET NX wins only on first sight; a retry of
       // the same dispatch loses the claim and must NOT consume another slot.
-      const claimed = await connection.set(
-        claimKey,
-        "1",
-        "EX",
-        EXPIRE_SECONDS,
-        "NX",
-      );
+      const claimed = await connection.set(claimKey, "1", "EX", EXPIRE_SECONDS, "NX");
       if (!claimed) {
         // Retry of an already-counted dispatch: read the current count without
         // incrementing. A missing counter (TTL rolled the hour) reads as 0,

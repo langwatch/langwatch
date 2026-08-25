@@ -117,10 +117,9 @@ test.describe("Scenario Execution", () => {
 
     // Either modal appears (if no remembered target) or run starts immediately
     // Wait for navigation to complete - URL should contain the same setId
-    await expect(page).toHaveURL(
-      new RegExp(`simulations/${originalSetId}/`),
-      { timeout: 60000 }
-    );
+    await expect(page).toHaveURL(new RegExp(`simulations/${originalSetId}/`), {
+      timeout: 60000,
+    });
 
     // Verify we're NOT in the legacy "default" fallback set
     // Internal on-platform sets use getOnPlatformSetId() from internal-set-id.ts
@@ -143,16 +142,22 @@ test.describe("Scenario Execution", () => {
     await expect(simulationsHeading).toBeVisible({ timeout: 15000 });
 
     // Check if there are any run rows visible (indicates existing runs)
-    const hasSimulations = await page.locator("[data-batch-id]").first().isVisible().catch(() => false);
+    const hasSimulations = await page
+      .locator("[data-batch-id]")
+      .first()
+      .isVisible()
+      .catch(() => false);
     if (hasSimulations) {
       // Click on a simulation set to view details
-      const firstSimulationSet = page.getByRole("button", { name: /view|expand/i }).first();
+      const firstSimulationSet = page
+        .getByRole("button", { name: /view|expand/i })
+        .first();
       if (await firstSimulationSet.isVisible().catch(() => false)) {
         await firstSimulationSet.click();
         // Should see run details
-        await expect(
-          page.getByText(/run|execution|results/i).first()
-        ).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText(/run|execution|results/i).first()).toBeVisible({
+          timeout: 10000,
+        });
       }
     }
   });

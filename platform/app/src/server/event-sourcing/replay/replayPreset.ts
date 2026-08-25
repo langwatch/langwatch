@@ -56,9 +56,7 @@ const STORELESS_REPLAYABLE = new Set(["metric_processing", "log_processing"]);
  * Iterates the live pipeline definitions from the EventSourcing runtime and
  * re-creates each fold projection with a raw CH store (no Redis cache).
  */
-export function createReplayRuntime(config: {
-  redisUrl: string;
-}): ReplayRuntime {
+export function createReplayRuntime(config: { redisUrl: string }): ReplayRuntime {
   // Replay runs its own connection rather than the App's on purpose: a full
   // rebuild should not share a socket with live traffic. It is still built by
   // the client package, so a `rediss://` target gets TLS and the dev database
@@ -81,14 +79,9 @@ export function createReplayRuntime(config: {
   const storeByPipeline = new Map<string, FoldProjectionStore<any>>([
     [
       "trace_processing",
-      new TraceSummaryStore(
-        new TraceSummaryClickHouseRepository(clientResolver),
-      ),
+      new TraceSummaryStore(new TraceSummaryClickHouseRepository(clientResolver)),
     ],
-    [
-      "evaluation_processing",
-      new EvaluationRunStore(getApp().evaluations),
-    ],
+    ["evaluation_processing", new EvaluationRunStore(getApp().evaluations)],
     [
       "experiment_run_processing",
       createExperimentRunStateFoldStore(

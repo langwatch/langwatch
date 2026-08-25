@@ -2,10 +2,7 @@ import {
   SCENARIO_TAB_NAVIGATE_EVENT,
   type ScenarioTabNavigatePayload,
 } from "./scenario-tab-events";
-import {
-  SCENARIO_TAB_REFRESH_MS,
-  scenarioTabRegistry,
-} from "./scenario-tab-registry";
+import { SCENARIO_TAB_REFRESH_MS, scenarioTabRegistry } from "./scenario-tab-registry";
 
 export interface ScenarioTabRegistration {
   projectId: string;

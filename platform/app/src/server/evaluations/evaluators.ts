@@ -28,14 +28,7 @@ export type EvaluatorTypes = keyof Evaluators;
 export type EvaluatorDefinition<T extends EvaluatorTypes> = {
   name: string;
   description: string;
-  category:
-    | "quality"
-    | "rag"
-    | "safety"
-    | "policy"
-    | "other"
-    | "custom"
-    | "similarity";
+  category: "quality" | "rag" | "safety" | "policy" | "other" | "custom" | "similarity";
   docsUrl?: string;
   isGuardrail: boolean;
   requiredFields: string[];

@@ -107,9 +107,7 @@ export function toolResultForCapability(
 function claimsNothing(result: CliToolResult): boolean {
   if (result.kind !== "card") return false;
   if (result.outcome === "unconfirmed") return true;
-  return (
-    result.card === "resourceCreated" && !namesCreatedResource(result.payload)
-  );
+  return result.card === "resourceCreated" && !namesCreatedResource(result.payload);
 }
 
 /**
@@ -174,11 +172,7 @@ export function hasCapabilityCard(call: CapabilityToolCall): boolean {
   return false;
 }
 
-export function LangyCapabilityRenderer({
-  call,
-}: {
-  call: CapabilityToolCall;
-}) {
+export function LangyCapabilityRenderer({ call }: { call: CapabilityToolCall }) {
   const { project } = useOrganizationTeamProject();
   const resolved = capabilityRenderFor(call);
   if (!resolved) return null;

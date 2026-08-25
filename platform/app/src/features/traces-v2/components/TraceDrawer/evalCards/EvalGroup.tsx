@@ -18,9 +18,7 @@ export function EvalGroup({
   const synthesizedHistory: EvalRunHistoryEntry[] | undefined =
     history.length > 0
       ? entries
-          .filter(
-            (e): e is EvalEntry & { timestamp: number } => e.timestamp != null,
-          )
+          .filter((e): e is EvalEntry & { timestamp: number } => e.timestamp != null)
           .map((e) => ({
             score: e.score,
             timestamp: e.timestamp,

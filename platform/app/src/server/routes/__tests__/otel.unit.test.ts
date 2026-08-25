@@ -19,10 +19,7 @@ const SPAN_ID_HEX = "1122334455667788";
 const SPAN_ID_BYTES = Buffer.from(SPAN_ID_HEX, "hex");
 
 function bufferToArrayBuffer(buf: Buffer): ArrayBuffer {
-  return buf.buffer.slice(
-    buf.byteOffset,
-    buf.byteOffset + buf.byteLength,
-  ) as ArrayBuffer;
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
 }
 
 function jsonOtlpBody(traceIdsB64: string[]): ArrayBuffer {
@@ -88,12 +85,8 @@ describe("peekCustomerTraceIds", () => {
 
   describe("when the body is malformed", () => {
     it("returns an empty array for non-protobuf garbage", () => {
-      const garbage = bufferToArrayBuffer(
-        Buffer.from([0xff, 0x00, 0xde, 0xad]),
-      );
-      expect(peekCustomerTraceIds(garbage, "application/x-protobuf")).toEqual(
-        [],
-      );
+      const garbage = bufferToArrayBuffer(Buffer.from([0xff, 0x00, 0xde, 0xad]));
+      expect(peekCustomerTraceIds(garbage, "application/x-protobuf")).toEqual([]);
     });
 
     it("returns an empty array for invalid JSON", () => {
@@ -105,9 +98,7 @@ describe("peekCustomerTraceIds", () => {
   describe("when the body is well-formed JSON OTLP", () => {
     it("decodes base64 trace_ids to lowercase hex", () => {
       const body = jsonOtlpBody([TRACE_ID_B64_1]);
-      expect(peekCustomerTraceIds(body, "application/json")).toEqual([
-        TRACE_ID_HEX_1,
-      ]);
+      expect(peekCustomerTraceIds(body, "application/json")).toEqual([TRACE_ID_HEX_1]);
     });
 
     it.each([
@@ -129,11 +120,7 @@ describe("peekCustomerTraceIds", () => {
     });
 
     it("deduplicates trace_ids that appear on multiple spans", () => {
-      const body = jsonOtlpBody([
-        TRACE_ID_B64_1,
-        TRACE_ID_B64_1,
-        TRACE_ID_B64_2,
-      ]);
+      const body = jsonOtlpBody([TRACE_ID_B64_1, TRACE_ID_B64_1, TRACE_ID_B64_2]);
       expect(peekCustomerTraceIds(body, "application/json")).toEqual([
         TRACE_ID_HEX_1,
         TRACE_ID_HEX_2,
@@ -165,9 +152,7 @@ describe("peekCustomerTraceIds", () => {
 
   describe("when the body has nothing useful to extract", () => {
     it("returns an empty array for OTLP with no resourceSpans", () => {
-      const body = bufferToArrayBuffer(
-        Buffer.from(JSON.stringify({}), "utf-8"),
-      );
+      const body = bufferToArrayBuffer(Buffer.from(JSON.stringify({}), "utf-8"));
       expect(peekCustomerTraceIds(body, "application/json")).toEqual([]);
     });
 
@@ -188,10 +173,7 @@ describe("peekCustomerTraceIds", () => {
     it("respects the max cap", () => {
       // Build 20 distinct ids, ask for 5
       const ids = Array.from({ length: 20 }, (_, i) =>
-        Buffer.from(
-          i.toString(16).padStart(2, "0").repeat(16).slice(0, 32),
-          "hex",
-        ),
+        Buffer.from(i.toString(16).padStart(2, "0").repeat(16).slice(0, 32), "hex"),
       );
       const body = protobufOtlpBody(ids);
       const result = peekCustomerTraceIds(body, "application/x-protobuf", 5);
@@ -222,9 +204,9 @@ describe("classifyTokenType", () => {
       // An ingestion key is one row of the single ApiKey primitive, so it
       // wears the sk-lw- prefix; the ingest discriminator lives on the
       // resolved ApiKey row, not the token shape.
-      expect(
-        classifyTokenType("sk-lw-aBcDeF12_WgdPxNGmczBPUunjT350X9ywK9EKyO9M"),
-      ).toBe("legacy");
+      expect(classifyTokenType("sk-lw-aBcDeF12_WgdPxNGmczBPUunjT350X9ywK9EKyO9M")).toBe(
+        "legacy",
+      );
     });
   });
 
@@ -237,9 +219,7 @@ describe("classifyTokenType", () => {
       // The binding subsystem is gone; a stale ik-lw- token no longer has a
       // dedicated class and falls through to unknown.
       expect(
-        classifyTokenType(
-          "ik-lw-WgdPxNGmczBPUunjT350X9ywK9EKyO9MEYcFBdmKxnoLGUdz",
-        ),
+        classifyTokenType("ik-lw-WgdPxNGmczBPUunjT350X9ywK9EKyO9MEYcFBdmKxnoLGUdz"),
       ).toBe("unknown");
     });
 

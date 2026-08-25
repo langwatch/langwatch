@@ -42,8 +42,8 @@ export default function ExperimentPage() {
             <Alert.Indicator />
             <Alert.Title>Experiment not found</Alert.Title>
             <Alert.Description>
-              The experiment you&apos;re looking for doesn&apos;t exist or you
-              don&apos;t have access to it.
+              The experiment you&apos;re looking for doesn&apos;t exist or you don&apos;t
+              have access to it.
             </Alert.Description>
           </Alert.Root>
         </Box>
@@ -68,17 +68,13 @@ export default function ExperimentPage() {
     <DashboardLayout>
       {project && experiment.data?.type === ExperimentType.DSPY ? (
         <DSPyExperiment project={project} experiment={experiment.data} />
-      ) : project &&
-        experiment.data?.type === ExperimentType.BATCH_EVALUATION ? (
+      ) : project && experiment.data?.type === ExperimentType.BATCH_EVALUATION ? (
         <BatchEvaluation project={project} experiment={experiment.data} />
       ) : !project ||
         experiment.data === undefined ||
         experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||
         experiment.data.type === ExperimentType.EVALUATIONS_V3 ? (
-        <BatchEvaluationResults
-          project={project}
-          experiment={experiment.data}
-        />
+        <BatchEvaluationResults project={project} experiment={experiment.data} />
       ) : (
         <Box padding={6}>
           <Alert.Root status="warning">

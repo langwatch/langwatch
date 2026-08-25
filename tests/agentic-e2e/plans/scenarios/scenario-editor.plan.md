@@ -7,6 +7,7 @@
 This test plan covers the LangWatch Scenario Editor feature, which allows users to create and edit behavioral test case specifications (scenarios) for their AI agents. The editor follows a 3-Part Spec model consisting of: Situation (what context to test), Script (the test steps/criteria), and Score (expected outcomes).
 
 The Scenario Editor is accessed via the Simulations page and provides a form-based interface for defining:
+
 - Scenario name and metadata
 - Situation description (the context for testing)
 - Success criteria (list of behaviors to verify)
@@ -24,11 +25,13 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 **File:** `tests/scenarios/scenario-editor/navigate-to-create-form.spec.ts`
 
 **Steps:**
+
 1. Navigate to the Simulations page via the sidebar link
 2. Click the "New Scenario" button
 3. Wait for the page to load
 
 **Expected Results:**
+
 - URL changes to match pattern `/simulations/new` or `/scenarios/create`
 - An empty scenario form is displayed
 - The Name field is visible and empty
@@ -39,11 +42,13 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 **File:** `tests/scenarios/scenario-editor/view-form-fields.spec.ts`
 
 **Steps:**
+
 1. Navigate to the Simulations page
 2. Click "New Scenario" to open the editor
 3. Inspect the form for required fields
 
 **Expected Results:**
+
 - Name field is visible as a text input with label "Name"
 - Situation field is visible as a textarea with label "Situation"
 - Criteria section is visible with heading "Criteria"
@@ -56,6 +61,7 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 **File:** `tests/scenarios/scenario-editor/save-new-scenario.spec.ts`
 
 **Steps:**
+
 1. Navigate to the Simulations page
 2. Click "New Scenario" to open the editor
 3. Fill in "Name" with "Refund Request Test"
@@ -67,6 +73,7 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 9. Click the "Save" button
 
 **Expected Results:**
+
 - User is redirected back to the scenarios list page
 - URL no longer contains `/new` or `/create`
 - "Refund Request Test" appears as a row in the scenarios list
@@ -85,11 +92,13 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 **File:** `tests/scenarios/scenario-editor/load-existing-scenario.spec.ts`
 
 **Steps:**
+
 1. Seed a scenario named "Refund Flow" with situation "User wants a refund" and criteria ["Acknowledge", "Resolve"]
 2. Navigate to the Simulations page
 3. Click on the "Refund Flow" row in the list
 
 **Expected Results:**
+
 - The scenario editor form opens
 - Name field is pre-populated with "Refund Flow"
 - Situation field contains the stored situation text
@@ -101,6 +110,7 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 **File:** `tests/scenarios/scenario-editor/update-scenario-name.spec.ts`
 
 **Steps:**
+
 1. Seed a scenario named "Refund Flow"
 2. Navigate to the Simulations page
 3. Click on "Refund Flow" to open the editor
@@ -109,6 +119,7 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 6. Click the "Save" button
 
 **Expected Results:**
+
 - User is redirected to the scenarios list
 - The row that previously showed "Refund Flow" now shows "Refund Flow (Updated)"
 - The original "Refund Flow" name no longer appears in the list
@@ -124,6 +135,7 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 **File:** `tests/scenarios/scenario-editor/add-criterion.spec.ts`
 
 **Steps:**
+
 1. Navigate to the Simulations page
 2. Click "New Scenario" to open the editor
 3. Locate the criterion input field
@@ -131,6 +143,7 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 5. Click the "Add Criterion" button
 
 **Expected Results:**
+
 - "Agent must apologize" appears in the criteria list (element with `data-testid="criteria-list"`)
 - The criterion input field is cleared and ready for the next entry
 - The add button remains visible for adding more criteria
@@ -140,6 +153,7 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 **File:** `tests/scenarios/scenario-editor/remove-criterion.spec.ts`
 
 **Steps:**
+
 1. Navigate to the Simulations page
 2. Click "New Scenario" to open the editor
 3. Add criterion "Criterion A" and click "Add Criterion"
@@ -148,6 +162,7 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 6. Click the remove/delete button on "Criterion A"
 
 **Expected Results:**
+
 - "Criterion A" is removed from the criteria list
 - "Criterion B" remains visible in the criteria list
 - The criteria list now contains only one item
@@ -165,12 +180,14 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 **Prerequisites:** Project must have at least one prompt configured (seeded via API).
 
 **Steps:**
+
 1. Seed at least one prompt in the project
 2. Navigate to the Simulations page
 3. Click "New Scenario" to open the editor
 4. Click the "Select Target" button/dropdown
 
 **Expected Results:**
+
 - A target selection dropdown/modal opens
 - Available prompts from the project are listed as options
 - Each prompt option shows the prompt name
@@ -181,12 +198,14 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 **File:** `tests/scenarios/scenario-editor/configure-http-target.spec.ts`
 
 **Steps:**
+
 1. Navigate to the Simulations page
 2. Click "New Scenario" to open the editor
 3. Click the "Select Target" button/dropdown
 4. Select "HTTP Agent" from the target type options
 
 **Expected Results:**
+
 - HTTP Agent configuration fields appear
 - URL/Endpoint input field is visible and editable
 - HTTP Method selector is visible (GET, POST, etc.)
@@ -199,12 +218,14 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 ### Test: Attempt to save scenario with empty name
 
 **Steps:**
+
 1. Navigate to create scenario page
 2. Leave the Name field empty
 3. Fill in other required fields
 4. Click Save
 
 **Expected Results:**
+
 - Form validation prevents submission
 - Error message appears indicating name is required
 - User remains on the editor page
@@ -212,11 +233,13 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 ### Test: Attempt to add empty criterion
 
 **Steps:**
+
 1. Navigate to create scenario page
 2. Leave the criterion input empty
 3. Click "Add Criterion" button
 
 **Expected Results:**
+
 - Empty criterion is not added to the list
 - Validation message may appear
 - Criteria list remains unchanged
@@ -238,8 +261,8 @@ The Scenario Editor is accessed via the Simulations page and provides a form-bas
 
 ## Test Data Requirements
 
-| Data Item | Description | Setup Method |
-|-----------|-------------|--------------|
-| Existing Scenario | "Refund Flow" with situation and criteria | API seed before edit tests |
-| Project Prompts | At least one prompt for target selection | API seed before target tests |
-| User Authentication | Logged-in user with project access | Auth setup fixture |
+| Data Item           | Description                               | Setup Method                 |
+| ------------------- | ----------------------------------------- | ---------------------------- |
+| Existing Scenario   | "Refund Flow" with situation and criteria | API seed before edit tests   |
+| Project Prompts     | At least one prompt for target selection  | API seed before target tests |
+| User Authentication | Logged-in user with project access        | Auth setup fixture           |

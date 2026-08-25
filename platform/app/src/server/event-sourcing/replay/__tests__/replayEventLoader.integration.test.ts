@@ -138,10 +138,7 @@ describe("replayEventLoader", () => {
       });
 
       expect(aggregates).toHaveLength(2);
-      expect(aggregates.map((a) => a.aggregateId).sort()).toEqual([
-        "agg-1",
-        "agg-2",
-      ]);
+      expect(aggregates.map((a) => a.aggregateId).sort()).toEqual(["agg-1", "agg-2"]);
     });
 
     describe("when filtering by tenant", () => {
@@ -372,9 +369,7 @@ describe("replayEventLoader", () => {
       });
 
       expect(firstPage.map((event) => event.id)).toEqual(["z-accepted-first"]);
-      expect(secondPage.map((event) => event.id)).toEqual([
-        "a-accepted-second",
-      ]);
+      expect(secondPage.map((event) => event.id)).toEqual(["a-accepted-second"]);
     });
 
     describe("when another tenant has the same aggregateId", () => {
@@ -670,9 +665,10 @@ describe("replayEventLoader", () => {
           occurredAtBounds: narrowBounds,
         });
 
-        expect(bounded.get(`${tenantId}:test:agg-1`)?.map((e) => e.id)).toEqual(
-          ["evt-001", "evt-002"],
-        );
+        expect(bounded.get(`${tenantId}:test:agg-1`)?.map((e) => e.id)).toEqual([
+          "evt-001",
+          "evt-002",
+        ]);
         expect(bounded.has(`${tenantId}:test:agg-2`)).toBe(false);
       });
     });

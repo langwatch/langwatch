@@ -11,9 +11,7 @@ export class PrismaLangyCredentialRepository extends LangyCredentialRepository {
     return new PrismaLangyCredentialRepository(database as PrismaClient);
   }
 
-  async tryFindProject(
-    projectId: string,
-  ): Promise<{ organizationId: string } | null> {
+  async tryFindProject(projectId: string): Promise<{ organizationId: string } | null> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { team: { select: { organizationId: true } } },

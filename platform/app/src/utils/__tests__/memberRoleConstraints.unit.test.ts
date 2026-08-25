@@ -86,15 +86,15 @@ describe("memberRoleConstraints", () => {
 
   describe("getDefaultTeamRoleForOrganizationRole()", () => {
     it("starts a Lite Member at Viewer and everyone else at Member", () => {
-      expect(
-        getDefaultTeamRoleForOrganizationRole(OrganizationUserRole.EXTERNAL),
-      ).toBe(TeamUserRole.VIEWER);
-      expect(
-        getDefaultTeamRoleForOrganizationRole(OrganizationUserRole.MEMBER),
-      ).toBe(TeamUserRole.MEMBER);
-      expect(
-        getDefaultTeamRoleForOrganizationRole(OrganizationUserRole.ADMIN),
-      ).toBe(TeamUserRole.MEMBER);
+      expect(getDefaultTeamRoleForOrganizationRole(OrganizationUserRole.EXTERNAL)).toBe(
+        TeamUserRole.VIEWER,
+      );
+      expect(getDefaultTeamRoleForOrganizationRole(OrganizationUserRole.MEMBER)).toBe(
+        TeamUserRole.MEMBER,
+      );
+      expect(getDefaultTeamRoleForOrganizationRole(OrganizationUserRole.ADMIN)).toBe(
+        TeamUserRole.MEMBER,
+      );
     });
   });
 

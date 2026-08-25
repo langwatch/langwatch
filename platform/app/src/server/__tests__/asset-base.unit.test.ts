@@ -64,9 +64,9 @@ describe("normalizeAssetBase", () => {
     });
 
     it("throws on a non-http(s) scheme", () => {
-      expect(() =>
-        normalizeAssetBase("ftp://cdn.langwatch.ai/abc123/"),
-      ).toThrow(/http or https/);
+      expect(() => normalizeAssetBase("ftp://cdn.langwatch.ai/abc123/")).toThrow(
+        /http or https/,
+      );
     });
   });
 
@@ -74,15 +74,15 @@ describe("normalizeAssetBase", () => {
     // The resolver concatenates, so these would swallow the asset path:
     // "…/abc123?rev=1" + "assets/x.js" puts the path inside the query string.
     it("throws on a query component", () => {
-      expect(() =>
-        normalizeAssetBase("https://cdn.langwatch.ai/abc123?rev=1"),
-      ).toThrow(/query or fragment/);
+      expect(() => normalizeAssetBase("https://cdn.langwatch.ai/abc123?rev=1")).toThrow(
+        /query or fragment/,
+      );
     });
 
     it("throws on a fragment component", () => {
-      expect(() =>
-        normalizeAssetBase("https://cdn.langwatch.ai/abc123#f"),
-      ).toThrow(/query or fragment/);
+      expect(() => normalizeAssetBase("https://cdn.langwatch.ai/abc123#f")).toThrow(
+        /query or fragment/,
+      );
     });
   });
 });
@@ -196,9 +196,7 @@ describe("injectAssetBaseIntoHtml", () => {
         base: "/",
       });
       expect(out).toContain(`window.${ASSET_URL_GLOBAL}`);
-      expect(out.indexOf(ASSET_URL_GLOBAL)).toBeLessThan(
-        out.indexOf("<div id=root>"),
-      );
+      expect(out.indexOf(ASSET_URL_GLOBAL)).toBeLessThan(out.indexOf("<div id=root>"));
     });
 
     it("prepends the bootstrap when there is no doctype/html/head", () => {

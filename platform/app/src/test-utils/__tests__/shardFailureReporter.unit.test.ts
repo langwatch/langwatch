@@ -9,10 +9,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  hardFloorReport,
-  resolveHardFloorMs,
-} from "../../test-unit-global-setup";
+import { hardFloorReport, resolveHardFloorMs } from "../../test-unit-global-setup";
 import ShardFailureReporter, {
   recordShardSelection,
   resetShardState,
@@ -94,17 +91,13 @@ describe("given a shard the finalize wedge is holding open", () => {
       reporter.onTestModuleQueued(module("src/finishes.unit.test.ts"));
       reporter.onTestModuleEnd(module("src/finishes.unit.test.ts"));
 
-      expect(shardModuleTally().unreportedFiles).toEqual([
-        "src/hangs.unit.test.tsx",
-      ]);
+      expect(shardModuleTally().unreportedFiles).toEqual(["src/hangs.unit.test.tsx"]);
       expect(shardSawFailure()).toBe(false);
 
       const { exitCode, lines } = report();
 
       expect(exitCode).toBe(1);
-      expect(lines[0]).toContain(
-        "1 test file started and never reported a result",
-      );
+      expect(lines[0]).toContain("1 test file started and never reported a result");
       expect(lines[1]).toBe(
         "[unit globalSetup] test files: 2 selected, 2 started, 1 reported a result",
       );
@@ -125,9 +118,7 @@ describe("given a shard the finalize wedge is holding open", () => {
       const { exitCode, lines } = report();
 
       expect(exitCode).toBe(1);
-      expect(lines[0]).toContain(
-        "2 test files started and never reported a result",
-      );
+      expect(lines[0]).toContain("2 test files started and never reported a result");
       expect(lines.slice(3, 5)).toEqual([
         "[unit globalSetup]   src/a.unit.test.ts",
         "[unit globalSetup]   src/b.unit.test.ts",
@@ -319,9 +310,7 @@ describe("given how long the shard may stay alive before the floor fires", () =>
 
   describe("when the override is absent", () => {
     it("leaves the floor disarmed off CI and says nothing", () => {
-      const warn = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => undefined);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
       vi.stubEnv("LANGWATCH_UNIT_HARD_FLOOR_MS", undefined);
       vi.stubEnv("CI", "");
 
@@ -332,9 +321,7 @@ describe("given how long the shard may stay alive before the floor fires", () =>
 
   describe("when the override is set to something that is not a duration", () => {
     it("falls back to the default and names the value it ignored", () => {
-      const warn = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => undefined);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
       vi.stubEnv("LANGWATCH_UNIT_HARD_FLOOR_MS", "4m");
       vi.stubEnv("CI", "1");
 

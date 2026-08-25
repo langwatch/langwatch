@@ -130,10 +130,7 @@ function clampLongStrings(value: unknown, depth = 0): unknown {
  * The full value is untouched in event_log (the eventref restores it); this
  * shapes ONLY the preview.
  */
-export function structuredIoPreview(
-  value: string,
-  maxBytes: number,
-): string | null {
+export function structuredIoPreview(value: string, maxBytes: number): string | null {
   if (Buffer.byteLength(value, "utf8") > PREVIEW_MAX_SOURCE_BYTES) return null;
   const trimmed = value.trim();
   if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return null;

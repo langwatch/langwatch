@@ -14,11 +14,7 @@
  */
 import type { GatewayBudgetWindow } from "@langwatch/prisma-client/generated";
 
-import {
-  anchoredPeriodStart,
-  isCyclicWindow,
-  nextBoundaryFor,
-} from "./gatewayWindow";
+import { anchoredPeriodStart, isCyclicWindow, nextBoundaryFor } from "./gatewayWindow";
 
 /**
  * The OccurredAt lower bound a spend read must honor for a budget whose
@@ -111,9 +107,7 @@ export function effectiveBudgetPeriod(
   const floorMs = budgetPeriodFloorMs(budget, now);
   return {
     currentPeriodStartedAt:
-      floorMs === undefined
-        ? currentPeriodStart(budget.window, now)
-        : new Date(floorMs),
+      floorMs === undefined ? currentPeriodStart(budget.window, now) : new Date(floorMs),
     resetsAt: nextBoundaryFor({ budget, now }),
   };
 }
@@ -159,10 +153,7 @@ export function bucketPeriodFloorMs(
  * is written, every read returns 0, and budgets on that window silently
  * stop enforcing.
  */
-export function currentPeriodStart(
-  window: GatewayBudgetWindow,
-  now: Date,
-): Date {
+export function currentPeriodStart(window: GatewayBudgetWindow, now: Date): Date {
   const d = new Date(now.getTime());
   if (window === "MINUTE") {
     d.setUTCSeconds(0, 0);

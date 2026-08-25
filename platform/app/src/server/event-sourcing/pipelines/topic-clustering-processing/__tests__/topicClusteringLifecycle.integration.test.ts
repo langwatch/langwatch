@@ -114,9 +114,7 @@ function topicEntry(
     centroid: [0.1, 0.2, 0.3],
     p95Distance: 0.42,
     automaticallyGenerated: true,
-    ...(overrides.firstRecordedAt
-      ? { firstRecordedAt: overrides.firstRecordedAt }
-      : {}),
+    ...(overrides.firstRecordedAt ? { firstRecordedAt: overrides.firstRecordedAt } : {}),
   };
 }
 
@@ -147,8 +145,9 @@ describe.skipIf(!hasTestcontainers)(
 
       const pipeline = eventSourcing.register(
         createTopicClusteringProcessingPipeline({
-          topicClusteringRunStatusStore:
-            new PrismaTopicClusteringRunProjectionRepository(prisma),
+          topicClusteringRunStatusStore: new PrismaTopicClusteringRunProjectionRepository(
+            prisma,
+          ),
           topicClusteringRunHistoryStore:
             new PrismaTopicClusteringRunHistoryProjectionRepository(prisma),
           topicModelStore: new PrismaTopicModelProjectionRepository(prisma),
@@ -237,13 +236,8 @@ describe.skipIf(!hasTestcontainers)(
           });
           return found.length === 2 ? found : null;
         }, "the recorded topics to land in the Topic table");
-        expect(rows.map((r) => r.id).sort()).toEqual([
-          `${ns}-child`,
-          `${ns}-parent`,
-        ]);
-        expect(rows.find((r) => r.id === `${ns}-child`)?.parentId).toBe(
-          `${ns}-parent`,
-        );
+        expect(rows.map((r) => r.id).sort()).toEqual([`${ns}-child`, `${ns}-parent`]);
+        expect(rows.find((r) => r.id === `${ns}-child`)?.parentId).toBe(`${ns}-parent`);
         for (const row of rows) expect(row.lastEventId).not.toBeNull();
         expect(
           await prisma.topicModelProjection.findUnique({
@@ -373,9 +367,9 @@ describe.skipIf(!hasTestcontainers)(
           `${ns}-legacy-child`,
           `${ns}-legacy-parent`,
         ]);
-        expect(
-          migrated.find((r) => r.id === `${ns}-legacy-child`)?.parentId,
-        ).toBe(`${ns}-legacy-parent`);
+        expect(migrated.find((r) => r.id === `${ns}-legacy-child`)?.parentId).toBe(
+          `${ns}-legacy-parent`,
+        );
         for (const row of migrated) {
           expect(row.lastEventId).not.toBeNull();
           expect(row.createdAt.getTime()).toBe(legacyCreatedAt.getTime());

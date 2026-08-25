@@ -75,9 +75,7 @@ export function createEvaluationAlertTriggerMatchHandler(deps: {
         triggerId: trigger.id,
         traceId,
         action: trigger.action,
-        actionClass: NOTIFY_TRIGGER_ACTIONS.has(trigger.action)
-          ? "notify"
-          : "persist",
+        actionClass: NOTIFY_TRIGGER_ACTIONS.has(trigger.action) ? "notify" : "persist",
         traceDebounceMs: trigger.traceDebounceMs,
         notificationCadence: trigger.notificationCadence,
       });

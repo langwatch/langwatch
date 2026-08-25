@@ -101,9 +101,7 @@ urlLiquid.registerFilter("raw", { handler: identity, raw: true });
  */
 const bodyLiquid = new Liquid({
   outputEscape: (value) =>
-    value instanceof RawJson
-      ? value.toString()
-      : escapeForJsonStringLiteral(value),
+    value instanceof RawJson ? value.toString() : escapeForJsonStringLiteral(value),
 });
 bodyLiquid.registerFilter("raw", { handler: identity, raw: true });
 
@@ -152,8 +150,7 @@ export function buildTemplateContext({
 }): Record<string, unknown> {
   const lastUserMessage = input.messages.findLast((m) => m.role === "user");
   const inputIsStructured =
-    lastUserMessage !== undefined &&
-    typeof lastUserMessage.content !== "string";
+    lastUserMessage !== undefined && typeof lastUserMessage.content !== "string";
   const base: Record<string, unknown> = {
     messages: new RawJson(JSON.stringify(input.messages)),
     threadId: input.threadId ?? DEFAULT_SCENARIO_THREAD_ID,
@@ -181,8 +178,7 @@ export function buildTemplateContext({
       const value = resolved[identifier];
       if (value === undefined) continue;
       const field = sourceFieldOf(mapping);
-      const isRawJson =
-        field === "messages" || (field === "input" && inputIsStructured);
+      const isRawJson = field === "messages" || (field === "input" && inputIsStructured);
       mapped[identifier] = isRawJson ? new RawJson(value) : value;
     }
   }

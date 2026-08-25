@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LLMConfig } from "@langwatch/workflow-contract";
-import {
-  type FormLLMConfig,
-  LLMConfigFormatUtils,
-} from "../llm-config-format-utils";
+import { type FormLLMConfig, LLMConfigFormatUtils } from "../llm-config-format-utils";
 
 describe("LLMConfigFormatUtils", () => {
   describe("formToDslFormat", () => {

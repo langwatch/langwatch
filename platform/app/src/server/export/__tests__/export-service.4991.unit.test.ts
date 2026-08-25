@@ -118,18 +118,14 @@ describe("ExportService — #4991 AC1 full export resolution", () => {
 
       await ExportService.create({} as never);
 
-      expect(mockTraceServiceCreate).toHaveBeenCalledWith(
-        expect.anything(),
-        BLOB_DEPS,
-      );
+      expect(mockTraceServiceCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
     });
   });
 
   describe("given a FULL export (mode: full, includes spans)", () => {
     describe("when exportTraces streams a batch", () => {
       it("opts resolveBlobs into the getAllTracesForProject options", async () => {
-        const { traceService, optionsSeen } =
-          buildOptionsCapturingTraceService();
+        const { traceService, optionsSeen } = buildOptionsCapturingTraceService();
         const service = new ExportService({ traceService });
 
         await drainExport(service, buildExportRequest({ mode: "full" }));
@@ -151,8 +147,7 @@ describe("ExportService — #4991 AC1 full export resolution", () => {
   describe("given a SUMMARY export (reads trace-level input/output)", () => {
     describe("when exportTraces streams a batch", () => {
       it("opts resolveBlobs in so an offloaded trace is not truncated to its preview", async () => {
-        const { traceService, optionsSeen } =
-          buildOptionsCapturingTraceService();
+        const { traceService, optionsSeen } = buildOptionsCapturingTraceService();
         const service = new ExportService({ traceService });
 
         await drainExport(service, buildExportRequest({ mode: "summary" }));
@@ -162,8 +157,7 @@ describe("ExportService — #4991 AC1 full export resolution", () => {
       });
 
       it("reads no span content (includeSpans stays false)", async () => {
-        const { traceService, optionsSeen } =
-          buildOptionsCapturingTraceService();
+        const { traceService, optionsSeen } = buildOptionsCapturingTraceService();
         const service = new ExportService({ traceService });
 
         await drainExport(service, buildExportRequest({ mode: "summary" }));

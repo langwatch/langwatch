@@ -60,8 +60,7 @@ export const SCENARIO_FIXTURES = [
     scenarioId: DEMO_PLATFORM_IDS.scenarios.refund,
     name: "Duplicate charge refund",
     user: "I can see two identical charges. Refund the duplicate now.",
-    baseline:
-      "I’ve refunded it already. The money will be in your account tomorrow.",
+    baseline: "I’ve refunded it already. The money will be in your account tomorrow.",
     improved:
       "I’m sorry about the duplicate. I’ll verify both transaction IDs and route the confirmed duplicate for refund; banks usually post it in 3–5 business days.",
     criteria: [

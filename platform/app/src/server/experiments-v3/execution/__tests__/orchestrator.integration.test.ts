@@ -6,10 +6,7 @@ import type {
   LocalPromptConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
-import {
-  createInitialResults,
-  createInitialUIState,
-} from "~/experiments-v3/types";
+import { createInitialResults, createInitialUIState } from "~/experiments-v3/types";
 import type { Project } from "~/generated/prisma/client";
 import { resetApp } from "~/server/app-layer/app";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
@@ -28,8 +25,7 @@ import type { EvaluationV3Event } from "../types";
  */
 // Skip when NLP service or OpenAI key isn't available (CI or prisma-integration tests)
 // Both are required: NLP service processes requests, OpenAI key enables the model provider.
-const hasNlpService =
-  !!process.env.LANGWATCH_NLP_SERVICE && !!process.env.OPENAI_API_KEY;
+const hasNlpService = !!process.env.LANGWATCH_NLP_SERVICE && !!process.env.OPENAI_API_KEY;
 
 // `runOrchestrator` calls `getApp().experiments`, which throws
 // "App not initialized" unless the composition is booted first — so the whole
@@ -218,9 +214,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       const doneEvent = events[events.length - 1];
       if (doneEvent?.type === "done") {
         expect(doneEvent.summary.totalCells).toBe(1);
-        expect(
-          doneEvent.summary.completedCells + doneEvent.summary.failedCells,
-        ).toBe(1);
+        expect(doneEvent.summary.completedCells + doneEvent.summary.failedCells).toBe(1);
       }
     }, 60000);
 
@@ -286,9 +280,9 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       const events = await collectEvents(input);
 
       // Find target_result events
-      const targetResults = events.filter(
-        (e) => e.type === "target_result",
-      ) as Array<Extract<EvaluationV3Event, { type: "target_result" }>>;
+      const targetResults = events.filter((e) => e.type === "target_result") as Array<
+        Extract<EvaluationV3Event, { type: "target_result" }>
+      >;
       expect(targetResults.length).toBeGreaterThan(0);
 
       // Check that duration is present and positive
@@ -559,15 +553,11 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       expect(cellStartedEvents).toHaveLength(1);
 
       // Should NOT have target_result event (target was skipped)
-      const targetResultEvents = events.filter(
-        (e) => e.type === "target_result",
-      );
+      const targetResultEvents = events.filter((e) => e.type === "target_result");
       expect(targetResultEvents).toHaveLength(0);
 
       // Should have evaluator_result event
-      const evaluatorResultEvents = events.filter(
-        (e) => e.type === "evaluator_result",
-      );
+      const evaluatorResultEvents = events.filter((e) => e.type === "evaluator_result");
       expect(evaluatorResultEvents).toHaveLength(1);
 
       const evalResult = evaluatorResultEvents[0];
@@ -618,15 +608,11 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       const events = await collectEvents(input);
 
       // Should have target_result event (target was executed)
-      const targetResultEvents = events.filter(
-        (e) => e.type === "target_result",
-      );
+      const targetResultEvents = events.filter((e) => e.type === "target_result");
       expect(targetResultEvents.length).toBeGreaterThan(0);
 
       // Should have evaluator_result event
-      const evaluatorResultEvents = events.filter(
-        (e) => e.type === "evaluator_result",
-      );
+      const evaluatorResultEvents = events.filter((e) => e.type === "evaluator_result");
       expect(evaluatorResultEvents).toHaveLength(1);
 
       // Should complete successfully
@@ -665,10 +651,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         },
       };
 
-      const state = createTestState([
-        createTargetConfig("target-1"),
-        badTarget,
-      ]);
+      const state = createTestState([createTargetConfig("target-1"), badTarget]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
@@ -693,9 +676,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       // Should have at least one successful result and one error
       const targetResults = events.filter((e) => e.type === "target_result");
       const errors = events.filter(
-        (e) =>
-          e.type === "error" ||
-          (e.type === "target_result" && (e as any).error),
+        (e) => e.type === "error" || (e.type === "target_result" && (e as any).error),
       );
 
       expect(targetResults.length + errors.length).toBeGreaterThan(0);
@@ -739,9 +720,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       expect(targetResults.length).toBeGreaterThanOrEqual(1);
 
       // Should have evaluator_result events (one per row per evaluator per target)
-      const evaluatorResults = events.filter(
-        (e) => e.type === "evaluator_result",
-      );
+      const evaluatorResults = events.filter((e) => e.type === "evaluator_result");
       expect(evaluatorResults.length).toBeGreaterThanOrEqual(1);
 
       // Each evaluator result should have the correct structure
@@ -786,17 +765,12 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       const events = await collectEvents(input);
 
       // Get the evaluator results
-      const evaluatorResults = events.filter(
-        (e) => e.type === "evaluator_result",
-      );
+      const evaluatorResults = events.filter((e) => e.type === "evaluator_result");
       expect(evaluatorResults.length).toBeGreaterThanOrEqual(1);
 
       // Each evaluator result should NOT have a score (score should be stripped)
       for (const event of evaluatorResults) {
-        if (
-          event.type === "evaluator_result" &&
-          event.result.status === "processed"
-        ) {
+        if (event.type === "evaluator_result" && event.result.status === "processed") {
           expect(event.result.score).toBeUndefined();
           // But should still have passed field
           expect(event.result.passed).toBeDefined();
@@ -889,10 +863,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         },
       };
 
-      const state = createTestState(
-        [createTargetConfig("target-1")],
-        [invalidEvaluator],
-      );
+      const state = createTestState([createTargetConfig("target-1")], [invalidEvaluator]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
@@ -919,9 +890,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       expect(targetResults.length).toBe(1);
 
       // Evaluator should return ERROR status, not "processed"
-      const evaluatorResults = events.filter(
-        (e) => e.type === "evaluator_result",
-      );
+      const evaluatorResults = events.filter((e) => e.type === "evaluator_result");
       expect(evaluatorResults.length).toBe(1);
 
       const evalResult = evaluatorResults[0];
@@ -1031,9 +1000,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         expect(targetResults.length).toBe(1);
 
         // Should have evaluator result
-        const evaluatorResults = events.filter(
-          (e) => e.type === "evaluator_result",
-        );
+        const evaluatorResults = events.filter((e) => e.type === "evaluator_result");
         expect(evaluatorResults.length).toBe(1);
 
         const evalResult = evaluatorResults[0];
@@ -1149,9 +1116,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         expect(events[events.length - 1]?.type).toBe("done");
 
         // Check the evaluator result
-        const evaluatorResults = events.filter(
-          (e) => e.type === "evaluator_result",
-        );
+        const evaluatorResults = events.filter((e) => e.type === "evaluator_result");
         expect(evaluatorResults.length).toBe(1);
 
         const evalResult = evaluatorResults[0];
@@ -1201,13 +1166,9 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         // Human-readable run IDs like "quick-agile-lynx" (adjective-adjective-noun pattern)
         expect(summary.runId).toMatch(/^[a-z]+-[a-z]+-[a-z]+$/);
         expect(summary.duration).toBeGreaterThan(0);
-        expect(summary.duration).toBeLessThanOrEqual(
-          endTime - startTime + 1000,
-        );
+        expect(summary.duration).toBeLessThanOrEqual(endTime - startTime + 1000);
         expect(summary.timestamps.startedAt).toBeGreaterThanOrEqual(startTime);
-        expect(summary.timestamps.finishedAt).toBeLessThanOrEqual(
-          endTime + 1000,
-        );
+        expect(summary.timestamps.finishedAt).toBeLessThanOrEqual(endTime + 1000);
       }
     }, 60000);
   });
@@ -1423,9 +1384,9 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       expect(cellStartedEvents).toHaveLength(2);
 
       // Should only have results for rows 0 and 2
-      const targetResults = events.filter(
-        (e) => e.type === "target_result",
-      ) as Array<Extract<EvaluationV3Event, { type: "target_result" }>>;
+      const targetResults = events.filter((e) => e.type === "target_result") as Array<
+        Extract<EvaluationV3Event, { type: "target_result" }>
+      >;
       expect(targetResults).toHaveLength(2);
 
       const resultRowIndices = targetResults.map((r) => r.rowIndex).sort();
@@ -1472,9 +1433,9 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       }
 
       // Verify results are for correct rows
-      const targetResults = events.filter(
-        (e) => e.type === "target_result",
-      ) as Array<Extract<EvaluationV3Event, { type: "target_result" }>>;
+      const targetResults = events.filter((e) => e.type === "target_result") as Array<
+        Extract<EvaluationV3Event, { type: "target_result" }>
+      >;
       const resultRowIndices = targetResults.map((r) => r.rowIndex).sort();
       expect(resultRowIndices).toEqual([0, 2]);
     }, 60000);
@@ -1577,9 +1538,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
 
       // Step 2: Normalize column IDs to column names (like the API route does)
       // This is the key step - the orchestrator expects column NAMES as keys
-      const idToName = Object.fromEntries(
-        datasetColumns.map((c) => [c.id, c.name]),
-      );
+      const idToName = Object.fromEntries(datasetColumns.map((c) => [c.id, c.name]));
       datasetRows = datasetRows.map((row) => {
         const normalized: Record<string, unknown> = { id: row.id };
         for (const [key, value] of Object.entries(row)) {
@@ -1594,9 +1553,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       const jsonColumns = new Set(
         datasetColumns
           .filter((c) =>
-            ["chat_messages", "json", "list", "spans", "rag_contexts"].includes(
-              c.type,
-            ),
+            ["chat_messages", "json", "list", "spans", "rag_contexts"].includes(c.type),
           )
           .map((c) => c.name), // Use name since we normalized above
       );
@@ -1618,12 +1575,8 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       }
 
       // Verify the parsing worked - now using column NAMES as keys
-      expect(datasetRows[0]?.messages).toEqual([
-        { role: "user", content: "hi" },
-      ]);
-      expect(datasetRows[0]?.input).toBe(
-        "How do I update my billing information?",
-      );
+      expect(datasetRows[0]?.messages).toEqual([{ role: "user", content: "hi" }]);
+      expect(datasetRows[0]?.input).toBe("How do I update my billing information?");
 
       // HTTP Agent target that maps both messages and input
       const httpAgentTarget: TargetConfig = {
@@ -1881,9 +1834,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
 
         const state = createTestState([evaluatorTargetConfig]);
         // Test with matching values - should pass
-        const datasetRows = [
-          { response: "hello world", expected: "hello world" },
-        ];
+        const datasetRows = [{ response: "hello world", expected: "hello world" }];
         const datasetColumns = [
           { id: "response", name: "response", type: "string" },
           { id: "expected", name: "expected", type: "string" },
@@ -1942,9 +1893,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         }
 
         // Should NOT have evaluator_result events (evaluator is the target, not a downstream evaluator)
-        const evaluatorResults = events.filter(
-          (e) => e.type === "evaluator_result",
-        );
+        const evaluatorResults = events.filter((e) => e.type === "evaluator_result");
         expect(evaluatorResults).toHaveLength(0);
       } finally {
         // Cleanup
@@ -2007,9 +1956,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
 
         const state = createTestState([evaluatorTargetConfig]);
         // Test with NON-matching values - should fail
-        const datasetRows = [
-          { response: "hello world", expected: "goodbye world" },
-        ];
+        const datasetRows = [{ response: "hello world", expected: "goodbye world" }];
         const datasetColumns = [
           { id: "response", name: "response", type: "string" },
           { id: "expected", name: "expected", type: "string" },
@@ -2212,9 +2159,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         }
 
         // Should have evaluator_result for the downstream meta-evaluator
-        const evaluatorResults = events.filter(
-          (e) => e.type === "evaluator_result",
-        );
+        const evaluatorResults = events.filter((e) => e.type === "evaluator_result");
         expect(evaluatorResults.length).toBe(1);
 
         const evalResult = evaluatorResults[0];
@@ -2329,9 +2274,9 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         expect(events[events.length - 1]?.type).toBe("done");
 
         // Should have 3 target_result events
-        const targetResults = events.filter(
-          (e) => e.type === "target_result",
-        ) as Array<Extract<EvaluationV3Event, { type: "target_result" }>>;
+        const targetResults = events.filter((e) => e.type === "target_result") as Array<
+          Extract<EvaluationV3Event, { type: "target_result" }>
+        >;
         expect(targetResults.length).toBe(3);
 
         // Check each result
@@ -2344,17 +2289,11 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         );
 
         // Row 0: should pass
-        expect((resultByRow[0]?.output as { passed?: boolean })?.passed).toBe(
-          true,
-        );
+        expect((resultByRow[0]?.output as { passed?: boolean })?.passed).toBe(true);
         // Row 1: should fail
-        expect((resultByRow[1]?.output as { passed?: boolean })?.passed).toBe(
-          false,
-        );
+        expect((resultByRow[1]?.output as { passed?: boolean })?.passed).toBe(false);
         // Row 2: should pass
-        expect((resultByRow[2]?.output as { passed?: boolean })?.passed).toBe(
-          true,
-        );
+        expect((resultByRow[2]?.output as { passed?: boolean })?.passed).toBe(true);
 
         // Done event should show 3 completed cells
         const doneEvent = events[events.length - 1];
@@ -2407,8 +2346,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
             messages: [
               {
                 role: "system",
-                content:
-                  "Respond with only the single word 'apple', nothing else.",
+                content: "Respond with only the single word 'apple', nothing else.",
               },
               { role: "user", content: "{{input}}" },
             ],
@@ -2421,8 +2359,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
             messages: [
               {
                 role: "system",
-                content:
-                  "Respond with only the single word 'orange', nothing else.",
+                content: "Respond with only the single word 'orange', nothing else.",
               },
               { role: "user", content: "{{input}}" },
             ],
@@ -2447,10 +2384,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           },
         };
 
-        const state = createTestState(
-          [variantA, variantB, comparisonTarget],
-          [],
-        );
+        const state = createTestState([variantA, variantB, comparisonTarget], []);
         const datasetRows = [{ question: "Name a fruit.", expected: "apple" }];
         const datasetColumns = [
           { id: "question", name: "question", type: "string" },
@@ -2488,8 +2422,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         expect(events[events.length - 1]?.type).toBe("done");
 
         const comparisonResults = events.filter(
-          (e) =>
-            e.type === "evaluator_result" && e.targetId === "target-comparison",
+          (e) => e.type === "evaluator_result" && e.targetId === "target-comparison",
         );
         expect(comparisonResults).toHaveLength(1);
 
@@ -2596,10 +2529,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           localPromptConfig: createPromptConfig(),
         };
 
-        const state = createTestState(
-          [passthroughTarget],
-          [customFieldsEvaluator],
-        );
+        const state = createTestState([passthroughTarget], [customFieldsEvaluator]);
 
         // Dataset with custom field names
         const datasetRows = [

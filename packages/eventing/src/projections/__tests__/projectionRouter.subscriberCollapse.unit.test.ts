@@ -131,8 +131,7 @@ describe("ProjectionRouter subscriber dispatch over a coalesced batch", () => {
       const subscriber: SubscriberDispatchDefinition<Event> = {
         name: "customEvaluationSync",
         options: {
-          makeJobId: ({ event }) =>
-            `custom-eval:${event.aggregateId}:${event.id}`,
+          makeJobId: ({ event }) => `custom-eval:${event.aggregateId}:${event.id}`,
         },
         handle: vi.fn().mockResolvedValue(undefined),
       };

@@ -21,33 +21,34 @@ Rules live under **Settings > Privacy** in your organization
 settings. A rule is written once at the scope it should govern, and
 every project underneath resolves it automatically.
 
-<Info>**Pairs with:** [No-spy mode](/ai-governance/no-spy-mode), the
-organization-wide posture built from this policy for enterprises that
-must not store employee conversational content, and
-[Compliance architecture](/ai-governance/compliance-architecture) for
-how privacy fits the broader audit story.</Info>
+<Info>
+  **Pairs with:** [No-spy mode](/ai-governance/no-spy-mode), the organization-wide posture
+  built from this policy for enterprises that must not store employee conversational
+  content, and [Compliance architecture](/ai-governance/compliance-architecture) for how
+  privacy fits the broader audit story.
+</Info>
 
 ## Content categories
 
 Four categories of trace content are governed independently:
 
-| Category | What it covers |
-|---|---|
-| **Input** | User prompts and request bodies |
-| **Output** | Model responses and completions |
+| Category                | What it covers                        |
+| ----------------------- | ------------------------------------- |
+| **Input**               | User prompts and request bodies       |
+| **Output**              | Model responses and completions       |
 | **System instructions** | System prompts and instruction blocks |
-| **Tool calls** | Tool-call arguments and tool results |
+| **Tool calls**          | Tool-call arguments and tool results  |
 
 Each category is set to one of three dispositions: **Capture**,
 **Restrict**, or **Drop**.
 
 ## The three dispositions
 
-| Disposition | Stored? | Who can read it |
-|---|---|---|
-| **Capture** (default) | Yes | The whole team |
-| **Restrict** | Yes | Only the audience chosen on the rule |
-| **Drop** | Never | No one, the content is stripped at ingestion |
+| Disposition           | Stored? | Who can read it                              |
+| --------------------- | ------- | -------------------------------------------- |
+| **Capture** (default) | Yes     | The whole team                               |
+| **Restrict**          | Yes     | Only the audience chosen on the rule         |
+| **Drop**              | Never   | No one, the content is stripped at ingestion |
 
 ### Restrict or drop?
 
@@ -63,8 +64,8 @@ export, or breach can surface it. The cost is that no one can debug
 with it, and it cannot be undone for data that already arrived
 dropped.
 
-Choose Restrict when the question is *who may read this*. Choose Drop
-when the requirement is *this must not exist in storage*.
+Choose Restrict when the question is _who may read this_. Choose Drop
+when the requirement is _this must not exist in storage_.
 
 ### Drop covers every ingestion path
 
@@ -86,11 +87,11 @@ the conversation.
 
 ### Retroactivity
 
-| Setting | Acts at | Applies to |
-|---|---|---|
-| Drop | Ingestion | New traces only |
-| PII redaction | Ingestion | New traces only |
-| Secrets redaction | Ingestion | New traces only |
+| Setting           | Acts at   | Applies to                                      |
+| ----------------- | --------- | ----------------------------------------------- |
+| Drop              | Ingestion | New traces only                                 |
+| PII redaction     | Ingestion | New traces only                                 |
+| Secrets redaction | Ingestion | New traces only                                 |
 | Restrict audience | Read time | All traces, existing ones included, immediately |
 
 Adding a drop rule does not scrub traces that are already stored. To
@@ -102,12 +103,12 @@ with your retention setup (see
 
 A rule is written at one of four scopes:
 
-| Scope | Governs |
-|---|---|
-| **Organization** | Every project in the organization |
-| **Department** | Every project assigned to that department |
-| **Team** | Every project under that team |
-| **Project** | That project only |
+| Scope            | Governs                                   |
+| ---------------- | ----------------------------------------- |
+| **Organization** | Every project in the organization         |
+| **Department**   | Every project assigned to that department |
+| **Team**         | Every project under that team             |
+| **Project**      | That project only                         |
 
 Organization and Department rules can be narrowed to **personal
 projects only**: every user's personal CLI workspace, where
@@ -139,11 +140,11 @@ Acme writes two rules:
 
 How three projects resolve:
 
-| Project | Input | Output | Why |
-|---|---|---|---|
-| `billing-api`, a team project | Captured | Captured | The organization rule is narrowed to personal projects, so neither rule applies; platform defaults. |
-| `hr-helpdesk`, assigned to the HR department | Captured | Restricted to the `HR` group | The department rule sets output; nothing sets input. |
-| Dana's personal workspace (Dana is in HR) | Dropped | Restricted to the `HR` group | The organization rule drops personal-project input, and a personal project follows its owner's department, so HR's output rule applies too. |
+| Project                                      | Input    | Output                       | Why                                                                                                                                         |
+| -------------------------------------------- | -------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `billing-api`, a team project                | Captured | Captured                     | The organization rule is narrowed to personal projects, so neither rule applies; platform defaults.                                         |
+| `hr-helpdesk`, assigned to the HR department | Captured | Restricted to the `HR` group | The department rule sets output; nothing sets input.                                                                                        |
+| Dana's personal workspace (Dana is in HR)    | Dropped  | Restricted to the `HR` group | The organization rule drops personal-project input, and a personal project follows its owner's department, so HR's output rule applies too. |
 
 All three projects also resolve **Essential** PII redaction and
 secrets redaction **on**: no rule sets those fields, so the platform
@@ -199,23 +200,26 @@ cascade, so a team's patterns apply on top of the organization's.
 
 A rule can disable secrets redaction for its scope.
 
-<Warning>With secrets redaction off, any credential pasted into a
-prompt or returned by a tool is stored in the clear. Turn it off only
-when you are certain no real credentials transit the projects in
-scope.</Warning>
+<Warning>
+  With secrets redaction off, any credential pasted into a prompt or returned by a tool is
+  stored in the clear. Turn it off only when you are certain no real credentials transit
+  the projects in scope.
+</Warning>
 
 ## PII redaction
 
-| Level | What it redacts | How it runs |
-|---|---|---|
-| **Disabled** | Nothing | No scanning at all |
+| Level                   | What it redacts                                                        | How it runs                                                |
+| ----------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **Disabled**            | Nothing                                                                | No scanning at all                                         |
 | **Essential** (default) | Emails, phone numbers, credit cards, IP addresses, IBANs, national IDs | Natively in the ingestion pipeline, fast, no external call |
-| **Strict** | Everything in Essential, plus person names and locations | Uses the deeper analysis service |
+| **Strict**              | Everything in Essential, plus person names and locations               | Uses the deeper analysis service                           |
 
 Like secrets, detected PII is replaced with a redaction placeholder.
 
-<Note>Credit card numbers are validated before redaction, so a random
-16-digit order id in your traces is left intact.</Note>
+<Note>
+  Credit card numbers are validated before redaction, so a random 16-digit order id in
+  your traces is left intact.
+</Note>
 
 ## Custom drop keys
 
@@ -228,16 +232,16 @@ at the organization, department, team, and project levels all apply.
 
 With no rule anywhere in the cascade, a project resolves to:
 
-| Setting | Default |
-|---|---|
-| Input | Captured, visible to the whole team |
-| Output | Captured, visible to the whole team |
-| System instructions | Captured, visible to the whole team |
-| Tool calls | Captured, visible to the whole team |
-| PII redaction | Essential |
-| Secrets redaction | On |
-| Custom drop keys | None |
-| Custom secret patterns | None |
+| Setting                | Default                             |
+| ---------------------- | ----------------------------------- |
+| Input                  | Captured, visible to the whole team |
+| Output                 | Captured, visible to the whole team |
+| System instructions    | Captured, visible to the whole team |
+| Tool calls             | Captured, visible to the whole team |
+| PII redaction          | Essential                           |
+| Secrets redaction      | On                                  |
+| Custom drop keys       | None                                |
+| Custom secret patterns | None                                |
 
 Privacy is default-on: secrets and essential PII are scrubbed before
 you write a single rule.
@@ -247,12 +251,12 @@ you write a single rule.
 Rules are managed under **Settings > Privacy**. Writing a rule
 requires the permission matching its scope:
 
-| Rule scope | Required permission |
-|---|---|
+| Rule scope   | Required permission |
+| ------------ | ------------------- |
 | Organization | Organization manage |
-| Department | Organization manage |
-| Team | Team manage |
-| Project | Project update |
+| Department   | Organization manage |
+| Team         | Team manage         |
+| Project      | Project update      |
 
 ## Where to next
 

@@ -11,10 +11,7 @@ import {
   applySpanToSummary,
   TraceSummaryFoldProjection,
 } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * Drift guard: the slim fold's handlers MUST produce the same values as the
@@ -100,9 +97,7 @@ function assertSharedFieldsParity({
   expect(slim.totalCost).toBe(summary.totalCost);
   expect(slim.nonBilledCost).toBe(summary.nonBilledCost);
   expect(slim.totalPromptTokenCount).toBe(summary.totalPromptTokenCount);
-  expect(slim.totalCompletionTokenCount).toBe(
-    summary.totalCompletionTokenCount,
-  );
+  expect(slim.totalCompletionTokenCount).toBe(summary.totalCompletionTokenCount);
 
   // Status
   expect(slim.containsErrorStatus).toBe(summary.containsErrorStatus);

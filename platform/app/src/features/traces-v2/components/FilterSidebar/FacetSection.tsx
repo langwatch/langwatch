@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
@@ -227,8 +219,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   // "openai/gpt-4o-mini", which the server's anchored prefix match misses) is
   // still found locally.
   const baseItems = useMemo(
-    () =>
-      serverSearchActive ? dedupeByValue([...items, ...serverItems]) : items,
+    () => (serverSearchActive ? dedupeByValue([...items, ...serverItems]) : items),
     [serverSearchActive, items, serverItems],
   );
   const filtered = useMemo(
@@ -446,86 +437,87 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
             operators only reach for on long-tail values. The toggle
             keeps it one click away; reopening auto-focuses the Input
             so the user can start typing immediately. */}
-          {items.length > 0 && searchOpen && (
-            // The Input carries an inset focus ring (outlineOffset -2px) so
-            // the keyboard outline renders fully inside the element instead
-            // of being clipped at the edge by the sidebar scroll
-            // container's overflow (#18b). The small paddingX/paddingY
-            // gutter is kept purely for visual breathing room around the
-            // focused input.
-            <VStack
-              gap={0.5}
-              align="stretch"
-              marginTop={1}
-              paddingX={0.5}
-              paddingY={0.5}
-            >
-              <Input
-                ref={searchInputRef}
-                size="xs"
-                placeholder="Search or press Enter to apply…"
-                value={searchQuery}
-                // Inset focus ring so the keyboard outline renders fully —
-                // the sidebar scroll container's overflow clips an outset
-                // ring's edges (#18b). The paddingX/paddingY gutter on the
-                // wrapper above is kept as belt-and-braces.
-                _focusVisible={{
-                  outlineWidth: "2px",
-                  outlineStyle: "solid",
-                  outlineColor: "blue.focusRing",
-                  outlineOffset: "-2px",
-                }}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  const typed = searchQuery.trim();
-                  if (!typed) return;
-                  // Prefer an exact match against a known FacetItem so
-                  // facets where label !== value (friendly topic names,
-                  // etc.) submit `value` rather than the typed `label`.
-                  // Fall back to the raw typed value for rare values
-                  // (a one-off `metadata.tenant`, a long error string
-                  // copy-pasted from a log) that don't surface in the
-                  // top-50 facet response. Toggle is symmetric: typing
-                  // the same value again removes the filter.
-                  const lowered = typed.toLowerCase();
-                  const matched = items.find(
-                    (i) =>
-                      i.value.toLowerCase() === lowered ||
-                      i.label.toLowerCase() === lowered,
-                  );
-                  e.preventDefault();
-                  handleToggle(matched?.value ?? typed);
-                  setSearchQuery("");
-                }}
-                textStyle="xs"
-              />
-              {serverSearchActive && serverSearch.isFetching && (
-                <HStack
-                  data-testid="facet-search-spinner"
-                  gap={2}
-                  paddingX={1}
-                  paddingY={1}
-                >
-                  <Spinner size="xs" />
-                  <Text textStyle="2xs" color="fg.subtle">
-                    Searching all values…
-                  </Text>
-                </HStack>
-              )}
-              {searchQuery.trim() &&
-                !(serverSearchActive && serverSearch.isFetching) &&
-                layout.facetWindow.visible.length === 0 && (
-                  <Text textStyle="2xs" color="fg.muted" paddingX={1}>
-                    No match. Press <Kbd>Enter</Kbd> to filter by "
-                    <Box as="span" fontWeight="600" color="fg">
-                      {searchQuery.trim()}
-                    </Box>
-                    " anyway.
-                  </Text>
+          {items.length > 0 &&
+            searchOpen && (
+              // The Input carries an inset focus ring (outlineOffset -2px) so
+              // the keyboard outline renders fully inside the element instead
+              // of being clipped at the edge by the sidebar scroll
+              // container's overflow (#18b). The small paddingX/paddingY
+              // gutter is kept purely for visual breathing room around the
+              // focused input.
+              <VStack
+                gap={0.5}
+                align="stretch"
+                marginTop={1}
+                paddingX={0.5}
+                paddingY={0.5}
+              >
+                <Input
+                  ref={searchInputRef}
+                  size="xs"
+                  placeholder="Search or press Enter to apply…"
+                  value={searchQuery}
+                  // Inset focus ring so the keyboard outline renders fully —
+                  // the sidebar scroll container's overflow clips an outset
+                  // ring's edges (#18b). The paddingX/paddingY gutter on the
+                  // wrapper above is kept as belt-and-braces.
+                  _focusVisible={{
+                    outlineWidth: "2px",
+                    outlineStyle: "solid",
+                    outlineColor: "blue.focusRing",
+                    outlineOffset: "-2px",
+                  }}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    const typed = searchQuery.trim();
+                    if (!typed) return;
+                    // Prefer an exact match against a known FacetItem so
+                    // facets where label !== value (friendly topic names,
+                    // etc.) submit `value` rather than the typed `label`.
+                    // Fall back to the raw typed value for rare values
+                    // (a one-off `metadata.tenant`, a long error string
+                    // copy-pasted from a log) that don't surface in the
+                    // top-50 facet response. Toggle is symmetric: typing
+                    // the same value again removes the filter.
+                    const lowered = typed.toLowerCase();
+                    const matched = items.find(
+                      (i) =>
+                        i.value.toLowerCase() === lowered ||
+                        i.label.toLowerCase() === lowered,
+                    );
+                    e.preventDefault();
+                    handleToggle(matched?.value ?? typed);
+                    setSearchQuery("");
+                  }}
+                  textStyle="xs"
+                />
+                {serverSearchActive && serverSearch.isFetching && (
+                  <HStack
+                    data-testid="facet-search-spinner"
+                    gap={2}
+                    paddingX={1}
+                    paddingY={1}
+                  >
+                    <Spinner size="xs" />
+                    <Text textStyle="2xs" color="fg.subtle">
+                      Searching all values…
+                    </Text>
+                  </HStack>
                 )}
-            </VStack>
-          )}
+                {searchQuery.trim() &&
+                  !(serverSearchActive && serverSearch.isFetching) &&
+                  layout.facetWindow.visible.length === 0 && (
+                    <Text textStyle="2xs" color="fg.muted" paddingX={1}>
+                      No match. Press <Kbd>Enter</Kbd> to filter by "
+                      <Box as="span" fontWeight="600" color="fg">
+                        {searchQuery.trim()}
+                      </Box>
+                      " anyway.
+                    </Text>
+                  )}
+              </VStack>
+            )}
         </VStack>
       </SidebarSection>
     </Box>
@@ -548,8 +540,7 @@ function filterAndSortItems({
   // (friendly topic names, IDs displayed with a label), typing
   // either should reveal the row.
   return sorted.filter(
-    (i) =>
-      i.label.toLowerCase().includes(q) || i.value.toLowerCase().includes(q),
+    (i) => i.label.toLowerCase().includes(q) || i.value.toLowerCase().includes(q),
   );
 }
 
@@ -605,11 +596,7 @@ const ExpandToggle: React.FC<ExpandToggleProps> = ({
 }) => {
   if (!showMore) {
     if (collapsedRemaining <= 0) return null;
-    return (
-      <LinkButton onClick={onShowMore}>
-        Show {collapsedRemaining} more
-      </LinkButton>
-    );
+    return <LinkButton onClick={onShowMore}>Show {collapsedRemaining} more</LinkButton>;
   }
   return (
     <>
@@ -619,8 +606,8 @@ const ExpandToggle: React.FC<ExpandToggleProps> = ({
         // so the hint points at the always-on search input (which
         // doubles as Enter-to-filter for arbitrary values).
         <Text textStyle="xs" color="fg.subtle" paddingX={1} paddingY={0.5}>
-          {beyondExpanded}+ rare values aren't shown — type a value and press
-          Enter to filter.
+          {beyondExpanded}+ rare values aren't shown — type a value and press Enter to
+          filter.
         </Text>
       )}
       <LinkButton onClick={onShowLess}>Show less</LinkButton>

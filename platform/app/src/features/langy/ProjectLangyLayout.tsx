@@ -7,10 +7,7 @@ import { LangySidecar } from "./components/LangyPanel";
 import { useLangyScopeReset } from "./hooks/useLangyScopeReset";
 import { useShowLangy } from "./hooks/useShowLangy";
 import { LangyProvider, useLangy } from "./LangyContext";
-import {
-  LANGY_DOCKED_OFFSET,
-  LANGY_TRANSITION,
-} from "./logic/langyPanelLayout";
+import { LANGY_DOCKED_OFFSET, LANGY_TRANSITION } from "./logic/langyPanelLayout";
 import { useLangyStore } from "./stores/langyStore";
 
 /**
@@ -45,10 +42,7 @@ export default function ProjectLangyLayout() {
   useLangyScopeReset();
 
   return (
-    <ProjectLangySubtree
-      projectId={project?.id ?? "no-project"}
-      showLangy={showLangy}
-    />
+    <ProjectLangySubtree projectId={project?.id ?? "no-project"} showLangy={showLangy} />
   );
 }
 
@@ -110,8 +104,7 @@ function LangyShiftedRoot({
   const { currentDrawer } = useDrawer();
   // Only Sidebar mode reserves room (pushes content left). Floating mode
   // overlays the page — content stays full width and the card floats over it.
-  const shifted =
-    showLangy && isOpen && panelMode === "sidebar" && !currentDrawer;
+  const shifted = showLangy && isOpen && panelMode === "sidebar" && !currentDrawer;
   // Publish the reservation truth for a claiming shell (see the store): this
   // wrapper owns the visibility gate, the shell only consumes the result.
   useEffect(() => {

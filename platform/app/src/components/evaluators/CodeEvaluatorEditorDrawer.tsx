@@ -55,10 +55,7 @@ export type CodeEvaluatorEditorDrawerProps = {
    * inputs are a plain identifier + type list.
    */
   mappingsConfig?: EvaluatorMappingsConfig;
-  onMappingChange?: (
-    identifier: string,
-    mapping: UIFieldMapping | undefined,
-  ) => void;
+  onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
   /** Called with the saved evaluator; flow callbacks take precedence. */
   onSave?: (evaluator: { id: string; name: string }) => void;
 };
@@ -84,8 +81,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     props.mappingsConfig ??
     (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
   const onMappingChange =
-    props.onMappingChange ??
-    getFlowCallbacks("codeEvaluatorEditor")?.onMappingChange;
+    props.onMappingChange ?? getFlowCallbacks("codeEvaluatorEditor")?.onMappingChange;
 
   const isOpen = props.open !== false && props.open !== undefined;
 
@@ -264,9 +260,7 @@ type CodeEvaluatorFormState = ReturnType<typeof useCodeEvaluatorForm>;
  * itself (no workflow record). In the workbench it also maps each input to a
  * source, merged into the inputs list like the prompt drawer.
  */
-export function CodeEvaluatorEditorDrawer(
-  props: CodeEvaluatorEditorDrawerProps,
-) {
+export function CodeEvaluatorEditorDrawer(props: CodeEvaluatorEditorDrawerProps) {
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const form = useCodeEvaluatorForm(props);
   const isOpen = props.open !== false && props.open !== undefined;
@@ -286,11 +280,7 @@ export function CodeEvaluatorEditorDrawer(
     >
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
-        <EditorHeader
-          canGoBack={canGoBack}
-          goBack={goBack}
-          isEditing={form.isEditing}
-        />
+        <EditorHeader canGoBack={canGoBack} goBack={goBack} isEditing={form.isEditing} />
         <Drawer.Body display="flex" flexDirection="column" gap={4}>
           {form.isLoadingEvaluator ? (
             <HStack justify="center" paddingY={8}>
@@ -377,8 +367,8 @@ function CodeEvaluatorFormFields({ form }: { form: CodeEvaluatorFormState }) {
       <Field.Root>
         <Field.Label>Python Code</Field.Label>
         <Field.HelperText margin={0}>
-          Define a Python class with a `__call__` method that takes the inputs
-          and returns the outputs (passed, score, label or details).
+          Define a Python class with a `__call__` method that takes the inputs and returns
+          the outputs (passed, score, label or details).
         </Field.HelperText>
         <Box
           width="full"
@@ -408,9 +398,7 @@ function CodeEvaluatorFormFields({ form }: { form: CodeEvaluatorFormState }) {
             type: f.type as Variable["type"],
           }))}
           onChange={(vars) =>
-            form.setInputs(
-              vars.map((v) => ({ identifier: v.identifier, type: v.type })),
-            )
+            form.setInputs(vars.map((v) => ({ identifier: v.identifier, type: v.type })))
           }
           showMappings
           mappings={form.mappings}
@@ -452,8 +440,8 @@ function OutputContractInfo() {
         Outputs
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        Return a dictionary from your function with any of these fields.
-        Whichever you return become the evaluation result.
+        Return a dictionary from your function with any of these fields. Whichever you
+        return become the evaluation result.
       </Text>
       <VStack
         align="stretch"
@@ -506,9 +494,7 @@ function FieldListEditor({
         <Button
           size="xs"
           variant="ghost"
-          onClick={() =>
-            setFields([...fields, { identifier: "", type: "str" }])
-          }
+          onClick={() => setFields([...fields, { identifier: "", type: "str" }])}
           data-testid={`${testIdPrefix}-add`}
         >
           <LuPlus size={14} /> Add

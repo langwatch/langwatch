@@ -9,9 +9,7 @@ import {
 describe("extractMessageContentText", () => {
   describe("when content is a string", () => {
     it("returns the string directly", () => {
-      expect(
-        extractMessageContentText({ role: "user", content: "hello" }),
-      ).toBe("hello");
+      expect(extractMessageContentText({ role: "user", content: "hello" })).toBe("hello");
     });
   });
 

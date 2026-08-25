@@ -5,11 +5,7 @@
  * the transformed BatchEvaluationData format.
  */
 import type { MetricStats } from "~/components/shared/MetricStatsTooltip";
-import type {
-  BatchEvaluationData,
-  BatchResultRow,
-  BatchTargetColumn,
-} from "./types";
+import type { BatchEvaluationData, BatchResultRow, BatchTargetColumn } from "./types";
 
 /**
  * Aggregate statistics for a target's evaluator results.
@@ -65,18 +61,14 @@ export type BatchTargetAggregate = {
 /**
  * Computes percentile from a sorted array.
  */
-const computePercentile = (
-  sortedValues: number[],
-  percentile: number,
-): number => {
+const computePercentile = (sortedValues: number[], percentile: number): number => {
   if (sortedValues.length === 0) return 0;
   const index = (percentile / 100) * (sortedValues.length - 1);
   const lower = Math.floor(index);
   const upper = Math.ceil(index);
   if (lower === upper) return sortedValues[lower]!;
   return (
-    sortedValues[lower]! +
-    (sortedValues[upper]! - sortedValues[lower]!) * (index - lower)
+    sortedValues[lower]! + (sortedValues[upper]! - sortedValues[lower]!) * (index - lower)
   );
 };
 
@@ -210,8 +202,7 @@ export const computeBatchTargetAggregates = (
     failed: agg.failed,
     errors: agg.errors,
     // Pass rate only counts results with explicit pass/fail (true/false), not score-only results
-    passRate:
-      agg.passFailCount > 0 ? (agg.passed / agg.passFailCount) * 100 : null,
+    passRate: agg.passFailCount > 0 ? (agg.passed / agg.passFailCount) * 100 : null,
     averageScore: agg.scoreCount > 0 ? agg.scoreSum / agg.scoreCount : null,
   }));
 
@@ -221,13 +212,10 @@ export const computeBatchTargetAggregates = (
     0,
   );
   const totalPassed = evaluatorAggregates.reduce((sum, e) => sum + e.passed, 0);
-  const overallPassRate =
-    totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null;
+  const overallPassRate = totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null;
 
   // Compute overall average score
-  const scoresWithValues = evaluatorAggregates.filter(
-    (e) => e.averageScore !== null,
-  );
+  const scoresWithValues = evaluatorAggregates.filter((e) => e.averageScore !== null);
   const overallAverageScore =
     scoresWithValues.length > 0
       ? scoresWithValues.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) /
@@ -260,10 +248,7 @@ export const computeAllBatchAggregates = (
   const aggregates = new Map<string, BatchTargetAggregate>();
 
   for (const targetCol of data.targetColumns) {
-    aggregates.set(
-      targetCol.id,
-      computeBatchTargetAggregates(targetCol, data.rows),
-    );
+    aggregates.set(targetCol.id, computeBatchTargetAggregates(targetCol, data.rows));
   }
 
   return aggregates;

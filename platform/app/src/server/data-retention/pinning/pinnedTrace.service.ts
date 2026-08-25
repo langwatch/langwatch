@@ -36,8 +36,7 @@ export type HasActiveShareForTrace = (params: {
 export class PinnedTraceService {
   constructor(
     private readonly repository: PinnedTraceRepository,
-    private readonly hasActiveShareForTrace: HasActiveShareForTrace = async () =>
-      false,
+    private readonly hasActiveShareForTrace: HasActiveShareForTrace = async () => false,
   ) {}
 
   async pin(params: PinTraceParams): Promise<PinnedTrace> {
@@ -118,19 +117,11 @@ export class PinnedTraceService {
     return this.repository.findByProjectAndTrace({ projectId, traceId });
   }
 
-  async listByProject({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<PinnedTrace[]> {
+  async listByProject({ projectId }: { projectId: string }): Promise<PinnedTrace[]> {
     return this.repository.findAllByProject({ projectId });
   }
 
-  async getPinnedTraceIds({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<string[]> {
+  async getPinnedTraceIds({ projectId }: { projectId: string }): Promise<string[]> {
     return this.repository.findAllTraceIds({ projectId });
   }
 }

@@ -14,9 +14,7 @@ export interface GroupTarget {
  */
 export function useGroupActions(target: GroupTarget) {
   const utils = api.useUtils();
-  const [confirmAction, setConfirmAction] = useState<"drain" | "dlq" | null>(
-    null,
-  );
+  const [confirmAction, setConfirmAction] = useState<"drain" | "dlq" | null>(null);
 
   const unblockMutation = api.ops.unblockGroup.useMutation({
     onSuccess: () => {
@@ -57,8 +55,7 @@ export function useGroupActions(target: GroupTarget) {
   const copyGroupId = () => {
     navigator.clipboard.writeText(target.groupId).then(
       () => toaster.create({ title: "Group ID copied", type: "success" }),
-      () =>
-        toaster.create({ title: "Couldn't copy the group ID", type: "error" }),
+      () => toaster.create({ title: "Couldn't copy the group ID", type: "error" }),
     );
   };
 

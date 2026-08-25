@@ -33,9 +33,7 @@ describe("shouldShowGenericTranslateError()", () => {
 
   describe("when no typed model-error handler matches", () => {
     it("returns true so the caller shows a generic fallback toast", () => {
-      expect(
-        shouldShowGenericTranslateError(new Error("Project not found")),
-      ).toBe(true);
+      expect(shouldShowGenericTranslateError(new Error("Project not found"))).toBe(true);
     });
   });
 

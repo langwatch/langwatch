@@ -4,11 +4,7 @@ import { PrismaProjectRepository } from "../src/repositories/prisma/prisma.proje
 describe("PrismaProjectRepository coding-agent activity", () => {
   it.each([
     ["session", "lastCodingAgentSessionAt", "touchCodingAgentSessionSeen"],
-    [
-      "pull request",
-      "lastCodingAgentPullRequestAt",
-      "touchCodingAgentPullRequestSeen",
-    ],
+    ["pull request", "lastCodingAgentPullRequestAt", "touchCodingAgentPullRequestSeen"],
   ] as const)("throttles the %s clock independently", async (_name, field, method) => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const repository = PrismaProjectRepository.create({

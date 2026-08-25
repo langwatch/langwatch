@@ -70,9 +70,7 @@ describe("resolveExpiresAt", () => {
 describe("earliestCustomDate", () => {
   describe("when the day is already part way through", () => {
     it("refuses today, so the smallest answer is a whole day away", () => {
-      expect(earliestCustomDate(new Date("2026-08-16T10:30:00.000Z"))).toBe(
-        "2026-08-17",
-      );
+      expect(earliestCustomDate(new Date("2026-08-16T10:30:00.000Z"))).toBe("2026-08-17");
     });
   });
 });

@@ -26,33 +26,25 @@ export const gatewaySpendAdmittedEventSchema = EventSchema.extend({
   type: z.literal(GATEWAY_SPEND_ADMITTED_EVENT_TYPE),
   data: admitSpendCommandDataSchema,
 });
-export type GatewaySpendAdmittedEvent = z.infer<
-  typeof gatewaySpendAdmittedEventSchema
->;
+export type GatewaySpendAdmittedEvent = z.infer<typeof gatewaySpendAdmittedEventSchema>;
 
 export const gatewaySpendConfirmedEventSchema = EventSchema.extend({
   type: z.literal(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE),
   data: confirmSpendCommandDataSchema,
 });
-export type GatewaySpendConfirmedEvent = z.infer<
-  typeof gatewaySpendConfirmedEventSchema
->;
+export type GatewaySpendConfirmedEvent = z.infer<typeof gatewaySpendConfirmedEventSchema>;
 
 export const gatewaySpendFailedEventSchema = EventSchema.extend({
   type: z.literal(GATEWAY_SPEND_FAILED_EVENT_TYPE),
   data: failSpendCommandDataSchema,
 });
-export type GatewaySpendFailedEvent = z.infer<
-  typeof gatewaySpendFailedEventSchema
->;
+export type GatewaySpendFailedEvent = z.infer<typeof gatewaySpendFailedEventSchema>;
 
 export const gatewaySpendSettledEventSchema = EventSchema.extend({
   type: z.literal(GATEWAY_SPEND_SETTLED_EVENT_TYPE),
   data: settleSpendCommandDataSchema,
 });
-export type GatewaySpendSettledEvent = z.infer<
-  typeof gatewaySpendSettledEventSchema
->;
+export type GatewaySpendSettledEvent = z.infer<typeof gatewaySpendSettledEventSchema>;
 
 export type GatewaySpendProcessingEvent =
   | GatewaySpendAdmittedEvent

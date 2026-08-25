@@ -38,9 +38,7 @@ describe("parsePermissionFlags", () => {
       // A value that is not a resource and action pair is refused by NAMING the
       // shape: "invalid" alone leaves the caller guessing.
       for (const malformed of ["project", "project:", ":view", "a:b:c"]) {
-        expect(() => parsePermissionFlags([malformed])).toThrow(
-          ManagementFlagError,
-        );
+        expect(() => parsePermissionFlags([malformed])).toThrow(ManagementFlagError);
         expect(() => parsePermissionFlags([malformed])).toThrow(
           /Expected resource:action/,
         );
@@ -109,17 +107,17 @@ describe("composeRoleBindingFilters", () => {
 
     describe("when only one half is given", () => {
       it("refuses a principal id with no principal type to say what it names", () => {
-        expect(() =>
-          composeRoleBindingFilters({ principalId: "user_1" }),
-        ).toThrow(/--principal-type/);
+        expect(() => composeRoleBindingFilters({ principalId: "user_1" })).toThrow(
+          /--principal-type/,
+        );
       });
 
       it("refuses a principal type with no principal id to name", () => {
         // Dropping the half pair would list every binding in the organization,
         // which is the opposite of what the caller asked for.
-        expect(() =>
-          composeRoleBindingFilters({ principalType: "user" }),
-        ).toThrow(/--principal-id/);
+        expect(() => composeRoleBindingFilters({ principalType: "user" })).toThrow(
+          /--principal-id/,
+        );
       });
     });
   });
@@ -193,9 +191,7 @@ describe("the single-value parsers", () => {
       expect(parsePermissionMode("Restricted")).toBe("restricted");
 
       expect(() => parseRole("owner")).toThrow(/Expected one of ADMIN/);
-      expect(() => parseScopeType("workspace")).toThrow(
-        /Expected one of ORGANIZATION/,
-      );
+      expect(() => parseScopeType("workspace")).toThrow(/Expected one of ORGANIZATION/);
       // VIEWER is a binding role, not an organization role: the two
       // vocabularies are different and the refusal says so.
       expect(() => parseOrganizationRole("VIEWER")).toThrow(

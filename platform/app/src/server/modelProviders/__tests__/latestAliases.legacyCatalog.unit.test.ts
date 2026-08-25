@@ -48,15 +48,11 @@ describe("given a catalog with no named-tier generation", () => {
     /** @scenario Older naming still resolves when no newer generation exists */
     it("falls back to the unsuffixed model and its -mini counterpart", () => {
       expect(resolveLatestAlias("openai/latest")).toBe("openai/gpt-5.5");
-      expect(resolveLatestAlias("openai/latest-mini")).toBe(
-        "openai/gpt-5.5-mini",
-      );
+      expect(resolveLatestAlias("openai/latest-mini")).toBe("openai/gpt-5.5-mini");
     });
 
     it("still skips the -pro serving mode", () => {
-      expect(resolveLatestAlias("openai/latest")).not.toBe(
-        "openai/gpt-5.5-pro",
-      );
+      expect(resolveLatestAlias("openai/latest")).not.toBe("openai/gpt-5.5-pro");
     });
   });
 });

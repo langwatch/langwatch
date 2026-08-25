@@ -1,3 +1,3 @@
 export abstract class SchedulerWake {
-	abstract publish(): void;
+  abstract publish(): void;
 }

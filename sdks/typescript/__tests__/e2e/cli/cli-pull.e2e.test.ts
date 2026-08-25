@@ -1,15 +1,7 @@
 // @vitest-environment node
 // @vitest-config ./vitest.e2e.config.mts
 
-import {
-  describe,
-  expect,
-  it,
-  afterEach,
-  beforeEach,
-  afterAll,
-  beforeAll,
-} from "vitest";
+import { describe, expect, it, afterEach, beforeEach, afterAll, beforeAll } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -120,9 +112,7 @@ describe("CLI E2E", () => {
             commitMessage: "Updated for pull test",
             temperature: 0.5,
             model: "gpt-4-turbo",
-            messages: [
-              { role: "system", content: "Updated system message." },
-            ],
+            messages: [{ role: "system", content: "Updated system message." }],
           });
 
           const pull2 = cli.run("prompt pull");

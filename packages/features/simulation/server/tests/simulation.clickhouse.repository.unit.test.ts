@@ -38,9 +38,7 @@ class FixtureWindowedRead extends SimulationWindowedRead {
     super();
   }
 
-  async query<Result>(
-    input: SimulationWindowedReadInput<Result>,
-  ): Promise<Result> {
+  async query<Result>(input: SimulationWindowedReadInput<Result>): Promise<Result> {
     this.inputs.push(input);
     return input.run(this.window);
   }
@@ -138,9 +136,7 @@ describe("SimulationClickHouseRepository", () => {
       tenantId: "project-1",
       scenarioRunId: "run-1",
     });
-    expect(fixture.calls[0]?.query).toContain(
-      "t.ScenarioRunId = {scenarioRunId:String}",
-    );
+    expect(fixture.calls[0]?.query).toContain("t.ScenarioRunId = {scenarioRunId:String}");
     expect(fixture.calls[0]?.query).toContain("max(s.UpdatedAt)");
   });
 
@@ -222,11 +218,7 @@ describe("SimulationClickHouseRepository", () => {
   it("uses the explicit window adapter for the history preview query", async () => {
     const windowedRead = new FixtureWindowedRead(makeWindow(1_000, 9_000));
     const { fixture, repository } = makeRepository(
-      [
-        [{ TotalBatchCount: "1" }],
-        [aggregateRow()],
-        [],
-      ],
+      [[{ TotalBatchCount: "1" }], [aggregateRow()], []],
       windowedRead,
     );
 
@@ -288,9 +280,7 @@ describe("SimulationClickHouseRepository", () => {
       ]),
     ).toBeNull();
     expect(
-      SimulationClickHouseRepository.buildStartedAtWindowClause(
-        makeWindow(1000, 9000),
-      ),
+      SimulationClickHouseRepository.buildStartedAtWindowClause(makeWindow(1000, 9000)),
     ).toEqual({
       whereClause:
         "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) AND StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
@@ -326,7 +316,9 @@ describe("SimulationClickHouseRepository", () => {
     ).resolves.toEqual(new Set());
     expect(empty.fixture.calls).toHaveLength(0);
 
-    const { repository } = makeRepository([[{ ScenarioSetId: "" }, { ScenarioSetId: "default" }]]);
+    const { repository } = makeRepository([
+      [{ ScenarioSetId: "" }, { ScenarioSetId: "default" }],
+    ]);
     await expect(
       repository.getDistinctExternalSetIds({ projectIds: ["project-1"] }),
     ).resolves.toEqual(new Set(["default"]));
@@ -335,7 +327,10 @@ describe("SimulationClickHouseRepository", () => {
   it("keeps export count and sweep filters aligned, with the date filter outside dedup", async () => {
     const { fixture, repository } = makeRepository([
       [{ Total: "2" }],
-      [runRow({ ScenarioRunId: "run-1", ExportSortKey: "1000" }), runRow({ ScenarioRunId: "run-2", ExportSortKey: "2000" })],
+      [
+        runRow({ ScenarioRunId: "run-1", ExportSortKey: "1000" }),
+        runRow({ ScenarioRunId: "run-2", ExportSortKey: "2000" }),
+      ],
     ]);
 
     await expect(
@@ -358,8 +353,15 @@ describe("SimulationClickHouseRepository", () => {
 
     expect(page).toMatchObject({ hasMore: true, runs: [{ scenarioRunId: "run-1" }] });
     const [count, sweep] = fixture.calls;
-    expect(count?.params).toMatchObject({ exportSetIds: ["default", ""], exportScenarioId: "scenario-1", startDateMs: "100", endDateMs: "200" });
-    expect(sweep?.query).toContain("ORDER BY toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt)) ASC, t.ScenarioRunId ASC");
+    expect(count?.params).toMatchObject({
+      exportSetIds: ["default", ""],
+      exportScenarioId: "scenario-1",
+      startDateMs: "100",
+      endDateMs: "200",
+    });
+    expect(sweep?.query).toContain(
+      "ORDER BY toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt)) ASC, t.ScenarioRunId ASC",
+    );
     expect(sweep?.query).toContain("t.StartedAt >=");
     expect(sweep?.query).toContain("AND t.ArchivedAt IS NULL");
     expect(sweep?.query).toContain("max(UpdatedAt)");

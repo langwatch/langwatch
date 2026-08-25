@@ -45,9 +45,7 @@ export function useKonamiEasterEgg(): boolean {
   useEffect(() => {
     const buffer: string[] = [];
     const onKey = (e: KeyboardEvent) => {
-      if (
-        !KONAMI_SEQUENCE.includes(e.key as (typeof KONAMI_SEQUENCE)[number])
-      ) {
+      if (!KONAMI_SEQUENCE.includes(e.key as (typeof KONAMI_SEQUENCE)[number])) {
         buffer.length = 0;
         return;
       }

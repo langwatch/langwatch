@@ -1,5 +1,9 @@
 import type { z } from "zod";
-import type { LlmPromptConfigVersion, Prisma, PrismaClient } from "../repositories/prisma/prisma.prompt.repository";
+import type {
+  LlmPromptConfigVersion,
+  Prisma,
+  PrismaClient,
+} from "../repositories/prisma/prisma.prompt.repository";
 import type { messageSchema } from "@langwatch/prompt-contract";
 import type { SchemaVersion } from "@langwatch/prompt-contract";
 import { SystemPromptConflictError } from "@langwatch/prompt-contract";
@@ -65,10 +69,7 @@ export class PromptVersionService {
     prompt?: string;
     messages?: z.infer<typeof messageSchema>[];
   }): void {
-    if (
-      params.prompt &&
-      params.messages?.some((msg) => msg.role === "system")
-    ) {
+    if (params.prompt && params.messages?.some((msg) => msg.role === "system")) {
       throw new SystemPromptConflictError();
     }
   }
@@ -107,8 +108,7 @@ export class PromptVersionService {
     return await prisma.llmPromptConfigVersion.create({
       data: {
         ...validatedData,
-        runtimeParameters: (data.runtimeParameters ??
-          {}) as Prisma.InputJsonValue,
+        runtimeParameters: (data.runtimeParameters ?? {}) as Prisma.InputJsonValue,
       },
     });
   }

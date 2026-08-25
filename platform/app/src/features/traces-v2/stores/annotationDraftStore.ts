@@ -88,9 +88,7 @@ export const useAnnotationDraftStore = create<AnnotationDraftState>((set) => ({
       },
     }),
   patchDraft: (patch) =>
-    set((state) =>
-      state.draft ? { draft: { ...state.draft, ...patch } } : state,
-    ),
+    set((state) => (state.draft ? { draft: { ...state.draft, ...patch } } : state)),
   closeDraft: () => set({ draft: null }),
 }));
 

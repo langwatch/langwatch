@@ -17,16 +17,10 @@ import { useDebouncedCallback } from "use-debounce";
 import type { Dataset } from "~/generated/prisma/client";
 import type { Trace } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type {
-  DatasetColumns,
-  DatasetRecordEntry,
-} from "@langwatch/dataset-contract";
+import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import type { MappingState } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
-import {
-  ThreadMapping,
-  type ThreadMappingState,
-} from "../traces/ThreadMapping";
+import { ThreadMapping, type ThreadMappingState } from "../traces/ThreadMapping";
 import { TracesMapping } from "../traces/TracesMapping";
 import { DatasetPreviewTable } from "./editor/DatasetPreviewTable";
 
@@ -120,12 +114,7 @@ export function DatasetMappingPreview({
         },
       );
     },
-    [
-      selectedDataset.id,
-      project?.id,
-      trpc.dataset.getAll,
-      updateStoredMapping_,
-    ],
+    [selectedDataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_],
   );
 
   const updateStoredThreadMapping = useCallback(
@@ -145,12 +134,7 @@ export function DatasetMappingPreview({
         },
       );
     },
-    [
-      selectedDataset.id,
-      project?.id,
-      trpc.dataset.getAll,
-      updateStoredMapping_,
-    ],
+    [selectedDataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_],
   );
 
   const debouncedUpdateThreadMapping = useDebouncedCallback(
@@ -336,9 +320,7 @@ export function DatasetMappingPreview({
                 onToggleRow={(rowIndex, isSelected) => {
                   onRowDataChange(
                     rowData.map((row, index) =>
-                      index === rowIndex
-                        ? { ...row, selected: isSelected }
-                        : row,
+                      index === rowIndex ? { ...row, selected: isSelected } : row,
                     ),
                   );
                 }}
@@ -350,9 +332,7 @@ export function DatasetMappingPreview({
                 onCellEdit={(rowIndex, columnName, value) => {
                   onRowDataChange(
                     rowData.map((row, index) =>
-                      index === rowIndex
-                        ? { ...row, [columnName]: value }
-                        : row,
+                      index === rowIndex ? { ...row, [columnName]: value } : row,
                     ),
                   );
                 }}

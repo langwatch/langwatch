@@ -183,8 +183,9 @@ interface Probe extends ProbeScope {
 
 /** A virtual key and a budget of this run's own, so the delta is this run's. */
 async function provision(args: Args, tenant: Tenant): Promise<Probe> {
-  const issued = await initializeDefaultApp({ processRole: "web" }).governance
-    .personalVirtualKeys.issue({
+  const issued = await initializeDefaultApp({
+    processRole: "web",
+  }).governance.personalVirtualKeys.issue({
     userId: tenant.userId,
     organizationId: tenant.organizationId,
     personalProjectId: tenant.projectId,
@@ -234,12 +235,9 @@ function callIdentity(headers: Headers): {
   traceId: string;
 } {
   const gatewayRequestId =
-    headers.get("X-LangWatch-Gateway-Request-Id") ??
-    headers.get("X-Request-Id") ??
-    "";
+    headers.get("X-LangWatch-Gateway-Request-Id") ?? headers.get("X-Request-Id") ?? "";
   const traceparent = headers.get("traceparent") ?? "";
-  const traceId =
-    headers.get("X-LangWatch-Trace-Id") ?? traceparent.split("-")[1] ?? "";
+  const traceId = headers.get("X-LangWatch-Trace-Id") ?? traceparent.split("-")[1] ?? "";
   return { gatewayRequestId, traceId };
 }
 

@@ -1,7 +1,4 @@
-import type {
-  SpanTreeCursor,
-  SpanTreeNode,
-} from "@langwatch/trace-contract";
+import type { SpanTreeCursor, SpanTreeNode } from "@langwatch/trace-contract";
 import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
 
 /** A private read record; cost inputs never leave the Trace service. */

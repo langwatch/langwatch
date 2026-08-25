@@ -97,9 +97,7 @@ export async function renderWebhookBody({
       }),
       usedDefault: true,
       missingVariables: [],
-      errors: [customError, errorMessage(err)].filter(
-        (e): e is string => e != null,
-      ),
+      errors: [customError, errorMessage(err)].filter((e): e is string => e != null),
     };
   }
 }

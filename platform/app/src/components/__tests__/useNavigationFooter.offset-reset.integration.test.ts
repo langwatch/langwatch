@@ -59,9 +59,7 @@ describe("useMessagesNavigationFooter() in offset mode", () => {
     describe("when the search query changes", () => {
       it("returns to the first page instead of holding the old offset", () => {
         mockQuery = { ...mockQuery, query: "first" };
-        const { rerender } = renderHook(() =>
-          useMessagesNavigationFooter("offset"),
-        );
+        const { rerender } = renderHook(() => useMessagesNavigationFooter("offset"));
 
         mockQuery = { ...mockQuery, query: "second" };
         act(() => {
@@ -81,9 +79,7 @@ describe("useMessagesNavigationFooter() in offset mode", () => {
         // must still never reach the URL, since the server rejects a non-zero
         // one and the whole point of the mode is that it is not used.
         mockQuery = { project: "my-project", scrollId: "cursor-token" };
-        const { result } = renderHook(() =>
-          useMessagesNavigationFooter("cursor"),
-        );
+        const { result } = renderHook(() => useMessagesNavigationFooter("cursor"));
 
         act(() => {
           result.current.changePageSize(50);

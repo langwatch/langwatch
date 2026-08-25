@@ -143,8 +143,7 @@ export async function refreshSession(
       return { status: "refreshed" };
     } catch (err2) {
       const rejected2 =
-        err2 instanceof deviceFlow.DeviceFlowError &&
-        err2.kind === "unauthorized";
+        err2 instanceof deviceFlow.DeviceFlowError && err2.kind === "unauthorized";
       return {
         status: rejected2 ? "rejected" : "failed",
         message: messageOf(err2),

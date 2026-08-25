@@ -20,11 +20,7 @@ export const createAnnotationCommand = async (
 
   try {
     const isThumbsUp =
-      options.thumbsUp === true
-        ? true
-        : options.thumbsDown === true
-          ? false
-          : undefined;
+      options.thumbsUp === true ? true : options.thumbsDown === true ? false : undefined;
 
     const annotation = await service.create(traceId, {
       comment: options.comment,
@@ -32,8 +28,7 @@ export const createAnnotationCommand = async (
       email: options.email,
     });
 
-    const ratingStr =
-      isThumbsUp === true ? " 👍" : isThumbsUp === false ? " 👎" : "";
+    const ratingStr = isThumbsUp === true ? " 👍" : isThumbsUp === false ? " 👎" : "";
 
     spinner.succeed(
       `Created annotation${ratingStr} ${chalk.gray(`(id: ${annotation.id ?? "—"})`)}`,

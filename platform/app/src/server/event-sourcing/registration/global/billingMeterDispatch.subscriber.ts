@@ -1,10 +1,7 @@
 import type { Event, SubscriberDispatchDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
-import {
-  getBillingMonth,
-  getPreviousBillingMonth,
-} from "~/runtime/app/features/billing";
+import { getBillingMonth, getPreviousBillingMonth } from "~/runtime/app/features/billing";
 import type { ReportUsageForMonthCommandData } from "../../pipelines/billing-reporting/schemas/commands";
 
 const logger = createLogger("langwatch:billing:meterDispatch");
@@ -36,9 +33,7 @@ export const BILLING_METER_DISPATCH_SUPPRESS_MS = 300_000;
  * The queue prefixes `<tenantId>/map/orgBillableEventsMeter/reactor/
  * billingMeterDispatch/` around this key.
  */
-export function billingMeterDispatchGroupKey(event: {
-  tenantId: string;
-}): string {
+export function billingMeterDispatchGroupKey(event: { tenantId: string }): string {
   return `billing-meter-dispatch:${event.tenantId}`;
 }
 

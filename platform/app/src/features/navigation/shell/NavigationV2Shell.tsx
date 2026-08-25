@@ -144,8 +144,7 @@ function ShellContentRow({
   isIconRail: boolean;
   children: ReactNode;
 }) {
-  const { activeProductId, isCompactSidebar, langyDockInset, menuWidth } =
-    state;
+  const { activeProductId, isCompactSidebar, langyDockInset, menuWidth } = state;
   // The rail is a sibling of this column, so its width is room the page does
   // not have, the same as the sidebar's.
   const contentMaxWidth = shellContentMaxWidth({

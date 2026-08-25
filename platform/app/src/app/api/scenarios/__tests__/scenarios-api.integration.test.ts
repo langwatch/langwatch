@@ -1,12 +1,7 @@
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
-import type {
-  Organization,
-  Project,
-  Scenario,
-  Team,
-} from "~/generated/prisma/client";
+import type { Organization, Project, Scenario, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
@@ -194,10 +189,7 @@ describe("Scenarios API", () => {
           id: scenario.id,
           name: "Login Flow",
           situation: "User attempts to log in with valid credentials",
-          criteria: [
-            "Responds with a welcome message",
-            "Includes user name in greeting",
-          ],
+          criteria: ["Responds with a welcome message", "Includes user name in greeting"],
           labels: ["auth", "happy-path"],
         });
       });
@@ -221,10 +213,7 @@ describe("Scenarios API", () => {
         const res = await helpers.api.post("/api/scenarios", {
           name: "Login Flow Happy Path",
           situation: "User attempts to log in with valid creds",
-          criteria: [
-            "Responds with a welcome message",
-            "Includes user name in greeting",
-          ],
+          criteria: ["Responds with a welcome message", "Includes user name in greeting"],
           labels: ["auth", "happy-path"],
         });
 
@@ -233,10 +222,7 @@ describe("Scenarios API", () => {
         expect(body).toMatchObject({
           name: "Login Flow Happy Path",
           situation: "User attempts to log in with valid creds",
-          criteria: [
-            "Responds with a welcome message",
-            "Includes user name in greeting",
-          ],
+          criteria: ["Responds with a welcome message", "Includes user name in greeting"],
           labels: ["auth", "happy-path"],
         });
         expect(body).toHaveProperty("id");

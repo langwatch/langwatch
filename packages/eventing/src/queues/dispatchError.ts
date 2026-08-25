@@ -139,10 +139,7 @@ export function extractHttpStatus(error: unknown): number | undefined {
  */
 export function toDispatchError(
   error: unknown,
-  {
-    message,
-    retryable: retryableOverride,
-  }: { message: string; retryable?: boolean },
+  { message, retryable: retryableOverride }: { message: string; retryable?: boolean },
 ): DispatchError {
   if (isDispatchError(error)) return error;
   if (retryableOverride !== undefined) {

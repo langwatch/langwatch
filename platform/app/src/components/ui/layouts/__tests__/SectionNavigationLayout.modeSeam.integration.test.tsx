@@ -44,9 +44,7 @@ function renderSection(props: Record<string, unknown> = {}) {
     <ChakraProvider value={defaultSystem}>
       <SectionNavigationLayout
         sectionLabel="AI Gateway"
-        navigationItems={[
-          { label: "Virtual Keys", href: "/gateway/virtual-keys" },
-        ]}
+        navigationItems={[{ label: "Virtual Keys", href: "/gateway/virtual-keys" }]}
         {...props}
       >
         <div data-testid="section-content" />
@@ -70,9 +68,7 @@ describe("given the section rail inside a navigation-v2 shell", () => {
     it("stands the rail down and gives the content the full width", () => {
       renderSection({ standDownRailInProductShell: true });
 
-      expect(
-        screen.queryByTestId("section-navigation-layout"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("section-navigation-layout")).not.toBeInTheDocument();
       expect(screen.getByTestId("product-page-frame")).toBeInTheDocument();
       expect(screen.getByTestId("section-content")).toBeInTheDocument();
     });
@@ -84,12 +80,8 @@ describe("given the section rail inside a navigation-v2 shell", () => {
       mockPathname = "/[project]/automations";
       renderSection({ sectionLabel: "Automations" });
 
-      expect(
-        screen.getByTestId("section-navigation-layout"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("product-page-frame"),
-      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("section-navigation-layout")).toBeInTheDocument();
+      expect(screen.queryByTestId("product-page-frame")).not.toBeInTheDocument();
     });
   });
 
@@ -98,12 +90,8 @@ describe("given the section rail inside a navigation-v2 shell", () => {
       mockMode = "legacy";
       renderSection({ standDownRailInProductShell: true });
 
-      expect(
-        screen.getByTestId("section-navigation-layout"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("product-page-frame"),
-      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("section-navigation-layout")).toBeInTheDocument();
+      expect(screen.queryByTestId("product-page-frame")).not.toBeInTheDocument();
     });
   });
 });

@@ -13,12 +13,8 @@ import type {
 export abstract class ExperimentExecutionPort {
   abstract startExperimentRun(input: StartExperimentRunInput): Promise<void>;
   abstract recordTargetResult(input: RecordTargetResultInput): Promise<void>;
-  abstract recordEvaluatorResult(
-    input: RecordEvaluatorResultInput,
-  ): Promise<void>;
-  abstract completeExperimentRun(
-    input: CompleteExperimentRunInput,
-  ): Promise<void>;
+  abstract recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void>;
+  abstract completeExperimentRun(input: CompleteExperimentRunInput): Promise<void>;
 }
 
 export class UnavailableExperimentExecutionPort extends ExperimentExecutionPort {
@@ -36,15 +32,11 @@ export class UnavailableExperimentExecutionPort extends ExperimentExecutionPort 
     this.unavailable();
   }
 
-  async recordEvaluatorResult(
-    _input: RecordEvaluatorResultInput,
-  ): Promise<void> {
+  async recordEvaluatorResult(_input: RecordEvaluatorResultInput): Promise<void> {
     this.unavailable();
   }
 
-  async completeExperimentRun(
-    _input: CompleteExperimentRunInput,
-  ): Promise<void> {
+  async completeExperimentRun(_input: CompleteExperimentRunInput): Promise<void> {
     this.unavailable();
   }
 }

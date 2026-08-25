@@ -198,10 +198,7 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
 
 /** Project-relative base path for each surface's index page. */
 export const SURFACE_PATH = Object.fromEntries(
-  Object.entries(SURFACE_ROUTE_CONFIG).map(([surface, config]) => [
-    surface,
-    config.path,
-  ]),
+  Object.entries(SURFACE_ROUTE_CONFIG).map(([surface, config]) => [surface, config.path]),
 ) as Record<CapabilitySurface, string>;
 
 /**
@@ -574,9 +571,7 @@ export interface CapabilityProgress {
  * not yet a "created" (green, ticked) card, so the in-progress shell always
  * renders in the neutral read tone.
  */
-export function resolveCapabilityProgress(
-  rawName: string,
-): CapabilityProgress | null {
+export function resolveCapabilityProgress(rawName: string): CapabilityProgress | null {
   const cli = resolveCliCapability(rawName);
   if (!cli) return null;
   const noun = CLI_COLLECTION_VERBS.has(cli.command.verb)
@@ -595,9 +590,7 @@ export function resolveCapabilityProgress(
  * `resolveCliCapability` decides the structure (gate + shared contract);
  * `cliOverline` words it.
  */
-export function resolveCapability(
-  rawName: string,
-): CapabilityDescriptor | null {
+export function resolveCapability(rawName: string): CapabilityDescriptor | null {
   const cli = resolveCliCapability(rawName);
   if (!cli) return null;
 
@@ -629,9 +622,7 @@ export function extractToolText(output: unknown): string {
     if (Array.isArray(content)) {
       const parts = content
         .map((c) =>
-          c &&
-          typeof c === "object" &&
-          typeof (c as { text?: unknown }).text === "string"
+          c && typeof c === "object" && typeof (c as { text?: unknown }).text === "string"
             ? (c as { text: string }).text
             : "",
         )
@@ -676,10 +667,7 @@ const ID_KEYS = [
  * Best-effort primary resource id for a deep link. Prefers the tool's output
  * (a create returns the new id) then its input (a get was called with the id).
  */
-export function extractPrimaryId(
-  input: unknown,
-  output: unknown,
-): string | null {
+export function extractPrimaryId(input: unknown, output: unknown): string | null {
   const fromText = matchIdInText(extractToolText(output));
   const fromOutput = firstIdIn(output);
   const fromInput = firstIdIn(input);
@@ -710,10 +698,7 @@ const NAME_KEYS = ["name", "title", "label", "slug"];
  * Best-effort human name for a resource a tool created / touched, preferring
  * the tool output (a create echoes the saved name) then its input.
  */
-export function extractResourceName(
-  input: unknown,
-  output: unknown,
-): string | null {
+export function extractResourceName(input: unknown, output: unknown): string | null {
   return firstNameIn(output) ?? firstNameIn(input);
 }
 

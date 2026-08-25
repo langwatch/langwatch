@@ -15,11 +15,7 @@ const migratedUrls = new Set<string>();
  * In CI, we use service containers instead of testcontainers.
  */
 function isUsingServiceContainers(): boolean {
-  return !!(
-    process.env.CI_CLICKHOUSE_URL &&
-    process.env.CI_REDIS_URL &&
-    process.env.CI
-  );
+  return !!(process.env.CI_CLICKHOUSE_URL && process.env.CI_REDIS_URL && process.env.CI);
 }
 
 /**
@@ -47,9 +43,7 @@ export async function startTestContainers(): Promise<{
   redisUrl: string;
 }> {
   if (process.env.NODE_ENV !== "test") {
-    logger.fatal(
-      "startTestContainers should only be called in test environment",
-    );
+    logger.fatal("startTestContainers should only be called in test environment");
   }
 
   // If using service containers (CI), connect to them directly

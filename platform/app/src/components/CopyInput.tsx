@@ -62,9 +62,7 @@ export function CopyInput(
                 padding: 0,
                 color: "#888",
               }}
-              aria-label={
-                visible ? `Hide ${props.label}` : `Show ${props.label}`
-              }
+              aria-label={visible ? `Hide ${props.label}` : `Show ${props.label}`}
               onClick={(e) => {
                 e.stopPropagation();
                 setVisible((v) => !v);

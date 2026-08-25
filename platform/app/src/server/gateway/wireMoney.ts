@@ -137,14 +137,9 @@ export function usdDisplayString(value: { toString(): string }): string {
  * The display string has no such ceiling: it is digits, so it stays exact and
  * keeps reading for amounts whose integer cannot be published.
  */
-export function decimalUsdToNanoUsd(value: {
-  toString(): string;
-}): number | null {
+export function decimalUsdToNanoUsd(value: { toString(): string }): number | null {
   const nano = usdToNanoUsd(value);
-  if (
-    nano > BigInt(Number.MAX_SAFE_INTEGER) ||
-    nano < -BigInt(Number.MAX_SAFE_INTEGER)
-  ) {
+  if (nano > BigInt(Number.MAX_SAFE_INTEGER) || nano < -BigInt(Number.MAX_SAFE_INTEGER)) {
     return null;
   }
   return Number(nano);

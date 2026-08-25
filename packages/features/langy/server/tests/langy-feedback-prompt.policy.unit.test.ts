@@ -153,9 +153,7 @@ describe("LangyFeedbackPromptPolicy", () => {
       },
     };
     await service(recordingRedis).markShown({ userId: "u1", conversationId: "c1" });
-    const stored = JSON.parse(
-      calls[0]?.[1] as string,
-    ) as { atMs: unknown };
+    const stored = JSON.parse(calls[0]?.[1] as string) as { atMs: unknown };
     expect(stored.atMs).toBe(NOW);
     expect(calls[0]?.slice(0, 3)).toEqual([
       "langy:feedback:last-asked:u1",

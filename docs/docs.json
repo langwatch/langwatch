@@ -21,23 +21,14 @@
     "dismissible": true
   },
   "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude"
-    ]
+    "options": ["copy", "view", "chatgpt", "claude"]
   },
   "api": {
     "playground": {
       "display": "interactive"
     },
     "examples": {
-      "languages": [
-        "python",
-        "typescript",
-        "curl"
-      ],
+      "languages": ["python", "typescript", "curl"],
       "defaults": "required"
     },
     "mdx": {
@@ -60,10 +51,7 @@
               "introduction",
               {
                 "group": "LangWatch Skills",
-                "pages": [
-                  "skills/directory",
-                  "skills/pms-and-domain-experts"
-                ]
+                "pages": ["skills/directory", "skills/pms-and-domain-experts"]
               },
               "integration/cli",
               "integration/mcp",
@@ -258,12 +246,7 @@
           },
           {
             "group": "Help",
-            "pages": [
-              "pricing",
-              "pricing/billable-events",
-              "support",
-              "status"
-            ]
+            "pages": ["pricing", "pricing/billable-events", "support", "status"]
           }
         ]
       },
@@ -273,10 +256,7 @@
         "groups": [
           {
             "group": "Overview",
-            "pages": [
-              "integration/overview",
-              "observability/trace-vs-activity-ingestion"
-            ]
+            "pages": ["integration/overview", "observability/trace-vs-activity-ingestion"]
           },
           {
             "group": "SDKs",
@@ -307,10 +287,7 @@
               {
                 "group": "Go",
                 "icon": "golang",
-                "pages": [
-                  "integration/go/guide",
-                  "integration/go/reference"
-                ]
+                "pages": ["integration/go/guide", "integration/go/reference"]
               },
               "integration/opentelemetry/guide",
               "integration/opentelemetry/multiple-providers",
@@ -474,9 +451,7 @@
               },
               {
                 "group": "Amazon Web Services",
-                "pages": [
-                  "integration/python/integrations/aws-bedrock"
-                ]
+                "pages": ["integration/python/integrations/aws-bedrock"]
               },
               "integration/go/integrations/groq",
               "integration/go/integrations/grok",
@@ -496,11 +471,7 @@
           },
           {
             "group": "No-Code Platforms",
-            "pages": [
-              "integration/n8n",
-              "integration/langflow",
-              "integration/flowise"
-            ]
+            "pages": ["integration/n8n", "integration/langflow", "integration/flowise"]
           },
           {
             "group": "Direct Integrations",
@@ -530,16 +501,12 @@
               {
                 "group": "Python",
                 "icon": "python",
-                "pages": [
-                  "ai-gateway/sdks/python"
-                ]
+                "pages": ["ai-gateway/sdks/python"]
               },
               {
                 "group": "TypeScript",
                 "icon": "square-js",
-                "pages": [
-                  "ai-gateway/sdks/typescript"
-                ]
+                "pages": ["ai-gateway/sdks/typescript"]
               }
             ]
           },
@@ -550,44 +517,32 @@
               {
                 "group": "Claude Code",
                 "icon": "/images/logos/anthropic.svg",
-                "pages": [
-                  "ai-gateway/cli/claude-code"
-                ]
+                "pages": ["ai-gateway/cli/claude-code"]
               },
               {
                 "group": "Codex",
                 "icon": "/images/logos/openai.svg",
-                "pages": [
-                  "ai-gateway/cli/codex"
-                ]
+                "pages": ["ai-gateway/cli/codex"]
               },
               {
                 "group": "Gemini CLI",
                 "icon": "/images/logos/google.svg",
-                "pages": [
-                  "ai-gateway/cli/gemini-cli"
-                ]
+                "pages": ["ai-gateway/cli/gemini-cli"]
               },
               {
                 "group": "OpenCode",
                 "icon": "code",
-                "pages": [
-                  "ai-gateway/cli/opencode"
-                ]
+                "pages": ["ai-gateway/cli/opencode"]
               },
               {
                 "group": "Cursor",
                 "icon": "arrow-pointer",
-                "pages": [
-                  "ai-gateway/cli/cursor"
-                ]
+                "pages": ["ai-gateway/cli/cursor"]
               },
               {
                 "group": "Aider",
                 "icon": "wand-magic-sparkles",
-                "pages": [
-                  "ai-gateway/cli/aider"
-                ]
+                "pages": ["ai-gateway/cli/aider"]
               }
             ]
           },
@@ -639,10 +594,7 @@
             "pages": [
               {
                 "group": "Caching & Performance",
-                "pages": [
-                  "ai-gateway/caching-passthrough",
-                  "ai-gateway/streaming"
-                ]
+                "pages": ["ai-gateway/caching-passthrough", "ai-gateway/streaming"]
               },
               {
                 "group": "Safety & Governance",
@@ -657,10 +609,7 @@
               "ai-gateway/model-aliases",
               {
                 "group": "Operations",
-                "pages": [
-                  "ai-gateway/observability",
-                  "ai-gateway/troubleshooting"
-                ]
+                "pages": ["ai-gateway/observability", "ai-gateway/troubleshooting"]
               }
             ]
           },
@@ -739,17 +688,11 @@
           },
           {
             "group": "Dashboards",
-            "pages": [
-              "ai-governance/governance-dashboard",
-              "ai-governance/departments"
-            ]
+            "pages": ["ai-governance/governance-dashboard", "ai-governance/departments"]
           },
           {
             "group": "Privacy",
-            "pages": [
-              "ai-governance/data-privacy",
-              "ai-governance/no-spy-mode"
-            ]
+            "pages": ["ai-governance/data-privacy", "ai-governance/no-spy-mode"]
           },
           {
             "group": "Sources",
@@ -766,9 +709,7 @@
           },
           {
             "group": "Detection",
-            "pages": [
-              "ai-governance/anomaly-rules"
-            ]
+            "pages": ["ai-governance/anomaly-rules"]
           },
           {
             "group": "Compliance & Architecture",
@@ -779,18 +720,11 @@
           },
           {
             "group": "Operations",
-            "pages": [
-              "ai-governance/cli-debug",
-              "ai-governance/pull-mode-connectors"
-            ]
+            "pages": ["ai-governance/cli-debug", "ai-governance/pull-mode-connectors"]
           },
           {
             "group": "Programmatic surfaces",
-            "pages": [
-              "ai-governance/api",
-              "ai-governance/cli",
-              "ai-governance/mcp"
-            ]
+            "pages": ["ai-governance/api", "ai-governance/cli", "ai-governance/mcp"]
           }
         ]
       },
@@ -800,11 +734,7 @@
         "groups": [
           {
             "group": "Get Started",
-            "pages": [
-              "langy/overview",
-              "langy/getting-started",
-              "langy/how-langy-works"
-            ]
+            "pages": ["langy/overview", "langy/getting-started", "langy/how-langy-works"]
           },
           {
             "group": "Using Langy",
@@ -817,11 +747,7 @@
           },
           {
             "group": "Models & Cost",
-            "pages": [
-              "langy/models",
-              "langy/codex",
-              "langy/token-usage-and-cost"
-            ]
+            "pages": ["langy/models", "langy/codex", "langy/token-usage-and-cost"]
           },
           {
             "group": "Security & Control",
@@ -879,9 +805,7 @@
           },
           {
             "group": "Infrastructure",
-            "pages": [
-              "self-hosting/infrastructure/architecture"
-            ]
+            "pages": ["self-hosting/infrastructure/architecture"]
           },
           {
             "group": "Operations",

@@ -99,9 +99,7 @@ export async function readSpendRows(scope: ProbeScope): Promise<SpendRow[]> {
   return (await result.json()) as SpendRow[];
 }
 
-export async function readLedgerDebits(
-  scope: ProbeScope,
-): Promise<LedgerDebit[]> {
+export async function readLedgerDebits(scope: ProbeScope): Promise<LedgerDebit[]> {
   const client = await clickhouse(scope.projectId);
   const result = await client.query({
     query: `
@@ -121,17 +119,12 @@ export async function readLedgerDebits(
   return (await result.json()) as LedgerDebit[];
 }
 
-export async function readBudgetSpendNanoUsd(
-  scope: ProbeScope,
-): Promise<number> {
+export async function readBudgetSpendNanoUsd(scope: ProbeScope): Promise<number> {
   const repo = new GatewayBudgetClickHouseRepository(clickhouse);
   const budget = await prisma.gatewayBudget.findUniqueOrThrow({
     where: { id: scope.budgetId },
   });
-  const [spend] = await repo.getSpendForBudgetsAcrossTenants(
-    [scope.projectId],
-    [budget],
-  );
+  const [spend] = await repo.getSpendForBudgetsAcrossTenants([scope.projectId], [budget]);
   return spend?.spentNanoUsd ?? 0;
 }
 

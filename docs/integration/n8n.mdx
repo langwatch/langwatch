@@ -57,6 +57,7 @@ Integrate LangWatch with your n8n workflows to get LLM observability, evaluation
         verified by n8n and available as community nodes.
       </Tab>
     </Tabs>
+
   </Step>
   
   <Step title="Set up Credentials">
@@ -92,10 +93,12 @@ The LangWatch n8n nodes cover evaluation, prompt management, and dataset process
 ### Node Types
 
 **Triggers:**
+
 - **Dataset Batch Trigger**: Emits one item per dataset row sequentially
 - **Dataset Row Trigger**: Fetches single dataset rows with cursor management
 
 **Actions:**
+
 - **Evaluation**: Runs evaluators and records results with multiple operation modes
 - **Prompt**: Retrieves and compiles prompts from LangWatch Prompt Manager
 
@@ -104,21 +107,27 @@ The LangWatch n8n nodes cover evaluation, prompt management, and dataset process
 Process your datasets row by row with full experiment context for batch evaluations.
 
 <Frame>
-  <img src="/images/integration/n8n/trigger-dataset-row.webp" alt="Dataset Batch Trigger node configuration" />
+  <img
+    src="/images/integration/n8n/trigger-dataset-row.webp"
+    alt="Dataset Batch Trigger node configuration"
+  />
 </Frame>
 
 **Key Features:**
+
 - Sequential row processing with progress tracking
 - Experiment context initialization for batch evaluations
 - Flexible row selection (start/end, step size, limits)
 - Shuffle support with seed for randomized processing
 
 **Configuration Options:**
+
 - **Dataset**: Slug or ID of your LangWatch dataset
 - **Experiment**: Enable experiment tracking with ID/name
 - **Row Processing**: Configure start row, end row, step size, and limits
 
 **Output Fields:**
+
 - `entry` - Your dataset row payload
 - `row_number`, `row_id`, `datasetId`, `projectId` - Row metadata
 - `_progress` - Processing progress information
@@ -130,16 +139,21 @@ Process your datasets row by row with full experiment context for batch evaluati
 Fetch individual dataset rows with internal cursor management for stepwise processing.
 
 <Frame>
-  <img src="/images/integration/n8n/trigger-dataset-row.webp" alt="Dataset Row Trigger node configuration" />
+  <img
+    src="/images/integration/n8n/trigger-dataset-row.webp"
+    alt="Dataset Row Trigger node configuration"
+  />
 </Frame>
 
 **Key Features:**
+
 - Single row processing per execution
 - Internal cursor management
 - Reset progress capability
 - Shuffle rows with seed support
 
 **Use Cases:**
+
 - Scheduled dataset processing
 - Step-by-step evaluation workflows
 - Incremental data processing
@@ -149,7 +163,10 @@ Fetch individual dataset rows with internal cursor management for stepwise proce
 Run evaluators and record results with multiple operation modes for comprehensive evaluation workflows.
 
 <Frame>
-  <img src="/images/integration/n8n/node-evaluation-auto.webp" alt="Evaluation node configuration showing auto mode" />
+  <img
+    src="/images/integration/n8n/node-evaluation-auto.webp"
+    alt="Evaluation node configuration showing auto mode"
+  />
 </Frame>
 
 **Operation Modes:**
@@ -158,25 +175,24 @@ Run evaluators and record results with multiple operation modes for comprehensiv
   <Tab title="Auto (Recommended)">
     Automatically selects behavior based on available inputs and context.
   </Tab>
-  
-  <Tab title="Check If Evaluating">
-    Determines if the workflow is running in an evaluation context.
-  </Tab>
-  
-  <Tab title="Record Result">
-    Log a pre-computed evaluation result to LangWatch.
-  </Tab>
-  
-  <Tab title="Run and Record">
-    Execute an evaluator and automatically record the results.
-  </Tab>
-  
+
+<Tab title="Check If Evaluating">
+  Determines if the workflow is running in an evaluation context.
+</Tab>
+
+<Tab title="Record Result">Log a pre-computed evaluation result to LangWatch.</Tab>
+
+<Tab title="Run and Record">
+  Execute an evaluator and automatically record the results.
+</Tab>
+
   <Tab title="Set Outputs (Dataset)">
     Write llm input and output back to a dataset for future use.
   </Tab>
 </Tabs>
 
 **Key Parameters:**
+
 - **Run ID**: Override or infer from `_langwatch.batch.runId`
 - **Evaluator**: Manual selection or dropdown of available evaluators
 - **Evaluation Data**: Input data for the evaluation
@@ -188,10 +204,14 @@ Run evaluators and record results with multiple operation modes for comprehensiv
 Retrieve and compile prompts from LangWatch Prompt Manager with variable substitution.
 
 <Frame>
-  <img src="/images/integration/n8n/node-prompt.webp" alt="Prompt node configuration interface" />
+  <img
+    src="/images/integration/n8n/node-prompt.webp"
+    alt="Prompt node configuration interface"
+  />
 </Frame>
 
 **Key Features:**
+
 - Prompt selection by handle or ID
 - Version control (latest or specific version)
 - Variable compilation with multiple sources
@@ -203,17 +223,18 @@ Retrieve and compile prompts from LangWatch Prompt Manager with variable substit
   <Tab title="Manual Variables">
     Define name/value pairs directly in the node configuration.
   </Tab>
-  
-  <Tab title="Input Data Variables">
-    Map template variables to input data paths from previous nodes.
-  </Tab>
-  
+
+<Tab title="Input Data Variables">
+  Map template variables to input data paths from previous nodes.
+</Tab>
+
   <Tab title="Mixed Mode">
     Combine manual variables with input data mapping for maximum flexibility.
   </Tab>
 </Tabs>
 
 **Configuration Options:**
+
 - **Prompt Selection**: Manual (handle/ID) or dropdown selection
 - **Version**: Latest or specific version
 - **Compile Prompt**: Enable/disable variable substitution
@@ -224,11 +245,14 @@ Retrieve and compile prompts from LangWatch Prompt Manager with variable substit
 Automatically instrument your n8n workflows with OpenTelemetry to capture comprehensive observability data.
 
 <Frame>
-  <img src="/images/integration/n8n/observability.webp" alt="n8n observability setup showing workflow instrumentation" />
+  <img
+    src="/images/integration/n8n/observability.webp"
+    alt="n8n observability setup showing workflow instrumentation"
+  />
 </Frame>
 
 <Note>
-Workflow observability is only available for self-hosted n8n instances, not n8n Cloud.
+  Workflow observability is only available for self-hosted n8n instances, not n8n Cloud.
 </Note>
 
 ### Features
@@ -299,6 +323,7 @@ Workflow observability is only available for self-hosted n8n instances, not n8n 
 
     n8n start
     ```
+
   </Tab>
   
   <Tab title="Programmatic">
@@ -318,35 +343,36 @@ Workflow observability is only available for self-hosted n8n instances, not n8n 
 ### Configuration
 
 <ParamField path="LANGWATCH_API_KEY" type="string" required>
-Your LangWatch API key. Get this from your LangWatch project settings.
+  Your LangWatch API key. Get this from your LangWatch project settings.
 </ParamField>
 
 <ParamField path="N8N_OTEL_SERVICE_NAME" type="string" default="n8n">
-Service name for your n8n instance in LangWatch.
+  Service name for your n8n instance in LangWatch.
 </ParamField>
 
 <ParamField path="N8N_OTEL_NODE_INCLUDE" type="string">
-Comma-separated list of node names/types to include in tracing. If not set, all nodes are traced.
+  Comma-separated list of node names/types to include in tracing. If not set, all nodes
+  are traced.
 </ParamField>
 
 <ParamField path="N8N_OTEL_NODE_EXCLUDE" type="string">
-Comma-separated list of node names/types to exclude from tracing.
+  Comma-separated list of node names/types to exclude from tracing.
 </ParamField>
 
 <ParamField path="N8N_OTEL_CAPTURE_INPUT" type="boolean" default="true">
-Whether to capture node input data. Set to `false` to disable.
+  Whether to capture node input data. Set to `false` to disable.
 </ParamField>
 
 <ParamField path="N8N_OTEL_CAPTURE_OUTPUT" type="boolean" default="true">
-Whether to capture node output data. Set to `false` to disable.
+  Whether to capture node output data. Set to `false` to disable.
 </ParamField>
 
 <ParamField path="LW_DEBUG" type="boolean" default="false">
-Enable LangWatch SDK debug logging.
+  Enable LangWatch SDK debug logging.
 </ParamField>
 
 <ParamField path="N8N_OTEL_DEBUG" type="boolean" default="false">
-Enable observability hook debugging and diagnostics.
+  Enable observability hook debugging and diagnostics.
 </ParamField>
 
 ### Verification
@@ -358,6 +384,7 @@ node -e "console.log(require.resolve('@langwatch/n8n-observability/hooks'))"
 ```
 
 Look for this startup message:
+
 ```
 [@langwatch/n8n-observability] observability ready and patches applied
 ```
@@ -367,10 +394,14 @@ Look for this startup message:
 Here's how to combine both LangWatch nodes and observability for a comprehensive evaluation workflow:
 
 <Frame>
-  <img src="/images/integration/n8n/cover.webp" alt="Complete n8n workflow with LangWatch nodes and observability" />
+  <img
+    src="/images/integration/n8n/cover.webp"
+    alt="Complete n8n workflow with LangWatch nodes and observability"
+  />
 </Frame>
 
 **Workflow Steps:**
+
 1. **Dataset Batch Trigger** - Process evaluation dataset
 2. **Prompt Node** - Retrieve and compile prompts with variables
 3. **HTTP Request** - Call your LLM API
@@ -380,7 +411,8 @@ Here's how to combine both LangWatch nodes and observability for a comprehensive
 ## LangWatch Concepts
 
 <Info>
-For a complete understanding of LangWatch concepts like traces, spans, threads, and user IDs, see our [Concepts Guide](/concepts).
+  For a complete understanding of LangWatch concepts like traces, spans, threads, and user
+  IDs, see our [Concepts Guide](/concepts).
 </Info>
 
 Key concepts for n8n integration:
@@ -395,29 +427,26 @@ Key concepts for n8n integration:
 
 <AccordionGroup>
   <Accordion title="Nodes not appearing in n8n">
-    - Ensure the package is installed: `npm list @langwatch/n8n-nodes-langwatch`
-    - Restart n8n after installation
-    - Check n8n logs for any loading errors
+    - Ensure the package is installed: `npm list @langwatch/n8n-nodes-langwatch` - Restart
+    n8n after installation - Check n8n logs for any loading errors
   </Accordion>
-  
-  <Accordion title="Observability not working">
-    - Verify environment variables are set correctly
-    - Check that the hook file path is correct
-    - Look for the startup message in n8n logs
-    - Ensure you're using self-hosted n8n (not n8n Cloud)
-  </Accordion>
-  
-  <Accordion title="Credentials not working">
-    - Verify your API key is correct in LangWatch dashboard
-    - Check the endpoint URL (should be `https://app.langwatch.ai` for cloud)
-    - Test the connection in the credential settings
-  </Accordion>
-  
+
+<Accordion title="Observability not working">
+  - Verify environment variables are set correctly - Check that the hook file path is
+  correct - Look for the startup message in n8n logs - Ensure you're using self-hosted n8n
+  (not n8n Cloud)
+</Accordion>
+
+<Accordion title="Credentials not working">
+  - Verify your API key is correct in LangWatch dashboard - Check the endpoint URL (should
+  be `https://app.langwatch.ai` for cloud) - Test the connection in the credential
+  settings
+</Accordion>
+
   <Accordion title="No traces appearing in LangWatch">
-    - Check that workflows are actually executing
-    - Verify the service name in LangWatch matches your configuration
-    - Look for any error messages in n8n logs
-    - Ensure your LangWatch project is active
+    - Check that workflows are actually executing - Verify the service name in LangWatch
+    matches your configuration - Look for any error messages in n8n logs - Ensure your
+    LangWatch project is active
   </Accordion>
 </AccordionGroup>
 

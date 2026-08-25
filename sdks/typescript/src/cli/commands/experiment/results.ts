@@ -75,8 +75,7 @@ export const experimentResultsCommand = async ({
 }): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const filter: ExperimentResultsFilter =
-    options.filter === "failed" ? "failed" : "all";
+  const filter: ExperimentResultsFilter = options.filter === "failed" ? "failed" : "all";
   const limit = (() => {
     const parsed = options.limit ? parseInt(options.limit, 10) : DEFAULT_LIMIT;
     return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_LIMIT;
@@ -126,21 +125,17 @@ export const experimentResultsCommand = async ({
     const datasetKeys = new Set(
       results.dataset.map((entry) => rowKey(entry.index, entry.targetId)),
     );
-    const rowIndependentEvaluations = results.evaluations.filter(
-      (evaluation) => {
-        if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) {
-          return false;
-        }
-        return !datasetKeys.has(rowKey(evaluation.index, evaluation.targetId));
-      },
-    );
+    const rowIndependentEvaluations = results.evaluations.filter((evaluation) => {
+      if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) {
+        return false;
+      }
+      return !datasetKeys.has(rowKey(evaluation.index, evaluation.targetId));
+    });
 
     // Determine evaluator columns to show
     const evaluatorNames = evaluatorFilter
       ? [evaluatorFilter]
-      : Array.from(
-          new Set(results.evaluations.map((e) => e.evaluator)),
-        ).slice(0, 3); // cap visible columns to keep table readable
+      : Array.from(new Set(results.evaluations.map((e) => e.evaluator))).slice(0, 3); // cap visible columns to keep table readable
 
     let rows = results.dataset.map((entry) => ({
       entry,
@@ -193,10 +188,7 @@ export const experimentResultsCommand = async ({
       data: {
         ...results,
         dataset: rows.map((row) => row.entry),
-        evaluations: [
-          ...rows.flatMap((row) => row.evaluations),
-          ...shownRowIndependent,
-        ],
+        evaluations: [...rows.flatMap((row) => row.evaluations), ...shownRowIndependent],
         meta: {
           totalMatching,
           truncated,
@@ -255,18 +247,14 @@ export const experimentResultsCommand = async ({
             } else if (e.label) {
               evaluatorCols[name] = e.label;
             } else if (typeof e.passed === "boolean") {
-              evaluatorCols[name] = e.passed
-                ? chalk.green("pass")
-                : chalk.red("fail");
+              evaluatorCols[name] = e.passed ? chalk.green("pass") : chalk.red("fail");
             } else {
               evaluatorCols[name] = chalk.gray("—");
             }
           }
           const status = entry.error
             ? chalk.red(
-                entry.error.length > 40
-                  ? `${entry.error.slice(0, 37)}...`
-                  : entry.error,
+                entry.error.length > 40 ? `${entry.error.slice(0, 37)}...` : entry.error,
               )
             : evaluations.some(isFailedEvaluation)
               ? chalk.red("failed")

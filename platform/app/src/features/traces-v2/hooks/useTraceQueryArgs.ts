@@ -30,8 +30,7 @@ export function useTraceQueryArgs() {
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
   const projectId = useDrawerProjectId();
 
-  const isLive =
-    occurredAtMs !== null && Date.now() - occurredAtMs < LIVE_WINDOW_MS;
+  const isLive = occurredAtMs !== null && Date.now() - occurredAtMs < LIVE_WINDOW_MS;
 
   const queryArgs = {
     projectId,

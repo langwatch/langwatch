@@ -93,10 +93,9 @@ describe("LegacyOtelTracesExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
-        ATTR_KEYS.LANGWATCH_INPUT,
-        { query: "test" },
-      );
+      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(ATTR_KEYS.LANGWATCH_INPUT, {
+        query: "test",
+      });
     });
   });
 

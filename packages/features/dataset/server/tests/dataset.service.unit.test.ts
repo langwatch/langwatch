@@ -14,7 +14,10 @@ import {
   DatasetNormalizeQueuePort,
   DatasetUploadPort,
 } from "../src/ports/dataset.port";
-import type { FinalizeUploadInput, RetryNormalizeInput } from "@langwatch/dataset-contract";
+import type {
+  FinalizeUploadInput,
+  RetryNormalizeInput,
+} from "@langwatch/dataset-contract";
 
 const makeDataset = (overrides: Partial<Dataset> = {}): Dataset =>
   datasetSchema.parse({
@@ -48,7 +51,10 @@ class MemoryDatasetRepository extends DatasetRepository {
       ? this.dataset
       : null;
   }
-  async tryFindBySlug(input: { slug: string; projectId: string }): Promise<Dataset | null> {
+  async tryFindBySlug(input: {
+    slug: string;
+    projectId: string;
+  }): Promise<Dataset | null> {
     return this.dataset.slug === input.slug && this.dataset.projectId === input.projectId
       ? this.dataset
       : null;
@@ -56,7 +62,12 @@ class MemoryDatasetRepository extends DatasetRepository {
   async list(): Promise<DatasetSummary[]> {
     return [{ ...this.dataset, recordCount: 0 }];
   }
-  async create(input: { projectId: string; name: string; slug: string; columnTypes: Dataset["columnTypes"] }): Promise<Dataset> {
+  async create(input: {
+    projectId: string;
+    name: string;
+    slug: string;
+    columnTypes: Dataset["columnTypes"];
+  }): Promise<Dataset> {
     this.dataset = makeDataset({
       id: "dataset_new",
       projectId: input.projectId,
@@ -66,19 +77,38 @@ class MemoryDatasetRepository extends DatasetRepository {
     });
     return this.dataset;
   }
-  async update(input: { id: string; projectId: string; name: string; slug: string; columnTypes: Dataset["columnTypes"] }): Promise<Dataset> {
+  async update(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    slug: string;
+    columnTypes: Dataset["columnTypes"];
+  }): Promise<Dataset> {
     this.dataset = makeDataset({ ...this.dataset, ...input });
     return this.dataset;
   }
-  async archive(input: { id: string; projectId: string; slug: string; archivedAt: Date | null }): Promise<Dataset> {
+  async archive(input: {
+    id: string;
+    projectId: string;
+    slug: string;
+    archivedAt: Date | null;
+  }): Promise<Dataset> {
     this.dataset = makeDataset({ ...this.dataset, ...input });
     return this.dataset;
   }
-  async restore(input: { id: string; projectId: string; slug: string }): Promise<Dataset> {
+  async restore(input: {
+    id: string;
+    projectId: string;
+    slug: string;
+  }): Promise<Dataset> {
     this.dataset = makeDataset({ ...this.dataset, ...input, archivedAt: null });
     return this.dataset;
   }
-  async updateMapping(input: { id: string; projectId: string; mapping: Record<string, unknown> }): Promise<Dataset> {
+  async updateMapping(input: {
+    id: string;
+    projectId: string;
+    mapping: Record<string, unknown>;
+  }): Promise<Dataset> {
     this.dataset = makeDataset({ ...this.dataset, mapping: input.mapping });
     return this.dataset;
   }
@@ -92,7 +122,11 @@ class MemoryRecordRepository extends DatasetRecordRepository {
   async list(): Promise<{ records: DatasetRecord[]; total: number }> {
     return { records: this.records, total: this.records.length };
   }
-  async createMany(input: { datasetId: string; projectId: string; entries: Array<Record<string, unknown> & { id: string }> }): Promise<DatasetRecord[]> {
+  async createMany(input: {
+    datasetId: string;
+    projectId: string;
+    entries: Array<Record<string, unknown> & { id: string }>;
+  }): Promise<DatasetRecord[]> {
     this.records = input.entries.map((entry) => ({
       id: entry.id,
       datasetId: input.datasetId,
@@ -103,7 +137,12 @@ class MemoryRecordRepository extends DatasetRecordRepository {
     }));
     return this.records;
   }
-  async update(input: { id: string; datasetId: string; projectId: string; entry: Record<string, unknown> }): Promise<DatasetRecord> {
+  async update(input: {
+    id: string;
+    datasetId: string;
+    projectId: string;
+    entry: Record<string, unknown>;
+  }): Promise<DatasetRecord> {
     const record = this.records.find((candidate) => candidate.id === input.id);
     if (!record) throw new Error("Dataset record not found");
     record.entry = input.entry;
@@ -173,7 +212,9 @@ describe("DatasetService", () => {
         calls.push("page");
         throw new Error("not used");
       }
-      async getDatasetWithRecords(input: { dataset: Dataset }): Promise<DatasetWithRecords> {
+      async getDatasetWithRecords(input: {
+        dataset: Dataset;
+      }): Promise<DatasetWithRecords> {
         calls.push(`read:${input.dataset.id}`);
         return { dataset: input.dataset, records: [], truncated: false };
       }
@@ -223,20 +264,40 @@ describe("DatasetService", () => {
     const records = new MemoryRecordRepository();
     const queueCalls: Array<{ projectId: string; datasetId: string }> = [];
     class Uploads extends DatasetUploadPort {
-      async finalizeUpload(input: FinalizeUploadInput): Promise<{ datasetId: string; status: "processing" }> {
+      async finalizeUpload(
+        input: FinalizeUploadInput,
+      ): Promise<{ datasetId: string; status: "processing" }> {
         return { datasetId: input.datasetId, status: "processing" };
       }
-      async retryNormalize(input: RetryNormalizeInput): Promise<{ datasetId: string; status: "processing" }> {
+      async retryNormalize(
+        input: RetryNormalizeInput,
+      ): Promise<{ datasetId: string; status: "processing" }> {
         return { datasetId: input.datasetId, status: "processing" };
       }
-      async uploadToExistingDataset(): Promise<{ datasetId: string; recordsCreated: number }> { return { datasetId: "d", recordsCreated: 0 }; }
-      async createDatasetFromUpload(): Promise<never> { throw new Error("unused"); }
-      async createPendingUpload(): Promise<never> { throw new Error("unused"); }
-      async writeStagedUpload(): Promise<void> { return; }
-      async abortPendingUpload(): Promise<never> { throw new Error("unused"); }
+      async uploadToExistingDataset(): Promise<{
+        datasetId: string;
+        recordsCreated: number;
+      }> {
+        return { datasetId: "d", recordsCreated: 0 };
+      }
+      async createDatasetFromUpload(): Promise<never> {
+        throw new Error("unused");
+      }
+      async createPendingUpload(): Promise<never> {
+        throw new Error("unused");
+      }
+      async writeStagedUpload(): Promise<void> {
+        return;
+      }
+      async abortPendingUpload(): Promise<never> {
+        throw new Error("unused");
+      }
     }
     class Queue extends DatasetNormalizeQueuePort {
-      async enqueueNormalize(input: { projectId: string; datasetId: string }): Promise<void> {
+      async enqueueNormalize(input: {
+        projectId: string;
+        datasetId: string;
+      }): Promise<void> {
         queueCalls.push(input);
       }
     }

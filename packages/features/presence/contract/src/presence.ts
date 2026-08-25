@@ -15,11 +15,7 @@ export const presenceLensSchema = z.enum([
   "other",
 ]);
 
-export const presenceDrawerViewModeSchema = z.enum([
-  "trace",
-  "conversation",
-  "scenario",
-]);
+export const presenceDrawerViewModeSchema = z.enum(["trace", "conversation", "scenario"]);
 export const presenceVisualizationTabSchema = z.enum([
   "waterfall",
   "flame",
@@ -80,7 +76,9 @@ export const presenceSessionSchema = z
 export type PresenceSession = z.infer<typeof presenceSessionSchema>;
 
 export const presenceEventSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("snapshot"), sessions: z.array(presenceSessionSchema) }).strict(),
+  z
+    .object({ kind: z.literal("snapshot"), sessions: z.array(presenceSessionSchema) })
+    .strict(),
   z.object({ kind: z.literal("join"), session: presenceSessionSchema }).strict(),
   z.object({ kind: z.literal("update"), session: presenceSessionSchema }).strict(),
   z.object({ kind: z.literal("leave"), sessionId: z.string().min(1) }).strict(),
@@ -100,9 +98,7 @@ export const presenceCursorPayloadSchema = z
     y: z.number().min(0).max(1),
   })
   .strict();
-export type PresenceCursorPayload = z.infer<
-  typeof presenceCursorPayloadSchema
->;
+export type PresenceCursorPayload = z.infer<typeof presenceCursorPayloadSchema>;
 
 export const presenceCursorEventSchema = presenceCursorPayloadSchema.extend({
   projectId: z.string().min(1),
@@ -110,9 +106,7 @@ export const presenceCursorEventSchema = presenceCursorPayloadSchema.extend({
   user: presenceUserSchema,
   emittedAt: z.number().int().nonnegative(),
 });
-export type PresenceCursorEvent = z.infer<
-  typeof presenceCursorEventSchema
->;
+export type PresenceCursorEvent = z.infer<typeof presenceCursorEventSchema>;
 
 export const presenceProjectInputSchema = z
   .object({ projectId: z.string().min(1) })

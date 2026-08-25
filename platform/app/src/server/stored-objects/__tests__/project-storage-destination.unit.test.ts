@@ -76,9 +76,9 @@ describe("resolveProjectStorageDestination", () => {
       mockEnv.S3_BUCKET_NAME = "global-bucket";
       mockEnv.LANGWATCH_LOCAL_STORAGE_PATH = "/data/objects";
 
-      await expect(
-        resolveProjectStorageDestination("proj_1"),
-      ).rejects.toBeInstanceOf(AzureBackendMisconfiguredError);
+      await expect(resolveProjectStorageDestination("proj_1")).rejects.toBeInstanceOf(
+        AzureBackendMisconfiguredError,
+      );
       await expect(resolveProjectStorageDestination("proj_1")).rejects.toThrow(
         new RegExp(missingVariable),
       );

@@ -48,12 +48,7 @@ import {
   useScrollFocusedTurnIntoView,
 } from "./FocusedTurn";
 import { SystemPromptBanner } from "./SystemPromptBanner";
-import {
-  EMPTY_TURNS,
-  type Mode,
-  type ParsedTurn,
-  type TurnLayout,
-} from "./types";
+import { EMPTY_TURNS, type Mode, type ParsedTurn, type TurnLayout } from "./types";
 import {
   type RailLayout,
   isRailActive as resolveIsRailActive,
@@ -125,8 +120,7 @@ export const ConversationView = memo(function ConversationView({
   const [mode, setMode] = useState<Mode>("thread");
   // "Expand all" seeds every message's local expand state; individual
   // Show more / Show less toggles override until the next expand-all flip.
-  const [isExpandAllEnabled, setIsExpandAllEnabled] =
-    useState(defaultExpandAll);
+  const [isExpandAllEnabled, setIsExpandAllEnabled] = useState(defaultExpandAll);
   const query = useConversationTurns(conversationId);
 
   const queriedTurns = resolveTurns({
@@ -137,10 +131,7 @@ export const ConversationView = memo(function ConversationView({
   // Events are read back per thread rather than carried on the turn summary.
   const turns = useConversationTurnEvents(queriedTurns);
 
-  const traceIds = useMemo(
-    () => queriedTurns.map((t) => t.traceId),
-    [queriedTurns],
-  );
+  const traceIds = useMemo(() => queriedTurns.map((t) => t.traceId), [queriedTurns]);
   const annotations = useConversationAnnotations(traceIds);
 
   // The rail belongs to this conversation only when the composer that opened
@@ -201,8 +192,7 @@ export const ConversationView = memo(function ConversationView({
   const hasRedactedText = useMemo(
     () =>
       parsedTurns.some(
-        (p) =>
-          hasRedactionMarker(p.userText) || hasRedactionMarker(p.assistantText),
+        (p) => hasRedactionMarker(p.userText) || hasRedactionMarker(p.assistantText),
       ),
     [parsedTurns],
   );
@@ -216,9 +206,7 @@ export const ConversationView = memo(function ConversationView({
   // Build markdown at the parent so the result survives mode toggles. Stay
   // lazy: skip the build until the user has actually viewed markdown at least
   // once, so first render in bubbles mode pays nothing.
-  const [hasViewedMarkdown, setHasViewedMarkdown] = useState(
-    () => mode === "markdown",
-  );
+  const [hasViewedMarkdown, setHasViewedMarkdown] = useState(() => mode === "markdown");
   useEffect(() => {
     if (mode === "markdown") setHasViewedMarkdown(true);
   }, [mode]);
@@ -471,13 +459,7 @@ const ConversationSkeleton: React.FC<{ conversationId: string }> = ({
         <Skeleton height="20px" width="96px" borderRadius="md" />
       </HStack>
 
-      <VStack
-        align="stretch"
-        gap={5}
-        paddingX={5}
-        paddingY={4}
-        overflow="hidden"
-      >
+      <VStack align="stretch" gap={5} paddingX={5} paddingY={4} overflow="hidden">
         {SKELETON_TURNS.map((turn, i) => (
           <VStack key={i} align="stretch" gap={2}>
             <Flex align="center" gap={2}>
@@ -521,17 +503,9 @@ const ConversationSkeleton: React.FC<{ conversationId: string }> = ({
                 paddingY={2}
               >
                 <Skeleton height="9px" width="56px" borderRadius="sm" />
-                <Skeleton
-                  height="11px"
-                  width={turn.assistant[0]}
-                  borderRadius="sm"
-                />
+                <Skeleton height="11px" width={turn.assistant[0]} borderRadius="sm" />
                 {turn.assistant[1] && (
-                  <Skeleton
-                    height="11px"
-                    width={turn.assistant[1]}
-                    borderRadius="sm"
-                  />
+                  <Skeleton height="11px" width={turn.assistant[1]} borderRadius="sm" />
                 )}
               </VStack>
               <Skeleton boxSize="22px" borderRadius="full" flexShrink={0} />
@@ -669,9 +643,7 @@ const TurnsView: React.FC<
 };
 
 /** A thread short enough to render row by row, in one scrolling column. */
-const PlainTurnsView: React.FC<
-  TurnsViewProps & { systemPrompt: string | null }
-> = ({
+const PlainTurnsView: React.FC<TurnsViewProps & { systemPrompt: string | null }> = ({
   layout,
   parsedTurns,
   systemPrompt,
@@ -762,9 +734,7 @@ function useCenterActiveTurnInVirtualizer({
   const hasCentered = useRef(false);
   useEffect(() => {
     if (hasCentered.current) return;
-    const activeIndex = parsedTurns.findIndex(
-      (p) => p.turn.traceId === currentTraceId,
-    );
+    const activeIndex = parsedTurns.findIndex((p) => p.turn.traceId === currentTraceId);
     if (activeIndex <= 0) return;
     hasCentered.current = true;
     virtualizer.scrollToIndex(activeIndex, { align: "center" });
@@ -799,9 +769,7 @@ function useScrollFocusedTurnInVirtualizer({
   const rest = useRef(0);
   useEffect(() => {
     if (!focusTraceId || scrolledTo.current === focusTraceId) return;
-    const focusedIndex = parsedTurns.findIndex(
-      (p) => p.turn.traceId === focusTraceId,
-    );
+    const focusedIndex = parsedTurns.findIndex((p) => p.turn.traceId === focusTraceId);
     if (focusedIndex < 0) return;
     scrolledTo.current = focusTraceId;
     rest.current = window.setTimeout(() => {
@@ -868,8 +836,7 @@ function useCenterActiveTurnOnce({
     const active = activeRef.current;
     if (!container || !active) return;
     done.current = true;
-    const top =
-      active.offsetTop - container.clientHeight / 2 + active.offsetHeight / 2;
+    const top = active.offsetTop - container.clientHeight / 2 + active.offsetHeight / 2;
     container.scrollTop = Math.max(0, top);
   }, [scrollRef, activeRef]);
 }
@@ -931,18 +898,15 @@ const VirtualizedTurnsView: React.FC<
   focusTraceId,
   showSessionCheckboxes,
 }) => {
-  const { virtualizer, railLayout, attachScroller, isBlinking } =
-    useVirtualizedTurnList({ parsedTurns, currentTraceId, focusTraceId });
+  const { virtualizer, railLayout, attachScroller, isBlinking } = useVirtualizedTurnList({
+    parsedTurns,
+    currentTraceId,
+    focusTraceId,
+  });
   const underReview = turnUnderReview({ parsedTurns, focusTraceId });
 
   return (
-    <Box
-      ref={attachScroller}
-      flex={1}
-      overflow="auto"
-      paddingX={5}
-      paddingY={4}
-    >
+    <Box ref={attachScroller} flex={1} overflow="auto" paddingX={5} paddingY={4}>
       <Box
         width="full"
         maxWidth={columnMaxWidth({ layout, isRailActive, railLayout })}
@@ -958,11 +922,7 @@ const VirtualizedTurnsView: React.FC<
             <SystemPromptBanner text={systemPrompt} />
           </Box>
         )}
-        <Box
-          height={`${virtualizer.getTotalSize()}px`}
-          width="full"
-          position="relative"
-        >
+        <Box height={`${virtualizer.getTotalSize()}px`} width="full" position="relative">
           {virtualizer.getVirtualItems().map((row) => {
             const p = parsedTurns[row.index]!;
             return (
@@ -1034,22 +994,13 @@ const MarkdownConversationView: React.FC<{
           Rendered for reading — Copy gives you the raw markdown source.
         </Text>
         <Box flex={1} />
-        <Button
-          size="xs"
-          variant="outline"
-          colorPalette="blue"
-          onClick={handleCopy}
-        >
+        <Button size="xs" variant="outline" colorPalette="blue" onClick={handleCopy}>
           <Icon as={copied ? Check : Copy} boxSize="12px" />
           {copied ? "Copied" : "Copy"}
         </Button>
       </HStack>
       <Box ref={scrollRef} flex={1} minHeight={0} overflow="auto" bg="bg.panel">
-        <Box
-          height={`${virtualizer.getTotalSize()}px`}
-          width="full"
-          position="relative"
-        >
+        <Box height={`${virtualizer.getTotalSize()}px`} width="full" position="relative">
           {virtualizer.getVirtualItems().map((row) => {
             const chunk = chunks[row.index]!;
             return (
@@ -1063,11 +1014,7 @@ const MarkdownConversationView: React.FC<{
                 width="full"
                 transform={`translateY(${row.start}px)`}
               >
-                <RenderedMarkdown
-                  markdown={chunk.markdown}
-                  paddingX={4}
-                  paddingY={2}
-                />
+                <RenderedMarkdown markdown={chunk.markdown} paddingX={4} paddingY={2} />
               </Box>
             );
           })}

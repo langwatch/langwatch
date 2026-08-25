@@ -12,9 +12,7 @@ describe("generateOtelTraceId", () => {
   describe("when called repeatedly", () => {
     /** @scenario Repeated generation yields unique trace ids */
     it("produces unique ids", () => {
-      const ids = new Set(
-        Array.from({ length: 1000 }, () => generateOtelTraceId()),
-      );
+      const ids = new Set(Array.from({ length: 1000 }, () => generateOtelTraceId()));
       expect(ids.size).toBe(1000);
     });
   });
@@ -30,9 +28,7 @@ describe("generateOtelSpanId", () => {
 
   describe("when called repeatedly", () => {
     it("produces unique ids", () => {
-      const ids = new Set(
-        Array.from({ length: 1000 }, () => generateOtelSpanId()),
-      );
+      const ids = new Set(Array.from({ length: 1000 }, () => generateOtelSpanId()));
       expect(ids.size).toBe(1000);
     });
   });

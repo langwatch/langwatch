@@ -46,12 +46,19 @@ export class EvaluationService extends EvaluationServiceContract {
     return new EvaluationService(options);
   }
 
-  private constructor(private readonly options: EvaluationServiceOptions) { super(); }
+  private constructor(private readonly options: EvaluationServiceOptions) {
+    super();
+  }
 
-  async executeForTrace(input: ExecuteEvaluationCommand): Promise<EvaluationExecutionResult> {
+  async executeForTrace(
+    input: ExecuteEvaluationCommand,
+  ): Promise<EvaluationExecutionResult> {
     const command = executeEvaluationCommandSchema.parse(input);
     if (command.workflowId) {
-      await this.options.workflows.assertInProject({ workflowId: command.workflowId, projectId: command.projectId });
+      await this.options.workflows.assertInProject({
+        workflowId: command.workflowId,
+        projectId: command.projectId,
+      });
     }
     return evaluationExecutionResultSchema.parse(
       await this.options.execution.execute(command),
@@ -61,7 +68,11 @@ export class EvaluationService extends EvaluationServiceContract {
   async upsertRun(input: UpsertEvaluationRunCommand): Promise<void> {
     const command = upsertEvaluationRunCommandSchema.parse(input);
     const data = evaluationRunDataSchema.parse(command.data);
-    await this.options.repository.upsert({ data, tenantId: command.tenantId, retentionDays: command.retentionDays });
+    await this.options.repository.upsert({
+      data,
+      tenantId: command.tenantId,
+      retentionDays: command.retentionDays,
+    });
   }
 
   async upsertRuns(input: UpsertEvaluationRunCommand[]): Promise<void> {
@@ -131,9 +142,7 @@ export class EvaluationService extends EvaluationServiceContract {
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {
     const query = evaluationInputsQuerySchema.parse(input);
-    const inputs = await this.options.repository.tryFindInputs(
-      query,
-    );
+    const inputs = await this.options.repository.tryFindInputs(query);
     return this.options.inputResolution.resolve({
       tenantId: query.tenantId,
       inputs,
@@ -199,9 +208,7 @@ function metricTotal(
     : { sum: bucket.scoreSum, count: bucket.scoreCount };
 }
 
-function average(
-  totals: Array<{ sum: number; count: number }>,
-): number | null {
+function average(totals: Array<{ sum: number; count: number }>): number | null {
   const sum = totals.reduce((value, total) => value + total.sum, 0);
   const count = totals.reduce((value, total) => value + total.count, 0);
   return count > 0 ? sum / count : null;

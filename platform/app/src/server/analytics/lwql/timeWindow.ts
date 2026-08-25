@@ -51,8 +51,7 @@ export const LWQL_TIME_WINDOW_PARAMETERS = [
   LWQL_PERIOD_END_PARAMETER,
 ] as const;
 
-export type LangWatchQLTimeWindowParameter =
-  (typeof LWQL_TIME_WINDOW_PARAMETERS)[number];
+export type LangWatchQLTimeWindowParameter = (typeof LWQL_TIME_WINDOW_PARAMETERS)[number];
 
 /** Whether a parameter name is one the surface owns. */
 export function isLangWatchQLTimeWindowParameter(

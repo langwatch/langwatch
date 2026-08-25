@@ -111,8 +111,7 @@ export function useRunHistoryPagination({
     return merged;
   }, [pages]);
 
-  const hasMore =
-    pages.length > 0 ? (pages[pages.length - 1]?.hasMore ?? false) : false;
+  const hasMore = pages.length > 0 ? (pages[pages.length - 1]?.hasMore ?? false) : false;
 
   const loadMore = useCallback(() => {
     const lastPage = pages[pages.length - 1];

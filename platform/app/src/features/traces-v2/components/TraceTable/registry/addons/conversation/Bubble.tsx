@@ -1,12 +1,4 @@
-import {
-  Box,
-  Circle,
-  Flex,
-  HStack,
-  Icon,
-  Spacer,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Circle, Flex, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
 import { Lightbulb, MessageSquare } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -119,8 +111,7 @@ export function truncateMarkdown({
     truncated.lastIndexOf("\n"),
     truncated.lastIndexOf(". "),
   );
-  const cut =
-    lastBreak > maxChars * TRUNCATE_BREAK_PREFER_RATIO ? lastBreak : maxChars;
+  const cut = lastBreak > maxChars * TRUNCATE_BREAK_PREFER_RATIO ? lastBreak : maxChars;
   return `${text.slice(0, cut).trimEnd()}\n\n…`;
 }
 
@@ -201,9 +192,7 @@ export const Bubble: React.FC<BubbleProps> = ({
             : undefined
         }
         _hover={
-          onClick
-            ? { bg: palette.selectedBg, transform: "translateY(-1px)" }
-            : undefined
+          onClick ? { bg: palette.selectedBg, transform: "translateY(-1px)" } : undefined
         }
         onClick={(e: React.MouseEvent) => {
           if (!onClick) return;
@@ -244,10 +233,7 @@ export const Bubble: React.FC<BubbleProps> = ({
           {annotate && (
             <>
               <Spacer />
-              <MessageAnnotateCluster
-                target={annotate}
-                translation={translate}
-              />
+              <MessageAnnotateCluster target={annotate} translation={translate} />
             </>
           )}
         </HStack>

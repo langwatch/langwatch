@@ -63,9 +63,7 @@ describe("SummaryMediaStrip", () => {
         "src",
         "/api/files/p1/i1",
       );
-      expect(screen.getByTestId("media-part-binary")).toHaveTextContent(
-        "report.pdf",
-      );
+      expect(screen.getByTestId("media-part-binary")).toHaveTextContent("report.pdf");
     });
   });
 
@@ -132,9 +130,7 @@ describe("SummaryMediaStrip", () => {
   });
 
   describe("given refs recorded before roles existed", () => {
-    const refsJson = JSON.stringify([
-      { kind: "audio", url: "/api/files/p1/a1" },
-    ]);
+    const refsJson = JSON.stringify([{ kind: "audio", url: "/api/files/p1/a1" }]);
 
     /** @scenario "Media refs recorded without a role render on both summary strips" */
     it("renders the recording on both strips, exactly as before", () => {

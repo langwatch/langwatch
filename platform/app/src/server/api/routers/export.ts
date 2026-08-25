@@ -45,10 +45,7 @@ function readProgressEvent({
   try {
     parsed = JSON.parse(raw) as ExportProgressEvent;
   } catch {
-    logger.warn(
-      { projectId, exportId },
-      "Ignoring invalid export progress event",
-    );
+    logger.warn({ projectId, exportId }, "Ignoring invalid export progress event");
     return null;
   }
 
@@ -64,9 +61,7 @@ function readProgressEvent({
  * `scenarios:view` and a trace export by `traces:view`. Factored rather than
  * copied so the two cannot drift on filtering or teardown.
  */
-function exportProgressSubscription(
-  permission: "traces:view" | "scenarios:view",
-) {
+function exportProgressSubscription(permission: "traces:view" | "scenarios:view") {
   return protectedProcedure
     .input(z.object({ projectId: z.string(), exportId: z.string() }))
     .permission(permission)
@@ -74,10 +69,7 @@ function exportProgressSubscription(
       const { projectId, exportId } = opts.input;
       const emitter = opts.ctx.app.broadcast.getTenantEmitter(projectId);
 
-      logger.info(
-        { projectId, exportId },
-        "Export progress subscription started",
-      );
+      logger.info({ projectId, exportId }, "Export progress subscription started");
 
       try {
         for await (const eventArgs of on(emitter, "export_progress", {
@@ -103,10 +95,7 @@ function exportProgressSubscription(
           }
         }
       } finally {
-        logger.debug(
-          { projectId, exportId },
-          "Export progress subscription cleanup",
-        );
+        logger.debug({ projectId, exportId }, "Export progress subscription cleanup");
       }
     });
 }

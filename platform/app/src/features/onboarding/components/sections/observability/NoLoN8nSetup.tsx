@@ -38,8 +38,7 @@ export const NoLoN8nSetup: React.FC = () => {
       <Card.Body>
         <VStack align="stretch" gap={3}>
           <Text fontSize="sm">
-            Install the LangWatch n8n nodes, set environment variables, and
-            restart n8n.
+            Install the LangWatch n8n nodes, set environment variables, and restart n8n.
           </Text>
           <CodeBlock.AdapterProvider key={colorMode} value={shikiAdapter}>
             <ClientOnly>

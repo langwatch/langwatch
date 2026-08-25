@@ -137,9 +137,7 @@ export function computeClaudeSpanEnrichment({
 
   for (const span of spans) {
     const output =
-      span.requestId !== null
-        ? (outputByRequestId.get(span.requestId) ?? null)
-        : null;
+      span.requestId !== null ? (outputByRequestId.get(span.requestId) ?? null) : null;
     const input = inputBySpanId.get(span.spanId) ?? null;
     if (input !== null || output !== null) {
       result.set(span.spanId, { input, output });
@@ -154,9 +152,7 @@ export function computeClaudeSpanEnrichment({
  * the first log of each kind wins. Bodies are bounded by `capPayloadString`
  * (the response-body extractor caps internally; the raw text is capped here).
  */
-function buildOutputIndex(
-  logs: ClaudeContentLog[],
-): Map<string, SpanInputOutput> {
+function buildOutputIndex(logs: ClaudeContentLog[]): Map<string, SpanInputOutput> {
   const byRequestId = new Map<string, SpanInputOutput>();
 
   for (const log of logs) {
@@ -223,9 +219,7 @@ function buildInputIndex({
 }): Map<string, SpanInputOutput> {
   const bySpanId = new Map<string, SpanInputOutput>();
 
-  const spansByQuerySource = groupBy(spans, (s) =>
-    querySourceKey(s.querySource),
-  );
+  const spansByQuerySource = groupBy(spans, (s) => querySourceKey(s.querySource));
   // Grouping by `query_source` isolates concurrent sources from each other,
   // but it only works while BOTH sides carry the field. Claude Code 2.1.x
   // stamps it on the log events and not on the `llm_request` span, so keying
@@ -299,10 +293,7 @@ function dedupeRepeatedSystemMessages({
         firstCallByContent,
       });
       if (seenAtCall === null) continue;
-      messages[i] = repeatedSystemPlaceholder(
-        message.content as string,
-        seenAtCall,
-      );
+      messages[i] = repeatedSystemPlaceholder(message.content as string, seenAtCall);
     }
   }
 }
@@ -332,10 +323,7 @@ function firstSystemCall({
   return firstCall;
 }
 
-function repeatedSystemPlaceholder(
-  content: string,
-  firstCall: number,
-): ChatMessage {
+function repeatedSystemPlaceholder(content: string, firstCall: number): ChatMessage {
   const chars = content.length.toLocaleString("en-US");
   return {
     role: "system",
@@ -406,9 +394,7 @@ function pickPromptFallback({
 }
 
 function normalizeRole(role: string | undefined): ChatRole {
-  return role !== undefined && CHAT_ROLE_SET.has(role)
-    ? (role as ChatRole)
-    : "unknown";
+  return role !== undefined && CHAT_ROLE_SET.has(role) ? (role as ChatRole) : "unknown";
 }
 
 function querySourceKey(querySource: string | null): string {
@@ -498,10 +484,7 @@ export function computeClaudeToolSpanEnrichment({
   const decisionByUseId = new Map<string, ClaudeToolLog>();
   for (const log of toolLogs) {
     if (log.toolUseId === null) continue;
-    if (
-      log.eventName === TOOL_RESULT_EVENT &&
-      !resultByUseId.has(log.toolUseId)
-    ) {
+    if (log.eventName === TOOL_RESULT_EVENT && !resultByUseId.has(log.toolUseId)) {
       resultByUseId.set(log.toolUseId, log);
     } else if (
       log.eventName === TOOL_DECISION_EVENT &&

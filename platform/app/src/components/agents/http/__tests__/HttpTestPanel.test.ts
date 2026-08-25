@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  formatDuration,
-  getStatusColor,
-  renderTemplate,
-} from "../HttpTestPanel";
+import { formatDuration, getStatusColor, renderTemplate } from "../HttpTestPanel";
 
 describe("renderTemplate", () => {
   it("replaces single variable", () => {

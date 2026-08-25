@@ -7,7 +7,12 @@ import {
   type PromptTagAssignment,
 } from "@langwatch/prompt-contract";
 import type { z } from "zod";
-import type { LlmPromptConfigVersion, Prisma, PrismaClient, PromptScope } from "../repositories/prisma/prisma.prompt.repository";
+import type {
+  LlmPromptConfigVersion,
+  Prisma,
+  PrismaClient,
+  PromptScope,
+} from "../repositories/prisma/prisma.prompt.repository";
 import {
   deriveResponseFormatFromOutputs,
   handleSchema,
@@ -58,9 +63,7 @@ import {
 const logger = createLogger("langwatch:prompt-service");
 
 // Extract the configData type from the schema
-type ConfigData = z.infer<
-  ReturnType<typeof getLatestConfigVersionSchema>
->["configData"];
+type ConfigData = z.infer<ReturnType<typeof getLatestConfigVersionSchema>>["configData"];
 
 /**
  * Full prompt shape that combines prompt config with version data.
@@ -171,8 +174,7 @@ export class PromptService extends PromptServiceContract {
     const { projectId } = params;
 
     const organizationId =
-      params.organizationId ??
-      (await this.getOrganizationIdFromProjectId(projectId));
+      params.organizationId ?? (await this.getOrganizationIdFromProjectId(projectId));
 
     const configs = await this.repository.getAllWithLatestVersion({
       projectId,
@@ -220,10 +222,7 @@ export class PromptService extends PromptServiceContract {
   }): Promise<VersionedPrompt | null> {
     const { idOrHandle, projectId } = params;
 
-    if (
-      params.tag &&
-      (params.version !== undefined || params.versionId !== undefined)
-    ) {
+    if (params.tag && (params.version !== undefined || params.versionId !== undefined)) {
       logger.warn(
         {
           idOrHandle,
@@ -239,8 +238,7 @@ export class PromptService extends PromptServiceContract {
     }
 
     const organizationId =
-      params.organizationId ??
-      (await this.getOrganizationIdFromProjectId(projectId));
+      params.organizationId ?? (await this.getOrganizationIdFromProjectId(projectId));
 
     // `latest` is a virtual tag that is never stored in the PromptTag table
     // (see parsePromptShorthand, which also normalizes it away). Treat
@@ -287,15 +285,13 @@ export class PromptService extends PromptServiceContract {
       resolvedVersionId = versionTag.versionId;
     }
 
-    const config = await this.repository.tryGetConfigByIdOrHandleWithLatestVersion(
-      {
-        idOrHandle,
-        projectId,
-        organizationId,
-        version: params.version,
-        versionId: resolvedVersionId,
-      },
-    );
+    const config = await this.repository.tryGetConfigByIdOrHandleWithLatestVersion({
+      idOrHandle,
+      projectId,
+      organizationId,
+      version: params.version,
+      versionId: resolvedVersionId,
+    });
 
     if (!config) {
       return null;
@@ -311,9 +307,7 @@ export class PromptService extends PromptServiceContract {
     // version and, when it differs, the latest version for the "latest" tag
     // comparison) — not the whole tag history for the config.
     const versionIdsToQuery = Array.from(
-      new Set(
-        [currentVersionId, latestVersionId].filter((id): id is string => !!id),
-      ),
+      new Set([currentVersionId, latestVersionId].filter((id): id is string => !!id)),
     );
     const tagsByVersionId = await this.getTagsByVersionIds({
       versionIds: versionIdsToQuery,
@@ -356,21 +350,18 @@ export class PromptService extends PromptServiceContract {
     }
 
     // Get the versions
-    const rawVersions =
-      await this.repository.versions.getVersionsForConfigByIdOrHandle({
-        idOrHandle: params.idOrHandle,
-        projectId: params.projectId,
-        organizationId,
-      });
+    const rawVersions = await this.repository.versions.getVersionsForConfigByIdOrHandle({
+      idOrHandle: params.idOrHandle,
+      projectId: params.projectId,
+      organizationId,
+    });
 
     const versions = rawVersions.map((v) => ({
       ...parseLlmConfigVersion(v),
       runtimeParameters: parseRuntimeParameters(v.runtimeParameters),
     }));
 
-    const versionIds = versions
-      .map((v) => v.id)
-      .filter((id): id is string => !!id);
+    const versionIds = versions.map((v) => v.id).filter((id): id is string => !!id);
     const tagsByVersionId = await this.getTagsByVersionIds({
       versionIds,
       projectId: params.projectId,
@@ -449,14 +440,14 @@ export class PromptService extends PromptServiceContract {
     // and it's not consideered a draft
     const shouldCreateVersion = Boolean(
       params.prompt !== undefined ||
-        params.messages !== undefined ||
-        params.inputs !== undefined ||
-        params.outputs !== undefined ||
-        params.model !== undefined ||
-        params.temperature !== undefined ||
-        params.maxTokens !== undefined ||
-        params.promptingTechnique !== undefined ||
-        params.demonstrations !== undefined,
+      params.messages !== undefined ||
+      params.inputs !== undefined ||
+      params.outputs !== undefined ||
+      params.model !== undefined ||
+      params.temperature !== undefined ||
+      params.maxTokens !== undefined ||
+      params.promptingTechnique !== undefined ||
+      params.demonstrations !== undefined,
     );
 
     if (shouldCreateVersion) {
@@ -499,9 +490,7 @@ export class PromptService extends PromptServiceContract {
               prompt: params.prompt,
               messages: params.messages,
               inputs: params.inputs ?? [{ identifier: "input", type: "str" }],
-              outputs: params.outputs ?? [
-                { identifier: "output", type: "str" },
-              ],
+              outputs: params.outputs ?? [{ identifier: "output", type: "str" }],
               model: params.model,
               temperature: params.temperature,
               maxTokens: params.maxTokens,
@@ -765,11 +754,7 @@ export class PromptService extends PromptServiceContract {
       projectId,
     });
 
-    const updatedConfig = await this.repository.updateConfig(
-      idOrHandle,
-      projectId,
-      data,
-    );
+    const updatedConfig = await this.repository.updateConfig(idOrHandle, projectId, data);
 
     // Get the latest version to return complete prompt
     const latestVersionRaw = await this.repository.versions.getLatestVersion(
@@ -778,9 +763,7 @@ export class PromptService extends PromptServiceContract {
     );
     const latestVersion = {
       ...parseLlmConfigVersion(latestVersionRaw),
-      runtimeParameters: parseRuntimeParameters(
-        latestVersionRaw.runtimeParameters,
-      ),
+      runtimeParameters: parseRuntimeParameters(latestVersionRaw.runtimeParameters),
     };
 
     const latestVersionId = latestVersion.id ?? "";
@@ -883,12 +866,11 @@ export class PromptService extends PromptServiceContract {
 
         // Get the latest version
         // TODO: This should use the version service instead of accessing the repository directly
-        const latestVersionRaw =
-          await this.repository.versions.getLatestVersion(
-            updatedConfig.id,
-            projectId,
-            { tx },
-          );
+        const latestVersionRaw = await this.repository.versions.getLatestVersion(
+          updatedConfig.id,
+          projectId,
+          { tx },
+        );
         const latestVersion = parseLlmConfigVersion(latestVersionRaw);
 
         const resolvedParameters =
@@ -1192,8 +1174,7 @@ export class PromptService extends PromptServiceContract {
           projectId,
           data: {
             authorId,
-            commitMessage:
-              commitMessage ?? describeLocalFileUpdate(allDifferences),
+            commitMessage: commitMessage ?? describeLocalFileUpdate(allDifferences),
             ...this.transformToDbFormat(resolvedConfigData),
             schemaVersion: SchemaVersion.V1_0,
             parameters: params.parameters,
@@ -1225,9 +1206,7 @@ export class PromptService extends PromptServiceContract {
 
         const baseParametersEqual = runtimeParametersEqual(
           params.parameters,
-          localBaseVersion.runtimeParameters as
-            | Record<string, unknown>
-            | undefined,
+          localBaseVersion.runtimeParameters as Record<string, unknown> | undefined,
         );
 
         if (baseComparison.isEqual && baseParametersEqual) {
@@ -1243,10 +1222,8 @@ export class PromptService extends PromptServiceContract {
           localVersion,
           remoteVersion,
           differences:
-            this.repository.compareConfigContent(
-              resolvedConfigData,
-              remoteConfigData,
-            ).differences ?? [],
+            this.repository.compareConfigContent(resolvedConfigData, remoteConfigData)
+              .differences ?? [],
           remoteConfigData,
           remoteParameters: existingPrompt.parameters ?? {},
         },
@@ -1260,10 +1237,8 @@ export class PromptService extends PromptServiceContract {
         localVersion: localVersion ?? 0,
         remoteVersion,
         differences:
-          this.repository.compareConfigContent(
-            resolvedConfigData,
-            remoteConfigData,
-          ).differences ?? [],
+          this.repository.compareConfigContent(resolvedConfigData, remoteConfigData)
+            .differences ?? [],
         remoteConfigData,
         remoteParameters: existingPrompt.parameters ?? {},
       },
@@ -1344,10 +1319,7 @@ export class PromptService extends PromptServiceContract {
       organizationId: config.organizationId,
       // The VersionedPrompt contains the system message,
       // but in the database, we only have the prompt field above
-      messages: [
-        { role: "system", content: prompt },
-        ...(configData.messages ?? []),
-      ],
+      messages: [{ role: "system", content: prompt }, ...(configData.messages ?? [])],
       inputs: configData.inputs,
       outputs: configData.outputs,
       responseFormat: deriveResponseFormatFromOutputs(configData.outputs),
@@ -1375,9 +1347,7 @@ export class PromptService extends PromptServiceContract {
     };
   }
 
-  private async getOrganizationIdFromProjectId(
-    projectId: string,
-  ): Promise<string> {
+  private async getOrganizationIdFromProjectId(projectId: string): Promise<string> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -1408,9 +1378,7 @@ export class PromptService extends PromptServiceContract {
    * TODO: Move to repository layer - the repository should handle this transformation
    * to properly isolate database schema concerns from service business logic.
    */
-  private transformToDbFormat(
-    data: Record<string, unknown>,
-  ): Record<string, unknown> {
+  private transformToDbFormat(data: Record<string, unknown>): Record<string, unknown> {
     return transformCamelToSnake(data);
   }
 
@@ -1463,7 +1431,10 @@ export class PromptService extends PromptServiceContract {
   // --- Tag operations ---
 
   /** Get all tags for a prompt config. */
-  async getTagsForConfig(params: { configId: string; projectId: string }): Promise<PromptTagAssignment[]> {
+  async getTagsForConfig(params: {
+    configId: string;
+    projectId: string;
+  }): Promise<PromptTagAssignment[]> {
     return this.tagRepository.getTagsForConfig(params);
   }
 
@@ -1477,9 +1448,7 @@ export class PromptService extends PromptServiceContract {
     organizationId?: string;
   }): Promise<PromptTagAssignment> {
     // Always resolve organizationId from projectId to prevent org mismatch attacks
-    const organizationId = await this.getOrganizationIdFromProjectId(
-      params.projectId,
-    );
+    const organizationId = await this.getOrganizationIdFromProjectId(params.projectId);
 
     const tagId = await this.resolveTagNameToId({
       tagName: params.tag,
@@ -1541,12 +1510,20 @@ export class PromptService extends PromptServiceContract {
       : null;
   }
 
-  getNamesByIds(input: { ids: string[]; projectId: string; organizationId: string }): Promise<Array<{ id: string; name: string }>> {
+  getNamesByIds(input: {
+    ids: string[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<Array<{ id: string; name: string }>> {
     return this.repository.findNamesByIds(input);
   }
 
-  async getExistingIds(input: { ids: string[]; projectId: string; organizationId: string }): Promise<string[]> {
-    return [...await this.repository.findExistingIds(input)];
+  async getExistingIds(input: {
+    ids: string[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<string[]> {
+    return [...(await this.repository.findExistingIds(input))];
   }
 
   async listTags(input: { organizationId: string }): Promise<PromptTag[]> {
@@ -1557,11 +1534,19 @@ export class PromptService extends PromptServiceContract {
     return this.tagService.seedForOrganization(input);
   }
 
-  createTag(input: { organizationId: string; name: string; createdById?: string }): Promise<PromptTag> {
+  createTag(input: {
+    organizationId: string;
+    name: string;
+    createdById?: string;
+  }): Promise<PromptTag> {
     return this.tagService.create(input);
   }
 
-  renameTag(input: { organizationId: string; oldName: string; newName: string }): Promise<PromptTag> {
+  renameTag(input: {
+    organizationId: string;
+    oldName: string;
+    newName: string;
+  }): Promise<PromptTag> {
     return this.tagService.rename(input);
   }
 
@@ -1569,7 +1554,10 @@ export class PromptService extends PromptServiceContract {
     return this.tagService.tryDelete(input);
   }
 
-  tryDeleteTagByName(input: { organizationId: string; name: string }): Promise<PromptTag | null> {
+  tryDeleteTagByName(input: {
+    organizationId: string;
+    name: string;
+  }): Promise<PromptTag | null> {
     return this.tagService.tryDeleteByName(input);
   }
 
@@ -1633,16 +1621,10 @@ export class PromptService extends PromptServiceContract {
     currentVersionId: string;
     latestVersionId: string;
   }): Array<{ name: string; versionId: string }> {
-    if (
-      !params.currentVersionId ||
-      params.currentVersionId !== params.latestVersionId
-    ) {
+    if (!params.currentVersionId || params.currentVersionId !== params.latestVersionId) {
       return params.tags;
     }
-    return [
-      { name: "latest", versionId: params.latestVersionId },
-      ...params.tags,
-    ];
+    return [{ name: "latest", versionId: params.latestVersionId }, ...params.tags];
   }
 
   /**

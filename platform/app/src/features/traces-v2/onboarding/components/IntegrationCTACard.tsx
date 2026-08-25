@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Flex,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Cable, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
@@ -35,9 +27,7 @@ export function useIntegrationCTAVisible({
 }): boolean {
   const { hasAnyTraces } = useProjectHasTraces();
   const dismissedAt = useOnboardingStore((s) =>
-    projectId
-      ? (s.integrationCtaDismissedAtByProject[projectId] ?? null)
-      : null,
+    projectId ? (s.integrationCtaDismissedAtByProject[projectId] ?? null) : null,
   );
 
   if (!projectId) return false;
@@ -64,9 +54,7 @@ export const IntegrationCTACard: React.FC = () => {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
   const visible = useIntegrationCTAVisible({ projectId });
-  const setDismissedAt = useOnboardingStore(
-    (s) => s.setIntegrationCtaDismissedAt,
-  );
+  const setDismissedAt = useOnboardingStore((s) => s.setIntegrationCtaDismissedAt);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -102,18 +90,12 @@ export const IntegrationCTACard: React.FC = () => {
               marginTop={0.5}
             />
             <VStack align="stretch" gap={2} flex={1}>
-              <Text
-                textStyle="sm"
-                fontWeight="semibold"
-                color="fg"
-                lineHeight="snug"
-              >
+              <Text textStyle="sm" fontWeight="semibold" color="fg" lineHeight="snug">
                 Integrate your code to see real traces here
               </Text>
               <Text textStyle="xs" color="fg.muted" lineHeight="tall">
-                The rows below are sample data. Send your own traces by
-                connecting the LangWatch SDK, MCP server, or a coding agent
-                skill.
+                The rows below are sample data. Send your own traces by connecting the
+                LangWatch SDK, MCP server, or a coding agent skill.
               </Text>
               <HStack gap={2} paddingTop={1}>
                 <Button
@@ -148,10 +130,7 @@ export const IntegrationCTACard: React.FC = () => {
         </Flex>
       </Box>
 
-      <IntegrateDrawer
-        open={drawerOpen}
-        onOpenChange={(open) => setDrawerOpen(open)}
-      />
+      <IntegrateDrawer open={drawerOpen} onOpenChange={(open) => setDrawerOpen(open)} />
     </>
   );
 };

@@ -4,10 +4,7 @@ import { useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 import { IconRadioCardGroup } from "../../../../components/forms/IconRadioCardGroup";
 import { PhoneNumberInput } from "../../../../components/inputs/PhoneNumberInput";
-import {
-  companySizeItems,
-  solutionTypeItems,
-} from "../../constants/onboarding-data";
+import { companySizeItems, solutionTypeItems } from "../../constants/onboarding-data";
 import type { CompanySize, SolutionType, UsageStyle } from "../../types/types";
 
 interface BasicInfoConditionalFieldsProps {
@@ -22,9 +19,7 @@ interface BasicInfoConditionalFieldsProps {
   setSolutionType: (value: SolutionType | undefined) => void;
 }
 
-export const BasicInfoConditionalFields: React.FC<
-  BasicInfoConditionalFieldsProps
-> = ({
+export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProps> = ({
   usageStyle,
   phoneNumber,
   setPhoneNumber,
@@ -37,9 +32,7 @@ export const BasicInfoConditionalFields: React.FC<
 }) => {
   const showFields = usageStyle !== void 0 && usageStyle !== "For myself";
 
-  const [phoneHasValue, setLocalPhoneHasValue] = useState<boolean>(
-    Boolean(phoneNumber),
-  );
+  const [phoneHasValue, setLocalPhoneHasValue] = useState<boolean>(Boolean(phoneNumber));
   const [phoneIsValid, setLocalPhoneIsValid] = useState<boolean>(true);
   const { emit } = useAnalytics({ usageStyle });
 
@@ -92,9 +85,7 @@ export const BasicInfoConditionalFields: React.FC<
             </Field.Root>
 
             <Field.Root colorPalette="orange" w="full">
-              <Field.Label>
-                {"How do you plan to deploy LangWatch?"}
-              </Field.Label>
+              <Field.Label>{"How do you plan to deploy LangWatch?"}</Field.Label>
               <IconRadioCardGroup<SolutionType>
                 items={solutionTypeItems}
                 value={solutionType}

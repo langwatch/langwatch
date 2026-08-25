@@ -41,8 +41,7 @@ export const TIME_LOCAL_AGGREGATE_TYPES: ReadonlySet<AggregateType> =
  * projection), so it errs large.
  */
 export const REHYDRATION_WINDOW_DAYS = 45;
-export const REHYDRATION_WINDOW_MS =
-  REHYDRATION_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+export const REHYDRATION_WINDOW_MS = REHYDRATION_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
 /**
  * Returns the `EventOccurredAt` lower bound (ms) to apply to an aggregate's

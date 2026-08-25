@@ -73,9 +73,9 @@ describe("a job whose pipeline is not registered in this worker", () => {
     // command minted by a newer one.
     const eventSourcing = new EventSourcing();
 
-    await expect(
-      eventSourcing.globalQueue!.send(confirmSpendJob),
-    ).rejects.toThrow(/not registered in this worker/);
+    await expect(eventSourcing.globalQueue!.send(confirmSpendJob)).rejects.toThrow(
+      /not registered in this worker/,
+    );
 
     expect(errorMock).toHaveBeenCalledWith(
       expect.objectContaining({

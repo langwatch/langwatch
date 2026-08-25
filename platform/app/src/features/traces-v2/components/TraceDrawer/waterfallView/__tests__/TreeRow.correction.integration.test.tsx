@@ -155,9 +155,7 @@ describe("TreeRow with a correction", () => {
           onToggleDelete: vi.fn(),
         });
 
-        expect(
-          getByLabelText("Delete span search the web"),
-        ).toBeInTheDocument();
+        expect(getByLabelText("Delete span search the web")).toBeInTheDocument();
       });
     });
   });
@@ -167,9 +165,7 @@ describe("TreeRow with a correction", () => {
       it("offers no delete affordance", () => {
         const { queryByLabelText } = renderRow();
 
-        expect(
-          queryByLabelText("Delete span web_search"),
-        ).not.toBeInTheDocument();
+        expect(queryByLabelText("Delete span web_search")).not.toBeInTheDocument();
       });
     });
   });

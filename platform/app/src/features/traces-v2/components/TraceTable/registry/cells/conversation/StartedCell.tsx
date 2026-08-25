@@ -8,9 +8,7 @@ export const StartedCell: CellDef<ConversationGroup> = {
   id: "started",
   label: "Started",
   render: ({ row }) => (
-    <MonoCell color="fg.subtle">
-      {formatRelativeTime(row.earliestTimestamp)}
-    </MonoCell>
+    <MonoCell color="fg.subtle">{formatRelativeTime(row.earliestTimestamp)}</MonoCell>
   ),
   renderComfortable: ({ row }) => (
     <Text textStyle="sm" color="fg.muted">

@@ -12,8 +12,7 @@ import { useScrollTraceIntoView } from "./useScrollTraceIntoView";
 import { MIN_QUERY_LENGTH, useTraceSearchIndex } from "./useTraceSearchIndex";
 
 const IS_MAC =
-  typeof navigator !== "undefined" &&
-  /Mac|iPhone|iPad/.test(navigator.platform);
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
 
 const ICON_SIZE = 14;
@@ -121,12 +120,7 @@ export function FindBar() {
           >
             <ChevronDown size={ICON_SIZE} />
           </IconButton>
-          <IconButton
-            size="2xs"
-            variant="ghost"
-            aria-label="Close find"
-            onClick={close}
-          >
+          <IconButton size="2xs" variant="ghost" aria-label="Close find" onClick={close}>
             <X size={ICON_SIZE} />
           </IconButton>
         </Flex>

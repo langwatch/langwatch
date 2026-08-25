@@ -19,10 +19,7 @@
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
 import { type CliResultDigest, parseCardResult } from "@langwatch/langy-contract";
 import { extractPlatformUrl } from "@langwatch/langy-contract";
-import {
-  type CapabilityData,
-  useCapabilityData,
-} from "../../hooks/useCapabilityData";
+import { type CapabilityData, useCapabilityData } from "../../hooks/useCapabilityData";
 import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
 import { StreamingStatCard } from "../StreamingStatCard";
 import {
@@ -160,9 +157,7 @@ function statsOf(document: unknown): LangyTurnMetric[] {
   const record = document as Record<string, unknown>;
   const keys = [
     ...["passed", "failed", "total"].filter((k) => k in record),
-    ...Object.keys(record).filter(
-      (k) => !["passed", "failed", "total"].includes(k),
-    ),
+    ...Object.keys(record).filter((k) => !["passed", "failed", "total"].includes(k)),
   ];
   for (const key of keys) {
     if (stats.length >= MAX_STATS) break;
@@ -177,9 +172,7 @@ function statsOf(document: unknown): LangyTurnMetric[] {
 function changedFields(changes: unknown): string[] {
   if (Array.isArray(changes)) {
     return changes
-      .map((c) =>
-        typeof c === "string" ? c : firstString(c, ["field", "name", "key"]),
-      )
+      .map((c) => (typeof c === "string" ? c : firstString(c, ["field", "name", "key"])))
       .filter((c): c is string => !!c);
   }
   if (changes && typeof changes === "object") {
@@ -194,8 +187,7 @@ function promptContent(input: unknown, output: unknown): string | null {
     if (!source || typeof source !== "object") continue;
     const obj = source as Record<string, unknown>;
     if (typeof obj.prompt === "string" && obj.prompt.trim()) return obj.prompt;
-    if (typeof obj.content === "string" && obj.content.trim())
-      return obj.content;
+    if (typeof obj.content === "string" && obj.content.trim()) return obj.content;
   }
   return null;
 }
@@ -255,11 +247,7 @@ function RowsBody({
   if (!rows) {
     // The document is a single resource after all — read it as one.
     return (
-      <FactsBody
-        descriptor={descriptor}
-        document={document}
-        projectSlug={projectSlug}
-      />
+      <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />
     );
   }
 
@@ -322,11 +310,7 @@ function FactsBody({
   if (Array.isArray(document) || collectionOf(document)) {
     // The document is a collection after all — read it as one.
     return (
-      <RowsBody
-        descriptor={descriptor}
-        document={document}
-        projectSlug={projectSlug}
-      />
+      <RowsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />
     );
   }
 
@@ -367,11 +351,7 @@ function StatsBody({
   if (stats.length === 0) {
     // Nothing counts as a figure — the resource's fields still tell the story.
     return (
-      <FactsBody
-        descriptor={descriptor}
-        document={document}
-        projectSlug={projectSlug}
-      />
+      <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />
     );
   }
   return <StreamingStatCard metrics={stats} />;
@@ -404,8 +384,7 @@ function DiffBody({
 
   return (
     <VStack align="stretch" gap={1.5}>
-      {version != null &&
-      (typeof version === "string" || typeof version === "number") ? (
+      {version != null && (typeof version === "string" || typeof version === "number") ? (
         <Text textStyle="2xs" color="fg.muted">
           Version {version}
         </Text>
@@ -413,11 +392,7 @@ function DiffBody({
       {fields.length > 0 ? (
         <VStack align="stretch" gap={0}>
           {fields.map((field) => (
-            <CapabilityRow
-              key={field}
-              primary={labelize(field)}
-              secondary="changed"
-            />
+            <CapabilityRow key={field} primary={labelize(field)} secondary="changed" />
           ))}
         </VStack>
       ) : content ? (
@@ -646,11 +621,7 @@ function WidgetBody({
   switch (descriptor.body) {
     case "rows":
       return (
-        <RowsBody
-          descriptor={descriptor}
-          document={document}
-          projectSlug={projectSlug}
-        />
+        <RowsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />
       );
     case "facts":
       return (
@@ -681,9 +652,7 @@ function WidgetBody({
     case "text": {
       const lines = summaryLines(output, 3);
       if (lines.length === 0) {
-        return (
-          <UnreadableBody descriptor={descriptor} projectSlug={projectSlug} />
-        );
+        return <UnreadableBody descriptor={descriptor} projectSlug={projectSlug} />;
       }
       return <SummaryLinesBody lines={lines} />;
     }

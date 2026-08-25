@@ -35,9 +35,7 @@ const names = candidates
 // otherwise vanish from the registry and only surface as "Task not found".
 const skipped = candidates.filter((f) => !hasDefaultExport(f)).sort();
 if (skipped.length > 0) {
-  console.log(
-    `  skipped (no default export, treated as helpers): ${skipped.join(", ")}`,
-  );
+  console.log(`  skipped (no default export, treated as helpers): ${skipped.join(", ")}`);
 }
 
 const body = names
@@ -58,6 +56,4 @@ ${body}
 `;
 
 writeFileSync(out, contents);
-console.log(
-  `Wrote ${path.relative(path.join(here, ".."), out)} (${names.length} tasks)`,
-);
+console.log(`Wrote ${path.relative(path.join(here, ".."), out)} (${names.length} tasks)`);

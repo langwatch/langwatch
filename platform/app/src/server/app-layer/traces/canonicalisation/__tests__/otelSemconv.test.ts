@@ -50,9 +50,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       expect(result.attributes["gen_ai.request.model"]).toBe("gpt-4");
       expect(result.attributes["gen_ai.response.model"]).toBe("gpt-4-0613");
       expect(result.attributes["gen_ai.response.id"]).toBe("chatcmpl-123");
-      expect(result.attributes["gen_ai.response.finish_reasons"]).toEqual([
-        "stop",
-      ]);
+      expect(result.attributes["gen_ai.response.finish_reasons"]).toEqual(["stop"]);
       expect(result.attributes["gen_ai.conversation.id"]).toBe("conv_abc");
     });
   });
@@ -85,10 +83,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       expect(result.attributes["gen_ai.request.frequency_penalty"]).toBe(0.5);
       expect(result.attributes["gen_ai.request.presence_penalty"]).toBe(0.3);
       expect(result.attributes["gen_ai.request.seed"]).toBe(42);
-      expect(result.attributes["gen_ai.request.stop_sequences"]).toEqual([
-        "END",
-        "STOP",
-      ]);
+      expect(result.attributes["gen_ai.request.stop_sequences"]).toEqual(["END", "STOP"]);
       expect(result.attributes["gen_ai.request.choice.count"]).toBe(3);
     });
   });
@@ -183,9 +178,10 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           clientSpan,
         );
 
-        expect(
-          result.attributes["gen_ai.server.time_to_first_token"],
-        ).toBeCloseTo(650, 5);
+        expect(result.attributes["gen_ai.server.time_to_first_token"]).toBeCloseTo(
+          650,
+          5,
+        );
       });
     });
 
@@ -202,9 +198,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           clientSpan,
         );
 
-        expect(result.attributes["gen_ai.server.time_to_first_token"]).toBe(
-          500,
-        );
+        expect(result.attributes["gen_ai.server.time_to_first_token"]).toBe(500);
       });
     });
 
@@ -272,12 +266,8 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           clientSpan,
         );
 
-        expect(result.attributes["gen_ai.usage.cached_input_tokens"]).toBe(
-          "lots",
-        );
-        expect(
-          result.attributes["gen_ai.usage.cache_read.input_tokens"],
-        ).toBeUndefined();
+        expect(result.attributes["gen_ai.usage.cached_input_tokens"]).toBe("lots");
+        expect(result.attributes["gen_ai.usage.cache_read.input_tokens"]).toBeUndefined();
       });
     });
 
@@ -293,12 +283,8 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           clientSpan,
         );
 
-        expect(result.attributes["gen_ai.usage.reasoning.output_tokens"]).toBe(
-          "many",
-        );
-        expect(
-          result.attributes["gen_ai.usage.reasoning_tokens"],
-        ).toBeUndefined();
+        expect(result.attributes["gen_ai.usage.reasoning.output_tokens"]).toBe("many");
+        expect(result.attributes["gen_ai.usage.reasoning_tokens"]).toBeUndefined();
       });
     });
 
@@ -314,12 +300,8 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           clientSpan,
         );
 
-        expect(result.attributes["gen_ai.response.time_to_first_chunk"]).toBe(
-          "fast",
-        );
-        expect(
-          result.attributes["gen_ai.server.time_to_first_token"],
-        ).toBeUndefined();
+        expect(result.attributes["gen_ai.response.time_to_first_chunk"]).toBe("fast");
+        expect(result.attributes["gen_ai.server.time_to_first_token"]).toBeUndefined();
       });
     });
 
@@ -335,12 +317,8 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           clientSpan,
         );
 
-        expect(result.attributes["gen_ai.response.time_to_first_chunk"]).toBe(
-          -1,
-        );
-        expect(
-          result.attributes["gen_ai.server.time_to_first_token"],
-        ).toBeUndefined();
+        expect(result.attributes["gen_ai.response.time_to_first_chunk"]).toBe(-1);
+        expect(result.attributes["gen_ai.server.time_to_first_token"]).toBeUndefined();
       });
     });
   });
@@ -446,9 +424,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
 
       // The GenAI extractor tries to extract system instruction from existing messages
       // Parts-based content uses {type: "text", content: "..."} which the helper handles
-      expect(result.attributes["gen_ai.system_instructions"]).toBe(
-        "Be concise.",
-      );
+      expect(result.attributes["gen_ai.system_instructions"]).toBe("Be concise.");
     });
 
     it("preserves multimodal blob parts", () => {
@@ -507,9 +483,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         clientSpan,
       );
 
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(
-        outputMessages,
-      );
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
     });
 
     it("preserves tool_call output messages", () => {
@@ -607,9 +581,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   describe("inference span with gen_ai.system_instructions", () => {
     it("extracts text from content-block array", () => {
-      const instructions = [
-        { type: "text", content: "You are a helpful assistant." },
-      ];
+      const instructions = [{ type: "text", content: "You are a helpful assistant." }];
 
       const result = service.canonicalize(
         {
@@ -723,14 +695,10 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       );
 
       expect(result.attributes["gen_ai.operation.name"]).toBe("embeddings");
-      expect(result.attributes["gen_ai.request.model"]).toBe(
-        "text-embedding-3-small",
-      );
+      expect(result.attributes["gen_ai.request.model"]).toBe("text-embedding-3-small");
       expect(result.attributes["gen_ai.usage.input_tokens"]).toBe(50);
       expect(result.attributes["gen_ai.embeddings.dimension.count"]).toBe(1536);
-      expect(result.attributes["gen_ai.request.encoding_formats"]).toEqual([
-        "float",
-      ]);
+      expect(result.attributes["gen_ai.request.encoding_formats"]).toEqual(["float"]);
     });
   });
 
@@ -837,9 +805,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           parts: [{ type: "text", content: "What is the weather in Paris?" }],
         },
       ]);
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(
-        outputMessages,
-      );
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
 
       // System instruction extracted from parts-based message
       expect(result.attributes["gen_ai.system_instructions"]).toBe(
@@ -847,9 +813,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       );
 
       // Conversation ID
-      expect(result.attributes["gen_ai.conversation.id"]).toBe(
-        "conv_session_1",
-      );
+      expect(result.attributes["gen_ai.conversation.id"]).toBe("conv_session_1");
     });
   });
 
@@ -879,9 +843,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       ]);
 
       // System instruction extraction from direct string content
-      expect(result.attributes["gen_ai.system_instructions"]).toBe(
-        "Be concise.",
-      );
+      expect(result.attributes["gen_ai.system_instructions"]).toBe("Be concise.");
     });
 
     it("handles output messages with direct string content", () => {
@@ -899,9 +861,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         clientSpan,
       );
 
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(
-        outputMessages,
-      );
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
     });
   });
 

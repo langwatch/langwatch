@@ -57,10 +57,7 @@ export function useFlameKeyboard({
 
       switch (e.key) {
         case "Escape": {
-          if (
-            viewportRef.current.endMs - viewportRef.current.startMs <
-            fullDur * 0.999
-          ) {
+          if (viewportRef.current.endMs - viewportRef.current.startMs < fullDur * 0.999) {
             e.preventDefault();
             handleResetZoom();
           } else if (selectedSpanId) {
@@ -114,9 +111,7 @@ export function useFlameKeyboard({
             const node = tree.byId.get(focusedSpanId);
             if (node) {
               const siblings = node.parent ? node.parent.children : tree.roots;
-              const idx = siblings.findIndex(
-                (n) => n.span.spanId === focusedSpanId,
-              );
+              const idx = siblings.findIndex((n) => n.span.spanId === focusedSpanId);
               const next = siblings[idx + direction];
               if (next) {
                 e.preventDefault();

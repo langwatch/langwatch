@@ -50,9 +50,7 @@ describe("LangyTurnAccessStore", () => {
       const store = LangyTurnAccessStore.create({ redis });
       await store.grant(ACCESS);
 
-      expect(await store.isTurnActor({ ...ACCESS, userId: "mallory" })).toBe(
-        false,
-      );
+      expect(await store.isTurnActor({ ...ACCESS, userId: "mallory" })).toBe(false);
     });
 
     it("does not confirm across projects, even for the same user", async () => {
@@ -60,9 +58,7 @@ describe("LangyTurnAccessStore", () => {
       const store = LangyTurnAccessStore.create({ redis });
       await store.grant(ACCESS);
 
-      expect(await store.isTurnActor({ ...ACCESS, projectId: "p2" })).toBe(
-        false,
-      );
+      expect(await store.isTurnActor({ ...ACCESS, projectId: "p2" })).toBe(false);
     });
   });
 

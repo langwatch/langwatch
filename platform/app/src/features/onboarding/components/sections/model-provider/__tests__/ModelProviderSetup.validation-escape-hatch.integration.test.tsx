@@ -123,8 +123,7 @@ const renderSetup = () =>
     </ChakraProvider>,
   );
 
-const saveButton = () =>
-  screen.getByRole("button", { name: /^save( anyway)?$/i });
+const saveButton = () => screen.getByRole("button", { name: /^save( anyway)?$/i });
 
 describe("Feature: a refused API key is not a dead end during onboarding", () => {
   beforeEach(() => {

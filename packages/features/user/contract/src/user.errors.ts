@@ -1,8 +1,5 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import {
-  USER_AVATAR_ALLOWED_MEDIA_TYPES,
-  USER_AVATAR_MAX_BYTES,
-} from "./user";
+import { USER_AVATAR_ALLOWED_MEDIA_TYPES, USER_AVATAR_MAX_BYTES } from "./user";
 
 export type UserAvatarUnreadableReason =
   | "invalid_data_url"
@@ -70,11 +67,10 @@ export class EmailAlreadyRegisteredError extends HandledError {
   declare readonly code: "email_already_registered";
 
   constructor() {
-    super(
-      "email_already_registered",
-      "An account with this email already exists",
-      { httpStatus: 409, fault: "customer" },
-    );
+    super("email_already_registered", "An account with this email already exists", {
+      httpStatus: 409,
+      fault: "customer",
+    });
     this.name = "EmailAlreadyRegisteredError";
   }
 }

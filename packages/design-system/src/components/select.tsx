@@ -4,35 +4,31 @@ import type { CollectionItem } from "@chakra-ui/react";
 // eslint-disable-next-line no-restricted-imports
 import { Select as ChakraSelect, Portal } from "@chakra-ui/react";
 import * as React from "react";
-import {
-  OverlayDepthContext,
-  useOverlayZIndex,
-} from "../overlays/depth";
+import { OverlayDepthContext, useOverlayZIndex } from "../overlays/depth";
 import { CloseButton } from "./close-button";
 
 interface SelectTriggerProps extends ChakraSelect.ControlProps {
   clearable?: boolean;
 }
 
-export const SelectTrigger = React.forwardRef<
-  HTMLButtonElement,
-  SelectTriggerProps
->(function SelectTrigger(props, ref) {
-  // `aria-label` belongs on the focusable trigger BUTTON (so it's the control's
-  // accessible name), not the Control wrapper that `...rest` spreads onto.
-  const { children, clearable, "aria-label": ariaLabel, ...rest } = props;
-  return (
-    <ChakraSelect.Control {...rest}>
-      <ChakraSelect.Trigger ref={ref} aria-label={ariaLabel}>
-        {children}
-      </ChakraSelect.Trigger>
-      <ChakraSelect.IndicatorGroup>
-        {clearable && <SelectClearTrigger />}
-        <ChakraSelect.Indicator />
-      </ChakraSelect.IndicatorGroup>
-    </ChakraSelect.Control>
-  );
-});
+export const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerProps>(
+  function SelectTrigger(props, ref) {
+    // `aria-label` belongs on the focusable trigger BUTTON (so it's the control's
+    // accessible name), not the Control wrapper that `...rest` spreads onto.
+    const { children, clearable, "aria-label": ariaLabel, ...rest } = props;
+    return (
+      <ChakraSelect.Control {...rest}>
+        <ChakraSelect.Trigger ref={ref} aria-label={ariaLabel}>
+          {children}
+        </ChakraSelect.Trigger>
+        <ChakraSelect.IndicatorGroup>
+          {clearable && <SelectClearTrigger />}
+          <ChakraSelect.Indicator />
+        </ChakraSelect.IndicatorGroup>
+      </ChakraSelect.Control>
+    );
+  },
+);
 
 const SelectClearTrigger = React.forwardRef<
   HTMLButtonElement,
@@ -56,71 +52,69 @@ interface SelectContentProps extends ChakraSelect.ContentProps {
   portalRef?: React.RefObject<HTMLElement>;
 }
 
-export const SelectContent = React.forwardRef<
-  HTMLDivElement,
-  SelectContentProps
->(function SelectContent(props, ref) {
-  const { portalled = true, portalRef, ...rest } = props;
-  const { zIndex, depth } = useOverlayZIndex();
-  return (
-    <Portal disabled={!portalled} container={portalRef}>
-      <ChakraSelect.Positioner
-        ref={(node: HTMLElement | null) => {
-          if (node) {
-            // Zag.js sets --z-index inline based on layer stack order, which
-            // can place selects behind dialogs. Force it higher. See #2519.
-            node.style.setProperty("z-index", zIndex, "important");
-          }
-        }}
-      >
-        <OverlayDepthContext.Provider value={depth}>
-          <ChakraSelect.Content {...rest} ref={ref} />
-        </OverlayDepthContext.Provider>
-      </ChakraSelect.Positioner>
-    </Portal>
-  );
-});
+export const SelectContent = React.forwardRef<HTMLDivElement, SelectContentProps>(
+  function SelectContent(props, ref) {
+    const { portalled = true, portalRef, ...rest } = props;
+    const { zIndex, depth } = useOverlayZIndex();
+    return (
+      <Portal disabled={!portalled} container={portalRef}>
+        <ChakraSelect.Positioner
+          ref={(node: HTMLElement | null) => {
+            if (node) {
+              // Zag.js sets --z-index inline based on layer stack order, which
+              // can place selects behind dialogs. Force it higher. See #2519.
+              node.style.setProperty("z-index", zIndex, "important");
+            }
+          }}
+        >
+          <OverlayDepthContext.Provider value={depth}>
+            <ChakraSelect.Content {...rest} ref={ref} />
+          </OverlayDepthContext.Provider>
+        </ChakraSelect.Positioner>
+      </Portal>
+    );
+  },
+);
 
-export const SelectItem = React.forwardRef<
-  HTMLDivElement,
-  ChakraSelect.ItemProps
->(function SelectItem(props, ref) {
-  const { item, children, ...rest } = props;
-  return (
-    <ChakraSelect.Item key={item.value} item={item} {...rest} ref={ref}>
-      {children}
-      <ChakraSelect.ItemIndicator />
-    </ChakraSelect.Item>
-  );
-});
+export const SelectItem = React.forwardRef<HTMLDivElement, ChakraSelect.ItemProps>(
+  function SelectItem(props, ref) {
+    const { item, children, ...rest } = props;
+    return (
+      <ChakraSelect.Item key={item.value} item={item} {...rest} ref={ref}>
+        {children}
+        <ChakraSelect.ItemIndicator />
+      </ChakraSelect.Item>
+    );
+  },
+);
 
-interface SelectValueTextProps
-  extends Omit<ChakraSelect.ValueTextProps, "children" | "placeholder"> {
+interface SelectValueTextProps extends Omit<
+  ChakraSelect.ValueTextProps,
+  "children" | "placeholder"
+> {
   children?(items: CollectionItem[]): React.ReactNode;
   placeholder?: React.ReactNode;
 }
 
-export const SelectValueText = React.forwardRef<
-  HTMLSpanElement,
-  SelectValueTextProps
->(function SelectValueText(props, ref) {
-  // eslint-disable-next-line @typescript-eslint/unbound-method
-  const { children, placeholder, ...rest } = props;
-  return (
-    <ChakraSelect.ValueText {...rest} ref={ref}>
-      <ChakraSelect.Context>
-        {(select) => {
-          const items = select.selectedItems;
-          if (items.length === 0) return placeholder;
-          if (children) return children(items);
-          if (items.length === 1)
-            return select.collection.stringifyItem(items[0]);
-          return `${items.length} selected`;
-        }}
-      </ChakraSelect.Context>
-    </ChakraSelect.ValueText>
-  );
-});
+export const SelectValueText = React.forwardRef<HTMLSpanElement, SelectValueTextProps>(
+  function SelectValueText(props, ref) {
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const { children, placeholder, ...rest } = props;
+    return (
+      <ChakraSelect.ValueText {...rest} ref={ref}>
+        <ChakraSelect.Context>
+          {(select) => {
+            const items = select.selectedItems;
+            if (items.length === 0) return placeholder;
+            if (children) return children(items);
+            if (items.length === 1) return select.collection.stringifyItem(items[0]);
+            return `${items.length} selected`;
+          }}
+        </ChakraSelect.Context>
+      </ChakraSelect.ValueText>
+    );
+  },
+);
 
 export const SelectRoot = React.forwardRef<
   HTMLDivElement,
@@ -150,18 +144,17 @@ interface SelectItemGroupProps extends ChakraSelect.ItemGroupProps {
   label: React.ReactNode;
 }
 
-export const SelectItemGroup = React.forwardRef<
-  HTMLDivElement,
-  SelectItemGroupProps
->(function SelectItemGroup(props, ref) {
-  const { children, label, ...rest } = props;
-  return (
-    <ChakraSelect.ItemGroup {...rest} ref={ref}>
-      <ChakraSelect.ItemGroupLabel>{label}</ChakraSelect.ItemGroupLabel>
-      {children}
-    </ChakraSelect.ItemGroup>
-  );
-});
+export const SelectItemGroup = React.forwardRef<HTMLDivElement, SelectItemGroupProps>(
+  function SelectItemGroup(props, ref) {
+    const { children, label, ...rest } = props;
+    return (
+      <ChakraSelect.ItemGroup {...rest} ref={ref}>
+        <ChakraSelect.ItemGroupLabel>{label}</ChakraSelect.ItemGroupLabel>
+        {children}
+      </ChakraSelect.ItemGroup>
+    );
+  },
+);
 
 export const SelectLabel = ChakraSelect.Label;
 export const SelectItemText = ChakraSelect.ItemText;

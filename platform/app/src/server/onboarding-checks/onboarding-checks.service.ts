@@ -90,8 +90,7 @@ export class OnboardingChecksService {
         })
       : null;
 
-    const { workflows, customGraphs, datasets, checks, triggers, team } =
-      project ?? {};
+    const { workflows, customGraphs, datasets, checks, triggers, team } = project ?? {};
 
     // Check for simulations (scenario sets in ClickHouse)
     const simulations = await this.getSimulationsCount(projectId);

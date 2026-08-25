@@ -32,9 +32,7 @@ export const sendEmail = async (content: EmailContent) => {
 
   if (!provider) {
     logger.error("No email sending method available. Skipping email sending.");
-    throw new Error(
-      "No email sending method available. Skipping email sending.",
-    );
+    throw new Error("No email sending method available. Skipping email sending.");
   }
 
   return await provider.send({ content, defaultFrom: computeDefaultFrom() });

@@ -16,10 +16,7 @@ import {
   updateAgentCommandSchema,
 } from "@langwatch/agent-contract";
 import { nanoid } from "nanoid";
-import type {
-  AgentsAuditLogPort,
-  AgentsWorkflowPort,
-} from "../ports/agent.port";
+import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../ports/agent.port";
 import type { AgentRepository } from "../repositories/agent.repository";
 
 type AgentServiceOptions = {
@@ -48,10 +45,7 @@ export class AgentService extends AgentServiceContract {
     super();
   }
 
-  async getById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<AgentWithFields> {
+  async getById(input: { id: string; projectId: string }): Promise<AgentWithFields> {
     const agent = await this.getAgent(input);
     return this.withFields(agent, input.projectId);
   }
@@ -121,10 +115,7 @@ export class AgentService extends AgentServiceContract {
     const commandResult = updateAgentCommandSchema.safeParse(input);
     if (!commandResult.success) {
       const existingType = input.type ?? "signature";
-      throw new InvalidAgentConfigError(
-        existingType,
-        commandResult.error.issues,
-      );
+      throw new InvalidAgentConfigError(existingType, commandResult.error.issues);
     }
     const existing = await this.getAgent({
       id: input.id,
@@ -138,10 +129,7 @@ export class AgentService extends AgentServiceContract {
       } catch (error) {
         throw new InvalidAgentConfigError(type, error);
       }
-    } else if (
-      commandResult.data.type &&
-      commandResult.data.type !== existing.type
-    ) {
+    } else if (commandResult.data.type && commandResult.data.type !== existing.type) {
       // A type-only update must not persist the old type's config under a new
       // discriminator. Keep it valid only when that config also matches the
       // requested type.
@@ -206,9 +194,7 @@ export class AgentService extends AgentServiceContract {
   }): ReturnType<AgentServiceContract["getCopies"]> {
     const copies = await this.repository.findCopies(input.sourceAgentId);
     if (!input.allowedProjectIds) return copies;
-    return copies.filter((copy) =>
-      input.allowedProjectIds?.includes(copy.projectId),
-    );
+    return copies.filter((copy) => input.allowedProjectIds?.includes(copy.projectId));
   }
 
   async copy(
@@ -328,10 +314,7 @@ export class AgentService extends AgentServiceContract {
     return this.auditLog.history({ ...input, limit: 100 });
   }
 
-  private async getAgent(input: {
-    id: string;
-    projectId: string;
-  }): Promise<Agent> {
+  private async getAgent(input: { id: string; projectId: string }): Promise<Agent> {
     const agent = await this.repository.tryFindById(input);
     if (!agent) throw new AgentNotFoundError(input.id, input.projectId);
     return agent;
@@ -343,10 +326,7 @@ export class AgentService extends AgentServiceContract {
     return source;
   }
 
-  private async withFields(
-    agent: Agent,
-    projectId: string,
-  ): Promise<AgentWithFields> {
+  private async withFields(agent: Agent, projectId: string): Promise<AgentWithFields> {
     const fields = await this.workflowFields([agent], projectId);
     return this.withResolvedFields(agent, fields);
   }

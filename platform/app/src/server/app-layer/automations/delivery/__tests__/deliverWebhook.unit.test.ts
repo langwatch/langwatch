@@ -1,10 +1,7 @@
 import { DispatchError } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { WebhookDeliveryInput } from "@langwatch/automation-contract";
-import type {
-  sendWebhook,
-  WebhookSendResult,
-} from "~/server/webhooks/sendWebhook";
+import type { sendWebhook, WebhookSendResult } from "~/server/webhooks/sendWebhook";
 import { deliverWebhook } from "../deliverWebhook";
 
 const base = {
@@ -18,9 +15,7 @@ const base = {
   triggerName: "My automation",
 };
 
-function sendResolvingWith(
-  overrides: Partial<WebhookSendResult>,
-): typeof sendWebhook {
+function sendResolvingWith(overrides: Partial<WebhookSendResult>): typeof sendWebhook {
   return (async () => ({
     status: 200,
     body: "ok",

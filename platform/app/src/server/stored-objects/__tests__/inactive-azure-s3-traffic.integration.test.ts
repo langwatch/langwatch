@@ -25,9 +25,7 @@ vi.mock("~/server/dataplane-s3", () => ({
 }));
 
 vi.mock("~/server/storage", async () => {
-  const { GetObjectCommand, PutObjectCommand } = await import(
-    "@aws-sdk/client-s3"
-  );
+  const { GetObjectCommand, PutObjectCommand } = await import("@aws-sdk/client-s3");
 
   return {
     createS3Client: vi.fn(async () => ({
@@ -60,9 +58,9 @@ vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
     withActiveSpan: (_name: string, ...args: unknown[]) => {
       const fn = args.length === 1 ? args[0] : args[1];
-      return (
-        fn as (span: { setAttribute: ReturnType<typeof vi.fn> }) => unknown
-      )({ setAttribute: vi.fn() });
+      return (fn as (span: { setAttribute: ReturnType<typeof vi.fn> }) => unknown)({
+        setAttribute: vi.fn(),
+      });
     },
   }),
 }));

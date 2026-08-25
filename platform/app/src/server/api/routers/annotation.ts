@@ -2,10 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import type {
-  AnnotationQueueItem,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { AnnotationQueueItem, PrismaClient } from "~/generated/prisma/client";
 import { AnnotationService } from "~/server/annotations/annotation.service";
 import {
   annotationAnchorColumnsSchema,
@@ -69,10 +66,7 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
 
   // Annotators label trace content — resolve full IO (#4991) so they see the
   // whole value, not the 64 KB preview.
-  const traceService = TraceService.create(
-    ctx.prisma,
-    buildTraceBlobResolutionDeps(),
-  );
+  const traceService = TraceService.create(ctx.prisma, buildTraceBlobResolutionDeps());
   const traces = await traceService.getTracesWithSpans(
     projectId,
     traceIds,
@@ -100,9 +94,8 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
     ...item,
     trace: traceMap.get(item.traceId) ?? null,
     annotations: annotationMap.get(item.traceId) ?? [],
-    scoreOptions: (annotationMap.get(item.traceId) ?? []).flatMap(
-      (annotation) =>
-        annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : [],
+    scoreOptions: (annotationMap.get(item.traceId) ?? []).flatMap((annotation) =>
+      annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : [],
     ),
   }));
 };
@@ -656,13 +649,12 @@ export const annotationRouter = createTRPCRouter({
           },
         });
       } else {
-        const existingAnnotationQueue =
-          await ctx.prisma.annotationQueue.findFirst({
-            where: {
-              slug: slug,
-              projectId: input.projectId,
-            },
-          });
+        const existingAnnotationQueue = await ctx.prisma.annotationQueue.findFirst({
+          where: {
+            slug: slug,
+            projectId: input.projectId,
+          },
+        });
 
         if (existingAnnotationQueue) {
           throw new TRPCError({
@@ -1188,9 +1180,7 @@ export const annotationRouter = createTRPCRouter({
       );
 
       // Create a map of enriched items by their original ID for easy lookup
-      const enrichedItemMap = new Map(
-        enrichedQueueItems.map((item) => [item.id, item]),
-      );
+      const enrichedItemMap = new Map(enrichedQueueItems.map((item) => [item.id, item]));
 
       // Process queues and enrich with traces and annotations
       const processedQueues = queues.map((queue) => ({

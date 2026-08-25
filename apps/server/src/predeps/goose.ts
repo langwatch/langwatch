@@ -15,12 +15,12 @@ const GOOSE_VERSION = "v3.26.0";
 // so we don't need a musl variant. Same for darwin — universal Go builds.
 function downloadUrl(platform: string): string {
   const map: Record<string, { os: string; arch: string }> = {
-    "darwin-arm64":     { os: "darwin", arch: "arm64" },
-    "darwin-x64":       { os: "darwin", arch: "x86_64" },
-    "linux-arm64":      { os: "linux",  arch: "arm64" },
-    "linux-x64":        { os: "linux",  arch: "x86_64" },
-    "linux-arm64-musl": { os: "linux",  arch: "arm64" },
-    "linux-x64-musl":   { os: "linux",  arch: "x86_64" },
+    "darwin-arm64": { os: "darwin", arch: "arm64" },
+    "darwin-x64": { os: "darwin", arch: "x86_64" },
+    "linux-arm64": { os: "linux", arch: "arm64" },
+    "linux-x64": { os: "linux", arch: "x86_64" },
+    "linux-arm64-musl": { os: "linux", arch: "arm64" },
+    "linux-x64-musl": { os: "linux", arch: "x86_64" },
   };
   const m = map[platform];
   if (!m) throw new Error(`No goose binary for ${platform}`);

@@ -38,10 +38,7 @@ export function rateLimitMiddleware({
     try {
       decision = await rateLimiter.check(key);
     } catch (error) {
-      logger.error(
-        { error, rateLimitKey: key },
-        "rate limiter failed; propagating",
-      );
+      logger.error({ error, rateLimitKey: key }, "rate limiter failed; propagating");
       throw error;
     }
 
@@ -79,8 +76,7 @@ function rateLimitPrincipal(c: Context): string {
   if (resolved?.id) return resolved.id;
   const userId = (c.get("user") as { id?: string } | undefined)?.id;
   if (userId) return userId;
-  const organizationId = (c.get("organization") as { id?: string } | undefined)
-    ?.id;
+  const organizationId = (c.get("organization") as { id?: string } | undefined)?.id;
   if (organizationId) return organizationId;
   const projectId = (c.get("project") as { id?: string } | undefined)?.id;
   if (projectId) return projectId;
@@ -204,9 +200,7 @@ function stableStringify(value: unknown): string {
     .sort()
     .map(
       (k) =>
-        `${JSON.stringify(k)}:${stableStringify(
-          (value as Record<string, unknown>)[k],
-        )}`,
+        `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`,
     );
   return `{${entries.join(",")}}`;
 }

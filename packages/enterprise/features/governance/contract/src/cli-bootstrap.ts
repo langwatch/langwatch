@@ -23,9 +23,7 @@ export type CliBootstrapInput = z.infer<typeof cliBootstrapInputSchema>;
 
 export const cliBootstrapResultSchema = z
   .object({
-    tools: z.array(
-      z.object({ slug: z.string().min(1), displayName: z.string().min(1) }),
-    ),
+    tools: z.array(z.object({ slug: z.string().min(1), displayName: z.string().min(1) })),
     providers: z.array(
       z.object({
         name: z.string().min(1),

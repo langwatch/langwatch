@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  OrganizationUserRole,
-  type PrismaClient,
-} from "~/generated/prisma/client";
+import { OrganizationUserRole, type PrismaClient } from "~/generated/prisma/client";
 import { LicenseEnforcementRepository } from "../license-enforcement.repository";
 
 /**
@@ -63,9 +60,7 @@ describe("LicenseEnforcementRepository", () => {
 
   beforeEach(() => {
     mockPrisma = createMockPrisma();
-    repository = new LicenseEnforcementRepository(
-      mockPrisma as unknown as PrismaClient,
-    );
+    repository = new LicenseEnforcementRepository(mockPrisma as unknown as PrismaClient);
   });
 
   describe("getMemberCount", () => {
@@ -459,10 +454,7 @@ describe("LicenseEnforcementRepository", () => {
   describe("getCurrentMonthCost", () => {
     /** @scenario "getCurrentMonthCost remains available in the repository" */
     it("fetches project IDs and aggregates cost for current month", async () => {
-      mockPrisma.project.findMany.mockResolvedValue([
-        { id: "proj-1" },
-        { id: "proj-2" },
-      ]);
+      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }, { id: "proj-2" }]);
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 150.5 } });
 
       const result = await repository.getCurrentMonthCost(organizationId);
@@ -530,8 +522,7 @@ describe("LicenseEnforcementRepository", () => {
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 75.25 } });
       const projectIds = ["proj-a", "proj-b", "proj-c"];
 
-      const result =
-        await repository.getCurrentMonthCostForProjects(projectIds);
+      const result = await repository.getCurrentMonthCostForProjects(projectIds);
 
       expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
         where: {
@@ -546,9 +537,7 @@ describe("LicenseEnforcementRepository", () => {
     it("returns zero when amount is null", async () => {
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: null } });
 
-      const result = await repository.getCurrentMonthCostForProjects([
-        "proj-1",
-      ]);
+      const result = await repository.getCurrentMonthCostForProjects(["proj-1"]);
 
       expect(result).toBe(0);
     });

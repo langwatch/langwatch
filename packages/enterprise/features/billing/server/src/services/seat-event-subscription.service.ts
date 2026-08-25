@@ -241,9 +241,7 @@ const createSeatEventOperations = ({
     const linked = (subscription: (typeof candidates)[number]) =>
       subscription.stripeSubscriptionId !== null;
 
-    const active = candidates.filter(
-      (s) => s.status === SubscriptionStatus.ACTIVE,
-    );
+    const active = candidates.filter((s) => s.status === SubscriptionStatus.ACTIVE);
 
     // Two live plans on one account: refuse, do not choose. There is no unique
     // index on `organizationId`, and the backoffice form writes ACTIVE rows
@@ -459,21 +457,17 @@ const createSeatEventOperations = ({
       const billingCycleAnchor = new Date(
         Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
       );
-      const subscriptionData: Stripe.Checkout.SessionCreateParams["subscription_data"] =
-        {
-          metadata: selectedOptionsMetadata,
-          billing_cycle_anchor: Math.floor(billingCycleAnchor.getTime() / 1000),
-          proration_behavior:
-            "create_prorations" as Stripe.Checkout.SessionCreateParams.SubscriptionData.ProrationBehavior,
-        };
+      const subscriptionData: Stripe.Checkout.SessionCreateParams["subscription_data"] = {
+        metadata: selectedOptionsMetadata,
+        billing_cycle_anchor: Math.floor(billingCycleAnchor.getTime() / 1000),
+        proration_behavior:
+          "create_prorations" as Stripe.Checkout.SessionCreateParams.SubscriptionData.ProrationBehavior,
+      };
 
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         currency: checkoutCurrency.toLowerCase(),
-        ...({ adaptive_pricing: { enabled: false } } as Record<
-          string,
-          unknown
-        >),
+        ...({ adaptive_pricing: { enabled: false } } as Record<string, unknown>),
         customer: customerId,
         customer_update: {
           address: "auto",
@@ -571,8 +565,7 @@ const createSeatEventOperations = ({
         }),
       });
 
-      const currency = (preview.currency?.toUpperCase() ??
-        Currency.USD) as CurrencyType;
+      const currency = (preview.currency?.toUpperCase() ?? Currency.USD) as CurrencyType;
       const billingInterval = seatItem.price.recurring?.interval ?? "month";
 
       const { prorationCents, creditAppliedCents } = quotedAmounts(preview);
@@ -595,15 +588,12 @@ const createSeatEventOperations = ({
 
       const format = (cents: number) => {
         const amount = cents / 100;
-        return new Intl.NumberFormat(
-          currency === Currency.EUR ? "en-IE" : "en-US",
-          {
-            style: "currency",
-            currency,
-            minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-            maximumFractionDigits: 2,
-          },
-        ).format(amount);
+        return new Intl.NumberFormat(currency === Currency.EUR ? "en-IE" : "en-US", {
+          style: "currency",
+          currency,
+          minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+          maximumFractionDigits: 2,
+        }).format(amount);
       };
 
       return {

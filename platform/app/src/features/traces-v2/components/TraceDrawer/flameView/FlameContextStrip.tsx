@@ -38,13 +38,7 @@ export function FlameContextStrip({
     >
       {contextNode && contextInfo ? (
         <>
-          <Text
-            textStyle="xs"
-            fontWeight="medium"
-            color="fg"
-            truncate
-            maxWidth="220px"
-          >
+          <Text textStyle="xs" fontWeight="medium" color="fg" truncate maxWidth="220px">
             {contextNode.span.name}
           </Text>
           <Text textStyle="xs" color="fg.muted" whiteSpace="nowrap">
@@ -84,8 +78,7 @@ export function FlameContextStrip({
         </>
       ) : (
         <Text textStyle="xs" color="fg.subtle">
-          {spanCount} span{spanCount === 1 ? "" : "s"} ·{" "}
-          {formatDuration(fullDur)} ·{" "}
+          {spanCount} span{spanCount === 1 ? "" : "s"} · {formatDuration(fullDur)} ·{" "}
           {showZoomHint
             ? "drag across the ruler to zoom into a region"
             : "hover a span for details"}

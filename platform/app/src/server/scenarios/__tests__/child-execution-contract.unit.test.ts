@@ -47,8 +47,7 @@ const walk = (dir: string, out: string[] = []): string[] => {
   return out;
 };
 
-const rel = (file: string) =>
-  path.relative(SRC, file).split(path.sep).join("/");
+const rel = (file: string) => path.relative(SRC, file).split(path.sep).join("/");
 
 describe("scenario child execution contract", () => {
   describe("when the whole application source tree is scanned", () => {

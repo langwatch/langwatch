@@ -62,9 +62,7 @@ function str(value: unknown): string | undefined {
 }
 
 function num(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 /** Parse a `github.open_pr` tool part's output. Null if it isn't one. */
@@ -102,12 +100,8 @@ export function parseGithubPrCard(output: unknown): GithubPrCardData | null {
     ...(str(pr.headRef) ? { headRef: str(pr.headRef)! } : {}),
     ...(str(pr.baseRef) ? { baseRef: str(pr.baseRef)! } : {}),
     ...(str(pr.author) ? { author: str(pr.author)! } : {}),
-    ...(num(pr.additions) !== undefined
-      ? { additions: num(pr.additions)! }
-      : {}),
-    ...(num(pr.deletions) !== undefined
-      ? { deletions: num(pr.deletions)! }
-      : {}),
+    ...(num(pr.additions) !== undefined ? { additions: num(pr.additions)! } : {}),
+    ...(num(pr.deletions) !== undefined ? { deletions: num(pr.deletions)! } : {}),
     ...(num(pr.changedFiles) !== undefined
       ? { changedFiles: num(pr.changedFiles)! }
       : {}),
@@ -128,9 +122,7 @@ interface ToolPart {
  * must never render as one that did. The prose card could not tell the
  * difference — a URL in the text looked the same either way.
  */
-export function githubPrsFromToolParts(
-  parts: readonly ToolPart[],
-): GithubPrCardData[] {
+export function githubPrsFromToolParts(parts: readonly ToolPart[]): GithubPrCardData[] {
   const prs: GithubPrCardData[] = [];
   const seen = new Set<string>();
   for (const part of parts) {

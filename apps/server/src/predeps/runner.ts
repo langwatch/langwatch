@@ -7,7 +7,10 @@ import { detectPlatform, type SupportedPlatform } from "../shared/platform.ts";
 import { predepRegistry } from "./registry.ts";
 import type { Predep } from "./types.ts";
 
-export type PredepResult = Record<string, { version: string; resolvedPath: string; preInstalled: boolean }>;
+export type PredepResult = Record<
+  string,
+  { version: string; resolvedPath: string; preInstalled: boolean }
+>;
 
 export type PredepOptions = {
   yes?: boolean;
@@ -15,7 +18,11 @@ export type PredepOptions = {
   version: string;
 };
 
-export async function runPredeps({ yes = false, skipConfirm = false, version }: PredepOptions): Promise<PredepResult> {
+export async function runPredeps({
+  yes = false,
+  skipConfirm = false,
+  version,
+}: PredepOptions): Promise<PredepResult> {
   const platform = detectPlatform();
   mkdirSync(paths.bin, { recursive: true });
   mkdirSync(paths.data, { recursive: true });
@@ -53,7 +60,7 @@ async function detectAll(predeps: Predep[]) {
   await Promise.all(
     predeps.map(async (p) => {
       out[p.id] = await p.detect(paths);
-    })
+    }),
   );
   return out;
 }
@@ -63,10 +70,11 @@ async function confirmUvInstallPrompt(): Promise<void> {
     {
       type: "confirm",
       name: "ok",
-      message: "LangWatch needs to install `uv` (Astral's Python package manager) — proceed?",
+      message:
+        "LangWatch needs to install `uv` (Astral's Python package manager) — proceed?",
       initial: true,
     },
-    { onCancel: () => process.exit(130) }
+    { onCancel: () => process.exit(130) },
   );
   if (!ok) {
     console.error(chalk.red("Aborted — `uv` is required to run langevals."));
@@ -108,7 +116,7 @@ async function runListr({
         exitOnError: false,
         collectErrors: "minimal",
         rendererOptions: { collapseSubtasks: false, showSubtasks: true },
-      }
+      },
     );
     await tasks.run().catch(() => {
       // listr re-throws even with exitOnError: false; we already captured
@@ -119,14 +127,16 @@ async function runListr({
 
     const action = await promptOnFailure(failed);
     if (action === "abort") {
-      console.error(chalk.red(`✗ aborting — ${failed.length} predep(s) did not install.`));
+      console.error(
+        chalk.red(`✗ aborting — ${failed.length} predep(s) did not install.`),
+      );
       process.exit(1);
     }
     if (action === "skip") {
       console.warn(
         chalk.yellow(
-          `⚠ skipping ${failed.length} predep(s) — services that depend on them will fail to start.`
-        )
+          `⚠ skipping ${failed.length} predep(s) — services that depend on them will fail to start.`,
+        ),
       );
       return;
     }
@@ -136,7 +146,9 @@ async function runListr({
   }
 }
 
-async function promptOnFailure(failed: Array<{ predep: Predep; error: Error }>): Promise<"retry" | "skip" | "abort"> {
+async function promptOnFailure(
+  failed: Array<{ predep: Predep; error: Error }>,
+): Promise<"retry" | "skip" | "abort"> {
   console.error("");
   console.error(chalk.red.bold(`✗ ${failed.length} predep(s) failed:`));
   for (const f of failed) {
@@ -155,7 +167,7 @@ async function promptOnFailure(failed: Array<{ predep: Predep; error: Error }>):
       ],
       initial: 0,
     },
-    { onCancel: () => process.exit(130) }
+    { onCancel: () => process.exit(130) },
   );
   return action ?? "abort";
 }
@@ -163,18 +175,26 @@ async function promptOnFailure(failed: Array<{ predep: Predep; error: Error }>):
 function collectResult(
   predeps: Predep[],
   detection: Record<string, Awaited<ReturnType<Predep["detect"]>>>,
-  installResults: Record<string, { version: string; resolvedPath: string }>
+  installResults: Record<string, { version: string; resolvedPath: string }>,
 ): PredepResult {
   const out: PredepResult = {};
   for (const p of predeps) {
     const det = detection[p.id];
     if (det?.installed) {
-      out[p.id] = { version: det.version, resolvedPath: det.resolvedPath, preInstalled: true };
+      out[p.id] = {
+        version: det.version,
+        resolvedPath: det.resolvedPath,
+        preInstalled: true,
+      };
       continue;
     }
     const inst = installResults[p.id];
     if (inst) {
-      out[p.id] = { version: inst.version, resolvedPath: inst.resolvedPath, preInstalled: false };
+      out[p.id] = {
+        version: inst.version,
+        resolvedPath: inst.resolvedPath,
+        preInstalled: false,
+      };
     }
   }
   return out;

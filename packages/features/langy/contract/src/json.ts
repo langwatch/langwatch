@@ -26,12 +26,7 @@ export const langyJsonValueSchema: z.ZodType<LangyJsonValue> = z.lazy(() =>
  * A chat message role. Mirrors the roles the Langy turn surface accepts plus
  * "tool" for tool-result messages the agent may record.
  */
-export const langyMessageRoleSchema = z.enum([
-  "user",
-  "assistant",
-  "system",
-  "tool",
-]);
+export const langyMessageRoleSchema = z.enum(["user", "assistant", "system", "tool"]);
 export type LangyMessageRole = z.infer<typeof langyMessageRoleSchema>;
 
 /**
@@ -40,8 +35,5 @@ export type LangyMessageRole = z.infer<typeof langyMessageRoleSchema>;
  * as JSON, and the UI flattens the text parts on read.
  * The pipeline never interprets part internals.
  */
-export const langyMessagePartSchema = z.record(
-  z.string(),
-  langyJsonValueSchema,
-);
+export const langyMessagePartSchema = z.record(z.string(), langyJsonValueSchema);
 export type LangyMessagePart = z.infer<typeof langyMessagePartSchema>;

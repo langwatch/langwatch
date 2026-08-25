@@ -39,11 +39,7 @@ export class AnomalyStateStore {
   async upsert(anomaly: Anomaly): Promise<void> {
     const field = `${anomaly.kind}:${anomaly.tenantId}`;
     try {
-      await this.redis.hset(
-        AnomalyStateStore.HASH_KEY,
-        field,
-        JSON.stringify(anomaly),
-      );
+      await this.redis.hset(AnomalyStateStore.HASH_KEY, field, JSON.stringify(anomaly));
     } catch (err) {
       logger.warn(
         { field, err: err instanceof Error ? err.message : String(err) },

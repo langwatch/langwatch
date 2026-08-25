@@ -25,9 +25,7 @@ export interface LangWatchQLResultMetaProps {
   statistics: LangWatchQLStatistics;
 }
 
-export function LangWatchQLResultMeta({
-  statistics,
-}: LangWatchQLResultMetaProps) {
+export function LangWatchQLResultMeta({ statistics }: LangWatchQLResultMetaProps) {
   return (
     <HStack
       gap={4}
@@ -38,14 +36,8 @@ export function LangWatchQLResultMeta({
       paddingX={4}
       paddingY={2}
     >
-      <Statistic
-        value={formatNumber(statistics.rowsReturned)}
-        label="rows returned"
-      />
-      <Statistic
-        value={`${formatNumber(statistics.elapsedMs)} ms`}
-        label="elapsed"
-      />
+      <Statistic value={formatNumber(statistics.rowsReturned)} label="rows returned" />
+      <Statistic value={`${formatNumber(statistics.elapsedMs)} ms`} label="elapsed" />
       <Statistic value={formatNumber(statistics.rowsRead)} label="rows read" />
       <Statistic value={formatBytes(statistics.bytesRead)} label="bytes read" />
     </HStack>

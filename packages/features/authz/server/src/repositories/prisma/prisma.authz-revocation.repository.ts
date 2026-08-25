@@ -28,9 +28,7 @@ export class PrismaAuthzRevocationRepository {
     return new PrismaAuthzRevocationRepository(options);
   }
 
-  private constructor(
-    private readonly options: PrismaAuthzRevocationRepositoryOptions,
-  ) {
+  private constructor(private readonly options: PrismaAuthzRevocationRepositoryOptions) {
     this.database = options.database as unknown as RevocationDatabase;
   }
 

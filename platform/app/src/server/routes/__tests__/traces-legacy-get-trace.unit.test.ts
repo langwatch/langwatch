@@ -75,9 +75,7 @@ vi.mock("~/server/db", () => ({
 // ─── Formatter stubs ──────────────────────────────────────────────────────────
 vi.mock("~/server/traces/trace-formatting", () => ({
   generateAsciiTree: vi.fn().mockReturnValue("ascii tree"),
-  formatTraceSummaryDigest: vi
-    .fn()
-    .mockReturnValue("Input: hello\nOutput: world"),
+  formatTraceSummaryDigest: vi.fn().mockReturnValue("Input: hello\nOutput: world"),
   toLLMModeTrace: vi.fn().mockReturnValue({}),
 }));
 

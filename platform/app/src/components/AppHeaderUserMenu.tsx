@@ -33,9 +33,7 @@ const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
 };
 
 /** The order the modes are offered in, oldest first. */
-const NAVIGATION_MODES = Object.keys(
-  NAVIGATION_MODE_LABELS,
-) as NavigationMode[];
+const NAVIGATION_MODES = Object.keys(NAVIGATION_MODE_LABELS) as NavigationMode[];
 
 /**
  * The avatar button and its dropdown in the top-right of the app header.
@@ -55,11 +53,10 @@ export function AppHeaderUserMenu({
 }) {
   const { data: session } = useRequiredSession({ required: !publicPage });
   const user = session?.user;
-  const { organization, isLoading: isOrganizationLoading } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+  const { organization, isLoading: isOrganizationLoading } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const { isLiteMember } = useLiteMemberGuard();
 
   // The "My Workspace" entry in the user-avatar dropdown is part of the
@@ -86,16 +83,12 @@ export function AppHeaderUserMenu({
     },
   );
   const storedNavigationMode = useNavigationModeStore((s) => s.storedMode);
-  const setStoredNavigationMode = useNavigationModeStore(
-    (s) => s.setStoredMode,
-  );
+  const setStoredNavigationMode = useNavigationModeStore((s) => s.setStoredMode);
   // The picker only shows with the flag on, where a device that never
   // picked runs the default mode. It reports that, not the old chrome.
   const currentNavigationMode = storedNavigationMode ?? DEFAULT_NAVIGATION_MODE;
 
-  const graphicsQualityOverride = useGraphicsQualityOverrideStore(
-    (s) => s.override,
-  );
+  const graphicsQualityOverride = useGraphicsQualityOverrideStore((s) => s.override);
   const setGraphicsQualityOverride = useGraphicsQualityOverrideStore(
     (s) => s.setOverride,
   );
@@ -151,9 +144,7 @@ export function AppHeaderUserMenu({
         <Portal>
           <Menu.Content>
             <ImpersonationSwitchBackMenuItem />
-            <Menu.ItemGroup
-              title={`${session.user.name} (${session.user.email})`}
-            >
+            <Menu.ItemGroup title={`${session.user.name} (${session.user.email})`}>
               {governancePreviewEnabled && (
                 <Menu.Item value="my-workspace" asChild>
                   <Link href="/me">My Workspace</Link>
@@ -168,9 +159,7 @@ export function AppHeaderUserMenu({
                 <Link href="/settings">Settings</Link>
               </Menu.Item>
               {navigationV2Enabled && (
-                <Menu.Root
-                  positioning={{ placement: "right-start", gutter: 2 }}
-                >
+                <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
                   <Menu.TriggerItem value="navigation-mode">
                     <PanelsTopLeft size={14} />
                     Navigation ({NAVIGATION_MODE_LABELS[currentNavigationMode]})
@@ -196,16 +185,13 @@ export function AppHeaderUserMenu({
               <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
                 <Menu.TriggerItem value="reduced-graphics">
                   <Monitor size={14} />
-                  Reduced graphics (
-                  {GRAPHICS_OVERRIDE_LABELS[graphicsQualityOverride]})
+                  Reduced graphics ({GRAPHICS_OVERRIDE_LABELS[graphicsQualityOverride]})
                 </Menu.TriggerItem>
                 <Menu.Content>
                   <Menu.RadioItemGroup
                     value={graphicsQualityOverride}
                     onValueChange={(e) =>
-                      setGraphicsQualityOverride(
-                        e.value as GraphicsQualityOverride,
-                      )
+                      setGraphicsQualityOverride(e.value as GraphicsQualityOverride)
                     }
                   >
                     <Menu.RadioItem value="auto">

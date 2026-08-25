@@ -3,13 +3,7 @@ import { blankTemplate } from "../blank";
 
 const node = (id: string) => blankTemplate.nodes.find((n) => n.id === id);
 
-const param = ({
-  nodeId,
-  identifier,
-}: {
-  nodeId: string;
-  identifier: string;
-}) =>
+const param = ({ nodeId, identifier }: { nodeId: string; identifier: string }) =>
   (
     node(nodeId)?.data as {
       parameters: Array<{ identifier: string; value: unknown }>;
@@ -45,9 +39,9 @@ describe("blankTemplate", () => {
         expect((node("llm_call")?.data as { inputs: unknown }).inputs).toEqual([
           { identifier: "input", type: "str" },
         ]);
-        expect(
-          (node("llm_call")?.data as { outputs: unknown }).outputs,
-        ).toEqual([{ identifier: "output", type: "str" }]);
+        expect((node("llm_call")?.data as { outputs: unknown }).outputs).toEqual([
+          { identifier: "output", type: "str" },
+        ]);
       });
     });
 

@@ -20,10 +20,7 @@ import type { TeamUserRole } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { ConfirmDialog } from "../../../components/gateway/ConfirmDialog";
 import SettingsLayout from "../../../components/SettingsLayout";
-import {
-  TeamForm,
-  type TeamFormData,
-} from "../../../components/settings/TeamForm";
+import { TeamForm, type TeamFormData } from "../../../components/settings/TeamForm";
 import {
   type RoleOption,
   teamRolesOptions,
@@ -52,10 +49,7 @@ function isValidCustomRole(role: unknown): role is {
 }
 
 function isValidPermissions(permissions: unknown): permissions is string[] {
-  return (
-    Array.isArray(permissions) &&
-    permissions.every((p) => typeof p === "string")
-  );
+  return Array.isArray(permissions) && permissions.every((p) => typeof p === "string");
 }
 
 // Helper function to convert a member's role to form data
@@ -108,10 +102,7 @@ function EditTeamPage() {
   // Handle UNAUTHORIZED error first
   if (team.error) {
     const error = team.error;
-    if (
-      error instanceof TRPCClientError &&
-      error.data?.code === "UNAUTHORIZED"
-    ) {
+    if (error instanceof TRPCClientError && error.data?.code === "UNAUTHORIZED") {
       return (
         <SettingsLayout>
           <VStack paddingX={4} paddingY={6} gap={4} align="start">
@@ -242,8 +233,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
 
     if (code === "UNAUTHORIZED") {
       toaster.create({
-        title:
-          "You need to be an administrator of the organization to update this team",
+        title: "You need to be an administrator of the organization to update this team",
         type: "error",
         duration: 5000,
       });
@@ -305,8 +295,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
         onError: (error) => {
           if (isHandledByGlobalHandler(error)) return;
           const refused =
-            error instanceof TRPCClientError &&
-            error.data?.code === "FORBIDDEN";
+            error instanceof TRPCClientError && error.data?.code === "FORBIDDEN";
           if (!refused) {
             showErrorToast({ error, fallbackTitle: "Failed to archive team" });
             return;
@@ -345,8 +334,8 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
                 <VStack align="start" gap={0}>
                   <Text fontWeight="medium">Archive this team</Text>
                   <Text fontSize="sm" color="fg.muted">
-                    Hides the team and all its projects. Contact LangWatch
-                    support to restore it.
+                    Hides the team and all its projects. Contact LangWatch support to
+                    restore it.
                   </Text>
                 </VStack>
                 <Button

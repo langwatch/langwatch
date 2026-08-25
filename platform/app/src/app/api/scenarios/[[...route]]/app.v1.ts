@@ -142,10 +142,7 @@ function registerGetScenarioRoute(
     async (c) => {
       const project = c.get("project");
       const { id } = c.req.param();
-      logger.info(
-        { projectId: project.id, scenarioId: id },
-        "Getting scenario",
-      );
+      logger.info({ projectId: project.id, scenarioId: id }, "Getting scenario");
 
       const scenario = await c.app.scenarios.tryGetById({
         id,
@@ -262,10 +259,7 @@ function registerUpdateScenarioRoute(
       const { id } = c.req.param();
       const body = c.req.valid("json");
 
-      logger.info(
-        { projectId: project.id, scenarioId: id },
-        "Updating scenario",
-      );
+      logger.info({ projectId: project.id, scenarioId: id }, "Updating scenario");
 
       const existing = await c.app.scenarios.tryGetById({
         id,
@@ -315,9 +309,7 @@ function registerDeleteScenarioRoute(
           description: "Scenario archived",
           content: {
             "application/json": {
-              schema: resolver(
-                z.object({ id: z.string(), archived: z.boolean() }),
-              ),
+              schema: resolver(z.object({ id: z.string(), archived: z.boolean() })),
             },
           },
         },
@@ -333,10 +325,7 @@ function registerDeleteScenarioRoute(
       const project = c.get("project");
       const { id } = c.req.param();
 
-      logger.info(
-        { projectId: project.id, scenarioId: id },
-        "Archiving scenario",
-      );
+      logger.info({ projectId: project.id, scenarioId: id }, "Archiving scenario");
 
       try {
         await c.app.scenarios.archive({ id, projectId: project.id });

@@ -1,12 +1,7 @@
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
-import type {
-  Evaluator,
-  Organization,
-  Project,
-  Team,
-} from "~/generated/prisma/client";
+import type { Evaluator, Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
@@ -87,9 +82,7 @@ describe("Evaluators API", () => {
   });
 
   afterEach(async () => {
-    await cleanupTestRows(prisma, [
-      ["evaluator", { projectId: testProjectId }],
-    ]);
+    await cleanupTestRows(prisma, [["evaluator", { projectId: testProjectId }]]);
 
     await prisma.project.delete({
       where: { id: testProjectId },

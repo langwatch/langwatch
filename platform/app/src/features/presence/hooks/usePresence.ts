@@ -1,9 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useSSESubscription } from "~/hooks/useSSESubscription";
-import type {
-  PresenceEvent,
-  PresenceLocation,
-} from "@langwatch/presence-contract";
+import type { PresenceEvent, PresenceLocation } from "@langwatch/presence-contract";
 import { api } from "~/utils/api";
 import { usePresencePreferencesStore } from "../stores/presencePreferencesStore";
 import { usePresenceStore } from "../stores/presenceStore";
@@ -61,9 +58,7 @@ export function usePresence({
 
   const hidden = usePresencePreferencesStore((s) => s.hidden);
 
-  const active = Boolean(
-    enabled && projectId && sessionId && location && !hidden,
-  );
+  const active = Boolean(enabled && projectId && sessionId && location && !hidden);
 
   useEffect(() => {
     if (active && sessionId) setSelfSessionId(sessionId);

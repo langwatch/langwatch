@@ -471,9 +471,7 @@ describe("useSimulationUpdateListener()", () => {
         });
       });
 
-      expect(onTabNavigate).toHaveBeenCalledWith(
-        navigatePayload("machine-abc"),
-      );
+      expect(onTabNavigate).toHaveBeenCalledWith(navigatePayload("machine-abc"));
     });
 
     /** @scenario "A navigate payload for another machine is ignored" */

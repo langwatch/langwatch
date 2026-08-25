@@ -143,9 +143,7 @@ function readObjectEntry({
 }): ModuleAlias {
   const entry = simpleEntryOf({ property });
   if (!entry) {
-    throw new Error(
-      `${fileName}: alias entry is not a simple "key": value pair`,
-    );
+    throw new Error(`${fileName}: alias entry is not a simple "key": value pair`);
   }
   const replacement = aliasReplacementOf({ value: entry.value, configDir });
   if (replacement === undefined) {
@@ -171,9 +169,7 @@ function entryPropertiesOf({
   for (const property of element.properties) {
     const entry = simpleEntryOf({ property });
     if (!entry) {
-      throw new Error(
-        `${fileName}: alias array entry is not a simple "key": value pair`,
-      );
+      throw new Error(`${fileName}: alias array entry is not a simple "key": value pair`);
     }
     parts.set(entry.key, entry.value);
   }
@@ -202,15 +198,11 @@ function readArrayEntry({
   const find = parts.get("find");
   const replacementValue = parts.get("replacement");
   if (!find || !replacementValue) {
-    throw new Error(
-      `${fileName}: alias array entry is missing find or replacement`,
-    );
+    throw new Error(`${fileName}: alias array entry is missing find or replacement`);
   }
   if (!isStringLiteral(find)) {
     // A regular-expression `find` is legal here and cannot be prefix-matched.
-    throw new Error(
-      `${fileName}: alias array entry's find is not a string literal`,
-    );
+    throw new Error(`${fileName}: alias array entry's find is not a string literal`);
   }
 
   const replacement = aliasReplacementOf({
@@ -245,9 +237,7 @@ function readAliasTable({
       readArrayEntry({ element, fileName, configDir }),
     );
   }
-  throw new Error(
-    `${fileName}: alias table is neither an object nor an array literal`,
-  );
+  throw new Error(`${fileName}: alias table is neither an object nor an array literal`);
 }
 
 /**

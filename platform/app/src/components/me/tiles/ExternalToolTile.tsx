@@ -14,12 +14,7 @@ interface Props {
   iconKey?: string | null;
 }
 
-export function ExternalToolTile({
-  displayName,
-  config,
-  iconAsset,
-  iconKey,
-}: Props) {
+export function ExternalToolTile({ displayName, config, iconAsset, iconKey }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -31,11 +26,7 @@ export function ExternalToolTile({
       width="full"
     >
       <HStack cursor="pointer" onClick={() => setExpanded(!expanded)} gap={3}>
-        <TileIcon
-          iconAsset={iconAsset}
-          iconKey={iconKey}
-          type="external_tool"
-        />
+        <TileIcon iconAsset={iconAsset} iconKey={iconKey} type="external_tool" />
         <VStack align="start" gap={0} flex={1}>
           <Text fontSize="sm" fontWeight="semibold">
             {displayName}
@@ -58,8 +49,7 @@ export function ExternalToolTile({
           </Box>
           <Button size="sm" variant="outline" asChild alignSelf="start">
             <a href={config.linkUrl} target="_blank" rel="noopener noreferrer">
-              <ExternalLink size={14} />{" "}
-              {config.ctaLabel ?? `Open ${displayName}`}
+              <ExternalLink size={14} /> {config.ctaLabel ?? `Open ${displayName}`}
             </a>
           </Button>
         </VStack>

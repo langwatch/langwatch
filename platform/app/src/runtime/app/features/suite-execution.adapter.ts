@@ -51,10 +51,7 @@ export class AppSuiteExecutionPort extends SuiteExecutionPort {
     startSuiteRun: (data: StartSuiteRunCommandData) => Promise<void>;
     queueSimulationRun: (data: QueueRunCommandData) => Promise<void>;
   }): AppSuiteExecutionPort {
-    return new AppSuiteExecutionPort(
-      options.startSuiteRun,
-      options.queueSimulationRun,
-    );
+    return new AppSuiteExecutionPort(options.startSuiteRun, options.queueSimulationRun);
   }
 
   private constructor(
@@ -102,9 +99,7 @@ export class AppSuiteExecutionPort extends SuiteExecutionPort {
     const batchRunId = input.batchRunId ?? generateBatchRunId();
     const setId = getSuiteSetId(input.suiteId);
     const total =
-      input.activeScenarioIds.length *
-      input.activeTargets.length *
-      input.repeatCount;
+      input.activeScenarioIds.length * input.activeTargets.length * input.repeatCount;
 
     logger.debug(
       {
@@ -153,9 +148,7 @@ export class AppSuiteExecutionPort extends SuiteExecutionPort {
     const now = Date.now();
     await Promise.allSettled(
       items.map((item) => {
-        const secretParameters = secretParametersByScenarioId.get(
-          item.scenarioId,
-        );
+        const secretParameters = secretParametersByScenarioId.get(item.scenarioId);
         return this.queueSimulationRunCommand({
           tenantId: input.projectId,
           scenarioRunId: item.scenarioRunId,

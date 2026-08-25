@@ -40,7 +40,11 @@ export type LegacyAuditLogInput = {
 };
 
 function validIp(value: string): string | undefined {
-  const candidate = value.split(",")[0]?.replace(/^::ffff:/, "").trim() ?? "";
+  const candidate =
+    value
+      .split(",")[0]
+      ?.replace(/^::ffff:/, "")
+      .trim() ?? "";
   if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(candidate)) return candidate;
   if (/^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/.test(candidate)) return candidate;
   return undefined;
@@ -69,15 +73,10 @@ function jsonClone(value: unknown): AuditLogJsonValue | undefined {
 export class AuditLogAdapter {
   private constructor(private readonly service: AuditLogService) {}
 
-  static create(input: {
-    prisma: unknown;
-    maxArgsBytes?: number;
-  }): AuditLogAdapter {
+  static create(input: { prisma: unknown; maxArgsBytes?: number }): AuditLogAdapter {
     return new AuditLogAdapter(
       DefaultAuditLogService.create({
-        repository: PrismaAuditLogRepository.create(
-          input.prisma as AuditLogPrismaClient,
-        ),
+        repository: PrismaAuditLogRepository.create(input.prisma as AuditLogPrismaClient),
         maxArgsBytes: input.maxArgsBytes,
       }),
     );

@@ -103,12 +103,8 @@ describe("firePromptCreatedNurturing()", () => {
   describe("when Customer.io API is unavailable", () => {
     /** @scenario 'Prompt creation hook failure does not break the prompt mutation' */
     it("does not throw (fire-and-forget)", async () => {
-      const { captureException } = await import(
-        "~/utils/posthogErrorCapture"
-      );
-      mockNurturing.identifyUser.mockRejectedValueOnce(
-        new Error("CIO unavailable"),
-      );
+      const { captureException } = await import("~/utils/posthogErrorCapture");
+      mockNurturing.identifyUser.mockRejectedValueOnce(new Error("CIO unavailable"));
 
       expect(() =>
         firePromptCreatedNurturing({

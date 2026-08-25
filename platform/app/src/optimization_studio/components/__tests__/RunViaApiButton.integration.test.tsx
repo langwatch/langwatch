@@ -167,9 +167,7 @@ describe("RunViaApiButton", () => {
       expect(screen.getByRole("dialog").textContent ?? "").toContain("data=[");
 
       await switchDataSource("Dataset id");
-      expect(screen.getByRole("dialog").textContent ?? "").toContain(
-        "dataset_id=",
-      );
+      expect(screen.getByRole("dialog").textContent ?? "").toContain("dataset_id=");
     });
   });
 });

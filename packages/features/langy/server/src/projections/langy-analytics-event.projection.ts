@@ -1,8 +1,5 @@
 import type { AppendStore } from "@langwatch/eventing";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import {
   type LangyAgentRespondedEvent,
@@ -85,25 +82,18 @@ export class LangyAnalyticsEventMapProjection
     typeof analyticsEvents
   >
   implements
-    MapEventHandlers<
-      typeof analyticsEvents,
-      LangyAnalyticsEventProjectionRecord
-    >
+    MapEventHandlers<typeof analyticsEvents, LangyAnalyticsEventProjectionRecord>
 {
   readonly name = "langyAnalyticsEvent";
   readonly store: AppendStore<LangyAnalyticsEventProjectionRecord>;
   protected readonly events = analyticsEvents;
 
-  constructor(deps: {
-    store: AppendStore<LangyAnalyticsEventProjectionRecord>;
-  }) {
+  constructor(deps: { store: AppendStore<LangyAnalyticsEventProjectionRecord> }) {
     super();
     this.store = deps.store;
   }
 
-  mapLangyConversationConversationStarted(
-    event: LangyConversationStartedEvent,
-  ) {
+  mapLangyConversationConversationStarted(event: LangyConversationStartedEvent) {
     return this.record(event);
   }
 
@@ -139,9 +129,7 @@ export class LangyAnalyticsEventMapProjection
     return this.record(event);
   }
 
-  mapLangyConversationAgentResponseFailed(
-    event: LangyAgentResponseFailedEvent,
-  ) {
+  mapLangyConversationAgentResponseFailed(event: LangyAgentResponseFailedEvent) {
     return this.record(event);
   }
 
@@ -149,9 +137,7 @@ export class LangyAnalyticsEventMapProjection
     return this.record(event);
   }
 
-  mapLangyConversationConversationArchived(
-    event: LangyConversationArchivedEvent,
-  ) {
+  mapLangyConversationConversationArchived(event: LangyConversationArchivedEvent) {
     return this.record(event);
   }
 

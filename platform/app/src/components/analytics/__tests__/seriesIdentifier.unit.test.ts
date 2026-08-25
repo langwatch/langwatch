@@ -5,9 +5,7 @@ import { deriveSeriesIdentifier } from "../seriesIdentifier";
 describe("deriveSeriesIdentifier", () => {
   describe("given a graph whose series entry has a key", () => {
     const graph = {
-      series: [
-        { key: "vendor/model", metric: "metadata.value", aggregation: "avg" },
-      ],
+      series: [{ key: "vendor/model", metric: "metadata.value", aggregation: "avg" }],
     };
 
     describe("when deriving the identifier for that index", () => {
@@ -19,16 +17,12 @@ describe("deriveSeriesIdentifier", () => {
 
   describe("given a series entry with an empty key and a metric", () => {
     const graph = {
-      series: [
-        { key: "", metric: "performance.total_cost", aggregation: "sum" },
-      ],
+      series: [{ key: "", metric: "performance.total_cost", aggregation: "sum" }],
     };
 
     describe("when deriving the identifier", () => {
       it("falls back to the metric", () => {
-        expect(deriveSeriesIdentifier(graph, 0)).toBe(
-          "0/performance.total_cost/sum",
-        );
+        expect(deriveSeriesIdentifier(graph, 0)).toBe("0/performance.total_cost/sum");
       });
     });
   });
@@ -72,9 +66,7 @@ describe("deriveSeriesIdentifier", () => {
 
     describe("when the index is out of range", () => {
       it("returns undefined", () => {
-        expect(
-          deriveSeriesIdentifier({ series: [{ key: "a" }] }, 3),
-        ).toBeUndefined();
+        expect(deriveSeriesIdentifier({ series: [{ key: "a" }] }, 3)).toBeUndefined();
       });
     });
   });

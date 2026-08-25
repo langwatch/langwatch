@@ -35,9 +35,7 @@ describe("buildRetentionTTLExpression", () => {
     // BAD_TTL_EXPRESSION (code 450). The anchor must be UpdatedAt — non-null
     // and partition-aligned with `toYearWeek(UpdatedAt)`.
     it("evaluation_runs anchors retention on the non-null partition key", () => {
-      const config = TABLE_TTL_CONFIG.find(
-        (c) => c.table === "evaluation_runs",
-      )!;
+      const config = TABLE_TTL_CONFIG.find((c) => c.table === "evaluation_runs")!;
       expect(config.retentionTTLColumn).toBe("UpdatedAt");
       const expr = buildRetentionTTLExpression(config);
       expect(expr).toBe(
@@ -58,9 +56,7 @@ describe("buildRetentionTTLExpression", () => {
 
   describe("when retentionTTLColumn is not set", () => {
     it("returns null for billable_events", () => {
-      const config = TABLE_TTL_CONFIG.find(
-        (c) => c.table === "billable_events",
-      )!;
+      const config = TABLE_TTL_CONFIG.find((c) => c.table === "billable_events")!;
       const expr = buildRetentionTTLExpression(config);
       expect(expr).toBeNull();
     });
@@ -136,9 +132,7 @@ describe("gateway_spend retention exemption", () => {
   /** @scenario Billing records are exempt from tenant retention and keep a fixed thirteen month window */
   it("is absent from tenant retention and from the TTL reconciler config", () => {
     expect(RETENTION_MANAGED_TABLES).not.toContain("gateway_spend");
-    expect(
-      TABLE_TTL_CONFIG.find((c) => c.table === "gateway_spend"),
-    ).toBeUndefined();
+    expect(TABLE_TTL_CONFIG.find((c) => c.table === "gateway_spend")).toBeUndefined();
   });
 
   it("declares its fixed 13-month delete in the migration itself", async () => {
@@ -151,9 +145,7 @@ describe("gateway_spend retention exemption", () => {
       ),
       "utf8",
     );
-    expect(migration).toContain(
-      "TTL toDateTime(OccurredAt) + INTERVAL 13 MONTH DELETE",
-    );
+    expect(migration).toContain("TTL toDateTime(OccurredAt) + INTERVAL 13 MONTH DELETE");
     expect(migration).not.toContain("_retention_days");
   });
 });

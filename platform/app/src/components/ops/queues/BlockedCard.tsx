@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Card,
-  HStack,
-  Input,
-  Spacer,
-  Table,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Button, Card, HStack, Input, Spacer, Table, Text } from "@chakra-ui/react";
 import { useRef, useState } from "react";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
@@ -32,9 +23,7 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
     groupId: string;
   } | null>(null);
   const [moveToDlqTarget, setMoveToDlqTarget] = useState<string | null>(null);
-  const [canaryQueueTarget, setCanaryQueueTarget] = useState<string | null>(
-    null,
-  );
+  const [canaryQueueTarget, setCanaryQueueTarget] = useState<string | null>(null);
   const [canaryCount, setCanaryCount] = useState(5);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -98,8 +87,7 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
   );
 
   if (blockedQuery.isLoading) return null;
-  if (!blockedQuery.data || blockedQuery.data.clusters.length === 0)
-    return null;
+  if (!blockedQuery.data || blockedQuery.data.clusters.length === 0) return null;
 
   const clusters = blockedQuery.data.clusters;
 
@@ -116,8 +104,8 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
             flexWrap="wrap"
           >
             <Text textStyle="sm" fontWeight="medium" color="red.500">
-              Blocked — {blockedQuery.data.totalBlocked} groups,{" "}
-              {clusters.length} error patterns
+              Blocked — {blockedQuery.data.totalBlocked} groups, {clusters.length} error
+              patterns
             </Text>
             <Spacer />
             {hasAccess && (
@@ -154,10 +142,7 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
                     value={canaryCount}
                     onChange={(e) =>
                       setCanaryCount(
-                        Math.max(
-                          1,
-                          Math.min(100, parseInt(e.target.value) || 5),
-                        ),
+                        Math.max(1, Math.min(100, parseInt(e.target.value) || 5)),
                       )
                     }
                     width="50px"
@@ -214,11 +199,7 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
                     return (
                       <Table.Row key={rowKey}>
                         <Table.Cell textAlign="end">
-                          <Text
-                            color="red.500"
-                            fontWeight="medium"
-                            textStyle="xs"
-                          >
+                          <Text color="red.500" fontWeight="medium" textStyle="xs">
                             {cluster.count}
                           </Text>
                         </Table.Cell>

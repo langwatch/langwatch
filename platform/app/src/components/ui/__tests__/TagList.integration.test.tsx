@@ -67,10 +67,9 @@ describe("<TagList/>", () => {
       const user = userEvent.setup();
       const onAdd = vi.fn();
 
-      render(
-        <TagList labels={["existing"]} onAdd={onAdd} onRemove={vi.fn()} />,
-        { wrapper: Wrapper },
-      );
+      render(<TagList labels={["existing"]} onAdd={onAdd} onRemove={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("+ add"));
       const input = screen.getByPlaceholderText("Add label...");
@@ -101,9 +100,7 @@ describe("<TagList/>", () => {
       await user.click(screen.getByText("+ add"));
       screen.getByPlaceholderText("Add label...");
       await user.keyboard("{Escape}");
-      expect(
-        screen.queryByPlaceholderText("Add label..."),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("Add label...")).not.toBeInTheDocument();
     });
   });
 
@@ -124,9 +121,7 @@ describe("<TagList/>", () => {
       expect(
         screen.getByRole("button", { name: "Remove alpha tag" }),
       ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Remove beta tag" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove beta tag" })).toBeInTheDocument();
     });
 
     it("calls onRemove with the label when remove is clicked", async () => {
@@ -137,9 +132,7 @@ describe("<TagList/>", () => {
         wrapper: Wrapper,
       });
 
-      await user.click(
-        screen.getByRole("button", { name: "Remove alpha tag" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Remove alpha tag" }));
       expect(onRemove).toHaveBeenCalledWith("alpha", 0);
     });
   });

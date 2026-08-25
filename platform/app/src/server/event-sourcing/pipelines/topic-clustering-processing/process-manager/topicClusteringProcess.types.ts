@@ -22,9 +22,7 @@ export const topicClusteringRunIntentSchema = z.object({
   page: z.number(),
   searchAfter: topicClusteringSearchAfterSchema.nullable(),
 });
-export type TopicClusteringRunIntent = z.infer<
-  typeof topicClusteringRunIntentSchema
->;
+export type TopicClusteringRunIntent = z.infer<typeof topicClusteringRunIntentSchema>;
 
 /**
  * Compact private process state (ADR-051 §2): only what evolve() decisions

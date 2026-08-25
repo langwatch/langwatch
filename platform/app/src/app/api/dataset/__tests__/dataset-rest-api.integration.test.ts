@@ -422,9 +422,7 @@ describe("Feature: Dataset REST API", () => {
         const body = await res.json();
         expect(body.name).toBe("New Name");
         expect(body.slug).toBe("new-name");
-        expect(body.columnTypes).toEqual([
-          { name: "question", type: "string" },
-        ]);
+        expect(body.columnTypes).toEqual([{ name: "question", type: "string" }]);
       });
     });
 
@@ -485,12 +483,9 @@ describe("Feature: Dataset REST API", () => {
 
       /** @scenario Update dataset does not enforce plan limits */
       it("updates the dataset successfully (no plan limit on PATCH)", async () => {
-        const res = await helpers.api.patch(
-          `/api/dataset/${existingDatasetSlug}`,
-          {
-            name: "Updated Name",
-          },
-        );
+        const res = await helpers.api.patch(`/api/dataset/${existingDatasetSlug}`, {
+          name: "Updated Name",
+        });
 
         expect(res.status).toBe(200);
         const body = await res.json();
@@ -614,10 +609,9 @@ describe("Feature: Dataset REST API", () => {
 
       /** @scenario Update a record entry */
       it("updates the record entry", async () => {
-        const res = await helpers.api.patch(
-          "/api/dataset/my-dataset/records/rec-123",
-          { entry: { input: "updated" } },
-        );
+        const res = await helpers.api.patch("/api/dataset/my-dataset/records/rec-123", {
+          entry: { input: "updated" },
+        });
 
         expect(res.status).toBe(200);
         const body = await res.json();
@@ -632,10 +626,9 @@ describe("Feature: Dataset REST API", () => {
 
       /** @scenario Update a non-existent record creates it */
       it("creates the record (upsert)", async () => {
-        const res = await helpers.api.patch(
-          "/api/dataset/my-dataset/records/rec-new",
-          { entry: { input: "new" } },
-        );
+        const res = await helpers.api.patch("/api/dataset/my-dataset/records/rec-new", {
+          entry: { input: "new" },
+        });
 
         expect(res.status).toBe(201);
         const body = await res.json();
@@ -647,10 +640,9 @@ describe("Feature: Dataset REST API", () => {
     describe("when the dataset does not exist", () => {
       /** @scenario Update a record for non-existent dataset returns 404 */
       it("returns 404 Not Found", async () => {
-        const res = await helpers.api.patch(
-          "/api/dataset/ghost/records/rec-1",
-          { entry: { input: "x" } },
-        );
+        const res = await helpers.api.patch("/api/dataset/ghost/records/rec-1", {
+          entry: { input: "x" },
+        });
 
         expect(res.status).toBe(404);
       });
@@ -676,10 +668,9 @@ describe("Feature: Dataset REST API", () => {
 
       /** @scenario Delete records in batch */
       it("deletes the specified records and returns count", async () => {
-        const res = await helpers.api.delete(
-          "/api/dataset/my-dataset/records",
-          { recordIds: ["rec-1", "rec-2"] },
-        );
+        const res = await helpers.api.delete("/api/dataset/my-dataset/records", {
+          recordIds: ["rec-1", "rec-2"],
+        });
 
         expect(res.status).toBe(200);
         const body = await res.json();
@@ -694,10 +685,9 @@ describe("Feature: Dataset REST API", () => {
 
       /** @scenario Delete records with no matching IDs returns 404 */
       it("returns 404 Not Found", async () => {
-        const res = await helpers.api.delete(
-          "/api/dataset/my-dataset/records",
-          { recordIds: ["nonexistent"] },
-        );
+        const res = await helpers.api.delete("/api/dataset/my-dataset/records", {
+          recordIds: ["nonexistent"],
+        });
 
         expect(res.status).toBe(404);
         const body = await res.json();
@@ -723,10 +713,7 @@ describe("Feature: Dataset REST API", () => {
 
       /** @scenario Delete records requires recordIds in body */
       it("returns 422 Unprocessable Entity", async () => {
-        const res = await helpers.api.delete(
-          "/api/dataset/my-dataset/records",
-          {},
-        );
+        const res = await helpers.api.delete("/api/dataset/my-dataset/records", {});
 
         expect(res.status).toBe(422);
       });
@@ -861,17 +848,12 @@ describe("Feature: Dataset REST API", () => {
 
     describe("when entries are missing from the body", () => {
       beforeEach(async () => {
-        await createDatasetWithColumns("my-dataset", [
-          { name: "input", type: "string" },
-        ]);
+        await createDatasetWithColumns("my-dataset", [{ name: "input", type: "string" }]);
       });
 
       /** @scenario Batch create records requires entries in body */
       it("returns 422 Unprocessable Entity for empty body", async () => {
-        const res = await helpers.api.post(
-          "/api/dataset/my-dataset/records",
-          {},
-        );
+        const res = await helpers.api.post("/api/dataset/my-dataset/records", {});
 
         expect(res.status).toBe(422);
       });
@@ -879,9 +861,7 @@ describe("Feature: Dataset REST API", () => {
 
     describe("when entries exceed the maximum batch size", () => {
       beforeEach(async () => {
-        await createDatasetWithColumns("my-dataset", [
-          { name: "input", type: "string" },
-        ]);
+        await createDatasetWithColumns("my-dataset", [{ name: "input", type: "string" }]);
       });
 
       /** @scenario Batch create records enforces maximum batch size */
@@ -914,10 +894,9 @@ describe("Feature: Dataset REST API", () => {
       });
 
       it("returns 500 with a descriptive error instead of crashing", async () => {
-        const res = await helpers.api.post(
-          "/api/dataset/malformed-cols/records",
-          { entries: [{ input: "hello" }] },
-        );
+        const res = await helpers.api.post("/api/dataset/malformed-cols/records", {
+          entries: [{ input: "hello" }],
+        });
 
         expect(res.status).toBe(500);
         const body = await res.json();
@@ -951,9 +930,7 @@ describe("Feature: Dataset REST API", () => {
 
     describe("when entries exceed the maximum batch size of 1000", () => {
       beforeEach(async () => {
-        await createDatasetWithColumns("my-dataset", [
-          { name: "input", type: "string" },
-        ]);
+        await createDatasetWithColumns("my-dataset", [{ name: "input", type: "string" }]);
       });
 
       it("returns 422 Unprocessable Entity", async () => {

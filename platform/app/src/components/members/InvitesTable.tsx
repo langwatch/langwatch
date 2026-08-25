@@ -93,11 +93,7 @@ export function InvitesTable({
                     <Table.Cell>{invite.email}</Table.Cell>
                     <Table.Cell>
                       {isWaitingApproval ? (
-                        <Badge
-                          size="sm"
-                          variant="surface"
-                          colorPalette="orange"
-                        >
+                        <Badge size="sm" variant="surface" colorPalette="orange">
                           Pending Approval
                         </Badge>
                       ) : (
@@ -111,12 +107,7 @@ export function InvitesTable({
                       <TeamIdsDisplay teamIds={invite.teamIds} teams={teams} />
                     </Table.Cell>
                     <Table.Cell>
-                      <Box
-                        width="full"
-                        height="full"
-                        display="flex"
-                        justifyContent="end"
-                      >
+                      <Box width="full" height="full" display="flex" justifyContent="end">
                         {isWaitingApproval ? (
                           <WaitingApprovalActions
                             isAdmin={isAdmin}
@@ -139,10 +130,7 @@ export function InvitesTable({
                               <Menu.Item
                                 value="view-link"
                                 onClick={() =>
-                                  onViewInviteLink(
-                                    invite.inviteCode,
-                                    invite.email,
-                                  )
+                                  onViewInviteLink(invite.inviteCode, invite.email)
                                 }
                               >
                                 <Mail size={16} />

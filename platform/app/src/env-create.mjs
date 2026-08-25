@@ -122,8 +122,7 @@ export function alignDevAuthUrlsToPort(processEnv) {
     } catch {
       continue;
     }
-    if (parsed.protocol !== "http:" || parsed.hostname !== "localhost")
-      continue;
+    if (parsed.protocol !== "http:" || parsed.hostname !== "localhost") continue;
 
     processEnv[name] = target;
     realigned.push({ name, from: current, to: target });
@@ -160,9 +159,7 @@ export function createEnvConfig(source) {
         .transform((val) => {
           if (val) return val;
           if (source.NODE_ENV === "production") {
-            console.warn(
-              "ENVIRONMENT is not set in production. Defaulting to 'local'.",
-            );
+            console.warn("ENVIRONMENT is not set in production. Defaulting to 'local'.");
           }
 
           return "local";
@@ -194,8 +191,7 @@ export function createEnvConfig(source) {
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
       // Shared HMAC secret between control-plane and the Go AI Gateway service.
       // See specs/ai-gateway/_shared/contract.md §4 + §9.
-      LW_GATEWAY_INTERNAL_SECRET:
-        gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
+      LW_GATEWAY_INTERNAL_SECRET: gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
       // HS256 secret used by control-plane to sign the short-lived JWT that the
       // gateway verifies on every request (contract §4.1). 32+ chars.
       LW_GATEWAY_JWT_SECRET: gatewaySecretsSchema.LW_GATEWAY_JWT_SECRET,
@@ -269,21 +265,9 @@ export function createEnvConfig(source) {
       // LANGEVALS_STAGING_TTL_SECONDS bounds how long the presigned URL
       // stays valid; keep it short so a leaked URL doesn't grant
       // long-window access.
-      LANGEVALS_STAGING_THRESHOLD_BYTES: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional(),
-      LANGEVALS_STAGING_TTL_SECONDS: z.coerce
-        .number()
-        .int()
-        .positive()
-        .default(600),
-      EVAL_MAX_PAYLOAD_BYTES: z.coerce
-        .number()
-        .int()
-        .positive()
-        .default(16_000_000),
+      LANGEVALS_STAGING_THRESHOLD_BYTES: z.coerce.number().int().positive().optional(),
+      LANGEVALS_STAGING_TTL_SECONDS: z.coerce.number().int().positive().default(600),
+      EVAL_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(16_000_000),
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: z.coerce
         .number()
         .int()
@@ -301,11 +285,7 @@ export function createEnvConfig(source) {
       // hourly cap, bounding the aggregate trigger-email volume a whole project
       // can emit in 24h (SES sender-reputation protection). Counts RECIPIENTS
       // (actual outbound email volume), not dispatches.
-      TRIGGER_EMAIL_TENANT_DAILY_CAP: z.coerce
-        .number()
-        .int()
-        .positive()
-        .default(10000),
+      TRIGGER_EMAIL_TENANT_DAILY_CAP: z.coerce.number().int().positive().default(10000),
       // Per-trigger daily ceiling on CONFIRMED persist dispatches — the dataset
       // rows and annotation-queue items an automation actually creates. Only
       // customer-attributable volume is counted: match records, unconfirmed
@@ -317,16 +297,8 @@ export function createEnvConfig(source) {
       // and 1,000 matches the existing per-project daily email cap. A single
       // contract can raise its own ceiling past the tier through
       // `PlanInfo.maxTriggerPersistDispatchesPerDay`.
-      TRIGGER_PERSIST_DAILY_CAP_FREE: z.coerce
-        .number()
-        .int()
-        .positive()
-        .default(100),
-      TRIGGER_PERSIST_DAILY_CAP_PAID: z.coerce
-        .number()
-        .int()
-        .positive()
-        .default(1000),
+      TRIGGER_PERSIST_DAILY_CAP_FREE: z.coerce.number().int().positive().default(100),
+      TRIGGER_PERSIST_DAILY_CAP_PAID: z.coerce.number().int().positive().default(1000),
       TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE: z.coerce
         .number()
         .int()
@@ -600,11 +572,9 @@ export function createEnvConfig(source) {
       REDIS_URL: source.REDIS_URL,
       REDIS_CLUSTER_ENDPOINTS: source.REDIS_CLUSTER_ENDPOINTS,
       SKIP_REDIS:
-        source.SKIP_REDIS === "1" ||
-        source.SKIP_REDIS?.toLowerCase() === "true",
+        source.SKIP_REDIS === "1" || source.SKIP_REDIS?.toLowerCase() === "true",
       REDIS_DB_INDEX: source.REDIS_DB_INDEX,
-      GOOGLE_APPLICATION_CREDENTIALS:
-        source.GOOGLE_APPLICATION_CREDENTIALS,
+      GOOGLE_APPLICATION_CREDENTIALS: source.GOOGLE_APPLICATION_CREDENTIALS,
       LANGWATCH_DISABLE_GOOGLE_DLP:
         source.LANGWATCH_DISABLE_GOOGLE_DLP?.toLowerCase() === "true",
       AZURE_OPENAI_ENDPOINT: source.AZURE_OPENAI_ENDPOINT,
@@ -620,22 +590,16 @@ export function createEnvConfig(source) {
       LANGY_INTERNAL_SECRET: source.LANGY_INTERNAL_SECRET,
       LANGY_PROMPT_PROJECT_ID: source.LANGY_PROMPT_PROJECT_ID,
       LANGEVALS_ENDPOINT: source.LANGEVALS_ENDPOINT,
-      LANGEVALS_STAGING_THRESHOLD_BYTES:
-        source.LANGEVALS_STAGING_THRESHOLD_BYTES,
+      LANGEVALS_STAGING_THRESHOLD_BYTES: source.LANGEVALS_STAGING_THRESHOLD_BYTES,
       LANGEVALS_STAGING_TTL_SECONDS: source.LANGEVALS_STAGING_TTL_SECONDS,
       EVAL_MAX_PAYLOAD_BYTES: source.EVAL_MAX_PAYLOAD_BYTES,
-      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
-        source.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
+      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: source.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       LANGWATCH_LICENSE_KEY: source.LANGWATCH_LICENSE_KEY,
       TRIGGER_EMAIL_HOURLY_CAP: source.TRIGGER_EMAIL_HOURLY_CAP,
-      TRIGGER_EMAIL_TENANT_DAILY_CAP:
-        source.TRIGGER_EMAIL_TENANT_DAILY_CAP,
-      TRIGGER_PERSIST_DAILY_CAP_FREE:
-        source.TRIGGER_PERSIST_DAILY_CAP_FREE,
-      TRIGGER_PERSIST_DAILY_CAP_PAID:
-        source.TRIGGER_PERSIST_DAILY_CAP_PAID,
-      TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE:
-        source.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
+      TRIGGER_EMAIL_TENANT_DAILY_CAP: source.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+      TRIGGER_PERSIST_DAILY_CAP_FREE: source.TRIGGER_PERSIST_DAILY_CAP_FREE,
+      TRIGGER_PERSIST_DAILY_CAP_PAID: source.TRIGGER_PERSIST_DAILY_CAP_PAID,
+      TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE: source.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
       DEMO_PROJECT_ID: source.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: source.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: source.DEMO_PROJECT_SLUG,
@@ -652,16 +616,13 @@ export function createEnvConfig(source) {
       SMTP_SECURE: source.SMTP_SECURE,
       RESEND_API_KEY: source.RESEND_API_KEY,
       S3_KEY_SALT: source.S3_KEY_SALT,
-      IS_SAAS:
-        source.IS_SAAS === "1" ||
-        source.IS_SAAS?.toLowerCase() === "true",
+      IS_SAAS: source.IS_SAAS === "1" || source.IS_SAAS?.toLowerCase() === "true",
       // Blank means unset, so a templated .env line with no value cannot take
       // the whole deployment down over an optional credential.
       LANGWATCH_INSTANCE_ADMIN_API_KEY:
         source.LANGWATCH_INSTANCE_ADMIN_API_KEY || undefined,
       RUM_ENABLED:
-        source.RUM_ENABLED === "1" ||
-        source.RUM_ENABLED?.toLowerCase() === "true",
+        source.RUM_ENABLED === "1" || source.RUM_ENABLED?.toLowerCase() === "true",
       RUM_SAMPLE_RATIO: source.RUM_SAMPLE_RATIO,
       BLOCK_LOCAL_HTTP_CALLS:
         source.BLOCK_LOCAL_HTTP_CALLS === "1" ||
@@ -674,11 +635,9 @@ export function createEnvConfig(source) {
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD:
         source.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,
       LANGWATCH_DISPATCH_TENANT_CAP: source.LANGWATCH_DISPATCH_TENANT_CAP,
-      LANGWATCH_DISPATCH_GLOBAL_BUDGET:
-        source.LANGWATCH_DISPATCH_GLOBAL_BUDGET,
+      LANGWATCH_DISPATCH_GLOBAL_BUDGET: source.LANGWATCH_DISPATCH_GLOBAL_BUDGET,
       USE_S3_STORAGE:
-        source.USE_S3_STORAGE === "1" ||
-        source.USE_S3_STORAGE?.toLowerCase() === "true",
+        source.USE_S3_STORAGE === "1" || source.USE_S3_STORAGE?.toLowerCase() === "true",
       S3_ENDPOINT: source.S3_ENDPOINT,
       S3_ACCESS_KEY_ID: source.S3_ACCESS_KEY_ID,
       S3_SECRET_ACCESS_KEY: source.S3_SECRET_ACCESS_KEY,
@@ -696,8 +655,7 @@ export function createEnvConfig(source) {
       AZURE_BLOB_TOKEN_AUDIENCE: source.AZURE_BLOB_TOKEN_AUDIENCE,
       AZURE_BLOB_SPOOL_RETENTION_CONFIRMED:
         source.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED === "1" ||
-        source.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED?.toLowerCase() ===
-          "true",
+        source.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED?.toLowerCase() === "true",
       DATASET_STORAGE_LOCAL:
         source.DATASET_STORAGE_LOCAL === "1" ||
         source.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
@@ -743,10 +701,8 @@ export function createEnvConfig(source) {
       LANGWATCH_LICENSE_PRIVATE_KEY: source.LANGWATCH_LICENSE_PRIVATE_KEY,
       STRIPE_SECRET_KEY: source.STRIPE_SECRET_KEY,
       STRIPE_WEBHOOK_SECRET: source.STRIPE_WEBHOOK_SECRET,
-      STRIPE_LICENSE_PAYMENT_LINK_ID:
-        source.STRIPE_LICENSE_PAYMENT_LINK_ID,
-      STRIPE_LICENSE_PAYMENT_LINK_URL:
-        source.STRIPE_LICENSE_PAYMENT_LINK_URL,
+      STRIPE_LICENSE_PAYMENT_LINK_ID: source.STRIPE_LICENSE_PAYMENT_LINK_ID,
+      STRIPE_LICENSE_PAYMENT_LINK_URL: source.STRIPE_LICENSE_PAYMENT_LINK_URL,
       ADMIN_EMAILS: source.ADMIN_EMAILS,
       HUBSPOT_PORTAL_ID: source.HUBSPOT_PORTAL_ID,
       HUBSPOT_REACHED_LIMIT_FORM_ID: source.HUBSPOT_REACHED_LIMIT_FORM_ID,
@@ -778,8 +734,7 @@ export function createEnvConfig(source) {
     !source.BUILD_TIME
   ) {
     if (
-      (source.IS_SAAS === "1" ||
-        source.IS_SAAS?.toLowerCase() === "true") &&
+      (source.IS_SAAS === "1" || source.IS_SAAS?.toLowerCase() === "true") &&
       !(
         source.BLOCK_LOCAL_HTTP_CALLS === "1" ||
         source.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true"
@@ -832,8 +787,6 @@ export function assertGatewaySecretsAllOrNone(env) {
     ].join("\n");
     // eslint-disable-next-line no-console
     console.error(banner);
-    throw new Error(
-      `AI Gateway secrets partial config (missing: ${missing.join(", ")})`,
-    );
+    throw new Error(`AI Gateway secrets partial config (missing: ${missing.join(", ")})`);
   }
 }

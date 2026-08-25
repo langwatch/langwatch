@@ -81,9 +81,7 @@ describe("governance backend services", () => {
   });
 
   it("encrypts only the credential subtree and tolerates legacy plaintext", () => {
-    const service = IngestionCredentialsService.create(
-      new ReversibleEncryption(),
-    );
+    const service = IngestionCredentialsService.create(new ReversibleEncryption());
     const sealed = service.tryEncryptParserConfig({
       adapter: "http_polling",
       credentials: { token: "secret" },
@@ -114,9 +112,7 @@ describe("governance backend services", () => {
       resourceLogs: [
         {
           resource: {
-            attributes: [
-              { key: "langwatch.model", value: { stringValue: "gpt-5" } },
-            ],
+            attributes: [{ key: "langwatch.model", value: { stringValue: "gpt-5" } }],
           },
           scopeLogs: [
             {

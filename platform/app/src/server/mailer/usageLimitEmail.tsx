@@ -70,10 +70,7 @@ const UsageLimitEmailTemplate = ({
             verticalAlign: "middle",
           }}
         />
-        <a
-          href={actionUrl}
-          style={{ color: "#ED8926", textDecoration: "none" }}
-        >
+        <a href={actionUrl} style={{ color: "#ED8926", textDecoration: "none" }}>
           {project.name}
         </a>
       </td>
@@ -166,8 +163,7 @@ const UsageLimitEmailTemplate = ({
               margin: "0 0 16px 0",
             }}
           >
-            You&apos;ve consumed {usagePercentageFormatted}% of your monthly
-            message limit
+            You&apos;ve consumed {usagePercentageFormatted}% of your monthly message limit
           </Heading>
           <Text
             style={{
@@ -377,8 +373,8 @@ const UsageLimitEmailTemplate = ({
             >
               Help Center
             </a>{" "}
-            for more information or feel free to reach out to us. Our support
-            engineers are here to help.
+            for more information or feel free to reach out to us. Our support engineers
+            are here to help.
           </Text>
         </Section>
       </Container>

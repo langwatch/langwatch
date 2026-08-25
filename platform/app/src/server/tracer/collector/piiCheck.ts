@@ -30,22 +30,14 @@ function getCredentials(): { project_id: string } | undefined {
     } else {
       try {
         const parsed = JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS);
-        if (
-          typeof parsed?.project_id !== "string" ||
-          !parsed.project_id.trim()
-        ) {
-          logger.error(
-            "GOOGLE_APPLICATION_CREDENTIALS missing valid project_id",
-          );
+        if (typeof parsed?.project_id !== "string" || !parsed.project_id.trim()) {
+          logger.error("GOOGLE_APPLICATION_CREDENTIALS missing valid project_id");
           cachedCredentials = undefined;
         } else {
           cachedCredentials = parsed;
         }
       } catch (e) {
-        logger.error(
-          { error: e },
-          "Failed to parse GOOGLE_APPLICATION_CREDENTIALS JSON",
-        );
+        logger.error({ error: e }, "Failed to parse GOOGLE_APPLICATION_CREDENTIALS JSON");
         cachedCredentials = undefined;
       }
     }
@@ -220,9 +212,7 @@ const dlpCheck = async (
  * code unit) indices for `text`. When the text has no surrogate pairs the two
  * indexing schemes coincide, so the identity function is returned.
  */
-const codepointToCodeUnitConverter = (
-  text: string,
-): ((cp: number) => number) => {
+const codepointToCodeUnitConverter = (text: string): ((cp: number) => number) => {
   if (!/[\uD800-\uDFFF]/.test(text)) {
     return (cp) => cp;
   }
@@ -259,9 +249,7 @@ const maskDlpFindings = ({
     const start = finding.location?.codepointRange?.start;
     const end = finding.location?.codepointRange?.end;
     if (start == null || end == null) return [];
-    return [
-      { finding, startIdx: toCodeUnit(+start), endIdx: toCodeUnit(+end) },
-    ];
+    return [{ finding, startIdx: toCodeUnit(+start), endIdx: toCodeUnit(+end) }];
   });
 
   // First pass: findings whose entire matched text matches a policy exception
@@ -337,8 +325,7 @@ function presidioEntitiesSetting(
 ): Record<string, boolean> {
   const names =
     entities ??
-    (piiRedactionLevel === "ESSENTIAL" ? essentialInfoTypes : strictInfoTypes)
-      .presidio;
+    (piiRedactionLevel === "ESSENTIAL" ? essentialInfoTypes : strictInfoTypes).presidio;
   return Object.fromEntries(names.map((name) => [name.toLowerCase(), true]));
 }
 
@@ -370,30 +357,25 @@ export const batchPresidioClearPII = async (
 
   let response: Response;
   try {
-    response = await fetch(
-      `${env.LANGEVALS_ENDPOINT}/presidio/pii_detection/evaluate`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          data: truncated.map((t) => ({ input: t.input })),
-          settings: {
-            entities: presidioEntitiesSetting(piiRedactionLevel, entities),
-            min_threshold: 0.5,
-          },
-          env: {},
-        }),
-        signal: controller.signal,
-      },
-    );
+    response = await fetch(`${env.LANGEVALS_ENDPOINT}/presidio/pii_detection/evaluate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        data: truncated.map((t) => ({ input: t.input })),
+        settings: {
+          entities: presidioEntitiesSetting(piiRedactionLevel, entities),
+          min_threshold: 0.5,
+        },
+        env: {},
+      }),
+      signal: controller.signal,
+    });
   } finally {
     clearTimeout(timeoutId);
   }
 
   const duration = performance.now() - startTime;
-  evaluationDurationHistogram
-    .labels("presidio/pii_detection")
-    .observe(duration);
+  evaluationDurationHistogram.labels("presidio/pii_detection").observe(duration);
 
   if (!response.ok) {
     getEvaluationStatusCounter("presidio/pii_detection", "error").inc();
@@ -419,10 +401,7 @@ export const batchPresidioClearPII = async (
       throw new Error(result.details);
     }
     if (result.status === "processed" && result.raw_response?.anonymized) {
-      return (
-        normalizePresidioMarkers(result.raw_response.anonymized) +
-        entry.remaining
-      );
+      return normalizePresidioMarkers(result.raw_response.anonymized) + entry.remaining;
     }
     return null;
   });

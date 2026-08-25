@@ -130,9 +130,7 @@ describe("mintInstallationToken", () => {
 
       // Cached under (installation, scope).
       const scope = computeRepoScopeKey({ repositoryIds: ["42"] });
-      expect(redis.store.get(`langy:gh:insttoken:99:${scope}`)).toBe(
-        "ghs_minted",
-      );
+      expect(redis.store.get(`langy:gh:insttoken:99:${scope}`)).toBe("ghs_minted");
     });
   });
 
@@ -197,9 +195,7 @@ describe("mintInstallationToken", () => {
         "fetch",
         vi.fn<typeof fetch>(async () => new Response("nope", { status: 403 })),
       );
-      await expect(
-        svc.mintInstallationToken({ installationId: "5" }),
-      ).rejects.toThrow();
+      await expect(svc.mintInstallationToken({ installationId: "5" })).rejects.toThrow();
       expect(redis.store.size).toBe(0);
     });
   });
@@ -210,9 +206,7 @@ describe("mintInstallationToken", () => {
       const svc = new GithubAppTokenService("app-1", privateKey, redis);
       vi.stubGlobal(
         "fetch",
-        vi.fn<typeof fetch>(
-          async () => new Response("not found", { status: 404 }),
-        ),
+        vi.fn<typeof fetch>(async () => new Response("not found", { status: 404 })),
       );
       await expect(
         svc.mintInstallationToken({ installationId: "dead-inst" }),
@@ -232,9 +226,7 @@ describe("mintInstallationToken", () => {
       redis.store.set(`langy:gh:insttoken:dead-inst:${scope}`, "ghs_stale");
       vi.stubGlobal(
         "fetch",
-        vi.fn<typeof fetch>(
-          async () => new Response("not found", { status: 404 }),
-        ),
+        vi.fn<typeof fetch>(async () => new Response("not found", { status: 404 })),
       );
 
       await expect(
@@ -407,10 +399,10 @@ describe("listPullRequestsForHead", () => {
       const svc = new GithubAppTokenService("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
         if (String(url).includes("/access_tokens")) {
-          return new Response(
-            JSON.stringify({ token: "ghs_read", expires_at: "" }),
-            { status: 201, headers: { "Content-Type": "application/json" } },
-          );
+          return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          });
         }
         return new Response(
           JSON.stringify([
@@ -440,9 +432,7 @@ describe("listPullRequestsForHead", () => {
         branch: "feature/thing",
       });
 
-      const readCall = fetchMock.mock.calls.find((c) =>
-        String(c[0]).includes("/pulls"),
-      );
+      const readCall = fetchMock.mock.calls.find((c) => String(c[0]).includes("/pulls"));
       expect(String(readCall?.[0])).toContain("head=acme%3Afeature%2Fthing");
       expect(String(readCall?.[0])).toContain("state=all");
       expect(pulls).toEqual([
@@ -467,10 +457,10 @@ describe("listPullRequestsForHead", () => {
       const svc = new GithubAppTokenService("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
         if (String(url).includes("/access_tokens")) {
-          return new Response(
-            JSON.stringify({ token: "ghs_read", expires_at: "" }),
-            { status: 201, headers: { "Content-Type": "application/json" } },
-          );
+          return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          });
         }
         return new Response("", {
           status: 403,
@@ -499,10 +489,10 @@ describe("listPullRequestsForHead", () => {
       const svc = new GithubAppTokenService("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
         if (String(url).includes("/access_tokens")) {
-          return new Response(
-            JSON.stringify({ token: "ghs_read", expires_at: "" }),
-            { status: 201, headers: { "Content-Type": "application/json" } },
-          );
+          return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          });
         }
         return new Response("", { status: 404 });
       });
@@ -524,8 +514,6 @@ describe("listPullRequestsForHead", () => {
 describe("configured", () => {
   it("is false without a private key, true with app id + key", () => {
     expect(new GithubAppTokenService("app", "", null).configured).toBe(false);
-    expect(new GithubAppTokenService("app", privateKey, null).configured).toBe(
-      true,
-    );
+    expect(new GithubAppTokenService("app", privateKey, null).configured).toBe(true);
   });
 });

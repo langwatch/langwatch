@@ -33,7 +33,12 @@ describe("ExtraFooterComponents", () => {
     render(
       <ExtraFooterComponents
         isSaas
-        user={{ id: "user-1", email: "user@example.com", name: "User", impersonator: null }}
+        user={{
+          id: "user-1",
+          email: "user@example.com",
+          name: "User",
+          impersonator: null,
+        }}
         organization={{ id: "org-1", name: "Acme" }}
         project={{ id: "project-1", name: "Main" }}
         environment="test"
@@ -49,7 +54,11 @@ describe("ExtraFooterComponents", () => {
     (window as Window & { gtag?: typeof gtag }).gtag = gtag;
     (window as Window & { Reo?: { identify: typeof identify } }).Reo = { identify };
     await vi.advanceTimersByTimeAsync(20);
-    expect(gtag).toHaveBeenCalledWith("event", "open_dashboard", expect.objectContaining({ organization_id: "org-1" }));
+    expect(gtag).toHaveBeenCalledWith(
+      "event",
+      "open_dashboard",
+      expect.objectContaining({ organization_id: "org-1" }),
+    );
     expect(identify).toHaveBeenCalledOnce();
   });
 });

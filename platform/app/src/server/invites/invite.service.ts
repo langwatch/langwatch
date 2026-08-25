@@ -415,10 +415,8 @@ export class InviteService {
       user,
     });
 
-    const currentFullMembers =
-      await this.licenseRepo.getMemberCount(organizationId);
-    const currentMembersLite =
-      await this.licenseRepo.getMembersLiteCount(organizationId);
+    const currentFullMembers = await this.licenseRepo.getMemberCount(organizationId);
+    const currentMembersLite = await this.licenseRepo.getMembersLiteCount(organizationId);
 
     const customRoles = await this.prisma.customRole.findMany({
       where: { organizationId },
@@ -439,10 +437,7 @@ export class InviteService {
           subscriptionLimits.maxMembers,
         );
       }
-      if (
-        currentMembersLite + newLiteMembers >
-        subscriptionLimits.maxMembersLite
-      ) {
+      if (currentMembersLite + newLiteMembers > subscriptionLimits.maxMembersLite) {
         throw new LimitExceededError(
           "membersLite",
           currentMembersLite,
@@ -611,9 +606,7 @@ export class InviteService {
 
     // Read-only validation outside the transaction.
     const preparedInvites = await Promise.all(
-      invites.map((invite) =>
-        this.prepareInvite({ organizationId, invite, isStrict }),
-      ),
+      invites.map((invite) => this.prepareInvite({ organizationId, invite, isStrict })),
     );
     const validInvites = preparedInvites.filter(
       (invite): invite is NonNullable<typeof invite> => invite !== null,
@@ -689,9 +682,7 @@ export class InviteService {
     invites: CreateAdminInviteInput[];
     organization: Organization;
     isStrict: boolean;
-  }): Promise<
-    Array<{ invite: OrganizationInvite; organization: Organization }>
-  > {
+  }): Promise<Array<{ invite: OrganizationInvite; organization: Organization }>> {
     const txInviteService = InviteService.create(tx, {
       planProvider: this.planProvider,
     });
@@ -925,14 +916,12 @@ export class InviteService {
     return teams
       .filter((team) => validTeamIds.includes(team.teamId))
       .map((team) => {
-        const isCustomString =
-          typeof team.role === "string" && isCustomRole(team.role);
+        const isCustomString = typeof team.role === "string" && isCustomRole(team.role);
         const isCustom = isCustomString || team.role === TeamUserRole.CUSTOM;
         return {
           teamId: team.teamId,
           role: isCustom ? TeamUserRole.CUSTOM : (team.role as TeamUserRole),
-          customRoleId:
-            isCustom && team.customRoleId ? team.customRoleId : undefined,
+          customRoleId: isCustom && team.customRoleId ? team.customRoleId : undefined,
         };
       })
       .filter((team) => {
@@ -977,9 +966,7 @@ export class InviteService {
         organizationId,
       }),
     );
-    const invalidRoleId = customRoleIds.find(
-      (id) => !validCustomRoleIds.has(id),
-    );
+    const invalidRoleId = customRoleIds.find((id) => !validCustomRoleIds.has(id));
     if (invalidRoleId) {
       if (isStrict) {
         throw new CustomRoleNotAssignableError(invalidRoleId);
@@ -1185,9 +1172,7 @@ export class InviteService {
    * project in the org so the client can land directly in the app rather than
    * hitting the onboarding flow.
    */
-  async findLandingProjectSlug(
-    invite: OrganizationInvite,
-  ): Promise<string | null> {
+  async findLandingProjectSlug(invite: OrganizationInvite): Promise<string | null> {
     // Collect all invited team IDs from either format
     const invitedTeamIds = (() => {
       if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {

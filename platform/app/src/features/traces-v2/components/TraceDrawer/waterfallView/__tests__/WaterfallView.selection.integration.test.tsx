@@ -254,9 +254,7 @@ describe("given a comment about a span the trace no longer has", () => {
       selectedSpanId: null,
     });
 
-    expect(
-      container.querySelectorAll('[aria-label*="comment on"]'),
-    ).toHaveLength(0);
+    expect(container.querySelectorAll('[aria-label*="comment on"]')).toHaveLength(0);
   });
 });
 
@@ -285,9 +283,7 @@ describe("given several spans of the trace carry comments", () => {
       ?.firstElementChild as HTMLElement;
     expect(treePane.style.width).toBe(widthBefore);
     expect(
-      commented.container.querySelector(
-        '[data-testid^="turn-annotation-rail"]',
-      ),
+      commented.container.querySelector('[data-testid^="turn-annotation-rail"]'),
     ).not.toBeInTheDocument();
   });
 });

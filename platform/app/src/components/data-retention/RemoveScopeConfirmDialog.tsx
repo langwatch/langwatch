@@ -36,9 +36,7 @@ export function RemoveScopeConfirmDialog({
   );
 
   const current = group ? renderPolicyValue(group.byCategory) : "—";
-  const fallback = previewQuery.data
-    ? renderPolicyValue(previewQuery.data)
-    : null;
+  const fallback = previewQuery.data ? renderPolicyValue(previewQuery.data) : null;
 
   return (
     <Dialog.Root
@@ -57,10 +55,9 @@ export function RemoveScopeConfirmDialog({
           {group && (
             <VStack align="stretch" gap={4}>
               <Text>
-                This removes the override only.{" "}
-                <strong>No data is deleted</strong> — existing data keeps the
-                retention it was already stored with. The change applies to
-                newly ingested data from now on.
+                This removes the override only. <strong>No data is deleted</strong> —
+                existing data keeps the retention it was already stored with. The change
+                applies to newly ingested data from now on.
               </Text>
 
               <VStack
@@ -86,14 +83,12 @@ export function RemoveScopeConfirmDialog({
                   <HStack gap={2}>
                     <Text fontWeight="600">{current}</Text>
                     <ArrowRight size={14} />
-                    <Text fontWeight="600">
-                      {fallback ?? "the next policy"}
-                    </Text>
+                    <Text fontWeight="600">{fallback ?? "the next policy"}</Text>
                   </HStack>
                 )}
                 <Text fontSize="xs" color="fg.muted">
-                  Falls back to the next applicable policy, or the platform
-                  default when none is closer.
+                  Falls back to the next applicable policy, or the platform default when
+                  none is closer.
                 </Text>
               </VStack>
 
@@ -102,8 +97,8 @@ export function RemoveScopeConfirmDialog({
                   <Alert.Indicator />
                   <Alert.Content>
                     <Alert.Description>
-                      Couldn't preview the fallback retention. Removing still
-                      falls back to the next applicable policy.
+                      Couldn't preview the fallback retention. Removing still falls back
+                      to the next applicable policy.
                     </Alert.Description>
                   </Alert.Content>
                 </Alert.Root>

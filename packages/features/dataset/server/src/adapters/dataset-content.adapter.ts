@@ -21,10 +21,7 @@ import {
   editS3JsonlRecord,
   migrateS3JsonlColumns,
 } from "../services/dataset-mutations";
-import {
-  DatasetChunkCountMissingError,
-  DatasetNotReadyError,
-} from "../services/errors";
+import { DatasetChunkCountMissingError, DatasetNotReadyError } from "../services/errors";
 
 /** Object-backed Dataset content; all storage selection is injected at boot. */
 export class DatasetContentAdapter extends DatasetContentPort {
@@ -51,13 +48,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
     );
   }
 
-  async listRecords({
-    dataset,
-    input,
-  }: {
-    dataset: Dataset;
-    input: DatasetPageInput;
-  }) {
+  async listRecords({ dataset, input }: { dataset: Dataset; input: DatasetPageInput }) {
     this.assertReady(dataset);
     const total = dataset.rowCount ?? 0;
     const limit = input.limit ?? 50;
@@ -72,9 +63,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
     }
     const selected =
       offsets.length > 0
-        ? offsets.filter(
-            (offset) => offset.startRow < end && offset.endRow > start,
-          )
+        ? offsets.filter((offset) => offset.startRow < end && offset.endRow > start)
         : Array.from({ length: dataset.chunkCount }, (_, index) => ({
             index,
             startRow: 0,
@@ -154,8 +143,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
       limitMb === null
         ? selected
         : selected.filter(
-            (record) =>
-              JSON.stringify(record.entry).length <= limitMb * 1024 * 1024,
+            (record) => JSON.stringify(record.entry).length <= limitMb * 1024 * 1024,
           );
     return {
       dataset,
@@ -224,9 +212,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
       forcedIds: entries.map((entry) => entry.id),
       storage,
     });
-    return entries.map((entry) =>
-      toDatasetRecord({ id: entry.id, entry }, dataset),
-    );
+    return entries.map((entry) => toDatasetRecord({ id: entry.id, entry }, dataset));
   }
 
   async deleteRecords({
@@ -262,10 +248,8 @@ export class DatasetContentAdapter extends DatasetContentPort {
     if (!source.chunkCount) {
       throw new DatasetChunkCountMissingError(source.id);
     }
-    const sourceStorage =
-      await this.storageResolver.forProject(sourceProjectId);
-    const targetStorage =
-      await this.storageResolver.forProject(targetProjectId);
+    const sourceStorage = await this.storageResolver.forProject(sourceProjectId);
+    const targetStorage = await this.storageResolver.forProject(targetProjectId);
     const rows = await sourceStorage.readChunks({
       projectId: sourceProjectId,
       datasetId: source.id,
@@ -285,9 +269,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
         status: "ready",
         rowCount: entries.length,
         chunkCount: chunks.length,
-        sizeBytes: BigInt(
-          chunks.reduce((total, chunk) => total + chunk.byteSize, 0),
-        ),
+        sizeBytes: BigInt(chunks.reduce((total, chunk) => total + chunk.byteSize, 0)),
         chunkOffsets: chunks.map((chunk) => ({
           index: chunk.index,
           startRow: chunk.startRow,
@@ -363,10 +345,7 @@ function toDatasetRecord(line: unknown, dataset: Dataset): DatasetRecord {
       ? (line as { id?: unknown; entry: unknown })
       : { entry: line };
   return datasetRecordSchema.parse({
-    id:
-      typeof value.id === "string"
-        ? value.id
-        : `record_${crypto.randomUUID()}`,
+    id: typeof value.id === "string" ? value.id : `record_${crypto.randomUUID()}`,
     entry: value.entry,
     datasetId: dataset.id,
     projectId: dataset.projectId,

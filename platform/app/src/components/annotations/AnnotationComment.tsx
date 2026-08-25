@@ -15,11 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { ChevronDown, MoreVertical, Trash2 } from "react-feather";
-import {
-  type UseFormSetValue,
-  type UseFormWatch,
-  useForm,
-} from "react-hook-form";
+import { type UseFormSetValue, type UseFormWatch, useForm } from "react-hook-form";
 import type { AnnotationScoreDataType } from "~/generated/prisma/client";
 import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
 import { useAnnotationInvalidation } from "~/hooks/useAnnotationInvalidation";
@@ -77,13 +73,12 @@ export function AnnotationComment({ key = "" }: { key: string }) {
     scoreOptions: {},
   };
 
-  const { register, handleSubmit, watch, setValue, reset } =
-    useForm<Annotation>({
-      defaultValues: {
-        comment: "",
-        scoreOptions: {},
-      },
-    });
+  const { register, handleSubmit, watch, setValue, reset } = useForm<Annotation>({
+    defaultValues: {
+      comment: "",
+      scoreOptions: {},
+    },
+  });
 
   // Set form values when data is available
   useEffect(() => {
@@ -208,9 +203,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
     );
   };
   const scoreReasonModal = useDisclosure();
-  const [selectedScoreTypeId, setSelectedScoreTypeId] = useState<string | null>(
-    null,
-  );
+  const [selectedScoreTypeId, setSelectedScoreTypeId] = useState<string | null>(null);
 
   const handleReasonClick = (scoreTypeId: string) => {
     setSelectedScoreTypeId(scoreTypeId);
@@ -228,12 +221,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
   }, [open]);
 
   return (
-    <Box
-      width="full"
-      onClick={(e) => e.stopPropagation()}
-      key={key}
-      minWidth={380}
-    >
+    <Box width="full" onClick={(e) => e.stopPropagation()} key={key} minWidth={380}>
       <Card.Root>
         <Card.Body>
           {getAnnotation.isLoading ? (
@@ -275,9 +263,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                   {action === "edit" && (
                     <Menu.Root
                       open={open}
-                      onOpenChange={(e) =>
-                        setOpen(doNotCloseMenu ? true : e.open)
-                      }
+                      onOpenChange={(e) => setOpen(doNotCloseMenu ? true : e.open)}
                     >
                       <Menu.Trigger asChild>
                         <Button size="xs" variant="ghost">
@@ -293,8 +279,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                             handleDelete();
                           }}
                         >
-                          {deleteAnnotation.isPending ||
-                          getAnnotation.isLoading ? (
+                          {deleteAnnotation.isPending || getAnnotation.isLoading ? (
                             <Spinner size="sm" />
                           ) : (
                             <Trash2 size={16} />
@@ -308,9 +293,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                 <Input
                   {...register("comment")}
                   autoFocus={action === "new"}
-                  placeholder={
-                    action === "new" ? "Leave your comment here" : ""
-                  }
+                  placeholder={action === "new" ? "Leave your comment here" : ""}
                 />
 
                 <HStack gap={2} width="full" wrap="wrap">
@@ -365,15 +348,11 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                   <>
                     <Separator />
                     <Text>
-                      Scoring metrics are currently disabled. Enable them to add
-                      more data to your annotations.
+                      Scoring metrics are currently disabled. Enable them to add more data
+                      to your annotations.
                     </Text>
                     <Link href={"/settings/annotation-scores"}>
-                      <Button
-                        colorPalette="blue"
-                        minWidth="fit-content"
-                        size="sm"
-                      >
+                      <Button colorPalette="blue" minWidth="fit-content" size="sm">
                         Enable scoring metrics
                       </Button>
                     </Link>

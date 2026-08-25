@@ -66,9 +66,7 @@ describe("<FacetSection /> mode toggle", () => {
     /** @scenario "Clicking the discrete-mode toggle requests range" */
     it("calls onToggle when clicked (consumer flips the mode)", () => {
       const { getByRole, onToggleMode } = setup("discrete");
-      fireEvent.click(
-        getByRole("button", { name: "Show VERSION as a range slider" }),
-      );
+      fireEvent.click(getByRole("button", { name: "Show VERSION as a range slider" }));
       expect(onToggleMode).toHaveBeenCalledTimes(1);
     });
   });
@@ -86,9 +84,7 @@ describe("<FacetSection /> mode toggle", () => {
     /** @scenario "Clicking the range-mode toggle requests discrete" */
     it("calls onToggle when clicked (consumer flips the mode)", () => {
       const { getByRole, onToggleMode } = setup("range");
-      fireEvent.click(
-        getByRole("button", { name: "Show VERSION as a value list" }),
-      );
+      fireEvent.click(getByRole("button", { name: "Show VERSION as a value list" }));
       expect(onToggleMode).toHaveBeenCalledTimes(1);
     });
   });

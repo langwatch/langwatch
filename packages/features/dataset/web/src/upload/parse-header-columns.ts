@@ -42,10 +42,7 @@ const DEFAULT_TYPE: DatasetColumnType = "string";
  *  `sourceHeader` is the canonical header itself, captured immutably so the
  *  confirm UI can rename/reorder while normalize still binds each file header
  *  to its column by header (not by position). */
-const toColumns = (
-  rawHeaders: string[],
-  format: FileFormat,
-): DatasetConfirmColumns => {
+const toColumns = (rawHeaders: string[], format: FileFormat): DatasetConfirmColumns => {
   // CSV maps rows to objects by index, so duplicate headers must be deduped the
   // same way normalize does; JSON/JSONL keys are already unique (an object can't
   // repeat a key) so only reserved-renaming applies — mirroring the job exactly.

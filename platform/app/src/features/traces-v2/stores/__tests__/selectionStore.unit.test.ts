@@ -15,9 +15,7 @@ describe("given the trace-table selection", () => {
   describe("when ids that address no trace are selected", () => {
     /** @scenario "The selection never holds a blank or placeholder id" */
     it("keeps the real ids and drops the blank ones", () => {
-      useSelectionStore
-        .getState()
-        .setMany(["trace-a", "", "   ", "trace-b"], true);
+      useSelectionStore.getState().setMany(["trace-a", "", "   ", "trace-b"], true);
 
       expect(selection()).toEqual(["trace-a", "trace-b"]);
     });

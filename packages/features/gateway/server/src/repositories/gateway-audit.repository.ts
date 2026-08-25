@@ -49,8 +49,7 @@ export const GATEWAY_AUDIT_TARGET_KINDS = [
   "guardrail",
 ] as const;
 
-export type GatewayAuditTargetKind =
-  (typeof GATEWAY_AUDIT_TARGET_KINDS)[number];
+export type GatewayAuditTargetKind = (typeof GATEWAY_AUDIT_TARGET_KINDS)[number];
 
 export type AppendAuditInput = {
   organizationId: string;
@@ -66,10 +65,7 @@ export type AppendAuditInput = {
 export class GatewayAuditAdapter {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async append(
-    input: AppendAuditInput,
-    tx?: Prisma.TransactionClient,
-  ): Promise<void> {
+  async append(input: AppendAuditInput, tx?: Prisma.TransactionClient): Promise<void> {
     const client = tx ?? this.prisma;
     await client.auditLog.create({
       data: {

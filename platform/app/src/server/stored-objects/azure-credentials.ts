@@ -309,8 +309,7 @@ export function resolveAzureCredentials({
   // the type here is what makes the exhaustiveness check at the bottom of this
   // function real — against `any` it would silently pass.
   const mode: AzureCredentials["mode"] =
-    (env.AZURE_BLOB_AUTH_MODE as AzureCredentials["mode"] | undefined) ??
-    "sharedKey";
+    (env.AZURE_BLOB_AUTH_MODE as AzureCredentials["mode"] | undefined) ?? "sharedKey";
 
   assertTokenModeIsSelected({ purpose, mode });
 

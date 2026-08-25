@@ -78,8 +78,7 @@ function fromTrpcEnvelope(err: unknown): HandledErrorShape | null {
     fault: safeFault(candidate.fault),
     tips: safeTips(candidate.tips),
     docsUrl: safeDocsUrl(candidate.docsUrl),
-    traceId:
-      typeof candidate.traceId === "string" ? candidate.traceId : undefined,
+    traceId: typeof candidate.traceId === "string" ? candidate.traceId : undefined,
     reasons: safeReasons(candidate.reasons),
   };
 }
@@ -429,11 +428,8 @@ export function readAuthoredMessage(err: unknown): string | undefined {
  * skipping the guard without that fact would let its wire message (the code
  * slug) through. It exists so the render path parses each error once.
  */
-export function readAuthoredMessageOfUnhandled(
-  err: unknown,
-): string | undefined {
-  const data = (err as { data?: { httpStatus?: unknown; authored?: unknown } })
-    ?.data;
+export function readAuthoredMessageOfUnhandled(err: unknown): string | undefined {
+  const data = (err as { data?: { httpStatus?: unknown; authored?: unknown } })?.data;
 
   // The fact, not a guess about it. Without this the channel also carried
   // `new TRPCError({ code: "NOT_FOUND" })` — whose message tRPC defaults to

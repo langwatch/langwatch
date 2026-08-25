@@ -1,14 +1,18 @@
 import { z } from "zod";
 
-export const codeEvaluatorFieldSchema = z.object({
-  identifier: z.string().min(1),
-  type: z.string().min(1),
-}).strict();
-export const codeEvaluatorConfigSchema = z.object({
-  code: z.string().min(1),
-  inputs: z.array(codeEvaluatorFieldSchema).min(1),
-  outputs: z.array(codeEvaluatorFieldSchema).min(1),
-}).strict();
+export const codeEvaluatorFieldSchema = z
+  .object({
+    identifier: z.string().min(1),
+    type: z.string().min(1),
+  })
+  .strict();
+export const codeEvaluatorConfigSchema = z
+  .object({
+    code: z.string().min(1),
+    inputs: z.array(codeEvaluatorFieldSchema).min(1),
+    outputs: z.array(codeEvaluatorFieldSchema).min(1),
+  })
+  .strict();
 export type CodeEvaluatorConfig = z.infer<typeof codeEvaluatorConfigSchema>;
 
 /** The fixed result fields a stored code evaluator may return. */

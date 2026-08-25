@@ -1,8 +1,5 @@
 import type { AppendStore } from "@langwatch/eventing";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import { SIMULATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import {
   type SimulationRunMetricsComputedEvent,
@@ -40,8 +37,7 @@ export class SimulationRunMetricsMapProjection
     SimulationRunMetricsProjectionRecord,
     typeof metricsEvents
   >
-  implements
-    MapEventHandlers<typeof metricsEvents, SimulationRunMetricsProjectionRecord>
+  implements MapEventHandlers<typeof metricsEvents, SimulationRunMetricsProjectionRecord>
 {
   readonly name = "simulationRunMetrics";
   readonly version = SIMULATION_PROJECTION_VERSIONS.RUN_METRICS;
@@ -49,9 +45,7 @@ export class SimulationRunMetricsMapProjection
 
   protected readonly events = metricsEvents;
 
-  constructor(deps: {
-    store: AppendStore<SimulationRunMetricsProjectionRecord>;
-  }) {
+  constructor(deps: { store: AppendStore<SimulationRunMetricsProjectionRecord> }) {
     super();
     this.store = deps.store;
   }

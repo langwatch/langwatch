@@ -142,13 +142,9 @@ describe("buildTimeTravelView", () => {
       expect(view!.isTurnInFlight).toBe(false);
       const assistant = view!.messages.find((m) => m.role === "assistant");
       expect(assistant?.id).toBe("msg-t1");
-      expect(assistant?.parts).toEqual([
-        { type: "text", text: "the full answer" },
-      ]);
+      expect(assistant?.parts).toEqual([{ type: "text", text: "the full answer" }]);
       // The partial never double-renders alongside the settled answer.
-      expect(view!.messages.filter((m) => m.role === "assistant")).toHaveLength(
-        1,
-      );
+      expect(view!.messages.filter((m) => m.role === "assistant")).toHaveLength(1);
     });
 
     it("dedupes the recorded answer against a history row with the same id", () => {
@@ -157,9 +153,7 @@ describe("buildTimeTravelView", () => {
       const view = buildTimeTravelView({
         records,
         scrubSeq: 1,
-        historyMessages: [
-          historyRow("msg-t1", "assistant", 1_999, "the full answer"),
-        ],
+        historyMessages: [historyRow("msg-t1", "assistant", 1_999, "the full answer")],
       });
       expect(view!.messages.filter((m) => m.id === "msg-t1")).toHaveLength(1);
     });
@@ -228,9 +222,7 @@ describe("buildTimeTravelView", () => {
           historyRow("a1", "assistant", 1_390, "How can I help?"),
         ],
       });
-      expect(view!.messages.filter((m) => m.role === "assistant")).toHaveLength(
-        1,
-      );
+      expect(view!.messages.filter((m) => m.role === "assistant")).toHaveLength(1);
       expect(view!.messages.find((m) => m.role === "assistant")?.id).toBe("a1");
       expect(view!.isTurnInFlight).toBe(false);
       expect(view!.signals.status).toBeNull();
@@ -255,9 +247,7 @@ describe("buildTimeTravelView", () => {
       });
       const assistants = view!.messages.filter((m) => m.role === "assistant");
       expect(assistants).toHaveLength(1);
-      expect(assistants[0]!.parts).toEqual([
-        { type: "text", text: "How can " },
-      ]);
+      expect(assistants[0]!.parts).toEqual([{ type: "text", text: "How can " }]);
       expect(view!.isTurnInFlight).toBe(true);
     });
 
@@ -278,13 +268,9 @@ describe("buildTimeTravelView", () => {
         ],
       });
       // The landed answer suppresses ITS partial, not the follow-up question.
-      expect(view!.messages.filter((m) => m.role === "assistant")).toHaveLength(
-        1,
-      );
+      expect(view!.messages.filter((m) => m.role === "assistant")).toHaveLength(1);
       expect(view!.messages.at(-1)?.role).toBe("user");
-      expect(view!.messages.at(-1)?.parts).toEqual([
-        { type: "text", text: "and now?" },
-      ]);
+      expect(view!.messages.at(-1)?.parts).toEqual([{ type: "text", text: "and now?" }]);
       expect(view!.isTurnInFlight).toBe(true);
     });
   });

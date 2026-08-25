@@ -16,14 +16,7 @@
 
 import { Box, Button, HStack, Kbd, Spinner, Text } from "@chakra-ui/react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { usePeriodSelector } from "~/components/PeriodSelector";
 
@@ -102,9 +95,7 @@ function failureView(state: LangWatchQLRequestState): FailureView {
     missingParameters:
       failure.code === LWQL_PARAMETER_MISSING_CODE ? failure.parameters : [],
     reservedParameters:
-      failure.code === LWQL_RESERVED_PARAMETER_SUPPLIED_CODE
-        ? failure.parameters
-        : [],
+      failure.code === LWQL_RESERVED_PARAMETER_SUPPLIED_CODE ? failure.parameters : [],
   };
 }
 
@@ -116,9 +107,7 @@ function failureView(state: LangWatchQLRequestState): FailureView {
  * rewritten — labelling the draft with it would be a claim about a query that
  * was never run.
  */
-function followsTimeWindowOf(
-  state: LangWatchQLRequestState,
-): boolean | undefined {
+function followsTimeWindowOf(state: LangWatchQLRequestState): boolean | undefined {
   if (state.outcome?.kind !== "result") return undefined;
   if (isLangWatchQLResultStale(state)) return undefined;
   return state.outcome.result.followsTimeWindow;
@@ -161,9 +150,7 @@ function useWorkbenchTimeWindow({
     [period.startDate, period.endDate],
   );
   const held =
-    override !== null && override.revision === openedRevision
-      ? override.window
-      : null;
+    override !== null && override.revision === openedRevision ? override.window : null;
   const value = held ?? pagePeriod;
 
   const { setTimeWindow } = query;
@@ -233,11 +220,7 @@ function QueryCardHeader({
         onClick={onToggleSchema}
       >
         <Box aria-hidden="true" display="flex">
-          {schemaVisible ? (
-            <PanelLeftClose size={14} />
-          ) : (
-            <PanelLeftOpen size={14} />
-          )}
+          {schemaVisible ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
         </Box>
       </Button>
       <Text fontSize="13px" fontWeight="600">
@@ -258,12 +241,7 @@ function QueryCardHeader({
           </Button>
         </>
       ) : (
-        <Button
-          size="sm"
-          colorPalette="orange"
-          disabled={!runnable}
-          onClick={onRun}
-        >
+        <Button size="sm" colorPalette="orange" disabled={!runnable} onClick={onRun}>
           {actionLabel}
         </Button>
       )}
@@ -284,12 +262,9 @@ function useDraftInsert({
   exampleSql: string | undefined;
 }) {
   const insertRef = useRef<((text: string) => void) | null>(null);
-  const registerInsert = useCallback(
-    (insert: ((text: string) => void) | null) => {
-      insertRef.current = insert;
-    },
-    [],
-  );
+  const registerInsert = useCallback((insert: ((text: string) => void) | null) => {
+    insertRef.current = insert;
+  }, []);
 
   const draftSql = query.state.draft.sql;
   const { setSql } = query;
@@ -311,8 +286,7 @@ function useDraftInsert({
   // draft. The example text is the schema response's own, so an empty workbench
   // with no schema simply offers nothing.
   const insertExample = useMemo(
-    () =>
-      exampleSql === undefined ? undefined : () => handleInsert(exampleSql),
+    () => (exampleSql === undefined ? undefined : () => handleInsert(exampleSql)),
     [exampleSql, handleInsert],
   );
 
@@ -348,9 +322,7 @@ function useSpecDraft(wiring: ReturnType<typeof useSavedChartWiring>) {
   // the opened chart's saved specification, else `null` — which chart mode
   // reads as "follow the starter for the result on screen".
   const shownSpecText =
-    editedSpecText === undefined
-      ? (wiring.openedSpecText ?? null)
-      : editedSpecText;
+    editedSpecText === undefined ? (wiring.openedSpecText ?? null) : editedSpecText;
   return { shownSpecText, setEditedSpecText };
 }
 
@@ -427,9 +399,7 @@ export function LangWatchQLWorkbench({ projectId }: LangWatchQLWorkbenchProps) {
       minHeight={0}
       data-testid="lwql-workbench"
     >
-      {schemaVisible && (
-        <SchemaSidebar schema={schema} onInsert={handleInsert} />
-      )}
+      {schemaVisible && <SchemaSidebar schema={schema} onInsert={handleInsert} />}
 
       <Box
         flex="1"
@@ -585,10 +555,7 @@ function QueryCard({
         onRun={query.runQuery}
         onCancel={query.cancelQuery}
         savedCharts={
-          <BoundSavedCharts
-            wiring={wiring}
-            canSave={draft.sql.trim().length > 0}
-          />
+          <BoundSavedCharts wiring={wiring} canSave={draft.sql.trim().length > 0} />
         }
       />
 
@@ -681,9 +648,7 @@ function chartArea({
   onEditedSpecTextChange,
 }: {
   state: LangWatchQLRequestState;
-  registerSpecReader: (
-    read: (() => Record<string, unknown> | undefined) | null,
-  ) => void;
+  registerSpecReader: (read: (() => Record<string, unknown> | undefined) | null) => void;
   /** Changes when a saved chart is opened, remounting the chart with its spec. */
   openedRevision: number;
   editedSpecText: string | null;
@@ -694,10 +659,7 @@ function chartArea({
   if (state.outcome?.kind !== "result") return undefined;
   const { result, snapshot } = state.outcome;
 
-  const renderArea = (
-    view: LangWatchQLResultView,
-    openSpecification: () => void,
-  ) => (
+  const renderArea = (view: LangWatchQLResultView, openSpecification: () => void) => (
     // The lazy boundary, not `LangWatchQLChartMode`: importing that here
     // would put the whole Vega runtime in the entry chunk, and nothing
     // would look wrong (vegaLazyBoundary.unit.test.ts is what would).

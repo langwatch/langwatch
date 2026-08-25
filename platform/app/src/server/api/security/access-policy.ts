@@ -305,9 +305,7 @@ export function isApiKeyReachable(policy: AccessPolicy): boolean {
  * should ask "what does this route actually demand?", so a new policy kind
  * cannot quietly drop out of the answer.
  */
-export function policyPermissions(
-  policy: AccessPolicy,
-): readonly AuthzPermission[] {
+export function policyPermissions(policy: AccessPolicy): readonly AuthzPermission[] {
   switch (policy.kind) {
     case "permission":
     case "apiKeyPermission":

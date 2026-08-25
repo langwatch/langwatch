@@ -40,9 +40,7 @@ describe("given a ConfirmDialog", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Delete saved view")).toBeInTheDocument();
-        expect(
-          screen.getByText('Delete "My View" saved view?'),
-        ).toBeInTheDocument();
+        expect(screen.getByText('Delete "My View" saved view?')).toBeInTheDocument();
       });
     });
 
@@ -50,9 +48,7 @@ describe("given a ConfirmDialog", () => {
       render(<ConfirmDialog {...defaultProps} />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: "Confirm" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument();
       });
     });
 
@@ -62,9 +58,7 @@ describe("given a ConfirmDialog", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: "Delete" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
       });
     });
   });
@@ -75,9 +69,7 @@ describe("given a ConfirmDialog", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.queryByText('Delete "My View" saved view?'),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText('Delete "My View" saved view?')).not.toBeInTheDocument();
     });
   });
 
@@ -87,11 +79,7 @@ describe("given a ConfirmDialog", () => {
       const onConfirm = vi.fn();
 
       render(
-        <ConfirmDialog
-          {...defaultProps}
-          confirmLabel="Delete"
-          onConfirm={onConfirm}
-        />,
+        <ConfirmDialog {...defaultProps} confirmLabel="Delete" onConfirm={onConfirm} />,
         { wrapper: Wrapper },
       );
 

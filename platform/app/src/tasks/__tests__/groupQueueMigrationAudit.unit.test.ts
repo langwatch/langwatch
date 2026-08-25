@@ -63,9 +63,7 @@ class AuditCluster extends AuditRedis {
   }
 
   override async smembers(key: string): Promise<string[]> {
-    return (
-      await Promise.all(this.masters.map((master) => master.smembers(key)))
-    ).flat();
+    return (await Promise.all(this.masters.map((master) => master.smembers(key)))).flat();
   }
 
   override async get(key: string): Promise<string | null> {
@@ -77,9 +75,7 @@ class AuditCluster extends AuditRedis {
   }
 
   override async zcard(key: string): Promise<number> {
-    return sum(
-      await Promise.all(this.masters.map((master) => master.zcard(key))),
-    );
+    return sum(await Promise.all(this.masters.map((master) => master.zcard(key))));
   }
 
   override async zcount(
@@ -88,22 +84,16 @@ class AuditCluster extends AuditRedis {
     max: number | string,
   ): Promise<number> {
     return sum(
-      await Promise.all(
-        this.masters.map((master) => master.zcount(key, min, max)),
-      ),
+      await Promise.all(this.masters.map((master) => master.zcount(key, min, max))),
     );
   }
 
   override async scard(key: string): Promise<number> {
-    return sum(
-      await Promise.all(this.masters.map((master) => master.scard(key))),
-    );
+    return sum(await Promise.all(this.masters.map((master) => master.scard(key))));
   }
 
   override async hvals(key: string): Promise<string[]> {
-    return (
-      await Promise.all(this.masters.map((master) => master.hvals(key)))
-    ).flat();
+    return (await Promise.all(this.masters.map((master) => master.hvals(key)))).flat();
   }
 }
 
@@ -186,14 +176,11 @@ describe("auditGroupQueuesForStorageMigration", () => {
     secondMaster.sets.set("other-shard:gq:blocked", ["tenant/group"]);
     const cluster = new AuditCluster([firstMaster, secondMaster]);
 
-    const blockers = await auditGroupQueuesForStorageMigration(
-      cluster,
-      Date.now(),
-      [firstMaster, secondMaster],
-    );
-
-    expect(blockers).toEqual([
-      { queueName: "other-shard", kind: "blocked", count: 1 },
+    const blockers = await auditGroupQueuesForStorageMigration(cluster, Date.now(), [
+      firstMaster,
+      secondMaster,
     ]);
+
+    expect(blockers).toEqual([{ queueName: "other-shard", kind: "blocked", count: 1 }]);
   });
 });

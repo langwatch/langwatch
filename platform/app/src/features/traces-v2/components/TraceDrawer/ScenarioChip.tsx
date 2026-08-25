@@ -82,9 +82,7 @@ export function buildScenarioChipDef(d: ScenarioChipData): ChipDef {
   return {
     id: `scenario:${d.scenarioRunId}`,
     label: "Scenario run",
-    value: hasResults
-      ? `${displayName} · ${metCount}/${totalCount}`
-      : displayName,
+    value: hasResults ? `${displayName} · ${metCount}/${totalCount}` : displayName,
     dot: dotColor,
     tone: "purple",
     onClick: d.openScenarioDrawer,
@@ -100,8 +98,7 @@ export function buildScenarioChipDef(d: ScenarioChipData): ChipDef {
           <Text textStyle="xs" color="fg.muted" textTransform="capitalize">
             {d.status.label}
             {hasResults && ` · ${metCount}/${totalCount} criteria met`}
-            {d.durationInMs != null &&
-              ` · ${(d.durationInMs / 1000).toFixed(1)}s`}
+            {d.durationInMs != null && ` · ${(d.durationInMs / 1000).toFixed(1)}s`}
           </Text>
         )}
         {hasResults && (

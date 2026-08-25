@@ -52,9 +52,7 @@ export interface LangWatchQLRequestController {
   /** `useSyncExternalStore`'s contract: notify, then the reader calls getState. */
   subscribe(listener: () => void): () => void;
   setSql(sql: string): void;
-  setParameters(
-    parameters: Readonly<Record<string, LangWatchQLParameterValue>>,
-  ): void;
+  setParameters(parameters: Readonly<Record<string, LangWatchQLParameterValue>>): void;
   /**
    * Sets the period the next submission reports over, or clears it.
    *

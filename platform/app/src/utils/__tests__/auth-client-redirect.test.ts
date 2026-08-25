@@ -79,17 +79,15 @@ describe("safeRedirectTarget", () => {
     });
 
     it("blocks a subdomain of the same root domain", () => {
-      expect(safeRedirectTarget("https://evil.app.example.com/", ORIGIN)).toBe(
-        "/",
-      );
+      expect(safeRedirectTarget("https://evil.app.example.com/", ORIGIN)).toBe("/");
     });
   });
 
   describe("when the callbackUrl is the app's own origin", () => {
     it("collapses to just the path+query+hash", () => {
-      expect(
-        safeRedirectTarget(`${ORIGIN}/settings?tab=general#auth`, ORIGIN),
-      ).toBe("/settings?tab=general#auth");
+      expect(safeRedirectTarget(`${ORIGIN}/settings?tab=general#auth`, ORIGIN)).toBe(
+        "/settings?tab=general#auth",
+      );
     });
 
     it("handles just the origin as /", () => {
@@ -124,9 +122,9 @@ describe("safeRedirectTarget", () => {
     });
 
     it("blocks data: URLs", () => {
-      expect(
-        safeRedirectTarget("data:text/html,<script>alert(1)</script>", ORIGIN),
-      ).toBe("/");
+      expect(safeRedirectTarget("data:text/html,<script>alert(1)</script>", ORIGIN)).toBe(
+        "/",
+      );
     });
 
     it("blocks file: URLs", () => {

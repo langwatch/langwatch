@@ -94,10 +94,7 @@ function redisBlobId(params: { projectId: TenantId; hash: string }): string {
 class BlobTooLargeError extends Error {}
 
 /** Buffers a stream, capped at `maxBytes` so a tampered/oversized object can't OOM the worker. */
-async function streamToBuffer(
-  stream: Readable,
-  maxBytes: number,
-): Promise<Buffer> {
+async function streamToBuffer(stream: Readable, maxBytes: number): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of stream) {
@@ -161,9 +158,7 @@ export class TieredBlobStore {
   constructor(deps: {
     redisBlobs: JobBlobStore;
     objectStoreFor: (projectId: string) => ObjectStore;
-    resolveDestination: (
-      projectId: string,
-    ) => Promise<ProjectStorageDestination>;
+    resolveDestination: (projectId: string) => Promise<ProjectStorageDestination>;
     s3ThresholdBytes?: number;
     /** Optional queue name for the decode-cap-exceeded counter. */
     queueName?: string;

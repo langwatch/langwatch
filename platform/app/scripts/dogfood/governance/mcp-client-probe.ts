@@ -23,19 +23,14 @@ const API_KEY = process.env.LANGWATCH_API_KEY;
 const GOVERNANCE_TOOL_PREFIX = "governance_";
 
 if (!API_KEY) {
-  console.error(
-    "LANGWATCH_API_KEY env var required (project apiKey, e.g. pkey_*)",
-  );
+  console.error("LANGWATCH_API_KEY env var required (project apiKey, e.g. pkey_*)");
   process.exit(2);
 }
 
 void (async () => {
-  const transport = new StreamableHTTPClientTransport(
-    new URL(`${BASE_URL}/mcp`),
-    {
-      requestInit: { headers: { Authorization: `Bearer ${API_KEY}` } },
-    },
-  );
+  const transport = new StreamableHTTPClientTransport(new URL(`${BASE_URL}/mcp`), {
+    requestInit: { headers: { Authorization: `Bearer ${API_KEY}` } },
+  });
 
   const client = new Client({
     name: "governance-dogfood-probe",
@@ -46,9 +41,7 @@ void (async () => {
   console.error("[probe] connected");
 
   const { tools } = await client.listTools();
-  const governanceTools = tools.filter((t) =>
-    t.name.startsWith(GOVERNANCE_TOOL_PREFIX),
-  );
+  const governanceTools = tools.filter((t) => t.name.startsWith(GOVERNANCE_TOOL_PREFIX));
   console.error(
     `[probe] tools registered: ${tools.length} total / ${governanceTools.length} governance`,
   );
@@ -67,16 +60,12 @@ void (async () => {
     "governance_ingestion_keys_list",
     "governance_ingestion_keys_mint",
   ];
-  const missing = expected.filter(
-    (n) => !governanceTools.some((t) => t.name === n),
-  );
+  const missing = expected.filter((n) => !governanceTools.some((t) => t.name === n));
   if (missing.length > 0) {
     console.error(`[probe] MISSING tools: ${missing.join(", ")}`);
     process.exit(1);
   }
-  console.error(
-    `[probe] all ${expected.length} expected governance tools registered ✓`,
-  );
+  console.error(`[probe] all ${expected.length} expected governance tools registered ✓`);
 
   // Read tool: governance_ingestion_templates_list works on
   // project-apiKey-only sessions (see governance-tools.ts requireRead).

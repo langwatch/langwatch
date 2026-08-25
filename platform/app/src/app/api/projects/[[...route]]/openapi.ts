@@ -112,8 +112,7 @@ export const CREATE_PROJECT: DescribeRouteOptions = {
             newTeamName: {
               type: "string",
               maxLength: 255,
-              description:
-                "Name for a new team to create and assign the project to",
+              description: "Name for a new team to create and assign the project to",
             },
             language: {
               type: "string",
@@ -131,8 +130,7 @@ export const CREATE_PROJECT: DescribeRouteOptions = {
   },
   responses: {
     "201": {
-      description:
-        "Project created. Returns a scoped service API key for this project.",
+      description: "Project created. Returns a scoped service API key for this project.",
       content: {
         "application/json": {
           schema: {

@@ -109,9 +109,7 @@ export const LoadingScreen = () => {
       // thing that survives an early-returned unmount.
       initial={reduceMotion || logoVisibleOnce ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={
-        reduceMotion ? { duration: 0 } : { duration: 0.2, ease: "easeOut" }
-      }
+      transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: "easeOut" }}
     >
       <Box
         width="full"

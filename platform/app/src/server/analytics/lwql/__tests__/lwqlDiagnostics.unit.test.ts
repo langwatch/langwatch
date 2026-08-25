@@ -130,9 +130,7 @@ describe("given a LangWatchQL query that ran", () => {
      */
     /** @scenario "Clean diagnostic status is documented as no known issue detected" */
     it("documents the empty list as no known issue detected, never as proof", () => {
-      expect(LWQL_CLEAN_DIAGNOSTICS_MEANING).toContain(
-        "no known issue was detected",
-      );
+      expect(LWQL_CLEAN_DIAGNOSTICS_MEANING).toContain("no known issue was detected");
       expect(LWQL_CLEAN_DIAGNOSTICS_MEANING).toContain("not proof");
       for (const overclaim of ["guarantee", "correct", "verified", "proves"]) {
         expect(
@@ -238,9 +236,9 @@ describe("given a LangWatchQL query that ran", () => {
 
       // Only one direction: evaluations repeat a trace, a trace never repeats
       // an evaluation.
-      expect(diagnostics.map((diagnostic) => diagnostic.meta?.dataset)).toEqual(
-        ["analytics.traces"],
-      );
+      expect(diagnostics.map((diagnostic) => diagnostic.meta?.dataset)).toEqual([
+        "analytics.traces",
+      ]);
     });
 
     it("stays quiet when the datasets are joined through a common table expression it cannot resolve", () => {
@@ -424,9 +422,7 @@ describe("given a LangWatchQL query that ran", () => {
       });
 
       expect(codesOf(diagnostics)).toEqual(["INCOMPLETE_COMPARISON_PERIOD"]);
-      expect(
-        find(diagnostics, "INCOMPLETE_COMPARISON_PERIOD")!.meta,
-      ).toMatchObject({
+      expect(find(diagnostics, "INCOMPLETE_COMPARISON_PERIOD")!.meta).toMatchObject({
         reason: "unfinished_newest_period",
         periodMs: HOUR_MS,
         newestPeriodStart: "2026-02-20T12:00:00.000Z",
@@ -464,9 +460,10 @@ describe("given a LangWatchQL query that ran", () => {
       });
 
       expect(codesOf(diagnostics)).toContain("INCOMPLETE_COMPARISON_PERIOD");
-      expect(
-        find(diagnostics, "INCOMPLETE_COMPARISON_PERIOD")!.meta,
-      ).toMatchObject({ reason: "unequal_periods", unevenPeriodCount: 1 });
+      expect(find(diagnostics, "INCOMPLETE_COMPARISON_PERIOD")!.meta).toMatchObject({
+        reason: "unequal_periods",
+        unevenPeriodCount: 1,
+      });
     });
 
     /**
@@ -567,9 +564,7 @@ describe("given a LangWatchQL query that ran", () => {
 
   describe("when the vocabulary itself is inspected", () => {
     it("declares every code exactly once", () => {
-      expect(new Set(LWQL_DIAGNOSTIC_CODES).size).toBe(
-        LWQL_DIAGNOSTIC_CODES.length,
-      );
+      expect(new Set(LWQL_DIAGNOSTIC_CODES).size).toBe(LWQL_DIAGNOSTIC_CODES.length);
     });
   });
 });

@@ -7,10 +7,32 @@ import { DataRetentionService } from "../src/services/data-retention.service";
 
 class Repository extends DataRetentionRepository {
   rows: RetentionPolicy[] = [];
-  async findForScopes() { return this.rows; }
-  async findAllInOrganization() { return this.rows; }
-  async tryFindById() { return null; }
-  async upsertForScope(input: { organizationId: string; scope: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }; category: "traces" | "scenarios" | "experiments"; retentionDays: number }) { return { id: "policy", organizationId: input.organizationId, scopeType: input.scope.scopeType, scopeId: input.scope.scopeId, category: input.category, retentionDays: input.retentionDays, createdAt: new Date(), updatedAt: new Date() }; }
+  async findForScopes() {
+    return this.rows;
+  }
+  async findAllInOrganization() {
+    return this.rows;
+  }
+  async tryFindById() {
+    return null;
+  }
+  async upsertForScope(input: {
+    organizationId: string;
+    scope: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string };
+    category: "traces" | "scenarios" | "experiments";
+    retentionDays: number;
+  }) {
+    return {
+      id: "policy",
+      organizationId: input.organizationId,
+      scopeType: input.scope.scopeType,
+      scopeId: input.scope.scopeId,
+      category: input.category,
+      retentionDays: input.retentionDays,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
   async deleteForScope() {}
 }
 
@@ -40,13 +62,32 @@ const createService = (repository = new Repository()) =>
 describe("DataRetentionService", () => {
   it("resolves policy through the project/team/organization cascade", async () => {
     const repository = new Repository();
-    repository.rows = [{ id: "1", organizationId: "org", scopeType: "ORGANIZATION", scopeId: "org", category: "traces", retentionDays: 63, createdAt: new Date(), updatedAt: new Date() }];
+    repository.rows = [
+      {
+        id: "1",
+        organizationId: "org",
+        scopeType: "ORGANIZATION",
+        scopeId: "org",
+        category: "traces",
+        retentionDays: 63,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
     const service = createService(repository);
-    await expect(service.getRetentionDays({ projectId: "project", category: "traces" })).resolves.toBe(63);
+    await expect(
+      service.getRetentionDays({ projectId: "project", category: "traces" }),
+    ).resolves.toBe(63);
   });
 
   it("rejects unaligned retention values at the service boundary", async () => {
     const service = createService();
-    await expect(service.setForScope({ scope: { scopeType: "PROJECT", scopeId: "project" }, category: "traces", retentionDays: 42 })).rejects.toThrow();
+    await expect(
+      service.setForScope({
+        scope: { scopeType: "PROJECT", scopeId: "project" },
+        category: "traces",
+        retentionDays: 42,
+      }),
+    ).rejects.toThrow();
   });
 });

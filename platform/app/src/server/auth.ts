@@ -55,9 +55,7 @@ export interface Session {
   sessionId?: string;
 }
 
-const toHeaders = (
-  input: IncomingHttpHeaders | Headers | undefined,
-): Headers => {
+const toHeaders = (input: IncomingHttpHeaders | Headers | undefined): Headers => {
   if (!input) return new Headers();
   if (input instanceof Headers) return input;
   const h = new Headers();
@@ -162,8 +160,7 @@ export const getServerAuthSession = async (ctx: {
         where: { id: impersonating.id },
         select: { id: true, deactivatedAt: true },
       });
-      const isTargetActive =
-        targetStillValid && !targetStillValid.deactivatedAt;
+      const isTargetActive = targetStillValid && !targetStillValid.deactivatedAt;
 
       if (isTargetActive) {
         return {

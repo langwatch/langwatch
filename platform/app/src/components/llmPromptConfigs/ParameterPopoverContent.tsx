@@ -92,9 +92,7 @@ function SliderControl({
         max={effectiveMax}
         step={config.step}
         value={[boundedValue]}
-        onValueChange={(details) =>
-          onChange(details.value[0] ?? config.default)
-        }
+        onValueChange={(details) => onChange(details.value[0] ?? config.default)}
       >
         <Slider.Control>
           <Slider.Track>
@@ -120,12 +118,7 @@ type SelectControlProps = {
   onClose?: () => void;
 };
 
-function SelectControl({
-  config,
-  value,
-  onChange,
-  onClose,
-}: SelectControlProps) {
+function SelectControl({ config, value, onChange, onClose }: SelectControlProps) {
   const currentValue = value ?? config.default;
 
   const handleSelect = (option: string) => {

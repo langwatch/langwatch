@@ -6,19 +6,11 @@ import { Link, Text } from "@chakra-ui/react";
  * settings. Renders nothing while the resolved model is unknown —
  * the no-provider / no-default states have their own banners.
  */
-export function ResolvedModelCaption({
-  model,
-}: {
-  model: string | null | undefined;
-}) {
+export function ResolvedModelCaption({ model }: { model: string | null | undefined }) {
   if (!model) return null;
 
   return (
-    <Text
-      fontSize="xs"
-      color="fg.muted"
-      data-testid="scenario-ai-model-caption"
-    >
+    <Text fontSize="xs" color="fg.muted" data-testid="scenario-ai-model-caption">
       Uses{" "}
       <Text as="span" fontWeight="medium">
         {model}

@@ -26,9 +26,7 @@ describe("filterRestrictedModels()", () => {
 
     it("returns non-codex models untouched", () => {
       const unrestricted = ["openai/gpt-5-mini", "anthropic/claude-sonnet-5"];
-      expect(filterRestrictedModels({ models: unrestricted })).toEqual(
-        unrestricted,
-      );
+      expect(filterRestrictedModels({ models: unrestricted })).toEqual(unrestricted);
     });
   });
 

@@ -10,13 +10,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -164,9 +158,7 @@ vi.mock("~/hooks/useFeatureFlag", async () => {
     ...actual,
     useFeatureFlag: (flag: string) => ({
       enabled:
-        flag === "release_ui_ai_governance_enabled"
-          ? mockGovernanceFlagEnabled
-          : true,
+        flag === "release_ui_ai_governance_enabled" ? mockGovernanceFlagEnabled : true,
       isLoading: false,
     }),
   };
@@ -344,19 +336,13 @@ describe("the mobile chrome", () => {
     it("shows the logo, the product selector, the project selector and the menu button, with no sidebar", () => {
       renderShell();
 
-      expect(
-        screen.getByRole("button", { name: "Switch product" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Switch project" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Switch product" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Switch project" })).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Open navigation menu" }),
       ).toBeInTheDocument();
       expect(screen.queryByTestId("product-sidebar")).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("shell-product-cluster"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("shell-product-cluster")).not.toBeInTheDocument();
     });
 
     /** @scenario LLM Ops keeps the organization out of the mobile bar */
@@ -369,9 +355,7 @@ describe("the mobile chrome", () => {
       ).not.toBeInTheDocument();
 
       const user = userEvent.setup();
-      await user.click(
-        screen.getByRole("button", { name: "Open navigation menu" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
 
       await waitFor(() => {
         expect(screen.getByTestId("mobile-menu-overlay")).toBeInTheDocument();
@@ -386,9 +370,7 @@ describe("the mobile chrome", () => {
       const user = userEvent.setup();
       renderShell();
 
-      await user.click(
-        screen.getByRole("button", { name: "Open navigation menu" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
 
       await waitFor(() => {
         expect(screen.getByTestId("mobile-menu-overlay")).toBeInTheDocument();
@@ -409,9 +391,7 @@ describe("the mobile chrome", () => {
       const user = userEvent.setup();
       const view = renderShell();
 
-      await user.click(
-        screen.getByRole("button", { name: "Open navigation menu" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
       await waitFor(() => {
         expect(screen.getByTestId("mobile-menu-overlay")).toBeInTheDocument();
       });
@@ -434,9 +414,7 @@ describe("the mobile chrome", () => {
       );
 
       await waitFor(() => {
-        expect(
-          screen.queryByTestId("mobile-menu-overlay"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("mobile-menu-overlay")).not.toBeInTheDocument();
       });
       expect(screen.getByTestId("page-body")).toBeInTheDocument();
     });
@@ -446,27 +424,17 @@ describe("the mobile chrome", () => {
       const user = userEvent.setup();
       renderShell();
 
-      await user.click(
-        screen.getByRole("button", { name: "Open navigation menu" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
       await waitFor(() => {
         expect(screen.getByTestId("mobile-menu-overlay")).toBeInTheDocument();
       });
-      expect(
-        screen.getByRole("dialog", { name: "Navigation menu" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Close navigation menu" }),
-      ).toHaveFocus();
+      expect(screen.getByRole("dialog", { name: "Navigation menu" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Close navigation menu" })).toHaveFocus();
 
-      await user.click(
-        screen.getByRole("button", { name: "Close navigation menu" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Close navigation menu" }));
 
       await waitFor(() => {
-        expect(
-          screen.queryByTestId("mobile-menu-overlay"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("mobile-menu-overlay")).not.toBeInTheDocument();
       });
       expect(pushMock).not.toHaveBeenCalled();
       expect(screen.getByTestId("page-body")).toBeInTheDocument();
@@ -477,9 +445,7 @@ describe("the mobile chrome", () => {
       const user = userEvent.setup();
       renderShell();
 
-      await user.click(
-        screen.getByRole("button", { name: "Open navigation menu" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
       await waitFor(() => {
         expect(screen.getByTestId("mobile-menu-overlay")).toBeInTheDocument();
       });
@@ -487,9 +453,7 @@ describe("the mobile chrome", () => {
       // Everything the shell renders under the overlay is inert, so the
       // page behind carries no tab stop and no reader can reach it.
       const overlay = screen.getByTestId("mobile-menu-overlay");
-      expect(
-        screen.getByTestId("page-body").closest("[inert]"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("page-body").closest("[inert]")).toBeInTheDocument();
       expect(overlay.closest("[inert]")).toBeNull();
 
       const focusable = Array.from(
@@ -515,16 +479,12 @@ describe("the mobile chrome", () => {
       const user = userEvent.setup();
       renderShell();
 
-      await user.click(
-        screen.getByRole("button", { name: "Open navigation menu" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
       await waitFor(() => {
         expect(screen.getByTestId("mobile-menu-overlay")).toBeInTheDocument();
       });
 
-      await user.click(
-        screen.getByRole("button", { name: "Switch organization" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Switch organization" }));
       await waitFor(() => {
         expect(screen.getByText("Beta Corp")).toBeInTheDocument();
       });
@@ -553,9 +513,7 @@ describe("the mobile chrome", () => {
       await user.keyboard("{Escape}");
 
       await waitFor(() => {
-        expect(
-          screen.queryByTestId("mobile-menu-overlay"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("mobile-menu-overlay")).not.toBeInTheDocument();
       });
       expect(menuButton).toHaveFocus();
     });

@@ -50,9 +50,7 @@ export class AppLangyGithubService {
     repositoryFullName?: string;
   }): Promise<{ token: string; repoScopeKey: string } | null> {
     const result = await this.github().tryMintTurnToken(input);
-    return result
-      ? { token: result.token, repoScopeKey: result.repoScopeKey }
-      : null;
+    return result ? { token: result.token, repoScopeKey: result.repoScopeKey } : null;
   }
 }
 

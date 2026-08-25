@@ -38,8 +38,7 @@ describe("TraceListService.getList position window", () => {
       const findAll = vi.fn();
       const service = serviceWithRepository(findAll);
 
-      const pastTheWindow =
-        TRACE_LIST_MAX_OFFSET_ROWS / listParams.pageSize + 1;
+      const pastTheWindow = TRACE_LIST_MAX_OFFSET_ROWS / listParams.pageSize + 1;
       await expect(
         service.getList({ ...listParams, page: pastTheWindow }),
       ).rejects.toMatchObject({
@@ -52,9 +51,7 @@ describe("TraceListService.getList position window", () => {
 
   describe("given the same depth carried by a cursor", () => {
     it("reads it, because keyset depth costs nothing", async () => {
-      const findAll = vi
-        .fn()
-        .mockResolvedValue({ rows: [], totalHits: 500_000 });
+      const findAll = vi.fn().mockResolvedValue({ rows: [], totalHits: 500_000 });
       const service = serviceWithRepository(findAll);
 
       await service.getList({
@@ -63,17 +60,13 @@ describe("TraceListService.getList position window", () => {
         cursor: { sortValue: 1_700_000_000_500, traceId: "trace-a" },
       });
 
-      expect(findAll).toHaveBeenCalledWith(
-        expect.objectContaining({ offset: 0 }),
-      );
+      expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ offset: 0 }));
     });
   });
 
   describe("given a page whose last row is exactly the window's edge", () => {
     it("still reads it", async () => {
-      const findAll = vi
-        .fn()
-        .mockResolvedValue({ rows: [], totalHits: 500_000 });
+      const findAll = vi.fn().mockResolvedValue({ rows: [], totalHits: 500_000 });
       const service = serviceWithRepository(findAll);
 
       const edgePage = TRACE_LIST_MAX_OFFSET_ROWS / listParams.pageSize;

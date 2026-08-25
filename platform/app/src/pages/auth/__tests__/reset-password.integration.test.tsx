@@ -6,13 +6,7 @@
  * hook are mocked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -32,14 +26,7 @@ vi.mock("~/utils/compat/next-navigation", () => ({
 }));
 
 vi.mock("~/utils/compat/next-link", () => ({
-  default: ({
-    href,
-    children,
-    ...props
-  }: {
-    href: string;
-    children: ReactNode;
-  }) => (
+  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -64,9 +51,7 @@ const renderPage = () => {
 };
 
 const passwordInputs = (container: HTMLElement) =>
-  Array.from(
-    container.querySelectorAll('input[type="password"]'),
-  ) as HTMLInputElement[];
+  Array.from(container.querySelectorAll('input[type="password"]')) as HTMLInputElement[];
 
 const fillAndSubmit = ({
   container,
@@ -114,9 +99,7 @@ describe("ResetPassword page", () => {
         });
       });
 
-      expect(
-        await screen.findByText(/your password has been reset/i),
-      ).toBeTruthy();
+      expect(await screen.findByText(/your password has been reset/i)).toBeTruthy();
       const signInLink = screen.getByRole("link", { name: /sign in/i });
       expect(signInLink.getAttribute("href")).toBe("/auth/signin");
     });
@@ -180,9 +163,7 @@ describe("ResetPassword page", () => {
       setToken(null);
       const { container } = renderPage();
 
-      expect(
-        screen.getByRole("heading", { name: /invalid reset link/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("heading", { name: /invalid reset link/i })).toBeTruthy();
       expect(
         screen.getByRole("link", { name: /request a new reset link/i }),
       ).toBeTruthy();

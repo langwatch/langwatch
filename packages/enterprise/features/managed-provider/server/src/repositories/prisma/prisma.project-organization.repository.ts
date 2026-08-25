@@ -6,9 +6,7 @@ export class PrismaManagedProviderProjectRepository extends ManagedProviderProje
     super();
   }
 
-  static create(
-    database: object,
-  ): PrismaManagedProviderProjectRepository {
+  static create(database: object): PrismaManagedProviderProjectRepository {
     return new PrismaManagedProviderProjectRepository(database as PrismaClient);
   }
 

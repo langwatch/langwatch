@@ -5,18 +5,10 @@ export const WEBHOOK_FEATURE_ID = "webhook" as const;
 export const webhookDestinationKindSchema = z.enum(["http", "sqs"]);
 export type WebhookDestinationKind = z.infer<typeof webhookDestinationKindSchema>;
 
-export const sqsCredentialModeSchema = z.enum([
-  "assume_role",
-  "static",
-  "ambient",
-]);
+export const sqsCredentialModeSchema = z.enum(["assume_role", "static", "ambient"]);
 export type SqsCredentialMode = z.infer<typeof sqsCredentialModeSchema>;
 
-export const webhookDeliveryOutcomeSchema = z.enum([
-  "success",
-  "retryable",
-  "terminal",
-]);
+export const webhookDeliveryOutcomeSchema = z.enum(["success", "retryable", "terminal"]);
 export type WebhookDeliveryOutcome = z.infer<typeof webhookDeliveryOutcomeSchema>;
 
 export const webhookDeliveryControlsSchema = z.object({

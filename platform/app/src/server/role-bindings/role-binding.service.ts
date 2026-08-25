@@ -209,10 +209,12 @@ export class RoleBindingService {
       organizationId,
       customRoleIds: [...new Set(customBindings.map((b) => b.customRoleId))],
     });
-    await this.roleService.assertNoOrganizationExclusivePermissionsBelowOrganizationScope({
-      organizationId,
-      customBindings,
-    });
+    await this.roleService.assertNoOrganizationExclusivePermissionsBelowOrganizationScope(
+      {
+        organizationId,
+        customBindings,
+      },
+    );
   }
 
   /**
@@ -342,9 +344,7 @@ export class RoleBindingService {
       bindings: [offending],
       organizationId,
     });
-    throw new LiteMemberViewerOnlyError(
-      scopeNames.get(offending.scopeId) ?? null,
-    );
+    throw new LiteMemberViewerOnlyError(scopeNames.get(offending.scopeId) ?? null);
   }
 
   /**
@@ -375,9 +375,7 @@ export class RoleBindingService {
     scopeNames: Map<string, string>;
     personalScopeIds: Set<string>;
   }> {
-    return foldScopeRows(
-      await this.findScopeRows({ bindings, organizationId }),
-    );
+    return foldScopeRows(await this.findScopeRows({ bindings, organizationId }));
   }
 
   /** The scoped rows these bindings point at, one query per scope type. */
@@ -467,9 +465,7 @@ export class RoleBindingService {
     });
     const manageable = bindings.filter((b) => !personalScopeIds.has(b.scopeId));
 
-    const groupIds = manageable
-      .filter((b) => b.groupId != null)
-      .map((b) => b.groupId!);
+    const groupIds = manageable.filter((b) => b.groupId != null).map((b) => b.groupId!);
     const groupMemberships =
       groupIds.length > 0
         ? await this.prisma.groupMembership.findMany({
@@ -584,9 +580,7 @@ export class RoleBindingService {
     for (const t of teams) scopeNames.set(t.id, t.name);
     for (const p of projects) scopeNames.set(p.id, p.name);
 
-    const resolvePermissions = (
-      binding: (typeof allBindings)[number],
-    ): string[] => {
+    const resolvePermissions = (binding: (typeof allBindings)[number]): string[] => {
       if (binding.role === TeamUserRole.CUSTOM && binding.customRole) {
         const perms = binding.customRole.permissions;
         return Array.isArray(perms)
@@ -623,10 +617,7 @@ export class RoleBindingService {
       .filter((b) => b.userId === userId)
       .map(toBindingSummary);
 
-    const groupBindingsByGroupId = new Map<
-      string,
-      (typeof allBindings)[number][]
-    >();
+    const groupBindingsByGroupId = new Map<string, (typeof allBindings)[number][]>();
     for (const b of allBindings.filter((b) => b.groupId != null)) {
       const gid = b.groupId!;
       if (!groupBindingsByGroupId.has(gid)) groupBindingsByGroupId.set(gid, []);
@@ -650,9 +641,7 @@ export class RoleBindingService {
         name: gm.group.name,
         slug: gm.group.slug,
         scimSource: gm.group.scimSource,
-        bindings: (groupBindingsByGroupId.get(gm.groupId) ?? []).map(
-          toBindingSummary,
-        ),
+        bindings: (groupBindingsByGroupId.get(gm.groupId) ?? []).map(toBindingSummary),
       })),
       directBindings,
     };
@@ -716,8 +705,7 @@ export class RoleBindingService {
             bindingId,
             principal: bindingPrincipal({ userId, groupId, apiKeyId }),
             role,
-            customRoleId:
-              role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
+            customRoleId: role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
             scopeType,
             scopeId,
           },
@@ -773,9 +761,7 @@ export class RoleBindingService {
         await this.assertRowsWithinLiteMemberSeat({
           organizationRole: membership.role,
           organizationId,
-          bindings: [
-            { role, scopeType: binding.scopeType, scopeId: binding.scopeId },
-          ],
+          bindings: [{ role, scopeType: binding.scopeType, scopeId: binding.scopeId }],
         });
       }
     }
@@ -784,8 +770,7 @@ export class RoleBindingService {
         organizationId,
         bindingId,
         role,
-        customRoleId:
-          role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
+        customRoleId: role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
         actor,
       });
     } catch (error) {
@@ -970,8 +955,7 @@ export class RoleBindingService {
         bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
         principal: { userId },
         role: b.role,
-        customRoleId:
-          b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
+        customRoleId: b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
         scopeType: b.scopeType,
         scopeId: b.scopeId,
       })),
@@ -1057,17 +1041,14 @@ export class RoleBindingService {
     if (bindingsToCreate.length > 0) {
       await this.writer.attachBindings({
         organizationId,
-        bindings: bindingsToCreate.map(
-          (b): AuthzLedgerBindingAttach => ({
-            bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            principal: { groupId },
-            role: b.role,
-            customRoleId:
-              b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
-            scopeType: b.scopeType,
-            scopeId: b.scopeId,
-          }),
-        ),
+        bindings: bindingsToCreate.map((b): AuthzLedgerBindingAttach => ({
+          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          principal: { groupId },
+          role: b.role,
+          customRoleId: b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
+          scopeType: b.scopeType,
+          scopeId: b.scopeId,
+        })),
         actor,
         onDuplicate: "skip",
       });
@@ -1179,8 +1160,7 @@ export class RoleBindingService {
         });
         if (orgMembers.length !== uniqueMemberIds.length) {
           const found = new Set(orgMembers.map((member) => member.userId));
-          const missing =
-            uniqueMemberIds.find((id) => !found.has(id)) ?? "unknown";
+          const missing = uniqueMemberIds.find((id) => !found.has(id)) ?? "unknown";
           throw new UserNotInOrganizationError(missing);
         }
         await tx.groupMembership.createMany({

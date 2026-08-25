@@ -1,9 +1,5 @@
 import { pMapLimited } from "./pMapLimited";
-import {
-  pauseProjection,
-  unpauseProjection,
-  waitForAllActiveJobs,
-} from "./replayDrain";
+import { pauseProjection, unpauseProjection, waitForAllActiveJobs } from "./replayDrain";
 import type {
   CutoffInfo,
   DiscoveredAggregate,
@@ -60,9 +56,7 @@ interface SelectedProjections {
   eventTypesByProjection: Map<string, Set<string>>;
   projectionByName: Map<string, RegisteredFoldProjection>;
   mapProjectionByName: Map<string, RegisteredMapProjection>;
-  allProjectionsToPause: Array<
-    RegisteredFoldProjection | RegisteredMapProjection
-  >;
+  allProjectionsToPause: Array<RegisteredFoldProjection | RegisteredMapProjection>;
   pausedProjectionEntries: Array<{
     projectionName: string;
     kind: ProjectionKind;
@@ -85,10 +79,7 @@ function collectSelectedProjections(config: ReplayConfig): SelectedProjections {
   }
   for (const p of [...config.projections, ...mapProjections]) {
     for (const et of p.definition.eventTypes) allEventTypes.add(et);
-    eventTypesByProjection.set(
-      p.projectionName,
-      new Set(p.definition.eventTypes),
-    );
+    eventTypesByProjection.set(p.projectionName, new Set(p.definition.eventTypes));
   }
 
   const allProjectionsToPause = [...config.projections, ...mapProjections];
@@ -192,8 +183,7 @@ async function discoverAggregateProjections({
   selected: SelectedProjections;
 }): Promise<AggregateProjectionMap> {
   const aggregateProjectionMap: AggregateProjectionMap = new Map();
-  const discoveryTargets =
-    config.tenantIds.length > 0 ? config.tenantIds : [undefined];
+  const discoveryTargets = config.tenantIds.length > 0 ? config.tenantIds : [undefined];
 
   for (const tenantId of discoveryTargets) {
     await discoverTenantAggregates({
@@ -326,8 +316,7 @@ class FoldMapReplayRun {
     // "map" for map-only runs, otherwise "fold" (fold-only and mixed runs —
     // fold is the dominant kind).
     this.runProjectionKind =
-      config.projections.length === 0 &&
-      (config.mapProjections ?? []).length > 0
+      config.projections.length === 0 && (config.mapProjections ?? []).length > 0
         ? "map"
         : "fold";
   }
@@ -433,8 +422,7 @@ class FoldMapReplayRun {
       progress.batchPhase = phase;
       if (eventsProcessed !== undefined) {
         progress.batchEventsProcessed = eventsProcessed;
-        progress.totalEventsReplayed =
-          this.totalEventsReplayed + eventsProcessed;
+        progress.totalEventsReplayed = this.totalEventsReplayed + eventsProcessed;
       }
       progress.elapsedSec = (Date.now() - this.startTime) / 1000;
       this.callbacks?.onProgress?.({ ...progress });
@@ -537,8 +525,7 @@ export async function optimizeTouchedTables({
   const optimizeTables = ctx.eventSource.optimizeTables;
   if (!optimizeTables) return;
 
-  const tenantTargets =
-    touchedTenants.size > 0 ? [...touchedTenants] : ["default"];
+  const tenantTargets = touchedTenants.size > 0 ? [...touchedTenants] : ["default"];
 
   await pMapLimited({
     items: tenantTargets,
@@ -761,9 +748,7 @@ async function unpauseAll({
           step: "error",
           batch: batchNum,
           error: `unpause failed: ${
-            unpauseError instanceof Error
-              ? unpauseError.message
-              : String(unpauseError)
+            unpauseError instanceof Error ? unpauseError.message : String(unpauseError)
           }`,
         });
       },

@@ -39,11 +39,7 @@ export const DiffCell = ({ values, inline = false }: DiffCellProps) => {
   const Container = inline ? HStack : VStack;
 
   return (
-    <Container
-      align={inline ? "center" : "stretch"}
-      gap={inline ? 4 : 2}
-      width="100%"
-    >
+    <Container align={inline ? "center" : "stretch"} gap={inline ? 4 : 2} width="100%">
       {values.map((item, idx) => (
         <HStack
           key={item.runId}

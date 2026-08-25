@@ -81,7 +81,8 @@ const mapSummary = (row: SpanSummaryRow) => {
         "gen_ai.request.model": row.Model || undefined,
         "gen_ai.usage.cache_read.input_tokens": row.CacheReadTokens || undefined,
         "gen_ai.usage.cache_creation.input_tokens": row.CacheCreationTokens || undefined,
-        "gen_ai.usage.cache_creation_1h.input_tokens": row.CacheCreation1hTokens || undefined,
+        "gen_ai.usage.cache_creation_1h.input_tokens":
+          row.CacheCreation1hTokens || undefined,
         "gen_ai.usage.input_chars": row.InputChars || undefined,
         "gen_ai.usage.audio_seconds": row.AudioSeconds || undefined,
         "gen_ai.usage.input_audio_tokens": row.InputAudioTokens || undefined,
@@ -89,8 +90,10 @@ const mapSummary = (row: SpanSummaryRow) => {
         "langwatch.model.inputCostPerToken": row.CustomInputRate || undefined,
         "langwatch.model.outputCostPerToken": row.CustomOutputRate || undefined,
         "langwatch.model.cacheReadCostPerToken": row.CustomCacheReadRate || undefined,
-        "langwatch.model.cacheCreationCostPerToken": row.CustomCacheCreationRate || undefined,
-        "langwatch.model.cacheCreation1hCostPerToken": row.CustomCacheCreation1hRate || undefined,
+        "langwatch.model.cacheCreationCostPerToken":
+          row.CustomCacheCreationRate || undefined,
+        "langwatch.model.cacheCreation1hCostPerToken":
+          row.CustomCacheCreation1hRate || undefined,
         "langwatch.span.cost": row.LwSpanCost || undefined,
       },
       model: row.ResponseModel || row.Model || undefined,
@@ -147,9 +150,7 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
     super();
   }
 
-  static create(
-    resolveClient: TraceClickHouseResolver,
-  ): ClickHouseTraceSpanRepository {
+  static create(resolveClient: TraceClickHouseResolver): ClickHouseTraceSpanRepository {
     return new ClickHouseTraceSpanRepository(resolveClient);
   }
 
@@ -171,9 +172,7 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
       input,
       occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
     );
-    return bounded.rows.length > 0
-      ? bounded
-      : this.queryPage(input, undefined);
+    return bounded.rows.length > 0 ? bounded : this.queryPage(input, undefined);
   }
 
   async findSummarySince(input: {
@@ -222,9 +221,10 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
     const cursor = input.cursor
       ? "AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64}) AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})"
       : "";
-    const timeFilter = lowerBoundMs !== undefined
-      ? "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})"
-      : "";
+    const timeFilter =
+      lowerBoundMs !== undefined
+        ? "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})"
+        : "";
     const result = await client.query({
       query: `
         SELECT ${summarySelect}

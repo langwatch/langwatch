@@ -135,9 +135,7 @@ function readSkill(dir: string): GeneratedSkill | null {
   // `splitFrontmatter` reads top-level keys only, so the nested `metadata:` block
   // (which is where `category: recipe` lives) is read from the raw block here
   // rather than by teaching the shared parser about nesting it does not need.
-  const isRecipe = /^\s+category:\s*recipe\s*$/m.test(
-    raw.split("---")[1] ?? "",
-  );
+  const isRecipe = /^\s+category:\s*recipe\s*$/m.test(raw.split("---")[1] ?? "");
   const userPrompt = frontmatter["user-prompt"]?.replace(/^["']|["']$/g, "");
 
   return {
@@ -171,9 +169,7 @@ export function deriveSkills(repoRoot: string): GeneratedSkill[] {
   for (const dir of dirs) {
     const absolute = path.join(repoRoot, dir);
     if (!fs.existsSync(absolute)) {
-      throw new Error(
-        `Dockerfile.langyagent copies ${dir}, which does not exist.`,
-      );
+      throw new Error(`Dockerfile.langyagent copies ${dir}, which does not exist.`);
     }
     for (const entry of fs.readdirSync(absolute, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;

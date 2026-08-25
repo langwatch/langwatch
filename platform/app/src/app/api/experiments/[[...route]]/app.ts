@@ -143,10 +143,7 @@ secured.access(requires("experiments:view")).get(
       max: MAX_PAGE_SIZE,
     });
 
-    logger.info(
-      { projectId: project.id, page, pageSize },
-      "Listing experiments",
-    );
+    logger.info({ projectId: project.id, page, pageSize }, "Listing experiments");
 
     const { experiments: paged, totalHits } = await c.app.experiments.getPage({
       projectId: project.id,

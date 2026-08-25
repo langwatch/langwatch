@@ -7,7 +7,10 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { mintRunToken, signFrame } from "@langwatch/langy-server/streaming/langy-frame-auth";
+import {
+  mintRunToken,
+  signFrame,
+} from "@langwatch/langy-server/streaming/langy-frame-auth";
 import {
   type LangyRelayBuffer,
   type LangyRelayConversations,
@@ -70,10 +73,7 @@ function surfaceResourceFrames({
 
 const navigateFrames = (
   resourceId: string,
-  {
-    id = "call-navigate",
-    output = "ok",
-  }: { id?: string; output?: string } = {},
+  { id = "call-navigate", output = "ok" }: { id?: string; output?: string } = {},
 ) => [
   frame({
     type: "tool",
@@ -118,13 +118,7 @@ function fakeResourceLinks() {
       for (const { id, href } of links) map.set(id, href);
       byConversation.set(conversationId, map);
     },
-    async resolve({
-      conversationId,
-      id,
-    }: {
-      conversationId: string;
-      id: string;
-    }) {
+    async resolve({ conversationId, id }: { conversationId: string; id: string }) {
       return byConversation.get(conversationId)?.get(id) ?? null;
     },
   };
@@ -158,14 +152,10 @@ function makeRelay(
       ? { readHandoffRunToken: over.readHandoffRunToken }
       : {}),
     resourceLinks,
-    ...(over.resolveResourceUrl
-      ? { resolveResourceUrl: over.resolveResourceUrl }
-      : {}),
+    ...(over.resolveResourceUrl ? { resolveResourceUrl: over.resolveResourceUrl } : {}),
     baseHost: "https://app.langwatch.ai",
     resolveCapabilityProgress: (name) =>
-      name === "langwatch.trace.search"
-        ? { headline: "Searching traces" }
-        : null,
+      name === "langwatch.trace.search" ? { headline: "Searching traces" } : null,
   });
   return { relay, buffer, conversations, reserveFrameNonce, resourceLinks };
 }
@@ -1037,10 +1027,7 @@ describe("LangyTurnRelay", () => {
       const { relay, buffer } = makeRelay();
       await relay.handle(frame({ type: "delta", text: "one" })); // pins turn-1
       const out = await relay.handle(
-        frame(
-          { type: "delta", text: "two" },
-          { ...IDENTITY, turnId: "turn-2" },
-        ),
+        frame({ type: "delta", text: "two" }, { ...IDENTITY, turnId: "turn-2" }),
       );
       expect(out).toEqual({ status: "rejected", reason: "wrong-turn" });
       expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
@@ -1136,9 +1123,7 @@ describe("LangyTurnRelay", () => {
         const first = await relay.handle(frame({ type: "delta", text: "one" }));
         expect(first).toEqual({ status: "rejected", reason: "no-run-token" });
 
-        const second = await relay.handle(
-          frame({ type: "delta", text: "two" }),
-        );
+        const second = await relay.handle(frame({ type: "delta", text: "two" }));
         expect(second).toEqual({ status: "applied" });
         expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
         // Re-queried because the first null was NOT cached (the bug this fixes).

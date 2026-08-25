@@ -70,8 +70,7 @@ export function StudioDrawerWrapper({
   );
 
   // Footer registered by child components via useRegisterDrawerFooter
-  const [registeredFooter, setRegisteredFooter] =
-    useState<React.ReactNode>(null);
+  const [registeredFooter, setRegisteredFooter] = useState<React.ReactNode>(null);
   const effectiveFooter = footer ?? registeredFooter;
 
   const isOpen = node !== undefined;
@@ -87,8 +86,7 @@ export function StudioDrawerWrapper({
   // Allow Escape to collapse the expanded view before closing.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isPopoverOpen =
-        document.querySelector(".chakra-popover__popper") !== null;
+      const isPopoverOpen = document.querySelector(".chakra-popover__popper") !== null;
       if (e.key === "Escape" && propertiesExpanded && !isPopoverOpen) {
         setPropertiesExpanded(false);
         e.stopPropagation();
@@ -128,11 +126,7 @@ export function StudioDrawerWrapper({
     <HStack width="full" justify="space-between" gap={0}>
       {/* Left: icon + name */}
       <HStack gap={2} overflow="hidden" flex={1} minWidth={0}>
-        <ComponentIcon
-          type={node.type as ComponentType}
-          cls={node.data.cls}
-          size="lg"
-        />
+        <ComponentIcon type={node.type as ComponentType} cls={node.data.cls} size="lg" />
         <HoverableBigText
           lineClamp={2}
           fontSize="15px"
@@ -186,10 +180,7 @@ export function StudioDrawerWrapper({
               </Button>
             </Menu.Trigger>
             <Menu.Content>
-              <Menu.Item
-                value="duplicate"
-                onClick={() => duplicateNode(node.id)}
-              >
+              <Menu.Item value="duplicate" onClick={() => duplicateNode(node.id)}>
                 <Copy size={14} />
                 Duplicate
               </Menu.Item>
@@ -208,12 +199,7 @@ export function StudioDrawerWrapper({
             </Menu.Content>
           </Menu.Root>
         )}
-        <Button
-          variant="ghost"
-          size="sm"
-          color="fg.muted"
-          onClick={handleClose}
-        >
+        <Button variant="ghost" size="sm" color="fg.muted" onClick={handleClose}>
           <X size={16} />
         </Button>
       </HStack>
@@ -244,12 +230,7 @@ export function StudioDrawerWrapper({
             </Drawer.Header>
           )}
 
-          <Drawer.Body
-            display="flex"
-            flexDirection="column"
-            overflow="auto"
-            padding={0}
-          >
+          <Drawer.Body display="flex" flexDirection="column" overflow="auto" padding={0}>
             <DrawerFooterContext.Provider value={setRegisteredFooter}>
               {children}
             </DrawerFooterContext.Provider>
@@ -380,9 +361,7 @@ export function StudioDrawerWrapper({
                 // @ts-ignore
                 className="js-outer-box"
                 onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-                  if (
-                    (e.target as HTMLElement).classList.contains("js-outer-box")
-                  ) {
+                  if ((e.target as HTMLElement).classList.contains("js-outer-box")) {
                     setPropertiesExpanded(false);
                   }
                 }}
@@ -415,9 +394,7 @@ export function StudioDrawerWrapper({
                 // @ts-ignore
                 className="js-outer-box"
                 onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-                  if (
-                    (e.target as HTMLElement).classList.contains("js-outer-box")
-                  ) {
+                  if ((e.target as HTMLElement).classList.contains("js-outer-box")) {
                     setPropertiesExpanded(false);
                   }
                 }}

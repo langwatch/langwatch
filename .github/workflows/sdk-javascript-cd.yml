@@ -53,7 +53,6 @@ jobs:
           LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test
 
-
       ## We run these against the current codebase for the CI build
       ## but here we want to validate the SDK against the deployed app
       ## before publishing

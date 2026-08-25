@@ -27,60 +27,60 @@ export class CustomerService {
     user: { email?: string | null };
     organizationId: string;
   }): Promise<string> {
-      const { user, organizationId } = params;
-      const organization = await this.organizations.getBillingProfile({
-        organizationId,
-      });
+    const { user, organizationId } = params;
+    const organization = await this.organizations.getBillingProfile({
+      organizationId,
+    });
 
-      if (organization.billingCustomerId) {
-        return organization.billingCustomerId;
-      }
+    if (organization.billingCustomerId) {
+      return organization.billingCustomerId;
+    }
 
-      if (!user.email) {
-        throw new UserEmailRequiredError();
-      }
+    if (!user.email) {
+      throw new UserEmailRequiredError();
+    }
 
-      const customer = await this.stripe.customers.create({
-        email: user.email,
-        name: organization.name,
-      });
+    const customer = await this.stripe.customers.create({
+      email: user.email,
+      name: organization.name,
+    });
 
-      const claimed = await this.organizations.claimBillingCustomerId({
-        organizationId,
-        billingCustomerId: customer.id,
-      });
+    const claimed = await this.organizations.claimBillingCustomerId({
+      organizationId,
+      billingCustomerId: customer.id,
+    });
 
-      if (!claimed) {
-        // Another request won the race — clean up orphan and use existing
+    if (!claimed) {
+      // Another request won the race — clean up orphan and use existing
+      logger.warn(
+        {
+          organizationId,
+          orphanedCustomerId: maskCustomerId(customer.id),
+        },
+        "[billing] Stripe customer race detected, cleaning up orphan",
+      );
+      try {
+        await this.stripe.customers.del(customer.id);
+      } catch (error) {
         logger.warn(
           {
             organizationId,
             orphanedCustomerId: maskCustomerId(customer.id),
+            error: (error as Error).message,
           },
-          "[billing] Stripe customer race detected, cleaning up orphan",
+          "[billing] Failed to clean up orphaned Stripe customer",
         );
-        try {
-          await this.stripe.customers.del(customer.id);
-        } catch (error) {
-          logger.warn(
-            {
-              organizationId,
-              orphanedCustomerId: maskCustomerId(customer.id),
-              error: (error as Error).message,
-            },
-            "[billing] Failed to clean up orphaned Stripe customer",
-          );
-        }
-
-        const refreshed = await this.organizations.getBillingProfile({
-          organizationId,
-        });
-        if (!refreshed.billingCustomerId) {
-          throw new CustomerCreationRaceError();
-        }
-        return refreshed.billingCustomerId;
       }
 
-      return customer.id;
+      const refreshed = await this.organizations.getBillingProfile({
+        organizationId,
+      });
+      if (!refreshed.billingCustomerId) {
+        throw new CustomerCreationRaceError();
+      }
+      return refreshed.billingCustomerId;
+    }
+
+    return customer.id;
   }
 }

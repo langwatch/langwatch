@@ -220,10 +220,7 @@ export function resolveHotDays(config: TableTTLEntry): number {
 
   const globalDefault = process.env.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS;
   if (globalDefault !== undefined && globalDefault !== "") {
-    return parseNonNegativeInt(
-      globalDefault,
-      "CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS",
-    );
+    return parseNonNegativeInt(globalDefault, "CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS");
   }
 
   return config.hardcodedDefault;
@@ -236,9 +233,7 @@ export function resolveHotDays(config: TableTTLEntry): number {
  * Example engine_full containing TTL:
  *   "... TTL toDateTime(CreatedAt) + toIntervalDay(2) TO VOLUME 'cold' ..."
  */
-export function parseTTLDaysFromEngineMetadata(
-  engineFull: string,
-): number | null {
+export function parseTTLDaysFromEngineMetadata(engineFull: string): number | null {
   const match = engineFull.match(/toIntervalDay\((\d+)\)/);
   if (!match?.[1]) return null;
   return parseInt(match[1], 10);
@@ -282,18 +277,14 @@ export function buildDesiredTTLExpression({
   config: TableTTLEntry;
   days: number;
 }): string {
-  const colExpr =
-    config.ttlColumnExpression ?? `toDateTime(${config.ttlColumn})`;
+  const colExpr = config.ttlColumnExpression ?? `toDateTime(${config.ttlColumn})`;
   return `${colExpr} + INTERVAL ${days} DAY TO VOLUME 'cold'`;
 }
 
-export function buildRetentionTTLExpression(
-  config: TableTTLEntry,
-): string | null {
+export function buildRetentionTTLExpression(config: TableTTLEntry): string | null {
   if (!config.retentionTTLColumn) return null;
   const colExpr =
-    config.retentionTTLColumnExpression ??
-    `toDateTime(${config.retentionTTLColumn})`;
+    config.retentionTTLColumnExpression ?? `toDateTime(${config.retentionTTLColumn})`;
   return `IF(_retention_days > 0, ${colExpr} + toIntervalDay(_retention_days), toDateTime('${INDEFINITE_RETENTION_SENTINEL_DATE}')) DELETE`;
 }
 
@@ -336,9 +327,7 @@ export const TIERED_STORAGE_POLICY = "local_primary";
  *
  * Uses SET materialize_ttl_after_modify = 0 to make changes metadata-only (cheap).
  */
-export async function reconcileTTL(
-  options: ReconcileOptions = {},
-): Promise<void> {
+export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void> {
   const connectionUrl = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
   if (!connectionUrl) {
     logger.info("CLICKHOUSE_URL not configured, skipping TTL reconciliation.");
@@ -350,8 +339,7 @@ export async function reconcileTTL(
   // platform's retention enforcement and must run on every deployment, or
   // ingestion stamps `_retention_days` but nothing ever deletes. Gate the
   // tiered-storage rewrite on the env flag; let retention TTL always reconcile.
-  const coldStorageEnabled =
-    process.env.CLICKHOUSE_COLD_STORAGE_ENABLED === "true";
+  const coldStorageEnabled = process.env.CLICKHOUSE_COLD_STORAGE_ENABLED === "true";
 
   const config = parseConnectionUrl(connectionUrl, options.database);
   const client = createClient({ url: config.databaseUrl });
@@ -388,16 +376,11 @@ export async function reconcileTTL(
       // but they CAN still have retention DELETE TTL. Likewise, when the operator
       // disables cold-storage management we still need to install retention TTL,
       // so collapse to the retention-only branch in both cases.
-      if (
-        tableInfo.storage_policy !== TIERED_STORAGE_POLICY ||
-        !coldStorageEnabled
-      ) {
+      if (tableInfo.storage_policy !== TIERED_STORAGE_POLICY || !coldStorageEnabled) {
         const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
         if (
           retentionTTLExpr &&
-          (RETENTION_MANAGED_TABLES as readonly string[]).includes(
-            tableConfig.table,
-          ) &&
+          (RETENTION_MANAGED_TABLES as readonly string[]).includes(tableConfig.table) &&
           !hasRetentionTTL(tableInfo.engine_full)
         ) {
           // No ON CLUSTER: whenever a cluster is configured the database uses
@@ -432,9 +415,9 @@ export async function reconcileTTL(
       const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
 
       const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
-      const isManaged = (
-        RETENTION_MANAGED_TABLES as readonly string[]
-      ).includes(tableConfig.table);
+      const isManaged = (RETENTION_MANAGED_TABLES as readonly string[]).includes(
+        tableConfig.table,
+      );
       // Whether the cold TTL alone is enough to skip this run — i.e. nothing
       // has changed in the cold-TTL space. For managed tables we must still
       // run when retention TTL is missing from the table (first-time apply).

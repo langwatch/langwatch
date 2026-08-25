@@ -20,11 +20,7 @@ interface CapturedItem {
 let capturedItems: CapturedItem[] = [];
 
 vi.mock("~/components/ui/layouts/SectionNavigationLayout", () => ({
-  SectionNavigationLayout: ({
-    navigationItems,
-  }: {
-    navigationItems: CapturedItem[];
-  }) => {
+  SectionNavigationLayout: ({ navigationItems }: { navigationItems: CapturedItem[] }) => {
     capturedItems = navigationItems;
     return null;
   },

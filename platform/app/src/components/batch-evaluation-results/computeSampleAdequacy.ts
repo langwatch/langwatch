@@ -46,9 +46,7 @@ export type SampleAdequacy = {
   familyWiseFalsePositiveRate: number | null;
 };
 
-export const computeSampleAdequacy = (
-  leaderboard: BTLeaderboard,
-): SampleAdequacy => {
+export const computeSampleAdequacy = (leaderboard: BTLeaderboard): SampleAdequacy => {
   const ranked = leaderboard.entries.filter((entry) => !entry.isDegenerate);
   const rankedVariantCount = ranked.length;
   const totalPairs = (rankedVariantCount * (rankedVariantCount - 1)) / 2;
@@ -85,7 +83,6 @@ export const computeSampleAdequacy = (
     // fact positively correlated, being differences among the same scores,
     // so the true rate is somewhat lower — this errs toward warning, which
     // is the right direction for a caveat.
-    familyWiseFalsePositiveRate:
-      totalPairs > 1 ? 1 - Math.pow(0.95, totalPairs) : null,
+    familyWiseFalsePositiveRate: totalPairs > 1 ? 1 - Math.pow(0.95, totalPairs) : null,
   };
 };

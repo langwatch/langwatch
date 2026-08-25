@@ -23,8 +23,7 @@ import { ACTIVE_LENS_KEY, useViewStore } from "../../stores/viewStore";
 import { getPresetById } from "../../utils/timeRangePresets";
 import { useURLSync } from "../useURLSync";
 
-const renderURLSync = () =>
-  renderHook(() => useURLSync(), { wrapper: BrowserRouter });
+const renderURLSync = () => renderHook(() => useURLSync(), { wrapper: BrowserRouter });
 
 const CURSOR_PAGE_2 = { sortValue: 1_700_000_002_000, traceId: "trace-b" };
 const CURSOR_PAGE_3 = { sortValue: 1_700_000_001_000, traceId: "trace-c" };
@@ -94,11 +93,7 @@ describe("useURLSync pagination across browser history navigation", () => {
         act(() => seedThirdPage());
 
         act(() => {
-          window.history.replaceState(
-            null,
-            "",
-            "/#all-traces?q=status%3Aerror",
-          );
+          window.history.replaceState(null, "", "/#all-traces?q=status%3Aerror");
           popState();
         });
 

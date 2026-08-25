@@ -27,10 +27,7 @@ export class HaystackExtractor implements CanonicalAttributesExtractor {
     // Detection Check
     // Only process spans from Haystack instrumentation
     // ─────────────────────────────────────────────────────────────────────────
-    if (
-      ctx.span.instrumentationScope.name !==
-      "openinference.instrumentation.haystack"
-    ) {
+    if (ctx.span.instrumentationScope.name !== "openinference.instrumentation.haystack") {
       return;
     }
 
@@ -60,15 +57,11 @@ export class HaystackExtractor implements CanonicalAttributesExtractor {
 
         const id = document.id;
         return {
-          ...(typeof id === "string" && id.length > 0
-            ? { document_id: id }
-            : {}),
+          ...(typeof id === "string" && id.length > 0 ? { document_id: id } : {}),
           content,
         };
       })
-      .filter(
-        (x): x is { content: string; document_id?: string } => x !== null,
-      );
+      .filter((x): x is { content: string; document_id?: string } => x !== null);
 
     if (contexts.length === 0) {
       return;

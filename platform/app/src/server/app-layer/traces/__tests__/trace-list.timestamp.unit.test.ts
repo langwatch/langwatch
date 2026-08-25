@@ -71,9 +71,7 @@ describe("the trace times a reader sees", () => {
       });
 
       expect(mapToTraceListItem(withSpans).timestamp).toBe(ANCHOR_MS + 250);
-      expect(mapTraceSummaryToHeader(withSpans).timestamp).toBe(
-        ANCHOR_MS + 250,
-      );
+      expect(mapTraceSummaryToHeader(withSpans).timestamp).toBe(ANCHOR_MS + 250);
     });
   });
 });

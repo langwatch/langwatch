@@ -53,9 +53,7 @@ const PromptCellView: React.FC<{ row: TraceListItem; density: Density }> = ({
 
   return (
     <FilterChip
-      onFilter={() =>
-        useFilterStore.getState().toggleFacet("lastUsedPrompt", promptId)
-      }
+      onFilter={() => useFilterStore.getState().toggleFacet("lastUsedPrompt", promptId)}
       filterLabel={`Filter by prompt "${name}"`}
       {...openProps}
     >
@@ -84,7 +82,5 @@ export const PromptCell = {
   id: "prompt",
   label: "Prompt",
   render: ({ row }) => <PromptCellView row={row} density="compact" />,
-  renderComfortable: ({ row }) => (
-    <PromptCellView row={row} density="comfortable" />
-  ),
+  renderComfortable: ({ row }) => <PromptCellView row={row} density="comfortable" />,
 } as const satisfies CellDef<TraceListItem>;

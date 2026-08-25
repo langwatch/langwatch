@@ -58,19 +58,14 @@ export function LangyHomeHero() {
 
   const reach = useProjectReach();
   const isNewProject =
-    devState === "empty"
-      ? true
-      : devState === "populated"
-        ? false
-        : reach.isNewProject;
+    devState === "empty" ? true : devState === "populated" ? false : reach.isNewProject;
 
   // Until the project's reach is known, "has nothing" and "has not answered
   // yet" look identical, and offering the empty-project asks to a project with
   // months of runs (then swapping them out a beat later) is worse than a beat
   // of nothing: the reader reaches for a chip that moves. A pinned dev state is
   // an answer, so it skips the wait.
-  const reachKnown =
-    devState === "empty" || devState === "populated" || !reach.isLoading;
+  const reachKnown = devState === "empty" || devState === "populated" || !reach.isLoading;
   // Only once the answer is actually known: leading with "send your first
   // trace" at a project that already has thousands is the product not knowing
   // its own customer, and `isNewProject` reads false while the check is still
@@ -102,18 +97,14 @@ export function LangyHomeHero() {
     inputRef.current?.select();
   }, []);
 
-  useEffect(
-    () => registerInlinePalette(focusField),
-    [registerInlinePalette, focusField],
-  );
+  useEffect(() => registerInlinePalette(focusField), [registerInlinePalette, focusField]);
 
   // Blur closes the results, but not while the click that caused it is landing
   // on a result: the mousedown fires first, and standing down there would
   // unmount the row before its click ever arrived.
   const onBlur = useCallback(() => {
     window.setTimeout(() => {
-      if (!fieldRef.current?.contains(document.activeElement))
-        setFocused(false);
+      if (!fieldRef.current?.contains(document.activeElement)) setFocused(false);
     }, 0);
   }, []);
 
@@ -198,10 +189,7 @@ export function LangyHomeHero() {
               control that changes that comes first, which in a stack means
               above, not merely left. */}
           {leadWithOnboarding ? (
-            <OnboardAgentPill
-              prominent
-              onAskLangy={canAsk ? askLangy : undefined}
-            />
+            <OnboardAgentPill prominent onAskLangy={canAsk ? askLangy : undefined} />
           ) : null}
           <Box
             width="full"
@@ -230,8 +218,8 @@ export function LangyHomeHero() {
 
         {!canAsk ? (
           <Text fontSize="12px" color="fg.subtle" textAlign="center">
-            You can read Langy conversations here. To start one, ask whoever
-            manages your account for access.
+            You can read Langy conversations here. To start one, ask whoever manages your
+            account for access.
           </Text>
         ) : null}
       </VStack>

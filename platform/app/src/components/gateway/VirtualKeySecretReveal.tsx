@@ -91,8 +91,8 @@ export function VirtualKeySecretReveal({
               <Alert.Content>
                 <Alert.Title>You will only see this secret once.</Alert.Title>
                 <Alert.Description>
-                  LangWatch stores only a hash. Copy and save the raw secret in
-                  your password manager or secret store before closing.
+                  LangWatch stores only a hash. Copy and save the raw secret in your
+                  password manager or secret store before closing.
                 </Alert.Description>
               </Alert.Content>
             </Alert.Root>
@@ -102,9 +102,9 @@ export function VirtualKeySecretReveal({
                 <Alert.Content>
                   <Alert.Title>24-hour grace window active.</Alert.Title>
                   <Alert.Description>
-                    The previous secret keeps working for 24 hours so clients
-                    can roll over gradually. After that it hard-fails with a 401
-                    even though this key stays active.
+                    The previous secret keeps working for 24 hours so clients can roll
+                    over gradually. After that it hard-fails with a 401 even though this
+                    key stays active.
                   </Alert.Description>
                 </Alert.Content>
               </Alert.Root>
@@ -129,12 +129,7 @@ export function VirtualKeySecretReveal({
                 gap={2}
               >
                 <Box flex={1} overflowX="auto">
-                  <Code
-                    fontSize="sm"
-                    bg="transparent"
-                    paddingX={0}
-                    whiteSpace="nowrap"
-                  >
+                  <Code fontSize="sm" bg="transparent" paddingX={0} whiteSpace="nowrap">
                     {revealed ? secret : maskSecret(secret)}
                   </Code>
                 </Box>
@@ -171,9 +166,7 @@ export function VirtualKeySecretReveal({
                 onChange={(e) => setConfirmed(e.target.checked)}
               />
               <label htmlFor="vk-secret-confirm">
-                <Text fontSize="sm">
-                  I've saved the secret in a safe place.
-                </Text>
+                <Text fontSize="sm">I've saved the secret in a safe place.</Text>
               </label>
             </HStack>
             <Box flex={1} />

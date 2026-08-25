@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { arbitrateClaims } from "../src/credential-claims";
 
-type TestClaim =
-  | { kind: "api-key"; token: string }
-  | { kind: "session"; userId: string };
+type TestClaim = { kind: "api-key"; token: string } | { kind: "session"; userId: string };
 
 describe("credential arbitration", () => {
   describe("given exactly one credential kind claims the request", () => {

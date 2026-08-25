@@ -15,14 +15,7 @@ import { z } from "zod";
  * - skipped: Intentionally skipped
  */
 export type ParsedEvaluationResult = {
-  status:
-    | "pending"
-    | "running"
-    | "passed"
-    | "failed"
-    | "processed"
-    | "error"
-    | "skipped";
+  status: "pending" | "running" | "passed" | "failed" | "processed" | "error" | "skipped";
   score?: number;
   label?: string;
   details?: string;
@@ -104,9 +97,7 @@ function readSerializedDomainError(
  * @param result - The raw evaluation result (can be boolean, object, or undefined)
  * @returns Parsed evaluation result with status and optional score/label/details
  */
-export const parseEvaluationResult = (
-  result: unknown,
-): ParsedEvaluationResult => {
+export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult => {
   if (result === null || result === undefined) {
     return { status: "pending" };
   }
@@ -240,9 +231,7 @@ export const EVALUATION_STATUS_TONES = {
 /**
  * Returns a human-readable status label.
  */
-export const getStatusLabel = (
-  status: ParsedEvaluationResult["status"],
-): string => {
+export const getStatusLabel = (status: ParsedEvaluationResult["status"]): string => {
   switch (status) {
     case "running":
       return "Running";
@@ -343,9 +332,7 @@ export interface EvalChipDisplay {
 }
 
 /** Map any source's status string onto the canonical v3 status enum. */
-function normalizeEvalStatus(
-  input: EvalChipInput,
-): ParsedEvaluationResult["status"] {
+function normalizeEvalStatus(input: EvalChipInput): ParsedEvaluationResult["status"] {
   switch (input.status) {
     case "passed":
     case "pass":
@@ -408,8 +395,7 @@ export function getEvalChipDisplay(input: EvalChipInput): EvalChipDisplay {
     color: EVALUATION_STATUS_COLORS[status],
     statusLabel: getStatusLabel(status),
     categoryLabel,
-    displayName:
-      input.name || input.evaluatorName || input.evaluatorId || "Unknown",
+    displayName: input.name || input.evaluatorName || input.evaluatorId || "Unknown",
     scoreText,
     noVerdict,
     passLabel:
@@ -440,8 +426,7 @@ function resolveCategoryLabel({
 }): string | null {
   if (noVerdict || !input.label || input.passed != null) return null;
   const isCategorical =
-    input.scoreType === "categorical" ||
-    (input.scoreType == null && input.score == null);
+    input.scoreType === "categorical" || (input.scoreType == null && input.score == null);
   return isCategorical ? input.label : null;
 }
 

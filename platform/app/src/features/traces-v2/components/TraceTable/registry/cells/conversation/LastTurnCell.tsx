@@ -8,9 +8,7 @@ export const LastTurnCell: CellDef<ConversationGroup> = {
   id: "lastTurn",
   label: "Last Activity",
   render: ({ row }) => (
-    <MonoCell color="fg.muted">
-      {formatRelativeTime(row.latestTimestamp)}
-    </MonoCell>
+    <MonoCell color="fg.muted">{formatRelativeTime(row.latestTimestamp)}</MonoCell>
   ),
   renderComfortable: ({ row }) => (
     <Text textStyle="xs" color="fg">

@@ -33,9 +33,7 @@ const PATCH_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 function parsePatch(body: unknown) {
   const parsed = scimPatchRequestSchema.safeParse(body);
   if (!parsed.success) {
-    throw new Error(
-      `SCIM PATCH rejected at the schema: ${parsed.error.message}`,
-    );
+    throw new Error(`SCIM PATCH rejected at the schema: ${parsed.error.message}`);
   }
   return parsed.data;
 }
@@ -80,9 +78,7 @@ function createMockPrisma() {
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       findMany: vi.fn().mockResolvedValue([]),
     },
-    $transaction: vi
-      .fn()
-      .mockImplementation((ops: unknown[]) => Promise.all(ops)),
+    $transaction: vi.fn().mockImplementation((ops: unknown[]) => Promise.all(ops)),
   };
   return mock as unknown as PrismaClient & typeof mock;
 }
@@ -160,9 +156,7 @@ describe("SCIM PATCH op casing", () => {
           organizationId: "org-1",
           patchRequest: parsePatch({
             schemas: [PATCH_SCHEMA],
-            Operations: [
-              { op: "Add", path: "members", value: [{ value: "user-1" }] },
-            ],
+            Operations: [{ op: "Add", path: "members", value: [{ value: "user-1" }] }],
           }),
         });
 
@@ -198,9 +192,7 @@ describe("SCIM PATCH op casing", () => {
           organizationId: "org-1",
           patchRequest: parsePatch({
             schemas: [PATCH_SCHEMA],
-            Operations: [
-              { op: "Replace", path: "displayName", value: "Platform" },
-            ],
+            Operations: [{ op: "Replace", path: "displayName", value: "Platform" }],
           }),
         });
 

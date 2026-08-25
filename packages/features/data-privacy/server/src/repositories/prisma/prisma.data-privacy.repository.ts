@@ -24,12 +24,14 @@ export class PrismaDataPrivacyPolicyRepository extends DataPrivacyPolicyReposito
     organizationId: string;
     scopes: Array<Pick<DataPrivacyRow, "scopeType" | "scopeId" | "personalOnly">>;
   }): Promise<DataPrivacyRow[]> {
-    const pairs = [...new Map(
-      input.scopes.map((candidate) => [
-        `${candidate.scopeType}:${candidate.scopeId}`,
-        { scopeType: candidate.scopeType, scopeId: candidate.scopeId },
-      ]),
-    ).values()];
+    const pairs = [
+      ...new Map(
+        input.scopes.map((candidate) => [
+          `${candidate.scopeType}:${candidate.scopeId}`,
+          { scopeType: candidate.scopeType, scopeId: candidate.scopeId },
+        ]),
+      ).values(),
+    ];
     const rows = await this.database.dataPrivacyPolicy.findMany({
       where: {
         organizationId: input.organizationId,
@@ -46,7 +48,9 @@ export class PrismaDataPrivacyPolicyRepository extends DataPrivacyPolicyReposito
     );
   }
 
-  async findAllInOrganization(input: { organizationId: string }): Promise<DataPrivacyPolicy[]> {
+  async findAllInOrganization(input: {
+    organizationId: string;
+  }): Promise<DataPrivacyPolicy[]> {
     const rows = await this.database.dataPrivacyPolicy.findMany({
       where: { organizationId: input.organizationId },
     });
@@ -96,7 +100,9 @@ export class PrismaDataPrivacyPolicyRepository extends DataPrivacyPolicyReposito
   }
 
   async tryFindById(input: { id: string }): Promise<DataPrivacyPolicy | null> {
-    const row = await this.database.dataPrivacyPolicy.findUnique({ where: { id: input.id } });
+    const row = await this.database.dataPrivacyPolicy.findUnique({
+      where: { id: input.id },
+    });
     return row ? dataPrivacyPolicySchema.parse(row) : null;
   }
 }

@@ -90,9 +90,7 @@ export function BelowFoldIndicator({
         if (!label) continue;
         const rawCount = node.dataset.sectionCount;
         const parsedCount =
-          rawCount != null && rawCount !== ""
-            ? Number.parseInt(rawCount, 10)
-            : null;
+          rawCount != null && rawCount !== "" ? Number.parseInt(rawCount, 10) : null;
         const count = Number.isFinite(parsedCount) ? parsedCount : null;
         if (count === 0) continue;
         sections.push({ label, count: count ?? null });
@@ -171,9 +169,7 @@ export function BelowFoldIndicator({
           paddingX={4}
           gap={2}
           _hover={{ bg: "bg.panel/80", transform: "translateY(-1px)" }}
-          aria-label={
-            summary ? `Below the fold: ${summary}` : "Scroll to bottom"
-          }
+          aria-label={summary ? `Below the fold: ${summary}` : "Scroll to bottom"}
           maxWidth="min(540px, 90vw)"
         >
           <Icon as={LuChevronDown} boxSize={3.5} color="fg.muted" />

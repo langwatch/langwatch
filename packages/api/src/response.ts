@@ -49,10 +49,9 @@ export function serializeEndpointResult({
     // only by the concrete URL, leaving "which endpoint breaks its own
     // contract" a question you had to answer by hand.
     const route = c.get(ENDPOINT_ROUTE) as string | undefined;
-    throw new Error(
-      `Response failed output validation${route ? ` for ${route}` : ""}`,
-      { cause: validation.error },
-    );
+    throw new Error(`Response failed output validation${route ? ` for ${route}` : ""}`, {
+      cause: validation.error,
+    });
   }
 
   // Reachable only for a `z.void()` / `z.undefined()` output, because

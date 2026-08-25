@@ -33,10 +33,7 @@ export function RegistryModelsModal({
 }: RegistryModelsModalProps) {
   const [search, setSearch] = useState("");
 
-  const chatModels = useMemo(
-    () => getProviderModelOptions(provider, "chat"),
-    [provider],
-  );
+  const chatModels = useMemo(() => getProviderModelOptions(provider, "chat"), [provider]);
 
   const embeddingModels = useMemo(
     () => getProviderModelOptions(provider, "embedding"),
@@ -47,9 +44,7 @@ export function RegistryModelsModal({
     if (!search.trim()) return chatModels;
     const term = search.toLowerCase();
     return chatModels.filter(
-      (m) =>
-        m.value.toLowerCase().includes(term) ||
-        m.label.toLowerCase().includes(term),
+      (m) => m.value.toLowerCase().includes(term) || m.label.toLowerCase().includes(term),
     );
   }, [chatModels, search]);
 
@@ -57,9 +52,7 @@ export function RegistryModelsModal({
     if (!search.trim()) return embeddingModels;
     const term = search.toLowerCase();
     return embeddingModels.filter(
-      (m) =>
-        m.value.toLowerCase().includes(term) ||
-        m.label.toLowerCase().includes(term),
+      (m) => m.value.toLowerCase().includes(term) || m.label.toLowerCase().includes(term),
     );
   }, [embeddingModels, search]);
 
@@ -69,14 +62,8 @@ export function RegistryModelsModal({
   };
 
   return (
-    <DialogRoot
-      open={open}
-      onOpenChange={(e) => !e.open && handleClose()}
-      size="lg"
-    >
-      <DialogContent
-        {...(dialogBackground ? { background: dialogBackground } : {})}
-      >
+    <DialogRoot open={open} onOpenChange={(e) => !e.open && handleClose()} size="lg">
+      <DialogContent {...(dialogBackground ? { background: dialogBackground } : {})}>
         <DialogHeader>
           <DialogTitle>Registry Models</DialogTitle>
         </DialogHeader>
@@ -131,12 +118,11 @@ export function RegistryModelsModal({
               </VStack>
             )}
 
-            {filteredChatModels.length === 0 &&
-              filteredEmbeddingModels.length === 0 && (
-                <Text fontSize="sm" color="fg.muted" textAlign="center">
-                  No models found
-                </Text>
-              )}
+            {filteredChatModels.length === 0 && filteredEmbeddingModels.length === 0 && (
+              <Text fontSize="sm" color="fg.muted" textAlign="center">
+                No models found
+              </Text>
+            )}
           </VStack>
         </DialogBody>
       </DialogContent>

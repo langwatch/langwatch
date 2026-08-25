@@ -124,9 +124,7 @@ function DerivedBlockBody({
 const MAX_TABLE_ROWS = 30;
 
 /** One cell, one rule per primitive — flat, no branching in the JSX. */
-function formatCell(
-  cell: string | number | boolean | null | undefined,
-): string {
+function formatCell(cell: string | number | boolean | null | undefined): string {
   if (cell === null || cell === undefined) return "—";
   if (typeof cell === "boolean") return cell ? "yes" : "no";
   if (typeof cell === "number") return cell.toLocaleString();
@@ -203,9 +201,7 @@ function DerivedStatsBody({ card }: { card: LangyDerivedStatsCard }) {
             {item.label}
           </Text>
           <Text textStyle="xs" color="fg" wordBreak="break-word">
-            {typeof item.value === "number"
-              ? item.value.toLocaleString()
-              : item.value}
+            {typeof item.value === "number" ? item.value.toLocaleString() : item.value}
             {item.unit ? ` ${item.unit}` : ""}
           </Text>
         </Box>

@@ -20,9 +20,7 @@ import {
 } from "@langwatch/langy-server/streaming/langy-frame-auth";
 
 interface Vectors {
-  vectors: Array<
-    LangyFrameSigned & { name: string; runToken: string; mac: string }
-  >;
+  vectors: Array<LangyFrameSigned & { name: string; runToken: string; mac: string }>;
   fieldShift: {
     runToken: string;
     a: LangyFrameSigned & { mac: string };
@@ -34,14 +32,7 @@ interface Vectors {
 // `platform/app/`, so the repo-root `specs/` dir is two levels up.
 const VECTORS: Vectors = JSON.parse(
   readFileSync(
-    resolve(
-      process.cwd(),
-      "..",
-      "..",
-      "specs",
-      "langy",
-      "langy-frame-auth.vectors.json",
-    ),
+    resolve(process.cwd(), "..", "..", "specs", "langy", "langy-frame-auth.vectors.json"),
     "utf8",
   ),
 ) as Vectors;
@@ -55,11 +46,12 @@ const identityOf = (f: LangyFrameSigned) => ({
 
 describe("computeFrameMac", () => {
   describe("given the cross-language test vectors", () => {
-    it.each(
-      VECTORS.vectors.map((v) => [v.name, v] as const),
-    )("reproduces the pinned MAC for %s (Go ≡ TS ≡ oracle)", (_name, v) => {
-      expect(computeFrameMac(v.runToken, v)).toBe(v.mac);
-    });
+    it.each(VECTORS.vectors.map((v) => [v.name, v] as const))(
+      "reproduces the pinned MAC for %s (Go ≡ TS ≡ oracle)",
+      (_name, v) => {
+        expect(computeFrameMac(v.runToken, v)).toBe(v.mac);
+      },
+    );
   });
 
   describe("given two field tuples that share a raw concatenation", () => {
@@ -92,11 +84,7 @@ describe("signFrame / verifyFrame", () => {
 
   describe("given the payload is tampered after signing", () => {
     it("fails verification — the body is inside the MAC", () => {
-      const frame = signFrame(
-        runToken,
-        identity,
-        '{"type":"delta","text":"hi"}',
-      );
+      const frame = signFrame(runToken, identity, '{"type":"delta","text":"hi"}');
       const tampered: LangyFrameEnvelope = {
         ...frame,
         payload: '{"type":"delta","text":"HACKED"}',
@@ -106,17 +94,14 @@ describe("signFrame / verifyFrame", () => {
   });
 
   describe("given an identity field is tampered after signing", () => {
-    it.each([
-      "projectId",
-      "userId",
-      "conversationId",
-      "turnId",
-      "frameNonce",
-    ] as const)("fails verification when %s is changed", (field) => {
-      const frame = signFrame(runToken, identity, "p");
-      const tampered = { ...frame, [field]: frame[field] + "x" };
-      expect(verifyFrame(runToken, tampered)).toBe(false);
-    });
+    it.each(["projectId", "userId", "conversationId", "turnId", "frameNonce"] as const)(
+      "fails verification when %s is changed",
+      (field) => {
+        const frame = signFrame(runToken, identity, "p");
+        const tampered = { ...frame, [field]: frame[field] + "x" };
+        expect(verifyFrame(runToken, tampered)).toBe(false);
+      },
+    );
   });
 
   describe("given a different runToken than the one that signed", () => {

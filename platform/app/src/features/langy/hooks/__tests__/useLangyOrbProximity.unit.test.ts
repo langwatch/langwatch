@@ -41,9 +41,7 @@ function makeOrb(): HTMLButtonElement {
 /** Move the pointer next to the orb and let the animation frame it schedules run. */
 function movePointerNearTheOrb() {
   act(() => {
-    window.dispatchEvent(
-      new MouseEvent("pointermove", { clientX: 120, clientY: 120 }),
-    );
+    window.dispatchEvent(new MouseEvent("pointermove", { clientX: 120, clientY: 120 }));
     vi.advanceTimersByTime(32);
   });
 }

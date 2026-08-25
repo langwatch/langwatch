@@ -36,8 +36,7 @@ const EVALUATOR_RESULT_DESCRIPTIONS: Record<string, string> = {
   passed: "Whether the evaluation passed or not.",
   score: "Any numerical score.",
   label: "A category, for categorical evaluations.",
-  details:
-    "The reasoning behind the result, usually the LLM as judge explanation.",
+  details: "The reasoning behind the result, usually the LLM as judge explanation.",
 };
 
 export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
@@ -57,8 +56,7 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
   // the node flag, and those were the ones still showing free-form fields
   // where users hand-created "score"/"passed" - the exact confusion this
   // contract removes.
-  const isEvaluator =
-    node.data.behave_as === "evaluator" || workflowType === "evaluator";
+  const isEvaluator = node.data.behave_as === "evaluator" || workflowType === "evaluator";
 
   // Pin the evaluator end node to the fixed result vocabulary. Existing
   // connections survive (identifiers keep their handles); free-form fields
@@ -97,8 +95,7 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
   const hasResultConnected = edges.some(
     (edge) =>
       edge.target === node.id &&
-      (edge.targetHandle === "inputs.score" ||
-        edge.targetHandle === "inputs.passed"),
+      (edge.targetHandle === "inputs.score" || edge.targetHandle === "inputs.passed"),
   );
 
   // Non-evaluator end nodes keep free-form results, rendered through the
@@ -134,8 +131,8 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
             Results
           </Text>
           <Text fontSize="13px" color="fg.muted">
-            Evaluators return up to these four results. Connect the ones your
-            workflow produces; unconnected results are simply omitted.
+            Evaluators return up to these four results. Connect the ones your workflow
+            produces; unconnected results are simply omitted.
           </Text>
           <Box display="flex" flexDirection="column" gap={3}>
             {EVALUATOR_RESULT_FIELDS.map((field) => (
@@ -173,8 +170,8 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
           <Alert.Indicator />
           <Alert.Content>
             <Text>
-              Connect at least one result, usually a <b>passed</b> or a{" "}
-              <b>score</b>, for this evaluator to be useful.
+              Connect at least one result, usually a <b>passed</b> or a <b>score</b>, for
+              this evaluator to be useful.
             </Text>
           </Alert.Content>
         </Alert.Root>

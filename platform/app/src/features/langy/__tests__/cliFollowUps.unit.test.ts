@@ -7,9 +7,7 @@ import {
   SUGGESTION_LABEL,
 } from "../components/capabilities/cliFollowUps";
 
-const traceSearch = (
-  overrides: Partial<SettledToolResult> = {},
-): SettledToolResult => ({
+const traceSearch = (overrides: Partial<SettledToolResult> = {}): SettledToolResult => ({
   name: "langwatch.trace.search",
   state: "output-available",
   output: JSON.stringify({
@@ -77,16 +75,12 @@ describe("followUpsForResult", () => {
 
   describe("given a call that has not settled successfully", () => {
     it("offers nothing while the call is still running", () => {
-      expect(
-        followUpsForResult(traceSearch({ state: "input-available" })),
-      ).toEqual([]);
+      expect(followUpsForResult(traceSearch({ state: "input-available" }))).toEqual([]);
     });
 
     it("offers nothing on a failed call", () => {
       expect(
-        followUpsForResult(
-          traceSearch({ state: "output-error", output: "not found" }),
-        ),
+        followUpsForResult(traceSearch({ state: "output-error", output: "not found" })),
       ).toEqual([]);
     });
   });
@@ -110,9 +104,7 @@ describe("followUpsForResult", () => {
         followUpsForResult({
           name: "langwatch.prompt.list",
           state: "output-available",
-          output: JSON.stringify([
-            { id: "prompt_1", handle: "demo-prompt", version: 3 },
-          ]),
+          output: JSON.stringify([{ id: "prompt_1", handle: "demo-prompt", version: 3 }]),
         }),
       ).toEqual([]);
     });
@@ -149,10 +141,7 @@ describe("deriveFollowUps", () => {
   describe("given a turn with several tool calls", () => {
     it("offers each follow-up once, in first-seen order", () => {
       const suggestions = deriveFollowUps({
-        results: [
-          traceSearch(),
-          traceSearch({ name: "langwatch.trace.export" }),
-        ],
+        results: [traceSearch(), traceSearch({ name: "langwatch.trace.export" })],
       });
 
       const ids = suggestions.map((suggestion) => suggestion.id);
@@ -179,9 +168,7 @@ describe("the suggestion copy, given feature-map.json is the source of structure
   describe("when a feature is worded for an offer", () => {
     it("words only features the map actually declares", () => {
       const featureIds = new Set(FEATURES.map((feature) => feature.id));
-      const unknown = Object.keys(SUGGESTION_LABEL).filter(
-        (id) => !featureIds.has(id),
-      );
+      const unknown = Object.keys(SUGGESTION_LABEL).filter((id) => !featureIds.has(id));
 
       expect(unknown).toEqual([]);
     });
@@ -192,9 +179,7 @@ describe("the suggestion copy, given feature-map.json is the source of structure
           (feature) => feature.id,
         ),
       );
-      const orphaned = Object.keys(SUGGESTION_LABEL).filter(
-        (id) => !consumers.has(id),
-      );
+      const orphaned = Object.keys(SUGGESTION_LABEL).filter((id) => !consumers.has(id));
 
       expect(orphaned).toEqual([]);
     });

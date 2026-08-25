@@ -19,8 +19,7 @@ import React, {
  */
 export const PANEL_ANIMATION_DURATION = 0.4;
 export const PANEL_ANIMATION_DELAY = 0.1;
-export const CENTER_CONTENT_BOX_ID =
-  "InputOutputExecutablePanel.CenterContent.Box";
+export const CENTER_CONTENT_BOX_ID = "InputOutputExecutablePanel.CenterContent.Box";
 
 interface InputOutputExecutablePanelProps {
   children: React.ReactNode;
@@ -64,8 +63,7 @@ const InputOutputExecutablePanelComponent = forwardRef(
 
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-        const isPopoverOpen =
-          document.querySelector(".chakra-popover__popper") !== null;
+        const isPopoverOpen = document.querySelector(".chakra-popover__popper") !== null;
         if (e.key === "Escape" && isExpanded && !isPopoverOpen) {
           onCloseExpanded();
           e.stopPropagation();
@@ -184,9 +182,7 @@ const InputOutputExecutablePanelComponent = forwardRef(
             borderTopWidth: isExpanded ? "1px" : 0,
             borderBottomWidth: isExpanded ? "1px" : 0,
             borderRightWidth: isExpanded ? "1px" : 0,
-            boxShadow: isExpanded
-              ? "0 0 10px rgba(0,0,0,0.1)"
-              : "0 0 0 rgba(0,0,0,0)",
+            boxShadow: isExpanded ? "0 0 10px rgba(0,0,0,0.1)" : "0 0 0 rgba(0,0,0,0)",
           }}
           transition={{
             duration: PANEL_ANIMATION_DURATION,

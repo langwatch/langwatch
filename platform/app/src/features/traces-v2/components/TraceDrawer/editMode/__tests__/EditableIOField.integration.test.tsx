@@ -42,18 +42,14 @@ describe("EditableIOField", () => {
         const { getByLabelText } = renderField();
 
         const editor = getByLabelText("Edit output") as HTMLTextAreaElement;
-        expect(editor.value).toBe(
-          JSON.stringify(JSON.parse(CAPTURED_JSON), null, 2),
-        );
+        expect(editor.value).toBe(JSON.stringify(JSON.parse(CAPTURED_JSON), null, 2));
         expect(editor.value.split("\n").length).toBeGreaterThan(1);
       });
 
       it("offers no reset until the value is touched", () => {
         const { queryByRole } = renderField();
 
-        expect(
-          queryByRole("button", { name: /reset/i }),
-        ).not.toBeInTheDocument();
+        expect(queryByRole("button", { name: /reset/i })).not.toBeInTheDocument();
       });
     });
 
@@ -115,9 +111,9 @@ describe("EditableIOField", () => {
             />
           </ChakraProvider>,
         );
-        expect(
-          (getByLabelText("Edit output") as HTMLTextAreaElement).value,
-        ).toBe(JSON.stringify(JSON.parse(CAPTURED_JSON), null, 2));
+        expect((getByLabelText("Edit output") as HTMLTextAreaElement).value).toBe(
+          JSON.stringify(JSON.parse(CAPTURED_JSON), null, 2),
+        );
       });
     });
   });
@@ -130,9 +126,7 @@ describe("EditableIOField", () => {
           captured: "x".repeat(100_001),
         });
 
-        expect(
-          getByText("This field is too large to edit here"),
-        ).toBeInTheDocument();
+        expect(getByText("This field is too large to edit here")).toBeInTheDocument();
         expect(queryByLabelText("Edit output")).not.toBeInTheDocument();
       });
     });

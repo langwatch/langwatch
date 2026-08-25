@@ -79,9 +79,7 @@ describe("usePromptTags", () => {
       rerender();
 
       expect(result.current.data).not.toBe(first);
-      expect(result.current.data).toEqual([
-        { id: "canary-id", name: "canary" },
-      ]);
+      expect(result.current.data).toEqual([{ id: "canary-id", name: "canary" }]);
     });
   });
 });

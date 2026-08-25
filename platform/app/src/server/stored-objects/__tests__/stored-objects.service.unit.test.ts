@@ -73,10 +73,7 @@ import type { StorageRegistry } from "../storage-registry";
 import type { StoredObject } from "../stored-object";
 import type { StoredObjectsRepository } from "../stored-objects.repository";
 import type { MintStorageUri } from "../stored-objects.service";
-import {
-  deriveStoredObjectId,
-  StoredObjectsService,
-} from "../stored-objects.service";
+import { deriveStoredObjectId, StoredObjectsService } from "../stored-objects.service";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -200,9 +197,7 @@ describe("storeFromBytes", () => {
       // rather than later in the dedup correctness.
       vi.mocked(repo.findById).mockResolvedValue(null);
 
-      const expectedSha256 = createHash("sha256")
-        .update(TEST_BYTES)
-        .digest("hex");
+      const expectedSha256 = createHash("sha256").update(TEST_BYTES).digest("hex");
       const expectedId = deriveStoredObjectId({
         projectId: PROJECT_ID,
         sha256: expectedSha256,
@@ -288,9 +283,7 @@ describe("storeFromBytes", () => {
         vi.mocked(repo.insert).mockRejectedValueOnce(insertError);
         vi.mocked(registry.delete).mockRejectedValueOnce(deleteError);
 
-        await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow(
-          insertError,
-        );
+        await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow(insertError);
 
         expect(logger.error.mock.calls[0]?.[0]).toMatchObject({
           insertError,
@@ -671,9 +664,7 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
       // Digest computed independently from the input bytes, not read off the
       // row under test — otherwise a wrong sha256 would move both sides of
       // the comparison together and the assertion would still pass.
-      const expectedSha256 = createHash("sha256")
-        .update(TEST_BYTES)
-        .digest("hex");
+      const expectedSha256 = createHash("sha256").update(TEST_BYTES).digest("hex");
       expect(insertedRow.sha256).toBe(expectedSha256);
       expect(putUri).toBe(
         `azure-blob://lwacct/lw-container/${PROJECT_ID}/${expectedSha256}`,
@@ -688,11 +679,7 @@ describe("StoredObjectsService surface", () => {
   it("exposes storeFromBytes, getById, deleteOwnedBy", () => {
     const mintStub: MintStorageUri = async ({ projectId, sha256 }) =>
       `file:///tmp/${projectId}/${sha256}`;
-    const service = new StoredObjectsService(
-      makeRepository(),
-      makeRegistry(),
-      mintStub,
-    );
+    const service = new StoredObjectsService(makeRepository(), makeRegistry(), mintStub);
 
     expect(typeof service.storeFromBytes).toBe("function");
     expect(typeof service.getById).toBe("function");

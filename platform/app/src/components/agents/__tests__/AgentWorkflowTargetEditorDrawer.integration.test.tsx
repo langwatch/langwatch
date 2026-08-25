@@ -68,9 +68,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 const renderDrawer = (
-  props: Partial<
-    React.ComponentProps<typeof AgentWorkflowTargetEditorDrawer>
-  > = {},
+  props: Partial<React.ComponentProps<typeof AgentWorkflowTargetEditorDrawer>> = {},
 ) =>
   render(
     <ChakraProvider value={defaultSystem}>
@@ -122,9 +120,7 @@ describe("AgentWorkflowTargetEditorDrawer", () => {
       it("renders the linked workflow's name with a link to open it in Studio", () => {
         renderDrawer();
 
-        expect(
-          screen.getByText("fast resolution agent workflow"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("fast resolution agent workflow")).toBeInTheDocument();
 
         expect(screen.getByTestId("open-workflow-link")).toHaveAttribute(
           "href",

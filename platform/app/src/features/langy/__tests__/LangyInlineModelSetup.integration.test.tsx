@@ -102,31 +102,28 @@ vi.mock("@paper-design/shaders-react", () => ({
 // jsdom. The mock exposes the variant (proves the panel chose "langy") and a
 // button that fires `onComplete` (proves the save→unblock wiring).
 const lastOnComplete = { current: null as null | (() => void) };
-vi.mock(
-  "~/features/onboarding/components/sections/ModelProviderScreen",
-  () => ({
-    ModelProviderScreen: ({
-      variant,
-      onComplete,
-    }: {
-      variant: string;
-      onComplete?: () => void;
-    }) => {
-      lastOnComplete.current = onComplete ?? null;
-      return (
-        <div data-testid="model-provider-screen" data-variant={variant}>
-          <label>
-            Provider API Key
-            <input aria-label="Provider API Key" />
-          </label>
-          <button type="button" onClick={() => onComplete?.()}>
-            Save and continue
-          </button>
-        </div>
-      );
-    },
-  }),
-);
+vi.mock("~/features/onboarding/components/sections/ModelProviderScreen", () => ({
+  ModelProviderScreen: ({
+    variant,
+    onComplete,
+  }: {
+    variant: string;
+    onComplete?: () => void;
+  }) => {
+    lastOnComplete.current = onComplete ?? null;
+    return (
+      <div data-testid="model-provider-screen" data-variant={variant}>
+        <label>
+          Provider API Key
+          <input aria-label="Provider API Key" />
+        </label>
+        <button type="button" onClick={() => onComplete?.()}>
+          Save and continue
+        </button>
+      </div>
+    );
+  },
+}));
 
 // Drives langyNeedsModel. `model: null` (or absent) => setup; a string => the
 // panel resolves a model and skips the prompt. A refetch spy lets the "save
@@ -386,13 +383,8 @@ describe("Feature: Langy prompts for a model when the project has none configure
         // Saving fires the screen's onComplete, which the panel wired to
         // refetch the gate model (the save itself wrote the provider key +
         // project default — mocked at the screen boundary).
-        await user.type(
-          screen.getByLabelText("Provider API Key"),
-          "sk-test-key",
-        );
-        await user.click(
-          screen.getByRole("button", { name: "Save and continue" }),
-        );
+        await user.type(screen.getByLabelText("Provider API Key"), "sk-test-key");
+        await user.click(screen.getByRole("button", { name: "Save and continue" }));
 
         // The panel re-resolved the model in place (no navigation / reload):
         // the refetch ran...
@@ -409,9 +401,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
           ).not.toBeInTheDocument();
         });
         expect(
-          await screen.findByText(
-            "Just type away, or start with one of these.",
-          ),
+          await screen.findByText("Just type away, or start with one of these."),
         ).toBeInTheDocument();
       });
     });
@@ -438,9 +428,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
         // The panel's ordinary empty state is what a failed lookup must fall
         // back to, so pin that it is really there.
         expect(
-          await screen.findByText(
-            "Just type away, or start with one of these.",
-          ),
+          await screen.findByText("Just type away, or start with one of these."),
         ).toBeInTheDocument();
 
         await waitFor(() => {
@@ -467,18 +455,14 @@ describe("Feature: Langy prompts for a model when the project has none configure
 
         // The panel shows its normal empty state.
         expect(
-          await screen.findByText(
-            "Just type away, or start with one of these.",
-          ),
+          await screen.findByText("Just type away, or start with one of these."),
         ).toBeInTheDocument();
 
         // No model setup prompt is shown.
         expect(
           screen.queryByText("Langy needs a model to get started"),
         ).not.toBeInTheDocument();
-        expect(
-          screen.queryByTestId("model-provider-screen"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("model-provider-screen")).not.toBeInTheDocument();
       });
     });
   });

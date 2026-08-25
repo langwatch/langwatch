@@ -50,8 +50,7 @@ import { setOutputFormat } from "./outputScope";
  * `build --compile`, which cannot see through `createRequire`.
  */
 let yamlModulePromise: Promise<typeof yaml> | undefined;
-const loadYaml = (): Promise<typeof yaml> =>
-  (yamlModulePromise ??= import("js-yaml"));
+const loadYaml = (): Promise<typeof yaml> => (yamlModulePromise ??= import("js-yaml"));
 
 /** The formats the output contract knows. */
 const OUTPUT_FORMATS = ["table", "json", "agents", "yaml"] as const;
@@ -118,9 +117,8 @@ const isTruthyEnvValue = (value: string | undefined): boolean =>
   value !== undefined && value !== "" && value !== "0" && value !== "false";
 
 /** Whether the environment says the caller is an agent. */
-export const isAgentModeEnv = (
-  env: NodeJS.ProcessEnv = process.env,
-): boolean => AGENT_MODE_ENV_VARS.some((name) => isTruthyEnvValue(env[name]));
+export const isAgentModeEnv = (env: NodeJS.ProcessEnv = process.env): boolean =>
+  AGENT_MODE_ENV_VARS.some((name) => isTruthyEnvValue(env[name]));
 
 /**
  * THE central option preprocessor: maps every spelling a caller can use —
@@ -164,7 +162,12 @@ export const resolveOutputOptions = (
     format = "table";
   }
 
-  return { format, ...(fields?.length ? { fields } : {}), ...(raw.jq !== undefined ? { jq: raw.jq } : {}), agent };
+  return {
+    format,
+    ...(fields?.length ? { fields } : {}),
+    ...(raw.jq !== undefined ? { jq: raw.jq } : {}),
+    agent,
+  };
 };
 
 /**
@@ -302,7 +305,9 @@ export const applyJq = (expression: string, data: unknown): unknown => {
     const iterate = head.endsWith("[]");
     const key = iterate ? head.slice(0, -2) : head;
     if (key === "" && !iterate) {
-      throw new Error(`Invalid --jq expression "${expression}": empty segment at "${path}"`);
+      throw new Error(
+        `Invalid --jq expression "${expression}": empty segment at "${path}"`,
+      );
     }
     // `key === ""` reaching here means root-level iteration (`.[]`, `.[].name`):
     // there is no key to validate, and the non-iterating empty segment was
@@ -587,9 +592,8 @@ export const assertFormatIsSupported = async (
     raw.json !== undefined;
 
   if (requestedNewContractFlag) {
-    const { commandValidationError, reportCommandError } = await import(
-      "./errorOutput.js"
-    );
+    const { commandValidationError, reportCommandError } =
+      await import("./errorOutput.js");
     // Reported here rather than thrown: `preAction` runs OUTSIDE each
     // registration's try/catch, so a throw escapes to the dependency-free net
     // in index.ts and renders as `Error: [object Object]` — prose at a parser,
@@ -635,9 +639,7 @@ export const assertFormatIsSupported = async (
  * `preAction` hook awaits this, so the disabler has run before the command's
  * action (and its own chalk imports) executes.
  */
-export const applyOutputContext = async (
-  resolved: ResolvedOutput,
-): Promise<void> => {
+export const applyOutputContext = async (resolved: ResolvedOutput): Promise<void> => {
   // Machine formats fail as structured documents; agent mode's document is the
   // compact single-line form (see renderErrorAsJson), everything else pretty.
   setOutputFormat(
@@ -675,7 +677,8 @@ export const registerOutputOptions = (program: Command): void => {
   }[] = [
     {
       flags: "-o, --output <format>",
-      description: "Output format: table (default), json, agents (compact single-line JSON), or yaml",
+      description:
+        "Output format: table (default), json, agents (compact single-line JSON), or yaml",
       long: "--output",
       short: "-o",
       // Constrained so a typo (`-o jsn`) errors loudly at parse time instead
@@ -696,7 +699,8 @@ export const registerOutputOptions = (program: Command): void => {
     },
     {
       flags: "--agent",
-      description: "Agent mode: compact JSON output, no colour, no spinners (auto-detected from agent env vars)",
+      description:
+        "Agent mode: compact JSON output, no colour, no spinners (auto-detected from agent env vars)",
       long: "--agent",
     },
   ];
@@ -704,8 +708,9 @@ export const registerOutputOptions = (program: Command): void => {
   const visit = (command: Command, isRoot: boolean): void => {
     // Commander private API: there is no public accessor for
     // allowUnknownOption — re-check on commander upgrades.
-    const allowsUnknown = (command as unknown as { _allowUnknownOption?: boolean })
-      ._allowUnknownOption === true;
+    const allowsUnknown =
+      (command as unknown as { _allowUnknownOption?: boolean })._allowUnknownOption ===
+      true;
 
     if (!allowsUnknown) {
       for (const option of globals) {

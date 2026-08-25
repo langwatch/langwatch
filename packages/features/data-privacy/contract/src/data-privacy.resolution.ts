@@ -20,15 +20,31 @@ export function buildDataPrivacyChain(facts: DataPrivacyScopeFacts): Candidate[]
   ];
   if (facts.departmentId) {
     if (facts.isPersonal) {
-      chain.push({ scopeType: "DEPARTMENT", scopeId: facts.departmentId, personalOnly: true });
+      chain.push({
+        scopeType: "DEPARTMENT",
+        scopeId: facts.departmentId,
+        personalOnly: true,
+      });
     }
-    chain.push({ scopeType: "DEPARTMENT", scopeId: facts.departmentId, personalOnly: false });
+    chain.push({
+      scopeType: "DEPARTMENT",
+      scopeId: facts.departmentId,
+      personalOnly: false,
+    });
   }
   chain.push({ scopeType: "TEAM", scopeId: facts.teamId, personalOnly: false });
   if (facts.isPersonal) {
-    chain.push({ scopeType: "ORGANIZATION", scopeId: facts.organizationId, personalOnly: true });
+    chain.push({
+      scopeType: "ORGANIZATION",
+      scopeId: facts.organizationId,
+      personalOnly: true,
+    });
   }
-  chain.push({ scopeType: "ORGANIZATION", scopeId: facts.organizationId, personalOnly: false });
+  chain.push({
+    scopeType: "ORGANIZATION",
+    scopeId: facts.organizationId,
+    personalOnly: false,
+  });
   return chain;
 }
 
@@ -44,14 +60,20 @@ export function resolveDataPrivacy(input: {
       tools: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.tools },
     },
     pii: { ...PLATFORM_DEFAULT_DATA_PRIVACY.pii },
-    secrets: { enabled: PLATFORM_DEFAULT_DATA_PRIVACY.secrets.enabled, customPatterns: [] },
+    secrets: {
+      enabled: PLATFORM_DEFAULT_DATA_PRIVACY.secrets.enabled,
+      customPatterns: [],
+    },
     customAttributes: [],
   };
   const setCategory: Partial<Record<(typeof CONTENT_CATEGORIES)[number], boolean>> = {};
   let setPii = false;
   let setSecretsEnabled = false;
   const piiExceptPatterns = new Set<string>();
-  const attributeRules = new Map<string, ResolvedDataPrivacy["customAttributes"][number]>();
+  const attributeRules = new Map<
+    string,
+    ResolvedDataPrivacy["customAttributes"][number]
+  >();
   const customPatterns = new Set<string>();
 
   for (const candidate of buildDataPrivacyChain(input.facts)) {
@@ -81,7 +103,8 @@ export function resolveDataPrivacy(input: {
       };
       setPii = true;
     }
-    for (const pattern of config.pii?.exceptPatterns ?? []) piiExceptPatterns.add(pattern);
+    for (const pattern of config.pii?.exceptPatterns ?? [])
+      piiExceptPatterns.add(pattern);
     if (config.secrets && !setSecretsEnabled) {
       resolved.secrets.enabled = config.secrets.enabled;
       setSecretsEnabled = true;
@@ -95,7 +118,8 @@ export function resolveDataPrivacy(input: {
         });
       }
     }
-    for (const pattern of config.secrets?.customPatterns ?? []) customPatterns.add(pattern);
+    for (const pattern of config.secrets?.customPatterns ?? [])
+      customPatterns.add(pattern);
   }
   resolved.customAttributes = [...attributeRules.values()];
   resolved.secrets.customPatterns = [...customPatterns];

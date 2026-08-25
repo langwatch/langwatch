@@ -81,18 +81,14 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
   ArgValue: (arg) => arg.toJSON(),
 });
 
-export const isPythonRepr = (input: string) =>
-  /^[A-Z][A-Za-z0-9_]*\(/.test(input);
+export const isPythonRepr = (input: string) => /^[A-Z][A-Za-z0-9_]*\(/.test(input);
 
 export const parsePythonInsideJson = <T extends object>(item: T): T => {
   if (typeof item === "object" && Array.isArray(item)) {
     return item.map((item) => parsePythonInsideJson(item)) as T;
   } else if (typeof item === "object" && item !== null) {
     return Object.fromEntries(
-      Object.entries(item).map(([key, value]) => [
-        key,
-        parsePythonInsideJson(value),
-      ]),
+      Object.entries(item).map(([key, value]) => [key, parsePythonInsideJson(value)]),
     ) as T;
   } else if (typeof item === "string" && isPythonRepr(item)) {
     const match = grammar.match(item);

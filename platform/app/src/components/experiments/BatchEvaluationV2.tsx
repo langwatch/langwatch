@@ -15,13 +15,7 @@ import {
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, ExternalLink } from "react-feather";
 import type { Experiment, Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
@@ -148,8 +142,7 @@ export function BatchEvaluationV2({
               <Card.Root width="100%" overflow="hidden">
                 <Card.Header>
                   <Heading as="h2" size="md">
-                    {selectedRun?.workflowVersion?.commitMessage ??
-                      "Evaluation Results"}
+                    {selectedRun?.workflowVersion?.commitMessage ?? "Evaluation Results"}
                   </Heading>
                 </Card.Header>
                 <Card.Body padding={0}>
@@ -228,17 +221,16 @@ export const useBatchEvaluationState = ({
   const [isSomeRunning, setIsSomeRunning] = useState(false);
   const [keepFetching, setKeepFetching] = useState(false);
 
-  const batchEvaluationRuns =
-    api.experiments.getExperimentBatchEvaluationRuns.useQuery(
-      {
-        projectId: project?.id ?? "",
-        experimentId: experiment?.id ?? "",
-      },
-      {
-        refetchInterval: keepFetching ? 1 : isSomeRunning ? 3000 : 10_000,
-        enabled: !!project && !!experiment,
-      },
-    );
+  const batchEvaluationRuns = api.experiments.getExperimentBatchEvaluationRuns.useQuery(
+    {
+      projectId: project?.id ?? "",
+      experimentId: experiment?.id ?? "",
+    },
+    {
+      refetchInterval: keepFetching ? 1 : isSomeRunning ? 3000 : 10_000,
+      enabled: !!project && !!experiment,
+    },
+  );
 
   const router = useRouter();
 
@@ -273,9 +265,7 @@ export const useBatchEvaluationState = ({
     if (!selectedRun) {
       return false;
     }
-    return (
-      getFinishedAt(selectedRun.timestamps, new Date().getTime()) !== undefined
-    );
+    return getFinishedAt(selectedRun.timestamps, new Date().getTime()) !== undefined;
   }, [selectedRun]);
 
   useEffect(() => {
@@ -323,9 +313,7 @@ export function BatchEvaluationV2RunList({
   setSelectedRunId: (runId: string) => void;
   size?: "sm" | "md";
 } & StackProps) {
-  const hasAnyVersion = batchEvaluationRuns.data?.runs.some(
-    (run) => run.workflowVersion,
-  );
+  const hasAnyVersion = batchEvaluationRuns.data?.runs.some((run) => run.workflowVersion);
 
   return (
     <VStack
@@ -366,9 +354,7 @@ export function BatchEvaluationV2RunList({
         </Text>
       ) : (
         <>
-          {!batchEvaluationRuns.data?.runs.find(
-            (r) => r.runId === selectedRunId,
-          ) && (
+          {!batchEvaluationRuns.data?.runs.find((r) => r.runId === selectedRunId) && (
             <HStack
               paddingX={size === "sm" ? 2 : 4}
               paddingY={size === "sm" ? 2 : 3}
@@ -393,8 +379,7 @@ export function BatchEvaluationV2RunList({
           )}
           {batchEvaluationRuns.data?.runs.map((run, index) => {
             const runCost =
-              (run.summary.datasetCost ?? 0) +
-              (run.summary.evaluationsCost ?? 0);
+              (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
             const runName = getRunDisplayName({
               commitMessage: run.workflowVersion?.commitMessage,
               index,
@@ -408,12 +393,9 @@ export function BatchEvaluationV2RunList({
                 width="100%"
                 cursor="pointer"
                 role="button"
-                background={
-                  selectedRun?.runId === run.runId ? "gray.200" : "none"
-                }
+                background={selectedRun?.runId === run.runId ? "gray.200" : "none"}
                 _hover={{
-                  background:
-                    selectedRun?.runId === run.runId ? "gray.200" : "gray.100",
+                  background: selectedRun?.runId === run.runId ? "gray.200" : "gray.100",
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -467,9 +449,7 @@ export function BatchEvaluationV2RunList({
                             content={evaluation.name}
                             positioning={{ placement: "top" }}
                           >
-                            <Text>
-                              {formatEvaluationSummary(evaluation, true)}
-                            </Text>
+                            <Text>{formatEvaluationSummary(evaluation, true)}</Text>
                           </Tooltip>
                         </React.Fragment>
                       ))}
@@ -488,17 +468,10 @@ export function BatchEvaluationV2RunList({
                       </>
                     )}
                   </HStack>
-                  <HStack
-                    color="fg.subtle"
-                    fontSize={size === "sm" ? "12px" : "13px"}
-                  >
+                  <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"}>
                     <Text whiteSpace="nowrap" lineClamp={1}>
                       {run.timestamps.createdAt
-                        ? formatTimeAgo(
-                            run.timestamps.createdAt,
-                            "yyyy-MM-dd HH:mm",
-                            5,
-                          )
+                        ? formatTimeAgo(run.timestamps.createdAt, "yyyy-MM-dd HH:mm", 5)
                         : "Waiting for steps..."}
                     </Text>
                     {run.timestamps.stoppedAt && (

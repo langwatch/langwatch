@@ -1,7 +1,4 @@
-import type {
-  GroupQueueDefinition,
-  GroupQueuePayloadSchema,
-} from "./contracts";
+import type { GroupQueueDefinition, GroupQueuePayloadSchema } from "./contracts";
 
 export function defineGroupQueue<
   Payload extends Record<string, unknown>,
@@ -44,9 +41,7 @@ export function defineGroupQueue<
     deduplication: options.deduplication
       ? Object.freeze({ ...options.deduplication })
       : undefined,
-    coalescing: options.coalescing
-      ? Object.freeze({ ...options.coalescing })
-      : undefined,
+    coalescing: options.coalescing ? Object.freeze({ ...options.coalescing }) : undefined,
     name: name as Name,
     transportName: `{${name}}` as `{${Name}}`,
   });

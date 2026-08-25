@@ -95,9 +95,7 @@ setup("authenticate", async ({ page, request }) => {
     "| Projects:",
     orgs.flatMap((o) => o.teams).flatMap((t) => t.projects).length,
   );
-  const hasProject = orgs.some((o) =>
-    o.teams.some((t) => t.projects.length > 0),
-  );
+  const hasProject = orgs.some((o) => o.teams.some((t) => t.projects.length > 0));
 
   if (!hasProject) {
     console.log("No project found — creating org + project via API...");
@@ -143,9 +141,9 @@ setup("authenticate", async ({ page, request }) => {
     });
     // href is stable regardless of sidebar expand state (collapsed links
     // drop their text label), so match the Settings nav link by href.
-    await expect(
-      page.locator('a[href="/settings"]').first(),
-    ).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('a[href="/settings"]').first()).toBeVisible({
+      timeout: 30000,
+    });
   } catch (err) {
     console.log("Authenticated shell not confirmed. URL:", page.url());
     await page.screenshot({

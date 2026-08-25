@@ -8,9 +8,7 @@ interface LLMIntegrationPromptProps {
   codeLanguage: string;
 }
 
-export function generateLLMIntegrationPrompt(
-  props: LLMIntegrationPromptProps,
-): string {
+export function generateLLMIntegrationPrompt(props: LLMIntegrationPromptProps): string {
   const { frameworkLabel, install, docs, code, codeLanguage } = props;
 
   let prompt = `# Integrate LangWatch with ${frameworkLabel}\n\n`;
@@ -25,18 +23,14 @@ export function generateLLMIntegrationPrompt(
 
     if (install.js) {
       if (install.js.npm) prompt += `\`\`\`bash\n${install.js.npm}\n\`\`\`\n\n`;
-      if (install.js.pnpm)
-        prompt += `\`\`\`bash\n${install.js.pnpm}\n\`\`\`\n\n`;
-      if (install.js.yarn)
-        prompt += `\`\`\`bash\n${install.js.yarn}\n\`\`\`\n\n`;
+      if (install.js.pnpm) prompt += `\`\`\`bash\n${install.js.pnpm}\n\`\`\`\n\n`;
+      if (install.js.yarn) prompt += `\`\`\`bash\n${install.js.yarn}\n\`\`\`\n\n`;
       if (install.js.bun) prompt += `\`\`\`bash\n${install.js.bun}\n\`\`\`\n\n`;
     }
 
     if (install.python) {
-      if (install.python.pip)
-        prompt += `\`\`\`bash\n${install.python.pip}\n\`\`\`\n\n`;
-      if (install.python.uv)
-        prompt += `\`\`\`bash\n${install.python.uv}\n\`\`\`\n\n`;
+      if (install.python.pip) prompt += `\`\`\`bash\n${install.python.pip}\n\`\`\`\n\n`;
+      if (install.python.uv) prompt += `\`\`\`bash\n${install.python.uv}\n\`\`\`\n\n`;
     }
 
     if (install.go) {

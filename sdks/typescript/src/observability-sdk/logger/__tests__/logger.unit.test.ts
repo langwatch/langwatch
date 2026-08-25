@@ -1,8 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getLangWatchLogger, getLangWatchLoggerFromProvider, setLangWatchLoggerProvider, createLangWatchLogger } from "..";
+import {
+  getLangWatchLogger,
+  getLangWatchLoggerFromProvider,
+  setLangWatchLoggerProvider,
+  createLangWatchLogger,
+} from "..";
 import { logs, createNoopLogger } from "@opentelemetry/api-logs";
 import { type LangWatchLogRecord } from "../types";
-import { resetObservabilitySdkConfig, initializeObservabilitySdkConfig } from "../../config";
+import {
+  resetObservabilitySdkConfig,
+  initializeObservabilitySdkConfig,
+} from "../../config";
 
 vi.mock("@opentelemetry/api-logs", () => ({
   logs: {
@@ -28,8 +36,6 @@ describe("LangWatchLoggerInternal enabled()", () => {
     expect(wrappedLogger.enabled).toHaveBeenCalledWith(undefined);
   });
 });
-
-
 
 describe("LangWatch Logger", () => {
   let mockLogger: any;
@@ -131,7 +137,7 @@ describe("LangWatch Logger", () => {
 
       const logger = getLangWatchLoggerFromProvider(
         customProvider as any,
-        "custom-logger"
+        "custom-logger",
       );
 
       expect(logger).toBeDefined();
@@ -146,7 +152,7 @@ describe("LangWatch Logger", () => {
       const logger = getLangWatchLoggerFromProvider(
         customProvider as any,
         "custom-logger",
-        "2.0.0"
+        "2.0.0",
       );
 
       expect(logger).toBeDefined();
@@ -222,7 +228,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: originalBody,
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -231,7 +237,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: originalBody,
-        })
+        }),
       );
     });
 
@@ -249,7 +255,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: originalBody,
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -258,7 +264,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: undefined,
-        })
+        }),
       );
     });
 
@@ -276,7 +282,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: originalBody,
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -285,7 +291,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: originalBody,
-        })
+        }),
       );
     });
 
@@ -303,7 +309,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: originalBody,
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -312,7 +318,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: undefined,
-        })
+        }),
       );
     });
 
@@ -329,7 +335,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: originalBody,
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -338,7 +344,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: originalBody,
-        })
+        }),
       );
     });
 
@@ -355,7 +361,7 @@ describe("LangWatch Logger", () => {
         severityText: "ERROR",
         severityNumber: 17,
         body: "Test log message",
-        attributes: { "test": "value", "custom": "attribute" },
+        attributes: { test: "value", custom: "attribute" },
         timestamp: new Date(),
       };
 
@@ -367,9 +373,9 @@ describe("LangWatch Logger", () => {
           severityText: "ERROR",
           severityNumber: 17,
           body: undefined, // Only body should be modified
-          attributes: { "test": "value", "custom": "attribute" },
+          attributes: { test: "value", custom: "attribute" },
           timestamp: expect.any(Date),
-        })
+        }),
       );
     });
 
@@ -386,7 +392,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         // No body property
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -395,7 +401,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: undefined,
-        })
+        }),
       );
     });
 
@@ -412,7 +418,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: null as any,
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -421,7 +427,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: undefined,
-        })
+        }),
       );
     });
 
@@ -438,7 +444,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: "",
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -447,7 +453,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: undefined,
-        })
+        }),
       );
     });
   });
@@ -461,7 +467,7 @@ describe("LangWatch Logger", () => {
       ];
 
       expect(loggers).toHaveLength(3);
-      loggers.forEach(logger => {
+      loggers.forEach((logger) => {
         expect(logger).toBeDefined();
         expect(typeof logger.emit).toBe("function");
       });
@@ -475,7 +481,7 @@ describe("LangWatch Logger", () => {
       ];
 
       expect(loggers).toHaveLength(3);
-      loggers.forEach(logger => {
+      loggers.forEach((logger) => {
         expect(logger).toBeDefined();
         expect(typeof logger.emit).toBe("function");
       });

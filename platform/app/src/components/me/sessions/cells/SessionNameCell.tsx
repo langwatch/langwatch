@@ -4,7 +4,6 @@ import type React from "react";
 
 import { Tooltip } from "~/components/ui/tooltip";
 
-
 /**
  * What the session was called, over where it ran.
  *
@@ -46,9 +45,7 @@ export const SessionNameCell: React.FC<{
             </Text>
           )}
         </SessionNameButton>
-        {isOpening ? (
-          <Spinner size="xs" color="fg.muted" flexShrink={0} />
-        ) : null}
+        {isOpening ? <Spinner size="xs" color="fg.muted" flexShrink={0} /> : null}
       </HStack>
       {where === "" ? null : (
         <Tooltip content={where} positioning={{ placement: "bottom-start" }}>

@@ -87,9 +87,7 @@ describe("resendProvider.send", () => {
         defaultFrom: "LangWatch <noreply@langwatch.ai>",
       });
 
-      expect(fetchMock.mock.calls[0]?.[0]).toBe(
-        "https://api.resend.com/emails",
-      );
+      expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.resend.com/emails");
       expect(sentInit().headers.Authorization).toBe("Bearer re_test_key");
       expect(sentPayload()).toMatchObject({
         from: "LangWatch <noreply@langwatch.ai>",
@@ -156,9 +154,7 @@ describe("resendProvider.send", () => {
         defaultFrom: "noreply@langwatch.ai",
       });
 
-      expect(sentPayload().headers["X-Custom"]).toBe(
-        "value Bcc: attacker@evil.com",
-      );
+      expect(sentPayload().headers["X-Custom"]).toBe("value Bcc: attacker@evil.com");
     });
   });
 

@@ -144,9 +144,7 @@ describe("PromptListDrawer", () => {
       });
       renderDrawer();
       await waitFor(() => {
-        expect(
-          screen.getByTestId("create-first-prompt-button"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("create-first-prompt-button")).toBeInTheDocument();
       });
     });
   });
@@ -278,9 +276,7 @@ describe("PromptListDrawer", () => {
       await waitFor(() => {
         expect(screen.getByText("No prompts yet")).toBeInTheDocument();
       });
-      expect(
-        screen.queryByTestId("prompt-search-input"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("prompt-search-input")).not.toBeInTheDocument();
     });
 
     it("filters prompts by name", async () => {

@@ -3,10 +3,7 @@ import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { uniqueConstraintTargets } from "~/server/utils/prismaErrors";
-import {
-  grafanaConfigFromEnv,
-  grafanaLinksForTrace,
-} from "~/utils/grafanaLinks";
+import { grafanaConfigFromEnv, grafanaLinksForTrace } from "~/utils/grafanaLinks";
 
 import { HttpError, NotFoundError } from "../shared/errors";
 import { errorSchema } from "../shared/schemas";
@@ -49,10 +46,7 @@ export const handleError = async (
  * trace/span ids are opaque correlation handles.
  */
 function withTraceInfo(response: object, c: Context): object {
-  const traceId = liveId(
-    c.get("traceId") as string | undefined,
-    INVALID_TRACE_ID,
-  );
+  const traceId = liveId(c.get("traceId") as string | undefined, INVALID_TRACE_ID);
   const spanId = liveId(c.get("spanId") as string | undefined, INVALID_SPAN_ID);
   if (!traceId && !spanId) return response;
 

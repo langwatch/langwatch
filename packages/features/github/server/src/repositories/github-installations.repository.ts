@@ -80,9 +80,7 @@ export abstract class GithubInstallationsRepository {
   }): Promise<boolean>;
 }
 
-export class NullGithubInstallationsRepository
-  extends GithubInstallationsRepository
-{
+export class NullGithubInstallationsRepository extends GithubInstallationsRepository {
   async findAllForOrganization(): Promise<GithubInstallationRow[]> {
     return [];
   }

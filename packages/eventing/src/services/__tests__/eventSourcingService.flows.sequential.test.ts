@@ -13,8 +13,7 @@ import {
 } from "./testHelpers";
 
 describe("EventSourcingService - Sequential Ordering Flows", () => {
-  const { aggregateType, tenantId, eventVersion, context } =
-    createTestContext();
+  const { aggregateType, tenantId, eventVersion, context } = createTestContext();
 
   beforeEach(() => {
     setupTestEnvironment();
@@ -26,17 +25,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
   describe("when handlers process events independently (no sequential ordering)", () => {
     it("processes events regardless of order - no sequence enforcement", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -74,17 +68,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
 
     it("processes events out of order without blocking", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -112,11 +101,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       );
 
       // Store all events
-      await eventStore.storeEvents(
-        [event1, event2, event3],
-        context,
-        aggregateType,
-      );
+      await eventStore.storeEvents([event1, event2, event3], context, aggregateType);
 
       // Process events out of order: event3, event1, event2 - all succeed
       await service.storeEvents([event3], context);
@@ -133,17 +118,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
 
     it("processes first event without any prerequisite checks", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -168,17 +148,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
 
     it("handles concurrent events with same timestamp independently", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -217,11 +192,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       );
 
       // Store all events
-      await eventStore.storeEvents(
-        [event1, event2, event3],
-        context,
-        aggregateType,
-      );
+      await eventStore.storeEvents([event1, event2, event3], context, aggregateType);
 
       // Process all events - handlers process independently
       await service.storeEvents([event1], context);
@@ -237,17 +208,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
   describe("duplicate event prevention", () => {
     it("prevents storing duplicate events in repository", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -281,17 +247,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
 
     it("prevents duplicate when event stored directly then via service", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -325,17 +286,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
 
     it("handles batch storage with duplicates correctly", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -375,18 +331,13 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
 
     it("prevents duplicates with multiple handlers correctly", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef1 = createMockMapProjectionDefinition("handler1");
       const mapDef2 = createMockMapProjectionDefinition("handler2");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef1, mapDef2],
       });
@@ -423,17 +374,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
 
     it("stores events in different aggregates separately (partition isolation)", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -490,17 +436,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
 
     it("handles batch with mixed duplicates correctly - dispatches all events to handlers", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });

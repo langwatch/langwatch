@@ -48,19 +48,15 @@ function serviceFor(app: App): ScenarioCancellationService {
   const cached = services.get(app);
   if (cached) return cached;
   const service = new ScenarioCancellationService({
-      getRunsForBatch: createGetRunsForBatch(app),
-      dispatchCancelRequested: async ({
+    getRunsForBatch: createGetRunsForBatch(app),
+    dispatchCancelRequested: async ({ tenantId, scenarioRunId, occurredAt }) => {
+      await app.simulations.cancelRun({
         tenantId,
         scenarioRunId,
         occurredAt,
-      }) => {
-        await app.simulations.cancelRun({
-          tenantId,
-          scenarioRunId,
-          occurredAt,
-        });
-      },
-    });
+      });
+    },
+  });
   services.set(app, service);
   return service;
 }

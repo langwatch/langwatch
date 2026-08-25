@@ -39,11 +39,7 @@ const toolCallSchema = z.object({
 export const rAGChunkSchema = z.object({
   document_id: z.string().optional().nullable(),
   chunk_id: z.string().optional().nullable(),
-  content: z.union([
-    z.string(),
-    z.record(z.string(), z.any()),
-    z.array(z.any()),
-  ]),
+  content: z.union([z.string(), z.record(z.string(), z.any()), z.array(z.any())]),
 });
 
 export type RAGChunk = z.infer<typeof rAGChunkSchema>;
@@ -232,11 +228,7 @@ export const moneySchema = z.object({
 export type Money = z.infer<typeof moneySchema>;
 
 export const evaluationResultSchema = z.object({
-  status: z.union([
-    z.literal("processed"),
-    z.literal("skipped"),
-    z.literal("error"),
-  ]),
+  status: z.union([z.literal("processed"), z.literal("skipped"), z.literal("error")]),
   passed: z.boolean().optional().nullable(),
   score: z.number().optional().nullable(),
   label: z.string().optional().nullable(),
@@ -251,27 +243,21 @@ export const typedValueGuardrailResultSchema = z.object({
   value: evaluationResultSchema,
 });
 
-export type TypedValueGuardrailResult = z.infer<
-  typeof typedValueGuardrailResultSchema
->;
+export type TypedValueGuardrailResult = z.infer<typeof typedValueGuardrailResultSchema>;
 
 export const typedValueEvaluationResultSchema = z.object({
   type: z.literal("evaluation_result"),
   value: evaluationResultSchema,
 });
 
-export type TypedValueEvaluationResult = z.infer<
-  typeof typedValueEvaluationResultSchema
->;
+export type TypedValueEvaluationResult = z.infer<typeof typedValueEvaluationResultSchema>;
 
 export const typedValueChatMessagesSchema = z.object({
   type: z.literal("chat_messages"),
   value: z.array(chatMessageSchema),
 });
 
-export type TypedValueChatMessages = z.infer<
-  typeof typedValueChatMessagesSchema
->;
+export type TypedValueChatMessages = z.infer<typeof typedValueChatMessagesSchema>;
 
 export type SpanInputOutput =
   | TypedValueText
@@ -422,11 +408,7 @@ export const rAGSpanSchema = baseSpanSchema.extend({
 
 export type RAGSpan = z.infer<typeof rAGSpanSchema>;
 
-export const spanSchema = z.union([
-  lLMSpanSchema,
-  rAGSpanSchema,
-  baseSpanSchema,
-]);
+export const spanSchema = z.union([lLMSpanSchema, rAGSpanSchema, baseSpanSchema]);
 
 export type Span = z.infer<typeof spanSchema>;
 
@@ -524,8 +506,7 @@ export const customMetadataSchema = z.record(
 
 export type CustomMetadata = z.infer<typeof customMetadataSchema>;
 
-export const traceMetadataSchema =
-  reservedTraceMetadataSchema.and(customMetadataSchema);
+export const traceMetadataSchema = reservedTraceMetadataSchema.and(customMetadataSchema);
 
 export type TraceMetadata = z.infer<typeof traceMetadataSchema>;
 
@@ -603,9 +584,7 @@ export type Evaluation = z.infer<typeof evaluationSchema>;
 
 export const elasticSearchEvaluationSchema = evaluationSchema;
 
-export type ElasticSearchEvaluation = z.infer<
-  typeof elasticSearchEvaluationSchema
->;
+export type ElasticSearchEvaluation = z.infer<typeof elasticSearchEvaluationSchema>;
 
 export const rESTEvaluationSchema = evaluationSchema
   .omit({
@@ -620,11 +599,7 @@ export const rESTEvaluationSchema = evaluationSchema
       evaluation_id: z.string().optional().nullable(),
       evaluator_id: z.string().optional().nullable(),
       status: z
-        .union([
-          z.literal("processed"),
-          z.literal("skipped"),
-          z.literal("error"),
-        ])
+        .union([z.literal("processed"), z.literal("skipped"), z.literal("error")])
         .optional()
         .nullable(),
       timestamps: z
@@ -755,8 +730,9 @@ export const collectorRESTParamsSchema = z.object({
 
 export type CollectorRESTParams = z.infer<typeof collectorRESTParamsSchema>;
 
-export const collectorRESTParamsValidatorSchema =
-  collectorRESTParamsSchema.omit({ spans: true });
+export const collectorRESTParamsValidatorSchema = collectorRESTParamsSchema.omit({
+  spans: true,
+});
 
 export type CollectorRESTParamsValidator = z.infer<
   typeof collectorRESTParamsValidatorSchema

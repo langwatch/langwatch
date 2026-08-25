@@ -5,9 +5,7 @@ import { registerModelProviderRoutes } from "./app.v1";
 
 patchZodOpenapi();
 
-const secured = createProjectApp<
-  OrganizationMiddlewareVariables
->({
+const secured = createProjectApp<OrganizationMiddlewareVariables>({
   basePath: "/api/model-providers",
 });
 

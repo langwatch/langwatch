@@ -16,15 +16,7 @@
  * failed element goes to a placeholder while the existence probe runs and
  * lands on a named state whether the probe answers or fails.
  */
-import {
-  Badge,
-  Box,
-  HStack,
-  Icon,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, ExternalLink, File, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { resolveRawPcmFormat, wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
@@ -223,9 +215,7 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
   // reporting bytes as expired that were never stored.
   const notCaptured = unsafeSrc ? parseNotCapturedMedia(src) : null;
 
-  const [status, setStatus] = useState<LoadStatus>(
-    isUrlBased ? "loading" : "ok",
-  );
+  const [status, setStatus] = useState<LoadStatus>(isUrlBased ? "loading" : "ok");
 
   // Probe at most once per <src>: a single failed audio/video element can fire
   // `error` repeatedly while the browser retries decoders, and a long scenario
@@ -240,11 +230,10 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
 
   // Server-side existence probe via tRPC — replaces the native fetch HEAD probe.
   // Inherits session auth automatically; no CORS / credential issues.
-  const { data: probeData, isError: probeFailed } =
-    api.storedObjects.headById.useQuery(
-      { projectId, id: storedObjectId ?? "" },
-      { enabled: probeEnabled && !!storedObjectId && !!projectId },
-    );
+  const { data: probeData, isError: probeFailed } = api.storedObjects.headById.useQuery(
+    { projectId, id: storedObjectId ?? "" },
+    { enabled: probeEnabled && !!storedObjectId && !!projectId },
+  );
 
   // When the probe result arrives, map the tri-state to a load status:
   //   not_found → "missing"   (row was deleted / never existed — placeholder)
@@ -466,9 +455,7 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
   // then keep the original name instead of the object id.
   const filename = part.type === "binary" ? part.filename : undefined;
   const chipHref =
-    filename && storedObjectId
-      ? `${src}?filename=${encodeURIComponent(filename)}`
-      : src;
+    filename && storedObjectId ? `${src}?filename=${encodeURIComponent(filename)}` : src;
   const isDocumentLike =
     mimeType === "application/pdf" || (mimeType?.startsWith("text/") ?? false);
   return (
@@ -496,11 +483,7 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
           borderColor="border"
           _hover={{ bg: "bg.muted" }}
         >
-          <Icon
-            as={isDocumentLike ? FileText : File}
-            boxSize={4}
-            color="fg.muted"
-          />
+          <Icon as={isDocumentLike ? FileText : File} boxSize={4} color="fg.muted" />
           <Text fontSize="sm" fontWeight="medium">
             {filename ?? mimeType ?? "file"}
           </Text>

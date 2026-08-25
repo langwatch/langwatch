@@ -1,8 +1,4 @@
-import type {
-  DynamicKeysDef,
-  FacetQuery,
-  FacetQueryContext,
-} from "../facet-registry";
+import type { DynamicKeysDef, FacetQuery, FacetQueryContext } from "../facet-registry";
 import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
 
 /**
@@ -21,9 +17,7 @@ import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
  * `filter-to-clickhouse/ast.ts`'s `translateEventAttribute`; this facet
  * only feeds the sidebar's discovery list.
  */
-export function buildEventAttributeKeysFacetQuery(
-  ctx: FacetQueryContext,
-): FacetQuery {
+export function buildEventAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
   const where = buildTimeWhere("StartTime");
   const prefixFilter = ctx.prefix
     ? "AND lower(key) ILIKE concat({prefix:String}, '%')"

@@ -186,9 +186,7 @@ describe("addEnvs", () => {
         nodes: [llmNode(undefined)],
       });
 
-      await expect(addEnvs(event, PROJECT_ID)).rejects.toThrow(
-        LlmModelNotSetError,
-      );
+      await expect(addEnvs(event, PROJECT_ID)).rejects.toThrow(LlmModelNotSetError);
       await expect(addEnvs(event, PROJECT_ID)).rejects.toThrow(
         'LLM node "LLM Call" has no model selected',
       );
@@ -199,9 +197,7 @@ describe("addEnvs", () => {
         nodes: [llmNode({ model: "" })],
       });
 
-      await expect(addEnvs(event, PROJECT_ID)).rejects.toThrow(
-        LlmModelNotSetError,
-      );
+      await expect(addEnvs(event, PROJECT_ID)).rejects.toThrow(LlmModelNotSetError);
     });
   });
 });

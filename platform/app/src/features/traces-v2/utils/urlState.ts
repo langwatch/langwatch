@@ -70,9 +70,7 @@ interface ComputeOverridesInput {
   defaultPresetId: string;
 }
 
-export function computeOverrides(
-  input: ComputeOverridesInput,
-): BarStateOverrides {
+export function computeOverrides(input: ComputeOverridesInput): BarStateOverrides {
   const overrides: BarStateOverrides = {};
   if (input.query) overrides.query = input.query;
   if (input.timeRange.presetId) {
@@ -86,18 +84,12 @@ export function computeOverrides(
   return overrides;
 }
 
-export function buildFragment(
-  lensId: string,
-  overrides: BarStateOverrides,
-): string {
+export function buildFragment(lensId: string, overrides: BarStateOverrides): string {
   const params = new URLSearchParams();
   if (overrides.query) params.set("q", overrides.query);
   if (overrides.preset) {
     params.set("preset", overrides.preset);
-  } else if (
-    overrides.timeFrom !== undefined &&
-    overrides.timeTo !== undefined
-  ) {
+  } else if (overrides.timeFrom !== undefined && overrides.timeTo !== undefined) {
     params.set("from", String(overrides.timeFrom));
     params.set("to", String(overrides.timeTo));
   }

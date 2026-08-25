@@ -238,15 +238,11 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     // read keeps the legacy membership fence (a departed member is not
     // listed); the role read is bounded to the organization.
     const userIds = [
-      ...new Set(
-        grants.flatMap(({ row }) => (row.principalId ? [row.principalId] : [])),
-      ),
+      ...new Set(grants.flatMap(({ row }) => (row.principalId ? [row.principalId] : []))),
     ];
     const roleIds = [
       ...new Set(
-        grants.flatMap(({ customRoleId }) =>
-          customRoleId ? [customRoleId] : [],
-        ),
+        grants.flatMap(({ customRoleId }) => (customRoleId ? [customRoleId] : [])),
       ),
     ];
     const [users, roles] = await Promise.all([
@@ -523,9 +519,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       this.findRolesAsCustomRoles({ organizationId, roleIds: [...ids.role] }),
     ]);
     return {
-      userById: new Map(
-        (users as AuthzAccessUser[]).map((user) => [user.id, user]),
-      ),
+      userById: new Map((users as AuthzAccessUser[]).map((user) => [user.id, user])),
       groupById: new Map(
         (groups as AuthzAccessGroup[]).map((group) => [group.id, group]),
       ),
@@ -608,9 +602,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
   }
 
   private isBindingPrincipal(principalType: string): boolean {
-    return (BINDING_PRINCIPAL_TYPES as readonly string[]).includes(
-      principalType,
-    );
+    return (BINDING_PRINCIPAL_TYPES as readonly string[]).includes(principalType);
   }
 
   private listableGrants(rows: readonly GrantListRow[]): ListableGrant[] {
@@ -630,9 +622,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     return listable;
   }
 
-  private collectDecorationIds(
-    grants: readonly ListableGrant[],
-  ): DecorationIds {
+  private collectDecorationIds(grants: readonly ListableGrant[]): DecorationIds {
     const ids: DecorationIds = {
       user: new Set(),
       group: new Set(),

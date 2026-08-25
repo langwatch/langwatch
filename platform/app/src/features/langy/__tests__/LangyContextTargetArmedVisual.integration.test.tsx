@@ -32,9 +32,7 @@ function renderPage() {
   return render(
     <ChakraProvider value={defaultSystem}>
       <LangyContextTargetLayer />
-      <LangyContextTarget
-        target={{ id: "trace:t-1", kind: "trace", label: "Trace t-1" }}
-      >
+      <LangyContextTarget target={{ id: "trace:t-1", kind: "trace", label: "Trace t-1" }}>
         <div data-testid="trace-card">a trace row</div>
       </LangyContextTarget>
     </ChakraProvider>,
@@ -89,9 +87,7 @@ describe("armed context targets", () => {
         renderPage();
         press("#");
         expect(
-          screen
-            .getByTestId("trace-card")
-            .getAttribute("data-langy-target-state"),
+          screen.getByTestId("trace-card").getAttribute("data-langy-target-state"),
         ).toBe("near");
 
         press("Escape");

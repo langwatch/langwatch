@@ -1,8 +1,5 @@
 import type { FoldProjectionStore } from "@langwatch/eventing";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
 import type { SpendUsage } from "../schemas/commands";
 import {
   GATEWAY_SPEND_PIPELINE_NAME,
@@ -26,12 +23,7 @@ const gatewaySpendEvents = [
   gatewaySpendSettledEventSchema,
 ] as const;
 
-export type GatewaySpendStatus =
-  | ""
-  | "admitted"
-  | "confirmed"
-  | "failed"
-  | "settled";
+export type GatewaySpendStatus = "" | "admitted" | "confirmed" | "failed" | "settled";
 
 /**
  * The spend record's working state. Every field is round-trippable through

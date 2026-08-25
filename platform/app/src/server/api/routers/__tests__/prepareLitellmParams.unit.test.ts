@@ -13,10 +13,7 @@ vi.mock("~/server/modelProviders/modelProvider.service", () => ({
   },
 }));
 
-import {
-  DEFAULT_AZURE_API_VERSION,
-  prepareLitellmParams,
-} from "../modelProviders.utils";
+import { DEFAULT_AZURE_API_VERSION, prepareLitellmParams } from "../modelProviders.utils";
 
 const baseAzureProvider = {
   provider: "azure" as const,

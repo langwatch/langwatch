@@ -60,9 +60,7 @@ describe("SchedulerOpsService controls", () => {
         const { service } = makeService(null);
 
         expect(
-          await codeOf(() =>
-            service.runNow({ scheduleId: "gone", actorUserId: "u1" }),
-          ),
+          await codeOf(() => service.runNow({ scheduleId: "gone", actorUserId: "u1" })),
         ).toBe("schedule_not_found");
       });
     });
@@ -111,9 +109,7 @@ describe("SchedulerOpsService controls", () => {
         // looks like an ordinary future timestamp — so the fencing guard alone
         // waves this through. `claim()` then re-claims (its COALESCE preserves
         // rather than refuses) and a second worker delivers the same slot.
-        const { service, repo } = makeService(
-          record({ currentSlot: at(-30_000) }),
-        );
+        const { service, repo } = makeService(record({ currentSlot: at(-30_000) }));
 
         expect(
           await codeOf(() =>
@@ -292,9 +288,7 @@ describe("SchedulerOpsService controls", () => {
 
   describe("given an operator pauses a schedule", () => {
     it("marks it inactive without touching an in-flight slot", async () => {
-      const { service, repo } = makeService(
-        record({ currentSlot: at(-1_000) }),
-      );
+      const { service, repo } = makeService(record({ currentSlot: at(-1_000) }));
 
       await service.setActive({
         scheduleId: "sched_1",

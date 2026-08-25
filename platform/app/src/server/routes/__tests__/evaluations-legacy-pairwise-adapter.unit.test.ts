@@ -32,9 +32,9 @@ describe("translateLegacyPairwisePayload", () => {
 
   describe("given a complete two-slot payload", () => {
     it("folds both slots into an ordered candidates list", () => {
-      const { candidates } = translateLegacyPairwisePayload(
-        pairwisePayload,
-      ) as { candidates: Array<Record<string, unknown>> };
+      const { candidates } = translateLegacyPairwisePayload(pairwisePayload) as {
+        candidates: Array<Record<string, unknown>>;
+      };
 
       expect(candidates).toEqual([
         {
@@ -129,8 +129,7 @@ describe("stripIncompatiblePairwisePrompt", () => {
       const migrated = {
         prompt: "Pick the best of {candidates} for {input}.",
       };
-      const { settings, droppedPrompt } =
-        stripIncompatiblePairwisePrompt(migrated);
+      const { settings, droppedPrompt } = stripIncompatiblePairwisePrompt(migrated);
 
       expect(droppedPrompt).toBe(false);
       expect(settings.prompt).toBe(migrated.prompt);

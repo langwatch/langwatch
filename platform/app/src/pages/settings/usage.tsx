@@ -108,10 +108,7 @@ function Usage() {
     refetchOnMount: false,
   } as const;
 
-  const activePlan = api.plan.getActivePlan.useQuery(
-    { organizationId },
-    queryOpts,
-  );
+  const activePlan = api.plan.getActivePlan.useQuery({ organizationId }, queryOpts);
   const usage = api.limits.getUsage.useQuery({ organizationId }, queryOpts);
   const licenseStatus = api.license.getStatus.useQuery(
     { organizationId },
@@ -134,17 +131,11 @@ function Usage() {
     (licenseStatus.isLoading || usage.isLoading) &&
     !licenseStatus.data &&
     !usage.data;
-  const hasLimitsError =
-    isSelfHosted && (licenseStatus.isError || usage.isError);
+  const hasLimitsError = isSelfHosted && (licenseStatus.isError || usage.isError);
   const hasValidLicense =
-    isSelfHosted &&
-    licenseStatus.data?.hasLicense &&
-    "plan" in licenseStatus.data;
+    isSelfHosted && licenseStatus.data?.hasLicense && "plan" in licenseStatus.data;
   const isUnlicensed =
-    isSelfHosted &&
-    licenseStatus.data &&
-    !licenseStatus.data.hasLicense &&
-    usage.data;
+    isSelfHosted && licenseStatus.data && !licenseStatus.data.hasLicense && usage.data;
 
   const saasPlan = activePlan.data ?? usage.data?.activePlan;
   const showLimits = shouldShowPlanLimits({
@@ -174,13 +165,7 @@ function Usage() {
 
   return (
     <SettingsLayout>
-      <VStack
-        gap={6}
-        width="full"
-        align="stretch"
-        maxWidth="900px"
-        marginX="auto"
-      >
+      <VStack gap={6} width="full" align="stretch" maxWidth="900px" marginX="auto">
         <Flex justifyContent="space-between" alignItems="flex-start">
           <VStack align="start" gap={1}>
             <Heading size="xl">Usage</Heading>
@@ -196,10 +181,7 @@ function Usage() {
             planLabel={saasPlan?.free ? "Free" : (saasPlan?.name ?? "Plan")}
             planColorPalette={saasPlan?.free ? "gray" : "blue"}
             subtitle={`Current usage versus ${saasPlan?.free ? "free tier" : "your plan"} limits`}
-            limits={mapUsageToLimits(
-              usage.data,
-              saasPlan ?? usage.data.activePlan,
-            )}
+            limits={mapUsageToLimits(usage.data, saasPlan ?? usage.data.activePlan)}
             showLimits={showLimits}
             showLiteMembers={showLiteMembers}
             actionHref={planManagementUrl}
@@ -233,8 +215,8 @@ function Usage() {
           >
             <Card.Body paddingY={5} paddingX={6}>
               <Text color="colorPalette.fg" fontSize="sm">
-                Unable to load resource limits. Please refresh the page or
-                contact support if the issue persists.
+                Unable to load resource limits. Please refresh the page or contact support
+                if the issue persists.
               </Text>
             </Card.Body>
           </Card.Root>

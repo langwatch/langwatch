@@ -26,9 +26,7 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 
 const TABLE_NAME = "governance_kpis" as const;
 
-const logger = createLogger(
-  "langwatch:governance:governance-kpis-clickhouse-repository",
-);
+const logger = createLogger("langwatch:governance:governance-kpis-clickhouse-repository");
 
 export interface GovernanceKpiContribution {
   tenantId: string;
@@ -74,8 +72,7 @@ export class GovernanceKpisClickHouseRepository extends AnomalySpendReaderPort {
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(
         {
           tenantId: row.tenantId,

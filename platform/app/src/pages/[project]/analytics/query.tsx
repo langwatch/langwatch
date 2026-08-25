@@ -24,8 +24,7 @@ import { HandledErrorState } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
-type AvailabilityReason =
-  RouterOutputs["analytics"]["lwql"]["availability"]["reason"];
+type AvailabilityReason = RouterOutputs["analytics"]["lwql"]["availability"]["reason"];
 
 /**
  * The backend's own unavailable state, worded by the error registry rather
@@ -88,13 +87,7 @@ export function CustomQueryPage() {
           <Spinner />
         </Box>
       ) : available ? (
-        <Box
-          width="full"
-          flex="1"
-          minHeight={0}
-          display="flex"
-          flexDirection="column"
-        >
+        <Box width="full" flex="1" minHeight={0} display="flex" flexDirection="column">
           {/*
             Keyed on the project so switching projects starts a clean
             workbench. The query controller holds the draft, the submitted

@@ -37,9 +37,8 @@ import {
   type LangyWorkerDispatchIntent,
 } from "../ports/langy-conversation-process.port";
 
-export const createLangyWorkerDispatchIntent = (
-  ports: LangyEffectPorts,
-): IntentExecutor<LangyWorkerDispatchIntent> =>
+export const createLangyWorkerDispatchIntent =
+  (ports: LangyEffectPorts): IntentExecutor<LangyWorkerDispatchIntent> =>
   async (payload, context) => {
     await ports.workerDispatch.dispatchTurn({
       ...payload,
@@ -47,9 +46,8 @@ export const createLangyWorkerDispatchIntent = (
     });
   };
 
-export const createLangyGenerateTitleIntent = (
-  ports: LangyEffectPorts,
-): IntentExecutor<LangyGenerateTitleIntent> =>
+export const createLangyGenerateTitleIntent =
+  (ports: LangyEffectPorts): IntentExecutor<LangyGenerateTitleIntent> =>
   async (payload, context) => {
     await ports.titleGeneration.generateTitle({
       ...payload,
@@ -57,10 +55,7 @@ export const createLangyGenerateTitleIntent = (
     });
   };
 
-export {
-  langyGenerateTitleIntentSchema,
-  langyWorkerDispatchIntentSchema,
-};
+export { langyGenerateTitleIntentSchema, langyWorkerDispatchIntentSchema };
 
 /**
  * Langy conversation commands. Most are pure 1:1 command → event mappings via
@@ -106,8 +101,7 @@ export const RecordMessageCommand = defineCommand({
   aggregateType: "langy_conversation",
   schema: langyMessageRecordedEventDataSchema,
   aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:message:${d.messageId}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:message:${d.messageId}`,
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
     "payload.message.id": d.messageId,
@@ -123,8 +117,7 @@ export const ImportMessageCommand = defineCommand({
   aggregateType: "langy_conversation",
   schema: langyMessageImportedEventDataSchema,
   aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:import:${d.sourceMessageId}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:import:${d.sourceMessageId}`,
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
     "payload.conversation.source_id": d.sourceConversationId,
@@ -148,20 +141,15 @@ const acceptAgentTurnDataSchema = langyAgentTurnAcceptedEventDataSchema.extend({
     .optional(),
   consumeHandoffTurnId: z.string().optional(),
 });
-const acceptAgentTurnCommandSchema = withCommandEnvelope(
-  acceptAgentTurnDataSchema,
-);
+const acceptAgentTurnCommandSchema = withCommandEnvelope(acceptAgentTurnDataSchema);
 export type LangyAcceptAgentTurnCommandData = z.infer<
   typeof acceptAgentTurnCommandSchema
 >;
 
-export class AcceptAgentTurnCommand
-  implements
-    CommandHandler<
-      Command<LangyAcceptAgentTurnCommandData>,
-      LangyConversationProcessingEvent
-    >
-{
+export class AcceptAgentTurnCommand implements CommandHandler<
+  Command<LangyAcceptAgentTurnCommandData>,
+  LangyConversationProcessingEvent
+> {
   static readonly schema = defineCommandSchema(
     LANGY_CONVERSATION_COMMAND_TYPES.ACCEPT_AGENT_TURN,
     acceptAgentTurnCommandSchema,
@@ -182,12 +170,8 @@ export class AcceptAgentTurnCommand
     command: Command<LangyAcceptAgentTurnCommandData>,
   ): LangyConversationProcessingEvent[] {
     const data = stripEnvelope(command.data);
-    const {
-      conversationStart,
-      userMessage,
-      consumeHandoffTurnId,
-      ...acceptedData
-    } = data;
+    const { conversationStart, userMessage, consumeHandoffTurnId, ...acceptedData } =
+      data;
     const events: LangyConversationProcessingEvent[] = [];
 
     if (conversationStart) {
@@ -267,8 +251,7 @@ export const InitiateToolCallCommand = defineCommand({
   aggregateType: "langy_conversation",
   schema: langyToolCallInitiatedEventDataSchema,
   aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:tool-start:${d.toolCallId}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:tool-start:${d.toolCallId}`,
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,
@@ -284,8 +267,7 @@ export const SucceedToolCallCommand = defineCommand({
   aggregateType: "langy_conversation",
   schema: langyToolCallSucceededEventDataSchema,
   aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:tool-done:${d.toolCallId}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:tool-done:${d.toolCallId}`,
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,
@@ -306,8 +288,7 @@ export const FailToolCallCommand = defineCommand({
   aggregateType: "langy_conversation",
   schema: langyToolCallFailedEventDataSchema,
   aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:tool-done:${d.toolCallId}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:tool-done:${d.toolCallId}`,
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,
@@ -361,8 +342,7 @@ export const FailAgentResponseCommand = defineCommand({
   aggregateType: "langy_conversation",
   schema: langyAgentResponseFailedEventDataSchema,
   aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:turn-terminal:${d.turnId}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:turn-terminal:${d.turnId}`,
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,
@@ -381,8 +361,7 @@ export const RecordAgentResponseCommand = defineCommand({
   aggregateType: "langy_conversation",
   schema: langyAgentRespondedEventDataSchema,
   aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:turn-terminal:${d.turnId}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:turn-terminal:${d.turnId}`,
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,
@@ -439,8 +418,7 @@ export const UpdateConversationMetadataCommand = defineCommand({
   aggregateType: "langy_conversation",
   schema: langyConversationMetadataUpdatedEventDataSchema,
   aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:metadata:${d.occurredAt}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:metadata:${d.occurredAt}`,
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
   }),
@@ -459,8 +437,7 @@ export const RecordTurnHandoffCommand = defineCommand({
   aggregateType: "langy_conversation",
   schema: langyConversationHandoffPendingEventDataSchema,
   aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:handoff:${d.turnId}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:handoff:${d.turnId}`,
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,
@@ -479,8 +456,7 @@ export const ConsumeTurnHandoffCommand = defineCommand({
   aggregateType: "langy_conversation",
   schema: langyConversationHandoffConsumedEventDataSchema,
   aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:handoff-consumed:${d.turnId}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:handoff-consumed:${d.turnId}`,
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,

@@ -23,12 +23,7 @@ export type EmailContent = {
   attachments?: EmailAttachment[];
 };
 
-export const EMAIL_PROVIDER_NAMES = [
-  "ses",
-  "sendgrid",
-  "smtp",
-  "resend",
-] as const;
+export const EMAIL_PROVIDER_NAMES = ["ses", "sendgrid", "smtp", "resend"] as const;
 
 export type EmailProviderName = (typeof EMAIL_PROVIDER_NAMES)[number];
 

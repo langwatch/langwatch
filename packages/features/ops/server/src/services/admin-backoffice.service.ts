@@ -32,11 +32,7 @@ export class AdminBackofficeService {
   ) {}
 
   static create(options: AdminBackofficeServiceOptions): AdminBackofficeService {
-    return new AdminBackofficeService(
-      options.repository,
-      options.users,
-      options.audit,
-    );
+    return new AdminBackofficeService(options.repository, options.users, options.audit);
   }
 
   async execute(input: AdminOperationInput): Promise<AdminOperationResult> {
@@ -89,9 +85,7 @@ export class AdminBackofficeService {
           payload: {
             id: userId,
             deactivate: true,
-            ...(isValidPickedDate
-              ? { pickedDate: pickedDate.toISOString() }
-              : {}),
+            ...(isValidPickedDate ? { pickedDate: pickedDate.toISOString() } : {}),
           },
         });
       }
@@ -131,9 +125,7 @@ export class AdminBackofficeService {
     return result;
   }
 
-  private normalizeOrganizationDomain(
-    input: AdminOperationInput,
-  ): AdminOperationInput {
+  private normalizeOrganizationDomain(input: AdminOperationInput): AdminOperationInput {
     if (
       input.resource !== "organization" ||
       (input.method !== "create" && input.method !== "update")

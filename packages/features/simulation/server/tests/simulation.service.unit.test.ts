@@ -15,7 +15,9 @@ import { SimulationService } from "../src/services/simulation.service";
 
 class RecordingExecutionPort extends SimulationExecutionPort {
   queue: SimulationQueueRun | undefined;
-  async queueRun(input: SimulationQueueRun): Promise<void> { this.queue = input; }
+  async queueRun(input: SimulationQueueRun): Promise<void> {
+    this.queue = input;
+  }
   async startRun(_input: SimulationStartRun): Promise<void> {}
   async messageSnapshot(_input: SimulationMessageSnapshot): Promise<void> {}
   async textMessageStart(_input: SimulationTextMessageStart): Promise<void> {}
@@ -32,8 +34,12 @@ describe("SimulationService", () => {
       new RecordingExecutionPort(),
     );
 
-    await expect(service.tryGetScenarioRunData({ projectId: "project_1", scenarioRunId: "run_1" })).resolves.toBeNull();
-    await expect(service.getRunIdsForSet({ projectId: "project_1", scenarioSetId: "set_1" })).resolves.toEqual({ runIds: [], reachedCap: false });
+    await expect(
+      service.tryGetScenarioRunData({ projectId: "project_1", scenarioRunId: "run_1" }),
+    ).resolves.toBeNull();
+    await expect(
+      service.getRunIdsForSet({ projectId: "project_1", scenarioSetId: "set_1" }),
+    ).resolves.toEqual({ runIds: [], reachedCap: false });
   });
 
   it("validates and dispatches execution through Simulation's port", async () => {

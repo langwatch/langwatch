@@ -33,10 +33,7 @@ vi.mock("~/utils/api", () => {
         {
           provider: "custom",
           enabled: true,
-          customModels: [
-            { modelId: "stealth/ox-alpha" },
-            { modelId: "stealth/ox-beta" },
-          ],
+          customModels: [{ modelId: "stealth/ox-alpha" }, { modelId: "stealth/ox-beta" }],
           customEmbeddingsModels: null,
         },
       ],
@@ -61,9 +58,10 @@ describe("useModelSelectionOptions()", () => {
         useModelSelectionOptions([], "custom/stealth/ox-alpha", "chat"),
       );
 
-      expect(
-        result.current.selectOptions.map((option) => option.value),
-      ).toEqual(["custom/stealth/ox-alpha", "custom/stealth/ox-beta"]);
+      expect(result.current.selectOptions.map((option) => option.value)).toEqual([
+        "custom/stealth/ox-alpha",
+        "custom/stealth/ox-beta",
+      ]);
     });
   });
 });

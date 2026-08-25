@@ -35,7 +35,7 @@ explicitly when prompted by the MCP client. The PKCE entrypoint is
 `/api/mcp/authorize` — `claude mcp add` can be configured to start at
 that URL; it will redirect through `/auth/signin` if the browser
 session isn't already established. The `userId` lands in the OAuth
-token cache and propagates through `resolveSessionContext` → 
+token cache and propagates through `resolveSessionContext` →
 `registerGovernanceMcpTools` → `ctx.callerUserId`.
 
 After `claude mcp add`, `claude mcp list` should show `langwatch`
@@ -84,7 +84,7 @@ Claude Code should call:
    row with id `<custom-id>`
 2. `mcp__langwatch__governance_ingestion_templates_update_ottl_rules`
    with `id: <custom-id>` and `ottl_rules: 'delete_key(attributes,
-   "claude.code.session_id")'`
+"claude.code.session_id")'`
 3. `mcp__langwatch__governance_ingestion_templates_archive` with
    `id: <custom-id>`
 

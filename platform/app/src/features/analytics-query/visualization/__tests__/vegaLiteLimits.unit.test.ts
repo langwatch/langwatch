@@ -27,10 +27,7 @@ import {
 import { VEGA_LITE_SCHEMA_URL as S } from "../vegaLiteSchema";
 import type { DatasetRowCounts } from "../visualization.types";
 
-const validate = (
-  spec: unknown,
-  rows: DatasetRowCounts = LWQL_FIXTURE_ROW_COUNTS,
-) =>
+const validate = (spec: unknown, rows: DatasetRowCounts = LWQL_FIXTURE_ROW_COUNTS) =>
   validateVegaLiteSpec({
     spec,
     columnsByDataset: LWQL_FIXTURE_COLUMNS,
@@ -130,8 +127,7 @@ const observeCeiling = ({
     limit,
     admittedAtCeiling: onCeiling.length === 0,
     refusedPastCeiling: pastIt.length > 0,
-    namedTheLimit:
-      named?.code === "complexity-refusal" && named.message.includes(limit),
+    namedTheLimit: named?.code === "complexity-refusal" && named.message.includes(limit),
     reportedTheAllowedValue:
       named?.meta?.limit === limit && named?.meta?.allowed === L[limit],
   };
@@ -148,9 +144,7 @@ describe("the LangWatchQL complexity ceilings", () => {
     describe("when a spec sits at a ceiling and another sits just past it", () => {
       it("covers exactly the ceiling rules the policy declares", () => {
         expect(
-          LWQL_VEGA_RULES.map((rule) => rule.id).filter((id) =>
-            id.startsWith("limit."),
-          ),
+          LWQL_VEGA_RULES.map((rule) => rule.id).filter((id) => id.startsWith("limit.")),
         ).toEqual([
           "limit.maxSpecBytes",
           "limit.maxNestingDepth",
@@ -184,16 +178,10 @@ describe("the LangWatchQL complexity ceilings", () => {
       it("admits the one on the ceiling and refuses the one past it, naming the limit", () => {
         // The generated pairs really are one step apart on the axis each
         // ceiling measures, checked with measurements of this file's own.
-        expect(JSON.stringify(specOf(L.maxSpecBytes)).length).toBe(
-          L.maxSpecBytes,
-        );
+        expect(JSON.stringify(specOf(L.maxSpecBytes)).length).toBe(L.maxSpecBytes);
         expect(jsonDepth(nestedTo(L.maxNestingDepth))).toBe(L.maxNestingDepth);
-        expect(jsonDepth(nestedTo(L.maxNestingDepth + 1))).toBe(
-          L.maxNestingDepth + 1,
-        );
-        expect(expressionOf(L.maxExpressionBytes)).toHaveLength(
-          L.maxExpressionBytes,
-        );
+        expect(jsonDepth(nestedTo(L.maxNestingDepth + 1))).toBe(L.maxNestingDepth + 1);
+        expect(expressionOf(L.maxExpressionBytes)).toHaveLength(L.maxExpressionBytes);
 
         const concatOf = (n: number) =>
           framed({ hconcat: Array.from({ length: n }, point) });
@@ -272,10 +260,7 @@ describe("the LangWatchQL complexity ceilings", () => {
             atCeiling: framed({ mark: "bar", transform: wholeCeiling }),
             pastCeiling: framed({
               mark: "bar",
-              transform: [
-                ...wholeCeiling,
-                { calculate: "1", as: "one-more-byte" },
-              ],
+              transform: [...wholeCeiling, { calculate: "1", as: "one-more-byte" }],
             }),
           }),
           observeCeiling({
@@ -302,16 +287,10 @@ describe("the LangWatchQL complexity ceilings", () => {
         // Every ceiling the policy names is exercised, not just the easy ones.
         expect(observations.map((o) => o.limit)).toEqual(Object.keys(L));
 
-        expect(limitsFailing(observations, (o) => o.admittedAtCeiling)).toEqual(
-          [],
-        );
-        expect(
-          limitsFailing(observations, (o) => o.refusedPastCeiling),
-        ).toEqual([]);
+        expect(limitsFailing(observations, (o) => o.admittedAtCeiling)).toEqual([]);
+        expect(limitsFailing(observations, (o) => o.refusedPastCeiling)).toEqual([]);
         expect(limitsFailing(observations, (o) => o.namedTheLimit)).toEqual([]);
-        expect(
-          limitsFailing(observations, (o) => o.reportedTheAllowedValue),
-        ).toEqual([]);
+        expect(limitsFailing(observations, (o) => o.reportedTheAllowedValue)).toEqual([]);
       });
     });
   });

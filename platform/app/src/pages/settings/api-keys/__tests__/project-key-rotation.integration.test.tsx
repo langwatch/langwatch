@@ -176,9 +176,7 @@ describe("<ApiKeysSection /> project base key rotation", () => {
       /** @scenario An admin rotates the base key and sees the new key once */
       it("offers a control to rotate the project base API key", () => {
         renderSection();
-        expect(
-          screen.getByRole("button", { name: ROTATE_LABEL }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: ROTATE_LABEL })).toBeInTheDocument();
       });
     });
 
@@ -188,9 +186,7 @@ describe("<ApiKeysSection /> project base key rotation", () => {
         const user = userEvent.setup();
         renderSection();
         await user.click(screen.getByRole("button", { name: ROTATE_LABEL }));
-        expect(
-          await screen.findByText("Regenerate API Key?"),
-        ).toBeInTheDocument();
+        expect(await screen.findByText("Regenerate API Key?")).toBeInTheDocument();
       });
     });
 
@@ -200,9 +196,7 @@ describe("<ApiKeysSection /> project base key rotation", () => {
         const user = userEvent.setup();
         renderSection();
         await user.click(screen.getByRole("button", { name: ROTATE_LABEL }));
-        await user.click(
-          await screen.findByRole("button", { name: "Regenerate Key" }),
-        );
+        await user.click(await screen.findByRole("button", { name: "Regenerate Key" }));
         expect(regenerateMutate).toHaveBeenCalledWith(
           { projectId: "proj-1" },
           expect.anything(),
@@ -219,9 +213,7 @@ describe("<ApiKeysSection /> project base key rotation", () => {
         const user = userEvent.setup();
         renderSection();
         await user.click(screen.getByRole("button", { name: ROTATE_LABEL }));
-        await user.click(
-          await screen.findByRole("button", { name: "Regenerate Key" }),
-        );
+        await user.click(await screen.findByRole("button", { name: "Regenerate Key" }));
 
         // TokenCreatedDialog opens masked; revealing the .env snippet shows
         // the new key. (CodePreview only puts the unmasked form in the DOM
@@ -232,9 +224,7 @@ describe("<ApiKeysSection /> project base key rotation", () => {
           name: "Show sensitive values",
         });
         await user.click(revealButtons[0]!);
-        const keyElements = await screen.findAllByText(
-          /sk-lw-newrotatedkey1234/,
-        );
+        const keyElements = await screen.findAllByText(/sk-lw-newrotatedkey1234/);
         expect(keyElements.length).toBeGreaterThan(0);
       });
     });
@@ -284,9 +274,7 @@ describe("<ApiKeysSection /> project base key rotation", () => {
         const user = userEvent.setup();
         renderSection();
         await user.click(screen.getByRole("button", { name: ROTATE_LABEL }));
-        await user.click(
-          await screen.findByRole("button", { name: "Regenerate Key" }),
-        );
+        await user.click(await screen.findByRole("button", { name: "Regenerate Key" }));
 
         expect(toaster.create).toHaveBeenCalledWith(
           expect.objectContaining({ type: "error" }),

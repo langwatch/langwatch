@@ -187,10 +187,7 @@ describe("when querying ungrouped totals (the partition target)", () => {
 
 describe("when grouping cost by metadata.model", () => {
   it("attributes cost per span-level model; buckets sum to the exact ungrouped total", async () => {
-    const buckets = await summedBuckets(
-      "performance.total_cost",
-      "metadata.model",
-    );
+    const buckets = await summedBuckets("performance.total_cost", "metadata.model");
 
     expect(buckets[MODEL_OPUS]).toBeCloseTo(0.5, 9);
     // Multi-model trace A + legacy-bundled trace E share the sonnet bucket.
@@ -207,10 +204,7 @@ describe("when grouping cost by metadata.model", () => {
 
 describe("when grouping prompt, completion and total tokens by metadata.model", () => {
   it("partitions each token metric across model buckets", async () => {
-    const prompt = await summedBuckets(
-      "performance.prompt_tokens",
-      "metadata.model",
-    );
+    const prompt = await summedBuckets("performance.prompt_tokens", "metadata.model");
     expect(prompt[MODEL_OPUS]).toBe(1000);
     expect(prompt[MODEL_SONNET]).toBe(2000);
     expect(prompt[MODEL_OPUS_1M]).toBe(4000);
@@ -229,10 +223,7 @@ describe("when grouping prompt, completion and total tokens by metadata.model", 
 
     // total_tokens crosses bug 2 (composite metric) with bug 1 (grouping):
     // prompt and completion differ per bucket so neither bug can hide.
-    const total = await summedBuckets(
-      "performance.total_tokens",
-      "metadata.model",
-    );
+    const total = await summedBuckets("performance.total_tokens", "metadata.model");
     expect(total[MODEL_OPUS]).toBe(1100);
     expect(total[MODEL_SONNET]).toBe(2200);
     expect(total[MODEL_OPUS_1M]).toBe(4400);
@@ -255,10 +246,7 @@ describe("when grouping the billed/non-billed cost split by metadata.model", () 
     expect(nonBilled[MODEL_OPUS] ?? 0).toBeCloseTo(0, 9);
     expect(bucketSum(nonBilled)).toBeCloseTo(EXPECTED_NON_BILLED_COST, 9);
 
-    const billed = await summedBuckets(
-      "performance.cost_billed",
-      "metadata.model",
-    );
+    const billed = await summedBuckets("performance.cost_billed", "metadata.model");
     expect(billed[MODEL_OPUS]).toBeCloseTo(0.5, 9);
     // Trace A's sonnet span is billed; trace E's sonnet share is not.
     expect(billed[MODEL_SONNET]).toBeCloseTo(0.25, 9);
@@ -311,10 +299,7 @@ describe("when a trace's spans cannot be exactly partitioned by model", () => {
     // stored_spans holds one more span on another model. Span-level sums
     // would EXCEED the frozen ungrouped total, so the whole trace must sit
     // under its primary model instead.
-    const buckets = await summedBuckets(
-      "performance.total_cost",
-      "metadata.model",
-    );
+    const buckets = await summedBuckets("performance.total_cost", "metadata.model");
     expect(buckets[MODEL_CAP_A]).toBeCloseTo(0.512, 9);
     expect(buckets[MODEL_CAP_B]).toBeUndefined();
   });
@@ -323,10 +308,7 @@ describe("when a trace's spans cannot be exactly partitioned by model", () => {
     // One contributing span sits outside the StartTime scan cushion. A
     // partial span scan must NOT ship a partial partition (model A's share
     // only); the whole trace falls back to its primary model.
-    const buckets = await summedBuckets(
-      "performance.total_cost",
-      "metadata.model",
-    );
+    const buckets = await summedBuckets("performance.total_cost", "metadata.model");
     expect(buckets[MODEL_ENV_B]).toBeCloseTo(0.09375, 9);
     expect(buckets[MODEL_ENV_A]).toBeUndefined();
   });
@@ -337,11 +319,9 @@ describe("when grouping by metadata.model with a span-joined filter", () => {
   // partition JOIN (alias smd) must coexist in one query without breaking
   // the partition property.
   it("keeps exact bucket partition when filtering by span type", async () => {
-    const rows = await runQuery(
-      sumSeries("performance.total_cost"),
-      "metadata.model",
-      { "spans.type": ["llm"] },
-    );
+    const rows = await runQuery(sumSeries("performance.total_cost"), "metadata.model", {
+      "spans.type": ["llm"],
+    });
     const buckets = bucketsOf(rows, "0__performance_total_cost__sum");
 
     // Every fixture trace has at least one llm span except the model-less
@@ -358,26 +338,17 @@ describe("when grouping by metadata.model with a span-joined filter", () => {
 // whole-trace attribution, isolating bug 2 from bug 1's model fix.
 describe("when grouping composite cost and token metrics by metadata.labels", () => {
   it("total_tokens = prompt + completion", async () => {
-    const buckets = await summedBuckets(
-      "performance.total_tokens",
-      "metadata.labels",
-    );
+    const buckets = await summedBuckets("performance.total_tokens", "metadata.labels");
     expect(buckets["session-x"]).toBe(7700);
   });
 
   it("cost_billed subtracts the non-billed portion", async () => {
-    const buckets = await summedBuckets(
-      "performance.cost_billed",
-      "metadata.labels",
-    );
+    const buckets = await summedBuckets("performance.cost_billed", "metadata.labels");
     expect(buckets["session-x"]).toBeCloseTo(0.875 - 0.125, 9);
   });
 
   it("cost_non_billed reads the non-billed column", async () => {
-    const buckets = await summedBuckets(
-      "performance.cost_non_billed",
-      "metadata.labels",
-    );
+    const buckets = await summedBuckets("performance.cost_non_billed", "metadata.labels");
     expect(buckets["session-x"]).toBeCloseTo(0.125, 9);
   });
 });
@@ -392,10 +363,7 @@ describe("when grouping cache-inclusive metrics by metadata.labels", () => {
   });
 
   it("cache token metrics work", async () => {
-    const read = await summedBuckets(
-      "performance.cache_read_tokens",
-      "metadata.labels",
-    );
+    const read = await summedBuckets("performance.cache_read_tokens", "metadata.labels");
     expect(read["session-x"]).toBe(10000);
 
     const write = await summedBuckets(

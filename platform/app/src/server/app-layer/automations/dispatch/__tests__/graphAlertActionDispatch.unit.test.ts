@@ -73,15 +73,9 @@ const FIRE_DIGEST = "0123456789abcdef";
  * at-most-once gate exactly as the outbox retry would.
  */
 function makeDeps() {
-  const sendEmail = vi.fn<(payload: unknown) => Promise<void>>(
-    async () => undefined,
-  );
-  const sendSlack = vi.fn<(payload: unknown) => Promise<void>>(
-    async () => undefined,
-  );
-  const sendSlackBot = vi.fn<(payload: unknown) => Promise<void>>(
-    async () => undefined,
-  );
+  const sendEmail = vi.fn<(payload: unknown) => Promise<void>>(async () => undefined);
+  const sendSlack = vi.fn<(payload: unknown) => Promise<void>>(async () => undefined);
+  const sendSlackBot = vi.fn<(payload: unknown) => Promise<void>>(async () => undefined);
   // Returns a 2xx by default — individual tests override to exercise the
   // retry/terminal classification the dispatcher applies via
   // assertWebhookDelivered.
@@ -110,11 +104,9 @@ function makeDeps() {
   const isRecipientSent = vi.fn(async ({ traceId }: { traceId: string }) =>
     claims.has(traceId),
   );
-  const recordRecipientSent = vi.fn(
-    async ({ traceId }: { traceId: string }) => {
-      claims.add(traceId);
-    },
-  );
+  const recordRecipientSent = vi.fn(async ({ traceId }: { traceId: string }) => {
+    claims.add(traceId);
+  });
   return {
     deps: {
       sendEmail,
@@ -172,9 +164,7 @@ describe("dispatchGraphAlertAction", () => {
       expect(call.triggerEmails).toEqual(["a@example.com", "b@example.com"]);
       expect(call.triggerId).toBe("trg_1");
       expect(call.projectId).toBe("proj_1");
-      expect(call.subject).toBe(
-        "[Alert] High latency — Latency p95 is greater than 500",
-      );
+      expect(call.subject).toBe("[Alert] High latency — Latency p95 is greater than 500");
       expect(call.html).toContain("Latency p95");
       expect(call.html).toContain("712");
     });
@@ -358,12 +348,8 @@ describe("dispatchGraphAlertAction", () => {
 
     describe("when the trigger is over its hourly cap", () => {
       it("skips the send, never consults the daily cap, and reports the fire as consumed", async () => {
-        const {
-          deps,
-          sendEmail,
-          consumeEmailCapSlot,
-          consumeTenantEmailCapSlot,
-        } = makeDeps();
+        const { deps, sendEmail, consumeEmailCapSlot, consumeTenantEmailCapSlot } =
+          makeDeps();
         consumeEmailCapSlot.mockResolvedValueOnce({
           allowed: false,
           count: 101,
@@ -406,8 +392,7 @@ describe("dispatchGraphAlertAction", () => {
 
     describe("when the same fire is retried by the outbox", () => {
       it("passes identical dedup keys, so the consumer's claim gate prevents a double-consume", async () => {
-        const { deps, consumeEmailCapSlot, consumeTenantEmailCapSlot } =
-          makeDeps();
+        const { deps, consumeEmailCapSlot, consumeTenantEmailCapSlot } = makeDeps();
         const input = makeEmailInput();
 
         await dispatchGraphAlertAction({ deps, input });
@@ -469,8 +454,7 @@ describe("dispatchGraphAlertAction", () => {
 
     describe("when a Slack alert dispatches", () => {
       it("never consults the email caps", async () => {
-        const { deps, consumeEmailCapSlot, consumeTenantEmailCapSlot } =
-          makeDeps();
+        const { deps, consumeEmailCapSlot, consumeTenantEmailCapSlot } = makeDeps();
 
         await dispatchGraphAlertAction({
           deps,
@@ -516,9 +500,7 @@ describe("dispatchGraphAlertAction", () => {
         triggerName: string;
         payload: { text?: string; blocks?: unknown };
       };
-      expect(call.triggerWebhook).toBe(
-        "https://hooks.slack.com/services/T/B/abc",
-      );
+      expect(call.triggerWebhook).toBe("https://hooks.slack.com/services/T/B/abc");
       expect(call.triggerName).toBe("High latency");
       const text = (call.payload as { text: string }).text;
       expect(text).toContain("High latency");
@@ -549,9 +531,7 @@ describe("dispatchGraphAlertAction", () => {
           payload: { blocks: Array<Record<string, unknown>> };
         };
         expect(call.payload.blocks).toHaveLength(1);
-        expect(JSON.stringify(call.payload.blocks)).toContain(
-          "*Alert:* High latency",
-        );
+        expect(JSON.stringify(call.payload.blocks)).toContain("*Alert:* High latency");
       });
     });
 
@@ -812,9 +792,9 @@ describe("dispatchGraphAlertAction", () => {
           slackWebhook: null,
           fireDigest: FIRE_DIGEST,
         };
-        await expect(
-          dispatchGraphAlertAction({ deps, input }),
-        ).rejects.toMatchObject({ retryable: true });
+        await expect(dispatchGraphAlertAction({ deps, input })).rejects.toMatchObject({
+          retryable: true,
+        });
         // No claim recorded — a retry must re-attempt, not skip as delivered.
         expect(claims.size).toBe(0);
       });

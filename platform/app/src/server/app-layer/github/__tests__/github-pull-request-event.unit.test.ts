@@ -81,14 +81,11 @@ describe("pull request announcements", () => {
         installation: { organizationId: "org-1" },
       });
 
-      await expect(
-        service.applyPullRequestEvent(parsed(delivery())),
-      ).resolves.toBe(true);
+      await expect(service.applyPullRequestEvent(parsed(delivery()))).resolves.toBe(true);
 
       expect(listPullRequestsForHead).not.toHaveBeenCalled();
       expect(repository.upsertPullRequests).toHaveBeenCalledTimes(1);
-      const [written] =
-        repository.upsertPullRequests.mock.calls[0]![0].pullRequests;
+      const [written] = repository.upsertPullRequests.mock.calls[0]![0].pullRequests;
       expect(written).toMatchObject({
         organizationId: "org-1",
         repositoryHost: "github.com",
@@ -111,9 +108,7 @@ describe("pull request announcements", () => {
         updated_at: string;
       } & Record<string, unknown>;
 
-      expect(
-        parseGithubPullRequestEvent(delivery({ pull_request: rest })),
-      ).toBeNull();
+      expect(parseGithubPullRequestEvent(delivery({ pull_request: rest }))).toBeNull();
     });
 
     it("does not parse one that is not an instant, rather than storing an invalid date", () => {
@@ -132,9 +127,7 @@ describe("pull request announcements", () => {
         },
       });
 
-      expect(parsed(offset).pullRequest.updatedAt).toBe(
-        "2026-08-01T13:00:00+02:00",
-      );
+      expect(parsed(offset).pullRequest.updatedAt).toBe("2026-08-01T13:00:00+02:00");
     });
   });
 
@@ -143,9 +136,9 @@ describe("pull request announcements", () => {
     it("stores nothing for it", async () => {
       const { service, repository } = serviceWith({ installation: null });
 
-      await expect(
-        service.applyPullRequestEvent(parsed(delivery())),
-      ).resolves.toBe(false);
+      await expect(service.applyPullRequestEvent(parsed(delivery()))).resolves.toBe(
+        false,
+      );
 
       expect(repository.upsertPullRequests).not.toHaveBeenCalled();
       expect(repository.upsertBranchCheck).not.toHaveBeenCalled();
@@ -225,9 +218,7 @@ describe("pull request announcements", () => {
       expect(parseGithubPullRequestEvent({ zen: "hi" })).toBeNull();
       expect(parseGithubPullRequestEvent(null)).toBeNull();
       // No installation means no organization to attribute the work to.
-      expect(
-        parseGithubPullRequestEvent(delivery({ installation: null })),
-      ).toBeNull();
+      expect(parseGithubPullRequestEvent(delivery({ installation: null }))).toBeNull();
     });
   });
 });

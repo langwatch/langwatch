@@ -415,14 +415,8 @@ function SortableViewBadge({
   onDelete: () => void;
   onRename: (newName: string) => void;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: view.id, disabled: !isEditMode });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: view.id, disabled: !isEditMode });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),

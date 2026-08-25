@@ -123,8 +123,7 @@ function AnnotationScorePage() {
             </PageLayout.HeaderButton>
           )}
         </HStack>
-        {getAllAnnotationScores.data &&
-        getAllAnnotationScores.data.length == 0 ? (
+        {getAllAnnotationScores.data && getAllAnnotationScores.data.length == 0 ? (
           <NoDataInfoBlock
             title="No scoring setup yet"
             description="Add new scoring metrics for your annotations."
@@ -153,9 +152,7 @@ function AnnotationScorePage() {
                   <Table.ColumnHeader>Score Type</Table.ColumnHeader>
                   <Table.ColumnHeader>Score Options</Table.ColumnHeader>
                   <Table.ColumnHeader>Enabled</Table.ColumnHeader>
-                  {canManage && (
-                    <Table.ColumnHeader>Actions</Table.ColumnHeader>
-                  )}
+                  {canManage && <Table.ColumnHeader>Actions</Table.ColumnHeader>}
                 </Table.Row>
               </Table.Header>
               <Table.Body>
@@ -231,11 +228,7 @@ function AnnotationScorePage() {
                                     });
                                   }}
                                 >
-                                  <Box
-                                    display="flex"
-                                    alignItems="center"
-                                    gap={2}
-                                  >
+                                  <Box display="flex" alignItems="center" gap={2}>
                                     <Edit size={14} />
                                     Edit
                                   </Box>

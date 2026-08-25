@@ -41,10 +41,7 @@ import { getRunStatePollInterval } from "./run-state-polling";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { ScenarioRunActions } from "./ScenarioRunActions";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
-import {
-  hasNoResults,
-  shouldShowNoResponse,
-} from "./scenario-run-status.utils";
+import { hasNoResults, shouldShowNoResponse } from "./scenario-run-status.utils";
 import { SimulationConsole } from "./simulation-console/SimulationConsole";
 
 export interface ScenarioRunDetailDrawerProps {
@@ -69,9 +66,7 @@ const secretParameterNamesSchema = z.array(z.string());
  */
 const SECRET_VALUE_MASK = "••••••••";
 
-export function ScenarioRunDetailDrawer({
-  open,
-}: ScenarioRunDetailDrawerProps) {
+export function ScenarioRunDetailDrawer({ open }: ScenarioRunDetailDrawerProps) {
   const { closeDrawer, openDrawer } = useDrawer();
   const params = useDrawerParams();
   const { project } = useOrganizationTeamProject();
@@ -129,20 +124,17 @@ export function ScenarioRunDetailDrawer({
   const scenarioId = scenarioState?.scenarioId;
   const batchRunId = scenarioState?.batchRunId;
 
-  const { data: scenarioData } =
-    api.scenarios.getByIdIncludingArchived.useQuery(
-      { projectId: project?.id ?? "", id: scenarioId ?? "" },
-      { enabled: !!project?.id && !!scenarioId },
-    );
+  const { data: scenarioData } = api.scenarios.getByIdIncludingArchived.useQuery(
+    { projectId: project?.id ?? "", id: scenarioId ?? "" },
+    { enabled: !!project?.id && !!scenarioId },
+  );
 
   const targetNameMap = useTargetNameMap();
 
   // Resolve display title with target name
   const displayTitle = useMemo(() => {
     const targetRefId = scenarioState?.metadata?.langwatch?.targetReferenceId;
-    const targetName = targetRefId
-      ? (targetNameMap.get(targetRefId) ?? null)
-      : null;
+    const targetName = targetRefId ? (targetNameMap.get(targetRefId) ?? null) : null;
     return buildDisplayTitle({
       scenarioName: scenarioState?.name ?? "",
       targetName,
@@ -260,8 +252,7 @@ export function ScenarioRunDetailDrawer({
   }, [scenarioState?.metadata]);
 
   const hasConversation =
-    (scenarioState?.messages ?? []).length > 0 ||
-    (streamingMessages ?? []).length > 0;
+    (scenarioState?.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0;
   const conversationCount =
     (scenarioState?.messages ?? []).length + (streamingMessages ?? []).length;
 
@@ -311,8 +302,8 @@ export function ScenarioRunDetailDrawer({
                     <Drawer.CloseTrigger />
                     <Heading size="md">Run details not available yet</Heading>
                     <Text color="fg.muted" fontSize="sm">
-                      This run may be queued, in progress, or recently
-                      cancelled. Details will appear once available.
+                      This run may be queued, in progress, or recently cancelled. Details
+                      will appear once available.
                     </Text>
                   </VStack>
                 ) : (
@@ -413,15 +404,12 @@ export function ScenarioRunDetailDrawer({
                 {/* Chip strip — metrics + copyable ids, one visual language
                     with the Traces V2 drawer header */}
                 <HStack w="100%" gap={1.5} flexWrap="wrap">
-                  {scenarioState.results &&
-                    !hasNoResults(scenarioState.status) && (
-                      <RunCriteriaChip
-                        metCriteria={scenarioState.results.metCriteria ?? []}
-                        unmetCriteria={
-                          scenarioState.results.unmetCriteria ?? []
-                        }
-                      />
-                    )}
+                  {scenarioState.results && !hasNoResults(scenarioState.status) && (
+                    <RunCriteriaChip
+                      metCriteria={scenarioState.results.metCriteria ?? []}
+                      unmetCriteria={scenarioState.results.unmetCriteria ?? []}
+                    />
+                  )}
                   {scenarioState.durationInMs > 0 && (
                     <Chip
                       label="Duration"
@@ -429,21 +417,12 @@ export function ScenarioRunDetailDrawer({
                     />
                   )}
                   {scenarioState.totalCost != null && (
-                    <Chip
-                      label="Cost"
-                      value={formatCost(scenarioState.totalCost)}
-                    />
+                    <Chip label="Cost" value={formatCost(scenarioState.totalCost)} />
                   )}
                   {timeAgo && <Chip label="Ran" value={timeAgo} />}
-                  {scenarioData?.archivedAt && (
-                    <Chip value="Archived" tone="yellow" />
-                  )}
+                  {scenarioData?.archivedAt && <Chip value="Archived" tone="yellow" />}
                   {copyableIds?.map((id) => (
-                    <CopyIdChip
-                      key={id.label}
-                      label={id.label}
-                      value={id.value}
-                    />
+                    <CopyIdChip key={id.label} label={id.label} value={id.value} />
                   ))}
                 </HStack>
               </VStack>
@@ -504,11 +483,7 @@ export function ScenarioRunDetailDrawer({
                 {/* No-response — explicit empty state when a finished run
                     produced no messages (agent under test returned nothing). */}
                 {showNoResponse && (
-                  <RunDetailSection
-                    value="no-response"
-                    title="Conversation"
-                    isFirst
-                  >
+                  <RunDetailSection value="no-response" title="Conversation" isFirst>
                     <VStack
                       align="center"
                       justify="center"
@@ -522,8 +497,7 @@ export function ScenarioRunDetailDrawer({
                         No response
                       </Text>
                       <Text fontSize="xs" textAlign="center" maxWidth="320px">
-                        The agent under test didn&apos;t return any messages for
-                        this run.
+                        The agent under test didn&apos;t return any messages for this run.
                       </Text>
                     </VStack>
                   </RunDetailSection>
@@ -568,17 +542,9 @@ export function ScenarioRunDetailDrawer({
                     title="Parameters"
                     count={parameters.length + secretParameterNames.length}
                   >
-                    <VStack
-                      align="stretch"
-                      gap={1.5}
-                      data-testid="run-parameters"
-                    >
+                    <VStack align="stretch" gap={1.5} data-testid="run-parameters">
                       {parameters.map(([name, value]) => (
-                        <ParameterRow
-                          key={name}
-                          name={name}
-                          value={String(value)}
-                        />
+                        <ParameterRow key={name} name={name} value={String(value)} />
                       ))}
                       {secretParameterNames.map((name) => (
                         <ParameterRow
@@ -627,13 +593,7 @@ function ParameterRow({
 }) {
   return (
     <HStack gap={3} align="start">
-      <Text
-        fontSize="xs"
-        fontFamily="mono"
-        color="fg.muted"
-        width="180px"
-        flexShrink={0}
-      >
+      <Text fontSize="xs" fontFamily="mono" color="fg.muted" width="180px" flexShrink={0}>
         {name}
       </Text>
       <Text

@@ -14,10 +14,7 @@ type FilterIconWithBadgeProps = {
  * Automatically reads the filter count from filter params,
  * or accepts an optional count override.
  */
-export function FilterIconWithBadge({
-  count,
-  size = 14,
-}: FilterIconWithBadgeProps) {
+export function FilterIconWithBadge({ count, size = 14 }: FilterIconWithBadgeProps) {
   const { filterCount } = useFilterParams();
   const displayCount = count ?? filterCount;
   const showBadge = displayCount > 0;

@@ -133,9 +133,7 @@ describe("RBAC Integration Tests", () => {
         },
       });
       // User belongs to a group (no direct teamUser)
-      mockPrisma.groupMembership.findMany.mockResolvedValue([
-        { groupId: "group-abc" },
-      ]);
+      mockPrisma.groupMembership.findMany.mockResolvedValue([{ groupId: "group-abc" }]);
       // Group has a MEMBER binding on the team scope
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.MEMBER, customRoleId: null },
@@ -620,9 +618,7 @@ describe("RBAC Integration Tests", () => {
           },
         });
 
-        const middleware = checkProjectPermission(
-          "workflows:manage" as Permission,
-        );
+        const middleware = checkProjectPermission("workflows:manage" as Permission);
 
         await expect(
           middleware({
@@ -645,9 +641,7 @@ describe("RBAC Integration Tests", () => {
           { role: TeamUserRole.ADMIN, customRoleId: null },
         ]);
 
-        const middleware = checkProjectPermission(
-          "workflows:view" as Permission,
-        );
+        const middleware = checkProjectPermission("workflows:view" as Permission);
 
         const result = await middleware({
           ctx: mockCtx,
@@ -673,9 +667,7 @@ describe("RBAC Integration Tests", () => {
 
         mockPrisma.teamUser.findFirst.mockResolvedValue(null);
 
-        const middleware = checkTeamPermission(
-          "workflows:manage" as Permission,
-        );
+        const middleware = checkTeamPermission("workflows:manage" as Permission);
 
         await expect(
           middleware({
@@ -741,9 +733,7 @@ describe("RBAC Integration Tests", () => {
           { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
         ]);
 
-        const middleware = checkOrganizationPermission(
-          "organization:view" as Permission,
-        );
+        const middleware = checkOrganizationPermission("organization:view" as Permission);
 
         const result = await middleware({
           ctx: mockCtx,
@@ -775,9 +765,7 @@ describe("RBAC Integration Tests", () => {
             input: { projectId: "project-123" },
             next: mockNext,
           } as never),
-        ).rejects.toThrow(
-          "projectId is not allowed to be used without permission check",
-        );
+        ).rejects.toThrow("projectId is not allowed to be used without permission check");
       });
     });
   });
@@ -1019,25 +1007,24 @@ describe("RBAC Integration Tests", () => {
           permission: "team:manage",
           expected: false,
         },
-      ])("returns permitted=$expected for $teamRole with $permission", async ({
-        teamRole,
-        permission,
-        expected,
-      }) => {
-        setupProjectMocks({
-          orgRole: OrganizationUserRole.MEMBER,
-          teamRole,
-        });
+      ])(
+        "returns permitted=$expected for $teamRole with $permission",
+        async ({ teamRole, permission, expected }) => {
+          setupProjectMocks({
+            orgRole: OrganizationUserRole.MEMBER,
+            teamRole,
+          });
 
-        const result = await resolveProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-1",
-          permission as Permission,
-        );
+          const result = await resolveProjectPermission(
+            { prisma: mockPrisma, session: mockSession },
+            "project-1",
+            permission as Permission,
+          );
 
-        expect(result.permitted).toBe(expected);
-        expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
-      });
+          expect(result.permitted).toBe(expected);
+          expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
+        },
+      );
     });
 
     describe("when verifying org role is carried for each org role type", () => {
@@ -1304,10 +1291,7 @@ describe("RBAC Integration Tests", () => {
           session: mockSession,
           permissionChecked: false,
           publiclyShared: false,
-          organizationRole: undefined as
-            | OrganizationUserRole
-            | null
-            | undefined,
+          organizationRole: undefined as OrganizationUserRole | null | undefined,
         };
 
         mockPrisma.project.findUnique.mockResolvedValue({
@@ -1324,9 +1308,7 @@ describe("RBAC Integration Tests", () => {
         ]);
 
         const mockNext = vi.fn().mockResolvedValue("success");
-        const middleware = checkProjectPermission(
-          "analytics:view" as Permission,
-        );
+        const middleware = checkProjectPermission("analytics:view" as Permission);
 
         await middleware({
           ctx,
@@ -1346,10 +1328,7 @@ describe("RBAC Integration Tests", () => {
           session: mockSession,
           permissionChecked: false,
           publiclyShared: false,
-          organizationRole: undefined as
-            | OrganizationUserRole
-            | null
-            | undefined,
+          organizationRole: undefined as OrganizationUserRole | null | undefined,
         };
 
         mockPrisma.team.findUnique.mockResolvedValue({
@@ -1400,9 +1379,7 @@ describe("RBAC Integration Tests", () => {
         });
 
         const mockNext = vi.fn().mockResolvedValue("success");
-        const middleware = checkProjectPermission(
-          "analytics:view" as Permission,
-        );
+        const middleware = checkProjectPermission("analytics:view" as Permission);
 
         await expect(
           middleware({
@@ -1649,33 +1626,32 @@ describe("RBAC Integration Tests", () => {
     });
 
     describe("when non-EXTERNAL user (MEMBER) has VIEWER team role", () => {
-      it.each([
-        "datasets:view",
-        "prompts:view",
-        "secrets:view",
-      ] as Permission[])("grants %s", async (permission) => {
-        mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-1",
-            organizationId: "org-1",
-            organization: {
-              members: [{ role: OrganizationUserRole.MEMBER }],
+      it.each(["datasets:view", "prompts:view", "secrets:view"] as Permission[])(
+        "grants %s",
+        async (permission) => {
+          mockPrisma.project.findUnique.mockResolvedValue({
+            team: {
+              id: "team-1",
+              organizationId: "org-1",
+              organization: {
+                members: [{ role: OrganizationUserRole.MEMBER }],
+              },
             },
-          },
-        });
-        mockPrisma.groupMembership.findMany.mockResolvedValue([]);
-        mockPrisma.roleBinding.findMany.mockResolvedValue([
-          { role: TeamUserRole.VIEWER, customRoleId: null },
-        ]);
+          });
+          mockPrisma.groupMembership.findMany.mockResolvedValue([]);
+          mockPrisma.roleBinding.findMany.mockResolvedValue([
+            { role: TeamUserRole.VIEWER, customRoleId: null },
+          ]);
 
-        const result = await resolveProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-1",
-          permission,
-        );
+          const result = await resolveProjectPermission(
+            { prisma: mockPrisma, session: mockSession },
+            "project-1",
+            permission,
+          );
 
-        expect(result.permitted).toBe(true);
-      });
+          expect(result.permitted).toBe(true);
+        },
+      );
     });
 
     describe("when non-EXTERNAL user (ADMIN org role) accesses resources", () => {
@@ -1711,16 +1687,11 @@ describe("RBAC Integration Tests", () => {
           session: mockSession,
           permissionChecked: false,
           publiclyShared: false,
-          organizationRole: undefined as
-            | OrganizationUserRole
-            | null
-            | undefined,
+          organizationRole: undefined as OrganizationUserRole | null | undefined,
         };
 
         const mockNext = vi.fn().mockResolvedValue("success");
-        const middleware = checkProjectPermission(
-          "datasets:manage" as Permission,
-        );
+        const middleware = checkProjectPermission("datasets:manage" as Permission);
 
         try {
           await middleware({
@@ -1737,9 +1708,9 @@ describe("RBAC Integration Tests", () => {
             "This feature is not available for your account",
           );
           expect(trpcError.cause).toBeInstanceOf(LiteMemberRestrictedError);
-          expect(
-            (trpcError.cause as LiteMemberRestrictedError).meta.resource,
-          ).toBe("datasets");
+          expect((trpcError.cause as LiteMemberRestrictedError).meta.resource).toBe(
+            "datasets",
+          );
         }
       });
     });
@@ -1753,10 +1724,7 @@ describe("RBAC Integration Tests", () => {
           session: mockSession,
           permissionChecked: false,
           publiclyShared: false,
-          organizationRole: undefined as
-            | OrganizationUserRole
-            | null
-            | undefined,
+          organizationRole: undefined as OrganizationUserRole | null | undefined,
         };
 
         const mockNext = vi.fn().mockResolvedValue("success");
@@ -1777,9 +1745,9 @@ describe("RBAC Integration Tests", () => {
             "This feature is not available for your account",
           );
           expect(trpcError.cause).toBeInstanceOf(LiteMemberRestrictedError);
-          expect(
-            (trpcError.cause as LiteMemberRestrictedError).meta.resource,
-          ).toBe("datasets");
+          expect((trpcError.cause as LiteMemberRestrictedError).meta.resource).toBe(
+            "datasets",
+          );
         }
       });
     });
@@ -1802,16 +1770,11 @@ describe("RBAC Integration Tests", () => {
           session: mockSession,
           permissionChecked: false,
           publiclyShared: false,
-          organizationRole: undefined as
-            | OrganizationUserRole
-            | null
-            | undefined,
+          organizationRole: undefined as OrganizationUserRole | null | undefined,
         };
 
         const mockNext = vi.fn().mockResolvedValue("success");
-        const middleware = checkProjectPermission(
-          "datasets:view" as Permission,
-        );
+        const middleware = checkProjectPermission("datasets:view" as Permission);
 
         try {
           await middleware({

@@ -90,9 +90,7 @@ vi.mock("~/hooks/useSimulationUpdateListener", () => ({
 }));
 
 vi.mock("~/components/DashboardLayout", () => ({
-  DashboardLayout: ({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  ),
+  DashboardLayout: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("~/components/suites/RunHistoryPanel", () => ({

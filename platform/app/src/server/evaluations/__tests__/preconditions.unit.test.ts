@@ -1178,9 +1178,7 @@ describe("evaluatePreconditions()", () => {
       expect(
         evaluatePreconditions({
           traceData: {
-            events: [
-              { event_type: "purchase", metrics: [], event_details: [] },
-            ],
+            events: [{ event_type: "purchase", metrics: [], event_details: [] }],
           },
           preconditions: [
             { field: "events.event_type", rule: "is", value: "thumbs_up_down" },
@@ -1329,9 +1327,7 @@ describe("evaluatePreconditions()", () => {
         evaluatePreconditions({
           traceData: {
             input: "hello",
-            events: [
-              { event_type: "purchase", metrics: [], event_details: [] },
-            ],
+            events: [{ event_type: "purchase", metrics: [], event_details: [] }],
           },
           preconditions: [
             { field: "input", rule: "contains", value: "hello" },

@@ -106,8 +106,7 @@ function DbEvaluatorPanel({
 
   const settingsSchema = useMemo(() => {
     if (!evaluatorType) return undefined;
-    return evaluatorsSchema.shape[evaluatorType as EvaluatorTypes]?.shape
-      ?.settings;
+    return evaluatorsSchema.shape[evaluatorType as EvaluatorTypes]?.shape?.settings;
   }, [evaluatorType]);
 
   const hasSettings =
@@ -118,12 +117,8 @@ function DbEvaluatorPanel({
   const effectiveEvaluatorDef = useMemo(() => {
     const fields = evaluatorQuery.data?.fields;
     if (fields && fields.length > 0) {
-      const requiredFields = fields
-        .filter((f) => !f.optional)
-        .map((f) => f.identifier);
-      const optionalFields = fields
-        .filter((f) => f.optional)
-        .map((f) => f.identifier);
+      const requiredFields = fields.filter((f) => !f.optional).map((f) => f.identifier);
+      const optionalFields = fields.filter((f) => f.optional).map((f) => f.identifier);
       return { requiredFields, optionalFields };
     }
     return evaluatorDef;
@@ -161,8 +156,7 @@ function DbEvaluatorPanel({
       const lc = node.data.localConfig;
       form.reset({
         name: lc?.name ?? evaluatorQuery.data.name,
-        settings:
-          lc?.settings ?? (evaluatorQuery.data.config as any)?.settings ?? {},
+        settings: lc?.settings ?? (evaluatorQuery.data.config as any)?.settings ?? {},
       });
     }
   }, [evaluatorQuery.data, form]);
@@ -270,15 +264,7 @@ function DbEvaluatorPanel({
         },
       },
     );
-  }, [
-    project?.id,
-    evaluatorId,
-    evaluatorType,
-    form,
-    updateMutation,
-    setNode,
-    node.id,
-  ]);
+  }, [project?.id, evaluatorId, evaluatorType, form, updateMutation, setNode, node.id]);
 
   const handleDiscard = useCallback(() => {
     debouncedSetLocalConfig.cancel();
@@ -322,13 +308,7 @@ function DbEvaluatorPanel({
         </Button>
       </HStack>
     ),
-    [
-      hasLocalChanges,
-      handleDiscard,
-      handleApply,
-      handleSave,
-      updateMutation.isPending,
-    ],
+    [hasLocalChanges, handleDiscard, handleApply, handleSave, updateMutation.isPending],
   );
   useRegisterDrawerFooter(footerContent);
 
@@ -370,20 +350,16 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
     { enabled: !!project?.id },
   );
-  const resolvedDefaultEmbeddings =
-    api.modelProvider.getResolvedDefault.useQuery(
-      {
-        projectId: project?.id ?? "",
-        featureKey: "analytics.topic_clustering_embeddings",
-      },
-      { enabled: !!project?.id },
-    );
+  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
+    {
+      projectId: project?.id ?? "",
+      featureKey: "analytics.topic_clustering_embeddings",
+    },
+    { enabled: !!project?.id },
+  );
 
   const settingsFromParameters = Object.fromEntries(
-    (node.data.parameters ?? []).map(({ identifier, value }) => [
-      identifier,
-      value,
-    ]),
+    (node.data.parameters ?? []).map(({ identifier, value }) => [identifier, value]),
   );
   const form = useForm({
     defaultValues: {
@@ -401,29 +377,16 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
   const availableEvaluators = useAvailableEvaluators();
 
   useEffect(() => {
-    if (
-      !evaluator ||
-      !availableEvaluators ||
-      !(evaluator in availableEvaluators)
-    )
-      return;
+    if (!evaluator || !availableEvaluators || !(evaluator in availableEvaluators)) return;
     if (node.data.parameters) return;
 
-    const evaluatorDefinition =
-      availableEvaluators[evaluator as EvaluatorTypes];
+    const evaluatorDefinition = availableEvaluators[evaluator as EvaluatorTypes];
 
-    const setDefaultSettings = (
-      defaultValues: Record<string, any>,
-      prefix: string,
-    ) => {
+    const setDefaultSettings = (defaultValues: Record<string, any>, prefix: string) => {
       if (!defaultValues) return;
 
       Object.entries(defaultValues).forEach(([key, value]) => {
-        if (
-          typeof value === "object" &&
-          !Array.isArray(value) &&
-          value !== null
-        ) {
+        if (typeof value === "object" && !Array.isArray(value) && value !== null) {
           setDefaultSettings(value, `${prefix}.${key}`);
         } else {
           //@ts-ignore
@@ -483,9 +446,7 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
   }, [form, handleSubmitDebounced]);
 
   const hasEvaluatorFields =
-    evaluator &&
-    schema instanceof z.ZodObject &&
-    Object.keys(schema.shape).length > 0;
+    evaluator && schema instanceof z.ZodObject && Object.keys(schema.shape).length > 0;
 
   return (
     <BasePropertiesPanel node={node} hideParameters={!!hasEvaluatorFields}>

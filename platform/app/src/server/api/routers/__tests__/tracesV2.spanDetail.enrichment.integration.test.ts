@@ -100,9 +100,7 @@ const { mocks } = vi.hoisted(() => ({
 // `.permission()` procedures decide through getApp().permissions (ADR-092),
 // so the fake carries the real composition over the real test database.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   const { prisma: dbForPermissions } = await import("~/server/db");
   return {
     // Consumers that degrade without Redis read through this one.
@@ -237,9 +235,7 @@ describe("tracesV2.spanDetail coding-agent enrichment", () => {
       expect(detail.outputRedacted).toBe(true);
       expect(detail.input ?? "").not.toContain("hello claudinho");
       expect(detail.output ?? "").not.toContain("E aí");
-      expect(JSON.stringify(detail.params ?? {})).not.toContain(
-        "hello claudinho",
-      );
+      expect(JSON.stringify(detail.params ?? {})).not.toContain("hello claudinho");
     });
   });
 

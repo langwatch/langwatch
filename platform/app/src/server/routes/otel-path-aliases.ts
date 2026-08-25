@@ -42,12 +42,7 @@ export const app = new Hono();
  * to the SPA fallback it answered with the HTML shell and a 200, which an
  * exporter reads as success before dropping the batch.
  */
-const CANDIDATE_PATTERNS = [
-  "/api/otel/*",
-  "/api/collector/*",
-  "/api/v1/*",
-  "/v1/*",
-];
+const CANDIDATE_PATTERNS = ["/api/otel/*", "/api/collector/*", "/api/v1/*", "/v1/*"];
 
 for (const pattern of CANDIDATE_PATTERNS) {
   app.all(pattern, async (c, next) => {

@@ -45,10 +45,7 @@ import {
   RedisReplayMarkerChecker,
 } from "@langwatch/eventing";
 import { AppAuditLogRuntime } from "~/runtime/app/features/audit-log";
-import {
-  AppApiKeyDiagnostics,
-  AppApiKeyRuntime,
-} from "~/runtime/app/features/api-key";
+import { AppApiKeyDiagnostics, AppApiKeyRuntime } from "~/runtime/app/features/api-key";
 import { AppAutomationRuntime } from "~/runtime/app/features/automation";
 import { AppGovernanceRuntime } from "~/runtime/app/features/governance";
 import { AgentsFeature } from "~/runtime/app/features/agents";
@@ -77,10 +74,7 @@ import { AppSimulationRuntime } from "~/runtime/app/features/simulation";
 import { AppSuiteRuntime } from "~/runtime/app/features/suite";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import {
-  RedisConnectionService,
-  RedisShutdownService,
-} from "@langwatch/redis-client";
+import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
 import { env } from "~/env.mjs";
@@ -90,10 +84,7 @@ import {
   LangyTokenBuffer,
 } from "@langwatch/langy-server";
 import { AuthzFeature } from "~/runtime/app/features/authz";
-import {
-  AnalyticsAdapter,
-  LoggingAnalyticsTripwire,
-} from "@langwatch/analytics-server";
+import { AnalyticsAdapter, LoggingAnalyticsTripwire } from "@langwatch/analytics-server";
 import { PostgresDashboardAdapter } from "@langwatch/dashboard-server";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validateSavedWorkbenchChartDefinition } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
@@ -271,10 +262,7 @@ import {
   type ProcessRole,
   roleRunsWorkers,
 } from "./config";
-import type {
-  AppDependencies,
-  DataRetentionDependencies,
-} from "./dependencies";
+import type { AppDependencies, DataRetentionDependencies } from "./dependencies";
 import { ManagedProvidersAppAdapter } from "./enterprise/managed-providers.adapter";
 import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.recorder";
 import { createDefaultModelEnvResolver } from "./evaluations/evaluation-execution.factories";
@@ -386,10 +374,7 @@ import { SessionGroupsService } from "./traces/session-groups.service";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
 import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
-import {
-  setDiscoverBroadcaster,
-  TraceListService,
-} from "./traces/trace-list.service";
+import { setDiscoverBroadcaster, TraceListService } from "./traces/trace-list.service";
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
@@ -426,9 +411,7 @@ export function initializeInProcessApp(): App {
   return initializeDefaultApp({ processRole: "all" });
 }
 
-export function initializeDefaultApp(options?: {
-  processRole?: ProcessRole;
-}): App {
+export function initializeDefaultApp(options?: { processRole?: ProcessRole }): App {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
 
   const prisma = globalPrisma;
@@ -441,8 +424,7 @@ export function initializeDefaultApp(options?: {
     tenantId: string,
   ): Promise<ClickHouseClient> => {
     const client = await getClickHouseClientForTenant(tenantId);
-    if (!client)
-      throw new Error(`ClickHouse not available for tenant ${tenantId}`);
+    if (!client) throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
   };
 
@@ -530,8 +512,7 @@ export function initializeDefaultApp(options?: {
         new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
       ),
       storedObjects: {
-        deleteOwnedBy: (input) =>
-          createStoredObjectsService(input).deleteOwnedBy(input),
+        deleteOwnedBy: (input) => createStoredObjectsService(input).deleteOwnedBy(input),
       },
       diagnostics: {
         error: (context, message) =>
@@ -555,12 +536,9 @@ export function initializeDefaultApp(options?: {
       grants: authzFeature.grants,
       organizations,
       projects,
-      newBindingId: () =>
-        generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
       deriveBindingId: AuthzFeature.deriveGrantId,
-      diagnostics: AppApiKeyDiagnostics.create(
-        createLogger("langwatch:api-key"),
-      ),
+      diagnostics: AppApiKeyDiagnostics.create(createLogger("langwatch:api-key")),
     }).build(),
     "ApiKeyService",
   );
@@ -594,9 +572,7 @@ export function initializeDefaultApp(options?: {
   // that read floor silently falls back to the platform default, which is the
   // whole point of making it tenant-aware.
   const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
-  const retentionPolicyCache = new RetentionPolicyCache(
-    dataRetentionPolicyRepo,
-  );
+  const retentionPolicyCache = new RetentionPolicyCache(dataRetentionPolicyRepo);
 
   const traceSummary = traced(
     new TraceSummaryService(
@@ -628,11 +604,7 @@ export function initializeDefaultApp(options?: {
       tenantId,
       timestamp: Date.now(),
     });
-    void broadcast.broadcastToTenantRateLimited(
-      tenantId,
-      payload,
-      "discover_updated",
-    );
+    void broadcast.broadcastToTenantRateLimited(tenantId, payload, "discover_updated");
   });
   const spanStorage = traced(
     new SpanStorageService(spanStorageRepository, {
@@ -660,8 +632,7 @@ export function initializeDefaultApp(options?: {
         : async () => null,
       tupleParam: (values) => new TupleParam(values),
       runHistoryTelemetry: AppExperimentRunHistoryTelemetry.create(),
-      dspyRetention:
-        AppExperimentDspyRetentionPort.create(retentionPolicyCache),
+      dspyRetention: AppExperimentDspyRetentionPort.create(retentionPolicyCache),
       execution: AppExperimentEventingAdapter.create(
         () => commands.experimentRuns,
       ).build(),
@@ -681,10 +652,12 @@ export function initializeDefaultApp(options?: {
     database: prisma,
     experiments: {
       getName: async ({ projectId, experimentId }) => {
-        const name = (await experiments.getById({
-          projectId,
-          id: experimentId,
-        })).name;
+        const name = (
+          await experiments.getById({
+            projectId,
+            id: experimentId,
+          })
+        ).name;
         if (!name) throw new Error(`Experiment ${experimentId} has no name`);
         return name;
       },
@@ -693,8 +666,7 @@ export function initializeDefaultApp(options?: {
   const dataset = traced(datasetRuntime.build(), "DatasetService");
   const workflowNlpExecutor = WorkflowNlpExecutor.create({
     migrateDsl: migrateWorkflowDslForExecution,
-    getProjectModelProviders: (projectId) =>
-      modelProviders.getForProject({ projectId }),
+    getProjectModelProviders: (projectId) => modelProviders.getForProject({ projectId }),
     stripUnsupportedParams: ({ projectId, workflow }) =>
       stripUnsupportedLLMParamsFromWorkflow({
         prisma,
@@ -756,8 +728,7 @@ export function initializeDefaultApp(options?: {
           query: async (input: Parameters<EvaluationClickHouseClient["query"]>[0]) => {
             const result = await client.query(input as never);
             return {
-              json: async <T>() =>
-                (await result.json<T>()) as unknown as T[],
+              json: async <T>() => (await result.json<T>()) as unknown as T[],
             };
           },
         };
@@ -796,10 +767,10 @@ export function initializeDefaultApp(options?: {
     resolveClient: resolveClickHouseClient,
     tripwire: LoggingAnalyticsTripwire.create({
       isEnabled: async (projectId) =>
-        featureFlagService.isEnabled(
-          "release_event_sourced_analytics_read_tripwire",
-          { distinctId: projectId, projectId },
-        ),
+        featureFlagService.isEnabled("release_event_sourced_analytics_read_tripwire", {
+          distinctId: projectId,
+          projectId,
+        }),
     }),
   });
   const langWatchQL = createLangWatchQLService();
@@ -834,9 +805,7 @@ export function initializeDefaultApp(options?: {
     agents,
     prompts,
     scenarios,
-    resolveClickHouseClient: clickhouseEnabled
-      ? resolveClickHouseClient
-      : null,
+    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
     defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
     execution: AppSuiteExecutionPort.create({
       startSuiteRun: suiteStartRun.fn,
@@ -977,9 +946,7 @@ export function initializeDefaultApp(options?: {
       testFireTrigger(triggerTemplateDeps, input),
   };
   const tokenizer = new TokenizerService(
-    config.disableTokenization
-      ? new NullTokenizerClient()
-      : new TiktokenClient(),
+    config.disableTokenization ? new NullTokenizerClient() : new TiktokenClient(),
   );
 
   const billingErrorReporter = AppBillingErrorReporter.create();
@@ -1104,9 +1071,7 @@ export function initializeDefaultApp(options?: {
       ? new SessionMetricSeriesClickHouseRepository(resolveClickHouseClient)
       : new NullSessionMetricSeriesRepository(),
     codingAgentSessionEvents: clickhouseEnabled
-      ? new CodingAgentSessionEventsClickHouseRepository(
-          resolveClickHouseClient,
-        )
+      ? new CodingAgentSessionEventsClickHouseRepository(resolveClickHouseClient)
       : new NullCodingAgentSessionEventsRepository(),
     metricDataPointStorage: clickhouseEnabled
       ? new MetricDataPointClickHouseRepository({
@@ -1121,9 +1086,7 @@ export function initializeDefaultApp(options?: {
       ? new TraceAnalyticsClickHouseRepository(resolveClickHouseClient)
       : new NullTraceAnalyticsRepository(),
     evaluationAnalyticsRollup: clickhouseEnabled
-      ? new EvaluationAnalyticsRollupClickHouseRepository(
-          resolveClickHouseClient,
-        )
+      ? new EvaluationAnalyticsRollupClickHouseRepository(resolveClickHouseClient)
       : new NullEvaluationAnalyticsRollupRepository(),
     evaluationAnalytics: clickhouseEnabled
       ? new EvaluationAnalyticsClickHouseRepository(resolveClickHouseClient)
@@ -1141,11 +1104,10 @@ export function initializeDefaultApp(options?: {
       PLATFORM_DEFAULT_RETENTION_DAYS,
     ),
     processStore,
-    topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
+    topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(prisma),
+    topicClusteringRunHistory: new PrismaTopicClusteringRunHistoryProjectionRepository(
       prisma,
     ),
-    topicClusteringRunHistory:
-      new PrismaTopicClusteringRunHistoryProjectionRepository(prisma),
     topicModel: new PrismaTopicModelProjectionRepository(prisma),
     langyTurnAdmission: langyPersistence.langyTurnAdmission,
   };
@@ -1166,8 +1128,7 @@ export function initializeDefaultApp(options?: {
     prisma,
   });
   installEnterpriseWebhookAccess(planProvider);
-  const webhookDelivery: WebhookDeliveryProcessDeps | undefined =
-    clickhouseEnabled
+  const webhookDelivery: WebhookDeliveryProcessDeps | undefined = clickhouseEnabled
     ? {
         processStore: repositories.processStore,
         endpoints: webhookEndpointService,
@@ -1178,7 +1139,7 @@ export function initializeDefaultApp(options?: {
         getPlan: (organizationId: string) =>
           planProvider.getActivePlan({ organizationId }),
       }
-      : undefined;
+    : undefined;
 
   // The gateway's ClickHouse-backed repositories, built once and handed out
   // on the App. Every surface - tRPC routers, the REST apps, the CLI auth
@@ -1243,9 +1204,7 @@ export function initializeDefaultApp(options?: {
   const governanceActivity = AppIngestionSourceActivityAdapter.create({
     database: prisma,
     resolveClient: async (organizationId) =>
-      clickhouseEnabled
-        ? getClickHouseClientForOrganization(organizationId)
-        : null,
+      clickhouseEnabled ? getClickHouseClientForOrganization(organizationId) : null,
   }).build();
 
   // Governance is composed once for the process. Request transports receive
@@ -1292,9 +1251,7 @@ export function initializeDefaultApp(options?: {
         resolveOrganizationClient: getClickHouseClientForOrganization,
       }).build()
     : null;
-  const billingQueries = BillableEventsQueryService.create(
-    billableEventsRepository,
-  );
+  const billingQueries = BillableEventsQueryService.create(billableEventsRepository);
 
   const eventStore = clickhouseEnabled
     ? new EventStoreClickHouse(
@@ -1302,9 +1259,7 @@ export function initializeDefaultApp(options?: {
         retentionPolicyCache,
       )
     : undefined;
-  const configuredGlobalConcurrency = Number(
-    process.env.GLOBAL_QUEUE_CONCURRENCY,
-  );
+  const configuredGlobalConcurrency = Number(process.env.GLOBAL_QUEUE_CONCURRENCY);
   const queueFactory = redis
     ? createEventingGroupQueueFactory({
         consumersEnabled: roleRunsWorkers(config.processRole),
@@ -1317,9 +1272,7 @@ export function initializeDefaultApp(options?: {
                 ? configuredGlobalConcurrency
                 : undefined,
             compression:
-              process.env.GROUP_QUEUE_ZSTD_WRITES_ENABLED === "true"
-                ? "zstd"
-                : "gzip",
+              process.env.GROUP_QUEUE_ZSTD_WRITES_ENABLED === "true" ? "zstd" : "gzip",
             payloadCodec:
               process.env.GROUP_QUEUE_MSGPACK_WRITES_ENABLED === "true"
                 ? "msgpack"
@@ -1336,11 +1289,8 @@ export function initializeDefaultApp(options?: {
     queueFactory,
     enabled: true,
     consumersEnabled: roleRunsWorkers(config.processRole),
-    executionTarget:
-      config.processRole === "all" ? undefined : config.processRole,
-    replayMarkerChecker: redis
-      ? new RedisReplayMarkerChecker(redis)
-      : undefined,
+    executionTarget: config.processRole === "all" ? undefined : config.processRole,
+    replayMarkerChecker: redis ? new RedisReplayMarkerChecker(redis) : undefined,
     retentionPolicyResolver: retentionPolicyCache,
     configureGlobalProjections: config.isSaas
       ? (registry) => {
@@ -1349,11 +1299,8 @@ export function initializeDefaultApp(options?: {
             "orgBillableEventsMeter",
             createBillingMeterDispatchSubscriber({
               getDispatch: () => {
-                const pipeline = es.getPipeline(
-                  BILLING_REPORTING_PIPELINE_NAME,
-                );
-                return (data) =>
-                  pipeline.commands.reportUsageForMonth.send(data);
+                const pipeline = es.getPipeline(BILLING_REPORTING_PIPELINE_NAME);
+                return (data) => pipeline.commands.reportUsageForMonth.send(data);
               },
             }),
           );
@@ -1451,9 +1398,7 @@ export function initializeDefaultApp(options?: {
                   undefined,
               });
               const projectUrl = `${config.baseHost ?? env.BASE_HOST}/${projectSlug}`;
-              return page.items.map((item) =>
-                toReportTraceRow({ item, projectUrl }),
-              );
+              return page.items.map((item) => toReportTraceRow({ item, projectUrl }));
             },
             // A report's fire is a completed EVENT, not an open incident, so
             // `resolvedAt` is stamped at write time. The list's "currently
@@ -1493,8 +1438,7 @@ export function initializeDefaultApp(options?: {
                       },
                       orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
                     }),
-                  getTimeseries: (input) =>
-                    analyticsService.getTimeseries(input),
+                  getTimeseries: (input) => analyticsService.getTimeseries(input),
                 },
                 source,
                 projectId,
@@ -1535,19 +1479,17 @@ export function initializeDefaultApp(options?: {
   // service composed further down (it needs the GitHub connection, which needs
   // Redis and Prisma), so the registry is handed the callable proxy now and the
   // real implementation is wired once it exists.
-  const requestBranchMapping = new Deferred<
-    GithubService["requestBranchMapping"]
-  >("requestBranchMapping");
+  const requestBranchMapping = new Deferred<GithubService["requestBranchMapping"]>(
+    "requestBranchMapping",
+  );
 
   // The fleet-wide linkage maintenance the scheduled process manager drives.
   // Late-bound for the same reason: both need the mapping service and its
   // repository, which are composed further down.
-  const recheckDueBranches = new Deferred<() => Promise<number>>(
-    "recheckDueBranches",
+  const recheckDueBranches = new Deferred<() => Promise<number>>("recheckDueBranches");
+  const pruneStaleBranchLinkage = new Deferred<() => Promise<{ branchChecks: number }>>(
+    "pruneStaleBranchLinkage",
   );
-  const pruneStaleBranchLinkage = new Deferred<
-    () => Promise<{ branchChecks: number }>
-  >("pruneStaleBranchLinkage");
 
   const registry = new PipelineRegistry({
     eventSourcing: es,
@@ -1637,8 +1579,7 @@ export function initializeDefaultApp(options?: {
     lifecycle: registry.getGovernanceLifecycle(),
     secretPepper: env.LW_VIRTUAL_KEY_PEPPER ?? "",
   }).build();
-  (globalForApp as any).__scenarioExecutionPool =
-    commands.scenarioExecutionPool;
+  (globalForApp as any).__scenarioExecutionPool = commands.scenarioExecutionPool;
 
   // The package-owned migration starts only after the pipeline has connected
   // its command dispatcher. The app process exposes metadata but runs no
@@ -1660,8 +1601,7 @@ export function initializeDefaultApp(options?: {
       redis: redis ?? null,
       commands: {
         recordTopics: (args) => commands.topicClustering.recordTopics(args),
-        requestClustering: (args) =>
-          commands.topicClustering.requestClustering(args),
+        requestClustering: (args) => commands.topicClustering.requestClustering(args),
       },
     });
   }
@@ -1680,9 +1620,7 @@ export function initializeDefaultApp(options?: {
       return github;
     },
     workerCallbackUrl:
-      env.LANGY_WORKER_CALLBACK_URL ??
-      env.LANGWATCH_ENDPOINT ??
-      env.LANGWATCH_API_URL,
+      env.LANGY_WORKER_CALLBACK_URL ?? env.LANGWATCH_ENDPOINT ?? env.LANGWATCH_API_URL,
     workerGatewayBaseUrl:
       env.LANGY_WORKER_GATEWAY_URL ??
       env.LW_GATEWAY_PUBLIC_URL ??
@@ -1735,9 +1673,7 @@ export function initializeDefaultApp(options?: {
         mintSessionKey: ({ session, projectId, organizationId }) =>
           mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
         revokeSessionKey: ({ apiKeyId, projectId }) =>
-          revokeLangySessionApiKey({ prisma, apiKeyId, projectId }).then(
-            () => undefined,
-          ),
+          revokeLangySessionApiKey({ prisma, apiKeyId, projectId }).then(() => undefined),
         admission: ports.admission,
         accessStore: redis ? LangyTurnAccessStore.create({ redis }) : null,
         handoffStore: redis ? langyHandoffStore : null,
@@ -1830,8 +1766,7 @@ export function initializeDefaultApp(options?: {
   const metricCollection = traced(
     new MetricRequestCollectionService({
       recordDataPoints: commands.metrics.recordDataPoint.sendBatch!,
-      recordMetricCorrelations:
-        commands.traces.recordMetricCorrelation.sendBatch!,
+      recordMetricCorrelations: commands.traces.recordMetricCorrelation.sendBatch!,
     }),
     "MetricRequestCollectionService",
   );
@@ -1876,8 +1811,7 @@ export function initializeDefaultApp(options?: {
     // The one place the bundled-plan policy is reached: the service takes the
     // answer as a dep so the read stays free of the enterprise module, and the
     // receiver and this rollup resolve bundled-ness the same way.
-    isSourceNonBillable: (input) =>
-      governanceRuntime.resolveSourceNonBillable(input),
+    isSourceNonBillable: (input) => governanceRuntime.resolveSourceNonBillable(input),
   });
 
   // The Sessions screen's read: the same session service, plus the mapping
@@ -2001,9 +1935,7 @@ export function initializeDefaultApp(options?: {
     baseHost: config.baseHost ?? env.BASE_HOST,
   });
 
-  const queueRepo = redis
-    ? new QueueRedisRepository(redis)
-    : new NullQueueRepository();
+  const queueRepo = redis ? new QueueRedisRepository(redis) : new NullQueueRepository();
   const replayRepo = redis
     ? new ReplayRedisRepository(redis)
     : new NullReplayRepository();
@@ -2054,15 +1986,12 @@ export function initializeDefaultApp(options?: {
     })(),
     replay: new ReplayService(replayRepo),
     blobStore: new BlobStoreService(
-      redis
-        ? new BlobStoreRedisRepository(redis)
-        : new NullBlobStoreRepository(),
+      redis ? new BlobStoreRedisRepository(redis) : new NullBlobStoreRepository(),
     ),
     metricsCollector: redis
       ? getOpsMetricsCollector({ redis, queueRepo, snapshotRepo })
       : null,
-    snapshotReader:
-      redis && snapshotRepo ? getOpsSnapshotReader(snapshotRepo) : null,
+    snapshotReader: redis && snapshotRepo ? getOpsSnapshotReader(snapshotRepo) : null,
   };
 
   const app = initializeApp({
@@ -2089,10 +2018,7 @@ export function initializeDefaultApp(options?: {
     topics,
     gateway: {
       budgetOverview: governanceRuntime.budgetOverview,
-      budgetDecisions: GatewayBudgetService.create(
-        prisma,
-        gatewayBudgetRepository,
-      ),
+      budgetDecisions: GatewayBudgetService.create(prisma, gatewayBudgetRepository),
       budgets: gatewayBudgetRepository,
       virtualKeySpend: gatewayVirtualKeySpendRepository,
       spendEvents: gatewaySpend?.repository,
@@ -2216,9 +2142,7 @@ export function createTestApp(
   const testPrisma = globalPrisma;
   AppAuditLogRuntime.install({ prisma: testPrisma });
   const testRetentionPolicyRepo = new DataRetentionPolicyRepository(testPrisma);
-  const testRetentionPolicyCache = new RetentionPolicyCache(
-    testRetentionPolicyRepo,
-  );
+  const testRetentionPolicyCache = new RetentionPolicyCache(testRetentionPolicyRepo);
   // Single PinnedTraceService instance shared between dataRetention.pinning
   // and share, mirroring the production wiring (presets.ts above). Without
   // this, tests that auto-pin via share would see a different repo state
@@ -2323,9 +2247,7 @@ export function createTestApp(
     projects: testProjects,
     newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
     deriveBindingId: AuthzFeature.deriveGrantId,
-    diagnostics: AppApiKeyDiagnostics.create(
-      createLogger("langwatch:api-key:test"),
-    ),
+    diagnostics: AppApiKeyDiagnostics.create(createLogger("langwatch:api-key:test")),
   }).build();
   const testGovernanceRuntime = AppGovernanceRuntime.create(testPrisma, {
     organizations: nullOrganizations,
@@ -2552,8 +2474,7 @@ export function createTestApp(
       resolveClickHouseClient: async () => null,
       tupleParam: (values) => new TupleParam(values),
       runHistoryTelemetry: AppExperimentRunHistoryTelemetry.create(),
-      dspyRetention:
-        AppExperimentDspyRetentionPort.create(testRetentionPolicyCache),
+      dspyRetention: AppExperimentDspyRetentionPort.create(testRetentionPolicyCache),
       slugify,
       newId: () => nanoid(8),
     }).build(),
@@ -2636,8 +2557,7 @@ export function createTestApp(
       cliBootstrap: testGovernanceRuntime.cliBootstrap,
       cliSessions: testGovernanceRuntime.cliSessions,
       cliTokenRevocation: testGovernanceRuntime.cliTokenRevocation,
-      adminWorkspaceViewAudit:
-        testGovernanceRuntime.adminWorkspaceViewAudit,
+      adminWorkspaceViewAudit: testGovernanceRuntime.adminWorkspaceViewAudit,
       quarantineFill: testGovernanceRuntime.quarantineFill,
       ingestionKeys: testGovernanceRuntime.ingestionKeys,
     },
@@ -2650,9 +2570,7 @@ export function createTestApp(
     },
     github: testGithub,
     storedObjects: {
-      crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(
-        async () => [],
-      ),
+      crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(async () => []),
     },
     opsExplain: {
       service: new OpsExplainService(
@@ -2720,7 +2638,7 @@ export function createTestApp(
       feedbackPromptRedis: null,
     }),
     organizations: nullOrganizations,
-      projects: testProjects,
+    projects: testProjects,
     users: testUsers,
     roles: testRoles,
     permissions: testAuthz.permissions,
@@ -2746,9 +2664,7 @@ export function createTestApp(
       scheduler: new SchedulerOpsService({
         repo: new NullScheduledJobStore(),
       }),
-      eventExplorer: new EventExplorerService(
-        new NullEventExplorerRepository(),
-      ),
+      eventExplorer: new EventExplorerService(new NullEventExplorerRepository()),
       managerExplorer: new ManagerExplorerService({
         store: new InMemoryProcessStore(),
         fleet: new NullProcessOpsRepository(),

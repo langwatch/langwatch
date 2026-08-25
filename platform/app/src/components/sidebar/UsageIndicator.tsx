@@ -11,9 +11,7 @@ import { Tooltip } from "../ui/tooltip";
 
 const MENU_ITEM_HEIGHT = "32px";
 
-export type UsageDisplay =
-  | { visible: true; unitLabel: string }
-  | { visible: false };
+export type UsageDisplay = { visible: true; unitLabel: string } | { visible: false };
 
 /**
  * Determines whether the sidebar usage bar is visible and which unit label
@@ -131,10 +129,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
                 </Text>
               </HStack>
               <Progress.Root
-                value={Math.min(
-                  currentCount,
-                  usage.data.activePlan.maxMessagesPerMonth,
-                )}
+                value={Math.min(currentCount, usage.data.activePlan.maxMessagesPerMonth)}
                 max={usage.data.activePlan.maxMessagesPerMonth}
                 colorPalette="orange"
                 width="full"

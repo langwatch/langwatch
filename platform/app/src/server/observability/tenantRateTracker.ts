@@ -60,8 +60,7 @@ export class TenantRateTracker {
    * unbounded before trimming existed). Bounds the hash at ~one field per
    * active minute over the window.
    */
-  private static readonly RETENTION_MINUTES =
-    TenantRateTracker.TTL_SECONDS / 60;
+  private static readonly RETENTION_MINUTES = TenantRateTracker.TTL_SECONDS / 60;
   /**
    * Batch size for the on-read orphan trim. A hash that predates trimming can
    * hold hundreds of thousands of fields; delete them in chunks so a single
@@ -95,14 +94,11 @@ export class TenantRateTracker {
   private async isKilledForTenant(tenantId: string): Promise<boolean> {
     if (!this.featureFlagService) return false;
     try {
-      return await this.featureFlagService.isEnabled(
-        ANOMALY_DETECTION_KILL_SWITCH_FLAG,
-        {
-          distinctId: tenantId,
-          defaultValue: false,
-          cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
-        },
-      );
+      return await this.featureFlagService.isEnabled(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
+        distinctId: tenantId,
+        defaultValue: false,
+        cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
+      });
     } catch {
       return false;
     }
@@ -144,10 +140,7 @@ export class TenantRateTracker {
    * Sum enqueues for `tenantId` across the last `windowSeconds` window.
    * Returns 0 when the tenant has no data.
    */
-  async currentWindowCount(
-    tenantId: string,
-    windowSeconds: number,
-  ): Promise<number> {
+  async currentWindowCount(tenantId: string, windowSeconds: number): Promise<number> {
     const minuteNow = Math.floor(this.nowFn() / 60_000);
     const minutesBack = Math.max(1, Math.ceil(windowSeconds / 60));
     const fields: string[] = [];
@@ -180,10 +173,7 @@ export class TenantRateTracker {
    * holds at most one field per active minute over that window and the reply
    * can never exceed ~11.5k fields however long the tenant stays active.
    */
-  async perMinuteSeries(
-    tenantId: string,
-    lookbackSeconds: number,
-  ): Promise<number[]> {
+  async perMinuteSeries(tenantId: string, lookbackSeconds: number): Promise<number[]> {
     const minuteNow = Math.floor(this.nowFn() / 60_000);
     const minutesBack = Math.max(1, Math.ceil(lookbackSeconds / 60));
     const oldestMinute = minuteNow - (minutesBack - 1);
@@ -245,9 +235,7 @@ export class TenantRateTracker {
    */
   async getCachedBaseline(tenantId: string): Promise<number | null> {
     try {
-      const raw = await this.redis.get(
-        `${TenantRateTracker.BASELINE_PREFIX}${tenantId}`,
-      );
+      const raw = await this.redis.get(`${TenantRateTracker.BASELINE_PREFIX}${tenantId}`);
       if (!raw) return null;
       const n = Number.parseFloat(raw);
       return Number.isFinite(n) ? n : null;

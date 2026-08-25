@@ -78,10 +78,7 @@ const AttributesSectionInner: React.FC<AttributesSectionProps> = ({
   }, [searchOpen]);
 
   // Keys sorted by count desc — the cap below trims the tail of this list.
-  const sorted = useMemo(
-    () => [...keys].sort((a, b) => b.count - a.count),
-    [keys],
-  );
+  const sorted = useMemo(() => [...keys].sort((a, b) => b.count - a.count), [keys]);
 
   const searchActive = searchQuery.trim().length > 0;
   const filtered = useMemo(() => {
@@ -98,12 +95,9 @@ const AttributesSectionInner: React.FC<AttributesSectionProps> = ({
   // Cap the unfiltered list at the top N keys (by count); the "Show N more"
   // expander reveals the rest. A search bypasses the cap and shows all matches.
   const [showAll, setShowAll] = useState(false);
-  const isCapped =
-    !searchActive && filtered.length > MAX_VISIBLE_ATTRIBUTE_KEYS;
+  const isCapped = !searchActive && filtered.length > MAX_VISIBLE_ATTRIBUTE_KEYS;
   const visible =
-    isCapped && !showAll
-      ? filtered.slice(0, MAX_VISIBLE_ATTRIBUTE_KEYS)
-      : filtered;
+    isCapped && !showAll ? filtered.slice(0, MAX_VISIBLE_ATTRIBUTE_KEYS) : filtered;
   const hiddenCount = filtered.length - MAX_VISIBLE_ATTRIBUTE_KEYS;
 
   return (

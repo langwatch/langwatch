@@ -80,11 +80,7 @@ describe("the Pull Requests table order", () => {
 
       expect(
         orderOf(sortPullRequestRows({ rows, sort: DEFAULT_PULL_REQUEST_SORT })),
-      ).toEqual([
-        "newest-pull-request",
-        "middle-branch",
-        "oldest-pull-request",
-      ]);
+      ).toEqual(["newest-pull-request", "middle-branch", "oldest-pull-request"]);
     });
 
     it("opens on the last update, read newest first", () => {
@@ -120,10 +116,7 @@ describe("the Pull Requests table order", () => {
       ];
       const sort = afterClicks({ column: "number", clicks: 1 });
 
-      expect(orderOf(sortPullRequestRows({ rows, sort }))).toEqual([
-        "high",
-        "low",
-      ]);
+      expect(orderOf(sortPullRequestRows({ rows, sort }))).toEqual(["high", "low"]);
     });
   });
 
@@ -164,10 +157,7 @@ describe("the Pull Requests table order", () => {
       ];
       const sort = afterClicks({ column: "title", clicks: 1 });
 
-      expect(orderOf(sortPullRequestRows({ rows, sort }))).toEqual([
-        "aardvark",
-        "zebra",
-      ]);
+      expect(orderOf(sortPullRequestRows({ rows, sort }))).toEqual(["aardvark", "zebra"]);
     });
   });
 
@@ -205,9 +195,7 @@ describe("the Pull Requests table order", () => {
 
       const third = afterClicks({ column: "tokens", clicks: 3 });
       expect(third).toEqual(DEFAULT_PULL_REQUEST_SORT);
-      expect(orderOf(sortPullRequestRows({ rows, sort: third }))).toEqual(
-        opening,
-      );
+      expect(orderOf(sortPullRequestRows({ rows, sort: third }))).toEqual(opening);
     });
 
     it("takes the last update column itself from newest, to oldest, and back", () => {

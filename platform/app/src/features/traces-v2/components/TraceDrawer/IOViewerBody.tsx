@@ -108,9 +108,7 @@ export function IOViewerBody({
         turns={conversationTurns}
         layout={chatLayout}
         collapseTools={mode === "output"}
-        maxHeightPx={
-          isLong && !expanded ? COMPACT_MAX_HEIGHT_PX : EXPANDED_MAX_HEIGHT_PX
-        }
+        maxHeightPx={isLong && !expanded ? COMPACT_MAX_HEIGHT_PX : EXPANDED_MAX_HEIGHT_PX}
       />
     );
   }
@@ -141,9 +139,7 @@ export function IOViewerBody({
   // Pretty is no longer a no-op vs the raw Text view. The "text" format
   // still falls straight through to the literal monospace block below.
   if (format === "pretty" && !isLong && looksLikeMarkdown(displayContent)) {
-    return (
-      <RenderedMarkdown markdown={displayContent} paddingX={3} paddingY={2} />
-    );
+    return <RenderedMarkdown markdown={displayContent} paddingX={3} paddingY={2} />;
   }
   return (
     <Text

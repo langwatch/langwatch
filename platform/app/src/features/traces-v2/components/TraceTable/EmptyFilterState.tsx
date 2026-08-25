@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Flex,
-  Heading,
-  HStack,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Button, Flex, Heading, HStack, Stack, Text } from "@chakra-ui/react";
 import type React from "react";
 import type { TimeRange } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
@@ -161,13 +153,7 @@ export const EmptyFilterState: React.FC = () => {
   }
 
   return (
-    <Flex
-      align="center"
-      justify="center"
-      height="full"
-      paddingX={6}
-      paddingY={12}
-    >
+    <Flex align="center" justify="center" height="full" paddingX={6} paddingY={12}>
       <Stack gap={5} align="center" textAlign="center" maxWidth="440px">
         <LangWatchMark />
         <Stack gap={1.5} align="center">

@@ -10,8 +10,7 @@ import { useRouter } from "~/utils/compat/next-router";
  */
 export default function UnsubscribePage() {
   const router = useRouter();
-  const token =
-    typeof router.query.token === "string" ? router.query.token : "";
+  const token = typeof router.query.token === "string" ? router.query.token : "";
   const [done, setDone] = useState<null | "trigger" | "project">(null);
 
   const resolved = api.emailSuppression.resolveUnsubscribeToken.useQuery(
@@ -49,9 +48,7 @@ export default function UnsubscribePage() {
         ) : !token || resolved.isError ? (
           <VStack align="start" gap={2}>
             <Heading size="md">Link not valid</Heading>
-            <Text color="fg.muted">
-              This unsubscribe link is invalid or has expired.
-            </Text>
+            <Text color="fg.muted">This unsubscribe link is invalid or has expired.</Text>
           </VStack>
         ) : resolved.isLoading || !resolved.data ? (
           <VStack gap={3}>

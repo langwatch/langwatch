@@ -13,13 +13,7 @@ const trpcErrorWithStatus = (httpStatus: number) =>
   } as never);
 
 /** A handled error as the tRPC boundary puts it on the wire. */
-const handledTrpcError = ({
-  code,
-  httpStatus,
-}: {
-  code: string;
-  httpStatus: number;
-}) =>
+const handledTrpcError = ({ code, httpStatus }: { code: string; httpStatus: number }) =>
   new TRPCClientError(code, {
     result: {
       error: {
@@ -50,9 +44,9 @@ describe("shouldRetryQuery", () => {
         "billing_customer_deleted",
         "subscription_service_unavailable",
       ])("does not retry %s", (code) => {
-        expect(
-          shouldRetryQuery(0, handledTrpcError({ code, httpStatus: 409 })),
-        ).toBe(false);
+        expect(shouldRetryQuery(0, handledTrpcError({ code, httpStatus: 409 }))).toBe(
+          false,
+        );
       });
     });
 
@@ -77,9 +71,7 @@ describe("shouldRetryQuery", () => {
     });
 
     describe("when the failure is a client error", () => {
-      it.each([
-        400, 401, 403, 404, 422, 431,
-      ])("does not retry a %i", (status) => {
+      it.each([400, 401, 403, 404, 422, 431])("does not retry a %i", (status) => {
         expect(shouldRetryQuery(0, trpcErrorWithStatus(status))).toBe(false);
       });
     });
@@ -87,12 +79,10 @@ describe("shouldRetryQuery", () => {
     describe("when the failure is a server error", () => {
       it("retries a 500 until the retry budget runs out", () => {
         expect(shouldRetryQuery(0, trpcErrorWithStatus(500))).toBe(true);
-        expect(
-          shouldRetryQuery(MAX_QUERY_RETRIES - 1, trpcErrorWithStatus(500)),
-        ).toBe(true);
-        expect(
-          shouldRetryQuery(MAX_QUERY_RETRIES, trpcErrorWithStatus(500)),
-        ).toBe(false);
+        expect(shouldRetryQuery(MAX_QUERY_RETRIES - 1, trpcErrorWithStatus(500))).toBe(
+          true,
+        );
+        expect(shouldRetryQuery(MAX_QUERY_RETRIES, trpcErrorWithStatus(500))).toBe(false);
       });
 
       it("stops at the budget even for a permanent code", () => {

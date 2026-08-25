@@ -22,10 +22,7 @@ import {
   type ReadableSpan,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import {
-  ATTR_HTTP_ROUTE,
-  ATTR_URL_PATH,
-} from "@opentelemetry/semantic-conventions";
+import { ATTR_HTTP_ROUTE, ATTR_URL_PATH } from "@opentelemetry/semantic-conventions";
 import { act, cleanup, render } from "@testing-library/react";
 import {
   createMemoryRouter,
@@ -149,9 +146,7 @@ describe("useNavigationTracing", () => {
 
         const span = exported("navigation /:project/traces/:traceId");
         expect(span).toBeDefined();
-        expect(span?.attributes[ATTR_HTTP_ROUTE]).toBe(
-          "/:project/traces/:traceId",
-        );
+        expect(span?.attributes[ATTR_HTTP_ROUTE]).toBe("/:project/traces/:traceId");
         expect(span?.attributes[ATTR_URL_PATH]).toBe("/acme/traces/trace_abc");
       });
     });
@@ -177,9 +172,7 @@ describe("useNavigationTracing", () => {
 
         const call = exported("GET /api/trpc/traces.getById");
         const navigation = exported("navigation /:project/traces/:traceId");
-        expect(call?.parentSpanContext?.spanId).toBe(
-          navigation?.spanContext().spanId,
-        );
+        expect(call?.parentSpanContext?.spanId).toBe(navigation?.spanContext().spanId);
       });
     });
 
@@ -208,9 +201,7 @@ describe("useNavigationTracing", () => {
 
         callServer("GET /api/trpc/poll");
 
-        expect(
-          exported("GET /api/trpc/poll")?.parentSpanContext,
-        ).toBeUndefined();
+        expect(exported("GET /api/trpc/poll")?.parentSpanContext).toBeUndefined();
       });
     });
   });

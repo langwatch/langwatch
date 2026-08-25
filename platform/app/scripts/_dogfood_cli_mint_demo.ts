@@ -10,9 +10,7 @@
  */
 import { spawn } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
-import {
-  PersonalVirtualKeyAlreadyExistsError,
-} from "@langwatch/enterprise-governance-contract";
+import { PersonalVirtualKeyAlreadyExistsError } from "@langwatch/enterprise-governance-contract";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { prisma } from "~/server/db";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
@@ -104,9 +102,7 @@ async function main() {
     child.kill("SIGTERM");
     throw new Error(`no device_code mapped for user_code ${userCode}`);
   }
-  console.error(
-    `[runner] resolved user_code -> device_code (len ${deviceCode.length})`,
-  );
+  console.error(`[runner] resolved user_code -> device_code (len ${deviceCode.length})`);
 
   // Mint a personal VK + approve the device-code, mirroring the
   // /api/auth/cli/approve handler. This invokes the SAME service code
@@ -162,15 +158,11 @@ async function main() {
 
   // Trail with `langwatch whoami` showing the lazy-minted VK.
   console.log("\n$ langwatch whoami");
-  const whoami = spawn(
-    "node",
-    ["sdks/typescript/dist/cli/index.js", "whoami"],
-    {
-      env,
-      stdio: ["ignore", "pipe", "pipe"],
-      cwd: process.cwd() + "/../..",
-    },
-  );
+  const whoami = spawn("node", ["sdks/typescript/dist/cli/index.js", "whoami"], {
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+    cwd: process.cwd() + "/../..",
+  });
   whoami.stdout.on("data", (c) => process.stdout.write(c));
   whoami.stderr.on("data", (c) => process.stderr.write(c));
   await new Promise((res) => whoami.on("close", res));

@@ -17,9 +17,7 @@ export interface ModelSortKey {
 
 /** Newest generation first, then highest tier rank. */
 export function compareModelSortKeys(a: ModelSortKey, b: ModelSortKey): number {
-  return (
-    b.major - a.major || b.minor - a.minor || (b.rank ?? 0) - (a.rank ?? 0)
-  );
+  return b.major - a.major || b.minor - a.minor || (b.rank ?? 0) - (a.rank ?? 0);
 }
 
 export type OpenAIVariant = "flagship" | "mini";
@@ -74,8 +72,7 @@ export function rankOpenAIChatModel({
   const match = OPENAI_CHAT_ID.exec(id);
   if (!match) return null;
   const tier = match[3]?.slice(1) ?? "";
-  const tiers =
-    variant === "flagship" ? OPENAI_FLAGSHIP_TIERS : OPENAI_FAST_TIERS;
+  const tiers = variant === "flagship" ? OPENAI_FLAGSHIP_TIERS : OPENAI_FAST_TIERS;
   const rank = tiers[tier];
   if (rank === undefined) return null;
   return { major: Number(match[1]), minor: Number(match[2]), rank };

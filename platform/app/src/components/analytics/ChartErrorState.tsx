@@ -30,10 +30,7 @@ export function ChartErrorState({
       zIndex={1}
     >
       <VStack gap={3} align="stretch" maxWidth="sm" width="fit-content">
-        <HandledErrorAlert
-          error={error}
-          fallbackTitle="Failed to load chart data"
-        />
+        <HandledErrorAlert error={error} fallbackTitle="Failed to load chart data" />
         <HStack gap={2}>
           <Button size="xs" variant="outline" onClick={onRetry}>
             <RefreshCw size={12} />

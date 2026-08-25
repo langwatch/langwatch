@@ -7,10 +7,7 @@ import { translateClickHouseQueryError } from "~/server/app-layer/clients/clickh
 import { queryWindowed } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import { ClickHouseLogger } from "./clickhouseLogger";
 import { getClickHouseMaxOpenConnections } from "./connectionPool";
-import {
-  incrementClickHouseQueryCount,
-  observeClickHouseQueryDuration,
-} from "./metrics";
+import { incrementClickHouseQueryCount, observeClickHouseQueryDuration } from "./metrics";
 import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 import { withStatementLimit } from "./statementLimit";
 

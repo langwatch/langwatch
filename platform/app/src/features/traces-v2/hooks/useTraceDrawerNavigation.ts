@@ -110,9 +110,7 @@ export function useTraceDrawerNavigation() {
         const target = popTraceHistoryTo(index);
         if (!target) return;
         setViewMode(target.viewMode);
-        useDrawerStore
-          .getState()
-          .openTrace(target.traceId, target.occurredAtMs ?? null);
+        useDrawerStore.getState().openTrace(target.traceId, target.occurredAtMs ?? null);
         openDrawer("traceV2Details", {
           traceId: target.traceId,
           ...(target.occurredAtMs !== undefined

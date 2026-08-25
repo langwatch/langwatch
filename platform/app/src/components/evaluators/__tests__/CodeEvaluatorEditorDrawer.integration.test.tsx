@@ -6,13 +6,7 @@
  * evaluator can actually be edited from the evaluators page and the workbench.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -51,9 +45,7 @@ vi.mock("~/components/ui/toaster", () => ({
 // Stub the monaco editor and the variables section so the test stays focused on
 // the drawer's create-vs-edit behavior without pulling in heavy editors.
 vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
-  CodeEditor: ({ code }: { code: string }) => (
-    <div data-testid="code-editor">{code}</div>
-  ),
+  CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
 }));
 vi.mock("~/components/variables", () => ({
   VariablesSection: () => <div data-testid="variables-section" />,
@@ -106,12 +98,8 @@ describe("CodeEvaluatorEditorDrawer", () => {
         await waitFor(() => {
           expect(screen.getByText("Edit Code Evaluator")).toBeInTheDocument();
         });
-        expect(screen.getByTestId("code-evaluator-name")).toHaveValue(
-          "my-code-eval",
-        );
-        expect(screen.getByTestId("code-editor")).toHaveTextContent(
-          "def __call__",
-        );
+        expect(screen.getByTestId("code-evaluator-name")).toHaveValue("my-code-eval");
+        expect(screen.getByTestId("code-editor")).toHaveTextContent("def __call__");
         // Inputs and outputs render (the bug was that edit showed only mapping).
         expect(screen.getByText("Inputs")).toBeInTheDocument();
         expect(screen.getByText("Outputs")).toBeInTheDocument();
@@ -146,9 +134,9 @@ describe("CodeEvaluatorEditorDrawer", () => {
         // requirement is the name: the button is disabled and says why, instead
         // of being a silent dead button.
         expect(screen.getByTestId("save-code-evaluator")).toBeDisabled();
-        expect(
-          screen.getByTestId("code-evaluator-disabled-reason"),
-        ).toHaveTextContent("Add a name to create the evaluator.");
+        expect(screen.getByTestId("code-evaluator-disabled-reason")).toHaveTextContent(
+          "Add a name to create the evaluator.",
+        );
 
         // Filling the name satisfies it: the reason clears and Create enables.
         fireEvent.change(screen.getByTestId("code-evaluator-name"), {
@@ -178,9 +166,7 @@ describe("CodeEvaluatorEditorDrawer", () => {
           ).toBeInTheDocument();
         }
         // Outputs are the fixed contract: there is no add-output control.
-        expect(
-          screen.queryByTestId("code-evaluator-output-add"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("code-evaluator-output-add")).not.toBeInTheDocument();
       });
     });
 
@@ -193,10 +179,9 @@ describe("CodeEvaluatorEditorDrawer", () => {
         });
 
         fireEvent.click(screen.getByTestId("code-evaluator-input-add"));
-        fireEvent.change(
-          screen.getByTestId("code-evaluator-input-identifier-2"),
-          { target: { value: "context" } },
-        );
+        fireEvent.change(screen.getByTestId("code-evaluator-input-identifier-2"), {
+          target: { value: "context" },
+        });
 
         expect(screen.getByTestId("code-editor")).toHaveTextContent(
           "def __call__(self, output: str = None, expected_output: str = None, context: str = None):",

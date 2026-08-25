@@ -134,9 +134,7 @@ describe("Model Providers API", () => {
         const body = await res.json();
         expect(body.openai).toBeDefined();
         expect(body.openai.enabled).toBe(true);
-        expect(body.openai.customKeys.OPENAI_API_KEY).toBe(
-          MASKED_KEY_PLACEHOLDER,
-        );
+        expect(body.openai.customKeys.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
       });
 
       it("never returns the raw API key", async () => {
@@ -193,10 +191,9 @@ describe("Model Providers API", () => {
         expect(body.openai_codex).toBeDefined();
 
         for (const field of Object.keys(SECRET_VALUES)) {
-          expect(
-            body.openai_codex.customKeys[field],
-            `${field} must be masked`,
-          ).toBe(MASKED_KEY_PLACEHOLDER);
+          expect(body.openai_codex.customKeys[field], `${field} must be masked`).toBe(
+            MASKED_KEY_PLACEHOLDER,
+          );
         }
       });
 
@@ -205,9 +202,7 @@ describe("Model Providers API", () => {
 
         const bodyStr = JSON.stringify(await res.json());
         for (const value of Object.values(SECRET_VALUES)) {
-          expect(bodyStr, `response contains a stored value`).not.toContain(
-            value,
-          );
+          expect(bodyStr, `response contains a stored value`).not.toContain(value);
         }
       });
 
@@ -239,9 +234,7 @@ describe("Model Providers API", () => {
         const body = await res.json();
         expect(body.openai).toBeDefined();
         expect(body.openai.enabled).toBe(true);
-        expect(body.openai.customKeys.OPENAI_API_KEY).toBe(
-          MASKED_KEY_PLACEHOLDER,
-        );
+        expect(body.openai.customKeys.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
       });
 
       /** @scenario PUT /api/model-providers/:provider upserts provider config */
@@ -296,9 +289,9 @@ describe("Model Providers API", () => {
         // encrypted-at-rest payload is decrypted before assertion.
         const repo = new ModelProviderRepository(prisma);
         const saved = await repo.findByProvider("openai", testProjectId);
-        expect(
-          (saved?.customKeys as Record<string, string>)?.OPENAI_API_KEY,
-        ).toBe("sk-original-key");
+        expect((saved?.customKeys as Record<string, string>)?.OPENAI_API_KEY).toBe(
+          "sk-original-key",
+        );
       });
     });
 
@@ -340,12 +333,9 @@ describe("Model Providers API", () => {
 
     describe("when given an invalid provider", () => {
       it("returns 400", async () => {
-        const res = await helpers.api.put(
-          "/api/model-providers/nonexistent-provider",
-          {
-            enabled: true,
-          },
-        );
+        const res = await helpers.api.put("/api/model-providers/nonexistent-provider", {
+          enabled: true,
+        });
 
         expect(res.status).toBe(400);
       });

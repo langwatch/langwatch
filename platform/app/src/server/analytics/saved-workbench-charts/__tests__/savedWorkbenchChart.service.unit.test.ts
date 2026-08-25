@@ -72,9 +72,7 @@ const NETWORK_SPEC = {
   mark: "bar",
 };
 
-function definition(
-  overrides: Record<string, unknown> = {},
-): Record<string, unknown> {
+function definition(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     version: WORKBENCH_CHART_DEFINITION_VERSION,
     sql: PERMITTED_SQL,
@@ -140,9 +138,7 @@ class FakeStore implements SavedWorkbenchChartStore {
     return row;
   }
 
-  async update(
-    input: UpdateSavedWorkbenchChartInput,
-  ): Promise<CustomGraph | null> {
+  async update(input: UpdateSavedWorkbenchChartInput): Promise<CustomGraph | null> {
     const existing = await this.findById({
       id: input.id,
       projectId: input.projectId,
@@ -159,13 +155,7 @@ class FakeStore implements SavedWorkbenchChartStore {
     return row;
   }
 
-  async delete({
-    id,
-    projectId,
-  }: {
-    id: string;
-    projectId: string;
-  }): Promise<number> {
+  async delete({ id, projectId }: { id: string; projectId: string }): Promise<number> {
     const existing = await this.findById({ id, projectId });
     if (!existing) return 0;
     this.rows.delete(id);
@@ -221,13 +211,11 @@ describe("saving a workbench chart", () => {
           }),
         );
 
-        expect(refusal.code).toBe(
-          "saved_workbench_chart_specification_refused",
-        );
+        expect(refusal.code).toBe("saved_workbench_chart_specification_refused");
         // The editor needs to know *where*, not just that something was wrong.
-        expect(
-          (refusal.meta as { errors?: unknown[] }).errors?.length,
-        ).toBeGreaterThan(0);
+        expect((refusal.meta as { errors?: unknown[] }).errors?.length).toBeGreaterThan(
+          0,
+        );
         expect(store.rows.size).toBe(0);
       });
 
@@ -246,9 +234,7 @@ describe("saving a workbench chart", () => {
           }),
         );
 
-        expect(refusal.code).toBe(
-          "saved_workbench_chart_specification_refused",
-        );
+        expect(refusal.code).toBe("saved_workbench_chart_specification_refused");
         expect(store.rows.size).toBe(0);
       });
     });
@@ -302,9 +288,7 @@ describe("saving a workbench chart", () => {
         );
 
         expect(refusal.code).toBe("lwql_parameter_missing");
-        expect((refusal.meta as { parameters?: unknown }).parameters).toEqual([
-          "since",
-        ]);
+        expect((refusal.meta as { parameters?: unknown }).parameters).toEqual(["since"]);
         expect(store.rows.size).toBe(0);
       });
 
@@ -501,9 +485,7 @@ describe("editing a saved workbench chart", () => {
           }),
         );
 
-        expect(refusedSpec.code).toBe(
-          "saved_workbench_chart_specification_refused",
-        );
+        expect(refusedSpec.code).toBe("saved_workbench_chart_specification_refused");
         expect(refusedSql.code).toBe("lwql_not_permitted");
 
         // The row is exactly what the accepted create wrote.

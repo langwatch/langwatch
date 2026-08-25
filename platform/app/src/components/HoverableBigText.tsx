@@ -19,11 +19,7 @@ export function ExpandedTextDialog({
   const [isFormatted, setIsFormatted] = useState(true);
 
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={({ open }) => onOpenChange(open)}
-      size="5xl"
-    >
+    <Dialog.Root open={open} onOpenChange={({ open }) => onOpenChange(open)} size="5xl">
       <Dialog.Content bg="bg">
         <Dialog.Header
           background="bg.muted"
@@ -76,9 +72,7 @@ export function HoverableBigText({
 }: BoxProps & { expandedVersion?: string; expandable?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [isOverflown, setIsOverflown] = useState(false);
-  const [textExpanded, setTextExpanded] = useState<string | undefined>(
-    undefined,
-  );
+  const [textExpanded, setTextExpanded] = useState<string | undefined>(undefined);
   const expandedVersion_ = expandedVersion ?? children;
 
   const checkOverflow = () => {

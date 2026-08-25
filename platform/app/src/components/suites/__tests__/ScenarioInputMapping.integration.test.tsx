@@ -40,9 +40,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function renderSection(
-  overrides: Partial<ScenarioInputMappingSectionProps> = {},
-) {
+function renderSection(overrides: Partial<ScenarioInputMappingSectionProps> = {}) {
   const defaults: ScenarioInputMappingSectionProps = {
     inputs: [
       { identifier: "query", type: "str" },
@@ -78,12 +76,8 @@ describe("ScenarioInputMappingSection", () => {
         renderSection();
 
         expect(screen.getByTestId("variable-name-input")).toBeInTheDocument();
-        expect(
-          screen.getByTestId("variable-name-messages"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByTestId("variable-name-threadId"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("variable-name-messages")).toBeInTheDocument();
+        expect(screen.getByTestId("variable-name-threadId")).toBeInTheDocument();
       });
     });
   });
@@ -101,9 +95,7 @@ describe("ScenarioInputMappingSection", () => {
 
         await user.click(screen.getByTestId("mapping-input-input"));
 
-        expect(
-          await screen.findByTestId("field-option-query"),
-        ).toBeInTheDocument();
+        expect(await screen.findByTestId("field-option-query")).toBeInTheDocument();
       });
 
       it("offers 'context' as a target", async () => {
@@ -112,9 +104,7 @@ describe("ScenarioInputMappingSection", () => {
 
         await user.click(screen.getByTestId("mapping-input-input"));
 
-        expect(
-          await screen.findByTestId("field-option-context"),
-        ).toBeInTheDocument();
+        expect(await screen.findByTestId("field-option-context")).toBeInTheDocument();
       });
     });
   });
@@ -167,9 +157,7 @@ describe("ScenarioInputMappingSection", () => {
         // The messages row should show "context" as its mapping
         // We verify by checking the mapping input values contain the agent input names
         const scenarioMessageInput = screen.getByTestId("mapping-input-input");
-        const conversationHistoryInput = screen.getByTestId(
-          "mapping-input-messages",
-        );
+        const conversationHistoryInput = screen.getByTestId("mapping-input-messages");
 
         // The inputs should exist and be rendered
         expect(scenarioMessageInput).toBeInTheDocument();
@@ -247,12 +235,8 @@ describe("ScenarioInputMappingSection", () => {
         });
 
         expect(screen.getByTestId("variable-name-input")).toBeInTheDocument();
-        expect(
-          screen.getByTestId("variable-name-messages"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByTestId("variable-name-threadId"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("variable-name-messages")).toBeInTheDocument();
+        expect(screen.getByTestId("variable-name-threadId")).toBeInTheDocument();
       });
     });
   });

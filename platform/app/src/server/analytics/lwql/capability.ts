@@ -63,9 +63,7 @@ import { createHash } from "node:crypto";
  */
 export function lwqlTenantCapability({ secret }: { secret: string }): string {
   if (!secret) {
-    throw new Error(
-      "LangWatchQL tenant capability requires a non-empty secret",
-    );
+    throw new Error("LangWatchQL tenant capability requires a non-empty secret");
   }
   return createHash("sha256").update(secret).digest("hex");
 }

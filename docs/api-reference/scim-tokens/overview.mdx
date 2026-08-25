@@ -4,7 +4,10 @@ description: "Mint, list and revoke the bearer tokens an identity provider uses 
 ---
 
 <Note>
-  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused
+  with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments
+  need an Enterprise license for the same endpoints. To enable it, reach out to
+  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
 ## Intro
@@ -21,11 +24,11 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/scim-tokens` | List the organization's SCIM tokens |
-| `POST` | `/api/scim-tokens` | Mint a token, returned once |
-| `DELETE` | `/api/scim-tokens/{id}` | Revoke a token |
+| Method   | Path                    | Description                         |
+| -------- | ----------------------- | ----------------------------------- |
+| `GET`    | `/api/scim-tokens`      | List the organization's SCIM tokens |
+| `POST`   | `/api/scim-tokens`      | Mint a token, returned once         |
+| `DELETE` | `/api/scim-tokens/{id}` | Revoke a token                      |
 
 ## The value is returned once
 

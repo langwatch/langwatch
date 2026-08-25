@@ -117,10 +117,7 @@ export class DemoOrgScope {
     assertDemoOrgAllowed(organizationId, this.allowlist);
   }
 
-  async loadOrg(
-    prisma: PrismaClient,
-    organizationId: string,
-  ): Promise<Organization> {
+  async loadOrg(prisma: PrismaClient, organizationId: string): Promise<Organization> {
     this.assertOrgIdAllowed(organizationId);
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
@@ -143,9 +140,7 @@ export class DemoOrgScope {
       include: { team: { include: { organization: true } } },
     });
     if (project === null) {
-      throw new DemoScopeViolation(
-        `Project ${JSON.stringify(projectId)} not found.`,
-      );
+      throw new DemoScopeViolation(`Project ${JSON.stringify(projectId)} not found.`);
     }
     this.assertOrgIdAllowed(project.team.organization.id);
     return project as ProjectWithOrgChain;

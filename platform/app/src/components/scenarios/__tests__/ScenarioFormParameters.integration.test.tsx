@@ -10,13 +10,7 @@
  * @see specs/scenarios/secret-run-parameters.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -34,11 +28,7 @@ vi.mock("../ScenarioRunModelDialog", () => ({
   ScenarioRunModelDialog: () => null,
 }));
 vi.mock("../SaveAndRunMenu", () => ({
-  SaveAndRunMenu: ({
-    onSaveWithoutRunning,
-  }: {
-    onSaveWithoutRunning?: () => void;
-  }) => (
+  SaveAndRunMenu: ({ onSaveWithoutRunning }: { onSaveWithoutRunning?: () => void }) => (
     <button data-testid="save-button" onClick={onSaveWithoutRunning}>
       Save
     </button>
@@ -57,11 +47,7 @@ vi.mock("~/utils/api", () => ({
   api: {
     scenarios: {
       create: {
-        useMutation: ({
-          onSuccess,
-        }: {
-          onSuccess?: (data: unknown) => void;
-        }) => ({
+        useMutation: ({ onSuccess }: { onSuccess?: (data: unknown) => void }) => ({
           mutateAsync: vi.fn(async (input: unknown) => {
             const result = await mocks.mockCreateMutateAsync(input);
             onSuccess?.(result);
@@ -71,11 +57,7 @@ vi.mock("~/utils/api", () => ({
         }),
       },
       update: {
-        useMutation: ({
-          onSuccess,
-        }: {
-          onSuccess?: (data: unknown) => void;
-        }) => ({
+        useMutation: ({ onSuccess }: { onSuccess?: (data: unknown) => void }) => ({
           mutateAsync: vi.fn(async (input: unknown) => {
             const result = await mocks.mockUpdateMutateAsync(input);
             onSuccess?.(result);
@@ -166,16 +148,9 @@ function renderDrawer() {
   // Being pointed at a scenario is what makes this an edit, so the id is what
   // decides that a save updates rather than creates. These cases are all about
   // a scenario that already exists, so they say so.
-  render(
-    <ScenarioFormDrawer
-      open={true}
-      onClose={vi.fn()}
-      scenarioId="scenario-1"
-    />,
-    {
-      wrapper: Wrapper,
-    },
-  );
+  render(<ScenarioFormDrawer open={true} onClose={vi.fn()} scenarioId="scenario-1" />, {
+    wrapper: Wrapper,
+  });
   return userEvent.setup();
 }
 
@@ -188,9 +163,7 @@ async function openParametersEditor(user: ReturnType<typeof userEvent.setup>) {
 async function clickDone(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByTestId("scenario-parameters-done"));
   await waitFor(() => {
-    expect(
-      screen.queryByTestId("scenario-parameters-list"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("scenario-parameters-list")).not.toBeInTheDocument();
   });
 }
 
@@ -244,9 +217,7 @@ describe("scenario editor parameters", () => {
       it("keeps the editor out of the form body until it is asked for", () => {
         renderDrawer();
 
-        expect(
-          screen.queryByTestId("scenario-parameters-list"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("scenario-parameters-list")).not.toBeInTheDocument();
       });
     });
 
@@ -259,12 +230,10 @@ describe("scenario editor parameters", () => {
         expect(screen.getByTestId("scenario-parameter-name-0")).toHaveValue(
           "account_tier",
         );
-        expect(
-          screen.getByTestId("scenario-parameter-description-0"),
-        ).toHaveValue("Which plan the customer is on");
-        expect(screen.getByTestId("scenario-parameter-default-0")).toHaveValue(
-          "gold",
+        expect(screen.getByTestId("scenario-parameter-description-0")).toHaveValue(
+          "Which plan the customer is on",
         );
+        expect(screen.getByTestId("scenario-parameter-default-0")).toHaveValue("gold");
       });
 
       /** @scenario "The definitions editor disables the default value for a secret parameter" */
@@ -281,9 +250,7 @@ describe("scenario editor parameters", () => {
         await openParametersEditor(user);
 
         expect(screen.getByTestId("scenario-parameter-secret-0")).toBeChecked();
-        expect(
-          screen.getByTestId("scenario-parameter-default-0"),
-        ).toBeDisabled();
+        expect(screen.getByTestId("scenario-parameter-default-0")).toBeDisabled();
       });
     });
 
@@ -317,12 +284,8 @@ describe("scenario editor parameters", () => {
         const name = screen.getByTestId("scenario-parameter-name-0");
         expect(name).toHaveValue("");
         expect(name).toHaveAttribute("placeholder", "e.g. account_tier");
-        expect(
-          screen.getByTestId("scenario-parameter-description-0"),
-        ).toHaveValue("");
-        expect(screen.getByTestId("scenario-parameter-default-0")).toHaveValue(
-          "",
-        );
+        expect(screen.getByTestId("scenario-parameter-description-0")).toHaveValue("");
+        expect(screen.getByTestId("scenario-parameter-default-0")).toHaveValue("");
       });
 
       /** @scenario "The parameters editor opens ready to declare the first parameter" */
@@ -341,18 +304,12 @@ describe("scenario editor parameters", () => {
         const user = renderDrawer();
 
         await openParametersEditor(user);
-        await user.type(
-          screen.getByTestId("scenario-parameter-name-0"),
-          "region",
-        );
+        await user.type(screen.getByTestId("scenario-parameter-name-0"), "region");
         await user.type(
           screen.getByTestId("scenario-parameter-description-0"),
           "Which region to run against",
         );
-        await user.type(
-          screen.getByTestId("scenario-parameter-default-0"),
-          "eu-central",
-        );
+        await user.type(screen.getByTestId("scenario-parameter-default-0"), "eu-central");
         await clickDone(user);
 
         expect(await save(user)).toMatchObject({
@@ -370,10 +327,7 @@ describe("scenario editor parameters", () => {
         const user = renderDrawer();
 
         await openParametersEditor(user);
-        await user.type(
-          screen.getByTestId("scenario-parameter-name-0"),
-          "region",
-        );
+        await user.type(screen.getByTestId("scenario-parameter-name-0"), "region");
         await clickDone(user);
 
         const footer = screen.getByTestId("scenario-parameters-footer");
@@ -386,14 +340,8 @@ describe("scenario editor parameters", () => {
         const user = renderDrawer();
 
         await openParametersEditor(user);
-        await user.type(
-          screen.getByTestId("scenario-parameter-name-0"),
-          "seats",
-        );
-        await user.type(
-          screen.getByTestId("scenario-parameter-default-0"),
-          "12",
-        );
+        await user.type(screen.getByTestId("scenario-parameter-name-0"), "seats");
+        await user.type(screen.getByTestId("scenario-parameter-default-0"), "12");
         await clickDone(user);
 
         expect(await save(user)).toMatchObject({
@@ -408,24 +356,14 @@ describe("scenario editor parameters", () => {
         const user = renderDrawer();
 
         await openParametersEditor(user);
-        await user.type(
-          screen.getByTestId("scenario-parameter-name-0"),
-          "api_token",
-        );
-        await user.type(
-          screen.getByTestId("scenario-parameter-default-0"),
-          "abc",
-        );
+        await user.type(screen.getByTestId("scenario-parameter-name-0"), "api_token");
+        await user.type(screen.getByTestId("scenario-parameter-default-0"), "abc");
         await user.click(screen.getByTestId("scenario-parameter-secret-0"));
 
         await waitFor(() => {
-          expect(
-            screen.getByTestId("scenario-parameter-default-0"),
-          ).toHaveValue("");
+          expect(screen.getByTestId("scenario-parameter-default-0")).toHaveValue("");
         });
-        expect(
-          screen.getByTestId("scenario-parameter-default-0"),
-        ).toBeDisabled();
+        expect(screen.getByTestId("scenario-parameter-default-0")).toBeDisabled();
         expect(screen.getByLabelText("Parameter 1 secret")).toBeChecked();
       });
 
@@ -434,14 +372,8 @@ describe("scenario editor parameters", () => {
         const user = renderDrawer();
 
         await openParametersEditor(user);
-        await user.type(
-          screen.getByTestId("scenario-parameter-name-0"),
-          "api_token",
-        );
-        await user.type(
-          screen.getByTestId("scenario-parameter-default-0"),
-          "abc",
-        );
+        await user.type(screen.getByTestId("scenario-parameter-name-0"), "api_token");
+        await user.type(screen.getByTestId("scenario-parameter-default-0"), "abc");
         await user.click(screen.getByTestId("scenario-parameter-secret-0"));
         await clickDone(user);
 
@@ -449,26 +381,21 @@ describe("scenario editor parameters", () => {
         expect(saved).toMatchObject({
           parameters: [{ name: "api_token", secret: true }],
         });
-        expect(
-          (saved?.parameters as Record<string, unknown>[])[0],
-        ).not.toHaveProperty("defaultValue");
+        expect((saved?.parameters as Record<string, unknown>[])[0]).not.toHaveProperty(
+          "defaultValue",
+        );
       });
 
       it("takes a default value again once it is no longer secret", async () => {
         const user = renderDrawer();
 
         await openParametersEditor(user);
-        await user.type(
-          screen.getByTestId("scenario-parameter-name-0"),
-          "api_token",
-        );
+        await user.type(screen.getByTestId("scenario-parameter-name-0"), "api_token");
         await user.click(screen.getByTestId("scenario-parameter-secret-0"));
         await user.click(screen.getByTestId("scenario-parameter-secret-0"));
 
         await waitFor(() => {
-          expect(
-            screen.getByTestId("scenario-parameter-default-0"),
-          ).not.toBeDisabled();
+          expect(screen.getByTestId("scenario-parameter-default-0")).not.toBeDisabled();
         });
         expect(screen.getByLabelText("Parameter 1 secret")).not.toBeChecked();
       });
@@ -479,10 +406,7 @@ describe("scenario editor parameters", () => {
         const user = renderDrawer();
 
         await openParametersEditor(user);
-        await user.type(
-          screen.getByTestId("scenario-parameter-name-0"),
-          "account tier",
-        );
+        await user.type(screen.getByTestId("scenario-parameter-name-0"), "account tier");
         await clickDone(user);
         await user.click(screen.getByTestId("save-button"));
         return user;
@@ -492,9 +416,7 @@ describe("scenario editor parameters", () => {
         await declareBadName();
 
         await waitFor(() => {
-          expect(
-            screen.getByTestId("scenario-parameter-error-0"),
-          ).toBeInTheDocument();
+          expect(screen.getByTestId("scenario-parameter-error-0")).toBeInTheDocument();
         });
         expect(mocks.mockUpdateMutateAsync).not.toHaveBeenCalled();
       });
@@ -502,21 +424,18 @@ describe("scenario editor parameters", () => {
       it("reopens the editor and reports it against the row", async () => {
         await declareBadName();
 
-        const rowError = await screen.findByTestId(
-          "scenario-parameter-error-0",
-        );
-        expect(rowError.textContent).toContain(
-          "letters, digits and underscores",
-        );
+        const rowError = await screen.findByTestId("scenario-parameter-error-0");
+        expect(rowError.textContent).toContain("letters, digits and underscores");
       });
 
       it("marks the footer group as rejected", async () => {
         await declareBadName();
 
         await waitFor(() => {
-          expect(
-            screen.getByTestId("scenario-parameters-footer"),
-          ).toHaveAttribute("data-invalid", "true");
+          expect(screen.getByTestId("scenario-parameters-footer")).toHaveAttribute(
+            "data-invalid",
+            "true",
+          );
         });
       });
     });

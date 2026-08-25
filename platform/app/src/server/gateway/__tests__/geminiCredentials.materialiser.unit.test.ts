@@ -52,14 +52,10 @@ describe("buildCredentials for gemini", () => {
     // requires both, so emitting one alone would be a field nothing reads.
     it("drops a lone project or location", () => {
       expect(
-        buildCredentials(
-          geminiRow({ GEMINI_API_KEY: "k", GEMINI_PROJECT: "acme-123" }),
-        ),
+        buildCredentials(geminiRow({ GEMINI_API_KEY: "k", GEMINI_PROJECT: "acme-123" })),
       ).toEqual({ api_key: "k" });
       expect(
-        buildCredentials(
-          geminiRow({ GEMINI_API_KEY: "k", GEMINI_LOCATION: "global" }),
-        ),
+        buildCredentials(geminiRow({ GEMINI_API_KEY: "k", GEMINI_LOCATION: "global" })),
       ).toEqual({ api_key: "k" });
     });
 

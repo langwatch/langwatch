@@ -21,10 +21,7 @@ import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
-import {
-  CODING_AGENT_LINK_WINDOW_DAYS,
-  withinDays,
-} from "./sidebar/codingAgentActivity";
+import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "./sidebar/codingAgentActivity";
 import { GovernSection } from "./sidebar/GovernSection";
 import {
   isExperimentsActivePath,
@@ -86,25 +83,19 @@ export const MainMenuSections = function MainMenuSections({
         label={projectRoutes.home.title}
         project={project}
         isActive={
-          router.pathname === "/[project]" &&
-          !router.pathname.includes("/analytics")
+          router.pathname === "/[project]" && !router.pathname.includes("/analytics")
         }
         showLabel={showExpanded}
       />
 
       <ObserveSection {...sectionProps} codingAgentLinks={codingAgentLinks} />
-      <TestSection
-        {...sectionProps}
-        pendingAnnotationCount={pendingItemsCount.data}
-      />
+      <TestSection {...sectionProps} pendingAnnotationCount={pendingItemsCount.data} />
       <BuildSection
         {...sectionProps}
         canSeeAutomations={hasPermission("triggers:view")}
       />
 
-      {shouldIncludeGovernSection && (
-        <GovernSection showExpanded={showExpanded} />
-      )}
+      {shouldIncludeGovernSection && <GovernSection showExpanded={showExpanded} />}
 
       {shouldIncludeOpsSection && <OpsSection showExpanded={showExpanded} />}
     </>
@@ -364,8 +355,7 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { project, hasPermission, isPublicRoute } =
-    useOrganizationTeamProject();
+  const { project, hasPermission, isPublicRoute } = useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
   // In compact mode, show expanded view on hover
@@ -499,8 +489,7 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   // Off-route: read from the lightweight badge counts. Either way the
   // badge stays in sync.
   const blockedCount = isOnOpsRoute
-    ? (opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ??
-      0)
+    ? (opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ?? 0)
     : (opsBadge.data?.blockedCount ?? 0);
   const dlqCount = isOnOpsRoute
     ? (opsData.data?.queues.reduce((sum, q) => sum + q.dlqCount, 0) ?? 0)
@@ -512,10 +501,7 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         icon={Activity}
         label="Dashboard"
         href="/ops"
-        isActive={
-          router.pathname === "/ops" ||
-          router.pathname.startsWith("/ops/queues")
-        }
+        isActive={router.pathname === "/ops" || router.pathname.startsWith("/ops/queues")}
         badgeNumber={blockedCount + dlqCount}
         showLabel={showExpanded}
       />

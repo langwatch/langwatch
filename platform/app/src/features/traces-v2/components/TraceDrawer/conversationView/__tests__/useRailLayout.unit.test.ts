@@ -165,9 +165,7 @@ describe("given the centered reading column", () => {
         isActive: true,
         layout: { mode: "side", railWidth: RAIL_WIDTH_WIDE_PX },
       }),
-    ).toBe(
-      `${THREAD_COLUMN_MAX_WIDTH_PX + RAIL_GAP_PX + RAIL_WIDTH_WIDE_PX}px`,
-    );
+    ).toBe(`${THREAD_COLUMN_MAX_WIDTH_PX + RAIL_GAP_PX + RAIL_WIDTH_WIDE_PX}px`);
   });
 
   it("keeps the reading width when the rail is stacked under the turn", () => {
@@ -198,8 +196,7 @@ describe("given a conversation whose scroller arrives after the first render", (
   const originalResizeObserver = globalThis.ResizeObserver;
 
   beforeEach(() => {
-    globalThis.ResizeObserver =
-      InertResizeObserver as unknown as typeof ResizeObserver;
+    globalThis.ResizeObserver = InertResizeObserver as unknown as typeof ResizeObserver;
   });
 
   afterEach(() => {

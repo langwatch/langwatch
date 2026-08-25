@@ -14,17 +14,12 @@ import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import {
-  isAbortLikeError,
-  nlpgoHandledErrorFrom,
-} from "~/server/nlpgo/goHandledError";
+import { isAbortLikeError, nlpgoHandledErrorFrom } from "~/server/nlpgo/goHandledError";
 
 const logger = createLogger("langwatch:api:scenario:generate");
 
 const scenarioSchema = z.object({
-  name: z
-    .string()
-    .describe("A short, descriptive name for the scenario (3-6 words)"),
+  name: z.string().describe("A short, descriptive name for the scenario (3-6 words)"),
   situation: z
     .string()
     .describe(

@@ -114,9 +114,10 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
     maxBytes?: number;
   }): Promise<DatasetChunk[]> {
     assertNoTraversal(projectId, datasetId);
-    const chunks = toJsonlChunks(records, maxBytes ? { maxBytes } : {}).map(
-      (c) => ({ ...c, index: c.index + fromIndex }),
-    );
+    const chunks = toJsonlChunks(records, maxBytes ? { maxBytes } : {}).map((c) => ({
+      ...c,
+      index: c.index + fromIndex,
+    }));
     const { driver, accountName, container } = await this.config(projectId);
     for (const chunk of chunks) {
       const uri = this.uriFor({
@@ -124,11 +125,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
         container,
         key: chunkKey(projectId, datasetId, chunk.index),
       });
-      await driver.put(
-        uri,
-        Buffer.from(chunk.jsonl, "utf-8"),
-        "application/x-ndjson",
-      );
+      await driver.put(uri, Buffer.from(chunk.jsonl, "utf-8"), "application/x-ndjson");
     }
     return chunks;
   }
@@ -250,11 +247,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
    * `LocalDatasetStorage`, mint a SAME-ORIGIN staging URL: the browser PUTs
    * through the app, which streams the bytes to Azure via `putStaged`.
    */
-  createPresignedUpload({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<PresignedUpload> {
+  createPresignedUpload({ projectId }: { projectId: string }): Promise<PresignedUpload> {
     const uploadId = nanoid();
     return Promise.resolve({
       uploadId,
@@ -359,7 +352,10 @@ export const AzureDatasetStorage = AzureDatasetStorageAdapter;
 const isObjectNotFound = (error: unknown): boolean =>
   error instanceof Error && error.name === "ObjectNotFoundError";
 
-const readStream = async (stream: Readable, maxBytes = Number.MAX_SAFE_INTEGER): Promise<Buffer> => {
+const readStream = async (
+  stream: Readable,
+  maxBytes = Number.MAX_SAFE_INTEGER,
+): Promise<Buffer> => {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of stream) {

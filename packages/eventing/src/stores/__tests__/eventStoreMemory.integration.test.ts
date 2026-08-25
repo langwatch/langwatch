@@ -53,11 +53,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       await store.storeEvents([event2], context, aggregateType);
 
       // Get events - should return only one (first occurrence)
-      const retrieved = await store.getEvents(
-        aggregateId,
-        context,
-        aggregateType,
-      );
+      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
 
       expect(retrieved.length).toBe(1);
       expect(retrieved[0]?.id).toBe(event1.id);
@@ -109,11 +105,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       // Store all events
       await store.storeEvents([event1, event2, event3], context, aggregateType);
 
-      const retrieved = await store.getEvents(
-        aggregateId,
-        context,
-        aggregateType,
-      );
+      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
 
       expect(retrieved.length).toBe(1);
       expect(retrieved[0]?.data).toEqual({ value: "first" });
@@ -164,11 +156,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       // Store in order - first one should be kept
       await store.storeEvents([event1, event2, event3], context, aggregateType);
 
-      const retrieved = await store.getEvents(
-        aggregateId,
-        context,
-        aggregateType,
-      );
+      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
 
       // Should keep the first one when sorted (earliest timestamp, first in array)
       expect(retrieved.length).toBe(1);
@@ -201,16 +189,10 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       await store.storeEvents([event1, event2], context, aggregateType);
 
-      const retrieved = await store.getEvents(
-        aggregateId,
-        context,
-        aggregateType,
-      );
+      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
 
       expect(retrieved.length).toBe(2);
-      expect(retrieved.map((e) => e.id).sort()).toEqual(
-        [event1.id, event2.id].sort(),
-      );
+      expect(retrieved.map((e) => e.id).sort()).toEqual([event1.id, event2.id].sort());
     });
   });
 
@@ -250,11 +232,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       await store.storeEvents([event2], context, aggregateType);
 
       // Should only have one event
-      const retrieved = await store.getEvents(
-        aggregateId,
-        context,
-        aggregateType,
-      );
+      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
       expect(retrieved.length).toBe(1);
       expect(retrieved[0]?.data).toEqual({ value: 1 });
     });
@@ -285,11 +263,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       await store.storeEvents([event1], context, aggregateType);
       await store.storeEvents([event2], context, aggregateType);
 
-      const retrieved = await store.getEvents(
-        aggregateId,
-        context,
-        aggregateType,
-      );
+      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
       expect(retrieved.length).toBe(2);
     });
   });
@@ -340,11 +314,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
         },
       ]);
 
-      const retrieved = await store.getEvents(
-        aggregateId,
-        context,
-        aggregateType,
-      );
+      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
 
       // The old event (EventOccurredAt=0) should fall back to its timestamp
       const oldRetrieved = retrieved.find((e) => e.id === oldEvent.id);

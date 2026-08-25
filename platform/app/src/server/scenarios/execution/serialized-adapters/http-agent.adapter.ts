@@ -70,14 +70,10 @@ function previewErrorBody(body: string): string {
   return `${body.slice(0, ERROR_BODY_LIMIT_CHARS)}... [truncated]`;
 }
 
-function redactHeaders(
-  headers: Record<string, string>,
-): Record<string, string> {
+function redactHeaders(headers: Record<string, string>): Record<string, string> {
   const redacted: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
-    redacted[key] = SENSITIVE_HEADERS.has(key.toLowerCase())
-      ? "[REDACTED]"
-      : value;
+    redacted[key] = SENSITIVE_HEADERS.has(key.toLowerCase()) ? "[REDACTED]" : value;
   }
   return redacted;
 }
@@ -122,8 +118,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     this.name = "SerializedHttpAgentAdapter";
     this.config = config;
     this.parameters = parameters ?? {};
-    this.logger =
-      logger ?? createChildProcessLogger("langwatch:scenarios:http-adapter");
+    this.logger = logger ?? createChildProcessLogger("langwatch:scenarios:http-adapter");
   }
 
   /** The project secrets this target may reference, never empty-undefined. */
@@ -135,8 +130,9 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     try {
       // One capture per turn: the traceparent header and the `{{ traceId }}`
       // / `{{ traceparent }}` template variables all name the same trace.
-      const { headers: propagationHeaders, traceId } =
-        injectTraceContextHeaders({ headers: {} });
+      const { headers: propagationHeaders, traceId } = injectTraceContextHeaders({
+        headers: {},
+      });
       const traceparent = propagationHeaders.traceparent;
       const templateContext = buildTemplateContext({
         input,
@@ -145,10 +141,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
         traceContext: { traceId, traceparent },
       });
       const url = this.buildUrl(templateContext);
-      const headers = this.buildRequestHeaders(
-        templateContext,
-        propagationHeaders,
-      );
+      const headers = this.buildRequestHeaders(templateContext, propagationHeaders);
       const body = this.buildRequestBody(input, templateContext);
       const responseData = await this.executeHttpRequest(url, headers, body);
       return this.extractResponseContent(responseData);
@@ -170,9 +163,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
    * likes, so `X-Custom-Token` holds a real credential and no name list can
    * know that. The value scrub is what covers the rest.
    */
-  private headersForLogs(
-    headers: Record<string, string>,
-  ): Record<string, string> {
+  private headersForLogs(headers: Record<string, string>): Record<string, string> {
     return Object.fromEntries(
       Object.entries(redactHeaders(headers)).map(([key, value]) => [
         key,
@@ -281,11 +272,8 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
         body: method !== "GET" ? body : undefined,
       });
     } catch (error) {
-      const errorClass =
-        error instanceof Error ? error.constructor.name : typeof error;
-      const message = this.scrub(
-        error instanceof Error ? error.message : String(error),
-      );
+      const errorClass = error instanceof Error ? error.constructor.name : typeof error;
+      const message = this.scrub(error instanceof Error ? error.message : String(error));
       this.logger.error(
         {
           url: loggedUrl,
@@ -304,9 +292,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
 
     if (!response.ok) {
       const responseBody = this.scrub(
-        typeof response.text === "function"
-          ? await response.text().catch(() => "")
-          : "",
+        typeof response.text === "function" ? await response.text().catch(() => "") : "",
       );
       const upstreamRequestId = pickUpstreamRequestId(response.headers);
       this.logger.warn(
@@ -367,10 +353,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     return typeof value === "string" ? value : JSON.stringify(value);
   }
 
-  private buildRequestBody(
-    input: AgentInput,
-    context: Record<string, unknown>,
-  ): string {
+  private buildRequestBody(input: AgentInput, context: Record<string, unknown>): string {
     if (!this.config.bodyTemplate) {
       return JSON.stringify({ messages: input.messages });
     }

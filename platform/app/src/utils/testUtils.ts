@@ -13,16 +13,11 @@ import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { ENTERPRISE_LICENSE_KEY } from "~/runtime/app/testing.licensing";
 import { prisma } from "../server/db";
 
-async function ignoreUniqueViolation<T>(
-  promise: Promise<T>,
-): Promise<T | null> {
+async function ignoreUniqueViolation<T>(promise: Promise<T>): Promise<T | null> {
   try {
     return await promise;
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return null;
     }
     throw error;
@@ -36,10 +31,7 @@ async function readAfterUniqueViolation<T>(
   try {
     return await promise;
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const existing = await readExisting();
       if (existing) {
         return existing;
@@ -72,8 +64,7 @@ export async function getTestUser() {
         license: ENTERPRISE_LICENSE_KEY,
       },
     }),
-    () =>
-      prisma.organization.findUnique({ where: { slug: "test-organization" } }),
+    () => prisma.organization.findUnique({ where: { slug: "test-organization" } }),
   );
 
   const team = await readAfterUniqueViolation<Team>(

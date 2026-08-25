@@ -173,9 +173,7 @@ const SIGNAL_RULES: readonly SignalRule[] = [
   },
 ];
 
-export function deriveSessionSignals(
-  row: CodingAgentSessionRow,
-): SessionSignal[] {
+export function deriveSessionSignals(row: CodingAgentSessionRow): SessionSignal[] {
   return SIGNAL_RULES.filter((rule) => rule.applies(row)).map((rule) => ({
     id: rule.id,
     tone: rule.tone,

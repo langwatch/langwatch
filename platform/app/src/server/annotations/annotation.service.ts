@@ -47,11 +47,7 @@ export class AnnotationService {
     });
   }
 
-  async getProjectOrganizationId({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<string> {
+  async getProjectOrganizationId({ projectId }: { projectId: string }): Promise<string> {
     const organizationId = await this.repository.findProjectOrganizationId({
       projectId,
     });
@@ -133,10 +129,7 @@ export class AnnotationService {
       }),
     ]);
 
-    if (
-      queueCount !== uniqueQueueIds.length ||
-      userCount !== uniqueUserIds.length
-    ) {
+    if (queueCount !== uniqueQueueIds.length || userCount !== uniqueUserIds.length) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: "One or more annotators are not available in this project",

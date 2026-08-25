@@ -4,10 +4,7 @@
  * Spec: specs/navigation/navigation-v2-product-memory.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  readLastVisitedProduct,
-  writeLastVisitedProduct,
-} from "../productMemory";
+import { readLastVisitedProduct, writeLastVisitedProduct } from "../productMemory";
 
 beforeEach(() => {
   localStorage.clear();
@@ -21,9 +18,7 @@ describe("product memory", () => {
         organizationId: "org_1",
         productId: "gateway",
       });
-      expect(readLastVisitedProduct({ organizationId: "org_1" })).toBe(
-        "gateway",
-      );
+      expect(readLastVisitedProduct({ organizationId: "org_1" })).toBe("gateway");
     });
   });
 
@@ -39,12 +34,8 @@ describe("product memory", () => {
         productId: "governance",
       });
 
-      expect(readLastVisitedProduct({ organizationId: "org_1" })).toBe(
-        "gateway",
-      );
-      expect(readLastVisitedProduct({ organizationId: "org_2" })).toBe(
-        "governance",
-      );
+      expect(readLastVisitedProduct({ organizationId: "org_1" })).toBe("gateway");
+      expect(readLastVisitedProduct({ organizationId: "org_2" })).toBe("governance");
     });
   });
 

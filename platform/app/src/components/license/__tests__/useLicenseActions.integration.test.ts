@@ -11,19 +11,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toaster } from "../../ui/toaster";
 import { useLicenseActions } from "../useLicenseActions";
 
-const {
-  uploadMutationOptions,
-  removeMutationOptions,
-  publicEnvData,
-  invalidateMock,
-} = vi.hoisted(() => ({
-  uploadMutationOptions: { current: null as null | Record<string, any> },
-  removeMutationOptions: { current: null as null | Record<string, any> },
-  publicEnvData: {
-    current: undefined as undefined | { IS_SAAS: boolean },
-  },
-  invalidateMock: vi.fn(),
-}));
+const { uploadMutationOptions, removeMutationOptions, publicEnvData, invalidateMock } =
+  vi.hoisted(() => ({
+    uploadMutationOptions: { current: null as null | Record<string, any> },
+    removeMutationOptions: { current: null as null | Record<string, any> },
+    publicEnvData: {
+      current: undefined as undefined | { IS_SAAS: boolean },
+    },
+    invalidateMock: vi.fn(),
+  }));
 
 // A full-page reload used to run in the same tick as the toast below and tore
 // it off the screen — the restart instruction is the one thing an operator has

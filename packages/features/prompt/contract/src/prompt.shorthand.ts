@@ -20,13 +20,19 @@ export function parsePromptShorthand(input: string): ParsedPromptShorthand {
   const slug = input.substring(0, colonIndex);
   const suffix = input.substring(colonIndex + 1);
   if (slug.length === 0) {
-    throw new ShorthandParseError(`Invalid format: slug must not be empty. Received "${input}"`);
+    throw new ShorthandParseError(
+      `Invalid format: slug must not be empty. Received "${input}"`,
+    );
   }
   if (suffix.length === 0) {
-    throw new ShorthandParseError(`Invalid format: suffix after colon must not be empty. Received "${input}"`);
+    throw new ShorthandParseError(
+      `Invalid format: suffix after colon must not be empty. Received "${input}"`,
+    );
   }
-  if (suffix === "latest") return { slug, tag: undefined, version: undefined, hadSuffix: true };
+  if (suffix === "latest")
+    return { slug, tag: undefined, version: undefined, hadSuffix: true };
   const parsed = Number(suffix);
-  if (Number.isInteger(parsed) && parsed > 0) return { slug, tag: undefined, version: parsed, hadSuffix: true };
+  if (Number.isInteger(parsed) && parsed > 0)
+    return { slug, tag: undefined, version: parsed, hadSuffix: true };
   return { slug, tag: suffix, version: undefined, hadSuffix: true };
 }

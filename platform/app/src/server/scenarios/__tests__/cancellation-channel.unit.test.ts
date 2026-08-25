@@ -83,8 +83,10 @@ describe("subscribeToCancellations", () => {
 
     await subscribeToCancellations({ subscriber, onCancel });
 
-    const handler = (subscriber.on as ReturnType<typeof vi.fn>).mock
-      .calls[0]![1] as (channel: string, raw: string) => void;
+    const handler = (subscriber.on as ReturnType<typeof vi.fn>).mock.calls[0]![1] as (
+      channel: string,
+      raw: string,
+    ) => void;
     handler("other:channel", JSON.stringify({ scenarioRunId: "run1" }));
 
     expect(onCancel).not.toHaveBeenCalled();
@@ -96,8 +98,10 @@ describe("subscribeToCancellations", () => {
 
     await subscribeToCancellations({ subscriber, onCancel });
 
-    const handler = (subscriber.on as ReturnType<typeof vi.fn>).mock
-      .calls[0]![1] as (channel: string, raw: string) => void;
+    const handler = (subscriber.on as ReturnType<typeof vi.fn>).mock.calls[0]![1] as (
+      channel: string,
+      raw: string,
+    ) => void;
     handler(CANCELLATION_CHANNEL, "not-json");
 
     expect(onCancel).not.toHaveBeenCalled();

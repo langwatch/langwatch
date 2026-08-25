@@ -1,10 +1,5 @@
 import { useEffect, useState } from "react";
-import type {
-  BriefingData,
-  BriefingReceipt,
-  ScenarioBar,
-  StatusCell,
-} from "../types";
+import type { BriefingData, BriefingReceipt, ScenarioBar, StatusCell } from "../types";
 
 /**
  * DEV-ONLY briefing fixtures.
@@ -33,13 +28,7 @@ export interface BriefingMock {
 
 // ── Dimensions ───────────────────────────────────────────────────────────────
 
-type ScenarioKey =
-  | "none"
-  | "traces"
-  | "passing"
-  | "mixed"
-  | "failing"
-  | "empty";
+type ScenarioKey = "none" | "traces" | "passing" | "mixed" | "failing" | "empty";
 
 interface ScenarioShape {
   label: string;
@@ -87,8 +76,7 @@ const SCENARIOS: Record<ScenarioKey, ScenarioShape> = {
     // A busy project with NO scenarios still has plenty to say — this is the
     // "1 million traces, lots to show" state, not a dead empty screen.
     label: "Traces, no scenarios",
-    headline:
-      "50 traces since yesterday. A couple worth a look, the rest healthy.",
+    headline: "50 traces since yesterday. A couple worth a look, the rest healthy.",
     cells: [
       { label: "Traces", value: "50", tone: "neutral" },
       { label: "Errors", value: "2", tone: "bad" },
@@ -163,13 +151,7 @@ const SCENARIOS: Record<ScenarioKey, ScenarioShape> = {
   },
 };
 
-type ReceiptsKey =
-  | "none"
-  | "errors"
-  | "latency"
-  | "shared"
-  | "repeated"
-  | "full";
+type ReceiptsKey = "none" | "errors" | "latency" | "shared" | "repeated" | "full";
 
 const mockEvidence = (query: string, label: string) => ({
   link: { label: "Open traces", href: `#${encodeURIComponent(query)}` },
@@ -363,8 +345,7 @@ export function getBriefingMock(key: string): BriefingMock | undefined {
 
 const STORAGE_KEY = "langwatch:dev:briefing-mock";
 
-export const isBriefingMockAvailable = () =>
-  process.env.NODE_ENV === "development";
+export const isBriefingMockAvailable = () => process.env.NODE_ENV === "development";
 
 // Same-tab fan-out: `storage` events only fire in OTHER tabs, so writes notify
 // hook instances in this tab by hand (the switcher and the page each hold one).

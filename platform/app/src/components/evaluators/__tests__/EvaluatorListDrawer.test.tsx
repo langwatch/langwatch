@@ -161,9 +161,7 @@ describe("EvaluatorListDrawer", () => {
       await waitFor(() => {
         // Shows evaluator type display names
         expect(screen.getByText("Exact Match Evaluator")).toBeInTheDocument();
-        expect(
-          screen.getByText("LLM-as-a-Judge Boolean Evaluator"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("LLM-as-a-Judge Boolean Evaluator")).toBeInTheDocument();
         // One workflow evaluator shows "Workflow"
         expect(screen.getByText("Workflow")).toBeInTheDocument();
       });
@@ -256,9 +254,7 @@ describe("EvaluatorListDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("create-first-evaluator-button"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("create-first-evaluator-button")).toBeInTheDocument();
       });
     });
 
@@ -272,9 +268,7 @@ describe("EvaluatorListDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("create-first-evaluator-button"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("create-first-evaluator-button")).toBeInTheDocument();
       });
 
       await user.click(screen.getByTestId("create-first-evaluator-button"));

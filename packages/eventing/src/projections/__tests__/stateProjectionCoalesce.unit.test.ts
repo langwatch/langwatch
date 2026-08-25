@@ -37,9 +37,7 @@ function stateProjectionOf({
       load: async () => null,
       store: async () => undefined,
     },
-    ...(coalesceMaxBatch === undefined
-      ? {}
-      : { options: { coalesceMaxBatch } }),
+    ...(coalesceMaxBatch === undefined ? {} : { options: { coalesceMaxBatch } }),
   };
 }
 
@@ -81,8 +79,7 @@ describe("state projection coalescing wiring", () => {
 
       router.initializeStateProjectionQueues();
 
-      const [defs] =
-        queueManager.initializeStateProjectionQueues.mock.calls[0] ?? [];
+      const [defs] = queueManager.initializeStateProjectionQueues.mock.calls[0] ?? [];
       // Business time a day in the past, appended now: without a createdAt
       // score this event jumps the group's queue, and the cursor its drain
       // commits silently drops everything appended before it.

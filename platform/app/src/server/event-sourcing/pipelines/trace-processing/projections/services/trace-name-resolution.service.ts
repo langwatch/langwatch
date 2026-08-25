@@ -71,8 +71,7 @@ export class TraceNameResolutionService {
     span: NormalizedSpan;
   }): ResolvedTraceName {
     const nameFromFallback = state.traceNameFromFallback ?? false;
-    const metadataFromFallback =
-      state.rootMetadataFromFallback ?? nameFromFallback;
+    const metadataFromFallback = state.rootMetadataFromFallback ?? nameFromFallback;
     const unchanged: ResolvedTraceName = {
       traceName: state.traceName,
       rootSpanType: state.rootSpanType,
@@ -89,9 +88,7 @@ export class TraceNameResolutionService {
       const currentRootStartMs = state.rootSpanStartTimeMs;
       const haveCanonicalRoot = currentRootStartMs !== undefined;
       const isEarlierNamedRoot =
-        span.name !== "" &&
-        haveCanonicalRoot &&
-        spanStartMs < currentRootStartMs;
+        span.name !== "" && haveCanonicalRoot && spanStartMs < currentRootStartMs;
       const upgradesEmptyNamedRoot =
         haveCanonicalRoot && state.traceName === "" && span.name !== "";
 
@@ -125,8 +122,7 @@ export class TraceNameResolutionService {
     // Non-root span. Only the fallback path can update from here, and
     // only if (a) we've never had a real root, and (b) this is now the
     // earliest-starting span we've seen.
-    const haveRealRoot =
-      !metadataFromFallback && state.rootSpanStartTimeMs !== undefined;
+    const haveRealRoot = !metadataFromFallback && state.rootSpanStartTimeMs !== undefined;
     if (haveRealRoot) return unchanged;
     // A user-overridden name is final; don't let the fallback path
     // overwrite it even when no real root exists. The user explicitly

@@ -42,9 +42,7 @@ export function CommandBar() {
         data-langy-handoff={handingOff ? "exiting" : undefined}
         style={{
           opacity: handingOff ? 0 : 1,
-          transform: handingOff
-            ? "translate3d(18px, 4px, 0) scale(0.985)"
-            : undefined,
+          transform: handingOff ? "translate3d(18px, 4px, 0) scale(0.985)" : undefined,
           filter: handingOff ? "blur(2px)" : undefined,
           transition: reduceMotion
             ? undefined

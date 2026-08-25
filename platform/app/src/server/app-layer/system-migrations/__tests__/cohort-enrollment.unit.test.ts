@@ -88,9 +88,7 @@ describe("SystemMigrationsService.enrollCohort", () => {
         expect(result.enrolled).toHaveLength(50);
         expect(result.eligibleCount).toBe(200);
         // A sample, not an echo: no repeats, and every pick from the pool.
-        const pickedIds = result.enrolled.map(
-          (organization) => organization.id,
-        );
+        const pickedIds = result.enrolled.map((organization) => organization.id);
         expect(new Set(pickedIds).size).toBe(50);
         const poolIds = new Set(
           organizations(200).map((organization) => organization.id),

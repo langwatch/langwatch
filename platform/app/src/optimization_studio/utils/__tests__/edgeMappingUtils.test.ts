@@ -112,9 +112,7 @@ describe("edgeMappingUtils", () => {
     describe("when field.value is empty or null", () => {
       it("ignores empty string values", () => {
         const edges: Edge[] = [];
-        const inputs: Field[] = [
-          createField({ identifier: "query", value: "" }),
-        ];
+        const inputs: Field[] = [createField({ identifier: "query", value: "" })];
 
         const result = buildInputMappings({
           nodeId: "node_b",
@@ -127,9 +125,7 @@ describe("edgeMappingUtils", () => {
 
       it("ignores null values", () => {
         const edges: Edge[] = [];
-        const inputs: Field[] = [
-          createField({ identifier: "query", value: null }),
-        ];
+        const inputs: Field[] = [createField({ identifier: "query", value: null })];
 
         const result = buildInputMappings({
           nodeId: "node_b",

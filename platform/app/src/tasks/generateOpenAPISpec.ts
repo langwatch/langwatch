@@ -76,14 +76,8 @@ const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
  * Pinned by rpc-openapi.unit.test.ts in @langwatch/api.
  */
 const FRAMEWORK_SPEC_OPTIONS = { excludeStaticFile: false } as const;
-const generateFrameworkSpecs: typeof generateApiSpecs = async (
-  hono,
-  options,
-  context,
-) =>
-  requireDefaultedResponseFields(
-    await generateApiSpecs(hono, options, context),
-  );
+const generateFrameworkSpecs: typeof generateApiSpecs = async (hono, options, context) =>
+  requireDefaultedResponseFields(await generateApiSpecs(hono, options, context));
 
 // Surfaces whose routes come straight from their Hono apps. Their paths
 // REPLACE on merge, and any path the apps no longer serve is pruned from
@@ -154,9 +148,7 @@ const APP_DERIVED_PREFIXES = [
  * and every operation field too.
  */
 const isAppDerivedPath = (key: string): boolean =>
-  APP_DERIVED_PREFIXES.some(
-    (prefix) => key === prefix || key.startsWith(`${prefix}/`),
-  );
+  APP_DERIVED_PREFIXES.some((prefix) => key === prefix || key.startsWith(`${prefix}/`));
 
 const currentSpec = {
   ...rawCurrentSpec,
@@ -179,8 +171,7 @@ import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as webhooksApp } from "../app/api/webhooks/[[...route]]/app";
 import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
 
-const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
-  sourceArray;
+const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) => sourceArray;
 
 const langwatchSpec = {
   openapi: "3.1.0",
@@ -257,10 +248,7 @@ export default async function execute() {
   console.log("Building projects spec...");
   const projectsSpec = await generateSpecs(projectsApp);
   console.log("Building roles spec...");
-  const rolesSpec = await generateFrameworkSpecs(
-    rolesApp,
-    FRAMEWORK_SPEC_OPTIONS,
-  );
+  const rolesSpec = await generateFrameworkSpecs(rolesApp, FRAMEWORK_SPEC_OPTIONS);
   console.log("Building role bindings spec...");
   const roleBindingsSpec = await generateFrameworkSpecs(
     roleBindingsApp,
@@ -278,10 +266,7 @@ export default async function execute() {
   // the document.
   const scimSpec = await generateSpecs(scimApp, SCIM_SPEC_OPTIONS);
   console.log("Building secrets spec...");
-  const secretsSpec = await generateFrameworkSpecs(
-    secretsApp,
-    FRAMEWORK_SPEC_OPTIONS,
-  );
+  const secretsSpec = await generateFrameworkSpecs(secretsApp, FRAMEWORK_SPEC_OPTIONS);
   console.log("Building scenarios spec...");
   const scenariosSpec = await generateSpecs(scenariosApp);
   console.log("Building simulation runs spec...");
@@ -396,12 +381,9 @@ type SpecShape = {
 export function stampSecurityFromRegistry(spec: SpecShape): void {
   const registry = indexRegistryByOperation();
 
-  for (const { routePath, operationKey, operation } of documentedOperations(
-    spec,
-  )) {
+  for (const { routePath, operationKey, operation } of documentedOperations(spec)) {
     const credentialClass =
-      registry.byOperation.get(operationKey) ??
-      registry.byAnyMethodPath.get(routePath);
+      registry.byOperation.get(operationKey) ?? registry.byAnyMethodPath.get(routePath);
     if (!credentialClass) {
       assertMayInheritTheDefault(operationKey, routePath);
       continue;
@@ -427,10 +409,7 @@ export function stampSecurityFromRegistry(spec: SpecShape): void {
  * Hand-maintained entries in the JSON have no route by design and are left
  * alone.
  */
-function assertMayInheritTheDefault(
-  operationKey: string,
-  routePath: string,
-): void {
+function assertMayInheritTheDefault(operationKey: string, routePath: string): void {
   if (!isAppDerivedPath(routePath)) return;
   throw new Error(
     `${operationKey} is generated from a Hono app but matches no registered route, ` +
@@ -518,9 +497,7 @@ const OPENAPI_METHODS = [
  * that documents nothing and reads, to anything scanning the document, as a
  * path we publish.
  */
-function withoutEmptyPaths<T extends { paths?: Record<string, unknown> }>(
-  spec: T,
-): T {
+function withoutEmptyPaths<T extends { paths?: Record<string, unknown> }>(spec: T): T {
   const paths = spec.paths;
   if (!paths) return spec;
 
@@ -552,9 +529,6 @@ function withoutEmbeddedJsonSchemaDefinitions<T>(value: T): T {
   return Object.fromEntries(
     Object.entries(value)
       .filter(([key]) => key !== "$defs")
-      .map(([key, item]) => [
-        key,
-        withoutEmbeddedJsonSchemaDefinitions(item),
-      ]),
+      .map(([key, item]) => [key, withoutEmbeddedJsonSchemaDefinitions(item)]),
   ) as T;
 }

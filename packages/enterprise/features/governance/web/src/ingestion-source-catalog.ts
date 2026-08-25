@@ -30,10 +30,7 @@ export type SourceMode = "push" | "pull" | "s3";
  */
 export type SourceGroup = "realtime" | "scheduled";
 
-export const SOURCE_GROUP_META: Record<
-  SourceGroup,
-  { title: string; blurb: string }
-> = {
+export const SOURCE_GROUP_META: Record<SourceGroup, { title: string; blurb: string }> = {
   realtime: {
     title: "Real-time streams",
     blurb: "These platforms send events to LangWatch as they happen.",
@@ -144,8 +141,7 @@ type UncataloguedSourceType = Exclude<
   SourceType,
   (typeof SOURCE_TYPE_OPTIONS)[number]["value"]
 >;
-const _catalogIsComplete: UncataloguedSourceType extends never ? true : never =
-  true;
+const _catalogIsComplete: UncataloguedSourceType extends never ? true : never = true;
 void _catalogIsComplete;
 
 export const SOURCE_TYPE_LABEL: Record<SourceType, string> = Object.fromEntries(

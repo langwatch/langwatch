@@ -32,8 +32,7 @@ export const SEGMENTS: SegmentDef[] = [
     value: "skill",
     label: "Skills",
     shortcut: "S",
-    description:
-      "Reusable slash commands you can invoke from your coding agent.",
+    description: "Reusable slash commands you can invoke from your coding agent.",
   },
   {
     value: "mcp",
@@ -87,8 +86,7 @@ export function IntegrateDrawer({
   const [token, setToken] = useState<string | null>(null);
   const [segment, setSegment] = useState<Segment>("skill");
 
-  const activeSegment =
-    SEGMENTS.find((s) => s.value === segment) ?? SEGMENTS[0];
+  const activeSegment = SEGMENTS.find((s) => s.value === segment) ?? SEGMENTS[0];
 
   if (!project || !organization) return null;
 

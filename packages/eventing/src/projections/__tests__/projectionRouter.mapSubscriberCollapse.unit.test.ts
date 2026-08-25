@@ -100,9 +100,7 @@ describe("ProjectionRouter map-subscriber dispatch over a coalesced batch", () =
     router.registerMapSubscriber("spans", subscriber);
     router.initializeMapQueues();
 
-    const initialize = queueManager.initializeHandlerQueues as ReturnType<
-      typeof vi.fn
-    >;
+    const initialize = queueManager.initializeHandlerQueues as ReturnType<typeof vi.fn>;
     const handlerDefs = initialize.mock.calls[0]?.[0] as Record<
       string,
       { handler: { handleBatch: (events: Event[]) => Promise<void> } }
@@ -249,9 +247,7 @@ describe("ProjectionRouter map-subscriber dispatch over a coalesced batch", () =
       };
 
       const payloads = await dispatchMapBatch(subscriber, batch(), (event) =>
-        event.id === "event-0" || event.id === "event-1"
-          ? { recordFor: event.id }
-          : null,
+        event.id === "event-0" || event.id === "event-1" ? { recordFor: event.id } : null,
       );
 
       expect(payloads.map((p) => p.event.id)).toEqual(["event-0", "event-1"]);

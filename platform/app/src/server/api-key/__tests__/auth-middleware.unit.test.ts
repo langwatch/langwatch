@@ -29,9 +29,7 @@ function mockHonoCtx(opts: {
 describe("extractCredentials", () => {
   describe("when using Basic Auth", () => {
     it("extracts projectId and token from base64-encoded header", () => {
-      const encoded = Buffer.from("proj-123:pat-lw-lookup_secret").toString(
-        "base64",
-      );
+      const encoded = Buffer.from("proj-123:pat-lw-lookup_secret").toString("base64");
       const c = mockGetHeader({ authorization: `Basic ${encoded}` });
       const result = extractCredentials(c);
 

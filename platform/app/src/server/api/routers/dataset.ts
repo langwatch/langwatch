@@ -195,8 +195,7 @@ export const datasetRouter = createTRPCRouter({
       if (!hasSourcePermission) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message:
-            "You do not have permission to view datasets in the source project",
+          message: "You do not have permission to view datasets in the source project",
         });
       }
 

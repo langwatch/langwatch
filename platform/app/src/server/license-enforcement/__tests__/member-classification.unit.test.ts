@@ -58,9 +58,9 @@ describe("isViewOnlyPermission", () => {
 
 describe("isViewOnlyCustomRole", () => {
   it("returns true when all permissions are view-only", () => {
-    expect(
-      isViewOnlyCustomRole(["project:view", "analytics:view", "traces:view"]),
-    ).toBe(true);
+    expect(isViewOnlyCustomRole(["project:view", "analytics:view", "traces:view"])).toBe(
+      true,
+    );
   });
 
   it("returns true for single view-only permission", () => {
@@ -68,27 +68,19 @@ describe("isViewOnlyCustomRole", () => {
   });
 
   it("returns false when any permission is manage", () => {
-    expect(isViewOnlyCustomRole(["project:view", "project:manage"])).toBe(
-      false,
-    );
+    expect(isViewOnlyCustomRole(["project:view", "project:manage"])).toBe(false);
   });
 
   it("returns false when any permission is create", () => {
-    expect(isViewOnlyCustomRole(["project:view", "project:create"])).toBe(
-      false,
-    );
+    expect(isViewOnlyCustomRole(["project:view", "project:create"])).toBe(false);
   });
 
   it("returns false when any permission is update", () => {
-    expect(isViewOnlyCustomRole(["project:view", "project:update"])).toBe(
-      false,
-    );
+    expect(isViewOnlyCustomRole(["project:view", "project:update"])).toBe(false);
   });
 
   it("returns false when any permission is delete", () => {
-    expect(isViewOnlyCustomRole(["project:view", "project:delete"])).toBe(
-      false,
-    );
+    expect(isViewOnlyCustomRole(["project:view", "project:delete"])).toBe(false);
   });
 
   it("returns false when any permission is share", () => {
@@ -110,9 +102,9 @@ describe("classifyMemberType", () => {
     });
 
     it("returns FullMember for ADMIN role even with view-only permissions", () => {
-      expect(
-        classifyMemberType(OrganizationUserRole.ADMIN, ["project:view"]),
-      ).toBe("FullMember");
+      expect(classifyMemberType(OrganizationUserRole.ADMIN, ["project:view"])).toBe(
+        "FullMember",
+      );
     });
 
     /** @scenario MEMBER role users count as Full Member */
@@ -123,9 +115,9 @@ describe("classifyMemberType", () => {
     });
 
     it("returns FullMember for MEMBER role even with view-only permissions", () => {
-      expect(
-        classifyMemberType(OrganizationUserRole.MEMBER, ["project:view"]),
-      ).toBe("FullMember");
+      expect(classifyMemberType(OrganizationUserRole.MEMBER, ["project:view"])).toBe(
+        "FullMember",
+      );
     });
 
     it("returns LiteMember for EXTERNAL role with no permissions (Lite Member)", () => {
@@ -138,9 +130,9 @@ describe("classifyMemberType", () => {
   describe("EXTERNAL role (Lite Member) with custom permissions", () => {
     /** @scenario Custom role with only view permissions counts as Lite Member */
     it("returns LiteMember for view-only permissions", () => {
-      expect(
-        classifyMemberType(OrganizationUserRole.EXTERNAL, ["project:view"]),
-      ).toBe("LiteMember");
+      expect(classifyMemberType(OrganizationUserRole.EXTERNAL, ["project:view"])).toBe(
+        "LiteMember",
+      );
     });
 
     it("returns LiteMember for multiple view-only permissions", () => {
@@ -204,9 +196,7 @@ describe("classifyMemberType", () => {
     });
 
     it("returns LiteMember for empty permissions array", () => {
-      expect(classifyMemberType(OrganizationUserRole.EXTERNAL, [])).toBe(
-        "LiteMember",
-      );
+      expect(classifyMemberType(OrganizationUserRole.EXTERNAL, [])).toBe("LiteMember");
     });
   });
 });
@@ -222,17 +212,12 @@ describe("isFullMember", () => {
 
   it("returns true for EXTERNAL with non-view permissions", () => {
     expect(
-      isFullMember(OrganizationUserRole.EXTERNAL, [
-        "project:view",
-        "project:manage",
-      ]),
+      isFullMember(OrganizationUserRole.EXTERNAL, ["project:view", "project:manage"]),
     ).toBe(true);
   });
 
   it("returns false for EXTERNAL with view-only permissions", () => {
-    expect(isFullMember(OrganizationUserRole.EXTERNAL, ["project:view"])).toBe(
-      false,
-    );
+    expect(isFullMember(OrganizationUserRole.EXTERNAL, ["project:view"])).toBe(false);
   });
 
   it("returns false for EXTERNAL with no permissions", () => {
@@ -251,17 +236,12 @@ describe("isLiteMember", () => {
 
   it("returns false for EXTERNAL with non-view permissions", () => {
     expect(
-      isLiteMember(OrganizationUserRole.EXTERNAL, [
-        "project:view",
-        "project:manage",
-      ]),
+      isLiteMember(OrganizationUserRole.EXTERNAL, ["project:view", "project:manage"]),
     ).toBe(false);
   });
 
   it("returns true for EXTERNAL with view-only permissions", () => {
-    expect(isLiteMember(OrganizationUserRole.EXTERNAL, ["project:view"])).toBe(
-      true,
-    );
+    expect(isLiteMember(OrganizationUserRole.EXTERNAL, ["project:view"])).toBe(true);
   });
 
   it("returns true for EXTERNAL with no permissions", () => {

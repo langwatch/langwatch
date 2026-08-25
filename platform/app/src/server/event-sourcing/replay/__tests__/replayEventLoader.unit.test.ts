@@ -42,8 +42,7 @@ describe("rowToEvent", () => {
 
       const attrs = (event.data as any)?.span?.attributes ?? [];
       const out =
-        attrs.find((a: any) => a.key === "langwatch.output")?.value
-          ?.stringValue ?? "";
+        attrs.find((a: any) => a.key === "langwatch.output")?.value?.stringValue ?? "";
       expect(out.length).toBeGreaterThan(0);
       expect(out.length).toBeLessThan(oversized.length);
     });

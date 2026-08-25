@@ -35,7 +35,5 @@ export function CustomQueryMenuLink({
   // The hook runs on every render; only the markup is conditional.
   if (!availability.data?.available) return null;
 
-  return (
-    <MenuLink href={`/${projectSlug}/analytics/query`}>Custom query</MenuLink>
-  );
+  return <MenuLink href={`/${projectSlug}/analytics/query`}>Custom query</MenuLink>;
 }

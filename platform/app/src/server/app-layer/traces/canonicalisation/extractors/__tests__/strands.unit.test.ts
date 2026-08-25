@@ -59,10 +59,7 @@ describe("StrandsExtractor", () => {
 
   describe("when Strands detection matches", () => {
     it("detects via instrumentationScope.name = strands.telemetry.tracer", () => {
-      const ctx = createStrandsContext(
-        { [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat" },
-        [],
-      );
+      const ctx = createStrandsContext({ [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat" }, []);
 
       extractor.apply(ctx);
 
@@ -87,10 +84,7 @@ describe("StrandsExtractor", () => {
 
   describe("when gen_ai.operation.name maps to span type", () => {
     it("maps chat to llm", () => {
-      const ctx = createStrandsContext(
-        { [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat" },
-        [],
-      );
+      const ctx = createStrandsContext({ [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat" }, []);
 
       extractor.apply(ctx);
 
@@ -147,9 +141,7 @@ describe("StrandsExtractor", () => {
       extractor.apply(ctx);
 
       // System message promoted to system_instruction, stripped from input
-      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(
-        "System prompt",
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("System prompt");
       expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toBeUndefined();
     });
 

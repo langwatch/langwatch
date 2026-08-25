@@ -16,17 +16,17 @@ import {
   type SpanType,
 } from "./types";
 import { type Prompt } from "@/client-sdk/services/prompts";
-import { type ChatMessage, type SpanInputOutput } from "../../internal/generated/types/tracer";
+import {
+  type ChatMessage,
+  type SpanInputOutput,
+} from "../../internal/generated/types/tracer";
 import * as intSemconv from "../semconv/attributes";
 import { processSpanInputOutput } from "./input-output";
 import type { SemConvAttributeKey, SemConvAttributes } from "../semconv";
-import {
-  emitEvaluationEvent,
-  type AddEvaluationParams,
-} from "../evaluation";
+import { emitEvaluationEvent, type AddEvaluationParams } from "../evaluation";
 
 class LangWatchSpanInternal implements LangWatchSpan {
-  constructor(private span: Span) { }
+  constructor(private span: Span) {}
   setAttributes(attributes: SemConvAttributes): this {
     this.span.setAttributes(attributes);
     return this;
@@ -120,7 +120,7 @@ class LangWatchSpanInternal implements LangWatchSpan {
   setRAGContexts(ragContexts: LangWatchSpanRAGContext[]): this {
     return this.setAttribute(
       intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
-      JSON.stringify(ragContexts)
+      JSON.stringify(ragContexts),
     );
   }
 
@@ -134,7 +134,7 @@ class LangWatchSpanInternal implements LangWatchSpan {
       JSON.stringify({
         type: "json",
         value: metrics,
-      })
+      }),
     );
   }
 
@@ -146,10 +146,7 @@ class LangWatchSpanInternal implements LangWatchSpan {
   setInput(input: any): this;
   setInput(typeOrInput: any, input?: any): this {
     const spanInput = processSpanInputOutput(typeOrInput, input);
-    return this.setAttribute(
-      intSemconv.ATTR_LANGWATCH_INPUT,
-      JSON.stringify(spanInput)
-    );
+    return this.setAttribute(intSemconv.ATTR_LANGWATCH_INPUT, JSON.stringify(spanInput));
   }
 
   setOutput(type: "text", output: string): this;
@@ -162,7 +159,7 @@ class LangWatchSpanInternal implements LangWatchSpan {
     const spanOutput = processSpanInputOutput(typeOrOutput, output);
     return this.setAttribute(
       intSemconv.ATTR_LANGWATCH_OUTPUT,
-      JSON.stringify(spanOutput)
+      JSON.stringify(spanOutput),
     );
   }
 }

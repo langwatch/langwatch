@@ -243,9 +243,7 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
     it("keeps a switched-off provider out of the gateway's eligible set", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const ids = (await eligibleModelProvidersForVk(prisma, vk!)).map(
-        (p) => p.id,
-      );
+      const ids = (await eligibleModelProvidersForVk(prisma, vk!)).map((p) => p.id);
 
       expect(ids).not.toContain(MP_ORG_OFF_ID);
       expect(ids).not.toContain(MP_ORG_WITHDRAWN_ID);
@@ -265,19 +263,13 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
     it("resolves the same provider set on both sides", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const reachableIds = (
-        await scopeReachableModelProvidersForVk(prisma, vk!)
-      )
+      const reachableIds = (await scopeReachableModelProvidersForVk(prisma, vk!))
         .map((p) => p.id)
         .sort();
-      const drawerIds = (await resolveAsTheDrawerWould())
-        .map((p) => p.id)
-        .sort();
+      const drawerIds = (await resolveAsTheDrawerWould()).map((p) => p.id).sort();
 
       expect(drawerIds).toEqual(reachableIds);
-      expect(drawerIds).toEqual(
-        [MP_ORG_ID, MP_MULTISCOPE_ID, MP_PROJECT_ID].sort(),
-      );
+      expect(drawerIds).toEqual([MP_ORG_ID, MP_MULTISCOPE_ID, MP_PROJECT_ID].sort());
     });
 
     it("never reaches a sibling project's provider", async () => {
@@ -312,9 +304,7 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
   describe("given an organization-wide provider inherited by a project key", () => {
     /** @scenario An org-scoped provider inherited into a project is attributed to the organization */
     it("attributes it to the organization, not to the key's project", async () => {
-      const row = (await resolveAsTheDrawerWould()).find(
-        (p) => p.id === MP_ORG_ID,
-      );
+      const row = (await resolveAsTheDrawerWould()).find((p) => p.id === MP_ORG_ID);
 
       expect(row?.definedAt).toEqual({
         scopeType: "ORGANIZATION",
@@ -323,9 +313,7 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
     });
 
     it("still attributes a project-scoped provider to that project", async () => {
-      const row = (await resolveAsTheDrawerWould()).find(
-        (p) => p.id === MP_PROJECT_ID,
-      );
+      const row = (await resolveAsTheDrawerWould()).find((p) => p.id === MP_PROJECT_ID);
 
       expect(row?.definedAt).toEqual({
         scopeType: "PROJECT",
@@ -342,9 +330,7 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
 
       // The scope-reachable set (allowlist validation + drawer) ignores the
       // policy, so the multi-scope provider the policy omits stays in it.
-      const reachableIds = (
-        await scopeReachableModelProvidersForVk(prisma, vk!)
-      )
+      const reachableIds = (await scopeReachableModelProvidersForVk(prisma, vk!))
         .map((p) => p.id)
         .sort();
       // The dispatch set (materialiser) applies the policy, so the omitted

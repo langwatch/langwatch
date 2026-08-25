@@ -13,9 +13,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 vi.mock("../../scenarioRoles", async () => {
-  const actual = await vi.importActual<typeof import("../../scenarioRoles")>(
-    "../../scenarioRoles",
-  );
+  const actual =
+    await vi.importActual<typeof import("../../scenarioRoles")>("../../scenarioRoles");
   return { ...actual, useIsScenarioRole: () => false };
 });
 
@@ -210,8 +209,7 @@ describe("ChatTurnRow separator ledger", () => {
       renderRow();
 
       const separator = separatorRow();
-      const badgeSlot = screen.getByTestId("turn-annotation-badges")
-        .parentElement!;
+      const badgeSlot = screen.getByTestId("turn-annotation-badges").parentElement!;
 
       // In flow: the slot holding the badge is a child of the separator, so the
       // badge takes its own room instead of being drawn over the ledger.
@@ -223,8 +221,7 @@ describe("ChatTurnRow separator ledger", () => {
     it("keeps the hover actions floating over the end of the line", () => {
       renderRow();
 
-      const floating = screen.getByTestId("turn-edit-trace-action")
-        .parentElement!;
+      const floating = screen.getByTestId("turn-edit-trace-action").parentElement!;
 
       expect(floating).not.toBe(separatorRow());
       expect(getComputedStyle(floating).position).toBe("absolute");
@@ -237,10 +234,8 @@ describe("ChatTurnRow separator ledger", () => {
     it("floats the hover actions clear of the badge, not across it", () => {
       renderRow();
 
-      const badgeSlot = screen.getByTestId("turn-annotation-badges")
-        .parentElement!;
-      const floating = screen.getByTestId("turn-edit-trace-action")
-        .parentElement!;
+      const badgeSlot = screen.getByTestId("turn-annotation-badges").parentElement!;
+      const floating = screen.getByTestId("turn-edit-trace-action").parentElement!;
 
       // Anchored to the badge's own slot, and past its far edge, so no part of
       // the action row can ever sit on top of the badge.

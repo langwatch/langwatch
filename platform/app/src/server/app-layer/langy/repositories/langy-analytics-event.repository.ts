@@ -20,15 +20,10 @@ export interface LangyAnalyticsEventRecord {
 /** Analytics-only sink. It is never used for operational Langy reads. */
 export interface LangyAnalyticsEventRepository {
   insert(record: LangyAnalyticsEventRecord, retentionDays: number): Promise<void>;
-  insertBatch(
-    records: LangyAnalyticsEventRecord[],
-    retentionDays: number,
-  ): Promise<void>;
+  insertBatch(records: LangyAnalyticsEventRecord[], retentionDays: number): Promise<void>;
 }
 
-export class NullLangyAnalyticsEventRepository
-  implements LangyAnalyticsEventRepository
-{
+export class NullLangyAnalyticsEventRepository implements LangyAnalyticsEventRepository {
   async insert(): Promise<void> {}
   async insertBatch(): Promise<void> {}
 }

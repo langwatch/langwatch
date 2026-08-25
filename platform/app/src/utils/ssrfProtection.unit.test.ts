@@ -84,9 +84,7 @@ describe("createSSRFValidator()", () => {
     /** @scenario <impl> blocks cloud metadata even when BLOCK_LOCAL_HTTP_CALLS is "false" */
     /** @scenario Cloud metadata endpoints are blocked even when BLOCK_LOCAL_HTTP_CALLS is <toggle> */
     it("blocks cloud metadata endpoints", async () => {
-      await expect(
-        validate("http://169.254.169.254/latest/meta-data/"),
-      ).rejects.toThrow(
+      await expect(validate("http://169.254.169.254/latest/meta-data/")).rejects.toThrow(
         "Access to cloud metadata endpoints is not allowed for security reasons",
       );
     });
@@ -95,9 +93,7 @@ describe("createSSRFValidator()", () => {
     it("blocks cloud provider internal domains", async () => {
       stubDnsResolve(["52.94.76.1"]);
 
-      await expect(
-        validate("https://s3.amazonaws.com/my-bucket"),
-      ).rejects.toThrow(
+      await expect(validate("https://s3.amazonaws.com/my-bucket")).rejects.toThrow(
         "Access to cloud provider internal domains is not allowed for security reasons",
       );
     });
@@ -114,9 +110,9 @@ describe("createSSRFValidator()", () => {
     it("blocks a private hostname", async () => {
       stubDnsResolve(["192.168.1.100"]);
 
-      await expect(
-        validate("https://my-internal-agent:8443/chat"),
-      ).rejects.toThrow(/not allowed for security reasons/);
+      await expect(validate("https://my-internal-agent:8443/chat")).rejects.toThrow(
+        /not allowed for security reasons/,
+      );
     });
 
     /** @scenario <impl> blocks private IP literals when BLOCK_LOCAL_HTTP_CALLS is "true" */
@@ -130,9 +126,7 @@ describe("createSSRFValidator()", () => {
     /** @scenario <impl> blocks cloud metadata even when BLOCK_LOCAL_HTTP_CALLS is "false" */
     /** @scenario Cloud metadata endpoints are blocked even when BLOCK_LOCAL_HTTP_CALLS is <toggle> */
     it("blocks cloud metadata endpoints", async () => {
-      await expect(
-        validate("http://169.254.169.254/latest/meta-data/"),
-      ).rejects.toThrow(
+      await expect(validate("http://169.254.169.254/latest/meta-data/")).rejects.toThrow(
         "Access to cloud metadata endpoints is not allowed for security reasons",
       );
     });
@@ -141,9 +135,7 @@ describe("createSSRFValidator()", () => {
     it("blocks cloud provider internal domains", async () => {
       stubDnsResolve(["52.94.76.1"]);
 
-      await expect(
-        validate("https://s3.amazonaws.com/my-bucket"),
-      ).rejects.toThrow(
+      await expect(validate("https://s3.amazonaws.com/my-bucket")).rejects.toThrow(
         "Access to cloud provider internal domains is not allowed for security reasons",
       );
     });
@@ -191,9 +183,9 @@ describe("createSSRFValidator()", () => {
         allowedHosts: ["169.254.169.254"],
       });
 
-      await expect(
-        validate("http://169.254.169.254/latest/meta-data/"),
-      ).rejects.toThrow("cloud metadata endpoints");
+      await expect(validate("http://169.254.169.254/latest/meta-data/")).rejects.toThrow(
+        "cloud metadata endpoints",
+      );
     });
 
     it("is matched case-insensitively on hostname", async () => {

@@ -4,7 +4,11 @@ description: Setup contract only, Azure AD app registration is captured; the Pur
 sidebarTitle: Microsoft Copilot Studio
 ---
 
-<Info>**Pairs with:** [Ingestion Sources index](/ai-governance/ingestion-sources/index). Microsoft Copilot Studio is on the adapter roadmap; configuration contract is captured today, the Purview poller worker is pending.</Info>
+<Info>
+  **Pairs with:** [Ingestion Sources index](/ai-governance/ingestion-sources/index).
+  Microsoft Copilot Studio is on the adapter roadmap; configuration contract is captured
+  today, the Purview poller worker is pending.
+</Info>
 
 `copilot_studio` polls the Microsoft Purview Audit API for Copilot Studio activity. Today the source can be created and the per-platform credentials are persisted, but the cron worker that calls Purview hasn't shipped, events do not flow yet.
 
@@ -22,12 +26,12 @@ The configuration contract below lets admins pre-stage Azure AD app registration
 
 The composer collects:
 
-| Field | Required | Stored | Used by |
-|---|---|---|---|
-| Azure AD tenant ID | yes | `IngestionSource.payloadConfig.tenantId` | (future poller) |
-| App registration client ID | yes | `payloadConfig.clientId` | (future poller) |
-| App registration client secret | yes | `payloadConfig.clientSecret` (hashed server-side) | (future poller) |
-| Polling cadence (seconds) | no | `payloadConfig.pollEverySec` (default 300) | (future poller) |
+| Field                          | Required | Stored                                            | Used by         |
+| ------------------------------ | -------- | ------------------------------------------------- | --------------- |
+| Azure AD tenant ID             | yes      | `IngestionSource.payloadConfig.tenantId`          | (future poller) |
+| App registration client ID     | yes      | `payloadConfig.clientId`                          | (future poller) |
+| App registration client secret | yes      | `payloadConfig.clientSecret` (hashed server-side) | (future poller) |
+| Polling cadence (seconds)      | no       | `payloadConfig.pollEverySec` (default 300)        | (future poller) |
 
 In the Azure portal:
 
@@ -54,7 +58,7 @@ secret, events will land here.
 
 Everything below is the adapter slice that has not yet shipped:
 
-- **Purview poller worker.** A cron job that authenticates as the app registration, calls `https://manage.office.com/api/v1.0/<tenantId>/activity/feed/subscriptions/content` to pull new content blobs, and walks them for Copilot Studio activity (`RecordType` = Copilot* operations).
+- **Purview poller worker.** A cron job that authenticates as the app registration, calls `https://manage.office.com/api/v1.0/<tenantId>/activity/feed/subscriptions/content` to pull new content blobs, and walks them for Copilot Studio activity (`RecordType` = Copilot\* operations).
 - **Purview event → governance event mapping.** Purview's audit JSON has `Operation`, `UserId`, `RecordType`, `ResultStatus` etc. The mapping into Actor, Action, Target, `eventType` is pending and will live in a `purview.ts` normaliser alongside `otel.ts`.
 - **Subscription bootstrap.** Purview audit feed subscriptions need to be created via API on first connect (`PUT /subscriptions/start?contentType=Audit.General`). The bootstrap will live in the poller worker on first run, idempotent.
 - **Watermark + dedup.** Purview content blobs have stable IDs; the worker will track high-water content IDs in `IngestionSource.payloadConfig.watermark` to avoid replays.

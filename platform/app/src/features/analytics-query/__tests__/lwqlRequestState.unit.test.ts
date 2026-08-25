@@ -17,10 +17,7 @@ import {
   createLangWatchQLRequestController,
   type LangWatchQLExecuteRequest,
 } from "../logic/lwqlRequestController";
-import {
-  isLangWatchQLResultStale,
-  lwqlActionLabel,
-} from "../logic/lwqlRequestState";
+import { isLangWatchQLResultStale, lwqlActionLabel } from "../logic/lwqlRequestState";
 
 import { lwqlResult } from "./lwqlFixtures";
 
@@ -56,10 +53,7 @@ interface Call {
 function fakeExecutor() {
   const calls: Call[] = [];
   const execute = vi.fn(
-    (
-      request: LangWatchQLExecuteRequest,
-      { signal }: { signal: AbortSignal },
-    ) => {
+    (request: LangWatchQLExecuteRequest, { signal }: { signal: AbortSignal }) => {
       const pending = deferred<LangWatchQLQueryResult>();
       calls.push({ request, signal, deferred: pending });
       return pending.promise;

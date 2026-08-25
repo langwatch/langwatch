@@ -1,7 +1,4 @@
-import type {
-  AccessDeclaration,
-  AuthzPermission,
-} from "@langwatch/authz-contract";
+import type { AccessDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { DescribeRouteOptions } from "hono-openapi";
@@ -209,10 +206,7 @@ export type EndpointConfig = Omit<EndpointDef, "permission" | "noPermission"> &
  *
  * @internal
  */
-export interface RawEndpointDef extends Omit<
-  EndpointDef,
-  "rateLimit" | "cache"
-> {
+export interface RawEndpointDef extends Omit<EndpointDef, "rateLimit" | "cache"> {
   rateLimit?: boolean;
   cache?: { tag: string; ttlSeconds: number } | false;
 }
@@ -337,10 +331,7 @@ export interface ServiceConfig<TApp = unknown> {
    * on `.withPermission(...)`; this seam is for a permission selected from
    * validated request data.
    */
-  authorize?: (
-    context: Context,
-    permission: AuthzPermission,
-  ) => Promise<void>;
+  authorize?: (context: Context, permission: AuthzPermission) => Promise<void>;
   /**
    * Require a validated body `projectId` to equal the project selected and
    * authorized by project authentication.

@@ -42,6 +42,7 @@ docker compose logs postgres --tail=50
 ```
 
 Common causes:
+
 - PostgreSQL not ready before app starts (health checks should handle this)
 - Missing or invalid `.env` file
 - Insufficient Docker memory (increase to 8+ GB in Docker Desktop settings)
@@ -49,6 +50,7 @@ Common causes:
 ### Slow startup
 
 First startup is slower because:
+
 - Docker pulls all images
 - PostgreSQL runs initial migrations
 - OpenSearch initializes its cluster
@@ -99,7 +101,7 @@ If not, set one in your values:
 ```yaml
 clickhouse:
   storage:
-    storageClass: "gp3"  # or your available StorageClass
+    storageClass: "gp3" # or your available StorageClass
 ```
 
 ### Ingress not routing traffic
@@ -136,7 +138,7 @@ Increase ClickHouse memory:
 
 ```yaml
 clickhouse:
-  memory: "16Gi"  # Up from default 4Gi
+  memory: "16Gi" # Up from default 4Gi
 ```
 
 The subchart auto-tunes internal memory limits based on this value.
@@ -155,7 +157,7 @@ Give one worker room for every local model it may load:
 langevals:
   resources:
     requests: { cpu: 100m, memory: 768Mi }
-    limits:   { cpu: 500m, memory: 4Gi }
+    limits: { cpu: 500m, memory: 4Gi }
 ```
 
 The limit is a ceiling, not a reservation, so a generous one costs nothing until
@@ -220,7 +222,8 @@ app:
 ```
 
 <Warning>
-Only skip migrations for debugging. Running with pending migrations can cause application errors.
+  Only skip migrations for debugging. Running with pending migrations can cause
+  application errors.
 </Warning>
 
 ### Connection refused

@@ -34,16 +34,13 @@ import { readHandledError } from "../readHandledError";
 const trpcError = (error: unknown) => ({ data: { error } });
 
 const docsLink = (docsUrl: string) =>
-  readHandledError(
-    trpcError({ code: "trace_not_found", httpStatus: 404, docsUrl }),
-  )?.docsUrl;
+  readHandledError(trpcError({ code: "trace_not_found", httpStatus: 404, docsUrl }))
+    ?.docsUrl;
 
 describe("readHandledError docs links", () => {
   describe("given a runtime that is not a local development client", () => {
     it("refuses the local docs origin", () => {
-      expect(
-        docsLink("http://localhost:3000/errors/query-timeout"),
-      ).toBeUndefined();
+      expect(docsLink("http://localhost:3000/errors/query-timeout")).toBeUndefined();
     });
 
     /**
@@ -61,9 +58,9 @@ describe("readHandledError docs links", () => {
      * bought safety by breaking every real docs link in production.
      */
     it("keeps a link on the canonical docs origin", () => {
-      expect(
-        docsLink("https://docs.langwatch.ai/platform/data-retention"),
-      ).toBe("https://docs.langwatch.ai/platform/data-retention");
+      expect(docsLink("https://docs.langwatch.ai/platform/data-retention")).toBe(
+        "https://docs.langwatch.ai/platform/data-retention",
+      );
     });
   });
 });

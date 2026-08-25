@@ -46,9 +46,7 @@ const switchEditingMode = async (
     await user.click(menuItem);
     // Wait for menu to close and state to update
     await waitFor(() => {
-      expect(
-        screen.queryByTestId(`editing-mode-${targetMode}`),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId(`editing-mode-${targetMode}`)).not.toBeInTheDocument();
     });
   }
 };

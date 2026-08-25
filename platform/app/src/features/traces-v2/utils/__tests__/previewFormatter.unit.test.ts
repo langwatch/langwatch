@@ -25,8 +25,7 @@ describe("formatPreview", () => {
       const input = JSON.stringify([
         {
           role: "user",
-          content:
-            "<system-reminder>big boilerplate</system-reminder>\n\nwhat is 2+2?",
+          content: "<system-reminder>big boilerplate</system-reminder>\n\nwhat is 2+2?",
         },
       ]);
       const result = formatPreview(input, opts);
@@ -36,8 +35,7 @@ describe("formatPreview", () => {
 
     /** @scenario "A context-only message stays visible instead of blanking" */
     it("keeps a context-only message visible rather than blanking it", () => {
-      const input =
-        "<system-reminder>only context, no human text</system-reminder>";
+      const input = "<system-reminder>only context, no human text</system-reminder>";
       const result = formatPreview(input, opts);
       expect(result.text).toContain("only context");
     });
@@ -128,12 +126,9 @@ describe("formatPreview", () => {
 
   describe("given markdown images", () => {
     it("replaces ![alt](url) with 📷 alt and flags hadImage", () => {
-      const result = formatPreview(
-        "Look ![diagram](https://x.test/d.png) here",
-        {
-          maxChars: 80,
-        },
-      );
+      const result = formatPreview("Look ![diagram](https://x.test/d.png) here", {
+        maxChars: 80,
+      });
       expect(result.hadImage).toBe(true);
       expect(result.text).toBe("Look 📷 diagram here");
     });
@@ -378,8 +373,7 @@ describe("formatPreview", () => {
     });
 
     it("handles False literals and embedded double quotes", () => {
-      const input =
-        "[{'role': 'user', 'content': 'say \"hi\" please', 'cached': False}]";
+      const input = "[{'role': 'user', 'content': 'say \"hi\" please', 'cached': False}]";
       const result = formatPreview(input, { maxChars: 80 });
       expect(result.text).toBe('say "hi" please');
     });

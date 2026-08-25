@@ -98,9 +98,7 @@ export function getWorkflowEntryOutputs(
   }
 
   return outputs
-    .filter((output) =>
-      isOutputConnectedToNonEvaluator(output.identifier, edges, nodes),
-    )
+    .filter((output) => isOutputConnectedToNonEvaluator(output.identifier, edges, nodes))
     .map((output) => ({
       identifier: output.identifier,
       type: output.type,

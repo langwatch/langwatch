@@ -2,10 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  APP_PACKAGE_NAME,
-  workspaceInstallArgs,
-} from "../src/services/node-deps";
+import { APP_PACKAGE_NAME, workspaceInstallArgs } from "../src/services/node-deps";
 
 /**
  * The invariants ADR-076 established, asserted against the repo itself.
@@ -41,10 +38,7 @@ function gitLsFiles(pattern: string): string[] {
  * below.
  */
 function workspaceMembers(): string[] {
-  const lines = readFileSync(
-    join(repoRoot, "pnpm-workspace.yaml"),
-    "utf8",
-  ).split("\n");
+  const lines = readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8").split("\n");
   const start = lines.findIndex((l) => l.trimEnd() === "packages:");
   if (start === -1) return [];
 
@@ -63,10 +57,7 @@ function workspaceMembers(): string[] {
 
 /** The keys of the root `overrides:` block, same line-scan approach. */
 function rootOverrideKeys(): string[] {
-  const lines = readFileSync(
-    join(repoRoot, "pnpm-workspace.yaml"),
-    "utf8",
-  ).split("\n");
+  const lines = readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8").split("\n");
   const start = lines.findIndex((l) => l.trimEnd() === "overrides:");
   if (start === -1) return [];
 
@@ -89,9 +80,7 @@ function trackedManifests(): string[] {
   )
     .split("\n")
     .filter(Boolean)
-    .filter(
-      (p) => !p.includes("node_modules") && existsSync(join(repoRoot, p)),
-    );
+    .filter((p) => !p.includes("node_modules") && existsSync(join(repoRoot, p)));
 }
 
 /** Directory of a manifest, "" for the root one. */
@@ -107,9 +96,7 @@ function isWorkspaceMember(dir: string): boolean {
     const globParts = glob.split("/");
     return (
       globParts.length === directoryParts.length &&
-      globParts.every(
-        (part, index) => part === "*" || part === directoryParts[index],
-      )
+      globParts.every((part, index) => part === "*" || part === directoryParts[index])
     );
   });
 }
@@ -140,9 +127,7 @@ describe("the repo is a single pnpm workspace", () => {
 
     /** @scenario The repo holds one lockfile */
     it("keeps the workspace definition at the repo root and nowhere else", () => {
-      expect(gitLsFiles("*pnpm-workspace.yaml")).toEqual([
-        "pnpm-workspace.yaml",
-      ]);
+      expect(gitLsFiles("*pnpm-workspace.yaml")).toEqual(["pnpm-workspace.yaml"]);
     });
   });
 
@@ -184,9 +169,7 @@ describe("the repo is a single pnpm workspace", () => {
       // tested runtime and fail at first import, taking down the app rather
       // than only the SDK path.
       const source = readFileSync(bundle, "utf8");
-      const externalZodImports = source.match(
-        /from\s*["']zod(?:\/[^"']*)?["']/g,
-      );
+      const externalZodImports = source.match(/from\s*["']zod(?:\/[^"']*)?["']/g);
 
       expect(externalZodImports ?? []).toEqual([]);
     });
@@ -237,11 +220,7 @@ describe("the repo is a single pnpm workspace", () => {
       // declaration governs it. An unconditional root pin (a bare package
       // name, no `@range` selector) would drag every project onto one
       // version; a future merge adding one back must fail here.
-      const disputed = [
-        "zod",
-        "@opentelemetry/api-logs",
-        "@opentelemetry/sdk-logs",
-      ];
+      const disputed = ["zod", "@opentelemetry/api-logs", "@opentelemetry/sdk-logs"];
       const unconditional = rootOverrideKeys().filter(
         (k) => !k.replace(/^@/, "").includes("@"),
       );
@@ -329,9 +308,7 @@ describe("the repo is a single pnpm workspace", () => {
       // Necessary, not sufficient: the distribution manifest drives what
       // pack-npm.sh stages, but npm deletes a package-root lockfile. The
       // packing script and smoke job assert that the nested copy survives.
-      const shipped = readJson(
-        "apps/server/distribution-files.json",
-      ) as unknown;
+      const shipped = readJson("apps/server/distribution-files.json") as unknown;
 
       expect(shipped).toBeInstanceOf(Array);
       expect(shipped).toContain("pnpm-workspace.yaml");
@@ -360,9 +337,7 @@ describe("the repo is a single pnpm workspace", () => {
         // so a distribution entry of `langwatch` cannot be read as shipping
         // `langwatch-something/package.json`.
         const covered = shipped.some(
-          (f) =>
-            manifest === f ||
-            manifest.startsWith(f.endsWith("/") ? f : `${f}/`),
+          (f) => manifest === f || manifest.startsWith(f.endsWith("/") ? f : `${f}/`),
         );
         expect(covered, `no distribution entry ships ${manifest}`).toBe(true);
       }

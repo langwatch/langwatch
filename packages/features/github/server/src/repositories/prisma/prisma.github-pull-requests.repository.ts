@@ -36,8 +36,7 @@ const normalizeFullName = (repositoryFullName: string): string =>
  * `headBranch` is deliberately never folded: `feat/X` and `feat/x` really are
  * two branches.
  */
-const normalizeHost = (repositoryHost: string): string =>
-  repositoryHost.toLowerCase();
+const normalizeHost = (repositoryHost: string): string => repositoryHost.toLowerCase();
 
 type PullRequestRecord = {
   organizationId: string;
@@ -109,10 +108,7 @@ function freshnessGuard(prUpdatedAt: Date) {
 }
 
 function isUniqueViolation(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
-  );
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
 function toBranchCheckRow(record: BranchCheckRecord): GithubBranchCheckRow {
@@ -130,9 +126,7 @@ function toBranchCheckRow(record: BranchCheckRecord): GithubBranchCheckRow {
   };
 }
 
-export class PrismaGithubPullRequestsRepository
-  extends GithubPullRequestsRepository
-{
+export class PrismaGithubPullRequestsRepository extends GithubPullRequestsRepository {
   static create(prisma: PrismaClient): PrismaGithubPullRequestsRepository {
     return new PrismaGithubPullRequestsRepository(prisma);
   }
@@ -168,9 +162,7 @@ export class PrismaGithubPullRequestsRepository
    * is the intended outcome and is not reported: a late delivery is ordinary,
    * not a failure the caller can act on.
    */
-  private async writeSnapshot(
-    pullRequest: UpsertGithubPullRequestInput,
-  ): Promise<void> {
+  private async writeSnapshot(pullRequest: UpsertGithubPullRequestInput): Promise<void> {
     const key = {
       organizationId: pullRequest.organizationId,
       repositoryHost: normalizeHost(pullRequest.repositoryHost),
@@ -285,9 +277,7 @@ export class PrismaGithubPullRequestsRepository
     return record ? toPullRequestRow(record) : null;
   }
 
-  async refreshSnapshot(
-    input: RefreshGithubPullRequestSnapshotInput,
-  ): Promise<void> {
+  async refreshSnapshot(input: RefreshGithubPullRequestSnapshotInput): Promise<void> {
     await this.prisma.githubPullRequest.updateMany({
       where: {
         organizationId: input.organizationId,
@@ -422,9 +412,7 @@ export class PrismaGithubPullRequestsRepository
     // and lets every racer claim. See `toPgTimestampUtc`.
     const at = toPgTimestampUtc(now);
     const leaseUntil = toPgTimestampUtc(new Date(now.getTime() + leaseMs));
-    const freshSince = toPgTimestampUtc(
-      new Date(now.getTime() - freshMappingMs),
-    );
+    const freshSince = toPgTimestampUtc(new Date(now.getTime() - freshMappingMs));
     const claimed = await this.prisma.$executeRaw`
       INSERT INTO "GithubBranchPullRequestCheck" (
         "id", "organizationId", "repositoryHost", "repositoryFullName",

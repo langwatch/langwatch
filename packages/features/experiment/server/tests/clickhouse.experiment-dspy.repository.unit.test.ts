@@ -70,9 +70,7 @@ describe("ClickHouseExperimentDspyRepository", () => {
   });
 
   it("merges examples and calls by hash while preserving first-write times", async () => {
-    const insert = vi.fn<ExperimentDspyClickHouseClient["insert"]>(
-      async () => undefined,
-    );
+    const insert = vi.fn<ExperimentDspyClickHouseClient["insert"]>(async () => undefined);
     const existing = {
       TenantId: "project_1",
       ExperimentId: "experiment_1",

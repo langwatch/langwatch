@@ -134,20 +134,18 @@ export const techStackFrameworkOptions = {
 
 export const getTechStack = (project: Project) => {
   const languageKey = project.language as keyof typeof techStackLanguageOptions;
-  const frameworkKey =
-    project.framework as keyof typeof techStackFrameworkOptions;
+  const frameworkKey = project.framework as keyof typeof techStackFrameworkOptions;
   return {
-    language:
-      techStackLanguageOptions[languageKey] ?? techStackLanguageOptions.other,
-    framework:
-      techStackFrameworkOptions[frameworkKey] ??
-      techStackFrameworkOptions.other,
+    language: techStackLanguageOptions[languageKey] ?? techStackLanguageOptions.other,
+    framework: techStackFrameworkOptions[frameworkKey] ?? techStackFrameworkOptions.other,
   };
 };
 
-export function TechStackSelector<
-  T extends { language: string; framework: string },
->({ form: form_ }: { form: UseFormReturn<T> }) {
+export function TechStackSelector<T extends { language: string; framework: string }>({
+  form: form_,
+}: {
+  form: UseFormReturn<T>;
+}) {
   const form = form_ as unknown as UseFormReturn<{
     language: string;
     framework: string;
@@ -175,10 +173,8 @@ export function TechStackSelector<
     form.watch("language") || Object.keys(techStackLanguageOptions)[0];
 
   const handleLanguageChange = (value: string) => {
-    const availableForLanguage = Object.entries(
-      techStackFrameworkOptions,
-    ).filter(([_, framework]) =>
-      Object.keys(framework.languages).includes(value),
+    const availableForLanguage = Object.entries(techStackFrameworkOptions).filter(
+      ([_, framework]) => Object.keys(framework.languages).includes(value),
     );
 
     form.setValue("language", value);
@@ -203,18 +199,16 @@ export function TechStackSelector<
               }}
             >
               <HStack gap={6} alignItems="stretch" wrap="wrap">
-                {Object.entries(techStackLanguageOptions).map(
-                  ([key, option]) => (
-                    <RadioCard key={key} value={key}>
-                      <VStack width="64px">
-                        <IconWrapper>{option.icon}</IconWrapper>
-                        <Box fontSize="sm" textAlign="center">
-                          {option.label}
-                        </Box>
-                      </VStack>
-                    </RadioCard>
-                  ),
-                )}
+                {Object.entries(techStackLanguageOptions).map(([key, option]) => (
+                  <RadioCard key={key} value={key}>
+                    <VStack width="64px">
+                      <IconWrapper>{option.icon}</IconWrapper>
+                      <Box fontSize="sm" textAlign="center">
+                        {option.label}
+                      </Box>
+                    </VStack>
+                  </RadioCard>
+                ))}
               </HStack>
             </RadioGroup.Root>
           )}
@@ -230,9 +224,7 @@ export function TechStackSelector<
               <HStack gap={6} alignItems="stretch" wrap="wrap">
                 {Object.entries(techStackFrameworkOptions)
                   .filter(([_, option]) =>
-                    Object.keys(option.languages).includes(
-                      currentLanguage ?? "",
-                    ),
+                    Object.keys(option.languages).includes(currentLanguage ?? ""),
                   )
                   .map(([key, option]) => (
                     <RadioCard key={key} value={key}>

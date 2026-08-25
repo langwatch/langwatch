@@ -34,12 +34,9 @@ export const storedObjectFilenameSchema = z
     message: "filename must not contain control characters",
   })
   .transform((value) => value.normalize("NFC"))
-  .refine(
-    (value) => utf8ByteLength(value) <= STORED_OBJECT_FILENAME_MAX_BYTES,
-    {
-      message: `filename must be at most ${STORED_OBJECT_FILENAME_MAX_BYTES} UTF-8 bytes after normalization`,
-    },
-  );
+  .refine((value) => utf8ByteLength(value) <= STORED_OBJECT_FILENAME_MAX_BYTES, {
+    message: `filename must be at most ${STORED_OBJECT_FILENAME_MAX_BYTES} UTF-8 bytes after normalization`,
+  });
 export type StoredObjectFilename = z.infer<typeof storedObjectFilenameSchema>;
 
 export const storedObjectMediaTypeSchema = z
@@ -56,20 +53,11 @@ export type StoredObjectMediaType = z.infer<typeof storedObjectMediaTypeSchema>;
 
 export const storedObjectSha256Schema = z
   .string()
-  .regex(
-    /^[0-9a-f]{64}$/u,
-    "sha256 must be 64 lowercase hexadecimal characters",
-  );
+  .regex(/^[0-9a-f]{64}$/u, "sha256 must be 64 lowercase hexadecimal characters");
 export type StoredObjectSha256 = z.infer<typeof storedObjectSha256Schema>;
 
-export const storedObjectByteLengthSchema = z
-  .number()
-  .int()
-  .nonnegative()
-  .safe();
-export type StoredObjectByteLength = z.infer<
-  typeof storedObjectByteLengthSchema
->;
+export const storedObjectByteLengthSchema = z.number().int().nonnegative().safe();
+export type StoredObjectByteLength = z.infer<typeof storedObjectByteLengthSchema>;
 
 /** Applies the runtime's semantic maximum without creating a second wire type. */
 export function createStoredObjectByteLengthSchema(maximumBytes: number) {
@@ -82,9 +70,7 @@ export function createStoredObjectByteLengthSchema(maximumBytes: number) {
   );
 }
 
-export const storedObjectTimestampSchema = z
-  .string()
-  .datetime({ offset: true });
+export const storedObjectTimestampSchema = z.string().datetime({ offset: true });
 export type StoredObjectTimestamp = z.infer<typeof storedObjectTimestampSchema>;
 
 export const storedObjectProvenanceSchema = z
@@ -94,9 +80,7 @@ export const storedObjectProvenanceSchema = z
     ownerId: z.string().min(1).max(255),
   })
   .strict();
-export type StoredObjectProvenance = z.infer<
-  typeof storedObjectProvenanceSchema
->;
+export type StoredObjectProvenance = z.infer<typeof storedObjectProvenanceSchema>;
 
 export const storedObjectLifecycleStatusSchema = z.enum([
   "pending",
@@ -151,9 +135,7 @@ export const storedObjectWriteOperationSchema = z
     completedAt: storedObjectTimestampSchema.optional(),
   })
   .strict();
-export type StoredObjectWriteOperation = z.infer<
-  typeof storedObjectWriteOperationSchema
->;
+export type StoredObjectWriteOperation = z.infer<typeof storedObjectWriteOperationSchema>;
 
 export const storedObjectStorageUsageSchema = z
   .object({
@@ -163,6 +145,4 @@ export const storedObjectStorageUsageSchema = z
     purpose: z.string().min(1).max(127).optional(),
   })
   .strict();
-export type StoredObjectStorageUsage = z.infer<
-  typeof storedObjectStorageUsageSchema
->;
+export type StoredObjectStorageUsage = z.infer<typeof storedObjectStorageUsageSchema>;

@@ -4,9 +4,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import type { Custom } from "@langwatch/workflow-contract";
 
-export const useComponentVersion = (
-  node: NodeProps<Node<Custom>> | Node<Custom>,
-) => {
+export const useComponentVersion = (node: NodeProps<Node<Custom>> | Node<Custom>) => {
   const { project } = useOrganizationTeamProject();
 
   if (!node) {
@@ -30,9 +28,7 @@ export const useComponentVersion = (
     (v) => String(v.id).trim() === String(componentsVersionId).trim(),
   );
 
-  const publishedVersion = getVersions.data?.find(
-    (v) => v.isPublishedVersion === true,
-  );
+  const publishedVersion = getVersions.data?.find((v) => v.isPublishedVersion === true);
 
   if (!currentVersion || !project) {
     return { currentVersion: null, publishedVersion: null };

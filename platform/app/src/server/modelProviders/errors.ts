@@ -104,13 +104,7 @@ export class ModelProviderScopesRequiredError extends HandledError {
 export class ModelProviderDeprecatedError extends HandledError {
   declare readonly code: "model_provider_deprecated";
 
-  constructor({
-    provider,
-    replacement,
-  }: {
-    provider: string;
-    replacement?: string;
-  }) {
+  constructor({ provider, replacement }: { provider: string; replacement?: string }) {
     super(
       "model_provider_deprecated",
       "This model provider is no longer available to add.",
@@ -305,13 +299,7 @@ export class ModelProviderCredentialsUnreadableError extends HandledError {
 export class ModelProviderRoutingHandleInvalidError extends HandledError {
   declare readonly code: "model_provider_routing_handle_invalid";
 
-  constructor({
-    handle,
-    problem,
-  }: {
-    handle: string;
-    problem: "shape" | "reserved";
-  }) {
+  constructor({ handle, problem }: { handle: string; problem: "shape" | "reserved" }) {
     super(
       "model_provider_routing_handle_invalid",
       problem === "reserved"

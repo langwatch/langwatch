@@ -21,15 +21,9 @@
 import crypto from "node:crypto";
 import { Readable } from "node:stream";
 import type { AzureCredentials } from "./azure-credentials";
-import {
-  getAzureBlobToken,
-  invalidateAzureBlobToken,
-} from "./azure-token-provider";
+import { getAzureBlobToken, invalidateAzureBlobToken } from "./azure-token-provider";
 import { ObjectNotFoundError } from "./errors";
-import {
-  redactStorageErrorText,
-  redactStorageUri,
-} from "./project-storage-destination";
+import { redactStorageErrorText, redactStorageUri } from "./project-storage-destination";
 import type { StorageDriver } from "./storage-driver";
 import { getUriScheme } from "./uri";
 
@@ -283,9 +277,7 @@ export class AzureBlobDriver implements StorageDriver {
     }
 
     if (!response.body) {
-      throw new Error(
-        `Azure Blob GET returned empty body for ${redactStorageUri(uri)}`,
-      );
+      throw new Error(`Azure Blob GET returned empty body for ${redactStorageUri(uri)}`);
     }
     return Readable.fromWeb(
       response.body as unknown as import("node:stream/web").ReadableStream<Uint8Array>,
@@ -319,9 +311,7 @@ export class AzureBlobDriver implements StorageDriver {
     });
 
     if (!response.ok) {
-      const body = redactStorageErrorText(
-        await response.text().catch(() => ""),
-      );
+      const body = redactStorageErrorText(await response.text().catch(() => ""));
       throw new Error(
         `Azure Blob PUT failed for ${redactStorageUri(uri)}: ${response.status} ${response.statusText} ${body}`,
       );
@@ -448,9 +438,7 @@ export class AzureBlobDriver implements StorageDriver {
     });
 
     if (!response.ok && response.status !== 409) {
-      const body = redactStorageErrorText(
-        await response.text().catch(() => ""),
-      );
+      const body = redactStorageErrorText(await response.text().catch(() => ""));
       throw new Error(
         `Azure Blob container create failed for ${container}: ${response.status} ${response.statusText} ${body}`,
       );

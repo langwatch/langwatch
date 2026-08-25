@@ -17,10 +17,7 @@ export class MemoryPresenceRepository extends PresenceRepository {
     return new MemoryPresenceRepository(options.now ?? (() => Date.now()));
   }
 
-  async upsert(
-    session: PresenceSession,
-    ttlSeconds: number,
-  ): Promise<void> {
+  async upsert(session: PresenceSession, ttlSeconds: number): Promise<void> {
     this.entries.set(this.key(session.projectId, session.sessionId), {
       session,
       expiresAt: this.now() + ttlSeconds * 1_000,

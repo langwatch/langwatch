@@ -104,10 +104,7 @@ describe("<OnlineEvaluationsTable />", () => {
     expect(screen.getByText("↑ 0.12")).toHaveAttribute("data-trend", "up");
     expect(screen.getByText("88%")).toBeInTheDocument();
     expect(screen.getByText("↓ 6 pp")).toHaveAttribute("data-trend", "down");
-    expect(screen.getByText("No data yet")).toHaveAttribute(
-      "data-trend",
-      "neutral",
-    );
+    expect(screen.getByText("No data yet")).toHaveAttribute("data-trend", "neutral");
     expect(
       screen.getByRole("img", { name: "Performance trend for Answer quality" }),
     ).toBeInTheDocument();
@@ -125,9 +122,7 @@ describe("<OnlineEvaluationsTable />", () => {
       }),
     ).toHaveAttribute("href", analyticsHref);
 
-    await user.click(
-      screen.getByRole("button", { name: "Actions for Answer quality" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Actions for Answer quality" }));
 
     expect(
       await screen.findByRole("menuitem", { name: "View analytics" }),
@@ -156,9 +151,7 @@ describe("<OnlineEvaluationsTable />", () => {
       wrapper: Wrapper,
     });
 
-    await user.click(
-      screen.getByRole("button", { name: "Actions for Safety policy" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Actions for Safety policy" }));
     await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
 
     expect(onEdit).toHaveBeenCalledWith("monitor-down");
@@ -185,9 +178,7 @@ describe("<OnlineEvaluationsTable />", () => {
     render(
       <OnlineEvaluationsTable
         {...defaultProps}
-        rows={[
-          { ...rows[0]!, performance: undefined, hasPerformanceError: true },
-        ]}
+        rows={[{ ...rows[0]!, performance: undefined, hasPerformanceError: true }]}
       />,
       { wrapper: Wrapper },
     );

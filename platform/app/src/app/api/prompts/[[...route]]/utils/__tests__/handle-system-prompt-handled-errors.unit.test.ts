@@ -62,17 +62,13 @@ describe("handleSystemPromptHandledErrors", () => {
 
   describe("when given any other error", () => {
     it("returns without throwing so the global error middleware can handle it", () => {
-      expect(() =>
-        handleSystemPromptHandledErrors(new Error("Unrelated")),
-      ).not.toThrow();
+      expect(() => handleSystemPromptHandledErrors(new Error("Unrelated"))).not.toThrow();
     });
 
     it("returns without throwing for non-Error inputs", () => {
       expect(() => handleSystemPromptHandledErrors(null)).not.toThrow();
       expect(() => handleSystemPromptHandledErrors(undefined)).not.toThrow();
-      expect(() =>
-        handleSystemPromptHandledErrors("string error"),
-      ).not.toThrow();
+      expect(() => handleSystemPromptHandledErrors("string error")).not.toThrow();
     });
   });
 });

@@ -55,14 +55,12 @@ describe("Experiment.compare", () => {
         // anyway, which is only possible because they are held elsewhere.
         const flushedBeforeJudging = harness.requestOrder.indexOf("batch");
         expect(flushedBeforeJudging).toBeGreaterThanOrEqual(0);
-        expect(flushedBeforeJudging).toBeLessThan(
-          harness.requestOrder.indexOf("judge")
-        );
+        expect(flushedBeforeJudging).toBeLessThan(harness.requestOrder.indexOf("judge"));
         expect(harness.loggedDatasetTargets.flat()).toEqual(
-          expect.arrayContaining(Object.keys(THREE_OUTPUTS))
+          expect.arrayContaining(Object.keys(THREE_OUTPUTS)),
         );
         expect(
-          harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id)
+          harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id),
         ).toEqual(Object.keys(THREE_OUTPUTS));
       });
 
@@ -136,9 +134,7 @@ describe("Experiment.compare", () => {
         });
 
         expect(
-          harness.judgeRequests[0]!.data.candidates.map(
-            (candidate) => candidate.output
-          )
+          harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.output),
         ).toEqual(["Four.", "Four.", '{"answer":"Four.","confidence":0.9}']);
       });
     });

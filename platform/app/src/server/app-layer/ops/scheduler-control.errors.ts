@@ -30,14 +30,10 @@ export class ScheduleInactiveError extends HandledError {
   declare readonly code: "schedule_inactive";
 
   constructor() {
-    super(
-      "schedule_inactive",
-      "That schedule is paused, so it will not be run.",
-      {
-        httpStatus: 409,
-        fault: "customer",
-      },
-    );
+    super("schedule_inactive", "That schedule is paused, so it will not be run.", {
+      httpStatus: 409,
+      fault: "customer",
+    });
     this.name = "ScheduleInactiveError";
   }
 }

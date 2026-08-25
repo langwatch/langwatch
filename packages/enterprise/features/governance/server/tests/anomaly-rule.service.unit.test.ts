@@ -47,8 +47,7 @@ class MemoryAnomalyRuleRepository extends AnomalyRuleRepository {
 
   async list(organizationId: string): Promise<AnomalyRule[]> {
     return [...this.rows.values()].filter(
-      (item) =>
-        item.organizationId === organizationId && item.archivedAt === null,
+      (item) => item.organizationId === organizationId && item.archivedAt === null,
     );
   }
 
@@ -62,10 +61,7 @@ class MemoryAnomalyRuleRepository extends AnomalyRuleRepository {
     return created;
   }
 
-  async update(
-    id: string,
-    changes: AnomalyRuleChanges,
-  ): Promise<AnomalyRule> {
+  async update(id: string, changes: AnomalyRuleChanges): Promise<AnomalyRule> {
     const existing = this.rows.get(id);
     if (!existing) throw new Error("missing fixture rule");
     const updated = { ...existing, ...changes };
@@ -127,9 +123,7 @@ describe("AnomalyRuleService", () => {
       repository: new MemoryAnomalyRuleRepository([rule()]),
     });
 
-    await expect(
-      service.tryFindById("rule-1", "organization-2"),
-    ).resolves.toBeNull();
+    await expect(service.tryFindById("rule-1", "organization-2")).resolves.toBeNull();
   });
 
   it("validates the effective rule type when updating", async () => {

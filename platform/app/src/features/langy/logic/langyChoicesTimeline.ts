@@ -61,9 +61,7 @@ export function langyChoicesTimeline(
     if (message.role === "user") {
       let sawSelection = false;
       for (const part of parts) {
-        if (
-          (part as { type?: string }).type !== LANGY_CHOICE_SELECTION_PART_TYPE
-        ) {
+        if ((part as { type?: string }).type !== LANGY_CHOICE_SELECTION_PART_TYPE) {
           continue;
         }
         const selection = parseLangyChoiceSelectionPart(part);

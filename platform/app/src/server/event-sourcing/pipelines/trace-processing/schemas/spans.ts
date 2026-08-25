@@ -91,9 +91,5 @@ export type NormalizedSpan = z.infer<typeof normalizedSpanSchema>;
 
 export type NormalizedAttributes = z.infer<typeof normalizedAttributesSchema>;
 
-export type NormalizedAttrScalar = z.infer<
-  typeof normalizedAttributeScalarSchema
->;
-export type NormalizedAttrValue = z.infer<
-  typeof normalizedAttributesValueSchema
->;
+export type NormalizedAttrScalar = z.infer<typeof normalizedAttributeScalarSchema>;
+export type NormalizedAttrValue = z.infer<typeof normalizedAttributesValueSchema>;

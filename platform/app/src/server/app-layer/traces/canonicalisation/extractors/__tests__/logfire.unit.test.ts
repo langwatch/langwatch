@@ -67,9 +67,7 @@ describe("LogfireExtractor", () => {
       // extractInputMessages skips and raw_input stays in the bag,
       // allowing span type inference.
       const ctx = createLogfireContext({
-        [ATTR_KEYS.RAW_INPUT]: JSON.stringify([
-          { role: "user", content: "Hello" },
-        ]),
+        [ATTR_KEYS.RAW_INPUT]: JSON.stringify([{ role: "user", content: "Hello" }]),
         [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: JSON.stringify([
           { role: "user", content: "existing" },
         ]),

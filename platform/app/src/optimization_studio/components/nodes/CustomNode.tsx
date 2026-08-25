@@ -18,11 +18,7 @@ export const CustomNode = forwardRef(function CustomNode(
   );
 });
 
-const LatestComponentVersionCheck = ({
-  node,
-}: {
-  node: NodeProps<Node<Custom>>;
-}) => {
+const LatestComponentVersionCheck = ({ node }: { node: NodeProps<Node<Custom>> }) => {
   const { currentVersion } = useComponentVersion(node);
 
   const updateNodeInternals = useUpdateNodeInternals();

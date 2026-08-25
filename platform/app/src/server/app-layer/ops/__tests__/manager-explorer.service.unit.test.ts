@@ -82,11 +82,7 @@ describe("ManagerExplorerService", () => {
   describe("given managers of mixed kinds share an aggregate type", () => {
     describe("when the aggregate's managers are requested", () => {
       it("returns only the per-aggregate machines, not scheduled singletons or other types", async () => {
-        metadataMock.mockReturnValue([
-          perAggregate,
-          scheduledSingleton,
-          otherAggregate,
-        ]);
+        metadataMock.mockReturnValue([perAggregate, scheduledSingleton, otherAggregate]);
         const service = makeService(fakeStore());
 
         const result = await service.getForAggregate({
@@ -128,9 +124,7 @@ describe("ManagerExplorerService", () => {
     describe("when it is read", () => {
       it("reports a null instance rather than fabricating state", async () => {
         metadataMock.mockReturnValue([perAggregate]);
-        const service = makeService(
-          fakeStore({ findByRef: vi.fn(async () => null) }),
-        );
+        const service = makeService(fakeStore({ findByRef: vi.fn(async () => null) }));
 
         const [manager] = await service.getForAggregate({
           aggregateType: "trigger",

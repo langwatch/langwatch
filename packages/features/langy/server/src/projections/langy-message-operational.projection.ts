@@ -1,8 +1,5 @@
 import type { AppendStore } from "@langwatch/eventing";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import {
   type LangyMessageProjectionRecord,
   mapLangyMessageEvent,
@@ -29,21 +26,16 @@ const messageEvents = [
  * rig (schema routing, store, per-message grouping).
  */
 export class LangyMessageOperationalMapProjection
-  extends AbstractMapProjection<
-    LangyMessageProjectionRecord,
-    typeof messageEvents
-  >
-  implements
-    MapEventHandlers<typeof messageEvents, LangyMessageProjectionRecord>
+  extends AbstractMapProjection<LangyMessageProjectionRecord, typeof messageEvents>
+  implements MapEventHandlers<typeof messageEvents, LangyMessageProjectionRecord>
 {
   readonly name = "langyMessageOperational";
   readonly store: AppendStore<LangyMessageProjectionRecord>;
   protected readonly events = messageEvents;
 
   override options = {
-    groupKeyFn: (event: {
-      data: { conversationId: string; messageId: string };
-    }) => `langy:${event.data.conversationId}:message:${event.data.messageId}`,
+    groupKeyFn: (event: { data: { conversationId: string; messageId: string } }) =>
+      `langy:${event.data.conversationId}:message:${event.data.messageId}`,
   };
 
   constructor(deps: { store: AppendStore<LangyMessageProjectionRecord> }) {

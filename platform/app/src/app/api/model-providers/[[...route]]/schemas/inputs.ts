@@ -10,8 +10,6 @@ export const updateModelProviderInputSchema = z.object({
   customEmbeddingsModels: z
     .union([z.array(customModelEntrySchema), z.array(z.string())])
     .optional(),
-  extraHeaders: z
-    .array(z.object({ key: z.string(), value: z.string() }))
-    .optional(),
+  extraHeaders: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
   defaultModel: z.string().optional(),
 });

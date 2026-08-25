@@ -44,7 +44,9 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 ```
 
 <Warning>
-`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production, secrets change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
+  `autogen.enabled=true` generates random secrets on each install. This is fine for
+  testing but not for production, secrets change on reinstall and invalidate sessions. See
+  [Production Deployment](#production-deployment) below.
 </Warning>
 
 ## Low-Resources Deployment
@@ -66,6 +68,7 @@ This configures smaller resource limits, single replicas, and disables evaluator
 ## Production Deployment
 
 For production, you should:
+
 1. Use external managed databases (PostgreSQL, Redis)
 2. Create Kubernetes Secrets manually
 3. Expose via Ingress with TLS
@@ -275,7 +278,7 @@ clickhouse:
     useEnvironmentCredentials: true
   cold:
     enabled: true
-    defaultTtlDays: 49  # Recommend multiples of 7 to align with weekly partition boundaries
+    defaultTtlDays: 49 # Recommend multiples of 7 to align with weekly partition boundaries
   backup:
     enabled: true
 
@@ -304,7 +307,8 @@ helm install langwatch langwatch/langwatch \
 ```
 
 <Note>
-Replicated ClickHouse requires an odd number of replicas (3, 5, 7) for Keeper consensus. Use 3 replicas unless you have a specific reason for more.
+  Replicated ClickHouse requires an odd number of replicas (3, 5, 7) for Keeper consensus.
+  Use 3 replicas unless you have a specific reason for more.
 </Note>
 
 ## Overlay System
@@ -313,30 +317,30 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 
 ### Size Overlays
 
-| Overlay | Use Case | Approx Resources (requests) |
-|---------|----------|-----------------|
-| _(default, no overlay)_ | Quick start, small production | ~6 CPU, ~18 Gi |
-| `size-dev.yaml` | Local dev, small teams | ~2 CPU, ~4 Gi |
-| `size-prod.yaml` | Production, single-node CH | ~12 CPU, ~28 Gi |
-| `size-ha.yaml` | HA production, replicated CH | ~25 CPU, ~70 Gi |
+| Overlay                 | Use Case                      | Approx Resources (requests) |
+| ----------------------- | ----------------------------- | --------------------------- |
+| _(default, no overlay)_ | Quick start, small production | ~6 CPU, ~18 Gi              |
+| `size-dev.yaml`         | Local dev, small teams        | ~2 CPU, ~4 Gi               |
+| `size-prod.yaml`        | Production, single-node CH    | ~12 CPU, ~28 Gi             |
+| `size-ha.yaml`          | HA production, replicated CH  | ~25 CPU, ~70 Gi             |
 
 ### Access Overlays
 
-| Overlay | Description |
-|---------|-------------|
+| Overlay                | Description                          |
+| ---------------------- | ------------------------------------ |
 | `access-nodeport.yaml` | NodePort on 30560 (Kind, bare-metal) |
-| `access-ingress.yaml` | Nginx Ingress with TLS template |
+| `access-ingress.yaml`  | Nginx Ingress with TLS template      |
 
 ### Infrastructure Overlays
 
-| Overlay | Description |
-|---------|-------------|
-| `postgres-external.yaml` | External PostgreSQL (RDS, Cloud SQL) |
-| `redis-external.yaml` | External Redis (ElastiCache, Memorystore) |
-| `clickhouse-external.yaml` | External ClickHouse instance |
-| `clickhouse-replicated.yaml` | 3-node replicated ClickHouse |
-| `cold-storage-s3.yaml` | S3 cold storage + backups |
-| `local-images.yaml` | Local images with `pullPolicy: Never` |
+| Overlay                      | Description                               |
+| ---------------------------- | ----------------------------------------- |
+| `postgres-external.yaml`     | External PostgreSQL (RDS, Cloud SQL)      |
+| `redis-external.yaml`        | External Redis (ElastiCache, Memorystore) |
+| `clickhouse-external.yaml`   | External ClickHouse instance              |
+| `clickhouse-replicated.yaml` | 3-node replicated ClickHouse              |
+| `cold-storage-s3.yaml`       | S3 cold storage + backups                 |
+| `local-images.yaml`          | Local images with `pullPolicy: Never`     |
 
 ### Composing Overlays
 
@@ -357,16 +361,16 @@ helm install langwatch langwatch/langwatch \
 
 ### Standalone vs Replicated
 
-| Mode | Replicas | Engine | When to Use |
-|------|----------|--------|-------------|
-| Standalone | 1 | MergeTree | Development, small production |
-| Replicated | 3+ (odd) | ReplicatedMergeTree + Keeper | HA production |
+| Mode       | Replicas | Engine                       | When to Use                   |
+| ---------- | -------- | ---------------------------- | ----------------------------- |
+| Standalone | 1        | MergeTree                    | Development, small production |
+| Replicated | 3+ (odd) | ReplicatedMergeTree + Keeper | HA production                 |
 
 Switch to replicated mode:
 
 ```yaml
 clickhouse:
-  replicas: 3  # Automatically uses ReplicatedMergeTree + Keeper
+  replicas: 3 # Automatically uses ReplicatedMergeTree + Keeper
 ```
 
 ### External ClickHouse
@@ -389,7 +393,7 @@ The `clickhouse-serverless` subchart automatically tunes ClickHouse parameters b
 
 ```yaml
 clickhouse:
-  cpu: 4        # Tunes thread pools, merge concurrency
+  cpu: 4 # Tunes thread pools, merge concurrency
   memory: "8Gi" # Tunes memory limits, cache sizes, per-query limits
 ```
 
@@ -440,6 +444,7 @@ This does not delete PersistentVolumeClaims. Your data in PostgreSQL, ClickHouse
 ```bash
 kubectl -n langwatch delete pvc --all
 ```
+
 </Warning>
 
 ## FAQ
@@ -478,6 +483,7 @@ redis:
 ### Air-Gapped Environments
 
 For clusters without internet access:
+
 1. Push LangWatch images to your private registry
 2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`
 3. Set `imagePullSecrets` if your registry requires authentication

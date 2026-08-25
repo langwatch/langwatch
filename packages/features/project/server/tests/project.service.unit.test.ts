@@ -62,9 +62,7 @@ const applicationProject: Project = projectSchema.parse({
   lastCodingAgentPullRequestAt: null,
 });
 
-const projectWithTeam = (
-  overrides: Partial<ProjectWithTeam> = {},
-): ProjectWithTeam => ({
+const projectWithTeam = (overrides: Partial<ProjectWithTeam> = {}): ProjectWithTeam => ({
   ...applicationProject,
   team: {
     id: "team_1",
@@ -94,9 +92,9 @@ class StubRepository extends ProjectRepository {
   findAllByTeam = vi.fn(async () => [applicationProject]);
   create = vi.fn(async () => applicationProject);
   tryGetById = vi.fn(async () => applicationProject);
-  tryGetWithTeam = vi.fn<
-    (id: string) => Promise<ProjectWithTeam | null>
-  >(async () => null);
+  tryGetWithTeam = vi.fn<(id: string) => Promise<ProjectWithTeam | null>>(
+    async () => null,
+  );
   updateMetadata = vi.fn(async () => undefined);
   touchCodingAgentSessionSeen = vi.fn(async () => undefined);
   touchCodingAgentPullRequestSeen = vi.fn(async () => undefined);
@@ -359,9 +357,9 @@ describe("ProjectService", () => {
       },
     });
 
-    await expect(
-      createService(repository).getOrganizationId("project_1"),
-    ).resolves.toBe("org");
+    await expect(createService(repository).getOrganizationId("project_1")).resolves.toBe(
+      "org",
+    );
   });
 
   it("creates an application project through its own repository", async () => {
@@ -533,23 +531,23 @@ describe("ProjectService", () => {
       current: projectWithTeam({ isPersonal: false, teamId: "shared" }),
       destination: { id: "personal", isPersonal: true },
     },
-  ])("rejects moves across the personal-workspace boundary", async ({
-    current,
-    destination,
-  }) => {
-    const repository = new StubRepository();
-    repository.tryGetWithTeam.mockResolvedValue(current);
-    repository.tryFindActiveTeamInOrganization.mockResolvedValue(destination);
+  ])(
+    "rejects moves across the personal-workspace boundary",
+    async ({ current, destination }) => {
+      const repository = new StubRepository();
+      repository.tryGetWithTeam.mockResolvedValue(current);
+      repository.tryFindActiveTeamInOrganization.mockResolvedValue(destination);
 
-    await expect(
-      createService(repository).update({
-        id: current.id,
-        organizationId: "org",
-        data: { teamId: destination.id },
-      }),
-    ).rejects.toBeInstanceOf(PersonalWorkspaceBoundaryError);
-    expect(repository.update).not.toHaveBeenCalled();
-  });
+      await expect(
+        createService(repository).update({
+          id: current.id,
+          organizationId: "org",
+          data: { teamId: destination.id },
+        }),
+      ).rejects.toBeInstanceOf(PersonalWorkspaceBoundaryError);
+      expect(repository.update).not.toHaveBeenCalled();
+    },
+  );
 
   it("allows an update that names the current personal team", async () => {
     const repository = new StubRepository();
@@ -572,9 +570,7 @@ describe("ProjectService", () => {
 
   it("refuses to archive a personal project", async () => {
     const repository = new StubRepository();
-    repository.tryGetWithTeam.mockResolvedValue(
-      projectWithTeam({ isPersonal: true }),
-    );
+    repository.tryGetWithTeam.mockResolvedValue(projectWithTeam({ isPersonal: true }));
 
     await expect(
       createService(repository).archive({
@@ -620,11 +616,7 @@ describe("ProjectService", () => {
       at,
       staleBefore: new Date("2026-08-25T11:00:00.000Z"),
     };
-    expect(repository.touchCodingAgentSessionSeen).toHaveBeenCalledWith(
-      expected,
-    );
-    expect(repository.touchCodingAgentPullRequestSeen).toHaveBeenCalledWith(
-      expected,
-    );
+    expect(repository.touchCodingAgentSessionSeen).toHaveBeenCalledWith(expected);
+    expect(repository.touchCodingAgentPullRequestSeen).toHaveBeenCalledWith(expected);
   });
 });

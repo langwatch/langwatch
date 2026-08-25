@@ -70,20 +70,14 @@ describe("the LangWatch Vega configuration", () => {
           expect(config.axis.titleColor, colorMode).toBe(tokens.textColor);
           expect(config.axis.gridColor, colorMode).toBe(tokens.gridColor);
           expect(config.axis.domainColor, colorMode).toBe(tokens.domainColor);
-          expect(config.axis.labelFontSize, colorMode).toBe(
-            tokens.labelFontSize,
-          );
+          expect(config.axis.labelFontSize, colorMode).toBe(tokens.labelFontSize);
           expect(config.legend.labelColor, colorMode).toBe(tokens.textColor);
           expect(config.legend.labelFont, colorMode).toBe(tokens.fontFamily);
           expect(config.header.labelFont, colorMode).toBe(tokens.fontFamily);
           expect(config.title.font, colorMode).toBe(tokens.fontFamily);
           expect(config.title.color, colorMode).toBe(tokens.textColor);
-          expect(config.range.category, colorMode).toEqual([
-            ...tokens.categoricalRange,
-          ]);
-          expect(config.range.ordinal, colorMode).toEqual([
-            ...tokens.categoricalRange,
-          ]);
+          expect(config.range.category, colorMode).toEqual([...tokens.categoricalRange]);
+          expect(config.range.ordinal, colorMode).toEqual([...tokens.categoricalRange]);
           expect(config.mark.color, colorMode).toBe(tokens.categoricalRange[0]);
         }
       });

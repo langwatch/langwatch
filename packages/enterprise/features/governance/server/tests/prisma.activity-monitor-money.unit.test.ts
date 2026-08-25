@@ -174,9 +174,7 @@ describe("money type lossless round-trip", () => {
       const prisma = {
         project: {
           findFirst: vi.fn(async () => ({ id: "gov-project" })),
-          findMany: vi.fn(async () => [
-            { id: "proj-1", departmentId: "dep-1" },
-          ]),
+          findMany: vi.fn(async () => [{ id: "proj-1", departmentId: "dep-1" }]),
         },
         organizationUser: { findMany: vi.fn(async () => []) },
         department: {

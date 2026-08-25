@@ -187,9 +187,7 @@ export function usageEstimateRow(point: CanonicalMetricDataPoint) {
     SeriesId: point.seriesId,
     MetricName: point.metricName,
     AcceptedAt: new Date(point.acceptedAt),
-    AcceptedHour: new Date(
-      Math.floor(point.acceptedAt / 3_600_000) * 3_600_000,
-    ),
+    AcceptedHour: new Date(Math.floor(point.acceptedAt / 3_600_000) * 3_600_000),
     CanonicalSourceBytes: point.canonicalSizeBytes,
     DedupVersion: firstAcceptanceWinsVersion(point.acceptedAt),
   };

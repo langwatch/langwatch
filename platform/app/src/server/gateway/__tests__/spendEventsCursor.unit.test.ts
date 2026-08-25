@@ -25,28 +25,20 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
           },
         ];
         for (const pair of pairs) {
-          const decoded = decodeSpendEventsCursor(
-            encodeSpendEventsCursor(pair),
-          );
+          const decoded = decodeSpendEventsCursor(encodeSpendEventsCursor(pair));
           expect(decoded).toEqual(pair);
         }
 
         expect(decodeSpendEventsCursor("")).toBeNull();
         expect(decodeSpendEventsCursor("%garbage%")).toBeNull();
         expect(
-          decodeSpendEventsCursor(
-            Buffer.from(":no-ts", "utf8").toString("base64url"),
-          ),
+          decodeSpendEventsCursor(Buffer.from(":no-ts", "utf8").toString("base64url")),
         ).toBeNull();
         expect(
-          decodeSpendEventsCursor(
-            Buffer.from("NaN:id", "utf8").toString("base64url"),
-          ),
+          decodeSpendEventsCursor(Buffer.from("NaN:id", "utf8").toString("base64url")),
         ).toBeNull();
         expect(
-          decodeSpendEventsCursor(
-            Buffer.from("123:", "utf8").toString("base64url"),
-          ),
+          decodeSpendEventsCursor(Buffer.from("123:", "utf8").toString("base64url")),
         ).toBeNull();
       });
 
@@ -55,17 +47,15 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         // start with `[`. Deciding the format by looking at the first character
         // refused those callers' perfectly good cursors and restarted their walk
         // from page one, which double-counts.
-        const legacy = Buffer.from("[beta]-model", "utf8").toString(
-          "base64url",
-        );
+        const legacy = Buffer.from("[beta]-model", "utf8").toString("base64url");
         expect(decodeSpendSummariesCursor(legacy)).toEqual(["[beta]-model"]);
 
         // The multi-part form still round-trips, including keys holding the
         // separator any joined encoding would have needed.
         for (const parts of [["gpt-5-mini"], ["a,b", "c:d"], ["[x]", "]y["]]) {
-          expect(
-            decodeSpendSummariesCursor(encodeSpendSummariesCursor(parts)),
-          ).toEqual(parts);
+          expect(decodeSpendSummariesCursor(encodeSpendSummariesCursor(parts))).toEqual(
+            parts,
+          );
         }
 
         expect(decodeSpendSummariesCursor("")).toBeNull();
@@ -91,9 +81,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         // The refusal is the one thing a reconciliation script cannot discover by
         // trying: it only fires on recent windows, so a script written and tested
         // against last month's data meets it first in production.
-        expect(SPEND_SUMMARIES_DESCRIPTION).toContain(
-          "gateway_spend_group_by_unstable",
-        );
+        expect(SPEND_SUMMARIES_DESCRIPTION).toContain("gateway_spend_group_by_unstable");
         expect(SPEND_SUMMARIES_DESCRIPTION).toContain("allow_unstable");
         // Named exactly, because `key` keeping its single-dimension meaning is
         // what stops an existing consumer silently reading one of two dimensions.

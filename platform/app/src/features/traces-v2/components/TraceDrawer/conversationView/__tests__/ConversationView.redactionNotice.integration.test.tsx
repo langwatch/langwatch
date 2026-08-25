@@ -45,13 +45,9 @@ vi.mock("../AnnotatedTurnRow", () => ({
 }));
 
 vi.mock("~/utils/compat/next-link", () => ({
-  default: ({
-    href,
-    children,
-  }: {
-    href: string;
-    children: React.ReactNode;
-  }) => <a href={href}>{children}</a>,
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
 }));
 
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../types/trace";
@@ -107,9 +103,9 @@ describe("given a conversation whose content carries a redaction marker", () => 
   it("links to the data-privacy settings page", () => {
     renderConversation([turn({ input: "reach me at [EMAIL_ADDRESS]" })]);
 
-    expect(
-      screen.getByRole("link", { name: /Settings/i }).getAttribute("href"),
-    ).toBe("/settings/data-privacy");
+    expect(screen.getByRole("link", { name: /Settings/i }).getAttribute("href")).toBe(
+      "/settings/data-privacy",
+    );
   });
 
   /** @scenario "A conversation carrying a redaction marker shows the notice" */

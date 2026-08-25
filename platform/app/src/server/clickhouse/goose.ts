@@ -256,9 +256,7 @@ async function bootstrapDatabase(
     const databaseEngine = config.clusterName
       ? `ENGINE = Replicated('/clickhouse/databases/${config.database}', '{shard}', '{replica}')`
       : "";
-    const onCluster = config.clusterName
-      ? `ON CLUSTER ${config.clusterName}`
-      : "";
+    const onCluster = config.clusterName ? `ON CLUSTER ${config.clusterName}` : "";
 
     await executeBootstrapSQL(
       client,
@@ -404,10 +402,7 @@ function executeGoose(
     logConfig(config);
     logger.info({ migrationsDir, __dirname }, "Goose migrations directory");
     // Log connection string with password masked
-    const maskedConnStr = config.gooseConnectionString.replace(
-      /:([^:@]+)@/,
-      ":***@",
-    );
+    const maskedConnStr = config.gooseConnectionString.replace(/:([^:@]+)@/, ":***@");
     logger.info({ connectionString: maskedConnStr }, "Goose connection string");
   }
 
@@ -443,10 +438,7 @@ function executeGoose(
 
   // In verbose mode, print the output
   if (options.verbose) {
-    logger.info(
-      { gooseOutput: output, exitCode: result.status },
-      "Goose output",
-    );
+    logger.info({ gooseOutput: output, exitCode: result.status }, "Goose output");
   }
 
   if (result.status !== 0) {
@@ -498,9 +490,7 @@ export async function migrateDown(options: GooseOptions = {}): Promise<string> {
   return result;
 }
 
-export async function migrateReset(
-  options: GooseOptions = {},
-): Promise<string> {
+export async function migrateReset(options: GooseOptions = {}): Promise<string> {
   const config = parseConnectionUrl(options.connectionUrl, options.database);
 
   logger.info("Resetting all ClickHouse migrations...");
@@ -513,16 +503,12 @@ export async function migrateReset(
   return result;
 }
 
-export async function getMigrateVersion(
-  options: GooseOptions = {},
-): Promise<string> {
+export async function getMigrateVersion(options: GooseOptions = {}): Promise<string> {
   const config = parseConnectionUrl(options.connectionUrl, options.database);
   return executeGoose("version", config, options);
 }
 
-export async function getMigrateStatus(
-  options: GooseOptions = {},
-): Promise<string> {
+export async function getMigrateStatus(options: GooseOptions = {}): Promise<string> {
   const config = parseConnectionUrl(options.connectionUrl, options.database);
   return executeGoose("status", config, options);
 }
@@ -530,9 +516,7 @@ export async function getMigrateStatus(
 export async function runMigrations(options: GooseOptions = {}): Promise<void> {
   const connectionUrlStr = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
   if (!connectionUrlStr) {
-    logger.info(
-      "CLICKHOUSE_URL not configured, skipping ClickHouse migrations.",
-    );
+    logger.info("CLICKHOUSE_URL not configured, skipping ClickHouse migrations.");
     return;
   }
 

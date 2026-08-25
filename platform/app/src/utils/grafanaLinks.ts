@@ -41,10 +41,7 @@ const DEFAULT_TO = "now";
  * These builders run on the error path (serialized domain errors, HTTP error
  * bodies), so a bad env value must never turn a handled error into a second throw.
  */
-function buildExploreUrl(
-  baseUrl: string,
-  pane: Record<string, unknown>,
-): string | null {
+function buildExploreUrl(baseUrl: string, pane: Record<string, unknown>): string | null {
   let url: URL;
   try {
     url = new URL("/explore", ensureTrailingSlash(baseUrl));
@@ -220,9 +217,7 @@ export function grafanaConfigFromEnv(): {
  * public), so surfacing the URL leaks nothing — a client without access just
  * can't follow it.
  */
-export function grafanaTraceUrlFromEnv(
-  traceId: string | undefined,
-): string | undefined {
+export function grafanaTraceUrlFromEnv(traceId: string | undefined): string | undefined {
   if (!traceId) return undefined;
   const { baseUrl, tempoDatasourceUid } = grafanaConfigFromEnv();
   if (!baseUrl) return undefined;

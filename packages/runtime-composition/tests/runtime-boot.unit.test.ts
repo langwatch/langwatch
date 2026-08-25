@@ -37,7 +37,13 @@ describe("RuntimeBoot", () => {
     });
 
     const runtime = await boot.boot({ PORT: "6560" });
-    expect(phases).toEqual(["infrastructure", "application:6560", "initialize", "ready", "start"]);
+    expect(phases).toEqual([
+      "infrastructure",
+      "application:6560",
+      "initialize",
+      "ready",
+      "start",
+    ]);
 
     await runtime.close();
     await runtime.close();
@@ -77,7 +83,11 @@ describe("RuntimeBoot", () => {
   it("does not construct resources when configuration resolution fails", async () => {
     const createInfrastructure = vi.fn();
     const boot = new RuntimeBoot({
-      config: { resolve: () => { throw new Error("invalid config"); } },
+      config: {
+        resolve: () => {
+          throw new Error("invalid config");
+        },
+      },
       createInfrastructure,
       createApplication: () => ({}),
     });

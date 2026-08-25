@@ -145,9 +145,7 @@ function containsOrOperator(node: LiqeQuery): boolean {
     case "UnaryOperator":
       return containsOrOperator((node as UnaryOperatorToken).operand);
     case "ParenthesizedExpression":
-      return containsOrOperator(
-        (node as ParenthesizedExpressionToken).expression,
-      );
+      return containsOrOperator((node as ParenthesizedExpressionToken).expression);
     default:
       return false;
   }
@@ -158,11 +156,7 @@ function containsOrOperator(node: LiqeQuery): boolean {
  * A negated branch contributes nothing: excluding a word cannot also be a
  * search for it.
  */
-function collectFreeTextTerms(
-  node: LiqeQuery,
-  negated: boolean,
-  terms: string[],
-): void {
+function collectFreeTextTerms(node: LiqeQuery, negated: boolean, terms: string[]): void {
   switch (node.type) {
     case "Tag": {
       const value = freeTextTermOf(node as TagToken, negated);
@@ -249,11 +243,7 @@ function translateNode(
   }
 }
 
-function translateTag(
-  tag: TagToken,
-  negated: boolean,
-  ctx: TranslationContext,
-): string {
+function translateTag(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
   if (tag.field.type === "ImplicitField") {
     return translateFreeText(tag, negated, ctx);
   }
@@ -283,10 +273,7 @@ function translateTag(
   }
   // Legacy alias — `event.<k>` (single-dot form). Skips the bare `event`
   // field so `event:<name>` still routes to the static handler map.
-  if (
-    fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) &&
-    fieldName !== "event"
-  ) {
+  if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) && fieldName !== "event") {
     const key = fieldName.slice(EVENT_ATTRIBUTE_PREFIX_LEGACY.length);
     return translateEventAttribute(key, tag, negated, ctx);
   }
@@ -310,9 +297,7 @@ function translateTraceAttribute(
   ctx: TranslationContext,
 ): string {
   if (!attrKey) {
-    throw new FilterParseError(
-      "trace.attribute.<key> requires a key after the dot",
-    );
+    throw new FilterParseError("trace.attribute.<key> requires a key after the dot");
   }
   validateAttributeKey(attrKey);
   const value = extractStringValue(tag);
@@ -339,9 +324,7 @@ function translateEventAttribute(
   ctx: TranslationContext,
 ): string {
   if (!attrKey) {
-    throw new FilterParseError(
-      "event.attribute.<key> requires a key after the dot",
-    );
+    throw new FilterParseError("event.attribute.<key> requires a key after the dot");
   }
   validateAttributeKey(attrKey);
   const value = extractStringValue(tag);
@@ -375,9 +358,7 @@ function translateSpanAttribute(
   ctx: TranslationContext,
 ): string {
   if (!attrKey) {
-    throw new FilterParseError(
-      "span.attribute.<key> requires a key after the dot",
-    );
+    throw new FilterParseError("span.attribute.<key> requires a key after the dot");
   }
   validateAttributeKey(attrKey);
   const value = extractStringValue(tag);

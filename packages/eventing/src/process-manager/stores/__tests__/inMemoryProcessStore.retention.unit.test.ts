@@ -88,9 +88,7 @@ describe("InMemoryProcessStore outbox retention", () => {
         limit: 10,
         leaseDurationMs: 100,
       });
-      expect(leasable.map((message) => message.processKey)).toEqual([
-        "conv_pending",
-      ]);
+      expect(leasable.map((message) => message.processKey)).toEqual(["conv_pending"]);
     });
   });
 });

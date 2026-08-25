@@ -1,7 +1,4 @@
-import type {
-  SpanTreeNode,
-  TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import type { useDrawerStore } from "../stores/drawerStore";
 import { isTerminalOrigin } from "../utils/terminalOrigin";
 import type { useTraceDrawerNavigation } from "./useTraceDrawerNavigation";
@@ -24,9 +21,7 @@ export interface ShortcutContext {
   nextTimestamp: number | undefined;
   prevTraceId: string | null;
   prevTimestamp: number | undefined;
-  navigateToTrace: ReturnType<
-    typeof useTraceDrawerNavigation
-  >["navigateToTrace"];
+  navigateToTrace: ReturnType<typeof useTraceDrawerNavigation>["navigateToTrace"];
   goBack: () => void;
   canGoBack: boolean;
   refreshActiveTrace: () => Promise<void> | void;
@@ -276,16 +271,14 @@ const HELP_GROUP_ORDER: ShortcutGroupTitle[] = [
  * JSON" entry is included here even though it isn't a global shortcut — it's
  * a contextual key handled by IOViewer when focused.
  */
-export const TRACE_DRAWER_HELP_GROUPS: HelpGroup[] = HELP_GROUP_ORDER.map(
-  (title) => ({
-    title,
-    items: TRACE_DRAWER_SHORTCUTS.filter((s) => s.group === title).map((s) => ({
-      keys: s.displayKeys,
-      label: s.description,
-      detail: s.detail,
-    })),
-  }),
-)
+export const TRACE_DRAWER_HELP_GROUPS: HelpGroup[] = HELP_GROUP_ORDER.map((title) => ({
+  title,
+  items: TRACE_DRAWER_SHORTCUTS.filter((s) => s.group === title).map((s) => ({
+    keys: s.displayKeys,
+    label: s.description,
+    detail: s.detail,
+  })),
+}))
   .map((g) =>
     g.title === "Actions"
       ? {

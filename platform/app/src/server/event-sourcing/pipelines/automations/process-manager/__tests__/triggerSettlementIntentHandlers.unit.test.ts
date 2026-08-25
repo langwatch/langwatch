@@ -12,12 +12,13 @@ import {
   type TriggerSettlementDispatchDeps,
 } from "../triggerSettlementIntentHandlers";
 
-const { deliverWebhookMock, loggerWarnMock, sendRenderedTriggerEmailMock } =
-  vi.hoisted(() => ({
+const { deliverWebhookMock, loggerWarnMock, sendRenderedTriggerEmailMock } = vi.hoisted(
+  () => ({
     deliverWebhookMock: vi.fn().mockResolvedValue(undefined),
     loggerWarnMock: vi.fn(),
     sendRenderedTriggerEmailMock: vi.fn().mockResolvedValue(undefined),
-  }));
+  }),
+);
 
 vi.mock("~/server/app-layer/automations/delivery/deliverWebhook", () => ({
   deliverWebhook: deliverWebhookMock,
@@ -111,9 +112,7 @@ function trigger(
   };
 }
 
-function context(
-  messageKey = "process:trigger-1:digest:1000:batch",
-): IntentContext {
+function context(messageKey = "process:trigger-1:digest:1000:batch"): IntentContext {
   return {
     processName: "triggerSettlement",
     projectId: "project-1",
@@ -133,9 +132,7 @@ function makeDeps(activeTrigger: TriggerSummary) {
     ["trace-2", fold("trace-2")],
   ]);
   const triggers = {
-    getActiveTraceTriggersForProject: vi
-      .fn()
-      .mockResolvedValue([activeTrigger]),
+    getActiveTraceTriggersForProject: vi.fn().mockResolvedValue([activeTrigger]),
     isSendClaimed: vi.fn().mockResolvedValue(false),
     filterSendClaimed: vi.fn().mockResolvedValue(new Set<string>()),
     claimSend: vi.fn().mockResolvedValue(undefined),
@@ -157,16 +154,12 @@ function makeDeps(activeTrigger: TriggerSummary) {
     },
     evaluationRuns: { findByTraceId: vi.fn().mockResolvedValue([]) },
     deriveEvents: vi.fn().mockResolvedValue([]),
-    traceById: vi.fn(async (_projectId: string, traceId: string) =>
-      fullTrace(traceId),
-    ),
+    traceById: vi.fn(async (_projectId: string, traceId: string) => fullTrace(traceId)),
     addToAnnotationQueue: vi.fn().mockResolvedValue(undefined),
     addToDataset: vi.fn().mockResolvedValue(undefined),
     consumeEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
     emailHourlyCap: 100,
-    consumeTenantEmailCapSlot: vi
-      .fn()
-      .mockResolvedValue({ allowed: true, count: 1 }),
+    consumeTenantEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
     tenantDailyCap: 1_000,
     filterSuppressedEmails: vi.fn(async ({ emails }) => emails),
     resolvePersistDailyCap: vi.fn().mockResolvedValue(PERSIST_DAILY_CAP),
@@ -257,10 +250,7 @@ describe("trigger settlement intent handlers integration", () => {
         traceId: "trace-1",
         projectId: "project-1",
       });
-      expect(triggers.updateLastRunAt).toHaveBeenCalledWith(
-        "trigger-1",
-        "project-1",
-      );
+      expect(triggers.updateLastRunAt).toHaveBeenCalledWith("trigger-1", "project-1");
     });
   });
 
@@ -278,16 +268,14 @@ describe("trigger settlement intent handlers integration", () => {
         templates: emailTemplates,
       });
       const { deps, raw } = makeDeps(triggerA);
-      raw.automation.getActiveTraceTriggersForProject.mockImplementation(
-        async () => [
-          triggerA,
-          trigger(TriggerAction.SEND_EMAIL, {
-            id: "trigger-b",
-            actionParams: { members: ["ops@example.com"] },
-            templates: emailTemplates,
-          }),
-        ],
-      );
+      raw.automation.getActiveTraceTriggersForProject.mockImplementation(async () => [
+        triggerA,
+        trigger(TriggerAction.SEND_EMAIL, {
+          id: "trigger-b",
+          actionParams: { members: ["ops@example.com"] },
+          templates: emailTemplates,
+        }),
+      ]);
 
       const digestPayload = (triggerId: string) => ({
         triggerId,
@@ -560,9 +548,7 @@ describe("trigger settlement intent handlers integration", () => {
       expect(raw.addToDataset).toHaveBeenCalledTimes(2);
       expect(triggers.claimSend).toHaveBeenCalledTimes(2);
       // The fixed per-dispatch reads are paid once per page, not per trace.
-      expect(triggers.getActiveTraceTriggersForProject).toHaveBeenCalledTimes(
-        1,
-      );
+      expect(triggers.getActiveTraceTriggersForProject).toHaveBeenCalledTimes(1);
       expect(raw.resolvePersistDailyCap).toHaveBeenCalledTimes(1);
       expect(raw.projects.tryGetById).toHaveBeenCalledTimes(1);
       expect(triggers.filterSendClaimed).toHaveBeenCalledWith({
@@ -872,9 +858,7 @@ describe("trigger settlement intent handlers integration", () => {
         traceIds: ["trace-1", "trace-2"],
         boundary: 1_000,
       };
-      const intentContext = context(
-        "process:trigger-1:digest:1000:stable-batch",
-      );
+      const intentContext = context("process:trigger-1:digest:1000:stable-batch");
 
       await handler(payload, intentContext);
       triggers.isSendClaimed.mockImplementation(

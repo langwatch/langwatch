@@ -213,9 +213,7 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
       expect(alert.state).toBe("open");
       expect(Number(alert.triggerSpendUsd)).toBeCloseTo(10.0, 2);
       expect(alert.triggerWindowEnd.getTime()).toBe(NOW.getTime());
-      expect(alert.triggerWindowStart.getTime()).toBe(
-        NOW.getTime() - 3600 * 1000,
-      );
+      expect(alert.triggerWindowStart.getTime()).toBe(NOW.getTime() - 3600 * 1000);
       const detail = alert.detail as Record<string, unknown>;
       expect(detail.baselineSpendUsd).toBeCloseTo(1.0, 2);
       expect(detail.windowSec).toBe(3600);

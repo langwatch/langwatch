@@ -9,13 +9,7 @@ const MotionBox = motion.create(Box);
 export function LangyObserverGlyph() {
   const reduce = useReducedMotion();
   return (
-    <Box
-      position="relative"
-      width="18px"
-      height="18px"
-      flexShrink={0}
-      aria-hidden
-    >
+    <Box position="relative" width="18px" height="18px" flexShrink={0} aria-hidden>
       <MotionBox
         position="absolute"
         left="1px"
@@ -63,11 +57,7 @@ export function LangyObserverGlyph() {
   );
 }
 
-export function LangyObservationState({
-  compact = false,
-}: {
-  compact?: boolean;
-}) {
+export function LangyObservationState({ compact = false }: { compact?: boolean }) {
   return (
     <HStack gap={2} align="center" role="status" aria-live="polite">
       <LangyObserverGlyph />

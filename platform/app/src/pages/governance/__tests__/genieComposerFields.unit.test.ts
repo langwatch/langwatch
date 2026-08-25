@@ -15,10 +15,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { ComposerState } from "../ingestion-sources.enterprise";
-import {
-  buildCreateInput,
-  PARSER_FIELDS,
-} from "../ingestion-sources.enterprise";
+import { buildCreateInput, PARSER_FIELDS } from "../ingestion-sources.enterprise";
 
 const genieFields = PARSER_FIELDS.databricks_genie;
 const keysInOrder = genieFields.map((f) => f.key);
@@ -50,14 +47,8 @@ describe("given the Genie composer field definitions", () => {
 
     /** @scenario "Genie setup asks for the service principal first" */
     it("marks the token, space IDs, and warehouse ID as Advanced", () => {
-      const advancedKeys = genieFields
-        .filter((f) => f.advanced)
-        .map((f) => f.key);
-      expect(advancedKeys).toEqual([
-        "credentialsToken",
-        "spaceIds",
-        "warehouseId",
-      ]);
+      const advancedKeys = genieFields.filter((f) => f.advanced).map((f) => f.key);
+      expect(advancedKeys).toEqual(["credentialsToken", "spaceIds", "warehouseId"]);
     });
 
     /** @scenario "Genie setup asks for the service principal first" */
@@ -76,10 +67,9 @@ describe("given the Genie composer field definitions", () => {
     /** @scenario "Field hints name their fields instead of pointing at them" */
     it("names the field instead of locating it above or below", () => {
       for (const field of genieFields) {
-        expect(
-          field.hint ?? "",
-          `${field.key} hint points positionally`,
-        ).not.toMatch(/\babove\b|\bbelow\b/i);
+        expect(field.hint ?? "", `${field.key} hint points positionally`).not.toMatch(
+          /\babove\b|\bbelow\b/i,
+        );
       }
     });
   });
@@ -108,9 +98,9 @@ describe("given the create input for a pull-mode source", () => {
       // The Genie pull settings carry their own copy of the schedule; a
       // mismatch here means the puller runs a different cadence than the
       // one the admin was shown.
-      expect(
-        (input?.pullConfig as { schedule?: string } | null)?.schedule,
-      ).toBe("0 * * * *");
+      expect((input?.pullConfig as { schedule?: string } | null)?.schedule).toBe(
+        "0 * * * *",
+      );
     });
   });
 
@@ -122,9 +112,7 @@ describe("given the create input for a pull-mode source", () => {
         organizationId: "org-1",
       });
       expect(input).not.toBeNull();
-      expect((input?.pullConfig as { spaceIds?: string[] }).spaceIds).toEqual(
-        [],
-      );
+      expect((input?.pullConfig as { spaceIds?: string[] }).spaceIds).toEqual([]);
     });
   });
 });

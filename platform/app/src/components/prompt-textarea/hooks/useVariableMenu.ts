@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CaretPosition } from "rich-textarea";
 import type { SelectedField } from "../../variables/VariableInsertMenu";
-import type {
-  AvailableSource,
-  FieldType,
-} from "../../variables/VariableMappingInput";
+import type { AvailableSource, FieldType } from "../../variables/VariableMappingInput";
 import type { Variable } from "../../variables/VariablesSection";
 import type { PromptTextAreaOnAddMention } from "../types";
 import { getCaretCoordinates, setTextareaValueUndoable } from "../utils";
@@ -16,11 +13,7 @@ type UseVariableMenuProps = {
   existingVariableIds: Set<string>;
   availableSources: AvailableSource[];
   onCreateVariable?: (variable: Variable) => void;
-  onSetVariableMapping?: (
-    identifier: string,
-    sourceId: string,
-    field: string,
-  ) => void;
+  onSetVariableMapping?: (identifier: string, sourceId: string, field: string) => void;
   otherNodesFields: Record<string, string[]>;
   onAddEdge?: (
     nodeId: string,
@@ -75,9 +68,7 @@ export const useVariableMenu = ({
 
     // Check for exact match
     const hasExactMatch = filteredSources.some((source) =>
-      source.fields.some(
-        (field) => field.name.toLowerCase() === normalizedQuery,
-      ),
+      source.fields.some((field) => field.name.toLowerCase() === normalizedQuery),
     );
 
     const options: Array<
@@ -295,12 +286,7 @@ export const useVariableMenu = ({
         otherNodesFields,
         field.sourceId,
       );
-      insertVariable(
-        field.fieldName,
-        field.fieldType,
-        field.sourceId,
-        isOtherNodeField,
-      );
+      insertVariable(field.fieldName, field.fieldType, field.sourceId, isOtherNodeField);
     },
     [insertVariable, otherNodesFields],
   );

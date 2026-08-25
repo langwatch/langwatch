@@ -104,9 +104,7 @@ describe("LangyHomeHero onboarding control", () => {
         await userEvent.click(onboardingTriggers()[0]!);
 
         expect(await screen.findByText("Walk me through it")).toBeDefined();
-        expect(
-          screen.getByText("Copy a prompt for your coding agent"),
-        ).toBeDefined();
+        expect(screen.getByText("Copy a prompt for your coding agent")).toBeDefined();
         expect(screen.getByText("Read the integration guide")).toBeDefined();
       });
     });

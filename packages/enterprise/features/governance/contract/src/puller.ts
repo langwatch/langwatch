@@ -1,16 +1,12 @@
 import { z } from "zod";
-import {
-  PULLED_USAGE_COST_BASIS,
-  PULLED_USAGE_COST_STATUS,
-} from "./pulled-usage.events";
+import { PULLED_USAGE_COST_BASIS, PULLED_USAGE_COST_STATUS } from "./pulled-usage.events";
 
 const COST_USD_PATTERN = /^[+-]?\d*(?:\.\d*)?(?:[eE][+-]?\d+)?$/;
 const costUsdSchema = z
   .union([z.string(), z.number()])
   .transform((value) => {
     const candidate = String(value).trim();
-    if (candidate === "" || candidate === "0" || candidate === "0.0")
-      return "0";
+    if (candidate === "" || candidate === "0" || candidate === "0.0") return "0";
     if (!COST_USD_PATTERN.test(candidate)) return "0";
     const numeric = Number(candidate);
     return Number.isFinite(numeric) && numeric >= 0 ? candidate : "0";
@@ -48,10 +44,7 @@ export type PullRunOptions = {
 export abstract class GovernancePuller<Configuration = unknown> {
   abstract readonly id: string;
   abstract validateConfig(config: unknown): Configuration;
-  abstract runOnce(
-    options: PullRunOptions,
-    config: Configuration,
-  ): Promise<PullResult>;
+  abstract runOnce(options: PullRunOptions, config: Configuration): Promise<PullResult>;
 }
 
 export const ANTHROPIC_ADMIN_ADAPTER_ID = "anthropic_admin" as const;
@@ -64,9 +57,7 @@ export const anthropicAdminPullConfigSchema = z
     schedule: z.string().default("0 * * * *"),
   })
   .strict();
-export type AnthropicAdminPullConfig = z.infer<
-  typeof anthropicAdminPullConfigSchema
->;
+export type AnthropicAdminPullConfig = z.infer<typeof anthropicAdminPullConfigSchema>;
 
 export const PULLED_USAGE_HINT_KEY = "pulled_usage" as const;
 

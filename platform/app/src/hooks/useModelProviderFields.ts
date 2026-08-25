@@ -30,9 +30,7 @@ export interface UseModelProviderFieldsResult {
   orderedFieldKeys: string[];
 
   /** Build defaults for a given stored customKeys, only including known keys */
-  buildDefaultValues: (
-    stored?: Record<string, unknown> | null,
-  ) => Record<string, string>;
+  buildDefaultValues: (stored?: Record<string, unknown> | null) => Record<string, string>;
 }
 
 /**
@@ -60,23 +58,16 @@ export function useModelProviderFields({
   return useMemo(() => {
     const provider = serverModelProviders[
       providerKey as keyof typeof serverModelProviders
-    ] as
-      | (typeof serverModelProviders)[keyof typeof serverModelProviders]
-      | undefined;
+    ] as (typeof serverModelProviders)[keyof typeof serverModelProviders] | undefined;
 
     const shape = getSchemaShape(provider?.keysSchema);
     const orderedFieldKeys = Object.keys(shape ?? {});
 
     const requiredKeys = getRequiredCredentialKeys({
       keysSchema: provider?.keysSchema,
-      fieldSchemas: getDisplayKeysForProvider(
-        providerKey,
-        useApiGateway ?? false,
-        shape,
-      ),
+      fieldSchemas: getDisplayKeysForProvider(providerKey, useApiGateway ?? false, shape),
       values: values ?? {},
-      optionalKeys: (provider as { optionalKeys?: readonly string[] })
-        ?.optionalKeys,
+      optionalKeys: (provider as { optionalKeys?: readonly string[] })?.optionalKeys,
     });
 
     const fields: DerivedFieldMeta[] = orderedFieldKeys.map((key) => {

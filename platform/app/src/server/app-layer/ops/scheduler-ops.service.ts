@@ -1,9 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { SLOT_STALE_AFTER_MS } from "../../../shared/ops/schedulerControl";
-import type {
-  ScheduledJobRecord,
-  ScheduledJobStore,
-} from "../scheduler/scheduler.types";
+import type { ScheduledJobRecord, ScheduledJobStore } from "../scheduler/scheduler.types";
 import {
   ScheduleAlreadyInFlightError,
   ScheduleInactiveError,
@@ -102,9 +99,7 @@ export class SchedulerOpsService {
     repo: ScheduledJobStore;
     audit?: SchedulerAuditSink | null;
     wake?: (() => void) | null;
-    resolveProjectNames?:
-      | ((projectIds: string[]) => Promise<Map<string, string>>)
-      | null;
+    resolveProjectNames?: ((projectIds: string[]) => Promise<Map<string, string>>) | null;
   }) {
     this.repo = deps.repo;
     this.audit = deps.audit ?? null;
@@ -320,9 +315,7 @@ export class SchedulerOpsService {
     return this.readBack(scheduleId);
   }
 
-  private async requireSchedule(
-    scheduleId: string,
-  ): Promise<ScheduledJobRecord> {
+  private async requireSchedule(scheduleId: string): Promise<ScheduledJobRecord> {
     const row = await this.repo.findByIdForOps({ id: scheduleId });
     if (!row) this.refuse({ error: new ScheduleNotFoundError(), scheduleId });
     return row!;
@@ -336,17 +329,8 @@ export class SchedulerOpsService {
    * schedule", so it is recorded here, on the server, where it is not part of
    * any contract.
    */
-  private refuse({
-    error,
-    scheduleId,
-  }: {
-    error: Error;
-    scheduleId: string;
-  }): never {
-    logger.info(
-      { scheduleId, code: error.name },
-      "Refused scheduler operator control",
-    );
+  private refuse({ error, scheduleId }: { error: Error; scheduleId: string }): never {
+    logger.info({ scheduleId, code: error.name }, "Refused scheduler operator control");
     throw error;
   }
 

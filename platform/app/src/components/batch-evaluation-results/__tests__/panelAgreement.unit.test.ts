@@ -19,11 +19,7 @@ import { areDistinguishable } from "../scoreSeparation";
  * @see specs/experiments/comparison-leaderboard.feature
  */
 
-const entry = (
-  variantId: string,
-  score: number,
-  scoreCI: [number, number] | null,
-) =>
+const entry = (variantId: string, score: number, scoreCI: [number, number] | null) =>
   ({
     variantId,
     wins: 5,
@@ -157,9 +153,7 @@ describe("the panels agree on which pairs were separated", () => {
       if (verdict.kind === "clear-winner") {
         expect(adequacy.separatedPairs).toBe(adequacy.totalPairs);
       }
-      expect(verdict.tiedIds.length + adequacy.separatedPairs).toBeGreaterThan(
-        0,
-      );
+      expect(verdict.tiedIds.length + adequacy.separatedPairs).toBeGreaterThan(0);
     });
   });
 });

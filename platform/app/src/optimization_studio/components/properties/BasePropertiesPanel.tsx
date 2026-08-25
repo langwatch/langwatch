@@ -16,10 +16,7 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
-import {
-  type FieldTypeOption,
-  FieldTypeSelect,
-} from "@langwatch/prompt-web";
+import { type FieldTypeOption, FieldTypeSelect } from "@langwatch/prompt-web";
 import { getTypeLabel } from "@langwatch/prompt-web";
 import { HoverableBigText } from "../../../components/HoverableBigText";
 import { toaster } from "../../../components/ui/toaster";
@@ -136,18 +133,16 @@ export function FieldsDefinition({
   // edits - which round-trip through setNode and return identical - never
   // trigger a replace mid-typing.
   const fieldsSignature = JSON.stringify(
-    (node.data[field] ?? []).map((f) => [
-      f.identifier,
-      f.type,
-      f.optional ?? false,
-    ]),
+    (node.data[field] ?? []).map((f) => [f.identifier, f.type, f.optional ?? false]),
   );
   useEffect(() => {
     const currentFields = node.data[field] ?? [];
     const formSignature = JSON.stringify(
-      ((control._formValues.fields as FieldType[] | undefined) ?? []).map(
-        (f) => [f.identifier, f.type, f.optional ?? false],
-      ),
+      ((control._formValues.fields as FieldType[] | undefined) ?? []).map((f) => [
+        f.identifier,
+        f.type,
+        f.optional ?? false,
+      ]),
     );
     if (formSignature === fieldsSignature) return;
     replace(currentFields);
@@ -205,10 +200,7 @@ export function FieldsDefinition({
         });
 
         return (
-          <Field.Root
-            key={field_.id}
-            invalid={!!errors.fields?.[index]?.identifier}
-          >
+          <Field.Root key={field_.id} invalid={!!errors.fields?.[index]?.identifier}>
             <HStack width="full">
               <HStack
                 background="bg.muted"
@@ -220,9 +212,7 @@ export function FieldsDefinition({
                   <Input
                     {...identifierField}
                     onChange={(e) => {
-                      e.target.value = e.target.value
-                        .replace(/ /g, "_")
-                        .toLowerCase();
+                      e.target.value = e.target.value.replace(/ /g, "_").toLowerCase();
                       void identifierField.onChange(e);
                     }}
                     width="full"
@@ -248,11 +238,9 @@ export function FieldsDefinition({
                     options={typeOptions}
                     readOnly={readOnly}
                     onChange={(newType) => {
-                      setValue(
-                        `fields.${index}.type`,
-                        newType as FieldType["type"],
-                        { shouldDirty: true },
-                      );
+                      setValue(`fields.${index}.type`, newType as FieldType["type"], {
+                        shouldDirty: true,
+                      });
                       void handleSubmit(handleOnChange)();
                     }}
                     testId={`field-type-select-${field}-${index}`}
@@ -416,10 +404,7 @@ export function FieldsForm({
         }
 
         return (
-          <Field.Root
-            key={field.id}
-            invalid={!!errors.fields?.[index]?.identifier}
-          >
+          <Field.Root key={field.id} invalid={!!errors.fields?.[index]?.identifier}>
             <VStack align="start" gap={3} width="full">
               <HStack width="full">
                 <PropertySectionTitle>
@@ -622,11 +607,7 @@ export function BasePropertiesPanel({
                           setIsEditingName(true);
                         }
                       }}
-                      cursor={
-                        node.type === "prompting_technique"
-                          ? undefined
-                          : "pointer"
-                      }
+                      cursor={node.type === "prompting_technique" ? undefined : "pointer"}
                       overflow="hidden"
                       textOverflow="ellipsis"
                       expandable={false}
@@ -648,11 +629,7 @@ export function BasePropertiesPanel({
                       }
                     }}
                   >
-                    <ComponentExecutionButton
-                      node={node}
-                      size="sm"
-                      iconSize={16}
-                    />
+                    <ComponentExecutionButton node={node} size="sm" iconSize={16} />
                   </HStack>
 
                   <Button

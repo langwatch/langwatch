@@ -15,9 +15,7 @@ describe("createCodingAgentSessionSeenTouch", () => {
   describe("given one project folding sessions", () => {
     describe("when its sessions commit repeatedly inside the window", () => {
       it("touches the project once and holds the rest back", async () => {
-        const touchCodingAgentSessionSeen = vi
-          .fn()
-          .mockResolvedValue(undefined);
+        const touchCodingAgentSessionSeen = vi.fn().mockResolvedValue(undefined);
         let clock = 1_000_000;
         const touch = createCodingAgentSessionSeenTouch({
           touchCodingAgentSessionSeen,
@@ -40,9 +38,7 @@ describe("createCodingAgentSessionSeenTouch", () => {
 
     describe("when the window has passed", () => {
       it("touches the project again", async () => {
-        const touchCodingAgentSessionSeen = vi
-          .fn()
-          .mockResolvedValue(undefined);
+        const touchCodingAgentSessionSeen = vi.fn().mockResolvedValue(undefined);
         let clock = 1_000_000;
         const touch = createCodingAgentSessionSeenTouch({
           touchCodingAgentSessionSeen,
@@ -61,9 +57,7 @@ describe("createCodingAgentSessionSeenTouch", () => {
   describe("given one commit batch carrying several projects", () => {
     describe("when the batch commits", () => {
       it("touches each project on its own clock", async () => {
-        const touchCodingAgentSessionSeen = vi
-          .fn()
-          .mockResolvedValue(undefined);
+        const touchCodingAgentSessionSeen = vi.fn().mockResolvedValue(undefined);
         const touch = createCodingAgentSessionSeenTouch({
           touchCodingAgentSessionSeen,
           now: () => 1_000_000,

@@ -39,9 +39,7 @@ describe("splitLangyCardFences", () => {
     });
 
     it("keeps multi-line fence content joined as it streamed", () => {
-      const text = ["```langy-card", "{", '  "kind": "table"', "}", "```"].join(
-        "\n",
-      );
+      const text = ["```langy-card", "{", '  "kind": "table"', "}", "```"].join("\n");
       expect(splitLangyCardFences(text)).toEqual([
         { type: "fence", raw: '{\n  "kind": "table"\n}', closed: true },
       ]);
@@ -71,9 +69,7 @@ describe("splitLangyCardFences", () => {
 
   describe("given a fence still open at the end of the text", () => {
     it("reports it unclosed — the forming-block case", () => {
-      const text = ["Prose first.", "```langy-card", '{"kind": "sta'].join(
-        "\n",
-      );
+      const text = ["Prose first.", "```langy-card", '{"kind": "sta'].join("\n");
       expect(splitLangyCardFences(text)).toEqual([
         { type: "text", text: "Prose first." },
         { type: "fence", raw: '{"kind": "sta', closed: false },
@@ -92,9 +88,7 @@ describe("splitLangyCardFences", () => {
         "````",
         "like so.",
       ].join("\n");
-      expect(splitLangyCardFences(text)).toEqual([
-        { type: "text", text },
-      ]);
+      expect(splitLangyCardFences(text)).toEqual([{ type: "text", text }]);
     });
 
     it("treats an ordinary json fence as opaque text", () => {

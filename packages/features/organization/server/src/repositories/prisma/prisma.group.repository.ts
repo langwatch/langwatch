@@ -6,10 +6,7 @@ import {
   type OrganizationGroup,
   type OrganizationGroupMember,
 } from "@langwatch/organization-contract";
-import {
-  Prisma,
-  type PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   GroupRepository,
   type OrganizationGroupWithMemberCount,
@@ -47,11 +44,7 @@ export class PrismaGroupRepository extends GroupRepository {
     return group;
   }
 
-  async list(input: {
-    organizationId: string;
-    page: number;
-    limit: number;
-  }): Promise<{
+  async list(input: { organizationId: string; page: number; limit: number }): Promise<{
     data: OrganizationGroupWithMemberCount[];
     pagination: { page: number; limit: number; total: number };
   }> {
@@ -173,9 +166,7 @@ export class PrismaGroupRepository extends GroupRepository {
         where: {
           organizationId: input.organizationId,
           slug: candidate,
-          ...(input.excludeGroupId
-            ? { id: { not: input.excludeGroupId } }
-            : {}),
+          ...(input.excludeGroupId ? { id: { not: input.excludeGroupId } } : {}),
         },
         select: { id: true },
       });
@@ -227,10 +218,7 @@ export class PrismaGroupRepository extends GroupRepository {
     return this.get(input);
   }
 
-  async delete(input: {
-    groupId: string;
-    organizationId: string;
-  }): Promise<void> {
+  async delete(input: { groupId: string; organizationId: string }): Promise<void> {
     const deleted = await this.database.group.deleteMany({
       where: { id: input.groupId, organizationId: input.organizationId },
     });

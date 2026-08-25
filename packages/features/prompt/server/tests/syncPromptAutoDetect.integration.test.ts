@@ -182,9 +182,7 @@ describe("PromptService", () => {
       describe("when synced with template variables", () => {
         /** @scenario CLI hardcoded "input" default is kept only when it appears in the template */
         it("creates the prompt with auto-detected inputs merged", async () => {
-          vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(
-            null,
-          );
+          vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(null);
 
           const createdPrompt = buildExistingPrompt({ version: 1 });
           const createSpy = vi

@@ -24,10 +24,7 @@ export type IngestionPullLifecycleDatabase = {
   ingestionSource: {
     findMany(input: {
       where: {
-        OR: Array<
-          | { pullSchedule: { not: null } }
-          | { id: { in: string[] } }
-        >;
+        OR: Array<{ pullSchedule: { not: null } } | { id: { in: string[] } }>;
       };
     }): Promise<IngestionPullLifecycleSource[]>;
   };

@@ -39,10 +39,7 @@ const COMMAND_KEYS = ["command", "cmd", "script"] as const;
 /** Keys opencode's `skill` tool may name the skill under. */
 const SKILL_KEYS = ["name", "skill", "id", "skill_name"] as const;
 
-function readString(
-  input: unknown,
-  keys: readonly string[],
-): string | undefined {
+function readString(input: unknown, keys: readonly string[]): string | undefined {
   if (!input || typeof input !== "object") return undefined;
   const record = input as Record<string, unknown>;
   for (const key of keys) {
@@ -52,10 +49,7 @@ function readString(
   return undefined;
 }
 
-export function shellCommandOf(
-  name: string,
-  input: unknown,
-): string | undefined {
+export function shellCommandOf(name: string, input: unknown): string | undefined {
   if (!SHELL_TOOLS.has(name.toLowerCase())) return undefined;
   return readString(input, COMMAND_KEYS);
 }
@@ -116,10 +110,7 @@ function describeShellIntent(command: string): {
 } | null {
   const lower = command.toLowerCase();
   const readsToolOutput = /(?:^|\/)tool-output(?:\/|$)/.test(lower);
-  if (
-    readsToolOutput &&
-    /(wc\s+-l|grep\s+-(?:c|o)|jq\s+.*length)/.test(lower)
-  ) {
+  if (readsToolOutput && /(wc\s+-l|grep\s+-(?:c|o)|jq\s+.*length)/.test(lower)) {
     return { title: "Counting results", detail: "Previous tool output" };
   }
   if (readsToolOutput) {

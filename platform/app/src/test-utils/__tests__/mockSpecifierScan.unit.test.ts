@@ -148,9 +148,7 @@ const scan = (sourceText: string) =>
     source: parseSourceText({ fileName: "virtual.test.ts", sourceText }),
   });
 
-const APP_ALIASES: ModuleAlias[] = [
-  { find: "~/", replacement: join(APP_ROOT, "src/") },
-];
+const APP_ALIASES: ModuleAlias[] = [{ find: "~/", replacement: join(APP_ROOT, "src/") }];
 
 const resolveIn = ({
   specifier,
@@ -192,9 +190,7 @@ describe("the mock-specifier rule", () => {
   describe("given doMock and unmock", () => {
     it("reads them the same way as mock", () => {
       const found = scan(
-        ['vi.doMock("./a");', 'vi.unmock("./b");', "vi.mocked(thing);"].join(
-          "\n",
-        ),
+        ['vi.doMock("./a");', 'vi.unmock("./b");', "vi.mocked(thing);"].join("\n"),
       );
 
       expect(found).toEqual([
@@ -237,9 +233,7 @@ describe("the mock-specifier rule", () => {
     });
 
     it("skips a file with no mock call in it", () => {
-      expect(
-        mightContainMockCall({ sourceText: 'it("adds", () => {});' }),
-      ).toBe(false);
+      expect(mightContainMockCall({ sourceText: 'it("adds", () => {});' })).toBe(false);
     });
   });
 
@@ -269,9 +263,9 @@ describe("the mock-specifier rule", () => {
     });
 
     it("resolves to nothing to answer for", () => {
-      expect(
-        resolveIn({ specifier: undefined, fromDir: APP_ROOT, exists: [] }),
-      ).toEqual({ kind: "dynamic" });
+      expect(resolveIn({ specifier: undefined, fromDir: APP_ROOT, exists: [] })).toEqual({
+        kind: "dynamic",
+      });
     });
   });
 });

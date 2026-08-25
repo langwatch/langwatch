@@ -41,16 +41,13 @@ describe("<IconCheckboxCardGroup/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByRole("group", { name: "Test group" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Test group" })).toBeInTheDocument();
     });
 
     it("renders all items as unchecked checkboxes", () => {
-      render(
-        <IconCheckboxCardGroup items={items} value={[]} onChange={() => {}} />,
-        { wrapper: Wrapper },
-      );
+      render(<IconCheckboxCardGroup items={items} value={[]} onChange={() => {}} />, {
+        wrapper: Wrapper,
+      });
 
       const checkboxes = screen.getAllByRole("checkbox");
       expect(checkboxes).toHaveLength(3);
@@ -60,10 +57,9 @@ describe("<IconCheckboxCardGroup/>", () => {
     });
 
     it("displays all item titles", () => {
-      render(
-        <IconCheckboxCardGroup items={items} value={[]} onChange={() => {}} />,
-        { wrapper: Wrapper },
-      );
+      render(<IconCheckboxCardGroup items={items} value={[]} onChange={() => {}} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("Alpha")).toBeInTheDocument();
       expect(screen.getByText("Beta")).toBeInTheDocument();
@@ -84,9 +80,7 @@ describe("<IconCheckboxCardGroup/>", () => {
       );
 
       expect(screen.getByText("Pick interests")).toBeInTheDocument();
-      expect(
-        screen.getByRole("group", { name: "Pick interests" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Pick interests" })).toBeInTheDocument();
     });
   });
 
@@ -114,11 +108,7 @@ describe("<IconCheckboxCardGroup/>", () => {
       const onChange = vi.fn();
 
       render(
-        <IconCheckboxCardGroup
-          items={items}
-          value={["alpha"]}
-          onChange={onChange}
-        />,
+        <IconCheckboxCardGroup items={items} value={["alpha"]} onChange={onChange} />,
         { wrapper: Wrapper },
       );
 

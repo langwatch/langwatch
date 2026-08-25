@@ -203,10 +203,7 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     let hasExtractedParams = false;
     for (const [key, raw] of paramMap) {
       const value = asNumber(raw);
-      if (
-        value !== null &&
-        this.setIfMissing({ ctx, key: key, value: value })
-      ) {
+      if (value !== null && this.setIfMissing({ ctx, key: key, value: value })) {
         hasExtractedParams = true;
       }
     }
@@ -256,9 +253,7 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     }
 
     // Usage tokens (fallback when the standard gen_ai.usage.* are absent)
-    const usage = isRecord(response.usage_metadata)
-      ? response.usage_metadata
-      : undefined;
+    const usage = isRecord(response.usage_metadata) ? response.usage_metadata : undefined;
     if (usage !== undefined) {
       const usageMap: [string, unknown][] = [
         [ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_token_count],
@@ -272,10 +267,7 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
       let hasExtractedUsage = false;
       for (const [key, raw] of usageMap) {
         const value = asNumber(raw);
-        if (
-          value !== null &&
-          this.setIfMissing({ ctx, key: key, value: value })
-        ) {
+        if (value !== null && this.setIfMissing({ ctx, key: key, value: value })) {
           hasExtractedUsage = true;
         }
       }
@@ -307,9 +299,7 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
   private liftToolCall(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
 
-    const args = stringifyToolPayload(
-      attrs.get(VERTEX_ADK_KEYS.TOOL_CALL_ARGS),
-    );
+    const args = stringifyToolPayload(attrs.get(VERTEX_ADK_KEYS.TOOL_CALL_ARGS));
     if (args !== null) {
       attrs.take(VERTEX_ADK_KEYS.TOOL_CALL_ARGS);
       const hasSetArgs = [
@@ -325,9 +315,7 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
       }
     }
 
-    const result = stringifyToolPayload(
-      attrs.get(VERTEX_ADK_KEYS.TOOL_RESPONSE),
-    );
+    const result = stringifyToolPayload(attrs.get(VERTEX_ADK_KEYS.TOOL_RESPONSE));
     if (result !== null) {
       attrs.take(VERTEX_ADK_KEYS.TOOL_RESPONSE);
       const hasSetResult = [

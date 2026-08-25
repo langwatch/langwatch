@@ -39,10 +39,9 @@ export const langyCardPartSchema = z
     card: langyDerivedCardSchema,
     hints: z.array(langyCardHintSchema).optional(),
   })
-  .refine(
-    (part) => part.kind === part.card.kind && part.blockId === part.card.blockId,
-    { message: "part identity must match the stamped card" },
-  );
+  .refine((part) => part.kind === part.card.kind && part.blockId === part.card.blockId, {
+    message: "part identity must match the stamped card",
+  });
 export type LangyCardPart = z.infer<typeof langyCardPartSchema>;
 
 export const langyCardFailedPartSchema = z.object({
@@ -58,9 +57,7 @@ export const langyChoiceSelectionPartSchema = z
     type: z.literal(LANGY_CHOICE_SELECTION_PART_TYPE),
   })
   .and(langyChoiceSelectionSchema);
-export type LangyChoiceSelectionPart = z.infer<
-  typeof langyChoiceSelectionPartSchema
->;
+export type LangyChoiceSelectionPart = z.infer<typeof langyChoiceSelectionPartSchema>;
 
 /** Parse an opaque message part as a stamped card part, or null. */
 export function parseLangyCardPart(part: unknown): LangyCardPart | null {
@@ -69,9 +66,7 @@ export function parseLangyCardPart(part: unknown): LangyCardPart | null {
 }
 
 /** Parse an opaque message part as a failed-card part, or null. */
-export function parseLangyCardFailedPart(
-  part: unknown,
-): LangyCardFailedPart | null {
+export function parseLangyCardFailedPart(part: unknown): LangyCardFailedPart | null {
   const parsed = langyCardFailedPartSchema.safeParse(part);
   return parsed.success ? parsed.data : null;
 }

@@ -1,9 +1,6 @@
 import { Card, HStack, Table, Text } from "@chakra-ui/react";
 import { formatCount, formatMs } from "@langwatch/ops-web";
-import type {
-  LatencyWindowPercentiles,
-  LatencyWindows,
-} from "~/shared/ops/latency";
+import type { LatencyWindowPercentiles, LatencyWindows } from "~/shared/ops/latency";
 
 const WINDOW_ROWS: Array<{ key: keyof LatencyWindows; label: string }> = [
   { key: "hour", label: "Last hour" },
@@ -21,11 +18,7 @@ function PercentileCell({
 }) {
   return (
     <Table.Cell textAlign="end">
-      <Text
-        textStyle="xs"
-        fontFamily="mono"
-        color={window ? undefined : "fg.muted"}
-      >
+      <Text textStyle="xs" fontFamily="mono" color={window ? undefined : "fg.muted"}>
         {window ? formatMs(pick(window)) : "—"}
       </Text>
     </Table.Cell>
@@ -38,11 +31,7 @@ function PercentileCell({
  * quiet window shows a dash, never a fabricated zero; "All time" means since
  * latency history began recording.
  */
-export function LatencyWindowsCard({
-  windows,
-}: {
-  windows: LatencyWindows | null;
-}) {
+export function LatencyWindowsCard({ windows }: { windows: LatencyWindows | null }) {
   if (!windows) return null;
 
   return (
@@ -85,14 +74,8 @@ export function LatencyWindowsCard({
                     {row.label}
                   </Text>
                 </Table.Cell>
-                <PercentileCell
-                  window={windows[row.key]}
-                  pick={(w) => w.p50Ms}
-                />
-                <PercentileCell
-                  window={windows[row.key]}
-                  pick={(w) => w.p99Ms}
-                />
+                <PercentileCell window={windows[row.key]} pick={(w) => w.p50Ms} />
+                <PercentileCell window={windows[row.key]} pick={(w) => w.p99Ms} />
               </Table.Row>
             ))}
           </Table.Body>

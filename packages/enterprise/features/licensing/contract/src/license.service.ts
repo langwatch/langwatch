@@ -1,8 +1,5 @@
 import type { PlanInfo } from "@langwatch/entitlement-contract";
-import type {
-  GenerateLicenseInput,
-  GenerateLicenseOutput,
-} from "./license.commands";
+import type { GenerateLicenseInput, GenerateLicenseOutput } from "./license.commands";
 import type {
   LicenseStatus,
   PlatformLicenseAccess,

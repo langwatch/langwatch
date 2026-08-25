@@ -8,10 +8,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type {
-  TraceListEventGroup,
-  TraceListItem,
-} from "../../../../../../types/trace";
+import type { TraceListEventGroup, TraceListItem } from "../../../../../../types/trace";
 import { NO_TRACE_EVENTS } from "../../../../../../types/trace";
 import { EventsCell } from "../EventsCell";
 
@@ -117,9 +114,7 @@ describe("EventsCell", () => {
         renderCell(
           row({
             events: {
-              groups: NAMES.map((name, i) =>
-                group({ name, firstTimestamp: i }),
-              ),
+              groups: NAMES.map((name, i) => group({ name, firstTimestamp: i })),
               totalCount: 5,
               distinctCount: 5,
             },
@@ -137,19 +132,14 @@ describe("EventsCell", () => {
         renderCell(
           row({
             events: {
-              groups: NAMES.map((name, i) =>
-                group({ name, firstTimestamp: i }),
-              ),
+              groups: NAMES.map((name, i) => group({ name, firstTimestamp: i })),
               totalCount: 5,
               distinctCount: 5,
             },
           }),
         );
 
-        expect(screen.getByText("+2")).toHaveAttribute(
-          "title",
-          "d.four, e.five",
-        );
+        expect(screen.getByText("+2")).toHaveAttribute("title", "d.four, e.five");
       });
     });
   });
@@ -172,10 +162,7 @@ describe("EventsCell", () => {
         );
 
         expect(screen.getByText("+37")).toBeInTheDocument();
-        expect(screen.getByText("+37")).toHaveAttribute(
-          "title",
-          "d, and 36 more",
-        );
+        expect(screen.getByText("+37")).toHaveAttribute("title", "d, and 36 more");
       });
     });
   });

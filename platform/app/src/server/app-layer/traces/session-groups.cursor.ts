@@ -59,9 +59,7 @@ export function encodeSessionGroupsCursor(cursor: SessionGroupsCursor): string {
   return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 }
 
-export function decodeSessionGroupsCursor(
-  encoded: string,
-): SessionGroupsCursor {
+export function decodeSessionGroupsCursor(encoded: string): SessionGroupsCursor {
   let parsed: unknown;
   try {
     parsed = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
@@ -93,10 +91,7 @@ export function keysetCursorFor({
 }): SessionGroupCursor | undefined {
   if (encoded === undefined) return undefined;
   const cursor = decodeSessionGroupsCursor(encoded);
-  if (
-    cursor.sortColumn !== sortColumn ||
-    cursor.sortDirection !== sortDirection
-  ) {
+  if (cursor.sortColumn !== sortColumn || cursor.sortDirection !== sortDirection) {
     throw new ValidationError("Sessions cursor does not match the sort");
   }
   return {

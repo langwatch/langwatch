@@ -82,10 +82,7 @@ export type AgentCodeEditorDrawerProps = {
   /** Current input mappings (from Evaluations V3) */
   inputMappings?: Record<string, FieldMapping>;
   /** Callback when input mappings change (for Evaluations V3) */
-  onInputMappingsChange?: (
-    identifier: string,
-    mapping: FieldMapping | undefined,
-  ) => void;
+  onInputMappingsChange?: (identifier: string, mapping: FieldMapping | undefined) => void;
 };
 
 /**
@@ -106,9 +103,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     flowCallbacks?.onSave ??
     (complexProps.onSave as AgentCodeEditorDrawerProps["onSave"]);
   const agentId =
-    props.agentId ??
-    drawerParams.agentId ??
-    (complexProps.agentId as string | undefined);
+    props.agentId ?? drawerParams.agentId ?? (complexProps.agentId as string | undefined);
   const isOpen = props.open !== false && props.open !== undefined;
 
   // Props from drawer params or direct props (for Evaluations V3)
@@ -132,12 +127,12 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const [code, setCode] = useState(DEFAULT_CODE);
   const [inputs, setInputs] = useState<DSLField[]>(DEFAULT_INPUTS);
   const [outputs, setOutputs] = useState<DSLField[]>(DEFAULT_OUTPUTS);
-  const [scenarioMappings, setScenarioMappings] = useState<
-    Record<string, FieldMapping>
-  >({});
-  const [scenarioOutputField, setScenarioOutputField] = useState<
-    string | undefined
-  >(undefined);
+  const [scenarioMappings, setScenarioMappings] = useState<Record<string, FieldMapping>>(
+    {},
+  );
+  const [scenarioOutputField, setScenarioOutputField] = useState<string | undefined>(
+    undefined,
+  );
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Track when code modal is open - we hide the drawer to avoid focus conflicts
@@ -161,17 +156,14 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
         (agentQuery.data.config as CodeComponentConfig).scenarioMappings ?? {};
       // If no saved mappings, compute best-match defaults from input names
       const effectiveInputs =
-        agentInputs.length > 0
-          ? agentInputs
-          : [{ identifier: "input", type: "str" }];
+        agentInputs.length > 0 ? agentInputs : [{ identifier: "input", type: "str" }];
       const mappings =
         Object.keys(existingMappings).length > 0
           ? existingMappings
           : computeBestMatchMappings({ inputs: effectiveInputs });
       setScenarioMappings(mappings);
       setScenarioOutputField(
-        (agentQuery.data.config as CodeComponentConfig).scenarioOutputField ??
-          undefined,
+        (agentQuery.data.config as CodeComponentConfig).scenarioOutputField ?? undefined,
       );
       setHasUnsavedChanges(false);
     } else if (!agentId) {
@@ -193,8 +185,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       onSave?.(agent);
       onClose();
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
   });
 
   const updateMutation = api.agents.update.useMutation({
@@ -211,8 +202,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const isValid =
-    name.trim().length > 0 &&
-    isScenarioMappingValid({ mappings: scenarioMappings });
+    name.trim().length > 0 && isScenarioMappingValid({ mappings: scenarioMappings });
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
@@ -277,9 +267,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     // Recompute best-match for any new inputs that don't already have a mapping
     setScenarioMappings((prev) => {
       const effectiveInputs =
-        newInputs.length > 0
-          ? newInputs
-          : [{ identifier: "input", type: "str" }];
+        newInputs.length > 0 ? newInputs : [{ identifier: "input", type: "str" }];
       const bestMatch = computeBestMatchMappings({ inputs: effectiveInputs });
       const merged = { ...prev };
       for (const inp of effectiveInputs) {
@@ -337,13 +325,10 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     [],
   );
 
-  const handleScenarioOutputFieldChange = useCallback(
-    (field: string | undefined) => {
-      setScenarioOutputField(field);
-      setHasUnsavedChanges(true);
-    },
-    [],
-  );
+  const handleScenarioOutputFieldChange = useCallback((field: string | undefined) => {
+    setScenarioOutputField(field);
+    setHasUnsavedChanges(true);
+  }, []);
 
   // Convert DSL inputs to Variable[] for VariablesSection
   const variablesForUI: Variable[] = inputs.map((input) => ({
@@ -354,9 +339,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   // For scenario mappings, mirror the backend's implicit input fallback
   // (code-agent.adapter.ts synthesizes { identifier: "input", type: "str" } when inputs is empty)
   const scenarioInputsForUI: Variable[] =
-    variablesForUI.length > 0
-      ? variablesForUI
-      : [{ identifier: "input", type: "str" }];
+    variablesForUI.length > 0 ? variablesForUI : [{ identifier: "input", type: "str" }];
 
   // Convert DSL outputs to Output[] for OutputsSection
   const outputsForUI: Output[] = outputs.map((output) => ({
@@ -366,11 +349,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
 
   const handleClose = () => {
     if (hasUnsavedChanges) {
-      if (
-        !window.confirm(
-          "You have unsaved changes. Are you sure you want to close?",
-        )
-      ) {
+      if (!window.confirm("You have unsaved changes. Are you sure you want to close?")) {
         return;
       }
     }
@@ -403,9 +382,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                   <LuArrowLeft size={20} />
                 </Button>
               )}
-              <Heading>
-                {agentId ? "Edit Code Agent" : "New Code Agent"}
-              </Heading>
+              <Heading>{agentId ? "Edit Code Agent" : "New Code Agent"}</Heading>
             </HStack>
           </Drawer.Header>
           <Drawer.Body
@@ -443,8 +420,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                   <Field.Root>
                     <Field.Label>Python Code</Field.Label>
                     <Text fontSize="sm" color="fg.muted" marginBottom={2}>
-                      Define a Python class with a `__call__` method that takes
-                      inputs and returns outputs.
+                      Define a Python class with a `__call__` method that takes inputs and
+                      returns outputs.
                     </Text>
                     <CodeBlockEditor
                       code={code}

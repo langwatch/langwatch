@@ -39,18 +39,14 @@ export const simulationMessageSnapshotSchema = simulationRunIdentitySchema.exten
   traceIds: z.array(z.string()).default([]),
   status: z.string().optional(),
 });
-export type SimulationMessageSnapshot = z.infer<
-  typeof simulationMessageSnapshotSchema
->;
+export type SimulationMessageSnapshot = z.infer<typeof simulationMessageSnapshotSchema>;
 
 export const simulationTextMessageStartSchema = simulationRunIdentitySchema.extend({
   messageId: z.string(),
   role: z.string(),
   messageIndex: z.number().optional(),
 });
-export type SimulationTextMessageStart = z.infer<
-  typeof simulationTextMessageStartSchema
->;
+export type SimulationTextMessageStart = z.infer<typeof simulationTextMessageStartSchema>;
 
 export const simulationTextMessageEndSchema = simulationRunIdentitySchema.extend({
   messageId: z.string(),
@@ -60,9 +56,7 @@ export const simulationTextMessageEndSchema = simulationRunIdentitySchema.extend
   traceId: z.string().optional(),
   messageIndex: z.number().optional(),
 });
-export type SimulationTextMessageEnd = z.infer<
-  typeof simulationTextMessageEndSchema
->;
+export type SimulationTextMessageEnd = z.infer<typeof simulationTextMessageEndSchema>;
 
 export const simulationFinishRunSchema = simulationRunIdentitySchema.extend({
   results: z

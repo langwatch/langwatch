@@ -50,9 +50,7 @@ export class EnvelopeBlobLifecycle {
     redis: IORedis | Cluster;
     queueName: string;
     objectStoreFor?: (projectId: string) => ObjectStore;
-    resolveStorageDestination?: (
-      projectId: string,
-    ) => Promise<ProjectStorageDestination>;
+    resolveStorageDestination?: (projectId: string) => Promise<ProjectStorageDestination>;
     compression?: "gzip" | "zstd";
     payloadCodec?: "json" | "msgpack";
   }) {
@@ -76,9 +74,7 @@ export class EnvelopeBlobLifecycle {
       objectStoreFor:
         objectStoreFor ??
         (() => {
-          throw new Error(
-            "No durable object store was configured for Group Queue",
-          );
+          throw new Error("No durable object store was configured for Group Queue");
         }),
       resolveDestination:
         resolveStorageDestination ??
@@ -143,9 +139,7 @@ export class EnvelopeBlobLifecycle {
     // so keying the tenant check off it let an envelope carrying a valid
     // cross-tenant ref and no holder id skip the guard entirely and still be
     // fetched by decodeJobEnvelope, which has no tenant check of its own.
-    const tieredRef = parsed
-      ? readEnvelopeTieredRefFromHeader(parsed.header)
-      : null;
+    const tieredRef = parsed ? readEnvelopeTieredRefFromHeader(parsed.header) : null;
     if (tieredRef) {
       // Defense-in-depth: the blob ref's tenant must match the group's tenant.
       // A forged or mis-routed ref must never read another tenant's blob, so
@@ -218,9 +212,7 @@ export class EnvelopeBlobLifecycle {
           projectId: lease.ref.projectId,
           blobHash: lease.ref.hash,
           tier: lease.ref.tier,
-          err: redactStorageUrisInText(
-            err instanceof Error ? err.message : String(err),
-          ),
+          err: redactStorageUrisInText(err instanceof Error ? err.message : String(err)),
         },
         "Blob lease heartbeat renewal failed; relying on the blob backstop",
       );
@@ -387,9 +379,7 @@ export class EnvelopeBlobLifecycle {
           projectId: oldLease.ref.projectId,
           blobHash: oldLease.ref.hash,
           tier: oldLease.ref.tier,
-          err: redactStorageUrisInText(
-            err instanceof Error ? err.message : String(err),
-          ),
+          err: redactStorageUrisInText(err instanceof Error ? err.message : String(err)),
         },
         "Blob lease transfer failed; relying on the TTL backstop",
       );

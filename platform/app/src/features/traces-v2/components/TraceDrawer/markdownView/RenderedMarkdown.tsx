@@ -21,10 +21,7 @@ export function RenderedMarkdown({
   paddingY?: number;
 }) {
   const { colorMode } = useColorMode();
-  const components = useMemo(
-    () => buildMarkdownComponents(colorMode),
-    [colorMode],
-  );
+  const components = useMemo(() => buildMarkdownComponents(colorMode), [colorMode]);
 
   return (
     <Box paddingX={paddingX} paddingY={paddingY} color="fg">

@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import {
-  WorkflowNlpExecutor,
-  type WorkflowExecutionRuntime,
-} from "../runWorkflow";
+import { WorkflowNlpExecutor, type WorkflowExecutionRuntime } from "../runWorkflow";
 
 const workflow: StudioWorkflow = {
   spec_version: "1.5",

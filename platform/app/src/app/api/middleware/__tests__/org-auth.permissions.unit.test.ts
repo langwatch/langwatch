@@ -16,15 +16,13 @@ vi.mock("~/server/db", () => ({ prisma: {} }));
 
 const resolveApiKeyPermission = vi.fn();
 vi.mock("~/server/rbac/role-binding-resolver", () => ({
-  resolveApiKeyPermission: (...args: unknown[]) =>
-    resolveApiKeyPermission(...args),
+  resolveApiKeyPermission: (...args: unknown[]) => resolveApiKeyPermission(...args),
 }));
 
 // The middleware resolves its service from the App on the request context.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appCredentialPermissionsMock } = await import(
-    "~/test-utils/appCredentialPermissionsMock"
-  );
+  const { appCredentialPermissionsMock } =
+    await import("~/test-utils/appCredentialPermissionsMock");
   return appCredentialPermissionsMock();
 });
 
@@ -68,9 +66,7 @@ describe("requireOrgPermission", () => {
   describe("when the credential lacks the permission", () => {
     it("answers 403 with the legacy body itself", async () => {
       resolveApiKeyPermission.mockResolvedValue(false);
-      const { app, caught } = buildApp(
-        requireOrgPermission("organization:manage"),
-      );
+      const { app, caught } = buildApp(requireOrgPermission("organization:manage"));
 
       const res = await app.request("/probe");
 

@@ -129,9 +129,7 @@ const comparePairedMetric = ({
   otherVariantId: string;
 }): Comparison => {
   const differences =
-    dimension === "cost"
-      ? metrics?.costDifferenceCI
-      : metrics?.durationDifferenceCI;
+    dimension === "cost" ? metrics?.costDifferenceCI : metrics?.durationDifferenceCI;
   const paired = differences?.[otherVariantId];
   if (!paired?.every((bound) => Number.isFinite(bound))) return 0;
 
@@ -182,8 +180,7 @@ const everyVariantRecorded = ({
   ranked.length > 0 &&
   ranked.every((entry) => {
     const metrics = variantMetrics[entry.variantId];
-    const stats =
-      dimension === "cost" ? metrics?.costStats : metrics?.durationStats;
+    const stats = dimension === "cost" ? metrics?.costStats : metrics?.durationStats;
     return usableMean(stats) !== null;
   });
 

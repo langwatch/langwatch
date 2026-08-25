@@ -30,16 +30,13 @@ export interface LangWatchQLDiagnosticsProps {
   diagnostics: readonly LangWatchQLDiagnostic[];
 }
 
-export function LangWatchQLDiagnostics({
-  diagnostics,
-}: LangWatchQLDiagnosticsProps) {
+export function LangWatchQLDiagnostics({ diagnostics }: LangWatchQLDiagnosticsProps) {
   if (diagnostics.length === 0) return null;
 
   return (
     <Stack gap={0} width="full" data-testid="lwql-diagnostics">
       {diagnostics.map((diagnostic, index) => {
-        const severity =
-          diagnostic.code === TRUNCATION_CODE ? "warning" : "info";
+        const severity = diagnostic.code === TRUNCATION_CODE ? "warning" : "info";
         return (
           <HStack
             key={`${diagnostic.code}-${index}`}

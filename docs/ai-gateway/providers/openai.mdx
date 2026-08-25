@@ -29,16 +29,16 @@ Per-VK overrides available on the binding:
 
 ## Supported endpoints
 
-| Gateway route | Upstream | Notes |
-|---|---|---|
-| `POST /v1/chat/completions` | `POST /v1/chat/completions` | Streaming and non-streaming both supported. |
-| `POST /v1/responses` | `POST /v1/responses` | Reasoning models (o3, o4-mini) and tool use. |
-| `POST /v1/embeddings` | `POST /v1/embeddings` | `text-embedding-3-small`, `text-embedding-3-large`, ada. |
-| `POST /v1/images/generations` | `POST /v1/images/generations` | DALL-E 3. |
-| `POST /v1/audio/transcriptions` | `POST /v1/audio/transcriptions` | Whisper. |
-| `POST /v1/audio/speech` | `POST /v1/audio/speech` | TTS. |
-| `POST /v1/moderations` | `POST /v1/moderations` | Content moderation. |
-| `GET /v1/models` | `GET /v1/models` | Filtered by the VK's `models_allowed`. |
+| Gateway route                   | Upstream                        | Notes                                                    |
+| ------------------------------- | ------------------------------- | -------------------------------------------------------- |
+| `POST /v1/chat/completions`     | `POST /v1/chat/completions`     | Streaming and non-streaming both supported.              |
+| `POST /v1/responses`            | `POST /v1/responses`            | Reasoning models (o3, o4-mini) and tool use.             |
+| `POST /v1/embeddings`           | `POST /v1/embeddings`           | `text-embedding-3-small`, `text-embedding-3-large`, ada. |
+| `POST /v1/images/generations`   | `POST /v1/images/generations`   | DALL-E 3.                                                |
+| `POST /v1/audio/transcriptions` | `POST /v1/audio/transcriptions` | Whisper.                                                 |
+| `POST /v1/audio/speech`         | `POST /v1/audio/speech`         | TTS.                                                     |
+| `POST /v1/moderations`          | `POST /v1/moderations`          | Content moderation.                                      |
+| `GET /v1/models`                | `GET /v1/models`                | Filtered by the VK's `models_allowed`.                   |
 
 ## Caching
 

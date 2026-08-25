@@ -198,9 +198,7 @@ describe("SearchBar in real Chromium", () => {
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard(
-        "status:error AND model:gpt-4o AND origin:application",
-      );
+      await userEvent.keyboard("status:error AND model:gpt-4o AND origin:application");
 
       const deleteButtons = editor.querySelectorAll(
         "[data-filter-delete]",
@@ -235,9 +233,7 @@ describe("SearchBar in real Chromium", () => {
 
       // Click back into the editor to mount actions on the same view.
       await userEvent.click(editor);
-      const btn = editor.querySelector(
-        "[data-filter-delete]",
-      ) as HTMLElement | null;
+      const btn = editor.querySelector("[data-filter-delete]") as HTMLElement | null;
       expect(btn).toBeTruthy();
       await userEvent.hover(btn!);
       await userEvent.click(btn!);
@@ -315,9 +311,7 @@ describe("SearchBar in real Chromium", () => {
 
       // Backspace through the rest of the value plus the colon — the
       // remaining `status` is a bare identifier, no longer a tag.
-      await userEvent.keyboard(
-        "[Backspace][Backspace][Backspace][Backspace][Backspace]",
-      );
+      await userEvent.keyboard("[Backspace][Backspace][Backspace][Backspace][Backspace]");
       expect(plainText(editor)).toBe("status");
       expect(editor.querySelectorAll(".filter-token").length).toBe(0);
     });
@@ -682,9 +676,7 @@ describe("SearchBar in real Chromium", () => {
       await userEvent.click(editor);
       await userEvent.keyboard("status:error");
       // Backspace the entire value back to `status:`.
-      await userEvent.keyboard(
-        "[Backspace][Backspace][Backspace][Backspace][Backspace]",
-      );
+      await userEvent.keyboard("[Backspace][Backspace][Backspace][Backspace][Backspace]");
       expect(plainText(editor)).toBe("status:");
       // Retype a different value.
       await userEvent.keyboard("warning");
@@ -870,9 +862,7 @@ describe("SearchBar in real Chromium", () => {
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard(
-        "(status:error OR status:warning) AND model:gpt-4o",
-      );
+      await userEvent.keyboard("(status:error OR status:warning) AND model:gpt-4o");
 
       const tokens = editor.querySelectorAll(".filter-token");
       expect(tokens.length).toBe(3);
@@ -921,9 +911,7 @@ describe("SearchBar in real Chromium", () => {
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard(
-        "status:error AND model:gpt-4o AND origin:application",
-      );
+      await userEvent.keyboard("status:error AND model:gpt-4o AND origin:application");
 
       const widgets = editor.querySelectorAll(
         "[data-filter-delete]",
@@ -945,9 +933,7 @@ describe("SearchBar in real Chromium", () => {
       await userEvent.click(editor);
       await userEvent.keyboard("(status:error)");
 
-      const widget = editor.querySelector(
-        "[data-filter-delete]",
-      ) as HTMLElement;
+      const widget = editor.querySelector("[data-filter-delete]") as HTMLElement;
       await userEvent.hover(widget);
       await userEvent.click(widget);
 
@@ -1069,9 +1055,7 @@ describe("SearchBar in real Chromium", () => {
       const tokens = editor.querySelectorAll(".filter-token");
       expect(tokens.length).toBe(1);
       expect(tokens[0]?.textContent).toBe('errorMessage:"rate limit"');
-      const widget = editor.querySelector(
-        "[data-filter-delete]",
-      ) as HTMLElement | null;
+      const widget = editor.querySelector("[data-filter-delete]") as HTMLElement | null;
       expect(widget?.dataset.value).toBe("rate limit");
     });
   });
@@ -1093,18 +1077,18 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("operator matrix — scenario fields get the purple accent", () => {
-    it.each([
-      "scenarioVerdict:success",
-      "scenarioStatus:failed",
-    ])("`%s` is rendered with filter-token-scenario", async (query) => {
-      renderEditor();
-      const editor = getEditor();
-      await userEvent.click(editor);
-      await userEvent.keyboard(query);
-      const scenario = editor.querySelector(".filter-token-scenario");
-      expect(scenario).toBeTruthy();
-      expect(scenario?.textContent).toBe(query);
-    });
+    it.each(["scenarioVerdict:success", "scenarioStatus:failed"])(
+      "`%s` is rendered with filter-token-scenario",
+      async (query) => {
+        renderEditor();
+        const editor = getEditor();
+        await userEvent.click(editor);
+        await userEvent.keyboard(query);
+        const scenario = editor.querySelector(".filter-token-scenario");
+        expect(scenario).toBeTruthy();
+        expect(scenario?.textContent).toBe(query);
+      },
+    );
   });
 
   describe("free-text fragments NEVER get a delete widget", () => {
@@ -1137,9 +1121,7 @@ describe("SearchBar in real Chromium", () => {
       expect(tokens.length).toBe(1);
       // The chip exists even without a value — the user sees a half-built
       // affordance prompting them to type something.
-      const widget = editor.querySelector(
-        "[data-filter-delete]",
-      ) as HTMLElement | null;
+      const widget = editor.querySelector("[data-filter-delete]") as HTMLElement | null;
       expect(widget).toBeTruthy();
       // No data-value attribute — the value is null until the user types.
       expect(widget?.dataset.value).toBeUndefined();
@@ -1256,9 +1238,7 @@ describe("SearchBar in real Chromium", () => {
       // The fix is on the resolver side; this test pins the suggestion
       // STATE so a regression in cursor → field detection trips the build.
       const Wrapper: React.FC = () => {
-        const [text, setText] = useState(
-          "trace.attribute.langwatch.origin:application",
-        );
+        const [text, setText] = useState("trace.attribute.langwatch.origin:application");
         return (
           <ActiveSearchEditor
             queryText={text}
@@ -1308,17 +1288,13 @@ describe("SearchBar in real Chromium", () => {
       renderEditor();
       const editor = getEditor();
       await userEvent.click(editor);
-      await userEvent.keyboard(
-        "scenarioVerdict:success AND cost:>5 AND status:error",
-      );
+      await userEvent.keyboard("scenarioVerdict:success AND cost:>5 AND status:error");
 
       const scenario = editor.querySelector(".filter-token-scenario");
       const numeric = editor.querySelector(".filter-token-numeric");
       // The plain `.filter-token` class is on every chip — to find the
       // categorical-only one we exclude the modifier classes.
-      const categorical = Array.from(
-        editor.querySelectorAll(".filter-token"),
-      ).find(
+      const categorical = Array.from(editor.querySelectorAll(".filter-token")).find(
         (el) =>
           !el.classList.contains("filter-token-scenario") &&
           !el.classList.contains("filter-token-numeric") &&

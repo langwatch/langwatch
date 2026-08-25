@@ -110,20 +110,19 @@ describe("translateClickHouseQueryError", () => {
   });
 
   describe("given a connection-level failure", () => {
-    it.each([
-      "ECONNREFUSED",
-      "ECONNRESET",
-      "ETIMEDOUT",
-    ])("translates %s to ClickHouseUnavailableError", (errno) => {
-      const raw = Object.assign(new Error(`connect ${errno}`), {
-        code: errno,
-      });
+    it.each(["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT"])(
+      "translates %s to ClickHouseUnavailableError",
+      (errno) => {
+        const raw = Object.assign(new Error(`connect ${errno}`), {
+          code: errno,
+        });
 
-      const translated = translateClickHouseQueryError(raw, 50);
+        const translated = translateClickHouseQueryError(raw, 50);
 
-      expect(translated).toBeInstanceOf(ClickHouseUnavailableError);
-      expect((translated as ClickHouseUnavailableError).fault).toBe("platform");
-    });
+        expect(translated).toBeInstanceOf(ClickHouseUnavailableError);
+        expect((translated as ClickHouseUnavailableError).fault).toBe("platform");
+      },
+    );
 
     it("translates a 503 response to ClickHouseUnavailableError", () => {
       const raw = Object.assign(new Error("service unavailable"), {
@@ -186,9 +185,7 @@ describe("translateClickHouseQueryError", () => {
     it("still reads the engine's own code prefix when the driver sets no properties", () => {
       // Raw HTTP text: no `code`/`type` properties, so the leading prefix the
       // engine writes is the only thing left to read.
-      const raw = new Error(
-        "Code: 158. DB::Exception: Limit for rows to read exceeded",
-      );
+      const raw = new Error("Code: 158. DB::Exception: Limit for rows to read exceeded");
 
       expect(translateClickHouseQueryError(raw, 10)).toBeInstanceOf(
         QueryScanLimitExceededError,
@@ -199,11 +196,7 @@ describe("translateClickHouseQueryError", () => {
 
 describe("isClickHouseObjectUnavailableError", () => {
   it.each([
-    [
-      "UNKNOWN_TABLE by driver properties",
-      { code: "60", type: "UNKNOWN_TABLE" },
-      "boom",
-    ],
+    ["UNKNOWN_TABLE by driver properties", { code: "60", type: "UNKNOWN_TABLE" }, "boom"],
     [
       "UNKNOWN_DATABASE by driver properties",
       { code: "81", type: "UNKNOWN_DATABASE" },
@@ -233,9 +226,7 @@ describe("isClickHouseObjectUnavailableError", () => {
   it("does not classify by a variant name echoed from the query", () => {
     // The engine echoes the submitted query in the message; only the anchored
     // `Code: <n>.` prefix the engine writes itself gets a vote.
-    const raw = new Error(
-      "Code: 62. DB::Exception: Syntax error near UNKNOWN_TABLE",
-    );
+    const raw = new Error("Code: 62. DB::Exception: Syntax error near UNKNOWN_TABLE");
 
     expect(isClickHouseObjectUnavailableError(raw)).toBe(false);
   });

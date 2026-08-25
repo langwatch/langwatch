@@ -1,12 +1,4 @@
-import {
-  Box,
-  chakra,
-  HStack,
-  Icon,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, chakra, HStack, Icon, IconButton, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuBot,
@@ -82,11 +74,7 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
     // glued to a sibling pill (the previous design's "[CHAT pill] +
     // [button]" layout had two visually distinct halves and didn't
     // make it obvious you could click anywhere on the row to expand).
-    <Popover.Root
-      positioning={{ placement: "right-start" }}
-      lazyMount
-      unmountOnExit
-    >
+    <Popover.Root positioning={{ placement: "right-start" }} lazyMount unmountOnExit>
       <Popover.Trigger asChild>
         <chakra.button
           type="button"
@@ -115,21 +103,11 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
             {inline.text}
           </Text>
           {inline.hint && (
-            <Text
-              textStyle="2xs"
-              color="fg.subtle"
-              fontFamily="mono"
-              flexShrink={0}
-            >
+            <Text textStyle="2xs" color="fg.subtle" fontFamily="mono" flexShrink={0}>
               {inline.hint}
             </Text>
           )}
-          <Icon
-            as={LuChevronRight}
-            boxSize={3}
-            color="fg.subtle"
-            flexShrink={0}
-          />
+          <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" flexShrink={0} />
         </chakra.button>
       </Popover.Trigger>
       <Popover.Content maxWidth="560px" minWidth="360px">
@@ -202,10 +180,7 @@ const FORMAT_VISUALS: Record<
 function FormatGlyph({ format }: { format: Exclude<AttributeFormat, "leaf"> }) {
   const v = FORMAT_VISUALS[format];
   return (
-    <Tooltip
-      content={`Detected format: ${v.label}`}
-      positioning={{ placement: "top" }}
-    >
+    <Tooltip content={`Detected format: ${v.label}`} positioning={{ placement: "top" }}>
       <Box
         display="inline-flex"
         alignItems="center"
@@ -321,14 +296,7 @@ function JsonBody({ raw }: { raw: string }) {
   // Shiki syntax highlighting (shared drawer adapter) instead of a flat
   // mono block — the un-highlighted JSON read as a hard-to-scan grey wall.
   // See specs/traces-v2/attribute-value-readability.feature
-  return (
-    <ShikiCodeBlock
-      code={formatted}
-      language="json"
-      colorMode={colorMode}
-      flush
-    />
-  );
+  return <ShikiCodeBlock code={formatted} language="json" colorMode={colorMode} flush />;
 }
 
 function ChatBody({ messages }: { messages: ChatMessage[] }) {
@@ -360,11 +328,7 @@ function ChatRow({ message }: { message: ChatMessage }) {
   return (
     <Box>
       <HStack gap={1.5} marginBottom={1}>
-        <Icon
-          as={RoleIcon}
-          boxSize={3}
-          color={known ? "fg.muted" : "fg.subtle"}
-        />
+        <Icon as={RoleIcon} boxSize={3} color={known ? "fg.muted" : "fg.subtle"} />
         <Text
           textStyle="2xs"
           fontWeight="700"
@@ -392,12 +356,7 @@ function CopyButton({ payload }: { payload: string }) {
   const { copied, copy } = useCopyToClipboard();
   const handleClick = useCallback(() => copy(payload), [copy, payload]);
   return (
-    <IconButton
-      aria-label="Copy value"
-      size="2xs"
-      variant="ghost"
-      onClick={handleClick}
-    >
+    <IconButton aria-label="Copy value" size="2xs" variant="ghost" onClick={handleClick}>
       <Icon
         as={copied ? LuCheck : LuCopy}
         boxSize={3}

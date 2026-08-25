@@ -12,7 +12,7 @@ export class PromptTracingDecorator {
   private traceCompilation(
     span: LangWatchSpan,
     variables: TemplateVariables,
-    compileFn: () => CompiledPrompt
+    compileFn: () => CompiledPrompt,
   ): CompiledPrompt {
     span.setType("prompt");
 
@@ -21,7 +21,7 @@ export class PromptTracingDecorator {
 
       if (variables) {
         span.setAttribute(
-          'langwatch.prompt.variables',
+          "langwatch.prompt.variables",
           JSON.stringify({
             type: "json",
             value: variables,
@@ -34,10 +34,7 @@ export class PromptTracingDecorator {
 
     // Only emit combined handle:version format when both are available
     if (result.handle != null && result.version != null) {
-      span.setAttribute(
-        'langwatch.prompt.id',
-        `${result.handle}:${result.version}`,
-      );
+      span.setAttribute("langwatch.prompt.id", `${result.handle}:${result.version}`);
     }
 
     if (shouldCaptureOutput()) {
@@ -51,18 +48,12 @@ export class PromptTracingDecorator {
   }
 
   compile(span: LangWatchSpan, variables: TemplateVariables = {}): CompiledPrompt {
-    return this.traceCompilation(
-      span,
-      variables,
-      () => this.target.compile(variables),
-    );
+    return this.traceCompilation(span, variables, () => this.target.compile(variables));
   }
 
   compileStrict(span: LangWatchSpan, variables: TemplateVariables): CompiledPrompt {
-    return this.traceCompilation(
-      span,
-      variables,
-      () => this.target.compileStrict(variables),
+    return this.traceCompilation(span, variables, () =>
+      this.target.compileStrict(variables),
     );
   }
 }

@@ -97,31 +97,31 @@ describe("LangyMessageService", () => {
     });
   });
 
-  describe.each([
-    "private conversation owned by another user",
-    "missing conversation",
-  ])("when the target is a %s", () => {
-    it("reports the same not-found result without reading its messages", async () => {
-      const messages = makeMessageRepo();
-      const conversations = makeConversationRepo({
-        // The visibility repository deliberately collapses private and absent.
-        findVisibleById: vi.fn().mockResolvedValue(null),
-      });
-      const service = new LangyMessageService(messages, conversations);
+  describe.each(["private conversation owned by another user", "missing conversation"])(
+    "when the target is a %s",
+    () => {
+      it("reports the same not-found result without reading its messages", async () => {
+        const messages = makeMessageRepo();
+        const conversations = makeConversationRepo({
+          // The visibility repository deliberately collapses private and absent.
+          findVisibleById: vi.fn().mockResolvedValue(null),
+        });
+        const service = new LangyMessageService(messages, conversations);
 
-      await expect(
-        service.getAllByConversation({
-          conversationId: "conversation-1",
-          projectId: "project-1",
-          userId: "user-1",
-        }),
-      ).rejects.toMatchObject({
-        code: "langy_conversation_not_found",
-        meta: { conversationId: "conversation-1" },
+        await expect(
+          service.getAllByConversation({
+            conversationId: "conversation-1",
+            projectId: "project-1",
+            userId: "user-1",
+          }),
+        ).rejects.toMatchObject({
+          code: "langy_conversation_not_found",
+          meta: { conversationId: "conversation-1" },
+        });
+        expect(messages.findAllByConversation).not.toHaveBeenCalled();
       });
-      expect(messages.findAllByConversation).not.toHaveBeenCalled();
-    });
-  });
+    },
+  );
 });
 
 describe("createLangyTrustedMessageReader", () => {

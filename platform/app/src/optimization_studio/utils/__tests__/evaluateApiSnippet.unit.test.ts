@@ -66,9 +66,7 @@ describe("buildEvaluateParameters", () => {
   describe("given an image-typed entry field", () => {
     describe("when resolving its example value", () => {
       it("uses a base64 data-url so the structure is clear", () => {
-        expect(exampleParameterValue("image")).toMatch(
-          /^data:image\/png;base64,/,
-        );
+        expect(exampleParameterValue("image")).toMatch(/^data:image\/png;base64,/);
       });
     });
   });

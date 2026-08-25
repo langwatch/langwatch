@@ -110,12 +110,8 @@ describe("computeComparability", () => {
       });
 
       // Direction is certain; the gap is not a measurement.
-      expect(comparabilityOf({ comparability, a: "A", b: "C" })).toBe(
-        "dominated",
-      );
-      expect(comparabilityOf({ comparability, a: "A", b: "B" })).toBe(
-        "same-group",
-      );
+      expect(comparabilityOf({ comparability, a: "A", b: "C" })).toBe("dominated");
+      expect(comparabilityOf({ comparability, a: "A", b: "B" })).toBe("same-group");
     });
   });
 
@@ -157,9 +153,7 @@ describe("computeComparability", () => {
 
       // A and C never met and share no opponent. The solver still hands back
       // numbers for both; nothing may be concluded from their order.
-      expect(comparabilityOf({ comparability, a: "A", b: "C" })).toBe(
-        "incomparable",
-      );
+      expect(comparabilityOf({ comparability, a: "A", b: "C" })).toBe("incomparable");
     });
   });
 

@@ -17,7 +17,4 @@ export interface GuardParams {
 
 export type GuardNext = (params: GuardParams) => Promise<unknown>;
 
-export type GuardMiddleware = (
-  params: GuardParams,
-  next: GuardNext,
-) => Promise<unknown>;
+export type GuardMiddleware = (params: GuardParams, next: GuardNext) => Promise<unknown>;

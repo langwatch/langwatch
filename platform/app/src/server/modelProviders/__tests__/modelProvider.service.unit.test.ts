@@ -11,9 +11,7 @@ import { mergeStoredCustomKeys } from "../credentialMerge";
 // Mirrors ModelProviderService.maskRowCustomKeys. It calls the real
 // classifier rather than restating the rule, so a change to what counts as a
 // secret reaches these expectations instead of passing against a stale copy.
-function maskApiKeys(
-  customKeys: Record<string, unknown>,
-): Record<string, unknown> {
+function maskApiKeys(customKeys: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(customKeys).map(([key, value]) => [
       key,
@@ -264,9 +262,7 @@ describe("ModelProviderService business logic", () => {
 
       const result = maskApiKeys(customKeys);
 
-      expect(result.GOOGLE_APPLICATION_CREDENTIALS).toBe(
-        MASKED_KEY_PLACEHOLDER,
-      );
+      expect(result.GOOGLE_APPLICATION_CREDENTIALS).toBe(MASKED_KEY_PLACEHOLDER);
     });
 
     it("masks an OAuth token set whose fields are not named as keys", () => {

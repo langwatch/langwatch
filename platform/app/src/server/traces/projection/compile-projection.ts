@@ -10,11 +10,7 @@
  */
 
 import type { Protections } from "~/server/traces/protections";
-import {
-  type ProjectionSource,
-  type ResolvedField,
-  resolveField,
-} from "./catalog";
+import { type ProjectionSource, type ResolvedField, resolveField } from "./catalog";
 import {
   type CompiledProjection,
   type CompileProjectionArgs,
@@ -27,11 +23,7 @@ import {
   type ResolvedSchema,
 } from "./types";
 
-const COLLECTIONS: ProjectionCollection[] = [
-  "events",
-  "annotations",
-  "evaluations",
-];
+const COLLECTIONS: ProjectionCollection[] = ["events", "annotations", "evaluations"];
 
 const COLLECTION_PREFIX: Record<ProjectionCollection, string> = {
   events: "events.",
@@ -158,24 +150,20 @@ function buildProjector({
     for (const collection of COLLECTIONS) {
       const collFields = collectionFields[collection];
       if (collFields.length === 0) continue;
-      row[collection] = collectionElements({ trace, collection }).map(
-        (element) => {
-          const projected: ProjectedRow = {};
-          for (const f of collFields) {
-            // Redact gated values on the collection path too — the catalog has
-            // no protected collection field today, but this keeps RBAC symmetric
-            // with the scalar path so a future protected field can't leak here.
-            setPath({
-              target: projected,
-              path: f.outPath,
-              value: isPermitted({ field: f, protections })
-                ? f.read(element)
-                : null,
-            });
-          }
-          return projected;
-        },
-      );
+      row[collection] = collectionElements({ trace, collection }).map((element) => {
+        const projected: ProjectedRow = {};
+        for (const f of collFields) {
+          // Redact gated values on the collection path too — the catalog has
+          // no protected collection field today, but this keeps RBAC symmetric
+          // with the scalar path so a future protected field can't leak here.
+          setPath({
+            target: projected,
+            path: f.outPath,
+            value: isPermitted({ field: f, protections }) ? f.read(element) : null,
+          });
+        }
+        return projected;
+      });
     }
 
     return row;

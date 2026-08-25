@@ -10,10 +10,7 @@ type UseDebouncedTextareaProps = {
  * Manages local textarea value with debounced sync to parent.
  * Prevents race conditions by disabling external sync while user is typing.
  */
-export const useDebouncedTextarea = ({
-  value,
-  onChange,
-}: UseDebouncedTextareaProps) => {
+export const useDebouncedTextarea = ({ value, onChange }: UseDebouncedTextareaProps) => {
   // Local value state for immediate UI updates
   const [localValue, setLocalValue] = useState(value);
 

@@ -60,9 +60,7 @@ describe("avatar upload refusals", () => {
     /** @scenario A file that is not an image is refused as unusable */
     it("refuses a non-image file as an unusable image", async () => {
       expect(
-        await codeOf(() =>
-          processAvatarImage(makeFile({ type: "application/pdf" })),
-        ),
+        await codeOf(() => processAvatarImage(makeFile({ type: "application/pdf" }))),
       ).toBe("avatar_image_unreadable");
     });
 
@@ -118,9 +116,7 @@ describe("avatar upload refusals", () => {
       });
 
       expect(explained.title).not.toBe(UNKNOWN_ERROR_PRESENTATION.title);
-      expect(explained.description).not.toBe(
-        UNKNOWN_ERROR_PRESENTATION.description,
-      );
+      expect(explained.description).not.toBe(UNKNOWN_ERROR_PRESENTATION.description);
       expect(explained.description.toLowerCase()).toContain("wait");
     });
   });

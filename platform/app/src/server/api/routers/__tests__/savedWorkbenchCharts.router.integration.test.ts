@@ -15,15 +15,7 @@
  */
 
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -112,11 +104,7 @@ const ALL_ANALYTICS: Permission[] = [
 
 let seq = 0;
 
-async function seedOrg(
-  orgId: string,
-  teamId: string,
-  projectId: string,
-): Promise<void> {
+async function seedOrg(orgId: string, teamId: string, projectId: string): Promise<void> {
   await prisma.organization.create({
     data: { id: orgId, name: orgId, slug: orgId },
   });
@@ -214,8 +202,7 @@ describe("the saved workbench chart router", () => {
    * created keeps cleanup a function of what the suite did.
    */
   afterAll(async () => {
-    const ids = (values: string[]) =>
-      values.map((value) => `'${value}'`).join(",");
+    const ids = (values: string[]) => values.map((value) => `'${value}'`).join(",");
     await prisma.$executeRawUnsafe(
       `DELETE FROM "CustomGraph" WHERE "projectId" IN (${ids([PROJECT, OTHER_PROJECT])})`,
     );
@@ -265,17 +252,13 @@ describe("the saved workbench chart router", () => {
         const saved = await saveChart();
         isEnabled.mockResolvedValue(false);
 
-        expect(
-          await refusalOf(() => author.getAll({ projectId: PROJECT })),
-        ).toBe("lwql_not_enabled");
-        expect(
-          await refusalOf(() =>
-            author.getById({ projectId: PROJECT, id: saved.id }),
-          ),
-        ).toBe("lwql_not_enabled");
-        expect(await refusalOf(() => saveChart("Another"))).toBe(
+        expect(await refusalOf(() => author.getAll({ projectId: PROJECT }))).toBe(
           "lwql_not_enabled",
         );
+        expect(
+          await refusalOf(() => author.getById({ projectId: PROJECT, id: saved.id })),
+        ).toBe("lwql_not_enabled");
+        expect(await refusalOf(() => saveChart("Another"))).toBe("lwql_not_enabled");
         expect(
           await refusalOf(() =>
             author.update({
@@ -286,9 +269,7 @@ describe("the saved workbench chart router", () => {
           ),
         ).toBe("lwql_not_enabled");
         expect(
-          await refusalOf(() =>
-            author.delete({ projectId: PROJECT, id: saved.id }),
-          ),
+          await refusalOf(() => author.delete({ projectId: PROJECT, id: saved.id })),
         ).toBe("lwql_not_enabled");
       });
     });
@@ -301,9 +282,9 @@ describe("the saved workbench chart router", () => {
         const saved = await saveChart();
 
         // The read they are entitled to.
-        expect(
-          (await reader.getAll({ projectId: PROJECT })).map(({ id }) => id),
-        ).toEqual([saved.id]);
+        expect((await reader.getAll({ projectId: PROJECT })).map(({ id }) => id)).toEqual(
+          [saved.id],
+        );
 
         // Each write, refused on its own permission rather than on the read one.
         expect(
@@ -325,9 +306,7 @@ describe("the saved workbench chart router", () => {
           ),
         ).toBe("permission_denied");
         expect(
-          await refusalOf(() =>
-            reader.delete({ projectId: PROJECT, id: saved.id }),
-          ),
+          await refusalOf(() => reader.delete({ projectId: PROJECT, id: saved.id })),
         ).toBe("permission_denied");
 
         // Nothing the refused writes attempted actually happened.
@@ -363,9 +342,7 @@ describe("the saved workbench chart router", () => {
         });
 
         expect(
-          await refusalOf(() =>
-            author.getById({ projectId: PROJECT, id: theirs.id }),
-          ),
+          await refusalOf(() => author.getById({ projectId: PROJECT, id: theirs.id })),
         ).toBe("saved_workbench_chart_not_found");
         expect(
           await refusalOf(() =>
@@ -382,9 +359,7 @@ describe("the saved workbench chart router", () => {
           ),
         ).toBe("saved_workbench_chart_not_found");
         expect(
-          await refusalOf(() =>
-            author.delete({ projectId: PROJECT, id: theirs.id }),
-          ),
+          await refusalOf(() => author.delete({ projectId: PROJECT, id: theirs.id })),
         ).toBe("saved_workbench_chart_not_found");
 
         // Still theirs, still named what they named it.

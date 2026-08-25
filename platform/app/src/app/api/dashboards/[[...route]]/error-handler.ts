@@ -15,8 +15,7 @@ export const handleDashboardError = async (
   const path = c.req.path;
   const method = c.req.method;
   const routeParams = c.req.param();
-  const status =
-    error instanceof HttpError ? error.status : (error.status ?? 500);
+  const status = error instanceof HttpError ? error.status : (error.status ?? 500);
 
   logger.error(
     {

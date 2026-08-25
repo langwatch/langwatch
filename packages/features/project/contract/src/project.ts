@@ -10,9 +10,7 @@ export const PROJECT_KIND = {
 export const projectKindSchema = z.enum(PROJECT_KIND);
 export type ProjectKind = z.infer<typeof projectKindSchema>;
 
-export const internalProjectKindSchema = z.literal(
-  PROJECT_KIND.INTERNAL_GOVERNANCE,
-);
+export const internalProjectKindSchema = z.literal(PROJECT_KIND.INTERNAL_GOVERNANCE);
 export type InternalProjectKind = z.infer<typeof internalProjectKindSchema>;
 
 export const internalProjectSchema = z
@@ -39,9 +37,7 @@ export type InternalProjectQuery = z.infer<typeof internalProjectQuerySchema>;
 export const projectPresenceInputSchema = z
   .object({ projectId: z.string().min(1) })
   .strict();
-export type ProjectPresenceInput = z.infer<
-  typeof projectPresenceInputSchema
->;
+export type ProjectPresenceInput = z.infer<typeof projectPresenceInputSchema>;
 
 export const projectJsonValueSchema = z.json();
 export type ProjectJsonValue = z.infer<typeof projectJsonValueSchema>;

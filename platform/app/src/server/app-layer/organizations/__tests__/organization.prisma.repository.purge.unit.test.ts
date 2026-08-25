@@ -21,8 +21,7 @@ import { PrismaOrganizationRepository } from "../repositories/organization.prism
 const ORGANIZATION_ID = "org_acme";
 
 function purgingPrisma() {
-  const deletions: Array<{ model: string; where: Record<string, unknown> }> =
-    [];
+  const deletions: Array<{ model: string; where: Record<string, unknown> }> = [];
   const deleteManyFor = (model: string) =>
     vi.fn(({ where }: { where: Record<string, unknown> }) => {
       deletions.push({ model, where });
@@ -40,9 +39,7 @@ function purgingPrisma() {
     "team",
     "organization",
   ];
-  const transaction = vi.fn((operations: unknown[]) =>
-    Promise.resolve(operations),
-  );
+  const transaction = vi.fn((operations: unknown[]) => Promise.resolve(operations));
   const prisma = {
     ...Object.fromEntries(
       models.map((model) => [model, { deleteMany: deleteManyFor(model) }]),

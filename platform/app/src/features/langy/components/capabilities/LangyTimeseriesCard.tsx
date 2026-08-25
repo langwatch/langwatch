@@ -20,21 +20,8 @@
  */
 
 import { useChart } from "@chakra-ui/charts";
-import {
-  Box,
-  Button,
-  HStack,
-  Menu,
-  Portal,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
-  ArrowUpRight,
-  LayoutDashboard,
-  TrendingDown,
-  TrendingUp,
-} from "lucide-react";
+import { Box, Button, HStack, Menu, Portal, Text, VStack } from "@chakra-ui/react";
+import { ArrowUpRight, LayoutDashboard, TrendingDown, TrendingUp } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Area,
@@ -167,10 +154,7 @@ export function isPlottable(payload: unknown): payload is TimeseriesPayload {
   );
 }
 
-export function LangyTimeseriesCard({
-  output,
-  projectSlug,
-}: CapabilityCardInput) {
+export function LangyTimeseriesCard({ output, projectSlug }: CapabilityCardInput) {
   const payload = output as TimeseriesPayload | undefined;
   // Read before the guard: the guard narrows an unplottable payload away, and
   // an empty range still deserves the title it was asked under.
@@ -229,18 +213,12 @@ export function TimeseriesPlot({ payload }: { payload: TimeseriesPayload }) {
   return (
     <VStack align="stretch" gap={3}>
       {payload.comparison ? (
-        <ComparisonHeadline
-          comparison={payload.comparison}
-          unit={payload.unit}
-        />
+        <ComparisonHeadline comparison={payload.comparison} unit={payload.unit} />
       ) : null}
 
       <Box height="140px" width="full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={chart.data}
-            margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
-          >
+          <AreaChart data={chart.data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <defs>
               {chart.series.map((s, index) => (
                 <linearGradient
@@ -251,11 +229,7 @@ export function TimeseriesPlot({ payload }: { payload: TimeseriesPayload }) {
                   x2="0"
                   y2="1"
                 >
-                  <stop
-                    offset="0%"
-                    stopColor={chart.color(s.color)}
-                    stopOpacity={0.28}
-                  />
+                  <stop offset="0%" stopColor={chart.color(s.color)} stopOpacity={0.28} />
                   <stop
                     offset="100%"
                     stopColor={chart.color(s.color)}
@@ -288,9 +262,7 @@ export function TimeseriesPlot({ payload }: { payload: TimeseriesPayload }) {
               // Value only: recharts already prints the series name beside
               // it, and returning the pair form fights v3's Formatter type
               // for a label we would be duplicating anyway.
-              formatter={(value: ValueType | undefined) =>
-                format(Number(value ?? 0))
-              }
+              formatter={(value: ValueType | undefined) => format(Number(value ?? 0))}
               contentStyle={{
                 background: chart.color("bg.panel"),
                 border: `1px solid ${chart.color("border.muted")}`,
@@ -332,9 +304,7 @@ export function TimeseriesPlot({ payload }: { payload: TimeseriesPayload }) {
             Peak {format(peak.v)} on {peak.t}
             {/* Only when it is genuinely concentrated. Announcing "18% of the
                 total" on an even week is noise dressed as insight. */}
-            {peak.share >= 0.4
-              ? ` — ${Math.round(peak.share * 100)}% of the period`
-              : ""}
+            {peak.share >= 0.4 ? ` — ${Math.round(peak.share * 100)}% of the period` : ""}
           </Text>
         </HStack>
       ) : null}
@@ -355,11 +325,7 @@ function ComparisonHeadline({
   const Icon = up ? TrendingUp : TrendingDown;
 
   const render = (value: number) =>
-    unit === "usd" ? (
-      <Money amount={value} />
-    ) : (
-      <>{valueFormatter(unit)(value)}</>
-    );
+    unit === "usd" ? <Money amount={value} /> : <>{valueFormatter(unit)(value)}</>;
 
   return (
     <HStack gap={4} align="baseline" flexWrap="wrap">
@@ -384,11 +350,7 @@ function ComparisonHeadline({
         // bad depends on why it rose, and the card does not know.
         <HStack gap={1} color="fg.muted">
           <Icon size={13} />
-          <Text
-            textStyle="xs"
-            fontWeight="560"
-            fontVariantNumeric="tabular-nums"
-          >
+          <Text textStyle="xs" fontWeight="560" fontVariantNumeric="tabular-nums">
             {up ? "+" : ""}
             {change.toFixed(1)}%
           </Text>

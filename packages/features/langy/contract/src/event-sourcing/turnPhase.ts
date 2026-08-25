@@ -51,9 +51,7 @@ export function beginTurn(_state: TurnPhaseState, turnId: string): TurnPhaseStat
 
 /** The user hit Stop: `active` → `stopping` (a no-op in any other phase). */
 export function requestStop(state: TurnPhaseState): TurnPhaseState {
-  return state.turnPhase === "active"
-    ? { ...state, turnPhase: "stopping" }
-    : state;
+  return state.turnPhase === "active" ? { ...state, turnPhase: "stopping" } : state;
 }
 
 /**
@@ -66,9 +64,7 @@ export function requestStop(state: TurnPhaseState): TurnPhaseState {
  * turn did in fact end, the fold settles it to `idle` on its next read.
  */
 export function abandonStop(state: TurnPhaseState): TurnPhaseState {
-  return state.turnPhase === "stopping"
-    ? { ...state, turnPhase: "active" }
-    : state;
+  return state.turnPhase === "stopping" ? { ...state, turnPhase: "active" } : state;
 }
 
 /**
@@ -103,16 +99,9 @@ export function observeBackendTurn(
 }
 
 /** A genuine end-of-turn frame settled the turn: go `idle` immediately. */
-export function settleTurn(
-  state: TurnPhaseState,
-  turnId: string | null,
-): TurnPhaseState {
+export function settleTurn(state: TurnPhaseState, turnId: string | null): TurnPhaseState {
   // A stale end frame for a superseded turn does not settle the new one.
-  if (
-    turnId !== null &&
-    state.activeTurnId !== null &&
-    turnId !== state.activeTurnId
-  ) {
+  if (turnId !== null && state.activeTurnId !== null && turnId !== state.activeTurnId) {
     return state;
   }
   return {

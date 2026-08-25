@@ -57,9 +57,7 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
 });
 
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   const base = appPermissionsMock();
   return {
     ...base,
@@ -208,9 +206,9 @@ describe("githubRouter access gates", () => {
       hasOrgPermission.mockReturnValue(false);
       isOrganizationMember.mockResolvedValue(true);
 
-      await expect(
-        caller().listRepos({ organizationId: "org-1" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(caller().listRepos({ organizationId: "org-1" })).rejects.toMatchObject(
+        { code: "FORBIDDEN" },
+      );
       expect(permissionsAsked).toEqual(["organization:manage"]);
       expect(listRepositoriesForOrganization).not.toHaveBeenCalled();
     });

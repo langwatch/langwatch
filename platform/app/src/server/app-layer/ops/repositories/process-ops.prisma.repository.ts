@@ -186,10 +186,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     const counts = new Map<string, { pending: number; dead: number }>();
     if (rows.length > 0) {
       const pairs = Prisma.join(
-        rows.map(
-          (r) =>
-            Prisma.sql`(${r.processName}, ${r.projectId}, ${r.processKey})`,
-        ),
+        rows.map((r) => Prisma.sql`(${r.processName}, ${r.projectId}, ${r.processKey})`),
       );
       const outbox = await this.prisma.$queryRaw<
         Array<{
@@ -236,9 +233,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     };
   }
 
-  async findUpcomingWakes(params: {
-    limit: number;
-  }): Promise<ProcessWakeRow[]> {
+  async findUpcomingWakes(params: { limit: number }): Promise<ProcessWakeRow[]> {
     const rows = await this.prisma.$queryRaw<
       Array<{
         processName: string;

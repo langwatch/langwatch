@@ -9,10 +9,7 @@ import type {
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "./pipeline/staticBuilder.types";
-import type {
-  PipelineWithCommandHandlers,
-  RegisteredPipeline,
-} from "./pipeline/types";
+import type { PipelineWithCommandHandlers, RegisteredPipeline } from "./pipeline/types";
 import { ProcessRuntime } from "./process-manager/processRuntime";
 import { InMemoryProcessStore } from "./process-manager/stores/inMemoryProcessStore";
 import type { ProcessStore } from "./process-manager/stores/processStore.types";
@@ -24,10 +21,7 @@ import type {
   JobDelivery,
 } from "./queues";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
-import type {
-  ExecutionTarget,
-  RetentionPolicyResolver,
-} from "./runtime.types";
+import type { ExecutionTarget, RetentionPolicyResolver } from "./runtime.types";
 import { EventSourcingPipeline } from "./runtimePipeline";
 import { QueueError } from "./services/errorHandling";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
@@ -92,13 +86,8 @@ type CommandsToProcessors<Commands extends RegisteredCommand> = {
  * - Closeable: close() shuts down all pipelines, the projection registry, and the global queue
  */
 export class EventSourcing {
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.event-sourcing.runtime",
-  );
-  private readonly pipelines = new Map<
-    string,
-    PipelineWithCommandHandlers<any, any>
-  >();
+  private readonly tracer = getLangWatchTracer("langwatch.event-sourcing.runtime");
+  private readonly pipelines = new Map<string, PipelineWithCommandHandlers<any, any>>();
   private readonly _definitions: StaticPipelineDefinition<any, any, any>[] = [];
   private readonly projectionRegistry: ProjectionRegistry<Event>;
 
@@ -159,9 +148,7 @@ export class EventSourcing {
     return this._eventStore;
   }
 
-  get globalQueue():
-    | EventSourcedQueueProcessor<Record<string, unknown>>
-    | undefined {
+  get globalQueue(): EventSourcedQueueProcessor<Record<string, unknown>> | undefined {
     this.ensureInitialized();
     return this._globalQueue;
   }
@@ -290,9 +277,7 @@ export class EventSourcing {
         const pipeline = new EventSourcingPipeline<EventType, ProjectionTypes>({
           name: definition.metadata.name,
           aggregateType: definition.metadata.aggregateType,
-          allowedEventTypes: definition.aggregate.events.map(
-            (event) => event.type,
-          ),
+          allowedEventTypes: definition.aggregate.events.map((event) => event.type),
           eventStore,
           ...serviceOptions,
           globalQueue: this._globalQueue,
@@ -399,12 +384,7 @@ export class EventSourcing {
       logger.debug({ registryKey }, "No handler registered for job");
       return null;
     }
-    const {
-      __pipelineName: _p,
-      __jobType: _t,
-      __jobName: _n,
-      ...clean
-    } = payload;
+    const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
     return { entry, clean };
   }
 
@@ -415,9 +395,7 @@ export class EventSourcing {
    * present and nothing else, because the rest of the payload is business
    * data and can hold an end user's identity.
    */
-  private static jobIdentity(
-    payload: Record<string, unknown>,
-  ): Record<string, unknown> {
+  private static jobIdentity(payload: Record<string, unknown>): Record<string, unknown> {
     const str = (value: unknown): string | undefined =>
       typeof value === "string" && value.length > 0 ? value : undefined;
     return {
@@ -503,10 +481,7 @@ export class EventSourcing {
         if (!result.entry.spanAttributes) return {};
         return result.entry.spanAttributes(result.clean);
       },
-      process: async (
-        payload: Record<string, unknown>,
-        delivery?: JobDelivery,
-      ) => {
+      process: async (payload: Record<string, unknown>, delivery?: JobDelivery) => {
         const result = this.lookupEntry(payload);
         if (!result) {
           this.rejectUnroutableJob(payload, queueName);
@@ -580,15 +555,9 @@ export class EventSourcing {
       : new EventSourcedQueueProcessorMemory(definition);
   }
 
-  private logDisabledWarning(context: {
-    pipeline?: string;
-    command?: string;
-  }): void {
+  private logDisabledWarning(context: { pipeline?: string; command?: string }): void {
     if (!this._loggedDisabledWarning) {
-      logger.warn(
-        context,
-        "Event sourcing is disabled. Operations will be no-ops.",
-      );
+      logger.warn(context, "Event sourcing is disabled. Operations will be no-ops.");
       this._loggedDisabledWarning = true;
     } else {
       logger.debug(context, "Event sourcing operation ignored (disabled)");
@@ -658,9 +627,7 @@ function buildServiceOptions<
   const foldProjections = Array.from(definition.foldProjections.values()).map(
     ({ definition: fold }) => fold,
   );
-  const stateProjections = Array.from(
-    definition.stateProjections?.values() ?? [],
-  );
+  const stateProjections = Array.from(definition.stateProjections?.values() ?? []);
 
   const mapProjections = Array.from(definition.mapProjections.values()).map(
     ({ definition: mapProj }) => mapProj,
@@ -676,12 +643,12 @@ function buildServiceOptions<
         }))
       : undefined;
 
-  const foldSubscriberList = Array.from(
-    definition.foldSubscribers.values(),
-  ).map((entry) => ({
-    foldName: entry.projectionName as string,
-    definition: entry.definition,
-  }));
+  const foldSubscriberList = Array.from(definition.foldSubscribers.values()).map(
+    (entry) => ({
+      foldName: entry.projectionName as string,
+      definition: entry.definition,
+    }),
+  );
 
   const mapSubscriberList = Array.from(definition.mapSubscribers.values()).map(
     (entry) => ({
@@ -690,10 +657,8 @@ function buildServiceOptions<
     }),
   );
 
-  const foldSubscribers =
-    foldSubscriberList.length > 0 ? foldSubscriberList : undefined;
-  const mapSubscribers =
-    mapSubscriberList.length > 0 ? mapSubscriberList : undefined;
+  const foldSubscribers = foldSubscriberList.length > 0 ? foldSubscriberList : undefined;
+  const mapSubscribers = mapSubscriberList.length > 0 ? mapSubscriberList : undefined;
   const subscribers =
     definition.eventSubscribers.size > 0
       ? Array.from(definition.eventSubscribers.values())
@@ -701,8 +666,7 @@ function buildServiceOptions<
 
   return {
     foldProjections: foldProjections.length > 0 ? foldProjections : undefined,
-    stateProjections:
-      stateProjections.length > 0 ? stateProjections : undefined,
+    stateProjections: stateProjections.length > 0 ? stateProjections : undefined,
     mapProjections: mapProjections.length > 0 ? mapProjections : undefined,
     commandRegistrations,
     foldSubscribers,

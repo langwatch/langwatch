@@ -122,17 +122,13 @@ describe("OtlpSpanTokenEstimationService", () => {
           {
             key: "gen_ai.input.messages",
             value: {
-              stringValue: JSON.stringify([
-                { role: "user", content: "What is 2+2?" },
-              ]),
+              stringValue: JSON.stringify([{ role: "user", content: "What is 2+2?" }]),
             },
           },
           {
             key: "gen_ai.output.messages",
             value: {
-              stringValue: JSON.stringify([
-                { role: "assistant", content: "4" },
-              ]),
+              stringValue: JSON.stringify([{ role: "assistant", content: "4" }]),
             },
           },
         ]);
@@ -436,10 +432,7 @@ describe("OtlpSpanTokenEstimationService", () => {
           "gpt-4o-mini",
           "What is the meaning of life?",
         );
-        expect(deps.tokenizer.countTokens).toHaveBeenCalledWith(
-          "gpt-4o-mini",
-          "42",
-        );
+        expect(deps.tokenizer.countTokens).toHaveBeenCalledWith("gpt-4o-mini", "42");
       });
     });
 

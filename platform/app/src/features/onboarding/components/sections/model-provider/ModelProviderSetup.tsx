@@ -30,10 +30,7 @@ import {
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
 } from "../../../../../utils/modelProviderHelpers";
-import {
-  parseZodFieldErrors,
-  type ZodErrorStructure,
-} from "../../../../../utils/zod";
+import { parseZodFieldErrors, type ZodErrorStructure } from "../../../../../utils/zod";
 import {
   getModelProvider,
   modelProviderRegistry,
@@ -126,8 +123,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     }
     return fallbackProviderMeta ?? requestedMeta;
   }, [fallbackProviderMeta, modelProviderKey]);
-  const { project, team, organization, hasPermission } =
-    useOrganizationTeamProject();
+  const { project, team, organization, hasPermission } = useOrganizationTeamProject();
   const projectId = project?.id;
 
   const backendModelProviderKey = useMemo(() => {
@@ -136,10 +132,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     }
 
     return fallbackProviderMeta?.backendModelProviderKey ?? "openai";
-  }, [
-    fallbackProviderMeta?.backendModelProviderKey,
-    meta?.backendModelProviderKey,
-  ]);
+  }, [fallbackProviderMeta?.backendModelProviderKey, meta?.backendModelProviderKey]);
   const { providers, isLoading } = useModelProvidersSettings({
     projectId,
   });
@@ -323,10 +316,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     );
 
     // Validate keys according to schema before submitting
-    if (
-      providerDefinition?.keysSchema &&
-      (!isUsingEnvVars || hasNonApiKeyChanges)
-    ) {
+    if (providerDefinition?.keysSchema && (!isUsingEnvVars || hasNonApiKeyChanges)) {
       const keysSchema = z.union([
         providerDefinition.keysSchema,
         z.object({ MANAGED: z.string() }),
@@ -336,9 +326,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       const result = keysSchema.safeParse(keysToValidate);
 
       if (!result.success) {
-        const parsedErrors = parseZodFieldErrors(
-          result.error as ZodErrorStructure,
-        );
+        const parsedErrors = parseZodFieldErrors(result.error as ZodErrorStructure);
         setFieldErrors(parsedErrors);
         return;
       }
@@ -348,9 +336,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       void actions
         .setEnabled(true)
         .then(() => actions.submit())
-        .catch((err) =>
-          logger.error(err, "failed to submit model provider settings"),
-        );
+        .catch((err) => logger.error(err, "failed to submit model provider settings"));
     };
 
     // Probe only what the customer actually changed. Checking the stored
@@ -449,9 +435,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
             <Field.Root>
               <Switch
                 checked={state.useApiGateway}
-                onCheckedChange={({ checked }) =>
-                  actions.setUseApiGateway(checked)
-                }
+                onCheckedChange={({ checked }) => actions.setUseApiGateway(checked)}
               >
                 Use API Gateway
               </Switch>
@@ -506,8 +490,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                 <NativeSelect.Indicator />
               </NativeSelect.Root>
               <Field.HelperText>
-                This model will be used for evaluations, prompt optimization,
-                and dataset generation.
+                This model will be used for evaluations, prompt optimization, and dataset
+                generation.
               </Field.HelperText>
             </Field.Root>
           ) : (
@@ -538,8 +522,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                   <NativeSelect.Indicator />
                 </NativeSelect.Root>
                 <Field.HelperText>
-                  This model will be used for evaluations, prompt optimization,
-                  and dataset generation.
+                  This model will be used for evaluations, prompt optimization, and
+                  dataset generation.
                 </Field.HelperText>
               </Field.Root>
             </VStack>

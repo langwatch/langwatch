@@ -187,9 +187,7 @@ describe("VariableInsertMenu", () => {
       renderComponent({ query: "my_custom", onCreateVariable });
 
       // Should show with {{ }} syntax
-      expect(
-        screen.getByText(/Create variable "{{my_custom}}"/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Create variable "{{my_custom}}"/)).toBeInTheDocument();
     });
 
     it("normalizes create variable name (spaces to underscores, lowercase)", () => {
@@ -197,9 +195,7 @@ describe("VariableInsertMenu", () => {
       renderComponent({ query: "My Custom Var", onCreateVariable });
 
       // Should normalize to my_custom_var
-      expect(
-        screen.getByText(/Create variable "{{my_custom_var}}"/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Create variable "{{my_custom_var}}"/)).toBeInTheDocument();
     });
 
     it("does not show create option when exact match exists", () => {
@@ -252,9 +248,7 @@ describe("VariableInsertMenu", () => {
 
       // No fields match "nonexistent", but create option should show
       expect(screen.queryByText("input")).not.toBeInTheDocument();
-      expect(
-        screen.getByText(/Create variable "{{nonexistent}}"/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Create variable "{{nonexistent}}"/)).toBeInTheDocument();
     });
 
     it("Enter on first item selects field, not create option", async () => {
@@ -288,9 +282,7 @@ describe("VariableInsertMenu", () => {
       renderComponent({ query: "my_custom", onCreateVariable });
 
       // Wait for popover content to appear
-      const createOption = await screen.findByText(
-        /Create variable "{{my_custom}}"/,
-      );
+      const createOption = await screen.findByText(/Create variable "{{my_custom}}"/);
       expect(createOption).toBeVisible();
       await user.click(createOption);
       expect(onCreateVariable).toHaveBeenCalledWith("my_custom");

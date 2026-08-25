@@ -1,8 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import {
-  OrganizationUserRole,
-  type PrismaClient,
-} from "~/generated/prisma/client";
+import { OrganizationUserRole, type PrismaClient } from "~/generated/prisma/client";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
@@ -99,11 +96,7 @@ async function actorHasPermissionAtScope(
       if (!actor.session) return false;
       const sessionCtx = { prisma, session: actor.session };
       if (scope.scopeType === "ORGANIZATION") {
-        return probeOrganizationPermission(
-          sessionCtx,
-          scope.scopeId,
-          permission,
-        );
+        return probeOrganizationPermission(sessionCtx, scope.scopeId, permission);
       }
       if (scope.scopeType === "TEAM") {
         return probeTeamPermission(sessionCtx, scope.scopeId, permission);
@@ -309,9 +302,7 @@ export async function assertScopesBelongToOrg(
     scopes.filter((s) => s.scopeType === scopeType).map((s) => s.scopeId);
 
   if (
-    scopes.some(
-      (s) => s.scopeType === "ORGANIZATION" && s.scopeId !== organizationId,
-    )
+    scopes.some((s) => s.scopeType === "ORGANIZATION" && s.scopeId !== organizationId)
   ) {
     throw new GatewayScopeOrgMismatchError("organization");
   }
@@ -472,8 +463,7 @@ export function isVisibleToMembership(
   if (membership.isOrgAdmin) return true;
   return scopes.some((scope) => {
     if (scope.scopeType === "ORGANIZATION") return membership.isOrgMember;
-    if (scope.scopeType === "TEAM")
-      return membership.teamIds.has(scope.scopeId);
+    if (scope.scopeType === "TEAM") return membership.teamIds.has(scope.scopeId);
     return membership.projectIds.has(scope.scopeId);
   });
 }

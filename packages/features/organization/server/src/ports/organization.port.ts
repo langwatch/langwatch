@@ -25,9 +25,7 @@ export type PersonalWorkspaceFeatureProject = {
 export abstract class OrganizationRepository {
   /** Returns the oldest team or throws OrganizationHasNoTeamError. */
   abstract getOldestTeamId(organizationId: string): Promise<string>;
-  abstract getBillingProfile(
-    organizationId: string,
-  ): Promise<OrganizationBillingProfile>;
+  abstract getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile>;
   abstract claimBillingCustomerId(input: {
     organizationId: string;
     billingCustomerId: string;

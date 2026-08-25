@@ -72,9 +72,7 @@ describe("<SidebarSection /> header", () => {
         searchToggleProps: { open: true, onToggle: vi.fn() },
       });
 
-      expect(
-        screen.getByLabelText("Hide STATUS value search"),
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Hide STATUS value search")).toBeInTheDocument();
     });
   });
 });

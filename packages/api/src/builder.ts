@@ -57,48 +57,33 @@ import { type RegistrationEvent, resolveVersions } from "./versioning.js";
  * actually declared the second parameter and what the handler returns; the
  * broad constraint exists only to type the inline callback parameters.
  */
-type RpcHandler<
-  TVariables extends Record<string, unknown>,
-  TApp,
-> = (
+type RpcHandler<TVariables extends Record<string, unknown>, TApp> = (
   c: ServiceContext<TVariables, TApp>,
   // oxlint-disable-next-line typescript/no-explicit-any -- the annotated handler parameter is the domain type; this constraint only supplies contextual typing.
   input: any,
   // oxlint-disable-next-line typescript/no-explicit-any -- inferred from each concrete handler.
 ) => any;
 
-type RouteHandler<
-  TVariables extends Record<string, unknown>,
-  TApp,
-> = RpcHandler<TVariables, TApp>;
+type RouteHandler<TVariables extends Record<string, unknown>, TApp> = RpcHandler<
+  TVariables,
+  TApp
+>;
 
-type NeedsOutput<TResult> = [Awaited<TResult>] extends [Response | void]
-  ? false
-  : true;
+type NeedsOutput<TResult> = [Awaited<TResult>] extends [Response | void] ? false : true;
 type HasInput<THandler extends (...args: never[]) => unknown> =
   "1" extends keyof Parameters<THandler> ? true : false;
-type RequiredDefinition<
-  TChain,
-  TNeedsInput extends boolean,
-  TResult,
-> = TChain &
+type RequiredDefinition<TChain, TNeedsInput extends boolean, TResult> = TChain &
   (TNeedsInput extends true ? InputDeclared : unknown) &
   (NeedsOutput<TResult> extends true ? OutputDeclared : unknown);
 
 /** SSE handler: `(c, stream)` — a stream has no body. */
-type SseHandler<
-  TVariables extends Record<string, unknown>,
-  TApp,
-> = (
+type SseHandler<TVariables extends Record<string, unknown>, TApp> = (
   c: ServiceContext<TVariables, TApp>,
   stream: TypedSSEStream<Record<string, ApiSchema>>,
 ) => void | Promise<void>;
 
 /** Handler of an endpoint registered with no definition chain at all. */
-type BareHandler<
-  TVariables extends Record<string, unknown>,
-  TApp,
-> = (
+type BareHandler<TVariables extends Record<string, unknown>, TApp> = (
   c: ServiceContext<TVariables, TApp>,
   input: undefined,
 ) => Response | Promise<Response>;
@@ -147,10 +132,7 @@ class ServiceBuilder<
    * Provided services reach handlers as typed context variables.
    */
   provide<
-    P extends Record<
-      string,
-      (base: BaseApp<TProject>, context: Context) => unknown
-    >,
+    P extends Record<string, (base: BaseApp<TProject>, context: Context) => unknown>,
   >(
     providers: P,
   ): ServiceBuilder<
@@ -163,9 +145,7 @@ class ServiceBuilder<
         throw new Error(`Provider name "${key}" is reserved by BaseApp`);
       }
       if (key === "params" || key === "query") {
-        throw new Error(
-          `Provider name "${key}" is reserved for validated request data`,
-        );
+        throw new Error(`Provider name "${key}" is reserved for validated request data`);
       }
     }
 
@@ -251,20 +231,13 @@ class ServiceBuilder<
     version: VersionLabel,
     handler: BareHandler<TVariables, TApp>,
   ): this;
-  register<
-    TName extends string,
-    THandler extends RpcHandler<TVariables, TApp>,
-  >(
+  register<TName extends string, THandler extends RpcHandler<TVariables, TApp>>(
     name: TName & RpcName<TName>,
     version: VersionLabel,
     handler: THandler,
     define: (
       b: RpcChain,
-    ) => RequiredDefinition<
-      RpcChain,
-      HasInput<THandler>,
-      ReturnType<THandler>
-    >,
+    ) => RequiredDefinition<RpcChain, HasInput<THandler>, ReturnType<THandler>>,
   ): this;
   register(
     name: string,
@@ -307,11 +280,7 @@ class ServiceBuilder<
     handler: THandler,
     define: (
       b: RouteChain,
-    ) => RequiredDefinition<
-      RouteChain,
-      HasInput<THandler>,
-      ReturnType<THandler>
-    >,
+    ) => RequiredDefinition<RouteChain, HasInput<THandler>, ReturnType<THandler>>,
   ): this;
   registerRoute(
     method: HttpMethod,
@@ -353,9 +322,7 @@ class ServiceBuilder<
 
     const basePath = this._config.basePath ?? `/api/${this._config.name}`;
     if (!basePath.startsWith("/")) {
-      throw new Error(
-        `Service basePath must start with "/"; received "${basePath}"`,
-      );
+      throw new Error(`Service basePath must start with "/"; received "${basePath}"`);
     }
 
     const app = new Hono().basePath(basePath);
@@ -500,10 +467,7 @@ class ServiceBuilder<
             `the service has no permissionEnforcer`,
         );
       }
-      if (
-        config.resourceLimit &&
-        !this._config._legacy?.resourceLimitMiddleware
-      ) {
+      if (config.resourceLimit && !this._config._legacy?.resourceLimitMiddleware) {
         throw new Error(
           `Endpoint ${route} declares resourceLimit ` +
             `"${config.resourceLimit}" but the service has no resourceLimitMiddleware`,
@@ -536,10 +500,7 @@ class ServiceBuilder<
  * registration methods as the service, with the group's chain applied as
  * defaults between the service defaults and the endpoint's own declaration.
  */
-class GroupRegistrar<
-  TVariables extends Record<string, unknown>,
-  TApp = unknown,
-> {
+class GroupRegistrar<TVariables extends Record<string, unknown>, TApp = unknown> {
   constructor(
     // biome-ignore lint/suspicious/noExplicitAny: the registrar never touches provider factories, so the project type is irrelevant here and `unknown` would be invariant.
     private readonly _service: ServiceBuilder<any, TVariables, TApp>,
@@ -558,11 +519,7 @@ class GroupRegistrar<
     handler: THandler,
     define: (
       b: RpcChain,
-    ) => RequiredDefinition<
-      RpcChain,
-      HasInput<THandler>,
-      ReturnType<THandler>
-    >,
+    ) => RequiredDefinition<RpcChain, HasInput<THandler>, ReturnType<THandler>>,
   ): void;
   register(
     name: string,
@@ -607,11 +564,7 @@ class GroupRegistrar<
     handler: THandler,
     define: (
       b: RouteChain,
-    ) => RequiredDefinition<
-      RouteChain,
-      HasInput<THandler>,
-      ReturnType<THandler>
-    >,
+    ) => RequiredDefinition<RouteChain, HasInput<THandler>, ReturnType<THandler>>,
   ): void;
   registerRoute(
     method: HttpMethod,
@@ -621,14 +574,7 @@ class GroupRegistrar<
     define?: (b: ChainBuilder) => unknown,
   ): void {
     // REST paths are used as-is: they already carry their shape.
-    this._service._registerRoute(
-      method,
-      path,
-      version,
-      this._defaults,
-      handler,
-      define,
-    );
+    this._service._registerRoute(method, path, version, this._defaults, handler, define);
   }
 
   withdraw(name: string, version: VersionLabel): void {

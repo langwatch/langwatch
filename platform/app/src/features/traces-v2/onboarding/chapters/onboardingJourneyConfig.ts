@@ -264,8 +264,7 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
     // because the drawer is now the finale of the journey rather
     // than an optional detour.
     heading: "There's a juicy one.",
-    subhead:
-      "Click the highlighted row to see how the agent worked through it.",
+    subhead: "Click the highlighted row to see how the agent worked through it.",
     typewriter: true,
     showArrivals: true,
     highlightRichRow: true,
@@ -321,9 +320,7 @@ export function findStageDef(id: StageId): StageDef {
   // stage. The journey will resume from the start, which matches
   // what we'd want anyway.
   // eslint-disable-next-line no-console
-  console.warn(
-    `[onboarding] Unknown stage "${id}", falling back to "${INITIAL_STAGE}"`,
-  );
+  console.warn(`[onboarding] Unknown stage "${id}", falling back to "${INITIAL_STAGE}"`);
   return ONBOARDING_JOURNEY[0]!;
 }
 

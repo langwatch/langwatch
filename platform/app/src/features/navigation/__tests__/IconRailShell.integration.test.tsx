@@ -10,13 +10,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -121,9 +115,7 @@ vi.mock("~/hooks/useFeatureFlag", async () => {
     ...actual,
     useFeatureFlag: (flag: string) => ({
       enabled:
-        flag === "release_ui_ai_governance_enabled"
-          ? mockGovernanceFlagEnabled
-          : true,
+        flag === "release_ui_ai_governance_enabled" ? mockGovernanceFlagEnabled : true,
       isLoading: false,
     }),
   };
@@ -292,10 +284,9 @@ afterEach(() => {
 });
 
 const railTile = (name: string) =>
-  within(screen.getByRole("navigation", { name: "Products" })).queryByRole(
-    "button",
-    { name },
-  );
+  within(screen.getByRole("navigation", { name: "Products" })).queryByRole("button", {
+    name,
+  });
 
 describe("the icon-rail shell", () => {
   describe("when the rail renders", () => {
@@ -406,9 +397,7 @@ describe("the icon-rail shell", () => {
         screen.queryByRole("button", { name: "Switch product" }),
       ).not.toBeInTheDocument();
       expect(screen.getByText("ACME")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Switch project" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Switch project" })).toBeInTheDocument();
     });
   });
 });

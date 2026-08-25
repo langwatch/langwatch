@@ -4,18 +4,18 @@
   "private": true,
   "description": "The shared handled-error contract: HandledError base class, serialized wire shapes, and the Go herr envelope adapter. Used by the LangWatch app, MCP server, CLI, and SDKs.",
   "license": "MIT",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": [
-    "src"
-  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

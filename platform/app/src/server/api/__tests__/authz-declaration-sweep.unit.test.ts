@@ -46,10 +46,7 @@ const UNRESOLVABLE_SCOPES: readonly string[] = [
   "datasetRecord.create declares a permission its input carries no scope id for",
 ];
 
-const OPAQUE_INPUTS: readonly string[] = [
-  "dataset.upsert",
-  "datasetRecord.create",
-];
+const OPAQUE_INPUTS: readonly string[] = ["dataset.upsert", "datasetRecord.create"];
 
 type Procedure = {
   path: string;
@@ -74,8 +71,7 @@ type Procedure = {
 function unwrap(schema: unknown): any {
   let current: any = schema;
   for (let depth = 0; depth < 10 && current?._def; depth += 1) {
-    const inner =
-      current._def.schema ?? current._def.innerType ?? current._def.in;
+    const inner = current._def.schema ?? current._def.innerType ?? current._def.in;
     if (!inner) break;
     current = inner;
   }
@@ -96,10 +92,7 @@ function isAbsentable(field: unknown): boolean {
   const name = (field as any)?._def?.typeName;
   if (name === "ZodDefault" || name === "ZodNullable") return false;
   if (name === "ZodOptional") return true;
-  return (
-    typeof (field as any)?.isOptional === "function" &&
-    (field as any).isOptional()
-  );
+  return typeof (field as any)?.isOptional === "function" && (field as any).isOptional();
 }
 
 type ScopeFieldSets = {
@@ -138,8 +131,7 @@ function scopeFieldsOf(parser: unknown): ScopeFieldSets | null {
     };
   }
 
-  const shape =
-    typeof schema?.shape === "function" ? schema.shape() : schema?.shape;
+  const shape = typeof schema?.shape === "function" ? schema.shape() : schema?.shape;
   if (!shape || typeof shape !== "object") return null;
 
   return {
@@ -246,12 +238,8 @@ function collectProcedures(): Procedure[] {
       // tRPC intersects chained `.input()` calls, so a field required by any
       // of them is required overall, and a field any of them accepts is
       // accepted overall.
-      requiredScopeFields: [
-        ...new Set(readable.flatMap((fields) => fields.required)),
-      ],
-      acceptedScopeFields: [
-        ...new Set(readable.flatMap((fields) => fields.accepted)),
-      ],
+      requiredScopeFields: [...new Set(readable.flatMap((fields) => fields.required))],
+      acceptedScopeFields: [...new Set(readable.flatMap((fields) => fields.accepted))],
     };
   });
 }
@@ -417,9 +405,7 @@ describe("tRPC authz declaration sweep", () => {
       });
 
       expect(covered).toHaveLength(1);
-      expect(covered).not.toEqual(
-        expect.arrayContaining(["teamId", "projectId"]),
-      );
+      expect(covered).not.toEqual(expect.arrayContaining(["teamId", "projectId"]));
     });
   });
 

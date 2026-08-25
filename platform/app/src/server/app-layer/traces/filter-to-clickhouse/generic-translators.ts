@@ -79,18 +79,11 @@ export function translateStringField(
   return wrap(`${columnExpr} = {${p}:String}`, negated);
 }
 
-function stringEqualityHandler(
-  expression: string,
-  name?: string,
-): FieldHandler {
-  return (tag, negated, ctx) =>
-    translateStringField(expression, tag, negated, ctx, name);
+function stringEqualityHandler(expression: string, name?: string): FieldHandler {
+  return (tag, negated, ctx) => translateStringField(expression, tag, negated, ctx, name);
 }
 
-function numericComparisonHandler(
-  expression: string,
-  name?: string,
-): FieldHandler {
+function numericComparisonHandler(expression: string, name?: string): FieldHandler {
   return (tag, negated, ctx) =>
     translateNumericField(expression, tag, negated, ctx, name);
 }
@@ -187,9 +180,7 @@ export function matchNumericInMemory(value: number, tag: TagToken): boolean {
     case ":<=":
       return value <= num;
     default:
-      throw new FilterParseError(
-        `Unsupported operator: ${tag.operator.operator}`,
-      );
+      throw new FilterParseError(`Unsupported operator: ${tag.operator.operator}`);
   }
 }
 
@@ -243,15 +234,10 @@ export function categorical(
 }
 
 /** Numeric comparison on a `trace_summaries` expression. */
-export function range(
-  expression: string,
-  read: RangeRead,
-  name?: string,
-): FieldDef {
+export function range(expression: string, read: RangeRead, name?: string): FieldDef {
   return {
     toClickHouse: numericComparisonHandler(expression, name),
-    evaluateInMemory: (tag, negated, trace) =>
-      evaluateRange(read, tag, negated, trace),
+    evaluateInMemory: (tag, negated, trace) => evaluateRange(read, tag, negated, trace),
   };
 }
 
@@ -288,7 +274,6 @@ export function crossTableRange(
   return {
     needs,
     toClickHouse: crossTableNumericHandler(table, timeColumn, expression, name),
-    evaluateInMemory: (tag, negated, trace) =>
-      evaluateRange(read, tag, negated, trace),
+    evaluateInMemory: (tag, negated, trace) => evaluateRange(read, tag, negated, trace),
   };
 }

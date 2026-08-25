@@ -20,10 +20,7 @@ import { HandledError, NotFoundError } from "@langwatch/handled-error";
 export class GithubNotConnectedError extends NotFoundError {
   declare readonly code: "github_not_connected";
 
-  constructor(
-    organizationId: string,
-    options: { reasons?: readonly Error[] } = {},
-  ) {
+  constructor(organizationId: string, options: { reasons?: readonly Error[] } = {}) {
     super("github_not_connected", "GitHub connection", organizationId, options);
     this.name = "GithubNotConnectedError";
   }
@@ -41,15 +38,11 @@ export class GithubInstallationSuspendedError extends HandledError {
     { accountLogin }: { accountLogin: string },
     options: { reasons?: readonly Error[] } = {},
   ) {
-    super(
-      "github_installation_suspended",
-      "The GitHub installation is suspended.",
-      {
-        meta: { accountLogin },
-        httpStatus: 409,
-        ...options,
-      },
-    );
+    super("github_installation_suspended", "The GitHub installation is suspended.", {
+      meta: { accountLogin },
+      httpStatus: 409,
+      ...options,
+    });
     this.name = "GithubInstallationSuspendedError";
   }
 }
@@ -66,15 +59,11 @@ export class GithubRepositoryNotAccessibleError extends HandledError {
     { repositoryFullName }: { repositoryFullName: string },
     options: { reasons?: readonly Error[] } = {},
   ) {
-    super(
-      "github_repo_not_accessible",
-      "The GitHub App cannot reach that repository.",
-      {
-        meta: { repositoryFullName },
-        httpStatus: 403,
-        ...options,
-      },
-    );
+    super("github_repo_not_accessible", "The GitHub App cannot reach that repository.", {
+      meta: { repositoryFullName },
+      httpStatus: 403,
+      ...options,
+    });
     this.name = "GithubRepositoryNotAccessibleError";
   }
 }
@@ -90,10 +79,7 @@ export class GithubPullRequestNotMappedError extends NotFoundError {
   declare readonly code: "github_pr_not_mapped";
 
   constructor(
-    {
-      repositoryFullName,
-      prNumber,
-    }: { repositoryFullName: string; prNumber: number },
+    { repositoryFullName, prNumber }: { repositoryFullName: string; prNumber: number },
     options: { reasons?: readonly Error[] } = {},
   ) {
     super(

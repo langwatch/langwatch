@@ -44,10 +44,7 @@ const CREDENTIAL_MUTATION_SUFFIXES = [
 const EMAIL_AUTH_SUFFIXES = ["/sign-in/email", "/sign-up/email"] as const;
 
 /** The password-reset pair: blocked on gate-ALLOW, open on gate-DENY (v6). */
-const PASSWORD_RESET_SUFFIXES = [
-  "/request-password-reset",
-  "/reset-password",
-] as const;
+const PASSWORD_RESET_SUFFIXES = ["/request-password-reset", "/reset-password"] as const;
 
 /**
  * Extracts the pathname from a BetterAuth request URL, stripping the query
@@ -99,9 +96,7 @@ export const isPasswordResetPath = (pathname: string): boolean =>
 export const isGateDependentPath = (url: string): boolean => {
   const pathname = normalizedRequestPathname(url);
   return (
-    isPasswordResetPath(pathname) ||
-    isEmailAuthPath(pathname) ||
-    isGatedSsoPath(url)
+    isPasswordResetPath(pathname) || isEmailAuthPath(pathname) || isGatedSsoPath(url)
   );
 };
 

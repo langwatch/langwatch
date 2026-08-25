@@ -1,7 +1,6 @@
 import type { Event, IntentContext, ProcessStore } from "@langwatch/eventing";
 
-export const GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE =
-  "lw.governance.vk_lifecycle" as const;
+export const GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE = "lw.governance.vk_lifecycle" as const;
 export const GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE =
   "lw.governance.budget_crossing" as const;
 

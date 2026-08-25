@@ -120,9 +120,7 @@ beforeAll(async () => {
     createdByUserId: userA.id,
     organizationId: orgA.id,
     permissionMode: "all",
-    bindings: [
-      { role: TeamUserRole.ADMIN, scopeType: "PROJECT", scopeId: projectA1.id },
-    ],
+    bindings: [{ role: TeamUserRole.ADMIN, scopeType: "PROJECT", scopeId: projectA1.id }],
   });
   adminTokenA = admin.token;
 
@@ -183,26 +181,18 @@ beforeAll(async () => {
     createdByUserId: userB.id,
     organizationId: orgB.id,
     permissionMode: "all",
-    bindings: [
-      { role: TeamUserRole.ADMIN, scopeType: "PROJECT", scopeId: projectB1.id },
-    ],
+    bindings: [{ role: TeamUserRole.ADMIN, scopeType: "PROJECT", scopeId: projectB1.id }],
   });
   adminTokenB = adminB.token;
 }, 120_000);
 
 afterAll(async () => {
-  await prisma.project
-    .deleteMany({ where: { slug: { contains: ns } } })
-    .catch(() => {});
-  await prisma.team
-    .deleteMany({ where: { slug: { contains: ns } } })
-    .catch(() => {});
+  await prisma.project.deleteMany({ where: { slug: { contains: ns } } }).catch(() => {});
+  await prisma.team.deleteMany({ where: { slug: { contains: ns } } }).catch(() => {});
   await prisma.organization
     .deleteMany({ where: { slug: { contains: ns } } })
     .catch(() => {});
-  await prisma.user
-    .deleteMany({ where: { email: { contains: ns } } })
-    .catch(() => {});
+  await prisma.user.deleteMany({ where: { email: { contains: ns } } }).catch(() => {});
 });
 
 const headers = (token: string, projectId: string) => ({
@@ -309,14 +299,11 @@ describe("Feature: migrated Hono apps enforce RBAC + tenant isolation", () => {
   describe("when a project key holds only read permissions", () => {
     /** @scenario "A read-only key cannot perform a write action" */
     it("forbids the write route PUT /api/model-providers/:provider (requires project:update)", async () => {
-      const res = await modelProvidersApp.request(
-        "/api/model-providers/openai",
-        {
-          method: "PUT",
-          headers: headers(readOnlyTokenA, projectA1.id),
-          body: JSON.stringify({ enabled: true }),
-        },
-      );
+      const res = await modelProvidersApp.request("/api/model-providers/openai", {
+        method: "PUT",
+        headers: headers(readOnlyTokenA, projectA1.id),
+        body: JSON.stringify({ enabled: true }),
+      });
       expect(res.status).toBe(403);
     });
   });

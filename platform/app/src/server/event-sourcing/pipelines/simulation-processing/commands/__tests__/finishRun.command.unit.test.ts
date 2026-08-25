@@ -197,8 +197,7 @@ describe("FinishRunCommand", () => {
         makeCommand({ status: "ERROR", error: "stalled" }) as any,
       );
 
-      const results = (events[0]!.data as { results?: SimulationResults })
-        .results;
+      const results = (events[0]!.data as { results?: SimulationResults }).results;
       expect(results).toBeDefined();
       expect(results!.verdict).toBe("failure");
       expect(decodeScenarioError(results!.error)?.code).toBe(
@@ -213,8 +212,7 @@ describe("FinishRunCommand", () => {
         makeCommand({ status: "CANCELLED", error: "Cancelled by user" }) as any,
       );
 
-      const results = (events[0]!.data as { results?: SimulationResults })
-        .results;
+      const results = (events[0]!.data as { results?: SimulationResults }).results;
       expect(results).toBeDefined();
       expect(results!.verdict).toBe("inconclusive");
       expect(results!.error).toBe("Cancelled by user");
@@ -238,9 +236,9 @@ describe("FinishRunCommand", () => {
         }) as any,
       );
 
-      expect(
-        (events[0]!.data as { results?: SimulationResults }).results,
-      ).toEqual(supplied);
+      expect((events[0]!.data as { results?: SimulationResults }).results).toEqual(
+        supplied,
+      );
     });
   });
 
@@ -251,9 +249,7 @@ describe("FinishRunCommand", () => {
       expect(FinishRunCommand.getSpanAttributes(payload)).toEqual({
         "payload.scenarioRun.id": "run-1",
       });
-      expect(FinishRunCommand.makeJobId(payload)).toBe(
-        "tenant-1:run-1:finish-run",
-      );
+      expect(FinishRunCommand.makeJobId(payload)).toBe("tenant-1:run-1:finish-run");
     });
   });
 });

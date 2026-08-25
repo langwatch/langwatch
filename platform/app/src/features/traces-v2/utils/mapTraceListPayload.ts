@@ -16,9 +16,7 @@ interface TraceListPayload {
  * Rows start eventless: events are not on the trace summary, so the list
  * reads them separately (`useTraceListEvents`) and merges them in.
  */
-export function mapTraceListPayload(
-  data: TraceListPayload | undefined,
-): TraceListItem[] {
+export function mapTraceListPayload(data: TraceListPayload | undefined): TraceListItem[] {
   if (!data) return [];
   const evalMap = (data.evaluations ?? {}) as Record<string, TraceEvalResult[]>;
   return (data.items as TraceListItem[]).map((item) => ({

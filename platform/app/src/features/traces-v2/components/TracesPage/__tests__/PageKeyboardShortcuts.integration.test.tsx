@@ -64,12 +64,8 @@ describe("PageKeyboardShortcuts", () => {
     it("names Langy on the ⌘I row instead of Ask AI", () => {
       askGate.langy = true;
       renderDialog();
-      expect(
-        screen.getByText(/ask langy about these traces/i),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText(/ask ai to build a query/i),
-      ).not.toBeInTheDocument();
+      expect(screen.getByText(/ask langy about these traces/i)).toBeInTheDocument();
+      expect(screen.queryByText(/ask ai to build a query/i)).not.toBeInTheDocument();
     });
   });
 });

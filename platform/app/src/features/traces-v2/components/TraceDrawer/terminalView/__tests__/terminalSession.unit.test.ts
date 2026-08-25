@@ -7,11 +7,7 @@ import {
   toolPrimaryArg,
 } from "../terminalSession";
 
-function modelCall(
-  atMs: number,
-  tokens: number,
-  costUsd: number,
-): TranscriptEntry {
+function modelCall(atMs: number, tokens: number, costUsd: number): TranscriptEntry {
   return {
     kind: "model_call",
     atMs,
@@ -42,12 +38,8 @@ describe("buildEntryTimeline", () => {
           modelCall(3000, 25, 0.03),
         ],
       });
-      expect(timeline.map((p) => p.cumulativeTokens)).toEqual([
-        100, 100, 150, 175,
-      ]);
-      expect(timeline.map((p) => p.cumulativeCostUsd)).toEqual([
-        0.01, 0.01, 0.03, 0.06,
-      ]);
+      expect(timeline.map((p) => p.cumulativeTokens)).toEqual([100, 100, 150, 175]);
+      expect(timeline.map((p) => p.cumulativeCostUsd)).toEqual([0.01, 0.01, 0.03, 0.06]);
     });
   });
 
@@ -102,9 +94,7 @@ describe("toolPrimaryArg", () => {
   });
 
   it("prefers command for a Bash call", () => {
-    expect(toolPrimaryArg({ command: "git status", timeout: 5 })).toBe(
-      "git status",
-    );
+    expect(toolPrimaryArg({ command: "git status", timeout: 5 })).toBe("git status");
   });
 
   it("falls back to the first entry when no known key is present", () => {

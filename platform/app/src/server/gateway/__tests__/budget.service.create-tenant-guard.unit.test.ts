@@ -15,10 +15,7 @@ import { GatewayBudgetService } from "../budget.service";
 
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";
 
-function mockPrisma(overrides: {
-  team?: unknown;
-  project?: unknown;
-}): PrismaClient {
+function mockPrisma(overrides: { team?: unknown; project?: unknown }): PrismaClient {
   return {
     organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
     team: { findFirst: vi.fn().mockResolvedValue(overrides.team ?? null) },
@@ -73,9 +70,7 @@ describe("GatewayBudgetService.create cross-org scope guard", () => {
 
   describe("when the TEAM belongs to the caller's organization", () => {
     it("passes the guard and proceeds to persist", async () => {
-      const sut = GatewayBudgetService.create(
-        mockPrisma({ team: { id: "team_ok" } }),
-      );
+      const sut = GatewayBudgetService.create(mockPrisma({ team: { id: "team_ok" } }));
       await expect(
         sut.create({
           ...baseInput,

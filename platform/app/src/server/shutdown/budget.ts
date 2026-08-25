@@ -50,10 +50,7 @@ const PROCESS_SLACK_MS = 15_000;
 export const KUBELET_SLACK_MS = 10_000;
 
 function isDevelopment(): boolean {
-  return (
-    process.env.NODE_ENV === "development" ||
-    process.env.ENVIRONMENT === "local"
-  );
+  return process.env.NODE_ENV === "development" || process.env.ENVIRONMENT === "local";
 }
 
 /**
@@ -106,9 +103,7 @@ export function resolveShutdownBudget(): ShutdownBudget {
     queueDrainMs,
     appCloseMs,
     processDeadlineMs,
-    requiredGracePeriodSeconds: Math.ceil(
-      (processDeadlineMs + KUBELET_SLACK_MS) / 1000,
-    ),
+    requiredGracePeriodSeconds: Math.ceil((processDeadlineMs + KUBELET_SLACK_MS) / 1000),
   };
 }
 

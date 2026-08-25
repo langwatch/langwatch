@@ -1,8 +1,10 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
 import { Dialog, type DialogRootProps } from "~/components/ui/dialog";
 
-interface AskIfUserWantsToContinueDraftDialogProps
-  extends Omit<DialogRootProps, "children"> {
+interface AskIfUserWantsToContinueDraftDialogProps extends Omit<
+  DialogRootProps,
+  "children"
+> {
   onStartNew: () => void;
   onContinueDraft: () => void;
 }
@@ -21,8 +23,8 @@ export function AskIfUserWantsToContinueDraftDialog({
         </Dialog.Header>
         <Dialog.Body>
           <Text>
-            You have an unfinished draft evaluation. Would you like to continue
-            with it or start a new one?
+            You have an unfinished draft evaluation. Would you like to continue with it or
+            start a new one?
           </Text>
         </Dialog.Body>
         <Dialog.Footer>

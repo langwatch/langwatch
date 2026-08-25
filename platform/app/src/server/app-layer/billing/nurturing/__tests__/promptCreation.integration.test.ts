@@ -202,13 +202,9 @@ describe("afterPromptCreated()", () => {
 
   describe("when Customer.io API is unavailable", () => {
     it("does not throw (fire-and-forget)", async () => {
-      const { captureException } = await import(
-        "~/utils/posthogErrorCapture"
-      );
+      const { captureException } = await import("~/utils/posthogErrorCapture");
       const prisma = createMockPrisma({ promptCount: 1 });
-      mockNurturing.identifyUser.mockRejectedValueOnce(
-        new Error("CIO unavailable"),
-      );
+      mockNurturing.identifyUser.mockRejectedValueOnce(new Error("CIO unavailable"));
 
       expect(() =>
         afterPromptCreated({
@@ -226,13 +222,9 @@ describe("afterPromptCreated()", () => {
 
   describe("when Prisma query fails", () => {
     it("captures the error and does not throw", async () => {
-      const { captureException } = await import(
-        "~/utils/posthogErrorCapture"
-      );
+      const { captureException } = await import("~/utils/posthogErrorCapture");
       const prisma = createMockPrisma();
-      prisma.project.findUnique.mockRejectedValueOnce(
-        new Error("DB unavailable"),
-      );
+      prisma.project.findUnique.mockRejectedValueOnce(new Error("DB unavailable"));
 
       expect(() =>
         afterPromptCreated({

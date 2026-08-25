@@ -1,7 +1,4 @@
-import type {
-  RetentionPolicy,
-  RetentionPolicyResolver,
-} from "../runtime.types";
+import type { RetentionPolicy, RetentionPolicyResolver } from "../runtime.types";
 import type { TenantId } from "../domain/tenantId";
 import type { Event } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
@@ -279,9 +276,7 @@ export class MapAccumulator {
           retentionPolicy,
         };
         for (let i = 0; i < entries.length; i += writeBatchSize) {
-          const chunk = entries
-            .slice(i, i + writeBatchSize)
-            .map((e) => e.record);
+          const chunk = entries.slice(i, i + writeBatchSize).map((e) => e.record);
           await store.bulkAppend(chunk, context);
         }
       } else {
@@ -349,15 +344,13 @@ export class StateAccumulator {
   apply(event: ReplayEvent): void {
     // Drop events this projection does not declare — an accumulator may be fed
     // the union of event types when it shares a load with sibling projections.
-    if (this.eventTypeSet.size > 0 && !this.eventTypeSet.has(event.type))
-      return;
+    if (this.eventTypeSet.size > 0 && !this.eventTypeSet.has(event.type)) return;
 
     // ADR-022: events arrive already leaned (rowToEvent), exactly as live
     // dispatch leans before its handlers, so a rebuilt row matches the
     // live-folded one.
     const domainEvent = event as unknown as Event;
-    const projectionKey =
-      this.projection.key?.(domainEvent) ?? event.aggregateId;
+    const projectionKey = this.projection.key?.(domainEvent) ?? event.aggregateId;
     const scopedKey = tenantScopedKey(event.tenantId, projectionKey);
 
     const existing = this.entries.get(scopedKey);

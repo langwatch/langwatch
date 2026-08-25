@@ -107,24 +107,22 @@ describe("buildCustomModelDisplayNames()", () => {
       { modelId: "gpt-5.3", mode: "chat" } as CustomModelEntry,
       { displayName: "Orphan", mode: "chat" } as CustomModelEntry,
     ];
-    const providers = [
-      makeProvider({ provider: "custom", customModels: entries }),
-    ];
+    const providers = [makeProvider({ provider: "custom", customModels: entries })];
 
     describe("when display names are resolved for them", () => {
       /** @scenario A blank or incomplete custom entry falls back to the model id */
       it("resolves each entry that has a model id to that model id", () => {
         const displayNames = buildCustomModelDisplayNames(providers);
 
-        expect(
-          modelDisplayLabel({ fullModelId: "custom/gpt-5.1", displayNames }),
-        ).toBe("gpt-5.1");
-        expect(
-          modelDisplayLabel({ fullModelId: "custom/gpt-5.2", displayNames }),
-        ).toBe("gpt-5.2");
-        expect(
-          modelDisplayLabel({ fullModelId: "custom/gpt-5.3", displayNames }),
-        ).toBe("gpt-5.3");
+        expect(modelDisplayLabel({ fullModelId: "custom/gpt-5.1", displayNames })).toBe(
+          "gpt-5.1",
+        );
+        expect(modelDisplayLabel({ fullModelId: "custom/gpt-5.2", displayNames })).toBe(
+          "gpt-5.2",
+        );
+        expect(modelDisplayLabel({ fullModelId: "custom/gpt-5.3", displayNames })).toBe(
+          "gpt-5.3",
+        );
       });
 
       it("skips the entry with no model id", () => {
@@ -203,17 +201,14 @@ describe("modelDisplayLabel()", () => {
     describe("when the label is resolved", () => {
       /** @scenario A legacy custom model resolves to its model id */
       it("resolves to its model id", () => {
-        const legacyEntries = toLegacyCompatibleCustomModels(
-          ["gpt-5.1"],
-          "chat",
-        );
+        const legacyEntries = toLegacyCompatibleCustomModels(["gpt-5.1"], "chat");
         const displayNames = buildCustomModelDisplayNames([
           makeProvider({ provider: "custom", customModels: legacyEntries }),
         ]);
 
-        expect(
-          modelDisplayLabel({ fullModelId: "custom/gpt-5.1", displayNames }),
-        ).toBe("gpt-5.1");
+        expect(modelDisplayLabel({ fullModelId: "custom/gpt-5.1", displayNames })).toBe(
+          "gpt-5.1",
+        );
       });
     });
   });

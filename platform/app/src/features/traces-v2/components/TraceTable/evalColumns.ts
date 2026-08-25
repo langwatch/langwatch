@@ -1,8 +1,5 @@
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
-import {
-  EVAL_FIELD_LABELS,
-  type EvalColumnField,
-} from "../../lens/evalColumnId";
+import { EVAL_FIELD_LABELS, type EvalColumnField } from "../../lens/evalColumnId";
 import type { TraceEvalResult, TraceListItem } from "../../types/trace";
 
 /**
@@ -87,8 +84,7 @@ export function buildEvalColumnDef({
   // Erase the value type at this boundary once instead of casting at the
   // push site.
   return evalCol.accessor(
-    (row) =>
-      evalFieldValue({ ev: latestEvalForKey({ row, evaluatorKey }), field }),
+    (row) => evalFieldValue({ ev: latestEvalForKey({ row, evaluatorKey }), field }),
     {
       id,
       header: label,

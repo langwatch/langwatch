@@ -118,13 +118,9 @@ export async function buildServiceCatalogue({
       operations.push({
         name,
         path: `${basePath}/${namespace}${ep.path}`,
-        ...(docs?.operationId !== undefined
-          ? { operationId: docs.operationId }
-          : {}),
+        ...(docs?.operationId !== undefined ? { operationId: docs.operationId } : {}),
         ...(docs?.summary !== undefined ? { summary: docs.summary } : {}),
-        ...(docs?.description !== undefined
-          ? { description: docs.description }
-          : {}),
+        ...(docs?.description !== undefined ? { description: docs.description } : {}),
         input: await jsonSchemaOf(ep.config.input),
         output: await jsonSchemaOf(ep.config.output),
         status:

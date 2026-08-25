@@ -105,12 +105,10 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
  *
  * Spec: specs/ai-gateway/governance/persona-aware-chrome.feature
  */
-const PersonalScopeHeaderSwitcher = React.memo(
-  function PersonalScopeHeaderSwitcher() {
-    const data = useWorkspaceData();
-    return <WorkspaceSwitcher {...data} current={{ kind: "personal" }} />;
-  },
-);
+const PersonalScopeHeaderSwitcher = React.memo(function PersonalScopeHeaderSwitcher() {
+  const data = useWorkspaceData();
+  return <WorkspaceSwitcher {...data} current={{ kind: "personal" }} />;
+});
 
 /**
  * Header chip rendered on project-scope routes (`/[project]/*`,
@@ -125,12 +123,10 @@ const PersonalScopeHeaderSwitcher = React.memo(
  *
  * Spec: specs/ai-gateway/governance/workspace-switcher.feature
  */
-const ProjectScopeHeaderSwitcher = React.memo(
-  function ProjectScopeHeaderSwitcher() {
-    const data = useWorkspaceData();
-    return <WorkspaceSwitcher {...data} />;
-  },
-);
+const ProjectScopeHeaderSwitcher = React.memo(function ProjectScopeHeaderSwitcher() {
+  const data = useWorkspaceData();
+  return <WorkspaceSwitcher {...data} />;
+});
 
 /**
  * Header chip rendered on org-scope routes (`/settings/*`, `/governance`).
@@ -246,10 +242,9 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                   // but still have full access. Resolve the current user's
                   // organization role explicitly rather than relying on
                   // members[0] being pre-filtered.
-                  const currentUserOrgRole =
-                    projectGroup.organization.members.find(
-                      (m) => m.userId === session?.user.id,
-                    )?.role;
+                  const currentUserOrgRole = projectGroup.organization.members.find(
+                    (m) => m.userId === session?.user.id,
+                  )?.role;
                   return (
                     currentUserOrgRole === OrganizationUserRole.ADMIN ||
                     (projectGroup.team.members?.some(
@@ -286,9 +281,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                           })}
                           onClick={() => {
                             const currentPath = window.location.pathname;
-                            const hasProjectInPath = currentPath.includes(
-                              project.slug,
-                            );
+                            const hasProjectInPath = currentPath.includes(project.slug);
                             if (!hasProjectInPath) {
                               localStorage.setItem(
                                 "selectedProjectSlug",
@@ -423,10 +416,7 @@ export const LegacyDashboardLayout = ({
   // fallback: "lg" tells Chakra to assume large screen during SSR/initial render,
   // so the menu starts expanded and only compacts after hydration on small screens.
   // This avoids the compact→expanded flicker on desktop page navigations.
-  const isSmallScreen = useBreakpointValue(
-    { base: true, lg: false },
-    { fallback: "lg" },
-  );
+  const isSmallScreen = useBreakpointValue({ base: true, lg: false }, { fallback: "lg" });
   const compactMenu = isSmallScreen ? true : compactMenuProp;
   const router = useRouter();
 
@@ -439,17 +429,11 @@ export const LegacyDashboardLayout = ({
   const { data: session } = useRequiredSession({ required: !publicPage });
 
   const bypassProjectGating = personalScope || orgScope;
-  const {
-    isLoading,
-    organization,
-    organizations,
-    team,
-    project,
-    hasPermission,
-  } = useOrganizationTeamProject({
-    redirectToOnboarding: !bypassProjectGating,
-    redirectToProjectOnboarding: !bypassProjectGating,
-  });
+  const { isLoading, organization, organizations, team, project, hasPermission } =
+    useOrganizationTeamProject({
+      redirectToOnboarding: !bypassProjectGating,
+      redirectToProjectOnboarding: !bypassProjectGating,
+    });
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
     {
@@ -480,9 +464,7 @@ export const LegacyDashboardLayout = ({
     claimDockShell();
     return releaseDockShell;
   }, [claimDockShell, releaseDockShell]);
-  const langyDockInset = langyDockShifted
-    ? LANGY_DOCKED_OFFSET + LANGY_DOCK_GAP
-    : 0;
+  const langyDockInset = langyDockShifted ? LANGY_DOCKED_OFFSET + LANGY_DOCK_GAP : 0;
 
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <NotFoundScene />;
@@ -498,9 +480,7 @@ export const LegacyDashboardLayout = ({
   const isOnOwnPersonalProject =
     !!team?.isPersonal && team.ownerUserId === session?.user?.id;
   const isPersonalScopeRoute =
-    personalScope ||
-    router.pathname.startsWith("/me") ||
-    isOnOwnPersonalProject;
+    personalScope || router.pathname.startsWith("/me") || isOnOwnPersonalProject;
   const isOrgScopeRoute = orgScope || router.pathname === "/governance";
 
   if (

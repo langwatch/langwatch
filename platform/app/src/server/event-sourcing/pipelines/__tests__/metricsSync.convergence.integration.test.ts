@@ -169,30 +169,12 @@ describe.skipIf(!hasTestcontainers)(
         .withClickHouseMapProjection(
           new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
-        .withProjectionSubscriber(
-          "evaluationTrigger",
-          noopFoldSubscriber() as any,
-        )
-        .withProjectionSubscriber(
-          "customEvaluationSync",
-          noopFoldSubscriber() as any,
-        )
-        .withProjectionSubscriber(
-          "traceUpdateBroadcast",
-          noopFoldSubscriber() as any,
-        )
-        .withProjectionSubscriber(
-          "simulationMetricsSync",
-          noopFoldSubscriber() as any,
-        )
-        .withProjectionSubscriber(
-          "projectMetadata",
-          noopFoldSubscriber() as any,
-        )
-        .withProjectionSubscriber(
-          "spanStorageBroadcast",
-          noopMapSubscriber() as any,
-        )
+        .withProjectionSubscriber("evaluationTrigger", noopFoldSubscriber() as any)
+        .withProjectionSubscriber("customEvaluationSync", noopFoldSubscriber() as any)
+        .withProjectionSubscriber("traceUpdateBroadcast", noopFoldSubscriber() as any)
+        .withProjectionSubscriber("simulationMetricsSync", noopFoldSubscriber() as any)
+        .withProjectionSubscriber("projectMetadata", noopFoldSubscriber() as any)
+        .withProjectionSubscriber("spanStorageBroadcast", noopMapSubscriber() as any)
         .withCommand("recordSpan", TestRecordSpanCommand as any)
         .withCommand("assignTopic", AssignTopicCommand as any)
         .build();

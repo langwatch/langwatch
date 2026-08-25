@@ -36,9 +36,7 @@ function makeCursor(
   pageSize = 25,
   sortDirection: "asc" | "desc" = "desc",
 ): string {
-  return btoa(
-    JSON.stringify({ lastTimestamp, lastTraceId, pageSize, sortDirection }),
-  );
+  return btoa(JSON.stringify({ lastTimestamp, lastTraceId, pageSize, sortDirection }));
 }
 
 describe("useMessagesNavigationFooter()", () => {

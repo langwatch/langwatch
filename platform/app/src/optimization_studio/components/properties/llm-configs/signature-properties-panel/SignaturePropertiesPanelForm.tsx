@@ -69,8 +69,7 @@ export function SignaturePropertiesPanelForm({
 
   // Initialize form with values from node data
   const initialConfigValues = useMemo(
-    () =>
-      safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(node.data),
+    () => safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(node.data),
     [node.data],
   );
 
@@ -174,24 +173,19 @@ export function SignaturePropertiesPanelForm({
       if (!currentNode) continue;
       dependentNodes.push(currentNode);
       toVisit.push(
-        ...edges
-          .filter((edge) => edge.source === currentNode)
-          .map((edge) => edge.target),
+        ...edges.filter((edge) => edge.source === currentNode).map((edge) => edge.target),
       );
     }
 
     return Object.fromEntries(
       nodes
-        .filter(
-          (node) => !dependentNodes.includes(node.id) && node.id !== "end",
-        )
+        .filter((node) => !dependentNodes.includes(node.id) && node.id !== "end")
         .map((node) => [
           node.id,
           node.data.outputs
             ?.map((output) => output.identifier)
-            .filter(
-              (id) => !currentConnections.includes(`${node.id}.outputs.${id}`),
-            ) ?? [],
+            .filter((id) => !currentConnections.includes(`${node.id}.outputs.${id}`)) ??
+            [],
         ]),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -236,10 +230,7 @@ export function SignaturePropertiesPanelForm({
       // Remove existing edge for this input
       const filteredEdges = currentEdges.filter(
         (edge) =>
-          !(
-            edge.target === node.id &&
-            edge.targetHandle === `inputs.${identifier}`
-          ),
+          !(edge.target === node.id && edge.targetHandle === `inputs.${identifier}`),
       );
 
       if (mapping && mapping.type === "source") {
@@ -262,11 +253,7 @@ export function SignaturePropertiesPanelForm({
     [getWorkflow, node.id, setEdges, updateNodeInternals],
   );
 
-  const onAddEdge = (
-    id: string,
-    handle: string,
-    content: PromptTextAreaOnAddMention,
-  ) => {
+  const onAddEdge = (id: string, handle: string, content: PromptTextAreaOnAddMention) => {
     const newHandle = edgeConnectToNewHandle(id, handle, node.id);
     updateNodeInternals(node.id);
 
@@ -302,11 +289,7 @@ export function SignaturePropertiesPanelForm({
     content: PromptTextAreaOnAddMention,
     idx: number,
   ): string | undefined => {
-    const {
-      node: stateNode,
-      newPrompt,
-      newHandle,
-    } = onAddEdge(id, handle, content);
+    const { node: stateNode, newPrompt, newHandle } = onAddEdge(id, handle, content);
 
     // Get form messages to correctly map form index to node parameter
     const formMessages = messageFields.fields.map((f) => ({
@@ -348,9 +331,7 @@ export function SignaturePropertiesPanelForm({
         <VStack width="full" gap={4}>
           <PromptSourceHeader
             node={node}
-            onPromptSourceSelect={(config) =>
-              void handlePromptSourceSelect(config)
-            }
+            onPromptSourceSelect={(config) => void handlePromptSourceSelect(config)}
           />
           <WrappedOptimizationStudioLLMConfigField />
           {templateAdapter === "default" && (

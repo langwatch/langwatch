@@ -52,10 +52,8 @@ SELECT 1`;
 async function bootStorageStatsCollection(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const {
-    startStorageStatsCollectionFromSharedClient,
-    stopStorageStatsCollection,
-  } = await import("~/server/clickhouse/metrics");
+  const { startStorageStatsCollectionFromSharedClient, stopStorageStatsCollection } =
+    await import("~/server/clickhouse/metrics");
   const hasStarted = startStorageStatsCollectionFromSharedClient();
   if (hasStarted) {
     shutdownHandles.push(() => stopStorageStatsCollection());
@@ -71,15 +69,11 @@ async function bootScenarioProcessor(
   shutdownHandles: ShutdownHandles,
   app: App,
 ): Promise<void> {
-  const { ScenarioExecutionPool } = await import(
-    "~/server/scenarios/execution/execution-pool"
-  );
-  const { startScenarioProcessor } = await import(
-    "~/server/scenarios/scenario.processor"
-  );
-  const { SCENARIO_WORKER } = await import(
-    "~/server/scenarios/scenario.constants"
-  );
+  const { ScenarioExecutionPool } =
+    await import("~/server/scenarios/execution/execution-pool");
+  const { startScenarioProcessor } =
+    await import("~/server/scenarios/scenario.processor");
+  const { SCENARIO_WORKER } = await import("~/server/scenarios/scenario.constants");
   const { prisma } = await import("~/server/db");
   const scenarioPool = new ScenarioExecutionPool({
     concurrency: SCENARIO_WORKER.CONCURRENCY,
@@ -99,12 +93,8 @@ async function bootScenarioProcessor(
 
 // Per-tenant enqueue-rate anomaly detector (surfaces runaway tenants on
 // the Ops page).
-async function bootAnomalyWorker(
-  shutdownHandles: ShutdownHandles,
-): Promise<void> {
-  const { startAnomalyWorker } = await import(
-    "~/server/observability/anomalyWorker"
-  );
+async function bootAnomalyWorker(shutdownHandles: ShutdownHandles): Promise<void> {
+  const { startAnomalyWorker } = await import("~/server/observability/anomalyWorker");
   const anomalyWorker = startAnomalyWorker();
   if (anomalyWorker) {
     shutdownHandles.push(() => anomalyWorker.stop());
@@ -118,9 +108,8 @@ async function bootAnomalyWorker(
 async function bootSpendSpikeAnomalyWorker(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startSpendSpikeAnomalyWorker } = await import(
-    "@ee/governance/services/spendSpikeAnomalyWorker"
-  );
+  const { startSpendSpikeAnomalyWorker } =
+    await import("@ee/governance/services/spendSpikeAnomalyWorker");
   const spendSpikeAnomalyWorker = startSpendSpikeAnomalyWorker();
   shutdownHandles.push(() => spendSpikeAnomalyWorker.stop());
   logger.info("spend spike anomaly worker ready");
@@ -133,9 +122,8 @@ async function bootSpendSpikeAnomalyWorker(
 async function bootRealtimeSessionPoller(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startRealtimeSessionPoller } = await import(
-    "~/server/gateway/realtimeSessionPoller"
-  );
+  const { startRealtimeSessionPoller } =
+    await import("~/server/gateway/realtimeSessionPoller");
   const poller = startRealtimeSessionPoller();
   shutdownHandles.push(() => poller.stop());
   logger.info("realtime voice session poller ready");
@@ -143,9 +131,7 @@ async function bootRealtimeSessionPoller(
 
 // Self-hosted daily usage telemetry (no-op on SaaS or when
 // DISABLE_USAGE_STATS is set).
-async function bootUsageStatsWorker(
-  shutdownHandles: ShutdownHandles,
-): Promise<void> {
+async function bootUsageStatsWorker(shutdownHandles: ShutdownHandles): Promise<void> {
   const { startUsageStatsWorker } = await import("~/server/usageStatsWorker");
   const usageStatsWorker = startUsageStatsWorker();
   if (usageStatsWorker) {
@@ -195,8 +181,7 @@ async function evaluateMetricsRequest({
 }> {
   if (url !== "/metrics") return { status: 404 };
   try {
-    if (!isMetricsAuthorized(request as IncomingMessage))
-      return { status: 401 };
+    if (!isMetricsAuthorized(request as IncomingMessage)) return { status: 401 };
   } catch (error) {
     // Fail closed when METRICS_API_KEY is unset in production.
     logger.error({ error }, "worker metrics auth misconfigured");
@@ -322,9 +307,7 @@ server.listen(workerData.port, () => parentPort.postMessage({ isListening: true 
 // so `/healthz` keeps answering while the main loop is saturated. If the
 // thread cannot start, fall back to the old in-loop server rather than boot
 // with no probe target at all.
-async function bootMetricsServer(
-  shutdownHandles: ShutdownHandles,
-): Promise<void> {
+async function bootMetricsServer(shutdownHandles: ShutdownHandles): Promise<void> {
   const metricsPort = getWorkerMetricsPort();
 
   // BigInt64 + Atomics — see the note in LIVENESS_THREAD_SOURCE.
@@ -392,9 +375,7 @@ async function wireLivenessThread(
     // emitting "error" would otherwise leave this promise pending forever
     // and the fallback server would never start.
     const rejectOnEarlyExit = (code: number) =>
-      reject(
-        new Error(`liveness thread exited before listening (code ${code})`),
-      );
+      reject(new Error(`liveness thread exited before listening (code ${code})`));
     thread.once("error", reject);
     thread.once("exit", rejectOnEarlyExit);
     thread.on("message", (msg: { isListening?: boolean; id?: number }) => {
@@ -490,9 +471,7 @@ async function respondToLivenessThread(
  * `setEnvironment()` call and breaks env loading — keep every helper's
  * imports as `await import()` for that reason.
  */
-export async function startWorkers(
-  options: StartWorkersOptions,
-): Promise<WorkerHandle> {
+export async function startWorkers(options: StartWorkersOptions): Promise<WorkerHandle> {
   const shouldStartMetricsServer = options.shouldStartMetricsServer ?? true;
 
   // Resources that hold OS-level handles — child processes, sockets, timers,
@@ -503,9 +482,7 @@ export async function startWorkers(
     // Reverse order: later stages may depend on earlier ones (e.g. the
     // scenario processor depends on the pool it registered into), so tear
     // down newest-first.
-    await Promise.allSettled(
-      [...shutdownHandles].reverse().map((close) => close()),
-    );
+    await Promise.allSettled([...shutdownHandles].reverse().map((close) => close()));
   };
 
   await assertRedisReady({ app: options.app });

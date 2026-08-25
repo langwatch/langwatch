@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Link,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { Node, XYPosition } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 import { useDragLayer } from "react-dnd";
@@ -111,9 +103,7 @@ export const NodeSelectionPanel = ({
       display={isOpen ? "block" : "none"}
       opacity={propertiesExpanded ? 0 : 1}
       visibility={propertiesExpanded ? "hidden" : "visible"}
-      position={
-        propertiesExpanded ? "absolute" : isOpen ? "relative" : "absolute"
-      }
+      position={propertiesExpanded ? "absolute" : isOpen ? "relative" : "absolute"}
       top={0}
       left={0}
       background="bg"
@@ -161,8 +151,7 @@ export const NodeSelectionPanel = ({
                 {components
                   .filter((custom) => custom.isComponent)
                   .map((custom) => {
-                    const isCurrentWorkflow =
-                      custom.id === workflow?.workflow_id;
+                    const isCurrentWorkflow = custom.id === workflow?.workflow_id;
                     return (
                       <NodeDraggable
                         key={custom.id}
@@ -175,13 +164,7 @@ export const NodeSelectionPanel = ({
               </>
             )}
         </VStack>
-        <HStack
-          width="full"
-          padding={3}
-          paddingLeft={5}
-          gap={4}
-          background="bg"
-        >
+        <HStack width="full" padding={3} paddingLeft={5} gap={4} background="bg">
           <Tooltip showArrow content="Star us on GitHub">
             <Link href="https://github.com/langwatch/langwatch" target="_blank">
               <IconWrapper width="20px" height="20px">

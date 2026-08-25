@@ -54,9 +54,7 @@ function SortChip({
         borderColor: active
           ? "var(--chakra-colors-orange-500)"
           : "var(--chakra-colors-border-muted)",
-        backgroundColor: active
-          ? "var(--chakra-colors-orange-50)"
-          : "transparent",
+        backgroundColor: active ? "var(--chakra-colors-orange-50)" : "transparent",
         color: active
           ? "var(--chakra-colors-orange-700)"
           : "var(--chakra-colors-fg-muted)",
@@ -109,9 +107,7 @@ function GovernanceTeamsListPage() {
   // Sort state lives in URL (`?sort=requests`) so the view is deep-linkable
   // and stable across refresh / share-this-view. `spend` is the canonical
   // default; URL is omitted in that case to keep the bare path clean.
-  const sortBy: SortField = isSortField(router.query.sort)
-    ? router.query.sort
-    : "spend";
+  const sortBy: SortField = isSortField(router.query.sort) ? router.query.sort : "spend";
   const setSortBy = (next: SortField) => {
     const params = new URLSearchParams();
     if (next !== "spend") params.set("sort", next);
@@ -131,18 +127,14 @@ function GovernanceTeamsListPage() {
             </Text>
             <Heading size="md">All teams by {SORT_LABEL[sortBy]}</Heading>
             <Text color="fg.muted" fontSize="sm">
-              Every team that reported activity in the last 30 days. Click a row
-              to drill into a single team.
+              Every team that reported activity in the last 30 days. Click a row to drill
+              into a single team.
             </Text>
           </VStack>
         </HStack>
 
         {canReadActivity ? (
-          <TeamSpendPanel
-            orgId={orgId}
-            sortBy={sortBy}
-            onSortChange={setSortBy}
-          />
+          <TeamSpendPanel orgId={orgId} sortBy={sortBy} onSortChange={setSortBy} />
         ) : (
           <PermissionRequiredNotice
             permission="activityMonitor:view"
@@ -284,11 +276,7 @@ function Row({ team }: { team: SpendByTeam }) {
   const isOrgWide = !team.teamId;
   const dotColor = isOrgWide ? "#94a3b8" : getHexColorForString(team.teamName);
   const arrow =
-    team.deltaPctVsPriorWindow > 0
-      ? "↑"
-      : team.deltaPctVsPriorWindow < 0
-        ? "↓"
-        : "·";
+    team.deltaPctVsPriorWindow > 0 ? "↑" : team.deltaPctVsPriorWindow < 0 ? "↓" : "·";
   const trendColor = !team.hasPriorBaseline
     ? "fg.muted"
     : team.deltaPctVsPriorWindow > 25

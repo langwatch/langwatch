@@ -166,11 +166,7 @@ export class AuthzService extends AuthzServiceContract {
     return decision.allowed;
   }
 
-  async isOnEngine({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<boolean> {
+  async isOnEngine({ organizationId }: { organizationId: string }): Promise<boolean> {
     return this.options.isOnEngine?.(organizationId) ?? true;
   }
 
@@ -182,10 +178,7 @@ export class AuthzService extends AuthzServiceContract {
     return this.options.tryGetEngineCutoverAt?.(organizationId) ?? null;
   }
 
-  async authorize<
-    Tier extends BindingScopeTier,
-    Permission extends AuthzPermission,
-  >({
+  async authorize<Tier extends BindingScopeTier, Permission extends AuthzPermission>({
     principal,
     permission,
     scope,
@@ -417,16 +410,14 @@ export class AuthzService extends AuthzServiceContract {
         : false;
 
     const resolvedProjects = await Promise.all(
-      projects.map(
-        async ({ projectId, teamId }): Promise<[string, boolean]> => [
-          projectId,
-          allowedAt(
-            teamId
-              ? { type: "project", id: projectId, teamId, organizationId }
-              : await this.collector.tryResolveScopeRef({ projectId }),
-          ),
-        ],
-      ),
+      projects.map(async ({ projectId, teamId }): Promise<[string, boolean]> => [
+        projectId,
+        allowedAt(
+          teamId
+            ? { type: "project", id: projectId, teamId, organizationId }
+            : await this.collector.tryResolveScopeRef({ projectId }),
+        ),
+      ]),
     );
 
     return {
@@ -554,9 +545,7 @@ export class AuthzService extends AuthzServiceContract {
     });
     if (result.allowed) return;
     if (result.organizationRole === "EXTERNAL") {
-      throw new LiteMemberRestrictedError(
-        permission.split(":")[0] ?? "unknown",
-      );
+      throw new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown");
     }
     throw new ProjectPermissionDeniedError(permission);
   }
@@ -668,11 +657,7 @@ export class AuthzService extends AuthzServiceContract {
    * between the decision and this call changes the rendered walk. Carrying
    * the decision's own snapshot lands with the stage E explain surface.
    */
-  async explainDecision({
-    decision,
-  }: {
-    decision: AuthzDecision;
-  }): Promise<string[]> {
+  async explainDecision({ decision }: { decision: AuthzDecision }): Promise<string[]> {
     const grants = await this.collectCached({
       principal: decision.principal,
       organizationId: scopeOrganizationId(decision.scope),
@@ -759,11 +744,7 @@ export class AuthzService extends AuthzServiceContract {
     // The epoch is the correctness bound and the age is the safety net: an
     // epoch that stops advancing (a wedged or silently-reset store) would
     // otherwise pin this snapshot for the process's whole life.
-    if (
-      entry &&
-      entry.epoch === currentEpoch &&
-      Date.now() - entry.storedAt < maxAgeMs
-    ) {
+    if (entry && entry.epoch === currentEpoch && Date.now() - entry.storedAt < maxAgeMs) {
       return entry.grants;
     }
 
@@ -797,9 +778,7 @@ export class AuthzService extends AuthzServiceContract {
       {
         principalType: decision.principal.type,
         principalId:
-          decision.principal.type === "anonymous"
-            ? undefined
-            : decision.principal.id,
+          decision.principal.type === "anonymous" ? undefined : decision.principal.id,
         permission: decision.permission,
         scopeType: decision.scope.type,
         scopeId: decision.scope.id,

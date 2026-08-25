@@ -1,11 +1,5 @@
 import type { Monaco } from "@monaco-editor/react";
-import type {
-  editor,
-  IDisposable,
-  IRange,
-  languages,
-  Position,
-} from "monaco-editor";
+import type { editor, IDisposable, IRange, languages, Position } from "monaco-editor";
 import {
   PYTHON_BUILTINS,
   PYTHON_KEYWORDS,
@@ -24,10 +18,7 @@ import {
   scanImports,
 } from "./shared";
 
-function itemKind(
-  monaco: Monaco,
-  kind: PyMember["kind"],
-): languages.CompletionItemKind {
+function itemKind(monaco: Monaco, kind: PyMember["kind"]): languages.CompletionItemKind {
   switch (kind) {
     case "function":
       return monaco.languages.CompletionItemKind.Function;
@@ -96,9 +87,7 @@ export function registerCompletion(
       const importMemberMatch = IMPORT_MEMBER_PREFIX.exec(lineBefore);
       if (importMemberMatch) {
         const moduleName = importMemberMatch[1];
-        const mod = moduleName
-          ? PYTHON_STDLIB_MODULE_BY_NAME.get(moduleName)
-          : undefined;
+        const mod = moduleName ? PYTHON_STDLIB_MODULE_BY_NAME.get(moduleName) : undefined;
         if (mod) {
           return {
             suggestions: mod.members.map((m) =>
@@ -221,8 +210,7 @@ export function registerCompletion(
       // Cheap detection: if the surrounding text on/before this line looks
       // like a return dict, offer the declared outputs as string-key snippets.
       const wantsKey =
-        /\breturn\s*\{[^}]*$/.test(lineBefore) ||
-        /\{[^}]*$/.test(lineBefore.trimStart());
+        /\breturn\s*\{[^}]*$/.test(lineBefore) || /\{[^}]*$/.test(lineBefore.trimStart());
       if (wantsKey) {
         for (const field of contractRef.current.outputs) {
           const defaultLit = defaultValueLiteralFor(field.type);

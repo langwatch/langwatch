@@ -170,11 +170,7 @@ describe("EventRepositoryClickHouse read projections", () => {
         const client = createMockClient({});
         const repository = new EventRepositoryClickHouse(async () => client);
 
-        const [plain] = await repository.getEventRecords(
-          "tenant",
-          "trace",
-          "id",
-        );
+        const [plain] = await repository.getEventRecords("tenant", "trace", "id");
         const [upTo] = await repository.getEventRecordsUpTo(upToRequest);
         const [paged] = await repository.getEventRecordsUpToPaged({
           ...upToRequest,

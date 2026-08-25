@@ -19,10 +19,7 @@ import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import { lwqlAllowedTables, lwqlGatedColumns } from "../catalog/types";
 import { describeLangWatchQLSchema } from "../schema";
 import { validateLangWatchQL } from "../validation/validate";
-import {
-  GATED_DATASET,
-  GATED_DATASET_QUALIFIED_NAME,
-} from "./gatedDatasetFixture";
+import { GATED_DATASET, GATED_DATASET_QUALIFIED_NAME } from "./gatedDatasetFixture";
 
 const DATABASE = "analytics";
 
@@ -85,9 +82,7 @@ describe("given the LangWatchQL schema catalog", () => {
     it("gives every column a type and a description", () => {
       for (const column of columnsOf(FULLY_PERMITTED)) {
         expect(column.type, `${column.dataset}.${column.name}`).not.toBe("");
-        expect(column.description, `${column.dataset}.${column.name}`).not.toBe(
-          "",
-        );
+        expect(column.description, `${column.dataset}.${column.name}`).not.toBe("");
       }
     });
 
@@ -118,9 +113,7 @@ describe("given the LangWatchQL schema catalog", () => {
       );
       expect(byName.get("analytics.traces.TotalDurationMs")!.unit).toBe("ms");
       expect(byName.get("analytics.traces.TotalCost")!.unit).toBe("USD");
-      expect(byName.get("analytics.traces.TotalPromptTokenCount")!.unit).toBe(
-        "tokens",
-      );
+      expect(byName.get("analytics.traces.TotalPromptTokenCount")!.unit).toBe("tokens");
       expect(byName.get("analytics.spans.Cost")!.unit).toBe("USD");
       // An identifier measures nothing, and says so.
       expect(byName.get("analytics.traces.TraceId")!.unit).toBeNull();
@@ -130,9 +123,7 @@ describe("given the LangWatchQL schema catalog", () => {
   describe("when a column is withheld from the caller", () => {
     /** @scenario "The schema endpoint names which permission unlocks each gated column" */
     it("names the permission kinds that unlock it rather than a bare refusal", () => {
-      const withheld = columnsOf(WITHOUT_CONTENT).filter(
-        (column) => !column.available,
-      );
+      const withheld = columnsOf(WITHOUT_CONTENT).filter((column) => !column.available);
       expect(
         withheld.length,
         "no column is withheld from a caller with no content permission — the claim below is vacuous",
@@ -152,19 +143,14 @@ describe("given the LangWatchQL schema catalog", () => {
       );
       // The three gate kinds, each read off a column the catalog declares it
       // for, so a collapsed boolean could not pass this.
-      expect(byName.get("analytics.traces.CapturedInput")!.gates).toEqual([
+      expect(byName.get("analytics.traces.CapturedInput")!.gates).toEqual(["input"]);
+      expect(byName.get("analytics.traces.CapturedOutput")!.gates).toEqual(["output"]);
+      expect(byName.get("analytics.traces.TotalCost")!.gates).toEqual(["costs"]);
+      // A column that needs two permissions says both.
+      expect(byName.get("analytics.simulations.MessageContents")!.gates).toEqual([
         "input",
-      ]);
-      expect(byName.get("analytics.traces.CapturedOutput")!.gates).toEqual([
         "output",
       ]);
-      expect(byName.get("analytics.traces.TotalCost")!.gates).toEqual([
-        "costs",
-      ]);
-      // A column that needs two permissions says both.
-      expect(
-        byName.get("analytics.simulations.MessageContents")!.gates,
-      ).toEqual(["input", "output"]);
     });
 
     /** @scenario "The schema endpoint names which permission unlocks each gated column" */
@@ -190,9 +176,7 @@ describe("given the LangWatchQL schema catalog", () => {
       );
       expect(gated.length).toBeGreaterThan(0);
       for (const column of gated) {
-        expect(column.available, `${column.dataset}.${column.name}`).toBe(
-          false,
-        );
+        expect(column.available, `${column.dataset}.${column.name}`).toBe(false);
       }
     });
 
@@ -212,11 +196,7 @@ describe("given the LangWatchQL schema catalog", () => {
      * single column, in either direction.
      */
     it("accepts exactly the columns it advertises, and refuses exactly the rest", () => {
-      for (const protections of [
-        FULLY_PERMITTED,
-        WITHOUT_CONTENT,
-        WITHOUT_ANYTHING,
-      ]) {
+      for (const protections of [FULLY_PERMITTED, WITHOUT_CONTENT, WITHOUT_ANYTHING]) {
         const policy = policyFor(protections);
         for (const column of columnsOf(protections)) {
           const result = validateLangWatchQL({
@@ -268,13 +248,8 @@ describe("given the LangWatchQL schema catalog", () => {
      */
     it("never puts the tenant scope column in its projection", () => {
       for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
-        const projection = /select\s+([\s\S]*?)\s+from\b/i.exec(
-          dataset.exampleSql,
-        )?.[1];
-        expect(
-          projection,
-          `${dataset.name}: no SELECT ... FROM found`,
-        ).toBeDefined();
+        const projection = /select\s+([\s\S]*?)\s+from\b/i.exec(dataset.exampleSql)?.[1];
+        expect(projection, `${dataset.name}: no SELECT ... FROM found`).toBeDefined();
         expect(projection, dataset.name).not.toContain("TenantId");
       }
     });
@@ -305,9 +280,9 @@ describe("given the LangWatchQL schema catalog", () => {
     });
 
     it("keeps every other dataset, rather than hiding the schema", () => {
-      expect(
-        schemaWith(WITHOUT_CONTENT).datasets.map((dataset) => dataset.name),
-      ).toEqual(LWQL_VIEW_CATALOG.map((view) => `${DATABASE}.${view.name}`));
+      expect(schemaWith(WITHOUT_CONTENT).datasets.map((dataset) => dataset.name)).toEqual(
+        LWQL_VIEW_CATALOG.map((view) => `${DATABASE}.${view.name}`),
+      );
     });
 
     it("names the dataset's permission on each of its columns", () => {
@@ -365,10 +340,7 @@ describe("given the LangWatchQL schema catalog", () => {
           sql: `SELECT ${column.name} FROM ${GATED_DATASET_QUALIFIED_NAME}`,
           ...policy,
         });
-        expect(
-          result.ok,
-          `${column.name} was readable in a hidden dataset`,
-        ).toBe(false);
+        expect(result.ok, `${column.name} was readable in a hidden dataset`).toBe(false);
       }
     });
   });

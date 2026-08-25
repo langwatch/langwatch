@@ -13,7 +13,9 @@ import Script from "~/utils/compat/next-script";
 import { useCrispBubblePolicy } from "~/utils/crispBubblePolicy";
 
 class AppSaasBrowserService extends SaasBrowserService {
-  private constructor(private readonly mutateLastLogin: () => void) { super(); }
+  private constructor(private readonly mutateLastLogin: () => void) {
+    super();
+  }
 
   static create(mutateLastLogin: () => void): AppSaasBrowserService {
     return new AppSaasBrowserService(mutateLastLogin);

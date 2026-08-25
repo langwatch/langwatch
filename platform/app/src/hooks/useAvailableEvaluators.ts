@@ -11,18 +11,14 @@ import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 export const useAvailableEvaluators = ():
-  | Record<
-      EvaluatorTypes | `custom/${string}`,
-      EvaluatorDefinition<EvaluatorTypes>
-    >
+  | Record<EvaluatorTypes | `custom/${string}`, EvaluatorDefinition<EvaluatorTypes>>
   | undefined => {
   const { project } = useOrganizationTeamProject();
 
-  const availableCustomEvaluators =
-    api.evaluations.availableCustomEvaluators.useQuery(
-      { projectId: project?.id ?? "" },
-      { enabled: !!project },
-    );
+  const availableCustomEvaluators = api.evaluations.availableCustomEvaluators.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project },
+  );
 
   const availableEvaluators = useMemo(() => {
     if (!availableCustomEvaluators.data) {
@@ -33,8 +29,7 @@ export const useAvailableEvaluators = ():
       ...Object.fromEntries(
         (availableCustomEvaluators.data ?? []).map((evaluator) => {
           const { inputs } = getInputsOutputs(
-            JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-              ?.edges as Edge[],
+            JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))?.edges as Edge[],
             JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
               ?.nodes as JsonArray as unknown[] as Node[],
           );

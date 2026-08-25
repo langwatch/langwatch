@@ -46,17 +46,16 @@ describe("the copy a retired provider's refusal renders", () => {
       replacedBy: providerDeprecation(provider)?.replacedBy,
     }))
     .filter(
-      (entry): entry is { provider: string; replacedBy: string } =>
-        !!entry.replacedBy,
+      (entry): entry is { provider: string; replacedBy: string } => !!entry.replacedBy,
     );
 
   describe("given the registry retires a provider", () => {
-    it.each(deprecated)("names the replacement for $provider", ({
-      provider,
-      replacedBy,
-    }) => {
-      expect(describeRefusal(provider, replacedBy)).not.toBe(UNNAMED);
-    });
+    it.each(deprecated)(
+      "names the replacement for $provider",
+      ({ provider, replacedBy }) => {
+        expect(describeRefusal(provider, replacedBy)).not.toBe(UNNAMED);
+      },
+    );
   });
 
   describe("given a replacement nothing has copy for", () => {

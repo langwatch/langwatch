@@ -24,9 +24,7 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-const featureSchema = z.enum(
-  PERSONAL_FEATURES as readonly [string, ...string[]],
-);
+const featureSchema = z.enum(PERSONAL_FEATURES as readonly [string, ...string[]]);
 
 void featureSchema;
 

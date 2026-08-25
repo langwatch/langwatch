@@ -8,13 +8,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -176,9 +170,7 @@ describe("<TokenValuePicker /> server-side search", () => {
         );
         // …yet the preloaded value, a substring match over the preloaded∪server
         // union, is still shown. Under a replace-regression it would vanish.
-        expect(
-          await screen.findByText("openai/gpt-4o-mini"),
-        ).toBeInTheDocument();
+        expect(await screen.findByText("openai/gpt-4o-mini")).toBeInTheDocument();
       });
     });
   });

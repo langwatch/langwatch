@@ -49,5 +49,4 @@ export const rowCannotServeEmbeddings = ({
 }: {
   provider: string;
   customKeys: unknown;
-}): boolean =>
-  provider === "gemini" && geminiAgentPlatformPair(customKeys) !== null;
+}): boolean => provider === "gemini" && geminiAgentPlatformPair(customKeys) !== null;

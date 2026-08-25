@@ -42,10 +42,7 @@ export function GeneratePromptApiSnippetDialog({
     [promptHandle, apiKey, label],
   );
 
-  const targets = useMemo(
-    () => snippets.map((snippet) => snippet.target),
-    [snippets],
-  );
+  const targets = useMemo(() => snippets.map((snippet) => snippet.target), [snippets]);
 
   if (!snippets) {
     return children;

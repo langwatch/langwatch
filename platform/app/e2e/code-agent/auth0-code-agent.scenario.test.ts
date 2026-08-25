@@ -106,9 +106,7 @@ beforeAll(async () => {
       }
       res
         .writeHead(200, { "content-type": "application/json" })
-        .end(
-          JSON.stringify({ access_token: MINTED_TOKEN, token_type: "Bearer" }),
-        );
+        .end(JSON.stringify({ access_token: MINTED_TOKEN, token_type: "Bearer" }));
     });
   });
   tokenUrl = `${await listen(tokenServer)}/oauth/token`;

@@ -21,9 +21,7 @@ function createLlmSpanCommand({
     { role: "system", content: "You are a helpful assistant." },
     { role: "user", content: "Any advice on sleep?" },
   ],
-  outputMessages = [
-    { role: "assistant", content: "Here are some strategies." },
-  ],
+  outputMessages = [{ role: "assistant", content: "Here are some strategies." }],
   existingTokenAttributes = [] as Array<{
     key: string;
     value: { intValue?: number; stringValue?: string };
@@ -109,8 +107,7 @@ function createDeps(): RecordSpanCommandDependencies {
         // Simulate the real token estimation service behavior:
         // Check if this is an LLM span without token counts, estimate from input/output
         const isLlm = span.attributes.some(
-          (a) =>
-            a.key === "langwatch.span.type" && a.value.stringValue === "llm",
+          (a) => a.key === "langwatch.span.type" && a.value.stringValue === "llm",
         );
         if (!isLlm) return;
 

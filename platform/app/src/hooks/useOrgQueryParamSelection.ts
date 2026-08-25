@@ -31,12 +31,11 @@ export function useOrgQueryParamSelection(): void {
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const [selectedOrganizationId, setSelectedOrganizationId] =
-    useLocalStorage<string>("selectedOrganizationId", "");
-  const [, setSelectedProjectSlug] = useLocalStorage<string>(
-    "selectedProjectSlug",
+  const [selectedOrganizationId, setSelectedOrganizationId] = useLocalStorage<string>(
+    "selectedOrganizationId",
     "",
   );
+  const [, setSelectedProjectSlug] = useLocalStorage<string>("selectedProjectSlug", "");
   const [, setSelectedTeamId] = useLocalStorage<string>("selectedTeamId", "");
 
   const orgParam = searchParams.get("org");

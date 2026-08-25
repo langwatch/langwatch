@@ -87,9 +87,7 @@ function makePrismaStub(perProjectOpenTriggers: Record<string, string[]>): {
   };
 }
 
-function makeClickHouseStub(
-  maxOccurredAtMsByProject: Record<string, number | null>,
-): {
+function makeClickHouseStub(maxOccurredAtMsByProject: Record<string, number | null>): {
   client: ClickHouseClient;
   callsByProject: Record<string, number>;
 } {
@@ -323,14 +321,10 @@ describe("defaultCandidateSources", () => {
         ]),
       },
       trigger: {
-        findMany: vi.fn(async (_args?: FindManyArgs) => [
-          { projectId: PROJECT_A },
-        ]),
+        findMany: vi.fn(async (_args?: FindManyArgs) => [{ projectId: PROJECT_A }]),
       },
       triggerSent: {
-        findMany: vi.fn(async (_args?: FindManyArgs) => [
-          { projectId: PROJECT_B },
-        ]),
+        findMany: vi.fn(async (_args?: FindManyArgs) => [{ projectId: PROJECT_B }]),
       },
     };
   }
@@ -345,8 +339,7 @@ describe("defaultCandidateSources", () => {
       const projects = await sources.loadProjectsWithGraphTriggers();
 
       expect(prismaStub.project.findMany).toHaveBeenCalledTimes(1);
-      const triggerWhere =
-        prismaStub.trigger.findMany.mock.calls[0]?.[0]?.where;
+      const triggerWhere = prismaStub.trigger.findMany.mock.calls[0]?.[0]?.where;
       expect(triggerWhere?.projectId).toEqual({ in: [PROJECT_A, PROJECT_B] });
       expect(projects).toEqual([PROJECT_A]);
     });
@@ -361,8 +354,7 @@ describe("defaultCandidateSources", () => {
 
       const projects = await sources.loadProjectsWithOpenGraphTriggerSent();
 
-      const sentWhere =
-        prismaStub.triggerSent.findMany.mock.calls[0]?.[0]?.where;
+      const sentWhere = prismaStub.triggerSent.findMany.mock.calls[0]?.[0]?.where;
       expect(sentWhere?.projectId).toEqual({ in: [PROJECT_A, PROJECT_B] });
       expect(projects).toEqual(new Set([PROJECT_B]));
     });

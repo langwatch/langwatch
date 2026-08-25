@@ -37,9 +37,7 @@ export interface BudgetChangeEventDedupeService {
 }
 
 /** No Redis (tests, SKIP_REDIS, dev without Redis): emit every time. */
-class NullBudgetChangeEventDedupeService
-  implements BudgetChangeEventDedupeService
-{
+class NullBudgetChangeEventDedupeService implements BudgetChangeEventDedupeService {
   async shouldEmit(): Promise<boolean> {
     return true;
   }
@@ -61,9 +59,7 @@ class NullBudgetChangeEventDedupeService
  * a cached bundle, which is a different kind of cost entirely; the caller owns
  * that distinction.
  */
-export class RedisBudgetChangeEventDedupeService
-  implements BudgetChangeEventDedupeService
-{
+export class RedisBudgetChangeEventDedupeService implements BudgetChangeEventDedupeService {
   constructor(private readonly redis: IORedis | Cluster) {}
 
   async shouldEmit({ projectId }: { projectId: string }): Promise<boolean> {

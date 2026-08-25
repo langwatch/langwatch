@@ -31,17 +31,25 @@ export class PrismaDataRetentionRepository extends DataRetentionRepository {
       },
       select: { scopeType: true, scopeId: true, category: true, retentionDays: true },
     });
-    return rows.map((row) => retentionRowSchema.parse({
-      scopeType: retentionScopeSchema.parse(row.scopeType),
-      scopeId: row.scopeId,
-      category: retentionCategorySchema.parse(row.category),
-      retentionDays: row.retentionDays,
-    }));
+    return rows.map((row) =>
+      retentionRowSchema.parse({
+        scopeType: retentionScopeSchema.parse(row.scopeType),
+        scopeId: row.scopeId,
+        category: retentionCategorySchema.parse(row.category),
+        retentionDays: row.retentionDays,
+      }),
+    );
   }
 
-  async findAllInOrganization(input: { organizationId: string }): Promise<RetentionPolicy[]> {
-    const rows = await this.prisma.retentionPolicy.findMany({ where: { organizationId: input.organizationId } });
-    return rows.map((row) => retentionPolicySchema.parse({ ...row, category: row.category }));
+  async findAllInOrganization(input: {
+    organizationId: string;
+  }): Promise<RetentionPolicy[]> {
+    const rows = await this.prisma.retentionPolicy.findMany({
+      where: { organizationId: input.organizationId },
+    });
+    return rows.map((row) =>
+      retentionPolicySchema.parse({ ...row, category: row.category }),
+    );
   }
 
   async tryFindById(input: { id: string }): Promise<RetentionPolicy | null> {
@@ -56,15 +64,38 @@ export class PrismaDataRetentionRepository extends DataRetentionRepository {
     retentionDays: number;
   }): Promise<RetentionPolicy> {
     const row = await this.prisma.retentionPolicy.upsert({
-      where: { scopeType_scopeId_category: { scopeType: input.scope.scopeType, scopeId: input.scope.scopeId, category: input.category } },
-      update: { organizationId: input.organizationId, retentionDays: input.retentionDays },
-      create: { organizationId: input.organizationId, scopeType: input.scope.scopeType, scopeId: input.scope.scopeId, category: input.category, retentionDays: input.retentionDays },
+      where: {
+        scopeType_scopeId_category: {
+          scopeType: input.scope.scopeType,
+          scopeId: input.scope.scopeId,
+          category: input.category,
+        },
+      },
+      update: {
+        organizationId: input.organizationId,
+        retentionDays: input.retentionDays,
+      },
+      create: {
+        organizationId: input.organizationId,
+        scopeType: input.scope.scopeType,
+        scopeId: input.scope.scopeId,
+        category: input.category,
+        retentionDays: input.retentionDays,
+      },
     });
     return retentionPolicySchema.parse(row);
   }
 
-  async deleteForScope(input: { scope: ScopeAssignment; category: RetentionCategory }): Promise<void> {
-    await this.prisma.retentionPolicy.deleteMany({ where: { scopeType: input.scope.scopeType, scopeId: input.scope.scopeId, category: input.category } });
+  async deleteForScope(input: {
+    scope: ScopeAssignment;
+    category: RetentionCategory;
+  }): Promise<void> {
+    await this.prisma.retentionPolicy.deleteMany({
+      where: {
+        scopeType: input.scope.scopeType,
+        scopeId: input.scope.scopeId,
+        category: input.category,
+      },
+    });
   }
-
 }

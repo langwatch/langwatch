@@ -618,9 +618,7 @@ export function generateConversation(opts: ConversationOptions): TraceConfig[] {
 
     const inputMessages: ChatMessage[] = [...history, userMessage];
 
-    const promptTokens = estimateTokens(
-      inputMessages.map((m) => m.content).join("\n"),
-    );
+    const promptTokens = estimateTokens(inputMessages.map((m) => m.content).join("\n"));
     const completionTokens = estimateTokens(exchange.assistant);
 
     const llmSpan: SpanConfig = {

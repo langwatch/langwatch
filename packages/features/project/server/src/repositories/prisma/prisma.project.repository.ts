@@ -52,9 +52,7 @@ export class PrismaProjectRepository extends ProjectRepository {
   }
 
   async tryFindInternalBySlug(slug: string): Promise<InternalProject | null> {
-    return this.mapInternal(
-      await this.prisma.project.findUnique({ where: { slug } }),
-    );
+    return this.mapInternal(await this.prisma.project.findUnique({ where: { slug } }));
   }
 
   async createInternalOrFindWinner(input: {
@@ -99,9 +97,7 @@ export class PrismaProjectRepository extends ProjectRepository {
         team: { select: { organization: { select: { presenceEnabled: true } } } },
       },
     });
-    return Boolean(
-      project?.presenceEnabled && project.team.organization.presenceEnabled,
-    );
+    return Boolean(project?.presenceEnabled && project.team.organization.presenceEnabled);
   }
 
   async tryGetById(id: string): Promise<Project | null> {
@@ -125,9 +121,7 @@ export class PrismaProjectRepository extends ProjectRepository {
     await this.prisma.project.update({ where: { id }, data });
   }
 
-  async touchCodingAgentSessionSeen(
-    input: TouchCodingAgentActivityInput,
-  ): Promise<void> {
+  async touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void> {
     await this.prisma.project.updateMany({
       where: {
         id: input.projectId,
@@ -245,10 +239,7 @@ export class PrismaProjectRepository extends ProjectRepository {
     );
   }
 
-  async archive(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<Project> {
+  async archive(input: { id: string; organizationId: string }): Promise<Project> {
     const result = await this.prisma.project.updateMany({
       where: {
         id: input.id,
@@ -305,9 +296,7 @@ export class PrismaProjectRepository extends ProjectRepository {
     return rows.map((row) => this.mapProjectRequired(row));
   }
 
-  async findActiveByScopes(
-    input: ActiveProjectsByScopesInput,
-  ): Promise<Project[]> {
+  async findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]> {
     const rows = await this.prisma.project.findMany({
       where: {
         archivedAt: null,
@@ -319,9 +308,7 @@ export class PrismaProjectRepository extends ProjectRepository {
                 ...(input.projectIds.length > 0
                   ? [{ id: { in: input.projectIds } }]
                   : []),
-                ...(input.teamIds.length > 0
-                  ? [{ teamId: { in: input.teamIds } }]
-                  : []),
+                ...(input.teamIds.length > 0 ? [{ teamId: { in: input.teamIds } }] : []),
               ],
             }),
       },
@@ -335,9 +322,7 @@ export class PrismaProjectRepository extends ProjectRepository {
     slug: string;
     teamId: string;
   }): Promise<Project | null> {
-    return this.mapProject(
-      await this.prisma.project.findFirst({ where: input }),
-    );
+    return this.mapProject(await this.prisma.project.findFirst({ where: input }));
   }
 
   tryFindActiveTeamInOrganization(input: {

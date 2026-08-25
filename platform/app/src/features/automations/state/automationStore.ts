@@ -60,8 +60,7 @@ export const useAutomationStore = create<AutomationStore>((set) => ({
   section: null,
   testHistory: [],
 
-  dispatch: (action) =>
-    set((state) => ({ draft: reducer(state.draft, action) })),
+  dispatch: (action) => set((state) => ({ draft: reducer(state.draft, action) })),
   setSection: (section) => set({ section }),
   pushTestAttempt: (attempt) =>
     set((state) => ({

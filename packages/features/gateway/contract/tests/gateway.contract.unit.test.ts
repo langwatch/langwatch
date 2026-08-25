@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  gatewayBudgetCheckInputSchema,
-  gatewayBudgetCheckResultSchema,
-} from "../src";
+import { gatewayBudgetCheckInputSchema, gatewayBudgetCheckResultSchema } from "../src";
 
 describe("gateway contract", () => {
   it("requires request scope context at the boundary", () => {
@@ -29,26 +26,29 @@ describe("gateway contract", () => {
       decision: "hard_block" as const,
       warnings: [],
       blockReason: "Budget exceeded",
-      blockedBy: [{
-        budgetId: "budget_1",
-        scope: "organization",
-        scopeId: "org_1",
-        window: "month",
-        limitUsd: "1.000000",
-        spentUsd: "1.000000",
-      }],
-      scopes: [{
-        scope: "organization",
-        scopeId: "org_1",
-        window: "month",
-        spentUsd: "1.000000",
-        limitUsd: "1.000000",
-      }],
+      blockedBy: [
+        {
+          budgetId: "budget_1",
+          scope: "organization",
+          scopeId: "org_1",
+          window: "month",
+          limitUsd: "1.000000",
+          spentUsd: "1.000000",
+        },
+      ],
+      scopes: [
+        {
+          scope: "organization",
+          scopeId: "org_1",
+          window: "month",
+          spentUsd: "1.000000",
+          limitUsd: "1.000000",
+        },
+      ],
     };
     expect(gatewayBudgetCheckResultSchema.parse(result)).toEqual(result);
     expect(
-      gatewayBudgetCheckResultSchema.safeParse({ ...result, extra: true })
-        .success,
+      gatewayBudgetCheckResultSchema.safeParse({ ...result, extra: true }).success,
     ).toBe(false);
   });
 });

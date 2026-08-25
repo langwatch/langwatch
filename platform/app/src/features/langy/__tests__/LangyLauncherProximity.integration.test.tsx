@@ -97,12 +97,9 @@ vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
 
-vi.mock(
-  "~/features/onboarding/components/sections/ModelProviderScreen",
-  () => ({
-    ModelProviderScreen: () => <div data-testid="model-provider-screen" />,
-  }),
-);
+vi.mock("~/features/onboarding/components/sections/ModelProviderScreen", () => ({
+  ModelProviderScreen: () => <div data-testid="model-provider-screen" />,
+}));
 
 // The whole tRPC surface the panel touches comes from the shared harness, which
 // answers anything a suite has not spoken for with a settled-idle query, a no-op
@@ -112,9 +109,8 @@ vi.mock(
 // Imported INSIDE the factory: `vi.mock` is hoisted above the imports, so a
 // top-level binding is still in its temporal dead zone when this runs.
 vi.mock("~/utils/api", async () => {
-  const { createTrpcUtils, idleQuery, withFallback } = await import(
-    "./support/langyApiMock"
-  );
+  const { createTrpcUtils, idleQuery, withFallback } =
+    await import("./support/langyApiMock");
   const trpcUtils = createTrpcUtils();
 
   return {
@@ -160,12 +156,9 @@ const renderSidecar = () => render(<LangySidecar />, { wrapper: Wrapper });
  * alone would not tell them apart if the flag ever flipped.
  */
 const orbButton = () =>
-  document
-    .querySelector<HTMLSpanElement>(".langy-orb-glow")
-    ?.closest("button") ?? null;
+  document.querySelector<HTMLSpanElement>(".langy-orb-glow")?.closest("button") ?? null;
 
-const orbGlow = () =>
-  document.querySelector<HTMLSpanElement>(".langy-orb-glow");
+const orbGlow = () => document.querySelector<HTMLSpanElement>(".langy-orb-glow");
 
 /** A pointer move the proximity listener can read (jsdom has no PointerEvent). */
 const movePointerOntoTheOrb = () => {
@@ -204,9 +197,7 @@ describe("the launcher orb's proximity glow", () => {
       movePointerOntoTheOrb();
 
       await waitForTheOrbToLean(orb!);
-      await waitFor(() =>
-        expect(Number(orbGlow()!.style.opacity)).toBeGreaterThan(0),
-      );
+      await waitFor(() => expect(Number(orbGlow()!.style.opacity)).toBeGreaterThan(0));
     });
   });
 
@@ -233,9 +224,7 @@ describe("the launcher orb's proximity glow", () => {
       movePointerOntoTheOrb();
 
       await waitForTheOrbToLean(second);
-      await waitFor(() =>
-        expect(Number(orbGlow()!.style.opacity)).toBeGreaterThan(0),
-      );
+      await waitFor(() => expect(Number(orbGlow()!.style.opacity)).toBeGreaterThan(0));
     });
 
     it("stops driving the orb it left behind, so the detached node is released", async () => {

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  consumeDraftKeptOnSubFlowReturn,
-  keepDraftOnSubFlowReturn,
-} from "../subFlow";
+import { consumeDraftKeptOnSubFlowReturn, keepDraftOnSubFlowReturn } from "../subFlow";
 
 describe("automation drawer sub-flow return intent", () => {
   describe("given the sub-flow announces its return", () => {

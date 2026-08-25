@@ -54,16 +54,16 @@ Standalone `tsx` scripts that drive a real headless Chromium against
 a running dev server. Each one corresponds to an iteration of the
 ralph audit and exercises a specific bug class:
 
-| Script | What it verifies |
-|--------|------------------|
-| `iter43-browser-qa.ts` | Basic signup / signin / signout / error page (17 checks) |
-| `iter44-browser-flows.ts` | Onboarding redirect, invitation link, settings page, wrong-email invite (10 checks) |
-| `iter45-change-password-flow.ts` | Change-password → `revokeOtherSessions` wiring with TWO browser contexts (18 checks) |
-| `iter45-csrf-browser.ts` | Cross-site form POST from `evil.localhost` blocked by `formCsrfMiddleware` (5 checks) |
-| `iter46-bug30-31-fixes.ts` | tRPC rate limit + same-origin gate (10 checks) |
-| `iter47-invite-edge-cases.ts` | Already-signed-in accept / already-accepted / expired / case-insensitive / unauth (10 checks) |
-| `iter49-bug36-changepw-rate-limit.ts` | Per-user rate limit on `user.changePassword` brute-force (4 checks) |
-| `iter49-bug37-unlink-race.ts` | `unlinkAccount` TOCTOU race (serializable tx) (4 checks) |
+| Script                                | What it verifies                                                                              |
+| ------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `iter43-browser-qa.ts`                | Basic signup / signin / signout / error page (17 checks)                                      |
+| `iter44-browser-flows.ts`             | Onboarding redirect, invitation link, settings page, wrong-email invite (10 checks)           |
+| `iter45-change-password-flow.ts`      | Change-password → `revokeOtherSessions` wiring with TWO browser contexts (18 checks)          |
+| `iter45-csrf-browser.ts`              | Cross-site form POST from `evil.localhost` blocked by `formCsrfMiddleware` (5 checks)         |
+| `iter46-bug30-31-fixes.ts`            | tRPC rate limit + same-origin gate (10 checks)                                                |
+| `iter47-invite-edge-cases.ts`         | Already-signed-in accept / already-accepted / expired / case-insensitive / unauth (10 checks) |
+| `iter49-bug36-changepw-rate-limit.ts` | Per-user rate limit on `user.changePassword` brute-force (4 checks)                           |
+| `iter49-bug37-unlink-race.ts`         | `unlinkAccount` TOCTOU race (serializable tx) (4 checks)                                      |
 
 ## Prerequisites
 

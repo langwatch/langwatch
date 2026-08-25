@@ -61,8 +61,7 @@ function createRedisMock() {
         set: (key: string, value: string, mode?: string, seconds?: number) => {
           pipelineOps.push(() => {
             strings.set(key, value);
-            if (mode === "EX" && typeof seconds === "number")
-              ttls.set(key, seconds);
+            if (mode === "EX" && typeof seconds === "number") ttls.set(key, seconds);
           });
           return pipe;
         },
@@ -131,9 +130,7 @@ describe("replayMarkers", () => {
         aggKeys: ["t1:trace:a1", "t1:trace:a2"],
       });
 
-      const markers = await redis.hgetall(
-        "projection-replay:cutoff:traceSummary",
-      );
+      const markers = await redis.hgetall("projection-replay:cutoff:traceSummary");
       expect(markers["t1:trace:a1"]).toBe("pending");
       expect(markers["t1:trace:a2"]).toBe("pending");
     });
@@ -175,9 +172,7 @@ describe("replayMarkers", () => {
         cutoffs,
       });
 
-      const markers = await redis.hgetall(
-        "projection-replay:cutoff:traceSummary",
-      );
+      const markers = await redis.hgetall("projection-replay:cutoff:traceSummary");
       expect(markers["t1:trace:a1"]).toBe("1700000000000:evt-abc");
       expect(markers["t1:trace:a2"]).toBe("1700000001000:evt-def");
     });
@@ -214,15 +209,11 @@ describe("replayMarkers", () => {
       });
 
       // Cutoff markers removed
-      const markers = await redis.hgetall(
-        "projection-replay:cutoff:traceSummary",
-      );
+      const markers = await redis.hgetall("projection-replay:cutoff:traceSummary");
       expect(Object.keys(markers)).toHaveLength(0);
 
       // Completed set populated
-      const completed = await redis.smembers(
-        "projection-replay:completed:traceSummary",
-      );
+      const completed = await redis.smembers("projection-replay:completed:traceSummary");
       expect(completed).toContain("t1:trace:a1");
       expect(completed).toContain("t1:trace:a2");
     });
@@ -258,26 +249,22 @@ describe("replayMarkers", () => {
       });
 
       // Cutoff hash is drained (stays bounded to in-flight aggregates)...
-      const markers = await redis.hgetall(
-        "projection-replay:cutoff:traceSummary",
-      );
+      const markers = await redis.hgetall("projection-replay:cutoff:traceSummary");
       expect(Object.keys(markers)).toHaveLength(0);
 
       // ...the boundary lives in a separate short-TTL done key per aggregate...
-      expect(
-        await redis.get(doneMarkerKey("traceSummary", "t1:trace:a1")),
-      ).toBe("1700000001000:evt-010");
-      expect(
-        await redis.get(doneMarkerKey("traceSummary", "t1:trace:a2")),
-      ).toBe("1700000002000:evt-020");
-      expect(
-        redis._ttls.get(doneMarkerKey("traceSummary", "t1:trace:a1")),
-      ).toBe(DONE_MARKER_TTL_SECONDS);
+      expect(await redis.get(doneMarkerKey("traceSummary", "t1:trace:a1"))).toBe(
+        "1700000001000:evt-010",
+      );
+      expect(await redis.get(doneMarkerKey("traceSummary", "t1:trace:a2"))).toBe(
+        "1700000002000:evt-020",
+      );
+      expect(redis._ttls.get(doneMarkerKey("traceSummary", "t1:trace:a1"))).toBe(
+        DONE_MARKER_TTL_SECONDS,
+      );
 
       // ...and completion is recorded for resume accounting.
-      const completed = await redis.smembers(
-        "projection-replay:completed:traceSummary",
-      );
+      const completed = await redis.smembers("projection-replay:completed:traceSummary");
       expect(completed).toContain("t1:trace:a1");
       expect(completed).toContain("t1:trace:a2");
     });
@@ -332,12 +319,10 @@ describe("replayMarkers", () => {
       expect(await redis.hlen("projection-replay:cutoff:spanIndex")).toBe(0);
 
       // Done marker and completed set from the completed batch survive.
-      expect(
-        await redis.get(doneMarkerKey("traceSummary", "t1:trace:done")),
-      ).toBe("1700000000000:evt-done");
-      const completed = await redis.smembers(
-        "projection-replay:completed:traceSummary",
+      expect(await redis.get(doneMarkerKey("traceSummary", "t1:trace:done"))).toBe(
+        "1700000000000:evt-done",
       );
+      const completed = await redis.smembers("projection-replay:completed:traceSummary");
       expect(completed).toContain("t1:trace:done");
 
       // Removed in-flight aggregates are NOT recorded as completed.
@@ -443,9 +428,7 @@ describe("replayMarkers", () => {
           log,
         });
 
-        expect(await redis.hlen("projection-replay:cutoff:traceSummary")).toBe(
-          0,
-        );
+        expect(await redis.hlen("projection-replay:cutoff:traceSummary")).toBe(0);
         expect(entries).toHaveLength(0);
       });
     });
@@ -496,9 +479,7 @@ describe("replayMarkers", () => {
         projectionName: "p",
         aggKeys: ["k1"],
       });
-      const cutoffs = new Map([
-        ["k2", { timestamp: 1700000000000, eventId: "evt-xyz" }],
-      ]);
+      const cutoffs = new Map([["k2", { timestamp: 1700000000000, eventId: "evt-xyz" }]]);
       await markCutoffBatch({ redis, projectionName: "p", cutoffs });
 
       const markers = await getCutoffMarkers({ redis, projectionName: "p" });

@@ -3,13 +3,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { InlineTagsInput } from "../InlineTagsInput";
 
@@ -73,10 +67,7 @@ describe("InlineTagsInput", () => {
   it("removes tag on close click", async () => {
     const onChange = vi.fn();
     renderWithChakra(
-      <InlineTagsInput
-        value={["first", "second", "third"]}
-        onChange={onChange}
-      />,
+      <InlineTagsInput value={["first", "second", "third"]} onChange={onChange} />,
     );
 
     await waitFor(() => {

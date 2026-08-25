@@ -51,11 +51,7 @@ describe("the projection cursor's time base", () => {
 describe("the framework comparator and the shared package comparator", () => {
   const cases: Array<[string, Event, Event]> = [
     ["time-ordered", event({ createdAt: 1 }), event({ createdAt: 2 })],
-    [
-      "same-millisecond id tie-break",
-      event({ id: "2AAAa" }),
-      event({ id: "2AAAb" }),
-    ],
+    ["same-millisecond id tie-break", event({ id: "2AAAa" }), event({ id: "2AAAb" })],
     [
       // Byte order puts uppercase ASCII first; locale collation typically does
       // not. KSUIDs are mixed-case base62, so this case decides real orderings.

@@ -81,9 +81,9 @@ describe("parseLicenseKey", () => {
   });
 
   it("returns null for valid JSON but missing required fields", () => {
-    const invalidStructure = Buffer.from(
-      JSON.stringify({ foo: "bar" }),
-    ).toString("base64");
+    const invalidStructure = Buffer.from(JSON.stringify({ foo: "bar" })).toString(
+      "base64",
+    );
 
     const result = parseLicenseKey(invalidStructure);
 
@@ -140,8 +140,7 @@ describe("verifySignature", () => {
       /** @scenario A verification key pasted with escaped newlines still verifies */
       it("verifies against a key carrying escaped newlines, the way a .env holds one", () => {
         const signedLicense = parseLicenseKey(VALID_LICENSE_KEY);
-        if (!signedLicense)
-          throw new Error("Expected signedLicense to be defined");
+        if (!signedLicense) throw new Error("Expected signedLicense to be defined");
         // Exactly what `LANGWATCH_LICENSE_PUBLIC_KEY=...` in a .env file, a Helm
         // value or a Kubernetes secret hands the process. Read as pasted,
         // OpenSSL refuses the layout and reports it as a bad signature.
@@ -153,14 +152,10 @@ describe("verifySignature", () => {
 
       it("still rejects a genuinely wrong key however it was pasted", () => {
         const signedLicense = parseLicenseKey(VALID_LICENSE_KEY);
-        if (!signedLicense)
-          throw new Error("Expected signedLicense to be defined");
+        if (!signedLicense) throw new Error("Expected signedLicense to be defined");
 
         expect(
-          verifySignature(
-            signedLicense,
-            WRONG_PUBLIC_KEY.replace(/\n/g, "\\n"),
-          ),
+          verifySignature(signedLicense, WRONG_PUBLIC_KEY.replace(/\n/g, "\\n")),
         ).toBe(false);
       });
     });
@@ -280,9 +275,7 @@ describe("validateLicense", () => {
 
       expect(result.valid).toBe(true);
       if (result.valid) {
-        expect(result.licenseData.organizationName).toBe(
-          BASE_LICENSE.organizationName,
-        );
+        expect(result.licenseData.organizationName).toBe(BASE_LICENSE.organizationName);
       }
     });
 
@@ -318,9 +311,7 @@ describe("validateLicense", () => {
 
       expect(result.valid).toBe(true);
       if (result.valid) {
-        expect(result.licenseData.plan.maxMembers).toBe(
-          BASE_LICENSE.plan.maxMembers,
-        );
+        expect(result.licenseData.plan.maxMembers).toBe(BASE_LICENSE.plan.maxMembers);
       }
     });
 
@@ -332,9 +323,7 @@ describe("validateLicense", () => {
 
       expect(result.valid).toBe(true);
       if (result.valid) {
-        expect(result.licenseData.plan.maxProjects).toBe(
-          BASE_LICENSE.plan.maxProjects,
-        );
+        expect(result.licenseData.plan.maxProjects).toBe(BASE_LICENSE.plan.maxProjects);
       }
     });
 
@@ -378,9 +367,7 @@ describe("validateLicense", () => {
 
       expect(result.valid).toBe(true);
       if (result.valid) {
-        expect(result.licenseData.plan.maxWorkflows).toBe(
-          BASE_LICENSE.plan.maxWorkflows,
-        );
+        expect(result.licenseData.plan.maxWorkflows).toBe(BASE_LICENSE.plan.maxWorkflows);
       }
     });
 
@@ -392,9 +379,7 @@ describe("validateLicense", () => {
 
       expect(result.valid).toBe(true);
       if (result.valid) {
-        expect(result.licenseData.plan.canPublish).toBe(
-          BASE_LICENSE.plan.canPublish,
-        );
+        expect(result.licenseData.plan.canPublish).toBe(BASE_LICENSE.plan.canPublish);
       }
     });
   });

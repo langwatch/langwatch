@@ -247,9 +247,9 @@ describe("chart mode", () => {
         );
 
         await waitFor(() =>
-          expect(
-            screen.getByTestId("vega-spec-editor-problems").textContent,
-          ).toContain("nowhere"),
+          expect(screen.getByTestId("vega-spec-editor-problems").textContent).toContain(
+            "nowhere",
+          ),
         );
 
         await replaceSpec(
@@ -299,9 +299,7 @@ describe("chart mode", () => {
 
         await userEvent.click(screen.getByTestId("vega-spec-reset"));
 
-        await waitFor(() =>
-          expect((editor as HTMLTextAreaElement).value).toBe(starter),
-        );
+        await waitFor(() => expect((editor as HTMLTextAreaElement).value).toBe(starter));
       });
     });
 
@@ -322,9 +320,9 @@ describe("chart mode", () => {
 
         // A refusal flips the panel and names what it refers to.
         await waitFor(() =>
-          expect(
-            screen.getByTestId("vega-spec-policy-panel").textContent,
-          ).toContain("Refused"),
+          expect(screen.getByTestId("vega-spec-policy-panel").textContent).toContain(
+            "Refused",
+          ),
         );
       });
     });

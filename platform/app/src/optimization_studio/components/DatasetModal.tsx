@@ -16,14 +16,7 @@
  * columns into the entry fields without clobbering user-added inputs; the
  * dataset is a data source, not the definition of the workflow's inputs.
  */
-import {
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Text,
-  useDisclosure,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
@@ -62,9 +55,7 @@ export function DatasetModal({
   node: NodeProps<Node<Component>> | Node<Component>;
   editingDataset?: Entry["dataset"];
 }) {
-  const [editingDataset, setEditingDataset] = useState<
-    Entry["dataset"] | undefined
-  >();
+  const [editingDataset, setEditingDataset] = useState<Entry["dataset"] | undefined>();
   const editorPortalRef = useRef<HTMLDivElement | null>(null);
   const uploadCSVModal = useDisclosure();
   const { openDrawer } = useDrawer();
@@ -79,10 +70,7 @@ export function DatasetModal({
     attachEntryDataset,
   }));
 
-  const attachDataset = (
-    dataset: Entry["dataset"],
-    columnTypes: DatasetColumns,
-  ) => {
+  const attachDataset = (dataset: Entry["dataset"], columnTypes: DatasetColumns) => {
     attachEntryDataset(node.id, dataset, datasetColumnsToFields(columnTypes));
     updateNodeInternals(node.id);
   };
@@ -92,10 +80,7 @@ export function DatasetModal({
     name: string;
     columnTypes: DatasetColumns;
   }) => {
-    attachDataset(
-      { id: dataset.datasetId, name: dataset.name },
-      dataset.columnTypes,
-    );
+    attachDataset({ id: dataset.datasetId, name: dataset.name }, dataset.columnTypes);
     onClose();
   };
 
@@ -137,21 +122,14 @@ export function DatasetModal({
         name: string;
         columnTypes: DatasetColumns;
       }) => {
-        attachDataset(
-          { id: saved.datasetId, name: saved.name },
-          saved.columnTypes,
-        );
+        attachDataset({ id: saved.datasetId, name: saved.name }, saved.columnTypes);
         onClose();
       },
     });
   };
 
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="full"
-    >
+    <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()} size="full">
       <Dialog.Content
         bg="bg"
         css={{
@@ -232,15 +210,11 @@ export function DatasetModal({
                 </Text>
               </HStack>
             </Dialog.Header>
-            <Dialog.Body
-              paddingBottom="32px"
-              display="flex"
-              flexDirection="column"
-            >
+            <Dialog.Body paddingBottom="32px" display="flex" flexDirection="column">
               <HStack paddingBottom={4}>
                 <Text color="fg.muted" fontSize="sm">
-                  Pick an existing dataset for this workflow, upload a CSV, or
-                  start a new draft.
+                  Pick an existing dataset for this workflow, upload a CSV, or start a new
+                  draft.
                 </Text>
                 <Spacer />
                 <Button
@@ -260,9 +234,7 @@ export function DatasetModal({
                   <Plus size={14} /> New dataset
                 </Button>
               </HStack>
-              {open && (
-                <DatasetPickerList enabled={open} onSelect={handlePick} />
-              )}
+              {open && <DatasetPickerList enabled={open} onSelect={handlePick} />}
             </Dialog.Body>
           </>
         )}

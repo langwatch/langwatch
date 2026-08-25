@@ -106,11 +106,7 @@ export interface LangyStreamRead {
  */
 export interface LangyStreamRedis {
   xadd(key: string, ...args: (string | number)[]): Promise<string | null>;
-  xrange(
-    key: string,
-    start: string,
-    end: string,
-  ): Promise<Array<[string, string[]]>>;
+  xrange(key: string, start: string, end: string): Promise<Array<[string, string[]]>>;
   expire(key: string, seconds: number): Promise<number>;
   set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
   get(key: string): Promise<string | null>;
@@ -118,10 +114,7 @@ export interface LangyStreamRedis {
   blocking?: {
     xread(
       ...args: (string | number)[]
-    ):
-      | Promise<Array<[string, Array<[string, string[]]>]>>
-      | null
-      | Promise<null>;
+    ): Promise<Array<[string, Array<[string, string[]]>]>> | null | Promise<null>;
   };
 }
 
@@ -161,10 +154,7 @@ export class LangyTokenBuffer {
    */
   private readonly sawVisibleText = new Set<string>();
   /** Per-turn time-arm timers: flush pending text FLUSH_AFTER_MS after the first pending token. */
-  private readonly flushTimers = new Map<
-    string,
-    ReturnType<typeof setTimeout>
-  >();
+  private readonly flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
   /** Reasoning is live-only too, but model providers may stream it token by token. */
   private readonly pendingReasoning = new Map<string, string>();
   private readonly reasoningFlushTimers = new Map<
@@ -176,10 +166,7 @@ export class LangyTokenBuffer {
     this.redis = deps.redis;
   }
 
-  static create(deps: {
-    redis: unknown;
-    blockingRedis?: unknown;
-  }): LangyTokenBuffer {
+  static create(deps: { redis: unknown; blockingRedis?: unknown }): LangyTokenBuffer {
     const redis = deps.redis as LangyStreamRedis;
     if (deps.blockingRedis) {
       redis.blocking = deps.blockingRedis as LangyStreamRedis["blocking"];
@@ -246,8 +233,7 @@ export class LangyTokenBuffer {
     if (text.trim()) this.sawVisibleText.add(pk);
     this.pending.set(pk, (this.pending.get(pk) ?? "") + text);
     // Cheap word-count proxy — we do not tokenize here.
-    const count =
-      (this.tokenCounts.get(pk) ?? 0) + (text.split(/\s+/).length || 1);
+    const count = (this.tokenCounts.get(pk) ?? 0) + (text.split(/\s+/).length || 1);
     this.tokenCounts.set(pk, count);
 
     // Time-to-first-token: the turn's first delta goes straight out.
@@ -333,9 +319,7 @@ export class LangyTokenBuffer {
     if (this.reasoningFlushTimers.has(pk)) return;
     const timer = setTimeout(() => {
       this.reasoningFlushTimers.delete(pk);
-      void this.flushReasoning({ conversationId, turnId }).catch(
-        () => undefined,
-      );
+      void this.flushReasoning({ conversationId, turnId }).catch(() => undefined);
     }, LANGY_STREAMING.FLUSH_AFTER_MS);
     timer.unref?.();
     this.reasoningFlushTimers.set(pk, timer);
@@ -560,9 +544,7 @@ export class LangyTokenBuffer {
     turnId: string;
   }): Promise<boolean> {
     const { reads } = await this.readTail({ conversationId, turnId });
-    return reads.some(
-      ({ entry }) => entry.type === "delta" && entry.text.trim() !== "",
-    );
+    return reads.some(({ entry }) => entry.type === "delta" && entry.text.trim() !== "");
   }
 
   /** Terminal marker: the turn errored. Flushes buffered tokens first. */
@@ -651,13 +633,9 @@ export class LangyTokenBuffer {
             ...args: (string | number)[]
           ): Promise<Array<[string, Array<[string, string[]]>]>> | null;
         }
-      ).xread(
-        "BLOCK",
-        LANGY_STREAMING.FOLLOW_BLOCK_MS,
-        "STREAMS",
-        key,
-        cursor,
-      )) as Array<[string, Array<[string, string[]]>]> | null;
+      ).xread("BLOCK", LANGY_STREAMING.FOLLOW_BLOCK_MS, "STREAMS", key, cursor)) as Array<
+        [string, Array<[string, string[]]>]
+      > | null;
       if (!res) continue; // block timed out; loop re-checks the abort signal
       for (const [, rows] of res) {
         for (const [id, fields] of rows) {

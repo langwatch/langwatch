@@ -25,9 +25,9 @@ describe("classifySseFrame", () => {
 
     describe("when an error frame carries a string message", () => {
       it("classifies it as a protocol error", () => {
-        expect(
-          classifySseFrame({ type: "error", message: "langy_not_enabled" }),
-        ).toBe("protocol-error");
+        expect(classifySseFrame({ type: "error", message: "langy_not_enabled" })).toBe(
+          "protocol-error",
+        );
       });
     });
 
@@ -58,9 +58,9 @@ describe("classifySseFrame", () => {
   describe("given payloads with no protocol discriminant", () => {
     describe("when ordinary data entries arrive", () => {
       it("passes them through untouched", () => {
-        expect(
-          classifySseFrame({ type: "status", status: "Starting Langy…" }),
-        ).toBe("data");
+        expect(classifySseFrame({ type: "status", status: "Starting Langy…" })).toBe(
+          "data",
+        );
         expect(classifySseFrame({ anything: 1 })).toBe("data");
         expect(classifySseFrame("plain string")).toBe("data");
         expect(classifySseFrame(null)).toBe("data");

@@ -196,13 +196,7 @@ export class SavedViewService {
    * Reorders saved views by updating their order field.
    * @throws {SavedViewReorderError} if any view doesn't exist
    */
-  async reorder({
-    projectId,
-    viewIds,
-  }: {
-    projectId: string;
-    viewIds: string[];
-  }) {
+  async reorder({ projectId, viewIds }: { projectId: string; viewIds: string[] }) {
     const existingViews = await this.repository.findByIds({
       ids: viewIds,
       projectId,
@@ -248,10 +242,7 @@ export class SavedViewService {
     const missing = SEED_VIEWS.filter((seed) => !existingNames.has(seed.name));
     if (missing.length === 0) return;
 
-    const highestOrder = existing.reduce(
-      (acc, v) => (v.order > acc ? v.order : acc),
-      -1,
-    );
+    const highestOrder = existing.reduce((acc, v) => (v.order > acc ? v.order : acc), -1);
     await this.repository.createMany({
       views: missing.map((seed, i) => ({
         id: nanoid(),

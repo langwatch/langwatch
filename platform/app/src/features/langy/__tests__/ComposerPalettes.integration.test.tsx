@@ -76,12 +76,8 @@ describe("given the Langy composer", () => {
     it("names the key that opens context and the key that opens skills", () => {
       renderComposer();
 
-      expect(
-        screen.getByRole("button", { name: /press #/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /press \//i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /press #/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /press \//i })).toBeInTheDocument();
     });
   });
 
@@ -92,9 +88,7 @@ describe("given the Langy composer", () => {
 
       await user.click(screen.getByRole("button", { name: /press #/i }));
 
-      expect(screen.getByTestId("langy-palette-title")).toHaveTextContent(
-        "Context",
-      );
+      expect(screen.getByTestId("langy-palette-title")).toHaveTextContent("Context");
       expect(
         screen.getByPlaceholderText(/reference something on this page/i),
       ).toBeInTheDocument();
@@ -108,9 +102,7 @@ describe("given the Langy composer", () => {
 
       await user.click(screen.getByRole("button", { name: /press \//i }));
 
-      expect(screen.getByTestId("langy-palette-title")).toHaveTextContent(
-        "Skills",
-      );
+      expect(screen.getByTestId("langy-palette-title")).toHaveTextContent("Skills");
       expect(screen.getByPlaceholderText(/pick a skill/i)).toBeInTheDocument();
     });
   });
@@ -123,9 +115,7 @@ describe("given the Langy composer", () => {
       await user.click(screen.getByRole("textbox"));
       await user.keyboard("/");
 
-      expect(screen.getByTestId("langy-palette-title")).toHaveTextContent(
-        "Skills",
-      );
+      expect(screen.getByTestId("langy-palette-title")).toHaveTextContent("Skills");
       expect(useLangyStore.getState().draft).toBe("");
     });
   });
@@ -151,13 +141,7 @@ describe("given a palette with no rows to show", () => {
    * opens on an empty list with an EMPTY query — and answering that with
    * "nothing matches that" replies to a search the reader never ran.
    */
-  function renderPalette({
-    mode,
-    query,
-  }: {
-    mode: "context" | "skills";
-    query: string;
-  }) {
+  function renderPalette({ mode, query }: { mode: "context" | "skills"; query: string }) {
     return render(
       <ChakraProvider value={defaultSystem}>
         <LangyComposerPalette
@@ -172,8 +156,7 @@ describe("given a palette with no rows to show", () => {
     );
   }
 
-  const emptyText = () =>
-    screen.getByTestId("langy-palette-empty").textContent ?? "";
+  const emptyText = () => screen.getByTestId("langy-palette-empty").textContent ?? "";
 
   describe("when the page had nothing to offer in the first place", () => {
     it("says so, instead of answering a search nobody ran", () => {

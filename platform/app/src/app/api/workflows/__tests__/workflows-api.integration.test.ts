@@ -395,9 +395,7 @@ describe("Workflows REST API", () => {
       it("creates the workflow's experiment and returns a run id and results url", async () => {
         await createVersion("1", entryDsl());
 
-        const res = await postEvaluate(
-          `/api/workflows/${workflow.id}/evaluate`,
-        );
+        const res = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`);
 
         const body = await expectRunResponse(res);
 
@@ -415,14 +413,10 @@ describe("Workflows REST API", () => {
       it("succeeds on a second evaluate call against the same workflow", async () => {
         await createVersion("1", entryDsl());
 
-        const first = await postEvaluate(
-          `/api/workflows/${workflow.id}/evaluate`,
-        );
+        const first = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`);
         const firstBody = await expectRunResponse(first);
 
-        const second = await postEvaluate(
-          `/api/workflows/${workflow.id}/evaluate`,
-        );
+        const second = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`);
         const secondBody = await expectRunResponse(second);
 
         expect(secondBody.run_id).not.toBe(firstBody.run_id);
@@ -440,9 +434,7 @@ describe("Workflows REST API", () => {
       it("still returns the evaluated version id and version", async () => {
         const version = await createVersion("1", entryDsl());
 
-        const res = await postEvaluate(
-          `/api/workflows/${workflow.id}/evaluate`,
-        );
+        const res = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`);
 
         const body = await expectRunResponse(res);
         expect(body.workflow_version_id).toBe(version.id);
@@ -462,9 +454,7 @@ describe("Workflows REST API", () => {
         });
         const v2 = await createVersion("2", entryDsl());
 
-        const res = await postEvaluate(
-          `/api/workflows/${workflow.id}/evaluate`,
-        );
+        const res = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`);
 
         const body = await expectRunResponse(res);
         expect(body.workflow_version_id).toBe(v2.id);
@@ -475,10 +465,9 @@ describe("Workflows REST API", () => {
         const v1 = await createVersion("1", entryDsl());
         await createVersion("2", entryDsl());
 
-        const res = await postEvaluate(
-          `/api/workflows/${workflow.id}/evaluate`,
-          { version_id: v1.id },
-        );
+        const res = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`, {
+          version_id: v1.id,
+        });
 
         const body = await expectRunResponse(res);
         expect(body.workflow_version_id).toBe(v1.id);
@@ -488,10 +477,9 @@ describe("Workflows REST API", () => {
       it("binds an undeclared parameter as a target input and dataset mapping", async () => {
         await createVersion("1", entryDsl());
 
-        const res = await postEvaluate(
-          `/api/workflows/${workflow.id}/evaluate`,
-          { parameters: { feature_flag: "variant-b" } },
-        );
+        const res = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`, {
+          parameters: { feature_flag: "variant-b" },
+        });
 
         await expectRunResponse(res);
 
@@ -525,10 +513,9 @@ describe("Workflows REST API", () => {
       it("accepts inline data and starts a run", async () => {
         await createVersion("1", entryDsl());
 
-        const res = await postEvaluate(
-          `/api/workflows/${workflow.id}/evaluate`,
-          { data: [{ question: "x" }, { question: "y" }] },
-        );
+        const res = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`, {
+          data: [{ question: "x" }, { question: "y" }],
+        });
 
         await expectRunResponse(res);
       });
@@ -537,10 +524,10 @@ describe("Workflows REST API", () => {
       it("rejects inline data and a dataset id together", async () => {
         await createVersion("1", entryDsl());
 
-        const res = await postEvaluate(
-          `/api/workflows/${workflow.id}/evaluate`,
-          { data: [{ question: "x" }], dataset_id: "dataset_123" },
-        );
+        const res = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`, {
+          data: [{ question: "x" }],
+          dataset_id: "dataset_123",
+        });
 
         // 422: the body failed the request SCHEMA (the two fields are mutually
         // exclusive). The "no committed version" case below stays 400 — that
@@ -552,9 +539,7 @@ describe("Workflows REST API", () => {
     describe("when the workflow does not exist in the project", () => {
       /** @scenario Unknown workflow returns not found */
       it("returns 404", async () => {
-        const res = await postEvaluate(
-          "/api/workflows/workflow_elsewhere/evaluate",
-        );
+        const res = await postEvaluate("/api/workflows/workflow_elsewhere/evaluate");
 
         expect(res.status).toBe(404);
       });
@@ -563,9 +548,7 @@ describe("Workflows REST API", () => {
     describe("when the workflow has no committed version", () => {
       /** @scenario A workflow with no committed version cannot be evaluated */
       it("returns 400 explaining a version is required", async () => {
-        const res = await postEvaluate(
-          `/api/workflows/${workflow.id}/evaluate`,
-        );
+        const res = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`);
 
         expect(res.status).toBe(400);
         const body = await res.json();

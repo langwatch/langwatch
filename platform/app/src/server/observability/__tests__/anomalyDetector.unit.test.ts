@@ -51,8 +51,7 @@ function makeFakes() {
       get: vi
         .fn()
         .mockImplementation(
-          async (tid: string, kind: string) =>
-            stored.get(`${kind}:${tid}`) ?? null,
+          async (tid: string, kind: string) => stored.get(`${kind}:${tid}`) ?? null,
         ),
       list: vi.fn().mockResolvedValue([]),
     } as any,
@@ -188,10 +187,7 @@ describe("AnomalyDetector.tick", () => {
     const result = await detector.tick();
 
     expect(result.cleared).toBe(1);
-    expect(fakes.anomalyState.clear).toHaveBeenCalledWith(
-      "proj_acme",
-      "rate_breaker",
-    );
+    expect(fakes.anomalyState.clear).toHaveBeenCalledWith("proj_acme", "rate_breaker");
   });
 
   it("preserves triggeredAt across ticks (anomaly stays the same instance)", async () => {

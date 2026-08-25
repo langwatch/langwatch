@@ -22,15 +22,7 @@
  * quiet, and neither half of that was covered by a test.
  */
 import type { BetterAuthOptions } from "better-auth";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTestApp } from "../../app-layer/presets";
 
@@ -67,9 +59,9 @@ vi.mock("~/env.mjs", async () => {
  * because a `vi.mock` factory is hoisted above any const it might reference.
  */
 vi.mock("@langwatch/observability", async () => {
-  const actual = await vi.importActual<
-    typeof import("@langwatch/observability")
-  >("@langwatch/observability");
+  const actual = await vi.importActual<typeof import("@langwatch/observability")>(
+    "@langwatch/observability",
+  );
   return {
     ...actual,
     createLogger: (name: string) => ({

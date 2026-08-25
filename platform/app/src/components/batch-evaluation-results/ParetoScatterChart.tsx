@@ -44,10 +44,7 @@ import {
 } from "recharts";
 
 import type { BTLeaderboard, BTLeaderboardEntry } from "./computeBTLeaderboard";
-import {
-  computeParetoDominance,
-  type ParetoDominance,
-} from "./computeParetoDominance";
+import { computeParetoDominance, type ParetoDominance } from "./computeParetoDominance";
 import type { VariantMetrics } from "./computeVariantMetrics";
 import { VARIANT_COLORS } from "./WinRateChart";
 
@@ -131,9 +128,7 @@ type ParetoPoint = {
  * A bootstrap over a handful of rows can return an unbounded interval, and
  * there is no bar to draw for one. Drawing nothing is the honest rendering.
  */
-const finiteCI = (
-  ci: [number, number] | null | undefined,
-): [number, number] | null =>
+const finiteCI = (ci: [number, number] | null | undefined): [number, number] | null =>
   ci?.every((bound) => Number.isFinite(bound)) ? ci : null;
 
 const readAvg = ({
@@ -262,14 +257,7 @@ export function ParetoScatterChart({
         axis,
         dominance,
       }),
-    [
-      leaderboard.entries,
-      variantMetrics,
-      variantNames,
-      targetColors,
-      axis,
-      dominance,
-    ],
+    [leaderboard.entries, variantMetrics, variantNames, targetColors, axis, dominance],
   );
 
   return (
@@ -357,10 +345,7 @@ function ParetoPlot({
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
       <ScatterChart margin={{ top: 14, right: 24, left: 10, bottom: 10 }}>
-        <CartesianGrid
-          stroke="var(--chakra-colors-border)"
-          strokeDasharray="3 3"
-        />
+        <CartesianGrid stroke="var(--chakra-colors-border)" strokeDasharray="3 3" />
         <XAxis
           type="number"
           dataKey="x"
@@ -401,18 +386,10 @@ function ParetoPlot({
         <Scatter data={data} name="Variants">
           {/* Drawn before the cells so the bars sit under the point. */}
           {anyInterval ? (
-            <ErrorBar
-              dataKey="ciOffsets"
-              direction="y"
-              {...INTERVAL_BAR_STYLE}
-            />
+            <ErrorBar dataKey="ciOffsets" direction="y" {...INTERVAL_BAR_STYLE} />
           ) : null}
           {anyXInterval ? (
-            <ErrorBar
-              dataKey="xOffsets"
-              direction="x"
-              {...INTERVAL_BAR_STYLE}
-            />
+            <ErrorBar dataKey="xOffsets" direction="x" {...INTERVAL_BAR_STYLE} />
           ) : null}
           {data.map(renderPointCell)}
         </Scatter>
@@ -470,13 +447,7 @@ function ParetoTooltip({
   );
 }
 
-function ParetoNotes({
-  data,
-  axis,
-}: {
-  data: ParetoPoint[];
-  axis: AxisConfig;
-}) {
+function ParetoNotes({ data, axis }: { data: ParetoPoint[]; axis: AxisConfig }) {
   const sizeIsMeaningful = data.some((point) => point.size !== null);
   const anyInterval = data.some((point) => point.ciOffsets !== undefined);
   const anyXInterval = data.some((point) => point.xOffsets !== undefined);

@@ -113,10 +113,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
   });
 
   /** Pull a single metric value out of the first current-period row. */
-  function extractMetric(
-    rows: Array<Record<string, unknown>>,
-    alias: string,
-  ): number {
+  function extractMetric(rows: Array<Record<string, unknown>>, alias: string): number {
     const currentRows = rows.filter((r) => r.period === "current");
     expect(currentRows.length).toBeGreaterThan(0);
     // Sum across all current buckets (some paths return one row, others
@@ -129,10 +126,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
     return total;
   }
 
-  function averageMetric(
-    rows: Array<Record<string, unknown>>,
-    alias: string,
-  ): number {
+  function averageMetric(rows: Array<Record<string, unknown>>, alias: string): number {
     const currentRows = rows.filter((r) => r.period === "current");
     const values = currentRows
       .map((r) => Number(r[alias]))
@@ -165,8 +159,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
             aggregation: "sum" as AggregationTypes,
           },
           {
-            metric:
-              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as AggregationTypes,
             key: EVALUATOR_ID,
           },
@@ -204,8 +197,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
             aggregation: "sum" as AggregationTypes,
           },
           {
-            metric:
-              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as AggregationTypes,
             key: EVALUATOR_ID,
           },
@@ -232,9 +224,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
       const firstGpt5Row = gpt5Rows[0];
       expect(firstGpt5Row).toBeDefined();
       const passRate = Number(
-        firstGpt5Row?.[
-          "1__evaluations_evaluation_pass_rate__avg__test_3088_evaluator"
-        ],
+        firstGpt5Row?.["1__evaluations_evaluation_pass_rate__avg__test_3088_evaluator"],
       );
       expect(passRate).toBeGreaterThan(0);
       expect(passRate).toBeLessThanOrEqual(1);
@@ -253,8 +243,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
             aggregation: "sum" as AggregationTypes,
           },
           {
-            metric:
-              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as AggregationTypes,
             key: EVALUATOR_ID,
           },

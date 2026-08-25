@@ -39,8 +39,7 @@ const panelStateCache = new Map<string, PanelState>();
 // each entry was a plain array of expanded ids (treated as both expanded and
 // seen, matching the old expand-all behavior those entries were saved under).
 try {
-  const stored =
-    typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+  const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
   if (stored) {
     const parsed = JSON.parse(stored) as Record<
       string,
@@ -110,9 +109,7 @@ export function useAutoExpansion({
     if (items.length === 0) return;
 
     const currentIds = items.map((item) =>
-      "batchRunId" in item
-        ? item.batchRunId
-        : (item as { groupKey: string }).groupKey,
+      "batchRunId" in item ? item.batchRunId : (item as { groupKey: string }).groupKey,
     );
 
     const cached = panelStateCache.get(key);

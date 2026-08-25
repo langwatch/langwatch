@@ -233,10 +233,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       },
     });
 
-    primaryGovProject = await ensureHiddenGovernanceProject(
-      prisma,
-      primaryOrg.id,
-    );
+    primaryGovProject = await ensureHiddenGovernanceProject(prisma, primaryOrg.id);
     crossGovProject = await ensureHiddenGovernanceProject(prisma, crossOrg.id);
 
     primarySourceId = `is-primary-${nanoid()}`;
@@ -544,10 +541,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       });
       // Cross-org trace had spend=$50; if any leaked, primary's largest row
       // would be far above $2 + $0.25.
-      const totalReturned = rows.reduce(
-        (sum, r) => sum + Number(r.spendUsd),
-        0,
-      );
+      const totalReturned = rows.reduce((sum, r) => sum + Number(r.spendUsd), 0);
       expect(totalReturned).toBeLessThan(10);
       // Cross-org Team is a Team but its id should never surface here.
       const allTeamIds = rows.map((r) => r.teamId).filter(Boolean);
@@ -800,9 +794,9 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       }
       // Buckets are strictly ascending by day.
       for (let i = 1; i < result.buckets.length; i++) {
-        expect(
-          new Date(result.buckets[i]!.bucketIso).getTime(),
-        ).toBeGreaterThan(new Date(result.buckets[i - 1]!.bucketIso).getTime());
+        expect(new Date(result.buckets[i]!.bucketIso).getTime()).toBeGreaterThan(
+          new Date(result.buckets[i - 1]!.bucketIso).getTime(),
+        );
       }
       // Anti-regression for the bucket-key arithmetic that produced
       // empty `points: []` despite live data (CH date-math bug caught
@@ -841,10 +835,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       const orgWidePoints = result.buckets
         .flatMap((b) => b.points)
         .filter((p) => p.key === "__org_wide__");
-      const orgWideSpend = orgWidePoints.reduce(
-        (sum, p) => sum + Number(p.spendUsd),
-        0,
-      );
+      const orgWideSpend = orgWidePoints.reduce((sum, p) => sum + Number(p.spendUsd), 0);
       expect(orgWideSpend).toBeCloseTo(0.25, 2);
       expect(orgWidePoints[0]?.label).toBe("Org-wide");
     });
@@ -902,15 +893,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
       const flatPoints = result.buckets.flatMap((b) => b.points);
       // The cross-org actor MUST NOT leak.
-      expect(
-        flatPoints.find((p) => p.key === "alice@cross.example.com"),
-      ).toBeUndefined();
+      expect(flatPoints.find((p) => p.key === "alice@cross.example.com")).toBeUndefined();
       // Total spend bounded by primary's seeded amount (2.25) — proves no
       // cross-org $50 leaked even into a different attribution dimension.
-      const totalSpend = flatPoints.reduce(
-        (sum, p) => sum + Number(p.spendUsd),
-        0,
-      );
+      const totalSpend = flatPoints.reduce((sum, p) => sum + Number(p.spendUsd), 0);
       expect(totalSpend).toBeCloseTo(2.25, 2);
     });
 

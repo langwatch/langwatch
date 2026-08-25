@@ -14,14 +14,11 @@ export type UseDefaultProviderSelectionActions = {
   setProjectDefaultModel: (model: string | null) => void;
   setProjectTopicClusteringModel: (model: string | null) => void;
   setProjectEmbeddingsModel: (model: string | null) => void;
-  reset: (
-    provider: MaybeStoredModelProvider,
-    enabledProvidersCount: number,
-  ) => void;
+  reset: (provider: MaybeStoredModelProvider, enabledProvidersCount: number) => void;
 };
 
-export type UseDefaultProviderSelectionReturn =
-  UseDefaultProviderSelectionState & UseDefaultProviderSelectionActions;
+export type UseDefaultProviderSelectionReturn = UseDefaultProviderSelectionState &
+  UseDefaultProviderSelectionActions;
 
 /**
  * Tracks the in-form state for the "Use as default" toggle and its three
@@ -38,17 +35,17 @@ export function useDefaultProviderSelection({
   provider: MaybeStoredModelProvider;
   enabledProvidersCount: number;
 }): UseDefaultProviderSelectionReturn {
-  const [useAsDefaultProvider, setUseAsDefaultProviderState] =
-    useState<boolean>(() =>
-      shouldAutoEnableAsDefault({ enabledProvidersCount }),
-    );
+  const [useAsDefaultProvider, setUseAsDefaultProviderState] = useState<boolean>(() =>
+    shouldAutoEnableAsDefault({ enabledProvidersCount }),
+  );
 
-  const [projectDefaultModel, setProjectDefaultModelState] = useState<
+  const [projectDefaultModel, setProjectDefaultModelState] = useState<string | null>(
+    null,
+  );
+
+  const [projectTopicClusteringModel, setProjectTopicClusteringModelState] = useState<
     string | null
   >(null);
-
-  const [projectTopicClusteringModel, setProjectTopicClusteringModelState] =
-    useState<string | null>(null);
 
   const [projectEmbeddingsModel, setProjectEmbeddingsModelState] = useState<
     string | null
@@ -71,10 +68,7 @@ export function useDefaultProviderSelection({
   }, []);
 
   const reset = useCallback(
-    (
-      _nextProvider: MaybeStoredModelProvider,
-      nextEnabledProvidersCount: number,
-    ) => {
+    (_nextProvider: MaybeStoredModelProvider, nextEnabledProvidersCount: number) => {
       setUseAsDefaultProviderState(
         shouldAutoEnableAsDefault({
           enabledProvidersCount: nextEnabledProvidersCount,

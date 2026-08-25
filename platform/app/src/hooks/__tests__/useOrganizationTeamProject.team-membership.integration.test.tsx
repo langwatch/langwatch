@@ -18,8 +18,8 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery } =
-  vi.hoisted(() => ({
+const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery } = vi.hoisted(
+  () => ({
     mockOrganizationsQuery: vi.fn(),
     idleQuery: () => ({
       data: undefined,
@@ -40,7 +40,8 @@ const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery } =
       selectedProjectSlug: "",
       lastVisitedHomeKind: "",
     } as Record<string, string>,
-  }));
+  }),
+);
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -83,9 +84,7 @@ const OTHER_TEAM = {
   isPersonal: false,
   ownerUserId: null,
   members: [] as { userId: string; role: string }[],
-  projects: [
-    { id: "proj-platform", name: "Platform App", slug: "platform-app" },
-  ],
+  projects: [{ id: "proj-platform", name: "Platform App", slug: "platform-app" }],
 };
 
 /** The owning team, where the member holds a real membership row. */
@@ -155,9 +154,7 @@ function chromeWouldRefuse({
   // The page body renders for an organization admin on the role alone,
   // whatever team rows they hold.
   if (organizationRole === "ADMIN") return false;
-  return !(
-    team?.members?.some((member) => member.userId === MEMBER_ID) ?? false
-  );
+  return !(team?.members?.some((member) => member.userId === MEMBER_ID) ?? false);
 }
 
 describe("useOrganizationTeamProject team-membership resolution", () => {

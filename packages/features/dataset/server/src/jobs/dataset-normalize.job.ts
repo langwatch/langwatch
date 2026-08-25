@@ -105,9 +105,7 @@ export type DatasetNormalizeDeps = {
  * user as the dataset's `statusError`. Convert to JSONL to stream it instead.
  */
 export class LargeJsonUnsupportedError extends Error {
-  constructor(
-    message = "Large .json files are not supported — convert to JSONL",
-  ) {
+  constructor(message = "Large .json files are not supported — convert to JSONL") {
     super(message);
     this.name = "LargeJsonUnsupportedError";
   }
@@ -146,9 +144,7 @@ const csvRowBytes = (data: Record<string, unknown>): number => {
 const streamToString = async (stream: Readable): Promise<string> => {
   const parts: string[] = [];
   for await (const chunk of stream) {
-    parts.push(
-      typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"),
-    );
+    parts.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
   }
   return parts.join("");
 };
@@ -250,8 +246,7 @@ const parseInto = async (params: {
     // rename + exclusion); fall back to positional binding for legacy bare
     // name+type lists (which require an exact 1:1 count — no exclusion).
     const hasSourceHeaders = targetColumns.every(
-      (c) =>
-        typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
+      (c) => typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
     );
     // A PARTIAL confirm payload (some items carry `sourceHeader`, some don't) is
     // a client bug, not a legacy list — positional-binding it could silently map
@@ -259,16 +254,12 @@ const parseInto = async (params: {
     // "looks like confirm" payload) and degrade rather than fall through to the
     // positional branch below.
     const hasAnySourceHeaders = targetColumns.some(
-      (c) =>
-        typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
+      (c) => typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
     );
     if (hasAnySourceHeaders && !hasSourceHeaders) return;
     if (hasSourceHeaders) {
       const byHeader = new Map(
-        (targetColumns as DatasetConfirmColumns).map((c) => [
-          c.sourceHeader,
-          c,
-        ]),
+        (targetColumns as DatasetConfirmColumns).map((c) => [c.sourceHeader, c]),
       );
       // Duplicate `sourceHeader`s collapse in the Map (last wins), which would
       // bind fewer columns than `targetColumns` claims while `appliedColumnTypes`
@@ -284,17 +275,13 @@ const parseInto = async (params: {
       return;
     }
     if (targetColumns.length !== canonical.length) return;
-    targetByCanonical = new Map(
-      canonical.map((h, i) => [h, targetColumns[i]!]),
-    );
+    targetByCanonical = new Map(canonical.map((h, i) => [h, targetColumns[i]!]));
   };
   // Rename confirmed keys to their new names and convert their values to the
   // confirmed types; drop excluded file headers; keep stray keys untouched.
   // Identity when nothing was confirmed (or on a mismatch) — preserving the
   // pre-v19 all-`string` pass-through. Streaming: one record at a time.
-  const applyTarget = (
-    record: Record<string, unknown>,
-  ): Record<string, unknown> => {
+  const applyTarget = (record: Record<string, unknown>): Record<string, unknown> => {
     if (!targetByCanonical) return record;
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(record)) {
@@ -316,9 +303,7 @@ const parseInto = async (params: {
   // (drag) order, with the transient `sourceHeader` stripped — null when nothing
   // bound (the handler then derives all-`string`).
   const appliedColumnTypes = (): DatasetColumns | null =>
-    targetByCanonical
-      ? targetColumns!.map(({ name, type }) => ({ name, type }))
-      : null;
+    targetByCanonical ? targetColumns!.map(({ name, type }) => ({ name, type })) : null;
   // Capture headers the first time we see them, derive the rename map, and
   // expose headers in their safe (renamed) form so columnTypes matches the
   // rewritten row keys.
@@ -374,9 +359,7 @@ const parseInto = async (params: {
           const values = row.data;
           // The first row is the header: dedupe repeats + reserved-rename once.
           if (csvHeaders === null) {
-            const raw = values.map((value) =>
-              value == null ? "" : String(value),
-            );
+            const raw = values.map((value) => (value == null ? "" : String(value)));
             csvHeaders = renameReservedColumns(dedupeHeaders(raw));
             headers = csvHeaders;
             buildTargetMap(headers);
@@ -555,8 +538,7 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
       }
       // Mark failed and rethrow so the queue records the failure; the staging
       // object is intentionally NOT deleted so a manual retry can re-run.
-      const statusError =
-        error instanceof Error ? error.message : "Normalize failed";
+      const statusError = error instanceof Error ? error.message : "Normalize failed";
       await deps.repository.update({
         id: datasetId,
         projectId,

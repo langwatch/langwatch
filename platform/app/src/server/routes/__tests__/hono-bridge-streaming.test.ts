@@ -34,10 +34,7 @@ import { afterEach, describe, expect, it } from "vitest";
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Poll until `predicate` holds, bounded so a buffered bridge fails, not hangs. */
-async function waitUntil(
-  predicate: () => boolean,
-  timeoutMs = 2_000,
-): Promise<void> {
+async function waitUntil(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!predicate() && Date.now() < deadline) await wait(10);
 }

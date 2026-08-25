@@ -150,10 +150,7 @@ describe.skipIf(!hasCredentialsSecret)(
       expect(rows).toHaveLength(2);
 
       const scopesById = Object.fromEntries(
-        rows.map((r) => [
-          r.id,
-          r.scopes.map((s) => `${s.scopeType}:${s.scopeId}`),
-        ]),
+        rows.map((r) => [r.id, r.scopes.map((s) => `${s.scopeType}:${s.scopeId}`)]),
       );
       expect(scopesById[first.id]).toEqual([`PROJECT:${projectId}`]);
       expect(scopesById[second.id]).toEqual([`ORGANIZATION:${organizationId}`]);
@@ -185,9 +182,7 @@ describe.skipIf(!hasCredentialsSecret)(
       const scopes = (stored?.scopes ?? [])
         .map((s) => `${s.scopeType}:${s.scopeId}`)
         .sort();
-      expect(scopes).toEqual(
-        [`ORGANIZATION:${organizationId}`, `TEAM:${teamId}`].sort(),
-      );
+      expect(scopes).toEqual([`ORGANIZATION:${organizationId}`, `TEAM:${teamId}`].sort());
     });
 
     it("updates an org-scoped provider by id from a project context without 404ing", async () => {

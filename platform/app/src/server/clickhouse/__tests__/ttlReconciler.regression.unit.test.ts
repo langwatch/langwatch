@@ -20,8 +20,7 @@ import { reconcileTTL, TIERED_STORAGE_POLICY } from "../ttlReconciler";
 
 describe("reconcileTTL()", () => {
   const envBackup = {
-    CLICKHOUSE_COLD_STORAGE_ENABLED:
-      process.env.CLICKHOUSE_COLD_STORAGE_ENABLED,
+    CLICKHOUSE_COLD_STORAGE_ENABLED: process.env.CLICKHOUSE_COLD_STORAGE_ENABLED,
   };
 
   beforeEach(() => {
@@ -148,8 +147,8 @@ describe("reconcileTTL()", () => {
 
       await reconcileTTL({ connectionUrl: "http://localhost:8123/default" });
 
-      const modifyCalls = clickhouseMocks.client.command.mock.calls.filter(
-        (c) => /MODIFY TTL/.test((c[0] as { query: string }).query),
+      const modifyCalls = clickhouseMocks.client.command.mock.calls.filter((c) =>
+        /MODIFY TTL/.test((c[0] as { query: string }).query),
       );
       expect(modifyCalls.length).toBeGreaterThan(0);
       const query = (modifyCalls[0]![0] as { query: string }).query;
@@ -191,8 +190,8 @@ describe("reconcileTTL()", () => {
 
       await reconcileTTL({ connectionUrl: "http://localhost:8123/default" });
 
-      const modifyCalls = clickhouseMocks.client.command.mock.calls.filter(
-        (c) => /MODIFY TTL/.test((c[0] as { query: string }).query),
+      const modifyCalls = clickhouseMocks.client.command.mock.calls.filter((c) =>
+        /MODIFY TTL/.test((c[0] as { query: string }).query),
       );
       expect(modifyCalls).toHaveLength(0);
     });
@@ -221,14 +220,12 @@ describe("reconcileTTL()", () => {
         }
       }
 
-      const modifyCalls = clickhouseMocks.client.command.mock.calls.filter(
-        (c) => /MODIFY TTL/.test((c[0] as { query: string }).query),
+      const modifyCalls = clickhouseMocks.client.command.mock.calls.filter((c) =>
+        /MODIFY TTL/.test((c[0] as { query: string }).query),
       );
       expect(modifyCalls.length).toBeGreaterThan(0);
       for (const call of modifyCalls) {
-        expect((call[0] as { query: string }).query).not.toContain(
-          "ON CLUSTER",
-        );
+        expect((call[0] as { query: string }).query).not.toContain("ON CLUSTER");
       }
     });
   });

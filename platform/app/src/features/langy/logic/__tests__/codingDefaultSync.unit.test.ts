@@ -27,9 +27,7 @@ function buildUtils({
   fetchFails?: boolean;
 }) {
   const invalidate = vi.fn().mockResolvedValue(void 0);
-  const getData = vi.fn(() =>
-    previousModel ? { model: previousModel } : null,
-  );
+  const getData = vi.fn(() => (previousModel ? { model: previousModel } : null));
   const fetch = fetchFails
     ? vi.fn().mockRejectedValue(new Error("resolver unavailable"))
     : vi.fn().mockResolvedValue(nextModel ? { model: nextModel } : null);
@@ -84,9 +82,7 @@ describe("syncLangyAfterDefaultModelWrite", () => {
 
       await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
 
-      expect(useLangyStore.getState().modelOverride).toBe(
-        "anthropic/claude-sonnet-5",
-      );
+      expect(useLangyStore.getState().modelOverride).toBe("anthropic/claude-sonnet-5");
     });
   });
 
@@ -133,9 +129,7 @@ describe("syncLangyAfterDefaultModelWrite", () => {
 
       await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
 
-      expect(useLangyStore.getState().modelOverride).toBe(
-        "custom/stealth/ox-alpha",
-      );
+      expect(useLangyStore.getState().modelOverride).toBe("custom/stealth/ox-alpha");
     });
   });
 

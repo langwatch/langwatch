@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
 import { invalidColumnNameKeys } from "../../src/upload/column-validation";
 
-const col = (
-  name: string,
-  sourceHeader: string,
-): DatasetConfirmColumns[number] => ({
+const col = (name: string, sourceHeader: string): DatasetConfirmColumns[number] => ({
   name,
   type: "string",
   sourceHeader,

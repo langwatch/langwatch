@@ -3,11 +3,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as scenario from "@langwatch/scenario";
 import { expect } from "vitest";
-import {
-  type BrowserQACheck,
-  type BrowserQAResult,
-  browserQA,
-} from "./browser-qa";
+import { type BrowserQACheck, type BrowserQAResult, browserQA } from "./browser-qa";
 import { isTransientInfrastructureError } from "./langy-agent";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -72,9 +68,7 @@ export async function runScenarioAndLog(
     result = await scenario.run(config);
   }
   const testName =
-    expect.getState().currentTestName ??
-    (config as { name?: string }).name ??
-    "unknown";
+    expect.getState().currentTestName ?? (config as { name?: string }).name ?? "unknown";
 
   let qa: BrowserQAResult | null = null;
   try {
@@ -91,11 +85,7 @@ export async function runScenarioAndLog(
     await fs.mkdir(LOG_DIR, { recursive: true });
     const slug = slugify(testName);
     const filePath = path.join(LOG_DIR, `${slug}.md`);
-    await fs.writeFile(
-      filePath,
-      formatAsMarkdown({ testName, result, qa }),
-      "utf8",
-    );
+    await fs.writeFile(filePath, formatAsMarkdown({ testName, result, qa }), "utf8");
   } catch {
     // intentionally silent — see jsdoc above.
   }

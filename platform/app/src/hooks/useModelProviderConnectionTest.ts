@@ -114,11 +114,8 @@ export function useModelProviderConnectionTest({
   projectId: string | undefined;
   organizationId: string | undefined;
 }) {
-  const [results, setResults] = useState<Record<string, ConnectionTestState>>(
-    {},
-  );
-  const { mutateAsync: testConnection } =
-    api.modelProvider.testConnection.useMutation();
+  const [results, setResults] = useState<Record<string, ConnectionTestState>>({});
+  const { mutateAsync: testConnection } = api.modelProvider.testConnection.useMutation();
 
   /**
    * Which round of verdicts the visible ones belong to.
@@ -136,9 +133,7 @@ export function useModelProviderConnectionTest({
   const setResult = useCallback(
     (modelProviderId: string, state: ConnectionTestState, from: number) =>
       setResults((current) =>
-        from === generation.current
-          ? { ...current, [modelProviderId]: state }
-          : current,
+        from === generation.current ? { ...current, [modelProviderId]: state } : current,
       ),
     [],
   );

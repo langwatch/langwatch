@@ -110,10 +110,7 @@ export class DefaultGovernanceAiToolCatalogService extends GovernanceAiToolCatal
       });
     }
     if (parsed.departmentIds) {
-      await this.assertDepartments(
-        parsed.organizationId,
-        parsed.departmentIds,
-      );
+      await this.assertDepartments(parsed.organizationId, parsed.departmentIds);
     }
     return this.repository.update(parsed);
   }
@@ -139,16 +136,12 @@ export class DefaultGovernanceAiToolCatalogService extends GovernanceAiToolCatal
   ): Promise<{ created: number; updated: number; skipped: number }> {
     const parsed = seedAiToolStarterPackInputSchema.parse(input);
     const selected = parsed.slugs
-      ? AI_TOOL_STARTER_TILES.filter((tile) =>
-          parsed.slugs?.includes(tile.slug),
-        )
+      ? AI_TOOL_STARTER_TILES.filter((tile) => parsed.slugs?.includes(tile.slug))
       : AI_TOOL_STARTER_TILES;
     return this.repository.seedStarterPack({ values: parsed, tiles: selected });
   }
 
-  listConfiguredProvidersForUser(
-    input: AiToolMemberInput,
-  ): Promise<string[]> {
+  listConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]> {
     return this.repository.listConfiguredProvidersForUser(
       aiToolMemberInputSchema.parse(input),
     );
@@ -159,9 +152,7 @@ export class DefaultGovernanceAiToolCatalogService extends GovernanceAiToolCatal
   ): Promise<AiToolProviderOption[]> {
     const parsed = aiToolOrganizationInputSchema.parse(input);
     const configured = new Set(
-      await this.repository.listConfiguredProvidersForOrganization(
-        parsed.organizationId,
-      ),
+      await this.repository.listConfiguredProvidersForOrganization(parsed.organizationId),
     );
     return this.providers
       .list()
@@ -171,9 +162,7 @@ export class DefaultGovernanceAiToolCatalogService extends GovernanceAiToolCatal
         displayName,
         configured: configured.has(providerKey),
       }))
-      .sort((left, right) =>
-        left.displayName.localeCompare(right.displayName),
-      );
+      .sort((left, right) => left.displayName.localeCompare(right.displayName));
   }
 
   listRoutingPolicyOptionsForAdmin(
@@ -197,23 +186,17 @@ export class DefaultGovernanceAiToolCatalogService extends GovernanceAiToolCatal
     });
     const sorted = [...tiles].sort(
       (left, right) =>
-        left.order - right.order ||
-        left.displayName.localeCompare(right.displayName),
+        left.order - right.order || left.displayName.localeCompare(right.displayName),
     );
-    const overrides: Partial<
-      Record<PlatformToolSlug, PlatformToolPolicy>
-    > = {};
+    const overrides: Partial<Record<PlatformToolSlug, PlatformToolPolicy>> = {};
     for (const tile of sorted) {
       const kind = tile.config.assistantKind;
       if (typeof kind !== "string") continue;
-      const slug = ASSISTANT_KIND_TO_TOOL_SLUG[
-        kind as keyof typeof ASSISTANT_KIND_TO_TOOL_SLUG
-      ];
+      const slug =
+        ASSISTANT_KIND_TO_TOOL_SLUG[kind as keyof typeof ASSISTANT_KIND_TO_TOOL_SLUG];
       if (!slug || overrides[slug]) continue;
       let allowVk =
-        tile.config.allowVk === undefined
-          ? true
-          : Boolean(tile.config.allowVk);
+        tile.config.allowVk === undefined ? true : Boolean(tile.config.allowVk);
       let allowOtelDirect =
         tile.config.allowOtelDirect === undefined
           ? true
@@ -225,9 +208,7 @@ export class DefaultGovernanceAiToolCatalogService extends GovernanceAiToolCatal
     return overrides;
   }
 
-  async resolveToolPolicyMap(
-    input: AiToolMemberInput,
-  ): Promise<PlatformToolPolicyMap> {
+  async resolveToolPolicyMap(input: AiToolMemberInput): Promise<PlatformToolPolicyMap> {
     const overrides = await this.resolveToolPolicyOverrides(input);
     const result = {} as PlatformToolPolicyMap;
     for (const slug of PLATFORM_TOOL_SLUGS) {
@@ -249,28 +230,24 @@ export class DefaultGovernanceAiToolCatalogService extends GovernanceAiToolCatal
     )[input.slug];
   }
 
-  async resolveCliCatalogForUser(
-    input: AiToolMemberInput,
-  ): Promise<AiToolCliCatalog> {
+  async resolveCliCatalogForUser(input: AiToolMemberInput): Promise<AiToolCliCatalog> {
     const parsed = aiToolMemberInputSchema.parse(input);
-    const [assistantTiles, providerTiles, configuredProviderKeys] =
-      await Promise.all([
-        this.repository.listVisible({
-          ...parsed,
-          type: "coding_assistant",
-        }),
-        this.repository.listVisible({ ...parsed, type: "model_provider" }),
-        this.repository.listConfiguredProvidersForUser(parsed),
-      ]);
+    const [assistantTiles, providerTiles, configuredProviderKeys] = await Promise.all([
+      this.repository.listVisible({
+        ...parsed,
+        type: "coding_assistant",
+      }),
+      this.repository.listVisible({ ...parsed, type: "model_provider" }),
+      this.repository.listConfiguredProvidersForUser(parsed),
+    ]);
     const configured = new Set(configuredProviderKeys);
     const tools: AiToolCliCatalog["tools"] = [];
     const seenTools = new Set<string>();
     for (const tile of sortTiles(assistantTiles)) {
       const kind = tile.config.assistantKind;
       if (typeof kind !== "string") continue;
-      const slug = ASSISTANT_KIND_TO_TOOL_SLUG[
-        kind as keyof typeof ASSISTANT_KIND_TO_TOOL_SLUG
-      ];
+      const slug =
+        ASSISTANT_KIND_TO_TOOL_SLUG[kind as keyof typeof ASSISTANT_KIND_TO_TOOL_SLUG];
       if (!slug || seenTools.has(slug)) continue;
       seenTools.add(slug);
       tools.push({ slug, displayName: tile.displayName });
@@ -279,10 +256,7 @@ export class DefaultGovernanceAiToolCatalogService extends GovernanceAiToolCatal
     const seenProviders = new Set<string>();
     for (const tile of sortTiles(providerTiles)) {
       const providerKey = tile.config.providerKey;
-      if (
-        typeof providerKey !== "string" ||
-        seenProviders.has(providerKey)
-      ) {
+      if (typeof providerKey !== "string" || seenProviders.has(providerKey)) {
         continue;
       }
       seenProviders.add(providerKey);
@@ -295,10 +269,7 @@ export class DefaultGovernanceAiToolCatalogService extends GovernanceAiToolCatal
     return { tools, providers, configuredProviderKeys };
   }
 
-  private async getOwn(
-    id: string,
-    organizationId: string,
-  ): Promise<AiToolEntry> {
+  private async getOwn(id: string, organizationId: string): Promise<AiToolEntry> {
     const entry = await this.repository.tryFindById(id);
     if (!entry || entry.organizationId !== organizationId) {
       throw new AiToolEntryNotFoundError(id, organizationId);
@@ -322,7 +293,6 @@ export class DefaultGovernanceAiToolCatalogService extends GovernanceAiToolCatal
 function sortTiles(entries: AiToolEntry[]): AiToolEntry[] {
   return [...entries].sort(
     (left, right) =>
-      left.order - right.order ||
-      left.displayName.localeCompare(right.displayName),
+      left.order - right.order || left.displayName.localeCompare(right.displayName),
   );
 }

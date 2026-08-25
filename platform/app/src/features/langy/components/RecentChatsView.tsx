@@ -169,11 +169,8 @@ export function RecentChatsView({
   // search creates a distinct server request.
   const history = useLangyConversationListQuery(debouncedQuery);
   const conversations =
-    history.isFetched || history.items.length > 0
-      ? history.items
-      : seededConversations;
-  const isLoading =
-    history.isLoading || (!history.isFetched && seededIsLoading);
+    history.isFetched || history.items.length > 0 ? history.items : seededConversations;
+  const isLoading = history.isLoading || (!history.isFetched && seededIsLoading);
   const hasError = seededHasError || history.isError;
 
   const allItems = useMemo<ChatItem[]>(
@@ -201,9 +198,7 @@ export function RecentChatsView({
   // filtering locally too keeps the list responsive inside the debounce window.
   const items = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q
-      ? allItems.filter((item) => item.searchText.includes(q))
-      : allItems;
+    return q ? allItems.filter((item) => item.searchText.includes(q)) : allItems;
   }, [allItems, query]);
 
   const searchable =
@@ -377,19 +372,11 @@ export function RecentChatsView({
             onClick={() => void history.fetchNextPage()}
             aria-label="Load older conversations"
           >
-            {history.isFetchingNextPage ? (
-              <Spinner size="xs" />
-            ) : (
-              "Load older chats"
-            )}
+            {history.isFetchingNextPage ? <Spinner size="xs" /> : "Load older chats"}
           </Button>
         </Box>
       ) : history.isFetchingNextPage ? (
-        <HStack
-          justify="center"
-          paddingY={2}
-          aria-label="Loading older conversations"
-        >
+        <HStack justify="center" paddingY={2} aria-label="Loading older conversations">
           <Spinner size="xs" />
         </HStack>
       ) : null}
@@ -467,8 +454,7 @@ function ChatRows({
       ) : (
         items.map((item, index) => {
           const startsGroup = item.group !== items[index - 1]?.group;
-          const headerHidesDate =
-            item.group === "Today" || item.group === "Yesterday";
+          const headerHidesDate = item.group === "Today" || item.group === "Yesterday";
           return (
             <Fragment key={item.value}>
               {startsGroup ? (
@@ -687,11 +673,7 @@ const ChatRow = memo(function ChatRow({
               something the panel offers: it doubled the list with
               near-identical titles nobody could tell apart. */}
           <Menu.Separator />
-          <Menu.Item
-            value="delete"
-            color="fg.error"
-            onClick={() => onDelete(item.value)}
-          >
+          <Menu.Item value="delete" color="fg.error" onClick={() => onDelete(item.value)}>
             <Trash2 size={14} /> Delete
           </Menu.Item>
         </Menu.Content>

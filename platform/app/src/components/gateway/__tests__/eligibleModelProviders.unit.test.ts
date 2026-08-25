@@ -53,9 +53,7 @@ describe("resolveProviderDefaultModel", () => {
 
   describe("when no model can be resolved", () => {
     it("returns the bare provider label so the gateway surfaces a readable error", () => {
-      expect(resolveProviderDefaultModel("custom", "My vLLM", [])).toBe(
-        "my vllm",
-      );
+      expect(resolveProviderDefaultModel("custom", "My vLLM", [])).toBe("my vllm");
     });
   });
 });
@@ -103,10 +101,7 @@ describe("resolveEligible", () => {
   const ORG_ID = "org-1";
   const TEAM_ID = "team-1";
   const PROJECT_ID = "project-1";
-  const hierarchy = buildScopeHierarchy(
-    [{ id: PROJECT_ID, teamId: TEAM_ID }],
-    ORG_ID,
-  );
+  const hierarchy = buildScopeHierarchy([{ id: PROJECT_ID, teamId: TEAM_ID }], ORG_ID);
   const keyAtProject = [{ scopeType: "PROJECT" as const, scopeId: PROJECT_ID }];
   const orgProvider: OrgModelProvider = {
     id: "mp-org",
@@ -197,9 +192,7 @@ describe("resolveEligible", () => {
       expect(
         resolveEligible({
           scopes: keyAtProject,
-          providers: [
-            { ...orgProvider, disabledAt: new Date("2026-07-01T00:00:00Z") },
-          ],
+          providers: [{ ...orgProvider, disabledAt: new Date("2026-07-01T00:00:00Z") }],
           hierarchy,
         }),
       ).toEqual([]);

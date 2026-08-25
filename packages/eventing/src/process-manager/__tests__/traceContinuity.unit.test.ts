@@ -12,10 +12,7 @@
  *   a child of the persisted span context — including across retries.
  */
 import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
-import {
-  InMemorySpanExporter,
-  SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import {
   afterAll,
@@ -39,8 +36,7 @@ import {
   T0,
 } from "./helpers/pilotProcess.fixture";
 
-const W3C_TRACEPARENT_REGEX =
-  /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/;
+const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/;
 
 describe("process-manager trace continuity", () => {
   let provider: NodeTracerProvider;
@@ -112,9 +108,7 @@ describe("process-manager trace continuity", () => {
       expect(traceparent).toMatch(W3C_TRACEPARENT_REGEX);
       const [, carrierTraceId] = W3C_TRACEPARENT_REGEX.exec(traceparent!)!;
       expect(carrierTraceId).toBe(producerTraceId);
-      expect(message!.traceCarrier.baggage).toContain(
-        "langwatch.tenant=tenant_1",
-      );
+      expect(message!.traceCarrier.baggage).toContain("langwatch.tenant=tenant_1");
     });
 
     it("emits an internal evolve span carrying process identity attributes", async () => {
@@ -237,13 +231,13 @@ describe("process-manager trace continuity", () => {
       for (const span of consumerSpans) {
         expect(span.spanContext().traceId).toBe(producerTraceId);
       }
-      expect(
-        consumerSpans.map((span) => span.attributes["process.attempt"]),
-      ).toEqual([1, 2]);
+      expect(consumerSpans.map((span) => span.attributes["process.attempt"])).toEqual([
+        1, 2,
+      ]);
       // The failed attempt carries the exception on its span.
-      expect(
-        consumerSpans[0]!.events.some((event) => event.name === "exception"),
-      ).toBe(true);
+      expect(consumerSpans[0]!.events.some((event) => event.name === "exception")).toBe(
+        true,
+      );
       const exceptionEvent = consumerSpans[0]!.events.find(
         (event) => event.name === "exception",
       );

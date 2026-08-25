@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { Span } from "~/server/tracer/types";
-import {
-  extractEventsFromSpans,
-  mapTraceSummaryToTrace,
-} from "../trace-summary.mapper";
+import { extractEventsFromSpans, mapTraceSummaryToTrace } from "../trace-summary.mapper";
 
 function makeSpan(overrides: Partial<Span> = {}): Span {
   return {
@@ -188,9 +185,7 @@ describe("extractEventsFromSpans", () => {
   });
 });
 
-function makeSummary(
-  overrides: Partial<TraceSummaryData> = {},
-): TraceSummaryData {
+function makeSummary(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {
     traceId: "trace-1",
     spanCount: 1,
@@ -299,9 +294,7 @@ describe("mapTraceSummaryToTrace — display-side single-key wrapper recursion",
         computedOutput: JSON.stringify({ type: "json", value: inner }),
       });
 
-      expect(() =>
-        mapTraceSummaryToTrace(summary, [], "project-1"),
-      ).not.toThrow();
+      expect(() => mapTraceSummaryToTrace(summary, [], "project-1")).not.toThrow();
     });
   });
 });
@@ -425,9 +418,7 @@ describe("mapAttributesToMetadata — otel_log_record_count sibling", () => {
 
       const trace = mapTraceSummaryToTrace(summary, [], "project-1");
 
-      expect(trace.metadata["langwatch.reserved.log_record_count"]).toBe(
-        "56353",
-      );
+      expect(trace.metadata["langwatch.reserved.log_record_count"]).toBe("56353");
       expect(trace.metadata.otel_log_record_count).toBe("56353");
     });
   });

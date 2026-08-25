@@ -269,16 +269,12 @@ describe("given a LogRecordReceived event with a 100 KB body", () => {
       const body = extractLogBody(leaned);
       const data = leaned.data as { attributes?: Record<string, string> };
 
-      expect(Buffer.byteLength(body, "utf-8")).toBeLessThanOrEqual(
-        IO_PREVIEW_BYTES + 4,
-      );
+      expect(Buffer.byteLength(body, "utf-8")).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 4);
       // eventref.body is stored in the event data attributes
-      expect(
-        data.attributes?.["langwatch.reserved.eventref.body"],
-      ).toBeDefined();
-      const ref = JSON.parse(
-        data.attributes!["langwatch.reserved.eventref.body"]!,
-      ) as { field: string };
+      expect(data.attributes?.["langwatch.reserved.eventref.body"]).toBeDefined();
+      const ref = JSON.parse(data.attributes!["langwatch.reserved.eventref.body"]!) as {
+        field: string;
+      };
       expect(ref.field).toBe("body");
     });
   });
@@ -321,12 +317,12 @@ describe("given a SpanReceived event with both langwatch.input and langwatch.out
       expect(attrs[`${EVENTREF_ATTR_PREFIX}langwatch.input`]).toBeDefined();
       expect(attrs[`${EVENTREF_ATTR_PREFIX}langwatch.output`]).toBeDefined();
 
-      const inputRef = JSON.parse(
-        attrs[`${EVENTREF_ATTR_PREFIX}langwatch.input`]!,
-      ) as { field: string };
-      const outputRef = JSON.parse(
-        attrs[`${EVENTREF_ATTR_PREFIX}langwatch.output`]!,
-      ) as { field: string };
+      const inputRef = JSON.parse(attrs[`${EVENTREF_ATTR_PREFIX}langwatch.input`]!) as {
+        field: string;
+      };
+      const outputRef = JSON.parse(attrs[`${EVENTREF_ATTR_PREFIX}langwatch.output`]!) as {
+        field: string;
+      };
 
       expect(inputRef.field).toBe("langwatch.input");
       expect(outputRef.field).toBe("langwatch.output");
@@ -393,9 +389,7 @@ describe("given a gen_ai.input.messages chat payload whose developer prompt alon
       const attrs = extractSpanAttributes(leaned);
       const preview = attrs["gen_ai.input.messages"]!;
 
-      expect(Buffer.byteLength(preview, "utf-8")).toBeLessThanOrEqual(
-        IO_PREVIEW_BYTES,
-      );
+      expect(Buffer.byteLength(preview, "utf-8")).toBeLessThanOrEqual(IO_PREVIEW_BYTES);
       const messages = JSON.parse(preview) as Array<{
         role: string;
         content: unknown;
@@ -405,9 +399,9 @@ describe("given a gen_ai.input.messages chat payload whose developer prompt alon
       expect(last.role).toBe("user");
       expect(last.content).toEqual([{ type: "input_text", text: "hi" }]);
       // The eventref to the FULL value still rides alongside the preview.
-      const ref = JSON.parse(
-        attrs[`${EVENTREF_ATTR_PREFIX}gen_ai.input.messages`]!,
-      ) as { field: string };
+      const ref = JSON.parse(attrs[`${EVENTREF_ATTR_PREFIX}gen_ai.input.messages`]!) as {
+        field: string;
+      };
       expect(ref.field).toBe("gen_ai.input.messages");
     });
   });
@@ -444,9 +438,7 @@ describe("structuredIoPreview", () => {
       const preview = structuredIoPreview(payload, 32 * 1024);
 
       expect(preview).not.toBeNull();
-      expect(Buffer.byteLength(preview!, "utf-8")).toBeLessThanOrEqual(
-        32 * 1024,
-      );
+      expect(Buffer.byteLength(preview!, "utf-8")).toBeLessThanOrEqual(32 * 1024);
       const messages = JSON.parse(preview!) as Array<{
         role: string;
         content: string | unknown;
@@ -492,9 +484,9 @@ describe("given a SpanReceived event with a non-IO attribute (langwatch.params) 
       const attrs = extractSpanAttributes(leaned);
 
       // The capped value must be a truncation placeholder, far shorter than the original
-      expect(
-        Buffer.byteLength(attrs["langwatch.params"] ?? "", "utf-8"),
-      ).toBeLessThan(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES);
+      expect(Buffer.byteLength(attrs["langwatch.params"] ?? "", "utf-8")).toBeLessThan(
+        DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+      );
       expect(attrs["langwatch.params"]).toMatch(/\[truncated:/);
     });
 
@@ -549,10 +541,7 @@ describe("given a SpanReceived event with a >256KB blob nested inside an arrayVa
             key: "langwatch.params",
             value: {
               arrayValue: {
-                values: [
-                  { stringValue: NON_IO_OVER_256KB },
-                  { stringValue: "small" },
-                ],
+                values: [{ stringValue: NON_IO_OVER_256KB }, { stringValue: "small" }],
               },
             },
           },
@@ -765,9 +754,7 @@ function makeSpanReceivedEventWithOversizedResourceAttr(): Event {
       },
       // Oversized value lives ONLY in resource attributes
       resource: {
-        attributes: [
-          { key: "service.name", value: { stringValue: oversizedValue } },
-        ],
+        attributes: [{ key: "service.name", value: { stringValue: oversizedValue } }],
       },
       instrumentationScope: null,
       piiRedactionLevel: "DISABLED",
@@ -826,9 +813,7 @@ describe("given a SpanReceived event with a >256KB value only in span.events[0].
         (a) => a.key === "exception.message",
       )?.value.stringValue;
       expect(valueAfter).toBe(originalValue);
-      expect(valueAfter?.length).toBeGreaterThan(
-        DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
-      );
+      expect(valueAfter?.length).toBeGreaterThan(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES);
     });
 
     it("does not attach an eventref for the event attribute (cap, not IO preview)", () => {
@@ -889,9 +874,7 @@ describe("given a SpanReceived event with a >256KB value only in resource.attrib
         (a) => a.key === "service.name",
       )?.value.stringValue;
       expect(valueAfter).toBe(originalValue);
-      expect(valueAfter?.length).toBeGreaterThan(
-        DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
-      );
+      expect(valueAfter?.length).toBeGreaterThan(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES);
     });
   });
 });
@@ -958,9 +941,7 @@ describe("given a span with a small structured non-IO attribute", () => {
             key: "langwatch.params",
             value: {
               kvlistValue: {
-                values: [
-                  { key: "blob", value: { stringValue: NON_IO_OVER_256KB } },
-                ],
+                values: [{ key: "blob", value: { stringValue: NON_IO_OVER_256KB } }],
               },
             },
           },

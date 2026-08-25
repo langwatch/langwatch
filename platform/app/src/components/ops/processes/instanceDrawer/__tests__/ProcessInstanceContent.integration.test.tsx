@@ -72,9 +72,7 @@ describe("ProcessInstanceContent", () => {
       expect(container.textContent).toContain("automation.execute");
       expect(container.textContent).toContain("2 attempts");
       const traceLink = screen.getByText(/producing trace/);
-      expect(traceLink.closest("a")?.getAttribute("href")).toContain(
-        "/explore",
-      );
+      expect(traceLink.closest("a")?.getAttribute("href")).toContain("/explore");
     });
   });
 
@@ -89,9 +87,9 @@ describe("ProcessInstanceContent", () => {
           now={NOW}
         />,
       );
-      expect(
-        screen.getByTestId("process-instance-missing").textContent,
-      ).toContain("no longer exists");
+      expect(screen.getByTestId("process-instance-missing").textContent).toContain(
+        "no longer exists",
+      );
     });
   });
 });
@@ -107,9 +105,7 @@ describe("OutboxMessageCard", () => {
           canManage={false}
         />,
       );
-      expect(container.textContent).toContain(
-        "dispatcher died or still delivering",
-      );
+      expect(container.textContent).toContain("dispatcher died or still delivering");
       expect(container.textContent).not.toMatch(/dispatcher died(?! or)/);
     });
   });

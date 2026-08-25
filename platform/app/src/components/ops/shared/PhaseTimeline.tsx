@@ -58,9 +58,7 @@ export function PhaseTimeline({
             paddingX={1.5}
             paddingY={0.5}
             borderRadius="sm"
-            bg={
-              isCurrent ? "orange.subtle" : isDone ? "green.subtle" : "bg.muted"
-            }
+            bg={isCurrent ? "orange.subtle" : isDone ? "green.subtle" : "bg.muted"}
             opacity={isDone || isCurrent ? 1 : 0.4}
           >
             <Text textStyle="xs">{icon}</Text>

@@ -9,12 +9,8 @@ import type { RetentionPolicyResolver } from "~/server/data-retention/retentionP
 
 export type AppExperimentRuntimeOptions = PostgresExperimentAdapterOptions;
 
-export class AppExperimentDspyRetentionPort
-  extends ExperimentDspyRetentionPort
-{
-  static create(
-    resolver: RetentionPolicyResolver,
-  ): AppExperimentDspyRetentionPort {
+export class AppExperimentDspyRetentionPort extends ExperimentDspyRetentionPort {
+  static create(resolver: RetentionPolicyResolver): AppExperimentDspyRetentionPort {
     return new AppExperimentDspyRetentionPort(resolver);
   }
 
@@ -24,8 +20,7 @@ export class AppExperimentDspyRetentionPort
 
   async getTraceRetentionDays(tenantId: string): Promise<number> {
     return (
-      (await this.resolver.resolve(tenantId))?.traces ??
-      PLATFORM_DEFAULT_RETENTION_DAYS
+      (await this.resolver.resolve(tenantId))?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS
     );
   }
 }

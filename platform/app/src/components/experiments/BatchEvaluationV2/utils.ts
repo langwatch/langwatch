@@ -4,9 +4,7 @@ import type { ExperimentRunWithItems } from "../../../server/experiments-v3/serv
  * Infer evaluation input/result column sets from a list of results.
  * Single Responsibility: derive columns used by UI and CSV builders.
  */
-export function getEvaluationColumns(
-  results: ExperimentRunWithItems["evaluations"],
-): {
+export function getEvaluationColumns(results: ExperimentRunWithItems["evaluations"]): {
   evaluationInputsColumns: Set<string>;
   evaluationResultsColumns: Set<string>;
 } {

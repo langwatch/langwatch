@@ -48,9 +48,10 @@ describe("splitTraceCost", () => {
         billedCost: 0,
         nonBilledCost: 0,
       });
-      expect(
-        splitTraceCost({ totalCost: undefined, nonBillable: false }),
-      ).toEqual({ billedCost: 0, nonBilledCost: 0 });
+      expect(splitTraceCost({ totalCost: undefined, nonBillable: false })).toEqual({
+        billedCost: 0,
+        nonBilledCost: 0,
+      });
     });
   });
 });

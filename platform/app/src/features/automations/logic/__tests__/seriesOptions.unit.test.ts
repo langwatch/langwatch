@@ -1,16 +1,11 @@
 import { describe, expect, it } from "vitest";
-import {
-  deriveSeriesOptionsFromGraph,
-  resolveSeriesLabel,
-} from "../seriesOptions";
+import { deriveSeriesOptionsFromGraph, resolveSeriesLabel } from "../seriesOptions";
 
 describe("deriveSeriesOptionsFromGraph", () => {
   describe("given a series with a human name", () => {
     it("uses the author's name as the label", () => {
       const options = deriveSeriesOptionsFromGraph({
-        series: [
-          { name: "p95 latency", metric: "latency", aggregation: "p95" },
-        ],
+        series: [{ name: "p95 latency", metric: "latency", aggregation: "p95" }],
       });
 
       expect(options).toEqual([{ key: "0/latency/p95", label: "p95 latency" }]);

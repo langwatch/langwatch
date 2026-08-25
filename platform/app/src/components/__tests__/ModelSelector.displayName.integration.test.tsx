@@ -91,17 +91,13 @@ describe("<ModelSelector/>", () => {
       it("lists the azure custom model by its configured display name", () => {
         renderSelector();
 
-        expect(
-          within(listbox()).getByText("Marketing GPT-5.1"),
-        ).toBeInTheDocument();
+        expect(within(listbox()).getByText("Marketing GPT-5.1")).toBeInTheDocument();
       });
 
       it("does not list the azure custom model by its raw model id", () => {
         renderSelector();
 
-        expect(
-          within(listbox()).queryByText("gpt-5.1"),
-        ).not.toBeInTheDocument();
+        expect(within(listbox()).queryByText("gpt-5.1")).not.toBeInTheDocument();
       });
     });
   });

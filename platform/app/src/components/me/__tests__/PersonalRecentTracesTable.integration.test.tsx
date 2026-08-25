@@ -67,9 +67,7 @@ describe("PersonalRecentTracesTable", () => {
       expect(
         screen.getByText("Set up a coding assistant").closest("button"),
       ).toBeTruthy();
-      expect(
-        screen.getByText("Mint an ingestion key").closest("button"),
-      ).toBeTruthy();
+      expect(screen.getByText("Mint an ingestion key").closest("button")).toBeTruthy();
     });
   });
 });

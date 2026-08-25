@@ -266,16 +266,12 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       roleIds: systemRoleIds,
     });
     return rows
-      .filter(
-        (row) => row.kind !== SYSTEM_API_KEY_ROLE_KIND || exclusive.has(row.id),
-      )
+      .filter((row) => row.kind !== SYSTEM_API_KEY_ROLE_KIND || exclusive.has(row.id))
       .map(({ id, permissions }) => ({ id, permissions }));
   }
 
   /** Membership again, not a grant: the legacy query, unchanged. */
-  async tryFindApiKeyOwner(
-    apiKeyId: string,
-  ): Promise<{ userId: string | null } | null> {
+  async tryFindApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null> {
     return (await this.database.apiKey.findUnique({
       where: { id: apiKeyId },
       select: { userId: true },
@@ -319,8 +315,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }): Promise<ShareLinkRow[]> {
     if (tokens.length === 0 || links.length === 0) return [];
     const resolvedOrganizationId =
-      organizationId ??
-      (await this.tryFindProjectLineage({ projectId }))?.organizationId;
+      organizationId ?? (await this.tryFindProjectLineage({ projectId }))?.organizationId;
     if (!resolvedOrganizationId) return [];
 
     const rows = await this.findResourceGrantCandidates({
@@ -471,10 +466,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         isMine: false,
         isForeign: false,
       };
-      if (
-        holder.principalType === "API_KEY" &&
-        holder.principalId === apiKeyId
-      ) {
+      if (holder.principalType === "API_KEY" && holder.principalId === apiKeyId) {
         entry.isMine = true;
       } else {
         entry.isForeign = true;

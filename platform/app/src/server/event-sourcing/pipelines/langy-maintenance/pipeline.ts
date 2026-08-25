@@ -40,9 +40,7 @@ export interface LangyMaintenancePipelineDeps {
  * the revision it was scheduled at, so when several workers race the same tick
  * one commit wins and the losers stand down.
  */
-export function createLangyMaintenancePipeline(
-  deps: LangyMaintenancePipelineDeps,
-) {
+export function createLangyMaintenancePipeline(deps: LangyMaintenancePipelineDeps) {
   return definePipeline<Event>({
     name: "langy_maintenance",
     aggregate: defineAggregate({

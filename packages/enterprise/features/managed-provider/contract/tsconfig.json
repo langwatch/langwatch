@@ -1,1 +1,16 @@
-{"compilerOptions":{"target":"es2022","module":"preserve","moduleResolution":"bundler","lib":["es2022"],"types":[],"strict":true,"noUncheckedIndexedAccess":true,"noEmit":true,"skipLibCheck":true,"forceConsistentCasingInFileNames":true,"verbatimModuleSyntax":true},"include":["src/**/*.ts","tests/**/*.ts"]}
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["es2022"],
+    "types": [],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

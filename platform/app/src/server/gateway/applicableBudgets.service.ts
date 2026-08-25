@@ -206,10 +206,7 @@ async function loadSpend(
     periodFloorMs: budgetPeriodFloorMs(r.budget),
   }));
   try {
-    const spends = await chRepo.getSpendForTargetsAcrossTenants(
-      tenantIds,
-      targets,
-    );
+    const spends = await chRepo.getSpendForTargetsAcrossTenants(tenantIds, targets);
     return new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
   } catch {
     // Spend is decoration on this list; the budgets themselves are the

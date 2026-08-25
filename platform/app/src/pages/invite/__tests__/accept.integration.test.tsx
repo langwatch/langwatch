@@ -113,9 +113,7 @@ describe("Accept invite page", () => {
         const user = userEvent.setup();
         renderAccept();
 
-        await user.click(
-          screen.getByRole("button", { name: "Go to Dashboard" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Go to Dashboard" }));
 
         expect(hardRedirectSpy).toHaveBeenCalledWith("/");
         expect(signOutSpy).not.toHaveBeenCalled();
@@ -127,9 +125,7 @@ describe("Accept invite page", () => {
         const user = userEvent.setup();
         renderAccept();
 
-        await user.click(
-          screen.getByRole("button", { name: "Log Out and Try Again" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Log Out and Try Again" }));
 
         expect(signOutSpy).toHaveBeenCalled();
         expect(hardRedirectSpy).not.toHaveBeenCalled();

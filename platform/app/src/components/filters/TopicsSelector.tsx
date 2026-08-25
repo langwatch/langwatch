@@ -1,11 +1,4 @@
-import {
-  EmptyState,
-  Heading,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { EmptyState, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { keepPreviousData } from "@tanstack/react-query";
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
@@ -33,9 +26,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   useEffect(() => {
     const subtopics = router.query.subtopics;
     if (subtopics) {
-      setSelectedSubtopics(
-        Array.isArray(subtopics) ? subtopics : subtopics.split(","),
-      );
+      setSelectedSubtopics(Array.isArray(subtopics) ? subtopics : subtopics.split(","));
     } else {
       setSelectedSubtopics([]);
     }
@@ -77,8 +68,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     setSelectedSubtopics(newSubtopics);
 
     const topicsQuery = newTopics.length > 0 ? newTopics.join(",") : undefined;
-    const subtopicsQuery =
-      newSubtopics.length > 0 ? newSubtopics.join(",") : undefined;
+    const subtopicsQuery = newSubtopics.length > 0 ? newSubtopics.join(",") : undefined;
     void router.push(
       {
         query: {
@@ -96,8 +86,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     const newSubtopics = checked
       ? [...selectedSubtopics, subtopicId]
       : selectedSubtopics.filter((t) => t !== subtopicId);
-    const subtopicsQuery =
-      newSubtopics.length > 0 ? newSubtopics.join(",") : undefined;
+    const subtopicsQuery = newSubtopics.length > 0 ? newSubtopics.join(",") : undefined;
     setSelectedSubtopics(newSubtopics);
 
     void router.push(
@@ -157,18 +146,14 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                     width="full"
                     paddingX={2}
                     cursor="pointer"
-                    fontWeight={
-                      selectedTopics.includes(topic.id) ? "500" : "normal"
-                    }
+                    fontWeight={selectedTopics.includes(topic.id) ? "500" : "normal"}
                   >
                     <Checkbox
                       borderColor="border.emphasized"
                       gap={3}
                       flexGrow={1}
                       checked={selectedTopics.includes(topic.id)}
-                      onChange={(e) =>
-                        handleTopicChange(topic.id, e.target.checked)
-                      }
+                      onChange={(e) => handleTopicChange(topic.id, e.target.checked)}
                       size="sm"
                     >
                       <OverflownTextWithTooltip
@@ -204,10 +189,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                             flexGrow={1}
                             checked={selectedSubtopics.includes(subtopic.id)}
                             onChange={(e) =>
-                              handleSubtopicChange(
-                                subtopic.id,
-                                e.target.checked,
-                              )
+                              handleSubtopicChange(subtopic.id, e.target.checked)
                             }
                           >
                             <OverflownTextWithTooltip
@@ -218,11 +200,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                               {subtopic.name}
                             </OverflownTextWithTooltip>
                           </Checkbox>
-                          <Text
-                            color="fg.muted"
-                            fontSize="12px"
-                            whiteSpace="nowrap"
-                          >
+                          <Text color="fg.muted" fontSize="12px" whiteSpace="nowrap">
                             {subtopic.count}
                           </Text>
                         </HStack>
@@ -233,9 +211,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
             <EmptyState.Root size="sm">
               <EmptyState.Content>
                 <VStack textAlign="center">
-                  <EmptyState.Title textStyle="sm">
-                    No topics found
-                  </EmptyState.Title>
+                  <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
                   <EmptyState.Description textStyle="xs">
                     Topics are assigned automatically after enough messages are
                     collected.{" "}
@@ -247,9 +223,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
         ) : (
           <EmptyState.Root size="sm">
             <EmptyState.Content>
-              <EmptyState.Title textStyle="sm">
-                No topics found
-              </EmptyState.Title>
+              <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
             </EmptyState.Content>
           </EmptyState.Root>
         )}

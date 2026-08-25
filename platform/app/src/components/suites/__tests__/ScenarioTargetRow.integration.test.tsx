@@ -12,10 +12,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
 import { ScenarioTargetRow } from "../ScenarioTargetRow";
 import { makeScenarioRunData } from "./test-helpers";
 
@@ -45,9 +42,7 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByText("Prod Agent: Angry refund request"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Prod Agent: Angry refund request")).toBeInTheDocument();
     });
 
     /** @scenario "List view row displays passed status with criteria count" */
@@ -301,9 +296,7 @@ describe("<ScenarioTargetRow/>", () => {
       );
 
       await user.hover(
-        screen.getByLabelText(
-          "View details for Prod Agent: Angry refund request",
-        ),
+        screen.getByLabelText("View details for Prod Agent: Angry refund request"),
       );
 
       expect(prefetchMock).toHaveBeenCalledWith("run_hover");

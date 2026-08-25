@@ -17,11 +17,13 @@ describe("ClickHouseExperimentRunRepository", () => {
   it("returns null for a polling read when ClickHouse is unavailable", async () => {
     const repository = ClickHouseExperimentRunRepository.create(options);
 
-    await expect(repository.tryGet({
-      projectId: "project_1",
-      experimentId: "experiment_1",
-      runId: "run_1",
-    })).resolves.toBeNull();
+    await expect(
+      repository.tryGet({
+        projectId: "project_1",
+        experimentId: "experiment_1",
+        runId: "run_1",
+      }),
+    ).resolves.toBeNull();
   });
 
   it("returns null when a newly started run has not reached ClickHouse yet", async () => {
@@ -32,20 +34,24 @@ describe("ClickHouseExperimentRunRepository", () => {
       }),
     });
 
-    await expect(repository.tryGet({
-      projectId: "project_1",
-      experimentId: "experiment_1",
-      runId: "run_1",
-    })).resolves.toBeNull();
+    await expect(
+      repository.tryGet({
+        projectId: "project_1",
+        experimentId: "experiment_1",
+        runId: "run_1",
+      }),
+    ).resolves.toBeNull();
   });
 
   it("fails a list read when ClickHouse is unavailable", async () => {
     const repository = ClickHouseExperimentRunRepository.create(options);
 
-    await expect(repository.list({
-      projectId: "project_1",
-      experimentIds: ["experiment_1"],
-    })).rejects.toThrow("Failed to list experiment runs from ClickHouse");
+    await expect(
+      repository.list({
+        projectId: "project_1",
+        experimentIds: ["experiment_1"],
+      }),
+    ).rejects.toThrow("Failed to list experiment runs from ClickHouse");
   });
 
   it("keeps the aggregate query's scope inside its deduplicating subquery", async () => {
@@ -67,7 +73,9 @@ describe("ClickHouseExperimentRunRepository", () => {
 
     expect(queries[0]).toMatch(/FROM \(\s*SELECT/s);
     expect(queries[0].match(/WHERE TenantId/g)).toHaveLength(1);
-    expect(queries[0]).toMatch(/GROUP BY ExperimentId, RunId\s*\)\s*GROUP BY ExperimentId/s);
+    expect(queries[0]).toMatch(
+      /GROUP BY ExperimentId, RunId\s*\)\s*GROUP BY ExperimentId/s,
+    );
   });
 
   it("uses the injected tuple wrapper for exact experiment/run pairs", async () => {
@@ -75,7 +83,21 @@ describe("ClickHouseExperimentRunRepository", () => {
     const queries: string[] = [];
     const queryParams: Array<Record<string, unknown>> = [];
     const results = [
-      [{ TenantId: "project_1", ExperimentId: "experiment_1", RunId: "run_1", WorkflowVersionId: null, Total: 1, Progress: 1, Targets: "[]", CreatedAt: "2026-01-01 00:00:00.000", UpdatedAt: "2026-01-01 00:00:00.000", FinishedAt: null, StoppedAt: null }],
+      [
+        {
+          TenantId: "project_1",
+          ExperimentId: "experiment_1",
+          RunId: "run_1",
+          WorkflowVersionId: null,
+          Total: 1,
+          Progress: 1,
+          Targets: "[]",
+          CreatedAt: "2026-01-01 00:00:00.000",
+          UpdatedAt: "2026-01-01 00:00:00.000",
+          FinishedAt: null,
+          StoppedAt: null,
+        },
+      ],
       [],
       [],
     ];

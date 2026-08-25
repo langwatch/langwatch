@@ -40,13 +40,9 @@ function InnerPromptConfigForm() {
   const [isSaving, setIsSaving] = useState(false);
   const configId = methods.watch("configId");
   const isDraft = !Boolean(methods.watch("handle"));
-  const hasRuntimeParametersError = Boolean(
-    methods.formState.errors.version?.parameters,
-  );
+  const hasRuntimeParametersError = Boolean(methods.formState.errors.version?.parameters);
   const saveEnabled =
-    (methods.formState.isDirty || isDraft) &&
-    !isSaving &&
-    !hasRuntimeParametersError;
+    (methods.formState.isDirty || isDraft) && !isSaving && !hasRuntimeParametersError;
 
   /**
    * It is a known limitation of react-hook-form useFieldArray that we cannot
@@ -59,12 +55,12 @@ function InnerPromptConfigForm() {
     name: "version.configData.messages",
   });
 
-  const availableFields = (
-    methods.watch("version.configData.inputs") ?? []
-  ).map((input) => ({
-    identifier: input.identifier,
-    type: input.type,
-  }));
+  const availableFields = (methods.watch("version.configData.inputs") ?? []).map(
+    (input) => ({
+      identifier: input.identifier,
+      type: input.type,
+    }),
+  );
 
   const handleSaveClick = useCallback(async () => {
     // Validate the full form so the save-time refinement (#3196: system
@@ -85,9 +81,7 @@ function InnerPromptConfigForm() {
     const data = formValuesToTriggerSaveVersionParams(values);
 
     const onSuccess = (prompt: VersionedPrompt) => {
-      methods.reset(
-        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
-      );
+      methods.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
       setIsSaving(false);
     };
 
@@ -116,15 +110,12 @@ function InnerPromptConfigForm() {
    */
   const demonstrations = methods.watch("version.configData.demonstrations");
   const demonstrationRecordsLength =
-    Object.values(demonstrations?.inline?.records ?? { dummy: [] })[0]
-      ?.length ?? 0;
+    Object.values(demonstrations?.inline?.records ?? { dummy: [] })[0]?.length ?? 0;
   const hasDemonstrations = demonstrationRecordsLength > 0;
 
   const handleRestore = useCallback(
     async (prompt: VersionedPrompt) => {
-      methods.reset(
-        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
-      );
+      methods.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
     },
     [methods],
   );

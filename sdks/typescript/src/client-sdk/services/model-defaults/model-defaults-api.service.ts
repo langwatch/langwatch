@@ -126,23 +126,17 @@ export class ModelDefaultsApiService {
   }
 
   async updateConfig(id: string, body: UpdateConfigBody): Promise<void> {
-    await this.request<void>(
-      `/api/model-defaults/${encodeURIComponent(id)}`,
-      {
-        method: "PUT",
-        body: JSON.stringify(body),
-        allowNoContent: true,
-      },
-    );
+    await this.request<void>(`/api/model-defaults/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+      allowNoContent: true,
+    });
   }
 
   async deleteConfig(id: string): Promise<void> {
-    await this.request<void>(
-      `/api/model-defaults/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE",
-        allowNoContent: true,
-      },
-    );
+    await this.request<void>(`/api/model-defaults/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      allowNoContent: true,
+    });
   }
 }

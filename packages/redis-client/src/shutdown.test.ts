@@ -12,10 +12,7 @@ describe("RedisShutdownService", () => {
     const connection = connectionThat(disconnect);
     const shutdown = RedisShutdownService.create();
 
-    await Promise.all([
-      shutdown.shutdown(connection),
-      shutdown.shutdown(connection),
-    ]);
+    await Promise.all([shutdown.shutdown(connection), shutdown.shutdown(connection)]);
 
     expect(disconnect).toHaveBeenCalledOnce();
   });

@@ -44,9 +44,7 @@ vi.mock("~/server/tracer/spanToReadableSpan", () => ({
 
 vi.mock("~/server/traces/trace-formatting", () => ({
   generateAsciiTree: vi.fn().mockReturnValue("ascii tree"),
-  formatTraceSummaryDigest: vi
-    .fn()
-    .mockReturnValue("Input: hello\nOutput: world"),
+  formatTraceSummaryDigest: vi.fn().mockReturnValue("Input: hello\nOutput: world"),
 }));
 
 vi.mock("@langwatch/observability", () => ({
@@ -74,8 +72,7 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
 // strategy runs the real authMiddleware. Mock it to a passthrough so these
 // unit tests exercise the handler logic with an injected project, not real auth.
 vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
   return {
     ...actual,
     authMiddleware: async (
@@ -85,8 +82,7 @@ vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
       c.set("project", { id: "project-123", apiKey: "key-123" });
       await next();
     },
-    requirePermission: () => async (_c: unknown, next: () => Promise<void>) =>
-      next(),
+    requirePermission: () => async (_c: unknown, next: () => Promise<void>) => next(),
   };
 });
 
@@ -97,17 +93,12 @@ const { createProjectApp } = await import("~/server/api/security");
 const securedTest = createProjectApp({ basePath: "/" });
 registerTracesRoutes(securedTest);
 const v1App = securedTest.hono;
-const { AmbiguousTraceIdPrefixError } = await import(
-  "~/server/traces/trace.service"
-);
+const { AmbiguousTraceIdPrefixError } = await import("~/server/traces/trace.service");
 
 // Build a wrapper app that injects the project variable (mimicking auth middleware)
 // and adds an error handler that mirrors the real app's JSON error responses
 const testApp = new Hono();
-testApp.use(
-  "*",
-  appContextMiddlewareFor({ evaluations: {} } as never),
-);
+testApp.use("*", appContextMiddlewareFor({ evaluations: {} } as never));
 testApp.use("*", async (c, next) => {
   c.set("project" as never, { id: "project-123", apiKey: "key-123" });
   await next();

@@ -74,9 +74,10 @@ describe("audio model cost", () => {
       regex: "^(elevenlabs\\/)?eleven_flash_v2",
       inputCostPerCharacter: FLASH_PER_CHAR,
     };
-    expect(
-      estimateCost({ llmModelCost: ttsEntry, inputCharacters: 2000 }),
-    ).toBeCloseTo(2000 * FLASH_PER_CHAR, 10);
+    expect(estimateCost({ llmModelCost: ttsEntry, inputCharacters: 2000 })).toBeCloseTo(
+      2000 * FLASH_PER_CHAR,
+      10,
+    );
 
     const sttEntry = {
       projectId: "",
@@ -84,9 +85,10 @@ describe("audio model cost", () => {
       regex: "^(elevenlabs\\/)?scribe_v1",
       inputCostPerSecond: SCRIBE_PER_SECOND,
     };
-    expect(
-      estimateCost({ llmModelCost: sttEntry, audioSeconds: 3600 }),
-    ).toBeCloseTo(3600 * SCRIBE_PER_SECOND, 10);
+    expect(estimateCost({ llmModelCost: sttEntry, audioSeconds: 3600 })).toBeCloseTo(
+      3600 * SCRIBE_PER_SECOND,
+      10,
+    );
 
     // A rate-less entry still reports "cannot price" rather than zero.
     expect(
@@ -115,10 +117,7 @@ describe("audio model cost", () => {
           promptTokens: 0,
           completionTokens: 32,
         });
-        expect(result).toBeCloseTo(
-          65 * TRANSCRIBE_AUDIO_IN + 32 * TRANSCRIBE_OUT,
-          12,
-        );
+        expect(result).toBeCloseTo(65 * TRANSCRIBE_AUDIO_IN + 32 * TRANSCRIBE_OUT, 12);
         expect(result).toBeGreaterThan(0);
       });
     });
@@ -219,9 +218,7 @@ describe("audio model cost", () => {
     expect(elevenChat).toHaveLength(0);
     expect(elevenEmbedding).toHaveLength(0);
 
-    const openaiChat = getProviderModelOptions("openai", "chat").map(
-      (o) => o.value,
-    );
+    const openaiChat = getProviderModelOptions("openai", "chat").map((o) => o.value);
     for (const audioModel of [
       "tts-1",
       "tts-1-hd",

@@ -24,8 +24,6 @@ afterAll(() => {
 describe("auth-client getSession server-side guard", () => {
   it("throws a descriptive error when called from a non-browser context", async () => {
     const { getSession } = await import("../auth-client");
-    await expect(getSession()).rejects.toThrow(
-      /server context.*getServerAuthSession/i,
-    );
+    await expect(getSession()).rejects.toThrow(/server context.*getServerAuthSession/i);
   });
 });

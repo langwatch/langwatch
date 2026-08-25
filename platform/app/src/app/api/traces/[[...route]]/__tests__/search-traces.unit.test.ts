@@ -26,9 +26,7 @@ vi.mock("~/server/tracer/spanToReadableSpan", () => ({
 
 vi.mock("~/server/traces/trace-formatting", () => ({
   generateAsciiTree: vi.fn().mockReturnValue("ascii tree"),
-  formatTraceSummaryDigest: vi
-    .fn()
-    .mockReturnValue("Input: hello\nOutput: world"),
+  formatTraceSummaryDigest: vi.fn().mockReturnValue("Input: hello\nOutput: world"),
 }));
 
 vi.mock("@langwatch/observability", () => ({
@@ -47,8 +45,7 @@ vi.mock("@langwatch/observability", () => ({
 const mockCompileProjection = vi.fn();
 
 vi.mock("~/server/traces/projection", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/traces/projection")>();
+  const actual = await importOriginal<typeof import("~/server/traces/projection")>();
   return {
     ...actual,
     compileProjection: (args: unknown) => mockCompileProjection(args),
@@ -71,8 +68,7 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
 // strategy runs the real authMiddleware. Mock it to a passthrough so these
 // unit tests exercise the handler logic with an injected project, not real auth.
 vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
   return {
     ...actual,
     authMiddleware: async (
@@ -82,16 +78,13 @@ vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
       c.set("project", { id: "project-123", apiKey: "key-123" });
       await next();
     },
-    requirePermission: () => async (_c: unknown, next: () => Promise<void>) =>
-      next(),
+    requirePermission: () => async (_c: unknown, next: () => Promise<void>) => next(),
   };
 });
 
 const { registerTracesRoutes } = await import("../app.v1");
 const { createProjectApp } = await import("~/server/api/security");
-const { ProjectionValidationError } = await import(
-  "~/server/traces/projection"
-);
+const { ProjectionValidationError } = await import("~/server/traces/projection");
 const securedTest = createProjectApp({ basePath: "/" });
 registerTracesRoutes(securedTest);
 const v1App = securedTest.hono;
@@ -181,9 +174,7 @@ describe("POST /search", () => {
 
       const body = await res.json();
       expect(body.traces).toHaveLength(2);
-      expect(body.traces[0].formatted_trace).toBe(
-        "Input: hello\nOutput: world",
-      );
+      expect(body.traces[0].formatted_trace).toBe("Input: hello\nOutput: world");
     });
 
     it("includes trace metadata in each digest entry", async () => {
@@ -305,9 +296,7 @@ describe("POST /search", () => {
       mockGetAllTracesForProject.mockResolvedValue({
         groups: [manyTraces],
         totalHits: 50,
-        traceChecks: Object.fromEntries(
-          manyTraces.map((t) => [t.trace_id, []]),
-        ),
+        traceChecks: Object.fromEntries(manyTraces.map((t) => [t.trace_id, []])),
         scrollId: "next-page-token",
       });
 
@@ -423,9 +412,7 @@ describe("POST /search", () => {
   const fakeProjection = () => ({
     schema: {
       from: "traces" as const,
-      columns: [
-        { path: "trace_id", type: "string" as const, collection: false },
-      ],
+      columns: [{ path: "trace_id", type: "string" as const, collection: false }],
     },
     plan: {
       from: "traces" as const,
@@ -497,10 +484,7 @@ describe("POST /search", () => {
         select: ["trace_id"],
       });
       const body = await res.json();
-      expect(body.traces).toEqual([
-        { trace_id: "trace-1" },
-        { trace_id: "trace-2" },
-      ]);
+      expect(body.traces).toEqual([{ trace_id: "trace-1" }, { trace_id: "trace-2" }]);
     });
 
     /** @scenario "Response includes schema when select is present" */

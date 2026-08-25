@@ -225,11 +225,7 @@ describe("TenantRateTracker", () => {
       const featureFlagService = {
         isEnabled: vi.fn().mockResolvedValue(true),
       };
-      const tracker = new TenantRateTracker(
-        redis,
-        nowFn,
-        featureFlagService as any,
-      );
+      const tracker = new TenantRateTracker(redis, nowFn, featureFlagService as any);
 
       await tracker.record("proj_killed");
 
@@ -244,11 +240,7 @@ describe("TenantRateTracker", () => {
       const featureFlagService = {
         isEnabled: vi.fn().mockResolvedValue(false),
       };
-      const tracker = new TenantRateTracker(
-        redis,
-        nowFn,
-        featureFlagService as any,
-      );
+      const tracker = new TenantRateTracker(redis, nowFn, featureFlagService as any);
 
       await tracker.record("proj_normal");
       expect(await tracker.currentWindowCount("proj_normal", 60)).toBe(1);
@@ -259,11 +251,7 @@ describe("TenantRateTracker", () => {
       const featureFlagService = {
         isEnabled: vi.fn().mockRejectedValue(new Error("posthog down")),
       };
-      const tracker = new TenantRateTracker(
-        redis,
-        nowFn,
-        featureFlagService as any,
-      );
+      const tracker = new TenantRateTracker(redis, nowFn, featureFlagService as any);
 
       await tracker.record("proj_acme");
       expect(await tracker.currentWindowCount("proj_acme", 60)).toBe(1);
@@ -362,11 +350,6 @@ describe("TenantRateTracker", () => {
       ttlSeconds: 600,
     });
 
-    expect(setCalls[0]).toEqual([
-      "obs:tenant_rate:baseline:proj_acme",
-      "0",
-      "EX",
-      600,
-    ]);
+    expect(setCalls[0]).toEqual(["obs:tenant_rate:baseline:proj_acme", "0", "EX", 600]);
   });
 });

@@ -49,9 +49,7 @@ export function createMockDepsForTurnConfig(overrides: {
       findUnique: vi.fn().mockResolvedValue({ apiKey: "test-api-key" }),
     },
     modelParamsProvider: {
-      prepare: vi
-        .fn()
-        .mockResolvedValue({ success: true, params: defaultModelParams }),
+      prepare: vi.fn().mockResolvedValue({ success: true, params: defaultModelParams }),
     },
     modelResolver: {
       resolve: vi.fn().mockImplementation(async (featureKey: string) => {

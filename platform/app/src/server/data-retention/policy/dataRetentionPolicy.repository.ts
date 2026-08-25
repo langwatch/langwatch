@@ -24,9 +24,7 @@ export class DataRetentionPolicyRepository {
    * input every scope query needs. Returns null for a project with no team
    * (personal-account edge — retention scoping needs an org anchor).
    */
-  async getProjectScopeContext(
-    projectId: string,
-  ): Promise<ProjectScopeContext | null> {
+  async getProjectScopeContext(projectId: string): Promise<ProjectScopeContext | null> {
     const project = await this.prisma.project.findFirst({
       where: { id: projectId },
       select: { teamId: true, team: { select: { organizationId: true } } },
@@ -44,9 +42,7 @@ export class DataRetentionPolicyRepository {
    * cascade. The caller resolves the cascade; this returns the raw rows so the
    * resolver and the grouped read can both consume them.
    */
-  async findForProjectChain(
-    ctx: ProjectScopeContext,
-  ): Promise<RetentionPolicy[]> {
+  async findForProjectChain(ctx: ProjectScopeContext): Promise<RetentionPolicy[]> {
     const chain = resolveScopeChain(ctx);
     return this.prisma.retentionPolicy.findMany({
       where: {
@@ -61,9 +57,7 @@ export class DataRetentionPolicyRepository {
    * page to render the full override landscape; the service filters to the
    * scopes the caller can read.
    */
-  async findAllInOrganization(
-    organizationId: string,
-  ): Promise<RetentionPolicy[]> {
+  async findAllInOrganization(organizationId: string): Promise<RetentionPolicy[]> {
     return this.prisma.retentionPolicy.findMany({
       where: { organizationId },
     });
@@ -128,9 +122,7 @@ export class DataRetentionPolicyRepository {
    * tier (or the platform default). Returns just the scope itself when the
    * lineage can't be resolved (e.g. a personal-account project with no team).
    */
-  async getScopeCascadeChain(
-    scope: ScopeAssignment,
-  ): Promise<ScopeAssignment[]> {
+  async getScopeCascadeChain(scope: ScopeAssignment): Promise<ScopeAssignment[]> {
     if (scope.scopeType === "PROJECT") {
       const ctx = await this.getProjectScopeContext(scope.scopeId);
       if (!ctx) return [{ scopeType: "PROJECT", scopeId: scope.scopeId }];
@@ -141,9 +133,7 @@ export class DataRetentionPolicyRepository {
         where: { id: scope.scopeId },
         select: { organizationId: true },
       });
-      const chain: ScopeAssignment[] = [
-        { scopeType: "TEAM", scopeId: scope.scopeId },
-      ];
+      const chain: ScopeAssignment[] = [{ scopeType: "TEAM", scopeId: scope.scopeId }];
       if (team?.organizationId) {
         chain.push({
           scopeType: "ORGANIZATION",
@@ -160,9 +150,7 @@ export class DataRetentionPolicyRepository {
    * Wraps the generic scope resolver so the service can stay free of
    * raw Prisma access.
    */
-  async findOrganizationForScope(
-    scope: ScopeAssignment,
-  ): Promise<string | null> {
+  async findOrganizationForScope(scope: ScopeAssignment): Promise<string | null> {
     return resolveOrganizationForScope(this.prisma, scope);
   }
 

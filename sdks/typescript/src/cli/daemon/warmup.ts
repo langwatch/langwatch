@@ -37,13 +37,7 @@ import * as tracesSearch from "../commands/traces/search";
  * every entry is memory the daemon holds forever, and a command that is not
  * here simply pays its own import once, on its first use.
  */
-const WARM: unknown[] = [
-  tracesSearch,
-  tracesGet,
-  analyticsQuery,
-  promptList,
-  status,
-];
+const WARM: unknown[] = [tracesSearch, tracesGet, analyticsQuery, promptList, status];
 
 export function warmCommandModules(): number {
   return WARM.length;

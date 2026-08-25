@@ -38,13 +38,7 @@ vi.mock("rich-textarea", () => ({
     }
   >(
     (
-      {
-        children,
-        autoHeight,
-        onSelectionChange,
-        "data-role": dataRole,
-        ...props
-      },
+      { children, autoHeight, onSelectionChange, "data-role": dataRole, ...props },
       ref,
     ) => {
       // Simple textarea that mimics RichTextarea behavior
@@ -93,9 +87,7 @@ describe("PromptTextAreaWithVariables", () => {
   describe("rendering", () => {
     it("renders textarea with placeholder", () => {
       renderComponent({ placeholder: "Enter your prompt..." });
-      expect(
-        screen.getByPlaceholderText("Enter your prompt..."),
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Enter your prompt...")).toBeInTheDocument();
     });
 
     it("renders with initial value", () => {
@@ -108,9 +100,7 @@ describe("PromptTextAreaWithVariables", () => {
         value: "Hello {{question}}",
         variables: mockVariables,
       });
-      expect(
-        screen.getByDisplayValue("Hello {{question}}"),
-      ).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Hello {{question}}")).toBeInTheDocument();
     });
   });
 
@@ -152,9 +142,7 @@ describe("PromptTextAreaWithVariables", () => {
         variables: mockVariables,
       });
 
-      expect(
-        screen.queryByText(/Undefined variables:/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/Undefined variables:/)).not.toBeInTheDocument();
     });
   });
 
@@ -493,9 +481,7 @@ describe("PromptTextAreaWithVariables", () => {
         variables: mockVariables,
       });
 
-      expect(
-        screen.queryByText(/Undefined variables:/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/Undefined variables:/)).not.toBeInTheDocument();
     });
 
     it("shows warning for partially undefined variables", () => {
@@ -626,9 +612,9 @@ describe("PromptTextAreaWithVariables", () => {
 
       const banner = screen.getByTestId("undefined-variables-banner");
       expect(banner).toHaveTextContent("Undefined variables: response");
-      expect(
-        screen.getByTestId("create-missing-variable-button"),
-      ).toHaveTextContent('Create "response"');
+      expect(screen.getByTestId("create-missing-variable-button")).toHaveTextContent(
+        'Create "response"',
+      );
     });
 
     /** @scenario Create button defines the missing variable */
@@ -672,9 +658,7 @@ describe("PromptTextAreaWithVariables", () => {
         variables: [],
       });
 
-      expect(
-        screen.getByTestId("undefined-variables-banner"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("undefined-variables-banner")).toBeInTheDocument();
       expect(
         screen.queryByTestId("create-missing-variable-button"),
       ).not.toBeInTheDocument();
@@ -719,11 +703,7 @@ describe("PromptTextAreaWithVariables", () => {
         const variables: Variable[] = [{ identifier: "question", type: "str" }];
         return (
           <ChakraProvider value={defaultSystem}>
-            <button
-              type="button"
-              data-testid="rerender"
-              onClick={() => forceRerender()}
-            >
+            <button type="button" data-testid="rerender" onClick={() => forceRerender()}>
               rerender
             </button>
             <PromptTextAreaWithVariables

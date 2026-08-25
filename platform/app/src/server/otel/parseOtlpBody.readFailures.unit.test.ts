@@ -100,9 +100,7 @@ describe("readOtlpBody", () => {
     it("reports an unreadable body rather than an unclassified error", async () => {
       const req = requestWithStream(streamThatFailsMidRead());
 
-      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(
-        OtlpBodyUnreadableError,
-      );
+      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(OtlpBodyUnreadableError);
     });
 
     it("answers 400 and attributes the failure to the sender", async () => {
@@ -133,9 +131,9 @@ describe("readOtlpBody", () => {
       // Lock the stream, so the reader the helper asks for cannot be handed out.
       stream.getReader();
 
-      await expect(
-        readOtlpBody(requestWithStream(stream)),
-      ).rejects.toBeInstanceOf(OtlpBodyUnreadableError);
+      await expect(readOtlpBody(requestWithStream(stream))).rejects.toBeInstanceOf(
+        OtlpBodyUnreadableError,
+      );
     });
   });
 
@@ -155,9 +153,9 @@ describe("readOtlpBody", () => {
 
         // The regression this whole file exists for: a throw from `finally`
         // used to overwrite the error on its way out.
-        await expect(
-          readOtlpBody(requestWithStream(stream)),
-        ).rejects.toBeInstanceOf(OtlpBodyUnreadableError);
+        await expect(readOtlpBody(requestWithStream(stream))).rejects.toBeInstanceOf(
+          OtlpBodyUnreadableError,
+        );
       });
 
       it("does not surface the release failure as the reported error", async () => {
@@ -167,9 +165,9 @@ describe("readOtlpBody", () => {
           releaseFailure,
         );
 
-        await expect(
-          readOtlpBody(requestWithStream(stream)),
-        ).rejects.not.toThrow(/private member/);
+        await expect(readOtlpBody(requestWithStream(stream))).rejects.not.toThrow(
+          /private member/,
+        );
       });
     });
 
@@ -218,9 +216,7 @@ describe("readOtlpBody", () => {
         new Error("cancel exploded"),
       );
 
-      await expect(
-        readOtlpBody(requestWithStream(stream)),
-      ).rejects.toMatchObject({
+      await expect(readOtlpBody(requestWithStream(stream))).rejects.toMatchObject({
         code: "ERR_PAYLOAD_TOO_LARGE",
         httpStatus: 413,
       });

@@ -38,10 +38,7 @@ function renderIndicator({
 } = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <SecretsIndicator
-        projectId="test-project-id"
-        onInsertSecret={onInsertSecret}
-      />
+      <SecretsIndicator projectId="test-project-id" onInsertSecret={onInsertSecret} />
     </ChakraProvider>,
   );
 }

@@ -51,9 +51,7 @@ describe("given a plan with a visibility window", () => {
 
     it("teases trace content and stamps the redacted flag", () => {
       const result = applyTraceProtections(makeTrace(15), protections);
-      expect(result.input?.value).toHaveLength(
-        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
-      );
+      expect(result.input?.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
       expect(result.output?.value).toHaveLength(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
@@ -63,9 +61,7 @@ describe("given a plan with a visibility window", () => {
     it("teases span content through the same pass", () => {
       const result = applyTraceProtections(makeTrace(15), protections);
       const spanInput = result.spans?.[0]?.input as { value: string };
-      expect(spanInput.value).toHaveLength(
-        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
-      );
+      expect(spanInput.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
     });
 
     it("keeps metadata, metrics, and timestamps intact", () => {

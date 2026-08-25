@@ -1,15 +1,8 @@
 import type { Evaluation } from "~/server/tracer/types";
 import { redactHiddenAttributes } from "~/server/traces/mappers/redactAttributes";
-import {
-  canReadCapturedContent,
-  type Protections,
-} from "~/server/traces/protections";
+import { canReadCapturedContent, type Protections } from "~/server/traces/protections";
 
-import type {
-  SpanTreeNode,
-  TraceHeader,
-  TraceResourceInfoDto,
-} from "./tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader, TraceResourceInfoDto } from "./tracesV2.schemas";
 
 /**
  * Viewer-scoped gates for the v2 trace read DTOs (header, span tree, resource
@@ -48,9 +41,7 @@ export function gateTreeCost({
   protections: Protections;
 }): SpanTreeNode[] {
   if (protections.canSeeCosts === true) return nodes;
-  return nodes.map((node) =>
-    node.cost == null ? node : { ...node, cost: null },
-  );
+  return nodes.map((node) => (node.cost == null ? node : { ...node, cost: null }));
 }
 
 /**
@@ -95,16 +86,12 @@ export function gateSessionTitle<
   protections: Protections;
 }): Array<
   T & {
-    codingAgent:
-      | (NonNullable<T["codingAgent"]> & SessionTitleRedactionFlag)
-      | null;
+    codingAgent: (NonNullable<T["codingAgent"]> & SessionTitleRedactionFlag) | null;
   }
 > {
   const contentVisible = canReadCapturedContent(protections);
   return sessions.map((session) => {
-    const codingAgent = session.codingAgent as NonNullable<
-      T["codingAgent"]
-    > | null;
+    const codingAgent = session.codingAgent as NonNullable<T["codingAgent"]> | null;
     return {
       ...session,
       codingAgent:
@@ -162,8 +149,7 @@ export function gateEvaluations({
   protections: Protections;
 }): Evaluation[] {
   const contentVisible =
-    protections.canSeeCapturedInput === true &&
-    protections.canSeeCapturedOutput === true;
+    protections.canSeeCapturedInput === true && protections.canSeeCapturedOutput === true;
   return evaluations.map((evaluation) => ({
     ...evaluation,
     inputs: undefined,

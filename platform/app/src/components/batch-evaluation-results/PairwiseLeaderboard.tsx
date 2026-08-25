@@ -1,10 +1,5 @@
 import { Box, HStack, Icon, Table, Text, VStack } from "@chakra-ui/react";
-import {
-  LuArrowDown,
-  LuArrowUp,
-  LuArrowUpDown,
-  LuTriangleAlert,
-} from "react-icons/lu";
+import { LuArrowDown, LuArrowUp, LuArrowUpDown, LuTriangleAlert } from "react-icons/lu";
 import type { BTLeaderboard } from "./computeBTLeaderboard";
 import { winMatrixHasPairwiseDetail } from "./computeWinMatrixShape";
 import {
@@ -91,8 +86,8 @@ export function PairwiseLeaderboard({
             numbers, the per-variant figure routinely exceeds the total and
             the pair reads as a contradiction.
           */}
-          {leaderboard.comparisonCount} comparisons · min{" "}
-          {leaderboard.minMatchups} matchups per variant
+          {leaderboard.comparisonCount} comparisons · min {leaderboard.minMatchups}{" "}
+          matchups per variant
         </Text>
       </HStack>
 
@@ -255,11 +250,7 @@ function SortableHeader({
   onSort: (k: SortKey) => void;
 }) {
   const active = sortKey === col;
-  const ArrowIcon = !active
-    ? LuArrowUpDown
-    : sortDir === "asc"
-      ? LuArrowUp
-      : LuArrowDown;
+  const ArrowIcon = !active ? LuArrowUpDown : sortDir === "asc" ? LuArrowUp : LuArrowDown;
   return (
     // `aria-sort` on the header itself, not just a keyboard handler on the
     // control inside it: the arrow icon communicates the sort state visually,
@@ -267,9 +258,7 @@ function SortableHeader({
     // Keyboard reachability without it would let someone sort the table and
     // have no way to learn that they had.
     <Table.ColumnHeader
-      aria-sort={
-        active ? (sortDir === "asc" ? "ascending" : "descending") : "none"
-      }
+      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
     >
       <HStack
         gap={1}
@@ -290,11 +279,7 @@ function SortableHeader({
         _focusVisible={{ outline: "2px solid", outlineColor: "blue.focusRing" }}
       >
         <Text>{label}</Text>
-        <Icon
-          as={ArrowIcon}
-          boxSize="12px"
-          color={active ? "fg" : "fg.muted"}
-        />
+        <Icon as={ArrowIcon} boxSize="12px" color={active ? "fg" : "fg.muted"} />
       </HStack>
     </Table.ColumnHeader>
   );
@@ -428,9 +413,7 @@ function WinMatrixCell({
       // Only the cells that actually do something are focus stops. Making every
       // cell tabbable would put an N×N grid of dead targets in the tab order —
       // worse than no keyboard support, because it buries the real ones.
-      {...(onClick
-        ? focusableCellProps({ rowId, colId, onCellClick: onClick })
-        : {})}
+      {...(onClick ? focusableCellProps({ rowId, colId, onCellClick: onClick }) : {})}
       // The visible cell is a bare number, which tells a screen reader nothing
       // about whose matchup it is or that activating it opens the judge's
       // reasoning.
@@ -488,10 +471,9 @@ function WinMatrixHeatmap({
       */}
       {!hasPairwiseDetail ? (
         <Text fontSize="2xs" color="fg.muted">
-          Each row here is the same number repeated — that variant&apos;s total
-          wins, not a per-opponent tally, so the counts cannot tell you who it
-          beat. The shading still can: it is how often the row variant won when
-          those two met.
+          Each row here is the same number repeated — that variant&apos;s total wins, not
+          a per-opponent tally, so the counts cannot tell you who it beat. The shading
+          still can: it is how often the row variant won when those two met.
         </Text>
       ) : null}
       <Box overflowX="auto">

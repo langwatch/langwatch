@@ -18,9 +18,7 @@ vi.mock("../../utils/api", () => ({
 import { api } from "../../utils/api";
 import { useModelProvidersSettings } from "../useModelProvidersSettings";
 
-const mockUseQuery = vi.mocked(
-  api.modelProvider.getAllForProjectForFrontend.useQuery,
-);
+const mockUseQuery = vi.mocked(api.modelProvider.getAllForProjectForFrontend.useQuery);
 
 describe("useModelProvidersSettings()", () => {
   beforeEach(() => {

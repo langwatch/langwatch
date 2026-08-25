@@ -319,11 +319,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
     await prisma.teamUser.deleteMany({
       where: {
         teamId: {
-          in: [
-            REGULAR_TEAM_ID,
-            ADMIN_PERSONAL_TEAM_ID,
-            MEMBER_PERSONAL_TEAM_ID,
-          ],
+          in: [REGULAR_TEAM_ID, ADMIN_PERSONAL_TEAM_ID, MEMBER_PERSONAL_TEAM_ID],
         },
       },
     });
@@ -417,12 +413,8 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       });
       const regular = teams.find((t) => t.id === REGULAR_TEAM_ID);
       expect(regular).toBeDefined();
-      const adminMember = regular!.members.find(
-        (m) => m.userId === ADMIN_USER_ID,
-      );
-      const memberMember = regular!.members.find(
-        (m) => m.userId === MEMBER_USER_ID,
-      );
+      const adminMember = regular!.members.find((m) => m.userId === ADMIN_USER_ID);
+      const memberMember = regular!.members.find((m) => m.userId === MEMBER_USER_ID);
       expect(adminMember?.user.email).toBeNull();
       expect(memberMember?.user.email).toBe(MEMBER_EMAIL);
       // Names stay visible — picker UX is unaffected.
@@ -435,9 +427,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       });
       const regular = teams.find((t) => t.id === REGULAR_TEAM_ID);
       expect(regular).toBeDefined();
-      const memberMember = regular!.members.find(
-        (m) => m.userId === MEMBER_USER_ID,
-      );
+      const memberMember = regular!.members.find((m) => m.userId === MEMBER_USER_ID);
       expect(memberMember?.user.email).toBe(MEMBER_EMAIL);
     });
 
@@ -451,10 +441,9 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
     });
 
     it("organization.getOrganizationWithMembersAndTheirTeams as MEMBER nulls other members' emails", async () => {
-      const org =
-        await memberCaller.organization.getOrganizationWithMembersAndTheirTeams(
-          { organizationId: ORG_ID },
-        );
+      const org = await memberCaller.organization.getOrganizationWithMembersAndTheirTeams(
+        { organizationId: ORG_ID },
+      );
       const adminEntry = org.members.find((m) => m.user.id === ADMIN_USER_ID);
       const memberEntry = org.members.find((m) => m.user.id === MEMBER_USER_ID);
       expect(adminEntry?.user.email).toBeNull();
@@ -597,12 +586,11 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       // the test App. The test isn't asserting an email actually got
       // sent — just that the permission gate lets admin through and
       // the procedure returns its declared shape.
-      const result =
-        await adminCaller.limits.checkAndSendUsageLimitNotification({
-          organizationId: ORG_ID,
-          currentMonthMessagesCount: 1,
-          maxMonthlyUsageLimit: 100,
-        });
+      const result = await adminCaller.limits.checkAndSendUsageLimitNotification({
+        organizationId: ORG_ID,
+        currentMonthMessagesCount: 1,
+        maxMonthlyUsageLimit: 100,
+      });
       expect(result).toMatchObject({ sent: expect.any(Boolean) });
     });
   });

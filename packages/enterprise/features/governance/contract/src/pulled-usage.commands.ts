@@ -8,13 +8,16 @@ export const PULLED_USAGE_PROCESSING_COMMAND_TYPES = Object.values(
   PULLED_USAGE_COMMAND_TYPES,
 );
 
-export const recordPulledUsageCommandSchema = z.object({
-  tenantId: z.string().min(1),
-  occurredAt: z.number().int().nonnegative().optional(),
-  data: pulledUsageObservedEventDataSchema,
-}).strict();
+export const recordPulledUsageCommandSchema = z
+  .object({
+    tenantId: z.string().min(1),
+    occurredAt: z.number().int().nonnegative().optional(),
+    data: pulledUsageObservedEventDataSchema,
+  })
+  .strict();
 export type RecordPulledUsageCommand = z.infer<typeof recordPulledUsageCommandSchema>;
-export type PulledUsageProcessingCommandType = (typeof PULLED_USAGE_PROCESSING_COMMAND_TYPES)[number];
+export type PulledUsageProcessingCommandType =
+  (typeof PULLED_USAGE_PROCESSING_COMMAND_TYPES)[number];
 
 export function pulledUsageObservationKey(
   data: z.infer<typeof pulledUsageObservedEventDataSchema>,

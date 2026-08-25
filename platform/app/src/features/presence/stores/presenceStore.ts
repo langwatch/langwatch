@@ -1,8 +1,5 @@
 import { create } from "zustand";
-import type {
-  PresenceEvent,
-  PresenceSession,
-} from "@langwatch/presence-contract";
+import type { PresenceEvent, PresenceSession } from "@langwatch/presence-contract";
 
 interface PresenceState {
   /** The current user's own sessionId, so callers can filter themselves out. */
@@ -60,9 +57,7 @@ export function selectPeersOnTrace(
   state: PresenceState,
   traceId: string,
 ): PresenceSession[] {
-  return selectPeerSessions(state).filter(
-    (s) => s.location.route.traceId === traceId,
-  );
+  return selectPeerSessions(state).filter((s) => s.location.route.traceId === traceId);
 }
 
 /** Peer sessions whose location points at the given conversation. */

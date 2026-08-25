@@ -128,9 +128,7 @@ function createCompletedEvent(
 /**
  * Helper to fold a sequence of events through init() + apply().
  */
-function foldEvents(
-  events: ExperimentRunProcessingEvent[],
-): ExperimentRunStateData {
+function foldEvents(events: ExperimentRunProcessingEvent[]): ExperimentRunStateData {
   let state = experimentRunStateFoldProjection.init();
   for (const event of events) {
     state = experimentRunStateFoldProjection.apply(state, event);
@@ -153,10 +151,7 @@ describe("experimentRunStateFoldProjection", () => {
     const state = foldEvents([
       createStartedEvent(),
       createTargetResultEvent({ index: 0 }),
-      createTargetResultEvent(
-        { index: 1 },
-        { id: "event-2b", createdAt: 2100 },
-      ),
+      createTargetResultEvent({ index: 1 }, { id: "event-2b", createdAt: 2100 }),
     ]);
 
     expect(state.Progress).toBe(2);

@@ -31,8 +31,8 @@ describe("project contract", () => {
   });
 
   it("validates a project-scoped presence decision", () => {
-    expect(
-      projectPresenceInputSchema.parse({ projectId: "project_1" }),
-    ).toEqual({ projectId: "project_1" });
+    expect(projectPresenceInputSchema.parse({ projectId: "project_1" })).toEqual({
+      projectId: "project_1",
+    });
   });
 });

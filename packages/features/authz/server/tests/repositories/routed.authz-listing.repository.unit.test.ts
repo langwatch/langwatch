@@ -6,9 +6,7 @@ import { RoutedAuthzListingRepository } from "../../src/repositories/routed/rout
 const spyRepository = (name: string): AuthzListingRepository =>
   ({
     findUserBindings: vi.fn().mockResolvedValue([]),
-    findOrganizationBindings: vi
-      .fn()
-      .mockResolvedValue([{ id: "row-from-" + name }]),
+    findOrganizationBindings: vi.fn().mockResolvedValue([{ id: "row-from-" + name }]),
     findUserAndGroupBindings: vi.fn().mockResolvedValue([]),
     findScopeBindings: vi.fn().mockResolvedValue([]),
     findGroupBindings: vi.fn().mockResolvedValue([]),
@@ -135,10 +133,7 @@ describe("RoutedAuthzListingRepository", () => {
   it("observes a rollback on the next listing call", async () => {
     const legacy = spyRepository("legacy");
     const eventing = spyRepository("eventing");
-    const selectHead = vi
-      .fn()
-      .mockResolvedValueOnce(true)
-      .mockResolvedValue(false);
+    const selectHead = vi.fn().mockResolvedValueOnce(true).mockResolvedValue(false);
     const repository = RoutedAuthzListingRepository.create({
       database: {} as AuthzDatabase,
       selectHead,

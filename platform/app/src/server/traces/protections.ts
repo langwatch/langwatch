@@ -68,5 +68,4 @@ export interface Protections {
  * verdicts) asks here, so none of them can drift behind the others.
  */
 export const canReadCapturedContent = (protections: Protections): boolean =>
-  protections.canSeeCapturedInput === true &&
-  protections.canSeeCapturedOutput === true;
+  protections.canSeeCapturedInput === true && protections.canSeeCapturedOutput === true;

@@ -28,12 +28,14 @@ const parametersSchema = z
   })
   .default({});
 
-export const savedWorkbenchChartDefinitionSchema = z.object({
-  version: z.literal(WORKBENCH_CHART_DEFINITION_VERSION),
-  sql: z.string().min(1).max(MAX_LWQL_LENGTH),
-  parameters: parametersSchema,
-  vegaLiteSpec: z.record(z.string(), z.unknown()).optional(),
-}).strict();
+export const savedWorkbenchChartDefinitionSchema = z
+  .object({
+    version: z.literal(WORKBENCH_CHART_DEFINITION_VERSION),
+    sql: z.string().min(1).max(MAX_LWQL_LENGTH),
+    parameters: parametersSchema,
+    vegaLiteSpec: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
 
 export const savedWorkbenchChartIdSchema = z.string().min(1).max(64);
 export const savedWorkbenchChartNameSchema = z.string().trim().min(1).max(255);
@@ -42,12 +44,14 @@ export type SavedWorkbenchChartDefinition = z.infer<
   typeof savedWorkbenchChartDefinitionSchema
 >;
 
-export const savedWorkbenchChartSchema = z.object({
-  id: savedWorkbenchChartIdSchema,
-  projectId: z.string().min(1),
-  name: savedWorkbenchChartNameSchema,
-  definition: savedWorkbenchChartDefinitionSchema,
-  createdAt: z.date(),
-  updatedAt: z.date(),
-}).strict();
+export const savedWorkbenchChartSchema = z
+  .object({
+    id: savedWorkbenchChartIdSchema,
+    projectId: z.string().min(1),
+    name: savedWorkbenchChartNameSchema,
+    definition: savedWorkbenchChartDefinitionSchema,
+    createdAt: z.date(),
+    updatedAt: z.date(),
+  })
+  .strict();
 export type SavedWorkbenchChart = z.infer<typeof savedWorkbenchChartSchema>;

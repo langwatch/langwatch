@@ -46,16 +46,10 @@ export function useTraceFreshness() {
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useUtils();
   const requestFastPoll = useSseStatusStore((s) => s.requestFastPoll);
-  const setSseConnectionState = useSseStatusStore(
-    (s) => s.setSseConnectionState,
-  );
+  const setSseConnectionState = useSseStatusStore((s) => s.setSseConnectionState);
   const setLastEventAt = useSseStatusStore((s) => s.setLastEventAt);
-  const discoverInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const newCountInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const discoverInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const newCountInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pulse = useRowPulseStore((s) => s.pulse);
   const visibleTraceIds = useVisibleTraceIds();
 
@@ -222,10 +216,7 @@ export function useTraceFreshness() {
   // those persistent connections starve the 6-per-origin pool, leaving query
   // bursts (the drawer opening) stuck pending. One coordinator subscription
   // invalidates the shared query, refreshing every consumer.
-  useSSESubscription<
-    { tenantId: string; timestamp: number },
-    { projectId: string }
-  >(
+  useSSESubscription<{ tenantId: string; timestamp: number }, { projectId: string }>(
     // @ts-expect-error - tRPC subscription type isn't perfectly inferred for the
     // hook's generic; the underlying procedure shape matches.
     api.tracesV2.onDiscoverUpdate,
@@ -239,9 +230,7 @@ export function useTraceFreshness() {
   );
 
   useEffect(() => {
-    setSseConnectionState(
-      liveUpdatesEnabled ? connectionState : "disconnected",
-    );
+    setSseConnectionState(liveUpdatesEnabled ? connectionState : "disconnected");
   }, [connectionState, liveUpdatesEnabled, setSseConnectionState]);
 
   useEffect(() => {

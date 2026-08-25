@@ -15,15 +15,7 @@
 
 import { createHash, createHmac } from "crypto";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { globalForApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
@@ -57,9 +49,7 @@ function signedPost(path: string, payload: unknown) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const bodyHash = createHash("sha256").update(body).digest("hex");
   const canonical = `POST\n${fullPath}\n${timestamp}\n${bodyHash}`;
-  const signature = createHmac("sha256", SECRET)
-    .update(canonical)
-    .digest("hex");
+  const signature = createHmac("sha256", SECRET).update(canonical).digest("hex");
   return new Request(`http://localhost${fullPath}`, {
     method: "POST",
     body,

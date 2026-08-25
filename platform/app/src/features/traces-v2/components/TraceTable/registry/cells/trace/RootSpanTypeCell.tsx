@@ -15,12 +15,6 @@ export const RootSpanTypeCell = {
         </Text>
       );
     }
-    return (
-      <SpanTypeBadge
-        spanType={spanType}
-        display="inline-block"
-        paddingY={0.5}
-      />
-    );
+    return <SpanTypeBadge spanType={spanType} display="inline-block" paddingY={0.5} />;
   },
 } as const satisfies CellDef<TraceListItem>;

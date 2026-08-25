@@ -143,9 +143,7 @@ export function resolvePathname(path: string): string {
   for (const pattern of ROUTE_PATTERNS) {
     if (matchPath(pattern, path)) {
       // Convert React Router params (:param) back to Next.js style ([param])
-      return pattern
-        .replace(/:(\w+)/g, "[$1]")
-        .replace(/\/\*$/, "/[[...path]]");
+      return pattern.replace(/:(\w+)/g, "[$1]").replace(/\/\*$/, "/[[...path]]");
     }
   }
   return path;
@@ -321,10 +319,7 @@ export function buildUrl(
  * Must be kept in sync with the current URL state.
  */
 type ImperativeRouter = {
-  navigate: (
-    to: string,
-    opts?: { replace?: boolean; flushSync?: boolean },
-  ) => void;
+  navigate: (to: string, opts?: { replace?: boolean; flushSync?: boolean }) => void;
 };
 
 /**
@@ -360,9 +355,7 @@ class RouterSingleton {
   }
 
   get asPath(): string {
-    return (
-      window.location.pathname + window.location.search + window.location.hash
-    );
+    return window.location.pathname + window.location.search + window.location.hash;
   }
 
   get isReady(): boolean {

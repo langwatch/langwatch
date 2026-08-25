@@ -31,12 +31,12 @@ first email and we will arrange one.
 
 ## What we commit to
 
-| Stage | Target |
-|-------|--------|
-| Acknowledgement that a human has the report | 2 business days |
-| Initial assessment, including whether we reproduced it | 5 business days |
-| Fix or documented mitigation for critical and high severity | 30 days |
-| Fix or documented mitigation for medium and low severity | 90 days |
+| Stage                                                       | Target          |
+| ----------------------------------------------------------- | --------------- |
+| Acknowledgement that a human has the report                 | 2 business days |
+| Initial assessment, including whether we reproduced it      | 5 business days |
+| Fix or documented mitigation for critical and high severity | 30 days         |
+| Fix or documented mitigation for medium and low severity    | 90 days         |
 
 We will keep you updated as the work progresses rather than going quiet, and we
 will tell you if a date is going to slip.

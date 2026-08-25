@@ -177,10 +177,9 @@ describe("Feature: Organization REST API", () => {
     it("serves the dated and latest paths and nothing else", async () => {
       // The versioned namespaces address the family root with a trailing
       // slash (the framework's canonical dated URL shape).
-      const dated = await app.request(
-        `/api/organization/${MANAGEMENT_API_VERSION}/`,
-        { headers: authHeaders() },
-      );
+      const dated = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/`, {
+        headers: authHeaders(),
+      });
       expect(dated.status).toBe(200);
       expect(dated.headers.get("X-API-Version")).toBe(MANAGEMENT_API_VERSION);
       expect(dated.headers.get("X-API-Version-Status")).toBe("stable");

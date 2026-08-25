@@ -61,9 +61,7 @@ export function TopErrorsCard({
                     {err.sampleMessage}
                   </Text>
                 </Table.Cell>
-                <Table.Cell color="fg.muted">
-                  {err.pipelineName ?? "—"}
-                </Table.Cell>
+                <Table.Cell color="fg.muted">{err.pipelineName ?? "—"}</Table.Cell>
               </Table.Row>
             ))}
           </Table.Body>

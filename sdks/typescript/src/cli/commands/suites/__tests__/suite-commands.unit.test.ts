@@ -11,7 +11,11 @@ vi.mock("@/client-sdk/services/suites/suites-api.service", async (importOriginal
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -69,8 +73,18 @@ const makeRunResult = (overrides = {}) => ({
   jobCount: 2,
   skippedArchived: { scenarios: [], targets: [] },
   items: [
-    { scenarioRunId: "run_1", scenarioId: "scenario_1", target: { type: "http" as const, referenceId: "agent_xyz" }, name: "Test Scenario" },
-    { scenarioRunId: "run_2", scenarioId: "scenario_2", target: { type: "http" as const, referenceId: "agent_xyz" }, name: "Another Scenario" },
+    {
+      scenarioRunId: "run_1",
+      scenarioId: "scenario_1",
+      target: { type: "http" as const, referenceId: "agent_xyz" },
+      name: "Test Scenario",
+    },
+    {
+      scenarioRunId: "run_2",
+      scenarioId: "scenario_2",
+      target: { type: "http" as const, referenceId: "agent_xyz" },
+      name: "Another Scenario",
+    },
   ],
   ...overrides,
 });
@@ -81,15 +95,17 @@ describe("listSuitesCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: mockGetAll,
-      get: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      duplicate: vi.fn(),
-      run: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as SuitesApiService; });
+    vi.mocked(SuitesApiService).mockImplementation(function () {
+      return {
+        getAll: mockGetAll,
+        get: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        duplicate: vi.fn(),
+        run: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as SuitesApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -147,15 +163,17 @@ describe("getSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: mockGet,
-      create: vi.fn(),
-      update: vi.fn(),
-      duplicate: vi.fn(),
-      run: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as SuitesApiService; });
+    vi.mocked(SuitesApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: mockGet,
+        create: vi.fn(),
+        update: vi.fn(),
+        duplicate: vi.fn(),
+        run: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as SuitesApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -200,15 +218,17 @@ describe("createSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: vi.fn(),
-      create: mockCreate,
-      update: vi.fn(),
-      duplicate: vi.fn(),
-      run: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as SuitesApiService; });
+    vi.mocked(SuitesApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: vi.fn(),
+        create: mockCreate,
+        update: vi.fn(),
+        duplicate: vi.fn(),
+        run: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as SuitesApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -257,15 +277,17 @@ describe("deleteSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDelete = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      duplicate: vi.fn(),
-      run: vi.fn(),
-      delete: mockDelete,
-    }) as unknown as SuitesApiService; });
+    vi.mocked(SuitesApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        duplicate: vi.fn(),
+        run: vi.fn(),
+        delete: mockDelete,
+      } as unknown as SuitesApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -298,15 +320,17 @@ describe("duplicateSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDuplicate = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      duplicate: mockDuplicate,
-      run: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as SuitesApiService; });
+    vi.mocked(SuitesApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        duplicate: mockDuplicate,
+        run: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as SuitesApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -314,7 +338,9 @@ describe("duplicateSuiteCommand()", () => {
 
   describe("when suite is duplicated successfully", () => {
     it("creates a copy", async () => {
-      mockDuplicate.mockResolvedValue(makeSuite({ name: "Test Suite (copy)", id: "suite_new123" }));
+      mockDuplicate.mockResolvedValue(
+        makeSuite({ name: "Test Suite (copy)", id: "suite_new123" }),
+      );
 
       await duplicateSuiteCommand("suite_abc123");
 
@@ -341,15 +367,17 @@ describe("runSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRun = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      duplicate: vi.fn(),
-      run: mockRun,
-      delete: vi.fn(),
-    }) as unknown as SuitesApiService; });
+    vi.mocked(SuitesApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        duplicate: vi.fn(),
+        run: mockRun,
+        delete: vi.fn(),
+      } as unknown as SuitesApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -406,16 +434,16 @@ describe("runSuiteCommand()", () => {
 
       await runSuiteCommand({ id: "suite_abc123", options: { format: "json" } });
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(result, null, 2),
-      );
+      expect(console.log).toHaveBeenCalledWith(JSON.stringify(result, null, 2));
     });
   });
 
   describe("when run has skipped archived references", () => {
     it("shows warning about skipped items", async () => {
       mockRun.mockResolvedValue(
-        makeRunResult({ skippedArchived: { scenarios: ["old_scenario"], targets: ["old_agent"] } }),
+        makeRunResult({
+          skippedArchived: { scenarios: ["old_scenario"], targets: ["old_agent"] },
+        }),
       );
 
       await runSuiteCommand({ id: "suite_abc123", options: {} });
@@ -454,7 +482,9 @@ describe("runSuiteCommand()", () => {
         new SuitesApiError("Suite not found", "POST /api/suites/nonexistent/run"),
       );
 
-      await expect(runSuiteCommand({ id: "nonexistent", options: {} })).rejects.toThrow(ProcessExitError);
+      await expect(runSuiteCommand({ id: "nonexistent", options: {} })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });

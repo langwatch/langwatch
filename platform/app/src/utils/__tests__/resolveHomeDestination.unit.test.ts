@@ -16,9 +16,7 @@ const base: HomeDestinationInput = {
 describe("resolveHomeDestination", () => {
   describe("when the user has no visit history", () => {
     it("uses the persona resolver's destination", () => {
-      expect(
-        resolveHomeDestination({ ...base, resolverDestination: "/me" }),
-      ).toBe("/me");
+      expect(resolveHomeDestination({ ...base, resolverDestination: "/me" })).toBe("/me");
       expect(
         resolveHomeDestination({
           ...base,

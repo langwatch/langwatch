@@ -55,9 +55,7 @@ export function buildTracePlaceholderRows(count: number): TraceListItem[] {
   }));
 }
 
-export function buildConversationPlaceholderRows(
-  count: number,
-): ConversationGroup[] {
+export function buildConversationPlaceholderRows(count: number): ConversationGroup[] {
   return Array.from({ length: count }, (_, i) => ({
     conversationId: `__skeleton_conv_${i}`,
     traces: [],

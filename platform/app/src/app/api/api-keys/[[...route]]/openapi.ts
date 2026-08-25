@@ -46,9 +46,7 @@ const legacySchema = (schema: object): OpenAPIV3_1.SchemaObject =>
   schema as OpenAPIV3_1.SchemaObject;
 
 /** The organization admin key every operation in this family takes. */
-const ADMIN_KEY_SECURITY: DescribeRouteOptions["security"] = [
-  { admin_api_key: [] },
-];
+const ADMIN_KEY_SECURITY: DescribeRouteOptions["security"] = [{ admin_api_key: [] }];
 
 /** The path parameter the by-id operations share. */
 const ID_PARAMETER: DescribeRouteOptions["parameters"] = [
@@ -265,8 +263,7 @@ export const UPDATE_API_KEY: DescribeRouteOptions = {
         "Insufficient permissions (requires organization:manage), the requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation)",
     },
     "404": {
-      description:
-        "API key not found, or not yours to edit (api_key_not_found)",
+      description: "API key not found, or not yours to edit (api_key_not_found)",
     },
     "409": {
       description: "API key is already revoked (api_key_already_revoked)",

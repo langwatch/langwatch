@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-  InMemorySpanExporter,
-  SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import type { setupObservability } from "../../../setup/node";
 import { getLangWatchTracer } from "../../../tracer";
 import { createLangWatchSpan } from "../..";
@@ -92,10 +89,7 @@ describe("Span Integration Tests", () => {
       const tracer = getLangWatchTracer("data-serialization-test");
 
       await tracer.withActiveSpan("complex-data-test", async (span) => {
-        span
-          .setType("llm")
-          .setInput(COMPLEX_TEST_INPUT)
-          .setOutput(COMPLEX_TEST_OUTPUT);
+        span.setType("llm").setInput(COMPLEX_TEST_INPUT).setOutput(COMPLEX_TEST_OUTPUT);
       });
 
       await spanProcessor.forceFlush();
@@ -126,9 +120,7 @@ describe("Span Integration Tests", () => {
         span.attributes[semconv.ATTR_LANGWATCH_OUTPUT] as string,
       );
       expect(outputData.type).toBe("json");
-      expect(outputData.value.response.text).toBe(
-        "Hello! How can I help you today?",
-      );
+      expect(outputData.value.response.text).toBe("Hello! How can I help you today?");
       expect(outputData.value.response.confidence).toBe(0.95);
       expect(outputData.value.response.reasoning).toEqual([
         "greeting_detected",
@@ -230,12 +222,8 @@ describe("Span Integration Tests", () => {
 
       expect(exportedSpans).toHaveLength(2);
 
-      const stringSpan = exportedSpans.find(
-        (s) => s.name === "string-input-span",
-      );
-      const objectSpan = exportedSpans.find(
-        (s) => s.name === "object-input-span",
-      );
+      const stringSpan = exportedSpans.find((s) => s.name === "string-input-span");
+      const objectSpan = exportedSpans.find((s) => s.name === "object-input-span");
 
       if (!stringSpan || !objectSpan) {
         throw new Error("Expected both string and object spans to be exported");
@@ -404,12 +392,8 @@ describe("Span Integration Tests", () => {
 
       expect(exportedSpans).toHaveLength(2);
 
-      const singleSpan = exportedSpans.find(
-        (s) => s.name === "single-rag-context",
-      );
-      const multipleSpan = exportedSpans.find(
-        (s) => s.name === "multiple-rag-contexts",
-      );
+      const singleSpan = exportedSpans.find((s) => s.name === "single-rag-context");
+      const multipleSpan = exportedSpans.find((s) => s.name === "multiple-rag-contexts");
 
       if (!singleSpan || !multipleSpan) {
         throw new Error("Expected both RAG context spans to be exported");
@@ -487,9 +471,7 @@ describe("Span Integration Tests", () => {
         throw new Error("Expected span to be exported");
       }
 
-      expect(span.attributes["gen_ai.request.model"]).toBe(
-        "gpt-4-turbo-preview",
-      );
+      expect(span.attributes["gen_ai.request.model"]).toBe("gpt-4-turbo-preview");
       expect(span.attributes["gen_ai.response.model"]).toBe(
         "gpt-4-turbo-preview-20240125",
       );

@@ -27,9 +27,7 @@ export class PrismaUserRepository extends UserRepository {
   }
 
   async tryFindByEmail(email: string): Promise<UserProfile | null> {
-    return this.map(
-      await this.database.user.findUnique({ where: { email } }),
-    );
+    return this.map(await this.database.user.findUnique({ where: { email } }));
   }
 
   async create(input: CreateUserInput): Promise<UserProfile> {
@@ -66,9 +64,7 @@ export class PrismaUserRepository extends UserRepository {
     });
   }
 
-  async getTraceExplorerTourPreference(
-    id: string,
-  ): Promise<UserTourPreference> {
+  async getTraceExplorerTourPreference(id: string): Promise<UserTourPreference> {
     const row = await this.database.user.findUniqueOrThrow({
       where: { id },
       select: { tracesExplorerTourDismissedAt: true },
@@ -116,10 +112,7 @@ export class PrismaUserRepository extends UserRepository {
     });
   }
 
-  async setDeactivatedAt(
-    id: string,
-    deactivatedAt: Date | null,
-  ): Promise<UserProfile> {
+  async setDeactivatedAt(id: string, deactivatedAt: Date | null): Promise<UserProfile> {
     return this.mapRequired(
       await this.database.user.update({
         where: { id },

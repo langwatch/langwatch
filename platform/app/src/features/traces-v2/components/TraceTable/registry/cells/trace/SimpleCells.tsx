@@ -2,10 +2,7 @@ import { Badge, Text } from "@chakra-ui/react";
 import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
 import type { TraceListItem } from "../../../../../types/trace";
 import { formatTokens } from "../../../../../utils/formatters";
-import {
-  originColorPalette,
-  originLabel,
-} from "../../../../../utils/originDisplay";
+import { originColorPalette, originLabel } from "../../../../../utils/originDisplay";
 import { MonoCell } from "../../../MonoCell";
 import { StatusIndicator } from "../../../StatusRow";
 import type { CellDef } from "../../types";
@@ -36,9 +33,7 @@ function renderOrigin(row: TraceListItem, size: "sm" | "xs") {
   if (!row.origin) return badge;
   return (
     <FilterChip
-      onFilter={() =>
-        useFilterStore.getState().toggleFacet("origin", row.origin)
-      }
+      onFilter={() => useFilterStore.getState().toggleFacet("origin", row.origin)}
       filterLabel={`Filter by origin "${label}"`}
     >
       {badge}
@@ -98,9 +93,7 @@ export const TokensInCell = {
   id: "tokensIn",
   label: "Tokens In",
   render: ({ row }) => (
-    <MonoCell>
-      {row.inputTokens != null ? formatTokens(row.inputTokens) : dash}
-    </MonoCell>
+    <MonoCell>{row.inputTokens != null ? formatTokens(row.inputTokens) : dash}</MonoCell>
   ),
   renderComfortable: ({ row }) => (
     <Text textStyle="sm" color="fg.muted" textAlign="right">

@@ -166,9 +166,7 @@ const RESERVED_PREFIX = "langwatch.reserved.";
  * unbounded — so there is no precedent here to copy, only the same debt in a
  * second place.
  */
-const FOLD_ACCUMULATOR_KEYS: ReadonlySet<string> = new Set([
-  "langwatch.prompt_ids",
-]);
+const FOLD_ACCUMULATOR_KEYS: ReadonlySet<string> = new Set(["langwatch.prompt_ids"]);
 
 function isBlocklisted(key: string): boolean {
   if (PAYLOAD_BLOCKLIST_EXACT.has(key)) return true;

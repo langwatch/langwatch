@@ -6,10 +6,7 @@
 import { type ChildProcess, spawn } from "child_process";
 import * as http from "http";
 import * as path from "path";
-import type {
-  ChildProcessJobData,
-  ScenarioExecutionResult,
-} from "../execution/types";
+import type { ChildProcessJobData, ScenarioExecutionResult } from "../execution/types";
 
 /**
  * Time to wait for OTEL traces to flush after process completion.

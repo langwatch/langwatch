@@ -9,13 +9,7 @@
  * carry the copied string.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -80,9 +74,7 @@ function copyButtons(): HTMLElement[] {
 }
 
 function findCopyButton(pattern: RegExp): HTMLElement | undefined {
-  return copyButtons().find((b) =>
-    pattern.test(b.getAttribute("aria-label") ?? ""),
-  );
+  return copyButtons().find((b) => pattern.test(b.getAttribute("aria-label") ?? ""));
 }
 
 /**
@@ -194,9 +186,7 @@ describe("when the user copies an agent quick command on the MCP tab", () => {
     renderScreen();
     await goToTab("MCP");
 
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "Copy command" })[0]!,
-    );
+    fireEvent.click(screen.getAllByRole("button", { name: "Copy command" })[0]!);
 
     await waitFor(() => expect(emitMock).toHaveBeenCalled());
     expect(emitted()).toHaveLength(1);
@@ -210,9 +200,7 @@ describe("when the user copies an agent quick command on the MCP tab", () => {
     renderScreen();
     await goToTab("MCP");
 
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "Copy command" })[1]!,
-    );
+    fireEvent.click(screen.getAllByRole("button", { name: "Copy command" })[1]!);
 
     await waitFor(() => expect(emitMock).toHaveBeenCalled());
     expect(emitted()).toHaveLength(1);
@@ -243,9 +231,7 @@ describe("when the user copies an editor config path", () => {
     renderScreen();
     await goToTab("MCP");
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Copy Cursor config path" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Copy Cursor config path" }));
 
     await waitFor(() => expect(emitMock).toHaveBeenCalled());
     expect(emitted()).toHaveLength(1);
@@ -300,8 +286,6 @@ describe("given the screen renders commands that embed the project API key", () 
       JSON.stringify(properties ?? {}),
     );
     expect(payloads.filter((p) => p.includes(API_KEY))).toEqual([]);
-    expect(
-      payloads.filter((p) => copiedTexts.some((t) => p.includes(t))),
-    ).toEqual([]);
+    expect(payloads.filter((p) => copiedTexts.some((t) => p.includes(t)))).toEqual([]);
   });
 });

@@ -1,9 +1,6 @@
 import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
 import { getTopDrawer, useDrawer } from "~/hooks/useDrawer";
-import type {
-  SpanTreeNode,
-  TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
 import { useConversationContext } from "../../hooks/useConversationContext";
 import { useConversationPrefetch } from "../../hooks/useConversationPrefetch";
@@ -85,9 +82,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
   // header chips, conversation context, etc. under the new selection.
   // Guard by traceId match; the spans tree is keyed on traceId too.
   const trace =
-    headerQuery.data && headerQuery.data.traceId === traceId
-      ? headerQuery.data
-      : null;
+    headerQuery.data && headerQuery.data.traceId === traceId ? headerQuery.data : null;
   const spanTree = spanTreeQuery.data && trace ? spanTreeQuery.data : [];
   // Show the full-shell skeleton whenever we have a traceId in the URL but
   // no result yet — including the moment before the project context has
@@ -102,10 +97,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
     trace?.traceId ?? null,
   );
   // Warm sibling trace headers so navigating between turns is instant.
-  useConversationPrefetch(
-    trace?.conversationId ?? null,
-    trace?.traceId ?? null,
-  );
+  useConversationPrefetch(trace?.conversationId ?? null, trace?.traceId ?? null);
 
   const {
     navigateToTrace,
@@ -120,9 +112,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
 
   const selectedSpan = useMemo(
     () =>
-      selectedSpanId
-        ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null)
-        : null,
+      selectedSpanId ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null) : null,
     [selectedSpanId, spanTree],
   );
 

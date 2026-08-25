@@ -216,9 +216,7 @@ function createTextMessageEndEvent(
 /**
  * Helper to fold a sequence of events through init() + apply().
  */
-function foldEvents(
-  events: SimulationProcessingEvent[],
-): SimulationRunStateData {
+function foldEvents(events: SimulationProcessingEvent[]): SimulationRunStateData {
   let state = foldProjection.init();
   for (const event of events) {
     state = foldProjection.apply(state, event);
@@ -665,10 +663,7 @@ describe("simulationRunStateFoldProjection", () => {
     });
 
     it("defaults to FAILURE when no verdict and no explicit status", () => {
-      const state = foldEvents([
-        createRunStartedEvent(),
-        createRunFinishedEvent({}),
-      ]);
+      const state = foldEvents([createRunStartedEvent(), createRunFinishedEvent({})]);
 
       expect(state.Status).toBe("FAILURE");
     });
@@ -676,10 +671,7 @@ describe("simulationRunStateFoldProjection", () => {
 
   describe("when RunDeleted event is applied", () => {
     it("sets ArchivedAt timestamp", () => {
-      const state = foldEvents([
-        createRunStartedEvent(),
-        createRunDeletedEvent(),
-      ]);
+      const state = foldEvents([createRunStartedEvent(), createRunDeletedEvent()]);
 
       expect(state.ArchivedAt).toBe(4000); // RunDeleted occurredAt
       expect(state.UpdatedAt).toBeGreaterThanOrEqual(4000);
@@ -704,14 +696,8 @@ describe("simulationRunStateFoldProjection", () => {
     it("preserves the original CancellationRequestedAt", () => {
       const state = foldEvents([
         createRunStartedEvent(),
-        createCancelRequestedEvent(
-          {},
-          { id: "event-cancel-first", occurredAt: 5500 },
-        ),
-        createCancelRequestedEvent(
-          {},
-          { id: "event-cancel-second", occurredAt: 7000 },
-        ),
+        createCancelRequestedEvent({}, { id: "event-cancel-first", occurredAt: 5500 }),
+        createCancelRequestedEvent({}, { id: "event-cancel-second", occurredAt: 7000 }),
       ]);
 
       expect(state.CancellationRequestedAt).toBe(5500);
@@ -1014,9 +1000,7 @@ describe("simulationRunStateFoldProjection", () => {
   });
 
   describe("when SimulationRunCancelRequested event is applied", () => {
-    function createCancelRequestedEvent(
-      occurredAt = 5000,
-    ): SimulationProcessingEvent {
+    function createCancelRequestedEvent(occurredAt = 5000): SimulationProcessingEvent {
       return {
         id: "event-cancel",
         aggregateId: "scenario-run-1",
@@ -1040,10 +1024,7 @@ describe("simulationRunStateFoldProjection", () => {
       expect(inProgress.Status).toBe("IN_PROGRESS");
       expect(inProgress.CancellationRequestedAt).toBeNull();
 
-      const after = foldProjection.apply(
-        inProgress,
-        createCancelRequestedEvent(5000),
-      );
+      const after = foldProjection.apply(inProgress, createCancelRequestedEvent(5000));
 
       expect(after.CancellationRequestedAt).toBe(5000);
       expect(after.Status).toBe("IN_PROGRESS");
@@ -1100,10 +1081,7 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
       it("keeps the terminal status", () => {
         const state = foldEvents([
           createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
-          createMessageSnapshotEvent(
-            { status: "IN_PROGRESS" },
-            { occurredAt: 5000 },
-          ),
+          createMessageSnapshotEvent({ status: "IN_PROGRESS" }, { occurredAt: 5000 }),
         ]);
 
         expect(state.Status).toBe("ERROR");
@@ -1183,10 +1161,7 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
       it("refuses the non-terminal status and finishes the run terminally", () => {
         const state = foldEvents([
           createRunStartedEvent({}, { occurredAt: 1000 }),
-          createRunFinishedEvent(
-            { status: "IN_PROGRESS" },
-            { occurredAt: 3000 },
-          ),
+          createRunFinishedEvent({ status: "IN_PROGRESS" }, { occurredAt: 3000 }),
         ]);
 
         expect(state.Status).not.toBe("IN_PROGRESS");
@@ -1221,37 +1196,29 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
     // Every non-terminal member of ScenarioRunStatus, not just the two that
     // happened to be interesting -- the ingest field is an unconstrained string
     // on the internal event schema, so the whole enum can arrive here.
-    describe.each([
-      "PENDING",
-      "QUEUED",
-      "IN_PROGRESS",
-      "RUNNING",
-    ])("when the non-terminal status is %s", (nonTerminal) => {
-      it("never leaves the run non-terminal once FinishedAt is set", () => {
-        const state = foldEvents([
-          createRunStartedEvent({}, { occurredAt: 1000 }),
-          createRunFinishedEvent({ status: nonTerminal }, { occurredAt: 3000 }),
-        ]);
+    describe.each(["PENDING", "QUEUED", "IN_PROGRESS", "RUNNING"])(
+      "when the non-terminal status is %s",
+      (nonTerminal) => {
+        it("never leaves the run non-terminal once FinishedAt is set", () => {
+          const state = foldEvents([
+            createRunStartedEvent({}, { occurredAt: 1000 }),
+            createRunFinishedEvent({ status: nonTerminal }, { occurredAt: 3000 }),
+          ]);
 
-        expect(state.FinishedAt).toBe(3000);
-        expect(state.Status).not.toBe(nonTerminal);
-        expect([
-          "SUCCESS",
-          "FAILURE",
-          "FAILED",
-          "ERROR",
-          "CANCELLED",
-        ]).toContain(state.Status);
-      });
-    });
+          expect(state.FinishedAt).toBe(3000);
+          expect(state.Status).not.toBe(nonTerminal);
+          expect(["SUCCESS", "FAILURE", "FAILED", "ERROR", "CANCELLED"]).toContain(
+            state.Status,
+          );
+        });
+      },
+    );
   });
 
   describe("given a run that has not finished", () => {
     describe("when a started event arrives", () => {
       it("still transitions to IN_PROGRESS (guard does not affect the live path)", () => {
-        const state = foldEvents([
-          createRunStartedEvent({}, { occurredAt: 1000 }),
-        ]);
+        const state = foldEvents([createRunStartedEvent({}, { occurredAt: 1000 })]);
 
         expect(state.Status).toBe("IN_PROGRESS");
         expect(state.FinishedAt).toBeNull();

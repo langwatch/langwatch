@@ -230,9 +230,7 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
   sessions = new CodingAgentSessionClickHouseRepository(async () => ch);
-  sessionEvents = new CodingAgentSessionEventsClickHouseRepository(
-    async () => ch,
-  );
+  sessionEvents = new CodingAgentSessionEventsClickHouseRepository(async () => ch);
 
   const organization = await prisma.organization.create({
     data: { name: `pr-usage-${tag}`, slug: `pr-usage-${tag}` },
@@ -451,15 +449,11 @@ describe("pull request usage", () => {
         "claude-fable-5",
         "gpt-5-mini",
       ]);
-      expect(
-        usage.modelBreakdown.every((model) => model.totalTokens === 180),
-      ).toBe(true);
+      expect(usage.modelBreakdown.every((model) => model.totalTokens === 180)).toBe(true);
 
       // The mapping stores the pull request's own GitHub title; this response
       // never carries it.
-      expect(JSON.stringify(usage)).not.toContain(
-        "Link sessions to pull requests",
-      );
+      expect(JSON.stringify(usage)).not.toContain("Link sessions to pull requests");
     });
   });
 
@@ -505,9 +499,7 @@ describe("pull request usage", () => {
       expect(tokensOnlyRow?.totalTokens).toBe(180);
       expect(tokensOnlyRow?.costUsd).toBeNull();
 
-      const pricedRow = usage.rows.find(
-        (row) => row.projectId === visibleProjectId,
-      );
+      const pricedRow = usage.rows.find((row) => row.projectId === visibleProjectId);
       expect(pricedRow?.costUsd).toBeCloseTo(4.0);
     });
   });

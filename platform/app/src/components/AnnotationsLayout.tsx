@@ -72,10 +72,7 @@ function QueueSidebarEntry({
           _groupHover={{ opacity: 1 }}
           _focusWithin={{ opacity: 1 }}
         >
-          <Menu.Root
-            open={menuOpen}
-            onOpenChange={({ open }) => setMenuOpen(open)}
-          >
+          <Menu.Root open={menuOpen} onOpenChange={({ open }) => setMenuOpen(open)}>
             <Menu.Trigger asChild>
               <Button
                 size="xs"
@@ -90,9 +87,7 @@ function QueueSidebarEntry({
             <Menu.Content>
               <Menu.Item
                 value="edit"
-                onClick={() =>
-                  openDrawer("addAnnotationQueue", { queueId: queue.id })
-                }
+                onClick={() => openDrawer("addAnnotationQueue", { queueId: queue.id })}
               >
                 <Pencil size={14} /> Edit queue
               </Menu.Item>
@@ -133,12 +128,7 @@ export default function AnnotationsLayout({
     inbox: <Inbox width={20} height={20} />,
     queues: <Users width={20} height={20} />,
     myQueues: (
-      <RandomColorAvatar
-        size="2xs"
-        width={5}
-        height={5}
-        name={user?.name ?? ""}
-      />
+      <RandomColorAvatar size="2xs" width={5} height={5} name={user?.name ?? ""} />
     ),
     all: <Edit width={20} height={20} />,
     done: <Check width={20} height={20} />,
@@ -152,13 +142,7 @@ export default function AnnotationsLayout({
 
   return (
     <DashboardLayout>
-      <HStack
-        align="start"
-        width="full"
-        height="full"
-        gap={0}
-        position="relative"
-      >
+      <HStack align="start" width="full" height="full" gap={0} position="relative">
         <VStack
           align="start"
           paddingY={5}
@@ -184,17 +168,13 @@ export default function AnnotationsLayout({
                     : ""}
                 </Text>
               }
-              isSelectedAnnotation={
-                pathname === `/${project?.slug}/annotations`
-              }
+              isSelectedAnnotation={pathname === `/${project?.slug}/annotations`}
             >
               Inbox
             </MenuLink>
             <MenuLink
               href={`/${project?.slug}/annotations/me`}
-              isSelectedAnnotation={
-                pathname === `/${project?.slug}/annotations/me`
-              }
+              isSelectedAnnotation={pathname === `/${project?.slug}/annotations/me`}
               icon={menuItems.myQueues}
               menuEnd={
                 <Text fontSize="xs" fontWeight="500">
@@ -209,9 +189,7 @@ export default function AnnotationsLayout({
             <MenuLink
               href={`/${project?.slug}/annotations/all`}
               icon={menuItems.all}
-              isSelectedAnnotation={
-                pathname === `/${project?.slug}/annotations/all`
-              }
+              isSelectedAnnotation={pathname === `/${project?.slug}/annotations/all`}
             >
               All
             </MenuLink>
@@ -244,9 +222,7 @@ export default function AnnotationsLayout({
                 <QueueSidebarEntry
                   queue={queue}
                   href={`/${project?.slug}/annotations/${queue.slug}`}
-                  isSelected={
-                    pathname === `/${project?.slug}/annotations/${queue.slug}`
-                  }
+                  isSelected={pathname === `/${project?.slug}/annotations/${queue.slug}`}
                   icon={menuItems.queues}
                   canEdit={!isLiteMember}
                 />

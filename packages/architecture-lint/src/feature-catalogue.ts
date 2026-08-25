@@ -9,18 +9,11 @@ import type {
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ENTRY_KEYS = ["classification", "id", "root", "subjects"] as const;
 
-function issue(
-  file: string,
-  message: string,
-  allowed?: string,
-): ArchitectureViolation {
+function issue(file: string, message: string, allowed?: string): ArchitectureViolation {
   return { policy: "feature-catalogue", file, message, allowed };
 }
 
-function expectedRoot(
-  id: string,
-  classification: FeatureClassification,
-): string {
+function expectedRoot(id: string, classification: FeatureClassification): string {
   return classification === "enterprise"
     ? `packages/enterprise/features/${id}`
     : `packages/features/${id}`;
@@ -62,10 +55,7 @@ export function readFeatureCatalogue(
     !Array.isArray((parsed as { features?: unknown }).features)
   ) {
     violations.push(
-      issue(
-        path,
-        "Feature catalogue must contain version 0 and a features array.",
-      ),
+      issue(path, "Feature catalogue must contain version 0 and a features array."),
     );
     return [];
   }
@@ -109,7 +99,9 @@ export function readFeatureCatalogue(
       subjects.length === 0 ||
       !subjects.every((subject) => typeof subject === "string" && NAME.test(subject)) ||
       new Set(subjects).size !== subjects.length ||
-      ![...subjects].sort().every((subject, subjectIndex) => subject === subjects[subjectIndex])
+      ![...subjects]
+        .sort()
+        .every((subject, subjectIndex) => subject === subjects[subjectIndex])
     ) {
       violations.push(
         issue(
@@ -124,14 +116,21 @@ export function readFeatureCatalogue(
     const expected = expectedRoot(id, classification);
     if (root !== expected) {
       violations.push(
-        issue(path, `Feature ${JSON.stringify(id)} must use root ${JSON.stringify(expected)}, found ${JSON.stringify(root)}.`),
+        issue(
+          path,
+          `Feature ${JSON.stringify(id)} must use root ${JSON.stringify(expected)}, found ${JSON.stringify(root)}.`,
+        ),
       );
     }
     if (ids.has(id)) {
-      violations.push(issue(path, `Feature id ${JSON.stringify(id)} is declared more than once.`));
+      violations.push(
+        issue(path, `Feature id ${JSON.stringify(id)} is declared more than once.`),
+      );
     }
     if (roots.has(root)) {
-      violations.push(issue(path, `Feature root ${JSON.stringify(root)} is declared more than once.`));
+      violations.push(
+        issue(path, `Feature root ${JSON.stringify(root)} is declared more than once.`),
+      );
     }
     ids.add(id);
     roots.add(root);

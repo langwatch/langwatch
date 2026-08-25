@@ -146,9 +146,7 @@ describe("ContributeSpanFactsCommand", () => {
   });
 
   it("routes the command by session, not by trace", () => {
-    expect(ContributeSpanFactsCommand.getAggregateId(spanFactsData())).toBe(
-      SESSION,
-    );
+    expect(ContributeSpanFactsCommand.getAggregateId(spanFactsData())).toBe(SESSION);
   });
 
   describe("given a nested interactive session launched from inside another", () => {

@@ -318,9 +318,7 @@ function tokenCount(...raws: string[]): number | null {
   return null;
 }
 
-function mapModelSpanSampleRow(
-  row: ModelSpanSampleQueryRow,
-): ModelSpanSampleRow {
+function mapModelSpanSampleRow(row: ModelSpanSampleQueryRow): ModelSpanSampleRow {
   return {
     traceId: row.TraceId,
     spanId: row.SpanId,
@@ -560,10 +558,8 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
           row.CacheCreation1hTokens || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS]: row.InputChars || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]: row.AudioSeconds || undefined,
-        [ATTR_KEYS.GEN_AI_USAGE_INPUT_AUDIO_TOKENS]:
-          row.InputAudioTokens || undefined,
-        [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS]:
-          row.OutputAudioTokens || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_INPUT_AUDIO_TOKENS]: row.InputAudioTokens || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS]: row.OutputAudioTokens || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]:
           row.CustomInputRate || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]:
@@ -637,9 +633,7 @@ function asNumber(value: string | number): number {
 
 function mapEventRow(row: EventRow): ElasticSearchEvent {
   const startedAt =
-    typeof row.started_at === "string"
-      ? parseInt(row.started_at, 10)
-      : row.started_at;
+    typeof row.started_at === "string" ? parseInt(row.started_at, 10) : row.started_at;
 
   const metrics: Array<{ key: string; value: number }> = [];
   const eventDetails: Array<{ key: string; value: string }> = [];
@@ -679,37 +673,25 @@ function mapEventRow(row: EventRow): ElasticSearchEvent {
  */
 const DECIMAL_NUMBER_RE = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
-const logger = createLogger(
-  "langwatch:app-layer:traces:span-storage-repository",
-);
+const logger = createLogger("langwatch:app-layer:traces:span-storage-repository");
 
 const VALID_SPAN_KINDS = new Set(
-  Object.values(NormalizedSpanKind).filter(
-    (v): v is number => typeof v === "number",
-  ),
+  Object.values(NormalizedSpanKind).filter((v): v is number => typeof v === "number"),
 );
 const VALID_STATUS_CODES = new Set(
-  Object.values(NormalizedStatusCode).filter(
-    (v): v is number => typeof v === "number",
-  ),
+  Object.values(NormalizedStatusCode).filter((v): v is number => typeof v === "number"),
 );
 
 function validateSpanKind(value: number): NormalizedSpanKind {
   if (VALID_SPAN_KINDS.has(value)) return value as NormalizedSpanKind;
-  logger.warn(
-    { value },
-    "Unknown SpanKind from ClickHouse, defaulting to INTERNAL",
-  );
+  logger.warn({ value }, "Unknown SpanKind from ClickHouse, defaulting to INTERNAL");
   return NormalizedSpanKind.INTERNAL;
 }
 
 function validateStatusCode(value: number | null): NormalizedStatusCode | null {
   if (value === null) return null;
   if (VALID_STATUS_CODES.has(value)) return value as NormalizedStatusCode;
-  logger.warn(
-    { value },
-    "Unknown StatusCode from ClickHouse, defaulting to UNSET",
-  );
+  logger.warn({ value }, "Unknown StatusCode from ClickHouse, defaulting to UNSET");
   return NormalizedStatusCode.UNSET;
 }
 
@@ -720,9 +702,7 @@ function validateStatusCode(value: number | null): NormalizedStatusCode | null {
  * Exported so every stored_spans read path shares the same row decoding.
  * Pair with {@link deserializeAttributes}.
  */
-export function ensureStringRecord(
-  raw: Record<string, unknown>,
-): Record<string, string> {
+export function ensureStringRecord(raw: Record<string, unknown>): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (typeof value === "string") {
@@ -924,12 +904,8 @@ export function mapChRowToNormalized(row: FullSpanRow) {
     durationMs: row.DurationMs,
     name: row.SpanName,
     kind: validateSpanKind(row.SpanKind),
-    resourceAttributes: deserializeAttributes(
-      ensureStringRecord(row.ResourceAttributes),
-    ),
-    spanAttributes: deserializeAttributes(
-      ensureStringRecord(row.SpanAttributes),
-    ),
+    resourceAttributes: deserializeAttributes(ensureStringRecord(row.ResourceAttributes)),
+    spanAttributes: deserializeAttributes(ensureStringRecord(row.SpanAttributes)),
     statusCode: validateStatusCode(row.StatusCode),
     statusMessage: row.StatusMessage,
     instrumentationScope: {
@@ -1467,9 +1443,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           ${windowPredicate}
       `,
       query_params:
-        sinceMs !== undefined
-          ? { tenantId, traceId, sinceMs }
-          : { tenantId, traceId },
+        sinceMs !== undefined ? { tenantId, traceId, sinceMs } : { tenantId, traceId },
       format: "JSONEachRow",
     });
     const rows = (await result.json()) as Array<{
@@ -1626,9 +1600,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           return rows.map((r) => ({
             spanId: r.spanId,
             timestamp:
-              typeof r.timestamp === "string"
-                ? parseInt(r.timestamp, 10)
-                : r.timestamp,
+              typeof r.timestamp === "string" ? parseInt(r.timestamp, 10) : r.timestamp,
             name: r.name,
             attributes: r.attributes ?? {},
           }));
@@ -1681,9 +1653,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         format: "JSONEachRow",
       });
 
-      return toTraceEventRollups(
-        (await result.json()) as TraceEventRollupRow[],
-      );
+      return toTraceEventRollups((await result.json()) as TraceEventRollupRow[]);
     } catch (error) {
       logger.warn(
         {
@@ -1919,8 +1889,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               SpanId,
               arrayFilter(x -> x != '', [
                 ${LANGWATCH_SIGNAL_BUCKETS.map(
-                  (bucket) =>
-                    `if(${SIGNAL_BUCKET_PREDICATES[bucket]}, '${bucket}', '')`,
+                  (bucket) => `if(${SIGNAL_BUCKET_PREDICATES[bucket]}, '${bucket}', '')`,
                 ).join(",\n                ")}
               ]) AS Signals
             FROM (
@@ -2194,9 +2163,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         format: "JSONEachRow",
       });
 
-      const rows = (await result.json<SpanSummaryQueryRow>()).map(
-        mapSpanSummaryRow,
-      );
+      const rows = (await result.json<SpanSummaryQueryRow>()).map(mapSpanSummaryRow);
       return {
         rows: rows.slice(0, effectiveLimit),
         hasMore: rows.length > effectiveLimit,
@@ -2402,10 +2369,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
 
   private toClickHouseRecord(span: SpanInsertData): ClickHouseSpanWriteRecord {
     const serviceNameAny =
-      span.spanAttributes["service.name"] ??
-      span.resourceAttributes["service.name"];
-    const serviceName =
-      typeof serviceNameAny === "string" ? serviceNameAny : "unknown";
+      span.spanAttributes["service.name"] ?? span.resourceAttributes["service.name"];
+    const serviceName = typeof serviceNameAny === "string" ? serviceNameAny : "unknown";
 
     return {
       ProjectionId: span.id,
@@ -2430,14 +2395,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       ScopeVersion: span.instrumentationScope.version ?? null,
       "Events.Timestamp": span.events.map((e) => new Date(e.timeUnixMs)),
       "Events.Name": span.events.map((e) => e.name),
-      "Events.Attributes": span.events.map((e) =>
-        serializeAttributes(e.attributes),
-      ),
+      "Events.Attributes": span.events.map((e) => serializeAttributes(e.attributes)),
       "Links.TraceId": span.links.map((l) => l.traceId),
       "Links.SpanId": span.links.map((l) => l.spanId),
-      "Links.Attributes": span.links.map((l) =>
-        serializeAttributes(l.attributes),
-      ),
+      "Links.Attributes": span.links.map((l) => serializeAttributes(l.attributes)),
       DroppedAttributesCount: 0,
       DroppedEventsCount: 0,
       DroppedLinksCount: 0,

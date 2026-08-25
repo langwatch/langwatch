@@ -44,9 +44,7 @@ describe("helm chart auth base URL", () => {
     /** @scenario "The workers pod is told the public address" */
     it("carries NEXTAUTH_URL through sharedEnv into the workers container", () => {
       expect(sharedEnvBlock()).toContain("- name: NEXTAUTH_URL");
-      expect(read(WORKERS_DEPLOYMENT)).toContain(
-        'include "langwatch.sharedEnv"',
-      );
+      expect(read(WORKERS_DEPLOYMENT)).toContain('include "langwatch.sharedEnv"');
       expect(read(APP_DEPLOYMENT)).toContain('include "langwatch.sharedEnv"');
     });
   });

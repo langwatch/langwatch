@@ -79,14 +79,14 @@ and returns `appliedRetentionDays` so the UI shows the truth, not the form.
 
 ### Constants (`src/server/data-retention/retentionPolicy.schema.ts`)
 
-| Constant | Value | Purpose |
-|---|---|---|
-| `PLATFORM_DEFAULT_RETENTION_DAYS` | 49 | What new rows get stamped when no override resolves. Default-on. |
-| `MIN_RETENTION_DAYS` | 49 | Floor for any override; below this, ClickHouse TTL churn ROI collapses. |
-| `MAX_RETENTION_DAYS` | 65534 | UInt16 max, kept week-aligned. |
-| `RETENTION_WEEK_DAYS` | 7 | Tables are weekly-partitioned; values must be multiples of 7. |
-| `INDEFINITE_RETENTION_DAYS` | 0 | Sentinel. Platform-admin only. Maps to year-2106 TTL expiry. |
-| `MIGRATION_DEFAULT_RETENTION_DAYS` | 308 | The `DEFAULT 308` in migration 00032. Only read by rows that pre-existed the column. Distinct from `PLATFORM_DEFAULT_RETENTION_DAYS`. |
+| Constant                           | Value | Purpose                                                                                                                               |
+| ---------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `PLATFORM_DEFAULT_RETENTION_DAYS`  | 49    | What new rows get stamped when no override resolves. Default-on.                                                                      |
+| `MIN_RETENTION_DAYS`               | 49    | Floor for any override; below this, ClickHouse TTL churn ROI collapses.                                                               |
+| `MAX_RETENTION_DAYS`               | 65534 | UInt16 max, kept week-aligned.                                                                                                        |
+| `RETENTION_WEEK_DAYS`              | 7     | Tables are weekly-partitioned; values must be multiples of 7.                                                                         |
+| `INDEFINITE_RETENTION_DAYS`        | 0     | Sentinel. Platform-admin only. Maps to year-2106 TTL expiry.                                                                          |
+| `MIGRATION_DEFAULT_RETENTION_DAYS` | 308   | The `DEFAULT 308` in migration 00032. Only read by rows that pre-existed the column. Distinct from `PLATFORM_DEFAULT_RETENTION_DAYS`. |
 
 The 49 / 308 distinction is load-bearing: **49** is what new rows get
 stamped going forward; **308** is what pre-migration rows read lazily
@@ -160,8 +160,8 @@ Every CH repository for the 11 managed tables takes a
 
 ```ts
 const retentionDays =
-  (await resolver?.getRetentionDays(tenantId, "traces"))
-  ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+  (await resolver?.getRetentionDays(tenantId, "traces")) ??
+  PLATFORM_DEFAULT_RETENTION_DAYS;
 ```
 
 `_size_bytes` is `MATERIALIZED` — CH computes it server-side at insert
@@ -228,12 +228,12 @@ Four independent gates, asserted at the router. Read paths use the same
 predicates to compute `writable` flags so the UI never offers a control
 the save will reject.
 
-| Gate | When | Failure |
-|---|---|---|
-| `assertCanWriteRetentionScope` | Always; per scope tier (`organization:manage` / `team:manage` / `project:update`) | FORBIDDEN |
-| `assertRetentionPlanForScope` | Set/remove; plan-gates against the **scope-owning org** | FORBIDDEN |
-| `assertCanDisableRetention` | Only when setting `INDEFINITE_RETENTION_DAYS`; `ADMIN_EMAILS` allow-list | FORBIDDEN |
-| `checkProjectPermission("project:update")` | Retroactive endpoint | FORBIDDEN |
+| Gate                                       | When                                                                              | Failure   |
+| ------------------------------------------ | --------------------------------------------------------------------------------- | --------- |
+| `assertCanWriteRetentionScope`             | Always; per scope tier (`organization:manage` / `team:manage` / `project:update`) | FORBIDDEN |
+| `assertRetentionPlanForScope`              | Set/remove; plan-gates against the **scope-owning org**                           | FORBIDDEN |
+| `assertCanDisableRetention`                | Only when setting `INDEFINITE_RETENTION_DAYS`; `ADMIN_EMAILS` allow-list          | FORBIDDEN |
+| `checkProjectPermission("project:update")` | Retroactive endpoint                                                              | FORBIDDEN |
 
 PROJECT-tier write uses `project:update` (not `manage`) to match the read
 snapshot's `writable` flag. Plan gating uses `resolveScopeOrganizationId`,

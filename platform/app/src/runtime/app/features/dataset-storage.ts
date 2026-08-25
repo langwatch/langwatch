@@ -34,7 +34,9 @@ class AppAzureConfigResolver extends DatasetAzureConfigResolver {
 
 export class AppDatasetStorageResolver extends DatasetStorageResolver {
   private readonly s3 = S3DatasetStorageAdapter.create(new AppS3ClientResolver());
-  private readonly azure = AzureDatasetStorageAdapter.create(new AppAzureConfigResolver());
+  private readonly azure = AzureDatasetStorageAdapter.create(
+    new AppAzureConfigResolver(),
+  );
 
   async forProject(projectId: string): Promise<DatasetStorage> {
     const destination = await resolveProjectStorageDestination(projectId);

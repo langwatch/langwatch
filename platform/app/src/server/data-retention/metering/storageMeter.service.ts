@@ -86,10 +86,7 @@ export class StorageMeterService {
   }) {
     this.resolveClickHouseClient = resolveClickHouseClient;
     this.cache = new TtlCache(STORAGE_HARD_TTL_MS, "storage-meter:v2:");
-    this.refreshLock = new TtlCache(
-      REFRESH_LOCK_TTL_MS,
-      "storage-meter:refresh:",
-    );
+    this.refreshLock = new TtlCache(REFRESH_LOCK_TTL_MS, "storage-meter:refresh:");
     // Injectable clock so the stale-while-revalidate timing is deterministic in
     // tests; production uses the wall clock.
     this.now = now ?? (() => Date.now());
@@ -104,11 +101,7 @@ export class StorageMeterService {
    * is kicked (see {@link refreshInBackground}). Only the first read for a
    * tenant — when nothing is cached — blocks on the heavy {@link queryTotalBytes}.
    */
-  async getTotalStorageBytes({
-    tenantId,
-  }: {
-    tenantId: string;
-  }): Promise<number> {
+  async getTotalStorageBytes({ tenantId }: { tenantId: string }): Promise<number> {
     const entry = await this.cache.get(tenantId);
     if (entry !== undefined) {
       if (this.now() - entry.computedAt >= STORAGE_FRESH_MS) {

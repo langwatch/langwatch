@@ -145,29 +145,28 @@ describe("putSpool — given each supported storage destination", () => {
       {
         name: "azure",
         destination: AZURE_DESTINATION,
-        expectedUri:
-          "azure-blob://acct/cont/trace-blobs/spool/orgA/trace-1/span-1",
+        expectedUri: "azure-blob://acct/cont/trace-blobs/spool/orgA/trace-1/span-1",
       },
       // No local-filesystem row on purpose: the spool refuses that
       // destination, since a filesystem cannot express the lifecycle rule the
       // orphan bound depends on. Covered by its own case below.
-    ])("writes to the $name destination the deployment resolved", async ({
-      destination,
-      expectedUri,
-    }) => {
-      const objectStore = fakeObjectStore();
-      const store = new BlobStore({
-        resolveS3Client: forbiddenS3Resolver,
-        spoolStorage: spoolStorageFor(objectStore, destination),
-      });
+    ])(
+      "writes to the $name destination the deployment resolved",
+      async ({ destination, expectedUri }) => {
+        const objectStore = fakeObjectStore();
+        const store = new BlobStore({
+          resolveS3Client: forbiddenS3Resolver,
+          spoolStorage: spoolStorageFor(objectStore, destination),
+        });
 
-      await store.putSpool({
-        ...spoolCoords,
-        body: Buffer.from("span payload data", "utf-8"),
-      });
+        await store.putSpool({
+          ...spoolCoords,
+          body: Buffer.from("span payload data", "utf-8"),
+        });
 
-      expect(objectStore.putUris).toEqual([expectedUri]);
-    });
+        expect(objectStore.putUris).toEqual([expectedUri]);
+      },
+    );
   });
 });
 
@@ -481,8 +480,7 @@ describe("getSpool — given a reference naming another tenant's object", () => 
       // A reference that names the victim's object, on a command
       // authenticated as orgA. The reference must not be honoured.
       const retrieved = await store.getSpool({
-        spoolRef:
-          "s3://test-bucket/trace-blobs/spool/victim-org/trace-1/span-1",
+        spoolRef: "s3://test-bucket/trace-blobs/spool/victim-org/trace-1/span-1",
         ...spoolCoords,
       });
 

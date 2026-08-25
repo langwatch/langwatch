@@ -55,8 +55,7 @@ const SOURCE_EXTENSIONS = new Set([
  * constant so the test below can check the pattern itself: a gap here does not
  * fail loudly, it just scans and finds nothing.
  */
-const IOREDIS_CONSTRUCTION =
-  /\bnew\s+(?:IORedis|Redis|Cluster)(?:\s*\.\s*\w+)*\s*\(/;
+const IOREDIS_CONSTRUCTION = /\bnew\s+(?:IORedis|Redis|Cluster)(?:\s*\.\s*\w+)*\s*\(/;
 
 /**
  * Any reference to the retired singleton module, whatever names it.
@@ -67,8 +66,7 @@ const IOREDIS_CONSTRUCTION =
  * past. A mock of a module that no longer resolves fails the suite at load, so
  * this guard is what turns that into one legible failure here.
  */
-const RETIRED_REDIS_MODULE =
-  /["'][^"']*(?:~\/server\/redis|\.\.\/redis|\.\/redis)["']/;
+const RETIRED_REDIS_MODULE = /["'][^"']*(?:~\/server\/redis|\.\.\/redis|\.\/redis)["']/;
 /**
  * The only directories the scan is allowed not to see.
  *
@@ -202,9 +200,7 @@ describe("Redis ownership", () => {
       const previous = globalForApp.__langwatch_app;
       globalForApp.__langwatch_app = createTestApp();
       try {
-        const { consumeEmailCapSlot } = await import(
-          "../automations/dispatch/emailCaps"
-        );
+        const { consumeEmailCapSlot } = await import("../automations/dispatch/emailCaps");
 
         // The hourly cap's fallback is a per-worker in-memory counter: the
         // dispatch is still decided, it is just no longer decided fleet-wide.
@@ -228,9 +224,8 @@ describe("Redis ownership", () => {
     it("uses the connection its caller supplied, with no App in play", async () => {
       await resetApp();
       const smembers = vi.fn().mockResolvedValue([]);
-      const { CliTokenRevocationService } = await import(
-        "@ee/governance/services/cliTokenRevocation.service"
-      );
+      const { CliTokenRevocationService } =
+        await import("@ee/governance/services/cliTokenRevocation.service");
 
       const service = CliTokenRevocationService.create({
         smembers,
@@ -252,9 +247,8 @@ describe("Redis ownership", () => {
 
       // Importing must not need an App — that is the whole point of retiring
       // the module-level singleton.
-      const { checkLangyMessageRateLimit } = await import(
-        "../../middleware/rate-limit-langy"
-      );
+      const { checkLangyMessageRateLimit } =
+        await import("../../middleware/rate-limit-langy");
 
       const incr = vi.fn().mockResolvedValue(1);
       const expire = vi.fn().mockResolvedValue(1);
@@ -278,17 +272,13 @@ describe("Redis ownership", () => {
   describe("given the platform source tree", () => {
     /** @scenario The retired singleton module is gone */
     it("has no module exporting a ready-made Redis connection", () => {
-      expect(fs.existsSync(path.join(APP_ROOT, "src/server/redis.ts"))).toBe(
-        false,
-      );
+      expect(fs.existsSync(path.join(APP_ROOT, "src/server/redis.ts"))).toBe(false);
 
       const referrers = allSourceFiles()
         // This file is the one legitimate exception: the fixtures below have to
         // spell the retired specifier out to prove the pattern still catches it.
         .filter((file) => file !== fileURLToPath(import.meta.url))
-        .filter((file) =>
-          RETIRED_REDIS_MODULE.test(fs.readFileSync(file, "utf8")),
-        );
+        .filter((file) => RETIRED_REDIS_MODULE.test(fs.readFileSync(file, "utf8")));
 
       expect(referrers.map(relative)).toEqual([]);
     });
@@ -300,9 +290,7 @@ describe("Redis ownership", () => {
       const offenders = allSourceFiles()
         .filter((file) => !file.startsWith(clientPackage))
         .filter((file) => !isTestFile(file))
-        .filter((file) =>
-          IOREDIS_CONSTRUCTION.test(fs.readFileSync(file, "utf8")),
-        );
+        .filter((file) => IOREDIS_CONSTRUCTION.test(fs.readFileSync(file, "utf8")));
 
       expect(offenders.map(relative)).toEqual([]);
     });
@@ -326,9 +314,7 @@ describe("Redis ownership", () => {
         "platform/app/vite/",
         "packages/",
       ]) {
-        expect(reached(directory), `nothing scanned under ${directory}`).toBe(
-          true,
-        );
+        expect(reached(directory), `nothing scanned under ${directory}`).toBe(true);
       }
 
       // Concrete non-TypeScript modules, so the extension set cannot quietly

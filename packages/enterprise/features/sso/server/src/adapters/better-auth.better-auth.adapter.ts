@@ -11,11 +11,7 @@
  */
 
 import type { BetterAuthOptions } from "better-auth";
-import {
-  auth0,
-  type genericOAuth,
-  okta,
-} from "better-auth/plugins/generic-oauth";
+import { auth0, type genericOAuth, okta } from "better-auth/plugins/generic-oauth";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 
 /**
@@ -31,15 +27,15 @@ import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 const fallbackNameImplementation = {
   execute(profile: Record<string, any>): string {
     return (
-    (typeof profile.name === "string" && profile.name.trim()) ||
-    (typeof profile.nickname === "string" && profile.nickname.trim()) ||
-    (typeof profile.displayName === "string" && profile.displayName.trim()) ||
-    (typeof profile.login === "string" && profile.login.trim()) ||
-    (typeof profile.username === "string" && profile.username.trim()) ||
-    (typeof profile.preferred_username === "string" &&
-      profile.preferred_username.trim()) ||
-    (typeof profile.email === "string" && profile.email.split("@")[0]) ||
-    "User"
+      (typeof profile.name === "string" && profile.name.trim()) ||
+      (typeof profile.nickname === "string" && profile.nickname.trim()) ||
+      (typeof profile.displayName === "string" && profile.displayName.trim()) ||
+      (typeof profile.login === "string" && profile.login.trim()) ||
+      (typeof profile.username === "string" && profile.username.trim()) ||
+      (typeof profile.preferred_username === "string" &&
+        profile.preferred_username.trim()) ||
+      (typeof profile.email === "string" && profile.email.split("@")[0]) ||
+      "User"
     );
   },
 };
@@ -102,79 +98,79 @@ const socialProviderImplementation = {
   ): NonNullable<BetterAuthOptions["socialProviders"]> {
     const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
 
-  if (
-    configuration.provider === "google" &&
-    configuration.googleClientId &&
-    configuration.googleClientSecret
-  ) {
-    socialProviders.google = {
-      clientId: configuration.googleClientId,
-      clientSecret: configuration.googleClientSecret,
-      mapProfileToUser: (profile) => ({
-        name: fallbackName(profile as Record<string, any>),
-        email: (profile as { email?: string }).email,
-        image: (profile as { picture?: string }).picture,
-      }),
-    };
-  }
+    if (
+      configuration.provider === "google" &&
+      configuration.googleClientId &&
+      configuration.googleClientSecret
+    ) {
+      socialProviders.google = {
+        clientId: configuration.googleClientId,
+        clientSecret: configuration.googleClientSecret,
+        mapProfileToUser: (profile) => ({
+          name: fallbackName(profile as Record<string, any>),
+          email: (profile as { email?: string }).email,
+          image: (profile as { picture?: string }).picture,
+        }),
+      };
+    }
 
-  if (
-    configuration.provider === "github" &&
-    configuration.githubClientId &&
-    configuration.githubClientSecret
-  ) {
-    socialProviders.github = {
-      clientId: configuration.githubClientId,
-      clientSecret: configuration.githubClientSecret,
-      mapProfileToUser: (profile) => ({
-        name: fallbackName(profile as Record<string, any>),
-        email: (profile as { email?: string }).email,
-        image: (profile as { avatar_url?: string }).avatar_url,
-      }),
-    };
-  }
+    if (
+      configuration.provider === "github" &&
+      configuration.githubClientId &&
+      configuration.githubClientSecret
+    ) {
+      socialProviders.github = {
+        clientId: configuration.githubClientId,
+        clientSecret: configuration.githubClientSecret,
+        mapProfileToUser: (profile) => ({
+          name: fallbackName(profile as Record<string, any>),
+          email: (profile as { email?: string }).email,
+          image: (profile as { avatar_url?: string }).avatar_url,
+        }),
+      };
+    }
 
-  if (
-    configuration.provider === "gitlab" &&
-    configuration.gitlabClientId &&
-    configuration.gitlabClientSecret
-  ) {
-    socialProviders.gitlab = {
-      clientId: configuration.gitlabClientId,
-      clientSecret: configuration.gitlabClientSecret,
-      mapProfileToUser: (profile) => ({
-        name: fallbackName(profile as Record<string, any>),
-        email: (profile as { email?: string }).email,
-        image: (profile as { avatar_url?: string }).avatar_url,
-      }),
-    };
-  }
+    if (
+      configuration.provider === "gitlab" &&
+      configuration.gitlabClientId &&
+      configuration.gitlabClientSecret
+    ) {
+      socialProviders.gitlab = {
+        clientId: configuration.gitlabClientId,
+        clientSecret: configuration.gitlabClientSecret,
+        mapProfileToUser: (profile) => ({
+          name: fallbackName(profile as Record<string, any>),
+          email: (profile as { email?: string }).email,
+          image: (profile as { avatar_url?: string }).avatar_url,
+        }),
+      };
+    }
 
-  if (
-    configuration.provider === "azure-ad" &&
-    configuration.azureAdClientId &&
-    configuration.azureAdClientSecret &&
-    configuration.azureAdTenantId
-  ) {
-    socialProviders.microsoft = {
-      clientId: configuration.azureAdClientId,
-      clientSecret: configuration.azureAdClientSecret,
-      tenantId: configuration.azureAdTenantId,
-      mapProfileToUser: (profile) => ({
-        name: fallbackName(profile as Record<string, any>),
-        email:
-          (
-            profile as {
-              email?: string;
-              mail?: string;
-              userPrincipalName?: string;
-            }
-          ).email ??
-          (profile as { mail?: string }).mail ??
-          (profile as { userPrincipalName?: string }).userPrincipalName,
-      }),
-    };
-  }
+    if (
+      configuration.provider === "azure-ad" &&
+      configuration.azureAdClientId &&
+      configuration.azureAdClientSecret &&
+      configuration.azureAdTenantId
+    ) {
+      socialProviders.microsoft = {
+        clientId: configuration.azureAdClientId,
+        clientSecret: configuration.azureAdClientSecret,
+        tenantId: configuration.azureAdTenantId,
+        mapProfileToUser: (profile) => ({
+          name: fallbackName(profile as Record<string, any>),
+          email:
+            (
+              profile as {
+                email?: string;
+                mail?: string;
+                userPrincipalName?: string;
+              }
+            ).email ??
+            (profile as { mail?: string }).mail ??
+            (profile as { userPrincipalName?: string }).userPrincipalName,
+        }),
+      };
+    }
 
     return socialProviders;
   },
@@ -195,9 +191,7 @@ const socialProviderImplementation = {
  */
 const issuerUrlImplementation = {
   parse(issuer: string, envName: string): URL {
-    const normalized = /^https?:\/\//i.test(issuer)
-      ? issuer
-      : `https://${issuer}`;
+    const normalized = /^https?:\/\//i.test(issuer) ? issuer : `https://${issuer}`;
     try {
       return new URL(normalized);
     } catch {
@@ -220,13 +214,7 @@ const issuerUrlImplementation = {
  * request.
  */
 const callbackUrlImplementation = {
-  build({
-    baseUrl,
-    providerId,
-  }: {
-    baseUrl: string;
-    providerId: string;
-  }): string {
+  build({ baseUrl, providerId }: { baseUrl: string; providerId: string }): string {
     return `${baseUrl.replace(/\/+$/, "")}/api/auth/callback/${providerId}`;
   },
 };
@@ -408,114 +396,114 @@ const genericOAuthImplementation = {
   ): Parameters<typeof genericOAuth>[0]["config"] {
     const genericOAuthConfigs: Parameters<typeof genericOAuth>[0]["config"] = [];
 
-  if (
-    configuration.provider === "auth0" &&
-    configuration.auth0ClientId &&
-    configuration.auth0ClientSecret &&
-    configuration.auth0Issuer
-  ) {
-    const issuerUrl = BetterAuthSsoAdapter.parseIssuerUrl(
-      configuration.auth0Issuer,
-      "AUTH0_ISSUER",
-    );
-    genericOAuthConfigs.push({
-      ...auth0({
-        clientId: configuration.auth0ClientId,
-        clientSecret: configuration.auth0ClientSecret,
-        domain: issuerUrl.host,
-      }),
-      // The `prompt=login` forces Auth0 to always show the login screen
-      // instead of silently using an existing session — matches the original
-      // NextAuth Auth0Provider behavior (`authorization: { params: { prompt: "login" } }`).
-      authorizationUrlParams: { prompt: "login" },
-      // Pin the OAuth `redirect_uri` to the LEGACY NextAuth callback path
-      // (`/api/auth/callback/auth0`). BetterAuth's genericOAuth plugin
-      // defaults to `/api/auth/oauth2/callback/auth0`, but existing customer
-      // Auth0 applications have only the legacy path registered as an
-      // allowed callback. Sending a different `redirect_uri` would cause
-      // Auth0 to reject the authorization request.
-      // BetterAuth serves that path because the genericOAuth plugin registers
-      // each config in `ctx.socialProviders`, which is what the core callback
-      // route resolves against.
-      redirectURI: BetterAuthSsoAdapter.legacyCallbackUrl({
-        baseUrl: configuration.baseUrl,
-        providerId: "auth0",
-      }),
-      mapProfileToUser: (profile) => {
-        const mapped: {
-          name: string;
-          email: string | undefined;
-          image: string | null | undefined;
-          emailVerified?: true;
-        } = {
+    if (
+      configuration.provider === "auth0" &&
+      configuration.auth0ClientId &&
+      configuration.auth0ClientSecret &&
+      configuration.auth0Issuer
+    ) {
+      const issuerUrl = BetterAuthSsoAdapter.parseIssuerUrl(
+        configuration.auth0Issuer,
+        "AUTH0_ISSUER",
+      );
+      genericOAuthConfigs.push({
+        ...auth0({
+          clientId: configuration.auth0ClientId,
+          clientSecret: configuration.auth0ClientSecret,
+          domain: issuerUrl.host,
+        }),
+        // The `prompt=login` forces Auth0 to always show the login screen
+        // instead of silently using an existing session — matches the original
+        // NextAuth Auth0Provider behavior (`authorization: { params: { prompt: "login" } }`).
+        authorizationUrlParams: { prompt: "login" },
+        // Pin the OAuth `redirect_uri` to the LEGACY NextAuth callback path
+        // (`/api/auth/callback/auth0`). BetterAuth's genericOAuth plugin
+        // defaults to `/api/auth/oauth2/callback/auth0`, but existing customer
+        // Auth0 applications have only the legacy path registered as an
+        // allowed callback. Sending a different `redirect_uri` would cause
+        // Auth0 to reject the authorization request.
+        // BetterAuth serves that path because the genericOAuth plugin registers
+        // each config in `ctx.socialProviders`, which is what the core callback
+        // route resolves against.
+        redirectURI: BetterAuthSsoAdapter.legacyCallbackUrl({
+          baseUrl: configuration.baseUrl,
+          providerId: "auth0",
+        }),
+        mapProfileToUser: (profile) => {
+          const mapped: {
+            name: string;
+            email: string | undefined;
+            image: string | null | undefined;
+            emailVerified?: true;
+          } = {
+            name: BetterAuthSsoAdapter.fallbackName(profile),
+            email: profile.email,
+            image: profile.picture,
+          };
+          // SAML sign-ins count as verified: the email was asserted by the
+          // organization's own IdP, but Auth0 reports `email_verified: false`
+          // for every SAML connection, which would stop BetterAuth from
+          // linking to an existing user (ADR-096). Non-SAML profiles get no
+          // `emailVerified` key so the claim-derived value flows through.
+          if (BetterAuthSsoAdapter.isSamlSub(profile.sub)) {
+            mapped.emailVerified = true;
+          }
+          return mapped;
+        },
+      });
+    }
+
+    if (
+      configuration.provider === "okta" &&
+      configuration.oktaClientId &&
+      configuration.oktaClientSecret &&
+      configuration.oktaIssuer
+    ) {
+      // Normalize issuer to a full URL — BetterAuth's okta helper builds the
+      // discovery URL by string concatenation and would otherwise fail
+      // silently at first sign-in if the issuer has no scheme.
+      const oktaIssuerUrl = BetterAuthSsoAdapter.parseIssuerUrl(
+        configuration.oktaIssuer,
+        "OKTA_ISSUER",
+      );
+      genericOAuthConfigs.push({
+        ...okta({
+          clientId: configuration.oktaClientId,
+          clientSecret: configuration.oktaClientSecret,
+          issuer: oktaIssuerUrl.toString().replace(/\/$/, ""),
+        }),
+        // Same backward-compat reasoning as auth0 above — pin the legacy
+        // NextAuth callback path so existing Okta applications don't need
+        // their allowed callback list updated during cutover.
+        redirectURI: BetterAuthSsoAdapter.legacyCallbackUrl({
+          baseUrl: configuration.baseUrl,
+          providerId: "okta",
+        }),
+        mapProfileToUser: (profile) => ({
           name: BetterAuthSsoAdapter.fallbackName(profile),
           email: profile.email,
-          image: profile.picture,
-        };
-        // SAML sign-ins count as verified: the email was asserted by the
-        // organization's own IdP, but Auth0 reports `email_verified: false`
-        // for every SAML connection, which would stop BetterAuth from
-        // linking to an existing user (ADR-096). Non-SAML profiles get no
-        // `emailVerified` key so the claim-derived value flows through.
-        if (BetterAuthSsoAdapter.isSamlSub(profile.sub)) {
-          mapped.emailVerified = true;
-        }
-        return mapped;
-      },
-    });
-  }
+          image: profile.image ?? profile.picture,
+        }),
+      });
+    }
 
-  if (
-    configuration.provider === "okta" &&
-    configuration.oktaClientId &&
-    configuration.oktaClientSecret &&
-    configuration.oktaIssuer
-  ) {
-    // Normalize issuer to a full URL — BetterAuth's okta helper builds the
-    // discovery URL by string concatenation and would otherwise fail
-    // silently at first sign-in if the issuer has no scheme.
-    const oktaIssuerUrl = BetterAuthSsoAdapter.parseIssuerUrl(
-      configuration.oktaIssuer,
-      "OKTA_ISSUER",
-    );
-    genericOAuthConfigs.push({
-      ...okta({
-        clientId: configuration.oktaClientId,
-        clientSecret: configuration.oktaClientSecret,
-        issuer: oktaIssuerUrl.toString().replace(/\/$/, ""),
-      }),
-      // Same backward-compat reasoning as auth0 above — pin the legacy
-      // NextAuth callback path so existing Okta applications don't need
-      // their allowed callback list updated during cutover.
-      redirectURI: BetterAuthSsoAdapter.legacyCallbackUrl({
-        baseUrl: configuration.baseUrl,
-        providerId: "okta",
-      }),
-      mapProfileToUser: (profile) => ({
-        name: BetterAuthSsoAdapter.fallbackName(profile),
-        email: profile.email,
-        image: profile.image ?? profile.picture,
-      }),
-    });
-  }
+    for (const provider of PLAIN_OIDC_PROVIDERS) {
+      if (configuration.provider !== provider.providerId) continue;
 
-  for (const provider of PLAIN_OIDC_PROVIDERS) {
-    if (configuration.provider !== provider.providerId) continue;
+      const { clientId, clientSecret, issuer } = provider.credentials(configuration);
+      if (!clientId || !clientSecret || !issuer) continue;
 
-    const { clientId, clientSecret, issuer } = provider.credentials(configuration);
-    if (!clientId || !clientSecret || !issuer) continue;
-
-    genericOAuthConfigs.push(
-      BetterAuthSsoAdapter.oidcProviderConfig({
-        providerId: provider.providerId,
-        clientId,
-        clientSecret,
-        issuer,
-        issuerEnvName: provider.issuerEnvName,
-        baseUrl: configuration.baseUrl,
-      }),
-    );
-  }
+      genericOAuthConfigs.push(
+        BetterAuthSsoAdapter.oidcProviderConfig({
+          providerId: provider.providerId,
+          clientId,
+          clientSecret,
+          issuer,
+          issuerEnvName: provider.issuerEnvName,
+          baseUrl: configuration.baseUrl,
+        }),
+      );
+    }
 
     return genericOAuthConfigs;
   },
@@ -547,10 +535,7 @@ export class BetterAuthSsoAdapter {
     return issuerUrlImplementation.parse(issuer, envName);
   }
 
-  static legacyCallbackUrl(input: {
-    baseUrl: string;
-    providerId: string;
-  }): string {
+  static legacyCallbackUrl(input: { baseUrl: string; providerId: string }): string {
     return callbackUrlImplementation.build(input);
   }
 
@@ -585,5 +570,4 @@ export const parseIssuerUrl = BetterAuthSsoAdapter.parseIssuerUrl;
 export const legacyCallbackUrl = BetterAuthSsoAdapter.legacyCallbackUrl;
 export const discoveryUrlFor = BetterAuthSsoAdapter.discoveryUrlFor;
 export const oidcProviderConfig = BetterAuthSsoAdapter.oidcProviderConfig;
-export const buildGenericOAuthConfigs =
-  BetterAuthSsoAdapter.buildGenericOAuthConfigs;
+export const buildGenericOAuthConfigs = BetterAuthSsoAdapter.buildGenericOAuthConfigs;

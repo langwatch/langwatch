@@ -39,22 +39,17 @@ function buildApi() {
     app: () => runtimeApp,
     permissionEnforcer: () => async (_context, next) => next(),
   });
-  return SecretPublicApi.create()
-    .install(builder)
-    .build();
+  return SecretPublicApi.create().install(builder).build();
 }
 
 describe("SecretPublicApi", () => {
   it("mounts the modern RPC at a dated and latest URL", async () => {
     const app = buildApi();
-    const dated = await app.request(
-      "/api/secrets/2026-08-24/secrets.list",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ projectId: "project-1" }),
-      },
-    );
+    const dated = await app.request("/api/secrets/2026-08-24/secrets.list", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ projectId: "project-1" }),
+    });
     const latest = await app.request("/api/secrets/latest/secrets.list", {
       method: "POST",
       headers: { "content-type": "application/json" },

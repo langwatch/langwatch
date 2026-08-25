@@ -17,10 +17,7 @@
 import os from "os";
 import path from "path";
 import { env } from "~/env.mjs";
-import {
-  encodeScenarioLogContext,
-  SCENARIO_LOG_CONTEXT_ENV,
-} from "./child-logger";
+import { encodeScenarioLogContext, SCENARIO_LOG_CONTEXT_ENV } from "./child-logger";
 import { resolveChildTlsEnv } from "./child-tls-env";
 import type { ChildEnvInputs } from "./data-prefetcher";
 import type { ExecutionJobData } from "./execution-pool";
@@ -87,8 +84,7 @@ export function buildChildProcessEnv(
     // degrades to no caching rather than failing the spawn.
     NODE_COMPILE_CACHE:
       process.env.NODE_COMPILE_CACHE ?? SCENARIO_CHILD_COMPILE_CACHE_DIR,
-    COREPACK_ENABLE_DOWNLOAD_PROMPT:
-      process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
     ...scenarioVars,
   };
 

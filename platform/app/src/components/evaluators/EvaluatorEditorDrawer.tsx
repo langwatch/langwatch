@@ -52,12 +52,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
             <EvaluatorEditorHeading controller={controller} />
           </HStack>
         </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-        >
+        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           <EvaluatorEditorBody controller={controller} />
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="border">

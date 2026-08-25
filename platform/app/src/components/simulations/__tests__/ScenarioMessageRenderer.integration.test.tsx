@@ -29,13 +29,7 @@ vi.mock("~/utils/api", () => ({
 // harness — mock the module so the renderer's grouping contract (one
 // separator per traced turn) is what these tests exercise.
 vi.mock("../RunTurnSeparator", () => ({
-  RunTurnSeparator: ({
-    index,
-    traceId,
-  }: {
-    index: number;
-    traceId: string;
-  }) => (
+  RunTurnSeparator: ({ index, traceId }: { index: number; traceId: string }) => (
     <div data-testid="run-turn-separator" data-trace-id={traceId}>
       Turn {index}
     </div>
@@ -48,9 +42,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 
 const PROJECT_ID = "proj_test";
 
-const renderWith = (
-  messages: ScenarioMessageSnapshotEvent["messages"],
-): void => {
+const renderWith = (messages: ScenarioMessageSnapshotEvent["messages"]): void => {
   render(
     <Wrapper>
       <ScenarioMessageRenderer
@@ -62,9 +54,7 @@ const renderWith = (
   );
 };
 
-const renderWithGrid = (
-  messages: ScenarioMessageSnapshotEvent["messages"],
-): void => {
+const renderWithGrid = (messages: ScenarioMessageSnapshotEvent["messages"]): void => {
   render(
     <Wrapper>
       <ScenarioMessageRenderer
@@ -404,10 +394,7 @@ describe("<ScenarioMessageRenderer/>", () => {
       // user bubble (audio players stretch instead — see data-media-align).
       const mediaWrapper = chip.closest("[data-media-align]");
       expect(mediaWrapper).toHaveAttribute("data-media-align", "flex-end");
-      expect(chip.closest("[data-align]")).toHaveAttribute(
-        "data-align",
-        "flex-end",
-      );
+      expect(chip.closest("[data-align]")).toHaveAttribute("data-align", "flex-end");
     });
 
     it("falls back to a download link for legacy inline base64 attachments", () => {

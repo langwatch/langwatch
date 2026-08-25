@@ -71,8 +71,7 @@ function statusBadge(vk: { status: string; expiresAt?: string | null }): {
   colorPalette: string;
 } {
   if (vk.status === "revoked") return { label: "revoked", colorPalette: "red" };
-  if (vk.status === "disabled")
-    return { label: "disabled", colorPalette: "yellow" };
+  if (vk.status === "disabled") return { label: "disabled", colorPalette: "yellow" };
   if (isExpired(vk.expiresAt)) {
     return { label: "expired", colorPalette: "orange" };
   }
@@ -170,20 +169,16 @@ function VirtualKeysPage() {
             : projectNameById.get(s.scopeId),
     }));
   const rotateMutation = api.virtualKeys.rotate.useMutation({
-    onSuccess: () =>
-      utils.virtualKeys.list.invalidate({ organizationId: orgId }),
+    onSuccess: () => utils.virtualKeys.list.invalidate({ organizationId: orgId }),
   });
   const revokeMutation = api.virtualKeys.revoke.useMutation({
-    onSuccess: () =>
-      utils.virtualKeys.list.invalidate({ organizationId: orgId }),
+    onSuccess: () => utils.virtualKeys.list.invalidate({ organizationId: orgId }),
   });
 
   const [createOpen, setCreateOpen] = useState(false);
   const [revealSecret, setRevealSecret] = useState<CreatedSecret | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
-  const [rotating, setRotating] = useState<{ id: string; name: string } | null>(
-    null,
-  );
+  const [rotating, setRotating] = useState<{ id: string; name: string } | null>(null);
   const [revoking, setRevoking] = useState<{
     id: string;
     name: string;
@@ -261,11 +256,7 @@ function VirtualKeysPage() {
           <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
           <Spacer />
           {canCreate && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCreateOpen(true)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
               <Plus size={14} /> New virtual key
             </Button>
           )}
@@ -281,13 +272,7 @@ function VirtualKeysPage() {
               onRetry={() => listQuery.refetch()}
             />
           ) : allRows.length === 0 ? (
-            <VStack
-              gap={6}
-              align="center"
-              maxWidth="640px"
-              marginX="auto"
-              paddingY={8}
-            >
+            <VStack gap={6} align="center" maxWidth="640px" marginX="auto" paddingY={8}>
               <EmptyState.Root>
                 <EmptyState.Content>
                   <EmptyState.Indicator>
@@ -295,9 +280,8 @@ function VirtualKeysPage() {
                   </EmptyState.Indicator>
                   <EmptyState.Title>No virtual keys yet</EmptyState.Title>
                   <EmptyState.Description>
-                    Mint your first virtual key to route requests through the
-                    LangWatch AI Gateway with budgets, guardrails, and
-                    per-tenant tracing attached.
+                    Mint your first virtual key to route requests through the LangWatch AI
+                    Gateway with budgets, guardrails, and per-tenant tracing attached.
                   </EmptyState.Description>
                   {canCreate && (
                     <Button
@@ -317,9 +301,7 @@ function VirtualKeysPage() {
               {revokedRows.length > 0 && (
                 <Tabs.Root
                   value={statusTab}
-                  onValueChange={(d) =>
-                    setStatusTab(d.value as "active" | "revoked")
-                  }
+                  onValueChange={(d) => setStatusTab(d.value as "active" | "revoked")}
                   variant="line"
                   size="sm"
                   colorPalette="blue"
@@ -343,12 +325,7 @@ function VirtualKeysPage() {
               {rows.length === 0 ? (
                 <Card.Root width="full">
                   <Card.Body>
-                    <Text
-                      fontSize="sm"
-                      color="fg.muted"
-                      textAlign="center"
-                      py={6}
-                    >
+                    <Text fontSize="sm" color="fg.muted" textAlign="center" py={6}>
                       No {statusTab} keys.
                     </Text>
                   </Card.Body>
@@ -495,19 +472,13 @@ function VirtualKeysPage() {
                                   aria-label={`Usage for ${vk.name}, this month`}
                                   width="full"
                                 >
-                                  <HStack
-                                    gap={1}
-                                    justify="space-between"
-                                    width="full"
-                                  >
+                                  <HStack gap={1} justify="space-between" width="full">
                                     <Text
                                       fontSize="sm"
                                       fontVariantNumeric="tabular-nums"
                                       color={
                                         spendByKeyId.get(vk.id) &&
-                                        Number.parseFloat(
-                                          spendByKeyId.get(vk.id)!,
-                                        ) > 0
+                                        Number.parseFloat(spendByKeyId.get(vk.id)!) > 0
                                           ? "fg"
                                           : "fg.muted"
                                       }
@@ -543,14 +514,10 @@ function VirtualKeysPage() {
                             <Table.Cell>
                               {vk.lastUsedAt ? (
                                 <Tooltip
-                                  content={new Date(
-                                    vk.lastUsedAt,
-                                  ).toLocaleString()}
+                                  content={new Date(vk.lastUsedAt).toLocaleString()}
                                 >
                                   <Text fontSize="sm">
-                                    {formatTimeAgo(
-                                      new Date(vk.lastUsedAt).getTime(),
-                                    )}
+                                    {formatTimeAgo(new Date(vk.lastUsedAt).getTime())}
                                   </Text>
                                 </Tooltip>
                               ) : (
@@ -578,9 +545,7 @@ function VirtualKeysPage() {
                                     <Menu.Item
                                       value="details"
                                       onClick={() =>
-                                        void router.push(
-                                          `/gateway/virtual-keys/${vk.id}`,
-                                        )
+                                        void router.push(`/gateway/virtual-keys/${vk.id}`)
                                       }
                                     >
                                       <Eye size={14} /> Details
@@ -590,9 +555,7 @@ function VirtualKeysPage() {
                                         value="view-traces"
                                         data-testid={`vk-view-traces-${vk.id}`}
                                         onClick={() =>
-                                          void router.push(
-                                            traceHrefByKeyId.get(vk.id)!,
-                                          )
+                                          void router.push(traceHrefByKeyId.get(vk.id)!)
                                         }
                                       >
                                         <Bird size={14} /> View traces
@@ -658,9 +621,7 @@ function VirtualKeysPage() {
           organizationId={orgId}
           open={createOpen}
           onOpenChange={setCreateOpen}
-          onCreated={(created) =>
-            setRevealSecret({ ...created, kind: "create" })
-          }
+          onCreated={(created) => setRevealSecret({ ...created, kind: "create" })}
         />
       )}
       <VirtualKeySecretReveal
@@ -758,12 +719,7 @@ function GatewayCapabilityPreview() {
           preview
         </Badge>
       </HStack>
-      <Box
-        borderWidth="1px"
-        borderColor="border.subtle"
-        borderRadius="md"
-        padding={3}
-      >
+      <Box borderWidth="1px" borderColor="border.subtle" borderRadius="md" padding={3}>
         <VStack align="stretch" gap={3}>
           {rows.map((row) => (
             <HStack key={row.label} align="start" gap={3}>

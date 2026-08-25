@@ -61,9 +61,9 @@ describe("evaluateRules", () => {
       expect(
         evaluateRules(rules, { projectId: "proj_a", organizationId: "org_b" }),
       ).toBeNull();
-      expect(
-        evaluateRules(rules, { projectId: "proj_a", organizationId: "org_a" }),
-      ).toBe(true);
+      expect(evaluateRules(rules, { projectId: "proj_a", organizationId: "org_a" })).toBe(
+        true,
+      );
     });
   });
 

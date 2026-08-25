@@ -16,9 +16,7 @@ const internalIdentitySchema = z
   .strict();
 
 export const storedObjectsMetadataInputSchema = internalIdentitySchema;
-export type StoredObjectsMetadataInput = z.infer<
-  typeof storedObjectsMetadataInputSchema
->;
+export type StoredObjectsMetadataInput = z.infer<typeof storedObjectsMetadataInputSchema>;
 export const storedObjectsMetadataOutputSchema = storedObjectMetadataSchema;
 export type StoredObjectsMetadataOutput = z.infer<
   typeof storedObjectsMetadataOutputSchema
@@ -42,11 +40,8 @@ export const storedObjectsDeliveryInputSchema = z
     audience: storedObjectDeliveryAudienceSchema,
   })
   .strict();
-export type StoredObjectsDeliveryInput = z.infer<
-  typeof storedObjectsDeliveryInputSchema
->;
-export const storedObjectsDeliveryOutputSchema =
-  storedObjectDeliveryCapabilitySchema;
+export type StoredObjectsDeliveryInput = z.infer<typeof storedObjectsDeliveryInputSchema>;
+export const storedObjectsDeliveryOutputSchema = storedObjectDeliveryCapabilitySchema;
 export type StoredObjectsDeliveryOutput = z.infer<
   typeof storedObjectsDeliveryOutputSchema
 >;

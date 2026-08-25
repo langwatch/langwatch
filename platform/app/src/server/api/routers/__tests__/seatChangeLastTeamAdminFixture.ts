@@ -32,9 +32,7 @@ import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { AppOrganizationRuntime } from "~/runtime/app/features/organization";
 
-export type SeatChangeFixture = Awaited<
-  ReturnType<typeof createSeatChangeFixture>
->;
+export type SeatChangeFixture = Awaited<ReturnType<typeof createSeatChangeFixture>>;
 
 /** Everything the fixture wrote, and everything a suite reads it back by. */
 type SeatChangeSeed = {
@@ -54,13 +52,7 @@ type SeatChangeSeed = {
 
 type SeatChangeMembers = Awaited<ReturnType<typeof createMembers>>;
 
-async function createMembers({
-  prisma,
-  ns,
-}: {
-  prisma: PrismaClient;
-  ns: string;
-}) {
+async function createMembers({ prisma, ns }: { prisma: PrismaClient; ns: string }) {
   const adminEmail = `${ns}-admin@example.com`;
 
   const [admin, solo, companion] = await Promise.all([

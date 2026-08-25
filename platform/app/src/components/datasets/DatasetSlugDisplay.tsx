@@ -1,16 +1,6 @@
-import {
-  Box,
-  type BoxProps,
-  Field,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, type BoxProps, Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { useCallback } from "react";
-import {
-  SlugChangeWarningAlert,
-  SlugConflictAlert,
-} from "@langwatch/dataset-web";
+import { SlugChangeWarningAlert, SlugConflictAlert } from "@langwatch/dataset-web";
 import { CopyButton } from "../CopyButton";
 import type { SlugValidationResult } from "./useDatasetSlugValidation";
 

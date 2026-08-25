@@ -459,12 +459,8 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           virtualKeyId: VK_SHARED_ID,
         },
       });
-      const filtered = resolved.find(
-        (r) => r.budget.id === BUDGET_PROJECT_OPENAI_ID,
-      )!;
-      const unfiltered = resolved.find(
-        (r) => r.budget.id === BUDGET_PROJECT_ALL_ID,
-      )!;
+      const filtered = resolved.find((r) => r.budget.id === BUDGET_PROJECT_OPENAI_ID)!;
+      const unfiltered = resolved.find((r) => r.budget.id === BUDGET_PROJECT_ALL_ID)!;
       // Same target, different bucket: otherwise each would report the
       // other's spend.
       expect(filtered.bucketScopeId).not.toBe(unfiltered.bucketScopeId);
@@ -530,18 +526,11 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("ships provider_key, the group bucket and routing_mode", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
-      const bundle = await new GatewayConfigMaterialiser(
-        prisma,
-        null,
-      ).materialise(vk!);
+      const bundle = await new GatewayConfigMaterialiser(prisma, null).materialise(vk!);
 
-      const openAiBudget = bundle.budgets.find(
-        (b) => b.id === BUDGET_PROJECT_OPENAI_ID,
-      );
+      const openAiBudget = bundle.budgets.find((b) => b.id === BUDGET_PROJECT_OPENAI_ID);
       expect(openAiBudget?.provider_key).toBe(MP_OPENAI_ID);
-      const allBudget = bundle.budgets.find(
-        (b) => b.id === BUDGET_PROJECT_ALL_ID,
-      );
+      const allBudget = bundle.budgets.find((b) => b.id === BUDGET_PROJECT_ALL_ID);
       expect(allBudget?.provider_key).toBeNull();
 
       const groupBudget = bundle.budgets.find((b) => b.id === BUDGET_GROUP_ID);
@@ -590,10 +579,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
-      const bundle = await new GatewayConfigMaterialiser(
-        prisma,
-        chRepo,
-      ).materialise(vk!);
+      const bundle = await new GatewayConfigMaterialiser(prisma, chRepo).materialise(vk!);
 
       const groupBudget = bundle.budgets.find((b) => b.id === BUDGET_GROUP_ID);
       // The gateway enforces spent >= limit on exactly this bucket. Reading
@@ -675,10 +661,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("pins max_attempts to 1 when routing mode is NONE", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
-      const bundle = await new GatewayConfigMaterialiser(
-        prisma,
-        null,
-      ).materialise(vk!);
+      const bundle = await new GatewayConfigMaterialiser(prisma, null).materialise(vk!);
       expect(bundle.fallback.max_attempts).toBe(1);
 
       await prisma.virtualKey.update({
@@ -699,10 +682,9 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("filters providers[] by providers_allowed and keeps All open-ended", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const openVk = await repo.findById(VK_SHARED_ID, ORG_ID);
-      const openBundle = await new GatewayConfigMaterialiser(
-        prisma,
-        null,
-      ).materialise(openVk!);
+      const openBundle = await new GatewayConfigMaterialiser(prisma, null).materialise(
+        openVk!,
+      );
       expect(openBundle.providers_allowed).toBeNull();
       expect(openBundle.providers.map((p) => p.id).sort()).toEqual(
         [MP_ANTHROPIC_ID, MP_OPENAI_ID].sort(),
@@ -740,10 +722,9 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // The key was created before this provider existed and was never
       // edited: leaving the list open has to mean future providers too,
       // otherwise "all" is only ever a snapshot of creation day.
-      const openBundle = await new GatewayConfigMaterialiser(
-        prisma,
-        null,
-      ).materialise((await repo.findById(VK_SHARED_ID, ORG_ID))!);
+      const openBundle = await new GatewayConfigMaterialiser(prisma, null).materialise(
+        (await repo.findById(VK_SHARED_ID, ORG_ID))!,
+      );
       expect(openBundle.providers.map((p) => p.id)).toContain(lateProviderId);
 
       await prisma.virtualKey.update({
@@ -754,9 +735,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
         prisma,
         null,
       ).materialise((await repo.findById(VK_SHARED_ID, ORG_ID))!);
-      expect(narrowedBundle.providers.map((p) => p.id)).not.toContain(
-        lateProviderId,
-      );
+      expect(narrowedBundle.providers.map((p) => p.id)).not.toContain(lateProviderId);
     });
   });
 
@@ -785,14 +764,8 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       expect(budget!.window).toBe("DAY");
       expect(budget!.archivedAt).toBeNull();
       // The cap has to reach the gateway, not just the database.
-      const bundle = await new GatewayConfigMaterialiser(
-        prisma,
-        null,
-      ).materialise(
-        (await new VirtualKeyRepository(prisma).findById(
-          virtualKey.id,
-          ORG_ID,
-        ))!,
+      const bundle = await new GatewayConfigMaterialiser(prisma, null).materialise(
+        (await new VirtualKeyRepository(prisma).findById(virtualKey.id, ORG_ID))!,
       );
       expect(bundle.budgets.map((b) => b.id)).toContain(budget!.id);
     });
@@ -1186,8 +1159,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           where: { id: virtualKey.id },
         });
         expect(
-          (stored?.config as { providersAllowed?: string[] } | null)
-            ?.providersAllowed,
+          (stored?.config as { providersAllowed?: string[] } | null)?.providersAllowed,
         ).toContain(MP_ANTHROPIC_ID);
       } finally {
         await prisma.routingPolicyScope.deleteMany({

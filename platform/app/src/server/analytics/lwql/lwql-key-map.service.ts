@@ -23,10 +23,7 @@ export class LwqlKeyMapService {
    * Best-effort synchronization. The deploy-time backfill repairs any missed
    * row, so project creation must not fail when ClickHouse is unavailable.
    */
-  async syncProject(input: {
-    projectId: string;
-    lwqlKey: string | null;
-  }): Promise<void> {
+  async syncProject(input: { projectId: string; lwqlKey: string | null }): Promise<void> {
     const connection = lwqlConnectionFromEnv();
     if (!connection) return;
 

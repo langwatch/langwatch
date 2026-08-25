@@ -92,14 +92,8 @@ export async function recordRealtimeSessionSpan(params: {
     attr(ATTR.LANGWATCH_SPAN_COST, params.costNanoUsd / 1_000_000_000),
     attr(ATTR.GEN_AI_USAGE_INPUT_TOKENS, params.usage.input_tokens ?? 0),
     attr(ATTR.GEN_AI_USAGE_OUTPUT_TOKENS, params.usage.output_tokens ?? 0),
-    attr(
-      ATTR.GEN_AI_USAGE_INPUT_AUDIO_TOKENS,
-      params.usage.input_audio_tokens ?? 0,
-    ),
-    attr(
-      ATTR.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS,
-      params.usage.output_audio_tokens ?? 0,
-    ),
+    attr(ATTR.GEN_AI_USAGE_INPUT_AUDIO_TOKENS, params.usage.input_audio_tokens ?? 0),
+    attr(ATTR.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS, params.usage.output_audio_tokens ?? 0),
     attr(ATTR.GEN_AI_USAGE_AUDIO_SECONDS, (params.usage.audio_ms ?? 0) / 1000),
     attr("langwatch.virtual_key_id", session.virtualKeyId),
     attr("langwatch.gateway_request_id", session.id),

@@ -11,13 +11,7 @@
  * Spec: specs/ai-gateway/virtual-keys.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
@@ -167,15 +161,9 @@ describe("virtual keys status column", () => {
     /** @scenario "A key past its expiration date is badged Expired" */
     it("badges it expired, and leaves a key with time left active", () => {
       renderPage();
-      expect(screen.getByTestId("vk-status-vk-expired")).toHaveTextContent(
-        "expired",
-      );
-      expect(screen.getByTestId("vk-status-vk-future")).toHaveTextContent(
-        "active",
-      );
-      expect(screen.getByTestId("vk-status-vk-live")).toHaveTextContent(
-        "active",
-      );
+      expect(screen.getByTestId("vk-status-vk-expired")).toHaveTextContent("expired");
+      expect(screen.getByTestId("vk-status-vk-future")).toHaveTextContent("active");
+      expect(screen.getByTestId("vk-status-vk-live")).toHaveTextContent("active");
     });
 
     /** @scenario "A key past its expiration date is badged Expired" */
@@ -190,13 +178,9 @@ describe("virtual keys status column", () => {
       await userEvent.click(screen.getByRole("tab", { name: /Revoked/ }));
 
       await waitFor(() =>
-        expect(screen.getByTestId("vk-status-vk-gone")).toHaveTextContent(
-          "revoked",
-        ),
+        expect(screen.getByTestId("vk-status-vk-gone")).toHaveTextContent("revoked"),
       );
-      expect(screen.getByTestId("vk-status-vk-gone")).not.toHaveTextContent(
-        "expired",
-      );
+      expect(screen.getByTestId("vk-status-vk-gone")).not.toHaveTextContent("expired");
     });
   });
 
@@ -204,16 +188,10 @@ describe("virtual keys status column", () => {
     /** @scenario "A disabled key is listed with the active keys and keeps its actions" */
     it("lists it with the live keys, badged disabled", () => {
       renderPage();
-      expect(screen.getByTestId("vk-status-vk-paused")).toHaveTextContent(
-        "disabled",
-      );
+      expect(screen.getByTestId("vk-status-vk-paused")).toHaveTextContent("disabled");
       // Four live keys, one revoked: the counts are what the tabs claim.
-      expect(screen.getByRole("tab", { name: /Active/ })).toHaveTextContent(
-        "4",
-      );
-      expect(screen.getByRole("tab", { name: /Revoked/ })).toHaveTextContent(
-        "1",
-      );
+      expect(screen.getByRole("tab", { name: /Active/ })).toHaveTextContent("4");
+      expect(screen.getByRole("tab", { name: /Revoked/ })).toHaveTextContent("1");
     });
 
     /** @scenario "A disabled key is listed with the active keys and keeps its actions" */
@@ -228,9 +206,7 @@ describe("virtual keys status column", () => {
         within(row as HTMLElement).getByRole("button", { name: "Actions" }),
       );
 
-      await waitFor(() =>
-        expect(screen.getByText("Details")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText("Details")).toBeInTheDocument());
       expect(screen.getByText("View traces")).toBeInTheDocument();
       expect(screen.getByText("Revoke")).toBeInTheDocument();
       expect(screen.queryByText("Edit")).not.toBeInTheDocument();

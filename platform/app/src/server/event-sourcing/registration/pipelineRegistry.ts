@@ -363,10 +363,7 @@ export interface PipelineRegistryDeps {
     /** Runs one clustering page (the ADR-051 effect's domain function). */
     runPort: TopicClusteringRunPort;
   };
-  enterprisePipelines: Omit<
-    AppGovernanceEventingAdapterOptions,
-    "eventSourcing"
-  >;
+  enterprisePipelines: Omit<AppGovernanceEventingAdapterOptions, "eventSourcing">;
   projects: ProjectService;
   monitors: MonitorService;
   automation: AutomationService;
@@ -503,15 +500,11 @@ export class PipelineRegistry {
       createProcessManagerMaintenancePipeline({
         retentionSweep: {
           deleteDispatchedOutboxBatch: (params) =>
-            this.deps.repositories.processStore.deleteDispatchedOutboxBatch(
-              params,
-            ),
+            this.deps.repositories.processStore.deleteDispatchedOutboxBatch(params),
           deleteDeadOutboxBatch: (params) =>
             this.deps.repositories.processStore.deleteDeadOutboxBatch(params),
           deleteConsumedInboxBatch: (params) =>
-            this.deps.repositories.processStore.deleteConsumedInboxBatch(
-              params,
-            ),
+            this.deps.repositories.processStore.deleteConsumedInboxBatch(params),
         },
       }),
     );
@@ -522,8 +515,7 @@ export class PipelineRegistry {
     this.deps.eventSourcing.register(
       createLangyMaintenancePipeline({
         sessionKeyReap: {
-          reap: () =>
-            reapExpiredLangySessionApiKeys({ prisma: this.deps.prisma }),
+          reap: () => reapExpiredLangySessionApiKeys({ prisma: this.deps.prisma }),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
@@ -541,9 +533,7 @@ export class PipelineRegistry {
             recheck: () => github.recheckDueBranches(),
             prune: () => github.pruneStaleBranchLinkage(),
             deleteDispatchedBefore: (params) =>
-              this.deps.repositories.processStore.deleteDispatchedBefore(
-                params,
-              ),
+              this.deps.repositories.processStore.deleteDispatchedBefore(params),
           },
         }),
       );
@@ -593,13 +583,12 @@ export class PipelineRegistry {
       evalPipeline,
       traceSummaryStore,
       automations: {
-          triggerMatchHandler: AppGovernanceSubscriberAdapter.create()
-          .traceAlerts({
-            triggers: this.deps.automation,
-            matches: {
-              send: automationCommands.recordTriggerMatch,
-            },
-          }),
+        triggerMatchHandler: AppGovernanceSubscriberAdapter.create().traceAlerts({
+          triggers: this.deps.automation,
+          matches: {
+            send: automationCommands.recordTriggerMatch,
+          },
+        }),
         graphActivityHandler,
       },
       codingAgentSubscribers: [
@@ -623,8 +612,7 @@ export class PipelineRegistry {
     });
     const { pipeline: langyConversationPipeline } =
       this.registerLangyConversationPipeline();
-    const { pipeline: topicClusteringPipeline } =
-      this.registerTopicClusteringPipeline();
+    const { pipeline: topicClusteringPipeline } = this.registerTopicClusteringPipeline();
     const enterprisePipelines = AppGovernanceEventingAdapter.create({
       ...this.deps.enterprisePipelines,
       eventSourcing: this.deps.eventSourcing,
@@ -638,9 +626,7 @@ export class PipelineRegistry {
     // these commands; every other organization still takes the imperative
     // Prisma path, and an operator's `rolled_back` flip returns one there
     // with no deploy.
-    const authzPipeline = this.deps.eventSourcing.register(
-      this.deps.authz.pipeline,
-    );
+    const authzPipeline = this.deps.eventSourcing.register(this.deps.authz.pipeline);
     this.deps.authz.connect(authzPipeline.commands);
 
     logger.info("All pipelines registered");
@@ -664,9 +650,7 @@ export class PipelineRegistry {
     };
   }
 
-  getGovernanceLifecycle(): NonNullable<
-    PipelineRegistry["governanceLifecycle"]
-  > {
+  getGovernanceLifecycle(): NonNullable<PipelineRegistry["governanceLifecycle"]> {
     if (!this.governanceLifecycle) {
       throw new Error("Governance pipelines have not been registered");
     }
@@ -687,10 +671,8 @@ export class PipelineRegistry {
 
     const pipeline = this.deps.eventSourcing.register(
       createTopicClusteringProcessingPipeline({
-        topicClusteringRunStatusStore:
-          this.deps.repositories.topicClusteringRunStatus,
-        topicClusteringRunHistoryStore:
-          this.deps.repositories.topicClusteringRunHistory,
+        topicClusteringRunStatusStore: this.deps.repositories.topicClusteringRunStatus,
+        topicClusteringRunHistoryStore: this.deps.repositories.topicClusteringRunHistory,
         topicModelStore: this.deps.repositories.topicModel,
         dispatch: {
           runPort: this.deps.topicClustering.runPort,
@@ -708,12 +690,9 @@ export class PipelineRegistry {
 
     const commands = mapCommands(pipeline.commands);
     outcomeCommands = {
-      recordClusteringRunStarted: (args) =>
-        commands.recordClusteringRunStarted(args),
-      recordClusteringRunCompleted: (args) =>
-        commands.recordClusteringRunCompleted(args),
-      recordClusteringRunFailed: (args) =>
-        commands.recordClusteringRunFailed(args),
+      recordClusteringRunStarted: (args) => commands.recordClusteringRunStarted(args),
+      recordClusteringRunCompleted: (args) => commands.recordClusteringRunCompleted(args),
+      recordClusteringRunFailed: (args) => commands.recordClusteringRunFailed(args),
     };
     // Level-triggered bootstrap: the projectMetadata subscriber asks on every
     // real ingest, and this claim keeps that to one commit per project per
@@ -806,15 +785,13 @@ export class PipelineRegistry {
       worker: this.deps.langy.worker,
       handoffStore: this.deps.langy.handoffStore,
     });
-    const broadcastSubscriber =
-      createLangyConversationUpdateBroadcastSubscriber({
-        broadcast: this.deps.broadcast,
-        conversations: conversationReader,
-      });
-    const admissionLifecycleSubscriber =
-      createLangyTurnAdmissionLifecycleSubscriber({
-        admissions: this.deps.repositories.langyTurnAdmission,
-      });
+    const broadcastSubscriber = createLangyConversationUpdateBroadcastSubscriber({
+      broadcast: this.deps.broadcast,
+      conversations: conversationReader,
+    });
+    const admissionLifecycleSubscriber = createLangyTurnAdmissionLifecycleSubscriber({
+      admissions: this.deps.repositories.langyTurnAdmission,
+    });
 
     const pipeline = this.deps.eventSourcing.register(
       createLangyConversationProcessingPipeline({
@@ -863,20 +840,14 @@ export class PipelineRegistry {
   private registerMetricPipeline({
     subscribers,
   }: {
-    subscribers: Parameters<
-      typeof createMetricProcessingPipeline
-    >[0]["subscribers"];
+    subscribers: Parameters<typeof createMetricProcessingPipeline>[0]["subscribers"];
   }) {
     const repository = this.deps.repositories.metricDataPointStorage;
     return this.deps.eventSourcing.register(
       createMetricProcessingPipeline({
         metricDataPointAppendStore: new MetricDataPointAppendStore(repository),
-        metricSeriesCatalogAppendStore: new MetricSeriesCatalogAppendStore(
-          repository,
-        ),
-        metricTimeRollupAppendStore: new MetricTimeRollupAppendStore(
-          repository,
-        ),
+        metricSeriesCatalogAppendStore: new MetricSeriesCatalogAppendStore(repository),
+        metricTimeRollupAppendStore: new MetricTimeRollupAppendStore(repository),
         metricCommandShardCount: resolveMetricCommandShardCount(
           process.env.METRIC_PROCESSING_SHARDS,
         ),
@@ -901,9 +872,7 @@ export class PipelineRegistry {
     return this.deps.eventSourcing.register(
       createGovernanceEventsPipeline({
         webhookDelivery: this.deps.webhookDelivery
-          ? AppGovernanceWebhookAdapter.create(
-              this.deps.webhookDelivery,
-            ).build()
+          ? AppGovernanceWebhookAdapter.create(this.deps.webhookDelivery).build()
           : undefined,
       }),
     );
@@ -993,30 +962,25 @@ export class PipelineRegistry {
         // coding_agent_sessions (store.get() → findBySessionId → decode row).
         // The delivery path never reads event_log. Same wiring as trace_summaries.
         codingAgentSessionStore: this.cached<CodingAgentSessionState>(
-          new CodingAgentSessionStore(
-            this.deps.repositories.codingAgentSession,
-            {
-              // The Sessions-destination stamp, inline at the commit seam with
-              // its own per-process window — a read-model write, not a subscriber.
-              onSessionsStored: createCodingAgentSessionSeenTouch({
-                touchCodingAgentSessionSeen: (params) =>
-                  this.deps.projects.touchCodingAgentSessionSeen(params),
-              }),
-            },
-          ),
+          new CodingAgentSessionStore(this.deps.repositories.codingAgentSession, {
+            // The Sessions-destination stamp, inline at the commit seam with
+            // its own per-process window — a read-model write, not a subscriber.
+            onSessionsStored: createCodingAgentSessionSeenTouch({
+              touchCodingAgentSessionSeen: (params) =>
+                this.deps.projects.touchCodingAgentSessionSeen(params),
+            }),
+          }),
           "coding_agent_sessions",
         ),
-        codingAgentTraceSessionAppendStore:
-          new CodingAgentTraceSessionAppendStore(
-            this.deps.repositories.codingAgentTraceSession,
-          ),
+        codingAgentTraceSessionAppendStore: new CodingAgentTraceSessionAppendStore(
+          this.deps.repositories.codingAgentTraceSession,
+        ),
         sessionMetricSeriesAppendStore: new SessionMetricSeriesAppendStore(
           this.deps.repositories.sessionMetricSeries,
         ),
-        codingAgentSessionEventsAppendStore:
-          new CodingAgentSessionEventsAppendStore(
-            this.deps.repositories.codingAgentSessionEvents,
-          ),
+        codingAgentSessionEventsAppendStore: new CodingAgentSessionEventsAppendStore(
+          this.deps.repositories.codingAgentSessionEvents,
+        ),
         ...(this.deps.codingAgent
           ? {
               pullRequestMappingHandler: createPullRequestMappingHandler(
@@ -1031,9 +995,7 @@ export class PipelineRegistry {
   private registerLogPipeline({
     subscribers,
   }: {
-    subscribers: Parameters<
-      typeof createLogProcessingPipeline
-    >[0]["subscribers"];
+    subscribers: Parameters<typeof createLogProcessingPipeline>[0]["subscribers"];
   }) {
     return this.deps.eventSourcing.register(
       createLogProcessingPipeline({
@@ -1067,13 +1029,10 @@ export class PipelineRegistry {
       // catches a rejection here and stays on the shipped default (recovery
       // ACTIVE) — an unreadable kill switch must not fail evaluations.
       isSettingsRecoveryDisabled: () =>
-        featureFlagService.isEnabled(
-          "ops_evaluator_settings_recovery_disabled",
-          {
-            distinctId: "evaluator-settings-recovery",
-            defaultValue: false,
-          },
-        ),
+        featureFlagService.isEnabled("ops_evaluator_settings_recovery_disabled", {
+          distinctId: "evaluator-settings-recovery",
+          defaultValue: false,
+        }),
       // ADR-040: offload oversized evaluator inputs to durable object storage
       // before the event is built. ON by default (this bounds the fat-payload
       // class behind the 2026-07-10 outage); the SYSTEM flag
@@ -1127,15 +1086,12 @@ export class PipelineRegistry {
         // 00056) rather than re-folding the event log. Same wiring as
         // trace_analytics.
         evaluationAnalyticsStore: this.cached<EvaluationAnalyticsData>(
-          new EvaluationAnalyticsStore(
-            this.deps.repositories.evaluationAnalytics,
-          ),
+          new EvaluationAnalyticsStore(this.deps.repositories.evaluationAnalytics),
           "evaluation_analytics",
         ),
-        evaluationAnalyticsRollupAppendStore:
-          new EvaluationAnalyticsRollupAppendStore(
-            this.deps.repositories.evaluationAnalyticsRollup,
-          ),
+        evaluationAnalyticsRollupAppendStore: new EvaluationAnalyticsRollupAppendStore(
+          this.deps.repositories.evaluationAnalyticsRollup,
+        ),
         executeEvaluationCommand,
         automations,
       }),
@@ -1156,9 +1112,9 @@ export class PipelineRegistry {
     const evalCommands = mapCommands(evalPipeline.commands);
 
     // Deferred dispatchers — resolved after pipeline registration.
-    const resolveOrigin = new Deferred<
-      CommandDispatcher<ResolveOriginCommandData>
-    >("resolveOrigin");
+    const resolveOrigin = new Deferred<CommandDispatcher<ResolveOriginCommandData>>(
+      "resolveOrigin",
+    );
     const scheduleDeferred = new Deferred<
       (payload: DeferredOriginPayload) => Promise<void>
     >("scheduleDeferred");
@@ -1229,9 +1185,7 @@ export class PipelineRegistry {
       },
       lookupExperimentId: async (tenantId, runId) => {
         if (!expLookupExperimentId) {
-          logger.warn(
-            "experiment lookupExperimentId not yet initialized, skipping",
-          );
+          logger.warn("experiment lookupExperimentId not yet initialized, skipping");
           return null;
         }
         return expLookupExperimentId(tenantId, runId);
@@ -1242,9 +1196,7 @@ export class PipelineRegistry {
     // OSS pipeline definition stays free of `@ee` imports.
     const governanceSubscribers = AppGovernanceSubscriberAdapter.create();
     const governanceKpis = this.deps.governanceKpisSync
-      ? governanceSubscribers.kpis(
-          this.deps.governanceKpisSync.governanceKpisRepository,
-        )
+      ? governanceSubscribers.kpis(this.deps.governanceKpisSync.governanceKpisRepository)
       : undefined;
     const governanceKpisSync = governanceKpis
       ? {
@@ -1335,23 +1287,22 @@ export class PipelineRegistry {
     // Wire the deferred origin resolution queue (GroupQueue-backed, survives process restart).
     // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → subscriber.
     const deferredOriginHandler = createDeferredOriginHandler(resolveOrigin.fn);
-    const deferredOriginQueue =
-      tracePipeline.service.registerJob<DeferredOriginPayload>({
-        name: "deferredOriginResolution",
-        process: deferredOriginHandler,
-        delay: DEFERRED_CHECK_DELAY_MS,
-        deduplication: {
-          makeId: makeDeferredJobId,
-          ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000, // 6 min — covers the 5-min delay + buffer
-          extend: false, // Don't reset the 5-min timer on new spans
-          replace: false, // Don't update payload (same trace, same data)
-        },
-        groupKeyFn: (p) => p.traceId, // Per-trace parallelism (framework prepends tenantId)
-        spanAttributes: (payload) => ({
-          "deferred.tenant_id": payload.tenantId,
-          "deferred.trace_id": payload.traceId,
-        }),
-      });
+    const deferredOriginQueue = tracePipeline.service.registerJob<DeferredOriginPayload>({
+      name: "deferredOriginResolution",
+      process: deferredOriginHandler,
+      delay: DEFERRED_CHECK_DELAY_MS,
+      deduplication: {
+        makeId: makeDeferredJobId,
+        ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000, // 6 min — covers the 5-min delay + buffer
+        extend: false, // Don't reset the 5-min timer on new spans
+        replace: false, // Don't update payload (same trace, same data)
+      },
+      groupKeyFn: (p) => p.traceId, // Per-trace parallelism (framework prepends tenantId)
+      spanAttributes: (payload) => ({
+        "deferred.tenant_id": payload.tenantId,
+        "deferred.trace_id": payload.traceId,
+      }),
+    });
 
     if (deferredOriginQueue) {
       scheduleDeferred.resolve((payload) => deferredOriginQueue.send(payload));
@@ -1402,10 +1353,7 @@ export class PipelineRegistry {
         computeExperimentRunMetrics: (
           data: ComputeExperimentRunMetricsCommandData,
         ) => Promise<void>;
-        lookupExperimentId: (
-          tenantId: string,
-          runId: string,
-        ) => Promise<string | null>;
+        lookupExperimentId: (tenantId: string, runId: string) => Promise<string | null>;
       }) => {
         expComputeRunMetrics = deps.computeExperimentRunMetrics;
         expLookupExperimentId = deps.lookupExperimentId;
@@ -1434,9 +1382,7 @@ export class PipelineRegistry {
   }: {
     suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-    simComputeRunMetrics: Deferred<
-      CommandDispatcher<ComputeRunMetricsCommandData>
-    >;
+    simComputeRunMetrics: Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>;
   }) {
     const simulationRunStore = this.cached<SimulationRunStateData>(
       new RepositoryFoldStore<SimulationRunStateData>(
@@ -1461,13 +1407,11 @@ export class PipelineRegistry {
     >("scheduleRetry");
     // The process manager's finish intent reports through this same
     // pipeline's commands, which exist only after `.build()`.
-    const selfExecutionCommands = new Deferred<
-      () => SimulationRunExecutionCommands
-    >("selfExecutionCommands");
-
-    const traceReadDerivation = new TraceReadDerivationService(
-      this.deps.traces.spans,
+    const selfExecutionCommands = new Deferred<() => SimulationRunExecutionCommands>(
+      "selfExecutionCommands",
     );
+
+    const traceReadDerivation = new TraceReadDerivationService(this.deps.traces.spans);
     const computeRunMetricsCommand = new ComputeRunMetricsCommand({
       traceSummaryStore,
       scheduleRetry: scheduleRetry.fn,
@@ -1493,8 +1437,7 @@ export class PipelineRegistry {
     const simulationPipeline = this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
-        simulationRunMetricsStore:
-          this.deps.repositories.simulationRunMetricsStore,
+        simulationRunMetricsStore: this.deps.repositories.simulationRunMetricsStore,
         finishRunCommand,
         computeRunMetricsCommand,
         simulationRunExecution: {
@@ -1604,17 +1547,14 @@ export class PipelineRegistry {
     >["wireExperimentDeps"];
   }) {
     const experimentRunStore = this.cached<ExperimentRunStateData>(
-      createExperimentRunStateFoldStore(
-        this.deps.repositories.experimentRunState,
-      ),
+      createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState),
       "experiment_runs",
     );
 
     const experimentRunPipeline = this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({
         experimentRunStateFoldStore: experimentRunStore,
-        experimentRunItemAppendStore:
-          this.deps.repositories.experimentRunItemStorage,
+        experimentRunItemAppendStore: this.deps.repositories.experimentRunItemStorage,
       }),
     );
 
@@ -1629,9 +1569,10 @@ export class PipelineRegistry {
       runId: string,
     ): Promise<string | null> => {
       try {
-        return await this.deps.repositories.experimentIdLookup.findExperimentId(
-          { tenantId, runId },
-        );
+        return await this.deps.repositories.experimentIdLookup.findExperimentId({
+          tenantId,
+          runId,
+        });
       } catch (error) {
         logger.warn(
           { tenantId, runId, error },
@@ -1690,49 +1631,41 @@ export interface DejaViewProjection {
   apply: (state: unknown, event: { type: string }) => unknown;
 }
 
-function getDefinitions(): ReadonlyArray<
-  StaticPipelineDefinition<any, any, any>
-> {
+function getDefinitions(): ReadonlyArray<StaticPipelineDefinition<any, any, any>> {
   return getApp().eventSourcing?.definitions ?? [];
 }
 
 export function getProjectionMetadata(): ProjectionMetadata[] {
   return getDefinitions().flatMap((def) => {
     const { name: pipelineName, aggregateType } = def.metadata;
-    const folds = Array.from(def.foldProjections.values()).map(
-      ({ definition }) => ({
-        projectionName: definition.name,
-        pipelineName,
-        aggregateType,
-        source: "pipeline" as const,
-        pauseKey: `${pipelineName}/projection/${definition.name}`,
-        kind: "fold" as const,
-      }),
-    );
-    const maps = Array.from(def.mapProjections.values()).map(
-      ({ definition }) => ({
-        projectionName: definition.name,
-        pipelineName,
-        aggregateType,
-        source: "pipeline" as const,
-        // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
-        // entry must use the `handler` segment to match the dispatcher's Lua check.
-        pauseKey: `${pipelineName}/handler/${definition.name}`,
-        kind: "map" as const,
-      }),
-    );
-    const states = Array.from(def.stateProjections?.entries() ?? []).map(
-      ([name]) => ({
-        projectionName: name,
-        pipelineName,
-        aggregateType,
-        source: "pipeline" as const,
-        // State projections enqueue with `__jobType=stateProjection`; the
-        // dispatcher matches the pause key against that raw segment.
-        pauseKey: `${pipelineName}/stateProjection/${name}`,
-        kind: "state" as const,
-      }),
-    );
+    const folds = Array.from(def.foldProjections.values()).map(({ definition }) => ({
+      projectionName: definition.name,
+      pipelineName,
+      aggregateType,
+      source: "pipeline" as const,
+      pauseKey: `${pipelineName}/projection/${definition.name}`,
+      kind: "fold" as const,
+    }));
+    const maps = Array.from(def.mapProjections.values()).map(({ definition }) => ({
+      projectionName: definition.name,
+      pipelineName,
+      aggregateType,
+      source: "pipeline" as const,
+      // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
+      // entry must use the `handler` segment to match the dispatcher's Lua check.
+      pauseKey: `${pipelineName}/handler/${definition.name}`,
+      kind: "map" as const,
+    }));
+    const states = Array.from(def.stateProjections?.entries() ?? []).map(([name]) => ({
+      projectionName: name,
+      pipelineName,
+      aggregateType,
+      source: "pipeline" as const,
+      // State projections enqueue with `__jobType=stateProjection`; the
+      // dispatcher matches the pause key against that raw segment.
+      pauseKey: `${pipelineName}/stateProjection/${name}`,
+      kind: "state" as const,
+    }));
     return [...folds, ...maps, ...states];
   });
 }
@@ -1823,8 +1756,7 @@ export function getDejaViewProjections(): DejaViewProjection[] {
       projectionName: d.name,
       eventTypes: d.eventTypes,
       init: () => d.init(),
-      apply: (state: unknown, event: { type: string }) =>
-        d.apply(state, event as any),
+      apply: (state: unknown, event: { type: string }) => d.apply(state, event as any),
     })),
   );
 }

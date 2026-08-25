@@ -31,9 +31,7 @@ describe("<ToolPairCard />", () => {
 
     /** @scenario "A skill run without a resolvable slug falls back to a bare label" */
     it("falls back to the bare Skill label when no slug is present", () => {
-      renderWithProviders(
-        <ToolPairCard name="Skill" input={{}} result={null} />,
-      );
+      renderWithProviders(<ToolPairCard name="Skill" input={{}} result={null} />);
 
       expect(screen.getByText("Skill")).toBeInTheDocument();
     });
@@ -43,11 +41,7 @@ describe("<ToolPairCard />", () => {
     /** @scenario "An ordinary tool call is not treated as a skill" */
     it("renders the tool name plainly, not as a skill", () => {
       renderWithProviders(
-        <ToolPairCard
-          name="Bash"
-          input={{ command: "ls -la" }}
-          result={null}
-        />,
+        <ToolPairCard name="Bash" input={{ command: "ls -la" }} result={null} />,
       );
 
       expect(screen.getByText("Bash")).toBeInTheDocument();

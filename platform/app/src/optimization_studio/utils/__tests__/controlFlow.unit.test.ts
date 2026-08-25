@@ -64,14 +64,10 @@ describe("controlFlow helpers", () => {
   describe("nodeHasGateInput", () => {
     it("detects an existing gate input", () => {
       expect(
-        nodeHasGateInput(
-          node("c", "code", [{ identifier: "gate", type: "bool" }]),
-        ),
+        nodeHasGateInput(node("c", "code", [{ identifier: "gate", type: "bool" }])),
       ).toBe(true);
       expect(
-        nodeHasGateInput(
-          node("c", "code", [{ identifier: "question", type: "str" }]),
-        ),
+        nodeHasGateInput(node("c", "code", [{ identifier: "question", type: "str" }])),
       ).toBe(false);
     });
   });
@@ -80,9 +76,7 @@ describe("controlFlow helpers", () => {
     /** @scenario The temporary gate is not offered when the node already has one */
     it("offers a temporary gate only to connectable nodes without one", () => {
       const sourceId = "gate";
-      expect(showsTemporaryGate({ node: node("code", "code"), sourceId })).toBe(
-        true,
-      );
+      expect(showsTemporaryGate({ node: node("code", "code"), sourceId })).toBe(true);
       // already has a gate input
       expect(
         showsTemporaryGate({
@@ -95,9 +89,7 @@ describe("controlFlow helpers", () => {
         showsTemporaryGate({ node: node("gate", "if_else"), sourceId: "gate" }),
       ).toBe(false);
       // entry / prompting_technique are excluded
-      expect(
-        showsTemporaryGate({ node: node("entry", "entry"), sourceId }),
-      ).toBe(false);
+      expect(showsTemporaryGate({ node: node("entry", "entry"), sourceId })).toBe(false);
       expect(
         showsTemporaryGate({
           node: node("pt", "prompting_technique"),

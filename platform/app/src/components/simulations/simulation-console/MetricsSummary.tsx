@@ -24,11 +24,7 @@ export function MetricsSummary({ results, durationInMs }: MetricsSummaryProps) {
       <HStack>
         <Text color="white">Success Criteria:</Text>
         <Text
-          color={
-            metCount > 0
-              ? CONSOLE_COLORS.successColor
-              : CONSOLE_COLORS.failureColor
-          }
+          color={metCount > 0 ? CONSOLE_COLORS.successColor : CONSOLE_COLORS.failureColor}
         >
           {metCount}/{totalCriteria}
         </Text>

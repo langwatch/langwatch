@@ -89,12 +89,10 @@ export function usePostHog() {
           // false branch can't be meaningfully exercised in a browser test.
           /* v8 ignore next */
           if (typeof window !== "undefined") {
-            (window as unknown as { posthog: typeof posthog }).posthog =
-              posthog;
+            (window as unknown as { posthog: typeof posthog }).posthog = posthog;
           }
           if (publicEnv.data?.NODE_ENV === "development") posthog.debug();
-          cancelStartSessionRecordingRef.current =
-            startSessionRecordingWhenIdle();
+          cancelStartSessionRecordingRef.current = startSessionRecordingWhenIdle();
         },
       });
     }

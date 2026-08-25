@@ -16,10 +16,9 @@ request, it is admitted against the key's budgets, and one key can be limited
 in how many calls it runs at once.
 
 <Note>
-The gateway does not carry the voice socket, so it cannot end a call that is
-already running. A voice budget admits at session start and reconciles when
-the call ends. Overshoot for voice is bounded by the length of a call, not by
-the size of one request.
+  The gateway does not carry the voice socket, so it cannot end a call that is already
+  running. A voice budget admits at session start and reconciles when the call ends.
+  Overshoot for voice is bounded by the length of a call, not by the size of one request.
 </Note>
 
 ## ElevenLabs Conversational AI
@@ -66,6 +65,7 @@ gateway reads that report in two ways, and either one is enough:
    topology where voice already works. Verification stays on the LangWatch
    app, which holds the secret; the gateway passes the raw bytes through
    untouched, because the signature covers them.
+
 2. **The reconciler.** If no webhook arrives, LangWatch reads the conversation
    back from ElevenLabs by its own id, a couple of minutes after the mint. The
    webhook is faster; it is not required.
@@ -86,6 +86,7 @@ call's billing data. It is not the only path. The reconciler asks the vendor
 for the same numbers on its own schedule, so a lost delivery costs a couple of
 minutes rather than a charge, and a workspace whose single webhook slot is
 already used for something else still bills correctly.
+
 </Note>
 
 Only the `post_call_transcription` event is acted on. If you enable
@@ -189,12 +190,12 @@ application, which is where voice tracing lives.
 
 ## Errors
 
-| Code | Status | Meaning |
-|---|---|---|
-| `realtime_session_limit` | 429 | The key holds its maximum open voice sessions. Retry when a call ends. |
-| `realtime_registry_unavailable` | 503 | LangWatch could not record the session, so nothing was minted. Retry. |
-| `model_provider_not_bound` | 400 | The key has no credential for the vendor this route serves. |
-| `budget_exceeded` | 402 | A budget the key is under is out of money. |
+| Code                            | Status | Meaning                                                                |
+| ------------------------------- | ------ | ---------------------------------------------------------------------- |
+| `realtime_session_limit`        | 429    | The key holds its maximum open voice sessions. Retry when a call ends. |
+| `realtime_registry_unavailable` | 503    | LangWatch could not record the session, so nothing was minted. Retry.  |
+| `model_provider_not_bound`      | 400    | The key has no credential for the vendor this route serves.            |
+| `budget_exceeded`               | 402    | A budget the key is under is out of money.                             |
 
 Both mint routes serve one vendor each: `/v1/realtime/client_secrets` needs an
 OpenAI credential and `/v1/convai/conversation/get-signed-url` needs an

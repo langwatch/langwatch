@@ -35,9 +35,7 @@ describe("governance page guard permission", () => {
       expect(managers.length).toBeGreaterThan(0);
 
       for (const role of managers) {
-        expect(organizationRoleHasPermission(role, "governance:view")).toBe(
-          true,
-        );
+        expect(organizationRoleHasPermission(role, "governance:view")).toBe(true);
       }
 
       // Team roles resolve their own bag. None of them holds
@@ -54,19 +52,19 @@ describe("governance page guard permission", () => {
   describe("when the hierarchy rule is asked to bridge the two grants", () => {
     /** @scenario "A governance read grant does not imply organization management" */
     it("refuses in both directions", () => {
-      expect(
-        hasPermissionWithHierarchy(["governance:view"], "organization:manage"),
-      ).toBe(false);
-      expect(
-        hasPermissionWithHierarchy(["organization:manage"], "governance:view"),
-      ).toBe(false);
+      expect(hasPermissionWithHierarchy(["governance:view"], "organization:manage")).toBe(
+        false,
+      );
+      expect(hasPermissionWithHierarchy(["organization:manage"], "governance:view")).toBe(
+        false,
+      );
 
       // The rule it DOES apply, for contrast: manage implies view on the same
       // resource. This is why a `governance:manage` holder needs no second
       // grant to open the pages.
-      expect(
-        hasPermissionWithHierarchy(["governance:manage"], "governance:view"),
-      ).toBe(true);
+      expect(hasPermissionWithHierarchy(["governance:manage"], "governance:view")).toBe(
+        true,
+      );
     });
   });
 });

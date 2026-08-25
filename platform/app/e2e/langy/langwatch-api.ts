@@ -51,9 +51,7 @@ async function lwFetch({
       // A stalled attempt is retried against the same loaded machine, so give
       // it a moment rather than firing all three inside a few milliseconds.
       if (attempt < 2) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, 500 * (attempt + 1)),
-        );
+        await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
       }
     }
   }
@@ -64,13 +62,7 @@ async function lwGet(path: string): Promise<any> {
   return lwFetch({ path, init: { headers: { "X-Auth-Token": LW_KEY } } });
 }
 
-async function lwPost({
-  path,
-  body,
-}: {
-  path: string;
-  body: unknown;
-}): Promise<any> {
+async function lwPost({ path, body }: { path: string; body: unknown }): Promise<any> {
   return lwFetch({
     path,
     init: {
@@ -102,9 +94,7 @@ export async function listDatasets(): Promise<
   return toArray(await lwGet("/api/dataset"));
 }
 
-export async function listAgents(): Promise<
-  Array<{ id: string; name: string }>
-> {
+export async function listAgents(): Promise<Array<{ id: string; name: string }>> {
   return toArray(await lwGet("/api/agents"));
 }
 
@@ -126,9 +116,7 @@ export async function ensureEvaluator({
   name: string;
   evaluatorType: string;
 }): Promise<void> {
-  const existing = (await listEvaluators()).find(
-    (evaluator) => evaluator.name === name,
-  );
+  const existing = (await listEvaluators()).find((evaluator) => evaluator.name === name);
   // The name alone does not make it the right fixture. A retained evaluator of
   // a DIFFERENT type leaves the scenario asserting against the wrong resource
   // while the premise reads as satisfied, so the type is checked too, and a
@@ -199,9 +187,7 @@ export async function resetEvaluationResources(): Promise<void> {
   }
 }
 
-export async function listScenarios(): Promise<
-  Array<{ id: string; name: string }>
-> {
+export async function listScenarios(): Promise<Array<{ id: string; name: string }>> {
   return toArray(await lwGet("/api/scenarios"));
 }
 
@@ -211,9 +197,7 @@ export async function listPrompts(): Promise<
   return toArray(await lwGet("/api/prompts"));
 }
 
-export async function listMonitors(): Promise<
-  Array<{ id: string; name?: string }>
-> {
+export async function listMonitors(): Promise<Array<{ id: string; name?: string }>> {
   return toArray(await lwGet("/api/monitors"));
 }
 
@@ -241,15 +225,11 @@ export async function deleteMonitor(id: string): Promise<void> {
   );
 }
 
-export async function listDashboards(): Promise<
-  Array<{ id: string; name?: string }>
-> {
+export async function listDashboards(): Promise<Array<{ id: string; name?: string }>> {
   return toArray(await lwGet("/api/dashboards"));
 }
 
-export async function listWorkflows(): Promise<
-  Array<{ id: string; name?: string }>
-> {
+export async function listWorkflows(): Promise<Array<{ id: string; name?: string }>> {
   return toArray(await lwGet("/api/workflows"));
 }
 
@@ -326,10 +306,7 @@ export async function listTriggers(): Promise<
  */
 export async function seedApplicationTraces(count = 8): Promise<void> {
   const now = Date.now();
-  const traceIds = Array.from(
-    { length: count },
-    (_, i) => `trace_e2e_seed_${now}_${i}`,
-  );
+  const traceIds = Array.from({ length: count }, (_, i) => `trace_e2e_seed_${now}_${i}`);
   const posts = Array.from({ length: count }, (_, i) => {
     const startedAt = now - (i + 1) * 60_000;
     // Varied latencies (0.8s–9.6s) so p95 is a real figure, one error span.

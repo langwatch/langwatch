@@ -17,15 +17,9 @@ import type {
   ProcessEventEnvelope,
   ProcessSignalEnvelope,
 } from "./processManager.types";
-import {
-  ProcessManagerService,
-  type SignalHandleResult,
-} from "./processManagerService";
+import { ProcessManagerService, type SignalHandleResult } from "./processManagerService";
 import type { ProcessStore } from "./stores/processStore.types";
-import {
-  ProcessWakeWorker,
-  type WakeHandlerPort,
-} from "./wake/processWakeWorker";
+import { ProcessWakeWorker, type WakeHandlerPort } from "./wake/processWakeWorker";
 
 const defaultLogger = createLogger("langwatch:event-sourcing:process-runtime");
 
@@ -129,8 +123,7 @@ export function buildProcessDefinition(
         return {
           state: previousState,
           nextWakeAt:
-            Math.max(envelope.occurredAt, input.now) +
-            (config.schedule?.everyMs ?? 0),
+            Math.max(envelope.occurredAt, input.now) + (config.schedule?.everyMs ?? 0),
           intents: [],
         };
       }
@@ -278,9 +271,7 @@ export class ProcessRuntime {
   }): Promise<SignalHandleResult<State>> {
     const registered = this.managers.get(params.processName);
     if (!registered) {
-      throw new Error(
-        `Process manager "${params.processName}" is not registered`,
-      );
+      throw new Error(`Process manager "${params.processName}" is not registered`);
     }
 
     const result = await registered.manager.handleSignal({
@@ -288,10 +279,7 @@ export class ProcessRuntime {
       now: params.now ?? Date.now(),
       createIfMissing: params.createIfMissing,
     });
-    if (
-      result.outcome === "committed" ||
-      result.outcome === "duplicateSignal"
-    ) {
+    if (result.outcome === "committed" || result.outcome === "duplicateSignal") {
       // The duplicate path may be recovery after the first response was lost;
       // nudging again is cheap and closes the analogous notification-loss
       // window. Periodic polling remains the crash-recovery guarantee.
@@ -303,9 +291,7 @@ export class ProcessRuntime {
   async stop(): Promise<void> {
     await Promise.all([
       this.wakeWorker?.stop(),
-      ...Array.from(this.managers.values(), (manager) =>
-        manager.outboxWorker.stop(),
-      ),
+      ...Array.from(this.managers.values(), (manager) => manager.outboxWorker.stop()),
     ]);
   }
 
@@ -367,11 +353,7 @@ export class ProcessRuntime {
     return registered;
   }
 
-  private armSchedule({
-    registered,
-  }: {
-    registered: RegisteredProcessManager;
-  }): void {
+  private armSchedule({ registered }: { registered: RegisteredProcessManager }): void {
     const now = Date.now();
     const day = new Date(now).toISOString().slice(0, 10);
     const processName = registered.definition.config.name;

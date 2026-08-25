@@ -65,9 +65,7 @@ describe("given the repository's typecheck projects", () => {
   describe("when the whole repository is typechecked", () => {
     // @scenario "The whole repository is typechecked as one program"
     it("runs one project that covers the app and its tests", () => {
-      const pkg = JSON.parse(
-        readFileSync(resolve(APP_ROOT, "package.json"), "utf8"),
-      );
+      const pkg = JSON.parse(readFileSync(resolve(APP_ROOT, "package.json"), "utf8"));
       const script = pkg.scripts["typecheck:all"];
       // Naming the project is not enough: it has to be handed to the compiler
       // as the project to check, with no emit.
@@ -93,9 +91,7 @@ describe("given the repository's typecheck projects", () => {
       const paths = [APP_PROJECT, TESTS_PROJECT, ALL_PROJECT].map(
         (p) => readProject(p).compilerOptions?.tsBuildInfoFile,
       );
-      expect(paths.every((p) => typeof p === "string" && p.length > 0)).toBe(
-        true,
-      );
+      expect(paths.every((p) => typeof p === "string" && p.length > 0)).toBe(true);
       expect(new Set(paths).size).toBe(paths.length);
     });
   });
@@ -110,22 +106,23 @@ describe("given the repository's typecheck projects", () => {
      * what the work costs, with room for a bad day.
      */
     // @scenario "The combined project checks every file the split projects checked"
-    it("leaves no file that was checked before unchecked", {
-      timeout: 180_000,
-    }, () => {
-      expect(existsSync(resolve(APP_ROOT, ALL_PROJECT))).toBe(true);
+    it(
+      "leaves no file that was checked before unchecked",
+      {
+        timeout: 180_000,
+      },
+      () => {
+        expect(existsSync(resolve(APP_ROOT, ALL_PROJECT))).toBe(true);
 
-      const combined = programFiles(ALL_PROJECT);
-      const covered = [
-        ...programFiles(APP_PROJECT),
-        ...programFiles(TESTS_PROJECT),
-      ];
+        const combined = programFiles(ALL_PROJECT);
+        const covered = [...programFiles(APP_PROJECT), ...programFiles(TESTS_PROJECT)];
 
-      const dropped = covered.filter((file) => !combined.has(file));
-      expect(
-        dropped,
-        "the combined project must be a superset: these files lose their typecheck",
-      ).toEqual([]);
-    });
+        const dropped = covered.filter((file) => !combined.has(file));
+        expect(
+          dropped,
+          "the combined project must be a superset: these files lose their typecheck",
+        ).toEqual([]);
+      },
+    );
   });
 });

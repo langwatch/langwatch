@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { baseNameFromFilename, batchDedupeNames } from "../../src/upload/batch-name-dedup";
+import {
+  baseNameFromFilename,
+  batchDedupeNames,
+} from "../../src/upload/batch-name-dedup";
 
 describe("baseNameFromFilename", () => {
   describe("when the filename has an extension", () => {
@@ -29,11 +32,7 @@ describe("batchDedupeNames", () => {
     });
 
     it("never collides a bumped name with a literal input of that suffix", () => {
-      expect(batchDedupeNames(["a", "a", "a (1)"])).toEqual([
-        "a",
-        "a (1)",
-        "a (1) (1)",
-      ]);
+      expect(batchDedupeNames(["a", "a", "a (1)"])).toEqual(["a", "a (1)", "a (1) (1)"]);
     });
   });
 

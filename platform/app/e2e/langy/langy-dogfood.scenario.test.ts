@@ -23,11 +23,7 @@ import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
-import {
-  listDatasets,
-  resetEvaluationResources,
-  traceExists,
-} from "./langwatch-api";
+import { listDatasets, resetEvaluationResources, traceExists } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import {
   LANGY_ACTIVITY_OVERVIEW_CRITERIA,
@@ -64,8 +60,7 @@ async function seedFailingApplicationTraces(): Promise<void> {
     {
       traceId: `langy-dogfood-error-timeout-${FIXTURE_RUN_STAMP}`,
       user: "Summarize the quarterly report for the board.",
-      error:
-        "OpenAI request timed out after 60000ms (model gpt-5-mini, attempt 2 of 2)",
+      error: "OpenAI request timed out after 60000ms (model gpt-5-mini, attempt 2 of 2)",
       startedAt: now - 50 * 60 * 1000,
       durationMs: 60_000,
     },
@@ -128,9 +123,7 @@ async function seedFailingApplicationTraces(): Promise<void> {
   // run against data that is not searchable yet.
   const deadline = Date.now() + 45_000;
   while (Date.now() < deadline) {
-    const projected = await Promise.all(
-      fixtures.map((f) => traceExists(f.traceId)),
-    );
+    const projected = await Promise.all(fixtures.map((f) => traceExists(f.traceId)));
     if (projected.every(Boolean)) return;
     await new Promise((resolve) => setTimeout(resolve, 2_000));
   }
@@ -270,12 +263,12 @@ describe("Langy dogfood: named flows", () => {
       // Layer 2: the seeded fixture traces the reply reports on really exist,
       // through the same REST surface any integration uses. Grounding is a
       // hard fact, so it is asserted here, not delegated to the LLM judge.
-      expect(
-        await traceExists(`langy-dogfood-error-timeout-${FIXTURE_RUN_STAMP}`),
-      ).toBe(true);
-      expect(
-        await traceExists(`langy-dogfood-error-schema-${FIXTURE_RUN_STAMP}`),
-      ).toBe(true);
+      expect(await traceExists(`langy-dogfood-error-timeout-${FIXTURE_RUN_STAMP}`)).toBe(
+        true,
+      );
+      expect(await traceExists(`langy-dogfood-error-schema-${FIXTURE_RUN_STAMP}`)).toBe(
+        true,
+      );
     });
 
     /** @scenario A multi-turn scenario checks that Langy drills in using prior context */
@@ -390,9 +383,7 @@ describe("Langy dogfood: named flows", () => {
       // space injected into every command, and still missed `cd repo && git`,
       // where the tool name is the last token.
       expect(
-        langy.state.toolCommands.some((command) =>
-          /\b(gh|git)\b/.test(command),
-        ),
+        langy.state.toolCommands.some((command) => /\b(gh|git)\b/.test(command)),
       ).toBe(true);
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
@@ -639,9 +630,9 @@ describe("Langy dogfood: named flows", () => {
       // Layer 2, the hard fact this scenario exists for: a navigate entry
       // really landed on the turn stream, addressing the prompts page. Words
       // alone (the old silent-drop failure) do not pass this.
-      expect(
-        langy.state.navigateHrefs.some((href) => href.includes("/prompts")),
-      ).toBe(true);
+      expect(langy.state.navigateHrefs.some((href) => href.includes("/prompts"))).toBe(
+        true,
+      );
     });
   });
 });

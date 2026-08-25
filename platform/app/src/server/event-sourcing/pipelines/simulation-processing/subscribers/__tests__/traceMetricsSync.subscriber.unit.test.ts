@@ -103,9 +103,7 @@ describe("traceMetricsSync subscriber", () => {
   describe("when the dispatch fails", () => {
     it("propagates the error so the GroupQueue retries", async () => {
       const deps = makeDeps({
-        computeRunMetrics: vi
-          .fn()
-          .mockRejectedValue(new Error("trace pipeline down")),
+        computeRunMetrics: vi.fn().mockRejectedValue(new Error("trace pipeline down")),
       });
       const subscriber = createTraceMetricsSyncSubscriber(deps);
 

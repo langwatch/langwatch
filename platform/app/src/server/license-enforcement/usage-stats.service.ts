@@ -32,10 +32,7 @@ export interface MessageLimitInfo {
 /**
  * Calculates the message limit status based on current usage and max allowed.
  */
-export function getMessageLimitStatus(
-  current: number,
-  max: number,
-): MessageLimitStatus {
+export function getMessageLimitStatus(current: number, max: number): MessageLimitStatus {
   if (max === 0 || max === Number.MAX_SAFE_INTEGER || max >= UNLIMITED_MESSAGES)
     return "ok";
   if (current >= max) return "exceeded";
@@ -46,10 +43,7 @@ export function getMessageLimitStatus(
 /**
  * Builds the complete message limit info with pre-formatted values.
  */
-export function buildMessageLimitInfo(
-  current: number,
-  max: number,
-): MessageLimitInfo {
+export function buildMessageLimitInfo(current: number, max: number): MessageLimitInfo {
   const status = getMessageLimitStatus(current, max);
   const currentFormatted = formatNumber(current);
   const isUnlimited = max >= UNLIMITED_MESSAGES;
@@ -89,9 +83,7 @@ export interface ITraceUsageService {
    * {@link USAGE_UNKNOWN} when the counting store could not answer — the usage
    * page has to be able to tell that apart from a genuine zero.
    */
-  getCurrentMonthCountForDisplay(params: {
-    organizationId: string;
-  }): Promise<UsageCount>;
+  getCurrentMonthCountForDisplay(params: { organizationId: string }): Promise<UsageCount>;
 }
 
 /**
@@ -153,10 +145,7 @@ export class UsageStatsService {
    * Gets comprehensive usage statistics for an organization.
    * Aggregates data from multiple sources in parallel.
    */
-  async getUsageStats(
-    organizationId: string,
-    user: MinimalUser,
-  ): Promise<UsageStats> {
+  async getUsageStats(organizationId: string, user: MinimalUser): Promise<UsageStats> {
     const [
       currentMonthMessagesCount,
       currentMonthCost,
@@ -183,9 +172,7 @@ export class UsageStatsService {
     // between a page saying "we can't show this right now" and one asserting
     // that a busy organization sent nothing this month.
     const resolvedCount =
-      currentMonthMessagesCount === USAGE_UNKNOWN
-        ? null
-        : currentMonthMessagesCount;
+      currentMonthMessagesCount === USAGE_UNKNOWN ? null : currentMonthMessagesCount;
 
     // Built from 0 when the count is unknown, so the bar renders at rest
     // rather than crashing on a null. It is not shown as a real figure:
@@ -216,9 +203,7 @@ export class UsageStatsService {
    * Either we remove the organizationId parameter from all the calls to this function,
    * or we use to get the plan and return it correctly.
    */
-  private async getMaxMonthlyUsageLimit(
-    _organizationId: string,
-  ): Promise<number> {
+  private async getMaxMonthlyUsageLimit(_organizationId: string): Promise<number> {
     return Infinity;
   }
 }

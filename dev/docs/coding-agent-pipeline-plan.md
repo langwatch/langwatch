@@ -22,7 +22,7 @@ do not re-derive them.
   FINAL; always filter the partition key (`StartedAt`).
 - **Preserve PR #5708's bug fixes** when porting (all have regression tests
   on the old branch): OTLP `statusCode` is a numeric enum, never compare to
-  `"error"`; MCP server/tool parsed from tool *name*
+  `"error"`; MCP server/tool parsed from tool _name_
   (`mcp__server__tool`), not span attrs; `isViewMode` must know `terminal`;
   Terminal tab shortcut is not `M`.
 - **Codex ignores `OTEL_*` env** (needs `config.toml [otel]`); Codex
@@ -94,6 +94,7 @@ files. Full dogfood only at slice 8.
 ## Port manifest (from `feat/claude-code-enhanced-telemetry-beta`, 181 files)
 
 ### PORT AS-IS (trace-enrichment surface + fixes; slice 5 unless noted)
+
 - `features/traces-v2/components/TraceDrawer/terminalView/**` (15 files + tests)
 - `features/traces-v2/utils/ansi/ansi.ts`, `utils/terminalOrigin.ts`, `utils/formatters.ts` (diff)
 - `features/traces-v2/hooks/useSpanLogs.ts`, `traceDrawerShortcutTable.ts`,
@@ -128,6 +129,7 @@ files. Full dogfood only at slice 8.
 - dogfood: `dev/scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts` (slice 8)
 
 ### ADAPT / REWRITE into the new pipeline (slices 1–4, 6)
+
 - `projections/services/coding-agent-normalization.ts` → pipeline services (slice 1)
 - `projections/services/coding-agent-session.derivation.ts` + `.types.ts`,
   `code-agent-summary.service.ts` → session fold, re-keyed (slice 2)
@@ -153,6 +155,7 @@ files. Full dogfood only at slice 8.
 - `components/me/*` + `pages/me/index.tsx` → slice 7
 
 ### DROP (verified dead on the old branch — grep-proven audit)
+
 - `claude-code-log-marking.ts` (write-only KIND/PII marking, zero readers)
 - `claude-code-log-events.ts` (scope consts only the marking used)
 - `getMarkedClaudeCodeLogsByTrace` / `countMarkedClaudeCodeLogsByTrace`
@@ -167,6 +170,7 @@ files. Full dogfood only at slice 8.
   by ADR-056 + this plan)
 
 ### DELETE from main (slice 8)
+
 - `trace-processing/subscribers/claudeCodeSpanSync.subscriber.ts` (+ registration, tests)
 - `app-layer/traces/claude-code-log-to-span.ts`
 - `specs/traces-v2/claude-code-log-conversion.feature`

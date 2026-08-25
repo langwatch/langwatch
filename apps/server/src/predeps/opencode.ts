@@ -16,9 +16,7 @@ export const OPENCODE_VERSION = "1.17.11";
 // darwin ships zips, linux ships tarballs. The `-baseline` variants target
 // pre-AVX2 x64 hardware; we take the standard build, matching the container
 // image. musl variants are for Alpine, which is not a `npx` host we support.
-type Source =
-  | { kind: "zip"; url: string }
-  | { kind: "tarball"; url: string };
+type Source = { kind: "zip"; url: string } | { kind: "tarball"; url: string };
 
 function downloadSource(platform: string): Source {
   const asset: Record<string, Source> = {
@@ -53,8 +51,11 @@ async function resolveVersion(bin: string): Promise<string | null> {
  * (the manager itself) already ships inside the mono-binary we download for
  * the gateway.
  */
-async function detectOpencode(binDir: string): Promise<
-  { installed: true; version: string; resolvedPath: string } | { installed: false; reason: string }
+async function detectOpencode(
+  binDir: string,
+): Promise<
+  | { installed: true; version: string; resolvedPath: string }
+  | { installed: false; reason: string }
 > {
   const bundled = join(binDir, "opencode");
   if (!existsSync(bundled)) {

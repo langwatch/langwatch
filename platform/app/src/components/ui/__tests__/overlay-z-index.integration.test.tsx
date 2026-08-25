@@ -34,9 +34,7 @@ describe("Overlay z-index stacking", () => {
         { wrapper: Wrapper },
       );
 
-      const positioner = document.querySelector<HTMLElement>(
-        "[data-part='positioner']",
-      );
+      const positioner = document.querySelector<HTMLElement>("[data-part='positioner']");
       expect(positioner).not.toBeNull();
       expect(positioner!.style.zIndex).toBe("2010");
     });

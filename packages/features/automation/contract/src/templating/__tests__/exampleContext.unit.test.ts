@@ -30,9 +30,7 @@ describe("template variable contract", () => {
   });
 
   describe("when resolving every advertised variable path against the example context", () => {
-    it.each(
-      TEMPLATE_VARIABLE_PATHS,
-    )("%s resolves to a provided value", (path) => {
+    it.each(TEMPLATE_VARIABLE_PATHS)("%s resolves to a provided value", (path) => {
       expect(resolve(path, context)).not.toBeUndefined();
     });
   });

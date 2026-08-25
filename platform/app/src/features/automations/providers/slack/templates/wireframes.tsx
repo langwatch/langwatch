@@ -51,13 +51,7 @@ function Wire({ kind }: { kind: WireKind }) {
       // rows read as a list of traces, not paragraphs of one message.
       return (
         <HStack gap="1.5" w="full">
-          <Box
-            h="1.5"
-            w="1.5"
-            bg="fg.muted"
-            borderRadius="full"
-            flexShrink={0}
-          />
+          <Box h="1.5" w="1.5" bg="fg.muted" borderRadius="full" flexShrink={0} />
           <Box h="2" bg="fg.muted" borderRadius="xs" flex="1" />
         </HStack>
       );
@@ -95,12 +89,7 @@ function Wire({ kind }: { kind: WireKind }) {
       // A rich_text_quote — a left rule with quoted text, the native primitive
       // the rich cards use for Input / Output instead of the markdown hack.
       return (
-        <Box
-          borderLeftWidth="2px"
-          borderLeftColor="border.emphasized"
-          pl="1.5"
-          w="full"
-        >
+        <Box borderLeftWidth="2px" borderLeftColor="border.emphasized" pl="1.5" w="full">
           <Box h="3" bg="fg.muted" borderRadius="xs" w="85%" />
         </Box>
       );
@@ -135,13 +124,7 @@ function Wire({ kind }: { kind: WireKind }) {
           p="1.5"
         >
           <HStack gap="1.5" align="start">
-            <Box
-              h="5"
-              w="5"
-              bg="bg.emphasized"
-              borderRadius="xs"
-              flexShrink={0}
-            />
+            <Box h="5" w="5" bg="bg.emphasized" borderRadius="xs" flexShrink={0} />
             <Stack gap="1" flex="1">
               <Box h="2.5" bg="fg" borderRadius="xs" w="70%" />
               <Box h="1.5" bg="fg.muted" borderRadius="xs" w="50%" />
@@ -199,9 +182,7 @@ function WireStack({ rows }: { rows: WireKind[] }) {
 }
 
 export function TraceAlertCompactWireframe() {
-  return (
-    <WireStack rows={["header", "context", "quote", "quote", "context"]} />
-  );
+  return <WireStack rows={["header", "context", "quote", "quote", "context"]} />;
 }
 
 export function TraceAlertOneLinerWireframe() {
@@ -210,9 +191,7 @@ export function TraceAlertOneLinerWireframe() {
 
 export function EvalFailureDetailedWireframe() {
   return (
-    <WireStack
-      rows={["header", "context", "divider", "quote", "quote", "context"]}
-    />
+    <WireStack rows={["header", "context", "divider", "quote", "quote", "context"]} />
   );
 }
 
@@ -222,9 +201,7 @@ export function TraceCardRichWireframe() {
 
 export function EvalFailureRichWireframe() {
   return (
-    <WireStack
-      rows={["alertError", "context", "divider", "quote", "quote", "context"]}
-    />
+    <WireStack rows={["alertError", "context", "divider", "quote", "quote", "context"]} />
   );
 }
 
@@ -246,11 +223,7 @@ export function DigestCompactWireframe() {
 }
 
 export function DigestEvaluatorRollupWireframe() {
-  return (
-    <WireStack
-      rows={["header", "context", "pie", "bullet", "bullet", "context"]}
-    />
-  );
+  return <WireStack rows={["header", "context", "pie", "bullet", "bullet", "context"]} />;
 }
 
 export function DigestInlineRichWireframe() {
@@ -277,15 +250,11 @@ export function DigestTableWireframe() {
 }
 
 export function GraphAlertCompactWireframe() {
-  return (
-    <WireStack rows={["header", "fields", "fields", "spark", "context"]} />
-  );
+  return <WireStack rows={["header", "fields", "fields", "spark", "context"]} />;
 }
 
 export function GraphAlertDetailedWireframe() {
-  return (
-    <WireStack rows={["header", "fields", "chart", "context", "context"]} />
-  );
+  return <WireStack rows={["header", "fields", "chart", "context", "context"]} />;
 }
 
 export function GraphAlertOneLinerWireframe() {
@@ -305,9 +274,7 @@ export function GraphAlertHistoryTableWireframe() {
 }
 
 export function ReportDigestWireframe() {
-  return (
-    <WireStack rows={["header", "context", "bullet", "bullet", "context"]} />
-  );
+  return <WireStack rows={["header", "context", "bullet", "bullet", "context"]} />;
 }
 
 export function ReportSummaryCardWireframe() {
@@ -319,9 +286,7 @@ export function ReportTableWireframe() {
 }
 
 export function ReportChartWireframe() {
-  return (
-    <WireStack rows={["header", "context", "chart", "section", "context"]} />
-  );
+  return <WireStack rows={["header", "context", "chart", "section", "context"]} />;
 }
 
 export function ReportChartCardWireframe() {
@@ -332,8 +297,6 @@ export function ReportChartCardWireframe() {
 // repetition, which is the whole point of the layout.
 export function ReportDashboardWireframe() {
   return (
-    <WireStack
-      rows={["header", "context", "chart", "chart", "section", "context"]}
-    />
+    <WireStack rows={["header", "context", "chart", "chart", "section", "context"]} />
   );
 }

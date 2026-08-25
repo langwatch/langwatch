@@ -294,16 +294,7 @@ export const navigationCommands: Command[] = [
     description: "Ops → The Foundry",
     icon: Terminal,
     category: "navigation",
-    keywords: [
-      "ops",
-      "foundry",
-      "forge",
-      "trace",
-      "test",
-      "otel",
-      "playground",
-      "send",
-    ],
+    keywords: ["ops", "foundry", "forge", "trace", "test", "otel", "playground", "send"],
     path: "/ops/foundry",
   },
 
@@ -487,15 +478,7 @@ export const actionCommands: Command[] = [
     description: "Create a notification or action triggered by trace filters",
     icon: Bell,
     category: "actions",
-    keywords: [
-      "create",
-      "add",
-      "automation",
-      "trigger",
-      "alert",
-      "slack",
-      "email",
-    ],
+    keywords: ["create", "add", "automation", "trigger", "alert", "slack", "email"],
   },
   {
     id: "action-new-scenario",
@@ -511,16 +494,7 @@ export const actionCommands: Command[] = [
     description: "Open The Foundry to craft and send test traces",
     icon: Anvil,
     category: "actions",
-    keywords: [
-      "forge",
-      "trace",
-      "foundry",
-      "test",
-      "otel",
-      "send",
-      "span",
-      "anvil",
-    ],
+    keywords: ["forge", "trace", "foundry", "test", "otel", "send", "span", "anvil"],
   },
   {
     id: "action-invite-member",
@@ -568,14 +542,7 @@ export const supportCommands: Command[] = [
     description: "Manage subscription or license",
     icon: CreditCard,
     category: "actions",
-    keywords: [
-      "plan",
-      "upgrade",
-      "subscription",
-      "billing",
-      "license",
-      "pricing",
-    ],
+    keywords: ["plan", "upgrade", "subscription", "billing", "license", "pricing"],
     // Path is set dynamically in useFilteredCommands based on IS_SAAS
   },
   {
@@ -602,8 +569,7 @@ export const supportCommands: Command[] = [
     icon: LifeBuoy,
     category: "actions",
     keywords: ["github", "support", "help", "community"],
-    externalUrl:
-      "https://github.com/orgs/langwatch/discussions/categories/support",
+    externalUrl: "https://github.com/orgs/langwatch/discussions/categories/support",
   },
   {
     id: "action-discord",
@@ -630,8 +596,7 @@ export const supportCommands: Command[] = [
     icon: Lightbulb,
     category: "actions",
     keywords: ["feature", "request", "idea", "suggestion"],
-    externalUrl:
-      "https://github.com/orgs/langwatch/discussions/categories/ideas",
+    externalUrl: "https://github.com/orgs/langwatch/discussions/categories/ideas",
   },
   {
     id: "action-bug-report",
@@ -698,8 +663,8 @@ const topLevelNavIds = new Set([
 /**
  * Top-level navigation commands (shown when query is empty).
  */
-export const topLevelNavigationCommands: Command[] = navigationCommands.filter(
-  (cmd) => topLevelNavIds.has(cmd.id),
+export const topLevelNavigationCommands: Command[] = navigationCommands.filter((cmd) =>
+  topLevelNavIds.has(cmd.id),
 );
 
 /**
@@ -721,9 +686,7 @@ export function filterCommands(commands: Command[], query: string): Command[] {
   const lowerQuery = query.toLowerCase();
   return commands.filter((cmd) => {
     const labelMatch = cmd.label.toLowerCase().includes(lowerQuery);
-    const descriptionMatch = cmd.description
-      ?.toLowerCase()
-      .includes(lowerQuery);
+    const descriptionMatch = cmd.description?.toLowerCase().includes(lowerQuery);
     const keywordMatch = cmd.keywords?.some((kw) =>
       kw.toLowerCase().includes(lowerQuery),
     );

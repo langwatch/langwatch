@@ -286,9 +286,7 @@ describe.skipIf(!hasCredentialsSecret)(
                 provider: "anthropic",
                 enabled: true,
                 customKeys: { ANTHROPIC_API_KEY: `sk-ant-${ns}` },
-                scopes: [
-                  { scopeType: "ORGANIZATION", scopeId: organizationId },
-                ],
+                scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
               },
               ctxFor(teamAAdminUserId),
             ),
@@ -312,9 +310,7 @@ describe.skipIf(!hasCredentialsSecret)(
                 provider: "gemini",
                 enabled: true,
                 customKeys: { GEMINI_API_KEY: `sk-gem-${ns}` },
-                scopes: [
-                  { scopeType: "ORGANIZATION", scopeId: organizationId },
-                ],
+                scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
               },
               ctxFor(teamAMemberUserId),
             ),

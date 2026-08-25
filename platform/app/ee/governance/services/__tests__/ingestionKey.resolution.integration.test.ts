@@ -129,9 +129,7 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
     await prisma.organizationUser
       .deleteMany({ where: { organizationId: ORG_ID } })
       .catch(() => undefined);
-    await prisma.user
-      .deleteMany({ where: { id: USER_ID } })
-      .catch(() => undefined);
+    await prisma.user.deleteMany({ where: { id: USER_ID } }).catch(() => undefined);
     await prisma.organization
       .deleteMany({ where: { id: ORG_ID } })
       .catch(() => undefined);
@@ -189,9 +187,7 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
         organizationId: ORG_ID,
         permissionMode: "restricted",
         permissions: ["traces:create"],
-        bindings: [
-          { role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID },
-        ],
+        bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID }],
       });
 
       // A single PROJECT-scoped binding is unambiguous, so the key resolves to
@@ -340,9 +336,7 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
       });
       expect(second.token).not.toBe(first.token);
 
-      expect(
-        await resolver.resolve({ token: first.token, projectId: null }),
-      ).toBeNull();
+      expect(await resolver.resolve({ token: first.token, projectId: null })).toBeNull();
       const live = await resolver.resolve({
         token: second.token,
         projectId: null,

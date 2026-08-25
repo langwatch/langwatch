@@ -52,19 +52,15 @@ export function GroupDetailDialog({
   const [pendingName, setPendingName] = useState(group.name);
   const [committedName, setCommittedName] = useState(group.name);
 
-  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<
-    Set<string>
-  >(new Set());
+  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<Set<string>>(
+    new Set(),
+  );
   const [pendingBindingAdditions, setPendingBindingAdditions] = useState<
     PendingBinding[]
   >([]);
 
-  const [pendingRemovals, setPendingRemovals] = useState<Set<string>>(
-    new Set(),
-  );
-  const [pendingAdditions, setPendingAdditions] = useState<PendingAddition[]>(
-    [],
-  );
+  const [pendingRemovals, setPendingRemovals] = useState<Set<string>>(new Set());
+  const [pendingAdditions, setPendingAdditions] = useState<PendingAddition[]>([]);
 
   const [addMemberId, setAddMemberId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
@@ -88,8 +84,7 @@ export function GroupDetailDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, group.id]);
 
-  const nameChanged =
-    pendingName.trim() !== committedName && pendingName.trim() !== "";
+  const nameChanged = pendingName.trim() !== committedName && pendingName.trim() !== "";
   const hasChanges =
     nameChanged ||
     pendingBindingRemovals.size > 0 ||
@@ -103,11 +98,10 @@ export function GroupDetailDialog({
     { enabled: open },
   );
 
-  const orgMembers =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      { organizationId },
-      { enabled: open && canManage },
-    );
+  const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+    { organizationId },
+    { enabled: open && canManage },
+  );
 
   // ── mutations ────────────────────────────────────────────────────────────────
   const applyEdits = api.group.applyEdits.useMutation();
@@ -218,9 +212,7 @@ export function GroupDetailDialog({
                 <Text fontSize="sm" color="fg.muted">
                   {Math.max(
                     0,
-                    d.members.length -
-                      pendingRemovals.size +
-                      pendingAdditions.length,
+                    d.members.length - pendingRemovals.size + pendingAdditions.length,
                   )}{" "}
                   members
                 </Text>
@@ -232,8 +224,7 @@ export function GroupDetailDialog({
                   Access granted
                 </Text>
 
-                {d.bindings.length === 0 &&
-                pendingBindingAdditions.length === 0 ? (
+                {d.bindings.length === 0 && pendingBindingAdditions.length === 0 ? (
                   <Text fontSize="sm" color="fg.muted" fontStyle="italic">
                     No access configured yet.
                   </Text>
@@ -255,9 +246,7 @@ export function GroupDetailDialog({
                           <Badge
                             colorPalette={roleBadgeColor(b.role)}
                             size="sm"
-                            textDecoration={
-                              markedForRemoval ? "line-through" : undefined
-                            }
+                            textDecoration={markedForRemoval ? "line-through" : undefined}
                           >
                             {b.customRoleName ?? b.role}
                           </Badge>
@@ -265,12 +254,9 @@ export function GroupDetailDialog({
                           <Badge
                             colorPalette="purple"
                             size="sm"
-                            textDecoration={
-                              markedForRemoval ? "line-through" : undefined
-                            }
+                            textDecoration={markedForRemoval ? "line-through" : undefined}
                           >
-                            {scopeTypeLabel(b.scopeType)}{" "}
-                            {b.scopeName ?? b.scopeId}
+                            {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
                           </Badge>
                           <Spacer />
                           {canManage && (
@@ -279,9 +265,7 @@ export function GroupDetailDialog({
                               variant="ghost"
                               color={markedForRemoval ? "blue.500" : "fg.muted"}
                               aria-label={
-                                markedForRemoval
-                                  ? "Undo removal"
-                                  : `Remove binding`
+                                markedForRemoval ? "Undo removal" : `Remove binding`
                               }
                               onClick={() => toggleBindingRemoval(b.id)}
                             >
@@ -307,8 +291,7 @@ export function GroupDetailDialog({
                         </Badge>
                         <Text color="fg.muted">on</Text>
                         <Badge colorPalette="purple" size="sm">
-                          {scopeTypeLabel(b.scopeType)}{" "}
-                          {b.scopeName ?? b.scopeId}
+                          {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
                         </Badge>
                         <Spacer />
                         <Button
@@ -333,9 +316,7 @@ export function GroupDetailDialog({
                   <BindingInputRow
                     ref={bindingInputRef}
                     organizationId={organizationId}
-                    onAdd={(b) =>
-                      setPendingBindingAdditions((prev) => [...prev, b])
-                    }
+                    onAdd={(b) => setPendingBindingAdditions((prev) => [...prev, b])}
                   />
                 )}
               </Box>
@@ -382,9 +363,7 @@ export function GroupDetailDialog({
                           />
                           <Text
                             flex={1}
-                            textDecoration={
-                              markedForRemoval ? "line-through" : undefined
-                            }
+                            textDecoration={markedForRemoval ? "line-through" : undefined}
                           >
                             {m.name ?? m.email}
                           </Text>
@@ -408,11 +387,7 @@ export function GroupDetailDialog({
                     })}
                     {pendingAdditions.map((a) => (
                       <HStack key={a.userId} py={1} fontSize="sm" opacity={0.7}>
-                        <RandomColorAvatar
-                          name={a.label}
-                          image={a.image}
-                          size="xs"
-                        />
+                        <RandomColorAvatar name={a.label} image={a.image} size="xs" />
                         <Text flex={1} color="green.600">
                           {a.label}
                         </Text>
@@ -447,9 +422,7 @@ export function GroupDetailDialog({
                       .sort((a, b) => a.label.localeCompare(b.label));
                     const availableItems = memberSearch
                       ? allAvailable.filter((m) =>
-                          m.label
-                            .toLowerCase()
-                            .includes(memberSearch.toLowerCase()),
+                          m.label.toLowerCase().includes(memberSearch.toLowerCase()),
                         )
                       : allAvailable;
                     const availableCollection = createListCollection({
@@ -461,9 +434,7 @@ export function GroupDetailDialog({
                         <Select.Root
                           collection={availableCollection}
                           value={addMemberId ? [addMemberId] : []}
-                          onValueChange={(e) =>
-                            setAddMemberId(e.value[0] ?? "")
-                          }
+                          onValueChange={(e) => setAddMemberId(e.value[0] ?? "")}
                           size="sm"
                           flex={1}
                         >
@@ -471,13 +442,7 @@ export function GroupDetailDialog({
                             <Select.ValueText placeholder="Add member..." />
                           </Select.Trigger>
                           <Select.Content>
-                            <Box
-                              position="sticky"
-                              top={0}
-                              zIndex={1}
-                              bg="bg"
-                              pb={1}
-                            >
+                            <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
                               <InputGroup
                                 startElement={<Search size={14} />}
                                 startOffset="2px"
@@ -487,9 +452,7 @@ export function GroupDetailDialog({
                                   size="sm"
                                   placeholder="Search members..."
                                   value={memberSearch}
-                                  onChange={(e) =>
-                                    setMemberSearch(e.target.value)
-                                  }
+                                  onChange={(e) => setMemberSearch(e.target.value)}
                                   onKeyDown={(e) => e.stopPropagation()}
                                 />
                               </InputGroup>

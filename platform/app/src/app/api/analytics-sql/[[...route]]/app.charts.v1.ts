@@ -345,20 +345,25 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
         requestedProjectId: c.req.param("projectId"),
       });
       const { name, definition } = c.req.valid("json");
-      const validatedDefinition = definition === undefined
-        ? undefined
-        : validateSavedWorkbenchChartDefinition({
-            projectId: project.id,
-            protections: await getProtectionsForProject(prisma, { projectId: project.id }),
-            definition,
-            lwql: c.app.langWatchQL,
-          });
+      const validatedDefinition =
+        definition === undefined
+          ? undefined
+          : validateSavedWorkbenchChartDefinition({
+              projectId: project.id,
+              protections: await getProtectionsForProject(prisma, {
+                projectId: project.id,
+              }),
+              definition,
+              lwql: c.app.langWatchQL,
+            });
       const chart = await dashboardSavedChartCall(() =>
         c.app.dashboard.updateSavedWorkbenchChart({
           chartId: chartIdOf(c.req.param("chartId")),
           projectId: project.id,
           ...(name === undefined ? {} : { name }),
-          ...(validatedDefinition === undefined ? {} : { definition: validatedDefinition }),
+          ...(validatedDefinition === undefined
+            ? {}
+            : { definition: validatedDefinition }),
         }),
       );
       return c.json(chartResource({ chart, project }));

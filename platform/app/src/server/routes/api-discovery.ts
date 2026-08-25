@@ -61,12 +61,7 @@ secured
  * route tables — a service appears because its catalogue mount exists, never
  * because someone listed it here.
  */
-const SERVICE_APPS = [
-  organizationApp,
-  roleBindingsApp,
-  rolesApp,
-  scimTokensApp,
-];
+const SERVICE_APPS = [organizationApp, roleBindingsApp, rolesApp, scimTokensApp];
 
 /**
  * Projected once, at module load.

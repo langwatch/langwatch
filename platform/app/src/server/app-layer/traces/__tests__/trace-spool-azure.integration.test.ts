@@ -47,9 +47,7 @@ let driver: AzureBlobDriver;
  * how the deployment was configured.
  */
 const s3MustNotBeUsed: S3ClientResolver = async () => {
-  throw new Error(
-    "the spool reached for an S3 client on an Azure-configured deployment",
-  );
+  throw new Error("the spool reached for an S3 client on an Azure-configured deployment");
 };
 
 function azureSpoolStorage(): SpoolStorage {

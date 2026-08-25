@@ -349,8 +349,7 @@ export function useLangyBriefing(): LangyBriefingResult {
     // Analytics is the slow read; its section (the overview + receipts) shows its
     // own inline loading until it lands, and the headline holds a neutral line so
     // it never flashes a false "quiet" before the real volume is known.
-    const isAnalyticsLoading =
-      canViewAnalytics && analytics.isLoading && !analytics.data;
+    const isAnalyticsLoading = canViewAnalytics && analytics.isLoading && !analytics.data;
     const isAttentionLoading =
       (canViewAnalytics && errorAnalytics.isLoading && !errorAnalytics.data) ||
       (canViewTraces &&
@@ -399,9 +398,7 @@ export function useLangyBriefing(): LangyBriefingResult {
     const threads = readMetric("metadata.thread_id", "cardinality");
     const users = readMetric("metadata.user_id", "cardinality");
     const tokens = readMetric("performance.total_tokens", "sum");
-    const cost = canViewCost
-      ? readMetric("performance.total_cost", "sum")
-      : undefined;
+    const cost = canViewCost ? readMetric("performance.total_cost", "sum") : undefined;
     const p50Latency = readMetric("performance.completion_time", "median");
     const hasTraces = traces !== undefined && traces > 0;
 
@@ -412,10 +409,7 @@ export function useLangyBriefing(): LangyBriefingResult {
         metric,
         aggregation,
       });
-    const previousP50Latency = readPrevMetric(
-      "performance.completion_time",
-      "median",
-    );
+    const previousP50Latency = readPrevMetric("performance.completion_time", "median");
     const previousCost = canViewCost
       ? readPrevMetric("performance.total_cost", "sum")
       : undefined;
@@ -440,9 +434,7 @@ export function useLangyBriefing(): LangyBriefingResult {
       return `${pct > 0 ? "+" : "−"}${magnitude}%`;
     };
     /** For metrics where creeping UP is the problem (latency, cost). */
-    const costLikeTone = (
-      delta: string | undefined,
-    ): "good" | "bad" | undefined =>
+    const costLikeTone = (delta: string | undefined): "good" | "bad" | undefined =>
       delta === undefined ? undefined : delta.startsWith("+") ? "bad" : "good";
     /**
      * DEV-ONLY mock: a fresh project has no previous 30-day window, so real
@@ -476,8 +468,7 @@ export function useLangyBriefing(): LangyBriefingResult {
       currentErrorShapes: currentErrorShapes.data?.values,
       previousErrorShapes: previousErrorShapes.data?.values,
       previousErrorShapesComplete: previousErrorShapes.data
-        ? previousErrorShapes.data.totalDistinct <=
-          previousErrorShapes.data.values.length
+        ? previousErrorShapes.data.totalDistinct <= previousErrorShapes.data.values.length
         : undefined,
       sharedTraceNames,
       errorTraces,
@@ -586,8 +577,7 @@ export function useLangyBriefing(): LangyBriefingResult {
         label: "Traces · threads",
         value: `${Math.round(traces)} · ${Math.round(threads ?? 0)}`,
         tone: "vanity",
-        delta:
-          pctDelta(traces, previousTraces) ?? devMockDelta("Traces · threads"),
+        delta: pctDelta(traces, previousTraces) ?? devMockDelta("Traces · threads"),
         deltaTone: "neutral",
       });
     }

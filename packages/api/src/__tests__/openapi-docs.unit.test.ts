@@ -58,8 +58,7 @@ function buildDocumentedApp() {
         "/hidden",
         "2025-03-15",
         async () => ({ ok: true }),
-        (b) =>
-          b.withOutput(z.object({ ok: z.boolean() })).withDocs({ hide: true }),
+        (b) => b.withOutput(z.object({ ok: z.boolean() })).withDocs({ hide: true }),
       )
       .registerRoute(
         "get",
@@ -98,10 +97,7 @@ describe("OpenAPI documentation", () => {
     const successSchema = (operation: unknown) => {
       const content = (
         operation as {
-          responses: Record<
-            string,
-            { content: Record<string, { schema: unknown }> }
-          >;
+          responses: Record<string, { content: Record<string, { schema: unknown }> }>;
         }
       ).responses["200"]!.content["application/json"]!.schema;
       return JSON.stringify(content);
@@ -154,19 +150,18 @@ describe("OpenAPI documentation", () => {
     );
 
     expect(new Set(operationIds).size).toBe(operationIds.length);
-    expect(
-      spec.paths["/api/things/latest/things.create"]?.post?.operationId,
-    ).toBe("createThing");
-    expect(
-      spec.paths["/api/things/2025-06-01/things.create"]?.post?.operationId,
-    ).toBe("createThing_2025_06_01");
+    expect(spec.paths["/api/things/latest/things.create"]?.post?.operationId).toBe(
+      "createThing",
+    );
+    expect(spec.paths["/api/things/2025-06-01/things.create"]?.post?.operationId).toBe(
+      "createThing_2025_06_01",
+    );
   });
 
   it("keeps the documented mounts' parameters and request body in the document", async () => {
     const spec = await generateSpecs(buildDocumentedApp(), SPEC_OPTIONS);
 
-    const parameters =
-      spec.paths["/api/things/2025-03-15/{id}"]?.get?.parameters ?? [];
+    const parameters = spec.paths["/api/things/2025-03-15/{id}"]?.get?.parameters ?? [];
     expect(parameters).toContainEqual(
       expect.objectContaining({ in: "path", name: "id" }),
     );
@@ -182,9 +177,7 @@ describe("OpenAPI documentation", () => {
     const app = buildDocumentedApp();
     const spec = await generateSpecs(app, SPEC_OPTIONS);
 
-    expect(
-      Object.keys(spec.paths ?? {}).filter((p) => p.includes("hidden")),
-    ).toEqual([]);
+    expect(Object.keys(spec.paths ?? {}).filter((p) => p.includes("hidden"))).toEqual([]);
 
     const res = await app.request("/api/things/2025-03-15/hidden");
     expect(res.status).toBe(200);
@@ -239,14 +232,12 @@ describe("OpenAPI documentation", () => {
     ]) {
       const operation = spec.paths[path]?.post;
       expect(operation?.deprecated).toBe(true);
-      expect(operation?.description).toContain(
-        "use things.new after 2026-01-01",
-      );
+      expect(operation?.description).toContain("use things.new after 2026-01-01");
     }
     // The notice rides alongside the declared description, not instead of it.
-    expect(
-      spec.paths["/api/w/2025-01-15/things.old"]?.post?.description,
-    ).toContain("The old way.");
+    expect(spec.paths["/api/w/2025-01-15/things.old"]?.post?.description).toContain(
+      "The old way.",
+    );
   });
 
   describe("when an endpoint is withdrawn", () => {
@@ -308,9 +299,7 @@ describe("OpenAPI documentation", () => {
         expect(res.status).toBe(422);
       }
 
-      const ok = await app.request(
-        "/api/things/2025-03-15/thing_1?verbose=true",
-      );
+      const ok = await app.request("/api/things/2025-03-15/thing_1?verbose=true");
       expect(ok.status).toBe(200);
       expect(await ok.json()).toEqual({ id: "thing_1" });
     });

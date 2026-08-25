@@ -28,9 +28,7 @@ const INVALID_LINK_MESSAGE =
 
 const resetPasswordSchema = z
   .object({
-    password: z
-      .string()
-      .min(8, { message: "Password must be at least 8 characters" }),
+    password: z.string().min(8, { message: "Password must be at least 8 characters" }),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -86,8 +84,7 @@ function ResetPasswordForm({ token }: { token: string }) {
     return (
       <AuthCard title="Password updated">
         <Text>
-          Your password has been reset. You can now sign in with your new
-          password.
+          Your password has been reset. You can now sign in with your new password.
         </Text>
         <Button colorPalette="orange" variant="solid" asChild>
           <Link href="/auth/signin" style={{ color: "white" }}>
@@ -126,18 +123,11 @@ function ResetPasswordForm({ token }: { token: string }) {
               <HorizontalFormControl
                 label="Confirm Password"
                 helper="Confirm your new password"
-                invalid={
-                  form.formState.errors.confirmPassword?.message !== undefined
-                }
+                invalid={form.formState.errors.confirmPassword?.message !== undefined}
               >
                 <VStack align="stretch" gap={1} width="full">
-                  <Input
-                    type="password"
-                    {...form.register("confirmPassword")}
-                  />
-                  <FormErrorDisplay
-                    error={form.formState.errors.confirmPassword}
-                  />
+                  <Input type="password" {...form.register("confirmPassword")} />
+                  <FormErrorDisplay error={form.formState.errors.confirmPassword} />
                 </VStack>
               </HorizontalFormControl>
               {serverError && (
@@ -151,10 +141,7 @@ function ResetPasswordForm({ token }: { token: string }) {
               )}
               <HStack width="full" paddingTop={4}>
                 <Box asChild>
-                  <Link
-                    href="/auth/signin"
-                    style={{ textDecoration: "underline" }}
-                  >
+                  <Link href="/auth/signin" style={{ textDecoration: "underline" }}>
                     Back to sign in
                   </Link>
                 </Box>
@@ -174,10 +161,7 @@ function ResetPasswordForm({ token }: { token: string }) {
 function RequestNewLink() {
   return (
     <Box asChild>
-      <Link
-        href="/auth/forgot-password"
-        style={{ textDecoration: "underline" }}
-      >
+      <Link href="/auth/forgot-password" style={{ textDecoration: "underline" }}>
         Request a new reset link
       </Link>
     </Box>

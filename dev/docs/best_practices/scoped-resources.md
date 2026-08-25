@@ -90,7 +90,7 @@ The read endpoint groups every row that shares the non-scope key (e.g. `(role, f
 
 ```ts
 type Assignment = {
-  id: string;          // stable group key
+  id: string; // stable group key
   role: ModelRole;
   featureKey: string | null;
   model: string;
@@ -138,7 +138,11 @@ The chip picker only offers scopes from `available`. The server still re-authz's
 The `{ scopeType, scopeId }` shape has one definition for the wire format, the UI, and resolvers: `platform/app/src/server/scopes/scope.types.ts`.
 
 ```ts
-import { SCOPE_TIERS, scopeAssignmentSchema, type ScopeAssignment } from "~/server/scopes/scope.types";
+import {
+  SCOPE_TIERS,
+  scopeAssignmentSchema,
+  type ScopeAssignment,
+} from "~/server/scopes/scope.types";
 
 // tRPC input: scopes: z.array(scopeAssignmentSchema).min(1)
 // single-field input: scopeType: z.enum(SCOPE_TIERS)

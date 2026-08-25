@@ -61,63 +61,60 @@ const eitherOrProviders = [
 ];
 
 describe("getRequiredCredentialKeys()", () => {
-  describe.each(
-    eitherOrProviders,
-  )("given $providerKey, which accepts an API key or a base URL", ({
-    providerKey,
-    apiKey,
-    baseUrl,
-  }) => {
-    describe("when no base URL is entered", () => {
-      /** @scenario The API key stops being required once a base URL is entered */
-      it("requires the API key", () => {
-        expect(
-          requiredKeysFor(providerKey, { [apiKey]: "", [baseUrl]: "" }),
-        ).toEqual([apiKey]);
+  describe.each(eitherOrProviders)(
+    "given $providerKey, which accepts an API key or a base URL",
+    ({ providerKey, apiKey, baseUrl }) => {
+      describe("when no base URL is entered", () => {
+        /** @scenario The API key stops being required once a base URL is entered */
+        it("requires the API key", () => {
+          expect(requiredKeysFor(providerKey, { [apiKey]: "", [baseUrl]: "" })).toEqual([
+            apiKey,
+          ]);
+        });
       });
-    });
 
-    describe("when a base URL is entered", () => {
-      /** @scenario The API key stops being required once a base URL is entered */
-      it("requires nothing further", () => {
-        expect(
-          requiredKeysFor(providerKey, {
-            [apiKey]: "",
-            [baseUrl]: "https://llm.acme.internal/v1",
-          }),
-        ).toEqual([]);
+      describe("when a base URL is entered", () => {
+        /** @scenario The API key stops being required once a base URL is entered */
+        it("requires nothing further", () => {
+          expect(
+            requiredKeysFor(providerKey, {
+              [apiKey]: "",
+              [baseUrl]: "https://llm.acme.internal/v1",
+            }),
+          ).toEqual([]);
+        });
       });
-    });
 
-    describe("when the base URL is cleared again", () => {
-      /** @scenario The API key stops being required once a base URL is entered */
-      it("requires the API key again", () => {
-        expect(
-          requiredKeysFor(providerKey, { [apiKey]: "", [baseUrl]: "" }),
-        ).toEqual([apiKey]);
+      describe("when the base URL is cleared again", () => {
+        /** @scenario The API key stops being required once a base URL is entered */
+        it("requires the API key again", () => {
+          expect(requiredKeysFor(providerKey, { [apiKey]: "", [baseUrl]: "" })).toEqual([
+            apiKey,
+          ]);
+        });
       });
-    });
 
-    describe("when the base URL holds only whitespace", () => {
-      /** @scenario The API key stops being required once a base URL is entered */
-      it("treats it as blank and requires the API key", () => {
-        expect(
-          requiredKeysFor(providerKey, { [apiKey]: "", [baseUrl]: "   " }),
-        ).toEqual([apiKey]);
+      describe("when the base URL holds only whitespace", () => {
+        /** @scenario The API key stops being required once a base URL is entered */
+        it("treats it as blank and requires the API key", () => {
+          expect(
+            requiredKeysFor(providerKey, { [apiKey]: "", [baseUrl]: "   " }),
+          ).toEqual([apiKey]);
+        });
       });
-    });
 
-    describe("when a key is entered and no base URL", () => {
-      it("never marks the base URL required", () => {
-        expect(
-          requiredKeysFor(providerKey, {
-            [apiKey]: "sk-acme",
-            [baseUrl]: "",
-          }),
-        ).toEqual([apiKey]);
+      describe("when a key is entered and no base URL", () => {
+        it("never marks the base URL required", () => {
+          expect(
+            requiredKeysFor(providerKey, {
+              [apiKey]: "sk-acme",
+              [baseUrl]: "",
+            }),
+          ).toEqual([apiKey]);
+        });
       });
-    });
-  });
+    },
+  );
 
   describe("given a provider with a single credential and no alternative", () => {
     /** @scenario A provider with a single credential keeps its required marker */
@@ -154,11 +151,7 @@ describe("getRequiredCredentialKeys()", () => {
           AWS_SECRET_ACCESS_KEY: "",
           AWS_REGION_NAME: "",
         }),
-      ).toEqual([
-        "AWS_ACCESS_KEY_ID",
-        "AWS_REGION_NAME",
-        "AWS_SECRET_ACCESS_KEY",
-      ]);
+      ).toEqual(["AWS_ACCESS_KEY_ID", "AWS_REGION_NAME", "AWS_SECRET_ACCESS_KEY"]);
     });
   });
 

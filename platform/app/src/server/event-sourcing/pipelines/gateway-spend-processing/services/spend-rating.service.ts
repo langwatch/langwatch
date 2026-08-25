@@ -135,10 +135,7 @@ export function rateSpendNanoUsd({
   usage: SpendUsage;
   rateVersion?: string;
 }): { costNanoUsd: number; rateVersion: string } {
-  const llmModelCost = matchModelCostWithFallbacks(
-    model,
-    getStaticModelCosts(),
-  );
+  const llmModelCost = matchModelCostWithFallbacks(model, getStaticModelCosts());
   const usd = llmModelCost
     ? estimateCost({
         llmModelCost,
@@ -157,9 +154,7 @@ export function rateSpendNanoUsd({
     : 0;
   const costNanoUsd = Math.round((usd ?? 0) * NANO_USD_PER_USD);
   const stamp =
-    rateVersion && rateVersion.length > 0
-      ? rateVersion
-      : currentRegistryRateVersion();
+    rateVersion && rateVersion.length > 0 ? rateVersion : currentRegistryRateVersion();
   if (costNanoUsd === 0) {
     warnUnpriced({ model, usage, rule: llmModelCost, rateVersion: stamp });
   }

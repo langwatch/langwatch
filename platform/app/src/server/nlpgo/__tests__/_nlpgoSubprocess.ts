@@ -18,32 +18,18 @@
  * binary boots in ~1s. The cached artifact is shared across every test
  * that calls ensureNlpgoBinary() within the same CI job.
  */
-import {
-  type ChildProcess,
-  execFileSync,
-  execSync,
-  spawn,
-} from "node:child_process";
+import { type ChildProcess, execFileSync, execSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import {
-  cachedBinaryIsUsable,
-  digestGoSources,
-  writeStamp,
-} from "./_nlpgoBinaryStamp";
+import { cachedBinaryIsUsable, digestGoSources, writeStamp } from "./_nlpgoBinaryStamp";
 
 // _nlpgoSubprocess.ts lives in platform/app/src/server/nlpgo/__tests__ →
 // up 6 = repo root.
 export const REPO_ROOT = path.resolve(__dirname, "../../../../../..");
 
-const NLPGO_TEST_BIN_DIR = path.join(
-  REPO_ROOT,
-  "platform",
-  "app",
-  ".vitest-tmp",
-);
+const NLPGO_TEST_BIN_DIR = path.join(REPO_ROOT, "platform", "app", ".vitest-tmp");
 const NLPGO_TEST_BIN = path.join(
   NLPGO_TEST_BIN_DIR,
   process.platform === "win32" ? "nlpgo-test.exe" : "nlpgo-test",
@@ -135,10 +121,7 @@ export interface NlpgoSubprocess {
   stop: () => Promise<void>;
 }
 
-async function waitForNlpgoHealth(
-  port: number,
-  timeoutMs: number,
-): Promise<void> {
+async function waitForNlpgoHealth(port: number, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -217,9 +200,7 @@ export async function startNlpgoSubprocess(opts: {
         /* group already gone */
       }
       const exited = await Promise.race([
-        new Promise<boolean>((resolve) =>
-          child.once("exit", () => resolve(true)),
-        ),
+        new Promise<boolean>((resolve) => child.once("exit", () => resolve(true))),
         sleep(3000).then(() => false),
       ]);
       if (!exited) {

@@ -43,12 +43,7 @@ export function HeadersConfigSection({
     <VStack align="stretch" gap={3} width="full">
       {/* Header */}
       <HStack width="full">
-        <Text
-          fontSize="xs"
-          fontWeight="bold"
-          textTransform="uppercase"
-          color="fg.muted"
-        >
+        <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color="fg.muted">
           Custom Headers
         </Text>
         <Spacer />
@@ -76,9 +71,7 @@ export function HeadersConfigSection({
             <HStack key={index} gap={2}>
               <Input
                 value={header.key}
-                onChange={(e) =>
-                  handleUpdateHeader(index, "key", e.target.value)
-                }
+                onChange={(e) => handleUpdateHeader(index, "key", e.target.value)}
                 placeholder="Header name"
                 size="sm"
                 flex={1}
@@ -87,9 +80,7 @@ export function HeadersConfigSection({
               />
               <Input
                 value={header.value}
-                onChange={(e) =>
-                  handleUpdateHeader(index, "value", e.target.value)
-                }
+                onChange={(e) => handleUpdateHeader(index, "value", e.target.value)}
                 placeholder="Header value"
                 size="sm"
                 flex={2}
@@ -97,10 +88,7 @@ export function HeadersConfigSection({
                 data-testid={`header-value-${index}`}
               />
               {!disabled && (
-                <Tooltip
-                  content="Remove header"
-                  positioning={{ placement: "top" }}
-                >
+                <Tooltip content="Remove header" positioning={{ placement: "top" }}>
                   <Button
                     size="xs"
                     variant="ghost"

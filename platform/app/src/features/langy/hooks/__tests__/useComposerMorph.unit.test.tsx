@@ -59,9 +59,7 @@ function mountFloatingPanelComposer() {
   composer.getBoundingClientRect = () =>
     ({
       ...FLOATING_CORNER,
-      left:
-        FLOATING_CORNER.left +
-        (panel.style.transform !== "none" ? CLOSED_OFFSET : 0),
+      left: FLOATING_CORNER.left + (panel.style.transform !== "none" ? CLOSED_OFFSET : 0),
     }) as DOMRect;
 
   return { textarea };
@@ -80,9 +78,8 @@ const setPrefersReducedMotion = (reduce: boolean) => {
   })) as unknown as typeof window.matchMedia;
 };
 
-const renderMorph = (
-  heroCardRef: ReturnType<typeof createRef<HTMLDivElement>>,
-) => renderHook(() => useComposerMorph({ heroCardRef }));
+const renderMorph = (heroCardRef: ReturnType<typeof createRef<HTMLDivElement>>) =>
+  renderHook(() => useComposerMorph({ heroCardRef }));
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -114,9 +111,7 @@ describe("useComposerMorph()", () => {
 
         expect(result.current.flight).toBeNull();
         expect(useLangyStore.getState().isOpen).toBe(true);
-        expect(useLangyStore.getState().pendingPrompt).toBe(
-          "why are my traces failing",
-        );
+        expect(useLangyStore.getState().pendingPrompt).toBe("why are my traces failing");
       });
 
       it("says out loud what the animation would have said", () => {
@@ -127,9 +122,7 @@ describe("useComposerMorph()", () => {
         const { result } = renderMorph(heroCardRef);
         act(() => result.current.ask("why are my traces failing"));
 
-        expect(result.current.announcement).toContain(
-          "why are my traces failing",
-        );
+        expect(result.current.announcement).toContain("why are my traces failing");
       });
     });
   });

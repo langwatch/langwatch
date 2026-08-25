@@ -94,9 +94,7 @@ describe("organization.acceptInvite", () => {
     ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
     ledger.revokeBindingsWhere.mockResolvedValue(0);
     findUniqueMock = vi.fn();
-    inviteUpdateMock = vi
-      .fn()
-      .mockResolvedValue(makeInvite({ status: "ACCEPTED" }));
+    inviteUpdateMock = vi.fn().mockResolvedValue(makeInvite({ status: "ACCEPTED" }));
     createManyMock = vi.fn().mockResolvedValue({ count: 1 });
   });
 

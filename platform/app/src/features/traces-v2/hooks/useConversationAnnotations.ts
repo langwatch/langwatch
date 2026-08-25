@@ -42,9 +42,7 @@ export interface ConversationAnnotations {
  * the last conversation's annotations while the next one is still loading, and
  * counting those would credit this conversation with another one's work.
  */
-export function useConversationAnnotations(
-  traceIds: string[],
-): ConversationAnnotations {
+export function useConversationAnnotations(traceIds: string[]): ConversationAnnotations {
   const { project, hasPermission } = useOrganizationTeamProject();
 
   const query = useAnnotationsByTraceIds({

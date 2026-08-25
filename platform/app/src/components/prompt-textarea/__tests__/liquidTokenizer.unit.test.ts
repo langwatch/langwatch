@@ -47,9 +47,7 @@ describe("tokenizeLiquidTemplate()", () => {
     it("identifies the entire expression including filters as a variable token", () => {
       const tokens = tokenizeLiquidTemplate("{{ name | upcase }}");
 
-      expect(tokens).toEqual([
-        { type: "variable", value: "{{ name | upcase }}" },
-      ]);
+      expect(tokens).toEqual([{ type: "variable", value: "{{ name | upcase }}" }]);
     });
   });
 

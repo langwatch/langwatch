@@ -85,10 +85,7 @@ vi.mock("~/utils/api", async () => {
       },
       currency: {
         detectCurrency: {
-          useQuery: (
-            _input: Record<string, never>,
-            opts: { enabled: boolean },
-          ) =>
+          useQuery: (_input: Record<string, never>, opts: { enabled: boolean }) =>
             opts.enabled ? setup.mockDetectCurrency() : { data: undefined },
         },
       },
@@ -164,9 +161,7 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /Show members/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Show members/i })).toBeInTheDocument();
         expect(screen.getByText("Seats available")).toBeInTheDocument();
       });
     });
@@ -211,9 +206,7 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /Add Seat/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
@@ -231,9 +224,7 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /Add Seat/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
@@ -264,9 +255,7 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /Add Seat/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
@@ -287,9 +276,7 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /Add Seat/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
@@ -319,9 +306,7 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /Add Seat/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
@@ -344,9 +329,7 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /Add Seat/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
@@ -461,9 +444,7 @@ describe("<SubscriptionPage/>", () => {
         await waitFor(() => {
           expect(screen.getByTestId("pending-seat-0")).toBeInTheDocument();
           expect(screen.getByTestId("pending-seat-1")).toBeInTheDocument();
-          expect(
-            screen.queryByTestId("pending-seat-2"),
-          ).not.toBeInTheDocument();
+          expect(screen.queryByTestId("pending-seat-2")).not.toBeInTheDocument();
         });
       });
     });
@@ -478,9 +459,7 @@ describe("<SubscriptionPage/>", () => {
         await waitFor(() => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
-        expect(
-          screen.queryByTestId("update-seats-block"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
       });
     });
 
@@ -490,9 +469,7 @@ describe("<SubscriptionPage/>", () => {
         renderSubscriptionPage();
         await user.click(screen.getByTestId("user-count-link"));
 
-        const emailInput = screen.getByTestId(
-          "seat-email-0",
-        ) as HTMLInputElement;
+        const emailInput = screen.getByTestId("seat-email-0") as HTMLInputElement;
         await user.type(emailInput, "newuser@example.com");
         await user.click(screen.getByRole("button", { name: /Done/i }));
 
@@ -510,9 +487,7 @@ describe("<SubscriptionPage/>", () => {
         });
 
         // No update-seats block should appear (invite only, no billing change)
-        expect(
-          screen.queryByTestId("update-seats-block"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
       });
     });
 
@@ -637,9 +612,7 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByRole("button", { name: /Done/i }));
 
       expect(mockCreateInvitesMutate).not.toHaveBeenCalled();
-      expect(
-        screen.queryByTestId("update-seats-block"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
     });
 
     it("sends invite and shows downgrade when filling email and deleting a row", async () => {

@@ -3,14 +3,8 @@ import type { Cluster, Redis } from "ioredis";
 import type { PrismaClient } from "~/generated/prisma/client";
 
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringProcess.types";
-import {
-  type BackfillDeps,
-  seedClusteringSchedules,
-} from "./seedClusteringSchedules";
-import {
-  type RecordTopicsSeedCommand,
-  seedTopicModelHistory,
-} from "./seedTopicModel";
+import { type BackfillDeps, seedClusteringSchedules } from "./seedClusteringSchedules";
+import { type RecordTopicsSeedCommand, seedTopicModelHistory } from "./seedTopicModel";
 
 export interface TopicClusteringBootSeedCommands {
   recordTopics: RecordTopicsSeedCommand;
@@ -37,10 +31,7 @@ export interface TopicClusteringBootSeedDeps {
  */
 export function prismaScheduleSeedPorts(
   prisma: PrismaClient,
-): Pick<
-  BackfillDeps,
-  "findEligibleProjectsPage" | "findAlreadyScheduledProjectIds"
-> {
+): Pick<BackfillDeps, "findEligibleProjectsPage" | "findAlreadyScheduledProjectIds"> {
   return {
     findEligibleProjectsPage: ({ afterId, take }) =>
       prisma.project.findMany({
@@ -79,9 +70,7 @@ export function prismaScheduleSeedPorts(
  * without it. Failures are logged and the next boot retries — nothing here
  * may take the boot down, so this returns immediately and never throws.
  */
-export function startTopicClusteringBootSeeds(
-  deps: TopicClusteringBootSeedDeps,
-): void {
+export function startTopicClusteringBootSeeds(deps: TopicClusteringBootSeedDeps): void {
   void seedTopicModelHistory({
     prisma: deps.prisma,
     redis: deps.redis,

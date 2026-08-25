@@ -15,11 +15,7 @@
  * it is registered as a public endpoint with the reason written out, because it
  * serves nothing but a 404 for unknown version segments.
  */
-import {
-  createService,
-  type MountedRoute,
-  type RouteChain,
-} from "@langwatch/api";
+import { createService, type MountedRoute, type RouteChain } from "@langwatch/api";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 
 import { appContextMiddleware } from "~/app/api/middleware/app-context";

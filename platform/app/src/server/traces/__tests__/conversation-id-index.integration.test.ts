@@ -42,9 +42,7 @@ async function insertTrace({
         TraceId: traceId,
         Version: "v1",
         Attributes:
-          conversationId === null
-            ? {}
-            : { "gen_ai.conversation.id": conversationId },
+          conversationId === null ? {} : { "gen_ai.conversation.id": conversationId },
         OccurredAt: new Date(),
         CreatedAt: new Date(),
         UpdatedAt: new Date(),

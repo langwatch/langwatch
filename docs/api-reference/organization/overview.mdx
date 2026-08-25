@@ -4,7 +4,10 @@ description: "Read and update the organization the calling credential belongs to
 ---
 
 <Note>
-  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused
+  with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments
+  need an Enterprise license for the same endpoints. To enable it, reach out to
+  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
 ## Intro
@@ -25,9 +28,9 @@ Reading needs `organization:view`; updating needs `organization:manage`. A key w
 
 ## Endpoints
 
-| Method | Path | Permission | Description |
-|--------|------|------------|-------------|
-| `GET` | `/api/organization` | `organization:view` | Read the organization profile |
+| Method  | Path                | Permission            | Description                             |
+| ------- | ------------------- | --------------------- | --------------------------------------- |
+| `GET`   | `/api/organization` | `organization:view`   | Read the organization profile           |
 | `PATCH` | `/api/organization` | `organization:manage` | Update part of the organization profile |
 
 Members and invites are families of their own: see [Members](/api-reference/members/overview) and [Invites](/api-reference/invites/overview).

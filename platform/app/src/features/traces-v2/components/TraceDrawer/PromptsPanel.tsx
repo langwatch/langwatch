@@ -199,27 +199,19 @@ export function PromptsPanel({
   const showRoleChips = usages.length > 1;
   const roleFor = (handle: string): PromptRole | null => {
     if (!showRoleChips) return null;
-    if (trace.lastUsedPromptId && handle === trace.lastUsedPromptId)
-      return "lastUsed";
-    if (trace.selectedPromptId && handle === trace.selectedPromptId)
-      return "pinned";
+    if (trace.lastUsedPromptId && handle === trace.lastUsedPromptId) return "lastUsed";
+    if (trace.selectedPromptId && handle === trace.selectedPromptId) return "pinned";
     return null;
   };
 
   return (
     <VStack align="stretch" gap={0}>
       {!hideHeader && (
-        <Box
-          paddingX={4}
-          paddingY={3}
-          borderBottomWidth="1px"
-          borderColor="border"
-        >
+        <Box paddingX={4} paddingY={3} borderBottomWidth="1px" borderColor="border">
           <HStack gap={2}>
             <Icon as={LuFileText} boxSize={4} color="blue.fg" />
             <Text textStyle="sm" fontWeight="semibold">
-              {usages.length} prompt{usages.length === 1 ? "" : "s"} in this
-              trace
+              {usages.length} prompt{usages.length === 1 ? "" : "s"} in this trace
             </Text>
           </HStack>
         </Box>
@@ -289,8 +281,8 @@ function PromptDriftBanner({
     >
       {hasDrift && (
         <WarningRow tone="warning" title="Pinned prompt drifted at runtime">
-          The pin resolved to a different concrete prompt than what was recorded
-          as last used. Common when a tag like{" "}
+          The pin resolved to a different concrete prompt than what was recorded as last
+          used. Common when a tag like{" "}
           <Text as="span" fontWeight="medium" color="fg">
             production
           </Text>{" "}
@@ -300,19 +292,16 @@ function PromptDriftBanner({
 
       {outOfDate && latestVersion != null && (
         <WarningRow tone="warning" title="Trace ran an out-of-date prompt">
-          This trace used v{trace.lastUsedPromptVersionNumber}; the
-          prompt&rsquo;s current latest is v{latestVersion}. Consider re-testing
-          against the latest version before relying on this behaviour.
+          This trace used v{trace.lastUsedPromptVersionNumber}; the prompt&rsquo;s current
+          latest is v{latestVersion}. Consider re-testing against the latest version
+          before relying on this behaviour.
         </WarningRow>
       )}
 
       {promptMissing && (
-        <WarningRow
-          tone="muted"
-          title="Prompt no longer exists in this project"
-        >
-          The trace still shows what ran at the time, but the underlying managed
-          prompt has been deleted.
+        <WarningRow tone="muted" title="Prompt no longer exists in this project">
+          The trace still shows what ran at the time, but the underlying managed prompt
+          has been deleted.
         </WarningRow>
       )}
     </VStack>
@@ -332,13 +321,7 @@ function WarningRow({
   const icon = tone === "warning" ? LuTriangleAlert : LuCircleDashed;
   return (
     <HStack gap={2} align="flex-start">
-      <Icon
-        as={icon}
-        boxSize={3.5}
-        color={color}
-        marginTop="2px"
-        flexShrink={0}
-      />
+      <Icon as={icon} boxSize={3.5} color={color} marginTop="2px" flexShrink={0} />
       <VStack align="stretch" gap={0.5}>
         <Text textStyle="xs" fontWeight="semibold" color={color}>
           {title}
@@ -395,12 +378,7 @@ function PromptUsageCard({
     <VStack align="stretch" gap={2.5} paddingY={3}>
       <HStack justify="space-between" gap={2} align="center">
         <HStack gap={2} minWidth={0}>
-          <Icon
-            as={LuFileText}
-            boxSize={3.5}
-            color="fg.subtle"
-            flexShrink={0}
-          />
+          <Icon as={LuFileText} boxSize={3.5} color="fg.subtle" flexShrink={0} />
           <Text textStyle="sm" fontWeight="semibold" truncate minWidth={0}>
             {ref.handle}
           </Text>
@@ -452,13 +430,7 @@ function PromptUsageCard({
       {variableEntries.length > 0 && (
         <Box bg="bg.subtle" borderRadius="md" overflow="hidden">
           {variableEntries.map(([key, val]) => (
-            <HStack
-              key={key}
-              paddingX={2.5}
-              paddingY={1}
-              gap={3}
-              align="center"
-            >
+            <HStack key={key} paddingX={2.5} paddingY={1} gap={3} align="center">
               <Text
                 width="120px"
                 flexShrink={0}
@@ -470,14 +442,7 @@ function PromptUsageCard({
               >
                 {key}
               </Text>
-              <Text
-                flex={1}
-                textStyle="xs"
-                color="fg"
-                truncate
-                minWidth={0}
-                title={val}
-              >
+              <Text flex={1} textStyle="xs" color="fg" truncate minWidth={0} title={val}>
                 {val}
               </Text>
             </HStack>
@@ -492,8 +457,8 @@ function PromptUsageCard({
         </VStack>
       ) : spanIds.length === 0 ? (
         <Text textStyle="xs" color="fg.subtle">
-          Recorded from trace attributes; no span on this trace exposes the
-          prompt id directly.
+          Recorded from trace attributes; no span on this trace exposes the prompt id
+          directly.
         </Text>
       ) : (
         <VStack align="stretch" gap={0}>
@@ -534,12 +499,7 @@ function SpanRow({
       width="full"
       textAlign="left"
     >
-      <Icon
-        as={LuCornerDownRight}
-        boxSize={3}
-        color="fg.subtle"
-        flexShrink={0}
-      />
+      <Icon as={LuCornerDownRight} boxSize={3} color="fg.subtle" flexShrink={0} />
       <Text textStyle="xs" color="fg" truncate flex={1} minWidth={0}>
         {span?.name ?? spanId}
       </Text>

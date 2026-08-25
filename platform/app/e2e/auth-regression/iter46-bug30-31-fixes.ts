@@ -72,9 +72,7 @@ async function main() {
     );
     check(
       "no Set-Cookie returned from rejected request",
-      !(csrfRes.headers.get("set-cookie") ?? "").includes(
-        "better-auth.session_token",
-      ),
+      !(csrfRes.headers.get("set-cookie") ?? "").includes("better-auth.session_token"),
     );
 
     console.log("\n[2] Bug 31: missing Origin AND missing Referer → 403");
@@ -106,16 +104,10 @@ async function main() {
         name: "Legit",
       }),
     });
-    check(
-      "same-origin POST returns 200",
-      okRes.status === 200,
-      `status=${okRes.status}`,
-    );
+    check("same-origin POST returns 200", okRes.status === 200, `status=${okRes.status}`);
     check(
       "same-origin POST sets session cookie",
-      (okRes.headers.get("set-cookie") ?? "").includes(
-        "better-auth.session_token",
-      ),
+      (okRes.headers.get("set-cookie") ?? "").includes("better-auth.session_token"),
     );
 
     console.log("\n[4] Bug 31: GET /api/auth/get-session bypasses gate");
@@ -202,9 +194,7 @@ async function main() {
     console.log(`✅ ALL CHECKS PASSED (${passes}/${passes})`);
     process.exit(0);
   } else {
-    console.log(
-      `❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`,
-    );
+    console.log(`❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`);
     process.exit(1);
   }
 }

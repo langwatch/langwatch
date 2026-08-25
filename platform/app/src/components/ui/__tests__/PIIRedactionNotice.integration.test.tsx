@@ -6,13 +6,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/utils/compat/next-link", () => ({
-  default: ({
-    href,
-    children,
-  }: {
-    href: string;
-    children: React.ReactNode;
-  }) => <a href={href}>{children}</a>,
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
 }));
 
 import { PIIRedactionNotice } from "../PIIRedactionNotice";

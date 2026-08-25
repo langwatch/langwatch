@@ -18,7 +18,7 @@ export async function handleSetModelProvider(params: {
 
   if (!updated) {
     throw new Error(
-      `Model provider "${params.provider}" was not found in the response. The provider name may be invalid.`
+      `Model provider "${params.provider}" was not found in the response. The provider name may be invalid.`,
     );
   }
 

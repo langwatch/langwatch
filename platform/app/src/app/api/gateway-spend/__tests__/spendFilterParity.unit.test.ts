@@ -21,12 +21,7 @@ const NARROWED_ON_SUMMARIES = "status";
 
 /** Controls that shape a rollup rather than narrowing it, so they belong to
  *  the summaries read alone and are not part of the shared vocabulary. */
-const ROLLUP_ONLY = new Set([
-  "group_by",
-  "bucket",
-  "timezone",
-  "allow_unstable",
-]);
+const ROLLUP_ONLY = new Set(["group_by", "bucket", "timezone", "allow_unstable"]);
 /** Paging and windowing, shared by both but not filters. */
 const NOT_A_FILTER = new Set(["from", "to", "cursor", "limit"]);
 
@@ -139,16 +134,13 @@ describe("given the two gateway spend reads", () => {
       // status parameter dropped from the rollups would otherwise fail here
       // with "cannot read properties of undefined" instead of saying what is
       // missing. Same rule as `queryParameters` above.
-      const parameter = queryParameters(SUMMARIES).find(
-        (p) => p.name === "status",
-      ) as
+      const parameter = queryParameters(SUMMARIES).find((p) => p.name === "status") as
         | { description?: string; schema?: { description?: string } }
         | undefined;
       if (parameter === undefined) {
         throw new Error(`${SUMMARIES} publishes no status parameter`);
       }
-      const description =
-        parameter.description ?? parameter.schema?.description ?? "";
+      const description = parameter.description ?? parameter.schema?.description ?? "";
 
       expect(description).toContain(SPEND_STATUS_IN_FLIGHT);
       expect(description).toContain("/spend-events");

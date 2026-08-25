@@ -72,10 +72,7 @@ export function decryptWebhookHeaders(
   params: Pick<WebhookStoredActionParams, "headersEncrypted" | "headers">,
 ): Record<string, string> {
   if (params.headersEncrypted) {
-    return JSON.parse(decrypt(params.headersEncrypted)) as Record<
-      string,
-      string
-    >;
+    return JSON.parse(decrypt(params.headersEncrypted)) as Record<string, string>;
   }
   return params.headers ?? {};
 }
@@ -93,9 +90,7 @@ export function persistWebhookActionParams({
   incoming: WebhookActionParams;
   existing?: WebhookStoredActionParams | null;
 }): WebhookStoredActionParams {
-  const hasKept = Object.values(incoming.headers).includes(
-    WEBHOOK_HEADER_VALUE_KEPT,
-  );
+  const hasKept = Object.values(incoming.headers).includes(WEBHOOK_HEADER_VALUE_KEPT);
   if (hasKept && existing?.url !== incoming.url) {
     throw new InvalidActionParamsError(
       "Re-enter webhook header values after changing the destination URL.",
@@ -194,19 +189,14 @@ export function redactWebhookActionParams(
   } = params;
   return {
     ...rest,
-    headers: Object.fromEntries(
-      names.map((name) => [name, WEBHOOK_HEADER_VALUE_KEPT]),
-    ),
+    headers: Object.fromEntries(names.map((name) => [name, WEBHOOK_HEADER_VALUE_KEPT])),
     signingSecret: signingSecretEncrypted ? WEBHOOK_HEADER_VALUE_KEPT : null,
   } as WebhookActionParams;
 }
 
 const def: ServerDef = {
   action: TriggerAction.SEND_WEBHOOK,
-  persistActionParams: async ({
-    incoming,
-    loadExisting,
-  }: PersistActionParamsArgs) => {
+  persistActionParams: async ({ incoming, loadExisting }: PersistActionParamsArgs) => {
     const params = incoming as WebhookActionParams;
     // The stored row is needed to resolve a kept header value, and equally to
     // resolve a kept signing secret or to rotate the one it replaces.

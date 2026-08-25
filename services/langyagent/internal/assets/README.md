@@ -8,11 +8,11 @@ the story is `skills/README.md` at the repo root.
 
 ## What lives here
 
-| Path | What it is |
-|---|---|
-| `AGENTS.md` | Langy's system-prompt rules doc, rendered into each worker's `$HOME/AGENTS.md`. Identical in dev and prod (no Docker overlay). |
-| `skills/github/` | Local-build mirror of the Langy-only GitHub skill compiled from root `skills/github/SKILL.mdx`. |
-| `assets.go` / `assets_test.go` | The embed + materialization code and its pins. |
+| Path                           | What it is                                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `AGENTS.md`                    | Langy's system-prompt rules doc, rendered into each worker's `$HOME/AGENTS.md`. Identical in dev and prod (no Docker overlay). |
+| `skills/github/`               | Local-build mirror of the Langy-only GitHub skill compiled from root `skills/github/SKILL.mdx`.                                |
+| `assets.go` / `assets_test.go` | The embed + materialization code and its pins.                                                                                 |
 
 ## Two kinds of skills, one directory at build time
 

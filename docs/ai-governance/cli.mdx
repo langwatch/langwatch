@@ -4,7 +4,13 @@ description: langwatch governance <resource> <verb>, a thin shell over the gover
 sidebarTitle: CLI
 ---
 
-<Info>**Pairs with:** [Governance REST API](/ai-governance/api) (the CLI is a thin shell over it; both call into the same service-layer functions) and [Governance MCP server](/ai-governance/mcp) (same surface for agent invocation). Distinct from [`langwatch ingest …`](/ai-governance/cli-debug): that namespace is for debugging ingestion sources; `langwatch governance …` is for managing every governance resource.</Info>
+<Info>
+  **Pairs with:** [Governance REST API](/ai-governance/api) (the CLI is a thin shell over
+  it; both call into the same service-layer functions) and [Governance MCP
+  server](/ai-governance/mcp) (same surface for agent invocation). Distinct from
+  [`langwatch ingest …`](/ai-governance/cli-debug): that namespace is for debugging
+  ingestion sources; `langwatch governance …` is for managing every governance resource.
+</Info>
 
 <Note>**Agentic-first by design.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every governance feature exposes the full CRUD verb set under `langwatch governance <resource> <verb>`. The CLI is built so a customer can fully set up governance via an agent (Claude Code, Codex, Cursor) without ever opening the dashboard, useful for self-hosted onboarding scripts, CI/CD pipelines, and runbook automations.</Note>
 
@@ -82,11 +88,11 @@ Use `--json` in scripts and CI; the human table is for interactive exploration.
 
 The first preview ships with the two governance resources Sergey wired through Hono REST + service-layer + repository (Ask B-1 through B-7). Additional resources fold into the same `langwatch governance <resource> <verb>` namespace as the umbrella spec's coverage extends.
 
-| Resource | Verbs (shipped in preview) | RBAC |
-|---|---|---|
-| `status` | `status` (top-level, no verb tree, prints setup-state OR-of-flags) | `aiTools:view` |
-| `ingestion-templates` | `list` `admin-list` `get` `create` `update-ottl-rules` `archive` `clone-from-platform` | `aiTools:view` (reads), `aiTools:manage` (writes) |
-| `ingestion-keys` | `list` `mint` `rotate` (project-scoped ingest-only ApiKeys, `sk-lw-` token returned once at mint) | `aiTools:manage` |
+| Resource              | Verbs (shipped in preview)                                                                        | RBAC                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `status`              | `status` (top-level, no verb tree, prints setup-state OR-of-flags)                                | `aiTools:view`                                    |
+| `ingestion-templates` | `list` `admin-list` `get` `create` `update-ottl-rules` `archive` `clone-from-platform`            | `aiTools:view` (reads), `aiTools:manage` (writes) |
+| `ingestion-keys`      | `list` `mint` `rotate` (project-scoped ingest-only ApiKeys, `sk-lw-` token returned once at mint) | `aiTools:manage`                                  |
 
 Resources expected to fold into the same namespace as their REST surfaces ship: `anomaly-rules`, `audit-log`, `gateway-budgets`, `ingestion-sources`, `members`, `invites`, `role-bindings`, `ai-tool-entries`, `sessions`, `virtual-keys`. The CLI is built so adding a new resource is a `commands/governance/<resource>.ts` file plus a `governanceCmd.command(...)` wiring in `sdks/typescript/src/cli/index.ts`.
 

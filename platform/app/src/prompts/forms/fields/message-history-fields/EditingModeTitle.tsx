@@ -54,12 +54,7 @@ export function EditingModeTitle({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <HStack
-          gap={1}
-          cursor="pointer"
-          role="button"
-          _hover={{ opacity: 0.8 }}
-        >
+        <HStack gap={1} cursor="pointer" role="button" _hover={{ opacity: 0.8 }}>
           <PropertySectionTitle padding={0} paddingY={1}>
             {mode === "prompt" ? "Prompt" : "Messages"}
           </PropertySectionTitle>
@@ -74,18 +69,14 @@ export function EditingModeTitle({
           onClick={() => onChange("prompt")}
           data-testid="editing-mode-prompt"
         >
-          <Text fontWeight={mode === "prompt" ? "medium" : "normal"}>
-            Prompt
-          </Text>
+          <Text fontWeight={mode === "prompt" ? "medium" : "normal"}>Prompt</Text>
         </Menu.Item>
         <Menu.Item
           value="messages"
           onClick={() => onChange("messages")}
           data-testid="editing-mode-messages"
         >
-          <Text fontWeight={mode === "messages" ? "medium" : "normal"}>
-            Messages
-          </Text>
+          <Text fontWeight={mode === "messages" ? "medium" : "normal"}>Messages</Text>
         </Menu.Item>
       </Menu.Content>
     </Menu.Root>

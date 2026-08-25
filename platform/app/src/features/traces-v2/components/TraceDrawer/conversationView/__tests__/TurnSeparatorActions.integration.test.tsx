@@ -19,9 +19,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../scenarioRoles", async () => {
-  const actual = await vi.importActual<typeof import("../../scenarioRoles")>(
-    "../../scenarioRoles",
-  );
+  const actual =
+    await vi.importActual<typeof import("../../scenarioRoles")>("../../scenarioRoles");
   return { ...actual, useIsScenarioRole: () => false };
 });
 
@@ -146,9 +145,9 @@ describe("given a reviewer who may correct annotated traces", () => {
 
       const actions = screen.getByRole("group", { name: "Turn actions" });
 
-      expect(
-        [...actions.querySelectorAll("button")].map((b) => b.textContent),
-      ).toEqual(["Edit trace"]);
+      expect([...actions.querySelectorAll("button")].map((b) => b.textContent)).toEqual([
+        "Edit trace",
+      ]);
     });
   });
 
@@ -213,9 +212,7 @@ describe("given a reviewer who may not update annotations", () => {
 
     renderTurn();
 
-    expect(
-      screen.queryByRole("button", { name: "Edit trace" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit trace" })).not.toBeInTheDocument();
   });
 });
 
@@ -354,10 +351,7 @@ describe("given a queue being walked", () => {
       await userEvent.click(sessionCheckbox());
 
       expect(
-        isSessionMarked(
-          useAnnotationQueueSessionStore.getState().marks,
-          TRACE_ID,
-        ),
+        isSessionMarked(useAnnotationQueueSessionStore.getState().marks, TRACE_ID),
       ).toBe(true);
     });
 

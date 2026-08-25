@@ -34,12 +34,8 @@ export function ReplayHistoryTable() {
                 <Table.ColumnHeader>Status</Table.ColumnHeader>
                 <Table.ColumnHeader>Description</Table.ColumnHeader>
                 <Table.ColumnHeader>Projections</Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end">
-                  Duration
-                </Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end">
-                  Aggregates
-                </Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">Duration</Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">Aggregates</Table.ColumnHeader>
                 <Table.ColumnHeader textAlign="end">Events</Table.ColumnHeader>
                 <Table.ColumnHeader>When</Table.ColumnHeader>
                 <Table.ColumnHeader width="40px" />
@@ -54,20 +50,14 @@ export function ReplayHistoryTable() {
                     key={run.runId}
                     cursor="pointer"
                     _hover={{ bg: "bg.subtle" }}
-                    onClick={() =>
-                      void router.push(`/ops/projections/${run.runId}`)
-                    }
+                    onClick={() => void router.push(`/ops/projections/${run.runId}`)}
                   >
                     <Table.Cell>
                       <HStack gap={2}>
                         <Status.Root colorPalette={stateColor}>
                           <Status.Indicator />
                         </Status.Root>
-                        <Badge
-                          size="sm"
-                          variant="subtle"
-                          colorPalette={stateColor}
-                        >
+                        <Badge size="sm" variant="subtle" colorPalette={stateColor}>
                           {run.state}
                         </Badge>
                       </HStack>

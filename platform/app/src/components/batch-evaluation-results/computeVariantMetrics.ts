@@ -205,9 +205,7 @@ export function computeVariantMetrics({
 
   for (const variantId of variantIds) {
     const costs = costByRow[variantId]!.filter((v): v is number => v !== null);
-    const durations = durationByRow[variantId]!.filter(
-      (v): v is number => v !== null,
-    );
+    const durations = durationByRow[variantId]!.filter((v): v is number => v !== null);
 
     result[variantId] = {
       variantId,

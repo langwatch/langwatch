@@ -31,10 +31,7 @@ interface OutroPanelProps {
  * as in-the-way. The single primary action is "send your own
  * traces" so the next step still feels like the user's to take.
  */
-export function OutroPanel({
-  onIntegrate,
-  onDone,
-}: OutroPanelProps): React.ReactElement {
+export function OutroPanel({ onIntegrate, onDone }: OutroPanelProps): React.ReactElement {
   return (
     <Box
       width="full"
@@ -59,12 +56,7 @@ export function OutroPanel({
         </HStack>
 
         <HStack gap={2} flexShrink={0}>
-          <Button
-            size="sm"
-            variant="solid"
-            colorPalette="orange"
-            onClick={onIntegrate}
-          >
+          <Button size="sm" variant="solid" colorPalette="orange" onClick={onIntegrate}>
             <Wrench size={13} />
             Send your own traces
             <ArrowRight size={13} />

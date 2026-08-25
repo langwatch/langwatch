@@ -1,18 +1,8 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
-import {
-  AssistantMessage,
-  CopilotChat,
-  UserMessage,
-} from "@copilotkit/react-ui";
+import { AssistantMessage, CopilotChat, UserMessage } from "@copilotkit/react-ui";
 import clsx from "clsx";
-import {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-} from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import type { z } from "zod";
 import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
 import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
@@ -44,9 +34,7 @@ interface PromptPlaygroundChatProps extends BoxProps {
 export function persistedMessagesKey(
   persisted: { id: string; role: ChatMessage["role"]; content: string }[],
 ): string {
-  return persisted
-    .map((m) => `${m.id}:${m.role}:${m.content.length}`)
-    .join("|");
+  return persisted.map((m) => `${m.id}:${m.role}:${m.content.length}`).join("|");
 }
 
 /**
@@ -131,8 +119,7 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
 
     useEffect(() => {
       const tab = getTabById(tabId);
-      const initialMessagesFromSpanData =
-        tab?.chat?.initialMessagesFromSpanData;
+      const initialMessagesFromSpanData = tab?.chat?.initialMessagesFromSpanData;
       if (initialMessagesFromSpanData?.length) {
         void setMessages(
           convertScenarioMessagesToCopilotKit(initialMessagesFromSpanData),
@@ -225,17 +212,11 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
 
           return (
             <>
-              <DeletableMessage
-                messageId={props.rawData.id}
-                onDelete={deleteMessage}
-              >
+              <DeletableMessage messageId={props.rawData.id} onDelete={deleteMessage}>
                 {isError && parsedError ? (
                   <ErrorMessage error={parsedError} />
                 ) : (
-                  <StructuredOutputDisplay
-                    content={content}
-                    isStreaming={isStreaming}
-                  >
+                  <StructuredOutputDisplay content={content} isStreaming={isStreaming}>
                     <AssistantMessage {...props} />
                   </StructuredOutputDisplay>
                 )}
@@ -248,10 +229,7 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
         }}
         UserMessage={(props) => {
           return (
-            <DeletableMessage
-              messageId={props.rawData.id}
-              onDelete={deleteMessage}
-            >
+            <DeletableMessage messageId={props.rawData.id} onDelete={deleteMessage}>
               <UserMessage {...props} />
             </DeletableMessage>
           );

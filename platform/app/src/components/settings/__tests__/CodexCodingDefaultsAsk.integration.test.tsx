@@ -10,13 +10,7 @@
  * the old one.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 
@@ -122,9 +116,7 @@ describe("Feature: Codex coding-defaults ask on the model-providers page", () =>
     /** @scenario Connecting Codex from settings asks before touching defaults */
     it("asks whether Codex should become the coding default", async () => {
       renderHost();
-      expect(
-        await screen.findByText("Set Codex as your coding default?"),
-      ).toBeTruthy();
+      expect(await screen.findByText("Set Codex as your coding default?")).toBeTruthy();
     });
 
     it("keeps the description short and lists every fast assist in the info tooltip", async () => {
@@ -151,9 +143,7 @@ describe("Feature: Codex coding-defaults ask on the model-providers page", () =>
       /** @scenario Connecting Codex from settings asks before touching defaults */
       it("applies the defaults at the scopes the sign-in saved at", async () => {
         renderHost();
-        fireEvent.click(
-          await screen.findByRole("button", { name: "Set as default" }),
-        );
+        fireEvent.click(await screen.findByRole("button", { name: "Set as default" }));
 
         await waitFor(() =>
           expect(mockApplyCodingDefaults).toHaveBeenCalledWith({
@@ -171,9 +161,7 @@ describe("Feature: Codex coding-defaults ask on the model-providers page", () =>
         useLangyStore.getState().setModelOverride(OLD_DEFAULT);
         renderHost();
 
-        fireEvent.click(
-          await screen.findByRole("button", { name: "Set as default" }),
-        );
+        fireEvent.click(await screen.findByRole("button", { name: "Set as default" }));
 
         await waitFor(() =>
           expect(useLangyStore.getState().modelOverride).toBe(CODEX_MODEL),
@@ -186,17 +174,13 @@ describe("Feature: Codex coding-defaults ask on the model-providers page", () =>
         useLangyStore.getState().setModelOverride("anthropic/claude-sonnet-5");
         renderHost();
 
-        fireEvent.click(
-          await screen.findByRole("button", { name: "Set as default" }),
-        );
+        fireEvent.click(await screen.findByRole("button", { name: "Set as default" }));
 
         await waitFor(() => expect(mockApplyCodingDefaults).toHaveBeenCalled());
         await waitFor(() =>
           expect(useCodexCodingDefaultsAskStore.getState().pending).toBeNull(),
         );
-        expect(useLangyStore.getState().modelOverride).toBe(
-          "anthropic/claude-sonnet-5",
-        );
+        expect(useLangyStore.getState().modelOverride).toBe("anthropic/claude-sonnet-5");
       });
     });
 
@@ -229,9 +213,7 @@ describe("Feature: Codex coding-defaults ask on the model-providers page", () =>
       await waitFor(() =>
         expect(useCodexCodingDefaultsAskStore.getState().pending).toBeNull(),
       );
-      expect(
-        screen.queryByText("Set Codex as your coding default?"),
-      ).toBeNull();
+      expect(screen.queryByText("Set Codex as your coding default?")).toBeNull();
     });
   });
 });

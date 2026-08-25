@@ -82,9 +82,7 @@ const ENTROPY_SAMPLE_LENGTH = 256;
 /** Shannon entropy of `value` in bits per character, over a bounded sample. */
 function shannonEntropyBits(value: string): number {
   const sample =
-    value.length > ENTROPY_SAMPLE_LENGTH
-      ? value.slice(0, ENTROPY_SAMPLE_LENGTH)
-      : value;
+    value.length > ENTROPY_SAMPLE_LENGTH ? value.slice(0, ENTROPY_SAMPLE_LENGTH) : value;
   const counts = new Map<string, number>();
   for (const char of sample) {
     counts.set(char, (counts.get(char) ?? 0) + 1);
@@ -222,10 +220,7 @@ const SHAPED_TOKEN_MIN_ENTROPY = 3.9;
  * new false positives, and it needs no vendor to be named.
  */
 function isKeyShapedBody(body: string): boolean {
-  if (
-    body.length < SHAPED_TOKEN_MIN_BODY ||
-    body.length > SHAPED_TOKEN_MAX_BODY
-  ) {
+  if (body.length < SHAPED_TOKEN_MIN_BODY || body.length > SHAPED_TOKEN_MAX_BODY) {
     return false;
   }
   const { lower, upper, digit } = countCharClasses(body);
@@ -667,8 +662,7 @@ const VALUE_RULES: ValueRule[] = [
         `([0-9a-f]{${HEX_BODY_MIN},${HEX_BODY_MAX}})${TOKEN_END}`,
       "gi",
     ),
-    accept: (groups) =>
-      !IDENTIFIER_PREFIXES.has((groups[1] ?? "").toLowerCase()),
+    accept: (groups) => !IDENTIFIER_PREFIXES.has((groups[1] ?? "").toLowerCase()),
     precondition: (text) => text.includes("_"),
   },
   {
@@ -697,8 +691,7 @@ const VALUE_RULES: ValueRule[] = [
       "g",
     ),
     accept: (groups) =>
-      !isNonCredentialPrefix(groups[1] ?? "") &&
-      isKeyShapedBody(groups[2] ?? ""),
+      !isNonCredentialPrefix(groups[1] ?? "") && isKeyShapedBody(groups[2] ?? ""),
     precondition: (text) => text.includes("_") || text.includes("-"),
   },
   {
@@ -1012,9 +1005,7 @@ function sliceEndAfter(text: string, start: number): number {
     const lookahead = text.slice(target, target + SAFE_CUT_LOOKAHEAD);
     const next = lookahead.search(/\s/);
     end =
-      next === -1
-        ? Math.min(target + SAFE_CUT_LOOKAHEAD, text.length)
-        : target + next;
+      next === -1 ? Math.min(target + SAFE_CUT_LOOKAHEAD, text.length) : target + next;
   }
 
   const begin = text.lastIndexOf(PEM_BEGIN, end);
@@ -1123,11 +1114,7 @@ export function detectSecretsInText({
   text: string;
   customPatterns?: readonly RegExp[];
 }): SecretMatch[] {
-  if (
-    typeof text !== "string" ||
-    text.length === 0 ||
-    text.length > MAX_SCAN_LENGTH
-  ) {
+  if (typeof text !== "string" || text.length === 0 || text.length > MAX_SCAN_LENGTH) {
     return [];
   }
 
@@ -1179,9 +1166,7 @@ function lengthPrecedingMatch({
 
 /** Whether a rule's second-stage test rejects this candidate. */
 function ruleDeclines(rule: ValueRule, match: RegExpMatchArray): boolean {
-  return (
-    rule.accept !== undefined && !rule.accept(match as unknown as string[])
-  );
+  return rule.accept !== undefined && !rule.accept(match as unknown as string[]);
 }
 
 /** How much of a match the rule claims: all of it, or up to the value boundary. */

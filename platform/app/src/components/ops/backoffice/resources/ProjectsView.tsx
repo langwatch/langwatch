@@ -138,21 +138,13 @@ export default function ProjectsView() {
                 </Table.Cell>
                 <Table.Cell>{formatDate(project.createdAt)}</Table.Cell>
                 <Table.Cell textAlign="right">
-                  <Box
-                    width="full"
-                    height="full"
-                    display="flex"
-                    justifyContent="end"
-                  >
+                  <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>
                       <Menu.Trigger>
                         <MoreVertical size={16} />
                       </Menu.Trigger>
                       <Menu.Content>
-                        <Menu.Item
-                          value="edit"
-                          onClick={() => setEditing(project)}
-                        >
+                        <Menu.Item value="edit" onClick={() => setEditing(project)}>
                           <Pencil size={16} />
                           Edit
                         </Menu.Item>
@@ -233,14 +225,11 @@ function ProjectEditDrawer({
 
     if (form.name !== project.name) data.name = form.name;
     if (form.slug !== project.slug) data.slug = form.slug;
-    if (form.language !== (project.language ?? ""))
-      data.language = form.language;
-    if (form.framework !== (project.framework ?? ""))
-      data.framework = form.framework;
+    if (form.language !== (project.language ?? "")) data.language = form.language;
+    if (form.framework !== (project.framework ?? "")) data.framework = form.framework;
     if (form.firstMessage !== !!project.firstMessage)
       data.firstMessage = form.firstMessage;
-    if (form.integrated !== !!project.integrated)
-      data.integrated = form.integrated;
+    if (form.integrated !== !!project.integrated) data.integrated = form.integrated;
     if (form.userLinkTemplate !== (project.userLinkTemplate ?? ""))
       data.userLinkTemplate = nullIfEmpty(form.userLinkTemplate);
     if (form.traceSharingEnabled !== !!project.traceSharingEnabled)
@@ -250,8 +239,7 @@ function ProjectEditDrawer({
     // received from the server can be compared against because the
     // server never sends these fields back.
     if (form.s3Endpoint.trim() !== "") data.s3Endpoint = form.s3Endpoint;
-    if (form.s3AccessKeyId.trim() !== "")
-      data.s3AccessKeyId = form.s3AccessKeyId;
+    if (form.s3AccessKeyId.trim() !== "") data.s3AccessKeyId = form.s3AccessKeyId;
     if (form.s3SecretAccessKey.trim() !== "")
       data.s3SecretAccessKey = form.s3SecretAccessKey;
     if (form.s3Bucket.trim() !== "") data.s3Bucket = form.s3Bucket;
@@ -368,8 +356,8 @@ function ProjectEditDrawer({
               </Field.Root>
               <SectionHeading>Project S3</SectionHeading>
               <Text fontSize="xs" color="fg.muted">
-                Credentials below are write-only — the server never reads them
-                back. Leave blank to keep the stored value; type to replace.
+                Credentials below are write-only — the server never reads them back. Leave
+                blank to keep the stored value; type to replace.
               </Text>
               <Field.Root>
                 <Field.Label>Endpoint</Field.Label>
@@ -403,9 +391,7 @@ function ProjectEditDrawer({
                 <Input
                   type="password"
                   value={form.s3SecretAccessKey}
-                  onChange={(e) =>
-                    setField("s3SecretAccessKey", e.target.value)
-                  }
+                  onChange={(e) => setField("s3SecretAccessKey", e.target.value)}
                   placeholder="Leave blank to keep current"
                   autoComplete="new-password"
                 />
@@ -493,10 +479,7 @@ function ToggleRow({
           )}
         </VStack>
         <Spacer />
-        <Switch
-          checked={checked}
-          onCheckedChange={(e) => onChange(e.checked)}
-        />
+        <Switch checked={checked} onCheckedChange={(e) => onChange(e.checked)} />
       </HStack>
     </Field.Root>
   );

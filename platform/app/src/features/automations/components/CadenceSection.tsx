@@ -1,12 +1,4 @@
-import {
-  Box,
-  Field,
-  HStack,
-  Input,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { CADENCE_LABELS } from "@langwatch/automation-contract";
 import { useEffect, useState } from "react";
 import {
@@ -189,8 +181,7 @@ function GraphCadence() {
 
       <Text textStyle="xs" color="fg.muted">
         Fires when the watched metric is {OPERATOR_LABELS[operator]}{" "}
-        {Number.isFinite(parsed) ? parsed : "…"} over{" "}
-        {TIME_PERIOD_LABELS[timePeriod]}.
+        {Number.isFinite(parsed) ? parsed : "…"} over {TIME_PERIOD_LABELS[timePeriod]}.
       </Text>
     </VStack>
   );

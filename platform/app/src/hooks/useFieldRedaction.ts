@@ -2,10 +2,7 @@ import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 export const useFieldRedaction = (field: "input" | "output") => {
-  if (
-    typeof window !== "undefined" &&
-    window.location.pathname.includes("/share/")
-  ) {
+  if (typeof window !== "undefined" && window.location.pathname.includes("/share/")) {
     return {
       isRedacted: false,
       isLoading: false,

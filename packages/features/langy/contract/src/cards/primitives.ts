@@ -55,8 +55,7 @@ export const resolveTotal = ({
 }: {
   pagination?: Pagination | null;
   rows: readonly unknown[];
-}): number =>
-  pagination?.totalHits ?? pagination?.total ?? rows.length;
+}): number => pagination?.totalHits ?? pagination?.total ?? rows.length;
 
 /**
  * A text field the platform sends either bare (`"hello"`) or wrapped in the trace

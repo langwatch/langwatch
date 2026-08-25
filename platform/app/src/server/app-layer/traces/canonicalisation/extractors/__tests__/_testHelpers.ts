@@ -74,11 +74,7 @@ export function createLogExtractorContext(
   body = "",
 ): LogExtractorContext {
   const parsed = parseJsonStringAttrs(attrs);
-  const bag = new LogRecordDataBag(
-    scopeName,
-    body,
-    parsed as NormalizedAttributes,
-  );
+  const bag = new LogRecordDataBag(scopeName, body, parsed as NormalizedAttributes);
   const out: NormalizedAttributes = {};
 
   const setAttr = vi.fn((key: string, value: unknown) => {

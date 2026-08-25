@@ -108,31 +108,16 @@ export function LangyToolErrorCard({
             </Text>
           ) : null}
           {presentation.tips?.length ? (
-            <VStack
-              as="ul"
-              align="stretch"
-              gap={0.5}
-              paddingLeft={4}
-              margin={0}
-            >
+            <VStack as="ul" align="stretch" gap={0.5} paddingLeft={4} margin={0}>
               {presentation.tips.map((tip) => (
-                <Text
-                  as="li"
-                  key={tip}
-                  textStyle="xs"
-                  color="fg.muted"
-                  lineHeight="1.45"
-                >
+                <Text as="li" key={tip} textStyle="xs" color="fg.muted" lineHeight="1.45">
                   {tip}
                 </Text>
               ))}
             </VStack>
           ) : null}
           {presentation.code ? (
-            <LangyFailureReference
-              code={presentation.code}
-              raw={presentation.raw}
-            />
+            <LangyFailureReference code={presentation.code} raw={presentation.raw} />
           ) : null}
           {presentation.traceId ? (
             <Text textStyle="2xs" color="fg.subtle" fontFamily="mono" truncate>

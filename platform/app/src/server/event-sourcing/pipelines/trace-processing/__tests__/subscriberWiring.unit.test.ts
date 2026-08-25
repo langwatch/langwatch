@@ -82,28 +82,20 @@ describe("trace-processing pipeline subscriber wiring", () => {
       expect(triggerMatch).toBeDefined();
       expect(triggerMatch!.projectionName).toBe("traceSummary");
       expect(triggerMatch!.definition.options?.delay).toBe(30_000);
-      expect(triggerMatch!.definition.options?.deduplication?.ttlMs).toBe(
-        30_000,
-      );
+      expect(triggerMatch!.definition.options?.deduplication?.ttlMs).toBe(30_000);
     });
 
     it("reacts only to span_received and origin_resolved events", () => {
       const shouldDispatch = triggerMatch!.definition.shouldDispatch!;
       const context = {} as never;
+      expect(shouldDispatch(fakeEvent({ type: SPAN_RECEIVED_EVENT_TYPE }), context)).toBe(
+        true,
+      );
       expect(
-        shouldDispatch(fakeEvent({ type: SPAN_RECEIVED_EVENT_TYPE }), context),
+        shouldDispatch(fakeEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }), context),
       ).toBe(true);
       expect(
-        shouldDispatch(
-          fakeEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
-          context,
-        ),
-      ).toBe(true);
-      expect(
-        shouldDispatch(
-          fakeEvent({ type: "lw.obs.trace.something_else" }),
-          context,
-        ),
+        shouldDispatch(fakeEvent({ type: "lw.obs.trace.something_else" }), context),
       ).toBe(false);
     });
 
@@ -119,8 +111,7 @@ describe("trace-processing pipeline subscriber wiring", () => {
     it("delegates to automations.triggerMatchHandler with tenant/aggregate/fold state", async () => {
       const deps = buildTraceDeps();
       const pipeline = createTraceProcessingPipeline(deps);
-      const subscriber =
-        pipeline.foldSubscribers.get("triggerMatch")!.definition;
+      const subscriber = pipeline.foldSubscribers.get("triggerMatch")!.definition;
       const event = fakeEvent({ tenantId: "project-2", aggregateId: "t-2" });
       const foldState = { traceId: "t-2" } as any;
       await subscriber.handle(event, {
@@ -138,22 +129,17 @@ describe("trace-processing pipeline subscriber wiring", () => {
 
   describe("given the customEvaluationSync subscriber", () => {
     const definition = createTraceProcessingPipeline(buildTraceDeps());
-    const customEvaluationSync = definition.foldSubscribers.get(
-      "customEvaluationSync",
-    );
+    const customEvaluationSync = definition.foldSubscribers.get("customEvaluationSync");
 
     it("attaches to the traceSummary fold with the subscriber-era 5s delay and 30s dedup ttl", () => {
       expect(customEvaluationSync).toBeDefined();
       expect(customEvaluationSync!.projectionName).toBe("traceSummary");
       expect(customEvaluationSync!.definition.options?.delay).toBe(5_000);
-      expect(
-        customEvaluationSync!.definition.options?.deduplication?.ttlMs,
-      ).toBe(30_000);
+      expect(customEvaluationSync!.definition.options?.deduplication?.ttlMs).toBe(30_000);
     });
 
     it("derives the dedup id from tenant + aggregate + event id, scoped to this subscriber", () => {
-      const makeId =
-        customEvaluationSync!.definition.options?.deduplication?.makeId;
+      const makeId = customEvaluationSync!.definition.options?.deduplication?.makeId;
       expect(makeId).toBeDefined();
       const event = fakeEvent({
         id: "ev-9",
@@ -168,14 +154,11 @@ describe("trace-processing pipeline subscriber wiring", () => {
     it("rejects events without syncable evaluations before enqueue", () => {
       const shouldDispatch = customEvaluationSync!.definition.shouldDispatch!;
       const context = {} as never;
+      expect(shouldDispatch(fakeEvent({ type: SPAN_RECEIVED_EVENT_TYPE }), context)).toBe(
+        false,
+      );
       expect(
-        shouldDispatch(fakeEvent({ type: SPAN_RECEIVED_EVENT_TYPE }), context),
-      ).toBe(false);
-      expect(
-        shouldDispatch(
-          fakeEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
-          context,
-        ),
+        shouldDispatch(fakeEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }), context),
       ).toBe(false);
     });
   });
@@ -191,14 +174,11 @@ describe("trace-processing pipeline subscriber wiring", () => {
 
     it("carries the 5s delay and 30s dedup ttl through the registration", () => {
       expect(trackedEventSync!.definition.options?.delay).toBe(5_000);
-      expect(trackedEventSync!.definition.options?.deduplication?.ttlMs).toBe(
-        30_000,
-      );
+      expect(trackedEventSync!.definition.options?.deduplication?.ttlMs).toBe(30_000);
     });
 
     it("derives the dedup id from tenant + aggregate + event id, scoped to this subscriber", () => {
-      const makeId =
-        trackedEventSync!.definition.options?.deduplication?.makeId;
+      const makeId = trackedEventSync!.definition.options?.deduplication?.makeId;
       expect(makeId).toBeDefined();
       const event = fakeEvent({
         id: "ev-9",
@@ -213,9 +193,7 @@ describe("trace-processing pipeline subscriber wiring", () => {
 
   describe("given the graphTriggerActivity subscriber", () => {
     const definition = createTraceProcessingPipeline(buildTraceDeps());
-    const graphTriggerActivity = definition.eventSubscribers.get(
-      "graphTriggerActivity",
-    );
+    const graphTriggerActivity = definition.eventSubscribers.get("graphTriggerActivity");
 
     it("registers for span_received and origin_resolved with the real-time debounce delay", () => {
       expect(graphTriggerActivity).toBeDefined();
@@ -254,10 +232,10 @@ describe("trace-processing pipeline subscriber wiring", () => {
         tenantId: "project-3",
         aggregateId: "t-3",
       });
-      expect(deps.automations.graphActivityHandler).toHaveBeenCalledWith(
-        event,
-        { tenantId: "project-3", aggregateId: "t-3" },
-      );
+      expect(deps.automations.graphActivityHandler).toHaveBeenCalledWith(event, {
+        tenantId: "project-3",
+        aggregateId: "t-3",
+      });
     });
   });
 });

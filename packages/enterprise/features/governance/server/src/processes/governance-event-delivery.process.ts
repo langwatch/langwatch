@@ -14,21 +14,16 @@ import {
   type GovernanceWebhookEnvelope,
 } from "../ports/governance-webhook.port";
 
-export const GOVERNANCE_EVENTS_PROCESS_NAME =
-  "governanceEventsDelivery" as const;
+export const GOVERNANCE_EVENTS_PROCESS_NAME = "governanceEventsDelivery" as const;
 
 export class GovernanceEventDeliveryProcess {
   private constructor(private readonly intent: GovernanceEventDeliveryIntent) {}
 
   static create(port: GovernanceWebhookPort): GovernanceEventDeliveryProcess {
-    return new GovernanceEventDeliveryProcess(
-      GovernanceEventDeliveryIntent.create(port),
-    );
+    return new GovernanceEventDeliveryProcess(GovernanceEventDeliveryIntent.create(port));
   }
 
-  static vkLifecycleEnvelope(
-    data: GovernanceVkLifecycleData,
-  ): GovernanceWebhookEnvelope {
+  static vkLifecycleEnvelope(data: GovernanceVkLifecycleData): GovernanceWebhookEnvelope {
     const type = `gateway.virtual_key.${data.action}`;
     const id = `${data.virtual_key_id}:${data.action}:${data.occurred_at}`;
     return {
@@ -86,17 +81,14 @@ export class GovernanceEventDeliveryProcess {
     return (process) =>
       process
         .state({})
-        .intent(
-          "deliverGovernance",
-          deliverGovernanceSchema,
-          (payload, context) => this.intent.deliver(payload, context),
+        .intent("deliverGovernance", deliverGovernanceSchema, (payload, context) =>
+          this.intent.deliver(payload, context),
         )
         .intent("sendBatch", governanceSendBatchSchema, (payload, context) =>
           this.intent.sendBatch(payload, context),
         )
         .on(GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE, (state, data, context) => {
-          const envelope =
-            GovernanceEventDeliveryProcess.vkLifecycleEnvelope(data);
+          const envelope = GovernanceEventDeliveryProcess.vkLifecycleEnvelope(data);
           return {
             state,
             intents: [
@@ -110,8 +102,7 @@ export class GovernanceEventDeliveryProcess {
           };
         })
         .on(GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE, (state, data, context) => {
-          const envelope =
-            GovernanceEventDeliveryProcess.budgetCrossingEnvelope(data);
+          const envelope = GovernanceEventDeliveryProcess.budgetCrossingEnvelope(data);
           return {
             state,
             intents: [

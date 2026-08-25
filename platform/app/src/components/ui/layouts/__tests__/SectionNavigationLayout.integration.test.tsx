@@ -37,9 +37,10 @@ describe("SectionNavigationFrame", () => {
     const content = screen.getByTestId("section-navigation-content");
 
     expect(within(navigation).getByText("Automations")).toBeInTheDocument();
-    expect(
-      within(navigation).getByRole("link", { name: "Overview" }),
-    ).toHaveAttribute("href", "/automations");
+    expect(within(navigation).getByRole("link", { name: "Overview" })).toHaveAttribute(
+      "href",
+      "/automations",
+    );
     expect(
       within(content).getByRole("heading", { name: "Overview" }),
     ).toBeInTheDocument();

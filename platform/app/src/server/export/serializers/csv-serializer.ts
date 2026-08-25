@@ -70,21 +70,14 @@ export function serializeTracesToSummaryCsv({
   evaluatorNames: string[];
 }): string {
   const headers = buildSummaryHeaders({ evaluatorNames });
-  const rows = traces.map((trace) =>
-    buildSummaryRow({ trace, evaluatorNames }),
-  );
+  const rows = traces.map((trace) => buildSummaryRow({ trace, evaluatorNames }));
 
   return (
-    Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) +
-    CSV_NEWLINE
+    Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) + CSV_NEWLINE
   );
 }
 
-function buildSummaryHeaders({
-  evaluatorNames,
-}: {
-  evaluatorNames: string[];
-}): string[] {
+function buildSummaryHeaders({ evaluatorNames }: { evaluatorNames: string[] }): string[] {
   const headers: string[] = [...SUMMARY_COLUMNS];
   for (const name of evaluatorNames) {
     headers.push(`${name}_score`);
@@ -115,9 +108,7 @@ function buildSummaryRow({
     nullableNumber(trace.metrics?.prompt_tokens),
     nullableNumber(trace.metrics?.completion_tokens),
     nullableNumber(trace.metrics?.total_cost),
-    Object.keys(customMetadata).length > 0
-      ? JSON.stringify(customMetadata)
-      : "",
+    Object.keys(customMetadata).length > 0 ? JSON.stringify(customMetadata) : "",
     trace.metadata.topic_id ?? "",
     trace.metadata.subtopic_id ?? "",
   ];
@@ -198,16 +189,11 @@ export function serializeTracesToFullCsv({
   }
 
   return (
-    Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) +
-    CSV_NEWLINE
+    Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) + CSV_NEWLINE
   );
 }
 
-function buildFullHeaders({
-  evaluatorNames,
-}: {
-  evaluatorNames: string[];
-}): string[] {
+function buildFullHeaders({ evaluatorNames }: { evaluatorNames: string[] }): string[] {
   const headers: string[] = [...FULL_TRACE_COLUMNS, ...FULL_SPAN_COLUMNS];
   for (const name of evaluatorNames) {
     headers.push(`${name}_score`);
@@ -248,9 +234,7 @@ function buildFullRow({
     nullableNumber(trace.metrics?.prompt_tokens),
     nullableNumber(trace.metrics?.completion_tokens),
     (trace.metadata.labels ?? []).join(", "),
-    Object.keys(customMetadata).length > 0
-      ? JSON.stringify(customMetadata)
-      : "",
+    Object.keys(customMetadata).length > 0 ? JSON.stringify(customMetadata) : "",
     trace.metadata.topic_id ?? "",
     trace.metadata.subtopic_id ?? "",
     serializeError(trace.error),
@@ -279,9 +263,7 @@ function buildFullRow({
   const spanEvaluations = (trace.evaluations ?? []).filter(
     (e) => !e.span_id || e.span_id === span.span_id,
   );
-  row.push(
-    ...buildEvaluationColumns({ evaluations: spanEvaluations, evaluatorNames }),
-  );
+  row.push(...buildEvaluationColumns({ evaluations: spanEvaluations, evaluatorNames }));
 
   return row;
 }
@@ -350,11 +332,7 @@ function serializeError(error: ErrorCapture | null | undefined): string {
 function extractCustomMetadata(trace: Trace): Record<string, unknown> {
   const custom: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(trace.metadata)) {
-    if (
-      !RESERVED_METADATA_KEYS.has(key) &&
-      value !== null &&
-      value !== undefined
-    ) {
+    if (!RESERVED_METADATA_KEYS.has(key) && value !== null && value !== undefined) {
       custom[key] = value;
     }
   }

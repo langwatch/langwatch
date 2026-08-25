@@ -18,10 +18,7 @@ import {
   barOverQueryResult,
   lookupBetweenRegisteredDatasets,
 } from "../../__tests__/fixtures/valid";
-import {
-  parseVegaLiteSpecText,
-  validateVegaLiteSpec,
-} from "../validateVegaLiteSpec";
+import { parseVegaLiteSpecText, validateVegaLiteSpec } from "../validateVegaLiteSpec";
 import { VEGA_LITE_SCHEMA_URL } from "../vegaLiteSchema";
 import type {
   LangWatchQLVegaLiteChartProps,
@@ -112,9 +109,7 @@ describe("validateVegaLiteSpec", () => {
         expect(refusalsOf(wrongVersion)).toEqual([
           ["spec.unsupported-schema-version", "unsupported-schema-version"],
         ]);
-        expect(messagesOf(wrongVersion).join(" ")).toContain(
-          VEGA_LITE_SCHEMA_URL,
-        );
+        expect(messagesOf(wrongVersion).join(" ")).toContain(VEGA_LITE_SCHEMA_URL);
 
         // Nothing was rewritten to the supported version on the way through.
         expect((unknownSchemaVersion as { $schema: string }).$schema).toBe(

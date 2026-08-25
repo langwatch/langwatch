@@ -75,9 +75,7 @@ export function splitChipsForOverflow(
 
   const overflowing = visibleChips.length > maxVisible;
   const primaryPicks = overflowing
-    ? [...visibleChips]
-        .sort((a, b) => a.priority - b.priority)
-        .slice(0, maxVisible - 1)
+    ? [...visibleChips].sort((a, b) => a.priority - b.priority).slice(0, maxVisible - 1)
     : visibleChips;
   const overflow = overflowing
     ? visibleChips.filter((c) => !primaryPicks.some((p) => p.id === c.id))

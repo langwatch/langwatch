@@ -102,14 +102,12 @@ function getSharedTransport(): DestinationStream | null {
   // to the NODE_ENV default (pretty in dev, JSON in prod), so nothing changes for
   // anyone who never sets it.
   const logFormat = process.env.LOG_FORMAT;
-  const usePretty =
-    logFormat === "pretty" || (logFormat !== "json" && isDevelopment);
+  const usePretty = logFormat === "pretty" || (logFormat !== "json" && isDevelopment);
 
   const isOtelExportEnabled = process.env.PINO_OTEL_ENABLED === "true";
   const consoleLevel =
     process.env.LOG_CONSOLE_LEVEL ?? process.env.PINO_CONSOLE_LEVEL ?? "info";
-  const otelLevel =
-    process.env.LOG_OTEL_LEVEL ?? process.env.PINO_OTEL_LEVEL ?? "debug";
+  const otelLevel = process.env.LOG_OTEL_LEVEL ?? process.env.PINO_OTEL_LEVEL ?? "debug";
 
   try {
     sharedTransport = buildTransport({
@@ -119,10 +117,7 @@ function getSharedTransport(): DestinationStream | null {
       otelLevel,
     });
   } catch (error) {
-    console.error(
-      "Failed to create pino transport, falling back to stdout:",
-      error,
-    );
+    console.error("Failed to create pino transport, falling back to stdout:", error);
     sharedTransport = null;
   }
 
@@ -175,10 +170,7 @@ export function resetLoggerCache(): void {
   loggerCache.clear();
 }
 
-export function createLogger(
-  name: string,
-  options?: CreateLoggerOptions,
-): PinoLogger {
+export function createLogger(name: string, options?: CreateLoggerOptions): PinoLogger {
   // The prefix keeps a context-disabled logger from being handed out for a
   // name that also has a context-enabled one, which would silently drop the
   // request fields from every line written through it.
@@ -195,8 +187,7 @@ export function createLogger(
 }
 
 function createBrowserLogger(name: string): PinoLogger {
-  const isTest =
-    typeof process !== "undefined" && process.env.NODE_ENV === "test";
+  const isTest = typeof process !== "undefined" && process.env.NODE_ENV === "test";
   const level = isTest
     ? "error"
     : typeof process !== "undefined"
@@ -274,14 +265,10 @@ export function serviceVersionField(): Record<string, string> {
   return {};
 }
 
-function createNodeLogger(
-  name: string,
-  options?: CreateLoggerOptions,
-): PinoLogger {
+function createNodeLogger(name: string, options?: CreateLoggerOptions): PinoLogger {
   const isTest = process.env.NODE_ENV === "test";
   const defaultLevel = isTest ? "error" : "debug";
-  const level =
-    process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? defaultLevel;
+  const level = process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? defaultLevel;
 
   const pinoOptions: LoggerOptions = {
     name,
@@ -315,15 +302,11 @@ function createNodeLogger(
       }),
       level: (label) => ({ level: label.toUpperCase() }),
     },
-    mixin: options?.disableContext
-      ? undefined
-      : () => logContextProvider?.() ?? {},
+    mixin: options?.disableContext ? undefined : () => logContextProvider?.() ?? {},
   };
 
   const transport = getSharedTransport();
-  return transport
-    ? pino(pinoOptions, transport)
-    : pino(pinoOptions, process.stdout);
+  return transport ? pino(pinoOptions, transport) : pino(pinoOptions, process.stdout);
 }
 
 function buildTransport({

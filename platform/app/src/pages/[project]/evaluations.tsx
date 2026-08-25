@@ -34,10 +34,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { formatEvaluationSummary } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
 import { CopyExperimentDialog } from "../../components/experiments/CopyExperimentDialog";
-import {
-  NavigationFooter,
-  useNavigationFooter,
-} from "../../components/NavigationFooter";
+import { NavigationFooter, useNavigationFooter } from "../../components/NavigationFooter";
 import { OverflownTextWithTooltip } from "../../components/OverflownText";
 import { PageLayout } from "../../components/ui/layouts/PageLayout";
 import { Menu } from "../../components/ui/menu";
@@ -79,31 +76,25 @@ export function ExperimentsPage() {
 
   navigationFooter.useUpdateTotalHits(experiments);
 
-  const deleteExperimentMutation = api.experiments.deleteExperiment.useMutation(
-    {
-      onSuccess: () => {
-        void experiments.refetch();
-        toaster.create({
-          title: "Experiment deleted",
-          type: "success",
-        });
-      },
-      onError: (error) => {
-        if (isHandledByGlobalHandler(error)) return;
-        toaster.create({
-          title: "Error deleting experiment",
-          description:
-            "Please try again. If the problem persists, contact support.",
-          type: "error",
-        });
-      },
+  const deleteExperimentMutation = api.experiments.deleteExperiment.useMutation({
+    onSuccess: () => {
+      void experiments.refetch();
+      toaster.create({
+        title: "Experiment deleted",
+        type: "success",
+      });
     },
-  );
+    onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
+      toaster.create({
+        title: "Error deleting experiment",
+        description: "Please try again. If the problem persists, contact support.",
+        type: "error",
+      });
+    },
+  });
 
-  const handleDeleteExperiment = (
-    experimentId: string,
-    experimentName: string,
-  ) => {
+  const handleDeleteExperiment = (experimentId: string, experimentName: string) => {
     setExperimentToDelete({ id: experimentId, name: experimentName });
   };
 
@@ -181,19 +172,13 @@ export function ExperimentsPage() {
               <ListTable width="full">
                 <Table.Header>
                   <Table.Row>
-                    <Table.ColumnHeader width="20%">
-                      Experiment
-                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="20%">Experiment</Table.ColumnHeader>
                     <Table.ColumnHeader width="15%">Type</Table.ColumnHeader>
                     <Table.ColumnHeader width="10%">Dataset</Table.ColumnHeader>
-                    <Table.ColumnHeader width="20%">
-                      Primary Metric
-                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="20%">Primary Metric</Table.ColumnHeader>
                     <Table.ColumnHeader width="10%">Runs</Table.ColumnHeader>
                     <Table.ColumnHeader width="10%">Status</Table.ColumnHeader>
-                    <Table.ColumnHeader width="10%">
-                      Last Updated
-                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="10%">Last Updated</Table.ColumnHeader>
                     <Table.ColumnHeader width="5%"></Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
@@ -271,9 +256,7 @@ export function ExperimentsPage() {
                               <Table.Cell whiteSpace="nowrap">
                                 <Badge colorPalette="gray" variant="outline">
                                   {experiment.workbenchState?.task
-                                    ? taskTypeToLabel[
-                                        experiment.workbenchState.task
-                                      ]
+                                    ? taskTypeToLabel[experiment.workbenchState.task]
                                     : experimentTypeToLabel[experiment.type]}
                                 </Badge>
                               </Table.Cell>
@@ -288,16 +271,8 @@ export function ExperimentsPage() {
                               <Table.Cell>
                                 {experiment.runsSummary.primaryMetric ? (
                                   <>
-                                    <Text
-                                      as="span"
-                                      fontSize="xs"
-                                      color="fg.muted"
-                                    >
-                                      {
-                                        experiment.runsSummary.primaryMetric
-                                          .name
-                                      }
-                                      : &nbsp;
+                                    <Text as="span" fontSize="xs" color="fg.muted">
+                                      {experiment.runsSummary.primaryMetric.name}: &nbsp;
                                     </Text>
                                     <Text as="span" fontWeight="semibold">
                                       {formatEvaluationSummary(
@@ -324,8 +299,8 @@ export function ExperimentsPage() {
                                       />
                                       <Text fontSize="sm">Completed</Text>
                                     </>
-                                  ) : experiment.runsSummary.latestRun
-                                      ?.timestamps?.stoppedAt ? (
+                                  ) : experiment.runsSummary.latestRun?.timestamps
+                                      ?.stoppedAt ? (
                                     <>
                                       <LuCircleX
                                         size={14}
@@ -333,11 +308,11 @@ export function ExperimentsPage() {
                                       />
                                       <Text fontSize="sm">Stopped</Text>
                                     </>
-                                  ) : experiment.runsSummary.latestRun
-                                      ?.timestamps?.updatedAt &&
+                                  ) : experiment.runsSummary.latestRun?.timestamps
+                                      ?.updatedAt &&
                                     Date.now() -
-                                      experiment.runsSummary.latestRun
-                                        .timestamps.updatedAt <
+                                      experiment.runsSummary.latestRun.timestamps
+                                        .updatedAt <
                                       5 * 60 * 1000 ? (
                                     <>
                                       <Spinner size="xs" />
@@ -359,9 +334,7 @@ export function ExperimentsPage() {
                                 </HStack>
                               </Table.Cell>
                               <Table.Cell whiteSpace="nowrap">
-                                {new Date(
-                                  experiment.updatedAt,
-                                ).toLocaleString()}
+                                {new Date(experiment.updatedAt).toLocaleString()}
                               </Table.Cell>
                               <Table.Cell>
                                 <Box
@@ -383,8 +356,7 @@ export function ExperimentsPage() {
                                     </Menu.Trigger>
                                     <Menu.Content>
                                       {hasPermission("workflows:create") &&
-                                        experiment.type ===
-                                          "EVALUATIONS_V3" && (
+                                        experiment.type === "EVALUATIONS_V3" && (
                                           <Menu.Item
                                             value="edit"
                                             onClick={(e) => {
@@ -400,8 +372,7 @@ export function ExperimentsPage() {
                                         )}
                                       {hasPermission("workflows:create") &&
                                         experiment.type !== "EVALUATIONS_V3" &&
-                                        experiment.type !==
-                                          "BATCH_EVALUATION_V2" &&
+                                        experiment.type !== "BATCH_EVALUATION_V2" &&
                                         experiment.workbenchState && (
                                           <Menu.Item
                                             value="edit"
@@ -437,8 +408,7 @@ export function ExperimentsPage() {
                                               open: true,
                                               experimentId: experiment.id,
                                               experimentName:
-                                                experiment.name ??
-                                                experiment.slug,
+                                                experiment.name ?? experiment.slug,
                                             });
                                           }}
                                         >
@@ -454,8 +424,7 @@ export function ExperimentsPage() {
                                             e.stopPropagation();
                                             handleDeleteExperiment(
                                               experiment.id,
-                                              experiment.name ??
-                                                experiment.slug,
+                                              experiment.name ?? experiment.slug,
                                             );
                                           }}
                                         >

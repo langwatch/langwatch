@@ -25,9 +25,7 @@ export type RunStatusCategory =
  * The switch is exhaustive over ScenarioRunStatus with no default, so adding a
  * status to the enum is a compile error here until it is categorised.
  */
-export function categorizeRunStatus(
-  status: ScenarioRunStatus,
-): RunStatusCategory {
+export function categorizeRunStatus(status: ScenarioRunStatus): RunStatusCategory {
   switch (status) {
     case ScenarioRunStatus.SUCCESS:
       return "success";

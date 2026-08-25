@@ -100,9 +100,7 @@ export async function resolveOffloadedTraces({
   aggregateType?: string;
 }): Promise<ResolvedTraceSpans> {
   // Fast path: no span in this trace has any event ref — skip entirely.
-  const anyHasRefs = normalizedSpans.some((span) =>
-    hasEventRefs(span.spanAttributes),
-  );
+  const anyHasRefs = normalizedSpans.some((span) => hasEventRefs(span.spanAttributes));
 
   if (!anyHasRefs) {
     return {
@@ -181,10 +179,7 @@ export async function resolveOffloadedTraces({
           // Log and keep preview for this field; other fields are not affected.
           const err = result.reason;
           const attrKey = eventrefEntries[idx]?.attrKey ?? "unknown";
-          if (
-            err instanceof BlobNotFoundError ||
-            err instanceof BlobFieldNotFoundError
-          ) {
+          if (err instanceof BlobNotFoundError || err instanceof BlobFieldNotFoundError) {
             logger.warn(
               {
                 projectId,
@@ -219,28 +214,26 @@ export async function resolveOffloadedTraces({
 
   // Collect resolved spans; fall back to original span on unexpected rejection.
   let anyResolved = false;
-  const resolvedSpans: NormalizedSpan[] = spanSettlements.map(
-    (settlement, i) => {
-      if (settlement.status === "fulfilled") {
-        if (settlement.value.resolvedCount > 0) anyResolved = true;
-        return settlement.value.span;
-      }
-      // Unexpected uncaught error from the span's async mapper — log and fall back.
-      logger.warn(
-        {
-          projectId,
-          spanId: normalizedSpans[i]?.spanId,
-          traceId: normalizedSpans[i]?.traceId,
-          error:
-            settlement.reason instanceof Error
-              ? settlement.reason.message
-              : String(settlement.reason),
-        },
-        "Failed to resolve offloaded event refs for span — keeping preview value",
-      );
-      return normalizedSpans[i]!;
-    },
-  );
+  const resolvedSpans: NormalizedSpan[] = spanSettlements.map((settlement, i) => {
+    if (settlement.status === "fulfilled") {
+      if (settlement.value.resolvedCount > 0) anyResolved = true;
+      return settlement.value.span;
+    }
+    // Unexpected uncaught error from the span's async mapper — log and fall back.
+    logger.warn(
+      {
+        projectId,
+        spanId: normalizedSpans[i]?.spanId,
+        traceId: normalizedSpans[i]?.traceId,
+        error:
+          settlement.reason instanceof Error
+            ? settlement.reason.message
+            : String(settlement.reason),
+      },
+      "Failed to resolve offloaded event refs for span — keeping preview value",
+    );
+    return normalizedSpans[i]!;
+  });
 
   if (!anyResolved) {
     return {

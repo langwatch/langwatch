@@ -109,9 +109,9 @@ export function getVersionValidator(schemaVersion: SchemaVersion) {
  * @throws Error if the schema llmConfigVersion is unknown
  * @throws ZodError if the config data is invalid
  */
-export function parseLlmConfigVersion(
-  llmConfigVersion: { schemaVersion: SchemaVersion | string },
-): LatestConfigVersionSchema {
+export function parseLlmConfigVersion(llmConfigVersion: {
+  schemaVersion: SchemaVersion | string;
+}): LatestConfigVersionSchema {
   const { schemaVersion } = llmConfigVersion;
 
   const validator = getVersionValidator(schemaVersion as SchemaVersion);
@@ -133,10 +133,7 @@ export function parseRuntimeParameters(value: unknown): RuntimeParameters {
 }
 
 export function runtimeParametersEqual(a: unknown, b: unknown): boolean {
-  return (
-    JSON.stringify(sortKeysDeep(a ?? {})) ===
-    JSON.stringify(sortKeysDeep(b ?? {}))
-  );
+  return JSON.stringify(sortKeysDeep(a ?? {})) === JSON.stringify(sortKeysDeep(b ?? {}));
 }
 
 /**

@@ -34,9 +34,7 @@ const TABLE_NAME = "coding_agent_sessions" as const;
  */
 const LIST_READ_DEDUP_OVERFETCH = 2;
 
-const logger = createLogger(
-  "langwatch:app-layer:coding-agent:session-repository",
-);
+const logger = createLogger("langwatch:app-layer:coding-agent:session-repository");
 
 /**
  * ClickHouse persistence for the coding-agent session row (ADR-056,
@@ -332,9 +330,7 @@ function toRecord({
   };
 }
 
-export class CodingAgentSessionClickHouseRepository
-  implements CodingAgentSessionRepository
-{
+export class CodingAgentSessionClickHouseRepository implements CodingAgentSessionRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   /**
@@ -352,11 +348,7 @@ export class CodingAgentSessionClickHouseRepository
   private lastVersionStampMs = 0;
 
   private nextVersionStamp(priorUpdatedAtMs: number): number {
-    const stamp = Math.max(
-      Date.now(),
-      priorUpdatedAtMs + 1,
-      this.lastVersionStampMs + 1,
-    );
+    const stamp = Math.max(Date.now(), priorUpdatedAtMs + 1, this.lastVersionStampMs + 1);
     this.lastVersionStampMs = stamp;
     return stamp;
   }
@@ -516,9 +508,7 @@ export class CodingAgentSessionClickHouseRepository
       query_params: {
         tenantId,
         sessionId,
-        ...(window !== undefined
-          ? { from: window.fromMs, to: window.toMs }
-          : {}),
+        ...(window !== undefined ? { from: window.fromMs, to: window.toMs } : {}),
       },
       format: "JSONEachRow",
     });
@@ -628,8 +618,7 @@ export class CodingAgentSessionClickHouseRepository
     );
     const client = await this.resolveClient(tenantId);
 
-    const userFilter =
-      userId !== undefined ? "AND UserId = {userId:String}" : "";
+    const userFilter = userId !== undefined ? "AND UserId = {userId:String}" : "";
 
     const startedAt = performance.now();
     const observe = (outcome: CodingAgentSessionListReadOutcome) =>
@@ -922,19 +911,10 @@ const asNumberArray = (value: unknown): number[] =>
   Array.isArray(value) ? value.map(asNumber) : [];
 
 /** Parse the `MetricSeries` Array(Tuple(...)), read as an array of arrays. */
-const asMetricSeriesRows = (
-  value: unknown,
-): CodingAgentSessionMetricSeriesRow[] =>
+const asMetricSeriesRows = (value: unknown): CodingAgentSessionMetricSeriesRow[] =>
   Array.isArray(value)
     ? value.map((unit) => {
-        const tuple = unit as [
-          unknown,
-          unknown,
-          unknown,
-          unknown,
-          unknown,
-          unknown,
-        ];
+        const tuple = unit as [unknown, unknown, unknown, unknown, unknown, unknown];
         return {
           seriesId: String(tuple[0] ?? ""),
           metricName: String(tuple[1] ?? ""),
@@ -1013,13 +993,9 @@ function preferredOf(
   const progressOf = (record: Record<string, unknown>) => ({
     watermark: msOf(record.LastEventOccurredAt),
     signals:
-      asNumber(record.ModelCalls) +
-      asNumber(record.ToolCalls) +
-      asNumber(record.Prompts),
+      asNumber(record.ModelCalls) + asNumber(record.ToolCalls) + asNumber(record.Prompts),
     units: Array.isArray(record.MetricSeries) ? record.MetricSeries.length : 0,
-    applied: Array.isArray(record.AppliedEventIds)
-      ? record.AppliedEventIds.length
-      : 0,
+    applied: Array.isArray(record.AppliedEventIds) ? record.AppliedEventIds.length : 0,
     startedAt: msOf(record.StartedAt),
   });
   const held = progressOf(incumbent);

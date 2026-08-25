@@ -1,11 +1,5 @@
-import {
-  TEST_FIRE_EMAIL_SUBJECT_PREFIX,
-  testFireEmailCalloutHtml,
-} from "./banner";
-import {
-  DEFAULT_EMAIL_BODY_TEMPLATE,
-  DEFAULT_EMAIL_SUBJECT_TEMPLATE,
-} from "./defaults";
+import { TEST_FIRE_EMAIL_SUBJECT_PREFIX, testFireEmailCalloutHtml } from "./banner";
+import { DEFAULT_EMAIL_BODY_TEMPLATE, DEFAULT_EMAIL_SUBJECT_TEMPLATE } from "./defaults";
 import { wrapEmailHtml } from "./emailLayout";
 import { markdownToEmailHtml } from "./markdown";
 import { renderWithFallback } from "./renderWithFallback";
@@ -102,10 +96,7 @@ export async function renderTriggerEmail({
     html,
     usedDefault: subjectRender.usedDefault || bodyRender.usedDefault,
     missingVariables: [
-      ...new Set([
-        ...subjectRender.missingVariables,
-        ...bodyRender.missingVariables,
-      ]),
+      ...new Set([...subjectRender.missingVariables, ...bodyRender.missingVariables]),
     ],
     errors,
   };

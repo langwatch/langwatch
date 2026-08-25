@@ -3,10 +3,7 @@ import { Check, ExternalLink, LogOut, RefreshCw } from "lucide-react";
 import { langyFirstPartyLinkProps } from "~/features/langy/hooks/useLangyExternalLinkGuard";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import { Link } from "../ui/link";
-import {
-  type CodexSignInPhase,
-  useCodexDeviceSignIn,
-} from "./useCodexDeviceSignIn";
+import { type CodexSignInPhase, useCodexDeviceSignIn } from "./useCodexDeviceSignIn";
 
 /**
  * Sign in with your OpenAI account — the Codex provider's whole credential
@@ -91,8 +88,8 @@ function ConnectedPanel({
         </Text>
       </HStack>
       <Text fontSize="xs" color="fg.muted">
-        Langy and the AI assists run on this account's plan. Usage counts
-        against your OpenAI subscription limits, not API credits.
+        Langy and the AI assists run on this account's plan. Usage counts against your
+        OpenAI subscription limits, not API credits.
       </Text>
       <HStack gap={2}>
         <Button size="xs" variant="outline" onClick={onReauthenticate}>
@@ -180,8 +177,8 @@ function StartPanel({
         </Text>
       ) : (
         <Text fontSize="xs" color="fg.muted">
-          Sign in with your OpenAI account and Codex runs on your ChatGPT plan.
-          No API key needed.
+          Sign in with your OpenAI account and Codex runs on your ChatGPT plan. No API key
+          needed.
         </Text>
       )}
       <Box>

@@ -46,11 +46,7 @@ class FakeRedis {
   /** TTL, in seconds, of the most recent successful lease renewal. */
   public lastRenewTtlSeconds: number | null = null;
 
-  async eval(
-    script: string,
-    numKeys: number,
-    ...rest: string[]
-  ): Promise<number> {
+  async eval(script: string, numKeys: number, ...rest: string[]): Promise<number> {
     this.evalCalls++;
     const keys = rest.slice(0, numKeys);
     const argv = rest.slice(numKeys);
@@ -73,32 +69,18 @@ class FakeRedis {
   }
 
   /** Refuses unless the lease is still ours and the payload is not older. */
-  private writeFenced({
-    keys,
-    argv,
-  }: {
-    keys: string[];
-    argv: string[];
-  }): number {
+  private writeFenced({ keys, argv }: { keys: string[]; argv: string[] }): number {
     const [artifactKey, leaseKey] = keys;
     const [payload, token, , computedAt] = argv;
     if (!this.ownsLease({ leaseKey: leaseKey!, token: token! })) return 0;
-    if (
-      this.isOlderThanStored({ key: artifactKey!, computedAt: computedAt! })
-    ) {
+    if (this.isOlderThanStored({ key: artifactKey!, computedAt: computedAt! })) {
       return 0;
     }
     this.store.set(artifactKey!, payload!);
     return 1;
   }
 
-  private ownsLease({
-    leaseKey,
-    token,
-  }: {
-    leaseKey: string;
-    token: string;
-  }): boolean {
+  private ownsLease({ leaseKey, token }: { leaseKey: string; token: string }): boolean {
     return this.store.get(leaseKey) === token;
   }
 
@@ -111,9 +93,7 @@ class FakeRedis {
   }): boolean {
     const existing = this.store.get(key);
     if (!existing) return false;
-    const previous = Number(
-      (JSON.parse(existing) as { computedAt?: number }).computedAt,
-    );
+    const previous = Number((JSON.parse(existing) as { computedAt?: number }).computedAt);
     return Number.isFinite(previous) && previous > Number(computedAt);
   }
 
@@ -362,9 +342,7 @@ describe("parseSnapshot", () => {
 
   describe("given a snapshot this reader understands", () => {
     it("returns it", () => {
-      expect(
-        parseSnapshot(liveSnapshotSchema, JSON.stringify(validLive)),
-      ).not.toBeNull();
+      expect(parseSnapshot(liveSnapshotSchema, JSON.stringify(validLive))).not.toBeNull();
     });
   });
 
@@ -372,9 +350,7 @@ describe("parseSnapshot", () => {
     /** @scenario "A snapshot with an unknown version is treated as absent" */
     it("treats it as absent rather than coercing it", () => {
       const future = { ...validLive, version: SNAPSHOT_VERSION + 1 };
-      expect(
-        parseSnapshot(liveSnapshotSchema, JSON.stringify(future)),
-      ).toBeNull();
+      expect(parseSnapshot(liveSnapshotSchema, JSON.stringify(future))).toBeNull();
     });
   });
 
@@ -420,10 +396,7 @@ describe("parseSnapshot", () => {
   describe("given the stored snapshot changed between reads", () => {
     /** @scenario "A rewritten snapshot is picked up on the next read" */
     it("returns the new one rather than the one it validated before", () => {
-      parseSnapshot(
-        liveSnapshotSchema,
-        JSON.stringify(liveSnapshot({ computedAt: 1 })),
-      );
+      parseSnapshot(liveSnapshotSchema, JSON.stringify(liveSnapshot({ computedAt: 1 })));
 
       const next = parseSnapshot(
         liveSnapshotSchema,

@@ -35,10 +35,7 @@ describe("EventSourcingService - Security Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
@@ -63,10 +60,7 @@ describe("EventSourcingService - Security Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
@@ -91,10 +85,7 @@ describe("EventSourcingService - Security Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
@@ -133,10 +124,7 @@ describe("EventSourcingService - Security Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -163,10 +151,7 @@ describe("EventSourcingService - Security Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
@@ -178,9 +163,9 @@ describe("EventSourcingService - Security Flows", () => {
         ),
       ];
 
-      await expect(
-        service.storeEvents(events, undefined as any),
-      ).rejects.toThrow("tenantId");
+      await expect(service.storeEvents(events, undefined as any)).rejects.toThrow(
+        "tenantId",
+      );
     });
 
     it("invalid tenantId causes errors", async () => {
@@ -188,10 +173,7 @@ describe("EventSourcingService - Security Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
@@ -211,9 +193,9 @@ describe("EventSourcingService - Security Flows", () => {
       ];
 
       for (const invalidContext of invalidContexts) {
-        await expect(
-          service.storeEvents(events, invalidContext as any),
-        ).rejects.toThrow(/tenantId|TenantId/);
+        await expect(service.storeEvents(events, invalidContext as any)).rejects.toThrow(
+          /tenantId|TenantId/,
+        );
       }
     });
 
@@ -230,10 +212,7 @@ describe("EventSourcingService - Security Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -331,10 +310,7 @@ describe("EventSourcingService - Security Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
@@ -379,10 +355,7 @@ describe("EventSourcingService - Security Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -414,10 +387,7 @@ describe("EventSourcingService - Security Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -453,10 +423,7 @@ describe("EventSourcingService - Security Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });

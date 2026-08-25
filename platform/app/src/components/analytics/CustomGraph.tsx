@@ -45,10 +45,7 @@ import { describeError } from "~/features/errors";
 import { availableFilters } from "~/server/filters/registry";
 import type { FilterField } from "~/server/filters/types";
 import { useRouter } from "~/utils/compat/next-router";
-import {
-  useColorModeValue,
-  useColorRawValue,
-} from "../../components/ui/color-mode";
+import { useColorModeValue, useColorRawValue } from "../../components/ui/color-mode";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -236,9 +233,7 @@ const CustomGraph_ = React.memo(
     useEffect(() => {
       try {
         const stored = localStorage.getItem(storageKey);
-        setHiddenSeries(
-          stored ? new Set(JSON.parse(stored) as string[]) : new Set(),
-        );
+        setHiddenSeries(stored ? new Set(JSON.parse(stored) as string[]) : new Set());
       } catch {
         setHiddenSeries(new Set());
       }
@@ -348,12 +343,7 @@ const CustomGraph_ = React.memo(
         return defaultOnDataPointClick;
       }
       return undefined;
-    }, [
-      onDataPointClick,
-      input.graphType,
-      input.timeScale,
-      defaultOnDataPointClick,
-    ]);
+    }, [onDataPointClick, input.graphType, input.timeScale, defaultOnDataPointClick]);
 
     const timeScale = useMemo(() => {
       // Force "full" only for summary charts to get aggregated data
@@ -368,11 +358,7 @@ const CustomGraph_ = React.memo(
           : parseInt(input.timeScale.toString(), 10);
 
       // Show 1 hour granularity for full period when days difference is 2 days or less
-      if (
-        typeof timeScale_ === "number" &&
-        timeScale_ >= 1440 &&
-        daysDifference <= 2
-      ) {
+      if (typeof timeScale_ === "number" && timeScale_ >= 1440 && daysDifference <= 2) {
         return 60;
       }
 
@@ -453,8 +439,7 @@ const CustomGraph_ = React.memo(
       },
       {
         ...queryOpts,
-        enabled:
-          queryOpts.enabled && load && input.graphType === "monitor_graph",
+        enabled: queryOpts.enabled && load && input.graphType === "monitor_graph",
       },
     );
 
@@ -527,8 +512,7 @@ const CustomGraph_ = React.memo(
       (aggKey: string) => {
         const { series, groupKey } = getSeries(seriesByKey, aggKey);
 
-        const group =
-          input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
+        const group = input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
         const displayGroupKey = groupKey || "unknown";
         const groupName =
           groupKey !== undefined
@@ -633,11 +617,7 @@ const CustomGraph_ = React.memo(
 
     const formatDate = (date: string) =>
       formatChartDate({ date, timeScale, daysDifference });
-    const tooltipValueFormatter: Formatter<ValueType, NameType> = (
-      value,
-      _,
-      payload,
-    ) => {
+    const tooltipValueFormatter: Formatter<ValueType, NameType> = (value, _, payload) => {
       if (payload.dataKey === "date") {
         return formatDate(value as string);
       }
@@ -667,8 +647,7 @@ const CustomGraph_ = React.memo(
       // label and a skeletoned number for each series), so painting bars behind
       // them stacks two different loading states on the same pixels. Every
       // other graph type keeps it.
-      const showChartSkeleton =
-        timeseries.isLoading && input.graphType !== "summary";
+      const showChartSkeleton = timeseries.isLoading && input.graphType !== "summary";
 
       return (
         <Box width="full" height="full" position="relative">
@@ -681,17 +660,15 @@ const CustomGraph_ = React.memo(
               justifyContent="center"
             >
               <HStack gap={1} align="end" opacity={0.15}>
-                {[35, 55, 25, 70, 45, 65, 40, 55, 30, 60, 50, 35].map(
-                  (h, i) => (
-                    <Skeleton
-                      key={i}
-                      width="8px"
-                      height={`${h}%`}
-                      maxHeight={`${(h / 100) * (height_ - 40)}px`}
-                      borderRadius="sm"
-                    />
-                  ),
-                )}
+                {[35, 55, 25, 70, 45, 65, 40, 55, 30, 60, 50, 35].map((h, i) => (
+                  <Skeleton
+                    key={i}
+                    width="8px"
+                    height={`${h}%`}
+                    maxHeight={`${(h / 100) * (height_ - 40)}px`}
+                    borderRadius="sm"
+                  />
+                ))}
               </HStack>
             </Box>
           )}
@@ -798,11 +775,7 @@ const CustomGraph_ = React.memo(
           <Flex paddingBottom={3} width="full" gap={0}>
             {timeseries.isLoading &&
               Object.entries(seriesSet).map(([key, series]) => (
-                <SummaryMetric
-                  key={key}
-                  label={series.name}
-                  titleProps={titleProps}
-                />
+                <SummaryMetric key={key} label={series.name} titleProps={titleProps} />
               ))}
             {summaryData.current.slice(0, 10).map((entry) => (
               <SummaryMetric
@@ -843,10 +816,7 @@ const CustomGraph_ = React.memo(
                   pieData[index]
                 ) {
                   const entry = pieData[index]!;
-                  const { series, groupKey } = getSeries(
-                    seriesByKey,
-                    entry.key,
-                  );
+                  const { series, groupKey } = getSeries(seriesByKey, entry.key);
                   // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
                   const evaluatorId =
                     series?.key || input.groupByKey || input.series[0]?.key;
@@ -860,10 +830,7 @@ const CustomGraph_ = React.memo(
               style={{ cursor: handleDataPointClick ? "pointer" : "default" }}
             >
               {pieData.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={colorForSeries(entry.key, index)}
-                />
+                <Cell key={`cell-${index}`} fill={colorForSeries(entry.key, index)} />
               ))}
             </Pie>
             <Tooltip
@@ -900,9 +867,7 @@ const CustomGraph_ = React.memo(
         timeseries,
         nameForSeries,
       );
-      const sortedCurrentData = summaryData.current.toSorted(
-        (a, b) => b.value - a.value,
-      );
+      const sortedCurrentData = summaryData.current.toSorted((a, b) => b.value - a.value);
 
       const longestName = Math.max(
         ...summaryData.current.map((entry) => entry.name.length),
@@ -918,28 +883,20 @@ const CustomGraph_ = React.memo(
           <BarChart
             data={sortedCurrentData}
             barCategoryGap={10}
-            layout={
-              input.graphType === "horizontal_bar" ? "vertical" : undefined
-            }
+            layout={input.graphType === "horizontal_bar" ? "vertical" : undefined}
           >
             <XAxisComponent
               type="category"
               dataKey="name"
-              width={
-                input.graphType === "horizontal_bar" ? xAxisWidth : undefined
-              }
-              height={
-                input.graphType === "horizontal_bar" ? undefined : xAxisWidth
-              }
+              width={input.graphType === "horizontal_bar" ? xAxisWidth : undefined}
+              height={input.graphType === "horizontal_bar" ? undefined : xAxisWidth}
               interval={input.graphType === "horizontal_bar" ? 0 : undefined}
               tickLine={false}
               axisLine={false}
               tick={{ fill: gray400 }}
               style={{ fontSize: "11px" }}
               angle={input.graphType === "horizontal_bar" ? undefined : 45}
-              textAnchor={
-                input.graphType === "horizontal_bar" ? "end" : "start"
-              }
+              textAnchor={input.graphType === "horizontal_bar" ? "end" : "start"}
             />
             <YAxisComponent
               type="number"
@@ -980,10 +937,7 @@ const CustomGraph_ = React.memo(
               style={{ cursor: handleDataPointClick ? "pointer" : "default" }}
             >
               {sortedCurrentData.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={colorForSeries(entry.key, index)}
-                />
+                <Cell key={`cell-${index}`} fill={colorForSeries(entry.key, index)} />
               ))}
             </Bar>
           </BarChart>
@@ -1114,9 +1068,7 @@ const CustomGraph_ = React.memo(
                 style={{
                   opacity:
                     entry.dataKey &&
-                    hiddenSeries.has(
-                      (entry.dataKey as string).replace(/^previous>/, ""),
-                    )
+                    hiddenSeries.has((entry.dataKey as string).replace(/^previous>/, ""))
                       ? 0.3
                       : 1,
                 }}
@@ -1128,16 +1080,13 @@ const CustomGraph_ = React.memo(
           {(sortedKeys ?? []).map((aggKey, index) => {
             const strokeColor = colorForSeries(aggKey, index);
             const fillColor = colorForSeries(aggKey, index);
-            const isAreaType = ["area", "stacked_area"].includes(
-              input.graphType,
-            );
+            const isAreaType = ["area", "stacked_area"].includes(input.graphType);
             const isBarType = ["bar", "stacked_bar", "horizontal_bar"].includes(
               input.graphType,
             );
             const { series, groupKey } = getSeries(seriesByKey, aggKey);
             // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
-            const evaluatorId =
-              series?.key || input.groupByKey || input.series[0]?.key;
+            const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
             const isHidden = hiddenSeries.has(aggKey);
             // Extra props that only apply to Bar-type graphs
             const extraProps: Record<string, unknown> = {};
@@ -1158,32 +1107,22 @@ const CustomGraph_ = React.memo(
                       ? "same"
                       : undefined
                   }
-                  fill={
-                    isAreaType
-                      ? `url(#gradient-${uniqueId}-${index})`
-                      : fillColor
-                  }
+                  fill={isAreaType ? `url(#gradient-${uniqueId}-${index})` : fillColor}
                   fillOpacity={isBarType ? 0.8 : undefined}
                   {...extraProps}
                   strokeWidth={isBarType ? 0 : 2.5}
                   dot={false}
-                  activeDot={
-                    input.graphType !== "scatter" ? { r: 8 } : undefined
-                  }
+                  activeDot={input.graphType !== "scatter" ? { r: 8 } : undefined}
                   name={nameForSeries(aggKey)}
                   line={
-                    input.graphType === "scatter" && input.connected
-                      ? true
-                      : undefined
+                    input.graphType === "scatter" && input.connected ? true : undefined
                   }
                   onClick={(data: any) => {
                     if (onDataPointClick && data) {
                       // Extract date from data - check multiple possible locations
                       let date: string | undefined;
                       if (
-                        ["bar", "stacked_bar", "horizontal_bar"].includes(
-                          input.graphType,
-                        )
+                        ["bar", "stacked_bar", "horizontal_bar"].includes(input.graphType)
                       ) {
                         // For bar charts, check multiple possible locations for the date
                         date =
@@ -1240,18 +1179,12 @@ const CustomGraph_ = React.memo(
                     stroke={colorForSeries(aggKey, index) + "99"}
                     fill={colorForSeries(aggKey, index) + "99"}
                     strokeWidth={2.5}
-                    strokeDasharray={
-                      input.graphType !== "scatter" ? "5 5" : undefined
-                    }
+                    strokeDasharray={input.graphType !== "scatter" ? "5 5" : undefined}
                     dot={false}
-                    activeDot={
-                      input.graphType !== "scatter" ? { r: 8 } : undefined
-                    }
+                    activeDot={input.graphType !== "scatter" ? { r: 8 } : undefined}
                     name={"Previous " + nameForSeries(aggKey)}
                     line={
-                      input.graphType === "scatter" && input.connected
-                        ? true
-                        : undefined
+                      input.graphType === "scatter" && input.connected ? true : undefined
                     }
                   />
                 )}
@@ -1265,8 +1198,7 @@ const CustomGraph_ = React.memo(
   (prevProps, nextProps) => {
     return (
       JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
-      JSON.stringify(prevProps.titleProps) ===
-        JSON.stringify(nextProps.titleProps) &&
+      JSON.stringify(prevProps.titleProps) === JSON.stringify(nextProps.titleProps) &&
       JSON.stringify(prevProps.filters) === JSON.stringify(nextProps.filters) &&
       prevProps.onDataPointClick === nextProps.onDataPointClick
     );
@@ -1294,13 +1226,7 @@ const pieChartPercentageLabel = ({
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
   return (
-    <text
-      x={x}
-      y={y}
-      fill="white"
-      textAnchor="middle"
-      dominantBaseline="central"
-    >
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central">
       {`${(percent * 100).toFixed(0)}%`}
     </text>
   );
@@ -1350,9 +1276,10 @@ const shapeDataForGraph = (
     return {
       ...entry,
       ...Object.fromEntries(
-        Object.entries(flattenPreviousPeriod[index] ?? {}).map(
-          ([key, value]) => [`previous>${key}`, value ?? 0],
-        ),
+        Object.entries(flattenPreviousPeriod[index] ?? {}).map(([key, value]) => [
+          `previous>${key}`,
+          value ?? 0,
+        ]),
       ),
     };
   });
@@ -1412,9 +1339,7 @@ const shapeDataForSummary = (
   };
 };
 
-const collectAllDays = (
-  data: ({ date: string } & Record<string, number>)[],
-) => {
+const collectAllDays = (data: ({ date: string } & Record<string, number>)[]) => {
   const result: Record<string, number[]> = {};
 
   for (const entry of data) {
@@ -1445,10 +1370,7 @@ const flattenGroupData = (
 
   if (groupBy) {
     return data.map((entry) => {
-      const buckets = entry[groupBy] as unknown as Record<
-        string,
-        Record<string, number>
-      >;
+      const buckets = entry[groupBy] as unknown as Record<string, Record<string, number>>;
 
       // Handle case where buckets might be empty or undefined
       if (!buckets || Object.keys(buckets).length === 0) {
@@ -1460,8 +1382,7 @@ const flattenGroupData = (
       const aggregations = Object.fromEntries(
         Object.entries(buckets)
           .filter(
-            ([bucketKey]) =>
-              !(input.excludeUnknownBuckets && bucketKey === "unknown"),
+            ([bucketKey]) => !(input.excludeUnknownBuckets && bucketKey === "unknown"),
           )
           .flatMap(([bucketKey, bucket]) => {
             return Object.entries(bucket).map(([metricKey, metricValue]) => {
@@ -1492,10 +1413,7 @@ const fillEmptyData = (
         filledEntry[key] = fillWith;
       }
       const previousKey = `previous>${key}`;
-      if (
-        filledEntry[previousKey] === null ||
-        filledEntry[previousKey] === undefined
-      ) {
+      if (filledEntry[previousKey] === null || filledEntry[previousKey] === undefined) {
         filledEntry[previousKey] = fillWith;
       }
     });
@@ -1530,11 +1448,7 @@ function MonitorGraph({
   >;
   sortedKeys: string[];
   nameForSeries: (aggKey: string) => string;
-  getColor: (
-    colorSet: RotatingColorSet,
-    index: number,
-    opacity: number,
-  ) => string;
+  getColor: (colorSet: RotatingColorSet, index: number, opacity: number) => string;
   size?: "sm" | "md";
   filterParams: ReturnType<typeof useFilterParams>["filterParams"];
   height_: number;
@@ -1564,8 +1478,7 @@ function MonitorGraph({
     .filter((x) => x !== undefined && x !== null);
   const dailyAverage =
     realDailyValues && realDailyValues.length > 0
-      ? realDailyValues.reduce((acc, curr) => acc + curr, 0) /
-        realDailyValues.length
+      ? realDailyValues.reduce((acc, curr) => acc + curr, 0) / realDailyValues.length
       : undefined;
 
   // The headline is the run-weighted value over the whole period (one "full"
@@ -1642,12 +1555,7 @@ function MonitorGraph({
       >
         <HStack>
           {input.monitorGraph?.isGuardrail && (
-            <Badge
-              colorPalette="blue"
-              variant="solid"
-              size="sm"
-              marginTop="-3px"
-            >
+            <Badge colorPalette="blue" variant="solid" size="sm" marginTop="-3px">
               <LuShield size={16} />
               Guardrail
             </Badge>
@@ -1670,11 +1578,7 @@ function MonitorGraph({
             )}
           </Text>
           <Text fontSize="xs">
-            {hasData
-              ? isPassRate
-                ? "Pass Rate"
-                : "Average Score"
-              : "No data yet"}
+            {hasData ? (isPassRate ? "Pass Rate" : "Average Score") : "No data yet"}
           </Text>
         </HStack>
         <Text fontSize="xs">
@@ -1686,8 +1590,7 @@ function MonitorGraph({
                 Math.ceil((now - filterParams.endDate) / (1000 * 60 * 60 * 24)),
               );
               const periodDays = Math.ceil(
-                (filterParams.endDate - filterParams.startDate) /
-                  (1000 * 60 * 60 * 24),
+                (filterParams.endDate - filterParams.startDate) / (1000 * 60 * 60 * 24),
               );
 
               // If end date is within one day of today, show "Last X days"

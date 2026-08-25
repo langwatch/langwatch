@@ -13,17 +13,10 @@ import { scenarioTabRegistry } from "~/server/scenarios/browser-tab/scenario-tab
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
-import {
-  responseSchemas,
-  scenarioEventSchema,
-} from "~/server/scenarios/schemas";
+import { responseSchemas, scenarioEventSchema } from "~/server/scenarios/schemas";
 import { extractInlineMediaFromEvent } from "~/server/stored-objects/content-extractor";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
-import {
-  encodeContent,
-  encodeEnd,
-  encodeStart,
-} from "~/utils/streaming-event-codec";
+import { encodeContent, encodeEnd, encodeStart } from "~/utils/streaming-event-codec";
 import { blockTraceUsageExceededMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -79,15 +72,14 @@ secured.access(requires("scenarios:create")).post(
     // Extract inline media bytes, externalize to stored objects, and rewrite
     // the event payload to reference them by URL before dispatch.
     const service = createStoredObjectsService({ projectId: project.id });
-    const { rewrittenEvent: rawRewritten, refs } =
-      await extractInlineMediaFromEvent({
-        event: validatedEvent,
-        projectId: project.id,
-        ownerKind: "scenario_run",
-        ownerId: validatedEvent.scenarioRunId,
-        purpose: "scenario_event",
-        service,
-      });
+    const { rewrittenEvent: rawRewritten, refs } = await extractInlineMediaFromEvent({
+      event: validatedEvent,
+      projectId: project.id,
+      ownerKind: "scenario_run",
+      ownerId: validatedEvent.scenarioRunId,
+      purpose: "scenario_event",
+      service,
+    });
 
     // Cast back to the typed ScenarioEvent — the rewrite only touches content
     // arrays inside message objects; all discriminant fields are preserved.
@@ -123,16 +115,12 @@ secured.access(requires("scenarios:create")).post(
       await broadcastStreamingEvent(c.app, project.id, event);
     }
 
-    const path = `/${project.slug}/simulations/${
-      event.scenarioSetId || DEFAULT_SET_ID
-    }`;
+    const path = `/${project.slug}/simulations/${event.scenarioSetId || DEFAULT_SET_ID}`;
 
     const base = process.env.BASE_HOST;
 
     if (!base) {
-      logger.error(
-        "BASE_HOST is not set, but required for scenario event url payload",
-      );
+      logger.error("BASE_HOST is not set, but required for scenario event url payload");
 
       return c.json({ success: false }, 500);
     }
@@ -265,9 +253,7 @@ export const route = secured.access(requires("scenarios:manage")).delete(
   zValidator(
     "query",
     z.object({
-      scenarioSetId: z
-        .string()
-        .min(1, "scenarioSetId query parameter is required"),
+      scenarioSetId: z.string().min(1, "scenarioSetId query parameter is required"),
     }),
   ),
   async (c) => {
@@ -388,11 +374,10 @@ export async function archiveScenarioSetRuns({
   scenarioSetId: string;
   hasMore: boolean;
 }> {
-  const { runIds, reachedCap } =
-    await app.simulations.getRunIdsForSet({
-      projectId,
-      scenarioSetId,
-    });
+  const { runIds, reachedCap } = await app.simulations.getRunIdsForSet({
+    projectId,
+    scenarioSetId,
+  });
 
   const now = Date.now();
   let archived = 0;

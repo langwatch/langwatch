@@ -19,10 +19,7 @@ import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
-import {
-  evaluationPassed,
-  evaluationStatusColor,
-} from "../checks/EvaluationStatus";
+import { evaluationPassed, evaluationStatusColor } from "../checks/EvaluationStatus";
 import { HoverableBigText } from "../HoverableBigText";
 import { Menu } from "../ui/menu";
 import { Tooltip } from "../ui/tooltip";
@@ -58,11 +55,7 @@ function EvaluatorInputsTooltip({
   inputs?: Record<string, any> | null;
   children: React.ReactNode;
 }) {
-  if (
-    inputs === undefined ||
-    inputs === null ||
-    Object.keys(inputs).length === 0
-  ) {
+  if (inputs === undefined || inputs === null || Object.keys(inputs).length === 0) {
     return <>{children}</>;
   }
 
@@ -93,11 +86,7 @@ function EvaluatorInputsTooltip({
   );
 }
 
-export function EvaluationStatusItem({
-  check,
-}: {
-  check: ElasticSearchEvaluation;
-}) {
+export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation }) {
   const router = useRouter();
   const projectSlug = router.query.project as string | undefined;
   const { openDrawer } = useDrawer();
@@ -143,9 +132,7 @@ export function EvaluationStatusItem({
     return undefined;
   }, [isEvaluatorTable, evaluatorQuery.data, monitorQuery.data]);
 
-  const hasEvaluatorData = isEvaluatorTable
-    ? !!evaluatorQuery.data
-    : !!monitorQuery.data;
+  const hasEvaluatorData = isEvaluatorTable ? !!evaluatorQuery.data : !!monitorQuery.data;
 
   const handleOpenConfig = () => {
     if (!check.evaluator_id) return;
@@ -159,9 +146,7 @@ export function EvaluationStatusItem({
 
   const hasDetails = check.status === "processed" && check.details;
   const errorMessage =
-    check.status === "error"
-      ? (check.error?.message ?? check.details ?? null)
-      : null;
+    check.status === "error" ? (check.error?.message ?? check.details ?? null) : null;
 
   return (
     <Box width="full">
@@ -189,10 +174,7 @@ export function EvaluationStatusItem({
               </Text>
               {customPrompt ? (
                 <Text fontSize="xs" color="fg.subtle" lineClamp={1}>
-                  <HoverableBigText
-                    expandedVersion={customPrompt}
-                    lineClamp={1}
-                  >
+                  <HoverableBigText expandedVersion={customPrompt} lineClamp={1}>
                     <Box as="span" whiteSpace="pre-wrap" wordBreak="break-word">
                       {customPrompt}
                     </Box>
@@ -302,9 +284,7 @@ export function EvaluationStatusItem({
 
         {/* Timestamp */}
         {check.timestamps.finished_at && (
-          <Tooltip
-            content={new Date(check.timestamps.finished_at).toLocaleString()}
-          >
+          <Tooltip content={new Date(check.timestamps.finished_at).toLocaleString()}>
             <Text
               fontSize="xs"
               color="fg.subtle"

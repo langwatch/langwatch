@@ -137,10 +137,7 @@ export function buildTimeTravelView({
   const newestBaselineUserAt = Math.max(
     0,
     ...historyMessages
-      .filter(
-        (message) =>
-          message.role === "user" && (message.createdAtMs ?? 0) <= atMs,
-      )
+      .filter((message) => message.role === "user" && (message.createdAtMs ?? 0) <= atMs)
       .map((message) => message.createdAtMs ?? 0),
   );
   const sendText = lastSend
@@ -205,9 +202,7 @@ export function buildTimeTravelView({
   const answerLanded =
     !!streamedText &&
     !!lastSettledAssistant &&
-    settledPartsText(lastSettledAssistant.parts).startsWith(
-      streamedText.trimEnd(),
-    );
+    settledPartsText(lastSettledAssistant.parts).startsWith(streamedText.trimEnd());
 
   if (streamedText && !answerLanded) {
     messages.push({
@@ -220,8 +215,7 @@ export function buildTimeTravelView({
   // A pending send is the NEXT turn knocking — it stays in flight even when
   // the previous answer has landed.
   const isTurnInFlight =
-    pendingSend ||
-    ((running || (!terminal && !!streamedText)) && !answerLanded);
+    pendingSend || ((running || (!terminal && !!streamedText)) && !answerLanded);
 
   return {
     atMs,

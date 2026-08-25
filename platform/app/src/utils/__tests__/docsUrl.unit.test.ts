@@ -24,9 +24,9 @@ describe("getDocsBaseUrl", () => {
     });
 
     it("returns production docs on a non-local hostname", () => {
-      expect(
-        getDocsBaseUrl({ hostname: "app.langwatch.ai", isDev: true }),
-      ).toBe("https://docs.langwatch.ai");
+      expect(getDocsBaseUrl({ hostname: "app.langwatch.ai", isDev: true })).toBe(
+        "https://docs.langwatch.ai",
+      );
     });
   });
 
@@ -39,15 +39,15 @@ describe("getDocsBaseUrl", () => {
     });
 
     it("returns production docs on app.langwatch.ai", () => {
-      expect(
-        getDocsBaseUrl({ hostname: "app.langwatch.ai", isDev: false }),
-      ).toBe("https://docs.langwatch.ai");
+      expect(getDocsBaseUrl({ hostname: "app.langwatch.ai", isDev: false })).toBe(
+        "https://docs.langwatch.ai",
+      );
     });
 
     it("returns production docs on a customer's self-hosted DNS", () => {
-      expect(
-        getDocsBaseUrl({ hostname: "langwatch.acme.internal", isDev: false }),
-      ).toBe("https://docs.langwatch.ai");
+      expect(getDocsBaseUrl({ hostname: "langwatch.acme.internal", isDev: false })).toBe(
+        "https://docs.langwatch.ai",
+      );
     });
   });
 

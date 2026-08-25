@@ -72,10 +72,7 @@ export const agentFieldsSchema = z.object({
   fieldsResolved: z.boolean(),
 });
 
-export const agentWithFieldsSchema = z.intersection(
-  agentSchema,
-  agentFieldsSchema,
-);
+export const agentWithFieldsSchema = z.intersection(agentSchema, agentFieldsSchema);
 
 export type AgentId = z.infer<typeof agentIdSchema>;
 export type Agent = z.infer<typeof agentSchema>;

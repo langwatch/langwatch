@@ -11,9 +11,7 @@ declare global {
      */
     entries<T extends object>(
       o: T,
-    ): Array<
-      { [K in Extract<keyof T, string>]-?: [K, T[K]] }[Extract<keyof T, string>]
-    >;
+    ): Array<{ [K in Extract<keyof T, string>]-?: [K, T[K]] }[Extract<keyof T, string>]>;
 
     /**
      * Strongly-typed values derived from keys of T

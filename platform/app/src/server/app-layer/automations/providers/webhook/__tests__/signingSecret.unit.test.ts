@@ -119,9 +119,7 @@ describe("the automations signing secret", () => {
         incoming: { ...BASE, signingSecret: "whsec_second" },
         existing: first,
       });
-      const afterWindow = new Date(
-        Date.now() + WEBHOOK_PREVIOUS_SECRET_TTL_MS + 1000,
-      );
+      const afterWindow = new Date(Date.now() + WEBHOOK_PREVIOUS_SECRET_TTL_MS + 1000);
       expect(decryptWebhookSigningSecrets(rotated, afterWindow)).toEqual([
         "whsec_second",
       ]);

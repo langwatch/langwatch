@@ -14,12 +14,9 @@ class ReplacingKpiContributions extends GovernanceKpiContributionPort {
   readonly rows = new Map<string, GovernanceKpiContribution>();
 
   insertContribution(row: GovernanceKpiContribution): Promise<void> {
-    const key = [
-      row.tenantId,
-      row.sourceId,
-      row.hourBucket.getTime(),
-      row.traceId,
-    ].join(":");
+    const key = [row.tenantId, row.sourceId, row.hourBucket.getTime(), row.traceId].join(
+      ":",
+    );
     this.rows.set(key, row);
     return Promise.resolve();
   }

@@ -232,8 +232,7 @@ const PROMPTS: LangWatchQLViewDefinition = {
     {
       name: "PromptHandle",
       type: "Nullable(String)",
-      description:
-        "Globally unique handle of the prompt, null when it has none.",
+      description: "Globally unique handle of the prompt, null when it has none.",
       gates: [],
       sourceColumns: ["handle"],
     },
@@ -288,8 +287,7 @@ const PROMPT_VERSIONS: LangWatchQLViewDefinition = {
     {
       name: "PromptVersionId",
       type: "String",
-      description:
-        "Version identifier. Matches `traces.LastUsedPromptVersionId`.",
+      description: "Version identifier. Matches `traces.LastUsedPromptVersionId`.",
       gates: [],
       sourceColumns: ["id"],
     },
@@ -353,16 +351,14 @@ const EXPERIMENTS: LangWatchQLViewDefinition = {
     {
       name: "ExperimentName",
       type: "Nullable(String)",
-      description:
-        "Display name of the experiment, null when it was never named.",
+      description: "Display name of the experiment, null when it was never named.",
       gates: [],
       sourceColumns: ["name"],
     },
     {
       name: "ExperimentSlug",
       type: "String",
-      description:
-        "URL-safe name of the experiment, unique within the project.",
+      description: "URL-safe name of the experiment, unique within the project.",
       gates: [],
       sourceColumns: ["slug"],
     },

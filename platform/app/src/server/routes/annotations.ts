@@ -138,10 +138,7 @@ secured.access(annotationsViewAuth).get("/annotations", async (c) => {
     markUsed();
     return c.json({ data: annotations ?? [] });
   } catch (e) {
-    logger.error(
-      { error: e, projectId: project.id },
-      "error fetching annotations",
-    );
+    logger.error({ error: e, projectId: project.id }, "error fetching annotations");
     return c.json(
       {
         status: "error",
@@ -171,10 +168,7 @@ secured.access(annotationsViewAuth).get("/annotations/:id", async (c) => {
     markUsed();
     return c.json({ data: annotation });
   } catch (e) {
-    logger.error(
-      { error: e, projectId: project.id },
-      "error fetching annotation",
-    );
+    logger.error({ error: e, projectId: project.id }, "error fetching annotation");
     return c.json(
       {
         status: "error",
@@ -200,10 +194,7 @@ secured.access(annotationsManageAuth).delete("/annotations/:id", async (c) => {
     markUsed();
     return c.json({ status: "success", message: "Annotation deleted." });
   } catch (e) {
-    logger.error(
-      { error: e, projectId: project.id },
-      "error deleting annotation",
-    );
+    logger.error({ error: e, projectId: project.id }, "error deleting annotation");
     return c.json(
       {
         status: "error",
@@ -232,8 +223,7 @@ secured.access(annotationsManageAuth).patch("/annotations/:id", async (c) => {
       return c.json(
         {
           status: "error",
-          message:
-            "[comment] is required in the request body and must be a string.",
+          message: "[comment] is required in the request body and must be a string.",
         },
         400,
       );
@@ -242,8 +232,7 @@ secured.access(annotationsManageAuth).patch("/annotations/:id", async (c) => {
       return c.json(
         {
           status: "error",
-          message:
-            "[isThumbsUp] is required in the request body and must be a boolean.",
+          message: "[isThumbsUp] is required in the request body and must be a boolean.",
         },
         400,
       );
@@ -261,10 +250,7 @@ secured.access(annotationsManageAuth).patch("/annotations/:id", async (c) => {
     markUsed();
     return c.json({ data: patchAnnotation });
   } catch (e) {
-    logger.error(
-      { error: e, projectId: project.id },
-      "error patching annotation",
-    );
+    logger.error({ error: e, projectId: project.id }, "error patching annotation");
     return c.json(
       {
         status: "error",
@@ -311,82 +297,78 @@ secured.access(annotationsViewAuth).get("/annotations/trace/:id", async (c) => {
   }
 });
 
-secured
-  .access(annotationsCreateAuth)
-  .post("/annotations/trace/:id", async (c) => {
-    // `:create` (not `:manage`) — same fix as evaluators' POST route. Creating
-    // is a lesser privilege than update/delete, and LANGY_CANDIDATE_PERMISSIONS
-    // only ever grants annotations:create, never :manage. PATCH/DELETE above
-    // correctly stay on :manage.
-    const auth = await authenticateRequest(c, "annotations:create");
-    if ("error" in auth) {
-      return c.json(auth.body, auth.status);
-    }
-    const { project, markUsed } = auth;
+secured.access(annotationsCreateAuth).post("/annotations/trace/:id", async (c) => {
+  // `:create` (not `:manage`) — same fix as evaluators' POST route. Creating
+  // is a lesser privilege than update/delete, and LANGY_CANDIDATE_PERMISSIONS
+  // only ever grants annotations:create, never :manage. PATCH/DELETE above
+  // correctly stay on :manage.
+  const auth = await authenticateRequest(c, "annotations:create");
+  if ("error" in auth) {
+    return c.json(auth.body, auth.status);
+  }
+  const { project, markUsed } = auth;
 
-    try {
-      const body = await c.req.json();
-      const comment = body.comment as string;
-      const isThumbsUp = body.isThumbsUp;
-      const trace = c.req.param("id");
-      const email = body.email as string;
+  try {
+    const body = await c.req.json();
+    const comment = body.comment as string;
+    const isThumbsUp = body.isThumbsUp;
+    const trace = c.req.param("id");
+    const email = body.email as string;
 
-      if (!comment || typeof comment !== "string") {
-        return c.json(
-          {
-            status: "error",
-            message:
-              "[comment] is required in the request body and must be a string.",
-          },
-          400,
-        );
-      }
-      if (isThumbsUp === undefined || typeof isThumbsUp !== "boolean") {
-        return c.json(
-          {
-            status: "error",
-            message:
-              "[isThumbsUp] is required in the request body and must be a boolean.",
-          },
-          400,
-        );
-      }
-      if (!trace || typeof trace !== "string") {
-        return c.json(
-          {
-            status: "error",
-            message: "Trace ID is required and must be a string.",
-          },
-          400,
-        );
-      }
-
-      const addAnnotation = await prisma.annotation.create({
-        data: {
-          id: nanoid(),
-          comment,
-          projectId: project.id,
-          isThumbsUp,
-          traceId: trace,
-          email,
-        },
-      });
-
-      markUsed();
-      return c.json({ data: addAnnotation });
-    } catch (e) {
-      logger.error(
-        { error: e, trace: c.req.param("id"), projectId: project.id },
-        "error creating annotation",
-      );
+    if (!comment || typeof comment !== "string") {
       return c.json(
         {
           status: "error",
-          message: e instanceof Error ? e.message : "Internal server error.",
+          message: "[comment] is required in the request body and must be a string.",
         },
-        500,
+        400,
       );
     }
-  });
+    if (isThumbsUp === undefined || typeof isThumbsUp !== "boolean") {
+      return c.json(
+        {
+          status: "error",
+          message: "[isThumbsUp] is required in the request body and must be a boolean.",
+        },
+        400,
+      );
+    }
+    if (!trace || typeof trace !== "string") {
+      return c.json(
+        {
+          status: "error",
+          message: "Trace ID is required and must be a string.",
+        },
+        400,
+      );
+    }
+
+    const addAnnotation = await prisma.annotation.create({
+      data: {
+        id: nanoid(),
+        comment,
+        projectId: project.id,
+        isThumbsUp,
+        traceId: trace,
+        email,
+      },
+    });
+
+    markUsed();
+    return c.json({ data: addAnnotation });
+  } catch (e) {
+    logger.error(
+      { error: e, trace: c.req.param("id"), projectId: project.id },
+      "error creating annotation",
+    );
+    return c.json(
+      {
+        status: "error",
+        message: e instanceof Error ? e.message : "Internal server error.",
+      },
+      500,
+    );
+  }
+});
 
 export const app = secured.hono;

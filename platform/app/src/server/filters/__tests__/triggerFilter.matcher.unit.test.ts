@@ -503,10 +503,7 @@ describe("classifyTriggerFilters", () => {
 
     const result = classifyTriggerFilters(filters);
 
-    expect(Object.keys(result.traceFilters)).toEqual([
-      "traces.origin",
-      "spans.model",
-    ]);
+    expect(Object.keys(result.traceFilters)).toEqual(["traces.origin", "spans.model"]);
     expect(Object.keys(result.evaluationFilters)).toEqual([
       "evaluations.passed",
       "evaluations.score",
@@ -525,9 +522,7 @@ describe("classifyTriggerFilters", () => {
 });
 
 describe("matchesEvaluationFilters", () => {
-  function makeEval(
-    overrides: Partial<EvaluationRunData> = {},
-  ): EvaluationRunData {
+  function makeEval(overrides: Partial<EvaluationRunData> = {}): EvaluationRunData {
     return {
       evaluationId: "eval-1",
       evaluatorId: "evaluator-1",
@@ -643,9 +638,7 @@ describe("matchesEvaluationFilters", () => {
     });
 
     it("does not match a score attached to an errored run", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", status: "error", score: 0.85 }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", status: "error", score: 0.85 })];
       const filters: TriggerFilters = {
         "evaluations.evaluator_id.has_score": ["eval-abc"],
       };
@@ -761,9 +754,7 @@ describe("matchesEvaluationFilters", () => {
     });
 
     it("does not match a score attached to an errored run", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", status: "error", score: 0.85 }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", status: "error", score: 0.85 })];
       const filters: TriggerFilters = {
         "evaluations.score": { "eval-abc": { score: ["0.85"] } },
       };
@@ -773,9 +764,7 @@ describe("matchesEvaluationFilters", () => {
 
   describe("when filtering by evaluations.state (keyed)", () => {
     it("matches when status matches", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", status: "processed" }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", status: "processed" })];
       const filters: TriggerFilters = {
         "evaluations.state": { "eval-abc": ["processed"] },
       };
@@ -1275,9 +1264,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
     expect(result.events).toHaveLength(1);
     expect(result.events![0]!.event_type).toBe("thumbs_up_down");
     expect(result.events![0]!.metrics).toEqual([{ key: "score", value: 1 }]);
-    expect(result.events![0]!.event_details).toEqual([
-      { key: "page", value: "/chat" },
-    ]);
+    expect(result.events![0]!.event_details).toEqual([{ key: "page", value: "/chat" }]);
   });
 });
 

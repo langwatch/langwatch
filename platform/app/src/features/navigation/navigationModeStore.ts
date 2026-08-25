@@ -86,18 +86,16 @@ interface NavigationModeState {
   rememberFlag: (isEnabled: boolean) => void;
 }
 
-export const useNavigationModeStore = create<NavigationModeState>(
-  (set, get) => ({
-    storedMode: loadStoredNavigationMode(),
-    isLastKnownFlagEnabled: loadLastKnownNavigationFlag(),
-    setStoredMode: (mode) => {
-      persist({ key: STORAGE_KEY, value: mode });
-      set({ storedMode: mode });
-    },
-    rememberFlag: (isEnabled) => {
-      if (get().isLastKnownFlagEnabled === isEnabled) return;
-      persist({ key: FLAG_STORAGE_KEY, value: isEnabled ? "on" : "off" });
-      set({ isLastKnownFlagEnabled: isEnabled });
-    },
-  }),
-);
+export const useNavigationModeStore = create<NavigationModeState>((set, get) => ({
+  storedMode: loadStoredNavigationMode(),
+  isLastKnownFlagEnabled: loadLastKnownNavigationFlag(),
+  setStoredMode: (mode) => {
+    persist({ key: STORAGE_KEY, value: mode });
+    set({ storedMode: mode });
+  },
+  rememberFlag: (isEnabled) => {
+    if (get().isLastKnownFlagEnabled === isEnabled) return;
+    persist({ key: FLAG_STORAGE_KEY, value: isEnabled ? "on" : "off" });
+    set({ isLastKnownFlagEnabled: isEnabled });
+  },
+}));

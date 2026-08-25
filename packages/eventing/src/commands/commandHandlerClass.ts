@@ -34,9 +34,7 @@ export interface CommandHandlerClassStatic<Payload, Type extends CommandType> {
   /**
    * Optional: Extract span attributes from the payload for observability.
    */
-  getSpanAttributes?(
-    payload: Payload,
-  ): Record<string, string | number | boolean>;
+  getSpanAttributes?(payload: Payload): Record<string, string | number | boolean>;
 
   /**
    * Optional: Static dispatcher name to use instead of the registration name.

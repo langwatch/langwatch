@@ -33,10 +33,7 @@ import { buildGraphAlertTemplateContext } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
-import type {
-  SeriesInputType,
-  TimeseriesInputType,
-} from "~/server/analytics/registry";
+import type { SeriesInputType, TimeseriesInputType } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import { buildSeriesName } from "@langwatch/analytics-contract";
 import {
@@ -161,10 +158,7 @@ export interface GraphTriggerNotifier {
 }
 
 export interface GraphTriggerEvaluationDeps {
-  loadTrigger(params: {
-    triggerId: string;
-    projectId: string;
-  }): Promise<Trigger | null>;
+  loadTrigger(params: { triggerId: string; projectId: string }): Promise<Trigger | null>;
   loadCustomGraph(params: {
     customGraphId: string;
     projectId: string;
@@ -175,10 +169,7 @@ export interface GraphTriggerEvaluationDeps {
     options?: TimeseriesReadOptions,
   ): Promise<TimeseriesResult>;
   triggerSent: GraphTriggerSentRepository;
-  updateLastRunAt(params: {
-    triggerId: string;
-    projectId: string;
-  }): Promise<void>;
+  updateLastRunAt(params: { triggerId: string; projectId: string }): Promise<void>;
   notifier: GraphTriggerNotifier;
   /** Base host for building deep links inside rendered templates
    *  (ADR-034 Phase 8.1). Injected, not read from env, so this service
@@ -238,11 +229,7 @@ export async function evaluateGraphTrigger({
   const operator = params.operator;
   const timePeriod = params.timePeriod;
   const seriesName = params.seriesName;
-  if (
-    threshold === undefined ||
-    operator === undefined ||
-    timePeriod === undefined
-  ) {
+  if (threshold === undefined || operator === undefined || timePeriod === undefined) {
     return skipped({
       triggerId,
       projectId,
@@ -676,7 +663,5 @@ function skipped({
 }
 
 function noteIfNoData(operator: string, threshold: number): string | undefined {
-  return isNoDataPredicate({ operator, threshold })
-    ? "no-data predicate"
-    : undefined;
+  return isNoDataPredicate({ operator, threshold }) ? "no-data predicate" : undefined;
 }

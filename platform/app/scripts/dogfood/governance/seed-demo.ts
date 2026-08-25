@@ -78,11 +78,7 @@ export function parseArgs(args: readonly string[]): ParsedArgs {
   return { execute, orgId, reportPath };
 }
 
-const ACTIONS: readonly SeedAction[] = [
-  verifyOrgIdentity,
-  seedBirdEye,
-  seedHeavyUsage,
-];
+const ACTIONS: readonly SeedAction[] = [verifyOrgIdentity, seedBirdEye, seedHeavyUsage];
 
 export interface RunSeedDemoOptions {
   execute: boolean;
@@ -97,9 +93,7 @@ export interface RunSeedDemoOptions {
  * or process.exitCode side effects, so the caller controls how to
  * present the result.
  */
-export async function runSeedDemo(
-  options: RunSeedDemoOptions,
-): Promise<SeedRunReport> {
+export async function runSeedDemo(options: RunSeedDemoOptions): Promise<SeedRunReport> {
   const scope = options.scope ?? DemoOrgScope.fromEnv();
   const targetOrgId = options.organizationId ?? scope.getAllowlist()[0];
   if (targetOrgId === undefined) {

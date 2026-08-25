@@ -22,10 +22,7 @@ import {
 } from "../../utils/edgeMappingUtils";
 
 /** Check whether two sets of fields have identical identifiers and types (order-independent). */
-function fieldsMatch(
-  a: Field[],
-  b: { identifier: string; type: string }[],
-): boolean {
+function fieldsMatch(a: Field[], b: { identifier: string; type: string }[]): boolean {
   if (a.length !== b.length) return false;
   const fieldMap = new Map(a.map((f) => [f.identifier, f.type]));
   return b.every((f) => fieldMap.get(f.identifier) === f.type);
@@ -101,9 +98,7 @@ function remapEdges({
     const newId = newFields[i]?.identifier;
     if (!oldId || !newId || oldId === newId) continue;
 
-    const oldHasEdge = connectedEdges.some(
-      (e) => e.targetHandle === `inputs.${oldId}`,
-    );
+    const oldHasEdge = connectedEdges.some((e) => e.targetHandle === `inputs.${oldId}`);
     const newExistsInOld = oldFields.some((f) => f.identifier === newId);
 
     if (oldHasEdge && !newExistsInOld) {
@@ -134,25 +129,20 @@ function remapEdges({
  * - Handles onVersionChange by updating promptVersionId and I/O on the node
  * - Handles onInputMappingsChange by creating/removing edges in the workflow
  */
-export function SignaturePromptEditorBridge({
-  node,
-}: {
-  node: Node<Component>;
-}) {
+export function SignaturePromptEditorBridge({ node }: { node: Node<Component> }) {
   const signatureNode = node as Node<Signature>;
   const setNode = useSmartSetNode();
   const updateNodeInternals = useUpdateNodeInternals();
 
-  const { nodes, edges, setEdges, getWorkflow, deselectAllNodes } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        nodes: state.getWorkflow().nodes,
-        edges: state.getWorkflow().edges,
-        setEdges: state.setEdges,
-        getWorkflow: state.getWorkflow,
-        deselectAllNodes: state.deselectAllNodes,
-      })),
-    );
+  const { nodes, edges, setEdges, getWorkflow, deselectAllNodes } = useWorkflowStore(
+    useShallow((state) => ({
+      nodes: state.getWorkflow().nodes,
+      edges: state.getWorkflow().edges,
+      setEdges: state.setEdges,
+      getWorkflow: state.getWorkflow,
+      deselectAllNodes: state.deselectAllNodes,
+    })),
+  );
 
   const availableSources = useMemo(
     () => buildAvailableSources({ nodeId: node.id, nodes, edges }),
@@ -284,15 +274,11 @@ export function SignaturePromptEditorBridge({
 
   /** Maps prompt I/O arrays to DSL Field format, preserving field.value from existing inputs. */
   const mapIOToFields = useCallback(
-    (
-      items?: Array<{ identifier: string; type: string }>,
-    ): Field[] | undefined => {
+    (items?: Array<{ identifier: string; type: string }>): Field[] | undefined => {
       if (!items) return undefined;
       const currentInputs = signatureNode.data.inputs ?? [];
       return items.map((item) => {
-        const existing = currentInputs.find(
-          (e) => e.identifier === item.identifier,
-        );
+        const existing = currentInputs.find((e) => e.identifier === item.identifier);
         return {
           identifier: item.identifier,
           type: item.type as Field["type"],

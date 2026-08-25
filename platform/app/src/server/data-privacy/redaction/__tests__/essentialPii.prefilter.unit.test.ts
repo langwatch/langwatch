@@ -16,9 +16,7 @@ import {
   getCountries,
   getExampleNumber,
 } from "libphonenumber-js";
-import examples from "libphonenumber-js/examples.mobile.json" with {
-  type: "json",
-};
+import examples from "libphonenumber-js/examples.mobile.json" with { type: "json" };
 import { describe, expect, it } from "vitest";
 
 import { redactEssentialPiiInText } from "../essentialPii";
@@ -36,16 +34,14 @@ describe("given a recognizer that is skipped unless the text holds its literal",
 
     /** @scenario "Skipped detectors still find their own kind of personal data" */
     it("still redacts an Ethereum address", () => {
-      expect(
-        redact("paid 0x52908400098527886E0F7030069857D2E4169EE7 out"),
-      ).toContain("[CRYPTO]");
+      expect(redact("paid 0x52908400098527886E0F7030069857D2E4169EE7 out")).toContain(
+        "[CRYPTO]",
+      );
     });
 
     /** @scenario "Skipped detectors still find their own kind of personal data" */
     it("still redacts an IPv6 address", () => {
-      expect(redact("host fe80::1ff:fe23:4567:890a end")).toContain(
-        "[IP_ADDRESS]",
-      );
+      expect(redact("host fe80::1ff:fe23:4567:890a end")).toContain("[IP_ADDRESS]");
     });
   });
 
@@ -102,13 +98,12 @@ describe("given a recognizer that is skipped unless the text holds its literal",
  * far and the small territories fail here first.
  */
 describe("given the phone detector's digit gate", () => {
-  const shapesOf = ({
-    formatted,
+  const shapesOf = ({ formatted, plain }: { formatted: string; plain: string }) => [
     plain,
-  }: {
-    formatted: string;
-    plain: string;
-  }) => [plain, formatted, `call ${formatted} now`, `{"phone":"${plain}"}`];
+    formatted,
+    `call ${formatted} now`,
+    `{"phone":"${plain}"}`,
+  ];
 
   describe("when the text holds a number of any country", () => {
     /** @scenario "A phone number is redacted whatever country it belongs to" */

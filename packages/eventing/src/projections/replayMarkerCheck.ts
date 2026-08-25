@@ -13,10 +13,10 @@ import { RecoverableError } from "../services/errorHandling";
  */
 export class ReplayDeferralError extends RecoverableError {
   constructor(projectionName: string, aggregateKey: string, reason: string) {
-    super(
-      `projection-replay active for ${projectionName}:${aggregateKey}: ${reason}`,
-      { projectionName, aggregateKey },
-    );
+    super(`projection-replay active for ${projectionName}:${aggregateKey}: ${reason}`, {
+      projectionName,
+      aggregateKey,
+    });
     this.name = "ReplayDeferralError";
   }
 }
@@ -64,10 +64,7 @@ interface ReplayMarkerRedis {
 export class RedisReplayMarkerChecker implements ReplayMarkerChecker {
   constructor(private readonly redis: ReplayMarkerRedis) {}
 
-  async check(
-    projectionName: string,
-    event: Event,
-  ): Promise<ReplayMarkerDecision> {
+  async check(projectionName: string, event: Event): Promise<ReplayMarkerDecision> {
     const aggregateKey = `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
 
     // Read the active cutoff marker (in-flight replay) and the short-TTL
@@ -122,10 +119,7 @@ export class RedisReplayMarkerChecker implements ReplayMarkerChecker {
  * coordination is needed. Always allows events through.
  */
 export class NoopReplayMarkerChecker implements ReplayMarkerChecker {
-  async check(
-    _projectionName: string,
-    _event: Event,
-  ): Promise<ReplayMarkerDecision> {
+  async check(_projectionName: string, _event: Event): Promise<ReplayMarkerDecision> {
     return "process";
   }
 }

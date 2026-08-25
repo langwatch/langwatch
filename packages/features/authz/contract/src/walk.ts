@@ -7,11 +7,7 @@
  * Deliberate legacy quirks are tagged `LEGACY-QUIRK(<stage>)` with the
  * migration stage that removes them.
  */
-import {
-  bindingGrants,
-  legacyTeamFallbackGrants,
-  matchResourceGrant,
-} from "./matchers";
+import { bindingGrants, legacyTeamFallbackGrants, matchResourceGrant } from "./matchers";
 import { builtinRoleGrants, builtinRolePermissions } from "./roles";
 import type { ScopeChainLink } from "./scope";
 import type {
@@ -188,11 +184,7 @@ export function resourceGrantStep({
 }
 
 /** No step granted: name the gate the caller can act on. */
-export function denyStep({
-  grants,
-  chainBindings,
-  base,
-}: DecideContext): AuthzDecision {
+export function denyStep({ grants, chainBindings, base }: DecideContext): AuthzDecision {
   const hadAnyPath =
     grants.isOrgMember ||
     chainBindings.length > 0 ||

@@ -8,10 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { EXTERNAL_MEMBER_PERMISSIONS } from "../../../server/api/rbac";
-import {
-  LITE_MEMBER_EXPLANATION,
-  LITE_MEMBER_SHORT_DESCRIPTION,
-} from "../seatTypeCopy";
+import { LITE_MEMBER_EXPLANATION, LITE_MEMBER_SHORT_DESCRIPTION } from "../seatTypeCopy";
 
 /** The resources the explanation promises a lite member can read. */
 const NAMED_IN_COPY: Record<string, string> = {
@@ -34,9 +31,7 @@ describe("lite member seat copy", () => {
 
     /** @scenario The explanation names capability rather than a billing switch */
     it("never presents the choice as a billing setting", () => {
-      expect(LITE_MEMBER_EXPLANATION).not.toMatch(
-        /billing|invoice|seat count/i,
-      );
+      expect(LITE_MEMBER_EXPLANATION).not.toMatch(/billing|invoice|seat count/i);
       expect(LITE_MEMBER_SHORT_DESCRIPTION).not.toMatch(/billing|invoice/i);
     });
 

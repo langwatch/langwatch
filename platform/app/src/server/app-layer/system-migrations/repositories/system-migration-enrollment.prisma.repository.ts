@@ -43,9 +43,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
     const organizationNames = new Map(
       organizations.map((organization) => [organization.id, organization.name]),
     );
-    const userLabels = new Map(
-      users.map((user) => [user.id, user.name ?? null]),
-    );
+    const userLabels = new Map(users.map((user) => [user.id, user.name ?? null]));
     return rows.map((row) => ({
       organizationId: row.organizationId,
       organizationName: organizationNames.get(row.organizationId) ?? null,
@@ -62,9 +60,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
    * at the start of each pass - fresh per pass, and one query instead of one
    * per tenant per migration.
    */
-  async findEnrolledOrganizationIdsByMigration(): Promise<
-    Map<string, Set<string>>
-  > {
+  async findEnrolledOrganizationIdsByMigration(): Promise<Map<string, Set<string>>> {
     const rows = await this.prisma.systemMigrationEnrollment.findMany({
       select: { organizationId: true, migrationName: true },
     });

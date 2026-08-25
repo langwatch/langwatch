@@ -90,15 +90,11 @@ export class AiQueryProviderError extends HandledError {
   declare readonly code: "ai_query_provider_error";
 
   constructor(details: AiActionErrorDetails = {}) {
-    super(
-      "ai_query_provider_error",
-      "The model did not produce a usable trace query.",
-      {
-        httpStatus: 502,
-        fault: "provider",
-        meta: { ...details },
-      },
-    );
+    super("ai_query_provider_error", "The model did not produce a usable trace query.", {
+      httpStatus: 502,
+      fault: "provider",
+      meta: { ...details },
+    });
     this.name = "AiQueryProviderError";
   }
 }
@@ -134,9 +130,7 @@ const aiActionSchema = z.discriminatedUnion("kind", [
     kind: z.literal("apply_query"),
     query: z
       .string()
-      .describe(
-        "The trace query language string to apply to the current view.",
-      ),
+      .describe("The trace query language string to apply to the current view."),
   }),
   z.object({
     kind: z.literal("create_lens"),
@@ -147,9 +141,7 @@ const aiActionSchema = z.discriminatedUnion("kind", [
       .describe("Short human-readable lens name (1-3 words). Use Title Case."),
     query: z
       .string()
-      .describe(
-        "The locked filter query for the new lens (same syntax as apply_query).",
-      ),
+      .describe("The locked filter query for the new lens (same syntax as apply_query)."),
   }),
 ]);
 
@@ -203,9 +195,7 @@ export async function generateTraceQueryFromPrompt(
   return { ok: false, lastQuery, lastError, attempts: MAX_ATTEMPTS };
 }
 
-function validateQuery(
-  query: string,
-): { ok: true } | { ok: false; error: string } {
+function validateQuery(query: string): { ok: true } | { ok: false; error: string } {
   if (!query) return { ok: false, error: "Empty query." };
   try {
     const ast = parse(query);
@@ -249,9 +239,7 @@ function sanitizeLlmOutput(raw: string): string {
  * any other, rather than as an in-band `{ ok: false }` payload the UI had to
  * know how to word.
  */
-export async function generateTraceAction(
-  input: AiQueryInput,
-): Promise<AiActionResult> {
+export async function generateTraceAction(input: AiQueryInput): Promise<AiActionResult> {
   const fieldsBlock = await buildFieldsBlock(input);
   const systemPrompt = buildActionSystemPrompt(fieldsBlock);
 
@@ -382,9 +370,7 @@ export function summarizeProviderError(
   // message out of, and there is nothing else in it we want.
   const structured = err as { statusCode?: unknown } | null | undefined;
   const structuredStatus =
-    typeof structured?.statusCode === "number"
-      ? structured.statusCode
-      : undefined;
+    typeof structured?.statusCode === "number" ? structured.statusCode : undefined;
 
   const statusMatch =
     cleaned.match(/status[_\s]*code[:\s]+(\d{3})/i) ??
@@ -395,8 +381,7 @@ export function summarizeProviderError(
   const providerMatch = cleaned.match(
     /(?:litellm\.|\b)(OpenAI|Azure|Anthropic|Gemini|Google|Cohere|Mistral|Groq|Together|Bedrock|Vertex)(?:Exception|Error|APIError)/i,
   );
-  const provider =
-    providerMatch?.[1]?.toLowerCase() ?? context?.model?.split("/")[0];
+  const provider = providerMatch?.[1]?.toLowerCase() ?? context?.model?.split("/")[0];
 
   const modelMatch =
     cleaned.match(

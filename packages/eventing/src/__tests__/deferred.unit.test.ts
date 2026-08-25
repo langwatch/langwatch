@@ -22,9 +22,7 @@ describe("Deferred", () => {
     it("throws with the deferred name", () => {
       const deferred = new Deferred<(x: number) => number>("myDispatcher");
 
-      expect(() => deferred.fn(1)).toThrow(
-        'Deferred "myDispatcher" not yet resolved',
-      );
+      expect(() => deferred.fn(1)).toThrow('Deferred "myDispatcher" not yet resolved');
     });
 
     it("reports isResolved as false", () => {

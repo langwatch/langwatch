@@ -4,16 +4,15 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import type { RequestAppServices } from "~/runtime/app/requestApp";
 import { evaluatorTypeSchema } from "@langwatch/evaluator-contract";
-import {
-  copyWorkflowWithDatasets,
-  saveOrCommitWorkflowVersion,
-} from "./workflows";
+import { copyWorkflowWithDatasets, saveOrCommitWorkflowVersion } from "./workflows";
 
-type CopyEvaluatorCtx = { prisma: PrismaClient; session: Session; app: RequestAppServices };
+type CopyEvaluatorCtx = {
+  prisma: PrismaClient;
+  session: Session;
+  app: RequestAppServices;
+};
 
-type SourceEvaluator = NonNullable<
-  Awaited<ReturnType<typeof loadSourceEvaluator>>
->;
+type SourceEvaluator = NonNullable<Awaited<ReturnType<typeof loadSourceEvaluator>>>;
 
 /** Loads the source evaluator (with its workflow), or throws NOT_FOUND. */
 async function loadSourceEvaluator(
@@ -54,8 +53,7 @@ async function copyWorkflowForEvaluator(
   if (!source.workflowId || !source.workflow?.latestVersion?.dsl) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message:
-        "Cannot replicate a workflow evaluator without a saved workflow version",
+      message: "Cannot replicate a workflow evaluator without a saved workflow version",
     });
   }
 
@@ -130,7 +128,7 @@ export async function copyEvaluatorToProject({
       projectId: targetProjectId,
       name: source.name,
       type: evaluatorTypeSchema.parse(source.type),
-      config: source.config === null ? {} : source.config as Record<string, unknown>,
+      config: source.config === null ? {} : (source.config as Record<string, unknown>),
       workflowId: newWorkflowId ?? undefined,
       copiedFromEvaluatorId: source.id,
     });

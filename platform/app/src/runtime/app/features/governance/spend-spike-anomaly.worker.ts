@@ -21,11 +21,7 @@ import {
  */
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import {
-  captureException,
-  toError,
-  withScope,
-} from "~/utils/posthogErrorCapture";
+import { captureException, toError, withScope } from "~/utils/posthogErrorCapture";
 import { SsrfSafeAnomalyAlertHttpAdapter } from "./ssrf-safe-anomaly-alert-http.adapter";
 
 const logger = createLogger("langwatch:workers:spendSpikeAnomalyWorker");

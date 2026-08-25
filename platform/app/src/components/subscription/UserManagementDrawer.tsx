@@ -20,11 +20,7 @@ import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import type { MemberType } from "~/server/license-enforcement/member-classification";
-import {
-  type BillingInterval,
-  type Currency,
-  formatPrice,
-} from "./billing-plans";
+import { type BillingInterval, type Currency, formatPrice } from "./billing-plans";
 import {
   countFullMembers,
   type DrawerSaveResult,
@@ -117,9 +113,7 @@ export function UserManagementDrawer({
   };
 
   const handleUpdatePlannedUserEmail = (id: string, email: string) => {
-    setLocalPlannedUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, email } : u)),
-    );
+    setLocalPlannedUsers((prev) => prev.map((u) => (u.id === id ? { ...u, email } : u)));
     setEmailErrors((prev) => {
       const next = { ...prev };
       delete next[id];
@@ -141,9 +135,7 @@ export function UserManagementDrawer({
     }
 
     const autoRows = localPlannedUsers.filter((u) => u.id.startsWith("auto-"));
-    const manualRows = localPlannedUsers.filter((u) =>
-      u.id.startsWith("planned-"),
-    );
+    const manualRows = localPlannedUsers.filter((u) => u.id.startsWith("planned-"));
     const autoRowsWithEmail = autoRows.filter((u) => u.email.trim() !== "");
     const deletedAutoCount = initialAutoFillCount - autoRows.length;
 
@@ -159,11 +151,9 @@ export function UserManagementDrawer({
     countFullMembers(editableUsers) +
     countFullMembers(pendingInvitesWithMemberType) +
     countFullMembers(localPlannedUsers);
-  const totalPriceCentsInDrawer =
-    totalFullMembersInDrawer * seatPricePerPeriodCents;
+  const totalPriceCentsInDrawer = totalFullMembersInDrawer * seatPricePerPeriodCents;
   const periodSuffix = billingPeriod === "annual" ? "/yr" : "/mo";
-  const priceLabel =
-    billingPeriod === "annual" ? "Annual Price:" : "Monthly Price:";
+  const priceLabel = billingPeriod === "annual" ? "Annual Price:" : "Monthly Price:";
 
   return (
     <Drawer.Root
@@ -193,26 +183,16 @@ export function UserManagementDrawer({
               <Collapsible.Root width="full">
                 <HStack justify="flex-start" width="full">
                   <Collapsible.Trigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      color="fg.muted"
-                      fontSize="xs"
-                    >
+                    <Button variant="ghost" size="xs" color="fg.muted" fontSize="xs">
                       Show members (
-                      {editableUsers.length +
-                        pendingInvitesWithMemberType.length}
+                      {editableUsers.length + pendingInvitesWithMemberType.length}
                       )
                       <ChevronDown size={12} />
                     </Button>
                   </Collapsible.Trigger>
                 </HStack>
                 <Collapsible.Content>
-                  <Box
-                    as="table"
-                    width="full"
-                    style={{ borderCollapse: "collapse" }}
-                  >
+                  <Box as="table" width="full" style={{ borderCollapse: "collapse" }}>
                     <Box as="tbody">
                       {editableUsers.map((user) => (
                         <Box as="tr" key={user.id}>
@@ -232,9 +212,7 @@ export function UserManagementDrawer({
                           >
                             <Badge
                               colorPalette={
-                                user.memberType === "FullMember"
-                                  ? "blue"
-                                  : "yellow"
+                                user.memberType === "FullMember" ? "blue" : "yellow"
                               }
                               variant="outline"
                             >
@@ -268,9 +246,7 @@ export function UserManagementDrawer({
                           >
                             <Badge
                               colorPalette={
-                                invite.memberType === "FullMember"
-                                  ? "blue"
-                                  : "yellow"
+                                invite.memberType === "FullMember" ? "blue" : "yellow"
                               }
                               variant="outline"
                             >
@@ -306,9 +282,7 @@ export function UserManagementDrawer({
                       padding={3}
                       borderWidth={1}
                       borderRadius="md"
-                      borderColor={
-                        emailErrors[user.id] ? "red.emphasized" : "border"
-                      }
+                      borderColor={emailErrors[user.id] ? "red.emphasized" : "border"}
                     >
                       <Input
                         data-testid={`seat-email-${index}`}

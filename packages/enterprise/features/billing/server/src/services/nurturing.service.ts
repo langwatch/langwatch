@@ -5,7 +5,10 @@ import type {
   CioOrgTraits,
   CioPersonTraits,
 } from "@langwatch/enterprise-billing-contract";
-import { NullBillingErrorReporter, type BillingErrorReporter } from "../ports/error-reporter.port";
+import {
+  NullBillingErrorReporter,
+  type BillingErrorReporter,
+} from "../ports/error-reporter.port";
 
 const logger = createLogger("ee:nurturing-service");
 
@@ -55,8 +58,7 @@ export class NurturingService {
       region && region in REGIONAL_ENDPOINTS
         ? REGIONAL_ENDPOINTS[region as Region]
         : REGIONAL_ENDPOINTS.eu;
-    this.fetchFn =
-      options.fetchFn ?? (((...args) => fetch(...args)) as typeof fetch);
+    this.fetchFn = options.fetchFn ?? (((...args) => fetch(...args)) as typeof fetch);
     this.errorReporter = options.errorReporter ?? NullBillingErrorReporter.create();
   }
 
@@ -146,18 +148,14 @@ export class NurturingService {
     const url = `${this.baseUrl}${path}`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      EXTERNAL_SERVICE_TIMEOUT_MS,
-    );
+    const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_SERVICE_TIMEOUT_MS);
 
     try {
       const response = await this.fetchFn(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization:
-            "Basic " + Buffer.from(`${this.apiKey}:`).toString("base64"),
+          Authorization: "Basic " + Buffer.from(`${this.apiKey}:`).toString("base64"),
         },
         body: JSON.stringify(body),
         signal: controller.signal,

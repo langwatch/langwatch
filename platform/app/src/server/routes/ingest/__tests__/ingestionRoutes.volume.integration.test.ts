@@ -131,9 +131,7 @@ async function deleteSeededOrg(seed: SeededOrg | null): Promise<void> {
   await prisma.organization
     .delete({ where: { id: seed.organizationId } })
     .catch(() => undefined);
-  await prisma.user
-    .delete({ where: { id: seed.userId } })
-    .catch(() => undefined);
+  await prisma.user.delete({ where: { id: seed.userId } }).catch(() => undefined);
 }
 
 function buildOtlpJsonBody(spanName = "volume-canary"): ArrayBuffer {
@@ -178,8 +176,7 @@ function buildOtlpJsonBody(spanName = "volume-canary"): ArrayBuffer {
       },
     ],
   };
-  return new TextEncoder().encode(JSON.stringify(payload))
-    .buffer as ArrayBuffer;
+  return new TextEncoder().encode(JSON.stringify(payload)).buffer as ArrayBuffer;
 }
 
 /**
@@ -229,16 +226,13 @@ function buildBatchedOtlpJsonBody(spansPerRequest: number): ArrayBuffer {
       },
     ],
   };
-  return new TextEncoder().encode(JSON.stringify(payload))
-    .buffer as ArrayBuffer;
+  return new TextEncoder().encode(JSON.stringify(payload)).buffer as ArrayBuffer;
 }
 
 const handleTraceSpy = vi.fn(
-  async (
-    _tenantId: string,
-    _request: unknown,
-    _piiRedactionLevel?: unknown,
-  ) => ({ rejectedSpans: 0 }),
+  async (_tenantId: string, _request: unknown, _piiRedactionLevel?: unknown) => ({
+    rejectedSpans: 0,
+  }),
 );
 const handleLogSpy = vi.fn(async (_args: unknown) => undefined);
 
@@ -268,10 +262,7 @@ vi.mock("~/server/app-layer/app", async () => {
 
 function percentile(sortedAscMs: number[], p: number): number {
   if (sortedAscMs.length === 0) return 0;
-  const idx = Math.min(
-    sortedAscMs.length - 1,
-    Math.floor(sortedAscMs.length * p),
-  );
+  const idx = Math.min(sortedAscMs.length - 1, Math.floor(sortedAscMs.length * p));
   return sortedAscMs[idx]!;
 }
 
@@ -375,10 +366,7 @@ describe("ingestionRoutes — volume regression", () => {
       const N = 100;
       const latencies: number[] = [];
       for (let i = 0; i < N; i++) {
-        const r = await postOnce(
-          mainSeed!.ingestionSourceId,
-          mainSeed!.ingestSecret,
-        );
+        const r = await postOnce(mainSeed!.ingestionSourceId, mainSeed!.ingestSecret);
         expect(r.status).toBe(202);
         latencies.push(r.latencyMs);
       }

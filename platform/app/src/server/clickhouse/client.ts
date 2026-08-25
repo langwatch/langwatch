@@ -1,8 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  createManagedClickHouseClient,
-  SHARED_INSTANCE,
-} from "./managedClient";
+import { createManagedClickHouseClient, SHARED_INSTANCE } from "./managedClient";
 import { unregisterClickHouseLimiter } from "./metrics";
 
 let clickHouseClient: ClickHouseClient | null = null;

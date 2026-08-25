@@ -23,14 +23,12 @@ export const AddAnnotationCommand = defineCommand({
   aggregateType: "trace",
   schema: annotationAddedEventDataSchema,
   aggregateId: (d) => d.traceId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.traceId}:add_annotation:${d.annotationId}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.traceId}:add_annotation:${d.annotationId}`,
   spanAttributes: (d) => ({
     "payload.trace.id": d.traceId,
     "payload.annotation.id": d.annotationId,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.traceId}:add_annotation:${d.annotationId}`,
+  makeJobId: (d) => `${d.tenantId}:${d.traceId}:add_annotation:${d.annotationId}`,
 });
 
 export const RemoveAnnotationCommand = defineCommand({
@@ -40,14 +38,12 @@ export const RemoveAnnotationCommand = defineCommand({
   aggregateType: "trace",
   schema: annotationRemovedEventDataSchema,
   aggregateId: (d) => d.traceId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.traceId}:remove_annotation:${d.annotationId}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.traceId}:remove_annotation:${d.annotationId}`,
   spanAttributes: (d) => ({
     "payload.trace.id": d.traceId,
     "payload.annotation.id": d.annotationId,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.traceId}:remove_annotation:${d.annotationId}`,
+  makeJobId: (d) => `${d.tenantId}:${d.traceId}:remove_annotation:${d.annotationId}`,
 });
 
 export const BulkSyncAnnotationsCommand = defineCommand({

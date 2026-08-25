@@ -10,11 +10,7 @@ import { EditableIOField } from "./EditableIOField";
  * about most, because it is what a dataset record's expected output is built
  * from, which is why the edit bar has a jump straight to it.
  */
-export function TraceEditableOutput({
-  capturedText,
-}: {
-  capturedText: string | null;
-}) {
+export function TraceEditableOutput({ capturedText }: { capturedText: string | null }) {
   const basePatch = useTraceEditStore((s) => s.basePatch);
   const draft = useTraceEditStore((s) => s.traceOutputDraft);
   const setTraceOutput = useTraceEditStore((s) => s.setTraceOutput);

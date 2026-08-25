@@ -70,9 +70,7 @@ describe("CachedLuaScript", () => {
       await new CachedLuaScript("return 1").run(a.redis, 0);
       await new CachedLuaScript("return 2").run(b.redis, 0);
 
-      expect(a.evalsha.mock.calls[0]?.[0]).not.toBe(
-        b.evalsha.mock.calls[0]?.[0],
-      );
+      expect(a.evalsha.mock.calls[0]?.[0]).not.toBe(b.evalsha.mock.calls[0]?.[0]);
     });
   });
 });

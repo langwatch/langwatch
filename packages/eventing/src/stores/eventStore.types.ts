@@ -204,8 +204,9 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
  * - SHOULD be idempotent (storing the same event twice should not fail)
  * - SHOULD support concurrent writes safely
  */
-export interface EventStore<EventType extends Event = Event>
-  extends ReadOnlyEventStore<EventType> {
+export interface EventStore<
+  EventType extends Event = Event,
+> extends ReadOnlyEventStore<EventType> {
   /**
    * Stores one or more events atomically.
    *

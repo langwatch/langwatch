@@ -27,9 +27,7 @@ export function AgentsClientProvider({
   children: ReactNode;
 }) {
   return (
-    <AgentsClientContext.Provider value={client}>
-      {children}
-    </AgentsClientContext.Provider>
+    <AgentsClientContext.Provider value={client}>{children}</AgentsClientContext.Provider>
   );
 }
 

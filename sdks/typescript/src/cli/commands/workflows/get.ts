@@ -25,10 +25,18 @@ export const getWorkflowCommand = async (id: string): Promise<CommandResult | vo
         if (workflow.description) {
           console.log(`  ${chalk.gray("Description:")} ${workflow.description}`);
         }
-        console.log(`  ${chalk.gray("Evaluator:")}   ${workflow.isEvaluator ? chalk.green("yes") : "no"}`);
-        console.log(`  ${chalk.gray("Component:")}   ${workflow.isComponent ? chalk.green("yes") : "no"}`);
-        console.log(`  ${chalk.gray("Created:")}     ${new Date(workflow.createdAt).toLocaleString()}`);
-        console.log(`  ${chalk.gray("Updated:")}     ${new Date(workflow.updatedAt).toLocaleString()}`);
+        console.log(
+          `  ${chalk.gray("Evaluator:")}   ${workflow.isEvaluator ? chalk.green("yes") : "no"}`,
+        );
+        console.log(
+          `  ${chalk.gray("Component:")}   ${workflow.isComponent ? chalk.green("yes") : "no"}`,
+        );
+        console.log(
+          `  ${chalk.gray("Created:")}     ${new Date(workflow.createdAt).toLocaleString()}`,
+        );
+        console.log(
+          `  ${chalk.gray("Updated:")}     ${new Date(workflow.updatedAt).toLocaleString()}`,
+        );
         console.log();
       },
     };

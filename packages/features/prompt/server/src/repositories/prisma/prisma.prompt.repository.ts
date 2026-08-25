@@ -7,7 +7,13 @@ import type {
   Prisma,
   PrismaClient,
 } from "@langwatch/prisma-client/generated";
-export type { LlmPromptConfigVersion, Prisma, PrismaClient, PromptScope, PromptTag } from "@langwatch/prisma-client/generated";
+export type {
+  LlmPromptConfigVersion,
+  Prisma,
+  PrismaClient,
+  PromptScope,
+  PromptTag,
+} from "@langwatch/prisma-client/generated";
 import { SchemaVersion, NotFoundError } from "@langwatch/prompt-contract";
 import {
   getSchemaValidator,
@@ -36,7 +42,6 @@ export type CreateLlmConfigParams = Omit<
   // and wouldn't be available via the API.
   authorId?: string;
 };
-
 
 /**
  * Interface for LLM Config with its latest version
@@ -146,9 +151,7 @@ export class LlmConfigRepository {
             },
             latestVersion: {
               ...parseLlmConfigVersion(rawVersion),
-              runtimeParameters: parseRuntimeParameters(
-                rawVersion.runtimeParameters,
-              ),
+              runtimeParameters: parseRuntimeParameters(rawVersion.runtimeParameters),
             },
           };
         } catch (error) {
@@ -289,9 +292,7 @@ export class LlmConfigRepository {
           `Prompt version ID ${params.versionId} not found for prompt ${idOrHandle}`,
         );
       } else {
-        throw new NotFoundError(
-          `Prompt config has no versions. ID: ${idOrHandle}`,
-        );
+        throw new NotFoundError(`Prompt config has no versions. ID: ${idOrHandle}`);
       }
     }
 
@@ -307,9 +308,7 @@ export class LlmConfigRepository {
         ...config,
         latestVersion: {
           ...parseLlmConfigVersion(rawVersion),
-          runtimeParameters: parseRuntimeParameters(
-            rawVersion.runtimeParameters,
-          ),
+          runtimeParameters: parseRuntimeParameters(rawVersion.runtimeParameters),
         },
       };
     } catch (error) {
@@ -347,9 +346,7 @@ export class LlmConfigRepository {
     const organizationId = project?.team?.organization.id;
 
     if (!organizationId) {
-      throw new NotFoundError(
-        `Organization not found. Project ID: ${projectId}`,
-      );
+      throw new NotFoundError(`Organization not found. Project ID: ${projectId}`);
     }
 
     // Verify the config exists
@@ -475,10 +472,7 @@ export class LlmConfigRepository {
      * The version data should not include the configId, or projectId.
      * These will be set automatically from the newly created config.
      */
-    versionData?: Omit<
-      CreateLlmConfigVersionParams,
-      "configId" | "projectId"
-    > & {
+    versionData?: Omit<CreateLlmConfigVersionParams, "configId" | "projectId"> & {
       prompt?: string;
       runtimeParameters?: Record<string, unknown>;
     };
@@ -486,10 +480,7 @@ export class LlmConfigRepository {
     const { configData, versionData } = params;
 
     // Sanity check on the authorId
-    if (
-      versionData?.authorId &&
-      configData?.authorId !== versionData.authorId
-    ) {
+    if (versionData?.authorId && configData?.authorId !== versionData.authorId) {
       throw new Error("Author ID mismatch between config and version data");
     }
 
@@ -523,12 +514,15 @@ export class LlmConfigRepository {
       // fires; only swallow resolver-internal crashes and fall back to
       // DEFAULT_MODEL as a last-resort placeholder.
       const resolveDefaultModel = async (): Promise<string> =>
-        (await this.modelProvider?.tryGetResolvedDefault({ projectId: configData.projectId, featureKey: "DEFAULT" }))?.model ??
-        "openai/gpt-5";
+        (
+          await this.modelProvider?.tryGetResolvedDefault({
+            projectId: configData.projectId,
+            featureKey: "DEFAULT",
+          })
+        )?.model ?? "openai/gpt-5";
 
       // Set the version data to the provided version data, or undefined if no version data is provided.
-      let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined =
-        versionData;
+      let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined = versionData;
 
       // If no version data is provided, we'll create a default (draft) version.
       if (!newVersionData) {
@@ -579,9 +573,7 @@ export class LlmConfigRepository {
         ...updatedConfig,
         latestVersion: {
           ...parseLlmConfigVersion(newVersion),
-          runtimeParameters: parseRuntimeParameters(
-            newVersion.runtimeParameters,
-          ),
+          runtimeParameters: parseRuntimeParameters(newVersion.runtimeParameters),
         },
       };
     });
@@ -728,14 +720,10 @@ export class LlmConfigRepository {
       if (!parseResult1.success || !parseResult2.success) {
         const differences: string[] = [];
         if (!parseResult1.success) {
-          differences.push(
-            "config1 validation failed: " + parseResult1.error.message,
-          );
+          differences.push("config1 validation failed: " + parseResult1.error.message);
         }
         if (!parseResult2.success) {
-          differences.push(
-            "config2 validation failed: " + parseResult2.error.message,
-          );
+          differences.push("config2 validation failed: " + parseResult2.error.message);
         }
         return { isEqual: false, differences };
       }
@@ -764,29 +752,20 @@ export class LlmConfigRepository {
 
         // TODO: move this to a more git diff kinda of approach
         if (normalized1.model !== normalized2.model) {
-          differences.push(
-            `model: ${normalized1.model} → ${normalized2.model}`,
-          );
+          differences.push(`model: ${normalized1.model} → ${normalized2.model}`);
         }
         if (normalized1.prompt !== normalized2.prompt) {
           differences.push("prompt content differs");
         }
         if (
-          JSON.stringify(normalized1.messages) !==
-          JSON.stringify(normalized2.messages)
+          JSON.stringify(normalized1.messages) !== JSON.stringify(normalized2.messages)
         ) {
           differences.push("messages differ");
         }
-        if (
-          JSON.stringify(normalized1.inputs) !==
-          JSON.stringify(normalized2.inputs)
-        ) {
+        if (JSON.stringify(normalized1.inputs) !== JSON.stringify(normalized2.inputs)) {
           differences.push("inputs differ");
         }
-        if (
-          JSON.stringify(normalized1.outputs) !==
-          JSON.stringify(normalized2.outputs)
-        ) {
+        if (JSON.stringify(normalized1.outputs) !== JSON.stringify(normalized2.outputs)) {
           differences.push("outputs differ");
         }
         if (normalized1.temperature !== normalized2.temperature) {

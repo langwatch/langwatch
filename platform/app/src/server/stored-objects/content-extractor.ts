@@ -341,8 +341,7 @@ export async function processContentPart({
       const original = part as Record<string, unknown>;
       const isFileShape = original.type === "file";
       const originalInputAudio =
-        typeof original.input_audio === "object" &&
-        original.input_audio !== null
+        typeof original.input_audio === "object" && original.input_audio !== null
           ? (original.input_audio as Record<string, unknown>)
           : {};
 

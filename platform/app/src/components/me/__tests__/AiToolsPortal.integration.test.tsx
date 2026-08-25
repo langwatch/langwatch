@@ -93,9 +93,7 @@ describe("<AiToolsPortal /> curated-empty fallback", () => {
       expect(
         screen.getByRole("heading", { name: "Your AI tools portal" }),
       ).toBeInTheDocument();
-      expect(
-        screen.getByText(/admin hasn.t added any AI tools/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/admin hasn.t added any AI tools/i)).toBeInTheDocument();
 
       expect(
         screen.queryByRole("heading", {

@@ -57,12 +57,7 @@ function renderNamed(
 ) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <TreeRow
-        node={node({ name: spanName })}
-        logCount={0}
-        {...baseProps}
-        {...over}
-      />
+      <TreeRow node={node({ name: spanName })} logCount={0} {...baseProps} {...over} />
     </ChakraProvider>,
   );
 }

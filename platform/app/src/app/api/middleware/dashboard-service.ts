@@ -5,10 +5,7 @@ export type DashboardServiceMiddlewareVariables = {
   dashboardService: DashboardService;
 };
 
-export const dashboardServiceMiddleware: MiddlewareHandler = async (
-  c,
-  next,
-) => {
+export const dashboardServiceMiddleware: MiddlewareHandler = async (c, next) => {
   c.set("dashboardService", c.app.dashboard);
   await next();
 };

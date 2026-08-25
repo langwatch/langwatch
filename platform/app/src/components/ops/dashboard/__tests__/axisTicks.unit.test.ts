@@ -63,9 +63,7 @@ describe("axisTicks", () => {
       // series onto the baseline — and an idle queue's rates live below 1/s.
       expect(alignedMax(0.25)).toBeLessThanOrEqual(1);
       expect(alignedMax(0.6)).toBeLessThanOrEqual(1);
-      expect(axisTicks(0.25)[axisTicks(0.25).length - 1]).toBeLessThanOrEqual(
-        1,
-      );
+      expect(axisTicks(0.25)[axisTicks(0.25).length - 1]).toBeLessThanOrEqual(1);
     });
 
     it("never places a tick below the data", () => {
@@ -98,13 +96,9 @@ describe("axisWidthFor", () => {
 
       it("fits the longest label it will actually render", () => {
         const ticks = axisTicks(500_000);
-        const longest = Math.max(
-          ...ticks.map((t) => formatAxisValue(t).length),
-        );
+        const longest = Math.max(...ticks.map((t) => formatAxisValue(t).length));
 
-        expect(axisWidthFor(ticks, formatAxisValue)).toBeGreaterThanOrEqual(
-          longest * 7,
-        );
+        expect(axisWidthFor(ticks, formatAxisValue)).toBeGreaterThanOrEqual(longest * 7);
       });
     });
   });

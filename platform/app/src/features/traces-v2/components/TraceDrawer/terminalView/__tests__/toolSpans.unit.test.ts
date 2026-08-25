@@ -26,11 +26,7 @@ function span(over: Partial<SpanDetail>): SpanDetail {
   } as unknown as SpanDetail;
 }
 
-function event(
-  spanId: string,
-  attributes: Record<string, string>,
-  name = "tool.output",
-) {
+function event(spanId: string, attributes: Record<string, string>, name = "tool.output") {
   return { spanId, name, attributes };
 }
 

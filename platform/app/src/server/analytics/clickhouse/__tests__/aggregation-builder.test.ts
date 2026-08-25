@@ -26,8 +26,8 @@ const {
  * drops a column the ARRAY JOIN needs.
  */
 const storedSpansSelectLists = (sql: string): string[][] =>
-  Array.from(sql.matchAll(/JOIN \(SELECT (.+?) FROM stored_spans/g)).map(
-    ([, columns]) => (columns ?? "").split(",").map((column) => column.trim()),
+  Array.from(sql.matchAll(/JOIN \(SELECT (.+?) FROM stored_spans/g)).map(([, columns]) =>
+    (columns ?? "").split(",").map((column) => column.trim()),
   );
 
 describe("aggregation-builder", () => {
@@ -84,9 +84,7 @@ describe("aggregation-builder", () => {
 
       expect(result.sql).toContain("FROM stored_spans");
       // The subquery prunes partitions instead of cold-scanning S3.
-      expect(result.sql).toContain(
-        "StartTime >= {previousStart:DateTime64(3)}",
-      );
+      expect(result.sql).toContain("StartTime >= {previousStart:DateTime64(3)}");
       expect(result.sql).toContain("StartTime < {currentEnd:DateTime64(3)}");
     });
 
@@ -168,8 +166,7 @@ describe("aggregation-builder", () => {
             aggregation: "sum" as const,
           },
           {
-            metric:
-              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as const,
             key: "my-evaluator",
           },
@@ -201,8 +198,7 @@ describe("aggregation-builder", () => {
         ...baseInput,
         series: [
           {
-            metric:
-              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as const,
             key: "my-evaluator",
           },
@@ -224,8 +220,7 @@ describe("aggregation-builder", () => {
       // The bound must reach the dedup inner scan too — it appears once in the
       // outer subquery WHERE and once inside the IN-tuple dedup subquery.
       const scheduledBounds =
-        result.sql.split("ScheduledAt >= {previousStart:DateTime64(3)}")
-          .length - 1;
+        result.sql.split("ScheduledAt >= {previousStart:DateTime64(3)}").length - 1;
       expect(scheduledBounds).toBeGreaterThanOrEqual(2);
     });
 
@@ -243,8 +238,7 @@ describe("aggregation-builder", () => {
             aggregation: "sum" as const,
           },
           {
-            metric:
-              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as const,
             key: "my-evaluator",
           },
@@ -253,9 +247,7 @@ describe("aggregation-builder", () => {
       const result = buildTimeseriesQuery(input);
 
       // Must use per-trace CTE approach, not plain sum(ts.TotalCost) over fanned-out eval rows
-      const hasRawTotalCostSum = /\bsum\s*\(\s*ts\.TotalCost\s*\)/.test(
-        result.sql,
-      );
+      const hasRawTotalCostSum = /\bsum\s*\(\s*ts\.TotalCost\s*\)/.test(result.sql);
       expect(hasRawTotalCostSum).toBe(false);
 
       // Must contain the per-trace CTE (the fix uses a WITH clause that groups by trace_id)
@@ -281,8 +273,7 @@ describe("aggregation-builder", () => {
             aggregation: "cardinality" as const,
           },
           {
-            metric:
-              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as const,
             key: "my-evaluator",
           },
@@ -292,9 +283,7 @@ describe("aggregation-builder", () => {
 
       // Must not produce nested aggregations like any(uniqIf(...)) or any(avg(...))
       expect(result.sql).not.toMatch(/\bany\s*\(\s*\w+If\s*\(/);
-      expect(result.sql).not.toMatch(
-        /\bany\s*\(\s*(sum|avg|min|max|count|uniq)\s*\(/,
-      );
+      expect(result.sql).not.toMatch(/\bany\s*\(\s*(sum|avg|min|max|count|uniq)\s*\(/);
 
       // Both metric aliases still emitted
       expect(result.sql).toContain("0__metadata_user_id__cardinality");
@@ -316,8 +305,7 @@ describe("aggregation-builder", () => {
             aggregation: "sum" as const,
           },
           {
-            metric:
-              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as const,
             key: "my-evaluator",
           },
@@ -371,43 +359,40 @@ describe("aggregation-builder", () => {
         outerAggregation:
           /\bquantileTDigest\(0\.9\)\s*\(\s*trace_time_to_first_token_ms\s*\)/,
       },
-    ])("routes $metric through the CTE alias in arrayJoin groupBy path", ({
-      metric,
-      aggregation,
-      alias,
-      rawColumn,
-      outerAggregation,
-    }) => {
-      const input = {
-        ...baseInput,
-        groupBy: "metadata.model" as const,
-        series: [
-          {
-            metric: metric as FlattenAnalyticsMetricsEnum,
-            aggregation: aggregation as "avg" | "p90",
-          },
-        ],
-      };
-      const result = buildTimeseriesQuery(input);
+    ])(
+      "routes $metric through the CTE alias in arrayJoin groupBy path",
+      ({ metric, aggregation, alias, rawColumn, outerAggregation }) => {
+        const input = {
+          ...baseInput,
+          groupBy: "metadata.model" as const,
+          series: [
+            {
+              metric: metric as FlattenAnalyticsMetricsEnum,
+              aggregation: aggregation as "avg" | "p90",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
 
-      // Must route through the grouped CTE path (span-model partition join)
-      expect(result.sql).toContain("SpanModelKey");
-      expect(result.sql).toContain("deduped_traces");
+        // Must route through the grouped CTE path (span-model partition join)
+        expect(result.sql).toContain("SpanModelKey");
+        expect(result.sql).toContain("deduped_traces");
 
-      // The CTE must project the column under the expected alias. A single
-      // `ts.<Column> AS <alias>` reference inside the CTE is expected and
-      // correct — the bug was only that the outer SELECT also used
-      // `ts.<Column>`, where `ts` is out of scope.
-      expect(result.sql).toContain(`ts.${rawColumn} AS ${alias}`);
+        // The CTE must project the column under the expected alias. A single
+        // `ts.<Column> AS <alias>` reference inside the CTE is expected and
+        // correct — the bug was only that the outer SELECT also used
+        // `ts.<Column>`, where `ts` is out of scope.
+        expect(result.sql).toContain(`ts.${rawColumn} AS ${alias}`);
 
-      // The outer SELECT must reference the CTE alias, not the raw column.
-      const outerPortion =
-        result.sql
-          .slice(result.sql.indexOf("FROM (") + "FROM (".length)
-          .split("FROM deduped_traces")[1] ?? "";
-      expect(result.sql).toMatch(outerAggregation);
-      expect(outerPortion).not.toContain(`ts.${rawColumn}`);
-    });
+        // The outer SELECT must reference the CTE alias, not the raw column.
+        const outerPortion =
+          result.sql
+            .slice(result.sql.indexOf("FROM (") + "FROM (".length)
+            .split("FROM deduped_traces")[1] ?? "";
+        expect(result.sql).toMatch(outerAggregation);
+        expect(outerPortion).not.toContain(`ts.${rawColumn}`);
+      },
+    );
 
     // @regression: Dashboard widgets `avgCostPerModel` and `avgTokensPerModel`
     // emit `pipeline: { field: "trace_id", aggregation: "avg" }` on a
@@ -432,31 +417,30 @@ describe("aggregation-builder", () => {
         pipelineAgg: "avg",
         outerAggregation: /\bavg\s*\(\s*trace_completion_tokens\s*\)/,
       },
-    ])("rewrites trace_id pipeline with $pipelineAgg aggregation on $metric in arrayJoin groupBy", ({
-      metric,
-      pipelineAgg,
-      outerAggregation,
-    }) => {
-      const input = {
-        ...baseInput,
-        groupBy: "metadata.model" as const,
-        series: [
-          {
-            metric: metric as FlattenAnalyticsMetricsEnum,
-            aggregation: "avg" as const,
-            pipeline: {
-              field: "trace_id" as const,
-              aggregation: pipelineAgg as "avg",
+    ])(
+      "rewrites trace_id pipeline with $pipelineAgg aggregation on $metric in arrayJoin groupBy",
+      ({ metric, pipelineAgg, outerAggregation }) => {
+        const input = {
+          ...baseInput,
+          groupBy: "metadata.model" as const,
+          series: [
+            {
+              metric: metric as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              pipeline: {
+                field: "trace_id" as const,
+                aggregation: pipelineAgg as "avg",
+              },
             },
-          },
-        ],
-      };
-      const result = buildTimeseriesQuery(input);
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
 
-      expect(result.sql).toContain("deduped_traces");
-      // Metric must survive to the outer SELECT (not silently dropped)
-      expect(result.sql).toMatch(outerAggregation);
-    });
+        expect(result.sql).toContain("deduped_traces");
+        // Metric must survive to the outer SELECT (not silently dropped)
+        expect(result.sql).toMatch(outerAggregation);
+      },
+    );
 
     // @guard: prevent this class of bug from recurring silently. Any
     // trace-level column referenced via `${ts}.<Column>` in metric-translator
@@ -474,9 +458,7 @@ describe("aggregation-builder", () => {
         "utf8",
       );
       const referenced = new Set(
-        Array.from(source.matchAll(/\$\{ts\}\.([A-Z][a-zA-Z]+)/g)).map(
-          (m) => m[1]!,
-        ),
+        Array.from(source.matchAll(/\$\{ts\}\.([A-Z][a-zA-Z]+)/g)).map((m) => m[1]!),
       );
       // Columns handled by special cases in transformMetricForDedup, not by
       // the substitution rewrite. Keep this list minimal and documented.
@@ -489,9 +471,7 @@ describe("aggregation-builder", () => {
       };
       const registered = new Set(
         dedupSubstitutions().flatMap(({ source }) =>
-          Array.from(source.matchAll(/ts\.([A-Z][a-zA-Z]+)/g)).map(
-            (m) => m[1]!,
-          ),
+          Array.from(source.matchAll(/ts\.([A-Z][a-zA-Z]+)/g)).map((m) => m[1]!),
         ),
       );
 
@@ -567,19 +547,13 @@ describe("aggregation-builder", () => {
       const paramKeys = Object.keys(result.params);
       const labelsParam = paramKeys.find((k) => k.startsWith("labels"));
       expect(labelsParam).toBeDefined();
-      expect(result.params[labelsParam!]).toEqual([
-        "populator",
-        "conversation",
-      ]);
+      expect(result.params[labelsParam!]).toEqual(["populator", "conversation"]);
 
       // Outer query must restrict group_key to only the filtered labels
       // (arrayJoin expands ALL labels from matching traces — without this,
       // unfiltered labels leak into pie/bar chart results)
       expect(result.sql).toContain("group_key IN");
-      expect(result.params.groupByFilterValues).toEqual([
-        "populator",
-        "conversation",
-      ]);
+      expect(result.params.groupByFilterValues).toEqual(["populator", "conversation"]);
     });
 
     it("does not JOIN stored_spans when metadata.span_type uses cardinality alongside trace-level metrics", () => {
@@ -617,8 +591,7 @@ describe("aggregation-builder", () => {
         ...baseInput,
         series: [
           {
-            metric:
-              "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as const,
           },
         ],
@@ -640,10 +613,7 @@ describe("aggregation-builder", () => {
 
       expect(result.sql).toContain("ts.TopicId IN");
       expect(result.sql).toContain("{topicIds_0:Array(String)}");
-      expect(result.params).toHaveProperty("topicIds_0", [
-        "topic-1",
-        "topic-2",
-      ]);
+      expect(result.params).toHaveProperty("topicIds_0", ["topic-1", "topic-2"]);
     });
 
     it("handles groupBy parameter", () => {
@@ -677,13 +647,9 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("gen_ai.response.model");
       expect(result.sql).toContain("gen_ai.request.model");
       // The fold's redundant-usage gate must apply to the buckets too.
-      expect(result.sql).toContain(
-        "langwatch.reserved.skip_token_accumulation",
-      );
+      expect(result.sql).toContain("langwatch.reserved.skip_token_accumulation");
       // Traces without span-model rows fall back to their primary model.
-      expect(result.sql).toContain(
-        "if(empty(ts.Models), 'unknown', ts.Models[1])",
-      );
+      expect(result.sql).toContain("if(empty(ts.Models), 'unknown', ts.Models[1])");
     });
 
     it("includes all date parameters", () => {
@@ -691,9 +657,7 @@ describe("aggregation-builder", () => {
 
       expect(result.params.currentStart).toEqual(baseInput.startDate);
       expect(result.params.currentEnd).toEqual(baseInput.endDate);
-      expect(result.params.previousStart).toEqual(
-        baseInput.previousPeriodStartDate,
-      );
+      expect(result.params.previousStart).toEqual(baseInput.previousPeriodStartDate);
       expect(result.params.previousEnd).toEqual(baseInput.startDate);
     });
 
@@ -716,12 +680,8 @@ describe("aggregation-builder", () => {
 
       // Uses CTEs for pipeline metrics with cte_ prefix to avoid starting with digit
       expect(result.sql).toContain("WITH");
-      expect(result.sql).toContain(
-        "cte_0__metadata_thread_id__cardinality_current AS",
-      );
-      expect(result.sql).toContain(
-        "cte_0__metadata_thread_id__cardinality_previous AS",
-      );
+      expect(result.sql).toContain("cte_0__metadata_thread_id__cardinality_current AS");
+      expect(result.sql).toContain("cte_0__metadata_thread_id__cardinality_previous AS");
       expect(result.sql).toContain("UNION ALL");
       expect(result.sql).toContain("'current' AS period");
       expect(result.sql).toContain("'previous' AS period");
@@ -793,9 +753,7 @@ describe("aggregation-builder", () => {
         };
         const result = buildTimeseriesQuery(input);
 
-        expect(result.sql).toContain(
-          "ts.TraceId IN ({traceIds:Array(String)})",
-        );
+        expect(result.sql).toContain("ts.TraceId IN ({traceIds:Array(String)})");
         expect(result.params.traceIds).toEqual(["trace-1", "trace-2"]);
       });
 
@@ -829,12 +787,8 @@ describe("aggregation-builder", () => {
         const result = buildTimeseriesQuery(input);
 
         expect(result.sql).toMatch(/AND NOT \(.*ts\.TopicId IN/s);
-        expect(result.sql).toContain(
-          "ts.TraceId IN ({traceIds:Array(String)})",
-        );
-        expect(result.sql).not.toMatch(
-          /NOT \([^)]*\{traceIds:Array\(String\)\}/,
-        );
+        expect(result.sql).toContain("ts.TraceId IN ({traceIds:Array(String)})");
+        expect(result.sql).not.toMatch(/NOT \([^)]*\{traceIds:Array\(String\)\}/);
       });
 
       it("leaves the query untouched when there are no filters", () => {
@@ -1038,8 +992,7 @@ describe("aggregation-builder", () => {
         timeScale: 1440,
         series: [
           {
-            metric:
-              "evaluations.evaluation_runs" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_runs" as FlattenAnalyticsMetricsEnum,
             aggregation: "cardinality" as const,
             pipeline: {
               field: "trace_id" as const,
@@ -1068,8 +1021,7 @@ describe("aggregation-builder", () => {
         timeScale: 60,
         series: [
           {
-            metric:
-              "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
+            metric: "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as const,
             pipeline: {
               field: "user_id" as const,
@@ -1094,8 +1046,7 @@ describe("aggregation-builder", () => {
         timeScale: 1440,
         series: [
           {
-            metric:
-              "evaluations.evaluation_runs" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_runs" as FlattenAnalyticsMetricsEnum,
             aggregation: "cardinality" as const,
             pipeline: {
               field: "trace_id" as const,
@@ -1130,8 +1081,7 @@ describe("aggregation-builder", () => {
           groupByKey: "evaluatorA",
           series: [
             {
-              metric:
-                "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg" as const,
               key: "evaluatorB",
             },
@@ -1158,8 +1108,7 @@ describe("aggregation-builder", () => {
           groupByKey: "evaluatorA",
           series: [
             {
-              metric:
-                "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg" as const,
               key: "evaluatorB",
             },
@@ -1193,9 +1142,7 @@ describe("aggregation-builder", () => {
         expect(result.sql).toContain("{groupByKey:String}");
         // The group_key expression should be conditional (if/CASE) so non-matching rows
         // return NULL and get filtered by HAVING rather than excluded from the whole dataset
-        expect(result.sql).toMatch(
-          /if\(.*EvaluatorId.*group_key|CASE.*EvaluatorId/s,
-        );
+        expect(result.sql).toMatch(/if\(.*EvaluatorId.*group_key|CASE.*EvaluatorId/s);
         const whereSection = result.sql.split("GROUP BY")[0] ?? result.sql;
         expect(whereSection).not.toMatch(
           /AND\s+es\.EvaluatorId\s*=\s*\{groupByKey:String\}/,
@@ -1209,8 +1156,7 @@ describe("aggregation-builder", () => {
           // no groupByKey
           series: [
             {
-              metric:
-                "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg" as const,
               key: "evaluatorB",
             },
@@ -1235,8 +1181,7 @@ describe("aggregation-builder", () => {
           groupBy: "metadata.labels" as const,
           series: [
             {
-              metric:
-                "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+              metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg" as const,
               key: "some-evaluator",
             },
@@ -1273,8 +1218,7 @@ describe("aggregation-builder", () => {
             aggregation: "sum" as const,
           },
           {
-            metric:
-              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as const,
             key: "my-evaluator",
           },
@@ -1340,8 +1284,7 @@ describe("aggregation-builder", () => {
             aggregation: "cardinality" as const,
           },
           {
-            metric:
-              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as const,
             key: "my-evaluator",
           },
@@ -1369,8 +1312,7 @@ describe("aggregation-builder", () => {
             aggregation: "sum" as const,
           },
           {
-            metric:
-              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as const,
             key: "my-evaluator",
           },
@@ -1455,12 +1397,7 @@ describe("aggregation-builder", () => {
     });
 
     it("builds query for spans.type with JOIN", () => {
-      const result = buildDataForFilterQuery(
-        projectId,
-        "spans.type",
-        startDate,
-        endDate,
-      );
+      const result = buildDataForFilterQuery(projectId, "spans.type", startDate, endDate);
 
       expect(result.sql).toContain("FROM stored_spans");
       expect(result.sql).toContain("langwatch.span.type");
@@ -1584,9 +1521,8 @@ describe("aggregation-builder", () => {
         ) ?? [],
       ).toHaveLength(2);
       expect(
-        result.sql.match(
-          /StartTime < \{endDate:DateTime64\(3\)\} \+ INTERVAL 2 DAY/g,
-        ) ?? [],
+        result.sql.match(/StartTime < \{endDate:DateTime64\(3\)\} \+ INTERVAL 2 DAY/g) ??
+          [],
       ).toHaveLength(2);
     });
 
@@ -1603,12 +1539,7 @@ describe("aggregation-builder", () => {
       const filters = {
         "topics.topics": ["topic-1"],
       };
-      const result = buildTopDocumentsQuery(
-        projectId,
-        startDate,
-        endDate,
-        filters,
-      );
+      const result = buildTopDocumentsQuery(projectId, startDate, endDate, filters);
 
       expect(result.sql).toContain("ts.TopicId IN");
     });
@@ -1669,9 +1600,7 @@ describe("aggregation-builder", () => {
     it("filters for thumbs_up_down events with vote metric", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
-      expect(result.sql).toContain(
-        "mapContains(event_attrs, 'event.metrics.vote')",
-      );
+      expect(result.sql).toContain("mapContains(event_attrs, 'event.metrics.vote')");
     });
 
     it("includes ARRAY JOIN for event arrays", () => {
@@ -1717,19 +1646,11 @@ describe("aggregation-builder", () => {
       const filters = {
         "metadata.user_id": ["user-1"],
       };
-      const result = buildFeedbacksQuery(
-        projectId,
-        startDate,
-        endDate,
-        filters,
-      );
+      const result = buildFeedbacksQuery(projectId, startDate, endDate, filters);
 
       // Filter values are now parameterized, key is in params
       expect(result.sql).toContain("ts.Attributes[{metaValues_");
-      expect(result.params).toHaveProperty(
-        "metaValues_0_key",
-        "langwatch.user_id",
-      );
+      expect(result.params).toHaveProperty("metaValues_0_key", "langwatch.user_id");
       expect(result.params).toHaveProperty("metaValues_0", ["user-1"]);
     });
 
@@ -1811,18 +1732,16 @@ describe("aggregation-builder", () => {
     });
 
     it("handles dot-access columns wrapped in coalesce+sum", () => {
-      expect(
-        extractTraceAggregationColumn("coalesce(sum(ts.TotalCost), 0)"),
-      ).toBe("ts.TotalCost");
+      expect(extractTraceAggregationColumn("coalesce(sum(ts.TotalCost), 0)")).toBe(
+        "ts.TotalCost",
+      );
     });
   });
 
   describe("hasEvalMixedWithTraceMetrics", () => {
     // Minimal MetricTranslation-shaped fixtures — the helper only inspects
     // `requiredJoins`, so other fields are intentionally stub values.
-    type MetricStub = Parameters<
-      typeof hasEvalMixedWithTraceMetrics
-    >[0][number];
+    type MetricStub = Parameters<typeof hasEvalMixedWithTraceMetrics>[0][number];
     const evalMetric = {
       selectExpression: "avgIf(es.Passed, 1)",
       alias: "e",
@@ -1837,9 +1756,7 @@ describe("aggregation-builder", () => {
     } as unknown as MetricStub;
 
     it("returns true when both eval and trace metrics are present", () => {
-      expect(hasEvalMixedWithTraceMetrics([evalMetric, traceMetric])).toBe(
-        true,
-      );
+      expect(hasEvalMixedWithTraceMetrics([evalMetric, traceMetric])).toBe(true);
     });
 
     it("returns false when only eval metrics are present", () => {
@@ -1923,10 +1840,7 @@ describe("aggregation-builder", () => {
 
     it("throws on a partially rewritable expression instead of emitting out-of-scope SQL", () => {
       expect(() =>
-        transformMetricForDedup(
-          `sum(ts.TotalCost + ts.SomeBrandNewColumn) AS t`,
-          "t",
-        ),
+        transformMetricForDedup(`sum(ts.TotalCost + ts.SomeBrandNewColumn) AS t`, "t"),
       ).toThrow(/could not fully rewrite/);
     });
   });

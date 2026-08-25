@@ -76,10 +76,7 @@ function safeGet(field: AttributionField): string | null {
  * semantics). Empty strings are ignored. No-op on SSR or when storage is
  * unavailable (private browsing).
  */
-export function setAttributionIfAbsent(
-  field: AttributionField,
-  value: string,
-): void {
+export function setAttributionIfAbsent(field: AttributionField, value: string): void {
   if (typeof window === "undefined") return;
   if (value.length === 0) return;
   try {

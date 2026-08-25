@@ -74,10 +74,7 @@ export function createExperimentRunProcessingPipeline(
     .withCommand("startExperimentRun", StartExperimentRunCommand)
     .withCommand("recordTargetResult", RecordTargetResultCommand)
     .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)
-    .withCommand(
-      "computeExperimentRunMetrics",
-      ComputeExperimentRunMetricsCommand,
-    )
+    .withCommand("computeExperimentRunMetrics", ComputeExperimentRunMetricsCommand)
     .withCommand("completeExperimentRun", CompleteExperimentRunCommand)
     .build();
 }

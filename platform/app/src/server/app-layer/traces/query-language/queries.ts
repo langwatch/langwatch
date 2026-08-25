@@ -18,8 +18,7 @@ import { walkAST } from "./walk";
 export function validateAst(ast: LiqeQuery): string | null {
   if (ast.type === "Tag") {
     if (ast.expression.type === "EmptyExpression") {
-      const fieldName =
-        ast.field.type === "ImplicitField" ? "" : ast.field.name;
+      const fieldName = ast.field.type === "ImplicitField" ? "" : ast.field.name;
       return fieldName
         ? `Missing value after \`${fieldName}:\``
         : "Missing value after `:`";
@@ -80,9 +79,7 @@ export function getFacetValueState(
  * each of which used to call `getFacetValueState` — meaning N×M walks per
  * render. With this lookup the walk happens once per AST identity change.
  */
-export function buildFacetStateLookup(
-  ast: LiqeQuery,
-): ReadonlyMap<string, FacetState> {
+export function buildFacetStateLookup(ast: LiqeQuery): ReadonlyMap<string, FacetState> {
   const map = new Map<string, FacetState>();
   walkAST(ast, (node, negated) => {
     if (node.type !== "Tag") return;

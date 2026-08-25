@@ -66,9 +66,9 @@ export async function getLangyGithubPrUsage({
   const key = `langy:gh:prs:${userId}:${bucket}`;
   let count = 0;
   try {
-    const raw = await (
-      connection as { get: (k: string) => Promise<string | null> }
-    ).get(key);
+    const raw = await (connection as { get: (k: string) => Promise<string | null> }).get(
+      key,
+    );
     count = raw ? Number.parseInt(raw, 10) : 0;
   } catch {
     return {
@@ -116,15 +116,14 @@ export async function recordLangyGithubPr({
   const key = `langy:gh:prs:${userId}:${bucket}`;
   let count: number;
   try {
-    count = await (connection as { incr: (k: string) => Promise<number> }).incr(
-      key,
-    );
+    count = await (connection as { incr: (k: string) => Promise<number> }).incr(key);
     if (count === 1) {
       // Two-day TTL gives us a margin around clock skew without leaking
       // counters into the next bucket. The bucket key itself rotates daily.
-      await (
-        connection as { expire: (k: string, s: number) => Promise<number> }
-      ).expire(key, 60 * 60 * 24 * 2);
+      await (connection as { expire: (k: string, s: number) => Promise<number> }).expire(
+        key,
+        60 * 60 * 24 * 2,
+      );
     }
   } catch {
     return {
@@ -222,9 +221,7 @@ export async function reserveLangyGithubPrPermit({
   // already told us about the count.
   let count: number | null = null;
   try {
-    count = await (connection as { incr: (k: string) => Promise<number> }).incr(
-      key,
-    );
+    count = await (connection as { incr: (k: string) => Promise<number> }).incr(key);
   } catch {
     // INCR itself never committed — no side effect to undo.
     return {
@@ -240,9 +237,10 @@ export async function reserveLangyGithubPrPermit({
     // the retry also fails, log and proceed — the key will outlive the
     // bucket but cap enforcement still works (the count starts correct).
     try {
-      await (
-        connection as { expire: (k: string, s: number) => Promise<number> }
-      ).expire(key, 60 * 60 * 24 * 2);
+      await (connection as { expire: (k: string, s: number) => Promise<number> }).expire(
+        key,
+        60 * 60 * 24 * 2,
+      );
     } catch {
       // Best-effort retry; on persistent EXPIRE failure the key has no
       // TTL — operator-visible via redis monitoring of `langy:gh:prs:*`

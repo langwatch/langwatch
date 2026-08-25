@@ -110,9 +110,7 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
       const existingInputs = node.data.inputs ?? [];
       const newInputs: Field[] = newVariables.map((v) => {
         // Preserve field.value from existing input with same identifier
-        const existing = existingInputs.find(
-          (i) => i.identifier === v.identifier,
-        );
+        const existing = existingInputs.find((i) => i.identifier === v.identifier);
         return {
           identifier: v.identifier,
           type: v.type as Field["type"],
@@ -147,13 +145,7 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
   );
 
   return (
-    <BasePropertiesPanel
-      node={node}
-      hideParameters
-      hideInputs
-      hideOutputs
-      paddingX={4}
-    >
+    <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs paddingX={4}>
       {/* Code Editor */}
       <CodeBlockEditor
         code={code}

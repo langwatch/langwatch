@@ -22,10 +22,7 @@ export const observeClickHouseQueryDuration = (
   queryType: "SELECT" | "INSERT" | "OTHER",
   table: string,
   durationSeconds: number,
-) =>
-  clickhouseQueryDurationHistogram
-    .labels(queryType, table)
-    .observe(durationSeconds);
+) => clickhouseQueryDurationHistogram.labels(queryType, table).observe(durationSeconds);
 
 // Counter for query totals
 register.removeSingleMetric("clickhouse_query_total");
@@ -81,10 +78,8 @@ const clickhouseWindowedReadTotal = new Counter({
   labelNames: ["table", "outcome"] as const,
 });
 
-export const incrementWindowedReadCount = (
-  table: string,
-  outcome: WindowedReadOutcome,
-) => clickhouseWindowedReadTotal.labels(table, outcome).inc();
+export const incrementWindowedReadCount = (table: string, outcome: WindowedReadOutcome) =>
+  clickhouseWindowedReadTotal.labels(table, outcome).inc();
 
 // ============================================================================
 // Storage Metrics
@@ -207,10 +202,8 @@ const clickhouseStatementsShed = new Counter({
   labelNames: ["instance", "operation"] as const,
 });
 
-export const incrementClickHouseStatementsShed = (
-  instance: string,
-  operation: string,
-) => clickhouseStatementsShed.labels(instance, operation).inc();
+export const incrementClickHouseStatementsShed = (instance: string, operation: string) =>
+  clickhouseStatementsShed.labels(instance, operation).inc();
 
 // Time spent waiting for a slot, which is the latency the pool used to hide.
 // Buckets start below a millisecond because the uncontended case must be
@@ -285,9 +278,7 @@ let clickhouseBackupStatusTotal: Gauge<"status"> | null = null;
 
 export const setClickHouseBackupLastSuccessTimestamp = (ts: number) => {
   if (!clickhouseBackupLastSuccessTimestamp) {
-    register.removeSingleMetric(
-      "clickhouse_backup_last_success_timestamp_seconds",
-    );
+    register.removeSingleMetric("clickhouse_backup_last_success_timestamp_seconds");
     clickhouseBackupLastSuccessTimestamp = new Gauge({
       name: "clickhouse_backup_last_success_timestamp_seconds",
       help: "Timestamp of the last successful ClickHouse backup (Unix seconds)",
@@ -461,9 +452,7 @@ async function collectBackupStats(client: ClickHouseClient): Promise<void> {
     }
 
     if (backupStatsCollectionFailing) {
-      logger.info(
-        "ClickHouse backup stats collection recovered from previous failure",
-      );
+      logger.info("ClickHouse backup stats collection recovered from previous failure");
       backupStatsCollectionFailing = false;
     }
   } catch (backupError) {
@@ -490,9 +479,7 @@ async function collectBackupStats(client: ClickHouseClient): Promise<void> {
  * Collects storage statistics for monitored tables.
  * Should be called periodically (e.g., every 15 seconds).
  */
-export async function collectStorageStats(
-  client: ClickHouseClient,
-): Promise<void> {
+export async function collectStorageStats(client: ClickHouseClient): Promise<void> {
   try {
     interface TableStats {
       table: string;
@@ -579,10 +566,7 @@ export async function collectStorageStats(
         setClickHouseDiskFreeBytes(row.name, parseInt(row.free_space, 10));
       }
     } catch (diskError) {
-      logger.debug(
-        { error: diskError },
-        "Failed to collect ClickHouse disk stats",
-      );
+      logger.debug({ error: diskError }, "Failed to collect ClickHouse disk stats");
     }
   } catch (error) {
     logger.error({ error }, "Failed to collect ClickHouse storage stats");

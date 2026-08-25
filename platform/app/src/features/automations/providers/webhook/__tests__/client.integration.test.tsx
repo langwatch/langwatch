@@ -21,13 +21,7 @@ import {
   DEFAULT_REPORT_WEBHOOK_BODY_TEMPLATE,
   DEFAULT_WEBHOOK_BODY_TEMPLATE,
 } from "@langwatch/automation-contract";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "~/features/automations/providers/types";
@@ -37,21 +31,14 @@ vi.mock("@monaco-editor/react", () => ({ default: () => null }));
  *  one export as a textarea carrying its `value`, so a test can read back the
  *  template the editor was seeded with. Everything else in the module stays
  *  real (FieldHeader is exercised as-is). */
-vi.mock(
-  "~/features/automations/editors/templateAuthoring",
-  async (original) => {
-    const actual =
-      await original<
-        typeof import("~/features/automations/editors/templateAuthoring")
-      >();
-    return {
-      ...actual,
-      LiquidEditor: ({ value }: { value: string }) => (
-        <textarea readOnly value={value} />
-      ),
-    };
-  },
-);
+vi.mock("~/features/automations/editors/templateAuthoring", async (original) => {
+  const actual =
+    await original<typeof import("~/features/automations/editors/templateAuthoring")>();
+  return {
+    ...actual,
+    LiquidEditor: ({ value }: { value: string }) => <textarea readOnly value={value} />,
+  };
+});
 
 import type { WebhookPreview } from "@langwatch/automation-contract";
 import webhookClient, { type WebhookSlice } from "../client";
@@ -120,9 +107,7 @@ const renderForm = ({
     wrapper: Wrapper,
   });
 
-function savedRowWith(
-  actionParams: Partial<WebhookActionParams>,
-): SavedTriggerRow {
+function savedRowWith(actionParams: Partial<WebhookActionParams>): SavedTriggerRow {
   return { actionParams } as SavedTriggerRow;
 }
 
@@ -148,9 +133,7 @@ describe("WebhookConfigForm URL validation", () => {
         { target: { value: "http://example.com/hooks" } },
       );
 
-      expect(
-        screen.getByText(/the webhook url must use https/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/the webhook url must use https/i)).toBeInTheDocument();
     });
   });
 
@@ -163,9 +146,7 @@ describe("WebhookConfigForm URL validation", () => {
         { target: { value: "https://example.com:8443/hooks" } },
       );
 
-      expect(
-        screen.getByText(/only the default https port/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/only the default https port/i)).toBeInTheDocument();
     });
   });
 
@@ -173,9 +154,7 @@ describe("WebhookConfigForm URL validation", () => {
     it("clears the error", () => {
       renderForm();
 
-      const input = screen.getByPlaceholderText(
-        "https://example.com/hooks/langwatch",
-      );
+      const input = screen.getByPlaceholderText("https://example.com/hooks/langwatch");
       fireEvent.change(input, { target: { value: "http://bad" } });
       expect(screen.getByText(/must use https/i)).toBeInTheDocument();
 
@@ -260,9 +239,7 @@ describe("webhookClient kept-header sentinel round-trip", () => {
       const valueInput = screen.getByPlaceholderText("•••••• (saved)");
       fireEvent.change(valueInput, { target: { value: "Bearer new-token" } });
 
-      expect(
-        screen.queryByPlaceholderText("•••••• (saved)"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("•••••• (saved)")).not.toBeInTheDocument();
     });
   });
 });
@@ -323,10 +300,7 @@ describe("webhookClient signing secret", () => {
       renderForm({ initial: webhookClient.fromTriggerRow(savedSignedRow) });
 
       expect(signingSecretInput()).toHaveValue("");
-      expect(signingSecretInput()).toHaveAttribute(
-        "placeholder",
-        "•••••• (saved)",
-      );
+      expect(signingSecretInput()).toHaveAttribute("placeholder", "•••••• (saved)");
       expect(
         screen.queryByDisplayValue(WEBHOOK_HEADER_VALUE_KEPT),
       ).not.toBeInTheDocument();
@@ -355,9 +329,7 @@ describe("webhookClient signing secret", () => {
         onChangeSpy.mock.calls.at(-1)![0],
       ) as WebhookActionParams;
       expect(params.signingSecret).toBeNull();
-      expect(
-        screen.queryByLabelText("Remove signing secret"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Remove signing secret")).not.toBeInTheDocument();
     });
   });
 

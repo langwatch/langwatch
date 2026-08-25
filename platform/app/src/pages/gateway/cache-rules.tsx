@@ -119,11 +119,7 @@ function CacheRulesPage() {
           <PageLayout.Heading>Cache Rules</PageLayout.Heading>
           <Spacer />
           {canCreate && (
-            <Button
-              colorPalette="orange"
-              size="sm"
-              onClick={() => setCreateOpen(true)}
-            >
+            <Button colorPalette="orange" size="sm" onClick={() => setCreateOpen(true)}>
               <Plus size={14} /> New rule
             </Button>
           )}
@@ -132,10 +128,9 @@ function CacheRulesPage() {
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           <Text fontSize="sm" color="fg.muted" mb={4}>
             Rules are evaluated first-match-wins by priority (highest first). A
-            per-request <code>X-LangWatch-Cache</code> header always wins over
-            matching rules, and a matched rule always wins over the
-            per-virtual-key default. Changes propagate to the gateway within 30
-            s via the /changes long-poll.
+            per-request <code>X-LangWatch-Cache</code> header always wins over matching
+            rules, and a matched rule always wins over the per-virtual-key default.
+            Changes propagate to the gateway within 30 s via the /changes long-poll.
           </Text>
           {listQuery.isLoading ? (
             <Spinner />
@@ -153,9 +148,9 @@ function CacheRulesPage() {
                 </EmptyState.Indicator>
                 <EmptyState.Title>No cache rules yet</EmptyState.Title>
                 <EmptyState.Description>
-                  Cache rules let operators force, disable, or override cache
-                  behaviour across virtual keys, models, principals, or custom
-                  request metadata — no client code changes required.
+                  Cache rules let operators force, disable, or override cache behaviour
+                  across virtual keys, models, principals, or custom request metadata — no
+                  client code changes required.
                 </EmptyState.Description>
                 {canCreate && (
                   <Button
@@ -174,9 +169,7 @@ function CacheRulesPage() {
                 <Table.Root variant="line" size="md" width="full">
                   <Table.Header>
                     <Table.Row>
-                      <Table.ColumnHeader width="60px">
-                        Priority
-                      </Table.ColumnHeader>
+                      <Table.ColumnHeader width="60px">Priority</Table.ColumnHeader>
                       <Table.ColumnHeader>Name</Table.ColumnHeader>
                       <Table.ColumnHeader>Match</Table.ColumnHeader>
                       <Table.ColumnHeader>Action</Table.ColumnHeader>
@@ -204,10 +197,7 @@ function CacheRulesPage() {
                           <MatcherSummary matchers={r.matchers} />
                         </Table.Cell>
                         <Table.Cell>
-                          <ActionBadge
-                            action={r.action}
-                            modeEnum={r.modeEnum}
-                          />
+                          <ActionBadge action={r.action} modeEnum={r.modeEnum} />
                         </Table.Cell>
                         <Table.Cell>
                           <Switch.Root
@@ -225,20 +215,13 @@ function CacheRulesPage() {
                           {(canUpdate || canDelete) && (
                             <Menu.Root>
                               <Menu.Trigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="xs"
-                                  aria-label="Actions"
-                                >
+                                <Button variant="ghost" size="xs" aria-label="Actions">
                                   <MoreVertical size={14} />
                                 </Button>
                               </Menu.Trigger>
                               <Menu.Content>
                                 {canUpdate && (
-                                  <Menu.Item
-                                    value="edit"
-                                    onClick={() => setEditing(r)}
-                                  >
+                                  <Menu.Item value="edit" onClick={() => setEditing(r)}>
                                     <Pencil size={14} /> Edit
                                   </Menu.Item>
                                 )}
@@ -350,8 +333,7 @@ function ActionBadge({
   modeEnum: "RESPECT" | "FORCE" | "DISABLE";
 }) {
   const a = (action ?? {}) as Record<string, unknown>;
-  const tone =
-    modeEnum === "FORCE" ? "orange" : modeEnum === "DISABLE" ? "red" : "green";
+  const tone = modeEnum === "FORCE" ? "orange" : modeEnum === "DISABLE" ? "red" : "green";
   return (
     <HStack gap={1}>
       <Badge colorPalette={tone}>{modeEnum.toLowerCase()}</Badge>

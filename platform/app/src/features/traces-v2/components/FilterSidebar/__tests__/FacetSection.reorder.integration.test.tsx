@@ -144,9 +144,7 @@ describe("<FacetSection /> row ordering", () => {
 
     /** @scenario "Empty-state hint and rendered rows agree when no values match" */
     it("renders empty-state alone when no rows match — not list+empty together", () => {
-      const { container, getByLabelText, queryByText } = render(
-        tree(new Set()),
-      );
+      const { container, getByLabelText, queryByText } = render(tree(new Set()));
       const section = container.firstElementChild as HTMLElement;
 
       enterSection(section);

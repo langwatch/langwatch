@@ -14,9 +14,7 @@ type EditablePromptHandleFieldProps = StackProps;
  * @param props - EditablePromptHandleFieldProps extending StackProps
  * @returns JSX.Element - Renders an editable prompt handle display with edit and copy buttons
  */
-export function EditablePromptHandleField(
-  props: EditablePromptHandleFieldProps,
-) {
+export function EditablePromptHandleField(props: EditablePromptHandleFieldProps) {
   const form = useFormContext<PromptConfigFormValues>();
   const handle = form.watch("handle");
 

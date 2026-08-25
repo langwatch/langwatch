@@ -97,9 +97,7 @@ const SPEND_SPIKE_THRESHOLD_TEMPLATE = JSON.stringify(
 function summariseThresholdConfig(
   ruleType: string,
   raw: string,
-):
-  | { kind: "ok" | "unsupported"; english: string }
-  | { kind: "error"; message: string } {
+): { kind: "ok" | "unsupported"; english: string } | { kind: "error"; message: string } {
   // Order matters: non-spend_spike rule types are persisted as
   // preview-mode (Sergey 5f416d410 — server accepts any
   // thresholdConfig shape for non-detector-wired types). So check
@@ -204,8 +202,7 @@ function AnomalyRulesHeader() {
           </Badge>
         </HStack>
         <Text color="fg.muted" fontSize="sm" maxW="3xl">
-          Define thresholds that page on-call when activity drifts. Rules
-          surface on the{" "}
+          Define thresholds that page on-call when activity drifts. Rules surface on the{" "}
           <Link href="/governance" color="blue.600">
             governance overview
           </Link>{" "}
@@ -247,16 +244,8 @@ function RuleListLoadError({
 }) {
   return (
     <VStack align="start" gap={2}>
-      <HandledErrorAlert
-        error={error}
-        fallbackTitle="Couldn't load anomaly rules"
-      />
-      <Button
-        size="xs"
-        variant="outline"
-        onClick={onRetry}
-        loading={isRefetching}
-      >
+      <HandledErrorAlert error={error} fallbackTitle="Couldn't load anomaly rules" />
+      <Button size="xs" variant="outline" onClick={onRetry} loading={isRefetching}>
         <RotateCw size={12} /> Try again
       </Button>
     </VStack>
@@ -313,12 +302,7 @@ function RuleSeveritySection({
         {/* The write is `anomalyRules:manage`. A viewer who only reads is
             not offered a composer the server refuses. */}
         {canManage && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onNewRule}
-            disabled={composerOpen}
-          >
+          <Button size="sm" variant="outline" onClick={onNewRule} disabled={composerOpen}>
             <Plus size={14} /> New rule
           </Button>
         )}
@@ -375,8 +359,7 @@ function buildRulePayload({
   orgId: string;
 }) {
   if (!composer.name.trim()) return null;
-  if (!composer.scopeId.trim() && composer.scope !== "organization")
-    return null;
+  if (!composer.scopeId.trim() && composer.scope !== "organization") return null;
   let thresholdConfig: Record<string, unknown>;
   let destinationConfig: Record<string, unknown>;
   try {
@@ -389,8 +372,7 @@ function buildRulePayload({
     toaster.create({
       title: "Invalid JSON in config field",
       // no-raw-error-toast-ok
-      description:
-        parseFailure instanceof SyntaxError ? parseFailure.message : "",
+      description: parseFailure instanceof SyntaxError ? parseFailure.message : "",
       type: "error",
     });
     return null;
@@ -402,8 +384,7 @@ function buildRulePayload({
     severity: composer.severity,
     ruleType: composer.ruleType,
     scope: composer.scope,
-    scopeId:
-      composer.scope === "organization" ? orgId : composer.scopeId.trim(),
+    scopeId: composer.scope === "organization" ? orgId : composer.scopeId.trim(),
     thresholdConfig,
     destinationConfig,
   };
@@ -479,8 +460,7 @@ function useAnomalyRulesPage() {
     { enabled: !!orgId && canRead, refetchOnWindowFocus: false },
   );
   const utils = api.useUtils();
-  const refetch = () =>
-    utils.anomalyRules.list.invalidate({ organizationId: orgId });
+  const refetch = () => utils.anomalyRules.list.invalidate({ organizationId: orgId });
 
   const [composer, setComposer] = useState<ComposerState | null>(null);
 
@@ -648,9 +628,7 @@ function RuleRow({
         )}
         <Text fontSize="xs" color="fg.muted">
           scope: {rule.scope}
-          {rule.scope !== "organization" && rule.scopeId
-            ? ` · ${rule.scopeId}`
-            : ""}
+          {rule.scope !== "organization" && rule.scopeId ? ` · ${rule.scopeId}` : ""}
         </Text>
       </VStack>
       {canManage && (
@@ -741,9 +719,7 @@ function RuleComposer({
                   size="sm"
                   backgroundColor="white"
                   value={composer.name}
-                  onChange={(e) =>
-                    setComposer({ ...composer, name: e.target.value })
-                  }
+                  onChange={(e) => setComposer({ ...composer, name: e.target.value })}
                   placeholder="Display name for this rule"
                 />
               </VStack>
@@ -821,13 +797,10 @@ function RuleComposer({
                   ))}
                 </datalist>
                 <Text fontSize="xs" color="fg.muted">
-                  Only <code>spend_spike</code> is evaluated by the anomaly
-                  subscriber today. Other rule types (<code>rate_limit</code>,
+                  Only <code>spend_spike</code> is evaluated by the anomaly subscriber
+                  today. Other rule types (<code>rate_limit</code>,
                   <code>after_hours</code>, …) are{" "}
-                  <Link
-                    href="/ai-gateway/governance/anomaly-rules"
-                    color="blue.600"
-                  >
+                  <Link href="/ai-gateway/governance/anomaly-rules" color="blue.600">
                     preview
                   </Link>{" "}
                   — persisted as active but not yet detected.
@@ -868,14 +841,10 @@ function RuleComposer({
                       fontSize="xs"
                       color="blue.600"
                       onClick={() =>
-                        setScopeIdMode((m) =>
-                          m === "picker" ? "custom" : "picker",
-                        )
+                        setScopeIdMode((m) => (m === "picker" ? "custom" : "picker"))
                       }
                     >
-                      {scopeIdMode === "picker"
-                        ? "type a custom ID"
-                        : "use picker"}
+                      {scopeIdMode === "picker" ? "type a custom ID" : "use picker"}
                     </Button>
                   </HStack>
                   {scopeIdMode === "picker" && composer.scope === "source" ? (
@@ -898,8 +867,7 @@ function RuleComposer({
                         </option>
                       ))}
                     </select>
-                  ) : scopeIdMode === "picker" &&
-                    composer.scope === "source_type" ? (
+                  ) : scopeIdMode === "picker" && composer.scope === "source_type" ? (
                     <select
                       value={composer.scopeId}
                       onChange={(e) =>
@@ -942,9 +910,7 @@ function RuleComposer({
                 </Text>
                 <Spacer />
                 <Link
-                  href={docsUrl(
-                    "/ai-governance/anomaly-rules#threshold-config",
-                  )}
+                  href={docsUrl("/ai-governance/anomaly-rules#threshold-config")}
                   isExternal
                   color="blue.600"
                   fontSize="xs"
@@ -985,13 +951,10 @@ function RuleComposer({
                 <Link href="/governance" color="blue.600">
                   governance dashboard
                 </Link>{" "}
-                today. Slack, PagerDuty, webhook, and email destinations ship in
-                a follow-up release — the composer will gain structured
-                destination fields then. (See{" "}
-                <Link
-                  href="/ai-gateway/governance/anomaly-rules"
-                  color="blue.600"
-                >
+                today. Slack, PagerDuty, webhook, and email destinations ship in a
+                follow-up release — the composer will gain structured destination fields
+                then. (See{" "}
+                <Link href="/ai-gateway/governance/anomaly-rules" color="blue.600">
                   anomaly rules docs
                 </Link>{" "}
                 for the dispatch coverage table.)
@@ -1032,13 +995,7 @@ const selectStyle = {
   fontSize: "14px",
 };
 
-function ThresholdPreview({
-  ruleType,
-  raw,
-}: {
-  ruleType: string;
-  raw: string;
-}) {
+function ThresholdPreview({ ruleType, raw }: { ruleType: string; raw: string }) {
   const summary = summariseThresholdConfig(ruleType, raw);
   const palette =
     summary.kind === "ok"

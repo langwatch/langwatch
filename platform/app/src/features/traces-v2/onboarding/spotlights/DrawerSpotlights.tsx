@@ -38,14 +38,9 @@ export function DrawerSpotlights({
   traceId: string;
 }): React.ReactElement | null {
   const pageTourActive = useOnboardingStore((s) => s.spotlightsActive);
-  const seenDrawerSpotlights = useOnboardingStore(
-    (s) => s.seenDrawerSpotlights,
-  );
-  const markDrawerSpotlightSeen = useOnboardingStore(
-    (s) => s.markDrawerSpotlightSeen,
-  );
-  const { dismiss: persistDismissal, isDismissed } =
-    useTraceExplorerTourPreference();
+  const seenDrawerSpotlights = useOnboardingStore((s) => s.seenDrawerSpotlights);
+  const markDrawerSpotlightSeen = useOnboardingStore((s) => s.markDrawerSpotlightSeen);
+  const { dismiss: persistDismissal, isDismissed } = useTraceExplorerTourPreference();
 
   // The queue is computed once per trace (after a rAF so the drawer's
   // content has painted). Freeze the seen-map behind a ref so marking
@@ -111,8 +106,7 @@ export function DrawerSpotlights({
     const settle = () => {
       const next = measureAnchor(current.anchor);
       const parked =
-        next !== null &&
-        isAnchorParkedOffscreen(next, window.innerWidth, window.scrollX);
+        next !== null && isAnchorParkedOffscreen(next, window.innerWidth, window.scrollX);
       if (
         isAnchorSettled(next, previous, window.innerWidth, window.scrollX) ||
         frames >= MAX_FRAMES
@@ -182,8 +176,7 @@ export function DrawerSpotlights({
       }
     };
     window.addEventListener("keydown", onKeyDown, { capture: true });
-    return () =>
-      window.removeEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
   }, [current, handleDismiss]);
 
   if (!current || !anchorRect) return null;

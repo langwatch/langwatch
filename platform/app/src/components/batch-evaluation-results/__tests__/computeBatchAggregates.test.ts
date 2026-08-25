@@ -410,9 +410,7 @@ describe("computeBatchTargetAggregates", () => {
       const result = computeBatchTargetAggregates(targetCol, rows);
 
       // exact_match should have 50% pass rate (1/2)
-      const exactMatch = result.evaluators.find(
-        (e) => e.evaluatorId === "exact_match",
-      );
+      const exactMatch = result.evaluators.find((e) => e.evaluatorId === "exact_match");
       expect(exactMatch?.passRate).toBe(50);
 
       // response_length should have null pass rate

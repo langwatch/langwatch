@@ -1,10 +1,6 @@
 import { ConsoleLogger, NoOpLogger } from "./logger";
 
-export {
-  getLangWatchTracer,
-  getLangWatchLogger,
-  attributes,
-} from "./observability-sdk";
+export { getLangWatchTracer, getLangWatchLogger, attributes } from "./observability-sdk";
 
 export {
   FilterableBatchSpanProcessor,

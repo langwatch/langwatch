@@ -5,10 +5,7 @@ import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { useLangyContextTarget } from "~/features/langy/hooks/useLangyContextTarget";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
-import type {
-  SpanTreeNode,
-  TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { useTraceEditSession } from "../../hooks/useTraceEditSession";
 import { useTraceQueryArgs } from "../../hooks/useTraceQueryArgs";
 import { useDrawerStore } from "../../stores/drawerStore";
@@ -107,10 +104,7 @@ export function TraceDrawerContent({
   return (
     <CodeBlock.AdapterProvider value={shikiAdapter}>
       {isLoading || !trace ? (
-        <TraceDrawerSkeleton
-          onClose={onClose}
-          expectedSpanCount={expectedSpanCount}
-        />
+        <TraceDrawerSkeleton onClose={onClose} expectedSpanCount={expectedSpanCount} />
       ) : (
         <>
           <Box
@@ -133,11 +127,7 @@ export function TraceDrawerContent({
               scope="Couldn't render this trace's header"
               resetKeys={[trace.traceId]}
             >
-              <DrawerHeader
-                trace={trace}
-                onClose={onClose}
-                readOnly={readOnly}
-              />
+              <DrawerHeader trace={trace} onClose={onClose} readOnly={readOnly} />
             </IsolatedErrorBoundary>
           </Box>
           <Box borderBottomWidth="1px" borderColor="border" />
@@ -187,9 +177,7 @@ export function TraceDrawerContent({
                   <SessionModePane trace={trace} />
                 ) : viewMode === "terminal" && !readOnly ? (
                   <TerminalModePane trace={trace} />
-                ) : viewMode === "conversation" &&
-                  trace.conversationId &&
-                  !readOnly ? (
+                ) : viewMode === "conversation" && trace.conversationId && !readOnly ? (
                   <ConversationModePane
                     conversationId={trace.conversationId}
                     traceId={trace.traceId}
@@ -270,10 +258,7 @@ function ConversationModePane({
       resetKeys={[conversationId, traceId]}
     >
       <Box flex={1} minHeight={0}>
-        <ConversationView
-          conversationId={conversationId}
-          currentTraceId={traceId}
-        />
+        <ConversationView conversationId={conversationId} currentTraceId={traceId} />
       </Box>
     </IsolatedErrorBoundary>
   );
@@ -319,9 +304,7 @@ function SummaryModePane({
               conversationId={trace.conversationId}
               traceId={trace.traceId}
               collapsed={ctxPaneState.collapsed}
-              onToggleCollapsed={() =>
-                togglePaneCollapsed("conversationContext")
-              }
+              onToggleCollapsed={() => togglePaneCollapsed("conversationContext")}
             />
           </Box>
         </IsolatedErrorBoundary>

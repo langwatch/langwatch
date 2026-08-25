@@ -335,11 +335,11 @@ describe("invites create", () => {
       });
 
       // The same batch as JSON on a file.
-      const file = join(
-        mkdtempSync(join(tmpdir(), "lw-invites-")),
-        "invites.json",
+      const file = join(mkdtempSync(join(tmpdir(), "lw-invites-")), "invites.json");
+      writeFileSync(
+        file,
+        JSON.stringify((fromFlags.body as { invites: unknown[] }).invites),
       );
-      writeFileSync(file, JSON.stringify((fromFlags.body as { invites: unknown[] }).invites));
 
       mockFetch.mockClear();
       respondWith(created);
@@ -351,17 +351,18 @@ describe("invites create", () => {
         (fromFlags.body as { invites: unknown[] }).invites,
       );
       const listeners = new Map<string, (chunk?: Buffer) => void>();
-      const stdinOn = vi
-        .spyOn(process.stdin, "on")
-        .mockImplementation(((event: string, listener: (chunk?: Buffer) => void) => {
-          listeners.set(event, listener);
-          if (event === "error") {
-            // Every listener is registered by now; feed the document through.
-            listeners.get("data")?.(Buffer.from(stdinChunks));
-            listeners.get("end")?.();
-          }
-          return process.stdin;
-        }) as typeof process.stdin.on);
+      const stdinOn = vi.spyOn(process.stdin, "on").mockImplementation(((
+        event: string,
+        listener: (chunk?: Buffer) => void,
+      ) => {
+        listeners.set(event, listener);
+        if (event === "error") {
+          // Every listener is registered by now; feed the document through.
+          listeners.get("data")?.(Buffer.from(stdinChunks));
+          listeners.get("end")?.();
+        }
+        return process.stdin;
+      }) as typeof process.stdin.on);
 
       mockFetch.mockClear();
       respondWith(created);
@@ -513,10 +514,7 @@ describe("every management family", () => {
         expect(logged, `${testCase.name} printed before rendering`).toEqual([]);
 
         result?.table();
-        expect(
-          logged.length,
-          `${testCase.name} human rendering`,
-        ).toBeGreaterThan(0);
+        expect(logged.length, `${testCase.name} human rendering`).toBeGreaterThan(0);
       }
     });
   });

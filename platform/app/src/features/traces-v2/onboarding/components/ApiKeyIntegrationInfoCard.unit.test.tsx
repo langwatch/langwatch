@@ -6,13 +6,7 @@
  * "shown once" warning, and the whole env block is highlighted.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -39,15 +33,12 @@ vi.mock("~/hooks/usePublicEnv", () => ({
   usePublicEnv: () => ({ data: { BASE_HOST: mockBaseHost } }),
 }));
 
-vi.mock(
-  "~/features/onboarding/components/sections/observability/CodePreview",
-  () => ({
-    CodePreview: (props: Record<string, unknown>) => {
-      capturedCodePreviewProps = props;
-      return <div data-testid="code-preview">{String(props.code)}</div>;
-    },
-  }),
-);
+vi.mock("~/features/onboarding/components/sections/observability/CodePreview", () => ({
+  CodePreview: (props: Record<string, unknown>) => {
+    capturedCodePreviewProps = props;
+    return <div data-testid="code-preview">{String(props.code)}</div>;
+  },
+}));
 
 // ─── Module under test ──────────────────────────────────────────────────────────
 
@@ -105,8 +96,7 @@ describe("<ApiKeyIntegrationInfoCard /> with a minted token", () => {
       const copyButton = screen.getByRole("button", { name: /copy token/i });
       // The copy button follows the warning sentence in document order.
       expect(
-        warning.compareDocumentPosition(copyButton) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        warning.compareDocumentPosition(copyButton) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 

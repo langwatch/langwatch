@@ -98,9 +98,7 @@ describe("TraceSummaryFoldProjection context guards", () => {
         createInitState(),
       );
       expect(after.timeToFirstTokenMs).toBe(250);
-      expect(
-        after.attributes[METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE],
-      ).toBe("1");
+      expect(after.attributes[METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE]).toBe("1");
     });
   });
 });

@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  NullSpanDedupeService,
-  RedisSpanDedupeService,
-} from "../span-dedupe.service";
+import { NullSpanDedupeService, RedisSpanDedupeService } from "../span-dedupe.service";
 
 describe("RedisSpanDedupeService", () => {
   const tenantId = "project_123";
@@ -32,11 +29,7 @@ describe("RedisSpanDedupeService", () => {
       it("returns true and passes correct key and args", async () => {
         mockSet.mockResolvedValue("OK");
 
-        const result = await service.tryAcquireProcessingLock(
-          tenantId,
-          traceId,
-          spanId,
-        );
+        const result = await service.tryAcquireProcessingLock(tenantId, traceId, spanId);
 
         expect(result).toBe(true);
         expect(mockSet).toHaveBeenCalledWith(expectedKey, "1", "EX", 60, "NX");
@@ -47,11 +40,7 @@ describe("RedisSpanDedupeService", () => {
       it("returns false", async () => {
         mockSet.mockResolvedValue(null);
 
-        const result = await service.tryAcquireProcessingLock(
-          tenantId,
-          traceId,
-          spanId,
-        );
+        const result = await service.tryAcquireProcessingLock(tenantId, traceId, spanId);
 
         expect(result).toBe(false);
       });
@@ -61,11 +50,7 @@ describe("RedisSpanDedupeService", () => {
       it("returns null and does not throw", async () => {
         mockSet.mockRejectedValue(new Error("Redis connection lost"));
 
-        const result = await service.tryAcquireProcessingLock(
-          tenantId,
-          traceId,
-          spanId,
-        );
+        const result = await service.tryAcquireProcessingLock(tenantId, traceId, spanId);
 
         expect(result).toBeNull();
       });
@@ -122,14 +107,10 @@ describe("NullSpanDedupeService", () => {
   });
 
   it("tryConfirmProcessed resolves", async () => {
-    await expect(
-      service.tryConfirmProcessed("t", "tr", "sp"),
-    ).resolves.toBeUndefined();
+    await expect(service.tryConfirmProcessed("t", "tr", "sp")).resolves.toBeUndefined();
   });
 
   it("tryReleaseOnFailure resolves", async () => {
-    await expect(
-      service.tryReleaseOnFailure("t", "tr", "sp"),
-    ).resolves.toBeUndefined();
+    await expect(service.tryReleaseOnFailure("t", "tr", "sp")).resolves.toBeUndefined();
   });
 });

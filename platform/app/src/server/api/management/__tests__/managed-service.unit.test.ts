@@ -32,8 +32,7 @@ vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
 });
 
 vi.mock("~/app/api/middleware/org-auth", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/app/api/middleware/org-auth")>();
+  const actual = await importOriginal<typeof import("~/app/api/middleware/org-auth")>();
   return {
     ...actual,
     requireOrgPermissionOrThrow:
@@ -46,9 +45,8 @@ vi.mock("~/app/api/middleware/org-auth", async (importOriginal) => {
 });
 
 vi.mock("~/app/api/middleware/enterprise-gate", async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import("~/app/api/middleware/enterprise-gate")
-  >();
+  const actual =
+    await importOriginal<typeof import("~/app/api/middleware/enterprise-gate")>();
   return {
     ...actual,
     requireEnterprisePlanRest:
@@ -112,9 +110,7 @@ describe("createManagementService", () => {
           expect(registered, path).toBeDefined();
           expect(registered?.policy.kind).toBe("public");
           if (registered?.policy.kind === "public") {
-            expect(registered.policy.reason).toContain(
-              "version-namespace guard",
-            );
+            expect(registered.policy.reason).toContain("version-namespace guard");
           }
         }
       });

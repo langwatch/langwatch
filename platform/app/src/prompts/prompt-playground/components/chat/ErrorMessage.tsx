@@ -30,9 +30,7 @@ interface ErrorMessageProps {
  */
 export function ErrorMessage({ error }: ErrorMessageProps) {
   const description =
-    error.type === "unknown"
-      ? describeError({ error })
-      : describeLLMError(error.type);
+    error.type === "unknown" ? describeError({ error }) : describeLLMError(error.type);
 
   return (
     <Alert.Root status="error" borderRadius="md">

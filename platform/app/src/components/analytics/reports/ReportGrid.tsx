@@ -80,10 +80,7 @@ export function ReportGrid({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <SortableContext
-        items={graphs.map((g) => g.id)}
-        strategy={rectSortingStrategy}
-      >
+      <SortableContext items={graphs.map((g) => g.id)} strategy={rectSortingStrategy}>
         <Grid
           templateColumns="repeat(2, 1fr)"
           autoRows="minmax(350px, auto)"

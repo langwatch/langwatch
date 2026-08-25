@@ -70,12 +70,9 @@ describe("useModelSelectionOptions()", () => {
     describe("when the caller declares the langy.chat featureKey", () => {
       it("includes codex models alongside the unrestricted ones", () => {
         const { result } = renderHook(() =>
-          useModelSelectionOptions(
-            OPTIONS,
-            "openai_codex/gpt-5.6-terra",
-            "chat",
-            { featureKey: "langy.chat" },
-          ),
+          useModelSelectionOptions(OPTIONS, "openai_codex/gpt-5.6-terra", "chat", {
+            featureKey: "langy.chat",
+          }),
         );
 
         const values = result.current.selectOptions.map((o) => o.value);

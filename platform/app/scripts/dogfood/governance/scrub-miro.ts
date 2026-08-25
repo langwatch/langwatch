@@ -15,9 +15,7 @@ async function main(): Promise<void> {
   });
   console.log(`[scrub] users found: ${users.length}`);
   for (const u of users) {
-    const newEmail = u.email
-      ?.replace(/@miro\./gi, "@acme.")
-      .replace(/-miro-/g, "-acme-");
+    const newEmail = u.email?.replace(/@miro\./gi, "@acme.").replace(/-miro-/g, "-acme-");
     const newName = u.name?.replace(/Miro/gi, "Acme");
     if (newEmail !== u.email || newName !== u.name) {
       await prisma.user.update({

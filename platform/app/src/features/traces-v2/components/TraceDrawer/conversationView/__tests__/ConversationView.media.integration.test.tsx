@@ -68,11 +68,9 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
  * which recording landed under which message.
  */
 vi.mock("~/components/simulations/MediaPart", () => ({
-  MediaPart: ({
-    part,
-  }: {
-    part: { source?: { value?: string }; url?: string };
-  }) => <div data-testid="media-part">{part.source?.value ?? part.url}</div>,
+  MediaPart: ({ part }: { part: { source?: { value?: string }; url?: string } }) => (
+    <div data-testid="media-part">{part.source?.value ?? part.url}</div>
+  ),
 }));
 
 import type { TraceMediaRef } from "~/shared/traces/media-refs";

@@ -73,46 +73,46 @@ itself.
 
 The initial core catalogue contains the following independently owned domains:
 
-| Feature | Representative ownership |
-| --- | --- |
-| `agent` | agent definitions and execution-facing product behaviour |
-| `analytics` | analytical query execution, query vocabulary, and reusable analytical read models |
-| `annotation` | annotation and score lifecycle |
-| `api-key` | API credential issuance, rotation, restriction, and revocation |
-| `auth` | authentication, login, identity-provider, and session behaviour |
-| `authz` | permissions, grants, bindings, and authorization decisions |
-| `automation` | automation definitions and execution lifecycle |
-| `coding-agent` | coding-agent conversations and jobs |
-| `dashboard` | dashboards, graphs, saved workbench charts, and chart ordering |
-| `data-privacy` | scoped capture, redaction, and privacy policy |
-| `data-retention` | retention policy, pinning, metering, and retroactive work |
-| `dataset` | datasets, records, imports, and dataset file handling |
-| `entitlement` | provider-neutral plan and capability decisions |
-| `evaluation` | evaluation definitions, runs, and results |
-| `evaluator` | evaluator definitions, execution, and evaluator providers |
-| `experiment` | experiment definitions and execution history |
-| `gateway` | AI gateway policy, virtual keys, budgets, cache rules, and guardrails |
-| `github` | GitHub installations, webhooks, repositories, and pull-request linkage |
-| `langy` | Langy conversations, signals, and jobs |
-| `model-provider` | provider credentials, models, model metadata, and model costs |
-| `monitor` | online monitor definitions and lifecycle |
-| `notification` | user-facing notification delivery and preferences |
-| `ops` | backoffice administration, queues, replay, schedulers, and event/process operations |
-| `organization` | organizations, teams, groups, memberships, invites, and personal-workspace provisioning |
-| `project` | project lifecycle, settings, and project identity |
-| `role` | custom-role definitions and assignment policy |
-| `prompt` | prompts, versions, tags, and prompt configuration |
-| `presence` | collaborative user presence and cursors |
-| `scenario` | scenario definitions and scenario lifecycle |
-| `secret` | project secret lifecycle and reserved-name policy |
-| `simulation` | simulation execution and batches |
-| `stored-object` | durable object metadata, upload, delivery, and migration |
-| `suite` | suite definitions, run plans, and suite run history |
-| `telemetry` | standards-compliant telemetry ingestion and collection |
-| `topic` | topic models, clustering runs, and clustering status |
-| `trace` | traces, spans, sharing, overlays, and trace querying |
-| `user` | user lifecycle, profile, preferences, deactivation, and avatar |
-| `workflow` | workflow definitions, versions, nodes, and execution-facing behaviour |
+| Feature          | Representative ownership                                                                |
+| ---------------- | --------------------------------------------------------------------------------------- |
+| `agent`          | agent definitions and execution-facing product behaviour                                |
+| `analytics`      | analytical query execution, query vocabulary, and reusable analytical read models       |
+| `annotation`     | annotation and score lifecycle                                                          |
+| `api-key`        | API credential issuance, rotation, restriction, and revocation                          |
+| `auth`           | authentication, login, identity-provider, and session behaviour                         |
+| `authz`          | permissions, grants, bindings, and authorization decisions                              |
+| `automation`     | automation definitions and execution lifecycle                                          |
+| `coding-agent`   | coding-agent conversations and jobs                                                     |
+| `dashboard`      | dashboards, graphs, saved workbench charts, and chart ordering                          |
+| `data-privacy`   | scoped capture, redaction, and privacy policy                                           |
+| `data-retention` | retention policy, pinning, metering, and retroactive work                               |
+| `dataset`        | datasets, records, imports, and dataset file handling                                   |
+| `entitlement`    | provider-neutral plan and capability decisions                                          |
+| `evaluation`     | evaluation definitions, runs, and results                                               |
+| `evaluator`      | evaluator definitions, execution, and evaluator providers                               |
+| `experiment`     | experiment definitions and execution history                                            |
+| `gateway`        | AI gateway policy, virtual keys, budgets, cache rules, and guardrails                   |
+| `github`         | GitHub installations, webhooks, repositories, and pull-request linkage                  |
+| `langy`          | Langy conversations, signals, and jobs                                                  |
+| `model-provider` | provider credentials, models, model metadata, and model costs                           |
+| `monitor`        | online monitor definitions and lifecycle                                                |
+| `notification`   | user-facing notification delivery and preferences                                       |
+| `ops`            | backoffice administration, queues, replay, schedulers, and event/process operations     |
+| `organization`   | organizations, teams, groups, memberships, invites, and personal-workspace provisioning |
+| `project`        | project lifecycle, settings, and project identity                                       |
+| `role`           | custom-role definitions and assignment policy                                           |
+| `prompt`         | prompts, versions, tags, and prompt configuration                                       |
+| `presence`       | collaborative user presence and cursors                                                 |
+| `scenario`       | scenario definitions and scenario lifecycle                                             |
+| `secret`         | project secret lifecycle and reserved-name policy                                       |
+| `simulation`     | simulation execution and batches                                                        |
+| `stored-object`  | durable object metadata, upload, delivery, and migration                                |
+| `suite`          | suite definitions, run plans, and suite run history                                     |
+| `telemetry`      | standards-compliant telemetry ingestion and collection                                  |
+| `topic`          | topic models, clustering runs, and clustering status                                    |
+| `trace`          | traces, spans, sharing, overlays, and trace querying                                    |
+| `user`           | user lifecycle, profile, preferences, deactivation, and avatar                          |
+| `workflow`       | workflow definitions, versions, nodes, and execution-facing behaviour                   |
 
 The catalogue is an ownership map, not a requirement to create empty packages.
 A package is created only when its vertical slice is migrated. The catalogue

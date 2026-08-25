@@ -55,11 +55,7 @@ export function ThreadedTurnView({
   // *display* role under scenario so the chip lines up with whatever
   // bubble/card body it sits next to.
   const sourceRole: string =
-    turn.kind === "user"
-      ? "user"
-      : turn.kind === "assistant"
-        ? "assistant"
-        : turn.role;
+    turn.kind === "user" ? "user" : turn.kind === "assistant" ? "assistant" : turn.role;
   const scenarioVisuals =
     isScenario && (turn.kind === "user" || turn.kind === "assistant")
       ? getDisplayRoleVisuals(turn.kind, { isScenario: true })
@@ -68,9 +64,7 @@ export function ThreadedTurnView({
   const palette = getRolePalette(colorKey);
   const RoleIcon = scenarioVisuals?.Icon ?? ROLE_ICONS[sourceRole] ?? LuUser;
   const label =
-    scenarioVisuals?.label ??
-    ROLE_LABELS[sourceRole] ??
-    sourceRole.toUpperCase();
+    scenarioVisuals?.label ?? ROLE_LABELS[sourceRole] ?? sourceRole.toUpperCase();
 
   if (expanded) {
     // Expanded body — FlatTurnView (or TurnView for bubble layout)
@@ -151,12 +145,7 @@ export function ThreadedTurnView({
             {summary}
           </Text>
         </HStack>
-        <Icon
-          as={LuChevronDown}
-          boxSize={3.5}
-          color="fg.subtle"
-          flexShrink={0}
-        />
+        <Icon as={LuChevronDown} boxSize={3.5} color="fg.subtle" flexShrink={0} />
       </chakra.button>
     </Box>
   );

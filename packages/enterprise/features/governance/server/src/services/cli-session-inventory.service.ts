@@ -39,13 +39,8 @@ export class DefaultGovernanceCliSessionInventoryService extends GovernanceCliSe
       return [];
     }
 
-    const memberKeys = await this.store.members(
-      cliUserTokensIndexKey(parsed.userId),
-    );
-    const buckets = new Map<
-      number,
-      { tokenKeys: string[]; records: CliTokenRecord[] }
-    >();
+    const memberKeys = await this.store.members(cliUserTokensIndexKey(parsed.userId));
+    const buckets = new Map<number, { tokenKeys: string[]; records: CliTokenRecord[] }>();
     for (const memberKey of memberKeys) {
       const raw = await this.store.tryGet(memberKey);
       if (!raw) continue;
@@ -76,27 +71,20 @@ export class DefaultGovernanceCliSessionInventoryService extends GovernanceCliSe
           hostname: fresh.client_info?.hostname ?? null,
           uname: fresh.client_info?.uname ?? null,
           platform: fresh.client_info?.platform ?? null,
-          lastSeenMs: Math.max(
-            ...bucket.records.map(({ issued_at }) => issued_at),
-          ),
-          expiresAtMs: Math.max(
-            ...bucket.records.map(({ expires_at }) => expires_at),
-          ),
+          lastSeenMs: Math.max(...bucket.records.map(({ issued_at }) => issued_at)),
+          expiresAtMs: Math.max(...bucket.records.map(({ expires_at }) => expires_at)),
           tokenKeys: bucket.tokenKeys,
         };
       })
       .sort((left, right) => right.lastSeenMs - left.lastSeenMs);
   }
 
-  async revokeSession(
-    input: RevokeCliSessionInput,
-  ): Promise<{ revokedTokens: number }> {
+  async revokeSession(input: RevokeCliSessionInput): Promise<{ revokedTokens: number }> {
     const parsed = revokeCliSessionInputSchema.parse(input);
     if (!this.store) return { revokedTokens: 0 };
     const sessions = await this.listForUser({ userId: parsed.userId });
     const target = sessions.find(
-      ({ sessionStartedAtMs }) =>
-        sessionStartedAtMs === parsed.sessionStartedAtMs,
+      ({ sessionStartedAtMs }) => sessionStartedAtMs === parsed.sessionStartedAtMs,
     );
     if (!target) return { revokedTokens: 0 };
 

@@ -102,8 +102,7 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
       projectId,
     });
     if (!prompt) return null;
-    return (projectSlug) =>
-      platformUrl({ projectSlug, path: promptPath(prompt.id) });
+    return (projectSlug) => platformUrl({ projectSlug, path: promptPath(prompt.id) });
   },
 
   dataset_: async ({ app, projectId, resourceId }) => {
@@ -153,8 +152,7 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
       id: resourceId,
     });
     if (!monitor) return null;
-    return (projectSlug) =>
-      platformUrl({ projectSlug, path: monitorPath(monitor.id) });
+    return (projectSlug) => platformUrl({ projectSlug, path: monitorPath(monitor.id) });
   },
 
   evaluator_: async ({ app, projectId, resourceId }) => {
@@ -200,8 +198,7 @@ async function resolveUrlBuilder({
 }): Promise<((projectSlug: string) => string) | null> {
   const pagePath = NAVIGATE_PAGES[resourceId.toLowerCase()];
   if (pagePath) {
-    return (projectSlug: string) =>
-      platformUrl({ projectSlug, path: pagePath });
+    return (projectSlug: string) => platformUrl({ projectSlug, path: pagePath });
   }
   const resolver = Object.entries(NAVIGATE_RESOLVERS).find(([prefix]) =>
     resourceId.startsWith(prefix),
@@ -226,9 +223,7 @@ export async function resolveNavigateFallbackUrl({
   });
   if (!buildUrl) return null;
 
-  const project = await app.projects
-    .tryGetById(projectId)
-    .catch(() => null);
+  const project = await app.projects.tryGetById(projectId).catch(() => null);
   if (!project?.slug) return null;
 
   return buildUrl(project.slug);

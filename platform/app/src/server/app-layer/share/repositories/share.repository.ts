@@ -31,10 +31,7 @@ export interface ShareRepository {
 
   /** Resolve a link by id, scoped to its project so a cross-tenant row is
    *  never returned into memory even transiently (multitenancy guard). */
-  findById(params: {
-    id: string;
-    projectId: string;
-  }): Promise<ShareWithProject | null>;
+  findById(params: { id: string; projectId: string }): Promise<ShareWithProject | null>;
 
   /** All links for a resource, newest first — backs the management list. */
   listByResource(params: {

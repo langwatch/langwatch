@@ -53,9 +53,7 @@ import { QueryFilterInput } from "./QueryFilterInput";
 /** One-line preview shown when the Subject facet is collapsed. */
 function subjectSummary(draft: AutomationDraft): string {
   if (draft.source === "customGraph") {
-    return subjectIsSet(draft)
-      ? "Watching a graph metric"
-      : "Pick a graph and series";
+    return subjectIsSet(draft) ? "Watching a graph metric" : "Pick a graph and series";
   }
   if (draft.source === "report") {
     return draft.report.sourceKind === "traceQuery"
@@ -123,10 +121,7 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
   const dispatch = useAutomationStore((s) => s.dispatch);
   const isPrefilled = !!prefilledGraphId;
 
-  const graphs = api.graphs.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId },
-  );
+  const graphs = api.graphs.getAll.useQuery({ projectId }, { enabled: !!projectId });
   const selectedGraphQuery = api.graphs.getById.useQuery(
     { projectId, id: draft.customGraphId ?? "" },
     { enabled: !!draft.customGraphId && !!projectId },
@@ -137,8 +132,7 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
   );
 
   const customGraphMissing = draft.customGraphId === null;
-  const seriesMissing =
-    !!draft.customGraphId && draft.graphAlert.seriesName.length === 0;
+  const seriesMissing = !!draft.customGraphId && draft.graphAlert.seriesName.length === 0;
 
   return (
     <VStack align="stretch" gap={4}>
@@ -163,9 +157,7 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
             {(graphs.data ?? []).map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name ?? g.id}
-                {g.trigger && g.id !== draft.customGraphId
-                  ? " — already automated"
-                  : ""}
+                {g.trigger && g.id !== draft.customGraphId ? " — already automated" : ""}
               </option>
             ))}
           </NativeSelect.Field>
@@ -184,9 +176,7 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
         disabled={!draft.customGraphId || seriesOptions.length === 0}
       >
         <Field.Label>Series</Field.Label>
-        <NativeSelect.Root
-          disabled={!draft.customGraphId || seriesOptions.length === 0}
-        >
+        <NativeSelect.Root disabled={!draft.customGraphId || seriesOptions.length === 0}>
           <NativeSelect.Field
             value={draft.graphAlert.seriesName}
             onChange={(e) =>
@@ -261,9 +251,7 @@ function ReportSubject() {
             <Field.Label>Which traces</Field.Label>
             <TraceQuerySubject
               query={draft.filterQuery ?? ""}
-              onChange={(value) =>
-                dispatch({ type: "SET_FILTER_QUERY", value })
-              }
+              onChange={(value) => dispatch({ type: "SET_FILTER_QUERY", value })}
               cadence={draft.notificationCadence}
               canBatch
               purpose="report"
@@ -345,24 +333,22 @@ function ReportSubject() {
 function TraceSubject() {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
-  const isLegacy =
-    !filterQueryIsSet(draft.filterQuery) && filtersAreSet(draft.filters);
+  const isLegacy = !filterQueryIsSet(draft.filterQuery) && filtersAreSet(draft.filters);
 
   if (isLegacy) {
     return (
       <VStack align="stretch" gap={2}>
         <Text textStyle="xs" color="fg.muted">
-          This automation uses the older structured filters. It keeps working as
-          is — clear these conditions to switch it to a search query.
+          This automation uses the older structured filters. It keeps working as is —
+          clear these conditions to switch it to a search query.
         </Text>
         <FieldsFilters
           filters={draft.filters as Record<FilterField, FilterParam>}
           setFilters={(next) =>
             dispatch({
               type: "SET_FILTERS",
-              value: sanitizeTriggerFilters(
-                next as Record<string, TriggerFilterValue>,
-              ).sanitized as Partial<Record<FilterField, FilterParam>>,
+              value: sanitizeTriggerFilters(next as Record<string, TriggerFilterValue>)
+                .sanitized as Partial<Record<FilterField, FilterParam>>,
             })
           }
         />
@@ -511,11 +497,7 @@ function TraceQuerySubject({
             ? "The schedule sends the traces that match these conditions, the same filters you use in the traces view. Leave it empty to send the most recent traces."
             : "The automation fires on every incoming trace that matches these conditions, the same filters you use in the traces view."}
         </Text>
-        <SubjectModeToggle
-          mode={mode}
-          onMode={setMode}
-          builderEnabled={structurable}
-        />
+        <SubjectModeToggle mode={mode} onMode={setMode} builderEnabled={structurable} />
       </HStack>
       {mode === "builder" ? (
         <ConditionBuilder query={query} onChange={onChange} />
@@ -530,20 +512,16 @@ function TraceQuerySubject({
             <Text textStyle="xs" color="fg.muted">
               Try
             </Text>
-            {["status:error", "model:gpt*", "cost:>0.1", "has:eval"].map(
-              (ex) => (
-                <Code
-                  key={ex}
-                  size="sm"
-                  cursor="pointer"
-                  onClick={() =>
-                    onChange(query.trim() ? `${query.trim()} ${ex}` : ex)
-                  }
-                >
-                  {ex}
-                </Code>
-              ),
-            )}
+            {["status:error", "model:gpt*", "cost:>0.1", "has:eval"].map((ex) => (
+              <Code
+                key={ex}
+                size="sm"
+                cursor="pointer"
+                onClick={() => onChange(query.trim() ? `${query.trim()} ${ex}` : ex)}
+              >
+                {ex}
+              </Code>
+            ))}
           </HStack>
         </VStack>
       )}
@@ -731,16 +709,9 @@ function TracePreview({
         {/* In-place refresh cue — never blanks the list. */}
         {fetching ? <Spinner size="xs" color="fg.subtle" /> : null}
       </HStack>
-      <DailyCapAdviceAlert
-        advice={capAdvice}
-        hasDividerBelow={sample.length > 0}
-      />
+      <DailyCapAdviceAlert advice={capAdvice} hasDividerBelow={sample.length > 0} />
       {sample.length > 0 ? (
-        <VStack
-          align="stretch"
-          gap={0}
-          separator={<Box height="1px" bg="border" />}
-        >
+        <VStack align="stretch" gap={0} separator={<Box height="1px" bg="border" />}>
           {sample.map((t) => (
             <PreviewTraceRow key={t.traceId} trace={t} />
           ))}
@@ -781,10 +752,10 @@ function DailyCapAdviceAlert({
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Description textStyle="xs">
-            About {advice.perDay.toLocaleString()} matches a day is over your
-            plan&apos;s daily automation limit of {advice.cap.toLocaleString()}.
-            Matches past the limit are skipped for the rest of the day. Narrow
-            the condition so it selects fewer traces.
+            About {advice.perDay.toLocaleString()} matches a day is over your plan&apos;s
+            daily automation limit of {advice.cap.toLocaleString()}. Matches past the
+            limit are skipped for the rest of the day. Narrow the condition so it selects
+            fewer traces.
           </Alert.Description>
         </Alert.Content>
         <Button

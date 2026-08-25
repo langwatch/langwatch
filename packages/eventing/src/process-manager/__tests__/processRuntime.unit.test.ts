@@ -5,10 +5,7 @@ import { z } from "zod";
 import { createTenantId } from "../../domain/tenantId";
 import type { Event } from "../../domain/types";
 import { buildProcessManager } from "../../pipeline/processBuilder";
-import {
-  ProcessRuntime,
-  SCHEDULED_SINGLETON_PROJECT_ID,
-} from "../processRuntime";
+import { ProcessRuntime, SCHEDULED_SINGLETON_PROJECT_ID } from "../processRuntime";
 import { InMemoryProcessStore } from "../stores/inMemoryProcessStore";
 import type { ProcessStore } from "../stores/processStore.types";
 
@@ -292,9 +289,7 @@ describe("ProcessRuntime", () => {
           pipelineName: "automations-second",
           processManagers: new Map([["dupeInbox", definition]]),
         }),
-      ).toThrow(
-        'Process manager "dupeInbox" is mounted by more than one pipeline',
-      );
+      ).toThrow('Process manager "dupeInbox" is mounted by more than one pipeline');
     });
   });
 

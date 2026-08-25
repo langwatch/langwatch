@@ -3,6 +3,4 @@ export {
   canUserSeeLangyConversationUpdate,
   isLangyConversationUpdateVisibleToUser,
 } from "@langwatch/langy-contract";
-export type {
-  LangyConversationUpdateAuthFields,
-} from "@langwatch/langy-contract";
+export type { LangyConversationUpdateAuthFields } from "@langwatch/langy-contract";

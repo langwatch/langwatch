@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  logCommandGroupKey,
-  prepareCanonicalLogRecords,
-} from "../canonicalLog";
+import { logCommandGroupKey, prepareCanonicalLogRecords } from "../canonicalLog";
 import { CanonicalLogStorageMapProjection } from "../projections/canonicalLogStorage.mapProjection";
 
 const noRedaction = {
@@ -16,9 +13,7 @@ function request(logRecords: unknown[], scopeName = "test.scope") {
         schemaUrl: "resource.schema",
         resource: {
           droppedAttributesCount: 2,
-          attributes: [
-            { key: "service.name", value: { stringValue: "worker" } },
-          ],
+          attributes: [{ key: "service.name", value: { stringValue: "worker" } }],
         },
         scopeLogs: [
           {
@@ -26,9 +21,7 @@ function request(logRecords: unknown[], scopeName = "test.scope") {
             scope: {
               name: scopeName,
               version: "1.2.3",
-              attributes: [
-                { key: "scope.enabled", value: { boolValue: true } },
-              ],
+              attributes: [{ key: "scope.enabled", value: { boolValue: true } }],
             },
             logRecords,
           },
@@ -71,10 +64,7 @@ describe("canonical log preparation", () => {
           key: "nested",
           value: {
             arrayValue: {
-              values: [
-                { doubleValue: 1.5 },
-                { bytesValue: new Uint8Array([1, 2, 3]) },
-              ],
+              values: [{ doubleValue: 1.5 }, { bytesValue: new Uint8Array([1, 2, 3]) }],
             },
           },
         },
@@ -91,9 +81,7 @@ describe("canonical log preparation", () => {
       correlationTraceId: log.traceId,
       timeUnixNano: log.timeUnixNano,
     });
-    expect(first.accepted[0]!.record.recordId).toBe(
-      second.accepted[0]!.record.recordId,
-    );
+    expect(first.accepted[0]!.record.recordId).toBe(second.accepted[0]!.record.recordId);
     expect(JSON.parse(first.accepted[0]!.record.bodyJson)).toEqual({
       type: "kvlist",
       value: [
@@ -251,9 +239,7 @@ describe("canonical log preparation", () => {
     expect(logCommandGroupKey("a".repeat(64), 16)).toBe(
       logCommandGroupKey("a".repeat(64), 16),
     );
-    expect(
-      Number(logCommandGroupKey("b".repeat(64), 16).split(":")[1]),
-    ).toBeLessThan(16);
+    expect(Number(logCommandGroupKey("b".repeat(64), 16).split(":")[1])).toBeLessThan(16);
   });
 
   it("uses the canonical record id to shard map storage", () => {

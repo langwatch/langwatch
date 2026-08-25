@@ -82,25 +82,19 @@ describe("OrganizationService", () => {
     vi.clearAllMocks();
     // The flows that compose raw-client helpers ask the repository for its
     // client; the double is Prisma-backed as far as they are concerned.
-    vi.mocked(mockRepo.getClient!).mockReturnValue(
-      {} as unknown as PrismaClient,
-    );
+    vi.mocked(mockRepo.getClient!).mockReturnValue({} as unknown as PrismaClient);
     service = new OrganizationService(mockRepo, mockPrompts);
   });
 
   describe("getOrganizationIdByTeamId", () => {
     describe("when team exists", () => {
       it("returns the organizationId", async () => {
-        vi.mocked(mockRepo.getOrganizationIdByTeamId).mockResolvedValue(
-          "org-123",
-        );
+        vi.mocked(mockRepo.getOrganizationIdByTeamId).mockResolvedValue("org-123");
 
         const result = await service.getOrganizationIdByTeamId("team-456");
 
         expect(result).toBe("org-123");
-        expect(mockRepo.getOrganizationIdByTeamId).toHaveBeenCalledWith(
-          "team-456",
-        );
+        expect(mockRepo.getOrganizationIdByTeamId).toHaveBeenCalledWith("team-456");
       });
     });
 
@@ -486,10 +480,7 @@ describe("OrganizationService", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         });
-        vi.mocked(mockRepo.getProjectIds).mockResolvedValue([
-          "proj-1",
-          "proj-2",
-        ]);
+        vi.mocked(mockRepo.getProjectIds).mockResolvedValue(["proj-1", "proj-2"]);
 
         await service.updateSettings({
           organizationId: "org-123",

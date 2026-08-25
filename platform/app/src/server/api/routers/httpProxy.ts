@@ -83,13 +83,7 @@ export const httpProxyRouter = createTRPCRouter({
     )
     .permission("evaluations:manage")
     .mutation(async ({ input, ctx }): Promise<HttpProxyResult> => {
-      const {
-        projectId,
-        agentId,
-        bodyTemplate,
-        templateVariables = {},
-        ...call
-      } = input;
+      const { projectId, agentId, bodyTemplate, templateVariables = {}, ...call } = input;
 
       // Generated up front so the traceparent can ride along on the request
       // and the customer's agent can correlate its own spans with the test.

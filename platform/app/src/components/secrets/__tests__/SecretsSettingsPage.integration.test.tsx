@@ -58,8 +58,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     organization: { id: "org-1" },
     organizations: [{ id: "org-1", name: "Test Org" }],
     project: { id: "proj-1", slug: "test-project" },
-    hasPermission: (permission: string) =>
-      mockHasPermissionRef.current(permission),
+    hasPermission: (permission: string) => mockHasPermissionRef.current(permission),
     hasOrgPermission: () => false,
     hasAnyPermission: () => false,
   }),
@@ -209,9 +208,7 @@ describe("Secrets settings page", () => {
       renderPage();
 
       expect(screen.getByText("No secrets configured")).toBeTruthy();
-      expect(
-        screen.getByText(/Add secrets to use in code blocks/),
-      ).toBeTruthy();
+      expect(screen.getByText(/Add secrets to use in code blocks/)).toBeTruthy();
     });
   });
 });

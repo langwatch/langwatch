@@ -47,10 +47,9 @@ describe("given a VirtualKeyUsageSnippet", () => {
   describe("when no model is passed", () => {
     /** @scenario Usage example falls back to a safe placeholder when no provider is resolvable */
     it("falls back to the gpt-5-mini placeholder", async () => {
-      const { container } = render(
-        <VirtualKeyUsageSnippet secret="vk-lw-testsecret" />,
-        { wrapper: Wrapper },
-      );
+      const { container } = render(<VirtualKeyUsageSnippet secret="vk-lw-testsecret" />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
         expect(container.textContent).toContain("gpt-5-mini");

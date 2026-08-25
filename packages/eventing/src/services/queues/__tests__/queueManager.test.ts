@@ -5,10 +5,7 @@ import type { CommandHandlerClass } from "../../../commands/commandHandlerClass"
 import { defineCommandSchema } from "../../../commands/commandSchema";
 import type { CommandType } from "../../../domain/commandType";
 import type { Event } from "../../../domain/types";
-import type {
-  DeduplicationStrategy,
-  EventSourcedQueueProcessor,
-} from "../../../queues";
+import type { DeduplicationStrategy, EventSourcedQueueProcessor } from "../../../queues";
 import {
   createTestAggregateType,
   createTestEvent,
@@ -29,9 +26,7 @@ function createMockEventHandlerDefinition(
     delay?: number;
     deduplication?: DeduplicationStrategy<Event>;
     concurrency?: number;
-    spanAttributes?: (
-      event: Event,
-    ) => Record<string, string | number | boolean>;
+    spanAttributes?: (event: Event) => Record<string, string | number | boolean>;
     disabled?: boolean;
     coalesceMaxBatch?: number;
   },
@@ -227,11 +222,7 @@ describe("QueueManager", () => {
         vi.fn(),
       );
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
       // Handler job groupKey — hierarchical: tenantId/map/name/domainKey
       const handlerEntry = globalJobRegistry.get("test-pipeline:handler:h1");
@@ -241,9 +232,7 @@ describe("QueueManager", () => {
       );
 
       // Projection job groupKey — hierarchical: tenantId/fold/name/domainKey
-      const projectionEntry = globalJobRegistry.get(
-        "test-pipeline:projection:p1",
-      );
+      const projectionEntry = globalJobRegistry.get("test-pipeline:projection:p1");
       const projectionGroupKey = projectionEntry?.groupKeyFn(event);
       expect(projectionGroupKey).toBe(
         `${tenantId}/fold/p1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
@@ -297,11 +286,7 @@ describe("QueueManager", () => {
         handleEventCallback,
       );
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
       const handlerEntry = globalJobRegistry.get("test-pipeline:handler:h1");
       await handlerEntry?.process(event);
@@ -332,15 +317,9 @@ describe("QueueManager", () => {
         vi.fn(),
       );
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
-      const projectionEntry = globalJobRegistry.get(
-        "test-pipeline:projection:p1",
-      );
+      const projectionEntry = globalJobRegistry.get("test-pipeline:projection:p1");
       const attrs = projectionEntry?.spanAttributes?.(event);
       expect(attrs).toEqual(
         expect.objectContaining({
@@ -367,9 +346,7 @@ describe("QueueManager", () => {
       );
 
       // Verify that a nonexistent key is not in the registry
-      expect(globalJobRegistry.has("test-pipeline:handler:nonexistent")).toBe(
-        false,
-      );
+      expect(globalJobRegistry.has("test-pipeline:handler:nonexistent")).toBe(false);
     });
   });
 
@@ -410,12 +387,8 @@ describe("QueueManager", () => {
       manager.initializeHandlerQueues(handlers, handleEventCallback);
 
       // Registry entries exist for each handler
-      expect(globalJobRegistry.has("test-pipeline:handler:handler1")).toBe(
-        true,
-      );
-      expect(globalJobRegistry.has("test-pipeline:handler:handler2")).toBe(
-        true,
-      );
+      expect(globalJobRegistry.has("test-pipeline:handler:handler1")).toBe(true);
+      expect(globalJobRegistry.has("test-pipeline:handler:handler2")).toBe(true);
       // Facades exist for each handler
       expect(manager.getHandlerQueue("handler1")).toBeDefined();
       expect(manager.getHandlerQueue("handler2")).toBeDefined();
@@ -469,11 +442,7 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getHandlerQueue("handler1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
       await facade.send(event);
 
       expect(mockQueueProcessor.send).toHaveBeenCalledWith(
@@ -545,11 +514,7 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getHandlerQueue("handler1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
       await facade.send(event);
 
       expect(mockQueueProcessor.send).toHaveBeenCalledWith(
@@ -580,11 +545,7 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getHandlerQueue("handler1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
       await facade.send(event);
 
       // The per-send dedup should be namespaced
@@ -617,11 +578,7 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getHandlerQueue("handler1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
       await facade.send(event);
 
       const sendOptions = (mockQueueProcessor.send as any).mock.calls[0]?.[1];
@@ -649,11 +606,7 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getHandlerQueue("handler1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
       await facade.send(event);
 
       const sendOptions = (mockQueueProcessor.send as any).mock.calls[0]?.[1];
@@ -685,10 +638,7 @@ describe("QueueManager", () => {
       };
       const processProjectionEventCallback = vi.fn();
 
-      manager.initializeProjectionQueues(
-        projections,
-        processProjectionEventCallback,
-      );
+      manager.initializeProjectionQueues(projections, processProjectionEventCallback);
 
       expect(manager.hasProjectionQueues()).toBe(false);
     });
@@ -710,18 +660,11 @@ describe("QueueManager", () => {
       };
       const processProjectionEventCallback = vi.fn();
 
-      manager.initializeProjectionQueues(
-        projections,
-        processProjectionEventCallback,
-      );
+      manager.initializeProjectionQueues(projections, processProjectionEventCallback);
 
       // Registry entries exist for each projection
-      expect(
-        globalJobRegistry.has("test-pipeline:projection:projection1"),
-      ).toBe(true);
-      expect(
-        globalJobRegistry.has("test-pipeline:projection:projection2"),
-      ).toBe(true);
+      expect(globalJobRegistry.has("test-pipeline:projection:projection1")).toBe(true);
+      expect(globalJobRegistry.has("test-pipeline:projection:projection2")).toBe(true);
       // Facades exist for each projection
       expect(manager.getProjectionQueue("projection1")).toBeDefined();
       expect(manager.getProjectionQueue("projection2")).toBeDefined();
@@ -744,11 +687,7 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getProjectionQueue("projection1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
       await facade.send(event);
 
       expect(mockQueueProcessor.send).toHaveBeenCalledWith(
@@ -777,16 +716,10 @@ describe("QueueManager", () => {
         vi.fn(),
       );
 
-      const entry = globalJobRegistry.get(
-        "test-pipeline:projection:projection1",
-      );
+      const entry = globalJobRegistry.get("test-pipeline:projection:projection1");
       expect(entry?.groupKeyFn).toBeDefined();
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
       const groupKey = entry?.groupKeyFn(event);
       expect(groupKey).toBe(
         `${tenantId}/fold/projection1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
@@ -848,12 +781,8 @@ describe("QueueManager", () => {
       );
 
       // Registry entries exist for each command
-      expect(globalJobRegistry.has("test-pipeline:command:command1")).toBe(
-        true,
-      );
-      expect(globalJobRegistry.has("test-pipeline:command:command2")).toBe(
-        true,
-      );
+      expect(globalJobRegistry.has("test-pipeline:command:command1")).toBe(true);
+      expect(globalJobRegistry.has("test-pipeline:command:command2")).toBe(true);
       // Facades exist for each command
       expect(manager.getCommandQueues().size).toBe(2);
       const command1Processor = manager.getCommandQueue("command1");
@@ -1021,12 +950,8 @@ describe("QueueManager", () => {
         vi.fn(),
       );
 
-      expect(globalJobRegistry.has("test-pipeline:reactor:subscriber1")).toBe(
-        true,
-      );
-      expect(globalJobRegistry.has("test-pipeline:reactor:subscriber2")).toBe(
-        true,
-      );
+      expect(globalJobRegistry.has("test-pipeline:reactor:subscriber1")).toBe(true);
+      expect(globalJobRegistry.has("test-pipeline:reactor:subscriber2")).toBe(true);
       expect(manager.getProjectionSubscriberQueue("subscriber1")).toBeDefined();
       expect(manager.getProjectionSubscriberQueue("subscriber2")).toBeDefined();
       expect(manager.hasProjectionSubscriberQueues()).toBe(true);
@@ -1049,11 +974,7 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getProjectionSubscriberQueue("subscriber1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
       await facade.send({ event, foldState: { count: 1 } });
 
       expect(mockQueueProcessor.send).toHaveBeenCalledWith(
@@ -1083,24 +1004,16 @@ describe("QueueManager", () => {
 
       manager.initializeProjectionSubscriberQueues(
         {
-          subscriber1: createMockSubscriberDispatchDefinition(
-            "subscriber1",
-            undefined,
-            {
-              parentProjection: "traceSummary",
-              parentType: "fold",
-            },
-          ),
+          subscriber1: createMockSubscriberDispatchDefinition("subscriber1", undefined, {
+            parentProjection: "traceSummary",
+            parentType: "fold",
+          }),
         },
         vi.fn(),
       );
 
       const entry = globalJobRegistry.get("test-pipeline:reactor:subscriber1");
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
       const groupKey = entry?.groupKeyFn({
         event,
@@ -1164,11 +1077,7 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getProjectionSubscriberQueue("subscriber1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
       await facade.send({ event, foldState: {} });
 
       expect(mockQueueProcessor.send).toHaveBeenCalledWith(

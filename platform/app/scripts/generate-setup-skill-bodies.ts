@@ -52,9 +52,7 @@ export function skillBody(raw: string): string {
   return (match ? raw.slice(match[0].length) : raw).trim();
 }
 
-export function deriveSetupSkillBodies(
-  repoRoot: string,
-): Record<string, string> {
+export function deriveSetupSkillBodies(repoRoot: string): Record<string, string> {
   const bodies: Record<string, string> = {};
   for (const id of SETUP_SKILL_IDS) {
     const file = path.join(repoRoot, "skills/_compiled/native", id, "SKILL.md");

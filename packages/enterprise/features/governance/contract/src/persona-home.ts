@@ -2,10 +2,7 @@
 
 import { z } from "zod";
 
-export const governanceOrganizationIntentSchema = z.enum([
-  "AGENT_GOVERNANCE",
-  "LLM_OPS",
-]);
+export const governanceOrganizationIntentSchema = z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]);
 export type GovernanceOrganizationIntent = z.infer<
   typeof governanceOrganizationIntentSchema
 >;
@@ -65,8 +62,7 @@ export class PersonaHomeResolverService {
       return {
         persona,
         destination:
-          input.organizationIntent === "AGENT_GOVERNANCE" &&
-          input.hasGovernanceUi
+          input.organizationIntent === "AGENT_GOVERNANCE" && input.hasGovernanceUi
             ? "/me"
             : projectHome,
         isOverride: false,
@@ -108,8 +104,7 @@ export class PersonaHomeResolverService {
           hasRecentActivity: false,
         },
         hasApplicationTraces: input.hasApplicationTraces ?? false,
-        hasOrganizationManagePermission:
-          input.hasOrganizationManagePermission ?? false,
+        hasOrganizationManagePermission: input.hasOrganizationManagePermission ?? false,
         isEnterprise: input.isEnterprise ?? false,
         hasGovernanceUi: input.hasGovernanceUi ?? false,
         firstProjectSlug: input.firstProjectSlug,
@@ -117,9 +112,7 @@ export class PersonaHomeResolverService {
     } catch {
       return {
         persona: "project_only",
-        destination: input.firstProjectSlug
-          ? `/${input.firstProjectSlug}`
-          : "/me",
+        destination: input.firstProjectSlug ? `/${input.firstProjectSlug}` : "/me",
         isOverride: false,
         governanceUiEnabled: input.hasGovernanceUi ?? false,
         intentPinned: false,
@@ -142,10 +135,7 @@ export class PersonaHomeResolverService {
     return "project_only";
   }
 
-  private mapPersonaToDestination(
-    persona: Persona,
-    input: PersonaResolverInput,
-  ): string {
+  private mapPersonaToDestination(persona: Persona, input: PersonaResolverInput): string {
     const projectHome = input.firstProjectSlug
       ? `/${input.firstProjectSlug}`
       : input.hasGovernanceUi

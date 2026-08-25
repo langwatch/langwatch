@@ -1,11 +1,5 @@
 import promBundle from "express-prom-bundle";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  writeSync,
-} from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, writeSync } from "fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
@@ -30,10 +24,7 @@ async function loadDevHttpsCredentials(
   repoDir: string,
   config: AppBootConfig,
 ): Promise<{ cert: Buffer; key: Buffer }> {
-  if (
-    config.developmentHttpsCertificatePath &&
-    config.developmentHttpsPrivateKeyPath
-  ) {
+  if (config.developmentHttpsCertificatePath && config.developmentHttpsPrivateKeyPath) {
     return {
       cert: readFileSync(config.developmentHttpsCertificatePath),
       key: readFileSync(config.developmentHttpsPrivateKeyPath),
@@ -41,8 +32,7 @@ async function loadDevHttpsCredentials(
   }
 
   const cacheDir =
-    config.developmentCertificateDirectory ??
-    path.join(repoDir, ".dev-certs");
+    config.developmentCertificateDirectory ?? path.join(repoDir, ".dev-certs");
   const certPath = path.join(cacheDir, "dev.pem");
   const keyPath = path.join(cacheDir, "dev-key.pem");
 
@@ -86,10 +76,7 @@ import { createMcpHandler } from "./mcp/handler";
 import { createApp } from "./runtime/app";
 import type { AppRuntime } from "./runtime/app";
 import { createApiRouter } from "./server/api-router";
-import {
-  initializeInProcessApp,
-  initializeWebApp,
-} from "./server/app-layer/presets";
+import { initializeInProcessApp, initializeWebApp } from "./server/app-layer/presets";
 import { assertRedisReady } from "./server/app-layer/redis-readiness";
 import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
 import {
@@ -157,8 +144,7 @@ export type StartAppOptions = {
 export const startApp = async (options: StartAppOptions) => {
   const config = options.config;
   const processRoot = options.processRoot ?? resolveAppPackageRoot();
-  const uiArtifactPath =
-    options.uiArtifactPath ?? path.join(processRoot, "dist/client");
+  const uiArtifactPath = options.uiArtifactPath ?? path.join(processRoot, "dist/client");
   const dev = config.nodeEnv !== "production";
   const hostname = "0.0.0.0";
 
@@ -225,8 +211,7 @@ export const startApp = async (options: StartAppOptions) => {
   // gateway secrets are set at all the UI renders but
   // /api/internal/gateway/* returns 503. That's a `pnpm dev` onboarding
   // confusion, so the warning stays here.
-  const gwSecretsUnset =
-    !config.gatewaySecretsConfigured;
+  const gwSecretsUnset = !config.gatewaySecretsConfigured;
   if (gwSecretsUnset) {
     logger.warn(
       "AI Gateway menu is on by default but no gateway secrets are set. " +
@@ -242,9 +227,7 @@ export const startApp = async (options: StartAppOptions) => {
   // In portless (haven) mode the API binds an ephemeral loopback port that
   // Vite proxies `/api` to under the app origin (`app.<slug>.../api`);
   // otherwise PORT+1000.
-  const port = config.apiPort ?? (dev
-      ? basePort + 1000
-      : basePort);
+  const port = config.apiPort ?? (dev ? basePort + 1000 : basePort);
 
   const mcpHandler = createMcpHandler();
   const honoApp = createApiRouter(appRuntime.app);
@@ -286,10 +269,7 @@ export const startApp = async (options: StartAppOptions) => {
     try {
       // Collapse runs of slashes so paths like `//authorize` resolve to `/authorize`
       // instead of failing the absolute-path guard on the SPA fallback below.
-      const pathname = ((req.url ?? "/").split("?")[0] ?? "/").replace(
-        /\/{2,}/g,
-        "/",
-      );
+      const pathname = ((req.url ?? "/").split("?")[0] ?? "/").replace(/\/{2,}/g, "/");
 
       // Apply security headers to all responses
       for (const [key, value] of Object.entries(securityHeaders)) {
@@ -373,18 +353,13 @@ export const startApp = async (options: StartAppOptions) => {
       res.statusCode = 404;
       res.end("Not Found");
     } catch (err) {
-      logger.error(
-        { url: req.url, error: err },
-        "error occurred handling request",
-      );
+      logger.error({ url: req.url, error: err }, "error occurred handling request");
       res.statusCode = 500;
       res.end("internal server error");
     }
   };
 
-  let server:
-    | ReturnType<typeof createServer>
-    | ReturnType<typeof createSecureServer>;
+  let server: ReturnType<typeof createServer> | ReturnType<typeof createSecureServer>;
   if (useHttp2) {
     const { cert, key } = await loadDevHttpsCredentials(processRoot, config);
     // Node's http2 compat-API hands us the same IncomingMessage /
@@ -444,9 +419,7 @@ export const startApp = async (options: StartAppOptions) => {
         hostname,
         port,
         fullUrl: `${useHttp2 ? "https" : "http"}://${hostname === "0.0.0.0" ? "localhost" : hostname}:${port}`,
-        mode: dev
-          ? `development (API only — Vite on :${basePort})`
-          : "production",
+        mode: dev ? `development (API only — Vite on :${basePort})` : "production",
       },
       "langwatch listening",
     );
@@ -487,9 +460,7 @@ export const startApp = async (options: StartAppOptions) => {
           // whatever was mid-request. Idle connections go immediately; the
           // rest get the phase's budget and are only destroyed if they
           // outlast it.
-          const closed = new Promise<void>((resolve) =>
-            server.close(() => resolve()),
-          );
+          const closed = new Promise<void>((resolve) => server.close(() => resolve()));
           if ("closeIdleConnections" in server) server.closeIdleConnections();
           await mcpHandler.closeAllSessions();
           try {

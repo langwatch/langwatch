@@ -119,8 +119,8 @@ export function registerCodeActions(
           // scaffold quick fix to land them in a known state first).
           const outputName = markerCode.slice(MISSING_OUTPUT_KEY.length + 1);
           const outputType =
-            contractRef.current.outputs.find((o) => o.identifier === outputName)
-              ?.type ?? "str";
+            contractRef.current.outputs.find((o) => o.identifier === outputName)?.type ??
+            "str";
           const defaultLit = defaultValueLiteralFor(outputType);
           const returnRe = /(return\s*\{)([^}]*)\}/g;
           let lastMatch: RegExpExecArray | null = null;

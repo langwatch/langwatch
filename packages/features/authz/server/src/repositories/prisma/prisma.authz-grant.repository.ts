@@ -21,9 +21,7 @@ export type AuthzGrantsReadRepository = Pick<
 
 type PrismaAuthzGrantDatabase = {
   roleBinding: {
-    findUnique(
-      args: unknown,
-    ): Promise<{ id: string; organizationId: string } | null>;
+    findUnique(args: unknown): Promise<{ id: string; organizationId: string } | null>;
   };
   customRole: {
     findUnique(

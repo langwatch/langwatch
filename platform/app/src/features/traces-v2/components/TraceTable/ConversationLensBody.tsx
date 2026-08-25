@@ -57,9 +57,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   // Turn rows for the one expanded conversation, fetched on demand: the
   // rollup is a GROUP BY, so the row itself carries no per-trace data. Same
   // conversation-scoped query the drawer's Conversation tab uses.
-  const expandedTurnsQuery = useConversationTurns(
-    isLoading ? null : expandedKey,
-  );
+  const expandedTurnsQuery = useConversationTurns(isLoading ? null : expandedKey);
   const expandedTurns = useMemo(
     () => mapTraceListPayload(expandedTurnsQuery.data),
     [expandedTurnsQuery.data],
@@ -69,17 +67,12 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
     if (isLoading) return buildConversationPlaceholderRows(pageSize);
     if (expandedKey === null || expandedTurns.length === 0) return realGroups;
     return realGroups.map((group) =>
-      group.conversationId === expandedKey
-        ? { ...group, traces: expandedTurns }
-        : group,
+      group.conversationId === expandedKey ? { ...group, traces: expandedTurns } : group,
     );
   }, [isLoading, pageSize, realGroups, expandedKey, expandedTurns]);
 
   const columns = useMemo(
-    () => [
-      conversationSelectColumnDef,
-      ...buildConversationColumns(lens.columns),
-    ],
+    () => [conversationSelectColumnDef, ...buildConversationColumns(lens.columns)],
     [lens.columns],
   );
   const [sorting, setSorting] = useState<SortingState>([
@@ -90,9 +83,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   // would drift out of sync with the rendered group order when the lens
   // changes.
   useEffect(() => {
-    setSorting([
-      { id: lens.sort.columnId, desc: lens.sort.direction === "desc" },
-    ]);
+    setSorting([{ id: lens.sort.columnId, desc: lens.sort.direction === "desc" }]);
   }, [lens.sort.columnId, lens.sort.direction]);
 
   const table = useReactTable({
@@ -121,11 +112,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
     setExpandedKey((prev) => (prev === id ? null : id));
 
   return (
-    <TraceTableShell
-      table={table}
-      minWidth={CONVERSATION_MIN_WIDTH}
-      stickyFirstColumn
-    >
+    <TraceTableShell table={table} minWidth={CONVERSATION_MIN_WIDTH} stickyFirstColumn>
       <VirtualSpacer height={paddingTop} colSpan={colSpan} />
       {virtualItems.map((virtualItem) => {
         const row = rows[virtualItem.index];
@@ -140,9 +127,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
             addons={lens.addons}
             status={row.original.worstStatus}
             hoverScope="split"
-            isExpanded={
-              !isLoading && expandedKey === row.original.conversationId
-            }
+            isExpanded={!isLoading && expandedKey === row.original.conversationId}
             expandedBg={EXPANDED_ROW_BG}
             // A click on the row opens the conversation's latest trace; the
             // chevron is what expands its turns inline (RegistryRow prefers
@@ -155,9 +140,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
                 : () => openLatestTrace(row.original)
             }
             onToggleExpand={
-              isLoading
-                ? undefined
-                : () => toggleExpanded(row.original.conversationId)
+              isLoading ? undefined : () => toggleExpanded(row.original.conversationId)
             }
             isLoading={isLoading}
           />

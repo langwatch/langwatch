@@ -54,9 +54,7 @@ describe("PipelineBuilder validations", () => {
       };
 
       expect(() =>
-        testPipeline<Event>()
-          .withClickHouseFoldProjection(fold)
-          .build(),
+        testPipeline<Event>().withClickHouseFoldProjection(fold).build(),
       ).not.toThrow();
     });
   });
@@ -66,9 +64,7 @@ describe("PipelineBuilder validations", () => {
       const fold = createMockFoldProjectionDefinition<Event>("simple");
 
       expect(() =>
-        testPipeline<Event>()
-          .withClickHouseFoldProjection(fold)
-          .build(),
+        testPipeline<Event>().withClickHouseFoldProjection(fold).build(),
       ).not.toThrow();
     });
   });
@@ -85,9 +81,7 @@ describe("PipelineBuilder validations", () => {
         .withEventSubscriber("conversationProcess", subscriber)
         .build();
 
-      expect(pipeline.eventSubscribers.get("conversationProcess")).toBe(
-        subscriber,
-      );
+      expect(pipeline.eventSubscribers.get("conversationProcess")).toBe(subscriber);
       expect(pipeline.foldSubscribers.size).toBe(0);
       expect(pipeline.mapSubscribers.size).toBe(0);
     });
@@ -117,8 +111,7 @@ describe("PipelineBuilder validations", () => {
         .build();
 
       const deduplication =
-        pipeline.foldSubscribers.get("settle")?.definition.options
-          ?.deduplication;
+        pipeline.foldSubscribers.get("settle")?.definition.options?.deduplication;
       expect(deduplication).toMatchObject({
         ttlMs: 12_000,
         extend: false,
@@ -167,9 +160,7 @@ describe("PipelineBuilder validations", () => {
 
       const subscriberGroupKeyFn =
         pipeline.foldSubscribers?.get("settle")?.definition.options?.groupKeyFn;
-      expect(subscriberGroupKeyFn?.({ event, foldState: {} })).toBe(
-        "lane:project-1",
-      );
+      expect(subscriberGroupKeyFn?.({ event, foldState: {} })).toBe("lane:project-1");
     });
 
     it("preserves the full deduplication contract on a raw subscriber", () => {
@@ -196,33 +187,25 @@ describe("PipelineBuilder validations", () => {
         shouldSurviveDispatch: true,
       });
       expect(
-        deduplication === "aggregate"
-          ? undefined
-          : deduplication?.makeId(event),
+        deduplication === "aggregate" ? undefined : deduplication?.makeId(event),
       ).toBe("custom:trace-1");
     });
   });
 
   describe("when a default state projection is registered", () => {
     it("keeps it out of the legacy fold and subscriber registries", () => {
-      const projection =
-        createMockStateProjectionDefinition<Event>("conversationState");
+      const projection = createMockStateProjectionDefinition<Event>("conversationState");
 
-      const pipeline = testPipeline<Event>()
-        .withPostgresProjection(projection)
-        .build();
+      const pipeline = testPipeline<Event>().withPostgresProjection(projection).build();
 
-      expect(pipeline.stateProjections?.get("conversationState")).toBe(
-        projection,
-      );
+      expect(pipeline.stateProjections?.get("conversationState")).toBe(projection);
       expect(pipeline.foldProjections.size).toBe(0);
       expect(pipeline.foldSubscribers.size).toBe(0);
       expect(pipeline.mapSubscribers.size).toBe(0);
     });
 
     it("cannot be used as a subscriber parent", () => {
-      const projection =
-        createMockStateProjectionDefinition<Event>("conversationState");
+      const projection = createMockStateProjectionDefinition<Event>("conversationState");
       expect(() =>
         testPipeline<Event>()
           .withPostgresProjection(projection)
@@ -264,9 +247,7 @@ describe("PipelineBuilder validations", () => {
 
       expect(pipeline.foldSubscribers.size).toBe(1);
       expect(pipeline.mapSubscribers.size).toBe(0);
-      expect(pipeline.foldSubscribers.get("mySubscriber")?.projectionName).toBe(
-        "myFold",
-      );
+      expect(pipeline.foldSubscribers.get("mySubscriber")?.projectionName).toBe("myFold");
     });
   });
 
@@ -284,9 +265,7 @@ describe("PipelineBuilder validations", () => {
 
       expect(pipeline.mapSubscribers.size).toBe(1);
       expect(pipeline.foldSubscribers.size).toBe(0);
-      expect(pipeline.mapSubscribers.get("mySubscriber")?.projectionName).toBe(
-        "myMap",
-      );
+      expect(pipeline.mapSubscribers.get("mySubscriber")?.projectionName).toBe("myMap");
     });
   });
 

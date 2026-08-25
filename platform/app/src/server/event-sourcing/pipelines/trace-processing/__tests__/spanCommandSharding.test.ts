@@ -80,9 +80,7 @@ describe("trace-processing pipeline span-command sharding", () => {
       const getGroupKey = shardedGroupKey({ spanCommandShardCount: 8 });
       const groups = new Set(
         Array.from({ length: 64 }, (_, i) =>
-          getGroupKey(
-            payload(TRACE_ID, (i + 1).toString(16).padStart(16, "0")),
-          ),
+          getGroupKey(payload(TRACE_ID, (i + 1).toString(16).padStart(16, "0"))),
         ),
       );
       expect(groups.size).toBeGreaterThan(1);
@@ -105,9 +103,9 @@ describe("trace-processing pipeline span-command sharding", () => {
       // No custom fold key → the fold queue falls back to the trace aggregate id,
       // so the fold stays serialized (and coalesced) per trace regardless of how
       // the command is sharded.
-      expect(
-        definition.foldProjections.get("traceSummary")?.definition.key,
-      ).toBe(undefined);
+      expect(definition.foldProjections.get("traceSummary")?.definition.key).toBe(
+        undefined,
+      );
     });
 
     it("clamps an out-of-range shard count so it can't explode the group space", () => {
@@ -139,9 +137,7 @@ describe("trace-processing pipeline span-command sharding", () => {
       const getGroupKey = cmd.options?.getGroupKey;
       expect(getGroupKey).toBeDefined();
       expect(
-        getGroupKey!(payload(TRACE_ID, "00000000000000ff")).startsWith(
-          `${TRACE_ID}:`,
-        ),
+        getGroupKey!(payload(TRACE_ID, "00000000000000ff")).startsWith(`${TRACE_ID}:`),
       ).toBe(true);
     });
   });
@@ -151,9 +147,7 @@ describe("trace-processing pipeline span-command sharding", () => {
     it("installs no getGroupKey, keeping the historic getAggregateId trace key", () => {
       const cmd = recordSpanCommand({ spanCommandShardCount: 1 });
       expect(cmd.options?.getGroupKey).toBeUndefined();
-      expect(RecordSpanCommand.getAggregateId(payload(TRACE_ID, "abc"))).toBe(
-        TRACE_ID,
-      );
+      expect(RecordSpanCommand.getAggregateId(payload(TRACE_ID, "abc"))).toBe(TRACE_ID);
     });
 
     it("installs no getGroupKey when no shard count is configured", () => {
@@ -175,17 +169,17 @@ describe("trace-processing pipeline span-command sharding", () => {
       const cmd = recordSpanCommand({ spanCommandShardCount: 1 });
       expect(cmd.options?.getGroupKey).toBeUndefined();
       const weirdTrace = "550e8400-e29b-41d4-a716-446655440000";
-      expect(
-        RecordSpanCommand.getAggregateId(payload(weirdTrace, "not-hex")),
-      ).toBe(weirdTrace);
+      expect(RecordSpanCommand.getAggregateId(payload(weirdTrace, "not-hex"))).toBe(
+        weirdTrace,
+      );
     });
   });
 
   describe("given the recordSpan command is registered", () => {
     it("keeps the per-span deduplication config intact", () => {
-      expect(
-        recordSpanCommand({ spanCommandShardCount: 8 }).options?.deduplication,
-      ).toBe(RECORD_SPAN_DEDUPLICATION);
+      expect(recordSpanCommand({ spanCommandShardCount: 8 }).options?.deduplication).toBe(
+        RECORD_SPAN_DEDUPLICATION,
+      );
     });
   });
 });
@@ -201,9 +195,7 @@ describe("given the retired stored_log_records write chain", () => {
       // so assert the exact "recordLog" name rather than a prefix.
       const definition = createTraceProcessingPipeline(buildTraceDeps());
 
-      expect(
-        definition.commands.find((c) => c.name === "recordLog"),
-      ).toBeUndefined();
+      expect(definition.commands.find((c) => c.name === "recordLog")).toBeUndefined();
       expect(definition.mapProjections.get("logRecordStorage")).toBeUndefined();
     });
   });

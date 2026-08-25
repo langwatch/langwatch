@@ -109,12 +109,12 @@ describe("excludes", () => {
         why: "session authenticated",
       };
 
-      expect(
-        excludes({ exclusion: entry, key: "POST /api/experiments/execute" }),
-      ).toBe(true);
-      expect(
-        excludes({ exclusion: entry, key: "GET /api/experiments/execute" }),
-      ).toBe(false);
+      expect(excludes({ exclusion: entry, key: "POST /api/experiments/execute" })).toBe(
+        true,
+      );
+      expect(excludes({ exclusion: entry, key: "GET /api/experiments/execute" })).toBe(
+        false,
+      );
     });
   });
 
@@ -139,9 +139,7 @@ describe("excludes", () => {
         why: "example",
       };
 
-      expect(excludes({ exclusion: entry, key: "GET /api/experiments" })).toBe(
-        false,
-      );
+      expect(excludes({ exclusion: entry, key: "GET /api/experiments" })).toBe(false);
     });
   });
 });
@@ -154,9 +152,7 @@ describe("auditCoverage", () => {
         routes: [route({ key: "POST /api/experiment/init" })],
       });
 
-      expect(result.unexplained.map((r) => r.key)).toEqual([
-        "POST /api/experiment/init",
-      ]);
+      expect(result.unexplained.map((r) => r.key)).toEqual(["POST /api/experiment/init"]);
     });
 
     /** @scenario "An internal route is excluded by a written reason" */
@@ -251,9 +247,7 @@ describe("auditCoverage", () => {
       });
 
       expect(result.unexplained).toEqual([]);
-      expect(result.withdrawn.map((r) => r.key)).toEqual([
-        "GET /api/roles/{id}/legacy",
-      ]);
+      expect(result.withdrawn.map((r) => r.key)).toEqual(["GET /api/roles/{id}/legacy"]);
       expect(result.stale).toEqual([]);
     });
 
@@ -282,9 +276,7 @@ describe("auditCoverage", () => {
         exclusions: [entry],
       });
 
-      expect(result.withdrawn.map((r) => r.key)).toEqual([
-        "GET /api/roles/{id}/legacy",
-      ]);
+      expect(result.withdrawn.map((r) => r.key)).toEqual(["GET /api/roles/{id}/legacy"]);
       expect(result.stale).toEqual([entry]);
     });
 
@@ -322,9 +314,7 @@ describe("auditCoverage", () => {
       });
 
       expect(result.unexplained).toEqual([]);
-      expect(result.withdrawn.map((r) => r.key)).toEqual([
-        "GET /api/roles/{id}",
-      ]);
+      expect(result.withdrawn.map((r) => r.key)).toEqual(["GET /api/roles/{id}"]);
     });
 
     it("treats it as live again when a later version re-registers it", () => {
@@ -337,18 +327,14 @@ describe("auditCoverage", () => {
       });
 
       expect(result.withdrawn).toEqual([]);
-      expect(result.unexplained.map((r) => r.key)).toEqual([
-        "GET /api/roles/{id}",
-      ]);
+      expect(result.unexplained.map((r) => r.key)).toEqual(["GET /api/roles/{id}"]);
     });
   });
 
   /** @scenario "A route annotated but whose app is unwired is still caught" */
   it("catches an annotated route whose app the generator never imports", () => {
     const result = audit({
-      routes: [
-        route({ key: "GET /api/projects/{id}/api-key", described: true }),
-      ],
+      routes: [route({ key: "GET /api/projects/{id}/api-key", described: true })],
     });
 
     expect(result.unexplained.map((r) => r.key)).toEqual([
@@ -424,9 +410,7 @@ describe("collectRegisteredRoutes", () => {
         "  .build();",
       ]);
 
-      expect(
-        collectRegisteredRoutes([root]).map((route) => route.key),
-      ).toEqual([
+      expect(collectRegisteredRoutes([root]).map((route) => route.key)).toEqual([
         // Per endpoint: its dated mounts, then latest.
         "GET /api/roles/2026-08-07",
         "GET /api/roles/latest",
@@ -460,9 +444,7 @@ describe("collectRegisteredRoutes", () => {
     });
 
     it("resolves a version named by a shared constant", () => {
-      write("version.ts", [
-        'export const MANAGEMENT_API_VERSION = "2026-08-07";',
-      ]);
+      write("version.ts", ['export const MANAGEMENT_API_VERSION = "2026-08-07";']);
       write("roles/app.ts", [
         'import { createService } from "@langwatch/api";',
         'import { MANAGEMENT_API_VERSION } from "./version";',
@@ -472,9 +454,10 @@ describe("collectRegisteredRoutes", () => {
         "  .build();",
       ]);
 
-      expect(
-        collectRegisteredRoutes([root]).map((route) => route.key),
-      ).toEqual(["GET /api/roles/2026-08-07", "GET /api/roles/latest"]);
+      expect(collectRegisteredRoutes([root]).map((route) => route.key)).toEqual([
+        "GET /api/roles/2026-08-07",
+        "GET /api/roles/latest",
+      ]);
     });
 
     it("flags the family, so a report can name the fix that family needs", () => {
@@ -490,11 +473,7 @@ describe("collectRegisteredRoutes", () => {
       const routes = collectRegisteredRoutes([root]);
 
       expect(
-        routes.map((route) => [
-          route.key,
-          route.described,
-          route.usesApiFramework,
-        ]),
+        routes.map((route) => [route.key, route.described, route.usesApiFramework]),
       ).toEqual([
         ["GET /api/roles/2026-08-07", true, true],
         ["GET /api/roles/latest", true, true],
@@ -656,9 +635,7 @@ const documentedPathsOf = (file: string): string[] => {
       if (!registration.described) continue;
       for (const basePath of basePaths) {
         paths.add(
-          honoPathToTemplate(
-            joinRoutePath({ basePath, routePath: registration.path }),
-          ),
+          honoPathToTemplate(joinRoutePath({ basePath, routePath: registration.path })),
         );
       }
     }
@@ -686,9 +663,7 @@ describe("APP_DERIVED_PREFIXES", () => {
       [...source.matchAll(/generateSpecs\(/g)].length,
     );
 
-    expect(
-      mergedApps(source).filter((identifier) => !files.has(identifier)),
-    ).toEqual([]);
+    expect(mergedApps(source).filter((identifier) => !files.has(identifier))).toEqual([]);
   });
 
   /** @scenario "Every app the generator merges is covered by an app-derived prefix" */
@@ -698,9 +673,7 @@ describe("APP_DERIVED_PREFIXES", () => {
     const files = importedFiles(source);
 
     const owned = (path: string): boolean =>
-      prefixes.some(
-        (prefix) => path === prefix || path.startsWith(`${prefix}/`),
-      );
+      prefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 
     const unowned = mergedApps(source).flatMap((identifier) => {
       const file = files.get(identifier);
@@ -727,9 +700,7 @@ describe("APP_DERIVED_PREFIXES", () => {
 
 describe("the UNPUBLISHED list", () => {
   it("gives every entry a reason", () => {
-    const unreasoned = UNPUBLISHED.filter(
-      (entry) => entry.why.trim().length === 0,
-    );
+    const unreasoned = UNPUBLISHED.filter((entry) => entry.why.trim().length === 0);
 
     expect(unreasoned).toEqual([]);
   });
@@ -747,14 +718,11 @@ describe("the UNPUBLISHED list", () => {
     // `POST /api/admin/{resource}` hide under the `/api/admin` prefix: the
     // probe became `GET POST /api/admin/{resource}`, whose path reads as
     // `POST /api/admin/{resource}` and matches no prefix at all.
-    const probe = (match: string) =>
-      match.startsWith("/") ? `GET ${match}` : match;
+    const probe = (match: string) => (match.startsWith("/") ? `GET ${match}` : match);
 
     it("builds a probe key that a prefix entry can actually match", () => {
       expect(probe("/api/admin")).toBe("GET /api/admin");
-      expect(probe("POST /api/admin/{resource}")).toBe(
-        "POST /api/admin/{resource}",
-      );
+      expect(probe("POST /api/admin/{resource}")).toBe("POST /api/admin/{resource}");
       expect(
         excludes({
           exclusion: {
@@ -785,20 +753,16 @@ describe("the UNPUBLISHED list", () => {
 
 describe("isEntryModule", () => {
   it("is false when node was given no path", () => {
-    expect(
-      isEntryModule({ invokedPath: undefined, modulePath: "/a/b.ts" }),
-    ).toBe(false);
+    expect(isEntryModule({ invokedPath: undefined, modulePath: "/a/b.ts" })).toBe(false);
   });
 
   it("is false for a different file", () => {
-    expect(
-      isEntryModule({ invokedPath: "/a/other.ts", modulePath: "/a/b.ts" }),
-    ).toBe(false);
+    expect(isEntryModule({ invokedPath: "/a/other.ts", modulePath: "/a/b.ts" })).toBe(
+      false,
+    );
   });
 
   it("is true for the same file", () => {
-    expect(
-      isEntryModule({ invokedPath: "/a/b.ts", modulePath: "/a/b.ts" }),
-    ).toBe(true);
+    expect(isEntryModule({ invokedPath: "/a/b.ts", modulePath: "/a/b.ts" })).toBe(true);
   });
 });

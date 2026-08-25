@@ -17,8 +17,7 @@ wireDefaultTestApp();
 
 // Mock license enforcement to avoid limits during tests
 vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../license-enforcement")>();
+  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
   return {
     ...actual,
     enforceLicenseLimit: vi.fn(),
@@ -53,9 +52,7 @@ describe("Cascade Archive", () => {
       await prisma.monitor.delete({ where: { id, projectId } }).catch(() => {});
     }
     for (const id of createdEvaluatorIds) {
-      await prisma.evaluator
-        .delete({ where: { id, projectId } })
-        .catch(() => {});
+      await prisma.evaluator.delete({ where: { id, projectId } }).catch(() => {});
     }
     for (const id of createdAgentIds) {
       await prisma.agent.delete({ where: { id, projectId } }).catch(() => {});
@@ -67,9 +64,7 @@ describe("Cascade Archive", () => {
       await prisma.workflowVersion
         .deleteMany({ where: { workflowId: id, projectId } })
         .catch(() => {});
-      await prisma.workflow
-        .delete({ where: { id, projectId } })
-        .catch(() => {});
+      await prisma.workflow.delete({ where: { id, projectId } }).catch(() => {});
     }
   });
 
@@ -153,9 +148,7 @@ describe("Cascade Archive", () => {
 
   describe("Workflow getRelatedEntities", () => {
     it("returns empty arrays when no related entities exist", async () => {
-      const workflow = await createTestWorkflow(
-        `${testNamespace}-no-relations`,
-      );
+      const workflow = await createTestWorkflow(`${testNamespace}-no-relations`);
 
       const result = await caller.workflow.getRelatedEntities({
         projectId,
@@ -168,13 +161,8 @@ describe("Cascade Archive", () => {
     });
 
     it("returns linked evaluators", async () => {
-      const workflow = await createTestWorkflow(
-        `${testNamespace}-with-evaluator`,
-      );
-      await createTestEvaluator(
-        `${testNamespace}-linked-evaluator`,
-        workflow.id,
-      );
+      const workflow = await createTestWorkflow(`${testNamespace}-with-evaluator`);
+      await createTestEvaluator(`${testNamespace}-linked-evaluator`, workflow.id);
 
       const result = await caller.workflow.getRelatedEntities({
         projectId,
@@ -182,9 +170,7 @@ describe("Cascade Archive", () => {
       });
 
       expect(result.evaluators).toHaveLength(1);
-      expect(result.evaluators[0]?.name).toBe(
-        `${testNamespace}-linked-evaluator`,
-      );
+      expect(result.evaluators[0]?.name).toBe(`${testNamespace}-linked-evaluator`);
     });
 
     it("returns linked agents", async () => {
@@ -201,9 +187,7 @@ describe("Cascade Archive", () => {
     });
 
     it("returns monitors linked to evaluators", async () => {
-      const workflow = await createTestWorkflow(
-        `${testNamespace}-with-monitor`,
-      );
+      const workflow = await createTestWorkflow(`${testNamespace}-with-monitor`);
       const evaluator = await createTestEvaluator(
         `${testNamespace}-eval-with-monitor`,
         workflow.id,
@@ -220,9 +204,7 @@ describe("Cascade Archive", () => {
     });
 
     it("excludes already-archived evaluators", async () => {
-      const workflow = await createTestWorkflow(
-        `${testNamespace}-archived-eval`,
-      );
+      const workflow = await createTestWorkflow(`${testNamespace}-archived-eval`);
       const evaluator = await createTestEvaluator(
         `${testNamespace}-will-archive`,
         workflow.id,
@@ -301,9 +283,7 @@ describe("Cascade Archive", () => {
     });
 
     it("deletes monitors when archiving evaluators", async () => {
-      const workflow = await createTestWorkflow(
-        `${testNamespace}-cascade-monitor`,
-      );
+      const workflow = await createTestWorkflow(`${testNamespace}-cascade-monitor`);
       const evaluator = await createTestEvaluator(
         `${testNamespace}-eval-with-mon`,
         workflow.id,
@@ -334,9 +314,7 @@ describe("Cascade Archive", () => {
 
   describe("Evaluator getRelatedEntities", () => {
     it("returns null workflow when not linked", async () => {
-      const evaluator = await createTestEvaluator(
-        `${testNamespace}-no-workflow`,
-      );
+      const evaluator = await createTestEvaluator(`${testNamespace}-no-workflow`);
 
       const result = await caller.evaluators.getRelatedEntities({
         projectId,
@@ -364,9 +342,7 @@ describe("Cascade Archive", () => {
     });
 
     it("returns monitors using this evaluator", async () => {
-      const evaluator = await createTestEvaluator(
-        `${testNamespace}-eval-with-mons`,
-      );
+      const evaluator = await createTestEvaluator(`${testNamespace}-eval-with-mons`);
       await createTestMonitor(`${testNamespace}-mon-1`, evaluator.id);
       await createTestMonitor(`${testNamespace}-mon-2`, evaluator.id);
 
@@ -381,9 +357,7 @@ describe("Cascade Archive", () => {
 
   describe("Evaluator cascadeArchive", () => {
     it("archives evaluator with no dependencies", async () => {
-      const evaluator = await createTestEvaluator(
-        `${testNamespace}-eval-simple`,
-      );
+      const evaluator = await createTestEvaluator(`${testNamespace}-eval-simple`);
 
       const result = await caller.evaluators.cascadeArchive({
         projectId,
@@ -396,13 +370,8 @@ describe("Cascade Archive", () => {
     });
 
     it("archives evaluator and deletes linked monitors", async () => {
-      const evaluator = await createTestEvaluator(
-        `${testNamespace}-eval-with-mons-2`,
-      );
-      const monitor = await createTestMonitor(
-        `${testNamespace}-mon-del`,
-        evaluator.id,
-      );
+      const evaluator = await createTestEvaluator(`${testNamespace}-eval-with-mons-2`);
+      const monitor = await createTestMonitor(`${testNamespace}-mon-del`, evaluator.id);
 
       const result = await caller.evaluators.cascadeArchive({
         projectId,
@@ -454,13 +423,8 @@ describe("Cascade Archive", () => {
     });
 
     it("returns linked workflow", async () => {
-      const workflow = await createTestWorkflow(
-        `${testNamespace}-agent-parent`,
-      );
-      const agent = await createTestAgent(
-        `${testNamespace}-agent-child`,
-        workflow.id,
-      );
+      const workflow = await createTestWorkflow(`${testNamespace}-agent-parent`);
+      const agent = await createTestAgent(`${testNamespace}-agent-child`, workflow.id);
 
       const result = await caller.agents.getRelatedEntities({
         projectId,
@@ -486,13 +450,8 @@ describe("Cascade Archive", () => {
     });
 
     it("archives agent and linked workflow", async () => {
-      const workflow = await createTestWorkflow(
-        `${testNamespace}-agent-wf-arch`,
-      );
-      const agent = await createTestAgent(
-        `${testNamespace}-agent-with-wf`,
-        workflow.id,
-      );
+      const workflow = await createTestWorkflow(`${testNamespace}-agent-wf-arch`);
+      const agent = await createTestAgent(`${testNamespace}-agent-with-wf`, workflow.id);
 
       const result = await caller.agents.cascadeArchive({
         projectId,

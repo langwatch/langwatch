@@ -1,19 +1,7 @@
-import {
-  Box,
-  Field,
-  HStack,
-  Input,
-  Tabs,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Field, HStack, Input, Tabs, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
-import type {
-  HttpAuth,
-  HttpHeader,
-  HttpMethod,
-} from "@langwatch/workflow-contract";
+import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/workflow-contract";
 import { AuthConfigSection } from "./AuthConfigSection";
 import { BodyTemplateEditor } from "./BodyTemplateEditor";
 import { HeadersConfigSection } from "./HeadersConfigSection";
@@ -34,9 +22,7 @@ export type HttpConfigEditorProps = {
   onAuthChange: (auth: HttpAuth | undefined) => void;
   headers: HttpHeader[];
   onHeadersChange: (headers: HttpHeader[]) => void;
-  onTest: (
-    templateVariables: Record<string, unknown>,
-  ) => Promise<HttpTestResult>;
+  onTest: (templateVariables: Record<string, unknown>) => Promise<HttpTestResult>;
   /** Horizontal padding for the endpoint and tab content areas. Defaults to 4. */
   paddingX?: number | string;
 };
@@ -95,11 +81,7 @@ export function HttpConfigEditor({
         width="full"
         colorPalette="blue"
       >
-        <Tabs.List
-          paddingX={paddingX}
-          borderBottomWidth="1px"
-          borderColor="border"
-        >
+        <Tabs.List paddingX={paddingX} borderBottomWidth="1px" borderColor="border">
           <Tabs.Trigger value="body">Body</Tabs.Trigger>
           <Tabs.Trigger value="auth">Auth</Tabs.Trigger>
           <Tabs.Trigger value="headers">Headers</Tabs.Trigger>
@@ -110,17 +92,11 @@ export function HttpConfigEditor({
           <VStack gap={4} align="stretch">
             <Field.Root>
               <Field.Label fontSize="sm">Request Body Template</Field.Label>
-              <BodyTemplateEditor
-                value={bodyTemplate}
-                onChange={onBodyTemplateChange}
-              />
+              <BodyTemplateEditor value={bodyTemplate} onChange={onBodyTemplateChange} />
             </Field.Root>
             <Field.Root>
               <Field.Label fontSize="sm">Output Path (JSONPath)</Field.Label>
-              <OutputPathInput
-                value={outputPath}
-                onChange={onOutputPathChange}
-              />
+              <OutputPathInput value={outputPath} onChange={onOutputPathChange} />
             </Field.Root>
           </VStack>
         </Tabs.Content>

@@ -38,9 +38,7 @@ describe("buildMassTimeline", () => {
       expect(all.some((trace) => startedAt(trace) >= cutoff)).toBe(true);
       expect(all.some((trace) => startedAt(trace) < cutoff)).toBe(true);
       const organicDays = new Set(
-        timeline.organicTraces.map((trace) =>
-          Math.floor(startedAt(trace) / DAY_MS),
-        ),
+        timeline.organicTraces.map((trace) => Math.floor(startedAt(trace) / DAY_MS)),
       );
       expect(organicDays.size).toBe(timeline.days);
     });

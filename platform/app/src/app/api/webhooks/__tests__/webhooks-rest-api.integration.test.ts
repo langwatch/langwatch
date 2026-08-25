@@ -3,15 +3,7 @@ import { createServer, type Server } from "node:http";
 import { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
@@ -39,9 +31,7 @@ vi.mock("~/server/app-layer/app", async () => {
   // The REST org-auth middleware decides through
   // appFromContext(c).permissions (ADR-092); the fake carries the real
   // composition over the real test database so requests reach the routes.
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   const { prisma: dbForPermissions } = await import("~/server/db");
   const permissions = appPermissionsService(dbForPermissions);
   return {
@@ -55,13 +45,11 @@ vi.mock("~/server/app-layer/app", async () => {
         }),
       },
       gateway: {
-        webhookEvents: WebhookEventsClickHouseRepository.create(
-          async (tenantId) => {
-            const client = await getClickHouseClientForTenant(tenantId);
-            if (!client) throw new Error("ClickHouse is not configured");
-            return client;
-          },
-        ),
+        webhookEvents: WebhookEventsClickHouseRepository.create(async (tenantId) => {
+          const client = await getClickHouseClientForTenant(tenantId);
+          if (!client) throw new Error("ClickHouse is not configured");
+          return client;
+        }),
       },
     }),
   };
@@ -192,17 +180,14 @@ describe("Feature: Webhook endpoints REST API", () => {
         code: string;
         meta?: { field?: string };
       }>;
-      expect(reasons.map((r) => r.meta?.field)).toEqual(
-        expect.arrayContaining(["url"]),
-      );
+      expect(reasons.map((r) => r.meta?.field)).toEqual(expect.arrayContaining(["url"]));
     });
 
     /** @scenario An unexpected server failure answers the canonical error envelope naming nothing internal */
     it("answers an unexpected server failure with it, naming nothing internal", async () => {
       planHasWebhookEndpoints = true;
-      const endpointFactory = await import(
-        "~/server/webhooks/enterpriseWebhookEndpointService"
-      );
+      const endpointFactory =
+        await import("~/server/webhooks/enterpriseWebhookEndpointService");
       const realService = createEnterpriseWebhookEndpointService({ prisma });
       const failingService = new Proxy(realService, {
         get(target, property, receiver) {
@@ -316,10 +301,9 @@ describe("Feature: Webhook endpoints REST API", () => {
       expect(row).not.toHaveProperty("secret_encrypted");
     }
 
-    const getRes = await app.request(
-      `/api/webhooks/v1/endpoints/${created.data.id}`,
-      { headers: headers() },
-    );
+    const getRes = await app.request(`/api/webhooks/v1/endpoints/${created.data.id}`, {
+      headers: headers(),
+    });
     const fetched = (await getRes.json()) as { data: Record<string, unknown> };
     expect(fetched.data).not.toHaveProperty("secret");
 
@@ -449,9 +433,7 @@ describe("Feature: Webhook endpoints REST API", () => {
           res.end("{}");
         });
       });
-      await new Promise<void>((resolve) =>
-        receiver.listen(0, "127.0.0.1", resolve),
-      );
+      await new Promise<void>((resolve) => receiver.listen(0, "127.0.0.1", resolve));
       const address = receiver.address();
       if (typeof address === "string" || address === null) {
         throw new Error("expected an AddressInfo");
@@ -489,10 +471,10 @@ describe("Feature: Webhook endpoints REST API", () => {
         data: { id: string; secret: string };
       };
 
-      const testRes = await app.request(
-        `/api/webhooks/v1/endpoints/${data.id}/test`,
-        { method: "POST", headers: headers() },
-      );
+      const testRes = await app.request(`/api/webhooks/v1/endpoints/${data.id}/test`, {
+        method: "POST",
+        headers: headers(),
+      });
       expect(testRes.status).toBe(200);
       const testBody = (await testRes.json()) as {
         data: { delivered: boolean; response_status: number | null };
@@ -547,28 +529,22 @@ describe("Feature: Webhook endpoints REST API", () => {
     });
     const { data } = (await createRes.json()) as { data: { id: string } };
 
-    const disableRes = await app.request(
-      `/api/webhooks/v1/endpoints/${data.id}`,
-      {
-        method: "PATCH",
-        headers: headers(),
-        body: JSON.stringify({ status: "disabled" }),
-      },
-    );
+    const disableRes = await app.request(`/api/webhooks/v1/endpoints/${data.id}`, {
+      method: "PATCH",
+      headers: headers(),
+      body: JSON.stringify({ status: "disabled" }),
+    });
     const disabled = (await disableRes.json()) as {
       data: { status: string; disabled_reason: string };
     };
     expect(disabled.data.status).toBe("disabled");
     expect(disabled.data.disabled_reason).toBe("manual");
 
-    const enableRes = await app.request(
-      `/api/webhooks/v1/endpoints/${data.id}`,
-      {
-        method: "PATCH",
-        headers: headers(),
-        body: JSON.stringify({ status: "active" }),
-      },
-    );
+    const enableRes = await app.request(`/api/webhooks/v1/endpoints/${data.id}`, {
+      method: "PATCH",
+      headers: headers(),
+      body: JSON.stringify({ status: "active" }),
+    });
     const enabled = (await enableRes.json()) as { data: { status: string } };
     expect(enabled.data.status).toBe("active");
   });
@@ -622,10 +598,10 @@ describe("Feature: Webhook endpoints REST API", () => {
     });
     const { data } = (await createRes.json()) as { data: { id: string } };
 
-    const deleteRes = await app.request(
-      `/api/webhooks/v1/endpoints/${data.id}`,
-      { method: "DELETE", headers: headers() },
-    );
+    const deleteRes = await app.request(`/api/webhooks/v1/endpoints/${data.id}`, {
+      method: "DELETE",
+      headers: headers(),
+    });
     expect(deleteRes.status).toBe(200);
 
     const getRes = await app.request(`/api/webhooks/v1/endpoints/${data.id}`, {
@@ -646,10 +622,9 @@ describe("Feature: Webhook endpoints REST API", () => {
     });
     const { data } = (await createRes.json()) as { data: { id: string } };
 
-    const res = await app.request(
-      `/api/webhooks/v1/endpoints/${data.id}/health`,
-      { headers: headers() },
-    );
+    const res = await app.request(`/api/webhooks/v1/endpoints/${data.id}/health`, {
+      headers: headers(),
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       data: {
@@ -674,9 +649,7 @@ describe("Feature: Webhook endpoints REST API", () => {
     const body = (await res.json()) as {
       data: Array<{ type: string; family: string; is_emitting: boolean }>;
     };
-    const completed = body.data.find(
-      (t) => t.type === "gateway.request.completed",
-    );
+    const completed = body.data.find((t) => t.type === "gateway.request.completed");
     expect(completed).toMatchObject({ family: "gateway", is_emitting: true });
   });
 
@@ -805,8 +778,7 @@ describe("Feature: Webhook endpoints REST API", () => {
       const res = await createEndpoint({
         destination_kind: "sqs",
         sqs: {
-          queue_url:
-            "https://sqs.eu-central-1.amazonaws.com/381491922238/orders.fifo",
+          queue_url: "https://sqs.eu-central-1.amazonaws.com/381491922238/orders.fifo",
         },
         enabled_events: ["gateway.request.completed"],
       });
@@ -884,10 +856,9 @@ describe("Feature: Webhook endpoints REST API", () => {
       // Not in the create response, and not in any read of it either.
       const serialized = JSON.stringify(created);
       expect(serialized).not.toContain("an-example-secret-access-key");
-      const read = await app.request(
-        `/api/webhooks/v1/endpoints/${created.data.id}`,
-        { headers: headers() },
-      );
+      const read = await app.request(`/api/webhooks/v1/endpoints/${created.data.id}`, {
+        headers: headers(),
+      });
       expect(await read.text()).not.toContain("an-example-secret-access-key");
 
       const row = await prisma.webhookEndpoint.findFirst({
@@ -919,18 +890,15 @@ describe("Feature: Webhook endpoints REST API", () => {
       // Move it onto a role. The key pair is now unreachable through every
       // read surface, so leaving it encrypted at rest would be a credential
       // nobody can see and nobody can rotate.
-      const moved = await app.request(
-        `/api/webhooks/v1/endpoints/${created.data.id}`,
-        {
-          method: "PATCH",
-          headers: headers(),
-          body: JSON.stringify({
-            sqs: {
-              role_arn: "arn:aws:iam::381491922238:role/langwatch-producer",
-            },
-          }),
-        },
-      );
+      const moved = await app.request(`/api/webhooks/v1/endpoints/${created.data.id}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({
+          sqs: {
+            role_arn: "arn:aws:iam::381491922238:role/langwatch-producer",
+          },
+        }),
+      });
       expect(moved.status).toBe(200);
       const view = (await moved.json()) as {
         data: {
@@ -967,19 +935,16 @@ describe("Feature: Webhook endpoints REST API", () => {
       expect(res.status).toBe(201);
       const created = (await res.json()) as { data: { id: string } };
 
-      const moved = await app.request(
-        `/api/webhooks/v1/endpoints/${created.data.id}`,
-        {
-          method: "PATCH",
-          headers: headers(),
-          body: JSON.stringify({
-            sqs: {
-              access_key_id: "AKIATAKEOVER",
-              secret_access_key: "the-key-that-must-win",
-            },
-          }),
-        },
-      );
+      const moved = await app.request(`/api/webhooks/v1/endpoints/${created.data.id}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({
+          sqs: {
+            access_key_id: "AKIATAKEOVER",
+            secret_access_key: "the-key-that-must-win",
+          },
+        }),
+      });
       expect(moved.status).toBe(200);
       const view = (await moved.json()) as {
         data: {
@@ -1055,9 +1020,7 @@ describe("Feature: Webhook endpoints REST API", () => {
         type: "bad_request",
         code: "validation_error",
       });
-      expect(error.meta?.fields).toEqual(
-        expect.arrayContaining(["sqs.queue_url"]),
-      );
+      expect(error.meta?.fields).toEqual(expect.arrayContaining(["sqs.queue_url"]));
     });
 
     /** @scenario Saving an endpoint refuses the address of the other destination kind */

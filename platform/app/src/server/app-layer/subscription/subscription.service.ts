@@ -56,14 +56,9 @@ export interface SubscriptionService {
     organizationId: string;
   }): Promise<{ url: string }>;
 
-  getLastNonCancelledSubscription(
-    organizationId: string,
-  ): Promise<Subscription | null>;
+  getLastNonCancelledSubscription(organizationId: string): Promise<Subscription | null>;
 
-  previewProration(params: {
-    organizationId: string;
-    newTotalSeats: number;
-  }): Promise<{
+  previewProration(params: { organizationId: string; newTotalSeats: number }): Promise<{
     amountDueCents: number;
     formattedAmountDue: string;
     formattedCreditApplied: string | null;

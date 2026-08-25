@@ -63,9 +63,7 @@ export async function resolveLangyTurnBaseDependencies(args: {
         // The resolved default is forwarded to the worker (ADR-065), so with
         // no override the lookup is load-bearing, not just a gate. An
         // override wins outright and skips it.
-        modelOverride
-          ? Promise.resolve(null)
-          : deps.resolveModel({ projectId }),
+        modelOverride ? Promise.resolve(null) : deps.resolveModel({ projectId }),
         deps.credentials.getOrProvision({
           projectId,
           session,
@@ -81,10 +79,7 @@ export async function resolveLangyTurnBaseDependencies(args: {
     throw conversationResult.reason;
   }
   if (modelResult.status === "rejected") {
-    logger.warn(
-      { error: modelResult.reason, projectId },
-      "getVercelAIModel failed",
-    );
+    logger.warn({ error: modelResult.reason, projectId }, "getVercelAIModel failed");
     throw new LangyModelNotConfiguredError();
   }
   if (credentialsResult.status === "rejected") {

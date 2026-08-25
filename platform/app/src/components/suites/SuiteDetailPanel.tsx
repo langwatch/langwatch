@@ -66,8 +66,7 @@ export function SuiteDetailPanel({
   // We don't know which are archived without a query, so we use the suite's
   // raw counts only for the header stats. The RunHistoryPanel gets the actual
   // per-batch count from the data (via event-sourcing queueRun projections).
-  const headerJobCount =
-    suite.scenarioIds.length * targets.length * suite.repeatCount;
+  const headerJobCount = suite.scenarioIds.length * targets.length * suite.repeatCount;
 
   const [liveStats, setLiveStats] = useState<RunHistoryStats | null>(null);
 
@@ -128,11 +127,7 @@ export function SuiteDetailPanel({
           />
           {liveStats && (
             <>
-              <Separator
-                orientation="vertical"
-                height="24px"
-                borderColor="border"
-              />
+              <Separator orientation="vertical" height="24px" borderColor="border" />
               <StatPill
                 icon={<Layers size={14} />}
                 value={headerJobCount}
@@ -149,10 +144,7 @@ export function SuiteDetailPanel({
               {liveStats.lastActivityTimestamp && (
                 <StatPill
                   icon={<Clock size={14} />}
-                  value={formatTimeAgoCompact(
-                    liveStats.lastActivityTimestamp,
-                    now,
-                  )}
+                  value={formatTimeAgoCompact(liveStats.lastActivityTimestamp, now)}
                   label=""
                   colorScheme="gray"
                 />
@@ -161,11 +153,7 @@ export function SuiteDetailPanel({
           )}
           {!liveStats && (
             <>
-              <Separator
-                orientation="vertical"
-                height="24px"
-                borderColor="border"
-              />
+              <Separator orientation="vertical" height="24px" borderColor="border" />
               <StatPill
                 icon={<Layers size={14} />}
                 value={headerJobCount}
@@ -209,13 +197,7 @@ function StatPill({
 }) {
   const colors = pillColors[colorScheme] ?? pillColors.gray!;
   return (
-    <HStack
-      gap={1.5}
-      paddingX={3}
-      paddingY={1.5}
-      borderRadius="full"
-      bg={colors.bg}
-    >
+    <HStack gap={1.5} paddingX={3} paddingY={1.5} borderRadius="full" bg={colors.bg}>
       <Box color={colors.color}>{icon}</Box>
       <Text fontSize="sm" fontWeight="semibold">
         {value}

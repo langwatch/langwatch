@@ -118,14 +118,10 @@ describe.skipIf(!hasGo())(
         },
         body: JSON.stringify(body),
       });
-      expect(resp.ok, `nlpgo /go/studio/execute responded ${resp.status}`).toBe(
-        true,
-      );
+      expect(resp.ok, `nlpgo /go/studio/execute responded ${resp.status}`).toBe(true);
 
       const frames = await collectSSE(resp.body, { timeoutMs: 30_000 });
-      const componentEvents = frames.filter(
-        (f) => f.type === "component_state_change",
-      );
+      const componentEvents = frames.filter((f) => f.type === "component_state_change");
 
       // The execute_component path must emit per-node state events —
       // without them the eval-v3 result cell has nothing to populate.

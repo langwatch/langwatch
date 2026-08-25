@@ -5,15 +5,7 @@ import {
   derivePullRequestStatus,
   formatShortDate,
 } from "@langwatch/coding-agent-web";
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import type React from "react";
 
@@ -21,10 +13,7 @@ import { GitHub } from "~/components/icons/GitHub";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";
 import { CostBreakdownTooltipContent } from "~/features/traces-v2/components/shared/CostBreakdownTooltip";
-import {
-  formatCost,
-  formatTokens,
-} from "~/features/traces-v2/utils/formatters";
+import { formatCost, formatTokens } from "~/features/traces-v2/utils/formatters";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
 import { ContributorsSection } from "./pullRequestDetail/ContributorsSection";
@@ -145,10 +134,7 @@ export function PullRequestDetailDrawer({
               <SummaryRow detail={detail} />
               <ContributorsSection contributors={detail.contributors} />
               <ModelsSection models={detail.modelBreakdown} />
-              <SessionsSection
-                projectId={projectId}
-                sessions={detail.sessions}
-              />
+              <SessionsSection projectId={projectId} sessions={detail.sessions} />
             </VStack>
           )}
         </Drawer.Body>
@@ -175,12 +161,7 @@ const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
   const isBundled = nonBilled > 0;
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
       <HStack align="start" gap={6} wrap="wrap">
         <Stat label="Sessions">
           <Text fontSize="lg" fontWeight="medium">
@@ -211,12 +192,7 @@ const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
               }
             >
               {/* The split lives only in the hover, so it gets a tab stop. */}
-              <Text
-                fontSize="lg"
-                fontWeight="medium"
-                cursor="help"
-                tabIndex={0}
-              >
+              <Text fontSize="lg" fontWeight="medium" cursor="help" tabIndex={0}>
                 {formatCost(totals.costUsd)}
               </Text>
             </Tooltip>

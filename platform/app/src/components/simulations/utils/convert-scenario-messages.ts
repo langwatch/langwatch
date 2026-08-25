@@ -67,9 +67,7 @@ function extractToolCalls(
     } = new ActionExecutionMessage({
       id: `${message.id}-tool-${name}`,
       name,
-      arguments: safeJsonParseOrStringFallback(
-        toolCall.function?.arguments ?? "{}",
-      ),
+      arguments: safeJsonParseOrStringFallback(toolCall.function?.arguments ?? "{}"),
     });
 
     actionExecutionMessage.traceId = message.trace_id;
@@ -127,11 +125,7 @@ function convertMixedContent(
       textMessage.traceId = originalMessage.trace_id;
       messages.push(textMessage);
     } else if (typeof item === "object" && item.image) {
-      const imageMessage = createImageMessage(
-        item.image,
-        originalMessage,
-        index,
-      );
+      const imageMessage = createImageMessage(item.image, originalMessage, index);
 
       if (imageMessage) {
         messages.push(imageMessage);
@@ -148,12 +142,11 @@ function convertMixedContent(
       actionExecutionMessage.traceId = originalMessage.trace_id;
       messages.push(actionExecutionMessage);
     } else if (item.type === "tool_result") {
-      const resultMessage: ResultMessage & { traceId?: string } =
-        new ResultMessage({
-          actionExecutionId: item.tool_use_id,
-          actionName: item.name ?? "tool_result",
-          result: item.content,
-        });
+      const resultMessage: ResultMessage & { traceId?: string } = new ResultMessage({
+        actionExecutionId: item.tool_use_id,
+        actionName: item.name ?? "tool_result",
+        result: item.content,
+      });
       resultMessage.traceId = originalMessage.trace_id;
       messages.push(resultMessage);
     }
@@ -198,18 +191,16 @@ function createImageMessage(
 function createToolResultMessage(
   message: ScenarioMessageSnapshotEvent["messages"][0],
 ): ResultMessage & { traceId?: string } {
-  const resultMessage: ResultMessage & { traceId?: string } = new ResultMessage(
-    {
-      id: message.id,
-      actionExecutionId: message.id ?? "",
-      actionName: "tool",
-      result: safeJsonParseOrStringFallback(
-        typeof message.content === "string"
-          ? message.content
-          : JSON.stringify(message.content ?? {}),
-      ),
-    },
-  );
+  const resultMessage: ResultMessage & { traceId?: string } = new ResultMessage({
+    id: message.id,
+    actionExecutionId: message.id ?? "",
+    actionName: "tool",
+    result: safeJsonParseOrStringFallback(
+      typeof message.content === "string"
+        ? message.content
+        : JSON.stringify(message.content ?? {}),
+    ),
+  });
   resultMessage.traceId = message.trace_id;
   return resultMessage;
 }

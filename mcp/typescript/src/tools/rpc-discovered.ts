@@ -100,10 +100,7 @@ async function callDiscoveredOperation(
     content: [
       {
         type: "text",
-        text:
-          typeof result === "string"
-            ? result
-            : JSON.stringify(result, null, 2),
+        text: typeof result === "string" ? result : JSON.stringify(result, null, 2),
       },
     ],
   };
@@ -136,11 +133,7 @@ export function registerDiscoveredRpcTools(
         handler,
       );
     } else {
-      server.registerTool(
-        tool.name,
-        { description: tool.description },
-        handler,
-      );
+      server.registerTool(tool.name, { description: tool.description }, handler);
     }
   }
 }

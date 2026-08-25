@@ -17,17 +17,10 @@ import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "~/experiments-v3/types";
-import {
-  getComplexProps,
-  getFlowCallbacks,
-  useDrawer,
-} from "~/hooks/useDrawer";
+import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "@langwatch/evaluator-contract";
+import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
 import { ConfirmDialog } from "../gateway/ConfirmDialog";
@@ -94,8 +87,8 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const evaluators = props.filterEvaluatorType
     ? evaluatorsQuery.data?.filter(
         (evaluator) =>
-          (evaluator.config as { evaluatorType?: string } | null)
-            ?.evaluatorType === props.filterEvaluatorType,
+          (evaluator.config as { evaluatorType?: string } | null)?.evaluatorType ===
+          props.filterEvaluatorType,
       )
     : // Comparison evaluators (current + legacy pairwise) judge target
       // columns against each other and only make sense wired through the
@@ -103,9 +96,8 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
       // `variants`/`goldenField`. Attached here as a per-target chip
       // instead, they'd have no variants configured and nothing to judge.
       evaluatorsQuery.data?.filter((evaluator) => {
-        const evaluatorType = (
-          evaluator.config as { evaluatorType?: string } | null
-        )?.evaluatorType;
+        const evaluatorType = (evaluator.config as { evaluatorType?: string } | null)
+          ?.evaluatorType;
         return (
           evaluatorType !== COMPARISON_EVALUATOR_TYPE &&
           evaluatorType !== LEGACY_PAIRWISE_EVALUATOR_TYPE
@@ -148,8 +140,9 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   // State for API usage dialog
   const [apiDialogEvaluator, setApiDialogEvaluator] =
     useState<EvaluatorWithFields | null>(null);
-  const [evaluatorToDelete, setEvaluatorToDelete] =
-    useState<EvaluatorWithFields | null>(null);
+  const [evaluatorToDelete, setEvaluatorToDelete] = useState<EvaluatorWithFields | null>(
+    null,
+  );
 
   const handleUseFromApi = (evaluator: EvaluatorWithFields) => {
     setApiDialogEvaluator(evaluator);
@@ -178,12 +171,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
             </Button>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-        >
+        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             {/* Evaluator list - scrollable */}
             <VStack
@@ -235,9 +223,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
           if (!isOpen) setEvaluatorToDelete(null);
         }}
         title="Delete evaluator"
-        message={`Are you sure you want to delete "${
-          evaluatorToDelete?.name ?? ""
-        }"?`}
+        message={`Are you sure you want to delete "${evaluatorToDelete?.name ?? ""}"?`}
         confirmLabel="Delete"
         tone="danger"
         loading={deleteMutation.isPending}
@@ -310,8 +296,7 @@ type EvaluatorCardProps = {
 const getEvaluatorDisplayName = (evaluatorType: string): string => {
   if (!evaluatorType) return "";
 
-  const evaluatorDefinition =
-    AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
+  const evaluatorDefinition = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
   if (!evaluatorDefinition) return evaluatorType;
 
   return evaluatorDisplayName(evaluatorDefinition.name);

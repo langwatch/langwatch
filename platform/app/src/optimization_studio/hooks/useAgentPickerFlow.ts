@@ -19,13 +19,11 @@ import { useWorkflowStore } from "@langwatch/workflow-web";
  */
 export function useAgentPickerFlow() {
   const { openDrawer, closeDrawer } = useDrawer();
-  const { setNode, deleteNode, setSelectedNode } = useWorkflowStore(
-    (state) => ({
-      setNode: state.setNode,
-      deleteNode: state.deleteNode,
-      setSelectedNode: state.setSelectedNode,
-    }),
-  );
+  const { setNode, deleteNode, setSelectedNode } = useWorkflowStore((state) => ({
+    setNode: state.setNode,
+    deleteNode: state.deleteNode,
+    setSelectedNode: state.setSelectedNode,
+  }));
 
   const pendingAgentRef = useRef<string | null>(null);
 

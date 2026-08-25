@@ -34,8 +34,9 @@ export function LangWatchQLVegaLiteChart({
   ariaLabel,
 }: LangWatchQLVegaLiteChartProps) {
   const descriptionId = useId();
-  const { containerRef, state, failures, warnings, isRefused } =
-    useLangWatchQLChartModel({ spec, datasets, columnsByDataset });
+  const { containerRef, state, failures, warnings, isRefused } = useLangWatchQLChartModel(
+    { spec, datasets, columnsByDataset },
+  );
 
   return (
     <VStack align="stretch" gap={3} data-testid="lwql-vega-chart">
@@ -100,8 +101,8 @@ function LangWatchQLChartCanvas({
         <Box ref={containerRef} width="full" minHeight={CHART_MIN_HEIGHT} />
       </Box>
       <Text id={descriptionId} fontSize="12px" color="fg.muted">
-        Drawn from the result of the query you ran. Switch to the table to read
-        every returned row.
+        Drawn from the result of the query you ran. Switch to the table to read every
+        returned row.
       </Text>
     </Box>
   );

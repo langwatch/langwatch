@@ -19,9 +19,7 @@ export function AggregateTable({
               <Table.ColumnHeader>Aggregate ID</Table.ColumnHeader>
               <Table.ColumnHeader>Type</Table.ColumnHeader>
               <Table.ColumnHeader>Tenant</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">
-                Event Count
-              </Table.ColumnHeader>
+              <Table.ColumnHeader textAlign="end">Event Count</Table.ColumnHeader>
               <Table.ColumnHeader>Last Event</Table.ColumnHeader>
               <Table.ColumnHeader />
             </Table.Row>

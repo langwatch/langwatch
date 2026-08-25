@@ -241,8 +241,7 @@ function createQueryClientConfig() {
           }
           showProviderDisabledToast({
             ...providerDisabledInfo,
-            onSwapToAlternate:
-              providerDisabledSwapHandler(providerDisabledInfo),
+            onSwapToAlternate: providerDisabledSwapHandler(providerDisabledInfo),
           });
         }
         // Non-license/non-restriction errors bubble up to component-level handlers
@@ -279,8 +278,7 @@ function createQueryClientConfig() {
           }
           showProviderDisabledToast({
             ...providerDisabledInfo,
-            onSwapToAlternate:
-              providerDisabledSwapHandler(providerDisabledInfo),
+            onSwapToAlternate: providerDisabledSwapHandler(providerDisabledInfo),
           });
         }
       },
@@ -339,9 +337,7 @@ function ModelProviderCrossTabSync() {
  * Provides QueryClient and tRPC client to the React tree.
  */
 export function TRPCProvider({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(
-    () => new QueryClient(createQueryClientConfig()),
-  );
+  const [queryClient] = useState(() => new QueryClient(createQueryClientConfig()));
   const [trpcClientInstance] = useState(() =>
     api.createClient({
       links: createTRPCLinks(),

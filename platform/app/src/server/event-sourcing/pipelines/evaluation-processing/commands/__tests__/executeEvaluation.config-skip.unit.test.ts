@@ -121,9 +121,7 @@ describe("Feature: Evaluator misconfiguration is a skip, not a failure", () => {
 
         expect(events).toHaveLength(1);
         expect(eventDataOf(events).status).toBe("skipped");
-        expect(eventDataOf(events).details).toBe(
-          "Provider openai is not enabled",
-        );
+        expect(eventDataOf(events).details).toBe("Provider openai is not enabled");
       });
 
       it("does not log at error level", async () => {
@@ -162,17 +160,13 @@ describe("Feature: Evaluator misconfiguration is a skip, not a failure", () => {
       /** @scenario Monitor using a provider the project never configured is skipped */
       it("emits a skipped event carrying the configure message", async () => {
         const { command } = buildCommandWithMocks({
-          thrown: new EvaluatorConfigError(
-            "Provider anthropic is not configured",
-          ),
+          thrown: new EvaluatorConfigError("Provider anthropic is not configured"),
         });
 
         const events = await command.handle(buildCommand());
 
         expect(eventDataOf(events).status).toBe("skipped");
-        expect(eventDataOf(events).details).toBe(
-          "Provider anthropic is not configured",
-        );
+        expect(eventDataOf(events).details).toBe("Provider anthropic is not configured");
       });
     });
   });

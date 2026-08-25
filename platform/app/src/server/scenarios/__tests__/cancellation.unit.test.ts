@@ -44,10 +44,7 @@ const defaultJobParams = {
 
 describe("ScenarioCancellationService", () => {
   describe("cancelJob()", () => {
-    function stubRunStatus(
-      mock: ReturnType<typeof vi.fn>,
-      status: ScenarioRunStatus,
-    ) {
+    function stubRunStatus(mock: ReturnType<typeof vi.fn>, status: ScenarioRunStatus) {
       mock.mockResolvedValue([
         {
           scenarioRunId: "run1",

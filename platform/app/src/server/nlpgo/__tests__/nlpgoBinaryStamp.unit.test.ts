@@ -1,10 +1,4 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  utimesSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -123,10 +117,7 @@ describe("nlpgo test binary stamp", () => {
     // run whatever binary happens to be sitting there.
     /** @scenario "A failed compile is not recorded as a success" */
     it("rebuilds when the stamp still describes the sources before the change", () => {
-      write(
-        "services/nlpgo/main.go",
-        "package main\n// the edit that failed\n",
-      );
+      write("services/nlpgo/main.go", "package main\n// the edit that failed\n");
 
       expect(
         cachedBinaryIsUsable({
@@ -243,14 +234,11 @@ describe("nlpgo test binary stamp", () => {
   describe("when a watched directory does not exist", () => {
     /** @scenario "A checkout does not on its own force a rebuild" */
     it("digests the trees that do exist rather than throwing", () => {
-      const withMissing = [
-        ...watchDirs,
-        path.join(root, "does", "not", "exist"),
-      ];
+      const withMissing = [...watchDirs, path.join(root, "does", "not", "exist")];
 
-      expect(
-        digestGoSources({ watchDirs: withMissing, watchFiles, root }),
-      ).toBe(digestGoSources({ watchDirs, watchFiles, root }));
+      expect(digestGoSources({ watchDirs: withMissing, watchFiles, root })).toBe(
+        digestGoSources({ watchDirs, watchFiles, root }),
+      );
     });
   });
 });

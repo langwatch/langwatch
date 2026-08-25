@@ -87,8 +87,7 @@ describe("IngestionTemplateService admin authoring", () => {
         sourceType: "internal_codex",
         displayName: "Internal Codex Wrapper",
         description: "Custom OTTL for our wrapper",
-        ottlRules:
-          'set(attributes["langwatch.cost.usd"], attributes["custom_cost"])',
+        ottlRules: 'set(attributes["langwatch.cost.usd"], attributes["custom_cost"])',
       });
       expect(created.platformPublished).toBe(false);
       expect(created.organizationId).toBe(ORG_ID);
@@ -263,9 +262,7 @@ describe("IngestionTemplateService admin authoring", () => {
           targetId: created.id,
         },
       });
-      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe(
-        "hono",
-      );
+      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe("hono");
     });
 
     it("stamps surface=cli into audit metadata for updateOttlRules", async () => {
@@ -290,9 +287,7 @@ describe("IngestionTemplateService admin authoring", () => {
           targetId: created.id,
         },
       });
-      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe(
-        "cli",
-      );
+      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe("cli");
     });
 
     it("stamps surface=mcp into audit metadata for archive", async () => {
@@ -315,9 +310,7 @@ describe("IngestionTemplateService admin authoring", () => {
           targetId: created.id,
         },
       });
-      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe(
-        "mcp",
-      );
+      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe("mcp");
     });
 
     it("defaults to surface=trpc when caller omits the field (back-compat)", async () => {
@@ -337,9 +330,7 @@ describe("IngestionTemplateService admin authoring", () => {
           targetId: created.id,
         },
       });
-      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe(
-        "trpc",
-      );
+      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe("trpc");
     });
   });
 });

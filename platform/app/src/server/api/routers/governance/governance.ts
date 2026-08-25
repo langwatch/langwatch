@@ -106,11 +106,7 @@ export const governanceRouter = createTRPCRouter({
           .getUsageStats(input.organizationId, ctx.session.user)
           .then((u) => u?.activePlan?.type === "ENTERPRISE")
           .catch(() => false),
-        probeOrganizationPermission(
-          ctx,
-          input.organizationId,
-          "organization:manage",
-        ),
+        probeOrganizationPermission(ctx, input.organizationId, "organization:manage"),
         ctx.prisma.user.findUnique({
           where: { id: userId },
           select: { lastHomePath: true },
@@ -330,8 +326,7 @@ export const governanceRouter = createTRPCRouter({
       });
       if (!membership) return null;
 
-      const workspace =
-        await ctx.app.organizations.tryFindPersonalWorkspace({
+      const workspace = await ctx.app.organizations.tryFindPersonalWorkspace({
         userId: user.id,
         organizationId: input.organizationId,
       });
@@ -356,11 +351,7 @@ export const governanceRouter = createTRPCRouter({
           .min(10)
           .max(3600)
           .default(QUARANTINE_DEFAULT_WINDOW_SECONDS),
-        threshold: z
-          .number()
-          .int()
-          .min(1)
-          .default(QUARANTINE_DEFAULT_THRESHOLD),
+        threshold: z.number().int().min(1).default(QUARANTINE_DEFAULT_THRESHOLD),
       }),
     )
     .permission("governance:view")

@@ -18,9 +18,7 @@ export function fireSubscriptionSyncNurturing({
   const nurturing = getApp().nurturing;
   if (!nurturing) return;
 
-  void syncSubscriptionTrait({ organizationId, hasSubscription }).catch(
-    captureException,
-  );
+  void syncSubscriptionTrait({ organizationId, hasSubscription }).catch(captureException);
 }
 
 async function syncSubscriptionTrait({

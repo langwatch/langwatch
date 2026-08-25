@@ -72,8 +72,7 @@ function renderCell(item: TraceListItem) {
   );
 }
 
-const countOn = (testId: string) =>
-  screen.getByTestId(testId).textContent?.trim();
+const countOn = (testId: string) => screen.getByTestId(testId).textContent?.trim();
 
 describe("AnnotationsCell", () => {
   describe("given a trace two reviewers commented on", () => {

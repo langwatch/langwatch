@@ -49,9 +49,7 @@ export type SourceEventRowData = {
 export type SourceEventsTablePresentation = {
   renderError?: (input: { error: unknown; title: string }) => ReactNode;
   renderTable?: (input: { header: ReactNode; body: ReactNode }) => ReactNode;
-  renderPagination?: (
-    pager: SourceEventsPager<SourceEventRowData>,
-  ) => ReactNode;
+  renderPagination?: (pager: SourceEventsPager<SourceEventRowData>) => ReactNode;
 };
 
 const fmtUsd = (raw: string) => {
@@ -88,15 +86,7 @@ function ErrorAlert({ title }: { title: string }) {
   );
 }
 
-const COLUMNS = [
-  "Time",
-  "Type",
-  "Actor",
-  "Action",
-  "Target",
-  "Cost",
-  "Tokens",
-] as const;
+const COLUMNS = ["Time", "Type", "Actor", "Action", "Target", "Cost", "Tokens"] as const;
 
 function EventsTableHeader() {
   return (
@@ -105,9 +95,7 @@ function EventsTableHeader() {
         {COLUMNS.map((column) => (
           <Table.ColumnHeader
             key={column}
-            textAlign={
-              column === "Cost" || column === "Tokens" ? "end" : undefined
-            }
+            textAlign={column === "Cost" || column === "Tokens" ? "end" : undefined}
           >
             {column}
           </Table.ColumnHeader>
@@ -242,20 +230,18 @@ function SourceEventsPagination({
         >
           Previous
         </Button>
-        {Array.from({ length: pageCount }, (_, index) => index + 1).map(
-          (page) => (
-            <Button
-              key={page}
-              data-testid={`pagination-page-${page}`}
-              size="sm"
-              variant={pager.page === page ? "solid" : "ghost"}
-              disabled={!pager.isPageReachable(page) || pager.isFetching}
-              onClick={() => pager.goToPage(page)}
-            >
-              {page}
-            </Button>
-          ),
-        )}
+        {Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => (
+          <Button
+            key={page}
+            data-testid={`pagination-page-${page}`}
+            size="sm"
+            variant={pager.page === page ? "solid" : "ghost"}
+            disabled={!pager.isPageReachable(page) || pager.isFetching}
+            onClick={() => pager.goToPage(page)}
+          >
+            {page}
+          </Button>
+        ))}
         <Button
           data-testid="pagination-next"
           size="sm"
@@ -287,11 +273,7 @@ function SkeletonRows({ pageSize }: { pageSize: number }) {
   );
 }
 
-function EventsTableBody({
-  pager,
-}: {
-  pager: SourceEventsPager<SourceEventRowData>;
-}) {
+function EventsTableBody({ pager }: { pager: SourceEventsPager<SourceEventRowData> }) {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   if (pager.status === "loading") {
     return <SkeletonRows pageSize={pager.pageSize} />;
@@ -328,9 +310,7 @@ export function SourceEventsTable({
   presentation?: SourceEventsTablePresentation;
 }) {
   const renderError = (error: unknown, title: string) =>
-    presentation?.renderError?.({ error, title }) ?? (
-      <ErrorAlert title={title} />
-    );
+    presentation?.renderError?.({ error, title }) ?? <ErrorAlert title={title} />;
   const tableHeader = <EventsTableHeader />;
   const tableBody = (
     <Table.Body>
@@ -345,8 +325,8 @@ export function SourceEventsTable({
         </Heading>
         {pager.status !== "error" && (
           <Text fontSize="sm" color="fg.muted">
-            Every OCSF-normalised event from this source, newest first. Click a
-            row for the raw and normalised records.
+            Every OCSF-normalised event from this source, newest first. Click a row for
+            the raw and normalised records.
           </Text>
         )}
       </VStack>

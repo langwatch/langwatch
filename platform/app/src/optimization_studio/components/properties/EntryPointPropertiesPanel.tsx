@@ -1,11 +1,4 @@
-import {
-  Button,
-  HStack,
-  Spacer,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, HStack, Spacer, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useState } from "react";
 import { ArrowRight, Database, Flag, Folder, X } from "react-feather";
@@ -16,10 +9,7 @@ import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { Entry, Field } from "@langwatch/workflow-contract";
 import { DatasetModal } from "../DatasetModal";
-import {
-  BasePropertiesPanel,
-  PropertySectionTitle,
-} from "./BasePropertiesPanel";
+import { BasePropertiesPanel, PropertySectionTitle } from "./BasePropertiesPanel";
 
 /**
  * Drawer for the workflow's entry point.
@@ -32,9 +22,7 @@ import {
  */
 export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
   const { open, onOpen, onClose } = useDisclosure();
-  const [editingDataset, setEditingDataset] = useState<
-    Entry["dataset"] | undefined
-  >();
+  const [editingDataset, setEditingDataset] = useState<Entry["dataset"] | undefined>();
   const { total } = useGetDatasetData({
     dataset: "dataset" in node.data ? node.data.dataset : undefined,
     preview: true,
@@ -112,13 +100,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
   }, [endNodeId, setSelectedNode]);
 
   return (
-    <BasePropertiesPanel
-      node={node}
-      hideOutputs
-      hideInputs
-      hideParameters
-      paddingX={4}
-    >
+    <BasePropertiesPanel node={node} hideOutputs hideInputs hideParameters paddingX={4}>
       <VariablesSection
         variables={inputVariables}
         onChange={handleInputsChange}
@@ -203,8 +185,8 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
           </HStack>
         ) : (
           <Text fontSize="13px" color="fg.muted">
-            Optional. Attaching a dataset adds its columns to the inputs and
-            provides the rows for evaluations.
+            Optional. Attaching a dataset adds its columns to the inputs and provides the
+            rows for evaluations.
           </Text>
         )}
       </VStack>

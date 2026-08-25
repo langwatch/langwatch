@@ -63,10 +63,7 @@ export function TypewriterHero({
         setPhase(subhead ? "gap" : "linger");
         return;
       }
-      const t = setTimeout(
-        () => setHeadingShown((s) => s + 1),
-        TYPEWRITER_HEADING_MS,
-      );
+      const t = setTimeout(() => setHeadingShown((s) => s + 1), TYPEWRITER_HEADING_MS);
       return () => clearTimeout(t);
     }
     if (phase === "gap") {
@@ -78,10 +75,7 @@ export function TypewriterHero({
         setPhase("linger");
         return;
       }
-      const t = setTimeout(
-        () => setSubheadShown((s) => s + 1),
-        TYPEWRITER_SUBHEAD_MS,
-      );
+      const t = setTimeout(() => setSubheadShown((s) => s + 1), TYPEWRITER_SUBHEAD_MS);
       return () => clearTimeout(t);
     }
     if (phase === "linger") {
@@ -91,16 +85,7 @@ export function TypewriterHero({
     if (phase === "done") {
       onDone();
     }
-  }, [
-    phase,
-    headingShown,
-    subheadShown,
-    heading,
-    subhead,
-    lingerMs,
-    onDone,
-    paused,
-  ]);
+  }, [phase, headingShown, subheadShown, heading, subhead, lingerMs, onDone, paused]);
 
   const headingTyping = phase === "heading";
   const subheadTyping = phase === "subhead";

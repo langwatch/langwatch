@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PromptTagValidationError } from "@langwatch/prompt-contract";
+import { validateTagName } from "../src/services/prompt-tag.service";
 import {
-  validateTagName,
-} from "../src/services/prompt-tag.service";
-import { PROTECTED_TAGS, PromptTagRepository } from "../src/repositories/prisma/prisma.prompt-tag.repository";
+  PROTECTED_TAGS,
+  PromptTagRepository,
+} from "../src/repositories/prisma/prisma.prompt-tag.repository";
 
 function makeTag(overrides: Record<string, unknown> = {}) {
   return {
@@ -81,9 +82,7 @@ describe("PromptTagRepository", () => {
           },
         };
         const mockPrisma = {
-          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<void>) =>
-            fn(mockTx),
-          ),
+          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<void>) => fn(mockTx)),
         } as unknown as PrismaClient;
         const repo = new PromptTagRepository(mockPrisma);
 
@@ -112,9 +111,7 @@ describe("PromptTagRepository", () => {
           promptTagAssignment: { deleteMany: vi.fn() },
         };
         const mockPrisma = {
-          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<void>) =>
-            fn(mockTx),
-          ),
+          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<void>) => fn(mockTx)),
         } as unknown as PrismaClient;
         const repo = new PromptTagRepository(mockPrisma);
 
@@ -247,9 +244,7 @@ describe("validateTagName()", () => {
     });
 
     it("throws for names with slashes", () => {
-      expect(() => validateTagName("can/ary")).toThrow(
-        PromptTagValidationError,
-      );
+      expect(() => validateTagName("can/ary")).toThrow(PromptTagValidationError);
     });
 
     /** @scenario "Validation rejects uppercase tag names" */
@@ -262,9 +257,7 @@ describe("validateTagName()", () => {
     });
 
     it("throws for names with special chars", () => {
-      expect(() => validateTagName("foo@bar")).toThrow(
-        PromptTagValidationError,
-      );
+      expect(() => validateTagName("foo@bar")).toThrow(PromptTagValidationError);
     });
   });
 

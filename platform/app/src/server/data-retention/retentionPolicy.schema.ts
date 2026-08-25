@@ -221,11 +221,7 @@ export const retentionDaysInputSchema = z.union([
   retentionDaysSchema,
 ]);
 
-export const RETENTION_CATEGORIES = [
-  "traces",
-  "scenarios",
-  "experiments",
-] as const;
+export const RETENTION_CATEGORIES = ["traces", "scenarios", "experiments"] as const;
 
 export type RetentionCategory = (typeof RETENTION_CATEGORIES)[number];
 
@@ -342,6 +338,5 @@ const TABLES_WITHOUT_SIZE_COLUMN = new Set<RetentionManagedTable>([
 
 export const PRODUCTION_STORAGE_METER_TABLES = RETENTION_MANAGED_TABLES.filter(
   (table) =>
-    !SHADOW_METRIC_STORAGE_TABLES.has(table) &&
-    !TABLES_WITHOUT_SIZE_COLUMN.has(table),
+    !SHADOW_METRIC_STORAGE_TABLES.has(table) && !TABLES_WITHOUT_SIZE_COLUMN.has(table),
 );

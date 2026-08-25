@@ -76,8 +76,7 @@ export function useWaterfallEditing(spans: SpanTreeNode[]): {
   }, [isEditing, spans, basePatch, sessionDeleted, restoredSpanIds]);
 
   const draftNames = useMemo(
-    () =>
-      isEditing ? correctedNames({ basePatch, spanDrafts }) : NO_DRAFT_NAMES,
+    () => (isEditing ? correctedNames({ basePatch, spanDrafts }) : NO_DRAFT_NAMES),
     [isEditing, basePatch, spanDrafts],
   );
 

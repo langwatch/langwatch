@@ -83,9 +83,9 @@ export function ModelTiersSection({
           onChange={(event) => onDefaultModelChange(event.target.value)}
         />
         <Field.HelperText>
-          Answers any tier above you have not pointed somewhere specific. It
-          applies to the tier names only, so a model name a client gets wrong is
-          still rejected rather than quietly served.
+          Answers any tier above you have not pointed somewhere specific. It applies to
+          the tier names only, so a model name a client gets wrong is still rejected
+          rather than quietly served.
         </Field.HelperText>
       </Field.Root>
 
@@ -137,12 +137,7 @@ function TierRow({
   const isKnownOption = options.some((option) => option.modelId === value);
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={3}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
       <VStack align="stretch" gap={2}>
         <HStack gap={2} alignItems="baseline" flexWrap="wrap">
           <Code fontSize="xs">{tier}</Code>
@@ -175,8 +170,7 @@ function TierRow({
         </NativeSelect.Root>
         {value && !isKnownOption && (
           <Text fontSize="xs" color="orange.600">
-            This model is not in the catalog. It still routes, but check the
-            name.
+            This model is not in the catalog. It still routes, but check the name.
           </Text>
         )}
       </VStack>

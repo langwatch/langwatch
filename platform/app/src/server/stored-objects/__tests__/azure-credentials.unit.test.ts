@@ -40,8 +40,7 @@ function setTokenModeEnv(mode: string) {
 const injectedWorkloadIdentityVars = {
   AZURE_CLIENT_ID: "client-id",
   AZURE_TENANT_ID: "tenant-id",
-  AZURE_FEDERATED_TOKEN_FILE:
-    "/var/run/secrets/azure/tokens/azure-identity-token",
+  AZURE_FEDERATED_TOKEN_FILE: "/var/run/secrets/azure/tokens/azure-identity-token",
 };
 
 beforeEach(() => {
@@ -79,28 +78,29 @@ describe("resolveAzureCredentials", () => {
       ["workloadIdentity" as const],
       ["managedIdentity" as const],
       ["azureCli" as const],
-    ])("resolves a distinct credential for %s without requiring an account key unless sharedKey", (mode) => {
-      if (mode === "sharedKey") {
-        setSharedKeyEnv();
-      } else {
-        setTokenModeEnv(mode);
-        if (mode === "workloadIdentity") {
-          Object.assign(process.env, injectedWorkloadIdentityVars);
+    ])(
+      "resolves a distinct credential for %s without requiring an account key unless sharedKey",
+      (mode) => {
+        if (mode === "sharedKey") {
+          setSharedKeyEnv();
+        } else {
+          setTokenModeEnv(mode);
+          if (mode === "workloadIdentity") {
+            Object.assign(process.env, injectedWorkloadIdentityVars);
+          }
         }
-      }
 
-      const credentials = resolveAzureCredentials();
+        const credentials = resolveAzureCredentials();
 
-      expect(credentials.mode).toBe(mode);
-      expect(credentials.accountName).toBe("lwacct");
-      if (mode === "sharedKey") {
-        expect((credentials as { accountKey: string }).accountKey).toBe(
-          "key-value",
-        );
-      } else {
-        expect("accountKey" in credentials).toBe(false);
-      }
-    });
+        expect(credentials.mode).toBe(mode);
+        expect(credentials.accountName).toBe("lwacct");
+        if (mode === "sharedKey") {
+          expect((credentials as { accountKey: string }).accountKey).toBe("key-value");
+        } else {
+          expect("accountKey" in credentials).toBe(false);
+        }
+      },
+    );
 
     /** @scenario "Adding an auth mode forces every Azure credential construction site to be revisited" */
     it("exhaustively handles every AZURE_BLOB_AUTH_MODE value — a switch, not a default fallthrough", () => {
@@ -140,9 +140,7 @@ describe("resolveAzureCredentials", () => {
       setTokenModeEnv("managedIdentity");
       mockEnv.AZURE_BLOB_ACCOUNT_KEY = "leftover-key";
 
-      expect(() => resolveAzureCredentials()).toThrow(
-        AzureBackendMisconfiguredError,
-      );
+      expect(() => resolveAzureCredentials()).toThrow(AzureBackendMisconfiguredError);
       expect(() => resolveAzureCredentials()).toThrow(/AZURE_BLOB_ACCOUNT_KEY/);
       expect(() => resolveAzureCredentials()).toThrow(/remove/i);
     });
@@ -154,12 +152,8 @@ describe("resolveAzureCredentials", () => {
       mockEnv.STORED_OBJECTS_BACKEND = "s3";
       mockEnv.AZURE_BLOB_AUTH_MODE = "workloadIdentity";
 
-      expect(() => resolveAzureCredentials()).toThrow(
-        AzureBackendMisconfiguredError,
-      );
-      expect(() => resolveAzureCredentials()).toThrow(
-        /STORED_OBJECTS_BACKEND=azure/,
-      );
+      expect(() => resolveAzureCredentials()).toThrow(AzureBackendMisconfiguredError);
+      expect(() => resolveAzureCredentials()).toThrow(/STORED_OBJECTS_BACKEND=azure/);
     });
 
     /**
@@ -185,9 +179,7 @@ describe("resolveAzureCredentials", () => {
       expect(credentials.mode).toBe("workloadIdentity");
       expect(credentials.accountName).toBe("acct");
       // ...while the default (write) resolution still refuses the same config.
-      expect(() => resolveAzureCredentials()).toThrow(
-        AzureBackendMisconfiguredError,
-      );
+      expect(() => resolveAzureCredentials()).toThrow(AzureBackendMisconfiguredError);
     });
   });
 
@@ -223,9 +215,7 @@ describe("resolveAzureCredentials", () => {
       mockEnv.AZURE_BLOB_CONTAINER = "lw-container";
       // AZURE_BLOB_ACCOUNT_KEY intentionally left unset.
 
-      expect(() => resolveAzureCredentials()).toThrow(
-        AzureBackendMisconfiguredError,
-      );
+      expect(() => resolveAzureCredentials()).toThrow(AzureBackendMisconfiguredError);
       expect(() => resolveAzureCredentials()).toThrow(/AZURE_BLOB_ACCOUNT_KEY/);
       expect(() => resolveAzureCredentials()).toThrow(/sharedKey/);
     });
@@ -237,9 +227,7 @@ describe("resolveAzureCredentials", () => {
       setTokenModeEnv("azureCli");
       mockEnv.AZURE_BLOB_ENDPOINT = "http://storage.example.com/lwacct";
 
-      expect(() => resolveAzureCredentials()).toThrow(
-        AzureBackendMisconfiguredError,
-      );
+      expect(() => resolveAzureCredentials()).toThrow(AzureBackendMisconfiguredError);
       expect(() => resolveAzureCredentials()).toThrow(/AZURE_BLOB_ENDPOINT/);
       expect(() => resolveAzureCredentials()).toThrow(/https/i);
     });
@@ -257,22 +245,16 @@ describe("resolveAzureCredentials", () => {
     /** @scenario "A sovereign-cloud endpoint without a matching authority is refused" */
     it("fails, explaining a sovereign endpoint requires a matching authority host", () => {
       setTokenModeEnv("managedIdentity");
-      mockEnv.AZURE_BLOB_ENDPOINT =
-        "https://lwacct.blob.core.usgovcloudapi.net";
+      mockEnv.AZURE_BLOB_ENDPOINT = "https://lwacct.blob.core.usgovcloudapi.net";
       // AZURE_BLOB_AUTHORITY_HOST intentionally left unset.
 
-      expect(() => resolveAzureCredentials()).toThrow(
-        AzureBackendMisconfiguredError,
-      );
-      expect(() => resolveAzureCredentials()).toThrow(
-        /AZURE_BLOB_AUTHORITY_HOST/,
-      );
+      expect(() => resolveAzureCredentials()).toThrow(AzureBackendMisconfiguredError);
+      expect(() => resolveAzureCredentials()).toThrow(/AZURE_BLOB_AUTHORITY_HOST/);
     });
 
     it("does not silently fall back to the public-cloud authority", () => {
       setTokenModeEnv("managedIdentity");
-      mockEnv.AZURE_BLOB_ENDPOINT =
-        "https://lwacct.blob.core.usgovcloudapi.net";
+      mockEnv.AZURE_BLOB_ENDPOINT = "https://lwacct.blob.core.usgovcloudapi.net";
       mockEnv.AZURE_BLOB_AUTHORITY_HOST = "https://login.microsoftonline.us";
 
       const credentials = resolveAzureCredentials();

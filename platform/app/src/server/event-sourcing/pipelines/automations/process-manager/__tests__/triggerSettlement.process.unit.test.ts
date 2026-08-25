@@ -104,13 +104,10 @@ describe("trigger settlement process", () => {
       });
 
       it("splits more settled matches than the page bound into multiple pages", () => {
-        const matches = Array.from(
-          { length: PERSIST_PAGE_MAX + 3 },
-          (_, index) => ({
-            traceId: `trace-${String(index).padStart(3, "0")}`,
-            settleWindowBucket: "30000-0",
-          }),
-        );
+        const matches = Array.from({ length: PERSIST_PAGE_MAX + 3 }, (_, index) => ({
+          traceId: `trace-${String(index).padStart(3, "0")}`,
+          settleWindowBucket: "30000-0",
+        }));
 
         const pages = pagePersistMatches({ matches });
 
@@ -119,9 +116,7 @@ describe("trigger settlement process", () => {
         expect(pages[1]!.traceIds).toHaveLength(3);
         expect(pages[0]!.pageKey).not.toBe(pages[1]!.pageKey);
         // Insertion order does not leak into the keys.
-        expect(pagePersistMatches({ matches: [...matches].reverse() })).toEqual(
-          pages,
-        );
+        expect(pagePersistMatches({ matches: [...matches].reverse() })).toEqual(pages);
       });
 
       it("keeps the next future boundary durable", () => {
@@ -155,8 +150,7 @@ describe("trigger settlement process", () => {
         const definition = automationProcessDefinition({
           name: "triggerSettlement",
         });
-        const evolve =
-          definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
+        const evolve = definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
         const intents = buildIntentFactories(definition.config.intents);
         const context = {
           key: "trigger-1",
@@ -211,8 +205,7 @@ describe("trigger settlement process", () => {
         const definition = automationProcessDefinition({
           name: "triggerSettlement",
         });
-        const evolve =
-          definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
+        const evolve = definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
         // The runtime builds the intent factories with the process key, and
         // that prefix is what separates two automations whose page bodies are
         // byte-identical.
@@ -273,9 +266,7 @@ describe("trigger settlement process", () => {
           MAX_PENDING_MATCHES + 1,
         );
 
-        expect(Object.keys(next.state.pendingMatches)).toHaveLength(
-          MAX_PENDING_MATCHES,
-        );
+        expect(Object.keys(next.state.pendingMatches)).toHaveLength(MAX_PENDING_MATCHES);
         expect(next.state.pendingMatches["trace-0"]).toBeUndefined();
         expect(next.state.overflowFlushed).toBe(1);
         expect(next.flushed).toEqual([
@@ -299,8 +290,7 @@ describe("trigger settlement process", () => {
             {
               settleDueAt: index,
               dispatchDueAt: index === 0 ? 1_000 : index,
-              actionClass:
-                index === 0 ? ("persist" as const) : ("notify" as const),
+              actionClass: index === 0 ? ("persist" as const) : ("notify" as const),
               settleWindowBucket: "30000-0",
             },
           ]),
@@ -308,8 +298,7 @@ describe("trigger settlement process", () => {
         const definition = automationProcessDefinition({
           name: "triggerSettlement",
         });
-        const evolve =
-          definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
+        const evolve = definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
 
         const evolution = evolve(
           { pendingMatches, overflowFlushed: 4 },
@@ -360,8 +349,7 @@ describe("trigger settlement process", () => {
         const definition = automationProcessDefinition({
           name: "triggerSettlement",
         });
-        const evolve =
-          definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
+        const evolve = definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
         // The oldest entry is the one that flushes; persist-class keeps this
         // fixture about the overflow key rather than digest batching.
         const pendingEntry = (offset: number, index: number) =>
@@ -370,8 +358,7 @@ describe("trigger settlement process", () => {
             {
               settleDueAt: index,
               dispatchDueAt: index === 0 ? 1_000 : index,
-              actionClass:
-                index === 0 ? ("persist" as const) : ("notify" as const),
+              actionClass: index === 0 ? ("persist" as const) : ("notify" as const),
               settleWindowBucket: "30000-0",
             },
           ] as const;
@@ -392,13 +379,10 @@ describe("trigger settlement process", () => {
               projectId: "project-1",
               intents: buildIntentFactories(definition.config.intents),
             },
-          ).intents?.find((intent) => intent.intentType === "logOverflow")
-            ?.messageKey;
+          ).intents?.find((intent) => intent.intentType === "logOverflow")?.messageKey;
 
         const minuteStart = 3 * 60_000;
-        expect(overflowKeyAt(minuteStart, "trigger-1")).toBe(
-          "overflow:trigger-1:3",
-        );
+        expect(overflowKeyAt(minuteStart, "trigger-1")).toBe("overflow:trigger-1:3");
         // Anywhere else inside the same minute collapses onto that same row.
         expect(overflowKeyAt(minuteStart + 59_999, "trigger-1")).toBe(
           "overflow:trigger-1:3",
@@ -410,9 +394,7 @@ describe("trigger settlement process", () => {
         // A different trigger in the same minute is never coalesced into
         // another trigger's row — the outbox uniqueness carries no processKey,
         // so the trigger has to be in the key itself.
-        expect(overflowKeyAt(minuteStart, "trigger-2")).toBe(
-          "overflow:trigger-2:3",
-        );
+        expect(overflowKeyAt(minuteStart, "trigger-2")).toBe("overflow:trigger-2:3");
       });
     });
   });

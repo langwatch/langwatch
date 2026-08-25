@@ -140,8 +140,7 @@ export default function OptimizationStudio() {
   const { socketStatus } = usePostEvent();
   const { closeDrawer, currentDrawer } = useDrawer();
 
-  const [nodeSelectionPanelIsOpen, setNodeSelectionPanelIsOpen] =
-    useState(true);
+  const [nodeSelectionPanelIsOpen, setNodeSelectionPanelIsOpen] = useState(true);
 
   const panelRef = useRef<ImperativePanelHandle>(null);
   const [isResultsPanelCollapsed, setIsResultsPanelCollapsed] = useState(false);
@@ -164,10 +163,7 @@ export default function OptimizationStudio() {
     // towards. Without this an in-flight expand keeps resizing the panel back
     // up while a "closed" request is collapsing it. The cleared request that
     // this effect writes at the end is not a new one, so it must not cancel.
-    if (
-      openResultsPanelRequest !== undefined &&
-      expandFrameRef.current !== null
-    ) {
+    if (openResultsPanelRequest !== undefined && expandFrameRef.current !== null) {
       window.cancelAnimationFrame(expandFrameRef.current);
       expandFrameRef.current = null;
     }
@@ -284,12 +280,7 @@ export default function OptimizationStudio() {
                   />
                   <PanelGroup direction="vertical">
                     <Panel style={{ position: "relative" }}>
-                      <HStack
-                        position="absolute"
-                        bottom={3}
-                        left={3}
-                        zIndex={100}
-                      >
+                      <HStack position="absolute" bottom={3} left={3} zIndex={100}>
                         <NodeSelectionPanelButton
                           isOpen={nodeSelectionPanelIsOpen}
                           setIsOpen={setNodeSelectionPanelIsOpen}
@@ -510,8 +501,7 @@ export function OptimizationStudioCanvas({
         zoom: defaultZoom,
         x: 100,
         y: Math.round(
-          ((typeof window !== "undefined" ? window.innerHeight - yAdjust : 0) ||
-            300) / 2,
+          ((typeof window !== "undefined" ? window.innerHeight - yAdjust : 0) || 300) / 2,
         ),
       }}
       proOptions={{ hideAttribution: true }}

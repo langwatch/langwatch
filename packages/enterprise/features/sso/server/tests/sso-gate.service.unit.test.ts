@@ -16,11 +16,12 @@ import {
 } from "../src/services/sso-gate.service";
 
 class FakeLicensingService extends LicensingService {
-  readonly inspectPlatformAccess = vi.fn<
-    (input: {
-      instanceLicenseKey?: string | undefined;
-    }) => Promise<PlatformLicenseAccess>
-  >();
+  readonly inspectPlatformAccess =
+    vi.fn<
+      (input: {
+        instanceLicenseKey?: string | undefined;
+      }) => Promise<PlatformLicenseAccess>
+    >();
 
   getActivePlan(): Promise<PlanInfo> {
     return Promise.reject(new Error("unused"));
@@ -47,8 +48,7 @@ class FakeLogger extends SsoGateLogger {
 class FakeProviderMountInspector extends SsoProviderMountInspector {
   isMounted(configuration: SsoConfiguration): boolean {
     return (
-      Object.keys(BetterAuthSsoAdapter.buildSocialProviders(configuration))
-        .length > 0 ||
+      Object.keys(BetterAuthSsoAdapter.buildSocialProviders(configuration)).length > 0 ||
       BetterAuthSsoAdapter.buildGenericOAuthConfigs(configuration).length > 0
     );
   }
@@ -76,9 +76,7 @@ const validAccess = (
       source: input.source ?? "organization",
       organizationId: input.organizationId ?? "org_1",
       valid: true,
-      expiresAt: input.expired
-        ? "2000-01-01T00:00:00Z"
-        : "2099-01-01T00:00:00Z",
+      expiresAt: input.expired ? "2000-01-01T00:00:00Z" : "2099-01-01T00:00:00Z",
       organizationName: "Acme",
       expired: input.expired ?? false,
     },
@@ -111,16 +109,14 @@ describe("SsoGateService", () => {
     });
 
   it("allows SaaS without asking the licensing service", async () => {
-    expect(
-      await create({ ...baseConfiguration(), isSaas: true }).platformAllowed(),
-    ).toBe(true);
+    expect(await create({ ...baseConfiguration(), isSaas: true }).platformAllowed()).toBe(
+      true,
+    );
     expect(licensing.inspectPlatformAccess).not.toHaveBeenCalled();
   });
 
   it("allows any signature-valid organization license even when expired", async () => {
-    licensing.inspectPlatformAccess.mockResolvedValue(
-      validAccess({ expired: true }),
-    );
+    licensing.inspectPlatformAccess.mockResolvedValue(validAccess({ expired: true }));
 
     expect(await create().platformAllowed()).toBe(true);
     expect(logger.warn).toHaveBeenCalledWith(

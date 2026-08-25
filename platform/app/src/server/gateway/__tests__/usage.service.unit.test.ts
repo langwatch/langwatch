@@ -8,10 +8,7 @@ import type {
   GatewayVirtualKeySpendRepository,
 } from "../virtualKeySpend.clickhouse.repository";
 
-type TraceStub = Pick<
-  GatewayTraceRow,
-  "virtualKeyId" | "costUsd" | "occurredAt"
-> & {
+type TraceStub = Pick<GatewayTraceRow, "virtualKeyId" | "costUsd" | "occurredAt"> & {
   model?: string;
   blockedByGuardrail?: boolean;
 };
@@ -72,9 +69,7 @@ function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpendRepository {
     return [...byKey.values()];
   };
   const filtered = (virtualKeyIds?: string[]) =>
-    virtualKeyIds
-      ? rows.filter((r) => virtualKeyIds.includes(r.virtualKeyId))
-      : rows;
+    virtualKeyIds ? rows.filter((r) => virtualKeyIds.includes(r.virtualKeyId)) : rows;
   return {
     usageBuckets: async ({ virtualKeyIds }: { virtualKeyIds?: string[] }) =>
       bucketsFor(filtered(virtualKeyIds)),
@@ -172,10 +167,7 @@ describe("GatewayUsageService.summary", () => {
         requests: 2,
       });
       expect(result.byModel[0]?.model).toBe("gpt-5-mini");
-      expect(result.byDay.map((b) => b.day)).toEqual([
-        "2026-04-15",
-        "2026-04-16",
-      ]);
+      expect(result.byDay.map((b) => b.day)).toEqual(["2026-04-15", "2026-04-16"]);
     });
 
     it("falls back to the key id when its display name cannot be resolved", async () => {

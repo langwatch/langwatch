@@ -41,9 +41,7 @@ export {
 } from "./legacy-feature-fragments";
 export { discoverClassifiedPackages } from "./workspace";
 
-export function lintWorkspace(
-  options: LintWorkspaceOptions,
-): ArchitectureViolation[] {
+export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolation[] {
   const root = resolve(options.root);
   const discovery = discoverClassifiedPackages(root);
   const violations = [
@@ -51,11 +49,7 @@ export function lintWorkspace(
     ...lintFeatureLayouts(discovery.packages, discovery.catalogue),
     ...(options.legacyFeatureFragments === false
       ? []
-      : lintLegacyFeatureFragments(
-          root,
-          discovery.catalogue,
-          discovery.packages,
-        )),
+      : lintLegacyFeatureFragments(root, discovery.catalogue, discovery.packages)),
     ...lintEventingRoles(root, discovery.packages),
     ...lintArchitectureRecords(discovery.packages),
     ...lintManifests(discovery.packages),
@@ -65,9 +59,7 @@ export function lintWorkspace(
     ...lintPrismaBoundaries(discovery.packages),
     ...lintServiceResultContracts(discovery.packages),
     ...lintCycles(discovery.packages),
-    ...(options.declarations === false
-      ? []
-      : lintDeclarations(discovery.packages)),
+    ...(options.declarations === false ? [] : lintDeclarations(discovery.packages)),
   ];
   return violations
     .map((violation) => ({

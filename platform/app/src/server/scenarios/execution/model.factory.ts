@@ -53,10 +53,7 @@ const REASONING_EFFORT_PARAM = "reasoning_effort";
  * separate a remediation ("set reasoning_effort to 'none'") from prose that
  * merely contains the word.
  */
-const REQUESTED_REASONING_OFF = [
-  `'${REASONING_OFF}'`,
-  `"${REASONING_OFF}"`,
-] as const;
+const REQUESTED_REASONING_OFF = [`'${REASONING_OFF}'`, `"${REASONING_OFF}"`] as const;
 
 interface ProviderErrorBody {
   error?: { message?: unknown; param?: unknown };
@@ -83,8 +80,7 @@ function rejectionAsksForReasoningOff(body: string): boolean {
   // JSON.parse happily returns null or a primitive for bodies like "null".
   if (typeof parsed !== "object" || parsed === null) return false;
 
-  const message =
-    typeof parsed.error?.message === "string" ? parsed.error.message : "";
+  const message = typeof parsed.error?.message === "string" ? parsed.error.message : "";
   const isAboutReasoningEffort =
     parsed.error?.param === REASONING_EFFORT_PARAM ||
     message.includes(REASONING_EFFORT_PARAM);
@@ -114,8 +110,7 @@ function retryEligibleRequestBody(
     return undefined;
   }
   if (typeof parsed !== "object" || parsed === null) return undefined;
-  const hasTools =
-    Array.isArray(parsed.tools) && (parsed.tools as unknown[]).length > 0;
+  const hasTools = Array.isArray(parsed.tools) && (parsed.tools as unknown[]).length > 0;
   if (!hasTools || parsed.reasoning_effort !== undefined) return undefined;
   return parsed;
 }
@@ -157,10 +152,7 @@ export function createModelFromParams(input: CreateModelFromParamsInput) {
   const { litellmParams, nlpServiceUrl } = input;
   const providerKey = litellmParams.model.split("/")[0] || undefined;
   const headers = Object.fromEntries(
-    Object.entries(litellmParams).map(([key, value]) => [
-      `x-litellm-${key}`,
-      value,
-    ]),
+    Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
   );
 
   const vercelProvider = createOpenAICompatible({
@@ -186,9 +178,7 @@ export function createModelFromParams(input: CreateModelFromParamsInput) {
  */
 export function createJudgeModelFromParams(input: CreateModelFromParamsInput) {
   const model = createModelFromParams(input);
-  if (
-    !JUDGE_MODELS_REQUIRING_DISABLED_REASONING.has(input.litellmParams.model)
-  ) {
+  if (!JUDGE_MODELS_REQUIRING_DISABLED_REASONING.has(input.litellmParams.model)) {
     return model;
   }
 

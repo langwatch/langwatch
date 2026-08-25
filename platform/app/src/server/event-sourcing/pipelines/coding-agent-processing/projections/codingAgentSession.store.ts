@@ -1,7 +1,4 @@
-import type {
-  FoldProjectionStore,
-  ProjectionStoreContext,
-} from "@langwatch/eventing";
+import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { CodingAgentSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import {
@@ -46,9 +43,7 @@ function carriesReadBackColumns(row: CodingAgentSessionRow): boolean {
  * row so a cold-cache retry still dedups a redelivered batch. Decoding is gated
  * on whether the row actually carries those columns — see `getWithApplied`.
  */
-export class CodingAgentSessionStore
-  implements FoldProjectionStore<CodingAgentSessionState>
-{
+export class CodingAgentSessionStore implements FoldProjectionStore<CodingAgentSessionState> {
   constructor(
     private readonly repo: CodingAgentSessionRepository,
     private readonly hooks: {
@@ -69,11 +64,7 @@ export class CodingAgentSessionStore
   ): Promise<void> {
     if (!hasPersistableSignal(state)) return;
     const entry = this.toRow(state, context);
-    await this.repo.upsert(
-      entry.row,
-      entry.retentionDays,
-      entry.appliedEventIds,
-    );
+    await this.repo.upsert(entry.row, entry.retentionDays, entry.appliedEventIds);
     this.reportSessionsStored([String(context.tenantId)]);
   }
 
@@ -83,12 +74,8 @@ export class CodingAgentSessionStore
       context: ProjectionStoreContext;
     }>,
   ): Promise<void> {
-    const persistable = entries.filter(({ state }) =>
-      hasPersistableSignal(state),
-    );
-    const rows = persistable.map(({ state, context }) =>
-      this.toRow(state, context),
-    );
+    const persistable = entries.filter(({ state }) => hasPersistableSignal(state));
+    const rows = persistable.map(({ state, context }) => this.toRow(state, context));
     if (rows.length === 0) return;
 
     const tenantIds = [
@@ -132,13 +119,10 @@ export class CodingAgentSessionStore
         sessionId: String(context.aggregateId),
         version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
       }),
-      retentionDays:
-        context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      retentionDays: context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
       // The executor's redelivery-dedup watermark, persisted next to the row so
       // a retry with a cold cache still recognises a batch it committed.
-      appliedEventIds: context.appliedEventIds
-        ? [...context.appliedEventIds]
-        : [],
+      appliedEventIds: context.appliedEventIds ? [...context.appliedEventIds] : [],
     };
   }
 

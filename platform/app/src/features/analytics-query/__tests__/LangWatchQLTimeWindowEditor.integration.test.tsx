@@ -180,9 +180,7 @@ describe("given the fields that carry the window a query reports over", () => {
 
       expect(onOverride).not.toHaveBeenCalled();
       expect(onSendableChange).toHaveBeenLastCalledWith(false);
-      expect(
-        screen.getByText("The start must be before the end."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("The start must be before the end.")).toBeInTheDocument();
     });
   });
 });

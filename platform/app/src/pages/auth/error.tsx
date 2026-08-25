@@ -25,9 +25,7 @@ import { usePublicEnv } from "../../hooks/usePublicEnv";
  *
  * Exported for unit testing.
  */
-export const normalizeErrorCode = (
-  error: string | null | undefined,
-): string | null => {
+export const normalizeErrorCode = (error: string | null | undefined): string | null => {
   if (!error) return null;
   if (
     error === "email_doesn't_match" ||
@@ -132,8 +130,8 @@ export default function Error() {
 
   return (
     <div style={{ padding: "12px" }}>
-      Auth Error: Redirecting back to Sign in... Click <a href="/">here</a> if
-      you are not redirected within 5 seconds.
+      Auth Error: Redirecting back to Sign in... Click <a href="/">here</a> if you are not
+      redirected within 5 seconds.
     </div>
   );
 }
@@ -155,9 +153,7 @@ export function SignInError({ error: rawError }: { error: string }) {
           </HStack>
         </Card.Header>
         <Card.Body>
-          <Alert.Root
-            status={error === "OAuthAccountNotLinked" ? "warning" : "error"}
-          >
+          <Alert.Root status={error === "OAuthAccountNotLinked" ? "warning" : "error"}>
             <Alert.Indicator />
             <Alert.Content gap={4}>
               <Alert.Title fontWeight="bold">{errorTitle(error)}</Alert.Title>
@@ -165,18 +161,16 @@ export function SignInError({ error: rawError }: { error: string }) {
                 <Alert.Description>
                   <VStack gap={1} align="start">
                     <Text>
-                      This email is already registered with a different sign-in
-                      method. To get back in, sign out completely and sign in
-                      again using the method you used originally.
+                      This email is already registered with a different sign-in method. To
+                      get back in, sign out completely and sign in again using the method
+                      you used originally.
                       <br />
                       <br />
-                      If your organization uses single sign-on, enter your work
-                      email and choose your company login.
+                      If your organization uses single sign-on, enter your work email and
+                      choose your company login.
                     </Text>
                     <Button asChild marginTop={4} color="white">
-                      <a href={FEDERATED_LOGOUT_PATH}>
-                        Sign out &amp; try again
-                      </a>
+                      <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
                     </Button>
                   </VStack>
                 </Alert.Description>
@@ -184,13 +178,11 @@ export function SignInError({ error: rawError }: { error: string }) {
                 <Alert.Description>
                   <VStack gap={1} align="start">
                     <Text>
-                      You cannot link an account with a different email address.
-                      Please use the same email address as your current account.
+                      You cannot link an account with a different email address. Please
+                      use the same email address as your current account.
                     </Text>
                     <Button asChild marginTop={4} color="white">
-                      <Link href="/settings/authentication">
-                        Back to Settings
-                      </Link>
+                      <Link href="/settings/authentication">Back to Settings</Link>
                     </Button>
                   </VStack>
                 </Alert.Description>
@@ -198,14 +190,12 @@ export function SignInError({ error: rawError }: { error: string }) {
                 <Alert.Description>
                   <VStack gap={1} align="start">
                     <Text>
-                      Your organization requires single sign-on. Sign out and
-                      sign in again by entering your company email address, then
-                      choose your organization's login.
+                      Your organization requires single sign-on. Sign out and sign in
+                      again by entering your company email address, then choose your
+                      organization's login.
                     </Text>
                     <Button asChild marginTop={4} color="white">
-                      <a href={FEDERATED_LOGOUT_PATH}>
-                        Sign out &amp; try again
-                      </a>
+                      <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
                     </Button>
                   </VStack>
                 </Alert.Description>

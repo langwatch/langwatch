@@ -28,9 +28,7 @@ import {
   type ProjectMetadataSubscriberDeps,
 } from "../projectMetadata.subscriber";
 
-function createFoldState(
-  overrides: Partial<TraceSummaryData> = {},
-): TraceSummaryData {
+function createFoldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {
     traceId: "trace-1",
     traceName: "",
@@ -411,9 +409,7 @@ describe("createProjectMetadataHandler()", () => {
         firstMessage: false,
         integrated: false,
       });
-      mockProjects.updateMetadata.mockRejectedValue(
-        new Error("database error"),
-      );
+      mockProjects.updateMetadata.mockRejectedValue(new Error("database error"));
     });
 
     it("swallows the error (non-fatal)", async () => {
@@ -520,10 +516,7 @@ describe("createProjectMetadataHandler()", () => {
         const subscriber = createProjectMetadataHandler(deps);
 
         await expect(
-          subscriber(
-            createEvent(tenantId),
-            createContext(tenantId, createFoldState()),
-          ),
+          subscriber(createEvent(tenantId), createContext(tenantId, createFoldState())),
         ).resolves.toBeUndefined();
       });
 
@@ -550,10 +543,7 @@ describe("createProjectMetadataHandler()", () => {
         });
 
         await expect(
-          subscriber(
-            createEvent(tenantId),
-            createContext(tenantId, createFoldState()),
-          ),
+          subscriber(createEvent(tenantId), createContext(tenantId, createFoldState())),
         ).resolves.toBeUndefined();
 
         expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
@@ -617,7 +607,7 @@ describe("createProjectMetadataHandler()", () => {
     describe("when a trace arrives", () => {
       it("does not bootstrap clustering", async () => {
         const bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
-      mockProjects.tryGetById.mockResolvedValue(null);
+        mockProjects.tryGetById.mockResolvedValue(null);
         const subscriber = createProjectMetadataHandler({
           projects: mockProjects as any,
           bootstrapTopicClustering: bootstrapTopicClustering as any,

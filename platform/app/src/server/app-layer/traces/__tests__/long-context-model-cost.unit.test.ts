@@ -25,10 +25,7 @@ const OPUS_5_CACHE_READ = 0.0000005;
 describe("long-context [1m] model cost matching", () => {
   /** @scenario "A [1m] long-context model id is priced as its base model" */
   it("matches claude-opus-5[1m] to the anthropic/claude-opus-5 registry entry at standard rates", () => {
-    const match = matchModelCostWithFallbacks(
-      "claude-opus-5[1m]",
-      getStaticModelCosts(),
-    );
+    const match = matchModelCostWithFallbacks("claude-opus-5[1m]", getStaticModelCosts());
 
     expect(match?.model).toBe("anthropic/claude-opus-5");
     expect(match?.inputCostPerToken).toBe(OPUS_5_INPUT);
@@ -83,11 +80,11 @@ describe("long-context [1m] model cost matching", () => {
   it("resolves the [1m] suffix for other Claude spellings too", () => {
     const costs = getStaticModelCosts();
 
-    expect(
-      matchModelCostWithFallbacks("claude-sonnet-4-5[1m]", costs)?.model,
-    ).toBe("anthropic/claude-sonnet-4-5");
-    expect(
-      matchModelCostWithFallbacks("anthropic/claude-opus-5[1m]", costs)?.model,
-    ).toBe("anthropic/claude-opus-5");
+    expect(matchModelCostWithFallbacks("claude-sonnet-4-5[1m]", costs)?.model).toBe(
+      "anthropic/claude-sonnet-4-5",
+    );
+    expect(matchModelCostWithFallbacks("anthropic/claude-opus-5[1m]", costs)?.model).toBe(
+      "anthropic/claude-opus-5",
+    );
   });
 });

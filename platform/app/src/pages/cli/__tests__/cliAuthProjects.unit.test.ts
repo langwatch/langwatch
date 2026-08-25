@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  PERSONAL_GROUP_NAME,
-  resolveCliAuthProjects,
-} from "../cliAuthProjects";
+import { PERSONAL_GROUP_NAME, resolveCliAuthProjects } from "../cliAuthProjects";
 
 const JANE = "u-jane";
 
@@ -58,9 +55,7 @@ describe("resolveCliAuthProjects", () => {
 
         expect(projects.map((p) => p.id)).toEqual(["p-shared"]);
         expect(projects[0]!.teamId).toBe("t-acme");
-        expect(projects.map((p) => p.slug)).not.toContain(
-          "internal_governance",
-        );
+        expect(projects.map((p) => p.slug)).not.toContain("internal_governance");
         // Personal rides its own explicit entry, never mixed into the shared
         // list, so selecting a team's project can never imply it.
         expect(projects.map((p) => p.slug)).not.toContain("jane-personal");
@@ -173,8 +168,10 @@ describe("resolveCliAuthProjects", () => {
     describe("when the default project is computed", () => {
       /** @scenario a user with no shared projects gets their personal project preselected */
       it("preselects the personal project so the user is never dead-ended", () => {
-        const { projects, personalProject, defaultProjectId } =
-          resolveCliAuthProjects({ teams: personalOnly, currentUserId: JANE });
+        const { projects, personalProject, defaultProjectId } = resolveCliAuthProjects({
+          teams: personalOnly,
+          currentUserId: JANE,
+        });
 
         expect(projects).toEqual([]);
         expect(personalProject?.id).toBe("p-personal");

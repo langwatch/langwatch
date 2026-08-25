@@ -30,7 +30,10 @@ import { createLogger } from "@langwatch/observability";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import type { Context } from "hono";
 import { z } from "zod";
-import type { GithubInstallStatePayload, GithubService } from "@langwatch/github-contract";
+import type {
+  GithubInstallStatePayload,
+  GithubService,
+} from "@langwatch/github-contract";
 import { GithubInstallationConflictError } from "@langwatch/github-contract";
 import {
   createServiceApp,
@@ -99,11 +102,7 @@ const POPUP_CSP =
   "form-action 'none'; " +
   "frame-ancestors 'none'";
 
-function popupHtml(
-  c: Context,
-  body: string,
-  status: number,
-): Response {
+function popupHtml(c: Context, body: string, status: number): Response {
   c.header("Content-Security-Policy", POPUP_CSP);
   c.header("X-Frame-Options", "DENY");
   return c.html(body, status);
@@ -149,10 +148,7 @@ async function handleInstall(c: Context): Promise<Response> {
   }
   const organizationId = c.req.query("organizationId") ?? "";
   if (!organizationId) {
-    return c.json(
-      { error: "organizationId query param is required" },
-      { status: 400 },
-    );
+    return c.json({ error: "organizationId query param is required" }, { status: 400 });
   }
   // Cross-tenant guard FIRST: the user must be a member of the org they install
   // for, so a non-member's response never depends on anything about that org.
@@ -162,10 +158,7 @@ async function handleInstall(c: Context): Promise<Response> {
       organizationId,
     }))
   ) {
-    return c.json(
-      { error: "Not a member of this organization." },
-      { status: 403 },
-    );
+    return c.json({ error: "Not a member of this organization." }, { status: 403 });
   }
   // Connecting GitHub grants repository access to the whole organization, so it
   // takes organization management: the same permission the tRPC surface demands
@@ -348,10 +341,7 @@ async function reportInstallationFailure({
       args: { installationId: err.installationId },
     });
   } catch (auditErr) {
-    logger.warn(
-      { err: auditErr },
-      "audit log write failed after blocked rebind",
-    );
+    logger.warn({ err: auditErr }, "audit log write failed after blocked rebind");
   }
 }
 
@@ -411,8 +401,7 @@ function verifyWebhookSignature(
   secret: string,
 ): boolean {
   if (!secret || !header) return false;
-  const expected =
-    "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
+  const expected = "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
   const a = Buffer.from(header);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
@@ -444,10 +433,7 @@ async function applyPullRequestEvent({
     // deliberately not logged: the delivery id is enough to find it in
     // GitHub's own redelivery view, and a raw body here would put customer
     // repository content in the logs.
-    logger.info(
-      { deliveryId },
-      "github pull request delivery dropped before linkage",
-    );
+    logger.info({ deliveryId }, "github pull request delivery dropped before linkage");
     return;
   }
   try {
@@ -467,11 +453,13 @@ async function handleWebhook(c: Context): Promise<Response> {
   }
   // Read the RAW body — the HMAC is over the exact bytes GitHub sent.
   const rawBody = await c.req.text();
-  if (!verifyWebhookSignature(
-    rawBody,
-    c.req.header("x-hub-signature-256"),
-    config.webhookSecret,
-  )) {
+  if (
+    !verifyWebhookSignature(
+      rawBody,
+      c.req.header("x-hub-signature-256"),
+      config.webhookSecret,
+    )
+  ) {
     return c.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -504,8 +492,7 @@ async function handleWebhook(c: Context): Promise<Response> {
       : null;
 
   if (
-    (eventType !== "installation" &&
-      eventType !== "installation_repositories") ||
+    (eventType !== "installation" && eventType !== "installation_repositories") ||
     !installationId ||
     !action
   ) {
@@ -519,10 +506,7 @@ async function handleWebhook(c: Context): Promise<Response> {
       installationId,
     });
   } catch (err) {
-    logger.warn(
-      { err, action, installationId },
-      "github webhook handling failed",
-    );
+    logger.warn({ err, action, installationId }, "github webhook handling failed");
     // Still ack — retries won't help a persistent handling error, and the
     // next event (or the setup callback) reconciles.
   }
@@ -539,9 +523,7 @@ secured
   )
   .get("/github/install", handleInstall);
 
-secured
-  .access(publicEndpoint(SETUP_PUBLIC_REASON))
-  .get("/github/setup", handleSetup);
+secured.access(publicEndpoint(SETUP_PUBLIC_REASON)).get("/github/setup", handleSetup);
 
 secured
   .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))

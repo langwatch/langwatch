@@ -15,9 +15,7 @@ describe("given plain free text", () => {
     });
 
     it("returns quoted phrases whole", () => {
-      expect(extractFreeTextTerms('"checkout failed"')).toEqual([
-        "checkout failed",
-      ]);
+      expect(extractFreeTextTerms('"checkout failed"')).toEqual(["checkout failed"]);
     });
   });
 });
@@ -62,9 +60,7 @@ describe("given a query joined by OR", () => {
     });
 
     it("returns no terms when the OR hides inside parentheses", () => {
-      expect(
-        extractFreeTextTerms("service:api AND (checkout OR refund)"),
-      ).toEqual([]);
+      expect(extractFreeTextTerms("service:api AND (checkout OR refund)")).toEqual([]);
     });
   });
 });
@@ -72,10 +68,7 @@ describe("given a query joined by OR", () => {
 describe("given a query joined only by AND", () => {
   describe("when extracting the content terms", () => {
     it("returns every free-text term", () => {
-      expect(extractFreeTextTerms("checkout AND refund")).toEqual([
-        "checkout",
-        "refund",
-      ]);
+      expect(extractFreeTextTerms("checkout AND refund")).toEqual(["checkout", "refund"]);
     });
   });
 });

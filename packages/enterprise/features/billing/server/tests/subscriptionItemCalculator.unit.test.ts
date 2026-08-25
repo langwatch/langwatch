@@ -1,18 +1,12 @@
 import type Stripe from "stripe";
 import { describe, expect, it } from "vitest";
-import {
-  BillingPriceCatalogue,
-  PlanTypes,
-} from "@langwatch/enterprise-billing-contract";
+import { BillingPriceCatalogue, PlanTypes } from "@langwatch/enterprise-billing-contract";
 import { SubscriptionItemCalculatorService } from "../src/index";
 
 const prices = BillingPriceCatalogue.create("test").prices;
 const calculator = SubscriptionItemCalculatorService.create(prices);
 
-const createSubscriptionItem = (
-  id: string,
-  priceId: string,
-): Stripe.SubscriptionItem =>
+const createSubscriptionItem = (id: string, priceId: string): Stripe.SubscriptionItem =>
   ({
     id,
     price: { id: priceId },

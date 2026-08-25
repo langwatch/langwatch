@@ -11,10 +11,7 @@
 export { lwqlTenantCapability } from "./capability";
 export type { LangWatchQLColumnUnit } from "./catalog/types";
 export { LWQL_COLUMN_UNITS } from "./catalog/types";
-export type {
-  LangWatchQLDiagnostic,
-  LangWatchQLDiagnosticCode,
-} from "./diagnostics";
+export type { LangWatchQLDiagnostic, LangWatchQLDiagnosticCode } from "./diagnostics";
 export {
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
   LWQL_DIAGNOSTIC_CODES,
@@ -39,10 +36,7 @@ export {
   DEFAULT_LWQL_RESULT_LIMITS,
   lwqlConnectionFromEnv,
 } from "./executor";
-export type {
-  LangWatchQLQueryResult,
-  ValidatedLangWatchQL,
-} from "./lwql.service";
+export type { LangWatchQLQueryResult, ValidatedLangWatchQL } from "./lwql.service";
 export {
   closeLangWatchQLService,
   createLangWatchQLService,

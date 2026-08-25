@@ -23,9 +23,7 @@ const teamInput = z.object({ teamId: z.string() });
 const organizationInput = z.object({ organizationId: z.string() });
 
 /** @scenario "A declared permission reads its scope from the validated input" */
-const projectScoped = protectedProcedure
-  .input(projectInput)
-  .permission("traces:view");
+const projectScoped = protectedProcedure.input(projectInput).permission("traces:view");
 
 /** @scenario "The most specific tier the permission allows decides the check scope" */
 const mixedScoped = protectedProcedure
@@ -61,12 +59,10 @@ const optedOut = protectedProcedure
   .input(z.object({ name: z.string() }))
   .noPermission({ reason: "user-scoped data only" });
 
-const optedOutWithAllowance = protectedProcedure
-  .input(organizationInput)
-  .noPermission({
-    reason: "creation flow",
-    allow: { organizationId: "the organization being created into" },
-  });
+const optedOutWithAllowance = protectedProcedure.input(organizationInput).noPermission({
+  reason: "creation flow",
+  allow: { organizationId: "the organization being created into" },
+});
 
 /** @scenario "A service-authorized procedure declares the permissions its service enforces" */
 const serviceAuthorized = protectedProcedure
@@ -259,13 +255,7 @@ describe("typed permission declarations", () => {
       // @ts-expect-error — the permission vocabulary is the registry's, here too
       const offRegistry: EndpointConfig = { permission: "traces:rotate" };
 
-      for (const config of [
-        declared,
-        optedOutEndpoint,
-        bare,
-        both,
-        offRegistry,
-      ]) {
+      for (const config of [declared, optedOutEndpoint, bare, both, offRegistry]) {
         expect(config).toBeDefined();
       }
     });

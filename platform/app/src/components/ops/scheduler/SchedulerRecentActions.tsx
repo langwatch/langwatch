@@ -27,12 +27,7 @@ export function SchedulerRecentActions() {
 
   return (
     <Box paddingTop={5} data-testid="scheduler-recent-actions">
-      <Text
-        textStyle="xs"
-        fontWeight="medium"
-        color="fg.muted"
-        paddingBottom={2}
-      >
+      <Text textStyle="xs" fontWeight="medium" color="fg.muted" paddingBottom={2}>
         Recent operator actions
       </Text>
       {entries.map((entry) => (
@@ -41,8 +36,7 @@ export function SchedulerRecentActions() {
             {formatTimeAgo(new Date(entry.at).getTime())}
           </Text>
           <Text textStyle="xs">
-            {entry.actor ?? "An operator"}{" "}
-            {ACTION_LABELS[entry.action] ?? entry.action}{" "}
+            {entry.actor ?? "An operator"} {ACTION_LABELS[entry.action] ?? entry.action}{" "}
             <Text as="span" fontFamily="mono">
               {entry.scheduleId}
             </Text>

@@ -96,11 +96,7 @@ describe("sharedTrace output schema", () => {
       ["spanTree", keysOf(spanTreeNodeSchema), keysOf(shared.spanTree.element)],
       ["spansFull", keysOf(spanDetailSchema), keysOf(shared.spansFull.element)],
       ["resources", keysOf(traceResourceInfoSchema), keysOf(shared.resources)],
-      [
-        "evaluations",
-        keysOf(evaluationSchema),
-        keysOf(shared.evaluations.element),
-      ],
+      ["evaluations", keysOf(evaluationSchema), keysOf(shared.evaluations.element)],
     ];
 
     for (const [section, internalKeys, sharedKeys] of sections) {
@@ -155,9 +151,7 @@ describe("sharedTrace output schema", () => {
 
       const parsed = sharedTraceDtoSchema.parse(withNewColumn);
 
-      expect(parsed.spansFull[0]).not.toHaveProperty(
-        "internalPromptFingerprint",
-      );
+      expect(parsed.spansFull[0]).not.toHaveProperty("internalPromptFingerprint");
     });
   });
 

@@ -169,9 +169,7 @@ export function partitionIntegrationFiles({
       datastore.push(relative);
       continue;
     }
-    (laneForSource(source) === "component" ? component : datastore).push(
-      relative,
-    );
+    (laneForSource(source) === "component" ? component : datastore).push(relative);
   }
 
   return { component, datastore };

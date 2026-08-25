@@ -29,9 +29,7 @@ export class PostgresIngestionPullLifecycleAdapter {
 
   build(): IngestionPullLifecycleService {
     return IngestionPullLifecycleService.create({
-      repository: PrismaIngestionPullLifecycleRepository.create(
-        this.options.database,
-      ),
+      repository: PrismaIngestionPullLifecycleRepository.create(this.options.database),
       tenant: this.options.tenant,
       commands: this.options.commands,
       diagnostics: this.options.diagnostics,

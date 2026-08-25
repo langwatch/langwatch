@@ -213,15 +213,11 @@ const routes: RouteObject[] = [
       },
       {
         path: "/governance/ingestion-sources",
-        ...page(
-          () => import("~/pages/governance/ingestion-sources.enterprise"),
-        ),
+        ...page(() => import("~/pages/governance/ingestion-sources.enterprise")),
       },
       {
         path: "/governance/ingestion-sources/:id",
-        ...page(
-          () => import("~/pages/governance/ingestion-source-detail.enterprise"),
-        ),
+        ...page(() => import("~/pages/governance/ingestion-source-detail.enterprise")),
       },
       {
         path: "/governance/anomaly-rules",
@@ -484,15 +480,11 @@ const routes: RouteObject[] = [
       },
       {
         path: "/:project/messages/:trace/:openTab",
-        ...page(
-          () => import("./pages/[project]/messages/[trace]/[openTab]/index"),
-        ),
+        ...page(() => import("./pages/[project]/messages/[trace]/[openTab]/index")),
       },
       {
         path: "/:project/messages/:trace/:openTab/:span",
-        ...page(
-          () => import("./pages/[project]/messages/[trace]/[openTab]/[span]"),
-        ),
+        ...page(() => import("./pages/[project]/messages/[trace]/[openTab]/[span]")),
       },
       {
         path: "/:project/prompts",

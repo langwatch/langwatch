@@ -20,9 +20,7 @@ const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
  * @example
  * safeUnflatten({ "a.b.c": 1 }) // → { a: { b: { c: 1 } } }
  */
-export function safeUnflatten(
-  flat: Record<string, unknown>,
-): Record<string, unknown> {
+export function safeUnflatten(flat: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = Object.create(null);
   for (const [key, value] of Object.entries(flat)) {
     const parts = key.split(".");

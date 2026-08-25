@@ -27,9 +27,7 @@ export function usePromptBrowserTabController() {
 
   const tab = useTabById(tabId);
   const removeTab = useDraggableTabsBrowserStore((state) => state.removeTab);
-  const updateTabData = useDraggableTabsBrowserStore(
-    (state) => state.updateTabData,
-  );
+  const updateTabData = useDraggableTabsBrowserStore((state) => state.updateTabData);
 
   const configId = tab?.data.form.currentValues?.configId;
   const isNewPrompt = !Boolean(configId);

@@ -12,9 +12,7 @@ export class PrismaGovernanceOcsfExportRepository extends GovernanceOcsfExportRe
     return new PrismaGovernanceOcsfExportRepository(database as PrismaClient);
   }
 
-  async tryResolveGovernanceTenantId(
-    organizationId: string,
-  ): Promise<string | null> {
+  async tryResolveGovernanceTenantId(organizationId: string): Promise<string | null> {
     const project = await this.prisma.project.findFirst({
       where: {
         kind: GOVERNANCE_PROJECT_KIND,

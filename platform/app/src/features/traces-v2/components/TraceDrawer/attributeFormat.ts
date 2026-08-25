@@ -71,10 +71,7 @@ export function detectFormat(value: unknown): AttributeFormat {
 }
 
 function looksJsonShaped(s: string): boolean {
-  return (
-    (s.startsWith("{") && s.endsWith("}")) ||
-    (s.startsWith("[") && s.endsWith("]"))
-  );
+  return (s.startsWith("{") && s.endsWith("}")) || (s.startsWith("[") && s.endsWith("]"));
 }
 
 export function tryParseJson(s: string): unknown {
@@ -130,10 +127,7 @@ export function buildInlineDescriptor(
 
   return {
     text: collapseWhitespace(raw).slice(0, INLINE_VALUE_MAX_CHARS),
-    hint:
-      raw.length > INLINE_VALUE_MAX_CHARS
-        ? humanizeBytes(raw.length)
-        : undefined,
+    hint: raw.length > INLINE_VALUE_MAX_CHARS ? humanizeBytes(raw.length) : undefined,
   };
 }
 

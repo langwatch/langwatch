@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { LuArrowRight, LuRocket } from "react-icons/lu";
 
@@ -110,9 +102,9 @@ export function GovernanceGettingStartedBanner() {
             Getting started with LangWatch AI Governance
           </Heading>
           <Text textStyle="sm" color="white/90" lineHeight={1.5}>
-            Publish a curated catalog of AI tools so your team installs Claude
-            Code, Codex, Gemini, and your model providers in one click, with
-            virtual keys, spend controls, and usage visibility built in.
+            Publish a curated catalog of AI tools so your team installs Claude Code,
+            Codex, Gemini, and your model providers in one click, with virtual keys, spend
+            controls, and usage visibility built in.
           </Text>
           <HStack gap={2} marginTop={1.5}>
             <Button

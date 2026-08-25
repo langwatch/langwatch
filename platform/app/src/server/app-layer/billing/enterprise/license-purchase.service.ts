@@ -59,9 +59,7 @@ export class LicensePurchaseService {
     const businessName = checkoutSession.customer_details?.name ?? "";
 
     // Line items are not included in the webhook payload — must fetch separately.
-    const lineItems = await stripe.checkout.sessions.listLineItems(
-      checkoutSession.id,
-    );
+    const lineItems = await stripe.checkout.sessions.listLineItems(checkoutSession.id);
     const quantity = lineItems.data[0]?.quantity ?? 1;
 
     const { licenseKey, licenseData } = LicenseGenerationService.create(

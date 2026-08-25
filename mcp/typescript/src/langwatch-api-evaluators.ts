@@ -28,8 +28,9 @@ export interface EvaluatorSummary {
 export function getEvaluatorType(
   evaluator: Pick<EvaluatorSummary, "config">,
 ): string | undefined {
-  return (evaluator.config as Record<string, unknown> | null)
-    ?.evaluatorType as string | undefined;
+  return (evaluator.config as Record<string, unknown> | null)?.evaluatorType as
+    | string
+    | undefined;
 }
 
 // --- Evaluator API functions ---

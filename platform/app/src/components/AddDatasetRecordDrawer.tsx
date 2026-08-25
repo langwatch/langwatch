@@ -12,10 +12,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type {
-  DatasetColumns,
-  DatasetRecordEntry,
-} from "@langwatch/dataset-contract";
+import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
@@ -81,9 +78,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     { enabled: !!project, refetchOnWindowFocus: false },
   );
 
-  const selectedDataset = datasets.data?.find(
-    (dataset) => dataset.id === datasetId,
-  );
+  const selectedDataset = datasets.data?.find((dataset) => dataset.id === datasetId);
 
   // Combine trace IDs from props into a single array
   const traceIds = useMemo(
@@ -138,13 +133,9 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   };
 
   // State for editable row data
-  const [editableRowData, setEditableRowData] = useState<DatasetRecordEntry[]>(
-    [],
-  );
+  const [editableRowData, setEditableRowData] = useState<DatasetRecordEntry[]>([]);
   const rowsToAdd = editableRowData.filter((row) => row.selected);
-  const columnTypes = selectedDataset?.columnTypes as
-    | DatasetColumns
-    | undefined;
+  const columnTypes = selectedDataset?.columnTypes as DatasetColumns | undefined;
 
   /**
    * Handle form submission
@@ -227,9 +218,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   };
 
   // State for row data from dataset
-  const [rowDataFromDataset, setRowDataFromDataset] = useState<
-    DatasetRecordEntry[]
-  >([]);
+  const [rowDataFromDataset, setRowDataFromDataset] = useState<DatasetRecordEntry[]>([]);
 
   // Update editable row data when dataset row data changes
   useEffect(() => {
@@ -249,8 +238,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
     setAtBottom(
       (scrollRef.current.scrollTop ?? 0) >=
-        (scrollRef.current.scrollHeight ?? 0) -
-          (scrollRef.current.clientHeight ?? 0),
+        (scrollRef.current.scrollHeight ?? 0) - (scrollRef.current.clientHeight ?? 0),
     );
   }, [rowDataFromDataset]);
 
@@ -267,9 +255,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       onEscapeKeyDown={(e) => {
         // Escape while the floating cell editor is open should only close
         // the editor (its own handler), never the whole drawer.
-        if (
-          editorPortalRef.current?.querySelector("[data-floating-cell-editor]")
-        ) {
+        if (editorPortalRef.current?.querySelector("[data-floating-cell-editor]")) {
           e.preventDefault();
         }
       }}
@@ -342,16 +328,12 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 marginBottom={4}
                 loading={createDatasetRecord.isPending}
                 disabled={
-                  !selectedDataset ||
-                  !tracesWithSpans.data ||
-                  rowsToAdd.length === 0
+                  !selectedDataset || !tracesWithSpans.data || rowsToAdd.length === 0
                 }
               >
                 Add{" "}
                 {selectedDataset && tracesWithSpans.data
-                  ? `${rowsToAdd.length} ${
-                      rowsToAdd.length == 1 ? "row" : "rows"
-                    }`
+                  ? `${rowsToAdd.length} ${rowsToAdd.length == 1 ? "row" : "rows"}`
                   : ""}{" "}
                 to dataset
               </Button>
@@ -366,8 +348,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 datasetId,
                 name: selectedDataset?.name ?? "",
                 datasetRecords: undefined,
-                columnTypes:
-                  (selectedDataset?.columnTypes as DatasetColumns) ?? [],
+                columnTypes: (selectedDataset?.columnTypes as DatasetColumns) ?? [],
               }
             : undefined
         }

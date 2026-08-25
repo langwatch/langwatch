@@ -1,10 +1,6 @@
 import type { WebhookEnvelope } from "@langwatch/enterprise-webhook-contract";
 
-export type WebhookSpendEventStatus =
-  | "admitted"
-  | "confirmed"
-  | "failed"
-  | "settled";
+export type WebhookSpendEventStatus = "admitted" | "confirmed" | "failed" | "settled";
 
 export type WebhookSpendEventRow = {
   tenantId: string;
@@ -44,13 +40,29 @@ function envelopeKind(status: WebhookSpendEventStatus): {
 } {
   switch (status) {
     case "admitted":
-      return { type: "gateway.request.admitted", idSuffix: "admitted", payloadStatus: "admitted" };
+      return {
+        type: "gateway.request.admitted",
+        idSuffix: "admitted",
+        payloadStatus: "admitted",
+      };
     case "settled":
-      return { type: "gateway.request.settled", idSuffix: "settled", payloadStatus: "settled" };
+      return {
+        type: "gateway.request.settled",
+        idSuffix: "settled",
+        payloadStatus: "settled",
+      };
     case "failed":
-      return { type: "gateway.request.completed", idSuffix: "completed", payloadStatus: "error" };
+      return {
+        type: "gateway.request.completed",
+        idSuffix: "completed",
+        payloadStatus: "error",
+      };
     case "confirmed":
-      return { type: "gateway.request.completed", idSuffix: "completed", payloadStatus: "success" };
+      return {
+        type: "gateway.request.completed",
+        idSuffix: "completed",
+        payloadStatus: "success",
+      };
   }
 }
 

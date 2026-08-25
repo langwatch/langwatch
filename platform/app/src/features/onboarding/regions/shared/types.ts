@@ -27,11 +27,7 @@ export interface Docs {
 /**
  * Creates a themed icon configuration for light and dark modes
  */
-export function themedIcon(
-  lightSrc: string,
-  darkSrc: string,
-  alt: string,
-): ThemedIcon {
+export function themedIcon(lightSrc: string, darkSrc: string, alt: string): ThemedIcon {
   return {
     type: "themed",
     lightSrc,

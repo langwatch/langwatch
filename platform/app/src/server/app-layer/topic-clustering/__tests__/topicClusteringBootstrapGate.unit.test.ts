@@ -69,10 +69,7 @@ describe("given a rate-limited topic clustering bootstrap", () => {
       await gated("project-1");
       await gated("project-2");
 
-      expect(bootstrap.mock.calls.map(([id]) => id)).toEqual([
-        "project-1",
-        "project-2",
-      ]);
+      expect(bootstrap.mock.calls.map(([id]) => id)).toEqual(["project-1", "project-2"]);
     });
   });
 

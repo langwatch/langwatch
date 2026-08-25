@@ -6,9 +6,9 @@ vi.mock("../../../server/app-layer/app", () => ({
 }));
 
 vi.mock("../../utils/datasetUtils", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../utils/datasetUtils")
-  >("../../utils/datasetUtils");
+  const actual = await vi.importActual<typeof import("../../utils/datasetUtils")>(
+    "../../utils/datasetUtils",
+  );
   return actual;
 });
 
@@ -118,16 +118,11 @@ describe("loadDatasets", () => {
     if (!("workflow" in enriched.payload)) {
       throw new Error("expected workflow in payload");
     }
-    const entry = enriched.payload.workflow.nodes.find(
-      (n: any) => n.id === "entry",
-    );
+    const entry = enriched.payload.workflow.nodes.find((n: any) => n.id === "entry");
     expect(entry).toBeDefined();
     expect((entry as any).data.dataset.inline).toBeDefined();
     expect((entry as any).data.dataset.inline.records).toBeDefined();
-    expect((entry as any).data.dataset.inline.records.question).toEqual([
-      "q1",
-      "q2",
-    ]);
+    expect((entry as any).data.dataset.inline.records.question).toEqual(["q1", "q2"]);
   });
 
   it("preserves inline datasets without fetching", async () => {
@@ -151,13 +146,8 @@ describe("loadDatasets", () => {
     if (!("workflow" in enriched.payload)) {
       throw new Error("expected workflow in payload");
     }
-    const entry = enriched.payload.workflow.nodes.find(
-      (n: any) => n.id === "entry",
-    );
-    expect((entry as any).data.dataset.inline.records.question).toEqual([
-      "a",
-      "b",
-    ]);
+    const entry = enriched.payload.workflow.nodes.find((n: any) => n.id === "entry");
+    expect((entry as any).data.dataset.inline.records.question).toEqual(["a", "b"]);
   });
 
   it("strips dataset on execute_component to keep the engine focused on the named node", async () => {
@@ -173,9 +163,7 @@ describe("loadDatasets", () => {
     if (!("workflow" in enriched.payload)) {
       throw new Error("expected workflow in payload");
     }
-    const entry = enriched.payload.workflow.nodes.find(
-      (n: any) => n.id === "entry",
-    );
+    const entry = enriched.payload.workflow.nodes.find((n: any) => n.id === "entry");
     expect((entry as any).data.dataset).toBeUndefined();
   });
 });

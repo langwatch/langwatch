@@ -17,10 +17,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type {
-  ModelDefaultScopeType,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { ModelDefaultScopeType, PrismaClient } from "~/generated/prisma/client";
 
 import { CODEX_DEFAULT_MODEL } from "../codexRestrictions";
 import { ModelNotConfiguredError } from "../modelNotConfiguredError";
@@ -75,9 +72,7 @@ function fakePrisma({
       }) => {
         const filters = where.scopes.some.OR;
         const matches = (s: ScopeRow): boolean =>
-          filters.some(
-            (f) => f.scopeType === s.scopeType && f.scopeId === s.scopeId,
-          );
+          filters.some((f) => f.scopeType === s.scopeType && f.scopeId === s.scopeId);
         return configs.filter((c) => c.scopes.some(matches));
       },
     },

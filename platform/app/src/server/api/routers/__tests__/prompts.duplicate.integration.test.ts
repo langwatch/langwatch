@@ -109,12 +109,8 @@ describe("prompts.duplicate", () => {
         expect(duplicate.model).toBe("gpt-5-mini");
         expect(duplicate.temperature).toBe(0.4);
         expect(duplicate.prompt).toBe("You are a support bot.");
-        expect(duplicate.inputs).toEqual([
-          { identifier: "question", type: "str" },
-        ]);
-        expect(duplicate.outputs).toEqual([
-          { identifier: "answer", type: "str" },
-        ]);
+        expect(duplicate.inputs).toEqual([{ identifier: "question", type: "str" }]);
+        expect(duplicate.outputs).toEqual([{ identifier: "answer", type: "str" }]);
       });
 
       // `responseFormat` is not stored — it is derived from a `json_schema`
@@ -164,9 +160,7 @@ describe("prompts.duplicate", () => {
           where: { configId: duplicate.id, projectId },
         });
         expect(versions).toHaveLength(1);
-        expect(versions[0]?.commitMessage).toBe(
-          'Duplicated from "support-bot"',
-        );
+        expect(versions[0]?.commitMessage).toBe('Duplicated from "support-bot"');
       });
     });
 

@@ -61,14 +61,10 @@ function readFromStorage(projectId: string): {
     if (parsed.version !== 1) return fallback;
     return {
       explicitlyShown: Array.isArray(parsed.explicitlyShown)
-        ? parsed.explicitlyShown.filter(
-            (s): s is string => typeof s === "string",
-          )
+        ? parsed.explicitlyShown.filter((s): s is string => typeof s === "string")
         : [],
       explicitlyHidden: Array.isArray(parsed.explicitlyHidden)
-        ? parsed.explicitlyHidden.filter(
-            (s): s is string => typeof s === "string",
-          )
+        ? parsed.explicitlyHidden.filter((s): s is string => typeof s === "string")
         : [],
     };
   } catch {
@@ -109,48 +105,46 @@ const STABLE_EMPTY_PREFS: {
   explicitlyHidden: string[];
 } = { explicitlyShown: [], explicitlyHidden: [] };
 
-export const useFacetVisibilityStore = create<FacetVisibilityState>(
-  (set, get) => ({
-    byProject: {},
+export const useFacetVisibilityStore = create<FacetVisibilityState>((set, get) => ({
+  byProject: {},
 
-    hydrateFromStorage: (projectId) => {
-      const stored = readFromStorage(projectId);
-      set((s) => ({ byProject: { ...s.byProject, [projectId]: stored } }));
-    },
+  hydrateFromStorage: (projectId) => {
+    const stored = readFromStorage(projectId);
+    set((s) => ({ byProject: { ...s.byProject, [projectId]: stored } }));
+  },
 
-    showFacet: (projectId, key) => {
-      const current = get().byProject[projectId] ?? readFromStorage(projectId);
-      // Show wins over hide — if it was hidden, remove from hidden first.
-      const next = {
-        explicitlyShown: current.explicitlyShown.includes(key)
-          ? current.explicitlyShown
-          : [...current.explicitlyShown, key],
-        explicitlyHidden: current.explicitlyHidden.filter((k) => k !== key),
-      };
-      writeToStorage(projectId, next);
-      set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
-    },
+  showFacet: (projectId, key) => {
+    const current = get().byProject[projectId] ?? readFromStorage(projectId);
+    // Show wins over hide — if it was hidden, remove from hidden first.
+    const next = {
+      explicitlyShown: current.explicitlyShown.includes(key)
+        ? current.explicitlyShown
+        : [...current.explicitlyShown, key],
+      explicitlyHidden: current.explicitlyHidden.filter((k) => k !== key),
+    };
+    writeToStorage(projectId, next);
+    set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
+  },
 
-    hideFacet: (projectId, key) => {
-      const current = get().byProject[projectId] ?? readFromStorage(projectId);
-      // Hide wins over show — symmetric to showFacet.
-      const next = {
-        explicitlyShown: current.explicitlyShown.filter((k) => k !== key),
-        explicitlyHidden: current.explicitlyHidden.includes(key)
-          ? current.explicitlyHidden
-          : [...current.explicitlyHidden, key],
-      };
-      writeToStorage(projectId, next);
-      set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
-    },
+  hideFacet: (projectId, key) => {
+    const current = get().byProject[projectId] ?? readFromStorage(projectId);
+    // Hide wins over show — symmetric to showFacet.
+    const next = {
+      explicitlyShown: current.explicitlyShown.filter((k) => k !== key),
+      explicitlyHidden: current.explicitlyHidden.includes(key)
+        ? current.explicitlyHidden
+        : [...current.explicitlyHidden, key],
+    };
+    writeToStorage(projectId, next);
+    set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
+  },
 
-    resetAll: (projectId) => {
-      const next = emptyPrefs();
-      writeToStorage(projectId, next);
-      set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
-    },
-  }),
-);
+  resetAll: (projectId) => {
+    const next = emptyPrefs();
+    writeToStorage(projectId, next);
+    set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
+  },
+}));
 
 /**
  * Convenience selector — returns the prefs for a project. A pure

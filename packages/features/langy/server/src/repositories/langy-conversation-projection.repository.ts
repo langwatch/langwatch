@@ -90,9 +90,7 @@ export abstract class LangyConversationRepository {
   }): Promise<boolean>;
 }
 
-export class NullLangyConversationRepository
-  extends LangyConversationRepository
-{
+export class NullLangyConversationRepository extends LangyConversationRepository {
   async tryFindVisibleById(): Promise<null> {
     return null;
   }

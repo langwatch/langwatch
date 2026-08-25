@@ -6,11 +6,7 @@ import {
   type ClaudePluginEnsureAction,
   ensureLangwatchClaudePlugin,
 } from "@/cli/utils/governance/claude-plugin";
-import {
-  isLoggedIn,
-  loadConfig,
-  saveConfig,
-} from "@/cli/utils/governance/config";
+import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
 import { installOpencodeSessionContextPlugin } from "@/cli/utils/governance/opencode-plugin";
 import { installSessionContextHooks } from "@/cli/utils/governance/session-context-hooks";
 import {
@@ -44,12 +40,7 @@ import { reportCommandError } from "@/cli/utils/errorOutput";
  * here once we know whether it needs an out-of-band activation step.
  */
 
-const SUPPORTED_TOOLS = [
-  "codex",
-  "claude_code",
-  "gemini",
-  "opencode",
-] as const;
+const SUPPORTED_TOOLS = ["codex", "claude_code", "gemini", "opencode"] as const;
 type SupportedTool = (typeof SUPPORTED_TOOLS)[number];
 
 export interface InstallOptions {
@@ -115,9 +106,7 @@ export async function installCommand(
 ): Promise<void> {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    process.stderr.write(
-      "Not logged in. Run `langwatch login --device` first.\n",
-    );
+    process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
     process.exit(1);
     return;
   }
@@ -260,11 +249,7 @@ async function runInstall(
   return report;
 }
 
-function buildEnvBlock(
-  tool: SupportedTool,
-  endpoint: string,
-  token: string,
-): string[] {
+function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): string[] {
   const base = [
     `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"`,
     `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`,
@@ -356,9 +341,7 @@ function renderHumanReport(report: InstallReport): void {
         : report.codex_config_action === "updated"
           ? "updated"
           : "already up to date";
-    process.stdout.write(
-      `${chalk.green("✓")} ${report.codex_config_path} ${verb2}\n`,
-    );
+    process.stdout.write(`${chalk.green("✓")} ${report.codex_config_path} ${verb2}\n`);
   }
 
   if (
@@ -366,9 +349,7 @@ function renderHumanReport(report: InstallReport): void {
     report.claude_plugin_action === "already_installed"
   ) {
     const pluginVerb =
-      report.claude_plugin_action === "installed"
-        ? "installed"
-        : "already up to date";
+      report.claude_plugin_action === "installed" ? "installed" : "already up to date";
     process.stdout.write(
       `${chalk.green("✓")} LangWatch Claude Code plugin ${pluginVerb}\n`,
     );
@@ -379,9 +360,7 @@ function renderHumanReport(report: InstallReport): void {
       `${chalk.green("✓")} Codex will record each turn's conversation as it completes\n`,
     );
   } else if (report.codex_turn_harvest_action === "blocked") {
-    process.stdout.write(
-      `${chalk.yellow("!")} ${CODEX_TURN_HARVEST_BLOCKED_MESSAGE}\n`,
-    );
+    process.stdout.write(`${chalk.yellow("!")} ${CODEX_TURN_HARVEST_BLOCKED_MESSAGE}\n`);
   }
 
   if (report.session_hooks_action) {

@@ -13,10 +13,7 @@ import {
 import { forwardRef, useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { SetupLayout } from "~/components/SetupLayout";
-import {
-  type ProjectFormData,
-  TechStackSelector,
-} from "~/components/TechStack";
+import { type ProjectFormData, TechStackSelector } from "~/components/TechStack";
 import ErrorPage from "~/utils/compat/next-error";
 import { useRouter } from "~/utils/compat/next-router";
 import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
@@ -137,9 +134,9 @@ export default function ProjectOnboarding() {
             Create New Project
           </Heading>
           <Text paddingBottom={4} fontSize="14px">
-            You can set up separate projects for each service or LLM feature of
-            your application (for example, one for your ChatBot, another for
-            that Content Generation feature).
+            You can set up separate projects for each service or LLM feature of your
+            application (for example, one for your ChatBot, another for that Content
+            Generation feature).
             <br />
           </Text>
           <Field.Root>
@@ -151,9 +148,7 @@ export default function ProjectOnboarding() {
               <Field.Root>
                 <Field.Label>Team</Field.Label>
                 <NativeSelect.Root>
-                  <NativeSelect.Field
-                    {...form.register("teamId", { required: true })}
-                  >
+                  <NativeSelect.Field {...form.register("teamId", { required: true })}>
                     {teams.data?.map((team) => (
                       <option key={team.id} value={team.id}>
                         {team.name}
@@ -167,9 +162,7 @@ export default function ProjectOnboarding() {
               {teamId == "NEW" && (
                 <Field.Root>
                   <Field.Label>New Team Name</Field.Label>
-                  <Input
-                    {...form.register("newTeamName", { required: true })}
-                  />
+                  <Input {...form.register("newTeamName", { required: true })} />
                 </Field.Root>
               )}
             </>

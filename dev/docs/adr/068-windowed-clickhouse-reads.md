@@ -6,7 +6,7 @@
 
 **Shipping with this ADR:** `queryWindowed` on the resilient ClickHouse client, one shared default window, and the `clickhouse_windowed_read_total{table, outcome}` counter — with all five hand-rolled window-and-fallback sites adopting it at byte-identical semantics. The token-bucket limiter on the widen path is the sequenced follow-up (below), gated on the metric data this change produces.
 
-**Builds on:** [ADR-066](../../../packages/eventing/adrs/066-clickhouse-cached-projections.md) — the same amplifier class (unbounded, cold-partition-walking ClickHouse reads on the per-item hot path) that took production down on 2026-07-23. ADR-066 closed it for *fold refolds*; this ADR closes the *ad-hoc windowed-read* face of it, and puts the surface that owns cold-scan detection in charge of the fallback.
+**Builds on:** [ADR-066](../../../packages/eventing/adrs/066-clickhouse-cached-projections.md) — the same amplifier class (unbounded, cold-partition-walking ClickHouse reads on the per-item hot path) that took production down on 2026-07-23. ADR-066 closed it for _fold refolds_; this ADR closes the _ad-hoc windowed-read_ face of it, and puts the surface that owns cold-scan detection in charge of the fallback.
 
 **Relates to:** [ADR-034](./034-event-sourced-analytics-materialization.md) (analytics rollup reads are windowed adopters), [ADR-024](./024-cold-path-tiered-storage.md) (why an unbounded scan on a retention-managed table walks cold S3 partitions).
 
@@ -15,13 +15,13 @@
 ## Context
 
 ADR-066 established the shape of our worst ClickHouse failure mode: a read that
-*looks* bounded but is not, run on the per-item hot path, walking cold S3
+_looks_ bounded but is not, run on the per-item hot path, walking cold S3
 partitions on a weekly-partitioned table until it pins the server at its memory
 ceiling and starves the merges that keep `event_log` healthy. ADR-066 closed
 that mode for one source — fold projections that refolded the whole aggregate
 history. It is not the only source.
 
-Across the platform, seven read sites hand-roll the *same* pattern by hand:
+Across the platform, seven read sites hand-roll the _same_ pattern by hand:
 compute a partition-pruning time window (a `StartedAt` / `OccurredAt` /
 `StartTime` range so ClickHouse skips cold partitions), run the read against
 that window, and — if the window comes back empty — **fall back to a wider or
@@ -41,7 +41,7 @@ reasonable pattern. It is implemented seven times, and the copies have drifted:
   everything", and the widen is invisible.
 
 The through-line: an unbounded fallback scan on a weekly-partitioned,
-retention-tiered table (ADR-024) is *exactly* the amplifier ADR-066 diagnosed —
+retention-tiered table (ADR-024) is _exactly_ the amplifier ADR-066 diagnosed —
 and here it is triggered by the routine, expected event of a windowed read
 missing. One miss is cheap. A storm of misses — a bad hint, a cold aggregate, a
 backfill — is N concurrent unbounded scans, and we would not see it coming
@@ -56,7 +56,7 @@ natural next adopters of a windowed read with a bounded fallback, and are named
 as such below rather than fixed here.
 
 Underneath all of it is the same design smell ADR-066 named: a pattern that
-every caller *assembles* by hand, with a fallback knob each site sets
+every caller _assembles_ by hand, with a fallback knob each site sets
 differently, is a pattern each site can get wrong — and several already have, in
 the direction that takes ClickHouse down.
 
@@ -96,15 +96,15 @@ carries its own private window constant.
 `clickhouse_windowed_read_total{table, outcome}`.** The outcome names exactly
 what happened:
 
-| outcome | meaning |
-|---|---|
-| `hit` | the windowed read answered |
-| `widened_hit` | the window missed; the wider/unbounded read answered |
-| `widened_empty` | the window missed; the wider/unbounded read also found nothing |
-| `unbounded_hit` | a policy-unbounded widen answered (distinguished from a bounded widen) |
-| `unbounded_empty` | a policy-unbounded widen found nothing |
-| `unwindowed` | the read ran with no hint at all |
-| `error` | an attempt threw; the read failed rather than resolved (rethrown to the caller) |
+| outcome           | meaning                                                                         |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `hit`             | the windowed read answered                                                      |
+| `widened_hit`     | the window missed; the wider/unbounded read answered                            |
+| `widened_empty`   | the window missed; the wider/unbounded read also found nothing                  |
+| `unbounded_hit`   | a policy-unbounded widen answered (distinguished from a bounded widen)          |
+| `unbounded_empty` | a policy-unbounded widen found nothing                                          |
+| `unwindowed`      | the read ran with no hint at all                                                |
+| `error`           | an attempt threw; the read failed rather than resolved (rethrown to the caller) |
 
 This is the load-bearing half of the change and the reason it ships now:
 **before we rate-limit the fallback, we must be able to see it.** Today three of
@@ -122,7 +122,7 @@ makes the metric trustworthy as the baseline for point 3.
 ### 3. Rate-limited fallback — planned, NOT in this change
 
 Once real fallback rates exist, the widen path gains a **token-bucket limiter**,
-so a miss-storm degrades to *bounded* reads instead of N concurrent unbounded
+so a miss-storm degrades to _bounded_ reads instead of N concurrent unbounded
 scans. Two properties define it, and both need the metric data this change
 produces before they can be set responsibly:
 
@@ -145,7 +145,7 @@ limit second (next change), with the measurement as the limiter's precondition.
 - **The fallback belongs on the client, not in a per-repository helper**,
   because the client is the one component that already distinguishes a cold scan
   from a warm one. A repository-local helper can widen; only the client can
-  widen *and* know it is about to walk cold partitions. Co-locating them is what
+  widen _and_ know it is about to walk cold partitions. Co-locating them is what
   makes point 3 implementable at all.
 - **Measure before you limit.** Shipping the limiter now would mean choosing its
   per-table rate from a guess. The two-step sequence trades a short window of
@@ -153,7 +153,7 @@ limit second (next change), with the measurement as the limiter's precondition.
   observed load — the same discipline ADR-066 applied when it tuned server
   flush windows against the actual burst regime rather than a default.
 - **Byte-identical adoption is a feature, not timidity.** The value of point 2
-  is a trustworthy baseline; a baseline gathered while *also* changing what the
+  is a trustworthy baseline; a baseline gathered while _also_ changing what the
   fallbacks do would not be one. The behaviour change is deferred to point 3,
   where it is the whole point.
 - **The cost we accept:** for one release, the unbounded fallbacks still exist
@@ -168,7 +168,7 @@ limit second (next change), with the measurement as the limiter's precondition.
   and the status quo is drift: five copies of one constant, three unmetered
   fallbacks, one silent unbounded re-run. Fixing them in place leaves five
   places to regress and no single surface to add the limiter to. Rejected — the
-  consolidation *is* the fix.
+  consolidation _is_ the fix.
 - **A general ClickHouse query-builder framework** that owns windowing,
   filtering, pagination, and fallback for every read. Over-reach: the vast
   majority of our reads are not windowed-with-fallback, and a framework that

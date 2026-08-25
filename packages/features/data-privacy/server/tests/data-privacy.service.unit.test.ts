@@ -10,9 +10,13 @@ import { DataPrivacyService } from "../src/services/data-privacy.service";
 
 class MemoryDataPrivacyRepository extends DataPrivacyPolicyRepository {
   readonly policies: DataPrivacyPolicy[] = [];
-  async findForProjectChain() { return []; }
+  async findForProjectChain() {
+    return [];
+  }
   async findAllInOrganization(input: { organizationId: string }) {
-    return this.policies.filter((policy) => policy.organizationId === input.organizationId);
+    return this.policies.filter(
+      (policy) => policy.organizationId === input.organizationId,
+    );
   }
   async upsertForScope(input: {
     organizationId: string;
@@ -34,7 +38,9 @@ class MemoryDataPrivacyRepository extends DataPrivacyPolicyRepository {
     return policy;
   }
   async deleteForScope() {}
-  async tryFindById() { return null; }
+  async tryFindById() {
+    return null;
+  }
 }
 
 const projects = {

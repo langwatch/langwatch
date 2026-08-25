@@ -35,11 +35,13 @@ import type { SuiteRunRepository } from "../repositories/suite-run.repository";
 const archivedSlugSuffix = "__archived";
 
 function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "") || "suite";
+  return (
+    value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "suite"
+  );
 }
 
 function isAgentTarget(target: SuiteTarget): boolean {
@@ -112,9 +114,16 @@ export class SuiteService extends SuiteServiceContract {
     const parsed = updateSuiteCommandSchema.parse(input);
     const slug = parsed.name === undefined ? undefined : slugify(parsed.name);
     if (slug !== undefined) {
-      await this.assertSlugAvailable({ projectId: parsed.projectId, slug, excludeId: parsed.id });
+      await this.assertSlugAvailable({
+        projectId: parsed.projectId,
+        slug,
+        excludeId: parsed.id,
+      });
     }
-    return this.options.repository.update({ ...parsed, ...(slug === undefined ? {} : { slug }) });
+    return this.options.repository.update({
+      ...parsed,
+      ...(slug === undefined ? {} : { slug }),
+    });
   }
 
   async duplicate(input: SuiteIdInput): Promise<Suite> {
@@ -212,15 +221,11 @@ export class SuiteService extends SuiteServiceContract {
   }
 
   async getSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
-    return this.runRepository.getSuiteRunState(
-      suiteRunStateInputSchema.parse(input),
-    );
+    return this.runRepository.getSuiteRunState(suiteRunStateInputSchema.parse(input));
   }
 
   async getBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
-    return this.runRepository.getBatchHistory(
-      suiteBatchHistoryInputSchema.parse(input),
-    );
+    return this.runRepository.getBatchHistory(suiteBatchHistoryInputSchema.parse(input));
   }
 
   async resolveArchivedNames(input: SuiteArchivedNamesInput): Promise<{
@@ -229,12 +234,13 @@ export class SuiteService extends SuiteServiceContract {
   }> {
     const parsed = suiteArchivedNamesInputSchema.parse(input);
     const { scenarios, agents, prompts } = this.options;
-    const scenarioRows = parsed.scenarioIds.length === 0
-      ? []
-      : await scenarios.getNamesByIds({
-          ids: parsed.scenarioIds,
-          projectId: parsed.projectId,
-        });
+    const scenarioRows =
+      parsed.scenarioIds.length === 0
+        ? []
+        : await scenarios.getNamesByIds({
+            ids: parsed.scenarioIds,
+            projectId: parsed.projectId,
+          });
     const agentIds = parsed.targets
       .filter(isAgentTarget)
       .map((target) => target.referenceId);
@@ -261,9 +267,14 @@ export class SuiteService extends SuiteServiceContract {
     };
   }
 
-  private async assertSlugAvailable(input: { projectId: string; slug: string; excludeId?: string }): Promise<void> {
+  private async assertSlugAvailable(input: {
+    projectId: string;
+    slug: string;
+    excludeId?: string;
+  }): Promise<void> {
     const existing = await this.options.repository.tryFindBySlug(input);
-    if (existing && existing.id !== input.excludeId) throw new SuiteNameTakenError(existing.name);
+    if (existing && existing.id !== input.excludeId)
+      throw new SuiteNameTakenError(existing.name);
   }
 
   private async resolveScenarioReferences(input: {
@@ -294,7 +305,11 @@ export class SuiteService extends SuiteServiceContract {
     organizationId: string;
     agents: AgentService;
     prompts: PromptService;
-  }): Promise<{ active: SuiteTarget[]; archived: SuiteTarget[]; missing: SuiteTarget[] }> {
+  }): Promise<{
+    active: SuiteTarget[];
+    archived: SuiteTarget[];
+    missing: SuiteTarget[];
+  }> {
     const agentTargets = input.targets.filter(isAgentTarget);
     const promptTargets = input.targets.filter((target) => target.type === "prompt");
     const [agentRows, promptIds] = await Promise.all([

@@ -67,9 +67,7 @@ export function signUnsubscribeToken(payload: UnsubscribePayload): string {
   return `${encoded}.${sign(serialized)}`;
 }
 
-export function verifyUnsubscribeToken(
-  token: string,
-): UnsubscribePayload | null {
+export function verifyUnsubscribeToken(token: string): UnsubscribePayload | null {
   const dot = token.lastIndexOf(".");
   if (dot <= 0) return null;
   const encoded = token.slice(0, dot);
@@ -87,10 +85,7 @@ export function verifyUnsubscribeToken(
   // timingSafeEqual throws on mismatched buffer lengths.
   const provided = Buffer.from(providedSig);
   const expected = Buffer.from(expectedSig);
-  if (
-    provided.length !== expected.length ||
-    !timingSafeEqual(provided, expected)
-  ) {
+  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
     return null;
   }
 

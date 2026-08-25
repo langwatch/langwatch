@@ -84,10 +84,7 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
             },
           ],
           activeSignature: 0,
-          activeParameter: Math.min(
-            activeArgIdx,
-            Math.max(0, params.length - 1),
-          ),
+          activeParameter: Math.min(activeArgIdx, Math.max(0, params.length - 1)),
         },
         dispose: () => undefined,
       };

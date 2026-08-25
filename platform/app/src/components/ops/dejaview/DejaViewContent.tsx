@@ -1,12 +1,4 @@
-import {
-  Box,
-  Center,
-  EmptyState,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Center, EmptyState, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Eye, Info } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -46,9 +38,7 @@ export function DejaViewContent() {
   const [submittedTenant, setSubmittedTenant] = useState(
     initialState.tenant ?? (deepLinkedAgg ? initialState.aggTenant! : ""),
   );
-  const [hasSearched, setHasSearched] = useState(
-    !!initialState.query || !!deepLinkedAgg,
-  );
+  const [hasSearched, setHasSearched] = useState(!!initialState.query || !!deepLinkedAgg);
 
   const [selectedAggregate, setSelectedAggregate] = useState<{
     aggregateId: string;
@@ -63,9 +53,7 @@ export function DejaViewContent() {
   const [selectedProjection, setSelectedProjection] = useState<string | null>(
     initialState.proj ?? null,
   );
-  const [showEventDetail, setShowEventDetail] = useState(
-    initialState.detail ?? false,
-  );
+  const [showEventDetail, setShowEventDetail] = useState(initialState.detail ?? false);
   const [showDiff, setShowDiff] = useState(true);
 
   // Sync state to URL fragment
@@ -108,10 +96,9 @@ export function DejaViewContent() {
   // back, they're just quite some slower. The banner under the search
   // surfaces both numbers so the operator sees the bounds up front
   // instead of guessing why an old aggregate didn't show up.
-  const searchWindowQuery = api.ops.getEventLogSearchWindow.useQuery(
-    undefined,
-    { staleTime: 60 * 60 * 1000 },
-  );
+  const searchWindowQuery = api.ops.getEventLogSearchWindow.useQuery(undefined, {
+    staleTime: 60 * 60 * 1000,
+  });
   const searchLookbackDays = searchWindowQuery.data?.searchLookbackDays ?? null;
   const hotTierDays = searchWindowQuery.data?.hotTierDays ?? null;
 
@@ -131,8 +118,7 @@ export function DejaViewContent() {
 
   const events: EventResult[] = eventsQuery.data ?? [];
   const currentEvent = events[eventCursor] ?? null;
-  const previousEvent =
-    eventCursor > 0 ? (events[eventCursor - 1] ?? null) : null;
+  const previousEvent = eventCursor > 0 ? (events[eventCursor - 1] ?? null) : null;
 
   const currentAggregateType = useMemo(() => {
     if (!searchResults.data || !selectedAggregate) return null;
@@ -263,9 +249,8 @@ export function DejaViewContent() {
                     {hotTierDays !== null && (
                       <>
                         {" "}
-                        Aggregates older than {hotTierDays} days within that
-                        window live in cold storage and load quite some slower
-                        (set by{" "}
+                        Aggregates older than {hotTierDays} days within that window live
+                        in cold storage and load quite some slower (set by{" "}
                         {searchWindowQuery.data?.hotTierEnvVar ??
                           "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS"}
                         ).
@@ -301,8 +286,8 @@ export function DejaViewContent() {
                       </EmptyState.Indicator>
                       <EmptyState.Title>No aggregates found</EmptyState.Title>
                       <EmptyState.Description>
-                        No aggregates match your search criteria. Try a
-                        different query or tenant ID.
+                        No aggregates match your search criteria. Try a different query or
+                        tenant ID.
                       </EmptyState.Description>
                     </EmptyState.Content>
                   </EmptyState.Root>

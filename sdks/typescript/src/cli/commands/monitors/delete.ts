@@ -11,14 +11,11 @@ import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
  * Returns the deletion outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const deleteMonitorCommand = async (
-  id: string
-): Promise<CommandResult | void> => {
+export const deleteMonitorCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Deleting monitor "${id}"...`).start();
 

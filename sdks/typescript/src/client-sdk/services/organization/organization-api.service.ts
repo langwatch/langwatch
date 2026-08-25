@@ -15,10 +15,7 @@ import {
   type ManagementRequest,
   resolveManagementToken,
 } from "../_shared/management-request";
-import type {
-  ManagementScopeType,
-  OrganizationRole,
-} from "../_shared/management-types";
+import type { ManagementScopeType, OrganizationRole } from "../_shared/management-types";
 
 export interface OrganizationSettings {
   id: string;
@@ -187,9 +184,7 @@ export class OrganizationApiService {
     });
   }
 
-  async listMembers(
-    options: ListMembersOptions = {},
-  ): Promise<ListMembersResponse> {
+  async listMembers(options: ListMembersOptions = {}): Promise<ListMembersResponse> {
     return this.#request({
       operation: "list organization members",
       path: managementPath("/api/organization/members"),
@@ -236,7 +231,9 @@ export class OrganizationApiService {
   async getMemberAccess(userId: string): Promise<MemberAccessBreakdown> {
     return this.#request({
       operation: `fetch the access of member "${userId}"`,
-      path: managementPath(`/api/organization/members/${encodeURIComponent(userId)}/access`),
+      path: managementPath(
+        `/api/organization/members/${encodeURIComponent(userId)}/access`,
+      ),
     });
   }
 

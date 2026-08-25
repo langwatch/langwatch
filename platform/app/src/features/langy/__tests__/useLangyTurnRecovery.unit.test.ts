@@ -316,10 +316,7 @@ describe("useLangyTurnRecovery", () => {
     });
 
     it("never retries at-capacity or unavailable — the server already did", () => {
-      for (const kind of [
-        "langy_agent_at_capacity",
-        "langy_agent_unavailable",
-      ]) {
+      for (const kind of ["langy_agent_at_capacity", "langy_agent_unavailable"]) {
         const onRetry = vi.fn();
         setup({ errorKind: kind, onRetry });
         act(() => {

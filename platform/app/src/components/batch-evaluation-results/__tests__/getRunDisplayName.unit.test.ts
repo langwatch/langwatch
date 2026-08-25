@@ -22,9 +22,7 @@ describe("getRunDisplayName()", () => {
     });
 
     it("uses the correct 1-based index", () => {
-      expect(getRunDisplayName({ commitMessage: undefined, index: 4 })).toBe(
-        "Run #5",
-      );
+      expect(getRunDisplayName({ commitMessage: undefined, index: 4 })).toBe("Run #5");
     });
   });
 

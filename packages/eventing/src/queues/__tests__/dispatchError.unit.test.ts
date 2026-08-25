@@ -34,9 +34,9 @@ describe("DispatchError", () => {
 describe("isDispatchError", () => {
   describe("when given a DispatchError instance", () => {
     it("returns true", () => {
-      expect(
-        isDispatchError(new DispatchError({ message: "x", retryable: true })),
-      ).toBe(true);
+      expect(isDispatchError(new DispatchError({ message: "x", retryable: true }))).toBe(
+        true,
+      );
     });
   });
 
@@ -72,15 +72,11 @@ describe("isRetryableHttpStatus", () => {
 describe("extractHttpStatus", () => {
   describe("when the error carries a status in a known shape", () => {
     it("reads the AWS SDK v3 metadata status", () => {
-      expect(extractHttpStatus({ $metadata: { httpStatusCode: 500 } })).toBe(
-        500,
-      );
+      expect(extractHttpStatus({ $metadata: { httpStatusCode: 500 } })).toBe(500);
     });
 
     it("reads an axios/@slack/webhook nested response status", () => {
-      expect(
-        extractHttpStatus({ original: { response: { status: 404 } } }),
-      ).toBe(404);
+      expect(extractHttpStatus({ original: { response: { status: 404 } } })).toBe(404);
     });
 
     it("reads a numeric SendGrid code", () => {
@@ -150,14 +146,10 @@ describe("parseRetryAfterMs", () => {
 
   describe("when the header is an HTTP date", () => {
     it("returns the delta from now for a future date", () => {
-      expect(parseRetryAfterMs("Wed, 15 Jul 2026 12:01:00 GMT", NOW)).toBe(
-        60_000,
-      );
+      expect(parseRetryAfterMs("Wed, 15 Jul 2026 12:01:00 GMT", NOW)).toBe(60_000);
     });
     it("returns undefined for a past date", () => {
-      expect(
-        parseRetryAfterMs("Wed, 15 Jul 2026 11:59:00 GMT", NOW),
-      ).toBeUndefined();
+      expect(parseRetryAfterMs("Wed, 15 Jul 2026 11:59:00 GMT", NOW)).toBeUndefined();
     });
   });
 

@@ -163,9 +163,7 @@ export const langyDerivedTimeseriesCardSchema = z.object({
     .min(1),
   comparison: z.object(timeseriesComparisonFields).optional(),
 });
-export type LangyDerivedTimeseriesCard = z.infer<
-  typeof langyDerivedTimeseriesCardSchema
->;
+export type LangyDerivedTimeseriesCard = z.infer<typeof langyDerivedTimeseriesCardSchema>;
 
 /** `table` — a generic derived table: named columns, rows of primitive cells. */
 export const langyDerivedTableCardSchema = z.object({
@@ -259,7 +257,5 @@ export type LangyDerivedCard = z.infer<typeof langyDerivedCardSchema>;
  * Is this kind model-emittable? The runtime reading of the allowlist, for the
  * places that hold a `CardKind` rather than a literal.
  */
-export const isDerivedSafeCardKind = (
-  kind: CardKind,
-): kind is DerivedSafeCardKind =>
+export const isDerivedSafeCardKind = (kind: CardKind): kind is DerivedSafeCardKind =>
   (DERIVED_SAFE_CARD_KINDS as readonly CardKind[]).includes(kind);

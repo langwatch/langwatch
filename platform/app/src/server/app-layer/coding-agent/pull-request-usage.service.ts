@@ -354,10 +354,7 @@ export interface SessionModelTotalsLookup {
 }
 
 export interface PullRequestUsageServiceDeps {
-  pullRequests: Pick<
-    GithubService,
-    "findAllByBranches" | "tryFindByNumber"
-  >;
+  pullRequests: Pick<GithubService, "findAllByBranches" | "tryFindByNumber">;
   sessions: Pick<CodingAgentSessionRepository, "listByRepositoryBranch">;
   personalSessions: PersonalSessionLookup;
   sessionEvents: SessionModelTotalsLookup;
@@ -411,9 +408,7 @@ export class PullRequestUsageService {
    * honest answer is "we do not know this pull request", and a zeroed rollup
    * would read as "it cost nothing", which is a different and wrong claim.
    */
-  async getPullRequestUsage(
-    query: PullRequestUsageQuery,
-  ): Promise<PullRequestUsage> {
+  async getPullRequestUsage(query: PullRequestUsageQuery): Promise<PullRequestUsage> {
     const gathered = await this.gatherPullRequest(query);
     return {
       pullRequest: toIdentity(gathered.target),
@@ -428,9 +423,7 @@ export class PullRequestUsageService {
    * the detail surface. See {@link PullRequestSessionFact} for what a session
    * carries, and where its title is decided.
    */
-  async getPullRequestDetail(
-    query: PullRequestUsageQuery,
-  ): Promise<PullRequestDetail> {
+  async getPullRequestDetail(query: PullRequestUsageQuery): Promise<PullRequestDetail> {
     const gathered = await this.gatherPullRequest(query);
     const costProjects = new Set(query.costProjectIds);
 
@@ -496,9 +489,7 @@ export class PullRequestUsageService {
         organizationId,
         repositoryHost: group.repositoryHost,
         repositoryFullName: group.repositoryFullName,
-        headBranches: [
-          ...new Set(group.sessions.flatMap((s) => s.headBranches)),
-        ],
+        headBranches: [...new Set(group.sessions.flatMap((s) => s.headBranches))],
       });
       const assignments = assignDrivingSessionsToPullRequests({
         sessions: group.sessions,
@@ -511,8 +502,7 @@ export class PullRequestUsageService {
       // rather than one person's share of it.
       const discovered = pullRequests.filter((pullRequest) =>
         group.sessions.some(
-          (session) =>
-            assignments.get(session.sessionId) === pullRequest.prNumber,
+          (session) => assignments.get(session.sessionId) === pullRequest.prNumber,
         ),
       );
       if (discovered.length > 0) {
@@ -602,18 +592,16 @@ export class PullRequestUsageService {
       organizationId,
       agents: sessions.map((session) => session.agent),
     });
-    const modelTotals =
-      await this.deps.sessionEvents.sumTokensByModelPerSession({
-        tenantIds: permittedProjectIds,
-        sessionIds: sessions.map((session) => session.sessionId),
-        fromMs: toMs - USAGE_SESSION_WINDOW_MS,
-      });
+    const modelTotals = await this.deps.sessionEvents.sumTokensByModelPerSession({
+      tenantIds: permittedProjectIds,
+      sessionIds: sessions.map((session) => session.sessionId),
+      fromMs: toMs - USAGE_SESSION_WINDOW_MS,
+    });
     const costProjects = new Set(costProjectIds);
 
     return discovered.map((pullRequest) => {
       const attached = sessions.filter(
-        (session) =>
-          assignments.get(session.sessionId) === pullRequest.prNumber,
+        (session) => assignments.get(session.sessionId) === pullRequest.prNumber,
       );
       const rows = groupRows({
         sessions: attached,
@@ -704,12 +692,11 @@ export class PullRequestUsageService {
       organizationId: query.organizationId,
       agents: attached.map((session) => session.agent),
     });
-    const modelTotals =
-      await this.deps.sessionEvents.sumTokensByModelPerSession({
-        tenantIds: query.permittedProjectIds,
-        sessionIds: attached.map((session) => session.sessionId),
-        fromMs: toMs - USAGE_SESSION_WINDOW_MS,
-      });
+    const modelTotals = await this.deps.sessionEvents.sumTokensByModelPerSession({
+      tenantIds: query.permittedProjectIds,
+      sessionIds: attached.map((session) => session.sessionId),
+      fromMs: toMs - USAGE_SESSION_WINDOW_MS,
+    });
 
     return {
       target,
@@ -755,9 +742,7 @@ async function resolveNonBillableAgents({
       }),
     })),
   );
-  return new Set(
-    answers.filter((answer) => answer.nonBillable).map((a) => a.agent),
-  );
+  return new Set(answers.filter((answer) => answer.nonBillable).map((a) => a.agent));
 }
 
 /** Keep only the sessions the tenure rule attaches to THIS pull request. */
@@ -778,9 +763,7 @@ function attachedToPullRequest({
     })),
     pullRequests: toAssignable(pullRequests),
   });
-  return sessions.filter(
-    (session) => assignments.get(session.sessionId) === prNumber,
-  );
+  return sessions.filter((session) => assignments.get(session.sessionId) === prNumber);
 }
 
 function toAssignable(pullRequests: ReadonlyArray<GithubPullRequestRow>) {
@@ -927,8 +910,7 @@ function addSessionToGroup({
   group.totalTokens += tokensOf(session);
   if (priced) {
     group.costUsd = (group.costUsd ?? 0) + session.costUsd;
-    group.billedCostUsd =
-      (group.billedCostUsd ?? 0) + (nonBilled ? 0 : session.costUsd);
+    group.billedCostUsd = (group.billedCostUsd ?? 0) + (nonBilled ? 0 : session.costUsd);
     group.nonBilledCostUsd =
       (group.nonBilledCostUsd ?? 0) + (nonBilled ? session.costUsd : 0);
   }
@@ -1088,9 +1070,7 @@ function contributorsSummaryFor({
       sessionsCount: 1,
     });
   }
-  return [...grouped.values()].sort(
-    (a, b) => b.sessionsCount - a.sessionsCount,
-  );
+  return [...grouped.values()].sort((a, b) => b.sessionsCount - a.sessionsCount);
 }
 
 function tokensOf(session: {
@@ -1138,11 +1118,7 @@ function groupSessionsByRepository(
 ): PersonalRepositoryGroup[] {
   const groups = new Map<string, PersonalRepositoryGroup>();
   for (const session of sessions) {
-    if (
-      !session.repositoryOwner ||
-      !session.repositoryName ||
-      !session.gitBranch
-    ) {
+    if (!session.repositoryOwner || !session.repositoryName || !session.gitBranch) {
       continue;
     }
     // Both halves of the key are case-folded, because a session stores the
@@ -1217,9 +1193,6 @@ function unlinkedRollupsFor({
   }));
 }
 
-function sumOf<K extends string>(
-  rows: Array<Record<K, number>>,
-  key: K,
-): number {
+function sumOf<K extends string>(rows: Array<Record<K, number>>, key: K): number {
   return rows.reduce((sum, row) => sum + row[key], 0);
 }

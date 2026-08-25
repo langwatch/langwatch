@@ -32,9 +32,7 @@ const TEST_DIR = fileURLToPath(new URL("./", import.meta.url));
  * object, a specification too large to be worth committing, a row count, or a
  * runtime load. Each names the test that exercises it.
  */
-const RULES_COVERED_BY_NAMED_TESTS: Partial<
-  Record<LangWatchQLVegaRuleId, string>
-> = {
+const RULES_COVERED_BY_NAMED_TESTS: Partial<Record<LangWatchQLVegaRuleId, string>> = {
   "spec.not-json": "validateVegaLiteSpec.unit.test.ts",
   "spec.not-object": "validateVegaLiteSpec.unit.test.ts",
   "limit.maxSpecBytes": "vegaLiteLimits.unit.test.ts",
@@ -57,14 +55,11 @@ describe("LangWatchQL rule coverage", () => {
         ]);
 
         const byNamedTest = new Set<string>();
-        for (const [rule, file] of Object.entries(
-          RULES_COVERED_BY_NAMED_TESTS,
-        )) {
+        for (const [rule, file] of Object.entries(RULES_COVERED_BY_NAMED_TESTS)) {
           const source = readFileSync(join(TEST_DIR, file), "utf8");
-          expect(
-            source.includes(rule),
-            `${file} must name ${rule} to cover it`,
-          ).toBe(true);
+          expect(source.includes(rule), `${file} must name ${rule} to cover it`).toBe(
+            true,
+          );
           byNamedTest.add(rule);
         }
 
@@ -79,19 +74,14 @@ describe("LangWatchQL rule coverage", () => {
       });
 
       it("keeps the rule list, the identifier list, and the catalogue in step", () => {
-        expect(LWQL_VEGA_RULES.map((rule) => rule.id)).toEqual([
-          ...LWQL_VEGA_RULE_IDS,
-        ]);
+        expect(LWQL_VEGA_RULES.map((rule) => rule.id)).toEqual([...LWQL_VEGA_RULE_IDS]);
 
         for (const rule of LWQL_VEGA_RULES) {
           expect(
             VEGA_VALIDATION_ERROR_CODES,
             `${rule.id} must map to a known code`,
           ).toContain(rule.code);
-          expect(
-            rule.summary.length,
-            `${rule.id} needs a summary`,
-          ).toBeGreaterThan(0);
+          expect(rule.summary.length, `${rule.id} needs a summary`).toBeGreaterThan(0);
         }
       });
 
@@ -100,14 +90,10 @@ describe("LangWatchQL rule coverage", () => {
           expect(LWQL_VEGA_RULE_IDS as readonly string[]).toContain(rule);
         }
         for (const fixture of ADVERSARIAL_VEGA_FIXTURES) {
-          expect(LWQL_VEGA_RULE_IDS as readonly string[]).toContain(
-            fixture.attacks,
-          );
+          expect(LWQL_VEGA_RULE_IDS as readonly string[]).toContain(fixture.attacks);
         }
         for (const fixture of INVALID_VEGA_FIXTURES) {
-          expect(LWQL_VEGA_RULE_IDS as readonly string[]).toContain(
-            fixture.refusedBy,
-          );
+          expect(LWQL_VEGA_RULE_IDS as readonly string[]).toContain(fixture.refusedBy);
         }
       });
     });

@@ -12,8 +12,7 @@
 export type RetentionChangeKind = "expansion" | "contraction" | "noop";
 
 /** Indefinite retention (0) is the longest possible window. */
-const asWindow = (days: number): number =>
-  days <= 0 ? Number.POSITIVE_INFINITY : days;
+const asWindow = (days: number): number => (days <= 0 ? Number.POSITIVE_INFINITY : days);
 
 /**
  * Classify applying `next` retention to data that currently carries `current`.

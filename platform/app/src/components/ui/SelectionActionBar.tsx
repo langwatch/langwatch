@@ -57,12 +57,7 @@ export function SelectionActionBar({
             {children}
           </>
         )}
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={onClear}
-          aria-label="Clear selection"
-        >
+        <Button size="xs" variant="ghost" onClick={onClear} aria-label="Clear selection">
           <X size={14} />
         </Button>
       </HStack>

@@ -28,9 +28,7 @@ describe("redactAuditArgs", () => {
           },
         }) as Record<string, unknown>;
 
-        expect(JSON.stringify(redacted)).not.toContain(
-          "AIzaSyTheCustomersRealKey",
-        );
+        expect(JSON.stringify(redacted)).not.toContain("AIzaSyTheCustomersRealKey");
         expect(redacted.customKeys).toEqual({
           GEMINI_API_KEY: "[redacted]",
         });
@@ -89,11 +87,7 @@ describe("redactAuditArgs", () => {
         }) as Record<string, unknown>;
 
         expect(JSON.stringify(redacted)).not.toContain("sk-");
-        expect(redacted.extraHeaders).toEqual([
-          "[redacted]",
-          "[redacted]",
-          "[redacted]",
-        ]);
+        expect(redacted.extraHeaders).toEqual(["[redacted]", "[redacted]", "[redacted]"]);
       });
 
       /** A passthrough object, so its contents cannot be assumed harmless. */
@@ -168,25 +162,25 @@ describe("redactAuditArgs", () => {
   describe("given a run started with parameter values", () => {
     describe("when the action is one that can carry a secret parameter", () => {
       /** @scenario "Audit log entries never record a secret value" */
-      it.each([
-        "suites.run",
-        "scenarios.run",
-      ])("keeps the names and drops every value on %s", (action) => {
-        const redacted = redactAuditArgs({
-          input: {
-            projectId: "proj-1",
-            parameters: { api_token: "tok-live-1", region: "eu-central" },
-          },
-          action,
-        }) as Record<string, unknown>;
+      it.each(["suites.run", "scenarios.run"])(
+        "keeps the names and drops every value on %s",
+        (action) => {
+          const redacted = redactAuditArgs({
+            input: {
+              projectId: "proj-1",
+              parameters: { api_token: "tok-live-1", region: "eu-central" },
+            },
+            action,
+          }) as Record<string, unknown>;
 
-        expect(JSON.stringify(redacted)).not.toContain("tok-live-1");
-        expect(redacted.parameters).toEqual({
-          api_token: "[redacted]",
-          region: "[redacted]",
-        });
-        expect(redacted.projectId).toBe("proj-1");
-      });
+          expect(JSON.stringify(redacted)).not.toContain("tok-live-1");
+          expect(redacted.parameters).toEqual({
+            api_token: "[redacted]",
+            region: "[redacted]",
+          });
+          expect(redacted.projectId).toBe("proj-1");
+        },
+      );
 
       /** @scenario "Audit log entries never record a secret value" */
       it("redacts the values typed into the http test button", () => {

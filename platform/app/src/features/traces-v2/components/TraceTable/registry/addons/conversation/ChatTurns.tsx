@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Flex,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, Bot, Clock, User } from "lucide-react";
 import type React from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
@@ -36,14 +28,11 @@ interface ChatTurnsProps {
   style: RowStyle;
 }
 
-export const ChatTurns: React.FC<ChatTurnsProps> = ({
-  group,
-  colSpan,
-  style,
-}) => {
+export const ChatTurns: React.FC<ChatTurnsProps> = ({ group, colSpan, style }) => {
   const systemPrompt = parseSystemPrompt(group.traces[0]?.input);
-  const { head, tail, hiddenCount, showMore, showAll, canShowMore } =
-    useTurnsWindow(group.traces);
+  const { head, tail, hiddenCount, showMore, showAll, canShowMore } = useTurnsWindow(
+    group.traces,
+  );
   const nextStep = Math.min(SHOW_MORE_STEP, hiddenCount);
 
   return (
@@ -73,20 +62,10 @@ export const ChatTurns: React.FC<ChatTurnsProps> = ({
                 <Text textStyle="sm" color="fg.subtle" flexShrink={0}>
                   … {hiddenCount} more {hiddenCount === 1 ? "turn" : "turns"}
                 </Text>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  color="blue.fg"
-                  onClick={showMore}
-                >
+                <Button size="xs" variant="ghost" color="blue.fg" onClick={showMore}>
                   Show {nextStep} more
                 </Button>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  color="fg.muted"
-                  onClick={showAll}
-                >
+                <Button size="xs" variant="ghost" color="fg.muted" onClick={showAll}>
                   Show all
                 </Button>
                 <Box height="1px" flex={1} bg="border.muted" />
@@ -129,9 +108,7 @@ const ChatTurn: React.FC<ChatTurnProps> = ({ trace, turnIndex, prevTrace }) => {
 
   return (
     <VStack align="stretch" gap={2.5}>
-      {gapSeconds > TURN_GAP_VISIBLE_SECONDS && (
-        <TurnGap seconds={gapSeconds} />
-      )}
+      {gapSeconds > TURN_GAP_VISIBLE_SECONDS && <TurnGap seconds={gapSeconds} />}
       <TurnDivider
         turnIndex={turnIndex}
         trace={trace}

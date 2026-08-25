@@ -1,7 +1,4 @@
-import {
-  DEFAULT_NAVIGATION_MODE,
-  type NavigationMode,
-} from "../navigationModeStore";
+import { DEFAULT_NAVIGATION_MODE, type NavigationMode } from "../navigationModeStore";
 
 export type NavigationModeResolution =
   | { status: "ready"; mode: NavigationMode }
@@ -62,10 +59,7 @@ export function resolveNavigationMode({
 export function isLegacyNavigationDevice({
   storedMode,
   isLastKnownFlagEnabled,
-}: Pick<
-  NavigationModeInputs,
-  "storedMode" | "isLastKnownFlagEnabled"
->): boolean {
+}: Pick<NavigationModeInputs, "storedMode" | "isLastKnownFlagEnabled">): boolean {
   const resolution = resolveNavigationMode({
     storedMode,
     isLastKnownFlagEnabled,

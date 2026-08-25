@@ -155,16 +155,10 @@ describe("Activity tracking hook", () => {
     describe("when Customer.io API is unavailable", () => {
       /** @scenario 'Activity tracking failure does not break the login flow' */
       it("does not throw (fire-and-forget)", async () => {
-        const { captureException } = await import(
-          "~/utils/posthogErrorCapture"
-        );
-        mockNurturing.identifyUser.mockRejectedValueOnce(
-          new Error("CIO unavailable"),
-        );
+        const { captureException } = await import("~/utils/posthogErrorCapture");
+        mockNurturing.identifyUser.mockRejectedValueOnce(new Error("CIO unavailable"));
 
-        expect(() =>
-          fireActivityTrackingNurturing({ userId: "user-1" }),
-        ).not.toThrow();
+        expect(() => fireActivityTrackingNurturing({ userId: "user-1" })).not.toThrow();
 
         await vi.waitFor(() => {
           expect(captureException).toHaveBeenCalled();
@@ -172,9 +166,7 @@ describe("Activity tracking hook", () => {
       });
 
       it("clears the cache entry on rejection so the next call can retry", async () => {
-        mockNurturing.identifyUser.mockRejectedValueOnce(
-          new Error("CIO unavailable"),
-        );
+        mockNurturing.identifyUser.mockRejectedValueOnce(new Error("CIO unavailable"));
 
         fireActivityTrackingNurturing({ userId: "user-1" });
         expect(getActivityTrackingCacheSize()).toBe(1);

@@ -44,15 +44,14 @@ export function withFeatureFlagGuard(
     const { bypassOnboardingRedirect = false } = options ?? {};
 
     const GuardedComponent = (props: P) => {
-      const { organization, isLoading: orgLoading } =
-        useOrganizationTeamProject(
-          bypassOnboardingRedirect
-            ? {
-                redirectToOnboarding: false,
-                redirectToProjectOnboarding: false,
-              }
-            : undefined,
-        );
+      const { organization, isLoading: orgLoading } = useOrganizationTeamProject(
+        bypassOnboardingRedirect
+          ? {
+              redirectToOnboarding: false,
+              redirectToProjectOnboarding: false,
+            }
+          : undefined,
+      );
       const orgId = organization?.id ?? "";
       const { enabled, isLoading: ffLoading } = useFeatureFlag(flag, {
         organizationId: orgId,

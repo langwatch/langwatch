@@ -9,9 +9,7 @@ import {
 
 describe("Experiment contract", () => {
   it("accepts only the stable experiment type vocabulary", () => {
-    expect(experimentTypeSchema.parse("EVALUATIONS_V3")).toBe(
-      "EVALUATIONS_V3",
-    );
+    expect(experimentTypeSchema.parse("EVALUATIONS_V3")).toBe("EVALUATIONS_V3");
     expect(experimentTypeSchema.safeParse("OTHER").success).toBe(false);
   });
 

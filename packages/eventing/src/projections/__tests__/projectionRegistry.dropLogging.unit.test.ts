@@ -51,11 +51,8 @@ async function registryClosedAfterRouting() {
 }
 
 function spyOnLogger(registry: ProjectionRegistry, level: "warn" | "error") {
-  const logger = (registry as unknown as { logger: Record<string, unknown> })
-    .logger;
-  return vi.spyOn(logger as never, level as never) as ReturnType<
-    typeof vi.spyOn
-  >;
+  const logger = (registry as unknown as { logger: Record<string, unknown> }).logger;
+  return vi.spyOn(logger as never, level as never) as ReturnType<typeof vi.spyOn>;
 }
 
 const events = [{ id: "event-1" }, { id: "event-2" }] as unknown as Event[];

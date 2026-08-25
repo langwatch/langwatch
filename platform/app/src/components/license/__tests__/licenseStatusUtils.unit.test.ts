@@ -142,17 +142,17 @@ describe("licenseMetersSeats", () => {
     it("keeps metering seats after the term ends", () => {
       // The whole point of the lapse policy: a license we signed keeps
       // metering what it sold, so an over-seats organization is still told.
-      expect(
-        licenseMetersSeats(createInvalidLicenseStatus({ expired: true })),
-      ).toBe(true);
+      expect(licenseMetersSeats(createInvalidLicenseStatus({ expired: true }))).toBe(
+        true,
+      );
     });
   });
 
   describe("given a license we did not sign", () => {
     it("meters nothing, so no seat count can be exceeded", () => {
-      expect(
-        licenseMetersSeats(createInvalidLicenseStatus({ expired: false })),
-      ).toBe(false);
+      expect(licenseMetersSeats(createInvalidLicenseStatus({ expired: false }))).toBe(
+        false,
+      );
     });
 
     it("meters nothing when the license cannot even be read", () => {
@@ -168,9 +168,7 @@ describe("licenseMetersSeats", () => {
 
   describe("given no license", () => {
     it("meters nothing, since the deployment runs uncapped", () => {
-      expect(licenseMetersSeats({ hasLicense: false, valid: false })).toBe(
-        false,
-      );
+      expect(licenseMetersSeats({ hasLicense: false, valid: false })).toBe(false);
       expect(licenseMetersSeats(undefined)).toBe(false);
     });
   });
@@ -268,9 +266,7 @@ describe("formatResourceUsage", () => {
 
   it("displays 'Unlimited' for large max values (>= 1M)", () => {
     expect(formatResourceUsage(5, 1_000_000)).toBe("5 / Unlimited");
-    expect(formatResourceUsage(5, Number.MAX_SAFE_INTEGER)).toBe(
-      "5 / Unlimited",
-    );
+    expect(formatResourceUsage(5, Number.MAX_SAFE_INTEGER)).toBe("5 / Unlimited");
   });
 });
 

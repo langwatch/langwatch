@@ -65,9 +65,7 @@ describe("OAuth client registry", () => {
   describe("given no client was ever registered with a client_id", () => {
     describe("when it is looked up", () => {
       it("returns null", async () => {
-        const found = await getOAuthClient(
-          `mcp_${nanoid(12)}_never_registered`,
-        );
+        const found = await getOAuthClient(`mcp_${nanoid(12)}_never_registered`);
         expect(found).toBeNull();
       });
     });

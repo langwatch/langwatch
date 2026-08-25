@@ -94,13 +94,7 @@ export class TeamsApiService {
     });
   }
 
-  async update({
-    id,
-    input,
-  }: {
-    id: string;
-    input: { name?: string };
-  }): Promise<Team> {
+  async update({ id, input }: { id: string; input: { name?: string } }): Promise<Team> {
     return this.#request({
       operation: `update team "${id}"`,
       path: `/api/teams/${encodeURIComponent(id)}`,

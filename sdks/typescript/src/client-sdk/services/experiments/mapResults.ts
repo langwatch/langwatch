@@ -36,13 +36,12 @@ export const mapRunResultsToRows = (
   const evaluations = response.evaluations ?? [];
 
   const rows: ExperimentRowResult[] = datasetEntries.map((entry) => {
-    const entryData =
-      entry.entry && typeof entry.entry === "object" ? entry.entry : {};
+    const entryData = entry.entry && typeof entry.entry === "object" ? entry.entry : {};
 
     const predicted = entry.predicted;
     const output =
       predicted && typeof predicted === "object" && "output" in predicted
-        ? (predicted).output
+        ? predicted.output
         : predicted;
 
     const row: ExperimentRowResult = {

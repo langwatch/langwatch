@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Code,
-  HStack,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Code, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -88,8 +80,7 @@ const KIND_FALLBACK_TITLE: Record<ErrorKind, string> = {
 };
 
 /** The one kind with no error behind it, so the one kind that keeps a string. */
-const NO_SELECTION_DESCRIPTION =
-  "Pick a trace from the table to see its details here.";
+const NO_SELECTION_DESCRIPTION = "Pick a trace from the table to see its details here.";
 
 /**
  * The line under the headline.
@@ -121,9 +112,7 @@ export function TraceDrawerEmptyState({
   // the degraded form does not, since "Trace not found" at least names what
   // the customer was looking at.
   const explanation = explainAnyError(error);
-  const title = explanation.isRegistered
-    ? explanation.title
-    : KIND_FALLBACK_TITLE[kind];
+  const title = explanation.isRegistered ? explanation.title : KIND_FALLBACK_TITLE[kind];
   // Emptiness, not identity. A registered code with a title and no `describe`
   // (`not_found`, `dspy_step_not_found`, …) returns a fresh object with an
   // empty description, so the slot is rendered conditionally rather than

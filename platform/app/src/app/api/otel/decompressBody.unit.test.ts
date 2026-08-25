@@ -85,9 +85,7 @@ describe("readBody", () => {
 
   describe("when Content-Encoding is br", () => {
     it("decompresses the body", async () => {
-      const compressed = new Uint8Array(
-        brotliCompressSync(Buffer.from(payload)),
-      );
+      const compressed = new Uint8Array(brotliCompressSync(Buffer.from(payload)));
 
       const req = new NextRequest("http://localhost/api/otel/v1/traces", {
         method: "POST",
@@ -109,9 +107,7 @@ describe("readBody", () => {
         headers: { "Content-Encoding": "zstd" },
       });
 
-      await expect(readBody(req)).rejects.toThrow(
-        "Unsupported Content-Encoding: zstd",
-      );
+      await expect(readBody(req)).rejects.toThrow("Unsupported Content-Encoding: zstd");
     });
   });
 });

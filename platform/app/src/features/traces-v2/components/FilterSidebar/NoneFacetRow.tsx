@@ -14,9 +14,7 @@ export const NoneFacetRow = memo(function NoneFacetRow({
       type="button"
       role="checkbox"
       aria-checked={active}
-      aria-label={
-        active ? "Filtering for missing values" : "Show missing values only"
-      }
+      aria-label={active ? "Filtering for missing values" : "Show missing values only"}
       position="relative"
       width="full"
       paddingY={1}

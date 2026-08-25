@@ -73,9 +73,7 @@ describe("Media rendering in trace views", () => {
   it("legacy input/output view shows an inline image and an attachment chip", () => {
     render(
       <RenderInputOutput
-        value={JSON.stringify([
-          { role: "user", content: [imagePart, pdfPart] },
-        ])}
+        value={JSON.stringify([{ role: "user", content: [imagePart, pdfPart] }])}
       />,
       { wrapper: Wrapper },
     );
@@ -170,9 +168,7 @@ describe("Media rendering in trace views", () => {
   it("finds media through a typed-raw envelope whose value is a JSON string", () => {
     const typedRaw = {
       type: "raw",
-      value: JSON.stringify([
-        { role: "user", content: [audioPart, imagePart] },
-      ]),
+      value: JSON.stringify([{ role: "user", content: [audioPart, imagePart] }]),
     };
 
     render(<RenderInputOutput value={JSON.stringify(typedRaw)} />, {

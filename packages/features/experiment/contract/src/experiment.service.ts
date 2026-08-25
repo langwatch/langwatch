@@ -49,9 +49,15 @@ export abstract class ExperimentService {
   ): Promise<{ id: string; slug: string }>;
   abstract findNextDraftName(input: { projectId: string }): Promise<string>;
   abstract archive(input: ExperimentLookup): Promise<{ success: true }>;
-  abstract listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>>;
-  abstract getRunAggregates(input: ExperimentRunListInput): Promise<Record<string, ExperimentRunAggregate>>;
-  abstract getRunsPage(input: ExperimentRunPageInput): Promise<{ runs: ExperimentRun[]; totalHits: number }>;
+  abstract listRuns(
+    input: ExperimentRunListInput,
+  ): Promise<Record<string, ExperimentRun[]>>;
+  abstract getRunAggregates(
+    input: ExperimentRunListInput,
+  ): Promise<Record<string, ExperimentRunAggregate>>;
+  abstract getRunsPage(
+    input: ExperimentRunPageInput,
+  ): Promise<{ runs: ExperimentRun[]; totalHits: number }>;
   /** A polling read: absent rows and disabled ClickHouse both read as null. */
   abstract tryGetRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null>;
   abstract getRunsPageBySlug(input: ExperimentRunSlugPageInput): Promise<{
@@ -61,17 +67,11 @@ export abstract class ExperimentService {
   }>;
   abstract startExperimentRun(input: StartExperimentRunInput): Promise<void>;
   abstract recordTargetResult(input: RecordTargetResultInput): Promise<void>;
-  abstract recordEvaluatorResult(
-    input: RecordEvaluatorResultInput,
-  ): Promise<void>;
-  abstract completeExperimentRun(
-    input: CompleteExperimentRunInput,
-  ): Promise<void>;
+  abstract recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void>;
+  abstract completeExperimentRun(input: CompleteExperimentRunInput): Promise<void>;
   abstract upsertDspyStep(input: ExperimentDspyStep): Promise<void>;
   abstract listDspySteps(
     input: ExperimentDspyStepsLookup,
   ): Promise<ExperimentDspyStepSummary[]>;
-  abstract getDspyStep(
-    input: ExperimentDspyStepLookup,
-  ): Promise<ExperimentDspyStep>;
+  abstract getDspyStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep>;
 }

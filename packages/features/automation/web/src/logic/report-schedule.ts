@@ -128,9 +128,7 @@ export function ordinal(n: number): string {
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** `HH:MM` for a time input, from the parts' hour + minute. */
-export function timeOfDay(
-  parts: Pick<ScheduleParts, "hour" | "minute">,
-): string {
+export function timeOfDay(parts: Pick<ScheduleParts, "hour" | "minute">): string {
   return `${pad(parts.hour)}:${pad(parts.minute)}`;
 }
 
@@ -194,10 +192,7 @@ export function partsFromCron(cron: string): ScheduleParts | null {
  * Friendly, sentence-form summary of the friendly schedule for the live
  * "this sends…" line, e.g. "Sends every Monday at 09:00 (Europe/Amsterdam)".
  */
-export function summarizeSchedule(
-  parts: ScheduleParts,
-  timezone: string,
-): string {
+export function summarizeSchedule(parts: ScheduleParts, timezone: string): string {
   const at = timeOfDay(parts);
   const tz = timezone.trim() || "UTC";
   switch (parts.frequency) {

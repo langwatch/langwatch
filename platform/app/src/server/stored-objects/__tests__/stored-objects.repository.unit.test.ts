@@ -26,8 +26,7 @@ vi.mock("~/server/app-layer/app", () => {
   const app = () => ({
     clickhouse: {
       enabled: true,
-      resolveClient: () =>
-        Promise.resolve({ insert: mockInsert, query: mockQuery }),
+      resolveClient: () => Promise.resolve({ insert: mockInsert, query: mockQuery }),
       resolveOrganizationClient: async () => {
         throw new Error("no organization client in this suite");
       },
@@ -201,9 +200,7 @@ describe("StoredObjectsRepository", () => {
         project_id: "proj-1",
         size_bytes: 5,
       });
-      expect(result[0]?.inserted_at).toEqual(
-        new Date("2025-01-02 00:00:00.000"),
-      );
+      expect(result[0]?.inserted_at).toEqual(new Date("2025-01-02 00:00:00.000"));
     });
   });
 });

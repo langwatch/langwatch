@@ -20,35 +20,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "~/server/invites/errors";
 
-const {
-  mutateSpy,
-  toasterCreate,
-  hardRedirectSpy,
-  captureExceptionSpy,
-  mockState,
-} = vi.hoisted(() => {
-  return {
-    mutateSpy: vi.fn(),
-    toasterCreate: vi.fn(),
-    hardRedirectSpy: vi.fn(),
-    captureExceptionSpy: vi.fn(),
-    mockState: {
-      handlers: {} as {
-        onSuccess?: (data: unknown, variables: { inviteCode: string }) => void;
-        onError?: (
-          error: { message: string },
-          variables: { inviteCode: string },
-        ) => void;
+const { mutateSpy, toasterCreate, hardRedirectSpy, captureExceptionSpy, mockState } =
+  vi.hoisted(() => {
+    return {
+      mutateSpy: vi.fn(),
+      toasterCreate: vi.fn(),
+      hardRedirectSpy: vi.fn(),
+      captureExceptionSpy: vi.fn(),
+      mockState: {
+        handlers: {} as {
+          onSuccess?: (data: unknown, variables: { inviteCode: string }) => void;
+          onError?: (
+            error: { message: string },
+            variables: { inviteCode: string },
+          ) => void;
+        },
+        mutation: {
+          isLoading: false,
+          isSuccess: false,
+          isError: false,
+          error: null as { message: string } | null,
+        },
       },
-      mutation: {
-        isLoading: false,
-        isSuccess: false,
-        isError: false,
-        error: null as { message: string } | null,
-      },
-    },
-  };
-});
+    };
+  });
 
 vi.mock("~/utils/api", () => ({
   api: {

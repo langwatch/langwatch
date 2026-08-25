@@ -27,10 +27,7 @@ import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.a
 import { RoutedAuthzListingRepository } from "../repositories/routed/routed.authz-listing.repository";
 import { RoutedAuthzReadRepository } from "../repositories/routed/routed.authz-read.repository";
 import { AuthzGrantsService } from "../services/authz-grants.service";
-import {
-  AuthzService,
-  type AuthzServiceOptions,
-} from "../services/authz.service";
+import { AuthzService, type AuthzServiceOptions } from "../services/authz.service";
 import {
   type AuthzLedgerDatabase,
   type EventingAuthzLedgerAdapterOptions,
@@ -106,9 +103,7 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
     });
   }
 
-  async defineRole(
-    args: Parameters<AuthzEngineLedger["defineRole"]>[0],
-  ): Promise<void> {
+  async defineRole(args: Parameters<AuthzEngineLedger["defineRole"]>[0]): Promise<void> {
     const { organizationId, commandId, role, actor } = args;
     await (
       await this.commands()
@@ -143,9 +138,7 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
     });
   }
 
-  async deleteRole(
-    args: Parameters<AuthzEngineLedger["deleteRole"]>[0],
-  ): Promise<void> {
+  async deleteRole(args: Parameters<AuthzEngineLedger["deleteRole"]>[0]): Promise<void> {
     await (
       await this.commands()
     ).deleteRole.send({
@@ -168,15 +161,13 @@ export class PostgresAuthzAdapter {
   private constructor(private readonly options: PostgresAuthzAdapterOptions) {}
 
   build(): PostgresAuthzBuild {
-    const database = this.options
-      .database as unknown as InternalPostgresAuthzDatabase;
+    const database = this.options.database as unknown as InternalPostgresAuthzDatabase;
     const epoch = RedisAuthzEpochAdapter.create({ redis: this.options.redis });
     const cutover = PostgresAuthzCutoverAdapter.create({
       database,
       reporter: this.options.cutoverReporter,
     });
-    const selectHead = (organizationId: string) =>
-      cutover.isOn({ organizationId });
+    const selectHead = (organizationId: string) => cutover.isOn({ organizationId });
 
     const revocation = PrismaAuthzRevocationRepository.create({
       database,

@@ -11,9 +11,7 @@ export const startSuiteRunCommandDataSchema = z.object({
   idempotencyKey: z.string(),
   occurredAt: z.number(),
 });
-export type StartSuiteRunCommandData = z.infer<
-  typeof startSuiteRunCommandDataSchema
->;
+export type StartSuiteRunCommandData = z.infer<typeof startSuiteRunCommandDataSchema>;
 
 export const recordSuiteRunItemStartedCommandDataSchema = z.object({
   tenantId: z.string(),

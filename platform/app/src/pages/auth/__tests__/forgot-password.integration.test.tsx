@@ -6,13 +6,7 @@
  * the public-env hook are mocked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -35,14 +29,7 @@ vi.mock("../../../hooks/usePublicEnv", () => ({
 }));
 
 vi.mock("~/utils/compat/next-link", () => ({
-  default: ({
-    href,
-    children,
-    ...props
-  }: {
-    href: string;
-    children: ReactNode;
-  }) => (
+  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -119,9 +106,7 @@ describe("ForgotPassword page", () => {
 
       expect(screen.getByText(/cannot send email/i)).toBeTruthy();
       expect(screen.queryByRole("textbox")).toBeNull();
-      expect(
-        screen.queryByRole("button", { name: /send reset link/i }),
-      ).toBeNull();
+      expect(screen.queryByRole("button", { name: /send reset link/i })).toBeNull();
     });
 
     it("points at the operator rather than leaving the user with nothing", () => {
@@ -152,12 +137,8 @@ describe("ForgotPassword page", () => {
       };
       renderPage();
 
-      expect(
-        screen.getByText(/managed by your identity provider/i),
-      ).toBeTruthy();
-      expect(
-        screen.queryByRole("button", { name: /send reset link/i }),
-      ).toBeNull();
+      expect(screen.getByText(/managed by your identity provider/i)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /send reset link/i })).toBeNull();
     });
   });
 });

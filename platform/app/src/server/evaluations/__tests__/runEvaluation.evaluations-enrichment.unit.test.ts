@@ -33,17 +33,13 @@ vi.mock("~/server/traces/trace.service", () => ({
 // capture the mapped data it receives without a langevals HTTP call.
 vi.mock("~/server/evaluations/evaluators.native", async (importOriginal) => {
   const actual =
-    await importOriginal<
-      typeof import("~/server/evaluations/evaluators.native")
-    >();
+    await importOriginal<typeof import("~/server/evaluations/evaluators.native")>();
   return { ...actual, isNativeEvaluatorType: () => true };
 });
 
 vi.mock("~/server/evaluations/native/registry", async (importOriginal) => {
   const actual =
-    await importOriginal<
-      typeof import("~/server/evaluations/native/registry")
-    >();
+    await importOriginal<typeof import("~/server/evaluations/native/registry")>();
   return {
     ...actual,
     executeNativeEvaluation: executeNativeEvaluationMock,
@@ -52,8 +48,7 @@ vi.mock("~/server/evaluations/native/registry", async (importOriginal) => {
 });
 
 vi.mock("~/server/evaluations/evaluators", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/evaluations/evaluators")>();
+  const actual = await importOriginal<typeof import("~/server/evaluations/evaluators")>();
   return {
     ...actual,
     AVAILABLE_EVALUATORS: {

@@ -1,12 +1,4 @@
-import {
-  Badge,
-  chakra,
-  HoverCard,
-  Icon,
-  Portal,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, chakra, HoverCard, Icon, Portal, Text, VStack } from "@chakra-ui/react";
 import { CircleHelp } from "lucide-react";
 import type React from "react";
 import {
@@ -123,11 +115,7 @@ export function ModelsTooltip({
   const visible = models.slice(0, EXTRA_MODELS_VISIBLE_CAP);
   const overflow = models.length - visible.length;
   return (
-    <HoverCard.Root
-      openDelay={150}
-      closeDelay={200}
-      positioning={{ placement: "top" }}
-    >
+    <HoverCard.Root openDelay={150} closeDelay={200} positioning={{ placement: "top" }}>
       <HoverCard.Trigger asChild>{children}</HoverCard.Trigger>
       <Portal>
         <HoverCard.Positioner>
@@ -166,9 +154,7 @@ export function ModelsTooltip({
                     cursor="pointer"
                     textAlign="left"
                     _hover={{ bg: "bg.muted" }}
-                    onClick={() =>
-                      useFilterStore.getState().toggleFacet("model", m)
-                    }
+                    onClick={() => useFilterStore.getState().toggleFacet("model", m)}
                     aria-label={`Filter by model "${m}"`}
                   >
                     <ProviderIcon model={m} size="comfortable" />
@@ -223,9 +209,7 @@ function renderModel(row: TraceListItem, density: Density) {
   // full list in a hover popover.
   const chip = (
     <FilterChip
-      onFilter={() =>
-        useFilterStore.getState().toggleFacet("model", rawPrimary)
-      }
+      onFilter={() => useFilterStore.getState().toggleFacet("model", rawPrimary)}
       filterLabel={`Filter by model "${rawPrimary}"`}
     >
       <Badge
@@ -237,10 +221,7 @@ function renderModel(row: TraceListItem, density: Density) {
         fontWeight="medium"
       >
         {known ? (
-          <ProviderIcon
-            model={rawPrimary}
-            size={compact ? "compact" : "comfortable"}
-          />
+          <ProviderIcon model={rawPrimary} size={compact ? "compact" : "comfortable"} />
         ) : (
           <Icon
             boxSize={compact ? "12px" : "14px"}

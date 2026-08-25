@@ -125,9 +125,7 @@ describe("daemonSocketDir", () => {
       // NOT the OS temp dir: on Linux that is /tmp, mode 1777, so another user
       // can pre-create langwatch-<uid>, own it, and leave us unable to secure
       // the socket. Nobody but us can create a directory under $HOME.
-      expect(dir).toBe(
-        path.join(os.homedir(), ".langwatch", "run", path.basename(dir)),
-      );
+      expect(dir).toBe(path.join(os.homedir(), ".langwatch", "run", path.basename(dir)));
       expect(path.basename(dir)).toMatch(/^langwatch-\d+$/);
     });
 
@@ -173,10 +171,7 @@ describe("socket permissions", () => {
   let dir: string;
 
   beforeEach(() => {
-    dir = path.join(
-      fs.mkdtempSync(path.join(os.tmpdir(), "lw-daemon-perm-")),
-      "sockets",
-    );
+    dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "lw-daemon-perm-")), "sockets");
   });
 
   afterEach(() => {
@@ -258,9 +253,7 @@ describe("inspectSocketTrust", () => {
     it("refuses it, so we never hand our args and API key to a stranger", async () => {
       await bindSocket();
       // We cannot chown without root; moving OUR uid is the same comparison.
-      vi.spyOn(process, "getuid").mockReturnValue(
-        (process.getuid?.() ?? 0) + 1,
-      );
+      vi.spyOn(process, "getuid").mockReturnValue((process.getuid?.() ?? 0) + 1);
 
       expect(inspectSocketTrust(socketPath)).toBe("socket-dir-foreign-owner");
     });
@@ -333,9 +326,7 @@ describe("ensureSocketDir", () => {
     it("fails closed instead of continuing with a socket it cannot make private", () => {
       const squatted = path.join(root, "langwatch-501");
       fs.mkdirSync(squatted, { mode: 0o777 });
-      vi.spyOn(process, "getuid").mockReturnValue(
-        (process.getuid?.() ?? 0) + 1,
-      );
+      vi.spyOn(process, "getuid").mockReturnValue((process.getuid?.() ?? 0) + 1);
 
       expect(() => ensureSocketDir(squatted)).toThrow(UntrustedSocketDirError);
     });
@@ -356,9 +347,7 @@ describe("ensureSocketDir", () => {
 describe("isSocketPathUsable", () => {
   describe("given a path longer than sockaddr_un allows", () => {
     it("rejects it, so the client falls back instead of crashing at bind()", () => {
-      expect(isSocketPathUsable("/tmp/" + "x".repeat(120) + ".sock")).toBe(
-        false,
-      );
+      expect(isSocketPathUsable("/tmp/" + "x".repeat(120) + ".sock")).toBe(false);
     });
   });
 });
@@ -382,8 +371,7 @@ describe("isDaemonSocketPathUsable", () => {
     });
 
     it("becomes usable once the staging allowance fits", () => {
-      const shorter =
-        "/tmp/" + "x".repeat(90 - MAX_STAGING_OVERHEAD_BYTES) + ".sock";
+      const shorter = "/tmp/" + "x".repeat(90 - MAX_STAGING_OVERHEAD_BYTES) + ".sock";
 
       expect(isDaemonSocketPathUsable(shorter)).toBe(true);
     });

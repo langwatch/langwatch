@@ -122,11 +122,7 @@ const mockDefaultFormValues = {
 };
 
 vi.mock("~/prompts/hooks/usePromptConfigForm", () => ({
-  usePromptConfigForm: ({
-    initialConfigValues,
-  }: {
-    initialConfigValues?: unknown;
-  }) => {
+  usePromptConfigForm: ({ initialConfigValues }: { initialConfigValues?: unknown }) => {
     capturedInitialConfigValues.push(initialConfigValues);
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const methods = useForm({
@@ -140,10 +136,7 @@ vi.mock("~/prompts/hooks/usePromptConfigForm", () => ({
 // Mock useLatestPromptVersion to return consistent values for tests
 // This ensures the SavePromptButton knows we're at the "latest" version
 vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
-  useLatestPromptVersion: (options: {
-    configId?: string;
-    currentVersion?: number;
-  }) => {
+  useLatestPromptVersion: (options: { configId?: string; currentVersion?: number }) => {
     // For new prompts (no configId), return undefined versions
     if (!options?.configId) {
       return {
@@ -222,10 +215,7 @@ vi.mock("~/utils/api", () => ({
         }),
       },
       updateHandle: {
-        useMutation: (opts?: {
-          onSuccess?: () => void;
-          onError?: () => void;
-        }) => ({
+        useMutation: (opts?: { onSuccess?: () => void; onError?: () => void }) => ({
           mutate: mockUpdateHandle,
           isPending: false,
         }),
@@ -257,37 +247,28 @@ vi.mock("~/prompts/forms/fields/ModelSelectFieldMini", () => ({
   },
 }));
 
-vi.mock(
-  "~/prompts/forms/prompt-config-form/components/VersionHistoryButton",
-  () => ({
-    VersionHistoryButton: ({
-      hasUnsavedChanges,
-      onDiscardChanges,
-    }: {
-      configId: string;
-      hasUnsavedChanges?: boolean;
-      onDiscardChanges?: () => void;
-    }) => (
-      <div data-testid="version-history-button">
-        {hasUnsavedChanges && (
-          <button
-            data-testid="discard-local-changes-button"
-            onClick={onDiscardChanges}
-          >
-            Discard
-          </button>
-        )}
-      </div>
-    ),
-  }),
-);
+vi.mock("~/prompts/forms/prompt-config-form/components/VersionHistoryButton", () => ({
+  VersionHistoryButton: ({
+    hasUnsavedChanges,
+    onDiscardChanges,
+  }: {
+    configId: string;
+    hasUnsavedChanges?: boolean;
+    onDiscardChanges?: () => void;
+  }) => (
+    <div data-testid="version-history-button">
+      {hasUnsavedChanges && (
+        <button data-testid="discard-local-changes-button" onClick={onDiscardChanges}>
+          Discard
+        </button>
+      )}
+    </div>
+  ),
+}));
 
-vi.mock(
-  "~/prompts/forms/fields/message-history-fields/PromptMessagesField",
-  () => ({
-    PromptMessagesField: () => <div data-testid="messages-field">Messages</div>,
-  }),
-);
+vi.mock("~/prompts/forms/fields/message-history-fields/PromptMessagesField", () => ({
+  PromptMessagesField: () => <div data-testid="messages-field">Messages</div>,
+}));
 
 vi.mock("~/prompts/forms/fields/PromptConfigVersionFieldGroup", () => ({
   InputsFieldGroup: () => <div data-testid="inputs-field">Inputs</div>,
@@ -390,9 +371,7 @@ describe("PromptEditorDrawer", () => {
     it("shows save button with Save text for new prompts", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
       // New prompts show "Save" on the button (no version update)
-      expect(screen.getByTestId("save-prompt-button")).toHaveTextContent(
-        "Save",
-      );
+      expect(screen.getByTestId("save-prompt-button")).toHaveTextContent("Save");
     });
 
     it("shows model selector in header", () => {
@@ -464,9 +443,7 @@ describe("PromptEditorDrawer", () => {
       await user.click(screen.getByTestId("remove-variable-input"));
 
       await waitFor(() => {
-        expect(
-          screen.queryByTestId("variable-name-input"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("variable-name-input")).not.toBeInTheDocument();
       });
     });
 
@@ -513,23 +490,17 @@ describe("PromptEditorDrawer", () => {
       // Default config ships a single "output"; the new float output
       // dedupes to output_1 and lands in rename-edit mode. Multiple
       // outputs = structured outputs on.
-      expect(
-        await screen.findByTestId("output-name-input-output_1"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("output-name-input-output_1")).toBeInTheDocument();
     });
 
     it("shows Saved button initially (no changes)", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
-      expect(screen.getByTestId("save-prompt-button")).toHaveTextContent(
-        "Saved",
-      );
+      expect(screen.getByTestId("save-prompt-button")).toHaveTextContent("Saved");
     });
 
     it("does not show version history button in create mode", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
-      expect(
-        screen.queryByTestId("version-history-button"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("version-history-button")).not.toBeInTheDocument();
     });
 
     it("Save button is disabled when no handle entered", () => {
@@ -555,14 +526,10 @@ describe("PromptEditorDrawer", () => {
           isLoading: false,
         });
 
-        const { rerender } = renderWithProviders(
-          <PromptEditorDrawer open={true} />,
-        );
+        const { rerender } = renderWithProviders(<PromptEditorDrawer open={true} />);
 
         await waitFor(() => {
-          expect(screen.getByTestId("model-select")).toHaveTextContent(
-            "(no model)",
-          );
+          expect(screen.getByTestId("model-select")).toHaveTextContent("(no model)");
         });
 
         // A provider was added in another tab; getResolvedDefault now
@@ -583,9 +550,7 @@ describe("PromptEditorDrawer", () => {
         );
 
         await waitFor(() => {
-          expect(screen.getByTestId("model-select")).toHaveTextContent(
-            "openai/gpt-4o",
-          );
+          expect(screen.getByTestId("model-select")).toHaveTextContent("openai/gpt-4o");
         });
         // The maxTokens write is paired with the model write — assert it
         // too, so removing just the maxTokens half of the backfill (while
@@ -593,9 +558,7 @@ describe("PromptEditorDrawer", () => {
         const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
         expect(methods.getValues("version.configData.llm.maxTokens")).toBe(
           getMaxTokenLimit(
-            mockModelMetadata[
-              "openai/gpt-4o"
-            ] as unknown as ModelMetadataForFrontend,
+            mockModelMetadata["openai/gpt-4o"] as unknown as ModelMetadataForFrontend,
           ),
         );
       });
@@ -606,14 +569,10 @@ describe("PromptEditorDrawer", () => {
           isLoading: false,
         });
 
-        const { rerender } = renderWithProviders(
-          <PromptEditorDrawer open={true} />,
-        );
+        const { rerender } = renderWithProviders(<PromptEditorDrawer open={true} />);
 
         await waitFor(() => {
-          expect(screen.getByTestId("model-select")).toHaveTextContent(
-            "(no model)",
-          );
+          expect(screen.getByTestId("model-select")).toHaveTextContent("(no model)");
         });
 
         // User manually picks a model before any provider resolves.
@@ -656,24 +615,18 @@ describe("PromptEditorDrawer", () => {
           isLoading: false,
         });
 
-        const { rerender } = renderWithProviders(
-          <PromptEditorDrawer open={true} />,
-        );
+        const { rerender } = renderWithProviders(<PromptEditorDrawer open={true} />);
 
         await waitFor(() => {
-          expect(screen.getByTestId("model-select")).toHaveTextContent(
-            "(no model)",
-          );
+          expect(screen.getByTestId("model-select")).toHaveTextContent("(no model)");
         });
 
         // User edits the token limit before any provider resolves.
         const methodsBeforeBackfill =
           capturedFormMethods[capturedFormMethods.length - 1]!;
-        methodsBeforeBackfill.setValue(
-          "version.configData.llm.maxTokens",
-          777,
-          { shouldDirty: true },
-        );
+        methodsBeforeBackfill.setValue("version.configData.llm.maxTokens", 777, {
+          shouldDirty: true,
+        });
 
         mockGetResolvedDefault.mockReturnValue({
           data: {
@@ -691,9 +644,7 @@ describe("PromptEditorDrawer", () => {
 
         // The model still backfills (it was never dirtied)...
         await waitFor(() => {
-          expect(screen.getByTestId("model-select")).toHaveTextContent(
-            "openai/gpt-4o",
-          );
+          expect(screen.getByTestId("model-select")).toHaveTextContent("openai/gpt-4o");
         });
         // ...but the user's manually-edited token limit survives.
         const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
@@ -711,33 +662,23 @@ describe("PromptEditorDrawer", () => {
     });
 
     it("renders prompt handle as header when editing", () => {
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
+      renderWithProviders(<PromptEditorDrawer open={true} promptId="prompt-123" />);
       // When editing, shows the prompt handle as the title
       expect(screen.getByText("test-prompt")).toBeInTheDocument();
     });
 
     it("does not show handle input field when editing", () => {
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
-      expect(
-        screen.queryByTestId("prompt-handle-input"),
-      ).not.toBeInTheDocument();
+      renderWithProviders(<PromptEditorDrawer open={true} promptId="prompt-123" />);
+      expect(screen.queryByTestId("prompt-handle-input")).not.toBeInTheDocument();
     });
 
     it("shows version history button when editing", () => {
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
+      renderWithProviders(<PromptEditorDrawer open={true} promptId="prompt-123" />);
       expect(screen.getByTestId("version-history-button")).toBeInTheDocument();
     });
 
     it("shows save button when editing existing prompt", () => {
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
+      renderWithProviders(<PromptEditorDrawer open={true} promptId="prompt-123" />);
       // Save button should be present (may show "Saved" or "Update to vX" depending on form state)
       expect(screen.getByTestId("save-prompt-button")).toBeInTheDocument();
     });
@@ -830,9 +771,7 @@ describe("PromptEditorDrawer", () => {
 
       // Since areFormValuesEqual returns false, hasUnsavedChanges is true
       // the discard button should be visible in version history
-      expect(
-        screen.getByTestId("discard-local-changes-button"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("discard-local-changes-button")).toBeInTheDocument();
     });
 
     it("does not show discard button when no unsaved changes", () => {
@@ -859,16 +798,11 @@ describe("PromptEditorDrawer", () => {
       });
 
       renderWithProviders(
-        <PromptEditorDrawer
-          open={true}
-          onLocalConfigChange={mockOnLocalConfigChange}
-        />,
+        <PromptEditorDrawer open={true} onLocalConfigChange={mockOnLocalConfigChange} />,
       );
 
       // New prompts don't have version history, so no version history button at all
-      expect(
-        screen.queryByTestId("version-history-button"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("version-history-button")).not.toBeInTheDocument();
       // And no discard button
       expect(
         screen.queryByTestId("discard-local-changes-button"),
@@ -912,9 +846,7 @@ describe("PromptEditorDrawer", () => {
     });
 
     it("shows simple inputs when no availableSources provided", () => {
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
+      renderWithProviders(<PromptEditorDrawer open={true} promptId="prompt-123" />);
 
       // Variables section should be present with simple inputs
       expect(screen.getByText("Variables")).toBeInTheDocument();
@@ -960,10 +892,7 @@ describe("PromptEditorDrawer", () => {
       const promptTextarea = textareas.find(
         (t) =>
           t.getAttribute("data-testid")?.includes("textarea") ||
-          t
-            .closest("[data-testid]")
-            ?.getAttribute("data-testid")
-            ?.includes("prompt"),
+          t.closest("[data-testid]")?.getAttribute("data-testid")?.includes("prompt"),
       );
 
       if (promptTextarea) {
@@ -1009,30 +938,22 @@ describe("PromptEditorDrawer", () => {
     });
 
     it("has model selector in the body (model-only header)", () => {
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
+      renderWithProviders(<PromptEditorDrawer open={true} promptId="prompt-123" />);
       expect(screen.getByTestId("model-select")).toBeInTheDocument();
     });
 
     it("renders version history button in the footer when editing", () => {
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
+      renderWithProviders(<PromptEditorDrawer open={true} promptId="prompt-123" />);
       expect(screen.getByTestId("version-history-button")).toBeInTheDocument();
     });
 
     it("renders save button in the footer", () => {
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
+      renderWithProviders(<PromptEditorDrawer open={true} promptId="prompt-123" />);
       expect(screen.getByTestId("save-prompt-button")).toBeInTheDocument();
     });
 
     it("renders exactly one save button (in footer, not header)", () => {
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
+      renderWithProviders(<PromptEditorDrawer open={true} promptId="prompt-123" />);
       // With variant="model-only" header, save button is only in the footer
       const saveButtons = screen.getAllByTestId("save-prompt-button");
       expect(saveButtons).toHaveLength(1);
@@ -1041,9 +962,7 @@ describe("PromptEditorDrawer", () => {
     it("always renders the footer in drawer mode", () => {
       // Even without targetId (not in evaluations context), footer shows
       mockDrawerParams = {};
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
+      renderWithProviders(<PromptEditorDrawer open={true} promptId="prompt-123" />);
       // Save button in footer indicates footer is rendered
       expect(screen.getByTestId("save-prompt-button")).toBeInTheDocument();
     });
@@ -1183,18 +1102,14 @@ describe("PromptEditorDrawer", () => {
       });
 
       // Apply button should be visible
-      expect(
-        screen.getByRole("button", { name: /apply/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /apply/i })).toBeInTheDocument();
     });
 
     it("does not show Apply button outside evaluations context", async () => {
       // No targetId - not in evaluations context
       mockDrawerParams = {};
 
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
+      renderWithProviders(<PromptEditorDrawer open={true} promptId="prompt-123" />);
 
       // Wait for drawer to load
       await waitFor(() => {
@@ -1202,9 +1117,7 @@ describe("PromptEditorDrawer", () => {
       });
 
       // Apply button should NOT be visible
-      expect(
-        screen.queryByRole("button", { name: /apply/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
     });
 
     it("closes drawer when Apply button is clicked", async () => {
@@ -1260,10 +1173,7 @@ describe("PromptEditorDrawer", () => {
       // Before the fix, configValues was always buildDefaultFormValues()
       // which has inputs: [{identifier: "input"}], causing a race where
       // the form watch fires with "input" before the init effect runs.
-      const firstCall = capturedInitialConfigValues[0] as Record<
-        string,
-        unknown
-      >;
+      const firstCall = capturedInitialConfigValues[0] as Record<string, unknown>;
       const inputs = (
         firstCall as {
           version: {
@@ -1272,14 +1182,10 @@ describe("PromptEditorDrawer", () => {
         }
       ).version.configData.inputs;
       expect(inputs).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ identifier: "llm_output" }),
-        ]),
+        expect.arrayContaining([expect.objectContaining({ identifier: "llm_output" })]),
       );
       expect(inputs).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ identifier: "input" }),
-        ]),
+        expect.arrayContaining([expect.objectContaining({ identifier: "input" })]),
       );
     });
 
@@ -1291,9 +1197,7 @@ describe("PromptEditorDrawer", () => {
       };
       const inputs = firstCall.version.configData.inputs;
       expect(inputs).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ identifier: "input" }),
-        ]),
+        expect.arrayContaining([expect.objectContaining({ identifier: "input" })]),
       );
     });
   });
@@ -1311,9 +1215,7 @@ describe("PromptEditorDrawer", () => {
     it("falls back to inlineConfigFallback instead of an empty form", async () => {
       const inlineConfigFallback = {
         llm: { model: "gpt-5-mini" },
-        messages: [
-          { role: "system" as const, content: "INLINE-FALLBACK-CONTENT" },
-        ],
+        messages: [{ role: "system" as const, content: "INLINE-FALLBACK-CONTENT" }],
         inputs: [{ identifier: "question", type: "str" as const }],
         outputs: [{ identifier: "answer", type: "str" as const }],
       };
@@ -1354,9 +1256,7 @@ describe("PromptEditorDrawer", () => {
     it("propagates edits to the fallback via onLocalConfigChange", async () => {
       const inlineConfigFallback = {
         llm: { model: "gpt-5-mini" },
-        messages: [
-          { role: "system" as const, content: "INLINE-FALLBACK-CONTENT" },
-        ],
+        messages: [{ role: "system" as const, content: "INLINE-FALLBACK-CONTENT" }],
         inputs: [{ identifier: "question", type: "str" as const }],
         outputs: [{ identifier: "answer", type: "str" as const }],
       };
@@ -1390,9 +1290,7 @@ describe("PromptEditorDrawer", () => {
       // content — never undefined — so the studio can persist the edit.
       await waitFor(() => {
         const editedCall = onLocalConfigChange.mock.calls.find((args) => {
-          const cfg = args[0] as
-            | { messages?: Array<{ content?: string }> }
-            | undefined;
+          const cfg = args[0] as { messages?: Array<{ content?: string }> } | undefined;
           return cfg?.messages?.some(
             (m) => m?.content === "EDITED-IN-MISSING-PROMPT-BRANCH",
           );
@@ -1455,8 +1353,7 @@ describe("PromptEditorDrawer", () => {
       });
 
       // Restore original content for other tests
-      mockDefaultFormValues.version.configData.messages[0]!.content =
-        originalContent;
+      mockDefaultFormValues.version.configData.messages[0]!.content = originalContent;
     });
 
     it("does not call checkAndProceed when updating existing prompt", async () => {
@@ -1469,9 +1366,7 @@ describe("PromptEditorDrawer", () => {
 
       const user = userEvent.setup();
 
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
+      renderWithProviders(<PromptEditorDrawer open={true} promptId="prompt-123" />);
 
       // Wait for drawer to load
       await waitFor(() => {

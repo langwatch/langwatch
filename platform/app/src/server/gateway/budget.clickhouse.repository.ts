@@ -54,10 +54,7 @@ import {
   budgetPeriodFloorMs,
   currentPeriodStart,
 } from "./budgetPeriod";
-import {
-  bucketScopeIdFor,
-  PROVIDER_BUCKET_SEPARATOR,
-} from "./budgetResolution.service";
+import { bucketScopeIdFor, PROVIDER_BUCKET_SEPARATOR } from "./budgetResolution.service";
 import { parseSummedNanoUsd } from "./spendEvents.clickhouse.repository";
 import { nanoUsdToDecimalString } from "./wireMoney";
 
@@ -391,8 +388,7 @@ function bucketQueryShape(args: {
   const movedBoundaryPredicates = boundaries.map((b, i) => {
     params[`fbucket${i}`] = b.bucketScopeId;
     params[`ffloor${i}`] =
-      bucketPeriodFloorMs(budget, b.periodStartedAt, now) ??
-      b.periodStartedAt.getTime();
+      bucketPeriodFloorMs(budget, b.periodStartedAt, now) ?? b.periodStartedAt.getTime();
     return `(ScopeId = {fbucket${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))`;
   });
   params.flooredBuckets = boundaries.map((b) => b.bucketScopeId);
@@ -467,12 +463,7 @@ function flooredTargetSums(targets: BudgetSpendTarget[]): {
     if (t.match === "prefix" && t.bucketSuffix) {
       params[`fsuffix${i}`] = t.bucketSuffix;
     }
-    const bucket = bucketMatchSql(
-      t,
-      `fbudgetId${i}`,
-      `fscopeId${i}`,
-      `fsuffix${i}`,
-    );
+    const bucket = bucketMatchSql(t, `fbudgetId${i}`, `fscopeId${i}`, `fsuffix${i}`);
     return `toString(sumIf(AmountNanoUSD, Scope = {fscope${i}:String} AND ${bucket} AND Window = {fwindow${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))) AS T${i}`;
   });
   return { sql: sums.join(",\n              "), params };
@@ -495,12 +486,7 @@ function rollupScopeFilter(targets: BudgetSpendTarget[]): {
     params[`scope${i}`] = scopeToClickHouse(t.scope);
     params[`scopeId${i}`] = t.scopeId;
     if (t.bucketSuffix) params[`suffix${i}`] = t.bucketSuffix;
-    const bucket = bucketMatchSql(
-      t,
-      `budgetId${i}`,
-      `scopeId${i}`,
-      `suffix${i}`,
-    );
+    const bucket = bucketMatchSql(t, `budgetId${i}`, `scopeId${i}`, `suffix${i}`);
     return `(Scope = {scope${i}:String} AND ${bucket})`;
   });
   return { sql: terms.join(" OR "), params };
@@ -975,9 +961,10 @@ export class GatewayBudgetClickHouseRepository {
       format: "JSONEachRow",
     });
     const existing = new Map(
-      (
-        (await probe.json()) as Array<{ BudgetId: string; ScopeId: string }>
-      ).map((r) => [r.BudgetId, r.ScopeId]),
+      ((await probe.json()) as Array<{ BudgetId: string; ScopeId: string }>).map((r) => [
+        r.BudgetId,
+        r.ScopeId,
+      ]),
     );
     // A budget already on this request suppresses the row, which is how a
     // replay stays idempotent. When the row that already sits there names
@@ -1119,9 +1106,7 @@ export class GatewayBudgetClickHouseRepository {
     // WHERE term is what lets ClickHouse prune partitions before the scan:
     // without it the read walks every month the tenant has ever written,
     // cold storage included, to sum a window that is usually this one.
-    const earliestFloorMs = Math.min(
-      ...floored.map((t) => t.periodFloorMs ?? 0),
-    );
+    const earliestFloorMs = Math.min(...floored.map((t) => t.periodFloorMs ?? 0));
     try {
       const client = await this.resolveClient(tenantIds[0]!);
       const result = await client.query({
@@ -1339,8 +1324,7 @@ export class GatewayBudgetClickHouseRepository {
     budget: GatewayBudget;
   }): Promise<Map<string, string>> {
     const { client, shape, budget } = args;
-    const templateFloor =
-      "OccurredAt >= fromUnixTimestamp64Milli({budgetFloor:Int64})";
+    const templateFloor = "OccurredAt >= fromUnixTimestamp64Milli({budgetFloor:Int64})";
     const floorPredicate =
       shape.movedBoundaryPredicates.length > 0
         ? `(${shape.movedBoundaryPredicates.join(" OR ")} OR (ScopeId NOT IN {flooredBuckets:Array(String)} AND ${templateFloor}))`
@@ -1491,14 +1475,11 @@ function toLedgerEventRow(r: {
     // that caused it is the amount that request was actually priced at.
     amountUsd: nanoUsdToDecimalString(BigInt(r.amountNanoUsd || "0")),
     model: r.model,
-    providerSlot:
-      r.providerSlot && r.providerSlot !== "" ? r.providerSlot : null,
+    providerSlot: r.providerSlot && r.providerSlot !== "" ? r.providerSlot : null,
     tokensInput: Number(r.tokensInput),
     tokensOutput: Number(r.tokensOutput),
     durationMs:
-      r.durationMs === null ||
-      r.durationMs === undefined ||
-      Number(r.durationMs) === 0
+      r.durationMs === null || r.durationMs === undefined || Number(r.durationMs) === 0
         ? null
         : Number(r.durationMs),
     status: ledgerStatusFromCH(r.status),

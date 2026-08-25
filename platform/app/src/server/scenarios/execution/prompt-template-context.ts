@@ -57,9 +57,7 @@ const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
  * Stripping here covers the base `messages` binding and every mapping that
  * resolves to it, since both read from this value.
  */
-function conversationForPrompt(
-  messages: AgentInput["messages"],
-): AgentInput["messages"] {
+function conversationForPrompt(messages: AgentInput["messages"]): AgentInput["messages"] {
   return messages.map((message) => {
     const { role, content } = message as { role: unknown; content: unknown };
     return { role, content } as (typeof messages)[number];
@@ -85,8 +83,7 @@ function transcriptForPrompt(messages: AgentInput["messages"]): string {
   return messages
     .map((message) => {
       const { role, content } = message as { role: string; content: unknown };
-      const text =
-        typeof content === "string" ? content : JSON.stringify(content);
+      const text = typeof content === "string" ? content : JSON.stringify(content);
       return `${role}: ${text}`;
     })
     .join("\n");
@@ -187,9 +184,7 @@ export function buildPromptTemplateContext({
  */
 function liquidExpressions(template: string): string[] {
   const expressions = template.match(/\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}/g) ?? [];
-  return expressions.map((expression) =>
-    expression.replace(/"[^"]*"|'[^']*'/g, '""'),
-  );
+  return expressions.map((expression) => expression.replace(/"[^"]*"|'[^']*'/g, '""'));
 }
 
 /**
@@ -200,14 +195,9 @@ function liquidExpressions(template: string): string[] {
  * conversation history entirely — the model was told to discuss a conversation
  * it was never shown. Only a reference inside a Liquid expression counts now.
  */
-export function templateReferencesVariable(
-  template: string,
-  variable: string,
-): boolean {
+export function templateReferencesVariable(template: string, variable: string): boolean {
   const reference = new RegExp(`\\b${variable}\\b`);
-  return liquidExpressions(template).some((expression) =>
-    reference.test(expression),
-  );
+  return liquidExpressions(template).some((expression) => reference.test(expression));
 }
 
 /**

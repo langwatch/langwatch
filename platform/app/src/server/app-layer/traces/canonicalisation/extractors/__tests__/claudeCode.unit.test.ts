@@ -8,10 +8,7 @@ import {
   extractSessionTitleFromResponseBody,
   isConversationalQuerySource,
 } from "../claudeCode";
-import {
-  createExtractorContext,
-  createLogExtractorContext,
-} from "./_testHelpers";
+import { createExtractorContext, createLogExtractorContext } from "./_testHelpers";
 
 const SCOPE = "com.anthropic.claude_code.events";
 
@@ -379,19 +376,13 @@ describe("extractSessionTitleFromResponseBody", () => {
         ),
       ).toBeNull();
       // Parseable body whose text is prose, not the title JSON.
-      expect(
-        extractSessionTitleFromResponseBody(titleBody("Done, pushed.")),
-      ).toBeNull();
+      expect(extractSessionTitleFromResponseBody(titleBody("Done, pushed."))).toBeNull();
       // Right shape, wrong type or empty.
-      expect(
-        extractSessionTitleFromResponseBody(titleBody('{"title": 7}')),
-      ).toBeNull();
+      expect(extractSessionTitleFromResponseBody(titleBody('{"title": 7}'))).toBeNull();
       expect(
         extractSessionTitleFromResponseBody(titleBody('{"title": "   "}')),
       ).toBeNull();
-      expect(
-        extractSessionTitleFromResponseBody(titleBody('["a title"]')),
-      ).toBeNull();
+      expect(extractSessionTitleFromResponseBody(titleBody('["a title"]'))).toBeNull();
       // No text block at all.
       expect(
         extractSessionTitleFromResponseBody(
@@ -639,9 +630,7 @@ describe("ClaudeCodeExtractor.apply cache lifetime", () => {
       new ClaudeCodeExtractor().apply(ctx);
 
       expect(ctx.out["gen_ai.usage.cache_creation.input_tokens"]).toBe(17854);
-      expect(
-        ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"],
-      ).toBeUndefined();
+      expect(ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"]).toBeUndefined();
     });
 
     /** @scenario "An hour-long cache write is recorded only where the provider states it" */
@@ -660,12 +649,8 @@ describe("ClaudeCodeExtractor.apply cache lifetime", () => {
       // Gateway-emitted spans carry the split already. Canonical output merges
       // over the span rather than replacing it, so writing nothing here is
       // what leaves the emitter's own 4000 standing.
-      expect(
-        ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"],
-      ).toBeUndefined();
-      expect(
-        ctx.bag.attrs.get("gen_ai.usage.cache_creation_1h.input_tokens"),
-      ).toBe(4000);
+      expect(ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"]).toBeUndefined();
+      expect(ctx.bag.attrs.get("gen_ai.usage.cache_creation_1h.input_tokens")).toBe(4000);
     });
   });
 
@@ -679,9 +664,7 @@ describe("ClaudeCodeExtractor.apply cache lifetime", () => {
 
       new ClaudeCodeExtractor().apply(ctx);
 
-      expect(
-        ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"],
-      ).toBeUndefined();
+      expect(ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"]).toBeUndefined();
     });
   });
 });

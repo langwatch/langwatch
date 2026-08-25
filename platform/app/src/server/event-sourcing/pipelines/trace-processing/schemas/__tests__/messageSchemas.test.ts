@@ -451,9 +451,7 @@ describe("messageSchemas", () => {
         const messages = [
           {
             role: "user",
-            content: [
-              { type: "tool_result", tool_use_id: "call-1", content: "sunny" },
-            ],
+            content: [{ type: "tool_result", tool_use_id: "call-1", content: "sunny" }],
           },
         ];
 

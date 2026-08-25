@@ -31,8 +31,7 @@ vi.mock("../../hooks/useProjectHasTraces", () => ({
 vi.mock("../store/onboardingStore", () => ({
   useOnboardingStore: (selector: (s: unknown) => unknown) =>
     selector({
-      integrationCtaDismissedAtByProject:
-        mockIntegrationCtaDismissedAtByProject,
+      integrationCtaDismissedAtByProject: mockIntegrationCtaDismissedAtByProject,
       setIntegrationCtaDismissedAt: mockSetDismissedAt,
     }),
 }));
@@ -79,9 +78,7 @@ describe("<IntegrationCTACard />", () => {
 
       it("shows the integrate button", () => {
         renderCard();
-        expect(
-          screen.getByRole("button", { name: /integrate/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /integrate/i })).toBeInTheDocument();
       });
     });
 
@@ -91,9 +88,7 @@ describe("<IntegrationCTACard />", () => {
           "proj-cta-test": Date.now() - 1000 * 60 * 60, // 1 hour ago
         };
         renderCard();
-        expect(
-          screen.queryByTestId("integration-cta-card"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("integration-cta-card")).not.toBeInTheDocument();
       });
     });
 
@@ -116,8 +111,10 @@ describe("<IntegrationCTACard />", () => {
           screen.getByRole("button", { name: /dismiss integration prompt/i }),
         );
         expect(mockSetDismissedAt).toHaveBeenCalledOnce();
-        const [calledProjectId, calledTs] = mockSetDismissedAt.mock
-          .calls[0] as [string, number];
+        const [calledProjectId, calledTs] = mockSetDismissedAt.mock.calls[0] as [
+          string,
+          number,
+        ];
         expect(calledProjectId).toBe("proj-cta-test");
         expect(calledTs).toBeGreaterThanOrEqual(before);
       });
@@ -126,9 +123,7 @@ describe("<IntegrationCTACard />", () => {
     describe("when user clicks 'Remind me later'", () => {
       it("calls setIntegrationCtaDismissedAt", () => {
         renderCard();
-        fireEvent.click(
-          screen.getByRole("button", { name: /remind me later/i }),
-        );
+        fireEvent.click(screen.getByRole("button", { name: /remind me later/i }));
         expect(mockSetDismissedAt).toHaveBeenCalledOnce();
       });
     });
@@ -139,9 +134,7 @@ describe("<IntegrationCTACard />", () => {
       it("does not render the CTA", () => {
         mockHasAnyTraces = true;
         renderCard();
-        expect(
-          screen.queryByTestId("integration-cta-card"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("integration-cta-card")).not.toBeInTheDocument();
       });
     });
   });

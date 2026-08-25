@@ -88,9 +88,7 @@ describe("seatEventSubscription", () => {
       stripe: stripe as any,
       database: db as any,
       prices,
-      customerCurrency: StripeCustomerCurrencyService.create(
-        StripeErrorAdapter.create(),
-      ),
+      customerCurrency: StripeCustomerCurrencyService.create(StripeErrorAdapter.create()),
     });
   });
 
@@ -573,9 +571,7 @@ describe("seatEventSubscription", () => {
           newTotalSeats: 3,
         });
 
-        expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith(
-          "sub_stripe_live",
-        );
+        expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith("sub_stripe_live");
       });
     });
 
@@ -602,9 +598,7 @@ describe("seatEventSubscription", () => {
           newTotalSeats: 3,
         });
 
-        expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith(
-          "sub_stripe_1",
-        );
+        expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith("sub_stripe_1");
       });
     });
 
@@ -631,9 +625,7 @@ describe("seatEventSubscription", () => {
         stripe.subscriptions.retrieve.mockResolvedValue({
           status: "active",
           items: {
-            data: [
-              { id: "si_events", price: { id: "price_events_usd_monthly" } },
-            ],
+            data: [{ id: "si_events", price: { id: "price_events_usd_monthly" } }],
           },
         });
 
@@ -664,14 +656,11 @@ describe("seatEventSubscription", () => {
         });
 
         expect(result).toEqual({ success: true });
-        expect(stripe.subscriptions.update).toHaveBeenCalledWith(
-          "sub_stripe_1",
-          {
-            items: [{ id: "si_seat", quantity: 10 }],
-            proration_behavior: "always_invoice",
-            proration_date: expect.any(Number),
-          },
-        );
+        expect(stripe.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
+          items: [{ id: "si_seat", quantity: 10 }],
+          proration_behavior: "always_invoice",
+          proration_date: expect.any(Number),
+        });
       });
 
       /** @scenario "The charge prices the same instant the quote did" */
@@ -757,15 +746,12 @@ describe("seatEventSubscription", () => {
           totalMembers: 5,
         });
 
-        expect(stripe.subscriptions.update).toHaveBeenCalledWith(
-          "sub_stripe_1",
-          {
-            cancel_at_period_end: false,
-            items: [{ id: "si_seat", quantity: 5 }],
-            proration_behavior: "always_invoice",
-            proration_date: expect.any(Number),
-          },
-        );
+        expect(stripe.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
+          cancel_at_period_end: false,
+          items: [{ id: "si_seat", quantity: 5 }],
+          proration_behavior: "always_invoice",
+          proration_date: expect.any(Number),
+        });
       });
     });
 
@@ -826,9 +812,7 @@ describe("seatEventSubscription", () => {
         stripe.subscriptions.retrieve.mockResolvedValue({
           status: "active",
           items: {
-            data: [
-              { id: "si_events", price: { id: "price_events_usd_monthly" } },
-            ],
+            data: [{ id: "si_events", price: { id: "price_events_usd_monthly" } }],
           },
         });
 
@@ -1027,8 +1011,7 @@ describe("seatEventSubscription", () => {
         });
 
         const callArgs = stripe.checkout.sessions.create.mock.calls[0]![0];
-        const anchor = callArgs.subscription_data
-          .billing_cycle_anchor as number;
+        const anchor = callArgs.subscription_data.billing_cycle_anchor as number;
 
         // Anchor should be a Unix timestamp for the 1st of next month
         const anchorDate = new Date(anchor * 1000);

@@ -6,23 +6,27 @@ sidebarTitle: RBAC
 
 The AI Gateway is governed by LangWatch's existing RBAC system, the same resources-and-actions model you already use for traces, datasets, evaluations, and prompts. Gateway-specific resources cover the gateway surface; provider credentials reuse the platform-wide `modelProviders` resource (no separate `gatewayProviders` resource since the binding model was retired). Permissions are checked **scope-aware**: every guard names the scope (`ORGANIZATION`, `TEAM`, `PROJECT`) the action operates on, and a higher-scope grant cascades downward (org `manage` allows team and project actions).
 
-<Note>The matrix below is the default. Custom roles can carry any combination of the permissions listed, see [Custom Roles](/platform/rbac#custom-roles) for how to define one.</Note>
+<Note>
+  The matrix below is the default. Custom roles can carry any combination of the
+  permissions listed, see [Custom Roles](/platform/rbac#custom-roles) for how to define
+  one.
+</Note>
 
 ## Resources
 
 Every gateway UI, tRPC call, and REST endpoint checks one of these nine resource keys:
 
-| Resource | What it gates |
-|---|---|
-| `virtualKeys` | VK list, detail, drawer, create, update, disable, enable, rotate, revoke, archive. **Plus** `viewOtherPersonal` for org-admin off-boarding sweeps over other users' personal VKs. |
-| `gatewayBudgets` | Budget list, detail, drawer, create, update, archive, spend view. |
-| `modelProviders` | ModelProvider list, create, update, basic credentials, AND the **Advanced (Gateway)** tab (RPM, TPM, RPD, fallback priority, providerConfig). Same resource the platform already uses; no gateway-specific provider resource exists. |
-| `gatewayGuardrails` | Attaching, detaching guardrails to a VK (the evaluator itself is still `evaluations` scope). |
-| `gatewayCacheRules` | Cache-control rule list, detail, create, update, archive. |
-| `gatewayLogs` | Audit log list, filter, export. |
-| `gatewayUsage` | `/gateway/usage` stat tiles + time-windowed spend aggregation, and the per-key REST spend read. |
-| `webhookEndpoints` | The [webhook endpoints platform](/features/webhooks): endpoint CRUD, secret roll, test fire, delivery log, health, the events log. **Organization-exclusive** (see below). Enterprise-gated at the plan layer on top of the permission. |
-| `gatewaySpend` | The [billing reconciliation surface](/ai-gateway/billing-events): spend-events pull, spend-summaries, and (`manage`) replay. **Organization-exclusive.** Separate from `webhookEndpoints` on purpose: reading the metered ledger is strictly weaker than managing outbound delivery, so billing consumers can hold keys that can only read. Same enterprise gate. |
+| Resource            | What it gates                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `virtualKeys`       | VK list, detail, drawer, create, update, disable, enable, rotate, revoke, archive. **Plus** `viewOtherPersonal` for org-admin off-boarding sweeps over other users' personal VKs.                                                                                                                                                                                 |
+| `gatewayBudgets`    | Budget list, detail, drawer, create, update, archive, spend view.                                                                                                                                                                                                                                                                                                 |
+| `modelProviders`    | ModelProvider list, create, update, basic credentials, AND the **Advanced (Gateway)** tab (RPM, TPM, RPD, fallback priority, providerConfig). Same resource the platform already uses; no gateway-specific provider resource exists.                                                                                                                              |
+| `gatewayGuardrails` | Attaching, detaching guardrails to a VK (the evaluator itself is still `evaluations` scope).                                                                                                                                                                                                                                                                      |
+| `gatewayCacheRules` | Cache-control rule list, detail, create, update, archive.                                                                                                                                                                                                                                                                                                         |
+| `gatewayLogs`       | Audit log list, filter, export.                                                                                                                                                                                                                                                                                                                                   |
+| `gatewayUsage`      | `/gateway/usage` stat tiles + time-windowed spend aggregation, and the per-key REST spend read.                                                                                                                                                                                                                                                                   |
+| `webhookEndpoints`  | The [webhook endpoints platform](/features/webhooks): endpoint CRUD, secret roll, test fire, delivery log, health, the events log. **Organization-exclusive** (see below). Enterprise-gated at the plan layer on top of the permission.                                                                                                                           |
+| `gatewaySpend`      | The [billing reconciliation surface](/ai-gateway/billing-events): spend-events pull, spend-summaries, and (`manage`) replay. **Organization-exclusive.** Separate from `webhookEndpoints` on purpose: reading the metered ledger is strictly weaker than managing outbound delivery, so billing consumers can hold keys that can only read. Same enterprise gate. |
 
 ### Organization-exclusive resources
 
@@ -32,16 +36,16 @@ Every gateway UI, tRPC call, and REST endpoint checks one of these nine resource
 
 Each resource supports a subset of the standard CRUD action verbs:
 
-| Action | Semantics |
-|---|---|
-| `view` | Read, list + detail pages + REST `GET` endpoints. |
-| `create` | Mint a new record (VK, budget). |
-| `update` | Edit an existing record's fields (but not delete or rotate). |
-| `rotate` | VK-specific: issue a fresh secret and retire the old one with a 24 h grace window. |
-| `delete` | Soft-delete, archive. Budgets use `archived = true`; VKs use `revoked = true`. Hard-delete is not a gateway operation. |
-| `attach`, `detach` | Guardrail-specific: link, unlink an evaluator to a VK direction (pre, post, stream_chunk). |
+| Action              | Semantics                                                                                                                                                                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `view`              | Read, list + detail pages + REST `GET` endpoints.                                                                                                                                                                                  |
+| `create`            | Mint a new record (VK, budget).                                                                                                                                                                                                    |
+| `update`            | Edit an existing record's fields (but not delete or rotate).                                                                                                                                                                       |
+| `rotate`            | VK-specific: issue a fresh secret and retire the old one with a 24 h grace window.                                                                                                                                                 |
+| `delete`            | Soft-delete, archive. Budgets use `archived = true`; VKs use `revoked = true`. Hard-delete is not a gateway operation.                                                                                                             |
+| `attach`, `detach`  | Guardrail-specific: link, unlink an evaluator to a VK direction (pre, post, stream_chunk).                                                                                                                                         |
 | `viewOtherPersonal` | VK-specific: view personal VKs whose `principalUserId` is **not** the calling user. Used by org admins for off-boarding sweeps. Without this perm, `api.personalVirtualKeys.list` always filters to the caller's own personal VKs. |
-| `manage` | Superset, implies all CRUD actions for the resource. |
+| `manage`            | Superset, implies all CRUD actions for the resource.                                                                                                                                                                               |
 
 The full permission set uses the `<resource>:<action>` format, for example `virtualKeys:rotate`, `gatewayBudgets:manage`, `gatewayGuardrails:attach`, `virtualKeys:viewOtherPersonal`. Custom roles can pick any subset.
 
@@ -51,33 +55,33 @@ When a VK is created with multiple scope rows (e.g. `TEAM:platform` AND `TEAM:da
 
 ## Default role matrix
 
-| Permission | ADMIN | MEMBER | VIEWER |
-|---|:-:|:-:|:-:|
-| `virtualKeys:view` | ✓ | ✓ | ✓ |
-| `virtualKeys:create` | ✓ | ✓ | |
-| `virtualKeys:update` | ✓ | ✓ | |
-| `virtualKeys:rotate` | ✓ | ✓ | |
-| `virtualKeys:delete` | ✓ | | |
-| `virtualKeys:manage` | ✓ | | |
-| `virtualKeys:viewOtherPersonal` | ✓ | | |
-| `gatewayBudgets:view` | ✓ | ✓ | ✓ |
-| `gatewayBudgets:create` | ✓ | | |
-| `gatewayBudgets:update` | ✓ | | |
-| `gatewayBudgets:delete` | ✓ | | |
-| `gatewayBudgets:manage` | ✓ | | |
-| `modelProviders:view` | ✓ | ✓ | ✓ |
-| `modelProviders:update` | ✓ | | |
-| `modelProviders:manage` | ✓ | | |
-| `gatewayGuardrails:view` | ✓ | ✓ | ✓ |
-| `gatewayGuardrails:attach` | ✓ | | |
-| `gatewayGuardrails:detach` | ✓ | | |
-| `gatewayGuardrails:manage` | ✓ | | |
-| `gatewayLogs:view` | ✓ | ✓ | ✓ |
-| `gatewayUsage:view` | ✓ | ✓ | ✓ |
-| `webhookEndpoints:view` | ✓ (org admin) | | |
-| `webhookEndpoints:manage` | ✓ (org admin) | | |
-| `gatewaySpend:view` | ✓ (org admin) | | |
-| `gatewaySpend:manage` | ✓ (org admin) | | |
+| Permission                      |     ADMIN     | MEMBER | VIEWER |
+| ------------------------------- | :-----------: | :----: | :----: |
+| `virtualKeys:view`              |       ✓       |   ✓    |   ✓    |
+| `virtualKeys:create`            |       ✓       |   ✓    |        |
+| `virtualKeys:update`            |       ✓       |   ✓    |        |
+| `virtualKeys:rotate`            |       ✓       |   ✓    |        |
+| `virtualKeys:delete`            |       ✓       |        |        |
+| `virtualKeys:manage`            |       ✓       |        |        |
+| `virtualKeys:viewOtherPersonal` |       ✓       |        |        |
+| `gatewayBudgets:view`           |       ✓       |   ✓    |   ✓    |
+| `gatewayBudgets:create`         |       ✓       |        |        |
+| `gatewayBudgets:update`         |       ✓       |        |        |
+| `gatewayBudgets:delete`         |       ✓       |        |        |
+| `gatewayBudgets:manage`         |       ✓       |        |        |
+| `modelProviders:view`           |       ✓       |   ✓    |   ✓    |
+| `modelProviders:update`         |       ✓       |        |        |
+| `modelProviders:manage`         |       ✓       |        |        |
+| `gatewayGuardrails:view`        |       ✓       |   ✓    |   ✓    |
+| `gatewayGuardrails:attach`      |       ✓       |        |        |
+| `gatewayGuardrails:detach`      |       ✓       |        |        |
+| `gatewayGuardrails:manage`      |       ✓       |        |        |
+| `gatewayLogs:view`              |       ✓       |   ✓    |   ✓    |
+| `gatewayUsage:view`             |       ✓       |   ✓    |   ✓    |
+| `webhookEndpoints:view`         | ✓ (org admin) |        |        |
+| `webhookEndpoints:manage`       | ✓ (org admin) |        |        |
+| `gatewaySpend:view`             | ✓ (org admin) |        |        |
+| `gatewaySpend:manage`           | ✓ (org admin) |        |        |
 
 ### What each default role can actually do
 
@@ -93,36 +97,36 @@ When a VK is created with multiple scope rows (e.g. `TEAM:platform` AND `TEAM:da
 
 Every `/api/gateway/v1/*` endpoint enforces the same permission as its equivalent UI action. The mapping is:
 
-| Endpoint | Permission |
-|---|---|
-| `GET /api/gateway/v1/virtual-keys` | `virtualKeys:view` |
-| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create` (plus `virtualKeys:manage` at every requested scope) |
-| `GET /api/gateway/v1/virtual-keys/:id` | `virtualKeys:view` |
-| `GET /api/gateway/v1/virtual-keys/:id/spend` | `gatewayUsage:view` |
-| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` (re-scoping needs `virtualKeys:manage` at every new scope) |
-| `POST /api/gateway/v1/virtual-keys/:id/rotate` | `virtualKeys:rotate` |
-| `POST /api/gateway/v1/virtual-keys/:id/disable` | `virtualKeys:update` |
-| `POST /api/gateway/v1/virtual-keys/:id/enable` | `virtualKeys:update` |
-| `POST /api/gateway/v1/virtual-keys/:id/revoke` | `virtualKeys:delete` |
-| `GET /api/gateway/v1/budgets` | `gatewayBudgets:view` |
-| `POST /api/gateway/v1/budgets` | `gatewayBudgets:create` |
-| `PATCH /api/gateway/v1/budgets/:id` | `gatewayBudgets:update` |
-| `POST /api/gateway/v1/budgets/:id/reset` | `gatewayBudgets:update` |
-| `DELETE /api/gateway/v1/budgets/:id` | `gatewayBudgets:delete` (soft archive) |
-| `GET /api/gateway/v1/cache-rules` | `gatewayCacheRules:view` |
-| `POST /api/gateway/v1/cache-rules` | `gatewayCacheRules:create` |
-| `PATCH /api/gateway/v1/cache-rules/:id` | `gatewayCacheRules:update` |
-| `DELETE /api/gateway/v1/cache-rules/:id` | `gatewayCacheRules:delete` |
+| Endpoint                                        | Permission                                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------------------------- |
+| `GET /api/gateway/v1/virtual-keys`              | `virtualKeys:view`                                                              |
+| `POST /api/gateway/v1/virtual-keys`             | `virtualKeys:create` (plus `virtualKeys:manage` at every requested scope)       |
+| `GET /api/gateway/v1/virtual-keys/:id`          | `virtualKeys:view`                                                              |
+| `GET /api/gateway/v1/virtual-keys/:id/spend`    | `gatewayUsage:view`                                                             |
+| `PATCH /api/gateway/v1/virtual-keys/:id`        | `virtualKeys:update` (re-scoping needs `virtualKeys:manage` at every new scope) |
+| `POST /api/gateway/v1/virtual-keys/:id/rotate`  | `virtualKeys:rotate`                                                            |
+| `POST /api/gateway/v1/virtual-keys/:id/disable` | `virtualKeys:update`                                                            |
+| `POST /api/gateway/v1/virtual-keys/:id/enable`  | `virtualKeys:update`                                                            |
+| `POST /api/gateway/v1/virtual-keys/:id/revoke`  | `virtualKeys:delete`                                                            |
+| `GET /api/gateway/v1/budgets`                   | `gatewayBudgets:view`                                                           |
+| `POST /api/gateway/v1/budgets`                  | `gatewayBudgets:create`                                                         |
+| `PATCH /api/gateway/v1/budgets/:id`             | `gatewayBudgets:update`                                                         |
+| `POST /api/gateway/v1/budgets/:id/reset`        | `gatewayBudgets:update`                                                         |
+| `DELETE /api/gateway/v1/budgets/:id`            | `gatewayBudgets:delete` (soft archive)                                          |
+| `GET /api/gateway/v1/cache-rules`               | `gatewayCacheRules:view`                                                        |
+| `POST /api/gateway/v1/cache-rules`              | `gatewayCacheRules:create`                                                      |
+| `PATCH /api/gateway/v1/cache-rules/:id`         | `gatewayCacheRules:update`                                                      |
+| `DELETE /api/gateway/v1/cache-rules/:id`        | `gatewayCacheRules:delete`                                                      |
 
 The billing and webhook surfaces authenticate with an **organization API key** and the org-exclusive permissions:
 
-| Endpoint | Permission |
-|---|---|
-| `POST/PATCH/DELETE /api/webhooks/v1/endpoints*`, `/roll-secret`, `/test` | `webhookEndpoints:manage` |
-| `GET /api/webhooks/v1/endpoints*`, `/deliveries`, `/health`, `/events`, `/event-types` | `webhookEndpoints:view` |
-| `GET /api/gateway/v1/spend-events`, `GET /api/gateway/v1/spend-summaries` | `gatewaySpend:view` |
-| `GET /api/gateway/v1/end-users/:id/spend` | `gatewaySpend:view` |
-| `POST /api/gateway/v1/spend-events/replay` | `gatewaySpend:manage` |
+| Endpoint                                                                               | Permission                |
+| -------------------------------------------------------------------------------------- | ------------------------- |
+| `POST/PATCH/DELETE /api/webhooks/v1/endpoints*`, `/roll-secret`, `/test`               | `webhookEndpoints:manage` |
+| `GET /api/webhooks/v1/endpoints*`, `/deliveries`, `/health`, `/events`, `/event-types` | `webhookEndpoints:view`   |
+| `GET /api/gateway/v1/spend-events`, `GET /api/gateway/v1/spend-summaries`              | `gatewaySpend:view`       |
+| `GET /api/gateway/v1/end-users/:id/spend`                                              | `gatewaySpend:view`       |
+| `POST /api/gateway/v1/spend-events/replay`                                             | `gatewaySpend:manage`     |
 
 Two layers apply on virtual-key writes, exactly as in the dashboard: the route's permission is the API-key ceiling, and the scopes the call touches are then checked individually (`virtualKeys:manage` on every scope at create/re-scope; the op permission on at least one existing scope for update/rotate/revoke). Guardrail attachments travel inside `config.guardrailAttachments` on create/update and require `gatewayGuardrails:attach` on the key's project; there are no separate guardrail routes. Legacy project API keys keep their historical power, full access to their own project and nothing beyond it, so org- and team-scoped provisioning requires a scoped API key with the bindings to prove it.
 
@@ -133,8 +137,8 @@ A request with an API token that lacks the required permission returns `403 perm
 ```json
 {
   "error": {
-    "type":    "permission_denied",
-    "code":    "permission_denied",
+    "type": "permission_denied",
+    "code": "permission_denied",
     "message": "permission_denied: virtualKeys:manage at ORGANIZATION:org_..."
   }
 }
@@ -142,7 +146,7 @@ A request with an API token that lacks the required permission returns `403 perm
 
 ## Personal VKs (principal-attributed)
 
-The default role matrix governs *who can mint a VK*: a VK can also be marked as **personal** by setting `principalUserId` on the record. The principal column is orthogonal to the VK's scope rows.
+The default role matrix governs _who can mint a VK_: a VK can also be marked as **personal** by setting `principalUserId` on the record. The principal column is orthogonal to the VK's scope rows.
 
 - A VK with `principalUserId = user_abc` is treated as that user's personal credential. Spend cascades through the principal's PRINCIPAL-scope budget first, then through scope-driven budgets (TEAM, ORGANIZATION).
 - A VK with `principalUserId = null` is shared (service-account-style): spend cascades through scope-driven budgets only.

@@ -6,15 +6,7 @@
  */
 
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -179,10 +171,7 @@ describe("License Router Integration", () => {
         "user",
         {
           email: {
-            in: [
-              "license-router-admin@test.com",
-              "license-router-member@test.com",
-            ],
+            in: ["license-router-admin@test.com", "license-router-member@test.com"],
           },
         },
       ],
@@ -267,9 +256,7 @@ describe("License Router Integration", () => {
 
       expect(result.success).toBe(true);
       expect(result.planInfo?.type).toBe(ENTERPRISE_LICENSE.plan.type);
-      expect(result.planInfo?.maxMembers).toBe(
-        ENTERPRISE_LICENSE.plan.maxMembers,
-      );
+      expect(result.planInfo?.maxMembers).toBe(ENTERPRISE_LICENSE.plan.maxMembers);
 
       // Verify stored in database
       const org = await prisma.organization.findUnique({
@@ -365,9 +352,9 @@ describe("License Router Integration", () => {
 
     it("throws UNAUTHORIZED when member tries to remove", async () => {
       // Member has organization:view but not organization:manage, so permission check throws UNAUTHORIZED
-      await expect(
-        memberCaller.license.remove({ organizationId }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(memberCaller.license.remove({ organizationId })).rejects.toMatchObject(
+        { code: "FORBIDDEN" },
+      );
     });
 
     it("throws UNAUTHORIZED for non-existent organization", async () => {
@@ -412,9 +399,7 @@ describe("License Router Integration", () => {
     it("generates license that can be parsed and verified", async () => {
       const result = await adminCaller.license.generate(getValidInput());
 
-      const parsedLicense = licenseCryptography.parseLicenseKey(
-        result.licenseKey,
-      );
+      const parsedLicense = licenseCryptography.parseLicenseKey(result.licenseKey);
       expect(parsedLicense).not.toBeNull();
       if (parsedLicense) {
         const isValid = licenseCryptography.verifySignature(
@@ -428,9 +413,7 @@ describe("License Router Integration", () => {
     it("includes correct organization name and email in license", async () => {
       const result = await adminCaller.license.generate(getValidInput());
 
-      const parsedLicense = licenseCryptography.parseLicenseKey(
-        result.licenseKey,
-      );
+      const parsedLicense = licenseCryptography.parseLicenseKey(result.licenseKey);
       expect(parsedLicense?.data.organizationName).toBe("Test Corp");
       expect(parsedLicense?.data.email).toBe("admin@test.corp");
     });
@@ -438,9 +421,7 @@ describe("License Router Integration", () => {
     it("includes correct plan limits in license", async () => {
       const result = await adminCaller.license.generate(getValidInput());
 
-      const parsedLicense = licenseCryptography.parseLicenseKey(
-        result.licenseKey,
-      );
+      const parsedLicense = licenseCryptography.parseLicenseKey(result.licenseKey);
       expect(parsedLicense?.data.plan.maxMembers).toBe(10);
       expect(parsedLicense?.data.plan.maxMembersLite).toBe(5);
       expect(parsedLicense?.data.plan.maxMessagesPerMonth).toBe(100000);
@@ -462,9 +443,7 @@ describe("License Router Integration", () => {
         planType: "PRO",
       });
 
-      const parsedLicense = licenseCryptography.parseLicenseKey(
-        result.licenseKey,
-      );
+      const parsedLicense = licenseCryptography.parseLicenseKey(result.licenseKey);
       expect(parsedLicense?.data.plan.type).toBe("PRO");
       expect(parsedLicense?.data.plan.name).toBe("Pro");
     });
@@ -482,9 +461,7 @@ describe("License Router Integration", () => {
         },
       });
 
-      const parsedLicense = licenseCryptography.parseLicenseKey(
-        result.licenseKey,
-      );
+      const parsedLicense = licenseCryptography.parseLicenseKey(result.licenseKey);
       expect(parsedLicense?.data.plan.type).toBe("ENTERPRISE");
       expect(parsedLicense?.data.plan.name).toBe("Enterprise");
     });
@@ -499,15 +476,10 @@ describe("License Router Integration", () => {
             privateKey,
           });
 
-          const parsedLicense = licenseCryptography.parseLicenseKey(
-            result.licenseKey,
-          );
+          const parsedLicense = licenseCryptography.parseLicenseKey(result.licenseKey);
           expect(parsedLicense).not.toBeNull();
           expect(
-            licenseCryptography.verifySignature(
-              parsedLicense!,
-              TEST_PUBLIC_KEY,
-            ),
+            licenseCryptography.verifySignature(parsedLicense!, TEST_PUBLIC_KEY),
           ).toBe(true);
         });
       }
@@ -518,13 +490,11 @@ describe("License Router Integration", () => {
           privateKey: `${TEST_PUBLIC_KEY}${TEST_PRIVATE_KEY}`,
         });
 
-        const parsedLicense = licenseCryptography.parseLicenseKey(
-          result.licenseKey,
-        );
+        const parsedLicense = licenseCryptography.parseLicenseKey(result.licenseKey);
         expect(parsedLicense).not.toBeNull();
-        expect(
-          licenseCryptography.verifySignature(parsedLicense!, TEST_PUBLIC_KEY),
-        ).toBe(true);
+        expect(licenseCryptography.verifySignature(parsedLicense!, TEST_PUBLIC_KEY)).toBe(
+          true,
+        );
       });
     });
 
@@ -582,9 +552,7 @@ describe("License Router Integration", () => {
     it("includes usageUnit in generated license", async () => {
       const result = await adminCaller.license.generate(getValidInput());
 
-      const parsedLicense = licenseCryptography.parseLicenseKey(
-        result.licenseKey,
-      );
+      const parsedLicense = licenseCryptography.parseLicenseKey(result.licenseKey);
       expect(parsedLicense?.data.plan.usageUnit).toBe("traces");
     });
 
@@ -596,16 +564,14 @@ describe("License Router Integration", () => {
 
       const result = await adminCaller.license.generate(input);
 
-      const parsedLicense = licenseCryptography.parseLicenseKey(
-        result.licenseKey,
-      );
+      const parsedLicense = licenseCryptography.parseLicenseKey(result.licenseKey);
       expect(parsedLicense?.data.plan.usageUnit).toBe("events");
     });
 
     it("throws UNAUTHORIZED when member tries to generate", async () => {
-      await expect(
-        memberCaller.license.generate(getValidInput()),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(memberCaller.license.generate(getValidInput())).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
     });
   });
 });

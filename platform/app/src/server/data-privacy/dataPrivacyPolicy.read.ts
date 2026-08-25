@@ -184,10 +184,7 @@ export async function getDataPrivacySnapshot(
   const teamName = new Map(orgTeams.map((t) => [t.id, t.name]));
   const projectName = new Map(orgProjects.map((p) => [p.id, p.name]));
 
-  const canReadScope = (
-    scopeType: DataPrivacyScopeTier,
-    scopeId: string,
-  ): boolean => {
+  const canReadScope = (scopeType: DataPrivacyScopeTier, scopeId: string): boolean => {
     if (scopeType === "ORGANIZATION" || scopeType === "DEPARTMENT") {
       return canManageOrg;
     }
@@ -195,10 +192,7 @@ export async function getDataPrivacySnapshot(
     return projectUpdate.projects.get(scopeId) === true;
   };
 
-  const scopeName = (
-    scopeType: DataPrivacyScopeTier,
-    scopeId: string,
-  ): string => {
+  const scopeName = (scopeType: DataPrivacyScopeTier, scopeId: string): string => {
     if (scopeType === "ORGANIZATION") return organizationName ?? scopeId;
     if (scopeType === "DEPARTMENT") {
       return departmentName.get(scopeId) ?? scopeId;

@@ -325,10 +325,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
 /**
  * Define what permissions each organization role has
  */
-const ORGANIZATION_ROLE_PERMISSIONS: Record<
-  OrganizationUserRole,
-  Permission[]
-> = {
+const ORGANIZATION_ROLE_PERMISSIONS: Record<OrganizationUserRole, Permission[]> = {
   [OrganizationUserRole.ADMIN]: [
     "organization:view",
     "organization:manage",
@@ -491,9 +488,7 @@ export function getTeamRolePermissions(role: TeamUserRole): Permission[] {
 /**
  * Get all permissions for an organization role
  */
-export function getOrganizationRolePermissions(
-  role: OrganizationUserRole,
-): Permission[] {
+export function getOrganizationRolePermissions(role: OrganizationUserRole): Permission[] {
   return ORGANIZATION_ROLE_PERMISSIONS[role];
 }
 
@@ -580,11 +575,7 @@ export type PermissionMiddleware<InputType> = (
  */
 export const checkProjectPermission =
   (permission: Permission) =>
-  async ({
-    ctx,
-    input,
-    next,
-  }: PermissionMiddlewareParams<{ projectId: string }>) => {
+  async ({ ctx, input, next }: PermissionMiddlewareParams<{ projectId: string }>) => {
     const { permitted, organizationRole } = await resolveProjectPermission(
       ctx,
       input.projectId,
@@ -596,9 +587,7 @@ export const checkProjectPermission =
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "This feature is not available for your account",
-          cause: new LiteMemberRestrictedError(
-            permission.split(":")[0] ?? "unknown",
-          ),
+          cause: new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown"),
         });
       }
       // `cause` carries the handled error, exactly as the EXTERNAL branch
@@ -629,11 +618,7 @@ export const checkProjectPermission =
  */
 export const checkTeamPermission =
   (permission: Permission) =>
-  async ({
-    ctx,
-    input,
-    next,
-  }: PermissionMiddlewareParams<{ teamId: string }>) => {
+  async ({ ctx, input, next }: PermissionMiddlewareParams<{ teamId: string }>) => {
     const { permitted, organizationRole } = await resolveTeamPermission(
       ctx,
       input.teamId,
@@ -645,9 +630,7 @@ export const checkTeamPermission =
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "This feature is not available for your account",
-          cause: new LiteMemberRestrictedError(
-            permission.split(":")[0] ?? "unknown",
-          ),
+          cause: new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown"),
         });
       }
       throw new TRPCError({
@@ -671,13 +654,10 @@ export const checkOrganizationPermission =
     input,
     next,
   }: PermissionMiddlewareParams<{ organizationId: string }>) => {
-    if (
-      !(await hasOrganizationPermission(ctx, input.organizationId, permission))
-    ) {
+    if (!(await hasOrganizationPermission(ctx, input.organizationId, permission))) {
       throw new TRPCError({
         code: "UNAUTHORIZED",
-        message:
-          "You do not have permission to access this organization resource",
+        message: "You do not have permission to access this organization resource",
       });
     }
 
@@ -749,9 +729,7 @@ async function checkPermissionFromBindings({
     // replace, and the engine keeps inferring from the same rows on both
     // heads (the dormant-fact principle), so switching this off early made
     // the readers disagree instead of making the rows dead.
-    const teamScope = scopes.find(
-      (s) => s.scopeType === RoleBindingScopeType.TEAM,
-    );
+    const teamScope = scopes.find((s) => s.scopeType === RoleBindingScopeType.TEAM);
     if (!teamScope) return false;
 
     const teamUser = await prisma.teamUser.findFirst({
@@ -801,9 +779,7 @@ async function checkPermissionFromBindings({
       // OrganizationUser role is authoritative for EXTERNAL restrictions.
       if (organizationRole === OrganizationUserRole.EXTERNAL) continue;
       if (binding.role === TeamUserRole.ADMIN) return true;
-      if (
-        organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)
-      )
+      if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission))
         return true;
       continue;
     }
@@ -1295,9 +1271,7 @@ async function hasOrganizationPermissionLegacy(
     prisma: ctx.prisma,
     userId,
     organizationId,
-    scopes: [
-      { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId },
-    ],
+    scopes: [{ scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId }],
     organizationRole: orgMember.role,
     permission,
   });
@@ -1384,10 +1358,7 @@ type ScopeResolution = {
   customRoleById: Map<string, { id: string; permissions: unknown }>;
   /** No RoleBindings at all for this user ⇒ fall back to legacy TeamUser roles. */
   needsLegacyFallback: boolean;
-  legacyByTeam: Map<
-    string,
-    { role: TeamUserRole; assignedRoleId: string | null }
-  >;
+  legacyByTeam: Map<string, { role: TeamUserRole; assignedRoleId: string | null }>;
 };
 
 type ResolvedBinding = {
@@ -1459,9 +1430,7 @@ async function loadScopeResolution(
       : [];
 
   const customRoleIds = Array.from(
-    new Set(
-      bindings.map((b) => b.customRoleId).filter((id): id is string => !!id),
-    ),
+    new Set(bindings.map((b) => b.customRoleId).filter((id): id is string => !!id)),
   );
   const customRoles =
     customRoleIds.length > 0
@@ -1550,10 +1519,7 @@ function bindingGrants(
       return false;
     }
     if (binding.role === TeamUserRole.ADMIN) return true;
-    return organizationRoleHasPermission(
-      OrganizationUserRole.MEMBER,
-      permission,
-    );
+    return organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission);
   }
 
   if (resolution.organizationRole === OrganizationUserRole.EXTERNAL) {
@@ -1573,9 +1539,7 @@ function projectGrants(
       bindingGrants(resolution, b, permission),
     );
 
-  if (
-    grantedBy(scopeKey(RoleBindingScopeType.ORGANIZATION, args.organizationId))
-  ) {
+  if (grantedBy(scopeKey(RoleBindingScopeType.ORGANIZATION, args.organizationId))) {
     return true;
   }
   if (grantedBy(scopeKey(RoleBindingScopeType.PROJECT, args.projectId))) {
@@ -1614,9 +1578,7 @@ function teamGrants(
       bindingGrants(resolution, b, permission),
     );
 
-  if (
-    grantedBy(scopeKey(RoleBindingScopeType.ORGANIZATION, args.organizationId))
-  ) {
+  if (grantedBy(scopeKey(RoleBindingScopeType.ORGANIZATION, args.organizationId))) {
     return true;
   }
   if (grantedBy(scopeKey(RoleBindingScopeType.TEAM, args.teamId))) return true;
@@ -1895,13 +1857,8 @@ export function isDemoProjectId(projectId: string | null | undefined): boolean {
   return !!demoId && projectId === demoId;
 }
 
-export function isDemoProject(
-  projectId: string,
-  permission: Permission,
-): boolean {
-  return (
-    isDemoProjectId(projectId) && DEMO_VIEW_PERMISSIONS.includes(permission)
-  );
+export function isDemoProject(projectId: string, permission: Permission): boolean {
+  return isDemoProjectId(projectId) && DEMO_VIEW_PERMISSIONS.includes(permission);
 }
 
 /**

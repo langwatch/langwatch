@@ -27,7 +27,7 @@ export async function handleListPrompts(): Promise<string> {
   }
 
   lines.push(
-    "\n> Use `platform_get_prompt` with the handle or ID to see full prompt details."
+    "\n> Use `platform_get_prompt` with the handle or ID to see full prompt details.",
   );
 
   return lines.join("\n");

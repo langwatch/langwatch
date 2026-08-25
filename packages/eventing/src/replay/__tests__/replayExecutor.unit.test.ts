@@ -1,16 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type {
-  RetentionPolicy,
-  RetentionPolicyResolver,
-} from "../../runtime.types";
+import type { RetentionPolicy, RetentionPolicyResolver } from "../../runtime.types";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
 import type { ReplayEvent } from "../replayEventSource";
-import {
-  FoldAccumulator,
-  MapAccumulator,
-  replayEvents,
-} from "../replayExecutor";
+import { FoldAccumulator, MapAccumulator, replayEvents } from "../replayExecutor";
 
 const TEST_SPAN_RECEIVED_EVENT_TYPE = "test.trace.span_received";
 
@@ -21,10 +14,7 @@ const TEST_SPAN_RECEIVED_EVENT_TYPE = "test.trace.span_received";
 function createTestProjection(opts?: { keyFn?: (event: any) => string }) {
   const storeBatchSpy = vi.fn().mockResolvedValue(undefined);
 
-  const projection: FoldProjectionDefinition<
-    { total: number; count: number },
-    any
-  > = {
+  const projection: FoldProjectionDefinition<{ total: number; count: number }, any> = {
     name: "testProjection",
     version: "2025-01-01",
     LastEventOccurredAtKey: "LastEventOccurredAt",
@@ -337,9 +327,7 @@ describe("FoldAccumulator", () => {
       const accumulator = new FoldAccumulator(projection);
 
       accumulator.apply(makeEvent({ type: "test.event", data: { value: 10 } }));
-      accumulator.apply(
-        makeEvent({ type: "unrelated.event", data: { value: 999 } }),
-      );
+      accumulator.apply(makeEvent({ type: "unrelated.event", data: { value: 999 } }));
       accumulator.apply(makeEvent({ type: "test.event", data: { value: 20 } }));
 
       expect(accumulator.processed).toBe(2);
@@ -389,11 +377,7 @@ describe("MapAccumulator", () => {
     const records = bulkAppendSpy.mock.calls[0]![0] as Array<{
       doubled: number;
     }>;
-    expect(records).toEqual([
-      { doubled: 10 },
-      { doubled: 20 },
-      { doubled: 30 },
-    ]);
+    expect(records).toEqual([{ doubled: 10 }, { doubled: 20 }, { doubled: 30 }]);
   });
 
   describe("when event type does not match", () => {
@@ -616,8 +600,7 @@ describe("MapAccumulator", () => {
 
   describe("when no events are applied", () => {
     it("skips store on flush", async () => {
-      const { projection, bulkAppendSpy, appendSpy } =
-        createTestMapProjection();
+      const { projection, bulkAppendSpy, appendSpy } = createTestMapProjection();
       const acc = new MapAccumulator(projection);
 
       await acc.flush();
@@ -642,8 +625,8 @@ describe("MapAccumulator", () => {
         map: (event: any) => {
           const attrs = event.data?.span?.attributes ?? [];
           const out =
-            attrs.find((a: any) => a.key === "langwatch.output")?.value
-              ?.stringValue ?? "";
+            attrs.find((a: any) => a.key === "langwatch.output")?.value?.stringValue ??
+            "";
           return { outLen: out.length };
         },
         store: { append: vi.fn(), bulkAppend: bulkAppendSpy },
@@ -656,9 +639,7 @@ describe("MapAccumulator", () => {
           type: TEST_SPAN_RECEIVED_EVENT_TYPE,
           data: {
             span: {
-              attributes: [
-                { key: "langwatch.output", value: { stringValue: preview } },
-              ],
+              attributes: [{ key: "langwatch.output", value: { stringValue: preview } }],
             },
           },
         }),

@@ -90,12 +90,7 @@ const NOGOV_LEGACY_KEY = `sk-lw-${nanoid(48)}`;
 const FOREIGN_LEGACY_KEY = `sk-lw-${nanoid(48)}`;
 
 const ALL_ORG_IDS = [ORG_ID, NOGOV_ORG_ID, FOREIGN_ORG_ID];
-const ALL_USER_IDS = [
-  ADMIN_USER_ID,
-  MEMBER_USER_ID,
-  VIEWER_USER_ID,
-  OUTSIDE_USER_ID,
-];
+const ALL_USER_IDS = [ADMIN_USER_ID, MEMBER_USER_ID, VIEWER_USER_ID, OUTSIDE_USER_ID];
 const ALL_PROJECT_IDS = [
   PROJECT_ID,
   SIBLING_PROJECT_ID,
@@ -560,10 +555,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
 
     /** @scenario Every gateway platform refusal is the canonical envelope */
     it("refuses at the API key ceiling in the canonical envelope", async () => {
-      const res = await createVk(
-        { name: "denied-by-ceiling" },
-        apiKeyAuth(viewerToken),
-      );
+      const res = await createVk({ name: "denied-by-ceiling" }, apiKeyAuth(viewerToken));
       expect(res.status).toBe(403);
       expect(res.body).toMatchObject({
         error: {
@@ -858,9 +850,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         headers: legacyAuth(),
       });
       const { data } = await list.json();
-      expect(
-        data.some((vk: any) => vk.id === sibling.body.virtual_key.id),
-      ).toBe(false);
+      expect(data.some((vk: any) => vk.id === sibling.body.virtual_key.id)).toBe(false);
 
       const get = await app.request(
         `/api/gateway/v1/virtual-keys/${sibling.body.virtual_key.id}`,
@@ -972,10 +962,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
           scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
         },
       });
-      const get = await app.request(
-        `/api/gateway/v1/virtual-keys/${langyVkId}`,
-        { headers: legacyAuth() },
-      );
+      const get = await app.request(`/api/gateway/v1/virtual-keys/${langyVkId}`, {
+        headers: legacyAuth(),
+      });
       expect(get.status).toBe(404);
       const rotate = await post(
         `/api/gateway/v1/virtual-keys/${langyVkId}/rotate`,
@@ -1029,9 +1018,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(list.status).toBe(200);
       const listBody = await list.json();
       expect(listBody.spend_available).toBe(true);
-      const scopeTypes = new Set(
-        listBody.data.map((b: any) => b.scope_type as string),
-      );
+      const scopeTypes = new Set(listBody.data.map((b: any) => b.scope_type as string));
       expect(scopeTypes.has("virtual_key")).toBe(true);
       expect(scopeTypes.has("principal")).toBe(true);
 
@@ -1041,18 +1028,18 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       );
       const filteredBody = await filtered.json();
       expect(filteredBody.data.length).toBeGreaterThan(0);
-      expect(
-        filteredBody.data.every((b: any) => b.scope_type === "virtual_key"),
-      ).toBe(true);
+      expect(filteredBody.data.every((b: any) => b.scope_type === "virtual_key")).toBe(
+        true,
+      );
 
       const excluded = await app.request(
         "/api/gateway/v1/budgets?scope_type=organization,team",
         { headers: legacyAuth() },
       );
       const excludedBody = await excluded.json();
-      expect(
-        excludedBody.data.some((b: any) => b.scope_type === "virtual_key"),
-      ).toBe(false);
+      expect(excludedBody.data.some((b: any) => b.scope_type === "virtual_key")).toBe(
+        false,
+      );
     });
 
     /** @scenario One budget can be read on its own */
@@ -1150,9 +1137,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const after = (await patched.json()).budget;
       expect(after.name).toBe(`anchored-renamed-${suffix}`);
       expect(after.cycle_anchor_at).toBe(anchor.toISOString());
-      expect(after.current_period_started_at).toBe(
-        budget.current_period_started_at,
-      );
+      expect(after.current_period_started_at).toBe(budget.current_period_started_at);
     });
 
     /** @scenario "A cycle anchor is rejected on windows that do not cycle" */
@@ -1173,8 +1158,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         expect(await res.json()).toMatchObject({
           error: {
             code: "gateway_budget_cycle_anchor_invalid",
-            message:
-              "That window does not cycle, so it cannot take a cycle anchor",
+            message: "That window does not cycle, so it cannot take a cycle anchor",
             meta: { window },
           },
         });
@@ -1216,10 +1200,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
 
     /** @scenario An invalid scope_type filter is refused */
     it("rejects an unknown scope_type value", async () => {
-      const res = await app.request(
-        "/api/gateway/v1/budgets?scope_type=BANANA",
-        { headers: legacyAuth() },
-      );
+      const res = await app.request("/api/gateway/v1/budgets?scope_type=BANANA", {
+        headers: legacyAuth(),
+      });
       expect(res.status).toBe(400);
     });
 
@@ -1228,10 +1211,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       // The surface used to accept `scope_type=Group` on this filter (it
       // uppercased whatever arrived) while the create body's `kind` refused
       // the same spelling. One casing, both directions, no tolerance.
-      const filter = await app.request(
-        "/api/gateway/v1/budgets?scope_type=VIRTUAL_KEY",
-        { headers: legacyAuth() },
-      );
+      const filter = await app.request("/api/gateway/v1/budgets?scope_type=VIRTUAL_KEY", {
+        headers: legacyAuth(),
+      });
       expect(filter.status).toBe(400);
 
       const create = await post(
@@ -1326,10 +1308,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(body.budget.scope_type).toBe("group");
       expect(body.budget.member_count).toBe(2);
 
-      const list = await app.request(
-        "/api/gateway/v1/budgets?scope_type=group",
-        { headers: legacyAuth() },
-      );
+      const list = await app.request("/api/gateway/v1/budgets?scope_type=group", {
+        headers: legacyAuth(),
+      });
       const listBody = await list.json();
       const row = listBody.data.find((b: any) => b.scope_id === GROUP_ID);
       expect(row.member_count).toBe(2);
@@ -1413,10 +1394,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       );
       expect(createRes.status).toBe(201);
 
-      const list = await app.request(
-        "/api/gateway/v1/budgets?scope_type=project",
-        { headers: legacyAuth() },
-      );
+      const list = await app.request("/api/gateway/v1/budgets?scope_type=project", {
+        headers: legacyAuth(),
+      });
       const listBody = await list.json();
       expect(listBody.data.length).toBeGreaterThan(0);
       for (const row of listBody.data) {
@@ -1522,10 +1502,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       });
       expect(pgRow!.spentUsd.toString()).toBe("0");
 
-      const list = await app.request(
-        "/api/gateway/v1/budgets?scope_type=virtual_key",
-        { headers: legacyAuth() },
-      );
+      const list = await app.request("/api/gateway/v1/budgets?scope_type=virtual_key", {
+        headers: legacyAuth(),
+      });
       const listBody = await list.json();
       const row = listBody.data.find((b: any) => b.id === budgetId);
       expect(row).toBeDefined();
@@ -1600,10 +1579,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
 
     /** @scenario A filtered list pages on rows returned, not rows examined */
     it("applies the scope_type filter in the query, not to the page", async () => {
-      const walked = await walkAll(
-        "/api/gateway/v1/budgets?scope_type=project",
-        2,
-      );
+      const walked = await walkAll("/api/gateway/v1/budgets?scope_type=project", 2);
       expect(walked.length).toBeGreaterThan(0);
       expect(new Set(walked).size).toBe(walked.length);
     });
@@ -1700,10 +1676,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         totalCost: 0.5,
       });
 
-      const res = await app.request(
-        `/api/gateway/v1/virtual-keys/${vkId}/spend`,
-        { headers: legacyAuth() },
-      );
+      const res = await app.request(`/api/gateway/v1/virtual-keys/${vkId}/spend`, {
+        headers: legacyAuth(),
+      });
       expect(res.status).toBe(200);
       const body = await res.json();
       // Exact, not `toBeCloseTo`: the field is a display STRING, and a
@@ -1730,10 +1705,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         });
       }
 
-      const res = await app.request(
-        `/api/gateway/v1/virtual-keys/${vkId}/spend`,
-        { headers: legacyAuth() },
-      );
+      const res = await app.request(`/api/gateway/v1/virtual-keys/${vkId}/spend`, {
+        headers: legacyAuth(),
+      });
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.spent_usd).toBe("0.000045");
@@ -1909,10 +1883,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(createdBody.budget.external_id).toBe(externalId);
       expect(createdBody.budget.metadata).toEqual({ owner: "finance" });
 
-      const byId = await app.request(
-        `/api/gateway/v1/budgets/${createdBody.budget.id}`,
-        { headers: legacyAuth() },
-      );
+      const byId = await app.request(`/api/gateway/v1/budgets/${createdBody.budget.id}`, {
+        headers: legacyAuth(),
+      });
       expect((await byId.json()).budget.external_id).toBe(externalId);
 
       const filtered = await app.request(
@@ -2019,9 +1992,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const iv = crypto.randomBytes(12);
       const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
       const body = cipher.update(text, "utf8", "hex") + cipher.final("hex");
-      return `${iv.toString("hex")}:${body}:${cipher
-        .getAuthTag()
-        .toString("hex")}`;
+      return `${iv.toString("hex")}:${body}:${cipher.getAuthTag().toString("hex")}`;
     }
 
     /** @scenario A create sent without an idempotency key is unchanged */
@@ -2066,9 +2037,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       // serialised bytes, so a replay writes them through rather than
       // re-deriving them from a parsed document.
       expect(await second.text()).toBe(firstBody);
-      expect(second.headers.get("Content-Type")).toBe(
-        first.headers.get("Content-Type"),
-      );
+      expect(second.headers.get("Content-Type")).toBe(first.headers.get("Content-Type"));
 
       expect(await budgetsNamed(body.name)).toHaveLength(1);
     });
@@ -2078,9 +2047,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const key = `idem-rotated-key-${suffix}`;
       const body = budgetBody("rotated");
 
-      expect(
-        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
-      ).toBe(201);
+      expect((await post("/api/gateway/v1/budgets", body, keyed(key))).status).toBe(201);
 
       // What rotating CREDENTIALS_SECRET inside the receipt's 24 hours leaves
       // behind: an authentic row this process can no longer read.
@@ -2105,9 +2072,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const key = `idem-mismatch-key-${suffix}`;
       const body = budgetBody("mismatch");
 
-      expect(
-        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
-      ).toBe(201);
+      expect((await post("/api/gateway/v1/budgets", body, keyed(key))).status).toBe(201);
 
       const mutated = await post(
         "/api/gateway/v1/budgets",
@@ -2157,9 +2122,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const key = `idem-pending-key-${suffix}`;
       const body = budgetBody("pending");
 
-      expect(
-        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
-      ).toBe(201);
+      expect((await post("/api/gateway/v1/budgets", body, keyed(key))).status).toBe(201);
 
       await windBackToPending({
         key,
@@ -2182,9 +2145,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const key = `idem-slow-key-${suffix}`;
       const body = budgetBody("slow");
 
-      expect(
-        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
-      ).toBe(201);
+      expect((await post("/api/gateway/v1/budgets", body, keyed(key))).status).toBe(201);
 
       // A request five minutes into its handler, waiting on a lock or a
       // saturated pool, that reported itself alive a moment ago. Any rule
@@ -2212,9 +2173,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const key = `idem-stale-key-${suffix}`;
       const body = budgetBody("stale");
 
-      expect(
-        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
-      ).toBe(201);
+      expect((await post("/api/gateway/v1/budgets", body, keyed(key))).status).toBe(201);
 
       // A process that died between claiming the key and writing anything:
       // the budget its create made is removed, so what is left is the pending
@@ -2315,9 +2274,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const key = `idem-expired-key-${suffix}`;
       const body = budgetBody("expired");
 
-      expect(
-        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
-      ).toBe(201);
+      expect((await post("/api/gateway/v1/budgets", body, keyed(key))).status).toBe(201);
 
       const stored = await receiptFor(key);
       await prisma.idempotencyReceipt.update({
@@ -2363,11 +2320,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(first.status).toBe(201);
       const firstBody = await first.text();
 
-      const second = await post(
-        "/api/gateway/v1/cache-rules",
-        body,
-        keyed(key),
-      );
+      const second = await post("/api/gateway/v1/cache-rules", body, keyed(key));
       expect(second.status).toBe(201);
       expect(second.headers.get("X-Idempotent-Replay")).toBe("true");
       expect(await second.text()).toBe(firstBody);

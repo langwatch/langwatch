@@ -23,9 +23,7 @@ export const PERSONAL_TRACE_INGEST_ANCHOR = "me-trace-ingest";
 
 function scrollToId(id: string) {
   if (typeof document === "undefined") return;
-  document
-    .getElementById(id)
-    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 const cardProps = {
@@ -53,10 +51,7 @@ type Offer = {
   icon: React.ElementType;
   title: string;
   description: string;
-} & (
-  | { onClick: () => void; href?: undefined }
-  | { href: string; onClick?: undefined }
-);
+} & ({ onClick: () => void; href?: undefined } | { href: string; onClick?: undefined });
 
 function OfferBody({
   icon,
@@ -76,13 +71,7 @@ function OfferBody({
   );
 }
 
-const OfferCard: React.FC<Offer> = ({
-  icon,
-  title,
-  description,
-  onClick,
-  href,
-}) => {
+const OfferCard: React.FC<Offer> = ({ icon, title, description, onClick, href }) => {
   if (href) {
     return (
       <Link href={href} display="block" _hover={{ textDecoration: "none" }}>
@@ -133,17 +122,12 @@ export function PersonalTracesEmptyState({
     <IntegratePaneShell isCompact ariaLabel="Start sending your AI usage">
       <VStack align="stretch" gap={6}>
         <VStack align="start" gap={1.5}>
-          <Text
-            textStyle="2xl"
-            fontWeight="600"
-            color="fg"
-            letterSpacing="-0.015em"
-          >
+          <Text textStyle="2xl" fontWeight="600" color="fg" letterSpacing="-0.015em">
             No activity here yet
           </Text>
           <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-            Send your AI usage to LangWatch with the tools you already have set
-            up above — no SDK wiring required.
+            Send your AI usage to LangWatch with the tools you already have set up above —
+            no SDK wiring required.
           </Text>
         </VStack>
         <SimpleGrid columns={{ base: 1, md: 3 }} gap={3}>

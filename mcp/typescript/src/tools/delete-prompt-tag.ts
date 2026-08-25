@@ -1,8 +1,6 @@
 import { deletePromptTag as apiDeletePromptTag } from "../langwatch-api.js";
 
-export async function handleDeletePromptTag(params: {
-  tag: string;
-}): Promise<string> {
+export async function handleDeletePromptTag(params: { tag: string }): Promise<string> {
   await apiDeletePromptTag(params.tag);
 
   const lines: string[] = [];

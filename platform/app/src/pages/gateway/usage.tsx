@@ -98,8 +98,7 @@ function GatewayUsagePage() {
     return PRESETS.some((p) => p.days === parsed) ? parsed : 30;
   })();
   const virtualKeyId =
-    (Array.isArray(router.query.vk) ? router.query.vk[0] : router.query.vk) ??
-    null;
+    (Array.isArray(router.query.vk) ? router.query.vk[0] : router.query.vk) ?? null;
 
   const setDays = (next: number | "mtd") => {
     void router.push({
@@ -135,9 +134,7 @@ function GatewayUsagePage() {
     { organizationId: organization?.id ?? "", id: virtualKeyId ?? "" },
     { enabled: !!organization?.id && !!virtualKeyId },
   );
-  const filteredKeyName = virtualKeyId
-    ? (keyQuery.data?.name ?? virtualKeyId)
-    : null;
+  const filteredKeyName = virtualKeyId ? (keyQuery.data?.name ?? virtualKeyId) : null;
   // Only offered while one key is in focus: the organization-wide view has
   // no single trace destination to open, and the key's own destination is
   // what decides whether there is anything to open at all.
@@ -179,13 +176,7 @@ function GatewayUsagePage() {
     rows.push(["Section", "Key", "Prefix / Model", "Spend (USD)", "Requests"]);
     rows.push(["daily", "day", "", "", ""]);
     for (const d of data.byDay) {
-      rows.push([
-        "daily",
-        d.day,
-        "",
-        Number(d.totalUsd).toFixed(6),
-        d.requests,
-      ]);
+      rows.push(["daily", d.day, "", Number(d.totalUsd).toFixed(6), d.requests]);
     }
     rows.push([]);
     rows.push(["virtual_key", "id", "prefix", "spend", "requests"]);
@@ -201,13 +192,7 @@ function GatewayUsagePage() {
     rows.push([]);
     rows.push(["model", "id", "", "spend", "requests"]);
     for (const m of data.byModel) {
-      rows.push([
-        "model",
-        m.model,
-        "",
-        Number(m.totalUsd).toFixed(6),
-        m.requests,
-      ]);
+      rows.push(["model", m.model, "", Number(m.totalUsd).toFixed(6), m.requests]);
     }
     const csv = Parse.unparse(rows);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -302,19 +287,16 @@ function GatewayUsagePage() {
                 </EmptyState.Indicator>
                 <EmptyState.Title>No usage in this window</EmptyState.Title>
                 <EmptyState.Description>
-                  Spend shows up here once the gateway has traced its first
-                  completed request. Send a few requests against a virtual key,
-                  then check back in a couple of minutes.
+                  Spend shows up here once the gateway has traced its first completed
+                  request. Send a few requests against a virtual key, then check back in a
+                  couple of minutes.
                 </EmptyState.Description>
               </EmptyState.Content>
             </EmptyState.Root>
           ) : (
             <VStack align="stretch" gap={6}>
               <HStack gap={4} align="stretch">
-                <StatTile
-                  label="Total spend"
-                  value={formatBudgetUsd(data.totalUsd)}
-                />
+                <StatTile label="Total spend" value={formatBudgetUsd(data.totalUsd)} />
                 <StatTile
                   label="Requests"
                   value={data.totalRequests.toLocaleString()}
@@ -349,9 +331,7 @@ function GatewayUsagePage() {
                       {data.byVirtualKey.map((row) => (
                         <Table.Row key={row.virtualKeyId}>
                           <Table.Cell>
-                            <Link
-                              href={`/gateway/virtual-keys/${row.virtualKeyId}`}
-                            >
+                            <Link href={`/gateway/virtual-keys/${row.virtualKeyId}`}>
                               {row.name}
                             </Link>
                           </Table.Cell>
@@ -360,9 +340,7 @@ function GatewayUsagePage() {
                               {row.displayPrefix}…
                             </Text>
                           </Table.Cell>
-                          <Table.Cell>
-                            {formatBudgetUsd(row.totalUsd)}
-                          </Table.Cell>
+                          <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
                           <Table.Cell>{row.requests}</Table.Cell>
                         </Table.Row>
                       ))}
@@ -449,21 +427,14 @@ function SpendSparkline({
         height="220px"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={points}
-            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
-          >
+          <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
                 <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#e2e8f0"
-              vertical={false}
-            />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
             <XAxis
               dataKey="day"
               tick={{ fontSize: 11, fill: "#64748b" }}

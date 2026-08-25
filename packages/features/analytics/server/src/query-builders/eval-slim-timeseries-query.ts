@@ -25,10 +25,7 @@
 
 import { buildMetricAlias } from "../clickhouse/metric-translator";
 import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
-import type {
-  AnalyticsTimeseriesBuilderInput,
-  BuiltAnalyticsQuery,
-} from "../types";
+import type { AnalyticsTimeseriesBuilderInput, BuiltAnalyticsQuery } from "../types";
 import {
   collectStringValues,
   dateTrunc,
@@ -283,10 +280,7 @@ export function buildEvalSlimTimeseriesQuery(
       );
     }
     const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);
-    const expr = evalSlimAggExpression(
-      s.aggregation,
-      evalSlimColumnFor(s.metric),
-    );
+    const expr = evalSlimAggExpression(s.aggregation, evalSlimColumnFor(s.metric));
     selectExprs.push(`${expr} AS ${alias}`);
   }
 
@@ -294,8 +288,9 @@ export function buildEvalSlimTimeseriesQuery(
   if (typeof input.timeScale === "number") groupByExprs.push("date");
   if (groupByColumn) groupByExprs.push("group_key");
 
-  const { whereClause: filterWhere, params: filterParams } =
-    buildEvalSlimFilterClauses(input.filters);
+  const { whereClause: filterWhere, params: filterParams } = buildEvalSlimFilterClauses(
+    input.filters,
+  );
 
   const havingClause = groupByColumn ? `HAVING group_key != ''` : "";
 

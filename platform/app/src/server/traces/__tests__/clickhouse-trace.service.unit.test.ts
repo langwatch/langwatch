@@ -33,9 +33,7 @@ vi.mock("langwatch", () => ({
     withActiveSpan: (_name: string, ...args: unknown[]) => {
       const fn = args.length === 1 ? args[0] : args[1];
       const span = { setAttribute: () => {} };
-      return (fn as (span: { setAttribute: () => void }) => Promise<unknown>)(
-        span,
-      );
+      return (fn as (span: { setAttribute: () => void }) => Promise<unknown>)(span);
     },
   }),
 }));
@@ -162,10 +160,7 @@ describe("ClickHouseTraceService", () => {
           } as never,
         });
 
-        const result = await service.getAllTracesForProject(
-          baseInput,
-          protections,
-        );
+        const result = await service.getAllTracesForProject(baseInput, protections);
 
         expect(result).not.toBeNull();
         const traces = result!.groups.flat();
@@ -198,23 +193,13 @@ describe("ClickHouseTraceService", () => {
 
         // Verify the count query (1st call) contains the TraceId IN clause
         const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query).toContain(
-          "ts.TraceId IN ({traceIds:Array(String)})",
-        );
-        expect(countCall[0].query_params.traceIds).toEqual([
-          "trace-A",
-          "trace-B",
-        ]);
+        expect(countCall[0].query).toContain("ts.TraceId IN ({traceIds:Array(String)})");
+        expect(countCall[0].query_params.traceIds).toEqual(["trace-A", "trace-B"]);
 
         // Verify the IDs query (2nd call) contains the TraceId IN clause
         const dataCall = mockClickHouseQuery.mock.calls[1]!;
-        expect(dataCall[0].query).toContain(
-          "ts.TraceId IN ({traceIds:Array(String)})",
-        );
-        expect(dataCall[0].query_params.traceIds).toEqual([
-          "trace-A",
-          "trace-B",
-        ]);
+        expect(dataCall[0].query).toContain("ts.TraceId IN ({traceIds:Array(String)})");
+        expect(dataCall[0].query_params.traceIds).toEqual(["trace-A", "trace-B"]);
       });
 
       it("returns only matching traces", async () => {
@@ -253,10 +238,7 @@ describe("ClickHouseTraceService", () => {
           } as never,
         });
 
-        const result = await service.getAllTracesForProject(
-          baseInput,
-          protections,
-        );
+        const result = await service.getAllTracesForProject(baseInput, protections);
 
         expect(result).not.toBeNull();
 
@@ -304,11 +286,9 @@ describe("ClickHouseTraceService", () => {
             } as never,
           });
 
-          const result = await service.getAllTracesForProject(
-            baseInput,
-            protections,
-            { scrollId },
-          );
+          const result = await service.getAllTracesForProject(baseInput, protections, {
+            scrollId,
+          });
 
           expect(result).not.toBeNull();
 
@@ -366,10 +346,7 @@ describe("ClickHouseTraceService", () => {
             } as never,
           });
 
-          const result = await service.getAllTracesForProject(
-            baseInput,
-            protections,
-          );
+          const result = await service.getAllTracesForProject(baseInput, protections);
 
           expect(result).not.toBeNull();
 
@@ -394,11 +371,9 @@ describe("ClickHouseTraceService", () => {
             } as never,
           });
 
-          const result = await service.getAllTracesForProject(
-            baseInput,
-            protections,
-            { scrollId: "not-valid-base64!!!" },
-          );
+          const result = await service.getAllTracesForProject(baseInput, protections, {
+            scrollId: "not-valid-base64!!!",
+          });
 
           expect(result).not.toBeNull();
 
@@ -426,11 +401,9 @@ describe("ClickHouseTraceService", () => {
             } as never,
           });
 
-          const result = await service.getAllTracesForProject(
-            baseInput,
-            protections,
-            { scrollId },
-          );
+          const result = await service.getAllTracesForProject(baseInput, protections, {
+            scrollId,
+          });
 
           expect(result).not.toBeNull();
 
@@ -456,11 +429,9 @@ describe("ClickHouseTraceService", () => {
             } as never,
           });
 
-          const result = await service.getAllTracesForProject(
-            baseInput,
-            protections,
-            { scrollId },
-          );
+          const result = await service.getAllTracesForProject(baseInput, protections, {
+            scrollId,
+          });
 
           expect(result).not.toBeNull();
 
@@ -562,9 +533,7 @@ describe("ClickHouseTraceService", () => {
         );
 
         const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query_params.searchQuery).toBe(
-          "%100\\% success\\_rate%",
-        );
+        expect(countCall[0].query_params.searchQuery).toBe("%100\\% success\\_rate%");
       });
 
       // Issue #6356: a tool or agent identifier usually lives on the span
@@ -742,9 +711,7 @@ describe("ClickHouseTraceService", () => {
         );
 
         const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query).toContain(
-          "lower(ifNull(ts.ComputedOutput, '')) LIKE",
-        );
+        expect(countCall[0].query).toContain("lower(ifNull(ts.ComputedOutput, '')) LIKE");
         expect(countCall[0].query).not.toContain("ComputedInput");
       });
 
@@ -766,9 +733,7 @@ describe("ClickHouseTraceService", () => {
         );
 
         const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query).toContain(
-          "lower(ifNull(ts.ComputedInput, '')) LIKE",
-        );
+        expect(countCall[0].query).toContain("lower(ifNull(ts.ComputedInput, '')) LIKE");
         expect(countCall[0].query).not.toContain("ComputedOutput");
       });
     });
@@ -804,10 +769,7 @@ describe("ClickHouseTraceService", () => {
           } as never,
         });
 
-        const result = await service.getAllTracesForProject(
-          baseInput,
-          protections,
-        );
+        const result = await service.getAllTracesForProject(baseInput, protections);
 
         expect(result).not.toBeNull();
 
@@ -983,10 +945,7 @@ describe("ClickHouseTraceService", () => {
           } as never,
         });
 
-        const result = await service.getAllTracesForProject(
-          baseInput,
-          protections,
-        );
+        const result = await service.getAllTracesForProject(baseInput, protections);
 
         expect(result).not.toBeNull();
         expect(result!.groups.flat()).toHaveLength(1);
@@ -1030,11 +989,9 @@ describe("ClickHouseTraceService", () => {
           } as never,
         });
 
-        const result = await service.getAllTracesForProject(
-          baseInput,
-          protections,
-          { includeSpans: true },
-        );
+        const result = await service.getAllTracesForProject(baseInput, protections, {
+          includeSpans: true,
+        });
 
         expect(result).not.toBeNull();
         const traces = result!.groups.flat();
@@ -1052,9 +1009,7 @@ describe("ClickHouseTraceService", () => {
         // reads as protection while protecting nothing.
         const spanQuery = mockClickHouseQuery.mock.calls[4]?.[0];
         expect(spanQuery.query).toContain("FROM stored_spans");
-        expect(spanQuery.clickhouse_settings).toHaveProperty(
-          "max_memory_usage",
-        );
+        expect(spanQuery.clickhouse_settings).toHaveProperty("max_memory_usage");
       });
     });
   });
@@ -1067,8 +1022,7 @@ describe("ClickHouseTraceService", () => {
         mockClickHouseQuery
           // resolve: min/max OccurredAt for the ids (no occurredAt passed)
           .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
+            json: () => Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
           })
           // summary query for the full list — OOM
           .mockRejectedValueOnce(
@@ -1079,12 +1033,10 @@ describe("ClickHouseTraceService", () => {
           )
           // retry batch (both traces fit in one batch of 25): summary then spans
           .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve(traceIds.map((id) => makeSummaryRow(id))),
+            json: () => Promise.resolve(traceIds.map((id) => makeSummaryRow(id))),
           })
           .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve(traceIds.map((id) => makeSpanRow(id, `${id}-s`))),
+            json: () => Promise.resolve(traceIds.map((id) => makeSpanRow(id, `${id}-s`))),
           });
 
         const service = new ClickHouseTraceService({
@@ -1112,17 +1064,14 @@ describe("ClickHouseTraceService", () => {
         mockClickHouseQuery
           // resolve: min/max OccurredAt for the ids (no occurredAt passed)
           .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
+            json: () => Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
           })
           // full-list summary — OOM
           .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
           // batch 1: summary (0-24) then spans
           .mockResolvedValueOnce({
             json: () =>
-              Promise.resolve(
-                traceIds.slice(0, 25).map((id) => makeSummaryRow(id)),
-              ),
+              Promise.resolve(traceIds.slice(0, 25).map((id) => makeSummaryRow(id))),
           })
           .mockResolvedValueOnce({
             json: () =>
@@ -1133,15 +1082,11 @@ describe("ClickHouseTraceService", () => {
           // batch 2: summary (25-29) then spans
           .mockResolvedValueOnce({
             json: () =>
-              Promise.resolve(
-                traceIds.slice(25).map((id) => makeSummaryRow(id)),
-              ),
+              Promise.resolve(traceIds.slice(25).map((id) => makeSummaryRow(id))),
           })
           .mockResolvedValueOnce({
             json: () =>
-              Promise.resolve(
-                traceIds.slice(25).map((id) => makeSpanRow(id, `${id}-s`)),
-              ),
+              Promise.resolve(traceIds.slice(25).map((id) => makeSpanRow(id, `${id}-s`))),
           });
 
         const service = new ClickHouseTraceService({
@@ -1166,9 +1111,7 @@ describe("ClickHouseTraceService", () => {
       });
 
       it("does not batch-retry non-OOM errors", async () => {
-        mockClickHouseQuery.mockRejectedValue(
-          new Error("SYNTAX_ERROR: bad query"),
-        );
+        mockClickHouseQuery.mockRejectedValue(new Error("SYNTAX_ERROR: bad query"));
 
         const service = new ClickHouseTraceService({
           prisma: {
@@ -1212,12 +1155,10 @@ describe("ClickHouseTraceService", () => {
         // Both bounds present in both the outer scan and the inner dedup
         // subquery (a dropped upper bound would leave the read half-open).
         expect(
-          summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ??
-            [],
+          summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ?? [],
         ).toHaveLength(2);
         expect(
-          summaryCall.query.match(/OccurredAt <= fromUnixTimestamp64Milli/g) ??
-            [],
+          summaryCall.query.match(/OccurredAt <= fromUnixTimestamp64Milli/g) ?? [],
         ).toHaveLength(2);
         expect(summaryCall.query_params.fromMs).toBe(1_000_000 - TWO_DAYS_MS);
         expect(summaryCall.query_params.toMs).toBe(2_000_000 + TWO_DAYS_MS);
@@ -1230,8 +1171,7 @@ describe("ClickHouseTraceService", () => {
         mockClickHouseQuery
           // resolve: min/max OccurredAt for the trace ids (light sort-key seek)
           .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
+            json: () => Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
           })
           .mockResolvedValueOnce({
             json: () => Promise.resolve([makeSummaryRow("trace-0")]),
@@ -1255,8 +1195,7 @@ describe("ClickHouseTraceService", () => {
         const summaryCall = mockClickHouseQuery.mock.calls[1]![0];
         // Bounded to the resolved window (±2 days) in outer scan and inner dedup.
         expect(
-          summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ??
-            [],
+          summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ?? [],
         ).toHaveLength(2);
         expect(summaryCall.query_params.fromMs).toBe(1_000_000 - TWO_DAYS_MS);
         expect(summaryCall.query_params.toMs).toBe(2_000_000 + TWO_DAYS_MS);
@@ -1327,12 +1266,8 @@ describe("ClickHouseTraceService", () => {
 
 describe("isClickHouseMemoryLimitError", () => {
   it("recognizes the resilient client's translated query_memory_exceeded", async () => {
-    const { isClickHouseMemoryLimitError } = await import(
-      "../clickhouse-trace.service"
-    );
-    const { QueryMemoryExceededError } = await import(
-      "~/server/app-layer/traces/errors"
-    );
+    const { isClickHouseMemoryLimitError } = await import("../clickhouse-trace.service");
+    const { QueryMemoryExceededError } = await import("~/server/app-layer/traces/errors");
 
     const translated = new QueryMemoryExceededError({
       reasons: [new Error("some driver detail without the fragment")],
@@ -1341,31 +1276,21 @@ describe("isClickHouseMemoryLimitError", () => {
   });
 
   it("recognizes a handled error wrapping a raw MEMORY_LIMIT_EXCEEDED in reasons", async () => {
-    const { isClickHouseMemoryLimitError } = await import(
-      "../clickhouse-trace.service"
-    );
-    const { ClickHouseUnavailableError } = await import(
-      "~/server/app-layer/traces/errors"
-    );
+    const { isClickHouseMemoryLimitError } = await import("../clickhouse-trace.service");
+    const { ClickHouseUnavailableError } =
+      await import("~/server/app-layer/traces/errors");
 
     const wrapped = new ClickHouseUnavailableError({
-      reasons: [
-        new Error("Code: 241. DB::Exception: ... (MEMORY_LIMIT_EXCEEDED)"),
-      ],
+      reasons: [new Error("Code: 241. DB::Exception: ... (MEMORY_LIMIT_EXCEEDED)")],
     });
     expect(isClickHouseMemoryLimitError(wrapped)).toBe(true);
   });
 
   it("does not match an unrelated handled error", async () => {
-    const { isClickHouseMemoryLimitError } = await import(
-      "../clickhouse-trace.service"
-    );
-    const { ClickHouseUnavailableError } = await import(
-      "~/server/app-layer/traces/errors"
-    );
+    const { isClickHouseMemoryLimitError } = await import("../clickhouse-trace.service");
+    const { ClickHouseUnavailableError } =
+      await import("~/server/app-layer/traces/errors");
 
-    expect(isClickHouseMemoryLimitError(new ClickHouseUnavailableError())).toBe(
-      false,
-    );
+    expect(isClickHouseMemoryLimitError(new ClickHouseUnavailableError())).toBe(false);
   });
 });

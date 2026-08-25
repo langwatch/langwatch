@@ -124,16 +124,11 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
    */
   private parametersAsEntryInputs(): Record<string, string> {
     return Object.fromEntries(
-      Object.entries(this.parameters).map(([name, value]) => [
-        name,
-        String(value),
-      ]),
+      Object.entries(this.parameters).map(([name, value]) => [name, String(value)]),
     );
   }
 
-  private resolveMappedInputValues(
-    agentInput: AgentInput,
-  ): Record<string, string> {
+  private resolveMappedInputValues(agentInput: AgentInput): Record<string, string> {
     const declaredInputs =
       this.config.inputs.length > 0
         ? this.config.inputs
@@ -154,9 +149,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       return record;
     }
 
-    const lastUserMessage = agentInput.messages.findLast(
-      (m) => m.role === "user",
-    );
+    const lastUserMessage = agentInput.messages.findLast((m) => m.role === "user");
     const inputValue =
       typeof lastUserMessage?.content === "string"
         ? lastUserMessage.content
@@ -184,8 +177,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
     // in the DSL (there shouldn't be any — they're stripped on save) are
     // overwritten by the fresh values to avoid leaking stale/decrypted data.
     const existingSecrets =
-      (this.config.workflow.secrets as Record<string, string> | undefined) ??
-      {};
+      (this.config.workflow.secrets as Record<string, string> | undefined) ?? {};
     const workflow = {
       ...this.config.workflow,
       api_key: this.projectApiKey,
@@ -220,15 +212,11 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       } catch (fetchError) {
         const cause =
           fetchError instanceof Error && "cause" in fetchError
-            ? ` (cause: ${String(
-                (fetchError as Error & { cause?: unknown }).cause,
-              )})`
+            ? ` (cause: ${String((fetchError as Error & { cause?: unknown }).cause)})`
             : "";
         throw new Error(
           `Workflow execution failed: fetch to ${this.nlpServiceUrl}/go/studio/execute_sync failed - ${
-            fetchError instanceof Error
-              ? fetchError.message
-              : String(fetchError)
+            fetchError instanceof Error ? fetchError.message : String(fetchError)
           }${cause}`,
         );
       }

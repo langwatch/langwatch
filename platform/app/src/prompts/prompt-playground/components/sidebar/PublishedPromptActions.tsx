@@ -41,8 +41,7 @@ export function PublishedPromptActions({
 }: PublishedPromptActionsProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
-  const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] =
-    useState(false);
+  const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] = useState(false);
   const { open, setOpen } = useDisclosure();
   const { deletePrompt } = usePrompts();
   const { project } = useOrganizationTeamProject();
@@ -172,10 +171,7 @@ export function PublishedPromptActions({
               </Menu.Item>
             )}
             {hasCopies && (
-              <Menu.Item
-                value="push"
-                onClick={() => setIsPushToCopiesDialogOpen(true)}
-              >
+              <Menu.Item value="push" onClick={() => setIsPushToCopiesDialogOpen(true)}>
                 <ArrowUp size={16} /> Push to replicas
               </Menu.Item>
             )}
@@ -200,8 +196,7 @@ export function PublishedPromptActions({
                     form: { currentValues: defaultValues },
                     meta: {
                       title: defaultValues.handle ?? null,
-                      versionNumber:
-                        defaultValues.versionMetadata?.versionNumber,
+                      versionNumber: defaultValues.versionMetadata?.versionNumber,
                       openHistoryOnLoad: true,
                     },
                     variableValues: {},
@@ -260,9 +255,7 @@ export function PublishedPromptActions({
       <CopyPromptDialog
         open={isCopyDialogOpen}
         onClose={() => setIsCopyDialogOpen(false)}
-        onSuccess={() =>
-          void utils.prompts.getAllPromptsForProject.invalidate()
-        }
+        onSuccess={() => void utils.prompts.getAllPromptsForProject.invalidate()}
         promptId={promptId}
         promptName={getDisplayHandle(promptHandle)}
       />

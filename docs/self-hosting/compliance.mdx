@@ -15,31 +15,36 @@ The right tier for your organization depends on which mechanisms you
 need on day one, so read the map below before you commit to a
 deployment plan.
 
-<Info>**Pairs with:** [AI Governance → Compliance architecture](/ai-governance/compliance-architecture). That page documents the underlying substrate; this page narrows it to "what runs in *your* self-hosted box without buying anything else".</Info>
+<Info>
+  **Pairs with:** [AI Governance → Compliance
+  architecture](/ai-governance/compliance-architecture). That page documents the
+  underlying substrate; this page narrows it to "what runs in *your* self-hosted box
+  without buying anything else".
+</Info>
 
 ## TL;DR: open-core split
 
-| Capability | Apache 2.0 floor | Enterprise |
-|---|---|---|
-| Single unified trace store + append-only event_log | ✅ | ✅ |
-| Per-project tenancy + RBAC catalog (5 default roles) | ✅ | ✅ |
-| Custom roles via `CustomRolePermissions` | ❌ | ✅ |
-| PII redaction at trace ingest (Presidio) | ✅ | ✅ |
-| Personal IDE keys + CLI device-flow login | ✅ | ✅ |
-| AI Tools Portal at `/me` (3-tile types, admin catalog) | ✅ | ✅ |
-| Routing policies for the AI Gateway | ✅ | ✅ |
-| Ingestion sources, `otel_generic` only, 1 source max | ✅ | ✅ |
-| Ingestion sources, multi-source (Workato, S3, Copilot Studio, OpenAI/Anthropic compliance APIs) | ❌ | ✅ |
-| Retention, platform default window | ✅ | ✅ |
-| Retention, configurable per-scope policies (extended windows) | ❌ | ✅ |
-| Billing spend ledger, fixed 13-month retention (with ClickHouse) | ✅ | ✅ |
-| Webhook endpoints platform (signed event delivery, retries, replay) | ❌ | ✅ |
-| Billing events APIs (spend-events pull, summaries, replay) | ❌ | ✅ |
-| Anomaly Rules, admin-curated detection + dispatch | ❌ | ✅ |
-| OCSF/SIEM export (Splunk, Datadog, Sentinel pull API) | ❌ | ✅ |
-| Audit log, org-wide cross-team | ❌ | ✅ |
-| SCIM provisioning | ❌ | ✅ |
-| Tamper-evidence (Merkle-root publication) | ❌ | Enterprise (post-GA follow-up) |
+| Capability                                                                                      | Apache 2.0 floor | Enterprise                     |
+| ----------------------------------------------------------------------------------------------- | ---------------- | ------------------------------ |
+| Single unified trace store + append-only event_log                                              | ✅               | ✅                             |
+| Per-project tenancy + RBAC catalog (5 default roles)                                            | ✅               | ✅                             |
+| Custom roles via `CustomRolePermissions`                                                        | ❌               | ✅                             |
+| PII redaction at trace ingest (Presidio)                                                        | ✅               | ✅                             |
+| Personal IDE keys + CLI device-flow login                                                       | ✅               | ✅                             |
+| AI Tools Portal at `/me` (3-tile types, admin catalog)                                          | ✅               | ✅                             |
+| Routing policies for the AI Gateway                                                             | ✅               | ✅                             |
+| Ingestion sources, `otel_generic` only, 1 source max                                            | ✅               | ✅                             |
+| Ingestion sources, multi-source (Workato, S3, Copilot Studio, OpenAI/Anthropic compliance APIs) | ❌               | ✅                             |
+| Retention, platform default window                                                              | ✅               | ✅                             |
+| Retention, configurable per-scope policies (extended windows)                                   | ❌               | ✅                             |
+| Billing spend ledger, fixed 13-month retention (with ClickHouse)                                | ✅               | ✅                             |
+| Webhook endpoints platform (signed event delivery, retries, replay)                             | ❌               | ✅                             |
+| Billing events APIs (spend-events pull, summaries, replay)                                      | ❌               | ✅                             |
+| Anomaly Rules, admin-curated detection + dispatch                                               | ❌               | ✅                             |
+| OCSF/SIEM export (Splunk, Datadog, Sentinel pull API)                                           | ❌               | ✅                             |
+| Audit log, org-wide cross-team                                                                  | ❌               | ✅                             |
+| SCIM provisioning                                                                               | ❌               | ✅                             |
+| Tamper-evidence (Merkle-root publication)                                                       | ❌               | Enterprise (post-GA follow-up) |
 
 The split is enforced at three layers, see
 [Open-core licensing](/ai-governance/overview#open-core-licensing) for
@@ -53,18 +58,18 @@ for the canonical SPDX header text on each tier.
 SOC 2 Type II asks for **operating-effectiveness evidence over a 6-12 month
 window** that your security controls work as designed. The self-hosted
 Apache 2.0 floor gives you the controls + the audit-evidence machinery for
-the *common-criteria* baseline:
+the _common-criteria_ baseline:
 
-| TSC | Mechanism | Tier |
-|---|---|---|
-| CC6.1, Logical access | RBAC catalog + per-project tenancy + RoleBinding scopes | Apache 2.0 |
-| CC6.6, Logical access (admin) | RBAC ADMIN role + `governance:manage` + `aiTools:manage` | Apache 2.0 |
-| CC6.7, Termination of access | CLI token revoke on user deactivation (CliTokenRevocationService, Phase 1B-1) | Apache 2.0 |
-| CC7.1, Detection | Anomaly rules on activity-event traffic (spend-spike, geo-mismatch, off-hours) | **Enterprise** |
-| CC7.2, Monitoring | Append-only event_log + 30-day retention | Apache 2.0 |
-| CC7.2, Monitoring (≥1y) | Per-scope retention policies with extended (multi-year) windows | **Enterprise** |
-| CC7.4, Incident response | OCSF v1.1 SIEM export with cursor pagination | **Enterprise** |
-| CC8.1, Change management | Per-org settings audit + SCIM provisioning history | **Enterprise** |
+| TSC                           | Mechanism                                                                      | Tier           |
+| ----------------------------- | ------------------------------------------------------------------------------ | -------------- |
+| CC6.1, Logical access         | RBAC catalog + per-project tenancy + RoleBinding scopes                        | Apache 2.0     |
+| CC6.6, Logical access (admin) | RBAC ADMIN role + `governance:manage` + `aiTools:manage`                       | Apache 2.0     |
+| CC6.7, Termination of access  | CLI token revoke on user deactivation (CliTokenRevocationService, Phase 1B-1)  | Apache 2.0     |
+| CC7.1, Detection              | Anomaly rules on activity-event traffic (spend-spike, geo-mismatch, off-hours) | **Enterprise** |
+| CC7.2, Monitoring             | Append-only event_log + 30-day retention                                       | Apache 2.0     |
+| CC7.2, Monitoring (≥1y)       | Per-scope retention policies with extended (multi-year) windows                | **Enterprise** |
+| CC7.4, Incident response      | OCSF v1.1 SIEM export with cursor pagination                                   | **Enterprise** |
+| CC8.1, Change management      | Per-org settings audit + SCIM provisioning history                             | **Enterprise** |
 
 **Bottom line**: self-hosted Apache 2.0 is sufficient for the access-control + 30-day-monitoring portions of SOC 2 CC. Detection (CC7.1) and long-window monitoring (CC7.2 ≥1y) and incident-response export (CC7.4) and change-mgmt audit (CC8.1) all require Enterprise.
 
@@ -79,15 +84,15 @@ require Enterprise.
 
 ## GDPR: Art. 32 + Art. 30 mapping
 
-| Article | Mechanism | Tier |
-|---|---|---|
-| Art. 32(1)(a), pseudonymisation | PII redaction at trace ingest (Presidio) | Apache 2.0 |
-| Art. 32(1)(b), confidentiality | Per-org tenancy + Layer-1 cross-org guards | Apache 2.0 |
-| Art. 32(1)(d), restoration | Backups (env-configured), trace store replay | Apache 2.0 |
-| Art. 30, record of processing | event_log @ 30d retention | Apache 2.0 |
-| Art. 30, record of processing (extended) | event_log under extended per-scope retention policies | **Enterprise** |
-| Art. 33, breach notification | Anomaly rule dispatch (Slack, PagerDuty, SIEM webhook, email) | **Enterprise** |
-| Art. 35, DPIA evidence | OCSF/SIEM export bundle | **Enterprise** |
+| Article                                  | Mechanism                                                     | Tier           |
+| ---------------------------------------- | ------------------------------------------------------------- | -------------- |
+| Art. 32(1)(a), pseudonymisation          | PII redaction at trace ingest (Presidio)                      | Apache 2.0     |
+| Art. 32(1)(b), confidentiality           | Per-org tenancy + Layer-1 cross-org guards                    | Apache 2.0     |
+| Art. 32(1)(d), restoration               | Backups (env-configured), trace store replay                  | Apache 2.0     |
+| Art. 30, record of processing            | event_log @ 30d retention                                     | Apache 2.0     |
+| Art. 30, record of processing (extended) | event_log under extended per-scope retention policies         | **Enterprise** |
+| Art. 33, breach notification             | Anomaly rule dispatch (Slack, PagerDuty, SIEM webhook, email) | **Enterprise** |
+| Art. 35, DPIA evidence                   | OCSF/SIEM export bundle                                       | **Enterprise** |
 
 If your processor agreement requires retention longer than 30 days OR a
 named breach-notification mechanism (Art. 33's "without undue delay,
@@ -138,7 +143,7 @@ Most enterprise-deploying-an-LLM-agent uses fall under Art. 12 (1-3
 year retention windows). Art. 18 record-keeping for high-risk systems
 explicitly requires the Enterprise retention extension.
 
-## What's *intentionally* unavailable on Apache 2.0
+## What's _intentionally_ unavailable on Apache 2.0
 
 These are deliberate design boundaries that keep the Apache 2.0 floor
 free to run and free to modify:
@@ -149,7 +154,7 @@ free to run and free to modify:
   CC7.2 monitoring + Art. 30 GDPR processing-records-baseline.
 - **OCSF/SIEM export** is Enterprise. Apache 2.0 customers can still
   pull traces from the trace store via the same query API the dashboard
-  uses; what's gated is the *normalised OCSF event stream* with cursor
+  uses; what's gated is the _normalised OCSF event stream_ with cursor
   pagination + tenant-isolated read endpoints.
 - **Custom roles via `CustomRolePermissions` JSON** is Enterprise. The
   default 5-role RBAC catalog (ADMIN, MEMBER, EXTERNAL + per-resource

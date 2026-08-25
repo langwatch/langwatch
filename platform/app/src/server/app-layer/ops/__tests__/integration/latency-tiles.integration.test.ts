@@ -5,10 +5,7 @@ import {
 } from "@langwatch/group-queue";
 import type { Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import {
-  latencyAllTimeKey,
-  latencyMinuteBucketKey,
-} from "~/shared/ops/latency";
+import { latencyAllTimeKey, latencyMinuteBucketKey } from "~/shared/ops/latency";
 import {
   getTestRedisConnection,
   startTestContainers,
@@ -58,13 +55,7 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
     for (const name of queueNames) {
       let cursor = "0";
       do {
-        const [next, batch] = await redis.scan(
-          cursor,
-          "MATCH",
-          `${name}*`,
-          "COUNT",
-          200,
-        );
+        const [next, batch] = await redis.scan(cursor, "MATCH", `${name}*`, "COUNT", 200);
         if (batch.length > 0) await redis.unlink(...batch);
         cursor = next;
       } while (cursor !== "0");
@@ -86,10 +77,7 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
       payload: {
         parse(value): TestPayload {
           const payload = value as Partial<TestPayload>;
-          if (
-            typeof payload.id !== "string" ||
-            typeof payload.groupId !== "string"
-          ) {
+          if (typeof payload.id !== "string" || typeof payload.groupId !== "string") {
             throw new Error("Invalid latency-test payload");
           }
           return payload as TestPayload;
@@ -100,16 +88,11 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
     });
     const dependencies = { redis };
     const producer = new GroupQueueProducer(definition, dependencies);
-    const consumer = new GroupQueueConsumer(definition, dependencies).handle(
-      process,
-    );
+    const consumer = new GroupQueueConsumer(definition, dependencies).handle(process);
     const queue: TestQueue = {
       send: (payload) => producer.send(payload),
       waitUntilReady: async () => {
-        await Promise.all([
-          producer.waitUntilReady(),
-          consumer.waitUntilReady(),
-        ]);
+        await Promise.all([producer.waitUntilReady(), consumer.waitUntilReady()]);
       },
       close: async () => {
         await producer.close();
@@ -121,11 +104,7 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
     return { queue, name };
   }
 
-  async function waitForLatencyCount(
-    name: string,
-    target: number,
-    timeoutMs: number,
-  ) {
+  async function waitForLatencyCount(name: string, target: number, timeoutMs: number) {
     const key = `${name}:gq:stats:latencies-ms`;
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
@@ -196,12 +175,9 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
         // Drive the real collector — stub queueRepo so it sees exactly this
         // suite's queue. Any future drift in key names, filtering, or
         // percentile math inside OpsMetricsCollector will break this test.
-        const queueRepoStub: QueueRepository = Object.assign(
-          new NullQueueRepository(),
-          {
-            discoverQueueNames: async () => [name],
-          },
-        );
+        const queueRepoStub: QueueRepository = Object.assign(new NullQueueRepository(), {
+          discoverQueueNames: async () => [name],
+        });
         const collector = new OpsMetricsCollector({
           redis,
           queueRepo: queueRepoStub,
@@ -217,12 +193,8 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
           const data = collector.getDashboardData();
           expect(data.latencyP50Ms).toBeGreaterThan(0);
           expect(data.latencyP99Ms).toBeGreaterThanOrEqual(data.latencyP50Ms);
-          expect(data.peakLatencyP50Ms).toBeGreaterThanOrEqual(
-            data.latencyP50Ms,
-          );
-          expect(data.peakLatencyP99Ms).toBeGreaterThanOrEqual(
-            data.latencyP99Ms,
-          );
+          expect(data.peakLatencyP50Ms).toBeGreaterThanOrEqual(data.latencyP50Ms);
+          expect(data.peakLatencyP99Ms).toBeGreaterThanOrEqual(data.latencyP99Ms);
         } finally {
           collector.stop();
         }
@@ -247,17 +219,12 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
         // The completions must have landed in all three histogram tiers.
         const allTime = await redis.hgetall(latencyAllTimeKey(name));
         expect(Object.keys(allTime).length).toBeGreaterThan(0);
-        const minute = await redis.hgetall(
-          latencyMinuteBucketKey(name, Date.now()),
-        );
+        const minute = await redis.hgetall(latencyMinuteBucketKey(name, Date.now()));
         expect(Object.keys(minute).length).toBeGreaterThan(0);
 
-        const queueRepoStub: QueueRepository = Object.assign(
-          new NullQueueRepository(),
-          {
-            discoverQueueNames: async () => [name],
-          },
-        );
+        const queueRepoStub: QueueRepository = Object.assign(new NullQueueRepository(), {
+          discoverQueueNames: async () => [name],
+        });
         const snapshotRepo = new SnapshotRedisRepository(redis);
         const collector = new OpsMetricsCollector({
           redis,
@@ -286,9 +253,7 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
           // The reader path: the persisted artifact round-trips through the
           // wire schema with the windows intact — what any pod would serve.
           const served = await snapshotRepo.readDetail();
-          expect(served?.latencyWindows?.hour?.p50Ms).toBe(
-            windows?.hour?.p50Ms,
-          );
+          expect(served?.latencyWindows?.hour?.p50Ms).toBe(windows?.hour?.p50Ms);
         } finally {
           collector.stop();
         }

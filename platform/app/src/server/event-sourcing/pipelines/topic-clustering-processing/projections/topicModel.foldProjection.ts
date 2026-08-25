@@ -1,8 +1,5 @@
 import type { StateProjectionStore } from "@langwatch/eventing";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
 import {
   TOPIC_CLUSTERING_PROJECTION_VERSIONS,
   TOPIC_MODEL_RECORD_MODE,
@@ -86,10 +83,7 @@ export class TopicModelFoldProjection
     // occurredAt, which would fold last and delete the clustering delta.
     // The guard also keeps live folds identical to replay, whose read path
     // DOES collapse duplicate idempotency keys.
-    if (
-      event.data.source === TOPIC_MODEL_RECORD_SOURCE.SEED &&
-      state.Topics.length > 0
-    ) {
+    if (event.data.source === TOPIC_MODEL_RECORD_SOURCE.SEED && state.Topics.length > 0) {
       return state;
     }
 
@@ -115,10 +109,7 @@ export class TopicModelFoldProjection
     return {
       ...state,
       ProjectId: projectId,
-      Topics: [
-        ...state.Topics.filter((t) => !recordedIds.has(t.id)),
-        ...recorded,
-      ],
+      Topics: [...state.Topics.filter((t) => !recordedIds.has(t.id)), ...recorded],
     };
   }
 }

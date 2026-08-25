@@ -1,8 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import {
-  IncomingWebhook,
-  type IncomingWebhookSendArguments,
-} from "@slack/webhook";
+import { IncomingWebhook, type IncomingWebhookSendArguments } from "@slack/webhook";
 import type {
   LicensePurchaseNotificationPayload,
   PlanLimitNotificationContext,
@@ -280,9 +277,7 @@ const buildCancelledBlocks = (
  */
 export class NotificationService {
   private readonly config: NotificationServiceOptions["config"];
-  private readonly createSlackWebhook: (
-    url: string,
-  ) => Pick<IncomingWebhook, "send">;
+  private readonly createSlackWebhook: (url: string) => Pick<IncomingWebhook, "send">;
   private readonly fetchFn: typeof fetch;
   private readonly errorReporter: BillingErrorReporter;
   private readonly usageLimitEmail: UsageLimitEmailAdapter;
@@ -295,8 +290,7 @@ export class NotificationService {
         new IncomingWebhook(url, {
           timeout: EXTERNAL_SERVICE_TIMEOUT_MS,
         }));
-    this.fetchFn =
-      options?.fetchFn ?? (((...args) => fetch(...args)) as typeof fetch);
+    this.fetchFn = options?.fetchFn ?? (((...args) => fetch(...args)) as typeof fetch);
     this.errorReporter = options.errorReporter ?? NullBillingErrorReporter.create();
     this.usageLimitEmail = options.usageLimitEmail ?? NullUsageLimitEmailAdapter.create();
   }
@@ -345,7 +339,9 @@ export class NotificationService {
       await webhook.send(body);
     } catch (error) {
       logger.error({ error }, errorLog);
-      this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
+      this.errorReporter.capture(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
   }
 
@@ -384,9 +380,7 @@ export class NotificationService {
   /**
    * Sends a Slack alert when a plan limit is reached.
    */
-  async sendSlackPlanLimitAlert(
-    context: PlanLimitNotificationContext,
-  ): Promise<void> {
+  async sendSlackPlanLimitAlert(context: PlanLimitNotificationContext): Promise<void> {
     await this.sendSlackMessage({
       channelUrl: this.config.slackPlanLimitChannel,
       body: {
@@ -473,16 +467,13 @@ export class NotificationService {
   /**
    * Sends a Slack notification for a new signup.
    */
-  async sendSlackSignupEvent(
-    payload: SignupNotificationPayload,
-  ): Promise<void> {
+  async sendSlackSignupEvent(payload: SignupNotificationPayload): Promise<void> {
     const details = [
       payload.phoneNumber,
       payload.utmCampaign ? `Campaign: ${payload.utmCampaign}` : null,
     ].filter(Boolean);
 
-    const organizationDetails =
-      details.length > 0 ? `, ${details.join(", ")}` : "";
+    const organizationDetails = details.length > 0 ? `, ${details.join(", ")}` : "";
 
     await this.sendSlackMessage({
       channelUrl: this.config.slackSignupsChannel,
@@ -540,9 +531,7 @@ export class NotificationService {
   /**
    * Submits a HubSpot signup lead form when a new user registers.
    */
-  async sendHubspotSignupForm(
-    payload: SignupNotificationPayload,
-  ): Promise<void> {
+  async sendHubspotSignupForm(payload: SignupNotificationPayload): Promise<void> {
     const { hubspotPortalId, hubspotFormId } = this.config;
 
     if (!hubspotPortalId || !hubspotFormId) {
@@ -551,8 +540,7 @@ export class NotificationService {
 
     const nameParts = (payload.userName ?? "").split(" ").filter(Boolean);
     const firstName = nameParts[0] ?? "";
-    const lastName =
-      nameParts.length > 1 ? nameParts[nameParts.length - 1]! : "";
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1]! : "";
 
     const signUpData = payload.signUpData;
 
@@ -612,10 +600,7 @@ export class NotificationService {
     const url = `https://api.hsforms.com/submissions/v3/integration/submit/${hubspotPortalId}/${hubspotFormId}`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      EXTERNAL_SERVICE_TIMEOUT_MS,
-    );
+    const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_SERVICE_TIMEOUT_MS);
 
     try {
       const response = await this.fetchFn(url, {
@@ -633,11 +618,10 @@ export class NotificationService {
         );
       }
     } catch (error) {
-      logger.error(
-        { error },
-        "Failed to send HubSpot signup form notification",
+      logger.error({ error }, "Failed to send HubSpot signup form notification");
+      this.errorReporter.capture(
+        error instanceof Error ? error : new Error(String(error)),
       );
-      this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
     } finally {
       clearTimeout(timeoutId);
     }
@@ -646,9 +630,7 @@ export class NotificationService {
   /**
    * Submits a HubSpot form when a plan limit is reached.
    */
-  async sendHubspotPlanLimitForm(
-    context: PlanLimitNotificationContext,
-  ): Promise<void> {
+  async sendHubspotPlanLimitForm(context: PlanLimitNotificationContext): Promise<void> {
     const { hubspotPortalId, hubspotReachedLimitFormId } = this.config;
 
     if (!hubspotPortalId || !hubspotReachedLimitFormId) {
@@ -683,10 +665,7 @@ export class NotificationService {
     const url = `https://api.hsforms.com/submissions/v3/integration/submit/${hubspotPortalId}/${hubspotReachedLimitFormId}`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      EXTERNAL_SERVICE_TIMEOUT_MS,
-    );
+    const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_SERVICE_TIMEOUT_MS);
 
     try {
       const response = await this.fetchFn(url, {
@@ -705,7 +684,9 @@ export class NotificationService {
       }
     } catch (error) {
       logger.error({ error }, "Failed to send HubSpot plan-limit notification");
-      this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
+      this.errorReporter.capture(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     } finally {
       clearTimeout(timeoutId);
     }

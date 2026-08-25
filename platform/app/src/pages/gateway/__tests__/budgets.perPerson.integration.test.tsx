@@ -148,9 +148,7 @@ describe("the Budgets list rendering a per-person template", () => {
     renderWith([templateRow({ endUsersSeen: 0, endUsersOver: 0 })]);
 
     const cell = screen.getByTestId("budget-attributed-user-spend");
-    expect(
-      within(cell).getByText("0 of 0 people over cap"),
-    ).toBeInTheDocument();
+    expect(within(cell).getByText("0 of 0 people over cap")).toBeInTheDocument();
     expect(within(cell).queryByText("—")).toBeNull();
   });
 

@@ -1,7 +1,4 @@
-import {
-  CADENCE_WINDOW_MS,
-  NOTIFICATION_CADENCES,
-} from "@langwatch/automation-contract";
+import { CADENCE_WINDOW_MS, NOTIFICATION_CADENCES } from "@langwatch/automation-contract";
 import { describe, expect, it, vi } from "vitest";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import type { TriggerSummary } from "~/server/app-layer/automations/trigger-summary";
@@ -19,20 +16,16 @@ describe("trigger action classification", () => {
   describe("when classifying notify actions", () => {
     it("treats email and Slack as notify", () => {
       expect(NOTIFY_TRIGGER_ACTIONS.has(TriggerAction.SEND_EMAIL)).toBe(true);
-      expect(NOTIFY_TRIGGER_ACTIONS.has(TriggerAction.SEND_SLACK_MESSAGE)).toBe(
-        true,
-      );
+      expect(NOTIFY_TRIGGER_ACTIONS.has(TriggerAction.SEND_SLACK_MESSAGE)).toBe(true);
     });
   });
 
   describe("when classifying persist actions", () => {
     it("treats dataset and annotation-queue writes as persist", () => {
-      expect(PERSIST_TRIGGER_ACTIONS.has(TriggerAction.ADD_TO_DATASET)).toBe(
+      expect(PERSIST_TRIGGER_ACTIONS.has(TriggerAction.ADD_TO_DATASET)).toBe(true);
+      expect(PERSIST_TRIGGER_ACTIONS.has(TriggerAction.ADD_TO_ANNOTATION_QUEUE)).toBe(
         true,
       );
-      expect(
-        PERSIST_TRIGGER_ACTIONS.has(TriggerAction.ADD_TO_ANNOTATION_QUEUE),
-      ).toBe(true);
     });
   });
 
@@ -43,10 +36,9 @@ describe("trigger action classification", () => {
       for (const action of allActions) {
         const inNotify = NOTIFY_TRIGGER_ACTIONS.has(action);
         const inPersist = PERSIST_TRIGGER_ACTIONS.has(action);
-        expect(
-          inNotify !== inPersist,
-          `${action} must be in exactly one class`,
-        ).toBe(true);
+        expect(inNotify !== inPersist, `${action} must be in exactly one class`).toBe(
+          true,
+        );
       }
     });
 
@@ -70,9 +62,9 @@ describe("triggerReadsEvaluations", () => {
     });
 
     it("is false when the query is trace-only", () => {
-      expect(
-        triggerReadsEvaluations({ filters: {}, filterQuery: "status:error" }),
-      ).toBe(false);
+      expect(triggerReadsEvaluations({ filters: {}, filterQuery: "status:error" })).toBe(
+        false,
+      );
     });
 
     it("ignores the legacy filters when a filterQuery is present", () => {
@@ -231,9 +223,7 @@ describe("dispatchTriggerAction trace loading", () => {
     return {
       automation: { updateLastRunAt: vi.fn().mockResolvedValue(undefined) },
       projects: {
-        tryGetById: vi
-          .fn()
-          .mockResolvedValue({ id: "project-1", name: "P", slug: "p" }),
+        tryGetById: vi.fn().mockResolvedValue({ id: "project-1", name: "P", slug: "p" }),
       },
       traceById: vi.fn().mockResolvedValue({
         trace_id: "trace-1",
@@ -289,9 +279,7 @@ describe("dispatchTriggerAction trace loading", () => {
           tenantId: "project-1",
           foldState,
           project: { id: "project-1", name: "P", slug: "p" } as NonNullable<
-            Awaited<
-              ReturnType<TriggerActionDispatchDeps["projects"]["tryGetById"]>
-            >
+            Awaited<ReturnType<TriggerActionDispatchDeps["projects"]["tryGetById"]>>
           >,
         });
 

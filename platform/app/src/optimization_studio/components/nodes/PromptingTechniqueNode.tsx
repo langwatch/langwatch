@@ -26,14 +26,12 @@ export const PromptingTechniqueDraggingNode = forwardRef(
   },
 );
 
-export const PromptingTechniqueNode = forwardRef(
-  function PromptingTechniqueNode(
-    _props: NodeProps<Node<PromptingTechnique>>,
-    _ref: Ref<HTMLDivElement>,
-  ) {
-    return null;
-  },
-);
+export const PromptingTechniqueNode = forwardRef(function PromptingTechniqueNode(
+  _props: NodeProps<Node<PromptingTechnique>>,
+  _ref: Ref<HTMLDivElement>,
+) {
+  return null;
+});
 
 export function PromptingTechniqueDropArea({
   id,
@@ -64,16 +62,14 @@ export function PromptingTechniqueWrapper({
     ref: string;
   };
 }) {
-  const { node, setNode, deleteNode, deselectAllNodes } = useWorkflowStore(
-    (state) => ({
-      node: decoratedBy?.ref
-        ? state.nodes.find((node) => node.id === decoratedBy.ref)
-        : undefined,
-      setNode: state.setNode,
-      deleteNode: state.deleteNode,
-      deselectAllNodes: state.deselectAllNodes,
-    }),
-  );
+  const { node, setNode, deleteNode, deselectAllNodes } = useWorkflowStore((state) => ({
+    node: decoratedBy?.ref
+      ? state.nodes.find((node) => node.id === decoratedBy.ref)
+      : undefined,
+    setNode: state.setNode,
+    deleteNode: state.deleteNode,
+    deselectAllNodes: state.deselectAllNodes,
+  }));
   const hovered = false;
   const wrapperShadow = useColorModeValue(
     "0px 0px 4px 0px rgba(0, 0, 0, 0.1)",
@@ -94,9 +90,7 @@ export function PromptingTechniqueWrapper({
       fontSize="10px"
       boxShadow={wrapperShadow}
       outline={!!node.selected || hovered ? "1.5px solid" : "none"}
-      outlineColor={
-        node.selected ? selectionColor : hovered ? "gray.emphasized" : "none"
-      }
+      outlineColor={node.selected ? selectionColor : hovered ? "gray.emphasized" : "none"}
       gap={0}
       onClick={(e) => {
         let parent: HTMLElement | null = e.target as HTMLElement;
@@ -145,11 +139,7 @@ export function PromptingTechniqueWrapper({
         </Menu.Root>
       )}
       <HStack gap={2} width="full" paddingX={3} paddingY={2}>
-        <ComponentIcon
-          type={node.type as ComponentType}
-          cls={node.data.cls}
-          size="xs"
-        />
+        <ComponentIcon type={node.type as ComponentType} cls={node.data.cls} size="xs" />
         <Text fontSize="12px" fontWeight={500}>
           {node.data.cls}
         </Text>

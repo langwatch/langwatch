@@ -46,89 +46,84 @@ secured
       credential: "session",
     }),
   )
-  .post(
-    "/download",
-    zValidator("json", scenarioRunExportRequestSchema),
-    async (c) => {
-      const request = c.req.valid("json");
+  .post("/download", zValidator("json", scenarioRunExportRequestSchema), async (c) => {
+    const request = c.req.valid("json");
 
-      const session = await getServerAuthSession({ req: c.req.raw });
-      if (!session) {
-        throw new ScenarioRunExportUnauthenticatedError();
-      }
+    const session = await getServerAuthSession({ req: c.req.raw });
+    if (!session) {
+      throw new ScenarioRunExportUnauthenticatedError();
+    }
 
-      const hasPermission = await probeProjectPermission(
-        { session },
-        request.projectId,
-        "scenarios:view",
-      );
-      if (!hasPermission) {
-        throw new ScenarioRunExportForbiddenError(request.projectId);
-      }
+    const hasPermission = await probeProjectPermission(
+      { session },
+      request.projectId,
+      "scenarios:view",
+    );
+    if (!hasPermission) {
+      throw new ScenarioRunExportForbiddenError(request.projectId);
+    }
 
-      logger.info(
-        { projectId: request.projectId, mode: request.mode },
-        "Starting scenario run export download",
-      );
+    logger.info(
+      { projectId: request.projectId, mode: request.mode },
+      "Starting scenario run export download",
+    );
 
-      // A bulk export lifts a project's whole run history — full mode includes
-      // every conversation transcript — so the download has to be attributable
-      // to a user, not just permitted. Recorded before a byte is streamed.
-      await auditLog({
-        userId: session.user.id,
-        projectId: request.projectId,
-        action: "scenarioRuns.export",
-        targetKind: "project",
-        targetId: request.projectId,
-        args: {
-          mode: request.mode,
-          scenarioSetId: request.scenarioSetId,
-          scenarioId: request.scenarioId,
-          passFailStatus: request.passFailStatus,
-          startDate: request.startDate,
-          endDate: request.endDate,
-        },
-      });
+    // A bulk export lifts a project's whole run history — full mode includes
+    // every conversation transcript — so the download has to be attributable
+    // to a user, not just permitted. Recorded before a byte is streamed.
+    await auditLog({
+      userId: session.user.id,
+      projectId: request.projectId,
+      action: "scenarioRuns.export",
+      targetKind: "project",
+      targetId: request.projectId,
+      args: {
+        mode: request.mode,
+        scenarioSetId: request.scenarioSetId,
+        scenarioId: request.scenarioId,
+        passFailStatus: request.passFailStatus,
+        startDate: request.startDate,
+        endDate: request.endDate,
+      },
+    });
 
-      const exportId = generate(KSUID_RESOURCES.EXPORT).toString();
-      const broadcast = c.app.broadcast;
+    const exportId = generate(KSUID_RESOURCES.EXPORT).toString();
+    const broadcast = c.app.broadcast;
 
-      const today = new Date().toISOString().slice(0, 10);
-      // Content-Disposition's filename is a quoted-string. projectId is only
-      // constrained to `z.string()`, so a quote in it would close the quote and
-      // let the caller append parameters. Server-generated ids never contain
-      // one today, but nothing in the code enforces that.
-      const safeProjectId = request.projectId.replace(/[^\w.-]/g, "_");
-      const fileName = `${safeProjectId} - Scenario Runs - ${today} - ${request.mode}.csv`;
+    const today = new Date().toISOString().slice(0, 10);
+    // Content-Disposition's filename is a quoted-string. projectId is only
+    // constrained to `z.string()`, so a quote in it would close the quote and
+    // let the caller append parameters. Server-generated ids never contain
+    // one today, but nothing in the code enforces that.
+    const safeProjectId = request.projectId.replace(/[^\w.-]/g, "_");
+    const fileName = `${safeProjectId} - Scenario Runs - ${today} - ${request.mode}.csv`;
 
-      const service = c.app.simulationExports;
-      const totalCount = await service.getTotalCount({ request });
+    const service = c.app.simulationExports;
+    const totalCount = await service.getTotalCount({ request });
 
-      // CSV of repeated run-level values compresses ~9x, and the browser
-      // inflates it transparently before writing the .csv to disk — so this is
-      // a pure transfer win with no change to the file the user ends up with.
-      const headers = new Headers({
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Encoding": "gzip",
-        Vary: "Accept-Encoding",
-        "Content-Disposition": `attachment; filename="${fileName}"`,
-        "X-Export-Id": exportId,
-        "X-Total-Runs": String(totalCount),
-        "Access-Control-Expose-Headers":
-          "X-Export-Id, X-Total-Runs, Content-Disposition",
-      });
-      const stream = buildExportStream({
-        service,
-        request,
-        exportId,
-        totalCount,
-        signal: c.req.raw.signal,
-        broadcast,
-      });
+    // CSV of repeated run-level values compresses ~9x, and the browser
+    // inflates it transparently before writing the .csv to disk — so this is
+    // a pure transfer win with no change to the file the user ends up with.
+    const headers = new Headers({
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Encoding": "gzip",
+      Vary: "Accept-Encoding",
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+      "X-Export-Id": exportId,
+      "X-Total-Runs": String(totalCount),
+      "Access-Control-Expose-Headers": "X-Export-Id, X-Total-Runs, Content-Disposition",
+    });
+    const stream = buildExportStream({
+      service,
+      request,
+      exportId,
+      totalCount,
+      signal: c.req.raw.signal,
+      broadcast,
+    });
 
-      return new Response(gzipped(stream), { headers });
-    },
-  );
+    return new Response(gzipped(stream), { headers });
+  });
 
 /**
  * Gzips a stream while letting backpressure reach its producer.
@@ -144,13 +139,9 @@ secured
  * read-ahead is bounded in bytes (~800KB here) rather than in pages, and a
  * bigger page simply means fewer of them buffered.
  */
-function gzipped(
-  source: ReadableStream<Uint8Array>,
-): ReadableStream<Uint8Array> {
+function gzipped(source: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
   const gzip = createGzip();
-  const nodeSource = Readable.fromWeb(
-    source as Parameters<typeof Readable.fromWeb>[0],
-  );
+  const nodeSource = Readable.fromWeb(source as Parameters<typeof Readable.fromWeb>[0]);
 
   // `.pipe()` does not forward a source error the way `pipeThrough` does: it
   // unpipes and leaves the destination open, and the Readable's own 'error'

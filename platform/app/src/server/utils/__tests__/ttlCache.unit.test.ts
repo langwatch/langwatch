@@ -8,13 +8,7 @@ const { mockRedisStore, mockRedis } = vi.hoisted(() => {
       mockRedisStore.set(key, { value, ttl });
     }),
     set: vi.fn(
-      async (
-        key: string,
-        value: string,
-        ex: string,
-        ttl: number,
-        nx: string,
-      ) => {
+      async (key: string, value: string, ex: string, ttl: number, nx: string) => {
         if (nx === "NX" && mockRedisStore.has(key)) return null;
         mockRedisStore.set(key, { value, ttl });
         return "OK";
@@ -99,10 +93,7 @@ describe("TtlCache", () => {
     });
 
     it("serializes complex objects to JSON", async () => {
-      const cache = new TtlCache<{ name: string; count: number }>(
-        30_000,
-        "test:",
-      );
+      const cache = new TtlCache<{ name: string; count: number }>(30_000, "test:");
       const obj = { name: "test", count: 42 };
 
       await cache.set("obj1", obj);

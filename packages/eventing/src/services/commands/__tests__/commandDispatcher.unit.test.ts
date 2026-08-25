@@ -123,9 +123,7 @@ describe("processCommand", () => {
         validate: vi.fn().mockReturnValue({
           success: false,
           error: {
-            issues: [
-              { path: ["tenantId"], message: "Required", code: "invalid_type" },
-            ],
+            issues: [{ path: ["tenantId"], message: "Required", code: "invalid_type" }],
           },
         }),
       });
@@ -150,9 +148,7 @@ describe("processCommand", () => {
       const params = createDefaultParams({ handler });
 
       await expect(processCommand(params)).rejects.toThrow(ValidationError);
-      await expect(processCommand(params)).rejects.toThrow(
-        /returned undefined/,
-      );
+      await expect(processCommand(params)).rejects.toThrow(/returned undefined/);
     });
   });
 
@@ -184,9 +180,7 @@ describe("processCommand", () => {
       const params = createDefaultParams({ handler });
 
       await expect(processCommand(params)).rejects.toThrow(ValidationError);
-      await expect(processCommand(params)).rejects.toThrow(
-        /undefined at index 1/,
-      );
+      await expect(processCommand(params)).rejects.toThrow(/undefined at index 1/);
     });
   });
 
@@ -202,9 +196,7 @@ describe("processCommand", () => {
       const params = createDefaultParams({ handler });
 
       await expect(processCommand(params)).rejects.toThrow(ValidationError);
-      await expect(processCommand(params)).rejects.toThrow(
-        /invalid event at index 0/,
-      );
+      await expect(processCommand(params)).rejects.toThrow(/invalid event at index 0/);
     });
   });
 
@@ -269,7 +261,6 @@ describe("processCommand", () => {
       expect(getAggregateId).toHaveBeenCalledWith(validPayload);
     });
   });
-
 });
 
 // ADR-066 pillar 2 — coalesced same-command batch collapses N appends into one
@@ -325,9 +316,7 @@ describe("processCommandBatch", () => {
       commandType,
       commandSchema: createEchoCommandSchema(),
       handler: {
-        handle: vi.fn(async (command: any) => [
-          eventWithKey(`k-${command.aggregateId}`),
-        ]),
+        handle: vi.fn(async (command: any) => [eventWithKey(`k-${command.aggregateId}`)]),
       },
       getAggregateId: vi.fn((p: any) => p.id ?? TEST_CONSTANTS.AGGREGATE_ID),
       storeEventsFn: vi.fn().mockResolvedValue(undefined),
@@ -397,9 +386,7 @@ describe("processCommandBatch", () => {
           storeEventsFn,
         });
 
-        await expect(processCommandBatch(params)).rejects.toThrow(
-          ValidationError,
-        );
+        await expect(processCommandBatch(params)).rejects.toThrow(ValidationError);
         expect(storeEventsFn).not.toHaveBeenCalled();
       });
     });
@@ -410,16 +397,11 @@ describe("processCommandBatch", () => {
       it("throws ValidationError before storing", async () => {
         const storeEventsFn = vi.fn();
         const params = createDefaultBatchParams({
-          payloads: [
-            payloadFor(0),
-            { ...payloadFor(1), tenantId: "other-tenant" },
-          ],
+          payloads: [payloadFor(0), { ...payloadFor(1), tenantId: "other-tenant" }],
           storeEventsFn,
         });
 
-        await expect(processCommandBatch(params)).rejects.toThrow(
-          /mixes tenants/,
-        );
+        await expect(processCommandBatch(params)).rejects.toThrow(/mixes tenants/);
         expect(storeEventsFn).not.toHaveBeenCalled();
       });
     });
@@ -545,9 +527,7 @@ describe("processCommandBatch", () => {
           storeEventsFn,
         });
 
-        await expect(processCommandBatch(params)).rejects.toThrow(
-          "handler boom",
-        );
+        await expect(processCommandBatch(params)).rejects.toThrow("handler boom");
         expect(storeEventsFn).not.toHaveBeenCalled();
       });
     });

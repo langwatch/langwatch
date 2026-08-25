@@ -17,39 +17,37 @@ import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockOpenDrawer, mockCloseDrawer, policies, organization } = vi.hoisted(
-  () => ({
-    mockOpenDrawer: vi.fn(),
-    mockCloseDrawer: vi.fn(),
-    organization: {
-      id: "org-1",
-      name: "ACME",
-      teams: [
-        {
-          id: "team-1",
-          name: "Platform",
-          projects: [{ id: "proj-1", name: "Web App" }],
-        },
-      ],
-    },
-    policies: [
+const { mockOpenDrawer, mockCloseDrawer, policies, organization } = vi.hoisted(() => ({
+  mockOpenDrawer: vi.fn(),
+  mockCloseDrawer: vi.fn(),
+  organization: {
+    id: "org-1",
+    name: "ACME",
+    teams: [
       {
-        id: "rp-1",
-        name: "Developer default",
-        description: null,
-        isDefault: true,
-        modelProviderIds: ["mp-openai"],
-        modelAliases: { complex: "anthropic/claude-opus-4-5" },
-        defaultModel: "openai/gpt-5-mini",
-        policyRules: { tools: { deny: ["^shell_.*"], allow: null } } as Record<
-          string,
-          { deny: string[]; allow: string[] | null }
-        >,
-        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+        id: "team-1",
+        name: "Platform",
+        projects: [{ id: "proj-1", name: "Web App" }],
       },
     ],
-  }),
-);
+  },
+  policies: [
+    {
+      id: "rp-1",
+      name: "Developer default",
+      description: null,
+      isDefault: true,
+      modelProviderIds: ["mp-openai"],
+      modelAliases: { complex: "anthropic/claude-opus-4-5" },
+      defaultModel: "openai/gpt-5-mini",
+      policyRules: { tools: { deny: ["^shell_.*"], allow: null } } as Record<
+        string,
+        { deny: string[]; allow: string[] | null }
+      >,
+      scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+    },
+  ],
+}));
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
@@ -146,8 +144,7 @@ const renderWithChakra = (ui: React.ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 
 /** The Restrictions accordion trigger, whose aria-expanded is the real state. */
-const restrictionsTrigger = () =>
-  screen.getByText("Restrictions").closest("button");
+const restrictionsTrigger = () => screen.getByText("Restrictions").closest("button");
 
 describe("given the routing policies page", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -175,9 +172,7 @@ describe("given the routing policies page", () => {
       const user = userEvent.setup();
       renderWithChakra(<RoutingPoliciesPage />);
 
-      await user.click(
-        screen.getAllByRole("button", { name: /New policy/ })[0]!,
-      );
+      await user.click(screen.getAllByRole("button", { name: /New policy/ })[0]!);
 
       expect(mockOpenDrawer).toHaveBeenCalledWith("routingPolicy", {
         seedScopeType: "ORGANIZATION",
@@ -240,9 +235,7 @@ describe("given a shared link that carries a policy", () => {
     renderWithChakra(<RoutingPolicyDrawer policyId="rp-1" />);
 
     await screen.findByText("Edit routing policy");
-    expect(
-      screen.queryByRole("button", { name: "Cancel" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
   });
 
   /** @scenario "A tier name cannot be set twice" */

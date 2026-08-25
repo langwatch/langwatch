@@ -21,8 +21,7 @@ import type { GitRunner } from "../git-context";
 
 export const ENDPOINT = "http://app.example.com/api/otel";
 export const SESSION_ID = "0199a1f4-2c5e-7a10-9f61-2d7f0a3b5c11";
-export const TRACEPARENT =
-  "00-16872e6253edb3e8748023ff172703c4-be7ce7c6bf1173f5-01";
+export const TRACEPARENT = "00-16872e6253edb3e8748023ff172703c4-be7ce7c6bf1173f5-01";
 export const NOW = 1_700_000_000_000;
 
 /** A linked worktree of langwatch/langwatch, checked out on a feature branch. */
@@ -75,9 +74,7 @@ export const unreachableCollector: typeof fetch = (async () => {
   throw new Error("connect ECONNREFUSED");
 }) as unknown as typeof fetch;
 
-export const attributesOf = (
-  request: PostedRequest,
-): Record<string, string> =>
+export const attributesOf = (request: PostedRequest): Record<string, string> =>
   Object.fromEntries(
     request.body.resourceLogs[0]!.scopeLogs[0]!.logRecords[0]!.attributes.map(
       (attribute) => [attribute.key, attribute.value.stringValue],
@@ -140,8 +137,7 @@ export const installHookHarness = (): HookHarness => {
   const exits: number[] = [];
   let stateDir = "";
 
-  const collector =
-    (status = 200): typeof fetch =>
+  const collector = (status = 200): typeof fetch =>
     ((url: string, init: { headers: Record<string, string>; body: string }) => {
       posted.push({
         url,
@@ -203,9 +199,7 @@ export const installHookHarness = (): HookHarness => {
         readInput:
           readInput ??
           (() =>
-            Promise.resolve(
-              typeof input === "string" ? input : JSON.stringify(input),
-            )),
+            Promise.resolve(typeof input === "string" ? input : JSON.stringify(input))),
         runGit: runGit ?? gitRunner(git),
         fetchImpl,
         now: () => now,

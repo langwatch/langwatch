@@ -46,8 +46,7 @@ export class SpanStatusService {
 
     // 2. span-level exception.message / error.message attribute
     if (!errorMessage) {
-      const msg =
-        attrs[ATTR_KEYS.EXCEPTION_MESSAGE] ?? attrs[ATTR_KEYS.ERROR_MESSAGE];
+      const msg = attrs[ATTR_KEYS.EXCEPTION_MESSAGE] ?? attrs[ATTR_KEYS.ERROR_MESSAGE];
       if (typeof msg === "string" && msg.length > 0) {
         errorMessage = msg;
         hasError = true;
@@ -55,31 +54,20 @@ export class SpanStatusService {
     }
 
     // 3. span-level statusMessage (HTTP status fallback)
-    if (
-      !errorMessage &&
-      span.statusCode === StatusCode.ERROR &&
-      span.statusMessage
-    ) {
+    if (!errorMessage && span.statusCode === StatusCode.ERROR && span.statusMessage) {
       errorMessage = span.statusMessage;
     }
 
     if (!hasError) {
       const flag =
-        attrs[ATTR_KEYS.ERROR_HAS_ERROR] ??
-        attrs[ATTR_KEYS.SPAN_ERROR_HAS_ERROR];
+        attrs[ATTR_KEYS.ERROR_HAS_ERROR] ?? attrs[ATTR_KEYS.SPAN_ERROR_HAS_ERROR];
       if (flag === true || flag === "true") hasError = true;
     }
 
     return { hasError, hasOK, errorMessage };
   }
 
-  accumulateStatus({
-    state,
-    span,
-  }: {
-    state: TraceSummaryData;
-    span: NormalizedSpan;
-  }): {
+  accumulateStatus({ state, span }: { state: TraceSummaryData; span: NormalizedSpan }): {
     containsErrorStatus: boolean;
     containsOKStatus: boolean;
     errorMessage: string | null;

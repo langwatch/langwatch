@@ -56,10 +56,7 @@ describe("given a specification the schema refuses", () => {
 
       // The whole finding in one assertion: an empty list here is what the
       // caller reads as "valid", so a detail-free refusal would admit the spec.
-      expect(
-        reported,
-        "a refusal must never be reported as zero errors",
-      ).not.toEqual([]);
+      expect(reported, "a refusal must never be reported as zero errors").not.toEqual([]);
       expect(reported).toHaveLength(1);
     });
 

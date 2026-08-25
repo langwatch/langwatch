@@ -34,10 +34,7 @@ export const convertEvaluators = (
  */
 export const buildEvaluatorFromType = (
   evaluatorType: EvaluatorTypes | `custom/${string}`,
-  availableEvaluators: Exclude<
-    ReturnType<typeof useAvailableEvaluators>,
-    undefined
-  >,
+  availableEvaluators: Exclude<ReturnType<typeof useAvailableEvaluators>, undefined>,
 ): Evaluator => {
   const definition = availableEvaluators[evaluatorType];
 
@@ -52,10 +49,7 @@ export const buildEvaluatorFromType = (
   definition.requiredFields.forEach((field) => {
     inputs.push({
       identifier: field,
-      type:
-        field === "contexts" || field === "expected_contexts"
-          ? "list[str]"
-          : "str",
+      type: field === "contexts" || field === "expected_contexts" ? "list[str]" : "str",
     });
   });
 
@@ -63,10 +57,7 @@ export const buildEvaluatorFromType = (
   definition.optionalFields.forEach((field) => {
     inputs.push({
       identifier: field,
-      type:
-        field === "contexts" || field === "expected_contexts"
-          ? "list[str]"
-          : "str",
+      type: field === "contexts" || field === "expected_contexts" ? "list[str]" : "str",
       optional: true,
     });
   });
@@ -80,8 +71,7 @@ export const buildEvaluatorFromType = (
     "expected_contexts",
   ];
   inputs = inputs.sort(
-    (a, b) =>
-      fieldsOrder.indexOf(a.identifier) - fieldsOrder.indexOf(b.identifier),
+    (a, b) => fieldsOrder.indexOf(a.identifier) - fieldsOrder.indexOf(b.identifier),
   );
 
   // Add outputs based on the result object

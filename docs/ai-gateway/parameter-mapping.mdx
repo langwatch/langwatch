@@ -17,7 +17,7 @@ Send `"drop_tuning_params": false` in the request body to opt into strict mode: 
 ```json
 {
   "model": "anthropic/claude-haiku-4-5",
-  "messages": [{"role": "user", "content": "hi"}],
+  "messages": [{ "role": "user", "content": "hi" }],
   "seed": 42,
   "drop_tuning_params": false
 }
@@ -45,39 +45,39 @@ When a parameter is dropped, the drop is visible in three places:
 
 {/* param-table:begin generated from paramPolicyTable, kept in sync by TestParamPolicyDocsInSync */}
 
-| Parameter | anthropic | bedrock | gemini / vertex | Notes |
-|---|---|---|---|---|
-| `audio` | dropped | dropped | dropped |  |
-| `frequency_penalty` | dropped | dropped | mapped |  |
-| `function_call` | refused | refused | refused |  |
-| `functions` | refused | refused | refused |  |
-| `logit_bias` | dropped | dropped | dropped |  |
-| `logprobs` | refused | refused | mapped |  |
-| `metadata` | dropped | dropped | dropped |  |
-| `modalities` | dropped | dropped | dropped |  |
-| `n` | dropped | dropped | dropped | n: 1 passes; n > 1 is reduced to one completion and signaled |
-| `parallel_tool_calls` | dropped | dropped | dropped |  |
-| `prediction` | dropped | dropped | dropped |  |
-| `presence_penalty` | dropped | dropped | mapped |  |
-| `prompt_cache_key` | dropped | dropped | dropped |  |
-| `prompt_cache_retention` | dropped | dropped | dropped |  |
-| `reasoning_effort` | mapped | mapped | mapped | bedrock: mapped for Anthropic (thinking) and Nova; refused for other families; a customer VPC endpoint maps Anthropic only |
-| `response_format` | mapped | mapped | mapped | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); a customer VPC endpoint enforces json_schema for Anthropic models only; gemini: json_object and json_schema both enforced |
-| `safety_identifier` | dropped | dropped | dropped |  |
-| `seed` | dropped | dropped | dropped |  |
-| `service_tier` | dropped | dropped | dropped | anthropic: "auto" passes natively; other values dropped; bedrock: dropped (AWS validates a different enum); gemini: dropped |
-| `stop` | mapped | mapped | mapped |  |
-| `store` | dropped | dropped | dropped |  |
-| `stream_options` | mapped | mapped | mapped |  |
-| `temperature` | mapped | mapped | mapped |  |
-| `tool_choice` | mapped | mapped | mapped | anthropic: none/auto/required/named mapped; named must exist in tools; allowed_tools refused; bedrock: none maps by removing tools (Converse has no none mode); named must exist in tools; allowed_tools refused; gemini: none/auto/required/named mapped; named must exist in tools; allowed_tools refused |
-| `tools` | mapped | mapped | mapped |  |
-| `top_logprobs` | refused | refused | mapped |  |
-| `top_p` | mapped | mapped | mapped | anthropic: dropped with a signal when temperature is also set (Anthropic models reject the pair); bedrock: dropped with a signal when temperature is also set on Anthropic models (they reject the pair); other families take both |
-| `user` | dropped | dropped | dropped |  |
-| `verbosity` | dropped | dropped | dropped |  |
-| `web_search_options` | dropped | dropped | dropped |  |
-| any other key | dropped | dropped | dropped | vendor params with no mapping on translated lanes |
+| Parameter                | anthropic | bedrock | gemini / vertex | Notes                                                                                                                                                                                                                                                                                                       |
+| ------------------------ | --------- | ------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `audio`                  | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `frequency_penalty`      | dropped   | dropped | mapped          |                                                                                                                                                                                                                                                                                                             |
+| `function_call`          | refused   | refused | refused         |                                                                                                                                                                                                                                                                                                             |
+| `functions`              | refused   | refused | refused         |                                                                                                                                                                                                                                                                                                             |
+| `logit_bias`             | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `logprobs`               | refused   | refused | mapped          |                                                                                                                                                                                                                                                                                                             |
+| `metadata`               | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `modalities`             | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `n`                      | dropped   | dropped | dropped         | n: 1 passes; n > 1 is reduced to one completion and signaled                                                                                                                                                                                                                                                |
+| `parallel_tool_calls`    | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `prediction`             | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `presence_penalty`       | dropped   | dropped | mapped          |                                                                                                                                                                                                                                                                                                             |
+| `prompt_cache_key`       | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `prompt_cache_retention` | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `reasoning_effort`       | mapped    | mapped  | mapped          | bedrock: mapped for Anthropic (thinking) and Nova; refused for other families; a customer VPC endpoint maps Anthropic only                                                                                                                                                                                  |
+| `response_format`        | mapped    | mapped  | mapped          | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); a customer VPC endpoint enforces json_schema for Anthropic models only; gemini: json_object and json_schema both enforced             |
+| `safety_identifier`      | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `seed`                   | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `service_tier`           | dropped   | dropped | dropped         | anthropic: "auto" passes natively; other values dropped; bedrock: dropped (AWS validates a different enum); gemini: dropped                                                                                                                                                                                 |
+| `stop`                   | mapped    | mapped  | mapped          |                                                                                                                                                                                                                                                                                                             |
+| `store`                  | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `stream_options`         | mapped    | mapped  | mapped          |                                                                                                                                                                                                                                                                                                             |
+| `temperature`            | mapped    | mapped  | mapped          |                                                                                                                                                                                                                                                                                                             |
+| `tool_choice`            | mapped    | mapped  | mapped          | anthropic: none/auto/required/named mapped; named must exist in tools; allowed_tools refused; bedrock: none maps by removing tools (Converse has no none mode); named must exist in tools; allowed_tools refused; gemini: none/auto/required/named mapped; named must exist in tools; allowed_tools refused |
+| `tools`                  | mapped    | mapped  | mapped          |                                                                                                                                                                                                                                                                                                             |
+| `top_logprobs`           | refused   | refused | mapped          |                                                                                                                                                                                                                                                                                                             |
+| `top_p`                  | mapped    | mapped  | mapped          | anthropic: dropped with a signal when temperature is also set (Anthropic models reject the pair); bedrock: dropped with a signal when temperature is also set on Anthropic models (they reject the pair); other families take both                                                                          |
+| `user`                   | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `verbosity`              | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| `web_search_options`     | dropped   | dropped | dropped         |                                                                                                                                                                                                                                                                                                             |
+| any other key            | dropped   | dropped | dropped         | vendor params with no mapping on translated lanes                                                                                                                                                                                                                                                           |
 
 {/* param-table:end */}
 

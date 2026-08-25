@@ -112,12 +112,7 @@ function ColumnRow({
         {column.name}
       </Text>
       {column.unit && (
-        <Badge
-          size="xs"
-          variant="subtle"
-          colorPalette="orange"
-          fontSize="9.5px"
-        >
+        <Badge size="xs" variant="subtle" colorPalette="orange" fontSize="9.5px">
           {column.unit}
         </Badge>
       )}
@@ -220,11 +215,7 @@ function DatasetEntry({
 
           <Stack gap={0}>
             {dataset.columns.map((column) => (
-              <ColumnRow
-                key={column.name}
-                column={column}
-                onInsert={onInsert}
-              />
+              <ColumnRow key={column.name} column={column} onInsert={onInsert} />
             ))}
           </Stack>
 
@@ -252,9 +243,7 @@ export function LangWatchQLSchemaBrowser({
   onInsert,
 }: LangWatchQLSchemaBrowserProps) {
   const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(
-    () => new Set<string>(),
-  );
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set<string>());
 
   const visible = useMemo(
     () => filterLangWatchQLSchemaModel({ model, search }),
@@ -301,10 +290,7 @@ export function LangWatchQLSchemaBrowser({
       />
 
       {error ? (
-        <HandledErrorAlert
-          error={error}
-          fallbackTitle="Couldn't load the schema"
-        />
+        <HandledErrorAlert error={error} fallbackTitle="Couldn't load the schema" />
       ) : isLoading ? (
         <HStack gap={2} padding={2} color="fg.muted">
           <Spinner size="sm" />

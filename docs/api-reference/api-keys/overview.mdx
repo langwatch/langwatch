@@ -1,6 +1,6 @@
 ---
-title: 'Overview'
-description: 'Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (project-scoped, for automation).'
+title: "Overview"
+description: "Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (project-scoped, for automation)."
 ---
 
 ## Intro
@@ -24,13 +24,13 @@ Service keys are the exception, because they belong to nobody. A member credenti
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/api-keys` | List API keys |
-| `POST` | `/api/api-keys` | Create a new API key |
-| `GET` | `/api/api-keys/{id}` | Read one key and the access it carries |
-| `PATCH` | `/api/api-keys/{id}` | Update a key's name, description or access |
-| `DELETE` | `/api/api-keys/{id}` | Revoke an API key |
+| Method   | Path                 | Description                                |
+| -------- | -------------------- | ------------------------------------------ |
+| `GET`    | `/api/api-keys`      | List API keys                              |
+| `POST`   | `/api/api-keys`      | Create a new API key                       |
+| `GET`    | `/api/api-keys/{id}` | Read one key and the access it carries     |
+| `PATCH`  | `/api/api-keys/{id}` | Update a key's name, description or access |
+| `DELETE` | `/api/api-keys/{id}` | Revoke an API key                          |
 
 ## Reading a key back
 
@@ -64,9 +64,7 @@ Created for a specific user. The key's effective permissions are the intersectio
 {
   "keyType": "personal",
   "name": "My dev key",
-  "bindings": [
-    { "role": "ADMIN", "scopeType": "ORGANIZATION", "scopeId": "<orgId>" }
-  ]
+  "bindings": [{ "role": "ADMIN", "scopeType": "ORGANIZATION", "scopeId": "<orgId>" }]
 }
 ```
 
@@ -85,7 +83,8 @@ Created without a user association (`userId: null`). Scoped to specific projects
 ```
 
 <Info>
-Service keys without `projectIds` get org-wide ADMIN access. Always scope to specific projects when possible.
+  Service keys without `projectIds` get org-wide ADMIN access. Always scope to specific
+  projects when possible.
 </Info>
 
 Because a service key has no person capping it, and a key minted for somebody else is capped by their access rather than yours, both are reserved for organization administrators. A caller who holds `organization:manage` without being an administrator is refused with 403. Minting a personal key for yourself is always allowed: your own access caps it.
@@ -104,9 +103,7 @@ Three fields decide how far a key reaches:
   "name": "Nightly evaluation runner",
   "permissionMode": "restricted",
   "permissions": ["project:view", "traces:view", "evaluations:create"],
-  "bindings": [
-    { "role": "CUSTOM", "scopeType": "PROJECT", "scopeId": "project_abc123" }
-  ]
+  "bindings": [{ "role": "CUSTOM", "scopeType": "PROJECT", "scopeId": "project_abc123" }]
 }
 ```
 

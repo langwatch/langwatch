@@ -1,11 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  NativeSelect,
-  Text,
-  useDisclosure,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, NativeSelect, Text, useDisclosure } from "@chakra-ui/react";
 import Ajv from "ajv";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown } from "react-feather";
@@ -248,8 +241,7 @@ const checkForJsonSchemaErrors = (jsonSchemaString: string) => {
     if (!valid) {
       return ajv.errorsText();
     }
-    const jsonSchemaValidation =
-      outputsSchema.shape.json_schema.safeParse(schema);
+    const jsonSchemaValidation = outputsSchema.shape.json_schema.safeParse(schema);
     if (!jsonSchemaValidation.success) {
       const validationError = fromZodError(jsonSchemaValidation.error);
       return validationError.message;

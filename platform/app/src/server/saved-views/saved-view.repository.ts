@@ -1,8 +1,4 @@
-import type {
-  Prisma,
-  PrismaClient,
-  SavedView,
-} from "~/generated/prisma/client";
+import type { Prisma, PrismaClient, SavedView } from "~/generated/prisma/client";
 
 /**
  * Input types for saved view operations.
@@ -53,10 +49,7 @@ export class SavedViewRepository {
       where: {
         projectId: input.projectId,
         ...(input.kind ? { kind: input.kind } : {}),
-        OR: [
-          { userId: null },
-          ...(input.userId ? [{ userId: input.userId }] : []),
-        ],
+        OR: [{ userId: null }, ...(input.userId ? [{ userId: input.userId }] : [])],
       },
       orderBy: { order: "asc" },
     });
@@ -65,10 +58,7 @@ export class SavedViewRepository {
   /**
    * Finds a saved view by id within a project.
    */
-  async findById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<SavedView | null> {
+  async findById(input: { id: string; projectId: string }): Promise<SavedView | null> {
     return await this.prisma.savedView.findFirst({
       where: {
         id: input.id,
@@ -80,10 +70,7 @@ export class SavedViewRepository {
   /**
    * Finds the last saved view by order for a project.
    */
-  async findLast(input: {
-    projectId: string;
-    kind?: string;
-  }): Promise<SavedView | null> {
+  async findLast(input: { projectId: string; kind?: string }): Promise<SavedView | null> {
     return await this.prisma.savedView.findFirst({
       where: {
         projectId: input.projectId,
@@ -177,10 +164,7 @@ export class SavedViewRepository {
   /**
    * Updates multiple saved views' order in a transaction.
    */
-  async updateOrder(input: {
-    projectId: string;
-    viewIds: string[];
-  }): Promise<void> {
+  async updateOrder(input: { projectId: string; viewIds: string[] }): Promise<void> {
     const updates = input.viewIds.map((viewId, index) =>
       this.prisma.savedView.update({
         where: { id: viewId, projectId: input.projectId },
@@ -204,10 +188,7 @@ export class SavedViewRepository {
       where: {
         projectId: input.projectId,
         ...(input.kind ? { kind: input.kind } : {}),
-        OR: [
-          { userId: null },
-          ...(input.userId ? [{ userId: input.userId }] : []),
-        ],
+        OR: [{ userId: null }, ...(input.userId ? [{ userId: input.userId }] : [])],
       },
     });
   }

@@ -344,8 +344,7 @@ describe("useRunScenario()", () => {
       // retry: false matters too: fetchQuery only defaults retry off when it is
       // undefined, and the app defines it globally — 4 retries with backoff
       // would burn the whole polling budget inside a single attempt.
-      const { fetchBatchRunData: fetcher } = mockPollForScenarioRun.mock
-        .calls[0]![0] as {
+      const { fetchBatchRunData: fetcher } = mockPollForScenarioRun.mock.calls[0]![0] as {
         fetchBatchRunData: (params: unknown) => Promise<unknown>;
       };
       const params = {

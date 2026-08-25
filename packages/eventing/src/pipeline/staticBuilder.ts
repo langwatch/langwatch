@@ -28,10 +28,7 @@ import type {
   SubscriberDispatchDefinition,
   SubscriberDispatchOptions,
 } from "../subscribers/subscriber.types";
-import {
-  buildProcessManager,
-  type ProcessManagerApplier,
-} from "./processBuilder";
+import { buildProcessManager, type ProcessManagerApplier } from "./processBuilder";
 import type {
   ProcessManagerDefinition,
   SubscriberSpec,
@@ -41,17 +38,18 @@ import type {
 // Turns a union like {name:"a"; payload:A} | {name:"b"; payload:B}
 // into a record { a: A; b: B }
 export type CommandsUnionToRegistry<C extends RegisteredCommand> = {
-  [K in C as K extends { name: infer N extends string }
-    ? N
-    : never]: K extends { payload: infer P } ? P : never;
+  [K in C as K extends { name: infer N extends string } ? N : never]: K extends {
+    payload: infer P;
+  }
+    ? P
+    : never;
 };
 
 // Convenience: command name union from a StaticPipelineDefinition
-export type CommandNamesFromPipeline<
-  P extends StaticPipelineDefinition<any, any, any>,
-> = keyof CommandsUnionToRegistry<
-  P extends StaticPipelineDefinition<any, any, infer C> ? C : never
->;
+export type CommandNamesFromPipeline<P extends StaticPipelineDefinition<any, any, any>> =
+  keyof CommandsUnionToRegistry<
+    P extends StaticPipelineDefinition<any, any, infer C> ? C : never
+  >;
 
 /**
  * Builder for creating static pipeline definitions without runtime dependencies.
@@ -72,10 +70,7 @@ export type CommandNamesFromPipeline<
  */
 export class PipelineBuilder<
   EventType extends Event = Event,
-  RegisteredProjections extends Record<string, Projection> = Record<
-    string,
-    Projection
-  >,
+  RegisteredProjections extends Record<string, Projection> = Record<string, Projection>,
   RegisteredCommands extends RegisteredCommand = NoCommands,
   FoldNames extends string = never,
   MapNames extends string = never,
@@ -95,10 +90,7 @@ export class PipelineBuilder<
       options?: MapProjectionOptions;
     }
   >();
-  private stateProjections = new Map<
-    string,
-    StateProjectionDefinition<any, EventType>
-  >();
+  private stateProjections = new Map<string, StateProjectionDefinition<any, EventType>>();
   private commands: Array<{
     name: string;
     handlerClass: CommandHandlerClass<any, any, any>;
@@ -120,10 +112,7 @@ export class PipelineBuilder<
     }
   >();
   private processManagers = new Map<string, ProcessManagerDefinition>();
-  private eventSubscribers = new Map<
-    string,
-    EventSubscriberDefinition<EventType>
-  >();
+  private eventSubscribers = new Map<string, EventSubscriberDefinition<EventType>>();
   constructor(
     private readonly name: string,
     private readonly aggregate: AggregateDefinition,
@@ -165,9 +154,7 @@ export class PipelineBuilder<
   }
 
   /** Register a Postgres load/evolve/store projection. */
-  withPostgresProjection(
-    definition: StateProjectionDefinition<any, EventType>,
-  ): this {
+  withPostgresProjection(definition: StateProjectionDefinition<any, EventType>): this {
     return this.registerStateProjection(definition);
   }
 
@@ -342,9 +329,7 @@ export class PipelineBuilder<
   }
 
   /** Register a subscriber that receives committed projection state. */
-  withProjectionSubscriber<
-    Fold extends FoldNames & keyof RegisteredFoldStates & string,
-  >(
+  withProjectionSubscriber<Fold extends FoldNames & keyof RegisteredFoldStates & string>(
     subscriberName: string,
     spec: SubscriberSpec<EventType> & {
       fold: Fold;
@@ -402,10 +387,7 @@ export class PipelineBuilder<
       );
     }
 
-    const definition = buildProjectionSubscriberDefinition(
-      subscriberName,
-      spec,
-    );
+    const definition = buildProjectionSubscriberDefinition(subscriberName, spec);
     if (isFold) {
       this.foldSubscribers.set(subscriberName, { projectionName, definition });
     } else {
@@ -423,10 +405,7 @@ export class PipelineBuilder<
    * The runtime owns its manager, the shared process-outbox and wake
    * workers, and the trigger adapters generated from its triggers.
    */
-  withProcessManager(
-    name: string,
-    applier: ProcessManagerApplier<EventType>,
-  ): this;
+  withProcessManager(name: string, applier: ProcessManagerApplier<EventType>): this;
   withProcessManager(definition: ProcessManagerDefinition<any, any, any>): this;
   withProcessManager(
     definitionOrName: ProcessManagerDefinition<any, any, any> | string,
@@ -516,8 +495,7 @@ export class PipelineBuilder<
   ): PipelineBuilder<
     EventType,
     RegisteredProjections,
-    | RegisteredCommands
-    | { name: Name; payload: ExtractCommandHandlerPayload<TStatic> },
+    RegisteredCommands | { name: Name; payload: ExtractCommandHandlerPayload<TStatic> },
     FoldNames,
     MapNames,
     RegisteredFoldStates
@@ -534,19 +512,14 @@ export class PipelineBuilder<
     // and the zero-arg constructor won't be called since handlerInstance is provided.
     this.commands.push({
       name,
-      handlerClass: handlerClass as unknown as CommandHandlerClass<
-        any,
-        any,
-        any
-      >,
+      handlerClass: handlerClass as unknown as CommandHandlerClass<any, any, any>,
       handlerInstance: instance,
       options,
     });
     return this as PipelineBuilder<
       EventType,
       RegisteredProjections,
-      | RegisteredCommands
-      | { name: Name; payload: ExtractCommandHandlerPayload<TStatic> },
+      RegisteredCommands | { name: Name; payload: ExtractCommandHandlerPayload<TStatic> },
       FoldNames,
       MapNames,
       RegisteredFoldStates
@@ -569,19 +542,15 @@ export class PipelineBuilder<
       name: this.name,
       aggregateType: this.aggregate.type,
       allowedEventTypes: this.aggregate.events.map((event) => event.type),
-      projections: Array.from(this.foldProjections.entries()).map(
-        ([name, def]) => ({
-          name,
-          handlerClassName: `FoldProjection(${def.definition.name})`,
-        }),
-      ),
-      mapProjections: Array.from(this.mapProjections.entries()).map(
-        ([name, def]) => ({
-          name,
-          handlerClassName: `MapProjection(${def.definition.name})`,
-          eventTypes: def.definition.eventTypes as string[],
-        }),
-      ),
+      projections: Array.from(this.foldProjections.entries()).map(([name, def]) => ({
+        name,
+        handlerClassName: `FoldProjection(${def.definition.name})`,
+      })),
+      mapProjections: Array.from(this.mapProjections.entries()).map(([name, def]) => ({
+        name,
+        handlerClassName: `MapProjection(${def.definition.name})`,
+        eventTypes: def.definition.eventTypes as string[],
+      })),
       stateProjections: Array.from(this.stateProjections.entries()).map(
         ([name, definition]) => ({
           name,
@@ -589,12 +558,10 @@ export class PipelineBuilder<
           eventTypes: [...definition.eventTypes],
         }),
       ),
-      subscribers: Array.from(this.eventSubscribers.values()).map(
-        (subscriber) => ({
-          name: subscriber.name,
-          eventTypes: [...subscriber.eventTypes],
-        }),
-      ),
+      subscribers: Array.from(this.eventSubscribers.values()).map((subscriber) => ({
+        name: subscriber.name,
+        eventTypes: [...subscriber.eventTypes],
+      })),
       commands: this.commands.map((cmd) => ({
         name: cmd.name,
         handlerClassName: cmd.handlerClass.name,
@@ -697,13 +664,10 @@ function buildProjectionSubscriberDedup<E extends Event>(
   spec: SubscriberSpec<E>,
 ): (SubscriberDispatchOptions["deduplication"] & object) | undefined {
   const wantsDedup =
-    spec.dedup !== undefined ||
-    spec.dedupId !== undefined ||
-    spec.ttl !== undefined;
+    spec.dedup !== undefined || spec.dedupId !== undefined || spec.ttl !== undefined;
   if (!wantsDedup) return undefined;
 
-  const customDedup =
-    spec.dedup && spec.dedup !== "aggregate" ? spec.dedup : undefined;
+  const customDedup = spec.dedup && spec.dedup !== "aggregate" ? spec.dedup : undefined;
   if (customDedup) {
     return {
       ...customDedup,
@@ -713,14 +677,11 @@ function buildProjectionSubscriberDedup<E extends Event>(
     };
   }
 
-  const defaultId = (event: Event) =>
-    `${event.tenantId}:${String(event.aggregateId)}`;
+  const defaultId = (event: Event) => `${event.tenantId}:${String(event.aggregateId)}`;
   return {
     makeId: (payload: SubscriberJobPayload) =>
       `subscriber:${subscriberName}:${
-        spec.dedupId
-          ? spec.dedupId(payload.event as E)
-          : defaultId(payload.event)
+        spec.dedupId ? spec.dedupId(payload.event as E) : defaultId(payload.event)
       }`,
     ttlMs: spec.ttl ?? 30_000,
   };
@@ -730,8 +691,7 @@ function buildProjectionSubscriberDefinition<E extends Event>(
   subscriberName: string,
   spec: SubscriberSpec<E>,
 ): SubscriberDispatchDefinition<E> {
-  const eventFilter =
-    spec.events !== undefined ? new Set<string>(spec.events) : null;
+  const eventFilter = spec.events !== undefined ? new Set<string>(spec.events) : null;
   const passes = (event: E, context: TriggerContext<unknown>): boolean => {
     if (eventFilter && !eventFilter.has(event.type)) return false;
     return spec.when?.(event, context) ?? true;
@@ -761,8 +721,7 @@ function buildProjectionSubscriberDefinition<E extends Event>(
     // Pre-enqueue rejection: a filtered event never pays serialization.
     // The committed projection state is in hand at guard time, so
     // state-dependent `when` guards reject before enqueue too.
-    shouldDispatch: (event, context) =>
-      passes(event, toTriggerContext(context)),
+    shouldDispatch: (event, context) => passes(event, toTriggerContext(context)),
     handle: async (event, context) => {
       const triggerContext = toTriggerContext(context);
       if (!passes(event, triggerContext)) return;

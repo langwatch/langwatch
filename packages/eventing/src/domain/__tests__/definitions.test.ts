@@ -1,26 +1,17 @@
 import { describe, expect, it } from "vitest";
-import {
-  createEventCatalogue,
-  defineAggregate,
-  defineEvents,
-} from "../definitions";
+import { createEventCatalogue, defineAggregate, defineEvents } from "../definitions";
 
 describe("event catalogue", () => {
   it("registers aggregate-owned event types", () => {
     const traces = defineAggregate({
       type: "trace",
-      events: defineEvents([
-        "lw.obs.trace.started",
-        "lw.obs.trace.finished",
-      ] as const),
+      events: defineEvents(["lw.obs.trace.started", "lw.obs.trace.finished"] as const),
     });
     const catalogue = createEventCatalogue([traces]);
 
     expect(catalogue.hasAggregate("trace")).toBe(true);
     expect(catalogue.hasEvent("lw.obs.trace.started")).toBe(true);
-    expect(() =>
-      catalogue.assertEvent("trace", "lw.obs.trace.finished"),
-    ).not.toThrow();
+    expect(() => catalogue.assertEvent("trace", "lw.obs.trace.finished")).not.toThrow();
   });
 
   it("rejects duplicate aggregate types", () => {
@@ -65,9 +56,7 @@ describe("event catalogue", () => {
       }),
     ]);
 
-    expect(() =>
-      catalogue.assertEvent("log", "lw.obs.trace.started"),
-    ).toThrow(
+    expect(() => catalogue.assertEvent("log", "lw.obs.trace.started")).toThrow(
       'Event type "lw.obs.trace.started" belongs to aggregate "trace", not "log"',
     );
   });

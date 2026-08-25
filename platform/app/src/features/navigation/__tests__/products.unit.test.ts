@@ -18,9 +18,7 @@ describe("product registry", () => {
         expect(productById("llm-ops").pitch).toBe(
           "Observe, evaluate and test your agents",
         );
-        expect(productById("gateway").pitch).toBe(
-          "Route, meter and bill LLM usage",
-        );
+        expect(productById("gateway").pitch).toBe("Route, meter and bill LLM usage");
         expect(productById("governance").pitch).toBe(
           "Every AI tool, license, agent and dollar",
         );
@@ -30,9 +28,7 @@ describe("product registry", () => {
 
   describe("when resolving a product home", () => {
     it("gives LLM Ops a home only once a project is known", () => {
-      expect(productById("llm-ops").homeHref({ projectSlug: "demo" })).toBe(
-        "/demo",
-      );
+      expect(productById("llm-ops").homeHref({ projectSlug: "demo" })).toBe("/demo");
       expect(productById("llm-ops").homeHref({ projectSlug: null })).toBeNull();
     });
 

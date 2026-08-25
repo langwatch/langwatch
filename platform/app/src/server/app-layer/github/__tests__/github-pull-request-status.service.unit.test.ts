@@ -77,12 +77,8 @@ describe("deriveStatus", () => {
   describe("given pull requests in each state on GitHub", () => {
     /** @scenario "Live status derives open, draft, merged and closed" */
     it("derives the matching status from state, draft flag and merge time", () => {
-      expect(
-        deriveStatus({ mergedAt: null, state: "open", draft: false }),
-      ).toBe("open");
-      expect(deriveStatus({ mergedAt: null, state: "open", draft: true })).toBe(
-        "draft",
-      );
+      expect(deriveStatus({ mergedAt: null, state: "open", draft: false })).toBe("open");
+      expect(deriveStatus({ mergedAt: null, state: "open", draft: true })).toBe("draft");
       expect(
         deriveStatus({
           mergedAt: "2026-05-02T00:00:00Z",
@@ -90,9 +86,9 @@ describe("deriveStatus", () => {
           draft: false,
         }),
       ).toBe("merged");
-      expect(
-        deriveStatus({ mergedAt: null, state: "closed", draft: false }),
-      ).toBe("closed");
+      expect(deriveStatus({ mergedAt: null, state: "closed", draft: false })).toBe(
+        "closed",
+      );
     });
 
     it("calls a merged pull request merged even while GitHub still calls it a draft", () => {
@@ -296,9 +292,7 @@ describe("GithubPullRequestStatusService", () => {
           } as never,
           appTokens: { getPullRequest } as never,
           redis: {
-            get: vi.fn((key: string) =>
-              Promise.resolve(store.get(key) ?? null),
-            ),
+            get: vi.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
             set: vi.fn((key: string, value: string) => {
               store.set(key, value);
               return Promise.resolve("OK");

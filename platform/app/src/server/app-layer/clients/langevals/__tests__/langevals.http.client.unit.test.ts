@@ -79,9 +79,7 @@ describe("LangEvalsHttpClient", () => {
           score: 0.95,
           passed: true,
         };
-        vi.spyOn(globalThis, "fetch").mockResolvedValue(
-          jsonResponse([expected]),
-        );
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([expected]));
 
         const client = new LangEvalsHttpClient(endpoint);
         const result = await client.evaluate(buildParams());
@@ -95,9 +93,7 @@ describe("LangEvalsHttpClient", () => {
           .mockResolvedValue(jsonResponse([{ status: "processed", score: 1 }]));
 
         const client = new LangEvalsHttpClient(endpoint);
-        await client.evaluate(
-          buildParams({ evaluatorType: "openai/moderation" }),
-        );
+        await client.evaluate(buildParams({ evaluatorType: "openai/moderation" }));
 
         expect(fetchSpy).toHaveBeenCalledWith(
           `${endpoint}/openai/moderation/evaluate`,
@@ -111,9 +107,7 @@ describe("LangEvalsHttpClient", () => {
 
     describe("when fetch throws a network error", () => {
       it("throws EvaluatorExecutionError", async () => {
-        vi.spyOn(globalThis, "fetch").mockRejectedValue(
-          new TypeError("fetch failed"),
-        );
+        vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
 
         const client = new LangEvalsHttpClient(endpoint);
 
@@ -180,9 +174,7 @@ describe("LangEvalsHttpClient", () => {
       it("throws EvaluatorInputTooLargeError without retrying", async () => {
         const fetchSpy = vi
           .spyOn(globalThis, "fetch")
-          .mockResolvedValue(
-            jsonResponse({ message: "Request Too Long" }, 413),
-          );
+          .mockResolvedValue(jsonResponse({ message: "Request Too Long" }, 413));
 
         const client = new LangEvalsHttpClient(endpoint, 2);
 

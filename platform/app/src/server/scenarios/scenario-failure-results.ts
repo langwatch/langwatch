@@ -50,10 +50,7 @@ export function buildFailureResults(params: {
   // the exact confusion the marker exists to remove: the developer's
   // `langwatch agent dev` session ended without restoring the URL. Name it,
   // rather than reporting a generic unreachable endpoint.
-  if (
-    params.targetHasDevTunnel &&
-    isTransportLevelScenarioFailure(params.error)
-  ) {
+  if (params.targetHasDevTunnel && isTransportLevelScenarioFailure(params.error)) {
     const handled = new AgentDevTunnelUnreachableError();
     return {
       verdict: Verdict.FAILURE,

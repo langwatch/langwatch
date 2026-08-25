@@ -58,9 +58,7 @@ const MAX_MESSAGE_REST_BYTES = 64 * 1024;
  * put the key there. `secretParameterNames` stays, because names are what a
  * person reads back off the run.
  */
-function storedMetadata(
-  metadata: Record<string, unknown> | undefined,
-): string | null {
+function storedMetadata(metadata: Record<string, unknown> | undefined): string | null {
   if (!metadata) return null;
   const { secretParameters: _secretParameters, ...rest } = metadata;
   return JSON.stringify(rest);
@@ -258,12 +256,8 @@ const simulationRunEvents = [
  * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
 export class SimulationRunStateFoldProjection
-  extends AbstractFoldProjection<
-    SimulationRunStateData,
-    typeof simulationRunEvents
-  >
-  implements
-    FoldEventHandlers<typeof simulationRunEvents, SimulationRunStateData>
+  extends AbstractFoldProjection<SimulationRunStateData, typeof simulationRunEvents>
+  implements FoldEventHandlers<typeof simulationRunEvents, SimulationRunStateData>
 {
   readonly name = "simulationRunState";
   readonly version = SIMULATION_PROJECTION_VERSIONS.RUN_STATE;
@@ -458,9 +452,7 @@ export class SimulationRunStateFoldProjection
     event: SimulationTextMessageEndEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
-    const existingIndex = state.Messages.findIndex(
-      (m) => m.Id === event.data.messageId,
-    );
+    const existingIndex = state.Messages.findIndex((m) => m.Id === event.data.messageId);
 
     // TextMessageEnd can also fold before the started event (the handler
     // appends/pads even without a prior START); fall back to the event's
@@ -492,9 +484,7 @@ export class SimulationRunStateFoldProjection
 
     let updatedMessages: SimulationMessageRow[];
     if (existingIndex >= 0) {
-      updatedMessages = state.Messages.map((m, i) =>
-        i === existingIndex ? row : m,
-      );
+      updatedMessages = state.Messages.map((m, i) => (i === existingIndex ? row : m));
     } else if (event.data.messageIndex != null) {
       updatedMessages = [...state.Messages];
       while (updatedMessages.length < event.data.messageIndex) {

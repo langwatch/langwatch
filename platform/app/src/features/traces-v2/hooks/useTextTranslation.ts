@@ -47,10 +47,7 @@ export function useTextTranslation({
   // mid-flight would fire a duplicate set of billed LLM calls. Track the
   // in-flight state locally instead.
   const [inFlight, setInFlight] = useState(false);
-  const [translations, setTranslations] = useState<Record<
-    string,
-    string
-  > | null>(null);
+  const [translations, setTranslations] = useState<Record<string, string> | null>(null);
   const cachedForRef = useRef<string | null>(null);
 
   const sourceKey = JSON.stringify(texts);
@@ -66,9 +63,7 @@ export function useTextTranslation({
       setActiveFor(sourceKey);
       return;
     }
-    const entries = Object.entries(texts).filter(
-      ([, value]) => value.trim().length > 0,
-    );
+    const entries = Object.entries(texts).filter(([, value]) => value.trim().length > 0);
     if (entries.length === 0 || !project?.id) return;
 
     setInFlight(true);
@@ -95,8 +90,7 @@ export function useTextTranslation({
         if (shouldShowGenericTranslateError(error)) {
           toaster.create({
             title: "Error translating",
-            description:
-              "There was an error translating the message, please try again.",
+            description: "There was an error translating the message, please try again.",
             type: "error",
           });
         }

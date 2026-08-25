@@ -126,12 +126,9 @@ export function HomePagePicker({ organizationId }: Props) {
               borderColor={selected === opt.value ? "blue.400" : "border.muted"}
               borderRadius="md"
               padding={3}
-              backgroundColor={
-                selected === opt.value ? "blue.50" : "transparent"
-              }
+              backgroundColor={selected === opt.value ? "blue.50" : "transparent"}
               _dark={{
-                backgroundColor:
-                  selected === opt.value ? "blue.900" : "transparent",
+                backgroundColor: selected === opt.value ? "blue.900" : "transparent",
               }}
               cursor="pointer"
               onClick={() => onChange(opt.value)}

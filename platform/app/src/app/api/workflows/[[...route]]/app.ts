@@ -208,9 +208,7 @@ secured.access(requires("workflows:manage")).delete(
         description: "Workflow archived",
         content: {
           "application/json": {
-            schema: resolver(
-              z.object({ id: z.string(), archived: z.boolean() }),
-            ),
+            schema: resolver(z.object({ id: z.string(), archived: z.boolean() })),
           },
         },
       },
@@ -225,10 +223,7 @@ secured.access(requires("workflows:manage")).delete(
   async (c) => {
     const project = c.get("project");
     const { id } = c.req.param();
-    logger.info(
-      { projectId: project.id, workflowId: id },
-      "Archiving workflow",
-    );
+    logger.info({ projectId: project.id, workflowId: id }, "Archiving workflow");
 
     try {
       await appFromContext(c).workflows.archive({
@@ -253,15 +248,11 @@ const evaluateBodySchema = z
     data: z
       .array(z.record(z.string(), z.unknown()))
       .optional()
-      .describe(
-        "Inline rows to evaluate instead of the workflow's attached dataset",
-      ),
+      .describe("Inline rows to evaluate instead of the workflow's attached dataset"),
     dataset_id: z
       .string()
       .optional()
-      .describe(
-        "Platform dataset id to evaluate; mutually exclusive with data",
-      ),
+      .describe("Platform dataset id to evaluate; mutually exclusive with data"),
     parameters: z
       .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
       .optional()

@@ -24,10 +24,7 @@
  */
 
 import { auditLog } from "~/runtime/app/features/audit-log";
-import {
-  GithubNotConnectedError,
-  type GithubService,
-} from "@langwatch/github-contract";
+import { GithubNotConnectedError, type GithubService } from "@langwatch/github-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PermissionMiddleware } from "~/server/api/rbac";
@@ -71,11 +68,14 @@ const enforceOrganizationMembership: PermissionMiddleware<{
 
 // GitHub can only be uninstalled by a human on GitHub itself. Deep-link to the
 // right account settings page on the host this instance is bound to.
-function uninstallUrl(installation: {
-  accountLogin: string;
-  accountType: string;
-  installationId: string;
-}, webBase: string): string {
+function uninstallUrl(
+  installation: {
+    accountLogin: string;
+    accountType: string;
+    installationId: string;
+  },
+  webBase: string,
+): string {
   if (installation.accountType === "Organization") {
     return `${webBase}/organizations/${installation.accountLogin}/settings/installations/${installation.installationId}`;
   }
@@ -92,10 +92,7 @@ function uninstallUrl(installation: {
  * way hands the customer a button whose only possible outcome is the route's
  * 503.
  */
-function installUrl(
-  organizationId: string,
-  service: GithubService,
-): string | null {
+function installUrl(organizationId: string, service: GithubService): string | null {
   if (!service.getAppConfig().configured) return null;
   return `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`;
 }
@@ -107,9 +104,7 @@ export const githubRouter = createTRPCRouter({
     .use(enforceOrganizationMembership)
     .query(async ({ input, ctx }) => {
       const service = ctx.app.github;
-      const installations = await service.getAllForOrganization(
-        input.organizationId,
-      );
+      const installations = await service.getAllForOrganization(input.organizationId);
       return {
         // The same reading `installUrl` takes, which includes the App slug the
         // deep link needs. Reporting token readiness here instead said GitHub
@@ -125,9 +120,7 @@ export const githubRouter = createTRPCRouter({
           repositorySelection: i.repositorySelection,
           // Known only for a "selected" install; "all" resolves live.
           repositoryCount:
-            i.repositorySelection === "selected"
-              ? (i.repositories?.length ?? 0)
-              : null,
+            i.repositorySelection === "selected" ? (i.repositories?.length ?? 0) : null,
           suspended: i.suspendedAt != null,
           uninstallUrl: uninstallUrl(i, service.getWebBase()),
         })),
@@ -140,9 +133,7 @@ export const githubRouter = createTRPCRouter({
     .permission("organization:manage")
     .use(enforceOrganizationMembership)
     .query(async ({ input, ctx }) => {
-      return ctx.app.github.listRepositoriesForOrganization(
-        input.organizationId,
-      );
+      return ctx.app.github.listRepositoriesForOrganization(input.organizationId);
     }),
 
   /**
@@ -174,11 +165,10 @@ export const githubRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const organizationId = await resolveOrganizationId(input.projectId);
       if (!organizationId) return { statuses: [] };
-      const statuses =
-        await ctx.app.github.getLivePullRequestStatuses({
-          organizationId,
-          refs: input.refs,
-        });
+      const statuses = await ctx.app.github.getLivePullRequestStatuses({
+        organizationId,
+        refs: input.refs,
+      });
       return { statuses };
     }),
 
@@ -187,17 +177,13 @@ export const githubRouter = createTRPCRouter({
     .permission("organization:manage")
     .use(enforceOrganizationMembership)
     .mutation(async ({ ctx, input }) => {
-      const installation =
-        await ctx.app.github.tryGetByInstallationId(
-          input.installationId,
-        );
+      const installation = await ctx.app.github.tryGetByInstallationId(
+        input.installationId,
+      );
       // Cross-tenant guard: the installation must belong to this org. One owned
       // by another organization is reported exactly as a missing one, so the id
       // cannot be probed.
-      if (
-        !installation ||
-        installation.organizationId !== input.organizationId
-      ) {
+      if (!installation || installation.organizationId !== input.organizationId) {
         throw new GithubNotConnectedError(input.organizationId);
       }
       await auditLog({

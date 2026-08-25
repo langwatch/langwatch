@@ -30,9 +30,7 @@ type TraceWithAnnotations = BaseTrace & {
 };
 
 /** One reviewer's annotation as this file reads it. */
-export type TraceAnnotation = NonNullable<
-  TraceWithAnnotations["annotations"]
->[number];
+export type TraceAnnotation = NonNullable<TraceWithAnnotations["annotations"]>[number];
 
 /** One scoreOptions entry, as the annotation router writes it. */
 type AnnotationScoreOption = {
@@ -155,13 +153,11 @@ function filterThreadTraces(
     return threadTraces.map((threadTrace) => {
       const filteredTrace: Record<string, unknown> = {};
       for (const field of data.selectedFields!) {
-        const traceMapping =
-          TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
+        const traceMapping = TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
         if (traceMapping) {
           filteredTrace[field] = traceMapping.mapping(threadTrace, "", "", {});
         } else {
-          filteredTrace[field] =
-            threadTrace[field as keyof TraceWithAnnotations];
+          filteredTrace[field] = threadTrace[field as keyof TraceWithAnnotations];
         }
       }
       return filteredTrace;
@@ -175,9 +171,7 @@ function filterThreadTraces(
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
 
 /** The name each span answers to, by its id, for naming the part a comment is about. */
-const buildSpanNameIndex = (
-  spans: Span[],
-): Map<string, string | null | undefined> =>
+const buildSpanNameIndex = (spans: Span[]): Map<string, string | null | undefined> =>
   new Map(spans.map((span) => [span.span_id, getSpanNameOrModel(span)]));
 
 /** A score's value as it reads: a multi-select answers with several, joined. */
@@ -218,12 +212,9 @@ const readableScoreParts = ({
   )) {
     const value = readableScoreValue(score?.value);
     if (!value) continue;
-    const name =
-      projectScores?.find((option) => option.id === scoreId)?.name ?? scoreId;
+    const name = projectScores?.find((option) => option.id === scoreId)?.name ?? scoreId;
     const reason = oneLine(score?.reason ?? "");
-    parts.push(
-      reason ? `[${name}: ${value}, reason: ${reason}]` : `[${name}: ${value}]`,
-    );
+    parts.push(reason ? `[${name}: ${value}, reason: ${reason}]` : `[${name}: ${value}]`);
   }
   return parts;
 };
@@ -249,9 +240,7 @@ const readableAnnotationPart = ({
   return describeAnnotationAnchor({
     anchor,
     traceId,
-    spanName: annotation.anchorId
-      ? spanNamesById?.get(annotation.anchorId)
-      : undefined,
+    spanName: annotation.anchorId ? spanNamesById?.get(annotation.anchorId) : undefined,
     withIds: true,
   });
 };
@@ -411,9 +400,7 @@ export function buildAnnotationRecord({
       : {}),
     ...(Object.keys(scores).length > 0 ? { score: scores } : {}),
     ...(suggestion ? { [suggestionKey]: suggestion } : {}),
-    ...(Number.isNaN(createdAt.getTime())
-      ? {}
-      : { created_at: createdAt.toISOString() }),
+    ...(Number.isNaN(createdAt.getTime()) ? {} : { created_at: createdAt.toISOString() }),
   };
 }
 
@@ -450,8 +437,7 @@ export const TRACE_MAPPINGS = {
     mapping: (trace: TraceWithAnnotations) => trace.metrics?.total_cost ?? 0,
   },
   "metrics.first_token_ms": {
-    mapping: (trace: TraceWithAnnotations) =>
-      trace.metrics?.first_token_ms ?? 0,
+    mapping: (trace: TraceWithAnnotations) => trace.metrics?.first_token_ms ?? 0,
   },
   "metrics.total_time_ms": {
     mapping: (trace: TraceWithAnnotations) => trace.metrics?.total_time_ms ?? 0,
@@ -460,21 +446,18 @@ export const TRACE_MAPPINGS = {
     mapping: (trace: TraceWithAnnotations) => trace.metrics?.prompt_tokens ?? 0,
   },
   "metrics.completion_tokens": {
-    mapping: (trace: TraceWithAnnotations) =>
-      trace.metrics?.completion_tokens ?? 0,
+    mapping: (trace: TraceWithAnnotations) => trace.metrics?.completion_tokens ?? 0,
   },
   "metrics.total_tokens": {
     mapping: (trace: TraceWithAnnotations) =>
-      (trace.metrics?.prompt_tokens ?? 0) +
-      (trace.metrics?.completion_tokens ?? 0),
+      (trace.metrics?.prompt_tokens ?? 0) + (trace.metrics?.completion_tokens ?? 0),
   },
   spans: {
     keys: (traces: TraceWithAnnotations[]) => {
       return Array.from(
         new Set(
           traces.flatMap(
-            (trace) =>
-              trace.spans?.map((span) => getSpanNameOrModel(span)) ?? [],
+            (trace) => trace.spans?.map((span) => getSpanNameOrModel(span)) ?? [],
           ),
         ),
       ).map((key) => ({
@@ -504,9 +487,7 @@ export const TRACE_MAPPINGS = {
       const filteredSpans =
         key === "*"
           ? traceSpans
-          : traceSpans.filter(
-              (span) => getSpanNameOrModel(span as Span) === key,
-            );
+          : traceSpans.filter((span) => getSpanNameOrModel(span as Span) === key);
       // Handle * as wildcard for subkey - return full span objects
       if (!subkey || subkey === "*") {
         return filteredSpans;
@@ -540,9 +521,7 @@ export const TRACE_MAPPINGS = {
       const mergedKeys = Array.from(new Set([...allKeys, ...reservedKeys]));
 
       const excludedKeys = ["custom", "all_keys"];
-      const filteredKeys = mergedKeys.filter(
-        (key) => !excludedKeys.includes(key),
-      );
+      const filteredKeys = mergedKeys.filter((key) => !excludedKeys.includes(key));
 
       // Return all keys, marking reserved ones
       return filteredKeys.map((key) => ({
@@ -555,9 +534,7 @@ export const TRACE_MAPPINGS = {
       if (key === "*") {
         return trace.metadata;
       }
-      return key
-        ? (trace.metadata?.[key] as any)
-        : JSON.stringify(trace.metadata);
+      return key ? (trace.metadata?.[key] as any) : JSON.stringify(trace.metadata);
     },
   },
   evaluations: {
@@ -584,9 +561,7 @@ export const TRACE_MAPPINGS = {
         .find((evaluation) => evaluation.evaluator_id === key);
       return Object.keys(evaluation || {})
         .filter((key) =>
-          ["passed", "score", "label", "details", "status", "error"].includes(
-            key,
-          ),
+          ["passed", "score", "label", "details", "status", "error"].includes(key),
         )
         .map((key) => ({
           key,
@@ -643,9 +618,7 @@ export const TRACE_MAPPINGS = {
     ) => {
       const annotations = trace.annotations ?? [];
       const spanNamesById =
-        !key || key === "ai_readable"
-          ? buildSpanNameIndex(trace.spans ?? [])
-          : undefined;
+        !key || key === "ai_readable" ? buildSpanNameIndex(trace.spans ?? []) : undefined;
 
       if (!key) {
         return annotations.map((annotation) =>
@@ -738,12 +711,10 @@ export const TRACE_MAPPINGS = {
         Object.keys(event.event_details).map((key) => `event_details.${key}`),
       );
 
-      return Array.from(new Set([...eventMetrics, ...eventDetails])).map(
-        (event) => ({
-          key: event,
-          label: event,
-        }),
-      );
+      return Array.from(new Set([...eventMetrics, ...eventDetails])).map((event) => ({
+        key: event,
+        label: event,
+      }));
     },
     mapping: (trace: TraceWithAnnotations, key: string, subkey: string) => {
       if (!key) {
@@ -762,10 +733,7 @@ export const TRACE_MAPPINGS = {
       if (subkey.startsWith("event_details.")) {
         return trace.events
           ?.filter((event) => event.event_type === key)
-          ?.map(
-            (event) =>
-              event.event_details[subkey.replace("event_details.", "")],
-          );
+          ?.map((event) => event.event_details[subkey.replace("event_details.", "")]);
       }
     },
     expandable_by: "events.event_id",
@@ -907,8 +875,7 @@ export const extractTracesFields = (
   selectedFields: (keyof typeof TRACE_MAPPINGS)[],
 ): Record<string, any>[] => {
   // When no fields are selected, extract default fields so the data is useful
-  const fields =
-    selectedFields.length > 0 ? selectedFields : DEFAULT_TRACE_FIELDS;
+  const fields = selectedFields.length > 0 ? selectedFields : DEFAULT_TRACE_FIELDS;
   return traces.map((trace) => {
     const result: Record<string, any> = {};
     for (const field of fields) {
@@ -987,9 +954,7 @@ export const mappingStateSchema = z.object({
         .object({
           source: z.union([
             z.enum([
-              ...(Object.keys(THREAD_MAPPINGS) as [
-                keyof typeof THREAD_MAPPINGS,
-              ]),
+              ...(Object.keys(THREAD_MAPPINGS) as [keyof typeof THREAD_MAPPINGS]),
               ...SERVER_ONLY_THREAD_SOURCES,
             ]),
             z.literal(""),
@@ -1151,42 +1116,40 @@ export const mapTraceToDatasetEntry = (
 
   return expandedTraces.map((trace) =>
     Object.fromEntries(
-      Object.entries(mapping).map(
-        ([column, { source, key, subkey, selectedFields }]) => {
-          const source_ =
-            source && source in TRACE_MAPPINGS
-              ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
-              : undefined;
+      Object.entries(mapping).map(([column, { source, key, subkey, selectedFields }]) => {
+        const source_ =
+          source && source in TRACE_MAPPINGS
+            ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
+            : undefined;
 
-          let value = source_?.mapping(trace, key!, subkey!, {
-            annotationScoreOptions,
-            allTraces,
-            selectedFields,
-          });
+        let value = source_?.mapping(trace, key!, subkey!, {
+          annotationScoreOptions,
+          allTraces,
+          selectedFields,
+        });
 
-          // An expanded trace holds exactly one of whatever it was expanded by,
-          // so a column that lists them holds one entry: take it out of the
-          // list. A column that already reads as one value, the annotations
-          // read as a single text, is that value; indexing it would take its
-          // first character.
-          if (
-            source_ &&
-            "expandable_by" in source_ &&
-            source_?.expandable_by &&
-            expansions.has(source_?.expandable_by) &&
-            Array.isArray(value)
-          ) {
-            value = value[0];
-          }
+        // An expanded trace holds exactly one of whatever it was expanded by,
+        // so a column that lists them holds one entry: take it out of the
+        // list. A column that already reads as one value, the annotations
+        // read as a single text, is that value; indexing it would take its
+        // first character.
+        if (
+          source_ &&
+          "expandable_by" in source_ &&
+          source_?.expandable_by &&
+          expansions.has(source_?.expandable_by) &&
+          Array.isArray(value)
+        ) {
+          value = value[0];
+        }
 
-          return [
-            column,
-            typeof value !== "string" && typeof value !== "number"
-              ? JSON.stringify(value)
-              : value,
-          ];
-        },
-      ),
+        return [
+          column,
+          typeof value !== "string" && typeof value !== "number"
+            ? JSON.stringify(value)
+            : value,
+        ];
+      }),
     ),
   );
 };
@@ -1255,9 +1218,7 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
       throw new Error("Failed to parse to a valid type, falling back");
     } catch {
       if (type === "string[]") {
-        return [
-          tryAndConvertTo(value, "string"),
-        ] as unknown as StringTypeToType[T];
+        return [tryAndConvertTo(value, "string")] as unknown as StringTypeToType[T];
       }
       if (type === "array") {
         return [value] as unknown as StringTypeToType[T];
@@ -1426,8 +1387,7 @@ export function getThreadAvailableSources(): TraceAvailableSource[] {
         ...Object.entries(THREAD_MAPPINGS)
           .filter(([key]) => key !== "traces")
           .map(([key, config]) => {
-            const hasKeys =
-              "keys" in config && typeof config.keys === "function";
+            const hasKeys = "keys" in config && typeof config.keys === "function";
 
             if (hasKeys) {
               return {

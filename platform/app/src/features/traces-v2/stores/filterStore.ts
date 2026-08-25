@@ -293,10 +293,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     set((state) => {
       const result = safeParseAndSerialize(text);
       if (result.parseError) {
-        if (
-          text === state.queryText &&
-          result.parseError === state.parseError
-        ) {
+        if (text === state.queryText && result.parseError === state.parseError) {
           return state;
         }
         return {
@@ -461,9 +458,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
 
   swapOperator: (start, end) =>
     set((s) =>
-      applyMutation(s, (q) =>
-        swapOperatorAtLocation({ currentQuery: q, start, end }),
-      ),
+      applyMutation(s, (q) => swapOperatorAtLocation({ currentQuery: q, start, end })),
     ),
 
   setFacetValueAt: (start, end, newValue) =>
@@ -489,9 +484,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
 
   removeFreeText: (value) =>
     set((s) =>
-      applyMutation(s, (q) =>
-        removeImplicitTermFromQuery({ currentQuery: q, value }),
-      ),
+      applyMutation(s, (q) => removeImplicitTermFromQuery({ currentQuery: q, value })),
     ),
 
   setRange: (field, from, to) =>
@@ -508,8 +501,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       ),
     ),
 
-  setTimeRange: (range) =>
-    set({ timeRange: range, page: 1, pageCursors: { 1: null } }),
+  setTimeRange: (range) => set({ timeRange: range, page: 1, pageCursors: { 1: null } }),
   rollTimeRange: (range) => set({ timeRange: range }),
   setPage: (page) => set({ page }),
   setPageCursor: ({ page, cursor }) =>
@@ -517,8 +509,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       pageCursors: { ...state.pageCursors, [page]: cursor },
     })),
   resetPagination: () => set({ page: 1, pageCursors: { 1: null } }),
-  setPageSize: (size) =>
-    set({ pageSize: size, page: 1, pageCursors: { 1: null } }),
+  setPageSize: (size) => set({ pageSize: size, page: 1, pageCursors: { 1: null } }),
   clearAll: () =>
     set({
       ast: EMPTY_AST,

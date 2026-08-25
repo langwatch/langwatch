@@ -28,8 +28,12 @@ export const getAgentCommand = async (id: string): Promise<CommandResult | void>
         console.log(chalk.gray("─".repeat(40)));
         console.log(`  ${chalk.gray("ID:")}      ${agent.id}`);
         console.log(`  ${chalk.gray("Type:")}    ${chalk.yellow(agent.type)}`);
-        console.log(`  ${chalk.gray("Created:")} ${new Date(agent.createdAt).toLocaleString()}`);
-        console.log(`  ${chalk.gray("Updated:")} ${new Date(agent.updatedAt).toLocaleString()}`);
+        console.log(
+          `  ${chalk.gray("Created:")} ${new Date(agent.createdAt).toLocaleString()}`,
+        );
+        console.log(
+          `  ${chalk.gray("Updated:")} ${new Date(agent.updatedAt).toLocaleString()}`,
+        );
 
         if (agent.platformUrl) {
           console.log(`  ${chalk.bold("View:")}  ${chalk.underline(agent.platformUrl)}`);
@@ -38,7 +42,9 @@ export const getAgentCommand = async (id: string): Promise<CommandResult | void>
         if (agent.config && Object.keys(agent.config).length > 0) {
           console.log();
           console.log(chalk.bold("  Config:"));
-          console.log(`    ${JSON.stringify(agent.config, null, 2).split("\n").join("\n    ")}`);
+          console.log(
+            `    ${JSON.stringify(agent.config, null, 2).split("\n").join("\n    ")}`,
+          );
         }
 
         console.log();

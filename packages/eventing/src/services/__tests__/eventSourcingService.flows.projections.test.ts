@@ -32,17 +32,12 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       const expectedState = { value: "test" };
-      (foldStore.get as ReturnType<typeof vi.fn>).mockResolvedValue(
-        expectedState,
-      );
+      (foldStore.get as ReturnType<typeof vi.fn>).mockResolvedValue(expectedState);
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -68,10 +63,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [createMockFoldProjectionDefinition("projection")],
       });
@@ -90,19 +82,12 @@ describe("EventSourcingService - Projection Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
       await expect(
-        service.getProjectionByName(
-          "projection",
-          TEST_CONSTANTS.AGGREGATE_ID,
-          context,
-        ),
+        service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context),
       ).rejects.toThrow(/projection/i);
     });
   });
@@ -122,10 +107,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -151,10 +133,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -173,10 +152,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [createMockFoldProjectionDefinition("projection")],
       });
@@ -195,19 +171,12 @@ describe("EventSourcingService - Projection Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
       await expect(
-        service.hasProjectionByName(
-          "projection",
-          TEST_CONSTANTS.AGGREGATE_ID,
-          context,
-        ),
+        service.hasProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context),
       ).rejects.toThrow(/projection/i);
     });
   });
@@ -218,10 +187,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [
           createMockFoldProjectionDefinition("projection1"),
@@ -255,10 +221,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -286,10 +249,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef1, foldDef2],
       });
@@ -316,10 +276,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });

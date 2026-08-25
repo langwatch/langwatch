@@ -167,12 +167,10 @@ describe("given a session group payload from the sessions procedure", () => {
 
     it("derives the worst status from error and warning counts", () => {
       expect(
-        mapSessionGroupToConversationGroup(payloadItem({ errorCount: 2 }))
-          .worstStatus,
+        mapSessionGroupToConversationGroup(payloadItem({ errorCount: 2 })).worstStatus,
       ).toBe("error");
       expect(
-        mapSessionGroupToConversationGroup(payloadItem({ warningCount: 1 }))
-          .worstStatus,
+        mapSessionGroupToConversationGroup(payloadItem({ warningCount: 1 })).worstStatus,
       ).toBe("warning");
     });
   });
@@ -192,10 +190,7 @@ describe("given a payload carrying several sessions", () => {
       const groups = mapSessionGroupsPayload({
         sessions: [payloadItem(), payloadItem({ conversationId: "sess-2" })],
       });
-      expect(groups.map((group) => group.conversationId)).toEqual([
-        "sess-1",
-        "sess-2",
-      ]);
+      expect(groups.map((group) => group.conversationId)).toEqual(["sess-1", "sess-2"]);
     });
   });
 });

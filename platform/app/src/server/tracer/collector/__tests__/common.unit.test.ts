@@ -22,8 +22,7 @@ const esTypedValueToTypedValue = (typed: any): SpanInputOutput => {
   try {
     return {
       type: typed.type,
-      value:
-        typeof typed.value === "string" ? JSON.parse(typed.value) : typed.value,
+      value: typeof typed.value === "string" ? JSON.parse(typed.value) : typed.value,
     } as SpanInputOutput;
   } catch {
     return { type: "raw", value: typed.value };
@@ -167,8 +166,7 @@ describe("Span organizing and flattening tests", () => {
       {
         output: {
           type: "json",
-          value:
-            '{"outputs":[],"kwargs":{"tags":["map:key:agent_scratchpad"]}}',
+          value: '{"outputs":[],"kwargs":{"tags":["map:key:agent_scratchpad"]}}',
         },
         input: {
           type: "json",
@@ -550,12 +548,8 @@ describe("Span organizing and flattening tests", () => {
       },
     ];
 
-    const input = getFirstInputAsText(
-      spans.map(elasticSearchSpanToSpan as any),
-    );
-    const output = getLastOutputAsText(
-      spans.map(elasticSearchSpanToSpan as any),
-    );
+    const input = getFirstInputAsText(spans.map(elasticSearchSpanToSpan as any));
+    const output = getLastOutputAsText(spans.map(elasticSearchSpanToSpan as any));
 
     expect(input).toEqual("hello");
     expect(output).toEqual("Hello, ai admin! How can I assist you today?");
@@ -804,12 +798,8 @@ describe("Span organizing and flattening tests", () => {
       },
     ];
 
-    const input = getFirstInputAsText(
-      spans.map(elasticSearchSpanToSpan as any),
-    );
-    const output = getLastOutputAsText(
-      spans.map(elasticSearchSpanToSpan as any),
-    );
+    const input = getFirstInputAsText(spans.map(elasticSearchSpanToSpan as any));
+    const output = getLastOutputAsText(spans.map(elasticSearchSpanToSpan as any));
 
     expect(input).toEqual("1");
     expect(output).toEqual("Hey there! How can I help you today? 🌟");
@@ -880,8 +870,7 @@ describe("Span organizing and flattening tests", () => {
         },
         output: {
           type: "chat_messages",
-          value:
-            '[{"role":"assistant","content":"Hello! How can I assist you today?"}]',
+          value: '[{"role":"assistant","content":"Hello! How can I assist you today?"}]',
         },
         input: {
           type: "chat_messages",
@@ -1026,12 +1015,8 @@ describe("Span organizing and flattening tests", () => {
       },
     ];
 
-    const input = getFirstInputAsText(
-      spans.map(elasticSearchSpanToSpan as any),
-    );
-    const output = getLastOutputAsText(
-      spans.map(elasticSearchSpanToSpan as any),
-    );
+    const input = getFirstInputAsText(spans.map(elasticSearchSpanToSpan as any));
+    const output = getLastOutputAsText(spans.map(elasticSearchSpanToSpan as any));
 
     expect(input).toEqual("hey there");
     expect(output).toEqual("Hello! How can I assist you today?");
@@ -1221,12 +1206,8 @@ describe("Span organizing and flattening tests", () => {
       },
     ];
 
-    const input = getFirstInputAsText(
-      spans.map(elasticSearchSpanToSpan as any),
-    );
-    const output = getLastOutputAsText(
-      spans.map(elasticSearchSpanToSpan as any),
-    );
+    const input = getFirstInputAsText(spans.map(elasticSearchSpanToSpan as any));
+    const output = getLastOutputAsText(spans.map(elasticSearchSpanToSpan as any));
 
     expect(input).toBe("Hello");
     expect(output).toBe(
@@ -1266,14 +1247,10 @@ describe("Span organizing and flattening tests", () => {
       },
     ];
 
-    const input = getFirstInputAsText(
-      spans.map(elasticSearchSpanToSpan as any),
-    );
+    const input = getFirstInputAsText(spans.map(elasticSearchSpanToSpan as any));
     expect(input).toBe("ohai");
 
-    const output = getLastOutputAsText(
-      spans.map(elasticSearchSpanToSpan as any),
-    );
+    const output = getLastOutputAsText(spans.map(elasticSearchSpanToSpan as any));
     expect(output).toBe(
       "You're welcome! If you have any more questions or need assistance, feel free to ask. Have a great day!",
     );
@@ -1297,9 +1274,7 @@ describe("Span organizing and flattening tests", () => {
       },
     ];
 
-    const input = getFirstInputAsText(
-      spans.map(elasticSearchSpanToSpan as any),
-    );
+    const input = getFirstInputAsText(spans.map(elasticSearchSpanToSpan as any));
     expect(input).toBe("how much is 2+2?");
   });
 
@@ -1317,15 +1292,11 @@ describe("Span organizing and flattening tests", () => {
             value: [
               {
                 role: "system",
-                content: [
-                  { type: "text", content: "You are a helpful assistant." },
-                ],
+                content: [{ type: "text", content: "You are a helpful assistant." }],
               },
               {
                 role: "user",
-                parts: [
-                  { type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" },
-                ],
+                parts: [{ type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" }],
               },
             ],
           },
@@ -1361,9 +1332,7 @@ describe("Span organizing and flattening tests", () => {
             value: [
               {
                 role: "system",
-                content: [
-                  { type: "text", content: "You are Snaps, a lobster AI." },
-                ],
+                content: [{ type: "text", content: "You are Snaps, a lobster AI." }],
               },
               {
                 role: "user",
@@ -1580,9 +1549,7 @@ describe("typedValueToText()", () => {
       // recursion. Specific text output is not asserted — cycles are not
       // realistic in real JSON payloads (the JSON encoder would have thrown
       // before we ever saw them), so this is purely a robustness check.
-      expect(() =>
-        typedValueToText({ type: "json", value: circular }),
-      ).not.toThrow();
+      expect(() => typedValueToText({ type: "json", value: circular })).not.toThrow();
     });
   });
 });

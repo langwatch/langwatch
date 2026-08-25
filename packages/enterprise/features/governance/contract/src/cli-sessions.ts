@@ -35,9 +35,7 @@ export const cliSessionSchema = z
   .strict();
 export type CliSession = z.infer<typeof cliSessionSchema>;
 
-export const cliUserInputSchema = z
-  .object({ userId: z.string().min(1) })
-  .strict();
+export const cliUserInputSchema = z.object({ userId: z.string().min(1) }).strict();
 export type CliUserInput = z.infer<typeof cliUserInputSchema>;
 
 export const revokeCliSessionInputSchema = cliUserInputSchema
@@ -58,9 +56,7 @@ export function cliRefreshTokenKey(token: string): string {
 }
 
 export abstract class GovernanceCliTokenRevocationService {
-  abstract revokeForUser(
-    input: CliUserInput,
-  ): Promise<{ revokedCount: number }>;
+  abstract revokeForUser(input: CliUserInput): Promise<{ revokedCount: number }>;
 }
 
 export abstract class GovernanceCliSessionInventoryService {

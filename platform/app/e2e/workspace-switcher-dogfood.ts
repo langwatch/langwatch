@@ -47,9 +47,7 @@ void (async () => {
   await shoot(page, "01-me-landing");
 
   // Open the workspace switcher
-  const trigger = page
-    .locator('button[aria-label*="Switch workspace"]')
-    .first();
+  const trigger = page.locator('button[aria-label*="Switch workspace"]').first();
   await trigger.waitFor({ state: "visible", timeout: 10_000 });
   await trigger.click();
   await page.waitForTimeout(600);

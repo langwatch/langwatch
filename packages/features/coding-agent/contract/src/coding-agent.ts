@@ -176,10 +176,7 @@ export const codingAgentSessionEventsInputSchema = z
     projectId: z.string(),
     sessionId: z.string(),
     kinds: z.array(z.string()).optional(),
-    occurredAt: z
-      .object({ fromMs: z.number(), toMs: z.number() })
-      .strict()
-      .optional(),
+    occurredAt: z.object({ fromMs: z.number(), toMs: z.number() }).strict().optional(),
     cursor: codingAgentSessionCursorSchema.optional(),
     limit: legacyPageLimitSchema,
   })
@@ -452,12 +449,8 @@ export const codingAgentPersonalPullRequestUsageInputSchema = z
   .strict();
 
 export type CodingAgentSession = z.infer<typeof codingAgentSessionSchema>;
-export type CodingAgentSessionEvent = z.infer<
-  typeof codingAgentSessionEventSchema
->;
-export type CodingAgentSessionCursor = z.infer<
-  typeof codingAgentSessionCursorSchema
->;
+export type CodingAgentSessionEvent = z.infer<typeof codingAgentSessionEventSchema>;
+export type CodingAgentSessionCursor = z.infer<typeof codingAgentSessionCursorSchema>;
 export type CodingAgentSessionEventsInput = z.infer<
   typeof codingAgentSessionEventsInputSchema
 >;
@@ -470,15 +463,11 @@ export type CodingAgentTraceSessionLookupInput = z.infer<
 export type CodingAgentRecentSessionsInput = z.infer<
   typeof codingAgentRecentSessionsInputSchema
 >;
-export type CodingAgentUsageTotals = z.infer<
-  typeof codingAgentUsageTotalsSchema
->;
+export type CodingAgentUsageTotals = z.infer<typeof codingAgentUsageTotalsSchema>;
 export type CodingAgentUsageTotalsInput = z.infer<
   typeof codingAgentUsageTotalsInputSchema
 >;
-export type CodingAgentSessionListRow = z.infer<
-  typeof codingAgentSessionListRowSchema
->;
+export type CodingAgentSessionListRow = z.infer<typeof codingAgentSessionListRowSchema>;
 export type CodingAgentSessionsListInput = z.infer<
   typeof codingAgentSessionsListInputSchema
 >;

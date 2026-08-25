@@ -15,8 +15,7 @@ export type ContributeLogFactsCommandData = z.infer<
   typeof contributeLogFactsCommandDataSchema
 >;
 
-export const contributeMetricFactsCommandDataSchema =
-  metricFactsContributionSchema;
+export const contributeMetricFactsCommandDataSchema = metricFactsContributionSchema;
 export type ContributeMetricFactsCommandData = z.infer<
   typeof contributeMetricFactsCommandDataSchema
 >;

@@ -12,8 +12,7 @@ import {
 
 const logger = createLogger("langwatch:mailer:smtp");
 
-export const isSmtpConfigured = (): boolean =>
-  Boolean(env.SMTP_URL ?? env.SMTP_HOST);
+export const isSmtpConfigured = (): boolean => Boolean(env.SMTP_URL ?? env.SMTP_HOST);
 
 /**
  * Nodemailer's own defaults let a send hang for minutes (2m to connect, 10m of
@@ -70,13 +69,7 @@ export const buildSmtpTransportOptions = (): SMTPTransport.Options => {
 
 export const smtpProvider: EmailProviderPort = {
   name: "smtp",
-  async send({
-    content,
-    defaultFrom,
-  }: {
-    content: EmailContent;
-    defaultFrom: string;
-  }) {
+  async send({ content, defaultFrom }: { content: EmailContent; defaultFrom: string }) {
     logger.info("Sending email using SMTP");
     const transporter = nodemailer.createTransport(buildSmtpTransportOptions());
 

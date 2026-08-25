@@ -7,11 +7,7 @@ describe("AdminAccessService", () => {
       AdminAccessService.parseEmails(
         " Root@Langwatch.ai , ops@langwatch.ai,, second@Example.com ",
       ),
-    ).toEqual([
-      "root@langwatch.ai",
-      "ops@langwatch.ai",
-      "second@example.com",
-    ]);
+    ).toEqual(["root@langwatch.ai", "ops@langwatch.ai", "second@example.com"]);
   });
 
   it("matches case-insensitively and rejects missing email", () => {

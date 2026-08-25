@@ -80,13 +80,23 @@ export const clickhousePredep: Predep = {
     const src = downloadSource(platform);
 
     if (src.kind === "binary") {
-      await downloadWithProgress(src.url, out, task, `downloading clickhouse ${CH_VERSION}`);
+      await downloadWithProgress(
+        src.url,
+        out,
+        task,
+        `downloading clickhouse ${CH_VERSION}`,
+      );
     } else {
       // Stage the .tgz under .langwatch/bin/, extract just the binary, then
       // delete the tarball — keeping disk hit minimal (~370MB tarball, ~580MB
       // extracted; we only keep the ~580MB binary).
       const tmp = join(paths.bin, `.clickhouse-${CH_VERSION}.tgz`);
-      await downloadWithProgress(src.url, tmp, task, `downloading clickhouse ${CH_VERSION}`);
+      await downloadWithProgress(
+        src.url,
+        tmp,
+        task,
+        `downloading clickhouse ${CH_VERSION}`,
+      );
 
       task.output = "extracting";
       // Extract the single binary entry. tar.x with `filter` skips everything

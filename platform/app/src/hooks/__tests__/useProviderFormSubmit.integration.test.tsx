@@ -134,9 +134,7 @@ function renderSubmitHook({
   getAdvancedPayload,
 }: {
   snapshot: FormSnapshot;
-  getAdvancedPayload?: Parameters<
-    typeof useProviderFormSubmit
-  >[0]["getAdvancedPayload"];
+  getAdvancedPayload?: Parameters<typeof useProviderFormSubmit>[0]["getAdvancedPayload"];
 }) {
   return renderHook(() =>
     useProviderFormSubmit({
@@ -168,9 +166,7 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(
-          mockUpdateProjectDefaultModelsMutateAsync,
-        ).not.toHaveBeenCalled();
+        expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
       });
 
       it("creates an error toast", async () => {
@@ -202,9 +198,7 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(
-          mockUpdateProjectDefaultModelsMutateAsync,
-        ).not.toHaveBeenCalled();
+        expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
       });
 
       it("creates an error toast", async () => {
@@ -243,9 +237,7 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(
-          mockUpdateProjectDefaultModelsMutateAsync,
-        ).not.toHaveBeenCalled();
+        expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
       });
     });
   });

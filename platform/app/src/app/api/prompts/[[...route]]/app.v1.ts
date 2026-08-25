@@ -5,16 +5,10 @@ import { z } from "zod";
 import { afterPromptCreated } from "~/server/app-layer/billing/nurturing/promptCreation";
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import { prisma } from "~/server/db";
-import {
-  commitMessageSchema,
-  versionSchema,
-} from "@langwatch/prompt-contract";
+import { commitMessageSchema, versionSchema } from "@langwatch/prompt-contract";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import {
-  parsePromptShorthand,
-  ShorthandParseError,
-} from "@langwatch/prompt-contract";
+import { parsePromptShorthand, ShorthandParseError } from "@langwatch/prompt-contract";
 import {
   PromptTagConflictError,
   PromptTagNotFoundError,
@@ -36,10 +30,7 @@ import {
   createPromptInputSchema,
   updatePromptInputSchema,
 } from "./schemas";
-import {
-  buildStandardSuccessResponse,
-  handlePossibleConflictError,
-} from "./utils";
+import { buildStandardSuccessResponse, handlePossibleConflictError } from "./utils";
 import { handleSystemPromptHandledErrors } from "./utils/handle-system-prompt-handled-errors";
 
 const logger = createLogger("langwatch:api:prompts");
@@ -287,10 +278,7 @@ export function registerPromptRoutes(
           "Custom prompt tag created via REST",
         );
 
-        return c.json(
-          { id: tag.id, name: tag.name, createdAt: tag.createdAt },
-          201,
-        );
+        return c.json({ id: tag.id, name: tag.name, createdAt: tag.createdAt }, 201);
       } catch (error) {
         if (error instanceof PromptTagValidationError) {
           throw new HTTPException(422, { message: error.message });
@@ -430,10 +418,7 @@ export function registerPromptRoutes(
       const organization = c.get("organization");
       const { id } = c.req.param();
 
-      logger.info(
-        { projectId: project.id, promptId: id },
-        "Getting versions for prompt",
-      );
+      logger.info({ projectId: project.id, promptId: id }, "Getting versions for prompt");
 
       const versions: ApiResponsePrompt[] = await service.getAllVersions({
         idOrHandle: id,
@@ -471,9 +456,7 @@ export function registerPromptRoutes(
         "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
       responses: {
         ...baseResponses,
-        200: buildStandardSuccessResponse(
-          apiResponsePromptWithVersionDataSchema,
-        ),
+        200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
         404: {
           description: "Prompt or version not found",
           content: {
@@ -564,9 +547,7 @@ export function registerPromptRoutes(
       ],
       responses: {
         ...baseResponses,
-        200: buildStandardSuccessResponse(
-          apiResponsePromptWithVersionDataSchema,
-        ),
+        200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
         404: {
           description: "Prompt not found",
           content: {
@@ -661,9 +642,7 @@ export function registerPromptRoutes(
       description: "Create a new prompt with default initial version",
       responses: {
         ...baseResponses,
-        200: buildStandardSuccessResponse(
-          apiResponsePromptWithVersionDataSchema,
-        ),
+        200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
         409: conflictResponses[409],
       },
     }),
@@ -768,23 +747,15 @@ export function registerPromptRoutes(
             "application/json": {
               schema: resolver(
                 z.object({
-                  action: z.enum([
-                    "created",
-                    "updated",
-                    "conflict",
-                    "up_to_date",
-                  ]),
+                  action: z.enum(["created", "updated", "conflict", "up_to_date"]),
                   prompt: apiResponsePromptWithVersionDataSchema.optional(),
                   conflictInfo: z
                     .object({
                       localVersion: z.number(),
                       remoteVersion: z.number(),
                       differences: z.array(z.string()),
-                      remoteConfigData:
-                        getLatestConfigVersionSchema().shape.configData,
-                      remoteParameters: z
-                        .record(z.string(), z.unknown())
-                        .optional(),
+                      remoteConfigData: getLatestConfigVersionSchema().shape.configData,
+                      remoteParameters: z.record(z.string(), z.unknown()).optional(),
                     })
                     .optional(),
                 }),
@@ -891,9 +862,7 @@ export function registerPromptRoutes(
       description: "Update a prompt",
       responses: {
         ...baseResponses,
-        200: buildStandardSuccessResponse(
-          apiResponsePromptWithVersionDataSchema,
-        ),
+        200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
         404: {
           description: "Prompt not found",
           content: {
@@ -1000,10 +969,7 @@ export function registerPromptRoutes(
           }),
         });
       } catch (error: any) {
-        logger.error(
-          { projectId, promptId: id, error },
-          "Error updating prompt",
-        );
+        logger.error({ projectId, promptId: id, error }, "Error updating prompt");
         if (error instanceof PromptTagValidationError) {
           throw new HTTPException(422, {
             message: error.message,

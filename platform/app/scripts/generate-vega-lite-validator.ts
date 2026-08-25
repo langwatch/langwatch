@@ -93,9 +93,7 @@ export function readBundledVegaLiteSchema(): Record<string, unknown> {
  * produce byte-identical output, which is what lets the drift guard compare
  * bytes rather than behaviour alone.
  */
-export function generateVegaLiteValidatorSource(
-  schema: Record<string, unknown>,
-): string {
+export function generateVegaLiteValidatorSource(schema: Record<string, unknown>): string {
   const ajv = new Ajv({
     ...VEGA_LITE_AJV_OPTIONS,
     code: { source: true, esm: true },
@@ -133,8 +131,7 @@ function runtimeImports(): string {
     `import ${binding}Module from "${specifier}";`,
   ]);
   const bindings = AJV_RUNTIME_IMPORTS.map(
-    ({ binding }) =>
-      `const ${binding} = ${binding}Module.default ?? ${binding}Module;`,
+    ({ binding }) => `const ${binding} = ${binding}Module.default ?? ${binding}Module;`,
   );
   return [...lines, ...bindings, ""].join("\n");
 }
@@ -188,20 +185,13 @@ function main(): void {
     "utf8",
   );
 
-  const megabytes = (Buffer.byteLength(source, "utf8") / 1024 / 1024).toFixed(
-    2,
-  );
-  console.log(
-    `Wrote ${GENERATED_VALIDATOR_PATH} (${megabytes} MB) and its declaration.`,
-  );
+  const megabytes = (Buffer.byteLength(source, "utf8") / 1024 / 1024).toFixed(2);
+  console.log(`Wrote ${GENERATED_VALIDATOR_PATH} (${megabytes} MB) and its declaration.`);
 }
 
 // `tsx scripts/generate-vega-lite-validator.ts` writes the files; the drift
 // guard imports the exports above and writes nothing.
 const entryPoint = process.argv[1];
-if (
-  entryPoint !== undefined &&
-  fileURLToPath(import.meta.url) === resolve(entryPoint)
-) {
+if (entryPoint !== undefined && fileURLToPath(import.meta.url) === resolve(entryPoint)) {
   main();
 }

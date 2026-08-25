@@ -60,14 +60,11 @@ describe("OrganizationService.createForProvisioning", () => {
     /** @scenario Provisioning that fails while setting the organization up leaves nothing behind */
     it("leaves no organization or team behind, and the slug provisions afterwards", async () => {
       const attempted: string[] = [];
-      const failing = new OrganizationService(
-        repo,
-        buildFailingTagRepository(attempted),
-      );
+      const failing = new OrganizationService(repo, buildFailingTagRepository(attempted));
 
-      await expect(
-        failing.createForProvisioning({ name, slug }),
-      ).rejects.toThrow(SEEDING_FAILURE);
+      await expect(failing.createForProvisioning({ name, slug })).rejects.toThrow(
+        SEEDING_FAILURE,
+      );
 
       // The failure has to have happened after the organization committed,
       // or the test would pass without exercising the compensation at all.
@@ -77,12 +74,8 @@ describe("OrganizationService.createForProvisioning", () => {
       expect(
         await prisma.organization.findUnique({ where: { id: orphanedId } }),
       ).toBeNull();
-      expect(
-        await prisma.team.count({ where: { organizationId: orphanedId } }),
-      ).toBe(0);
-      expect(
-        await prisma.organization.findFirst({ where: { slug } }),
-      ).toBeNull();
+      expect(await prisma.team.count({ where: { organizationId: orphanedId } })).toBe(0);
+      expect(await prisma.organization.findFirst({ where: { slug } })).toBeNull();
 
       const retried = await new OrganizationService(
         repo,

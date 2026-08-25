@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 // codex Path B emits ONE authoritative per-turn rollup span (session_task.turn,
 // carrying the model) AND a lower-level response span (handle_responses) that
@@ -15,10 +12,7 @@ describe("applySpanToSummary codex redundant-usage handling", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    extractSpy = vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    );
+    extractSpy = vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan");
     extractSpy.mockReturnValue(null);
   });
 
@@ -94,9 +88,7 @@ describe("applySpanToSummary codex redundant-usage handling", () => {
 
         const result = applySpanToSummary({ state: createInitState(), span });
 
-        expect(result.attributes["gen_ai.request.reasoning_effort"]).toBe(
-          "high",
-        );
+        expect(result.attributes["gen_ai.request.reasoning_effort"]).toBe("high");
       });
     });
 
@@ -112,9 +104,7 @@ describe("applySpanToSummary codex redundant-usage handling", () => {
 
         const result = applySpanToSummary({ state: createInitState(), span });
 
-        expect(
-          result.attributes["gen_ai.request.reasoning_effort"],
-        ).toBeUndefined();
+        expect(result.attributes["gen_ai.request.reasoning_effort"]).toBeUndefined();
       });
     });
   });
@@ -143,9 +133,7 @@ describe("applySpanToSummary codex redundant-usage handling", () => {
         state = applySpanToSummary({ state, span: turnSpan });
         state = applySpanToSummary({ state, span: responseSpan });
 
-        expect(state.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
-          "4480",
-        );
+        expect(state.attributes["langwatch.reserved.cache_read_tokens"]).toBe("4480");
       });
     });
   });

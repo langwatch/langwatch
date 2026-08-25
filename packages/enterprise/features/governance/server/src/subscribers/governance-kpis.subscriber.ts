@@ -22,10 +22,7 @@ export class GovernanceKpisSubscriber {
     contributions: GovernanceKpiContributionPort;
     diagnostics: GovernanceSubscriberDiagnosticsPort;
   }): GovernanceKpisSubscriber {
-    return new GovernanceKpisSubscriber(
-      options.contributions,
-      options.diagnostics,
-    );
+    return new GovernanceKpisSubscriber(options.contributions, options.diagnostics);
   }
 
   when(_event: GovernanceTraceEvent, context: GovernanceTraceContext): boolean {
@@ -64,8 +61,7 @@ export class GovernanceKpisSubscriber {
     return {
       tenantId,
       sourceId,
-      sourceType:
-        state.attributes[GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE] ?? "unknown",
+      sourceType: state.attributes[GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE] ?? "unknown",
       hourBucket: new Date(Math.floor(state.occurredAt / hourMs) * hourMs),
       traceId: state.traceId,
       spendUsd: state.totalCost ?? 0,

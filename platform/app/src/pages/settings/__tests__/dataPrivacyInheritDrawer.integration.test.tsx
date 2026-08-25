@@ -120,13 +120,7 @@ describe("PrivacyRuleDrawer inherit controls", () => {
         expect(categoryValue(label)).toContain("Inherit");
       }
 
-      for (const name of [
-        /Inherit/,
-        /^Off$/,
-        /^Essential/,
-        /^Strict/,
-        /^Custom/,
-      ]) {
+      for (const name of [/Inherit/, /^Off$/, /^Essential/, /^Strict/, /^Custom/]) {
         expect(screen.getByRole("radio", { name })).toBeInTheDocument();
       }
     });

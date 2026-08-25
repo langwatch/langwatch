@@ -17,10 +17,7 @@ import type { SlackSlice } from "../slack/client";
  * for the action providers; the notify template columns live at the row root
  * and are exercised separately.
  */
-function rowFrom(
-  action: TriggerAction,
-  actionParams: unknown,
-): SavedTriggerRow {
+function rowFrom(action: TriggerAction, actionParams: unknown): SavedTriggerRow {
   return {
     id: "tr_test",
     name: "Round trip",
@@ -205,17 +202,13 @@ describe("provider slice round trips", () => {
 
     describe("when a webhook slice is serialised to a row and read back", () => {
       it("preserves the webhook through actionParams", () => {
-        const client =
-          CLIENT_PROVIDERS[TriggerAction.SEND_SLACK_MESSAGE].client;
+        const client = CLIENT_PROVIDERS[TriggerAction.SEND_SLACK_MESSAGE].client;
         const slice: SlackSlice = {
           ...baseSlackSlice,
           webhook: "https://hooks.slack.com/services/T000/B000/xyz",
         };
         const back = client.fromTriggerRow(
-          rowFrom(
-            TriggerAction.SEND_SLACK_MESSAGE,
-            client.toActionParams(slice),
-          ),
+          rowFrom(TriggerAction.SEND_SLACK_MESSAGE, client.toActionParams(slice)),
         ) as SlackSlice;
         expect(back.deliveryMethod).toBe("webhook");
         expect(back.webhook).toBe(slice.webhook);
@@ -224,8 +217,7 @@ describe("provider slice round trips", () => {
 
     describe("when a bot slice is serialised, redacted, and read back", () => {
       it("carries the channel and reports the token as already set", () => {
-        const client =
-          CLIENT_PROVIDERS[TriggerAction.SEND_SLACK_MESSAGE].client;
+        const client = CLIENT_PROVIDERS[TriggerAction.SEND_SLACK_MESSAGE].client;
         const slice: SlackSlice = {
           ...baseSlackSlice,
           deliveryMethod: "bot",
@@ -235,10 +227,7 @@ describe("provider slice round trips", () => {
         // The server strips the token and echoes a "set" flag before the row
         // ever reaches the browser (see `redactSlackActionParams`); emulate
         // that so the read path sees what the client actually receives.
-        const persisted = client.toActionParams(slice) as Record<
-          string,
-          unknown
-        >;
+        const persisted = client.toActionParams(slice) as Record<string, unknown>;
         const redacted = {
           slackDelivery: persisted.slackDelivery,
           slackChannelId: persisted.slackChannelId,
@@ -282,11 +271,7 @@ describe("provider slice round trips", () => {
           { name: "output", type: "string" },
           { name: "notes", type: "string" },
         ]);
-        expect(Object.keys(mapping.mapping)).toEqual([
-          "input",
-          "output",
-          "notes",
-        ]);
+        expect(Object.keys(mapping.mapping)).toEqual(["input", "output", "notes"]);
         // Known columns map to their obvious source; unknown columns fall back
         // to the trace metadata field of the same name — never a blank source.
         expect(mapping.mapping.input?.source).toBe("input");
@@ -303,16 +288,12 @@ describe("provider slice round trips", () => {
   describe("given an annotation-queue slice", () => {
     describe("when serialised to a row and read back", () => {
       it("preserves the annotator list", () => {
-        const client =
-          CLIENT_PROVIDERS[TriggerAction.ADD_TO_ANNOTATION_QUEUE].client;
+        const client = CLIENT_PROVIDERS[TriggerAction.ADD_TO_ANNOTATION_QUEUE].client;
         const slice: AnnotationQueueSlice = {
           annotators: [{ id: "u_1", name: "Ada" }],
         };
         const back = client.fromTriggerRow(
-          rowFrom(
-            TriggerAction.ADD_TO_ANNOTATION_QUEUE,
-            client.toActionParams(slice),
-          ),
+          rowFrom(TriggerAction.ADD_TO_ANNOTATION_QUEUE, client.toActionParams(slice)),
         ) as AnnotationQueueSlice;
         expect(back.annotators).toEqual(slice.annotators);
       });

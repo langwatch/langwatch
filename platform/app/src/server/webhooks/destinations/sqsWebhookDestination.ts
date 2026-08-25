@@ -228,10 +228,7 @@ const STALE_CREDENTIAL_ERROR_NAMES = new Set([
 /** Whether this failure means the cached client's identity is worth rebuilding. */
 export function isStaleCredentialFailure(error: unknown): boolean {
   const { name, code } = failureShape(error);
-  return (
-    STALE_CREDENTIAL_ERROR_NAMES.has(name) ||
-    STALE_CREDENTIAL_ERROR_NAMES.has(code)
-  );
+  return STALE_CREDENTIAL_ERROR_NAMES.has(name) || STALE_CREDENTIAL_ERROR_NAMES.has(code);
 }
 
 export function classifySqsFailure(error: unknown): {
@@ -372,9 +369,7 @@ export function sqsWebhookDestination(
 ): WebhookDestination {
   return {
     kind: "sqs",
-    async send(
-      request: WebhookDispatchRequest,
-    ): Promise<WebhookDispatchResult> {
+    async send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult> {
       // The same cap the HTTPS transport answers to, called here directly
       // because a queue send never passes through the HTTP sender that used
       // to own it. Without this line a queue endpoint would be uncapped. A

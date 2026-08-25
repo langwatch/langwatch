@@ -8,10 +8,7 @@ import {
   type TopicProjectInput,
 } from "@langwatch/topic-contract";
 import { z } from "zod";
-import {
-  TopicRepository,
-  type TopicClusteringStatusRecord,
-} from "../topic.repository";
+import { TopicRepository, type TopicClusteringStatusRecord } from "../topic.repository";
 
 const projectionSchema = z.object({
   LastRequestedAt: z.number().nullable(),
@@ -34,9 +31,7 @@ const runsSchema = z.array(topicClusteringRunHistoryEntrySchema);
 
 export type TopicDatabase = Pick<
   PrismaClient,
-  | "topic"
-  | "topicClusteringRunProjection"
-  | "topicClusteringRunHistoryProjection"
+  "topic" | "topicClusteringRunProjection" | "topicClusteringRunHistoryProjection"
 >;
 
 export class PrismaTopicRepository extends TopicRepository {
@@ -78,10 +73,9 @@ export class PrismaTopicRepository extends TopicRepository {
   async findClusteringStatus(
     input: TopicProjectInput,
   ): Promise<TopicClusteringStatusRecord> {
-    const projection =
-      await this.database.topicClusteringRunProjection.findUnique({
-        where: { projectId: input.projectId },
-      });
+    const projection = await this.database.topicClusteringRunProjection.findUnique({
+      where: { projectId: input.projectId },
+    });
 
     const parsed = projection ? projectionSchema.parse(projection) : null;
     return {
@@ -109,11 +103,10 @@ export class PrismaTopicRepository extends TopicRepository {
   async findClusteringRunHistory(
     input: TopicProjectInput,
   ): Promise<TopicClusteringRunHistoryEntry[]> {
-    const row =
-      await this.database.topicClusteringRunHistoryProjection.findUnique({
-        where: { projectId: input.projectId },
-        select: { Runs: true },
-      });
+    const row = await this.database.topicClusteringRunHistoryProjection.findUnique({
+      where: { projectId: input.projectId },
+      select: { Runs: true },
+    });
     if (!row) return [];
     // Malformed projection JSON is an empty rebuildable history.
     const parsed = runsSchema.safeParse(row.Runs);

@@ -30,15 +30,13 @@ describe("isPermissionDenial", () => {
   describe("given a refusal from the permission layer", () => {
     /** @scenario "A denial is recognised without matching on its wording" */
     it("recognises a project permission denial by its code", () => {
-      expect(
-        isPermissionDenial(new ProjectPermissionDeniedError("traces:view")),
-      ).toBe(true);
+      expect(isPermissionDenial(new ProjectPermissionDeniedError("traces:view"))).toBe(
+        true,
+      );
     });
 
     it("recognises a lite-member restriction", () => {
-      expect(isPermissionDenial(new LiteMemberRestrictedError("traces"))).toBe(
-        true,
-      );
+      expect(isPermissionDenial(new LiteMemberRestrictedError("traces"))).toBe(true);
     });
 
     // The ADR-092 engine denies with its own code. A route migrated to
@@ -80,17 +78,13 @@ describe("isPermissionDenial", () => {
     it("does not accept a plain error that happens to say the old sentence", () => {
       expect(
         isPermissionDenial(
-          new Error(
-            "You do not have permission to access this project resource",
-          ),
+          new Error("You do not have permission to access this project resource"),
         ),
       ).toBe(false);
     });
 
     it("treats an unrelated handled error as an outage", () => {
-      expect(isPermissionDenial({ code: "clickhouse_unavailable" })).toBe(
-        false,
-      );
+      expect(isPermissionDenial({ code: "clickhouse_unavailable" })).toBe(false);
     });
   });
 });

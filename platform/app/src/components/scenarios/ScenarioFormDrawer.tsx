@@ -89,9 +89,7 @@ export function ScenarioFormDrawerFromUrl(
   // When rendered from the drawer registry (CurrentDrawer), no `open` prop is
   // passed.  Fall back to checking the URL so the drawer actually opens.
   const open = props.open ?? drawerOpen("scenarioEditor");
-  return (
-    <ScenarioFormDrawer {...props} open={open} scenarioId={params.scenarioId} />
-  );
+  return <ScenarioFormDrawer {...props} open={open} scenarioId={params.scenarioId} />;
 }
 
 /**
@@ -135,9 +133,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   // the project default.
   const [runModelDialogOpen, setRunModelDialogOpen] = useState(false);
   const [pendingRunTarget, setPendingRunTarget] = useState<TargetValue>(null);
-  const [runSimulatorModel, setRunSimulatorModel] = useState<string | null>(
-    null,
-  );
+  const [runSimulatorModel, setRunSimulatorModel] = useState<string | null>(null);
   const [runJudgeModel, setRunJudgeModel] = useState<string | null>(null);
 
   // Initialize from persisted target when scenario loads
@@ -366,12 +362,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
    * row shows on the row. When parameter validation rejects a submit, open the
    * dialog again. The reader can then see which row is wrong.
    */
-  const openParametersOnInvalid = useCallback(
-    (errors: FieldErrors<ScenarioFormData>) => {
-      if (errors.parameters) setParametersDialogOpen(true);
-    },
-    [],
-  );
+  const openParametersOnInvalid = useCallback((errors: FieldErrors<ScenarioFormData>) => {
+    if (errors.parameters) setParametersDialogOpen(true);
+  }, []);
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {
       const form = formInstance;
@@ -379,8 +372,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       if (!target) {
         toaster.create({
           title: "Select a target",
-          description:
-            "Please select a prompt or agent to run the scenario against.",
+          description: "Please select a prompt or agent to run the scenario against.",
           type: "warning",
         });
         return;
@@ -493,9 +485,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         // Intentionally NOT calling onClose() here: closeDrawer() does its
         // own router.push to strip drawer.* params, which would race with
         // this redirect and silently win (lw#3586 F11).
-        void router.push(
-          `/${project.slug}/simulations?pendingBatch=${batchRunId}`,
-        );
+        void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
       })();
     } catch (error) {
       showErrorToast({ error, fallbackTitle: "Couldn't run scenario" });
@@ -530,18 +520,13 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       }
     }, openParametersOnInvalid)();
   }, [handleSave, scenario, formInstance, onClose, openParametersOnInvalid]);
-  const setFormRef = useCallback(
-    (form: UseFormReturn<ScenarioFormData> | null) => {
-      setFormInstance(form);
-    },
-    [],
-  );
-  const isSubmitting =
-    createMutation.isPending || updateMutation.isPending || isRunning;
+  const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData> | null) => {
+    setFormInstance(form);
+  }, []);
+  const isSubmitting = createMutation.isPending || updateMutation.isPending || isRunning;
 
   // Use initial data from complexProps (new scenario from modal) or from DB (editing)
-  const initialFormData =
-    props.initialFormData ?? complexPropsData.initialFormData;
+  const initialFormData = props.initialFormData ?? complexPropsData.initialFormData;
   const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(() => {
     // A stored scenario carries its parameters as JSON, including the null a
     // scenario that never declared any has, so they are read through the
@@ -556,11 +541,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   }, [scenario, initialFormData]);
 
   return (
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="xl"
-    >
+    <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()} size="xl">
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
@@ -697,13 +678,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
  * second copy of it. Copy comes from the code-keyed registry like every other
  * error surface; the way forward is to read it again.
  */
-function ScenarioReadError({
-  error,
-  onRetry,
-}: {
-  error: unknown;
-  onRetry: () => void;
-}) {
+function ScenarioReadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   return (
     <Box data-testid="scenario-read-error">
       <HandledErrorState
@@ -784,9 +759,7 @@ function FooterParameters({
   const parameters = useWatch({ control: form.control, name: "parameters" });
   const { errors } = useFormState({ control: form.control });
   const invalid = !!errors.parameters;
-  const declared = (parameters ?? []).filter(
-    (definition) => definition.name.length > 0,
-  );
+  const declared = (parameters ?? []).filter((definition) => definition.name.length > 0);
 
   return (
     <HStack
@@ -845,9 +818,7 @@ function ParameterChip({
     <ChipButton
       type="button"
       onClick={onOpen}
-      aria-label={
-        isSecret ? `Edit secret parameter ${name}` : `Edit parameter ${name}`
-      }
+      aria-label={isSecret ? `Edit secret parameter ${name}` : `Edit parameter ${name}`}
       data-testid={`scenario-parameter-chip-${name}`}
       bg="bg.muted"
       paddingX={2}

@@ -1,10 +1,4 @@
-import {
-  type Dispatch,
-  type SetStateAction,
-  useCallback,
-  useRef,
-  useState,
-} from "react";
+import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import type { ExportProgressEvent } from "~/server/api/routers/export";
@@ -47,12 +41,10 @@ export function useExportScenarioRuns({
    * X-Total-Runs. Counted in runs rather than written rows because criteria
    * mode emits several rows per run.
    */
-  const [progress, setProgress] = useState<{ exported: number; total: number }>(
-    {
-      exported: 0,
-      total: 0,
-    },
-  );
+  const [progress, setProgress] = useState<{ exported: number; total: number }>({
+    exported: 0,
+    total: 0,
+  });
   /**
    * Set from the X-Export-Id response header once the stream starts. The
    * server broadcasts progress over Redis rather than in the response body
@@ -250,8 +242,7 @@ async function downloadExport({
     if (total === 0) {
       toaster.create({
         title: "Export produced no data",
-        description:
-          "No runs matched the current filters. Try widening the date range.",
+        description: "No runs matched the current filters. Try widening the date range.",
         type: "warning",
       });
       return;
@@ -301,13 +292,7 @@ function fallbackFilename(request: ScenarioRunExportRequest): string {
   return `${request.projectId} - Scenario Runs - ${today} - ${request.mode}.csv`;
 }
 
-function triggerBlobDownload({
-  blob,
-  filename,
-}: {
-  blob: Blob;
-  filename: string;
-}): void {
+function triggerBlobDownload({ blob, filename }: { blob: Blob; filename: string }): void {
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -326,8 +311,6 @@ function extractFilename({
   fallbackName: string;
 }): string {
   if (!contentDisposition) return fallbackName;
-  const match = contentDisposition.match(
-    /filename\*?=(?:UTF-8''|")?([^";]+)"?/i,
-  );
+  const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^";]+)"?/i);
   return match?.[1] ? decodeURIComponent(match[1]) : fallbackName;
 }

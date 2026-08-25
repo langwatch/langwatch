@@ -25,11 +25,7 @@ import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
 import type { ProjectServiceMiddlewareVariables } from "../../middleware/project-service";
 import { projectServiceMiddleware } from "../../middleware/project-service";
-import {
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-} from "../../shared/errors";
+import { BadRequestError, ForbiddenError, NotFoundError } from "../../shared/errors";
 import { handleProjectError } from "./error-handler";
 import {
   ARCHIVE_PROJECT,
@@ -53,11 +49,7 @@ const paginationQuerySchema = z.object({
 
 const createProjectSchema = z
   .object({
-    name: z
-      .string()
-      .min(1, "name is required")
-      .max(255)
-      .describe("Project name"),
+    name: z.string().min(1, "name is required").max(255).describe("Project name"),
     teamId: z
       .string()
       .min(1)
@@ -86,11 +78,7 @@ const updateProjectSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   language: z.string().optional(),
   framework: z.string().optional(),
-  teamId: z
-    .string()
-    .min(1)
-    .optional()
-    .describe("Moves the project to this team"),
+  teamId: z.string().min(1).optional().describe("Moves the project to this team"),
 });
 
 function projectResponse(project: {
@@ -233,23 +221,18 @@ secured
 
 secured
   .access(requires("project:view"))
-  .get(
-    "/:id",
-    projectServiceMiddleware,
-    describeRoute(GET_PROJECT),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("projectService") as ProjectService;
+  .get("/:id", projectServiceMiddleware, describeRoute(GET_PROJECT), async (c) => {
+    const { id } = c.req.param();
+    const organization = c.get("organization") as Organization;
+    const service = c.get("projectService") as ProjectService;
 
-      const project = await service.tryGetWithTeam(id);
-      if (!project || project.team.organizationId !== organization.id) {
-        throw new NotFoundError("Project not found");
-      }
+    const project = await service.tryGetWithTeam(id);
+    if (!project || project.team.organizationId !== organization.id) {
+      throw new NotFoundError("Project not found");
+    }
 
-      return c.json(projectResponse(project));
-    },
-  );
+    return c.json(projectResponse(project));
+  });
 
 /** The service's update failures, as the status codes they mean. */
 function asProjectUpdateHttpError(error: unknown): unknown {
@@ -300,38 +283,33 @@ secured
 
 secured
   .access(requires("project:delete"))
-  .delete(
-    "/:id",
-    projectServiceMiddleware,
-    describeRoute(ARCHIVE_PROJECT),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("projectService") as ProjectService;
+  .delete("/:id", projectServiceMiddleware, describeRoute(ARCHIVE_PROJECT), async (c) => {
+    const { id } = c.req.param();
+    const organization = c.get("organization") as Organization;
+    const service = c.get("projectService") as ProjectService;
 
-      let project;
-      try {
-        project = await service.archive({
-          id,
-          organizationId: organization.id,
-        });
-      } catch (error) {
-        if (error instanceof ProjectNotFoundError) {
-          throw new NotFoundError("Project not found");
-        }
-        if (error instanceof PersonalProjectProtectedError) {
-          throw new ForbiddenError(error.message);
-        }
-        throw error;
-      }
-
-      return c.json({
-        id: project.id,
-        name: project.name,
-        archivedAt: project.archivedAt,
+    let project;
+    try {
+      project = await service.archive({
+        id,
+        organizationId: organization.id,
       });
-    },
-  );
+    } catch (error) {
+      if (error instanceof ProjectNotFoundError) {
+        throw new NotFoundError("Project not found");
+      }
+      if (error instanceof PersonalProjectProtectedError) {
+        throw new ForbiddenError(error.message);
+      }
+      throw error;
+    }
+
+    return c.json({
+      id: project.id,
+      name: project.name,
+      archivedAt: project.archivedAt,
+    });
+  });
 
 // ── API Key management ───────────────────────────────────────────────────────
 

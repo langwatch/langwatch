@@ -32,11 +32,7 @@ const setupTestTracer = () => {
 const mockFetch = () => {
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
     const urlStr =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input.url;
+      typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (urlStr.includes("experiment/init")) {
       return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
         status: 200,
@@ -82,15 +78,13 @@ describe("Experiment origin and span parenting", () => {
         async ({ index }) => {
           evaluation.log("metric", { index, score: 1.0 });
         },
-        { concurrency: 1 }
+        { concurrency: 1 },
       );
 
       await new Promise((r) => setTimeout(r, 100));
 
       const spans = exporter.getFinishedSpans();
-      const iterationSpan = spans.find(
-        (s) => s.name === "evaluation.iteration"
-      );
+      const iterationSpan = spans.find((s) => s.name === "evaluation.iteration");
 
       expect(iterationSpan).toBeDefined();
       expect(iterationSpan!.attributes["langwatch.origin"]).toBe("evaluation");
@@ -123,28 +117,24 @@ describe("Experiment origin and span parenting", () => {
             }
           });
         },
-        { concurrency: 1 }
+        { concurrency: 1 },
       );
 
       await new Promise((r) => setTimeout(r, 100));
 
       const spans = exporter.getFinishedSpans();
-      const iterationSpan = spans.find(
-        (s) => s.name === "evaluation.iteration"
-      );
+      const iterationSpan = spans.find((s) => s.name === "evaluation.iteration");
       const childSpan = spans.find((s) => s.name === "llm.call");
 
       expect(iterationSpan).toBeDefined();
       expect(childSpan).toBeDefined();
 
       // Child span shares the same trace_id
-      expect(childSpan!.spanContext().traceId).toBe(
-        iterationSpan!.spanContext().traceId
-      );
+      expect(childSpan!.spanContext().traceId).toBe(iterationSpan!.spanContext().traceId);
 
       // Child span's parent is the iteration span
       expect((childSpan as any).parentSpanContext.spanId).toBe(
-        iterationSpan!.spanContext().spanId
+        iterationSpan!.spanContext().spanId,
       );
     });
   });
@@ -170,15 +160,13 @@ describe("Experiment origin and span parenting", () => {
             return "4";
           });
         },
-        { concurrency: 1 }
+        { concurrency: 1 },
       );
 
       await new Promise((r) => setTimeout(r, 100));
 
       const spans = exporter.getFinishedSpans();
-      const targetSpan = spans.find((s) =>
-        s.name.startsWith("evaluation.target.")
-      );
+      const targetSpan = spans.find((s) => s.name.startsWith("evaluation.target."));
 
       expect(targetSpan).toBeDefined();
       expect(targetSpan!.attributes["langwatch.origin"]).toBe("evaluation");
@@ -195,9 +183,7 @@ describe("Experiment origin and span parenting", () => {
         endpoint: "http://localhost:5560",
       });
 
-      const evaluation = await langwatch.experiments.init(
-        "test-target-parenting"
-      );
+      const evaluation = await langwatch.experiments.init("test-target-parenting");
       const tracer = trace.getTracer("langwatch");
 
       await evaluation.run(
@@ -214,25 +200,21 @@ describe("Experiment origin and span parenting", () => {
             return "4";
           });
         },
-        { concurrency: 1 }
+        { concurrency: 1 },
       );
 
       await new Promise((r) => setTimeout(r, 100));
 
       const spans = exporter.getFinishedSpans();
-      const targetSpan = spans.find((s) =>
-        s.name.startsWith("evaluation.target.")
-      );
+      const targetSpan = spans.find((s) => s.name.startsWith("evaluation.target."));
       const childSpan = spans.find((s) => s.name === "llm.call");
 
       expect(targetSpan).toBeDefined();
       expect(childSpan).toBeDefined();
 
-      expect(childSpan!.spanContext().traceId).toBe(
-        targetSpan!.spanContext().traceId
-      );
+      expect(childSpan!.spanContext().traceId).toBe(targetSpan!.spanContext().traceId);
       expect((childSpan as any).parentSpanContext.spanId).toBe(
-        targetSpan!.spanContext().spanId
+        targetSpan!.spanContext().spanId,
       );
     });
   });

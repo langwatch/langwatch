@@ -25,14 +25,9 @@ export class GroupQueueError extends Error {
 
 export class GroupQueueConfigurationError extends GroupQueueError {
   constructor(component: string, details: string) {
-    super(
-      component,
-      "configure",
-      `Configuration error in ${component}: ${details}`,
-      {
-        retryable: false,
-      },
-    );
+    super(component, "configure", `Configuration error in ${component}: ${details}`, {
+      retryable: false,
+    });
     this.name = "GroupQueueConfigurationError";
   }
 }

@@ -184,8 +184,7 @@ export function ProviderScopeChips({
         ? [{ scopeType: fallbackScopeType, scopeId: "" }]
         : [];
   const iconSize = size === "xs" ? 10 : 12;
-  const principalLabel =
-    principal?.name?.trim() || principal?.email?.trim() || undefined;
+  const principalLabel = principal?.name?.trim() || principal?.email?.trim() || undefined;
   if (entries.length === 0 && !principalLabel) {
     if (!system) return null;
     // Matches the "from System" labelling the default-model resolver
@@ -219,10 +218,7 @@ export function ProviderScopeChips({
           </Badge>
         );
         return (
-          <Tooltip
-            key={`${entry.scopeType}:${entry.scopeId}`}
-            content={tooltip}
-          >
+          <Tooltip key={`${entry.scopeType}:${entry.scopeId}`} content={tooltip}>
             {entry.href ? (
               <Link
                 href={entry.href}

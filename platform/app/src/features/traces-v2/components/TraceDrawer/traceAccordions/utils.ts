@@ -1,6 +1,4 @@
-export function countFlatLeaves(
-  obj: Record<string, unknown> | undefined | null,
-): number {
+export function countFlatLeaves(obj: Record<string, unknown> | undefined | null): number {
   if (!obj) return 0;
   let n = 0;
   for (const v of Object.values(obj)) {

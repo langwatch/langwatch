@@ -34,9 +34,7 @@ function oversizedDataUrl(): string {
 describe("capOversizedAttributes", () => {
   it("caps an oversized base64 data-url attribute and names the mime type", () => {
     const url = oversizedDataUrl();
-    const span = makeSpan([
-      { key: "langwatch.input", value: { stringValue: url } },
-    ]);
+    const span = makeSpan([{ key: "langwatch.input", value: { stringValue: url } }]);
 
     const cappedCount = capOversizedAttributes(span, null);
 
@@ -115,9 +113,7 @@ describe("capOversizedAttributes", () => {
 
     expect(cappedCount).toBe(1);
     expect(span.attributes[0]!.value.bytesValue).toBeNull();
-    expect(span.attributes[0]!.value.stringValue).toMatch(
-      /^\[truncated: \d+ bytes\]$/,
-    );
+    expect(span.attributes[0]!.value.stringValue).toMatch(/^\[truncated: \d+ bytes\]$/);
   });
 
   it("caps oversized values in events, links, and the resource", () => {
@@ -148,10 +144,7 @@ describe("capOversizedAttributes", () => {
   });
 
   it("does not throw on malformed attribute shapes", () => {
-    const span = makeSpan([
-      { key: "weird", value: null as never },
-      undefined as never,
-    ]);
+    const span = makeSpan([{ key: "weird", value: null as never }, undefined as never]);
 
     expect(() => capOversizedAttributes(span, null)).not.toThrow();
   });
@@ -176,9 +169,7 @@ describe("capOversizedAttributes with copilot content-capture payloads", () => {
     (span as unknown as { events: unknown[] }).events = [
       {
         name: "gen_ai.content",
-        attributes: [
-          { key: "gen_ai.input.messages", value: { stringValue: big } },
-        ],
+        attributes: [{ key: "gen_ai.input.messages", value: { stringValue: big } }],
       },
     ];
 
@@ -231,9 +222,7 @@ describe("valueExceeds", () => {
         const value = {
           stringValue: "a".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
         };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          true,
-        );
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
       });
     });
 
@@ -242,18 +231,14 @@ describe("valueExceeds", () => {
         const value = {
           stringValue: "a".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
         };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          false,
-        );
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
       });
     });
 
     describe("when the string is small", () => {
       it("returns false", () => {
         const value = { stringValue: "hello" };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          false,
-        );
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
       });
     });
   });
@@ -264,9 +249,7 @@ describe("valueExceeds", () => {
         const value = {
           bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
         };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          true,
-        );
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
       });
     });
 
@@ -275,9 +258,7 @@ describe("valueExceeds", () => {
         const value = {
           bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
         };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          false,
-        );
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
       });
     });
   });
@@ -295,9 +276,7 @@ describe("valueExceeds", () => {
             ],
           },
         };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          true,
-        );
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
       });
     });
 
@@ -308,9 +287,7 @@ describe("valueExceeds", () => {
             values: [{ stringValue: "a" }, { stringValue: "b" }],
           },
         };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          false,
-        );
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
       });
     });
   });
@@ -325,17 +302,13 @@ describe("valueExceeds", () => {
               {
                 key: "big",
                 value: {
-                  stringValue: "z".repeat(
-                    DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1,
-                  ),
+                  stringValue: "z".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
                 },
               },
             ],
           },
         };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          true,
-        );
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
       });
     });
 
@@ -349,9 +322,7 @@ describe("valueExceeds", () => {
             ],
           },
         };
-        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          false,
-        );
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
       });
     });
   });
@@ -362,9 +333,7 @@ describe("valueExceeds", () => {
     });
 
     it("returns false for undefined", () => {
-      expect(valueExceeds(undefined, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-        false,
-      );
+      expect(valueExceeds(undefined, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
     });
   });
 });
@@ -380,9 +349,7 @@ describe("hasOversizedAttribute", () => {
   describe("given a span with all small attributes and no resource", () => {
     describe("when hasOversizedAttribute is called", () => {
       it("returns false", () => {
-        const span = makeSpan([
-          { key: "custom.attr", value: { stringValue: small } },
-        ]);
+        const span = makeSpan([{ key: "custom.attr", value: { stringValue: small } }]);
         expect(hasOversizedAttribute(span, null)).toBe(false);
       });
     });
@@ -391,9 +358,7 @@ describe("hasOversizedAttribute", () => {
   describe("given a span with an oversized value in span.attributes", () => {
     describe("when hasOversizedAttribute is called", () => {
       it("returns true", () => {
-        const span = makeSpan([
-          { key: "custom.attr", value: { stringValue: big } },
-        ]);
+        const span = makeSpan([{ key: "custom.attr", value: { stringValue: big } }]);
         expect(hasOversizedAttribute(span, null)).toBe(true);
       });
     });
@@ -437,9 +402,7 @@ describe("hasOversizedAttribute", () => {
   describe("given a span with all small span attributes but an oversized value in resource.attributes", () => {
     describe("when hasOversizedAttribute is called", () => {
       it("returns true", () => {
-        const span = makeSpan([
-          { key: "custom.small", value: { stringValue: small } },
-        ]);
+        const span = makeSpan([{ key: "custom.small", value: { stringValue: small } }]);
         const resource: OtlpResource = {
           attributes: [{ key: "service.name", value: { stringValue: big } }],
         } as unknown as OtlpResource;

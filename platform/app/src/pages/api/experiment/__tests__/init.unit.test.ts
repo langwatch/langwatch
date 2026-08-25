@@ -85,13 +85,7 @@ describe("POST /api/experiment/init", () => {
     });
   });
 
-  function createRequest({
-    slug,
-    type = "DSPY",
-  }: {
-    slug: string;
-    type?: string;
-  }) {
+  function createRequest({ slug, type = "DSPY" }: { slug: string; type?: string }) {
     const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
       method: "POST",
       headers: {
@@ -107,9 +101,7 @@ describe("POST /api/experiment/init", () => {
 
   describe("when slug already exists", () => {
     beforeEach(() => {
-      (prisma.experiment.findFirst as Mock).mockResolvedValue(
-        existingExperiment,
-      );
+      (prisma.experiment.findFirst as Mock).mockResolvedValue(existingExperiment);
     });
 
     it("returns 200 for the existing experiment", async () => {

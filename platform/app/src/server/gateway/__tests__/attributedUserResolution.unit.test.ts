@@ -58,9 +58,7 @@ describe("attributed-user template resolution", () => {
     expect(plain.endUserId).toBe("end_user_42");
 
     const filtered = resolved.find((r) => r.budget.id === "budget_tpl_openai")!;
-    expect(filtered.bucketScopeId).toBe(
-      "vk_anchor:end_user_42|provider:mp_openai",
-    );
+    expect(filtered.bucketScopeId).toBe("vk_anchor:end_user_42|provider:mp_openai");
   });
 
   /** @scenario A template resolves as itself when no end user is in context */

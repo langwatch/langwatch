@@ -19,11 +19,7 @@
  */
 
 /** A plan item's lifecycle, mirroring opencode's todo statuses. */
-export type LangyPlanItemStatus =
-  | "pending"
-  | "in_progress"
-  | "completed"
-  | "cancelled";
+export type LangyPlanItemStatus = "pending" | "in_progress" | "completed" | "cancelled";
 
 export interface LangyPlanItem {
   content: string;
@@ -124,12 +120,10 @@ export function parseTodoList(input: unknown): LangyPlanItem[] | null {
   for (const entry of raw) {
     if (!entry || typeof entry !== "object") continue;
     const e = entry as { content?: unknown; status?: unknown };
-    const content =
-      typeof e.content === "string" ? cleanPlanContent(e.content) : "";
+    const content = typeof e.content === "string" ? cleanPlanContent(e.content) : "";
     if (!content) continue;
     const status =
-      typeof e.status === "string" &&
-      PLAN_STATUSES.has(e.status as LangyPlanItemStatus)
+      typeof e.status === "string" && PLAN_STATUSES.has(e.status as LangyPlanItemStatus)
         ? (e.status as LangyPlanItemStatus)
         : "pending";
     items.push({ content, status });
@@ -143,10 +137,7 @@ function inProgressIndex(items: LangyPlanItem[]): number {
 }
 
 /** Normalise a wire item (permissive `status` string) into a plan item. */
-function normaliseItem(item: {
-  content: string;
-  status: string;
-}): LangyPlanItem {
+function normaliseItem(item: { content: string; status: string }): LangyPlanItem {
   const status = PLAN_STATUSES.has(item.status as LangyPlanItemStatus)
     ? (item.status as LangyPlanItemStatus)
     : "pending";
@@ -210,9 +201,7 @@ export function langyPlan(
         // Map the snapshot's in-progress item onto the latest list by content:
         // a call made while step 2 ran belongs to step 2 even now that it reads
         // "completed". An item whose text has since changed falls to preamble.
-        currentItemIndex = items.findIndex(
-          (it) => it.content === snapshot[ip]!.content,
-        );
+        currentItemIndex = items.findIndex((it) => it.content === snapshot[ip]!.content);
       }
       continue;
     }

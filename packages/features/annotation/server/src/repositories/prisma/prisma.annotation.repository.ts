@@ -161,9 +161,7 @@ export class PrismaAnnotationRepository extends AnnotationRepository {
     );
   }
 
-  async findProjectOrganizationId(input: {
-    projectId: string;
-  }): Promise<string | null> {
+  async findProjectOrganizationId(input: { projectId: string }): Promise<string | null> {
     const project = await this.database.project.findUnique({
       where: { id: input.projectId },
       select: { team: { select: { organizationId: true } } },

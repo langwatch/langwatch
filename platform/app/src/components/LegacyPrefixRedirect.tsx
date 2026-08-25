@@ -7,13 +7,7 @@ import { Navigate, useLocation } from "react-router";
  * link arrives. Keeps the sub-path, query string and hash, and replaces the
  * history entry so the back button never returns to the retired address.
  */
-export function LegacyPrefixRedirect({
-  from,
-  to,
-}: {
-  from: string;
-  to: string;
-}) {
+export function LegacyPrefixRedirect({ from, to }: { from: string; to: string }) {
   const location = useLocation();
   const suffix = location.pathname.startsWith(from)
     ? location.pathname.slice(from.length)

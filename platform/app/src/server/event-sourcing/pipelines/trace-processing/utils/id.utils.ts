@@ -46,9 +46,7 @@ function makeDeterministicKsuid({
 }
 
 function generateDeterministicSpanRecordId(event: SpanReceivedEvent): string {
-  const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
-    event.data.span,
-  );
+  const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(event.data.span);
   const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
     TraceRequestUtils.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
   );
@@ -66,10 +64,7 @@ function generateDeterministicSpanRecordIdFromData(
   spanId: string,
   startTimeUnixMs: number,
 ): string {
-  EventUtils.validateTenantId(
-    { tenantId },
-    "generateDeterministicSpanRecordIdFromData",
-  );
+  EventUtils.validateTenantId({ tenantId }, "generateDeterministicSpanRecordIdFromData");
   return makeDeterministicKsuid({
     hashKey: `${tenantId}:${traceId}:${spanId}`,
     resource: KSUID_RESOURCES.SPAN,

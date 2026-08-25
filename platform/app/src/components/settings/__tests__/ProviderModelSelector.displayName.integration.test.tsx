@@ -29,13 +29,7 @@
  * @see specs/model-providers/custom-model-display-name.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -200,9 +194,7 @@ describe("<ProviderModelSelector/>", () => {
           />,
         );
 
-        expect(
-          within(listbox()).getByText(EMBED_DISPLAY_NAME),
-        ).toBeInTheDocument();
+        expect(within(listbox()).getByText(EMBED_DISPLAY_NAME)).toBeInTheDocument();
       });
 
       it("does not render the raw embeddings model id as the item's label", () => {
@@ -215,9 +207,7 @@ describe("<ProviderModelSelector/>", () => {
           />,
         );
 
-        expect(
-          within(listbox()).queryByText(EMBED_MODEL_ID),
-        ).not.toBeInTheDocument();
+        expect(within(listbox()).queryByText(EMBED_MODEL_ID)).not.toBeInTheDocument();
       });
     });
   });
@@ -291,9 +281,7 @@ describe("<ProviderModelSelector/>", () => {
         );
 
         expect(within(listbox()).getByText("Latest")).toBeInTheDocument();
-        expect(
-          within(listbox()).getByText(resolvedLatest!),
-        ).toBeInTheDocument();
+        expect(within(listbox()).getByText(resolvedLatest!)).toBeInTheDocument();
       });
     });
   });
@@ -320,9 +308,7 @@ describe("<ProviderModelSelector/>", () => {
         // Scoped to the inherit entry, not the whole listbox: the
         // inherited model is also a real option here, so both legitimately
         // render the display name and an unscoped getByText matches twice.
-        expect(
-          within(inheritItem()).getByText(DISPLAY_NAME),
-        ).toBeInTheDocument();
+        expect(within(inheritItem()).getByText(DISPLAY_NAME)).toBeInTheDocument();
       });
 
       it("renders the collapsed selector's placeholder as the display name", () => {

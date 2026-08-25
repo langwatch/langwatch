@@ -2,13 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -58,8 +52,7 @@ const useOrganizationTeamProjectMock = vi.mocked(useOrganizationTeamProject);
 const useReducedMotionMock = vi.mocked(useReducedMotion);
 
 const VOICE_KEY = "langwatch:voice-agents-home-banner-dismissed:v1:project-1";
-const AUTOMATIONS_KEY =
-  "langwatch:automations-home-banner-dismissed:v1:project-1";
+const AUTOMATIONS_KEY = "langwatch:automations-home-banner-dismissed:v1:project-1";
 
 /** The pill row next to a slide's heading — where the "New" badge lives. */
 const headingRow = (name: string) =>
@@ -101,16 +94,10 @@ describe("<HomePageBanners />", () => {
   });
 
   it("keeps the full-colour banner for users outside the Langy rollout", () => {
-    const { container } = renderWithProviders(
-      <HomePageBanners variant="legacy" />,
-    );
+    const { container } = renderWithProviders(<HomePageBanners variant="legacy" />);
 
-    expect(
-      container.querySelector('[data-banner-variant="legacy"]'),
-    ).not.toBeNull();
-    expect(
-      screen.queryByRole("button", { name: "Previous announcement" }),
-    ).toBeNull();
+    expect(container.querySelector('[data-banner-variant="legacy"]')).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Previous announcement" })).toBeNull();
   });
 
   it("carries every announcement, with dots to move between them", () => {
@@ -157,9 +144,7 @@ describe("<HomePageBanners />", () => {
     it("routes in-app announcements through SPA navigation", () => {
       renderWithProviders(<HomePageBanners />);
 
-      fireEvent.click(
-        screen.getByRole("button", { name: /Explore automations/ }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: /Explore automations/ }));
 
       expect(routerPush).toHaveBeenCalledWith("/my-project/automations");
     });
@@ -167,9 +152,7 @@ describe("<HomePageBanners />", () => {
     it("keeps the announcement on the page, so the way back is not lost", () => {
       renderWithProviders(<HomePageBanners />);
 
-      fireEvent.click(
-        screen.getByRole("button", { name: /Explore automations/ }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: /Explore automations/ }));
 
       // Still on screen: following a link is interest, not "seen it, thanks".
       expect(
@@ -181,9 +164,7 @@ describe("<HomePageBanners />", () => {
     it("offers no way to hide an announcement at all", () => {
       renderWithProviders(<HomePageBanners />);
 
-      expect(
-        screen.queryAllByRole("button", { name: /Hide|Dismiss/ }),
-      ).toHaveLength(0);
+      expect(screen.queryAllByRole("button", { name: /Hide|Dismiss/ })).toHaveLength(0);
     });
   });
 
@@ -192,24 +173,18 @@ describe("<HomePageBanners />", () => {
     /** @scenario That announcement is not shown to readers without Langy */
     it("adds the Langy announcement only for the lantern", () => {
       renderWithProviders(<HomePageBanners variant="lantern" />);
-      expect(
-        screen.getByText("Langy can ship the fix, not just find it"),
-      ).toBeDefined();
+      expect(screen.getByText("Langy can ship the fix, not just find it")).toBeDefined();
 
       cleanup();
       renderWithProviders(<HomePageBanners />);
-      expect(
-        screen.queryByText("Langy can ship the fix, not just find it"),
-      ).toBeNull();
+      expect(screen.queryByText("Langy can ship the fix, not just find it")).toBeNull();
     });
 
     /** @scenario The Langy home carries an announcement about Langy */
     it("starts the conversation in place instead of navigating", () => {
       renderWithProviders(<HomePageBanners variant="lantern" />);
 
-      fireEvent.click(
-        screen.getByRole("button", { name: /Ask Langy to investigate/ }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: /Ask Langy to investigate/ }));
 
       expect(askLangy).toHaveBeenCalledTimes(1);
       expect(routerPush).not.toHaveBeenCalled();
@@ -219,11 +194,7 @@ describe("<HomePageBanners />", () => {
   it("does not reintroduce a Langy promo into the announcement carousel", () => {
     renderWithProviders(<HomePageBanners />);
     expect(screen.queryByRole("heading", { name: "Meet Langy" })).toBeNull();
-    expect(
-      screen.queryByRole("heading", { name: "Langy is on its way" }),
-    ).toBeNull();
-    expect(
-      headingRow("Voice agent simulations are here").getByText("New"),
-    ).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Langy is on its way" })).toBeNull();
+    expect(headingRow("Voice agent simulations are here").getByText("New")).toBeDefined();
   });
 });

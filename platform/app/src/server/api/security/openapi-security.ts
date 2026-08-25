@@ -44,10 +44,7 @@ export function isHttpMethod(member: string): boolean {
  * pattern (`{[0-9]{3}}`) is consumed whole rather than ending the match early.
  */
 export function documentedPathOf(honoPath: string): string {
-  return honoPath.replace(
-    /:([A-Za-z0-9_]+)(\{(?:[^{}]|\{[^{}]*\})*\})?/g,
-    "{$1}",
-  );
+  return honoPath.replace(/:([A-Za-z0-9_]+)(\{(?:[^{}]|\{[^{}]*\})*\})?/g, "{$1}");
 }
 
 /**

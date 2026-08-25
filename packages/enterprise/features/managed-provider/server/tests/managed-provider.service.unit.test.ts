@@ -22,9 +22,15 @@ class ProjectRepository extends ManagedProviderProjectRepository {
 
 class CredentialAdapter extends ManagedProviderCredentialsPort {
   configs: ManagedBedrockConfig[] = [];
-  async assumeCustomerRole(config: ManagedBedrockConfig): Promise<ManagedProviderCredentials> {
+  async assumeCustomerRole(
+    config: ManagedBedrockConfig,
+  ): Promise<ManagedProviderCredentials> {
     this.configs.push(config);
-    return { accessKeyId: "temporary-key", secretAccessKey: "temporary-secret", sessionToken: "temporary-token" };
+    return {
+      accessKeyId: "temporary-key",
+      secretAccessKey: "temporary-secret",
+      sessionToken: "temporary-token",
+    };
   }
 }
 
@@ -33,9 +39,12 @@ describe("ManagedProviderService", () => {
     const configuration = EnvironmentManagedProviderConfigurationAdapter.create({
       source: {
         MANAGED_BEDROCK__customer__org_1: JSON.stringify({
-          proxyRoleArn: "proxy", bedrockRoleArn: "customer",
-          proxyAwsAccessKeyId: "key", proxyAwsSecretAccessKey: "secret",
-          bedrockProxyEndpoint: "private.internal", region: "eu-west-1",
+          proxyRoleArn: "proxy",
+          bedrockRoleArn: "customer",
+          proxyAwsAccessKeyId: "key",
+          proxyAwsSecretAccessKey: "secret",
+          bedrockProxyEndpoint: "private.internal",
+          region: "eu-west-1",
         }),
       },
       reporter: new SilentReporter(),
@@ -46,7 +55,9 @@ describe("ManagedProviderService", () => {
       credentials: new CredentialAdapter(),
     });
     const result = await service.buildLitellmParameters({
-      params: { api_key: "old" }, projectId: "project-1", model: "model",
+      params: { api_key: "old" },
+      projectId: "project-1",
+      model: "model",
       modelProvider: { provider: "bedrock" },
     });
     expect(result).toMatchObject({

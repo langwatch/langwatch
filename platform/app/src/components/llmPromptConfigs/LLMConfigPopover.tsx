@@ -4,11 +4,7 @@ import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { clampMaxTokens } from "../../utils/clampMaxTokens";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
-import {
-  type Output,
-  OutputsSection,
-  type OutputType,
-} from "../outputs/OutputsSection";
+import { type Output, OutputsSection, type OutputType } from "../outputs/OutputsSection";
 import { Popover } from "../ui/popover";
 import { ParameterRow } from "./ParameterRow";
 import {
@@ -85,9 +81,7 @@ export function LLMConfigPopover({
   });
 
   // Get metadata for the currently selected model
-  const currentModelMetadata = values.model
-    ? modelMetadata?.[values.model]
-    : undefined;
+  const currentModelMetadata = values.model ? modelMetadata?.[values.model] : undefined;
 
   // Get reasoning config for the model
   const reasoningConfig = currentModelMetadata?.reasoningConfig;
@@ -240,9 +234,7 @@ export function LLMConfigPopover({
             // - For max_tokens: use model's maxCompletionTokens
             // - For other params: use provider constraints if available
             const maxOverride =
-              paramName === "max_tokens"
-                ? maxTokenLimit
-                : paramConstraints?.max;
+              paramName === "max_tokens" ? maxTokenLimit : paramConstraints?.max;
 
             // Determine effective min override from provider constraints
             const minOverride = paramConstraints?.min;
@@ -257,9 +249,7 @@ export function LLMConfigPopover({
                 maxOverride={maxOverride}
                 minOverride={minOverride}
                 isOpen={openParameter === paramName}
-                onOpenChange={(open) =>
-                  setOpenParameter(open ? paramName : null)
-                }
+                onOpenChange={(open) => setOpenParameter(open ? paramName : null)}
               />
             );
           })}
@@ -300,9 +290,7 @@ export function LLMConfigPopover({
                 justify="space-between"
                 cursor="pointer"
                 onPointerDown={(e) => e.stopPropagation()}
-                onClick={() =>
-                  handleStructuredOutputsToggle(!isStructuredOutputsEnabled)
-                }
+                onClick={() => handleStructuredOutputsToggle(!isStructuredOutputsEnabled)}
               >
                 <Text fontSize="13px" fontWeight="medium" color="fg.subtle">
                   Structured Outputs
@@ -312,14 +300,10 @@ export function LLMConfigPopover({
                   role="switch"
                   aria-checked={isStructuredOutputsEnabled}
                   data-testid="structured-outputs-switch"
-                  data-state={
-                    isStructuredOutputsEnabled ? "checked" : "unchecked"
-                  }
+                  data-state={isStructuredOutputsEnabled ? "checked" : "unchecked"}
                   display="flex"
                   alignItems="center"
-                  justifyContent={
-                    isStructuredOutputsEnabled ? "flex-end" : "flex-start"
-                  }
+                  justifyContent={isStructuredOutputsEnabled ? "flex-end" : "flex-start"}
                   width="34px"
                   height="20px"
                   borderRadius="full"

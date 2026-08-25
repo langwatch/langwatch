@@ -143,8 +143,7 @@ export function mapClickHouseRunToExperimentRun({
     datasetAverageCost: costSummary?.datasetAverageCost ?? undefined,
     datasetAverageDuration: costSummary?.datasetAverageDuration ?? undefined,
     evaluationsAverageCost: costSummary?.evaluationsAverageCost ?? undefined,
-    evaluationsAverageDuration:
-      costSummary?.evaluationsAverageDuration ?? undefined,
+    evaluationsAverageDuration: costSummary?.evaluationsAverageDuration ?? undefined,
     evaluations,
   };
 
@@ -155,12 +154,8 @@ export function mapClickHouseRunToExperimentRun({
     timestamps: {
       createdAt: parseClickHouseDateTimeMs(record.CreatedAt),
       updatedAt: parseClickHouseDateTimeMs(record.UpdatedAt),
-      finishedAt: record.FinishedAt
-        ? parseClickHouseDateTimeMs(record.FinishedAt)
-        : null,
-      stoppedAt: record.StoppedAt
-        ? parseClickHouseDateTimeMs(record.StoppedAt)
-        : null,
+      finishedAt: record.FinishedAt ? parseClickHouseDateTimeMs(record.FinishedAt) : null,
+      stoppedAt: record.StoppedAt ? parseClickHouseDateTimeMs(record.StoppedAt) : null,
     },
     progress: record.Progress,
     total: record.Total,
@@ -175,9 +170,7 @@ export function mapClickHouseRunToExperimentRun({
  * results are worth more than the one cell whose code we can't read, and the
  * raw `error` string is still there to fall back on.
  */
-function parseDomainError(
-  stored: string | null,
-): SerializedHandledError | undefined {
+function parseDomainError(stored: string | null): SerializedHandledError | undefined {
   if (!stored) return undefined;
   try {
     const parsed: unknown = JSON.parse(stored);
@@ -259,9 +252,7 @@ export function mapClickHouseItemsToRunWithItems({
         evaluator: item.EvaluatorId ?? "",
         name: item.EvaluatorName,
         targetId,
-        status:
-          (item.EvaluationStatus as "processed" | "skipped" | "error") ||
-          "error",
+        status: (item.EvaluationStatus as "processed" | "skipped" | "error") || "error",
         index: item.RowIndex,
         score: item.Score,
         label: item.Label,

@@ -33,12 +33,7 @@ export function MemberSeatUsage({
   if (!usage.data) return null;
 
   return (
-    <SimpleGrid
-      columns={{ base: 1, md: 2 }}
-      gap={3}
-      width="full"
-      maxWidth="2xl"
-    >
+    <SimpleGrid columns={{ base: 1, md: 2 }} gap={3} width="full" maxWidth="2xl">
       <ResourceLimitRow
         label={LIMIT_TYPE_DISPLAY_LABELS.members}
         current={usage.data.membersCount}

@@ -192,9 +192,7 @@ describe("<ScenarioFormDrawerFromUrl/>", () => {
         expect(screen.getByText("Create Scenario")).toBeInTheDocument();
       });
 
-      const nameInput = screen.getByPlaceholderText(
-        "e.g., Angry refund request",
-      );
+      const nameInput = screen.getByPlaceholderText("e.g., Angry refund request");
       await user.click(nameInput);
       await user.type(nameInput, "My new scenario");
 

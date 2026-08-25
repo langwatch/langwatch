@@ -124,9 +124,9 @@ describe("session groups cursor codec", () => {
         conversationId: "s-1",
         ...CURSOR_SORT,
       };
-      expect(
-        decodeSessionGroupsCursor(encodeSessionGroupsCursor(cursor)),
-      ).toEqual(cursor);
+      expect(decodeSessionGroupsCursor(encodeSessionGroupsCursor(cursor))).toEqual(
+        cursor,
+      );
     });
 
     it("rejects malformed cursors", () => {
@@ -419,10 +419,7 @@ describe("SessionGroupsService", () => {
         pageSize: 2,
       });
 
-      expect(result.sessions.map((s) => s.conversationId)).toEqual([
-        "s-1",
-        "s-2",
-      ]);
+      expect(result.sessions.map((s) => s.conversationId)).toEqual(["s-1", "s-2"]);
       expect(result.nextCursor).not.toBeNull();
       expect(decodeSessionGroupsCursor(result.nextCursor!)).toEqual({
         sortValue: 200,
@@ -571,8 +568,7 @@ describe("SessionGroupsService", () => {
 
     /** @scenario A session beyond the visibility window teases its title */
     it("teases the generated title the same way, and leaves the git context whole", async () => {
-      const title =
-        "Rebuild the flaky session fold test and its ClickHouse fixture";
+      const title = "Rebuild the flaky session fold test and its ClickHouse fixture";
       const service = new SessionGroupsService({
         repository: new FakeRepository([makeRow({ lastActivityMs: 1000 })]),
         codingAgentSessions: lookupReturning({

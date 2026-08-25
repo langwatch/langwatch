@@ -73,16 +73,12 @@ describe("computeClaudeSpanEnrichment", () => {
           querySource: REPL,
           timeUnixMs: 1000,
           body: JSON.stringify({
-            content: [
-              { type: "tool_use", name: "Bash", input: { command: "ls" } },
-            ],
+            content: [{ type: "tool_use", name: "Bash", input: { command: "ls" } }],
           }),
         },
       ];
 
-      const output = computeClaudeSpanEnrichment({ spans, logs }).get(
-        "span-1",
-      )?.output;
+      const output = computeClaudeSpanEnrichment({ spans, logs }).get("span-1")?.output;
       expect(output?.type).toBe("text");
       expect((output as { value: string }).value).toContain("[tool_use: Bash]");
     });
@@ -255,19 +251,13 @@ describe("computeClaudeSpanEnrichment", () => {
       const result = computeClaudeSpanEnrichment({ spans, logs });
 
       // Output: EXACT by request_id, never crossed.
-      expect((result.get("span-A")?.output as { value: string }).value).toBe(
-        "ANSWER_A",
-      );
-      expect((result.get("span-B")?.output as { value: string }).value).toBe(
-        "ANSWER_B",
-      );
+      expect((result.get("span-A")?.output as { value: string }).value).toBe("ANSWER_A");
+      expect((result.get("span-B")?.output as { value: string }).value).toBe("ANSWER_B");
 
       // Input: POSITIONAL — span-A (array index 0) pairs with the earliest body
       // (agent B's), so the transcript crosses. Documented limitation.
       const inputOf = (spanId: string): string =>
-        (
-          result.get(spanId)?.input as { value: Array<{ content: string }> }
-        ).value
+        (result.get(spanId)?.input as { value: Array<{ content: string }> }).value
           .map((m) => m.content)
           .join(" ");
       expect(inputOf("span-A")).toContain("AGENT_B_PROMPT");
@@ -298,9 +288,7 @@ describe("computeClaudeSpanEnrichment", () => {
         },
       ];
 
-      const input = computeClaudeSpanEnrichment({ spans, logs }).get(
-        "span-1",
-      )?.input;
+      const input = computeClaudeSpanEnrichment({ spans, logs }).get("span-1")?.input;
 
       expect(input).toEqual({
         type: "text",
@@ -329,9 +317,7 @@ describe("computeClaudeSpanEnrichment", () => {
         ?.output as { type: "text"; value: string };
 
       expect(output.value.length).toBeLessThan(huge.length);
-      expect(Buffer.byteLength(output.value, "utf8")).toBeLessThanOrEqual(
-        256 * 1024,
-      );
+      expect(Buffer.byteLength(output.value, "utf8")).toBeLessThanOrEqual(256 * 1024);
       expect(output.value).toContain("langwatch: truncated");
     });
   });
@@ -397,9 +383,7 @@ describe("computeClaudeSpanEnrichment", () => {
         },
       ];
 
-      const enrichment = computeClaudeSpanEnrichment({ spans, logs }).get(
-        "span-1",
-      );
+      const enrichment = computeClaudeSpanEnrichment({ spans, logs }).get("span-1");
 
       expect(enrichment?.output).toEqual({
         type: "text",
@@ -437,9 +421,7 @@ describe("computeClaudeSpanEnrichment", () => {
         },
       ];
 
-      const enrichment = computeClaudeSpanEnrichment({ spans, logs }).get(
-        "span-1",
-      );
+      const enrichment = computeClaudeSpanEnrichment({ spans, logs }).get("span-1");
 
       expect(enrichment?.output).toEqual({ type: "text", value: "hello!" });
       expect(enrichment?.input?.type).toBe("chat_messages");
@@ -540,9 +522,7 @@ describe("computeClaudeToolSpanEnrichment", () => {
           { role: "user", content: "count the lines" },
           {
             role: "assistant",
-            content: [
-              { type: "tool_use", id: TOOL_USE_ID, name: "Bash", input: {} },
-            ],
+            content: [{ type: "tool_use", id: TOOL_USE_ID, name: "Bash", input: {} }],
           },
           {
             role: "user",

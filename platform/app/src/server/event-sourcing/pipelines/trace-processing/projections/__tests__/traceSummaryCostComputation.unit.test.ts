@@ -1,19 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary cost computation", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    extractSpy = vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    );
+    extractSpy = vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan");
     extractSpy.mockReturnValue(null);
   });
 
@@ -242,10 +236,7 @@ describe("applySpanToSummary guardrail blocking detection", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    extractSpy = vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    );
+    extractSpy = vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan");
     extractSpy.mockReturnValue(null);
   });
 
@@ -311,10 +302,7 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
   let extractSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    extractSpy = vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    );
+    extractSpy = vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan");
     extractSpy.mockReturnValue(null);
   });
 
@@ -495,9 +483,7 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         startTimeUnixMs: 1000,
         endTimeUnixMs: 4000,
         durationMs: 3000,
-        events: [
-          { name: "ai.stream.firstChunk", timeUnixMs: 1250, attributes: {} },
-        ],
+        events: [{ name: "ai.stream.firstChunk", timeUnixMs: 1250, attributes: {} }],
         spanAttributes: {
           "ai.response.msToFirstChunk": 1716,
         },
@@ -514,10 +500,7 @@ describe("applySpanToSummary cache + reasoning token roll-up", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    extractSpy = vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    );
+    extractSpy = vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan");
     extractSpy.mockReturnValue(null);
   });
 
@@ -551,12 +534,8 @@ describe("applySpanToSummary cache + reasoning token roll-up", () => {
 
       // The last span carries no cache write, so reading the raw merged
       // attribute would drop it entirely — the sum is what keeps it visible.
-      expect(result.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
-        "19701",
-      );
-      expect(
-        result.attributes["langwatch.reserved.cache_creation_tokens"],
-      ).toBe("30553");
+      expect(result.attributes["langwatch.reserved.cache_read_tokens"]).toBe("19701");
+      expect(result.attributes["langwatch.reserved.cache_creation_tokens"]).toBe("30553");
     });
   });
 
@@ -571,9 +550,7 @@ describe("applySpanToSummary cache + reasoning token roll-up", () => {
 
       const result = applySpanToSummary({ state: createInitState(), span });
 
-      expect(
-        result.attributes["langwatch.reserved.reasoning_tokens"],
-      ).toBeUndefined();
+      expect(result.attributes["langwatch.reserved.reasoning_tokens"]).toBeUndefined();
     });
   });
 
@@ -588,9 +565,7 @@ describe("applySpanToSummary cache + reasoning token roll-up", () => {
 
       const result = applySpanToSummary({ state: createInitState(), span });
 
-      expect(result.attributes["langwatch.reserved.reasoning_tokens"]).toBe(
-        "512",
-      );
+      expect(result.attributes["langwatch.reserved.reasoning_tokens"]).toBe("512");
     });
   });
 });
@@ -599,10 +574,7 @@ describe("applySpanToSummary model ordering", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    extractSpy = vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    );
+    extractSpy = vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan");
     extractSpy.mockReturnValue(null);
   });
 

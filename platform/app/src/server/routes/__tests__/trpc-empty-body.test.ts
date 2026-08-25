@@ -73,10 +73,9 @@ describe("tRPC route empty-body guard (langwatch#5219)", () => {
 
       const { app } = await import("~/server/routes/trpc");
 
-      const res = await app.request(
-        "http://localhost/api/trpc/analytics.getTimeseries",
-        { method: "GET" },
-      );
+      const res = await app.request("http://localhost/api/trpc/analytics.getTimeseries", {
+        method: "GET",
+      });
 
       // Body must never be empty (the root of "Unexpected end of JSON input").
       const text = await res.text();
@@ -159,39 +158,38 @@ describe("honoFetchForNode null-body guard (langwatch#5219)", () => {
    * and the body is non-null — this assertion fails.
    * GREEN (status guard present): 204/304 pass through with a null body.
    */
-  it.each([
-    204, 304,
-  ])("passes a null-body %i No-Content response through untouched (no injected JSON)", async (status) => {
-    const { honoFetchForNode } = await import("~/start");
+  it.each([204, 304])(
+    "passes a null-body %i No-Content response through untouched (no injected JSON)",
+    async (status) => {
+      const { honoFetchForNode } = await import("~/start");
 
-    // No-Content response: null body, as Hono's `c.body(null, 204|304)`
-    // produces at the real call sites.
-    const honoApp = {
-      fetch: vi.fn().mockResolvedValue(
-        new Response(null, {
-          status,
-          headers: { "X-LangWatch-Revision": "42" },
-        }),
-      ),
-    } as unknown as Hono;
+      // No-Content response: null body, as Hono's `c.body(null, 204|304)`
+      // produces at the real call sites.
+      const honoApp = {
+        fetch: vi.fn().mockResolvedValue(
+          new Response(null, {
+            status,
+            headers: { "X-LangWatch-Revision": "42" },
+          }),
+        ),
+      } as unknown as Hono;
 
-    const response = await honoFetchForNode(honoApp)(
-      new Request("http://localhost/api/prompts/v1"),
-    );
+      const response = await honoFetchForNode(honoApp)(
+        new Request("http://localhost/api/prompts/v1"),
+      );
 
-    expect(response.status).toBe(status);
-    // No-Content statuses MUST stay empty — nothing injected.
-    expect(response.body).toBeNull();
-    expect(response.headers.get("X-LangWatch-Revision")).toBe("42");
-  });
+      expect(response.status).toBe(status);
+      // No-Content statuses MUST stay empty — nothing injected.
+      expect(response.body).toBeNull();
+      expect(response.headers.get("X-LangWatch-Revision")).toBe("42");
+    },
+  );
 
   it("turns Hono's default not-found sentinel into the uniform JSON 404", async () => {
     const { honoFetchForNode } = await import("~/start");
 
     const honoApp = {
-      fetch: vi
-        .fn()
-        .mockResolvedValue(new Response("404 Not Found", { status: 404 })),
+      fetch: vi.fn().mockResolvedValue(new Response("404 Not Found", { status: 404 })),
     } as unknown as Hono;
 
     const response = await honoFetchForNode(honoApp)(

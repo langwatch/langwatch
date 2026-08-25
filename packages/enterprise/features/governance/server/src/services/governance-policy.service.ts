@@ -12,10 +12,7 @@ type TraceDepartmentInput = Parameters<
 >[0];
 
 export class PostgresGovernancePolicyService extends GovernancePolicyContract {
-  private readonly cache = new Map<
-    string,
-    { nonBillable: boolean; expiresAt: number }
-  >();
+  private readonly cache = new Map<string, { nonBillable: boolean; expiresAt: number }>();
 
   static create(
     repository: CostAttributionPolicyRepository,
@@ -58,14 +55,10 @@ export class PostgresGovernancePolicyService extends GovernancePolicyContract {
           candidate && typeof candidate === "object"
             ? (candidate as Record<string, unknown>)
             : {};
-        return (
-          config.assistantKind === input.sourceType &&
-          config.bundledPlan === false
-        );
+        return config.assistantKind === input.sourceType && config.bundledPlan === false;
       });
     } catch (error) {
-      const diagnostics =
-        this.options.diagnostics ?? new NullGovernanceDiagnosticsPort();
+      const diagnostics = this.options.diagnostics ?? new NullGovernanceDiagnosticsPort();
       diagnostics.warn(
         "failed to resolve bundled-plan policy; defaulting to non-billable",
         {

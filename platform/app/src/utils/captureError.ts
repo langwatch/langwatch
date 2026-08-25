@@ -23,9 +23,7 @@ export const captureError = (error: unknown): ErrorCapture => {
   } else if (typeof error === "object" && error !== null) {
     const err = error as { message: unknown; stack: unknown };
     const message =
-      typeof err.message === "string"
-        ? err.message
-        : "An unknown error occurred";
+      typeof err.message === "string" ? err.message : "An unknown error occurred";
     const stacktrace =
       typeof err.stack === "string"
         ? err.stack.split("\n")

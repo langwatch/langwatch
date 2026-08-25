@@ -20,9 +20,7 @@ export function useDrawerRunCallbacks() {
       // Transient null during initial auth/project resolve. By the time a
       // user can click Run Again from a drawer, project.slug is present.
       if (!project?.slug) return;
-      const query = result.batchRunId
-        ? `?pendingBatch=${result.batchRunId}`
-        : "";
+      const query = result.batchRunId ? `?pendingBatch=${result.batchRunId}` : "";
       void router.push(`/${project.slug}/simulations${query}`);
     },
     [router, project?.slug],

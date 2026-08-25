@@ -60,12 +60,7 @@ export function SetCard({
         </Text>
 
         {/* Scenarios count and last run in a row */}
-        <HStack
-          justify="space-between"
-          align="center"
-          color="fg.subtle"
-          fontSize="sm"
-        >
+        <HStack justify="space-between" align="center" color="fg.subtle" fontSize="sm">
           <Text>{scenarioCount} scenarios</Text>
           <Text>Last run: {formatTimeAgo(lastRunAt)}</Text>
         </HStack>

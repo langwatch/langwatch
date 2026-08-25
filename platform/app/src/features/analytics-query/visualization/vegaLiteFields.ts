@@ -81,9 +81,7 @@ export function validateFieldReferences({
 
   for (const view of collectViewNodes(spec)) {
     const inherited =
-      view.parentPath === null
-        ? null
-        : (scopeByPath.get(view.parentPath) ?? null);
+      view.parentPath === null ? null : (scopeByPath.get(view.parentPath) ?? null);
 
     const scope = applyTransforms({
       node: view.node,
@@ -365,9 +363,7 @@ function encodingReferences({
       const entryPath = Array.isArray(definition)
         ? joinPointer(channelPath, index)
         : channelPath;
-      references.push(
-        ...channelDefinitionReferences({ entry, path: entryPath }),
-      );
+      references.push(...channelDefinitionReferences({ entry, path: entryPath }));
     }
   }
   return references;
@@ -391,9 +387,7 @@ function channelDefinitionReferences({
 
   const sort = entry.sort;
   if (isPlainObject(sort)) {
-    references.push(
-      ...fieldRefAt({ holder: sort, path: joinPointer(path, "sort") }),
-    );
+    references.push(...fieldRefAt({ holder: sort, path: joinPointer(path, "sort") }));
   }
 
   const conditionPath = joinPointer(path, "condition");

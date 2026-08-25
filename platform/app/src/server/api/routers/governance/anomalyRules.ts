@@ -31,9 +31,7 @@ import {
 } from "~/server/api/enterprise";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
-const enterpriseGate = requireEnterprisePlan(
-  ENTERPRISE_FEATURE_ERRORS.ANOMALY_RULES,
-);
+const enterpriseGate = requireEnterprisePlan(ENTERPRISE_FEATURE_ERRORS.ANOMALY_RULES);
 
 /**
  * Translate threshold-config shape failures from the service layer into a
@@ -60,10 +58,7 @@ const enterpriseGate = requireEnterprisePlan(
  * `isZodLikeError`, not `instanceof z.ZodError`, keeps this boundary coupled to
  * the portable error shape rather than a particular installed runtime instance.
  */
-function translateConfigValidationError(
-  err: unknown,
-  ruleType?: string,
-): never {
+function translateConfigValidationError(err: unknown, ruleType?: string): never {
   if (isZodLikeError(err)) {
     // Detect which config the issues belong to so the error message
     // points the admin at the right field. Both threshold-config and
@@ -73,9 +68,7 @@ function translateConfigValidationError(
     const isDestinationConfig = err.issues.some((i) =>
       i.path.some((p) => p === "destinations"),
     );
-    const configName = isDestinationConfig
-      ? "destinationConfig"
-      : "thresholdConfig";
+    const configName = isDestinationConfig ? "destinationConfig" : "thresholdConfig";
     const complaint = `Invalid ${configName}${
       !isDestinationConfig && ruleType ? ` for ${ruleType}` : ""
     }: ${err.issues.map((i) => i.message).join("; ")}`;
@@ -86,9 +79,7 @@ function translateConfigValidationError(
   throw err;
 }
 
-const severitySchema = z.enum(
-  ANOMALY_RULE_SEVERITIES,
-);
+const severitySchema = z.enum(ANOMALY_RULE_SEVERITIES);
 const scopeSchema = z.enum(ANOMALY_RULE_SCOPES);
 const statusSchema = z.enum(["active", "disabled"]);
 

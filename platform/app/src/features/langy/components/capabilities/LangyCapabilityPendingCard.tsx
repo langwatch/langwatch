@@ -110,10 +110,7 @@ export function LangyCapabilityPendingCard({
                   : { animation: `${rowAppear} 0.3s ease-out both` }
               }
             >
-              <CapabilityRow
-                primary={row.primary ?? row.id}
-                secondary={row.secondary}
-              />
+              <CapabilityRow primary={row.primary ?? row.id} secondary={row.secondary} />
             </Box>
           ))}
           <Text textStyle="2xs" color="fg.subtle" paddingX={2} paddingTop={1}>
@@ -158,13 +155,7 @@ function PendingTitle({
         </Box>
       </HStack>
       {detail ? (
-        <Box
-          textStyle="2xs"
-          fontFamily="mono"
-          color="fg.subtle"
-          truncate
-          maxWidth="100%"
-        >
+        <Box textStyle="2xs" fontFamily="mono" color="fg.subtle" truncate maxWidth="100%">
           {detail}
         </Box>
       ) : null}
@@ -197,12 +188,7 @@ function PendingProgress({
   }
   return (
     <VStack align="stretch" gap={1.5} marginTop={0.5}>
-      <Box
-        height="6px"
-        borderRadius="full"
-        background="langy.barTrack"
-        overflow="hidden"
-      >
+      <Box height="6px" borderRadius="full" background="langy.barTrack" overflow="hidden">
         <Box
           height="full"
           width={`${percent}%`}

@@ -109,12 +109,7 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
               {selectedSpanId ? (
                 <SpanEditorPanel />
               ) : (
-                <Flex
-                  h="300px"
-                  align="center"
-                  justify="center"
-                  color="fg.muted"
-                >
+                <Flex h="300px" align="center" justify="center" color="fg.muted">
                   <Box textAlign="center">
                     <Text fontSize="md">Select a span to edit</Text>
                     <Text fontSize="sm" mt={1}>

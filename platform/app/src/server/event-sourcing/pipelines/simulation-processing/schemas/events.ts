@@ -47,9 +47,7 @@ export const SimulationRunQueuedEventSchema = EventSchema.extend({
   version: z.literal(SIMULATION_EVENT_VERSIONS.QUEUED),
   data: simulationRunQueuedEventDataSchema,
 });
-export type SimulationRunQueuedEvent = z.infer<
-  typeof SimulationRunQueuedEventSchema
->;
+export type SimulationRunQueuedEvent = z.infer<typeof SimulationRunQueuedEventSchema>;
 
 /**
  * RunStarted event - emitted when a simulation run begins.
@@ -72,9 +70,7 @@ export const SimulationRunStartedEventSchema = EventSchema.extend({
   version: z.literal(SIMULATION_EVENT_VERSIONS.STARTED),
   data: simulationRunStartedEventDataSchema,
 });
-export type SimulationRunStartedEvent = z.infer<
-  typeof SimulationRunStartedEventSchema
->;
+export type SimulationRunStartedEvent = z.infer<typeof SimulationRunStartedEventSchema>;
 
 /**
  * MessageSnapshot event - emitted when simulation messages are updated.
@@ -128,9 +124,7 @@ export const SimulationRunFinishedEventSchema = EventSchema.extend({
   version: z.literal(SIMULATION_EVENT_VERSIONS.FINISHED),
   data: simulationRunFinishedEventDataSchema,
 });
-export type SimulationRunFinishedEvent = z.infer<
-  typeof SimulationRunFinishedEventSchema
->;
+export type SimulationRunFinishedEvent = z.infer<typeof SimulationRunFinishedEventSchema>;
 
 /**
  * TextMessageStart event - emitted when a message begins (placeholder).
@@ -240,9 +234,7 @@ export const SimulationRunDeletedEventSchema = EventSchema.extend({
   version: z.literal(SIMULATION_EVENT_VERSIONS.DELETED),
   data: simulationRunDeletedEventDataSchema,
 });
-export type SimulationRunDeletedEvent = z.infer<
-  typeof SimulationRunDeletedEventSchema
->;
+export type SimulationRunDeletedEvent = z.infer<typeof SimulationRunDeletedEventSchema>;
 
 /**
  * SetArchived event — emitted when a user archives a whole scenario set.
@@ -274,9 +266,7 @@ export const SimulationSetArchivedEventSchema = EventSchema.extend({
   version: z.literal(SIMULATION_EVENT_VERSIONS.SET_ARCHIVED),
   data: simulationSetArchivedEventDataSchema,
 });
-export type SimulationSetArchivedEvent = z.infer<
-  typeof SimulationSetArchivedEventSchema
->;
+export type SimulationSetArchivedEvent = z.infer<typeof SimulationSetArchivedEventSchema>;
 
 /**
  * Union of all simulation processing event types.

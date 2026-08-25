@@ -58,12 +58,7 @@ export const projectionRequestSchema = z.object({
 export type ProjectionRequest = z.infer<typeof projectionRequestSchema>;
 
 /** Scalar value type advertised for a resolved column in the response `schema`. */
-export type ProjectionValueType =
-  | "string"
-  | "number"
-  | "boolean"
-  | "string[]"
-  | "json";
+export type ProjectionValueType = "string" | "number" | "boolean" | "string[]" | "json";
 
 /**
  * One entry in the resolved `schema` envelope field. `collection: true` means

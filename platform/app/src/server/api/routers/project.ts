@@ -236,9 +236,7 @@ export const projectRouter = createTRPCRouter({
             traceSharingEnabled: input.traceSharingEnabled,
             presenceEnabled: input.presenceEnabled,
             s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
-            s3AccessKeyId: input.s3AccessKeyId
-              ? encrypt(input.s3AccessKeyId)
-              : null,
+            s3AccessKeyId: input.s3AccessKeyId ? encrypt(input.s3AccessKeyId) : null,
             s3SecretAccessKey: input.s3SecretAccessKey
               ? encrypt(input.s3SecretAccessKey)
               : null,
@@ -259,10 +257,7 @@ export const projectRouter = createTRPCRouter({
       }
 
       // If trace sharing was disabled, revoke all existing trace shares
-      if (
-        input.traceSharingEnabled === false &&
-        project.traceSharingEnabled === true
-      ) {
+      if (input.traceSharingEnabled === false && project.traceSharingEnabled === true) {
         await ctx.app.share.revokeAllTraceShares(input.projectId);
       }
 
@@ -317,9 +312,7 @@ export const projectRouter = createTRPCRouter({
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
 
-      const target = await ctx.app.projects.tryGetWithTeam(
-        input.projectToArchiveId,
-      );
+      const target = await ctx.app.projects.tryGetWithTeam(input.projectToArchiveId);
       if (!target) return { success: true, alreadyArchived: true };
 
       try {

@@ -38,9 +38,7 @@ interface PartLike {
 export function hasLangyBlockParts(parts: readonly unknown[]): boolean {
   return parts.some((part) => {
     const type = (part as PartLike).type;
-    return (
-      type === LANGY_CARD_PART_TYPE || type === LANGY_CARD_FAILED_PART_TYPE
-    );
+    return type === LANGY_CARD_PART_TYPE || type === LANGY_CARD_FAILED_PART_TYPE;
   });
 }
 
@@ -50,9 +48,7 @@ export function hasLangyBlockParts(parts: readonly unknown[]): boolean {
  * blocks, and a bare join glued the last word of one part onto the first
  * word of the next. Empty text segments are dropped.
  */
-export function langyAnswerSegments(
-  parts: readonly unknown[],
-): LangyAnswerSegment[] {
+export function langyAnswerSegments(parts: readonly unknown[]): LangyAnswerSegment[] {
   const segments: LangyAnswerSegment[] = [];
   let textBuffer: string[] = [];
 

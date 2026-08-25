@@ -254,11 +254,7 @@ export class TraceService {
   }): Promise<Trace> {
     const enriched = await this.enrichCodingAgentTrace(projectId, trace);
     if (!withEditOverlay) return enriched;
-    const [corrected] = await this.applyEditOverlays(
-      projectId,
-      [enriched],
-      protections,
-    );
+    const [corrected] = await this.applyEditOverlays(projectId, [enriched], protections);
     return corrected ?? enriched;
   }
 
@@ -392,18 +388,15 @@ export class TraceService {
           HEX_ONLY.test(traceId)
         ) {
           const now = Date.now();
-          const candidates =
-            await this.clickHouseService.resolveTraceIdByPrefix({
-              projectId,
-              prefix: traceId,
-              occurredAt: {
-                from:
-                  now -
-                  TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
-                to: now,
-              },
-              limit: TRACE_ID_PREFIX_CANDIDATE_LIMIT,
-            });
+          const candidates = await this.clickHouseService.resolveTraceIdByPrefix({
+            projectId,
+            prefix: traceId,
+            occurredAt: {
+              from: now - TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+              to: now,
+            },
+            limit: TRACE_ID_PREFIX_CANDIDATE_LIMIT,
+          });
           if (candidates.length === 0) {
             return undefined;
           }
@@ -477,10 +470,7 @@ export class TraceService {
    * no-op when the trace has no Claude content logs; best-effort (a log-read
    * failure returns the un-enriched trace rather than failing the read).
    */
-  private async enrichCodingAgentTrace(
-    projectId: string,
-    trace: Trace,
-  ): Promise<Trace> {
+  private async enrichCodingAgentTrace(projectId: string, trace: Trace): Promise<Trace> {
     if (trace.metadata?.["langwatch.origin"] !== CODING_AGENT_ORIGIN) {
       return trace;
     }
@@ -600,10 +590,7 @@ export class TraceService {
         // the whole page; a page with no coding-agent trace returns the same
         // array reference and pays nothing.
         const flat = result.groups.flat();
-        const enriched = await this.enrichCodingAgentTraces(
-          input.projectId,
-          flat,
-        );
+        const enriched = await this.enrichCodingAgentTraces(input.projectId, flat);
         if (enriched === flat) return result;
         // The helper is positional (same order, same length), so the groups
         // rebuild by position rather than by id.
@@ -713,13 +700,12 @@ export class TraceService {
         },
       },
       async () => {
-        const traces =
-          await this.clickHouseService.getTracesWithSpansByThreadIds(
-            projectId,
-            threadIds,
-            protections,
-            { resolveBlobs: opts?.full },
-          );
+        const traces = await this.clickHouseService.getTracesWithSpansByThreadIds(
+          projectId,
+          threadIds,
+          protections,
+          { resolveBlobs: opts?.full },
+        );
         const enriched = await this.enrichCodingAgentTraces(projectId, traces);
         if (!opts?.withEditOverlay) return enriched;
         return this.applyEditOverlays(projectId, enriched, protections);
@@ -733,9 +719,7 @@ export class TraceService {
    * @param input - Filter parameters including projectId and date range
    * @returns TopicCountsResult with topic and subtopic aggregations
    */
-  async getTopicCounts(
-    input: AggregationFiltersInput,
-  ): Promise<TopicCountsResult> {
+  async getTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult> {
     return this.tracer.withActiveSpan(
       "TraceService.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },

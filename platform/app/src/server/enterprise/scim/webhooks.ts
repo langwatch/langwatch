@@ -135,8 +135,7 @@ function extractAction(
 ): "create" | "deactivate" | "unknown" {
   const data = (event.data ?? event) as Record<string, unknown>;
   const details = data.details as Record<string, unknown> | undefined;
-  const method =
-    (details?.method as string) ?? (data.description as string) ?? "";
+  const method = (details?.method as string) ?? (data.description as string) ?? "";
 
   if (method.toLowerCase().includes("post") || method.includes("Create")) {
     return "create";

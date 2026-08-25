@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Code,
-  HStack,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Code, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
 
@@ -24,12 +16,7 @@ interface Props {
   iconKey?: string | null;
 }
 
-export function CodingAssistantTile({
-  displayName,
-  config,
-  iconAsset,
-  iconKey,
-}: Props) {
+export function CodingAssistantTile({ displayName, config, iconAsset, iconKey }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
 
@@ -46,11 +33,7 @@ export function CodingAssistantTile({
       width="full"
     >
       <HStack cursor="pointer" onClick={() => setExpanded(!expanded)} gap={3}>
-        <TileIcon
-          iconAsset={iconAsset}
-          iconKey={iconKey}
-          type="coding_assistant"
-        />
+        <TileIcon iconAsset={iconAsset} iconKey={iconKey} type="coding_assistant" />
         <VStack align="start" gap={0} flex={1}>
           <Text fontSize="sm" fontWeight="semibold">
             {displayName}
@@ -92,11 +75,7 @@ export function CodingAssistantTile({
 
           <HStack gap={2} fontSize="xs" color="fg.muted">
             <Text>New to LangWatch?</Text>
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => setSetupOpen(true)}
-            >
+            <Button size="xs" variant="outline" onClick={() => setSetupOpen(true)}>
               Setup guide
             </Button>
           </HStack>

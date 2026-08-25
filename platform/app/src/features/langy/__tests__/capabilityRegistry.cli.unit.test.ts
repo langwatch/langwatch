@@ -187,9 +187,7 @@ describe("resolveCapability, given a LangWatch CLI tool call", () => {
     });
 
     it("offers no deep link rather than a broken one", () => {
-      expect(
-        buildSurfaceHref({ surface: "platform", projectSlug: "acme" }),
-      ).toBeNull();
+      expect(buildSurfaceHref({ surface: "platform", projectSlug: "acme" })).toBeNull();
     });
   });
 
@@ -247,9 +245,9 @@ describe("buildResourceHref, given a row-level deep link", () => {
   // history, where a scenario that was just written does not appear at all.
   describe("when the resource is a scenario", () => {
     it("points the surface link at the scenario library", () => {
-      expect(
-        buildSurfaceHref({ surface: "scenarios", projectSlug: "acme" }),
-      ).toBe("/acme/simulations/scenarios");
+      expect(buildSurfaceHref({ surface: "scenarios", projectSlug: "acme" })).toBe(
+        "/acme/simulations/scenarios",
+      );
     });
 
     it("opens the scenario in the library", () => {
@@ -287,9 +285,7 @@ describe("extractPlatformUrl, given a settled tool call's result payload", () =>
           platformUrl:
             "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
         }),
-      ).toBe(
-        "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
-      );
+      ).toBe("https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1");
     });
   });
 
@@ -319,9 +315,7 @@ describe("the card binding, given the catalog and feature map are the sources of
   describe("when a fallback surface is bound to a feature", () => {
     it("binds only to features the map actually declares", () => {
       const featureIds = new Set(FEATURES.map((feature) => feature.id));
-      const unknown = Object.keys(SURFACE_BY_FEATURE).filter(
-        (id) => !featureIds.has(id),
-      );
+      const unknown = Object.keys(SURFACE_BY_FEATURE).filter((id) => !featureIds.has(id));
 
       expect(unknown).toEqual([]);
     });
@@ -355,8 +349,7 @@ describe("the card binding, given the catalog and feature map are the sources of
         if (!featureSurface) continue;
         for (const command of feature.cli) {
           const resource = command.split(/\s+/)[0]!;
-          const entry =
-            CAPABILITY_CATALOG[resource as keyof typeof CAPABILITY_CATALOG];
+          const entry = CAPABILITY_CATALOG[resource as keyof typeof CAPABILITY_CATALOG];
           if (entry && entry.surface !== featureSurface) {
             disagreements.push(
               `${resource}: catalog says ${entry.surface}, feature ${feature.id} says ${featureSurface}`,
@@ -385,8 +378,7 @@ describe("withDecidedCard, given a result whose card was decided by its shape", 
   describe("when the decided card is richer than the name's", () => {
     it("draws the decided card", () => {
       expect(
-        withDecidedCard({ descriptor: analyticsQuery(), card: "timeseries" })
-          .render,
+        withDecidedCard({ descriptor: analyticsQuery(), card: "timeseries" }).render,
       ).toBe("timeseries");
     });
 
@@ -394,8 +386,7 @@ describe("withDecidedCard, given a result whose card was decided by its shape", 
       // A trend's body is its plot. Carrying the metrics card's figures over
       // would draw the promoted card with the widget of the card it replaced.
       expect(
-        withDecidedCard({ descriptor: analyticsQuery(), card: "timeseries" })
-          .body,
+        withDecidedCard({ descriptor: analyticsQuery(), card: "timeseries" }).body,
       ).toBe("chart");
     });
 

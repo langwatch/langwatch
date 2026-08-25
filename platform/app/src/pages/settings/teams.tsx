@@ -12,14 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  ChevronDown,
-  ChevronRight,
-  Pencil,
-  Plus,
-  RotateCcw,
-  X,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Dialog } from "~/components/ui/dialog";
@@ -140,20 +133,14 @@ function AddToTeamDialog({
 }) {
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("MEMBER");
-  const [customRoleId, setCustomRoleId] = useState<string | undefined>(
-    undefined,
-  );
+  const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
   const queryClient = api.useUtils();
 
-  const orgMembers =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      { organizationId, includeDeactivated: false },
-      { enabled: open },
-    );
-  const customRoles = api.role.getAll.useQuery(
-    { organizationId },
+  const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+    { organizationId, includeDeactivated: false },
     { enabled: open },
   );
+  const customRoles = api.role.getAll.useQuery({ organizationId }, { enabled: open });
 
   const create = api.roleBinding.create.useMutation({
     onSuccess: () => {
@@ -181,8 +168,7 @@ function AddToTeamDialog({
   );
 
   const selectedMemberRole = useMemo(
-    () =>
-      (orgMembers.data?.members ?? []).find((m) => m.userId === userId)?.role,
+    () => (orgMembers.data?.members ?? []).find((m) => m.userId === userId)?.role,
     [orgMembers.data, userId],
   );
 
@@ -278,8 +264,7 @@ function AddToTeamDialog({
             </Field.Root>
 
             <Text fontSize="sm" color="gray.500">
-              This gives them access to all projects in the team at this role
-              level.
+              This gives them access to all projects in the team at this role level.
             </Text>
           </VStack>
         </Dialog.Body>
@@ -326,20 +311,14 @@ function AddToProjectDialog({
 }) {
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("VIEWER");
-  const [customRoleId, setCustomRoleId] = useState<string | undefined>(
-    undefined,
-  );
+  const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
   const queryClient = api.useUtils();
 
-  const orgMembers =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      { organizationId, includeDeactivated: false },
-      { enabled: open },
-    );
-  const customRoles = api.role.getAll.useQuery(
-    { organizationId },
+  const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+    { organizationId, includeDeactivated: false },
     { enabled: open },
   );
+  const customRoles = api.role.getAll.useQuery({ organizationId }, { enabled: open });
 
   const create = api.roleBinding.create.useMutation({
     onSuccess: () => {
@@ -427,8 +406,8 @@ function AddToProjectDialog({
             </Field.Root>
 
             <Text fontSize="sm" color="gray.500">
-              If they&apos;re already on the team, this overrides their team
-              role for this project only.
+              If they&apos;re already on the team, this overrides their team role for this
+              project only.
             </Text>
           </VStack>
         </Dialog.Body>
@@ -562,21 +541,13 @@ function ProjectSection({
                 </Text>
                 {inherited.map((m, i) => (
                   <HStack key={i} py={1} opacity={0.5} fontSize="sm">
-                    <RandomColorAvatar
-                      name={m.name}
-                      image={m.image}
-                      size="xs"
-                    />
+                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
                     <Text flex={1}>{m.name}</Text>
                     <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
                       {m.customRoleName ?? m.role}
                     </Badge>
                     {m.viaGroupName ? (
-                      <Link
-                        href="/settings/groups"
-                        fontSize="xs"
-                        color="purple.400"
-                      >
+                      <Link href="/settings/groups" fontSize="xs" color="purple.400">
                         via {m.viaGroupName}
                       </Link>
                     ) : (
@@ -604,11 +575,7 @@ function ProjectSection({
                 </Text>
                 {projectLevel.map((m, i) => (
                   <HStack key={i} py={1} fontSize="sm">
-                    <RandomColorAvatar
-                      name={m.name}
-                      image={m.image}
-                      size="xs"
-                    />
+                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
                     <Box flex={1}>
                       <Text display="inline">{m.name}</Text>
                       {m.source === "override" && m.teamRole && (
@@ -629,9 +596,7 @@ function ProjectSection({
                       <Button
                         size="xs"
                         variant="ghost"
-                        color={
-                          m.source === "override" ? "orange.400" : "gray.400"
-                        }
+                        color={m.source === "override" ? "orange.400" : "gray.400"}
                         title={
                           m.source === "override"
                             ? "Remove override, revert to team role"
@@ -670,11 +635,7 @@ function ProjectSection({
             {/* Add actions */}
             {canManage && (
               <HStack mt={3} gap={2} flexWrap="wrap">
-                <Button
-                  size="xs"
-                  variant="outline"
-                  onClick={() => setAddingPerson(true)}
-                >
+                <Button size="xs" variant="outline" onClick={() => setAddingPerson(true)}>
                   <Plus size={12} />
                   Add person to this project
                 </Button>
@@ -794,8 +755,7 @@ function TeamCard({
           <Text fontWeight="semibold">{team.name}</Text>
           <Spacer />
           <Text fontSize="sm" color="gray.500">
-            {team.projects.length}{" "}
-            {team.projects.length === 1 ? "project" : "projects"}
+            {team.projects.length} {team.projects.length === 1 ? "project" : "projects"}
             {" · "}
             {team.directMembers.length}{" "}
             {team.directMembers.length === 1 ? "member" : "members"}
@@ -869,11 +829,7 @@ function TeamCard({
                     _dark={{ borderColor: "gray.700" }}
                     opacity={m.viaGroupId ? 0.7 : 1}
                   >
-                    <RandomColorAvatar
-                      name={m.name}
-                      image={m.image}
-                      size="xs"
-                    />
+                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
                     <Text fontSize="sm" flex={1}>
                       {m.name}
                     </Text>
@@ -882,11 +838,7 @@ function TeamCard({
                         <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
                           {m.customRoleName ?? m.role}
                         </Badge>
-                        <Link
-                          href="/settings/groups"
-                          fontSize="xs"
-                          color="purple.400"
-                        >
+                        <Link href="/settings/groups" fontSize="xs" color="purple.400">
                           via {m.viaGroupName}
                         </Link>
                       </>
@@ -929,8 +881,8 @@ function TeamCard({
                 ))
               )}
               <Text fontSize="xs" color="gray.400" mt={2}>
-                Editing a role here changes their team-level access, inherited
-                by all projects below.
+                Editing a role here changes their team-level access, inherited by all
+                projects below.
               </Text>
             </Box>
 
@@ -958,11 +910,7 @@ function TeamCard({
                     borderColor="gray.100"
                     _dark={{ borderColor: "gray.700" }}
                   >
-                    <RandomColorAvatar
-                      name={m.name}
-                      image={m.image}
-                      size="xs"
-                    />
+                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
                     <Text flex={1}>{m.name}</Text>
                     <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
                       {m.role}
@@ -1076,15 +1024,13 @@ function TeamsAndProjects() {
           <Box>
             <Heading size="md">Teams &amp; Projects</Heading>
             <Text fontSize="sm" color="gray.500" mt={1}>
-              People on a team inherit access to all its projects. Expand a
-              project to add overrides or direct access.
+              People on a team inherit access to all its projects. Expand a project to add
+              overrides or direct access.
             </Text>
           </Box>
           <Spacer />
           {hasPermission("project:create") && (
-            <PageLayout.HeaderButton
-              onClick={() => openDrawer("createProject")}
-            >
+            <PageLayout.HeaderButton onClick={() => openDrawer("createProject")}>
               <Plus size={16} />
               Add project
             </PageLayout.HeaderButton>
@@ -1099,9 +1045,7 @@ function TeamsAndProjects() {
 
         {teams.isLoading && <Spinner />}
 
-        {teams.data?.length === 0 && (
-          <Text color="gray.500">No teams yet.</Text>
-        )}
+        {teams.data?.length === 0 && <Text color="gray.500">No teams yet.</Text>}
 
         <VStack gap={3} width="full" align="stretch">
           {teams.data?.map((team) => (

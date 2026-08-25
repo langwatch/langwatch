@@ -2,10 +2,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { type DetailPayload, MISSING_VALUE } from "@langwatch/coding-agent-web";
 import type React from "react";
 
-import {
-  formatCost,
-  formatTokens,
-} from "~/features/traces-v2/utils/formatters";
+import { formatCost, formatTokens } from "~/features/traces-v2/utils/formatters";
 
 import { EmptySection, Section } from "@langwatch/coding-agent-web";
 
@@ -19,10 +16,7 @@ type ModelUsage = DetailPayload["modelBreakdown"][number];
  * figure to print and nothing to scale a bar against, and drawing either would
  * be a claim the read did not make.
  */
-const ModelRow: React.FC<{ model: ModelUsage; peak: number }> = ({
-  model,
-  peak,
-}) => (
+const ModelRow: React.FC<{ model: ModelUsage; peak: number }> = ({ model, peak }) => (
   <VStack align="stretch" gap={1}>
     <HStack justify="space-between" gap={3}>
       <Text fontSize="sm" truncate>
@@ -40,12 +34,7 @@ const ModelRow: React.FC<{ model: ModelUsage; peak: number }> = ({
       ) : null}
     </HStack>
     {model.tokensKnown ? (
-      <Box
-        height="3px"
-        bg="border.subtle"
-        borderRadius="full"
-        overflow="hidden"
-      >
+      <Box height="3px" bg="border.subtle" borderRadius="full" overflow="hidden">
         <Box
           height="full"
           width={`${peak > 0 ? (model.totalTokens / peak) * 100 : 0}%`}
@@ -61,10 +50,7 @@ const ModelRow: React.FC<{ model: ModelUsage; peak: number }> = ({
 export const ModelsSection: React.FC<{
   models: DetailPayload["modelBreakdown"];
 }> = ({ models }) => {
-  const peak = models.reduce(
-    (max, model) => Math.max(max, model.totalTokens),
-    0,
-  );
+  const peak = models.reduce((max, model) => Math.max(max, model.totalTokens), 0);
   return (
     <Section title="Models">
       {models.length === 0 ? (

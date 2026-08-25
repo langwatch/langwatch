@@ -86,10 +86,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     return s3PollingConfigSchema.parse(config);
   }
 
-  async runOnce(
-    options: PullRunOptions,
-    config: S3PollingConfig,
-  ): Promise<PullResult> {
+  async runOnce(options: PullRunOptions, config: S3PollingConfig): Promise<PullResult> {
     const cursor = options.cursor;
 
     const listed = await this.listKeys({
@@ -108,14 +105,11 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
 
     for (const key of listed) {
       if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
-        this.diagnostics.info(
-          "deadline reached mid-pull, returning partial results",
-          {
-            adapter: this.id,
-            key,
-            processed: events.length,
-          },
-        );
+        this.diagnostics.info("deadline reached mid-pull, returning partial results", {
+          adapter: this.id,
+          key,
+          processed: events.length,
+        });
         return { events, cursor: lastSuccessfulKey, errorCount };
       }
       try {
@@ -257,8 +251,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     const parsed = JSON.parse(body) as unknown;
     if (!Array.isArray(parsed)) {
       throw new Error(
-        "json-array parser expected a top-level JSON array, got " +
-          typeof parsed,
+        "json-array parser expected a top-level JSON array, got " + typeof parsed,
       );
     }
     return parsed;
@@ -311,10 +304,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     return cells;
   }
 
-  private mapEvent(
-    rawEvent: unknown,
-    config: S3PollingConfig,
-  ): NormalizedPullEvent {
+  private mapEvent(rawEvent: unknown, config: S3PollingConfig): NormalizedPullEvent {
     const get = (path: string | undefined): unknown =>
       path === undefined
         ? undefined

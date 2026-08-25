@@ -64,10 +64,7 @@ type ProjectionDatabase = {
   customRole: ProjectionDelegate;
   shareLink: ProjectionDelegate;
   $transaction(writes: Promise<unknown>[]): Promise<unknown[]>;
-  $executeRaw(
-    strings: TemplateStringsArray,
-    ...values: unknown[]
-  ): Promise<number>;
+  $executeRaw(strings: TemplateStringsArray, ...values: unknown[]): Promise<number>;
 };
 
 /** Exactly the columns `grantRowToFact` reads, so the re-read a compat write
@@ -144,9 +141,7 @@ class AuthzProjectionResultMapper {
 
 export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
   static create(database: AuthzDatabase): PrismaAuthzProjectionRepository {
-    return new PrismaAuthzProjectionRepository(
-      database as unknown as ProjectionDatabase,
-    );
+    return new PrismaAuthzProjectionRepository(database as unknown as ProjectionDatabase);
   }
 
   private constructor(private readonly prisma: ProjectionDatabase) {
@@ -255,10 +250,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
    *  the row is re-read here — the same shape `compatForRoleChange` uses — and
    *  a grant that is absent or revoked has its compat rows removed rather than
    *  written. */
-  private async compatForGrant(
-    row: GrantRow,
-    guardWon: boolean,
-  ): Promise<void> {
+  private async compatForGrant(row: GrantRow, guardWon: boolean): Promise<void> {
     const organizationId = row.organizationId;
 
     // Common path: this event won the guard, so its own row is the
@@ -305,9 +297,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
     // must not be given one: its legacy representation is the membership or
     // credential row it came from, and minting a binding for it would be
     // exactly the visible change the migration promises not to make.
-    const migrationSourced = AuthzMigrationOwnershipMapper.includes(
-      grant.source,
-    );
+    const migrationSourced = AuthzMigrationOwnershipMapper.includes(grant.source);
 
     const binding = grantFactToCompatBinding({ grant, organizationId });
     if (binding) {

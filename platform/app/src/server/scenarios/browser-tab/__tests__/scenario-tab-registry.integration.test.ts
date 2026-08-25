@@ -9,10 +9,7 @@
  * set semantics and key scoping are the real ones.
  */
 
-import {
-  type RedisConnection,
-  RedisConnectionService,
-} from "@langwatch/redis-client";
+import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
@@ -78,18 +75,16 @@ describe("scenarioTabRegistry", () => {
     // `unregister` retires a tab by ageing its score by the difference between
     // these two, so a grace at or above the TTL would extend a tab's life
     // instead of ending it, and a closed tab would keep taking runs.
-    expect(SCENARIO_TAB_DISCONNECT_GRACE_SECONDS).toBeLessThan(
-      SCENARIO_TAB_TTL_SECONDS,
-    );
+    expect(SCENARIO_TAB_DISCONNECT_GRACE_SECONDS).toBeLessThan(SCENARIO_TAB_TTL_SECONDS);
   });
 
   it("reports no live tab before anything registers", async () => {
     const tabKey = `tab-${nanoid(8)}`;
     track(projectId, tabKey);
 
-    await expect(
-      scenarioTabRegistry.hasLiveTab({ projectId, tabKey }),
-    ).resolves.toBe(false);
+    await expect(scenarioTabRegistry.hasLiveTab({ projectId, tabKey })).resolves.toBe(
+      false,
+    );
   });
 
   it("reports a live tab once one registers", async () => {
@@ -98,9 +93,9 @@ describe("scenarioTabRegistry", () => {
 
     await scenarioTabRegistry.register({ projectId, tabKey, tabId: "tab-a" });
 
-    await expect(
-      scenarioTabRegistry.hasLiveTab({ projectId, tabKey }),
-    ).resolves.toBe(true);
+    await expect(scenarioTabRegistry.hasLiveTab({ projectId, tabKey })).resolves.toBe(
+      true,
+    );
   });
 
   it("gives the registration a TTL so a dead browser expires on its own", async () => {
@@ -276,9 +271,9 @@ describe("scenarioTabRegistry", () => {
 
     await scenarioTabRegistry.unregister({ projectId, tabKey, tabId: "tab-a" });
 
-    await expect(
-      scenarioTabRegistry.hasLiveTab({ projectId, tabKey }),
-    ).resolves.toBe(true);
+    await expect(scenarioTabRegistry.hasLiveTab({ projectId, tabKey })).resolves.toBe(
+      true,
+    );
   });
 
   it("ages out a tab that stopped refreshing without saying goodbye", async () => {

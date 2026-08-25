@@ -4,23 +4,19 @@ import { useWorkflowStore } from "@langwatch/workflow-web";
 import { selectionColor } from "./nodes/Nodes";
 
 export default function DefaultEdge(props: EdgeProps) {
-  const { hoveredNodeId, nodes } = useWorkflowStore(
-    ({ hoveredNodeId, nodes }) => ({
-      hoveredNodeId,
-      nodes,
-    }),
-  );
+  const { hoveredNodeId, nodes } = useWorkflowStore(({ hoveredNodeId, nodes }) => ({
+    hoveredNodeId,
+    nodes,
+  }));
   // Disable this for now, let's see how it looks like with many nodes
   const isConnectionHovered =
     0 && (hoveredNodeId === props.source || hoveredNodeId === props.target);
   const isConnectionSelected =
     0 &&
     nodes.some(
-      (node) =>
-        node.selected && (node.id === props.source || node.id === props.target),
+      (node) => node.selected && (node.id === props.source || node.id === props.target),
     );
-  const highlighted =
-    !!props.selected || isConnectionHovered || isConnectionSelected;
+  const highlighted = !!props.selected || isConnectionHovered || isConnectionSelected;
 
   const [edgePath] = getBezierPath(props);
 

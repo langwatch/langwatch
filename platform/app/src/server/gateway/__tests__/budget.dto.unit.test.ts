@@ -10,9 +10,7 @@ import { toBudgetDto } from "../budget.dto";
 import type { GatewayBudgetWithSeats } from "../budget.service";
 import { decimalUsdToNanoUsd } from "../wireMoney";
 
-function budget(
-  overrides: Partial<GatewayBudgetWithSeats> = {},
-): GatewayBudgetWithSeats {
+function budget(overrides: Partial<GatewayBudgetWithSeats> = {}): GatewayBudgetWithSeats {
   const now = new Date("2026-08-01T00:00:00.000Z");
   return {
     id: "bgt_1",
@@ -44,13 +42,9 @@ describe("decimalUsdToNanoUsd", () => {
   it("scales the decimal string exactly", () => {
     // 0.1 + 0.2 arithmetic is why this scales the STRING: `toNumber() * 1e9`
     // on these lands fractions of a cent away from the true integer.
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("25.500000"))).toBe(
-      25_500_000_000,
-    );
+    expect(decimalUsdToNanoUsd(new Prisma.Decimal("25.500000"))).toBe(25_500_000_000);
     expect(decimalUsdToNanoUsd(new Prisma.Decimal("0.000001"))).toBe(1_000);
-    expect(decimalUsdToNanoUsd(new Prisma.Decimal("0.070000"))).toBe(
-      70_000_000,
-    );
+    expect(decimalUsdToNanoUsd(new Prisma.Decimal("0.070000"))).toBe(70_000_000);
     expect(decimalUsdToNanoUsd(new Prisma.Decimal("0"))).toBe(0);
   });
 
@@ -127,9 +121,7 @@ describe("toBudgetDto", () => {
 
   /** @scenario Per-person and per-member fields appear only on their scopes */
   it("carries the seat fields only when the scope has them", () => {
-    expect(toBudgetDto({ budget: budget() })).not.toHaveProperty(
-      "end_users_seen",
-    );
+    expect(toBudgetDto({ budget: budget() })).not.toHaveProperty("end_users_seen");
     expect(toBudgetDto({ budget: budget(), memberCount: 4 })).toMatchObject({
       member_count: 4,
     });

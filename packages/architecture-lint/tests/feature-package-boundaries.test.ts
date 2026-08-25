@@ -91,10 +91,7 @@ function featurePackage({
       return classificationOrder || left.id.localeCompare(right.id);
     });
   write("packages/features/catalogue.json", JSON.stringify(catalogue));
-  write(
-    `${featureRoot}/feature.json`,
-    JSON.stringify({ layoutVersion }),
-  );
+  write(`${featureRoot}/feature.json`, JSON.stringify({ layoutVersion }));
   write(
     `${featureRoot}/adrs/${adrName}`,
     `# ADR-001: ${feature} package boundary
@@ -145,10 +142,7 @@ The ${feature} implementation becomes singular at the cost of explicit compositi
 `,
   );
   write(`${featureRoot}/adrs/README.md`, `- [Boundary](./${adrName})\n`);
-  write(
-    `${featureRoot}/specs/package-boundary.feature`,
-    `Feature: ${feature}\n`,
-  );
+  write(`${featureRoot}/specs/package-boundary.feature`, `Feature: ${feature}\n`);
   write(
     `${prefix}/package.json`,
     JSON.stringify({
@@ -322,8 +316,7 @@ describe("feature package boundary lint", () => {
     featurePackage({
       feature: "agent",
       role: "server",
-      source:
-        'export { AgentRepository } from "./repositories/agent.repository";',
+      source: 'export { AgentRepository } from "./repositories/agent.repository";',
     });
 
     expect(policies()).toContain("private-runtime-export");
@@ -346,9 +339,7 @@ describe("feature package boundary lint", () => {
       role: "contract",
       name: "@langwatch/not-agents-contract",
     });
-    expect(lintWorkspace({ root, declarations: false }).length).toBeGreaterThan(
-      0,
-    );
+    expect(lintWorkspace({ root, declarations: false }).length).toBeGreaterThan(0);
   });
 });
 
@@ -395,10 +386,7 @@ describe("strict feature source layout", () => {
     rmSync(join(root, "packages/features/agent/feature.json"));
     expect(policies()).toContain("feature-source-layout");
 
-    write(
-      "packages/features/agent/feature.json",
-      JSON.stringify({ layoutVersion: 99 }),
-    );
+    write("packages/features/agent/feature.json", JSON.stringify({ layoutVersion: 99 }));
     expect(policies()).toContain("feature-source-layout");
   });
 
@@ -534,14 +522,12 @@ describe("Prisma client containment", () => {
     featurePackage({
       feature: "agent",
       role: "contract",
-      source:
-        'export type { PrismaClient } from "@langwatch/prisma-client/generated";',
+      source: 'export type { PrismaClient } from "@langwatch/prisma-client/generated";',
     });
     featurePackage({
       feature: "agent",
       role: "web",
-      source:
-        'export type { PrismaClient } from "@langwatch/prisma-client/generated";',
+      source: 'export type { PrismaClient } from "@langwatch/prisma-client/generated";',
     });
     featurePackage({ feature: "agent", role: "server" });
     write(
@@ -549,9 +535,9 @@ describe("Prisma client containment", () => {
       'import type { PrismaClient } from "@langwatch/prisma-client/generated"; export class AgentsService { static create(_client: PrismaClient) { return new AgentsService(); } }',
     );
 
-    expect(
-      policies().filter((policy) => policy === "prisma-containment"),
-    ).toHaveLength(3);
+    expect(policies().filter((policy) => policy === "prisma-containment")).toHaveLength(
+      3,
+    );
   });
 
   it("allows lifecycle construction in an app but rejects it from feature services", () => {
@@ -573,9 +559,9 @@ describe("Prisma client containment", () => {
       'import { PrismaConnectionService } from "@langwatch/prisma-client"; export { PrismaConnectionService };',
     );
 
-    expect(
-      policies().filter((policy) => policy === "prisma-containment"),
-    ).toHaveLength(1);
+    expect(policies().filter((policy) => policy === "prisma-containment")).toHaveLength(
+      1,
+    );
   });
 
   /** @scenario Prisma cannot leak through public declarations */

@@ -7,9 +7,7 @@ import type {
 } from "./presence";
 
 export abstract class PresenceService {
-  abstract isEnabledForProject(
-    input: PresenceProjectInput,
-  ): Promise<boolean>;
+  abstract isEnabledForProject(input: PresenceProjectInput): Promise<boolean>;
   abstract update(input: PresenceUpdateInput): Promise<PresenceSession>;
   abstract leave(input: PresenceLeaveInput): Promise<void>;
   abstract list(input: PresenceProjectInput): Promise<PresenceSession[]>;

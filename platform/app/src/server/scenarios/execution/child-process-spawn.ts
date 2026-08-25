@@ -63,10 +63,7 @@ export function resolveChildProcessSpawn({
     return { command: "node", args: [bundlePath] };
   }
 
-  logger.debug(
-    { nodeEnv: nodeEnv ?? "undefined" },
-    "Using tsx for child process",
-  );
+  logger.debug({ nodeEnv: nodeEnv ?? "undefined" }, "Using tsx for child process");
   return resolveDevelopmentSpawn(packageRoot);
 }
 
@@ -138,10 +135,7 @@ function resolveProductionSpawn(packageRoot: string): SpawnConfig {
   );
 
   if (fs.existsSync(bundlePath)) {
-    logger.info(
-      { bundlePath },
-      "Spawning child process from pre-compiled bundle",
-    );
+    logger.info({ bundlePath }, "Spawning child process from pre-compiled bundle");
     return {
       command: "node",
       args: [bundlePath],

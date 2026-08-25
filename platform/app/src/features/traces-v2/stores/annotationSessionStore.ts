@@ -19,10 +19,8 @@ interface AnnotationSessionState {
  * the comments are part of the draft: they are not, and Save and Discard must
  * keep speaking about the correction alone.
  */
-export const useAnnotationSessionStore = create<AnnotationSessionState>(
-  (set) => ({
-    savedCount: 0,
-    recordSaved: () => set((state) => ({ savedCount: state.savedCount + 1 })),
-    start: () => set({ savedCount: 0 }),
-  }),
-);
+export const useAnnotationSessionStore = create<AnnotationSessionState>((set) => ({
+  savedCount: 0,
+  recordSaved: () => set((state) => ({ savedCount: state.savedCount + 1 })),
+  start: () => set({ savedCount: 0 }),
+}));

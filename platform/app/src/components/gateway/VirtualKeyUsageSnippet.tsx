@@ -205,8 +205,8 @@ func main() {
     <VStack align="stretch" gap={2}>
       <Text fontWeight="medium">{title}</Text>
       <Text textStyle="xs" color="fg.muted">
-        Works with any OpenAI-compatible SDK or coding assistant (Claude Code,
-        Codex, Cursor, Aider).{" "}
+        Works with any OpenAI-compatible SDK or coding assistant (Claude Code, Codex,
+        Cursor, Aider).{" "}
         <Link
           href="https://langwatch.ai/docs/ai-gateway/quickstart"
           color="orange.600"

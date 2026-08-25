@@ -32,17 +32,17 @@ export interface ProcessManagerStateStage<E extends Event, State> {
     schema: Schema,
     run: IntentSpec<Schema>["run"],
   ): ProcessManagerIntentStage<E, State, Record<Name, IntentSpec<Schema>>>;
-  schedule(options: {
-    everyMs: number;
-  }): ProcessManagerScheduledStage<E, State>;
+  schedule(options: { everyMs: number }): ProcessManagerScheduledStage<E, State>;
   /** Enter the handler stage without declaring an outbox intent. */
   keyBy(
     resolve: (event: E) => string,
   ): ProcessManagerIntentStage<E, State, Record<never, never>>;
 }
 
-export interface ProcessManagerScheduledStage<E extends Event, State>
-  extends ProcessManagerStateStage<E, State> {
+export interface ProcessManagerScheduledStage<
+  E extends Event,
+  State,
+> extends ProcessManagerStateStage<E, State> {
   onWake<FutureIntents extends Record<string, IntentSpec<any>>>(
     handle: WakeHandler<State, FutureIntents>,
   ): ProcessManagerScheduledHandledStage<E, State, FutureIntents>;
@@ -69,11 +69,7 @@ export interface ProcessManagerIntentStage<
     name: Name,
     schema: Schema,
     run: IntentSpec<Schema>["run"],
-  ): ProcessManagerIntentStage<
-    E,
-    State,
-    Intents & Record<Name, IntentSpec<Schema>>
-  >;
+  ): ProcessManagerIntentStage<E, State, Intents & Record<Name, IntentSpec<Schema>>>;
   on<Type extends EventTypeOf<E>>(
     eventType: Type,
     handle: EventHandler<State, EventData<E, Type>, Intents>,
@@ -87,9 +83,7 @@ export interface ProcessManagerIntentStage<
     handle: WakeHandler<State, Intents>,
   ): ProcessManagerHandledStage<E, State, Intents>;
   keyBy(resolve: (event: E) => string): ProcessManagerIntentStage<E, State, Intents>;
-  schedule(options: {
-    everyMs: number;
-  }): ProcessManagerIntentStage<E, State, Intents>;
+  schedule(options: { everyMs: number }): ProcessManagerIntentStage<E, State, Intents>;
   outbox(options: OutboxOptions): ProcessManagerIntentStage<E, State, Intents>;
   transient(): ProcessManagerIntentStage<E, State, Intents>;
   toPayload(
@@ -115,9 +109,7 @@ export interface ProcessManagerHandledStage<
     handle: WakeHandler<State, Intents>,
   ): ProcessManagerHandledStage<E, State, Intents>;
   keyBy(resolve: (event: E) => string): ProcessManagerHandledStage<E, State, Intents>;
-  schedule(options: {
-    everyMs: number;
-  }): ProcessManagerHandledStage<E, State, Intents>;
+  schedule(options: { everyMs: number }): ProcessManagerHandledStage<E, State, Intents>;
   outbox(options: OutboxOptions): ProcessManagerHandledStage<E, State, Intents>;
   transient(): ProcessManagerHandledStage<E, State, Intents>;
   toPayload(
@@ -140,9 +132,7 @@ class ProcessManagerBuilder<E extends Event> {
   private scheduleOptions: { everyMs: number } | undefined;
   private transientOption = false;
   private keyResolver: ((event: E) => string) | undefined;
-  private payloadMapper:
-    | ((event: E) => ProcessEventEnvelope["payload"])
-    | undefined;
+  private payloadMapper: ((event: E) => ProcessEventEnvelope["payload"]) | undefined;
 
   constructor(private readonly name: string) {}
 
@@ -176,11 +166,7 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
-  onSignal(
-    name: string,
-    schema: ZodTypeAny,
-    handle: SignalHandler<any, any, any>,
-  ): this {
+  onSignal(name: string, schema: ZodTypeAny, handle: SignalHandler<any, any, any>): this {
     if (this.signals[name]) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",

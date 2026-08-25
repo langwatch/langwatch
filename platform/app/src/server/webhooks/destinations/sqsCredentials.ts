@@ -21,8 +21,7 @@
  * spelling, same "unsafe" in the name so nobody sets it without reading it.
  */
 
-export const AMBIENT_CREDENTIALS_FLAG =
-  "WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS";
+export const AMBIENT_CREDENTIALS_FLAG = "WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS";
 
 /**
  * Whether this deployment lets a queue endpoint run on the deployment's OWN
@@ -55,8 +54,7 @@ export function sqsCredentialMode({
  * An IAM role ARN, in the one shape a role ARN has. Checked at save time so
  * a typo is a 400 rather than an AccessDenied on the first delivery.
  */
-const ROLE_ARN_PATTERN =
-  /^arn:aws(?:-cn|-us-gov)?:iam::\d{12}:role\/[\w+=,.@/-]{1,512}$/;
+const ROLE_ARN_PATTERN = /^arn:aws(?:-cn|-us-gov)?:iam::\d{12}:role\/[\w+=,.@/-]{1,512}$/;
 
 export function isRoleArn(value: string): boolean {
   return ROLE_ARN_PATTERN.test(value.trim());

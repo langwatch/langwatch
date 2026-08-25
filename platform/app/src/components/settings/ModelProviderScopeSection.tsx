@@ -33,12 +33,9 @@ function summariseSelection(scopes: ScopeSelection[]): string {
   );
   const parts: string[] = [];
   if (counts.ORGANIZATION) parts.push("the organization");
-  if (counts.TEAM)
-    parts.push(counts.TEAM === 1 ? "1 team" : `${counts.TEAM} teams`);
+  if (counts.TEAM) parts.push(counts.TEAM === 1 ? "1 team" : `${counts.TEAM} teams`);
   if (counts.PROJECT)
-    parts.push(
-      counts.PROJECT === 1 ? "1 project" : `${counts.PROJECT} projects`,
-    );
+    parts.push(counts.PROJECT === 1 ? "1 project" : `${counts.PROJECT} projects`);
   return `Shared across ${parts.join(" + ")}.`;
 }
 
@@ -109,8 +106,7 @@ export function ProviderScopeSection({
           {summariseSelection(storedScopes)}
         </Text>
         <Text fontSize="xs" color="gray.500">
-          Scope is fixed after create. To change it, delete and recreate at the
-          new scope.
+          Scope is fixed after create. To change it, delete and recreate at the new scope.
         </Text>
       </VStack>
     );

@@ -25,11 +25,7 @@ import { fromZodError } from "zod-validation-error";
 import { LEGACY_PAIRWISE_EVALUATOR_TYPE } from "~/experiments-v3/types";
 import { resolveDispatchEvaluatorType } from "~/experiments-v3/utils/normalizeComparison";
 import type { Project } from "~/generated/prisma/client";
-import {
-  CostReferenceType,
-  CostType,
-  ExperimentType,
-} from "~/generated/prisma/client";
+import { CostReferenceType, CostType, ExperimentType } from "~/generated/prisma/client";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { getInputsOutputs } from "@langwatch/workflow-contract";
 import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";
@@ -408,8 +404,7 @@ secured.access(legacyEvaluationAuth).post(
         });
         return c.json(
           {
-            error:
-              error instanceof Error ? error.message : "Internal server error",
+            error: error instanceof Error ? error.message : "Internal server error",
           },
           500,
         );
@@ -524,8 +519,7 @@ secured.access(legacyEvaluationAuth).post(
         name: "subpath",
         required: true,
         schema: { type: "string" },
-        description:
-          "Second segment of the evaluator id, such as `faithfulness`",
+        description: "Second segment of the evaluator id, such as `faithfulness`",
       },
     ],
     requestBody: evaluateRequestBody,
@@ -685,13 +679,8 @@ secured.access(legacyEvaluationAuth).post(
 
     let data: DataForEvaluation;
     try {
-      data = getEvaluatorDataForParams(
-        checkType,
-        params.data as Record<string, any>,
-      );
-      if (
-        !evaluator.requiredFields.every((field: string) => field in data.data)
-      ) {
+      data = getEvaluatorDataForParams(checkType, params.data as Record<string, any>);
+      if (!evaluator.requiredFields.every((field: string) => field in data.data)) {
         return c.json(
           {
             error: `Missing required field for ${checkType}`,
@@ -760,8 +749,7 @@ secured.access(legacyEvaluationAuth).post(
       });
     }
 
-    const { score, passed, details, cost, status, label } =
-      result as EvaluationResult;
+    const { score, passed, details, cost, status, label } = result as EvaluationResult;
 
     await prisma.batchEvaluation.create({
       data: {
@@ -829,16 +817,12 @@ const defaultEvaluatorInputSchema = z.object({
     .nullable(),
 });
 
-const autoparseContexts = (
-  contexts: unknown[] | unknown,
-): string[] | undefined => {
+const autoparseContexts = (contexts: unknown[] | unknown): string[] | undefined => {
   if (contexts === null || contexts === undefined) return undefined;
   const parsedContexts = Array.isArray(contexts) ? contexts : [contexts];
   return parsedContexts.map((context) => {
     if (typeof context === "string") return context;
-    return extractChunkTextualContent(
-      "content" in context ? context.content : context,
-    );
+    return extractChunkTextualContent("content" in context ? context.content : context);
   });
 };
 
@@ -894,9 +878,7 @@ export const getEvaluatorDataForParams = (
       input: data_.input ? data_.input : undefined,
       output: data_.output ? data_.output : undefined,
       contexts: JSON.stringify(data_.contexts),
-      expected_output: data_.expected_output
-        ? data_.expected_output
-        : undefined,
+      expected_output: data_.expected_output ? data_.expected_output : undefined,
       expected_contexts: JSON.stringify(data_.expected_contexts),
       conversation: JSON.stringify(
         data_.conversation?.map((message) => ({
@@ -975,10 +957,7 @@ export const translateLegacyPairwisePayload = (
 export const stripIncompatiblePairwisePrompt = (
   settings: Record<string, unknown>,
 ): { settings: Record<string, unknown>; droppedPrompt: boolean } => {
-  if (
-    typeof settings.prompt === "string" &&
-    !settings.prompt.includes("{candidates}")
-  ) {
+  if (typeof settings.prompt === "string" && !settings.prompt.includes("{candidates}")) {
     const { prompt: _incompatible, ...rest } = settings;
     return { settings: rest, droppedPrompt: true };
   }
@@ -1112,9 +1091,7 @@ async function handleEvaluatorCall(
   let evaluatorSettings: Record<string, unknown> | undefined;
   let evaluatorName: string | undefined;
   let savedEvaluatorId: string | undefined;
-  let workflowEvaluatorDef:
-    | { name: string; requiredFields: string[] }
-    | undefined;
+  let workflowEvaluatorDef: { name: string; requiredFields: string[] } | undefined;
 
   if (evaluatorSlug.startsWith("evaluators/")) {
     const slugOrId = evaluatorSlug.replace("evaluators/", "");
@@ -1139,14 +1116,9 @@ async function handleEvaluatorCall(
           include: { currentVersion: true },
         });
         if (!workflow) {
-          return c.json(
-            { error: `Workflow not found for evaluator: ${slugOrId}` },
-            404,
-          );
+          return c.json({ error: `Workflow not found for evaluator: ${slugOrId}` }, 404);
         }
-        const dsl = workflow.currentVersion?.dsl as unknown as
-          | StudioWorkflow
-          | undefined;
+        const dsl = workflow.currentVersion?.dsl as unknown as StudioWorkflow | undefined;
         const entryOutputs = dsl ? getWorkflowEntryOutputs(dsl) : [];
         workflowEvaluatorDef = {
           name: savedEvaluator.name,
@@ -1154,9 +1126,7 @@ async function handleEvaluatorCall(
         };
       } else if (savedEvaluator.type === "code") {
         checkType = `${CODE_EVALUATOR_CHECK_PREFIX}${savedEvaluator.id}`;
-        const parsedConfig = codeEvaluatorConfigSchema.safeParse(
-          savedEvaluator.config,
-        );
+        const parsedConfig = codeEvaluatorConfigSchema.safeParse(savedEvaluator.config);
         if (!parsedConfig.success) {
           return c.json(
             { error: `Code evaluator has an invalid config: ${slugOrId}` },
@@ -1174,10 +1144,7 @@ async function handleEvaluatorCall(
       evaluatorName = savedEvaluator.name;
       savedEvaluatorId = savedEvaluator.id;
     } else {
-      return c.json(
-        { error: `Evaluator not found with slug or id: ${slugOrId}` },
-        404,
-      );
+      return c.json({ error: `Evaluator not found with slug or id: ${slugOrId}` }, 404);
     }
   } else {
     const monitor = await prisma.monitor.findUnique({
@@ -1187,9 +1154,7 @@ async function handleEvaluatorCall(
     });
     if (monitor != null) {
       checkType = monitor.checkType;
-      evaluatorSettings = monitor.parameters as
-        | Record<string, unknown>
-        | undefined;
+      evaluatorSettings = monitor.parameters as Record<string, unknown> | undefined;
       evaluatorName = monitor.name;
     } else {
       checkType = evaluatorSlug;
@@ -1217,10 +1182,7 @@ async function handleEvaluatorCall(
 
   const evaluatorDefinition =
     workflowEvaluatorDef ??
-    (await getEvaluatorIncludingCustom(
-      project.id,
-      checkType as EvaluatorTypes,
-    ));
+    (await getEvaluatorIncludingCustom(project.id, checkType as EvaluatorTypes));
   if (!evaluatorDefinition) {
     return c.json({ error: `Evaluator not found: ${checkType}` }, 404);
   }
@@ -1371,10 +1333,7 @@ async function handleEvaluatorCall(
   }
 
   for (const requiredField of evaluatorDefinition.requiredFields) {
-    if (
-      data.data[requiredField] === undefined ||
-      data.data[requiredField] === null
-    ) {
+    if (data.data[requiredField] === undefined || data.data[requiredField] === null) {
       const handledError = new EvaluatorMissingFieldError(
         requiredField,
         evaluatorDefinition.name,
@@ -1427,10 +1386,7 @@ async function handleEvaluatorCall(
   try {
     result = await runEval();
 
-    if (
-      result.status === "error" &&
-      result.details.toLowerCase().includes("timed out")
-    ) {
+    if (result.status === "error" && result.details.toLowerCase().includes("timed out")) {
       result = await runEval();
     }
 
@@ -1452,10 +1408,7 @@ async function handleEvaluatorCall(
     }
   } catch (error) {
     captureException(toError(error), { extra: { projectId: project.id } });
-    logger.error(
-      { err: error, projectId: project.id },
-      "error running evaluation",
-    );
+    logger.error({ err: error, projectId: project.id }, "error running evaluation");
     result = {
       status: "error",
       error_type: "INTERNAL_ERROR",
@@ -1474,8 +1427,7 @@ async function handleEvaluatorCall(
         evaluationId,
         evaluatorId,
         evaluatorType: checkType!,
-        evaluatorName:
-          evaluatorName ?? monitor?.name ?? params.name ?? undefined,
+        evaluatorName: evaluatorName ?? monitor?.name ?? params.name ?? undefined,
         traceId: params.trace_id ?? undefined,
         isGuardrail: isGuardrail ?? undefined,
         status: result!.status,
@@ -1538,11 +1490,7 @@ async function handleEvaluatorCall(
 
 // --- Batch evaluation processing ---
 
-const VALID_TARGET_TYPES: ESBatchEvaluationTargetType[] = [
-  "prompt",
-  "agent",
-  "custom",
-];
+const VALID_TARGET_TYPES: ESBatchEvaluationTargetType[] = ["prompt", "agent", "custom"];
 
 const processTargets = (
   targets: ESBatchEvaluationRESTParams["targets"],
@@ -1556,8 +1504,7 @@ const processTargets = (
     if (metadata && "type" in metadata) {
       const typeFromMetadata = metadata.type;
       if (typeof typeFromMetadata === "string") {
-        const parseResult =
-          eSBatchEvaluationTargetTypeSchema.safeParse(typeFromMetadata);
+        const parseResult = eSBatchEvaluationTargetTypeSchema.safeParse(typeFromMetadata);
         if (parseResult.success) {
           targetType = parseResult.data;
           const { type: _, ...restMetadata } = metadata;
@@ -1689,17 +1636,14 @@ const dispatchToClickHouse = async (
           evaluatorId: evaluation.evaluator,
           evaluatorName: evaluation.name ?? undefined,
           status: evaluation.status,
-          score:
-            typeof evaluation.score === "number" ? evaluation.score : undefined,
+          score: typeof evaluation.score === "number" ? evaluation.score : undefined,
           label: evaluation.label ?? undefined,
           passed: evaluation.passed ?? undefined,
           details: evaluation.details ?? undefined,
           cost: evaluation.cost ?? undefined,
           inputs: evaluation.inputs ?? undefined,
           duration:
-            typeof evaluation.duration === "number"
-              ? evaluation.duration
-              : undefined,
+            typeof evaluation.duration === "number" ? evaluation.duration : undefined,
           occurredAt: Date.now(),
         })
         .catch((err) => {
@@ -1717,10 +1661,7 @@ const dispatchToClickHouse = async (
   ];
   await Promise.all(resultPromises);
 
-  if (
-    batchEvaluation.timestamps.finished_at ||
-    batchEvaluation.timestamps.stopped_at
-  ) {
+  if (batchEvaluation.timestamps.finished_at || batchEvaluation.timestamps.stopped_at) {
     try {
       await app.experiments.completeExperimentRun({
         tenantId: project.id,

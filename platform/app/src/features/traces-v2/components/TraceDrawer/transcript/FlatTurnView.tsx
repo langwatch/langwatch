@@ -2,12 +2,7 @@ import { Box, chakra, Flex, Icon, Text } from "@chakra-ui/react";
 import { LuBot, LuChevronUp, LuUser } from "react-icons/lu";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { BlockStack } from "./BlockStack";
-import {
-  getRolePalette,
-  ROLE_ICONS,
-  ROLE_LABELS,
-  type RolePalette,
-} from "./RoleChip";
+import { getRolePalette, ROLE_ICONS, ROLE_LABELS, type RolePalette } from "./RoleChip";
 import type { ContentBlock, ConversationTurn } from "./types";
 
 /**
@@ -35,12 +30,7 @@ export function FlatTurnView({
     const palette = getRolePalette(sourceRole);
     const label = ROLE_LABELS[sourceRole] ?? sourceRole.toUpperCase();
     return (
-      <FlatBody
-        Icon={RoleIcon}
-        palette={palette}
-        label={label}
-        onCollapse={onCollapse}
-      >
+      <FlatBody Icon={RoleIcon} palette={palette} label={label} onCollapse={onCollapse}>
         {/* System prompts in thread layout render as plain text instead
             of the asMarkdownBody → fenced-code-block path used elsewhere.
             The latter detects pseudo-XML markers like `<role>`/`<goal>`
@@ -62,19 +52,12 @@ export function FlatTurnView({
   const colorKey = visuals.displayRole ?? sourceRole;
   const palette = getRolePalette(colorKey);
   const RoleIcon =
-    visuals.Icon ??
-    ROLE_ICONS[sourceRole] ??
-    (turn.kind === "user" ? LuUser : LuBot);
+    visuals.Icon ?? ROLE_ICONS[sourceRole] ?? (turn.kind === "user" ? LuUser : LuBot);
   const label =
     visuals.bubbleLabel ?? ROLE_LABELS[sourceRole] ?? sourceRole.toUpperCase();
 
   return (
-    <FlatBody
-      Icon={RoleIcon}
-      palette={palette}
-      label={label}
-      onCollapse={onCollapse}
-    >
+    <FlatBody Icon={RoleIcon} palette={palette} label={label} onCollapse={onCollapse}>
       <BlockStack
         blocks={turn.blocks}
         toolCalls={turn.toolCalls}
@@ -92,9 +75,7 @@ export function FlatTurnView({
  */
 function SystemPlainText({ blocks }: { blocks: ContentBlock[] }) {
   const text = blocks
-    .filter(
-      (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
-    )
+    .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
     .map((b) => b.text)
     .join("\n");
   if (!text) {

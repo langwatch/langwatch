@@ -21,9 +21,7 @@ describe("resolveActingGithubLogin", () => {
   });
 
   it("falls back to the email local-part when there is no name", () => {
-    expect(
-      resolveActingGithubLogin(session({ email: "ada@example.com" })),
-    ).toBe("ada");
+    expect(resolveActingGithubLogin(session({ email: "ada@example.com" }))).toBe("ada");
   });
 
   it("falls back to a stable handle when nothing usable is present", () => {

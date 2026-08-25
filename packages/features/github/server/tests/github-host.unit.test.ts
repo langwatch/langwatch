@@ -19,9 +19,7 @@ describe("GithubHost", () => {
   it("supports GitHub Enterprise Server", () => {
     const config = { host: "GitHub.example.test" };
     expect(getGithubHost(config)).toBe("github.example.test");
-    expect(getGithubApiBase(config)).toBe(
-      "https://github.example.test/api/v3",
-    );
+    expect(getGithubApiBase(config)).toBe("https://github.example.test/api/v3");
     expect(isMappableGithubHost("GITHUB.EXAMPLE.TEST", config)).toBe(true);
   });
 });

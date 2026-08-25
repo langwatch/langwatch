@@ -20,9 +20,7 @@ describe("groupMessagesIntoTurns", () => {
         { role: "system", content: "You are the pizza delivery guy" },
         {
           role: "user",
-          content: [
-            { type: "image_url", image_url: { url: "/api/files/p1/i1" } },
-          ],
+          content: [{ type: "image_url", image_url: { url: "/api/files/p1/i1" } }],
         },
       ]);
 
@@ -77,15 +75,11 @@ describe("groupMessagesIntoTurns", () => {
         { role: "user", content: "list the files" },
         {
           role: "assistant",
-          content: [
-            { type: "tool_use", id: "t1", name: "ls", input: { path: "." } },
-          ],
+          content: [{ type: "tool_use", id: "t1", name: "ls", input: { path: "." } }],
         },
         {
           role: "user",
-          content: [
-            { type: "tool_result", tool_use_id: "t1", content: "a.txt" },
-          ],
+          content: [{ type: "tool_result", tool_use_id: "t1", content: "a.txt" }],
         },
       ]);
 

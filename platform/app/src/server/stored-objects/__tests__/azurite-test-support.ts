@@ -8,11 +8,7 @@
  * Not a `*.test.ts` file, so vitest's integration glob does not pick it up
  * as a suite on its own.
  */
-import {
-  GenericContainer,
-  type StartedTestContainer,
-  Wait,
-} from "testcontainers";
+import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import { AzureBlobDriver } from "../azure-blob-driver";
 
 /**
@@ -72,9 +68,7 @@ export async function startAzurite(): Promise<StartedAzurite> {
   };
 }
 
-export async function stopAzurite(
-  azurite: StartedAzurite | undefined,
-): Promise<void> {
+export async function stopAzurite(azurite: StartedAzurite | undefined): Promise<void> {
   // Guard: beforeAll may have failed before startAzurite resolved, in which
   // case afterAll still runs with an undefined handle.
   await azurite?.container.stop();

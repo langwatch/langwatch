@@ -95,12 +95,7 @@ export function JsonView() {
           )}
         </HStack>
         <HStack gap={1}>
-          <Button
-            size="2xs"
-            variant="ghost"
-            onClick={handleFormat}
-            title="Format"
-          >
+          <Button size="2xs" variant="ghost" onClick={handleFormat} title="Format">
             <WrapText size={12} />
           </Button>
           <Button size="2xs" variant="ghost" onClick={handleCopy} title="Copy">

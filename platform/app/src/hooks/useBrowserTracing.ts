@@ -6,10 +6,7 @@
  * resolves. See ADR-058.
  */
 
-import {
-  RUM_DEFAULT_SAMPLE_RATIO,
-  startBrowserTracing,
-} from "@langwatch/react-rum";
+import { RUM_DEFAULT_SAMPLE_RATIO, startBrowserTracing } from "@langwatch/react-rum";
 import { useEffect } from "react";
 import { usePublicEnv } from "./usePublicEnv";
 

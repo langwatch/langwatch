@@ -73,8 +73,7 @@ export function EditableIOField({
   );
 
   const handleChange = useCallback(
-    (event: React.ChangeEvent<HTMLTextAreaElement>) =>
-      onChange(event.target.value),
+    (event: React.ChangeEvent<HTMLTextAreaElement>) => onChange(event.target.value),
     [onChange],
   );
 
@@ -84,12 +83,7 @@ export function EditableIOField({
 
   return (
     <Box>
-      <FieldHeader
-        label={label}
-        delta={delta}
-        isEdited={isEdited}
-        onReset={onReset}
-      />
+      <FieldHeader label={label} delta={delta} isEdited={isEdited} onReset={onReset} />
       <Textarea
         aria-label={`Edit ${label.toLowerCase()}`}
         value={value}
@@ -104,9 +98,7 @@ export function EditableIOField({
       {isPlainTextWarningVisible && (
         <HStack gap={1.5} marginTop={1} color="orange.fg">
           <Icon as={LuTriangleAlert} boxSize={3} />
-          <Text textStyle="2xs">
-            Not valid JSON. It will be saved as plain text.
-          </Text>
+          <Text textStyle="2xs">Not valid JSON. It will be saved as plain text.</Text>
         </HStack>
       )}
     </Box>
@@ -155,22 +147,12 @@ function FieldHeader({
     <HStack gap={2} marginBottom={1} align="center">
       <FieldHeading label={label} />
       {delta !== 0 && (
-        <Text
-          textStyle="2xs"
-          fontFamily="mono"
-          color={delta > 0 ? "green.fg" : "red.fg"}
-        >
+        <Text textStyle="2xs" fontFamily="mono" color={delta > 0 ? "green.fg" : "red.fg"}>
           {delta > 0 ? `+${delta}` : `${delta}`}
         </Text>
       )}
       {isEdited && (
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={onReset}
-          gap={1}
-          marginLeft="auto"
-        >
+        <Button size="xs" variant="ghost" onClick={onReset} gap={1} marginLeft="auto">
           <Icon as={LuRotateCcw} boxSize={3} />
           <Text textStyle="2xs">Reset</Text>
         </Button>

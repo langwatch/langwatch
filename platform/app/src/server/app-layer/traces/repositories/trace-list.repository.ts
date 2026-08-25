@@ -91,10 +91,7 @@ export interface DiscreteFacetResult {
   distinctCount: number;
 }
 
-export type FacetTableName =
-  | "trace_summaries"
-  | "evaluation_runs"
-  | "stored_spans";
+export type FacetTableName = "trace_summaries" | "evaluation_runs" | "stored_spans";
 
 export interface BatchedFacetResult {
   categoricals: Record<string, CategoricalFacetResult>;

@@ -30,12 +30,7 @@ export function EventDetailRow({
 function NormalisedPanel({ event }: { event: SourceEventRowData }) {
   return (
     <Box>
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        marginBottom={1}
-      >
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted" marginBottom={1}>
         Normalised (OCSF)
       </Text>
       <Code
@@ -76,12 +71,7 @@ function RawPanel({ event }: { event: SourceEventRowData }) {
   }
   return (
     <Box>
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        marginBottom={1}
-      >
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted" marginBottom={1}>
         Raw payload (as ingested)
       </Text>
       {event.rawPayload ? (
@@ -97,8 +87,8 @@ function RawPanel({ event }: { event: SourceEventRowData }) {
         </Code>
       ) : (
         <Text fontSize="xs" color="fg.muted">
-          The raw body is not stored for this source type — pushed events are
-          normalised at the edge and only the normalised record is kept.
+          The raw body is not stored for this source type — pushed events are normalised
+          at the edge and only the normalised record is kept.
         </Text>
       )}
     </Box>

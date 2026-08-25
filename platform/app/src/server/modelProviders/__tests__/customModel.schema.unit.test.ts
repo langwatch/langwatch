@@ -197,10 +197,7 @@ describe("isLegacyCustomModels", () => {
 describe("toLegacyCompatibleCustomModels", () => {
   describe("when converting string arrays", () => {
     it("converts strings to CustomModelEntry objects for chat mode", () => {
-      const result = toLegacyCompatibleCustomModels(
-        ["model-a", "model-b"],
-        "chat",
-      );
+      const result = toLegacyCompatibleCustomModels(["model-a", "model-b"], "chat");
 
       expect(result).toEqual([
         { modelId: "model-a", displayName: "model-a", mode: "chat" },
@@ -209,10 +206,7 @@ describe("toLegacyCompatibleCustomModels", () => {
     });
 
     it("converts strings to CustomModelEntry objects for embedding mode", () => {
-      const result = toLegacyCompatibleCustomModels(
-        ["embedding-a"],
-        "embedding",
-      );
+      const result = toLegacyCompatibleCustomModels(["embedding-a"], "embedding");
 
       expect(result).toEqual([
         {

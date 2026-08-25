@@ -61,18 +61,16 @@ describe("buildEnterprisePlanFeatures()", () => {
 
       expect(features).not.toContain(WEBHOOK_FEATURE_LABEL);
       expect(features).toEqual(
-        ENTERPRISE_PLAN_FEATURES.filter(
-          (feature) => feature !== WEBHOOK_FEATURE_LABEL,
-        ),
+        ENTERPRISE_PLAN_FEATURES.filter((feature) => feature !== WEBHOOK_FEATURE_LABEL),
       );
     });
   });
 
   describe("given a contract that grants webhook endpoints", () => {
     it("lists everything the tier offers", () => {
-      expect(
-        buildEnterprisePlanFeatures({ webhookEndpointsEnabled: true }),
-      ).toEqual(ENTERPRISE_PLAN_FEATURES);
+      expect(buildEnterprisePlanFeatures({ webhookEndpointsEnabled: true })).toEqual(
+        ENTERPRISE_PLAN_FEATURES,
+      );
     });
   });
 

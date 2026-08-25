@@ -85,9 +85,8 @@ langwatch.get_current_trace().update(
           Setup
         </Text>
         <Text textStyle="sm">
-          Add the following environment variable to your Langflow configuration.
-          This will automatically enable LangWatch tracing for all your Langflow
-          components.
+          Add the following environment variable to your Langflow configuration. This will
+          automatically enable LangWatch tracing for all your Langflow components.
         </Text>
         <CodePreview
           code={envVarsCode}
@@ -110,8 +109,8 @@ langwatch.get_current_trace().update(
           codeLanguage="bash"
         />
         <Text textStyle="sm" color="fg.muted">
-          Run a message through your Langflow project and check the LangWatch
-          dashboard for monitoring and observability.
+          Run a message through your Langflow project and check the LangWatch dashboard
+          for monitoring and observability.
         </Text>
       </VStack>
 
@@ -122,8 +121,7 @@ langwatch.get_current_trace().update(
           Advanced Configuration
         </Text>
         <Text textStyle="sm" color="fg.muted">
-          Optional: Customize what LangWatch captures from your Langflow
-          components
+          Optional: Customize what LangWatch captures from your Langflow components
         </Text>
 
         <Accordion.Root

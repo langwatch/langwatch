@@ -1,19 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockEnv, httpsProxyAgentMock, nodeHttpHandlerMock } = vi.hoisted(
-  () => ({
-    mockEnv: {} as Record<string, unknown>,
-    httpsProxyAgentMock: vi.fn(function (this: { url: string }, url: string) {
-      this.url = url;
-    }),
-    nodeHttpHandlerMock: vi.fn(function (
-      this: { options: unknown },
-      options: unknown,
-    ) {
-      this.options = options;
-    }),
+const { mockEnv, httpsProxyAgentMock, nodeHttpHandlerMock } = vi.hoisted(() => ({
+  mockEnv: {} as Record<string, unknown>,
+  httpsProxyAgentMock: vi.fn(function (this: { url: string }, url: string) {
+    this.url = url;
   }),
-);
+  nodeHttpHandlerMock: vi.fn(function (this: { options: unknown }, options: unknown) {
+    this.options = options;
+  }),
+}));
 
 vi.mock("../../../../env.mjs", () => ({ env: mockEnv }));
 
@@ -99,9 +94,7 @@ describe("buildSesClientConfig", () => {
 
       const config = buildSesClientConfig();
 
-      expect(httpsProxyAgentMock).toHaveBeenCalledWith(
-        "http://proxy.corp:8080",
-      );
+      expect(httpsProxyAgentMock).toHaveBeenCalledWith("http://proxy.corp:8080");
       expect(config.requestHandler).toBeDefined();
     });
 
@@ -139,9 +132,7 @@ describe("buildSesClientConfig", () => {
 
       buildSesClientConfig();
 
-      expect(httpsProxyAgentMock).toHaveBeenCalledWith(
-        "http://fallback.corp:3128",
-      );
+      expect(httpsProxyAgentMock).toHaveBeenCalledWith("http://fallback.corp:3128");
     });
 
     it("honours lowercase proxy variables", () => {
@@ -149,9 +140,7 @@ describe("buildSesClientConfig", () => {
 
       buildSesClientConfig();
 
-      expect(httpsProxyAgentMock).toHaveBeenCalledWith(
-        "http://lower.corp:8080",
-      );
+      expect(httpsProxyAgentMock).toHaveBeenCalledWith("http://lower.corp:8080");
     });
   });
 
@@ -168,9 +157,7 @@ describe("buildSesClientConfig", () => {
       // all, so the assertion is that the excluded host gets the same one a
       // deployment with no proxy at all gets.
       clearProxyEnv();
-      expect(excluded.requestHandler).toBe(
-        buildSesClientConfig().requestHandler,
-      );
+      expect(excluded.requestHandler).toBe(buildSesClientConfig().requestHandler);
     });
 
     it("connects directly when a parent domain is listed", () => {
@@ -207,8 +194,7 @@ describe("buildSesClientConfig", () => {
       setEnv({
         USE_AWS_SES: "true",
         AWS_REGION: "eu-central-1",
-        AWS_SES_ENDPOINT:
-          "https://vpce-123.email.eu-central-1.vpce.amazonaws.com",
+        AWS_SES_ENDPOINT: "https://vpce-123.email.eu-central-1.vpce.amazonaws.com",
       });
 
       const config = buildSesClientConfig();

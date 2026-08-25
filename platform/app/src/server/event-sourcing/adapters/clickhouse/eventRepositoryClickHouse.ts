@@ -21,11 +21,7 @@ function normalizePayloadValue(value: unknown): unknown {
     // Only convert numeric strings to numbers
     // Do NOT parse JSON strings - they should remain as strings
     // Simple length check to skip long strings early
-    if (
-      value.length > 0 &&
-      value.length < 32 &&
-      NUMERIC_STRING_REGEX.test(value)
-    ) {
+    if (value.length > 0 && value.length < 32 && NUMERIC_STRING_REGEX.test(value)) {
       const numberValue = Number(value);
       if (Number.isFinite(numberValue)) {
         return numberValue;
@@ -75,8 +71,7 @@ const EVENT_LOG_COLUMNS = [
   "IdempotencyKey",
 ] as const;
 
-export const EVENT_LOG_SELECT_COLUMNS =
-  EVENT_LOG_COLUMNS.join(",\n            ");
+export const EVENT_LOG_SELECT_COLUMNS = EVENT_LOG_COLUMNS.join(",\n            ");
 
 /** Raw `event_log` row shape shared by every read query and the mapper. */
 interface EventLogRow {
@@ -113,9 +108,7 @@ function mapEventLogRows({
     EventId: row.EventId,
     EventTimestamp: row.EventTimestamp,
     EventOccurredAt:
-      row.EventOccurredAt != null && row.EventOccurredAt > 0
-        ? row.EventOccurredAt
-        : null,
+      row.EventOccurredAt != null && row.EventOccurredAt > 0 ? row.EventOccurredAt : null,
     EventType: row.EventType,
     EventVersion: row.EventVersion,
     EventPayload: normalizePayloadValue(row.EventPayload),
@@ -156,8 +149,7 @@ export class EventRepositoryClickHouse implements EventRepository {
       // an event. EventOccurredAt is UInt64 milliseconds; the table is
       // PARTITION BY toYearWeek(toDateTime64(EventOccurredAt / 1000, 3)), which
       // is monotonic in EventOccurredAt so the predicate prunes partitions.
-      const hasLowerBound =
-        typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+      const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
       const occurredAtFilter = hasLowerBound
         ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
         : "";
@@ -221,8 +213,7 @@ export class EventRepositoryClickHouse implements EventRepository {
       // table is PARTITION BY toYearWeek(EventOccurredAt), so ONLY an
       // EventOccurredAt predicate prunes. Without one this walks every weekly
       // partition ever written, including the cold tier on S3.
-      const hasLowerBound =
-        typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+      const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
       const occurredAtFilter = hasLowerBound
         ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
         : "";
@@ -343,8 +334,7 @@ export class EventRepositoryClickHouse implements EventRepository {
       : "";
     // The cursor and the upper bound are both on EventTimestamp, which is NOT
     // the partition key — so neither prunes. Only EventOccurredAt does.
-    const hasLowerBound =
-      typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+    const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
     const occurredAtFilter = hasLowerBound
       ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
       : "";

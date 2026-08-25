@@ -26,7 +26,10 @@ export type SkillEntry = {
 };
 
 /** Minimal SKILL.md frontmatter reader: `name:` and `description:` between --- fences. */
-export function parseSkillFrontmatter(markdown: string): { name?: string; description?: string } {
+export function parseSkillFrontmatter(markdown: string): {
+  name?: string;
+  description?: string;
+} {
   if (!markdown.startsWith("---")) return {};
   const end = markdown.indexOf("\n---", 3);
   if (end === -1) return {};
@@ -36,7 +39,8 @@ export function parseSkillFrontmatter(markdown: string): { name?: string; descri
     if (!match) continue;
     const value = match[2]?.trim().replace(/^["']|["']$/g, "") ?? "";
     if (match[1] === "name" && result.name === undefined) result.name = value;
-    if (match[1] === "description" && result.description === undefined) result.description = value;
+    if (match[1] === "description" && result.description === undefined)
+      result.description = value;
   }
   return result;
 }
@@ -76,12 +80,17 @@ export function listSkills(skillsDir: string | undefined): SkillEntry[] {
 
 export function renderSkillInventory(skills: SkillEntry[]): string {
   if (skills.length === 0) return "No skills installed.";
-  return ["Installed skills:", ...skills.map((s) => `- ${s.name}: ${s.description}`)].join("\n");
+  return [
+    "Installed skills:",
+    ...skills.map((s) => `- ${s.name}: ${s.description}`),
+  ].join("\n");
 }
 
 const skillParams = Type.Object({
   name: Type.Optional(
-    Type.String({ description: "Skill name to load. Omit to list every installed skill." }),
+    Type.String({
+      description: "Skill name to load. Omit to list every installed skill.",
+    }),
   ),
 });
 

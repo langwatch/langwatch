@@ -62,14 +62,12 @@ describe("parseWireValue", () => {
   });
 
   describe("when the value is malformed", () => {
-    it.each([
-      "",
-      "no-slash",
-      "/leading-slash",
-      "trailing-slash/",
-    ])("returns kind=unknown for %s", (raw) => {
-      expect(parseWireValue(raw)).toEqual({ kind: "unknown", raw });
-    });
+    it.each(["", "no-slash", "/leading-slash", "trailing-slash/"])(
+      "returns kind=unknown for %s",
+      (raw) => {
+        expect(parseWireValue(raw)).toEqual({ kind: "unknown", raw });
+      },
+    );
   });
 });
 
@@ -103,19 +101,13 @@ describe("resolveWireValue", () => {
   describe("when the wire value is legacy provider-keyed", () => {
     /** @scenario Legacy "provider/model" wire value resolves when exactly one MP matches */
     it("resolves unambiguously when exactly one MP matches the provider", () => {
-      const result = resolveWireValue("openai/gpt-5", [
-        openaiShared,
-        anthropic,
-      ]);
+      const result = resolveWireValue("openai/gpt-5", [openaiShared, anthropic]);
       expect(result).toEqual({ ok: true, mp: openaiShared, model: "gpt-5" });
     });
 
     /** @scenario Legacy wire value errors when no MPs match */
     it("reports not_found when no accessible MP has that provider", () => {
-      const result = resolveWireValue("cohere/command-r", [
-        openaiShared,
-        anthropic,
-      ]);
+      const result = resolveWireValue("cohere/command-r", [openaiShared, anthropic]);
       expect(result).toEqual({
         ok: false,
         reason: "not_found",
@@ -126,10 +118,7 @@ describe("resolveWireValue", () => {
 
     /** @scenario Legacy wire value errors when multiple MPs match */
     it("reports ambiguous when multiple accessible MPs share the provider", () => {
-      const result = resolveWireValue("openai/gpt-5", [
-        openaiShared,
-        openaiProd,
-      ]);
+      const result = resolveWireValue("openai/gpt-5", [openaiShared, openaiProd]);
       expect(result).toEqual({
         ok: false,
         reason: "ambiguous",
@@ -162,8 +151,8 @@ describe("enumerateWireValuesForModel", () => {
   });
 
   it("returns an empty list when no accessible MP has the provider", () => {
-    expect(
-      enumerateWireValuesForModel("cohere", "command-r", [openaiShared]),
-    ).toEqual([]);
+    expect(enumerateWireValuesForModel("cohere", "command-r", [openaiShared])).toEqual(
+      [],
+    );
   });
 });

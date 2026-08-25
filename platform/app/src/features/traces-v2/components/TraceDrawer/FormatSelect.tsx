@@ -85,10 +85,7 @@ const FormatSelectTrigger = forwardRef<
     /** Submodes follow inside the pill, so the trailing padding closes up. */
     tightEnd: boolean;
   } & React.ComponentProps<typeof Flex>
->(function FormatSelectTrigger(
-  { label, ariaLabel, tightEnd, ...triggerProps },
-  ref,
-) {
+>(function FormatSelectTrigger({ label, ariaLabel, tightEnd, ...triggerProps }, ref) {
   return (
     <Flex
       ref={ref}
@@ -147,8 +144,7 @@ export function FormatSelect<Value extends string>({
   ariaLabel,
 }: FormatSelectProps<Value>) {
   const normalized = options.map(normalizeOption);
-  const active =
-    normalized.find((option) => option.value === value) ?? normalized[0];
+  const active = normalized.find((option) => option.value === value) ?? normalized[0];
   if (!active) return null;
 
   return (

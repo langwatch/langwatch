@@ -1,9 +1,6 @@
 import type { StateProjectionStore } from "@langwatch/eventing";
 
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
 import { z } from "zod";
 import {
   TOPIC_CLUSTERING_PROJECTION_VERSIONS,
@@ -113,8 +110,7 @@ function settleSuperseded(
   liveRunId: string,
 ): TopicClusteringRunHistoryEntry[] {
   return runs.map((run) =>
-    run.outcome === TOPIC_CLUSTERING_RUN_OUTCOME.RUNNING &&
-    run.runId !== liveRunId
+    run.outcome === TOPIC_CLUSTERING_RUN_OUTCOME.RUNNING && run.runId !== liveRunId
       ? { ...run, outcome: TOPIC_CLUSTERING_RUN_OUTCOME.ABANDONED }
       : run,
   );
@@ -128,18 +124,14 @@ function settleSuperseded(
 function withRun(
   state: TopicClusteringRunHistoryData,
   params: { projectId: string; runId: string; occurredAt: number },
-  update: (
-    entry: TopicClusteringRunHistoryEntry,
-  ) => TopicClusteringRunHistoryEntry,
+  update: (entry: TopicClusteringRunHistoryEntry) => TopicClusteringRunHistoryEntry,
 ): TopicClusteringRunHistoryData {
   const settled = settleSuperseded(state.Runs, params.runId);
   const index = settled.findIndex((run) => run.runId === params.runId);
   const runs =
     index === -1
       ? [
-          update(
-            openEntry({ runId: params.runId, startedAt: params.occurredAt }),
-          ),
+          update(openEntry({ runId: params.runId, startedAt: params.occurredAt })),
           ...settled,
         ]
       : settled.map((run, i) => (i === index ? update(run) : run));
@@ -159,8 +151,7 @@ export class TopicClusteringRunHistoryFoldProjection
     "LastEventOccurredAt",
     StateProjectionStore<TopicClusteringRunHistoryData>
   >
-  implements
-    FoldEventHandlers<typeof historyEvents, TopicClusteringRunHistoryData>
+  implements FoldEventHandlers<typeof historyEvents, TopicClusteringRunHistoryData>
 {
   readonly name = "topicClusteringRunHistory";
   readonly version = TOPIC_CLUSTERING_PROJECTION_VERSIONS.RUN_HISTORY;
@@ -168,9 +159,7 @@ export class TopicClusteringRunHistoryFoldProjection
 
   protected readonly events = historyEvents;
 
-  constructor(deps: {
-    store: StateProjectionStore<TopicClusteringRunHistoryData>;
-  }) {
+  constructor(deps: { store: StateProjectionStore<TopicClusteringRunHistoryData> }) {
     super();
     this.store = deps.store;
   }
@@ -225,8 +214,7 @@ export class TopicClusteringRunHistoryFoldProjection
             pages,
           };
         }
-        const skippedWithoutWork =
-          data.skippedReason != null && tracesProcessed === 0;
+        const skippedWithoutWork = data.skippedReason != null && tracesProcessed === 0;
         return {
           ...entry,
           finishedAt: event.occurredAt,

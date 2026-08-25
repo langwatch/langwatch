@@ -69,10 +69,7 @@ export function evaluateGatewayReuse({
     };
   }
 
-  if (
-    normalizeUrl(probe.controlPlaneBaseUrl) ===
-    normalizeUrl(expectedControlPlaneUrl)
-  ) {
+  if (normalizeUrl(probe.controlPlaneBaseUrl) === normalizeUrl(expectedControlPlaneUrl)) {
     return { verdict: "ok", warning: null };
   }
 
@@ -91,16 +88,11 @@ export function evaluateGatewayReuse({
   };
 }
 
-async function probeControlPlane(
-  gatewayPort: number,
-): Promise<ControlPlaneProbe> {
+async function probeControlPlane(gatewayPort: number): Promise<ControlPlaneProbe> {
   try {
-    const response = await fetch(
-      `http://localhost:${gatewayPort}/debug/control-plane`,
-      {
-        signal: AbortSignal.timeout(1500),
-      },
-    );
+    const response = await fetch(`http://localhost:${gatewayPort}/debug/control-plane`, {
+      signal: AbortSignal.timeout(1500),
+    });
     if (!response.ok) {
       return { kind: "unreachable", reason: `HTTP ${response.status}` };
     }

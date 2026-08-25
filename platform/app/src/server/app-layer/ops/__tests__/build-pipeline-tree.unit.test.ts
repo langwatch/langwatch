@@ -192,9 +192,7 @@ describe("buildPipelineTree", () => {
     /** @scenario A map projection's live jobs light up its row */
     it("normalizes 'handler' to 'map' so the health join can find it", () => {
       const queue = createQueue({
-        groups: [
-          createGroup({ pipelineName: "p", jobType: "handler", jobName: "n" }),
-        ],
+        groups: [createGroup({ pipelineName: "p", jobType: "handler", jobName: "n" })],
       });
 
       const tree = buildPipelineTree({ queues: [queue] });
@@ -234,9 +232,7 @@ describe("buildPipelineTree", () => {
 
     it("normalizes 'reaction' to the kept 'reactor' jobType", () => {
       const queue = createQueue({
-        groups: [
-          createGroup({ pipelineName: "p", jobType: "reaction", jobName: "n" }),
-        ],
+        groups: [createGroup({ pipelineName: "p", jobType: "reaction", jobName: "n" })],
       });
 
       const tree = buildPipelineTree({ queues: [queue] });

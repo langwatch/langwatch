@@ -152,10 +152,7 @@ describe("GatewayCacheRuleService", () => {
         archivedAt: null,
         enabled: true,
       });
-      expect(args.orderBy).toEqual([
-        { priority: "desc" },
-        { createdAt: "asc" },
-      ]);
+      expect(args.orderBy).toEqual([{ priority: "desc" }, { createdAt: "asc" }]);
     });
   });
 

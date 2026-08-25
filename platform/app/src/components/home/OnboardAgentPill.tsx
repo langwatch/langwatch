@@ -202,11 +202,7 @@ function OnboardOption({
 }) {
   return (
     <HStack gap={2.5} width="full" align="start">
-      <Box
-        color={accent ? "orange.fg" : "fg.subtle"}
-        display="grid"
-        paddingTop="2px"
-      >
+      <Box color={accent ? "orange.fg" : "fg.subtle"} display="grid" paddingTop="2px">
         <Icon size={13} />
       </Box>
       <Box minWidth={0} flex={1}>

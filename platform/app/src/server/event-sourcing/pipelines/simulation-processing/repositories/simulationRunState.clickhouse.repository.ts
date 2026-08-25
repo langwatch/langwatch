@@ -23,9 +23,7 @@ import type { SimulationRunStateRepository } from "./simulationRunState.reposito
 
 const TABLE_NAME = "simulation_runs" as const;
 
-const logger = createLogger(
-  "langwatch:simulation-processing:run-state-repository",
-);
+const logger = createLogger("langwatch:simulation-processing:run-state-repository");
 
 interface ClickHouseSimulationRunRecord {
   ProjectionId: string;
@@ -82,8 +80,7 @@ type ClickHouseSimulationRunWriteRecord = WithDateWrites<
 
 export class SimulationRunStateRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
-> implements SimulationRunStateRepository<ProjectionType>
-{
+> implements SimulationRunStateRepository<ProjectionType> {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   private mapClickHouseRecordToProjectionData(
@@ -116,9 +113,7 @@ export class SimulationRunStateRepositoryClickHouse<
       TotalCost: record.TotalCost ?? null,
       RoleCosts: record.RoleCosts ?? {},
       RoleLatencies: record.RoleLatencies ?? {},
-      TraceMetrics: record.TraceMetricsJson
-        ? JSON.parse(record.TraceMetricsJson)
-        : {},
+      TraceMetrics: record.TraceMetricsJson ? JSON.parse(record.TraceMetricsJson) : {},
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
       QueuedAt:
         record.QueuedAt === null || record.QueuedAt === undefined
@@ -290,8 +285,7 @@ export class SimulationRunStateRepositoryClickHouse<
 
       return projection as ProjectionType;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(
         { scenarioRunId, tenantId: context.tenantId, error },
         "Failed to get projection from ClickHouse",
@@ -360,8 +354,7 @@ export class SimulationRunStateRepositoryClickHouse<
         },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(
         {
           tenantId: context.tenantId,
@@ -411,8 +404,7 @@ export class SimulationRunStateRepositoryClickHouse<
       const retentionPolicy = context.metadata?.retentionPolicy as
         | { scenarios?: number | null }
         | undefined;
-      const retentionDays =
-        retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+      const retentionDays = retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
       const records = projections.map((projection) => {
         const scenarioRunId = String(projection.aggregateId);
         const record = this.mapProjectionDataToClickHouseRecord(
@@ -434,8 +426,7 @@ export class SimulationRunStateRepositoryClickHouse<
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(
         {
           tenantId: context.tenantId,

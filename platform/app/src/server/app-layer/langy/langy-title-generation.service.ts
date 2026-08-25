@@ -69,9 +69,7 @@ function sanitizeTitle(raw: string): string {
 }
 
 /** Render the recent transcript into a compact prompt block. */
-function buildTranscript(
-  messages: { role: string; content: string }[],
-): string {
+function buildTranscript(messages: { role: string; content: string }[]): string {
   return messages
     .map((m) => ({
       role: m.role,

@@ -41,8 +41,7 @@ export function getEffectiveLens(state: {
   columnOrder: string[];
 }): LensConfig | null {
   const lens =
-    state.allLenses.find((l) => l.id === state.activeLensId) ??
-    state.allLenses[0];
+    state.allLenses.find((l) => l.id === state.activeLensId) ?? state.allLenses[0];
   if (!lens) return null;
   // Reconcile addons against the LIVE grouping's capability — not the
   // saved lens's. The saved lens stores whatever addons matched its
@@ -221,8 +220,7 @@ function isSortConfig(value: unknown): value is SortConfig {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   return (
-    typeof v.columnId === "string" &&
-    (v.direction === "asc" || v.direction === "desc")
+    typeof v.columnId === "string" && (v.direction === "asc" || v.direction === "desc")
   );
 }
 
@@ -242,9 +240,7 @@ function loadDrafts(): Map<string, DraftLensState> {
       const grouping = migrateGrouping(v.grouping);
       if (grouping) draft.grouping = grouping;
       if (Array.isArray(v.columns)) {
-        draft.columns = v.columns.filter(
-          (c): c is string => typeof c === "string",
-        );
+        draft.columns = v.columns.filter((c): c is string => typeof c === "string");
       }
       if (typeof v.filter === "string") draft.filter = v.filter;
       if (Object.keys(draft).length > 0) out.set(lensId, draft);
@@ -385,15 +381,7 @@ const builtInLenses: LensConfig[] = [
     id: "slow-requests",
     name: "Slow Traces",
     isBuiltIn: true,
-    columns: [
-      "time",
-      "trace",
-      "service",
-      "model",
-      "duration",
-      "tokens",
-      "cost",
-    ],
+    columns: ["time", "trace", "service", "model", "duration", "tokens", "cost"],
     addons: ["error-detail", "io-preview"],
     grouping: "flat",
     sort: { columnId: "duration", direction: "desc" },
@@ -404,15 +392,7 @@ const builtInLenses: LensConfig[] = [
     id: "token-heavy-traces",
     name: "Token-Heavy Traces",
     isBuiltIn: true,
-    columns: [
-      "time",
-      "trace",
-      "service",
-      "model",
-      "tokens",
-      "cost",
-      "duration",
-    ],
+    columns: ["time", "trace", "service", "model", "tokens", "cost", "duration"],
     addons: ["error-detail", "io-preview"],
     grouping: "flat",
     sort: { columnId: "tokens", direction: "desc" },
@@ -424,15 +404,7 @@ const builtInLenses: LensConfig[] = [
     id: "token-heavy-conversations",
     name: "Token-Heavy Conversations",
     isBuiltIn: true,
-    columns: [
-      "conversation",
-      "turns",
-      "tokens",
-      "cost",
-      "duration",
-      "model",
-      "service",
-    ],
+    columns: ["conversation", "turns", "tokens", "cost", "duration", "model", "service"],
     addons: ["conversation-turns"],
     grouping: "by-conversation",
     sort: { columnId: "tokens", direction: "desc" },
@@ -444,15 +416,7 @@ const builtInLenses: LensConfig[] = [
     id: "longest-conversations",
     name: "Longest Conversations",
     isBuiltIn: true,
-    columns: [
-      "conversation",
-      "turns",
-      "duration",
-      "tokens",
-      "cost",
-      "model",
-      "service",
-    ],
+    columns: ["conversation", "turns", "duration", "tokens", "cost", "model", "service"],
     addons: ["conversation-turns"],
     grouping: "by-conversation",
     sort: { columnId: "turns", direction: "desc" },
@@ -463,15 +427,7 @@ const builtInLenses: LensConfig[] = [
     id: "expensive-traces",
     name: "Expensive Traces",
     isBuiltIn: true,
-    columns: [
-      "time",
-      "trace",
-      "service",
-      "model",
-      "cost",
-      "tokens",
-      "duration",
-    ],
+    columns: ["time", "trace", "service", "model", "cost", "tokens", "duration"],
     addons: ["error-detail", "io-preview"],
     grouping: "flat",
     sort: { columnId: "cost", direction: "desc" },
@@ -482,15 +438,7 @@ const builtInLenses: LensConfig[] = [
     id: "expensive-conversations",
     name: "Expensive Conversations",
     isBuiltIn: true,
-    columns: [
-      "conversation",
-      "turns",
-      "cost",
-      "tokens",
-      "duration",
-      "model",
-      "service",
-    ],
+    columns: ["conversation", "turns", "cost", "tokens", "duration", "model", "service"],
     addons: ["conversation-turns"],
     grouping: "by-conversation",
     sort: { columnId: "cost", direction: "desc" },
@@ -502,15 +450,7 @@ const builtInLenses: LensConfig[] = [
     id: "large-traces",
     name: "Large Traces",
     isBuiltIn: true,
-    columns: [
-      "time",
-      "trace",
-      "service",
-      "model",
-      "size",
-      "tokens",
-      "duration",
-    ],
+    columns: ["time", "trace", "service", "model", "size", "tokens", "duration"],
     addons: ["error-detail", "io-preview"],
     grouping: "flat",
     sort: { columnId: "size", direction: "desc" },
@@ -553,10 +493,7 @@ const defaultColumnOrder: string[] = [
 ];
 
 function generateId(): string {
-  if (
-    typeof crypto !== "undefined" &&
-    typeof crypto.randomUUID === "function"
-  ) {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return `custom-${crypto.randomUUID()}`;
   }
   return `custom-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -627,10 +564,7 @@ function dropKeysetCursorsIfSortChanged({
   previous: SortConfig;
   next: SortConfig;
 }): void {
-  if (
-    previous.columnId === next.columnId &&
-    previous.direction === next.direction
-  ) {
+  if (previous.columnId === next.columnId && previous.direction === next.direction) {
     return;
   }
   useFilterStore.getState().resetPagination();
@@ -650,21 +584,16 @@ const initialActiveLensId =
   initialLenses[0]?.id ||
   "all-traces";
 const initialDrafts = loadDrafts();
-const initialActiveLens = initialLenses.find(
-  (l) => l.id === initialActiveLensId,
-);
+const initialActiveLens = initialLenses.find((l) => l.id === initialActiveLensId);
 const initialActiveDraft = initialDrafts.get(initialActiveLensId);
 
 export const useViewStore = create<ViewState>((set, get) => ({
   activeLensId: initialActiveLensId,
   allLenses: initialLenses,
   sort: initialActiveDraft?.sort ?? initialActiveLens?.sort ?? DEFAULT_SORT,
-  grouping:
-    initialActiveDraft?.grouping ?? initialActiveLens?.grouping ?? "flat",
+  grouping: initialActiveDraft?.grouping ?? initialActiveLens?.grouping ?? "flat",
   columnOrder:
-    initialActiveDraft?.columns ??
-    initialActiveLens?.columns ??
-    defaultColumnOrder,
+    initialActiveDraft?.columns ?? initialActiveLens?.columns ?? defaultColumnOrder,
   draftState: initialDrafts,
 
   selectLens: (id, opts) => {
@@ -844,9 +773,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
       id,
       name,
       isBuiltIn: false,
-      columns: overrides?.columns
-        ? [...overrides.columns]
-        : [...state.columnOrder],
+      columns: overrides?.columns ? [...overrides.columns] : [...state.columnOrder],
       addons: overrides?.addons ? [...overrides.addons] : [],
       grouping: overrides?.grouping ?? state.grouping,
       sort: overrides?.sort ? { ...overrides.sort } : { ...state.sort },
@@ -895,9 +822,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     set((s) => {
       const lens = s.allLenses.find((l) => l.id === lensId);
       if (!lens || lens.isBuiltIn) return s;
-      const allLenses = s.allLenses.map((l) =>
-        l.id === lensId ? { ...l, name } : l,
-      );
+      const allLenses = s.allLenses.map((l) => (l.id === lensId ? { ...l, name } : l));
       lensSyncBridge?.rename(lensId, name);
       return { allLenses };
     }),
@@ -978,11 +903,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
       // anything), the active lens is no longer the default, so subsequent
       // hydrations skip and an explicit choice is never clobbered.
       const persisted = getPersistedActiveLensId();
-      if (
-        s.activeLensId === "all-traces" &&
-        persisted &&
-        persisted !== s.activeLensId
-      ) {
+      if (s.activeLensId === "all-traces" && persisted && persisted !== s.activeLensId) {
         const target = allLenses.find((l) => l.id === persisted);
         if (target) {
           const draft = s.draftState.get(persisted);

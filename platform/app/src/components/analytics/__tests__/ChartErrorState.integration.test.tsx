@@ -46,9 +46,7 @@ describe("<ChartErrorState />", () => {
       // An unhandled failure has no copy of its own, so the caller's
       // fallback names what the user was looking at.
       expect(screen.getByText("Failed to load chart data")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /retry/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
       expect(screen.queryByText(/no data/i)).not.toBeInTheDocument();
     });
   });
@@ -71,9 +69,7 @@ describe("<ChartErrorState />", () => {
 
       expect(screen.getByText("This search took too long")).toBeInTheDocument();
       expect(
-        screen.getByText(
-          "Narrow the time range or add a filter, then try again.",
-        ),
+        screen.getByText("Narrow the time range or add a filter, then try again."),
       ).toBeInTheDocument();
       expect(screen.queryByText("query_timeout")).not.toBeInTheDocument();
     });

@@ -52,11 +52,10 @@ export function useRoutingPolicyDrawerForm({
   // One row per configured provider. The project-scoped listing collapses
   // rows that share a provider key, which would render every second entry of
   // an existing policy as an unknown provider.
-  const providersQuery =
-    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
-      { organizationId },
-      { enabled: !!organizationId, refetchOnWindowFocus: false },
-    );
+  const providersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+    { organizationId },
+    { enabled: !!organizationId, refetchOnWindowFocus: false },
+  );
 
   // The schema runs, rather than only typing the form: its required-field
   // messages and the name length limit are the ones the operator reads, and a
@@ -89,9 +88,7 @@ export function useRoutingPolicyDrawerForm({
     [values, boundProviderTypes],
   );
 
-  const { availableTeams, availableProjects } = useScopeOptions(
-    organization?.teams,
-  );
+  const { availableTeams, availableProjects } = useScopeOptions(organization?.teams);
 
   const scopesWithNames = useMemo(
     () => namedScopes({ scopes: values.scopes, organization }),
@@ -160,9 +157,7 @@ function useProviderOptions({
     );
     return [
       ...new Set(
-        selectedIds
-          .map((id) => byId.get(id))
-          .filter((type): type is string => !!type),
+        selectedIds.map((id) => byId.get(id)).filter((type): type is string => !!type),
       ),
     ];
   }, [selectedIds, providers]);

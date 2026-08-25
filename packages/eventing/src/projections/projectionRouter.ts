@@ -105,10 +105,7 @@ type SubscriberDelivery<E extends Event> = { event: E; foldState: unknown };
  */
 export class ProjectionRouter<
   EventType extends Event = Event,
-  ProjectionTypes extends Record<string, Projection> = Record<
-    string,
-    Projection
-  >,
+  ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
 > {
   private readonly executionTarget?: ExecutionTarget;
   private readonly replayMarkerChecker?: ReplayMarkerChecker;
@@ -116,9 +113,7 @@ export class ProjectionRouter<
   private readonly tracer = getLangWatchTracer(
     "langwatch.event-sourcing.projection-router",
   );
-  private readonly logger = createLogger(
-    "langwatch:event-sourcing:projection-router",
-  );
+  private readonly logger = createLogger("langwatch:event-sourcing:projection-router");
   private readonly foldExecutor = new FoldProjectionExecutor();
   private readonly stateProjectionExecutor = new StateProjectionExecutor();
   private readonly mapExecutor = new MapProjectionExecutor();
@@ -163,9 +158,7 @@ export class ProjectionRouter<
     this.retentionPolicyResolver = options.retentionPolicyResolver;
   }
 
-  registerFoldProjection(
-    projection: FoldProjectionDefinition<any, EventType>,
-  ): void {
+  registerFoldProjection(projection: FoldProjectionDefinition<any, EventType>): void {
     if (this.foldProjections.has(projection.name)) {
       throw new ConfigurationError(
         "ProjectionRouter",
@@ -226,8 +219,8 @@ export class ProjectionRouter<
     projection: FoldProjectionDefinition<any, EventType>,
   ): void {
     const hasDurableWatermark =
-      typeof (projection.store as { getWithApplied?: unknown })
-        .getWithApplied === "function";
+      typeof (projection.store as { getWithApplied?: unknown }).getWithApplied ===
+      "function";
     if (!hasDurableWatermark) return;
 
     const effectiveBatch =
@@ -245,9 +238,7 @@ export class ProjectionRouter<
     );
   }
 
-  registerStateProjection(
-    projection: StateProjectionDefinition<any, EventType>,
-  ): void {
+  registerStateProjection(projection: StateProjectionDefinition<any, EventType>): void {
     if (this.stateProjections.has(projection.name)) {
       throw new ConfigurationError(
         "ProjectionRouter",
@@ -258,9 +249,7 @@ export class ProjectionRouter<
     this.stateProjections.set(projection.name, projection);
   }
 
-  registerMapProjection(
-    projection: MapProjectionDefinition<any, EventType>,
-  ): void {
+  registerMapProjection(projection: MapProjectionDefinition<any, EventType>): void {
     if (this.mapProjections.has(projection.name)) {
       throw new ConfigurationError(
         "ProjectionRouter",
@@ -305,9 +294,7 @@ export class ProjectionRouter<
     this.subscribersForMap.set(mapName, existing);
   }
 
-  registerEventSubscriber(
-    subscriber: EventSubscriberDefinition<EventType>,
-  ): void {
+  registerEventSubscriber(subscriber: EventSubscriberDefinition<EventType>): void {
     if (this.eventSubscribers.has(subscriber.name)) {
       throw new ConfigurationError(
         "ProjectionRouter",
@@ -332,9 +319,7 @@ export class ProjectionRouter<
           delay?: number;
           deduplication?: DeduplicationStrategy<EventType>;
           groupKeyFn?: (event: EventType) => string;
-          spanAttributes: (
-            event: EventType,
-          ) => Record<string, string | number | boolean>;
+          spanAttributes: (event: EventType) => Record<string, string | number | boolean>;
         };
       }
     > = {};
@@ -382,8 +367,7 @@ export class ProjectionRouter<
    * Each subscriber gets a SimpleQueue for async dispatch.
    */
   initializeProjectionSubscriberQueues(): void {
-    if (this.subscribersForFold.size === 0 && this.subscribersForMap.size === 0)
-      return;
+    if (this.subscribersForFold.size === 0 && this.subscribersForMap.size === 0) return;
 
     const subscriberDefs: Record<
       string,
@@ -392,15 +376,9 @@ export class ProjectionRouter<
         parentProjection: string;
         parentType: "fold" | "map";
         handler: {
-          handle: (payload: {
-            event: EventType;
-            foldState: unknown;
-          }) => Promise<void>;
+          handle: (payload: { event: EventType; foldState: unknown }) => Promise<void>;
         };
-        groupKeyFn?: (payload: {
-          event: EventType;
-          foldState: unknown;
-        }) => string;
+        groupKeyFn?: (payload: { event: EventType; foldState: unknown }) => string;
         options?: {
           disabled?: boolean;
           delay?: number;
@@ -420,10 +398,7 @@ export class ProjectionRouter<
           parentProjection: foldName,
           parentType: "fold" as const,
           handler: {
-            handle: async (payload: {
-              event: EventType;
-              foldState: unknown;
-            }) => {
+            handle: async (payload: { event: EventType; foldState: unknown }) => {
               await subscriber.handle(payload.event, {
                 tenantId: payload.event.tenantId,
                 aggregateId: String(payload.event.aggregateId),
@@ -457,10 +432,7 @@ export class ProjectionRouter<
           parentProjection: mapName,
           parentType: "map" as const,
           handler: {
-            handle: async (payload: {
-              event: EventType;
-              foldState: unknown;
-            }) => {
+            handle: async (payload: { event: EventType; foldState: unknown }) => {
               await subscriber.handle(payload.event, {
                 tenantId: payload.event.tenantId,
                 aggregateId: String(payload.event.aggregateId),
@@ -500,19 +472,11 @@ export class ProjectionRouter<
         await withMetrics({
           fn: () => subscriberDef.handler.handle(payload),
           onComplete: (ms) => {
-            incrementEsReactorTotal(
-              this.pipelineName,
-              subscriberName,
-              "completed",
-            );
+            incrementEsReactorTotal(this.pipelineName, subscriberName, "completed");
             observeEsReactorDuration(this.pipelineName, subscriberName, ms);
           },
           onFail: (ms) => {
-            incrementEsReactorTotal(
-              this.pipelineName,
-              subscriberName,
-              "failed",
-            );
+            incrementEsReactorTotal(this.pipelineName, subscriberName, "failed");
             observeEsReactorDuration(this.pipelineName, subscriberName, ms);
           },
         });
@@ -652,17 +616,12 @@ export class ProjectionRouter<
           );
         }
 
-        await this.processFoldProjectionEvent(
-          projectionName,
-          fold,
-          triggerEvent,
-          {
-            tenantId: triggerEvent.tenantId,
-            ...(context.deliveryAttempt !== undefined
-              ? { deliveryAttempt: context.deliveryAttempt }
-              : {}),
-          },
-        );
+        await this.processFoldProjectionEvent(projectionName, fold, triggerEvent, {
+          tenantId: triggerEvent.tenantId,
+          ...(context.deliveryAttempt !== undefined
+            ? { deliveryAttempt: context.deliveryAttempt }
+            : {}),
+        });
       },
       async (projectionName, events, context) => {
         const fold = this.foldProjections.get(projectionName);
@@ -717,10 +676,7 @@ export class ProjectionRouter<
             // Defer or skip if projection-replay is active for this aggregate.
             // Mirrors the fold projection replay-marker check.
             if (this.replayMarkerChecker) {
-              const decision = await this.replayMarkerChecker.check(
-                name,
-                event,
-              );
+              const decision = await this.replayMarkerChecker.check(name, event);
               if (decision === "skip") return;
             }
 
@@ -755,11 +711,7 @@ export class ProjectionRouter<
 
             // Dispatch to map subscribers after map execute succeeds
             const mapSubscribers = this.subscribersForMap.get(name);
-            if (
-              record !== null &&
-              mapSubscribers &&
-              mapSubscribers.length > 0
-            ) {
+            if (record !== null && mapSubscribers && mapSubscribers.length > 0) {
               await this.dispatchToSubscribers({
                 projectionName: name,
                 subscribers: mapSubscribers,
@@ -771,10 +723,7 @@ export class ProjectionRouter<
             const toApply: EventType[] = [];
             for (const event of events) {
               if (this.replayMarkerChecker) {
-                const decision = await this.replayMarkerChecker.check(
-                  name,
-                  event,
-                );
+                const decision = await this.replayMarkerChecker.check(name, event);
                 if (decision === "skip") continue;
               }
               toApply.push(event);
@@ -791,8 +740,7 @@ export class ProjectionRouter<
               tenantId: event.tenantId,
             }));
             const mapped = await withMetrics({
-              fn: () =>
-                this.mapExecutor.executeBatch(mapProj, toApply, contexts),
+              fn: () => this.mapExecutor.executeBatch(mapProj, toApply, contexts),
               onComplete: (ms) => {
                 for (const _event of toApply) {
                   incrementEsMapProjectionTotal({
@@ -995,8 +943,7 @@ export class ProjectionRouter<
             : matching;
         if (filtered.length === 0) continue;
 
-        const queueProcessor =
-          this.queueManager.getProjectionQueue(projectionName);
+        const queueProcessor = this.queueManager.getProjectionQueue(projectionName);
         if (queueProcessor) {
           try {
             await queueProcessor.sendBatch(filtered);
@@ -1017,19 +964,11 @@ export class ProjectionRouter<
       // Inline sync processing
       for (const event of events) {
         for (const [projectionName, fold] of this.foldProjections) {
-          if (
-            fold.eventTypes.length > 0 &&
-            !fold.eventTypes.includes(event.type)
-          ) {
+          if (fold.eventTypes.length > 0 && !fold.eventTypes.includes(event.type)) {
             continue;
           }
           try {
-            await this.processFoldProjectionEvent(
-              projectionName,
-              fold,
-              event,
-              context,
-            );
+            await this.processFoldProjectionEvent(projectionName, fold, event, context);
           } catch (error) {
             const category = categorizeError(error);
             handleError(error, category, this.logger, {
@@ -1062,9 +1001,7 @@ export class ProjectionRouter<
       const matching =
         projection.eventTypes.length === 0
           ? [...events]
-          : events.filter((event) =>
-              projection.eventTypes.includes(event.type),
-            );
+          : events.filter((event) => projection.eventTypes.includes(event.type));
       if (matching.length === 0) continue;
 
       try {
@@ -1077,12 +1014,7 @@ export class ProjectionRouter<
         }
 
         for (const event of matching) {
-          await this.processStateProjectionEvents(
-            name,
-            projection,
-            [event],
-            context,
-          );
+          await this.processStateProjectionEvents(name, projection, [event], context);
         }
       } catch (error) {
         this.logger.error(
@@ -1122,10 +1054,7 @@ export class ProjectionRouter<
         let declined = 0;
         for (const event of events) {
           // Filter by event type
-          if (
-            mapProj.eventTypes.length > 0 &&
-            !mapProj.eventTypes.includes(event.type)
-          ) {
+          if (mapProj.eventTypes.length > 0 && !mapProj.eventTypes.includes(event.type)) {
             continue;
           }
 
@@ -1174,10 +1103,7 @@ export class ProjectionRouter<
         for (const [name, mapProj] of this.mapProjections) {
           if (mapProj.options?.disabled) continue;
 
-          if (
-            mapProj.eventTypes.length > 0 &&
-            !mapProj.eventTypes.includes(event.type)
-          ) {
+          if (mapProj.eventTypes.length > 0 && !mapProj.eventTypes.includes(event.type)) {
             continue;
           }
 
@@ -1204,10 +1130,7 @@ export class ProjectionRouter<
             // Defer or skip if projection-replay is active for this aggregate.
             // Mirrors the fold projection replay-marker check.
             if (this.replayMarkerChecker) {
-              const decision = await this.replayMarkerChecker.check(
-                name,
-                event,
-              );
+              const decision = await this.replayMarkerChecker.check(name, event);
               if (decision === "skip") continue;
             }
 
@@ -1242,11 +1165,7 @@ export class ProjectionRouter<
 
             // Dispatch to map subscribers after map execute succeeds
             const mapSubscribers = this.subscribersForMap.get(name);
-            if (
-              record !== null &&
-              mapSubscribers &&
-              mapSubscribers.length > 0
-            ) {
+            if (record !== null && mapSubscribers && mapSubscribers.length > 0) {
               await this.dispatchToSubscribers({
                 projectionName: name,
                 subscribers: mapSubscribers,
@@ -1316,9 +1235,7 @@ export class ProjectionRouter<
     }
   }
 
-  private async dispatchToEventSubscribers(
-    events: readonly EventType[],
-  ): Promise<void> {
+  private async dispatchToEventSubscribers(events: readonly EventType[]): Promise<void> {
     const queued = this.queueManager.hasSubscriberQueues();
     const errors: Error[] = [];
 
@@ -1327,9 +1244,7 @@ export class ProjectionRouter<
       const matching =
         subscriber.eventTypes.length === 0
           ? events
-          : events.filter((event) =>
-              subscriber.eventTypes.includes(event.type),
-            );
+          : events.filter((event) => subscriber.eventTypes.includes(event.type));
 
       const enqueue = subscriber.options?.enqueue;
 
@@ -1362,13 +1277,9 @@ export class ProjectionRouter<
           // different event type, and a worker running the previous build
           // silently COMPLETES a job it cannot decode. See
           // `EnqueueDispatchOptions.stage` and ADR-069.
-          const staged = enqueue?.stage
-            ? (enqueue.stage(event) as EventType)
-            : event;
+          const staged = enqueue?.stage ? (enqueue.stage(event) as EventType) : event;
 
-          const queue = queued
-            ? this.queueManager.getSubscriberQueue(name)
-            : undefined;
+          const queue = queued ? this.queueManager.getSubscriberQueue(name) : undefined;
           if (queue) {
             await queue.send(staged);
           } else {
@@ -1522,19 +1433,13 @@ export class ProjectionRouter<
         const readContext: EventStoreReadContext<EventType> = {
           tenantId: first.tenantId,
         };
-        EventUtils.validateTenantId(
-          readContext,
-          "processStateProjectionEvents",
-        );
+        EventUtils.validateTenantId(readContext, "processStateProjectionEvents");
 
         let toApply = events;
         if (this.replayMarkerChecker) {
           const kept: EventType[] = [];
           for (const event of events) {
-            const decision = await this.replayMarkerChecker.check(
-              projectionName,
-              event,
-            );
+            const decision = await this.replayMarkerChecker.check(projectionName, event);
             if (decision !== "skip") kept.push(event);
           }
           toApply = kept;
@@ -1637,10 +1542,7 @@ export class ProjectionRouter<
 
         // Defer or skip if projection-replay is active for this aggregate
         if (this.replayMarkerChecker) {
-          const decision = await this.replayMarkerChecker.check(
-            projectionName,
-            event,
-          );
+          const decision = await this.replayMarkerChecker.check(projectionName, event);
           if (decision === "skip") return;
         }
 
@@ -1802,10 +1704,7 @@ export class ProjectionRouter<
         if (this.replayMarkerChecker) {
           const kept: EventType[] = [];
           for (const event of events) {
-            const decision = await this.replayMarkerChecker.check(
-              projectionName,
-              event,
-            );
+            const decision = await this.replayMarkerChecker.check(projectionName, event);
             if (decision !== "skip") kept.push(event);
           }
           toApply = kept;
@@ -2029,19 +1928,11 @@ export class ProjectionRouter<
       const relevant: SubscriberDelivery<EventType>[] = [];
       for (const delivery of deliveries) {
         if (
-          this.subscriberShouldDispatch(
-            subscriber,
-            delivery.event,
-            delivery.foldState,
-          )
+          this.subscriberShouldDispatch(subscriber, delivery.event, delivery.foldState)
         ) {
           relevant.push(delivery);
         } else {
-          incrementEsReactorTotal(
-            this.pipelineName,
-            subscriber.name,
-            "skipped",
-          );
+          incrementEsReactorTotal(this.pipelineName, subscriber.name, "skipped");
         }
       }
       if (relevant.length === 0) continue;
@@ -2085,8 +1976,7 @@ export class ProjectionRouter<
     foldState: unknown;
     errors: Error[];
   }): Promise<void> {
-    const hasSubscriberQueues =
-      this.queueManager.hasProjectionSubscriberQueues();
+    const hasSubscriberQueues = this.queueManager.hasProjectionSubscriberQueues();
 
     if (hasSubscriberQueues) {
       const queueProcessor = this.queueManager.getProjectionSubscriberQueue(
@@ -2125,19 +2015,11 @@ export class ProjectionRouter<
                 this.buildSubscriberDispatchContext({ event, foldState }),
               ),
             onComplete: (ms) => {
-              incrementEsReactorTotal(
-                this.pipelineName,
-                subscriber.name,
-                "completed",
-              );
+              incrementEsReactorTotal(this.pipelineName, subscriber.name, "completed");
               observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
             },
             onFail: (ms) => {
-              incrementEsReactorTotal(
-                this.pipelineName,
-                subscriber.name,
-                "failed",
-              );
+              incrementEsReactorTotal(this.pipelineName, subscriber.name, "failed");
               observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
             },
           });
@@ -2167,19 +2049,11 @@ export class ProjectionRouter<
               this.buildSubscriberDispatchContext({ event, foldState }),
             ),
           onComplete: (ms) => {
-            incrementEsReactorTotal(
-              this.pipelineName,
-              subscriber.name,
-              "completed",
-            );
+            incrementEsReactorTotal(this.pipelineName, subscriber.name, "completed");
             observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
           },
           onFail: (ms) => {
-            incrementEsReactorTotal(
-              this.pipelineName,
-              subscriber.name,
-              "failed",
-            );
+            incrementEsReactorTotal(this.pipelineName, subscriber.name, "failed");
             observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
           },
         });
@@ -2204,9 +2078,7 @@ export class ProjectionRouter<
   /**
    * Gets a fold projection by name for a given aggregate.
    */
-  async getProjectionByName<
-    ProjectionName extends keyof ProjectionTypes & string,
-  >(
+  async getProjectionByName<ProjectionName extends keyof ProjectionTypes & string>(
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
@@ -2245,9 +2117,7 @@ export class ProjectionRouter<
   /**
    * Checks if a fold projection exists for a given aggregate.
    */
-  async hasProjectionByName<
-    ProjectionName extends keyof ProjectionTypes & string,
-  >(
+  async hasProjectionByName<ProjectionName extends keyof ProjectionTypes & string>(
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
@@ -2289,15 +2159,10 @@ export class ProjectionRouter<
   private isSubscriberExcluded(
     subscriber: SubscriberDispatchDefinition<EventType>,
   ): boolean {
-    return !executionTargetMatches(
-      subscriber.options?.runIn,
-      this.executionTarget,
-    );
+    return !executionTargetMatches(subscriber.options?.runIn, this.executionTarget);
   }
 
-  private async resolveRetention(
-    tenantId: unknown,
-  ): Promise<RetentionPolicy | null> {
+  private async resolveRetention(tenantId: unknown): Promise<RetentionPolicy | null> {
     if (!this.retentionPolicyResolver) return null;
     return this.retentionPolicyResolver.resolve(String(tenantId));
   }
@@ -2325,9 +2190,7 @@ export class ProjectionRouter<
       tenantId: event.tenantId,
       ...(key !== undefined ? { key } : {}),
       ...(deliveryAttempt !== undefined ? { deliveryAttempt } : {}),
-      ...(isDeliveryContinuation !== undefined
-        ? { isDeliveryContinuation }
-        : {}),
+      ...(isDeliveryContinuation !== undefined ? { isDeliveryContinuation } : {}),
       retentionPolicy,
     };
   }

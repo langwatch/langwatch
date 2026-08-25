@@ -12,11 +12,7 @@ import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { collectUsageStats } from "~/server/collectUsageStats";
 import { prisma } from "~/server/db";
-import {
-  captureException,
-  toError,
-  withScope,
-} from "~/utils/posthogErrorCapture";
+import { captureException, toError, withScope } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:workers:usageStatsWorker");
 
@@ -87,10 +83,7 @@ export function startUsageStatsWorker(): UsageStatsWorkerHandle | undefined {
     try {
       await sendUsageStatsForAllOrganizations();
     } catch (error) {
-      logger.warn(
-        { error },
-        "usage stats tick failed (will retry on next interval)",
-      );
+      logger.warn({ error }, "usage stats tick failed (will retry on next interval)");
     }
     if (!stopped) {
       timer = setTimeout(() => void tick(), DAY_MS);

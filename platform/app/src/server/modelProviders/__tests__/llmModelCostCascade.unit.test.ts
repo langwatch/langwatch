@@ -55,11 +55,7 @@ describe("getLLMModelCosts cascade", () => {
     it("orders most-specific-first: project, then team, then organization", async () => {
       const costs = await getLLMModelCosts({ projectId: "proj_1" });
       const custom = costs.filter((c) => c.id);
-      expect(custom.map((c) => c.scopeType)).toEqual([
-        "PROJECT",
-        "TEAM",
-        "ORGANIZATION",
-      ]);
+      expect(custom.map((c) => c.scopeType)).toEqual(["PROJECT", "TEAM", "ORGANIZATION"]);
     });
 
     it("places every custom override ahead of the static defaults", async () => {

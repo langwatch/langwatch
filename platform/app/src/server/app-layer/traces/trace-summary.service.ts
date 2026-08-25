@@ -27,9 +27,7 @@ export interface TraceSummaryFullResolutionDeps {
 }
 
 export class TraceSummaryService {
-  private readonly logger = createLogger(
-    "langwatch:traces:trace-summary-service",
-  );
+  private readonly logger = createLogger("langwatch:traces:trace-summary-service");
 
   constructor(
     readonly repository: TraceSummaryRepository,
@@ -58,11 +56,7 @@ export class TraceSummaryService {
       full?: boolean;
     },
   ): Promise<TraceSummaryData> {
-    const result = await this.repository.findByTraceId(
-      tenantId,
-      traceId,
-      options,
-    );
+    const result = await this.repository.findByTraceId(tenantId, traceId, options);
     if (!result) throw new TraceNotFoundError(traceId);
 
     const cutoff = options?.visibilityCutoffMs;
@@ -120,12 +114,8 @@ export class TraceSummaryService {
       if (!anyResolved) return summary;
       return {
         ...summary,
-        ...(recomputedInput !== null
-          ? { computedInput: recomputedInput.text }
-          : {}),
-        ...(recomputedOutput !== null
-          ? { computedOutput: recomputedOutput.text }
-          : {}),
+        ...(recomputedInput !== null ? { computedInput: recomputedInput.text } : {}),
+        ...(recomputedOutput !== null ? { computedOutput: recomputedOutput.text } : {}),
       };
     } catch (error) {
       this.logger.warn(

@@ -107,9 +107,7 @@ function langevalsMemory(relativePath: string): {
   }
 
   const read = (key: "requests" | "limits"): number => {
-    const line = new RegExp(`^\\s+${key}:.*memory:\\s*([^,}\\s]+)`, "m").exec(
-      block[1]!,
-    );
+    const line = new RegExp(`^\\s+${key}:.*memory:\\s*([^,}\\s]+)`, "m").exec(block[1]!);
     if (!line) {
       throw new Error(`No ${key}.memory for langevals in ${relativePath}`);
     }
@@ -170,46 +168,47 @@ describe("Helm sizing for the evaluations service", () => {
     });
 
     /** @scenario "Running a local-model evaluator does not kill the evaluations service" */
-    it.each(
-      SMALL_PROFILES,
-    )("survives a local-model evaluator under the ceiling %s sets", (profile) => {
-      const { limit } = langevalsMemory(profile);
+    it.each(SMALL_PROFILES)(
+      "survives a local-model evaluator under the ceiling %s sets",
+      (profile) => {
+        const { limit } = langevalsMemory(profile);
 
-      expect(limit).toBeGreaterThanOrEqual(SINGLE_WORKER_LOADED_MIB);
-    });
+        expect(limit).toBeGreaterThanOrEqual(SINGLE_WORKER_LOADED_MIB);
+      },
+    );
 
     /** @scenario "The evaluations service asks for at least what it uses at rest" */
-    it.each(
-      SMALL_PROFILES,
-    )("requests at least the resting footprint in %s", (profile) => {
-      const { request } = langevalsMemory(profile);
+    it.each(SMALL_PROFILES)(
+      "requests at least the resting footprint in %s",
+      (profile) => {
+        const { request } = langevalsMemory(profile);
 
-      expect(request).toBeGreaterThanOrEqual(RESTING_MIB);
-    });
+        expect(request).toBeGreaterThanOrEqual(RESTING_MIB);
+      },
+    );
 
     /** @scenario "Shrinking the footprint shrinks the reservation, not the ceiling" */
-    it.each(
-      SMALL_PROFILES,
-    )("keeps %s schedulable on a small node by requesting well under its ceiling", (profile) => {
-      const { request, limit } = langevalsMemory(profile);
+    it.each(SMALL_PROFILES)(
+      "keeps %s schedulable on a small node by requesting well under its ceiling",
+      (profile) => {
+        const { request, limit } = langevalsMemory(profile);
 
-      // The point of these profiles is a small scheduling footprint. Holding
-      // the request to a fraction of the ceiling is what makes the pod fit on
-      // a node it could never fill.
-      expect(request).toBeLessThanOrEqual(limit / 2);
-    });
+        // The point of these profiles is a small scheduling footprint. Holding
+        // the request to a fraction of the ceiling is what makes the pod fit on
+        // a node it could never fill.
+        expect(request).toBeLessThanOrEqual(limit / 2);
+      },
+    );
   });
 
   describe("when the sizing page quotes a profile's figures", () => {
     /** @scenario "The sizing documentation quotes the profile it is describing" */
-    it.each(DOCUMENTED_PROFILES)("matches $values under $heading", ({
-      heading,
-      values,
-    }) => {
-      expect(documentedLangevalsMemory(heading)).toEqual(
-        langevalsMemory(values),
-      );
-    });
+    it.each(DOCUMENTED_PROFILES)(
+      "matches $values under $heading",
+      ({ heading, values }) => {
+        expect(documentedLangevalsMemory(heading)).toEqual(langevalsMemory(values));
+      },
+    );
   });
 
   describe("when no profile is layered on top", () => {

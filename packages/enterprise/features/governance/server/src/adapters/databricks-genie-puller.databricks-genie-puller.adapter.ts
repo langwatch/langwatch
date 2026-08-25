@@ -136,9 +136,7 @@ export function isDatabricksWorkspaceOrigin(value: string): boolean {
   if (url.protocol !== "https:") return false;
   if (url.username !== "" || url.password !== "") return false;
   const host = url.hostname.toLowerCase();
-  return DATABRICKS_WORKSPACE_HOST_SUFFIXES.some((suffix) =>
-    host.endsWith(suffix),
-  );
+  return DATABRICKS_WORKSPACE_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
 }
 
 export const databricksGeniePullConfigSchema = z.object({
@@ -174,9 +172,7 @@ export const databricksGeniePullConfigSchema = z.object({
    */
   warehouseId: z.string().min(1).optional(),
 });
-export type DatabricksGeniePullConfig = z.infer<
-  typeof databricksGeniePullConfigSchema
->;
+export type DatabricksGeniePullConfig = z.infer<typeof databricksGeniePullConfigSchema>;
 
 /**
  * How far back a completed sweep sets its watermark from the instant it began.
@@ -258,18 +254,15 @@ async function resolveWorkspaceToken(params: {
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   const timeout = AbortSignal.timeout(TOKEN_TIMEOUT_MS);
 
-  const response = await http.fetch(
-    `${workspaceUrl.replace(/\/+$/, "")}/oidc/v1/token`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Basic ${basic}`,
-        "content-type": "application/x-www-form-urlencoded",
-      },
-      body: "grant_type=client_credentials&scope=all-apis",
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+  const response = await http.fetch(`${workspaceUrl.replace(/\/+$/, "")}/oidc/v1/token`, {
+    method: "POST",
+    headers: {
+      authorization: `Basic ${basic}`,
+      "content-type": "application/x-www-form-urlencoded",
     },
-  );
+    body: "grant_type=client_credentials&scope=all-apis",
+    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+  });
 
   if (!response.ok) {
     // The status alone, never the body: a token endpoint may echo the request
@@ -713,11 +706,7 @@ type WarehouseCostStatement = z.infer<typeof warehouseCostResponseSchema>;
  * assumption behind that request no longer holds, and treating it as a refusal
  * would write off a window nobody ever declined to price.
  */
-const WAREHOUSE_COST_UNFINISHED_STATES = new Set([
-  "CANCELED",
-  "PENDING",
-  "RUNNING",
-]);
+const WAREHOUSE_COST_UNFINISHED_STATES = new Set(["CANCELED", "PENDING", "RUNNING"]);
 
 /**
  * The last instant still covered by what this run priced, given that `chunk` is
@@ -782,9 +771,7 @@ function readUnsuccessfulWarehouseCost({
   statement: WarehouseCostStatement;
   log: Record<string, unknown>;
 }): WarehouseCostRead {
-  const unfinished = WAREHOUSE_COST_UNFINISHED_STATES.has(
-    statement.status.state,
-  );
+  const unfinished = WAREHOUSE_COST_UNFINISHED_STATES.has(statement.status.state);
   logger.warn(
     {
       ...log,
@@ -1188,8 +1175,7 @@ function nextWatermark({
 }): number {
   if (!complete) return previousMs;
   const swept = sweepStartedAtMs - WATERMARK_LAG_MS;
-  const pending =
-    oldestPendingMs === null ? swept : Math.min(swept, oldestPendingMs - 1);
+  const pending = oldestPendingMs === null ? swept : Math.min(swept, oldestPendingMs - 1);
   // At, not just short of: `pricedThroughMs` is the END of the last period read
   // whole, so everything up to and including that instant has its cost.
   //
@@ -1260,9 +1246,7 @@ function parseCursor(
       );
     }
   }
-  const sinceMs = config.startingAt
-    ? Date.parse(config.startingAt)
-    : defaultSinceMs();
+  const sinceMs = config.startingAt ? Date.parse(config.startingAt) : defaultSinceMs();
   return {
     sinceMs: Number.isFinite(sinceMs) ? sinceMs : defaultSinceMs(),
     spaceId: null,
@@ -1441,9 +1425,7 @@ class RunBudget {
    */
   exhaustedWithin(reserveMs: number): boolean {
     if (this.requests >= this.maxRequests) return true;
-    return (
-      this.deadlineMs !== undefined && Date.now() + reserveMs > this.deadlineMs
-    );
+    return this.deadlineMs !== undefined && Date.now() + reserveMs > this.deadlineMs;
   }
 }
 
@@ -1533,8 +1515,7 @@ function spaceWalkPlan({
   // `Math.max` below restarts from the top), but an ADDITION sorting before the
   // resume point would be skipped and then dropped.
   const resumable =
-    spaces.complete &&
-    (resumeFingerprint === null || resumeFingerprint === fingerprint);
+    spaces.complete && (resumeFingerprint === null || resumeFingerprint === fingerprint);
   // An id no longer in the list means the space was deleted since the cursor
   // was written; starting over only ever re-reads, and the watermark is held.
   const startAt =
@@ -1722,10 +1703,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     private readonly warehouseCosts: DatabricksWarehouseCostService,
     options?: { maxRequests?: number },
   ) {
-    this.maxRequests = Math.max(
-      1,
-      options?.maxRequests ?? MAX_REQUESTS_PER_RUN,
-    );
+    this.maxRequests = Math.max(1, options?.maxRequests ?? MAX_REQUESTS_PER_RUN);
   }
 
   static create(
@@ -1763,8 +1741,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     // run instead of its first, silently dropping everything asked in an
     // already-swept space in between. Reading the clock at the end of the run
     // would be the same bug, one step worse.
-    const resuming =
-      cursor.spaceId !== null && cursor.sweepStartedAtMs !== null;
+    const resuming = cursor.spaceId !== null && cursor.sweepStartedAtMs !== null;
     const sweepStartedAtMs = resuming ? cursor.sweepStartedAtMs! : Date.now();
 
     let sweep: SweepResult;
@@ -2072,11 +2049,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     let hadGap = false;
     let oldestPendingMs: number | null = null;
 
-    for (
-      let i = conversationPlan.startAt;
-      i < conversationPlan.ordered.length;
-      i += 1
-    ) {
+    for (let i = conversationPlan.startAt; i < conversationPlan.ordered.length; i += 1) {
       const conversation = conversationPlan.ordered[i]!;
       if (budget.exhausted()) {
         return stoppedAt({
@@ -2263,9 +2236,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
         context: {},
         run: () => this.discoverSpaces({ config, token, options, budget }),
       });
-      const titles = new Map(
-        (discovered?.items ?? []).map((s) => [s.space_id, s.title]),
-      );
+      const titles = new Map((discovered?.items ?? []).map((s) => [s.space_id, s.title]));
       return {
         items: config.spaceIds.map((space_id) => ({
           space_id,
@@ -2322,9 +2293,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     conversation: z.infer<typeof conversationSchema>;
     sinceMs: number;
     identities: Map<number, GenieIdentity>;
-  }): Promise<
-    PagedRead<NormalizedPullEvent> & { oldestPendingMs: number | null }
-  > {
+  }): Promise<PagedRead<NormalizedPullEvent> & { oldestPendingMs: number | null }> {
     const messages = await this.paginate({
       config,
       token,
@@ -2719,9 +2688,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     warehouseId: string;
     chunk: { fromMs: number; toMs: number };
     costByStatementId: Map<string, WarehousePricedStatement>;
-  }): Promise<
-    { done: true; pricedThroughMs: number | null } | { done: false }
-  > {
+  }): Promise<{ done: true; pricedThroughMs: number | null } | { done: false }> {
     // Out of requests, or out of the time one more would need, with days still
     // unpriced. Those days are not refused, just unread, so the watermark holds
     // here and the next run starts its cost read where this one ran out — which
@@ -2835,9 +2802,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     chunk: { fromMs: number; toMs: number };
     read: WarehouseCostRead;
     costByStatementId: Map<string, WarehousePricedStatement>;
-  }): Promise<
-    { done: true; pricedThroughMs: number | null } | { done: false }
-  > {
+  }): Promise<{ done: true; pricedThroughMs: number | null } | { done: false }> {
     const pieces = this.warehouseCosts.pieces(chunk);
     logger.warn(
       {
@@ -3018,8 +2983,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
           ...observed,
           outcome: read.outcome,
           elapsedMs: Date.now() - askedAtMs,
-          statements:
-            read.outcome === "priced" ? read.costByStatementId.size : 0,
+          statements: read.outcome === "priced" ? read.costByStatementId.size : 0,
           owed: read.outcome === "priced" ? read.owed : false,
         },
         "databricks warehouse cost question answered",
@@ -3034,9 +2998,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
       // is refused identically forever, and holding for it would stall the
       // source with no way out but turning the feature off.
       const unfinished =
-        !(error instanceof GenieHttpError) ||
-        error.status === 429 ||
-        error.status >= 500;
+        !(error instanceof GenieHttpError) || error.status === 429 || error.status >= 500;
       logger.warn(
         {
           ...observed,
@@ -3070,10 +3032,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     const url = new URL(path, config.workspaceUrl);
 
     const signal = options.signal
-      ? AbortSignal.any([
-          options.signal,
-          AbortSignal.timeout(WAREHOUSE_COST_TIMEOUT_MS),
-        ])
+      ? AbortSignal.any([options.signal, AbortSignal.timeout(WAREHOUSE_COST_TIMEOUT_MS)])
       : AbortSignal.timeout(WAREHOUSE_COST_TIMEOUT_MS);
 
     budget.spend();
@@ -3118,10 +3077,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     }
 
     const signal = options.signal
-      ? AbortSignal.any([
-          options.signal,
-          AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        ])
+      ? AbortSignal.any([options.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
       : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
 
     budget.spend();
@@ -3181,9 +3137,7 @@ function withWarehouseCost({
 }): NormalizedPullEvent[] {
   if (!costEnabled) return events;
 
-  return events.map((event) =>
-    withCost({ event, costByStatementId, watermarkMs }),
-  );
+  return events.map((event) => withCost({ event, costByStatementId, watermarkMs }));
 }
 
 /** One event's share of the warehouse bill, or its hint removed, or it unchanged. */
@@ -3278,8 +3232,7 @@ function nextCursor({
   const costHeldSinceMs =
     pricedThroughMs === null ? null : (previous.costHeldSinceMs ?? nowMs);
   const holdExpired =
-    costHeldSinceMs !== null &&
-    nowMs - costHeldSinceMs > WAREHOUSE_COST_MAX_HOLD_MS;
+    costHeldSinceMs !== null && nowMs - costHeldSinceMs > WAREHOUSE_COST_MAX_HOLD_MS;
 
   return {
     // A sweep that walked past something it never read is not whole, no matter

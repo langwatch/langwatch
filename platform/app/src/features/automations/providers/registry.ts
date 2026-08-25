@@ -1,12 +1,15 @@
 import { annotationQueueProvider as annotationQueueShared } from "@langwatch/automation-contract";
 import { datasetProvider as datasetShared } from "@langwatch/automation-contract";
-import { emailProvider as emailShared,
+import {
+  emailProvider as emailShared,
   type EmailPreview,
 } from "@langwatch/automation-contract";
-import { slackProvider as slackShared,
+import {
+  slackProvider as slackShared,
   type SlackPreview,
 } from "@langwatch/automation-contract";
-import { webhookProvider as webhookShared,
+import {
+  webhookProvider as webhookShared,
   type WebhookPreview,
 } from "@langwatch/automation-contract";
 import { TriggerAction } from "~/generated/prisma/client";
@@ -16,11 +19,7 @@ import annotationQueueClient, {
 import datasetClient, { type DatasetSlice } from "./dataset/client";
 import emailClient, { type EmailSlice } from "./email/client";
 import slackClient, { type SlackSlice } from "./slack/client";
-import {
-  type ClientEntry,
-  isNotifyEntry,
-  type NotifyClientEntry,
-} from "./types";
+import { type ClientEntry, isNotifyEntry, type NotifyClientEntry } from "./types";
 import webhookClient, { type WebhookSlice } from "./webhook/client";
 
 /** Per-action slice type — adding a new action means adding one entry. */
@@ -89,9 +88,9 @@ export const NOTIFY_PROVIDERS: NotifyClientEntry[] = Object.values(
   CLIENT_PROVIDERS,
 ).filter((p): p is NotifyClientEntry => isNotifyEntry(p));
 
-export const ACTION_PROVIDERS: ClientEntry[] = Object.values(
-  CLIENT_PROVIDERS,
-).filter((p) => p.shared.category === "action");
+export const ACTION_PROVIDERS: ClientEntry[] = Object.values(CLIENT_PROVIDERS).filter(
+  (p) => p.shared.category === "action",
+);
 
 /** Typed slice lookup — returns the right slice type for an action. */
 export function getSlice<A extends TriggerAction>(
@@ -109,7 +108,6 @@ export function initialSlices(): AllSlices {
     [TriggerAction.SEND_SLACK_MESSAGE]: slackClient.initialSlice(),
     [TriggerAction.SEND_WEBHOOK]: webhookClient.initialSlice(),
     [TriggerAction.ADD_TO_DATASET]: datasetClient.initialSlice(),
-    [TriggerAction.ADD_TO_ANNOTATION_QUEUE]:
-      annotationQueueClient.initialSlice(),
+    [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: annotationQueueClient.initialSlice(),
   };
 }

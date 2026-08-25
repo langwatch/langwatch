@@ -29,16 +29,12 @@ export type AppGatewayDebitAdapterDependencies = {
 class AppGatewayDebitPort extends GatewayDebitPort {
   private readonly signals: AppGovernanceSignalsService;
 
-  private constructor(
-    private readonly dependencies: AppGatewayDebitAdapterDependencies,
-  ) {
+  private constructor(private readonly dependencies: AppGatewayDebitAdapterDependencies) {
     super();
     this.signals = AppGovernanceSignalsService.create(dependencies);
   }
 
-  static create(
-    dependencies: AppGatewayDebitAdapterDependencies,
-  ): AppGatewayDebitPort {
+  static create(dependencies: AppGatewayDebitAdapterDependencies): AppGatewayDebitPort {
     return new AppGatewayDebitPort(dependencies);
   }
 
@@ -48,21 +44,17 @@ class AppGatewayDebitPort extends GatewayDebitPort {
       target: input.target,
     });
     return resolved
-      .filter(({ budget }) =>
-        budgetAppliesToProvider(budget, input.providerKey),
-      )
-      .map(
-        ({ budget, bucketScopeId, endUserId }): GatewayResolvedBudget => ({
-          budget: {
-            id: budget.id,
-            scopeType: budget.scopeType,
-            window: budget.window,
-            onBreach: budget.onBreach,
-          },
-          bucketScopeId,
-          endUserId,
-        }),
-      );
+      .filter(({ budget }) => budgetAppliesToProvider(budget, input.providerKey))
+      .map(({ budget, bucketScopeId, endUserId }): GatewayResolvedBudget => ({
+        budget: {
+          id: budget.id,
+          scopeType: budget.scopeType,
+          window: budget.window,
+          onBreach: budget.onBreach,
+        },
+        bucketScopeId,
+        endUserId,
+      }));
   }
 
   async insert(rows: GatewayBudgetDebitRow[]): Promise<void> {
@@ -129,8 +121,6 @@ export class AppGatewayDebitAdapter {
   }
 
   build(): GatewayDebitProcess {
-    return GatewayDebitProcess.create(
-      AppGatewayDebitPort.create(this.dependencies),
-    );
+    return GatewayDebitProcess.create(AppGatewayDebitPort.create(this.dependencies));
   }
 }

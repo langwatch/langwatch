@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  chakra,
-  HStack,
-  Icon,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Icon, Input, Text, VStack } from "@chakra-ui/react";
 import { BookOpen, Check, Plus, Search } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -108,9 +99,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   // unknown field leaves `cat` undefined and the picker shows nothing.
   const cat = useMemo(() => {
     if (!anchor) return undefined;
-    const found = facets.find(
-      (d) => d.kind === "categorical" && d.key === anchor.field,
-    );
+    const found = facets.find((d) => d.kind === "categorical" && d.key === anchor.field);
     return found && found.kind === "categorical" ? found : undefined;
   }, [facets, anchor]);
 
@@ -135,8 +124,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   const serverPristine =
     !anchor ||
     debouncedFilter.trim() === "" ||
-    debouncedFilter.trim().toLowerCase() ===
-      anchor.currentValue.trim().toLowerCase();
+    debouncedFilter.trim().toLowerCase() === anchor.currentValue.trim().toLowerCase();
 
   // Gated on BOTH the live `pristine` and the debounced `serverPristine`: the
   // debounced gate waits for typing to settle before fetching, the live gate
@@ -216,13 +204,11 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
       (v.label !== undefined && v.label.toLowerCase() === lower)
     );
   });
-  const customValue =
-    trimmedFilter.length > 0 && !exactValueMatch ? trimmedFilter : null;
+  const customValue = trimmedFilter.length > 0 && !exactValueMatch ? trimmedFilter : null;
   // Total interactive rows for keyboard navigation: known values
   // followed by the optional custom-value row at the end.
   const interactiveRowCount = values.length + (customValue ? 1 : 0);
-  const isCustomRowActive =
-    customValue !== null && activeIndex === values.length;
+  const isCustomRowActive = customValue !== null && activeIndex === values.length;
 
   // Click-outside dismisses the popover. Listen on `mousedown` so the
   // dismiss fires before any subsequent click logic somewhere else.
@@ -230,11 +216,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
     if (!anchor) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Node | null;
-      if (
-        containerRef.current &&
-        target &&
-        containerRef.current.contains(target)
-      ) {
+      if (containerRef.current && target && containerRef.current.contains(target)) {
         return;
       }
       onClose();
@@ -280,21 +262,13 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
         // Custom row → commit the typed text verbatim. Known row →
         // commit its id.
         if (isCustomRowActive && customValue) {
-          setFacetValueAt(
-            anchor.location.start,
-            anchor.location.end,
-            customValue,
-          );
+          setFacetValueAt(anchor.location.start, anchor.location.end, customValue);
           onClose();
           return;
         }
         const next = values[activeIndex];
         if (next) {
-          setFacetValueAt(
-            anchor.location.start,
-            anchor.location.end,
-            next.value,
-          );
+          setFacetValueAt(anchor.location.start, anchor.location.end, next.value);
           onClose();
         }
       }
@@ -396,8 +370,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
                 // differs from the raw id; muted id rendered on the
                 // right so the operator always sees what they're
                 // about to commit.
-                const displayLabel =
-                  v.label && v.label !== v.value ? v.label : null;
+                const displayLabel = v.label && v.label !== v.value ? v.label : null;
                 return (
                   <chakra.button
                     key={v.value}
@@ -500,12 +473,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
                       <Text as="span" color="fg.muted">
                         Use as {anchor.field}:
                       </Text>
-                      <Text
-                        as="span"
-                        color="fg"
-                        fontWeight="medium"
-                        fontFamily="mono"
-                      >
+                      <Text as="span" color="fg" fontWeight="medium" fontFamily="mono">
                         {customValue}
                       </Text>
                     </Text>

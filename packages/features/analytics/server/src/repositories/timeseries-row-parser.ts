@@ -6,11 +6,7 @@ import {
 } from "@langwatch/analytics-contract";
 
 const aliasFor = (index: number, series: AnalyticsSeries): string => {
-  const parts = [
-    String(index),
-    series.metric.replace(/\./g, "_"),
-    series.aggregation,
-  ];
+  const parts = [String(index), series.metric.replace(/\./g, "_"), series.aggregation];
   if (series.key) parts.push(series.key.replace(/[^a-zA-Z0-9]/g, "_"));
   if (series.subkey) parts.push(series.subkey.replace(/[^a-zA-Z0-9]/g, "_"));
   return parts.join("__");
@@ -44,20 +40,15 @@ export function parseTimeseriesRows(input: {
   for (const row of rows) {
     const period = row.period === "current" ? current : previous;
     const date =
-      input.timeScale === "full"
-        ? "full"
-        : typeof row.date === "string"
-          ? row.date
-          : "";
+      input.timeScale === "full" ? "full" : typeof row.date === "string" ? row.date : "";
     const bucket = period.get(date) ?? { date };
     period.set(date, bucket);
     const grouped =
       input.groupBy && row.group_key !== undefined && row.group_key !== null;
     const target = grouped
-      ? ((bucket[input.groupBy!] ??= {}) as Record<
-          string,
-          Record<string, number>
-        >)[String(row.group_key)] ??= {}
+      ? (((bucket[input.groupBy!] ??= {}) as Record<string, Record<string, number>>)[
+          String(row.group_key)
+        ] ??= {})
       : bucket;
     for (const [index, series] of input.series.entries()) {
       const value = numberOrNull(row[aliasFor(index, series)]);

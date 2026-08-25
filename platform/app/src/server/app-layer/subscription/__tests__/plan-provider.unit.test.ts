@@ -158,9 +158,9 @@ describe("PlanProviderService", () => {
       };
       const service = PlanProviderService.create(source);
 
-      await expect(
-        service.getActivePlan({ organizationId: "org_1" }),
-      ).rejects.toBe(error);
+      await expect(service.getActivePlan({ organizationId: "org_1" })).rejects.toBe(
+        error,
+      );
     });
   });
 
@@ -187,8 +187,7 @@ describe("PlanProviderService", () => {
       const licenseGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
 
       const service = PlanProviderService.create({
-        getActivePlan: ({ organizationId }) =>
-          licenseGetActivePlan(organizationId),
+        getActivePlan: ({ organizationId }) => licenseGetActivePlan(organizationId),
       });
 
       const result = await service.getActivePlan({

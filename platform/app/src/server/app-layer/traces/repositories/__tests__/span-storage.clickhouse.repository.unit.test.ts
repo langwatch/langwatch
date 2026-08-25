@@ -230,9 +230,9 @@ describe("given a requested span-read limit", () => {
 
   describe("when a caller supplies its own ceiling", () => {
     it("clamps to that ceiling instead of the derivation default", () => {
-      expect(
-        clampSpanReadLimit(50_000, { max: MAX_LIGHT_SPAN_READ_ROWS }),
-      ).toBe(MAX_LIGHT_SPAN_READ_ROWS);
+      expect(clampSpanReadLimit(50_000, { max: MAX_LIGHT_SPAN_READ_ROWS })).toBe(
+        MAX_LIGHT_SPAN_READ_ROWS,
+      );
       expect(clampSpanReadLimit(undefined, { max: 100 })).toBe(100);
     });
   });
@@ -243,9 +243,7 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
     const query = vi.fn().mockResolvedValue({ json: async () => [] });
     const repo = new SpanStorageClickHouseRepository((async () => ({
       query,
-    })) as unknown as ConstructorParameters<
-      typeof SpanStorageClickHouseRepository
-    >[0]);
+    })) as unknown as ConstructorParameters<typeof SpanStorageClickHouseRepository>[0]);
     return { repo, query };
   }
 
@@ -337,9 +335,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
     query.mockResolvedValue({ json: async () => [] });
     const repo = new SpanStorageClickHouseRepository((async () => ({
       query,
-    })) as unknown as ConstructorParameters<
-      typeof SpanStorageClickHouseRepository
-    >[0]);
+    })) as unknown as ConstructorParameters<typeof SpanStorageClickHouseRepository>[0]);
     return { repo, query };
   }
 
@@ -364,9 +360,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
 
   describe("when the page comes back short of the limit", () => {
     it("reports hasMore false without any follow-up fetch", async () => {
-      const { repo, query } = repoWithSpyClient([
-        [summaryRow("s-1"), summaryRow("s-2")],
-      ]);
+      const { repo, query } = repoWithSpyClient([[summaryRow("s-1"), summaryRow("s-2")]]);
 
       const page = await repo.findSpanSummariesPage({
         tenantId: "p-1",
@@ -464,9 +458,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
         "StartTime >= fromUnixTimestamp64Milli({pageFromMs:Int64})",
       );
       expect(call?.query as string).not.toContain("StartTime <=");
-      expect(call?.query_params?.pageFromMs).toBe(
-        occurredAtMs - 2 * 24 * 60 * 60 * 1000,
-      );
+      expect(call?.query_params?.pageFromMs).toBe(occurredAtMs - 2 * 24 * 60 * 60 * 1000);
     });
 
     it("retries unbounded when the hinted read is empty (stale or skewed hint)", async () => {
@@ -480,9 +472,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       });
 
       expect(query).toHaveBeenCalledTimes(2);
-      expect(query.mock.calls[1]?.[0]?.query as string).not.toContain(
-        "pageFromMs",
-      );
+      expect(query.mock.calls[1]?.[0]?.query as string).not.toContain("pageFromMs");
       expect(page.rows.map((r) => r.spanId)).toEqual(["s-1"]);
     });
   });
@@ -493,9 +483,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
     const query = vi.fn().mockResolvedValue({ json: async () => [] });
     const repo = new SpanStorageClickHouseRepository((async () => ({
       query,
-    })) as unknown as ConstructorParameters<
-      typeof SpanStorageClickHouseRepository
-    >[0]);
+    })) as unknown as ConstructorParameters<typeof SpanStorageClickHouseRepository>[0]);
     return { repo, query };
   }
 
@@ -598,9 +586,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
 });
 
 describe("mapSpanSummaryRow", () => {
-  const baseRow = (
-    overrides: Partial<SpanSummaryQueryRow>,
-  ): SpanSummaryQueryRow => ({
+  const baseRow = (overrides: Partial<SpanSummaryQueryRow>): SpanSummaryQueryRow => ({
     SpanId: "s-1",
     ParentSpanId: null,
     SpanName: "llm call",

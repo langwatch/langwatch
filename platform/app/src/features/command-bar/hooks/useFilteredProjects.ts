@@ -48,9 +48,7 @@ export function useFilteredProjects(
       "workspaces",
     ];
     const isSearchingCategory = projectKeywords.some(
-      (kw) =>
-        kw.startsWith(lowerQuery) &&
-        lowerQuery.length >= MIN_CATEGORY_MATCH_LENGTH,
+      (kw) => kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_CATEGORY_MATCH_LENGTH,
     );
 
     const projects: FilteredProject[] = [];
@@ -59,8 +57,7 @@ export function useFilteredProjects(
       for (const team of org.teams) {
         // Skip teams where current user is not a member
         const isTeamMember =
-          currentUserId &&
-          team.members?.some((m) => m.userId === currentUserId);
+          currentUserId && team.members?.some((m) => m.userId === currentUserId);
         if (!isTeamMember) continue;
 
         for (const proj of team.projects) {

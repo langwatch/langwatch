@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  chakra,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import { ChevronDown, ChevronRight, ExternalLink, Link2 } from "lucide-react";
 import * as React from "react";
@@ -27,10 +19,7 @@ import {
   type VariableInfo,
   validateLiquidModel,
 } from "./liquidMonaco";
-import {
-  monacoBackgroundFor,
-  trapEscapeInsideEditor,
-} from "./monacoEditorChrome";
+import { monacoBackgroundFor, trapEscapeInsideEditor } from "./monacoEditorChrome";
 import { useMonacoTheme } from "./useMonacoTheme";
 
 export type { VariableInfo };
@@ -438,8 +427,7 @@ export function CompactSlackPreview({
             {blockCount === 1
               ? "1 block ready to preview."
               : `${blockCount} blocks ready to preview.`}{" "}
-            Block Kit renders differently than plain text, so preview where it
-            will run.
+            Block Kit renders differently than plain text, so preview where it will run.
           </Text>
         </VStack>
         <HStack gap={2} align="center" flexWrap="wrap">
@@ -447,12 +435,7 @@ export function CompactSlackPreview({
             content="Preview your blocks in Slack's Block Kit Builder. Opens once in a new tab."
             positioning={{ placement: "top" }}
           >
-            <Button
-              size="sm"
-              colorPalette="orange"
-              variant="outline"
-              onClick={openOnce}
-            >
+            <Button size="sm" colorPalette="orange" variant="outline" onClick={openOnce}>
               <ExternalLink size={14} /> Open in Block Kit Builder
             </Button>
           </Tooltip>
@@ -460,12 +443,7 @@ export function CompactSlackPreview({
             content="Live preview in Slack's Block Kit Builder. Updates as you edit."
             positioning={{ placement: "top" }}
           >
-            <Button
-              size="sm"
-              colorPalette="orange"
-              variant="solid"
-              onClick={openSynced}
-            >
+            <Button size="sm" colorPalette="orange" variant="solid" onClick={openSynced}>
               <Link2 size={14} /> Open synced Block Kit Builder
             </Button>
           </Tooltip>

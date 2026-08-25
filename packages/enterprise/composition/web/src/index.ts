@@ -12,9 +12,7 @@ export class EnterpriseWebComposition {
     readonly initialLicenseStatus: LicenseStatus | undefined,
   ) {}
 
-  static create(
-    options: EnterpriseWebCompositionOptions = {},
-  ): EnterpriseWebComposition {
+  static create(options: EnterpriseWebCompositionOptions = {}): EnterpriseWebComposition {
     return new EnterpriseWebComposition(
       EnterpriseCatalogue.create(),
       options.initialLicenseStatus,

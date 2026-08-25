@@ -45,10 +45,7 @@ function makeFold({
     init: () => ({ count: 0, LastEventOccurredAt: 0 }),
     apply: (state: CounterState, event: Event) => ({
       count: state.count + 1,
-      LastEventOccurredAt: Math.max(
-        state.LastEventOccurredAt,
-        event.occurredAt ?? 0,
-      ),
+      LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt ?? 0),
     }),
     options: {
       refoldOnOutOfOrder: false,
@@ -66,8 +63,9 @@ function makeFold({
   return { fold, store };
 }
 
-const fallbackMetric =
-  incrementEsFoldReadWindowFallbackTotal as unknown as ReturnType<typeof vi.fn>;
+const fallbackMetric = incrementEsFoldReadWindowFallbackTotal as unknown as ReturnType<
+  typeof vi.fn
+>;
 
 describe("FoldProjectionExecutor declared read window", () => {
   const tenantId = createTestTenantId();
@@ -100,11 +98,7 @@ describe("FoldProjectionExecutor declared read window", () => {
           LastEventOccurredAt: OCCURRED_AT - 1,
         });
 
-        const state = await executor.execute(
-          fold,
-          eventAt(OCCURRED_AT),
-          context,
-        );
+        const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
         expect(store.get).toHaveBeenCalledTimes(1);
         expect(store.get).toHaveBeenCalledWith(
@@ -133,11 +127,7 @@ describe("FoldProjectionExecutor declared read window", () => {
               : null,
         );
 
-        const state = await executor.execute(
-          fold,
-          eventAt(OCCURRED_AT),
-          context,
-        );
+        const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
         expect(store.get).toHaveBeenCalledTimes(2);
         const retryContext = (store.get as ReturnType<typeof vi.fn>).mock
@@ -157,11 +147,7 @@ describe("FoldProjectionExecutor declared read window", () => {
       it("confirms the miss unwindowed and starts from an empty state", async () => {
         const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
 
-        const state = await executor.execute(
-          fold,
-          eventAt(OCCURRED_AT),
-          context,
-        );
+        const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
         expect(store.get).toHaveBeenCalledTimes(2);
         expect(state.count).toBe(1);
@@ -254,11 +240,7 @@ describe("FoldProjectionExecutor declared read window", () => {
           );
         store.getWithApplied = getWithApplied;
 
-        const state = await executor.execute(
-          fold,
-          eventAt(OCCURRED_AT),
-          context,
-        );
+        const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
         expect(getWithApplied).toHaveBeenCalledTimes(2);
         expect(store.get).not.toHaveBeenCalled();

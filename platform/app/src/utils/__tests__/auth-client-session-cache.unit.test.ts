@@ -64,8 +64,7 @@ describe("useSession session caching", () => {
 
     // Only ONE fetch call despite two hooks mounting
     const sessionCalls = mockFetch.mock.calls.filter(
-      (call) =>
-        typeof call[0] === "string" && call[0].includes("/api/auth/session"),
+      (call) => typeof call[0] === "string" && call[0].includes("/api/auth/session"),
     );
     expect(sessionCalls).toHaveLength(1);
   });
@@ -100,8 +99,7 @@ describe("useSession session caching", () => {
 
     // No new fetch calls — served from cache
     const sessionCalls = mockFetch.mock.calls.filter(
-      (call) =>
-        typeof call[0] === "string" && call[0].includes("/api/auth/session"),
+      (call) => typeof call[0] === "string" && call[0].includes("/api/auth/session"),
     );
     expect(sessionCalls).toHaveLength(0);
   });

@@ -1,3 +1,3 @@
 export abstract class AutomationClock {
-	abstract now(): Date;
+  abstract now(): Date;
 }

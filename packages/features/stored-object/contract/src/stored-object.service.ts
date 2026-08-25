@@ -1,8 +1,5 @@
 import type { StoredObjectDeliveryAudience } from "./audiences";
-import type {
-  StoredObjectId,
-  StoredObjectProjectId,
-} from "./ids";
+import type { StoredObjectId, StoredObjectProjectId } from "./ids";
 import type {
   StoredObjectMetadata,
   StoredObjectProvenance,
@@ -82,9 +79,7 @@ export abstract class StoredObjectService {
     id: StoredObjectId;
   }): Promise<ReadStoredObjectResult>;
 
-  abstract resolveDelivery(
-    input: StoredObjectsGetInput,
-  ): Promise<StoredObjectsGetOutput>;
+  abstract resolveDelivery(input: StoredObjectsGetInput): Promise<StoredObjectsGetOutput>;
 
   abstract streamForDelivery(input: {
     projectId: StoredObjectProjectId;
@@ -94,9 +89,7 @@ export abstract class StoredObjectService {
     method: "GET" | "HEAD";
   }): Promise<ReadStoredObjectResult>;
 
-  abstract delete(
-    input: DeleteStoredObjectInput,
-  ): Promise<StoredObjectsDeleteOutput>;
+  abstract delete(input: DeleteStoredObjectInput): Promise<StoredObjectsDeleteOutput>;
 
   abstract getStorageUsageByProject(input: {
     projectId: StoredObjectProjectId;

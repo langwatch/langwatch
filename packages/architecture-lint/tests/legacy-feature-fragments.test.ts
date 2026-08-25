@@ -1,9 +1,4 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -32,10 +27,7 @@ beforeEach(() => {
       ],
     }),
   );
-  write(
-    "packages/features/dataset/feature.json",
-    JSON.stringify({ layoutVersion: 0 }),
-  );
+  write("packages/features/dataset/feature.json", JSON.stringify({ layoutVersion: 0 }));
   write(
     "packages/features/dataset/server/package.json",
     JSON.stringify({ name: "@langwatch/dataset-server", type: "module" }),
@@ -88,11 +80,7 @@ function baseline(): void {
   write(
     "packages/architecture-lint/src/legacy-feature-fragment-baseline.json",
     formatLegacyFeatureFragmentBaseline(
-      collectLegacyFeatureFragments(
-        root,
-        discovery.catalogue,
-        discovery.packages,
-      ),
+      collectLegacyFeatureFragments(root, discovery.catalogue, discovery.packages),
     ),
   );
 }
@@ -107,10 +95,7 @@ describe("shrinking legacy feature fragment inventory", () => {
       "platform/app/src/components/datasets/DatasetCard.tsx",
       "export const DatasetCard = () => null;",
     );
-    write(
-      "platform/app/src/components/datasets/DatasetCard.test.tsx",
-      "export {};",
-    );
+    write("platform/app/src/components/datasets/DatasetCard.test.tsx", "export {};");
 
     baseline();
 

@@ -60,10 +60,7 @@ function convertObject(source: JsonObject): z.ZodType {
   }
 
   // A record: no declared properties, a schema for the values.
-  if (
-    Object.keys(shape).length === 0 &&
-    isObject(source.additionalProperties)
-  ) {
+  if (Object.keys(shape).length === 0 && isObject(source.additionalProperties)) {
     return withDescription(
       z.record(z.string(), convertSchema(source.additionalProperties)),
       source,
@@ -79,9 +76,7 @@ function convertObject(source: JsonObject): z.ZodType {
 
 function convertUnion(types: unknown[], source: JsonObject): z.ZodType {
   // The nullable spelling: one real type plus `null`.
-  const nonNull = types.filter(
-    (member) => !(isObject(member) && member.type === "null"),
-  );
+  const nonNull = types.filter((member) => !(isObject(member) && member.type === "null"));
   if (nonNull.length === 1 && nonNull.length !== types.length) {
     return convertSchema(nonNull[0]).nullable();
   }
@@ -113,10 +108,11 @@ export function convertSchema(source: unknown): z.ZodType {
   }
   if (Array.isArray(source.anyOf)) return convertUnion(source.anyOf, source);
   if (Array.isArray(source.oneOf)) return convertUnion(source.oneOf, source);
-  if (Array.isArray(source.type)) return convertUnion(
-    source.type.map((type) => ({ ...source, type })),
-    source,
-  );
+  if (Array.isArray(source.type))
+    return convertUnion(
+      source.type.map((type) => ({ ...source, type })),
+      source,
+    );
 
   switch (source.type) {
     case "object":

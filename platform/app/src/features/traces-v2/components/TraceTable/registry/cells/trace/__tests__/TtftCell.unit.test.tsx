@@ -60,9 +60,7 @@ function renderWithProvider({
 }) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <TraceStatisticsProvider traces={traces}>
-        {children}
-      </TraceStatisticsProvider>
+      <TraceStatisticsProvider traces={traces}>{children}</TraceStatisticsProvider>
     </ChakraProvider>,
   );
 }
@@ -105,10 +103,7 @@ describe("TraceStatisticsProvider", () => {
   describe("given a page where no trace has a TTFT", () => {
     describe("when statistics are computed", () => {
       it("reports hasTtftData false while duration stats stay available", () => {
-        const traces = [
-          makeTrace({ durationMs: 1000 }),
-          makeTrace({ durationMs: 2000 }),
-        ];
+        const traces = [makeTrace({ durationMs: 1000 }), makeTrace({ durationMs: 2000 })];
         const { getByTestId } = renderWithProvider({
           traces,
           children: <StatsProbe />,
@@ -151,9 +146,7 @@ describe("TtftCell", () => {
         });
         expect(container.textContent).toContain("800ms");
         // The latency bar track renders alongside the value.
-        expect(container.querySelectorAll("div[class]").length).toBeGreaterThan(
-          1,
-        );
+        expect(container.querySelectorAll("div[class]").length).toBeGreaterThan(1);
       });
 
       it("renders the comfortable density variant with the value", () => {

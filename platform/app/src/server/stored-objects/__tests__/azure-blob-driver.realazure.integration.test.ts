@@ -114,9 +114,7 @@ describeRealAzure(
         const stream = await driver.get(uri);
         const chunks: Buffer[] = [];
         for await (const chunk of stream) chunks.push(chunk as Buffer);
-        expect(Buffer.concat(chunks).toString("utf8")).toBe(
-          bytes.toString("utf8"),
-        );
+        expect(Buffer.concat(chunks).toString("utf8")).toBe(bytes.toString("utf8"));
       });
 
       it("reports the blob size from a signed HEAD without transferring the body", async () => {
@@ -162,9 +160,7 @@ describeRealAzure(
         await driver.delete(uri);
 
         expect(await driver.exists(uri)).toBe(false);
-        await expect(driver.get(uri)).rejects.toBeInstanceOf(
-          ObjectNotFoundError,
-        );
+        await expect(driver.get(uri)).rejects.toBeInstanceOf(ObjectNotFoundError);
       });
     });
 
@@ -185,9 +181,7 @@ describeRealAzure(
         const stream = await registry.get(uri);
         const chunks: Buffer[] = [];
         for await (const chunk of stream) chunks.push(chunk as Buffer);
-        expect(Buffer.concat(chunks).toString("utf8")).toBe(
-          bytes.toString("utf8"),
-        );
+        expect(Buffer.concat(chunks).toString("utf8")).toBe(bytes.toString("utf8"));
       });
     });
   },
@@ -218,9 +212,7 @@ describeTokenAzure(
 
     afterAll(async () => {
       if (!hasTokenModeAzure) return;
-      await Promise.allSettled(
-        tokenUris.map((uri) => tokenDriver().delete(uri)),
-      );
+      await Promise.allSettled(tokenUris.map((uri) => tokenDriver().delete(uri)));
     });
 
     describe("given an account that refuses shared-key authentication", () => {
@@ -237,9 +229,7 @@ describeTokenAzure(
         const stream = await driver.get(uri);
         const chunks: Buffer[] = [];
         for await (const chunk of stream) chunks.push(chunk as Buffer);
-        expect(Buffer.concat(chunks).toString("utf8")).toBe(
-          bytes.toString("utf8"),
-        );
+        expect(Buffer.concat(chunks).toString("utf8")).toBe(bytes.toString("utf8"));
 
         await driver.delete(uri);
         expect(await driver.exists(uri)).toBe(false);

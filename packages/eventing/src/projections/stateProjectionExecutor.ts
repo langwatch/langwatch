@@ -16,10 +16,7 @@ export function cursorFor(event: Event): ProjectionCursor {
   return { acceptedAt: event.createdAt, eventId: event.id };
 }
 
-export function compareCursors(
-  left: ProjectionCursor,
-  right: ProjectionCursor,
-): number {
+export function compareCursors(left: ProjectionCursor, right: ProjectionCursor): number {
   if (left.acceptedAt !== right.acceptedAt) {
     return left.acceptedAt - right.acceptedAt;
   }
@@ -54,10 +51,7 @@ export function applyStateEvent<State, E extends Event>({
   latest: StoredProjection<State> | null;
   event: E;
 }): StoredProjection<State> | null {
-  if (
-    projection.eventTypes.length > 0 &&
-    !projection.eventTypes.includes(event.type)
-  ) {
+  if (projection.eventTypes.length > 0 && !projection.eventTypes.includes(event.type)) {
     return latest;
   }
   const cursor = cursorFor(event);

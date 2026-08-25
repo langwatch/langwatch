@@ -19,9 +19,7 @@ const listCancel = vi.fn(() => Promise.resolve());
 
 // Capture the callback the hook hands to the SSE listener so a test can drive a
 // signal batch through the real hook logic.
-let capturedOnUpdate:
-  | ((signals: LangyConversationUpdateSignal[]) => void)
-  | null = null;
+let capturedOnUpdate: ((signals: LangyConversationUpdateSignal[]) => void) | null = null;
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: PROJECT_ID } }),

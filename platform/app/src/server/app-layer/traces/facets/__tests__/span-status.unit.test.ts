@@ -26,8 +26,7 @@ describe("SPAN_STATUS_FACET", () => {
       // dropping the span out of the filter entirely. Every read of the
       // column must therefore be NULL-coalesced before it is compared.
       const bareComparisons =
-        SPAN_STATUS_FACET.expression.match(/(?<!ifNull\()StatusCode\s*=/g) ??
-        [];
+        SPAN_STATUS_FACET.expression.match(/(?<!ifNull\()StatusCode\s*=/g) ?? [];
 
       expect(bareComparisons).toEqual([]);
       expect(SPAN_STATUS_FACET.expression).toContain("ifNull(StatusCode, 0)");

@@ -8,9 +8,7 @@ import type { CommandResult } from "../../utils/output";
  * Returns the archive result rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const deleteSuiteCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const deleteSuiteCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new SuitesApiService();

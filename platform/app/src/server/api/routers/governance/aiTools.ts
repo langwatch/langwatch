@@ -32,9 +32,7 @@ import { ZodError as Zod4Error } from "zod/v4";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
-const typeSchema = z.enum(
-  AI_TOOL_TYPES as unknown as [string, ...string[]],
-);
+const typeSchema = z.enum(AI_TOOL_TYPES as unknown as [string, ...string[]]);
 
 /// Tightened from a free-string to a base64 data URL for uploaded
 /// icons or "preset:<kind>" / "preset:<namespace>:<kind>" for

@@ -303,9 +303,7 @@ export abstract class GithubPullRequestsRepository {
   }>;
 }
 
-export class NullGithubPullRequestsRepository
-  extends GithubPullRequestsRepository
-{
+export class NullGithubPullRequestsRepository extends GithubPullRequestsRepository {
   async upsertPullRequests(): Promise<void> {}
   async findAllByBranches(): Promise<GithubPullRequestRow[]> {
     return [];

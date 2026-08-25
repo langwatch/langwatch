@@ -4,7 +4,11 @@ export { formatDurationSeconds } from "./duration";
 export { formatShortDate } from "./short-date";
 export { EmptySection, Section } from "./detail-section";
 export { PeerComparisonCell, peerComparisonSentence } from "./peer-comparison-cell";
-export { MIN_VALUES_FOR_PERCENTILE, percentileStats, type PercentileStats } from "./percentile";
+export {
+  MIN_VALUES_FOR_PERCENTILE,
+  percentileStats,
+  type PercentileStats,
+} from "./percentile";
 export { type DetailPayload, MISSING_VALUE } from "./pull-request-detail";
 export { PullRequestStatusBadge } from "./pull-request-status-badge";
 export * from "./pull-request-sort";

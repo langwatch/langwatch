@@ -63,18 +63,14 @@ export function mediaRoleBelongsToSide(
 }
 
 /** Whether a ref belongs on the given summary strip. */
-export function mediaRefBelongsToSide(
-  ref: TraceMediaRef,
-  side: TraceMediaSide,
-): boolean {
+export function mediaRefBelongsToSide(ref: TraceMediaRef, side: TraceMediaSide): boolean {
   return mediaRoleBelongsToSide(ref.role, side);
 }
 
 export const MAX_TRACE_MEDIA_REFS = 4;
 
 export const RESERVED_INPUT_MEDIA_REFS = "langwatch.reserved.media_refs.input";
-export const RESERVED_OUTPUT_MEDIA_REFS =
-  "langwatch.reserved.media_refs.output";
+export const RESERVED_OUTPUT_MEDIA_REFS = "langwatch.reserved.media_refs.output";
 
 function kindFromMime(mimeType: string): TraceMediaRef["kind"] {
   const mime = mimeType.toLowerCase();
@@ -117,10 +113,7 @@ export function collectMediaRefs(value: unknown): TraceMediaRef[] {
         ...(kind === "file" ? { mimeType: media.mimeType } : {}),
         ...withRole,
       };
-    } else if (
-      media.source.type === "url" &&
-      isStoredObjectRefUrl(media.source.value)
-    ) {
+    } else if (media.source.type === "url" && isStoredObjectRefUrl(media.source.value)) {
       ref = { kind: media.type, url: media.source.value, ...withRole };
     }
     if (!ref || seen.has(ref.url)) continue;
@@ -155,9 +148,7 @@ export function mergeMediaRefs({
   precedence: "prepend" | "append";
 }): TraceMediaRef[] {
   const ordered =
-    precedence === "prepend"
-      ? [...incoming, ...existing]
-      : [...existing, ...incoming];
+    precedence === "prepend" ? [...incoming, ...existing] : [...existing, ...incoming];
   const merged: TraceMediaRef[] = [];
   const seen = new Set<string>();
   for (const ref of ordered) {
@@ -195,12 +186,8 @@ function parseMediaRefEntry(entry: unknown): TraceMediaRef | null {
   return {
     kind: candidate.kind as TraceMediaRef["kind"],
     url: candidate.url,
-    ...(typeof candidate.filename === "string"
-      ? { filename: candidate.filename }
-      : {}),
-    ...(typeof candidate.mimeType === "string"
-      ? { mimeType: candidate.mimeType }
-      : {}),
+    ...(typeof candidate.filename === "string" ? { filename: candidate.filename } : {}),
+    ...(typeof candidate.mimeType === "string" ? { mimeType: candidate.mimeType } : {}),
     // Same allowlist the walk applies, so an unrecognized role read back from
     // the attribute lands on "no role" rather than hiding the ref everywhere.
     ...(isMediaPartRole(candidate.role) ? { role: candidate.role } : {}),
@@ -214,9 +201,7 @@ function parseMediaRefEntry(entry: unknown): TraceMediaRef | null {
  * stored-objects reference (see `parseMediaRefEntry`), so a crafted
  * attribute cannot smuggle an external or scripted URL to a renderer.
  */
-export function parseMediaRefs(
-  serialized: string | null | undefined,
-): TraceMediaRef[] {
+export function parseMediaRefs(serialized: string | null | undefined): TraceMediaRef[] {
   if (!serialized) return [];
   try {
     const parsed: unknown = JSON.parse(serialized);

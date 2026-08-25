@@ -158,7 +158,7 @@ export function formatLegacyFeatureFragmentBaseline(
   fragments: readonly LegacyFeatureFragment[],
 ): string {
   const sorted = [...fragments].sort(compareFragments);
-  const lines = ['{', '  "version": 0,', '  "fragments": ['];
+  const lines = ["{", '  "version": 0,', '  "fragments": ['];
   for (const [index, fragment] of sorted.entries()) {
     lines.push(
       `    ${JSON.stringify(fragment)}${index + 1 === sorted.length ? "" : ","}`,
@@ -229,8 +229,7 @@ function readBaseline(root: string): {
         policy: "legacy-feature-fragment-baseline",
         file: path,
         message: `Legacy feature fragment baseline entry ${index} is malformed.`,
-        allowed:
-          "Use feature, file, and a recognised kind in canonical key order.",
+        allowed: "Use feature, file, and a recognised kind in canonical key order.",
       });
       continue;
     }
@@ -239,14 +238,14 @@ function readBaseline(root: string): {
 
   if (
     baseline.some(
-      (entry, index) =>
-        index > 0 && compareFragments(baseline[index - 1]!, entry) > 0,
+      (entry, index) => index > 0 && compareFragments(baseline[index - 1]!, entry) > 0,
     )
   ) {
     violations.push({
       policy: "legacy-feature-fragment-baseline",
       file: path,
-      message: "Legacy feature fragment baseline entries must be sorted by feature, file, and kind.",
+      message:
+        "Legacy feature fragment baseline entries must be sorted by feature, file, and kind.",
     });
   }
   const keys = baseline.map(fragmentFileKey);
@@ -254,7 +253,8 @@ function readBaseline(root: string): {
     violations.push({
       policy: "legacy-feature-fragment-baseline",
       file: path,
-      message: "Legacy feature fragment baseline contains duplicate feature/file entries.",
+      message:
+        "Legacy feature fragment baseline contains duplicate feature/file entries.",
     });
   }
   return { baseline, violations };
@@ -277,7 +277,9 @@ export function lintLegacyFeatureFragments(
     });
   }
 
-  const actualByKey = new Map(actual.map((fragment) => [fragmentKey(fragment), fragment]));
+  const actualByKey = new Map(
+    actual.map((fragment) => [fragmentKey(fragment), fragment]),
+  );
   const baselineByKey = new Map(
     baseline.map((fragment) => [fragmentKey(fragment), fragment]),
   );

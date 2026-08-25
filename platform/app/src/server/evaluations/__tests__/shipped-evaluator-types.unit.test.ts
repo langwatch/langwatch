@@ -95,9 +95,7 @@ describe("the evaluator types our shipped instructions teach", () => {
   describe("when an instruction puts a slug in an evaluator-type position", () => {
     /** @scenario No shipped instruction teaches an evaluator type the platform rejects */
     it("only ever names a type the platform accepts", () => {
-      const invalid = taught.filter(
-        ({ slug }) => !(slug in AVAILABLE_EVALUATORS),
-      );
+      const invalid = taught.filter(({ slug }) => !(slug in AVAILABLE_EVALUATORS));
 
       expect(invalid.map(({ slug, file }) => `${slug} (${file})`)).toEqual([]);
     });
@@ -112,9 +110,7 @@ describe("the evaluator types our shipped instructions teach", () => {
 
     it("would catch the slug the original failure was built on", () => {
       const [sample] = evaluatorTypesTaughtIn(
-        writeTempInstruction(
-          'langwatch evaluator create "x" --type langevals/llm_judge',
-        ),
+        writeTempInstruction('langwatch evaluator create "x" --type langevals/llm_judge'),
       );
 
       expect(sample?.slug).toBe("langevals/llm_judge");

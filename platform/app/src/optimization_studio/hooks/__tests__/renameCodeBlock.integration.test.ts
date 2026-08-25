@@ -1,10 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
-import {
-  store as storeCreator,
-  type WorkflowStore,
-} from "@langwatch/workflow-web";
+import { store as storeCreator, type WorkflowStore } from "@langwatch/workflow-web";
 
 function makeCodeNode({
   id,
@@ -73,10 +70,7 @@ describe("rename code blocks", () => {
 
       testStore
         .getState()
-        .setNode(
-          { id: "code1", data: { name: "data_processor" } },
-          "data_processor",
-        );
+        .setNode({ id: "code1", data: { name: "data_processor" } }, "data_processor");
 
       const state = testStore.getState();
       const node = state.nodes.find((n) => n.id === "data_processor");
@@ -97,10 +91,7 @@ describe("rename code blocks", () => {
 
       testStore
         .getState()
-        .setNode(
-          { id: "code1", data: { name: "data_processor" } },
-          "data_processor",
-        );
+        .setNode({ id: "code1", data: { name: "data_processor" } }, "data_processor");
 
       const state = testStore.getState();
       const node = state.nodes.find((n) => n.id === "data_processor");

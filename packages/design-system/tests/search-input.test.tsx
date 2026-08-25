@@ -10,8 +10,6 @@ describe("SearchInput", () => {
   it("provides a stable accessible name and hides its decorative icon", () => {
     const { container } = renderWithDesignSystem(<SearchInput />);
     expect(screen.getByRole("searchbox", { name: "Search" })).toBeTruthy();
-    expect(container.querySelector("svg")?.getAttribute("aria-hidden")).toBe(
-      "true",
-    );
+    expect(container.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
   });
 });

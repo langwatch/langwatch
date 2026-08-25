@@ -209,9 +209,7 @@ describe("reading a vitest config's alias table", () => {
 });
 
 describe("choosing the table in force for a file", () => {
-  const appTable: ModuleAlias[] = [
-    { find: "~/", replacement: join(APP_ROOT, "src/") },
-  ];
+  const appTable: ModuleAlias[] = [{ find: "~/", replacement: join(APP_ROOT, "src/") }];
   const nestedTable: ModuleAlias[] = [
     { find: "~", replacement: join(APP_ROOT, "e2e/src") },
   ];

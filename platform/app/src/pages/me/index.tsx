@@ -1,12 +1,4 @@
-import {
-  Box,
-  Heading,
-  HStack,
-  SimpleGrid,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Heading, HStack, SimpleGrid, Spacer, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useState } from "react";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
@@ -41,9 +33,7 @@ import Head from "~/utils/compat/next-head";
 const fmtUsd = (amount: number) => formatBudgetUsd(amount);
 
 const fmtPctDelta = (pct: number | null) =>
-  pct === null
-    ? null
-    : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct)}% vs last month`;
+  pct === null ? null : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct)}% vs last month`;
 
 function MyUsagePage() {
   const ctx = usePersonalContext();
@@ -98,18 +88,12 @@ function MyUsagePage() {
       <VStack align="stretch" gap={6} width="full">
         <PersonalWorkspaceViewOnlyNotice />
 
-        <VStack
-          id={PERSONAL_AI_TOOLS_ANCHOR}
-          align="stretch"
-          gap={3}
-          scrollMarginTop={4}
-        >
+        <VStack id={PERSONAL_AI_TOOLS_ANCHOR} align="stretch" gap={3} scrollMarginTop={4}>
           <Heading as="h2" size="lg">
             Your AI tools
           </Heading>
           <Text color="fg.muted" fontSize="sm">
-            Pick a tool to get started, or issue a virtual key for your own
-            integrations.
+            Pick a tool to get started, or issue a virtual key for your own integrations.
           </Text>
           <AiToolsPortal />
         </VStack>
@@ -194,12 +178,7 @@ function MyUsagePage() {
                         </VStack>
                       }
                     >
-                      <Box
-                        flex={1}
-                        position="relative"
-                        height="full"
-                        cursor="default"
-                      >
+                      <Box flex={1} position="relative" height="full" cursor="default">
                         {/* Always-present baseline so empty days still read as a
                             point on the timeline instead of a blank gap. */}
                         <Box
@@ -235,11 +214,7 @@ function MyUsagePage() {
                   );
                 })}
               </HStack>
-              <HStack
-                justifyContent="space-between"
-                fontSize="xs"
-                color="fg.muted"
-              >
+              <HStack justifyContent="space-between" fontSize="xs" color="fg.muted">
                 <Text>{spendByDay[0]?.day}</Text>
                 <Text>{spendByDay[spendByDay.length - 1]?.day}</Text>
               </HStack>
@@ -435,12 +410,7 @@ function SectionCard({
   }
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
       <HStack marginBottom={3}>
         <Text fontSize="sm" fontWeight="semibold">
           {title}
@@ -498,9 +468,7 @@ function BreachedBudgetBanner({
       period={item.window.toLowerCase()}
       scope={item.scopeClass}
       requestIncreaseUrl={
-        "requestIncreaseUrl" in budget
-          ? (budget.requestIncreaseUrl ?? null)
-          : null
+        "requestIncreaseUrl" in budget ? (budget.requestIncreaseUrl ?? null) : null
       }
       adminEmail={"adminEmail" in budget ? (budget.adminEmail ?? null) : null}
     />
@@ -611,16 +579,8 @@ function LegendChip({
       _hover={{ opacity: active ? 0.8 : 0.65 }}
       title={active ? `Hide ${label}` : `Show ${label}`}
     >
-      <Box
-        width="10px"
-        height="10px"
-        borderRadius="sm"
-        backgroundColor={color}
-      />
-      <Text
-        color="fg.muted"
-        textDecoration={active ? undefined : "line-through"}
-      >
+      <Box width="10px" height="10px" borderRadius="sm" backgroundColor={color} />
+      <Text color="fg.muted" textDecoration={active ? undefined : "line-through"}>
         {label}
       </Text>
     </HStack>

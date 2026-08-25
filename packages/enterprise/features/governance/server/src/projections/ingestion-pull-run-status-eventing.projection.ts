@@ -51,8 +51,7 @@ export class IngestionPullRunStatusEventingProjection
     "LastEventOccurredAt",
     StateProjectionStore<IngestionPullRunStatusData>
   >
-  implements
-    FoldEventHandlers<typeof ingestionPullEvents, IngestionPullRunStatusData>
+  implements FoldEventHandlers<typeof ingestionPullEvents, IngestionPullRunStatusData>
 {
   readonly name = "ingestionPullRunStatus";
   readonly version = INGESTION_PULL_PROJECTION_VERSIONS.RUN_STATUS;
@@ -148,13 +147,7 @@ export class IngestionPullRunStatusEventingProjection
     };
   }
 
-  private superseded(
-    state: IngestionPullRunStatusData,
-    scheduledFor: number,
-  ): boolean {
-    return (
-      state.LastRunScheduledFor !== null &&
-      scheduledFor < state.LastRunScheduledFor
-    );
+  private superseded(state: IngestionPullRunStatusData, scheduledFor: number): boolean {
+    return state.LastRunScheduledFor !== null && scheduledFor < state.LastRunScheduledFor;
   }
 }

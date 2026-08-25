@@ -8,7 +8,8 @@ const CANNED_TRACES_SEARCH = {
   traces: [
     {
       trace_id: "trace-001",
-      formatted_trace: "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Hello, how are you?\n    Output: I am fine, thank you!",
+      formatted_trace:
+        "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Hello, how are you?\n    Output: I am fine, thank you!",
       input: { value: "Hello, how are you?" },
       output: { value: "I am fine, thank you!" },
       timestamps: { started_at: 1700000000000 },
@@ -20,7 +21,8 @@ const CANNED_TRACES_SEARCH = {
 
 const CANNED_TRACE_DETAIL = {
   trace_id: "trace-001",
-  formatted_trace: "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Hello\n    Output: Hi there",
+  formatted_trace:
+    "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Hello\n    Output: Hi there",
   timestamps: {
     started_at: 1700000000000,
     inserted_at: 1700000001000,
@@ -109,16 +111,10 @@ function createMockServer(): Server {
       if (url === "/api/traces/search" && req.method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_TRACES_SEARCH));
-      } else if (
-        url.match(/^\/api\/traces\/[^/]+(\?|$)/) &&
-        req.method === "GET"
-      ) {
+      } else if (url.match(/^\/api\/traces\/[^/]+(\?|$)/) && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_TRACE_DETAIL));
-      } else if (
-        url === "/api/analytics/timeseries" &&
-        req.method === "POST"
-      ) {
+      } else if (url === "/api/analytics/timeseries" && req.method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_ANALYTICS));
       } else if (url === "/api/prompts" && req.method === "GET") {
@@ -130,17 +126,12 @@ function createMockServer(): Server {
       } else if (url === "/api/prompts" && req.method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_CREATED));
-      } else if (
-        url.match(/^\/api\/prompts\/[^/]+$/) &&
-        req.method === "PUT"
-      ) {
+      } else if (url.match(/^\/api\/prompts\/[^/]+$/) && req.method === "PUT") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
       } else {
         res.writeHead(404);
-        res.end(
-          JSON.stringify({ message: `Not found: ${req.method} ${url}` })
-        );
+        res.end(JSON.stringify({ message: `Not found: ${req.method} ${url}` }));
       }
     });
   });
@@ -173,9 +164,7 @@ describe("MCP tools integration", () => {
 
   describe("search_traces", () => {
     it("returns formatted trace digests from mock server", async () => {
-      const { handleSearchTraces } = await import(
-        "../tools/search-traces.js"
-      );
+      const { handleSearchTraces } = await import("../tools/search-traces.js");
       const result = await handleSearchTraces({
         startDate: "24h",
         endDate: "now",
@@ -199,9 +188,7 @@ describe("MCP tools integration", () => {
 
   describe("get_analytics", () => {
     it("returns formatted analytics data from mock server", async () => {
-      const { handleGetAnalytics } = await import(
-        "../tools/get-analytics.js"
-      );
+      const { handleGetAnalytics } = await import("../tools/get-analytics.js");
       const result = await handleGetAnalytics({
         metric: "metadata.trace_id",
         aggregation: "cardinality",
@@ -235,9 +222,7 @@ describe("MCP tools integration", () => {
 
   describe("platform_create_prompt", () => {
     it("returns success message from mock server", async () => {
-      const { handleCreatePrompt } = await import(
-        "../tools/create-prompt.js"
-      );
+      const { handleCreatePrompt } = await import("../tools/create-prompt.js");
       const result = await handleCreatePrompt({
         name: "New Prompt",
         messages: [{ role: "system", content: "You are helpful." }],
@@ -250,9 +235,7 @@ describe("MCP tools integration", () => {
 
   describe("platform_update_prompt", () => {
     it("returns success message from mock server", async () => {
-      const { handleUpdatePrompt } = await import(
-        "../tools/update-prompt.js"
-      );
+      const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
       const result = await handleUpdatePrompt({
         idOrHandle: "greeting-bot",
         model: "openai/gpt-4o-mini",
@@ -277,12 +260,8 @@ describe("MCP tools integration", () => {
         endpoint: `http://localhost:${port}`,
       });
 
-      const { handleSearchTraces } = await import(
-        "../tools/search-traces.js"
-      );
-      await expect(
-        handleSearchTraces({ startDate: "24h" })
-      ).rejects.toThrow("401");
+      const { handleSearchTraces } = await import("../tools/search-traces.js");
+      await expect(handleSearchTraces({ startDate: "24h" })).rejects.toThrow("401");
     });
   });
 });

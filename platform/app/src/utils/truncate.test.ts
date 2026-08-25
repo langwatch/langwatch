@@ -72,9 +72,7 @@ describe("safeTruncate", () => {
 
     expect(JSON.stringify(result).length).toBeLessThanOrEqual(32 * 1024);
     expect(result["..."]).toBe("[truncated]");
-    expect(Object.keys(result).length).toBeLessThan(
-      Object.keys(input).length + 1,
-    );
+    expect(Object.keys(result).length).toBeLessThan(Object.keys(input).length + 1);
   });
 
   it("handles null and undefined", () => {

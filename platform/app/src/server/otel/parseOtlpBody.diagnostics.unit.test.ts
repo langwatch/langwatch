@@ -14,11 +14,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  parseOtlpLogs,
-  parseOtlpMetrics,
-  parseOtlpTraces,
-} from "./parseOtlpBody";
+import { parseOtlpLogs, parseOtlpMetrics, parseOtlpTraces } from "./parseOtlpBody";
 
 /** A string no parser could invent, so finding it proves it came from the body. */
 const MARKER = "CUSTOMERSECRETMARKER";
@@ -131,9 +127,7 @@ describe("given a trace body that cannot be decoded", () => {
 
       // The decoder's vocabulary is ours, not the sender's — it is what says
       // whether the sender truncated the body or we mis-read it.
-      expect(failure).toMatch(
-        /index out of range|invalid wire type|offset|range/i,
-      );
+      expect(failure).toMatch(/index out of range|invalid wire type|offset|range/i);
     });
 
     /** @scenario A body that cannot be decoded reports the stage that rejected it */

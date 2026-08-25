@@ -35,10 +35,7 @@ import { Button, Text } from "@chakra-ui/react";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy-contract";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
-import {
-  type CapabilityData,
-  useCapabilityData,
-} from "../../hooks/useCapabilityData";
+import { type CapabilityData, useCapabilityData } from "../../hooks/useCapabilityData";
 import { traceContextChip } from "../../logic/langyContextChips";
 import {
   buildTraceExplorerHref,
@@ -164,8 +161,7 @@ export function LangyTraceSampleCard({
           ))}
           {total !== null && total > sample.length ? (
             <Text textStyle="2xs" color="fg.subtle" paddingX={2} paddingTop={1}>
-              {(total - sample.length).toLocaleString()} more in the Trace
-              Explorer
+              {(total - sample.length).toLocaleString()} more in the Trace Explorer
             </Text>
           ) : null}
         </>
@@ -182,13 +178,7 @@ export function LangyTraceSampleCard({
 function ExplorerAction({ href }: { href: string | null }) {
   if (!href) return null;
   return (
-    <Button
-      asChild
-      size="xs"
-      variant="outline"
-      width="full"
-      textDecoration="none"
-    >
+    <Button asChild size="xs" variant="outline" width="full" textDecoration="none">
       <LangySpaAnchor href={href}>
         View in Trace Explorer
         <ArrowUpRight size={12} />
@@ -220,9 +210,7 @@ function TraceSampleShell({
       // where this result lives. The action below goes to the Trace Explorer
       // WITH the query, which is the only link worth offering here.
       deepLink={false}
-      actions={
-        explorerHref ? <ExplorerAction href={explorerHref} /> : undefined
-      }
+      actions={explorerHref ? <ExplorerAction href={explorerHref} /> : undefined}
     >
       {children}
     </LangyCapabilityCard>
@@ -276,8 +264,7 @@ function HydratedTraceSampleCard({
         title={total !== null ? headline({ total, shown: 0 }) : "Traces"}
       >
         <Text textStyle="xs" color="fg.muted">
-          Couldn&apos;t load these traces right now — open the Trace Explorer to
-          see them.
+          Couldn&apos;t load these traces right now — open the Trace Explorer to see them.
         </Text>
       </TraceSampleShell>
     );
@@ -307,10 +294,7 @@ function HydratedTraceSampleCard({
       title={headline({ total, shown: hydration.rows.length })}
     >
       {hydration.rows.map((row) => (
-        <LangyContextTarget
-          key={row.id}
-          target={traceContextChip(row.id, row.primary)}
-        >
+        <LangyContextTarget key={row.id} target={traceContextChip(row.id, row.primary)}>
           <CapabilityRow
             href={
               buildTraceExplorerHref({
@@ -328,8 +312,7 @@ function HydratedTraceSampleCard({
       ))}
       {total !== null && total > hydration.rows.length ? (
         <Text textStyle="2xs" color="fg.subtle" paddingX={2} paddingTop={1}>
-          {(total - hydration.rows.length).toLocaleString()} more in the Trace
-          Explorer
+          {(total - hydration.rows.length).toLocaleString()} more in the Trace Explorer
         </Text>
       ) : null}
     </TraceSampleShell>
@@ -340,13 +323,7 @@ function HydratedTraceSampleCard({
  * "34 traces · showing 3". Never lets the sample masquerade as the whole result:
  * the qualifier only disappears when the sample IS the whole result.
  */
-function headline({
-  total,
-  shown,
-}: {
-  total: number | null;
-  shown: number;
-}): string {
+function headline({ total, shown }: { total: number | null; shown: number }): string {
   if (total === null) {
     return `${shown} ${shown === 1 ? "trace" : "traces"}`;
   }
@@ -401,9 +378,7 @@ function traceIdOf(row: Record<string, unknown>): string | null {
 function numberAt(source: unknown, key: string): number | undefined {
   if (!source || typeof source !== "object") return undefined;
   const value = (source as Record<string, unknown>)[key];
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 /**

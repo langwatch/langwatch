@@ -14,15 +14,11 @@ export class NotificationService extends NotificationServiceContract {
     super();
   }
 
-  static create(options: {
-    repository: NotificationRepository;
-  }): NotificationService {
+  static create(options: { repository: NotificationRepository }): NotificationService {
     return new NotificationService(options.repository);
   }
 
-  listRecentByOrganization(
-    input: NotificationRecentQuery,
-  ): Promise<Notification[]> {
+  listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]> {
     return this.repository.listRecentByOrganization(
       notificationRecentQuerySchema.parse(input),
     );

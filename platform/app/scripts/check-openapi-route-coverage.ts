@@ -61,10 +61,7 @@ const __dirname = dirname(__filename);
 
 const LANGWATCH_ROOT = resolve(__dirname, "..");
 
-export const SPEC_PATH = join(
-  LANGWATCH_ROOT,
-  "src/app/api/openapiLangWatch.json",
-);
+export const SPEC_PATH = join(LANGWATCH_ROOT, "src/app/api/openapiLangWatch.json");
 
 /** Trees that hold Hono route registrations. */
 export const HANDLER_ROOTS = [
@@ -140,20 +137,12 @@ function dateConstantsOf(files: string[]): Map<string, string> {
  * any of those files would never have been caught, which is the failure this
  * check exists to prevent.
  */
-function basePathsFor({
-  file,
-  source,
-}: {
-  file: string;
-  source: string;
-}): string[] {
+function basePathsFor({ file, source }: { file: string; source: string }): string[] {
   const declared = declaredApiBasePaths(source);
   if (declared.length > 0) return declared;
 
   try {
-    return declaredApiBasePaths(
-      readFileSync(join(dirname(file), "app.ts"), "utf8"),
-    );
+    return declaredApiBasePaths(readFileSync(join(dirname(file), "app.ts"), "utf8"));
   } catch {
     return [];
   }
@@ -167,18 +156,13 @@ function basePathsFor({
  * mounts a rewriting alias app beside the real one, so both spellings really
  * are served, and both have to be accounted for.
  */
-export function collectRegisteredRoutes(
-  roots: readonly string[],
-): RegisteredRoute[] {
+export function collectRegisteredRoutes(roots: readonly string[]): RegisteredRoute[] {
   const files = discoverTypeScriptFiles(roots);
   // Version constants live outside the handler roots by design —
   // `MANAGEMENT_API_VERSION` sits in `src/server/api/management/version.ts` —
   // so the scan for them casts a wider net than the route walk itself.
   const constants = dateConstantsOf(
-    discoverTypeScriptFiles([
-      ...roots,
-      join(LANGWATCH_ROOT, "src/server/api"),
-    ]),
+    discoverTypeScriptFiles([...roots, join(LANGWATCH_ROOT, "src/server/api")]),
   );
   return files.flatMap((file) =>
     routesRegisteredIn({
@@ -300,9 +284,7 @@ function expandServiceRegistrations({
   }));
 
   const dated = [
-    ...new Set(
-      events.map((event) => event.namespace).filter((v) => v !== "preview"),
-    ),
+    ...new Set(events.map((event) => event.namespace).filter((v) => v !== "preview")),
   ].sort((a, b) => a.localeCompare(b));
 
   const methodsByPath = new Map<string, Set<string>>();
@@ -326,8 +308,7 @@ function expandServiceRegistrations({
       }
       const applies = event.registration.withdrawn
         ? event.registration.path === path
-        : event.registration.path === path &&
-          event.registration.method === method;
+        : event.registration.path === path && event.registration.method === method;
       if (applies) state = event.registration;
     }
     return state;
@@ -371,8 +352,7 @@ function expandServiceRegistrations({
         if (event.namespace !== "preview") continue;
         const applies = event.registration.withdrawn
           ? event.registration.path === path
-          : event.registration.path === path &&
-            event.registration.method === method;
+          : event.registration.path === path && event.registration.method === method;
         if (applies) preview = event.registration;
       }
       if (preview) emit(method, path, "preview", preview);
@@ -455,9 +435,7 @@ export function auditCoverage({
     byKey.set(route.key, route);
   }
 
-  const missing = [...byKey.values()].filter(
-    (route) => !documented.has(route.key),
-  );
+  const missing = [...byKey.values()].filter((route) => !documented.has(route.key));
 
   // A tombstone is accounted for by its own shape, so it never counts as the
   // route an UNPUBLISHED entry was written for. Letting it count would leave a
@@ -479,9 +457,7 @@ export function auditCoverage({
 
   return {
     unexplained: unexcused.sort(byKeyOrder),
-    withdrawn: missing
-      .filter((route) => route.withdrawn === true)
-      .sort(byKeyOrder),
+    withdrawn: missing.filter((route) => route.withdrawn === true).sort(byKeyOrder),
     stale: exclusions.filter((exclusion) => !used.has(exclusion)),
     documented: byKey.size - missing.length,
     registered: byKey.size,
@@ -562,9 +538,7 @@ function formatReport(result: CoverageResult): string {
 function main(): void {
   const asJson = process.argv.includes("--json");
 
-  const document = JSON.parse(
-    readFileSync(SPEC_PATH, "utf8"),
-  ) as OpenApiDocument;
+  const document = JSON.parse(readFileSync(SPEC_PATH, "utf8")) as OpenApiDocument;
 
   const result = auditCoverage({
     routes: collectRegisteredRoutes(HANDLER_ROOTS),
@@ -595,9 +569,7 @@ function main(): void {
   // Annotated because the list narrows to the categories it currently holds:
   // with the last `gap` entry closed, an unannotated comparison against "gap"
   // is a type error rather than the zero it should report.
-  const gaps = UNPUBLISHED.filter(
-    (entry: Exclusion) => entry.category === "gap",
-  ).length;
+  const gaps = UNPUBLISHED.filter((entry: Exclusion) => entry.category === "gap").length;
   console.log(
     `openapi route coverage: ${result.documented}/${result.registered} registered routes are in the document`,
   );

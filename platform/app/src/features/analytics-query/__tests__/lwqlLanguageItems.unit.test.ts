@@ -28,13 +28,7 @@ describe("the editor's language suggestions", () => {
     describe("when a member starts typing a statement", () => {
       /** @scenario "Typing a keyword offers the keyword" */
       it("offers the words every LangWatchQL statement is built from", () => {
-        for (const keyword of [
-          "SELECT",
-          "FROM",
-          "WHERE",
-          "GROUP BY",
-          "LIMIT",
-        ]) {
+        for (const keyword of ["SELECT", "FROM", "WHERE", "GROUP BY", "LIMIT"]) {
           expect(labels).toContain(keyword);
         }
         for (const fn of ["count", "subtractDays", "toStartOfDay", "uniq"]) {

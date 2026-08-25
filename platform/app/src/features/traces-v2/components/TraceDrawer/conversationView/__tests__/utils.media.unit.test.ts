@@ -10,30 +10,29 @@ import { turnMediaForSide } from "../utils";
 const CALLER = "/api/files/project-1/caller";
 const REPLY = "/api/files/project-1/reply";
 
-const audioRef = (
-  url: string,
-  role?: TraceMediaRef["role"],
-): TraceMediaRef => ({ kind: "audio", url, ...(role ? { role } : {}) });
+const audioRef = (url: string, role?: TraceMediaRef["role"]): TraceMediaRef => ({
+  kind: "audio",
+  url,
+  ...(role ? { role } : {}),
+});
 
 const urls = (parts: ReturnType<typeof turnMediaForSide>): string[] =>
-  parts.map((part) =>
-    part.type === "binary" ? (part.url ?? "") : part.source.value,
-  );
+  parts.map((part) => (part.type === "binary" ? (part.url ?? "") : part.source.value));
 
 describe("turnMediaForSide", () => {
   describe("given a turn whose references carry both sides of a voice call", () => {
     const refs = [audioRef(CALLER, "user"), audioRef(REPLY, "assistant")];
 
     it("keeps the caller's recording on the input side", () => {
-      expect(
-        urls(turnMediaForSide({ refs, value: null, side: "input" })),
-      ).toEqual([CALLER]);
+      expect(urls(turnMediaForSide({ refs, value: null, side: "input" }))).toEqual([
+        CALLER,
+      ]);
     });
 
     it("keeps the reply recording on the output side", () => {
-      expect(
-        urls(turnMediaForSide({ refs, value: null, side: "output" })),
-      ).toEqual([REPLY]);
+      expect(urls(turnMediaForSide({ refs, value: null, side: "output" }))).toEqual([
+        REPLY,
+      ]);
     });
   });
 
@@ -41,12 +40,12 @@ describe("turnMediaForSide", () => {
     const refs = [audioRef(CALLER)];
 
     it("renders them on either side asked for", () => {
-      expect(
-        urls(turnMediaForSide({ refs, value: null, side: "input" })),
-      ).toEqual([CALLER]);
-      expect(
-        urls(turnMediaForSide({ refs, value: null, side: "output" })),
-      ).toEqual([CALLER]);
+      expect(urls(turnMediaForSide({ refs, value: null, side: "input" }))).toEqual([
+        CALLER,
+      ]);
+      expect(urls(turnMediaForSide({ refs, value: null, side: "output" }))).toEqual([
+        CALLER,
+      ]);
     });
   });
 
@@ -63,12 +62,12 @@ describe("turnMediaForSide", () => {
     ]);
 
     it("walks the payload and splits it by the role each part sat under", () => {
-      expect(
-        urls(turnMediaForSide({ refs: undefined, value, side: "input" })),
-      ).toEqual([CALLER]);
-      expect(
-        urls(turnMediaForSide({ refs: undefined, value, side: "output" })),
-      ).toEqual([REPLY]);
+      expect(urls(turnMediaForSide({ refs: undefined, value, side: "input" }))).toEqual([
+        CALLER,
+      ]);
+      expect(urls(turnMediaForSide({ refs: undefined, value, side: "output" }))).toEqual([
+        REPLY,
+      ]);
     });
 
     it("reaches media through a nested JSON string", () => {
@@ -83,9 +82,7 @@ describe("turnMediaForSide", () => {
       });
 
       expect(
-        urls(
-          turnMediaForSide({ refs: undefined, value: nested, side: "input" }),
-        ),
+        urls(turnMediaForSide({ refs: undefined, value: nested, side: "input" })),
       ).toEqual([CALLER]);
     });
   });

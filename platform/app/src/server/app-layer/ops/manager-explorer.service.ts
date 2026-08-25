@@ -1,10 +1,7 @@
 import type { ProcessRef, ProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { getProcessManagerMetadata } from "~/server/event-sourcing/registration/pipelineRegistry";
-import type {
-  ProcessAuditEntryView,
-  ProcessAuditSink,
-} from "./process-audit.repository";
+import type { ProcessAuditEntryView, ProcessAuditSink } from "./process-audit.repository";
 import type {
   DeadLetterCount,
   DeadOutboxMessageView,
@@ -160,13 +157,9 @@ export class ManagerExplorerService {
     }
 
     const trouble = (r: ProcessFleetSummary) =>
-      r.deadMessages * 4 +
-      r.lapsedLeases * 3 +
-      r.overduePending * 2 +
-      r.overdueWakes;
+      r.deadMessages * 4 + r.lapsedLeases * 3 + r.overduePending * 2 + r.overdueWakes;
     return rows.sort(
-      (a, b) =>
-        trouble(b) - trouble(a) || a.processName.localeCompare(b.processName),
+      (a, b) => trouble(b) - trouble(a) || a.processName.localeCompare(b.processName),
     );
   }
 
@@ -415,9 +408,7 @@ export class ManagerExplorerService {
   }
 
   /** Recent process control actions, so the page explains its own history. */
-  async listRecentActions(params: {
-    limit: number;
-  }): Promise<ProcessAuditEntryView[]> {
+  async listRecentActions(params: { limit: number }): Promise<ProcessAuditEntryView[]> {
     return this.audit.listRecent(params);
   }
 

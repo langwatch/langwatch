@@ -42,11 +42,7 @@ export function PausedSchedulesSection({
         <Text textStyle="xs" color="fg.muted">
           these will not fire until an operator turns them back on
         </Text>
-        <Link
-          href="/ops/event-sourcing/schedules"
-          fontSize="xs"
-          color="fg.muted"
-        >
+        <Link href="/ops/event-sourcing/schedules" fontSize="xs" color="fg.muted">
           Schedules
         </Link>
       </HStack>

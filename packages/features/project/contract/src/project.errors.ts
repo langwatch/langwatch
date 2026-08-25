@@ -55,7 +55,5 @@ export function personalWorkspaceArchiveViolation(
 export function personalWorkspaceCreateViolation(
   isDestinationTeamPersonal: boolean,
 ): string | null {
-  return isDestinationTeamPersonal
-    ? PERSONAL_TEAM_PROJECT_CREATE_REFUSAL
-    : null;
+  return isDestinationTeamPersonal ? PERSONAL_TEAM_PROJECT_CREATE_REFUSAL : null;
 }

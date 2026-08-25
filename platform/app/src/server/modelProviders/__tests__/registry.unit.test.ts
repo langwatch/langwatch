@@ -183,9 +183,9 @@ describe("Backward Compatibility", () => {
     it("includes models with numeric suffixes like Bedrock version numbers", () => {
       // Bedrock models use :0 suffix for versions, not variants
       expect(hasVariantSuffix("bedrock/amazon.nova-pro-v1:0")).toBe(false);
-      expect(
-        hasVariantSuffix("bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0"),
-      ).toBe(false);
+      expect(hasVariantSuffix("bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0")).toBe(
+        false,
+      );
     });
 
     it("includes standard models without suffixes", () => {
@@ -275,15 +275,9 @@ describe("hasVariantSuffix", () => {
     // AWS Bedrock models (should NOT be filtered - numeric version suffixes)
     describe("AWS Bedrock", () => {
       it("preserves Anthropic Claude models on Bedrock", () => {
-        expect(hasVariantSuffix("anthropic.claude-3-haiku-20240307-v1:0")).toBe(
-          false,
-        );
-        expect(
-          hasVariantSuffix("anthropic.claude-opus-4-5-20251101-v1:0"),
-        ).toBe(false);
-        expect(
-          hasVariantSuffix("anthropic.claude-sonnet-4-5-20250929-v1:0"),
-        ).toBe(false);
+        expect(hasVariantSuffix("anthropic.claude-3-haiku-20240307-v1:0")).toBe(false);
+        expect(hasVariantSuffix("anthropic.claude-opus-4-5-20251101-v1:0")).toBe(false);
+        expect(hasVariantSuffix("anthropic.claude-sonnet-4-5-20250929-v1:0")).toBe(false);
       });
 
       it("preserves Amazon Nova models", () => {
@@ -294,15 +288,11 @@ describe("hasVariantSuffix", () => {
 
       it("preserves Meta Llama models on Bedrock", () => {
         expect(hasVariantSuffix("meta.llama3-70b-instruct-v1:0")).toBe(false);
-        expect(hasVariantSuffix("meta.llama3-1-405b-instruct-v1:0")).toBe(
-          false,
-        );
+        expect(hasVariantSuffix("meta.llama3-1-405b-instruct-v1:0")).toBe(false);
       });
 
       it("preserves Mistral models on Bedrock", () => {
-        expect(hasVariantSuffix("mistral.mistral-7b-instruct-v0:2")).toBe(
-          false,
-        );
+        expect(hasVariantSuffix("mistral.mistral-7b-instruct-v0:2")).toBe(false);
         expect(hasVariantSuffix("mistral.mistral-large-2402-v1:0")).toBe(false);
       });
 
@@ -321,9 +311,7 @@ describe("hasVariantSuffix", () => {
 
       it("preserves Stability AI models on Bedrock", () => {
         expect(hasVariantSuffix("stability.sd3-5-large-v1:0")).toBe(false);
-        expect(hasVariantSuffix("stability.stable-image-ultra-v1:1")).toBe(
-          false,
-        );
+        expect(hasVariantSuffix("stability.stable-image-ultra-v1:1")).toBe(false);
       });
     });
 
@@ -359,18 +347,12 @@ describe("hasVariantSuffix", () => {
       it("filters :free variants from OpenRouter", () => {
         expect(hasVariantSuffix("allenai/molmo-2-8b:free")).toBe(true);
         expect(hasVariantSuffix("mistralai/devstral-2512:free")).toBe(true);
-        expect(hasVariantSuffix("nvidia/nemotron-3-nano-30b-a3b:free")).toBe(
-          true,
-        );
+        expect(hasVariantSuffix("nvidia/nemotron-3-nano-30b-a3b:free")).toBe(true);
       });
 
       it("filters :thinking variants", () => {
-        expect(hasVariantSuffix("qwen/qwen-plus-2025-07-28:thinking")).toBe(
-          true,
-        );
-        expect(hasVariantSuffix("anthropic/claude-3.7-sonnet:thinking")).toBe(
-          true,
-        );
+        expect(hasVariantSuffix("qwen/qwen-plus-2025-07-28:thinking")).toBe(true);
+        expect(hasVariantSuffix("anthropic/claude-3.7-sonnet:thinking")).toBe(true);
       });
 
       it("filters :extended variants", () => {
@@ -486,9 +468,7 @@ describe("Parameter Constraints", () => {
 
     /** @scenario "Unknown provider returns undefined constraints" */
     it("returns undefined for unknown provider", () => {
-      const constraints = getParameterConstraints(
-        "unknown-provider/some-model",
-      );
+      const constraints = getParameterConstraints("unknown-provider/some-model");
 
       expect(constraints).toBeUndefined();
     });
@@ -508,9 +488,7 @@ describe("Parameter Constraints", () => {
 
     it("extracts provider correctly from model ID with slashes", () => {
       // Model IDs like "anthropic/claude-3.5-sonnet" should extract "anthropic"
-      const constraints = getParameterConstraints(
-        "anthropic/claude-3.5-sonnet",
-      );
+      const constraints = getParameterConstraints("anthropic/claude-3.5-sonnet");
 
       expect(constraints).toBeDefined();
       expect(constraints?.temperature?.max).toBe(1);
@@ -520,9 +498,7 @@ describe("Parameter Constraints", () => {
   describe("Anthropic provider constraints", () => {
     it("has temperature constraint defined", () => {
       expect(modelProviders.anthropic.parameterConstraints).toBeDefined();
-      expect(
-        modelProviders.anthropic.parameterConstraints?.temperature,
-      ).toEqual({
+      expect(modelProviders.anthropic.parameterConstraints?.temperature).toEqual({
         min: 0,
         max: 1,
       });

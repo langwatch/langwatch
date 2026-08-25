@@ -55,8 +55,7 @@ export class TopicService extends TopicServiceContract {
     const isInProgress =
       projection?.inProgressRunId !== null &&
       projection?.inProgressRunId !== undefined &&
-      this.now() -
-        (projection.inProgressStartedAt ?? projection.occurredAt) <
+      this.now() - (projection.inProgressStartedAt ?? projection.occurredAt) <
         TOPIC_CLUSTERING_STALE_RUN_MS;
     const status = {
       lastRequestedAt,
@@ -66,8 +65,7 @@ export class TopicService extends TopicServiceContract {
       lastRunMode: projection?.lastRunMode ?? null,
       lastRunSkippedReason: projection?.lastRunSkippedReason ?? null,
       lastRunErrorCode: projection?.lastRunErrorCode ?? null,
-      isLastRunErrorUserActionable:
-        projection?.lastRunErrorUserActionable ?? false,
+      isLastRunErrorUserActionable: projection?.lastRunErrorUserActionable ?? false,
       lastRunTracesProcessed: projection?.lastRunTracesProcessed ?? 0,
       lastRunTopicsCount: projection?.lastRunTopicsCount ?? 0,
       lastRunSubtopicsCount: projection?.lastRunSubtopicsCount ?? 0,

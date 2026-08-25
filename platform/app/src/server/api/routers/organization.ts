@@ -54,10 +54,7 @@ import {
 
 const customTeamRoleInputSchema = z
   .string()
-  .regex(
-    /^custom:[a-zA-Z0-9_-]+$/,
-    "Custom role must be in format 'custom:{roleId}'",
-  );
+  .regex(/^custom:[a-zA-Z0-9_-]+$/, "Custom role must be in format 'custom:{roleId}'");
 const builtInTeamRoleInputSchema = z.enum([
   TeamUserRole.ADMIN,
   TeamUserRole.MEMBER,
@@ -260,24 +257,19 @@ export const organizationRouter = createTRPCRouter({
         const projectIds = Object.keys(projectTeamId);
         if (projectIds.length === 0) continue;
 
-        const { projects: updatableProjects } = await batchScopePermissions(
-          ctx,
-          {
-            organizationId: organization.id,
-            teamIds: [],
-            projectIds,
-            projectTeamId,
-            permission: "project:update",
-          },
-        );
+        const { projects: updatableProjects } = await batchScopePermissions(ctx, {
+          organizationId: organization.id,
+          teamIds: [],
+          projectIds,
+          projectTeamId,
+          permission: "project:update",
+        });
         updatableProjectsByOrg.set(organization.id, updatableProjects);
       }
 
       for (const organization of organizations) {
         const canManage = manageableOrgIds.has(organization.id);
-        for (const project of organization.teams.flatMap(
-          (team) => team.projects,
-        )) {
+        for (const project of organization.teams.flatMap((team) => team.projects)) {
           if (project.s3AccessKeyId) {
             project.s3AccessKeyId = decrypt(project.s3AccessKeyId);
           }
@@ -293,8 +285,7 @@ export const organizationRouter = createTRPCRouter({
           // rather than relying on the UI not to render it. Demo projects
           // expose it to no one.
           const canUpdateProject =
-            updatableProjectsByOrg.get(organization.id)?.get(project.id) ??
-            false;
+            updatableProjectsByOrg.get(organization.id)?.get(project.id) ?? false;
           if (isDemo || !canUpdateProject) {
             project.apiKey = "";
           }
@@ -311,15 +302,13 @@ export const organizationRouter = createTRPCRouter({
           );
 
         organization.members = organization.members.filter(
-          (member) =>
-            member.userId === userId || member.userId === demoProjectUserId,
+          (member) => member.userId === userId || member.userId === demoProjectUserId,
         );
         if (organization.s3AccessKeyId) {
           organization.s3AccessKeyId = decrypt(organization.s3AccessKeyId);
         }
         organization.s3SecretAccessKey =
-          manageableOrgIds.has(organization.id) &&
-          organization.s3SecretAccessKey
+          manageableOrgIds.has(organization.id) && organization.s3SecretAccessKey
             ? decrypt(organization.s3SecretAccessKey)
             : null;
         if (organization.s3Endpoint) {
@@ -372,8 +361,7 @@ export const organizationRouter = createTRPCRouter({
 
         organization.teams = organization.teams.filter((team) => {
           team.members = team.members.filter(
-            (member) =>
-              member.userId === userId || member.userId === demoProjectUserId,
+            (member) => member.userId === userId || member.userId === demoProjectUserId,
           );
 
           // RoleBinding is authoritative for team membership and role.
@@ -410,8 +398,7 @@ export const organizationRouter = createTRPCRouter({
 
               team.members = team.members.filter(
                 (member) =>
-                  member.userId === demoProjectUserId ||
-                  member.userId === userId,
+                  member.userId === demoProjectUserId || member.userId === userId,
               );
               return [team];
             } else {
@@ -437,10 +424,7 @@ export const organizationRouter = createTRPCRouter({
           presenceEnabled: z.boolean().optional(),
           traceSharingEnabled: z.boolean().optional(),
           supportContact: z.string().max(500).nullable().optional(),
-          primaryIntent: z
-            .enum(["AGENT_GOVERNANCE", "LLM_OPS"])
-            .nullable()
-            .optional(),
+          primaryIntent: z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]).nullable().optional(),
         })
         .refine(
           (data) => {
@@ -497,12 +481,11 @@ export const organizationRouter = createTRPCRouter({
     // the way out for non-admin callers below.
     .permission("organization:view")
     .query(async ({ input, ctx }) => {
-      const organization =
-        await ctx.app.organizations.getOrganizationWithMembers({
-          organizationId: input.organizationId,
-          userId: ctx.session.user.id,
-          includeDeactivated: input.includeDeactivated ?? false,
-        });
+      const organization = await ctx.app.organizations.getOrganizationWithMembers({
+        organizationId: input.organizationId,
+        userId: ctx.session.user.id,
+        includeDeactivated: input.includeDeactivated ?? false,
+      });
 
       if (!organization) {
         throw new TRPCError({
@@ -655,8 +638,7 @@ export const organizationRouter = createTRPCRouter({
           properties: { inviteCount: created.invites.length },
         });
 
-        const memberCount =
-          created.organization.members.length + created.invites.length;
+        const memberCount = created.organization.members.length + created.invites.length;
         for (const record of created.invites) {
           fireTeamMemberInvitedNurturing({
             userId: ctx.session.user.id,
@@ -763,9 +745,7 @@ export const organizationRouter = createTRPCRouter({
         );
 
         if (duplicatePayloadEmails.length > 0) {
-          const uniqueDuplicatePayloadEmails = [
-            ...new Set(duplicatePayloadEmails),
-          ];
+          const uniqueDuplicatePayloadEmails = [...new Set(duplicatePayloadEmails)];
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: `Duplicate emails in request payload: ${uniqueDuplicatePayloadEmails.join(", ")}`,
@@ -801,8 +781,7 @@ export const organizationRouter = createTRPCRouter({
               teamAssignments = invite.teams
                 .filter((t) => validTeamIds.includes(t.teamId))
                 .map((t) => {
-                  const hasCustom =
-                    typeof t.role === "string" && isCustomRole(t.role);
+                  const hasCustom = typeof t.role === "string" && isCustomRole(t.role);
                   return {
                     teamId: t.teamId,
                     role: hasCustom
@@ -826,9 +805,7 @@ export const organizationRouter = createTRPCRouter({
                   },
                   select: { id: true },
                 });
-                const validCustomRoleIds = new Set(
-                  validCustomRoles.map((r) => r.id),
-                );
+                const validCustomRoleIds = new Set(validCustomRoles.map((r) => r.id));
                 const invalidRoleIds = customRoleIds.filter(
                   (id) => !validCustomRoleIds.has(id),
                 );
@@ -861,9 +838,7 @@ export const organizationRouter = createTRPCRouter({
 
               teamAssignments = validTeamIds.map((teamId) => ({
                 teamId,
-                role: ORGANIZATION_TO_TEAM_ROLE_MAP[
-                  invite.role as OrganizationUserRole
-                ],
+                role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role as OrganizationUserRole],
               }));
 
               teamIdsString = validTeamIds.join(",");
@@ -879,8 +854,7 @@ export const organizationRouter = createTRPCRouter({
               role: invite.role as OrganizationUserRole,
               organizationId: input.organizationId,
               teamIds: teamIdsString,
-              teamAssignments:
-                teamAssignments.length > 0 ? teamAssignments : undefined,
+              teamAssignments: teamAssignments.length > 0 ? teamAssignments : undefined,
               requestedBy: ctx.session.user.id,
             };
           }),
@@ -1005,10 +979,7 @@ export const organizationRouter = createTRPCRouter({
         include: { organization: true },
       });
 
-      if (
-        !invite ||
-        (invite.expiration !== null && invite.expiration < new Date())
-      ) {
+      if (!invite || (invite.expiration !== null && invite.expiration < new Date())) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Invite not found or has expired",
@@ -1044,9 +1015,7 @@ export const organizationRouter = createTRPCRouter({
       // reject an "Alice@Acme.com" invite for an "alice@acme.com" user.
       // The old NextAuth flow worked accidentally because it didn't
       // lowercase emails either — this is now a real mismatch post-migration.
-      if (
-        session.user.email.toLowerCase() !== invite.email.trim().toLowerCase()
-      ) {
+      if (session.user.email.toLowerCase() !== invite.email.trim().toLowerCase()) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: `The invite was sent to ${invite.email}, but you are signed in as ${session.user.email}`,
@@ -1139,8 +1108,7 @@ export const organizationRouter = createTRPCRouter({
             if (data.customRoleId !== undefined) {
               ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message:
-                  "customRoleId must not be provided when using a built-in role",
+                message: "customRoleId must not be provided when using a built-in role",
                 path: ["customRoleId"],
               });
             }
@@ -1152,9 +1120,7 @@ export const organizationRouter = createTRPCRouter({
       const prisma = ctx.prisma;
       await assertNoPersonalTeamScope({
         client: prisma,
-        scopes: [
-          { scopeType: RoleBindingScopeType.TEAM, scopeId: input.teamId },
-        ],
+        scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: input.teamId }],
       });
       const inputIsCustomRole = isCustomRole(input.role);
 
@@ -1219,7 +1185,9 @@ export const organizationRouter = createTRPCRouter({
 
           const oldPermissions = currentBinding?.customRoleId
             ? await (async () => {
-                const role = await ctx.app.roles.tryGet({ roleId: currentBinding.customRoleId });
+                const role = await ctx.app.roles.tryGet({
+                  roleId: currentBinding.customRoleId,
+                });
                 return role?.permissions as string[] | undefined;
               })()
             : undefined;
@@ -1293,15 +1261,14 @@ export const organizationRouter = createTRPCRouter({
       // The whole orchestration (personal-workspace assertion, shared-team
       // scoping, seat classification, Enterprise gate for custom roles)
       // lives in the service so the REST surface runs the same rules.
-      const { teamsLeftWithoutAdmin } =
-        await ctx.app.organizations.changeMemberRole({
-          organizationId: input.organizationId,
-          userId: input.userId,
-          role: input.role,
-          teamRoleUpdates: input.teamRoleUpdates,
-          currentUserId: ctx.session.user.id,
-          planUser: ctx.session.user,
-        });
+      const { teamsLeftWithoutAdmin } = await ctx.app.organizations.changeMemberRole({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        role: input.role,
+        teamRoleUpdates: input.teamRoleUpdates,
+        currentUserId: ctx.session.user.id,
+        planUser: ctx.session.user,
+      });
 
       // Reported rather than refused: correcting a seat down to Viewer can take
       // away a shared team's only team-scoped admin, which is allowed because

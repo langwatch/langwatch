@@ -88,8 +88,8 @@ describe("LangyPlanCard", () => {
     it("marks every step as a checkbox and counts done, never left", () => {
       ui(<LangyPlanCard plan={plan()} isStreaming />);
       fireEvent.click(screen.getByRole("button", { name: /plan/i }));
-      const markers = [...document.querySelectorAll("[data-plan-marker]")].map(
-        (el) => el.getAttribute("data-plan-marker"),
+      const markers = [...document.querySelectorAll("[data-plan-marker]")].map((el) =>
+        el.getAttribute("data-plan-marker"),
       );
       expect(markers).toEqual(["completed", "in_progress", "pending"]);
       expect(screen.getByText("Plan · 1 of 3 done")).toBeDefined();

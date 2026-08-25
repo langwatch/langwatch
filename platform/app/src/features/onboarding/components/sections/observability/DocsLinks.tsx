@@ -11,10 +11,7 @@ interface DocsLinksProps {
   label: string;
 }
 
-export function DocsLinks({
-  docs,
-  label,
-}: DocsLinksProps): React.ReactElement | null {
+export function DocsLinks({ docs, label }: DocsLinksProps): React.ReactElement | null {
   if (!docs || (!docs.internal && !docs.external)) return null;
 
   return (

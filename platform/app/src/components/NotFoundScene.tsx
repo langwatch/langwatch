@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Center,
-  HStack,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Center, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft, Home, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useColorMode, useColorModeValue } from "~/components/ui/color-mode";
@@ -48,9 +40,7 @@ function ParamSlider({
         max={max}
         step={step}
         value={[value]}
-        onValueChange={(e: { value: number[] }) =>
-          onChange(e.value[0] ?? value)
-        }
+        onValueChange={(e: { value: number[] }) => onChange(e.value[0] ?? value)}
       />
       <Input
         size="xs"
@@ -85,10 +75,7 @@ export function NotFoundScene() {
   const isVisible = useRef(true);
   const isTabActive = useRef(true);
 
-  const updateParam = <K extends keyof GridParams>(
-    key: K,
-    value: GridParams[K],
-  ) => {
+  const updateParam = <K extends keyof GridParams>(key: K, value: GridParams[K]) => {
     setParams((p) => ({ ...p, [key]: value }));
   };
 
@@ -119,14 +106,8 @@ export function NotFoundScene() {
     const el = containerRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    mouse.current.x = Math.max(
-      -0.5,
-      Math.min(0.5, (e.clientX - r.left) / r.width - 0.5),
-    );
-    mouse.current.y = Math.max(
-      -0.5,
-      Math.min(0.5, (e.clientY - r.top) / r.height - 0.5),
-    );
+    mouse.current.x = Math.max(-0.5, Math.min(0.5, (e.clientX - r.left) / r.width - 0.5));
+    mouse.current.y = Math.max(-0.5, Math.min(0.5, (e.clientY - r.top) / r.height - 0.5));
   }, []);
 
   useEffect(() => {
@@ -433,9 +414,7 @@ export function NotFoundScene() {
             lineHeight={1}
             letterSpacing="-0.04em"
             color={textRedColor}
-            animation={
-              prefersReducedMotion ? "none" : "glitch-1 3s steps(1) infinite"
-            }
+            animation={prefersReducedMotion ? "none" : "glitch-1 3s steps(1) infinite"}
             willChange="transform"
             style={{ transform: "translate(-2px, -1px)" }}
           >
@@ -451,9 +430,7 @@ export function NotFoundScene() {
             lineHeight={1}
             letterSpacing="-0.04em"
             color={textBlueColor}
-            animation={
-              prefersReducedMotion ? "none" : "glitch-2 2.5s steps(1) infinite"
-            }
+            animation={prefersReducedMotion ? "none" : "glitch-2 2.5s steps(1) infinite"}
             willChange="transform"
             style={{ transform: "translate(2px, 1px)" }}
           >

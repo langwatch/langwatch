@@ -7,13 +7,7 @@
  * boundary is mocked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -25,18 +19,13 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-vi.mock(
-  "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground",
-  () => ({
-    useGoToSpanInPlaygroundTabUrlBuilder: () => ({ buildUrl: () => null }),
-  }),
-);
+vi.mock("~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground", () => ({
+  useGoToSpanInPlaygroundTabUrlBuilder: () => ({ buildUrl: () => null }),
+}));
 
-const translateMock = vi.fn(
-  async ({ textToTranslate }: { textToTranslate: string }) => ({
-    translation: `TRANSLATED::${textToTranslate.slice(0, 20)}`,
-  }),
-);
+const translateMock = vi.fn(async ({ textToTranslate }: { textToTranslate: string }) => ({
+  translation: `TRANSLATED::${textToTranslate.slice(0, 20)}`,
+}));
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -148,9 +137,7 @@ describe("IOViewer translate action", () => {
 
       expect(screen.getByText(/Hej två/)).toBeInTheDocument();
       expect(screen.queryByText(/TRANSLATED::/)).not.toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /translate/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /translate/i })).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /show original/i }),
       ).not.toBeInTheDocument();
@@ -193,12 +180,8 @@ describe("IOViewer translate action", () => {
       // The translated variant still parses as the same conversation, so
       // the JSON format option survives translation instead of dropping
       // out of the format selector's menu.
-      await user.click(
-        screen.getByRole("button", { name: "Input view format" }),
-      );
-      expect(
-        await screen.findByRole("menuitem", { name: "JSON" }),
-      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Input view format" }));
+      expect(await screen.findByRole("menuitem", { name: "JSON" })).toBeInTheDocument();
     });
   });
 });

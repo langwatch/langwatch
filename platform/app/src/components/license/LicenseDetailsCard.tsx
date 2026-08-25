@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Link,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Link, Text, VStack } from "@chakra-ui/react";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import {
@@ -64,10 +56,9 @@ function LapsedLicenseNotice({ maxMembers }: { maxMembers: number }) {
       _dark={{ backgroundColor: "orange.950" }}
     >
       <Text fontSize="sm" color="orange.700" _dark={{ color: "orange.200" }}>
-        Your license reached its end date. Nothing was switched off: everyone
-        keeps their access and your {maxMembers}{" "}
-        {maxMembers === 1 ? "seat" : "seats"} and enterprise capabilities stay
-        as they are. Renew to add members again.
+        Your license reached its end date. Nothing was switched off: everyone keeps their
+        access and your {maxMembers} {maxMembers === 1 ? "seat" : "seats"} and enterprise
+        capabilities stay as they are. Renew to add members again.
       </Text>
     </Box>
   );
@@ -78,8 +69,7 @@ function InvalidLicenseNotice() {
   return (
     <Box backgroundColor="red.50" padding={3} borderRadius="md" width="full">
       <Text fontSize="sm" color="red.600">
-        Your license is invalid. Please contact support or upload a valid
-        license.
+        Your license is invalid. Please contact support or upload a valid license.
       </Text>
     </Box>
   );
@@ -104,15 +94,10 @@ export function LicenseDetailsCard({
             </Badge>
           </HStack>
 
-          <Box
-            backgroundColor="red.50"
-            padding={3}
-            borderRadius="md"
-            width="full"
-          >
+          <Box backgroundColor="red.50" padding={3} borderRadius="md" width="full">
             <Text fontSize="sm" color="red.600">
-              Your license file is corrupted and cannot be read. Please upload a
-              valid license or contact support.
+              Your license file is corrupted and cannot be read. Please upload a valid
+              license or contact support.
             </Text>
           </Box>
 
@@ -146,11 +131,7 @@ export function LicenseDetailsCard({
     <Box borderWidth="1px" borderRadius="lg" padding={6} width="full">
       <VStack align="start" gap={4}>
         <HStack>
-          <LicenseStateBadge
-            isValid={isValid}
-            isExpired={isExpired}
-            plan={status.plan}
-          />
+          <LicenseStateBadge isValid={isValid} isExpired={isExpired} plan={status.plan} />
         </HStack>
 
         <VStack align="start" gap={2} width="full">

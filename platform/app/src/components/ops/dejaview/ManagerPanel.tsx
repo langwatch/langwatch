@@ -46,12 +46,7 @@ export function ManagerPanel({
       overflowY="auto"
       bg="bg.surface"
     >
-      <Box
-        paddingX={3}
-        paddingY={2}
-        borderBottom="1px solid"
-        borderBottomColor="border"
-      >
+      <Box paddingX={3} paddingY={2} borderBottom="1px solid" borderBottomColor="border">
         <Text
           textStyle="xs"
           fontWeight="semibold"

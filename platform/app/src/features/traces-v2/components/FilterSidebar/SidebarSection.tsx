@@ -126,18 +126,14 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
     onOpenChange?.(next);
   };
 
-  const handleTriggerClick: React.MouseEventHandler<HTMLButtonElement> = (
-    e,
-  ) => {
+  const handleTriggerClick: React.MouseEventHandler<HTMLButtonElement> = (e) => {
     if (!e.shiftKey || !onShiftToggle) return;
     e.preventDefault();
     e.stopPropagation();
     onShiftToggle(!effectiveOpen);
   };
 
-  const handleTriggerKeyDown: React.KeyboardEventHandler<HTMLButtonElement> = (
-    e,
-  ) => {
+  const handleTriggerKeyDown: React.KeyboardEventHandler<HTMLButtonElement> = (e) => {
     if (!e.shiftKey || !onShiftToggle) return;
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault();
@@ -146,18 +142,8 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
   };
 
   return (
-    <Collapsible.Root
-      open={effectiveOpen}
-      onOpenChange={(e) => handleOpenChange(e.open)}
-    >
-      <VStack
-        align="stretch"
-        paddingX={2}
-        paddingY={2}
-        gap={1}
-        role="group"
-        data-group
-      >
+    <Collapsible.Root open={effectiveOpen} onOpenChange={(e) => handleOpenChange(e.open)}>
+      <VStack align="stretch" paddingX={2} paddingY={2} gap={1} role="group" data-group>
         {/* position:relative anchors the absolute grip below to the header
             row (so it stays vertically centred on the title, not the whole
             expanded section). The grip is pulled into the left gutter so the
@@ -272,12 +258,7 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
               values with matches, not the row count). Right-aligned so the
               digits and the chevron form a clean vertical column. */}
           {!effectiveOpen && valueCount !== undefined && valueCount > 0 && (
-            <Box
-              minWidth="20px"
-              textAlign="right"
-              flexShrink={0}
-              color="fg.subtle"
-            >
+            <Box minWidth="20px" textAlign="right" flexShrink={0} color="fg.subtle">
               <Text textStyle="2xs">{valueCount}</Text>
             </Box>
           )}
@@ -365,11 +346,7 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
                 }}
               >
                 <Icon boxSize="11px">
-                  {modeToggleProps.mode === "discrete" ? (
-                    <SlidersHorizontal />
-                  ) : (
-                    <List />
-                  )}
+                  {modeToggleProps.mode === "discrete" ? <SlidersHorizontal /> : <List />}
                 </Icon>
               </chakra.button>
             </Box>
@@ -393,9 +370,7 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
               handleOpenChange(!effectiveOpen);
             }}
           >
-            <Icon boxSize="12px">
-              {effectiveOpen ? <ChevronUp /> : <ChevronDown />}
-            </Icon>
+            <Icon boxSize="12px">{effectiveOpen ? <ChevronUp /> : <ChevronDown />}</Icon>
           </chakra.button>
           {/* Per-section hover-X retired in Round 3 — removing a section
               is now done exclusively from the FacetManagerPopover.

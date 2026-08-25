@@ -97,9 +97,7 @@ describe("LangyConversationService", () => {
           .mockResolvedValue(row());
         const repo = makeRepo({
           findVisibleById,
-          findPendingHandoff: vi
-            .fn()
-            .mockResolvedValue({ token: "t", turnId: "turn-1" }),
+          findPendingHandoff: vi.fn().mockResolvedValue({ token: "t", turnId: "turn-1" }),
         });
         const svc = new LangyConversationService(repo, makeCommands());
         const pending = svc.getById({
@@ -130,9 +128,7 @@ describe("LangyConversationService", () => {
           projectId: "p1",
           userId: "alice",
         });
-        const outcome = expect(pending).rejects.toThrow(
-          LangyConversationNotFoundError,
-        );
+        const outcome = expect(pending).rejects.toThrow(LangyConversationNotFoundError);
         await vi.advanceTimersByTimeAsync(10_000);
         await outcome;
         // A short grace, not the whole window: an id nobody is creating must
@@ -183,9 +179,7 @@ describe("LangyConversationService", () => {
       try {
         const repo = makeRepo({
           findVisibleById: vi.fn().mockResolvedValue(null),
-          findPendingHandoff: vi
-            .fn()
-            .mockResolvedValue({ token: "t", turnId: "turn-1" }),
+          findPendingHandoff: vi.fn().mockResolvedValue({ token: "t", turnId: "turn-1" }),
         });
         const svc = new LangyConversationService(repo, makeCommands());
         const pending = svc.getById({
@@ -193,9 +187,7 @@ describe("LangyConversationService", () => {
           projectId: "p1",
           userId: "alice",
         });
-        const outcome = expect(pending).rejects.toThrow(
-          LangyConversationNotFoundError,
-        );
+        const outcome = expect(pending).rejects.toThrow(LangyConversationNotFoundError);
         await vi.advanceTimersByTimeAsync(20_000);
         await outcome;
       } finally {
@@ -476,9 +468,7 @@ describe("LangyConversationService", () => {
       const repo = makeRepo({
         findAllForUser: vi
           .fn()
-          .mockResolvedValue([
-            row({ title: "t", lastActivityAtMs, messageCount: 3 }),
-          ]),
+          .mockResolvedValue([row({ title: "t", lastActivityAtMs, messageCount: 3 })]),
       });
       const svc = new LangyConversationService(repo, makeCommands());
       const result = await svc.getAll({ projectId: "p1", userId: "alice" });
@@ -781,9 +771,9 @@ describe("LangyConversationService", () => {
 
     describe("when the agent posts a failed turn", () => {
       it("dispatches failAgentResponse with a serialized domain error, never raw prose", async () => {
-        const failAgentResponse = vi.fn<
-          LangyConversationCommands["failAgentResponse"]
-        >(async () => {});
+        const failAgentResponse = vi.fn<LangyConversationCommands["failAgentResponse"]>(
+          async () => {},
+        );
         const svc = new LangyConversationService(
           makeRepo(),
           makeCommands({ failAgentResponse }),

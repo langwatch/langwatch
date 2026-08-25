@@ -38,18 +38,16 @@ describe("EventRepositoryMemory.getEventRecords lower bound", () => {
       const ids = (await repo.getEventRecords("tenant", "trace", "agg")).map(
         (r) => r.EventId,
       );
-      expect(new Set(ids)).toEqual(
-        new Set(["before", "at", "after", "unknown-time"]),
-      );
+      expect(new Set(ids)).toEqual(new Set(["before", "at", "after", "unknown-time"]));
     });
   });
 
   describe("when a lower bound is passed", () => {
     it("keeps events at/after the bound and unknown-time events, drops older ones", async () => {
       const repo = await seeded();
-      const ids = (
-        await repo.getEventRecords("tenant", "trace", "agg", bound)
-      ).map((r) => r.EventId);
+      const ids = (await repo.getEventRecords("tenant", "trace", "agg", bound)).map(
+        (r) => r.EventId,
+      );
 
       expect(new Set(ids)).toEqual(new Set(["at", "after", "unknown-time"]));
       expect(ids).not.toContain("before");

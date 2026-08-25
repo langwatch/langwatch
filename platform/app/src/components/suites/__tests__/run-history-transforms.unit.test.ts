@@ -764,9 +764,7 @@ describe("groupRunsByScenarioId()", () => {
     });
 
     it("sets groupType to scenario", () => {
-      const runs = [
-        makeScenarioRunData({ scenarioId: "s1", scenarioRunId: "run_1" }),
-      ];
+      const runs = [makeScenarioRunData({ scenarioId: "s1", scenarioRunId: "run_1" })];
 
       const result = groupRunsByScenarioId({ runs });
 
@@ -1225,8 +1223,7 @@ describe("resolveOriginLabel()", () => {
       const suiteNameMap = new Map<string, string>();
 
       const result = resolveOriginLabel({
-        scenarioSetId:
-          "__internal__project_owUldAg3-Pmddu7CMcgeo__on-platform-scenarios",
+        scenarioSetId: "__internal__project_owUldAg3-Pmddu7CMcgeo__on-platform-scenarios",
         suiteNameMap,
       });
 

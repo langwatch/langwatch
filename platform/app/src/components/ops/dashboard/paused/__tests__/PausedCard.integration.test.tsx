@@ -65,9 +65,7 @@ const renderCard = (
     <ChakraProvider value={defaultSystem}>
       <PausedCard
         parkedTenants={props.parkedTenants ?? []}
-        parkedTenantsBound={
-          props.parkedTenantsBound ?? { total: 0, included: 0 }
-        }
+        parkedTenantsBound={props.parkedTenantsBound ?? { total: 0, included: 0 }}
         pausedKeys={props.pausedKeys ?? []}
       />
     </ChakraProvider>,
@@ -83,9 +81,7 @@ describe("PausedCard", () => {
     describe("when the dashboard renders", () => {
       /** @scenario Everything switched off is reported together */
       it("reports all three under one panel, each naming its mechanism", () => {
-        mockPausedSchedules.mockReturnValue(
-          pausedSchedulesResult([pausedSchedule()]),
-        );
+        mockPausedSchedules.mockReturnValue(pausedSchedulesResult([pausedSchedule()]));
 
         renderCard({
           parkedTenants: [parkedTenant()],
@@ -105,9 +101,7 @@ describe("PausedCard", () => {
 
       /** @scenario Everything switched off is reported together */
       it("summarises the three counts on one line", () => {
-        mockPausedSchedules.mockReturnValue(
-          pausedSchedulesResult([pausedSchedule()]),
-        );
+        mockPausedSchedules.mockReturnValue(pausedSchedulesResult([pausedSchedule()]));
 
         renderCard({
           parkedTenants: [parkedTenant()],
@@ -131,9 +125,7 @@ describe("PausedCard", () => {
           parkedTenantsBound: { total: 1, included: 1 },
         });
 
-        expect(
-          screen.getByText(/at their in-flight capacity limit/),
-        ).toBeTruthy();
+        expect(screen.getByText(/at their in-flight capacity limit/)).toBeTruthy();
         expect(screen.getByText(/nothing has failed/)).toBeTruthy();
       });
 
@@ -159,9 +151,7 @@ describe("PausedCard", () => {
           parkedTenantsBound: { total: 1, included: 1 },
         });
 
-        expect(container.querySelectorAll('[role="separator"]')).toHaveLength(
-          0,
-        );
+        expect(container.querySelectorAll('[role="separator"]')).toHaveLength(0);
       });
     });
   });

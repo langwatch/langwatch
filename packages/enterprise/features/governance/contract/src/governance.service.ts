@@ -10,7 +10,9 @@ import type { TraceDepartmentInput } from "./department";
 export abstract class GovernanceIngestionService {
   abstract configure(input: ConfigureIngestionPullCommand): Promise<void>;
   abstract disable(input: DisableIngestionPullCommand): Promise<void>;
-  abstract recordRunCompleted(input: RecordIngestionPullRunCompletedCommand): Promise<void>;
+  abstract recordRunCompleted(
+    input: RecordIngestionPullRunCompletedCommand,
+  ): Promise<void>;
   abstract recordRunFailed(input: RecordIngestionPullRunFailedCommand): Promise<void>;
 }
 

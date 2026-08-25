@@ -23,9 +23,7 @@ export abstract class UserService {
   abstract getTraceExplorerTourPreference(
     input: UserIdInput,
   ): Promise<UserTourPreference>;
-  abstract dismissTraceExplorerTour(
-    input: UserIdInput,
-  ): Promise<UserTourPreference>;
+  abstract dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference>;
   abstract updateLastLogin(input: UserIdInput): Promise<void>;
   abstract getLastHomePath(input: UserIdInput): Promise<string | null>;
   abstract setLastHomePath(input: SetUserHomePathInput): Promise<void>;

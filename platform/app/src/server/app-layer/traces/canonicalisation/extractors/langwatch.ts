@@ -53,9 +53,7 @@ interface LangWatchStructuredValue {
   value: unknown;
 }
 
-const isLangWatchStructuredValue = (
-  v: unknown,
-): v is LangWatchStructuredValue =>
+const isLangWatchStructuredValue = (v: unknown): v is LangWatchStructuredValue =>
   isRecord(v) &&
   "type" in v &&
   "value" in v &&
@@ -118,11 +116,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
       attrs.take(ATTR_KEYS.LANGWATCH_THREAD_ID_LEGACY) ??
       attrs.take(ATTR_KEYS.LANGWATCH_THREAD_ID_LEGACY_ROOT) ??
       attrs.take(ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID);
-    if (
-      threadId !== undefined &&
-      typeof threadId === "string" &&
-      threadId.length > 0
-    ) {
+    if (threadId !== undefined && typeof threadId === "string" && threadId.length > 0) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, threadId);
       ctx.recordRule(`${this.id}:conversation.id`);
     }
@@ -170,8 +164,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // SDK may send as langwatch.tags, normalize to langwatch.labels
     // ─────────────────────────────────────────────────────────────────────────
     const labels =
-      attrs.take(ATTR_KEYS.LANGWATCH_LABELS) ??
-      attrs.take(ATTR_KEYS.LANGWATCH_TAGS);
+      attrs.take(ATTR_KEYS.LANGWATCH_LABELS) ?? attrs.take(ATTR_KEYS.LANGWATCH_TAGS);
     if (labels !== undefined) {
       ctx.setAttr(ATTR_KEYS.LANGWATCH_LABELS, labels);
       ctx.recordRule(`${this.id}:labels`);
@@ -252,10 +245,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // subkeys and normalize to metadata.{bareKey}.
     // Uses setAttr (not setAttrIfAbsent) so subkeys override blob fields.
     // ─────────────────────────────────────────────────────────────────────────
-    const METADATA_SUBKEY_PREFIXES = [
-      "langwatch.metadata.",
-      "langwatch.trace.",
-    ] as const;
+    const METADATA_SUBKEY_PREFIXES = ["langwatch.metadata.", "langwatch.trace."] as const;
     for (const prefix of METADATA_SUBKEY_PREFIXES) {
       for (const { key, value } of attrs.takeByPrefix(prefix)) {
         const bareKey = key.slice(prefix.length);
@@ -291,10 +281,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
       if (isLangWatchStructuredValue(rawInput)) {
         reservedTypes.push(`${ATTR_KEYS.LANGWATCH_INPUT}=${rawInput.type}`);
 
-        if (
-          rawInput.type === "chat_messages" &&
-          Array.isArray(rawInput.value)
-        ) {
+        if (rawInput.type === "chat_messages" && Array.isArray(rawInput.value)) {
           // Strip trailing assistant messages — these are the model's
           // response leaking back into input from post-call attribute
           // capture, not part of what was actually sent.
@@ -302,8 +289,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           const messages = normalizeToMessages(cleanedValue, "user");
 
           if (messages) {
-            const systemInstruction =
-              extractSystemInstructionFromMessages(messages);
+            const systemInstruction = extractSystemInstructionFromMessages(messages);
             if (systemInstruction !== null) {
               ctx.setAttrIfAbsent(
                 ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
@@ -312,15 +298,11 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
             }
 
             // Strip system messages — they are promoted to gen_ai.system_instructions
-            const chatMsgs = systemInstruction
-              ? stripSystemMessages(messages)
-              : messages;
+            const chatMsgs = systemInstruction ? stripSystemMessages(messages) : messages;
             if (chatMsgs.length > 0) {
               ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
             }
-            ctx.recordRule(
-              `${this.id}:input.chat_messages->gen_ai.input.messages`,
-            );
+            ctx.recordRule(`${this.id}:input.chat_messages->gen_ai.input.messages`);
           }
 
           // Preserve the (cleaned) raw input
@@ -337,9 +319,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
       } else {
         // Legacy behavior: flatten single-element arrays
         const normalizedInput =
-          Array.isArray(rawInput) && rawInput.length === 1
-            ? rawInput[0]
-            : rawInput;
+          Array.isArray(rawInput) && rawInput.length === 1 ? rawInput[0] : rawInput;
         ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, normalizedInput);
         ctx.recordRule(`${this.id}:input`);
       }
@@ -350,30 +330,20 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
       if (isLangWatchStructuredValue(rawOutput)) {
         reservedTypes.push(`${ATTR_KEYS.LANGWATCH_OUTPUT}=${rawOutput.type}`);
 
-        if (
-          rawOutput.type === "chat_messages" &&
-          Array.isArray(rawOutput.value)
-        ) {
+        if (rawOutput.type === "chat_messages" && Array.isArray(rawOutput.value)) {
           const messages = normalizeToMessages(rawOutput.value, "assistant");
 
           if (messages && messages.length > 0) {
             ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
-            ctx.recordRule(
-              `${this.id}:output.chat_messages->gen_ai.output.messages`,
-            );
+            ctx.recordRule(`${this.id}:output.chat_messages->gen_ai.output.messages`);
           }
 
           // Always preserve raw output — even when normalization fails
           ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, rawOutput.value);
           ctx.recordRule(`${this.id}:output`);
-        } else if (
-          rawOutput.type === "json" &&
-          Array.isArray(rawOutput.value)
-        ) {
+        } else if (rawOutput.type === "json" && Array.isArray(rawOutput.value)) {
           const content = (rawOutput.value as unknown[])
-            .map((item) =>
-              typeof item === "string" ? item : safeStringify(item),
-            )
+            .map((item) => (typeof item === "string" ? item : safeStringify(item)))
             .join("\n");
 
           const messages = normalizeToMessages(content, "assistant");
@@ -393,9 +363,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
       } else {
         // Legacy behavior: flatten single-element arrays
         const normalizedOutput =
-          Array.isArray(rawOutput) && rawOutput.length === 1
-            ? rawOutput[0]
-            : rawOutput;
+          Array.isArray(rawOutput) && rawOutput.length === 1 ? rawOutput[0] : rawOutput;
         ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, normalizedOutput);
         ctx.recordRule(`${this.id}:output`);
       }
@@ -437,34 +405,19 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
         // Token counts (setAttrIfAbsent — GenAI extractor may have set these)
         const promptTokens = numberField("promptTokens", "prompt_tokens");
         if (promptTokens !== null && promptTokens > 0) {
-          ctx.setAttrIfAbsent(
-            ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
-            promptTokens,
-          );
+          ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, promptTokens);
           ctx.recordRule(`${this.id}:metrics.promptTokens`);
         }
 
-        const completionTokens = numberField(
-          "completionTokens",
-          "completion_tokens",
-        );
+        const completionTokens = numberField("completionTokens", "completion_tokens");
         if (completionTokens !== null && completionTokens > 0) {
-          ctx.setAttrIfAbsent(
-            ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
-            completionTokens,
-          );
+          ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, completionTokens);
           ctx.recordRule(`${this.id}:metrics.completionTokens`);
         }
 
-        const reasoningTokens = numberField(
-          "reasoningTokens",
-          "reasoning_tokens",
-        );
+        const reasoningTokens = numberField("reasoningTokens", "reasoning_tokens");
         if (reasoningTokens !== null && reasoningTokens > 0) {
-          ctx.setAttrIfAbsent(
-            ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
-            reasoningTokens,
-          );
+          ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, reasoningTokens);
           ctx.recordRule(`${this.id}:metrics.reasoningTokens`);
         }
 
@@ -478,10 +431,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
         // Time to first token, already a duration in milliseconds
         const firstTokenMs = numberField("firstTokenMs", "first_token_ms");
         if (firstTokenMs !== null && firstTokenMs >= 0) {
-          ctx.setAttrIfAbsent(
-            ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN,
-            firstTokenMs,
-          );
+          ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN, firstTokenMs);
           ctx.recordRule(`${this.id}:metrics.firstTokenMs`);
         }
 
@@ -512,9 +462,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
         // json_encoded_event may be a string (raw OTLP) or already parsed
         // by normalizeOtlpAttributes' parseJsonStringValues step
         const parsed =
-          typeof jsonPayload === "string"
-            ? JSON.parse(jsonPayload)
-            : jsonPayload;
+          typeof jsonPayload === "string" ? JSON.parse(jsonPayload) : jsonPayload;
         if (!isRecord(parsed)) continue;
 
         const evalData = parsed as Record<string, unknown>;
@@ -524,16 +472,10 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_EVALUATION_NAME, evalData.name);
         }
         if (typeof evalData.label === "string") {
-          ctx.setAttrIfAbsent(
-            ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL,
-            evalData.label,
-          );
+          ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL, evalData.label);
         }
         if (typeof evalData.score === "number") {
-          ctx.setAttrIfAbsent(
-            ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE,
-            evalData.score,
-          );
+          ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE, evalData.score);
         }
         ctx.recordRule(`${this.id}:evaluation.custom`);
         break; // Only first evaluation maps to semconv

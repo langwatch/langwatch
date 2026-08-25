@@ -231,12 +231,8 @@ async function recordClusteringSuccess(params: {
       tracesProcessed: outcome.tracesProcessed,
       topicsCount: outcome.topicsCount,
       subtopicsCount: outcome.subtopicsCount,
-      ...(outcome.skippedReason
-        ? { skippedReason: outcome.skippedReason }
-        : {}),
-      ...(outcome.nextSearchAfter
-        ? { nextSearchAfter: outcome.nextSearchAfter }
-        : {}),
+      ...(outcome.skippedReason ? { skippedReason: outcome.skippedReason } : {}),
+      ...(outcome.nextSearchAfter ? { nextSearchAfter: outcome.nextSearchAfter } : {}),
     });
   } catch (error) {
     logger.error(
@@ -269,10 +265,7 @@ export function createTopicClusteringRunHandler(
   const maxAttempts = deps.maxAttempts ?? TOPIC_CLUSTERING_MAX_ATTEMPTS;
   const clock = deps.clock ?? (() => Date.now());
 
-  return async (
-    payload: TopicClusteringRunIntent,
-    intentContext: IntentContext,
-  ) => {
+  return async (payload: TopicClusteringRunIntent, intentContext: IntentContext) => {
     const commands = deps.commands();
     const context: PageContext = {
       projectId: intentContext.projectId,

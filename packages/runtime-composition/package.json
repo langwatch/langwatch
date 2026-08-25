@@ -4,18 +4,18 @@
   "private": true,
   "description": "Portable typed capability graphs, feature installation, and runtime resource ownership.",
   "license": "MIT",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": [
-    "src"
-  ],
   "scripts": {
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",

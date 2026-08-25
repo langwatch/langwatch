@@ -11,9 +11,7 @@ const TRACE_ID = "534bd8a1bf83e7c58e8aaacefb047cc2";
 
 /** 64 distinct hex span ids, shaped like real OTLP span ids. */
 function makeSpanIds(n: number): string[] {
-  return Array.from({ length: n }, (_, i) =>
-    (i + 1).toString(16).padStart(16, "0"),
-  );
+  return Array.from({ length: n }, (_, i) => (i + 1).toString(16).padStart(16, "0"));
 }
 
 describe("spanCommandGroupKey", () => {
@@ -90,9 +88,7 @@ describe("spanCommandGroupKey", () => {
       it("uses every shard for a well-distributed span population", () => {
         const shardCount = 8;
         const seen = new Set(
-          makeSpanIds(512).map((spanId) =>
-            spanShardIndex({ spanId, shardCount }),
-          ),
+          makeSpanIds(512).map((spanId) => spanShardIndex({ spanId, shardCount })),
         );
         expect(seen.size).toBe(shardCount);
       });
@@ -170,9 +166,9 @@ describe("spanCommandGroupKey", () => {
           "550e8400-e29b-41d4-a716-446655440000",
           "",
         ]) {
-          expect(
-            spanCommandGroupKey({ traceId, spanId: "any", shardCount: 1 }),
-          ).toBe(traceId);
+          expect(spanCommandGroupKey({ traceId, spanId: "any", shardCount: 1 })).toBe(
+            traceId,
+          );
         }
       });
 

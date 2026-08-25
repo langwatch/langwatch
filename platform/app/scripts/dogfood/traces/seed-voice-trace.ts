@@ -77,8 +77,7 @@ function assertLocalEndpoint(endpoint: string): void {
   } catch {
     throw new Error(`--endpoint is not a URL: ${endpoint}`);
   }
-  const isLocal =
-    LOCAL_HOSTS.has(hostname) || hostname.endsWith(".langwatch.localhost");
+  const isLocal = LOCAL_HOSTS.has(hostname) || hostname.endsWith(".langwatch.localhost");
   if (!isLocal) {
     throw new Error(
       `refusing to seed ${hostname}: this script only runs against a local app`,
@@ -308,14 +307,11 @@ async function main() {
     throw new Error(`POST ${url} -> ${response.status} ${text}`);
   }
 
-  const wavBytes =
-    wrapRawPcmToWav(new Uint8Array(spoken), "pcm16")?.length ?? 0;
+  const wavBytes = wrapRawPcmToWav(new Uint8Array(spoken), "pcm16")?.length ?? 0;
   console.log(`POST ${url} -> ${response.status} ${text}`);
   console.log(`project     ${project.name} (${project.slug})`);
   console.log(`stored      ${[...new Set(references)].join(", ")}`);
-  console.log(
-    `caller clip ${wavBytes} bytes of WAV at ${PCM16_SAMPLE_RATE} Hz`,
-  );
+  console.log(`caller clip ${wavBytes} bytes of WAV at ${PCM16_SAMPLE_RATE} Hz`);
   console.log(
     `\nTrace (give the fold a few seconds):\n${args.endpoint.replace(/\/$/, "")}/${project.slug}/traces?drawer.open=traceV2Details&drawer.traceId=${traceId}&drawer.t=${startedAt}`,
   );

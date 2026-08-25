@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import {
-  InMemorySpanExporter,
-  SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { trace } from "@opentelemetry/api";
 import { ChatOpenAI } from "@langchain/openai";
 import { DynamicStructuredTool } from "@langchain/core/tools";
@@ -17,9 +14,7 @@ import { NoOpLogger } from "../../../../../logger";
 const RUN_EXTERNAL = process.env.RUN_EXTERNAL_LLM_TESTS === "true";
 
 if (RUN_EXTERNAL && !process.env.OPENAI_API_KEY) {
-  throw new Error(
-    "RUN_EXTERNAL_LLM_TESTS is true but OPENAI_API_KEY is not set"
-  );
+  throw new Error("RUN_EXTERNAL_LLM_TESTS is true but OPENAI_API_KEY is not set");
 }
 
 /**
@@ -30,8 +25,7 @@ if (RUN_EXTERNAL && !process.env.OPENAI_API_KEY) {
 function validateSpanDataIntegrity(spans: any[], expectedTypes: string[]) {
   const spansByType = spans.reduce(
     (acc, span) => {
-      const type =
-        (span.attributes["langwatch.span.type"] as string) ?? "undefined";
+      const type = (span.attributes["langwatch.span.type"] as string) ?? "undefined";
       acc[type] = (acc[type] ?? 0) + 1;
       return acc;
     },
@@ -91,47 +85,43 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
   it("traces multi-agent collaboration workflow", async () => {
     const tracer = getLangWatchTracer("multi-agent-test");
 
-    await tracer.withActiveSpan(
-      "multi-agent-collaboration",
-      { root: true },
-      async () => {
-        // Create simple research agent
-        const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 }); // gpt-4.1 takes too long to respond
-        const tools = [
-          new DynamicStructuredTool({
-            name: "search",
-            description: "Search for information",
-            schema: z.object({
-              query: z.string().describe("The search query"),
-            }),
-            func: async ({ query }: { query: string }) => `Found results for: ${query}`,
+    await tracer.withActiveSpan("multi-agent-collaboration", { root: true }, async () => {
+      // Create simple research agent
+      const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 }); // gpt-4.1 takes too long to respond
+      const tools = [
+        new DynamicStructuredTool({
+          name: "search",
+          description: "Search for information",
+          schema: z.object({
+            query: z.string().describe("The search query"),
           }),
-        ];
+          func: async ({ query }: { query: string }) => `Found results for: ${query}`,
+        }),
+      ];
 
-        const prompt = ChatPromptTemplate.fromMessages([
-          ["system", "You are a research assistant."],
-          ["human", "{input}"],
-          ["placeholder", "{agent_scratchpad}"],
-        ]);
+      const prompt = ChatPromptTemplate.fromMessages([
+        ["system", "You are a research assistant."],
+        ["human", "{input}"],
+        ["placeholder", "{agent_scratchpad}"],
+      ]);
 
-        const agent = createToolCallingAgent({ llm, tools, prompt });
-        const executor = new AgentExecutor({
-          agent,
-          tools,
-        });
+      const agent = createToolCallingAgent({ llm, tools, prompt });
+      const executor = new AgentExecutor({
+        agent,
+        tools,
+      });
 
-        const tracingCallback = new LangWatchCallbackHandler();
+      const tracingCallback = new LangWatchCallbackHandler();
 
-        const result = await executor.invoke(
-          {
-            input: "Hello, search for AI trends",
-          },
-          { callbacks: [tracingCallback] },
-        );
+      const result = await executor.invoke(
+        {
+          input: "Hello, search for AI trends",
+        },
+        { callbacks: [tracingCallback] },
+      );
 
-        expect(result.output).toBeDefined();
-      },
-    );
+      expect(result.output).toBeDefined();
+    });
 
     await spanProcessor.forceFlush();
     const finishedSpans = spanExporter.getFinishedSpans();
@@ -172,63 +162,58 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
   it("handles nested agent execution with tool chains", async () => {
     const tracer = getLangWatchTracer("nested-agent-test");
 
-    await tracer.withActiveSpan(
-      "nested-agent-execution",
-      { root: true },
-      async () => {
-        // Create agent with multiple tools for tool chaining
-        const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
-        const tools = [
-          new DynamicStructuredTool({
-            name: "data_collector",
-            description: "Collect data from various sources",
-            schema: z.object({
-              task: z.string().describe("The task to collect data for"),
-            }),
-            func: async ({ task }: { task: string }) => `Data collected for: ${task}`,
+    await tracer.withActiveSpan("nested-agent-execution", { root: true }, async () => {
+      // Create agent with multiple tools for tool chaining
+      const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
+      const tools = [
+        new DynamicStructuredTool({
+          name: "data_collector",
+          description: "Collect data from various sources",
+          schema: z.object({
+            task: z.string().describe("The task to collect data for"),
           }),
-          new DynamicStructuredTool({
-            name: "data_processor",
-            description: "Process and analyze collected data",
-            schema: z.object({
-              data: z.string().describe("The data to process"),
-            }),
-            func: async ({ data }: { data: string }) => `Processed: ${data}`,
+          func: async ({ task }: { task: string }) => `Data collected for: ${task}`,
+        }),
+        new DynamicStructuredTool({
+          name: "data_processor",
+          description: "Process and analyze collected data",
+          schema: z.object({
+            data: z.string().describe("The data to process"),
           }),
-          new DynamicStructuredTool({
-            name: "report_generator",
-            description: "Generate reports from processed data",
-            schema: z.object({
-              analysis: z.string().describe("The analysis to generate report from"),
-            }),
-            func: async ({ analysis }: { analysis: string }) => `Report: ${analysis}`,
+          func: async ({ data }: { data: string }) => `Processed: ${data}`,
+        }),
+        new DynamicStructuredTool({
+          name: "report_generator",
+          description: "Generate reports from processed data",
+          schema: z.object({
+            analysis: z.string().describe("The analysis to generate report from"),
           }),
-        ];
+          func: async ({ analysis }: { analysis: string }) => `Report: ${analysis}`,
+        }),
+      ];
 
-        const prompt = ChatPromptTemplate.fromMessages([
-          [
-            "system",
-            "You are a data analysis supervisor. Use tools to collect, process, and report on data.",
-          ],
-          ["human", "{input}"],
-          ["placeholder", "{agent_scratchpad}"],
-        ]);
+      const prompt = ChatPromptTemplate.fromMessages([
+        [
+          "system",
+          "You are a data analysis supervisor. Use tools to collect, process, and report on data.",
+        ],
+        ["human", "{input}"],
+        ["placeholder", "{agent_scratchpad}"],
+      ]);
 
-        const agent = createToolCallingAgent({ llm, tools, prompt });
-        const executor = new AgentExecutor({ agent, tools });
-        const tracingCallback = new LangWatchCallbackHandler();
+      const agent = createToolCallingAgent({ llm, tools, prompt });
+      const executor = new AgentExecutor({ agent, tools });
+      const tracingCallback = new LangWatchCallbackHandler();
 
-        const result = await executor.invoke(
-          {
-            input:
-              "Collect data on market trends, process it, and create a summary report",
-          },
-          { callbacks: [tracingCallback] },
-        );
+      const result = await executor.invoke(
+        {
+          input: "Collect data on market trends, process it, and create a summary report",
+        },
+        { callbacks: [tracingCallback] },
+      );
 
-        expect(result.output).toBeDefined();
-      },
-    );
+      expect(result.output).toBeDefined();
+    });
 
     await spanProcessor.forceFlush();
     const finishedSpans = spanExporter.getFinishedSpans();
@@ -278,63 +263,59 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
   it("traces conversational agent memory and context", async () => {
     const tracer = getLangWatchTracer("conversational-agent-test");
 
-    await tracer.withActiveSpan(
-      "conversational-flow",
-      { root: true },
-      async () => {
-        // Create conversational agent with context tools
-        const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
-        const tools = [
-          new DynamicStructuredTool({
-            name: "memory_store",
-            description: "Store information for later recall",
-            schema: z.object({
-              info: z.string().describe("Information to store"),
-            }),
-            func: async ({ info }: { info: string }) => `Stored: ${info}`,
+    await tracer.withActiveSpan("conversational-flow", { root: true }, async () => {
+      // Create conversational agent with context tools
+      const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
+      const tools = [
+        new DynamicStructuredTool({
+          name: "memory_store",
+          description: "Store information for later recall",
+          schema: z.object({
+            info: z.string().describe("Information to store"),
           }),
-          new DynamicStructuredTool({
-            name: "memory_recall",
-            description: "Recall stored information",
-            schema: z.object({
-              query: z.string().describe("Query to recall information"),
-            }),
-            func: async ({ query }: { query: string }) =>
-              `Recalled about ${query}: renewable energy project discussion`,
+          func: async ({ info }: { info: string }) => `Stored: ${info}`,
+        }),
+        new DynamicStructuredTool({
+          name: "memory_recall",
+          description: "Recall stored information",
+          schema: z.object({
+            query: z.string().describe("Query to recall information"),
           }),
-        ];
+          func: async ({ query }: { query: string }) =>
+            `Recalled about ${query}: renewable energy project discussion`,
+        }),
+      ];
 
-        const prompt = ChatPromptTemplate.fromMessages([
-          [
-            "system",
-            "You are a helpful assistant with memory. Use tools to store and recall context.",
-          ],
-          ["human", "{input}"],
-          ["placeholder", "{agent_scratchpad}"],
-        ]);
+      const prompt = ChatPromptTemplate.fromMessages([
+        [
+          "system",
+          "You are a helpful assistant with memory. Use tools to store and recall context.",
+        ],
+        ["human", "{input}"],
+        ["placeholder", "{agent_scratchpad}"],
+      ]);
 
-        const agent = createToolCallingAgent({ llm, tools, prompt });
-        const executor = new AgentExecutor({ agent, tools });
-        const tracingCallback = new LangWatchCallbackHandler();
+      const agent = createToolCallingAgent({ llm, tools, prompt });
+      const executor = new AgentExecutor({ agent, tools });
+      const tracingCallback = new LangWatchCallbackHandler();
 
-        // Simplified 2-turn conversation
-        const response1 = await executor.invoke(
-          {
-            input: "I'm working on renewable energy research",
-          },
-          { callbacks: [tracingCallback] },
-        );
-        expect(response1.output).toBeDefined();
+      // Simplified 2-turn conversation
+      const response1 = await executor.invoke(
+        {
+          input: "I'm working on renewable energy research",
+        },
+        { callbacks: [tracingCallback] },
+      );
+      expect(response1.output).toBeDefined();
 
-        const response2 = await executor.invoke(
-          {
-            input: "What did I mention I was working on?",
-          },
-          { callbacks: [tracingCallback] },
-        );
-        expect(response2.output).toBeDefined();
-      },
-    );
+      const response2 = await executor.invoke(
+        {
+          input: "What did I mention I was working on?",
+        },
+        { callbacks: [tracingCallback] },
+      );
+      expect(response2.output).toBeDefined();
+    });
 
     await spanProcessor.forceFlush();
     const finishedSpans = spanExporter.getFinishedSpans();
@@ -359,9 +340,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
         expect(input).toMatch(/working on|mentioned|recall/i);
       }
     });
-    const memorySpans = finishedSpans.filter((span) =>
-      span.name.includes("memory"),
-    );
+    const memorySpans = finishedSpans.filter((span) => span.name.includes("memory"));
     expect(memorySpans.length).toBeGreaterThan(0);
 
     memorySpans.forEach((span) => {
@@ -381,60 +360,56 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
   it("handles agent error recovery and fallback chains", async () => {
     const tracer = getLangWatchTracer("error-recovery-test");
 
-    await tracer.withActiveSpan(
-      "error-recovery-flow",
-      { root: true },
-      async () => {
-        // Create agent with failing and fallback tools
-        const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
-        const tools = [
-          new DynamicStructuredTool({
-            name: "primary_tool",
-            description: "Primary data source (may fail)",
-            schema: z.object({
-              input: z.string().describe("Input for primary tool"),
-            }),
-            func: async ({ input }: { input: string }) => {
-              if (input.includes("fail")) {
-                throw new Error("Primary tool failed");
-              }
-              return `Primary result for: ${input}`;
-            },
+    await tracer.withActiveSpan("error-recovery-flow", { root: true }, async () => {
+      // Create agent with failing and fallback tools
+      const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
+      const tools = [
+        new DynamicStructuredTool({
+          name: "primary_tool",
+          description: "Primary data source (may fail)",
+          schema: z.object({
+            input: z.string().describe("Input for primary tool"),
           }),
-          new DynamicStructuredTool({
-            name: "fallback_tool",
-            description: "Backup data source",
-            schema: z.object({
-              input: z.string().describe("Input for fallback tool"),
-            }),
-            func: async ({ input }: { input: string }) => `Fallback result for: ${input}`,
-          }),
-        ];
-
-        const prompt = ChatPromptTemplate.fromMessages([
-          [
-            "system",
-            "You are a resilient agent. Try primary_tool first, if it fails use fallback_tool.",
-          ],
-          ["human", "{input}"],
-          ["placeholder", "{agent_scratchpad}"],
-        ]);
-
-        const agent = createToolCallingAgent({ llm, tools, prompt });
-        const executor = new AgentExecutor({ agent, tools });
-        const tracingCallback = new LangWatchCallbackHandler();
-
-        // This should trigger fallback behavior
-        const result = await executor.invoke(
-          {
-            input: "Get data that will fail from primary source",
+          func: async ({ input }: { input: string }) => {
+            if (input.includes("fail")) {
+              throw new Error("Primary tool failed");
+            }
+            return `Primary result for: ${input}`;
           },
-          { callbacks: [tracingCallback] },
-        );
+        }),
+        new DynamicStructuredTool({
+          name: "fallback_tool",
+          description: "Backup data source",
+          schema: z.object({
+            input: z.string().describe("Input for fallback tool"),
+          }),
+          func: async ({ input }: { input: string }) => `Fallback result for: ${input}`,
+        }),
+      ];
 
-        expect(result.output).toBeDefined();
-      },
-    );
+      const prompt = ChatPromptTemplate.fromMessages([
+        [
+          "system",
+          "You are a resilient agent. Try primary_tool first, if it fails use fallback_tool.",
+        ],
+        ["human", "{input}"],
+        ["placeholder", "{agent_scratchpad}"],
+      ]);
+
+      const agent = createToolCallingAgent({ llm, tools, prompt });
+      const executor = new AgentExecutor({ agent, tools });
+      const tracingCallback = new LangWatchCallbackHandler();
+
+      // This should trigger fallback behavior
+      const result = await executor.invoke(
+        {
+          input: "Get data that will fail from primary source",
+        },
+        { callbacks: [tracingCallback] },
+      );
+
+      expect(result.output).toBeDefined();
+    });
 
     await spanProcessor.forceFlush();
     const finishedSpans = spanExporter.getFinishedSpans();
@@ -478,55 +453,52 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
   it("traces parallel agent execution", async () => {
     const tracer = getLangWatchTracer("parallel-agent-test");
 
-    await tracer.withActiveSpan(
-      "parallel-execution",
-      { root: true },
-      async () => {
-        // Create two simple agents to run in parallel
-        const createAgent = (name: string) => {
-          const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
-          const tools = [
-            new DynamicStructuredTool({
-              name: `${name}_analysis`,
-              description: `Perform ${name} analysis`,
-              schema: z.object({
-                task: z.string().describe("Task to analyze"),
-              }),
-              func: async ({ task }: { task: string }) => `${name} analysis result: ${task}`,
+    await tracer.withActiveSpan("parallel-execution", { root: true }, async () => {
+      // Create two simple agents to run in parallel
+      const createAgent = (name: string) => {
+        const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
+        const tools = [
+          new DynamicStructuredTool({
+            name: `${name}_analysis`,
+            description: `Perform ${name} analysis`,
+            schema: z.object({
+              task: z.string().describe("Task to analyze"),
             }),
-          ];
+            func: async ({ task }: { task: string }) =>
+              `${name} analysis result: ${task}`,
+          }),
+        ];
 
-          const prompt = ChatPromptTemplate.fromMessages([
-            ["system", `You are a ${name} specialist.`],
-            ["human", "{input}"],
-            ["placeholder", "{agent_scratchpad}"],
-          ]);
+        const prompt = ChatPromptTemplate.fromMessages([
+          ["system", `You are a ${name} specialist.`],
+          ["human", "{input}"],
+          ["placeholder", "{agent_scratchpad}"],
+        ]);
 
-          const agent = createToolCallingAgent({ llm, tools, prompt });
-          return new AgentExecutor({ agent, tools });
-        };
+        const agent = createToolCallingAgent({ llm, tools, prompt });
+        return new AgentExecutor({ agent, tools });
+      };
 
-        const agents = [createAgent("data"), createAgent("market")];
+      const agents = [createAgent("data"), createAgent("market")];
 
-        const tracingCallback = new LangWatchCallbackHandler();
+      const tracingCallback = new LangWatchCallbackHandler();
 
-        // Execute agents in parallel
-        const results = await Promise.all(
-          agents.map((agent, index) =>
-            agent.invoke(
-              {
-                input: `Analyze trends for area ${index + 1}`,
-              },
-              { callbacks: [tracingCallback] },
-            ),
+      // Execute agents in parallel
+      const results = await Promise.all(
+        agents.map((agent, index) =>
+          agent.invoke(
+            {
+              input: `Analyze trends for area ${index + 1}`,
+            },
+            { callbacks: [tracingCallback] },
           ),
-        );
+        ),
+      );
 
-        results.forEach((result) => {
-          expect(result.output).toBeDefined();
-        });
-      },
-    );
+      results.forEach((result) => {
+        expect(result.output).toBeDefined();
+      });
+    });
 
     await spanProcessor.forceFlush();
     const finishedSpans = spanExporter.getFinishedSpans();
@@ -572,51 +544,46 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
   it("verifies comprehensive span data capture integrity", async () => {
     const tracer = getLangWatchTracer("data-integrity-test");
 
-    await tracer.withActiveSpan(
-      "data-integrity-validation",
-      { root: true },
-      async () => {
-        // Create a simple agent to test data capture
-        const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
-        const tools = [
-          new DynamicStructuredTool({
-            name: "test_tool",
-            description: "Test tool for data validation",
-            schema: z.object({
-              input: z.string().describe("Input to process"),
-            }),
-            func: async ({ input }: { input: string }) => `Processed: ${input}`,
+    await tracer.withActiveSpan("data-integrity-validation", { root: true }, async () => {
+      // Create a simple agent to test data capture
+      const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
+      const tools = [
+        new DynamicStructuredTool({
+          name: "test_tool",
+          description: "Test tool for data validation",
+          schema: z.object({
+            input: z.string().describe("Input to process"),
           }),
-        ];
+          func: async ({ input }: { input: string }) => `Processed: ${input}`,
+        }),
+      ];
 
-        const prompt = ChatPromptTemplate.fromMessages([
-          ["system", "You are a test agent for data validation."],
-          ["human", "{input}"],
-          ["placeholder", "{agent_scratchpad}"],
-        ]);
+      const prompt = ChatPromptTemplate.fromMessages([
+        ["system", "You are a test agent for data validation."],
+        ["human", "{input}"],
+        ["placeholder", "{agent_scratchpad}"],
+      ]);
 
-        const agent = createToolCallingAgent({ llm, tools, prompt });
-        const executor = new AgentExecutor({ agent, tools });
-        const tracingCallback = new LangWatchCallbackHandler();
+      const agent = createToolCallingAgent({ llm, tools, prompt });
+      const executor = new AgentExecutor({ agent, tools });
+      const tracingCallback = new LangWatchCallbackHandler();
 
-        const result = await executor.invoke(
-          {
-            input: "Test input for data validation",
-          },
-          { callbacks: [tracingCallback] },
-        );
+      const result = await executor.invoke(
+        {
+          input: "Test input for data validation",
+        },
+        { callbacks: [tracingCallback] },
+      );
 
-        expect(result.output).toBeDefined();
-      },
-    );
+      expect(result.output).toBeDefined();
+    });
 
     await spanProcessor.forceFlush();
     const finishedSpans = spanExporter.getFinishedSpans();
 
     const spanAnalysis = finishedSpans.map((span, index) => {
       const attributes = span.attributes;
-      const spanType =
-        (attributes["langwatch.span.type"] as string) ?? "undefined";
+      const spanType = (attributes["langwatch.span.type"] as string) ?? "undefined";
       return {
         index,
         name: span.name,

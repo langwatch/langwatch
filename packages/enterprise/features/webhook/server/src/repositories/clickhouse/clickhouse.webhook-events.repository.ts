@@ -1,5 +1,11 @@
-import { WebhookEventsRepository, type WebhookEventsPage } from "../webhook-events.repository";
-import type { WebhookSpendEventRow, WebhookSpendEventStatus } from "../../services/webhook-envelope.service";
+import {
+  WebhookEventsRepository,
+  type WebhookEventsPage,
+} from "../webhook-events.repository";
+import type {
+  WebhookSpendEventRow,
+  WebhookSpendEventStatus,
+} from "../../services/webhook-envelope.service";
 
 const SPEND_TABLE = "gateway_spend";
 const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
@@ -85,7 +91,10 @@ export type WebhookEventsCursor = {
 };
 
 function encodeCursor(cursor: WebhookEventsCursor): string {
-  return Buffer.from(`${cursor.occurredAtMs}:${cursor.gatewayRequestId}`, "utf8").toString("base64url");
+  return Buffer.from(
+    `${cursor.occurredAtMs}:${cursor.gatewayRequestId}`,
+    "utf8",
+  ).toString("base64url");
 }
 
 function decodeCursor(encoded: string): WebhookEventsCursor | null {
@@ -110,7 +119,8 @@ function parseEventId(
   if (separator <= 0 || separator === id.length - 1) return null;
   const gatewayRequestId = id.slice(0, separator);
   const suffix = id.slice(separator + 1);
-  if (suffix === "completed") return { gatewayRequestId, statuses: ["confirmed", "failed"] };
+  if (suffix === "completed")
+    return { gatewayRequestId, statuses: ["confirmed", "failed"] };
   if (suffix === "settled") return { gatewayRequestId, statuses: ["settled"] };
   return null;
 }
@@ -167,7 +177,9 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepository {
     }
     const cursor = input.cursor ? decodeCursor(input.cursor) : null;
     if (cursor) {
-      clauses.push("AND (OccurredAt, GatewayRequestId) < (fromUnixTimestamp64Milli({cursorOccurredAtMs:Int64}), {cursorRequestId:String})");
+      clauses.push(
+        "AND (OccurredAt, GatewayRequestId) < (fromUnixTimestamp64Milli({cursorOccurredAtMs:Int64}), {cursorRequestId:String})",
+      );
       queryParams.cursorOccurredAtMs = cursor.occurredAtMs;
       queryParams.cursorRequestId = cursor.gatewayRequestId;
     }
@@ -183,7 +195,9 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepository {
       query_params: queryParams,
       format: "JSONEachRow",
     });
-    const rows = ((await result.json()) as Array<Record<string, unknown>>).map(mapSpendEventRow);
+    const rows = ((await result.json()) as Array<Record<string, unknown>>).map(
+      mapSpendEventRow,
+    );
     const last = rows.at(-1);
     return {
       rows,

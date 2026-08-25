@@ -415,9 +415,7 @@ describe("Feature: editing a model-provider row resolves the correct row by id",
         const input = getInputNearLabel("OPENAI_API_KEY");
         await user.clear(input);
         await user.type(input, "sk-survives-rerender");
-        expect(getInputNearLabel("OPENAI_API_KEY").value).toBe(
-          "sk-survives-rerender",
-        );
+        expect(getInputNearLabel("OPENAI_API_KEY").value).toBe("sk-survives-rerender");
 
         rerender(
           <Wrapper>
@@ -430,9 +428,7 @@ describe("Feature: editing a model-provider row resolves the correct row by id",
           </Wrapper>,
         );
 
-        expect(getInputNearLabel("OPENAI_API_KEY").value).toBe(
-          "sk-survives-rerender",
-        );
+        expect(getInputNearLabel("OPENAI_API_KEY").value).toBe("sk-survives-rerender");
       });
     });
   });

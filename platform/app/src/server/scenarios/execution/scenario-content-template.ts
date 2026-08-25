@@ -46,9 +46,7 @@ const PARAMS_PREFIX = `${PARAMS_NAMESPACE}.`;
  * reads back as `region`, anything else keeps its full path.
  */
 function referencedName(path: string): string {
-  return path.startsWith(PARAMS_PREFIX)
-    ? path.slice(PARAMS_PREFIX.length)
-    : path;
+  return path.startsWith(PARAMS_PREFIX) ? path.slice(PARAMS_PREFIX.length) : path;
 }
 
 type FieldRenderResult =

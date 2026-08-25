@@ -201,9 +201,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     }
     const organizationId = scopeOrganizationId(from);
     if (scopeOrganizationId(to) !== organizationId) {
-      throw new GrantValidationError(
-        "replace() must stay within one organization",
-      );
+      throw new GrantValidationError("replace() must stay within one organization");
     }
     const { repository } = this.options;
     await this.assertScopeBelongsToOrganization({
@@ -262,15 +260,11 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     return this.options.ledger.attachBindings(args);
   }
 
-  async attachResourceGrant(
-    args: AuthzAttachResourceGrantInput,
-  ): Promise<void> {
+  async attachResourceGrant(args: AuthzAttachResourceGrantInput): Promise<void> {
     return this.options.ledger.attachResourceGrant(args);
   }
 
-  async revokeResourceGrants(
-    args: AuthzRevokeResourceGrantsInput,
-  ): Promise<void> {
+  async revokeResourceGrants(args: AuthzRevokeResourceGrantsInput): Promise<void> {
     return this.options.ledger.revokeResourceGrants(args);
   }
 
@@ -395,10 +389,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     const lineage = await repository.tryFindProjectLineage({
       projectId: where.id,
     });
-    if (
-      lineage?.organizationId !== organizationId ||
-      lineage.teamId !== where.teamId
-    ) {
+    if (lineage?.organizationId !== organizationId || lineage.teamId !== where.teamId) {
       throw new GrantValidationError("Project is not in this scope", {
         projectId: where.id,
       });
@@ -418,24 +409,20 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     const { customRoleId } = role;
     const customRole = await repository.tryFindCustomRole({ customRoleId });
     if (!customRole || customRole.organizationId !== organizationId) {
-      throw new GrantValidationError(
-        "Custom role does not belong to this organization",
-        { customRoleId },
-      );
+      throw new GrantValidationError("Custom role does not belong to this organization", {
+        customRoleId,
+      });
     }
     const unknownPermissions = Array.isArray(customRole.permissions)
       ? customRole.permissions
-          .filter(
-            (value) =>
-              typeof value !== "string" || !isRegistryPermission(value),
-          )
+          .filter((value) => typeof value !== "string" || !isRegistryPermission(value))
           .map((value) => String(value))
       : [];
     if (unknownPermissions.length > 0) {
-      throw new GrantValidationError(
-        "Custom role lists permissions that do not exist",
-        { customRoleId, unknownPermissions },
-      );
+      throw new GrantValidationError("Custom role lists permissions that do not exist", {
+        customRoleId,
+        unknownPermissions,
+      });
     }
   }
 
@@ -449,9 +436,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         return { apiKeyId: who.id };
       default: {
         const unreachable: never = who;
-        throw new Error(
-          `unhandled grant principal: ${JSON.stringify(unreachable)}`,
-        );
+        throw new Error(`unhandled grant principal: ${JSON.stringify(unreachable)}`);
       }
     }
   }
@@ -477,8 +462,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
       userId,
       organizationId,
       actor,
-      prove: (reader) =>
-        this.proveNothingResolves({ reader, userId, organizationId }),
+      prove: (reader) => this.proveNothingResolves({ reader, userId, organizationId }),
     });
     const [ownedApiKeys, personalTeams] = await Promise.all([
       repository.findOwnedApiKeys({ userId, organizationId }),
@@ -496,12 +480,10 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     userId: string;
     organizationId: string;
   }): Promise<void> {
-    const grants = await AuthzCollectorService.create({ reader }).collectGrants(
-      {
-        principal: { type: "user", id: userId },
-        organizationId,
-      },
-    );
+    const grants = await AuthzCollectorService.create({ reader }).collectGrants({
+      principal: { type: "user", id: userId },
+      organizationId,
+    });
     if (
       grants.isOrgMember ||
       grants.bindings.length > 0 ||

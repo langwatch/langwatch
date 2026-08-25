@@ -184,10 +184,9 @@ describe("automationLimitEmail", () => {
         // A rejection quotes the envelope back, so repeating the message would
         // write the recipient's address into every log that handles the throw.
         vi.mocked(sendEmail).mockRejectedValue(
-          Object.assign(
-            new Error("550 5.1.1 <a@example.com>: recipient rejected"),
-            { code: "EENVELOPE" },
-          ),
+          Object.assign(new Error("550 5.1.1 <a@example.com>: recipient rejected"), {
+            code: "EENVELOPE",
+          }),
         );
 
         const error = await sendAutomationLimitEmail({

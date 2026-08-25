@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { EventSchema } from "../../domain/types";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "../abstractMapProjection";
+import { AbstractMapProjection, type MapEventHandlers } from "../abstractMapProjection";
 import type { AppendStore } from "../mapProjection.types";
 
 // Test schemas
@@ -88,9 +85,7 @@ describe("AbstractMapProjection", () => {
   describe("map()", () => {
     it("dispatches to the correct typed handler", () => {
       const projection = new TestMapProjection(mockStore);
-      const result = projection.map(
-        makeEvent("lw.test.foo_happened", { value: 42 }),
-      );
+      const result = projection.map(makeEvent("lw.test.foo_happened", { value: 42 }));
       expect(result).toEqual({ id: "foo-42", payload: "val:42" });
     });
 
@@ -104,9 +99,7 @@ describe("AbstractMapProjection", () => {
 
     it("returns null when handler returns null", () => {
       const projection = new TestMapProjection(mockStore);
-      const result = projection.map(
-        makeEvent("lw.test.bar_happened", { label: "skip" }),
-      );
+      const result = projection.map(makeEvent("lw.test.bar_happened", { label: "skip" }));
       expect(result).toBeNull();
     });
 

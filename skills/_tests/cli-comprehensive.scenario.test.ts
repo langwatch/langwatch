@@ -25,9 +25,7 @@ describe("LangWatch CLI Comprehensive — Agent Usability", () => {
   it.skipIf(isCI)(
     "agent uses status command to get project overview then drills into details",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-status-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-status-"));
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
@@ -79,9 +77,7 @@ Then run CLI commands:
 
             const allText = state.messages
               .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
+                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
               )
               .join("\n");
 
@@ -99,9 +95,7 @@ Then run CLI commands:
   it.skipIf(isCI)(
     "agent uses CLI to manage prompts with version tracking",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-prompts-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-prompts-"));
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
@@ -152,9 +146,7 @@ Prompt management commands:
 
             const allText = state.messages
               .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
+                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
               )
               .join("\n");
 

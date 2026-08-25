@@ -91,8 +91,7 @@ describe("directUpload service", () => {
       it("omits the field rather than sending an empty schema", async () => {
         mockFetch().mockResolvedValue({
           ok: true,
-          json: () =>
-            Promise.resolve({ datasetId: "d", slug: "s", uploadUrl: "/u" }),
+          json: () => Promise.resolve({ datasetId: "d", slug: "s", uploadUrl: "/u" }),
         });
 
         await requestDirectUpload({
@@ -134,8 +133,7 @@ describe("directUpload service", () => {
         mockFetch().mockResolvedValue({
           ok: false,
           status: 409,
-          json: () =>
-            Promise.resolve({ error: "Conflict", message: "name taken" }),
+          json: () => Promise.resolve({ error: "Conflict", message: "name taken" }),
         });
 
         await expect(
@@ -201,9 +199,7 @@ describe("directUpload service", () => {
         );
 
         const [url, init] = mockFetch().mock.calls[0]!;
-        expect(url).toBe(
-          "/api/dataset/direct-upload/staging/up_1?projectId=p1",
-        );
+        expect(url).toBe("/api/dataset/direct-upload/staging/up_1?projectId=p1");
         expect(init.method).toBe("PUT");
         expect(init.body).toBe(file);
         // Session cookie included on the same-origin route (vs omit for S3).
@@ -293,9 +289,7 @@ describe("directUpload service", () => {
         });
 
         const [url, init] = mockFetch().mock.calls[0]!;
-        expect(url).toBe(
-          "/api/dataset/direct-upload/dataset_1?projectId=proj_1",
-        );
+        expect(url).toBe("/api/dataset/direct-upload/dataset_1?projectId=proj_1");
         expect(init.method).toBe("DELETE");
       });
     });
@@ -320,8 +314,7 @@ describe("directUpload service", () => {
       it("POSTs to the finalize route with projectId and returns the status", async () => {
         mockFetch().mockResolvedValue({
           ok: true,
-          json: () =>
-            Promise.resolve({ datasetId: "dataset_1", status: "processing" }),
+          json: () => Promise.resolve({ datasetId: "dataset_1", status: "processing" }),
         });
 
         const result = await finalizeDirectUpload({
@@ -361,8 +354,7 @@ describe("directUpload service", () => {
       it("POSTs to the retry route with projectId and returns the status", async () => {
         mockFetch().mockResolvedValue({
           ok: true,
-          json: () =>
-            Promise.resolve({ datasetId: "dataset_1", status: "processing" }),
+          json: () => Promise.resolve({ datasetId: "dataset_1", status: "processing" }),
         });
 
         const result = await retryDatasetNormalize({
@@ -375,9 +367,7 @@ describe("directUpload service", () => {
           status: "processing",
         });
         const [url, init] = mockFetch().mock.calls[0]!;
-        expect(url).toBe(
-          "/api/dataset/direct-upload/dataset_1/retry?projectId=proj_1",
-        );
+        expect(url).toBe("/api/dataset/direct-upload/dataset_1/retry?projectId=proj_1");
         expect(init.method).toBe("POST");
       });
     });

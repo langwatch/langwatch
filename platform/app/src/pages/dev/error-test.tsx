@@ -1,11 +1,4 @@
-import {
-  Box,
-  Button,
-  Heading,
-  SimpleGrid,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import {
   AlertTriangle,
   Bomb,
@@ -68,26 +61,17 @@ function InnerContent({ onCrashOuter }: { onCrashOuter: () => void }) {
 
           <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4} width="full">
             {/* Inner crash — stays in shell */}
-            <Box
-              padding={4}
-              borderRadius="lg"
-              border="1px solid"
-              borderColor="border"
-            >
+            <Box padding={4} borderRadius="lg" border="1px solid" borderColor="border">
               <VStack gap={3}>
                 <AlertTriangle size={20} color="var(--chakra-colors-red-400)" />
                 <Text textStyle="sm" fontWeight="medium">
                   Crash page content (inner)
                 </Text>
                 <Text textStyle="xs" color="fg.muted" textAlign="center">
-                  Caught by DashboardLayout's ErrorBoundary — sidebar and header
-                  stay visible.
+                  Caught by DashboardLayout's ErrorBoundary — sidebar and header stay
+                  visible.
                 </Text>
-                <Button
-                  size="sm"
-                  colorPalette="red"
-                  onClick={() => setShouldCrash(true)}
-                >
+                <Button size="sm" colorPalette="red" onClick={() => setShouldCrash(true)}>
                   <Bomb size={14} />
                   Crash inner
                 </Button>
@@ -95,20 +79,15 @@ function InnerContent({ onCrashOuter }: { onCrashOuter: () => void }) {
             </Box>
 
             {/* Outer crash — full-screen fallback */}
-            <Box
-              padding={4}
-              borderRadius="lg"
-              border="1px solid"
-              borderColor="border"
-            >
+            <Box padding={4} borderRadius="lg" border="1px solid" borderColor="border">
               <VStack gap={3}>
                 <Skull size={20} color="var(--chakra-colors-red-600)" />
                 <Text textStyle="sm" fontWeight="medium">
                   Crash entire page (outer)
                 </Text>
                 <Text textStyle="xs" color="fg.muted" textAlign="center">
-                  Crashes outside DashboardLayout — caught by RootLayout's
-                  ErrorBoundary. Full-screen error fallback, no shell.
+                  Crashes outside DashboardLayout — caught by RootLayout's ErrorBoundary.
+                  Full-screen error fallback, no shell.
                 </Text>
                 <Button
                   size="sm"
@@ -123,12 +102,7 @@ function InnerContent({ onCrashOuter }: { onCrashOuter: () => void }) {
             </Box>
 
             {/* Dialog crash */}
-            <Box
-              padding={4}
-              borderRadius="lg"
-              border="1px solid"
-              borderColor="border"
-            >
+            <Box padding={4} borderRadius="lg" border="1px solid" borderColor="border">
               <VStack gap={3}>
                 <Square size={20} color="var(--chakra-colors-orange-400)" />
                 <Text textStyle="sm" fontWeight="medium">
@@ -137,11 +111,7 @@ function InnerContent({ onCrashOuter }: { onCrashOuter: () => void }) {
                 <Text textStyle="xs" color="fg.muted" textAlign="center">
                   Opens a dialog, then crashes its content.
                 </Text>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setDialogOpen(true)}
-                >
+                <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
                   <Square size={14} />
                   Open dialog
                 </Button>
@@ -149,12 +119,7 @@ function InnerContent({ onCrashOuter }: { onCrashOuter: () => void }) {
             </Box>
 
             {/* Drawer crash */}
-            <Box
-              padding={4}
-              borderRadius="lg"
-              border="1px solid"
-              borderColor="border"
-            >
+            <Box padding={4} borderRadius="lg" border="1px solid" borderColor="border">
               <VStack gap={3}>
                 <PanelRight size={20} color="var(--chakra-colors-blue-400)" />
                 <Text textStyle="sm" fontWeight="medium">
@@ -163,11 +128,7 @@ function InnerContent({ onCrashOuter }: { onCrashOuter: () => void }) {
                 <Text textStyle="xs" color="fg.muted" textAlign="center">
                   Opens a drawer, then crashes its content.
                 </Text>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setDrawerOpen(true)}
-                >
+                <Button size="sm" variant="outline" onClick={() => setDrawerOpen(true)}>
                   <PanelRight size={14} />
                   Open drawer
                 </Button>
@@ -175,17 +136,9 @@ function InnerContent({ onCrashOuter }: { onCrashOuter: () => void }) {
             </Box>
 
             {/* 404 link */}
-            <Box
-              padding={4}
-              borderRadius="lg"
-              border="1px solid"
-              borderColor="border"
-            >
+            <Box padding={4} borderRadius="lg" border="1px solid" borderColor="border">
               <VStack gap={3}>
-                <FileQuestion
-                  size={20}
-                  color="var(--chakra-colors-orange-400)"
-                />
+                <FileQuestion size={20} color="var(--chakra-colors-orange-400)" />
                 <Text textStyle="sm" fontWeight="medium">
                   Test 404 Page
                 </Text>
@@ -205,10 +158,7 @@ function InnerContent({ onCrashOuter }: { onCrashOuter: () => void }) {
       </Box>
 
       {/* Dialog with crashable content */}
-      <Dialog.Root
-        open={dialogOpen}
-        onOpenChange={({ open }) => setDialogOpen(open)}
-      >
+      <Dialog.Root open={dialogOpen} onOpenChange={({ open }) => setDialogOpen(open)}>
         <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>Test Dialog</Dialog.Title>
@@ -223,10 +173,7 @@ function InnerContent({ onCrashOuter }: { onCrashOuter: () => void }) {
       </Dialog.Root>
 
       {/* Drawer with crashable content */}
-      <Drawer.Root
-        open={drawerOpen}
-        onOpenChange={({ open }) => setDrawerOpen(open)}
-      >
+      <Drawer.Root open={drawerOpen} onOpenChange={({ open }) => setDrawerOpen(open)}>
         <Drawer.Content bg="bg">
           <Drawer.Header>
             <Drawer.Title>Test Drawer</Drawer.Title>

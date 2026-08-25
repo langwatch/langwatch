@@ -7,10 +7,7 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import {
-  buildSeriesName,
-  type AnalyticsSeries,
-} from "@langwatch/analytics-contract";
+import { buildSeriesName, type AnalyticsSeries } from "@langwatch/analytics-contract";
 import { AnalyticsAdapter as AnalyticsServerAdapter } from "@langwatch/analytics-server";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -279,9 +276,7 @@ export const seedMonitorPerformance = async ({
         occurredAtMs: evaluation.traceOccurredAtMs!,
       }),
     );
-  const evaluationRows = seeded.map((seed) =>
-    evaluationRunRow({ tenantId, seed }),
-  );
+  const evaluationRows = seeded.map((seed) => evaluationRunRow({ tenantId, seed }));
 
   await client.insert({
     table: "trace_summaries",

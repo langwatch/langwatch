@@ -92,9 +92,7 @@ export class PrismaConnectionService {
   }
 
   connect(configuration: PrismaConfiguration): PrismaConnection {
-    const { adapter, pool } = this.driverAdapter.create(
-      configuration.databaseUrl,
-    );
+    const { adapter, pool } = this.driverAdapter.create(configuration.databaseUrl);
     const client = this.clientFactory.create({
       adapter,
       log: configuration.log,
@@ -105,9 +103,8 @@ export class PrismaConnectionService {
       query: {
         $allModels: {
           $allOperations({ model, operation, args, query }) {
-            return guard.execute(
-              { model, action: operation, args },
-              (guardedArgs) => query(guardedArgs as typeof args),
+            return guard.execute({ model, action: operation, args }, (guardedArgs) =>
+              query(guardedArgs as typeof args),
             );
           },
         },

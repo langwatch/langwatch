@@ -21,9 +21,7 @@ export const traceScope = (
   ...partial,
 });
 
-export const grantOn = (
-  partial: Partial<ResourceGrant> = {},
-): ResourceGrant => ({
+export const grantOn = (partial: Partial<ResourceGrant> = {}): ResourceGrant => ({
   kind: "trace",
   id: "trace-1",
   projectId: PROJECT,
@@ -53,8 +51,7 @@ export function makeGrants({
 }
 
 export const binding = (
-  partial: Partial<CollectedBinding> &
-    Pick<CollectedBinding, "scopeType" | "scopeId">,
+  partial: Partial<CollectedBinding> & Pick<CollectedBinding, "scopeType" | "scopeId">,
 ): CollectedBinding => ({
   role: "MEMBER",
   customRoleId: null,

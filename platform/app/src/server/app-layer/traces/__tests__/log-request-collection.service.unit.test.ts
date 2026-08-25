@@ -19,22 +19,17 @@ function expectCollected(
   return result;
 }
 
-function makeService(args?: {
-  storageFails?: boolean;
-  contributionFails?: boolean;
-}) {
+function makeService(args?: { storageFails?: boolean; contributionFails?: boolean }) {
   const records: CanonicalLogRecord[] = [];
   const contributions: LogTraceContribution[] = [];
   const recordLogRecords = vi.fn(async (batch: CanonicalLogRecord[]) => {
     if (args?.storageFails) throw new Error("storage unavailable");
     records.push(...batch);
   });
-  const recordLogContributions = vi.fn(
-    async (batch: LogTraceContribution[]) => {
-      if (args?.contributionFails) throw new Error("trace unavailable");
-      contributions.push(...batch);
-    },
-  );
+  const recordLogContributions = vi.fn(async (batch: LogTraceContribution[]) => {
+    if (args?.contributionFails) throw new Error("trace unavailable");
+    contributions.push(...batch);
+  });
   const service = new LogRequestCollectionService({
     recordLogRecords,
     recordLogContributions,
@@ -151,9 +146,9 @@ describe("LogRequestCollectionService", () => {
     await service.handleOtlpLogRequest({ ...args, logRequest: request });
 
     expect(records[0]!.canonicalPayload).toContain(prompt);
-    expect(
-      Buffer.byteLength(contributions[0]!.input!, "utf8"),
-    ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 3);
+    expect(Buffer.byteLength(contributions[0]!.input!, "utf8")).toBeLessThanOrEqual(
+      IO_PREVIEW_BYTES + 3,
+    );
     expect(
       contributions[0]!.liftedAttributes["langwatch.reserved.log_io_truncated"],
     ).toBe(true);

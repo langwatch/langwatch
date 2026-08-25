@@ -117,9 +117,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       // shape (`inputs.input` + `inputs.messages`) consistent with
       // what nlpgo's buildMessages expects and what the saved prompt
       // template assumes.
-      const lastLiveUserMsg = [...messages]
-        .reverse()
-        .find((m: any) => m.role === "user");
+      const lastLiveUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
       // Broaden the absorb-check to ANY template message (system +
       // user templates), not just user-role templates. Old
       // langwatch_nlp's playground heuristic was 'append the live
@@ -233,10 +231,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         this.projectId,
       );
     } catch (earlyError: any) {
-      logger.error(
-        { err: earlyError },
-        "early error preparing prompt workflow",
-      );
+      logger.error({ err: earlyError }, "early error preparing prompt workflow");
       // Use the pre-allocated traceId so the frontend's TraceMessage queries
       // the same id the backend would have used for tracing (issue #853).
       const messageId = traceId;
@@ -244,9 +239,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         eventStream$.sendTextMessageStart({ messageId });
         eventStream$.sendTextMessageContent({
           messageId,
-          content: `❌ Configuration Error: ${
-            earlyError?.message ?? "Unknown error"
-          }`,
+          content: `❌ Configuration Error: ${earlyError?.message ?? "Unknown error"}`,
         });
         eventStream$.sendTextMessageEnd({ messageId });
         eventStream$.complete();
@@ -312,14 +305,8 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
               }
 
               // Stream incremental output deltas using dynamic field lookup
-              const current = extractStreamableOutput(
-                state.outputs,
-                outputConfigs,
-              );
-              if (
-                current !== undefined &&
-                current.length >= lastOutput.length
-              ) {
+              const current = extractStreamableOutput(state.outputs, outputConfigs);
+              if (current !== undefined && current.length >= lastOutput.length) {
                 const delta = current.slice(lastOutput.length);
                 if (delta) {
                   eventStream$.sendTextMessageContent({
@@ -343,9 +330,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
               }
             } else if (serverEvent.type === "error") {
               logger.error({ serverEvent }, "error");
-              throw new Error(
-                serverEvent.payload?.message ?? "An error occurred",
-              );
+              throw new Error(serverEvent.payload?.message ?? "An error occurred");
             } else if (serverEvent.type === "done") {
               finishIfNeeded();
             }
@@ -444,9 +429,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       }),
       ...(formValues.handle !== undefined && { handle: formValues.handle }),
       ...(formValues.versionMetadata !== undefined && {
-        versionMetadata: versionMetadataToNodeFormat(
-          formValues.versionMetadata,
-        ),
+        versionMetadata: versionMetadataToNodeFormat(formValues.versionMetadata),
       }),
       parameters: [
         {

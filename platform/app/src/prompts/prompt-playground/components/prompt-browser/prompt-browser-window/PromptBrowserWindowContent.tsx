@@ -42,15 +42,13 @@ export const useLayoutMode = () => useContext(LayoutModeContext);
  */
 export function PromptBrowserWindowContent() {
   const tabId = useTabId();
-  const { tab, isSingleWindow } = useDraggableTabsBrowserStore(
-    ({ windows }) => {
-      const allTabs = windows.flatMap((w) => w.tabs);
-      return {
-        tab: allTabs.find((t) => t.id === tabId),
-        isSingleWindow: windows.length === 1,
-      };
-    },
-  );
+  const { tab, isSingleWindow } = useDraggableTabsBrowserStore(({ windows }) => {
+    const allTabs = windows.flatMap((w) => w.tabs);
+    return {
+      tab: allTabs.find((t) => t.id === tabId),
+      isSingleWindow: windows.length === 1,
+    };
+  });
 
   // All hooks must run on every render — `useMemo` below used to sit
   // after an early-return for `tab?.data.loading`, which crashed React
@@ -59,10 +57,7 @@ export function PromptBrowserWindowContent() {
   // next render).
   const currentValues = tab?.data.form.currentValues;
   const versionNumber = tab?.data.meta.versionNumber;
-  const initialConfigValues = useMemo(
-    () => cloneDeep(currentValues),
-    [currentValues],
-  );
+  const initialConfigValues = useMemo(() => cloneDeep(currentValues), [currentValues]);
 
   // Use horizontal layout when there's only one window
   const layoutMode: LayoutMode = isSingleWindow ? "horizontal" : "vertical";
@@ -102,11 +97,9 @@ function PromptBrowserWindowInner(props: {
   layoutMode: LayoutMode;
 }) {
   const form = usePromptConfigForm(props);
-  const { updateTabData } = useDraggableTabsBrowserStore(
-    ({ updateTabData }) => ({
-      updateTabData,
-    }),
-  );
+  const { updateTabData } = useDraggableTabsBrowserStore(({ updateTabData }) => ({
+    updateTabData,
+  }));
 
   const updateTabDataDebounced = useMemo(
     () => debounce(updateTabData, 500),
@@ -119,17 +112,13 @@ function PromptBrowserWindowInner(props: {
   );
 
   useEffect(() => {
-    const newVersion =
-      props.initialConfigValues?.versionMetadata?.versionNumber;
+    const newVersion = props.initialConfigValues?.versionMetadata?.versionNumber;
     if (newVersion !== lastVersionRef.current) {
       // Version changed externally (e.g., upgrade clicked) - cancel pending updates
       updateTabDataDebounced.cancel();
       lastVersionRef.current = newVersion;
     }
-  }, [
-    props.initialConfigValues?.versionMetadata?.versionNumber,
-    updateTabDataDebounced,
-  ]);
+  }, [props.initialConfigValues?.versionMetadata?.versionNumber, updateTabDataDebounced]);
 
   useEffect(() => {
     const sub = form.methods.watch((values) => {
@@ -186,11 +175,7 @@ function PromptBrowserWindowInner(props: {
   // Handle drag with direct DOM manipulation (no React state updates during drag)
   const handlePositionChange = useCallback(
     (clientY: number) => {
-      if (
-        !containerRef.current ||
-        !headerRef.current ||
-        !messagesWrapperRef.current
-      )
+      if (!containerRef.current || !headerRef.current || !messagesWrapperRef.current)
         return;
 
       const containerRect = containerRef.current.getBoundingClientRect();
@@ -277,12 +262,7 @@ function PromptBrowserWindowInner(props: {
               overflow="hidden"
               boxShadow="md"
             >
-              <Box
-                ref={headerRef}
-                flexShrink={0}
-                paddingTop={3}
-                paddingBottom={3}
-              >
+              <Box ref={headerRef} flexShrink={0} paddingTop={3} paddingBottom={3}>
                 <Box width="full" paddingX={3}>
                   <PromptBrowserHeader />
                 </Box>
@@ -349,11 +329,7 @@ function PromptBrowserWindowInner(props: {
           <Box
             ref={messagesWrapperRef}
             maxHeight={
-              isCollapsed
-                ? 0
-                : messagesMaxHeight
-                  ? `${messagesMaxHeight}px`
-                  : undefined
+              isCollapsed ? 0 : messagesMaxHeight ? `${messagesMaxHeight}px` : undefined
             }
             overflow="hidden"
             position="relative"

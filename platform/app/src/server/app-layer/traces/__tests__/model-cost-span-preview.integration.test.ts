@@ -118,9 +118,7 @@ function makeTraceSummaryRow({
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  spans = new SpanStorageService(
-    new SpanStorageClickHouseRepository(async () => ch),
-  );
+  spans = new SpanStorageService(new SpanStorageClickHouseRepository(async () => ch));
 
   await ch.insert({
     table: "trace_summaries",
@@ -246,8 +244,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (ch) {
     await ch.exec({
-      query:
-        "ALTER TABLE stored_spans DELETE WHERE TenantId IN ({a:String}, {b:String})",
+      query: "ALTER TABLE stored_spans DELETE WHERE TenantId IN ({a:String}, {b:String})",
       query_params: { a: tenantId, b: otherTenantId },
     });
     await ch.exec({
@@ -285,10 +282,7 @@ describe("previewCostRuleMatchingSpans", () => {
       expect(sample.spanName).toBe("chat completion");
       expect(sample.inputTokens).toBe(1000);
       expect(sample.outputTokens).toBe(200);
-      expect(sample.exampleCost).toBeCloseTo(
-        1000 * 0.000003 + 200 * 0.000015,
-        10,
-      );
+      expect(sample.exampleCost).toBeCloseTo(1000 * 0.000003 + 200 * 0.000015, 10);
 
       const unmatched = preview.unmatchedModels.map((m) => m.model);
       expect(unmatched).toContain("eu.anthropic.claude-sonnet-4-6-v1:0");
@@ -372,9 +366,7 @@ describe("previewCostRuleMatchingSpans", () => {
         },
       });
 
-      expect(preview.matchedModels.map((m) => m.model)).toContain(
-        `response-model-${ns}`,
-      );
+      expect(preview.matchedModels.map((m) => m.model)).toContain(`response-model-${ns}`);
       expect(preview.unmatchedModels.map((m) => m.model)).not.toContain(
         `request-model-${ns}`,
       );
@@ -421,8 +413,7 @@ describe("previewCostRuleMatchingSpans", () => {
         (s) => s.inputTokens === null && s.outputTokens === null,
       );
       const lastTokenBearing = preview.sampleSpans.reduce(
-        (last, s, i) =>
-          s.inputTokens !== null || s.outputTokens !== null ? i : last,
+        (last, s, i) => (s.inputTokens !== null || s.outputTokens !== null ? i : last),
         -1,
       );
       expect(tokenless).toBeGreaterThan(lastTokenBearing);
@@ -571,8 +562,7 @@ describe("unmapped cost suggestion + scope-cascade rule resolution", () => {
       // legacy projectId column, so ORGANIZATION/TEAM-scoped rules
       // (projectId = null) never applied at ingestion and spans stayed
       // uncosted despite a configured rule.
-      const costs =
-        await createCostEnrichmentDeps(prisma).getCustomModelCosts(projectId);
+      const costs = await createCostEnrichmentDeps(prisma).getCustomModelCosts(projectId);
 
       expect(costs.map((c) => c.model)).toContain(orgRuleModel);
       const orgRule = costs.find((c) => c.model === orgRuleModel)!;

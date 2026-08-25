@@ -15,8 +15,7 @@ const logRecords: {
 }[] = [];
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof import("@langwatch/observability")>();
   const record =
     (level: string) => (payload: Record<string, unknown>, message: string) => {
       logRecords.push({ level, payload, message });
@@ -33,9 +32,9 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 });
 
 const { createService: createRawService } = await import("../builder.js");
-const createService: typeof createRawService = ((config: Parameters<
-  typeof createRawService
->[0]) =>
+const createService: typeof createRawService = ((
+  config: Parameters<typeof createRawService>[0],
+) =>
   createRawService(config).withoutPermission(
     "framework test endpoint",
   )) as typeof createRawService;
@@ -345,9 +344,7 @@ describe("withCache", () => {
       (b) => b.withCache("things", 60),
     );
 
-    expect(() => service.build()).toThrow(
-      /unvalidated bytes may not be cached/,
-    );
+    expect(() => service.build()).toThrow(/unvalidated bytes may not be cached/);
   });
 
   it("degrades a cache failure to a handler call and logs it", async () => {
@@ -467,16 +464,14 @@ describe("capability defaults", () => {
         "things.get",
         "2026-08-07",
         async () => ({ id: "1" }),
-        (b) =>
-          b.withOutput(z.object({ id: z.string() })).withCache("special", 5),
+        (b) => b.withOutput(z.object({ id: z.string() })).withCache("special", 5),
       )
       // Opts out of both.
       .register(
         "things.search",
         "2026-08-07",
         async () => ["x"],
-        (b) =>
-          b.withOutput(z.array(z.string())).withoutCache().withoutRateLimit(),
+        (b) => b.withOutput(z.array(z.string())).withoutCache().withoutRateLimit(),
       )
       .build();
 
@@ -497,12 +492,8 @@ describe("capability defaults", () => {
     }));
     expect(tags).toHaveLength(2);
     expect(tags.filter((t) => t.tag === "special")).toHaveLength(1);
-    expect(tags.filter((t) => t.tag === "special")[0]!.key).toContain(
-      "/things.get",
-    );
+    expect(tags.filter((t) => t.tag === "special")[0]!.key).toContain("/things.get");
     expect(tags.filter((t) => t.tag === "things")).toHaveLength(1);
-    expect(tags.filter((t) => t.tag === "things")[0]!.key).toContain(
-      "/things.list",
-    );
+    expect(tags.filter((t) => t.tag === "things")[0]!.key).toContain("/things.list");
   });
 });

@@ -9,9 +9,5 @@ export function isReplyTextPart(part: {
   text?: unknown;
   thought?: unknown;
 }): part is { text: string } {
-  return (
-    typeof part.text === "string" &&
-    part.text.length > 0 &&
-    part.thought !== true
-  );
+  return typeof part.text === "string" && part.text.length > 0 && part.thought !== true;
 }

@@ -54,9 +54,7 @@ describe("AcceptAgentTurn command", () => {
     // occurredAt. The monotonic KSUID sequence must preserve this command's
     // boundary order even when every event is created in the same millisecond.
     expect(new Set(events.map((event) => event.createdAt)).size).toBe(1);
-    expect(orderEvents(events).map((event) => event.type)).toEqual(
-      expectedOrder,
-    );
+    expect(orderEvents(events).map((event) => event.type)).toEqual(expectedOrder);
     expect(events[0]?.data).toEqual(
       expect.objectContaining({
         conversationId: CONVERSATION,

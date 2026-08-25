@@ -51,7 +51,11 @@ export abstract class WorkflowRepository {
     includeArchived?: boolean;
   }): Promise<WorkflowWithVersion | null>;
   abstract findAll(input: { projectId: string }): Promise<Workflow[]>;
-  abstract findVersions(input: { workflowId: string; projectId: string; includeDsl?: boolean }): Promise<WorkflowVersion[]>;
+  abstract findVersions(input: {
+    workflowId: string;
+    projectId: string;
+    includeDsl?: boolean;
+  }): Promise<WorkflowVersion[]>;
   abstract findVersionHistory(input: {
     workflowId: string;
     projectId: string;
@@ -61,13 +65,40 @@ export abstract class WorkflowRepository {
     id: string;
     projectId: string;
   }): Promise<WorkflowVersion | null>;
-  abstract tryFindVersion(input: { id: string; workflowId: string; projectId: string }): Promise<WorkflowVersion | null>;
-  abstract tryFindPublishedVersion(input: { workflowId: string; projectId: string; versionId?: string }): Promise<WorkflowVersion | null>;
+  abstract tryFindVersion(input: {
+    id: string;
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowVersion | null>;
+  abstract tryFindPublishedVersion(input: {
+    workflowId: string;
+    projectId: string;
+    versionId?: string;
+  }): Promise<WorkflowVersion | null>;
   abstract createWorkflow(input: PersistWorkflowInput): Promise<WorkflowWithVersion>;
-  abstract updateWorkflow(input: { id: string; projectId: string; data: Record<string, unknown> }): Promise<Workflow>;
+  abstract updateWorkflow(input: {
+    id: string;
+    projectId: string;
+    data: Record<string, unknown>;
+  }): Promise<Workflow>;
   abstract createVersion(input: PersistWorkflowVersionInput): Promise<WorkflowVersion>;
-  abstract updateAutoSavedVersion(input: PersistWorkflowVersionInput & { id: string }): Promise<WorkflowVersion>;
-  abstract setVersionPointers(input: { id: string; projectId: string; currentVersionId: string; latestVersionId?: string | null }): Promise<void>;
-  abstract publish(input: { id: string; projectId: string; versionId: string; actorId?: string }): Promise<Workflow>;
-  abstract findCopies(input: { workflowId: string; projectId: string }): Promise<Workflow[]>;
+  abstract updateAutoSavedVersion(
+    input: PersistWorkflowVersionInput & { id: string },
+  ): Promise<WorkflowVersion>;
+  abstract setVersionPointers(input: {
+    id: string;
+    projectId: string;
+    currentVersionId: string;
+    latestVersionId?: string | null;
+  }): Promise<void>;
+  abstract publish(input: {
+    id: string;
+    projectId: string;
+    versionId: string;
+    actorId?: string;
+  }): Promise<Workflow>;
+  abstract findCopies(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<Workflow[]>;
 }

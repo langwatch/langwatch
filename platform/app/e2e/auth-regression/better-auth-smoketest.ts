@@ -47,9 +47,7 @@ const SMOKETEST_USER_ID = "smoketest_user_1";
 const DEACTIVATED_USER_ID = "smoketest_deactivated";
 const DEACTIVATED_EMAIL = "deactivated@example.com";
 
-const parseSetCookie = (
-  header: string | null,
-): Record<string, string | boolean> => {
+const parseSetCookie = (header: string | null): Record<string, string | boolean> => {
   if (!header) return {};
   const parts = header.split(";").map((p) => p.trim());
   const result: Record<string, string | boolean> = {};
@@ -146,19 +144,13 @@ async function main() {
   const setCookieHeader = signInRes.headers.get("set-cookie");
   check("Set-Cookie header present", !!setCookieHeader);
   const parsedCookie = parseSetCookie(setCookieHeader);
-  check(
-    "session_token cookie set",
-    !!parsedCookie["better-auth.session_token"],
-  );
+  check("session_token cookie set", !!parsedCookie["better-auth.session_token"]);
   check("HttpOnly flag", !!parsedCookie.httponly);
   check(
     "SameSite=Lax flag",
     parsedCookie.samesite === "Lax" || parsedCookie.samesite === "lax",
   );
-  check(
-    "Path=/ flag",
-    parsedCookie.path === "/" || parsedCookie.path === "/" + "",
-  );
+  check("Path=/ flag", parsedCookie.path === "/" || parsedCookie.path === "/" + "");
 
   // Verify the session row has the expected 30-day expiry (NextAuth parity).
   const sessionRow = await prisma.session.findFirst({
@@ -184,11 +176,7 @@ async function main() {
     body: { email: SMOKETEST_EMAIL, password: "wrong-password" },
     asResponse: true,
   });
-  check(
-    "HTTP 401 for wrong password",
-    wrongRes.status === 401,
-    `got ${wrongRes.status}`,
-  );
+  check("HTTP 401 for wrong password", wrongRes.status === 401, `got ${wrongRes.status}`);
   const wrongCookie = wrongRes.headers.get("set-cookie");
   check(
     "no session cookie set on failure",
@@ -272,11 +260,7 @@ async function main() {
   check("lastLoginAt is set", !!refreshed?.lastLoginAt);
   if (refreshed?.lastLoginAt) {
     const delta = Date.now() - refreshed.lastLoginAt.getTime();
-    check(
-      "lastLoginAt is recent (< 30s old)",
-      delta < 30_000,
-      `${delta}ms old`,
-    );
+    check("lastLoginAt is recent (< 30s old)", delta < 30_000, `${delta}ms old`);
   }
 
   // ─────────────────────────────────────────────────────────────────
@@ -292,11 +276,7 @@ async function main() {
       headers: signOutHeaders,
       asResponse: true,
     });
-    check(
-      "signOut HTTP 200",
-      signOutRes.status === 200,
-      `got ${signOutRes.status}`,
-    );
+    check("signOut HTTP 200", signOutRes.status === 200, `got ${signOutRes.status}`);
     const clearCookie = signOutRes.headers.get("set-cookie");
     const parsedClear = parseSetCookie(clearCookie);
     const clearedToken = parsedClear["better-auth.session_token"];
@@ -311,9 +291,7 @@ async function main() {
   // ADMIN IMPERSONATION COMPAT via Session.impersonating
   // ─────────────────────────────────────────────────────────────────
 
-  console.log(
-    "\n[8] Admin impersonation compat via Session.impersonating JSON",
-  );
+  console.log("\n[8] Admin impersonation compat via Session.impersonating JSON");
   // Create a real impersonation target user. The compat layer in
   // iter 14 now verifies the target still exists + isn't deactivated,
   // so we need a real user in the DB (not a fake id).
@@ -422,9 +400,7 @@ async function main() {
   // LEGACY BCRYPT HASH COMPAT (on-prem upgrade path)
   // ─────────────────────────────────────────────────────────────────
 
-  console.log(
-    "\n[10] Legacy bcrypt hash (cost 10) from NextAuth still verifies",
-  );
+  console.log("\n[10] Legacy bcrypt hash (cost 10) from NextAuth still verifies");
   // Pre-computed bcrypt hash for "legacy-password-from-2024" with cost 10.
   // This simulates a user whose password was originally hashed by the old
   // NextAuth credentials provider using `hash(password, 10)` — we want
@@ -539,9 +515,7 @@ async function main() {
   // [13] changePassword via Account row update
   // ─────────────────────────────────────────────────────────────────
 
-  console.log(
-    "\n[13] changePassword updates Account.password (not User.password)",
-  );
+  console.log("\n[13] changePassword updates Account.password (not User.password)");
   const newPassword = "new-password-after-change";
   const newPasswordHash = await hash(newPassword, 10);
   // Simulate the tRPC changePassword mutation logic
@@ -582,19 +556,14 @@ async function main() {
   // [14] UserService.create (used by SCIM webhook) still works
   // ─────────────────────────────────────────────────────────────────
 
-  console.log(
-    "\n[14] UserService.create still creates a User without password column",
-  );
+  console.log("\n[14] UserService.create still creates a User without password column");
   await prisma.user.deleteMany({ where: { email: "scim@example.com" } });
   // SCIM webhook path: creates a User with just name + email, no Account
   const scimUser = await prisma.user.create({
     data: { name: "SCIM User", email: "scim@example.com" },
   });
   check("SCIM-style User row created", !!scimUser);
-  check(
-    "User has no password field (moved to Account)",
-    !("password" in scimUser),
-  );
+  check("User has no password field (moved to Account)", !("password" in scimUser));
 
   // ─────────────────────────────────────────────────────────────────
   // CLEANUP NEW FIXTURES
@@ -623,9 +592,7 @@ async function main() {
   // [9.5] Compat layer rejects impersonation of deleted target
   // ─────────────────────────────────────────────────────────────────
 
-  console.log(
-    "\n[9.5] Impersonation target deleted after start → fall back to admin",
-  );
+  console.log("\n[9.5] Impersonation target deleted after start → fall back to admin");
   if (freshSession && impCookie) {
     // Write a valid (non-expired) impersonation payload for a nonexistent user.
     await prisma.session.update({

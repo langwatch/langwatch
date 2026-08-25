@@ -1,8 +1,5 @@
 import type { Projection, StateProjectionStore } from "@langwatch/eventing";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
 import {
   foldLangyConversationState,
   initLangyConversationState,
@@ -44,8 +41,7 @@ import {
   LangyToolCallSucceededEventSchema,
 } from "../adapters/eventing.langy.adapter";
 
-export interface LangyConversationState
-  extends Projection<LangyConversationStateData> {
+export interface LangyConversationState extends Projection<LangyConversationStateData> {
   data: LangyConversationStateData;
 }
 
@@ -90,10 +86,7 @@ export class LangyConversationStateFoldProjection
     StateProjectionStore<LangyConversationStateData>
   >
   implements
-    FoldEventHandlers<
-      typeof langyConversationEvents,
-      LangyConversationStateData
-    >
+    FoldEventHandlers<typeof langyConversationEvents, LangyConversationStateData>
 {
   readonly name = "langyConversationState";
   readonly version = LANGY_CONVERSATION_PROJECTION_VERSIONS.CONVERSATION_STATE;
@@ -101,9 +94,7 @@ export class LangyConversationStateFoldProjection
 
   protected readonly events = langyConversationEvents;
 
-  constructor(deps: {
-    store: StateProjectionStore<LangyConversationStateData>;
-  }) {
+  constructor(deps: { store: StateProjectionStore<LangyConversationStateData> }) {
     super();
     this.store = deps.store;
   }

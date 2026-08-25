@@ -239,9 +239,7 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
         expect(
           screen.queryByText(/Keys scoped to a user or service/),
         ).not.toBeInTheDocument();
-        expect(
-          screen.getByText(/Do not share your API keys/),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/Do not share your API keys/)).toBeInTheDocument();
       });
 
       /** @scenario Ingestion keys render in their own labeled section */
@@ -330,9 +328,7 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
     it("anchors every key row so a deep link can target it", () => {
       const { container } = renderSection();
       expect(container.querySelector("#api-key-key-ci")).toBeInTheDocument();
-      expect(
-        container.querySelector("#api-key-key-ingest"),
-      ).toBeInTheDocument();
+      expect(container.querySelector("#api-key-key-ingest")).toBeInTheDocument();
     });
 
     /** @scenario Ingestion keys render in their own labeled section */

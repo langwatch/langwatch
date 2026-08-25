@@ -13,16 +13,12 @@ const base = {
 describe("shell route classification", () => {
   describe("when the address is a product page", () => {
     it("names the product that owns it", () => {
+      expect(resolveShellRoute({ ...base, pathname: "/me" }).activeProductId).toBe("me");
       expect(
-        resolveShellRoute({ ...base, pathname: "/me" }).activeProductId,
-      ).toBe("me");
-      expect(
-        resolveShellRoute({ ...base, pathname: "/gateway/budgets" })
-          .activeProductId,
+        resolveShellRoute({ ...base, pathname: "/gateway/budgets" }).activeProductId,
       ).toBe("gateway");
       expect(
-        resolveShellRoute({ ...base, pathname: "/settings/members" })
-          .isSettingsRoute,
+        resolveShellRoute({ ...base, pathname: "/settings/members" }).isSettingsRoute,
       ).toBe(true);
     });
   });

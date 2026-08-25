@@ -7,9 +7,7 @@ import { useSession } from "~/utils/auth-client";
  * Extract greeting name from user's name.
  * Returns the first name if available, null if unavailable or looks like an email.
  */
-export const getGreetingName = (
-  name: string | null | undefined,
-): string | null => {
+export const getGreetingName = (name: string | null | undefined): string | null => {
   if (!name?.trim()) {
     return null;
   }

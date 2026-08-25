@@ -35,13 +35,7 @@ function CriteriaList({
       </Text>
       {items.map((criterion) => (
         <HStack key={criterion} gap={1.5} align="flex-start">
-          <Icon
-            as={icon}
-            boxSize={3}
-            color={color}
-            marginTop="2px"
-            flexShrink={0}
-          />
+          <Icon as={icon} boxSize={3} color={color} marginTop="2px" flexShrink={0} />
           <Text textStyle="xs" color="fg">
             {criterion}
           </Text>
@@ -70,28 +64,12 @@ export function RunCriteriaChip({
       value={`${met}/${total}`}
       tone={unmetCriteria.length === 0 ? "green" : "red"}
       tooltip={
-        <VStack
-          align="stretch"
-          gap={2}
-          minWidth="220px"
-          maxWidth="340px"
-          paddingY={0.5}
-        >
+        <VStack align="stretch" gap={2} minWidth="220px" maxWidth="340px" paddingY={0.5}>
           {metCriteria.length > 0 && (
-            <CriteriaList
-              title="Met"
-              color="green.fg"
-              icon={Check}
-              items={metCriteria}
-            />
+            <CriteriaList title="Met" color="green.fg" icon={Check} items={metCriteria} />
           )}
           {unmetCriteria.length > 0 && (
-            <CriteriaList
-              title="Unmet"
-              color="red.fg"
-              icon={X}
-              items={unmetCriteria}
-            />
+            <CriteriaList title="Unmet" color="red.fg" icon={X} items={unmetCriteria} />
           )}
           <Text textStyle="2xs" color="fg.muted">
             {rate}% of success criteria met

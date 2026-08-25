@@ -4,8 +4,7 @@ import { PrismaScheduledJobStore } from "../scheduled-job.repository";
 
 // Mirror the repository's naive-UTC timestamp rendering so we can assert the
 // exact literals interpolated into the raw claim/settle.
-const toPg = (d: Date): string =>
-  d.toISOString().slice(0, 23).replace("T", " ");
+const toPg = (d: Date): string => d.toISOString().slice(0, 23).replace("T", " ");
 
 /**
  * Unit-level proof of the conditional lease + settle logic with a mocked Prisma.

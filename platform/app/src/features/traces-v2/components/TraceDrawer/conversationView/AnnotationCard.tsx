@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Icon,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
   Crosshair,
   Lightbulb,
@@ -86,10 +78,7 @@ export function AnnotationCard({
       <VStack align="stretch" gap={2}>
         <CardHeader annotation={annotation} isOwn={isOwn} />
 
-        <AnchorBreadcrumb
-          annotation={annotation}
-          contextTraceId={contextTraceId}
-        />
+        <AnchorBreadcrumb annotation={annotation} contextTraceId={contextTraceId} />
 
         {annotation.comment && (
           <Text textStyle="xs" whiteSpace="pre-wrap">
@@ -97,9 +86,7 @@ export function AnnotationCard({
           </Text>
         )}
 
-        <ScoreBadges
-          scores={resolveScores(annotation.scoreOptions, scoreNamesById)}
-        />
+        <ScoreBadges scores={resolveScores(annotation.scoreOptions, scoreNamesById)} />
 
         <SuggestedCorrection expectedOutput={annotation.expectedOutput} />
       </VStack>
@@ -229,30 +216,12 @@ function Author({ annotation }: { annotation: AnnotationByTrace }) {
 }
 
 /** The thumb a reviewer gave the turn, and nothing at all when they gave none. */
-function ThumbVerdict({
-  isThumbsUp,
-}: {
-  isThumbsUp: AnnotationByTrace["isThumbsUp"];
-}) {
+function ThumbVerdict({ isThumbsUp }: { isThumbsUp: AnnotationByTrace["isThumbsUp"] }) {
   if (isThumbsUp === true) {
-    return (
-      <Icon
-        as={ThumbsUp}
-        boxSize={3.5}
-        color="green.fg"
-        aria-label="Thumbs up"
-      />
-    );
+    return <Icon as={ThumbsUp} boxSize={3.5} color="green.fg" aria-label="Thumbs up" />;
   }
   if (isThumbsUp === false) {
-    return (
-      <Icon
-        as={ThumbsDown}
-        boxSize={3.5}
-        color="red.fg"
-        aria-label="Thumbs down"
-      />
-    );
+    return <Icon as={ThumbsDown} boxSize={3.5} color="red.fg" aria-label="Thumbs down" />;
   }
   return null;
 }
@@ -320,11 +289,7 @@ function ScoreBadges({ scores }: { scores: ScoreEntry[] }) {
 }
 
 /** The output the reviewer said the turn should have produced. */
-function SuggestedCorrection({
-  expectedOutput,
-}: {
-  expectedOutput: string | null;
-}) {
+function SuggestedCorrection({ expectedOutput }: { expectedOutput: string | null }) {
   if (!expectedOutput) return null;
   return (
     <VStack align="stretch" gap={1}>

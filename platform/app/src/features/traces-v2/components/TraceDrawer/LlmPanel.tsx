@@ -1,10 +1,7 @@
 import { Box, Flex, HStack, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMemo, useRef, useState } from "react";
-import type {
-  SpanTreeNode,
-  TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { useSpansFull } from "../../hooks/useSpansFull";
 import { useTraceEvents } from "../../hooks/useTraceEvents";
 import {
@@ -115,11 +112,7 @@ export function LlmPanel({ trace, spans }: LlmPanelProps) {
         overflow="auto"
         bg="bg.panel"
       >
-        <Box
-          height={`${virtualizer.getTotalSize()}px`}
-          width="full"
-          position="relative"
-        >
+        <Box height={`${virtualizer.getTotalSize()}px`} width="full" position="relative">
           {virtualizer.getVirtualItems().map((row) => {
             const chunk = chunks[row.index]!;
             return (
@@ -133,11 +126,7 @@ export function LlmPanel({ trace, spans }: LlmPanelProps) {
                 width="full"
                 transform={`translateY(${row.start}px)`}
               >
-                <RenderedMarkdown
-                  markdown={chunk.markdown}
-                  paddingX={4}
-                  paddingY={3}
-                />
+                <RenderedMarkdown markdown={chunk.markdown} paddingX={4} paddingY={3} />
               </Box>
             );
           })}

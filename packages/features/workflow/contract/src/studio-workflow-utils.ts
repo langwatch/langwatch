@@ -1,9 +1,6 @@
 import type { StudioNode, StudioWorkflow } from "./studio-workflow";
 
-export const clearDsl = (
-  dsl: StudioWorkflow,
-  includeExecutionStates = false,
-) => {
+export const clearDsl = (dsl: StudioWorkflow, includeExecutionStates = false) => {
   return {
     ...dsl,
     version: undefined,
@@ -41,14 +38,10 @@ export const hasDSLChanged = (
 ) => {
   return (
     JSON.stringify(
-      recursiveAlphabeticallySortedKeys(
-        clearDsl(dslCurrent, includeExecutionStates),
-      ),
+      recursiveAlphabeticallySortedKeys(clearDsl(dslCurrent, includeExecutionStates)),
     ) !==
     JSON.stringify(
-      recursiveAlphabeticallySortedKeys(
-        clearDsl(dslPrevious, includeExecutionStates),
-      ),
+      recursiveAlphabeticallySortedKeys(clearDsl(dslPrevious, includeExecutionStates)),
     )
   );
 };

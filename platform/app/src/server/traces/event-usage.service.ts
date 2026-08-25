@@ -1,11 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";
 import { getBillingMonth } from "~/runtime/app/features/billing";
-import {
-  type ProjectUsageCounts,
-  USAGE_UNKNOWN,
-  type UsageCount,
-} from "./usage-count";
+import { type ProjectUsageCounts, USAGE_UNKNOWN, type UsageCount } from "./usage-count";
 
 const logger = createLogger("langwatch:traces:eventUsage");
 

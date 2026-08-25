@@ -64,8 +64,7 @@ export function resolveLangyStopTarget({
   if (!projectId || !conversationId) {
     return { kind: "unavailable", reason: "no-conversation" };
   }
-  const ownsLiveTurn =
-    localTurnId !== null && localTurnId !== localSettledTurnId;
+  const ownsLiveTurn = localTurnId !== null && localTurnId !== localSettledTurnId;
   const turnId = ownsLiveTurn ? localTurnId : durableTurnId;
   if (!turnId) {
     return { kind: "unavailable", reason: "turn-not-identified" };

@@ -28,9 +28,7 @@ export function TraceDebounceField() {
   const dispatch = useAutomationStore((s) => s.dispatch);
 
   const committedSeconds = Math.round(draft.traceDebounceMs / 1000);
-  const [localValue, setLocalValue] = useState<string>(
-    String(committedSeconds),
-  );
+  const [localValue, setLocalValue] = useState<string>(String(committedSeconds));
 
   useEffect(() => {
     setLocalValue(String(committedSeconds));
@@ -79,8 +77,8 @@ export function TraceDebounceField() {
         </Text>
       </HStack>
       <Text textStyle="xs" color="fg.muted" mt={1}>
-        How long to wait for late spans before evaluating a trace. Higher
-        absorbs late spans, lower cuts latency.
+        How long to wait for late spans before evaluating a trace. Higher absorbs late
+        spans, lower cuts latency.
       </Text>
     </Field.Root>
   );

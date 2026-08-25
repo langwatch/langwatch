@@ -17,12 +17,9 @@ export type UseExtraHeadersActions = {
   reset: (provider: MaybeStoredModelProvider, useApiGateway: boolean) => void;
 };
 
-export type UseExtraHeadersReturn = UseExtraHeadersState &
-  UseExtraHeadersActions;
+export type UseExtraHeadersReturn = UseExtraHeadersState & UseExtraHeadersActions;
 
-function buildInitialHeaders(
-  provider: MaybeStoredModelProvider,
-): ExtraHeader[] {
+function buildInitialHeaders(provider: MaybeStoredModelProvider): ExtraHeader[] {
   return (provider.extraHeaders ?? []).map((h) => ({
     key: h.key,
     value: h.value,
@@ -40,10 +37,7 @@ export function useExtraHeaders({
   );
 
   const addExtraHeader = useCallback(() => {
-    setExtraHeaders((prev) => [
-      ...prev,
-      { key: "", value: "", concealed: false },
-    ]);
+    setExtraHeaders((prev) => [...prev, { key: "", value: "", concealed: false }]);
   }, []);
 
   const removeExtraHeader = useCallback((index: number) => {
@@ -57,15 +51,11 @@ export function useExtraHeaders({
   }, []);
 
   const setExtraHeaderKey = useCallback((index: number, key: string) => {
-    setExtraHeaders((prev) =>
-      prev.map((h, i) => (i === index ? { ...h, key } : h)),
-    );
+    setExtraHeaders((prev) => prev.map((h, i) => (i === index ? { ...h, key } : h)));
   }, []);
 
   const setExtraHeaderValue = useCallback((index: number, value: string) => {
-    setExtraHeaders((prev) =>
-      prev.map((h, i) => (i === index ? { ...h, value } : h)),
-    );
+    setExtraHeaders((prev) => prev.map((h, i) => (i === index ? { ...h, value } : h)));
   }, []);
 
   /** Adds an `api-key` header if the list is currently empty (Azure gateway coupling). */

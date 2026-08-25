@@ -97,9 +97,7 @@ describe("SecretService", () => {
     const { repository, service } = createService();
     repository.rows.push(row(), row({ id: "reserved", name: "LANGY_KEY" }));
 
-    await expect(service.list({ projectId: "project-1" })).resolves.toEqual([
-      row(),
-    ]);
+    await expect(service.list({ projectId: "project-1" })).resolves.toEqual([row()]);
   });
 
   it("reports reserved and missing rows as not found", async () => {

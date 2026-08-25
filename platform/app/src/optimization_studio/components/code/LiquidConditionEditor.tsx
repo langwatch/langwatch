@@ -149,12 +149,7 @@ export function LiquidConditionEditor({
         overflow="hidden"
         data-testid="if-else-condition-input"
       >
-        <Text
-          fontFamily="mono"
-          fontSize="13px"
-          color="fg.muted"
-          userSelect="none"
-        >
+        <Text fontFamily="mono" fontSize="13px" color="fg.muted" userSelect="none">
           {"{%"}
         </Text>
         <Box flex="1" minWidth="0" height="22px">
@@ -184,8 +179,7 @@ export function LiquidConditionEditor({
               hideCursorInOverviewRuler: true,
               wordWrap: "off",
               fontSize: 13,
-              fontFamily:
-                "ui-monospace, SFMono-Regular, Menlo, Monaco, monospace",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, monospace",
               placeholder,
               fixedOverflowWidgets: true,
               contextmenu: false,
@@ -193,29 +187,16 @@ export function LiquidConditionEditor({
             }}
           />
         </Box>
-        <Text
-          fontFamily="mono"
-          fontSize="13px"
-          color="fg.muted"
-          userSelect="none"
-        >
+        <Text fontFamily="mono" fontSize="13px" color="fg.muted" userSelect="none">
           {"%}"}
         </Text>
       </HStack>
       {validation.error ? (
-        <Text
-          fontSize="12px"
-          color="red.500"
-          data-testid="if-else-condition-error"
-        >
+        <Text fontSize="12px" color="red.500" data-testid="if-else-condition-error">
           {validation.error}
         </Text>
       ) : validation.missingVariables.length > 0 ? (
-        <Text
-          fontSize="12px"
-          color="orange.600"
-          data-testid="if-else-condition-warning"
-        >
+        <Text fontSize="12px" color="orange.600" data-testid="if-else-condition-warning">
           Unknown input
           {validation.missingVariables.length > 1 ? "s" : ""}:{" "}
           {validation.missingVariables.join(", ")}

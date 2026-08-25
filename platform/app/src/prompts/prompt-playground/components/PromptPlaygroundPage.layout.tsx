@@ -16,13 +16,7 @@ export function PromptPlaygroundPageLayout() {
       <PromptConfigProvider>
         <PromptPlaygroundChatProvider>
           <HStack width="full" height="full" gap={0} position="relative">
-            <VStack
-              position="relative"
-              top={0}
-              left={0}
-              width="250px"
-              height="full"
-            >
+            <VStack position="relative" top={0} left={0} width="250px" height="full">
               <PageLayout.Header withBorder={false}>
                 <PageLayout.Heading>Prompts</PageLayout.Heading>
               </PageLayout.Header>

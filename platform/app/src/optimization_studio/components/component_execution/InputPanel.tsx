@@ -24,12 +24,10 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
   const [animationFinished, setAnimationFinished] = useState(false);
 
   // Access workflow store state for validation triggering
-  const { triggerValidation, setTriggerValidation } = useWorkflowStore(
-    (state) => ({
-      triggerValidation: state.triggerValidation,
-      setTriggerValidation: state.setTriggerValidation,
-    }),
-  );
+  const { triggerValidation, setTriggerValidation } = useWorkflowStore((state) => ({
+    triggerValidation: state.triggerValidation,
+    setTriggerValidation: state.setTriggerValidation,
+  }));
 
   // Hook to execute the component
   const { startComponentExecution } = useComponentExecution();
@@ -40,9 +38,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
       node.data.inputs?.map((input) => ({
         identifier: input.identifier,
         type: input.type,
-        optional: !missingFields.some(
-          (field) => field.identifier === input.identifier,
-        ),
+        optional: !missingFields.some((field) => field.identifier === input.identifier),
         value: inputs[input.identifier],
       })) ?? []
     );

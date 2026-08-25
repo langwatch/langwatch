@@ -10,9 +10,7 @@ const isMappableGithubHost = (host: string) =>
 import type { CodingAgentSessionState } from "../projections/codingAgentSession.foldProjection";
 import type { CodingAgentProcessingEvent } from "../schemas/events";
 
-const logger = createLogger(
-  "langwatch:coding-agent-processing:pull-request-mapping",
-);
+const logger = createLogger("langwatch:coding-agent-processing:pull-request-mapping");
 
 /**
  * The window one branch's mapping job collapses into.
@@ -64,11 +62,11 @@ export function shouldMapPullRequests(
   if (!isMappableGithubHost(state.repositoryHost ?? "")) return false;
   return Boolean(
     state.repositoryOwner &&
-      state.repositoryName &&
-      state.gitBranch &&
-      state.repositoryOwner.length > 0 &&
-      state.repositoryName.length > 0 &&
-      state.gitBranch.length > 0,
+    state.repositoryName &&
+    state.gitBranch &&
+    state.repositoryOwner.length > 0 &&
+    state.repositoryName.length > 0 &&
+    state.gitBranch.length > 0,
   );
 }
 
@@ -105,8 +103,7 @@ export function pullRequestMappingJobId({
     "repositoryOwner" | "repositoryName" | "gitBranch"
   >;
 }): string {
-  const repository =
-    `${state.repositoryOwner}/${state.repositoryName}`.toLowerCase();
+  const repository = `${state.repositoryOwner}/${state.repositoryName}`.toLowerCase();
   return `prmap:${tenantId}:${repository}:${state.gitBranch}`;
 }
 

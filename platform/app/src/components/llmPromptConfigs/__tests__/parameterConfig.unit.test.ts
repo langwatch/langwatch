@@ -91,29 +91,17 @@ describe("Parameter Config", () => {
     });
 
     it("filters to only configured parameters", () => {
-      const params = getDisplayParameters([
-        "temperature",
-        "unknown_param",
-        "max_tokens",
-      ]);
+      const params = getDisplayParameters(["temperature", "unknown_param", "max_tokens"]);
       expect(params).toContain("temperature");
       expect(params).toContain("max_tokens");
       expect(params).not.toContain("unknown_param");
     });
 
     it("sorts parameters by display order", () => {
-      const params = getDisplayParameters([
-        "max_tokens",
-        "temperature",
-        "reasoning",
-      ]);
+      const params = getDisplayParameters(["max_tokens", "temperature", "reasoning"]);
       // reasoning should come before temperature in display order
-      expect(params.indexOf("reasoning")).toBeLessThan(
-        params.indexOf("temperature"),
-      );
-      expect(params.indexOf("temperature")).toBeLessThan(
-        params.indexOf("max_tokens"),
-      );
+      expect(params.indexOf("reasoning")).toBeLessThan(params.indexOf("temperature"));
+      expect(params.indexOf("temperature")).toBeLessThan(params.indexOf("max_tokens"));
     });
 
     it("handles GPT-4.1 style parameters", () => {
@@ -238,10 +226,7 @@ describe("Parameter Config", () => {
         defaultValue: "medium",
         canDisable: false,
       };
-      const config = getParameterConfigWithModelOverrides(
-        "temperature",
-        reasoningConfig,
-      );
+      const config = getParameterConfigWithModelOverrides("temperature", reasoningConfig);
       expect(config?.type).toBe("slider");
     });
 
@@ -253,10 +238,7 @@ describe("Parameter Config", () => {
         defaultValue: "high",
         canDisable: false,
       };
-      const config = getParameterConfigWithModelOverrides(
-        "reasoning",
-        reasoningConfig,
-      );
+      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
 
       expect(config?.type).toBe("select");
       if (config?.type === "select") {
@@ -273,10 +255,7 @@ describe("Parameter Config", () => {
         defaultValue: "medium",
         canDisable: false,
       };
-      const config = getParameterConfigWithModelOverrides(
-        "reasoning",
-        reasoningConfig,
-      );
+      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
 
       expect(config?.label).toBe("Reasoning Effort");
     });
@@ -289,10 +268,7 @@ describe("Parameter Config", () => {
         defaultValue: "low",
         canDisable: false,
       };
-      const config = getParameterConfigWithModelOverrides(
-        "reasoning",
-        reasoningConfig,
-      );
+      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
 
       expect(config?.label).toBe("Thinking Level");
     });
@@ -305,10 +281,7 @@ describe("Parameter Config", () => {
         defaultValue: "medium",
         canDisable: false,
       };
-      const config = getParameterConfigWithModelOverrides(
-        "reasoning",
-        reasoningConfig,
-      );
+      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
 
       expect(config?.label).toBe("Effort");
     });
@@ -321,10 +294,7 @@ describe("Parameter Config", () => {
         defaultValue: "low",
         canDisable: false,
       };
-      const config = getParameterConfigWithModelOverrides(
-        "reasoning",
-        reasoningConfig,
-      );
+      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
 
       expect(config?.label).toBe("Reasoning");
     });
@@ -337,20 +307,11 @@ describe("Parameter Config", () => {
         defaultValue: "none",
         canDisable: true,
       };
-      const config = getParameterConfigWithModelOverrides(
-        "reasoning",
-        reasoningConfig,
-      );
+      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
 
       expect(config?.type).toBe("select");
       if (config?.type === "select") {
-        expect(config.options).toEqual([
-          "none",
-          "low",
-          "medium",
-          "high",
-          "xhigh",
-        ]);
+        expect(config.options).toEqual(["none", "low", "medium", "high", "xhigh"]);
         expect(config.default).toBe("none");
       }
     });

@@ -170,9 +170,7 @@ export class ChangeGrantRoleCommand implements CommandHandler<
     return payload.grantId;
   }
 
-  handle(
-    command: Command<ChangeGrantRoleCommandData>,
-  ): GrantRoleChangedEvent[] {
+  handle(command: Command<ChangeGrantRoleCommandData>): GrantRoleChangedEvent[] {
     const { commandId, grantId, from, to, actor, occurredAtMs } = command.data;
     return [
       EventUtils.createEvent<GrantRoleChangedEvent>({
@@ -274,8 +272,7 @@ export class ChangeRolePermissionsCommand implements CommandHandler<
   handle(
     command: Command<ChangeRolePermissionsCommandData>,
   ): RolePermissionsChangedEvent[] {
-    const { commandId, roleId, permissions, actor, occurredAtMs } =
-      command.data;
+    const { commandId, roleId, permissions, actor, occurredAtMs } = command.data;
     return [
       EventUtils.createEvent<RolePermissionsChangedEvent>({
         aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,

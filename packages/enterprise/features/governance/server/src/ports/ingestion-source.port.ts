@@ -34,13 +34,9 @@ export abstract class IngestionSourceRepository {
   abstract tryFindByCurrentSecretHash(
     hash: string,
   ): Promise<GovernanceIngestionSource | null>;
-  abstract findByPriorSecretHash(
-    hash: string,
-  ): Promise<GovernanceIngestionSource[]>;
+  abstract findByPriorSecretHash(hash: string): Promise<GovernanceIngestionSource[]>;
   abstract countLive(organizationId: string): Promise<number>;
-  abstract create(
-    input: CreateIngestionSourceRecord,
-  ): Promise<GovernanceIngestionSource>;
+  abstract create(input: CreateIngestionSourceRecord): Promise<GovernanceIngestionSource>;
   abstract update(
     id: string,
     input: UpdateIngestionSourceRecord,

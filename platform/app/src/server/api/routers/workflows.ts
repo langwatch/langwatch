@@ -81,7 +81,8 @@ export const workflowRouter = createTRPCRouter({
         authorId: ctx.session.user.id,
       });
 
-      void ctx.app.workflows.list({ projectId: input.projectId })
+      void ctx.app.workflows
+        .list({ projectId: input.projectId })
         .then((workflows) => {
           fireWorkflowCreatedNurturing({
             userId: ctx.session.user.id,
@@ -116,8 +117,7 @@ export const workflowRouter = createTRPCRouter({
       if (!hasSourcePermission) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message:
-            "You do not have permission to create workflows in the source project",
+          message: "You do not have permission to create workflows in the source project",
         });
       }
 
@@ -210,13 +210,10 @@ export const workflowRouter = createTRPCRouter({
 
       return workflows.map(({ copiedWorkflows, ...workflow }) => {
         const canSeeSource =
-          workflow.copiedFrom &&
-          visibleProjects.get(workflow.copiedFrom.projectId);
+          workflow.copiedFrom && visibleProjects.get(workflow.copiedFrom.projectId);
         return {
           ...workflow,
-          copiedFromWorkflowId: canSeeSource
-            ? workflow.copiedFromWorkflowId
-            : null,
+          copiedFromWorkflowId: canSeeSource ? workflow.copiedFromWorkflowId : null,
           copiedFrom: canSeeSource ? workflow.copiedFrom : null,
           _count: {
             copiedWorkflows: copiedWorkflows.filter((copy) =>
@@ -336,9 +333,7 @@ export const workflowRouter = createTRPCRouter({
       );
 
       // Only return copies where user has permission
-      const filteredCopies = copiesWithPermissions.filter(
-        (copy) => copy.hasPermission,
-      );
+      const filteredCopies = copiesWithPermissions.filter((copy) => copy.hasPermission);
 
       // If no copies found but copies exist, it means user doesn't have permission on any of them
       if (filteredCopies.length === 0 && copies.length > 0) {
@@ -387,9 +382,7 @@ export const workflowRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         workflowId: z.string(),
-        returnDSL: z
-          .union([z.boolean(), z.literal("previousVersion")])
-          .optional(),
+        returnDSL: z.union([z.boolean(), z.literal("previousVersion")]).optional(),
       }),
     )
     .permission("workflows:view")
@@ -578,8 +571,7 @@ export const workflowRouter = createTRPCRouter({
       if (!hasSourcePermission) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message:
-            "You do not have permission to view workflows in the source project",
+          message: "You do not have permission to view workflows in the source project",
         });
       }
 
@@ -667,9 +659,7 @@ export const workflowRouter = createTRPCRouter({
 
       // Filter copies if copyIds is provided
       const copiesToPush = input.copyIds
-        ? workflow.copiedWorkflows.filter((copy) =>
-            input.copyIds!.includes(copy.id),
-          )
+        ? workflow.copiedWorkflows.filter((copy) => input.copyIds!.includes(copy.id))
         : workflow.copiedWorkflows;
 
       if (copiesToPush.length === 0) {
@@ -746,8 +736,7 @@ export const workflowRouter = createTRPCRouter({
       if (results.length === 0) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message:
-            "You do not have permission to update any of the copied workflows",
+          message: "You do not have permission to update any of the copied workflows",
         });
       }
 
@@ -773,9 +762,11 @@ export const workflowRouter = createTRPCRouter({
     .permission("workflows:view")
     .query(async ({ ctx, input }) => {
       // Find evaluators linked to this workflow
-      const evaluators = (await ctx.app.evaluators.getAll({
-        projectId: input.projectId,
-      }))
+      const evaluators = (
+        await ctx.app.evaluators.getAll({
+          projectId: input.projectId,
+        })
+      )
         .filter((evaluator) => evaluator.workflowId === input.workflowId)
         .map(({ id, name }) => ({ id, name }));
 
@@ -1032,16 +1023,12 @@ export const copyWorkflowWithDatasets = async ({
   }
 
   // Deep clone DSL to ensure mutability
-  const dsl = parseStudioWorkflow(
-    JSON.parse(JSON.stringify(workflow.latestVersion.dsl)),
-  );
+  const dsl = parseStudioWorkflow(JSON.parse(JSON.stringify(workflow.latestVersion.dsl)));
   const datasetIdMap = new Map<string, { id: string; name: string }>();
 
   if (copyDatasets) {
     // Type guard for dataset reference
-    const isDatasetRef = (
-      value: unknown,
-    ): value is { id?: string; name?: string } => {
+    const isDatasetRef = (value: unknown): value is { id?: string; name?: string } => {
       if (!value || typeof value !== "object") return false;
       const obj = value as Record<string, unknown>;
       return (
@@ -1051,10 +1038,7 @@ export const copyWorkflowWithDatasets = async ({
     };
 
     // Helper to process dataset reference
-    const processDatasetRef = async (datasetRef: {
-      id?: string;
-      name?: string;
-    }) => {
+    const processDatasetRef = async (datasetRef: { id?: string; name?: string }) => {
       if (!datasetRef.id) return;
 
       if (datasetIdMap.has(datasetRef.id)) {

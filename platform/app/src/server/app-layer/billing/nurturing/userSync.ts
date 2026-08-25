@@ -1,7 +1,10 @@
 import { getApp } from "../../app";
 import { prisma } from "../../../db";
 import { captureException } from "../../../../utils/posthogErrorCapture";
-import type { CioOrgTraits, CioPersonTraits } from "@langwatch/enterprise-billing-contract";
+import type {
+  CioOrgTraits,
+  CioPersonTraits,
+} from "@langwatch/enterprise-billing-contract";
 
 /**
  * Tracks which users have had a full CIO profile sync this process lifetime.
@@ -100,9 +103,7 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
     ...(user.email ? { email: user.email } : {}),
     ...(user.name ? { name: user.name } : {}),
     ...(signupData.yourRole ? { role: signupData.yourRole as string } : {}),
-    ...(signupData.companySize
-      ? { company_size: signupData.companySize as string }
-      : {}),
+    ...(signupData.companySize ? { company_size: signupData.companySize as string } : {}),
     has_traces: hasTraces,
     has_subscription: !!activeSubscription,
     createdAt: user.createdAt.toISOString(),
@@ -111,9 +112,7 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
 
   const orgTraits: Partial<CioOrgTraits> = {
     name: org.name,
-    ...(signupData.companySize
-      ? { company_size: signupData.companySize as string }
-      : {}),
+    ...(signupData.companySize ? { company_size: signupData.companySize as string } : {}),
   };
 
   await Promise.all([

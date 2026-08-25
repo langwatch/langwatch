@@ -20,11 +20,7 @@ export function UpdateSeatsBlock({
   isLoading?: boolean;
 }) {
   return (
-    <Card.Root
-      data-testid="update-seats-block"
-      borderWidth={1}
-      borderColor="border"
-    >
+    <Card.Root data-testid="update-seats-block" borderWidth={1} borderColor="border">
       <Card.Body paddingY={5} paddingX={6}>
         <Flex justifyContent="space-between" alignItems="center">
           <VStack align="start" gap={1}>

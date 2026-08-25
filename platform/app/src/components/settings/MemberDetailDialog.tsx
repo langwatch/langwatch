@@ -69,12 +69,10 @@ export function MemberDetailDialog({
 }) {
   const queryClient = api.useUtils();
 
-  const [pendingRole, setPendingRole] = useState<OrganizationUserRole>(
-    member.role,
+  const [pendingRole, setPendingRole] = useState<OrganizationUserRole>(member.role);
+  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<Set<string>>(
+    new Set(),
   );
-  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<
-    Set<string>
-  >(new Set());
   const [pendingBindingAdditions, setPendingBindingAdditions] = useState<
     PendingBinding[]
   >([]);
@@ -134,8 +132,7 @@ export function MemberDetailDialog({
     const binding = constrainStagedRowToSeat(incoming);
     const alreadyHeld = (directBindings.data ?? []).some(
       (row) =>
-        !pendingBindingRemovals.has(row.id) &&
-        bindingKey(row) === bindingKey(binding),
+        !pendingBindingRemovals.has(row.id) && bindingKey(row) === bindingKey(binding),
     );
     if (alreadyHeld) return;
     setPendingBindingAdditions((prev) =>
@@ -154,9 +151,7 @@ export function MemberDetailDialog({
     setPendingBindingAdditions((prev) => {
       const seen = new Set<string>();
       return prev
-        .filter(
-          (binding) => binding.scopeType !== RoleBindingScopeType.ORGANIZATION,
-        )
+        .filter((binding) => binding.scopeType !== RoleBindingScopeType.ORGANIZATION)
         .map(constrainStagedRowToSeat)
         .filter((binding) => {
           const key = bindingKey(binding);
@@ -352,9 +347,7 @@ export function MemberDetailDialog({
                           <Badge
                             colorPalette={roleBadgeColor(b.role)}
                             size="sm"
-                            textDecoration={
-                              markedForRemoval ? "line-through" : undefined
-                            }
+                            textDecoration={markedForRemoval ? "line-through" : undefined}
                           >
                             {b.customRoleName ?? b.role}
                           </Badge>
@@ -362,12 +355,9 @@ export function MemberDetailDialog({
                           <Badge
                             colorPalette="purple"
                             size="sm"
-                            textDecoration={
-                              markedForRemoval ? "line-through" : undefined
-                            }
+                            textDecoration={markedForRemoval ? "line-through" : undefined}
                           >
-                            {scopeTypeLabel(b.scopeType)}{" "}
-                            {b.scopeName ?? b.scopeId}
+                            {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
                           </Badge>
                           <Spacer />
                           {b.scopeType !== RoleBindingScopeType.PROJECT &&
@@ -375,20 +365,14 @@ export function MemberDetailDialog({
                               <Button
                                 size="xs"
                                 variant="ghost"
-                                color={
-                                  markedForRemoval ? "blue.500" : "fg.muted"
-                                }
+                                color={markedForRemoval ? "blue.500" : "fg.muted"}
                                 aria-label={
-                                  markedForRemoval
-                                    ? "Undo removal"
-                                    : "Remove binding"
+                                  markedForRemoval ? "Undo removal" : "Remove binding"
                                 }
                                 onClick={() =>
                                   setPendingBindingRemovals((prev) => {
                                     const next = new Set(prev);
-                                    next.has(b.id)
-                                      ? next.delete(b.id)
-                                      : next.add(b.id);
+                                    next.has(b.id) ? next.delete(b.id) : next.add(b.id);
                                     return next;
                                   })
                                 }
@@ -414,8 +398,7 @@ export function MemberDetailDialog({
                         </Badge>
                         <Text color="fg.muted">on</Text>
                         <Badge colorPalette="purple" size="sm">
-                          {scopeTypeLabel(b.scopeType)}{" "}
-                          {b.scopeName ?? b.scopeId}
+                          {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
                         </Badge>
                         <Spacer />
                         <Button
@@ -473,11 +456,7 @@ export function MemberDetailDialog({
                         <Text fontSize="sm" color="fg.muted">
                           {group.name}
                         </Text>
-                        <Link
-                          href="/settings/groups"
-                          fontSize="xs"
-                          color="blue.400"
-                        >
+                        <Link href="/settings/groups" fontSize="xs" color="blue.400">
                           No access configured
                         </Link>
                       </HStack>
@@ -491,10 +470,7 @@ export function MemberDetailDialog({
                           borderRadius="md"
                           fontSize="sm"
                         >
-                          <Badge
-                            colorPalette={roleBadgeColor(b.role)}
-                            size="sm"
-                          >
+                          <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
                             {b.customRoleName ?? b.role}
                           </Badge>
                           <Text color="fg.muted">on</Text>

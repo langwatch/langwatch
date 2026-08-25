@@ -36,10 +36,8 @@ type Ctx = ProcessHandlerContext<SimulationRunExecutionIntents>;
 /** Deterministic outbox identities (unique per process instance). */
 const executeKey = (scenarioRunId: string) => `execute:${scenarioRunId}`;
 const cancelKey = (scenarioRunId: string) => `cancel:${scenarioRunId}`;
-const finishCancelledKey = (scenarioRunId: string) =>
-  `finish:${scenarioRunId}:cancelled`;
-const finishStalledKey = (scenarioRunId: string) =>
-  `finish:${scenarioRunId}:stalled`;
+const finishCancelledKey = (scenarioRunId: string) => `finish:${scenarioRunId}:cancelled`;
+const finishStalledKey = (scenarioRunId: string) => `finish:${scenarioRunId}:stalled`;
 const finishUnexecutableKey = (scenarioRunId: string) =>
   `finish:${scenarioRunId}:unexecutable`;
 
@@ -69,8 +67,9 @@ export function buildSimulationRunEventView(
   // malformed target becomes a redelivering handler instead of a run that
   // fails once, clearly. Normalising to null instead hands handleRunQueued the
   // case it already has an answer for: finish the run as unexecutable.
-  const parsedTarget =
-    simulationRunProcessEventViewSchema.shape.target.safeParse(data.target);
+  const parsedTarget = simulationRunProcessEventViewSchema.shape.target.safeParse(
+    data.target,
+  );
   const target = parsedTarget.success ? parsedTarget.data : null;
   // The queued event is the only place the run's resolved parameter values
   // cross into execution: the pool job is otherwise built from ids, which do
@@ -82,9 +81,7 @@ export function buildSimulationRunEventView(
     typeof data.metadata === "object" && data.metadata !== null
       ? (data.metadata as Record<string, unknown>)
       : undefined;
-  const parsedParameters = runParameterValuesSchema.safeParse(
-    metadata?.parameters,
-  );
+  const parsedParameters = runParameterValuesSchema.safeParse(metadata?.parameters);
   const parameters =
     parsedParameters.success && Object.keys(parsedParameters.data).length > 0
       ? parsedParameters.data
@@ -96,16 +93,13 @@ export function buildSimulationRunEventView(
     data.secretParameters,
   );
   const secretParameters =
-    parsedSecretParameters.success &&
-    Object.keys(parsedSecretParameters.data).length > 0
+    parsedSecretParameters.success && Object.keys(parsedSecretParameters.data).length > 0
       ? parsedSecretParameters.data
       : null;
   // The names ride the metadata in clear. They say what the ciphertext beside
   // them has to cover, so a queued event whose secret values were lost or
   // written by another CREDENTIALS_SECRET is caught before the run starts.
-  const parsedSecretNames = z
-    .array(z.string())
-    .safeParse(metadata?.secretParameterNames);
+  const parsedSecretNames = z.array(z.string()).safeParse(metadata?.secretParameterNames);
   const secretParameterNames =
     parsedSecretNames.success && parsedSecretNames.data.length > 0
       ? parsedSecretNames.data
@@ -169,9 +163,7 @@ function schedulingRef(ctx: Ctx): number {
  * A name is missing when the ciphertext record has no entry for it, or holds
  * an empty one.
  */
-function declaredSecretsWithoutCiphertext(
-  view: SimulationRunProcessEventView,
-): string[] {
+function declaredSecretsWithoutCiphertext(view: SimulationRunProcessEventView): string[] {
   if (view.secretParameterNames === null) return [];
   const ciphertext = view.secretParameters ?? {};
   return view.secretParameterNames.filter(

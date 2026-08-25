@@ -99,9 +99,7 @@ describe("CodingAgentSessionEventsClickHouseRepository", () => {
         limit: 10,
       });
 
-      const matching = events.filter(
-        (event) => event.recordId === record.recordId,
-      );
+      const matching = events.filter((event) => event.recordId === record.recordId);
       expect(matching).toHaveLength(1);
       expect(matching[0]?.costUsd).toBeCloseTo(0.0421);
       expect(matching[0]?.cacheReadTokens).toBe(13000);
@@ -159,9 +157,7 @@ describe("CodingAgentSessionEventsClickHouseRepository", () => {
       });
 
       expect(events.length).toBe(toolResultCount);
-      expect(events.every((event) => event.eventKind === "tool_result")).toBe(
-        true,
-      );
+      expect(events.every((event) => event.eventKind === "tool_result")).toBe(true);
     });
   });
 
@@ -283,9 +279,7 @@ describe("CodingAgentSessionEventsClickHouseRepository", () => {
         "claude-fable-5",
         "gpt-5-mini",
       ]);
-      expect(
-        totals.every((row) => row.inputTokens < 999 && row.costUsd < 99),
-      ).toBe(true);
+      expect(totals.every((row) => row.inputTokens < 999 && row.costUsd < 99)).toBe(true);
     });
   });
 });

@@ -21,78 +21,54 @@ describe("Secrets resource in RBAC", () => {
 
   describe("given the ADMIN team role", () => {
     it("includes secrets:view permission", () => {
-      expect(teamRoleHasPermission(TeamUserRole.ADMIN, "secrets:view")).toBe(
-        true,
-      );
+      expect(teamRoleHasPermission(TeamUserRole.ADMIN, "secrets:view")).toBe(true);
     });
 
     it("includes secrets:manage permission", () => {
-      expect(teamRoleHasPermission(TeamUserRole.ADMIN, "secrets:manage")).toBe(
-        true,
-      );
+      expect(teamRoleHasPermission(TeamUserRole.ADMIN, "secrets:manage")).toBe(true);
     });
   });
 
   describe("given the MEMBER team role", () => {
     it("includes secrets:view permission", () => {
-      expect(teamRoleHasPermission(TeamUserRole.MEMBER, "secrets:view")).toBe(
-        true,
-      );
+      expect(teamRoleHasPermission(TeamUserRole.MEMBER, "secrets:view")).toBe(true);
     });
 
     it("includes secrets:manage permission", () => {
-      expect(teamRoleHasPermission(TeamUserRole.MEMBER, "secrets:manage")).toBe(
-        true,
-      );
+      expect(teamRoleHasPermission(TeamUserRole.MEMBER, "secrets:manage")).toBe(true);
     });
   });
 
   describe("given the VIEWER team role", () => {
     it("includes secrets:view permission", () => {
-      expect(teamRoleHasPermission(TeamUserRole.VIEWER, "secrets:view")).toBe(
-        true,
-      );
+      expect(teamRoleHasPermission(TeamUserRole.VIEWER, "secrets:view")).toBe(true);
     });
 
     it("does not include secrets:manage permission", () => {
-      expect(teamRoleHasPermission(TeamUserRole.VIEWER, "secrets:manage")).toBe(
-        false,
-      );
+      expect(teamRoleHasPermission(TeamUserRole.VIEWER, "secrets:manage")).toBe(false);
     });
   });
 
   describe("given the CUSTOM fallback team role", () => {
     it("includes secrets:view permission", () => {
-      expect(teamRoleHasPermission(TeamUserRole.CUSTOM, "secrets:view")).toBe(
-        true,
-      );
+      expect(teamRoleHasPermission(TeamUserRole.CUSTOM, "secrets:view")).toBe(true);
     });
 
     it("does not include secrets:manage permission", () => {
-      expect(teamRoleHasPermission(TeamUserRole.CUSTOM, "secrets:manage")).toBe(
-        false,
-      );
+      expect(teamRoleHasPermission(TeamUserRole.CUSTOM, "secrets:manage")).toBe(false);
     });
   });
 
   describe("given organization role permissions", () => {
     it("does not include any secrets permissions for ADMIN", () => {
-      const permissions = getOrganizationRolePermissions(
-        OrganizationUserRole.ADMIN,
-      );
-      const secretsPermissions = permissions.filter((p) =>
-        p.startsWith("secrets:"),
-      );
+      const permissions = getOrganizationRolePermissions(OrganizationUserRole.ADMIN);
+      const secretsPermissions = permissions.filter((p) => p.startsWith("secrets:"));
       expect(secretsPermissions).toHaveLength(0);
     });
 
     it("does not include any secrets permissions for MEMBER", () => {
-      const permissions = getOrganizationRolePermissions(
-        OrganizationUserRole.MEMBER,
-      );
-      const secretsPermissions = permissions.filter((p) =>
-        p.startsWith("secrets:"),
-      );
+      const permissions = getOrganizationRolePermissions(OrganizationUserRole.MEMBER);
+      const secretsPermissions = permissions.filter((p) => p.startsWith("secrets:"));
       expect(secretsPermissions).toHaveLength(0);
     });
   });

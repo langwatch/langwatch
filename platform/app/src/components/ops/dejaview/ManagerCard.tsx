@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-  Wrap,
-} from "@chakra-ui/react";
+import { Badge, Box, HStack, Spacer, Text, VStack, Wrap } from "@chakra-ui/react";
 
 import { JsonViewer } from "~/components/ops/JsonViewer";
 import { formatTimeAgo } from "@langwatch/ops-web";
@@ -16,10 +8,7 @@ import type {
   AggregateProcessManagerOutboxMessage,
 } from "~/server/app-layer/ops/manager-explorer.service";
 
-const OUTBOX_PALETTE: Record<
-  AggregateProcessManagerOutboxMessage["status"],
-  string
-> = {
+const OUTBOX_PALETTE: Record<AggregateProcessManagerOutboxMessage["status"], string> = {
   pending: "yellow",
   dispatched: "green",
   dead: "red",
@@ -37,13 +26,7 @@ function instanceStatus(instance: AggregateProcessManagerInstance | null): {
   return { label: "Active", palette: "green" };
 }
 
-function Chips({
-  items,
-  palette,
-}: {
-  items: readonly string[];
-  palette: string;
-}) {
+function Chips({ items, palette }: { items: readonly string[]; palette: string }) {
   return (
     <Wrap gap={1}>
       {items.map((item) => (
@@ -55,13 +38,7 @@ function Chips({
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <Box>
       <Text
@@ -78,11 +55,7 @@ function Field({
   );
 }
 
-function EmittedCommands({
-  outbox,
-}: {
-  outbox: AggregateProcessManagerOutboxMessage[];
-}) {
+function EmittedCommands({ outbox }: { outbox: AggregateProcessManagerOutboxMessage[] }) {
   return (
     <Field label="Emitted commands">
       <VStack align="stretch" gap={1}>
@@ -97,11 +70,7 @@ function EmittedCommands({
                 ×{msg.attempts}
               </Text>
             )}
-            <Badge
-              colorPalette={OUTBOX_PALETTE[msg.status]}
-              variant="subtle"
-              size="sm"
-            >
+            <Badge colorPalette={OUTBOX_PALETTE[msg.status]} variant="subtle" size="sm">
               {msg.status}
             </Badge>
           </HStack>
@@ -153,9 +122,7 @@ export function ManagerCard({ manager }: { manager: AggregateProcessManager }) {
             <Field label="State">
               <JsonViewer data={instance.state} maxHeight="220px" />
             </Field>
-            {manager.outbox.length > 0 && (
-              <EmittedCommands outbox={manager.outbox} />
-            )}
+            {manager.outbox.length > 0 && <EmittedCommands outbox={manager.outbox} />}
           </>
         ) : (
           <Text textStyle="xs" color="fg.muted">

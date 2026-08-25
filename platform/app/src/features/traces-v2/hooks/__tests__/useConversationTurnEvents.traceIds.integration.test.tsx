@@ -58,11 +58,7 @@ describe("useConversationTurnEvents", () => {
   describe("given the same trace appears more than once among the turns", () => {
     it("asks for that trace once", () => {
       renderHook(() =>
-        useConversationTurnEvents([
-          turn("t-2", 20),
-          turn("t-1", 10),
-          turn("t-1", 10),
-        ]),
+        useConversationTurnEvents([turn("t-2", 20), turn("t-1", 10), turn("t-1", 10)]),
       );
 
       expect(lastInput()).toMatchObject({ traceIds: ["t-1", "t-2"] });

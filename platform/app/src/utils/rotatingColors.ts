@@ -102,9 +102,7 @@ export type RotatingColorSet = keyof typeof rotatingColors;
  * are all mode-aware (good dark contrast) instead of a hand-picked
  * subtle/emphasized token pair.
  */
-const ROTATING_PALETTES = rotatingColors.colors.map(
-  (c) => c.background.split(".")[0]!,
-);
+const ROTATING_PALETTES = rotatingColors.colors.map((c) => c.background.split(".")[0]!);
 
 export type RotatingPalette = string;
 

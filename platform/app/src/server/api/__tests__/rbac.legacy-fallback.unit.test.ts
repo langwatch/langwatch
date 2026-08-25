@@ -100,11 +100,7 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
         status: "finalized",
       });
 
-      await resolveTeamPermission(
-        context(),
-        "team-1",
-        "team:manage" as Permission,
-      );
+      await resolveTeamPermission(context(), "team-1", "team:manage" as Permission);
 
       expect(mockPrisma.teamUser.findFirst).not.toHaveBeenCalled();
     });

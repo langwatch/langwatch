@@ -199,10 +199,9 @@ export const dataRetentionRouter = createTRPCRouter({
       // value. We return `appliedRetentionDays` to the UI so it can show
       // the truth (the dialog previously named the form value, which
       // could differ silently from what got applied).
-      const effective =
-        await ctx.app.dataRetention.policy.getResolvedForProject(
-          input.projectId,
-        );
+      const effective = await ctx.app.dataRetention.policy.getResolvedForProject(
+        input.projectId,
+      );
       const category = input.category as RetentionCategory;
       const newRetentionDays = effective[category];
       if (newRetentionDays === undefined) {

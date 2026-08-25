@@ -10,13 +10,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -197,9 +191,7 @@ vi.mock("~/hooks/useFeatureFlag", async () => {
     ...actual,
     useFeatureFlag: (flag: string) => ({
       enabled:
-        flag === "release_ui_ai_governance_enabled"
-          ? mockGovernanceFlagEnabled
-          : true,
+        flag === "release_ui_ai_governance_enabled" ? mockGovernanceFlagEnabled : true,
       isLoading: false,
     }),
   };
@@ -396,9 +388,7 @@ describe("the product-switcher top bar", () => {
       expect(
         screen.getByText("Observe, evaluate and test your agents"),
       ).toBeInTheDocument();
-      expect(
-        screen.getByText("Route, meter and bill LLM usage"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Route, meter and bill LLM usage")).toBeInTheDocument();
       expect(
         screen.getByText("Every AI tool, license, agent and dollar"),
       ).toBeInTheDocument();
@@ -438,9 +428,7 @@ describe("the product-switcher top bar", () => {
     it("gives the product trigger its own surface, a border and a radius", () => {
       renderShell();
 
-      expect(
-        screen.getByRole("button", { name: "Switch product" }),
-      ).toHaveStyle({
+      expect(screen.getByRole("button", { name: "Switch product" })).toHaveStyle({
         backgroundColor: "var(--chakra-colors-bg-panel)",
         borderWidth: "1px",
         borderRadius: "var(--chakra-radii-lg)",
@@ -484,9 +472,7 @@ describe("the product-switcher top bar", () => {
       renderShell();
 
       const user = userEvent.setup();
-      await user.click(
-        screen.getByRole("button", { name: "Switch organization" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Switch organization" }));
       await waitFor(() => {
         expect(screen.getByText("Beta Corp")).toBeInTheDocument();
       });
@@ -528,9 +514,7 @@ describe("the product-switcher top bar", () => {
       const user = userEvent.setup();
       await user.click(screen.getByRole("button", { name: "Switch project" }));
       await waitFor(() => {
-        expect(
-          screen.getByPlaceholderText("Search projects"),
-        ).toBeInTheDocument();
+        expect(screen.getByPlaceholderText("Search projects")).toBeInTheDocument();
       });
       return user;
     }
@@ -550,9 +534,7 @@ describe("the product-switcher top bar", () => {
       await openProjectPicker();
 
       // The field carries its own accessible name, not only a placeholder.
-      expect(
-        screen.getByRole("combobox", { name: "Search projects" }),
-      ).toHaveFocus();
+      expect(screen.getByRole("combobox", { name: "Search projects" })).toHaveFocus();
       await waitFor(() => {
         expect(screen.getByText("Edge Router")).toBeInTheDocument();
       });
@@ -584,9 +566,7 @@ describe("the product-switcher top bar", () => {
       await user.keyboard("{ArrowDown}{Enter}");
 
       await waitFor(() => {
-        expect(pushMock).toHaveBeenCalledWith(
-          expect.stringContaining("billing-sync"),
-        );
+        expect(pushMock).toHaveBeenCalledWith(expect.stringContaining("billing-sync"));
       });
     });
 
@@ -615,9 +595,7 @@ describe("the product-switcher top bar", () => {
       await waitFor(() => {
         expect(screen.getByText("Support Bot")).toBeInTheDocument();
       });
-      expect(
-        screen.queryByPlaceholderText("Search projects"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("Search projects")).not.toBeInTheDocument();
     });
   });
 
@@ -642,10 +620,7 @@ describe("the product-switcher top bar", () => {
 
     /** @scenario LLM Ops opens from the personal workspace */
     it("offers LLM Ops and opens the project last worked in", async () => {
-      localStorage.setItem(
-        "selectedProjectSlug",
-        JSON.stringify("support-bot"),
-      );
+      localStorage.setItem("selectedProjectSlug", JSON.stringify("support-bot"));
       renderShell({ personalScope: true });
       const user = await openProductSwitcher();
 

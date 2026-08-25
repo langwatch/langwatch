@@ -64,9 +64,7 @@ describe("collectUsageStats", () => {
 
   describe("when ClickHouse is available", () => {
     it("queries CH for trace and scenario counts", async () => {
-      vi.mocked(prisma.project.findMany).mockResolvedValue([
-        { id: "proj-1" },
-      ] as any);
+      vi.mocked(prisma.project.findMany).mockResolvedValue([{ id: "proj-1" }] as any);
 
       mockClickHouseQuery
         .mockResolvedValueOnce({
@@ -89,9 +87,7 @@ describe("collectUsageStats", () => {
 
   describe("when CH client is null", () => {
     it("returns zero counts", async () => {
-      vi.mocked(prisma.project.findMany).mockResolvedValue([
-        { id: "proj-1" },
-      ] as any);
+      vi.mocked(prisma.project.findMany).mockResolvedValue([{ id: "proj-1" }] as any);
 
       const result = await collectUsageStats({
         instanceId: "inst__org-1",

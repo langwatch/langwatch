@@ -48,10 +48,7 @@ import type { Context } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { AppContextVariables } from "~/app/api/middleware/app-context";
-import {
-  assertEnterprisePlan,
-  ENTERPRISE_FEATURE_ERRORS,
-} from "~/server/api/enterprise";
+import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { tryGetApp } from "~/server/app-layer/app";
@@ -430,9 +427,7 @@ const BEARER_ACCESS_TOKEN_REGEX = /^Bearer\s+(lw_at_[A-Za-z0-9_\-]+)$/;
  * Kept separate from validateAccessToken so callers that need the raw token
  * string (to revoke it) don't re-run full validation.
  */
-function bearerAccessToken(
-  authHeader: string | null | undefined,
-): string | null {
+function bearerAccessToken(authHeader: string | null | undefined): string | null {
   if (!authHeader) return null;
   const match = BEARER_ACCESS_TOKEN_REGEX.exec(authHeader.trim());
   return match ? match[1]! : null;
@@ -491,10 +486,7 @@ async function ensureActiveOrgMemberOr403(
     try {
       const redis = getRedis();
       await redis.del(accessTokenKey(token));
-      await redis.srem(
-        userTokensIndexKey(tokenRecord.user_id),
-        accessTokenKey(token),
-      );
+      await redis.srem(userTokensIndexKey(tokenRecord.user_id), accessTokenKey(token));
     } catch (err) {
       logger.warn(
         { err, userId: tokenRecord.user_id },
@@ -665,8 +657,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
     return c.json(
       {
         error: "slow_down",
-        error_description:
-          "Polling too fast. Increase your interval before retrying.",
+        error_description: "Polling too fast. Increase your interval before retrying.",
       },
       429,
     );
@@ -778,8 +769,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
         return c.json(
           {
             error: "authorization_pending",
-            error_description:
-              "Approval received but project key not ready yet",
+            error_description: "Approval received but project key not ready yet",
           },
           428,
         );
@@ -828,8 +818,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
       | { id: string; slug: string; name: string; api_key: string }
       | undefined;
     try {
-      const workspace =
-        await c.var.langwatchApp.organizations.ensurePersonalWorkspace({
+      const workspace = await c.var.langwatchApp.organizations.ensurePersonalWorkspace({
         userId: user.id,
         organizationId: organization.id,
         displayName: user.name,
@@ -868,8 +857,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
       // change and let credentials accumulate.
       const deviceLabel =
         sanitizeDeviceLabel(
-          parsed.data.client_info?.device_label ??
-            parsed.data.client_info?.hostname,
+          parsed.data.client_info?.device_label ?? parsed.data.client_info?.hostname,
         ) ?? CLI_LOGIN_UNKNOWN_DEVICE_LABEL;
       let minted: {
         token: string;
@@ -969,11 +957,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
     const indexKey = userTokensIndexKey(user.id);
     await redis
       .pipeline()
-      .sadd(
-        indexKey,
-        accessTokenKey(accessToken),
-        refreshTokenKey(refreshToken),
-      )
+      .sadd(indexKey, accessTokenKey(accessToken), refreshTokenKey(refreshToken))
       .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
       .exec();
 
@@ -1080,8 +1064,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: CliContext) => {
   // record.issued_at for sessions started before client_info was
   // captured. When maxSessionDurationDays > 0 and the session is
   // older, reject the refresh — the user must re-run `langwatch login`.
-  const sessionAnchorMs =
-    record.client_info?.session_started_at ?? record.issued_at;
+  const sessionAnchorMs = record.client_info?.session_started_at ?? record.issued_at;
   const org = await prisma.organization.findUnique({
     where: { id: record.organization_id },
     select: { maxSessionDurationDays: true },
@@ -1165,11 +1148,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: CliContext) => {
   const indexKey = userTokensIndexKey(record.user_id);
   await redis
     .pipeline()
-    .sadd(
-      indexKey,
-      accessTokenKey(newAccessToken),
-      refreshTokenKey(newRefreshToken),
-    )
+    .sadd(indexKey, accessTokenKey(newAccessToken), refreshTokenKey(newRefreshToken))
     .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
     .exec();
 
@@ -1231,8 +1210,7 @@ secured.access(CLI_POLICY).get("/budget/status", async (c: CliContext) => {
     return c.json(
       {
         error: "unauthorized",
-        error_description:
-          "Bearer access token is missing, malformed, or expired",
+        error_description: "Bearer access token is missing, malformed, or expired",
       },
       401,
     );
@@ -1241,8 +1219,7 @@ secured.access(CLI_POLICY).get("/budget/status", async (c: CliContext) => {
   // Resolve the user's personal workspace (team + project). If none
   // exists yet (first login, hasn't activated the CLI), nothing can be
   // over budget — return 200 and let the wrapper exec normally.
-  const workspace =
-    await c.var.langwatchApp.organizations.tryFindPersonalWorkspace({
+  const workspace = await c.var.langwatchApp.organizations.tryFindPersonalWorkspace({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
   });
@@ -1313,8 +1290,7 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: CliContext) => {
     return c.json(
       {
         error: "unauthorized",
-        error_description:
-          "Bearer access token is missing, malformed, or expired",
+        error_description: "Bearer access token is missing, malformed, or expired",
       },
       401,
     );
@@ -1342,8 +1318,7 @@ secured.access(CLI_POLICY).get("/budget-overview", async (c: CliContext) => {
     return c.json(
       {
         error: "unauthorized",
-        error_description:
-          "Bearer access token is missing, malformed, or expired",
+        error_description: "Bearer access token is missing, malformed, or expired",
       },
       401,
     );
@@ -1372,8 +1347,7 @@ secured.access(CLI_POLICY).get("/personal-project", async (c: CliContext) => {
     return c.json(
       {
         error: "unauthorized",
-        error_description:
-          "Bearer access token is missing, malformed, or expired",
+        error_description: "Bearer access token is missing, malformed, or expired",
       },
       401,
     );
@@ -1389,8 +1363,7 @@ secured.access(CLI_POLICY).get("/personal-project", async (c: CliContext) => {
     select: { name: true, email: true },
   });
   try {
-    const workspace =
-      await c.var.langwatchApp.organizations.ensurePersonalWorkspace({
+    const workspace = await c.var.langwatchApp.organizations.ensurePersonalWorkspace({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
       displayName: user?.name,
@@ -1466,8 +1439,7 @@ secured.access(CLI_POLICY).post("/virtual-key", async (c: CliContext) => {
     return c.json(
       {
         error: "unauthorized",
-        error_description:
-          "Bearer access token is missing, malformed, or expired",
+        error_description: "Bearer access token is missing, malformed, or expired",
       },
       401,
     );
@@ -1640,8 +1612,7 @@ secured.access(CLI_POLICY).post("/project-key", async (c: CliContext) => {
     return c.json(
       {
         error: "unauthorized",
-        error_description:
-          "Bearer access token is missing, malformed, or expired",
+        error_description: "Bearer access token is missing, malformed, or expired",
       },
       401,
     );
@@ -1683,11 +1654,7 @@ secured.access(CLI_POLICY).post("/project-key", async (c: CliContext) => {
       404,
     );
   }
-  const refusal = await refuseProjectKeyHandout(
-    c,
-    project,
-    tokenRecord.user_id,
-  );
+  const refusal = await refuseProjectKeyHandout(c, project, tokenRecord.user_id);
   if (refusal) return refusal;
   return c.json(
     {
@@ -1769,68 +1736,58 @@ async function ensureGovernancePermissionOr403(
   );
 }
 
-secured
-  .access(cliIngestionSourcesAuth)
-  .get("/governance/ingest/sources", async (c) => {
-    const tokenRecord = await validateAccessToken(
-      c.req.header("Authorization"),
+secured.access(cliIngestionSourcesAuth).get("/governance/ingest/sources", async (c) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description: "Bearer access token is missing, malformed, or expired",
+      },
+      401,
     );
-    if (!tokenRecord) {
-      return c.json(
-        {
-          error: "unauthorized",
-          error_description:
-            "Bearer access token is missing, malformed, or expired",
-        },
-        401,
-      );
-    }
-    const gate = await ensureEnterpriseOr402(
-      c,
-      tokenRecord.organization_id,
-      ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
-    );
-    if (gate) return gate;
-    const denied = await ensureGovernancePermissionOr403(
-      c,
-      tokenRecord,
-      "ingestionSources:view",
-    );
-    if (denied) return denied;
-    const includeArchived = c.req.query("include_archived") === "1";
-    const service = c.var.langwatchApp.governance.ingestionSources;
-    const sources = await service.list(tokenRecord.organization_id);
-    const filtered = includeArchived
-      ? sources
-      : sources.filter(
-          (s: { archivedAt: Date | null }) => s.archivedAt === null,
-        );
-    return c.json({
-      sources: filtered.map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        sourceType: s.sourceType,
-        description: s.description,
-        status: s.status,
-        lastEventAt: s.lastEventAt?.toISOString() ?? null,
-        createdAt: s.createdAt.toISOString(),
-        archivedAt: s.archivedAt?.toISOString() ?? null,
-      })),
-    });
+  }
+  const gate = await ensureEnterpriseOr402(
+    c,
+    tokenRecord.organization_id,
+    ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+  );
+  if (gate) return gate;
+  const denied = await ensureGovernancePermissionOr403(
+    c,
+    tokenRecord,
+    "ingestionSources:view",
+  );
+  if (denied) return denied;
+  const includeArchived = c.req.query("include_archived") === "1";
+  const service = c.var.langwatchApp.governance.ingestionSources;
+  const sources = await service.list(tokenRecord.organization_id);
+  const filtered = includeArchived
+    ? sources
+    : sources.filter((s: { archivedAt: Date | null }) => s.archivedAt === null);
+  return c.json({
+    sources: filtered.map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      sourceType: s.sourceType,
+      description: s.description,
+      status: s.status,
+      lastEventAt: s.lastEventAt?.toISOString() ?? null,
+      createdAt: s.createdAt.toISOString(),
+      archivedAt: s.archivedAt?.toISOString() ?? null,
+    })),
   });
+});
 
 secured
   .access(cliActivityMonitorAuth)
   .get("/governance/ingest/sources/:id/events", async (c) => {
-    const tokenRecord = await validateAccessToken(
-      c.req.header("Authorization"),
-    );
+    const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
     if (!tokenRecord) {
       return c.json(
         {
           error: "unauthorized",
-          error_description:
-            "Bearer access token is missing, malformed, or expired",
+          error_description: "Bearer access token is missing, malformed, or expired",
         },
         401,
       );
@@ -1859,18 +1816,13 @@ secured
     }
     const limitRaw = c.req.query("limit");
     const beforeIso = c.req.query("before_iso") ?? undefined;
-    const limit = limitRaw
-      ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 200)
-      : 50;
+    const limit = limitRaw ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 200) : 50;
 
     // Defensive ownership check before hitting CH — prevents the
     // "querying any source-id with a valid bearer" footgun even
     // though ActivityMonitorService also filters by OrganizationId.
     const sourceService = c.var.langwatchApp.governance.ingestionSources;
-    const source = await sourceService.getById(
-      sourceId,
-      tokenRecord.organization_id,
-    );
+    const source = await sourceService.getById(sourceId, tokenRecord.organization_id);
 
     const monitor = c.var.langwatchApp.governance.activity;
     const events = await monitor.eventsForSource({
@@ -1885,15 +1837,12 @@ secured
 secured
   .access(cliActivityMonitorAuth)
   .get("/governance/ingest/sources/:id/health", async (c) => {
-    const tokenRecord = await validateAccessToken(
-      c.req.header("Authorization"),
-    );
+    const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
     if (!tokenRecord) {
       return c.json(
         {
           error: "unauthorized",
-          error_description:
-            "Bearer access token is missing, malformed, or expired",
+          error_description: "Bearer access token is missing, malformed, or expired",
         },
         401,
       );
@@ -1921,10 +1870,7 @@ secured
       );
     }
     const sourceService = c.var.langwatchApp.governance.ingestionSources;
-    const source = await sourceService.getById(
-      sourceId,
-      tokenRecord.organization_id,
-    );
+    const source = await sourceService.getById(sourceId, tokenRecord.organization_id);
     const monitor = c.var.langwatchApp.governance.activity;
     const health = await monitor.sourceHealthMetrics({
       organizationId: tokenRecord.organization_id,
@@ -1942,8 +1888,7 @@ secured.access(CLI_POLICY).get("/governance/status", async (c: CliContext) => {
     return c.json(
       {
         error: "unauthorized",
-        error_description:
-          "Bearer access token is missing, malformed, or expired",
+        error_description: "Bearer access token is missing, malformed, or expired",
       },
       401,
     );
@@ -1973,42 +1918,37 @@ secured.access(CLI_POLICY).get("/governance/status", async (c: CliContext) => {
 // { data: [...] } shape.
 // ---------------------------------------------------------------------------
 
-secured
-  .access(CLI_POLICY)
-  .get("/governance/ingestion-templates", async (c) => {
-    const tokenRecord = await validateAccessToken(
-      c.req.header("Authorization"),
+secured.access(CLI_POLICY).get("/governance/ingestion-templates", async (c) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description: "Bearer access token is missing, malformed, or expired",
+      },
+      401,
     );
-    if (!tokenRecord) {
-      return c.json(
-        {
-          error: "unauthorized",
-          error_description:
-            "Bearer access token is missing, malformed, or expired",
-        },
-        401,
-      );
-    }
-    const service = c.var.langwatchApp.governance.ingestionTemplates;
-    const rows = await service.listForUser({
-      organizationId: tokenRecord.organization_id,
-    });
-    return c.json({
-      ingestion_templates: rows.map((t) => ({
-        id: t.id,
-        organization_id: t.organizationId,
-        slug: t.slug,
-        source_type: t.sourceType,
-        display_name: t.displayName,
-        description: t.description,
-        icon_asset: t.iconAsset,
-        credential_schema: t.credentialSchema,
-        ottl_rules: t.ottlRules,
-        platform_published: t.platformPublished,
-        enabled: t.enabled,
-      })),
-    });
+  }
+  const service = c.var.langwatchApp.governance.ingestionTemplates;
+  const rows = await service.listForUser({
+    organizationId: tokenRecord.organization_id,
   });
+  return c.json({
+    ingestion_templates: rows.map((t) => ({
+      id: t.id,
+      organization_id: t.organizationId,
+      slug: t.slug,
+      source_type: t.sourceType,
+      display_name: t.displayName,
+      description: t.description,
+      icon_asset: t.iconAsset,
+      credential_schema: t.credentialSchema,
+      ottl_rules: t.ottlRules,
+      platform_published: t.platformPublished,
+      enabled: t.enabled,
+    })),
+  });
+});
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/cli/governance/ingestion-key
@@ -2206,90 +2146,84 @@ async function mintProjectIngestionKey(
   }
 }
 
-secured
-  .access(CLI_POLICY)
-  .post("/governance/ingestion-key", async (c: CliContext) => {
-    const tokenRecord = await validateAccessToken(
-      c.req.header("Authorization"),
+secured.access(CLI_POLICY).post("/governance/ingestion-key", async (c: CliContext) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description: "Bearer access token is missing, malformed, or expired",
+      },
+      401,
     );
-    if (!tokenRecord) {
+  }
+  // This mints a credential, so an offboarded caller's pre-removal token
+  // must not reach it, the same boundary /virtual-key holds.
+  const denied = await ensureActiveOrgMemberOr403(c, tokenRecord);
+  if (denied) return denied;
+
+  const parsed = mintIngestionKeySchema.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: "invalid_request",
+        error_description: parsed.error.message,
+      },
+      400,
+    );
+  }
+  // Apply the declared tool's direct-OTLP policy: a mint that names a tool
+  // the organization turned off is refused, which catches an old CLI, a
+  // stale cached policy, or a hand-run of the documented flow. The
+  // declaration is trusted; the route docblock states why it cannot be
+  // more than that. Only source types a wrapped tool stamps are governed;
+  // anything else has no per-tool policy to apply and must stay mintable
+  // (`copilot_app`, ingestion templates, SDK sources).
+  //
+  // `Object.hasOwn` and not a plain lookup: the key is request-controlled,
+  // so `"toString"` would otherwise resolve an inherited function, pass a
+  // truthy check, and index the policy map with nothing.
+  const policedSlug = Object.hasOwn(
+    PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
+    parsed.data.source_type,
+  )
+    ? PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE[parsed.data.source_type]
+    : undefined;
+  if (policedSlug) {
+    const policy = await c.var.langwatchApp.governance.aiTools.resolveToolPolicy({
+      organizationId: tokenRecord.organization_id,
+      userId: tokenRecord.user_id,
+      slug: policedSlug,
+    });
+    if (!policy.allowOtelDirect) {
       return c.json(
         {
-          error: "unauthorized",
-          error_description:
-            "Bearer access token is missing, malformed, or expired",
+          error: "direct_otel_not_allowed",
+          error_description: `Your organization does not allow ${policedSlug} to send telemetry directly. Run \`langwatch ${policedSlug}\`, which routes through the gateway.`,
         },
-        401,
+        403,
       );
     }
-    // This mints a credential, so an offboarded caller's pre-removal token
-    // must not reach it, the same boundary /virtual-key holds.
-    const denied = await ensureActiveOrgMemberOr403(c, tokenRecord);
-    if (denied) return denied;
+  }
 
-    const parsed = mintIngestionKeySchema.safeParse(await c.req.json());
-    if (!parsed.success) {
-      return c.json(
-        {
-          error: "invalid_request",
-          error_description: parsed.error.message,
-        },
-        400,
-      );
-    }
-    // Apply the declared tool's direct-OTLP policy: a mint that names a tool
-    // the organization turned off is refused, which catches an old CLI, a
-    // stale cached policy, or a hand-run of the documented flow. The
-    // declaration is trusted; the route docblock states why it cannot be
-    // more than that. Only source types a wrapped tool stamps are governed;
-    // anything else has no per-tool policy to apply and must stay mintable
-    // (`copilot_app`, ingestion templates, SDK sources).
-    //
-    // `Object.hasOwn` and not a plain lookup: the key is request-controlled,
-    // so `"toString"` would otherwise resolve an inherited function, pass a
-    // truthy check, and index the policy map with nothing.
-    const policedSlug = Object.hasOwn(
-      PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
-      parsed.data.source_type,
-    )
-      ? PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE[parsed.data.source_type]
-      : undefined;
-    if (policedSlug) {
-      const policy =
-        await c.var.langwatchApp.governance.aiTools.resolveToolPolicy({
-        organizationId: tokenRecord.organization_id,
-        userId: tokenRecord.user_id,
-        slug: policedSlug,
-      });
-      if (!policy.allowOtelDirect) {
-        return c.json(
-          {
-            error: "direct_otel_not_allowed",
-            error_description: `Your organization does not allow ${policedSlug} to send telemetry directly. Run \`langwatch ${policedSlug}\`, which routes through the gateway.`,
-          },
-          403,
-        );
-      }
-    }
+  const service = c.var.langwatchApp.governance.ingestionKeys;
 
-    const service = c.var.langwatchApp.governance.ingestionKeys;
-
-    if (parsed.data.project) {
-      return await mintProjectIngestionKey(c, {
-        tokenRecord,
-        service,
-        projectRef: parsed.data.project,
-        sourceType: parsed.data.source_type,
-        deviceLabel: parsed.data.device_label ?? null,
-      });
-    }
-
-    return await mintPersonalIngestionKey(c, {
+  if (parsed.data.project) {
+    return await mintProjectIngestionKey(c, {
       tokenRecord,
       service,
+      projectRef: parsed.data.project,
       sourceType: parsed.data.source_type,
+      deviceLabel: parsed.data.device_label ?? null,
     });
+  }
+
+  return await mintPersonalIngestionKey(c, {
+    tokenRecord,
+    service,
+    sourceType: parsed.data.source_type,
   });
+});
 
 /**
  * The personal-project branch of the ingestion-key mint: the caller's own
@@ -2374,38 +2308,32 @@ async function mintPersonalIngestionKey(
 // (`ik-lw-{lookupId}_…`) so the CLI can match the cached token against a
 // live server entry without possessing the full secret.
 // ---------------------------------------------------------------------------
-secured
-  .access(CLI_POLICY)
-  .get("/governance/ingestion-keys", async (c: CliContext) => {
-    const tokenRecord = await validateAccessToken(
-      c.req.header("Authorization"),
-    );
-    if (!tokenRecord) {
-      return c.json(
-        {
-          error: "unauthorized",
-          error_description:
-            "Bearer access token is missing, malformed, or expired",
-        },
-        401,
-      );
-    }
-    const keys =
-      await c.var.langwatchApp.governance.ingestionKeys.listForPersonalProject({
-      userId: tokenRecord.user_id,
-      organizationId: tokenRecord.organization_id,
-    });
+secured.access(CLI_POLICY).get("/governance/ingestion-keys", async (c: CliContext) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
     return c.json(
       {
-        keys: keys.map((k) => ({
-          source_type: k.sourceType,
-          lookup_id: k.lookupId,
-          ingestion_template_id: k.ingestionTemplateId,
-        })),
+        error: "unauthorized",
+        error_description: "Bearer access token is missing, malformed, or expired",
       },
-      200,
+      401,
     );
+  }
+  const keys = await c.var.langwatchApp.governance.ingestionKeys.listForPersonalProject({
+    userId: tokenRecord.user_id,
+    organizationId: tokenRecord.organization_id,
   });
+  return c.json(
+    {
+      keys: keys.map((k) => ({
+        source_type: k.sourceType,
+        lookup_id: k.lookupId,
+        ingestion_template_id: k.ingestionTemplateId,
+      })),
+    },
+    200,
+  );
+});
 
 // ---------------------------------------------------------------------------
 // GET /api/auth/cli/lookup?user_code=XXXX-YYYY
@@ -2552,16 +2480,10 @@ secured.access(cliApproveAuth).post("/approve", async (c: CliContext) => {
 
   const record = await findDeviceCodeByUserCode(user_code);
   if (!record) {
-    return c.json(
-      { error: "not_found", error_description: "Code not recognised" },
-      404,
-    );
+    return c.json({ error: "not_found", error_description: "Code not recognised" }, 404);
   }
   if (Date.now() > record.expires_at) {
-    return c.json(
-      { error: "expired", error_description: "Code has expired" },
-      410,
-    );
+    return c.json({ error: "expired", error_description: "Code has expired" }, 410);
   }
   if (record.status !== "pending") {
     return c.json(
@@ -2620,8 +2542,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: CliContext) => {
       return c.json(
         {
           error: "forbidden",
-          error_description:
-            "Project not found or unavailable in this organization",
+          error_description: "Project not found or unavailable in this organization",
         },
         403,
       );
@@ -2814,9 +2735,7 @@ secured.access(CLI_POLICY).post("/logout", async (c: CliContext) => {
     parsed.data.refresh_token
       ? redis.get(refreshTokenKey(parsed.data.refresh_token))
       : null,
-    parsed.data.access_token
-      ? redis.get(accessTokenKey(parsed.data.access_token))
-      : null,
+    parsed.data.access_token ? redis.get(accessTokenKey(parsed.data.access_token)) : null,
   ]);
 
   const ops = redis.multi();
@@ -2828,10 +2747,10 @@ secured.access(CLI_POLICY).post("/logout", async (c: CliContext) => {
   }
   await ops.exec();
 
-  await revokeCliKeysFromTokenRecords(
-    c.var.langwatchApp.apiKeys,
-    [refreshRaw, accessRaw],
-  );
+  await revokeCliKeysFromTokenRecords(c.var.langwatchApp.apiKeys, [
+    refreshRaw,
+    accessRaw,
+  ]);
 
   return c.json({ ok: true });
 });

@@ -190,10 +190,7 @@ describe("pull-request mapping throttle", () => {
       await stageMappingJob(first, "job-a");
       // Simulate the dispatch the elapsed deadline makes immediate: the job
       // leaves staging while its dedup key is still alive.
-      await redis.zrem(
-        `${keyPrefix()}group:${groupIdFor(first)}:jobs`,
-        "job-a",
-      );
+      await redis.zrem(`${keyPrefix()}group:${groupIdFor(first)}:jobs`, "job-a");
 
       const secondResult = await stageMappingJob(second, "job-b");
 

@@ -54,9 +54,7 @@ export const MetadataTag = ({
   }
 
   const isTruncated = value.length > MAX_VALUE_LENGTH;
-  const displayValue = isTruncated
-    ? value.slice(0, MAX_VALUE_LENGTH) + "…"
-    : value;
+  const displayValue = isTruncated ? value.slice(0, MAX_VALUE_LENGTH) + "…" : value;
 
   // Helper: render value as link if it's a URL
   const renderValue = (text: string) => {
@@ -81,12 +79,7 @@ export const MetadataTag = ({
       onClick={isTruncated ? undefined : onClick}
       cursor={!isTruncated && onClick ? "pointer" : "default"}
     >
-      <Text
-        borderWidth={1}
-        borderColor="border"
-        paddingX={2}
-        borderLeftRadius="md"
-      >
+      <Text borderWidth={1} borderColor="border" paddingX={2} borderLeftRadius="md">
         {label}:
       </Text>
       <HStack

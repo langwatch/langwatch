@@ -132,10 +132,7 @@ export function hashVirtualKeySecret(secret: string): string {
  * Constant-time comparison of a presented secret against the hashed form
  * stored in the database.
  */
-export function verifyVirtualKeySecret(
-  presented: string,
-  stored: string,
-): boolean {
+export function verifyVirtualKeySecret(presented: string, stored: string): boolean {
   const computed = hashVirtualKeySecret(presented);
   const a = Buffer.from(computed, "hex");
   const b = Buffer.from(stored, "hex");

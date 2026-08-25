@@ -10,11 +10,7 @@ import type {
   NodeDataset,
   Signature,
 } from "@langwatch/workflow-contract";
-import {
-  formSchema,
-  handleSchema,
-  type PromptConfigFormValues,
-} from "~/prompts";
+import { formSchema, handleSchema, type PromptConfigFormValues } from "~/prompts";
 import type { SaveVersionParams } from "~/prompts/providers/types";
 import {
   versionMetadataToFormFormat,
@@ -106,9 +102,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   // Legacy format: llm = "openai/gpt-4-0125-preview"
   // New format: llm = { model: "openai/gpt-4-0125-preview", temperature: 0.7, maxTokens: 1000 }
   const rawLlmValue = llmParameter?.value;
-  let llmValue: DeepPartial<
-    PromptConfigFormValues["version"]["configData"]["llm"]
-  >;
+  let llmValue: DeepPartial<PromptConfigFormValues["version"]["configData"]["llm"]>;
 
   if (rawLlmValue && typeof rawLlmValue === "string") {
     // Migrate legacy format: string model name → object with model field
@@ -151,8 +145,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
           inline: {
             columnTypes: inputsAndOutputsToDemostrationColumns(inputs, outputs),
             records:
-              (parametersMap.demonstrations?.value as NodeDataset)?.inline
-                ?.records ?? {},
+              (parametersMap.demonstrations?.value as NodeDataset)?.inline?.records ?? {},
           },
         },
         promptingTechnique: parametersMap.prompting_technique
@@ -188,9 +181,7 @@ function safeInputs(
           baseName: "input",
           existingIdentifiers,
         });
-        console.warn(
-          `Auto-generated identifier "${identifier}" for corrupted input`,
-        );
+        console.warn(`Auto-generated identifier "${identifier}" for corrupted input`);
       }
 
       existingIdentifiers.push(identifier);
@@ -233,9 +224,7 @@ function safeOutputs(
           baseName: "output",
           existingIdentifiers,
         });
-        console.warn(
-          `Auto-generated identifier "${identifier}" for corrupted output`,
-        );
+        console.warn(`Auto-generated identifier "${identifier}" for corrupted output`);
       }
 
       existingIdentifiers.push(identifier);
@@ -434,9 +423,7 @@ export function createNewOptimizationStudioPromptName(
     node.data.name?.startsWith(kebabCase(workflowName)),
   ).length;
 
-  const promptName = kebabCase(
-    `${workflowName}-new-prompt-${nodesWithSameName + 1}`,
-  );
+  const promptName = kebabCase(`${workflowName}-new-prompt-${nodesWithSameName + 1}`);
 
   return promptName;
 }
@@ -557,9 +544,7 @@ export function formValuesToTriggerSaveVersionParams(
  * - "gato" -> "gato" (no change if no prefix)
  * - "folder/gato" -> "folder/gato" (no change if no scope prefix)
  */
-const extractShortHandle = (
-  handle: string | null | undefined,
-): string | null => {
+const extractShortHandle = (handle: string | null | undefined): string | null => {
   if (!handle) return null;
 
   // Check for known prefixes: project_, org_, organization_

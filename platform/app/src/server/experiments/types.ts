@@ -160,9 +160,7 @@ export const eSBatchEvaluationTargetSchema = z.object({
     .nullable(),
 });
 
-export type ESBatchEvaluationTarget = z.infer<
-  typeof eSBatchEvaluationTargetSchema
->;
+export type ESBatchEvaluationTarget = z.infer<typeof eSBatchEvaluationTargetSchema>;
 
 export const eSBatchEvaluationSchema = z.object({
   project_id: z.string(),
@@ -192,11 +190,7 @@ export const eSBatchEvaluationSchema = z.object({
       name: z.string().optional().nullable(),
       /** For Evaluations V3: identifies which target this evaluation is for */
       target_id: z.string().optional().nullable(),
-      status: z.union([
-        z.literal("processed"),
-        z.literal("skipped"),
-        z.literal("error"),
-      ]),
+      status: z.union([z.literal("processed"), z.literal("skipped"), z.literal("error")]),
       index: z.number(),
       duration: z.number().optional().nullable(),
       inputs: z.record(z.string(), z.any()).optional(),
@@ -271,9 +265,7 @@ export const appliedOptimizationFieldSchema = z.object({
   desc: z.string().optional(),
 });
 
-export type AppliedOptimizationField = z.infer<
-  typeof appliedOptimizationFieldSchema
->;
+export type AppliedOptimizationField = z.infer<typeof appliedOptimizationFieldSchema>;
 
 // WorkflowVersion is a Prisma row; keep the precise type while accepting it
 // structurally at runtime.

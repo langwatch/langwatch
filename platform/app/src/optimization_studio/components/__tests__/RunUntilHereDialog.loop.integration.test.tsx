@@ -58,8 +58,7 @@ vi.mock("~/components/datasets/editor/DatasetPreviewTable", () => ({
 }));
 
 vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
-  getNodeDisplayName: (node: { data?: { name?: string } }) =>
-    node?.data?.name ?? "node",
+  getNodeDisplayName: (node: { data?: { name?: string } }) => node?.data?.name ?? "node",
 }));
 
 const { RunUntilHereDialog } = await import("../RunUntilHereDialog");
@@ -82,9 +81,7 @@ describe("given the run-until-here dialog with a saved dataset attached", () => 
         ),
       ).not.toThrow();
 
-      expect(
-        screen.getByDisplayValue("What is LangWatch?"),
-      ).toBeInTheDocument();
+      expect(screen.getByDisplayValue("What is LangWatch?")).toBeInTheDocument();
     });
   });
 });

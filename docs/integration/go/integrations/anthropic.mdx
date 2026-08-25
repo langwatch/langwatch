@@ -17,7 +17,7 @@ go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ## Usage
 
 <Info>
-Set `LANGWATCH_API_KEY` and `ANTHROPIC_API_KEY` environment variables before running.
+  Set `LANGWATCH_API_KEY` and `ANTHROPIC_API_KEY` environment variables before running.
 </Info>
 
 ```go
@@ -75,7 +75,8 @@ func main() {
 ```
 
 <Warning>
-The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+  The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory
+  will be lost when your application exits.
 </Warning>
 
 ## Related

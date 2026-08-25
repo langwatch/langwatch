@@ -2,34 +2,24 @@
   "name": "@langwatch/server",
   "version": "3.16.0",
   "description": "Run LangWatch locally with one command — `npx @langwatch/server`. Complete LangWatch stack: observability, evaluations, AI gateway, agent simulations.",
-  "license": "Apache-2.0",
-  "homepage": "https://langwatch.ai",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/langwatch/langwatch.git"
-  },
-  "bugs": {
-    "url": "https://github.com/langwatch/langwatch/issues"
-  },
   "keywords": [
+    "ai",
+    "evaluations",
     "langwatch",
     "llm",
     "observability",
-    "evaluations",
-    "ai",
-    "tracing",
     "playground",
-    "self-hosted"
+    "self-hosted",
+    "tracing"
   ],
-  "engines": {
-    "node": ">=20",
-    "pnpm": ">=10"
+  "homepage": "https://langwatch.ai",
+  "bugs": {
+    "url": "https://github.com/langwatch/langwatch/issues"
   },
-  "packageManager": "pnpm@10.24.0",
-  "type": "module",
-  "main": "dist/cli.cjs",
-  "exports": {
-    ".": "./dist/cli.cjs"
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/langwatch/langwatch.git"
   },
   "bin": {
     "langwatch-server": "dist/cli.cjs"
@@ -37,6 +27,11 @@
   "files": [
     "dist"
   ],
+  "type": "module",
+  "main": "dist/cli.cjs",
+  "exports": {
+    ".": "./dist/cli.cjs"
+  },
   "scripts": {
     "build": "tsx scripts/build.ts",
     "dev": "tsx src/cli.ts",
@@ -63,5 +58,10 @@
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.0"
-  }
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "packageManager": "pnpm@10.24.0"
 }

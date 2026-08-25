@@ -101,9 +101,7 @@ describe("given a config for an adapter with no fixed destination", () => {
     });
 
     it("ignores a config with no adapter at all", () => {
-      expect(() =>
-        pullDestination.assertAllowed({ ottlStatements: [] }),
-      ).not.toThrow();
+      expect(() => pullDestination.assertAllowed({ ottlStatements: [] })).not.toThrow();
       expect(() => pullDestination.assertAllowed(null)).not.toThrow();
     });
   });

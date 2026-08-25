@@ -94,10 +94,7 @@ export interface RunawayContainmentDeps {
   /** Drops a claim this lease still owns, so a later attempt can retake it. */
   releaseClaim: (lease: ClaimLease) => Promise<void>;
   projectName: (projectId: string) => Promise<string>;
-  automationUrl: (params: {
-    projectId: string;
-    triggerId: string;
-  }) => Promise<string>;
+  automationUrl: (params: { projectId: string; triggerId: string }) => Promise<string>;
   now?: () => Date;
 }
 
@@ -275,10 +272,7 @@ async function pauseAndNotify({
   // pausedAt, so doing it twice costs an update; doing it zero times is the
   // failure this whole file exists to prevent.
   if (
-    !(await deps.claimOnce(
-      `automation-pause:${trigger.id}`,
-      PAUSE_ATTEMPT_CLAIM_SECONDS,
-    ))
+    !(await deps.claimOnce(`automation-pause:${trigger.id}`, PAUSE_ATTEMPT_CLAIM_SECONDS))
   ) {
     return;
   }

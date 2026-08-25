@@ -85,15 +85,15 @@ describe("trace correlation append coalescing", () => {
   describe("given the trace-processing pipeline is defined", () => {
     describe("when the correlation commands are registered", () => {
       it("bounds a log contribution batch at the trace correlation bound", () => {
-        expect(
-          registrationOf("recordLogContribution")?.options?.coalesceMaxBatch,
-        ).toBe(TRACE_CORRELATION_COALESCE_MAX_BATCH);
+        expect(registrationOf("recordLogContribution")?.options?.coalesceMaxBatch).toBe(
+          TRACE_CORRELATION_COALESCE_MAX_BATCH,
+        );
       });
 
       it("bounds a metric correlation batch at the same bound", () => {
-        expect(
-          registrationOf("recordMetricCorrelation")?.options?.coalesceMaxBatch,
-        ).toBe(TRACE_CORRELATION_COALESCE_MAX_BATCH);
+        expect(registrationOf("recordMetricCorrelation")?.options?.coalesceMaxBatch).toBe(
+          TRACE_CORRELATION_COALESCE_MAX_BATCH,
+        );
       });
 
       // Both stay on the aggregate key. Sharding them would spread one trace's
@@ -173,10 +173,7 @@ describe("trace correlation append coalescing", () => {
       it("installs a batch processor for both correlation commands", () => {
         const registry = registryFor();
 
-        for (const name of [
-          "recordLogContribution",
-          "recordMetricCorrelation",
-        ]) {
+        for (const name of ["recordLogContribution", "recordMetricCorrelation"]) {
           expect(
             registry.get(`trace_processing:command:${name}`)?.processBatch,
           ).toBeDefined();
@@ -187,9 +184,7 @@ describe("trace correlation append coalescing", () => {
       it("installs none for a command that appends one event per human action", () => {
         const registry = registryFor();
 
-        const annotation = registry.get(
-          "trace_processing:command:addAnnotation",
-        );
+        const annotation = registry.get("trace_processing:command:addAnnotation");
         expect(annotation).toBeDefined();
         expect(annotation?.processBatch).toBeUndefined();
         expect(annotation?.coalesceMaxBatch).toBeUndefined();
@@ -202,13 +197,9 @@ describe("trace correlation append coalescing", () => {
       /** @scenario 'many items for one aggregate become one insert' */
       it("appends them as one insert holding every contribution in dispatch order", async () => {
         const storeEventsFn = vi.fn().mockResolvedValue(undefined);
-        const payloads = [0, 1, 2, 3].map((index) =>
-          logContributionPayload({ index }),
-        );
+        const payloads = [0, 1, 2, 3].map((index) => logContributionPayload({ index }));
 
-        await processCommandBatch(
-          logBatchParamsFor({ payloads, storeEventsFn }),
-        );
+        await processCommandBatch(logBatchParamsFor({ payloads, storeEventsFn }));
 
         expect(storeEventsFn).toHaveBeenCalledTimes(1);
         const [events, context] = storeEventsFn.mock.calls[0]!;
@@ -218,9 +209,7 @@ describe("trace correlation append coalescing", () => {
           ),
         ).toEqual(payloads.map((payload) => payload.recordId));
         expect(
-          (events as Event[]).every(
-            (event) => event.type === LOG_CONTRIBUTED_EVENT_TYPE,
-          ),
+          (events as Event[]).every((event) => event.type === LOG_CONTRIBUTED_EVENT_TYPE),
         ).toBe(true);
         expect(context).toEqual({ tenantId: FIXTURE_TENANT_ID });
       });
@@ -228,18 +217,12 @@ describe("trace correlation append coalescing", () => {
       /** @scenario 'coalescing preserves every item' */
       it("keeps each contribution's idempotency key so a retry cannot duplicate it", async () => {
         const storeEventsFn = vi.fn().mockResolvedValue(undefined);
-        const payloads = [0, 1].map((index) =>
-          logContributionPayload({ index }),
-        );
+        const payloads = [0, 1].map((index) => logContributionPayload({ index }));
 
-        await processCommandBatch(
-          logBatchParamsFor({ payloads, storeEventsFn }),
-        );
+        await processCommandBatch(logBatchParamsFor({ payloads, storeEventsFn }));
 
         const [events] = storeEventsFn.mock.calls[0]!;
-        expect(
-          (events as Event[]).map((event) => event.idempotencyKey),
-        ).toEqual(
+        expect((events as Event[]).map((event) => event.idempotencyKey)).toEqual(
           payloads.map((payload) => `${FIXTURE_TENANT_ID}:${payload.recordId}`),
         );
       });
@@ -292,9 +275,7 @@ describe("trace correlation append coalescing", () => {
           const storeEventsFn = vi.fn().mockResolvedValue(undefined);
           await processCommandBatch(
             logBatchParamsFor({
-              payloads: [0, 1, 2].map((index) =>
-                logContributionPayload({ index }),
-              ),
+              payloads: [0, 1, 2].map((index) => logContributionPayload({ index })),
               storeEventsFn,
             }),
           );
@@ -314,18 +295,14 @@ describe("trace correlation append coalescing", () => {
       /** @scenario 'many items for one aggregate become one insert' */
       it("emits every contribution's event as a single trace aggregate", async () => {
         const storeEventsFn = vi.fn().mockResolvedValue(undefined);
-        const payloads = [0, 1, 2].map((index) =>
-          logContributionPayload({ index }),
-        );
+        const payloads = [0, 1, 2].map((index) => logContributionPayload({ index }));
 
-        await processCommandBatch(
-          logBatchParamsFor({ payloads, storeEventsFn }),
-        );
+        await processCommandBatch(logBatchParamsFor({ payloads, storeEventsFn }));
 
         const [events] = storeEventsFn.mock.calls[0]!;
-        expect(
-          new Set((events as Event[]).map((event) => event.aggregateId)),
-        ).toEqual(new Set([FIXTURE_TRACE_ID]));
+        expect(new Set((events as Event[]).map((event) => event.aggregateId))).toEqual(
+          new Set([FIXTURE_TRACE_ID]),
+        );
       });
     });
   });
@@ -335,20 +312,14 @@ describe("trace correlation append coalescing", () => {
       /** @scenario 'many items for one aggregate become one insert' */
       it("appends them as one insert holding every correlation", async () => {
         const storeEventsFn = vi.fn().mockResolvedValue(undefined);
-        const payloads = [0, 1, 2].map((index) =>
-          metricCorrelationPayload({ index }),
-        );
+        const payloads = [0, 1, 2].map((index) => metricCorrelationPayload({ index }));
 
-        await processCommandBatch(
-          metricBatchParamsFor({ payloads, storeEventsFn }),
-        );
+        await processCommandBatch(metricBatchParamsFor({ payloads, storeEventsFn }));
 
         expect(storeEventsFn).toHaveBeenCalledTimes(1);
         const [events] = storeEventsFn.mock.calls[0]!;
         expect(
-          (events as Event[]).map(
-            (event) => (event.data as { pointId: string }).pointId,
-          ),
+          (events as Event[]).map((event) => (event.data as { pointId: string }).pointId),
         ).toEqual(payloads.map((payload) => payload.pointId));
         expect(
           (events as Event[]).every(
@@ -362,21 +333,13 @@ describe("trace correlation append coalescing", () => {
       /** @scenario 'coalescing preserves every item' */
       it("keeps each correlation's idempotency key so a retry cannot duplicate it", async () => {
         const storeEventsFn = vi.fn().mockResolvedValue(undefined);
-        const payloads = [0, 1].map((index) =>
-          metricCorrelationPayload({ index }),
-        );
+        const payloads = [0, 1].map((index) => metricCorrelationPayload({ index }));
 
-        await processCommandBatch(
-          metricBatchParamsFor({ payloads, storeEventsFn }),
-        );
+        await processCommandBatch(metricBatchParamsFor({ payloads, storeEventsFn }));
 
         const [events] = storeEventsFn.mock.calls[0]!;
-        expect(
-          (events as Event[]).map((event) => event.idempotencyKey),
-        ).toEqual(
-          payloads.map((payload) =>
-            RecordMetricCorrelationCommand.makeJobId(payload),
-          ),
+        expect((events as Event[]).map((event) => event.idempotencyKey)).toEqual(
+          payloads.map((payload) => RecordMetricCorrelationCommand.makeJobId(payload)),
         );
       });
 
@@ -391,16 +354,12 @@ describe("trace correlation append coalescing", () => {
           metricCorrelationPayload({ index: 2 }),
         ];
 
-        await processCommandBatch(
-          metricBatchParamsFor({ payloads, storeEventsFn }),
-        );
+        await processCommandBatch(metricBatchParamsFor({ payloads, storeEventsFn }));
 
         expect(storeEventsFn).toHaveBeenCalledTimes(1);
         const [events] = storeEventsFn.mock.calls[0]!;
         expect(
-          (events as Event[]).map(
-            (event) => (event.data as { pointId: string }).pointId,
-          ),
+          (events as Event[]).map((event) => (event.data as { pointId: string }).pointId),
         ).toEqual([payloads[0]!.pointId, payloads[2]!.pointId]);
       });
     });

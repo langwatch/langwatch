@@ -30,10 +30,7 @@ export function dotColorForIndex(index: number): string {
   return GROUP_DOT_COLORS[index % GROUP_DOT_COLORS.length]!;
 }
 
-export function extractGroupKey(
-  trace: TraceListItem,
-  groupBy: GroupBy,
-): string {
+export function extractGroupKey(trace: TraceListItem, groupBy: GroupBy): string {
   switch (groupBy) {
     case "service":
       return trace.serviceName || "(unknown)";
@@ -44,10 +41,7 @@ export function extractGroupKey(
   }
 }
 
-export function buildGroups(
-  traces: TraceListItem[],
-  groupBy: GroupBy,
-): TraceGroup[] {
+export function buildGroups(traces: TraceListItem[], groupBy: GroupBy): TraceGroup[] {
   const map = new Map<string, TraceListItem[]>();
 
   for (const trace of traces) {

@@ -17,10 +17,7 @@ import {
 } from "~/server/data-privacy/dataPrivacy.types";
 import { PRIVACY_DROPPED_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
 import { TraceSummaryFoldProjection } from "../../projections/traceSummary.foldProjection";
-import type {
-  PIIRedactionLevel,
-  RecordSpanCommandData,
-} from "../../schemas/commands";
+import type { PIIRedactionLevel, RecordSpanCommandData } from "../../schemas/commands";
 import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
 import type { OtlpKeyValue } from "../../schemas/otlp";
 import {
@@ -56,9 +53,7 @@ function policy({
   };
 }
 
-function makeHandler(
-  dropPolicy: ResolvedDataPrivacy | null,
-): RecordSpanCommand {
+function makeHandler(dropPolicy: ResolvedDataPrivacy | null): RecordSpanCommand {
   const deps: RecordSpanCommandDependencies = {
     piiRedactionService: { redactSpan: async () => {} },
     costEnrichmentService: { enrichSpan: async () => {} },
@@ -124,9 +119,7 @@ function command({
   };
 }
 
-function spanKeys(event: {
-  data: { span: { attributes: OtlpKeyValue[] } };
-}): string[] {
+function spanKeys(event: { data: { span: { attributes: OtlpKeyValue[] } } }): string[] {
   return event.data.span.attributes.map((a) => a.key);
 }
 
@@ -198,10 +191,7 @@ describe("RecordSpanCommand content drop", () => {
         const captured = await makeHandler(null).handle(
           command({ project: "project-keep", attributes: IO_ATTRS }),
         );
-        const keptState = fold.handleTraceSpanReceived(
-          captured[0]!,
-          fold.init(),
-        );
+        const keptState = fold.handleTraceSpanReceived(captured[0]!, fold.init());
         expect(keptState.computedInput).toBeTruthy();
 
         // Drop input — the same fold path now sees no input on the event.
@@ -210,10 +200,7 @@ describe("RecordSpanCommand content drop", () => {
         );
         expect(spanKeys(dropped[0]!)).not.toContain("langwatch.input");
 
-        const droppedState = fold.handleTraceSpanReceived(
-          dropped[0]!,
-          fold.init(),
-        );
+        const droppedState = fold.handleTraceSpanReceived(dropped[0]!, fold.init());
         expect(droppedState.computedInput).toBeNull();
         expect(droppedState.computedOutput).toBeTruthy();
       });

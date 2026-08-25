@@ -19,9 +19,7 @@ import posthog from "posthog-js";
  * background timer, or in a browser with no provider registered. Claiming no
  * trace is honest; claiming an invalid all-zero one is not.
  */
-function activeTraceContext():
-  | { trace_id: string; span_id: string }
-  | undefined {
+function activeTraceContext(): { trace_id: string; span_id: string } | undefined {
   const spanContext = trace.getActiveSpan()?.spanContext();
   if (!spanContext || !isSpanContextValid(spanContext)) return void 0;
 
@@ -81,10 +79,7 @@ interface Scope {
 /**
  * Captures a message using PostHog (similar to Sentry.captureMessage)
  */
-export function captureMessage(
-  message: string,
-  options?: CaptureExceptionOptions,
-): void {
+export function captureMessage(message: string, options?: CaptureExceptionOptions): void {
   const properties: Record<string, unknown> = {
     $exception_message: message,
     ...(options?.extra && { ...options.extra }),
@@ -123,11 +118,7 @@ export function captureMessage(
       if (posthog?.__loaded) {
         posthog.capture("$exception", exceptionProperties);
       } else {
-        console.error(
-          "PostHog not initialized, logging message:",
-          message,
-          options,
-        );
+        console.error("PostHog not initialized, logging message:", message, options);
       }
     } catch (err) {
       console.error("Failed to capture message with client PostHog:", err);
@@ -144,8 +135,7 @@ export function captureException(
 ): void {
   const errorMessage = error instanceof Error ? error.message : error;
 
-  const errorStack =
-    error instanceof Error && error.stack ? error.stack : undefined;
+  const errorStack = error instanceof Error && error.stack ? error.stack : undefined;
 
   const properties: Record<string, unknown> = {
     $exception_type: error instanceof Error ? error.constructor.name : "Error",
@@ -188,11 +178,7 @@ export function captureException(
         posthog.capture("$exception", exceptionProperties);
       } else {
         // PostHog not initialized yet, log to console
-        console.error(
-          "PostHog not initialized, logging error:",
-          error,
-          options,
-        );
+        console.error("PostHog not initialized, logging error:", error, options);
       }
     } catch (err) {
       console.error("Failed to capture exception with client PostHog:", err);
@@ -236,9 +222,7 @@ export function getCurrentScope(): Scope {
 /**
  * Executes a function within a scope (no-op for PostHog, but maintains API compatibility)
  */
-export function withScope<T>(
-  callback: (scope: Scope) => T | Promise<T>,
-): T | Promise<T> {
+export function withScope<T>(callback: (scope: Scope) => T | Promise<T>): T | Promise<T> {
   return callback(getCurrentScope());
 }
 

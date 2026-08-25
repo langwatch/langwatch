@@ -55,9 +55,7 @@ export function PromptSourceHeader({
         duration: 2000,
       });
       // IMPORTANT: Use WithSystemMessage to include the system prompt in messages array
-      formProps.reset(
-        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
-      );
+      formProps.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
     };
 
     const onError = () => {
@@ -118,24 +116,16 @@ export function PromptSourceHeader({
         >
           <EditablePromptHandleField />
           <Spacer />
-          <GeneratePromptApiSnippetDialog
-            promptHandle={handle}
-            apiKey={project?.apiKey}
-          >
+          <GeneratePromptApiSnippetDialog promptHandle={handle} apiKey={project?.apiKey}>
             <GeneratePromptApiSnippetDialog.Trigger>
               <GenerateApiSnippetButton hasHandle={!!handle} />
             </GeneratePromptApiSnippetDialog.Trigger>
           </GeneratePromptApiSnippetDialog>
-          <PromptSource
-            selectedPromptId={configId}
-            onSelect={onPromptSourceSelect}
-          />
+          <PromptSource selectedPromptId={configId} onSelect={onPromptSourceSelect} />
           {configId && (
             <VersionHistoryButton
               configId={configId}
-              currentVersionId={
-                formProps.getValues("versionMetadata")?.versionId
-              }
+              currentVersionId={formProps.getValues("versionMetadata")?.versionId}
               onRestoreSuccess={(params) => handleOnRestore(params)}
             />
           )}

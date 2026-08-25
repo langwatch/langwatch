@@ -37,25 +37,15 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
     getEventsOccurredSince: vi.fn().mockResolvedValue([]),
     getEventsUpTo: vi
       .fn()
-      .mockImplementation(
-        async (aggregateId, context, aggregateType, upToEvent) => {
-          // Default implementation: get all events and filter
-          const allEvents = await mockStore.getEvents(
-            aggregateId,
-            context,
-            aggregateType,
-          );
-          const upToIndex = allEvents.findIndex(
-            (e: T) => e.id === upToEvent.id,
-          );
-          if (upToIndex === -1) {
-            throw new Error(
-              `Event ${upToEvent.id} not found in aggregate ${aggregateId}`,
-            );
-          }
-          return allEvents.slice(0, upToIndex + 1);
-        },
-      ),
+      .mockImplementation(async (aggregateId, context, aggregateType, upToEvent) => {
+        // Default implementation: get all events and filter
+        const allEvents = await mockStore.getEvents(aggregateId, context, aggregateType);
+        const upToIndex = allEvents.findIndex((e: T) => e.id === upToEvent.id);
+        if (upToIndex === -1) {
+          throw new Error(`Event ${upToEvent.id} not found in aggregate ${aggregateId}`);
+        }
+        return allEvents.slice(0, upToIndex + 1);
+      }),
     countEventsBefore: vi.fn().mockResolvedValue(0),
   };
   return mockStore;
@@ -132,15 +122,12 @@ export function createTestCommandHandlerClass<
   EventType extends Event = TestEvent,
 >(config?: {
   getAggregateId?: (payload: Payload) => string;
-  getSpanAttributes?: (
-    payload: Payload,
-  ) => Record<string, string | number | boolean>;
+  getSpanAttributes?: (payload: Payload) => Record<string, string | number | boolean>;
   handleImpl?: (command: Command<Payload>) => Promise<EventType[]>;
   schema?: CommandSchema<Payload, CommandType>;
   dispatcherName?: string;
 }): CommandHandlerClass<Payload, CommandType, EventType> {
-  const getAggregateId =
-    config?.getAggregateId ?? ((payload: Payload) => payload.id);
+  const getAggregateId = config?.getAggregateId ?? ((payload: Payload) => payload.id);
   const handleImpl =
     config?.handleImpl ??
     (async (): Promise<EventType[]> => {
@@ -155,9 +142,7 @@ export function createTestCommandHandlerClass<
         testCommandPayloadSchema,
       ) as CommandSchema<Payload, CommandType>);
 
-    static readonly dispatcherName = config?.dispatcherName as
-      | string
-      | undefined;
+    static readonly dispatcherName = config?.dispatcherName as string | undefined;
 
     static getAggregateId(payload: Payload): string {
       return getAggregateId(payload);
@@ -172,11 +157,7 @@ export function createTestCommandHandlerClass<
     }
   }
 
-  return TestCommandHandler as CommandHandlerClass<
-    Payload,
-    CommandType,
-    EventType
-  >;
+  return TestCommandHandler as CommandHandlerClass<Payload, CommandType, EventType>;
 }
 
 /**

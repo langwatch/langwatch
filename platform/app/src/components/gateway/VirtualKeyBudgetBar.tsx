@@ -68,14 +68,9 @@ export function VirtualKeyBudgetBar({
 
   const limit = Number.parseFloat(value.limitUsd);
   const spent =
-    value.periodSpentUsd === null
-      ? null
-      : Number.parseFloat(value.periodSpentUsd);
+    value.periodSpentUsd === null ? null : Number.parseFloat(value.periodSpentUsd);
   const ratio =
-    spent === null ||
-    !Number.isFinite(spent) ||
-    !Number.isFinite(limit) ||
-    limit <= 0
+    spent === null || !Number.isFinite(spent) || !Number.isFinite(limit) || limit <= 0
       ? null
       : spent / limit;
   const label = budgetBarLabel(value);

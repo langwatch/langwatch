@@ -27,9 +27,7 @@ export interface KeysetColumn {
 
 /** Opaque page cursor: base64url of the sort key's values. */
 export function encodePageCursor(values: Array<string | number>): string {
-  return Buffer.from(values.join(CURSOR_SEPARATOR), "utf8").toString(
-    "base64url",
-  );
+  return Buffer.from(values.join(CURSOR_SEPARATOR), "utf8").toString("base64url");
 }
 
 /**
@@ -40,10 +38,7 @@ export function encodePageCursor(values: Array<string | number>): string {
  * garbled cursor is a 400, because silently restarting the walk would re-serve
  * everything the caller already has.
  */
-export function decodePageCursor(
-  encoded: string,
-  arity: number,
-): string[] | null {
+export function decodePageCursor(encoded: string, arity: number): string[] | null {
   try {
     const parts = Buffer.from(encoded, "base64url")
       .toString("utf8")
@@ -66,9 +61,7 @@ export function decodePageCursor(
  * direction. With the last column unique, the walk can neither skip a row nor
  * serve one twice.
  */
-export function keysetAfter(
-  columns: KeysetColumn[],
-): Array<Record<string, unknown>> {
+export function keysetAfter(columns: KeysetColumn[]): Array<Record<string, unknown>> {
   return columns.map((column, index) => {
     const branch: Record<string, unknown> = {};
     for (const earlier of columns.slice(0, index)) {

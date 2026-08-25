@@ -95,10 +95,7 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
         } as unknown as ExecutionState;
 
         render(
-          <ExecutionOutputPanel
-            executionState={zeroDuration}
-            nodeType="if_else"
-          />,
+          <ExecutionOutputPanel executionState={zeroDuration} nodeType="if_else" />,
           { wrapper: Wrapper },
         );
 

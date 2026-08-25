@@ -81,9 +81,7 @@ describe("langyPeekDock proximity", () => {
     };
 
     it("stays at rest while the pointer works elsewhere on the page", () => {
-      expect(
-        resolvePeekProximity({ ...base, pointerX: 200, pointerY: 200 }),
-      ).toBe(false);
+      expect(resolvePeekProximity({ ...base, pointerX: 200, pointerY: 200 })).toBe(false);
     });
 
     it("pops when the pointer nears the bottom-right region", () => {
@@ -98,20 +96,18 @@ describe("langyPeekDock proximity", () => {
     });
 
     it("does not pop for a pointer at the bottom-LEFT of the viewport", () => {
-      expect(
-        resolvePeekProximity({ ...base, pointerX: 60, pointerY: 890 }),
-      ).toBe(false);
+      expect(resolvePeekProximity({ ...base, pointerX: 60, pointerY: 890 })).toBe(false);
     });
 
     describe("when a drawer holds the corner and the peek dodged left", () => {
       it("the zone follows it to the bottom-left", () => {
         const dodged = { ...base, dodgeLeft: true };
-        expect(
-          resolvePeekProximity({ ...dodged, pointerX: 60, pointerY: 890 }),
-        ).toBe(true);
-        expect(
-          resolvePeekProximity({ ...dodged, pointerX: 1400, pointerY: 890 }),
-        ).toBe(false);
+        expect(resolvePeekProximity({ ...dodged, pointerX: 60, pointerY: 890 })).toBe(
+          true,
+        );
+        expect(resolvePeekProximity({ ...dodged, pointerX: 1400, pointerY: 890 })).toBe(
+          false,
+        );
       });
     });
 
@@ -127,9 +123,7 @@ describe("langyPeekDock proximity", () => {
           (PEEK_PROXIMITY_ENTER_PX + PEEK_PROXIMITY_EXIT_PX) / 2;
         const between = { ...base, pointerX: 1200, pointerY: betweenY };
         // Approaching from afar: not yet near.
-        expect(resolvePeekProximity({ ...between, wasNear: false })).toBe(
-          false,
-        );
+        expect(resolvePeekProximity({ ...between, wasNear: false })).toBe(false);
         // Retreating from near: still near.
         expect(resolvePeekProximity({ ...between, wasNear: true })).toBe(true);
       });
@@ -145,27 +139,19 @@ describe("langyPeekDock proximity", () => {
     };
 
     it("pops for a pointer drifting toward the right edge, mid-height", () => {
-      expect(
-        resolvePeekProximity({ ...base, pointerX: 1350, pointerY: 450 }),
-      ).toBe(true);
+      expect(resolvePeekProximity({ ...base, pointerX: 1350, pointerY: 450 })).toBe(true);
     });
 
     it("pops anywhere along that edge — the dock is full-height", () => {
       // The peek IS the dock, which runs top to bottom, so its whole right
       // edge is the target. (The retired stand-in was a short mid-height card,
       // which is why this used to be a dead zone.)
-      expect(
-        resolvePeekProximity({ ...base, pointerX: 1430, pointerY: 40 }),
-      ).toBe(true);
-      expect(
-        resolvePeekProximity({ ...base, pointerX: 1430, pointerY: 860 }),
-      ).toBe(true);
+      expect(resolvePeekProximity({ ...base, pointerX: 1430, pointerY: 40 })).toBe(true);
+      expect(resolvePeekProximity({ ...base, pointerX: 1430, pointerY: 860 })).toBe(true);
     });
 
     it("stays at rest for a pointer working out in the page", () => {
-      expect(
-        resolvePeekProximity({ ...base, pointerX: 500, pointerY: 450 }),
-      ).toBe(false);
+      expect(resolvePeekProximity({ ...base, pointerX: 500, pointerY: 450 })).toBe(false);
     });
   });
 });

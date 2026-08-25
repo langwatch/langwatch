@@ -1,10 +1,5 @@
 import { Box, chakra, Text, VStack } from "@chakra-ui/react";
-import {
-  ChevronRight,
-  GitCompare,
-  ScanSearch,
-  ShieldCheck,
-} from "lucide-react";
+import { ChevronRight, GitCompare, ScanSearch, ShieldCheck } from "lucide-react";
 import { type ComponentType, useMemo } from "react";
 // Lucide dropped its brand glyphs, so the octocat comes from react-feather —
 // the same mark LangyGitHubConnectCard uses, so the suggestion and the card you
@@ -23,11 +18,7 @@ export type SuggestionIcon = ComponentType<{ size?: string | number }>;
  * exactly what governs which asks are honest to offer them: "compare my last
  * two runs" is a dead end until there are two runs.
  */
-export type SuggestionRequirement =
-  | "nothing"
-  | "traces"
-  | "evaluations"
-  | "experiments";
+export type SuggestionRequirement = "nothing" | "traces" | "evaluations" | "experiments";
 
 export interface LangySuggestion {
   icon: SuggestionIcon;
@@ -68,8 +59,7 @@ export const SUGGESTIONS: LangySuggestion[] = [
   {
     icon: ScanSearch,
     label: "Find failing traces",
-    prompt:
-      "Find recent traces that are failing their evaluations and tell me why.",
+    prompt: "Find recent traces that are failing their evaluations and tell me why.",
     requires: "evaluations",
   },
   {
@@ -119,8 +109,7 @@ export const SETUP_SUGGESTIONS: LangySuggestion[] = [
   {
     icon: ScanSearch,
     label: "Onboard your agent",
-    prompt:
-      "Help me onboard my agent and send its first trace to this project.",
+    prompt: "Help me onboard my agent and send its first trace to this project.",
     // The first trace arriving is exactly what makes this ask obsolete.
     until: "traces",
   },
@@ -214,11 +203,7 @@ export function EmptyState({
       paddingX={3}
       paddingY={sidebar ? 6 : 8}
     >
-      <VStack
-        gap={0}
-        align="center"
-        marginBottom={`${metrics.heroMarginBottom}px`}
-      >
+      <VStack gap={0} align="center" marginBottom={`${metrics.heroMarginBottom}px`}>
         {/* The LangWatch mark, in the brand gradient — and the ONLY place it
             appears inside the panel (the minimised peek is the other). Bare, no tile:
             the orange chip that used to box it in was old-brand chrome, a

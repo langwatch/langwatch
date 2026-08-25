@@ -293,9 +293,7 @@ describe("AgentListDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("create-first-agent-button"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("create-first-agent-button")).toBeInTheDocument();
       });
     });
 
@@ -309,9 +307,7 @@ describe("AgentListDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("create-first-agent-button"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("create-first-agent-button")).toBeInTheDocument();
       });
 
       await user.click(screen.getByTestId("create-first-agent-button"));

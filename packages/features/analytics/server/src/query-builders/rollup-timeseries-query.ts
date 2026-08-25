@@ -28,10 +28,7 @@ import {
   isRollupRollableTraceMetricKey,
   type TraceRollupMetricKey,
 } from "../routing/route-table";
-import type {
-  AnalyticsTimeseriesBuilderInput,
-  BuiltAnalyticsQuery,
-} from "../types";
+import type { AnalyticsTimeseriesBuilderInput, BuiltAnalyticsQuery } from "../types";
 import { dateTrunc } from "./_shared";
 
 const ROLLUP_TABLE = "trace_analytics_rollup" as const;

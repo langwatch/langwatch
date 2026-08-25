@@ -52,12 +52,7 @@ function RequestBudgetIncreasePage() {
   const limitUsd = parseUsd(limitUsdRaw);
   const spentUsd = parseUsd(spentUsdRaw);
   const period = periodRaw || "current period";
-  const hasContext = !!(
-    scope &&
-    scopeId &&
-    limitUsd !== null &&
-    spentUsd !== null
-  );
+  const hasContext = !!(scope && scopeId && limitUsd !== null && spentUsd !== null);
 
   const adminQuery = api.user.personalBudget.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -69,9 +64,7 @@ function RequestBudgetIncreasePage() {
       : null;
 
   const [message, setMessage] = useState("");
-  const [submitState, setSubmitState] = useState<
-    "idle" | "submitting" | "sent"
-  >("idle");
+  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "sent">("idle");
   const [sendFailed, setSendFailed] = useState(false);
 
   const requestMutation = api.user.requestBudgetIncrease.useMutation({
@@ -127,8 +120,8 @@ function RequestBudgetIncreasePage() {
               Request budget increase
             </Heading>
             <Text color="fg.muted" fontSize="sm">
-              Send the request to your organization admin with the current spend
-              and limit context.
+              Send the request to your organization admin with the current spend and limit
+              context.
             </Text>
           </VStack>
           <Spacer />
@@ -140,8 +133,8 @@ function RequestBudgetIncreasePage() {
             <Box>
               <Alert.Title>Personal account — no admin to email</Alert.Title>
               <Alert.Description fontSize="sm">
-                Budget-increase requests only apply to organization-managed
-                accounts. Personal accounts manage their own limits in Settings.
+                Budget-increase requests only apply to organization-managed accounts.
+                Personal accounts manage their own limits in Settings.
               </Alert.Description>
             </Box>
           </Alert.Root>
@@ -155,9 +148,9 @@ function RequestBudgetIncreasePage() {
             <Box>
               <Alert.Title>Request sent</Alert.Title>
               <Alert.Description fontSize="sm">
-                We emailed {adminEmail ?? "your organization admin"} with the
-                spend context. They'll review and update the budget in Settings
-                → AI Governance → Budgets.
+                We emailed {adminEmail ?? "your organization admin"} with the spend
+                context. They'll review and update the budget in Settings → AI Governance
+                → Budgets.
               </Alert.Description>
             </Box>
           </Alert.Root>
@@ -174,8 +167,7 @@ function RequestBudgetIncreasePage() {
                 Try again, or{" "}
                 {adminEmail ? (
                   <>
-                    email{" "}
-                    <Link href={`mailto:${adminEmail}`}>{adminEmail}</Link>{" "}
+                    email <Link href={`mailto:${adminEmail}`}>{adminEmail}</Link>{" "}
                     directly.
                   </>
                 ) : (
@@ -213,10 +205,7 @@ function RequestBudgetIncreasePage() {
                     value={fmtUsd(spentUsd ?? 0)}
                     tone="red"
                   />
-                  <ContextRow
-                    label="Current limit"
-                    value={fmtUsd(limitUsd ?? 0)}
-                  />
+                  <ContextRow label="Current limit" value={fmtUsd(limitUsd ?? 0)} />
                 </VStack>
               </Box>
             ) : (
@@ -227,9 +216,8 @@ function RequestBudgetIncreasePage() {
                 <Box>
                   <Alert.Title>No context attached</Alert.Title>
                   <Alert.Description fontSize="sm">
-                    The page was opened without a budget block context. You can
-                    still send a free-form message — the admin will review and
-                    decide.
+                    The page was opened without a budget block context. You can still send
+                    a free-form message — the admin will review and decide.
                   </Alert.Description>
                 </Box>
               </Alert.Root>
@@ -265,9 +253,7 @@ function RequestBudgetIncreasePage() {
                 colorPalette="orange"
                 onClick={submit}
                 disabled={
-                  submitState === "submitting" ||
-                  !organization ||
-                  adminQuery.isLoading
+                  submitState === "submitting" || !organization || adminQuery.isLoading
                 }
                 loading={submitState === "submitting"}
               >

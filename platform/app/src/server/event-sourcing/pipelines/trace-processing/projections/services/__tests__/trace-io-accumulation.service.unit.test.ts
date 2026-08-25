@@ -292,9 +292,7 @@ describe("TraceIOAccumulationService — claude utility spans", () => {
 });
 
 describe("extractIOFromLogRecord — claude assistant_response fallback", () => {
-  function claudeLog(
-    attributes: Record<string, string>,
-  ): LogRecordReceivedEventData {
+  function claudeLog(attributes: Record<string, string>): LogRecordReceivedEventData {
     return {
       traceId: "t1",
       spanId: "s1",
@@ -407,9 +405,7 @@ describe("TraceIOAccumulationService: media refs", () => {
     let state = emptyState();
     let last!: ReturnType<TraceIOAccumulationService["accumulateIO"]>;
     for (const { span, input } of spans) {
-      const accumulator = new TraceIOAccumulationService(
-        stubExtractor({ input }),
-      );
+      const accumulator = new TraceIOAccumulationService(stubExtractor({ input }));
       last = accumulator.accumulateIO({ state, span });
       state = {
         ...state,
@@ -511,9 +507,7 @@ describe("TraceIOAccumulationService: media refs", () => {
 
   describe("given a span with no media at all", () => {
     it("leaves the trace's refs empty rather than inventing an attribute", () => {
-      const result = foldSpans([
-        { span: rootSpan(), input: textOnlyIO("just words") },
-      ]);
+      const result = foldSpans([{ span: rootSpan(), input: textOnlyIO("just words") }]);
 
       expect(result.inputMediaRefs).toBeNull();
     });

@@ -105,10 +105,7 @@ export function filtersMatch(
   a: Partial<Record<FilterField, FilterParam>>,
   b: Partial<Record<FilterField, FilterParam>>,
 ): boolean {
-  const allKeys = new Set([
-    ...Object.keys(a),
-    ...Object.keys(b),
-  ]) as Set<FilterField>;
+  const allKeys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<FilterField>;
 
   for (const key of allKeys) {
     const normA = normalizeFilterValue(a[key]);
@@ -153,9 +150,7 @@ export function periodMatches({
   }
 
   if (viewPeriod.startDate && viewPeriod.endDate) {
-    return (
-      urlStartDate === viewPeriod.startDate && urlEndDate === viewPeriod.endDate
-    );
+    return urlStartDate === viewPeriod.startDate && urlEndDate === viewPeriod.endDate;
   }
 
   return false;

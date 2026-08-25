@@ -49,10 +49,7 @@ const registry = {
     docsPath: "/platform/data-retention",
   },
   query_timeout: {
-    tips: [
-      "Narrow the time range",
-      "Add filters to reduce the amount of data scanned",
-    ],
+    tips: ["Narrow the time range", "Add filters to reduce the amount of data scanned"],
   },
   query_memory_exceeded: {
     tips: [
@@ -183,9 +180,7 @@ const registry = {
     docsPath: "/api-reference/api-keys/overview",
   },
   api_key_already_revoked: {
-    tips: [
-      "Revoked keys cannot be reactivated — create a new API key if you need one",
-    ],
+    tips: ["Revoked keys cannot be reactivated — create a new API key if you need one"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
   api_key_permission_denied: {
@@ -380,9 +375,7 @@ const registry = {
     tips: ["Ask a workspace admin to grant Langy permissions in this project"],
   },
   langy_turn_in_progress: {
-    tips: [
-      "Wait for the current response to finish before sending another message",
-    ],
+    tips: ["Wait for the current response to finish before sending another message"],
   },
   langy_rate_limited: {
     tips: ["Wait a few seconds before sending another message"],
@@ -407,14 +400,10 @@ const registry = {
     ],
   },
   langy_agent_unavailable: {
-    tips: [
-      "Retry in a few seconds — the agent is down, mid-deploy, or restarting",
-    ],
+    tips: ["Retry in a few seconds — the agent is down, mid-deploy, or restarting"],
   },
   langy_agent_at_capacity: {
-    tips: [
-      "Too many conversations are running at once — wait a few seconds and retry",
-    ],
+    tips: ["Too many conversations are running at once — wait a few seconds and retry"],
   },
   langy_agent_session_lost: {
     tips: [
@@ -455,9 +444,7 @@ const registry = {
     ],
   },
   langy_api_request_invalid: {
-    tips: [
-      "Read the `issues` array in `meta` — it names the field that failed and why",
-    ],
+    tips: ["Read the `issues` array in `meta` — it names the field that failed and why"],
   },
   langy_github_repo_not_accessible: {
     tips: [
@@ -480,9 +467,7 @@ const registry = {
     ],
   },
   langy_turn_timeout: {
-    tips: [
-      "Retry — or ask for a narrower slice: a shorter time range or a single trace",
-    ],
+    tips: ["Retry — or ask for a narrower slice: a shorter time range or a single trace"],
   },
   langy_worker_restarting: {
     tips: ["An update interrupted this reply — resend the message"],
@@ -501,9 +486,7 @@ const registry = {
     ],
   },
   license_signing_failed: {
-    tips: [
-      "Check that this is the license signing key and that it was copied in full",
-    ],
+    tips: ["Check that this is the license signing key and that it was copied in full"],
   },
 } as const satisfies Record<string, RemediationEntry>;
 

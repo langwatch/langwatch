@@ -15,16 +15,10 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
-import {
-  RUM_SESSION_HEADER,
-  RUM_TRACES_PATH,
-} from "@langwatch/react-rum/constants";
+import { RUM_SESSION_HEADER, RUM_TRACES_PATH } from "@langwatch/react-rum/constants";
 import type { Context } from "hono";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import {
-  ingestBrowserTraces,
-  readCappedBody,
-} from "~/server/rum/rum-ingest.service";
+import { ingestBrowserTraces, readCappedBody } from "~/server/rum/rum-ingest.service";
 
 const secured = createServiceApp({ basePath: "/api/rum" });
 

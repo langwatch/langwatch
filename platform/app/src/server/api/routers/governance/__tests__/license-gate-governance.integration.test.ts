@@ -232,10 +232,7 @@ describe("license-gate on governance backend", () => {
         // Clean up so the enterprise-plan suite below starts from a known
         // count (it asserts list() returns an array — value isn't pinned).
         await cleanupTestRows(prisma, [
-          [
-            "ingestionSource",
-            { organizationId, name: { startsWith: `free-tier-` } },
-          ],
+          ["ingestionSource", { organizationId, name: { startsWith: `free-tier-` } }],
         ]);
       });
 
@@ -358,9 +355,7 @@ describe("license-gate on governance backend", () => {
       expect(ingestSecret).toBeTruthy();
 
       // Cleanup so the test stays idempotent across reruns.
-      await prisma.ingestionSource
-        .delete({ where: { id: source.id } })
-        .catch(() => {});
+      await prisma.ingestionSource.delete({ where: { id: source.id } }).catch(() => {});
     });
   });
 });

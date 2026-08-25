@@ -33,11 +33,11 @@ const MAX_REGISTRY_FILE_BYTES = 16 * 1024;
  * claude itself does, so a relocated config home is still found.
  */
 export function defaultClaudeSessionRegistryDir(
-	env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env,
 ): string {
-	const configDir = env.CLAUDE_CONFIG_DIR?.trim();
-	if (configDir) return join(configDir, "sessions");
-	return join(homedir(), ".claude", "sessions");
+  const configDir = env.CLAUDE_CONFIG_DIR?.trim();
+  if (configDir) return join(configDir, "sessions");
+  return join(homedir(), ".claude", "sessions");
 }
 
 /**
@@ -45,40 +45,39 @@ export function defaultClaudeSessionRegistryDir(
  * it. Never throws.
  */
 export function readClaudeSessionName({
-	sessionId,
-	registryDir,
+  sessionId,
+  registryDir,
 }: {
-	sessionId: string;
-	registryDir: string;
+  sessionId: string;
+  registryDir: string;
 }): string | null {
-	let entries: string[];
-	try {
-		entries = readdirSync(registryDir);
-	} catch {
-		return null;
-	}
+  let entries: string[];
+  try {
+    entries = readdirSync(registryDir);
+  } catch {
+    return null;
+  }
 
-	let name: string | null = null;
-	let newest = -1;
-	for (const entry of entries.slice(0, MAX_REGISTRY_FILES)) {
-		if (!entry.endsWith(".json")) continue;
-		const file = join(registryDir, entry);
-		try {
-			if (statSync(file).size > MAX_REGISTRY_FILE_BYTES) continue;
-			const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
-			if (typeof parsed !== "object" || parsed === null) continue;
-			const record = parsed as Record<string, unknown>;
-			if (record.sessionId !== sessionId) continue;
-			if (typeof record.name !== "string") continue;
-			const updatedAt =
-				typeof record.updatedAt === "number" ? record.updatedAt : 0;
-			if (updatedAt < newest) continue;
-			newest = updatedAt;
-			name = record.name;
-		} catch {
-			// A file claude was mid-write on, or one that is not a registry
-			// entry at all. Either way it names nothing.
-		}
-	}
-	return name;
+  let name: string | null = null;
+  let newest = -1;
+  for (const entry of entries.slice(0, MAX_REGISTRY_FILES)) {
+    if (!entry.endsWith(".json")) continue;
+    const file = join(registryDir, entry);
+    try {
+      if (statSync(file).size > MAX_REGISTRY_FILE_BYTES) continue;
+      const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
+      if (typeof parsed !== "object" || parsed === null) continue;
+      const record = parsed as Record<string, unknown>;
+      if (record.sessionId !== sessionId) continue;
+      if (typeof record.name !== "string") continue;
+      const updatedAt = typeof record.updatedAt === "number" ? record.updatedAt : 0;
+      if (updatedAt < newest) continue;
+      newest = updatedAt;
+      name = record.name;
+    } catch {
+      // A file claude was mid-write on, or one that is not a registry
+      // entry at all. Either way it names nothing.
+    }
+  }
+  return name;
 }

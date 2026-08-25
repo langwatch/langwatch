@@ -27,9 +27,7 @@ export class PostgresAdminWorkspaceViewAuditAdapter {
 
   build(): DefaultGovernanceAdminWorkspaceViewAuditService {
     return DefaultGovernanceAdminWorkspaceViewAuditService.create({
-      repository: PrismaAdminWorkspaceViewAuditRepository.create(
-        this.options.database,
-      ),
+      repository: PrismaAdminWorkspaceViewAuditRepository.create(this.options.database),
       projects: this.options.projects,
       ocsf: this.options.ocsf,
       diagnostics: this.options.diagnostics,

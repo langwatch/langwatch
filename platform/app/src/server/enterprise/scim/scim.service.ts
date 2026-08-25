@@ -164,10 +164,7 @@ export class ScimService {
         select: { id: true },
       });
     } catch (error) {
-      if (
-        error instanceof PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
         const winner = await this.prisma.department.findFirst({
           where: {
             organizationId: input.organizationId,
@@ -209,9 +206,9 @@ export class ScimService {
   private costCenterFromRequest(
     request: ScimCreateUserRequest,
   ): string | null | undefined {
-    const ext = (request as Record<string, unknown>)[
-      SCIM_ENTERPRISE_USER_SCHEMA
-    ] as { costCenter?: string | null } | undefined;
+    const ext = (request as Record<string, unknown>)[SCIM_ENTERPRISE_USER_SCHEMA] as
+      | { costCenter?: string | null }
+      | undefined;
     if (!ext || !("costCenter" in ext)) return undefined;
     return ext.costCenter ?? null;
   }
@@ -518,8 +515,7 @@ export class ScimService {
         continue;
       }
 
-      if (operation.value == null || typeof operation.value !== "object")
-        continue;
+      if (operation.value == null || typeof operation.value !== "object") continue;
 
       const value = operation.value as Record<string, unknown>;
       const updates: { name?: string; email?: string } = {};
@@ -545,13 +541,9 @@ export class ScimService {
       } else if ("name.givenName" in value || "name.familyName" in value) {
         // Dot-notation attribute paths in value object (RFC 7644 §3.5.2)
         const given =
-          typeof value["name.givenName"] === "string"
-            ? value["name.givenName"]
-            : null;
+          typeof value["name.givenName"] === "string" ? value["name.givenName"] : null;
         const family =
-          typeof value["name.familyName"] === "string"
-            ? value["name.familyName"]
-            : null;
+          typeof value["name.familyName"] === "string" ? value["name.familyName"] : null;
         const parts = [given, family].filter(Boolean);
         if (parts.length > 0) {
           updates.name = parts.join(" ");
@@ -646,9 +638,7 @@ export class ScimService {
 
   private buildNameFromRequest(request: ScimCreateUserRequest): string {
     if (request.name) {
-      const parts = [request.name.givenName, request.name.familyName].filter(
-        Boolean,
-      );
+      const parts = [request.name.givenName, request.name.familyName].filter(Boolean);
       if (parts.length > 0) {
         return parts.join(" ");
       }
@@ -676,13 +666,7 @@ export class ScimService {
     return match?.[1] ?? null;
   }
 
-  private scimError({
-    status,
-    detail,
-  }: {
-    status: string;
-    detail: string;
-  }): ScimError {
+  private scimError({ status, detail }: { status: string; detail: string }): ScimError {
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
       status,

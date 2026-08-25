@@ -225,9 +225,7 @@ describe("MastraExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.LANGWATCH_INPUT]).toBe(
-        "what's the weather in london?",
-      );
+      expect(ctx.out[ATTR_KEYS.LANGWATCH_INPUT]).toBe("what's the weather in london?");
     });
 
     it("extracts last user message with string content", () => {
@@ -268,9 +266,7 @@ describe("MastraExtractor", () => {
     });
 
     it("does not set langwatch.input when langwatch.input already exists", () => {
-      const messages = JSON.stringify([
-        { role: "user", content: "from mastra" },
-      ]);
+      const messages = JSON.stringify([{ role: "user", content: "from mastra" }]);
       const ctx = createExtractorContext(
         {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
@@ -469,9 +465,9 @@ describe("MastraExtractor", () => {
       extractor.apply(ctx);
 
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(720);
-      expect(
-        typeof ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
-      ).toBe("number");
+      expect(typeof ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+        "number",
+      );
     });
   });
 
@@ -535,9 +531,7 @@ describe("MastraExtractor", () => {
 
       extractor.apply(ctx);
 
-      const valueTypes = ctx.out[
-        ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES
-      ] as string[];
+      const valueTypes = ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES] as string[];
       expect(valueTypes).toContain("gen_ai.output.messages=chat_messages");
     });
 
@@ -655,9 +649,7 @@ describe("MastraExtractor", () => {
       expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual([
         { role: "user", content: "What is 2+2?" },
       ]);
-      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(
-        "You are helpful",
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("You are helpful");
     });
 
     it("keeps all messages when no system message present", () => {
@@ -704,9 +696,7 @@ describe("MastraExtractor", () => {
 
       extractor.apply(ctx);
 
-      const valueTypes = ctx.out[
-        ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES
-      ] as string[];
+      const valueTypes = ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES] as string[];
       expect(valueTypes).toContain("gen_ai.input.messages=chat_messages");
     });
 
@@ -730,9 +720,7 @@ describe("MastraExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(
-        "You are a math tutor",
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("You are a math tutor");
     });
 
     it("does not overwrite existing model name", () => {

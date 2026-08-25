@@ -31,9 +31,7 @@ export const GroupingSelector: React.FC<{ compact?: boolean }> = ({
     <MenuRoot>
       <Tooltip
         content={
-          grouping === "flat"
-            ? "Group rows"
-            : `Grouped: ${GROUPING_OPTIONS[grouping]}`
+          grouping === "flat" ? "Group rows" : `Grouped: ${GROUPING_OPTIONS[grouping]}`
         }
         positioning={{ placement: "bottom" }}
       >

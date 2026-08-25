@@ -69,9 +69,7 @@ describe("UsageStatsService", () => {
 
     describe("when usage unit resolves to traces", () => {
       it("includes usageUnit as traces in the result", async () => {
-        mockUsageUnitResolver.getResolvedUsageUnit = vi
-          .fn()
-          .mockResolvedValue("traces");
+        mockUsageUnitResolver.getResolvedUsageUnit = vi.fn().mockResolvedValue("traces");
 
         const stats = await service.getUsageStats("org-123", testUser);
 
@@ -81,9 +79,7 @@ describe("UsageStatsService", () => {
 
     describe("when usage unit resolves to events", () => {
       it("includes usageUnit as events in the result", async () => {
-        mockUsageUnitResolver.getResolvedUsageUnit = vi
-          .fn()
-          .mockResolvedValue("events");
+        mockUsageUnitResolver.getResolvedUsageUnit = vi.fn().mockResolvedValue("events");
 
         const stats = await service.getUsageStats("org-123", testUser);
 
@@ -103,9 +99,9 @@ describe("UsageStatsService", () => {
     it("surfaces the display count and never the enforcement counter", async () => {
       await service.getUsageStats("org-123", testUser);
 
-      expect(
-        mockTraceUsage.getCurrentMonthCountForDisplay,
-      ).toHaveBeenCalledWith({ organizationId: "org-123" });
+      expect(mockTraceUsage.getCurrentMonthCountForDisplay).toHaveBeenCalledWith({
+        organizationId: "org-123",
+      });
       expect(mockTraceUsage.getCurrentMonthCount).not.toHaveBeenCalled();
     });
   });

@@ -2,10 +2,7 @@ import { Avatar, type AvatarRootProps, Box } from "@chakra-ui/react";
 import { useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PresenceSession } from "@langwatch/presence-contract";
-import {
-  presenceDisplayName,
-  presenceSessionColor,
-} from "../utils/sessionColor";
+import { presenceDisplayName, presenceSessionColor } from "../utils/sessionColor";
 
 interface PresenceAvatarProps extends Omit<AvatarRootProps, "size"> {
   session: PresenceSession;
@@ -30,8 +27,7 @@ export function PresenceAvatar({
   // is reused across different sessions — we retry instead of staying
   // permanently latched to the fallback.
   const [brokenImageUrl, setBrokenImageUrl] = useState<string | null>(null);
-  const showImage =
-    !!session.user.image && session.user.image !== brokenImageUrl;
+  const showImage = !!session.user.image && session.user.image !== brokenImageUrl;
 
   const avatar = (
     <Avatar.Root
@@ -64,10 +60,7 @@ export function PresenceAvatar({
   );
 }
 
-function describePresence(
-  session: PresenceSession,
-  displayName: string,
-): string {
+function describePresence(session: PresenceSession, displayName: string): string {
   const parts: string[] = [displayName];
   const { route, view } = session.location;
 

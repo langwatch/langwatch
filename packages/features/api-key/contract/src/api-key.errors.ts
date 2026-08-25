@@ -73,15 +73,19 @@ export class ApiKeyPermissionDeniedError extends HandledError {
   declare readonly code: "api_key_permission_denied";
 
   constructor(permission: string, options: { meta?: Record<string, unknown> } = {}) {
-    super("api_key_permission_denied", `API Key does not grant required permission: ${permission}`, {
-      meta: { permission, ...options.meta },
-      httpStatus: 403,
-      fault: "customer",
-      tips: [
-        "Re-create the API key with the required scope, or ask an admin to raise your role",
-      ],
-      docsUrl: "https://docs.langwatch.ai/api-reference/api-keys/create-api-key",
-    });
+    super(
+      "api_key_permission_denied",
+      `API Key does not grant required permission: ${permission}`,
+      {
+        meta: { permission, ...options.meta },
+        httpStatus: 403,
+        fault: "customer",
+        tips: [
+          "Re-create the API key with the required scope, or ask an admin to raise your role",
+        ],
+        docsUrl: "https://docs.langwatch.ai/api-reference/api-keys/create-api-key",
+      },
+    );
     this.name = "ApiKeyPermissionDeniedError";
   }
 }
@@ -89,16 +93,23 @@ export class ApiKeyPermissionDeniedError extends HandledError {
 export class ApiKeyPermissionNotDelegableError extends HandledError {
   declare readonly code: "api_key_permission_not_delegable";
 
-  constructor(permission: string, options: { subject: string; meta?: Record<string, unknown> }) {
-    super("api_key_permission_not_delegable", `${options.subject} is never granted ${permission}, whatever key or role you use. Make this change in LangWatch yourself.`, {
-      meta: { permission, ...options.meta },
-      httpStatus: 403,
-      fault: "customer",
-      tips: [
-        "A wider key or a higher role does not change this — make the change in LangWatch instead",
-      ],
-      docsUrl: "https://docs.langwatch.ai/api-reference/api-keys/create-api-key",
-    });
+  constructor(
+    permission: string,
+    options: { subject: string; meta?: Record<string, unknown> },
+  ) {
+    super(
+      "api_key_permission_not_delegable",
+      `${options.subject} is never granted ${permission}, whatever key or role you use. Make this change in LangWatch yourself.`,
+      {
+        meta: { permission, ...options.meta },
+        httpStatus: 403,
+        fault: "customer",
+        tips: [
+          "A wider key or a higher role does not change this — make the change in LangWatch instead",
+        ],
+        docsUrl: "https://docs.langwatch.ai/api-reference/api-keys/create-api-key",
+      },
+    );
     this.name = "ApiKeyPermissionNotDelegableError";
   }
 }

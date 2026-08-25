@@ -121,8 +121,10 @@ export interface ConfigFormProps<S, TPreview = unknown> {
 }
 
 /** Notify-specific client additions. Generic over slice and preview. */
-export interface NotifyClientDef<S = unknown, TPreview = unknown>
-  extends ClientDef<S, TPreview> {
+export interface NotifyClientDef<S = unknown, TPreview = unknown> extends ClientDef<
+  S,
+  TPreview
+> {
   /** The channel string the preview/testFire endpoints accept. Each
    *  provider names its own — the shared layer doesn't enumerate. */
   readonly channel: "email" | "slack" | "webhook";
@@ -161,8 +163,10 @@ export interface ClientEntry<S = unknown, TPreview = unknown> {
   client: ClientDef<S, TPreview> | NotifyClientDef<S, TPreview>;
 }
 
-export interface NotifyClientEntry<S = unknown, TPreview = unknown>
-  extends ClientEntry<S, TPreview> {
+export interface NotifyClientEntry<S = unknown, TPreview = unknown> extends ClientEntry<
+  S,
+  TPreview
+> {
   shared: SharedDef & { category: "notify" };
   client: NotifyClientDef<S, TPreview>;
 }

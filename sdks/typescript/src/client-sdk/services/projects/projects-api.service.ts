@@ -92,7 +92,11 @@ export class ProjectsApiService {
     };
   }
 
-  private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
+  private async request<T>(
+    operation: string,
+    path: string,
+    init?: RequestInit,
+  ): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
       headers: { ...this.headers(), ...(init?.headers ?? {}) },
@@ -115,12 +119,7 @@ export class ProjectsApiService {
         status: response.status,
         message,
       });
-      throw new ProjectsApiError(
-        message,
-        operation,
-        parsedBody,
-        response.status,
-      );
+      throw new ProjectsApiError(message, operation, parsedBody, response.status);
     }
     return (await response.json()) as T;
   }
@@ -144,11 +143,10 @@ export class ProjectsApiService {
   }
 
   async create(input: CreateProjectInput): Promise<ProjectWithServiceKey> {
-    return this.request<ProjectWithServiceKey>(
-      "create project",
-      "/api/projects",
-      { method: "POST", body: JSON.stringify(input) },
-    );
+    return this.request<ProjectWithServiceKey>("create project", "/api/projects", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   async update(id: string, input: UpdateProjectInput): Promise<Project> {

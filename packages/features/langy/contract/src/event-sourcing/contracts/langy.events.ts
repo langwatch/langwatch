@@ -208,14 +208,12 @@ export type LangyToolCallFailedEventData = z.infer<
  * reload from the fold. `status` is a permissive string (the client tolerates an
  * unknown value as pending), and `items` is capped/truncated at the manager.
  */
-export const langyPlanItemSchema = z
-  .record(z.string(), langyJsonValueSchema)
-  .and(
-    z.object({
-      content: z.string(),
-      status: z.string(),
-    }),
-  );
+export const langyPlanItemSchema = z.record(z.string(), langyJsonValueSchema).and(
+  z.object({
+    content: z.string(),
+    status: z.string(),
+  }),
+);
 export type LangyPlanItemData = z.infer<typeof langyPlanItemSchema>;
 
 export const langyPlanUpdatedEventDataSchema = z.object({
@@ -223,9 +221,7 @@ export const langyPlanUpdatedEventDataSchema = z.object({
   turnId: z.string(),
   items: z.array(langyPlanItemSchema).default([]),
 });
-export type LangyPlanUpdatedEventData = z.infer<
-  typeof langyPlanUpdatedEventDataSchema
->;
+export type LangyPlanUpdatedEventData = z.infer<typeof langyPlanUpdatedEventDataSchema>;
 
 /**
  * AgentResponseFailed — the response's lifecycle failed with no answer to carry

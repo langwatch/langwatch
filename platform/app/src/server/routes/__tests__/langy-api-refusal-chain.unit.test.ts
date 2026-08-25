@@ -57,8 +57,7 @@ vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
   return {
     ...actual,
     extractCredentials: (...args: unknown[]) => mockExtractCredentials(...args),
-    enforceApiKeyCeiling: (...args: unknown[]) =>
-      mockEnforceApiKeyCeiling(...args),
+    enforceApiKeyCeiling: (...args: unknown[]) => mockEnforceApiKeyCeiling(...args),
   };
 });
 
@@ -78,13 +77,11 @@ const mockResolveLangyKeyIdentity = vi.fn();
 const mockResolveLangyActorSession = vi.fn();
 
 vi.mock("~/server/app-layer/langy/langyApiKeyIdentity", () => ({
-  resolveLangyKeyIdentity: (...args: unknown[]) =>
-    mockResolveLangyKeyIdentity(...args),
+  resolveLangyKeyIdentity: (...args: unknown[]) => mockResolveLangyKeyIdentity(...args),
 }));
 
 vi.mock("~/server/app-layer/langy/langyApiKeyActorSession", () => ({
-  resolveLangyActorSession: (...args: unknown[]) =>
-    mockResolveLangyActorSession(...args),
+  resolveLangyActorSession: (...args: unknown[]) => mockResolveLangyActorSession(...args),
 }));
 
 // ─── App layer ────────────────────────────────────────────────────────────────
@@ -237,9 +234,7 @@ describe("/api/langy refusal chain", () => {
 
   describe("open surface (flag on)", () => {
     it("lets the ceiling denial through untranslated", async () => {
-      const { ApiKeyPermissionDeniedError } = await import(
-        "@langwatch/api-key-contract"
-      );
+      const { ApiKeyPermissionDeniedError } = await import("@langwatch/api-key-contract");
       mockEnforceApiKeyCeiling.mockRejectedValue(
         new ApiKeyPermissionDeniedError("langy:create"),
       );
@@ -265,9 +260,7 @@ describe("/api/langy refusal chain", () => {
       const res = await postTurn();
 
       expect(res.status).toBe(403);
-      expect(JSON.stringify(await res.json())).toContain(
-        "langy_api_key_unowned",
-      );
+      expect(JSON.stringify(await res.json())).toContain("langy_api_key_unowned");
     });
 
     /** @scenario "A key owned by a user without Langy access is refused" */
@@ -285,9 +278,7 @@ describe("/api/langy refusal chain", () => {
       const res = await postTurn();
 
       expect(res.status).toBe(403);
-      expect(JSON.stringify(await res.json())).toContain(
-        "langy_api_key_no_langy_access",
-      );
+      expect(JSON.stringify(await res.json())).toContain("langy_api_key_no_langy_access");
     });
 
     /** @scenario "A key whose owning user no longer exists is refused" */
@@ -300,9 +291,7 @@ describe("/api/langy refusal chain", () => {
       const res = await postTurn();
 
       expect(res.status).toBe(403);
-      expect(JSON.stringify(await res.json())).toContain(
-        "langy_api_actor_missing",
-      );
+      expect(JSON.stringify(await res.json())).toContain("langy_api_actor_missing");
     });
 
     it("refuses an invalid body as 400 without dispatching a turn", async () => {
@@ -312,9 +301,7 @@ describe("/api/langy refusal chain", () => {
       });
 
       expect(res.status).toBe(400);
-      expect(JSON.stringify(await res.json())).toContain(
-        "langy_api_request_invalid",
-      );
+      expect(JSON.stringify(await res.json())).toContain("langy_api_request_invalid");
       expect(mockStartConversationTurn).not.toHaveBeenCalled();
     });
 
@@ -386,9 +373,7 @@ describe("/api/langy refusal chain", () => {
       );
 
       expect(await describeResponse(res)).toEqual(
-        await describeResponse(
-          await testApp.request(UNMOUNTED_URL, { method: "POST" }),
-        ),
+        await describeResponse(await testApp.request(UNMOUNTED_URL, { method: "POST" })),
       );
       expect(mockStartConversationTurn).not.toHaveBeenCalled();
     });

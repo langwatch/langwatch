@@ -202,10 +202,7 @@ function runSweep(deps: SpendSettlementProcessDeps) {
  * re-resolved, so the settled record and the envelope it delivers name the
  * same organization and key the request was admitted against.
  */
-function settleCommandFor(
-  admission: OpenAdmission,
-  now: number,
-): SettleSpendCommandData {
+function settleCommandFor(admission: OpenAdmission, now: number): SettleSpendCommandData {
   return {
     gateway_request_id: admission.gatewayRequestId,
     tenantId: admission.tenantId,

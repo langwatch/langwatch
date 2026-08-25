@@ -21,10 +21,7 @@ describe("group queue discovery", () => {
     /** @scenario A starting producer advertises its queue name in the registry */
     it("adds its queue name to the registry set", async () => {
       const redis = createRedis();
-      const scripts = new GroupStagingScripts(
-        redis as never,
-        "{event-sourcing/jobs}",
-      );
+      const scripts = new GroupStagingScripts(redis as never, "{event-sourcing/jobs}");
 
       await scripts.registerQueue();
 

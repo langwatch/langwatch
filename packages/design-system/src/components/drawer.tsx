@@ -11,30 +11,29 @@ export interface DrawerContentProps extends ChakraDrawer.ContentProps {
   offset?: ChakraDrawer.ContentProps["padding"];
 }
 
-export const DrawerContent = React.forwardRef<
-  HTMLDivElement,
-  DrawerContentProps
->(function DrawerContent(
-  { portalled = true, portalRef, offset, marginTop, ...contentProps },
-  ref,
-) {
-  const context = React.useContext(DrawerOffsetContext);
-  return (
-    <Portal disabled={!portalled} container={portalRef}>
-      <ChakraDrawer.Positioner padding={offset}>
-        <ChakraDrawer.Content
-          ref={ref}
-          margin={2}
-          borderRadius="lg"
-          background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)"
-          backdropFilter="var(--lw-backdrop-blur, blur(25px))"
-          marginTop={marginTop ?? context.marginTop}
-          {...contentProps}
-        />
-      </ChakraDrawer.Positioner>
-    </Portal>
-  );
-});
+export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps>(
+  function DrawerContent(
+    { portalled = true, portalRef, offset, marginTop, ...contentProps },
+    ref,
+  ) {
+    const context = React.useContext(DrawerOffsetContext);
+    return (
+      <Portal disabled={!portalled} container={portalRef}>
+        <ChakraDrawer.Positioner padding={offset}>
+          <ChakraDrawer.Content
+            ref={ref}
+            margin={2}
+            borderRadius="lg"
+            background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)"
+            backdropFilter="var(--lw-backdrop-blur, blur(25px))"
+            marginTop={marginTop ?? context.marginTop}
+            {...contentProps}
+          />
+        </ChakraDrawer.Positioner>
+      </Portal>
+    );
+  },
+);
 
 export const DrawerCloseTrigger = React.forwardRef<
   HTMLButtonElement,

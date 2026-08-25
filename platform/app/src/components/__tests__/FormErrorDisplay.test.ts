@@ -40,10 +40,7 @@ describe("extractErrorMessages", () => {
   describe("when input is an array", () => {
     it("processes multiple error objects in array", () => {
       const errors = [{ message: "First error" }, { message: "Second error" }];
-      expect(extractErrorMessages(errors)).toEqual([
-        "First error",
-        "Second error",
-      ]);
+      expect(extractErrorMessages(errors)).toEqual(["First error", "Second error"]);
     });
 
     it("handles mixed array with valid and invalid items", () => {
@@ -70,10 +67,7 @@ describe("extractErrorMessages", () => {
         field1: { message: "Field 1 error" },
         field2: { message: "Field 2 error" },
       };
-      expect(extractErrorMessages(error)).toEqual([
-        "Field 1 error",
-        "Field 2 error",
-      ]);
+      expect(extractErrorMessages(error)).toEqual(["Field 1 error", "Field 2 error"]);
     });
 
     it("ignores non-error nested values", () => {
@@ -119,10 +113,7 @@ describe("extractErrorMessages", () => {
       const error = {
         validField: { message: "Valid message" },
         invalidField: { type: "required" }, // no message
-        arrayField: [
-          { message: "Array error 1" },
-          { message: "Array error 2" },
-        ],
+        arrayField: [{ message: "Array error 1" }, { message: "Array error 2" }],
       };
       expect(extractErrorMessages(error)).toEqual([
         "Valid message",

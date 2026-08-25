@@ -121,8 +121,7 @@ function resultChip({
     return {
       label: "Previous submission",
       palette: "orange",
-      title:
-        "The visible result belongs to the statement as it was when it ran",
+      title: "The visible result belongs to the statement as it was when it ran",
     };
   }
   if (state.outcome.result.truncated) {
@@ -242,9 +241,8 @@ function TruncationBanner({ result }: { result: LangWatchQLQueryResult }) {
         Partial result
       </Text>
       <Text fontSize="12px" color="fg.muted" lineHeight="1.5">
-        Showing the first {formatNumber(result.statistics.rowsReturned)} rows.
-        The rest of the answer did not fit in the response — aggregate or narrow
-        the query to see it.
+        Showing the first {formatNumber(result.statistics.rowsReturned)} rows. The rest of
+        the answer did not fit in the response — aggregate or narrow the query to see it.
       </Text>
     </HStack>
   );
@@ -273,23 +271,12 @@ function EmptyState({ onInsertExample }: { onInsertExample?: () => void }) {
       <Text fontSize="14px" fontWeight="600" marginBottom={1}>
         Nothing has run yet
       </Text>
-      <Text
-        fontSize="12.5px"
-        color="fg.muted"
-        lineHeight="1.6"
-        maxWidth="420px"
-      >
-        The LangWatchQL datasets on the left are ready — open one to see what a
-        row means and what you can select. Nothing runs until you press{" "}
-        <strong>Run query</strong>.
+      <Text fontSize="12.5px" color="fg.muted" lineHeight="1.6" maxWidth="420px">
+        The LangWatchQL datasets on the left are ready — open one to see what a row means
+        and what you can select. Nothing runs until you press <strong>Run query</strong>.
       </Text>
       {onInsertExample && (
-        <Button
-          size="sm"
-          colorPalette="orange"
-          marginTop={4}
-          onClick={onInsertExample}
-        >
+        <Button size="sm" colorPalette="orange" marginTop={4} onClick={onInsertExample}>
           Start from an example
         </Button>
       )}
@@ -422,10 +409,7 @@ export function LangWatchQLResultPane({
 
   if (state.outcome === null) {
     return (
-      <NoOutcomePane
-        isInFlight={state.isInFlight}
-        onInsertExample={onInsertExample}
-      />
+      <NoOutcomePane isInFlight={state.isInFlight} onInsertExample={onInsertExample} />
     );
   }
 
@@ -484,8 +468,7 @@ function readPaneModel(state: LangWatchQLRequestState) {
     state.outcome?.kind === "error"
       ? readLangWatchQLFailure(state.outcome.error)
       : undefined;
-  const result =
-    state.outcome?.kind === "result" ? state.outcome.result : undefined;
+  const result = state.outcome?.kind === "result" ? state.outcome.result : undefined;
   return {
     isStale,
     failure,
@@ -503,13 +486,7 @@ function NoOutcomePane({
   onInsertExample: (() => void) | undefined;
 }) {
   return (
-    <VStack
-      align="stretch"
-      flex="1"
-      minHeight={0}
-      gap={0}
-      data-testid="lwql-result-pane"
-    >
+    <VStack align="stretch" flex="1" minHeight={0} gap={0} data-testid="lwql-result-pane">
       {isInFlight ? (
         <RunningState />
       ) : (

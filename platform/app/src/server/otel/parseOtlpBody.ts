@@ -49,8 +49,8 @@ const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
 const logRequestType = (root as any).opentelemetry.proto.collector.logs.v1
   .ExportLogsServiceRequest;
-const metricsRequestType = (root as any).opentelemetry.proto.collector.metrics
-  .v1.ExportMetricsServiceRequest;
+const metricsRequestType = (root as any).opentelemetry.proto.collector.metrics.v1
+  .ExportMetricsServiceRequest;
 
 function toArrayBuffer(buf: Buffer): ArrayBuffer {
   return new Uint8Array(buf).buffer as ArrayBuffer;
@@ -90,10 +90,7 @@ function isOutputLimitExceeded(error: unknown): boolean {
   );
 }
 
-type Decompressor = (
-  buf: Buffer,
-  opts: { maxOutputLength: number },
-) => Promise<Buffer>;
+type Decompressor = (buf: Buffer, opts: { maxOutputLength: number }) => Promise<Buffer>;
 
 const DECOMPRESSORS = {
   gzip: gunzipAsync,
@@ -126,9 +123,7 @@ function releaseQuietly(reader: { releaseLock: () => void }): void {
 }
 
 /** Same reasoning as {@link releaseQuietly}, for the over-size cancel path. */
-async function cancelQuietly(reader: {
-  cancel: () => Promise<void>;
-}): Promise<void> {
+async function cancelQuietly(reader: { cancel: () => Promise<void> }): Promise<void> {
   try {
     await reader.cancel();
   } catch {
@@ -233,9 +228,7 @@ export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
   const raw = await readWireBody(req);
 
   try {
-    return toArrayBuffer(
-      await decompress(raw, { maxOutputLength: OTLP_MAX_BODY_BYTES }),
-    );
+    return toArrayBuffer(await decompress(raw, { maxOutputLength: OTLP_MAX_BODY_BYTES }));
   } catch (error) {
     if (isOutputLimitExceeded(error)) {
       throw new OtlpBodyTooLargeError({
@@ -250,9 +243,7 @@ export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
   }
 }
 
-export type OtlpParseResult<T> =
-  | { ok: true; request: T }
-  | { ok: false; error: string };
+export type OtlpParseResult<T> = { ok: true; request: T } | { ok: false; error: string };
 
 /**
  * Parse an OTLP/HTTP traces export request from a decompressed body.
@@ -281,11 +272,7 @@ export function parseOtlpLogs(
   if (body.byteLength === 0) {
     return { ok: true, request: { resourceLogs: [] } };
   }
-  return parseWithFallback<IExportLogsServiceRequest>(
-    body,
-    contentType,
-    logRequestType,
-  );
+  return parseWithFallback<IExportLogsServiceRequest>(body, contentType, logRequestType);
 }
 
 export function parseOtlpMetrics(
@@ -327,9 +314,7 @@ function parseWithFallback<T>(
     // see it.
     try {
       const json = JSON.parse(Buffer.from(body).toString("utf-8")) as T;
-      request = protoType.decode(
-        new Uint8Array(protoType.encode(json).finish()),
-      );
+      request = protoType.decode(new Uint8Array(protoType.encode(json).finish()));
       return { ok: true, request };
     } catch (jsonErr) {
       // The size is context for the numbers printed beside it, not a verdict of

@@ -83,9 +83,8 @@ export async function resolveThreadMappingsIntoData(params: {
     } else {
       const threadSource = source as keyof typeof THREAD_MAPPINGS;
       const selectedFields =
-        ("selectedFields" in mappingConfig
-          ? mappingConfig.selectedFields
-          : undefined) ?? [];
+        ("selectedFields" in mappingConfig ? mappingConfig.selectedFields : undefined) ??
+        [];
       data[targetField] = THREAD_MAPPINGS[threadSource].mapping(
         { thread_id: threadId, traces },
         selectedFields as (keyof typeof TRACE_MAPPINGS)[],

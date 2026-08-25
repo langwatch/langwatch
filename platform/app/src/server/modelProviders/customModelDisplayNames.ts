@@ -240,7 +240,5 @@ export const modelDisplayLabel = ({
   fullModelId: string;
   displayNames?: Record<string, string>;
 }): string => {
-  return (
-    displayNames?.[fullModelId] || fullModelId.split("/").slice(1).join("/")
-  );
+  return displayNames?.[fullModelId] || fullModelId.split("/").slice(1).join("/");
 };

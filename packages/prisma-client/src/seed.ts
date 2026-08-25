@@ -13,10 +13,7 @@ export class PrismaSeedService {
     return new PrismaSeedService();
   }
 
-  run(input: {
-    connection: PrismaConnection;
-    seed: PrismaSeed;
-  }): Promise<void> {
+  run(input: { connection: PrismaConnection; seed: PrismaSeed }): Promise<void> {
     return input.seed.run(input.connection.client);
   }
 }

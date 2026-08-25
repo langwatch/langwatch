@@ -41,9 +41,7 @@ export const governanceIngestionSourceSchema = z
     createdById: z.string().nullable(),
   })
   .strict();
-export type GovernanceIngestionSource = z.infer<
-  typeof governanceIngestionSourceSchema
->;
+export type GovernanceIngestionSource = z.infer<typeof governanceIngestionSourceSchema>;
 
 export const createGovernanceIngestionSourceCommandSchema = z
   .object({

@@ -8,10 +8,10 @@ OpenAI-compatible audio endpoints. Any client that speaks OpenAI's audio API (th
 
 Two providers ship today:
 
-| Provider | TTS (`/v1/audio/speech`) | STT (`/v1/audio/transcriptions`) |
-|---|---|---|
-| OpenAI | `openai/gpt-4o-mini-tts`, `openai/tts-1`, `openai/tts-1-hd` | `openai/gpt-4o-transcribe`, `openai/gpt-4o-mini-transcribe`, `openai/whisper-1` |
-| ElevenLabs | `elevenlabs/eleven_flash_v2`, `elevenlabs/eleven_turbo_v2_5`, `elevenlabs/eleven_multilingual_v2` | `elevenlabs/scribe_v1` |
+| Provider   | TTS (`/v1/audio/speech`)                                                                          | STT (`/v1/audio/transcriptions`)                                                |
+| ---------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| OpenAI     | `openai/gpt-4o-mini-tts`, `openai/tts-1`, `openai/tts-1-hd`                                       | `openai/gpt-4o-transcribe`, `openai/gpt-4o-mini-transcribe`, `openai/whisper-1` |
+| ElevenLabs | `elevenlabs/eleven_flash_v2`, `elevenlabs/eleven_turbo_v2_5`, `elevenlabs/eleven_multilingual_v2` | `elevenlabs/scribe_v1`                                                          |
 
 Configure the provider key once in **Settings → Model Providers** (OpenAI and ElevenLabs both take a plain API key); every virtual key routed to that provider can then call its voice models.
 
@@ -113,9 +113,9 @@ Streaming (`/v1/text-to-speech/{voice_id}/stream`) is not served yet.
 
 Every audio call lands as a gateway trace like chat does. Providers that report token usage (`gpt-4o-mini-tts`, `gpt-4o-transcribe`) fill the standard `gen_ai.usage.*` token attributes; character- and duration-priced providers are measured by two audio-specific attributes:
 
-| Attribute | Meaning |
-|---|---|
-| `gen_ai.usage.input_chars` | Characters synthesized by a TTS call |
+| Attribute                    | Meaning                                     |
+| ---------------------------- | ------------------------------------------- |
+| `gen_ai.usage.input_chars`   | Characters synthesized by a TTS call        |
 | `gen_ai.usage.audio_seconds` | Seconds of audio transcribed by an STT call |
 
 ## Errors

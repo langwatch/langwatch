@@ -29,10 +29,7 @@ export function compileHiddenAttributeMatchers(
   }));
 }
 
-function placeholderFor(
-  path: string,
-  matchers: HiddenMatcher[],
-): string | null {
+function placeholderFor(path: string, matchers: HiddenMatcher[]): string | null {
   for (const matcher of matchers) {
     if (matcher.regex.test(path)) {
       return `[REDACTED] (visible to ${matcher.visibleTo})`;

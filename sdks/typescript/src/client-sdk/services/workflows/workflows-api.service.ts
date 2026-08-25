@@ -1,8 +1,5 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
@@ -75,17 +72,20 @@ export class WorkflowsApiService {
     // client built on that endpoint rather than on the environment.
     this.endpoint = resolveEndpoint(config?.endpoint);
     this.apiClient =
-      config?.langwatchApiClient ??
-      createLangWatchApiClient(undefined, this.endpoint);
+      config?.langwatchApiClient ?? createLangWatchApiClient(undefined, this.endpoint);
     this.experimentsApiService = new ExperimentsApiService({
       langwatchApiClient: this.apiClient,
     });
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new WorkflowsApiError(message, operation, error);
   }
 
@@ -174,13 +174,11 @@ export class WorkflowsApiService {
     if (options.parameters !== undefined) body.parameters = options.parameters;
     if (options.rowIndices !== undefined) body.row_indices = options.rowIndices;
 
-    const startResponse = await this.postUndeclaredEndpoint<WorkflowEvaluateResponse>(
-      {
-        path: `/api/workflows/${encodeURIComponent(workflowId)}/evaluate`,
-        body,
-        operation: `run workflow evaluation for "${workflowId}"`,
-      },
-    );
+    const startResponse = await this.postUndeclaredEndpoint<WorkflowEvaluateResponse>({
+      path: `/api/workflows/${encodeURIComponent(workflowId)}/evaluate`,
+      body,
+      operation: `run workflow evaluation for "${workflowId}"`,
+    });
 
     const runId = startResponse.run_id;
 

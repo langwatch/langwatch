@@ -1,7 +1,4 @@
-import type {
-  BulkAppendContext,
-  ProjectionStoreContext,
-} from "@langwatch/eventing";
+import type { BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { MetricDataPointRepository } from "~/server/app-layer/metrics/repositories/metric-data-point.repository";
@@ -40,18 +37,9 @@ describe("canonical metric projection stores", () => {
     it("stamps trace retention on raw, catalog, and rollup writes", async () => {
       const repository = makeRepository();
 
-      await new MetricDataPointAppendStore(repository).append(
-        dataPoint,
-        context,
-      );
-      await new MetricSeriesCatalogAppendStore(repository).append(
-        dataPoint,
-        context,
-      );
-      await new MetricTimeRollupAppendStore(repository).append(
-        dataPoint,
-        context,
-      );
+      await new MetricDataPointAppendStore(repository).append(dataPoint, context);
+      await new MetricSeriesCatalogAppendStore(repository).append(dataPoint, context);
+      await new MetricTimeRollupAppendStore(repository).append(dataPoint, context);
 
       const write = {
         point: dataPoint,
@@ -71,32 +59,22 @@ describe("canonical metric projection stores", () => {
       const points = [dataPoint, dataPoint, dataPoint];
       const bulkContext = context as BulkAppendContext;
 
-      await new MetricDataPointAppendStore(repository).bulkAppend(
-        points,
-        bulkContext,
-      );
+      await new MetricDataPointAppendStore(repository).bulkAppend(points, bulkContext);
       await new MetricSeriesCatalogAppendStore(repository).bulkAppend(
         points,
         bulkContext,
       );
-      await new MetricTimeRollupAppendStore(repository).bulkAppend(
-        points,
-        bulkContext,
-      );
+      await new MetricTimeRollupAppendStore(repository).bulkAppend(points, bulkContext);
 
       const bulkWrite = {
         points,
         retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
       };
-      expect(repository.ensureDataPoints).toHaveBeenCalledExactlyOnceWith(
+      expect(repository.ensureDataPoints).toHaveBeenCalledExactlyOnceWith(bulkWrite);
+      expect(repository.upsertSeriesMany).toHaveBeenCalledExactlyOnceWith(bulkWrite);
+      expect(repository.recomputeAffectedRollupsMany).toHaveBeenCalledExactlyOnceWith(
         bulkWrite,
       );
-      expect(repository.upsertSeriesMany).toHaveBeenCalledExactlyOnceWith(
-        bulkWrite,
-      );
-      expect(
-        repository.recomputeAffectedRollupsMany,
-      ).toHaveBeenCalledExactlyOnceWith(bulkWrite);
       expect(repository.ensureDataPoint).not.toHaveBeenCalled();
       expect(repository.upsertSeries).not.toHaveBeenCalled();
       expect(repository.recomputeAffectedRollups).not.toHaveBeenCalled();

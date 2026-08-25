@@ -72,9 +72,7 @@ describe("handleError()", () => {
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body.error).toBe("resource_limit_exceeded");
-      expect(body.message).toBe(
-        "You have reached the maximum number of team members",
-      );
+      expect(body.message).toBe("You have reached the maximum number of team members");
     });
 
     /** @scenario "A known failure is normalised by Hono to a client-safe body" */
@@ -253,13 +251,10 @@ describe("handleError()", () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = "production";
       try {
-        const error = Object.assign(
-          new Error("connect ECONNREFUSED 10.0.0.42:5432"),
-          {
-            name: "PrismaClientInitializationError",
-            code: "P1001",
-          },
-        );
+        const error = Object.assign(new Error("connect ECONNREFUSED 10.0.0.42:5432"), {
+          name: "PrismaClientInitializationError",
+          code: "P1001",
+        });
         const app = createTestApp(error);
 
         const res = await app.request("/");
@@ -270,9 +265,7 @@ describe("handleError()", () => {
         expect(body.message).toBe("An unknown error occurred");
         expect(JSON.stringify(body)).not.toContain("10.0.0.42:5432");
         expect(JSON.stringify(body)).not.toContain("P1001");
-        expect(JSON.stringify(body)).not.toContain(
-          "PrismaClientInitializationError",
-        );
+        expect(JSON.stringify(body)).not.toContain("PrismaClientInitializationError");
       } finally {
         process.env.NODE_ENV = originalEnv;
       }

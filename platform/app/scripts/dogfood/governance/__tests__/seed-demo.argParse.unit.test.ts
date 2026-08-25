@@ -19,9 +19,7 @@ describe("seed-demo parseArgs", () => {
   });
 
   it("captures --report-path value", () => {
-    expect(parseArgs(["--report-path", "/tmp/run.txt"]).reportPath).toBe(
-      "/tmp/run.txt",
-    );
+    expect(parseArgs(["--report-path", "/tmp/run.txt"]).reportPath).toBe("/tmp/run.txt");
   });
 
   it("accepts all flags together in any order", () => {

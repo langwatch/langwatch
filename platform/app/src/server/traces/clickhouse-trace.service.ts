@@ -47,10 +47,7 @@ import {
 } from "./mappers";
 import { parseLLMSpanMessages } from "./parseLLMSpanMessages";
 import { parsePromptReference } from "./parsePromptReference";
-import {
-  type EventSpanRow,
-  mapEventAttrsToEvent,
-} from "./projection/event-attrs.mapper";
+import { type EventSpanRow, mapEventAttrsToEvent } from "./projection/event-attrs.mapper";
 import type { ProjectableTrace, ProjectedAnnotation } from "./projection/types";
 import type { ResolvedTraceSpans } from "./resolve-offloaded-traces";
 import type {
@@ -386,9 +383,7 @@ export class TraceSpansBatchResolverContractError extends Error {
  */
 export class ClickHouseTraceService {
   private readonly logger = createLogger("langwatch:traces:clickhouse-service");
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.traces.clickhouse-service",
-  );
+  private readonly tracer = getLangWatchTracer("langwatch.traces.clickhouse-service");
 
   /**
    * Optional callback that resolves offloaded blob refs for a single trace's
@@ -429,9 +424,7 @@ export class ClickHouseTraceService {
     this.retentionFloor = createRetentionFloorService(retentionResolver);
   }
 
-  private readonly retentionFloor: ReturnType<
-    typeof createRetentionFloorService
-  >;
+  private readonly retentionFloor: ReturnType<typeof createRetentionFloorService>;
 
   /**
    * Resolve the ClickHouse client for a given project.
@@ -559,8 +552,7 @@ export class ClickHouseTraceService {
           // A resolver-contract violation is a code bug, not a fetch failure —
           // surface it verbatim rather than flattening it into the generic
           // message and losing the mismatch.
-          if (error instanceof TraceSpansBatchResolverContractError)
-            throw error;
+          if (error instanceof TraceSpansBatchResolverContractError) throw error;
           this.logger.warn(
             {
               projectId,
@@ -806,15 +798,13 @@ export class ClickHouseTraceService {
           // Re-sort by timestamp — getTracesWithSpans returns in TraceId
           // order which doesn't match the chronological order we need.
           traces.sort(
-            (a, b) =>
-              (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0),
+            (a, b) => (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0),
           );
           return traces;
         } catch (error) {
           // See getTracesWithSpans: a resolver-contract violation is a code bug,
           // not a fetch failure — surface it verbatim.
-          if (error instanceof TraceSpansBatchResolverContractError)
-            throw error;
+          if (error instanceof TraceSpansBatchResolverContractError) throw error;
           this.logger.warn(
             {
               projectId,
@@ -910,8 +900,7 @@ export class ClickHouseTraceService {
           // Re-sort by timestamp — getTracesWithSpans returns in TraceId
           // order which doesn't match the chronological order we need.
           traces.sort(
-            (a, b) =>
-              (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0),
+            (a, b) => (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0),
           );
           return traces;
         } catch (error) {
@@ -920,8 +909,7 @@ export class ClickHouseTraceService {
           // that method lands here and would be flattened again. Allowlist it,
           // same as the other two. (Live path: called with resolveBlobs from the
           // thread router and the evaluation-execution service.)
-          if (error instanceof TraceSpansBatchResolverContractError)
-            throw error;
+          if (error instanceof TraceSpansBatchResolverContractError) throw error;
           this.logger.warn(
             {
               projectId,
@@ -959,8 +947,7 @@ export class ClickHouseTraceService {
 
         try {
           const pageSize = input.pageSize ?? 25;
-          const sortDirection =
-            (input.sortDirection as "asc" | "desc") ?? "desc";
+          const sortDirection = (input.sortDirection as "asc" | "desc") ?? "desc";
 
           // Projection DSL plan (from/select). When absent, behavior is the
           // legacy full-trace response. When present, it drives heavy-column
@@ -1028,10 +1015,7 @@ export class ClickHouseTraceService {
                   "Invalid scrollStart in cursor, ignoring cursor",
                 );
                 cursor = null;
-              } else if (
-                cursor &&
-                (cursor.dateField ?? "occurred") !== dateField
-              ) {
+              } else if (cursor && (cursor.dateField ?? "occurred") !== dateField) {
                 this.logger.warn(
                   {
                     cursorDateField: cursor.dateField ?? "occurred",
@@ -1079,9 +1063,7 @@ export class ClickHouseTraceService {
           });
 
           if (hasUnsupportedFilters) {
-            throw new Error(
-              "Filters contain unsupported fields for ClickHouse",
-            );
+            throw new Error("Filters contain unsupported fields for ClickHouse");
           }
 
           // The scroll's snapshot point. Pinned once, on the page that starts
@@ -1113,24 +1095,23 @@ export class ClickHouseTraceService {
               : input.endDate;
 
           // Build the query with keyset pagination
-          let { traces, totalHits, lastTrace } =
-            await this.fetchTracesWithPagination({
-              projectId: input.projectId,
-              pageSize,
-              sortDirection,
-              cursor,
-              protections,
-              startDate: input.startDate,
-              endDate: effectiveEndDate,
-              filterConditions,
-              filterParams,
-              traceIds: input.traceIds,
-              query: input.query,
-              fetchInput,
-              fetchOutput,
-              dateField,
-              scrollStart,
-            });
+          let { traces, totalHits, lastTrace } = await this.fetchTracesWithPagination({
+            projectId: input.projectId,
+            pageSize,
+            sortDirection,
+            cursor,
+            protections,
+            startDate: input.startDate,
+            endDate: effectiveEndDate,
+            filterConditions,
+            filterParams,
+            traceIds: input.traceIds,
+            query: input.query,
+            fetchInput,
+            fetchOutput,
+            dateField,
+            scrollStart,
+          });
 
           // Spans are fetched when the caller wants them OR when it wants full
           // IO — because those are not the same thing.
@@ -1191,9 +1172,7 @@ export class ClickHouseTraceService {
               // scroll started from, not a fresh reading per page.
               ...(scrollStart !== undefined ? { scrollStart } : {}),
             };
-            newScrollId = Buffer.from(JSON.stringify(newCursor)).toString(
-              "base64",
-            );
+            newScrollId = Buffer.from(JSON.stringify(newCursor)).toString("base64");
 
             this.logger.debug(
               {
@@ -1211,9 +1190,7 @@ export class ClickHouseTraceService {
           const rawGroups = this.groupTraces(traces, input.groupBy);
 
           // Transform traces to include guardrail information
-          const groups = rawGroups.map((group) =>
-            transformTracesWithGuardrails(group),
-          );
+          const groups = rawGroups.map((group) => transformTracesWithGuardrails(group));
 
           this.logger.debug(
             {
@@ -1223,8 +1200,7 @@ export class ClickHouseTraceService {
               firstTraceId: traces[0]?.trace_id,
               firstTraceTimestamp: traces[0]?.timestamps.started_at,
               lastTraceId: traces[traces.length - 1]?.trace_id,
-              lastTraceTimestamp:
-                traces[traces.length - 1]?.timestamps.started_at,
+              lastTraceTimestamp: traces[traces.length - 1]?.timestamps.started_at,
             },
             "Returning traces result",
           );
@@ -1248,9 +1224,7 @@ export class ClickHouseTraceService {
             }
             for (const row of evalRows) {
               if (row.TraceId && grouped[row.TraceId]) {
-                grouped[row.TraceId]!.push(
-                  mapClickHouseEvaluationToTraceEvaluation(row),
-                );
+                grouped[row.TraceId]!.push(mapClickHouseEvaluationToTraceEvaluation(row));
               }
             }
 
@@ -1311,9 +1285,7 @@ export class ClickHouseTraceService {
    * @returns TopicCountsResult
    * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
-  async getTopicCounts(
-    input: AggregationFiltersInput,
-  ): Promise<TopicCountsResult> {
+  async getTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
@@ -1324,14 +1296,10 @@ export class ClickHouseTraceService {
           // Build date filter conditions
           const conditions: string[] = ["TenantId = {tenantId:String}"];
           if (input.startDate) {
-            conditions.push(
-              "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
-            );
+            conditions.push("CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})");
           }
           if (input.endDate) {
-            conditions.push(
-              "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
-            );
+            conditions.push("CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})");
           }
 
           const whereClause = conditions.join(" AND ");
@@ -1369,24 +1337,19 @@ export class ClickHouseTraceService {
           for (const row of rows) {
             if (row.TopicId) {
               const current = topicCountsMap.get(row.TopicId) ?? 0;
-              topicCountsMap.set(
-                row.TopicId,
-                current + parseInt(row.count, 10),
-              );
+              topicCountsMap.set(row.TopicId, current + parseInt(row.count, 10));
             }
             if (row.SubTopicId) {
               const current = subtopicCountsMap.get(row.SubTopicId) ?? 0;
-              subtopicCountsMap.set(
-                row.SubTopicId,
-                current + parseInt(row.count, 10),
-              );
+              subtopicCountsMap.set(row.SubTopicId, current + parseInt(row.count, 10));
             }
           }
 
           return {
-            topicCounts: Array.from(topicCountsMap.entries()).map(
-              ([key, count]) => ({ key, count }),
-            ),
+            topicCounts: Array.from(topicCountsMap.entries()).map(([key, count]) => ({
+              key,
+              count,
+            })),
             subtopicCounts: Array.from(subtopicCountsMap.entries()).map(
               ([key, count]) => ({ key, count }),
             ),
@@ -1425,14 +1388,10 @@ export class ClickHouseTraceService {
           // Build date filter conditions
           const conditions: string[] = ["TenantId = {tenantId:String}"];
           if (input.startDate) {
-            conditions.push(
-              "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
-            );
+            conditions.push("CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})");
           }
           if (input.endDate) {
-            conditions.push(
-              "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
-            );
+            conditions.push("CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})");
           }
 
           const whereClause = conditions.join(" AND ");
@@ -1598,9 +1557,9 @@ export class ClickHouseTraceService {
           // sibling that started at or after the requested span. The
           // playground form needs an llm span's messages + llm config —
           // anything else lands as "No prompts open".
-          const requestedType = requestedRow.SpanAttributes[
-            "langwatch.span.type"
-          ] as string | undefined;
+          const requestedType = requestedRow.SpanAttributes["langwatch.span.type"] as
+            | string
+            | undefined;
           const row =
             requestedType === "llm"
               ? requestedRow
@@ -1610,10 +1569,7 @@ export class ClickHouseTraceService {
           }
 
           // Extract span data from attributes
-          const result = this.extractPromptStudioDataFromClickHouse(
-            row,
-            protections,
-          );
+          const result = this.extractPromptStudioDataFromClickHouse(row, protections);
 
           // If the LLM span itself doesn't have a prompt reference,
           // search ancestors and their siblings to find it (SDK sets it on
@@ -1624,13 +1580,10 @@ export class ClickHouseTraceService {
               const promptId = r.SpanAttributes["langwatch.prompt.id"];
               if (promptId) attributes["langwatch.prompt.id"] = promptId;
               const promptVars = r.SpanAttributes["langwatch.prompt.variables"];
-              if (promptVars)
-                attributes["langwatch.prompt.variables"] = promptVars;
+              if (promptVars) attributes["langwatch.prompt.variables"] = promptVars;
               const promptHandle = r.SpanAttributes["langwatch.prompt.handle"];
-              if (promptHandle)
-                attributes["langwatch.prompt.handle"] = promptHandle;
-              const promptVersion =
-                r.SpanAttributes["langwatch.prompt.version.number"];
+              if (promptHandle) attributes["langwatch.prompt.handle"] = promptHandle;
+              const promptVersion = r.SpanAttributes["langwatch.prompt.version.number"];
               if (promptVersion)
                 attributes["langwatch.prompt.version.number"] = promptVersion;
               return {
@@ -1693,8 +1646,7 @@ export class ClickHouseTraceService {
     // contract — including the single-message-object form nlpgo emits
     // for langwatch.output — is unit-testable without standing up the
     // full service. See that file's docstring for the shape catalog.
-    const messages: PromptStudioSpanResult["messages"] =
-      parseLLMSpanMessages(attrs);
+    const messages: PromptStudioSpanResult["messages"] = parseLLMSpanMessages(attrs);
 
     // Extract LLM config
     const model =
@@ -1731,9 +1683,7 @@ export class ClickHouseTraceService {
     }
 
     // Extract metrics
-    const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as
-      | number
-      | undefined;
+    const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as number | undefined;
     const completionTokens = attrs["gen_ai.usage.completion_tokens"] as
       | number
       | undefined;
@@ -2009,9 +1959,7 @@ export class ClickHouseTraceService {
 
         const searchFilter = effectiveQuery
           ? ` AND (${[
-              ...searchableColumns.map(
-                (col) => `${col} LIKE {searchQuery:String}`,
-              ),
+              ...searchableColumns.map((col) => `${col} LIKE {searchQuery:String}`),
               spanNameSearch,
             ].join(" OR ")})`
           : "";
@@ -2196,8 +2144,7 @@ export class ClickHouseTraceService {
           return applyTraceProtections(trace, protections);
         });
 
-        const lastTrace =
-          traces.length > 0 ? (traces[traces.length - 1] ?? null) : null;
+        const lastTrace = traces.length > 0 ? (traces[traces.length - 1] ?? null) : null;
 
         return { traces, totalHits, lastTrace };
       },
@@ -2352,10 +2299,7 @@ export class ClickHouseTraceService {
         i < traceIds.length;
         i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
       ) {
-        const batch = traceIds.slice(
-          i,
-          i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
-        );
+        const batch = traceIds.slice(i, i + ClickHouseTraceService.SUMMARY_BATCH_SIZE);
         const batchRows = await runQuery(batch);
         allRows.push(...batchRows);
       }
@@ -2609,10 +2553,7 @@ export class ClickHouseTraceService {
         i < traceIds.length;
         i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
       ) {
-        const batch = traceIds.slice(
-          i,
-          i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
-        );
+        const batch = traceIds.slice(i, i + ClickHouseTraceService.SUMMARY_BATCH_SIZE);
         const batchRows = await runQuery(batch);
         allRows.push(...batchRows);
       }
@@ -2769,10 +2710,7 @@ export class ClickHouseTraceService {
     resolveBlobs?: boolean;
   }): Promise<ResolvedTraceSpans[]> {
     if (resolveBlobs === true && this.resolveTraceSpansBatch) {
-      const resolutions = await this.resolveTraceSpansBatch(
-        projectId,
-        spansPerTrace,
-      );
+      const resolutions = await this.resolveTraceSpansBatch(projectId, spansPerTrace);
 
       // ResolveTraceSpansBatchFn is INJECTED, so "one resolution per input
       // trace, in input order" is a convention its type cannot enforce. Today's
@@ -2875,9 +2813,7 @@ export class ClickHouseTraceService {
     if (recomputedInput !== null || recomputedOutput !== null) {
       trace = {
         ...trace,
-        ...(recomputedInput !== null
-          ? { input: { value: recomputedInput.text } }
-          : {}),
+        ...(recomputedInput !== null ? { input: { value: recomputedInput.text } } : {}),
         ...(recomputedOutput !== null
           ? { output: { value: recomputedOutput.text } }
           : {}),
@@ -3023,9 +2959,7 @@ export class ClickHouseTraceService {
     projectId: string,
     traceIds: string[],
     occurredAt?: OccurredAtRange,
-  ): Promise<
-    Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
-  > {
+  ): Promise<Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithSpansJoined",
       {
@@ -3136,12 +3070,8 @@ export class ClickHouseTraceService {
             fallback: "none",
             isEmpty: (rows) => rows.length === 0,
             run: async (window) => {
-              const summaryTimeFilterOuter = window
-                ? window.sqlFor("t.OccurredAt")
-                : "";
-              const summaryTimeFilterInner = window
-                ? window.sqlFor("OccurredAt")
-                : "";
+              const summaryTimeFilterOuter = window ? window.sqlFor("t.OccurredAt") : "";
+              const summaryTimeFilterInner = window ? window.sqlFor("OccurredAt") : "";
               const summaryResult = await clickHouseClient.query({
                 query: `
         SELECT
@@ -3274,9 +3204,7 @@ export class ClickHouseTraceService {
               : hasSummaryWindow
                 ? effectiveOccurredAt
                 : undefined;
-          const spanHintMs = spanRange
-            ? (spanRange.from + spanRange.to) / 2
-            : null;
+          const spanHintMs = spanRange ? (spanRange.from + spanRange.to) / 2 : null;
           const spanWindowMs = spanRange
             ? (spanRange.to - spanRange.from) / 2 + DEFAULT_PARTITION_WINDOW_MS
             : DEFAULT_PARTITION_WINDOW_MS;
@@ -3321,12 +3249,8 @@ export class ClickHouseTraceService {
               // Always present now: a hint yields the hinted fragment, and the
               // hint-less path yields the retention floor's fragment. The null
               // arm is kept only because the shared contract permits it.
-              const spanTimeFilterOuter = window
-                ? window.sqlFor("t.StartTime")
-                : "";
-              const spanTimeFilterInner = window
-                ? window.sqlFor("StartTime")
-                : "";
+              const spanTimeFilterOuter = window ? window.sqlFor("t.StartTime") : "";
+              const spanTimeFilterInner = window ? window.sqlFor("StartTime") : "";
               const spansResult = await clickHouseClient.query({
                 query: `
         SELECT
@@ -3455,8 +3379,7 @@ export class ClickHouseTraceService {
             // budget goes into the read so an over-budget batch is refused by
             // ClickHouse instead of arriving in this process first.
             // See {@link MAX_SPANS_PER_JOINED_FALLBACK}.
-            const remainingSpanBudget =
-              MAX_SPANS_PER_JOINED_FALLBACK - mergedSpanCount;
+            const remainingSpanBudget = MAX_SPANS_PER_JOINED_FALLBACK - mergedSpanCount;
             let batchMap: Map<
               string,
               { summary: TraceSummaryData; spans: NormalizedSpan[] }
@@ -3467,8 +3390,7 @@ export class ClickHouseTraceService {
                 maxSpanRows: remainingSpanBudget,
               });
             } catch (batchError) {
-              if (!isClickHouseResultOverflowError(batchError))
-                throw batchError;
+              if (!isClickHouseResultOverflowError(batchError)) throw batchError;
               throw new Error(
                 `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
                   `(${mergedSpanCount} already merged across ${merged.size} of ${traceIds.length} traces, ` +
@@ -3504,9 +3426,7 @@ export class ClickHouseTraceService {
    * Extract TraceSummaryData from a joined row.
    * @internal
    */
-  private extractTraceSummaryFromRow(
-    row: JoinedTraceSpanRow,
-  ): TraceSummaryData {
+  private extractTraceSummaryFromRow(row: JoinedTraceSpanRow): TraceSummaryData {
     return {
       traceId: row.ts_TraceId,
       spanCount: row.ts_SpanCount,
@@ -3698,9 +3618,7 @@ function traceSummaryTimesFromRow(row: TraceSummaryRow): {
   const isAnchored = isStorageAnchoredVersion(row.ts_Version);
   return {
     storageAnchorMs: row.ts_OccurredAt,
-    occurredAt: isAnchored
-      ? Number(row.ts_EarliestSpanStartMs ?? 0)
-      : row.ts_OccurredAt,
+    occurredAt: isAnchored ? Number(row.ts_EarliestSpanStartMs ?? 0) : row.ts_OccurredAt,
   };
 }
 

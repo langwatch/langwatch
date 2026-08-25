@@ -46,10 +46,7 @@ export function SourceCard({
     >
       <HStack gap={1.5}>
         {icon ? (
-          <Box
-            color={active ? "colorPalette.fg" : "fg.muted"}
-            display="inline-flex"
-          >
+          <Box color={active ? "colorPalette.fg" : "fg.muted"} display="inline-flex">
             {icon}
           </Box>
         ) : null}

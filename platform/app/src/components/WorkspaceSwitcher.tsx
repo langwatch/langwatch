@@ -1,21 +1,5 @@
-import {
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Portal,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
-  Building2,
-  Check,
-  ChevronDown,
-  Folder,
-  Plus,
-  User,
-  Users,
-} from "lucide-react";
+import { Box, Button, HStack, IconButton, Portal, Text, VStack } from "@chakra-ui/react";
+import { Building2, Check, ChevronDown, Folder, Plus, User, Users } from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 import { ProjectAvatar } from "./ProjectAvatar";
@@ -241,9 +225,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
   // to more than one org. The active org is the current chip, so it is not a
   // navigation target - it just gets the checkmark.
   const orgSwitchList =
-    current.kind === "organization" && onSwitchOrganization
-      ? (organizations ?? [])
-      : [];
+    current.kind === "organization" && onSwitchOrganization ? (organizations ?? []) : [];
   const showOrgSwitch = orgSwitchList.length > 1;
 
   // "My Workspace" is a switch target only when it isn't already the current
@@ -320,9 +302,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
   // not disappear. Only a truly org-less personal (orgId null) has no org to
   // nest under and stays a top-level "My Workspace" group.
   const orgPersonals = personals.filter((p) => p.orgId);
-  const personalByOrgId = new Map(
-    orgPersonals.map((p) => [p.orgId as string, p]),
-  );
+  const personalByOrgId = new Map(orgPersonals.map((p) => [p.orgId as string, p]));
   const topLevelPersonal = personals.find((p) => !p.orgId);
 
   // Include governance orgs the user has a personal in but no visible team in —
@@ -390,8 +370,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
                 <Group title="Organizations">
                   {orgSwitchList.map((org) => {
                     const active =
-                      current.kind === "organization" &&
-                      current.orgId === org.orgId;
+                      current.kind === "organization" && current.orgId === org.orgId;
                     return (
                       <Menu.Item
                         key={org.orgId}
@@ -475,8 +454,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
                       />
                     )}
                     {org.teams.map((team) => {
-                      const teamProjects =
-                        projectsByTeam.get(team.teamId) ?? [];
+                      const teamProjects = projectsByTeam.get(team.teamId) ?? [];
                       return (
                         <Box key={team.teamId}>
                           <Box position="relative">
@@ -488,16 +466,13 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
                                 void router.push(team.href);
                               }}
                             />
-                            {team.canCreateProject &&
-                              onCreateProjectForTeam && (
-                                <TeamCreateProjectButton
-                                  team={team}
-                                  onCreateProjectForTeam={
-                                    onCreateProjectForTeam
-                                  }
-                                  setOpen={setOpen}
-                                />
-                              )}
+                            {team.canCreateProject && onCreateProjectForTeam && (
+                              <TeamCreateProjectButton
+                                team={team}
+                                onCreateProjectForTeam={onCreateProjectForTeam}
+                                setOpen={setOpen}
+                              />
+                            )}
                           </Box>
                           {teamProjects.length > 0 && (
                             <VStack gap={0} align="stretch" paddingLeft={5}>
@@ -540,8 +515,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
               {!hasMore && (
                 <Box paddingX={3} paddingY={2}>
                   <Text fontSize="xs" color="fg.muted">
-                    Ask your admin to add you to a team to see more contexts
-                    here.
+                    Ask your admin to add you to a team to see more contexts here.
                   </Text>
                 </Box>
               )}
@@ -553,13 +527,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
   );
 });
 
-function Group({
-  title,
-  children,
-}: {
-  title?: string;
-  children: React.ReactNode;
-}) {
+function Group({ title, children }: { title?: string; children: React.ReactNode }) {
   // No title → render the items inline without the ItemGroup wrapper so
   // the section header doesn't render an empty stripe. Used for the
   // single-org case where the org context is implicit.
@@ -612,13 +580,7 @@ function SwitcherItem({
           // tab" gestures — let the browser handle them via the <a href>.
           // Only intercept plain left-click so the menu can close
           // synchronously and onSelect drives the navigation.
-          if (
-            e.metaKey ||
-            e.ctrlKey ||
-            e.shiftKey ||
-            e.altKey ||
-            e.button === 1
-          ) {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) {
             return;
           }
           e.preventDefault();
@@ -626,12 +588,7 @@ function SwitcherItem({
       >
         <VStack gap={0} width="full" alignItems="stretch">
           <HStack gap={3} width="full" alignItems="center">
-            <Box
-              width="20px"
-              display="flex"
-              justifyContent="center"
-              flexShrink={0}
-            >
+            <Box width="20px" display="flex" justifyContent="center" flexShrink={0}>
               {entry.kind === "project" ? (
                 <ProjectAvatar name={entry.label} />
               ) : (
@@ -680,9 +637,7 @@ function TeamCreateProjectButton({
   setOpen,
 }: {
   team: Extract<WorkspaceSwitcherEntry, { kind: "team" }>;
-  onCreateProjectForTeam: NonNullable<
-    WorkspaceSwitcherProps["onCreateProjectForTeam"]
-  >;
+  onCreateProjectForTeam: NonNullable<WorkspaceSwitcherProps["onCreateProjectForTeam"]>;
   setOpen: (open: boolean) => void;
 }) {
   const [tipOpen, setTipOpen] = React.useState(false);

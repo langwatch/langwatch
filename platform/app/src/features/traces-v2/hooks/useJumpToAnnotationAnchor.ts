@@ -67,9 +67,7 @@ export function canJumpToAnnotationAnchor({
  * selected row hundreds of rows off screen, so the waterfall scrolls to the
  * selection of its own accord; this only has to name the span.
  */
-export function useJumpToAnnotationAnchor(): (
-  anchor: AnnotationAnchorTarget,
-) => void {
+export function useJumpToAnnotationAnchor(): (anchor: AnnotationAnchorTarget) => void {
   const openSpanInTrace = useDrawerStore((s) => s.openSpanInTrace);
   const clearSpan = useDrawerStore((s) => s.clearSpan);
   const setViewModeTransient = useDrawerStore((s) => s.setViewModeTransient);

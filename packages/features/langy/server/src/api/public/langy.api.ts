@@ -21,9 +21,7 @@ export class LangyPublicApi {
   }
 
   list(input: unknown): Promise<LangyConversationPage> {
-    return this.service.listConversations(
-      langyConversationListInputSchema.parse(input),
-    );
+    return this.service.listConversations(langyConversationListInputSchema.parse(input));
   }
 
   get(input: unknown): Promise<LangyConversation> {
@@ -45,9 +43,7 @@ export class LangyPublicApi {
   }
 
   egress(input: unknown): Promise<LangyEgressAllowlist | null> {
-    return this.service.tryGetEgressAllowlist(
-      langyEgressProjectInputSchema.parse(input),
-    );
+    return this.service.tryGetEgressAllowlist(langyEgressProjectInputSchema.parse(input));
   }
 
   setEgress(input: unknown): Promise<LangyEgressAllowlist | null> {

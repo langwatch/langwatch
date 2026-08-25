@@ -48,14 +48,10 @@ export function copilotManagedSettingsPaths(
 ): string[] {
   switch (platform) {
     case "darwin":
-      return [
-        "/Library/Application Support/GitHubCopilot/managed-settings.json",
-      ];
+      return ["/Library/Application Support/GitHubCopilot/managed-settings.json"];
     case "win32": {
       const programData = process.env.ProgramData ?? "C:\\ProgramData";
-      return [
-        path.join(programData, "GitHubCopilot", "managed-settings.json"),
-      ];
+      return [path.join(programData, "GitHubCopilot", "managed-settings.json")];
     }
     default:
       return ["/etc/github-copilot/policy.d"];
@@ -150,9 +146,7 @@ export interface CopilotPrespawnOptions {
  * with respect to the resolved path: takes no mode input, so gateway and
  * ingestion runs surface the same warnings. Empty array = all clear.
  */
-export function copilotPrespawnWarnings(
-  opts: CopilotPrespawnOptions = {},
-): string[] {
+export function copilotPrespawnWarnings(opts: CopilotPrespawnOptions = {}): string[] {
   const warnings: string[] = [];
 
   const pinned = detectManagedOtelPin(opts.managedPaths);
@@ -163,10 +157,7 @@ export function copilotPrespawnWarnings(
   }
 
   const version = (opts.readVersionImpl ?? readInstalledVersion)();
-  if (
-    version &&
-    compareVersions({ version, against: COPILOT_MIN_OTEL_VERSION }) < 0
-  ) {
+  if (version && compareVersions({ version, against: COPILOT_MIN_OTEL_VERSION }) < 0) {
     warnings.push(
       `${lwTag()} copilot ${version} exports incomplete telemetry attributes; upgrade to ${COPILOT_MIN_OTEL_VERSION}+ (\`copilot update\`) for full capture.`,
     );

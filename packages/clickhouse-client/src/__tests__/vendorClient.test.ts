@@ -1,12 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type {
-  StatementLogSink,
-  StatementMetrics,
-} from "../statementReporting";
-import {
-  VendorClientResilience,
-  type VendorStatementClient,
-} from "../vendorClient";
+import type { StatementLogSink, StatementMetrics } from "../statementReporting";
+import { VendorClientResilience, type VendorStatementClient } from "../vendorClient";
 
 function recordingMetrics(): StatementMetrics & {
   durations: [string, string, number][];
@@ -19,8 +13,7 @@ function recordingMetrics(): StatementMetrics & {
     counts,
     observeDuration: ({ queryType, table, durationSeconds }) =>
       void durations.push([queryType, table, durationSeconds]),
-    incrementCount: ({ queryType, outcome }) =>
-      void counts.push([queryType, outcome]),
+    incrementCount: ({ queryType, outcome }) => void counts.push([queryType, outcome]),
   };
 }
 
@@ -32,9 +25,8 @@ function recordingSink(): StatementLogSink & {
     fields: Record<string, unknown>;
     message: string;
   }[] = [];
-  const record =
-    (level: string) => (fields: Record<string, unknown>, message: string) =>
-      void lines.push({ level, fields, message });
+  const record = (level: string) => (fields: Record<string, unknown>, message: string) =>
+    void lines.push({ level, fields, message });
   return {
     lines,
     debug: record("debug"),
@@ -83,9 +75,7 @@ describe("VendorClientResilience", () => {
         await client.query({ query: "SELECT * FROM traces", table: "traces" });
 
         expect(metrics.counts).toEqual([["SELECT", "success"]]);
-        expect(metrics.durations).toEqual([
-          ["SELECT", "traces", expect.any(Number)],
-        ]);
+        expect(metrics.durations).toEqual([["SELECT", "traces", expect.any(Number)]]);
       });
 
       it("classifies WITH as a read and unparseable params as OTHER", async () => {
@@ -114,9 +104,7 @@ describe("VendorClientResilience", () => {
         const query = vi
           .fn()
           .mockRejectedValueOnce(
-            new Error(
-              "Code: 202. DB::Exception: Too many simultaneous queries.",
-            ),
+            new Error("Code: 202. DB::Exception: Too many simultaneous queries."),
           )
           .mockResolvedValueOnce({});
 
@@ -155,9 +143,7 @@ describe("VendorClientResilience", () => {
         const query = vi
           .fn()
           .mockRejectedValue(
-            new Error(
-              "Code: 202. DB::Exception: Too many simultaneous queries.",
-            ),
+            new Error("Code: 202. DB::Exception: Too many simultaneous queries."),
           );
 
         const client = new VendorClientResilience({
@@ -182,9 +168,7 @@ describe("VendorClientResilience", () => {
         const insert = vi
           .fn()
           .mockRejectedValue(
-            new Error(
-              "Code: 202. DB::Exception: Too many simultaneous queries.",
-            ),
+            new Error("Code: 202. DB::Exception: Too many simultaneous queries."),
           );
 
         const client = new VendorClientResilience({
@@ -196,16 +180,14 @@ describe("VendorClientResilience", () => {
           translateQueryError,
         }).wrap({ query: vi.fn(), insert });
 
-        await expect(
-          client.insert({ table: "events", values: [] }),
-        ).rejects.toThrow(/Too many simultaneous queries/);
+        await expect(client.insert({ table: "events", values: [] })).rejects.toThrow(
+          /Too many simultaneous queries/,
+        );
 
         expect(insert).toHaveBeenCalledTimes(1);
         expect(translateQueryError).not.toHaveBeenCalled();
         expect(metrics.counts).toEqual([["INSERT", "error"]]);
-        expect(metrics.durations).toEqual([
-          ["INSERT", "events", expect.any(Number)],
-        ]);
+        expect(metrics.durations).toEqual([["INSERT", "events", expect.any(Number)]]);
       });
     });
   });
@@ -228,9 +210,7 @@ describe("VendorClientResilience", () => {
           insert: vi.fn(),
         });
 
-        await expect(client.query({ query: "SELECT 1" })).rejects.toBe(
-          translated,
-        );
+        await expect(client.query({ query: "SELECT 1" })).rejects.toBe(translated);
         expect(translateQueryError).toHaveBeenCalledWith({
           error: expect.any(Error),
           durationMs: expect.any(Number),
@@ -291,9 +271,7 @@ describe("VendorClientResilience", () => {
     describe("when the rows are consumed", () => {
       it("passes them through untouched, because the signature is absent", async () => {
         const rows = [{ exception: "healthy" }, { exception: "degraded" }];
-        const client = new VendorClientResilience({}).wrap(
-          clientAnswering(rows),
-        );
+        const client = new VendorClientResilience({}).wrap(clientAnswering(rows));
 
         const result = (await client.query({
           query: "SELECT status AS exception FROM checks",
@@ -338,9 +316,7 @@ describe("VendorClientResilience", () => {
 
         await client.query({ query: "SELECT 1" });
 
-        expect(outcomes.lines).toEqual([
-          expect.objectContaining({ level: "debug" }),
-        ]);
+        expect(outcomes.lines).toEqual([expect.objectContaining({ level: "debug" })]);
       });
     });
   });
@@ -366,9 +342,7 @@ describe("VendorClientResilience", () => {
           insert: vi.fn(),
         });
 
-        await expect(client.query({ query: "SELECT 1" })).rejects.toBe(
-          translated,
-        );
+        await expect(client.query({ query: "SELECT 1" })).rejects.toBe(translated);
       });
     });
 

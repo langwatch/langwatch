@@ -183,9 +183,7 @@ export class AuthzCollectorService {
         // would otherwise silently resolve to "no grants" - a fail-open
         // shape. Fail loudly instead.
         const unreachable: never = principal;
-        throw new Error(
-          `unhandled authz principal type: ${JSON.stringify(unreachable)}`,
-        );
+        throw new Error(`unhandled authz principal type: ${JSON.stringify(unreachable)}`);
       }
     }
   }
@@ -370,9 +368,7 @@ export class AuthzCollectorService {
     const map = new Map<string, readonly string[]>();
     for (const row of rows) {
       const permissions = Array.isArray(row.permissions)
-        ? row.permissions.filter(
-            (value): value is string => typeof value === "string",
-          )
+        ? row.permissions.filter((value): value is string => typeof value === "string")
         : [];
       map.set(row.id, permissions);
     }
@@ -398,9 +394,7 @@ export class AuthzCollectorService {
         // otherwise need a fallback, and any fallback is a grant matched at a
         // node the resource does not sit at.
         const unreachable: never = resourceType;
-        throw new Error(
-          `unhandled share link resource type: ${String(unreachable)}`,
-        );
+        throw new Error(`unhandled share link resource type: ${String(unreachable)}`);
       }
     }
   }
@@ -437,9 +431,7 @@ export class AuthzCollectorService {
         // A visibility added to the stored enum without an audience here
         // would otherwise fall out as undefined and read as "no audience".
         const unreachable: never = visibility;
-        throw new Error(
-          `unhandled share link visibility: ${String(unreachable)}`,
-        );
+        throw new Error(`unhandled share link visibility: ${String(unreachable)}`);
       }
     }
   }

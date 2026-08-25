@@ -162,9 +162,9 @@ export const ProjectionEnvelopeSchema = z.object({
  * @param projectionSchema - The custom projection schema to use
  * @returns A Zod schema for the projection envelope
  */
-export function createProjectionEnvelopeSchema<
-  TProjection extends ProjectionType,
->(projectionSchema: z.ZodType<TProjection>) {
+export function createProjectionEnvelopeSchema<TProjection extends ProjectionType>(
+  projectionSchema: z.ZodType<TProjection>,
+) {
   return z.object({
     projection: projectionSchema,
     metadata: ProjectionMetadataSchema,

@@ -59,9 +59,7 @@ describe("TraceAnalyticsFoldProjection re-fold policy", () => {
   /** @scenario "The slim trace-analytics fold folds an earlier span without reading the event log" */
   it("folds a span that occurred before the checkpoint without reading the event log", async () => {
     const store: FoldProjectionStore<TraceAnalyticsData> = {
-      get: vi
-        .fn()
-        .mockResolvedValue(stateWithSpanCount(MAX_PROCESSED_SPANS + 1)),
+      get: vi.fn().mockResolvedValue(stateWithSpanCount(MAX_PROCESSED_SPANS + 1)),
       store: vi.fn().mockResolvedValue(undefined),
     };
     const projection = new TraceAnalyticsFoldProjection({ store });
@@ -99,11 +97,7 @@ describe("TraceAnalyticsFoldProjection re-fold policy", () => {
         // sharded, parallel recordSpan produces for a hot trace.
         const result = await new FoldProjectionExecutor().executeBatch(
           projection,
-          [
-            spanEventAt(3_000, "a"),
-            spanEventAt(1_000, "b"),
-            spanEventAt(2_000, "c"),
-          ],
+          [spanEventAt(3_000, "a"), spanEventAt(1_000, "b"), spanEventAt(2_000, "c")],
           { aggregateId: TRACE_ID, tenantId: TENANT_ID },
         );
 

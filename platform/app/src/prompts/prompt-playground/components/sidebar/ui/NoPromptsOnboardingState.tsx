@@ -19,15 +19,11 @@ export function NoPromptsOnboardingState() {
           </EmptyState.Indicator>
           <EmptyState.Title>Create Your First Prompt</EmptyState.Title>
           <EmptyState.Description>
-            Get started on the prompt playground to design, test, and optimize
-            your AI prompts in one place.
+            Get started on the prompt playground to design, test, and optimize your AI
+            prompts in one place.
           </EmptyState.Description>
           <HStack gap={2}>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void createDraftPrompt()}
-            >
+            <Button variant="outline" size="sm" onClick={() => void createDraftPrompt()}>
               Create First Prompt
             </Button>
             <SetupWithAgentButton surface="prompts" />

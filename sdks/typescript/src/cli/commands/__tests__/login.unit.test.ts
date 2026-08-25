@@ -31,8 +31,7 @@ const saveConfig = vi.fn();
 vi.mock("@/cli/utils/governance/config", () => ({
   loadConfig: () => loadConfig(),
   saveConfig: (...args: unknown[]) => saveConfig(...args),
-  isLoggedIn: (cfg: { access_token?: string } | undefined) =>
-    !!cfg?.access_token,
+  isLoggedIn: (cfg: { access_token?: string } | undefined) => !!cfg?.access_token,
 }));
 
 // The slug path's server boundary: POST /api/auth/cli/project-key.
@@ -44,8 +43,7 @@ vi.mock("@/cli/utils/governance/session-api", async () => {
   return {
     SessionApiError: actual.SessionApiError,
     fetchPersonalProject: vi.fn(),
-    fetchProjectKeyBySlug: (...args: unknown[]) =>
-      fetchProjectKeyBySlug(...args),
+    fetchProjectKeyBySlug: (...args: unknown[]) => fetchProjectKeyBySlug(...args),
   };
 });
 
@@ -127,9 +125,7 @@ describe("loginCommand", () => {
     it("fails fast with every non-interactive path forward, never starting the poll", async () => {
       const errorSpy = console.error as unknown as ReturnType<typeof vi.fn>;
 
-      await expect(loginCommand({ project: true })).rejects.toThrow(
-        "process.exit(1)",
-      );
+      await expect(loginCommand({ project: true })).rejects.toThrow("process.exit(1)");
 
       expect(runUnifiedLoginFlow).not.toHaveBeenCalled();
       const printed = errorSpy.mock.calls.flat().join("\n");
@@ -249,10 +245,7 @@ describe("loginCommand", () => {
         const firstCall = promptsMock.mock.calls[0]![0] as {
           choices: Array<{ value: string }>;
         };
-        expect(firstCall.choices.map((c) => c.value)).toEqual([
-          "cloud",
-          "self-hosted",
-        ]);
+        expect(firstCall.choices.map((c) => c.value)).toEqual(["cloud", "self-hosted"]);
       });
     });
 

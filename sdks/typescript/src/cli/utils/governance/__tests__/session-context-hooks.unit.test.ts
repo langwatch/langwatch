@@ -28,9 +28,7 @@ const origUserprofile = process.env.USERPROFILE;
 const origCodexHome = process.env.CODEX_HOME;
 
 const entryFor = (tool: HookedTool) => ({
-  hooks: [
-    { type: "command", command: sessionContextHookCommand(tool), timeout: 10 },
-  ],
+  hooks: [{ type: "command", command: sessionContextHookCommand(tool), timeout: 10 }],
 });
 
 const ourEntry = entryFor("claude_code");
@@ -46,11 +44,9 @@ const install = ({
 }: { tool?: HookedTool; filePath?: string } = {}) =>
   installSessionContextHooks({ tool, ...(filePath ? { filePath } : {}) });
 
-const has = (tool: HookedTool = "claude_code") =>
-  hasSessionContextHooks({ tool });
+const has = (tool: HookedTool = "claude_code") => hasSessionContextHooks({ tool });
 
-const remove = (tool: HookedTool = "claude_code") =>
-  removeSessionContextHooks({ tool });
+const remove = (tool: HookedTool = "claude_code") => removeSessionContextHooks({ tool });
 
 const readSettings = (file = settingsPath): Record<string, any> =>
   JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, any>;
@@ -152,9 +148,7 @@ describe("installSessionContextHooks", () => {
           SessionStart: [
             userEntry,
             {
-              hooks: [
-                { type: "command", command: "langwatch ingest hook claude" },
-              ],
+              hooks: [{ type: "command", command: "langwatch ingest hook claude" }],
             },
           ],
         },
@@ -228,10 +222,7 @@ describe("installSessionContextHooks", () => {
 
       const document = readSettings(codexHooks);
       expect(document.description).toBe("mine");
-      expect(document.hooks.SessionStart).toEqual([
-        userEntry,
-        entryFor("codex"),
-      ]);
+      expect(document.hooks.SessionStart).toEqual([userEntry, entryFor("codex")]);
     });
 
     it("leaves the claude settings file alone", () => {
@@ -298,9 +289,7 @@ describe("removeSessionContextHooks", () => {
       install({ tool: "codex" });
 
       expect(remove("codex")).toBe(true);
-      expect(readSettings(path.join(tmpHome, ".codex", "hooks.json"))).toEqual(
-        {},
-      );
+      expect(readSettings(path.join(tmpHome, ".codex", "hooks.json"))).toEqual({});
     });
   });
 
@@ -321,9 +310,7 @@ describe("removeSessionContextHooks", () => {
       fs.writeFileSync(settingsPath, '{ "hooks": { "Stop": [ , ] }');
 
       expect(remove()).toBe(false);
-      expect(fs.readFileSync(settingsPath, "utf8")).toBe(
-        '{ "hooks": { "Stop": [ , ] }',
-      );
+      expect(fs.readFileSync(settingsPath, "utf8")).toBe('{ "hooks": { "Stop": [ , ] }');
     });
   });
 });

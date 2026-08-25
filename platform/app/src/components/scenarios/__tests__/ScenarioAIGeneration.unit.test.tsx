@@ -191,9 +191,7 @@ describe("useScenarioGeneration", () => {
       }
     });
 
-    expect(thrownError?.message).toBe(
-      "Invalid response: missing scenario data",
-    );
+    expect(thrownError?.message).toBe("Invalid response: missing scenario data");
   });
 
   it("sends correct payload to API", async () => {

@@ -6,9 +6,7 @@ import type {
   RawEventRow,
 } from "./event-explorer.repository";
 
-export class EventExplorerClickHouseRepository
-  implements EventExplorerRepository
-{
+export class EventExplorerClickHouseRepository implements EventExplorerRepository {
   private readonly client: ClickHouseClient;
 
   constructor(client: ClickHouseClient) {
@@ -20,8 +18,7 @@ export class EventExplorerClickHouseRepository
     sinceMs: number;
     tenantIds?: string[];
   }): Promise<AggregateDiscoveryRow[]> {
-    const hasTenantFilter =
-      params.tenantIds !== undefined && params.tenantIds.length > 0;
+    const hasTenantFilter = params.tenantIds !== undefined && params.tenantIds.length > 0;
     const tenantClause = hasTenantFilter
       ? "AND TenantId IN ({tenantIds:Array(String)})"
       : "";
@@ -90,8 +87,7 @@ export class EventExplorerClickHouseRepository
     // tenant, just to surface 50 rows. The doc rule "TenantId is always
     // required" applies, but this is an ops/admin tool so we allow the
     // cross-tenant case when a non-empty query string at least bounds it.
-    const hasTenants =
-      params.tenantIds !== undefined && params.tenantIds.length > 0;
+    const hasTenants = params.tenantIds !== undefined && params.tenantIds.length > 0;
     const trimmedQuery = params.query.trim();
     const hasQueryString = trimmedQuery.length > 0;
     if (!hasTenants && !hasQueryString) {

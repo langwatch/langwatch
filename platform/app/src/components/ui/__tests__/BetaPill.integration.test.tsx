@@ -47,9 +47,7 @@ describe("<BetaPill />", () => {
       await user.hover(screen.getByText("Beta"));
 
       await waitFor(() => {
-        expect(
-          screen.getByText("This feature is currently in beta"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("This feature is currently in beta")).toBeInTheDocument();
       });
     });
   });
@@ -143,9 +141,7 @@ describe("<BetaPill />", () => {
       await user.tab();
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Keyboard accessible beta info"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Keyboard accessible beta info")).toBeInTheDocument();
       });
     });
   });

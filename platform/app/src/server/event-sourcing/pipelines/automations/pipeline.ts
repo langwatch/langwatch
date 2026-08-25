@@ -1,8 +1,4 @@
-import {
-  defineAggregate,
-  defineEvents,
-  definePipeline,
-} from "@langwatch/eventing";
+import { defineAggregate, defineEvents, definePipeline } from "@langwatch/eventing";
 import { RecordTriggerMatchCommand } from "./commands/recordTriggerMatch.command";
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,

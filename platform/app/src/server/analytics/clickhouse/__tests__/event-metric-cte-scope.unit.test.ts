@@ -30,9 +30,7 @@ import { resetParamCounter } from "../filter-translator";
  */
 function extractOuterSelect(sql: string): string {
   // The CTE ends with `) SELECT ...` — find the outer SELECT
-  const cteEndMatch = sql.match(
-    /\)\s*SELECT\s+([\s\S]+?)FROM\s+deduped_traces/i,
-  );
+  const cteEndMatch = sql.match(/\)\s*SELECT\s+([\s\S]+?)FROM\s+deduped_traces/i);
   return cteEndMatch?.[1] ?? "";
 }
 

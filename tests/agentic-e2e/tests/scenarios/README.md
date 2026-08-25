@@ -5,18 +5,19 @@ E2E tests for the Scenario feature (Library, Editor, Execution).
 ## Source Feature Files
 
 These tests implement scenarios from:
+
 - `specs/scenarios/scenario-library.feature`
 - `specs/scenarios/scenario-editor.feature`
 - `specs/scenarios/scenario-execution.feature`
 
 ## Test Files
 
-| File | Feature | Tests |
-|------|---------|-------|
-| `steps.ts` | - | Shared Gherkin-style step definitions |
-| `scenario-library.spec.ts` | Library | Navigation, empty state |
-| `scenario-editor.spec.ts` | Editor | Create, edit, workflow lifecycle |
-| `scenario-execution.spec.ts` | Execution | Page loads, content display |
+| File                         | Feature   | Tests                                 |
+| ---------------------------- | --------- | ------------------------------------- |
+| `steps.ts`                   | -         | Shared Gherkin-style step definitions |
+| `scenario-library.spec.ts`   | Library   | Navigation, empty state               |
+| `scenario-editor.spec.ts`    | Editor    | Create, edit, workflow lifecycle      |
+| `scenario-execution.spec.ts` | Execution | Page loads, content display           |
 
 ## Architecture
 
@@ -67,6 +68,7 @@ The `scenario lifecycle` test combines multiple feature scenarios:
 ```
 
 This approach:
+
 - Avoids needing seeded data (no scenario API exists)
 - Tests a real user journey
 - Each step builds on the previous one
@@ -128,19 +130,25 @@ Add a doc comment linking to the feature file with line numbers.
 ## Test Data Strategies
 
 ### Option 1: Workflow Tests (Current)
+
 Combine create → use → verify into one test. Best when:
+
 - No API exists for creating test data
 - Testing a natural user flow
 - Data from one step is needed by the next
 
 ### Option 2: API Seeding (Future)
+
 Create data via API in `beforeAll`. Best when:
+
 - API endpoints exist
 - Need isolation between tests
 - Testing specific scenarios in isolation
 
 ### Option 3: Database Seeding (Future)
+
 Insert data directly via Prisma. Best when:
+
 - Need complex data setups
 - API doesn't support all fields
 - Performance is critical
@@ -148,20 +156,31 @@ Insert data directly via Prisma. Best when:
 ## Troubleshooting
 
 ### "strict mode violation: resolved to N elements"
+
 Chakra renders duplicates. Use `.first()` or `.last()`:
+
 ```typescript
 await page.getByRole("dialog").last().getByRole("button").click();
 ```
 
 ### Test timing out on save
+
 The "Save and Run" button opens a popover. Click "Save without running":
+
 ```typescript
-await page.getByRole("button", { name: /save and run/i }).last().click();
+await page
+  .getByRole("button", { name: /save and run/i })
+  .last()
+  .click();
 await page.getByText("Save without running").last().click();
 ```
 
 ### Element not found in dialog
+
 Wait for the dialog heading first:
+
 ```typescript
-await expect(page.getByRole("heading", { name: /create scenario/i }).last()).toBeVisible();
+await expect(
+  page.getByRole("heading", { name: /create scenario/i }).last(),
+).toBeVisible();
 ```

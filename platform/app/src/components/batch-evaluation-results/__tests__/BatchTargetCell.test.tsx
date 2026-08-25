@@ -118,9 +118,9 @@ describe("BatchTargetCell", () => {
 
         await user.hover(screen.getByTestId("error-output-target-1"));
 
-        expect(
-          await screen.findByTestId("error-tooltip-target-1"),
-        ).toHaveTextContent(longError);
+        expect(await screen.findByTestId("error-tooltip-target-1")).toHaveTextContent(
+          longError,
+        );
       });
 
       /** @scenario Expand full error message on click */
@@ -137,9 +137,7 @@ describe("BatchTargetCell", () => {
 
         await user.click(screen.getByTestId("error-output-target-1"));
 
-        expect(
-          screen.getByTestId("expanded-cell-backdrop"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("expanded-cell-backdrop")).toBeInTheDocument();
       });
 
       // The backdrop covers the viewport and swallows every pointer event, so
@@ -158,9 +156,7 @@ describe("BatchTargetCell", () => {
         });
 
         await user.click(screen.getByTestId("error-output-target-1"));
-        expect(
-          screen.getByTestId("expanded-cell-backdrop"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("expanded-cell-backdrop")).toBeInTheDocument();
 
         await user.keyboard("{Escape}");
 
@@ -287,13 +283,9 @@ describe("BatchTargetCell", () => {
     it("hides cost and latency when showCostAndLatency is false", () => {
       const targetOutput = createTargetOutput({ cost: 0.05, duration: 1500 });
 
-      render(
-        <BatchTargetCell
-          targetOutput={targetOutput}
-          showCostAndLatency={false}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<BatchTargetCell targetOutput={targetOutput} showCostAndLatency={false} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.queryByTestId("cost-target-1")).not.toBeInTheDocument();
       expect(screen.queryByTestId("latency-target-1")).not.toBeInTheDocument();

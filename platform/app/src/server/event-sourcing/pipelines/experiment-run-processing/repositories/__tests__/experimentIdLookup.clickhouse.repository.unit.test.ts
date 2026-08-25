@@ -19,9 +19,7 @@ describe("ExperimentIdLookupClickHouseRepository", () => {
         mockQuery.mockResolvedValue({
           json: async () => [{ ExperimentId: "exp-1" }],
         });
-        const repository = new ExperimentIdLookupClickHouseRepository(
-          resolveClient,
-        );
+        const repository = new ExperimentIdLookupClickHouseRepository(resolveClient);
 
         const result = await repository.findExperimentId({
           tenantId: "tenant-1",
@@ -45,9 +43,7 @@ describe("ExperimentIdLookupClickHouseRepository", () => {
     describe("when the experiment id is looked up", () => {
       it("returns null", async () => {
         mockQuery.mockResolvedValue({ json: async () => [] });
-        const repository = new ExperimentIdLookupClickHouseRepository(
-          resolveClient,
-        );
+        const repository = new ExperimentIdLookupClickHouseRepository(resolveClient);
 
         const result = await repository.findExperimentId({
           tenantId: "tenant-1",

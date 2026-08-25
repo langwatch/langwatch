@@ -27,8 +27,7 @@ import { describe, expect, it } from "vitest";
 /** `…/lwql/__tests__` → `…/lwql` */
 const MODULE_DIR = fileURLToPath(new URL("../", import.meta.url));
 
-const read = (name: string): string =>
-  readFileSync(path.join(MODULE_DIR, name), "utf8");
+const read = (name: string): string => readFileSync(path.join(MODULE_DIR, name), "utf8");
 
 /**
  * Every way a module can name another, in the order they are reported.
@@ -51,14 +50,10 @@ describe("the LangWatchQL time-window vocabulary", () => {
       const source = read("timeWindow.ts");
       // The file is the one meant: a rename that emptied it would otherwise
       // pass this every time.
-      expect(source).toContain(
-        "export function formatLangWatchQLDateTimeParameter",
-      );
+      expect(source).toContain("export function formatLangWatchQLDateTimeParameter");
 
       for (const [form, pattern] of IMPORT_FORMS) {
-        expect(pattern.test(source), `timeWindow.ts contains ${form}`).toBe(
-          false,
-        );
+        expect(pattern.test(source), `timeWindow.ts contains ${form}`).toBe(false);
       }
     });
   });
@@ -82,9 +77,7 @@ describe("the LangWatchQL time-window vocabulary", () => {
     it("reports the policy module next door, which really does import", () => {
       const source = read("resolveTimeWindow.ts");
 
-      expect(IMPORT_FORMS.some(([, pattern]) => pattern.test(source))).toBe(
-        true,
-      );
+      expect(IMPORT_FORMS.some(([, pattern]) => pattern.test(source))).toBe(true);
     });
   });
 });

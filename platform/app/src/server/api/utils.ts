@@ -78,9 +78,7 @@ export async function getVisibilityCutoffMsForProject(
       getApp().planProvider,
     ).getVisibilityCutoffMs({ organizationId });
     const visibilityDays =
-      cutoffMs === null
-        ? ("none" as const)
-        : Math.round((Date.now() - cutoffMs) / dayMs);
+      cutoffMs === null ? ("none" as const) : Math.round((Date.now() - cutoffMs) / dayMs);
     await visibilityDaysCache.set(projectId, visibilityDays);
     return cutoffMs;
   } catch (error) {
@@ -94,9 +92,7 @@ export async function getVisibilityCutoffMsForProject(
   }
 }
 
-export const extractCheckKeys = (
-  inputObject: Record<string, any>,
-): string[] => {
+export const extractCheckKeys = (inputObject: Record<string, any>): string[] => {
   const keys: string[] = [];
 
   const recurse = (obj: Record<string, any>) => {
@@ -118,10 +114,7 @@ export const extractCheckKeys = (
   return keys;
 };
 
-export const flattenObjectKeys = (
-  obj: Record<string, any>,
-  prefix = "",
-): string[] => {
+export const flattenObjectKeys = (obj: Record<string, any>, prefix = ""): string[] => {
   return Object.entries(obj).reduce((acc: string[], [key, value]) => {
     const newKey = prefix ? `${prefix}.${key}` : key;
 
@@ -190,10 +183,7 @@ function uniformContentCategories(
   canSee: boolean,
 ): Record<ContentCategory, CategoryVisibility> {
   return Object.fromEntries(
-    CONTENT_CATEGORIES.map((category) => [
-      category,
-      { canSee, restrictVisibleTo: null },
-    ]),
+    CONTENT_CATEGORIES.map((category) => [category, { canSee, restrictVisibleTo: null }]),
   ) as Record<ContentCategory, CategoryVisibility>;
 }
 
@@ -271,9 +261,7 @@ export async function getUserProtectionsForProject(
         // no-op on an empty list), leaking resource/span attributes an outage
         // must never expose — so use a catch-all `*` pattern, the most
         // restrictive value, which matches every attribute key.
-        hiddenAttributes: [
-          { pattern: "*", visibleTo: "members of this project" },
-        ],
+        hiddenAttributes: [{ pattern: "*", visibleTo: "members of this project" }],
         visibilityCutoffMs,
       };
     }
@@ -336,8 +324,7 @@ export async function getUserProtectionsForProject(
   let isMember = teamBindings.length > 0;
   let isMemberRole = teamBindings.some((b) => b.role === TeamUserRole.MEMBER);
   const isViewer = teamBindings.some((b) => b.role === TeamUserRole.VIEWER);
-  const isProjectOwner =
-    project.ownerUserId != null && project.ownerUserId === userId;
+  const isProjectOwner = project.ownerUserId != null && project.ownerUserId === userId;
   if (!isMember) {
     const orgRole = await getApp().organizations.getUserOrgRoleByTeamId({
       userId,
@@ -389,10 +376,7 @@ export async function getUserProtectionsForProject(
   };
   const hiddenAttributeRules = restrictedAttributeRules.filter(
     (rule) =>
-      !isContentVisible(
-        { disposition: "restrict", audience: rule.audience },
-        viewer,
-      ),
+      !isContentVisible({ disposition: "restrict", audience: rule.audience }, viewer),
   );
 
   // One batched name lookup serves every label this viewer needs: every

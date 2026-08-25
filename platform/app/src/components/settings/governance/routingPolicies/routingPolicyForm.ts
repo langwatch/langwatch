@@ -12,19 +12,10 @@ import { z } from "zod";
 
 import { validateModelAliasesAgainstBoundProviders } from "~/components/gateway/virtualKeyAliasValidation";
 import type { ScopeTriadEntry } from "~/components/settings/ScopeChipPicker";
-import {
-  isModelTier,
-  MODEL_TIERS,
-  type ModelTier,
-} from "~/utils/modelTierPresets";
+import { isModelTier, MODEL_TIERS, type ModelTier } from "~/utils/modelTierPresets";
 
 /** The four dimensions a restriction rule can target. */
-export const RESTRICTION_DIMENSIONS = [
-  "tools",
-  "mcp",
-  "urls",
-  "models",
-] as const;
+export const RESTRICTION_DIMENSIONS = ["tools", "mcp", "urls", "models"] as const;
 export type RestrictionDimension = (typeof RESTRICTION_DIMENSIONS)[number];
 
 const restrictionDimensionSchema = z.object({
@@ -42,9 +33,7 @@ export const routingPolicyFormSchema = z.object({
   scopes: z.array(scopeEntrySchema).min(1, "Pick where this policy applies"),
   name: z.string().trim().min(1, "Give the policy a name").max(128),
   description: z.string(),
-  modelProviderIds: z
-    .array(z.string())
-    .min(1, "Pick at least one model provider"),
+  modelProviderIds: z.array(z.string()).min(1, "Pick at least one model provider"),
   isDefault: z.boolean(),
   /**
    * Per-tier target. An empty string means the tier has no target of its own
@@ -266,9 +255,7 @@ function readStringRecord(raw: unknown): Record<string, string> {
   );
 }
 
-function restrictionsFromStored(
-  raw: unknown,
-): RoutingPolicyFormValues["restrictions"] {
+function restrictionsFromStored(raw: unknown): RoutingPolicyFormValues["restrictions"] {
   const restrictions = emptyRestrictions();
   if (!raw || typeof raw !== "object") return restrictions;
   const source = raw as Record<string, unknown>;

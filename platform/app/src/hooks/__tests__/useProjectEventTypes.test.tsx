@@ -35,9 +35,7 @@ describe("useProjectEventTypes", () => {
       error: null,
     });
 
-    const { result } = renderHook(() =>
-      useProjectEventTypes({ projectId: undefined }),
-    );
+    const { result } = renderHook(() => useProjectEventTypes({ projectId: undefined }));
 
     expect(result.current.eventTypes).toEqual([]);
   });
@@ -80,9 +78,7 @@ describe("useProjectEventTypes", () => {
       useProjectEventTypes({ projectId: "project-123" }),
     );
 
-    expect(result.current.eventTypes).toEqual([
-      { key: "thumbs_up", label: "thumbs_up" },
-    ]);
+    expect(result.current.eventTypes).toEqual([{ key: "thumbs_up", label: "thumbs_up" }]);
   });
 
   it("queries the events.event_type filter field", () => {
@@ -132,9 +128,7 @@ describe("useProjectEventTypes", () => {
       error: null,
     });
 
-    renderHook(() =>
-      useProjectEventTypes({ projectId: "project-123", enabled: false }),
-    );
+    renderHook(() => useProjectEventTypes({ projectId: "project-123", enabled: false }));
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       expect.anything(),

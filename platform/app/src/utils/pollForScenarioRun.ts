@@ -6,9 +6,7 @@ const logger = createLogger("pollForScenarioRun");
 
 const POLLING_INTERVAL_MS = 500;
 const POLLING_MAX_DURATION_MS = 30_000;
-const MAX_POLLING_ATTEMPTS = Math.ceil(
-  POLLING_MAX_DURATION_MS / POLLING_INTERVAL_MS,
-);
+const MAX_POLLING_ATTEMPTS = Math.ceil(POLLING_MAX_DURATION_MS / POLLING_INTERVAL_MS);
 
 interface PollForRunParams {
   projectId: string;
@@ -25,9 +23,7 @@ interface PollForRunParams {
  * hid the fact that the server always sends a `ScenarioRunStatus` and forced a
  * cast in the classifier below.
  */
-type FetchBatchRunData = (
-  params: PollForRunParams,
-) => Promise<BatchRunDataResult>;
+type FetchBatchRunData = (params: PollForRunParams) => Promise<BatchRunDataResult>;
 
 export type PollResult =
   | { success: true; scenarioRunId: string }

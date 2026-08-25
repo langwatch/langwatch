@@ -27,8 +27,7 @@ export const evaluationStatusColor = (
     in_progress: "status.pending",
     error: "status.error",
     skipped: "status.warning",
-    processed:
-      evaluationPassed(check) === false ? "status.error" : "status.success",
+    processed: evaluationPassed(check) === false ? "status.error" : "status.success",
   };
 
   return colorMap[check.status];

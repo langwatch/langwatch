@@ -113,11 +113,9 @@ vi.mock("../SectionRenderer", () => ({
 }));
 
 vi.mock("../SortableSection", () => ({
-  SortableSection: ({
-    children,
-  }: {
-    children: (p: unknown) => React.ReactNode;
-  }) => <div>{children({})}</div>,
+  SortableSection: ({ children }: { children: (p: unknown) => React.ReactNode }) => (
+    <div>{children({})}</div>
+  ),
 }));
 
 vi.mock("../FilterSidebarSkeleton", () => ({
@@ -135,9 +133,7 @@ vi.mock("@dnd-kit/core", () => ({
 }));
 
 vi.mock("@dnd-kit/sortable", () => ({
-  SortableContext: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
+  SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   sortableKeyboardCoordinates: vi.fn(),
   arrayMove: (arr: unknown[], from: number, to: number) => {
     const result = [...(arr as unknown[])];
@@ -245,9 +241,7 @@ describe("<FilterSidebar />", () => {
         // weak signal. The load-bearing check is that real facet SECTIONS
         // render — the synthetic FACET_DEFAULTS visible under comfortable
         // density. Zero here = the blank-rail regression.
-        expect(
-          screen.getAllByTestId("section-renderer").length,
-        ).toBeGreaterThan(0);
+        expect(screen.getAllByTestId("section-renderer").length).toBeGreaterThan(0);
       });
     });
 
@@ -273,9 +267,7 @@ describe("<FilterSidebar />", () => {
 
         renderSidebar();
 
-        expect(
-          screen.getAllByTestId("section-renderer").length,
-        ).toBeGreaterThan(0);
+        expect(screen.getAllByTestId("section-renderer").length).toBeGreaterThan(0);
       });
     });
   });

@@ -53,15 +53,11 @@ export class RetentionPolicyCache implements RetentionPolicyResolver {
     this.cache.delete(projectId).catch(() => undefined);
   }
 
-  private async loadResolved(
-    projectId: string,
-  ): Promise<ResolvedRetention | null> {
+  private async loadResolved(projectId: string): Promise<ResolvedRetention | null> {
     const ctx = await this.repository.getProjectScopeContext(projectId);
     if (!ctx) return null;
 
-    const rows = (await this.repository.findForProjectChain(
-      ctx,
-    )) as RetentionRow[];
+    const rows = (await this.repository.findForProjectChain(ctx)) as RetentionRow[];
     return resolveRetention({ rows, chain: resolveScopeChain(ctx) });
   }
 }

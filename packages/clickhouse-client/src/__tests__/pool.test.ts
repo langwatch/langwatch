@@ -185,9 +185,7 @@ describe("resolvePoolSize", () => {
       });
 
       it("still reports the ceiling when nothing conflicts", () => {
-        expect(
-          resolvePoolSize({ override: 8, replicas: 10 }).derivedCeiling,
-        ).toBe(21);
+        expect(resolvePoolSize({ override: 8, replicas: 10 }).derivedCeiling).toBe(21);
       });
     });
 
@@ -275,9 +273,9 @@ describe("poolSizingFromEnv", () => {
           poolSizingFromEnv({ CLICKHOUSE_CLIENT_REPLICAS: "10" }),
         );
 
-        expect(
-          decision.size * 10 * DEFAULT_CLIENTS_PER_PROCESS,
-        ).toBeLessThanOrEqual(DEFAULT_SERVER_MAX_CONCURRENT_QUERIES);
+        expect(decision.size * 10 * DEFAULT_CLIENTS_PER_PROCESS).toBeLessThanOrEqual(
+          DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
+        );
       });
     });
   });

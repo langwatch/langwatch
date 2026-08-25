@@ -271,8 +271,7 @@ export async function dispatchGraphAlertAction({
   // Per-recipient at-most-once gate for THIS fire. Same key shape the trace
   // cadence dispatcher uses (`rcpt:{fireDigest}:{recipientHash}`), so both
   // paths read and write one ledger.
-  const claimKey = (recipientHash: string) =>
-    `rcpt:${input.fireDigest}:${recipientHash}`;
+  const claimKey = (recipientHash: string) => `rcpt:${input.fireDigest}:${recipientHash}`;
   const isRecipientSent = (recipientHash: string) =>
     deps.isRecipientSent({
       triggerId: trigger.id,
@@ -429,9 +428,7 @@ export async function dispatchGraphAlertAction({
 
   if (trigger.action === "SEND_SLACK_MESSAGE") {
     const templateType: SlackTemplateType | null =
-      trigger.templates.slackTemplateType === "block_kit"
-        ? "block_kit"
-        : "string";
+      trigger.templates.slackTemplateType === "block_kit" ? "block_kit" : "string";
 
     // Bot connection (ADR-041): post via the Web API with the gate open so the
     // alert's chart/table/alert blocks render.
@@ -545,8 +542,7 @@ export async function dispatchGraphAlertAction({
     // `actionParams` (ADR-040 §1) — no evaluator pre-extraction to thread.
     // Header values are stored as one ciphertext blob (ADR-040 §3),
     // decrypted just before the send below.
-    const params = (trigger.actionParams ??
-      {}) as Partial<WebhookStoredActionParams>;
+    const params = (trigger.actionParams ?? {}) as Partial<WebhookStoredActionParams>;
     if (!params.url) {
       logger.info(
         { triggerId: trigger.id, projectId: project.id },

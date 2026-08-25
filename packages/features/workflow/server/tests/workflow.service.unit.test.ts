@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { Workflow, WorkflowVersion, WorkflowWithVersion } from "@langwatch/workflow-contract";
+import type {
+  Workflow,
+  WorkflowVersion,
+  WorkflowWithVersion,
+} from "@langwatch/workflow-contract";
 import {
   WorkflowNotPublishedError,
   type RunWorkflowCommand,
@@ -17,26 +21,73 @@ import {
 } from "../src/repositories/workflow.repository";
 
 const workflow = (id = "workflow_1", projectId = "project_1"): Workflow => ({
-  id, projectId, name: "Triage", icon: null, description: null,
-  latestVersionId: null, currentVersionId: null, publishedId: null,
-  publishedById: null, copiedFromWorkflowId: null, isEvaluator: false,
-  isComponent: false, archivedAt: null, createdAt: new Date(), updatedAt: new Date(),
+  id,
+  projectId,
+  name: "Triage",
+  icon: null,
+  description: null,
+  latestVersionId: null,
+  currentVersionId: null,
+  publishedId: null,
+  publishedById: null,
+  copiedFromWorkflowId: null,
+  isEvaluator: false,
+  isComponent: false,
+  archivedAt: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
 });
 
 class FakeWorkflowRepository extends WorkflowRepository {
   private readonly workflows = new Map<string, Workflow>();
   private readonly versions = new Map<string, WorkflowVersion>();
 
-  constructor() { super(); this.workflows.set("workflow_1", workflow()); }
-  async tryFindById(input: { id: string; projectId: string; includeVersion?: boolean; includeArchived?: boolean }): Promise<WorkflowWithVersion | null> {
-    const value = this.workflows.get(input.id);
-    if (!value || value.projectId !== input.projectId || (!input.includeArchived && value.archivedAt)) return null;
-    const current = value.currentVersionId ? this.versions.get(value.currentVersionId) : null;
-    return { ...value, ...(input.includeVersion ? { currentVersion: current, latestVersion: current } : {}) };
+  constructor() {
+    super();
+    this.workflows.set("workflow_1", workflow());
   }
-  async findAll(input: { projectId: string }): Promise<Workflow[]> { return [...this.workflows.values()].filter((item) => item.projectId === input.projectId && !item.archivedAt); }
-  async findVersions(input: { workflowId: string; projectId: string }): Promise<WorkflowVersion[]> { return [...this.versions.values()].filter((item) => item.workflowId === input.workflowId && item.projectId === input.projectId); }
-  async findVersionHistory(input: { workflowId: string; projectId: string; includeDsl: boolean }): Promise<WorkflowVersionHistoryRecord[]> {
+  async tryFindById(input: {
+    id: string;
+    projectId: string;
+    includeVersion?: boolean;
+    includeArchived?: boolean;
+  }): Promise<WorkflowWithVersion | null> {
+    const value = this.workflows.get(input.id);
+    if (
+      !value ||
+      value.projectId !== input.projectId ||
+      (!input.includeArchived && value.archivedAt)
+    )
+      return null;
+    const current = value.currentVersionId
+      ? this.versions.get(value.currentVersionId)
+      : null;
+    return {
+      ...value,
+      ...(input.includeVersion
+        ? { currentVersion: current, latestVersion: current }
+        : {}),
+    };
+  }
+  async findAll(input: { projectId: string }): Promise<Workflow[]> {
+    return [...this.workflows.values()].filter(
+      (item) => item.projectId === input.projectId && !item.archivedAt,
+    );
+  }
+  async findVersions(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowVersion[]> {
+    return [...this.versions.values()].filter(
+      (item) =>
+        item.workflowId === input.workflowId && item.projectId === input.projectId,
+    );
+  }
+  async findVersionHistory(input: {
+    workflowId: string;
+    projectId: string;
+    includeDsl: boolean;
+  }): Promise<WorkflowVersionHistoryRecord[]> {
     return (await this.findVersions(input)).reverse().map((item) => ({
       id: item.id,
       version: item.version,
@@ -48,24 +99,99 @@ class FakeWorkflowRepository extends WorkflowRepository {
         ? {
             id: item.parentId,
             version: this.versions.get(item.parentId)?.version ?? "",
-            commitMessage:
-              this.versions.get(item.parentId)?.commitMessage ?? "",
+            commitMessage: this.versions.get(item.parentId)?.commitMessage ?? "",
           }
         : null,
       author: null,
     }));
   }
-  async tryFindVersionById(input: { id: string; projectId: string }): Promise<WorkflowVersion | null> { const item = this.versions.get(input.id); return item?.projectId === input.projectId ? item : null; }
-  async tryFindVersion(input: { id: string; workflowId: string; projectId: string }): Promise<WorkflowVersion | null> { const item = this.versions.get(input.id); return item?.workflowId === input.workflowId && item.projectId === input.projectId ? item : null; }
-  async tryFindPublishedVersion(input: { workflowId: string; projectId: string; versionId?: string }): Promise<WorkflowVersion | null> { const item = this.workflows.get(input.workflowId); return item?.publishedId ? this.versions.get(input.versionId ?? item.publishedId) ?? null : null; }
-  async createWorkflow(input: PersistWorkflowInput): Promise<WorkflowWithVersion> { const item = { ...workflow(input.id, input.projectId), name: input.name, icon: input.icon, description: input.description }; this.workflows.set(item.id, item); return item; }
-  async updateWorkflow(input: { id: string; projectId: string; data: Record<string, unknown> }): Promise<Workflow> { const item = this.workflows.get(input.id); if (!item) throw new Error("missing"); const updated = { ...item, ...input.data, updatedAt: new Date() } as Workflow; this.workflows.set(item.id, updated); return updated; }
-  async createVersion(input: PersistWorkflowVersionInput): Promise<WorkflowVersion> { const item = { ...input, authorId: input.authorId ?? null, dsl: input.dsl, createdAt: new Date(), updatedAt: new Date() }; this.versions.set(item.id, item); return item; }
-  async updateAutoSavedVersion(input: PersistWorkflowVersionInput & { id: string }): Promise<WorkflowVersion> { return this.createVersion(input); }
+  async tryFindVersionById(input: {
+    id: string;
+    projectId: string;
+  }): Promise<WorkflowVersion | null> {
+    const item = this.versions.get(input.id);
+    return item?.projectId === input.projectId ? item : null;
+  }
+  async tryFindVersion(input: {
+    id: string;
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowVersion | null> {
+    const item = this.versions.get(input.id);
+    return item?.workflowId === input.workflowId && item.projectId === input.projectId
+      ? item
+      : null;
+  }
+  async tryFindPublishedVersion(input: {
+    workflowId: string;
+    projectId: string;
+    versionId?: string;
+  }): Promise<WorkflowVersion | null> {
+    const item = this.workflows.get(input.workflowId);
+    return item?.publishedId
+      ? (this.versions.get(input.versionId ?? item.publishedId) ?? null)
+      : null;
+  }
+  async createWorkflow(input: PersistWorkflowInput): Promise<WorkflowWithVersion> {
+    const item = {
+      ...workflow(input.id, input.projectId),
+      name: input.name,
+      icon: input.icon,
+      description: input.description,
+    };
+    this.workflows.set(item.id, item);
+    return item;
+  }
+  async updateWorkflow(input: {
+    id: string;
+    projectId: string;
+    data: Record<string, unknown>;
+  }): Promise<Workflow> {
+    const item = this.workflows.get(input.id);
+    if (!item) throw new Error("missing");
+    const updated = { ...item, ...input.data, updatedAt: new Date() } as Workflow;
+    this.workflows.set(item.id, updated);
+    return updated;
+  }
+  async createVersion(input: PersistWorkflowVersionInput): Promise<WorkflowVersion> {
+    const item = {
+      ...input,
+      authorId: input.authorId ?? null,
+      dsl: input.dsl,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.versions.set(item.id, item);
+    return item;
+  }
+  async updateAutoSavedVersion(
+    input: PersistWorkflowVersionInput & { id: string },
+  ): Promise<WorkflowVersion> {
+    return this.createVersion(input);
+  }
   async setVersionPointers(): Promise<void> {}
-  async publish(input: { id: string; projectId: string; versionId: string; actorId?: string }): Promise<Workflow> { return this.updateWorkflow({ id: input.id, projectId: input.projectId, data: { publishedId: input.versionId, publishedById: input.actorId ?? null } }); }
-  async unpublish(input: { id: string; projectId: string }): Promise<Workflow> { return this.updateWorkflow({ id: input.id, projectId: input.projectId, data: { publishedId: null, publishedById: null } }); }
-  async findCopies(): Promise<Workflow[]> { return []; }
+  async publish(input: {
+    id: string;
+    projectId: string;
+    versionId: string;
+    actorId?: string;
+  }): Promise<Workflow> {
+    return this.updateWorkflow({
+      id: input.id,
+      projectId: input.projectId,
+      data: { publishedId: input.versionId, publishedById: input.actorId ?? null },
+    });
+  }
+  async unpublish(input: { id: string; projectId: string }): Promise<Workflow> {
+    return this.updateWorkflow({
+      id: input.id,
+      projectId: input.projectId,
+      data: { publishedId: null, publishedById: null },
+    });
+  }
+  async findCopies(): Promise<Workflow[]> {
+    return [];
+  }
 }
 
 class FakeWorkflowExecutionPort extends WorkflowExecutionPort {
@@ -97,14 +223,25 @@ const service = (
 
 describe("WorkflowService", () => {
   it("creates, versions and publishes through the repository boundary", async () => {
-    const workflowService = ServerWorkflowService.create({ repository: new FakeWorkflowRepository(), dslMigration: new FakeWorkflowDslMigrationPort(), generateId: () => "id" });
-    const result = await workflowService.create({ projectId: "project_1", dsl: { version: "1", name: "Triage", nodes: [], edges: [] }, commitMessage: "first", publish: true });
+    const workflowService = ServerWorkflowService.create({
+      repository: new FakeWorkflowRepository(),
+      dslMigration: new FakeWorkflowDslMigrationPort(),
+      generateId: () => "id",
+    });
+    const result = await workflowService.create({
+      projectId: "project_1",
+      dsl: { version: "1", name: "Triage", nodes: [], edges: [] },
+      commitMessage: "first",
+      publish: true,
+    });
     expect(result.version.workflowId).toBe(result.workflow.id);
     expect(result.workflow.publishedId).toBe(result.version.id);
   });
 
   it("throws a concrete error when a workflow is not published", async () => {
-    await expect(service().getPublishedVersion({ workflowId: "workflow_1", projectId: "project_1" })).rejects.toBeInstanceOf(WorkflowNotPublishedError);
+    await expect(
+      service().getPublishedVersion({ workflowId: "workflow_1", projectId: "project_1" }),
+    ).rejects.toBeInstanceOf(WorkflowNotPublishedError);
   });
 
   it("unpublishes through the workflow repository boundary", async () => {
@@ -123,9 +260,16 @@ describe("WorkflowService", () => {
 
   it("exposes evaluator fields without exposing persistence", async () => {
     const repo = new FakeWorkflowRepository();
-    const fields = await service(repo).getFields({ workflowId: "workflow_1", projectId: "project_1" });
+    const fields = await service(repo).getFields({
+      workflowId: "workflow_1",
+      projectId: "project_1",
+    });
     expect(fields).toMatchObject({ workflowId: "workflow_1", workflowName: "Triage" });
-    expect(fields.outputFields.map((field) => field.identifier)).toEqual(["passed", "score", "label"]);
+    expect(fields.outputFields.map((field) => field.identifier)).toEqual([
+      "passed",
+      "score",
+      "label",
+    ]);
   });
 
   it("returns version history with the same sparse tags and previous DSL as the transport", async () => {

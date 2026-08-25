@@ -10,13 +10,7 @@
  * @see specs/api-keys/token-created-snippets.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TokenCreatedDialog } from "../TokenCreatedDialog";
@@ -91,9 +85,7 @@ describe("given a token has just been minted", () => {
     /** @scenario Bearer tab renders in the shared labelled code preview */
     it("shows a snippet box whose header names the snippet", async () => {
       renderDialog();
-      fireEvent.click(
-        within(useInCodeSection()).getByRole("button", { name: "Bearer" }),
-      );
+      fireEvent.click(within(useInCodeSection()).getByRole("button", { name: "Bearer" }));
 
       expect(await screen.findByText("HTTP headers")).toBeInTheDocument();
     });
@@ -151,9 +143,7 @@ describe("given a token has just been minted", () => {
 
       const label = await screen.findByText("HTTP headers");
       const box = label.closest(".code-block__root") as HTMLElement;
-      fireEvent.click(
-        within(box).getByRole("button", { name: "Show sensitive values" }),
-      );
+      fireEvent.click(within(box).getByRole("button", { name: "Show sensitive values" }));
       await vi.waitFor(() => {
         expect(box.textContent).toContain(blob);
       });
@@ -181,9 +171,7 @@ describe("given a token has just been minted", () => {
     it("keeps the amber copy-this-token-now warning", async () => {
       renderDialog();
 
-      expect(
-        await screen.findByText(/Copy this token now\./),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(/Copy this token now\./)).toBeInTheDocument();
     });
 
     /** @scenario Reveal toggle still works for masked secret values */
@@ -199,16 +187,12 @@ describe("given a token has just been minted", () => {
         .map((el) => el.closest(".code-block__root"))
         .find(Boolean) as HTMLElement;
 
-      fireEvent.click(
-        within(box).getByRole("button", { name: "Show sensitive values" }),
-      );
+      fireEvent.click(within(box).getByRole("button", { name: "Show sensitive values" }));
       await vi.waitFor(() => {
         expect(within(box).queryByText(new RegExp(TOKEN))).not.toBeNull();
       });
 
-      fireEvent.click(
-        within(box).getByRole("button", { name: "Hide sensitive values" }),
-      );
+      fireEvent.click(within(box).getByRole("button", { name: "Hide sensitive values" }));
       await vi.waitFor(() => {
         expect(within(box).queryByText(new RegExp(TOKEN))).toBeNull();
       });
@@ -227,9 +211,7 @@ describe("given a token has just been minted", () => {
       expect(
         within(header).getByRole("button", { name: "Show sensitive values" }),
       ).toBeInTheDocument();
-      expect(
-        within(header).getByRole("button", { name: /copy/i }),
-      ).toBeInTheDocument();
+      expect(within(header).getByRole("button", { name: /copy/i })).toBeInTheDocument();
       expect(within(header).getByText(".env")).toBeInTheDocument();
     });
 

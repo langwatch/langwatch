@@ -35,9 +35,7 @@ describe("dailyCapAdvice", () => {
       });
 
       it("rounds a fractional estimate for display", () => {
-        expect(
-          dailyCapAdvice({ ...overCap, matchesPerDay: 142.6 })?.perDay,
-        ).toBe(143);
+        expect(dailyCapAdvice({ ...overCap, matchesPerDay: 142.6 })?.perDay).toBe(143);
       });
 
       it("flags the annotation-queue action too", () => {
@@ -66,9 +64,7 @@ describe("dailyCapAdvice", () => {
   describe("given a notify-class action", () => {
     /** @scenario "A notify action is never flagged against the ceiling" */
     it("returns nothing even far over the ceiling", () => {
-      expect(
-        dailyCapAdvice({ ...overCap, action: TriggerAction.SEND_EMAIL }),
-      ).toBeNull();
+      expect(dailyCapAdvice({ ...overCap, action: TriggerAction.SEND_EMAIL })).toBeNull();
     });
   });
 
@@ -87,9 +83,7 @@ describe("dailyCapAdvice", () => {
     });
 
     it("returns nothing for a non-finite estimate", () => {
-      expect(
-        dailyCapAdvice({ ...overCap, matchesPerDay: Number.NaN }),
-      ).toBeNull();
+      expect(dailyCapAdvice({ ...overCap, matchesPerDay: Number.NaN })).toBeNull();
     });
 
     it("returns nothing for a ceiling of zero", () => {

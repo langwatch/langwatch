@@ -380,9 +380,7 @@ describe("LangyDeclarativeCard", () => {
         });
         renderHydrated();
 
-        expect(
-          screen.getByText("These prompts are no longer available."),
-        ).toBeTruthy();
+        expect(screen.getByText("These prompts are no longer available.")).toBeTruthy();
         expect(screen.queryByText("No prompts yet.")).toBeNull();
       });
     });

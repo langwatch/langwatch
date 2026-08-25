@@ -7,18 +7,9 @@ import {
 } from "../src/anomaly-rule";
 import { isGovernanceOriginTrace } from "../src/governance-attributes";
 import { departmentSchema } from "../src/department";
-import {
-  getStarterTemplate,
-  isOttlEnabledSourceType,
-} from "../src/ingestion-source";
-import {
-  ottlTransformInputSchema,
-  ottlValidationResultSchema,
-} from "../src/ottl";
-import {
-  normalizedPullEventSchema,
-  pulledUsageHintSchema,
-} from "../src/puller";
+import { getStarterTemplate, isOttlEnabledSourceType } from "../src/ingestion-source";
+import { ottlTransformInputSchema, ottlValidationResultSchema } from "../src/ottl";
+import { normalizedPullEventSchema, pulledUsageHintSchema } from "../src/puller";
 import { quarantineFillInputSchema } from "../src/quarantine-fill";
 
 describe("governance backend contract", () => {
@@ -36,12 +27,10 @@ describe("governance backend contract", () => {
   });
 
   it("keeps preview rule types explicit and rejects unknown types", () => {
-    expect(
-      validateThresholdConfig({ ruleType: "rate_limit", config: {} }),
-    ).toBeNull();
-    expect(() =>
-      validateThresholdConfig({ ruleType: "typo", config: {} }),
-    ).toThrow('Unsupported ruleType "typo"');
+    expect(validateThresholdConfig({ ruleType: "rate_limit", config: {} })).toBeNull();
+    expect(() => validateThresholdConfig({ ruleType: "typo", config: {} })).toThrow(
+      'Unsupported ruleType "typo"',
+    );
   });
 
   it("validates portable anomaly rule commands and records with Zod 4", () => {
@@ -108,9 +97,7 @@ describe("governance backend contract", () => {
   });
 
   it("applies the portable quarantine-fill defaults", () => {
-    expect(
-      quarantineFillInputSchema.parse({ organizationId: "organization" }),
-    ).toEqual({
+    expect(quarantineFillInputSchema.parse({ organizationId: "organization" })).toEqual({
       organizationId: "organization",
       windowSeconds: 60,
       threshold: 100,
@@ -118,9 +105,9 @@ describe("governance backend contract", () => {
   });
 
   it("recognizes governance traces by the canonical origin attribute", () => {
-    expect(
-      isGovernanceOriginTrace({ "langwatch.origin.kind": "ingestion_source" }),
-    ).toBe(true);
+    expect(isGovernanceOriginTrace({ "langwatch.origin.kind": "ingestion_source" })).toBe(
+      true,
+    );
     expect(isGovernanceOriginTrace(undefined)).toBe(false);
   });
 

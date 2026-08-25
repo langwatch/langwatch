@@ -29,15 +29,15 @@ describe("deriveStatus", () => {
     describe("when its status is derived", () => {
       /** @scenario "An overdue schedule reads as overdue, not as a timestamp" */
       it("reads as overdue rather than as a timestamp", () => {
-        expect(
-          deriveStatus({ job: job({ nextRunAt: at(-2_520_000) }), now: NOW }),
-        ).toBe("overdue");
+        expect(deriveStatus({ job: job({ nextRunAt: at(-2_520_000) }), now: NOW })).toBe(
+          "overdue",
+        );
       });
 
       it("states how late it is", () => {
-        expect(
-          latenessMs({ job: job({ nextRunAt: at(-2_520_000) }), now: NOW }),
-        ).toBe(2_520_000);
+        expect(latenessMs({ job: job({ nextRunAt: at(-2_520_000) }), now: NOW })).toBe(
+          2_520_000,
+        );
       });
     });
   });
@@ -47,9 +47,9 @@ describe("deriveStatus", () => {
       it("is not called overdue yet", () => {
         // The loop leases a slot by pushing nextRunAt forward, so a row sits a
         // beat in the past during normal claiming.
-        expect(
-          deriveStatus({ job: job({ nextRunAt: at(-5_000) }), now: NOW }),
-        ).toBe("scheduled");
+        expect(deriveStatus({ job: job({ nextRunAt: at(-5_000) }), now: NOW })).toBe(
+          "scheduled",
+        );
       });
     });
   });
@@ -57,9 +57,9 @@ describe("deriveStatus", () => {
   describe("given a claimed slot", () => {
     describe("when there are no prior attempts", () => {
       it("reads as running", () => {
-        expect(
-          deriveStatus({ job: job({ currentSlot: at(-1_000) }), now: NOW }),
-        ).toBe("running");
+        expect(deriveStatus({ job: job({ currentSlot: at(-1_000) }), now: NOW })).toBe(
+          "running",
+        );
       });
     });
 
@@ -113,9 +113,7 @@ describe("compareForAttention", () => {
           job({ active: false }),
         ];
 
-        const sorted = [...rows].sort((a, b) =>
-          compareForAttention({ a, b, now: NOW }),
-        );
+        const sorted = [...rows].sort((a, b) => compareForAttention({ a, b, now: NOW }));
 
         expect(sorted.map((r) => deriveStatus({ job: r, now: NOW }))).toEqual([
           "overdue",
@@ -133,9 +131,7 @@ describe("compareForAttention", () => {
       const sooner = job({ nextRunAt: at(60_000) });
 
       expect(
-        [later, sooner].sort((a, b) =>
-          compareForAttention({ a, b, now: NOW }),
-        )[0],
+        [later, sooner].sort((a, b) => compareForAttention({ a, b, now: NOW }))[0],
       ).toBe(sooner);
     });
   });
@@ -314,9 +310,7 @@ describe("isSlotStale", () => {
 
   describe("given no slot in flight", () => {
     it("keeps slot clearing unavailable", () => {
-      expect(isSlotStale({ job: job({ currentSlot: null }), now: NOW })).toBe(
-        false,
-      );
+      expect(isSlotStale({ job: job({ currentSlot: null }), now: NOW })).toBe(false);
     });
   });
 });
@@ -331,9 +325,7 @@ describe("canRunNow", () => {
     });
 
     it("withholds it while it is retrying too", () => {
-      expect(canRunNow({ projectName: "Acme", status: "retrying" })).toBe(
-        false,
-      );
+      expect(canRunNow({ projectName: "Acme", status: "retrying" })).toBe(false);
     });
   });
 
@@ -351,9 +343,7 @@ describe("canRunNow", () => {
 
   describe("given an idle schedule with a resolved project", () => {
     it("offers run now", () => {
-      expect(canRunNow({ projectName: "Acme", status: "scheduled" })).toBe(
-        true,
-      );
+      expect(canRunNow({ projectName: "Acme", status: "scheduled" })).toBe(true);
       expect(canRunNow({ projectName: "Acme", status: "overdue" })).toBe(true);
     });
   });

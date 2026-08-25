@@ -20,9 +20,7 @@ describe("buildChildProcessEnv", () => {
       const previous = process.env.NODE_COMPILE_CACHE;
       process.env.NODE_COMPILE_CACHE = "/somewhere/else";
       try {
-        expect(buildChildProcessEnv({}).NODE_COMPILE_CACHE).toBe(
-          "/somewhere/else",
-        );
+        expect(buildChildProcessEnv({}).NODE_COMPILE_CACHE).toBe("/somewhere/else");
       } finally {
         if (previous === undefined) {
           delete process.env.NODE_COMPILE_CACHE;

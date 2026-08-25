@@ -129,11 +129,7 @@ export function ComparisonWinnerCell({
 
   if (!verdict) {
     return (
-      <Text
-        fontSize="13px"
-        color="fg.subtle"
-        data-testid="comparison-winner-none"
-      >
+      <Text fontSize="13px" color="fg.subtle" data-testid="comparison-winner-none">
         -
       </Text>
     );
@@ -144,9 +140,7 @@ export function ComparisonWinnerCell({
   const winner = resolveWinner({ column, verdict });
   const reasoning = verdict.reasoning?.trim();
   const winnerOutput = verdict.winnerOutput?.trim();
-  const winnerColor = verdict.winnerId
-    ? targetColors?.[verdict.winnerId]
-    : undefined;
+  const winnerColor = verdict.winnerId ? targetColors?.[verdict.winnerId] : undefined;
 
   const badge = (
     <Badge
@@ -160,13 +154,7 @@ export function ComparisonWinnerCell({
       {/* Same colour square the target column header uses, so the reader can
           trace the winner back to its column and its win-rate bar. */}
       {winnerColor && (
-        <Box
-          width="8px"
-          height="8px"
-          borderRadius="sm"
-          bg={winnerColor}
-          flexShrink={0}
-        />
+        <Box width="8px" height="8px" borderRadius="sm" bg={winnerColor} flexShrink={0} />
       )}
       {isTie || isUnsettled ? winner.label : `Winner: ${winner.label}`}
     </Badge>
@@ -174,8 +162,7 @@ export function ComparisonWinnerCell({
 
   // Combined text used only for the "is this cell overflowing" heuristic —
   // the actual render is structured (badge + output + reasoning).
-  const combinedTextLength =
-    (winnerOutput?.length ?? 0) + (reasoning?.length ?? 0);
+  const combinedTextLength = (winnerOutput?.length ?? 0) + (reasoning?.length ?? 0);
   const isLikelyOverflowing =
     isTextLikelyOverflowing(`${winnerOutput ?? ""}\n\n${reasoning ?? ""}`) ||
     combinedTextLength > 400;
@@ -186,9 +173,7 @@ export function ComparisonWinnerCell({
       {winnerOutput && (
         <Box
           borderLeftWidth="3px"
-          borderLeftColor={
-            winnerColor ?? (isTie ? "gray.subtle" : "green.subtle")
-          }
+          borderLeftColor={winnerColor ?? (isTie ? "gray.subtle" : "green.subtle")}
           paddingLeft={2}
           paddingY={1}
           maxWidth="100%"

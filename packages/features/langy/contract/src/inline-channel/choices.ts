@@ -28,8 +28,7 @@ export const langyChoiceSelectionSchema = z
   .refine(
     (selection) =>
       selection.optionIds.length > 0 ||
-      (selection.otherText !== undefined &&
-        selection.otherText.trim().length > 0),
+      (selection.otherText !== undefined && selection.otherText.trim().length > 0),
     { message: "a selection must pick an option or carry other-text" },
   );
 export type LangyChoiceSelection = z.infer<typeof langyChoiceSelectionSchema>;
@@ -104,9 +103,7 @@ export function deriveLangyChoicesLockState({
       return {
         status: "answered",
         optionIds: entry.optionIds,
-        ...(entry.otherText !== undefined
-          ? { otherText: entry.otherText }
-          : {}),
+        ...(entry.otherText !== undefined ? { otherText: entry.otherText } : {}),
       };
     }
     sawLaterEntry = true;
@@ -126,9 +123,7 @@ export function renderLangyChoiceSelectionText({
   selection: LangyChoiceSelection;
   optionLabelById: ReadonlyMap<string, string>;
 }): string {
-  const labels = selection.optionIds.map(
-    (id) => optionLabelById.get(id) ?? id,
-  );
+  const labels = selection.optionIds.map((id) => optionLabelById.get(id) ?? id);
   if (selection.otherText !== undefined && selection.otherText.trim() !== "") {
     labels.push(selection.otherText.trim());
   }

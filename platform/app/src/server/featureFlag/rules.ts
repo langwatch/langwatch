@@ -117,10 +117,7 @@ function matchesContext(
   if (match.projectId !== undefined && match.projectId !== ctx.projectId) {
     return false;
   }
-  if (
-    match.organizationId !== undefined &&
-    match.organizationId !== ctx.organizationId
-  ) {
+  if (match.organizationId !== undefined && match.organizationId !== ctx.organizationId) {
     return false;
   }
   return true;

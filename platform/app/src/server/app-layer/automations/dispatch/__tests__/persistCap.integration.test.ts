@@ -11,17 +11,10 @@
  * TTL does not slide, and that a retry re-reads rather than re-counts.
  */
 
-import {
-  type RedisConnection,
-  RedisConnectionService,
-} from "@langwatch/redis-client";
+import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import {
-  consumePersistCapSlot,
-  persistCapClaimKey,
-  persistCapKey,
-} from "../persistCap";
+import { consumePersistCapSlot, persistCapClaimKey, persistCapKey } from "../persistCap";
 
 /** Injected into every call, so this suite needs no App (ADR-093). */
 let connection: RedisConnection | null = null;
@@ -70,9 +63,7 @@ beforeAll(() => {
     dbIndex: process.env.REDIS_DB_INDEX,
   });
   if (!connection) {
-    throw new Error(
-      "This suite needs Redis. Set LANGWATCH_TEST_REDIS_URL in .env.",
-    );
+    throw new Error("This suite needs Redis. Set LANGWATCH_TEST_REDIS_URL in .env.");
   }
 });
 

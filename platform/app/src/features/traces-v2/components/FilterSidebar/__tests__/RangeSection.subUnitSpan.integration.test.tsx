@@ -7,13 +7,7 @@
  * set by dragging. The slider must get a step sized to the span.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { clampRangeToBounds, RangeSection } from "../RangeSection";
 import { stepForSpan } from "../rangeControls";

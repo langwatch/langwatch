@@ -85,17 +85,15 @@ export function installClickHouseTestApp({
   const requiredOrg = async (organizationId: string) => {
     const client = await orgSource(organizationId);
     if (!client) {
-      throw new Error(
-        `Test ClickHouse not available for organization ${organizationId}`,
-      );
+      throw new Error(`Test ClickHouse not available for organization ${organizationId}`);
     }
     return client;
   };
 
-  const governanceTraceActivity =
-    new GovernanceTraceActivityClickHouseRepository(required);
-  const governanceOcsfEvents =
-    new GovernanceOcsfEventsClickHouseRepository(required);
+  const governanceTraceActivity = new GovernanceTraceActivityClickHouseRepository(
+    required,
+  );
+  const governanceOcsfEvents = new GovernanceOcsfEventsClickHouseRepository(required);
   const personalUsage = new PersonalUsageClickHouseRepository(required);
   const baseApp = createTestApp();
   const governanceRuntime = AppGovernanceRuntime.create(prisma, {

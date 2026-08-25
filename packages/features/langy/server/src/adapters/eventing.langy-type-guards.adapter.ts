@@ -86,17 +86,13 @@ export function isLangyConversationMetadataUpdatedEvent(
 export function isLangyConversationHandoffPendingEvent(
   event: LangyConversationProcessingEvent,
 ): event is LangyConversationHandoffPendingEvent {
-  return (
-    event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING
-  );
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING;
 }
 
 export function isLangyConversationHandoffConsumedEvent(
   event: LangyConversationProcessingEvent,
 ): event is LangyConversationHandoffConsumedEvent {
-  return (
-    event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED
-  );
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED;
 }
 
 export function isLangyConversationTitleGeneratedEvent(

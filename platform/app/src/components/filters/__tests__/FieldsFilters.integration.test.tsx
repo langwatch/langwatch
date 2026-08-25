@@ -71,9 +71,7 @@ const mockFilterOptions = [
   { field: "label-3", label: "Development", count: 25 },
 ];
 
-const renderComponent = (
-  props: Partial<Parameters<typeof FieldsFilters>[0]> = {},
-) => {
+const renderComponent = (props: Partial<Parameters<typeof FieldsFilters>[0]> = {}) => {
   const defaultProps = {
     filters: {} as Record<FilterField, string[]>,
     setFilters: vi.fn(),
@@ -115,10 +113,7 @@ describe("FieldsFilters", () => {
 
     it("shows selected filter values in button", () => {
       renderComponent({
-        filters: { "metadata.labels": ["Production"] } as Record<
-          FilterField,
-          string[]
-        >,
+        filters: { "metadata.labels": ["Production"] } as Record<FilterField, string[]>,
       });
 
       const labelButton = screen.getByText("Label").closest("button");

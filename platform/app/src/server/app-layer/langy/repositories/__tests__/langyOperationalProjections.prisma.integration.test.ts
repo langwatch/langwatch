@@ -45,17 +45,12 @@ const otherUser = `${namespace}-other-user`;
 const stateExecutor = new StateProjectionExecutor();
 const mapExecutor = new MapProjectionExecutor();
 
-const conversationProjectionStore =
-  new PrismaLangyConversationProjectionRepository(prisma);
-const turnProjectionStore = new PrismaLangyConversationTurnProjectionRepository(
+const conversationProjectionStore = new PrismaLangyConversationProjectionRepository(
   prisma,
 );
-const messageProjectionStore = new PrismaLangyMessageProjectionRepository(
-  prisma,
-);
-const conversationReadRepository = new PrismaLangyConversationRepository(
-  prisma,
-);
+const turnProjectionStore = new PrismaLangyConversationTurnProjectionRepository(prisma);
+const messageProjectionStore = new PrismaLangyMessageProjectionRepository(prisma);
+const conversationReadRepository = new PrismaLangyConversationRepository(prisma);
 const messageReadRepository = new PrismaLangyMessageRepository(prisma);
 const messageService = new LangyMessageService(
   messageReadRepository,
@@ -303,9 +298,7 @@ describe("Langy operational projections with Postgres", () => {
         userId: otherUser,
         limit: 10,
       }),
-    ).toEqual([
-      expect.objectContaining({ id: conversationId, userId: ownerA }),
-    ]);
+    ).toEqual([expect.objectContaining({ id: conversationId, userId: ownerA })]);
   });
 
   it("round-trips a complete turn document and its canonical cursor", async () => {

@@ -44,9 +44,7 @@ export type ResolvedPlanLimits = {
  * @param plan - License plan limits (the signed payload)
  * @returns The enforced limits, with the levers the license does set resolved
  */
-export function resolvePlanDefaults(
-  plan: LicensePlanLimits,
-): ResolvedPlanLimits {
+export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits {
   return {
     type: plan.type,
     name: plan.name,
@@ -58,7 +56,7 @@ export function resolvePlanDefaults(
     usageUnit: KNOWN_USAGE_UNITS.includes(
       plan.usageUnit as (typeof KNOWN_USAGE_UNITS)[number],
     )
-      ? plan.usageUnit ?? "traces"
+      ? (plan.usageUnit ?? "traces")
       : "traces",
   };
 }

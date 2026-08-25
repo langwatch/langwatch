@@ -27,12 +27,12 @@ describe("webhook event registry", () => {
 
   /** @scenario A settled event never matches a completed-only subscription */
   it("settled is its own stream: completed-only endpoints never receive it", () => {
-    expect(
-      eventMatches(["gateway.request.completed"], "gateway.request.settled"),
-    ).toBe(false);
-    expect(
-      eventMatches(["gateway.request.settled"], "gateway.request.settled"),
-    ).toBe(true);
+    expect(eventMatches(["gateway.request.completed"], "gateway.request.settled")).toBe(
+      false,
+    );
+    expect(eventMatches(["gateway.request.settled"], "gateway.request.settled")).toBe(
+      true,
+    );
     expect(eventMatches(["gateway.*"], "gateway.request.settled")).toBe(true);
     expect(eventMatches(["*"], "gateway.request.settled")).toBe(true);
   });

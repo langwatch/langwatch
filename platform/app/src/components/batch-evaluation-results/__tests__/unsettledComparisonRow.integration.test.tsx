@@ -181,9 +181,9 @@ describe("given a comparison row the judge ran and could not settle", () => {
       );
 
       expect(screen.getByText("No verdict")).toBeDefined();
-      expect(
-        screen.getByTestId("comparison-winner-reasoning").textContent,
-      ).toContain("did not survive being asked again");
+      expect(screen.getByTestId("comparison-winner-reasoning").textContent).toContain(
+        "did not survive being asked again",
+      );
     });
 
     /** @scenario "A row the judge could not settle says so, and why" */
@@ -196,9 +196,7 @@ describe("given a comparison row the judge ran and could not settle", () => {
 
       expect(screen.queryByText("Tie")).toBeNull();
       expect(screen.queryByTestId("comparison-winner-badge-tie")).toBeNull();
-      expect(
-        screen.getByTestId("comparison-winner-badge-no-verdict"),
-      ).toBeDefined();
+      expect(screen.getByTestId("comparison-winner-badge-no-verdict")).toBeDefined();
     });
 
     /** @scenario "A row the judge could not settle says so, and why" */
@@ -235,9 +233,7 @@ describe("given a comparison row the judge ran and could not settle", () => {
         </Wrapper>,
       );
 
-      expect(screen.getByTestId("comparison-winner-none").textContent).toBe(
-        "-",
-      );
+      expect(screen.getByTestId("comparison-winner-none").textContent).toBe("-");
     });
   });
 });
@@ -260,9 +256,7 @@ describe("given a win-rate chart over decided and unsettled rows", () => {
 
     const tieBar = chartData.find((entry) => entry.name === "Tie");
     expect(tieBar?.wins ?? 0).toBe(0);
-    expect(chartData.find((entry) => entry.name === "gpt-5-mini")?.wins).toBe(
-      1,
-    );
+    expect(chartData.find((entry) => entry.name === "gpt-5-mini")?.wins).toBe(1);
   });
 });
 
@@ -302,9 +296,7 @@ describe("given a CSV export of a run with an unsettled row", () => {
     // the cell says only what is certain and the reasoning says the rest.
     expect(row.comparison_winner).toBe("no_verdict");
     expect(row.comparison_candidates).toBe("gpt-5-mini, gemini-2.5-flash");
-    expect(row.comparison_reasoning).toContain(
-      "did not survive being asked again",
-    );
+    expect(row.comparison_reasoning).toContain("did not survive being asked again");
   });
 
   /** @scenario "An unsettled row exports its explanation" */
@@ -324,17 +316,10 @@ describe("given a CSV export of a run with an unsettled row", () => {
 // recharts measures its own layout, which jsdom cannot do, so the mock
 // surfaces the data the component computed instead of drawing it.
 vi.mock("recharts", () => {
-  const MockComponent = ({ children }: { children?: ReactNode }) =>
-    children ?? null;
+  const MockComponent = ({ children }: { children?: ReactNode }) => children ?? null;
   return {
     ResponsiveContainer: MockComponent,
-    BarChart: ({
-      data,
-      children,
-    }: {
-      data?: unknown;
-      children?: ReactNode;
-    }) => (
+    BarChart: ({ data, children }: { data?: unknown; children?: ReactNode }) => (
       <div data-testid="bar-chart" data-chart={JSON.stringify(data ?? [])}>
         {children}
       </div>

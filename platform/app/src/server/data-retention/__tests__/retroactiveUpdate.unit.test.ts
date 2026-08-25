@@ -33,17 +33,12 @@ describe("RetroactiveUpdateService", () => {
           const call = issuedCalls.find((c) =>
             (c.query as string).includes(`ALTER TABLE ${table}`),
           );
-          expect(
-            call,
-            `expected uniform update for table: ${table}`,
-          ).toBeDefined();
+          expect(call, `expected uniform update for table: ${table}`).toBeDefined();
           expect(call!.query).toContain(
             "UPDATE _retention_days = {retentionDays:UInt16}",
           );
           expect(call!.query).toContain("WHERE TenantId = {tenantId:String}");
-          expect(call!.query).toContain(
-            "_retention_days != {retentionDays:UInt16}",
-          );
+          expect(call!.query).toContain("_retention_days != {retentionDays:UInt16}");
           expect(call!.query_params).toEqual({
             tenantId: "project-1",
             retentionDays: 91,
@@ -61,21 +56,19 @@ describe("RetroactiveUpdateService", () => {
 
         expect(
           issuedCalls.some((call) =>
-            (call.query as string).includes(
-              "ALTER TABLE langy_analytics_events",
-            ),
+            (call.query as string).includes("ALTER TABLE langy_analytics_events"),
           ),
         ).toBe(true);
 
         // No NOT IN clause anywhere — no pin exclusion
-        expect(
-          issuedCalls.some((c) => (c.query as string).includes("NOT IN")),
-        ).toBe(false);
+        expect(issuedCalls.some((c) => (c.query as string).includes("NOT IN"))).toBe(
+          false,
+        );
 
         // No literal projectId interpolation anywhere
-        expect(
-          issuedCalls.some((c) => (c.query as string).includes("'project-1'")),
-        ).toBe(false);
+        expect(issuedCalls.some((c) => (c.query as string).includes("'project-1'"))).toBe(
+          false,
+        );
       });
     });
 
@@ -197,10 +190,7 @@ describe("RetroactiveUpdateService", () => {
           expect(e).toBeInstanceOf(RetroactiveMutationInProgressError);
           const err = e as RetroactiveMutationInProgressError;
           // Caller can now act on the IDs without scraping the message.
-          expect(err.blocked.map((b) => b.mutationId)).toEqual([
-            "mut-1",
-            "mut-2",
-          ]);
+          expect(err.blocked.map((b) => b.mutationId)).toEqual(["mut-1", "mut-2"]);
           expect(err.message).toContain("mut-1");
           expect(err.message).toContain("mut-2");
         }
@@ -241,9 +231,7 @@ describe("RetroactiveUpdateService", () => {
         const query = vi.fn().mockResolvedValue({
           json: async () => mockRows,
         });
-        const service = new RetroactiveUpdateService(
-          async () => ({ query }) as any,
-        );
+        const service = new RetroactiveUpdateService(async () => ({ query }) as any);
 
         const progress = await service.getMutationProgress({
           projectId: "project-1",
@@ -283,9 +271,7 @@ describe("RetroactiveUpdateService", () => {
       const query = vi.fn().mockResolvedValue({
         json: async () => [],
       });
-      const service = new RetroactiveUpdateService(
-        async () => ({ query }) as any,
-      );
+      const service = new RetroactiveUpdateService(async () => ({ query }) as any);
 
       await service.getMutationProgress({ projectId: "weird'\\id" });
 
@@ -300,9 +286,7 @@ describe("RetroactiveUpdateService", () => {
   describe("killMutation()", () => {
     it("parametrizes mutation_id and tenant filter", async () => {
       const command = vi.fn().mockResolvedValue(undefined);
-      const service = new RetroactiveUpdateService(
-        async () => ({ command }) as any,
-      );
+      const service = new RetroactiveUpdateService(async () => ({ command }) as any);
 
       await service.killMutation({
         projectId: "project-1",

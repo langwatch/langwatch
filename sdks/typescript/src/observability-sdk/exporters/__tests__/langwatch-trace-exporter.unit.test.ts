@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { LangWatchTraceExporter, type LangWatchTraceExporterOptions } from "../langwatch-trace-exporter";
+import {
+  LangWatchTraceExporter,
+  type LangWatchTraceExporterOptions,
+} from "../langwatch-trace-exporter";
 import {
   LANGWATCH_SDK_NAME_OBSERVABILITY,
   LANGWATCH_SDK_LANGUAGE,
@@ -39,7 +42,7 @@ describe("LangWatchExporter", () => {
     consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
 
-    afterEach(() => {
+  afterEach(() => {
     // Restore original environment
     process.env = originalEnv;
 
@@ -231,7 +234,7 @@ describe("LangWatchExporter", () => {
             "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
           }),
           url: expect.stringContaining("/api/otel/v1/traces"),
-        })
+        }),
       );
     });
   });
@@ -266,7 +269,9 @@ describe("LangWatchExporter", () => {
 
       // URL constructor behavior: new URL("/api/otel/v1/traces", "https://subdomain.example.com:8080/path")
       // results in "https://subdomain.example.com:8080/api/otel/v1/traces" (path gets replaced, not appended)
-      expect((exporter as any).url).toBe("https://subdomain.example.com:8080/api/otel/v1/traces");
+      expect((exporter as any).url).toBe(
+        "https://subdomain.example.com:8080/api/otel/v1/traces",
+      );
     });
   });
 
@@ -303,9 +308,24 @@ describe("LangWatchExporter", () => {
   describe("filters pipeline", () => {
     function makeSpans() {
       return [
-        { name: "GET /users", instrumentationScope: { name: "http" }, attributes: { "http.method": "GET" }, resource: { attributes: { "service.name": "api" } } },
-        { name: "chat.completion", instrumentationScope: { name: "ai" }, attributes: { "app.env": "prod" }, resource: { attributes: { region: "us" } } },
-        { name: "custom op", instrumentationScope: { name: "custom" }, attributes: { foo: "bar" }, resource: { attributes: { "service.name": "worker" } } },
+        {
+          name: "GET /users",
+          instrumentationScope: { name: "http" },
+          attributes: { "http.method": "GET" },
+          resource: { attributes: { "service.name": "api" } },
+        },
+        {
+          name: "chat.completion",
+          instrumentationScope: { name: "ai" },
+          attributes: { "app.env": "prod" },
+          resource: { attributes: { region: "us" } },
+        },
+        {
+          name: "custom op",
+          instrumentationScope: { name: "custom" },
+          attributes: { foo: "bar" },
+          resource: { attributes: { "service.name": "worker" } },
+        },
       ];
     }
 
@@ -324,11 +344,9 @@ describe("LangWatchExporter", () => {
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
       expect(result).toHaveLength(3);
-      expect(result.map((s: any) => s.name)).toEqual(expect.arrayContaining([
-        "GET /users",
-        "chat.completion",
-        "custom op"
-      ]));
+      expect(result.map((s: any) => s.name)).toEqual(
+        expect.arrayContaining(["GET /users", "chat.completion", "custom op"]),
+      );
     });
 
     it("accepts empty array to disable filtering", () => {
@@ -337,25 +355,29 @@ describe("LangWatchExporter", () => {
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
       expect(result).toHaveLength(3);
-      expect(result.map((s: any) => s.name)).toEqual(expect.arrayContaining([
-        "GET /users",
-        "chat.completion",
-        "custom op"
-      ]));
+      expect(result.map((s: any) => s.name)).toEqual(
+        expect.arrayContaining(["GET /users", "chat.completion", "custom op"]),
+      );
     });
 
     it("preset vercelAIOnly keeps only AI spans", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [{ preset: "vercelAIOnly" }] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [{ preset: "vercelAIOnly" }],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
       expect(result).toEqual([
-        expect.objectContaining({ instrumentationScope: expect.objectContaining({ name: "ai" }) }),
+        expect.objectContaining({
+          instrumentationScope: expect.objectContaining({ name: "ai" }),
+        }),
       ]);
     });
 
     it("preset excludeHttpRequests removes HTTP request spans", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [{ preset: "excludeHttpRequests" }] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [{ preset: "excludeHttpRequests" }],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const names = (exporter as any).__lastExportedSpans.map((s: any) => s.name);
@@ -364,10 +386,12 @@ describe("LangWatchExporter", () => {
     });
 
     it("pipeline include instrumentation ai then exclude http requests", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { instrumentationScopeName: [{ equals: "ai" }] } },
-        { preset: "excludeHttpRequests" },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [
+          { include: { instrumentationScopeName: [{ equals: "ai" }] } },
+          { preset: "excludeHttpRequests" },
+        ],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
@@ -376,9 +400,9 @@ describe("LangWatchExporter", () => {
     });
 
     it("criteria by name startsWith only", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { name: [{ startsWith: "chat." }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [{ include: { name: [{ startsWith: "chat." }] } }],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
@@ -387,9 +411,9 @@ describe("LangWatchExporter", () => {
     });
 
     it("include instrumentationScopeName equals (case-sensitive by default)", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { instrumentationScopeName: [{ equals: "ai" }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [{ include: { instrumentationScopeName: [{ equals: "ai" }] } }],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
@@ -398,9 +422,9 @@ describe("LangWatchExporter", () => {
     });
 
     it("include name equals (case-sensitive by default)", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { name: [{ equals: "chat.completion" }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [{ include: { name: [{ equals: "chat.completion" }] } }],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const names = (exporter as any).__lastExportedSpans.map((s: any) => s.name);
@@ -408,9 +432,11 @@ describe("LangWatchExporter", () => {
     });
 
     it("include name equals with ignoreCase true", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { name: [{ equals: "CHAT.completion", ignoreCase: true }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [
+          { include: { name: [{ equals: "CHAT.completion", ignoreCase: true }] } },
+        ],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const names = (exporter as any).__lastExportedSpans.map((s: any) => s.name);
@@ -418,9 +444,11 @@ describe("LangWatchExporter", () => {
     });
 
     it("include name with OR semantics across array of Match", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { name: [{ startsWith: "chat." }, { equals: "custom op" }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [
+          { include: { name: [{ startsWith: "chat." }, { equals: "custom op" }] } },
+        ],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const names = (exporter as any).__lastExportedSpans.map((s: any) => s.name);
@@ -429,21 +457,31 @@ describe("LangWatchExporter", () => {
     });
 
     it("include instrumentationScopeName with OR array", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { instrumentationScopeName: [{ equals: "ai" }, { equals: "custom" }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [
+          {
+            include: {
+              instrumentationScopeName: [{ equals: "ai" }, { equals: "custom" }],
+            },
+          },
+        ],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
-      const scopes = (exporter as any).__lastExportedSpans.map((s: any) => s.instrumentationScope.name);
+      const scopes = (exporter as any).__lastExportedSpans.map(
+        (s: any) => s.instrumentationScope.name,
+      );
       expect(scopes).toEqual(expect.arrayContaining(["ai", "custom"]));
       expect(scopes).not.toContain("http");
     });
 
     it("include then exclude applies sequentially (AND pipeline)", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { instrumentationScopeName: [{ equals: "ai" }] } },
-        { exclude: { name: [{ equals: "chat.completion" }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [
+          { include: { instrumentationScopeName: [{ equals: "ai" }] } },
+          { exclude: { name: [{ equals: "chat.completion" }] } },
+        ],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
@@ -451,10 +489,12 @@ describe("LangWatchExporter", () => {
     });
 
     it("exclude then include can restore only matching subset (results zero here)", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { exclude: { name: [{ startsWith: "chat." }] } },
-        { include: { instrumentationScopeName: [{ equals: "ai" }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [
+          { exclude: { name: [{ startsWith: "chat." }] } },
+          { include: { instrumentationScopeName: [{ equals: "ai" }] } },
+        ],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       expect((exporter as any).__lastExportedSpans).toHaveLength(0);

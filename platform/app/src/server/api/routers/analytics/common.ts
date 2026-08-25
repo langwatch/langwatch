@@ -19,10 +19,7 @@ export const currentVsPreviousDates = (
       ? period / (24 * 60) // Convert minutes to days
       : 1;
 
-  const daysDifference = Math.max(
-    periodInDays,
-    getDaysDifference(startDate, endDate),
-  );
+  const daysDifference = Math.max(periodInDays, getDaysDifference(startDate, endDate));
   const previousPeriodStartDate = addDays(startDate, -daysDifference);
 
   return { previousPeriodStartDate, startDate, endDate, daysDifference };

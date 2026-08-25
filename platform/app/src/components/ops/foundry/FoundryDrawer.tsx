@@ -32,8 +32,7 @@ export function FoundryDrawer() {
   const selectedSpanId = useTraceStore((s) => s.selectedSpanId);
   const selectSpan = useTraceStore((s) => s.selectSpan);
   const updateSpan = useTraceStore((s) => s.updateSpan);
-  const { running, setRunning, addLogEntry, updateLogEntry } =
-    useExecutionStore();
+  const { running, setRunning, addLogEntry, updateLogEntry } = useExecutionStore();
   const { builtIn } = usePresetStore();
   const [showPresets, setShowPresets] = useState(!trace.spans.length);
   const [lastTraceId, setLastTraceId] = useState<string | null>(null);
@@ -42,10 +41,7 @@ export function FoundryDrawer() {
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      )
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)
         return;
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
@@ -95,12 +91,7 @@ export function FoundryDrawer() {
   const selectedSpan = selectedSpanId ? findSpan(spans, selectedSpanId) : null;
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="md"
-      onOpenChange={() => closeDrawer()}
-    >
+    <Drawer.Root open={true} placement="end" size="md" onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack width="full">
@@ -189,12 +180,7 @@ export function FoundryDrawer() {
                       borderColor="border"
                       bg="bg.subtle"
                     >
-                      <Text
-                        fontSize="xs"
-                        fontWeight="medium"
-                        color="fg.muted"
-                        mb={2}
-                      >
+                      <Text fontSize="xs" fontWeight="medium" color="fg.muted" mb={2}>
                         {SPAN_TYPE_ICONS[selectedSpan.type]} {selectedSpan.name}
                       </Text>
                       {selectedSpan.type === "llm" &&
@@ -208,9 +194,7 @@ export function FoundryDrawer() {
                               fontSize="xs"
                               value={msg.content}
                               onChange={(e) => {
-                                const msgs = [
-                                  ...(selectedSpan.llm?.messages ?? []),
-                                ];
+                                const msgs = [...(selectedSpan.llm?.messages ?? [])];
                                 msgs[i] = {
                                   ...msgs[i]!,
                                   content: e.target.value,
@@ -243,12 +227,7 @@ export function FoundryDrawer() {
                   )}
                 </Box>
 
-                <Box
-                  p={3}
-                  borderTop="1px solid"
-                  borderColor="border"
-                  bg="bg.subtle"
-                >
+                <Box p={3} borderTop="1px solid" borderColor="border" bg="bg.subtle">
                   <HStack gap={2}>
                     <Button
                       ref={sendRef}
@@ -296,26 +275,14 @@ export function FoundryDrawer() {
                         fontWeight="medium"
                         mb={0.5}
                       >
-                        {copied
-                          ? "Trace ID copied!"
-                          : "Trace sent — click to copy ID"}
+                        {copied ? "Trace ID copied!" : "Trace sent — click to copy ID"}
                       </Text>
-                      <Text
-                        fontSize="11px"
-                        fontFamily="mono"
-                        color="fg.muted"
-                        truncate
-                      >
+                      <Text fontSize="11px" fontFamily="mono" color="fg.muted" truncate>
                         {lastTraceId}
                       </Text>
                     </Box>
                   )}
-                  <Text
-                    fontSize="10px"
-                    color="fg.muted"
-                    mt={1}
-                    textAlign="center"
-                  >
+                  <Text fontSize="10px" color="fg.muted" mt={1} textAlign="center">
                     ⌘Enter to send · R to reset
                   </Text>
                 </Box>

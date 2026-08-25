@@ -19,10 +19,7 @@
  *     trade-off verdict would imply the run weighed things it never saw.
  */
 
-import type {
-  ParetoDominance,
-  TradeoffDimension,
-} from "./computeParetoDominance";
+import type { ParetoDominance, TradeoffDimension } from "./computeParetoDominance";
 
 export type TradeoffSummary = {
   headline: string;
@@ -69,9 +66,7 @@ export const formatTradeoffSummary = ({
     };
   }
 
-  const comparedOn = joinWords(
-    dominance.dimensions.map((d) => DIMENSION_WORDS[d]),
-  );
+  const comparedOn = joinWords(dominance.dimensions.map((d) => DIMENSION_WORDS[d]));
 
   if (dominance.edges.length === 0) {
     return {
@@ -100,8 +95,7 @@ export const formatTradeoffSummary = ({
     // it unconditionally pointed the reader at dimensions that did not exist
     // whenever the winner swept every one of them — a small version of
     // exactly the fault this feature is built to avoid.
-    const tiedOnSome =
-      (edge?.strictlyBetterOn.length ?? 0) < dominance.dimensions.length;
+    const tiedOnSome = (edge?.strictlyBetterOn.length ?? 0) < dominance.dimensions.length;
     const clause = tiedOnSome ? ", and no worse on the rest" : "";
 
     return {
@@ -118,8 +112,7 @@ export const formatTradeoffSummary = ({
     droppableIds,
     headline: `${droppableIds.length} variants are beaten outright and can be dropped: ${joinWords(
       droppableIds.map(
-        (id) =>
-          `${nameOf(id)} (by ${joinWords(dominance.dominatedBy[id]!.map(nameOf))})`,
+        (id) => `${nameOf(id)} (by ${joinWords(dominance.dominatedBy[id]!.map(nameOf))})`,
       ),
     )}.`,
   };

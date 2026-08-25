@@ -20,9 +20,7 @@ import { PERMISSION_CATEGORIES } from "@langwatch/api-key-contract";
 describe("authz registry", () => {
   describe("given the legacy vocabulary", () => {
     const legacyGrantedStrings: string[] = [
-      ...Object.values(TeamUserRole).flatMap((role) =>
-        getTeamRolePermissions(role),
-      ),
+      ...Object.values(TeamUserRole).flatMap((role) => getTeamRolePermissions(role)),
       ...Object.values(OrganizationUserRole).flatMap((role) =>
         getOrganizationRolePermissions(role),
       ),
@@ -55,9 +53,7 @@ describe("authz registry", () => {
       // picker (stage E3) retires them. Shrinking this list is progress;
       // growing it is a regression.
       const uiStrings = orderedResources.flatMap((resource) =>
-        getValidActionsForResource(resource).map(
-          (action) => `${resource}:${action}`,
-        ),
+        getValidActionsForResource(resource).map((action) => `${resource}:${action}`),
       );
       const KNOWN_DRIFT = [
         "team:create",
@@ -70,14 +66,12 @@ describe("authz registry", () => {
         "aiTools:update",
         "aiTools:delete",
       ];
-      const missing = uiStrings.filter(
-        (permission) => !isRegistryPermission(permission),
-      );
+      const missing = uiStrings.filter((permission) => !isRegistryPermission(permission));
       // Only NEW drift fails: retiring a pair from the UI catalogue is the
       // progress the comment above promises, so a shrunk list passes.
-      expect(
-        missing.filter((permission) => !KNOWN_DRIFT.includes(permission)),
-      ).toEqual([]);
+      expect(missing.filter((permission) => !KNOWN_DRIFT.includes(permission))).toEqual(
+        [],
+      );
     });
   });
 

@@ -25,13 +25,9 @@ vi.mock("~/hooks/useAnnotationsByTraceIds", () => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: harness.projectId.value
-      ? { id: harness.projectId.value }
-      : undefined,
+    project: harness.projectId.value ? { id: harness.projectId.value } : undefined,
     hasPermission: (permission: string) =>
-      permission === "annotations:view"
-        ? harness.permissions.annotationsView
-        : true,
+      permission === "annotations:view" ? harness.permissions.annotationsView : true,
   }),
 }));
 
@@ -106,9 +102,7 @@ describe("useTraceListAnnotations", () => {
     describe("when a page of traces is on screen", () => {
       /** @scenario "Annotations are read for the traces currently on screen" */
       it("asks for the page's traces, and for everything said about them", () => {
-        renderHook(() =>
-          useTraceListAnnotations({ rows: [row("t1"), row("t2")] }),
-        );
+        renderHook(() => useTraceListAnnotations({ rows: [row("t1"), row("t2")] }));
 
         expect(lastArgs()).toEqual(
           expect.objectContaining({
@@ -201,9 +195,7 @@ describe("useTraceListAnnotations", () => {
       it("starts asking about the traces already on screen", () => {
         harness.view = { columnOrder: ["time", "trace"] };
         const rows = [row("t1")];
-        const { rerender } = renderHook(() =>
-          useTraceListAnnotations({ rows }),
-        );
+        const { rerender } = renderHook(() => useTraceListAnnotations({ rows }));
         expect(lastArgs()).toEqual(expect.objectContaining({ enabled: false }));
 
         harness.view = { columnOrder: ["time", "trace", "annotations"] };

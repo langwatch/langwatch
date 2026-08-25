@@ -1,9 +1,9 @@
 import {
-	annotationQueueProvider as annotationQueueShared,
-	datasetProvider as datasetShared,
-	emailProvider as emailShared,
-	slackProvider as slackShared,
-	webhookProvider as webhookShared,
+  annotationQueueProvider as annotationQueueShared,
+  datasetProvider as datasetShared,
+  emailProvider as emailShared,
+  slackProvider as slackShared,
+  webhookProvider as webhookShared,
 } from "@langwatch/automation-contract";
 import { TriggerAction } from "~/generated/prisma/client";
 import annotationQueueServer from "./annotationQueue/server";
@@ -57,10 +57,7 @@ export async function persistActionParamsFor(
 
 /** Strip secrets from stored actionParams before the row leaves the server.
  *  Identity for providers without secrets. */
-export function redactActionParamsFor(
-  action: TriggerAction,
-  params: unknown,
-): unknown {
+export function redactActionParamsFor(action: TriggerAction, params: unknown): unknown {
   // Fail closed: a legacy row can carry an action value no provider claims
   // (e.g. after an action is removed). Returning the params unredacted would
   // leak whatever secrets that action stored; return nothing instead.

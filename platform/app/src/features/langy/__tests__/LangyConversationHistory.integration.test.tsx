@@ -23,15 +23,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Shared fixtures + observation state
@@ -100,11 +92,7 @@ const spies = {
   listInvalidate: vi.fn<(input: unknown) => void>(),
   stopMutation:
     vi.fn<
-      (variables: {
-        projectId: string;
-        conversationId: string;
-        turnId: string;
-      }) => void
+      (variables: { projectId: string; conversationId: string; turnId: string }) => void
     >(),
 };
 
@@ -205,9 +193,8 @@ vi.mock("~/utils/api", async () => {
   // pull their own tRPC queries these tests do not care about; the shared
   // harness answers every one of them inert. Only the langy surface and the
   // model picker below are explicit.
-  const { createTrpcUtils, modelProviderRouter, withFallback } = await import(
-    "./support/langyApiMock"
-  );
+  const { createTrpcUtils, modelProviderRouter, withFallback } =
+    await import("./support/langyApiMock");
 
   // A minimal, `enabled`-honouring stand-in for a tRPC query: one async
   // resolution per arm / refetch / invalidate, loading → success | error, no
@@ -394,8 +381,7 @@ vi.mock("~/utils/api", async () => {
 
     return {
       data: state.data,
-      isLoading:
-        enabled && state.status === "loading" && state.data === undefined,
+      isLoading: enabled && state.status === "loading" && state.data === undefined,
       isFetching: enabled && state.status === "loading",
       isPlaceholderData: state.status === "loading" && state.data !== undefined,
       isFetched: state.fetched,
@@ -460,8 +446,8 @@ vi.mock("~/utils/api", async () => {
               isTurnInFlight:
                 input.conversationId in scenarioRef.current.turnInFlightById,
               inFlightTurnId:
-                scenarioRef.current.turnInFlightById[input.conversationId]
-                  ?.turnId ?? null,
+                scenarioRef.current.turnInFlightById[input.conversationId]?.turnId ??
+                null,
             }),
             opts?.enabled !== false,
           ),
@@ -475,10 +461,9 @@ vi.mock("~/utils/api", async () => {
             conversationId: string;
           }) => {
             spies.deleteMutation(variables);
-            scenarioRef.current.conversations =
-              scenarioRef.current.conversations.filter(
-                (c) => c.id !== variables.conversationId,
-              );
+            scenarioRef.current.conversations = scenarioRef.current.conversations.filter(
+              (c) => c.id !== variables.conversationId,
+            );
             opts?.onSuccess?.({ success: true }, variables);
             return { success: true };
           },
@@ -577,11 +562,7 @@ interface UIMessageLike {
 }
 
 /** Build a list row, taking an ISO date purely as an ordering key. */
-function makeConv(
-  id: string,
-  title: string,
-  lastActivity: string,
-): ApiConversation {
+function makeConv(id: string, title: string, lastActivity: string): ApiConversation {
   return { id, title, lastActivityAtMs: Date.parse(lastActivity) };
 }
 
@@ -629,8 +610,7 @@ function renderPanel() {
  * conversations are only in the DOM while that view is showing — the rows are
  * ordinary list items, not combobox options.
  */
-const recentsTrigger = () =>
-  screen.findByRole("button", { name: "Recent chats" });
+const recentsTrigger = () => screen.findByRole("button", { name: "Recent chats" });
 
 async function openHistory() {
   await userEvent.click(await recentsTrigger());
@@ -661,9 +641,7 @@ async function openRecentOption(pattern: RegExp): Promise<void> {
   // The title button is the row's other control — everything except the ⋯.
   const titleButton = within(row)
     .getAllByRole("button")
-    .find(
-      (button) => button.getAttribute("aria-label") !== "Conversation actions",
-    );
+    .find((button) => button.getAttribute("aria-label") !== "Conversation actions");
   expect(titleButton).toBeDefined();
   await userEvent.click(titleButton!);
 }
@@ -673,9 +651,7 @@ async function deleteRecentOption(option: HTMLElement): Promise<void> {
   await userEvent.click(
     within(option).getByRole("button", { name: "Conversation actions" }),
   );
-  await userEvent.click(
-    await screen.findByRole("menuitem", { name: /delete/i }),
-  );
+  await userEvent.click(await screen.findByRole("menuitem", { name: /delete/i }));
 }
 
 // ---------------------------------------------------------------------------
@@ -737,12 +713,8 @@ describe("LangyPanel conversation history", () => {
       makeConv("conv-new", "Newest chat", "2026-05-10T10:00:00.000Z"),
     ];
     const messagesById = {
-      "conv-new": [
-        { id: "m1", role: "user" as const, text: "hello from newest" },
-      ],
-      "conv-old": [
-        { id: "m2", role: "user" as const, text: "hello from older" },
-      ],
+      "conv-new": [{ id: "m1", role: "user" as const, text: "hello from newest" }],
+      "conv-old": [{ id: "m2", role: "user" as const, text: "hello from older" }],
     };
 
     describe("when the panel mounts", () => {
@@ -750,9 +722,7 @@ describe("LangyPanel conversation history", () => {
         installScenario({ conversations, messagesById });
         renderPanel();
         await waitFor(() => {
-          const call = spies.listQuery.mock.calls.find(
-            ([, enabled]) => enabled,
-          );
+          const call = spies.listQuery.mock.calls.find(([, enabled]) => enabled);
           expect(call, "list query should arm on mount").toBeTruthy();
           expect(call![0]).toMatchObject({ projectId: "project-demo" });
         });
@@ -764,9 +734,7 @@ describe("LangyPanel conversation history", () => {
         await waitFor(() => {
           expect(chatRef.setMessages).toHaveBeenCalled();
           const lastCall =
-            chatRef.setMessages.mock.calls[
-              chatRef.setMessages.mock.calls.length - 1
-            ];
+            chatRef.setMessages.mock.calls[chatRef.setMessages.mock.calls.length - 1];
           expect(lastCall?.[0]).toEqual([]);
         });
         expect(useLangyStore.getState().activeConversationId).toBeNull();
@@ -848,9 +816,7 @@ describe("LangyPanel conversation history", () => {
         await openRecentOption(/Older chat/i);
         await waitFor(() => {
           const lastCall =
-            chatRef.setMessages.mock.calls[
-              chatRef.setMessages.mock.calls.length - 1
-            ];
+            chatRef.setMessages.mock.calls[chatRef.setMessages.mock.calls.length - 1];
           const passed = lastCall?.[0] as UIMessageLike[] | undefined;
           expect(passed?.[0]?.parts?.[0]?.text).toBe("hello from older");
         });
@@ -863,14 +829,10 @@ describe("LangyPanel conversation history", () => {
         renderPanel();
         await recentsTrigger();
         chatRef.setMessages.mockClear();
-        await userEvent.click(
-          screen.getByRole("button", { name: /new chat/i }),
-        );
+        await userEvent.click(screen.getByRole("button", { name: /new chat/i }));
         await waitFor(() => {
           const lastCall =
-            chatRef.setMessages.mock.calls[
-              chatRef.setMessages.mock.calls.length - 1
-            ];
+            chatRef.setMessages.mock.calls[chatRef.setMessages.mock.calls.length - 1];
           expect(lastCall?.[0]).toEqual([]);
         });
       });
@@ -879,9 +841,7 @@ describe("LangyPanel conversation history", () => {
         installScenario({ conversations, messagesById });
         renderPanel();
         await recentsTrigger();
-        await userEvent.click(
-          screen.getByRole("button", { name: /new chat/i }),
-        );
+        await userEvent.click(screen.getByRole("button", { name: /new chat/i }));
         await openHistory();
         expect(await findRecentOption(/Newest chat/i)).toBeInTheDocument();
       });
@@ -919,9 +879,7 @@ describe("LangyPanel conversation history", () => {
         await openHistory();
         await openRecentOption(/Newest chat/i);
         await waitFor(() => {
-          expect(useLangyStore.getState().activeConversationId).toBe(
-            "conv-new",
-          );
+          expect(useLangyStore.getState().activeConversationId).toBe("conv-new");
         });
         await openHistory();
         const newestItem = await findRecentOption(/Newest chat/i);
@@ -929,9 +887,7 @@ describe("LangyPanel conversation history", () => {
         await deleteRecentOption(newestItem);
         await waitFor(() => {
           const lastCall =
-            chatRef.setMessages.mock.calls[
-              chatRef.setMessages.mock.calls.length - 1
-            ];
+            chatRef.setMessages.mock.calls[chatRef.setMessages.mock.calls.length - 1];
           expect(lastCall?.[0]).toEqual([]);
         });
       });
@@ -943,9 +899,7 @@ describe("LangyPanel conversation history", () => {
         await openHistory();
         await openRecentOption(/Newest chat/i);
         await waitFor(() => {
-          expect(useLangyStore.getState().activeConversationId).toBe(
-            "conv-new",
-          );
+          expect(useLangyStore.getState().activeConversationId).toBe("conv-new");
         });
         await openHistory();
         const newestItem = await findRecentOption(/Newest chat/i);
@@ -963,12 +917,9 @@ describe("LangyPanel conversation history", () => {
         await openRecentOption(/Newest chat/i);
         await waitFor(() => {
           const lastCall =
-            chatRef.setMessages.mock.calls[
-              chatRef.setMessages.mock.calls.length - 1
-            ];
+            chatRef.setMessages.mock.calls[chatRef.setMessages.mock.calls.length - 1];
           expect(
-            (lastCall?.[0] as UIMessageLike[] | undefined)?.[0]?.parts?.[0]
-              ?.text,
+            (lastCall?.[0] as UIMessageLike[] | undefined)?.[0]?.parts?.[0]?.text,
           ).toBe("hello from newest");
         });
         await openHistory();
@@ -995,9 +946,7 @@ describe("LangyPanel conversation history", () => {
         // Backend filters by userId; UI must trust the response and not show
         // any conversation the API did not return.
         installScenario({
-          conversations: [
-            makeConv("mine-1", "My only chat", "2026-05-10T10:00:00.000Z"),
-          ],
+          conversations: [makeConv("mine-1", "My only chat", "2026-05-10T10:00:00.000Z")],
           messagesById: { "mine-1": [] },
         });
         renderPanel();
@@ -1053,17 +1002,14 @@ describe("LangyPanel conversation history", () => {
     describe("when the panel re-renders with a new project", () => {
       it("refetches the recent list for the new project", async () => {
         installScenario({
-          conversations: [
-            makeConv("c1", "demo chat", "2026-05-10T10:00:00.000Z"),
-          ],
+          conversations: [makeConv("c1", "demo chat", "2026-05-10T10:00:00.000Z")],
           messagesById: { c1: [] },
         });
         const { unmount } = renderPanel();
         await waitFor(() => {
           expect(
             spies.listQuery.mock.calls.some(
-              ([input, enabled]) =>
-                enabled && input.projectId === "project-demo",
+              ([input, enabled]) => enabled && input.projectId === "project-demo",
             ),
           ).toBe(true);
         });
@@ -1071,9 +1017,7 @@ describe("LangyPanel conversation history", () => {
 
         projectRef.current = { id: "project-other", slug: "other" };
         installScenario({
-          conversations: [
-            makeConv("c2", "other chat", "2026-05-10T11:00:00.000Z"),
-          ],
+          conversations: [makeConv("c2", "other chat", "2026-05-10T11:00:00.000Z")],
           messagesById: { c2: [] },
         });
         renderPanel();
@@ -1086,9 +1030,7 @@ describe("LangyPanel conversation history", () => {
       it("does not render conversations from the previous project", async () => {
         // First mount: project-demo with "demo chat"
         installScenario({
-          conversations: [
-            makeConv("c1", "demo chat", "2026-05-10T10:00:00.000Z"),
-          ],
+          conversations: [makeConv("c1", "demo chat", "2026-05-10T10:00:00.000Z")],
           messagesById: { c1: [] },
         });
         const { unmount } = renderPanel();
@@ -1116,9 +1058,7 @@ describe("LangyPanel conversation history", () => {
         });
         renderPanel();
         const card = await screen.findByRole("alert");
-        expect(card.textContent).toContain(
-          "Recent conversations aren't loading",
-        );
+        expect(card.textContent).toContain("Recent conversations aren't loading");
         expect(toaster.create).not.toHaveBeenCalled();
         expect(
           screen.queryByRole("list", { name: "Recent chats" }),
@@ -1158,9 +1098,7 @@ describe("LangyPanel conversation history", () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
         // The hook may still RENDER (React calls it), but it must never be
         // ARMED — a disabled query never resolves and so never fails.
-        expect(
-          spies.listQuery.mock.calls.every(([, enabled]) => !enabled),
-        ).toBe(true);
+        expect(spies.listQuery.mock.calls.every(([, enabled]) => !enabled)).toBe(true);
         expect(screen.queryByRole("alert")).not.toBeInTheDocument();
         expect(toaster.create).not.toHaveBeenCalled();
       });
@@ -1178,16 +1116,12 @@ describe("LangyPanel conversation history", () => {
         });
         renderPanel();
         await openHistory();
-        expect(
-          await screen.findByLabelText(/loading recent/i),
-        ).toBeInTheDocument();
+        expect(await screen.findByLabelText(/loading recent/i)).toBeInTheDocument();
         await act(async () => {
           slow.resolveLater();
         });
         await waitFor(() =>
-          expect(
-            screen.queryByLabelText(/loading recent/i),
-          ).not.toBeInTheDocument(),
+          expect(screen.queryByLabelText(/loading recent/i)).not.toBeInTheDocument(),
         );
       });
     });
@@ -1234,9 +1168,7 @@ describe("LangyPanel turn failures", () => {
  * they fail on the panel's WIRING, not just on the resolver's arithmetic.
  */
 describe("LangyPanel stopping a turn", () => {
-  const conversations = [
-    makeConv("conv-live", "Live chat", "2026-05-10T10:00:00.000Z"),
-  ];
+  const conversations = [makeConv("conv-live", "Live chat", "2026-05-10T10:00:00.000Z")];
   const messagesById = {
     "conv-live": [{ id: "m1", role: "user" as const, text: "do the thing" }],
   };
@@ -1270,9 +1202,7 @@ describe("LangyPanel stopping a turn", () => {
           });
         });
         // Only now may the control claim a stop is under way.
-        expect(
-          await screen.findByRole("button", { name: "Stopping" }),
-        ).toBeDisabled();
+        expect(await screen.findByRole("button", { name: "Stopping" })).toBeDisabled();
       });
     });
   });
@@ -1291,9 +1221,7 @@ describe("LangyPanel stopping a turn", () => {
 
       expect(spies.stopMutation).not.toHaveBeenCalled();
       // The lie under test: a "Stopping" spinner with no request behind it.
-      expect(
-        screen.queryByRole("button", { name: "Stopping" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Stopping" })).not.toBeInTheDocument();
       expect(await stopButton()).toBeEnabled();
       expect(toaster.create).toHaveBeenCalled();
     });

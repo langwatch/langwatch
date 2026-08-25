@@ -48,12 +48,7 @@ export const aggregationTypesEnum = z.enum([
 
 export const allAggregationTypes = aggregationTypesEnum.options;
 
-export const numericAggregationTypes: AggregationTypes[] = [
-  "avg",
-  "sum",
-  "min",
-  "max",
-];
+export const numericAggregationTypes: AggregationTypes[] = ["avg", "sum", "min", "max"];
 
 export const percentileAggregationTypes = ["median", "p99", "p95", "p90"] as (
   | "median"
@@ -62,9 +57,7 @@ export const percentileAggregationTypes = ["median", "p99", "p95", "p90"] as (
   | "p90"
 )[] satisfies AggregationTypes[];
 
-export type PercentileAggregationTypes = Unpacked<
-  typeof percentileAggregationTypes
->;
+export type PercentileAggregationTypes = Unpacked<typeof percentileAggregationTypes>;
 
 export type AggregationTypes = z.infer<typeof aggregationTypesEnum>;
 
@@ -77,16 +70,9 @@ export const pipelineFieldsEnum = z.enum([
 
 export type PipelineFields = z.infer<typeof pipelineFieldsEnum>;
 
-export const pipelineAggregationTypesEnum = z.enum([
-  "sum",
-  "avg",
-  "min",
-  "max",
-]);
+export const pipelineAggregationTypesEnum = z.enum(["sum", "avg", "min", "max"]);
 
-export type PipelineAggregationTypes = z.infer<
-  typeof pipelineAggregationTypesEnum
->;
+export type PipelineAggregationTypes = z.infer<typeof pipelineAggregationTypesEnum>;
 
 export const sharedFiltersInputSchema = z.object({
   projectId: z.string(),

@@ -68,12 +68,7 @@ export const datasetConfirmColumnsSchema = z.array(
 );
 export type DatasetConfirmColumns = z.infer<typeof datasetConfirmColumnsSchema>;
 
-export const datasetStatusSchema = z.enum([
-  "uploading",
-  "processing",
-  "ready",
-  "failed",
-]);
+export const datasetStatusSchema = z.enum(["uploading", "processing", "ready", "failed"]);
 export type DatasetStatus = z.infer<typeof datasetStatusSchema>;
 
 export const datasetContentLayoutSchema = z.enum(["postgres", "s3_jsonl"]);
@@ -213,17 +208,17 @@ export type DatasetLookupInput = z.infer<typeof datasetLookupInputSchema>;
 
 export const datasetWithRecordsInputSchema = datasetLookupInputSchema.extend({
   limitMb: z.number().nonnegative().nullable().optional(),
-  entrySelection: z.union([
-    z.literal("first"),
-    z.literal("last"),
-    z.literal("random"),
-    z.literal("all"),
-    z.number().int().nonnegative(),
-  ]).default("all"),
+  entrySelection: z
+    .union([
+      z.literal("first"),
+      z.literal("last"),
+      z.literal("random"),
+      z.literal("all"),
+      z.number().int().nonnegative(),
+    ])
+    .default("all"),
 });
-export type DatasetWithRecordsInput = z.input<
-  typeof datasetWithRecordsInputSchema
->;
+export type DatasetWithRecordsInput = z.input<typeof datasetWithRecordsInputSchema>;
 
 export const listDatasetsInputSchema = z
   .object({
@@ -250,24 +245,18 @@ export type DatasetPageInput = z.input<typeof datasetPageInputSchema>;
 export const createDatasetRecordsInputSchema = datasetRecordLookupInputSchema.extend({
   entries: z.array(datasetRecordInputSchema),
 });
-export type CreateDatasetRecordsInput = z.infer<
-  typeof createDatasetRecordsInputSchema
->;
+export type CreateDatasetRecordsInput = z.infer<typeof createDatasetRecordsInputSchema>;
 
 export const updateDatasetRecordInputSchema = datasetRecordLookupInputSchema.extend({
   recordId: z.string().min(1),
   updatedRecord: z.record(z.string(), z.unknown()),
 });
-export type UpdateDatasetRecordInput = z.infer<
-  typeof updateDatasetRecordInputSchema
->;
+export type UpdateDatasetRecordInput = z.infer<typeof updateDatasetRecordInputSchema>;
 
 export const deleteDatasetRecordsInputSchema = datasetRecordLookupInputSchema.extend({
   recordIds: z.array(z.string().min(1)),
 });
-export type DeleteDatasetRecordsInput = z.infer<
-  typeof deleteDatasetRecordsInputSchema
->;
+export type DeleteDatasetRecordsInput = z.infer<typeof deleteDatasetRecordsInputSchema>;
 
 export const uploadExistingDatasetInputSchema = z.object({
   slugOrId: z.string().min(1),
@@ -276,9 +265,7 @@ export const uploadExistingDatasetInputSchema = z.object({
   content: z.string(),
   fileSize: z.number().nonnegative(),
 });
-export type UploadExistingDatasetInput = z.infer<
-  typeof uploadExistingDatasetInputSchema
->;
+export type UploadExistingDatasetInput = z.infer<typeof uploadExistingDatasetInputSchema>;
 
 export const createDatasetFromUploadInputSchema = z.object({
   projectId: z.string().min(1),
@@ -305,11 +292,15 @@ export const pendingUploadInputSchema = z.object({
   projectId: z.string().min(1),
   name: z.string().min(1),
   filename: z.string().min(1),
-  columnTypes: z.array(z.object({
-    name: z.string(),
-    type: datasetColumnTypeSchema,
-    sourceHeader: z.string().optional(),
-  })).optional(),
+  columnTypes: z
+    .array(
+      z.object({
+        name: z.string(),
+        type: datasetColumnTypeSchema,
+        sourceHeader: z.string().optional(),
+      }),
+    )
+    .optional(),
 });
 export type PendingUploadInput = z.infer<typeof pendingUploadInputSchema>;
 

@@ -66,9 +66,7 @@ export function writeSpotlightFragment(id: string | null): void {
  */
 export function useSpotlightURLSync(): void {
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
-  const setCurrentSpotlightId = useOnboardingStore(
-    (s) => s.setCurrentSpotlightId,
-  );
+  const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
 
   useEffect(() => {
     const id = readSpotlightFragment();
@@ -95,9 +93,7 @@ export interface AnchorRect {
 
 export function measureAnchor(anchor: string): AnchorRect | null {
   if (typeof document === "undefined") return null;
-  const el = document.querySelector<HTMLElement>(
-    `[data-spotlight="${anchor}"]`,
-  );
+  const el = document.querySelector<HTMLElement>(`[data-spotlight="${anchor}"]`);
   if (!el) return null;
   const rect = el.getBoundingClientRect();
   return {
@@ -372,13 +368,7 @@ export function SpotlightPopover({
           addition to the header ✕) means anyone who's already
           oriented can leave with one click without hunting for the
           close glyph. */}
-      <Flex
-        align="center"
-        justify="space-between"
-        gap={2}
-        paddingX={3}
-        paddingBottom={3}
-      >
+      <Flex align="center" justify="space-between" gap={2} paddingX={3} paddingBottom={3}>
         <Button
           size="xs"
           variant="ghost"
@@ -500,9 +490,7 @@ export function SpotlightOverlay(): React.ReactElement | null {
   const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
   const currentSpotlightId = useOnboardingStore((s) => s.currentSpotlightId);
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
-  const setCurrentSpotlightId = useOnboardingStore(
-    (s) => s.setCurrentSpotlightId,
-  );
+  const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
 
   // URL sync on mount
   useSpotlightURLSync();

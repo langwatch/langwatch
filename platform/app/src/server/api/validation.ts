@@ -119,12 +119,8 @@ class SchemaFailure extends HandledError {
         field: violation.field,
         type: violation.type,
         message: violation.message,
-        ...(violation.expected !== undefined
-          ? { expected: violation.expected }
-          : {}),
-        ...(violation.received !== undefined
-          ? { received: violation.received }
-          : {}),
+        ...(violation.expected !== undefined ? { expected: violation.expected } : {}),
+        ...(violation.received !== undefined ? { received: violation.received } : {}),
       },
     });
     this.name = "SchemaFailure";
@@ -176,16 +172,12 @@ function violationOf(issue: ZodIssue): FieldViolation {
 /** The request never parsed, so no schema ever ran. */
 class MalformedRequestError extends HandledError {
   constructor(args: { target: keyof ValidationTargets; detail: string }) {
-    super(
-      "malformed_request",
-      `The ${TARGET_NOUN[args.target]} could not be parsed.`,
-      {
-        httpStatus: 400,
-        fault: "customer",
-        meta: { target: args.target, detail: args.detail },
-        ...remediation("malformed_request"),
-      },
-    );
+    super("malformed_request", `The ${TARGET_NOUN[args.target]} could not be parsed.`, {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { target: args.target, detail: args.detail },
+      ...remediation("malformed_request"),
+    });
     this.name = "MalformedRequestError";
   }
 }
@@ -343,8 +335,6 @@ export const validator = build as unknown as typeof openApiValidator;
  */
 export const hiddenValidator = ((...args: Parameters<typeof openApiValidator>) => {
   const middleware = validator(...args);
-  delete (middleware as Partial<Record<typeof uniqueSymbol, unknown>>)[
-    uniqueSymbol
-  ];
+  delete (middleware as Partial<Record<typeof uniqueSymbol, unknown>>)[uniqueSymbol];
   return middleware;
 }) as typeof openApiValidator;

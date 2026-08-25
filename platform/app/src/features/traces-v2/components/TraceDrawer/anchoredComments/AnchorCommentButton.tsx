@@ -22,11 +22,7 @@ import { AnchorCommentThread } from "./AnchorCommentThread";
  *   reason: a transcript is prose, and a glyph beside every paragraph of it
  *   competes with the words.
  */
-export type AnchorCommentReveal =
-  | "always"
-  | "hidden"
-  | "on-row-hover"
-  | "on-block-hover";
+export type AnchorCommentReveal = "always" | "hidden" | "on-row-hover" | "on-block-hover";
 
 interface AnchorCommentButtonProps {
   traceId: string;
@@ -138,13 +134,7 @@ function commentCountLabel(count: number): string {
 }
 
 /** What the control is called when there is no room to write it down. */
-function denseCommentLabel({
-  count,
-  name,
-}: {
-  count: number;
-  name?: string;
-}): string {
+function denseCommentLabel({ count, name }: { count: number; name?: string }): string {
   const on = name ? ` on ${name}` : "";
   if (count === 0) return `Comment${on}`;
   return count === 1 ? `1 comment${on}` : `${count} comments${on}`;
@@ -187,10 +177,7 @@ const LabelledTrigger = forwardRef<
  * Which surface's hover brings the control back, for the modes that leave it to
  * CSS. `always` and `hidden` are decided in JavaScript and need no rule.
  */
-const REVEAL_ON_HOVER_CSS: Record<
-  AnchorCommentReveal,
-  SystemStyleObject | undefined
-> = {
+const REVEAL_ON_HOVER_CSS: Record<AnchorCommentReveal, SystemStyleObject | undefined> = {
   always: undefined,
   hidden: undefined,
   "on-row-hover": { ".attr-row:hover &": { opacity: 1 } },
@@ -209,10 +196,7 @@ const DenseTrigger = forwardRef<
     label: string;
     reveal: AnchorCommentReveal;
   } & React.ComponentProps<typeof Button>
->(function DenseTrigger(
-  { count, label, reveal, onClick, ...triggerProps },
-  ref,
-) {
+>(function DenseTrigger({ count, label, reveal, onClick, ...triggerProps }, ref) {
   // Both reveal modes keep the control off screen until its row is under the
   // cursor, and they get there differently. The waterfall row tracks its own
   // hover in a store, so the control can be taken out of the tab order while it

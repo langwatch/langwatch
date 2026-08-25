@@ -48,9 +48,7 @@ async function tryGoto(
             timeout: 15_000,
           },
         )
-        .catch((e) =>
-          console.log(`[${name}] waitForText timed out: ${e.message}`),
-        );
+        .catch((e) => console.log(`[${name}] waitForText timed out: ${e.message}`));
     }
     await page.waitForTimeout(1500);
     return status;
@@ -81,9 +79,7 @@ void (async () => {
   await shoot(page, "A1-me-portal-cold", true);
 
   // workspace switcher dropdown
-  const switcherTrigger = page
-    .locator('button[aria-label*="Switch workspace"]')
-    .first();
+  const switcherTrigger = page.locator('button[aria-label*="Switch workspace"]').first();
   if ((await switcherTrigger.count()) > 0) {
     await switcherTrigger.click();
     await page.waitForTimeout(700);
@@ -177,12 +173,7 @@ void (async () => {
   await tryGoto(page, "D3-roles", "/settings/access-audit");
   await shoot(page, "D3-role-bindings", true);
 
-  await tryGoto(
-    page,
-    "D4-auditlog",
-    "/settings/audit-log",
-    /Action|Actor|Target/,
-  );
+  await tryGoto(page, "D4-auditlog", "/settings/audit-log", /Action|Actor|Target/);
   await shoot(page, "D4-audit-log", true);
 
   // ============================================================

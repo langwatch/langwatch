@@ -100,9 +100,9 @@ describe("metric command append coalescing", () => {
         await processCommandBatch(batchParamsFor({ payloads, storeEventsFn }));
 
         const [events] = storeEventsFn.mock.calls[0]!;
-        expect(
-          (events as Event[]).map((event) => event.idempotencyKey),
-        ).toEqual(payloads.map((payload) => `${TENANT_ID}:${payload.pointId}`));
+        expect((events as Event[]).map((event) => event.idempotencyKey)).toEqual(
+          payloads.map((payload) => `${TENANT_ID}:${payload.pointId}`),
+        );
       });
     });
   });

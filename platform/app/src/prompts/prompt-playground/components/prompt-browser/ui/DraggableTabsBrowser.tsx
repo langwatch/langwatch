@@ -47,8 +47,7 @@ interface DraggableTabsContextValue {
   ) => void;
 }
 
-const DraggableTabsContext =
-  React.createContext<DraggableTabsContextValue | null>(null);
+const DraggableTabsContext = React.createContext<DraggableTabsContextValue | null>(null);
 
 /**
  * useDraggableTabsContext
@@ -69,16 +68,12 @@ interface TabWindowContextValue {
   activeTabId?: string;
 }
 
-const TabWindowContext = React.createContext<TabWindowContextValue | null>(
-  null,
-);
+const TabWindowContext = React.createContext<TabWindowContextValue | null>(null);
 
 function useTabWindowContext() {
   const context = React.useContext(TabWindowContext);
   if (!context) {
-    throw new Error(
-      "Tab components must be used within DraggableTabsBrowser.Window",
-    );
+    throw new Error("Tab components must be used within DraggableTabsBrowser.Window");
   }
   return context;
 }
@@ -103,10 +98,7 @@ interface DraggableTabsBrowserProps {
  * @param children - Child window components
  * @param onTabMove - Callback fired when a tab is moved
  */
-function DraggableTabsBrowserRoot({
-  children,
-  onTabMove,
-}: DraggableTabsBrowserProps) {
+function DraggableTabsBrowserRoot({ children, onTabMove }: DraggableTabsBrowserProps) {
   const [activeDrag, setActiveDrag] = React.useState<{
     windowId: string;
     tabId: string;
@@ -213,8 +205,10 @@ function DragOverlayContent({
  *
  * Single Responsibility: Manages one split-pane window of tabs with shared state and drop zone
  */
-interface DraggableTabsWindowProps
-  extends Omit<TabsRootProps, "onClick" | "defaultValue"> {
+interface DraggableTabsWindowProps extends Omit<
+  TabsRootProps,
+  "onClick" | "defaultValue"
+> {
   windowId: string;
   activeTabId?: string;
   onTabChange?: (params: { windowId: string; tabId: string }) => void;
@@ -240,12 +234,8 @@ function DraggableTabsWindow({
       <VStack height="full" gap={0} align="stretch" width="full">
         <Tabs.Root
           value={activeTabId}
-          onValueChange={(change) =>
-            onTabChange?.({ windowId, tabId: change.value })
-          }
-          onClick={() =>
-            onWindowClick?.({ windowId, tabId: activeTabId ?? "" })
-          }
+          onValueChange={(change) => onTabChange?.({ windowId, tabId: change.value })}
+          onClick={() => onWindowClick?.({ windowId, tabId: activeTabId ?? "" })}
           width="full"
           height="full"
           display="flex"
@@ -278,17 +268,10 @@ interface DraggableTabsTabBarProps extends StackProps {
  * @param children - Tab trigger components
  * @param tabIds - Array of tab IDs for sortable context
  */
-function DraggableTabsTabBar({
-  children,
-  tabIds,
-  ...props
-}: DraggableTabsTabBarProps) {
+function DraggableTabsTabBar({ children, tabIds, ...props }: DraggableTabsTabBarProps) {
   return (
     <HStack gap={0} width="full" flexWrap="nowrap" minWidth={0} {...props}>
-      <SortableContext
-        items={tabIds ?? []}
-        strategy={horizontalListSortingStrategy}
-      >
+      <SortableContext items={tabIds ?? []} strategy={horizontalListSortingStrategy}>
         <Tabs.List
           width="full"
           gap={0}
@@ -367,26 +350,19 @@ function DraggableBrowserTabTrigger({
 function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
   const { windowId } = useTabWindowContext();
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-    isOver,
-  } = useSortable({
-    id,
-    data: {
-      windowId,
-      tabId: id,
-      label: (
-        <TabIdProvider tabId={id}>
-          <PromptBrowserTab dimmed={false} />
-        </TabIdProvider>
-      ),
-    },
-  });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
+    useSortable({
+      id,
+      data: {
+        windowId,
+        tabId: id,
+        label: (
+          <TabIdProvider tabId={id}>
+            <PromptBrowserTab dimmed={false} />
+          </TabIdProvider>
+        ),
+      },
+    });
 
   return (
     <Box

@@ -64,9 +64,7 @@ export type CacheRuleFormComplaint = {
   message: string;
 };
 
-export function validateForm(
-  state: CacheRuleFormState,
-): CacheRuleFormComplaint | null {
+export function validateForm(state: CacheRuleFormState): CacheRuleFormComplaint | null {
   if (!state.name.trim()) {
     return { field: "name", message: "Name is required" };
   }
@@ -127,8 +125,7 @@ export function toWire(state: CacheRuleFormState): {
 } {
   const matchers: Record<string, unknown> = {};
   if (state.matchVkId.trim()) matchers.vk_id = state.matchVkId.trim();
-  if (state.matchVkPrefix.trim())
-    matchers.vk_prefix = state.matchVkPrefix.trim();
+  if (state.matchVkPrefix.trim()) matchers.vk_prefix = state.matchVkPrefix.trim();
   if (state.matchVkTagsCsv.trim()) {
     matchers.vk_tags = state.matchVkTagsCsv
       .split(",")
@@ -190,9 +187,7 @@ export function fromWire(rule: {
     matchPrincipalId: typeof m.principal_id === "string" ? m.principal_id : "",
     matchModel: typeof m.model === "string" ? m.model : "",
     matchMetadataKey: firstMetadataKey,
-    matchMetadataValue: firstMetadataKey
-      ? (metadataObj[firstMetadataKey] ?? "")
-      : "",
+    matchMetadataValue: firstMetadataKey ? (metadataObj[firstMetadataKey] ?? "") : "",
     actionMode:
       a.mode === "force" || a.mode === "disable" || a.mode === "respect"
         ? a.mode
@@ -292,12 +287,7 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
         </Field.Root>
       </HStack>
 
-      <Box
-        borderWidth="1px"
-        borderColor="border.subtle"
-        borderRadius="md"
-        padding={4}
-      >
+      <Box borderWidth="1px" borderColor="border.subtle" borderRadius="md" padding={4}>
         <HStack mb={3}>
           <Text fontSize="sm" fontWeight="semibold">
             Match when
@@ -393,12 +383,7 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
         </VStack>
       </Box>
 
-      <Box
-        borderWidth="1px"
-        borderColor="border.subtle"
-        borderRadius="md"
-        padding={4}
-      >
+      <Box borderWidth="1px" borderColor="border.subtle" borderRadius="md" padding={4}>
         <Text fontSize="sm" fontWeight="semibold" mb={3}>
           Then do
         </Text>
@@ -415,10 +400,7 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
               <NativeSelect.Field
                 value={state.actionMode}
                 onChange={(e) =>
-                  set(
-                    "actionMode",
-                    e.target.value as "respect" | "force" | "disable",
-                  )
+                  set("actionMode", e.target.value as "respect" | "force" | "disable")
                 }
               >
                 <option value="respect">respect — passthrough</option>
@@ -428,10 +410,10 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
             </NativeSelect.Root>
             <Field.HelperText>
               Force injects cache_control: ephemeral on Anthropic (system[-1] +
-              messages[-1].content[-1], no-double-inject if already present).
-              OpenAI/Azure caching is automatic — force is a wire no-op but
-              still attributes + bumps the rule-hit counter. Gemini force WARNs
-              + passes through today (v1.1 will wire /cachedContents).
+              messages[-1].content[-1], no-double-inject if already present). OpenAI/Azure
+              caching is automatic — force is a wire no-op but still attributes + bumps
+              the rule-hit counter. Gemini force WARNs + passes through today (v1.1 will
+              wire /cachedContents).
             </Field.HelperText>
           </Field.Root>
           {state.actionMode === "force" && (
@@ -452,13 +434,11 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
                 placeholder="300"
               />
               {complaintFor("actionTtlSeconds") ? (
-                <Field.ErrorText>
-                  {complaintFor("actionTtlSeconds")}
-                </Field.ErrorText>
+                <Field.ErrorText>{complaintFor("actionTtlSeconds")}</Field.ErrorText>
               ) : (
                 <Field.HelperText>
-                  Clamped to [0, 86400]. Providers without explicit TTL support
-                  treat this as a best-effort hint.
+                  Clamped to [0, 86400]. Providers without explicit TTL support treat this
+                  as a best-effort hint.
                 </Field.HelperText>
               )}
             </Field.Root>

@@ -12,12 +12,7 @@ describe("the vocabulary type guards", () => {
       // `"constructor" in {}` and `"toString" in {}` are both true, so a
       // guard written with `in` would narrow these untrusted strings to a
       // tier or principal kind whose table lookup then yields a function.
-      for (const key of [
-        "constructor",
-        "toString",
-        "hasOwnProperty",
-        "__proto__",
-      ]) {
+      for (const key of ["constructor", "toString", "hasOwnProperty", "__proto__"]) {
         expect(isScopeTier(key)).toBe(false);
         expect(isStoredScopeTier(key)).toBe(false);
         expect(isPrincipalKind(key)).toBe(false);

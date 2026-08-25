@@ -2,11 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  LOCAL_GATEWAY_URL,
-  resolveGatewayBaseUrl,
-  SAAS_GATEWAY_URL,
-} from "../src";
+import { LOCAL_GATEWAY_URL, resolveGatewayBaseUrl, SAAS_GATEWAY_URL } from "../src";
 
 describe("resolveGatewayBaseUrl", () => {
   describe("given no explicit gateway env vars", () => {
@@ -28,9 +24,7 @@ describe("resolveGatewayBaseUrl", () => {
 
     describe("when the deployment is self-hosted", () => {
       it("resolves the local Go gateway port", () => {
-        expect(resolveGatewayBaseUrl({ isSaas: false })).toBe(
-          LOCAL_GATEWAY_URL,
-        );
+        expect(resolveGatewayBaseUrl({ isSaas: false })).toBe(LOCAL_GATEWAY_URL);
       });
     });
   });

@@ -1,10 +1,7 @@
 import { compareOrdinal } from "@langwatch/eventing";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import type { DeepPartial } from "~/utils/types";
-import {
-  sha256,
-  stableStringify,
-} from "../metric-processing/canonical/serialization";
+import { sha256, stableStringify } from "../metric-processing/canonical/serialization";
 import type { PIIRedactionLevel } from "../trace-processing/schemas/commands";
 import type { OtlpKeyValue } from "../trace-processing/schemas/otlp";
 import {
@@ -82,10 +79,7 @@ function longBitsToBigInt(value: UnknownRecord): bigint {
 }
 
 function integerDecimal(value: unknown, label: string, max: bigint): string {
-  if (
-    typeof value === "number" &&
-    (!Number.isSafeInteger(value) || value < 0)
-  ) {
+  if (typeof value === "number" && (!Number.isSafeInteger(value) || value < 0)) {
     throw new Error(`${label} is not a safely represented unsigned integer`);
   }
   let decimal: string;
@@ -115,9 +109,7 @@ function uint32Number(value: unknown, label: string): number {
 function timestampMs(timestamp: string): number {
   const ms = Number(BigInt(timestamp) / 1_000_000n);
   if (!Number.isSafeInteger(ms) || ms < 0) {
-    throw new Error(
-      `OTLP timestamp is outside the supported range: ${timestamp}`,
-    );
+    throw new Error(`OTLP timestamp is outside the supported range: ${timestamp}`);
   }
   return ms;
 }
@@ -134,8 +126,7 @@ function canonicalAnyValue(value: unknown): unknown {
     "kvlistValue",
   ].filter((key) => value[key] !== undefined && value[key] !== null);
   if (present.length === 0) return { type: "empty" };
-  if (present.length > 1)
-    throw new Error("OTLP AnyValue contains multiple values");
+  if (present.length > 1) throw new Error("OTLP AnyValue contains multiple values");
   const kind = present[0]!;
   if (kind === "stringValue") {
     if (typeof value.stringValue !== "string") {
@@ -177,9 +168,7 @@ function canonicalAnyValue(value: unknown): unknown {
     const raw = value.bytesValue;
     if (typeof raw === "string") {
       const unpadded = raw.replace(/=+$/, "");
-      const roundTrip = Buffer.from(raw, "base64")
-        .toString("base64")
-        .replace(/=+$/, "");
+      const roundTrip = Buffer.from(raw, "base64").toString("base64").replace(/=+$/, "");
       if (!/^[A-Za-z0-9+/]*={0,2}$/.test(raw) || roundTrip !== unpadded) {
         throw new Error("bytesValue is not valid base64");
       }
@@ -230,11 +219,7 @@ function canonicalAttributes(
     .sort((left, right) => {
       const byKey = compareOrdinal(left.key, right.key);
       return (
-        byKey ||
-        compareOrdinal(
-          stableStringify(left.value),
-          stableStringify(right.value),
-        )
+        byKey || compareOrdinal(stableStringify(left.value), stableStringify(right.value))
       );
     });
 }
@@ -260,9 +245,7 @@ type StringRef = {
  */
 /** The attribute an OTLP KeyValue node names, when this node is one. */
 function otlpAttributeName(value: UnknownRecord): string | undefined {
-  return typeof value.key === "string" && "value" in value
-    ? value.key
-    : undefined;
+  return typeof value.key === "string" && "value" in value ? value.key : undefined;
 }
 
 function collectStringRefs({
@@ -450,9 +433,7 @@ function buildRecord(args: {
   piiRedactionLevel: PIIRedactionLevel;
   acceptedAt: number;
 }): PreparedCanonicalLogRecord {
-  const resource = isRecord(args.resourceLog.resource)
-    ? args.resourceLog.resource
-    : {};
+  const resource = isRecord(args.resourceLog.resource) ? args.resourceLog.resource : {};
   const scope = isRecord(args.scopeLog.scope) ? args.scopeLog.scope : {};
   const log = args.logRecord;
   const scopeName = typeof scope.name === "string" ? scope.name : "";
@@ -463,9 +444,7 @@ function buildRecord(args: {
   const resourceAttributes = canonicalAttributes(resource.attributes);
   const scopeAttributes = canonicalAttributes(scope.attributes);
   const attributes = canonicalAttributes(log.attributes);
-  const flatAttributes = normalizeOtlpAttributeMap(
-    log.attributes as OtlpKeyValue[],
-  );
+  const flatAttributes = normalizeOtlpAttributeMap(log.attributes as OtlpKeyValue[]);
   const eventName =
     typeof log.eventName === "string"
       ? log.eventName
@@ -501,9 +480,7 @@ function buildRecord(args: {
   const canonicalPayloadValue = {
     resource: {
       schemaUrl:
-        typeof args.resourceLog.schemaUrl === "string"
-          ? args.resourceLog.schemaUrl
-          : "",
+        typeof args.resourceLog.schemaUrl === "string" ? args.resourceLog.schemaUrl : "",
       droppedAttributesCount: uint32Number(
         resource.droppedAttributesCount,
         "resource.droppedAttributesCount",
@@ -512,9 +489,7 @@ function buildRecord(args: {
     },
     scope: {
       schemaUrl:
-        typeof args.scopeLog.schemaUrl === "string"
-          ? args.scopeLog.schemaUrl
-          : "",
+        typeof args.scopeLog.schemaUrl === "string" ? args.scopeLog.schemaUrl : "",
       name: scopeName,
       version: scopeVersion,
       droppedAttributesCount: uint32Number(
@@ -529,8 +504,7 @@ function buildRecord(args: {
       timeUnixNano,
       observedTimeUnixNano,
       severityNumber,
-      severityText:
-        typeof log.severityText === "string" ? log.severityText : "",
+      severityText: typeof log.severityText === "string" ? log.severityText : "",
       body: canonicalBody,
       attributes,
       droppedAttributesCount: uint32Number(
@@ -549,8 +523,7 @@ function buildRecord(args: {
     );
   }
   const recordId = sha256(`${args.tenantId}\0${canonicalPayload}`);
-  const normalizedBody =
-    bodyText(canonicalBody) ?? stableStringify(canonicalBody);
+  const normalizedBody = bodyText(canonicalBody) ?? stableStringify(canonicalBody);
   const record: CanonicalLogRecord = {
     tenantId: args.tenantId,
     organizationId: args.organizationId,
@@ -559,15 +532,13 @@ function buildRecord(args: {
     resourceAttributesJson: stableStringify(resourceAttributes),
     resourceAttributesFlatJson: stableStringify(flatResourceAttributes),
     resourceAttributeKeys: [...new Set(resourceAttributes.map((a) => a.key))],
-    resourceDroppedAttributesCount:
-      canonicalPayloadValue.resource.droppedAttributesCount,
+    resourceDroppedAttributesCount: canonicalPayloadValue.resource.droppedAttributesCount,
     scopeSchemaUrl: canonicalPayloadValue.scope.schemaUrl,
     scopeName,
     scopeVersion,
     scopeAttributesJson: stableStringify(scopeAttributes),
     scopeAttributeKeys: [...new Set(scopeAttributes.map((a) => a.key))],
-    scopeDroppedAttributesCount:
-      canonicalPayloadValue.scope.droppedAttributesCount,
+    scopeDroppedAttributesCount: canonicalPayloadValue.scope.droppedAttributesCount,
     wireTraceId,
     wireSpanId,
     correlationTraceId: correlation.traceId,
@@ -638,16 +609,12 @@ export async function prepareCanonicalLogRecords(args: {
   for (const resourceLogRaw of args.request.resourceLogs ?? []) {
     if (!resourceLogRaw) continue;
     const resourceLog = structuredClone(resourceLogRaw) as UnknownRecord;
-    const resourceTemplate = isRecord(resourceLog.resource)
-      ? resourceLog.resource
-      : {};
+    const resourceTemplate = isRecord(resourceLog.resource) ? resourceLog.resource : {};
     for (const scopeLogRaw of (resourceLog.scopeLogs as unknown[]) ?? []) {
       if (!scopeLogRaw) continue;
       const scopeLog = structuredClone(scopeLogRaw) as UnknownRecord;
       const scopeTemplate = isRecord(scopeLog.scope) ? scopeLog.scope : {};
-      const logRecords = Array.isArray(scopeLog.logRecords)
-        ? scopeLog.logRecords
-        : [];
+      const logRecords = Array.isArray(scopeLog.logRecords) ? scopeLog.logRecords : [];
       for (const logRecordRaw of logRecords) {
         if (!isRecord(logRecordRaw)) {
           rejectedLogRecords++;
@@ -706,10 +673,7 @@ export function resolveLogCommandShardCount(value: string | undefined): number {
     : DEFAULT_LOG_COMMAND_SHARDS;
 }
 
-export function logCommandGroupKey(
-  recordId: string,
-  shardCount: number,
-): string {
+export function logCommandGroupKey(recordId: string, shardCount: number): string {
   const count = BigInt(clampLogCommandShardCount(shardCount));
   const lane = BigInt(`0x${sha256(recordId).slice(0, 16)}`) % count;
   return `log:${lane}`;

@@ -22,20 +22,12 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
   const messages = llm.messages ?? [];
 
   function updateMessage(index: number, partial: Partial<ChatMessage>) {
-    const updated = messages.map((m, i) =>
-      i === index ? { ...m, ...partial } : m,
-    );
+    const updated = messages.map((m, i) => (i === index ? { ...m, ...partial } : m));
     updateLLM({ messages: updated });
   }
 
   return (
-    <Box
-      rounded="lg"
-      border="1px solid"
-      borderColor="blue.500/20"
-      bg="blue.500/5"
-      p={4}
-    >
+    <Box rounded="lg" border="1px solid" borderColor="blue.500/20" bg="blue.500/5" p={4}>
       <Text fontSize="sm" fontWeight="semibold" color="blue.400" mb={3}>
         LLM Configuration
       </Text>
@@ -68,9 +60,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
             size="sm"
             type="number"
             value={llm.temperature ?? 0.7}
-            onChange={(e) =>
-              updateLLM({ temperature: parseFloat(e.target.value) })
-            }
+            onChange={(e) => updateLLM({ temperature: parseFloat(e.target.value) })}
             step={0.1}
             min={0}
             max={2}
@@ -132,9 +122,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
               variant="ghost"
               color="fg.muted"
               _hover={{ color: "red.400" }}
-              onClick={() =>
-                updateLLM({ messages: messages.filter((_, j) => j !== i) })
-              }
+              onClick={() => updateLLM({ messages: messages.filter((_, j) => j !== i) })}
               alignSelf="flex-start"
             >
               <Trash2 size={12} />

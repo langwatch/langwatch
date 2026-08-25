@@ -51,7 +51,9 @@ regexes = ['''^0123456789abcdef0123456789abcdef$''']
 [[allowlists]]
 description = "Literal fixture ids (conversation-1) in the process-store suite, not credentials"
 targetRules = ["generic-api-key"]
-paths = ['''platform/app/src/server/event-sourcing/process-manager/stores/__tests__/prismaProcessStore\.integration\.test\.ts''']
+paths = [
+  '''platform/app/src/server/event-sourcing/process-manager/stores/__tests__/prismaProcessStore\.integration\.test\.ts''',
+]
 
 # The self-hosted license fixtures are base64 payloads signed with the TEST
 # keypair that sits beside them in `fixtures/testKeys.ts`, checked in on
@@ -105,10 +107,7 @@ regexes = ['''^(0123456789abcdef){4}$''']
 # would add little: the value is the axis that matters.
 [[allowlists]]
 description = "AWS-shaped fixture credentials planted by the secrets-gate scoping tests"
-regexes = [
-  '''AKIAQYLPMN5HHHFPZAM2''',
-  '''A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0''',
-]
+regexes = ['''AKIAQYLPMN5HHHFPZAM2''', '''A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0''']
 
 # The synthetic credentials the secrets-redaction suite feeds to the redactor.
 # This suite's whole job is to hand credential-shaped strings to `redact()` and
@@ -174,7 +173,9 @@ paths = [
 [[allowlists]]
 description = "Synthetic JWT-shaped fixture proving bearer-token redaction; signs nothing, grants nothing"
 targetRules = ["jwt", "generic-api-key"]
-paths = ['''platform/app/src/server/stored-objects/__tests__/azure-secret-hygiene\.unit\.test\.ts''']
+paths = [
+  '''platform/app/src/server/stored-objects/__tests__/azure-secret-hygiene\.unit\.test\.ts''',
+]
 
 # The three synthetic credentials the secret-redaction tests assign to a named
 # key. Same argument as the Azure fixture above: a test that proves a secret is
@@ -207,11 +208,7 @@ paths = ['''platform/app/src/server/stored-objects/__tests__/azure-secret-hygien
 [[allowlists]]
 description = "Synthetic credential fixtures in the secret-redaction tests; issued by nobody, revocable nowhere"
 targetRules = ["generic-api-key"]
-regexes = [
-  '''^sk-live-abc123$''',
-  '''^hunter2-signing$''',
-  '''^tok-live-abc123$''',
-]
+regexes = ['''^sk-live-abc123$''', '''^hunter2-signing$''', '''^tok-live-abc123$''']
 
 # `ik-lw-fresh1234567890_secret`, the stand-in ingestion token an earlier commit
 # on the ingest-key rotation branch handed the mocked `apiKeys.create`. The tip

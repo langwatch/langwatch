@@ -265,8 +265,7 @@ describe("virtualKeys.update — guardrail attach", () => {
         where: { id: VK_ID },
       });
       expect(
-        (vk.config as { guardrailAttachments?: unknown[] })
-          .guardrailAttachments ?? [],
+        (vk.config as { guardrailAttachments?: unknown[] }).guardrailAttachments ?? [],
       ).toEqual([]);
     });
   });
@@ -323,15 +322,12 @@ describe("virtualKeys.update — guardrail attach", () => {
         organizationId: ORG_ID,
         id: VK_ID,
         config: {
-          guardrailAttachments: [
-            { direction: "pre", guardrailIds: [DEMO_GUARDRAIL_ID] },
-          ],
+          guardrailAttachments: [{ direction: "pre", guardrailIds: [DEMO_GUARDRAIL_ID] }],
         },
       });
 
       expect(
-        (updated.config as { guardrailAttachments?: unknown[] })
-          .guardrailAttachments,
+        (updated.config as { guardrailAttachments?: unknown[] }).guardrailAttachments,
       ).toEqual([{ direction: "pre", guardrailIds: [DEMO_GUARDRAIL_ID] }]);
 
       const auditRows = await prisma.auditLog.findMany({

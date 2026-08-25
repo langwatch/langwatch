@@ -88,9 +88,7 @@ describe("S3Driver", () => {
         });
         s3Client.send.mockRejectedValueOnce(noSuchKey);
 
-        await expect(driver.get(TEST_URI)).rejects.toBeInstanceOf(
-          ObjectNotFoundError,
-        );
+        await expect(driver.get(TEST_URI)).rejects.toBeInstanceOf(ObjectNotFoundError);
       });
     });
   });

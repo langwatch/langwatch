@@ -49,7 +49,11 @@ export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promis
   // resolving against the LangWatch workspace.
   writeFileSync(
     join(cliRoot, "package.json"),
-    JSON.stringify({ name: "langwatch-cli-host", private: true, version: "0.0.0" }, null, 2) + "\n",
+    JSON.stringify(
+      { name: "langwatch-cli-host", private: true, version: "0.0.0" },
+      null,
+      2,
+    ) + "\n",
   );
 
   const pnpm = await resolvePnpm(ctx.paths);
@@ -59,7 +63,9 @@ export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promis
   });
 
   if (!existsSync(entry)) {
-    throw new Error(`langwatch CLI ${LANGY_CLI_VERSION} installed but ${entry} is missing`);
+    throw new Error(
+      `langwatch CLI ${LANGY_CLI_VERSION} installed but ${entry} is missing`,
+    );
   }
 
   // A shell shim rather than a symlink into node_modules/.bin: the workers get
@@ -70,7 +76,9 @@ export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promis
   // backtick that the directory name happens to contain.
   mkdirSync(ctx.paths.bin, { recursive: true });
   const sq = (v: string) => `'${v.replaceAll("'", `'\\''`)}'`;
-  writeFileSync(shim, `#!/bin/sh\nexec ${sq(process.execPath)} ${sq(entry)} "$@"\n`, { mode: 0o755 });
+  writeFileSync(shim, `#!/bin/sh\nexec ${sq(process.execPath)} ${sq(entry)} "$@"\n`, {
+    mode: 0o755,
+  });
   chmodSync(shim, 0o755);
   writeFileSync(marker, LANGY_CLI_VERSION);
 

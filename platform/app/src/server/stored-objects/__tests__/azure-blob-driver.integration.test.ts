@@ -172,9 +172,7 @@ describe("AzureBlobDriver against a real Azurite emulator (path-style addressing
       const stream = await driver.get(uri);
       const chunks: Buffer[] = [];
       for await (const chunk of stream) chunks.push(chunk as Buffer);
-      expect(Buffer.concat(chunks).toString("utf8")).toBe(
-        "azurite round-trip payload",
-      );
+      expect(Buffer.concat(chunks).toString("utf8")).toBe("azurite round-trip payload");
 
       await driver.delete(uri);
       expect(await driver.exists(uri)).toBe(false);
@@ -210,9 +208,7 @@ describe("AzureBlobDriver against a real Azurite emulator (path-style addressing
       const stream = await driverWithSlash.get(uri);
       const chunks: Buffer[] = [];
       for await (const chunk of stream) chunks.push(chunk as Buffer);
-      expect(Buffer.concat(chunks).toString("utf8")).toBe(
-        "trailing slash payload",
-      );
+      expect(Buffer.concat(chunks).toString("utf8")).toBe("trailing slash payload");
 
       await driverWithSlash.delete(uri);
     });
@@ -299,9 +295,7 @@ describe("StoredObjectsService against a real Azurite emulator", () => {
 
       const chunks: Buffer[] = [];
       for await (const chunk of result.stream) chunks.push(chunk as Buffer);
-      expect(Buffer.concat(chunks).toString("utf8")).toBe(
-        "azure media payload",
-      );
+      expect(Buffer.concat(chunks).toString("utf8")).toBe("azure media payload");
     });
   });
 });

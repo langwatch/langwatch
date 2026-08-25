@@ -1,7 +1,4 @@
-import type {
-  FoldProjectionStore,
-  ProjectionStoreContext,
-} from "@langwatch/eventing";
+import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import type { GatewaySpendState } from "./gatewaySpend.foldProjection";
 
@@ -23,9 +20,7 @@ import type { GatewaySpendState } from "./gatewaySpend.foldProjection";
  * the ReplacingMergeTree version (the fold's monotonic updatedAt) replaces
  * rather than duplicates.
  */
-export class GatewaySpendStore
-  implements FoldProjectionStore<GatewaySpendState>
-{
+export class GatewaySpendStore implements FoldProjectionStore<GatewaySpendState> {
   constructor(private readonly repo: GatewaySpendEventsRepository) {}
 
   async get(
@@ -38,10 +33,7 @@ export class GatewaySpendStore
     });
   }
 
-  async store(
-    state: GatewaySpendState,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
+  async store(state: GatewaySpendState, context: ProjectionStoreContext): Promise<void> {
     await this.repo.upsertFromFold([
       {
         tenantId: String(context.tenantId),

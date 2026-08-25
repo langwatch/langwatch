@@ -1,16 +1,8 @@
 import { Button, Circle, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { LuChevronDown } from "react-icons/lu";
-import {
-  MenuContent,
-  MenuItem,
-  MenuRoot,
-  MenuTrigger,
-} from "~/components/ui/menu";
-import {
-  getDisplayHandle,
-  getPromptFolder,
-} from "@langwatch/prompt-web";
+import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "~/components/ui/menu";
+import { getDisplayHandle, getPromptFolder } from "@langwatch/prompt-web";
 import { usePromptTabSummary } from "../tab/usePromptTabSummary";
 
 interface PromptTabSwitcherProps {
@@ -144,12 +136,7 @@ function PromptTabSwitcherRow({
       fontWeight={isActive ? "semibold" : undefined}
     >
       <HStack gap={2} width="full" minWidth={0}>
-        <Text
-          textOverflow="ellipsis"
-          whiteSpace="nowrap"
-          overflow="hidden"
-          minWidth={0}
-        >
+        <Text textOverflow="ellipsis" whiteSpace="nowrap" overflow="hidden" minWidth={0}>
           {/* The row has room the tab does not, so it carries the folder. It is
               what tells two prompts both named "welcome" apart. */}
           {folder && (

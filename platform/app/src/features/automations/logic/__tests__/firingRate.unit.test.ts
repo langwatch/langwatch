@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  estimateFiringRate,
-  estimateRatePerDay,
-} from "@langwatch/automation-web";
+import { estimateFiringRate, estimateRatePerDay } from "@langwatch/automation-web";
 
 const immediate = (matchesLast7Days: number) =>
   estimateFiringRate({

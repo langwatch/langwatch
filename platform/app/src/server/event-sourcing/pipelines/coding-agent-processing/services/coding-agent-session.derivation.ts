@@ -384,9 +384,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
  * without drifting.
  */
 export function meanTtftMs(state: CodingAgentSessionData): number | null {
-  return state.ttftSamples > 0
-    ? Math.round(state.ttftMsTotal / state.ttftSamples)
-    : null;
+  return state.ttftSamples > 0 ? Math.round(state.ttftMsTotal / state.ttftSamples) : null;
 }
 
 /**
@@ -395,8 +393,7 @@ export function meanTtftMs(state: CodingAgentSessionData): number | null {
  * prefix keeps changing and every turn is re-paying for it.
  */
 export function cacheHitRate(state: CodingAgentSessionData): number | null {
-  const total =
-    state.cacheReadTokens + state.cacheCreationTokens + state.inputTokens;
+  const total = state.cacheReadTokens + state.cacheCreationTokens + state.inputTokens;
   return total > 0 ? state.cacheReadTokens / total : null;
 }
 
@@ -429,11 +426,7 @@ export function addToBoundedSet(set: string[], value: string): string[] {
 }
 
 /** Increment a bounded, low-cardinality counter map. */
-function bump(
-  map: Record<string, number>,
-  key: string,
-  by = 1,
-): Record<string, number> {
+function bump(map: Record<string, number>, key: string, by = 1): Record<string, number> {
   if (map[key] === undefined && Object.keys(map).length >= MAX_SET) return map;
   return { ...map, [key]: (map[key] ?? 0) + by };
 }
@@ -527,9 +520,7 @@ function withIdentity(
   return {
     ...state,
     agentVersion:
-      state.agentVersion ??
-      str(attrs["app.version"]) ??
-      str(attrs["service.version"]),
+      state.agentVersion ?? str(attrs["app.version"]) ?? str(attrs["service.version"]),
     terminalType: state.terminalType ?? str(attrs["terminal.type"]),
     entrypoint: state.entrypoint ?? str(attrs["app.entrypoint"]),
     // Claude stamps user identity on log events, not spans; other agents send
@@ -587,14 +578,12 @@ function foldModelCall(
   const isRebuild =
     next.previousCallContextTokens > 0 &&
     cacheCreationTokens >= CACHE_REBUILD_MIN_TOKENS &&
-    cacheCreationTokens / next.previousCallContextTokens >=
-      CACHE_REBUILD_RATIO_THRESHOLD;
+    cacheCreationTokens / next.previousCallContextTokens >= CACHE_REBUILD_RATIO_THRESHOLD;
 
   return {
     ...next,
     modelCalls: next.modelCalls + 1,
-    modelCallMs:
-      next.modelCallMs + (num(attrs.duration_ms) || fallbackDurationMs),
+    modelCallMs: next.modelCallMs + (num(attrs.duration_ms) || fallbackDurationMs),
     ttftMsTotal: next.ttftMsTotal + ttft,
     ttftSamples: next.ttftSamples + (ttft > 0 ? 1 : 0),
     // Attempts includes the first try, so attempts > modelCalls means the
@@ -656,9 +645,7 @@ function pricedFromTokens(facts: Record<string, unknown>): number {
  * same stamp the trace pipeline's extractor puts on the identical span, so
  * the session and the trace price one call to one figure.
  */
-function claudeCallTokenFacts(
-  attrs: Record<string, unknown>,
-): Record<string, unknown> {
+function claudeCallTokenFacts(attrs: Record<string, unknown>): Record<string, unknown> {
   const cacheWriteTokens = num(attrs.cache_creation_tokens);
   return {
     ...attrs,
@@ -684,18 +671,14 @@ function claudeCallTokenFacts(
  * is the same value the trace is priced from, which is what makes a codex
  * session and its trace state one figure.
  */
-function codexTurnTokenFacts(
-  attrs: Record<string, unknown>,
-): Record<string, unknown> {
+function codexTurnTokenFacts(attrs: Record<string, unknown>): Record<string, unknown> {
   return {
     ...attrs,
     input_tokens: num(attrs[CODEX.ATTR.INPUT_TOKENS]),
     output_tokens: num(attrs[CODEX.ATTR.OUTPUT_TOKENS]),
     cache_read_tokens: num(attrs[CODEX.ATTR.CACHE_READ_TOKENS]),
     cache_creation_tokens: num(attrs[CODEX.ATTR.CACHE_CREATION_TOKENS]),
-    model:
-      str(attrs["gen_ai.request.model"]) ??
-      str(attrs[CODEX.ATTR.RESPONSE_MODEL]),
+    model: str(attrs["gen_ai.request.model"]) ?? str(attrs[CODEX.ATTR.RESPONSE_MODEL]),
   };
 }
 
@@ -779,8 +762,7 @@ export function applySpanToCodingAgentSession({
   if (span.name === CLAUDE.SPAN.BLOCKED_ON_USER) {
     return {
       ...state,
-      blockedOnUserMs:
-        state.blockedOnUserMs + (num(attrs.duration_ms) || durationMs),
+      blockedOnUserMs: state.blockedOnUserMs + (num(attrs.duration_ms) || durationMs),
     };
   }
 
@@ -879,10 +861,7 @@ function foldToolInvocation(
   // Codex spells the server as a bare `mcp_server` on its tool_result events
   // (empty string for a builtin tool, which str() already reads as absent).
   const mcpServer =
-    str(attrs["mcp_server.name"]) ??
-    str(attrs.mcp_server) ??
-    fromName?.server ??
-    null;
+    str(attrs["mcp_server.name"]) ?? str(attrs.mcp_server) ?? fromName?.server ?? null;
   if (mcpServer !== null) {
     withTool.mcpServers = addToBoundedSet(next.mcpServers, mcpServer);
   }
@@ -1025,18 +1004,14 @@ export function applyLogToCodingAgentSession({
       });
       return {
         ...named,
-        repositoryHost:
-          base.repositoryHost ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]),
+        repositoryHost: base.repositoryHost ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]),
         repositoryOwner:
           base.repositoryOwner ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]),
-        repositoryName:
-          base.repositoryName ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]),
+        repositoryName: base.repositoryName ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]),
         gitWorktree: base.gitWorktree ?? str(attrs[LANGWATCH.ATTR.WORKTREE]),
         gitBranch: branch ?? base.gitBranch,
         gitBranches:
-          branch !== null
-            ? addToBoundedSet(base.gitBranches, branch)
-            : base.gitBranches,
+          branch !== null ? addToBoundedSet(base.gitBranches, branch) : base.gitBranches,
       };
     }
 
@@ -1046,8 +1021,7 @@ export function applyLogToCodingAgentSession({
         ...base,
         // Bytes of tool OUTPUT fed back into the context — the usual cause of a
         // session bloating its way into a compaction.
-        toolResultBytes:
-          base.toolResultBytes + num(attrs.tool_result_size_bytes),
+        toolResultBytes: base.toolResultBytes + num(attrs.tool_result_size_bytes),
         toolInputBytes: base.toolInputBytes + num(attrs.tool_input_size_bytes),
         errorTypes:
           errorType !== null && scalarStr(attrs.success) === "false"
@@ -1060,17 +1034,13 @@ export function applyLogToCodingAgentSession({
       // too would count every carried command twice. Its bytes still fold —
       // it is the run that is declined, not the record.
       const wrapperNames =
-        agent !== undefined
-          ? WRAPPER_TOOL_NAMES_BY_AGENT_ID.get(agent)
-          : undefined;
+        agent !== undefined ? WRAPPER_TOOL_NAMES_BY_AGENT_ID.get(agent) : undefined;
       const wrapped = wrapperNames?.has(str(attrs.tool_name) ?? "") === true;
       // For an agent whose tool runs live on events — every logs-only agent,
       // and codex, which has no tool span — this event IS the tool run:
       // name, duration, outcome, which span-bearing agents fold from the
       // tool span instead.
-      return !wrapped &&
-        agent !== undefined &&
-        EVENTS_FOLD_TOOL_RUNS_AGENT_IDS.has(agent)
+      return !wrapped && agent !== undefined && EVENTS_FOLD_TOOL_RUNS_AGENT_IDS.has(agent)
         ? foldToolInvocation(withBytes, {
             attrs,
             failed: scalarStr(attrs.success) === "false",
@@ -1105,8 +1075,7 @@ export function applyLogToCodingAgentSession({
         ...base,
         apiErrors: base.apiErrors + 1,
         rateLimited:
-          base.rateLimited +
-          (scalarStr(attrs.status_code) === RATE_LIMIT_STATUS ? 1 : 0),
+          base.rateLimited + (scalarStr(attrs.status_code) === RATE_LIMIT_STATUS ? 1 : 0),
       };
 
     case CLAUDE.EVENT.RETRIES_EXHAUSTED:
@@ -1143,10 +1112,8 @@ export function applyLogToCodingAgentSession({
       return {
         ...base,
         compactions: base.compactions + 1,
-        compactionTokensBefore:
-          base.compactionTokensBefore + num(attrs.pre_tokens),
-        compactionTokensAfter:
-          base.compactionTokensAfter + num(attrs.post_tokens),
+        compactionTokensBefore: base.compactionTokensBefore + num(attrs.pre_tokens),
+        compactionTokensAfter: base.compactionTokensAfter + num(attrs.post_tokens),
         // A manual /compact and an auto-compaction tell different stories
         // about the session; "unknown" is the honest bucket for telemetry
         // that predates the trigger attribute.
@@ -1279,10 +1246,7 @@ export function applyMetricToCodingAgentSession({
   if (normalizeMetricName(metric.metricName) === null) return base;
 
   const isNewUnit = state.metricSeries[metric.seriesId] === undefined;
-  if (
-    isNewUnit &&
-    Object.keys(state.metricSeries).length >= MAX_METRIC_SERIES
-  ) {
+  if (isNewUnit && Object.keys(state.metricSeries).length >= MAX_METRIC_SERIES) {
     return base;
   }
 
@@ -1306,9 +1270,7 @@ export function applyMetricToCodingAgentSession({
  * fields are EXCLUSIVELY metric-fed (no span or log path writes them), so a
  * full overwrite cannot clobber another signal's work.
  */
-function recomputeMetricOverlay(
-  state: CodingAgentSessionData,
-): CodingAgentSessionData {
+function recomputeMetricOverlay(state: CodingAgentSessionData): CodingAgentSessionData {
   let linesAdded = 0;
   let linesRemoved = 0;
   let commits = 0;

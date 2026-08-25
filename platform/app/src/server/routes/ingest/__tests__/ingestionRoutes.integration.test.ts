@@ -131,14 +131,10 @@ async function deleteSeededOrg(seed: SeededOrg | null): Promise<void> {
   await prisma.organization
     .delete({ where: { id: seed.organizationId } })
     .catch(() => undefined);
-  await prisma.user
-    .delete({ where: { id: seed.userId } })
-    .catch(() => undefined);
+  await prisma.user.delete({ where: { id: seed.userId } }).catch(() => undefined);
 }
 
-function buildOtlpJsonBody(
-  opts: { spanCount?: number; spanNamePrefix?: string } = {},
-): {
+function buildOtlpJsonBody(opts: { spanCount?: number; spanNamePrefix?: string } = {}): {
   body: ArrayBuffer;
   spanCount: number;
 } {
@@ -174,8 +170,7 @@ function buildOtlpJsonBody(
       },
     ],
   };
-  const body = new TextEncoder().encode(JSON.stringify(payload))
-    .buffer as ArrayBuffer;
+  const body = new TextEncoder().encode(JSON.stringify(payload)).buffer as ArrayBuffer;
   return { body, spanCount };
 }
 
@@ -195,9 +190,7 @@ function buildOtlpLogsJsonBody(): ArrayBuffer {
                 severityNumber: 9,
                 severityText: "INFO",
                 body: { stringValue: "ingest-canary-log" },
-                attributes: [
-                  { key: "event.name", value: { stringValue: "canary" } },
-                ],
+                attributes: [{ key: "event.name", value: { stringValue: "canary" } }],
               },
             ],
           },
@@ -205,16 +198,13 @@ function buildOtlpLogsJsonBody(): ArrayBuffer {
       },
     ],
   };
-  return new TextEncoder().encode(JSON.stringify(payload))
-    .buffer as ArrayBuffer;
+  return new TextEncoder().encode(JSON.stringify(payload)).buffer as ArrayBuffer;
 }
 
 const handleTraceSpy = vi.fn(
-  async (
-    _tenantId: string,
-    _request: unknown,
-    _piiRedactionLevel?: unknown,
-  ) => ({ rejectedSpans: 0 }),
+  async (_tenantId: string, _request: unknown, _piiRedactionLevel?: unknown) => ({
+    rejectedSpans: 0,
+  }),
 );
 const handleLogSpy = vi.fn(async (_args: unknown) => undefined);
 
@@ -385,30 +375,21 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
         const [tenantId, parsedRequest] = handleTraceSpy.mock.calls[0]!;
         expect(tenantId).toBe(govProject.id);
 
-        const allSpans = ((parsedRequest as any).resourceSpans ?? []).flatMap(
-          (rs: any) =>
-            (rs.scopeSpans ?? []).flatMap((ss: any) => ss.spans ?? []),
+        const allSpans = ((parsedRequest as any).resourceSpans ?? []).flatMap((rs: any) =>
+          (rs.scopeSpans ?? []).flatMap((ss: any) => ss.spans ?? []),
         );
         expect(allSpans).toHaveLength(spanCount);
 
-        const stampedAttrs = (allSpans[0]?.attributes ?? []).map(
-          (a: any) => a.key,
-        );
+        const stampedAttrs = (allSpans[0]?.attributes ?? []).map((a: any) => a.key);
         expect(stampedAttrs).toContain("langwatch.origin.kind");
         expect(stampedAttrs).toContain("langwatch.ingestion_source.id");
-        expect(stampedAttrs).toContain(
-          "langwatch.ingestion_source.organization_id",
-        );
-        expect(stampedAttrs).toContain(
-          "langwatch.ingestion_source.source_type",
-        );
+        expect(stampedAttrs).toContain("langwatch.ingestion_source.organization_id");
+        expect(stampedAttrs).toContain("langwatch.ingestion_source.source_type");
 
         const sourceIdAttr = (allSpans[0]?.attributes ?? []).find(
           (a: any) => a.key === "langwatch.ingestion_source.id",
         );
-        expect(sourceIdAttr?.value?.stringValue).toBe(
-          otelSeed!.ingestionSourceId,
-        );
+        expect(sourceIdAttr?.value?.stringValue).toBe(otelSeed!.ingestionSourceId);
 
         const orgIdAttr = (allSpans[0]?.attributes ?? []).find(
           (a: any) => a.key === "langwatch.ingestion_source.organization_id",
@@ -437,9 +418,8 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
         );
         expect(res.status).toBe(202);
         const [, parsedRequest] = handleTraceSpy.mock.calls[0]!;
-        const allSpans = ((parsedRequest as any).resourceSpans ?? []).flatMap(
-          (rs: any) =>
-            (rs.scopeSpans ?? []).flatMap((ss: any) => ss.spans ?? []),
+        const allSpans = ((parsedRequest as any).resourceSpans ?? []).flatMap((rs: any) =>
+          (rs.scopeSpans ?? []).flatMap((ss: any) => ss.spans ?? []),
         );
         const userEmailAttr = (allSpans[0]?.attributes ?? []).find(
           (a: any) => a.key === "user.email",
@@ -588,8 +568,7 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
             }[];
           };
         };
-        const record =
-          logRequest.resourceLogs?.[0]?.scopeLogs?.[0]?.logRecords?.[0];
+        const record = logRequest.resourceLogs?.[0]?.scopeLogs?.[0]?.logRecords?.[0];
         const attrKeys = (record?.attributes ?? []).map((a) => a.key);
         expect(attrKeys).toContain("langwatch.origin.kind");
         expect(attrKeys).toContain("langwatch.ingestion_source.id");
@@ -699,9 +678,8 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
         };
         expect(callArgs.tenantId).toBe(govProject.id);
 
-        const allRecords = (callArgs.logRequest.resourceLogs ?? []).flatMap(
-          (rl: any) =>
-            (rl.scopeLogs ?? []).flatMap((sl: any) => sl.logRecords ?? []),
+        const allRecords = (callArgs.logRequest.resourceLogs ?? []).flatMap((rl: any) =>
+          (rl.scopeLogs ?? []).flatMap((sl: any) => sl.logRecords ?? []),
         );
         expect(allRecords).toHaveLength(1);
 
@@ -709,9 +687,7 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
         const attrKeys = (record.attributes ?? []).map((a: any) => a.key);
         expect(attrKeys).toContain("langwatch.origin.kind");
         expect(attrKeys).toContain("langwatch.ingestion_source.id");
-        expect(attrKeys).toContain(
-          "langwatch.ingestion_source.organization_id",
-        );
+        expect(attrKeys).toContain("langwatch.ingestion_source.organization_id");
         expect(attrKeys).toContain("langwatch.ingestion_source.source_type");
 
         const sourceTypeAttr = (record.attributes ?? []).find(

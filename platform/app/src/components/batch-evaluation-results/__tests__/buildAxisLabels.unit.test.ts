@@ -67,11 +67,7 @@ describe("buildAxisLabels", () => {
 
     it("needs no disambiguation suffixes", () => {
       const labels = buildAxisLabels(
-        [
-          "support-assistant-warm",
-          "support-assistant-formal",
-          "support-assistant-blunt",
-        ],
+        ["support-assistant-warm", "support-assistant-formal", "support-assistant-blunt"],
         16,
       );
 
@@ -93,10 +89,7 @@ describe("buildAxisLabels", () => {
   describe("given a name longer than the limit even after stripping", () => {
     it("truncates it", () => {
       const labels = buildAxisLabels(
-        [
-          "support-assistant-extremely-verbose-variant-name",
-          "support-assistant-blunt",
-        ],
+        ["support-assistant-extremely-verbose-variant-name", "support-assistant-blunt"],
         12,
       );
 
@@ -107,10 +100,7 @@ describe("buildAxisLabels", () => {
 
   describe("when two labels still collide after trimming", () => {
     it("indexes them so no two bars are labelled the same", () => {
-      const labels = buildAxisLabels(
-        ["identical-name", "identical-name", "other"],
-        20,
-      );
+      const labels = buildAxisLabels(["identical-name", "identical-name", "other"], 20);
 
       expect(labels[0]).toBe("identical-name (1)");
       expect(labels[1]).toBe("identical-name (2)");

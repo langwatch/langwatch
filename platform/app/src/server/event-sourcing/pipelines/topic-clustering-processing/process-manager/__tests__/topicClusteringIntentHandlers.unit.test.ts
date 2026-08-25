@@ -9,9 +9,8 @@ async function metricValue(
   if (!metric) return 0;
   const { values } = await metric.get();
   return (
-    values.find((v) =>
-      Object.entries(labels).every(([k, val]) => v.labels[k] === val),
-    )?.value ?? 0
+    values.find((v) => Object.entries(labels).every(([k, val]) => v.labels[k] === val))
+      ?.value ?? 0
   );
 }
 
@@ -210,9 +209,9 @@ describe("createTopicClusteringRunHandler", () => {
         commands: () => commands,
       });
 
-      await expect(
-        run(makePayload(), makeContext({ attempt: 2 })),
-      ).rejects.toThrow("langevals unavailable");
+      await expect(run(makePayload(), makeContext({ attempt: 2 }))).rejects.toThrow(
+        "langevals unavailable",
+      );
 
       expect(commands.recordClusteringRunFailed).not.toHaveBeenCalled();
       expect(commands.recordClusteringRunCompleted).not.toHaveBeenCalled();

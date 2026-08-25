@@ -26,9 +26,7 @@ type LangWatchLambdaConfig = {
 const parseLambdaConfig = (): LangWatchLambdaConfig => {
   const configStr = process.env.LANGWATCH_NLP_LAMBDA_CONFIG;
   if (!configStr) {
-    throw new Error(
-      "LANGWATCH_NLP_LAMBDA_CONFIG environment variable is required",
-    );
+    throw new Error("LANGWATCH_NLP_LAMBDA_CONFIG environment variable is required");
   }
 
   try {
@@ -134,9 +132,7 @@ const checkLambdaExists = async (
   functionName: string,
 ): Promise<boolean> => {
   try {
-    await lambdaClient.send(
-      new GetFunctionCommand({ FunctionName: functionName }),
-    );
+    await lambdaClient.send(new GetFunctionCommand({ FunctionName: functionName }));
     return true;
   } catch (error: any) {
     if (error.name === "ResourceNotFoundException") {
@@ -216,9 +212,7 @@ export default async function execute() {
         }
 
         logger.info(
-          `Last event time for ${
-            func.FunctionName
-          }: ${lastEventTime.toISOString()}`,
+          `Last event time for ${func.FunctionName}: ${lastEventTime.toISOString()}`,
         );
 
         // Delete Lambda function if older than 7 days
@@ -228,9 +222,7 @@ export default async function execute() {
           );
           await deleteLambdaFunction(lambda, func.FunctionName);
         } else {
-          logger.info(
-            `Function ${func.FunctionName} is recent, keeping Lambda`,
-          );
+          logger.info(`Function ${func.FunctionName} is recent, keeping Lambda`);
         }
 
         // Delete log group if older than 365 days
@@ -258,9 +250,7 @@ export default async function execute() {
     if (!logGroupsResponse.logGroups) {
       logger.info("No langwatch_nlp log groups found");
     } else {
-      logger.info(
-        `Found ${logGroupsResponse.logGroups.length} langwatch_nlp log groups`,
-      );
+      logger.info(`Found ${logGroupsResponse.logGroups.length} langwatch_nlp log groups`);
 
       for (const logGroup of logGroupsResponse.logGroups) {
         if (!logGroup.logGroupName) continue;
@@ -274,9 +264,7 @@ export default async function execute() {
         const lambdaExists = await checkLambdaExists(lambda, functionName);
 
         if (lambdaExists) {
-          logger.info(
-            `Lambda function ${functionName} still exists, skipping log group`,
-          );
+          logger.info(`Lambda function ${functionName} still exists, skipping log group`);
           continue;
         }
 

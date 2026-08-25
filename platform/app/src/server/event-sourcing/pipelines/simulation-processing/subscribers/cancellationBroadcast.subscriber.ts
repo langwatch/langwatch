@@ -5,9 +5,7 @@ import { publishCancellation } from "../../../../scenarios/cancellation-channel"
 import type { SimulationRunStateData } from "../projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "../schemas/events";
 
-const logger = createLogger(
-  "langwatch:simulation-processing:cancellation-broadcast",
-);
+const logger = createLogger("langwatch:simulation-processing:cancellation-broadcast");
 
 export interface CancellationBroadcastSubscriberDeps {
   publisher: CancellationPublisher | null;

@@ -1,10 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  type S3Client,
-} from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import { Ksuid } from "@langwatch/ksuid";
 import type { Logger } from "@langwatch/observability";
 import { z } from "zod";
@@ -77,9 +73,7 @@ function parseKsuidCreatedAtMs(eventId: string): number | null {
 }
 
 /** Resolves the per-organization S3 client + bucket for a project. */
-export type S3ClientResolver = (
-  projectId: string,
-) => Promise<S3ClientResolution>;
+export type S3ClientResolver = (projectId: string) => Promise<S3ClientResolution>;
 
 /**
  * Thrown by `BlobStore.getFromEventLog` when the requested row is not found or
@@ -290,10 +284,7 @@ function projectIdFromLegacySpoolKey(spoolRef: string): string {
  * it to the command's own tenant keeps the compatibility window from reopening
  * the hole the v2 format closes.
  */
-function assertLegacySpoolKeyBelongsTo(
-  spoolRef: string,
-  projectId: string,
-): void {
+function assertLegacySpoolKeyBelongsTo(spoolRef: string, projectId: string): void {
   const keyProjectId = projectIdFromLegacySpoolKey(spoolRef);
   if (keyProjectId !== projectId) {
     throw new Error(
@@ -534,9 +525,7 @@ export class BlobStore {
               0,
               Math.floor(occurredAtMs - EVENT_LOG_OCCURRED_AT_WINDOW_MS),
             ),
-            occurredAtToMs: Math.floor(
-              occurredAtMs + EVENT_LOG_OCCURRED_AT_WINDOW_MS,
-            ),
+            occurredAtToMs: Math.floor(occurredAtMs + EVENT_LOG_OCCURRED_AT_WINDOW_MS),
           }
         : {};
 
@@ -666,10 +655,7 @@ export class BlobStore {
    * v1 read path: the reference IS the S3 key. Retained for one release so
    * commands queued across the deploy still resolve. See {@link isLegacySpoolRef}.
    */
-  private async getLegacySpool(
-    spoolRef: string,
-    projectId: string,
-  ): Promise<Buffer> {
+  private async getLegacySpool(spoolRef: string, projectId: string): Promise<Buffer> {
     const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
     const { Body } = await s3Client.send(
       new GetObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
@@ -751,9 +737,7 @@ export class BlobStore {
           return;
         }
         const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
-        await s3Client.send(
-          new DeleteObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
-        );
+        await s3Client.send(new DeleteObjectCommand({ Bucket: s3Bucket, Key: spoolRef }));
         return;
       }
       const { uri, objectStore } = await this.mintSpoolUri({

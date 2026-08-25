@@ -42,10 +42,9 @@ describe("a dataset value too long to fit its row", () => {
   const expandCell = async () => {
     const user = userEvent.setup();
 
-    render(
-      <ExpandableDatasetCell value={OVERFLOWING_VALUE} columnName="input" />,
-      { wrapper: Wrapper },
-    );
+    render(<ExpandableDatasetCell value={OVERFLOWING_VALUE} columnName="input" />, {
+      wrapper: Wrapper,
+    });
 
     await user.click(screen.getByText(OVERFLOWING_VALUE));
 

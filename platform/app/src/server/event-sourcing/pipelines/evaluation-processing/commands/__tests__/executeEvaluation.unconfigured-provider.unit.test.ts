@@ -93,9 +93,7 @@ describe("ExecuteEvaluationCommand, given a recovered model naming an unconfigur
     /** @scenario A recovered model naming an unconfigured provider degrades rather than erroring */
     it("reports the evaluation as skipped rather than errored", async () => {
       const data = await runWith(
-        new EvaluatorConfigError(
-          "Provider unconfigured-provider is not configured",
-        ),
+        new EvaluatorConfigError("Provider unconfigured-provider is not configured"),
       );
 
       expect(data.status).toBe("skipped");
@@ -104,9 +102,7 @@ describe("ExecuteEvaluationCommand, given a recovered model naming an unconfigur
 
     it("carries the reason so the customer can act on it", async () => {
       const data = await runWith(
-        new EvaluatorConfigError(
-          "Provider unconfigured-provider is not configured",
-        ),
+        new EvaluatorConfigError("Provider unconfigured-provider is not configured"),
       );
 
       expect(data.details).toContain("not configured");
@@ -114,9 +110,7 @@ describe("ExecuteEvaluationCommand, given a recovered model naming an unconfigur
 
     it("does not throw out of the command, so the trace is not retried forever", async () => {
       await expect(
-        runWith(
-          new EvaluatorConfigError("Provider some-provider is not enabled"),
-        ),
+        runWith(new EvaluatorConfigError("Provider some-provider is not enabled")),
       ).resolves.toBeDefined();
     });
   });

@@ -62,30 +62,26 @@ type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 
 type AutomationSection = "overview" | "automations" | "alerts" | "schedules";
 
-const sectionDetails: Record<
-  AutomationSection,
-  { title: string; description: string }
-> = {
-  overview: {
-    title: "Overview",
-    description:
-      "See what is firing, what is scheduled next, and recent automation activity.",
-  },
-  automations: {
-    title: "Automations",
-    description: "Act on every incoming trace that matches your filters.",
-  },
-  alerts: {
-    title: "Alerts",
-    description:
-      "Get told when a metric crosses a threshold and when it recovers.",
-  },
-  schedules: {
-    title: "Schedules",
-    description:
-      "Send a dashboard, graph, or trace table on a recurring cadence.",
-  },
-};
+const sectionDetails: Record<AutomationSection, { title: string; description: string }> =
+  {
+    overview: {
+      title: "Overview",
+      description:
+        "See what is firing, what is scheduled next, and recent automation activity.",
+    },
+    automations: {
+      title: "Automations",
+      description: "Act on every incoming trace that matches your filters.",
+    },
+    alerts: {
+      title: "Alerts",
+      description: "Get told when a metric crosses a threshold and when it recovers.",
+    },
+    schedules: {
+      title: "Schedules",
+      description: "Send a dashboard, graph, or trace table on a recurring cadence.",
+    },
+  };
 
 const sectionFromPath = (pathname: string): AutomationSection => {
   if (pathname.includes("/automations/automations")) return "automations";
@@ -160,9 +156,7 @@ function AutomationsPage() {
   );
   const traceAutomations = useMemo(
     () =>
-      (triggers.data ?? []).filter(
-        (t) => !t.customGraphId && t.triggerKind !== "REPORT",
-      ),
+      (triggers.data ?? []).filter((t) => !t.customGraphId && t.triggerKind !== "REPORT"),
     [triggers.data],
   );
   // Only needed to resolve dataset names on ADD_TO_DATASET rows. Gated on
@@ -181,8 +175,8 @@ function AutomationsPage() {
     () =>
       reports.some(
         (r) =>
-          (r.actionParams as { source?: { kind?: string } } | null)?.source
-            ?.kind === "customGraph",
+          (r.actionParams as { source?: { kind?: string } } | null)?.source?.kind ===
+          "customGraph",
       ),
     [reports],
   );
@@ -242,9 +236,8 @@ function AutomationsPage() {
       return (
         <Link href={`/${project?.slug}/datasets/${actionParams.datasetId}`}>
           {
-            getDatasets.data?.find(
-              (dataset) => dataset.id === actionParams.datasetId,
-            )?.name
+            getDatasets.data?.find((dataset) => dataset.id === actionParams.datasetId)
+              ?.name
           }
         </Link>
       );
@@ -280,16 +273,11 @@ function AutomationsPage() {
   const triggerActionName = (action: TriggerAction) =>
     CLIENT_PROVIDERS[action]?.shared.label ?? action;
 
-  const actionItems = (
-    action: TriggerAction,
-    actionParams: TriggerActionParams,
-  ) => {
+  const actionItems = (action: TriggerAction, actionParams: TriggerActionParams) => {
     switch (action) {
       case "SEND_SLACK_MESSAGE":
         return (
-          <Tooltip
-            content={(actionParams as { slackWebhook: string }).slackWebhook}
-          >
+          <Tooltip content={(actionParams as { slackWebhook: string }).slackWebhook}>
             <Text lineClamp={1} display="block">
               Webhook
             </Text>
@@ -329,18 +317,11 @@ function AutomationsPage() {
   const FilterLabel = ({ children }: { children: React.ReactNode }) => {
     const text = String(children)
       .split(".")
-      .filter(
-        (word, index) => index !== 0 || word.toLowerCase() === "evaluations",
-      )
+      .filter((word, index) => index !== 0 || word.toLowerCase() === "evaluations")
       .join(" ");
 
     return (
-      <Box
-        padding={1}
-        fontWeight="500"
-        textTransform="capitalize"
-        color="fg.muted"
-      >
+      <Box padding={1} fontWeight="500" textTransform="capitalize" color="fg.muted">
         {text.replace("_", " ")}
       </Box>
     );
@@ -364,9 +345,7 @@ function AutomationsPage() {
     return (
       <FilterContainer fontSize="sm">
         <FilterLabel>Evaluations</FilterLabel>
-        <FilterValue>
-          {checks.map((check) => check?.name).join(", ")}
-        </FilterValue>
+        <FilterValue>{checks.map((check) => check?.name).join(", ")}</FilterValue>
       </FilterContainer>
     );
   };
@@ -485,10 +464,7 @@ function AutomationsPage() {
   const overview = useMemo(() => {
     const stats = [...statsByTriggerId.values()];
     const firingNow = stats.filter((stat) => stat.currentlyFiring).length;
-    const fired30d = stats.reduce(
-      (sum, stat) => sum + (stat.recentFireCount ?? 0),
-      0,
-    );
+    const fired30d = stats.reduce((sum, stat) => sum + (stat.recentFireCount ?? 0), 0);
     const next = (reportSchedules.data ?? [])
       .filter((schedule) => schedule.nextRunAt)
       .map((schedule) => ({
@@ -497,8 +473,8 @@ function AutomationsPage() {
       }))
       .sort((left, right) => left.at - right.at)[0];
     const nextName = next
-      ? ((triggers.data ?? []).find((trigger) => trigger.id === next.triggerId)
-          ?.name ?? null)
+      ? ((triggers.data ?? []).find((trigger) => trigger.id === next.triggerId)?.name ??
+        null)
       : null;
 
     return { firingNow, fired30d, next, nextName };
@@ -616,9 +592,7 @@ function AutomationsPage() {
                                   </Table.Cell>
                                   <Table.Cell maxWidth="260px">
                                     <AlertSubjectCell
-                                      graphName={
-                                        trigger.customGraph?.name ?? null
-                                      }
+                                      graphName={trigger.customGraph?.name ?? null}
                                       graph={graphJsonById.get(
                                         trigger.customGraphId ?? "",
                                       )}
@@ -626,28 +600,19 @@ function AutomationsPage() {
                                     />
                                   </Table.Cell>
                                   <Table.Cell whiteSpace="nowrap">
-                                    <AlertRuleCell
-                                      actionParams={actionParams}
-                                    />
+                                    <AlertRuleCell actionParams={actionParams} />
                                   </Table.Cell>
                                   <Table.Cell>
                                     {actionItems(trigger.action, actionParams)}
                                   </Table.Cell>
                                   <Table.Cell whiteSpace="nowrap">
-                                    <LastFiredCell
-                                      trigger={trigger}
-                                      stats={stats}
-                                    />
+                                    <LastFiredCell trigger={trigger} stats={stats} />
                                   </Table.Cell>
                                   <Table.Cell whiteSpace="nowrap">
-                                    <FiringStatus
-                                      firing={!!stats?.currentlyFiring}
-                                    />
+                                    <FiringStatus firing={!!stats?.currentlyFiring} />
                                   </Table.Cell>
                                   {activeCell(trigger)}
-                                  <Table.Cell>
-                                    {rowActionsMenu(trigger)}
-                                  </Table.Cell>
+                                  <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
                                 </Table.Row>
                               </LangyContextTarget>
                             );
@@ -680,9 +645,7 @@ function AutomationsPage() {
                     <StatTile
                       label="Next scheduled"
                       value={
-                        overview.next
-                          ? (formatTimeAgo(overview.next.at) ?? "—")
-                          : "—"
+                        overview.next ? (formatTimeAgo(overview.next.at) ?? "—") : "—"
                       }
                       sub={overview.nextName ?? "no schedules queued"}
                     />
@@ -711,11 +674,7 @@ function AutomationsPage() {
                       summary="Start from a common workflow and tailor it to your project."
                     />
                     <VStack align="stretch" gap={2}>
-                      <Text
-                        textStyle="xs"
-                        fontWeight="semibold"
-                        color="fg.muted"
-                      >
+                      <Text textStyle="xs" fontWeight="semibold" color="fg.muted">
                         Alerts
                       </Text>
                       <UseCaseStrip
@@ -725,11 +684,7 @@ function AutomationsPage() {
                       />
                     </VStack>
                     <VStack align="stretch" gap={2}>
-                      <Text
-                        textStyle="xs"
-                        fontWeight="semibold"
-                        color="fg.muted"
-                      >
+                      <Text textStyle="xs" fontWeight="semibold" color="fg.muted">
                         Automations
                       </Text>
                       <UseCaseStrip
@@ -752,14 +707,11 @@ function AutomationsPage() {
                     summary="Send a dashboard, a graph, or a table of traces on a recurring schedule."
                     details="A schedule bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
                     addLabel="New schedule"
-                    onAdd={() =>
-                      openDrawer("automation", { initialSource: "report" })
-                    }
+                    onAdd={() => openDrawer("automation", { initialSource: "report" })}
                   />
                   {reports.length === 0 ? (
                     <EmptyHint>
-                      No schedules yet. Create one for a recurring Slack or
-                      email digest.
+                      No schedules yet. Create one for a recurring Slack or email digest.
                     </EmptyHint>
                   ) : (
                     <TableShell>
@@ -842,9 +794,7 @@ function AutomationsPage() {
                                     </Text>
                                   </Table.Cell>
                                   <ReportRunCells
-                                    schedule={scheduleByTriggerId.get(
-                                      trigger.id,
-                                    )}
+                                    schedule={scheduleByTriggerId.get(trigger.id)}
                                     loading={reportSchedules.isLoading}
                                   />
                                   <Table.Cell>
@@ -853,9 +803,7 @@ function AutomationsPage() {
                                       : "Email"}
                                   </Table.Cell>
                                   {activeCell(trigger)}
-                                  <Table.Cell>
-                                    {rowActionsMenu(trigger)}
-                                  </Table.Cell>
+                                  <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
                                 </Table.Row>
                               </LangyContextTarget>
                             );
@@ -964,18 +912,12 @@ function AutomationsPage() {
                                         {triggerActionName(trigger.action)}
                                       </Text>
                                       <Box textStyle="xs" color="fg.muted">
-                                        {actionItems(
-                                          trigger.action,
-                                          actionParams,
-                                        )}
+                                        {actionItems(trigger.action, actionParams)}
                                       </Box>
                                     </VStack>
                                   </Table.Cell>
                                   <Table.Cell whiteSpace="nowrap">
-                                    <LastFiredCell
-                                      trigger={trigger}
-                                      stats={stats}
-                                    />
+                                    <LastFiredCell trigger={trigger} stats={stats} />
                                   </Table.Cell>
                                   <Table.Cell>
                                     <Text as="span" color="fg.muted">
@@ -983,9 +925,7 @@ function AutomationsPage() {
                                     </Text>
                                   </Table.Cell>
                                   {activeCell(trigger)}
-                                  <Table.Cell>
-                                    {rowActionsMenu(trigger)}
-                                  </Table.Cell>
+                                  <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
                                 </Table.Row>
                               </LangyContextTarget>
                             );
@@ -1004,13 +944,7 @@ function AutomationsPage() {
   );
 }
 
-function OverviewSectionHeading({
-  title,
-  summary,
-}: {
-  title: string;
-  summary: string;
-}) {
+function OverviewSectionHeading({ title, summary }: { title: string; summary: string }) {
   return (
     <VStack align="start" gap={0.5}>
       <Text fontSize="lg" fontWeight="semibold">

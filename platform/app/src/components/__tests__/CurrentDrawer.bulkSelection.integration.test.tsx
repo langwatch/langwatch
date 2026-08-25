@@ -64,9 +64,7 @@ describe("CurrentDrawer bulk trace selection", () => {
       );
 
       const probe = screen.getByTestId("drawer-probe");
-      const ids: unknown = JSON.parse(
-        probe.getAttribute("data-selected-trace-ids")!,
-      );
+      const ids: unknown = JSON.parse(probe.getAttribute("data-selected-trace-ids")!);
       expect(Array.isArray(ids)).toBe(true);
       expect(ids).toEqual(TRACE_IDS);
     });

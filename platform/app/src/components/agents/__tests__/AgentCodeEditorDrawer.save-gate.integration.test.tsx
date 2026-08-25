@@ -113,32 +113,24 @@ vi.mock("~/components/blocks/CodeBlockEditor", () => ({
 // Partial mock: stub the heavy React component but keep the real
 // isScenarioMappingValid / hasScenarioInputMapping so the save-gate tests
 // exercise the actual predicate, not a mock.
-vi.mock(
-  "~/components/suites/ScenarioInputMappingSection",
-  async (importOriginal) => {
-    const mod =
-      await importOriginal<
-        typeof import("~/components/suites/ScenarioInputMappingSection")
-      >();
-    return {
-      ...mod,
-      ScenarioInputMappingSection: ({
-        inputs,
-      }: ScenarioInputMappingSectionProps) => (
-        <div data-testid="scenario-mapping-section">
-          {inputs.map((i) => (
-            <div
-              key={i.identifier}
-              data-testid={`scenario-mapping-input-${i.identifier}`}
-            >
-              {i.identifier}
-            </div>
-          ))}
-        </div>
-      ),
-    };
-  },
-);
+vi.mock("~/components/suites/ScenarioInputMappingSection", async (importOriginal) => {
+  const mod =
+    await importOriginal<
+      typeof import("~/components/suites/ScenarioInputMappingSection")
+    >();
+  return {
+    ...mod,
+    ScenarioInputMappingSection: ({ inputs }: ScenarioInputMappingSectionProps) => (
+      <div data-testid="scenario-mapping-section">
+        {inputs.map((i) => (
+          <div key={i.identifier} data-testid={`scenario-mapping-input-${i.identifier}`}>
+            {i.identifier}
+          </div>
+        ))}
+      </div>
+    ),
+  };
+});
 
 vi.mock("~/utils/api", () => ({
   api: {

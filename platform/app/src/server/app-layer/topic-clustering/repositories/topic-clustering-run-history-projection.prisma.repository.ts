@@ -20,9 +20,7 @@ type RunHistoryPrismaClient = {
     findUnique(
       args: Prisma.TopicClusteringRunHistoryProjectionFindUniqueArgs,
     ): Promise<Row | null>;
-    upsert(
-      args: Prisma.TopicClusteringRunHistoryProjectionUpsertArgs,
-    ): Promise<Row>;
+    upsert(args: Prisma.TopicClusteringRunHistoryProjectionUpsertArgs): Promise<Row>;
   };
 };
 
@@ -32,9 +30,7 @@ type RunHistoryPrismaClient = {
 // an empty history (which a replay rebuilds) instead of poisoning the fold.
 const runsSchema = z.array(topicClusteringRunHistoryEntrySchema);
 
-export function parseRunHistoryRuns(
-  value: unknown,
-): TopicClusteringRunHistoryEntry[] {
+export function parseRunHistoryRuns(value: unknown): TopicClusteringRunHistoryEntry[] {
   const parsed = runsSchema.safeParse(value);
   return parsed.success ? parsed.data : [];
 }
@@ -57,9 +53,7 @@ function fromRow(row: Row): StoredProjection<TopicClusteringRunHistoryData> {
 }
 
 /** Postgres row I/O for the topic clustering run-history projection. */
-export class PrismaTopicClusteringRunHistoryProjectionRepository
-  implements StateProjectionStore<TopicClusteringRunHistoryData>
-{
+export class PrismaTopicClusteringRunHistoryProjectionRepository implements StateProjectionStore<TopicClusteringRunHistoryData> {
   constructor(private readonly prisma: RunHistoryPrismaClient) {}
 
   async load(
@@ -67,10 +61,9 @@ export class PrismaTopicClusteringRunHistoryProjectionRepository
     context: ProjectionStoreContext,
   ): Promise<StoredProjection<TopicClusteringRunHistoryData> | null> {
     const projectId = String(context.tenantId);
-    const row =
-      await this.prisma.topicClusteringRunHistoryProjection.findUnique({
-        where: { projectId },
-      });
+    const row = await this.prisma.topicClusteringRunHistoryProjection.findUnique({
+      where: { projectId },
+    });
     return row ? fromRow(row) : null;
   }
 

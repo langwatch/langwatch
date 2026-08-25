@@ -206,13 +206,9 @@ describe("AttributeTable editing", () => {
           ],
         });
 
-        expect(
-          queryByLabelText("Edit gen_ai.request.model"),
-        ).not.toBeInTheDocument();
+        expect(queryByLabelText("Edit gen_ai.request.model")).not.toBeInTheDocument();
         // The attributes the viewer can read are still editable.
-        expect(
-          getByLabelText("Edit gen_ai.request.temperature"),
-        ).toBeInTheDocument();
+        expect(getByLabelText("Edit gen_ai.request.temperature")).toBeInTheDocument();
       });
     });
   });
@@ -224,10 +220,7 @@ describe("AttributeTable editing", () => {
     ) {
       return render(
         <ChakraProvider value={defaultSystem}>
-          <AttributeTable
-            attributes={attributes}
-            correctedFrom={correctedFrom}
-          />
+          <AttributeTable attributes={attributes} correctedFrom={correctedFrom} />
         </ChakraProvider>,
       );
     }
@@ -307,9 +300,7 @@ describe("AttributeTable editing", () => {
 
         expect(getByText("user.email")).toBeInTheDocument();
         expect(getByText("someone@acme.test")).toBeInTheDocument();
-        expect(
-          getByLabelText("user.email, removed by an edit"),
-        ).toBeInTheDocument();
+        expect(getByLabelText("user.email, removed by an edit")).toBeInTheDocument();
       });
 
       /** @scenario "An attribute the correction removes is listed struck through" */
@@ -391,9 +382,7 @@ describe("AttributeTable editing", () => {
           </ChakraProvider>,
         );
 
-        expect(
-          getByLabelText("review.note, added by an edit"),
-        ).toBeInTheDocument();
+        expect(getByLabelText("review.note, added by an edit")).toBeInTheDocument();
       });
     });
   });
@@ -436,27 +425,24 @@ describe("AttributeTable editing", () => {
       /** @scenario "The keys that place a trace carry no metadata editor" */
       it("carries no editor and refuses to add it", () => {
         const onEditAttribute = vi.fn();
-        const { queryByLabelText, getByLabelText, getByRole, getByText } =
-          render(
-            <ChakraProvider value={defaultSystem}>
-              <AttributeTable
-                attributes={{
-                  "metadata.environment": "staging",
-                  "gen_ai.conversation.id": "thread-1",
-                }}
-                editing={{
-                  edits: {},
-                  onEditAttribute,
-                  onResetAttribute: vi.fn(),
-                  isKeyEditable: (key) => key.startsWith("metadata."),
-                }}
-              />
-            </ChakraProvider>,
-          );
+        const { queryByLabelText, getByLabelText, getByRole, getByText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{
+                "metadata.environment": "staging",
+                "gen_ai.conversation.id": "thread-1",
+              }}
+              editing={{
+                edits: {},
+                onEditAttribute,
+                onResetAttribute: vi.fn(),
+                isKeyEditable: (key) => key.startsWith("metadata."),
+              }}
+            />
+          </ChakraProvider>,
+        );
 
-        expect(
-          queryByLabelText("Edit gen_ai.conversation.id"),
-        ).not.toBeInTheDocument();
+        expect(queryByLabelText("Edit gen_ai.conversation.id")).not.toBeInTheDocument();
         expect(getByLabelText("Edit metadata.environment")).toBeInTheDocument();
 
         fireEvent.change(getByLabelText("New attribute name"), {

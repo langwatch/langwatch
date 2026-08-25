@@ -30,18 +30,16 @@ const suiteTargetFields = z.object({
  * reads it from prompt targets and nowhere else, so accepting it on an agent
  * target would persist a binding the run silently ignores.
  */
-export const suiteTargetSchema = suiteTargetFields.superRefine(
-  (target, ctx) => {
-    if (target.type === "prompt" || target.scenarioMappings === undefined) {
-      return;
-    }
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["scenarioMappings"],
-      message: `A ${target.type} target cannot carry scenarioMappings — an agent's mappings belong on the agent record.`,
-    });
-  },
-);
+export const suiteTargetSchema = suiteTargetFields.superRefine((target, ctx) => {
+  if (target.type === "prompt" || target.scenarioMappings === undefined) {
+    return;
+  }
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ["scenarioMappings"],
+    message: `A ${target.type} target cannot carry scenarioMappings — an agent's mappings belong on the agent record.`,
+  });
+});
 
 export type SuiteTarget = z.infer<typeof suiteTargetSchema>;
 
@@ -50,9 +48,7 @@ export const SUITE_AGENT_TARGET_TYPES = ["http", "code", "workflow"] as const;
 export type SuiteAgentTargetType = (typeof SUITE_AGENT_TARGET_TYPES)[number];
 
 /** Type guard: narrows `type` to `SuiteAgentTargetType`. */
-export function isSuiteAgentTargetType(
-  type: string,
-): type is SuiteAgentTargetType {
+export function isSuiteAgentTargetType(type: string): type is SuiteAgentTargetType {
   return (SUITE_AGENT_TARGET_TYPES as readonly string[]).includes(type);
 }
 

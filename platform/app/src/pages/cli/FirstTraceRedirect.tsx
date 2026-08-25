@@ -52,12 +52,9 @@ export function resolveFirstTracePolling({
   hasPriorTraces: boolean;
   hasSeenNeverSynced: boolean;
 }): { enabled: boolean; refetchInterval: number | false } {
-  const enabled =
-    hasProject && !isRedirecting && !isTimedOut && !hasPriorTraces;
+  const enabled = hasProject && !isRedirecting && !isTimedOut && !hasPriorTraces;
   const refetchInterval =
-    enabled && (hasSeenNeverSynced || !hasResult)
-      ? FIRST_TRACE_POLL_INTERVAL_MS
-      : false;
+    enabled && (hasSeenNeverSynced || !hasResult) ? FIRST_TRACE_POLL_INTERVAL_MS : false;
   return { enabled, refetchInterval };
 }
 
@@ -111,10 +108,7 @@ function useFirstTraceWatch(): FirstTraceWatchState {
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    const timeout = setTimeout(
-      () => setIsTimedOut(true),
-      FIRST_TRACE_POLL_TIMEOUT_MS,
-    );
+    const timeout = setTimeout(() => setIsTimedOut(true), FIRST_TRACE_POLL_TIMEOUT_MS);
     return () => clearTimeout(timeout);
   }, []);
 
@@ -150,13 +144,7 @@ function useFirstTraceWatch(): FirstTraceWatchState {
     if (transition === "confirm-never-synced") setHasSeenNeverSynced(true);
     if (transition === "mark-prior-traces") setHasPriorTraces(true);
     if (transition === "redirect" && !isRedirecting) setIsRedirecting(true);
-  }, [
-    hasFirstMessage.data,
-    hasResult,
-    hasSeenNeverSynced,
-    isRedirecting,
-    isTimedOut,
-  ]);
+  }, [hasFirstMessage.data, hasResult, hasSeenNeverSynced, isRedirecting, isTimedOut]);
 
   useEffect(() => {
     if (!isRedirecting || !personalProject?.slug) return;

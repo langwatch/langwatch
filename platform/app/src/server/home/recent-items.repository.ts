@@ -10,11 +10,7 @@ export class RecentItemsRepository {
    * Get recent audit log entries for a user and project
    * Filters to only relevant entity-related actions
    */
-  async getRecentAuditLogEntries({
-    userId,
-    projectId,
-    limit,
-  }: GetRecentItemsParams) {
+  async getRecentAuditLogEntries({ userId, projectId, limit }: GetRecentItemsParams) {
     const actionPrefixes = Object.keys(ACTION_TO_TYPE_MAP);
 
     // Build OR conditions for action prefixes

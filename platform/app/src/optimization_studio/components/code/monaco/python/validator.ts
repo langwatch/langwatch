@@ -48,10 +48,7 @@ export function registerValidator(
         const next2 = line.slice(col, col + 3);
 
         if (inString) {
-          if (
-            (inString === '"""' || inString === "'''") &&
-            next2 === inString
-          ) {
+          if ((inString === '"""' || inString === "'''") && next2 === inString) {
             inString = false;
             col += 3;
             continue;
@@ -115,11 +112,7 @@ export function registerValidator(
       }
 
       const leading = /^([ \t]+)/.exec(line);
-      if (
-        leading &&
-        /\t/.test(leading[1] ?? "") &&
-        / /.test(leading[1] ?? "")
-      ) {
+      if (leading && /\t/.test(leading[1] ?? "") && / /.test(leading[1] ?? "")) {
         markers.push({
           severity: monaco.MarkerSeverity.Warning,
           code: MIXED_INDENT,
@@ -214,18 +207,14 @@ export function registerValidator(
       if (lastReturn) {
         const entries = parseSimpleDictEntries(lastReturn.body);
         for (const entry of entries) {
-          const declared = declaredOutputs.find(
-            (o) => o.identifier === entry.key,
-          );
+          const declared = declaredOutputs.find((o) => o.identifier === entry.key);
           if (!declared) continue;
           const expectedKind = literalKindFor(declared.type);
           const actualKind = literalKindOf(entry.value);
           if (actualKind && expectedKind && actualKind !== expectedKind) {
             const valueOffset = lastReturn.bodyStart + entry.valueOffset;
             const startPos = model.getPositionAt(valueOffset);
-            const endPos = model.getPositionAt(
-              valueOffset + entry.value.length,
-            );
+            const endPos = model.getPositionAt(valueOffset + entry.value.length);
             markers.push({
               severity: monaco.MarkerSeverity.Warning,
               code: `${OUTPUT_TYPE_MISMATCH}:${entry.key}`,
@@ -244,12 +233,10 @@ export function registerValidator(
   };
 
   const onChangeDisposers: IDisposable[] = [];
-  const onCreate = monaco.editor.onDidCreateModel(
-    (model: editor.ITextModel) => {
-      validate(model);
-      onChangeDisposers.push(model.onDidChangeContent(() => validate(model)));
-    },
-  );
+  const onCreate = monaco.editor.onDidCreateModel((model: editor.ITextModel) => {
+    validate(model);
+    onChangeDisposers.push(model.onDidChangeContent(() => validate(model)));
+  });
   for (const model of monaco.editor.getModels()) {
     validate(model);
     onChangeDisposers.push(model.onDidChangeContent(() => validate(model)));

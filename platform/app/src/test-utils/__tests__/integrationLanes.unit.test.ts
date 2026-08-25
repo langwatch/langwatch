@@ -1,10 +1,4 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import picomatch from "picomatch";
@@ -44,23 +38,20 @@ describe("integration test lanes", () => {
     });
 
     /** @scenario "Every datastore a test could reach sends it to the datastore lane" */
-    it.each([
-      "prisma",
-      "clickhouse",
-      "redis",
-      "bullmq",
-      "groupQueue",
-    ])("sends a file naming %s to the datastore lane", (dependency) => {
-      expect(
-        laneForSource(`${jsdomHeader}import x from "${dependency}";`),
-      ).toBe("datastore");
-    });
+    it.each(["prisma", "clickhouse", "redis", "bullmq", "groupQueue"])(
+      "sends a file naming %s to the datastore lane",
+      (dependency) => {
+        expect(laneForSource(`${jsdomHeader}import x from "${dependency}";`)).toBe(
+          "datastore",
+        );
+      },
+    );
 
     /** @scenario "Every datastore a test could reach sends it to the datastore lane" */
     it("matches a datastore name whatever its casing", () => {
-      expect(
-        laneForSource(`${jsdomHeader}import { ClickHouseClient } from "x";`),
-      ).toBe("datastore");
+      expect(laneForSource(`${jsdomHeader}import { ClickHouseClient } from "x";`)).toBe(
+        "datastore",
+      );
     });
   });
 
@@ -83,16 +74,11 @@ describe("integration test lanes", () => {
         "src/pages/[project]/__tests__/a.integration.test.tsx",
       ]);
 
-      expect(pattern).toBe(
-        "src/pages/\\[project\\]/__tests__/a.integration.test.tsx",
-      );
+      expect(pattern).toBe("src/pages/\\[project\\]/__tests__/a.integration.test.tsx");
       // Unescaped, `[project]` is a character class, so this is what the glob
       // would have matched instead of the real directory.
       expect(
-        picomatch.isMatch(
-          "src/pages/p/__tests__/a.integration.test.tsx",
-          pattern!,
-        ),
+        picomatch.isMatch("src/pages/p/__tests__/a.integration.test.tsx", pattern!),
       ).toBe(false);
       expect(
         picomatch.isMatch(
@@ -131,33 +117,18 @@ describe("integration test lanes", () => {
 
     beforeEach(() => {
       root = mkdtempSync(path.join(tmpdir(), "lanes-"));
-      write(
-        "src/components/Button.integration.test.tsx",
-        `${jsdomHeader}render();`,
-      );
-      write(
-        "src/components/Table.integration.test.tsx",
-        `${jsdomHeader}render();`,
-      );
+      write("src/components/Button.integration.test.tsx", `${jsdomHeader}render();`);
+      write("src/components/Table.integration.test.tsx", `${jsdomHeader}render();`);
       write(
         "src/components/Grid.integration.test.tsx",
         `${jsdomHeader}import { prisma } from "~/server/db";`,
       );
-      write(
-        "src/server/api.integration.test.ts",
-        `import { prisma } from "x";`,
-      );
-      write(
-        "ee/governance/gate.integration.test.ts",
-        `import { redis } from "x";`,
-      );
+      write("src/server/api.integration.test.ts", `import { prisma } from "x";`);
+      write("ee/governance/gate.integration.test.ts", `import { redis } from "x";`);
       // Neighbours that must not be swept in.
       write("src/components/Button.unit.test.tsx", `${jsdomHeader}render();`);
       write("src/components/Button.tsx", "export const Button = () => null;");
-      write(
-        "node_modules/pkg/thing.integration.test.ts",
-        `${jsdomHeader}render();`,
-      );
+      write("node_modules/pkg/thing.integration.test.ts", `${jsdomHeader}render();`);
     });
 
     afterEach(() => {

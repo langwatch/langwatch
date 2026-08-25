@@ -36,9 +36,7 @@ function assertSafePatterns(patterns: string[], label: string): void {
       new RegExp(pattern);
     } catch {
       throw new InvalidDataPrivacyConfigError(
-        `${label} ${JSON.stringify(
-          pattern,
-        )} is not a valid regular expression.`,
+        `${label} ${JSON.stringify(pattern)} is not a valid regular expression.`,
       );
     }
     if (!isSafeRegex(pattern)) {
@@ -84,9 +82,7 @@ function assertNotOverBroadExceptions(patterns: string[]): void {
       // Compile failure already reported by assertSafePatterns.
       continue;
     }
-    const matched = OVER_BROAD_EXCEPTION_PROBES.filter((probe) =>
-      anchored.test(probe),
-    );
+    const matched = OVER_BROAD_EXCEPTION_PROBES.filter((probe) => anchored.test(probe));
     if (matched.length > 1) {
       throw new InvalidDataPrivacyConfigError(
         `PII exception pattern ${JSON.stringify(
@@ -204,15 +200,11 @@ export class DataPrivacyPolicyService {
       "Custom secret pattern",
     );
     assertNotOverBroadSecretPatterns(parsed.data.secrets?.customPatterns ?? []);
-    assertSafePatterns(
-      parsed.data.pii?.exceptPatterns ?? [],
-      "PII exception pattern",
-    );
+    assertSafePatterns(parsed.data.pii?.exceptPatterns ?? [], "PII exception pattern");
     assertNotOverBroadExceptions(parsed.data.pii?.exceptPatterns ?? []);
     assertSafeAttributePatterns(parsed.data.customAttributes);
 
-    const organizationId =
-      await this.repository.findOrganizationForScope(scope);
+    const organizationId = await this.repository.findOrganizationForScope(scope);
     if (!organizationId) {
       throw new ScopeTargetNotFoundError("Scope target not found.");
     }

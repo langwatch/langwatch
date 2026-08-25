@@ -67,9 +67,7 @@ function sqsEndpoint(
   } as DrawerEndpoint;
 }
 
-function renderDrawer(
-  props: Partial<Parameters<typeof WebhookEndpointDrawer>[0]> = {},
-) {
+function renderDrawer(props: Partial<Parameters<typeof WebhookEndpointDrawer>[0]> = {}) {
   const onSave = vi.fn();
   render(
     <ChakraProvider value={defaultSystem}>
@@ -110,10 +108,7 @@ describe("WebhookEndpointDrawer", () => {
     const user = userEvent.setup();
     const { onSave } = renderDrawer();
 
-    await user.type(
-      screen.getByTestId("webhook-url-input"),
-      "https://example.com/hook",
-    );
+    await user.type(screen.getByTestId("webhook-url-input"), "https://example.com/hook");
     await user.click(screen.getByTestId("webhook-family-toggle-gateway"));
 
     const exact = screen.getByTestId("webhook-event-gateway.request.completed");
@@ -134,13 +129,8 @@ describe("WebhookEndpointDrawer", () => {
     const user = userEvent.setup();
     const { onSave } = renderDrawer();
 
-    await user.type(
-      screen.getByTestId("webhook-url-input"),
-      "https://example.com/hook",
-    );
-    await user.click(
-      screen.getByTestId("webhook-event-gateway.request.completed"),
-    );
+    await user.type(screen.getByTestId("webhook-url-input"), "https://example.com/hook");
+    await user.click(screen.getByTestId("webhook-event-gateway.request.completed"));
     await user.click(screen.getByTestId("webhook-save"));
     expect(onSave).toHaveBeenCalledWith({
       destinationKind: "http",
@@ -172,13 +162,8 @@ describe("WebhookSecretDialog", () => {
     expect(batchDelay).toHaveValue(250);
     expect(inFlight).toHaveValue(4);
 
-    await user.type(
-      screen.getByTestId("webhook-url-input"),
-      "https://example.com/hooks",
-    );
-    await user.click(
-      screen.getByTestId("webhook-event-gateway.request.completed"),
-    );
+    await user.type(screen.getByTestId("webhook-url-input"), "https://example.com/hooks");
+    await user.click(screen.getByTestId("webhook-event-gateway.request.completed"));
     await user.clear(batchSize);
     await user.type(batchSize, "25");
     await user.clear(batchDelay);
@@ -204,9 +189,7 @@ describe("WebhookSecretDialog", () => {
         <WebhookSecretDialog secret="whsec_test123" onClose={vi.fn()} />
       </ChakraProvider>,
     );
-    expect(screen.getByTestId("webhook-secret-value")).toHaveTextContent(
-      "whsec_test123",
-    );
+    expect(screen.getByTestId("webhook-secret-value")).toHaveTextContent("whsec_test123");
     expect(screen.getByText(/shown only once/i)).toBeInTheDocument();
   });
 
@@ -220,9 +203,7 @@ describe("WebhookSecretDialog", () => {
       expect(screen.getByText("Amazon SQS queue")).toBeInTheDocument();
       // HTTPS is the default, so the URL field is the one on screen.
       expect(screen.getByTestId("webhook-url-input")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("webhook-sqs-queue-url"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("webhook-sqs-queue-url")).not.toBeInTheDocument();
 
       await user.click(screen.getByText("Amazon SQS queue"));
 
@@ -236,9 +217,7 @@ describe("WebhookSecretDialog", () => {
       const { onSave } = renderDrawer();
 
       await user.click(screen.getByText("Amazon SQS queue"));
-      await user.click(
-        screen.getByTestId("webhook-event-gateway.request.completed"),
-      );
+      await user.click(screen.getByTestId("webhook-event-gateway.request.completed"));
       expect(screen.getByTestId("webhook-save")).toBeDisabled();
 
       await user.type(
@@ -260,10 +239,8 @@ describe("WebhookSecretDialog", () => {
         expect.objectContaining({
           destinationKind: "sqs",
           sqs: {
-            queueUrl:
-              "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test",
-            roleArn:
-              "arn:aws:iam::381491922238:role/langwatch-webhook-producer",
+            queueUrl: "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test",
+            roleArn: "arn:aws:iam::381491922238:role/langwatch-webhook-producer",
           },
         }),
       );
@@ -284,9 +261,7 @@ describe("WebhookSecretDialog", () => {
       cleanup();
       renderDrawer();
       await user.click(screen.getByText("Amazon SQS queue"));
-      expect(
-        screen.queryByTestId("webhook-sqs-external-id"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("webhook-sqs-external-id")).not.toBeInTheDocument();
     });
 
     /** @scenario A saved role destination shows the external id to trust */
@@ -300,9 +275,7 @@ describe("WebhookSecretDialog", () => {
         }),
       });
 
-      expect(
-        screen.queryByTestId("webhook-sqs-external-id"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("webhook-sqs-external-id")).not.toBeInTheDocument();
     });
 
     /** @scenario An existing endpoint cannot be moved to another destination kind */
@@ -314,14 +287,12 @@ describe("WebhookSecretDialog", () => {
           destinationKind: "sqs",
           url: null,
           sqs: {
-            queueUrl:
-              "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test",
+            queueUrl: "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test",
             region: "eu-central-1",
             accountId: "381491922238",
             queueName: "lw-test",
             credentialMode: "assume_role",
-            roleArn:
-              "arn:aws:iam::381491922238:role/langwatch-webhook-producer",
+            roleArn: "arn:aws:iam::381491922238:role/langwatch-webhook-producer",
             externalId: "lw-abc",
             accessKeyId: null,
           },
@@ -355,9 +326,7 @@ describe("WebhookSecretDialog", () => {
         "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test",
       );
       // The stored secret is never prefilled: an empty box means keep it.
-      expect(screen.getByTestId("webhook-sqs-secret-access-key")).toHaveValue(
-        "",
-      );
+      expect(screen.getByTestId("webhook-sqs-secret-access-key")).toHaveValue("");
     });
   });
 });

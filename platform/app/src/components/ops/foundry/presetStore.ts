@@ -89,9 +89,7 @@ export const usePresetStore = create<PresetStore>((set, get) => {
 
     renamePreset(id, name) {
       set((state) => {
-        const updated = state.userPresets.map((p) =>
-          p.id === id ? { ...p, name } : p,
-        );
+        const updated = state.userPresets.map((p) => (p.id === id ? { ...p, name } : p));
         saveUserPresets(updated);
         return {
           userPresets: updated,

@@ -81,9 +81,7 @@ Then run CLI commands directly:
 
             const allText = state.messages
               .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
+                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
               )
               .join("\n");
 
@@ -146,7 +144,7 @@ Then: \`langwatch dataset records list qa-test-set\`
         ],
         script: [
           scenario.user(
-            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH=\"./bin:$PATH\" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch dataset upload qa-test-set test-data.csv`\n3. `langwatch dataset records list qa-test-set`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
+            'Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch dataset upload qa-test-set test-data.csv`\n3. `langwatch dataset records list qa-test-set`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.',
           ),
           scenario.agent(),
           (state) => {
@@ -154,9 +152,7 @@ Then: \`langwatch dataset records list qa-test-set\`
 
             const allText = state.messages
               .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
+                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
               )
               .join("\n");
 
@@ -213,7 +209,7 @@ Then: \`langwatch trace search --limit 5\`
         ],
         script: [
           scenario.user(
-            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH=\"./bin:$PATH\" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch analytics query --metric trace-count`\n3. `langwatch trace search --limit 5`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
+            'Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch analytics query --metric trace-count`\n3. `langwatch trace search --limit 5`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.',
           ),
           scenario.agent(),
           (state) => {
@@ -221,9 +217,7 @@ Then: \`langwatch trace search --limit 5\`
 
             const allText = state.messages
               .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
+                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
               )
               .join("\n");
 

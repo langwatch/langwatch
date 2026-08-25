@@ -113,8 +113,7 @@ vi.mock("../components/LazyLangWatchQLChartMode", () => ({
 
 import { LangWatchQLWorkbench } from "../components/LangWatchQLWorkbench";
 
-const SQL =
-  "SELECT evaluator_id, score FROM analytics.evaluations_daily LIMIT 500";
+const SQL = "SELECT evaluator_id, score FROM analytics.evaluations_daily LIMIT 500";
 
 /**
  * The page the workbench is mounted on, period and all.
@@ -216,9 +215,7 @@ describe("the LangWatchQL workbench in real Chromium", () => {
         await userEvent.keyboard(SQL);
         expect(editor).toHaveValue(SQL);
 
-        await userEvent.click(
-          screen.getByRole("button", { name: "Run query" }),
-        );
+        await userEvent.click(screen.getByRole("button", { name: "Run query" }));
 
         // The statement went out exactly as typed, once.
         await poll(() => harness.mutation.mock.calls.length > 0);
@@ -232,12 +229,8 @@ describe("the LangWatchQL workbench in real Chromium", () => {
         // carried, with the database's own types beneath them.
         await poll(() => renderedRows().length > 0);
         const table = await screen.findByRole("table");
-        expect(table.querySelector("thead")?.textContent).toContain(
-          "evaluator_id",
-        );
-        expect(table.querySelector("thead")?.textContent).toContain(
-          "Nullable(Float64)",
-        );
+        expect(table.querySelector("thead")?.textContent).toContain("evaluator_id");
+        expect(table.querySelector("thead")?.textContent).toContain("Nullable(Float64)");
         const firstRow = renderedRows()[0];
         expect(firstRow?.textContent).toContain("evaluator-000");
         expect(firstRow?.textContent).toContain("0.5");
@@ -265,9 +258,7 @@ describe("the LangWatchQL workbench in real Chromium", () => {
         const editor = await screen.findByTestId("lwql-editor-input");
         await userEvent.click(editor);
         await userEvent.keyboard(SQL);
-        await userEvent.click(
-          screen.getByRole("button", { name: "Run query" }),
-        );
+        await userEvent.click(screen.getByRole("button", { name: "Run query" }));
         await poll(() => renderedRows().length > 0);
 
         const scroller = screen.getByTestId("lwql-result-scroll");
@@ -289,9 +280,7 @@ describe("the LangWatchQL workbench in real Chromium", () => {
 
         // Scrolling the real element moves the window to the far end.
         scroller.scrollTop = scroller.scrollHeight;
-        const reachedEnd = await poll(() =>
-          renderedRowIndexes().includes(ROW_COUNT - 1),
-        );
+        const reachedEnd = await poll(() => renderedRowIndexes().includes(ROW_COUNT - 1));
         expect(reachedEnd).toBe(true);
 
         // …and the rows that were on screen at the top are no longer in the

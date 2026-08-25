@@ -1,10 +1,7 @@
 import { z } from "zod";
 
 import type { WorkflowDsl } from "./workflow";
-import {
-  parseStudioWorkflow,
-  type StudioWorkflow,
-} from "./studio-workflow";
+import { parseStudioWorkflow, type StudioWorkflow } from "./studio-workflow";
 
 const migrationNodeSchema = z
   .object({
@@ -30,9 +27,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const parametersOf = (node: MigrationNode): MigrationParameter[] | undefined => {
   const { parameters } = node.data;
-  return Array.isArray(parameters) && parameters.every(isRecord)
-    ? parameters
-    : undefined;
+  return Array.isArray(parameters) && parameters.every(isRecord) ? parameters : undefined;
 };
 
 const updateParameters = (

@@ -14,15 +14,11 @@ export const LANGY_OUTBOX_LEASE_DURATION_MS =
   LANGY_AGENT_DISPATCH_TIMEOUT_MS + LANGY_OUTBOX_LEASE_MARGIN_MS;
 
 export interface LangyWorkerDispatchPort {
-  dispatchTurn(
-    params: LangyWorkerDispatchIntent & { projectId: string },
-  ): Promise<void>;
+  dispatchTurn(params: LangyWorkerDispatchIntent & { projectId: string }): Promise<void>;
 }
 
 export interface LangyTitleGenerationPort {
-  generateTitle(
-    params: LangyGenerateTitleIntent & { projectId: string },
-  ): Promise<void>;
+  generateTitle(params: LangyGenerateTitleIntent & { projectId: string }): Promise<void>;
 }
 
 export interface LangyEffectPorts {

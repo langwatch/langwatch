@@ -34,14 +34,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import Parse from "papaparse";
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Download, Edit2, Plus, Trash2, Upload, X } from "react-feather";
 import { useStore } from "zustand";
 
@@ -52,10 +45,7 @@ import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
 import { Tooltip } from "~/components/ui/tooltip";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type {
-  DatasetColumns,
-  DatasetRecordEntry,
-} from "@langwatch/dataset-contract";
+import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { api } from "~/utils/api";
 import { AddRowsFromCSVModal } from "../AddRowsFromCSVModal";
 import {
@@ -246,9 +236,7 @@ export function DatasetEditorTable({
     if (page > count) setPage(count);
   }, [serverRecordCount, pageSize, page]);
 
-  const datasetName = datasetId
-    ? databaseDataset.data?.name
-    : inMemoryDataset?.name;
+  const datasetName = datasetId ? databaseDataset.data?.name : inMemoryDataset?.name;
   const columnTypes: DatasetColumns = useMemo(
     () =>
       datasetId
@@ -411,9 +399,7 @@ export function DatasetEditorTable({
   // no longer find it). The autosave debounce is short, so this is a brief gate.
   const hasPendingWrites =
     autosave.state === "saving" ||
-    (datasetId
-      ? Object.keys(pendingSavedChanges[datasetId] ?? {}).length > 0
-      : false);
+    (datasetId ? Object.keys(pendingSavedChanges[datasetId] ?? {}).length > 0 : false);
 
   // The count chip shows the PG-authoritative whole-dataset total (`count`),
   // not just the rows on this page; the pager shows the position within it.
@@ -432,10 +418,7 @@ export function DatasetEditorTable({
     });
   }, [records, columns, displayRowCount]);
 
-  const columnHelper = useMemo(
-    () => createColumnHelper<DatasetTableRowData>(),
-    [],
-  );
+  const columnHelper = useMemo(() => createColumnHelper<DatasetTableRowData>(), []);
 
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
 
@@ -518,9 +501,7 @@ export function DatasetEditorTable({
 
   // Scroll container detection for virtualization
   const tableRef = useRef<HTMLTableElement>(null);
-  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(
-    null,
-  );
+  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
   useEffect(() => {
     if (!tableRef.current) return;
     let parent = tableRef.current.parentElement;
@@ -597,8 +578,7 @@ export function DatasetEditorTable({
           projectId: project?.id ?? "",
           datasetId,
         });
-        const fullColumnTypes = (fullDataset?.columnTypes ??
-          []) as DatasetColumns;
+        const fullColumnTypes = (fullDataset?.columnTypes ?? []) as DatasetColumns;
         exportColumns = toEditorColumns(fullColumnTypes);
         exportRecords = toEditorRecords(
           (fullDataset?.datasetRecords ?? []).map(
@@ -663,9 +643,7 @@ export function DatasetEditorTable({
           {formatRecordCount(totalRecordCount)}{" "}
           {totalRecordCount === 1 ? "record" : "records"}
         </Text>
-        {datasetId && (
-          <SaveStatusChip state={autosave.state} error={autosave.error} />
-        )}
+        {datasetId && <SaveStatusChip state={autosave.state} error={autosave.error} />}
         <Spacer />
         {!floatingSelectionBar && selectedRows.size > 0 && (
           <Button
@@ -749,10 +727,7 @@ export function DatasetEditorTable({
                     <th key={header.id}>
                       {header.isPlaceholder
                         ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
+                        : flexRender(header.column.columnDef.header, header.getContext())}
                     </th>
                   ))}
                 </tr>
@@ -777,12 +752,7 @@ export function DatasetEditorTable({
 
       <HStack>
         {showAddRow && (
-          <Button
-            size="sm"
-            variant="ghost"
-            data-testid="add-row"
-            onClick={handleAddRow}
-          >
+          <Button size="sm" variant="ghost" data-testid="add-row" onClick={handleAddRow}>
             <Plus size={14} /> Add row
           </Button>
         )}

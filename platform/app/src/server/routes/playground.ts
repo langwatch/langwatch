@@ -102,10 +102,7 @@ secured
       projectId,
     });
     const headers = Object.fromEntries(
-      Object.entries(litellmParams).map(([key, value]) => [
-        `x-litellm-${key}`,
-        value,
-      ]),
+      Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
     );
 
     // Go playground proxy: nlpgo's /go/proxy/v1/* (in-process AI Gateway,

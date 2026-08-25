@@ -180,10 +180,7 @@ export const assertNoTraversal = (...parts: string[]): void => {
  * `..` segment and require it to sit under this project's `staging/` prefix so
  * a key can never escape the tenant scope.
  */
-export const assertKeyWithinProject = (
-  projectId: string,
-  key: string,
-): void => {
+export const assertKeyWithinProject = (projectId: string, key: string): void => {
   assertNoTraversal(projectId);
   if (
     key.includes("..") ||

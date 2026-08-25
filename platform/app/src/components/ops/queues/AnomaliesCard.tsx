@@ -61,8 +61,8 @@ export function AnomaliesCard() {
         </HStack>
         {hasError && (
           <Text paddingX={4} paddingBottom={3} color="red.500" textStyle="xs">
-            Could not load anomalies — Redis may be unavailable. Retrying every
-            30s. Do NOT interpret this as &ldquo;all clear&rdquo;.
+            Could not load anomalies — Redis may be unavailable. Retrying every 30s. Do
+            NOT interpret this as &ldquo;all clear&rdquo;.
           </Text>
         )}
         {hasAny && (
@@ -89,10 +89,7 @@ export function AnomaliesCard() {
                   </Table.Cell>
                   <Table.Cell>{a.kind.replace("_", " ")}</Table.Cell>
                   <Table.Cell>
-                    <Badge
-                      colorPalette={a.tier === "hard" ? "red" : "yellow"}
-                      size="xs"
-                    >
+                    <Badge colorPalette={a.tier === "hard" ? "red" : "yellow"} size="xs">
                       {a.tier}
                     </Badge>
                   </Table.Cell>

@@ -27,10 +27,7 @@ interface ShellTopBarProps {
  * "product-switcher" the logo and the product dropdown lead the left
  * side; in "icon-rail" the rail carries them and they are hidden here.
  */
-export function ShellTopBar({
-  state,
-  shouldShowProductCluster,
-}: ShellTopBarProps) {
+export function ShellTopBar({ state, shouldShowProductCluster }: ShellTopBarProps) {
   const { user, project, activeProductId, isDevelopment } = state;
   // The product cluster spans the sidebar column, so the organization and
   // the scope start at the left edge of the content column and stay there
@@ -66,10 +63,7 @@ export function ShellTopBar({
 
       <HStack gap={0} flex={1} alignItems="center" minWidth={0}>
         {shouldShowProductCluster && (
-          <ProductCluster
-            activeProductId={activeProductId}
-            width={clusterWidth}
-          />
+          <ProductCluster activeProductId={activeProductId} width={clusterWidth} />
         )}
         <HStack
           gap={3}

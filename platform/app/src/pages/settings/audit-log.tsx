@@ -22,10 +22,7 @@ import type { EnrichedAuditLog } from "~/server/app-layer/organizations/reposito
 import { useRouter } from "~/utils/compat/next-router";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import { NavigationFooter } from "../../components/NavigationFooter";
-import {
-  PeriodSelector,
-  usePeriodSelector,
-} from "../../components/PeriodSelector";
+import { PeriodSelector, usePeriodSelector } from "../../components/PeriodSelector";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
 import { InputGroup } from "../../components/ui/input-group";
@@ -64,29 +61,18 @@ function AuditLogPage() {
   } = usePeriodSelector(30);
 
   // Helper to parse URL query param to number with default
-  const parseQueryNumber = (
-    param: string | undefined,
-    defaultValue: number,
-  ): number => {
+  const parseQueryNumber = (param: string | undefined, defaultValue: number): number => {
     if (!param) return defaultValue;
     const parsed = Number(param);
     return isNaN(parsed) ? defaultValue : parsed;
   };
 
   // Get pagination from URL parameters with defaults
-  const pageOffset = parseQueryNumber(
-    router.query.pageOffset as string | undefined,
-    0,
-  );
-  const pageSize = parseQueryNumber(
-    router.query.pageSize as string | undefined,
-    25,
-  );
+  const pageOffset = parseQueryNumber(router.query.pageOffset as string | undefined, 0);
+  const pageSize = parseQueryNumber(router.query.pageSize as string | undefined, 25);
 
   // Search state
-  const [userSearch, setUserSearch] = useState(
-    (router.query.userSearch as string) ?? "",
-  );
+  const [userSearch, setUserSearch] = useState((router.query.userSearch as string) ?? "");
   const [actionFilter, setActionFilter] = useState(
     (router.query.actionFilter as string) ?? "",
   );
@@ -124,8 +110,7 @@ function AuditLogPage() {
   const searchUserId = userSearch
     ? organizationMembers?.members.find((member) => {
         const searchLower = userSearch.toLowerCase();
-        const nameMatch =
-          member.user.name?.toLowerCase().includes(searchLower) ?? false;
+        const nameMatch = member.user.name?.toLowerCase().includes(searchLower) ?? false;
         const emailMatch =
           member.user.email?.toLowerCase().includes(searchLower) ?? false;
         return nameMatch || emailMatch;
@@ -133,24 +118,23 @@ function AuditLogPage() {
     : undefined;
 
   // Fetch audit logs
-  const { data: auditLogsData, isLoading } =
-    api.organization.getAuditLogs.useQuery(
-      {
-        organizationId,
-        projectId: selectedProjectId ?? undefined,
-        userId: searchUserId,
-        pageOffset,
-        pageSize,
-        action: actionFilter || undefined,
-        startDate: startDate.getTime(),
-        endDate: endDate.getTime(),
-        targetKind: urlTargetKind || undefined,
-        targetId: urlTargetId || undefined,
-      },
-      {
-        enabled: !!organization && isEnterprise,
-      },
-    );
+  const { data: auditLogsData, isLoading } = api.organization.getAuditLogs.useQuery(
+    {
+      organizationId,
+      projectId: selectedProjectId ?? undefined,
+      userId: searchUserId,
+      pageOffset,
+      pageSize,
+      action: actionFilter || undefined,
+      startDate: startDate.getTime(),
+      endDate: endDate.getTime(),
+      targetKind: urlTargetKind || undefined,
+      targetId: urlTargetId || undefined,
+    },
+    {
+      enabled: !!organization && isEnterprise,
+    },
+  );
 
   if (!organization || isPlanLoading) {
     return (
@@ -171,10 +155,10 @@ function AuditLogPage() {
             <Alert.Content>
               <Alert.Title>Enterprise Feature</Alert.Title>
               <Alert.Description>
-                Organisation-wide audit logs — including AI Gateway events
-                (virtual-key / budget / provider / cache-rule mutations)
-                alongside logins, member changes, settings, RBAC, and billing —
-                are available on Enterprise plans. Contact sales to upgrade.
+                Organisation-wide audit logs — including AI Gateway events (virtual-key /
+                budget / provider / cache-rule mutations) alongside logins, member
+                changes, settings, RBAC, and billing — are available on Enterprise plans.
+                Contact sales to upgrade.
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
@@ -404,8 +388,8 @@ function AuditLogPage() {
             )}
             <Heading as="h2">Audit Log</Heading>
             <Text color="fg.muted">
-              View all audit logs for your organization. Filter by project,
-              user, action type, or date range.
+              View all audit logs for your organization. Filter by project, user, action
+              type, or date range.
             </Text>
             {urlTargetKind && urlTargetId && (
               <Badge
@@ -429,13 +413,7 @@ function AuditLogPage() {
         {/* Filters */}
 
         <HStack gap={4} width="full" flexWrap="wrap" align="end">
-          <VStack
-            align="start"
-            gap={1}
-            flex="1"
-            minWidth="200px"
-            maxWidth="300px"
-          >
+          <VStack align="start" gap={1} flex="1" minWidth="200px" maxWidth="300px">
             <Text fontSize="sm" fontWeight="medium" color="fg.muted">
               Search by User
             </Text>
@@ -449,13 +427,7 @@ function AuditLogPage() {
             </InputGroup>
           </VStack>
 
-          <VStack
-            align="start"
-            gap={1}
-            flex="1"
-            minWidth="200px"
-            maxWidth="300px"
-          >
+          <VStack align="start" gap={1} flex="1" minWidth="200px" maxWidth="300px">
             <Text fontSize="sm" fontWeight="medium" color="fg.muted">
               Filter by Action
             </Text>
@@ -467,13 +439,7 @@ function AuditLogPage() {
             />
           </VStack>
 
-          <VStack
-            align="start"
-            gap={1}
-            flex="1"
-            minWidth="150px"
-            maxWidth="200px"
-          >
+          <VStack align="start" gap={1} flex="1" minWidth="150px" maxWidth="200px">
             <Text fontSize="sm" fontWeight="medium" color="fg.muted">
               Project
             </Text>
@@ -481,9 +447,7 @@ function AuditLogPage() {
               <NativeSelect.Field
                 value={selectedProjectId ?? "all"}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                  handleProjectChange(
-                    e.target.value === "all" ? null : e.target.value,
-                  )
+                  handleProjectChange(e.target.value === "all" ? null : e.target.value)
                 }
               >
                 <option value="all">All Projects</option>
@@ -506,13 +470,7 @@ function AuditLogPage() {
             </NativeSelect.Root>
           </VStack>
 
-          <VStack
-            align="start"
-            gap={1}
-            flex="1"
-            minWidth="200px"
-            maxWidth="300px"
-          >
+          <VStack align="start" gap={1} flex="1" minWidth="200px" maxWidth="300px">
             <Text fontSize="sm" fontWeight="medium" color="fg.muted">
               Select Date
             </Text>
@@ -595,9 +553,7 @@ function AuditLogPage() {
                         <Badge
                           size="sm"
                           variant="subtle"
-                          colorPalette={
-                            log.source === "gateway" ? "purple" : "gray"
-                          }
+                          colorPalette={log.source === "gateway" ? "purple" : "gray"}
                         >
                           {log.source === "gateway" ? "Gateway" : "Platform"}
                         </Badge>
@@ -646,9 +602,7 @@ function AuditLogPage() {
                               .flatMap((team) => team.projects)
                               .find((p) => p.id === log.projectId);
                             return (
-                              <Text fontSize="sm">
-                                {project?.name ?? log.projectId}
-                              </Text>
+                              <Text fontSize="sm">{project?.name ?? log.projectId}</Text>
                             );
                           })()
                         ) : (

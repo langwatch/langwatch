@@ -19,10 +19,7 @@ import type {
   OrganizationRole,
   ShareLinkRow,
 } from "../authz-read.repository";
-import {
-  AuthzReadRepository,
-  type AuthzDatabase,
-} from "../authz-read.repository";
+import { AuthzReadRepository, type AuthzDatabase } from "../authz-read.repository";
 
 const SYSTEM_API_KEY_ROLE_KIND = "system_api_key" as const;
 
@@ -225,9 +222,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
    * `{ userId: null }` is a service key - it exists and has no owner, so the
    * §9 ceiling does not apply to it; `null` is a key that is not there at all.
    */
-  async tryFindApiKeyOwner(
-    apiKeyId: string,
-  ): Promise<{ userId: string | null } | null> {
+  async tryFindApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null> {
     return (await this.database.apiKey.findUnique({
       where: { id: apiKeyId },
       select: { userId: true },
@@ -248,8 +243,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
         projectId,
         token: { in: [...tokens] },
         OR: links.map((link) => ({
-          resourceType:
-            link.kind === "trace" ? ("TRACE" as const) : ("THREAD" as const),
+          resourceType: link.kind === "trace" ? ("TRACE" as const) : ("THREAD" as const),
           resourceId: link.id,
         })),
       },
@@ -296,9 +290,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
   /** Keeps an API key's private permission role with the key it was minted
    * for. The `some` clause prevents Prisma's vacuous `every` from admitting
    * an unassigned system role. */
-  private systemRoleGuard(
-    principal: AuthzPrincipalRef,
-  ): Record<string, unknown> {
+  private systemRoleGuard(principal: AuthzPrincipalRef): Record<string, unknown> {
     if (principal.type !== "apiKey") {
       return { kind: { not: SYSTEM_API_KEY_ROLE_KIND } };
     }

@@ -6,7 +6,6 @@ import { Menu } from "~/components/ui/menu";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 import { formatLeaseLapse, formatTtl, sweepOutcomeLabel } from "@langwatch/ops-web";
 
-
 export function BlobRow({
   blob,
   canManage,
@@ -66,11 +65,7 @@ export function BlobRow({
               </Button>
             </Menu.Trigger>
             <Menu.Content>
-              <Menu.Item
-                value="delete"
-                color="red.500"
-                onClick={() => onDelete(blob)}
-              >
+              <Menu.Item value="delete" color="red.500" onClick={() => onDelete(blob)}>
                 Delete payload
               </Menu.Item>
             </Menu.Content>

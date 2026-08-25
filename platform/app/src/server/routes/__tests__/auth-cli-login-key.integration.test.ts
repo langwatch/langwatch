@@ -756,9 +756,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
           "access_denied",
         );
         // Burned, so the CLI's next poll cannot re-run the ceiling walk.
-        expect(
-          await redisConnection!.get(`lwcli:device:${dc.device_code}`),
-        ).toBeNull();
+        expect(await redisConnection!.get(`lwcli:device:${dc.device_code}`)).toBeNull();
       } finally {
         await prisma.organizationUser.createMany({
           data: removedMemberships,
@@ -853,10 +851,9 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
       const cliKey = result.cli_api_key!;
 
       // Positive control before the demotion: the key reaches the project.
-      const before = await projectsApp.request(
-        `/api/projects/${PROJECT_B_ID}`,
-        { headers: { Authorization: `Bearer ${cliKey}` } },
-      );
+      const before = await projectsApp.request(`/api/projects/${PROJECT_B_ID}`, {
+        headers: { Authorization: `Bearer ${cliKey}` },
+      });
       expect(before.status).toBe(200);
 
       // Demote: the owner keeps org membership but loses the org-wide role.

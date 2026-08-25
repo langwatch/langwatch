@@ -13,21 +13,12 @@
  * Spec: specs/ai-gateway/virtual-keys.feature (Tags field).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  VK_TAG_MAX_LENGTH,
-  VK_TAGS_MAX_COUNT,
-} from "~/server/gateway/virtualKey.config";
+import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "~/server/gateway/virtualKey.config";
 
 import { VirtualKeyCreateDrawer } from "../VirtualKeyCreateDrawer";
 
@@ -93,8 +84,7 @@ const renderDrawer = () =>
     { wrapper: Wrapper },
   );
 
-const tagsInput = () =>
-  screen.getByPlaceholderText("e.g. tier=enterprise, team=ml");
+const tagsInput = () => screen.getByPlaceholderText("e.g. tier=enterprise, team=ml");
 
 /** The field wrapper, so a query stays scoped to Tags and not a sibling. */
 const tagsField = (): HTMLElement => {
@@ -121,9 +111,7 @@ describe("given the New virtual key drawer is open", () => {
 
       await waitFor(() =>
         expect(
-          screen.getByText(
-            /Group this key's traffic by team, app, or environment/,
-          ),
+          screen.getByText(/Group this key's traffic by team, app, or environment/),
         ).toBeVisible(),
       );
     });
@@ -153,9 +141,7 @@ describe("given the New virtual key drawer is open", () => {
         /A cache rule that lists tags applies to any key carrying all of them/,
       );
       await waitFor(() => expect(explanation).toBeVisible());
-      expect(explanation.textContent).not.toMatch(
-        /AND-subset|vk_tags|\bVKs?\b/,
-      );
+      expect(explanation.textContent).not.toMatch(/AND-subset|vk_tags|\bVKs?\b/);
     });
 
     /** @scenario The Tags field explains itself behind the label's information icon */
@@ -204,9 +190,7 @@ describe("given the New virtual key drawer is open", () => {
     it("keeps the explanation behind the icon rather than on the page", () => {
       renderDrawer();
 
-      expect(
-        screen.getByText(/Group this key's traffic by team/),
-      ).not.toBeVisible();
+      expect(screen.getByText(/Group this key's traffic by team/)).not.toBeVisible();
     });
   });
 

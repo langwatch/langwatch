@@ -14,10 +14,7 @@ import { streamSSE } from "hono/streaming";
 import { CompletionCopilot } from "monacopilot";
 import { z } from "zod";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
-import {
-  addEnvs,
-  LlmModelNotSetError,
-} from "~/optimization_studio/server/addEnvs";
+import { addEnvs, LlmModelNotSetError } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import {
   type StudioClientEvent,
@@ -184,10 +181,7 @@ secured
         // A node reached dispatch without a model: fixable in the editor,
         // not a server fault — 422 and no error capture.
         if (error instanceof LlmModelNotSetError) {
-          return c.json(
-            { error: error.message, cause: error.cause },
-            { status: 422 },
-          );
+          return c.json({ error: error.message, cause: error.cause }, { status: 422 });
         }
         logger.error({ error, projectId }, "error");
         captureException(toError(error), { extra: { projectId } });
@@ -252,8 +246,7 @@ secured
           })
             .catch((error: unknown) => {
               logger.error({ error }, "Error handling message");
-              const errorMessage =
-                error instanceof Error ? error.message : String(error);
+              const errorMessage = error instanceof Error ? error.message : String(error);
 
               if ("node_id" in message.payload && message.payload.node_id) {
                 void stream.writeSSE({

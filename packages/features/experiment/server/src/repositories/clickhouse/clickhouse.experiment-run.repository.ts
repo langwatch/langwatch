@@ -133,40 +133,59 @@ const parseRecord = (value: string | null): Record<string, unknown> | undefined 
     return undefined;
   }
 };
-const runKey = (experimentId: string, runId: string): string => `${experimentId}:${runId}`;
+const runKey = (experimentId: string, runId: string): string =>
+  `${experimentId}:${runId}`;
 
 export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
-  static create(options: ClickHouseExperimentRunRepositoryOptions): ClickHouseExperimentRunRepository {
+  static create(
+    options: ClickHouseExperimentRunRepositoryOptions,
+  ): ClickHouseExperimentRunRepository {
     return new ClickHouseExperimentRunRepository(options);
   }
 
-  private constructor(private readonly options: ClickHouseExperimentRunRepositoryOptions) { super(); }
-
-  async list(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {
-    return this.options.telemetry.trace({
-      name: "ExperimentRunService.listRuns",
-      attributes: {
-        "tenant.id": input.projectId,
-        "experiment.count": input.experimentIds.length,
-      },
-    }, async () => {
-      if (input.experimentIds.length === 0) return {};
-      try {
-        const client = await this.requireClient(input.projectId);
-        const runs = await this.enrichRuns(client, input.projectId, await this.rowsForExperiments(client, input));
-        const grouped: Record<string, ExperimentRun[]> = {};
-        for (const run of runs) {
-          (grouped[run.experimentId] ??= []).push(run);
-        }
-        return grouped;
-      } catch (error) {
-        this.options.telemetry.error({ projectId: input.projectId, error }, "Failed to list experiment runs from ClickHouse");
-        throw new Error("Failed to list experiment runs from ClickHouse");
-      }
-    });
+  private constructor(
+    private readonly options: ClickHouseExperimentRunRepositoryOptions,
+  ) {
+    super();
   }
 
-  async getAggregates(input: ExperimentRunListInput): Promise<Record<string, ExperimentRunAggregate>> {
+  async list(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {
+    return this.options.telemetry.trace(
+      {
+        name: "ExperimentRunService.listRuns",
+        attributes: {
+          "tenant.id": input.projectId,
+          "experiment.count": input.experimentIds.length,
+        },
+      },
+      async () => {
+        if (input.experimentIds.length === 0) return {};
+        try {
+          const client = await this.requireClient(input.projectId);
+          const runs = await this.enrichRuns(
+            client,
+            input.projectId,
+            await this.rowsForExperiments(client, input),
+          );
+          const grouped: Record<string, ExperimentRun[]> = {};
+          for (const run of runs) {
+            (grouped[run.experimentId] ??= []).push(run);
+          }
+          return grouped;
+        } catch (error) {
+          this.options.telemetry.error(
+            { projectId: input.projectId, error },
+            "Failed to list experiment runs from ClickHouse",
+          );
+          throw new Error("Failed to list experiment runs from ClickHouse");
+        }
+      },
+    );
+  }
+
+  async getAggregates(
+    input: ExperimentRunListInput,
+  ): Promise<Record<string, ExperimentRunAggregate>> {
     return this.options.telemetry.trace(
       {
         name: "ExperimentRunService.getRunAggregatesForExperimentIds",
@@ -214,8 +233,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
             row.ExperimentId,
             {
               runsCount: Number(row.runsCount),
-              lastRunAt:
-                row.lastRunAt === null ? null : Number(row.lastRunAt),
+              lastRunAt: row.lastRunAt === null ? null : Number(row.lastRunAt),
             },
           ]),
         );
@@ -223,35 +241,39 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     );
   }
 
-  async getPage(input: ExperimentRunPageInput): Promise<{ runs: ExperimentRun[]; totalHits: number }> {
-    return this.options.telemetry.trace({
-      name: "ExperimentRunService.listRunsForExperimentPaginated",
-      attributes: {
-        "tenant.id": input.projectId,
-        "experiment.id": input.experimentId,
-        page: input.page,
-        pageSize: input.pageSize,
+  async getPage(
+    input: ExperimentRunPageInput,
+  ): Promise<{ runs: ExperimentRun[]; totalHits: number }> {
+    return this.options.telemetry.trace(
+      {
+        name: "ExperimentRunService.listRunsForExperimentPaginated",
+        attributes: {
+          "tenant.id": input.projectId,
+          "experiment.id": input.experimentId,
+          page: input.page,
+          pageSize: input.pageSize,
+        },
       },
-    }, async () => {
-      const client = await this.requireClient(input.projectId);
-      const offset = (input.page - 1) * input.pageSize;
-      try {
-        const [countResult, runsResult] = await Promise.all([
-          client.query({
-            query: `
+      async () => {
+        const client = await this.requireClient(input.projectId);
+        const offset = (input.page - 1) * input.pageSize;
+        try {
+          const [countResult, runsResult] = await Promise.all([
+            client.query({
+              query: `
               SELECT uniqExact(RunId) AS totalHits
               FROM experiment_runs
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
             `,
-            query_params: {
-              tenantId: input.projectId,
-              experimentId: input.experimentId,
-            },
-            format: "JSONEachRow",
-          }),
-          client.query({
-            query: `
+              query_params: {
+                tenantId: input.projectId,
+                experimentId: input.experimentId,
+              },
+              format: "JSONEachRow",
+            }),
+            client.query({
+              query: `
               SELECT *
               FROM experiment_runs AS t
               WHERE t.TenantId = {tenantId:String}
@@ -267,44 +289,50 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
               LIMIT {pageSize:UInt32}
               OFFSET {offset:UInt32}
             `,
-            query_params: {
-              tenantId: input.projectId,
-              experimentId: input.experimentId,
-              pageSize: input.pageSize,
-              offset,
-            },
-            format: "JSONEachRow",
-          }),
-        ]);
-        const [countRows, runRows] = await Promise.all([
-          countResult.json<{ totalHits: number | string }>(),
-          runsResult.json<RunRow>(),
-        ]);
-        if (runRows.length === 0) {
-          return { runs: [], totalHits: Number(countRows[0]?.totalHits ?? 0) };
+              query_params: {
+                tenantId: input.projectId,
+                experimentId: input.experimentId,
+                pageSize: input.pageSize,
+                offset,
+              },
+              format: "JSONEachRow",
+            }),
+          ]);
+          const [countRows, runRows] = await Promise.all([
+            countResult.json<{ totalHits: number | string }>(),
+            runsResult.json<RunRow>(),
+          ]);
+          if (runRows.length === 0) {
+            return { runs: [], totalHits: Number(countRows[0]?.totalHits ?? 0) };
+          }
+          return {
+            totalHits: Number(countRows[0]?.totalHits ?? 0),
+            runs: await this.enrichRuns(client, input.projectId, runRows),
+          };
+        } catch (error) {
+          this.options.telemetry.error(
+            { projectId: input.projectId, experimentId: input.experimentId, error },
+            "Failed to list paginated experiment runs from ClickHouse",
+          );
+          throw new Error("Failed to list paginated experiment runs from ClickHouse");
         }
-        return {
-          totalHits: Number(countRows[0]?.totalHits ?? 0),
-          runs: await this.enrichRuns(client, input.projectId, runRows),
-        };
-      } catch (error) {
-        this.options.telemetry.error({ projectId: input.projectId, experimentId: input.experimentId, error }, "Failed to list paginated experiment runs from ClickHouse");
-        throw new Error("Failed to list paginated experiment runs from ClickHouse");
-      }
-    });
+      },
+    );
   }
 
   async tryGet(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
-    return this.options.telemetry.trace({
-      name: "ExperimentRunService.getRun",
-      attributes: { "tenant.id": input.projectId, "run.id": input.runId },
-    }, async () => {
-      const client = await this.options.resolveClient(input.projectId);
-      if (!client) return null;
+    return this.options.telemetry.trace(
+      {
+        name: "ExperimentRunService.getRun",
+        attributes: { "tenant.id": input.projectId, "run.id": input.runId },
+      },
+      async () => {
+        const client = await this.options.resolveClient(input.projectId);
+        if (!client) return null;
 
-      try {
-        const result = await client.query({
-          query: `
+        try {
+          const result = await client.query({
+            query: `
             SELECT *
             FROM experiment_runs
             WHERE TenantId = {tenantId:String}
@@ -319,20 +347,20 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
               )
             LIMIT 1
           `,
-          query_params: {
-            tenantId: input.projectId,
-            experimentId: input.experimentId,
-            runId: input.runId,
-          },
-          format: "JSONEachRow",
-        });
-        const run = (await result.json<RunRow>())[0];
-        if (!run) return null;
+            query_params: {
+              tenantId: input.projectId,
+              experimentId: input.experimentId,
+              runId: input.runId,
+            },
+            format: "JSONEachRow",
+          });
+          const run = (await result.json<RunRow>())[0];
+          if (!run) return null;
 
-        const range = computeOccurredAtRangeForRuns([run]);
-        this.warnIfRunsAreOld(input.projectId, range.minMs, 1);
-        const itemsResult = await client.query({
-          query: `
+          const range = computeOccurredAtRangeForRuns([run]);
+          this.warnIfRunsAreOld(input.projectId, range.minMs, 1);
+          const itemsResult = await client.query({
+            query: `
             SELECT *
             FROM experiment_run_items
             WHERE TenantId = {tenantId:String}
@@ -360,39 +388,44 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
               )
             ORDER BY RowIndex ASC, ResultType ASC
           `,
-          query_params: {
-            tenantId: input.projectId,
-            experimentId: input.experimentId,
-            runId: input.runId,
-            minOccurredAt: range.minOccurredAt,
-            maxOccurredAt: range.maxOccurredAt,
-          },
-          format: "JSONEachRow",
-        });
-        const items = await this.enrichItemCosts(
-          client,
-          input.projectId,
-          await itemsResult.json<ItemRow>(),
-          range,
-        );
-        return mapRunWithItems(run, items, input.projectId);
-      } catch (error) {
-        this.options.telemetry.error(
-          { projectId: input.projectId, runId: input.runId, error },
-          "Failed to fetch experiment run from ClickHouse",
-        );
-        throw new Error("Failed to fetch experiment run from ClickHouse");
-      }
-    });
+            query_params: {
+              tenantId: input.projectId,
+              experimentId: input.experimentId,
+              runId: input.runId,
+              minOccurredAt: range.minOccurredAt,
+              maxOccurredAt: range.maxOccurredAt,
+            },
+            format: "JSONEachRow",
+          });
+          const items = await this.enrichItemCosts(
+            client,
+            input.projectId,
+            await itemsResult.json<ItemRow>(),
+            range,
+          );
+          return mapRunWithItems(run, items, input.projectId);
+        } catch (error) {
+          this.options.telemetry.error(
+            { projectId: input.projectId, runId: input.runId, error },
+            "Failed to fetch experiment run from ClickHouse",
+          );
+          throw new Error("Failed to fetch experiment run from ClickHouse");
+        }
+      },
+    );
   }
 
   private async requireClient(projectId: string): Promise<ExperimentClickHouseClient> {
     const client = await this.options.resolveClient(projectId);
-    if (!client) throw new Error(`ClickHouse client unavailable for project ${projectId}`);
+    if (!client)
+      throw new Error(`ClickHouse client unavailable for project ${projectId}`);
     return client;
   }
 
-  private async rowsForExperiments(client: ExperimentClickHouseClient, input: ExperimentRunListInput): Promise<RunRow[]> {
+  private async rowsForExperiments(
+    client: ExperimentClickHouseClient,
+    input: ExperimentRunListInput,
+  ): Promise<RunRow[]> {
     const result = await client.query({
       query: `
         SELECT *
@@ -418,11 +451,17 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     return result.json<RunRow>();
   }
 
-  private async enrichRuns(client: ExperimentClickHouseClient, projectId: string, rows: RunRow[]): Promise<ExperimentRun[]> {
+  private async enrichRuns(
+    client: ExperimentClickHouseClient,
+    projectId: string,
+    rows: RunRow[],
+  ): Promise<ExperimentRun[]> {
     if (rows.length === 0) return [];
     const range = computeOccurredAtRangeForRuns(rows);
     this.warnIfRunsAreOld(projectId, range.minMs, rows.length);
-    const runPairs = rows.map((row) => this.options.tupleParam([row.ExperimentId, row.RunId]));
+    const runPairs = rows.map((row) =>
+      this.options.tupleParam([row.ExperimentId, row.RunId]),
+    );
     const [breakdownResult, costResult, versions] = await Promise.all([
       client.query({
         query: `
@@ -436,10 +475,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
             countIf(Passed IS NOT NULL) AS hasPassedCount
           FROM experiment_run_items
           ${buildDedupedRunItemsWhere({
-            extraFilters: [
-              "ResultType = 'evaluator'",
-              "EvaluationStatus = 'processed'",
-            ],
+            extraFilters: ["ResultType = 'evaluator'", "EvaluationStatus = 'processed'"],
           })}
           GROUP BY ExperimentId, RunId, EvaluatorId
           LIMIT 10000
@@ -476,12 +512,17 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         },
         format: "JSONEachRow",
       }),
-      this.versions(projectId, rows.flatMap((row) => row.WorkflowVersionId ? [row.WorkflowVersionId] : [])),
+      this.versions(
+        projectId,
+        rows.flatMap((row) => (row.WorkflowVersionId ? [row.WorkflowVersionId] : [])),
+      ),
     ]);
-    const [breakdowns, costs] = await Promise.all([breakdownResult.json<BreakdownRow>(), costResult.json<CostRow>()]);
-    const byKey = <T extends { ExperimentId: string; RunId: string }>(
-      values: T[],
-    ) => new Map(values.map((value) => [runKey(value.ExperimentId, value.RunId), value]));
+    const [breakdowns, costs] = await Promise.all([
+      breakdownResult.json<BreakdownRow>(),
+      costResult.json<CostRow>(),
+    ]);
+    const byKey = <T extends { ExperimentId: string; RunId: string }>(values: T[]) =>
+      new Map(values.map((value) => [runKey(value.ExperimentId, value.RunId), value]));
     const costsByKey = byKey(costs);
     const breakdownsByKey = new Map<string, BreakdownRow[]>();
     for (const value of breakdowns) {
@@ -500,7 +541,10 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     );
   }
 
-  private async versions(projectId: string, versionIds: string[]): Promise<Record<string, ExperimentRunWorkflowVersion>> {
+  private async versions(
+    projectId: string,
+    versionIds: string[],
+  ): Promise<Record<string, ExperimentRunWorkflowVersion>> {
     if (versionIds.length === 0) return {};
     const rows = await this.options.database.workflowVersion.findMany({
       where: { projectId, id: { in: [...new Set(versionIds)] } },
@@ -525,9 +569,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         items
           .filter(
             (item) =>
-              item.ResultType === "target" &&
-              item.TraceId &&
-              item.TargetCost === null,
+              item.ResultType === "target" && item.TraceId && item.TargetCost === null,
           )
           .flatMap((item) => (item.TraceId ? [item.TraceId] : [])),
       ),
@@ -562,12 +604,12 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         format: "JSONEachRow",
       });
       const costs = new Map(
-        (await result.json<{ TraceId: string; TotalCost: number | null }>())
-          .flatMap((row) =>
+        (await result.json<{ TraceId: string; TotalCost: number | null }>()).flatMap(
+          (row) =>
             row.TotalCost && row.TotalCost > 0
               ? [[row.TraceId, row.TotalCost] as const]
               : [],
-          ),
+        ),
       );
       const counts = new Map<string, number>();
       for (const item of items) {
@@ -667,7 +709,9 @@ function mapRunWithItems(
   for (const item of items) {
     const targetId = item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
     if (item.ResultType === "target") {
-      const domainError = serializedHandledErrorSchema.safeParse(parseRecord(item.TargetDomainError));
+      const domainError = serializedHandledErrorSchema.safeParse(
+        parseRecord(item.TargetDomainError),
+      );
       const predicted = parseRecord(item.Predicted);
       dataset.push({
         index: item.RowIndex,
@@ -686,8 +730,7 @@ function mapRunWithItems(
         name: item.EvaluatorName,
         targetId,
         status:
-          item.EvaluationStatus === "processed" ||
-          item.EvaluationStatus === "skipped"
+          item.EvaluationStatus === "processed" || item.EvaluationStatus === "skipped"
             ? item.EvaluationStatus
             : "error",
         index: item.RowIndex,

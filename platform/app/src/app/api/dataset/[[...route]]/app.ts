@@ -10,11 +10,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod/v4";
-import {
-  createProjectApp,
-  handlerManagedAuth,
-  requires,
-} from "~/server/api/security";
+import { createProjectApp, handlerManagedAuth, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
@@ -236,8 +232,7 @@ secured.access(requires("datasets:create")).post(
   "/upload",
   datasetServiceMiddleware,
   describeRoute({
-    description:
-      "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
+    description: "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
   }),
   async (c) => {
     const project = c.get("project");
@@ -269,10 +264,7 @@ secured.access(requires("datasets:create")).post(
       return c.json(result, 201);
     } catch (error) {
       if (error instanceof UploadValidationError) {
-        if (
-          error.kind === "file_too_large" ||
-          error.kind === "row_limit_exceeded"
-        ) {
+        if (error.kind === "file_too_large" || error.kind === "row_limit_exceeded") {
           throw new BadRequestError(error.message);
         }
         throw new UnprocessableEntityError(error.message);
@@ -287,10 +279,7 @@ secured.access(requires("datasets:create")).post(
         );
       }
       // Unsupported format from detectFileFormat
-      if (
-        error instanceof Error &&
-        error.message.includes("Unsupported file format")
-      ) {
+      if (error instanceof Error && error.message.includes("Unsupported file format")) {
         throw new UnprocessableEntityError(error.message);
       }
       throw error;
@@ -305,19 +294,14 @@ secured.access(directUploadSessionAuth).post(
   "/direct-upload",
   datasetServiceMiddleware,
   describeRoute({
-    description:
-      "Start a direct browser→S3 dataset upload (returns a presigned PUT)",
+    description: "Start a direct browser→S3 dataset upload (returns a presigned PUT)",
   }),
   async (c) => {
     const service = c.get("datasetService");
 
     const body = await c.req.parseBody();
     const projectId = body.projectId;
-    if (
-      !projectId ||
-      typeof projectId !== "string" ||
-      projectId.trim() === ""
-    ) {
+    if (!projectId || typeof projectId !== "string" || projectId.trim() === "") {
       throw new UnprocessableEntityError("projectId field is required");
     }
     // Auth is in-handler (session cookie or API key) since there's no
@@ -351,13 +335,8 @@ secured.access(directUploadSessionAuth).post(
     if (body.columnTypes !== undefined) {
       // Present-but-invalid is rejected, never silently dropped (the contract).
       // Absent (undefined) is the only "no schema → derive" path.
-      if (
-        typeof body.columnTypes !== "string" ||
-        body.columnTypes.trim() === ""
-      ) {
-        throw new UnprocessableEntityError(
-          "columnTypes must be a non-empty JSON string",
-        );
+      if (typeof body.columnTypes !== "string" || body.columnTypes.trim() === "") {
+        throw new UnprocessableEntityError("columnTypes must be a non-empty JSON string");
       }
       let parsed: unknown;
       try {
@@ -378,9 +357,7 @@ secured.access(directUploadSessionAuth).post(
           Array.isArray(parsed) &&
           parsed.some(
             (column) =>
-              column !== null &&
-              typeof column === "object" &&
-              "sourceHeader" in column,
+              column !== null && typeof column === "object" && "sourceHeader" in column,
           );
         if (looksLikeConfirmPayload) {
           throw new UnprocessableEntityError("columnTypes is malformed");
@@ -594,10 +571,7 @@ secured.access(requires("datasets:update")).post(
         ) {
           throw new BadRequestError(error.message);
         }
-        if (
-          error.kind === "empty_file" ||
-          error.kind === "unsupported_format"
-        ) {
+        if (error.kind === "empty_file" || error.kind === "unsupported_format") {
           throw new UnprocessableEntityError(error.message);
         }
         throw new UnprocessableEntityError(error.message);
@@ -606,10 +580,7 @@ secured.access(requires("datasets:update")).post(
         throw new NotFoundError("Dataset not found");
       }
       // Unsupported format from detectFileFormat
-      if (
-        error instanceof Error &&
-        error.message.includes("Unsupported file format")
-      ) {
+      if (error instanceof Error && error.message.includes("Unsupported file format")) {
         throw new UnprocessableEntityError(error.message);
       }
       throw error;
@@ -644,10 +615,7 @@ secured.access(requires("datasets:update")).post(
       if (error instanceof Error && error.name === "InvalidColumnError") {
         throw new BadRequestError(error.message);
       }
-      if (
-        error instanceof Error &&
-        error.name === "MalformedColumnTypesError"
-      ) {
+      if (error instanceof Error && error.name === "MalformedColumnTypesError") {
         throw new InternalServerError(error.message);
       }
       return mapDatasetNotFoundError(error);
@@ -704,10 +672,7 @@ secured.access(requires("datasets:update")).post(
       if (error instanceof Error && error.name === "InvalidColumnError") {
         throw new BadRequestError(error.message);
       }
-      if (
-        error instanceof Error &&
-        error.name === "MalformedColumnTypesError"
-      ) {
+      if (error instanceof Error && error.name === "MalformedColumnTypesError") {
         throw new InternalServerError(error.message);
       }
       // M1: an s3_jsonl dataset still preparing rejects the append (I-READY).
@@ -815,8 +780,7 @@ secured.access(requires("datasets:manage")).patch(
         datasetId: dataset.id,
         name: body.name ?? dataset.name,
         columnTypes:
-          (body.columnTypes as DatasetColumns) ??
-          (dataset.columnTypes as DatasetColumns),
+          (body.columnTypes as DatasetColumns) ?? (dataset.columnTypes as DatasetColumns),
       });
 
       return c.json({

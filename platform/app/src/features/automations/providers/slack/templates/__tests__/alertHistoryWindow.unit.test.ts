@@ -19,9 +19,7 @@ const OCCURRED_AT = new Date("2026-06-21T18:00:00.000Z");
 
 function makeContext(): GraphAlertTemplateContext {
   const history = Array.from({ length: HISTORY_POINTS }, (_, i) => ({
-    timestamp: new Date(
-      OCCURRED_AT.getTime() - (HISTORY_POINTS - 1 - i) * 5 * 60 * 1000,
-    ),
+    timestamp: new Date(OCCURRED_AT.getTime() - (HISTORY_POINTS - 1 - i) * 5 * 60 * 1000),
     value: i,
   }));
   return buildGraphAlertTemplateContext({
@@ -94,16 +92,13 @@ describe("graph alert history window", () => {
         const values = data.map((point) => point.value);
         expect(values).toEqual([...values].sort((a, b) => a - b));
         // The x-axis labels the same buckets the series plots, in the same order.
-        expect(chart.axis_config.categories).toEqual(
-          data.map((point) => point.label),
-        );
+        expect(chart.axis_config.categories).toEqual(data.map((point) => point.label));
       });
 
       it("names the newest buckets in the recent-values footnote", async () => {
         const blocks = await renderBlocks("graph_alert_detailed");
         const context = blockOfType(blocks, "context");
-        const text = (context.elements as { type: string; text: string }[])[0]!
-          .text;
+        const text = (context.elements as { type: string; text: string }[])[0]!.text;
 
         expect(text).toContain(`${BREACH_VALUE}`);
         expect(text).not.toContain("` 0");

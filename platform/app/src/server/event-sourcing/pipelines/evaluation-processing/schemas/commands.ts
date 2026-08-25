@@ -59,9 +59,7 @@ const baseEvaluationSchema = z.object({
  */
 export const startEvaluationCommandDataSchema = baseEvaluationSchema;
 
-export type StartEvaluationCommandData = z.infer<
-  typeof startEvaluationCommandDataSchema
->;
+export type StartEvaluationCommandData = z.infer<typeof startEvaluationCommandDataSchema>;
 
 /**
  * Command data for completing an evaluation.

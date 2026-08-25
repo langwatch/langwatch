@@ -108,16 +108,12 @@ describe("given productionClickHouseObjectStatements", () => {
   });
 
   it("creates the LangWatchQL database first", () => {
-    expect(statements[0]).toBe(
-      `CREATE DATABASE IF NOT EXISTS ${NAMES.database}`,
-    );
+    expect(statements[0]).toBe(`CREATE DATABASE IF NOT EXISTS ${NAMES.database}`);
   });
 
   it("creates a view for the ClickHouse-native dataset", () => {
     expect(
-      statements.some((s) =>
-        s.includes(`${NAMES.database}.${GATED_DATASET.name}`),
-      ),
+      statements.some((s) => s.includes(`${NAMES.database}.${GATED_DATASET.name}`)),
     ).toBe(true);
   });
 
@@ -133,13 +129,13 @@ describe("given productionClickHouseObjectStatements", () => {
     ["GRANT", "grants"],
     ["CREATE ROW POLICY", "row policies"],
     ["CREATE USER", "a restricted user"],
-    [
-      LWQL_KEY_MAP_TABLE,
-      "the key-map table (migration 00084 already created it)",
-    ],
-  ])("never emits a statement containing %s — this deploy does not provision %s (infra's job)", (needle) => {
-    expect(statements.some((s) => s.includes(needle))).toBe(false);
-  });
+    [LWQL_KEY_MAP_TABLE, "the key-map table (migration 00084 already created it)"],
+  ])(
+    "never emits a statement containing %s — this deploy does not provision %s (infra's job)",
+    (needle) => {
+      expect(statements.some((s) => s.includes(needle))).toBe(false);
+    },
+  );
 });
 
 describe("given productionPostgresApprovedViewStatements", () => {
@@ -150,16 +146,14 @@ describe("given productionPostgresApprovedViewStatements", () => {
 
     expect(statements.length).toBeGreaterThan(0);
     expect(
-      statements.some((s) =>
-        s.includes(POSTGRES_RESIDENT_VIEW.postgres.approvedView),
-      ),
+      statements.some((s) => s.includes(POSTGRES_RESIDENT_VIEW.postgres.approvedView)),
     ).toBe(true);
   });
 
   it("returns nothing for a views array with no PostgreSQL-resident dataset", () => {
-    expect(
-      productionPostgresApprovedViewStatements({ views: [GATED_DATASET] }),
-    ).toEqual([]);
+    expect(productionPostgresApprovedViewStatements({ views: [GATED_DATASET] })).toEqual(
+      [],
+    );
   });
 
   it("creates the view in the given schema, not a hardcoded public", () => {
@@ -184,9 +178,7 @@ describe("given lwqlPostgresSchemaFromDatabaseUrl", () => {
 
   it("defaults to public when the URL names no schema", () => {
     expect(
-      lwqlPostgresSchemaFromDatabaseUrl(
-        "postgresql://user:pass@db.internal:5432/mydb",
-      ),
+      lwqlPostgresSchemaFromDatabaseUrl("postgresql://user:pass@db.internal:5432/mydb"),
     ).toBe("public");
   });
 

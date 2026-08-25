@@ -57,11 +57,7 @@ type MessageRowProps = {
   onRemove: () => void;
   onCreateVariable: (variable: Variable) => void;
   /** Callback when a variable mapping should be set */
-  onSetVariableMapping?: (
-    identifier: string,
-    sourceId: string,
-    field: string,
-  ) => void;
+  onSetVariableMapping?: (identifier: string, sourceId: string, field: string) => void;
   onAddEdge?: (
     id: string,
     handle: string,
@@ -119,17 +115,12 @@ function MessageRow({
             paddingX={3}
             paddingBottom={2}
           >
-            {role !== "system" && (
-              <MessageRoleLabel role={role} marginLeft={-1} />
-            )}
+            {role !== "system" && <MessageRoleLabel role={role} marginLeft={-1} />}
             <Spacer />
             {role !== "system" && <RemoveMessageButton onRemove={onRemove} />}
           </HStack>
         )}
-        <Box
-          flex={fillHeight ? 1 : undefined}
-          height={fillHeight ? "100%" : undefined}
-        >
+        <Box flex={fillHeight ? 1 : undefined} height={fillHeight ? "100%" : undefined}>
           <Controller
             key={`message-row-${idx}-content`}
             control={form.control}
@@ -165,15 +156,8 @@ function MessageRow({
       width="full"
       label={
         showControls ? (
-          <HStack
-            width="full"
-            align="center"
-            fontWeight="normal"
-            textTransform="none"
-          >
-            {role !== "system" && (
-              <MessageRoleLabel role={role} marginLeft={-1} />
-            )}
+          <HStack width="full" align="center" fontWeight="normal" textTransform="none">
+            {role !== "system" && <MessageRoleLabel role={role} marginLeft={-1} />}
             <Spacer />
             {role !== "system" && <RemoveMessageButton onRemove={onRemove} />}
           </HStack>
@@ -242,11 +226,7 @@ export function PromptMessagesField({
   /** Available sources for variable insertion (datasets, runners, etc.) */
   availableSources?: AvailableSource[];
   /** Callback when a variable mapping should be set */
-  onSetVariableMapping?: (
-    identifier: string,
-    sourceId: string,
-    field: string,
-  ) => void;
+  onSetVariableMapping?: (identifier: string, sourceId: string, field: string) => void;
   onAddEdge?: (
     id: string,
     handle: string,
@@ -282,10 +262,7 @@ export function PromptMessagesField({
     // Only re-compute mode if:
     // 1. User hasn't manually changed it, AND
     // 2. Messages have actually changed from what we last computed from
-    if (
-      !hasUserChangedMode &&
-      currentSignature !== lastMessagesSignatureRef.current
-    ) {
+    if (!hasUserChangedMode && currentSignature !== lastMessagesSignatureRef.current) {
       const computedMode = getDefaultEditingMode(messageFields.fields);
       setEditingMode(computedMode);
       lastMessagesSignatureRef.current = currentSignature;
@@ -304,8 +281,7 @@ export function PromptMessagesField({
       // Check if variable already exists
       const existingInputs = form.getValues("version.configData.inputs") ?? [];
       const alreadyExists = existingInputs.some(
-        (input: { identifier: string }) =>
-          input.identifier === variable.identifier,
+        (input: { identifier: string }) => input.identifier === variable.identifier,
       );
 
       if (!alreadyExists) {
@@ -323,8 +299,7 @@ export function PromptMessagesField({
    */
   const getMessageError = (index: number, key: "role" | "content") => {
     const messageErrors =
-      (errors.version?.configData?.messages as MessageError[] | undefined) ??
-      [];
+      (errors.version?.configData?.messages as MessageError[] | undefined) ?? [];
     return messageErrors[index]?.[key];
   };
 
@@ -371,13 +346,10 @@ export function PromptMessagesField({
   const borderless = layoutMode === "horizontal";
 
   // Get the system message field
-  const systemField =
-    systemIndex >= 0 ? messageFields.fields[systemIndex] : undefined;
+  const systemField = systemIndex >= 0 ? messageFields.fields[systemIndex] : undefined;
 
   // Get non-system messages
-  const nonSystemMessages = messageFields.fields.filter(
-    (_, idx) => idx !== systemIndex,
-  );
+  const nonSystemMessages = messageFields.fields.filter((_, idx) => idx !== systemIndex);
 
   return (
     <Box
@@ -446,9 +418,7 @@ export function PromptMessagesField({
                 >
                   <MessageRoleLabel role="system" />
                   <Spacer />
-                  {editingMode === "messages" && (
-                    <AddMessageButton onAdd={handleAdd} />
-                  )}
+                  {editingMode === "messages" && <AddMessageButton onAdd={handleAdd} />}
                 </HStack>
                 <MessageRow
                   key="system-message-row"
@@ -470,9 +440,7 @@ export function PromptMessagesField({
               </Box>
             )}
             {nonSystemMessages.map((field, mapIdx) => {
-              const idx = messageFields.fields.findIndex(
-                (f) => f.id === field.id,
-              );
+              const idx = messageFields.fields.findIndex((f) => f.id === field.id);
               const isLast = mapIdx === nonSystemMessages.length - 1;
               return (
                 <Box

@@ -79,11 +79,7 @@ export function AgentCard({
         <VStack align="start" gap={2} height="full">
           <HStack width="full">
             <Box bg="blue.subtle" padding={1} borderRadius="md">
-              <Icon
-                aria-hidden="true"
-                size={18}
-                color="var(--chakra-colors-blue-fg)"
-              />
+              <Icon aria-hidden="true" size={18} color="var(--chakra-colors-blue-fg)" />
             </Box>
             <Spacer />
             {(onEdit || onDelete) && (
@@ -103,14 +99,12 @@ export function AgentCard({
                   )}
                   {agent.type === "workflow" && onOpenWorkflow && (
                     <Menu.Item value="open-workflow" onClick={onOpenWorkflow}>
-                      <ExternalLink aria-hidden="true" size={14} /> Open
-                      workflow
+                      <ExternalLink aria-hidden="true" size={14} /> Open workflow
                     </Menu.Item>
                   )}
                   {isCopiedAgent && onSyncFromSource && (
                     <Menu.Item value="sync" onClick={onSyncFromSource}>
-                      <RefreshCw aria-hidden="true" size={14} /> Update from
-                      source
+                      <RefreshCw aria-hidden="true" size={14} /> Update from source
                     </Menu.Item>
                   )}
                   {hasCopies && onPushToCopies && (
@@ -120,8 +114,7 @@ export function AgentCard({
                   )}
                   {onReplicate && (
                     <Menu.Item value="replicate" onClick={onReplicate}>
-                      <Copy aria-hidden="true" size={14} /> Replicate to another
-                      project
+                      <Copy aria-hidden="true" size={14} /> Replicate to another project
                     </Menu.Item>
                   )}
                   {onViewHistory && (
@@ -130,11 +123,7 @@ export function AgentCard({
                     </Menu.Item>
                   )}
                   {onDelete && (
-                    <Menu.Item
-                      value="delete"
-                      color="red.500"
-                      onClick={onDelete}
-                    >
+                    <Menu.Item value="delete" color="red.500" onClick={onDelete}>
                       <Trash2 aria-hidden="true" size={14} /> Delete
                     </Menu.Item>
                   )}

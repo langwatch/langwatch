@@ -94,36 +94,19 @@ export function emptyStateMetrics({
   if (variant === "sidebar") return SIDEBAR_METRICS;
 
   const t = clamp01(
-    (width - FLOATING_NARROW_WIDTH) /
-      (FLOATING_ROOMY_WIDTH - FLOATING_NARROW_WIDTH),
+    (width - FLOATING_NARROW_WIDTH) / (FLOATING_ROOMY_WIDTH - FLOATING_NARROW_WIDTH),
   );
   return {
     markSize: lerpRound(FLOATING_NARROW.markSize, FLOATING_ROOMY.markSize, t),
-    greetingSize: lerpRound(
-      FLOATING_NARROW.greetingSize,
-      FLOATING_ROOMY.greetingSize,
-      t,
-    ),
-    heroGapTop: lerpRound(
-      FLOATING_NARROW.heroGapTop,
-      FLOATING_ROOMY.heroGapTop,
-      t,
-    ),
+    greetingSize: lerpRound(FLOATING_NARROW.greetingSize, FLOATING_ROOMY.greetingSize, t),
+    heroGapTop: lerpRound(FLOATING_NARROW.heroGapTop, FLOATING_ROOMY.heroGapTop, t),
     heroMarginBottom: lerpRound(
       FLOATING_NARROW.heroMarginBottom,
       FLOATING_ROOMY.heroMarginBottom,
       t,
     ),
-    rowPaddingY: lerpRound(
-      FLOATING_NARROW.rowPaddingY,
-      FLOATING_ROOMY.rowPaddingY,
-      t,
-    ),
-    rowPaddingX: lerpRound(
-      FLOATING_NARROW.rowPaddingX,
-      FLOATING_ROOMY.rowPaddingX,
-      t,
-    ),
+    rowPaddingY: lerpRound(FLOATING_NARROW.rowPaddingY, FLOATING_ROOMY.rowPaddingY, t),
+    rowPaddingX: lerpRound(FLOATING_NARROW.rowPaddingX, FLOATING_ROOMY.rowPaddingX, t),
     rowGap: lerpRound(FLOATING_NARROW.rowGap, FLOATING_ROOMY.rowGap, t),
     subtitleMaxWidth: lerpRound(
       FLOATING_NARROW.subtitleMaxWidth,

@@ -134,9 +134,7 @@ vi.mock("~/utils/api", async () => {
       apiKey: {
         myBindings: {
           useQuery: () => ({
-            data: [
-              { scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" },
-            ],
+            data: [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" }],
             isLoading: false,
           }),
         },
@@ -227,9 +225,7 @@ describe("/cli/auth first-trace watch", () => {
       expect(screen.getByRole("button", { name: "Approve" })).toBeDefined(),
     );
     await user.click(screen.getByRole("button", { name: "Approve" }));
-    await waitFor(() =>
-      expect(screen.getByText(/You're signed in!/i)).toBeDefined(),
-    );
+    await waitFor(() => expect(screen.getByText(/You're signed in!/i)).toBeDefined());
   };
 
   /** @scenario "Approving a device session before any trace has synced waits and then redirects to the personal traces page" */
@@ -251,12 +247,9 @@ describe("/cli/auth first-trace watch", () => {
 
     act(() => firstMessageState.set(true));
 
-    await waitFor(() =>
-      expect(screen.getByText(/First trace received/i)).toBeDefined(),
-    );
+    await waitFor(() => expect(screen.getByText(/First trace received/i)).toBeDefined());
     await waitFor(
-      () =>
-        expect(mockRouter.push).toHaveBeenCalledWith("/personal-proj/traces"),
+      () => expect(mockRouter.push).toHaveBeenCalledWith("/personal-proj/traces"),
       { timeout: 4_000 },
     );
   });
@@ -284,14 +277,10 @@ describe("/cli/auth first-trace watch", () => {
 
     const user = userEvent.setup();
     await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Send API key" }),
-      ).toBeDefined(),
+      expect(screen.getByRole("button", { name: "Send API key" })).toBeDefined(),
     );
     await user.click(screen.getByRole("button", { name: "Send API key" }));
-    await waitFor(() =>
-      expect(screen.getByText(/API key approved/i)).toBeDefined(),
-    );
+    await waitFor(() => expect(screen.getByText(/API key approved/i)).toBeDefined());
 
     await new Promise((resolve) => setTimeout(resolve, 500));
 

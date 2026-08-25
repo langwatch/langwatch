@@ -93,10 +93,9 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
                 ) : null}
               </HStack>
               <Text fontSize="sm" color="fg.muted">
-                Lets LangWatch open pull requests on the repositories you
-                choose, and link coding agent sessions to the pull requests they
-                produced. Pull requests are made by the LangWatch app and credit
-                you as the requester.
+                Lets LangWatch open pull requests on the repositories you choose, and link
+                coding agent sessions to the pull requests they produced. Pull requests
+                are made by the LangWatch app and credit you as the requester.
               </Text>
 
               {!configured ? (
@@ -182,12 +181,7 @@ function InstallationRow({
         }`;
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={3}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
       <HStack justify="space-between" gap={3}>
         <VStack align="stretch" gap={0}>
           <HStack gap={2}>

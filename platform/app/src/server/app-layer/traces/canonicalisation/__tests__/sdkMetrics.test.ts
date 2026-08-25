@@ -183,9 +183,7 @@ describe("CanonicalizeSpanAttributesService — gen_ai is the default token sour
         stubSpan,
       );
 
-      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]).toBe(
-        512,
-      );
+      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]).toBe(512);
     });
   });
 
@@ -217,9 +215,7 @@ describe("CanonicalizeSpanAttributesService — gen_ai is the default token sour
         stubSpan,
       );
 
-      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]).toBe(
-        999,
-      );
+      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]).toBe(999);
     });
   });
 });
@@ -241,9 +237,9 @@ describe("CanonicalizeSpanAttributesService — cache-read token canonicalisatio
         stubSpan,
       );
 
-      expect(
-        result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
-      ).toBe(37127);
+      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+        37127,
+      );
       expect(
         result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS],
       ).toBeUndefined();
@@ -296,9 +292,9 @@ describe("CanonicalizeSpanAttributesService — cache-read token canonicalisatio
         stubSpan,
       );
 
-      expect(
-        result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
-      ).toBe(5000);
+      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+        5000,
+      );
     });
   });
 });
@@ -313,17 +309,16 @@ describe("CanonicalizeSpanAttributesService — cache-creation across providers"
     it("carries the count through and prices it at the cache-creation rate", () => {
       const result = service.canonicalize(
         {
-          [ATTR_KEYS.GEN_AI_REQUEST_MODEL]:
-            "bedrock/us.anthropic.claude-opus-4-7",
+          [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: "bedrock/us.anthropic.claude-opus-4-7",
           [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: 1000,
         },
         [],
         stubSpan,
       );
 
-      expect(
-        result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS],
-      ).toBe(1000);
+      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(
+        1000,
+      );
 
       const withCacheCreation = computeSpanCost({
         attrs: result.attributes,
@@ -332,8 +327,7 @@ describe("CanonicalizeSpanAttributesService — cache-creation across providers"
       });
       const withoutCacheCreation = computeSpanCost({
         attrs: {
-          [ATTR_KEYS.GEN_AI_REQUEST_MODEL]:
-            "bedrock/us.anthropic.claude-opus-4-7",
+          [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: "bedrock/us.anthropic.claude-opus-4-7",
         },
         promptTokens: 100,
         completionTokens: 0,

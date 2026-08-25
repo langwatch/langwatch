@@ -40,8 +40,8 @@ export function BlobStoreContent() {
   return (
     <>
       <Text textStyle="sm" color="fg.muted" marginBottom={4}>
-        Stored job payloads, what still references them, and what the next
-        cleanup would do with each. Payload contents are never shown.
+        Stored job payloads, what still references them, and what the next cleanup would
+        do with each. Payload contents are never shown.
       </Text>
 
       <BlobToolbar
@@ -58,8 +58,8 @@ export function BlobStoreContent() {
 
       {listing.rankedFromSample && (
         <Text textStyle="xs" color="fg.muted" marginBottom={3}>
-          Ordered from a sample of {listing.sampled} payloads, not the whole
-          store. Use storage order to walk everything.
+          Ordered from a sample of {listing.sampled} payloads, not the whole store. Use
+          storage order to walk everything.
         </Text>
       )}
 

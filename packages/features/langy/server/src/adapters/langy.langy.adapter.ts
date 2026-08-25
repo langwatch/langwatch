@@ -1,7 +1,4 @@
-import type {
-  AppendStore,
-  StateProjectionStore,
-} from "@langwatch/eventing";
+import type { AppendStore, StateProjectionStore } from "@langwatch/eventing";
 import type {
   LangyConversationStateData,
   LangyConversationTurnCapability,
@@ -41,10 +38,7 @@ import type { LangyCredentialServiceOptions } from "../services/langy-credential
  * boundary. The Prisma row and repository stay private to this package.
  */
 export interface LangyMessageTurnCompositionCapability {
-  findAllByConversation(input: {
-    conversationId: string;
-    projectId: string;
-  }): Promise<
+  findAllByConversation(input: { conversationId: string; projectId: string }): Promise<
     Array<{
       id: string;
       role: "user" | "assistant" | "tool" | "system";
@@ -55,10 +49,7 @@ export interface LangyMessageTurnCompositionCapability {
 }
 
 export interface LangyTrustedMessageCompositionCapability {
-  getRecordsByConversation(input: {
-    conversationId: string;
-    projectId: string;
-  }): Promise<
+  getRecordsByConversation(input: { conversationId: string; projectId: string }): Promise<
     Array<{
       id: string;
       role: "user" | "assistant" | "tool" | "system";
@@ -87,9 +78,7 @@ export type LangyCredentialComposition = () => Omit<
   "repository"
 >;
 
-export type LangyTurnComposition = (
-  ports: LangyTurnCompositionPorts,
-) => object;
+export type LangyTurnComposition = (ports: LangyTurnCompositionPorts) => object;
 
 export interface LangyCompositionCapabilities {
   turns: LangyTurnComposition;
@@ -105,8 +94,7 @@ export interface LangyEventingCapabilities {
   trustedMessages: LangyTrustedMessageCompositionCapability;
 }
 
-export interface LangyServiceCompositionOptions
-  extends LangyCompositionCapabilities {
+export interface LangyServiceCompositionOptions extends LangyCompositionCapabilities {
   commands: LangyConversationCommands;
   events?: LangyConversationEventsReader | null;
   runtime?: LangyConversationRuntime;
@@ -140,13 +128,13 @@ export class PostgresLangyAdapter {
       messages: PrismaLangyMessageRepository.create(options.database),
       credentials: PrismaLangyCredentialRepository.create(options.database),
       admission: PrismaLangyTurnAdmissionRepository.create(options.database),
-      conversationState:
-        PrismaLangyConversationProjectionRepository.create(options.database),
-      conversationTurnState:
-        PrismaLangyConversationTurnProjectionRepository.create(options.database),
-      messageStorage: PrismaLangyMessageProjectionRepository.create(
+      conversationState: PrismaLangyConversationProjectionRepository.create(
         options.database,
       ),
+      conversationTurnState: PrismaLangyConversationTurnProjectionRepository.create(
+        options.database,
+      ),
+      messageStorage: PrismaLangyMessageProjectionRepository.create(options.database),
     };
     this.eventingCapabilities = {
       langyConversationState: this.repositories.conversationState,

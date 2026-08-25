@@ -1,8 +1,4 @@
-import {
-  defaultHandler,
-  getListHandler,
-  getOneHandler,
-} from "ra-data-simple-prisma";
+import { defaultHandler, getListHandler, getOneHandler } from "ra-data-simple-prisma";
 import {
   PlanTypes,
   type PrismaClient,
@@ -176,18 +172,14 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
         return {
           id: this.stringValue(params.id),
           data: params.data ?? {},
-          ...(params.previousData
-            ? { previousData: params.previousData }
-            : {}),
+          ...(params.previousData ? { previousData: params.previousData } : {}),
         };
       case "updateMany":
         return { ids: this.stringArray(params.ids), data: params.data ?? {} };
       case "delete":
         return {
           id: this.stringValue(params.id),
-          ...(params.previousData
-            ? { previousData: params.previousData }
-            : {}),
+          ...(params.previousData ? { previousData: params.previousData } : {}),
         };
       case "deleteMany":
         return { ids: this.stringArray(params.ids) };
@@ -197,10 +189,7 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
     }
   }
 
-  private listParams(
-    params: AdminOperationParams,
-    filter: Record<string, unknown>,
-  ) {
+  private listParams(params: AdminOperationParams, filter: Record<string, unknown>) {
     return {
       pagination: {
         page: params.pagination?.page ?? 1,
@@ -241,10 +230,7 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
                   orgMemberships: {
                     some: {
                       organization: {
-                        OR: [
-                          { id: insensitive },
-                          { name: insensitive },
-                        ],
+                        OR: [{ id: insensitive }, { name: insensitive }],
                       },
                     },
                   },
@@ -257,10 +243,7 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
                           some: {
                             projects: {
                               some: {
-                                OR: [
-                                  { id: insensitive },
-                                  { name: insensitive },
-                                ],
+                                OR: [{ id: insensitive }, { name: insensitive }],
                               },
                             },
                           },
@@ -275,9 +258,7 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
         };
       case "subscription": {
         const upperQuery = query.toUpperCase();
-        const matchingPlan = Object.values(PlanTypes).find(
-          (plan) => plan === upperQuery,
-        );
+        const matchingPlan = Object.values(PlanTypes).find((plan) => plan === upperQuery);
         const matchingStatus = Object.values(SubscriptionStatus).find(
           (status) => status === upperQuery,
         );
@@ -298,9 +279,7 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
                   },
                 },
                 ...(matchingPlan ? [{ plan: { equals: matchingPlan } }] : []),
-                ...(matchingStatus
-                  ? [{ status: { equals: matchingStatus } }]
-                  : []),
+                ...(matchingStatus ? [{ status: { equals: matchingStatus } }] : []),
               ],
             },
           },
@@ -312,11 +291,7 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
           filter,
           where: {
             where: {
-              OR: [
-                { id: insensitive },
-                { name: insensitive },
-                { slug: insensitive },
-              ],
+              OR: [{ id: insensitive }, { name: insensitive }, { slug: insensitive }],
             },
           },
         };

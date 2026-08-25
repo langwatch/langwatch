@@ -10,11 +10,12 @@ import type { z } from "zod";
 // ---------------------------------------------------------------------------
 
 /** Extract the literal event type string from a Zod schema's output type. */
-export type EventTypeOf<S extends z.ZodType> = z.output<S> extends {
-  type: infer T extends string;
-}
-  ? T
-  : never;
+export type EventTypeOf<S extends z.ZodType> =
+  z.output<S> extends {
+    type: infer T extends string;
+  }
+    ? T
+    : never;
 
 // ---------------------------------------------------------------------------
 // Type-level string transforms
@@ -33,19 +34,16 @@ export type SnakeToPascal<S extends string> = S extends `${infer H}_${infer T}`
   : Capitalize<S>;
 
 /** `"suite_run.item_started"` → `"SuiteRunItemStarted"` */
-export type DotSnakeToPascal<S extends string> =
-  S extends `${infer H}.${infer T}`
-    ? `${SnakeToPascal<H>}${DotSnakeToPascal<T>}`
-    : SnakeToPascal<S>;
+export type DotSnakeToPascal<S extends string> = S extends `${infer H}.${infer T}`
+  ? `${SnakeToPascal<H>}${DotSnakeToPascal<T>}`
+  : SnakeToPascal<S>;
 
 // ---------------------------------------------------------------------------
 // Utility types
 // ---------------------------------------------------------------------------
 
 export type UnionToIntersection<U> = (
-  U extends unknown
-    ? (k: U) => void
-    : never
+  U extends unknown ? (k: U) => void : never
 ) extends (k: infer I) => void
   ? I
   : never;

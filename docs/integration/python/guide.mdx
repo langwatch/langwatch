@@ -8,7 +8,9 @@ keywords: LangWatch, Python, SDK, integration, guide, setup, tracing, spans, tra
 import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a
+  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set
+  this up for you automatically.
 </Tip>
 
 <div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
@@ -55,9 +57,8 @@ langwatch.setup()
 ```
 
 <Note>
-  If you have an existing OpenTelemetry setup in your application, please see
-  the [Already using OpenTelemetry?](#already-using-opentelemetry) section
-  below.
+  If you have an existing OpenTelemetry setup in your application, please see the [Already
+  using OpenTelemetry?](#already-using-opentelemetry) section below.
 </Note>
 
 ## Capturing Messages
@@ -136,10 +137,10 @@ async def handle_message(message: cl.Message):
 ```
 
 <Note>
-  The `@langwatch.span()` decorator automatically captures the decorated
-  function's arguments as the span's `input` and its return value as the
-  `output`. This behavior can be controlled via the `capture_input` and
-  `capture_output` arguments (both default to `True`).
+  The `@langwatch.span()` decorator automatically captures the decorated function's
+  arguments as the span's `input` and its return value as the `output`. This behavior can
+  be controlled via the `capture_input` and `capture_output` arguments (both default to
+  `True`).
 </Note>
 
 Spans created within a function **decorated** with `@langwatch.trace()` will automatically be nested under the main trace span. You can add additional `type`, `name`, `metadata`, and `events`, or override the automatic input/output using decorator arguments or the `update()` method on the span object obtained via `langwatch.get_current_span()`.
@@ -195,18 +196,18 @@ langwatch.setup(
 ### Options
 
 <ParamField path="api_key" type="str | None">
-  Your LangWatch API key. If not provided, it uses the `LANGWATCH_API_KEY`
-  environment variable.
+  Your LangWatch API key. If not provided, it uses the `LANGWATCH_API_KEY` environment
+  variable.
 </ParamField>
 
 <ParamField path="project_id" type="str | None">
-  Your LangWatch project ID. Required when using a service API key. If not
-  provided, it uses the `LANGWATCH_PROJECT_ID` environment variable.
+  Your LangWatch project ID. Required when using a service API key. If not provided, it
+  uses the `LANGWATCH_PROJECT_ID` environment variable.
 </ParamField>
 
 <ParamField path="endpoint_url" type="str | None">
-  The LangWatch endpoint URL. Defaults to the `LANGWATCH_ENDPOINT` environment
-  variable or `https://app.langwatch.ai`.
+  The LangWatch endpoint URL. Defaults to the `LANGWATCH_ENDPOINT` environment variable or
+  `https://app.langwatch.ai`.
 </ParamField>
 
 <ParamField path="base_attributes" type="dict[str, Any] | None">
@@ -215,14 +216,14 @@ langwatch.setup(
 </ParamField>
 
 <ParamField path="instrumentors" type="Sequence[Instrumentor] | None">
-  A list of automatic instrumentors (e.g., `OpenAIInstrumentor`,
-  `LangChainInstrumentor`) to capture data from supported libraries.
+  A list of automatic instrumentors (e.g., `OpenAIInstrumentor`, `LangChainInstrumentor`)
+  to capture data from supported libraries.
 </ParamField>
 
 <ParamField path="tracer_provider" type="TracerProvider | None">
-  An existing OpenTelemetry `TracerProvider`. If provided, LangWatch will use it
-  (adding its exporter) instead of creating a new one. If not provided,
-  LangWatch checks the global provider or creates a new one.
+  An existing OpenTelemetry `TracerProvider`. If provided, LangWatch will use it (adding
+  its exporter) instead of creating a new one. If not provided, LangWatch checks the
+  global provider or creates a new one.
 </ParamField>
 
 <ParamField path="debug" type="bool" default="False">
@@ -231,21 +232,18 @@ langwatch.setup(
 </ParamField>
 
 <ParamField path="disable_sending" type="bool" default="False">
-  If `True`, disables sending traces to the LangWatch server. Useful for testing
-  or development.
+  If `True`, disables sending traces to the LangWatch server. Useful for testing or
+  development.
 </ParamField>
 
 <ParamField path="flush_on_exit" type="bool" default="True">
-  If `True` (the default), the tracer provider will attempt to flush all pending
-  spans when the program exits via `atexit`.
+  If `True` (the default), the tracer provider will attempt to flush all pending spans
+  when the program exits via `atexit`.
 </ParamField>
 
-<ParamField
-  path="span_exclude_rules"
-  type="List[SpanProcessingExcludeRule] | None"
->
-  If provided, the SDK will exclude spans from being exported to LangWatch based
-  on the rules defined in the list (e.g., matching span names).
+<ParamField path="span_exclude_rules" type="List[SpanProcessingExcludeRule] | None">
+  If provided, the SDK will exclude spans from being exported to LangWatch based on the
+  rules defined in the list (e.g., matching span names).
 </ParamField>
 
 <ParamField
@@ -254,8 +252,8 @@ langwatch.setup(
   default="False"
 >
   If `True`, suppresses the warning message logged when an existing global
-  `TracerProvider` is detected and LangWatch attaches its exporter to it instead
-  of overriding it.
+  `TracerProvider` is detected and LangWatch attaches its exporter to it instead of
+  overriding it.
 </ParamField>
 
 ## Integrations
@@ -288,29 +286,45 @@ If you are using a library that is not listed here, you can still instrument you
     LangWatch captures token counts from the span and prices them against the model registry in **Settings > Model Costs**, so a model that is in the registry gets its cost automatically. If you're missing costs or token counts, our [cost tracking tutorial](/integration/python/tutorials/tracking-llm-costs) covers troubleshooting steps, model cost configuration, and manual token tracking setup.
   </Accordion>
 
-  <Accordion title="How do I capture RAG (Retrieval Augmented Generation) contexts?">
-    To monitor your RAG pipelines and track retrieved documents, see our [RAG capturing guide](/integration/python/tutorials/capturing-rag). This enables specialized RAG evaluators and analytics on document usage patterns.
-  </Accordion>
+<Accordion title="How do I capture RAG (Retrieval Augmented Generation) contexts?">
+  To monitor your RAG pipelines and track retrieved documents, see our [RAG capturing
+  guide](/integration/python/tutorials/capturing-rag). This enables specialized RAG
+  evaluators and analytics on document usage patterns.
+</Accordion>
 
-  <Accordion title="How can I make input and output of the trace more human readable to better read the conversation?">
-    Our [input/output mapping guide](/integration/python/tutorials/capturing-mapping-input-output) shows how to properly structure chat messages, handle different data formats, and ensure your LLM conversations are captured correctly for analysis.
-  </Accordion>
+<Accordion title="How can I make input and output of the trace more human readable to better read the conversation?">
+  Our [input/output mapping
+  guide](/integration/python/tutorials/capturing-mapping-input-output) shows how to
+  properly structure chat messages, handle different data formats, and ensure your LLM
+  conversations are captured correctly for analysis.
+</Accordion>
 
-  <Accordion title="How do I add custom metadata and user information to traces?">
-    Learn how to enrich your traces with user IDs, session data, and custom attributes in our [metadata and attributes tutorial](/integration/python/tutorials/capturing-metadata). This is essential for user analytics and filtering traces by custom criteria.
-  </Accordion>
+<Accordion title="How do I add custom metadata and user information to traces?">
+  Learn how to enrich your traces with user IDs, session data, and custom attributes in
+  our [metadata and attributes
+  tutorial](/integration/python/tutorials/capturing-metadata). This is essential for user
+  analytics and filtering traces by custom criteria.
+</Accordion>
 
-  <Accordion title="How can I capture a whole conversation?">
-    To connect multiple traces into a conversation, set the `thread_id` metadata on each trace. See the [Tracking Conversations](/integration/python/tutorials/tracking-conversations) tutorial for a full example.
-  </Accordion>
+<Accordion title="How can I capture a whole conversation?">
+  To connect multiple traces into a conversation, set the `thread_id` metadata on each
+  trace. See the [Tracking
+  Conversations](/integration/python/tutorials/tracking-conversations) tutorial for a full
+  example.
+</Accordion>
 
-  <Accordion title="How do I capture evaluations and guardrails tracing data?">
-    Implement automated quality checks and safety measures with our [evaluations and guardrails tutorial](/integration/python/tutorials/capturing-evaluations-guardrails). Learn to create custom evaluators and integrate safety guardrails into your LLM workflows.
-  </Accordion>
+<Accordion title="How do I capture evaluations and guardrails tracing data?">
+  Implement automated quality checks and safety measures with our [evaluations and
+  guardrails tutorial](/integration/python/tutorials/capturing-evaluations-guardrails).
+  Learn to create custom evaluators and integrate safety guardrails into your LLM
+  workflows.
+</Accordion>
 
-  <Accordion title="How can I manually instrument my application for more fine-grained control?">
-    For custom frameworks or fine-grained control, our [manual instrumentation guide](/integration/python/tutorials/manual-instrumentation) covers creating traces and spans programmatically using context managers and direct API calls.
-  </Accordion>
+<Accordion title="How can I manually instrument my application for more fine-grained control?">
+  For custom frameworks or fine-grained control, our [manual instrumentation
+  guide](/integration/python/tutorials/manual-instrumentation) covers creating traces and
+  spans programmatically using context managers and direct API calls.
+</Accordion>
 
   <Accordion title="How do I integrate with existing OpenTelemetry setups?">
     LangWatch is OpenTelemetry-based, so it works with any OpenTelemetry-compatible application. If you already use OpenTelemetry in your application, our [OpenTelemetry integration tutorial](/integration/python/tutorials/open-telemetry) explains how to configure LangWatch alongside existing telemetry infrastructure, including custom collectors and exporters.

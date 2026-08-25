@@ -78,11 +78,7 @@ type LangyIntents = {
  * and parse the view — the same shape topic-clustering uses for a process with
  * a content boundary.
  */
-type LangyHandler = EventHandler<
-  LangyConversationProcessState,
-  unknown,
-  LangyIntents
->;
+type LangyHandler = EventHandler<LangyConversationProcessState, unknown, LangyIntents>;
 
 /**
  * Automatic titling is a one-shot logical transition: the first SUCCESSFUL
@@ -91,10 +87,7 @@ type LangyHandler = EventHandler<
  * may ever retitle.
  */
 function shouldGenerateTitle(state: LangyConversationProcessState): boolean {
-  return (
-    state.titleSource === LANGY_TITLE_SOURCE.DERIVED &&
-    !state.autoTitleRequested
-  );
+  return state.titleSource === LANGY_TITLE_SOURCE.DERIVED && !state.autoTitleRequested;
 }
 
 export const handleAgentTurnAccepted: LangyHandler = (state, payload, ctx) => {
@@ -109,14 +102,11 @@ export const handleAgentTurnAccepted: LangyHandler = (state, payload, ctx) => {
   return {
     state: { ...state, currentTurnId: view.turnId, turnStatus: "running" },
     intents: [
-      ctx.intents[LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH](
-        `dispatch:${view.turnId}`,
-        {
-          conversationId: ctx.key,
-          turnId: view.turnId,
-          resumeFromTurnId: state.pendingHandoffTurnId,
-        },
-      ),
+      ctx.intents[LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH](`dispatch:${view.turnId}`, {
+        conversationId: ctx.key,
+        turnId: view.turnId,
+        resumeFromTurnId: state.pendingHandoffTurnId,
+      }),
     ],
   };
 };
@@ -127,8 +117,7 @@ export const handleAgentResponded: LangyHandler = (state, payload, ctx) => {
     return { state };
   }
   const succeeded = view.outcome !== "failed";
-  const generateTitle =
-    succeeded && !state.archived && shouldGenerateTitle(state);
+  const generateTitle = succeeded && !state.archived && shouldGenerateTitle(state);
   return {
     state: {
       ...state,
@@ -138,10 +127,10 @@ export const handleAgentResponded: LangyHandler = (state, payload, ctx) => {
     },
     intents: generateTitle
       ? [
-          ctx.intents[LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE](
-            `title:${view.turnId}`,
-            { conversationId: ctx.key, turnId: view.turnId },
-          ),
+          ctx.intents[LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE](`title:${view.turnId}`, {
+            conversationId: ctx.key,
+            turnId: view.turnId,
+          }),
         ]
       : undefined,
   };
@@ -237,20 +226,11 @@ export function langyConversationProcess(
         createLangyGenerateTitleIntent(ports),
       )
       .toPayload(buildLangyProcessEventView)
-      .on(
-        LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
-        handleAgentTurnAccepted,
-      )
+      .on(LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED, handleAgentTurnAccepted)
       .on(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED, handleAgentResponded)
-      .on(
-        LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED,
-        handleAgentResponseFailed,
-      )
+      .on(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED, handleAgentResponseFailed)
       .on(LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED, handleArchived)
-      .on(
-        LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED,
-        handleMetadataUpdated,
-      )
+      .on(LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED, handleMetadataUpdated)
       .on(LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED, handleTitleGenerated)
       .on(
         LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING,

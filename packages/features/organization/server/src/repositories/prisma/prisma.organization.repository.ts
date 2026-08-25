@@ -6,11 +6,7 @@ import {
   type PersonalFeatures,
   type PersonalWorkspace,
 } from "@langwatch/organization-contract";
-import {
-  Prisma,
-  type PrismaClient,
-  type Team,
-} from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
 import {
   OrganizationRepository,
   type PersonalWorkspaceFeatureProject,
@@ -38,9 +34,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     return team.id;
   }
 
-  async getBillingProfile(
-    organizationId: string,
-  ): Promise<OrganizationBillingProfile> {
+  async getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile> {
     const organization = await this.database.organization.findUnique({
       where: { id: organizationId },
       select: { id: true, name: true, stripeCustomerId: true },
@@ -85,10 +79,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }> {
     try {
       return await this.database.$transaction(async (transaction) => {
-        const existing = await this.tryFindWorkspace(
-          transaction,
-          input.workspace,
-        );
+        const existing = await this.tryFindWorkspace(transaction, input.workspace);
         if (existing) {
           return {
             workspace: existing,
@@ -119,10 +110,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
       });
     } catch (error) {
       if (!isUniqueConstraintError(error)) throw error;
-      const winner = await this.tryFindWorkspace(
-        this.database,
-        input.workspace,
-      );
+      const winner = await this.tryFindWorkspace(this.database, input.workspace);
       if (!winner) throw error;
       return {
         workspace: winner,
@@ -193,9 +181,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     resources: PersonalWorkspaceResourceIds,
   ): Promise<PersonalWorkspace> {
     const displayLabel =
-      input.displayName?.trim() ||
-      input.displayEmail?.split("@")[0] ||
-      "user";
+      input.displayName?.trim() || input.displayEmail?.split("@")[0] || "user";
     const team = await transaction.team.create({
       data: {
         id: resources.teamId,
@@ -291,10 +277,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }
 }
 function isUniqueConstraintError(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
-  );
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
 function mapPersonalWorkspace(

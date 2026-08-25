@@ -68,8 +68,9 @@ function BudgetsPage() {
   const canDelete = hasPermission("gatewayBudgets:delete");
 
   const router = useRouter();
-  const { rows, spendAvailable, isLoading, isError, error, refetch } =
-    useBudgetRows(organization?.id);
+  const { rows, spendAvailable, isLoading, isError, error, refetch } = useBudgetRows(
+    organization?.id,
+  );
 
   const utils = api.useUtils();
   const archiveMutation = api.gatewayBudgets.archive.useMutation({
@@ -106,11 +107,7 @@ function BudgetsPage() {
           <PageLayout.Heading>Budgets</PageLayout.Heading>
           <Spacer />
           {canCreate && (
-            <Button
-              colorPalette="orange"
-              size="sm"
-              onClick={() => setCreateOpen(true)}
-            >
+            <Button colorPalette="orange" size="sm" onClick={() => setCreateOpen(true)}>
               <Plus size={14} /> New budget
             </Button>
           )}
@@ -133,10 +130,9 @@ function BudgetsPage() {
                 </EmptyState.Indicator>
                 <EmptyState.Title>No budgets yet</EmptyState.Title>
                 <EmptyState.Description>
-                  Budgets enforce a spend ceiling on any dimension:
-                  organization, group, team, project, member, or virtual key;
-                  each optionally limited to a single provider. Create one to
-                  start governing cost.
+                  Budgets enforce a spend ceiling on any dimension: organization, group,
+                  team, project, member, or virtual key; each optionally limited to a
+                  single provider. Create one to start governing cost.
                 </EmptyState.Description>
                 {canCreate && (
                   <Button
@@ -152,16 +148,13 @@ function BudgetsPage() {
           ) : (
             <VStack align="stretch" gap={4}>
               {!spendAvailable && (
-                <Alert.Root
-                  status="warning"
-                  data-testid="budget-spend-unavailable"
-                >
+                <Alert.Root status="warning" data-testid="budget-spend-unavailable">
                   <Alert.Indicator />
                   <Alert.Content>
                     <Alert.Title>Spend figures are unavailable</Alert.Title>
                     <Alert.Description>
-                      Spend cannot be totalled right now, so these budgets are
-                      not stopping or warning about anything.
+                      Spend cannot be totalled right now, so these budgets are not
+                      stopping or warning about anything.
                     </Alert.Description>
                   </Alert.Content>
                 </Alert.Root>
@@ -190,10 +183,9 @@ function BudgetsPage() {
                           <Tooltip
                             content={
                               <Text fontSize="xs">
-                                WARN: emits 402-equivalent warning header +
-                                audit event, request proceeds.{"\n"}BLOCK: the
-                                gateway returns HTTP 402 and refuses to dispatch
-                                once the limit is crossed.
+                                WARN: emits 402-equivalent warning header + audit event,
+                                request proceeds.{"\n"}BLOCK: the gateway returns HTTP 402
+                                and refuses to dispatch once the limit is crossed.
                               </Text>
                             }
                           >
@@ -208,8 +200,7 @@ function BudgetsPage() {
                       {rows.map((b) => {
                         const spent = Number.parseFloat(b.spentUsd);
                         const limit = Number.parseFloat(b.limitUsd);
-                        const pct =
-                          limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+                        const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
                         // Per-person templates report a headcount, not a
                         // total. Nobody seen yet is "0 of 0", which is true,
                         // rather than a dash that reads as broken.
@@ -222,9 +213,7 @@ function BudgetsPage() {
                             key={b.id}
                             cursor="pointer"
                             _hover={{ bg: "bg.subtle" }}
-                            onClick={() =>
-                              void router.push(`/gateway/budgets/${b.id}`)
-                            }
+                            onClick={() => void router.push(`/gateway/budgets/${b.id}`)}
                           >
                             <Table.Cell>
                               <VStack align="start" gap={0}>
@@ -253,8 +242,8 @@ function BudgetsPage() {
                                       fontSize="2xs"
                                       data-testid="budget-unreachable-badge"
                                     >
-                                      <TriangleAlert size={10} /> No key sends
-                                      traffic here
+                                      <TriangleAlert size={10} /> No key sends traffic
+                                      here
                                     </Badge>
                                   </Tooltip>
                                 )}
@@ -269,9 +258,7 @@ function BudgetsPage() {
                               {!b.spendAvailable ? (
                                 <HStack fontSize="xs">
                                   <Text color="fg.muted">Unavailable</Text>
-                                  <Text color="fg.muted">
-                                    / {formatBudgetUsd(limit)}
-                                  </Text>
+                                  <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
                                 </HStack>
                               ) : b.scopeType === "GROUP" ? (
                                 // A group budget is one allowance per member;
@@ -292,8 +279,7 @@ function BudgetsPage() {
                                   </HStack>
                                   <Text fontSize="2xs" color="fg.muted">
                                     {formatBudgetUsd(limit)} per member
-                                    {typeof b.scopeTarget?.memberCount ===
-                                    "number"
+                                    {typeof b.scopeTarget?.memberCount === "number"
                                       ? ` · ${b.scopeTarget.memberCount} ${
                                           b.scopeTarget.memberCount === 1
                                             ? "member"
@@ -325,9 +311,7 @@ function BudgetsPage() {
                                   <Progress.Root
                                     value={seatsOverPct}
                                     size="xs"
-                                    colorPalette={
-                                      seatsOver > 0 ? "red" : "green"
-                                    }
+                                    colorPalette={seatsOver > 0 ? "red" : "green"}
                                   >
                                     <Progress.Track>
                                       <Progress.Range />
@@ -362,11 +346,7 @@ function BudgetsPage() {
                                     value={pct}
                                     size="xs"
                                     colorPalette={
-                                      pct >= 100
-                                        ? "red"
-                                        : pct >= 80
-                                          ? "orange"
-                                          : "green"
+                                      pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
                                     }
                                   >
                                     <Progress.Track>
@@ -378,9 +358,7 @@ function BudgetsPage() {
                             </Table.Cell>
                             <Table.Cell>
                               <Badge
-                                colorPalette={
-                                  b.onBreach === "BLOCK" ? "red" : "yellow"
-                                }
+                                colorPalette={b.onBreach === "BLOCK" ? "red" : "yellow"}
                               >
                                 {b.onBreach.toLowerCase()}
                               </Badge>
@@ -391,15 +369,9 @@ function BudgetsPage() {
                                   never
                                 </Text>
                               ) : (
-                                <Tooltip
-                                  content={new Date(
-                                    b.resetsAt,
-                                  ).toLocaleString()}
-                                >
+                                <Tooltip content={new Date(b.resetsAt).toLocaleString()}>
                                   <Text fontSize="xs">
-                                    {formatTimeAgo(
-                                      new Date(b.resetsAt).getTime(),
-                                    )}
+                                    {formatTimeAgo(new Date(b.resetsAt).getTime())}
                                   </Text>
                                 </Tooltip>
                               )}
@@ -410,11 +382,7 @@ function BudgetsPage() {
                             >
                               <Menu.Root>
                                 <Menu.Trigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="xs"
-                                    aria-label="Actions"
-                                  >
+                                  <Button variant="ghost" size="xs" aria-label="Actions">
                                     <MoreVertical size={14} />
                                   </Button>
                                 </Menu.Trigger>
@@ -422,18 +390,13 @@ function BudgetsPage() {
                                   <Menu.Item
                                     value="details"
                                     onClick={() =>
-                                      void router.push(
-                                        `/gateway/budgets/${b.id}`,
-                                      )
+                                      void router.push(`/gateway/budgets/${b.id}`)
                                     }
                                   >
                                     <Eye size={14} /> Details
                                   </Menu.Item>
                                   {canUpdate && (
-                                    <Menu.Item
-                                      value="edit"
-                                      onClick={() => setEditing(b)}
-                                    >
+                                    <Menu.Item value="edit" onClick={() => setEditing(b)}>
                                       <Pencil size={14} /> Edit
                                     </Menu.Item>
                                   )}
@@ -509,9 +472,7 @@ type ScopeTarget = {
  * target beyond its name (a slug, a key prefix) plus, for a group, how
  * many people the limit is handed to.
  */
-export function scopeChipDetail(
-  scopeTarget: ScopeTarget | null,
-): string | undefined {
+export function scopeChipDetail(scopeTarget: ScopeTarget | null): string | undefined {
   if (!scopeTarget) return undefined;
   const parts: string[] = [];
   if (scopeTarget.secondary) parts.push(scopeTarget.secondary);
@@ -568,11 +529,7 @@ function ScopeCell({
       )}
       {providerLabel && (
         <Tooltip content="Only spend dispatched to this provider counts toward this budget.">
-          <Badge
-            colorPalette="blue"
-            variant="subtle"
-            data-testid="budget-provider-badge"
-          >
+          <Badge colorPalette="blue" variant="subtle" data-testid="budget-provider-badge">
             {providerLabel} only
           </Badge>
         </Tooltip>

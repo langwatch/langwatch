@@ -30,7 +30,9 @@ describe("httpGetCheck", () => {
       await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
       const port = (server.address() as { port: number }).port;
       try {
-        const result = await httpGetCheck(`http://127.0.0.1:${port}/`, { expectStatus: 200 })();
+        const result = await httpGetCheck(`http://127.0.0.1:${port}/`, {
+          expectStatus: 200,
+        })();
         expect(result.ok).toBe(false);
         if (!result.ok) expect(result.reason).toContain("503");
       } finally {
@@ -115,7 +117,8 @@ describe("pollUntilHealthy", () => {
       const result = await pollUntilHealthy({
         check: async () => {
           attempts += 1;
-          if (attempts < 3) return { ok: false, durationMs: 0, reason: `attempt ${attempts}` };
+          if (attempts < 3)
+            return { ok: false, durationMs: 0, reason: `attempt ${attempts}` };
           return { ok: true, durationMs: 0 };
         },
         timeoutMs: 5000,

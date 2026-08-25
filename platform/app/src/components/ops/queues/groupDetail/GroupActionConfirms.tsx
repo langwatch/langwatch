@@ -56,11 +56,7 @@ export function GroupDrawerActions({
           Retry now
         </Button>
       )}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => actions.setConfirmAction("dlq")}
-      >
+      <Button variant="outline" size="sm" onClick={() => actions.setConfirmAction("dlq")}>
         Move to dead-letter queue
       </Button>
       <Button

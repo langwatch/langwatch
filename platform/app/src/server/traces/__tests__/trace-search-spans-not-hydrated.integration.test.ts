@@ -45,8 +45,7 @@ const now = Date.now();
  */
 const BEDROCK_INPUT = JSON.stringify({
   type: "text",
-  value:
-    'Bedrock Converse input: [{"text":"summarise this shipping manifest"}]',
+  value: 'Bedrock Converse input: [{"text":"summarise this shipping manifest"}]',
 });
 const BEDROCK_OUTPUT = JSON.stringify({
   type: "text",
@@ -147,8 +146,7 @@ vi.mock("~/server/app-layer/app", async () => {
   const app = () => ({
     clickhouse: {
       enabled: true,
-      resolveClient: (tenantId: string) =>
-        clients.getClickHouseClientForTenant(tenantId),
+      resolveClient: (tenantId: string) => clients.getClickHouseClientForTenant(tenantId),
       resolveOrganizationClient: async () => {
         throw new Error("no organization client in this suite");
       },
@@ -192,9 +190,7 @@ beforeAll(async () => {
   ch = containers.clickHouseClient;
   vi.mocked(getClickHouseClientForTenant).mockResolvedValue(ch);
   service = new ClickHouseTraceService({
-    prisma: prisma as ConstructorParameters<
-      typeof ClickHouseTraceService
-    >[0]["prisma"],
+    prisma: prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]["prisma"],
   });
 
   await ch.insert({

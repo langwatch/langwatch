@@ -34,9 +34,7 @@ export interface PhoneNumberInputProps {
   onBlur?: React.FocusEventHandler<HTMLInputElement>;
 }
 
-export function PhoneNumberInput(
-  props: PhoneNumberInputProps,
-): React.JSX.Element {
+export function PhoneNumberInput(props: PhoneNumberInputProps): React.JSX.Element {
   const {
     value,
     defaultCountry = "US",
@@ -216,12 +214,8 @@ export function PhoneNumberInput(
                 const { popular, others } = splitByPopularity(allowedCountries);
                 return (
                   <>
-                    <optgroup label="Popular">
-                      {popular.map(renderOption)}
-                    </optgroup>
-                    <optgroup label="All countries">
-                      {others.map(renderOption)}
-                    </optgroup>
+                    <optgroup label="Popular">{popular.map(renderOption)}</optgroup>
+                    <optgroup label="All countries">{others.map(renderOption)}</optgroup>
                   </>
                 );
               }
@@ -241,9 +235,7 @@ export function PhoneNumberInput(
           pr="8"
           color="fg"
         >
-          {`${countryCodeToFlagEmoji(country)} +${getCountryCallingCode(
-            country,
-          )}`}
+          {`${countryCodeToFlagEmoji(country)} +${getCountryCallingCode(country)}`}
         </Box>
       </Box>
 
@@ -266,10 +258,7 @@ function formatNational(input: string, country: CountryCode): string {
   return formatter.input(input);
 }
 
-function e164FromInput(
-  input: string,
-  country: CountryCode,
-): string | undefined {
+function e164FromInput(input: string, country: CountryCode): string | undefined {
   const parsed = parsePhoneNumberFromString(input, country);
   return parsed?.number;
 }

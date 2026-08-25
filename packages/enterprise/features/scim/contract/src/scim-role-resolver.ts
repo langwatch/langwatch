@@ -6,11 +6,7 @@ export type ScimRole = (typeof SCIM_ROLES)[number];
  * Role hierarchy from least to most permissive.
  * CUSTOM is not ranked in this hierarchy.
  */
-const ROLE_HIERARCHY: readonly ScimRole[] = [
-  "VIEWER",
-  "MEMBER",
-  "ADMIN",
-] as const;
+const ROLE_HIERARCHY: readonly ScimRole[] = ["VIEWER", "MEMBER", "ADMIN"] as const;
 
 /**
  * Given an array of {@link TeamUserRole} values from different SCIM group mappings,

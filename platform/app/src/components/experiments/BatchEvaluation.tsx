@@ -16,11 +16,7 @@ import type { JsonObject } from "@prisma/client/runtime/client";
 import numeral from "numeral";
 import Parse from "papaparse";
 import { Download } from "react-feather";
-import type {
-  BatchEvaluation,
-  Experiment,
-  Project,
-} from "~/generated/prisma/client";
+import type { BatchEvaluation, Experiment, Project } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 import { Tooltip } from "../../components/ui/tooltip";
 import { formatMoney } from "../../utils/formatMoney";
@@ -110,17 +106,13 @@ export default function BatchEvaluation({
   const totalCost = evaluations.data?.reduce((acc, curr) => acc + curr.cost, 0);
   const earliestEvaluation = evaluations.data?.reduce(
     (acc: BatchEvaluation | undefined, curr) => {
-      return !acc || new Date(curr.createdAt) < new Date(acc.createdAt)
-        ? curr
-        : acc;
+      return !acc || new Date(curr.createdAt) < new Date(acc.createdAt) ? curr : acc;
     },
     undefined,
   );
   const latestEvaluation = evaluations.data?.reduce(
     (acc: BatchEvaluation | undefined, curr) => {
-      return !acc || new Date(curr.createdAt) > new Date(acc.createdAt)
-        ? curr
-        : acc;
+      return !acc || new Date(curr.createdAt) > new Date(acc.createdAt) ? curr : acc;
     },
     undefined,
   );
@@ -165,38 +157,31 @@ export default function BatchEvaluation({
     >,
   );
 
-  const passedOrScoreMetric: Record<string, "passed" | "score"> =
-    Object.fromEntries(
-      Object.entries(groupedByEvaluation ?? {}).map(
-        ([evaluation, evaluations]) => {
-          return [
-            evaluation,
-            evaluations.processed.some((evaluation) => evaluation.score)
-              ? "score"
-              : "passed",
-          ];
-        },
-      ),
-    );
+  const passedOrScoreMetric: Record<string, "passed" | "score"> = Object.fromEntries(
+    Object.entries(groupedByEvaluation ?? {}).map(([evaluation, evaluations]) => {
+      return [
+        evaluation,
+        evaluations.processed.some((evaluation) => evaluation.score) ? "score" : "passed",
+      ];
+    }),
+  );
 
   const averageScoresPerEvaluation = Object.fromEntries(
-    Object.entries(groupedByEvaluation ?? {}).map(
-      ([evaluation, evaluations]) => {
-        if (passedOrScoreMetric[evaluation] === "score") {
-          return [
-            evaluation,
-            evaluations.processed.reduce((acc, curr) => acc + curr.score, 0) /
-              evaluations.processed.length,
-          ];
-        } else {
-          return [
-            evaluation,
-            evaluations.processed.filter((evaluation) => evaluation.passed)
-              .length / evaluations.processed.length,
-          ];
-        }
-      },
-    ),
+    Object.entries(groupedByEvaluation ?? {}).map(([evaluation, evaluations]) => {
+      if (passedOrScoreMetric[evaluation] === "score") {
+        return [
+          evaluation,
+          evaluations.processed.reduce((acc, curr) => acc + curr.score, 0) /
+            evaluations.processed.length,
+        ];
+      } else {
+        return [
+          evaluation,
+          evaluations.processed.filter((evaluation) => evaluation.passed).length /
+            evaluations.processed.length,
+        ];
+      }
+    }),
   );
 
   return (
@@ -232,77 +217,64 @@ export default function BatchEvaluation({
         padding={6}
         gap={6}
       >
-        {Object.entries(averageScoresPerEvaluation).map(
-          ([evaluation, score]) => (
-            <Card.Root key={evaluation}>
-              <Card.Body>
-                <VStack align="start" justify="center" height="full" gap={2}>
-                  <Text color="fg" fontSize="15px" fontWeight="500">
-                    {evaluation}
+        {Object.entries(averageScoresPerEvaluation).map(([evaluation, score]) => (
+          <Card.Root key={evaluation}>
+            <Card.Body>
+              <VStack align="start" justify="center" height="full" gap={2}>
+                <Text color="fg" fontSize="15px" fontWeight="500">
+                  {evaluation}
+                </Text>
+                <HStack align="end" color={score < 0.5 ? "red.500" : "green.500"}>
+                  <Text fontSize="26px" fontWeight="300">
+                    {typeof score === "number"
+                      ? numeral(score).format(
+                          passedOrScoreMetric[evaluation] === "score" ? "0.00" : "0%",
+                        )
+                      : score}
                   </Text>
-                  <HStack
-                    align="end"
-                    color={score < 0.5 ? "red.500" : "green.500"}
-                  >
-                    <Text fontSize="26px" fontWeight="300">
-                      {typeof score === "number"
-                        ? numeral(score).format(
-                            passedOrScoreMetric[evaluation] === "score"
-                              ? "0.00"
-                              : "0%",
-                          )
-                        : score}
+                  <Text fontSize="13px" fontWeight="500" marginBottom="4px" opacity={0.8}>
+                    {passedOrScoreMetric[evaluation] === "score"
+                      ? "avg score"
+                      : "pass rate"}
+                  </Text>
+                </HStack>
+                <HStack
+                  fontSize="11px"
+                  textTransform="uppercase"
+                  fontWeight="600"
+                  color="fg.muted"
+                >
+                  {groupedByEvaluation?.[evaluation]?.skipped.length && (
+                    <Text>
+                      <Box
+                        display="inline-block"
+                        background="yellow.400"
+                        borderRadius="100%"
+                        width={2}
+                        height={2}
+                        marginRight={1}
+                      ></Box>
+                      {groupedByEvaluation?.[evaluation]?.skipped.length} skipped
                     </Text>
-                    <Text
-                      fontSize="13px"
-                      fontWeight="500"
-                      marginBottom="4px"
-                      opacity={0.8}
-                    >
-                      {passedOrScoreMetric[evaluation] === "score"
-                        ? "avg score"
-                        : "pass rate"}
+                  )}
+                  {groupedByEvaluation?.[evaluation]?.error.length && (
+                    <Text>
+                      <Box
+                        display="inline-block"
+                        background="red.400"
+                        borderRadius="100%"
+                        width={2}
+                        height={2}
+                        marginRight={1}
+                      ></Box>
+                      {groupedByEvaluation?.[evaluation]?.error.length} error
                     </Text>
-                  </HStack>
-                  <HStack
-                    fontSize="11px"
-                    textTransform="uppercase"
-                    fontWeight="600"
-                    color="fg.muted"
-                  >
-                    {groupedByEvaluation?.[evaluation]?.skipped.length && (
-                      <Text>
-                        <Box
-                          display="inline-block"
-                          background="yellow.400"
-                          borderRadius="100%"
-                          width={2}
-                          height={2}
-                          marginRight={1}
-                        ></Box>
-                        {groupedByEvaluation?.[evaluation]?.skipped.length}{" "}
-                        skipped
-                      </Text>
-                    )}
-                    {groupedByEvaluation?.[evaluation]?.error.length && (
-                      <Text>
-                        <Box
-                          display="inline-block"
-                          background="red.400"
-                          borderRadius="100%"
-                          width={2}
-                          height={2}
-                          marginRight={1}
-                        ></Box>
-                        {groupedByEvaluation?.[evaluation]?.error.length} error
-                      </Text>
-                    )}
-                  </HStack>
-                </VStack>
-              </Card.Body>
-            </Card.Root>
-          ),
-        )}
+                  )}
+                </HStack>
+              </VStack>
+            </Card.Body>
+          </Card.Root>
+        ))}
         <Card.Root>
           <Card.Body>
             <VStack align="start" justify="center" height="full" gap={2}>
@@ -310,9 +282,7 @@ export default function BatchEvaluation({
                 Evaluations Cost
               </Text>
               <Text fontSize="26px" fontWeight="300">
-                {totalCost
-                  ? formatMoney({ amount: totalCost, currency: "USD" })
-                  : "-"}
+                {totalCost ? formatMoney({ amount: totalCost, currency: "USD" }) : "-"}
               </Text>
             </VStack>
           </Card.Body>
@@ -361,43 +331,28 @@ export default function BatchEvaluation({
             Object.entries(groupedByEvaluation ?? {}).map(
               ([evaluationKey, evaluations]) => {
                 const hasExpectedOutput = evaluations.all.some(
-                  (evaluation) =>
-                    (evaluation.data as JsonObject)?.expected_output,
+                  (evaluation) => (evaluation.data as JsonObject)?.expected_output,
                 );
                 const hasDetails = evaluations.all.some(
                   (evaluation) => evaluation.details,
                 );
 
                 return (
-                  <VStack
-                    key={evaluationKey}
-                    align="start"
-                    gap={8}
-                    paddingTop={12}
-                  >
+                  <VStack key={evaluationKey} align="start" gap={8} paddingTop={12}>
                     <Heading as={"h2"} size="md">
                       {evaluationKey}
                     </Heading>
                     <Box>
-                      <Table.Root
-                        variant="line"
-                        borderWidth="1px"
-                        borderColor="border"
-                      >
+                      <Table.Root variant="line" borderWidth="1px" borderColor="border">
                         <Table.Header>
                           <Table.Row>
                             <Table.ColumnHeader>Input</Table.ColumnHeader>
                             <Table.ColumnHeader>Output</Table.ColumnHeader>
                             {hasExpectedOutput && (
-                              <Table.ColumnHeader>
-                                Expected Output
-                              </Table.ColumnHeader>
+                              <Table.ColumnHeader>Expected Output</Table.ColumnHeader>
                             )}
                             <Table.ColumnHeader>Status</Table.ColumnHeader>
-                            <Table.ColumnHeader
-                              minWidth={120}
-                              textAlign="center"
-                            >
+                            <Table.ColumnHeader minWidth={120} textAlign="center">
                               {passedOrScoreMetric[evaluationKey] === "score"
                                 ? "Score"
                                 : "Passed"}
@@ -411,34 +366,25 @@ export default function BatchEvaluation({
                         </Table.Header>
                         <Table.Body>
                           {evaluations.all.map((evaluation, i) => {
-                            const input = ((evaluation?.data as JsonObject)
-                              ?.input ?? "") as string;
-                            const output = ((evaluation?.data as JsonObject)
-                              ?.output ?? "") as string;
-                            const expected_output = ((
-                              evaluation?.data as JsonObject
-                            )?.expected_output ?? "") as string;
+                            const input = ((evaluation?.data as JsonObject)?.input ??
+                              "") as string;
+                            const output = ((evaluation?.data as JsonObject)?.output ??
+                              "") as string;
+                            const expected_output = ((evaluation?.data as JsonObject)
+                              ?.expected_output ?? "") as string;
 
                             return (
                               <Table.Row key={i}>
                                 <Table.Cell>
                                   <Tooltip content={input}>
-                                    <Text
-                                      lineClamp={2}
-                                      display="block"
-                                      maxWidth={230}
-                                    >
+                                    <Text lineClamp={2} display="block" maxWidth={230}>
                                       {input}
                                     </Text>
                                   </Tooltip>
                                 </Table.Cell>
                                 <Table.Cell>
                                   <Tooltip content={output}>
-                                    <Text
-                                      lineClamp={2}
-                                      display="block"
-                                      maxWidth={230}
-                                    >
+                                    <Text lineClamp={2} display="block" maxWidth={230}>
                                       {output}
                                     </Text>
                                   </Tooltip>
@@ -446,11 +392,7 @@ export default function BatchEvaluation({
                                 {hasExpectedOutput && (
                                   <Table.Cell>
                                     <Tooltip content={expected_output}>
-                                      <Text
-                                        lineClamp={2}
-                                        display="block"
-                                        maxWidth={230}
-                                      >
+                                      <Text lineClamp={2} display="block" maxWidth={230}>
                                         {expected_output}
                                       </Text>
                                     </Tooltip>
@@ -472,8 +414,7 @@ export default function BatchEvaluation({
                                     textAlign="center"
                                     fontWeight="500"
                                     color={
-                                      passedOrScoreMetric[evaluationKey] ===
-                                      "score"
+                                      passedOrScoreMetric[evaluationKey] === "score"
                                         ? evaluation.score < 0.5
                                           ? "red.500"
                                           : "green.500"
@@ -482,8 +423,7 @@ export default function BatchEvaluation({
                                           : "red.500"
                                     }
                                   >
-                                    {passedOrScoreMetric[evaluationKey] ===
-                                    "score"
+                                    {passedOrScoreMetric[evaluationKey] === "score"
                                       ? numeral(evaluation.score).format("0.00")
                                       : evaluation.passed
                                         ? "True"
@@ -523,9 +463,7 @@ export default function BatchEvaluation({
                                     : "-"}
                                 </Table.Cell>
                                 <Table.Cell>
-                                  {new Date(
-                                    evaluation.createdAt,
-                                  ).toLocaleString()}
+                                  {new Date(evaluation.createdAt).toLocaleString()}
                                 </Table.Cell>
                               </Table.Row>
                             );

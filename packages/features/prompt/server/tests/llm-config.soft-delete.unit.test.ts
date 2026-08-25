@@ -34,10 +34,7 @@ describe("LlmConfigRepository", () => {
         // Mock tryGetConfigByIdOrHandleWithLatestVersion to return a config with
         // a prefixed handle (what the DB actually stores) and a non-empty name.
         const repo = new LlmConfigRepository(prisma);
-        vi.spyOn(
-          repo,
-          "tryGetConfigByIdOrHandleWithLatestVersion",
-        ).mockResolvedValue({
+        vi.spyOn(repo, "tryGetConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",
@@ -73,10 +70,7 @@ describe("LlmConfigRepository", () => {
         const prisma = makeMockPrisma({ update: mockUpdate });
 
         const repo = new LlmConfigRepository(prisma);
-        vi.spyOn(
-          repo,
-          "tryGetConfigByIdOrHandleWithLatestVersion",
-        ).mockResolvedValue({
+        vi.spyOn(repo, "tryGetConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",
@@ -111,10 +105,7 @@ describe("LlmConfigRepository", () => {
         });
 
         const repo = new LlmConfigRepository(prisma);
-        vi.spyOn(
-          repo,
-          "tryGetConfigByIdOrHandleWithLatestVersion",
-        ).mockResolvedValue({
+        vi.spyOn(repo, "tryGetConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",

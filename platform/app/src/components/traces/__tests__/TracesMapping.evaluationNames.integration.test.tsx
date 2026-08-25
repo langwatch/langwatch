@@ -119,9 +119,7 @@ describe("TracesMapping evaluations dropdown (integration)", () => {
       renderEvaluationsMapping();
       await user.click(await screen.findByText("* (any evaluation)"));
 
-      await user.click(
-        await screen.findByRole("option", { name: "PII Check" }),
-      );
+      await user.click(await screen.findByRole("option", { name: "PII Check" }));
 
       // Scope the subfield assertions to the subkey <select> (identified by its
       // "* (full object)" option) so they don't collide with other dropdowns.
@@ -131,14 +129,7 @@ describe("TracesMapping evaluations dropdown (integration)", () => {
       const subkeySelect = fullObjectOption.closest("select");
       expect(subkeySelect).not.toBeNull();
 
-      for (const subfield of [
-        "passed",
-        "score",
-        "label",
-        "details",
-        "status",
-        "error",
-      ]) {
+      for (const subfield of ["passed", "score", "label", "details", "status", "error"]) {
         expect(
           within(subkeySelect!).getByRole("option", { name: subfield }),
         ).toBeInTheDocument();

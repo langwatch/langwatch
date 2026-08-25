@@ -2,10 +2,7 @@ import { VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 
 import { PromptConfigProvider } from "~/prompts/providers/PromptConfigProvider";
-import type {
-  LlmPromptConfigComponent,
-  Signature,
-} from "@langwatch/workflow-contract";
+import type { LlmPromptConfigComponent, Signature } from "@langwatch/workflow-contract";
 import { BasePropertiesPanel } from "../../BasePropertiesPanel";
 
 import { SignaturePropertiesPanelForm } from "./SignaturePropertiesPanelForm";
@@ -29,9 +26,7 @@ export function SignaturePropertiesPanel({
     >
       <PromptConfigProvider>
         <VStack width="full" gap={4}>
-          <SignaturePropertiesPanelForm
-            node={node as Node<LlmPromptConfigComponent>}
-          />
+          <SignaturePropertiesPanelForm node={node as Node<LlmPromptConfigComponent>} />
         </VStack>
       </PromptConfigProvider>
     </BasePropertiesPanel>

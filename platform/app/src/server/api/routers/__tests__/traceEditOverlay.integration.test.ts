@@ -176,9 +176,7 @@ describe("Trace edit overlay storage", () => {
           traceId: "trace-edit-overlay-malformed",
           patch: {
             version: 1,
-            spans: [
-              { spanId: "span-1", input: { type: "nonsense", value: 1 } },
-            ],
+            spans: [{ spanId: "span-1", input: { type: "nonsense", value: 1 } }],
             deletedSpanIds: [],
           } as unknown as TraceEditOverlayPatch,
         }),

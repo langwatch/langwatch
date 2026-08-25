@@ -34,18 +34,10 @@ export function PresenceMenuItem() {
       ? "Teammates can see your avatar and which view you're in. Click to hide your presence."
       : "Your presence is hidden from teammates. Click to share it again.";
 
-  const dotColor = !featureEnabled
-    ? "fg.subtle"
-    : visible
-      ? "green.solid"
-      : "fg.subtle";
+  const dotColor = !featureEnabled ? "fg.subtle" : visible ? "green.solid" : "fg.subtle";
 
   return (
-    <Tooltip
-      content={tooltip}
-      positioning={{ placement: "left" }}
-      openDelay={250}
-    >
+    <Tooltip content={tooltip} positioning={{ placement: "left" }} openDelay={250}>
       <Menu.Item
         value="presence"
         // Keep the row open after a click so the operator can see the

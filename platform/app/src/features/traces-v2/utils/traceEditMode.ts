@@ -1,8 +1,5 @@
 import { isUneditableViewMode, useDrawerStore } from "../stores/drawerStore";
-import {
-  selectIsTraceEditDirty,
-  useTraceEditStore,
-} from "../stores/traceEditStore";
+import { selectIsTraceEditDirty, useTraceEditStore } from "../stores/traceEditStore";
 
 /**
  * Starts correcting a trace: the drawer flips into edit mode (which the URL
@@ -26,9 +23,7 @@ export function enterTraceEditMode(traceId: string): void {
  * better left out than sent as "NaN".
  */
 export function tracePartitionHint(startedAt: unknown): number | null {
-  return typeof startedAt === "number" && Number.isFinite(startedAt)
-    ? startedAt
-    : null;
+  return typeof startedAt === "number" && Number.isFinite(startedAt) ? startedAt : null;
 }
 
 /**
@@ -115,10 +110,7 @@ export function exitTraceEditMode(): void {
  */
 export function guardTraceEditExit(run: () => void): boolean {
   const editStore = useTraceEditStore.getState();
-  if (
-    !useDrawerStore.getState().isEditing ||
-    !selectIsTraceEditDirty(editStore)
-  ) {
+  if (!useDrawerStore.getState().isEditing || !selectIsTraceEditDirty(editStore)) {
     run();
     return true;
   }

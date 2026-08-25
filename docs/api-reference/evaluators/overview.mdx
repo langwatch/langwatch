@@ -1,6 +1,6 @@
 ---
-title: 'Overview'
-description: 'Browse all available evaluators in LangWatch to find the right scoring method for your AI agent evaluation use case.'
+title: "Overview"
+description: "Browse all available evaluators in LangWatch to find the right scoring method for your AI agent evaluation use case."
 ---
 
 ## Intro
@@ -19,7 +19,7 @@ To make a call to the Evaluators API, you will need to pass through your LangWat
 
 ## Evaluators List
 
-import EvaluatorsList from "/snippets/evaluators-list.mdx"
+import EvaluatorsList from "/snippets/evaluators-list.mdx";
 
 <EvaluatorsList />
 
@@ -28,9 +28,14 @@ import EvaluatorsList from "/snippets/evaluators-list.mdx"
 Set up your first experiment using the [Experiments via UI](https://app.langwatch.ai/@project/experiments):
 
 <a href="https://app.langwatch.ai/@project/experiments" target="_blank">
-<Frame>
-<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png" alt="" style={{ maxWidth: '400px' }} noZoom />
-</Frame>
+  <Frame>
+    <img
+      src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png"
+      alt=""
+      style={{ maxWidth: "400px" }}
+      noZoom
+    />
+  </Frame>
 </a>
 
 ## Using Evaluators
@@ -59,10 +64,13 @@ Set up your first experiment using the [Experiments via UI](https://app.langwatc
 ## The `name` Parameter
 
 <Warning>
-**Important for Analytics:** When calling evaluators from code (Real-Time Evaluations), always provide a descriptive `name` parameter to distinguish between different evaluation checks in Analytics.
+  **Important for Analytics:** When calling evaluators from code (Real-Time Evaluations),
+  always provide a descriptive `name` parameter to distinguish between different
+  evaluation checks in Analytics.
 </Warning>
 
 When running the same evaluator type multiple times for different purposes, you must use unique `name` values to:
+
 - Track results separately in the Analytics dashboard
 - Filter and group evaluation results by purpose
 - Avoid confusion when multiple evaluations use the same evaluator type
@@ -76,21 +84,24 @@ If you're using the LLM Category evaluator to check different aspects of your ou
 import langwatch
 
 # Check 1: Is the answer complete?
+
 langwatch.evaluation.evaluate(
-    "langevals/llm_category",
-    name="Answer Completeness Check",  # Unique name for this check
-    data={"input": user_input, "output": response},
-    settings={"categories": [{"name": "complete"}, {"name": "incomplete"}]}
+"langevals/llm_category",
+name="Answer Completeness Check", # Unique name for this check
+data={"input": user_input, "output": response},
+settings={"categories": [{"name": "complete"}, {"name": "incomplete"}]}
 )
 
 # Check 2: Is the tone appropriate?
+
 langwatch.evaluation.evaluate(
-    "langevals/llm_category",
-    name="Tone Appropriateness Check",  # Different name for this check
-    data={"input": user_input, "output": response},
-    settings={"categories": [{"name": "professional"}, {"name": "casual"}, {"name": "inappropriate"}]}
+"langevals/llm_category",
+name="Tone Appropriateness Check", # Different name for this check
+data={"input": user_input, "output": response},
+settings={"categories": [{"name": "professional"}, {"name": "casual"}, {"name": "inappropriate"}]}
 )
-```
+
+````
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -110,7 +121,8 @@ await langwatch.evaluations.evaluate("langevals/llm_category", {
     data: { input: userInput, output: response },
     settings: { categories: [{ name: "professional" }, { name: "casual" }, { name: "inappropriate" }] }
 });
-```
+````
+
 </CodeGroup>
 
 Without unique names, all results would be grouped under the same auto-generated identifier (e.g., `custom_eval_langevalsllm_category`), making it impossible to analyze them separately.

@@ -11,10 +11,7 @@
  * Splitting the two schemas keeps the security boundary crisp: the envelope is
  * verified as bytes BEFORE its payload is trusted or parsed.
  */
-import {
-  type HerrEnvelope,
-  handledErrorFromHerr,
-} from "@langwatch/handled-error";
+import { type HerrEnvelope, handledErrorFromHerr } from "@langwatch/handled-error";
 import { cliToolResultSchema } from "@langwatch/langy-contract";
 import { z } from "zod";
 

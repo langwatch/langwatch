@@ -190,22 +190,14 @@ describe("budgets list scope column", () => {
   /** @scenario "Budget list Scope column renders the shared scope chip on one line" */
   it("gives every other scope kind its own chip, named", () => {
     renderPage();
-    expect(
-      within(rowFor("team cap")).getByText("Platform"),
-    ).toBeInTheDocument();
-    expect(
-      within(rowFor("project cap")).getByText("Web App"),
-    ).toBeInTheDocument();
+    expect(within(rowFor("team cap")).getByText("Platform")).toBeInTheDocument();
+    expect(within(rowFor("project cap")).getByText("Web App")).toBeInTheDocument();
     const principal = rowFor("principal cap");
     expect(within(principal).getByText("Ada Lovelace")).toBeInTheDocument();
-    expect(
-      within(principal).queryByText(/ada@acme\.test/),
-    ).not.toBeInTheDocument();
+    expect(within(principal).queryByText(/ada@acme\.test/)).not.toBeInTheDocument();
     const attributed = rowFor("per person cap");
     expect(within(attributed).getByText("prod-openai")).toBeInTheDocument();
-    expect(
-      within(attributed).queryByText("attributed user"),
-    ).not.toBeInTheDocument();
+    expect(within(attributed).queryByText("attributed user")).not.toBeInTheDocument();
   });
 
   /** @scenario "Budget list links a virtual-key scope to that key" */
@@ -222,8 +214,6 @@ describe("budgets list scope column", () => {
     renderPage();
     const row = rowFor("group cap");
     expect(within(row).getByText("Engineering")).toBeInTheDocument();
-    expect(
-      within(row).getByTestId("budget-per-member-badge"),
-    ).toBeInTheDocument();
+    expect(within(row).getByTestId("budget-per-member-badge")).toBeInTheDocument();
   });
 });

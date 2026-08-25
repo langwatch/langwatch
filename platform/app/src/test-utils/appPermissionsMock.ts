@@ -61,11 +61,7 @@ class ResolverBackedTestAuthzService {
         return resolveTeamPermission(context, scope.id, permission);
       case "organization":
         return {
-          permitted: await hasOrganizationPermission(
-            context,
-            scope.id,
-            permission,
-          ),
+          permitted: await hasOrganizationPermission(context, scope.id, permission),
           organizationRole: null,
         };
     }
@@ -98,8 +94,7 @@ export function appPermissionsService(prisma?: unknown): AuthzService {
 }
 
 export function appPermissionsMock() {
-  const permissions =
-    new ResolverBackedTestAuthzService() as unknown as AuthzService;
+  const permissions = new ResolverBackedTestAuthzService() as unknown as AuthzService;
   return {
     getApp: () => ({ permissions }),
     tryGetApp: () => null,

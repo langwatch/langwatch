@@ -129,9 +129,7 @@ function checkIdentifierFilter(value: Identifier, check: WhereCheck): void {
  * The expression carrying a filter value out of one object-literal property,
  * or undefined for a property shape that carries none.
  */
-function filterValueOf(
-  property: ObjectLiteralElementLike,
-): Expression | undefined {
+function filterValueOf(property: ObjectLiteralElementLike): Expression | undefined {
   if (isPropertyAssignment(property)) return property.initializer;
   // TypeScript 7 types a shorthand property's name as `PropertyName`, which
   // admits a computed name — a shape the grammar does not allow here, but one
@@ -146,20 +144,14 @@ function filterValueOf(
   return undefined;
 }
 
-function checkObjectFilter(
-  value: ObjectLiteralExpression,
-  check: WhereCheck,
-): void {
+function checkObjectFilter(value: ObjectLiteralExpression, check: WhereCheck): void {
   for (const property of value.properties) {
     const target = filterValueOf(property);
     if (target) checkWhereExpression({ ...check, expression: target });
   }
 }
 
-function checkListFilter(
-  value: ArrayLiteralExpression,
-  check: WhereCheck,
-): void {
+function checkListFilter(value: ArrayLiteralExpression, check: WhereCheck): void {
   for (const element of value.elements) {
     // `{ in: [...teamIds] }` spreads a reassignable array into the list:
     // check the spread expression itself, not the (nonexistent) element it
@@ -246,8 +238,7 @@ function checkDeleteManyArgument({
       line,
       variable: "<none>",
       model,
-      reason:
-        "deleteMany without a where clause deletes every row in the table",
+      reason: "deleteMany without a where clause deletes every row in the table",
     });
     return;
   }

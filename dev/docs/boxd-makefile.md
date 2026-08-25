@@ -35,12 +35,12 @@ make boxd-preview-status BRANCH=feat/foo    # VM status + git HEAD + docker comp
 
 ## Naming
 
-| Source | VM name | tmux session |
-|---|---|---|
-| `fork-pr PR=N` | `langwatch-<slug(branch)>` | `claude-<slug(branch)>` |
-| `fork-branch BRANCH=X` | `langwatch-<slug(X)>` | `claude-<slug(X)>` |
-| `fork-issue ISSUE=N` | `langwatch-issue<N>` (literal) | `claude-issue<N>` |
-| `preview BRANCH=X` | `preview-<slug(X)>` | (none — compose, not claude) |
+| Source                 | VM name                        | tmux session                 |
+| ---------------------- | ------------------------------ | ---------------------------- |
+| `fork-pr PR=N`         | `langwatch-<slug(branch)>`     | `claude-<slug(branch)>`      |
+| `fork-branch BRANCH=X` | `langwatch-<slug(X)>`          | `claude-<slug(X)>`           |
+| `fork-issue ISSUE=N`   | `langwatch-issue<N>` (literal) | `claude-issue<N>`            |
+| `preview BRANCH=X`     | `preview-<slug(X)>`            | (none — compose, not claude) |
 
 Slug rules: lowercase, replace `/` and non-`[a-z0-9-]` with `-`, collapse `-`, trim, max 40 chars (truncate, no word-boundary cut).
 
@@ -63,15 +63,15 @@ Collision: `boxd-fork-branch BRANCH=issue42/foo` produces `langwatch-issue42-foo
 
 ## Customizing
 
-| Env var | Default | Purpose |
-|---|---|---|
-| `CLAUDE_CREDS` | `~/.claude/.credentials.json` | Path to the file `boxd cp`-ed into the fork |
-| `BOXD_FORK_YES` | unset | Set to `1` to skip the destructive-confirm on `boxd-golden-reset` |
-| `BOXD_NAMESPACE` | `gh api user --jq .login` (fallback `whoami`) | Override the per-user prefix on the golden VM name (`<namespace>--langwatch-golden`). Useful for shared/team-owned goldens. |
-| `LW_PREVIEW_GOLDEN_SOURCE` | `langwatch-golden-v2` | Team golden that preview VMs fork from. Override when using a personal or alternative base. |
-| `BOXD_RESUME_TIMEOUT_SECS` | `30` | Max seconds to wait for a VM to reach `running` after `boxd resume` |
-| `BOXD_BIN` | `boxd` | Override the `boxd` binary (used by tests) |
-| `GH_BIN` | `gh` | Override the `gh` binary (used by tests) |
+| Env var                    | Default                                       | Purpose                                                                                                                     |
+| -------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `CLAUDE_CREDS`             | `~/.claude/.credentials.json`                 | Path to the file `boxd cp`-ed into the fork                                                                                 |
+| `BOXD_FORK_YES`            | unset                                         | Set to `1` to skip the destructive-confirm on `boxd-golden-reset`                                                           |
+| `BOXD_NAMESPACE`           | `gh api user --jq .login` (fallback `whoami`) | Override the per-user prefix on the golden VM name (`<namespace>--langwatch-golden`). Useful for shared/team-owned goldens. |
+| `LW_PREVIEW_GOLDEN_SOURCE` | `langwatch-golden-v2`                         | Team golden that preview VMs fork from. Override when using a personal or alternative base.                                 |
+| `BOXD_RESUME_TIMEOUT_SECS` | `30`                                          | Max seconds to wait for a VM to reach `running` after `boxd resume`                                                         |
+| `BOXD_BIN`                 | `boxd`                                        | Override the `boxd` binary (used by tests)                                                                                  |
+| `GH_BIN`                   | `gh`                                          | Override the `gh` binary (used by tests)                                                                                    |
 
 ## Threat model — forks are trusted-developer environments
 
@@ -82,6 +82,7 @@ Forks receive every `.env` in the monorepo plus your Claude credentials. **Anyon
 The golden VM is a single fixed-name VM per namespace (e.g. `drewdrewthis--langwatch-golden`), not a versioned image family. Boxd subdomains are globally unique across all accounts, so the namespace prefix prevents cross-team collisions. Reset = destroy + rebuild via `make boxd-golden-reset BOXD_FORK_YES=1`. The Makefile does **not** auto-rebuild.
 
 Recommended cadence: rebuild **weekly**, or after any of:
+
 - `pnpm-lock.yaml` change you want pre-installed
 - Docker image bump (dev/compose.dev.yml)
 - Schema migration that changes seed data
@@ -115,6 +116,7 @@ make boxd-preview-down BRANCH=feat/my-feature
 ```
 
 The golden source is overridable:
+
 ```bash
 LW_PREVIEW_GOLDEN_SOURCE=lw-preview make boxd-preview BRANCH=feat/my-feature
 ```
@@ -124,11 +126,13 @@ LW_PREVIEW_GOLDEN_SOURCE=lw-preview make boxd-preview BRANCH=feat/my-feature
 **`boxd fork` fails with quota error.** You're at the 10-VM ceiling. `boxd list` to see what you have, `boxd destroy <vm>` to free a slot. Fork pruning is intentionally manual (see "Out of scope" below).
 
 **`make boxd-fork-issue ISSUE=N` says the VM already exists.** Pick a different source, or destroy the existing VM:
+
 ```
 boxd destroy langwatch-issueN
 ```
 
 **`make boxd-connect-issue` says "no claude session".** The tmux session inside the VM was killed (or the VM was rebooted, which clears tmux state). Either re-run `make boxd-fork-issue` (idempotent on the worktree) or SSH in manually:
+
 ```
 boxd connect langwatch-issueN
 tmux new -s claude-issueN

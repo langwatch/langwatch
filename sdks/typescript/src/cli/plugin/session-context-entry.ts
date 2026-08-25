@@ -46,8 +46,7 @@ const AGENT_MARKERS: Record<string, readonly string[]> = {
   claude_code: ["CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_PROJECT_DIR"],
 };
 
-const normalize = (tool: string): string =>
-  tool.trim().toLowerCase().replace(/-/g, "_");
+const normalize = (tool: string): string => tool.trim().toLowerCase().replace(/-/g, "_");
 
 /** Whether this process is running inside the agent it was told to report as. */
 function runningInsideAgent({

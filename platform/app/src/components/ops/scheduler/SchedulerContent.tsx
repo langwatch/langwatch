@@ -50,10 +50,7 @@ export function SchedulerContent() {
     [rows, now],
   );
   const counts = useMemo(() => summarize({ jobs: rows, now }), [rows, now]);
-  const loop = useMemo(
-    () => deriveLoopHealth({ jobs: rows, now }),
-    [rows, now],
-  );
+  const loop = useMemo(() => deriveLoopHealth({ jobs: rows, now }), [rows, now]);
 
   if (jobs.isLoading) {
     return (
@@ -168,13 +165,9 @@ function ScheduleRow({
       <Table.Cell color="fg.muted">
         <Text
           textStyle="xs"
-          title={
-            job.lastSlot ? new Date(job.lastSlot).toLocaleString() : undefined
-          }
+          title={job.lastSlot ? new Date(job.lastSlot).toLocaleString() : undefined}
         >
-          {job.lastSlot
-            ? formatTimeAgo(new Date(job.lastSlot).getTime(), now)
-            : "never"}
+          {job.lastSlot ? formatTimeAgo(new Date(job.lastSlot).getTime(), now) : "never"}
         </Text>
       </Table.Cell>
       <Table.Cell>

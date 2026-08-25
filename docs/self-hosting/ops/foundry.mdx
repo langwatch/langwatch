@@ -6,7 +6,7 @@ description: "Interactive trace playground for building and sending synthetic tr
 **The Foundry** (`/ops/foundry`) is an interactive trace builder and sender. It lets you construct complete trace hierarchies, LLM calls, tool invocations, RAG retrievals, agent steps, and send them to any LangWatch project. Use it to test ingestion pipelines, reproduce issues, or generate sample data.
 
 <Frame>
-<img src="/images/ops/foundry.png" alt="The Foundry trace builder" />
+  <img src="/images/ops/foundry.png" alt="The Foundry trace builder" />
 </Frame>
 
 ## Layout
@@ -14,12 +14,14 @@ description: "Interactive trace playground for building and sending synthetic tr
 The Foundry is split into two panels:
 
 **Left sidebar:**
+
 - [Target project](#target-project) selector
 - Trace settings (service name, user ID, metadata)
 - [Span tree](#span-tree): hierarchical view of all spans
 - [Execution controls](#sending-traces): send button, batch settings, execution log
 
 **Main area** with four tabs:
+
 - [Editor](#span-editor): form-based span attribute editing
 - [Waterfall](#waterfall-view): timeline visualization
 - [Graph](#graph-view): DAG of span relationships
@@ -34,6 +36,7 @@ The project selector at the top of the sidebar determines where traces are sent.
 The span tree shows all spans in the trace as a nested hierarchy. Each span displays its type icon, name, and type badge.
 
 **Supported span types:**
+
 - **LLM**: language model calls with messages, model, temperature
 - **Agent**: autonomous agent steps
 - **Tool**: tool/function invocations
@@ -44,6 +47,7 @@ The span tree shows all spans in the trace as a nested hierarchy. Each span disp
 - **Generic**: any other operation
 
 **Actions:**
+
 - Click a span to select it for editing
 - Hover to reveal quick actions: reorder (up/down), duplicate, delete
 - Use the **"Add Span"** button to add child spans under any parent
@@ -61,7 +65,7 @@ When a span is selected, the Editor tab shows a form with:
 - **Custom Attributes**: arbitrary key-value pairs
 
 <Frame>
-<img src="/images/ops/foundry-editor.png" alt="Span editor form" />
+  <img src="/images/ops/foundry-editor.png" alt="Span editor form" />
 </Frame>
 
 ## Waterfall View
@@ -69,7 +73,7 @@ When a span is selected, the Editor tab shows a form with:
 A horizontal timeline showing when each span executed relative to the trace start. Bar width represents duration, position represents offset, and indentation shows parent-child hierarchy. Color coding matches span type.
 
 <Frame>
-<img src="/images/ops/foundry-waterfall.png" alt="Waterfall timeline visualization" />
+  <img src="/images/ops/foundry-waterfall.png" alt="Waterfall timeline visualization" />
 </Frame>
 
 ## Graph View
@@ -91,6 +95,7 @@ The execution controls at the bottom of the sidebar let you send the configured 
 - **Send Traces**: executes the batch
 
 The **execution log** below the button shows the status of each send:
+
 - Pending, success (with copyable trace ID), or error
 - Click a successful entry to copy its trace ID for lookup in the main LangWatch UI
 

@@ -1,9 +1,5 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
-import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ResolveOriginCommandData } from "../schemas/commands";
 import { resolveOriginCommandDataSchema } from "../schemas/commands";
@@ -23,10 +19,10 @@ const logger = createLogger("langwatch:trace-processing:resolve-origin");
  * by the SDK). This persists the inferred origin through the event-sourcing
  * pipeline so it reaches ClickHouse via the fold projection.
  */
-export class ResolveOriginCommand
-  implements
-    CommandHandler<Command<ResolveOriginCommandData>, OriginResolvedEvent>
-{
+export class ResolveOriginCommand implements CommandHandler<
+  Command<ResolveOriginCommandData>,
+  OriginResolvedEvent
+> {
   static readonly schema = defineCommandSchema(
     RESOLVE_ORIGIN_COMMAND_TYPE,
     resolveOriginCommandDataSchema,

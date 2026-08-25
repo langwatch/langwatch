@@ -71,9 +71,7 @@ describe("langyContextTargetStore", () => {
         store().register(traceRow);
         store().register({ ...traceRow, label: "trace abc123 (renamed)" });
 
-        expect(store().targets["trace:abc123"]?.label).toBe(
-          "trace abc123 (renamed)",
-        );
+        expect(store().targets["trace:abc123"]?.label).toBe("trace abc123 (renamed)");
       });
     });
 

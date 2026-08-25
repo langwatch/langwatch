@@ -375,8 +375,7 @@ secured.access(requires("scenarios:create")).post(
 
     try {
       const idempotencyKey =
-        body.idempotencyKey ??
-        `api-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        body.idempotencyKey ?? `api-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const result = await c.app.suites.run({
         id,
         projectId: project.id,
@@ -414,9 +413,7 @@ secured.access(requires("scenarios:manage")).delete(
         description: "Suite archived",
         content: {
           "application/json": {
-            schema: resolver(
-              z.object({ id: z.string(), archived: z.boolean() }),
-            ),
+            schema: resolver(z.object({ id: z.string(), archived: z.boolean() })),
           },
         },
       },

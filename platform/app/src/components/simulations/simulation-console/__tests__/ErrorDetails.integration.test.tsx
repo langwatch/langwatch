@@ -43,9 +43,9 @@ describe("<ErrorDetails />", () => {
     it("renders the handled-error title and actionable hint", () => {
       renderError(SDK_CERT_ERROR);
       expect(screen.getByText("Secure connection failed")).toBeDefined();
-      expect(
-        screen.getByTestId("scenario-handled-error-hint").textContent,
-      ).toMatch(/certificate authority|NODE_EXTRA_CA_CERTS/i);
+      expect(screen.getByTestId("scenario-handled-error-hint").textContent).toMatch(
+        /certificate authority|NODE_EXTRA_CA_CERTS/i,
+      );
     });
 
     it("never renders the raw stack trace", () => {

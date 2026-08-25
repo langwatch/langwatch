@@ -44,11 +44,7 @@ import {
 import { describeError } from "~/features/errors";
 import { api } from "~/utils/api";
 import { TestFireButton } from "../TestFireButton";
-import type {
-  ConfigFormProps,
-  NotifyClientDef,
-  SummaryIdentity,
-} from "../types";
+import type { ConfigFormProps, NotifyClientDef, SummaryIdentity } from "../types";
 import {
   findTemplateOptionBySource,
   pickDefaultSlackBlockKitTemplateId,
@@ -147,11 +143,9 @@ function fromTriggerRow(row: SavedTriggerRow): SlackSlice {
     // The token is never sent to the browser — start blank and rely on
     // `botTokenAlreadySet` to keep the stored one.
     botToken: "",
-    channelId:
-      typeof params.slackChannelId === "string" ? params.slackChannelId : "",
+    channelId: typeof params.slackChannelId === "string" ? params.slackChannelId : "",
     botTokenAlreadySet: params.slackBotTokenSet === true,
-    templateType:
-      row.slackTemplateType === "block_kit" ? "block_kit" : "string",
+    templateType: row.slackTemplateType === "block_kit" ? "block_kit" : "string",
     template: {
       value: row.slackTemplate ?? "",
       usingDefault: row.slackTemplate == null,
@@ -166,11 +160,7 @@ function toActionParams(slice: SlackSlice): SlackActionParams {
     // stored token sends the sentinel so the server keeps it; a blank field on
     // a fresh draft sends blank (the server rejects it with a clear error).
     const slackBotToken =
-      typed.length > 0
-        ? typed
-        : slice.botTokenAlreadySet
-          ? SLACK_BOT_TOKEN_KEPT
-          : "";
+      typed.length > 0 ? typed : slice.botTokenAlreadySet ? SLACK_BOT_TOKEN_KEPT : "";
     return {
       slackDelivery: "bot",
       slackChannelId: slice.channelId,
@@ -255,11 +245,7 @@ function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
 }
 
 /** One channel as the picker shows it: the ID is stored, the name is read. */
-function channelOption(channel: {
-  id: string;
-  name: string;
-  isPrivate?: boolean;
-}) {
+function channelOption(channel: { id: string; name: string; isPrivate?: boolean }) {
   return {
     value: channel.id,
     label: `${channel.isPrivate ? "🔒 " : "#"}${channel.name}`,
@@ -406,8 +392,7 @@ function SlackChannelField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelData, slice.channelId]);
 
-  const canLoad =
-    typedToken.length > 0 || slice.botTokenAlreadySet || !!automationId;
+  const canLoad = typedToken.length > 0 || slice.botTokenAlreadySet || !!automationId;
   const returnedError =
     list.data?.error && list.data.error !== "no_token" ? list.data.error : null;
   // A listing can succeed and still be short of the workspace. Saying nothing
@@ -493,9 +478,7 @@ function SlackChannelField({
       >
         <Combobox.Control>
           <Combobox.Input
-            placeholder={
-              list.isPending ? "Loading channels…" : "#alerts or C0123…"
-            }
+            placeholder={list.isPending ? "Loading channels…" : "#alerts or C0123…"}
             onBlur={commitTypedChannel}
             onKeyDown={(event) => {
               if (event.key === "Enter") commitTypedChannel();
@@ -527,11 +510,7 @@ function SlackChannelField({
         </Portal>
       </Combobox.Root>
       {hint ? (
-        <Text
-          textStyle="xs"
-          color={list.isError ? "fg.error" : "fg.muted"}
-          pt={1}
-        >
+        <Text textStyle="xs" color={list.isError ? "fg.error" : "fg.muted"} pt={1}>
           {hint}
         </Text>
       ) : null}
@@ -547,8 +526,7 @@ function templatesFromSlice(slice: SlackSlice) {
     // they wrote it, picked it from the gallery, or it was seeded from the
     // report's content source. An empty field means no template of our own, so
     // the framework default applies.
-    slackTemplate:
-      slice.template.value.trim().length > 0 ? slice.template.value : null,
+    slackTemplate: slice.template.value.trim().length > 0 ? slice.template.value : null,
     // Always carry the toggle. A null `slackTemplate` paired with a
     // non-null `slackTemplateType` means "use the framework default for
     // this type" — without this the server can't tell apart a user who
@@ -581,9 +559,7 @@ function SlackConfigForm({
   // The editor must seed the same default dispatch renders for this kind —
   // otherwise the shown template and the sent message disagree.
   const defaults = defaultsForSourceKind(ctx.sourceKind);
-  const templateDefault = isBlockKit
-    ? defaults.slackBlockKit
-    : defaults.slackString;
+  const templateDefault = isBlockKit ? defaults.slackBlockKit : defaults.slackString;
   // A report draft carries its layout from the start (see the seeding effect
   // below) while still counting as un-customised, so a filled field always wins
   // over the framework default.
@@ -766,8 +742,8 @@ function SlackConfigForm({
               // A dashboard IS its panels — there is no layout to choose, so the
               // gallery would be a menu of one. Switch to Code to edit the copy.
               <Text textStyle="xs" color="fg.muted">
-                Every panel on the dashboard is sent as its own chart. There's
-                nothing to lay out; switch to Code to edit the message yourself.
+                Every panel on the dashboard is sent as its own chart. There's nothing to
+                lay out; switch to Code to edit the message yourself.
               </Text>
             ) : (
               <SlackBlockKitTemplatePicker
@@ -790,9 +766,7 @@ function SlackConfigForm({
                   // reset effect above sees a consistent pair and leaves it
                   // alone.
                   ctx.setNotificationCadence(
-                    option.cadenceFit === "digest"
-                      ? "5min_digest"
-                      : "immediate",
+                    option.cadenceFit === "digest" ? "5min_digest" : "immediate",
                   );
                   onChange({
                     ...slice,
@@ -808,8 +782,8 @@ function SlackConfigForm({
             // schema drives in-editor markers.
             <VStack align="stretch" gap={2}>
               <Text textStyle="xs" color="fg.muted">
-                Write the layout yourself in Block Kit. Values in braces fill in
-                from your trace or alert when the message sends.
+                Write the layout yourself in Block Kit. Values in braces fill in from your
+                trace or alert when the message sends.
               </Text>
               <Box data-testid="slack-code-editor">
                 <LiquidEditor
@@ -829,9 +803,7 @@ function SlackConfigForm({
               </Box>
             </VStack>
           )}
-          {slackPreview ? (
-            <CompactSlackPreview payload={slackPreview.payload} />
-          ) : null}
+          {slackPreview ? <CompactSlackPreview payload={slackPreview.payload} /> : null}
           {/* Escape hatch: write the message yourself as plain text. */}
           <Button
             variant="plain"
@@ -849,8 +821,7 @@ function SlackConfigForm({
         // "Edit text" tier: a plain text Slack message, no Block Kit JSON.
         <VStack align="stretch" gap={3}>
           <Text textStyle="xs" color="fg.muted">
-            Write the message Slack will post. Markdown and variables are
-            supported.
+            Write the message Slack will post. Markdown and variables are supported.
           </Text>
           <Box data-testid="slack-text-editor">
             <LiquidEditor
@@ -865,9 +836,7 @@ function SlackConfigForm({
               }
             />
           </Box>
-          {slackPreview ? (
-            <CompactSlackPreview payload={slackPreview.payload} />
-          ) : null}
+          {slackPreview ? <CompactSlackPreview payload={slackPreview.payload} /> : null}
           <Button
             variant="plain"
             size="xs"
@@ -925,8 +894,8 @@ function SlackBotFields({
       >
         <VStack align="stretch" gap={2}>
           <Text textStyle="xs" color="fg">
-            Post to your Slack workspace with a bot token. Create a Slack app,
-            then paste its token below.
+            Post to your Slack workspace with a bot token. Create a Slack app, then paste
+            its token below.
           </Text>
           <HStack gap={3}>
             <Link
@@ -960,20 +929,20 @@ function SlackBotFields({
             <List.Root as="ol" gap={1} paddingLeft={4}>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Create the app with &ldquo;From a manifest&rdquo; and paste
-                  the copied manifest — it sets the permissions for you.
+                  Create the app with &ldquo;From a manifest&rdquo; and paste the copied
+                  manifest — it sets the permissions for you.
                 </Text>
               </List.Item>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Install it to your workspace and copy the Bot User OAuth Token
-                  (<Code size="sm">xoxb-</Code>).
+                  Install it to your workspace and copy the Bot User OAuth Token (
+                  <Code size="sm">xoxb-</Code>).
                 </Text>
               </List.Item>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Public channels work straight away. To post to a private
-                  channel, add the app to that channel first.
+                  Public channels work straight away. To post to a private channel, add
+                  the app to that channel first.
                 </Text>
               </List.Item>
             </List.Root>
@@ -1067,10 +1036,7 @@ function ReuseSlackWebhook({
     return out;
   }, [triggersQuery.data, currentWebhook]);
 
-  const collection = useMemo(
-    () => createListCollection({ items: options }),
-    [options],
-  );
+  const collection = useMemo(() => createListCollection({ items: options }), [options]);
 
   if (triggersQuery.isLoading) return null;
   if (options.length === 0) return null;

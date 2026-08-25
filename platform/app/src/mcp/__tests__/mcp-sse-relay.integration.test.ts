@@ -8,10 +8,7 @@
  * answered it, while every follow-up `POST /messages?sessionId=…` is a fresh
  * connection the balancer may hand to any replica.
  */
-import {
-  type RedisConnection,
-  RedisConnectionService,
-} from "@langwatch/redis-client";
+import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   handshake,
@@ -56,8 +53,7 @@ vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 // read back what the handler stored without holding a key.
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,
-  decrypt: (text: string) =>
-    text.startsWith("encrypted:") ? text.slice(10) : text,
+  decrypt: (text: string) => (text.startsWith("encrypted:") ? text.slice(10) : text),
 }));
 
 describe("Feature: MCP SSE transport across replicas", () => {

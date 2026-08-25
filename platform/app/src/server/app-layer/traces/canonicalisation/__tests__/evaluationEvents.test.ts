@@ -31,15 +31,9 @@ describe("CanonicalizeSpanAttributesService — evaluation events", () => {
 
       const result = service.canonicalize({}, events, stubSpan);
 
-      expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe(
-        "relevance",
-      );
-      expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE]).toBe(
-        0.85,
-      );
-      expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL]).toBe(
-        "relevant",
-      );
+      expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe("relevance");
+      expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE]).toBe(0.85);
+      expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL]).toBe("relevant");
     });
 
     it("does not set langwatch.reserved.evaluations (no metadata leakage)", () => {
@@ -58,9 +52,7 @@ describe("CanonicalizeSpanAttributesService — evaluation events", () => {
 
       const result = service.canonicalize({}, events, stubSpan);
 
-      expect(
-        result.attributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS],
-      ).toBeUndefined();
+      expect(result.attributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS]).toBeUndefined();
     });
 
     describe("when json_encoded_event is already a parsed object", () => {
@@ -81,15 +73,9 @@ describe("CanonicalizeSpanAttributesService — evaluation events", () => {
 
         const result = service.canonicalize({}, events, stubSpan);
 
-        expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe(
-          "toxicity",
-        );
-        expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE]).toBe(
-          0.95,
-        );
-        expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL]).toBe(
-          "safe",
-        );
+        expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe("toxicity");
+        expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE]).toBe(0.95);
+        expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL]).toBe("safe");
         expect(result.appliedRules).toContain("langwatch:evaluation.custom");
       });
     });
@@ -115,9 +101,7 @@ describe("CanonicalizeSpanAttributesService — evaluation events", () => {
     it("does not set GenAI evaluation attributes", () => {
       const result = service.canonicalize({}, [], stubSpan);
 
-      expect(
-        result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME],
-      ).toBeUndefined();
+      expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBeUndefined();
     });
   });
 });

@@ -68,9 +68,7 @@ describe("given TypeScript 7 is the compiler", () => {
           // The SDK and the MCP server are on TypeScript 6, where the root
           // export is still the compiler.
           ![...HELD_ON_SIX].some((held) => file.startsWith(`${held}/`)) &&
-          ROOT_IMPORT_PATTERN.test(
-            readFileSync(resolve(REPO_ROOT, file), "utf8"),
-          ),
+          ROOT_IMPORT_PATTERN.test(readFileSync(resolve(REPO_ROOT, file), "utf8")),
       );
 
       expect(offenders).toEqual([]);
@@ -84,11 +82,8 @@ describe("given TypeScript 7 is the compiler", () => {
     it("declares TypeScript 7 everywhere except the packages held on 6", () => {
       const declared = new Map<string, string>();
       for (const manifest of manifests) {
-        const json = JSON.parse(
-          readFileSync(resolve(REPO_ROOT, manifest), "utf8"),
-        );
-        const version =
-          json.devDependencies?.typescript ?? json.dependencies?.typescript;
+        const json = JSON.parse(readFileSync(resolve(REPO_ROOT, manifest), "utf8"));
+        const version = json.devDependencies?.typescript ?? json.dependencies?.typescript;
         if (version) declared.set(manifest, version);
       }
 
@@ -97,9 +92,7 @@ describe("given TypeScript 7 is the compiler", () => {
       expect(declared.has("platform/app/package.json")).toBe(true);
 
       const wrong = [...declared].filter(([manifest, version]) => {
-        const held = [...HELD_ON_SIX].some((pkg) =>
-          manifest.startsWith(`${pkg}/`),
-        );
+        const held = [...HELD_ON_SIX].some((pkg) => manifest.startsWith(`${pkg}/`));
         return held ? !version.startsWith("^6.") : !version.startsWith("^7.");
       });
 

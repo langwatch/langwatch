@@ -35,11 +35,7 @@ import {
   resolveScopeReach,
   type ScopeReach,
 } from "../gatewayScopeReach";
-import {
-  isCyclicWindow,
-  nextBoundaryFor,
-  shouldResetBudget,
-} from "../gatewayWindow";
+import { isCyclicWindow, nextBoundaryFor, shouldResetBudget } from "../gatewayWindow";
 import { ChangeEventRepository } from "./gateway-change-event.repository";
 import {
   GatewayBudgetCycleAnchorInvalidError,
@@ -294,10 +290,7 @@ export class PrismaGatewayBudgetRepository {
       },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return await this.applyClickHouseSpend(
-      budgets,
-      project.team.organizationId,
-    );
+    return await this.applyClickHouseSpend(budgets, project.team.organizationId);
   }
 
   /**
@@ -350,29 +343,19 @@ export class PrismaGatewayBudgetRepository {
     }
     if (!this.chRepo) return { budgets, spendAvailable: false, readAt: now };
 
-    const tenantIds = await organizationSpendTenantIds(
-      this.prisma,
-      organizationId,
-    );
+    const tenantIds = await organizationSpendTenantIds(this.prisma, organizationId);
     // No project means nothing has ever been able to emit a ledger row, so
     // zero is the true total rather than a missing one.
     if (tenantIds.length === 0) {
       return { budgets, spendAvailable: true, readAt: now };
     }
 
-    const boundariesByBudget = await this.bucketBoundaries(
-      budgets,
-      organizationId,
-    );
+    const boundariesByBudget = await this.bucketBoundaries(budgets, organizationId);
 
     let spends;
     let seats: Map<string, { seen: number; over: number }>;
     try {
-      spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
-        tenantIds,
-        budgets,
-        now,
-      );
+      spends = await this.chRepo.getSpendForBudgetsAcrossTenants(tenantIds, budgets, now);
       seats = await this.seatStandings({
         budgets,
         tenantIds,
@@ -465,8 +448,7 @@ export class PrismaGatewayBudgetRepository {
       const limitNanoUsd = usdToNanoUsd(budget.limitUsd);
       out.set(budget.id, {
         seen: buckets.length,
-        over: buckets.filter((b) => BigInt(b.spentNanoUsd) >= limitNanoUsd)
-          .length,
+        over: buckets.filter((b) => BigInt(b.spentNanoUsd) >= limitNanoUsd).length,
       });
     }
     return out;
@@ -507,9 +489,7 @@ export class PrismaGatewayBudgetRepository {
         organizationId: args.organizationId,
         archivedAt: null,
         ...(args.scopeTypes ? { scopeType: { in: args.scopeTypes } } : {}),
-        ...(args.externalId !== undefined
-          ? { externalId: args.externalId }
-          : {}),
+        ...(args.externalId !== undefined ? { externalId: args.externalId } : {}),
         ...(args.cursor
           ? {
               OR: keysetAfter([
@@ -530,9 +510,7 @@ export class PrismaGatewayBudgetRepository {
   }
 
   /** As listWithHealth, for the budgets that apply to one project. */
-  async listForProjectWithHealth(
-    projectId: string,
-  ): Promise<BudgetListWithHealth> {
+  async listForProjectWithHealth(projectId: string): Promise<BudgetListWithHealth> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: { team: true },
@@ -564,16 +542,14 @@ export class PrismaGatewayBudgetRepository {
     rows: GatewayBudget[],
     organizationId: string,
   ): Promise<BudgetListWithHealth> {
-    const [{ budgets, spendAvailable, readAt }, scopeReach] = await Promise.all(
-      [
-        this.applyClickHouseSpendWithHealth(rows, organizationId),
-        resolveBudgetScopeReach({
-          prisma: this.prisma,
-          organizationId,
-          budgets: rows,
-        }),
-      ],
-    );
+    const [{ budgets, spendAvailable, readAt }, scopeReach] = await Promise.all([
+      this.applyClickHouseSpendWithHealth(rows, organizationId),
+      resolveBudgetScopeReach({
+        prisma: this.prisma,
+        organizationId,
+        budgets: rows,
+      }),
+    ]);
     return { budgets, spendAvailable, readAt, scopeReach };
   }
 
@@ -599,8 +575,10 @@ export class PrismaGatewayBudgetRepository {
       where: { id, organizationId, archivedAt: null },
     });
     if (!row) return null;
-    const { budgets, spendAvailable, readAt, scopeReach } =
-      await this.decorateWithHealth([row], organizationId);
+    const { budgets, spendAvailable, readAt, scopeReach } = await this.decorateWithHealth(
+      [row],
+      organizationId,
+    );
     return {
       budget: budgets[0] ?? row,
       spendAvailable,
@@ -609,18 +587,12 @@ export class PrismaGatewayBudgetRepository {
     };
   }
 
-  async get(
-    id: string,
-    organizationId: string,
-  ): Promise<GatewayBudgetWithSeats | null> {
+  async get(id: string, organizationId: string): Promise<GatewayBudgetWithSeats | null> {
     const budget = await this.prisma.gatewayBudget.findFirst({
       where: { id, organizationId },
     });
     if (!budget) return null;
-    const [decorated] = await this.applyClickHouseSpend(
-      [budget],
-      organizationId,
-    );
+    const [decorated] = await this.applyClickHouseSpend([budget], organizationId);
     return decorated ?? budget;
   }
 
@@ -630,23 +602,18 @@ export class PrismaGatewayBudgetRepository {
    * page. Keeps the target lookup in one round-trip per scope kind so
    * the detail page doesn't need to chain queries in the UI.
    */
-  async getDetail(
-    id: string,
-    organizationId: string,
-  ): Promise<BudgetDetail | null> {
+  async getDetail(id: string, organizationId: string): Promise<BudgetDetail | null> {
     const row = await this.prisma.gatewayBudget.findFirst({
       where: { id, organizationId },
     });
     if (!row) return null;
-    const { budgets, spendAvailable, scopeReach } =
-      await this.decorateWithHealth([row], organizationId);
-    const budget = budgets[0] ?? row;
-
-    const targets = await resolveScopeTargetsBatch(
-      this.prisma,
-      [budget],
+    const { budgets, spendAvailable, scopeReach } = await this.decorateWithHealth(
+      [row],
       organizationId,
     );
+    const budget = budgets[0] ?? row;
+
+    const targets = await resolveScopeTargetsBatch(this.prisma, [budget], organizationId);
     // Scope FKs are ON DELETE CASCADE, but a stale row must not blank
     // the page: fall back to the raw scopeId as the display name.
     const scopeTarget: BudgetScopeTargetInfo = targets.get(
@@ -669,10 +636,7 @@ export class PrismaGatewayBudgetRepository {
       // every project in the org, so the read fans out over the same
       // tenant set the utilization read uses. The BudgetId filter keeps
       // narrower scopes exact.
-      const tenantIds = await organizationSpendTenantIds(
-        this.prisma,
-        organizationId,
-      );
+      const tenantIds = await organizationSpendTenantIds(this.prisma, organizationId);
       const events =
         tenantIds.length > 0
           ? await this.chRepo.recentEventsForBudget(tenantIds, budget.id, 20)
@@ -755,9 +719,7 @@ export class PrismaGatewayBudgetRepository {
    * Create only: scope is immutable afterwards, so no update can turn a
    * reachable budget into an unreachable one.
    */
-  private async assertScopeIsReachable(
-    input: CreateBudgetInput,
-  ): Promise<void> {
+  private async assertScopeIsReachable(input: CreateBudgetInput): Promise<void> {
     if (input.allowUnreachable) return;
     const kind = input.scope.kind;
     if (kind !== "TEAM" && kind !== "PROJECT" && kind !== "GROUP") return;
@@ -786,9 +748,7 @@ export class PrismaGatewayBudgetRepository {
     // any lookup, since it needs nothing but the request.
     const cycleAnchorAt = input.cycleAnchorAt ?? null;
     if (cycleAnchorAt && !isCyclicWindow(input.window)) {
-      throw new GatewayBudgetCycleAnchorInvalidError(
-        input.window.toLowerCase(),
-      );
+      throw new GatewayBudgetCycleAnchorInvalidError(input.window.toLowerCase());
     }
 
     // Cross-org guard for PRINCIPAL budgets: the named user must be a
@@ -1017,16 +977,13 @@ export class PrismaGatewayBudgetRepository {
           data: {
             name: input.name ?? existing.name,
             description:
-              input.description === undefined
-                ? existing.description
-                : input.description,
+              input.description === undefined ? existing.description : input.description,
             limitUsd:
               input.limitUsd !== undefined
                 ? new Prisma.Decimal(input.limitUsd.toString())
                 : existing.limitUsd,
             onBreach: input.onBreach ?? existing.onBreach,
-            timezone:
-              input.timezone === undefined ? existing.timezone : input.timezone,
+            timezone: input.timezone === undefined ? existing.timezone : input.timezone,
             ...identityPatchData(input),
           },
         });
@@ -1342,11 +1299,7 @@ export class PrismaGatewayBudgetRepository {
     }
 
     const decision: BudgetCheckDecision =
-      blockedBy.length > 0
-        ? "hard_block"
-        : warnings.length > 0
-          ? "soft_warn"
-          : "allow";
+      blockedBy.length > 0 ? "hard_block" : warnings.length > 0 ? "soft_warn" : "allow";
 
     return { decision, warnings, blockReason, blockedBy, scopes };
   }

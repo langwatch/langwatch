@@ -26,10 +26,7 @@
  * Matched case-insensitively: ClickHouse exposes `information_schema` under
  * both that spelling and `INFORMATION_SCHEMA`, and they are the same database.
  */
-export const RESERVED_DATABASES: readonly string[] = [
-  "system",
-  "information_schema",
-];
+export const RESERVED_DATABASES: readonly string[] = ["system", "information_schema"];
 
 /** Nesting ceilings. Both refuse with `NESTING_TOO_DEEP`. */
 export interface LangWatchQLLimits {

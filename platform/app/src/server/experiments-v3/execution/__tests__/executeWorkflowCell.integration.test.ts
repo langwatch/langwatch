@@ -229,9 +229,7 @@ describe("executeWorkflowCell", () => {
           evaluatorId: "eval_1",
         });
         // Workflow evaluators emit stringy values; they are coerced.
-        expect(
-          evaluator?.type === "evaluator_result" && evaluator.result,
-        ).toMatchObject({
+        expect(evaluator?.type === "evaluator_result" && evaluator.result).toMatchObject({
           status: "processed",
           score: 0.85,
           passed: true,
@@ -269,13 +267,14 @@ describe("executeWorkflowCell", () => {
         );
 
         const graded = events.find(
-          (e) =>
-            e.type === "evaluator_result" && e.evaluatorId === "eval-grading",
+          (e) => e.type === "evaluator_result" && e.evaluatorId === "eval-grading",
         );
         expect(graded).toMatchObject({ rowIndex: 0, targetId: "wf-target" });
-        expect(
-          graded?.type === "evaluator_result" && graded.result,
-        ).toMatchObject({ status: "processed", score: 1, passed: true });
+        expect(graded?.type === "evaluator_result" && graded.result).toMatchObject({
+          status: "processed",
+          score: 1,
+          passed: true,
+        });
       });
 
       /** @scenario "An evaluator can read a result other than the first one" */
@@ -288,9 +287,7 @@ describe("executeWorkflowCell", () => {
         const componentDispatch = scripted.dispatched.find(
           (m) => m.type === "execute_component",
         );
-        expect(componentDispatch?.payload.node_id).toBe(
-          "wf-target.eval-grading",
-        );
+        expect(componentDispatch?.payload.node_id).toBe("wf-target.eval-grading");
         expect(componentDispatch?.payload.inputs).toEqual({
           output: { a: 1 },
         });
@@ -325,13 +322,12 @@ describe("executeWorkflowCell", () => {
         expect(target?.type === "target_result" && target.error).toBe(
           "the http call timed out",
         );
-        expect(
-          scripted.dispatched.some((m) => m.type === "execute_component"),
-        ).toBe(false);
+        expect(scripted.dispatched.some((m) => m.type === "execute_component")).toBe(
+          false,
+        );
         expect(
           events.some(
-            (e) =>
-              e.type === "evaluator_result" && e.evaluatorId === "eval-grading",
+            (e) => e.type === "evaluator_result" && e.evaluatorId === "eval-grading",
           ),
         ).toBe(false);
       });
@@ -353,18 +349,16 @@ describe("executeWorkflowCell", () => {
           output: "yes",
           chunks: { a: 1 },
         });
-        expect(
-          target?.type === "target_result" && target.error,
-        ).toBeUndefined();
+        expect(target?.type === "target_result" && target.error).toBeUndefined();
 
         const graded = events.find(
-          (e) =>
-            e.type === "evaluator_result" && e.evaluatorId === "eval-grading",
+          (e) => e.type === "evaluator_result" && e.evaluatorId === "eval-grading",
         );
         expect(graded).toBeDefined();
-        expect(
-          graded?.type === "evaluator_result" && graded.result,
-        ).toMatchObject({ status: "error", error_type: "EvaluatorError" });
+        expect(graded?.type === "evaluator_result" && graded.result).toMatchObject({
+          status: "error",
+          error_type: "EvaluatorError",
+        });
       });
     });
   });

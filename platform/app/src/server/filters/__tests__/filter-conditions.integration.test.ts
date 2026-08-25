@@ -105,12 +105,8 @@ async function queryWithFilters(
   filters: Partial<Record<FilterField, FilterParam>>,
   timeWindow?: { startDate: number; endDate: number },
 ): Promise<string[]> {
-  const { conditions, params } = generateClickHouseFilterConditions(
-    filters,
-    timeWindow,
-  );
-  const whereClause =
-    conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
+  const { conditions, params } = generateClickHouseFilterConditions(filters, timeWindow);
+  const whereClause = conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
 
   const result = await ch.query({
     query: `

@@ -1,13 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Field,
-  HStack,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import {
   EMAIL_RX,
   type EmailActionParams,
@@ -27,11 +18,7 @@ import {
 } from "~/features/automations/editors/templateAuthoring";
 import { api } from "~/utils/api";
 import { TestFireButton } from "../TestFireButton";
-import type {
-  ConfigFormProps,
-  NotifyClientDef,
-  SummaryIdentity,
-} from "../types";
+import type { ConfigFormProps, NotifyClientDef, SummaryIdentity } from "../types";
 
 /** A "field that defaults to the framework template until the user
  *  edits it" — `usingDefault=true` means the editor renders the default
@@ -90,9 +77,7 @@ function testFireTarget(_slice: EmailSlice) {
 
 function templatesFromSlice(slice: EmailSlice) {
   return {
-    emailSubjectTemplate: slice.subject.usingDefault
-      ? null
-      : slice.subject.value,
+    emailSubjectTemplate: slice.subject.usingDefault ? null : slice.subject.value,
     emailBodyTemplate: slice.body.usingDefault ? null : slice.body.value,
     slackTemplate: null,
     slackTemplateType: null,
@@ -166,9 +151,7 @@ function EmailConfigForm({
   const subjectValue = slice.subject.usingDefault
     ? defaults.emailSubject
     : slice.subject.value;
-  const bodyValue = slice.body.usingDefault
-    ? defaults.emailBody
-    : slice.body.value;
+  const bodyValue = slice.body.usingDefault ? defaults.emailBody : slice.body.value;
 
   const emailPreview = ctx.preview;
   // Filter the variable surface to what's populated at the author's current
@@ -262,11 +245,7 @@ function EmailConfigForm({
               }
             }}
           />
-          <Button
-            variant="outline"
-            onClick={addExternal}
-            disabled={!newEmail.trim()}
-          >
+          <Button variant="outline" onClick={addExternal} disabled={!newEmail.trim()}>
             Add email
           </Button>
         </HStack>
@@ -290,8 +269,8 @@ function EmailConfigForm({
           Message
         </Text>
         <Text textStyle="xs" color="fg.muted">
-          We send a ready-made summary email. Customize the wording to change
-          the subject or body.
+          We send a ready-made summary email. Customize the wording to change the subject
+          or body.
         </Text>
         {/* "Edit text" tier: the subject and body editors sit behind an
             opt-in so the default surface stays a preview only. */}

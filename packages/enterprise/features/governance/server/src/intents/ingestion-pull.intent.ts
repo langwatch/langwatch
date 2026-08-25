@@ -8,9 +8,7 @@ export const ingestionPullRunIntentSchema = z.object({
   cursor: z.string().nullable(),
 });
 
-export type IngestionPullRunIntent = z.infer<
-  typeof ingestionPullRunIntentSchema
->;
+export type IngestionPullRunIntent = z.infer<typeof ingestionPullRunIntentSchema>;
 
 export class IngestionPullIntent {
   private constructor(private readonly execution: IngestionPullService) {}

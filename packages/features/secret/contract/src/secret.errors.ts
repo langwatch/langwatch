@@ -30,11 +30,11 @@ export class SecretLimitReachedError extends HandledError {
   declare readonly code: "secret_limit_reached";
 
   constructor(limit = MAX_SECRETS_PER_PROJECT) {
-    super(
-      "secret_limit_reached",
-      `Maximum of ${limit} secrets per project reached`,
-      { meta: { limit }, httpStatus: 412, fault: "customer" },
-    );
+    super("secret_limit_reached", `Maximum of ${limit} secrets per project reached`, {
+      meta: { limit },
+      httpStatus: 412,
+      fault: "customer",
+    });
     this.name = "SecretLimitReachedError";
   }
 }

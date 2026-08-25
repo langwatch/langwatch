@@ -9,12 +9,7 @@
 
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type {
-  Department,
-  Project,
-  Team,
-  User,
-} from "~/generated/prisma/client";
+import type { Department, Project, Team, User } from "~/generated/prisma/client";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { getTestProject } from "../../../utils/testUtils";
 import { prisma } from "../../db";
@@ -159,9 +154,7 @@ describe("DataPrivacyPolicyRepository integration", () => {
   describe("given rules upserted at several tiers of the project's chain", () => {
     describe("when the chain is fetched, a rule is updated, and a rule is deleted", () => {
       it("roundtrips upsert, chain read, update-in-place, and delete", async () => {
-        await cleanupTestRows(prisma, [
-          ["dataPrivacyPolicy", { organizationId }],
-        ]);
+        await cleanupTestRows(prisma, [["dataPrivacyPolicy", { organizationId }]]);
 
         await repository.upsertForScope({
           organizationId,
@@ -237,21 +230,15 @@ describe("DataPrivacyPolicyRepository integration", () => {
         });
         const rowsAfterDelete = await repository.findForProjectChain(facts);
         expect(rowsAfterDelete).toHaveLength(2);
-        expect(rowsAfterDelete.some((r) => r.scopeType === "PROJECT")).toBe(
-          false,
-        );
+        expect(rowsAfterDelete.some((r) => r.scopeType === "PROJECT")).toBe(false);
 
-        await cleanupTestRows(prisma, [
-          ["dataPrivacyPolicy", { organizationId }],
-        ]);
+        await cleanupTestRows(prisma, [["dataPrivacyPolicy", { organizationId }]]);
       });
     });
 
     describe("when a stored rule's config no longer parses", () => {
       it("skips the invalid row and returns the valid ones", async () => {
-        await cleanupTestRows(prisma, [
-          ["dataPrivacyPolicy", { organizationId }],
-        ]);
+        await cleanupTestRows(prisma, [["dataPrivacyPolicy", { organizationId }]]);
 
         await prisma.dataPrivacyPolicy.create({
           data: {
@@ -280,9 +267,7 @@ describe("DataPrivacyPolicyRepository integration", () => {
           config: { pii: { level: "disabled" } },
         });
 
-        await cleanupTestRows(prisma, [
-          ["dataPrivacyPolicy", { organizationId }],
-        ]);
+        await cleanupTestRows(prisma, [["dataPrivacyPolicy", { organizationId }]]);
       });
     });
   });

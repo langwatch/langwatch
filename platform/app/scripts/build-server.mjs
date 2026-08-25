@@ -241,9 +241,7 @@ for (const { name, entry, inlineAll } of ENTRIES) {
     // Inlined packages are tree-shaken only if esbuild can see ESM: a CJS
     // entry is opaque, so every branch of it (the voice stack included) would
     // be kept. Entries that inline nothing keep the node default.
-    ...(inlineAll
-      ? { mainFields: ["module", "main"], conditions: ["import"] }
-      : {}),
+    ...(inlineAll ? { mainFields: ["module", "main"], conditions: ["import"] } : {}),
     plugins: [createExternalize(inlineAll ?? false)],
     metafile: true,
     // Linked source maps so production stack traces name real files/lines
@@ -263,8 +261,7 @@ for (const { name, entry, inlineAll } of ENTRIES) {
       const base = basePackage(id);
       if (declared.has(base)) continue;
       if (optionalExternals.has(base)) continue;
-      if (imp.kind === "dynamic-import" && devOnlyDynamicImports.has(base))
-        continue;
+      if (imp.kind === "dynamic-import" && devOnlyDynamicImports.has(base)) continue;
       let entriesFor = undeclared.get(base);
       if (!entriesFor) {
         entriesFor = new Set();
@@ -304,9 +301,7 @@ for (const { name, entry, inlineAll } of ENTRIES) {
     // production, and it breaks quietly wherever the caller catches and
     // degrades — the tokenizer skipped tokenization entirely for exactly this
     // reason.
-    for (const m of source.matchAll(
-      /import\s*\(\s*(["'])([^"'\n]+\.json)\1\s*([,)])/g,
-    )) {
+    for (const m of source.matchAll(/import\s*\(\s*(["'])([^"'\n]+\.json)\1\s*([,)])/g)) {
       const spec = m[2] ?? "";
       // Relative JSON is bundled in, so the loader never sees it.
       if (/^(\.|\/|~\/|@app\/|@ee\/)/.test(spec)) continue;

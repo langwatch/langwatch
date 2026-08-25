@@ -45,9 +45,7 @@ export class GovernanceOcsfSubscriber {
     }
   }
 
-  private row(
-    context: GovernanceTraceContext,
-  ): GovernanceOcsfEvent | undefined {
+  private row(context: GovernanceTraceContext): GovernanceOcsfEvent | undefined {
     const { tenantId, state } = context;
     if (!isGovernanceOriginTrace(state.attributes)) return undefined;
     const sourceId = state.attributes[GOVERNANCE_ATTR.INGESTION_SOURCE_ID];
@@ -67,10 +65,8 @@ export class GovernanceOcsfSubscriber {
     const actorEmail = state.attributes["user.email"] ?? "";
     const actorEnduserId = state.attributes["enduser.id"] ?? "";
     const actionName = state.attributes["tool.name"] ?? "trace.recorded";
-    const targetName =
-      state.attributes["gen_ai.request.model"] ?? state.models[0] ?? "";
-    const anomalyAlertId =
-      state.attributes[GOVERNANCE_ATTR.ANOMALY_ALERT_ID] ?? "";
+    const targetName = state.attributes["gen_ai.request.model"] ?? state.models[0] ?? "";
+    const anomalyAlertId = state.attributes[GOVERNANCE_ATTR.ANOMALY_ALERT_ID] ?? "";
     const severityId = anomalyAlertId
       ? GOVERNANCE_OCSF_MEDIUM_SEVERITY_ID
       : GOVERNANCE_OCSF_INFO_SEVERITY_ID;

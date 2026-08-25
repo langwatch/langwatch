@@ -1,21 +1,7 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  Stack,
-  Tabs,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Stack, Tabs, Text } from "@chakra-ui/react";
 import type React from "react";
 import { useState } from "react";
-import {
-  LuCopy,
-  LuFilePlus,
-  LuPencil,
-  LuTrash2,
-  LuUndo2,
-} from "react-icons/lu";
+import { LuCopy, LuFilePlus, LuPencil, LuTrash2, LuUndo2 } from "react-icons/lu";
 import {
   PopoverBody,
   PopoverContent,
@@ -141,10 +127,7 @@ interface BuiltInTooltipProps {
   children: React.ReactNode;
 }
 
-const BuiltInTooltip: React.FC<BuiltInTooltipProps> = ({
-  enabled,
-  children,
-}) => {
+const BuiltInTooltip: React.FC<BuiltInTooltipProps> = ({ enabled, children }) => {
   if (!enabled) return <>{children}</>;
   return (
     <Tooltip
@@ -235,8 +218,8 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
                     <Text as="span" color="fg" fontWeight="semibold">
                       {lensName}
                     </Text>
-                    . These edits live in your browser only. Save them as a new
-                    lens to keep them, or discard to snap back.
+                    . These edits live in your browser only. Save them as a new lens to
+                    keep them, or discard to snap back.
                   </Text>
                   <HStack gap={2} justify="flex-end">
                     <Button
@@ -370,11 +353,7 @@ const BuiltInLensMenuItems: React.FC<{
         <LuFilePlus />
         {isDraft ? "Save changes as new lens…" : "Save as new lens…"}
       </MenuItem>
-      <MenuItem
-        value="revert"
-        onClick={() => revertLens(lensId)}
-        disabled={!isDraft}
-      >
+      <MenuItem value="revert" onClick={() => revertLens(lensId)} disabled={!isDraft}>
         <LuUndo2 />
         Revert local changes
       </MenuItem>
@@ -426,11 +405,7 @@ const UserLensMenuItems: React.FC<{
         <LuFilePlus />
         {isDraft ? "Save changes as new lens…" : "Save as new lens…"}
       </MenuItem>
-      <MenuItem
-        value="revert"
-        onClick={() => revertLens(lensId)}
-        disabled={!isDraft}
-      >
+      <MenuItem value="revert" onClick={() => revertLens(lensId)} disabled={!isDraft}>
         <LuUndo2 />
         Revert local changes
       </MenuItem>
@@ -444,11 +419,7 @@ const UserLensMenuItems: React.FC<{
         Duplicate
       </MenuItem>
       <MenuSeparator />
-      <MenuItem
-        value="delete"
-        onClick={() => deleteLens(lensId)}
-        color="fg.error"
-      >
+      <MenuItem value="delete" onClick={() => deleteLens(lensId)} color="fg.error">
         <LuTrash2 />
         Delete
       </MenuItem>

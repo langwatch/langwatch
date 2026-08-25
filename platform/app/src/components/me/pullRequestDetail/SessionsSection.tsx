@@ -7,10 +7,7 @@ import {
 import type React from "react";
 
 import { ListTable } from "~/components/ui/ListTable";
-import {
-  formatCost,
-  formatTokens,
-} from "~/features/traces-v2/utils/formatters";
+import { formatCost, formatTokens } from "~/features/traces-v2/utils/formatters";
 
 import { AgentLabel } from "../AgentLabel";
 import { useTerminalReplay } from "../sessions/useTerminalReplay";
@@ -56,9 +53,7 @@ export const SessionsSection: React.FC<{
               <Table.ColumnHeader>Contributor</Table.ColumnHeader>
               <Table.ColumnHeader>Agent</Table.ColumnHeader>
               <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">
-                Token cost
-              </Table.ColumnHeader>
+              <Table.ColumnHeader textAlign="end">Token cost</Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
           <Table.Body>
@@ -138,9 +133,7 @@ const SessionRow: React.FC<{
             </Text>
           ))
         )}
-        {isOpening ? (
-          <Spinner size="xs" color="fg.muted" flexShrink={0} />
-        ) : null}
+        {isOpening ? <Spinner size="xs" color="fg.muted" flexShrink={0} /> : null}
       </HStack>
     </Table.Cell>
     <Table.Cell fontSize="sm" whiteSpace="nowrap">

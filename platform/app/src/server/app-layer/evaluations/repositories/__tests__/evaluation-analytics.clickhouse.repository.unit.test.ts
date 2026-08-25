@@ -47,9 +47,7 @@ const EVALUATION_ID = "eval-tz";
 const TABLE = "evaluation_analytics";
 
 function makeRepositoryReturning(record: Record<string, unknown>) {
-  return new EvaluationAnalyticsClickHouseRepository(async () =>
-    clientReturning(record),
-  );
+  return new EvaluationAnalyticsClickHouseRepository(async () => clientReturning(record));
 }
 
 function makeOrderingRepository(rows: Array<Record<string, unknown>>) {
@@ -113,13 +111,9 @@ describe("EvaluationAnalyticsClickHouseRepository DateTime64 decode", () => {
           evaluationId: EVALUATION_ID,
         });
 
-        expect(read?.row.occurredAtMs).toBe(
-          Date.UTC(2026, 6, 24, 12, 0, 0, 123),
-        );
+        expect(read?.row.occurredAtMs).toBe(Date.UTC(2026, 6, 24, 12, 0, 0, 123));
         expect(read?.row.createdAtMs).toBe(Date.UTC(2026, 6, 24, 12, 0, 1, 0));
-        expect(read?.row.updatedAtMs).toBe(
-          Date.UTC(2026, 6, 24, 12, 0, 2, 500),
-        );
+        expect(read?.row.updatedAtMs).toBe(Date.UTC(2026, 6, 24, 12, 0, 2, 500));
       });
     });
   });
@@ -281,12 +275,10 @@ describe("EvaluationAnalyticsClickHouseRepository windowed read", () => {
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
 
-        expect(
-          await windowedReadCount({ table: TABLE, outcome: "windowed_empty" }),
-        ).toBe(beforeEmpty + 1);
-        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(
-          beforeHit,
+        expect(await windowedReadCount({ table: TABLE, outcome: "windowed_empty" })).toBe(
+          beforeEmpty + 1,
         );
+        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(beforeHit);
       });
 
       it("passes the caller's bounds through to ClickHouse unchanged", async () => {
@@ -320,10 +312,7 @@ describe("EvaluationAnalyticsClickHouseRepository windowed read", () => {
         const query = seen[0]?.query ?? "";
         const innerScopeStart = query.indexOf("IN (");
         const outerScope = query.slice(0, innerScopeStart);
-        const innerScope = query.slice(
-          innerScopeStart,
-          query.indexOf("GROUP BY"),
-        );
+        const innerScope = query.slice(innerScopeStart, query.indexOf("GROUP BY"));
 
         expect(outerScope).toContain("fromUnixTimestamp64Milli");
         expect(innerScope).not.toContain("fromUnixTimestamp64Milli");
@@ -345,9 +334,9 @@ describe("EvaluationAnalyticsClickHouseRepository windowed read", () => {
           evaluationId: EVALUATION_ID,
         });
 
-        expect(
-          await windowedReadCount({ table: TABLE, outcome: "unwindowed" }),
-        ).toBe(before + 1);
+        expect(await windowedReadCount({ table: TABLE, outcome: "unwindowed" })).toBe(
+          before + 1,
+        );
         expect(seen[0]?.query).not.toContain("fromUnixTimestamp64Milli");
       });
     });

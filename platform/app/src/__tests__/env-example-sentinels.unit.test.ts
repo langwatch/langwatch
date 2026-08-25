@@ -17,9 +17,7 @@ import { describe, expect, it } from "vitest";
 // platform/app/src/__tests__/ -> repository root -> .env.example
 const ENV_EXAMPLE_PATH = path.join(__dirname, "../../../../.env.example");
 
-const envExampleLines: string[] = readFileSync(ENV_EXAMPLE_PATH, "utf-8").split(
-  "\n",
-);
+const envExampleLines: string[] = readFileSync(ENV_EXAMPLE_PATH, "utf-8").split("\n");
 
 /**
  * Returns the value part (RHS) for the first line matching `^KEY=(.*)$`.
@@ -57,10 +55,7 @@ describe(".env.example", () => {
     /** @scenario .env.example ships a sentinel placeholder for LW_VIRTUAL_KEY_PEPPER */
     it("declares a non-empty sentinel value for LW_VIRTUAL_KEY_PEPPER", () => {
       const value = getSentinelValue("LW_VIRTUAL_KEY_PEPPER");
-      expect(
-        value,
-        "LW_VIRTUAL_KEY_PEPPER must have a sentinel value",
-      ).not.toBeNull();
+      expect(value, "LW_VIRTUAL_KEY_PEPPER must have a sentinel value").not.toBeNull();
       expect(
         value!.length,
         "LW_VIRTUAL_KEY_PEPPER sentinel must be non-empty",
@@ -83,10 +78,7 @@ describe(".env.example", () => {
     /** @scenario .env.example ships a sentinel placeholder for LW_GATEWAY_JWT_SECRET */
     it("declares a non-empty sentinel value for LW_GATEWAY_JWT_SECRET", () => {
       const value = getSentinelValue("LW_GATEWAY_JWT_SECRET");
-      expect(
-        value,
-        "LW_GATEWAY_JWT_SECRET must have a sentinel value",
-      ).not.toBeNull();
+      expect(value, "LW_GATEWAY_JWT_SECRET must have a sentinel value").not.toBeNull();
       expect(
         value!.length,
         "LW_GATEWAY_JWT_SECRET sentinel must be non-empty",
@@ -95,9 +87,7 @@ describe(".env.example", () => {
 
     it("preceding comment for LW_VIRTUAL_KEY_PEPPER mentions openssl rand -hex 32", () => {
       const preceding = getPrecedingLines("LW_VIRTUAL_KEY_PEPPER");
-      const mentionsCommand = preceding.some((l) =>
-        l.includes("openssl rand -hex 32"),
-      );
+      const mentionsCommand = preceding.some((l) => l.includes("openssl rand -hex 32"));
       expect(
         mentionsCommand,
         `One of the 5 lines above LW_VIRTUAL_KEY_PEPPER must contain "openssl rand -hex 32". Got:\n${preceding.join("\n")}`,
@@ -106,9 +96,7 @@ describe(".env.example", () => {
 
     it("preceding comment for LW_GATEWAY_INTERNAL_SECRET mentions openssl rand -hex 32", () => {
       const preceding = getPrecedingLines("LW_GATEWAY_INTERNAL_SECRET");
-      const mentionsCommand = preceding.some((l) =>
-        l.includes("openssl rand -hex 32"),
-      );
+      const mentionsCommand = preceding.some((l) => l.includes("openssl rand -hex 32"));
       expect(
         mentionsCommand,
         `One of the 5 lines above LW_GATEWAY_INTERNAL_SECRET must contain "openssl rand -hex 32". Got:\n${preceding.join("\n")}`,
@@ -117,9 +105,7 @@ describe(".env.example", () => {
 
     it("preceding comment for LW_GATEWAY_JWT_SECRET mentions openssl rand -hex 32", () => {
       const preceding = getPrecedingLines("LW_GATEWAY_JWT_SECRET");
-      const mentionsCommand = preceding.some((l) =>
-        l.includes("openssl rand -hex 32"),
-      );
+      const mentionsCommand = preceding.some((l) => l.includes("openssl rand -hex 32"));
       expect(
         mentionsCommand,
         `One of the 5 lines above LW_GATEWAY_JWT_SECRET must contain "openssl rand -hex 32". Got:\n${preceding.join("\n")}`,

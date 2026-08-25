@@ -62,9 +62,7 @@ export type JudgeIndependence = {
 export const VERBOSITY_NOTABLE_RATIO = 1.5;
 
 const meanOf = (values: number[]): number | null =>
-  values.length === 0
-    ? null
-    : values.reduce((sum, v) => sum + v, 0) / values.length;
+  values.length === 0 ? null : values.reduce((sum, v) => sum + v, 0) / values.length;
 
 /** Mean output length for one variant, over the rows it answered with text. */
 const meanOutputLength = ({
@@ -106,9 +104,7 @@ export const computeVerbosityProfile = ({
     meanLengthByVariant[variantId] = meanOutputLength({ rows, variantId });
   }
 
-  const leaderMeanLength = leaderId
-    ? (meanLengthByVariant[leaderId] ?? null)
-    : null;
+  const leaderMeanLength = leaderId ? (meanLengthByVariant[leaderId] ?? null) : null;
 
   const fieldLengths = variantIds
     .filter((id) => id !== leaderId)
@@ -141,9 +137,7 @@ export const computeVerbosityProfile = ({
  * itself. A bare id with no provider prefix yields null — better to report
  * the judge as unknown than to guess a family from a name.
  */
-export const modelFamily = (
-  model: string | null | undefined,
-): string | null => {
+export const modelFamily = (model: string | null | undefined): string | null => {
   if (!model) return null;
   const [provider] = model.split("/");
   if (!provider || provider === model) return null;

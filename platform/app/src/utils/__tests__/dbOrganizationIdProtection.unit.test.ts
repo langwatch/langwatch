@@ -565,8 +565,7 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
 
   describe("when an updateMany carries the sweep's name and un-revoked clause but no expiry bound", () => {
     it("THROWS — that predicate is every LIVE session key, in every organization", async () => {
-      const { expiresAt: _elapsed, ...withoutExpiryBound } =
-        await captureSweepWhere();
+      const { expiresAt: _elapsed, ...withoutExpiryBound } = await captureSweepWhere();
 
       await expect(
         runGuard({
@@ -701,9 +700,9 @@ describe("guardOrganizationId — the migration rollout's enrollment rows", () =
     it("passes the guard — one read covers every tenant and every migration", async () => {
       const { repository } = guardedEnrollmentRepository();
 
-      await expect(
-        repository.findEnrolledOrganizationIdsByMigration(),
-      ).resolves.toEqual(new Map());
+      await expect(repository.findEnrolledOrganizationIdsByMigration()).resolves.toEqual(
+        new Map(),
+      );
     });
   });
 
@@ -711,9 +710,7 @@ describe("guardOrganizationId — the migration rollout's enrollment rows", () =
     it("passes the guard — the groupBy reads across organizations", async () => {
       const { repository } = guardedEnrollmentRepository();
 
-      await expect(repository.countEnrolledByMigration()).resolves.toEqual(
-        new Map(),
-      );
+      await expect(repository.countEnrolledByMigration()).resolves.toEqual(new Map());
     });
   });
 

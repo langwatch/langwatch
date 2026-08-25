@@ -37,9 +37,7 @@ describe("<ScenarioTabConnectedBadge/>", () => {
     await user.hover(screen.getByTestId("scenario-tab-connected-badge"));
 
     await waitFor(() =>
-      expect(
-        screen.getByTestId("scenario-tab-connected-popover"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("scenario-tab-connected-popover")).toBeInTheDocument(),
     );
     expect(
       screen.getByText(/this view moves to it instead of opening another/i),
@@ -48,12 +46,9 @@ describe("<ScenarioTabConnectedBadge/>", () => {
 
   /** @scenario "A connected tab quietly shows that it is linked to local runs" */
   it("renders nothing for a tab the user opened themselves", () => {
-    const { container } = render(
-      <ScenarioTabConnectedBadge visible={false} />,
-      {
-        wrapper: Wrapper,
-      },
-    );
+    const { container } = render(<ScenarioTabConnectedBadge visible={false} />, {
+      wrapper: Wrapper,
+    });
 
     expect(container).toBeEmptyDOMElement();
   });

@@ -23,10 +23,7 @@ type SpanTreeAction =
   | { type: "CLEAR_NEW_FLAGS" }
   | { type: "SET_TOTAL"; total: number };
 
-function spanTreeReducer(
-  state: SpanTreeState,
-  action: SpanTreeAction,
-): SpanTreeState {
+function spanTreeReducer(state: SpanTreeState, action: SpanTreeAction): SpanTreeState {
   switch (action.type) {
     case "INITIAL_LOAD": {
       const spans = new Map<string, Span>();
@@ -229,12 +226,9 @@ export function useSpanTreeLoader({
   const sortedSpans = (() => {
     const arr = [...state.spans.values()];
     arr.sort((a, b) => {
-      const startDiff =
-        (a.timestamps?.started_at ?? 0) - (b.timestamps?.started_at ?? 0);
+      const startDiff = (a.timestamps?.started_at ?? 0) - (b.timestamps?.started_at ?? 0);
       if (startDiff === 0) {
-        return (
-          (b.timestamps?.finished_at ?? 0) - (a.timestamps?.finished_at ?? 0)
-        );
+        return (b.timestamps?.finished_at ?? 0) - (a.timestamps?.finished_at ?? 0);
       }
       return startDiff;
     });

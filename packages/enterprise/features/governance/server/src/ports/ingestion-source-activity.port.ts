@@ -14,15 +14,9 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 
 export abstract class ActivityMonitorRepository {
-  abstract summary(
-    input: ActivityMonitorWindowQuery,
-  ): Promise<ActivityMonitorSummary>;
-  abstract spendByUser(
-    input: ActivityMonitorPagedWindowQuery,
-  ): Promise<SpendByUserRow[]>;
-  abstract spendByTeam(
-    input: ActivityMonitorPagedWindowQuery,
-  ): Promise<SpendByTeamRow[]>;
+  abstract summary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary>;
+  abstract spendByUser(input: ActivityMonitorPagedWindowQuery): Promise<SpendByUserRow[]>;
+  abstract spendByTeam(input: ActivityMonitorPagedWindowQuery): Promise<SpendByTeamRow[]>;
   abstract spendByDepartment(
     input: ActivityMonitorWindowQuery,
   ): Promise<SpendByDepartmentRow[]>;

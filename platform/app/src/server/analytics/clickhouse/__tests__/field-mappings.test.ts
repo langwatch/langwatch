@@ -36,9 +36,7 @@ describe("field-mappings", () => {
 
     it("has mappings for performance metrics", () => {
       expect(fieldMappings["metrics.total_time_ms"]).toBeDefined();
-      expect(fieldMappings["metrics.total_time_ms"]?.column).toBe(
-        "TotalDurationMs",
-      );
+      expect(fieldMappings["metrics.total_time_ms"]?.column).toBe("TotalDurationMs");
 
       expect(fieldMappings["metrics.total_cost"]).toBeDefined();
       expect(fieldMappings["metrics.total_cost"]?.column).toBe("TotalCost");
@@ -58,12 +56,8 @@ describe("field-mappings", () => {
 
     it("has mappings for evaluation fields with evaluation_runs table", () => {
       expect(fieldMappings["evaluations.evaluator_id"]).toBeDefined();
-      expect(fieldMappings["evaluations.evaluator_id"]?.table).toBe(
-        "evaluation_runs",
-      );
-      expect(fieldMappings["evaluations.evaluator_id"]?.column).toBe(
-        "EvaluatorId",
-      );
+      expect(fieldMappings["evaluations.evaluator_id"]?.table).toBe("evaluation_runs");
+      expect(fieldMappings["evaluations.evaluator_id"]?.column).toBe("EvaluatorId");
 
       expect(fieldMappings["evaluations.score"]).toBeDefined();
       expect(fieldMappings["evaluations.score"]?.column).toBe("Score");
@@ -102,9 +96,7 @@ describe("field-mappings", () => {
     });
 
     it("returns evaluation_runs for evaluation fields", () => {
-      expect(getTableForField("evaluations.evaluator_id")).toBe(
-        "evaluation_runs",
-      );
+      expect(getTableForField("evaluations.evaluator_id")).toBe("evaluation_runs");
       expect(getTableForField("evaluations.score")).toBe("evaluation_runs");
     });
 
@@ -264,9 +256,7 @@ describe("field-mappings", () => {
     it("prefixes simple columns with table alias", () => {
       expect(qualifiedColumn("trace_id")).toBe("ts.TraceId");
       expect(qualifiedColumn("spans.span_id")).toBe("ss.SpanId");
-      expect(qualifiedColumn("evaluations.evaluator_id")).toBe(
-        "es.EvaluatorId",
-      );
+      expect(qualifiedColumn("evaluations.evaluator_id")).toBe("es.EvaluatorId");
     });
 
     it("handles map access columns correctly", () => {

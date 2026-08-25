@@ -83,15 +83,13 @@ const TRACE_SCALARS: Record<
     type: "number",
     protection: null,
     outPath: ["inserted_at"],
-    read: (t) =>
-      (t.timestamps as { inserted_at?: number } | null)?.inserted_at ?? null,
+    read: (t) => (t.timestamps as { inserted_at?: number } | null)?.inserted_at ?? null,
   },
   updated_at: {
     type: "number",
     protection: null,
     outPath: ["updated_at"],
-    read: (t) =>
-      (t.timestamps as { updated_at?: number } | null)?.updated_at ?? null,
+    read: (t) => (t.timestamps as { updated_at?: number } | null)?.updated_at ?? null,
   },
   input: {
     type: "string",
@@ -153,9 +151,7 @@ const ANNOTATION_FIELDS: Record<
   created_at: { type: "number", protection: null },
 };
 
-function field(
-  partial: Omit<ResolvedField, "path"> & { path: string },
-): ResolvedField {
+function field(partial: Omit<ResolvedField, "path"> & { path: string }): ResolvedField {
   return partial;
 }
 

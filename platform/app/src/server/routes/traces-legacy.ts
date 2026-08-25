@@ -108,8 +108,7 @@ secured.access(tracesViewAuth).get("/trace/:id", async (c) => {
   try {
     const traceId = c.req.param("id");
     const formatParam = c.req.query("format");
-    const llmMode =
-      c.req.query("llmMode") === "true" || c.req.query("llmMode") === "1";
+    const llmMode = c.req.query("llmMode") === "true" || c.req.query("llmMode") === "1";
     const format = formatParam ?? (llmMode ? "digest" : "json");
 
     c.header("Deprecation", "true");
@@ -279,9 +278,7 @@ secured.access(tracesViewAuth).post("/trace/search", async (c) => {
           ? Date.parse(params.startDate)
           : params.startDate,
       endDate:
-        typeof params.endDate === "string"
-          ? Date.parse(params.endDate)
-          : params.endDate,
+        typeof params.endDate === "string" ? Date.parse(params.endDate) : params.endDate,
       pageSize,
     },
     protections,
@@ -342,10 +339,7 @@ secured.access(tracesViewAuth).get("/thread/:id", async (c) => {
     projectId: project.id,
   });
   // Thread-detail read consumes conversation content — resolve full IO (#4991).
-  const traceService = TraceService.create(
-    prisma,
-    buildTraceBlobResolutionDeps(),
-  );
+  const traceService = TraceService.create(prisma, buildTraceBlobResolutionDeps());
   const traces = await traceService.getTracesByThreadId(
     project.id,
     threadId,

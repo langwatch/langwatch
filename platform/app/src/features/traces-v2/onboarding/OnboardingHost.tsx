@@ -22,9 +22,7 @@ interface OnboardingHostProps {
  * host is a future iteration; this host establishes the boundary
  * and the lazy-mount discipline so we have somewhere to grow.
  */
-export function OnboardingHost({
-  children,
-}: OnboardingHostProps): React.ReactElement {
+export function OnboardingHost({ children }: OnboardingHostProps): React.ReactElement {
   const active = useOnboardingActive();
 
   if (!active) return <>{children}</>;

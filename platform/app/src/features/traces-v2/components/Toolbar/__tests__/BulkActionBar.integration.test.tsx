@@ -104,9 +104,7 @@ describe("BulkActionBar Add to context", () => {
         screen.queryByRole("button", { name: /Add to context/ }),
       ).not.toBeInTheDocument();
       // The other bulk actions still render.
-      expect(
-        screen.getByRole("button", { name: /Export selected/ }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Export selected/ })).toBeInTheDocument();
     });
   });
 
@@ -116,9 +114,7 @@ describe("BulkActionBar Add to context", () => {
       useSelectionStore.getState().enableAllMatching();
       renderBar();
 
-      expect(
-        screen.getByRole("button", { name: /Add to context/ }),
-      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Add to context/ })).toBeDisabled();
     });
   });
 });

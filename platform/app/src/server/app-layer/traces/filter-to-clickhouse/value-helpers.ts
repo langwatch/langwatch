@@ -125,10 +125,7 @@ export function wrap(sql: string, negated: boolean): string {
  * `true` on every trace while the compiled `Attributes['constructor'] != ''`
  * matched none of them.
  */
-export function readAttribute(
-  attrs: Record<string, string>,
-  key: string,
-): string {
+export function readAttribute(attrs: Record<string, string>, key: string): string {
   return Object.hasOwn(attrs, key) ? (attrs[key] ?? "") : "";
 }
 

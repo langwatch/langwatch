@@ -6,9 +6,7 @@ import {
   useTraceEditStore,
 } from "../../../stores/traceEditStore";
 
-const SPAN_TYPES: SpanTypes[] = spanTypesSchema.options.map(
-  (option) => option.value,
-);
+const SPAN_TYPES: SpanTypes[] = spanTypesSchema.options.map((option) => option.value);
 
 function isSpanType(value: string): value is SpanTypes {
   return (SPAN_TYPES as string[]).includes(value);

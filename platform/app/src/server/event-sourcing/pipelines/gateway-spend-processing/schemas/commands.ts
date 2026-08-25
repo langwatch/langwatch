@@ -29,11 +29,7 @@ const boundedMetadataJson = z
       if (raw === "") return true;
       try {
         const parsed: unknown = JSON.parse(raw);
-        return (
-          typeof parsed === "object" &&
-          parsed !== null &&
-          !Array.isArray(parsed)
-        );
+        return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
       } catch {
         return false;
       }
@@ -215,9 +211,7 @@ export const confirmSpendCommandDataSchema = confirmSpendWireSchema.extend({
   rate_version: z.string().min(1).max(128),
   ...spendControlPlaneAttributionSchema.shape,
 });
-export type ConfirmSpendCommandData = z.infer<
-  typeof confirmSpendCommandDataSchema
->;
+export type ConfirmSpendCommandData = z.infer<typeof confirmSpendCommandDataSchema>;
 
 export const failSpendWireSchema = z.object({
   gateway_request_id: boundedId,
@@ -271,6 +265,4 @@ export const settleSpendCommandDataSchema = z.object({
   model: z.string().max(512).default(""),
   model_provider_id: z.string().max(256).default(""),
 });
-export type SettleSpendCommandData = z.infer<
-  typeof settleSpendCommandDataSchema
->;
+export type SettleSpendCommandData = z.infer<typeof settleSpendCommandDataSchema>;

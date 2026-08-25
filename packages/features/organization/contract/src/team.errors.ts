@@ -4,12 +4,7 @@ export class TeamNotFoundError extends NotFoundError {
   declare readonly code: "team_not_found";
 
   constructor(teamId?: string) {
-    super(
-      "team_not_found",
-      "Team",
-      teamId ?? "",
-      teamId ? { meta: { teamId } } : {},
-    );
+    super("team_not_found", "Team", teamId ?? "", teamId ? { meta: { teamId } } : {});
     this.name = "TeamNotFoundError";
   }
 }
@@ -81,15 +76,11 @@ export class PersonalWorkspaceNotManagedHereError extends HandledError {
   declare readonly code: "personal_workspace_not_managed_here";
 
   constructor(ownerName?: string | null) {
-    super(
-      "personal_workspace_not_managed_here",
-      PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
-      {
-        meta: ownerName ? { ownerName } : {},
-        httpStatus: 403,
-        fault: "customer",
-      },
-    );
+    super("personal_workspace_not_managed_here", PERSONAL_TEAM_MEMBERSHIP_REFUSAL, {
+      meta: ownerName ? { ownerName } : {},
+      httpStatus: 403,
+      fault: "customer",
+    });
     this.name = "PersonalWorkspaceNotManagedHereError";
   }
 }

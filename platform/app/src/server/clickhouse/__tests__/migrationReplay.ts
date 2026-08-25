@@ -45,9 +45,7 @@ export const CURRENT_ROLLUP_REBUILD_MIGRATIONS = [
 ] as const;
 
 /** Replays `CURRENT_ROLLUP_REBUILD_MIGRATIONS` in order. */
-export async function replayRollupRebuild(
-  client: ClickHouseClient,
-): Promise<void> {
+export async function replayRollupRebuild(client: ClickHouseClient): Promise<void> {
   for (const fileName of CURRENT_ROLLUP_REBUILD_MIGRATIONS) {
     await replayGooseMigrationUp({ client, fileName });
   }
@@ -123,9 +121,7 @@ async function runMigrationStatements({
   const vars: Record<string, string> = {
     CLICKHOUSE_DATABASE: database,
     CLICKHOUSE_STORAGE_POLICY_SETTING: storagePolicySetting,
-    CLICKHOUSE_ENGINE_MERGETREE: cluster
-      ? "ReplicatedMergeTree()"
-      : "MergeTree()",
+    CLICKHOUSE_ENGINE_MERGETREE: cluster ? "ReplicatedMergeTree()" : "MergeTree()",
     CLICKHOUSE_ENGINE_REPLACING_PREFIX: cluster
       ? "ReplicatedReplacingMergeTree("
       : "ReplacingMergeTree(",
@@ -201,10 +197,7 @@ export async function withReplayLock<T>({
   database: string;
   run: () => Promise<T>;
 }): Promise<T> {
-  const lockPath = join(
-    tmpdir(),
-    `langwatch-migration-replay-${database}.lock`,
-  );
+  const lockPath = join(tmpdir(), `langwatch-migration-replay-${database}.lock`);
   const owner = await acquireLock(lockPath);
   try {
     return await run();
@@ -340,9 +333,7 @@ async function acquireLock(lockPath: string): Promise<string> {
 
   while (!(await tryTakeLock(lockPath, owner))) {
     if (Date.now() > deadline) {
-      throw new Error(
-        `timed out waiting for the migration replay lock at ${lockPath}`,
-      );
+      throw new Error(`timed out waiting for the migration replay lock at ${lockPath}`);
     }
     // A crashed holder must not wedge every later suite, so a lock older than
     // any replay could legitimately take is broken rather than waited on. The

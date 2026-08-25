@@ -65,11 +65,7 @@ export type AllowedBlockType = (typeof ALLOWED_BLOCK_TYPES)[number];
  * uses one carries an allowlisted fallback so stripping it never yields an
  * empty message.
  */
-export const GATED_BLOCK_TYPES = [
-  "alert",
-  "data_visualization",
-  "data_table",
-] as const;
+export const GATED_BLOCK_TYPES = ["alert", "data_visualization", "data_table"] as const;
 
 export type GatedBlockType = (typeof GATED_BLOCK_TYPES)[number];
 
@@ -108,13 +104,7 @@ const ALLOWED_RICH_TEXT_INLINE_TYPES = new Set<string>([
 // shape and the two boolean flags, discarding anything else an author appended.
 const ALLOWED_TEXT_OBJECT_TYPES = new Set<string>(["plain_text", "mrkdwn"]);
 
-const ALERT_LEVELS = new Set<string>([
-  "default",
-  "info",
-  "warning",
-  "error",
-  "success",
-]);
+const ALERT_LEVELS = new Set<string>(["default", "info", "warning", "error", "success"]);
 
 const CHART_TYPES = new Set<string>(["pie", "area", "bar", "line"]);
 
@@ -160,15 +150,13 @@ function isBlock(value: unknown): value is Record<string, unknown> {
 
 function isAllowedType(type: unknown): type is AllowedBlockType {
   return (
-    typeof type === "string" &&
-    (ALLOWED_BLOCK_TYPES as readonly string[]).includes(type)
+    typeof type === "string" && (ALLOWED_BLOCK_TYPES as readonly string[]).includes(type)
   );
 }
 
 function isGatedType(type: unknown): type is GatedBlockType {
   return (
-    typeof type === "string" &&
-    (GATED_BLOCK_TYPES as readonly string[]).includes(type)
+    typeof type === "string" && (GATED_BLOCK_TYPES as readonly string[]).includes(type)
   );
 }
 
@@ -188,10 +176,7 @@ function capText(text: string, max: number): string {
   return `${text.slice(0, max - TRUNCATION_MARKER.length)}${TRUNCATION_MARKER}`;
 }
 
-function capTextObject(
-  value: unknown,
-  max: number,
-): Record<string, unknown> | null {
+function capTextObject(value: unknown, max: number): Record<string, unknown> | null {
   const text = sanitizeTextObject(value);
   if (!text) return null;
   return { ...text, text: capText(text.text as string, max) };
@@ -204,9 +189,7 @@ function capTextObject(
  * section instead of a rejected message. A section left with neither text nor a
  * field is unusable, so it is dropped (→ the caller's fallback delivers).
  */
-function sanitizeSection(
-  block: Record<string, unknown>,
-): Record<string, unknown> | null {
+function sanitizeSection(block: Record<string, unknown>): Record<string, unknown> | null {
   const out = stripInteractiveAccessory(block);
   const text = capTextObject(out.text, MAX_SECTION_TEXT_CHARS);
   const fields = Array.isArray(out.fields)
@@ -230,9 +213,7 @@ function sanitizeSection(
  * (an image element, say) is DROPPED rather than emitted empty — an empty
  * `elements` array fails the whole message with `invalid_blocks`.
  */
-function sanitizeContext(
-  block: Record<string, unknown>,
-): Record<string, unknown> | null {
+function sanitizeContext(block: Record<string, unknown>): Record<string, unknown> | null {
   if (!Array.isArray(block.elements)) return null;
   const elements = block.elements
     .filter(
@@ -306,10 +287,7 @@ function sanitizeRichText(
 // broadcast ping or a link. Escaping angle brackets also neutralises markdown
 // autolinks / raw HTML (`<https://…>`, `<script>`) in the same pass.
 function escapeMrkdwnControlChars(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**
@@ -325,10 +303,7 @@ function sanitizeMarkdown(
   block: Record<string, unknown>,
 ): Record<string, unknown> | null {
   if (typeof block.text !== "string" || block.text.length === 0) return null;
-  const text = capText(
-    escapeMrkdwnControlChars(block.text),
-    MAX_MARKDOWN_TEXT_CHARS,
-  );
+  const text = capText(escapeMrkdwnControlChars(block.text), MAX_MARKDOWN_TEXT_CHARS);
   const out: Record<string, unknown> = { type: "markdown", text };
   if (typeof block.block_id === "string") out.block_id = block.block_id;
   return out;
@@ -341,9 +316,7 @@ function sanitizeMarkdown(
  * `invalid_blocks`, so the text object is coerced to `plain_text` and capped; a
  * header with no valid text object is dropped (→ fallback delivers).
  */
-function sanitizeHeader(
-  block: Record<string, unknown>,
-): Record<string, unknown> | null {
+function sanitizeHeader(block: Record<string, unknown>): Record<string, unknown> | null {
   const parsed = sanitizeTextObject(block.text);
   if (!parsed) return null;
   // Header text is a single-line plain_text field — the multi-line truncation
@@ -393,10 +366,7 @@ function sanitizeVerifiedBlock(
 // a valid `plain_text` / `mrkdwn` object with a string `text` yields null.
 function sanitizeTextObject(value: unknown): Record<string, unknown> | null {
   if (!isBlock(value)) return null;
-  if (
-    typeof value.type !== "string" ||
-    !ALLOWED_TEXT_OBJECT_TYPES.has(value.type)
-  )
+  if (typeof value.type !== "string" || !ALLOWED_TEXT_OBJECT_TYPES.has(value.type))
     return null;
   if (typeof value.text !== "string") return null;
   const out: Record<string, unknown> = { type: value.type, text: value.text };
@@ -408,9 +378,7 @@ function sanitizeTextObject(value: unknown): Record<string, unknown> | null {
 // `alert` — a coloured banner. Text-only, no fetch vectors. An out-of-range
 // `level` is dropped (Slack defaults to "default"); a missing/invalid `text`
 // makes the block unusable, so it is dropped entirely (→ fallback delivers).
-function sanitizeAlert(
-  block: Record<string, unknown>,
-): Record<string, unknown> | null {
+function sanitizeAlert(block: Record<string, unknown>): Record<string, unknown> | null {
   const text = sanitizeTextObject(block.text);
   if (!text) return null;
   const out: Record<string, unknown> = { type: "alert", text };
@@ -425,9 +393,7 @@ function sanitizeAlert(
 // `image` is banned for), and `actions` is STRIPPED (interactive callback
 // vector — the exact class ADR-036 bans). Only the text fields survive; a card
 // with no surviving text field is dropped (→ fallback delivers).
-function sanitizeCard(
-  block: Record<string, unknown>,
-): Record<string, unknown> | null {
+function sanitizeCard(block: Record<string, unknown>): Record<string, unknown> | null {
   const out: Record<string, unknown> = { type: "card" };
   let hasContent = false;
   for (const field of ["title", "subtitle", "body", "subtext"] as const) {
@@ -457,8 +423,7 @@ function sanitizePieChart(
       if (!isBlock(seg)) return null;
       const label = toLabel(seg.label);
       const value = seg.value;
-      if (label === null || typeof value !== "number" || !(value > 0))
-        return null;
+      if (label === null || typeof value !== "number" || !(value > 0)) return null;
       return { label, value };
     })
     .filter((x): x is { label: string; value: number } => x !== null)
@@ -516,8 +481,7 @@ function sanitizeDataVisualization(
   block: Record<string, unknown>,
 ): Record<string, unknown> | null {
   if (typeof block.title !== "string") return null;
-  if (!isBlock(block.chart) || typeof block.chart.type !== "string")
-    return null;
+  if (!isBlock(block.chart) || typeof block.chart.type !== "string") return null;
   if (!CHART_TYPES.has(block.chart.type)) return null;
   const chart =
     block.chart.type === "pie"

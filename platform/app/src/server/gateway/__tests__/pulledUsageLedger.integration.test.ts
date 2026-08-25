@@ -393,9 +393,7 @@ describe("given a connected provider source that pulls usage on a schedule", () 
       // which is the way a gate quietly stops being a gate.
       const overTheLine = await checkTeamRequest("0.50");
       expect(overTheLine.decision).toBe("hard_block");
-      expect(overTheLine.blockedBy.map((b) => b.budgetId)).toContain(
-        TEAM_BUDGET_ID,
-      );
+      expect(overTheLine.blockedBy.map((b) => b.budgetId)).toContain(TEAM_BUDGET_ID);
 
       const beforePull = await checkTeamRequest("0.001");
       expect(beforePull.decision).not.toBe("hard_block");
@@ -464,10 +462,7 @@ describe("given a connected provider source that pulls usage on a schedule", () 
       // request id shared between a provider's bucket and a gateway request,
       // so a combined total would be a number nobody could defend — and the
       // separation is structural: they do not even live in the same read.
-      expect(gatewayUsd).toBeCloseTo(
-        (NEARLY_SPENT_NANO + gatewayNano) / 1e9,
-        6,
-      );
+      expect(gatewayUsd).toBeCloseTo((NEARLY_SPENT_NANO + gatewayNano) / 1e9, 6);
       expect(pulled.spentNanoUsd).toBeGreaterThan(0);
       // The gateway figure is the gateway's alone: the pulled cost, which is
       // far larger, is nowhere inside it.

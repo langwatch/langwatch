@@ -16,10 +16,7 @@ export function hasFleetTrouble(row: ProcessFleetSummary): boolean {
  * countdown, a past-due wake is an AGE ("due 3m ago") — a bare countdown
  * shape for an overdue wake would read as scheduled rather than as stuck.
  */
-export function describeNextWake(
-  nextWakeAt: number | null,
-  now = Date.now(),
-): string {
+export function describeNextWake(nextWakeAt: number | null, now = Date.now()): string {
   if (nextWakeAt === null) return "none";
   if (nextWakeAt > now) return formatTimeAgo(nextWakeAt, now);
   return `due ${formatTimeAgo(nextWakeAt, now)}`;

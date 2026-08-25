@@ -145,16 +145,13 @@ export function VirtualKeyEditDrawer({
   const [routing, setRouting] = useState<VirtualKeyRoutingValue>(
     routingValueFromKey({ routingMode: "NONE", routingPolicyId: null }),
   );
-  const [cacheMode, setCacheMode] = useState<"respect" | "force" | "disable">(
-    "respect",
-  );
+  const [cacheMode, setCacheMode] = useState<"respect" | "force" | "disable">("respect");
   const [cacheTtlS, setCacheTtlS] = useState<number>(3600);
   const [rpm, setRpm] = useState<string>("");
   const [tpm, setTpm] = useState<string>("");
   const [rpd, setRpd] = useState<string>("");
   const [maxOpenSessions, setMaxOpenSessions] = useState<string>("");
-  const [expiration, setExpiration] =
-    useState<VirtualKeyExpirationValue>(NEVER_EXPIRES);
+  const [expiration, setExpiration] = useState<VirtualKeyExpirationValue>(NEVER_EXPIRES);
   const [expiryFieldError, setExpiryFieldError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -221,11 +218,10 @@ export function VirtualKeyEditDrawer({
     { organizationId },
     { enabled: !!vk && !!organizationId },
   );
-  const orgProvidersQuery =
-    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
-      { organizationId },
-      { enabled: !!vk && !!organizationId },
-    );
+  const orgProvidersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+    { organizationId },
+    { enabled: !!vk && !!organizationId },
+  );
   // The key's own budget, read from the same resolver that decides what
   // the gateway enforces. Seeds the budget field once per open.
   const applicableQuery = api.virtualKeys.applicableBudgets.useQuery(
@@ -265,8 +261,7 @@ export function VirtualKeyEditDrawer({
     },
   });
 
-  const providers = (orgProvidersQuery.data?.providers ??
-    []) as OrgModelProvider[];
+  const providers = (orgProvidersQuery.data?.providers ?? []) as OrgModelProvider[];
   const policies = (policiesQuery.data ?? []) as Array<{
     id: string;
     name: string;
@@ -316,10 +311,7 @@ export function VirtualKeyEditDrawer({
     if (orgProvidersQuery.isLoading) {
       return "Loading providers…";
     }
-    const providerReason = providerAccessInvalidReason(
-      providerAccess,
-      eligible,
-    );
+    const providerReason = providerAccessInvalidReason(providerAccess, eligible);
     if (providerReason) return providerReason;
     return expiryIncompleteReason({ preset: expiration.preset, expiresAt });
   })();
@@ -391,12 +383,7 @@ export function VirtualKeyEditDrawer({
   };
 
   return (
-    <Drawer.Root
-      open={!!vk}
-      onOpenChange={() => close()}
-      placement="end"
-      size="md"
-    >
+    <Drawer.Root open={!!vk} onOpenChange={() => close()} placement="end" size="md">
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Edit virtual key</Drawer.Title>
@@ -441,9 +428,7 @@ export function VirtualKeyEditDrawer({
                 maxLength={TAGS_CSV_MAX_LENGTH}
               />
               {tagsNotice && (
-                <Field.HelperText color="orange.600">
-                  {tagsNotice}
-                </Field.HelperText>
+                <Field.HelperText color="orange.600">{tagsNotice}</Field.HelperText>
               )}
             </Field.Root>
 
@@ -453,9 +438,7 @@ export function VirtualKeyEditDrawer({
                 <VirtualKeyOwnershipReadOnly
                   scopes={vk.scopes}
                   principal={
-                    vk.principalUserId && vk.principalUser
-                      ? vk.principalUser
-                      : undefined
+                    vk.principalUserId && vk.principalUser ? vk.principalUser : undefined
                   }
                   traceProjectId={vk.traceProjectId ?? null}
                   traceProjectArchived={vk.traceProjectArchived ?? false}
@@ -521,8 +504,7 @@ export function VirtualKeyEditDrawer({
                     value={cacheMode}
                     onChange={(e) =>
                       setCacheMode(
-                        (e.target.value as "respect" | "force" | "disable") ??
-                          "respect",
+                        (e.target.value as "respect" | "force" | "disable") ?? "respect",
                       )
                     }
                   >
@@ -533,8 +515,7 @@ export function VirtualKeyEditDrawer({
                       Disable: strip cache directives before dispatch
                     </option>
                     <option value="force">
-                      Force: inject cache_control on Anthropic (OpenAI auto,
-                      Gemini WARN)
+                      Force: inject cache_control on Anthropic (OpenAI auto, Gemini WARN)
                     </option>
                   </NativeSelect.Field>
                 </NativeSelect.Root>
@@ -544,9 +525,7 @@ export function VirtualKeyEditDrawer({
                 <Input
                   value={cacheTtlS.toString()}
                   onChange={(e) =>
-                    setCacheTtlS(
-                      Math.max(0, Number.parseInt(e.target.value, 10) || 0),
-                    )
+                    setCacheTtlS(Math.max(0, Number.parseInt(e.target.value, 10) || 0))
                   }
                   inputMode="numeric"
                 />
@@ -582,12 +561,7 @@ export function VirtualKeyEditDrawer({
                     docHref="/ai-gateway/rate-limits"
                   />
                 </Field.Label>
-                <Input
-                  value={tpm}
-                  placeholder="deferred"
-                  inputMode="numeric"
-                  disabled
-                />
+                <Input value={tpm} placeholder="deferred" inputMode="numeric" disabled />
                 <Field.HelperText>Tokens / minute</Field.HelperText>
               </Field.Root>
               <Field.Root flex={1}>
@@ -621,9 +595,7 @@ export function VirtualKeyEditDrawer({
                   placeholder="unlimited"
                   inputMode="numeric"
                 />
-                <Field.HelperText>
-                  Concurrent realtime voice sessions
-                </Field.HelperText>
+                <Field.HelperText>Concurrent realtime voice sessions</Field.HelperText>
               </Field.Root>
             </HStack>
             {vk && (
@@ -646,11 +618,7 @@ export function VirtualKeyEditDrawer({
               </Text>
             )}
             <Spacer />
-            <Button
-              variant="ghost"
-              onClick={close}
-              disabled={updateMutation.isPending}
-            >
+            <Button variant="ghost" onClick={close} disabled={updateMutation.isPending}>
               Cancel
             </Button>
             <Button

@@ -1,7 +1,4 @@
-import type {
-  ReportChart,
-  ReportTraceRow,
-} from "@langwatch/automation-contract";
+import type { ReportChart, ReportTraceRow } from "@langwatch/automation-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { Project, Trigger } from "~/generated/prisma/client";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
@@ -113,8 +110,7 @@ function makeDeps(
       loadProject: vi.fn(async () => PROJECT),
       sendEmail: sendEmail as unknown as ReportDispatchDeps["sendEmail"],
       sendSlack: sendSlack as unknown as ReportDispatchDeps["sendSlack"],
-      sendSlackBot:
-        sendSlackBot as unknown as ReportDispatchDeps["sendSlackBot"],
+      sendSlackBot: sendSlackBot as unknown as ReportDispatchDeps["sendSlackBot"],
       filterSuppressedRecipients: vi.fn(async ({ emails }) => emails),
       listReportTraces:
         listReportTraces as unknown as ReportDispatchDeps["listReportTraces"],
@@ -197,9 +193,7 @@ describe("reportWindowMs", () => {
     ];
 
     it.each(cases)("$name", ({ cron, timezone, slot, expected }) => {
-      expect(reportWindowMs({ cron, timezone, slot: new Date(slot) })).toBe(
-        expected,
-      );
+      expect(reportWindowMs({ cron, timezone, slot: new Date(slot) })).toBe(expected);
     });
   });
 });
@@ -237,15 +231,12 @@ describe("dispatchScheduledReport", () => {
 
   describe("given a traceQuery report is due", () => {
     it("queries the schedule window and renders the matching traces into Slack", async () => {
-      const { deps, sendSlack, listReportTraces } = makeDeps(
-        makeReportTrigger(),
-        {
-          traces: [
-            makeTraceRow(),
-            makeTraceRow({ traceId: "trace-def", input: "second input" }),
-          ],
-        },
-      );
+      const { deps, sendSlack, listReportTraces } = makeDeps(makeReportTrigger(), {
+        traces: [
+          makeTraceRow(),
+          makeTraceRow({ traceId: "trace-def", input: "second input" }),
+        ],
+      });
 
       await dispatchScheduledReport({ deps, fire });
 
@@ -376,9 +367,7 @@ describe("dispatchScheduledReport", () => {
 
   describe("given the trigger is inactive or gone", () => {
     it("skips without sending", async () => {
-      const { deps, sendSlack } = makeDeps(
-        makeReportTrigger({ active: false }),
-      );
+      const { deps, sendSlack } = makeDeps(makeReportTrigger({ active: false }));
       await dispatchScheduledReport({ deps, fire });
       expect(sendSlack).not.toHaveBeenCalled();
 
@@ -407,9 +396,7 @@ describe("dispatchScheduledReport", () => {
         const { deps, recordFire, sendSlack } = makeDeps(makeReportTrigger());
         recordFire.mockRejectedValueOnce(new Error("postgres is down"));
 
-        await expect(
-          dispatchScheduledReport({ deps, fire }),
-        ).resolves.toBeUndefined();
+        await expect(dispatchScheduledReport({ deps, fire })).resolves.toBeUndefined();
         expect(sendSlack).toHaveBeenCalledTimes(1);
       });
     });

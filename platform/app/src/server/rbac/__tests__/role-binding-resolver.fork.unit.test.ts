@@ -65,9 +65,7 @@ function buildPrisma({
   const roleBindingFindMany = vi.fn().mockResolvedValue([]);
   const prisma = {
     systemMigrationTenantState: {
-      findUnique: vi
-        .fn()
-        .mockResolvedValue(onEngine ? { status: "finalized" } : null),
+      findUnique: vi.fn().mockResolvedValue(onEngine ? { status: "finalized" } : null),
     },
     project: {
       findUnique: vi.fn().mockResolvedValue({

@@ -26,10 +26,7 @@ import opencodeBSpan from "./fixtures/opencode-B.doStream.json";
 
 const svc = new CanonicalizeSpanAttributesService();
 
-const SPAN_CTX = (
-  scopeName: string,
-  spanName: string,
-): ExtractorContext["span"] => ({
+const SPAN_CTX = (scopeName: string, spanName: string): ExtractorContext["span"] => ({
   name: spanName,
   kind: 0,
   instrumentationScope: { name: scopeName, version: null },
@@ -85,15 +82,12 @@ const ELEMENTS: {
   },
   {
     key: "input content",
-    get: (a) =>
-      a["gen_ai.input.messages"] ?? a["gen_ai.prompt"] ?? a["langwatch.input"],
+    get: (a) => a["gen_ai.input.messages"] ?? a["gen_ai.prompt"] ?? a["langwatch.input"],
   },
   {
     key: "output content",
     get: (a) =>
-      a["gen_ai.output.messages"] ??
-      a["gen_ai.completion"] ??
-      a["langwatch.output"],
+      a["gen_ai.output.messages"] ?? a["gen_ai.completion"] ?? a["langwatch.output"],
   },
 ];
 
@@ -110,12 +104,9 @@ const TOOLS: {
     name: "codex-B (codex_cli_rs session_task.turn span)",
     attrs: () => canonicalizeSpan(codexBSpan),
     absentReason: {
-      "cache write":
-        "OpenAI usage exposes only cached (read) tokens, no creation count",
-      "input content":
-        "codex OTLP carries token counts only, no message bodies",
-      "output content":
-        "codex OTLP carries token counts only, no message bodies",
+      "cache write": "OpenAI usage exposes only cached (read) tokens, no creation count",
+      "input content": "codex OTLP carries token counts only, no message bodies",
+      "output content": "codex OTLP carries token counts only, no message bodies",
     },
     expected: {
       model: "present",

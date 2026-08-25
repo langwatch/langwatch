@@ -52,9 +52,7 @@ describe("logContentKeys", () => {
 
     it("resolves gemini events, whose reply rides response_text", () => {
       expect(categoryOf("gemini_cli.user_prompt", "prompt")).toBe("input");
-      expect(categoryOf("gemini_cli.api_response", "response_text")).toBe(
-        "output",
-      );
+      expect(categoryOf("gemini_cli.api_response", "response_text")).toBe("output");
       expect(categoryOf("gemini_cli.tool_call", "function_args")).toBe("input");
     });
   });
@@ -103,9 +101,7 @@ describe("logContentKeys", () => {
         "commit",
         "brand_new_agent.some_event",
       ]) {
-        const gated = new Set(
-          logContentKeys(eventName).map((entry) => entry.key),
-        );
+        const gated = new Set(logContentKeys(eventName).map((entry) => entry.key));
         for (const key of contentAttrKeys(eventName)) {
           expect(gated).toContain(key);
         }

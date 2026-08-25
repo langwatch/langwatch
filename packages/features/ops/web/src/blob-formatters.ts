@@ -19,9 +19,7 @@ export function sweepOutcomeLabel(outcome: string): {
   label: string;
   palette: string;
 } {
-  return (
-    OUTCOME_LABELS[outcome as keyof typeof OUTCOME_LABELS] ?? UNKNOWN_OUTCOME
-  );
+  return OUTCOME_LABELS[outcome as keyof typeof OUTCOME_LABELS] ?? UNKNOWN_OUTCOME;
 }
 
 /** Remaining lifetime. Null means the key carries no expiry at all. */

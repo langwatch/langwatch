@@ -47,9 +47,7 @@ describe("column-pruning", () => {
   describe("given a SELECT list is split into items", () => {
     it("keeps a reconstructed map as one item", () => {
       expect(
-        selectListItems(
-          "TraceId, map('k', SpanAttributes['k']) AS SpanAttributes",
-        ),
+        selectListItems("TraceId, map('k', SpanAttributes['k']) AS SpanAttributes"),
       ).toEqual(["TraceId", "map() AS SpanAttributes"]);
     });
 
@@ -257,8 +255,7 @@ describe("column-pruning", () => {
           ...baseInput,
           series: [
             {
-              metric:
-                "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg" as const,
             },
           ],
@@ -273,8 +270,7 @@ describe("column-pruning", () => {
           ...baseInput,
           series: [
             {
-              metric:
-                "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg" as const,
             },
           ],
@@ -348,16 +344,14 @@ describe("column-pruning", () => {
         // any position. Checked against the extracted SELECT list rather than
         // the raw SQL, so a mid-list `SpanAttributes,` cannot slip through the
         // way an end-of-list-only pattern would.
-        const storedSpansSelect =
-          /SELECT\s+(?<list>[\s\S]*?)\s+FROM stored_spans/.exec(result.sql)
-            ?.groups?.list;
+        const storedSpansSelect = /SELECT\s+(?<list>[\s\S]*?)\s+FROM stored_spans/.exec(
+          result.sql,
+        )?.groups?.list;
         expect(storedSpansSelect).toBeDefined();
         const selectedItems = selectListItems(storedSpansSelect!);
         expect(selectedItems).not.toContain("SpanAttributes");
         // Outer accesses still resolve against the reconstructed map.
-        expect(result.sql).toContain(
-          "ss.SpanAttributes['langwatch.span.type']",
-        );
+        expect(result.sql).toContain("ss.SpanAttributes['langwatch.span.type']");
       });
     });
 
@@ -386,8 +380,7 @@ describe("column-pruning", () => {
           ...baseInput,
           series: [
             {
-              metric:
-                "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+              metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
               aggregation: "avg" as const,
             },
           ],

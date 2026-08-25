@@ -151,9 +151,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       // Since #5984 the wire message is the error's code slug, so it must
       // never reach the page — the words come from the registry instead.
       expect(screen.queryByText("internal_error")).not.toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /Try again/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Try again/i })).toBeInTheDocument();
     });
 
     describe("given the failure carries a handled payload", () => {
@@ -179,13 +177,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
           wrapper: Wrapper,
         });
 
+        expect(screen.getByText("This search took too long")).toBeInTheDocument();
         expect(
-          screen.getByText("This search took too long"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText(
-            "Narrow the time range or add a filter, then try again.",
-          ),
+          screen.getByText("Narrow the time range or add a filter, then try again."),
         ).toBeInTheDocument();
       });
     });
@@ -500,9 +494,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         // Both runs from different suites should be grouped under one scenario
         const groupHeaders = screen.getAllByTestId("group-row-header");
         expect(groupHeaders.length).toBe(1);
-        expect(
-          within(groupHeaders[0]!).getByText("Shared Scenario"),
-        ).toBeInTheDocument();
+        expect(within(groupHeaders[0]!).getByText("Shared Scenario")).toBeInTheDocument();
       });
     });
 

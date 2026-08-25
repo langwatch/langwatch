@@ -41,9 +41,7 @@ function spendFields(b: GatewayBudgetWithSeats, spendAvailable: boolean) {
   const nano = b.spentNanoUsd ?? decimalUsdToNanoUsd(b.spentUsd);
   return {
     spent_usd:
-      nano === null
-        ? usdDisplayString(b.spentUsd)
-        : nanoUsdToDecimalString(nano),
+      nano === null ? usdDisplayString(b.spentUsd) : nanoUsdToDecimalString(nano),
     spent_nano_usd: nano,
   };
 }

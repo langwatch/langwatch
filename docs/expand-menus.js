@@ -6,8 +6,9 @@ const expandAllGroups = () => {
 
   // biome-ignore lint/complexity/noForEach: <explanation>
   groups.forEach((group) => {
-    const isExpandable = group.tagName === 'DIV';
-    const text = group.querySelector('div')?.textContent?.trim() || group.textContent.trim();
+    const isExpandable = group.tagName === "DIV";
+    const text =
+      group.querySelector("div")?.textContent?.trim() || group.textContent.trim();
 
     if (isExpandable && expandables.includes(text) && !expanded.includes(group)) {
       console.log(`Expanding: ${text}`);
@@ -15,7 +16,7 @@ const expandAllGroups = () => {
       // Get React props
       const reactProps = getReactProps(group);
       if (reactProps && reactProps.onClick) {
-        console.log('Found React onClick, calling with modified parameters');
+        console.log("Found React onClick, calling with modified parameters");
 
         // We need to modify the router context temporarily
         // The 'c' variable in their onClick is the Next.js router
@@ -28,14 +29,14 @@ const expandAllGroups = () => {
 
           // Temporarily disable router.push
           router.push = () => {
-            console.log('Blocked router.push during expansion');
+            console.log("Blocked router.push during expansion");
             return Promise.resolve();
           };
 
           // Call the React onClick
           reactProps.onClick({
             preventDefault: () => {},
-            stopPropagation: () => {}
+            stopPropagation: () => {},
           });
 
           // Restore router.push after a short delay
@@ -50,7 +51,7 @@ const expandAllGroups = () => {
             stopPropagation: () => {},
             // Try to make it look like mobile to skip navigation
             target: { closest: () => null },
-            currentTarget: group
+            currentTarget: group,
           };
 
           reactProps.onClick(fakeEvent);
@@ -74,10 +75,11 @@ const expandAllGroups = () => {
 
 // Helper function to get React props
 const getReactProps = (element) => {
-  const key = Object.keys(element).find(key =>
-    key.startsWith('__reactProps') ||
-    key.startsWith('__reactInternalInstance') ||
-    key.startsWith('__reactInternalFiber')
+  const key = Object.keys(element).find(
+    (key) =>
+      key.startsWith("__reactProps") ||
+      key.startsWith("__reactInternalInstance") ||
+      key.startsWith("__reactInternalFiber"),
   );
   return key ? element[key] : null;
 };

@@ -79,9 +79,7 @@ describe("OnboardingChecksService", () => {
 
     describe("given the simulations lookup throws (ClickHouse unavailable)", () => {
       it("reports simulations as incomplete instead of failing the whole check", async () => {
-        mockGetScenarioSetsData.mockRejectedValue(
-          new Error("ClickHouse unavailable"),
-        );
+        mockGetScenarioSetsData.mockRejectedValue(new Error("ClickHouse unavailable"));
 
         const result = await service.getCheckStatus("project-1");
 

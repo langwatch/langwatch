@@ -16,15 +16,9 @@ export type ScopeAttachment = {
   scopeId: string;
 };
 
-export type ConfigAtScope = Pick<
-  ModelDefaultConfig,
-  "id" | "config" | "createdAt"
->;
+export type ConfigAtScope = Pick<ModelDefaultConfig, "id" | "config" | "createdAt">;
 
-export type AttachedScope = Pick<
-  ModelDefaultConfigScope,
-  "id" | "scopeType" | "scopeId"
->;
+export type AttachedScope = Pick<ModelDefaultConfigScope, "id" | "scopeType" | "scopeId">;
 
 /**
  * Repository for ModelDefaultConfig + ModelDefaultConfigScope data
@@ -67,10 +61,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc-org:${organizationId}`}, 0)
    * `setFeatureAtScope` serialises across concurrent callers without
    * blocking unrelated scopes. Hashes the key with `hashtextextended`
    * to fit the lock's bigint. */
-  async lockScope(
-    scopeType: ModelDefaultScopeType,
-    scopeId: string,
-  ): Promise<void> {
+  async lockScope(scopeType: ModelDefaultScopeType, scopeId: string): Promise<void> {
     // -- @tenancy: advisory-lock helper; the lock key already carries
     // the (scopeType, scopeId) scope and the call site is bounded by
     // the caller's transaction. No tenancy predicate in the SQL itself
@@ -222,9 +213,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
           scopeType: s.scopeType,
           scopeId: s.scopeId,
         })),
-        ...(opts.exceptConfigId
-          ? { configId: { not: opts.exceptConfigId } }
-          : {}),
+        ...(opts.exceptConfigId ? { configId: { not: opts.exceptConfigId } } : {}),
       },
       select: { id: true, configId: true },
     });
@@ -304,8 +293,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
     });
     attached.sort(
       (a, b) =>
-        (b.config.createdAt?.getTime() ?? 0) -
-        (a.config.createdAt?.getTime() ?? 0),
+        (b.config.createdAt?.getTime() ?? 0) - (a.config.createdAt?.getTime() ?? 0),
     );
     return attached.map((a) => a.config);
   }

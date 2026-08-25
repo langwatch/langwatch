@@ -47,9 +47,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
     });
 
     it("removes llm.output_messages from output after mapping", () => {
-      const messages = JSON.stringify([
-        { role: "assistant", content: "Response" },
-      ]);
+      const messages = JSON.stringify([{ role: "assistant", content: "Response" }]);
       const result = service.canonicalize(
         { "llm.output_messages": messages },
         [],
@@ -131,11 +129,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
     });
 
     it("preserves langwatch.span.type when read for detection", () => {
-      const result = service.canonicalize(
-        { "langwatch.span.type": "llm" },
-        [],
-        stubSpan,
-      );
+      const result = service.canonicalize({ "langwatch.span.type": "llm" }, [], stubSpan);
 
       // langwatch.span.type is read with get() by LangWatch extractor
       // then written to out via setAttr, so it appears in final output
@@ -163,9 +157,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
 
       // gen_ai.input.messages stays in the bag (it's not taken by anyone when already present)
       // But system_instruction should be extracted from it
-      expect(result.attributes["gen_ai.system_instructions"]).toBe(
-        "Be helpful.",
-      );
+      expect(result.attributes["gen_ai.system_instructions"]).toBe("Be helpful.");
     });
   });
 

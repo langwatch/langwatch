@@ -7,9 +7,7 @@ import type {
 } from "./langy-analytics-event.repository";
 
 const TABLE_NAME = "langy_analytics_events" as const;
-const logger = createLogger(
-  "langwatch:app-layer:langy:analytics-event-repository",
-);
+const logger = createLogger("langwatch:app-layer:langy:analytics-event-repository");
 
 interface ClickHouseLangyAnalyticsEventRecord {
   TenantId: string;
@@ -45,8 +43,7 @@ function toClickHouseRecord(
     ToolName: record.toolName,
     Outcome: record.outcome,
     Model: record.model,
-    DurationMs:
-      record.durationMs === null ? null : String(Math.round(record.durationMs)),
+    DurationMs: record.durationMs === null ? null : String(Math.round(record.durationMs)),
     OccurredAt: new Date(record.occurredAtMs),
     AcceptedAt: new Date(record.acceptedAtMs),
     _retention_days: retentionDays,
@@ -69,15 +66,10 @@ function validateBatch(records: LangyAnalyticsEventRecord[]): string | null {
   return tenantId;
 }
 
-export class ClickHouseLangyAnalyticsEventRepository
-  implements LangyAnalyticsEventRepository
-{
+export class ClickHouseLangyAnalyticsEventRepository implements LangyAnalyticsEventRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async insert(
-    record: LangyAnalyticsEventRecord,
-    retentionDays: number,
-  ): Promise<void> {
+  async insert(record: LangyAnalyticsEventRecord, retentionDays: number): Promise<void> {
     await this.insertRecords([record], retentionDays, false);
   }
 
@@ -100,9 +92,7 @@ export class ClickHouseLangyAnalyticsEventRepository
       const client = await this.resolveClient(tenantId);
       await client.insert({
         table: TABLE_NAME,
-        values: records.map((record) =>
-          toClickHouseRecord(record, retentionDays),
-        ),
+        values: records.map((record) => toClickHouseRecord(record, retentionDays)),
         format: "JSONEachRow",
         clickhouse_settings: {
           async_insert: 1,

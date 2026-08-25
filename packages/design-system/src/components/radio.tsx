@@ -18,9 +18,7 @@ export const Radio = React.forwardRef<
     <ChakraRadioGroup.Item ref={rootRef} {...rest}>
       <ChakraRadioGroup.ItemHiddenInput ref={ref} {...inputProps} />
       <ChakraRadioGroup.ItemIndicator cursor="pointer" />
-      {children && (
-        <ChakraRadioGroup.ItemText>{children}</ChakraRadioGroup.ItemText>
-      )}
+      {children && <ChakraRadioGroup.ItemText>{children}</ChakraRadioGroup.ItemText>}
     </ChakraRadioGroup.Item>
   );
 });
@@ -33,11 +31,7 @@ export const RadioGroup = React.forwardRef<
 >(function RadioGroup(props, ref) {
   const { children, ...rest } = props;
   return (
-    <ChakraRadioGroup.Root
-      ref={ref}
-      {...rest}
-      colorPalette={rest.colorPalette ?? "blue"}
-    >
+    <ChakraRadioGroup.Root ref={ref} {...rest} colorPalette={rest.colorPalette ?? "blue"}>
       {children}
     </ChakraRadioGroup.Root>
   );

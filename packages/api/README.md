@@ -44,8 +44,7 @@ export const app = createProjectApiService({
   .register(
     "things.list",
     "2026-08-07",
-    async (context, input: { projectId: string }) =>
-      context.app.things.list(input),
+    async (context, input: { projectId: string }) => context.app.things.list(input),
     (b) =>
       b
         .withInput(z.object({ projectId: z.string().min(1) }))

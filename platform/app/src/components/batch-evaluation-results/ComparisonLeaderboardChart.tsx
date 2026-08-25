@@ -109,12 +109,8 @@ const buildCompactBars = ({
   targetColors?: Record<string, string>;
 }) => {
   const nameById = new Map(column.variants.map((v) => [v.id, v.name]));
-  const names = leaderboard.entries.map(
-    (e) => nameById.get(e.variantId) ?? e.variantId,
-  );
-  const axis = axisLabelProps(
-    Math.min(leaderboard.entries.length, MAX_COMPACT_BARS),
-  );
+  const names = leaderboard.entries.map((e) => nameById.get(e.variantId) ?? e.variantId);
+  const axis = axisLabelProps(Math.min(leaderboard.entries.length, MAX_COMPACT_BARS));
   const displayNames = buildAxisLabels(names, axis.maxLabelLength);
   const fullNames = disambiguateNames(names);
 
@@ -124,9 +120,7 @@ const buildCompactBars = ({
     name: displayNames[index] ?? e.variantId,
     fullName: fullNames[index] ?? e.variantId,
     score: e.score,
-    color:
-      targetColors?.[e.variantId] ??
-      VARIANT_COLORS[index % VARIANT_COLORS.length]!,
+    color: targetColors?.[e.variantId] ?? VARIANT_COLORS[index % VARIANT_COLORS.length]!,
   }));
 
   return {
@@ -201,11 +195,7 @@ function LeaderboardBars({
   const { chartData, yMax, axis } = bars;
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
-      <BarChart
-        data={chartData}
-        layout="vertical"
-        margin={{ left: 10, right: 20 }}
-      >
+      <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20 }}>
         <CartesianGrid
           horizontal={false}
           vertical={true}
@@ -238,8 +228,8 @@ function LeaderboardBars({
           }}
           formatter={(value) => [(value as number).toFixed(2), "Score"]}
           labelFormatter={(label, payload) =>
-            (payload?.[0]?.payload as { fullName?: string } | undefined)
-              ?.fullName ?? label
+            (payload?.[0]?.payload as { fullName?: string } | undefined)?.fullName ??
+            label
           }
         />
         <Bar dataKey="score" name="Score" radius={[0, 4, 4, 0]}>
@@ -341,12 +331,7 @@ export function ComparisonLeaderboardChart({
       />
       <LeaderboardBars bars={bars} chartHeight={chartHeight} />
       {bars.hiddenCount > 0 ? (
-        <Text
-          fontSize="2xs"
-          color="fg.muted"
-          textAlign="center"
-          paddingBottom={1}
-        >
+        <Text fontSize="2xs" color="fg.muted" textAlign="center" paddingBottom={1}>
           +{bars.hiddenCount} more — expand for the full leaderboard
         </Text>
       ) : null}

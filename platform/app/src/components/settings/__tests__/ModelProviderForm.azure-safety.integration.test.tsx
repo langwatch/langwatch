@@ -38,8 +38,7 @@ const {
 }));
 
 vi.mock("../../../hooks/useModelProviderForm", () => ({
-  useModelProviderForm: (...args: unknown[]) =>
-    mockUseModelProviderForm(...args),
+  useModelProviderForm: (...args: unknown[]) => mockUseModelProviderForm(...args),
 }));
 
 vi.mock("../../../hooks/useModelProvidersSettings", () => ({
@@ -202,10 +201,7 @@ function primeHooksForProvider({
     isLoading: false,
     refetch: vi.fn(),
   });
-  mockUseModelProviderForm.mockReturnValue([
-    buildState({ displayKeys }),
-    buildActions(),
-  ]);
+  mockUseModelProviderForm.mockReturnValue([buildState({ displayKeys }), buildActions()]);
 }
 
 // ---------------------------------------------------------------------------
@@ -256,9 +252,7 @@ describe("Feature: Azure Safety model provider form rendering", () => {
       });
 
       it("does not render the Default Provider toggle", () => {
-        expect(
-          screen.queryByText(/use .* as the default for langwatch/i),
-        ).toBeNull();
+        expect(screen.queryByText(/use .* as the default for langwatch/i)).toBeNull();
       });
 
       it("does not render the Use API Gateway toggle", () => {
@@ -301,9 +295,7 @@ describe("Feature: Azure Safety model provider form rendering", () => {
       it("no longer renders the Default Provider toggle in the drawer", () => {
         // Defaults moved to the page-level DefaultModelsSection (see
         // specs/model-providers/hierarchical-default-models.feature).
-        expect(
-          screen.queryByText(/use openai as the default for langwatch/i),
-        ).toBeNull();
+        expect(screen.queryByText(/use openai as the default for langwatch/i)).toBeNull();
       });
 
       it("does not render the Use API Gateway toggle", () => {

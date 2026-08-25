@@ -141,9 +141,7 @@ describe("UserService", () => {
   it("rejects a blank normalized email before writing", async () => {
     const { service, repository, sessions } = createService();
 
-    await expect(
-      service.updateProfile({ id: "user-1", email: "   " }),
-    ).rejects.toThrow();
+    await expect(service.updateProfile({ id: "user-1", email: "   " })).rejects.toThrow();
 
     expect(repository.updateProfile).not.toHaveBeenCalled();
     expect(sessions.revokeForUser).not.toHaveBeenCalled();
@@ -176,13 +174,7 @@ describe("UserService", () => {
       "user-1",
       new Date(42),
     );
-    expect(repository.setLastLoginAt).toHaveBeenCalledWith(
-      "user-1",
-      new Date(42),
-    );
-    expect(repository.setLastHomePath).toHaveBeenCalledWith(
-      "user-1",
-      "/me/usage",
-    );
+    expect(repository.setLastLoginAt).toHaveBeenCalledWith("user-1", new Date(42));
+    expect(repository.setLastHomePath).toHaveBeenCalledWith("user-1", "/me/usage");
   });
 });

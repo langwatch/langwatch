@@ -15,8 +15,7 @@ wireDefaultTestApp();
 
 // Mock license enforcement to avoid limits during tests
 vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../license-enforcement")>();
+  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
   return {
     ...actual,
     enforceLicenseLimit: vi.fn(),
@@ -236,10 +235,7 @@ describe("Evaluators Endpoints", () => {
         "output",
         "expected_output",
       ]);
-      expect(fetched?.outputFields.map((f) => f.identifier)).toEqual([
-        "passed",
-        "score",
-      ]);
+      expect(fetched?.outputFields.map((f) => f.identifier)).toEqual(["passed", "score"]);
     });
   });
 
@@ -533,9 +529,9 @@ describe("Evaluators Endpoints", () => {
       const targetCopy = copies.find((c) => c.projectId === targetProjectId);
       expect(targetCopy).toBeDefined();
       expect(targetCopy!.projectId).toBe(targetProjectId);
-      expect(
-        (targetCopy!.fullPath as string).includes("Test Project Copy Target"),
-      ).toBe(true);
+      expect((targetCopy!.fullPath as string).includes("Test Project Copy Target")).toBe(
+        true,
+      );
     });
 
     it("pushToCopies updates selected copies with source name and config", async () => {

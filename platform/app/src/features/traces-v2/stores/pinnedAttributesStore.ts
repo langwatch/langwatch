@@ -11,11 +11,7 @@ export interface PinnedAttribute {
 interface PinnedAttributesState {
   byProject: Record<string, PinnedAttribute[]>;
   togglePin: (projectId: string, pin: PinnedAttribute) => void;
-  removePin: (
-    projectId: string,
-    source: PinnedAttributeSource,
-    key: string,
-  ) => void;
+  removePin: (projectId: string, source: PinnedAttributeSource, key: string) => void;
   reorder: (projectId: string, fromIndex: number, toIndex: number) => void;
   hydrateFromStorage: (projectId: string) => void;
 }
@@ -71,51 +67,49 @@ function samePin(
   return a.source === source && a.key === key;
 }
 
-export const usePinnedAttributesStore = create<PinnedAttributesState>(
-  (set, get) => ({
-    byProject: {},
+export const usePinnedAttributesStore = create<PinnedAttributesState>((set, get) => ({
+  byProject: {},
 
-    togglePin: (projectId, pin) => {
-      const current = get().byProject[projectId] ?? readFromStorage(projectId);
-      const exists = current.some((p) => samePin(p, pin.source, pin.key));
-      const next = exists
-        ? current.filter((p) => !samePin(p, pin.source, pin.key))
-        : [...current, pin];
-      writeToStorage(projectId, next);
-      set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
-    },
+  togglePin: (projectId, pin) => {
+    const current = get().byProject[projectId] ?? readFromStorage(projectId);
+    const exists = current.some((p) => samePin(p, pin.source, pin.key));
+    const next = exists
+      ? current.filter((p) => !samePin(p, pin.source, pin.key))
+      : [...current, pin];
+    writeToStorage(projectId, next);
+    set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
+  },
 
-    removePin: (projectId, source, key) => {
-      const current = get().byProject[projectId] ?? readFromStorage(projectId);
-      const next = current.filter((p) => !samePin(p, source, key));
-      writeToStorage(projectId, next);
-      set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
-    },
+  removePin: (projectId, source, key) => {
+    const current = get().byProject[projectId] ?? readFromStorage(projectId);
+    const next = current.filter((p) => !samePin(p, source, key));
+    writeToStorage(projectId, next);
+    set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
+  },
 
-    reorder: (projectId, fromIndex, toIndex) => {
-      const current = get().byProject[projectId] ?? readFromStorage(projectId);
-      if (
-        fromIndex === toIndex ||
-        fromIndex < 0 ||
-        toIndex < 0 ||
-        fromIndex >= current.length ||
-        toIndex >= current.length
-      ) {
-        return;
-      }
-      const next = [...current];
-      const [moved] = next.splice(fromIndex, 1);
-      if (moved) next.splice(toIndex, 0, moved);
-      writeToStorage(projectId, next);
-      set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
-    },
+  reorder: (projectId, fromIndex, toIndex) => {
+    const current = get().byProject[projectId] ?? readFromStorage(projectId);
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= current.length ||
+      toIndex >= current.length
+    ) {
+      return;
+    }
+    const next = [...current];
+    const [moved] = next.splice(fromIndex, 1);
+    if (moved) next.splice(toIndex, 0, moved);
+    writeToStorage(projectId, next);
+    set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
+  },
 
-    hydrateFromStorage: (projectId) => {
-      const stored = readFromStorage(projectId);
-      set((s) => ({ byProject: { ...s.byProject, [projectId]: stored } }));
-    },
-  }),
-);
+  hydrateFromStorage: (projectId) => {
+    const stored = readFromStorage(projectId);
+    set((s) => ({ byProject: { ...s.byProject, [projectId]: stored } }));
+  },
+}));
 
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {

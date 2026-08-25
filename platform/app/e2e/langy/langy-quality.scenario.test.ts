@@ -46,18 +46,10 @@
 
 import { randomUUID } from "node:crypto";
 import { openai } from "@ai-sdk/openai";
-import type {
-  AgentAdapter,
-  AgentInput,
-  AgentReturnTypes,
-} from "@langwatch/scenario";
+import type { AgentAdapter, AgentInput, AgentReturnTypes } from "@langwatch/scenario";
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  deleteMonitor,
-  listMonitors,
-  seedApplicationTraces,
-} from "./langwatch-api";
+import { deleteMonitor, listMonitors, seedApplicationTraces } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import {
   LANGY_NO_PHANTOM_CHECKOUT_CRITERIA,
@@ -259,9 +251,7 @@ describe("Langy quality bar", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "what's my p95 latency, and show me a few recent traces",
-          ),
+          scenario.user("what's my p95 latency, and show me a few recent traces"),
           scenario.agent(),
           scenario.judge(),
         ],
@@ -396,9 +386,7 @@ describe("Langy quality bar", () => {
    */
   describe("when the question needs a single lookup", () => {
     it("answers inside the latency budget", async () => {
-      const { adapter: langy, turnDurationsMs } = withTurnTimings(
-        makeLangyAdapter(),
-      );
+      const { adapter: langy, turnDurationsMs } = withTurnTimings(makeLangyAdapter());
       const result = await runScenarioAndLog({
         setId: SET_ID,
         name: "single-lookup question inside the budget",

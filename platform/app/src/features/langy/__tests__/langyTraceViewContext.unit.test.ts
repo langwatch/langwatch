@@ -44,9 +44,7 @@ describe("traceViewContextChip", () => {
       sort: { columnId: "duration", direction: "desc" },
     });
 
-    expect(chip.label).toBe(
-      "Traces · Checkout errors · Last 15 days · searched",
-    );
+    expect(chip.label).toBe("Traces · Checkout errors · Last 15 days · searched");
     expect(chip.ref).toContain("saved view: Checkout errors");
     expect(chip.ref).toContain("local changes: yes");
     expect(chip.ref).toContain("grouping: by-service");

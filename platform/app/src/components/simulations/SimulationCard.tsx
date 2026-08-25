@@ -123,11 +123,7 @@ function SimulationCardSkeleton() {
   );
 }
 
-function SimulationCardAwaitingState({
-  description,
-}: {
-  description?: string;
-}) {
+function SimulationCardAwaitingState({ description }: { description?: string }) {
   return (
     <VStack
       height="100%"
@@ -160,13 +156,7 @@ function SimulationCardAwaitingState({
         ))}
       </Box>
       {description && (
-        <Text
-          fontSize="xs"
-          color="fg.muted"
-          textAlign="center"
-          lineClamp={2}
-          maxW="90%"
-        >
+        <Text fontSize="xs" color="fg.muted" textAlign="center" lineClamp={2} maxW="90%">
           {description}
         </Text>
       )}
@@ -176,13 +166,7 @@ function SimulationCardAwaitingState({
 
 function SimulationCardContent({ children }: { children: React.ReactNode }) {
   return (
-    <Card.Body
-      p={0}
-      height="100%"
-      overflow="hidden"
-      position="relative"
-      w="100%"
-    >
+    <Card.Body p={0} height="100%" overflow="hidden" position="relative" w="100%">
       <Box height="100%" width="100%" position="relative">
         {children}
       </Box>
@@ -194,8 +178,7 @@ function SimulationStatusBadge({ status }: { status: ScenarioRunStatus }) {
   const config = SCENARIO_RUN_STATUS_CONFIG[status];
   const Icon = SCENARIO_RUN_STATUS_ICONS[status];
   const isRunning =
-    status === ScenarioRunStatus.RUNNING ||
-    status === ScenarioRunStatus.IN_PROGRESS;
+    status === ScenarioRunStatus.RUNNING || status === ScenarioRunStatus.IN_PROGRESS;
   const isPending =
     status === ScenarioRunStatus.PENDING || status === ScenarioRunStatus.QUEUED;
 
@@ -249,9 +232,7 @@ export function SimulationCard({
   isAwaitingMessages,
   children,
 }: SimulationCardProps) {
-  const isComplete = status
-    ? SCENARIO_RUN_STATUS_CONFIG[status].isComplete
-    : false;
+  const isComplete = status ? SCENARIO_RUN_STATUS_CONFIG[status].isComplete : false;
 
   const shouldDim = isComplete && !isActive;
 
@@ -289,9 +270,7 @@ export function SimulationCard({
       }}
     >
       <VStack height="100%" gap={0}>
-        {!isLoading && (
-          <SimulationCardHeader title={title} isComplete={isComplete} />
-        )}
+        {!isLoading && <SimulationCardHeader title={title} isComplete={isComplete} />}
         <Box
           className="simulation-card-content"
           opacity={shouldDim ? 0.8 : 1}

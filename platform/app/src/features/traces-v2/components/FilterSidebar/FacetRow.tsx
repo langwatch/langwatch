@@ -34,10 +34,7 @@ export const FacetRow = memo(function FacetRow({
   // descriptors. Once real data lands the row gets a count + bar.
   const fillPct =
     !item.synthetic && maxCount > 0
-      ? Math.max(
-          (item.count / maxCount) * 100,
-          item.count > 0 ? MIN_VISIBLE_FILL_PCT : 0,
-        )
+      ? Math.max((item.count / maxCount) * 100, item.count > 0 ? MIN_VISIBLE_FILL_PCT : 0)
       : 0;
 
   const isInclude = state === "include";

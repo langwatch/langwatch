@@ -74,6 +74,7 @@ span.end();
   const tracer = getLangWatchTracer("my-app");
   ```
 - **Start a span and record input/output:**
+
   ```ts
   const span = tracer.startSpan("call-llm");
   span.setType("llm");
@@ -81,9 +82,11 @@ span.end();
   span.setOutput("Model response"); // Main way to record output
   span.end();
   ```
+
   > **Note:** `setInput` and `setOutput` are the primary methods to record input/output. Use `setInputString`/`setOutputString` for plain text, or pass any serializable value.
 
 - **Use withActiveSpan for automatic error handling:**
+
   ```ts
   await tracer.withActiveSpan("my-operation", async (span) => {
     span.setType("llm");
@@ -94,19 +97,27 @@ span.end();
   ```
 
 - **Record an evaluation directly on a span:**
+
   ```ts
   span.addEvaluation({ name: "My Eval", passed: true, score: 1.0 });
   ```
+
   > **Note:** This associates evaluation results with a specific span (operation or model call).
 
 - **(Optional) Add GenAI message events:**
+
   ```ts
   span.addGenAISystemMessageEvent({ content: "You are a helpful assistant." });
   span.addGenAIUserMessageEvent({ content: "Hello!" });
   span.addGenAIAssistantMessageEvent({ content: "Hi! How can I help you?" });
   span.addGenAIToolMessageEvent({ content: "Tool result", id: "tool-1" });
-  span.addGenAIChoiceEvent({ finish_reason: "stop", index: 0, message: { content: "Response" } });
+  span.addGenAIChoiceEvent({
+    finish_reason: "stop",
+    index: 0,
+    message: { content: "Response" },
+  });
   ```
+
   > **Advanced:** The `addGenAI...` methods are optional and mainly for advanced/manual instrumentation. Most users do not need these unless you want fine-grained message event logs.
 
 - **RAG context, metrics, and model information:**
@@ -126,6 +137,7 @@ span.end();
   const compiledPrompt = await getPrompt("prompt-id", { user: "Alice" });
   ```
 - **Fetch a specific prompt version:**
+
   ```ts
   import { getPromptVersion } from "langwatch/prompt";
   const compiledPrompt = await getPromptVersion("prompt-id", "version-id", {
@@ -142,17 +154,18 @@ span.end();
   import { runEvaluation } from "langwatch/evaluation";
   const result = await runEvaluation({
     slug: "helpfulness",
-    data: { input: "Hi", output: "Hello!" }
+    data: { input: "Hi", output: "Hello!" },
   });
   ```
 - **Record a custom evaluation:**
+
   ```ts
   await tracer.withActiveSpan("my-operation", async (span) => {
     span.addEvaluation({
       name: "Manual Eval",
       passed: true,
       score: 0.9,
-      details: "Looks good!"
+      details: "Looks good!",
     });
   });
   ```
@@ -197,16 +210,12 @@ const exporter = new LangWatchTraceExporter({
 ```ts
 // Include only specific scopes
 const exporter = new LangWatchTraceExporter({
-  filters: [
-    { include: { instrumentationScopeName: [{ equals: "ai" }] } },
-  ],
+  filters: [{ include: { instrumentationScopeName: [{ equals: "ai" }] } }],
 });
 
 // Exclude spans by name pattern
 const exporter = new LangWatchTraceExporter({
-  filters: [
-    { exclude: { name: [{ startsWith: "internal." }] } },
-  ],
+  filters: [{ exclude: { name: [{ startsWith: "internal." }] } }],
 });
 
 // Combine filters (AND pipeline)
@@ -221,6 +230,7 @@ const exporter = new LangWatchTraceExporter({
 **Learn more:** See the [Filtering Spans Tutorial](https://docs.langwatch.ai/integration/typescript/tutorials/filtering-spans) for comprehensive examples and best practices.
 
 ### Custom OpenTelemetry Integration
+
 ```ts
 import { FilterableBatchSpanProcessor, LangWatchExporter } from "langwatch";
 
@@ -229,11 +239,12 @@ const processor = new FilterableBatchSpanProcessor(
     apiKey: "your-api-key",
     endpoint: "https://custom.langwatch.com",
   }),
-  excludeRules
+  excludeRules,
 );
 ```
 
 ### Span Processing Rules
+
 ```ts
 const excludeRules: SpanProcessingExcludeRule[] = [
   { attribute: "http.url", value: "/health" },
@@ -242,6 +253,7 @@ const excludeRules: SpanProcessingExcludeRule[] = [
 ```
 
 ### Manual Instrumentation
+
 ```ts
 import { semconv } from "langwatch/observability";
 

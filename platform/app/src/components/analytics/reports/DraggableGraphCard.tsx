@@ -1,10 +1,7 @@
 import { Box, Card } from "@chakra-ui/react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  CustomGraph,
-  type CustomGraphInput,
-} from "~/components/analytics/CustomGraph";
+import { CustomGraph, type CustomGraphInput } from "~/components/analytics/CustomGraph";
 import type { FilterField } from "~/server/filters/types";
 import { GraphCardHeader } from "./GraphCardHeader";
 import type { SizeOption } from "./GraphCardMenu";
@@ -42,14 +39,8 @@ export function DraggableGraphCard({
   onSizeChange,
   isDeleting,
 }: DraggableGraphCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: graph.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: graph.id });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),

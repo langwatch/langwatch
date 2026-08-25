@@ -9,8 +9,6 @@ describe("modelProviders router module", () => {
   it("loads without throwing and exposes update", async () => {
     const mod = await import("../modelProviders");
     expect(mod.modelProviderRouter).toBeDefined();
-    expect(
-      (mod.modelProviderRouter as any)._def.procedures.update,
-    ).toBeDefined();
+    expect((mod.modelProviderRouter as any)._def.procedures.update).toBeDefined();
   });
 });

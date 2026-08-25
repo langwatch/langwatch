@@ -54,9 +54,9 @@ export class WebhookDestinationService {
     return null;
   }
 
-  inspectSqsQueueUrl(queueUrl: string):
-    | { ok: true; parsed: ParsedSqsQueueUrl }
-    | { ok: false; problem: "shape" | "fifo" } {
+  inspectSqsQueueUrl(
+    queueUrl: string,
+  ): { ok: true; parsed: ParsedSqsQueueUrl } | { ok: false; problem: "shape" | "fifo" } {
     const trimmed = queueUrl.trim();
     const match = SQS_QUEUE_URL_PATTERNS.reduce<RegExpExecArray | null>(
       (found, pattern) => found ?? pattern.exec(trimmed),

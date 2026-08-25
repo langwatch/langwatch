@@ -1,13 +1,7 @@
 import { Button, Icon } from "@chakra-ui/react";
 import { forwardRef, useState } from "react";
 import type { IconType } from "react-icons";
-import {
-  LuCheck,
-  LuCopy,
-  LuLanguages,
-  LuLightbulb,
-  LuPlay,
-} from "react-icons/lu";
+import { LuCheck, LuCopy, LuLanguages, LuLightbulb, LuPlay } from "react-icons/lu";
 import type { TraceAnchor } from "../../hooks/useAnchoredAnnotations";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
@@ -114,9 +108,7 @@ export function TranslateButton({
   return (
     <ActionButton
       icon={LuLanguages}
-      label={
-        isLoading ? "Translating…" : isActive ? "Show original" : "Translate"
-      }
+      label={isLoading ? "Translating…" : isActive ? "Show original" : "Translate"}
       aria-pressed={isActive}
       color={isActive ? "blue.fg" : "fg.muted"}
       disabled={isLoading}

@@ -40,9 +40,7 @@ export const useSectionTrackerStore = create<SectionTrackerState>((set) => ({
 
 /** The section id with the highest current visibility, or null when nothing
  *  is in view. Returns null if nothing exceeds the noise floor (10%). */
-export function selectMostVisibleSection(
-  state: SectionTrackerState,
-): string | null {
+export function selectMostVisibleSection(state: SectionTrackerState): string | null {
   let bestId: string | null = null;
   let bestRatio = 0.1;
   for (const [id, ratio] of state.visibility) {

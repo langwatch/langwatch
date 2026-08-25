@@ -15,16 +15,9 @@ export interface QueueAuditRedis {
   smembers(key: string): Promise<string[]>;
   get(key: string): Promise<string | null>;
   zcard(key: string): Promise<number>;
-  zcount(
-    key: string,
-    min: number | string,
-    max: number | string,
-  ): Promise<number>;
+  zcount(key: string, min: number | string, max: number | string): Promise<number>;
   scard(key: string): Promise<number>;
-  scan(
-    cursor: string,
-    ...args: Array<string | number>
-  ): Promise<[string, string[]]>;
+  scan(cursor: string, ...args: Array<string | number>): Promise<[string, string[]]>;
   hvals(key: string): Promise<string[]>;
 }
 
@@ -43,9 +36,7 @@ export async function auditGroupQueuesForStorageMigration(
   const queueNames = await discoverQueueNames(redis, scanNodes);
   const blockers: QueueMigrationBlocker[] = [];
   for (const queueName of queueNames) {
-    blockers.push(
-      ...(await auditQueue({ redis, scanNodes, queueName, nowMs })),
-    );
+    blockers.push(...(await auditQueue({ redis, scanNodes, queueName, nowMs })));
   }
   return blockers;
 }
@@ -113,18 +104,13 @@ async function auditQueue({
     : [];
 }
 
-async function countPending(
-  redis: QueueAuditRedis,
-  prefix: string,
-): Promise<number> {
+async function countPending(redis: QueueAuditRedis, prefix: string): Promise<number> {
   const [totalPendingValue, readyCount] = await Promise.all([
     redis.get(`${prefix}stats:total-pending`),
     redis.zcard(`${prefix}ready`),
   ]);
   const totalPending = Number(totalPendingValue);
-  return Number.isFinite(totalPending)
-    ? Math.max(totalPending, readyCount)
-    : readyCount;
+  return Number.isFinite(totalPending) ? Math.max(totalPending, readyCount) : readyCount;
 }
 
 async function countDurableRefs(
@@ -143,10 +129,7 @@ async function countDurableRefs(
 function hasS3DurableReference(value: string): boolean {
   if (!isEnvelope(value)) return false;
   try {
-    return (
-      readEnvelopeTieredRefFromHeader(splitEnvelope(value).header)?.tier ===
-      "s3"
-    );
+    return readEnvelopeTieredRefFromHeader(splitEnvelope(value).header)?.tier === "s3";
   } catch {
     // Malformed staged values remain blocked by pending/blocked queue state.
     return false;
@@ -170,13 +153,7 @@ async function scanSingleNode(
   const keys: string[] = [];
   let cursor = "0";
   do {
-    const [next, batch] = await redis.scan(
-      cursor,
-      "MATCH",
-      pattern,
-      "COUNT",
-      500,
-    );
+    const [next, batch] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 500);
     keys.push(...batch);
     cursor = next;
   } while (cursor !== "0");

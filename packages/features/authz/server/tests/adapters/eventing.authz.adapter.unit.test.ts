@@ -92,9 +92,7 @@ describe("EventingAuthzAdapter", () => {
 
     expect(pipeline.metadata.name).toBe(AUTHZ_GRANT_PIPELINE_NAME);
     expect(pipeline.metadata.aggregateType).toBe(AUTHZ_GRANT_AGGREGATE_TYPE);
-    expect(pipeline.metadata.allowedEventTypes).toEqual([
-      ...AUTHZ_GRANTS_EVENT_TYPES,
-    ]);
+    expect(pipeline.metadata.allowedEventTypes).toEqual([...AUTHZ_GRANTS_EVENT_TYPES]);
     expect(pipeline.commands.map(({ name }) => name)).toEqual([
       "attachGrant",
       "changeGrantRole",
@@ -108,12 +106,7 @@ describe("EventingAuthzAdapter", () => {
   });
 
   it.each([
-    [
-      "attach grant",
-      new AttachGrantCommand(),
-      { ...IDENTITY, grant: GRANT },
-      "grant_1",
-    ],
+    ["attach grant", new AttachGrantCommand(), { ...IDENTITY, grant: GRANT }, "grant_1"],
     [
       "change grant role",
       new ChangeGrantRoleCommand(),

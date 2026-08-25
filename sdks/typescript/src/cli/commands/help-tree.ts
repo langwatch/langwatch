@@ -17,9 +17,7 @@ import {
   type RawOutputFlags,
 } from "../utils/output";
 
-export const helpTreeCommand = (
-  options?: RawOutputFlags,
-): CommandResult | void => {
+export const helpTreeCommand = (options?: RawOutputFlags): CommandResult | void => {
   const catalog = buildCatalog(buildProgram());
 
   // Auto-detected agent mode still gets the tree: it IS the compact agent

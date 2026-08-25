@@ -90,9 +90,7 @@ const humanize = (value: string): string =>
 export function resolveLangyCapabilityProgress(
   rawName: string,
 ): { headline: string } | null {
-  const match = /^langwatch\.([a-z][a-z0-9-]*)\.([a-z][a-z0-9-]*)$/.exec(
-    rawName,
-  );
+  const match = /^langwatch\.([a-z][a-z0-9-]*)\.([a-z][a-z0-9-]*)$/.exec(rawName);
   if (!match) return null;
   const resource = match[1]!;
   const verb = match[2]!;

@@ -242,11 +242,7 @@ export function SavedChartsToolbar({
             </Menu.Item>
           ) : (
             charts.map((chart) => (
-              <Menu.Item
-                key={chart.id}
-                value={chart.id}
-                onClick={() => onOpen(chart.id)}
-              >
+              <Menu.Item key={chart.id} value={chart.id} onClick={() => onOpen(chart.id)}>
                 {chart.name}
               </Menu.Item>
             ))

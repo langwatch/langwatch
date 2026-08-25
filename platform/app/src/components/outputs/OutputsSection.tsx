@@ -20,15 +20,9 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
 import type { Field } from "@langwatch/workflow-contract";
 import { FieldTypeSelect } from "@langwatch/prompt-web";
-import {
-  TYPE_LABELS,
-  VariableTypeIcon,
-} from "@langwatch/prompt-web";
+import { TYPE_LABELS, VariableTypeIcon } from "@langwatch/prompt-web";
 import { outputsSchema } from "@langwatch/prompt-contract";
-import {
-  generateUniqueIdentifier,
-  normalizeIdentifier,
-} from "~/utils/identifierUtils";
+import { generateUniqueIdentifier, normalizeIdentifier } from "~/utils/identifierUtils";
 
 // ============================================================================
 // Types
@@ -73,12 +67,7 @@ const ALL_OUTPUT_TYPE_OPTIONS: Array<{ value: OutputType; label: string }> = [
 ];
 
 /** Default types for LLM outputs (with structured output support) */
-export const LLM_OUTPUT_TYPES: OutputType[] = [
-  "str",
-  "float",
-  "bool",
-  "json_schema",
-];
+export const LLM_OUTPUT_TYPES: OutputType[] = ["str", "float", "bool", "json_schema"];
 
 /** Types for code block outputs */
 export const CODE_OUTPUT_TYPES: OutputType[] = [
@@ -114,9 +103,9 @@ export const OutputsSection = ({
 }: OutputsSectionProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const jsonSchemaDialog = useDisclosure();
-  const [editingJsonSchemaIndex, setEditingJsonSchemaIndex] = useState<
-    number | null
-  >(null);
+  const [editingJsonSchemaIndex, setEditingJsonSchemaIndex] = useState<number | null>(
+    null,
+  );
 
   // Filter type options based on availableTypes prop
   const typeOptions = ALL_OUTPUT_TYPE_OPTIONS.filter((opt) =>
@@ -126,10 +115,7 @@ export const OutputsSection = ({
   const handleAddOutput = useCallback(
     (type: OutputType) => {
       const existingIdentifiers = outputs.map((o) => o.identifier);
-      const newIdentifier = generateUniqueIdentifier(
-        "output",
-        existingIdentifiers,
-      );
+      const newIdentifier = generateUniqueIdentifier("output", existingIdentifiers);
 
       const newOutput: Output = {
         identifier: newIdentifier,
@@ -210,23 +196,14 @@ export const OutputsSection = ({
     <VStack align="stretch" gap={3} width="full">
       {/* Header */}
       <HStack width="full">
-        <Text
-          fontSize="xs"
-          fontWeight="bold"
-          textTransform="uppercase"
-          color="fg.muted"
-        >
+        <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color="fg.muted">
           {title}
         </Text>
         <Spacer />
         {canAddRemove && !readOnly && (
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button
-                size="xs"
-                variant="outline"
-                data-testid="add-output-button"
-              >
+              <Button size="xs" variant="outline" data-testid="add-output-button">
                 <Plus size={14} />
                 Add
               </Button>
@@ -265,9 +242,7 @@ export const OutputsSection = ({
               isEditing={editingId === output.identifier}
               onStartEdit={() => setEditingId(output.identifier)}
               onEndEdit={() => setEditingId(null)}
-              onUpdate={(updates) =>
-                handleUpdateOutput(output.identifier, updates)
-              }
+              onUpdate={(updates) => handleUpdateOutput(output.identifier, updates)}
               onRemove={() => handleRemoveOutput(output.identifier)}
               onEditJsonSchema={() => handleEditJsonSchema(index)}
               typeOptions={typeOptions}
@@ -435,9 +410,7 @@ const OutputRow = ({
       {/* Delete Button */}
       {!readOnly && (
         <Tooltip
-          content={
-            canRemove ? "Remove output" : "At least one output is required"
-          }
+          content={canRemove ? "Remove output" : "At least one output is required"}
           positioning={{ placement: "top" }}
         >
           <Button
@@ -471,8 +444,7 @@ const checkForJsonSchemaErrors = (jsonSchemaString: string) => {
     if (!valid) {
       return ajv.errorsText();
     }
-    const jsonSchemaValidation =
-      outputsSchema.shape.json_schema.safeParse(schema);
+    const jsonSchemaValidation = outputsSchema.shape.json_schema.safeParse(schema);
     if (!jsonSchemaValidation.success) {
       const validationError = fromZodError(jsonSchemaValidation.error);
       return validationError.message;

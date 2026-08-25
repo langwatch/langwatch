@@ -69,12 +69,8 @@ describe("mapNormalizedSpanToSpan", () => {
 
       const params = result.params as Record<string, unknown>;
       expect(
-        (
-          (params.gen_ai as Record<string, unknown>).input as Record<
-            string,
-            unknown
-          >
-        ).messages,
+        ((params.gen_ai as Record<string, unknown>).input as Record<string, unknown>)
+          .messages,
       ).toEqual([{ role: "user", content: "hello" }]);
     });
 
@@ -363,9 +359,7 @@ describe("mapNormalizedSpanToSpan", () => {
             passed: true,
             score: 0.95,
           },
-          "langwatch.reserved.value_types": [
-            "langwatch.output=evaluation_result",
-          ],
+          "langwatch.reserved.value_types": ["langwatch.output=evaluation_result"],
         },
       });
 

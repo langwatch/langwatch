@@ -64,8 +64,9 @@ export function TracesEmptyOnboarding(): React.ReactElement {
    * place of `Selected ✓`) advances the journey. Resets whenever
    * we leave the spotlight stage.
    */
-  const [pickedDensityThisStage, setPickedDensityThisStage] =
-    useState<Density | null>(null);
+  const [pickedDensityThisStage, setPickedDensityThisStage] = useState<Density | null>(
+    null,
+  );
   const setSetupDismissedForProject = useOnboardingStore(
     (s) => s.setSetupDismissedForProject,
   );
@@ -105,14 +106,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
     const next = stageDef.next;
     const t = setTimeout(() => setStage(next), stageDef.holdMs);
     return () => clearTimeout(t);
-  }, [
-    stage,
-    stageDef.holdMs,
-    stageDef.next,
-    stageDef.typewriter,
-    setStage,
-    drawerOpen,
-  ]);
+  }, [stage, stageDef.holdMs, stageDef.next, stageDef.typewriter, setStage, drawerOpen]);
 
   // Reset the journey on unmount so re-entry (e.g. via the toolbar's
   // "SDK connection pending" button) starts fresh from welcome.
@@ -186,10 +180,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
       (t) => t.traceId === RICH_ARRIVAL_TRACE_ID,
     );
     if (!richTrace) return;
-    const t = setTimeout(
-      () => openTraceDrawer(richTrace),
-      POST_ARRIVAL_AUTO_OPEN_MS,
-    );
+    const t = setTimeout(() => openTraceDrawer(richTrace), POST_ARRIVAL_AUTO_OPEN_MS);
     return () => clearTimeout(t);
   }, [stage, openTraceDrawer, drawerOpen]);
 
@@ -458,35 +449,34 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             IntegrateDrawer (the drawer's default segment), which is
             the lightest-touch handoff path. */}
         <AnimatePresence>
-          {(stage === "welcome" || stage === "trace_explorer") &&
-            !isReturningWelcome && (
-              <motion.div
-                key="agent-handoff"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{
-                  duration: 0.6,
-                  delay: 0.4,
-                  ease: [0.16, 1, 0.3, 1],
-                }}
+          {(stage === "welcome" || stage === "trace_explorer") && !isReturningWelcome && (
+            <motion.div
+              key="agent-handoff"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{
+                duration: 0.6,
+                delay: 0.4,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                colorPalette="gray"
+                color="fg.muted"
+                _hover={{ color: "fg", bg: "bg.softHover" }}
+                onClick={() => setDrawerOpen(true)}
               >
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  colorPalette="gray"
-                  color="fg.muted"
-                  _hover={{ color: "fg", bg: "bg.softHover" }}
-                  onClick={() => setDrawerOpen(true)}
-                >
-                  <Wrench size={12} />
-                  <Text as="span">Or hand this to your coding agent</Text>
-                  <Text as="span" aria-hidden color="fg.subtle">
-                    →
-                  </Text>
-                </Button>
-              </motion.div>
-            )}
+                <Wrench size={12} />
+                <Text as="span">Or hand this to your coding agent</Text>
+                <Text as="span" aria-hidden color="fg.subtle">
+                  →
+                </Text>
+              </Button>
+            </motion.div>
+          )}
         </AnimatePresence>
 
         {/* Primary Integrate CTA — visible per-stage via

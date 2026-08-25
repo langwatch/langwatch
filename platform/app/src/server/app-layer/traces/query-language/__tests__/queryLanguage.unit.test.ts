@@ -19,10 +19,7 @@ import {
   validateAst,
 } from "../queries";
 
-function locationOf(
-  query: string,
-  fragment: string,
-): { start: number; end: number } {
+function locationOf(query: string, fragment: string): { start: number; end: number } {
   const start = query.indexOf(fragment);
   if (start < 0) throw new Error(`Fragment ${fragment} not found in ${query}`);
   return { start, end: start + fragment.length };
@@ -61,9 +58,7 @@ describe("stripAtSigils", () => {
     });
 
     it("strips a sigil after the closing quote", () => {
-      expect(stripAtSigils('user:"foo" @model:gpt')).toBe(
-        'user:"foo" model:gpt',
-      );
+      expect(stripAtSigils('user:"foo" @model:gpt')).toBe('user:"foo" model:gpt');
     });
   });
 });
@@ -73,9 +68,7 @@ describe("removeNodeAtLocation", () => {
     it("returns an empty query", () => {
       const query = "status:error";
       const { start, end } = locationOf(query, "status:error");
-      expect(removeNodeAtLocation({ currentQuery: query, start, end })).toBe(
-        "",
-      );
+      expect(removeNodeAtLocation({ currentQuery: query, start, end })).toBe("");
     });
   });
 
@@ -105,9 +98,9 @@ describe("removeNodeAtLocation", () => {
   describe("given a tag whose location does not match", () => {
     it("leaves the query unchanged", () => {
       const query = "status:error AND model:gpt-5-mini";
-      expect(
-        removeNodeAtLocation({ currentQuery: query, start: 999, end: 1000 }),
-      ).toBe(query);
+      expect(removeNodeAtLocation({ currentQuery: query, start: 999, end: 1000 })).toBe(
+        query,
+      );
     });
   });
 });
@@ -252,9 +245,7 @@ describe("parse operator matrix", () => {
       // silently rewriting the user's search value when an unrelated chip is
       // removed (serialize runs on every clause-removal mutation).
       expect(serialize(parse('model:"( x )"'))).toBe('model:"( x )"');
-      expect(serialize(parse('user:"name ( test )"'))).toBe(
-        'user:"name ( test )"',
-      );
+      expect(serialize(parse('user:"name ( test )"'))).toBe('user:"name ( test )"');
       // A literal boolean word + double spaces inside a quote survive too.
       expect(serialize(parse('user:"a  b AND  c"'))).toBe('user:"a  b AND  c"');
     });
@@ -430,9 +421,7 @@ describe("validateAst", () => {
     });
 
     it("returns the field-name error for `field:`", () => {
-      expect(validateAst(parse("status:"))).toBe(
-        "Missing value after `status:`",
-      );
+      expect(validateAst(parse("status:"))).toBe("Missing value after `status:`");
     });
 
     it("returns the generic error when there is no field name", () => {
@@ -458,9 +447,7 @@ describe("validateAst", () => {
     });
 
     it("recurses into NOT operands", () => {
-      expect(validateAst(parse("NOT status:"))).toBe(
-        "Missing value after `status:`",
-      );
+      expect(validateAst(parse("NOT status:"))).toBe("Missing value after `status:`");
     });
 
     it("recurses into both arms of a LogicalExpression", () => {
@@ -470,9 +457,9 @@ describe("validateAst", () => {
     });
 
     it("recurses into parenthesised groups", () => {
-      expect(
-        validateAst(parse("(status:error AND model:) OR origin:application")),
-      ).toBe("Missing value after `model:`");
+      expect(validateAst(parse("(status:error AND model:) OR origin:application"))).toBe(
+        "Missing value after `model:`",
+      );
     });
   });
 });
@@ -880,9 +867,7 @@ describe("buildFacetStateLookup", () => {
 describe("analyzeOrGroups", () => {
   describe("given a query without any OR", () => {
     it("returns an empty analysis", () => {
-      const result = analyzeOrGroups(
-        parse("status:error AND model:gpt-5-mini"),
-      );
+      const result = analyzeOrGroups(parse("status:error AND model:gpt-5-mini"));
       expect(result.groups).toEqual([]);
       expect(result.memberToGroupId.size).toBe(0);
       expect(result.fieldToGroupIds.size).toBe(0);
@@ -897,10 +882,7 @@ describe("analyzeOrGroups", () => {
       expect(g.fields.size).toBe(1);
       expect(g.fields.has("status")).toBe(true);
       expect(g.members).toHaveLength(2);
-      expect(g.members.map((m) => m.value).sort()).toEqual([
-        "error",
-        "warning",
-      ]);
+      expect(g.members.map((m) => m.value).sort()).toEqual(["error", "warning"]);
     });
   });
 
@@ -917,9 +899,7 @@ describe("analyzeOrGroups", () => {
 
   describe("given a NOT-wrapped Tag inside an OR", () => {
     it("marks that member as negated, peers as not-negated", () => {
-      const result = analyzeOrGroups(
-        parse("status:error OR NOT model:gpt-5-mini"),
-      );
+      const result = analyzeOrGroups(parse("status:error OR NOT model:gpt-5-mini"));
       const members = result.groups[0]!.members;
       const status = members.find((m) => m.field === "status")!;
       const model = members.find((m) => m.field === "model")!;
@@ -937,9 +917,7 @@ describe("analyzeOrGroups", () => {
       // chip styling lands. Pinning current behaviour so a later
       // negation-threading fix is a deliberate, visible change rather
       // than a silent shift.
-      const result = analyzeOrGroups(
-        parse("NOT (status:error OR status:warning)"),
-      );
+      const result = analyzeOrGroups(parse("NOT (status:error OR status:warning)"));
       const members = result.groups[0]!.members;
       expect(members.every((m) => m.negated === false)).toBe(true);
     });
@@ -1003,9 +981,7 @@ describe("analyzeOrGroups", () => {
       const statusGroups = result.fieldToGroupIds.get("status");
       expect(statusGroups).toBeDefined();
       expect(statusGroups!.length).toBe(2);
-      expect(new Set(statusGroups)).toEqual(
-        new Set(result.groups.map((g) => g.id)),
-      );
+      expect(new Set(statusGroups)).toEqual(new Set(result.groups.map((g) => g.id)));
     });
   });
 
@@ -1232,9 +1208,7 @@ describe("addSameFieldOrValue", () => {
           fieldName: "origin",
           value: "application",
         });
-        expect(out).toBe(
-          "model:gpt-5-mini AND (origin:sample OR origin:application)",
-        );
+        expect(out).toBe("model:gpt-5-mini AND (origin:sample OR origin:application)");
         expect(() => parse(out)).not.toThrow();
       });
     });
@@ -1247,9 +1221,7 @@ describe("addSameFieldOrValue", () => {
           value: "anthropic/claude-sonnet-4-6",
         });
         // `model` already has one bare value → wrap into a group.
-        expect(out).toBe(
-          '(model:gpt-5-mini OR model:"anthropic/claude-sonnet-4-6")',
-        );
+        expect(out).toBe('(model:gpt-5-mini OR model:"anthropic/claude-sonnet-4-6")');
         expect(() => parse(out)).not.toThrow();
       });
     });
@@ -1294,9 +1266,7 @@ describe("addSameFieldOrValue", () => {
           fieldName: "origin",
           value: "api",
         });
-        expect(out).toBe(
-          "(origin:sample OR origin:application) AND origin:api",
-        );
+        expect(out).toBe("(origin:sample OR origin:application) AND origin:api");
         expect(() => parse(out)).not.toThrow();
       });
     });
@@ -1309,8 +1279,7 @@ describe("addSameFieldOrValue", () => {
         // is location-scoped to the lone `origin` tag, so
         // `(evaluator:X AND evaluatorVerdict:pass)` is untouched.
         const out = addSameFieldOrValue({
-          currentQuery:
-            "origin:sample AND (evaluator:eval_1 AND evaluatorVerdict:pass)",
+          currentQuery: "origin:sample AND (evaluator:eval_1 AND evaluatorVerdict:pass)",
           fieldName: "origin",
           value: "application",
         });
@@ -1356,9 +1325,7 @@ describe("addSameFieldOrValue removal round-trips (collapse via removeFacetValue
           fieldName: "origin",
           value: "api",
         });
-        expect(out).toBe(
-          "(origin:sample OR origin:application) AND model:gpt-5-mini",
-        );
+        expect(out).toBe("(origin:sample OR origin:application) AND model:gpt-5-mini");
         expect(() => parse(out)).not.toThrow();
       });
     });
@@ -1368,8 +1335,7 @@ describe("addSameFieldOrValue removal round-trips (collapse via removeFacetValue
     describe("when one value is removed (2 → 1)", () => {
       it("collapses to a bare tag with no stray parens or dangling OR", () => {
         const out = removeFacetValueFromQuery({
-          currentQuery:
-            "model:gpt-5-mini AND (origin:sample OR origin:application)",
+          currentQuery: "model:gpt-5-mini AND (origin:sample OR origin:application)",
           fieldName: "origin",
           value: "application",
         });
@@ -1554,15 +1520,13 @@ describe("setFacetValueAtLocation", () => {
 describe("swapOperatorAtLocation", () => {
   describe("given an empty query", () => {
     it("returns an empty input unchanged", () => {
-      expect(
-        swapOperatorAtLocation({ currentQuery: "", start: 0, end: 0 }),
-      ).toBe("");
+      expect(swapOperatorAtLocation({ currentQuery: "", start: 0, end: 0 })).toBe("");
     });
 
     it("returns whitespace-only input unchanged", () => {
-      expect(
-        swapOperatorAtLocation({ currentQuery: "   ", start: 0, end: 0 }),
-      ).toBe("   ");
+      expect(swapOperatorAtLocation({ currentQuery: "   ", start: 0, end: 0 })).toBe(
+        "   ",
+      );
     });
   });
 
@@ -1581,9 +1545,9 @@ describe("swapOperatorAtLocation", () => {
       it("flips it to AND", () => {
         const query = "status:error OR model:gpt-5-mini";
         const { start, end } = locationOf(query, "OR");
-        expect(
-          swapOperatorAtLocation({ currentQuery: query, start, end }),
-        ).toBe("status:error AND model:gpt-5-mini");
+        expect(swapOperatorAtLocation({ currentQuery: query, start, end })).toBe(
+          "status:error AND model:gpt-5-mini",
+        );
       });
     });
   });
@@ -1605,9 +1569,7 @@ describe("swapOperatorAtLocation", () => {
       it("returns the query unchanged", () => {
         const query = "status:error AND model:gpt-5-mini";
         const { start, end } = locationOf(query, "status");
-        expect(
-          swapOperatorAtLocation({ currentQuery: query, start, end }),
-        ).toBe(query);
+        expect(swapOperatorAtLocation({ currentQuery: query, start, end })).toBe(query);
       });
     });
   });

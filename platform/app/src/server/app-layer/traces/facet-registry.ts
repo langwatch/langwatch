@@ -17,19 +17,11 @@ import {
   SPAN_STATUS_FACET,
   TRACE_METADATA_FACET,
 } from "./facets";
-import type {
-  CategoricalRead,
-  RangeRead,
-} from "./filter-to-clickhouse/field-def";
+import type { CategoricalRead, RangeRead } from "./filter-to-clickhouse/field-def";
 import { UNSUPPORTED } from "./filter-to-clickhouse/field-def";
 
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
-export type FacetGroup =
-  | "trace"
-  | "evaluation"
-  | "span"
-  | "metadata"
-  | "prompt";
+export type FacetGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";
 
 export interface FacetQueryContext {
   tenantId: string;
@@ -96,14 +88,9 @@ export interface DynamicKeysDef extends BaseFacetDef {
   queryBuilder: (ctx: FacetQueryContext) => FacetQuery;
 }
 
-export type CategoricalFacetDef =
-  | ExpressionCategoricalDef
-  | QueryBuilderCategoricalDef;
+export type CategoricalFacetDef = ExpressionCategoricalDef | QueryBuilderCategoricalDef;
 
-export type FacetDefinition =
-  | CategoricalFacetDef
-  | RangeFacetDef
-  | DynamicKeysDef;
+export type FacetDefinition = CategoricalFacetDef | RangeFacetDef | DynamicKeysDef;
 
 export const TABLE_TIME_COLUMNS: Record<FacetTable, string> = {
   trace_summaries: "OccurredAt",
@@ -248,8 +235,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     // calls them unannotated. Coalesce, matching the analytics filter's
     // `HasAnnotation = false OR HasAnnotation IS NULL`.
     expression: "if(ifNull(HasAnnotation, false), 'annotated', 'unannotated')",
-    read: (t) =>
-      t.summary.annotationIds.length > 0 ? "annotated" : "unannotated",
+    read: (t) => (t.summary.annotationIds.length > 0 ? "annotated" : "unannotated"),
   },
   {
     key: "containsAi",

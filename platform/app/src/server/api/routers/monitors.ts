@@ -47,8 +47,7 @@ export const monitorsRouter = createTRPCRouter({
 
       const performanceMonitors = monitors.map((monitor) => ({
         id: monitor.id,
-        isGuardrail:
-          getEvaluatorDefinitions(monitor.checkType)?.isGuardrail ?? false,
+        isGuardrail: getEvaluatorDefinitions(monitor.checkType)?.isGuardrail ?? false,
       }));
       const endMs = Date.now();
       const currentStartMs = endMs - PERFORMANCE_PERIOD_MS;
@@ -71,9 +70,7 @@ export const monitorsRouter = createTRPCRouter({
       });
     }),
   toggle: protectedProcedure
-    .input(
-      z.object({ id: z.string(), projectId: z.string(), enabled: z.boolean() }),
-    )
+    .input(z.object({ id: z.string(), projectId: z.string(), enabled: z.boolean() }))
     .permission("evaluations:update")
     .mutation(async ({ input, ctx }) => {
       return ctx.app.monitors.toggle(input);
@@ -322,11 +319,7 @@ const validateCheckSettings = (checkType: string, parameters: any) => {
 
   // Skip settings validation for workflow, code, and custom evaluators
   // (they don't have schema-based settings)
-  if (
-    !checkType.startsWith("custom/") &&
-    !isWorkflowEvaluator &&
-    !isCodeEvaluator
-  ) {
+  if (!checkType.startsWith("custom/") && !isWorkflowEvaluator && !isCodeEvaluator) {
     const checkType_ = checkType as EvaluatorTypes;
     try {
       evaluatorsSchema.shape[checkType_].shape.settings.parse(parameters);

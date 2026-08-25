@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { LuRotateCcw } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
@@ -39,9 +31,7 @@ function cycleNext(current: boolean | undefined): boolean | undefined {
 function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el) return false;
-  return (
-    el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable
-  );
+  return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable;
 }
 
 export function FeatureFlagsDrawer() {
@@ -68,9 +58,7 @@ export function FeatureFlagsDrawer() {
         case "j":
         case "ArrowDown":
           e.preventDefault();
-          setSelectedIndex((i) =>
-            Math.min(i + 1, FRONTEND_FEATURE_FLAGS.length - 1),
-          );
+          setSelectedIndex((i) => Math.min(i + 1, FRONTEND_FEATURE_FLAGS.length - 1));
           return;
         case "k":
         case "ArrowUp":
@@ -107,12 +95,7 @@ export function FeatureFlagsDrawer() {
   }, []);
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="md"
-      onOpenChange={() => closeDrawer()}
-    >
+    <Drawer.Root open={true} placement="end" size="md" onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack width="full">
@@ -133,9 +116,9 @@ export function FeatureFlagsDrawer() {
         <Drawer.Body>
           <VStack align="stretch" gap={4}>
             <Text textStyle="xs" color="fg.muted">
-              Overrides are stored in this browser only and force the flag value
-              for every consumer in the current tab. Clear an override to fall
-              back to the server-resolved value.
+              Overrides are stored in this browser only and force the flag value for every
+              consumer in the current tab. Clear an override to fall back to the
+              server-resolved value.
             </Text>
             <VStack align="stretch" gap={3}>
               {FRONTEND_FEATURE_FLAGS.map((flag, idx) => (

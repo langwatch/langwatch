@@ -166,8 +166,7 @@ const IDENTIFIER = /[A-Za-z_$][A-Za-z0-9_$]*/g;
  * digit is eaten and the identifier is reported under a name that never
  * appeared in the expression.
  */
-const NUMERIC_LITERAL =
-  /(?<![A-Za-z0-9_$])(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?/g;
+const NUMERIC_LITERAL = /(?<![A-Za-z0-9_$])(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?/g;
 
 /** Every character an expression may contain once its string literals are gone. */
 const DISALLOWED_CHARACTER = /[^A-Za-z0-9_$.,()[\]{}+\-*/%<>=!?:&|^~\s]/g;
@@ -193,18 +192,14 @@ export interface VegaExpressionScreening {
  * Field names reached through `datum.` are NOT screened here: they are data,
  * and the dataset that feeds the branch decides whether they exist.
  */
-export function screenVegaExpression(
-  expression: string,
-): VegaExpressionScreening {
+export function screenVegaExpression(expression: string): VegaExpressionScreening {
   const withoutStrings = expression.replace(STRING_LITERAL, "0");
 
   const forbiddenConstructs: string[] = [];
   const badCharacters = withoutStrings.match(DISALLOWED_CHARACTER);
   if (badCharacters) {
     forbiddenConstructs.push(
-      ...[...new Set(badCharacters)].map(
-        (c) => `character ${JSON.stringify(c)}`,
-      ),
+      ...[...new Set(badCharacters)].map((c) => `character ${JSON.stringify(c)}`),
     );
   }
   if (ASSIGNMENT.test(withoutStrings)) {

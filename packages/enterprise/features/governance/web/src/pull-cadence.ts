@@ -68,9 +68,7 @@ export const MINUTE_INTERVALS = [5, 10, 15, 30] as const;
  * can resolve a source's recommended schedule without importing the page
  * it is rendered by.
  */
-export const PULL_ADAPTER_FOR_SOURCE: Partial<
-  Record<GovernanceSourceType, string>
-> = {
+export const PULL_ADAPTER_FOR_SOURCE: Partial<Record<GovernanceSourceType, string>> = {
   copilot_studio: "copilot_studio",
   openai_compliance: "openai_compliance",
   claude_compliance: "claude_compliance",
@@ -96,9 +94,7 @@ export const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
 
 /** The recommended schedule for a source type, or null when it has no
  *  pull adapter (push and s3 sources carry no cadence). */
-export function recommendedPullSchedule(
-  sourceType: GovernanceSourceType,
-): string | null {
+export function recommendedPullSchedule(sourceType: GovernanceSourceType): string | null {
   const adapter = PULL_ADAPTER_FOR_SOURCE[sourceType];
   if (!adapter) return null;
   return PULL_SCHEDULE_DEFAULTS[adapter] ?? "*/15 * * * *";
@@ -194,8 +190,7 @@ function fixedMinuteShape({
 export function partsFromPullCron(cron: string): PullCadenceParts | null {
   const fields = cron.trim().split(/\s+/);
   if (fields.length !== 5) return null;
-  const [minField = "", hourField = "", domField, monField, dowField = ""] =
-    fields;
+  const [minField = "", hourField = "", domField, monField, dowField = ""] = fields;
   // Month and day-of-month are wildcards in every shape we speak.
   if (monField !== "*" || domField !== "*") return null;
   const shape = { minField, hourField, dowField };

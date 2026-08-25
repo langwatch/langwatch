@@ -46,15 +46,15 @@ describe("requestPathname", () => {
 describe("isEmailAuthPath", () => {
   describe("given the email sign-in and sign-up endpoints", () => {
     it("matches them, trailing slash included, and nothing else", () => {
-      expect(
-        isEmailAuthPath(normalizedRequestPathname(`${host}/sign-in/email/`)),
-      ).toBe(true);
-      expect(
-        isEmailAuthPath(normalizedRequestPathname(`${host}/sign-up/email`)),
-      ).toBe(true);
-      expect(
-        isEmailAuthPath(normalizedRequestPathname(`${host}/get-session`)),
-      ).toBe(false);
+      expect(isEmailAuthPath(normalizedRequestPathname(`${host}/sign-in/email/`))).toBe(
+        true,
+      );
+      expect(isEmailAuthPath(normalizedRequestPathname(`${host}/sign-up/email`))).toBe(
+        true,
+      );
+      expect(isEmailAuthPath(normalizedRequestPathname(`${host}/get-session`))).toBe(
+        false,
+      );
     });
   });
 });
@@ -63,9 +63,7 @@ describe("isCredentialMutationPath", () => {
   describe("given the always-blocked mutation routes and the reset pair", () => {
     it("matches the mutation routes but not the reset pair", () => {
       expect(
-        isCredentialMutationPath(
-          normalizedRequestPathname(`${host}/set-password`),
-        ),
+        isCredentialMutationPath(normalizedRequestPathname(`${host}/set-password`)),
       ).toBe(true);
       expect(
         isCredentialMutationPath(
@@ -80,18 +78,14 @@ describe("isPasswordResetPath", () => {
   describe("given the reset pair and a neighbouring credential route", () => {
     it("matches only the reset pair", () => {
       expect(
-        isPasswordResetPath(
-          normalizedRequestPathname(`${host}/request-password-reset`),
-        ),
+        isPasswordResetPath(normalizedRequestPathname(`${host}/request-password-reset`)),
       ).toBe(true);
       expect(
-        isPasswordResetPath(
-          normalizedRequestPathname(`${host}/reset-password?token=x`),
-        ),
+        isPasswordResetPath(normalizedRequestPathname(`${host}/reset-password?token=x`)),
       ).toBe(true);
-      expect(
-        isPasswordResetPath(normalizedRequestPathname(`${host}/set-password`)),
-      ).toBe(false);
+      expect(isPasswordResetPath(normalizedRequestPathname(`${host}/set-password`))).toBe(
+        false,
+      );
     });
   });
 });
@@ -112,12 +106,8 @@ describe("isGatedSsoPath", () => {
 
   describe("given any callback route (incl. the legacy rewrite)", () => {
     it("matches by pathname prefix regardless of query or provider segment", () => {
-      expect(isGatedSsoPath(`${host}/callback/auth0?code=abc&state=xyz`)).toBe(
-        true,
-      );
-      expect(isGatedSsoPath(`${host}/oauth2/callback/okta?code=abc`)).toBe(
-        true,
-      );
+      expect(isGatedSsoPath(`${host}/callback/auth0?code=abc&state=xyz`)).toBe(true);
+      expect(isGatedSsoPath(`${host}/oauth2/callback/okta?code=abc`)).toBe(true);
     });
   });
 
@@ -132,9 +122,7 @@ describe("isGatedSsoPath", () => {
   describe("given an account route that merely ends in the word callback", () => {
     it("does not match, with or without a trailing slash", () => {
       expect(isGatedSsoPath(`${host}/delete-user/callback`)).toBe(false);
-      expect(isGatedSsoPath(`${host}/delete-user/callback/?token=x`)).toBe(
-        false,
-      );
+      expect(isGatedSsoPath(`${host}/delete-user/callback/?token=x`)).toBe(false);
     });
   });
 });

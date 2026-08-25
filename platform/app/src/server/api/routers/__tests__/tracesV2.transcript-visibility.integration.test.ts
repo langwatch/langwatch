@@ -16,15 +16,7 @@
  * whatever the policy says.
  */
 
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Project } from "~/generated/prisma/client";
 
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
@@ -84,26 +76,18 @@ function logRow(attributes: Record<string, string>, offsetMs: number) {
 /** Claude Code: bare event names, prompt on `prompt`, reply on `response`. */
 const CLAUDE_LOGS = [
   logRow({ "event.name": "user_prompt", prompt: USER_PROMPT_SECRET }, 100),
-  logRow(
-    { "event.name": "assistant_response", response: ASSISTANT_REPLY_SECRET },
-    300,
-  ),
+  logRow({ "event.name": "assistant_response", response: ASSISTANT_REPLY_SECRET }, 300),
 ];
 
 /** gemini-cli: `gemini_cli.`-namespaced, reply on `response_text`. */
 const GEMINI_LOGS = [
-  logRow(
-    { "event.name": "gemini_cli.user_prompt", prompt: USER_PROMPT_SECRET },
-    100,
-  ),
+  logRow({ "event.name": "gemini_cli.user_prompt", prompt: USER_PROMPT_SECRET }, 100),
   logRow(
     {
       "event.name": "gemini_cli.api_response",
       role: "main",
       response_text: JSON.stringify({
-        candidates: [
-          { content: { parts: [{ text: ASSISTANT_REPLY_SECRET }] } },
-        ],
+        candidates: [{ content: { parts: [{ text: ASSISTANT_REPLY_SECRET }] } }],
       }),
     },
     300,
@@ -112,10 +96,7 @@ const GEMINI_LOGS = [
 
 /** codex: `codex.`-namespaced, tool content on `arguments` / `output`. */
 const CODEX_LOGS = [
-  logRow(
-    { "event.name": "codex.user_prompt", prompt: USER_PROMPT_SECRET },
-    100,
-  ),
+  logRow({ "event.name": "codex.user_prompt", prompt: USER_PROMPT_SECRET }, 100),
   logRow(
     {
       "event.name": "codex.tool_result",
@@ -207,12 +188,8 @@ describe("transcript captured-content matrix for an API-key caller", () => {
 
     /** @scenario transcript endpoint withholds restricted output from an API key caller */
     it("withholds the assistant reply from a session-less caller", async () => {
-      expect(await documentFor(CLAUDE_LOGS)).not.toContain(
-        ASSISTANT_REPLY_SECRET,
-      );
-      expect(await documentFor(GEMINI_LOGS)).not.toContain(
-        ASSISTANT_REPLY_SECRET,
-      );
+      expect(await documentFor(CLAUDE_LOGS)).not.toContain(ASSISTANT_REPLY_SECRET);
+      expect(await documentFor(GEMINI_LOGS)).not.toContain(ASSISTANT_REPLY_SECRET);
     });
 
     it("still serves tool arguments, which the policy leaves captured", async () => {

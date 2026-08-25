@@ -30,13 +30,7 @@ export const buildSesClientConfig = (): SESClientConfig => {
 
 export const sesProvider: EmailProviderPort = {
   name: "ses",
-  async send({
-    content,
-    defaultFrom,
-  }: {
-    content: EmailContent;
-    defaultFrom: string;
-  }) {
+  async send({ content, defaultFrom }: { content: EmailContent; defaultFrom: string }) {
     logger.info("Sending email using AWS SES");
     const sesClient = new SESClient(buildSesClientConfig());
     const from = content.from ?? defaultFrom;
@@ -48,10 +42,7 @@ export const sesProvider: EmailProviderPort = {
       content.headers != null && Object.keys(content.headers).length > 0;
 
     try {
-      if (
-        (content.attachments && content.attachments.length > 0) ||
-        hasCustomHeaders
-      ) {
+      if ((content.attachments && content.attachments.length > 0) || hasCustomHeaders) {
         // BCC recipients are NOT written into the MIME headers. SES uses the
         // envelope `Destinations` from `SendRawEmail` to deliver them invisibly,
         // so `buildRawMimeMessage` intentionally receives no bcc and renders no

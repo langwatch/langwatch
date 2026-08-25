@@ -186,11 +186,7 @@ const updateEndpointSchema = z.object({
   destination_kind: destinationKindSchema.optional(),
   url: z.string().min(1).max(2000).optional(),
   sqs: sqsDestinationSchema.partial().optional(),
-  enabled_events: z
-    .array(z.string().min(1).max(200))
-    .min(1)
-    .max(100)
-    .optional(),
+  enabled_events: z.array(z.string().min(1).max(200)).min(1).max(100).optional(),
   status: endpointStatusSchema.optional(),
   ...deliveryControlsSchema,
 });
@@ -433,9 +429,7 @@ function sqsFromBody(sqs: {
     ...(sqs.queue_url !== undefined ? { queueUrl: sqs.queue_url } : {}),
     ...(sqs.role_arn !== undefined ? { roleArn: sqs.role_arn } : {}),
     ...(sqs.external_id !== undefined ? { externalId: sqs.external_id } : {}),
-    ...(sqs.access_key_id !== undefined
-      ? { accessKeyId: sqs.access_key_id }
-      : {}),
+    ...(sqs.access_key_id !== undefined ? { accessKeyId: sqs.access_key_id } : {}),
     ...(sqs.secret_access_key !== undefined
       ? { secretAccessKey: sqs.secret_access_key }
       : {}),
@@ -530,8 +524,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
       ...canonicalBaseResponses,
       ...canonicalConflictResponses,
       201: {
-        description:
-          "The endpoint, with the signing secret this body alone carries",
+        description: "The endpoint, with the signing secret this body alone carries",
         headers: idempotentReplayHeaders,
         content: {
           "application/json": {
@@ -783,10 +776,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
           // Null on a transport with no status of its own: a queue accepted
           // the message or it did not, and there is no code to report.
           response_status: result.status,
-          response_body: (delivered ? result.body : (result.error ?? "")).slice(
-            0,
-            500,
-          ),
+          response_body: (delivered ? result.body : (result.error ?? "")).slice(0, 500),
         },
       });
     } catch (error) {
@@ -798,8 +788,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
         endpointId,
         dispatchId,
         outcome: "terminal",
-        error:
-          error instanceof Error ? error.message.slice(0, 500) : String(error),
+        error: error instanceof Error ? error.message.slice(0, 500) : String(error),
       });
       return c.json({
         data: {

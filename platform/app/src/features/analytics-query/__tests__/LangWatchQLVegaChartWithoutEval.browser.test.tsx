@@ -102,8 +102,7 @@ function forbidStringEvaluation(): Hardening {
   };
   refusingFunction.prototype = realFunction.prototype;
 
-  globalThis.eval =
-    refusesStringEvaluation as unknown as typeof globalThis.eval;
+  globalThis.eval = refusesStringEvaluation as unknown as typeof globalThis.eval;
   globalThis.Function = refusingFunction as unknown as FunctionConstructor;
 
   return {
@@ -137,10 +136,7 @@ function bars(container: ParentNode = document): Element[] {
   );
 }
 
-async function poll(
-  check: () => boolean,
-  timeoutMs = 15_000,
-): Promise<boolean> {
+async function poll(check: () => boolean, timeoutMs = 15_000): Promise<boolean> {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     if (check()) return true;
@@ -162,9 +158,9 @@ describe("the LangWatchQL chart on a page that forbids string evaluation", () =>
       it("draws through Vega's expression interpreter, while the same specification with the interpreter disabled is refused", async () => {
         // The control differs from the shipped path by exactly one option, and
         // this is the shipped value of it.
-        expect(
-          lwqlVegaEmbedOptions({ themeConfig: {}, colorMode: "light" }).ast,
-        ).toBe(true);
+        expect(lwqlVegaEmbedOptions({ themeConfig: {}, colorMode: "light" }).ast).toBe(
+          true,
+        );
 
         // The specification Vega is actually handed, built the way the chart
         // builds it: the member's specification names the dataset, the rows are
@@ -204,17 +200,13 @@ describe("the LangWatchQL chart on a page that forbids string evaluation", () =>
           // interpreter turned off, so expressions are compiled from source
           // text instead of walked as an abstract syntax tree.
           try {
-            await embed(
-              control,
-              handedToVega.spec as Parameters<typeof embed>[1],
-              {
-                ...lwqlVegaEmbedOptions({
-                  themeConfig: {},
-                  colorMode: "light",
-                }),
-                ast: false,
-              },
-            );
+            await embed(control, handedToVega.spec as Parameters<typeof embed>[1], {
+              ...lwqlVegaEmbedOptions({
+                themeConfig: {},
+                colorMode: "light",
+              }),
+              ast: false,
+            });
           } catch (error) {
             controlFailure = error;
           }

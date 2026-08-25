@@ -11,10 +11,7 @@ vi.mock("@slack/webhook", () => ({
   },
 }));
 
-import {
-  sendRenderedSlackMessage,
-  sendSlackWebhook,
-} from "../sendSlackWebhook";
+import { sendRenderedSlackMessage, sendSlackWebhook } from "../sendSlackWebhook";
 
 function callSlack() {
   return sendSlackWebhook({
@@ -88,21 +85,22 @@ describe("sendSlackWebhook", () => {
       "https://hooks.slack.com",
     ];
 
-    it.each(
-      bypassAttempts,
-    )("raises a non-retryable DispatchError without sending for %s", async (triggerWebhook) => {
-      const err = await sendSlackWebhook({
-        triggerWebhook,
-        triggerData: [],
-        triggerName: "Quality Alert",
-        projectSlug: "demo",
-        triggerType: AlertType.WARNING,
-        triggerMessage: "",
-      }).catch((e: unknown) => e);
-      expect(err).toBeInstanceOf(DispatchError);
-      expect((err as DispatchError).retryable).toBe(false);
-      expect(sendMock).not.toHaveBeenCalled();
-    });
+    it.each(bypassAttempts)(
+      "raises a non-retryable DispatchError without sending for %s",
+      async (triggerWebhook) => {
+        const err = await sendSlackWebhook({
+          triggerWebhook,
+          triggerData: [],
+          triggerName: "Quality Alert",
+          projectSlug: "demo",
+          triggerType: AlertType.WARNING,
+          triggerMessage: "",
+        }).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(DispatchError);
+        expect((err as DispatchError).retryable).toBe(false);
+        expect(sendMock).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("when the webhook scheme is upper-cased but the host is genuine", () => {

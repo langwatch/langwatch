@@ -110,10 +110,7 @@ vi.mock("~/components/traces/AddParticipants", () => ({
     queueDrawerOpen?: { onOpen: () => void };
   }) => (
     <div>
-      <button
-        type="button"
-        onClick={() => setAnnotators(mocks.pickedAnnotators)}
-      >
+      <button type="button" onClick={() => setAnnotators(mocks.pickedAnnotators)}>
         Pick participants
       </button>
       <button type="button" onClick={() => queueDrawerOpen?.onOpen()}>
@@ -137,11 +134,7 @@ const onClose = vi.fn();
 const renderDialog = (traceIds = ["t1", "t2", "t3"]) =>
   render(
     <ChakraProvider value={defaultSystem}>
-      <AddToAnnotationQueueDialog
-        open={true}
-        onClose={onClose}
-        traceIds={traceIds}
-      />
+      <AddToAnnotationQueueDialog open={true} onClose={onClose} traceIds={traceIds} />
     </ChakraProvider>,
   );
 
@@ -187,9 +180,7 @@ describe("AddToAnnotationQueueDialog", () => {
 
       expect(screen.getByText("Add to annotation queue")).toBeInTheDocument();
       expect(
-        screen.getByText(
-          "Send the selected traces to people or queues for annotation",
-        ),
+        screen.getByText("Send the selected traces to people or queues for annotation"),
       ).toBeInTheDocument();
     });
 
@@ -283,9 +274,7 @@ describe("AddToAnnotationQueueDialog", () => {
         expect(toast.action.label).toBe("View queue");
 
         toast.action.onClick();
-        expect(mocks.push).toHaveBeenCalledWith(
-          "/acme/annotations/support-reviews",
-        );
+        expect(mocks.push).toHaveBeenCalledWith("/acme/annotations/support-reviews");
       });
 
       /** @scenario "Sending to yourself alone offers to open your inbox" */
@@ -308,9 +297,7 @@ describe("AddToAnnotationQueueDialog", () => {
 
         pickAndSend();
 
-        expect(mocks.toastCreate.mock.calls[0]?.[0].action.label).toBe(
-          "View queues",
-        );
+        expect(mocks.toastCreate.mock.calls[0]?.[0].action.label).toBe("View queues");
       });
     });
 
@@ -337,9 +324,7 @@ describe("AddToAnnotationQueueDialog", () => {
       it("opens the new queue drawer from inside the dialog", () => {
         renderDialog();
 
-        expect(
-          screen.queryByTestId("new-queue-drawer"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("new-queue-drawer")).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "Add new queue" }));
 
         expect(screen.getByTestId("new-queue-drawer")).toBeInTheDocument();

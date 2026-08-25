@@ -56,10 +56,7 @@ export const INITIAL_TOPIC_CLUSTERING_STATE: TopicClusteringProcessState = {
  * Whether a run should still be treated as owning the project at `refMs`.
  * Rows written before `startedAtMs` existed fall back to `updatedAtMs`.
  */
-function isRunInFlight(
-  state: TopicClusteringProcessState,
-  refMs: number,
-): boolean {
+function isRunInFlight(state: TopicClusteringProcessState, refMs: number): boolean {
   const run = state.currentRun;
   if (run === null) return false;
   const startedAtMs = run.startedAtMs ?? run.updatedAtMs;
@@ -127,12 +124,9 @@ export function buildProcessEventView(
     trigger: "trigger" in event.data ? event.data.trigger : null,
     runId: "runId" in event.data ? event.data.runId : null,
     page: "page" in event.data ? event.data.page : null,
-    hasNextPage:
-      "nextSearchAfter" in event.data && event.data.nextSearchAfter != null,
+    hasNextPage: "nextSearchAfter" in event.data && event.data.nextSearchAfter != null,
     nextSearchAfter:
-      "nextSearchAfter" in event.data
-        ? (event.data.nextSearchAfter ?? null)
-        : null,
+      "nextSearchAfter" in event.data ? (event.data.nextSearchAfter ?? null) : null,
   };
 }
 
@@ -146,9 +140,7 @@ function settle(
   return {
     state,
     nextWakeAt:
-      state.enabled && state.projectId
-        ? nextDailySlot(state.projectId, refMs)
-        : null,
+      state.enabled && state.projectId ? nextDailySlot(state.projectId, refMs) : null,
     intents,
   };
 }
@@ -159,10 +151,7 @@ function settle(
  * after a stale-run recovery has moved on, so identity — not arrival order —
  * decides whether an outcome may touch `currentRun`.
  */
-function isCurrentRun(
-  state: TopicClusteringProcessState,
-  runId: string,
-): boolean {
+function isCurrentRun(state: TopicClusteringProcessState, runId: string): boolean {
   return state.currentRun?.runId === runId;
 }
 
@@ -261,9 +250,7 @@ export const handleClusteringRunCompleted: EventHandler<
         // make a walk immortal: every completed page would push the
         // stale-run deadline out and no wake could ever reclaim it.
         startedAtMs:
-          state.currentRun?.startedAtMs ??
-          state.currentRun?.updatedAtMs ??
-          refMs,
+          state.currentRun?.startedAtMs ?? state.currentRun?.updatedAtMs ?? refMs,
       },
     },
     refMs,

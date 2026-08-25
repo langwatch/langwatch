@@ -62,14 +62,9 @@ export class StoredObjectService extends StoredObjectServiceContract {
       !Number.isSafeInteger(options.maximumUploadBytes) ||
       options.maximumUploadBytes < 0
     ) {
-      throw new RangeError(
-        "maximumUploadBytes must be a non-negative safe integer",
-      );
+      throw new RangeError("maximumUploadBytes must be a non-negative safe integer");
     }
-    if (
-      !Number.isSafeInteger(options.uploadExpiryMs) ||
-      options.uploadExpiryMs <= 0
-    ) {
+    if (!Number.isSafeInteger(options.uploadExpiryMs) || options.uploadExpiryMs <= 0) {
       throw new RangeError("uploadExpiryMs must be a positive safe integer");
     }
     return new StoredObjectService(options);
@@ -156,10 +151,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     input: CreateStoredObjectUploadInput,
   ): Promise<StoredObjectsCreateUploadOutput> {
     if (input.byteLength > this.options.maximumUploadBytes) {
-      throw new UploadTooLargeError(
-        input.byteLength,
-        this.options.maximumUploadBytes,
-      );
+      throw new UploadTooLargeError(input.byteLength, this.options.maximumUploadBytes);
     }
     const id = await this.options.idDeriver.fromDigest({
       projectId: input.projectId,
@@ -256,10 +248,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
       if (value?.status === "available") return this.reference(value);
       throw new UploadIncompleteError(claims.operationId);
     }
-    if (
-      value.expiresAt === null ||
-      value.expiresAt.getTime() <= this.now().getTime()
-    ) {
+    if (value.expiresAt === null || value.expiresAt.getTime() <= this.now().getTime()) {
       throw new UploadExpiredError(claims.operationId);
     }
     const stat = await this.storageCall(() =>
@@ -303,8 +292,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     const bytes = await this.storageCall(() =>
       this.options.storage.tryRead({ projectId: input.projectId, address }),
     );
-    if (!bytes)
-      throw new StoredObjectBytesMissingError(input.projectId, input.id);
+    if (!bytes) throw new StoredObjectBytesMissingError(input.projectId, input.id);
     return { metadata: this.metadata(value), bytes };
   }
 
@@ -343,9 +331,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     return this.getById(input);
   }
 
-  async delete(
-    input: DeleteStoredObjectInput,
-  ): Promise<StoredObjectsDeleteOutput> {
+  async delete(input: DeleteStoredObjectInput): Promise<StoredObjectsDeleteOutput> {
     const value = await this.getStoredObject(input);
     if (value.status === "deleted" && value.deletedAt) {
       return {
@@ -564,9 +550,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     };
   }
 
-  private getStorage(
-    value: StoredObjectRecord,
-  ): StoredObjectStorageAddress {
+  private getStorage(value: StoredObjectRecord): StoredObjectStorageAddress {
     if (!value.storage) {
       throw new StoredObjectBytesMissingError(value.tenantId, value.id);
     }
@@ -593,10 +577,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     for await (const chunk of values) {
       byteLength += chunk.byteLength;
       if (byteLength > this.options.maximumUploadBytes) {
-        throw new UploadTooLargeError(
-          byteLength,
-          this.options.maximumUploadBytes,
-        );
+        throw new UploadTooLargeError(byteLength, this.options.maximumUploadBytes);
       }
       chunks.push(chunk);
     }
@@ -609,9 +590,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     return result;
   }
 
-  private async decodeUploadToken(
-    token: string,
-  ): Promise<StoredObjectUploadTokenClaims> {
+  private async decodeUploadToken(token: string): Promise<StoredObjectUploadTokenClaims> {
     try {
       return await this.options.uploadTokens.decode(token);
     } catch {
@@ -633,9 +612,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     }
   }
 
-  private async ignoreStorageFailure(
-    operation: () => Promise<void>,
-  ): Promise<void> {
+  private async ignoreStorageFailure(operation: () => Promise<void>): Promise<void> {
     try {
       await operation();
     } catch {

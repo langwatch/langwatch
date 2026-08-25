@@ -17,9 +17,9 @@ describe("PrismaAuthzGrantRepository", () => {
         customRole: { findUnique },
       } as never;
 
-      const role = await PrismaAuthzGrantRepository.create(
-        prisma,
-      ).tryFindCustomRole({ customRoleId: "role-1" });
+      const role = await PrismaAuthzGrantRepository.create(prisma).tryFindCustomRole({
+        customRoleId: "role-1",
+      });
 
       expect(findUnique).toHaveBeenCalledWith({
         where: { id: "role-1" },

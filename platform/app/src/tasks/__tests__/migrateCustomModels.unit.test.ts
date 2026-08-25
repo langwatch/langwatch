@@ -71,10 +71,7 @@ describe("migrateCustomModelsRow()", () => {
       const row = buildRow({
         provider: "openai",
         customModels: ["gpt-4o", "ft:gpt-4o:my-org:custom:abc123"],
-        customEmbeddingsModels: [
-          "text-embedding-3-small",
-          "my-custom-embedding",
-        ],
+        customEmbeddingsModels: ["text-embedding-3-small", "my-custom-embedding"],
       });
 
       const result = migrateCustomModelsRow({ row, registryLookup });

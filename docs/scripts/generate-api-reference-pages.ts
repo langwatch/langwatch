@@ -78,18 +78,15 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/governance/ingestion-templates/admin": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/clone": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/{id}": UNDOCUMENTED_INGESTION_TEMPLATES,
-  "/api/governance/ingestion-templates/{id}/ottl-rules":
-    UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/{id}/ottl-rules": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/me/project": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/v1/projects/{projectId}/analytics/query/clickhouse":
     UNDOCUMENTED_LWQL_ANALYTICS_SQL,
-  "/api/v1/projects/{projectId}/analytics/schema":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
-  "/api/v1/projects/{projectId}/analytics/charts":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/schema": UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/charts": UNDOCUMENTED_LWQL_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
     UNDOCUMENTED_LWQL_ANALYTICS_SQL,
 };
@@ -441,11 +438,7 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function generateTitle(
-  method: string,
-  apiPath: string,
-  op: OpenAPIOperation,
-): string {
+function generateTitle(method: string, apiPath: string, op: OpenAPIOperation): string {
   if (op.summary) return op.summary;
 
   const desc = op.description ?? "";
@@ -468,9 +461,7 @@ function generateTitle(
 function getResourceName(apiPath: string): string {
   const parts = apiPath
     .split("/")
-    .filter(
-      (p) => !p.startsWith("{") && p !== "api" && p !== "v1" && p !== "v3",
-    )
+    .filter((p) => !p.startsWith("{") && p !== "api" && p !== "v1" && p !== "v3")
     .filter(Boolean);
   const last = parts[parts.length - 1] ?? "resource";
   return last
@@ -479,11 +470,7 @@ function getResourceName(apiPath: string): string {
     .join(" ");
 }
 
-function generateFileName(
-  method: string,
-  apiPath: string,
-  op: OpenAPIOperation,
-): string {
+function generateFileName(method: string, apiPath: string, op: OpenAPIOperation): string {
   if (op.summary) {
     const s = slugify(op.summary);
     return s.length > 40 ? s.substring(0, 40).replace(/-$/, "") : s;
@@ -673,9 +660,7 @@ function main() {
   }
   if (misownedOrder.length > 0) {
     const noun =
-      misownedOrder.length === 1
-        ? "key names an operation"
-        : "keys name operations";
+      misownedOrder.length === 1 ? "key names an operation" : "keys name operations";
     console.error(
       `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts nothing:`,
     );
@@ -859,18 +844,11 @@ const BUILTIN_EVALUATOR_CATEGORIES: Record<string, string[]> = {
   ],
 };
 
-function buildBuiltInEvaluatorNav(): (
-  | string
-  | { group: string; pages: string[] }
-)[] {
+function buildBuiltInEvaluatorNav(): (string | { group: string; pages: string[] })[] {
   const p = (name: string) => `api-reference/evaluators/${name}`;
-  const pages: (string | { group: string; pages: string[] })[] = [
-    p("overview"),
-  ];
+  const pages: (string | { group: string; pages: string[] })[] = [p("overview")];
 
-  for (const [category, evaluators] of Object.entries(
-    BUILTIN_EVALUATOR_CATEGORIES,
-  )) {
+  for (const [category, evaluators] of Object.entries(BUILTIN_EVALUATOR_CATEGORIES)) {
     pages.push({
       group: category,
       pages: evaluators.map(p),

@@ -49,16 +49,14 @@ const MAP_KEY_ACCESS = /\[\s*'([^']+)'\s*\]/g;
 const SOURCE = (name: string) => `SRC.\`${name}\``;
 
 /** A column's SQL, with source references qualified the way the generator does. */
-const expressionOf = (
-  column: Parameters<typeof columnExpression>[0]["column"],
-) => columnExpression({ column, source: SOURCE });
+const expressionOf = (column: Parameters<typeof columnExpression>[0]["column"]) =>
+  columnExpression({ column, source: SOURCE });
 
 /** Which content category a span-attribute key belongs to, if any. */
 function contentCategoryOf(key: string): ContentCategory | null {
   return (
-    CONTENT_CATEGORIES.find((category) =>
-      CONTENT_KEY_CATALOG[category].includes(key),
-    ) ?? null
+    CONTENT_CATEGORIES.find((category) => CONTENT_KEY_CATALOG[category].includes(key)) ??
+    null
   );
 }
 
@@ -70,13 +68,8 @@ describe("given the LangWatchQL view catalog", () => {
 
       for (const view of LWQL_VIEW_CATALOG) {
         const columnNames = view.columns.map((column) => column.name);
-        expect(view.grain.length, `${view.name} has no grain`).toBeGreaterThan(
-          0,
-        );
-        expect(
-          view.freshness.length,
-          `${view.name} has no freshness`,
-        ).toBeGreaterThan(0);
+        expect(view.grain.length, `${view.name} has no grain`).toBeGreaterThan(0);
+        expect(view.freshness.length, `${view.name} has no freshness`).toBeGreaterThan(0);
         expect(
           view.joinKeys.length,
           `${view.name} declares no join keys`,
@@ -193,9 +186,7 @@ describe("given the LangWatchQL view catalog", () => {
 
       for (const view of LWQL_VIEW_CATALOG) {
         const names = view.columns.map((column) => column.name);
-        expect(new Set(names).size, `${view.name} repeats a column`).toBe(
-          names.length,
-        );
+        expect(new Set(names).size, `${view.name} repeats a column`).toBe(names.length);
         for (const column of view.columns) {
           expect(
             column.description.trim().length,
@@ -284,10 +275,9 @@ describe("given the LangWatchQL view catalog", () => {
       for (const view of LWQL_VIEW_CATALOG) {
         for (const column of view.columns) {
           if (column.unit === undefined) continue;
-          expect(
-            [...LWQL_COLUMN_UNITS],
-            `${view.name}.${column.name}`,
-          ).toContain(column.unit);
+          expect([...LWQL_COLUMN_UNITS], `${view.name}.${column.name}`).toContain(
+            column.unit,
+          );
         }
       }
     });
@@ -377,9 +367,7 @@ describe("given the LangWatchQL view catalog", () => {
     it("excludes every key the policy classifies as content, and its exploded form", () => {
       const expected = [
         ...new Set(
-          CONTENT_CATEGORIES.flatMap(
-            (category) => CONTENT_KEY_CATALOG[category],
-          ),
+          CONTENT_CATEGORIES.flatMap((category) => CONTENT_KEY_CATALOG[category]),
         ),
       ].sort();
       expect(
@@ -390,10 +378,9 @@ describe("given the LangWatchQL view catalog", () => {
       const sql = contentKeyExclusionSql("k");
       for (const key of expected) {
         expect(sql, `the filter never mentions ${key}`).toContain(`'${key}'`);
-        expect(
-          sql,
-          `the filter does not exclude the exploded form of ${key}`,
-        ).toContain(`'${key}.'`);
+        expect(sql, `the filter does not exclude the exploded form of ${key}`).toContain(
+          `'${key}.'`,
+        );
         expect(isContentAttributeKey(key)).toBe(true);
         expect(isContentAttributeKey(`${key}.0.content`)).toBe(true);
       }
@@ -481,9 +468,7 @@ describe("given the LangWatchQL view catalog", () => {
    * survives" and the one that cannot be inferred from the other two.
    */
   describe("when a dataset's source aggregates rather than supersedes", () => {
-    const aggregating = LWQL_VIEW_CATALOG.filter(
-      (view) => view.dedup.aggregating,
-    );
+    const aggregating = LWQL_VIEW_CATALOG.filter((view) => view.dedup.aggregating);
 
     /** @scenario "A pre-aggregated dataset declares that its rows merge rather than supersede" */
     it("declares every column that is not a measure as a key its rows merge on", () => {
@@ -663,9 +648,7 @@ describe("given the LangWatchQL view catalog", () => {
    */
   describe("when a summed measure is declared", () => {
     const summed = LWQL_VIEW_CATALOG.flatMap((view) =>
-      view.columns
-        .filter((column) => column.summed)
-        .map((column) => ({ view, column })),
+      view.columns.filter((column) => column.summed).map((column) => ({ view, column })),
     );
 
     /** @scenario "A summed measure reads the column it is named after" */
@@ -811,9 +794,7 @@ describe("given the LangWatchQL view catalog", () => {
         views: LWQL_VIEW_CATALOG,
       });
       expect(contentOnly).not.toContain("TotalCost");
-      expect(contentOnly).toEqual([
-        ...lwqlContentGatedColumns(LWQL_VIEW_CATALOG),
-      ]);
+      expect(contentOnly).toEqual([...lwqlContentGatedColumns(LWQL_VIEW_CATALOG)]);
 
       const costOnly = lwqlGatedColumns({
         protections: {
@@ -855,8 +836,7 @@ describe("given the LangWatchQL view catalog", () => {
       });
       const bothGates = LWQL_VIEW_CATALOG.flatMap((view) =>
         view.columns.filter(
-          (column) =>
-            column.gates.includes("input") && column.gates.includes("output"),
+          (column) => column.gates.includes("input") && column.gates.includes("output"),
         ),
       );
       expect(
@@ -887,9 +867,7 @@ describe("given the LangWatchQL view catalog", () => {
       // By name rather than by index, so a column added to the fixture cannot
       // silently shift which shape each assertion exercises.
       const column = (name: string) => {
-        const found = GATED_DATASET.columns.find(
-          (candidate) => candidate.name === name,
-        );
+        const found = GATED_DATASET.columns.find((candidate) => candidate.name === name);
         if (!found) throw new Error(`fixture lost its ${name} column`);
         return found;
       };
@@ -950,17 +928,14 @@ describe("given the LangWatchQL view catalog", () => {
         views,
       });
       for (const column of GATED_DATASET.columns) {
-        expect(
-          withheld,
-          `${column.name} is readable in a hidden dataset`,
-        ).toContain(column.name);
+        expect(withheld, `${column.name} is readable in a hidden dataset`).toContain(
+          column.name,
+        );
       }
     });
 
     it("withholds none of them from a caller holding the dataset's permission", () => {
-      expect(
-        lwqlGatedColumns({ protections: holding(true, true), views }),
-      ).toEqual([]);
+      expect(lwqlGatedColumns({ protections: holding(true, true), views })).toEqual([]);
     });
   });
 });

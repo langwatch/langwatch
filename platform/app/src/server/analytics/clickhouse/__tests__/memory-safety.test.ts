@@ -288,11 +288,7 @@ describe("memory-safety", () => {
       /** @scenario Every metric prefix in metric-translator has a column-pruning test */
       it("has at least one column-pruning test for every registered metric prefix", () => {
         // Extract metric prefixes from metric-translator.ts by reading the source
-        const translatorPath = path.resolve(
-          __dirname,
-          "..",
-          "metric-translator.ts",
-        );
+        const translatorPath = path.resolve(__dirname, "..", "metric-translator.ts");
         const translatorSource = fs.readFileSync(translatorPath, "utf-8");
 
         // Find all metric.startsWith("prefix.") patterns
@@ -306,10 +302,7 @@ describe("memory-safety", () => {
         expect(registeredPrefixes.size).toBeGreaterThan(0);
 
         // Read the column-pruning test file to find which prefixes are covered
-        const pruningTestPath = path.resolve(
-          __dirname,
-          "column-pruning.test.ts",
-        );
+        const pruningTestPath = path.resolve(__dirname, "column-pruning.test.ts");
         const pruningTestSource = fs.readFileSync(pruningTestPath, "utf-8");
 
         // Find all metric references and groupBy references in the test
@@ -320,9 +313,7 @@ describe("memory-safety", () => {
         const metricRefPattern =
           /"([a-z_]+)\.[a-z_]+"\s*as\s*FlattenAnalyticsMetricsEnum/g;
         let metricRef: RegExpExecArray | null;
-        while (
-          (metricRef = metricRefPattern.exec(pruningTestSource)) !== null
-        ) {
+        while ((metricRef = metricRefPattern.exec(pruningTestSource)) !== null) {
           coveredPrefixes.add(metricRef[1]!);
         }
 

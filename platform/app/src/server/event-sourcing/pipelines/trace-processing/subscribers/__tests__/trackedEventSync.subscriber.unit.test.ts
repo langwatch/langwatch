@@ -2,10 +2,7 @@ import type { TriggerContext } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import type {
-  SpanReceivedEvent,
-  TraceProcessingEvent,
-} from "../../schemas/events";
+import type { SpanReceivedEvent, TraceProcessingEvent } from "../../schemas/events";
 import type { OtlpSpan } from "../../schemas/otlp";
 import {
   createTrackedEventSyncHandler,
@@ -86,9 +83,7 @@ function makeRecordedTrackEventSpan(eventType: string): OtlpSpan {
     startTimeUnixNano: "1700000000500000000",
     endTimeUnixNano: "1700000000500000000",
     attributes,
-    events: [
-      { name: eventType, timeUnixNano: "1700000000500000000", attributes },
-    ],
+    events: [{ name: eventType, timeUnixNano: "1700000000500000000", attributes }],
     links: [],
     status: { code: 1, message: null },
     flags: null,
@@ -147,9 +142,7 @@ function createNonSpanEvent(): TraceProcessingEvent {
   } as unknown as TraceProcessingEvent;
 }
 
-function createContext(
-  state: TraceSummaryData,
-): TriggerContext<TraceSummaryData> {
+function createContext(state: TraceSummaryData): TriggerContext<TraceSummaryData> {
   // Deliberately NOT the event's `tenant-1`: the subscriber must record against
   // the context's tenant, and identical fixtures would let a subscriber reading
   // `event.tenantId` pass just as happily.
@@ -185,9 +178,7 @@ describe("extractTrackedEventsFromSpan", () => {
 
   describe("given a metric encoded as an OTLP integer", () => {
     it("reads a plain intValue", () => {
-      const span = makeOtlpSpan([
-        { type: "thumbs_up_down", intMetrics: { vote: 1 } },
-      ]);
+      const span = makeOtlpSpan([{ type: "thumbs_up_down", intMetrics: { vote: 1 } }]);
 
       expect(extractTrackedEventsFromSpan(span)[0]?.metrics).toEqual({
         vote: 1,
@@ -195,9 +186,7 @@ describe("extractTrackedEventsFromSpan", () => {
     });
 
     it("reads a stringified intValue", () => {
-      const span = makeOtlpSpan([
-        { type: "thumbs_up_down", intMetrics: { vote: "-1" } },
-      ]);
+      const span = makeOtlpSpan([{ type: "thumbs_up_down", intMetrics: { vote: "-1" } }]);
 
       expect(extractTrackedEventsFromSpan(span)[0]?.metrics).toEqual({
         vote: -1,
@@ -273,9 +262,7 @@ describe("extractTrackedEventsFromSpan", () => {
 
   describe("given a feedback event typed as the envelope name", () => {
     it("skips the reserved event type", () => {
-      const span = makeOtlpSpan([
-        { type: "langwatch.event", metrics: { vote: 1 } },
-      ]);
+      const span = makeOtlpSpan([{ type: "langwatch.event", metrics: { vote: 1 } }]);
 
       expect(extractTrackedEventsFromSpan(span)).toHaveLength(0);
     });
@@ -312,10 +299,7 @@ describe("trackedEventSync subscriber", () => {
       const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([]);
 
-      await subscriber(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await subscriber(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
     });
@@ -327,10 +311,7 @@ describe("trackedEventSync subscriber", () => {
       const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([{ metrics: { vote: 1 } }]);
 
-      await subscriber(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await subscriber(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
     });
@@ -348,10 +329,7 @@ describe("trackedEventSync subscriber", () => {
         },
       ]);
 
-      await subscriber(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await subscriber(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       expect(deps.recordTrackedEvent).toHaveBeenCalledTimes(1);
       const call = vi.mocked(deps.recordTrackedEvent).mock.calls[0]![0];
@@ -364,9 +342,7 @@ describe("trackedEventSync subscriber", () => {
 
     it("derives a deterministic event id from trace, span, and event type", async () => {
       const subscriber = createTrackedEventSyncHandler(deps);
-      const span = makeOtlpSpan([
-        { type: "thumbs_up_down", metrics: { vote: 1 } },
-      ]);
+      const span = makeOtlpSpan([{ type: "thumbs_up_down", metrics: { vote: 1 } }]);
       const event = createSpanReceivedEvent(span);
 
       await subscriber(event, createContext(createFoldState()));
@@ -382,14 +358,9 @@ describe("trackedEventSync subscriber", () => {
     it("does not record the invalid event", async () => {
       const subscriber = createTrackedEventSyncHandler(deps);
       // thumbs_up_down requires a vote in [-1, 1]; 5 is out of range.
-      const span = makeOtlpSpan([
-        { type: "thumbs_up_down", metrics: { vote: 5 } },
-      ]);
+      const span = makeOtlpSpan([{ type: "thumbs_up_down", metrics: { vote: 5 } }]);
 
-      await subscriber(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await subscriber(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
     });
@@ -403,10 +374,7 @@ describe("trackedEventSync subscriber", () => {
         { type: "waited_to_finish", metrics: { finished: 1 } },
       ]);
 
-      await subscriber(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await subscriber(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       expect(deps.recordTrackedEvent).toHaveBeenCalledTimes(2);
     });
@@ -420,10 +388,7 @@ describe("trackedEventSync subscriber", () => {
         { type: "thumbs_up_down", metrics: { vote: -1 } },
       ]);
 
-      await subscriber(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await subscriber(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       expect(deps.recordTrackedEvent).toHaveBeenCalledTimes(2);
       const calls = vi.mocked(deps.recordTrackedEvent).mock.calls;
@@ -461,10 +426,7 @@ describe("trackedEventSync subscriber", () => {
       ]);
 
       await expect(
-        subscriber(
-          createSpanReceivedEvent(span),
-          createContext(createFoldState()),
-        ),
+        subscriber(createSpanReceivedEvent(span), createContext(createFoldState())),
       ).rejects.toThrow("clickhouse unavailable");
 
       expect(deps.recordTrackedEvent).toHaveBeenCalledTimes(2);
@@ -477,15 +439,10 @@ describe("trackedEventSync subscriber", () => {
         new Error("clickhouse unavailable"),
       );
       const subscriber = createTrackedEventSyncHandler(deps);
-      const span = makeOtlpSpan([
-        { type: "thumbs_up_down", metrics: { vote: 1 } },
-      ]);
+      const span = makeOtlpSpan([{ type: "thumbs_up_down", metrics: { vote: 1 } }]);
 
       await expect(
-        subscriber(
-          createSpanReceivedEvent(span),
-          createContext(createFoldState()),
-        ),
+        subscriber(createSpanReceivedEvent(span), createContext(createFoldState())),
       ).rejects.toThrow("clickhouse unavailable");
     });
   });
@@ -493,9 +450,7 @@ describe("trackedEventSync subscriber", () => {
   describe("when the event is too old", () => {
     it("records no tracked event", async () => {
       const subscriber = createTrackedEventSyncHandler(deps);
-      const span = makeOtlpSpan([
-        { type: "thumbs_up_down", metrics: { vote: 1 } },
-      ]);
+      const span = makeOtlpSpan([{ type: "thumbs_up_down", metrics: { vote: 1 } }]);
       const oldEvent = createSpanReceivedEvent(span, {
         occurredAt: Date.now() - 2 * 60 * 60 * 1000,
       } as Partial<SpanReceivedEvent>);
@@ -512,10 +467,7 @@ describe("trackedEventSync subscriber", () => {
         const subscriber = createTrackedEventSyncHandler(deps);
         const span = makeRecordedTrackEventSpan("langwatch.event");
 
-        await subscriber(
-          createSpanReceivedEvent(span),
-          createContext(createFoldState()),
-        );
+        await subscriber(createSpanReceivedEvent(span), createContext(createFoldState()));
 
         expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
       });
@@ -532,10 +484,7 @@ describe("trackedEventSync subscriber", () => {
         const subscriber = createTrackedEventSyncHandler(deps);
         const span = makeRecordedTrackEventSpan("thumbs_up_down");
 
-        await subscriber(
-          createSpanReceivedEvent(span),
-          createContext(createFoldState()),
-        );
+        await subscriber(createSpanReceivedEvent(span), createContext(createFoldState()));
 
         expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
       });
@@ -545,14 +494,9 @@ describe("trackedEventSync subscriber", () => {
   describe("given a span claiming the envelope name as its event type", () => {
     it("records no tracked event", async () => {
       const subscriber = createTrackedEventSyncHandler(deps);
-      const span = makeOtlpSpan([
-        { type: "langwatch.event", metrics: { vote: 1 } },
-      ]);
+      const span = makeOtlpSpan([{ type: "langwatch.event", metrics: { vote: 1 } }]);
 
-      await subscriber(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await subscriber(createSpanReceivedEvent(span), createContext(createFoldState()));
 
       expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
     });
@@ -561,9 +505,7 @@ describe("trackedEventSync subscriber", () => {
   describe("given an ordinary SDK feedback span", () => {
     it("still records exactly one tracked event", async () => {
       const subscriber = createTrackedEventSyncHandler(deps);
-      const span = makeOtlpSpan([
-        { type: "thumbs_up_down", metrics: { vote: 1 } },
-      ]);
+      const span = makeOtlpSpan([{ type: "thumbs_up_down", metrics: { vote: 1 } }]);
       const event = createSpanReceivedEvent(span);
 
       expect(hasSyncableFeedback(event)).toBe(true);
@@ -577,9 +519,7 @@ describe("trackedEventSync subscriber", () => {
   describe("when deciding whether the span carries syncable feedback", () => {
     describe("when the span carries feedback events", () => {
       it("returns true", () => {
-        const span = makeOtlpSpan([
-          { type: "thumbs_up_down", metrics: { vote: 1 } },
-        ]);
+        const span = makeOtlpSpan([{ type: "thumbs_up_down", metrics: { vote: 1 } }]);
 
         expect(hasSyncableFeedback(createSpanReceivedEvent(span))).toBe(true);
       });

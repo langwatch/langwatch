@@ -170,9 +170,7 @@ export class TraceIOExtractionService {
         // No semantic match on any span — try stringified-payload fallback
         // against the span that finished last. See `extractFirstInput` for
         // rationale: fallback is never allowed to shadow a semantic match.
-        const allByEndTime = [...spans].sort(
-          (a, b) => b.endTimeUnixMs - a.endTimeUnixMs,
-        );
+        const allByEndTime = [...spans].sort((a, b) => b.endTimeUnixMs - a.endTimeUnixMs);
         for (const span of allByEndTime) {
           if (shouldExcludeSpan(span)) continue;
           const fb = this.extractFallbackIOFromSpan(span, "output");
@@ -290,9 +288,7 @@ export class TraceIOExtractionService {
    */
   organizeSpansIntoTree(spans: NormalizedSpan[]): SpanTreeNode[] {
     // Sort by start time for chronological ordering
-    const sorted = [...spans].sort(
-      (a, b) => a.startTimeUnixMs - b.startTimeUnixMs,
-    );
+    const sorted = [...spans].sort((a, b) => a.startTimeUnixMs - b.startTimeUnixMs);
 
     // Build node map
     const nodeMap = new Map<string, SpanTreeNode>();
@@ -446,10 +442,7 @@ function extractTextFromPlainJson(
     if (typeof val === "number" || typeof val === "boolean") return String(val);
     // Nested object with a known key (e.g. { inputs: { input: "hello" } })
     if (val && typeof val === "object" && !Array.isArray(val)) {
-      const nested = extractTextFromPlainJson(
-        val as Record<string, unknown>,
-        depth + 1,
-      );
+      const nested = extractTextFromPlainJson(val as Record<string, unknown>, depth + 1);
       if (nested) return nested;
     }
   }
@@ -472,10 +465,7 @@ function extractTextFromPlainJson(
   if (entries.length === 1) {
     const [, only] = entries[0]!;
     if (only && typeof only === "object" && !Array.isArray(only)) {
-      const nested = extractTextFromPlainJson(
-        only as Record<string, unknown>,
-        depth + 1,
-      );
+      const nested = extractTextFromPlainJson(only as Record<string, unknown>, depth + 1);
       if (nested) return nested;
     }
   }
@@ -500,8 +490,7 @@ function hasMeaningfulLeaf(
   if (typeof value !== "object") return false;
   if (seen.has(value as object)) return false;
   seen.add(value as object);
-  if (Array.isArray(value))
-    return value.some((v) => hasMeaningfulLeaf(v, seen));
+  if (Array.isArray(value)) return value.some((v) => hasMeaningfulLeaf(v, seen));
   return Object.values(value as Record<string, unknown>).some((v) =>
     hasMeaningfulLeaf(v, seen),
   );

@@ -47,11 +47,7 @@ export function LangyScenarioCard({
             {name ?? "Scenario"}
           </Text>
           {verdict ? (
-            <Badge
-              size="sm"
-              variant="subtle"
-              colorPalette={failed ? "red" : "green"}
-            >
+            <Badge size="sm" variant="subtle" colorPalette={failed ? "red" : "green"}>
               {verdict}
             </Badge>
           ) : null}

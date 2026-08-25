@@ -237,9 +237,7 @@ describe("CodingAgentSessionFoldProjection", () => {
           facts: {
             model: "claude-sonnet-4-5",
             cache_creation_tokens: 17_854,
-            ...(context !== undefined
-              ? { "llm_request.context": context }
-              : {}),
+            ...(context !== undefined ? { "llm_request.context": context } : {}),
           },
         }),
         initStateOf(projection),
@@ -250,10 +248,7 @@ describe("CodingAgentSessionFoldProjection", () => {
       // 17,854 writes at sonnet-4.5's $6/M hour-long rate vs $3.75/M
       // five-minute rate — the same lifetime rule the trace pipeline's
       // extractor stamps on the identical span.
-      expect(pricedCall("interaction").costUsd).toBeCloseTo(
-        17_854 * 0.000006,
-        6,
-      );
+      expect(pricedCall("interaction").costUsd).toBeCloseTo(17_854 * 0.000006, 6);
     });
 
     it("prices a sub-agent call's writes at the five-minute rate", () => {
@@ -621,12 +616,7 @@ describe("CodingAgentSessionFoldProjection", () => {
       const projection = makeProjection();
       let state = initStateOf(projection);
 
-      for (const [index, branch] of [
-        "main",
-        "feat/a",
-        "main",
-        "feat/a",
-      ].entries()) {
+      for (const [index, branch] of ["main", "feat/a", "main", "feat/a"].entries()) {
         state = projection.handleCodingAgentSessionLogFactsContributed(
           logFactsEvent({
             facts: contextFacts({ "vcs.ref.head.name": branch }),
@@ -664,27 +654,27 @@ describe("CodingAgentSessionFoldProjection", () => {
 
     /** @scenario A session context event from Codex folds its git identity */
     /** @scenario A session context event from opencode folds its git identity */
-    it.each([
-      "codex",
-      "opencode",
-    ])("folds the same identity for %s, because nothing in the fold is per-agent", (agent) => {
-      const projection = makeProjection();
-      let state = initStateOf(projection);
+    it.each(["codex", "opencode"])(
+      "folds the same identity for %s, because nothing in the fold is per-agent",
+      (agent) => {
+        const projection = makeProjection();
+        let state = initStateOf(projection);
 
-      state = projection.handleCodingAgentSessionLogFactsContributed(
-        logFactsEvent({
-          agent,
-          facts: contextFacts({ "coding_agent.name": agent }),
-        }),
-        state,
-      );
+        state = projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            agent,
+            facts: contextFacts({ "coding_agent.name": agent }),
+          }),
+          state,
+        );
 
-      expect(state.repositoryHost).toBe("github.com");
-      expect(state.repositoryOwner).toBe("acme");
-      expect(state.repositoryName).toBe("widgets");
-      expect(state.gitBranch).toBe("main");
-      expect(state.gitWorktree).toBe("widgets");
-    });
+        expect(state.repositoryHost).toBe("github.com");
+        expect(state.repositoryOwner).toBe("acme");
+        expect(state.repositoryName).toBe("widgets");
+        expect(state.gitBranch).toBe("main");
+        expect(state.gitWorktree).toBe("widgets");
+      },
+    );
   });
 
   describe("when the generated conversation title arrives", () => {
@@ -732,9 +722,7 @@ describe("CodingAgentSessionFoldProjection", () => {
   });
 
   describe("when the session earns its name from a prompt", () => {
-    const promptFacts = (
-      title: string,
-    ): Record<string, string | number | boolean> => ({
+    const promptFacts = (title: string): Record<string, string | number | boolean> => ({
       "event.name": "claude_code.user_prompt",
       prompt_length: title.length,
       "langwatch.session.title_fallback": title,
@@ -1414,10 +1402,7 @@ describe("read-back losslessness (ADR-066)", () => {
           facts: { tool_name: tool },
         });
 
-      let state = projection.apply(
-        projection.init(),
-        toolAt("t1", "Read", 3_000),
-      );
+      let state = projection.apply(projection.init(), toolAt("t1", "Read", 3_000));
       state = projection.apply(state, toolAt("t2", "Bash", 5_000));
 
       // Spans are batched on the wire, so this one lands last despite having
@@ -1426,11 +1411,7 @@ describe("read-back losslessness (ADR-066)", () => {
 
       const next = projection.apply(recover(state), late);
 
-      expect(next.steps.map((step) => step.name)).toEqual([
-        "Read",
-        "Grep",
-        "Bash",
-      ]);
+      expect(next.steps.map((step) => step.name)).toEqual(["Read", "Grep", "Bash"]);
 
       // Without the recorded start times every earlier step reads as time zero,
       // so the late step can only be appended — the order the spans arrived in.
@@ -1792,10 +1773,8 @@ describe("coding-agent session fold, codex", () => {
 
     it("reads the input the canonicalisation settled on, without deriving it again", () => {
       const projection = makeProjection();
-      const {
-        "codex.turn.token_usage.non_cached_input_tokens": _omit,
-        ...rest
-      } = codexTurnFacts;
+      const { "codex.turn.token_usage.non_cached_input_tokens": _omit, ...rest } =
+        codexTurnFacts;
 
       const state = projection.handleCodingAgentSessionSpanFactsContributed(
         spanFactsEvent({
@@ -1836,20 +1815,19 @@ describe("coding-agent session fold, codex", () => {
     it("folds the tool run from the event and drops the sandbox outcome", () => {
       const projection = makeProjection();
 
-      const afterToolResult =
-        projection.handleCodingAgentSessionLogFactsContributed(
-          logFactsEvent({
-            agent: "codex",
-            timeMs: 2_000,
-            facts: {
-              "event.name": "codex.tool_result",
-              tool_name: "shell",
-              success: "true",
-              duration_ms: 340,
-            },
-          }),
-          initStateOf(projection),
-        );
+      const afterToolResult = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "codex",
+          timeMs: 2_000,
+          facts: {
+            "event.name": "codex.tool_result",
+            tool_name: "shell",
+            success: "true",
+            duration_ms: 340,
+          },
+        }),
+        initStateOf(projection),
+      );
       // The SAME shell command also fires sandbox_outcome; mapping it onto
       // tool_result again would count the command twice.
       const state = projection.handleCodingAgentSessionLogFactsContributed(
@@ -1880,20 +1858,19 @@ describe("coding-agent session fold, codex", () => {
       // Code mode: the model calls `exec` with a script, and the
       // `tools.exec_command(...)` inside re-enters codex's registry as its
       // own dispatch — BOTH layers report a tool_result for one command.
-      const afterCommand =
-        projection.handleCodingAgentSessionLogFactsContributed(
-          logFactsEvent({
-            agent: "codex",
-            timeMs: 3_000,
-            facts: {
-              "event.name": "codex.tool_result",
-              tool_name: "exec_command",
-              success: "true",
-              duration_ms: 47,
-            },
-          }),
-          initStateOf(projection),
-        );
+      const afterCommand = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "codex",
+          timeMs: 3_000,
+          facts: {
+            "event.name": "codex.tool_result",
+            tool_name: "exec_command",
+            success: "true",
+            duration_ms: 47,
+          },
+        }),
+        initStateOf(projection),
+      );
       const state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
           agent: "codex",
@@ -1942,11 +1919,7 @@ describe("coding-agent session fold, codex", () => {
     /** @scenario "a codex denial and a codex abort are the human's decisions, not failures" */
     it("counts denied as a denial, and abort or timed_out as walking away", () => {
       const projection = makeProjection();
-      const decide = (
-        state: CodingAgentSessionState,
-        decision: string,
-        timeMs: number,
-      ) =>
+      const decide = (state: CodingAgentSessionState, decision: string, timeMs: number) =>
         projection.handleCodingAgentSessionLogFactsContributed(
           logFactsEvent({
             agent: "codex",

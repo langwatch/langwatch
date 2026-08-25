@@ -15,18 +15,12 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockState, mockOpenDrawer, mockDeleteProvider, mockTestConnection } =
-  vi.hoisted(() => ({
+const { mockState, mockOpenDrawer, mockDeleteProvider, mockTestConnection } = vi.hoisted(
+  () => ({
     mockState: {
       project: undefined as { id: string; slug: string } | undefined,
       permissions: { "project:manage": true, "project:create": true } as Record<
@@ -38,7 +32,8 @@ const { mockState, mockOpenDrawer, mockDeleteProvider, mockTestConnection } =
     mockOpenDrawer: vi.fn(),
     mockDeleteProvider: vi.fn(),
     mockTestConnection: vi.fn(),
-  }));
+  }),
+);
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -52,8 +47,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
       ],
     },
     team: { id: "team-1", name: "ACME" },
-    hasPermission: (permission: string) =>
-      mockState.permissions[permission] ?? false,
+    hasPermission: (permission: string) => mockState.permissions[permission] ?? false,
   }),
 }));
 
@@ -144,9 +138,7 @@ vi.mock("~/components/settings/ProviderScopeChips", () => ({
   }) => (
     <div
       data-testid="provider-scope-chips"
-      data-scopes={(scopes ?? [])
-        .map((s) => `${s.scopeType}:${s.name ?? ""}`)
-        .join(",")}
+      data-scopes={(scopes ?? []).map((s) => `${s.scopeType}:${s.name ?? ""}`).join(",")}
     />
   ),
 }));
@@ -228,9 +220,7 @@ vi.mock("~/components/ui/tooltip", () => ({
     ),
 }));
 
-const { default: ModelProvidersPage } = await import(
-  "~/pages/settings/model-providers"
-);
+const { default: ModelProvidersPage } = await import("~/pages/settings/model-providers");
 
 function renderPage() {
   return render(
@@ -273,13 +263,9 @@ describe("given the Model Providers settings page", () => {
       renderPage();
 
       expect(screen.getByText("No model providers")).toBeTruthy();
-      expect(
-        screen.getByText("Add a model provider to get started"),
-      ).toBeTruthy();
+      expect(screen.getByText("Add a model provider to get started")).toBeTruthy();
       expect(screen.queryByText("Create a project first")).toBeNull();
-      expect(
-        screen.queryByTestId("empty-state-create-first-project"),
-      ).toBeNull();
+      expect(screen.queryByTestId("empty-state-create-first-project")).toBeNull();
     });
 
     /** @scenario "The add action is available" */
@@ -289,9 +275,7 @@ describe("given the Model Providers settings page", () => {
       const addButton = screen.getByTestId("header-add-model-provider");
 
       expect(addButton.hasAttribute("disabled")).toBe(false);
-      expect(
-        tooltipWith("Create a project first to add a model provider."),
-      ).toBeNull();
+      expect(tooltipWith("Create a project first to add a model provider.")).toBeNull();
     });
 
     /** @scenario "Picking a provider opens its setup" */
@@ -299,9 +283,7 @@ describe("given the Model Providers settings page", () => {
       renderPage();
 
       expect(document.querySelector('[data-menu-item="openai"]')).toBeTruthy();
-      expect(
-        document.querySelector('[data-menu-item="anthropic"]'),
-      ).toBeTruthy();
+      expect(document.querySelector('[data-menu-item="anthropic"]')).toBeTruthy();
     });
 
     /** @scenario "Picking a provider opens its setup" */
@@ -322,9 +304,7 @@ describe("given the Model Providers settings page", () => {
     it("offers the same add action from the empty state itself", () => {
       renderPage();
 
-      const emptyStateAdd = screen.getByTestId(
-        "empty-state-add-model-provider",
-      );
+      const emptyStateAdd = screen.getByTestId("empty-state-add-model-provider");
 
       expect(emptyStateAdd.hasAttribute("disabled")).toBe(false);
     });
@@ -344,9 +324,7 @@ describe("given the Model Providers settings page", () => {
 
         expect(table.getByText("OpenAI")).toBeTruthy();
         expect(
-          screen
-            .getByTestId("provider-scope-chips")
-            .getAttribute("data-scopes"),
+          screen.getByTestId("provider-scope-chips").getAttribute("data-scopes"),
         ).toBe("ORGANIZATION:ACME");
       });
 
@@ -379,9 +357,9 @@ describe("given the Model Providers settings page", () => {
         );
         // No endpoint travels with it — see the service for why the absence is
         // the point.
-        expect(
-          Object.keys(mockTestConnection.mock.calls[0]![0] as object),
-        ).not.toContain("customBaseUrl");
+        expect(Object.keys(mockTestConnection.mock.calls[0]![0] as object)).not.toContain(
+          "customBaseUrl",
+        );
       });
 
       /** @scenario "A working credential says so" */
@@ -404,9 +382,7 @@ describe("given the Model Providers settings page", () => {
 
         fireEvent.click(document.querySelector('[data-menu-item="test"]')!);
 
-        expect(
-          await screen.findByText(/can't be tested automatically/),
-        ).toBeTruthy();
+        expect(await screen.findByText(/can't be tested automatically/)).toBeTruthy();
         expect(screen.queryByText("Connection works")).toBeNull();
       });
 
@@ -460,14 +436,10 @@ describe("given the Model Providers settings page", () => {
       renderPage();
 
       expect(
-        screen
-          .getByTestId("header-add-model-provider")
-          .hasAttribute("disabled"),
+        screen.getByTestId("header-add-model-provider").hasAttribute("disabled"),
       ).toBe(true);
       expect(
-        tooltipWith(
-          "You need model provider manage permissions to add new providers.",
-        ),
+        tooltipWith("You need model provider manage permissions to add new providers."),
       ).toBeTruthy();
     });
 
@@ -504,9 +476,7 @@ describe("given the Model Providers settings page", () => {
       renderPage();
 
       expect(
-        screen
-          .getByTestId("header-add-model-provider")
-          .hasAttribute("disabled"),
+        screen.getByTestId("header-add-model-provider").hasAttribute("disabled"),
       ).toBe(false);
       expect(screen.queryByText("Create a project first")).toBeNull();
     });

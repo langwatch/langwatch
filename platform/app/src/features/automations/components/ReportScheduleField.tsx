@@ -1,11 +1,4 @@
-import {
-  Field,
-  HStack,
-  Input,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SegmentedControl } from "~/components/ui/segmented-control";
 import { Switch } from "~/components/ui/switch";
@@ -130,9 +123,7 @@ export function ReportScheduleField({
           <Field.HelperText>
             Five fields: minute, hour, day-of-month, month, day-of-week.
           </Field.HelperText>
-          {cronError !== null ? (
-            <Field.ErrorText>{cronError}</Field.ErrorText>
-          ) : null}
+          {cronError !== null ? <Field.ErrorText>{cronError}</Field.ErrorText> : null}
         </Field.Root>
       ) : (
         <VStack align="stretch" gap={4}>
@@ -142,9 +133,7 @@ export function ReportScheduleField({
               <NativeSelect.Root>
                 <NativeSelect.Field
                   value={parts.frequency}
-                  onChange={(e) =>
-                    emitParts({ frequency: e.target.value as Frequency })
-                  }
+                  onChange={(e) => emitParts({ frequency: e.target.value as Frequency })}
                 >
                   {FREQUENCIES.map((f) => (
                     <option key={f} value={f}>
@@ -172,9 +161,7 @@ export function ReportScheduleField({
               <SegmentedControl
                 size="sm"
                 value={String(parts.dayOfWeek)}
-                onValueChange={({ value }) =>
-                  emitParts({ dayOfWeek: Number(value) })
-                }
+                onValueChange={({ value }) => emitParts({ dayOfWeek: Number(value) })}
                 items={WEEKDAY_OPTIONS.map((d) => ({
                   value: String(d.value),
                   label: d.short,
@@ -189,9 +176,7 @@ export function ReportScheduleField({
               <NativeSelect.Root>
                 <NativeSelect.Field
                   value={String(parts.dayOfMonth)}
-                  onChange={(e) =>
-                    emitParts({ dayOfMonth: Number(e.target.value) })
-                  }
+                  onChange={(e) => emitParts({ dayOfMonth: Number(e.target.value) })}
                 >
                   {DAYS_OF_MONTH.map((d) => (
                     <option key={d} value={d}>
@@ -213,9 +198,7 @@ export function ReportScheduleField({
             value={timezone}
             onChange={(e) => onChange({ cron, timezone: e.target.value })}
           >
-            {currentTzMissing ? (
-              <option value={timezone}>{timezone}</option>
-            ) : null}
+            {currentTzMissing ? <option value={timezone}>{timezone}</option> : null}
             {groups.map((group) => (
               <optgroup key={group.region} label={group.region}>
                 {group.zones.map((zone) => (
@@ -231,9 +214,7 @@ export function ReportScheduleField({
       </Field.Root>
 
       <Text textStyle="sm" color="fg.muted">
-        {advanced
-          ? describeCron(cron, timezone)
-          : summarizeSchedule(parts, timezone)}
+        {advanced ? describeCron(cron, timezone) : summarizeSchedule(parts, timezone)}
       </Text>
     </VStack>
   );

@@ -3,7 +3,9 @@ export abstract class BillingErrorReporter {
 }
 
 export class NullBillingErrorReporter extends BillingErrorReporter {
-  private constructor() { super(); }
+  private constructor() {
+    super();
+  }
 
   static create(): NullBillingErrorReporter {
     return new NullBillingErrorReporter();

@@ -20,12 +20,8 @@ describe("redactHiddenAttributes", () => {
         hidden,
       );
 
-      expect(result["app.billing.card_token"]).toBe(
-        "[REDACTED] (visible to Admins)",
-      );
-      expect(result["app.session_token"]).toBe(
-        "[REDACTED] (visible to no one)",
-      );
+      expect(result["app.billing.card_token"]).toBe("[REDACTED] (visible to Admins)");
+      expect(result["app.session_token"]).toBe("[REDACTED] (visible to no one)");
       expect(result["gen_ai.request.model"]).toBe("gpt-5-mini");
     });
   });
@@ -42,9 +38,7 @@ describe("redactHiddenAttributes", () => {
         hidden,
       ) as Record<string, Record<string, Record<string, unknown>>>;
 
-      expect(result.app!.billing!.card_token).toBe(
-        "[REDACTED] (visible to Admins)",
-      );
+      expect(result.app!.billing!.card_token).toBe("[REDACTED] (visible to Admins)");
       expect(result.app!.billing!.plan).toBe("[REDACTED] (visible to Admins)");
       expect(result.app!.public!.label).toBe("ok");
     });
@@ -62,9 +56,7 @@ describe("redactHiddenAttributes", () => {
         Record<string, Record<string, unknown>>
       >;
 
-      expect(result.app!.billing!.card_token).toBe(
-        "[REDACTED] (visible to Admins)",
-      );
+      expect(result.app!.billing!.card_token).toBe("[REDACTED] (visible to Admins)");
     });
 
     it("replaces a matched array whole instead of entering it", () => {
@@ -73,9 +65,7 @@ describe("redactHiddenAttributes", () => {
         hidden,
       ) as Record<string, unknown>;
 
-      expect((result.app as any).billing.items).toBe(
-        "[REDACTED] (visible to Admins)",
-      );
+      expect((result.app as any).billing.items).toBe("[REDACTED] (visible to Admins)");
       expect(result.other).toEqual([4, 5]);
     });
   });
@@ -87,9 +77,7 @@ describe("redactHiddenAttributes", () => {
         { pattern: "app.billing.*", visibleTo: "Admins" },
       ]);
 
-      expect(result["app.billing.card_token"]).toBe(
-        "[REDACTED] (visible to Security)",
-      );
+      expect(result["app.billing.card_token"]).toBe("[REDACTED] (visible to Security)");
     });
   });
 

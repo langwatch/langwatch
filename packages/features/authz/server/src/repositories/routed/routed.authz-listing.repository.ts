@@ -30,10 +30,7 @@ import type {
   RoleBindingScopeType,
 } from "@langwatch/authz-contract";
 import { AuthzListingRepository } from "../authz-listing.repository";
-import type {
-  AuthzDatabase,
-  AuthzReadHeadSelector,
-} from "../authz-read.repository";
+import type { AuthzDatabase, AuthzReadHeadSelector } from "../authz-read.repository";
 import { EventingAuthzListingRepository } from "../eventing/eventing.authz-listing.repository";
 import { PrismaAuthzListingRepository } from "../prisma/prisma.authz-listing.repository";
 
@@ -75,9 +72,7 @@ export class RoutedAuthzListingRepository extends AuthzListingRepository {
   async findOrganizationBindings(args: {
     organizationId: string;
   }): Promise<AuthzAccessBinding[]> {
-    return (await this.readerFor(args.organizationId)).findOrganizationBindings(
-      args,
-    );
+    return (await this.readerFor(args.organizationId)).findOrganizationBindings(args);
   }
 
   async findUserAndGroupBindings(args: {
@@ -85,9 +80,7 @@ export class RoutedAuthzListingRepository extends AuthzListingRepository {
     userId: string;
     groupIds: readonly string[];
   }): Promise<AuthzAccessBinding[]> {
-    return (await this.readerFor(args.organizationId)).findUserAndGroupBindings(
-      args,
-    );
+    return (await this.readerFor(args.organizationId)).findUserAndGroupBindings(args);
   }
 
   async findScopeBindings(args: {
@@ -109,9 +102,7 @@ export class RoutedAuthzListingRepository extends AuthzListingRepository {
     organizationId: string;
     teamIds: readonly string[];
   }): Promise<Map<string, AuthzTeamMemberBinding[]>> {
-    return (await this.readerFor(args.organizationId)).findTeamMemberBindings(
-      args,
-    );
+    return (await this.readerFor(args.organizationId)).findTeamMemberBindings(args);
   }
 
   /** Partitioned, not pinned: each organization is asked about on the head
@@ -157,14 +148,10 @@ export class RoutedAuthzListingRepository extends AuthzListingRepository {
   async findUserCreatedRoles(args: {
     organizationId: string;
   }): Promise<AuthzCustomRole[]> {
-    return (await this.readerFor(args.organizationId)).findUserCreatedRoles(
-      args,
-    );
+    return (await this.readerFor(args.organizationId)).findUserCreatedRoles(args);
   }
 
-  private async readerFor(
-    organizationId: string,
-  ): Promise<AuthzListingRepository> {
+  private async readerFor(organizationId: string): Promise<AuthzListingRepository> {
     return (await this.onEngine(organizationId))
       ? this.repositories.eventing
       : this.repositories.legacy;

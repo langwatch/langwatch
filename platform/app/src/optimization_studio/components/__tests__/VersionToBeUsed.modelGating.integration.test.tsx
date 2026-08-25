@@ -9,13 +9,7 @@
  * UX contract: specs/model-providers/missing-model-popup.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -109,9 +103,7 @@ describe("given the save-version fields are rendered", () => {
       mockResolvedDefault.current = null;
       render(<Harness />);
 
-      const sparkles = await screen.findByTestId(
-        "generate-commit-message-button",
-      );
+      const sparkles = await screen.findByTestId("generate-commit-message-button");
       expect(sparkles).toBeInTheDocument();
       // Past the effect + debounce window: still no request.
       await new Promise((resolve) => setTimeout(resolve, 30));
@@ -123,9 +115,7 @@ describe("given the save-version fields are rendered", () => {
       mockResolvedDefault.current = null;
       render(<Harness />);
 
-      const sparkles = await screen.findByTestId(
-        "generate-commit-message-button",
-      );
+      const sparkles = await screen.findByTestId("generate-commit-message-button");
       fireEvent.click(sparkles);
 
       // The request fires; the resulting MODEL_NOT_CONFIGURED error is
@@ -146,9 +136,7 @@ describe("given the save-version fields are rendered", () => {
       });
       // The sparkles button stays available as a manual retry / re-roll,
       // not only when no model is configured.
-      expect(
-        screen.getByTestId("generate-commit-message-button"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("generate-commit-message-button")).toBeInTheDocument();
     });
 
     /** @scenario Clicking the sparkles button with a configured model regenerates the description */

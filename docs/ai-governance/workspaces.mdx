@@ -6,26 +6,30 @@ sidebarTitle: Workspaces
 
 LangWatch organizes everything around three workspace scopes. Every Virtual Key, every Routing Policy, every Budget, every Audit Log row, every spend chart attaches to one of:
 
-- **Personal**: *you*. One Personal Workspace per user per org. Your Personal Virtual Keys, your `/me` dashboard, your spend ledger.
-- **Team**: a *group of people* in the same org. Shared budget envelope, shared routing policy override, shared Audit Log scope.
-- **Project**: a *shared application*. The right home for a virtual key bundled into an app's config (a chatbot, an internal RAG, a workflow). One project, many apps if useful, governed centrally.
+- **Personal**: _you_. One Personal Workspace per user per org. Your Personal Virtual Keys, your `/me` dashboard, your spend ledger.
+- **Team**: a _group of people_ in the same org. Shared budget envelope, shared routing policy override, shared Audit Log scope.
+- **Project**: a _shared application_. The right home for a virtual key bundled into an app's config (a chatbot, an internal RAG, a workflow). One project, many apps if useful, governed centrally.
 
 Every workspace lives **inside an organization**. Think of the org as the tenant boundary; the three workspaces are the inner partitions.
 
-<Info>**Pairs with:** [Members & invites](/ai-governance/members-and-invites) (who lives in your org) and [Routing policies](/ai-gateway/governance/routing-policies) (the shape every workspace's gateway behaviour inherits).</Info>
+<Info>
+  **Pairs with:** [Members & invites](/ai-governance/members-and-invites) (who lives in
+  your org) and [Routing policies](/ai-gateway/governance/routing-policies) (the shape
+  every workspace's gateway behaviour inherits).
+</Info>
 
 ## When to pick which
 
-Choose by what the artifact is *for*, not what's convenient.
+Choose by what the artifact is _for_, not what's convenient.
 
-| You want to… | Pick this scope | Why |
-|---|---|---|
-| Use Claude Code on your laptop | **Personal** | The CLI persona is per-user; spend, budget, and the Recent activity ledger should be yours. |
-| Mint a key for a chatbot the marketing team owns | **Project** | The key outlives any one engineer; project scope decouples the app from a specific person's account. |
-| Apply a tighter routing policy to the engineering team only | **Team** | The team scope nests under org and overrides the org default for its members. |
-| Cap spend across "everyone in the org" | **Organization** | Org scope sits above the three workspaces, see [Org-wide budgets](/ai-gateway/budgets). |
-| Cap spend "for marketing only" | **Team** | Same shape as the org cap, narrower scope. |
-| Cap spend for one engineer | **Principal** | A Personal workspace's owner is the principal, pin a budget there. |
+| You want to…                                                | Pick this scope  | Why                                                                                                  |
+| ----------------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------- |
+| Use Claude Code on your laptop                              | **Personal**     | The CLI persona is per-user; spend, budget, and the Recent activity ledger should be yours.          |
+| Mint a key for a chatbot the marketing team owns            | **Project**      | The key outlives any one engineer; project scope decouples the app from a specific person's account. |
+| Apply a tighter routing policy to the engineering team only | **Team**         | The team scope nests under org and overrides the org default for its members.                        |
+| Cap spend across "everyone in the org"                      | **Organization** | Org scope sits above the three workspaces, see [Org-wide budgets](/ai-gateway/budgets).              |
+| Cap spend "for marketing only"                              | **Team**         | Same shape as the org cap, narrower scope.                                                           |
+| Cap spend for one engineer                                  | **Principal**    | A Personal workspace's owner is the principal, pin a budget there.                                   |
 
 The chrome's [Workspace Switcher](#workspace-switcher) shows you the workspaces you can see; the [admin catalog](/ai-governance/personal-portal/admin-catalog) at `/governance/tool-catalog` controls which ones developers see entries for.
 
@@ -52,7 +56,7 @@ What you can't do:
 
 ### Personal-workspace privacy
 
-By default, *other users' Personal Workspaces are invisible to you*, outside the admin-only surfaces listed at the end of this section. The privacy contract is enforced at four layers:
+By default, _other users' Personal Workspaces are invisible to you_, outside the admin-only surfaces listed at the end of this section. The privacy contract is enforced at four layers:
 
 1. **Picker procedures** (`team.getTeamsWithMembers`, `team.getTeamWithMembers`, `organization.getOrganizationWithMembersAndTheirTeams`) strip personal teams owned by other users from the result, AND null-redact other members' email addresses while preserving the caller's own email.
 2. **Workspace data** (`useWorkspaceData` hook) fail-closes on null `ownerUserId`, an orphaned personal team without a clear owner is hidden from everyone.
@@ -85,7 +89,7 @@ Projects are shared applications. They:
 
 Create a project at `/[team]/projects` or via the project drawer in the chrome. Project visibility follows the team's member list, every member of a team can see every project under that team. If you need finer per-project access control, lift the gate to a [custom RBAC role](/ai-gateway/rbac) instead of nesting projects.
 
-When the AI Tools Portal's model-provider tiles offer to mint a virtual key, the inline form includes a hint: *"Building an application for your team? Consider creating a project instead."*: the Personal VK path is fast for personal work but the wrong shape for "everyone on the team uses this key."
+When the AI Tools Portal's model-provider tiles offer to mint a virtual key, the inline form includes a hint: _"Building an application for your team? Consider creating a project instead."_: the Personal VK path is fast for personal work but the wrong shape for "everyone on the team uses this key."
 
 ## Workspace switcher
 

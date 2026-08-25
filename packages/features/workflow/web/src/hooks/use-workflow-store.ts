@@ -70,9 +70,7 @@ export const _useWorkflowStore = create<WorkflowStore>()(
 
 type UseWorkflowStoreType = typeof _useWorkflowStore;
 
-export const useWorkflowStore = ((
-  ...args: Parameters<UseWorkflowStoreType>
-) => {
+export const useWorkflowStore = ((...args: Parameters<UseWorkflowStoreType>) => {
   const selector = args[0] ?? ((state) => state);
   const equalityFn = args[1];
 

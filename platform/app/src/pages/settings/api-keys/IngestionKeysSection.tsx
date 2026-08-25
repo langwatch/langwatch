@@ -48,8 +48,8 @@ export function IngestionKeysSection({
       <VStack gap={1} align="start">
         <Heading size="md">Ingestion keys</Heading>
         <Text fontSize="sm" color="fg.muted">
-          Write-only keys scoped to one project that only ingest traces. The
-          langwatch CLI mints these when you connect a tool.
+          Write-only keys scoped to one project that only ingest traces. The langwatch CLI
+          mints these when you connect a tool.
         </Text>
       </VStack>
 
@@ -111,9 +111,7 @@ export function IngestionKeysSection({
                   </Table.Cell>
                   <Table.Cell>
                     {apiKey.lastUsedAt ? (
-                      <Tooltip
-                        content={new Date(apiKey.lastUsedAt).toISOString()}
-                      >
+                      <Tooltip content={new Date(apiKey.lastUsedAt).toISOString()}>
                         <Text
                           cursor="help"
                           tabIndex={0}

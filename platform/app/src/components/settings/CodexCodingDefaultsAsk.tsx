@@ -49,12 +49,13 @@ interface CodexCodingDefaultsAskState {
   clear: () => void;
 }
 
-export const useCodexCodingDefaultsAskStore =
-  create<CodexCodingDefaultsAskState>((set) => ({
+export const useCodexCodingDefaultsAskStore = create<CodexCodingDefaultsAskState>(
+  (set) => ({
     pending: null,
     request: (ask) => set({ pending: ask }),
     clear: () => set({ pending: null }),
-  }));
+  }),
+);
 
 /**
  * Mounted once on the model-providers settings page. Renders the queued ask,
@@ -171,8 +172,8 @@ export function CodexCodingDefaultsDialog({
               description="The fast assists are the small AI helpers across the product: search, chat titles, autocomplete, and translations."
               testId="codex-fast-assists-info"
             />{" "}
-            across LangWatch will run on this OpenAI account's plan. The
-            playground, evaluations and workflows keep their current models.
+            across LangWatch will run on this OpenAI account's plan. The playground,
+            evaluations and workflows keep their current models.
           </Text>
         </DialogBody>
         <DialogFooter>

@@ -45,7 +45,7 @@ void (async () => {
 
   process.exit(0);
 })().catch((error: unknown) => {
-  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
   process.stderr.write(`[langwatch:task] fatal task failure: ${message}\n`);
   process.exit(1);
 });

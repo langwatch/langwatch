@@ -1,7 +1,4 @@
-import type {
-  AuthzGrantsService,
-  AuthzService,
-} from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import {
   PersonalWorkspaceDiagnosticsPort,
@@ -86,11 +83,7 @@ export class AppOrganizationRuntime {
     authz: AuthzService;
     grants: AuthzGrantsService;
   }): AppOrganizationRuntime {
-    return new AppOrganizationRuntime(
-      options.database,
-      options.authz,
-      options.grants,
-    );
+    return new AppOrganizationRuntime(options.database, options.authz, options.grants);
   }
 
   build(): OrganizationService {

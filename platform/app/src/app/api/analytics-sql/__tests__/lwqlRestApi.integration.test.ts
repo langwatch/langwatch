@@ -730,12 +730,10 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
     /** @scenario "An organization-scoped rule can switch the workbench on" */
     it("leaves the surface off for a project outside the rule's organization", async () => {
-      const response = await withOrganizationRule(
-        "org_someone_else",
-        async () =>
-          app.request(schemaPath(openProject), {
-            headers: { "X-Auth-Token": openProject.apiKey },
-          }),
+      const response = await withOrganizationRule("org_someone_else", async () =>
+        app.request(schemaPath(openProject), {
+          headers: { "X-Auth-Token": openProject.apiKey },
+        }),
       );
       const body = (await response.json()) as Record<string, any>;
       expect(response.status).toBe(403);
@@ -745,11 +743,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
   describe("when the caller is not authenticated", () => {
     it("refuses the request before any query is considered", async () => {
-      const response = await post(
-        openProject,
-        { sql: "SELECT 1" },
-        { token: null },
-      );
+      const response = await post(openProject, { sql: "SELECT 1" }, { token: null });
       expect(response.status).toBe(401);
     });
   });
@@ -856,10 +850,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
     });
 
     it("resolves an unqualified dataset name to the LangWatchQL database", async () => {
-      const body = await run(
-        openProject,
-        "SELECT count() AS value FROM traces",
-      );
+      const body = await run(openProject, "SELECT count() AS value FROM traces");
       expect(Number(body.rows[0].value)).toBeGreaterThan(0);
     });
   });
@@ -881,8 +872,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
     /** Every seeded trace shares this instant. */
     const SEEDED_AT = new Date(`${SEED_AT.replace(" ", "T")}Z`);
-    const second = (offset: number) =>
-      new Date(SEEDED_AT.getTime() + offset * 1000);
+    const second = (offset: number) => new Date(SEEDED_AT.getTime() + offset * 1000);
 
     const PERIOD_SQL = () =>
       `SELECT count() AS value FROM ${database}.traces ` +
@@ -895,9 +885,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         timeWindow,
       });
       const body = (await response.json()) as Record<string, any>;
-      expect(response.status, `query failed: ${JSON.stringify(body)}`).toBe(
-        200,
-      );
+      expect(response.status, `query failed: ${JSON.stringify(body)}`).toBe(200);
       expect(body.followsTimeWindow).toBe(true);
       return Number(body.rows[0].value);
     };
@@ -917,10 +905,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
           `AND OccurredAt < toDateTime64('2026-02-20 12:01:00', 3)`,
       );
       const count = Number(body.rows[0].value);
-      expect(
-        count,
-        "nothing is seeded in the window under test",
-      ).toBeGreaterThan(0);
+      expect(count, "nothing is seeded in the window under test").toBeGreaterThan(0);
       return count;
     };
 
@@ -928,25 +913,19 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
     it("returns the rows inside the window and none outside it", async () => {
       const expected = await literalBaseline();
 
-      expect(await countFor({ start: second(-60), end: second(60) })).toBe(
-        expected,
-      );
+      expect(await countFor({ start: second(-60), end: second(60) })).toBe(expected);
 
       // An hour and a half later. Under a local-time bug this window would
       // still bracket the seeded instant, because the pinned zone is three
       // hours behind UTC — so a non-zero answer here names that bug.
-      expect(await countFor({ start: second(5400), end: second(9000) })).toBe(
-        0,
-      );
+      expect(await countFor({ start: second(5400), end: second(9000) })).toBe(0);
     });
 
     /** @scenario "The period is half-open, so the start instant is included and the end instant is not" */
     it("includes a row sitting exactly on the start and excludes one on the end", async () => {
       const expected = await literalBaseline();
 
-      expect(await countFor({ start: SEEDED_AT, end: second(1) })).toBe(
-        expected,
-      );
+      expect(await countFor({ start: SEEDED_AT, end: second(1) })).toBe(expected);
       expect(await countFor({ start: second(-1), end: SEEDED_AT })).toBe(0);
     });
 
@@ -998,10 +977,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
     /** @scenario "Tenant scope derives exclusively from authenticated server context" */
     it("returns nothing, not everything, for a predicate naming the other tenant", async () => {
-      const foreignRows = await adminRowCount(
-        "trace_summaries",
-        gatedProject.id,
-      );
+      const foreignRows = await adminRowCount("trace_summaries", gatedProject.id);
       expect(foreignRows).toBeGreaterThan(0);
 
       const body = await run(
@@ -1047,9 +1023,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         { path: queryPath(gatedProject), token: openProject.apiKey },
       );
       expect(response.status).toBe(404);
-      expect(((await response.json()) as any).error.code).toBe(
-        "project_not_found",
-      );
+      expect(((await response.json()) as any).error.code).toBe("project_not_found");
     });
 
     /** @scenario "Tenant scope derives exclusively from authenticated server context" */
@@ -1061,9 +1035,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       });
       const body = (await response.json()) as any;
       expect(response.status, JSON.stringify(body)).toBe(200);
-      expect(body.rows.map((row: any) => row.TenantId)).toEqual([
-        openProject.id,
-      ]);
+      expect(body.rows.map((row: any) => row.TenantId)).toEqual([openProject.id]);
     });
 
     /** @scenario "Tenant scope derives exclusively from authenticated server context" */
@@ -1211,17 +1183,13 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       const withheld = columnOf(gated, "traces", "CapturedInput");
       expect(withheld.available).toBe(false);
       expect(withheld.gates).toEqual(["input"]);
-      expect(columnOf(gated, "traces", "CapturedOutput").gates).toEqual([
-        "output",
-      ]);
+      expect(columnOf(gated, "traces", "CapturedOutput").gates).toEqual(["output"]);
       expect(columnOf(gated, "traces", "TotalCost")).toMatchObject({
         gates: ["costs"],
         available: true,
       });
 
-      expect(columnOf(permitted, "traces", "CapturedInput").available).toBe(
-        true,
-      );
+      expect(columnOf(permitted, "traces", "CapturedInput").available).toBe(true);
       expect(
         permitted.datasets.flatMap((dataset: any) =>
           dataset.columns.filter((column: any) => !column.available),
@@ -1237,9 +1205,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
       for (const dataset of schema.datasets) {
         const result = await post(gatedProject, { sql: dataset.exampleSql });
-        expect(result.status, `${dataset.name}: ${dataset.exampleSql}`).toBe(
-          200,
-        );
+        expect(result.status, `${dataset.name}: ${dataset.exampleSql}`).toBe(200);
       }
     });
 
@@ -1334,15 +1300,11 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       );
       try {
         const names = async (project: Project) =>
-          (await readSchema(project)).datasets.map(
-            (dataset: any) => dataset.name,
-          );
+          (await readSchema(project)).datasets.map((dataset: any) => dataset.name);
 
         // The gated project's data-privacy rule withholds captured input, so
         // the dataset that needs it is not there at all.
-        expect(await names(gatedProject)).not.toContain(
-          `${database}.transcripts`,
-        );
+        expect(await names(gatedProject)).not.toContain(`${database}.transcripts`);
         // The same catalog, a caller who holds the permission: present. Absence
         // is about the permission and not about the fixture.
         expect(await names(openProject)).toContain(`${database}.transcripts`);
@@ -1428,9 +1390,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         expect(Number(answered.rows[0].value)).toBeGreaterThan(0);
       } finally {
         restoreShippedService();
-        await harness.applyAsAdmin([
-          `DROP VIEW IF EXISTS ${database}.transcripts`,
-        ]);
+        await harness.applyAsAdmin([`DROP VIEW IF EXISTS ${database}.transcripts`]);
       }
     });
 
@@ -1626,18 +1586,16 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       ["the database the connection is bound to", () => "currentDatabase()"],
     ];
 
-    it.each(
-      SESSION_PROBES,
-    )("refuses a query asking for %s", async (_case, call) => {
+    it.each(SESSION_PROBES)("refuses a query asking for %s", async (_case, call) => {
       const body = await refuse(
         openProject,
         `SELECT ${call(harness.names.tenantSetting)} AS value FROM ${database}.traces`,
       );
 
       expect(body.error.code).toBe("lwql_not_permitted");
-      expect(
-        body.error.meta.violations.map((violation: any) => violation.code),
-      ).toEqual(["FUNCTION_NOT_ALLOWED"]);
+      expect(body.error.meta.violations.map((violation: any) => violation.code)).toEqual([
+        "FUNCTION_NOT_ALLOWED",
+      ]);
     });
 
     it("still answers the same query shape with a function it does support", async () => {
@@ -1698,10 +1656,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       // ClickHouse then refuses. Its message is what an unfiltered error path
       // would relay, so it is captured here and asserted absent below.
       const failing = `SELECT CAST(TraceName AS UInt64) AS value FROM ${database}.traces`;
-      const databaseError = await selectScalar<string>(
-        restricted,
-        failing,
-      ).then(
+      const databaseError = await selectScalar<string>(restricted, failing).then(
         () => "",
         (error: unknown) => String((error as Error)?.message ?? ""),
       );

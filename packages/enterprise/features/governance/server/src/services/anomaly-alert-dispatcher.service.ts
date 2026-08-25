@@ -181,12 +181,8 @@ function buildAlertPayload(input: AnomalyAlertDispatchInput) {
   };
 }
 
-function summariseOutcomes(
-  outcomes: AnomalyAlertDispatchOutcome[],
-): string {
-  const succeeded = outcomes.filter(
-    (outcome) => outcome.status === "succeeded",
-  ).length;
+function summariseOutcomes(outcomes: AnomalyAlertDispatchOutcome[]): string {
+  const succeeded = outcomes.filter((outcome) => outcome.status === "succeeded").length;
   const failed = outcomes.length - succeeded;
   if (succeeded > 0 && failed === 0) return `dispatched_webhook_${succeeded}`;
   if (succeeded > 0) {

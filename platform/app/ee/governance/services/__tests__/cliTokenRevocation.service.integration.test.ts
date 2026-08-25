@@ -122,19 +122,12 @@ describe("CliTokenRevocationService.revokeForUser", () => {
       const userId = `usr-revoke-stale-${ns}`;
       const liveAccessToken = `lw_at_${ns}-live`;
       const staleAccessToken = `lw_at_${ns}-stale`;
-      const liveAccessKey =
-        CliTokenRevocationService.accessTokenKey(liveAccessToken);
-      const staleAccessKey =
-        CliTokenRevocationService.accessTokenKey(staleAccessToken);
+      const liveAccessKey = CliTokenRevocationService.accessTokenKey(liveAccessToken);
+      const staleAccessKey = CliTokenRevocationService.accessTokenKey(staleAccessToken);
       const indexKey = CliTokenRevocationService.userTokensIndexKey(userId);
 
       // Live token + stale entry in the index but no underlying key.
-      await redis.set(
-        liveAccessKey,
-        JSON.stringify({ user_id: userId }),
-        "EX",
-        3600,
-      );
+      await redis.set(liveAccessKey, JSON.stringify({ user_id: userId }), "EX", 3600);
       await redis.sadd(indexKey, liveAccessKey, staleAccessKey);
       await redis.pexpire(indexKey, 30 * 86400 * 1000);
 

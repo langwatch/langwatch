@@ -40,11 +40,7 @@ const productPillStyle = {
  *
  * Spec: specs/navigation/product-switcher-navigation.feature
  */
-export function ProductSwitcherMenu({
-  activeProductId,
-}: {
-  activeProductId: ProductId;
-}) {
+export function ProductSwitcherMenu({ activeProductId }: { activeProductId: ProductId }) {
   const router = useRouter();
   const { reachableProducts } = useReachableProducts();
   const projectSlug = useLlmOpsProjectSlug();
@@ -52,8 +48,7 @@ export function ProductSwitcherMenu({
   const active = productById(activeProductId);
   const ActiveIcon = active.icon;
   const options = PRODUCTS.filter(
-    (product) =>
-      product.id === activeProductId || reachableProducts.includes(product.id),
+    (product) => product.id === activeProductId || reachableProducts.includes(product.id),
   );
 
   const openProduct = (product: ProductDefinition) => {

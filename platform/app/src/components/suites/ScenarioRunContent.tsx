@@ -10,14 +10,7 @@
 
 import { Grid, VStack } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { ScenarioGridCard } from "./ScenarioGridCard";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
@@ -180,10 +173,7 @@ function VirtualizedContent({
     if (!containerRef.current || !isGrid) return;
     const available = containerRef.current.clientWidth - GRID_PADDING * 2;
     setColumns(
-      Math.max(
-        1,
-        Math.floor((available + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP)),
-      ),
+      Math.max(1, Math.floor((available + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP))),
     );
   }, [isGrid]);
 
@@ -194,10 +184,7 @@ function VirtualizedContent({
     const observer = new ResizeObserver(() => {
       const available = el.clientWidth - GRID_PADDING * 2;
       setColumns(
-        Math.max(
-          1,
-          Math.floor((available + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP)),
-        ),
+        Math.max(1, Math.floor((available + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP))),
       );
     });
     observer.observe(el);
@@ -316,9 +303,7 @@ function VirtualizedContent({
               targetName={resolveTargetName(scenarioRun)}
               onClick={() => onScenarioRunClick(scenarioRun)}
               iteration={iterationMap.get(scenarioRun.scenarioRunId)}
-              onCancel={
-                onCancelRun ? () => onCancelRun(scenarioRun) : undefined
-              }
+              onCancel={onCancelRun ? () => onCancelRun(scenarioRun) : undefined}
               isCancelling={cancellingJobId === scenarioRun.scenarioRunId}
             />
           </div>

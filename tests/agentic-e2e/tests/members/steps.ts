@@ -24,9 +24,9 @@ export async function givenIAmOnTheMembersPage(page: Page) {
   // exact href (see platform/app/src/routes.tsx). The org context comes from the
   // authenticated session, not the URL.
   await page.goto(`/settings/members`);
-  await expect(
-    page.getByRole("heading", { name: "Organization Members" })
-  ).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole("heading", { name: "Organization Members" })).toBeVisible({
+    timeout: 15000,
+  });
 }
 
 // =============================================================================
@@ -39,9 +39,9 @@ export async function givenIAmOnTheMembersPage(page: Page) {
 export async function whenIClickAddMembers(page: Page) {
   await page.getByRole("button", { name: /Add members/i }).click();
   // Wait for dialog - use last() for Chakra UI duplicate rendering
-  await expect(
-    page.getByRole("heading", { name: "Add members" }).last()
-  ).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("heading", { name: "Add members" }).last()).toBeVisible({
+    timeout: 5000,
+  });
 }
 
 /**
@@ -51,7 +51,10 @@ export async function whenIFillEmailWith(page: Page, email: string) {
   // The Add-members dialog uses a single comma/space-separated email input whose
   // placeholder is an example list ("alice@example.com, bob@example.com") — see
   // platform/app/src/components/AddMembersForm.tsx. Match it by a stable substring.
-  await page.getByPlaceholder(/alice@example\.com/i).last().fill(email);
+  await page
+    .getByPlaceholder(/alice@example\.com/i)
+    .last()
+    .fill(email);
 }
 
 /**
@@ -100,9 +103,7 @@ export async function whenICloseInviteLinkDialog(page: Page) {
  * Approve the invitation for a given email in the Invites table.
  */
 export async function whenIApproveInvitationFor(page: Page, email: string) {
-  const row = page
-    .getByRole("row")
-    .filter({ hasText: email });
+  const row = page.getByRole("row").filter({ hasText: email });
   await row.getByRole("button", { name: /approve/i }).click();
 }
 
@@ -110,9 +111,7 @@ export async function whenIApproveInvitationFor(page: Page, email: string) {
  * Reject the invitation for a given email in the Invites table.
  */
 export async function whenIRejectInvitationFor(page: Page, email: string) {
-  const row = page
-    .getByRole("row")
-    .filter({ hasText: email });
+  const row = page.getByRole("row").filter({ hasText: email });
   await row.getByRole("button", { name: /reject/i }).click();
 }
 
@@ -170,9 +169,9 @@ export async function thenISeeSuccessToast(page: Page, titleText: string) {
  * Assert that the Invites section is NOT visible.
  */
 export async function thenPendingApprovalSectionIsHidden(page: Page) {
-  await expect(
-    page.getByRole("heading", { name: "Invites" })
-  ).not.toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("heading", { name: "Invites" })).not.toBeVisible({
+    timeout: 5000,
+  });
 }
 
 // =============================================================================
@@ -229,31 +228,28 @@ export async function seedWaitingApprovalInvite({
   organizationId: string;
   teamId: string;
 }) {
-  const response = await page.request.post(
-    "/api/trpc/organization.createInviteRequest",
-    {
-      data: {
-        json: {
-          organizationId,
-          invites: [
-            {
-              email: email.toLowerCase(),
-              role: "MEMBER",
-              // Omit customRoleId entirely: the createInviteRequest schema types
-              // it as z.string().optional() (organization.ts), so a literal null
-              // fails validation with "Expected string, received null".
-              teams: [
-                {
-                  teamId,
-                  role: "MEMBER",
-                },
-              ],
-            },
-          ],
-        },
+  const response = await page.request.post("/api/trpc/organization.createInviteRequest", {
+    data: {
+      json: {
+        organizationId,
+        invites: [
+          {
+            email: email.toLowerCase(),
+            role: "MEMBER",
+            // Omit customRoleId entirely: the createInviteRequest schema types
+            // it as z.string().optional() (organization.ts), so a literal null
+            // fails validation with "Expected string, received null".
+            teams: [
+              {
+                teamId,
+                role: "MEMBER",
+              },
+            ],
+          },
+        ],
       },
-    }
-  );
+    },
+  });
 
   if (!response.ok()) {
     const body = await response.text();
@@ -293,9 +289,10 @@ export async function activateEnterpriseLicense(page: Page): Promise<void> {
   const result = await response.json().catch(() => null);
   if (!response.ok() || result?.["0"]?.error) {
     throw new Error(
-      `license.upload failed: ${response.status()} ${JSON.stringify(
-        result,
-      ).slice(0, 500)}`,
+      `license.upload failed: ${response.status()} ${JSON.stringify(result).slice(
+        0,
+        500,
+      )}`,
     );
   }
 }
@@ -322,9 +319,10 @@ export async function removeEnterpriseLicense(page: Page): Promise<void> {
   const result = await response.json().catch(() => null);
   if (!response.ok() || result?.["0"]?.error) {
     throw new Error(
-      `license.remove failed: ${response.status()} ${JSON.stringify(
-        result,
-      ).slice(0, 500)}`,
+      `license.remove failed: ${response.status()} ${JSON.stringify(result).slice(
+        0,
+        500,
+      )}`,
     );
   }
 }

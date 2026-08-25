@@ -8,9 +8,7 @@ describe("resolvePlatformDefaultRetentionDays", () => {
   describe("given the variable is not set", () => {
     // @scenario "An unset variable resolves to the fixed platform default"
     it("resolves to the fixed 49-day platform default", () => {
-      expect(
-        resolvePlatformDefaultRetentionDays({ NODE_ENV: "production" }),
-      ).toBe(49);
+      expect(resolvePlatformDefaultRetentionDays({ NODE_ENV: "production" })).toBe(49);
       expect(
         resolvePlatformDefaultRetentionDays({
           NODE_ENV: "development",

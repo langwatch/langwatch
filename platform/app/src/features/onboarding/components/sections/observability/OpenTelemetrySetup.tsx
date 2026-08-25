@@ -66,9 +66,9 @@ service:
           Environment Variables
         </Text>
         <Text textStyle="sm">
-          Configure your application to send traces directly to LangWatch by
-          setting these environment variables. This approach works with any
-          OpenTelemetry SDK or library that supports OTLP HTTP export.
+          Configure your application to send traces directly to LangWatch by setting these
+          environment variables. This approach works with any OpenTelemetry SDK or library
+          that supports OTLP HTTP export.
         </Text>
         <CodePreview
           code={envVarsCode}
@@ -80,8 +80,7 @@ service:
           onToggleVisibility={toggleVisibility}
         />
         <Text textStyle="xs" color="fg.muted">
-          Note: LangWatch supports all HTTP/protobuf, HTTP/JSON and gRPC
-          protocols.
+          Note: LangWatch supports all HTTP/protobuf, HTTP/JSON and gRPC protocols.
         </Text>
       </VStack>
 
@@ -92,9 +91,9 @@ service:
           OpenTelemetry Collector
         </Text>
         <Text textStyle="sm">
-          Use the OpenTelemetry Collector as an intermediary to receive traces
-          from your application and forward them to LangWatch. This is useful
-          for complex deployments or when you need additional processing.
+          Use the OpenTelemetry Collector as an intermediary to receive traces from your
+          application and forward them to LangWatch. This is useful for complex
+          deployments or when you need additional processing.
         </Text>
         <CodePreview
           code={collectorCode}

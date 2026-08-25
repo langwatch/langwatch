@@ -10,11 +10,7 @@ import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
  * turn, so a reader who opens a count here is reading, and the one thing they
  * can do from here is add another.
  */
-export function AnchorCommentThread({
-  comments,
-}: {
-  comments: AnnotationByTrace[];
-}) {
+export function AnchorCommentThread({ comments }: { comments: AnnotationByTrace[] }) {
   if (comments.length === 0) return null;
   return (
     <VStack

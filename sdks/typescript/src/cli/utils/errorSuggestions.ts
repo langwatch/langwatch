@@ -104,9 +104,8 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
 };
 
 /** The fallback advice for a code, or undefined when we have none to give. */
-export const fallbackSuggestionsFor = (
-  code: string,
-): ErrorExplanation | undefined => FALLBACK_BY_CODE[code];
+export const fallbackSuggestionsFor = (code: string): ErrorExplanation | undefined =>
+  FALLBACK_BY_CODE[code];
 
 /**
  * Fill `suggestions`/`docUrl` from the fallback table — ONLY when the platform
@@ -114,9 +113,7 @@ export const fallbackSuggestionsFor = (
  * code that raised the failure, so it can only be more specific than a table
  * shipped with the CLI.
  */
-export const withFallbackSuggestions = (
-  domain: CliHandledError,
-): CliHandledError => {
+export const withFallbackSuggestions = (domain: CliHandledError): CliHandledError => {
   if (domain.suggestions?.length && domain.docUrl) return domain;
 
   const fallback = fallbackSuggestionsFor(domain.code);
@@ -124,9 +121,7 @@ export const withFallbackSuggestions = (
 
   return {
     ...domain,
-    ...(domain.suggestions?.length
-      ? {}
-      : { suggestions: fallback.suggestions }),
+    ...(domain.suggestions?.length ? {} : { suggestions: fallback.suggestions }),
     ...(domain.docUrl ? {} : fallback.docUrl ? { docUrl: fallback.docUrl } : {}),
   };
 };

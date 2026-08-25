@@ -25,13 +25,8 @@ export const useFilterToggle = (
   { defaultShowFilters } = { defaultShowFilters: false },
 ) => {
   const router = useRouter();
-  const {
-    filterParams,
-    filterCount,
-    hasAnyFilters,
-    clearFilters,
-    setNegateFilters,
-  } = useFilterParams();
+  const { filterParams, filterCount, hasAnyFilters, clearFilters, setNegateFilters } =
+    useFilterParams();
 
   const showFilters =
     typeof router.query.show_filters === "string"
@@ -102,15 +97,10 @@ export function FilterToggle({
 }: {
   defaultShowFilters?: boolean;
 }) {
-  const {
-    showFilters,
-    setShowFilters,
-    filterParams,
-    clearFilters,
-    setNegateFilters,
-  } = useFilterToggle({
-    defaultShowFilters,
-  });
+  const { showFilters, setShowFilters, filterParams, clearFilters, setNegateFilters } =
+    useFilterToggle({
+      defaultShowFilters,
+    });
 
   return (
     <FilterToggleButton
@@ -191,8 +181,7 @@ export function FilterToggleButton({
               setNegateFilters(!negateFiltersToggled);
             }}
           >
-            <span style={{ fontSize: "20px", marginTop: "-4px" }}>¬</span>{" "}
-            Negate Filters
+            <span style={{ fontSize: "20px", marginTop: "-4px" }}>¬</span> Negate Filters
           </Button>
         </Tooltip>
       )}

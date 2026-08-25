@@ -3,11 +3,7 @@ import { registerCodeActions } from "./python/codeActions";
 import { registerCompletion } from "./python/completion";
 import { registerFormatter } from "./python/formatter";
 import { registerHover } from "./python/hover";
-import type {
-  ContractRef,
-  PythonContract,
-  PythonProviderHandle,
-} from "./python/shared";
+import type { ContractRef, PythonContract, PythonProviderHandle } from "./python/shared";
 import { registerSignatureHelp } from "./python/signatureHelp";
 import { registerValidator } from "./python/validator";
 

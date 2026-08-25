@@ -10,10 +10,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-const CONTAINER_INFO_FILE = path.join(
-  os.tmpdir(),
-  "langwatch-test-containers.json",
-);
+const CONTAINER_INFO_FILE = path.join(os.tmpdir(), "langwatch-test-containers.json");
 
 try {
   if (fs.existsSync(CONTAINER_INFO_FILE)) {

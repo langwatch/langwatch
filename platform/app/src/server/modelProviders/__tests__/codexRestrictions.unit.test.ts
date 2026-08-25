@@ -66,19 +66,11 @@ describe("codexRestrictions", () => {
   });
 
   it("allows codex as a role default only for LANGY and FAST", () => {
-    expect(isModelAllowedAsRoleDefault(CODEX_DEFAULT_MODEL, "LANGY")).toBe(
-      true,
-    );
+    expect(isModelAllowedAsRoleDefault(CODEX_DEFAULT_MODEL, "LANGY")).toBe(true);
     expect(isModelAllowedAsRoleDefault(CODEX_DEFAULT_MODEL, "FAST")).toBe(true);
-    expect(isModelAllowedAsRoleDefault(CODEX_DEFAULT_MODEL, "DEFAULT")).toBe(
-      false,
-    );
-    expect(isModelAllowedAsRoleDefault(CODEX_DEFAULT_MODEL, "EMBEDDINGS")).toBe(
-      false,
-    );
-    expect(isModelAllowedAsRoleDefault("openai/gpt-5-mini", "DEFAULT")).toBe(
-      true,
-    );
+    expect(isModelAllowedAsRoleDefault(CODEX_DEFAULT_MODEL, "DEFAULT")).toBe(false);
+    expect(isModelAllowedAsRoleDefault(CODEX_DEFAULT_MODEL, "EMBEDDINGS")).toBe(false);
+    expect(isModelAllowedAsRoleDefault("openai/gpt-5-mini", "DEFAULT")).toBe(true);
   });
 
   describe("given the two sibling scenario feature keys", () => {
@@ -92,10 +84,7 @@ describe("codexRestrictions", () => {
     describe("when the run-time agent-under-test key is checked", () => {
       it("registers it as DEFAULT-role and refuses codex", () => {
         const feature = featureByKey("scenarios.agent_under_test");
-        expect(
-          feature,
-          'feature "scenarios.agent_under_test" must exist',
-        ).toBeTruthy();
+        expect(feature, 'feature "scenarios.agent_under_test" must exist').toBeTruthy();
         expect(feature?.role).toBe("DEFAULT");
         expect(
           isModelAllowedForFeature({

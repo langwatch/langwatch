@@ -1,13 +1,7 @@
-import {
-  ALL_PERMISSIONS,
-  type CollectedBinding,
-} from "@langwatch/authz-contract";
+import { ALL_PERMISSIONS, type CollectedBinding } from "@langwatch/authz-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthzReadRepository } from "../src/repositories/authz-read.repository";
-import {
-  AuthzService,
-  type AuthzServiceOptions,
-} from "../src/services/authz.service";
+import { AuthzService, type AuthzServiceOptions } from "../src/services/authz.service";
 import { StubAuthzEpoch } from "./support/authz-epoch.stub";
 import { StubAuthzListingRepository } from "./support/authz-listing.stub";
 import { makeReader } from "./support/authz-read.stub";
@@ -74,18 +68,14 @@ describe("AuthzService epoch cache", () => {
 
       const cached: boolean[] = [];
       for (const permission of ALL_PERMISSIONS) {
-        cached.push(
-          await authz.can({ principal: alice, permission, scope: orgScope }),
-        );
+        cached.push(await authz.can({ principal: alice, permission, scope: orgScope }));
       }
       expect(collects()).toBe(1);
 
       const fresh = makeUncachedService(makeMemberReader().reader);
       const expected: boolean[] = [];
       for (const permission of ALL_PERMISSIONS) {
-        expected.push(
-          await fresh.can({ principal: alice, permission, scope: orgScope }),
-        );
+        expected.push(await fresh.can({ principal: alice, permission, scope: orgScope }));
       }
       expect(cached).toEqual(expected);
       expect(cached).toContain(true);

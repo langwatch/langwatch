@@ -27,9 +27,7 @@ class MemoryCatalog extends GovernanceAiToolCatalogService {
   resolveToolPolicyMap = vi.fn(async () => PLATFORM_TOOL_POLICY_DEFAULTS);
   resolveCliCatalogForUser = vi.fn(async () => ({
     tools: [{ slug: "claude", displayName: "Claude Code" }],
-    providers: [
-      { providerKey: "anthropic", displayName: "Anthropic", configured: true },
-    ],
+    providers: [{ providerKey: "anthropic", displayName: "Anthropic", configured: true }],
     configuredProviderKeys: ["anthropic"],
   }));
 }

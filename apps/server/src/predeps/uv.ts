@@ -29,7 +29,10 @@ export const uvPredep: Predep = {
         if (v) return { installed: true, version: v, resolvedPath: c };
       }
     }
-    return { installed: false, reason: "uv binary not found on PATH or in ~/.langwatch/bin" };
+    return {
+      installed: false,
+      reason: "uv binary not found on PATH or in ~/.langwatch/bin",
+    };
   },
 
   async install({ paths, task }) {

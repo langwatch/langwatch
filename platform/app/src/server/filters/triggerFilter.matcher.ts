@@ -56,12 +56,8 @@ const MATCHABLE_EVENT_FILTER_FIELDS: ReadonlySet<string> = new Set([
  * events list. Subscribers use this to derive events from stored_spans only when a
  * trigger actually filters on them, keeping the common path off the read.
  */
-export function triggerFiltersReferenceEvents(
-  filters: TriggerFilters,
-): boolean {
-  return Object.keys(filters).some((field) =>
-    MATCHABLE_EVENT_FILTER_FIELDS.has(field),
-  );
+export function triggerFiltersReferenceEvents(filters: TriggerFilters): boolean {
+  return Object.keys(filters).some((field) => MATCHABLE_EVENT_FILTER_FIELDS.has(field));
 }
 
 /**
@@ -387,9 +383,7 @@ function matchEventMetricRange(
             event.event_type === eventType &&
             event.metrics.some(
               (metric) =>
-                metric.key === metricKey &&
-                metric.value >= min &&
-                metric.value <= max,
+                metric.key === metricKey && metric.value >= min && metric.value <= max,
             ),
         )
       ) {
@@ -450,9 +444,7 @@ function matchEvaluationField(
 
   // Keyed filters: evaluations.passed, evaluations.state, evaluations.label, evaluations.score
   for (const [evaluatorId, subValue] of Object.entries(filterValue)) {
-    const evalsForEvaluator = evaluations.filter(
-      (e) => e.evaluatorId === evaluatorId,
-    );
+    const evalsForEvaluator = evaluations.filter((e) => e.evaluatorId === evaluatorId);
     if (evalsForEvaluator.length === 0) return false;
 
     if (Array.isArray(subValue)) {
@@ -504,18 +496,12 @@ function matchEvaluatorIdFilter(
 
     case "evaluations.evaluator_id.has_passed":
       return evaluations.some(
-        (e) =>
-          evaluatorIds.includes(e.evaluatorId) &&
-          hasVerdict(e) &&
-          e.passed !== null,
+        (e) => evaluatorIds.includes(e.evaluatorId) && hasVerdict(e) && e.passed !== null,
       );
 
     case "evaluations.evaluator_id.has_score":
       return evaluations.some(
-        (e) =>
-          evaluatorIds.includes(e.evaluatorId) &&
-          hasVerdict(e) &&
-          e.score !== null,
+        (e) => evaluatorIds.includes(e.evaluatorId) && hasVerdict(e) && e.score !== null,
       );
 
     case "evaluations.evaluator_id.has_label":
@@ -540,16 +526,12 @@ function matchEvaluationValues(
   switch (field) {
     case "evaluations.passed":
       return evaluations.some(
-        (e) =>
-          hasVerdict(e) &&
-          e.passed !== null &&
-          values.includes(String(e.passed)),
+        (e) => hasVerdict(e) && e.passed !== null && values.includes(String(e.passed)),
       );
 
     case "evaluations.score":
       return evaluations.some(
-        (e) =>
-          hasVerdict(e) && e.score !== null && values.includes(String(e.score)),
+        (e) => hasVerdict(e) && e.score !== null && values.includes(String(e.score)),
       );
 
     case "evaluations.state":

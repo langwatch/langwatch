@@ -2,10 +2,8 @@ import type { AnnotationScoreDataType } from "~/generated/prisma/client";
 import type { AnnotationAnchorColumns } from "~/server/annotations/annotationAnchor";
 import type { RouterOutputs } from "~/utils/api";
 
-export type AnnotationScoreList =
-  RouterOutputs["annotationScore"]["getAllActive"];
-export type TraceAnnotation =
-  RouterOutputs["annotation"]["getByTraceId"][number];
+export type AnnotationScoreList = RouterOutputs["annotationScore"]["getAllActive"];
+export type TraceAnnotation = RouterOutputs["annotation"]["getByTraceId"][number];
 
 /** Rating a turn versus correcting its output. */
 export type AnnotationMode = "annotate" | "suggest";

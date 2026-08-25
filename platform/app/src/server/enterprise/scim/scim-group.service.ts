@@ -103,9 +103,7 @@ export class ScimGroupService {
       totalResults: totalCount,
       startIndex,
       itemsPerPage: count,
-      Resources: groups.map((g) =>
-        this.toScimGroup(g, g.members, excludeMembers),
-      ),
+      Resources: groups.map((g) => this.toScimGroup(g, g.members, excludeMembers)),
     };
   }
 
@@ -119,8 +117,7 @@ export class ScimGroupService {
     excludeMembers?: boolean;
   }): Promise<ScimGroup | ScimError> {
     const group = await this.findGroup({ externalScimId, organizationId });
-    if (!group)
-      return this.scimError({ status: "404", detail: "Group not found" });
+    if (!group) return this.scimError({ status: "404", detail: "Group not found" });
 
     const members = await this.prisma.groupMembership.findMany({
       where: { groupId: group.id },
@@ -189,8 +186,7 @@ export class ScimGroupService {
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup | ScimError> {
     const group = await this.findGroup({ externalScimId, organizationId });
-    if (!group)
-      return this.scimError({ status: "404", detail: "Group not found" });
+    if (!group) return this.scimError({ status: "404", detail: "Group not found" });
 
     if (request.displayName !== group.name) {
       await this.prisma.group.update({
@@ -238,8 +234,7 @@ export class ScimGroupService {
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup | ScimError> {
     const group = await this.findGroup({ externalScimId, organizationId });
-    if (!group)
-      return this.scimError({ status: "404", detail: "Group not found" });
+    if (!group) return this.scimError({ status: "404", detail: "Group not found" });
 
     for (const operation of patchRequest.Operations) {
       await this.applyPatch({ group, operation, organizationId });
@@ -264,8 +259,7 @@ export class ScimGroupService {
     organizationId: string;
   }): Promise<ScimError | null> {
     const group = await this.findGroup({ externalScimId, organizationId });
-    if (!group)
-      return this.scimError({ status: "404", detail: "Group not found" });
+    if (!group) return this.scimError({ status: "404", detail: "Group not found" });
 
     // The grants the group carried go first and carry instant enforcement:
     // an IdP that deletes a group has taken that access away. Reconciled to
@@ -359,20 +353,13 @@ export class ScimGroupService {
     }
 
     if (operation.op === "remove" && operation.path?.startsWith("members")) {
-      const ids = this.extractMemberIdsFromPath(
-        operation.path,
-        operation.value,
-      );
-      if (ids.length)
-        await this.removeMembers({ groupId: group.id, userIds: ids });
+      const ids = this.extractMemberIdsFromPath(operation.path, operation.value);
+      if (ids.length) await this.removeMembers({ groupId: group.id, userIds: ids });
       return;
     }
 
     if (operation.op === "replace") {
-      if (
-        operation.path === "displayName" &&
-        typeof operation.value === "string"
-      ) {
+      if (operation.path === "displayName" && typeof operation.value === "string") {
         await this.prisma.group.update({
           where: { id: group.id },
           data: { name: operation.value },
@@ -388,10 +375,7 @@ export class ScimGroupService {
         operation.value !== null
       ) {
         const valueObj = operation.value as Record<string, unknown>;
-        if (
-          "displayName" in valueObj &&
-          typeof valueObj.displayName === "string"
-        ) {
+        if ("displayName" in valueObj && typeof valueObj.displayName === "string") {
           await this.prisma.group.update({
             where: { id: group.id },
             data: { name: valueObj.displayName },
@@ -446,16 +430,11 @@ export class ScimGroupService {
     }
   }
 
-  private async uniqueSlug(
-    organizationId: string,
-    name: string,
-  ): Promise<string> {
+  private async uniqueSlug(organizationId: string, name: string): Promise<string> {
     const base = slugify(name, { lower: true, strict: true }) || "group";
     let slug = base;
     let i = 1;
-    while (
-      await this.prisma.group.findFirst({ where: { organizationId, slug } })
-    ) {
+    while (await this.prisma.group.findFirst({ where: { organizationId, slug } })) {
       slug = `${base}-${i++}`;
     }
     return slug;
@@ -527,11 +506,8 @@ export class ScimGroupService {
    * apart so the logs can be: one is a payload worth fixing, the other is an
    * ordinary operation that simply had nothing to say about members.
    */
-  private extractRequestedMemberIds(
-    operation: ScimPatchOperation,
-  ): MemberInstruction {
-    if (operation.path === "members")
-      return this.readMemberList(operation.value);
+  private extractRequestedMemberIds(operation: ScimPatchOperation): MemberInstruction {
+    if (operation.path === "members") return this.readMemberList(operation.value);
 
     if (
       !operation.path &&
@@ -539,9 +515,7 @@ export class ScimGroupService {
       operation.value !== null &&
       "members" in operation.value
     ) {
-      return this.readMemberList(
-        (operation.value as Record<string, unknown>).members,
-      );
+      return this.readMemberList((operation.value as Record<string, unknown>).members);
     }
 
     return { kind: "absent" };
@@ -577,13 +551,7 @@ export class ScimGroupService {
     return this.extractMemberIds(value);
   }
 
-  private scimError({
-    status,
-    detail,
-  }: {
-    status: string;
-    detail: string;
-  }): ScimError {
+  private scimError({ status, detail }: { status: string; detail: string }): ScimError {
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
       status,

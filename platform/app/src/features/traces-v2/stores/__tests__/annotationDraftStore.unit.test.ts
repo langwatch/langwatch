@@ -157,9 +157,7 @@ describe("given a comment about one part of a trace", () => {
       expect(isSameAnnotationTarget(onOutput, onOutput)).toBe(true);
       expect(isSameAnnotationTarget(onOutput, onInput)).toBe(false);
       expect(isSameAnnotationTarget(onOutput, onWholeTrace)).toBe(false);
-      expect(isSameAnnotationTarget(onWholeTrace, { traceId: "trace-1" })).toBe(
-        true,
-      );
+      expect(isSameAnnotationTarget(onWholeTrace, { traceId: "trace-1" })).toBe(true);
     });
   });
 });

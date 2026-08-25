@@ -178,9 +178,7 @@ describe("AGENT_GOVERNANCE signup then adding a model provider (real DB)", () =>
         include: { projects: true },
       });
 
-      expect(selectAmbientTeam({ teams })?.id).toBe(
-        teams.find((t) => !t.isPersonal)!.id,
-      );
+      expect(selectAmbientTeam({ teams })?.id).toBe(teams.find((t) => !t.isPersonal)!.id);
     });
   });
 

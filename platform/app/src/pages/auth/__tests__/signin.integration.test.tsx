@@ -12,16 +12,14 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockSignIn, sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(
-  () => ({
-    mockSignIn: vi.fn(),
-    sessionRef: { current: { data: null as unknown } },
-    publicEnvRef: {
-      current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
-    },
-    searchParamsRef: { current: new URLSearchParams("") },
-  }),
-);
+const { mockSignIn, sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(() => ({
+  mockSignIn: vi.fn(),
+  sessionRef: { current: { data: null as unknown } },
+  publicEnvRef: {
+    current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
+  },
+  searchParamsRef: { current: new URLSearchParams("") },
+}));
 
 vi.mock("~/utils/auth-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/utils/auth-client")>();
@@ -55,14 +53,7 @@ vi.mock("~/hooks/usePublicEnv", () => ({
 }));
 
 vi.mock("~/utils/compat/next-link", () => ({
-  default: ({
-    href,
-    children,
-    ...props
-  }: {
-    href: string;
-    children: ReactNode;
-  }) => (
+  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -112,9 +103,7 @@ describe("SignIn forgot-password entry point", () => {
 
       expect(container.querySelector('input[type="email"]')).toBeNull();
       expect(container.querySelector('input[type="password"]')).toBeNull();
-      expect(
-        screen.queryByRole("link", { name: /forgot password/i }),
-      ).toBeNull();
+      expect(screen.queryByRole("link", { name: /forgot password/i })).toBeNull();
     });
   });
 });
@@ -134,9 +123,7 @@ describe("SignIn already-authenticated redirect", () => {
 
   describe("given a protocol-relative callbackUrl (@regression: open redirect via //host)", () => {
     it("falls back to the dashboard instead of following it off-domain", async () => {
-      searchParamsRef.current = new URLSearchParams(
-        "callbackUrl=//evil.example.com",
-      );
+      searchParamsRef.current = new URLSearchParams("callbackUrl=//evil.example.com");
       renderPage();
 
       await waitFor(() => {
@@ -148,9 +135,7 @@ describe("SignIn already-authenticated redirect", () => {
 
   describe("given a same-origin relative callbackUrl", () => {
     it("preserves it as the redirect destination", async () => {
-      searchParamsRef.current = new URLSearchParams(
-        "callbackUrl=/settings/members",
-      );
+      searchParamsRef.current = new URLSearchParams("callbackUrl=/settings/members");
       renderPage();
 
       await waitFor(() => {

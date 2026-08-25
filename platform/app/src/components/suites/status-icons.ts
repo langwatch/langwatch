@@ -6,14 +6,7 @@
  */
 
 import type { LucideIcon } from "lucide-react";
-import {
-  AlertTriangle,
-  Ban,
-  CheckCircle,
-  Clock,
-  Loader,
-  XCircle,
-} from "lucide-react";
+import { AlertTriangle, Ban, CheckCircle, Clock, Loader, XCircle } from "lucide-react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
 export interface StatusIconConfig {

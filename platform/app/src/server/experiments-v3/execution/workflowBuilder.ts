@@ -35,11 +35,7 @@ import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
 import { buildLLMConfig } from "~/prompts/llmConfigBuilder";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ChatMessage } from "~/server/tracer/types";
-import type {
-  ExecutionCell,
-  WorkflowBuilderInput,
-  WorkflowBuilderOutput,
-} from "./types";
+import type { ExecutionCell, WorkflowBuilderInput, WorkflowBuilderOutput } from "./types";
 
 // ============================================================================
 // Main Workflow Builder
@@ -148,8 +144,7 @@ const datasetEdge = ({
   datasetColumns: Array<{ id: string; name: string; type: string }>;
 }): Edge => {
   const columnId =
-    datasetColumns.find((column) => column.name === columnName)?.id ??
-    columnName;
+    datasetColumns.find((column) => column.name === columnName)?.id ?? columnName;
   return {
     id: `${entryNodeId}->${nodeId}.${inputField}`,
     source: entryNodeId,
@@ -654,9 +649,7 @@ export const buildSignatureNodeFromLocalConfig = ({
 
   // Extract system prompt from messages if present
   const systemMessage = localConfig.messages.find((m) => m.role === "system");
-  const nonSystemMessages = localConfig.messages.filter(
-    (m) => m.role !== "system",
-  );
+  const nonSystemMessages = localConfig.messages.filter((m) => m.role !== "system");
 
   return {
     id: nodeId,
@@ -763,9 +756,7 @@ export const buildSignatureNodeFromAgent = (
  * This function normalizes both formats into the parameters array
  * so that addEnvs() can process them consistently.
  */
-const buildSignatureNodeParameters = (
-  config: TypedAgent["config"],
-): Field[] => {
+const buildSignatureNodeParameters = (config: TypedAgent["config"]): Field[] => {
   const baseParams = config.parameters ?? [];
 
   // Start with existing parameters (may already have llm, instructions, messages)
@@ -953,8 +944,7 @@ const buildEvaluatorNodes = (
       ? loadedEvaluators?.get(evaluator.dbEvaluatorId)
       : undefined;
     const dbConfig = dbEvaluator?.config as EvaluatorDbConfig | undefined;
-    const settings =
-      evaluator.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
+    const settings = evaluator.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
 
     // Get name from loaded evaluator, fall back to evaluator ID
     const evaluatorName = dbEvaluator?.name ?? evaluator.id;
@@ -992,8 +982,7 @@ export const buildEvaluatorNode = (
   name?: string,
 ): Node<Evaluator> => {
   // Get evaluator definition to know what inputs it expects
-  const _evaluatorDef =
-    AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
+  const _evaluatorDef = AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
 
   // Build inputs with value mappings applied
   const inputs: Field[] = evaluator.inputs.map((input) => ({
@@ -1057,9 +1046,7 @@ const buildEdges = (
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
 
   // Build edges from entry to target based on target mappings
-  const targetMappings = datasetId
-    ? (targetConfig.mappings[datasetId] ?? {})
-    : {};
+  const targetMappings = datasetId ? (targetConfig.mappings[datasetId] ?? {}) : {};
 
   for (const [inputField, mapping] of Object.entries(targetMappings)) {
     if (mapping.type === "source" && mapping.source === "dataset") {
@@ -1096,10 +1083,7 @@ const buildEdges = (
               datasetColumns,
             }),
           );
-        } else if (
-          mapping.source === "target" &&
-          mapping.sourceId === targetConfig.id
-        ) {
+        } else if (mapping.source === "target" && mapping.sourceId === targetConfig.id) {
           // From target output
           edges.push({
             id: `${targetNodeId}->${evaluatorNodeId}.${inputField}`,

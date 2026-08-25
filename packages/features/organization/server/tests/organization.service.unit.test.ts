@@ -162,14 +162,11 @@ class RecordingGrants extends AuthzGrantsService {
   readonly revoke = unsupported<AuthzGrantsService["revoke"]>();
   readonly replace = unsupported<AuthzGrantsService["replace"]>();
   readonly offboard = unsupported<AuthzGrantsService["offboard"]>();
-  readonly attachResourceGrant =
-    unsupported<AuthzGrantsService["attachResourceGrant"]>();
+  readonly attachResourceGrant = unsupported<AuthzGrantsService["attachResourceGrant"]>();
   readonly revokeResourceGrants =
     unsupported<AuthzGrantsService["revokeResourceGrants"]>();
-  readonly changeBindingRole =
-    unsupported<AuthzGrantsService["changeBindingRole"]>();
-  readonly offboardMember =
-    unsupported<AuthzGrantsService["offboardMember"]>();
+  readonly changeBindingRole = unsupported<AuthzGrantsService["changeBindingRole"]>();
+  readonly offboardMember = unsupported<AuthzGrantsService["offboardMember"]>();
   readonly defineRole = unsupported<AuthzGrantsService["defineRole"]>();
   readonly deleteRole = unsupported<AuthzGrantsService["deleteRole"]>();
 
@@ -177,9 +174,7 @@ class RecordingGrants extends AuthzGrantsService {
     super();
   }
 
-  attachBindings(
-    input: AuthzAttachBindingsInput,
-  ): Promise<AuthzAttachBindingsOutput> {
+  attachBindings(input: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput> {
     if (this.failure) return Promise.reject(this.failure);
     this.attachedInputs.push(input);
     return Promise.resolve({
@@ -245,15 +240,15 @@ function createService(
   return OrganizationService.create({
     repository,
     teams,
-    groups: ({
+    groups: {
       listMembersForGroups: () => Promise.resolve(new Map()),
-    } as unknown) as import("../src/repositories/group.repository").GroupRepository,
+    } as unknown as import("../src/repositories/group.repository").GroupRepository,
     identities: new FixedIdentities(),
     teamIdentities: new FixedTeamIdentities(),
     groupIdentities: {} as import("../src/ports/organization.port").GroupIdentityPort,
-    authz: ({
+    authz: {
       listScopeBindings: () => Promise.resolve(teamBindings),
-    } as unknown) as AuthzService,
+    } as unknown as AuthzService,
     grants,
   });
 }
@@ -366,11 +361,10 @@ describe("OrganizationService", () => {
   it("owns team creation behind the canonical service", async () => {
     const teams = new MemoryTeams();
     await expect(
-      createService(
-        new StubRepository("team"),
-        new RecordingGrants(),
-        teams,
-      ).createTeam({ organizationId: "org", name: "Shared" }),
+      createService(new StubRepository("team"), new RecordingGrants(), teams).createTeam({
+        organizationId: "org",
+        name: "Shared",
+      }),
     ).resolves.toMatchObject({ id: "team", slug: "team" });
   });
 

@@ -94,9 +94,7 @@ export function langyMessagesPollInterval(
  * messages here, and the recents list is never re-fetched to obtain them (and
  * never carries content). Disabled until a conversation is selected.
  */
-export function useLangyMessages(
-  conversationId: string | null,
-): LangyMessagesResult {
+export function useLangyMessages(conversationId: string | null): LangyMessagesResult {
   const { project } = useOrganizationTeamProject();
 
   const query = api.langy.messages.useQuery(

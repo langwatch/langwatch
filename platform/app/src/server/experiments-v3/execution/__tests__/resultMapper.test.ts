@@ -69,9 +69,7 @@ describe("resultMapper", () => {
     });
 
     it("returns output field when present (backward compatible)", () => {
-      expect(extractTargetOutput({ output: "hello world" })).toBe(
-        "hello world",
-      );
+      expect(extractTargetOutput({ output: "hello world" })).toBe("hello world");
     });
 
     it("returns full object when output field is present with other fields", () => {
@@ -505,9 +503,7 @@ describe("resultMapper", () => {
             kind: "evaluator_execution_error",
             meta: { httpStatus: 403 },
           });
-          expect(result.result.details).toContain(
-            "Missing Authentication Token",
-          );
+          expect(result.result.details).toContain("Missing Authentication Token");
         }
       });
 
@@ -531,8 +527,7 @@ describe("resultMapper", () => {
         status: "success", // Execution succeeded
         outputs: {
           status: "error", // But evaluator itself returned error
-          details:
-            "EvaluatorException('404 Evaluator not found: langevals/invalid')",
+          details: "EvaluatorException('404 Evaluator not found: langevals/invalid')",
         },
       });
 
@@ -541,8 +536,7 @@ describe("resultMapper", () => {
         expect(result.result).toEqual({
           status: "error",
           error_type: "EvaluatorError",
-          details:
-            "EvaluatorException('404 Evaluator not found: langevals/invalid')",
+          details: "EvaluatorException('404 Evaluator not found: langevals/invalid')",
           traceback: [],
         });
       }
@@ -566,9 +560,9 @@ describe("resultMapper", () => {
     });
 
     it("throws for non-evaluator node ID", () => {
-      expect(() =>
-        mapEvaluatorResult("target-1", 0, { status: "success" }),
-      ).toThrow("Expected evaluator node ID");
+      expect(() => mapEvaluatorResult("target-1", 0, { status: "success" })).toThrow(
+        "Expected evaluator node ID",
+      );
     });
 
     it("strips score when stripScore option is true", () => {
@@ -1141,8 +1135,7 @@ describe("mapThrownErrorEvent", () => {
   });
 
   describe("given an unhandled infrastructure error", () => {
-    const connectionRefused = () =>
-      new Error("connect ECONNREFUSED 10.0.0.5:5432");
+    const connectionRefused = () => new Error("connect ECONNREFUSED 10.0.0.5:5432");
 
     it("puts neither host nor port anywhere on the event", () => {
       const event = mapThrownErrorEvent({

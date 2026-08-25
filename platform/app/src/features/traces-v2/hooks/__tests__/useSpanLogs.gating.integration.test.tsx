@@ -25,9 +25,7 @@ vi.mock("../useTraceQueryArgs", () => ({
 const headerQuery = vi.mocked(api.tracesV2.header.useQuery);
 const traceLogsQuery = vi.mocked(api.tracesV2.traceLogs.useQuery);
 
-function headerData(
-  over: { attributes?: Record<string, string>; origin?: string } = {},
-) {
+function headerData(over: { attributes?: Record<string, string>; origin?: string } = {}) {
   return {
     data: {
       attributes: over.attributes ?? {},

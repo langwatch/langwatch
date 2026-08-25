@@ -26,9 +26,7 @@ export interface MetricProcessingPipelineDeps {
   subscribers?: EventSubscriberDefinition<MetricProcessingEvent>[];
 }
 
-export function createMetricProcessingPipeline(
-  deps: MetricProcessingPipelineDeps,
-) {
+export function createMetricProcessingPipeline(deps: MetricProcessingPipelineDeps) {
   let builder = definePipeline<MetricProcessingEvent>({
     name: "metric_processing",
     aggregate: defineAggregate({

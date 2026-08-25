@@ -66,10 +66,7 @@ function dataUrlMimeType(value: string): string | null {
   return mimeType || null;
 }
 
-function truncationPlaceholder(
-  byteSize: number,
-  mimeType: string | null,
-): string {
+function truncationPlaceholder(byteSize: number, mimeType: string | null): string {
   return mimeType
     ? `[truncated: ${byteSize} bytes, ${mimeType}]`
     : `[truncated: ${byteSize} bytes]`;

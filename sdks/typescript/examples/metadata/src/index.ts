@@ -30,10 +30,7 @@ interface UserContext {
   environment: string;
 }
 
-async function handleUserMessage(
-  message: string,
-  context: UserContext
-): Promise<string> {
+async function handleUserMessage(message: string, context: UserContext): Promise<string> {
   return await tracer.withActiveSpan(
     "HandleUserMessage",
     {
@@ -103,7 +100,7 @@ async function handleUserMessage(
       span.setAttribute("input.tokens", result.usage?.promptTokens ?? 0);
 
       return result.text;
-    }
+    },
   );
 }
 
@@ -131,16 +128,13 @@ async function main() {
     console.log("User: What is the capital of France?\n");
     const response1 = await handleUserMessage(
       "What is the capital of France?",
-      userContext
+      userContext,
     );
     console.log(`Assistant: ${response1}\n`);
 
     // Second message in same conversation (same conversation ID)
     console.log("User: What about Germany?\n");
-    const response2 = await handleUserMessage(
-      "What about Germany?",
-      userContext
-    );
+    const response2 = await handleUserMessage("What about Germany?", userContext);
     console.log(`Assistant: ${response2}\n`);
 
     console.log("=".repeat(50));

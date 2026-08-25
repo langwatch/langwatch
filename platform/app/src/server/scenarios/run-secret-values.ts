@@ -50,9 +50,7 @@ export function decryptRunSecretValues(
       try {
         return [name, decrypt(ciphertext)];
       } catch {
-        throw new Error(
-          `Secret parameter "${name}" could not be decrypted for this run`,
-        );
+        throw new Error(`Secret parameter "${name}" could not be decrypted for this run`);
       }
     }),
   );

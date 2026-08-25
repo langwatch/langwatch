@@ -77,10 +77,7 @@ export function stampCorrectedPath({
   headers: Headers;
   originalPath: string;
 }): void {
-  headers.set(
-    OTLP_CORRECTED_PATH_HEADER,
-    `${CORRECTION_SECRET} ${originalPath}`,
-  );
+  headers.set(OTLP_CORRECTED_PATH_HEADER, `${CORRECTION_SECRET} ${originalPath}`);
 }
 
 /** The path the exporter actually used, or null if this was not our replay. */

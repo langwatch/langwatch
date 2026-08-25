@@ -1,9 +1,4 @@
-import type {
-  Attributes,
-  HrTime,
-  SpanContext,
-  SpanStatus,
-} from "@opentelemetry/api";
+import type { Attributes, HrTime, SpanContext, SpanStatus } from "@opentelemetry/api";
 import { SpanKind, SpanStatusCode, TraceFlags } from "@opentelemetry/api";
 import { emptyResource } from "@opentelemetry/resources";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
@@ -127,8 +122,7 @@ function buildAttributes(span: Span): Attributes {
       attrs["gen_ai.request.temperature"] = span.params.temperature;
     if (span.params.max_tokens != null)
       attrs["gen_ai.request.max_tokens"] = span.params.max_tokens;
-    if (span.params.top_p != null)
-      attrs["gen_ai.request.top_p"] = span.params.top_p;
+    if (span.params.top_p != null) attrs["gen_ai.request.top_p"] = span.params.top_p;
 
     flattenParams({ params: span.params, prefix: "", attrs });
   }
@@ -139,8 +133,7 @@ function buildAttributes(span: Span): Attributes {
       attrs["gen_ai.usage.prompt_tokens"] = span.metrics.prompt_tokens;
     if (span.metrics.completion_tokens != null)
       attrs["gen_ai.usage.completion_tokens"] = span.metrics.completion_tokens;
-    if (span.metrics.cost != null)
-      attrs["gen_ai.usage.cost"] = span.metrics.cost;
+    if (span.metrics.cost != null) attrs["gen_ai.usage.cost"] = span.metrics.cost;
   }
 
   // RAG contexts

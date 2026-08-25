@@ -57,9 +57,10 @@ describe("computeBandClipping", () => {
 
   describe("given an interval wider than the whole axis", () => {
     it("reports both edges clipped", () => {
-      expect(computeBandClipping({ ci: [-50, 150], min: 0, max: 100 })).toEqual(
-        { start: true, end: true },
-      );
+      expect(computeBandClipping({ ci: [-50, 150], min: 0, max: 100 })).toEqual({
+        start: true,
+        end: true,
+      });
     });
   });
 
@@ -105,9 +106,7 @@ describe("clippedBandMask", () => {
 
   describe("given a clipped edge", () => {
     it("fades the start", () => {
-      expect(clippedBandMask({ start: true, end: false })).toContain(
-        "to right",
-      );
+      expect(clippedBandMask({ start: true, end: false })).toContain("to right");
     });
 
     it("fades the end", () => {

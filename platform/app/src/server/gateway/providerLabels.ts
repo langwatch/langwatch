@@ -12,9 +12,7 @@ export async function resolveProviderLabels(args: {
 }): Promise<Map<string, string>> {
   const ids = [
     ...new Set(
-      args.budgets
-        .map((b) => b.providerKey)
-        .filter((k): k is string => Boolean(k)),
+      args.budgets.map((b) => b.providerKey).filter((k): k is string => Boolean(k)),
     ),
   ];
   if (ids.length === 0) return new Map();

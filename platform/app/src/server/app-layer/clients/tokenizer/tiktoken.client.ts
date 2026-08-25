@@ -77,9 +77,7 @@ export class TiktokenClient implements TokenizerClient {
     return "o200k_base";
   }
 
-  private async loadEncoder(
-    encodingName: string,
-  ): Promise<Tiktoken | undefined> {
+  private async loadEncoder(encodingName: string): Promise<Tiktoken | undefined> {
     try {
       const { Tiktoken } = await import("tiktoken/lite");
       const { load } = await import("tiktoken/load");
@@ -92,10 +90,7 @@ export class TiktokenClient implements TokenizerClient {
 
       const registryInfo = registry.default[encodingName];
       if (!registryInfo) {
-        logger.warn(
-          { encodingName },
-          "unknown tiktoken encoding, skipping tokenization",
-        );
+        logger.warn({ encodingName }, "unknown tiktoken encoding, skipping tokenization");
         return undefined;
       }
 
@@ -110,10 +105,7 @@ export class TiktokenClient implements TokenizerClient {
         bpeData.pat_str,
       ) as unknown as Tiktoken;
     } catch (error) {
-      logger.warn(
-        { error },
-        "tiktoken could not be loaded, skipping tokenization",
-      );
+      logger.warn({ error }, "tiktoken could not be loaded, skipping tokenization");
       return undefined;
     }
   }
@@ -157,17 +149,12 @@ export class TiktokenClient implements TokenizerClient {
     const timeout = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {
         controller.abort();
-        reject(
-          new Error(`tiktoken remote fetch timed out after ${timeoutMs}ms`),
-        );
+        reject(new Error(`tiktoken remote fetch timed out after ${timeoutMs}ms`));
       }, timeoutMs);
     });
 
     try {
-      return await Promise.race([
-        this.doRemoteFetch(url, controller.signal),
-        timeout,
-      ]);
+      return await Promise.race([this.doRemoteFetch(url, controller.signal), timeout]);
     } finally {
       if (timer) clearTimeout(timer);
     }
@@ -180,10 +167,7 @@ export class TiktokenClient implements TokenizerClient {
       : DEFAULT_TIKTOKEN_FETCH_TIMEOUT_MS;
   }
 
-  private async doRemoteFetch(
-    url: string,
-    signal: AbortSignal,
-  ): Promise<string> {
+  private async doRemoteFetch(url: string, signal: AbortSignal): Promise<string> {
     try {
       const nodeFetchCache = await import("node-fetch-cache");
       const cachedFetch = nodeFetchCache.default.create({

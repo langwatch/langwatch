@@ -5,9 +5,7 @@ import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 
 // getLangWatchTracer is loaded lazily after setupObservability initializes
-let tracer:
-  | ReturnType<typeof import("langwatch").getLangWatchTracer>
-  | undefined;
+let tracer: ReturnType<typeof import("langwatch").getLangWatchTracer> | undefined;
 
 // Initialize LangWatch observability before the server starts handling requests.
 // This sets up the OTEL NodeSDK with LangWatch exporters so that Vercel AI SDK
@@ -71,14 +69,13 @@ void initObservability();
  *     -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "What is the weather in Tokyo?"}]}'
  */
 
-const MOCK_WEATHER: Record<string, { temperature: number; condition: string }> =
-  {
-    tokyo: { temperature: 22, condition: "partly cloudy" },
-    london: { temperature: 14, condition: "rainy" },
-    "new york": { temperature: 28, condition: "sunny" },
-    paris: { temperature: 18, condition: "overcast" },
-    sydney: { temperature: 25, condition: "clear" },
-  };
+const MOCK_WEATHER: Record<string, { temperature: number; condition: string }> = {
+  tokyo: { temperature: 22, condition: "partly cloudy" },
+  london: { temperature: 14, condition: "rainy" },
+  "new york": { temperature: 28, condition: "sunny" },
+  paris: { temperature: 18, condition: "overcast" },
+  sydney: { temperature: 25, condition: "clear" },
+};
 
 const weatherTool = tool({
   description: "Get the current weather for a city",
@@ -135,10 +132,7 @@ const server = createServer(async (req, res) => {
   // CORS headers for browser testing
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, X-API-Key, X-Client-ID",
-  );
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-API-Key, X-Client-ID");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -212,10 +206,7 @@ const server = createServer(async (req, res) => {
 
     try {
       // Extract incoming trace context so AI SDK spans are children of the caller's trace
-      const parentContext = propagation.extract(
-        otelContext.active(),
-        req.headers,
-      );
+      const parentContext = propagation.extract(otelContext.active(), req.headers);
       const extractedSpan = trace.getSpan(parentContext);
       const extractedTraceId = extractedSpan?.spanContext().traceId;
       const extractedSpanId = extractedSpan?.spanContext().spanId;
@@ -300,10 +291,7 @@ const server = createServer(async (req, res) => {
       console.error(`[${timestamp}] 500 Generation error:`, errorMessage);
 
       // Check for common OpenAI errors
-      if (
-        errorMessage.includes("401") ||
-        errorMessage.includes("invalid_api_key")
-      ) {
+      if (errorMessage.includes("401") || errorMessage.includes("invalid_api_key")) {
         jsonResponse(res, 401, {
           error: "Unauthorized",
           message: "Invalid OpenAI API key",
@@ -329,9 +317,7 @@ const server = createServer(async (req, res) => {
 
   console.log(`[${timestamp}] 404 Not found: ${req.method} ${req.url}`);
   res.writeHead(404, { "Content-Type": "application/json" });
-  res.end(
-    JSON.stringify({ error: "Not Found", message: `${req.method} ${req.url}` }),
-  );
+  res.end(JSON.stringify({ error: "Not Found", message: `${req.method} ${req.url}` }));
 });
 
 server.listen(PORT, () => {

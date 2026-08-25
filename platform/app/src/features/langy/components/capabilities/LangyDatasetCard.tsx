@@ -58,10 +58,7 @@ function parseDataset(output: unknown): {
       : null;
     if (bullet) names.push(bullet[1]!.replace(/\*\*/g, ""));
     else if (cells && cells.length > 0 && !/^-+$/.test(cells[0]!)) {
-      if (
-        cells[0]!.toLowerCase() !== "name" &&
-        cells[0]!.toLowerCase() !== "date"
-      )
+      if (cells[0]!.toLowerCase() !== "name" && cells[0]!.toLowerCase() !== "date")
         names.push(cells[0]!);
     }
     if (names.length >= 5) break;
@@ -101,9 +98,7 @@ export function LangyDatasetCard({
         resourceId={digest?.primaryId ?? id}
       >
         {hydration.isHydrating && hydration.rows.length === 0 ? (
-          <CapabilityRowSkeletons
-            count={Math.min(digest?.counts?.returned ?? 3, 5)}
-          />
+          <CapabilityRowSkeletons count={Math.min(digest?.counts?.returned ?? 3, 5)} />
         ) : hydration.rows.length > 0 ? (
           <VStack align="stretch" gap={0}>
             {hydration.rows.map((row) => (

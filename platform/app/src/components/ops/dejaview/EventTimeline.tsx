@@ -38,12 +38,7 @@ export function EventTimeline({
   }, [eventCursor]);
 
   return (
-    <Box
-      borderTop="1px solid"
-      borderTopColor="border"
-      bg="bg.subtle"
-      flexShrink={0}
-    >
+    <Box borderTop="1px solid" borderTopColor="border" bg="bg.subtle" flexShrink={0}>
       <HStack
         paddingX={3}
         paddingY={1}
@@ -51,12 +46,7 @@ export function EventTimeline({
         borderBottom="1px solid"
         borderBottomColor="border"
       >
-        <Text
-          textStyle="xs"
-          color="fg.muted"
-          fontWeight="medium"
-          flexShrink={0}
-        >
+        <Text textStyle="xs" color="fg.muted" fontWeight="medium" flexShrink={0}>
           Timeline
         </Text>
         <Box flex={1} />

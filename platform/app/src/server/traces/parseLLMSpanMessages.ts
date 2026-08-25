@@ -35,9 +35,7 @@ type ChatMessage = PromptStudioSpanResult["messages"][number];
  * Default role is `user` for input, `assistant` for output. Embedded
  * roles always win when the shape carries them.
  */
-export function parseLLMSpanMessages(
-  attrs: Record<string, unknown>,
-): ChatMessage[] {
+export function parseLLMSpanMessages(attrs: Record<string, unknown>): ChatMessage[] {
   const messages: ChatMessage[] = [];
 
   const inputStr =
@@ -101,9 +99,7 @@ function pushDecoded(
       ) {
         const role = (item as { role?: unknown }).role;
         out.push({
-          role: (typeof role === "string"
-            ? role
-            : defaultRole) as ChatMessage["role"],
+          role: (typeof role === "string" ? role : defaultRole) as ChatMessage["role"],
           content: (item as { content: string }).content,
         });
       }
@@ -117,9 +113,7 @@ function pushDecoded(
       ) {
         const role = (item as { role?: unknown }).role;
         out.push({
-          role: (typeof role === "string"
-            ? role
-            : defaultRole) as ChatMessage["role"],
+          role: (typeof role === "string" ? role : defaultRole) as ChatMessage["role"],
           content: (item as { content: string }).content,
         });
       }
@@ -131,9 +125,7 @@ function pushDecoded(
   ) {
     const role = (parsed as { role?: unknown }).role;
     out.push({
-      role: (typeof role === "string"
-        ? role
-        : defaultRole) as ChatMessage["role"],
+      role: (typeof role === "string" ? role : defaultRole) as ChatMessage["role"],
       content: (parsed as { content: string }).content,
     });
   } else {

@@ -45,9 +45,7 @@ describe("given a Langy skill chip", () => {
       renderChip();
       expect(screen.getByText("GitHub")).toBeTruthy();
       expect(screen.queryByLabelText("Remove GitHub skill")).toBeNull();
-      expect(
-        screen.getByLabelText("GitHub skill. Expand options"),
-      ).toBeTruthy();
+      expect(screen.getByLabelText("GitHub skill. Expand options")).toBeTruthy();
     });
   });
 

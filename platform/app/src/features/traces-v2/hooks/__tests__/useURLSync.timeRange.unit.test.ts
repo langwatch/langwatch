@@ -27,8 +27,7 @@ import { ACTIVE_LENS_KEY, useViewStore } from "../../stores/viewStore";
 import { getPresetById } from "../../utils/timeRangePresets";
 import { useURLSync } from "../useURLSync";
 
-const renderURLSync = () =>
-  renderHook(() => useURLSync(), { wrapper: BrowserRouter });
+const renderURLSync = () => renderHook(() => useURLSync(), { wrapper: BrowserRouter });
 
 const CURSOR_PAGE_2 = { sortValue: 1_700_000_002_000, traceId: "trace-b" };
 const CURSOR_PAGE_3 = { sortValue: 1_700_000_001_000, traceId: "trace-c" };
@@ -150,11 +149,7 @@ describe("useURLSync time range across browser history navigation", () => {
         renderURLSync();
         act(() => {
           pinAbsoluteWindow({ from, to });
-          window.history.replaceState(
-            null,
-            "",
-            `/#all-traces?from=${from}&to=${to}`,
-          );
+          window.history.replaceState(null, "", `/#all-traces?from=${from}&to=${to}`);
           seedThirdPage();
         });
 

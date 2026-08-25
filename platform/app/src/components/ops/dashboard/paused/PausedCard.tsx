@@ -72,10 +72,7 @@ function sectionsWithContent({
   parkedTenantsBound,
   schedules,
   pausedKeys,
-}: Pick<
-  DashboardData,
-  "parkedTenants" | "parkedTenantsBound" | "pausedKeys"
-> & {
+}: Pick<DashboardData, "parkedTenants" | "parkedTenantsBound" | "pausedKeys"> & {
   schedules: ReturnType<typeof usePausedSchedules>;
 }) {
   return [
@@ -125,5 +122,4 @@ function describe({
   return parts.join(" · ");
 }
 
-const plural = (count: number, word: string) =>
-  count === 1 ? word : `${word}s`;
+const plural = (count: number, word: string) => (count === 1 ? word : `${word}s`);

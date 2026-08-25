@@ -21,11 +21,7 @@ import {
   resolveColorLevel,
   stdinCarriesData,
 } from "./eligibility";
-import {
-  isDaemonSocketPathUsable,
-  resolveBuildId,
-  resolveIdentity,
-} from "./identity";
+import { isDaemonSocketPathUsable, resolveBuildId, resolveIdentity } from "./identity";
 import { spawnDaemon } from "./spawn";
 import { recordMissAndDecideToSpawn } from "./spawn-hint";
 

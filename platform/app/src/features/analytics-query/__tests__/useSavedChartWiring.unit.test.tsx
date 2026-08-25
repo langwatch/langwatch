@@ -118,9 +118,7 @@ function mountWiring() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.utils.analytics.savedWorkbenchCharts.getById.fetch.mockResolvedValue(
-    SAVED_CHART,
-  );
+  mocks.utils.analytics.savedWorkbenchCharts.getById.fetch.mockResolvedValue(SAVED_CHART);
   mocks.update.mutateAsync.mockResolvedValue({
     id: "chart-1",
     name: "Traces per day",

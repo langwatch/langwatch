@@ -178,8 +178,7 @@ describe("useViewSwitchingDim", () => {
             isFetching: boolean;
             isFetched: boolean;
             isPlaceholderData: boolean;
-          }) =>
-            useViewSwitchingDim({ isFetching, isFetched, isPlaceholderData }),
+          }) => useViewSwitchingDim({ isFetching, isFetched, isPlaceholderData }),
           {
             initialProps: {
               isFetching: true,

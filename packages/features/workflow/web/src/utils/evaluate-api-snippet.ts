@@ -5,8 +5,7 @@ import type { WorkflowField } from "@langwatch/workflow-contract";
  * shows the "data:<mime>;base64,<payload>" structure the endpoint expects,
  * not a usable image. Callers replace it with their own encoded image.
  */
-export const IMAGE_EXAMPLE =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...";
+export const IMAGE_EXAMPLE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...";
 
 /**
  * Example scalar value for an entry field type, or undefined when the type is
@@ -84,14 +83,10 @@ export function evaluateCurlSnippet({
   datasetName?: string;
 }): string {
   const mapped = buildEvaluateParameters({ entryFields, datasetColumns });
-  const parameters =
-    Object.keys(mapped).length > 0 ? mapped : PLACEHOLDER_PARAMETERS;
+  const parameters = Object.keys(mapped).length > 0 ? mapped : PLACEHOLDER_PARAMETERS;
 
   // Pretty JSON re-indented two spaces so the body sits under `-d '`.
-  const bodyJson = JSON.stringify({ parameters }, null, 2).replace(
-    /\n/g,
-    "\n  ",
-  );
+  const bodyJson = JSON.stringify({ parameters }, null, 2).replace(/\n/g, "\n  ");
 
   const hasDataset = !!datasetName || datasetColumns.length > 0;
   const datasetLine = !hasDataset

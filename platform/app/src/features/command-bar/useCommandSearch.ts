@@ -4,12 +4,7 @@ import { useDebounceValue } from "usehooks-ts";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { MIN_SEARCH_QUERY_LENGTH, SEARCH_DEBOUNCE_MS } from "./constants";
-import {
-  findEntityByPrefix,
-  isSpanId,
-  isTraceId,
-  traceIcon,
-} from "./entityRegistry";
+import { findEntityByPrefix, isSpanId, isTraceId, traceIcon } from "./entityRegistry";
 import type { SearchResult } from "./types";
 
 /**
@@ -89,21 +84,22 @@ export function useCommandSearch(query: string, isOpen: boolean) {
   const canFetch = isOpen && !!projectId;
 
   const { data: prompts, isLoading: promptsLoading } =
-    api.prompts.getAllPromptsForProject.useQuery(
-      { projectId },
-      { enabled: canFetch },
-    );
+    api.prompts.getAllPromptsForProject.useQuery({ projectId }, { enabled: canFetch });
 
   const { data: agents, isLoading: agentsLoading } = api.agents.getAll.useQuery(
     { projectId },
     { enabled: canFetch },
   );
 
-  const { data: datasets, isLoading: datasetsLoading } =
-    api.dataset.getAll.useQuery({ projectId }, { enabled: canFetch });
+  const { data: datasets, isLoading: datasetsLoading } = api.dataset.getAll.useQuery(
+    { projectId },
+    { enabled: canFetch },
+  );
 
-  const { data: workflows, isLoading: workflowsLoading } =
-    api.workflow.getAll.useQuery({ projectId }, { enabled: canFetch });
+  const { data: workflows, isLoading: workflowsLoading } = api.workflow.getAll.useQuery(
+    { projectId },
+    { enabled: canFetch },
+  );
 
   const { data: evaluators, isLoading: evaluatorsLoading } =
     api.evaluators.getAll.useQuery({ projectId }, { enabled: canFetch });

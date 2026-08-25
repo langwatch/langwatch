@@ -39,18 +39,13 @@ export const singleEvaluationResultSchema = z.union([
   evaluationResultErrorSchema,
 ]);
 
-export const batchEvaluationResultSchema = z.array(
-  singleEvaluationResultSchema,
-);
+export const batchEvaluationResultSchema = z.array(singleEvaluationResultSchema);
 
 export const evaluatorsSchema = z.object({
   "openai/moderation": z.object({
     settings: z.object({
       model: z
-        .union([
-          z.literal("text-moderation-stable"),
-          z.literal("text-moderation-latest"),
-        ])
+        .union([z.literal("text-moderation-stable"), z.literal("text-moderation-latest")])
         .describe(
           "The model version to use, `text-moderation-latest` will be automatically upgraded over time, while `text-moderation-stable` will only be updated with advanced notice by OpenAI.",
         )
@@ -221,11 +216,7 @@ export const evaluatorsSchema = z.object({
         .describe("ROUGE type")
         .default("rouge1"),
       measure_type: z
-        .union([
-          z.literal("fmeasure"),
-          z.literal("precision"),
-          z.literal("recall"),
-        ])
+        .union([z.literal("fmeasure"), z.literal("precision"), z.literal("recall")])
         .describe("ROUGE measure type")
         .default("fmeasure"),
     }),
@@ -383,10 +374,7 @@ export const evaluatorsSchema = z.object({
         .describe("The categories of moderation to check for.")
         .default({ Hate: true, SelfHarm: true, Sexual: true, Violence: true }),
       output_type: z
-        .union([
-          z.literal("FourSeverityLevels"),
-          z.literal("EightSeverityLevels"),
-        ])
+        .union([z.literal("FourSeverityLevels"), z.literal("EightSeverityLevels")])
         .describe(
           "The type of severity levels to return on the full 0-7 severity scale, it can be either the trimmed version with four values (0, 2, 4, 6 scores) or the whole range.",
         )
@@ -400,10 +388,7 @@ export const evaluatorsSchema = z.object({
   "lingua/language_detection": z.object({
     settings: z.object({
       check_for: z
-        .union([
-          z.literal("input_matches_output"),
-          z.literal("output_matches_language"),
-        ])
+        .union([z.literal("input_matches_output"), z.literal("output_matches_language")])
         .describe("What should be checked")
         .default("input_matches_output"),
       expected_language: z
@@ -505,9 +490,7 @@ export const evaluatorsSchema = z.object({
       rules: z
         .array(
           z.object({
-            field: z
-              .union([z.literal("input"), z.literal("output")])
-              .default("output"),
+            field: z.union([z.literal("input"), z.literal("output")]).default("output"),
             rule: z.union([
               z.literal("contains"),
               z.literal("not_contains"),
@@ -545,16 +528,11 @@ export const evaluatorsSchema = z.object({
         .number()
         .describe("Max tokens allowed for evaluation")
         .default(128000),
-      name: z
-        .string()
-        .describe("The name of your company")
-        .default("LangWatch"),
+      name: z.string().describe("The name of your company").default("LangWatch"),
       description: z
         .string()
         .describe("Description of what your company is specializing at")
-        .default(
-          "We are providing an LLM observability and evaluation platform",
-        ),
+        .default("We are providing an LLM observability and evaluation platform"),
     }),
   }),
   "langevals/competitor_llm_function_call": z.object({
@@ -567,16 +545,11 @@ export const evaluatorsSchema = z.object({
         .number()
         .describe("Max tokens allowed for evaluation")
         .default(128000),
-      name: z
-        .string()
-        .describe("The name of your company")
-        .default("LangWatch"),
+      name: z.string().describe("The name of your company").default("LangWatch"),
       description: z
         .string()
         .describe("Description of what your company is specializing at")
-        .default(
-          "We are providing an LLM observability and evaluation platform",
-        ),
+        .default("We are providing an LLM observability and evaluation platform"),
       competitors: z
         .array(z.string())
         .describe("The competitors that must not be mentioned.")
@@ -587,21 +560,15 @@ export const evaluatorsSchema = z.object({
     settings: z.object({
       case_sensitive: z
         .boolean()
-        .describe(
-          "True if the comparison should be case-sensitive, False otherwise",
-        )
+        .describe("True if the comparison should be case-sensitive, False otherwise")
         .default(false),
       trim_whitespace: z
         .boolean()
-        .describe(
-          "True if the comparison should trim whitespace, False otherwise",
-        )
+        .describe("True if the comparison should trim whitespace, False otherwise")
         .default(true),
       remove_punctuation: z
         .boolean()
-        .describe(
-          "True if the comparison should remove punctuation, False otherwise",
-        )
+        .describe("True if the comparison should remove punctuation, False otherwise")
         .default(true),
     }),
   }),
@@ -741,9 +708,7 @@ export const evaluatorsSchema = z.object({
         .default(true),
       allow_tie: z
         .boolean()
-        .describe(
-          "Allow the judge to return 'tie' when candidates are equivalent",
-        )
+        .describe("Allow the judge to return 'tie' when candidates are equivalent")
         .default(true),
       include_metrics: z
         .array(z.union([z.literal("cost"), z.literal("duration")]))
@@ -795,9 +760,7 @@ export const evaluatorsSchema = z.object({
         .default(true),
       allow_tie: z
         .boolean()
-        .describe(
-          "Allow the judge to return 'tie' when candidates are equivalent",
-        )
+        .describe("Allow the judge to return 'tie' when candidates are equivalent")
         .default(true),
       include_metrics: z
         .array(z.union([z.literal("cost"), z.literal("duration")]))
@@ -805,9 +768,7 @@ export const evaluatorsSchema = z.object({
         .default([]),
       temperature: z
         .number()
-        .describe(
-          "Sampling temperature for the judge call. Lower is more deterministic.",
-        )
+        .describe("Sampling temperature for the judge call. Lower is more deterministic.")
         .default(0.0),
       swap_and_reconcile: z
         .boolean()
@@ -825,15 +786,11 @@ export const evaluatorsSchema = z.object({
         .default("openai/text-embedding-3-small"),
       positive_reference: z
         .string()
-        .describe(
-          "Reference phrase representing the positive end of the sentiment scale",
-        )
+        .describe("Reference phrase representing the positive end of the sentiment scale")
         .default("Comment of a very happy and satisfied user"),
       negative_reference: z
         .string()
-        .describe(
-          "Reference phrase representing the negative end of the sentiment scale",
-        )
+        .describe("Reference phrase representing the negative end of the sentiment scale")
         .default("Comment of a user who is extremely dissatisfied"),
       normalization_factor: z
         .number()
@@ -845,9 +802,7 @@ export const evaluatorsSchema = z.object({
   }),
   "langevals/similarity": z.object({
     settings: z.object({
-      field: z
-        .union([z.literal("input"), z.literal("output")])
-        .default("output"),
+      field: z.union([z.literal("input"), z.literal("output")]).default("output"),
       rule: z
         .union([z.literal("is_not_similar_to"), z.literal("is_similar_to")])
         .default("is_not_similar_to"),
@@ -876,13 +831,9 @@ export const evaluatorsSchema = z.object({
 
 export type Money = z.infer<typeof moneySchema>;
 export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
-export type EvaluationResultSkipped = z.infer<
-  typeof evaluationResultSkippedSchema
->;
+export type EvaluationResultSkipped = z.infer<typeof evaluationResultSkippedSchema>;
 export type EvaluationResultError = z.infer<typeof evaluationResultErrorSchema>;
-export type SingleEvaluationResult = z.infer<
-  typeof singleEvaluationResultSchema
->;
+export type SingleEvaluationResult = z.infer<typeof singleEvaluationResultSchema>;
 export type BatchEvaluationResult = z.infer<typeof batchEvaluationResultSchema>;
 export type Evaluators = z.infer<typeof evaluatorsSchema>;
 export type EvaluatorTypes = keyof Evaluators;
@@ -890,14 +841,7 @@ export type EvaluatorTypes = keyof Evaluators;
 export type EvaluatorDefinition<T extends EvaluatorTypes> = {
   name: string;
   description: string;
-  category:
-    | "quality"
-    | "rag"
-    | "safety"
-    | "policy"
-    | "other"
-    | "custom"
-    | "similarity";
+  category: "quality" | "rag" | "safety" | "policy" | "other" | "custom" | "similarity";
   docsUrl?: string;
   isGuardrail: boolean;
   requiredFields: string[];
@@ -1033,8 +977,7 @@ Measures how accurate is the retrieval compared to expected contexts, increasing
     envVars: [],
     result: {
       score: {
-        description:
-          "A score between 0.0 and 1.0 indicating the precision score.",
+        description: "A score between 0.0 and 1.0 indicating the precision score.",
       },
     },
   },
@@ -1310,8 +1253,7 @@ Rubric-based evaluation metric that is used to evaluate responses. The rubric co
     envVars: [],
     result: {
       score: {
-        description:
-          "A score according to the rubrics, typically between 1 and 5.",
+        description: "A score according to the rubrics, typically between 1 and 5.",
       },
     },
   },
@@ -1369,8 +1311,7 @@ Measures how well the summary captures important information from the retrieved 
     envVars: [],
     result: {
       score: {
-        description:
-          "A score between 0.0 and 1.0 indicating the summarization quality.",
+        description: "A score between 0.0 and 1.0 indicating the summarization quality.",
       },
     },
   },
@@ -1569,8 +1510,7 @@ Allows you to check for simple text matches or regex evaluation.
     optionalFields: ["input", "output"],
     settings: {
       rules: {
-        description:
-          "List of rules to check, the message must pass all of them",
+        description: "List of rules to check, the message must pass all of them",
         default: [
           {
             field: "output",
@@ -1638,8 +1578,7 @@ This evaluator use an LLM-as-judge to check if the conversation is related to co
       },
       description: {
         description: "Description of what your company is specializing at",
-        default:
-          "We are providing an LLM observability and evaluation platform",
+        default: "We are providing an LLM observability and evaluation platform",
       },
     },
     envVars: [],
@@ -1677,8 +1616,7 @@ This evaluator implements LLM-as-a-judge with a function call approach to check 
       },
       description: {
         description: "Description of what your company is specializing at",
-        default:
-          "We are providing an LLM observability and evaluation platform",
+        default: "We are providing an LLM observability and evaluation platform",
       },
       competitors: {
         description: "The competitors that must not be mentioned.",
@@ -1707,18 +1645,15 @@ A simple evaluator that checks if the output matches the expected_output exactly
     optionalFields: ["output", "expected_output"],
     settings: {
       case_sensitive: {
-        description:
-          "True if the comparison should be case-sensitive, False otherwise",
+        description: "True if the comparison should be case-sensitive, False otherwise",
         default: false,
       },
       trim_whitespace: {
-        description:
-          "True if the comparison should trim whitespace, False otherwise",
+        description: "True if the comparison should trim whitespace, False otherwise",
         default: true,
       },
       remove_punctuation: {
-        description:
-          "True if the comparison should remove punctuation, False otherwise",
+        description: "True if the comparison should remove punctuation, False otherwise",
         default: true,
       },
     },
@@ -1782,8 +1717,7 @@ Use an LLM as a judge with a custom prompt to do a true/false boolean evaluation
         default: 128000,
       },
       prompt: {
-        description:
-          "The system prompt to use for the LLM to run the evaluation",
+        description: "The system prompt to use for the LLM to run the evaluation",
         default:
           "You are an LLM evaluator. We need the guarantee that the output answers what is being asked on the input, please evaluate as False if it doesn't",
       },
@@ -1815,8 +1749,7 @@ Use an LLM as a judge with a custom prompt to classify the message into custom d
         default: 128000,
       },
       prompt: {
-        description:
-          "The system prompt to use for the LLM to run the evaluation",
+        description: "The system prompt to use for the LLM to run the evaluation",
         default:
           "You are an LLM category evaluator. Please categorize the message in one of the following categories",
       },
@@ -1861,8 +1794,7 @@ Use an LLM as a judge with custom prompt to do a numeric score evaluation of the
         default: 128000,
       },
       prompt: {
-        description:
-          "The system prompt to use for the LLM to run the evaluation",
+        description: "The system prompt to use for the LLM to run the evaluation",
         default:
           "You are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied",
       },
@@ -1970,8 +1902,7 @@ better one. Superseded by Comparison, which judges two or more candidates.
         default: true,
       },
       allow_tie: {
-        description:
-          "Allow the judge to return 'tie' when candidates are equivalent",
+        description: "Allow the judge to return 'tie' when candidates are equivalent",
         default: true,
       },
       include_metrics: {
@@ -2054,8 +1985,7 @@ for that row when the two checks disagree, rather than guessing.
         default: true,
       },
       allow_tie: {
-        description:
-          "Allow the judge to return 'tie' when candidates are equivalent",
+        description: "Allow the judge to return 'tie' when candidates are equivalent",
         default: true,
       },
       include_metrics: {
@@ -2120,8 +2050,7 @@ to 1.0 (very positive) and a corresponding label.
     envVars: [],
     result: {
       score: {
-        description:
-          "Sentiment score from -1.0 (very negative) to 1.0 (very positive)",
+        description: "Sentiment score from -1.0 (very negative) to 1.0 (very positive)",
       },
       label: {
         description: "Sentiment label: 'positive' or 'negative'",
@@ -2198,8 +2127,7 @@ For JSON, can optionally validate against a provided schema.
     envVars: [],
     result: {
       passed: {
-        description:
-          "True if the output is formatted correctly, False otherwise",
+        description: "True if the output is formatted correctly, False otherwise",
       },
     },
   },

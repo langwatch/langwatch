@@ -160,9 +160,7 @@ beforeAll(async () => {
   // The path under test takes its ClickHouse repositories from the App rather
   // than resolving a client, so the fixture has to provide one.
   installClickHouseTestApp({ resolveClient: async () => ch });
-  vi.mocked(
-    clickhouseClientModule.getClickHouseClientForTenant,
-  ).mockResolvedValue(ch);
+  vi.mocked(clickhouseClientModule.getClickHouseClientForTenant).mockResolvedValue(ch);
 
   eventRepo = new EventRepositoryClickHouse(async () => ch);
 
@@ -202,13 +200,14 @@ describe("evaluation inputs offload (integration)", () => {
       const originalSerialized = JSON.stringify(originalInputs);
 
       // Offload → marker + durable object (the write-time step in emitReported).
-      const { inputs: offloaded, offloaded: didOffload } =
-        await offloadInputsIfOversized({
+      const { inputs: offloaded, offloaded: didOffload } = await offloadInputsIfOversized(
+        {
           inputs: originalInputs,
           projectId: tenantId,
           evaluationId,
           storedObjects,
-        });
+        },
+      );
       expect(didOffload).toBe(true);
       expect(isStoredObjectMarker(offloaded)).toBe(true);
 
@@ -255,9 +254,7 @@ describe("evaluation inputs offload (integration)", () => {
       );
 
       // (c) a stored_objects row exists with the correct size_bytes + project_id.
-      const marker = (offloaded as Record<string, any>)[
-        STORED_OBJECT_MARKER_KEY
-      ];
+      const marker = (offloaded as Record<string, any>)[STORED_OBJECT_MARKER_KEY];
       const soResult = await ch.query({
         query: `
           SELECT project_id, size_bytes, purpose, owner_id
@@ -299,13 +296,12 @@ describe("evaluation inputs offload (integration)", () => {
       const evaluationId = `eval-small-${nanoid()}`;
       const inputs = { question: "what?", answer: "this", nested: { n: 1 } };
 
-      const { inputs: maybeOffloaded, offloaded } =
-        await offloadInputsIfOversized({
-          inputs,
-          projectId: tenantId,
-          evaluationId,
-          storedObjects,
-        });
+      const { inputs: maybeOffloaded, offloaded } = await offloadInputsIfOversized({
+        inputs,
+        projectId: tenantId,
+        evaluationId,
+        storedObjects,
+      });
       expect(offloaded).toBe(false);
       expect(maybeOffloaded).toBe(inputs);
 

@@ -30,10 +30,7 @@ import {
   GitPullRequestClosed,
   type LucideIcon,
 } from "lucide-react";
-import type {
-  GithubPrCardData,
-  GithubPrState,
-} from "~/shared/langy/githubPrCard";
+import type { GithubPrCardData, GithubPrState } from "~/shared/langy/githubPrCard";
 
 export type LangyGitHubPrCardProps = GithubPrCardData;
 
@@ -64,9 +61,7 @@ export function LangyGitHubPrCard({
 }: LangyGitHubPrCardProps) {
   const { label, color, Icon } = STATE_STYLE[state] ?? STATE_STYLE.open;
   const hasDiff =
-    additions !== undefined ||
-    deletions !== undefined ||
-    changedFiles !== undefined;
+    additions !== undefined || deletions !== undefined || changedFiles !== undefined;
   const hasBranches = !!headRef && !!baseRef;
 
   return (

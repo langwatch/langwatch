@@ -10,16 +10,9 @@
  * makes a reconnect work; doing it only for the project that owns the session
  * is what keeps it safe.
  */
-import {
-  type RedisConnection,
-  RedisConnectionService,
-} from "@langwatch/redis-client";
+import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import {
-  initializeBody,
-  type ReplicaPair,
-  startReplicaPair,
-} from "./support/sseHarness";
+import { initializeBody, type ReplicaPair, startReplicaPair } from "./support/sseHarness";
 
 const VALID_API_KEY = "lw_relay_key_a";
 const OTHER_API_KEY = "lw_relay_key_b";
@@ -53,8 +46,7 @@ vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 // read back what the handler stored without holding a key.
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,
-  decrypt: (text: string) =>
-    text.startsWith("encrypted:") ? text.slice(10) : text,
+  decrypt: (text: string) => (text.startsWith("encrypted:") ? text.slice(10) : text),
 }));
 
 describe("Feature: MCP streamable transport across replicas", () => {

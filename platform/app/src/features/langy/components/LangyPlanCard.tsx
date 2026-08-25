@@ -25,11 +25,7 @@ import { Check, ChevronRight, Square, SquareCheck } from "lucide-react";
 import { useState } from "react";
 import { LangyCard } from "~/features/asaplangy";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import type {
-  LangyPlan,
-  LangyPlanItem,
-  LangyPlanItemStatus,
-} from "../logic/langyPlan";
+import type { LangyPlan, LangyPlanItem, LangyPlanItemStatus } from "../logic/langyPlan";
 import { LangyActivityParts } from "./LangyToolActivity";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
 
@@ -66,8 +62,7 @@ export function LangyPlanCard({
   // A plan is a small status receipt first; the checklist is available on
   // demand. This keeps a three-step task from becoming the whole conversation.
   const [cardOpen, setCardOpen] = useState(false);
-  const currentItem =
-    plan.currentIndex >= 0 ? plan.items[plan.currentIndex] : undefined;
+  const currentItem = plan.currentIndex >= 0 ? plan.items[plan.currentIndex] : undefined;
 
   // The plan is a `progress` card in the taxonomy (asaplangy CARD_TAXONOMY): the
   // thing you asked for is under way. LangyCard renders the intent's material —
@@ -270,9 +265,7 @@ function PlanStep({
           borderRadius="2px"
           background="orange.solid"
           css={
-            pulsing
-              ? { animation: `${dotPulse} 1.4s ease-in-out infinite` }
-              : undefined
+            pulsing ? { animation: `${dotPulse} 1.4s ease-in-out infinite` } : undefined
           }
         />
       </Box>

@@ -19,11 +19,7 @@ import {
   FormServerError,
   showErrorToast,
 } from "~/features/errors";
-import {
-  getComplexProps,
-  getFlowCallbacks,
-  useDrawer,
-} from "~/hooks/useDrawer";
+import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { EmojiPickerModal } from "~/optimization_studio/components/properties/modals/EmojiPickerModal";
 import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
@@ -103,8 +99,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
     // has the headline that names the whole action.
   });
 
-  const isSaving =
-    createWorkflowMutation.isPending || createAgentMutation.isPending;
+  const isSaving = createWorkflowMutation.isPending || createAgentMutation.isPending;
 
   const onSubmit = useCallback(
     async (data: FormData) => {
@@ -147,13 +142,10 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
 
         // Close drawer and navigate to workflow studio
         onClose();
-        void router.push(
-          `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
-        );
+        void router.push(`/${project.slug}/studio/${createdWorkflow.workflow.id}`);
       } catch (error) {
         console.error("Error creating workflow agent:", error);
-        if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
-          return;
+        if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
         showErrorToast({
           error,
           fallbackTitle: "Couldn't create workflow agent",
@@ -208,8 +200,8 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
           >
             <VStack gap={4} align="stretch" flex={1} overflow="hidden">
               <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-                Create a new workflow to use as a custom agent. You&apos;ll be
-                taken to the workflow editor to configure the agent logic.
+                Create a new workflow to use as a custom agent. You&apos;ll be taken to
+                the workflow editor to configure the agent logic.
               </Text>
 
               <Box paddingX={6}>
@@ -251,9 +243,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
                       {...register("description")}
                       placeholder="What does this agent do?"
                     />
-                    <Field.ErrorText>
-                      {errors.description?.message}
-                    </Field.ErrorText>
+                    <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
                   </Field.Root>
                 </VStack>
               </Box>

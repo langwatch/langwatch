@@ -1,9 +1,5 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
-import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import {
   type ContributeSpanFactsCommandData,
   contributeSpanFactsCommandDataSchema,
@@ -15,13 +11,10 @@ import {
 } from "../schemas/constants";
 import type { SpanFactsContributedEvent } from "../schemas/events";
 
-export class ContributeSpanFactsCommand
-  implements
-    CommandHandler<
-      Command<ContributeSpanFactsCommandData>,
-      SpanFactsContributedEvent
-    >
-{
+export class ContributeSpanFactsCommand implements CommandHandler<
+  Command<ContributeSpanFactsCommandData>,
+  SpanFactsContributedEvent
+> {
   static readonly schema = defineCommandSchema(
     CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE,
     contributeSpanFactsCommandDataSchema,

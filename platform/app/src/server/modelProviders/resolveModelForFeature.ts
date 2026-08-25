@@ -1,12 +1,6 @@
-import type {
-  ModelDefaultScopeType,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { ModelDefaultScopeType, PrismaClient } from "~/generated/prisma/client";
 
-import {
-  isModelAllowedForFeature,
-  LANGY_CHAT_FEATURE_KEY,
-} from "./codexRestrictions";
+import { isModelAllowedForFeature, LANGY_CHAT_FEATURE_KEY } from "./codexRestrictions";
 import { type FeatureDescriptor, featureByKey } from "./featureRegistry";
 import { expandLatestAlias, isLatestAlias } from "./latestAliases";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
@@ -125,9 +119,7 @@ async function loadConfigsForChain(
     config: (r.config ?? {}) as Record<string, unknown>,
     createdAt: r.createdAt,
     scopeTiersHere: r.scopes.filter((s) =>
-      orFilters.some(
-        (f) => f.scopeType === s.scopeType && f.scopeId === s.scopeId,
-      ),
+      orFilters.some((f) => f.scopeType === s.scopeType && f.scopeId === s.scopeId),
     ),
   }));
 }

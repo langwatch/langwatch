@@ -14,15 +14,9 @@ import type {
 
 // Deliberately not exported: persistence is an implementation detail of Langy.
 export abstract class ConversationRepository {
-  abstract list(
-    input: LangyConversationListInput,
-  ): Promise<LangyConversationPage>;
-  abstract tryGet(
-    input: LangyConversationInput,
-  ): Promise<LangyConversation | null>;
-  abstract create(
-    input: LangyCreateConversationInput,
-  ): Promise<LangyConversation>;
+  abstract list(input: LangyConversationListInput): Promise<LangyConversationPage>;
+  abstract tryGet(input: LangyConversationInput): Promise<LangyConversation | null>;
+  abstract create(input: LangyCreateConversationInput): Promise<LangyConversation>;
   abstract archive(input: LangyConversationInput): Promise<void>;
 }
 
@@ -39,9 +33,7 @@ export abstract class MessageRepository {
 
 export abstract class CredentialRepository {
   abstract resolve(input: LangyCredentialInput): Promise<LangyCredential>;
-  abstract tryGetEgressAllowlist(
-    projectId: string,
-  ): Promise<LangyEgressAllowlist | null>;
+  abstract tryGetEgressAllowlist(projectId: string): Promise<LangyEgressAllowlist | null>;
   abstract trySetEgressAllowlist(
     projectId: string,
     allowlist: LangyEgressAllowlist | null,

@@ -194,10 +194,7 @@ function ParameterRow({
           onUpdate={onUpdate}
         />
         {!disabled && (
-          <Tooltip
-            content="Remove parameter"
-            positioning={{ placement: "top" }}
-          >
+          <Tooltip content="Remove parameter" positioning={{ placement: "top" }}>
             <Button
               type="button"
               size="xs"

@@ -14,7 +14,9 @@ import { PageLayout } from "../../components/ui/layouts/PageLayout";
 
 export function ExamplePage() {
   return (
-    <DashboardLayout compactMenu={false}> {/* true for content-heavy pages */}
+    <DashboardLayout compactMenu={false}>
+      {" "}
+      {/* true for content-heavy pages */}
       <PageLayout.Container>
         <PageLayout.Header>
           <PageLayout.Heading>Page Title</PageLayout.Heading>
@@ -68,7 +70,9 @@ export function ResourceDrawer() {
             </VStack>
           </Drawer.Body>
           <Drawer.Footer>
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
             <Button colorPalette="blue">Save</Button>
           </Drawer.Footer>
         </Drawer.Content>
@@ -91,7 +95,9 @@ export function DeleteConfirmDialog({ itemName, onConfirm }) {
 
   return (
     <>
-      <Button colorPalette="red" variant="outline" onClick={onOpen}>Delete</Button>
+      <Button colorPalette="red" variant="outline" onClick={onOpen}>
+        Delete
+      </Button>
       <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
         <Dialog.Content>
           <Dialog.CloseTrigger />
@@ -102,8 +108,16 @@ export function DeleteConfirmDialog({ itemName, onConfirm }) {
             <Text>This action cannot be undone.</Text>
           </Dialog.Body>
           <Dialog.Footer>
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button colorPalette="red" onClick={() => { onConfirm(); onClose(); }}>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              colorPalette="red"
+              onClick={() => {
+                onConfirm();
+                onClose();
+              }}
+            >
               Delete
             </Button>
           </Dialog.Footer>
@@ -140,13 +154,19 @@ import { Menu } from "../../components/ui/menu";
 
 <Menu.Root>
   <Menu.Trigger asChild>
-    <Button variant="ghost" size="sm"><MoreVertical /></Button>
+    <Button variant="ghost" size="sm">
+      <MoreVertical />
+    </Button>
   </Menu.Trigger>
   <Menu.Content>
-    <Menu.Item value="edit"><Pencil /> Edit</Menu.Item>
-    <Menu.Item value="delete" color="red.500"><Trash /> Delete</Menu.Item>
+    <Menu.Item value="edit">
+      <Pencil /> Edit
+    </Menu.Item>
+    <Menu.Item value="delete" color="red.500">
+      <Trash /> Delete
+    </Menu.Item>
   </Menu.Content>
-</Menu.Root>
+</Menu.Root>;
 ```
 
 ## Nested Drawer Navigation
@@ -232,6 +252,7 @@ export function ItemDrawer() {
 ```
 
 **Key points:**
+
 - `canGoBack` / `goBack()` - back button in drawer header
 - `closeDrawer()` - close entire flow
 - `setFlowCallbacks()` / `getFlowCallbacks()` - persist callbacks across navigation
@@ -245,12 +266,18 @@ import { Popover } from "../../components/ui/popover";
 
 <Popover.Root positioning={{ placement: "bottom-start" }}>
   <Popover.Trigger asChild>
-    <Button variant="ghost" size="sm"><Info /></Button>
+    <Button variant="ghost" size="sm">
+      <Info />
+    </Button>
   </Popover.Trigger>
   <Popover.Content>
     <Popover.Arrow />
-    <Popover.Header><Popover.Title>Title</Popover.Title></Popover.Header>
-    <Popover.Body><Text fontSize="sm">Content</Text></Popover.Body>
+    <Popover.Header>
+      <Popover.Title>Title</Popover.Title>
+    </Popover.Header>
+    <Popover.Body>
+      <Text fontSize="sm">Content</Text>
+    </Popover.Body>
   </Popover.Content>
-</Popover.Root>
+</Popover.Root>;
 ```

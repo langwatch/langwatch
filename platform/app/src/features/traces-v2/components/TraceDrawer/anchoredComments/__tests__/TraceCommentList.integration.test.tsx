@@ -109,18 +109,14 @@ describe("given comments on a span, on an attribute and on the trace itself", ()
   it("lists the one about the trace itself without a part", () => {
     renderList(comments);
 
-    expect(
-      screen.getByText("the answer contradicts the policy"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("the answer contradicts the policy")).toBeInTheDocument();
     expect(screen.getAllByRole("button")).toHaveLength(2);
   });
 
   it("takes the reader to the span a comment is about", () => {
     renderList(comments);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Go to Span web_search" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Go to Span web_search" }));
 
     expect(useDrawerStore.getState().selectedSpanId).toBe(SEARCH_SPAN);
     expect(useDrawerStore.getState().viewMode).toBe("trace");
@@ -147,9 +143,7 @@ describe("given a comment on a span a correction deleted", () => {
   it("still lists the comment", () => {
     renderList([onADeletedSpan]);
 
-    expect(
-      screen.getByText("this step should not have run"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("this step should not have run")).toBeInTheDocument();
   });
 
   /** @scenario "A comment on a span a correction deleted reads as being on a part that is no longer there" */

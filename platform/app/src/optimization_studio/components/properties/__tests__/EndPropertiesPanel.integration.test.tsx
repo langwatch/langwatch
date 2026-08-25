@@ -21,26 +21,20 @@ let mockEdges: Array<{
 }> = [];
 let mockWorkflowType = "workflow";
 
-vi.mock(
-  "@langwatch/workflow-web",
-  async (importOriginal) => {
-    const actual =
-      await importOriginal<
-        typeof import("@langwatch/workflow-web")
-      >();
-    return {
-      ...actual,
-      useWorkflowStore: (selector: (state: unknown) => unknown) =>
-        selector({
-          setNode: mockSetNode,
-          nodes: [currentNode],
-          edges: mockEdges,
-          workflow_type: mockWorkflowType,
-          getWorkflow: () => ({ nodes: [currentNode], edges: mockEdges }),
-        }),
-    };
-  },
-);
+vi.mock("@langwatch/workflow-web", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/workflow-web")>();
+  return {
+    ...actual,
+    useWorkflowStore: (selector: (state: unknown) => unknown) =>
+      selector({
+        setNode: mockSetNode,
+        nodes: [currentNode],
+        edges: mockEdges,
+        workflow_type: mockWorkflowType,
+        getWorkflow: () => ({ nodes: [currentNode], edges: mockEdges }),
+      }),
+  };
+});
 
 vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),
@@ -48,8 +42,7 @@ vi.mock("@xyflow/react", () => ({
 
 // Render the shell's children inline so the real VariablesSection mounts.
 vi.mock("../BasePropertiesPanel", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../BasePropertiesPanel")>();
+  const actual = await importOriginal<typeof import("../BasePropertiesPanel")>();
   return {
     ...actual,
     BasePropertiesPanel: ({ children }: { children: React.ReactNode }) => (
@@ -59,10 +52,7 @@ vi.mock("../BasePropertiesPanel", async (importOriginal) => {
 });
 
 import type { End } from "@langwatch/workflow-contract";
-import {
-  EndPropertiesPanel,
-  EVALUATOR_RESULT_FIELDS,
-} from "../EndPropertiesPanel";
+import { EndPropertiesPanel, EVALUATOR_RESULT_FIELDS } from "../EndPropertiesPanel";
 
 let currentNode: Node<End>;
 
@@ -148,12 +138,8 @@ describe("EndPropertiesPanel", () => {
       expect(screen.getByText("details")).toBeInTheDocument();
       expect(screen.getByText("Any numerical score.")).toBeInTheDocument();
       // No editable variable components in evaluator mode.
-      expect(
-        screen.queryByTestId("add-variable-button"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("variable-name-passed"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("add-variable-button")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("variable-name-passed")).not.toBeInTheDocument();
     });
 
     /** @scenario Evaluator End node lists details first */
@@ -176,17 +162,13 @@ describe("EndPropertiesPanel", () => {
       const order = Array.from(container.querySelectorAll("*"))
         .filter((el) => el.children.length === 0)
         .map((el) => el.textContent)
-        .filter((t) =>
-          ["passed", "score", "label", "details"].includes(t ?? ""),
-        );
+        .filter((t) => ["passed", "score", "label", "details"].includes(t ?? ""));
       expect(order).toEqual(["details", "passed", "score", "label"]);
     });
 
     /** @scenario All evaluator results are optional */
     it("marks every result field optional", () => {
-      expect(EVALUATOR_RESULT_FIELDS.every((f) => f.optional === true)).toBe(
-        true,
-      );
+      expect(EVALUATOR_RESULT_FIELDS.every((f) => f.optional === true)).toBe(true);
     });
 
     it("nudges to connect score or passed when neither is wired", () => {
@@ -198,9 +180,7 @@ describe("EndPropertiesPanel", () => {
         }),
       );
 
-      expect(
-        screen.getByText(/Connect at least one result/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Connect at least one result/i)).toBeInTheDocument();
     });
 
     /** @scenario Unconnected fixed fields are allowed */
@@ -220,9 +200,7 @@ describe("EndPropertiesPanel", () => {
         }),
       );
 
-      expect(
-        screen.queryByText(/Connect at least one result/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/Connect at least one result/i)).not.toBeInTheDocument();
     });
   });
 
@@ -259,9 +237,7 @@ describe("EndPropertiesPanel", () => {
       );
 
       expect(screen.getByText("Results")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("add-variable-button"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("add-variable-button")).not.toBeInTheDocument();
     });
   });
 

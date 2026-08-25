@@ -86,17 +86,13 @@ const AUDIO_B64 = Buffer.from("fake-pcm-bytes-0123456789").toString("base64");
 
 describe("containsMediaMarkers", () => {
   it("matches the content-part vocabulary in compact and spaced JSON", () => {
-    expect(
-      containsMediaMarkers(`{"type":"file","mediaType":"audio/wav"}`),
-    ).toBe(true);
+    expect(containsMediaMarkers(`{"type":"file","mediaType":"audio/wav"}`)).toBe(true);
     // Python json.dumps default separators put a space after the colon
-    expect(
-      containsMediaMarkers(`{"type": "file", "mediaType": "audio/wav"}`),
-    ).toBe(true);
+    expect(containsMediaMarkers(`{"type": "file", "mediaType": "audio/wav"}`)).toBe(true);
     expect(containsMediaMarkers(`{"type":"input_audio"}`)).toBe(true);
-    expect(
-      containsMediaMarkers(`{"type":"binary","mimeType":"application/pdf"}`),
-    ).toBe(true);
+    expect(containsMediaMarkers(`{"type":"binary","mimeType":"application/pdf"}`)).toBe(
+      true,
+    );
     expect(containsMediaMarkers(`data:image/png;base64,AAAA`)).toBe(true);
     expect(containsMediaMarkers(`{"file":{"file_data":"..."}}`)).toBe(true);
   });
@@ -115,13 +111,9 @@ describe("containsMediaMarkers", () => {
   });
 
   it("rejects plain text and ordinary JSON", () => {
-    expect(containsMediaMarkers("a plain sentence about audio files")).toBe(
-      false,
-    );
+    expect(containsMediaMarkers("a plain sentence about audio files")).toBe(false);
     expect(containsMediaMarkers(`{"type":"text","text":"hello"}`)).toBe(false);
-    expect(containsMediaMarkers(`{"temperature":0.2,"messages":[]}`)).toBe(
-      false,
-    );
+    expect(containsMediaMarkers(`{"temperature":0.2,"messages":[]}`)).toBe(false);
   });
 });
 
@@ -192,9 +184,7 @@ describe("extractInlineMediaFromValue", () => {
 
     it("keeps a marker-free nested string byte-identical", async () => {
       const { service, calls } = makeFakeService();
-      const inner = JSON.stringify([
-        { role: "user", content: "no media here" },
-      ]);
+      const inner = JSON.stringify([{ role: "user", content: "no media here" }]);
       const value = { type: "raw", value: inner };
 
       const result = await extractInlineMediaFromValue({
@@ -242,9 +232,9 @@ describe("extractInlineMediaFromValue", () => {
           result: { screenshots: Array<{ image_url: { url: string } }> };
         }>;
       }>;
-      expect(
-        rewritten[0]!.content[0]!.result.screenshots[0]!.image_url.url,
-      ).toBe("/api/files/proj-1/so-1");
+      expect(rewritten[0]!.content[0]!.result.screenshots[0]!.image_url.url).toBe(
+        "/api/files/proj-1/so-1",
+      );
     });
   });
 
@@ -364,9 +354,7 @@ describe("extractInlineMediaFromValue", () => {
       });
 
       expect(result.refs).toHaveLength(1);
-      expect((result.value as { image: string }).image).toBe(
-        "/api/files/proj-1/so-1",
-      );
+      expect((result.value as { image: string }).image).toBe("/api/files/proj-1/so-1");
     });
   });
 });
@@ -405,9 +393,7 @@ describe("extraction budget", () => {
           content: Array<{ image_url: { url: string } }>;
         }>
       )[0]!.content;
-      const externalized = parts.filter((p) =>
-        p.image_url.url.startsWith("/api/files/"),
-      );
+      const externalized = parts.filter((p) => p.image_url.url.startsWith("/api/files/"));
       const inline = parts.filter((p) => p.image_url.url.startsWith("data:"));
       expect(externalized).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
       expect(inline).toHaveLength(4);
@@ -468,9 +454,9 @@ describe("extraction budget", () => {
       )[0]!.content;
       // The stored four are referenced in the rewritten value — a deadline
       // never orphans bytes that were already written.
-      expect(
-        parts.filter((p) => p.image_url.url.startsWith("/api/files/")),
-      ).toHaveLength(4);
+      expect(parts.filter((p) => p.image_url.url.startsWith("/api/files/"))).toHaveLength(
+        4,
+      );
     });
   });
 
@@ -501,12 +487,10 @@ describe("extraction budget", () => {
           content: Array<{ image_url: { url: string } }>;
         }>
       )[0]!.content;
-      expect(
-        parts.filter((p) => p.image_url.url.startsWith("/api/files/")),
-      ).toHaveLength(2);
-      expect(
-        parts.filter((p) => p.image_url.url.startsWith("data:")),
-      ).toHaveLength(1);
+      expect(parts.filter((p) => p.image_url.url.startsWith("/api/files/"))).toHaveLength(
+        2,
+      );
+      expect(parts.filter((p) => p.image_url.url.startsWith("data:"))).toHaveLength(1);
     });
   });
 

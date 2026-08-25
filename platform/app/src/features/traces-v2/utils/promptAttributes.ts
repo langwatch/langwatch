@@ -55,10 +55,7 @@ function readAttribute(
  * its dotted form. Used by `hasPromptMetadata` to detect the prefix on
  * nested attribute trees.
  */
-function* iterateLeafPaths(
-  obj: Record<string, unknown>,
-  prefix = "",
-): Generator<string> {
+function* iterateLeafPaths(obj: Record<string, unknown>, prefix = ""): Generator<string> {
   for (const [key, value] of Object.entries(obj)) {
     const path = prefix ? `${prefix}.${key}` : key;
     if (value !== null && typeof value === "object" && !Array.isArray(value)) {
@@ -267,15 +264,9 @@ function parsePromptVariables(
       const parsed: unknown = JSON.parse(wrapped);
       if (typeof parsed === "object" && parsed !== null && "value" in parsed) {
         const value = (parsed as { value: unknown }).value;
-        if (
-          typeof value === "object" &&
-          value !== null &&
-          !Array.isArray(value)
-        ) {
+        if (typeof value === "object" && value !== null && !Array.isArray(value)) {
           const result: Record<string, string> = {};
-          for (const [key, val] of Object.entries(
-            value as Record<string, unknown>,
-          )) {
+          for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
             result[key] = String(val);
           }
           return result;
@@ -286,15 +277,9 @@ function parsePromptVariables(
     }
   }
 
-  if (
-    typeof wrapped === "object" &&
-    wrapped !== null &&
-    !Array.isArray(wrapped)
-  ) {
+  if (typeof wrapped === "object" && wrapped !== null && !Array.isArray(wrapped)) {
     const result: Record<string, string> = {};
-    for (const [key, val] of Object.entries(
-      wrapped as Record<string, unknown>,
-    )) {
+    for (const [key, val] of Object.entries(wrapped as Record<string, unknown>)) {
       if (val == null) continue;
       result[key] = typeof val === "string" ? val : JSON.stringify(val);
     }

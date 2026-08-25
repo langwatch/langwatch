@@ -100,9 +100,7 @@ const CONVERSATIONAL_QUERY_SOURCES: ReadonlySet<string> = new Set([
  * fold gates the trace's output text through this exact allowlist instead of
  * duplicating it.
  */
-export const isConversationalQuerySource = (
-  querySource: string | null,
-): boolean =>
+export const isConversationalQuerySource = (querySource: string | null): boolean =>
   querySource === null || CONVERSATIONAL_QUERY_SOURCES.has(querySource);
 
 const asString = (raw: unknown): string | null =>
@@ -131,8 +129,7 @@ export const claudeCacheWritesLongLived = ({
 }: {
   llmRequestContext?: string | null;
   querySource?: string | null;
-}): boolean =>
-  llmRequestContext === "interaction" || querySource === "repl_main_thread";
+}): boolean => llmRequestContext === "interaction" || querySource === "repl_main_thread";
 
 export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
   readonly id = "claude-code";
@@ -155,10 +152,7 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
 
     liftNumber("input_tokens", ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS);
     liftNumber("output_tokens", ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS);
-    liftNumber(
-      "cache_read_tokens",
-      ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-    );
+    liftNumber("cache_read_tokens", ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS);
     liftNumber(
       "cache_creation_tokens",
       ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
@@ -303,9 +297,7 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
  *
  * @internal exported for unit testing only
  */
-export function extractAssistantTextFromResponseBody(
-  raw: unknown,
-): string | null {
+export function extractAssistantTextFromResponseBody(raw: unknown): string | null {
   if (raw === null || raw === undefined) return null;
   // The upstream attribute bag (`parseJsonStringValues`) eagerly
   // JSON.parses string attributes that look like JSON, so we may
@@ -361,9 +353,7 @@ const MAX_SESSION_TITLE_CHARS = 512;
  * The CALLER decides which bodies are titles (the `query_source` gate); this
  * only reads the shape.
  */
-export function extractSessionTitleFromResponseBody(
-  raw: string,
-): string | null {
+export function extractSessionTitleFromResponseBody(raw: string): string | null {
   const text = extractAssistantTextFromResponseBody(raw);
   if (text === null) return null;
   const parsed = safeParse(text);
@@ -443,9 +433,7 @@ function parseJsonBody(raw: unknown): Record<string, unknown> | null {
  *
  * @internal exported for unit testing
  */
-export function extractAssistantOutputFromResponseBody(
-  raw: unknown,
-): string | null {
+export function extractAssistantOutputFromResponseBody(raw: unknown): string | null {
   const parsed = parseJsonBody(raw);
   if (!parsed) return null;
   const content = parsed.content;
@@ -469,9 +457,7 @@ export function extractAssistantOutputFromResponseBody(
           ? safeStringify(block.input)
           : "";
       parts.push(
-        args
-          ? `[tool_use: ${block.name}]\n${args}`
-          : `[tool_use: ${block.name}]`,
+        args ? `[tool_use: ${block.name}]\n${args}` : `[tool_use: ${block.name}]`,
       );
     }
   }
@@ -536,9 +522,7 @@ function contentToText(content: unknown): string {
  *
  * @internal exported for the read-time tool-span enrichment + unit testing
  */
-export function extractToolResultsFromRequestBody(
-  raw: unknown,
-): Map<string, string> {
+export function extractToolResultsFromRequestBody(raw: unknown): Map<string, string> {
   const out = new Map<string, string>();
   if (raw === null || raw === undefined) return out;
   let parsed: unknown = raw;
@@ -570,10 +554,7 @@ export function extractToolResultsFromRequestBody(
       if (out.has(b.tool_use_id)) continue;
       const text = contentToText(b.content);
       if (text.length > 0) {
-        out.set(
-          b.tool_use_id,
-          capPayloadString(text, undefined, "tool_result"),
-        );
+        out.set(b.tool_use_id, capPayloadString(text, undefined, "tool_result"));
       }
     }
   }
@@ -679,9 +660,7 @@ function toolDefinitionLine(tool: unknown): string | null {
   };
   if (typeof name !== "string" || name.length === 0) return null;
   const summary =
-    typeof description === "string"
-      ? (description.split("\n", 1)[0] ?? "").trim()
-      : "";
+    typeof description === "string" ? (description.split("\n", 1)[0] ?? "").trim() : "";
   return summary ? `${name}: ${summary}` : name;
 }
 

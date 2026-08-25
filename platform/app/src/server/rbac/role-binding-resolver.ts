@@ -35,9 +35,7 @@ export type ScopeRef =
  * - "user": a human user (supports group memberships)
  * - "apiKey": an API key (no groups)
  */
-export type Principal =
-  | { type: "user"; id: string }
-  | { type: "apiKey"; id: string };
+export type Principal = { type: "user"; id: string } | { type: "apiKey"; id: string };
 
 type ResolvedBinding = {
   role: TeamUserRole;
@@ -178,9 +176,7 @@ async function collectBindingsForUser({
 
   return allOrgBindings
     .filter((b) =>
-      ancestorScopeList.some(
-        (s) => s.type === b.scopeType && s.id === b.scopeId,
-      ),
+      ancestorScopeList.some((s) => s.type === b.scopeType && s.id === b.scopeId),
     )
     .map((b) => ({
       role: b.role,
@@ -217,9 +213,7 @@ async function collectBindingsForApiKey({
 
   return bindings
     .filter((b) =>
-      ancestorScopeList.some(
-        (s) => s.type === b.scopeType && s.id === b.scopeId,
-      ),
+      ancestorScopeList.some((s) => s.type === b.scopeType && s.id === b.scopeId),
     )
     .map((b) => ({
       role: b.role,
@@ -420,9 +414,7 @@ async function checkRoleBindingPermissionInner({
       binding.role !== TeamUserRole.CUSTOM
     ) {
       if (binding.role === TeamUserRole.ADMIN) return true;
-      if (
-        organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)
-      )
+      if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission))
         return true;
       continue;
     }
@@ -515,10 +507,7 @@ export async function resolveLegacyCeiling({
       scopeId: {
         in: [organizationId, ...ancestorScopes(scope).map((s) => s.id)],
       },
-      OR: [
-        { userId },
-        ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
-      ],
+      OR: [{ userId }, ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : [])],
     },
   });
   if (bindingCount > 0) return LEGACY_CEILING_DENIES_ALL;

@@ -39,13 +39,7 @@ interface TracePreviewHoverCardProps {
    * its leading edge. Override when the trigger is on the far right of
    * a row and a bottom-end placement reads better.
    */
-  placement?:
-    | "top"
-    | "top-start"
-    | "top-end"
-    | "bottom"
-    | "bottom-start"
-    | "bottom-end";
+  placement?: "top" | "top-start" | "top-end" | "bottom" | "bottom-start" | "bottom-end";
 }
 
 /**
@@ -85,10 +79,7 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
             boxShadow="lg"
           >
             {hasHovered && (
-              <PeekPopoverContent
-                traceId={traceId}
-                occurredAtMs={occurredAtMs}
-              />
+              <PeekPopoverContent traceId={traceId} occurredAtMs={occurredAtMs} />
             )}
           </HoverCard.Content>
         </HoverCard.Positioner>
@@ -116,10 +107,7 @@ interface TraceIdPeekProps {
  * already have a button or link you can wrap, prefer
  * `<TracePreviewHoverCard>` directly so the eye doesn't crowd the row.
  */
-export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({
-  traceId,
-  occurredAtMs,
-}) => {
+export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId, occurredAtMs }) => {
   const { openDrawer } = useDrawer();
 
   const handleOpenDrawer = (e: React.MouseEvent) => {
@@ -202,21 +190,12 @@ function PeekPopoverContent({
 
       {/* Metrics */}
       <HStack paddingX={3} paddingBottom={2} gap={3} flexWrap="wrap">
-        <PopoverMetric
-          label="Duration"
-          value={formatDuration(trace.durationMs)}
-        />
+        <PopoverMetric label="Duration" value={formatDuration(trace.durationMs)} />
         {(trace.totalCost ?? 0) > 0 && (
-          <PopoverMetric
-            label="Cost"
-            value={formatCost(trace.totalCost ?? 0)}
-          />
+          <PopoverMetric label="Cost" value={formatCost(trace.totalCost ?? 0)} />
         )}
         {trace.totalTokens > 0 && (
-          <PopoverMetric
-            label="Tokens"
-            value={formatTokens(trace.totalTokens)}
-          />
+          <PopoverMetric label="Tokens" value={formatTokens(trace.totalTokens)} />
         )}
         {trace.models.length > 0 && (
           <PopoverMetric label="Model" value={trace.models[0]!} />

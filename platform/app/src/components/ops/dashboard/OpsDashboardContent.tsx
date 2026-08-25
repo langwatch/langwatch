@@ -64,12 +64,7 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
 
       <Card.Root overflow="hidden">
         <Card.Body padding={4}>
-          <Text
-            textStyle="xs"
-            fontWeight="medium"
-            color="fg.muted"
-            marginBottom={2}
-          >
+          <Text textStyle="xs" fontWeight="medium" color="fg.muted" marginBottom={2}>
             Throughput
           </Text>
           <ThroughputChart data={data} />

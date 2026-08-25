@@ -5,9 +5,7 @@ import { annotationRouter, createOrUpdateQueueItems } from "../annotation";
 
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
 
@@ -79,9 +77,7 @@ describe("annotation queue references", () => {
   it("rejects queue members from another organization", async () => {
     organizationUserCount.mockResolvedValue(0);
 
-    await expect(
-      createCaller().createOrUpdateQueue(queueInput),
-    ).rejects.toMatchObject({
+    await expect(createCaller().createOrUpdateQueue(queueInput)).rejects.toMatchObject({
       code: "BAD_REQUEST",
     });
 
@@ -94,9 +90,7 @@ describe("annotation queue references", () => {
   it("rejects annotation scores from another project", async () => {
     annotationScoreCount.mockResolvedValue(0);
 
-    await expect(
-      createCaller().createOrUpdateQueue(queueInput),
-    ).rejects.toMatchObject({
+    await expect(createCaller().createOrUpdateQueue(queueInput)).rejects.toMatchObject({
       code: "BAD_REQUEST",
     });
 

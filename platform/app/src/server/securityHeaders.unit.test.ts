@@ -44,9 +44,7 @@ describe("buildSecurityHeaders", () => {
     ];
 
     function directive(csp: string, name: string): string {
-      const found = csp
-        .split("; ")
-        .find((d) => d === name || d.startsWith(`${name} `));
+      const found = csp.split("; ").find((d) => d === name || d.startsWith(`${name} `));
       if (!found) throw new Error(`directive ${name} not found in CSP`);
       return found;
     }

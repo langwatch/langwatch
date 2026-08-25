@@ -17,20 +17,17 @@ export const monitorMappingStateSchema = z
 export type MonitorMappingState = z.infer<typeof monitorMappingStateSchema>;
 
 /** Legacy `{}`/malformed mappings are persisted as a safe empty mapping. */
-export const monitorMappingsInputSchema = z.preprocess(
-  (value) => {
-    if (
-      value !== null &&
-      typeof value === "object" &&
-      !Array.isArray(value) &&
-      "mapping" in value
-    ) {
-      return value;
-    }
-    return { mapping: {}, expansions: [] };
-  },
-  monitorMappingStateSchema,
-);
+export const monitorMappingsInputSchema = z.preprocess((value) => {
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "mapping" in value
+  ) {
+    return value;
+  }
+  return { mapping: {}, expansions: [] };
+}, monitorMappingStateSchema);
 
 const monitorPreconditionSchema = z
   .object({
@@ -158,6 +155,4 @@ export const monitorReplicationInputSchema = z
     evaluatorId: z.string().min(1).nullable(),
   })
   .strict();
-export type MonitorReplicationInput = z.infer<
-  typeof monitorReplicationInputSchema
->;
+export type MonitorReplicationInput = z.infer<typeof monitorReplicationInputSchema>;

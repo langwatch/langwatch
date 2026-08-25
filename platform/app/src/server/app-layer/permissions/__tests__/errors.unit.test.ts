@@ -11,9 +11,7 @@ describe("LiteMemberRestrictedError", () => {
 
     it("sets the user-facing message", () => {
       const error = new LiteMemberRestrictedError("prompts");
-      expect(error.message).toBe(
-        "This feature is not available for your account",
-      );
+      expect(error.message).toBe("This feature is not available for your account");
     });
 
     it("sets httpStatus to 401", () => {

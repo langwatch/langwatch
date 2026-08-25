@@ -9,9 +9,7 @@ import {
 } from "../evaluationTrigger.subscriber";
 import { DEFERRED_CHECK_DELAY_MS } from "../originGate.subscriber";
 
-function makeEvent(
-  overrides: Partial<TraceProcessingEvent> = {},
-): TraceProcessingEvent {
+function makeEvent(overrides: Partial<TraceProcessingEvent> = {}): TraceProcessingEvent {
   return {
     id: "evt-1",
     type: "lw.obs.trace.span_received",
@@ -100,9 +98,7 @@ describe("evaluationTrigger subscriber", () => {
     it("sends with dedup TTL outlasting deferred origin window", async () => {
       const monitor = makeMonitor({ threadIdleTimeout: null });
       const deps = createDeps();
-      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
-        monitor,
-      ]);
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
 
       const subscriber = createEvaluationTriggerSubscriber(deps);
       const event = makeEvent();
@@ -114,9 +110,7 @@ describe("evaluationTrigger subscriber", () => {
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
       expect(options!.deduplication).toBeDefined();
-      expect(options!.deduplication!.ttlMs).toBe(
-        DEFERRED_CHECK_DELAY_MS + 60_000,
-      );
+      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
       expect(options!.delay).toBeUndefined();
     });
   });
@@ -125,9 +119,7 @@ describe("evaluationTrigger subscriber", () => {
     it("sends with dynamic delay and dedup based on threadIdleTimeout", async () => {
       const monitor = makeMonitor({ threadIdleTimeout: 300 });
       const deps = createDeps();
-      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
-        monitor,
-      ]);
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
 
       const subscriber = createEvaluationTriggerSubscriber(deps);
       const event = makeEvent();
@@ -160,9 +152,7 @@ describe("evaluationTrigger subscriber", () => {
     it("falls back to trace-level dedup (6-min TTL, no delay override)", async () => {
       const monitor = makeMonitor({ threadIdleTimeout: 300 });
       const deps = createDeps();
-      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
-        monitor,
-      ]);
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
 
       const subscriber = createEvaluationTriggerSubscriber(deps);
       const event = makeEvent();
@@ -173,9 +163,7 @@ describe("evaluationTrigger subscriber", () => {
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
-      expect(options!.deduplication!.ttlMs).toBe(
-        DEFERRED_CHECK_DELAY_MS + 60_000,
-      );
+      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
       expect(options!.delay).toBeUndefined();
     });
   });
@@ -184,9 +172,7 @@ describe("evaluationTrigger subscriber", () => {
     it("falls back to trace-level dedup (6-min TTL, no delay override)", async () => {
       const monitor = makeMonitor({ threadIdleTimeout: 0 });
       const deps = createDeps();
-      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
-        monitor,
-      ]);
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
 
       const subscriber = createEvaluationTriggerSubscriber(deps);
       const event = makeEvent();
@@ -203,9 +189,7 @@ describe("evaluationTrigger subscriber", () => {
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
-      expect(options!.deduplication!.ttlMs).toBe(
-        DEFERRED_CHECK_DELAY_MS + 60_000,
-      );
+      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
       expect(options!.delay).toBeUndefined();
     });
   });
@@ -217,9 +201,7 @@ describe("evaluationTrigger subscriber", () => {
         evaluator: { name: "Evaluator Name" },
       });
       const deps = createDeps();
-      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
-        monitor,
-      ]);
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
 
       const subscriber = createEvaluationTriggerSubscriber(deps);
       await subscriber.spec.handler(makeEvent(), makeContext());
@@ -237,9 +219,7 @@ describe("evaluationTrigger subscriber", () => {
         evaluator: null,
       });
       const deps = createDeps();
-      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
-        monitor,
-      ]);
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
 
       const subscriber = createEvaluationTriggerSubscriber(deps);
       await subscriber.spec.handler(makeEvent(), makeContext());

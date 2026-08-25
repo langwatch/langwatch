@@ -1,10 +1,7 @@
 import { Badge, Box, Card, HStack, Table, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { api } from "~/utils/api";
-import {
-  joinProjectionHealth,
-  type ProjectionHealthRow,
-} from "./projectionHealth";
+import { joinProjectionHealth, type ProjectionHealthRow } from "./projectionHealth";
 
 function ProjectionRow({ row }: { row: ProjectionHealthRow }) {
   return (

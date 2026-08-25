@@ -55,18 +55,14 @@ export const langyWorkerDispatchIntentSchema = z.object({
    */
   resumeFromTurnId: z.string().nullable(),
 });
-export type LangyWorkerDispatchIntent = z.infer<
-  typeof langyWorkerDispatchIntentSchema
->;
+export type LangyWorkerDispatchIntent = z.infer<typeof langyWorkerDispatchIntentSchema>;
 
 export const langyGenerateTitleIntentSchema = z.object({
   conversationId: z.string(),
   /** The finalized turn that triggered generation (idempotency scope). */
   turnId: z.string(),
 });
-export type LangyGenerateTitleIntent = z.infer<
-  typeof langyGenerateTitleIntentSchema
->;
+export type LangyGenerateTitleIntent = z.infer<typeof langyGenerateTitleIntentSchema>;
 
 /**
  * The content-stripped view of a Langy event the decision function receives

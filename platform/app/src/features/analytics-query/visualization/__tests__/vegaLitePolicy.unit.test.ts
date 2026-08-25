@@ -58,9 +58,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
           mark: "bar",
         });
 
-        expect(errors.map((error) => error.rule)).toEqual([
-          "data.unknown-name",
-        ]);
+        expect(errors.map((error) => error.rule)).toEqual(["data.unknown-name"]);
         expect(errors[0]?.code).toBe("unknown-dataset");
         expect(errors[0]?.message).toContain("customer_pii");
         expect(errors[0]?.message).toContain("query_result");
@@ -72,9 +70,9 @@ describe("the LangWatchQL Vega-Lite policy", () => {
       });
 
       it("refuses a view that no data source reaches at all", () => {
-        expect(
-          refusalRules({ $schema: S, vconcat: [{ mark: "bar" }] }),
-        ).toEqual(["data.unresolved"]);
+        expect(refusalRules({ $schema: S, vconcat: [{ mark: "bar" }] })).toEqual([
+          "data.unresolved",
+        ]);
       });
 
       it("admits a nested view that inherits a registered dataset", () => {
@@ -93,9 +91,9 @@ describe("the LangWatchQL Vega-Lite policy", () => {
     describe("when it is validated", () => {
       /** @scenario "Caller-supplied datasets and inline values are rejected" */
       it("refuses a top-level datasets property and inline values before Vega sees them", () => {
-        expect(
-          refusalRules(bar({ datasets: { smuggled: [{ model: "a" }] } })),
-        ).toContain("data.caller-datasets");
+        expect(refusalRules(bar({ datasets: { smuggled: [{ model: "a" }] } }))).toContain(
+          "data.caller-datasets",
+        );
 
         expect(
           refusalRules({
@@ -146,9 +144,9 @@ describe("the LangWatchQL Vega-Lite policy", () => {
         ).toContain("lookup.url-data");
 
         expect(refusalRules(nested({ mark: "image" }))).toContain("mark.image");
-        expect(
-          refusalRules(nested({ mark: { type: "image", width: 8 } })),
-        ).toContain("mark.image");
+        expect(refusalRules(nested({ mark: { type: "image", width: 8 } }))).toContain(
+          "mark.image",
+        );
 
         expect(
           refusalRules(
@@ -167,9 +165,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
           }),
         );
 
-        expect(errors.map((error) => error.rule)).toEqual([
-          "resource.url-property",
-        ]);
+        expect(errors.map((error) => error.rule)).toEqual(["resource.url-property"]);
         expect(errors[0]?.path).toBe("/config/mark/url");
       });
 
@@ -185,13 +181,9 @@ describe("the LangWatchQL Vega-Lite policy", () => {
           registeredDatasets: ["query_result"],
         });
 
-        expect(errors.map((error) => error.rule)).toContain(
-          "resource.url-property",
-        );
+        expect(errors.map((error) => error.rule)).toContain("resource.url-property");
         expect(
-          refusalRules(
-            bar({ usermeta: { patch: "https://exfiltrate.example/p.json" } }),
-          ),
+          refusalRules(bar({ usermeta: { patch: "https://exfiltrate.example/p.json" } })),
         ).toContain("resource.url-property");
       });
     });
@@ -212,13 +204,11 @@ describe("the LangWatchQL Vega-Lite policy", () => {
           }),
         );
 
-        expect(errors.map((error) => error.rule)).toEqual([
-          "runtime.embed-options",
-        ]);
+        expect(errors.map((error) => error.rule)).toEqual(["runtime.embed-options"]);
         expect(errors[0]?.path).toBe("/usermeta/embedOptions");
-        expect(
-          validate(bar({ usermeta: { note: "a comment of my own" } })).ok,
-        ).toBe(true);
+        expect(validate(bar({ usermeta: { note: "a comment of my own" } })).ok).toBe(
+          true,
+        );
       });
     });
   });
@@ -245,19 +235,16 @@ describe("the LangWatchQL Vega-Lite policy", () => {
         expect(
           refusalRules(from({ url: "https://exfiltrate.example/j.json" })),
         ).toContain("lookup.url-data");
-        expect(
-          refusalRules(from({ values: [{ model: "a", vendor: "b" }] })),
-        ).toContain("lookup.inline-data");
+        expect(refusalRules(from({ values: [{ model: "a", vendor: "b" }] }))).toContain(
+          "lookup.inline-data",
+        );
 
         const pastTheTransformCeiling = bar({
           transform: [
-            ...Array.from(
-              { length: LWQL_VEGA_LIMITS.maxTransforms },
-              (_, i) => ({
-                calculate: "datum.total + 1",
-                as: `c${i}`,
-              }),
-            ),
+            ...Array.from({ length: LWQL_VEGA_LIMITS.maxTransforms }, (_, i) => ({
+              calculate: "datum.total + 1",
+              as: `c${i}`,
+            })),
             {
               lookup: "model",
               from: {
@@ -268,9 +255,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
             },
           ],
         });
-        expect(refusalRules(pastTheTransformCeiling)).toContain(
-          "limit.maxTransforms",
-        );
+        expect(refusalRules(pastTheTransformCeiling)).toContain("limit.maxTransforms");
       });
     });
   });
@@ -289,9 +274,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
           { extent: "total", param: "p" },
         ]) {
           const errors = refusals(bar({ transform: [unreviewed] }));
-          expect(errors.map((error) => error.rule)).toContain(
-            "transform.unknown",
-          );
+          expect(errors.map((error) => error.rule)).toContain("transform.unknown");
           expect(errors[0]?.message).toContain(ALLOWED_VEGA_LITE_TRANSFORMS[0]);
         }
 
@@ -308,9 +291,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
           const errors = refusals(
             bar({ transform: [{ calculate: forbidden, as: "smuggled" }] }),
           );
-          expect(errors.map((error) => error.rule)).toContain(
-            "expression.forbidden",
-          );
+          expect(errors.map((error) => error.rule)).toContain("expression.forbidden");
         }
       });
 
@@ -344,18 +325,14 @@ describe("the LangWatchQL Vega-Lite policy", () => {
               },
             },
           ],
-          [
-            "/transform/0/calculate",
-            { transform: [{ calculate: "now()", as: "c" }] },
-          ],
+          ["/transform/0/calculate", { transform: [{ calculate: "now()", as: "c" }] }],
         ];
 
         for (const [path, extra] of sites) {
           const errors = refusals(bar(extra));
           expect(
             errors.some(
-              (error) =>
-                error.rule === "expression.forbidden" && error.path === path,
+              (error) => error.rule === "expression.forbidden" && error.path === path,
             ),
             `${path} was not screened`,
           ).toBe(true);
@@ -393,9 +370,9 @@ describe("the LangWatchQL Vega-Lite policy", () => {
           "round(sqrt(abs(datum.latency)))",
           "lower(datum.model) == 'gpt'",
         ]) {
-          expect(
-            validate(bar({ transform: [{ calculate: allowed, as: "c" }] })).ok,
-          ).toBe(true);
+          expect(validate(bar({ transform: [{ calculate: allowed, as: "c" }] })).ok).toBe(
+            true,
+          );
         }
 
         expect(ALLOWED_VEGA_EXPRESSION_IDENTIFIERS).toContain("datum");
@@ -416,9 +393,9 @@ describe("the LangWatchQL Vega-Lite policy", () => {
       it("refuses it in a conditional encoding, as it does in a filter", () => {
         const forbidden = "window.parent.document.cookie";
 
-        expect(
-          refusalRules(bar({ transform: [{ filter: forbidden }] })),
-        ).toContain("expression.forbidden");
+        expect(refusalRules(bar({ transform: [{ filter: forbidden }] }))).toContain(
+          "expression.forbidden",
+        );
 
         expect(
           refusalRules(

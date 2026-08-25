@@ -303,41 +303,41 @@ describe.skipIf(!hasCredentialsSecret)(
         { label: "http", referenceId: () => httpAgentId },
       ];
 
-      describe.each(cases)("when the run is against a $label target", ({
-        label,
-        referenceId,
-      }) => {
-        /** @scenario "A project whose FAST/coding default is codex still runs workflow, code, and http simulations" */
-        /** @scenario "Coding defaults never break a simulation run" */
-        it("prefetches successfully instead of hitting the codex coding-assistant backstop", async () => {
-          const deps = createDataPrefetcherDependencies({
-            app: getApp(),
-            prisma,
-          });
-          const target: TargetConfig = {
-            type: label,
-            referenceId: referenceId(),
-          };
+      describe.each(cases)(
+        "when the run is against a $label target",
+        ({ label, referenceId }) => {
+          /** @scenario "A project whose FAST/coding default is codex still runs workflow, code, and http simulations" */
+          /** @scenario "Coding defaults never break a simulation run" */
+          it("prefetches successfully instead of hitting the codex coding-assistant backstop", async () => {
+            const deps = createDataPrefetcherDependencies({
+              app: getApp(),
+              prisma,
+            });
+            const target: TargetConfig = {
+              type: label,
+              referenceId: referenceId(),
+            };
 
-          const result = await prefetchScenarioData({
-            context: {
-              projectId,
-              scenarioId,
-              setId: `set_${ns}_${label}`,
-              batchRunId: `batch_${ns}_${label}`,
-            },
-            target,
-            deps,
-          });
+            const result = await prefetchScenarioData({
+              context: {
+                projectId,
+                scenarioId,
+                setId: `set_${ns}_${label}`,
+                batchRunId: `batch_${ns}_${label}`,
+              },
+              target,
+              deps,
+            });
 
-          expect(
-            result.success,
-            `prefetch failed for ${label} target: ${
-              result.success ? "" : result.error
-            }`,
-          ).toBe(true);
-        });
-      });
+            expect(
+              result.success,
+              `prefetch failed for ${label} target: ${
+                result.success ? "" : result.error
+              }`,
+            ).toBe(true);
+          });
+        },
+      );
     });
   },
 );

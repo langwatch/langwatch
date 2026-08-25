@@ -76,12 +76,7 @@ const differenceInterval = (
   mine: number | null | undefined,
   theirs: number | null | undefined,
 ): [number, number] | null => {
-  if (
-    mine === null ||
-    mine === undefined ||
-    theirs === null ||
-    theirs === undefined
-  ) {
+  if (mine === null || mine === undefined || theirs === null || theirs === undefined) {
     return null;
   }
   const diff = mine - theirs;
@@ -113,10 +108,7 @@ const statsOrNull = (value: number | null | undefined, rows: number) =>
   value === null || value === undefined ? null : stats(value, rows);
 
 const metrics = (
-  byId: Record<
-    string,
-    { cost?: number | null; duration?: number | null; rows?: number }
-  >,
+  byId: Record<string, { cost?: number | null; duration?: number | null; rows?: number }>,
 ) => {
   const ids = Object.keys(byId);
   return Object.fromEntries(
@@ -174,9 +166,9 @@ describe("computeParetoDominance", () => {
     });
 
     it("leaves only the winner on the front", () => {
-      expect(
-        computeParetoDominance({ leaderboard, variantMetrics }).front,
-      ).toEqual(["a"]);
+      expect(computeParetoDominance({ leaderboard, variantMetrics }).front).toEqual([
+        "a",
+      ]);
     });
   });
 
@@ -251,9 +243,7 @@ describe("computeParetoDominance", () => {
         b: { cost: 0.001 * TWO_PERCENT_APART },
       });
 
-      expect(
-        computeParetoDominance({ leaderboard, variantMetrics }).edges,
-      ).toEqual([]);
+      expect(computeParetoDominance({ leaderboard, variantMetrics }).edges).toEqual([]);
     });
   });
 
@@ -293,9 +283,10 @@ describe("computeParetoDominance", () => {
       const dominance = computeParetoDominance({ leaderboard, variantMetrics });
 
       expect(dominance.dimensions).toEqual(["quality", "cost"]);
-      expect(
-        dominance.edges.find((e) => e.loserId === "b")!.strictlyBetterOn,
-      ).toEqual(["quality", "cost"]);
+      expect(dominance.edges.find((e) => e.loserId === "b")!.strictlyBetterOn).toEqual([
+        "quality",
+        "cost",
+      ]);
     });
   });
 
@@ -315,9 +306,9 @@ describe("computeParetoDominance", () => {
       const dominance = computeParetoDominance({ leaderboard, variantMetrics });
 
       expect(dominance.dimensions).not.toContain("cost");
-      expect(
-        dominance.edges.find((e) => e.loserId === "b")!.strictlyBetterOn,
-      ).toEqual(["quality"]);
+      expect(dominance.edges.find((e) => e.loserId === "b")!.strictlyBetterOn).toEqual([
+        "quality",
+      ]);
     });
   });
 
@@ -334,9 +325,7 @@ describe("computeParetoDominance", () => {
         b: { cost: 0.001, duration: 1000 },
       });
 
-      expect(
-        computeParetoDominance({ leaderboard, variantMetrics }).edges,
-      ).toEqual([]);
+      expect(computeParetoDominance({ leaderboard, variantMetrics }).edges).toEqual([]);
     });
   });
 
@@ -477,11 +466,7 @@ describe("computeParetoDominance — the duration side of the paired test", () =
       bootstrapNonConvergence: null,
     }) as any;
 
-  const withDurations = ({
-    durationDiff,
-  }: {
-    durationDiff: [number, number];
-  }) =>
+  const withDurations = ({ durationDiff }: { durationDiff: [number, number] }) =>
     ({
       a: {
         variantId: "a",
@@ -591,9 +576,7 @@ describe("computeParetoDominance — a field that broke into groups that never m
     });
 
     expect(
-      dominance.edges.filter(
-        (edge) => ISLAND[edge.winnerId] !== ISLAND[edge.loserId],
-      ),
+      dominance.edges.filter((edge) => ISLAND[edge.winnerId] !== ISLAND[edge.loserId]),
     ).toEqual([]);
   });
 });

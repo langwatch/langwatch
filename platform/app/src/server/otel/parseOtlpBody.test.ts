@@ -87,9 +87,7 @@ function buildTraceRequest(): {
   };
 }
 
-function buildProtobufBody(
-  payload: ReturnType<typeof buildTraceRequest>,
-): ArrayBuffer {
+function buildProtobufBody(payload: ReturnType<typeof buildTraceRequest>): ArrayBuffer {
   const message = traceRequestType.create(payload);
   const bytes = traceRequestType.encode(message).finish() as Uint8Array;
   return bytes.buffer.slice(
@@ -98,11 +96,8 @@ function buildProtobufBody(
   ) as ArrayBuffer;
 }
 
-function buildJsonBody(
-  payload: ReturnType<typeof buildTraceRequest>,
-): ArrayBuffer {
-  return new TextEncoder().encode(JSON.stringify(payload))
-    .buffer as ArrayBuffer;
+function buildJsonBody(payload: ReturnType<typeof buildTraceRequest>): ArrayBuffer {
+  return new TextEncoder().encode(JSON.stringify(payload)).buffer as ArrayBuffer;
 }
 
 function makeRequest(
@@ -176,9 +171,7 @@ describe("readOtlpBody", () => {
       const req = makeRequest(new ArrayBuffer(0), {
         "content-encoding": "snappy",
       });
-      await expect(readOtlpBody(req)).rejects.toThrow(
-        /Unsupported Content-Encoding/,
-      );
+      await expect(readOtlpBody(req)).rejects.toThrow(/Unsupported Content-Encoding/);
     });
   });
 
@@ -192,9 +185,7 @@ describe("readOtlpBody", () => {
       const compressed = bomb(OTLP_MAX_BODY_BYTES + 1024);
       const req = makeRequest(compressed, { "content-encoding": "gzip" });
 
-      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(
-        OtlpBodyTooLargeError,
-      );
+      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(OtlpBodyTooLargeError);
     });
 
     it("asks the sender for smaller batches with a 413", async () => {
@@ -215,24 +206,21 @@ describe("readOtlpBody", () => {
       );
     });
 
-    it.each([
-      "gzip",
-      "deflate",
-      "br",
-    ])("applies the cap to %s as well", async (encoding) => {
-      const payload = Buffer.alloc(OTLP_MAX_BODY_BYTES + 1024, 0);
-      const compressed =
-        encoding === "gzip"
-          ? gzipSync(payload)
-          : encoding === "deflate"
-            ? deflateSync(payload)
-            : brotliCompressSync(payload);
-      const req = makeRequest(compressed, { "content-encoding": encoding });
+    it.each(["gzip", "deflate", "br"])(
+      "applies the cap to %s as well",
+      async (encoding) => {
+        const payload = Buffer.alloc(OTLP_MAX_BODY_BYTES + 1024, 0);
+        const compressed =
+          encoding === "gzip"
+            ? gzipSync(payload)
+            : encoding === "deflate"
+              ? deflateSync(payload)
+              : brotliCompressSync(payload);
+        const req = makeRequest(compressed, { "content-encoding": encoding });
 
-      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(
-        OtlpBodyTooLargeError,
-      );
-    });
+        await expect(readOtlpBody(req)).rejects.toBeInstanceOf(OtlpBodyTooLargeError);
+      },
+    );
 
     it("still accepts a body that sits just under the cap", async () => {
       const payload = Buffer.alloc(OTLP_MAX_BODY_BYTES - 1024, 0);
@@ -256,9 +244,7 @@ describe("readOtlpBody", () => {
         "content-type": "application/x-protobuf",
       });
 
-      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(
-        OtlpBodyTooLargeError,
-      );
+      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(OtlpBodyTooLargeError);
     });
 
     it("asks the sender for smaller batches with a 413", async () => {
@@ -297,10 +283,7 @@ describe("readOtlpBody", () => {
 describe("parseOtlpTraces", () => {
   describe("when body is empty", () => {
     it("returns ok with empty resourceSpans", () => {
-      const result = parseOtlpTraces(
-        new ArrayBuffer(0),
-        "application/x-protobuf",
-      );
+      const result = parseOtlpTraces(new ArrayBuffer(0), "application/x-protobuf");
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.request.resourceSpans).toEqual([]);
@@ -357,8 +340,7 @@ describe("parseOtlpTraces", () => {
 
   describe("when body is malformed", () => {
     it("returns ok:false with diagnostic error", () => {
-      const garbage = new TextEncoder().encode("this is not OTLP")
-        .buffer as ArrayBuffer;
+      const garbage = new TextEncoder().encode("this is not OTLP").buffer as ArrayBuffer;
       const result = parseOtlpTraces(garbage, "application/json");
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -371,10 +353,7 @@ describe("parseOtlpTraces", () => {
 describe("parser equivalence — JSON path produces same shape as protobuf path", () => {
   it("returns the same span count and same canonical attributes regardless of wire format", () => {
     const payload = buildTraceRequest();
-    const jsonResult = parseOtlpTraces(
-      buildJsonBody(payload),
-      "application/json",
-    );
+    const jsonResult = parseOtlpTraces(buildJsonBody(payload), "application/json");
     const protoResult = parseOtlpTraces(
       buildProtobufBody(payload),
       "application/x-protobuf",
@@ -384,14 +363,10 @@ describe("parser equivalence — JSON path produces same shape as protobuf path"
     expect(protoResult.ok).toBe(true);
     if (!jsonResult.ok || !protoResult.ok) return;
 
-    expect(spanCountOf(jsonResult.request)).toBe(
-      spanCountOf(protoResult.request),
-    );
+    expect(spanCountOf(jsonResult.request)).toBe(spanCountOf(protoResult.request));
 
-    const jsonSpan =
-      jsonResult.request.resourceSpans?.[0]?.scopeSpans?.[0]?.spans?.[0];
-    const protoSpan =
-      protoResult.request.resourceSpans?.[0]?.scopeSpans?.[0]?.spans?.[0];
+    const jsonSpan = jsonResult.request.resourceSpans?.[0]?.scopeSpans?.[0]?.spans?.[0];
+    const protoSpan = protoResult.request.resourceSpans?.[0]?.scopeSpans?.[0]?.spans?.[0];
 
     expect(jsonSpan?.name).toBe(protoSpan?.name);
 
@@ -453,10 +428,7 @@ describe("parser-helper exports — both consumer routes import the same primiti
 describe("parseOtlpLogs", () => {
   describe("when body is empty", () => {
     it("returns ok with empty resourceLogs", () => {
-      const result = parseOtlpLogs(
-        new ArrayBuffer(0),
-        "application/x-protobuf",
-      );
+      const result = parseOtlpLogs(new ArrayBuffer(0), "application/x-protobuf");
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.request.resourceLogs).toEqual([]);
@@ -509,10 +481,7 @@ describe("parseOtlpLogs", () => {
 describe("parseOtlpMetrics", () => {
   describe("when body is empty", () => {
     it("returns ok with empty resourceMetrics", () => {
-      const result = parseOtlpMetrics(
-        new ArrayBuffer(0),
-        "application/x-protobuf",
-      );
+      const result = parseOtlpMetrics(new ArrayBuffer(0), "application/x-protobuf");
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.request.resourceMetrics).toEqual([]);

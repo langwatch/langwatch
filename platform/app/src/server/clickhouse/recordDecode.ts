@@ -25,9 +25,7 @@ export const asNullableNumber = (value: unknown): number | null => {
 };
 
 export const asStringArray = (value: unknown): string[] =>
-  Array.isArray(value)
-    ? value.filter((v): v is string => typeof v === "string")
-    : [];
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
 
 export const asStringMap = (value: unknown): Record<string, string> =>
   typeof value === "object" && value !== null && !Array.isArray(value)

@@ -79,10 +79,7 @@ secured
   .access(adminAuth)
   .delete("/admin/impersonate", async (c) => handleImpersonate(c, "DELETE"));
 
-async function handleImpersonate(
-  c: AdminContext,
-  method: "POST" | "DELETE",
-) {
+async function handleImpersonate(c: AdminContext, method: "POST" | "DELETE") {
   const session = await getServerAuthSession({ req: c.req.raw });
   const user = session?.user.impersonator ?? session?.user;
   const ops = c.var.langwatchApp.ops;
@@ -132,51 +129,48 @@ async function handleImpersonate(
   return c.json({ message: "Impersonation started" });
 }
 
-secured.access(adminAuth).post(
-  "/admin/:resource",
-  async (c: AdminContext) => {
-    const session = await getServerAuthSession({ req: c.req.raw });
-    const user = session?.user.impersonator ?? session?.user;
-    const ops = c.var.langwatchApp.ops;
-    if (!session || !user || !ops.isAdmin(user)) {
-      throw new AdminSurfaceHiddenError();
-    }
+secured.access(adminAuth).post("/admin/:resource", async (c: AdminContext) => {
+  const session = await getServerAuthSession({ req: c.req.raw });
+  const user = session?.user.impersonator ?? session?.user;
+  const ops = c.var.langwatchApp.ops;
+  if (!session || !user || !ops.isAdmin(user)) {
+    throw new AdminSurfaceHiddenError();
+  }
 
-    const body = await readJsonBody(c);
-    const resource = canonicalResource(body.resource ?? c.req.param("resource"));
-    if (!resource) {
-      throw new ValidationError("Unknown admin resource", {
-        meta: {
-          fieldErrors: {
-            resource: ["This isn't a resource the admin API serves."],
-          },
+  const body = await readJsonBody(c);
+  const resource = canonicalResource(body.resource ?? c.req.param("resource"));
+  if (!resource) {
+    throw new ValidationError("Unknown admin resource", {
+      meta: {
+        fieldErrors: {
+          resource: ["This isn't a resource the admin API serves."],
         },
-      });
-    }
-
-    const parsed = adminOperationRequestSchema.safeParse({
-      resource,
-      method: body.method,
-      params: body.params ?? {},
+      },
     });
-    if (!parsed.success) {
-      throw new ValidationError("Invalid admin operation", {
-        meta: {
-          fieldErrors: {
-            method: ["This is not a supported admin operation."],
-          },
+  }
+
+  const parsed = adminOperationRequestSchema.safeParse({
+    resource,
+    method: body.method,
+    params: body.params ?? {},
+  });
+  if (!parsed.success) {
+    throw new ValidationError("Invalid admin operation", {
+      meta: {
+        fieldErrors: {
+          method: ["This is not a supported admin operation."],
         },
-      });
-    }
-
-    const result = await ops.adminOperation({
-      ...parsed.data,
-      actorId: user.id,
-      req: auditRequestFrom(c.req.raw),
+      },
     });
-    return c.json(result);
-  },
-);
+  }
+
+  const result = await ops.adminOperation({
+    ...parsed.data,
+    actorId: user.id,
+    req: auditRequestFrom(c.req.raw),
+  });
+  return c.json(result);
+});
 
 function canonicalResource(value: unknown) {
   if (typeof value !== "string") return null;

@@ -21,10 +21,7 @@ vi.mock("../ScenarioGridCard", () => ({
     scenarioRun: { scenarioRunId: string; name: string };
     onClick: () => void;
   }) => (
-    <div
-      data-testid={`grid-card-${scenarioRun.scenarioRunId}`}
-      onClick={onClick}
-    >
+    <div data-testid={`grid-card-${scenarioRun.scenarioRunId}`} onClick={onClick}>
       {scenarioRun.name}
     </div>
   ),
@@ -38,10 +35,7 @@ vi.mock("../ScenarioTargetRow", () => ({
     scenarioRun: { scenarioRunId: string; name: string };
     onClick: () => void;
   }) => (
-    <div
-      data-testid={`list-row-${scenarioRun.scenarioRunId}`}
-      onClick={onClick}
-    >
+    <div data-testid={`list-row-${scenarioRun.scenarioRunId}`} onClick={onClick}>
       {scenarioRun.name}
     </div>
   ),

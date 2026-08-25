@@ -88,9 +88,7 @@ const checks = [
   {
     name: "Order preserved: input turns before output (chronological)",
     pass:
-      messages.findIndex(
-        (m) => m.role === "user" && m.content === "thanks bro!",
-      ) <
+      messages.findIndex((m) => m.role === "user" && m.content === "thanks bro!") <
       messages.findIndex(
         (m) => m.role === "assistant" && m.content === "You're welcome.",
       ),

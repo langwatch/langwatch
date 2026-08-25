@@ -9,8 +9,7 @@ import {
 
 const logger = createLogger("langwatch:process-manager:retention-sweep");
 
-export const PROCESS_RETENTION_SWEEP_PROCESS_NAME =
-  "processRetentionSweep" as const;
+export const PROCESS_RETENTION_SWEEP_PROCESS_NAME = "processRetentionSweep" as const;
 
 /**
  * Hourly. The tables this reaps grow with traffic, so the interval only has to
@@ -130,9 +129,7 @@ export const processRetentionSweepSchema = z.object({
   maxBatchesPerFamily: z.number().int().positive().optional(),
 });
 
-export type ProcessRetentionSweepPayload = z.output<
-  typeof processRetentionSweepSchema
->;
+export type ProcessRetentionSweepPayload = z.output<typeof processRetentionSweepSchema>;
 
 export interface ProcessRetentionSweepState {
   lastSweepAt: number | null;
@@ -160,10 +157,7 @@ export interface ProcessRetentionSweepDeps {
     before: number;
     limit: number;
   }) => Promise<number>;
-  deleteDeadOutboxBatch: (params: {
-    before: number;
-    limit: number;
-  }) => Promise<number>;
+  deleteDeadOutboxBatch: (params: { before: number; limit: number }) => Promise<number>;
   deleteConsumedInboxBatch: (params: {
     before: number;
     limit: number;
@@ -199,10 +193,7 @@ export const processRetentionSweepWake: WakeHandler<
   };
 };
 
-type DeleteBatch = (params: {
-  before: number;
-  limit: number;
-}) => Promise<number>;
+type DeleteBatch = (params: { before: number; limit: number }) => Promise<number>;
 
 interface FamilyPlan {
   family: RetentionFamily;
@@ -212,10 +203,7 @@ interface FamilyPlan {
 }
 
 /** The three families and the cutoff each one reaps behind, for this wake. */
-function planFamilies(
-  deps: ProcessRetentionSweepDeps,
-  startedAt: number,
-): FamilyPlan[] {
+function planFamilies(deps: ProcessRetentionSweepDeps, startedAt: number): FamilyPlan[] {
   return [
     {
       family: "dispatched_outbox",
@@ -347,9 +335,7 @@ export function runProcessRetentionSweep(deps: ProcessRetentionSweepDeps) {
       const familyDeadline = Math.min(
         deadline,
         startedAt +
-          Math.floor(
-            ((index + 1) * RETENTION_SWEEP_DEADLINE_MS) / plans.length,
-          ),
+          Math.floor(((index + 1) * RETENTION_SWEEP_DEADLINE_MS) / plans.length),
       );
       swept[plan.family] = await sweepFamily(plan, {
         deadline: familyDeadline,

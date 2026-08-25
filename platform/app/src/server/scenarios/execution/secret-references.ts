@@ -87,9 +87,7 @@ export function fenceSecretRefs({
   // A nonce per call, so no authored template can spell a placeholder itself.
   const nonce = randomUUID();
   const fenced = template.replace(SECRET_REFERENCE, (match, name: string) => {
-    const value = Object.hasOwn(secrets, name)
-      ? (secrets[name] as string)
-      : match;
+    const value = Object.hasOwn(secrets, name) ? (secrets[name] as string) : match;
     const index = values.push(value) - 1;
     return placeholderFor({ nonce, index });
   });
@@ -100,8 +98,7 @@ export function fenceSecretRefs({
     template: fenced,
     restore: (rendered) =>
       values.reduce(
-        (text, value, index) =>
-          text.split(placeholderFor({ nonce, index })).join(value),
+        (text, value, index) => text.split(placeholderFor({ nonce, index })).join(value),
         rendered,
       ),
   };
@@ -115,13 +112,7 @@ export function fenceSecretRefs({
  * placeholder is literal text. The nonce is what makes it unguessable, so no
  * authored template can spell one by accident.
  */
-function placeholderFor({
-  nonce,
-  index,
-}: {
-  nonce: string;
-  index: number;
-}): string {
+function placeholderFor({ nonce, index }: { nonce: string; index: number }): string {
   return `lw-secret-${nonce}-${index}`;
 }
 

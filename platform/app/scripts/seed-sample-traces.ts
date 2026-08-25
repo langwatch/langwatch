@@ -16,8 +16,7 @@
  */
 
 const ENDPOINT = process.env.HAVEN_SEED_ENDPOINT ?? "http://localhost:5560";
-const API_KEY =
-  process.env.HAVEN_SEED_LANGWATCH_API_KEY ?? "sk-lw-local-development-key";
+const API_KEY = process.env.HAVEN_SEED_LANGWATCH_API_KEY ?? "sk-lw-local-development-key";
 
 // Locality guard: this script POSTs an ingestion key to HAVEN_SEED_ENDPOINT.
 // Refuse to run against anything but a local host so a stray env var can never
@@ -128,8 +127,7 @@ const THREADS: SampleThread[] = [
     turns: [
       {
         user: 'Translate to Dutch: "Your order has shipped and will arrive within two business days."',
-        assistant:
-          '"Je bestelling is verzonden en wordt binnen twee werkdagen bezorgd."',
+        assistant: '"Je bestelling is verzonden en wordt binnen twee werkdagen bezorgd."',
       },
     ],
   },

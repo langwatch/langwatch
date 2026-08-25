@@ -59,11 +59,15 @@ export class EvaluatorSourceNotFoundError extends NotFoundError {
 export class EvaluatorCopySelectionError extends HandledError {
   declare readonly code: "evaluator_copy_selection_invalid";
   constructor(evaluatorId: string) {
-    super("evaluator_copy_selection_invalid", "No valid evaluator copies were selected.", {
-      httpStatus: 400,
-      meta: { evaluatorId },
-      fault: "customer",
-    });
+    super(
+      "evaluator_copy_selection_invalid",
+      "No valid evaluator copies were selected.",
+      {
+        httpStatus: 400,
+        meta: { evaluatorId },
+        fault: "customer",
+      },
+    );
     this.name = "EvaluatorCopySelectionError";
   }
 }

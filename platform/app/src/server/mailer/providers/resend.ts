@@ -64,13 +64,7 @@ const buildPayload = (content: EmailContent, defaultFrom: string) => {
 
 export const resendProvider: EmailProviderPort = {
   name: "resend",
-  async send({
-    content,
-    defaultFrom,
-  }: {
-    content: EmailContent;
-    defaultFrom: string;
-  }) {
+  async send({ content, defaultFrom }: { content: EmailContent; defaultFrom: string }) {
     const apiKey = env.RESEND_API_KEY;
     if (!apiKey) {
       throw new EmailProviderConfigurationError(
@@ -105,9 +99,7 @@ export const resendProvider: EmailProviderPort = {
         // logged. The status identifies the failure class. It still has to be
         // cancelled, or undici keeps the connection out of the pool.
         await response.body?.cancel().catch(() => void 0);
-        throw new Error(
-          `Resend responded ${response.status} ${response.statusText}`,
-        );
+        throw new Error(`Resend responded ${response.status} ${response.statusText}`);
       }
 
       const data = (await response.json()) as { id?: string };

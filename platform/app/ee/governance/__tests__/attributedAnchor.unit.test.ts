@@ -10,9 +10,7 @@ function serviceWith(vkFound: boolean, projectFound: boolean) {
       findFirst: vi.fn().mockResolvedValue(vkFound ? { id: "vk_1" } : null),
     },
     project: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue(projectFound ? { id: "proj_1" } : null),
+      findFirst: vi.fn().mockResolvedValue(projectFound ? { id: "proj_1" } : null),
     },
   } as never;
   // The ClickHouse repo's presence is what template creation requires;

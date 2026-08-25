@@ -9,7 +9,9 @@ const INSTALL_TASKS = [
   { title: "installing langwatch deps", service: "prepare:langwatch" },
 ] as const;
 
-const INSTALL_SERVICES: ReadonlySet<string> = new Set(INSTALL_TASKS.map((t) => t.service));
+const INSTALL_SERVICES: ReadonlySet<string> = new Set(
+  INSTALL_TASKS.map((t) => t.service),
+);
 
 export function isInstallEvent(ev: RuntimeEvent): boolean {
   return INSTALL_SERVICES.has(ev.service);
@@ -110,14 +112,14 @@ export function renderInstallPanels(router: InstallPanelRouter): Promise<void> {
             }
           });
 
-          (router as InstallPanelRouter & { onInstallFinished(fn: () => void): void }).onInstallFinished(
-            () => {
-              if (!started) {
-                task.skip("(cached)");
-                resolve();
-              }
-            },
-          );
+          (
+            router as InstallPanelRouter & { onInstallFinished(fn: () => void): void }
+          ).onInstallFinished(() => {
+            if (!started) {
+              task.skip("(cached)");
+              resolve();
+            }
+          });
         }),
     })),
     {

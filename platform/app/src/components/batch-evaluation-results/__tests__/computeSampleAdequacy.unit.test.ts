@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  BTLeaderboard,
-  BTLeaderboardEntry,
-} from "../computeBTLeaderboard";
+import type { BTLeaderboard, BTLeaderboardEntry } from "../computeBTLeaderboard";
 import { computeSampleAdequacy } from "../computeSampleAdequacy";
 
 const entry = (
@@ -87,10 +84,7 @@ describe("computeSampleAdequacy", () => {
   describe("given a run that separates nothing", () => {
     it("reports zero resolution rather than an order", () => {
       const adequacy = computeSampleAdequacy(
-        leaderboard([
-          entry("a", 100, [-200, 300]),
-          entry("b", 50, [-250, 250]),
-        ]),
+        leaderboard([entry("a", 100, [-200, 300]), entry("b", 50, [-250, 250])]),
       );
 
       expect(adequacy.separatedPairs).toBe(0);
@@ -139,9 +133,7 @@ describe("computeSampleAdequacy", () => {
 
   describe("given a single ranked variant", () => {
     it("reports no resolution rather than dividing by zero", () => {
-      const adequacy = computeSampleAdequacy(
-        leaderboard([entry("a", 0, [-10, 10])]),
-      );
+      const adequacy = computeSampleAdequacy(leaderboard([entry("a", 0, [-10, 10])]));
 
       expect(adequacy.totalPairs).toBe(0);
       expect(adequacy.resolution).toBeNull();
@@ -194,10 +186,7 @@ describe("computeSampleAdequacy — when multiplicity is worth raising", () => {
       const adequacy = computeSampleAdequacy(board(["a", "b", "c"]));
 
       expect(adequacy.totalPairs).toBe(3);
-      expect(adequacy.familyWiseFalsePositiveRate).toBeCloseTo(
-        1 - Math.pow(0.95, 3),
-        10,
-      );
+      expect(adequacy.familyWiseFalsePositiveRate).toBeCloseTo(1 - Math.pow(0.95, 3), 10);
     });
 
     it("grows as more pairs are tested", () => {

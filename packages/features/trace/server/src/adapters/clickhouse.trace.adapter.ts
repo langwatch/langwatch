@@ -20,9 +20,7 @@ export class ClickHouseTraceAdapter {
 
   build(): TraceServiceContract {
     return TraceService.create({
-      repository: ClickHouseTraceSpanRepository.create(
-        this.options.resolveClient,
-      ),
+      repository: ClickHouseTraceSpanRepository.create(this.options.resolveClient),
       modelProviders: this.options.modelProviders,
     });
   }

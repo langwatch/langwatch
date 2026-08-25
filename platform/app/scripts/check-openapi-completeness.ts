@@ -76,10 +76,7 @@ const __dirname = dirname(__filename);
 const LANGWATCH_ROOT = resolve(__dirname, "..");
 
 /** The generated document this gate reads. */
-export const SPEC_PATH = join(
-  LANGWATCH_ROOT,
-  "src/app/api/openapiLangWatch.json",
-);
+export const SPEC_PATH = join(LANGWATCH_ROOT, "src/app/api/openapiLangWatch.json");
 
 /** The REST surfaces published to external integrators. */
 export const GATED_PREFIXES = ["/api/gateway/v1", "/api/webhooks/v1"];
@@ -93,11 +90,7 @@ export const HANDLER_ROOTS = [
 
 const BODY_ACCEPTING_METHODS = new Set(["post", "patch", "put"]);
 
-export type Rule =
-  | "request-body"
-  | "query-parameters"
-  | "response-schema"
-  | "security";
+export type Rule = "request-body" | "query-parameters" | "response-schema" | "security";
 
 export interface Suppression {
   /** `METHOD /path/with/{templates}`, exactly as the document spells it. */
@@ -256,9 +249,7 @@ function hasTwoHundredSchema(operation: OpenApiOperation): boolean {
   return Object.entries(operation.responses ?? {}).some(
     ([status, response]) =>
       /^2\d\d$/.test(status) &&
-      Object.values(response?.content ?? {}).some(
-        (media) => media?.schema !== undefined,
-      ),
+      Object.values(response?.content ?? {}).some((media) => media?.schema !== undefined),
   );
 }
 
@@ -328,13 +319,11 @@ function gatedOperationsOf(document: OpenApiDocument): {
   return Object.entries(document.paths ?? {})
     .filter(([path]) => isGatedPath(path))
     .flatMap(([path, item]) =>
-      HTTP_METHODS.filter((method) => item[method] !== undefined).map(
-        (method) => ({
-          key: `${method.toUpperCase()} ${path}`,
-          method,
-          operation: item[method] as OpenApiOperation,
-        }),
-      ),
+      HTTP_METHODS.filter((method) => item[method] !== undefined).map((method) => ({
+        key: `${method.toUpperCase()} ${path}`,
+        method,
+        operation: item[method] as OpenApiOperation,
+      })),
     );
 }
 
@@ -477,9 +466,7 @@ export function formatReport(result: SuppressionResult): string {
 function main(): void {
   const asJson = process.argv.includes("--json");
 
-  const document = JSON.parse(
-    readFileSync(SPEC_PATH, "utf8"),
-  ) as OpenApiDocument;
+  const document = JSON.parse(readFileSync(SPEC_PATH, "utf8")) as OpenApiDocument;
 
   const gatedOperations = Object.entries(document.paths ?? {})
     .filter(([path]) => isGatedPath(path))

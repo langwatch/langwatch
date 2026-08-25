@@ -87,8 +87,7 @@ export function mapSessionGroupToConversationGroup(
     // session has one; the per-trace attribute maximum covers everyone else.
     // `??`, not `||`: a session that has carried no context into any call yet
     // peaks at 0, and that 0 is the accurate answer, not a missing value.
-    contextSizeTokens:
-      item.codingAgent?.peakContextTokens ?? item.contextSizeTokens,
+    contextSizeTokens: item.codingAgent?.peakContextTokens ?? item.contextSizeTokens,
     ...codingAgentFields(item.codingAgent),
   };
 }

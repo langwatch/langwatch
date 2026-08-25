@@ -57,8 +57,7 @@ export function SpanEditableIO({
   );
 
   const handleChange = useCallback(
-    (text: string) =>
-      setSpanIO({ spanId, field, text, baselineText: baseline ?? null }),
+    (text: string) => setSpanIO({ spanId, field, text, baselineText: baseline ?? null }),
     [setSpanIO, spanId, field, baseline],
   );
 

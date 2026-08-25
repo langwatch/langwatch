@@ -86,9 +86,9 @@ describe("trackEventOnce", () => {
       expect(gtag).toHaveBeenCalledWith("event", "organization_initialized", {
         project_id: "p1",
       });
-      expect(
-        JSON.parse(window.localStorage.getItem("events_tracked") ?? "[]"),
-      ).toContain("organization_initialized");
+      expect(JSON.parse(window.localStorage.getItem("events_tracked") ?? "[]")).toContain(
+        "organization_initialized",
+      );
     });
   });
 
@@ -125,9 +125,9 @@ describe("trackEventOnce", () => {
       expect(gtag).toHaveBeenCalledWith("event", "organization_initialized", {
         project_id: "p1",
       });
-      expect(
-        JSON.parse(window.localStorage.getItem("events_tracked") ?? "[]"),
-      ).toContain("organization_initialized");
+      expect(JSON.parse(window.localStorage.getItem("events_tracked") ?? "[]")).toContain(
+        "organization_initialized",
+      );
     });
 
     describe("when called again before the first poll resolves", () => {

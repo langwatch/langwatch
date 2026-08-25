@@ -57,9 +57,7 @@ const useChatLayoutPref = create<ChatLayoutPrefState>((set) => ({
  * dismisses on a `mousedown` outside the engaged ref so the panel never
  * traps wheel scroll once the user moves on.
  */
-export function useIOViewerState({
-  mode,
-}: UseIOViewerStateArgs): IOViewerState {
+export function useIOViewerState({ mode }: UseIOViewerStateArgs): IOViewerState {
   const [format, setFormat] = useState<ViewFormat>("pretty");
   const chatLayout = useChatLayoutPref((s) => s.chatLayout);
   // Wrap the store setter as a `SetStateAction` so the existing IOViewer
@@ -68,24 +66,20 @@ export function useIOViewerState({
   // LATEST store state (not the render-time `chatLayout` closure), so
   // concurrent updates from multiple subscribers compose correctly
   // (CodeRabbit suggestion, PR #4084).
-  const setChatLayout = useCallback<Dispatch<SetStateAction<ChatLayout>>>(
-    (value) => {
-      useChatLayoutPref.setState((state) => ({
-        chatLayout:
-          typeof value === "function"
-            ? (value as (prev: ChatLayout) => ChatLayout)(state.chatLayout)
-            : value,
-      }));
-    },
-    [],
-  );
+  const setChatLayout = useCallback<Dispatch<SetStateAction<ChatLayout>>>((value) => {
+    useChatLayoutPref.setState((state) => ({
+      chatLayout:
+        typeof value === "function"
+          ? (value as (prev: ChatLayout) => ChatLayout)(state.chatLayout)
+          : value,
+    }));
+  }, []);
   // `mode` is retained on the API for future per-mode defaults but no
   // longer drives the initial layout.
   void mode;
   // Markdown sub-mode: rendered (with formatting + Shiki for code fences)
   // or source (raw markdown text, syntax-highlighted as markdown).
-  const [markdownSubmode, setMarkdownSubmode] =
-    useState<MarkdownSubmode>("rendered");
+  const [markdownSubmode, setMarkdownSubmode] = useState<MarkdownSubmode>("rendered");
   const [expanded, setExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 

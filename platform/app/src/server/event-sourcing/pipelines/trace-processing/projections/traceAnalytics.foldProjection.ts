@@ -1,11 +1,5 @@
-import type {
-  FoldProjectionOptions,
-  FoldProjectionStore,
-} from "@langwatch/eventing";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
+import type { FoldProjectionOptions, FoldProjectionStore } from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
   enrichRagContextIds,
@@ -51,10 +45,7 @@ import {
   TraceOriginService,
 } from "./services";
 import { trimAttributesForAnalytics } from "./services/analytics-attribute-trim.service";
-import {
-  anchorStorageTime,
-  firstUsableAnchor,
-} from "./services/storage-anchor";
+import { anchorStorageTime, firstUsableAnchor } from "./services/storage-anchor";
 import {
   MAX_PROCESSED_SPANS,
   mergeModelsMostRecentFirst,
@@ -207,8 +198,7 @@ export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-07-29" as const;
  * time as a span start and inflates the trace's duration by the whole ingest lag.
  * The version is what tells them apart.
  */
-export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT =
-  "2026-07-27" as const;
+export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT = "2026-07-27" as const;
 
 /**
  * How far a trace's OccurredAt (the partition column, and since ADR-071 step 3
@@ -557,9 +547,7 @@ export function projectAnalyticsStateToRow({
   const conversationId = readNullableString(
     attrs[TRACE_ANALYTICS_ATTR_KEYS.CONVERSATION_ID],
   );
-  const customerId = readNullableString(
-    attrs[TRACE_ANALYTICS_ATTR_KEYS.CUSTOMER_ID],
-  );
+  const customerId = readNullableString(attrs[TRACE_ANALYTICS_ATTR_KEYS.CUSTOMER_ID]);
   const origin = attrs[TRACE_ANALYTICS_ATTR_KEYS.ORIGIN] ?? "";
   const labels = parseLabels(attrs[TRACE_ANALYTICS_ATTR_KEYS.LABELS]);
 
@@ -613,13 +601,10 @@ export function projectAnalyticsStateToRow({
     promptTokens: state.totalPromptTokenCount,
     completionTokens: state.totalCompletionTokenCount,
     cacheReadTokens: readReservedTokenSum(attrs[RESERVED_CACHE_READ_TOKENS]),
-    cacheWriteTokens: readReservedTokenSum(
-      attrs[RESERVED_CACHE_CREATION_TOKENS],
-    ),
+    cacheWriteTokens: readReservedTokenSum(attrs[RESERVED_CACHE_CREATION_TOKENS]),
     reasoningTokens: readReservedTokenSum(attrs[RESERVED_REASONING_TOKENS]),
     hasError: state.containsErrorStatus,
-    hasAnnotation:
-      state.annotationIds && state.annotationIds.length > 0 ? true : null,
+    hasAnnotation: state.annotationIds && state.annotationIds.length > 0 ? true : null,
 
     attributes: trimAttributesForAnalytics(attrs),
 
@@ -677,9 +662,7 @@ export function projectAnalyticsStateToRow({
  * `occurredAt` branch below and
  * {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}.
  */
-export function traceAnalyticsStateFromRow(
-  row: TraceAnalyticsRow,
-): TraceAnalyticsData {
+export function traceAnalyticsStateFromRow(row: TraceAnalyticsRow): TraceAnalyticsData {
   // Start from the trimmed map the row carries — it holds the reserved
   // accumulators (cache/reasoning sums, log_record_count, correlation count)
   // verbatim — then re-inject the hoisted dimension keys from their columns so
@@ -689,8 +672,7 @@ export function traceAnalyticsStateFromRow(
   if (row.userId) attributes[TRACE_ANALYTICS_ATTR_KEYS.USER_ID] = row.userId;
   if (row.conversationId)
     attributes[TRACE_ANALYTICS_ATTR_KEYS.CONVERSATION_ID] = row.conversationId;
-  if (row.customerId)
-    attributes[TRACE_ANALYTICS_ATTR_KEYS.CUSTOMER_ID] = row.customerId;
+  if (row.customerId) attributes[TRACE_ANALYTICS_ATTR_KEYS.CUSTOMER_ID] = row.customerId;
   if (row.origin) attributes[TRACE_ANALYTICS_ATTR_KEYS.ORIGIN] = row.origin;
   if (row.labels.length > 0)
     attributes[TRACE_ANALYTICS_ATTR_KEYS.LABELS] = JSON.stringify(row.labels);
@@ -902,11 +884,7 @@ function accumulateReservedTokenSums(
     RESERVED_CACHE_CREATION_TOKENS,
     cacheTokens.cacheCreationTokens,
   );
-  addReservedTokenSum(
-    attributes,
-    RESERVED_REASONING_TOKENS,
-    cacheTokens.reasoningTokens,
-  );
+  addReservedTokenSum(attributes, RESERVED_REASONING_TOKENS, cacheTokens.reasoningTokens);
 }
 
 /**
@@ -1031,9 +1009,7 @@ function applyLogContribution({
     mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
     10,
   );
-  mergedAttributes["langwatch.reserved.log_record_count"] = String(
-    logCount + 1,
-  );
+  mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
   for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
     mergedAttributes[key] = String(value);
   }
@@ -1054,15 +1030,11 @@ function applyLogContribution({
       nonBilledCost = (nonBilledCost ?? 0) + cost;
     }
   }
-  const inputTokens = Number(
-    contribution.liftedAttributes["langwatch.input_tokens"],
-  );
+  const inputTokens = Number(contribution.liftedAttributes["langwatch.input_tokens"]);
   if (Number.isFinite(inputTokens) && inputTokens > 0) {
     totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
   }
-  const outputTokens = Number(
-    contribution.liftedAttributes["langwatch.output_tokens"],
-  );
+  const outputTokens = Number(contribution.liftedAttributes["langwatch.output_tokens"]);
   if (Number.isFinite(outputTokens) && outputTokens > 0) {
     totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
   }
@@ -1272,10 +1244,7 @@ export class TraceAnalyticsFoldProjection
    * stamp, and so an unhandled event type — which `super.apply` returns
    * untouched — anchors nothing.
    */
-  override apply(
-    state: TraceAnalyticsData,
-    event: { type: string },
-  ): TraceAnalyticsData {
+  override apply(state: TraceAnalyticsData, event: { type: string }): TraceAnalyticsData {
     const folded = super.apply(state, event);
     if (folded === state) return state;
     const eventOccurredAt = (event as { occurredAt?: unknown }).occurredAt;
@@ -1297,13 +1266,12 @@ export class TraceAnalyticsFoldProjection
       return { ...state, spanCount: state.spanCount + 1 };
     }
 
-    const normalizedSpan =
-      spanNormalizationPipelineService.normalizeSpanReceived(
-        event.tenantId,
-        event.data.span,
-        event.data.resource,
-        event.data.instrumentationScope,
-      );
+    const normalizedSpan = spanNormalizationPipelineService.normalizeSpanReceived(
+      event.tenantId,
+      event.data.span,
+      event.data.resource,
+      event.data.instrumentationScope,
+    );
     enrichRagContextIds(normalizedSpan);
 
     return applySpanToAnalytics({ state, span: normalizedSpan });
@@ -1341,8 +1309,7 @@ export class TraceAnalyticsFoldProjection
       contribution: {
         traceId: event.data.traceId,
         liftedAttributes: liftCanonicalAttributesFromLogRecord(event.data),
-        nonBillable:
-          event.data.resourceAttributes?.[NON_BILLABLE_ATTR] === "true",
+        nonBillable: event.data.resourceAttributes?.[NON_BILLABLE_ATTR] === "true",
       },
     });
   }
@@ -1372,9 +1339,7 @@ export class TraceAnalyticsFoldProjection
     ) {
       const ttftMs = event.data.exemplarValue * 1000;
       timeToFirstTokenMs =
-        timeToFirstTokenMs === null
-          ? ttftMs
-          : Math.min(timeToFirstTokenMs, ttftMs);
+        timeToFirstTokenMs === null ? ttftMs : Math.min(timeToFirstTokenMs, ttftMs);
     }
 
     // Counts exemplar correlations, not metric data points: the canonical

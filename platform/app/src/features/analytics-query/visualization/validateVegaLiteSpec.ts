@@ -17,20 +17,14 @@
  * `normalized` is the object that was handed in.
  */
 
-import {
-  type ColumnsByDataset,
-  validateFieldReferences,
-} from "./vegaLiteFields";
+import { type ColumnsByDataset, validateFieldReferences } from "./vegaLiteFields";
 import {
   applyLangWatchQLVegaPolicy,
   checkDatasetRowLimits,
   checkSpecEnvelopeLimits,
   lwqlVegaError,
 } from "./vegaLitePolicy";
-import {
-  checkSchemaDeclaration,
-  validateAgainstVegaLiteSchema,
-} from "./vegaLiteSchema";
+import { checkSchemaDeclaration, validateAgainstVegaLiteSchema } from "./vegaLiteSchema";
 import { isPlainObject, JSON_POINTER_ROOT } from "./vegaLiteStructure";
 import type {
   DatasetRowCounts,

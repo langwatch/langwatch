@@ -31,9 +31,7 @@ describe("fetchSSE", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetchEventSource = fetchEventSource as unknown as ReturnType<
-      typeof vi.fn
-    >;
+    mockFetchEventSource = fetchEventSource as unknown as ReturnType<typeof vi.fn>;
 
     // Default successful connection - calls onclose to properly resolve
     mockFetchEventSource.mockImplementation(
@@ -254,8 +252,7 @@ describe("fetchSSE", () => {
 
         // Attach the rejection handler BEFORE advancing timers
         // to avoid unhandled rejection warnings
-        const rejectionPromise =
-          expect(ssePromise).rejects.toThrow(FetchSSETimeoutError);
+        const rejectionPromise = expect(ssePromise).rejects.toThrow(FetchSSETimeoutError);
 
         await vi.advanceTimersByTimeAsync(101);
         await rejectionPromise;

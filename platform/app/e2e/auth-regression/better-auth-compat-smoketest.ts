@@ -123,8 +123,7 @@ async function main() {
   check("impersonator is undefined", session1?.user.impersonator === undefined);
   check(
     "expires is ISO string",
-    typeof session1?.expires === "string" &&
-      !isNaN(Date.parse(session1!.expires)),
+    typeof session1?.expires === "string" && !isNaN(Date.parse(session1!.expires)),
   );
 
   // ─────────────────────────────────────────────────────────────────
@@ -133,9 +132,7 @@ async function main() {
 
   console.log("\n[3] Invalid/tampered cookie → null");
   const tampered = await getServerAuthSession({
-    req: makeReq(
-      "better-auth.session_token=garbage-not-a-real-token.signature",
-    ),
+    req: makeReq("better-auth.session_token=garbage-not-a-real-token.signature"),
   });
   check("tampered cookie returns null", tampered === null);
 
@@ -212,10 +209,7 @@ async function main() {
       req: makeReq(adminCookie),
     });
     check("falls back to admin id", afterExpire?.user.id === adminId);
-    check(
-      "impersonator is undefined",
-      afterExpire?.user.impersonator === undefined,
-    );
+    check("impersonator is undefined", afterExpire?.user.impersonator === undefined);
   }
 
   // ─────────────────────────────────────────────────────────────────

@@ -133,10 +133,7 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
 
     const rich: RichEval[] = all
       .filter(
-        (e) =>
-          e.status === "processed" ||
-          e.status === "error" ||
-          e.status === "skipped",
+        (e) => e.status === "processed" || e.status === "error" || e.status === "skipped",
       )
       .map((e) => {
         const started = e.timestamps.started_at ?? null;

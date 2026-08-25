@@ -86,12 +86,8 @@ export function buildConversationMarkdownChunks(
   if (parsedTurns.length > 0) {
     const first = parsedTurns[0]!.turn;
     const last = parsedTurns[parsedTurns.length - 1]!.turn;
-    headerLines.push(
-      `- **Started:** ${new Date(first.timestamp).toISOString()}`,
-    );
-    headerLines.push(
-      `- **Last turn:** ${new Date(last.timestamp).toISOString()}`,
-    );
+    headerLines.push(`- **Started:** ${new Date(first.timestamp).toISOString()}`);
+    headerLines.push(`- **Last turn:** ${new Date(last.timestamp).toISOString()}`);
     let totalCost = 0;
     let totalTokens = 0;
     for (const p of parsedTurns) {
@@ -167,9 +163,7 @@ export function buildConversationMarkdownChunks(
 }
 
 /** Join chunks into a single markdown blob (clipboard / fallback). */
-export function joinConversationMarkdown(
-  chunks: ConversationMarkdownChunk[],
-): string {
+export function joinConversationMarkdown(chunks: ConversationMarkdownChunk[]): string {
   return chunks
     .map((c) => c.markdown)
     .join("\n\n")

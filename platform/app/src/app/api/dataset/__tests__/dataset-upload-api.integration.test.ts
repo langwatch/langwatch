@@ -119,11 +119,7 @@ describe("Feature: Dataset File Upload REST API", () => {
   }
 
   // Helper: make an upload request
-  function uploadToExisting(
-    slugOrId: string,
-    formData: FormData,
-    apiKey?: string,
-  ) {
+  function uploadToExisting(slugOrId: string, formData: FormData, apiKey?: string) {
     return app.request(`/api/dataset/${slugOrId}/upload`, {
       method: "POST",
       headers: { "X-Auth-Token": apiKey ?? testApiKey },
@@ -145,10 +141,10 @@ describe("Feature: Dataset File Upload REST API", () => {
   // `limit` caps the rows fetched (default 1000). A test that creates more than
   // this MUST pass a higher limit or its assertions will silently truncate.
   async function getRecords(slugOrId: string, apiKey?: string, limit = 1000) {
-    const res = await app.request(
-      `/api/dataset/${slugOrId}/records?limit=${limit}`,
-      { method: "GET", headers: { "X-Auth-Token": apiKey ?? testApiKey } },
-    );
+    const res = await app.request(`/api/dataset/${slugOrId}/records?limit=${limit}`, {
+      method: "GET",
+      headers: { "X-Auth-Token": apiKey ?? testApiKey },
+    });
     const body = (await res.json()) as {
       data: Array<{ id: string; entry: Record<string, unknown> }>;
     };
@@ -692,8 +688,7 @@ describe("Feature: Dataset File Upload REST API", () => {
       /** @scenario Create + upload accepts a JSONL file containing a null byte in a string field */
       it("strips the null byte and persists all records", async () => {
         const NUL = String.fromCharCode(0);
-        const jsonl =
-          `{"input": "before${NUL}after"}\n` + `{"input": "clean"}\n`;
+        const jsonl = `{"input": "before${NUL}after"}\n` + `{"input": "clean"}\n`;
         const form = buildFormData({
           file: { content: jsonl, filename: "data.jsonl" },
           name: "Nulls JSONL",
@@ -817,17 +812,14 @@ describe("Feature: Dataset File Upload REST API", () => {
     /** @scenario Update record via REST sanitises null bytes */
     it("strips the null byte from the updated entry", async () => {
       const NUL = String.fromCharCode(0);
-      const res = await app.request(
-        `/api/dataset/editable/records/${recordId}`,
-        {
-          method: "PATCH",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ entry: { input: `new${NUL}value` } }),
+      const res = await app.request(`/api/dataset/editable/records/${recordId}`, {
+        method: "PATCH",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({ entry: { input: `new${NUL}value` } }),
+      });
 
       expect(res.status).toBe(200);
 

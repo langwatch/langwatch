@@ -61,13 +61,9 @@ vi.mock("~/hooks/useLicenseEnforcement", () => ({
 }));
 
 vi.mock("~/utils/compat/next-link", () => ({
-  default: ({
-    href,
-    children,
-  }: {
-    href: string;
-    children: React.ReactNode;
-  }) => <a href={href}>{children}</a>,
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
 }));
 
 // ---------------------------------------------------------------------------
@@ -107,15 +103,10 @@ vi.mock("~/hooks/useDrawer", () => ({
 // ---------------------------------------------------------------------------
 
 vi.mock("~/components/suites/ScenarioInputMappingSection", () => ({
-  ScenarioInputMappingSection: ({
-    inputs,
-  }: ScenarioInputMappingSectionProps) => (
+  ScenarioInputMappingSection: ({ inputs }: ScenarioInputMappingSectionProps) => (
     <div data-testid="scenario-mapping-section">
       {inputs.map((i) => (
-        <div
-          key={i.identifier}
-          data-testid={`scenario-mapping-input-${i.identifier}`}
-        >
+        <div key={i.identifier} data-testid={`scenario-mapping-input-${i.identifier}`}>
           {i.identifier}
         </div>
       ))}
@@ -252,10 +243,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 function renderDrawer(
   props: Partial<Parameters<typeof AgentWorkflowEditorDrawer>[0]> = {},
 ) {
-  return render(
-    <AgentWorkflowEditorDrawer open={true} agentId="agent-1" {...props} />,
-    { wrapper: Wrapper },
-  );
+  return render(<AgentWorkflowEditorDrawer open={true} agentId="agent-1" {...props} />, {
+    wrapper: Wrapper,
+  });
 }
 
 // ---------------------------------------------------------------------------

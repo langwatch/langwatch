@@ -30,11 +30,7 @@ const TRACE_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaabb";
 const SPAN_ID = "bbbbbbbbbbbbbbbb";
 
 /** Build a RecordSpanCommandData with a langwatch.output of `outputSize` bytes. */
-function makeCommandData({
-  outputSize,
-}: {
-  outputSize: number;
-}): RecordSpanCommandData {
+function makeCommandData({ outputSize }: { outputSize: number }): RecordSpanCommandData {
   return {
     tenantId: TENANT_ID,
     occurredAt: 1700000000000,
@@ -112,8 +108,7 @@ describe("given a command payload ≤ COMMAND_INLINE_THRESHOLD (256 KB)", () => 
 
       // putSpool was never called
       expect(
-        (blobStore as unknown as { putSpool: ReturnType<typeof vi.fn> })
-          .putSpool,
+        (blobStore as unknown as { putSpool: ReturnType<typeof vi.fn> }).putSpool,
       ).not.toHaveBeenCalled();
     });
   });
@@ -141,10 +136,7 @@ describe("given a command payload > COMMAND_INLINE_THRESHOLD (256 KB) and the S3
       const outputAttr = result.span.attributes?.find(
         (a) => a.key === "langwatch.output",
       );
-      const outputSize = Buffer.byteLength(
-        outputAttr?.value?.stringValue ?? "",
-        "utf-8",
-      );
+      const outputSize = Buffer.byteLength(outputAttr?.value?.stringValue ?? "", "utf-8");
       // Returned command must be well under the threshold (it carries only id fields)
       expect(outputSize).toBeLessThan(COMMAND_INLINE_THRESHOLD);
     });
@@ -172,9 +164,9 @@ describe("given a command payload > COMMAND_INLINE_THRESHOLD and the S3 spool PU
       const outputAttr = result.span.attributes?.find(
         (a) => a.key === "langwatch.output",
       );
-      expect(
-        Buffer.byteLength(outputAttr?.value?.stringValue ?? "", "utf-8"),
-      ).toBe(300 * 1024);
+      expect(Buffer.byteLength(outputAttr?.value?.stringValue ?? "", "utf-8")).toBe(
+        300 * 1024,
+      );
     });
 
     it("emits a warn log containing 'oversize protection skipped'", async () => {

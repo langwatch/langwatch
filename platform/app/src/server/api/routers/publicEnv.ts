@@ -19,8 +19,7 @@ const isOpsSidebarEmail = (
 export const publicEnvRouter = publicProcedure
   .input(z.object({}).passthrough())
   .noPermission({
-    reason:
-      "resolves sign-in mode and viewer UI visibility only; no tenant product data",
+    reason: "resolves sign-in mode and viewer UI visibility only; no tenant product data",
   })
   .query(async ({ ctx }) => {
     return {

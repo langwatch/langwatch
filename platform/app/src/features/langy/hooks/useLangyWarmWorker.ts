@@ -124,9 +124,7 @@ function fireWarm({
         // "Thinking…" from the first frame of the next send instead of the
         // cold-boot ladder.
         if (result.warmed && result.conversationId) {
-          useLangyStore
-            .getState()
-            .markConversationWarmed(result.conversationId);
+          useLangyStore.getState().markConversationWarmed(result.conversationId);
         }
         // Only a mint (a fresh warm with no target) has an id worth holding.
         if (targetConversationId || !result.conversationId) return;
@@ -275,12 +273,5 @@ export function useLangyWarmWorker({
       model,
       targetConversationId,
     });
-  }, [
-    isOpen,
-    projectId,
-    conversationId,
-    pendingConversationId,
-    turnInFlight,
-    model,
-  ]);
+  }, [isOpen, projectId, conversationId, pendingConversationId, turnInFlight, model]);
 }

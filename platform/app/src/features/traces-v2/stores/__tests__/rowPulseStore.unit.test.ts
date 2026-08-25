@@ -21,20 +21,14 @@ describe("rowPulseStore", () => {
     describe("when pulse is called", () => {
       it("adds the traceId to pulsingIds", () => {
         useRowPulseStore.getState().pulse("trace-abc");
-        expect(useRowPulseStore.getState().pulsingIds.has("trace-abc")).toBe(
-          true,
-        );
+        expect(useRowPulseStore.getState().pulsingIds.has("trace-abc")).toBe(true);
       });
 
       it("evicts the traceId after 1200ms", () => {
         useRowPulseStore.getState().pulse("trace-abc");
-        expect(useRowPulseStore.getState().pulsingIds.has("trace-abc")).toBe(
-          true,
-        );
+        expect(useRowPulseStore.getState().pulsingIds.has("trace-abc")).toBe(true);
         vi.advanceTimersByTime(1200);
-        expect(useRowPulseStore.getState().pulsingIds.has("trace-abc")).toBe(
-          false,
-        );
+        expect(useRowPulseStore.getState().pulsingIds.has("trace-abc")).toBe(false);
       });
     });
   });
@@ -46,9 +40,7 @@ describe("rowPulseStore", () => {
 
         pulse("trace-xyz");
         // The first pulse should add to pulsing set.
-        expect(useRowPulseStore.getState().pulsingIds.has("trace-xyz")).toBe(
-          true,
-        );
+        expect(useRowPulseStore.getState().pulsingIds.has("trace-xyz")).toBe(true);
 
         // Advance time just inside the coalesce window.
         vi.advanceTimersByTime(400);
@@ -72,9 +64,7 @@ describe("rowPulseStore", () => {
 
         // After the original pulse duration the trace is evicted.
         vi.advanceTimersByTime(900); // total 1200ms
-        expect(useRowPulseStore.getState().pulsingIds.has("trace-xyz")).toBe(
-          false,
-        );
+        expect(useRowPulseStore.getState().pulsingIds.has("trace-xyz")).toBe(false);
       });
     });
   });
@@ -88,9 +78,7 @@ describe("rowPulseStore", () => {
         vi.advanceTimersByTime(700); // past coalesce window
 
         // Row should still be pulsing (eviction timer hasn't fired yet).
-        expect(useRowPulseStore.getState().pulsingIds.has("trace-def")).toBe(
-          true,
-        );
+        expect(useRowPulseStore.getState().pulsingIds.has("trace-def")).toBe(true);
 
         // Second pulse after coalesce window — should restart the eviction timer.
         pulse("trace-def");
@@ -98,13 +86,9 @@ describe("rowPulseStore", () => {
         // We're now 700ms in + the eviction was reset, so we need 1200ms more
         // before it evicts.
         vi.advanceTimersByTime(600);
-        expect(useRowPulseStore.getState().pulsingIds.has("trace-def")).toBe(
-          true,
-        );
+        expect(useRowPulseStore.getState().pulsingIds.has("trace-def")).toBe(true);
         vi.advanceTimersByTime(600); // total 1200ms after second pulse
-        expect(useRowPulseStore.getState().pulsingIds.has("trace-def")).toBe(
-          false,
-        );
+        expect(useRowPulseStore.getState().pulsingIds.has("trace-def")).toBe(false);
       });
     });
   });

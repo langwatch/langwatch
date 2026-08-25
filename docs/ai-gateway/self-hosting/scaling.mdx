@@ -88,7 +88,7 @@ There are no current `LW_GATEWAY_UPSTREAM_*` env vars to tune the transport dire
 
 ## Cold-start cost
 
-There is no boot-time cache warm-up in the current gateway. The `auth_cache_warm` readiness probe was removed because it created a chicken-and-egg with `/startupz` (the warm-up itself called the control plane, which couldn't accept traffic until *its* startup gate flipped). Instead the resolver warms organically on the first request per VK; an unwarmed gateway adds at most one extra ~50–200 ms control-plane round-trip on cold-cache requests. Subsequent requests hit the in-process cache and skip the round-trip entirely until the cache entry's soft-expiry passes.
+There is no boot-time cache warm-up in the current gateway. The `auth_cache_warm` readiness probe was removed because it created a chicken-and-egg with `/startupz` (the warm-up itself called the control plane, which couldn't accept traffic until _its_ startup gate flipped). Instead the resolver warms organically on the first request per VK; an unwarmed gateway adds at most one extra ~50–200 ms control-plane round-trip on cold-cache requests. Subsequent requests hit the in-process cache and skip the round-trip entirely until the cache entry's soft-expiry passes.
 
 The cache is in-process and per-replica. Replicas warm independently; there is no cross-replica cache, by design. A Bootstrap-pull design that pre-loads keys before flipping `/startupz` to 200 is tracked under `specs/ai-gateway/auth-cache.feature` for v1.1+ when tenant key counts make the first-request tax visible at scale.
 
@@ -102,6 +102,7 @@ Because JWTs use symmetric-secret signing (`LW_GATEWAY_JWT_SECRET`) and the secr
 4. Drain blue once green is stable.
 
 Two operational invariants:
+
 - Roll **the same** `LW_GATEWAY_JWT_SECRET` (and `LW_GATEWAY_INTERNAL_SECRET`) onto both colors.
 - For HMAC-secret rotation specifically, use the dual-secret rotation path (chart value `secrets.jwtSecretPreviousKey`), see [Config](/ai-gateway/self-hosting/config) for the rotation procedure.
 
@@ -129,12 +130,12 @@ go test -bench=. -benchmem -run=^$ \
 
 Indicative happy-path-per-request budget (Apple M3 Pro, Go 1.26.1):
 
-| Operation                  | ns/op | allocs | Fires on                                       |
-|----------------------------|------:|-------:|------------------------------------------------|
-| `HashKey`                  |  83.8 |      1 | Every request (VK → L1 lookup key)             |
-| `Precheck` (cached, 3 scopes)|  4.6 |      0 | Every request (budget evaluation)              |
-| `Walk_PrimarySuccess`      |  71.7 |      0 | Every request (retry engine, primary succeeds) |
-| `NewULID`                  |  76.0 |      2 | Every request (`gateway_request_id`)           |
+| Operation                     | ns/op | allocs | Fires on                                       |
+| ----------------------------- | ----: | -----: | ---------------------------------------------- |
+| `HashKey`                     |  83.8 |      1 | Every request (VK → L1 lookup key)             |
+| `Precheck` (cached, 3 scopes) |   4.6 |      0 | Every request (budget evaluation)              |
+| `Walk_PrimarySuccess`         |  71.7 |      0 | Every request (retry engine, primary succeeds) |
+| `NewULID`                     |  76.0 |      2 | Every request (`gateway_request_id`)           |
 
 Total pre-dispatch overhead: **~0.24 μs**. A full router benchmark (chi routing + middleware + JSON serialization) lands at ~4.8 μs in `httptest`; production with connection reuse and kernel zero-copy is in the 3–4 μs range. Bifrost + upstream RTT dominate wall time; the gateway's own tax is negligible.
 

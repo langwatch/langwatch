@@ -13,10 +13,7 @@ import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.t
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
 import type { CommandHandlerOptions } from "./commands/commandDispatcher";
 import type { JobRegistryEntry } from "./queues/queueManager";
-import type {
-  ExecutionTarget,
-  RetentionPolicyResolver,
-} from "../runtime.types";
+import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types";
 
 /**
  * Options for configuring event sourcing behavior.

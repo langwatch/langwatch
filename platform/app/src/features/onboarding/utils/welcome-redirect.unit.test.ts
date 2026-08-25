@@ -40,9 +40,7 @@ describe("resolveWelcomeRedirect", () => {
     it("sends the user home instead of re-onboarding — any intent-set org is onboarded", () => {
       expect(
         resolveWelcomeRedirect({
-          organizations: [
-            org("LLM_OPS", [{ isPersonal: false, projects: [] }]),
-          ],
+          organizations: [org("LLM_OPS", [{ isPersonal: false, projects: [] }])],
           currentProjectSlug: null,
         }),
       ).toEqual({ kind: "home" });
@@ -111,9 +109,7 @@ describe("resolveWelcomeRedirect", () => {
       expect(
         resolveWelcomeRedirect({
           organizations: [
-            org(null, [
-              { isPersonal: true, projects: [{ slug: "personal-abc" }] },
-            ]),
+            org(null, [{ isPersonal: true, projects: [{ slug: "personal-abc" }] }]),
           ],
           currentProjectSlug: null,
         }),

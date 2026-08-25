@@ -59,10 +59,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function insertRows(
-  ch: ClickHouseClient,
-  rows: ReturnType<typeof makeRow>[],
-) {
+async function insertRows(ch: ClickHouseClient, rows: ReturnType<typeof makeRow>[]) {
   await ch.insert({
     table: "simulation_runs",
     values: rows,
@@ -126,9 +123,7 @@ describe("SimulationRunStateRepositoryClickHouse.getProjection (integration)", (
       expect(projection).not.toBeNull();
       expect(projection!.data.Status).toBe("SUCCESS");
       expect(projection!.data.Verdict).toBe("success");
-      expect(projection!.data.Messages.map((m) => m.Content)).toEqual([
-        "final-answer",
-      ]);
+      expect(projection!.data.Messages.map((m) => m.Content)).toEqual(["final-answer"]);
     });
   });
 
@@ -159,10 +154,7 @@ describe("SimulationRunStateRepositoryClickHouse.getProjection (integration)", (
 
   describe("when the run does not exist", () => {
     it("returns null", async () => {
-      const projection = await repo.getProjection(
-        `run-missing-${nanoid()}`,
-        context,
-      );
+      const projection = await repo.getProjection(`run-missing-${nanoid()}`, context);
       expect(projection).toBeNull();
     });
   });

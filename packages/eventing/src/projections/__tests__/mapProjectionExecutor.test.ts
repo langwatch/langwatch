@@ -47,10 +47,7 @@ describe("MapProjectionExecutor.execute", () => {
       const result = await executor.execute(mapDef, event, context);
 
       expect(result).toEqual({ name: "mapped-record" });
-      expect(store.append).toHaveBeenCalledWith(
-        { name: "mapped-record" },
-        context,
-      );
+      expect(store.append).toHaveBeenCalledWith({ name: "mapped-record" }, context);
     });
   });
 
@@ -199,9 +196,9 @@ describe("MapProjectionExecutor.executeBatch", () => {
           tenantId: event.tenantId,
         }));
 
-        await expect(
-          executor.executeBatch(mapDef, events, contexts),
-        ).rejects.toThrow("Map projection batches cannot cross tenants");
+        await expect(executor.executeBatch(mapDef, events, contexts)).rejects.toThrow(
+          "Map projection batches cannot cross tenants",
+        );
         expect(bulkAppend).not.toHaveBeenCalled();
         expect(store.append).not.toHaveBeenCalled();
       });

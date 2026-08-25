@@ -21,9 +21,7 @@ export interface CompiledAttributeMatcher {
   regex: RegExp;
 }
 
-export function compileAttributePatterns(
-  patterns: string[],
-): CompiledAttributeMatcher[] {
+export function compileAttributePatterns(patterns: string[]): CompiledAttributeMatcher[] {
   return patterns.map((pattern) => ({
     pattern,
     regex: compileAttributePattern(pattern),

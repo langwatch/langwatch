@@ -24,12 +24,7 @@ export function ConfigurationSecondaryDrawer({
 
   if (!active) {
     return (
-      <SecondaryDrawerShell
-        open={open}
-        title="Setup"
-        onClose={onDone}
-        onDone={onDone}
-      >
+      <SecondaryDrawerShell open={open} title="Setup" onClose={onDone} onDone={onDone}>
         Choose a type first.
       </SecondaryDrawerShell>
     );
@@ -41,12 +36,7 @@ export function ConfigurationSecondaryDrawer({
   const title = `${provider.shared.label} setup`;
 
   return (
-    <SecondaryDrawerShell
-      open={open}
-      title={title}
-      onClose={onDone}
-      onDone={onDone}
-    >
+    <SecondaryDrawerShell open={open} title={title} onClose={onDone} onDone={onDone}>
       <Form
         slice={slice}
         // The store guarantees the slice type matches `action`; the

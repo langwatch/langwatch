@@ -36,10 +36,7 @@ describe("AgentService field derivation", () => {
 
     await cleanupTestRows(prisma, [
       ["agent", { id: { in: cleanupAgentIds }, projectId }],
-      [
-        "workflowVersion",
-        { workflowId: { in: cleanupWorkflowIds }, projectId },
-      ],
+      ["workflowVersion", { workflowId: { in: cleanupWorkflowIds }, projectId }],
       ["workflow", { id: { in: cleanupWorkflowIds }, projectId }],
     ]);
   });
@@ -142,9 +139,7 @@ describe("AgentService field derivation", () => {
 
         const read = await service.getById({ id: agent.id, projectId });
 
-        expect(read?.inputFields).toEqual([
-          { identifier: "question", type: "str" },
-        ]);
+        expect(read?.inputFields).toEqual([{ identifier: "question", type: "str" }]);
       });
 
       it("reports the same fields when listing every agent in the project", async () => {

@@ -34,11 +34,10 @@ async function isTraceWindowRedacted({
     return false;
   }
   try {
-    const summary = await traceSummary.getByTraceId(
-      projectId,
-      traceId,
-      { visibilityCutoffMs, full: false },
-    );
+    const summary = await traceSummary.getByTraceId(projectId, traceId, {
+      visibilityCutoffMs,
+      full: false,
+    });
     return summary.redactedByVisibilityWindow === true;
   } catch (error) {
     logger.warn(

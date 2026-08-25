@@ -4,18 +4,18 @@
   "private": true,
   "description": "The shared ClickHouse client contract: fail-closed tenant routing and scope guarding, bounded concurrency with shedding, retries and backoff, tracing and vendor logging policy, resilience over the vendor client, and fleet-aware connection-pool sizing - composed by a client class that states its order.",
   "license": "MIT",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": [
-    "src"
-  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest",

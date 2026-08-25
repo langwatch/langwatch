@@ -73,9 +73,7 @@ describe("<FloatingAiBar /> error row", () => {
     it("shows the rotating tip, not an alert", () => {
       renderBar();
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-      expect(
-        screen.getByText(/save the result as a lens/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/save the result as a lens/i)).toBeInTheDocument();
     });
   });
 
@@ -109,9 +107,7 @@ describe("<FloatingAiBar /> error row", () => {
       expect(alert).toHaveTextContent(registryTitle(providerError.cause));
       // The model id is a detail row behind the chevron, not the headline.
       expect(alert).not.toHaveTextContent("azure/gpt-5.4-mini");
-      expect(
-        screen.queryByText(/save the result as a lens/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/save the result as a lens/i)).not.toBeInTheDocument();
     });
 
     it("links to Model Providers settings", () => {
@@ -125,9 +121,7 @@ describe("<FloatingAiBar /> error row", () => {
     it("expands structured details on demand", async () => {
       const user = userEvent.setup();
       renderWithProviderError();
-      await user.click(
-        screen.getByRole("button", { name: /show error details/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /show error details/i }));
       expect(screen.getByText("Status")).toBeInTheDocument();
       expect(screen.getByText("404")).toBeInTheDocument();
       expect(screen.getByText("Provider")).toBeInTheDocument();

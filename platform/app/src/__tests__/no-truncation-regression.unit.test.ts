@@ -91,10 +91,7 @@ describe("no-truncation regression — issue #2487", () => {
     });
 
     it("old safeTruncate call drops the end key (documents the bug)", () => {
-      const truncated = applyOldDatasetTruncation(predicted) as Record<
-        string,
-        unknown
-      >;
+      const truncated = applyOldDatasetTruncation(predicted) as Record<string, unknown>;
       // The old code would drop trailing keys and add "..." marker
       expect(Object.keys(truncated)).not.toContain("end");
       expect(truncated["..."]).toBe("[truncated]");
@@ -125,10 +122,7 @@ describe("no-truncation regression — issue #2487", () => {
     };
 
     it("old safeTruncate truncates the entry strings", () => {
-      const truncated = applyOldDatasetTruncation(largeEntry) as Record<
-        string,
-        unknown
-      >;
+      const truncated = applyOldDatasetTruncation(largeEntry) as Record<string, unknown>;
       // At 40KB+ total the strings get clipped
       expect(JSON.stringify(truncated).length).toBeLessThanOrEqual(32 * 1024);
     });
@@ -240,9 +234,10 @@ describe("no-truncation regression — issue #2487", () => {
     });
 
     it("old safeTruncate drops the tags key", () => {
-      const truncated = applyOldCustomMetadataTruncation(
-        largeMetadata,
-      ) as Record<string, unknown>;
+      const truncated = applyOldCustomMetadataTruncation(largeMetadata) as Record<
+        string,
+        unknown
+      >;
       expect(Object.keys(truncated)).not.toContain("tags");
     });
 

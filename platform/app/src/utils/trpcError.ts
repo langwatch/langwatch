@@ -3,11 +3,7 @@ import type { AppRouter } from "../server/api/root";
 import type { LimitType } from "../server/license-enforcement";
 
 export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
-  if (
-    error &&
-    error instanceof TRPCClientError &&
-    error.data?.httpStatus === 404
-  ) {
+  if (error && error instanceof TRPCClientError && error.data?.httpStatus === 404) {
     return true;
   }
   return false;
@@ -126,9 +122,7 @@ export function extractLiteMemberRestrictionInfo(
  * Extracts limit exceeded info from a TRPC error.
  * Returns the info if the error is a FORBIDDEN error with limit data, null otherwise.
  */
-export function extractLimitExceededInfo(
-  error: unknown,
-): LimitExceededInfo | null {
+export function extractLimitExceededInfo(error: unknown): LimitExceededInfo | null {
   if (!(error instanceof TRPCClientError)) return null;
   if (error.data?.code !== "FORBIDDEN") return null;
 
@@ -170,9 +164,7 @@ export interface MissingModelExtracted {
  * `ModelNotConfiguredError` (see
  * `specs/model-providers/model-resolver-and-registry.feature`).
  */
-export function extractMissingModelInfo(
-  error: unknown,
-): MissingModelExtracted | null {
+export function extractMissingModelInfo(error: unknown): MissingModelExtracted | null {
   if (!(error instanceof TRPCClientError)) return null;
   // Server wraps the typed error as a BAD_REQUEST TRPCError with
   // cause.code === "MODEL_NOT_CONFIGURED". The interceptor keys off the
@@ -283,8 +275,7 @@ export function extractProviderDisabledInfo(
   ) {
     return null;
   }
-  const resolvedScope =
-    cause.resolvedScope as ProviderDisabledExtracted["resolvedScope"];
+  const resolvedScope = cause.resolvedScope as ProviderDisabledExtracted["resolvedScope"];
   if (
     resolvedScope !== "project" &&
     resolvedScope !== "team" &&
@@ -322,9 +313,7 @@ export interface AiCallFailedExtracted {
   role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
 }
 
-export function extractAiCallFailedInfo(
-  error: unknown,
-): AiCallFailedExtracted | null {
+export function extractAiCallFailedInfo(error: unknown): AiCallFailedExtracted | null {
   if (!(error instanceof TRPCClientError)) return null;
   const cause = error.data?.cause as
     | {

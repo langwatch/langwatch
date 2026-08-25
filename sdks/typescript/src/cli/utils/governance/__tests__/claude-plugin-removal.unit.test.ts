@@ -17,8 +17,7 @@ import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 

@@ -13,11 +13,7 @@ export function getGetPromptSnippets(params?: {
   apiKey?: string;
   label?: string;
 }): Snippet[] {
-  const {
-    promptHandle = "{handle}",
-    apiKey = "YOUR_API_KEY",
-    label,
-  } = params ?? {};
+  const { promptHandle = "{handle}", apiKey = "YOUR_API_KEY", label } = params ?? {};
 
   // Shorthand syntax: "my-prompt:production" instead of query params
   const shorthand = label ? `${promptHandle}:${label}` : promptHandle;

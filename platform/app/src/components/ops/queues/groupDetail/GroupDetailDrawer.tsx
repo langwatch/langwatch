@@ -6,10 +6,7 @@ import { useShikiAdapter } from "~/features/traces-v2/components/TraceDrawer/mar
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
-import {
-  grafanaGroupLogsUrl,
-  grafanaGroupTracesUrl,
-} from "~/utils/grafanaLinks";
+import { grafanaGroupLogsUrl, grafanaGroupTracesUrl } from "~/utils/grafanaLinks";
 import { GroupActionConfirms, GroupDrawerActions } from "./GroupActionConfirms";
 import { GroupDetailContent } from "./GroupDetailContent";
 import { GroupDrawerHeader } from "./GroupDrawerHeader";
@@ -54,12 +51,7 @@ export function GroupDetailDrawer({ queueName = "", groupId = "" }: Props) {
   const actions = useGroupActions(target);
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="lg"
-      onOpenChange={() => closeDrawer()}
-    >
+    <Drawer.Root open={true} placement="end" size="lg" onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <GroupDrawerHeader

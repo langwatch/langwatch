@@ -206,14 +206,12 @@ describe("given a trace whose span carries a 1 MB output value", () => {
       // "…" (3 bytes) at the codepoint boundary, so allow that much slack and
       // nothing more — a raw 1 MB value would miss this by 16x.
       expect(cached.computedOutput).not.toBeNull();
-      expect(
-        Buffer.byteLength(cached.computedOutput!, "utf8"),
-      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 8);
-      expect(cached.computedOutput).toContain("oooo");
-      // No string anywhere in the entry — attributes included — busts the budget.
-      expect(longestStringBytes(cached)).toBeLessThanOrEqual(
+      expect(Buffer.byteLength(cached.computedOutput!, "utf8")).toBeLessThanOrEqual(
         IO_PREVIEW_BYTES + 8,
       );
+      expect(cached.computedOutput).toContain("oooo");
+      // No string anywhere in the entry — attributes included — busts the budget.
+      expect(longestStringBytes(cached)).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 8);
       expect(Buffer.byteLength(raw!, "utf8")).toBeLessThan(1024 * 1024);
 
       // Then: no events[] payload. The span-count-scaling collections are

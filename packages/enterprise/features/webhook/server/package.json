@@ -4,24 +4,26 @@
   "private": true,
   "description": "Server-side LangWatch Enterprise webhook endpoint and delivery services.",
   "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": ["src"],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/enterprise-webhook-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

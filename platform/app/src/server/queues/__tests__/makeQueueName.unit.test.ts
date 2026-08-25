@@ -29,17 +29,13 @@ describe("makeQueueName", () => {
     });
 
     it("wraps a path-style name in hash tags", () => {
-      expect(makeQueueName("pipeline/handler/foo")).toBe(
-        "{pipeline/handler/foo}",
-      );
+      expect(makeQueueName("pipeline/handler/foo")).toBe("{pipeline/handler/foo}");
     });
   });
 
   describe("when called with an already-wrapped name", () => {
     it("throws to prevent double-wrapping", () => {
-      expect(() => makeQueueName("{collector}")).toThrow(
-        /already wrapped in hash tags/,
-      );
+      expect(() => makeQueueName("{collector}")).toThrow(/already wrapped in hash tags/);
     });
   });
 });
@@ -47,10 +43,11 @@ describe("makeQueueName", () => {
 describe("queue name constants", () => {
   describe("when checking every declared queue name", () => {
     /** @scenario Every queue name produced by the system contains a hash tag */
-    it.each([
-      ["SCENARIO_QUEUE", SCENARIO_QUEUE.NAME],
-    ])("%s contains a hash tag", (_label, queueName) => {
-      expect(hasHashTag(queueName)).toBe(true);
-    });
+    it.each([["SCENARIO_QUEUE", SCENARIO_QUEUE.NAME]])(
+      "%s contains a hash tag",
+      (_label, queueName) => {
+        expect(hasHashTag(queueName)).toBe(true);
+      },
+    );
   });
 });

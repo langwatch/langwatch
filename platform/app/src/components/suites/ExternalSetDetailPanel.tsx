@@ -7,14 +7,7 @@
  * External sets omit "Target" from group-by since they have no target resolution.
  */
 
-import {
-  Box,
-  Button,
-  EmptyState,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, EmptyState, HStack, Text, VStack } from "@chakra-ui/react";
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "~/components/PeriodSelector";
@@ -27,10 +20,7 @@ import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
 import { GroupRow } from "./GroupRow";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-} from "./RunHistoryFilters";
+import { RunHistoryFilters, type RunHistoryFilterValues } from "./RunHistoryFilters";
 import { RunHistorySkeleton } from "./RunHistorySkeleton";
 import { RunRow } from "./RunRow";
 import {
@@ -79,9 +69,7 @@ export function ExternalSetDetailPanel({
   const setFilters = useRunHistoryStore((s) => s.setFilters);
 
   // Clamp groupBy to valid external options (e.g. if user navigated from suite with "target")
-  const effectiveGroupBy = EXTERNAL_GROUP_BY_OPTIONS.includes(groupBy)
-    ? groupBy
-    : "none";
+  const effectiveGroupBy = EXTERNAL_GROUP_BY_OPTIONS.includes(groupBy) ? groupBy : "none";
 
   // Live updates: SSE invalidates getSuiteRunData directly; its connection
   // state disables the fallback freshness polling below.
@@ -165,8 +153,7 @@ export function ExternalSetDetailPanel({
     } else if (filters.passFailStatus === "fail") {
       runs = runs.filter(
         (r) =>
-          r.status === ScenarioRunStatus.ERROR ||
-          r.status === ScenarioRunStatus.FAILED,
+          r.status === ScenarioRunStatus.ERROR || r.status === ScenarioRunStatus.FAILED,
       );
     } else if (filters.passFailStatus === "stalled") {
       runs = runs.filter((r) => r.status === ScenarioRunStatus.STALLED);
@@ -212,8 +199,7 @@ export function ExternalSetDetailPanel({
     [setFilters],
   );
 
-  const hasData =
-    effectiveGroupBy === "none" ? batchRuns.length > 0 : groups.length > 0;
+  const hasData = effectiveGroupBy === "none" ? batchRuns.length > 0 : groups.length > 0;
   const hasActiveFilters = !!(filters.scenarioId || filters.passFailStatus);
 
   return (
@@ -221,12 +207,7 @@ export function ExternalSetDetailPanel({
       {/* Header */}
       <HStack paddingX={6} paddingY={4} justify="space-between">
         <VStack align="start" gap={0}>
-          <Text
-            fontSize="xs"
-            fontWeight="bold"
-            color="fg.muted"
-            letterSpacing="wider"
-          >
+          <Text fontSize="xs" fontWeight="bold" color="fg.muted" letterSpacing="wider">
             EXTERNAL SET
           </Text>
           <Text fontSize="lg" fontWeight="semibold">
@@ -284,16 +265,9 @@ export function ExternalSetDetailPanel({
           <EmptyState.Root paddingY={12}>
             <EmptyState.Content>
               <Box maxWidth="420px" width="100%">
-                <HandledErrorAlert
-                  error={error}
-                  fallbackTitle="Couldn't load run data"
-                />
+                <HandledErrorAlert error={error} fallbackTitle="Couldn't load run data" />
               </Box>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void refetch()}
-              >
+              <Button size="sm" variant="outline" onClick={() => void refetch()}>
                 <RefreshCw size={14} /> Try again
               </Button>
             </EmptyState.Content>
@@ -305,9 +279,7 @@ export function ExternalSetDetailPanel({
             {/* Run rows */}
             {!hasData && hasActiveFilters ? (
               <Box paddingX={6} paddingY={8} textAlign="center">
-                <Text color="fg.muted">
-                  No runs match the selected filters.
-                </Text>
+                <Text color="fg.muted">No runs match the selected filters.</Text>
               </Box>
             ) : (
               <>
@@ -326,9 +298,7 @@ export function ExternalSetDetailPanel({
                           resolveTargetName={resolveTargetName}
                           onScenarioRunClick={handleScenarioRunClick}
                           viewMode={viewMode}
-                          isHighlighted={
-                            highlightedBatchId === batchRun.batchRunId
-                          }
+                          isHighlighted={highlightedBatchId === batchRun.batchRunId}
                         />
                       );
                     })

@@ -153,9 +153,7 @@ vi.mock("langwatch", () => ({
 describe("fetchScenario turn config mapping", () => {
   it("maps maxTurns and minTurns from DB row to ScenarioConfig", async () => {
     const { prefetchScenarioData } = await import("../data-prefetcher");
-    const { createMockDepsForTurnConfig } = await import(
-      "./support/turn-config-helpers"
-    );
+    const { createMockDepsForTurnConfig } = await import("./support/turn-config-helpers");
 
     const deps = createMockDepsForTurnConfig({
       scenario: {
@@ -191,9 +189,7 @@ describe("fetchScenario turn config mapping", () => {
 
   it("maps null turn fields as undefined", async () => {
     const { prefetchScenarioData } = await import("../data-prefetcher");
-    const { createMockDepsForTurnConfig } = await import(
-      "./support/turn-config-helpers"
-    );
+    const { createMockDepsForTurnConfig } = await import("./support/turn-config-helpers");
 
     const deps = createMockDepsForTurnConfig({
       scenario: {

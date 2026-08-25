@@ -68,9 +68,7 @@ describe("given a composer state with both secret and non-secret values set", ()
     it("keeps secrets out of the persisted config", () => {
       const built = buildParserConfig(composerState);
       expect(built).not.toHaveProperty("clientSecret");
-      expect(Object.values(built)).not.toContain(
-        "super-secret-client-secret-value",
-      );
+      expect(Object.values(built)).not.toContain("super-secret-client-secret-value");
     });
 
     it("persists a non-secret field with a value", () => {

@@ -1,1 +1,17 @@
-{"compilerOptions":{"target":"es2022","module":"preserve","moduleResolution":"bundler","lib":["es2022","dom","dom.iterable"],"types":[],"jsx":"react-jsx","strict":true,"noUncheckedIndexedAccess":true,"noEmit":true,"skipLibCheck":true,"forceConsistentCasingInFileNames":true,"verbatimModuleSyntax":true},"include":["src/**/*.ts","src/**/*.tsx","tests/**/*.ts","tests/**/*.tsx"]}
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "types": [],
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
+}

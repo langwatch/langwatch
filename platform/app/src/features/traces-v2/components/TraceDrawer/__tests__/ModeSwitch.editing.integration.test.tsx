@@ -14,13 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 vi.mock("~/components/ui/tooltip", () => ({
-  Tooltip: ({
-    children,
-    content,
-  }: {
-    children: ReactNode;
-    content: ReactNode;
-  }) => (
+  Tooltip: ({ children, content }: { children: ReactNode; content: ReactNode }) => (
     <div>
       {children}
       <span>{content}</span>

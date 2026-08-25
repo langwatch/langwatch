@@ -109,9 +109,9 @@ describe("createStorageRegistry()", () => {
 
       const registry = createStorageRegistry({ projectId: "proj-1" });
 
-      expect(() =>
-        registry.exists("azure-blob://acct/container/proj-1/sha256"),
-      ).toThrow(/AZURE_BLOB_ACCOUNT_NAME/);
+      expect(() => registry.exists("azure-blob://acct/container/proj-1/sha256")).toThrow(
+        /AZURE_BLOB_ACCOUNT_NAME/,
+      );
       expect(driverConstructorCalls).toHaveLength(0);
     });
 
@@ -124,9 +124,9 @@ describe("createStorageRegistry()", () => {
 
       const registry = createStorageRegistry({ projectId: "proj-1" });
 
-      await expect(
-        registry.exists("s3://private-bucket/proj-1/sha256"),
-      ).resolves.toBe(false);
+      await expect(registry.exists("s3://private-bucket/proj-1/sha256")).resolves.toBe(
+        false,
+      );
       expect(driverConstructorCalls).toHaveLength(0);
     });
   });

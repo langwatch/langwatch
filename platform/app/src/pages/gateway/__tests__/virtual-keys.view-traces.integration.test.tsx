@@ -166,9 +166,7 @@ describe("View traces row action", () => {
 
         expect(routerPush).toHaveBeenCalledTimes(1);
         const href = String(routerPush.mock.calls[0]?.[0]);
-        expect(href.startsWith(`/${PROJECT_SLUG}/traces#all-traces?`)).toBe(
-          true,
-        );
+        expect(href.startsWith(`/${PROJECT_SLUG}/traces#all-traces?`)).toBe(true);
         expect(href).toContain(encodeURIComponent(`"${VK_ID}"`));
       });
     });

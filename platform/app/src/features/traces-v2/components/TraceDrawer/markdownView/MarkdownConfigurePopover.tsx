@@ -9,12 +9,7 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import { Radio, RadioGroup } from "~/components/ui/radio";
-import type {
-  MarkdownConfig,
-  SpanDetailLevel,
-  SpanLayout,
-  SpanScope,
-} from "./types";
+import type { MarkdownConfig, SpanDetailLevel, SpanLayout, SpanScope } from "./types";
 
 export function MarkdownConfigurePopover({
   config,

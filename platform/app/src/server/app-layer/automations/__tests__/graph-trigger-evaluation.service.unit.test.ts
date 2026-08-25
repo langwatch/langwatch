@@ -164,10 +164,7 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
     return row;
   }
 
-  async deleteOpenClaim(params: {
-    id: string;
-    projectId: string;
-  }): Promise<void> {
+  async deleteOpenClaim(params: { id: string; projectId: string }): Promise<void> {
     this.deleteCalls.push(params);
     // A real delete removes the row entirely — from the open set AND the fire
     // generation, so a rolled-back claim never advances `findLatestForGraphAlert`.
@@ -276,9 +273,7 @@ describe("evaluateGraphTrigger", () => {
     // failed. Three of those in a row poison-parked the tenant's whole
     // graph-trigger lane and silently stopped every alert in the project.
     function tooLarge() {
-      const error = new Error(
-        "Limit for result exceeded: TOO_MANY_ROWS_OR_BYTES",
-      );
+      const error = new Error("Limit for result exceeded: TOO_MANY_ROWS_OR_BYTES");
       (error as Error & { code?: string }).code = "396";
       return error;
     }
@@ -465,9 +460,7 @@ describe("evaluateGraphTrigger", () => {
           `&endDate=${encodeURIComponent(NOW.toISOString())}`,
       );
       expect(arg.context.metric.label).toBe("Trace count");
-      expect(arg.context.metric.seriesName).toBe(
-        "0/metadata.trace_id/cardinality",
-      );
+      expect(arg.context.metric.seriesName).toBe("0/metadata.trace_id/cardinality");
       expect(arg.context.condition.operator).toBe("gt");
       expect(arg.context.condition.operatorLabel).toBe("is greater than");
       expect(arg.context.condition.threshold).toBe(10);
@@ -482,12 +475,9 @@ describe("evaluateGraphTrigger", () => {
       expect((arg.context as unknown as { history: unknown }).history).toEqual([
         { timestamp: "2026-06-20T11:00:00Z", value: 15 },
       ]);
+      expect((arg.context as unknown as { sparkline: string }).sparkline).toHaveLength(1);
       expect(
-        (arg.context as unknown as { sparkline: string }).sparkline,
-      ).toHaveLength(1);
-      expect(
-        (arg.context as unknown as { previousValue: number | null })
-          .previousValue,
+        (arg.context as unknown as { previousValue: number | null }).previousValue,
       ).toBeNull();
       expect(arg.context.project.url).toBe("https://app.langwatch.test/demo");
       expect(arg.recipients).toEqual(["a@example.com"]);
@@ -524,9 +514,7 @@ describe("evaluateGraphTrigger", () => {
           slackWebhook: string | null;
         };
         expect(arg.trigger.action).toBe(TriggerAction.SEND_SLACK_MESSAGE);
-        expect(arg.slackWebhook).toBe(
-          "https://hooks.slack.com/services/T/B/abc",
-        );
+        expect(arg.slackWebhook).toBe("https://hooks.slack.com/services/T/B/abc");
       });
     });
   });
@@ -1053,12 +1041,10 @@ describe("evaluateGraphTrigger", () => {
       expect(harness.dispatch).toHaveBeenCalledTimes(2);
       // The two fires carry DISTINCT digests — the resolved first incident is
       // the second fire's generation, so retries never conflate them.
-      const firstDigest = (
-        harness.dispatch.mock.calls[0]?.[0] as { fireDigest: string }
-      ).fireDigest;
-      const secondDigest = (
-        harness.dispatch.mock.calls[1]?.[0] as { fireDigest: string }
-      ).fireDigest;
+      const firstDigest = (harness.dispatch.mock.calls[0]?.[0] as { fireDigest: string })
+        .fireDigest;
+      const secondDigest = (harness.dispatch.mock.calls[1]?.[0] as { fireDigest: string })
+        .fireDigest;
       expect(firstDigest).toBeTruthy();
       expect(secondDigest).not.toBe(firstDigest);
     });

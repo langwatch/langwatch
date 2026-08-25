@@ -31,9 +31,7 @@ export function TraceViewerProvider({
 }: TraceViewer & { children: ReactNode }) {
   const value = useMemo(() => ({ traceId, isReadOnly }), [traceId, isReadOnly]);
   return (
-    <TraceViewerContext.Provider value={value}>
-      {children}
-    </TraceViewerContext.Provider>
+    <TraceViewerContext.Provider value={value}>{children}</TraceViewerContext.Provider>
   );
 }
 

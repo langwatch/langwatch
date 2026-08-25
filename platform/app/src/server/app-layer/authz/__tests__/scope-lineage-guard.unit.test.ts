@@ -33,9 +33,7 @@ function harness({
     },
     project: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
-        projects[where.id]
-          ? { team: { organizationId: projects[where.id] } }
-          : null,
+        projects[where.id] ? { team: { organizationId: projects[where.id] } } : null,
       ),
     },
   };

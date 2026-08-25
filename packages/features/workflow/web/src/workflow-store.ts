@@ -33,7 +33,13 @@ import {
 } from "./utils/control-flow";
 import { hasDSLChanged } from "@langwatch/workflow-contract";
 import { canConvergeOnInput } from "./utils/edge-convergence";
-export type CodedExecutionFailure = { error_type?: string; upstream_status?: number; trace_id?: string; span_id?: string; error?: string };
+export type CodedExecutionFailure = {
+  error_type?: string;
+  upstream_status?: number;
+  trace_id?: string;
+  span_id?: string;
+  error?: string;
+};
 import { findLowestAvailableName, nameToId } from "@langwatch/workflow-contract";
 
 const logger = {
@@ -56,11 +62,7 @@ export type State = StudioWorkflow & {
   lastCommittedWorkflow: StudioWorkflow | undefined;
   /** The DB id of the current workflow version. Updated on load, autosave, commit, and restore. */
   currentVersionId: string | undefined;
-  openResultsPanelRequest:
-    | "evaluations"
-    | "optimizations"
-    | "closed"
-    | undefined;
+  openResultsPanelRequest: "evaluations" | "optimizations" | "closed" | undefined;
   /** True while the user is dragging a node. Used to suppress drawer opening during drag. */
   isDraggingNode: boolean;
   /** The node ID confirmed by onNodeClick (genuine click, not drag). Gates drawer opening. */
@@ -97,10 +99,7 @@ export type WorkflowStore = State & {
   onNodesDelete: () => void;
   onConnect: (connection: Connection) => { error?: string } | undefined;
   /** Called when a connection drag starts; flags If/Else branch drags so nodes show the temporary gate input. */
-  onConnectStart: (params: {
-    nodeId: string | null;
-    handleId: string | null;
-  }) => void;
+  onConnectStart: (params: { nodeId: string | null; handleId: string | null }) => void;
   /** Called when a connection drag ends; clears the branch-drag flag. */
   onConnectEnd: () => void;
   setNodes: (nodes: Node[]) => void;
@@ -256,12 +255,14 @@ export const removeInvalidEdges = ({
     nodes,
     edges: edges.filter((edge) => {
       const source = nodes.find((node) => node.id === edge.source);
-      const [sourceHandleGroup, sourceHandleIdentifier] =
-        edge.sourceHandle?.split(".") ?? [null, null];
+      const [sourceHandleGroup, sourceHandleIdentifier] = edge.sourceHandle?.split(
+        ".",
+      ) ?? [null, null];
 
       const target = nodes.find((node) => node.id === edge.target);
-      const [targetHandleGroup, targetHandleIdentifier] =
-        edge.targetHandle?.split(".") ?? [null, null];
+      const [targetHandleGroup, targetHandleIdentifier] = edge.targetHandle?.split(
+        ".",
+      ) ?? [null, null];
 
       if (!source || !target) {
         logger.warn(
@@ -434,7 +435,9 @@ export const store = (
     return hasDSLChanged(autosavedWorkflow, currentWorkflow, true);
   },
   setWorkflow: (
-    workflow: Partial<StudioWorkflow> | ((current: StudioWorkflow) => Partial<StudioWorkflow>),
+    workflow:
+      | Partial<StudioWorkflow>
+      | ((current: StudioWorkflow) => Partial<StudioWorkflow>),
   ) => {
     const resolved =
       typeof workflow === "function" ? workflow(get().getWorkflow()) : workflow;
@@ -491,12 +494,9 @@ export const store = (
     }
     return hasDSLChanged(currentWorkflow, lastCommitted, false);
   },
-  setSocketStatus: (
-    status: SocketStatus | ((status: SocketStatus) => SocketStatus),
-  ) => {
+  setSocketStatus: (status: SocketStatus | ((status: SocketStatus) => SocketStatus)) => {
     set({
-      socketStatus:
-        typeof status === "function" ? status(get().socketStatus) : status,
+      socketStatus: typeof status === "function" ? status(get().socketStatus) : status,
     });
   },
   onNodesChange: (changes: NodeChange[]) => {
@@ -504,9 +504,7 @@ export const store = (
     if (removeChanges.length > 0) {
       logger.warn({ removeChanges }, "onNodesChange: REMOVING nodes");
     }
-    const hasDeselection = changes.some(
-      (c) => c.type === "select" && !c.selected,
-    );
+    const hasDeselection = changes.some((c) => c.type === "select" && !c.selected);
     set({
       nodes: applyNodeChanges(changes, get().nodes),
       ...(hasDeselection ? { clickedNodeId: null } : {}),
@@ -543,11 +541,7 @@ export const store = (
     // "gate" bool input on the target and wire the branch into it. The branch
     // carries its boolean value like a normal edge; the engine gates the node
     // on the branch and plumbs that value into the gate input.
-    if (
-      fromBranch &&
-      connection.targetHandle === GATE_HANDLE_ID &&
-      connection.target
-    ) {
+    if (fromBranch && connection.targetHandle === GATE_HANDLE_ID && connection.target) {
       const targetNode = nodes.find((n) => n.id === connection.target);
       if (targetNode && !nodeHasGateInput(targetNode)) {
         const inputs: Field[] = [
@@ -571,8 +565,7 @@ export const store = (
                     ...(n.type === "code"
                       ? {
                           parameters: updateInputFields(
-                            (n.data as { parameters?: Field[] }).parameters ??
-                              [],
+                            (n.data as { parameters?: Field[] }).parameters ?? [],
                             inputs,
                           ),
                         }
@@ -612,10 +605,7 @@ export const store = (
       })),
     });
   },
-  onConnectStart: (params: {
-    nodeId: string | null;
-    handleId: string | null;
-  }) => {
+  onConnectStart: (params: { nodeId: string | null; handleId: string | null }) => {
     const node = get().nodes.find((n) => n.id === params.nodeId);
     const fromBranch = isBranchConnectionOrigin({
       node,
@@ -659,11 +649,7 @@ export const store = (
     }
     set({ edges });
   },
-  edgeConnectToNewHandle: (
-    source: string,
-    sourceHandle: string,
-    target: string,
-  ) => {
+  edgeConnectToNewHandle: (source: string, sourceHandle: string, target: string) => {
     const nodes = get().nodes;
     const edges = get().edges;
     const inputs = edges
@@ -768,9 +754,7 @@ export const store = (
           ...(newId && n.type === "code"
             ? {
                 parameters: updateCodeClassName(
-                  (node.data?.parameters as Field[]) ??
-                    n.data?.parameters ??
-                    [],
+                  (node.data?.parameters as Field[]) ?? n.data?.parameters ?? [],
                   n.id,
                   newId,
                 ),
@@ -780,9 +764,7 @@ export const store = (
             ? {
                 parameters: updateOutputFields(
                   updateInputFields(
-                    (node.data?.parameters as Field[]) ??
-                      n.data?.parameters ??
-                      [],
+                    (node.data?.parameters as Field[]) ?? n.data?.parameters ?? [],
                     (node.data?.inputs ?? []) as Field[],
                   ),
                   n.data.outputs ?? [],
@@ -852,9 +834,7 @@ export const store = (
             ...node.data,
             parameters: existingParameter
               ? (node.data.parameters ?? []).map((p) =>
-                  p.identifier === parameter.identifier
-                    ? { ...p, ...parameter }
-                    : p,
+                  p.identifier === parameter.identifier ? { ...p, ...parameter } : p,
                 )
               : [...(node.data.parameters ?? []), parameter],
           },
@@ -866,9 +846,7 @@ export const store = (
     logger.info({ nodeId: id }, "deleteNode: deleting node");
     set(
       removeInvalidEdges({
-        nodes: removeInvalidDecorations(
-          get().nodes.filter((node) => node.id !== id),
-        ),
+        nodes: removeInvalidDecorations(get().nodes.filter((node) => node.id !== id)),
         edges: get().edges,
       }),
     );
@@ -956,9 +934,7 @@ export const store = (
       status: executionState.status ?? currentExecution?.status ?? "idle",
       ...currentExecution,
       ...executionState,
-      ...(executionState.error
-        ? { error: executionState.error.slice(0, 140) }
-        : {}),
+      ...(executionState.error ? { error: executionState.error.slice(0, 140) } : {}),
     };
     set({
       state: {
@@ -998,19 +974,13 @@ export const store = (
           ...(optimizationState?.stdout
             ? {
                 stdout: (() => {
-                  const stdout =
-                    get().state.optimization?.stdout?.trimStart() ?? "";
+                  const stdout = get().state.optimization?.stdout?.trimStart() ?? "";
                   const hasCarriageReturn =
-                    optimizationState.stdout?.startsWith("\r") ||
-                    stdout.endsWith("\r\n");
+                    optimizationState.stdout?.startsWith("\r") || stdout.endsWith("\r\n");
 
                   if (hasCarriageReturn) {
                     return (
-                      stdout
-                        .split("\n")
-                        .slice(0, -2)
-                        .join("\n")
-                        .replaceAll("\r", "") +
+                      stdout.split("\n").slice(0, -2).join("\n").replaceAll("\r", "") +
                       "\n" +
                       optimizationState.stdout +
                       "\n"
@@ -1028,11 +998,7 @@ export const store = (
   setHoveredNodeId: (nodeId: string | undefined) => {
     set({ hoveredNodeId: nodeId });
   },
-  attachEntryDataset: (
-    nodeId: string,
-    dataset: Entry["dataset"],
-    columns: Field[],
-  ) => {
+  attachEntryDataset: (nodeId: string, dataset: Entry["dataset"], columns: Field[]) => {
     set({
       nodes: get().nodes.map((node) => {
         if (node.id !== nodeId) return node;

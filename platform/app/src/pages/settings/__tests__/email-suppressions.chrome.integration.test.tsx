@@ -59,9 +59,8 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-const { default: EmailSuppressionsPage } = await import(
-  "~/pages/settings/email-suppressions"
-);
+const { default: EmailSuppressionsPage } =
+  await import("~/pages/settings/email-suppressions");
 
 function renderPage() {
   return render(

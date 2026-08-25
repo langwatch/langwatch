@@ -85,9 +85,7 @@ describe("namesCreatedResource", () => {
     });
 
     it("accepts a human name", () => {
-      expect(namesCreatedResource({ name: "Customer support agent" })).toBe(
-        true,
-      );
+      expect(namesCreatedResource({ name: "Customer support agent" })).toBe(true);
     });
 
     it("accepts a non-empty collection", () => {
@@ -103,9 +101,7 @@ describe("namesCreatedResource", () => {
 describe("reading a create result as a created-resource card", () => {
   describe("when the result names no resource", () => {
     it("refuses the card schema", () => {
-      expect(
-        SCHEMA_BY_CARD_KIND.resourceCreated.safeParse([]).success,
-      ).toBe(false);
+      expect(SCHEMA_BY_CARD_KIND.resourceCreated.safeParse([]).success).toBe(false);
     });
 
     it("fails to parse as a create result", () => {
@@ -170,9 +166,7 @@ describe("reading a create result as a created-resource card", () => {
     };
 
     it("refuses the card schema", () => {
-      expect(
-        SCHEMA_BY_CARD_KIND.resourceCreated.safeParse(scaffold).success,
-      ).toBe(false);
+      expect(SCHEMA_BY_CARD_KIND.resourceCreated.safeParse(scaffold).success).toBe(false);
     });
 
     it("records the outcome as unconfirmed", () => {

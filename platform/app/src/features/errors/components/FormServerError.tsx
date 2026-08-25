@@ -27,9 +27,9 @@ export function FormServerError<TFieldValues extends FieldValues>({
   const { errors } = useFormState({ control: form.control });
   // Read through the same constant `applyHandledErrorToForm` writes to, so
   // the two can never drift apart silently.
-  const message = (
-    errors.root as Record<string, { message?: string }> | undefined
-  )?.[FORM_SERVER_ERROR_KEY]?.message;
+  const message = (errors.root as Record<string, { message?: string }> | undefined)?.[
+    FORM_SERVER_ERROR_KEY
+  ]?.message;
   if (!message) return null;
 
   return (

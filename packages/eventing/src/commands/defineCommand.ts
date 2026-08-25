@@ -88,15 +88,13 @@ export function defineCommand<
       return aggregateId(payload);
     }
 
-    static getGroupKey: ((payload: CommandData) => string) | undefined =
-      groupKey;
+    static getGroupKey: ((payload: CommandData) => string) | undefined = groupKey;
 
     static getSpanAttributes:
       | ((payload: CommandData) => Record<string, string | number | boolean>)
       | undefined = spanAttributes;
 
-    static makeJobId: ((payload: CommandData) => string) | undefined =
-      makeJobId;
+    static makeJobId: ((payload: CommandData) => string) | undefined = makeJobId;
 
     handle(command: Command<CommandData>): CommandHandlerResult<Event> {
       const { tenantId: tenantIdStr, data: commandData } = command;
@@ -124,8 +122,5 @@ export function defineCommand<
   // The inner class structurally satisfies DefinedCommandClass but TS needs the
   // intermediate `unknown` to bridge the nominal gap between class literals and
   // intersection constructor types.
-  return DefinedCommand as unknown as DefinedCommandClass<
-    CommandData,
-    TCmdType
-  >;
+  return DefinedCommand as unknown as DefinedCommandClass<CommandData, TCmdType>;
 }

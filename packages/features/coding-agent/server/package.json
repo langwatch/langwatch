@@ -3,17 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "description": "Canonical coding-agent session read service.",
+  "files": [
+    "src"
+  ],
   "type": "module",
-  "exports": {
-    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
-  },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "files": ["src"],
-  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run" },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
   "dependencies": {
     "@langwatch/coding-agent-contract": "workspace:*",
     "zod": "^4.4.3"
   },
-  "devDependencies": { "typescript": "^7.0.2", "vitest": "^4.1.9" }
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
 }

@@ -54,8 +54,7 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
 // the real chart derives its bars, axis labels and tie bar from, tests the
 // chart's own tally rather than recharts' rendering.
 vi.mock("recharts", () => {
-  const MockComponent = ({ children }: { children?: ReactNode }) =>
-    children ?? null;
+  const MockComponent = ({ children }: { children?: ReactNode }) => children ?? null;
   return {
     ResponsiveContainer: MockComponent,
     BarChart: ({ data }: { data: Array<{ name: string; wins: number }> }) => (
@@ -210,17 +209,16 @@ const COMPARISON_VERDICTS: ExperimentRunEvaluation[] = [
 ];
 
 /** A per-target scalar evaluator, the ordinary company a comparison keeps. */
-const SCALAR_EVALUATIONS: ExperimentRunEvaluation[] = ROW_INPUTS.flatMap(
-  (_, index) =>
-    TARGET_NAMES.map((name) => ({
-      evaluator: "exact_match",
-      name: "Exact Match",
-      targetId: name,
-      status: "processed" as const,
-      index,
-      score: 0.75,
-      passed: true,
-    })),
+const SCALAR_EVALUATIONS: ExperimentRunEvaluation[] = ROW_INPUTS.flatMap((_, index) =>
+  TARGET_NAMES.map((name) => ({
+    evaluator: "exact_match",
+    name: "Exact Match",
+    targetId: name,
+    status: "processed" as const,
+    index,
+    score: 0.75,
+    passed: true,
+  })),
 );
 
 const SDK_RUN: ExperimentRunWithItems = {
@@ -300,13 +298,7 @@ describe("an n-way comparison logged by the code-first SDK", () => {
 
         const column = comparisonColumnOf(SDK_RUN);
 
-        expect(Object.keys(column.verdictsByRow)).toEqual([
-          "0",
-          "1",
-          "2",
-          "3",
-          "4",
-        ]);
+        expect(Object.keys(column.verdictsByRow)).toEqual(["0", "1", "2", "3", "4"]);
       });
 
       it("counts a row the judge could not settle as neither a tie nor a win for anyone", () => {
@@ -363,17 +355,13 @@ describe("an n-way comparison logged by the code-first SDK", () => {
 
         // The tie reads as a tie, and the row the judge ran and could not
         // settle reads as its own outcome rather than as a tie or a win.
-        expect(
-          screen.getAllByTestId("comparison-winner-badge-tie"),
-        ).toHaveLength(1);
-        expect(
-          screen.getAllByTestId("comparison-winner-badge-no-verdict"),
-        ).toHaveLength(1);
+        expect(screen.getAllByTestId("comparison-winner-badge-tie")).toHaveLength(1);
+        expect(screen.getAllByTestId("comparison-winner-badge-no-verdict")).toHaveLength(
+          1,
+        );
         // A bare dash is reserved for a row the judge never ran, and every row
         // of this run was judged.
-        expect(screen.queryAllByTestId("comparison-winner-none")).toHaveLength(
-          0,
-        );
+        expect(screen.queryAllByTestId("comparison-winner-none")).toHaveLength(0);
 
         // "Why" is on the page, not one drill-down away, and that includes the
         // reason a row reached no verdict.
@@ -469,10 +457,7 @@ describe("a verdict too long to fit its cell", () => {
     const user = userEvent.setup();
 
     render(
-      <ComparisonWinnerCell
-        column={OVERFLOWING_COLUMN}
-        verdict={OVERFLOWING_VERDICT}
-      />,
+      <ComparisonWinnerCell column={OVERFLOWING_COLUMN} verdict={OVERFLOWING_VERDICT} />,
       { wrapper: Wrapper },
     );
 

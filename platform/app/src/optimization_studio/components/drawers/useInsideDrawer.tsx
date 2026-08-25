@@ -17,15 +17,9 @@ export const DrawerFooterContext = createContext<
   ((footer: React.ReactNode) => void) | null
 >(null);
 
-export function InsideDrawerProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function InsideDrawerProvider({ children }: { children: React.ReactNode }) {
   return (
-    <InsideDrawerContext.Provider value={true}>
-      {children}
-    </InsideDrawerContext.Provider>
+    <InsideDrawerContext.Provider value={true}>{children}</InsideDrawerContext.Provider>
   );
 }
 

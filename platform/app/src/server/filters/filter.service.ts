@@ -31,9 +31,7 @@ export class FilterService {
    */
   constructor(private readonly repository: FilterOptionsRepository | null) {}
 
-  async getFilterOptions(
-    input: GetFilterOptionsInput,
-  ): Promise<FilterOption[]> {
+  async getFilterOptions(input: GetFilterOptionsInput): Promise<FilterOption[]> {
     return await this.tracer.withActiveSpan(
       "FilterService.getFilterOptions",
       {
@@ -48,9 +46,7 @@ export class FilterService {
           typeof input.projectId !== "string" ||
           input.projectId.trim() === ""
         ) {
-          throw new Error(
-            "Security: projectId (tenantId) must be a non-empty string",
-          );
+          throw new Error("Security: projectId (tenantId) must be a non-empty string");
         }
 
         if (!this.repository) {

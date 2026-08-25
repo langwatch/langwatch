@@ -158,10 +158,7 @@ const baseInput: AgentInput = {
   scenarioConfig: {} as AgentInput["scenarioConfig"],
 };
 
-function makeConfig(
-  url: string,
-  overrides?: Partial<HttpAgentData>,
-): HttpAgentData {
+function makeConfig(url: string, overrides?: Partial<HttpAgentData>): HttpAgentData {
   return {
     type: "http",
     agentId: "agent_test",
@@ -474,9 +471,7 @@ describe("given an HTTP agent target pointed at a stub returning 200 (for diagno
         logger: loggerArg(logger),
       });
       await adapter.call(baseInput).catch(() => undefined);
-      const hasStatus = collectEntries(logger).some(
-        (e) => e.statusCode === 200,
-      );
+      const hasStatus = collectEntries(logger).some((e) => e.statusCode === 200);
       expect(hasStatus).toBe(true);
     });
 
@@ -550,9 +545,7 @@ describe("given an HTTP agent target pointed at a stub returning 422 (for diagno
         logger: loggerArg(logger),
       });
       await adapter.call(baseInput).catch(() => undefined);
-      const hasStatus = collectEntries(logger).some(
-        (e) => e.statusCode === 422,
-      );
+      const hasStatus = collectEntries(logger).some((e) => e.statusCode === 422);
       expect(hasStatus).toBe(true);
     });
 
@@ -673,10 +666,7 @@ describe("given a request that sets Authorization and x-api-key headers (diagnos
 
       const serialized = JSON.stringify(collectEntries(logger));
       // Only assert the placeholder if the log includes the header names at all
-      if (
-        serialized.includes("Authorization") ||
-        serialized.includes("x-api-key")
-      ) {
+      if (serialized.includes("Authorization") || serialized.includes("x-api-key")) {
         expect(serialized).toContain(REDACTED);
       }
     });

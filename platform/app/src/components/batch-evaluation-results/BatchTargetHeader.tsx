@@ -13,11 +13,7 @@ import {
   LuFileText,
   LuTriangleRight,
 } from "react-icons/lu";
-import {
-  formatCost,
-  formatLatency,
-  formatScore,
-} from "~/components/shared/formatters";
+import { formatCost, formatLatency, formatScore } from "~/components/shared/formatters";
 import {
   CostStatsTooltip,
   LatencyStatsTooltip,
@@ -50,11 +46,7 @@ const formatPassRate = (passRate: number | null): string => {
 /**
  * Summary statistics tooltip content.
  */
-const SummaryTooltipContent = ({
-  aggregates,
-}: {
-  aggregates: BatchTargetAggregate;
-}) => (
+const SummaryTooltipContent = ({ aggregates }: { aggregates: BatchTargetAggregate }) => (
   <VStack align="stretch" gap={0} fontSize="12px" minWidth="230px" color="fg">
     <VStack align="stretch" gap={2} padding={2}>
       {/* Progress */}
@@ -64,8 +56,7 @@ const SummaryTooltipContent = ({
           {aggregates.completedRows}/{aggregates.totalRows}
           {aggregates.errorRows > 0 && (
             <Text as="span" color="red.300" marginLeft={1}>
-              ({aggregates.errorRows}{" "}
-              {aggregates.errorRows === 1 ? "error" : "errors"})
+              ({aggregates.errorRows} {aggregates.errorRows === 1 ? "error" : "errors"})
             </Text>
           )}
         </Text>
@@ -91,9 +82,7 @@ const SummaryTooltipContent = ({
       {aggregates.overallAverageScore !== null && (
         <HStack justify="space-between">
           <Text color="fg.muted">Avg Score</Text>
-          <Text fontWeight="medium">
-            {formatScore(aggregates.overallAverageScore)}
-          </Text>
+          <Text fontWeight="medium">{formatScore(aggregates.overallAverageScore)}</Text>
         </HStack>
       )}
 
@@ -117,9 +106,7 @@ const SummaryTooltipContent = ({
             <Text color="fg.muted">Avg Latency</Text>
             <HStack gap={1}>
               <Icon as={LuClock} color="fg.muted" boxSize={3} />
-              <Text fontWeight="medium">
-                {formatLatency(aggregates.averageLatency)}
-              </Text>
+              <Text fontWeight="medium">{formatLatency(aggregates.averageLatency)}</Text>
               <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
             </HStack>
           </HStack>
@@ -145,9 +132,7 @@ const SummaryTooltipContent = ({
           >
             <Text color="fg.muted">Total Cost</Text>
             <HStack gap={1}>
-              <Text fontWeight="medium">
-                {formatCost(aggregates.totalCost)}
-              </Text>
+              <Text fontWeight="medium">{formatCost(aggregates.totalCost)}</Text>
               <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
             </HStack>
           </HStack>
@@ -158,9 +143,7 @@ const SummaryTooltipContent = ({
       {aggregates.totalDuration !== null && (
         <HStack justify="space-between">
           <Text color="fg.muted">Execution Time</Text>
-          <Text fontWeight="medium">
-            {formatLatency(aggregates.totalDuration)}
-          </Text>
+          <Text fontWeight="medium">{formatLatency(aggregates.totalDuration)}</Text>
         </HStack>
       )}
     </VStack>
@@ -197,8 +180,7 @@ const SummaryTooltipContent = ({
                 )}
                 {evaluator.errors > 0 && (
                   <Text fontSize="11px" color="red.300">
-                    {evaluator.errors}{" "}
-                    {evaluator.errors === 1 ? "error" : "errors"}
+                    {evaluator.errors} {evaluator.errors === 1 ? "error" : "errors"}
                   </Text>
                 )}
               </HStack>
@@ -228,8 +210,7 @@ const SummaryBadge = memo(function SummaryBadge({
     aggregates.errorRows > 0 ||
     aggregates.totalCost !== null;
 
-  const { isOpen, handleMouseEnter, handleMouseLeave } =
-    useInteractiveTooltip(150);
+  const { isOpen, handleMouseEnter, handleMouseLeave } = useInteractiveTooltip(150);
 
   if (!hasResults) return null;
 
@@ -261,9 +242,7 @@ const SummaryBadge = memo(function SummaryBadge({
         onMouseLeave={handleMouseLeave}
       >
         {(aggregates.overallPassRate !== null ||
-          aggregates.overallAverageScore !== null) && (
-          <Text fontWeight="600">Score</Text>
-        )}
+          aggregates.overallAverageScore !== null) && <Text fontWeight="600">Score</Text>}
 
         {/* Pass rate */}
         {aggregates.overallPassRate !== null && (
@@ -282,9 +261,7 @@ const SummaryBadge = memo(function SummaryBadge({
         {aggregates.overallAverageScore !== null && (
           <HStack gap={1}>
             <LuTriangleRight />
-            <Text color="fg.muted">
-              {formatScore(aggregates.overallAverageScore)}
-            </Text>
+            <Text color="fg.muted">{formatScore(aggregates.overallAverageScore)}</Text>
           </HStack>
         )}
 
@@ -292,9 +269,7 @@ const SummaryBadge = memo(function SummaryBadge({
         {aggregates.averageLatency !== null && (
           <HStack gap={1}>
             <LuClock size={12} />
-            <Text fontWeight="medium">
-              {formatLatency(aggregates.averageLatency)}
-            </Text>
+            <Text fontWeight="medium">{formatLatency(aggregates.averageLatency)}</Text>
           </HStack>
         )}
 
@@ -310,8 +285,7 @@ const SummaryBadge = memo(function SummaryBadge({
         {/* Errors indicator */}
         {aggregates.errorRows > 0 && (
           <Text color="red.500" fontWeight="medium">
-            {aggregates.errorRows}{" "}
-            {aggregates.errorRows === 1 ? "error" : "errors"}
+            {aggregates.errorRows} {aggregates.errorRows === 1 ? "error" : "errors"}
           </Text>
         )}
       </HStack>
@@ -362,11 +336,7 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
             flexShrink={0}
           />
         )}
-        <ColorfulBlockIcon
-          color={getTargetColor()}
-          size="xs"
-          icon={getTargetIcon()}
-        />
+        <ColorfulBlockIcon color={getTargetColor()} size="xs" icon={getTargetIcon()} />
         <Text fontSize="13px" fontWeight="medium" truncate>
           {target.name}
         </Text>

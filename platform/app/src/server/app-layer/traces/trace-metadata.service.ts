@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import type {
-  CustomMetadata,
-  ReservedTraceMetadata,
-} from "~/server/tracer/types";
+import type { CustomMetadata, ReservedTraceMetadata } from "~/server/tracer/types";
 import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
 
 /**
@@ -92,9 +89,7 @@ export async function updateTraceMetadata({
       kind: 1,
       startTimeUnixNano: nowNano,
       endTimeUnixNano: nowNano,
-      attributes: [
-        { key: "langwatch.span.type", value: { stringValue: "span" } },
-      ],
+      attributes: [{ key: "langwatch.span.type", value: { stringValue: "span" } }],
       events: [],
       links: [],
       status: { code: 1 },

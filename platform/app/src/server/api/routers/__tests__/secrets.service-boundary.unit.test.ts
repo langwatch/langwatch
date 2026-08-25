@@ -1,7 +1,4 @@
-import {
-  SecretNotFoundError,
-  type Secret,
-} from "@langwatch/secret-contract";
+import { SecretNotFoundError, type Secret } from "@langwatch/secret-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const list = vi.fn();
@@ -10,9 +7,7 @@ const update = vi.fn();
 const deleteSecret = vi.fn();
 
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
 
@@ -63,9 +58,7 @@ describe("secrets tRPC compatibility adapter", () => {
     list.mockResolvedValueOnce([secret]);
     create.mockResolvedValueOnce(secret);
 
-    await expect(caller().list({ projectId: "project-1" })).resolves.toEqual([
-      secret,
-    ]);
+    await expect(caller().list({ projectId: "project-1" })).resolves.toEqual([secret]);
     await expect(
       caller().create({
         projectId: "project-1",

@@ -19,9 +19,7 @@ class RecordingReporter extends AuthzCutoverFailureReporter {
 }
 
 function stateTable(status: string | null) {
-  const findUnique = vi
-    .fn()
-    .mockResolvedValue(status === null ? null : { status });
+  const findUnique = vi.fn().mockResolvedValue(status === null ? null : { status });
   const reporter = new RecordingReporter();
   const adapter = PostgresAuthzCutoverAdapter.create({
     database: {
@@ -59,9 +57,7 @@ describe("PostgresAuthzCutoverAdapter", () => {
     [null, false],
   ])("reads %s as on-ledger=%s", async (status, expected) => {
     const { adapter } = stateTable(status);
-    await expect(adapter.isOn({ organizationId: ORG_ID })).resolves.toBe(
-      expected,
-    );
+    await expect(adapter.isOn({ organizationId: ORG_ID })).resolves.toBe(expected);
   });
 
   it("reports a failed state read and fails safe to legacy", async () => {
@@ -93,9 +89,9 @@ describe("PostgresAuthzCutoverAdapter", () => {
       reporter: new RecordingReporter(),
     });
 
-    await expect(
-      adapter.tryGetFinalizedAt({ organizationId: ORG_ID }),
-    ).resolves.toEqual(occurredAt);
+    await expect(adapter.tryGetFinalizedAt({ organizationId: ORG_ID })).resolves.toEqual(
+      occurredAt,
+    );
     await expect(
       adapter.tryGetFinalizedAt({ organizationId: ORG_ID }),
     ).resolves.toBeNull();
@@ -111,9 +107,9 @@ describe("PostgresAuthzCutoverAdapter", () => {
       reporter: new RecordingReporter(),
     });
 
-    await expect(
-      adapter.readUncached({ organizationId: ORG_ID }),
-    ).rejects.toThrow("pg is down");
+    await expect(adapter.readUncached({ organizationId: ORG_ID })).rejects.toThrow(
+      "pg is down",
+    );
   });
 
   it("coalesces repeated reads inside the cache window", async () => {

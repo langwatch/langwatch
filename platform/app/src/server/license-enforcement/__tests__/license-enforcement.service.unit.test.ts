@@ -132,19 +132,18 @@ describe("LicenseEnforcementService", () => {
         },
       ];
 
-      it.each(limitTypeTests)("checks $type limit using $repoMethod", async ({
-        type,
-        repoMethod,
-        planField,
-      }) => {
-        vi.mocked(mockRepository[repoMethod]).mockResolvedValue(1);
+      it.each(limitTypeTests)(
+        "checks $type limit using $repoMethod",
+        async ({ type, repoMethod, planField }) => {
+          vi.mocked(mockRepository[repoMethod]).mockResolvedValue(1);
 
-        const result = await service.checkLimit("org-123", type);
+          const result = await service.checkLimit("org-123", type);
 
-        expect(mockRepository[repoMethod]).toHaveBeenCalledWith("org-123");
-        expect(result.limitType).toBe(type);
-        expect(result.max).toBe(basePlan[planField]);
-      });
+          expect(mockRepository[repoMethod]).toHaveBeenCalledWith("org-123");
+          expect(result.limitType).toBe(type);
+          expect(result.max).toBe(basePlan[planField]);
+        },
+      );
     });
   });
 
@@ -152,9 +151,7 @@ describe("LicenseEnforcementService", () => {
     it("does not throw when limit is not exceeded", async () => {
       vi.mocked(mockRepository.getMemberCount).mockResolvedValue(2);
 
-      await expect(
-        service.enforceLimit("org-123", "members"),
-      ).resolves.toBeUndefined();
+      await expect(service.enforceLimit("org-123", "members")).resolves.toBeUndefined();
     });
 
     it("throws LimitExceededError when limit is reached", async () => {
@@ -198,9 +195,7 @@ describe("LicenseEnforcementService", () => {
       vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue(overridePlan);
       vi.mocked(mockRepository.getMemberCount).mockResolvedValue(1000);
 
-      await expect(
-        service.enforceLimit("org-123", "members"),
-      ).resolves.toBeUndefined();
+      await expect(service.enforceLimit("org-123", "members")).resolves.toBeUndefined();
     });
   });
 

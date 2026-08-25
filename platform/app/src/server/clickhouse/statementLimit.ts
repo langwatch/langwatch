@@ -1,8 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  ConcurrencyLimiter,
-  QueueFullError,
-} from "@langwatch/clickhouse-client";
+import { ConcurrencyLimiter, QueueFullError } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 import { ClickHouseOverloadedError } from "~/server/app-layer/traces/errors";
 import { toError } from "~/utils/posthogErrorCapture";
@@ -94,10 +91,7 @@ export function withStatementLimit<T extends ClickHouseClient>({
   /** Overridable so a test can prove the bound without spending it. */
   waitTimeoutMs?: number;
 }): T {
-  const maxQueued = Math.max(
-    MIN_QUEUE_DEPTH,
-    maxConcurrent * QUEUE_DEPTH_PER_SLOT,
-  );
+  const maxQueued = Math.max(MIN_QUEUE_DEPTH, maxConcurrent * QUEUE_DEPTH_PER_SLOT);
   const limiter = new ConcurrencyLimiter({ maxConcurrent, maxQueued });
 
   registerClickHouseLimiter(instance, () => limiter.stats());
@@ -109,12 +103,7 @@ export function withStatementLimit<T extends ClickHouseClient>({
 
   const limited = Object.create(client) as T;
 
-  for (const operation of [
-    "query",
-    "insert",
-    "command",
-    "exec",
-  ] as LimitedOperation[]) {
+  for (const operation of ["query", "insert", "command", "exec"] as LimitedOperation[]) {
     const inner = client[operation];
     // A driver that does not expose one of these is not an error worth
     // failing a boot over - leave the property alone and let the prototype
@@ -129,8 +118,7 @@ export function withStatementLimit<T extends ClickHouseClient>({
         operation,
         signal: signalOf(params),
         waitTimeoutMs,
-        task: () =>
-          (inner as (p: unknown) => Promise<unknown>).call(client, params),
+        task: () => (inner as (p: unknown) => Promise<unknown>).call(client, params),
       });
   }
 
@@ -142,9 +130,8 @@ export function withStatementLimit<T extends ClickHouseClient>({
   for (const passthrough of ["close", "ping"] as const) {
     const inner = client[passthrough];
     if (typeof inner !== "function") continue;
-    (limited as Record<string, unknown>)[passthrough] = (
-      ...args: unknown[]
-    ): unknown => (inner as (...a: unknown[]) => unknown).apply(client, args);
+    (limited as Record<string, unknown>)[passthrough] = (...args: unknown[]): unknown =>
+      (inner as (...a: unknown[]) => unknown).apply(client, args);
   }
 
   return limited;
@@ -203,9 +190,7 @@ function armWait({
   timer.unref?.();
 
   return {
-    signal: signal
-      ? AbortSignal.any([signal, controller.signal])
-      : controller.signal,
+    signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
     hasTimedOut: () => hasFired,
     dispose: () => clearTimeout(timer),
   };

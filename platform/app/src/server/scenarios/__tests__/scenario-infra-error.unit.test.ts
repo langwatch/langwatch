@@ -44,9 +44,9 @@ const INTERNAL_MARKERS = [
  * and reported by label so a failure names what leaked.
  */
 function expectNoInternals(message: string): void {
-  const leaked = INTERNAL_MARKERS.filter(({ pattern }) =>
-    pattern.test(message),
-  ).map(({ label }) => label);
+  const leaked = INTERNAL_MARKERS.filter(({ pattern }) => pattern.test(message)).map(
+    ({ label }) => label,
+  );
   // biome-ignore lint/suspicious/noMisplacedAssertion: one shared guard for every "no internals" case; the assertion belongs with the marker list it checks
   expect(leaked).toEqual([]);
 }
@@ -65,9 +65,9 @@ describe("classifyScenarioInfraError", () => {
     });
 
     it("also matches the raw Node error code without a message", () => {
-      expect(
-        classifyScenarioInfraError("Error: DEPTH_ZERO_SELF_SIGNED_CERT").code,
-      ).toBe(ScenarioInfraErrorCode.UntrustedCertificate);
+      expect(classifyScenarioInfraError("Error: DEPTH_ZERO_SELF_SIGNED_CERT").code).toBe(
+        ScenarioInfraErrorCode.UntrustedCertificate,
+      );
     });
 
     it("matches the real UserSimulatorAgent retry message (from Grafana)", () => {
@@ -100,9 +100,7 @@ describe("classifyScenarioInfraError", () => {
           "(request-id: abc): <html><body>error code: 1033</body></html>",
       );
 
-      expect(envelope.code).toBe(
-        ScenarioInfraErrorCode.AgentDevTunnelUnreachable,
-      );
+      expect(envelope.code).toBe(ScenarioInfraErrorCode.AgentDevTunnelUnreachable);
       expect(envelope.message).toBe(
         "The agent points at a local development tunnel that is no longer " +
           "responding. The `langwatch agent dev` session that created it has " +
@@ -116,9 +114,7 @@ describe("classifyScenarioInfraError", () => {
         "HTTP 530: upstream error from https://my-agent.example.com: site frozen",
       );
 
-      expect(envelope.code).not.toBe(
-        ScenarioInfraErrorCode.AgentDevTunnelUnreachable,
-      );
+      expect(envelope.code).not.toBe(ScenarioInfraErrorCode.AgentDevTunnelUnreachable);
       expect(
         isTransportLevelScenarioFailure(
           "HTTP 530: upstream error from https://my-agent.example.com",
@@ -160,9 +156,7 @@ describe("classifyScenarioInfraError", () => {
 
       const result = classifyScenarioInfraError(raw);
 
-      expect(result.code).toBe(
-        ScenarioInfraErrorCode.ModelToolReasoningConflict,
-      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.ModelToolReasoningConflict);
       expect(result.message).toBe(
         "The selected judge model cannot use its current reasoning mode with the judge's function tool.",
       );
@@ -175,18 +169,16 @@ describe("classifyScenarioInfraError", () => {
   describe("when the raw error is a timeout", () => {
     /** @scenario "A timeout becomes an execution-timeout error" */
     it("classifies it as an execution timeout", () => {
-      expect(
-        classifyScenarioInfraError("Scenario execution timed out").code,
-      ).toBe(ScenarioInfraErrorCode.ExecutionTimeout);
+      expect(classifyScenarioInfraError("Scenario execution timed out").code).toBe(
+        ScenarioInfraErrorCode.ExecutionTimeout,
+      );
     });
   });
 
   describe("when the raw error is unrecognised", () => {
     /** @scenario "An unrecognised failure keeps its message under a generic infra code" */
     it("keeps the message under the generic infra code", () => {
-      const result = classifyScenarioInfraError(
-        "Something unexpected happened",
-      );
+      const result = classifyScenarioInfraError("Something unexpected happened");
       expect(result.code).toBe(ScenarioInfraErrorCode.Infra);
       expect(result.message).toBe("Something unexpected happened");
       expect(result.hint).toBeUndefined();
@@ -353,14 +345,8 @@ describe("classifyScenarioInfraError", () => {
     });
 
     it.each([
-      [
-        "a bundle-relative frame",
-        "Error thrown in dist/server/workers.cjs:80978",
-      ],
-      [
-        "an async stack frame",
-        "Caused by: at async Foo.bar (dist/server/x.js:1:1)",
-      ],
+      ["a bundle-relative frame", "Error thrown in dist/server/workers.cjs:80978"],
+      ["an async stack frame", "Caused by: at async Foo.bar (dist/server/x.js:1:1)"],
       [
         "our runner bundle by name",
         "TypeError: x is not a function (scenario-child-process.cjs:80978:27)",
@@ -374,10 +360,7 @@ describe("classifyScenarioInfraError", () => {
         "backslash-separated",
         "Error thrown in C:\\app\\dist\\server\\scenario-child-process.cjs:80978",
       ],
-      [
-        "a UNC share",
-        "Error thrown in \\\\build\\share\\dist\\server\\workers.cjs:12",
-      ],
+      ["a UNC share", "Error thrown in \\\\build\\share\\dist\\server\\workers.cjs:12"],
     ])("suppresses our bundle path when %s", (_label, raw) => {
       // The guard keys on our artefacts (dist, node_modules, .cjs, the runner
       // bundle's name) with either separator, rather than on path shape — so
@@ -428,15 +411,10 @@ describe("classifyScenarioInfraError", () => {
     /** @scenario "A codex coding-assistant-surface refusal becomes a named, actionable error" */
     it.each([
       ["the featureKey-style wording (codexGatewayModel.ts)", gatewayWording],
-      [
-        "the litellm-params-style wording (modelProviders.utils.ts)",
-        litellmWording,
-      ],
+      ["the litellm-params-style wording (modelProviders.utils.ts)", litellmWording],
     ])("classifies %s to the dedicated code", (_label, raw) => {
       const result = classifyScenarioInfraError(raw);
-      expect(result.code).toBe(
-        ScenarioInfraErrorCode.ModelNotAllowedForSurface,
-      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.ModelNotAllowedForSurface);
     });
 
     it("does not surface a raw stack trace in the message", () => {
@@ -454,8 +432,7 @@ describe("classifyScenarioInfraError", () => {
 
   describe("when multiple failure reasons overlap in the raw error", () => {
     it("prefers the cert reason over the fetch-failed it rides on", () => {
-      const raw =
-        "TypeError: fetch failed: self-signed certificate in certificate chain";
+      const raw = "TypeError: fetch failed: self-signed certificate in certificate chain";
       expect(classifyScenarioInfraError(raw).code).toBe(
         ScenarioInfraErrorCode.UntrustedCertificate,
       );
@@ -518,9 +495,7 @@ describe("resolveScenarioError", () => {
 
   it("returns an already-encoded envelope unchanged", () => {
     const envelope = classifyScenarioInfraError("ECONNREFUSED");
-    expect(resolveScenarioError(encodeScenarioError(envelope))).toEqual(
-      envelope,
-    );
+    expect(resolveScenarioError(encodeScenarioError(envelope))).toEqual(envelope);
   });
 
   /** @scenario "An SDK-recorded failure classifies the same as a processor-caught one" */
@@ -561,9 +536,7 @@ describe("resolveScenarioError", () => {
 
 describe("scenarioErrorTitle", () => {
   it("returns a distinct human title per code", () => {
-    const titles = Object.values(ScenarioInfraErrorCode).map(
-      scenarioErrorTitle,
-    );
+    const titles = Object.values(ScenarioInfraErrorCode).map(scenarioErrorTitle);
     expect(new Set(titles).size).toBe(titles.length);
     titles.forEach((t) => expect(t.length).toBeGreaterThan(0));
   });

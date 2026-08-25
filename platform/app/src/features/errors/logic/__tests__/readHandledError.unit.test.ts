@@ -172,9 +172,7 @@ describe("readHandledError", () => {
         }),
       );
 
-      expect(result?.docsUrl).toBe(
-        "https://docs.langwatch.ai/platform/data-retention",
-      );
+      expect(result?.docsUrl).toBe("https://docs.langwatch.ai/platform/data-retention");
     });
 
     /**
@@ -250,10 +248,7 @@ describe("readHandledError", () => {
 
     it.each([
       ["an unhandled 500", { error: "Internal server error" }],
-      [
-        "a Prisma conflict",
-        { error: "Conflict", message: "Unique constraint" },
-      ],
+      ["a Prisma conflict", { error: "Conflict", message: "Unique constraint" }],
       ["a bare not-found", { error: "Not found" }],
     ])("declines %s, whose error field is prose not a code", (_label, body) => {
       expect(readHandledError(body)).toBeNull();
@@ -264,10 +259,7 @@ describe("readHandledError", () => {
 describe("readErrorTraceId", () => {
   it("prefers the id inside the handled payload", () => {
     const traceId = readErrorTraceId(
-      trpcError(
-        { code: "x", httpStatus: 500, traceId: "from-payload" },
-        "from-envelope",
-      ),
+      trpcError({ code: "x", httpStatus: 500, traceId: "from-payload" }, "from-envelope"),
     );
 
     expect(traceId).toBe("from-payload");
@@ -361,8 +353,7 @@ describe("handledShapeFromSerialized", () => {
 
     it("keeps one on our own docs origin", () => {
       expect(
-        serializedWith("https://docs.langwatch.ai/errors/provider-error")
-          .docsUrl,
+        serializedWith("https://docs.langwatch.ai/errors/provider-error").docsUrl,
       ).toBe("https://docs.langwatch.ai/errors/provider-error");
     });
 
@@ -472,9 +463,7 @@ describe("readAuthoredMessage", () => {
     });
 
     it("declines anything shaped like a code slug", () => {
-      expect(
-        readAuthoredMessage(trpcError(422, "validation_error")),
-      ).toBeUndefined();
+      expect(readAuthoredMessage(trpcError(422, "validation_error"))).toBeUndefined();
     });
 
     it("declines a single-word code, which has no underscore to spot it by", () => {

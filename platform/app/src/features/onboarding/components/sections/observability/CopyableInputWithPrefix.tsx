@@ -74,11 +74,7 @@ export function CopyableInputWithPrefix({
         gap="0.5"
       >
         {showVisibilityToggle && (
-          <Tooltip
-            content={isVisible ? "Hide" : "Show"}
-            openDelay={0}
-            showArrow
-          >
+          <Tooltip content={isVisible ? "Hide" : "Show"} openDelay={0} showArrow>
             <IconButton
               size="xs"
               variant="ghost"
@@ -93,11 +89,7 @@ export function CopyableInputWithPrefix({
             </IconButton>
           </Tooltip>
         )}
-        <Tooltip
-          content={`Copy ${ariaLabel.toLowerCase()}`}
-          openDelay={0}
-          showArrow
-        >
+        <Tooltip content={`Copy ${ariaLabel.toLowerCase()}`} openDelay={0} showArrow>
           <IconButton
             size="xs"
             variant="ghost"

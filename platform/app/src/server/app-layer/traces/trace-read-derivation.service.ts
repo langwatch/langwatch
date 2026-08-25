@@ -78,16 +78,11 @@ export class TraceReadDerivationService {
     string,
     MemoEntry<ScenarioRoleMetrics>
   >();
-  private readonly eventsMemo = new Map<
-    string,
-    MemoEntry<DerivedTraceEvent[]>
-  >();
+  private readonly eventsMemo = new Map<string, MemoEntry<DerivedTraceEvent[]>>();
 
   constructor(private readonly spans: NormalizedSpanReader) {}
 
-  async deriveScenarioRoleMetrics(
-    params: DeriveParams,
-  ): Promise<ScenarioRoleMetrics> {
+  async deriveScenarioRoleMetrics(params: DeriveParams): Promise<ScenarioRoleMetrics> {
     return this.memoize(this.scenarioRoleMetricsMemo, params, async () => {
       const spans = await this.spans.getNormalizedSpansByTraceId({
         tenantId: params.tenantId,

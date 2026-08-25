@@ -77,9 +77,9 @@ describe("FormatSelect", () => {
       // longer than the 1s default.
       await waitFor(
         () =>
-          expect(
-            screen.getByRole("menuitem", { name: "Flat" }),
-          ).toHaveAttribute("data-highlighted"),
+          expect(screen.getByRole("menuitem", { name: "Flat" })).toHaveAttribute(
+            "data-highlighted",
+          ),
         { timeout: 5000 },
       );
       await user.keyboard("{Enter}");

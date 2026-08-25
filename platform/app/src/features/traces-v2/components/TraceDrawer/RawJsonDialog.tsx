@@ -9,14 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
-import {
-  LuCheck,
-  LuCopy,
-  LuMinus,
-  LuSearch,
-  LuWrapText,
-  LuX,
-} from "react-icons/lu";
+import { LuCheck, LuCopy, LuMinus, LuSearch, LuWrapText, LuX } from "react-icons/lu";
 import { useColorMode } from "~/components/ui/color-mode";
 import { Dialog } from "~/components/ui/dialog";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -76,9 +69,7 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
   );
   const spansJson = useMemo(
     () =>
-      spansQuery.data
-        ? JSON.stringify(spansQuery.data, null, pretty ? 2 : 0)
-        : null,
+      spansQuery.data ? JSON.stringify(spansQuery.data, null, pretty ? 2 : 0) : null,
     [spansQuery.data, pretty],
   );
 
@@ -102,17 +93,10 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
   // measures without an encoder, and doesn't collide with other
   // "bytes" readings elsewhere on the page.
   const charCount = useMemo(() => fullPayload.length, [fullPayload]);
-  const lineCount = useMemo(
-    () => fullPayload.split("\n").length,
-    [fullPayload],
-  );
+  const lineCount = useMemo(() => fullPayload.split("\n").length, [fullPayload]);
   const matchedLines = useMemo(
     () =>
-      search
-        ? visiblePayload === ""
-          ? 0
-          : visiblePayload.split("\n").length
-        : null,
+      search ? (visiblePayload === "" ? 0 : visiblePayload.split("\n").length) : null,
     [visiblePayload, search],
   );
 
@@ -125,12 +109,7 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
       size="xl"
       placement="center"
     >
-      <Dialog.Content
-        bg="bg"
-        maxHeight="85vh"
-        display="flex"
-        flexDirection="column"
-      >
+      <Dialog.Content bg="bg" maxHeight="85vh" display="flex" flexDirection="column">
         <Dialog.Header borderBottomWidth="1px" borderColor="border">
           <VStack align="stretch" gap={2}>
             <HStack gap={3} align="center">
@@ -320,12 +299,7 @@ function SizeBadge({ chars, lines }: { chars: number; lines: number }) {
       content={`${chars.toLocaleString()} chars · ${lines.toLocaleString()} lines`}
       positioning={{ placement: "bottom" }}
     >
-      <Text
-        textStyle="2xs"
-        color="fg.subtle"
-        fontFamily="mono"
-        whiteSpace="nowrap"
-      >
+      <Text textStyle="2xs" color="fg.subtle" fontFamily="mono" whiteSpace="nowrap">
         {formatCharCount(chars)} · {lines}L
       </Text>
     </Tooltip>
@@ -343,13 +317,7 @@ function formatCharCount(chars: number): string {
   return `${(chars / 1_000_000).toFixed(1)}M`;
 }
 
-function CopyButton({
-  payload,
-  disabled,
-}: {
-  payload: string;
-  disabled?: boolean;
-}) {
+function CopyButton({ payload, disabled }: { payload: string; disabled?: boolean }) {
   // The hook awaits the clipboard write before flipping the success label,
   // so a permission-denied write (Safari private mode, secure-context
   // failures) never shows a misleading "Copied", and rejections stay silent

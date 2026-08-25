@@ -11,10 +11,7 @@ import type {
   GithubPullRequestLookup,
   PullRequestBranchKey,
 } from "../traces/session-groups.pull-request-link";
-import {
-  assignSessionsToPullRequests,
-  branchesOf,
-} from "./pull-request-assignment";
+import { assignSessionsToPullRequests, branchesOf } from "./pull-request-assignment";
 
 /**
  * The Sessions screen's read: one row per coding-agent session, named by the
@@ -33,9 +30,7 @@ import {
  * Spec: specs/coding-agent/sessions-screen.feature.
  */
 
-const logger = createLogger(
-  "langwatch:app-layer:coding-agent:sessions-list-service",
-);
+const logger = createLogger("langwatch:app-layer:coding-agent:sessions-list-service");
 
 /** How far back the screen looks. */
 export const SESSIONS_LIST_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
@@ -342,9 +337,7 @@ function linkOneRepository({
   }> = [];
   for (const drive of drives) {
     const prNumber = assignments.get(driveKeyOf(drive));
-    const match = candidates.find(
-      (candidate) => candidate.prNumber === prNumber,
-    );
+    const match = candidates.find((candidate) => candidate.prNumber === prNumber);
     if (!match) continue;
     links.push({
       sessionId: drive.sessionId,

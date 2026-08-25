@@ -66,8 +66,7 @@ function traceRow({
     UpdatedAt: new Date(now),
     LastEventOccurredAt: new Date(now),
     ComputedIOSchemaVersion: "v1",
-    ComputedInput:
-      input === null ? null : JSON.stringify({ type: "text", value: input }),
+    ComputedInput: input === null ? null : JSON.stringify({ type: "text", value: input }),
     ComputedOutput:
       output === null ? null : JSON.stringify({ type: "text", value: output }),
     TotalDurationMs: 100,
@@ -129,8 +128,7 @@ vi.mock("~/server/app-layer/app", async () => {
   const app = () => ({
     clickhouse: {
       enabled: true,
-      resolveClient: (tenantId: string) =>
-        clients.getClickHouseClientForTenant(tenantId),
+      resolveClient: (tenantId: string) => clients.getClickHouseClientForTenant(tenantId),
       resolveOrganizationClient: async () => {
         throw new Error("no organization client in this suite");
       },
@@ -201,9 +199,7 @@ beforeAll(async () => {
   ch = containers.clickHouseClient;
   vi.mocked(getClickHouseClientForTenant).mockResolvedValue(ch);
   service = new ClickHouseTraceService({
-    prisma: prisma as ConstructorParameters<
-      typeof ClickHouseTraceService
-    >[0]["prisma"],
+    prisma: prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]["prisma"],
   });
 
   await ch.insert({
@@ -311,9 +307,7 @@ describe("free-text search over span names (integration)", () => {
 
     it("finds every matching trace and nothing else", async () => {
       const found = await searchViaCompiledFilter(TERM);
-      expect(found).toEqual(
-        [BY_SPAN_NAME, BY_TRACE_NAME, BY_INPUT, BY_OUTPUT].sort(),
-      );
+      expect(found).toEqual([BY_SPAN_NAME, BY_TRACE_NAME, BY_INPUT, BY_OUTPUT].sort());
     });
 
     it("leaves a trace with no occurrence anywhere out", async () => {

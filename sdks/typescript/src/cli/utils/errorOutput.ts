@@ -32,11 +32,7 @@ import {
 } from "@langwatch/langy-contract/cards/handled-error";
 import { redactSecrets } from "../telemetry/events";
 import { withFallbackSuggestions } from "./errorSuggestions";
-import {
-  currentOutputScope,
-  getOutputFormat,
-  resolveOutputFormat,
-} from "./outputScope";
+import { currentOutputScope, getOutputFormat, resolveOutputFormat } from "./outputScope";
 
 /**
  * The output-context machinery (format + colour scope) lives in
@@ -122,8 +118,7 @@ const detailLines = (domain: CliHandledError): string[] => {
   // the very identifiers the user is reading the error to find.
   for (const [key, value] of Object.entries(domain.meta)) {
     if (value === null || value === undefined) continue;
-    const rendered =
-      typeof value === "string" ? value : JSON.stringify(value) ?? "";
+    const rendered = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
     if (!rendered) continue;
     details.push([key, rendered]);
   }
@@ -139,10 +134,7 @@ const detailLines = (domain: CliHandledError): string[] => {
       const field = reason.meta?.field;
       const message = reason.meta?.message;
       if (typeof message !== "string" || !message) continue;
-      details.push([
-        typeof field === "string" && field ? field : reason.kind,
-        message,
-      ]);
+      details.push([typeof field === "string" && field ? field : reason.kind, message]);
     }
   }
 

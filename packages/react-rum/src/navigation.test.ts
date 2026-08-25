@@ -14,10 +14,7 @@ import {
   type ReadableSpan,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import {
-  ATTR_HTTP_ROUTE,
-  ATTR_URL_PATH,
-} from "@opentelemetry/semantic-conventions";
+import { ATTR_HTTP_ROUTE, ATTR_URL_PATH } from "@opentelemetry/semantic-conventions";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -70,9 +67,7 @@ describe("startNavigationSpan", () => {
 
         const span = exported("navigation /:project/traces/:traceId");
         expect(span).toBeDefined();
-        expect(span?.attributes[ATTR_HTTP_ROUTE]).toBe(
-          "/:project/traces/:traceId",
-        );
+        expect(span?.attributes[ATTR_HTTP_ROUTE]).toBe("/:project/traces/:traceId");
         expect(span?.attributes[ATTR_URL_PATH]).toBe("/acme/traces/trace_abc");
         expect(span?.attributes[ATTR_NAVIGATION_FROM_PATH]).toBe("/acme/home");
         expect(span?.attributes[ATTR_NAVIGATION_TYPE]).toBe("resolved");
@@ -109,9 +104,7 @@ describe("startNavigationSpan", () => {
 
         openAmbientSpan("GET /api/trpc/poll");
 
-        expect(
-          exported("GET /api/trpc/poll")?.parentSpanContext,
-        ).toBeUndefined();
+        expect(exported("GET /api/trpc/poll")?.parentSpanContext).toBeUndefined();
       });
     });
   });
@@ -147,9 +140,7 @@ describe("startNavigationSpan", () => {
         first.end();
 
         expect(
-          exported("navigation /acme/traces")?.attributes[
-            ATTR_NAVIGATION_SUPERSEDED
-          ],
+          exported("navigation /acme/traces")?.attributes[ATTR_NAVIGATION_SUPERSEDED],
         ).toBe(true);
         expect(exported("navigation /:project/datasets")).toBeDefined();
       });
@@ -164,9 +155,9 @@ describe("startNavigationSpan", () => {
         openAmbientSpan("GET /api/trpc/datasets.getAll");
         second.end();
 
-        expect(
-          exported("GET /api/trpc/datasets.getAll")?.parentSpanContext?.spanId,
-        ).toBe(exported("navigation /acme/datasets")?.spanContext().spanId);
+        expect(exported("GET /api/trpc/datasets.getAll")?.parentSpanContext?.spanId).toBe(
+          exported("navigation /acme/datasets")?.spanContext().spanId,
+        );
       });
     });
   });
@@ -179,9 +170,7 @@ describe("startNavigationSpan", () => {
         openAmbientSpan("GET /api/trpc/poll");
 
         expect(exported("navigation /acme/traces")).toBeDefined();
-        expect(
-          exported("GET /api/trpc/poll")?.parentSpanContext,
-        ).toBeUndefined();
+        expect(exported("GET /api/trpc/poll")?.parentSpanContext).toBeUndefined();
       });
     });
   });

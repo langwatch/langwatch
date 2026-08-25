@@ -50,20 +50,14 @@ describe("assertCanManageAllScopes", () => {
       await expect(
         assertCanManageAllScopes(ctx, [TEAM_PLATFORM, TEAM_DATA_SCI]),
       ).resolves.toBeUndefined();
-      expect(teamPerm).toHaveBeenCalledWith(
-        ctx,
-        "team_platform",
-        "virtualKeys:manage",
-      );
+      expect(teamPerm).toHaveBeenCalledWith(ctx, "team_platform", "virtualKeys:manage");
     });
   });
 
   describe("when the caller lacks manage on one of the requested scopes", () => {
     it("throws FORBIDDEN naming the unauthorized scope", async () => {
       // manage on platform, not on data-sci
-      teamPerm.mockImplementation(
-        async (_ctx, scopeId) => scopeId === "team_platform",
-      );
+      teamPerm.mockImplementation(async (_ctx, scopeId) => scopeId === "team_platform");
       await expect(
         assertCanManageAllScopes(ctx, [TEAM_PLATFORM, TEAM_DATA_SCI]),
       ).rejects.toMatchObject({
@@ -76,9 +70,7 @@ describe("assertCanManageAllScopes", () => {
   describe("when an ORGANIZATION-scoped create is requested", () => {
     it("checks virtualKeys:manage at the organization scope", async () => {
       orgPerm.mockResolvedValue(true);
-      await expect(
-        assertCanManageAllScopes(ctx, [ORG]),
-      ).resolves.toBeUndefined();
+      await expect(assertCanManageAllScopes(ctx, [ORG])).resolves.toBeUndefined();
       expect(orgPerm).toHaveBeenCalledWith(
         { prisma: ctx.prisma, session: ctx.session },
         "org_acme",
@@ -90,9 +82,9 @@ describe("assertCanManageAllScopes", () => {
   describe("when there is no session", () => {
     it("throws FORBIDDEN without consulting the rbac helpers", async () => {
       const anon = { prisma: ctx.prisma, session: null };
-      await expect(assertCanManageAllScopes(anon, [ORG])).rejects.toMatchObject(
-        { code: "FORBIDDEN" },
-      );
+      await expect(assertCanManageAllScopes(anon, [ORG])).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
       expect(orgPerm).not.toHaveBeenCalled();
     });
   });

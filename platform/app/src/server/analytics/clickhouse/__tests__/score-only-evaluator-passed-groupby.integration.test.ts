@@ -170,8 +170,7 @@ describe("score-only-evaluator-passed-groupby", () => {
             groupByKey: SCORE_ONLY_EVALUATOR_ID,
             series: [
               {
-                metric:
-                  "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+                metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
                 aggregation: "avg" as AggregationTypes,
                 key: SCORE_ONLY_EVALUATOR_ID,
               },
@@ -192,9 +191,7 @@ describe("score-only-evaluator-passed-groupby", () => {
           const currentRows = rows.filter((r) => r.period === "current");
 
           // THE core assertion — fails before fix (rows had NULL group_key → HAVING dropped them)
-          const unknownRows = currentRows.filter(
-            (r) => r.group_key === "unknown",
-          );
+          const unknownRows = currentRows.filter((r) => r.group_key === "unknown");
           expect(unknownRows.length).toBeGreaterThan(0);
 
           // Score-only evaluator produces no pass or fail groups
@@ -221,8 +218,7 @@ describe("score-only-evaluator-passed-groupby", () => {
             groupByKey: PASSFAIL_EVALUATOR_ID,
             series: [
               {
-                metric:
-                  "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+                metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
                 aggregation: "avg" as AggregationTypes,
                 key: PASSFAIL_EVALUATOR_ID,
               },
@@ -242,19 +238,13 @@ describe("score-only-evaluator-passed-groupby", () => {
 
           const currentRows = rows.filter((r) => r.period === "current");
 
-          const passedRows = currentRows.filter(
-            (r) => r.group_key === "passed",
-          );
-          const failedRows = currentRows.filter(
-            (r) => r.group_key === "failed",
-          );
+          const passedRows = currentRows.filter((r) => r.group_key === "passed");
+          const failedRows = currentRows.filter((r) => r.group_key === "failed");
 
           expect(passedRows.length).toBeGreaterThan(0);
           expect(failedRows.length).toBeGreaterThan(0);
 
-          expect(
-            currentRows.filter((r) => r.group_key === "unknown"),
-          ).toHaveLength(0);
+          expect(currentRows.filter((r) => r.group_key === "unknown")).toHaveLength(0);
 
           const metricKey = Object.keys(passedRows[0]!).find(
             (k) => k !== "date" && k !== "period" && k !== "group_key",

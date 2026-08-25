@@ -68,13 +68,9 @@ const estimateCost = (input: {
   const outputAudioRate = rate.outputAudioCostPerToken ?? outputRate;
   const cacheReadRate = rate.cacheReadCostPerToken ?? inputRate;
   const cacheCreationRate = rate.cacheCreationCostPerToken ?? inputRate;
-  const cacheCreation1hRate =
-    rate.cacheCreation1hCostPerToken ?? cacheCreationRate;
+  const cacheCreation1hRate = rate.cacheCreation1hCostPerToken ?? cacheCreationRate;
   const cacheWrite1h = Math.max(0, input.cacheCreation1hTokens);
-  const cacheWriteTotal = Math.max(
-    Math.max(0, input.cacheCreationTokens),
-    cacheWrite1h,
-  );
+  const cacheWriteTotal = Math.max(Math.max(0, input.cacheCreationTokens), cacheWrite1h);
 
   return (
     input.inputTokens * inputRate +
@@ -133,7 +129,8 @@ const findModelCost = (
 ): ModelCostRate | undefined => {
   const matched = costs.find((cost) => tryRegex(cost.regex)?.test(model));
   if (matched) return matched;
-  if (model.includes("/")) return findModelCost(model.slice(model.indexOf("/") + 1), costs);
+  if (model.includes("/"))
+    return findModelCost(model.slice(model.indexOf("/") + 1), costs);
   return undefined;
 };
 
@@ -186,34 +183,48 @@ export const estimateModelCost = (
   const inputTokens = parsed.promptTokens ?? 0;
   const outputTokens = parsed.completionTokens ?? 0;
   const cacheReadTokens = Math.max(0, coerceToNumber(attrs[ATTR.cacheReadTokens]) ?? 0);
-  const cacheCreationTokens = Math.max(0, coerceToNumber(attrs[ATTR.cacheCreationTokens]) ?? 0);
-  const cacheCreation1hTokens = Math.max(0, coerceToNumber(attrs[ATTR.cacheCreation1hTokens]) ?? 0);
+  const cacheCreationTokens = Math.max(
+    0,
+    coerceToNumber(attrs[ATTR.cacheCreationTokens]) ?? 0,
+  );
+  const cacheCreation1hTokens = Math.max(
+    0,
+    coerceToNumber(attrs[ATTR.cacheCreation1hTokens]) ?? 0,
+  );
   const inputCharacters = Math.max(0, coerceToNumber(attrs[ATTR.inputCharacters]) ?? 0);
   const audioSeconds = Math.max(0, coerceToNumber(attrs[ATTR.audioSeconds]) ?? 0);
   const inputAudioTokens = Math.max(0, coerceToNumber(attrs[ATTR.inputAudioTokens]) ?? 0);
-  const outputAudioTokens = Math.max(0, coerceToNumber(attrs[ATTR.outputAudioTokens]) ?? 0);
+  const outputAudioTokens = Math.max(
+    0,
+    coerceToNumber(attrs[ATTR.outputAudioTokens]) ?? 0,
+  );
 
   const customInputRate = coerceToNumber(attrs[ATTR.customInputRate]);
   const customOutputRate = coerceToNumber(attrs[ATTR.customOutputRate]);
   if (customInputRate !== null || customOutputRate !== null) {
-    return estimateCost({
-      rate: {
-        model: "",
-        regex: "",
-        inputCostPerToken: customInputRate ?? 0,
-        outputCostPerToken: customOutputRate ?? 0,
-        cacheReadCostPerToken: coerceToNumber(attrs[ATTR.customCacheReadRate]) ?? undefined,
-        cacheCreationCostPerToken: coerceToNumber(attrs[ATTR.customCacheCreationRate]) ?? undefined,
-        cacheCreation1hCostPerToken: coerceToNumber(attrs[ATTR.customCacheCreation1hRate]) ?? undefined,
-      },
-      inputTokens,
-      outputTokens,
-      cacheReadTokens,
-      cacheCreationTokens,
-      cacheCreation1hTokens,
-      inputAudioTokens,
-      outputAudioTokens,
-    }) ?? 0;
+    return (
+      estimateCost({
+        rate: {
+          model: "",
+          regex: "",
+          inputCostPerToken: customInputRate ?? 0,
+          outputCostPerToken: customOutputRate ?? 0,
+          cacheReadCostPerToken:
+            coerceToNumber(attrs[ATTR.customCacheReadRate]) ?? undefined,
+          cacheCreationCostPerToken:
+            coerceToNumber(attrs[ATTR.customCacheCreationRate]) ?? undefined,
+          cacheCreation1hCostPerToken:
+            coerceToNumber(attrs[ATTR.customCacheCreation1hRate]) ?? undefined,
+        },
+        inputTokens,
+        outputTokens,
+        cacheReadTokens,
+        cacheCreationTokens,
+        cacheCreation1hTokens,
+        inputAudioTokens,
+        outputAudioTokens,
+      }) ?? 0
+    );
   }
 
   const explicitCost = coerceToNumber(attrs[ATTR.explicitCost]);
@@ -226,9 +237,15 @@ export const estimateModelCost = (
     (typeof responseModel === "string" ? responseModel : undefined) ??
     (typeof requestModel === "string" ? requestModel : undefined);
   const hasUsage =
-    inputTokens > 0 || outputTokens > 0 || cacheReadTokens > 0 ||
-    cacheCreationTokens > 0 || cacheCreation1hTokens > 0 ||
-    inputCharacters > 0 || audioSeconds > 0 || inputAudioTokens > 0 || outputAudioTokens > 0;
+    inputTokens > 0 ||
+    outputTokens > 0 ||
+    cacheReadTokens > 0 ||
+    cacheCreationTokens > 0 ||
+    cacheCreation1hTokens > 0 ||
+    inputCharacters > 0 ||
+    audioSeconds > 0 ||
+    inputAudioTokens > 0 ||
+    outputAudioTokens > 0;
   if (resolvedModel && hasUsage) {
     const matched = matchModelCost(resolvedModel, staticCosts);
     if (matched) {

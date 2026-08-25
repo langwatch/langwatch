@@ -590,9 +590,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       const vk = await repo.findById(VK_ID, ORG_ID);
       const mat = new GatewayConfigMaterialiser(prisma, null);
       const bundle = await mat.materialise(vk!);
-      const slot = bundle.providers.find(
-        (p) => p.id === MP_ANTHROPIC_KEYLESS_ID,
-      );
+      const slot = bundle.providers.find((p) => p.id === MP_ANTHROPIC_KEYLESS_ID);
       expect(slot).toBeDefined();
       expect(slot!.type).toBe("anthropic");
       expect(slot!.base_url).toBe(ANTHROPIC_BASE_URL_OVERRIDE);
@@ -799,9 +797,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       // Provider access dropped every scope-reachable dispatchable provider
       // the allowlist leaves out. The non-dispatchable safety provider is not
       // scope-reachable for dispatch, so it is in neither list.
-      expect(
-        new Set(bundle.access_excluded_providers.map((p) => p.id)),
-      ).toEqual(
+      expect(new Set(bundle.access_excluded_providers.map((p) => p.id))).toEqual(
         new Set([
           MP_CUSTOM_ID,
           MP_OPENAI_BASE_ID,

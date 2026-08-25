@@ -13,8 +13,7 @@ export const STANDARD_AGENT_VARIABLES = [
   { name: "messages", description: "Array of chat messages in OpenAI format" },
   {
     name: "params.NAME",
-    description:
-      "A parameter the running scenario declares, resolved for this run",
+    description: "A parameter the running scenario declares, resolved for this run",
   },
 ] as const;
 
@@ -52,12 +51,7 @@ export function BodyTemplateEditor({
         borderWidth="1px"
         borderColor="border"
       >
-        <Text
-          fontSize="xs"
-          fontWeight="medium"
-          color="fg.muted"
-          marginBottom={2}
-        >
+        <Text fontSize="xs" fontWeight="medium" color="fg.muted" marginBottom={2}>
           Available Variables
         </Text>
         <VStack align="stretch" gap={1}>

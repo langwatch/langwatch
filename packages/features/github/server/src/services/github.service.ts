@@ -24,9 +24,7 @@ import {
   popupErrorHtml,
   popupResponseHtml,
 } from "../adapters/github.github-install-popup-html.adapter";
-import {
-  parseGithubPullRequestEvent,
-} from "../adapters/github.github-pull-request-event.adapter";
+import { parseGithubPullRequestEvent } from "../adapters/github.github-pull-request-event.adapter";
 import {
   getGithubAppInstallUrl,
   getGithubWebBase,
@@ -78,9 +76,7 @@ export class GithubFeatureService extends GithubServiceContract {
     super();
   }
 
-  getAllForOrganization(
-    organizationId: string,
-  ): Promise<readonly GithubInstallation[]> {
+  getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]> {
     return this.installations.getAllForOrganization(organizationId);
   }
 
@@ -88,9 +84,7 @@ export class GithubFeatureService extends GithubServiceContract {
     return this.getAppConfig().configured;
   }
 
-  tryGetByInstallationId(
-    installationId: string,
-  ): Promise<GithubInstallation | null> {
+  tryGetByInstallationId(installationId: string): Promise<GithubInstallation | null> {
     return this.installations.tryGetByInstallationId(installationId);
   }
 
@@ -134,18 +128,16 @@ export class GithubFeatureService extends GithubServiceContract {
     organizationId: string;
     repositoryFullName: string;
   }): Promise<boolean> {
-    return this.installations.tryResolveInstallationForRepository(input).then(
-      (installation) => installation !== null,
-    );
+    return this.installations
+      .tryResolveInstallationForRepository(input)
+      .then((installation) => installation !== null);
   }
 
   getAppConfig(): GithubAppConfig {
     return {
       appSlug: this.protocol.appSlug,
       webhookSecret: this.protocol.webhookSecret,
-      configured: Boolean(
-        this.installations.configured && this.protocol.appSlug,
-      ),
+      configured: Boolean(this.installations.configured && this.protocol.appSlug),
     };
   }
 
@@ -154,25 +146,15 @@ export class GithubFeatureService extends GithubServiceContract {
   }
 
   getAppInstallUrl(): string {
-    return getGithubAppInstallUrl(
-      this.protocol.appSlug,
-      this.protocol.hostConfig,
-    );
+    return getGithubAppInstallUrl(this.protocol.appSlug, this.protocol.hostConfig);
   }
 
   getInstallStateTtlMs(): number {
     return STATE_TTL_MS;
   }
 
-  registerInstallNonce(input: {
-    nonce: string;
-    ttlSec: number;
-  }): Promise<boolean> {
-    return registerGithubInstallNonce(
-      this.protocol.redis,
-      input.nonce,
-      input.ttlSec,
-    );
+  registerInstallNonce(input: { nonce: string; ttlSec: number }): Promise<boolean> {
+    return registerGithubInstallNonce(this.protocol.redis, input.nonce, input.ttlSec);
   }
 
   tryConsumeInstallNonce(nonce: string): Promise<boolean | null> {

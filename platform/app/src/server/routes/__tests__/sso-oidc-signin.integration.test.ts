@@ -94,9 +94,8 @@ const licenseThisDeployment = async (): Promise<void> => {
   // Set before the app graph evaluates: the verifying key is read at import.
   process.env.LANGWATCH_LICENSE_PUBLIC_KEY = publicKey;
 
-  const { NodeLicenseCryptographyAdapter } = await import(
-    "~/runtime/app/testing.licensing"
-  );
+  const { NodeLicenseCryptographyAdapter } =
+    await import("~/runtime/app/testing.licensing");
   const licenseCryptography = NodeLicenseCryptographyAdapter.create();
   process.env.LANGWATCH_LICENSE_KEY = licenseCryptography.encodeLicenseKey(
     licenseCryptography.signLicense(
@@ -213,9 +212,7 @@ describe("given a self-hosted deployment federating to an OIDC identity provider
     /** @scenario Starting sign-in sends the browser to the identity provider */
     it("asks for the openid, email and profile scopes", () => {
       const scopes = (authorizeUrl.searchParams.get("scope") ?? "").split(" ");
-      expect(scopes).toEqual(
-        expect.arrayContaining(["openid", "email", "profile"]),
-      );
+      expect(scopes).toEqual(expect.arrayContaining(["openid", "email", "profile"]));
     });
 
     /** @scenario Starting sign-in sends the browser to the identity provider */
@@ -236,9 +233,7 @@ describe("given a self-hosted deployment federating to an OIDC identity provider
      */
     it("carries a PKCE challenge", () => {
       expect(authorizeUrl.searchParams.get("code_challenge")).toBeTruthy();
-      expect(authorizeUrl.searchParams.get("code_challenge_method")).toBe(
-        "S256",
-      );
+      expect(authorizeUrl.searchParams.get("code_challenge_method")).toBe("S256");
     });
   });
 

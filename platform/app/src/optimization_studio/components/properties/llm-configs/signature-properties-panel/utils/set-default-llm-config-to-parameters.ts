@@ -1,7 +1,4 @@
-import type {
-  LLMConfig,
-  LlmPromptConfigComponent,
-} from "@langwatch/workflow-contract";
+import type { LLMConfig, LlmPromptConfigComponent } from "@langwatch/workflow-contract";
 
 export function setDefaultLlmConfigToParameters(
   parameters: LlmPromptConfigComponent["parameters"],
@@ -9,8 +6,7 @@ export function setDefaultLlmConfigToParameters(
 ) {
   return parameters.map((item) => {
     if (item.identifier === "llm") {
-      const value =
-        typeof item.value === "object" ? item.value : defaultLLMConfig;
+      const value = typeof item.value === "object" ? item.value : defaultLLMConfig;
 
       return {
         ...item,

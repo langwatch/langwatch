@@ -46,19 +46,9 @@ function SkeletonCard() {
     >
       <Skeleton height="12px" width="70%" />
       <Box flex={1} />
-      <Skeleton
-        height="26px"
-        width="55%"
-        borderRadius="lg"
-        alignSelf="flex-end"
-      />
+      <Skeleton height="26px" width="55%" borderRadius="lg" alignSelf="flex-end" />
       <Skeleton height="26px" width="75%" borderRadius="lg" />
-      <Skeleton
-        height="26px"
-        width="45%"
-        borderRadius="lg"
-        alignSelf="flex-end"
-      />
+      <Skeleton height="26px" width="45%" borderRadius="lg" alignSelf="flex-end" />
     </VStack>
   );
 }

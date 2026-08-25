@@ -198,8 +198,7 @@ function planTeamMembership(
       continue;
     }
     const displayed = [...bindings].sort(
-      (left, right) =>
-        TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role],
+      (left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role],
     )[0]!;
     const target = memberTarget(member);
     if (
@@ -321,9 +320,7 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.repository.getBillingProfile(parsed.organizationId);
   }
 
-  claimBillingCustomerId(
-    input: ClaimOrganizationBillingCustomerInput,
-  ): Promise<boolean> {
+  claimBillingCustomerId(input: ClaimOrganizationBillingCustomerInput): Promise<boolean> {
     return this.repository.claimBillingCustomerId(
       claimOrganizationBillingCustomerInputSchema.parse(input),
     );
@@ -411,15 +408,11 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.teams.get(parsed);
   }
 
-  listTeams(
-    input: ListOrganizationTeamsInput,
-  ): Promise<OrganizationTeamPage> {
+  listTeams(input: ListOrganizationTeamsInput): Promise<OrganizationTeamPage> {
     return this.teams.list(listOrganizationTeamsInputSchema.parse(input));
   }
 
-  async createTeam(
-    input: CreateOrganizationTeamInput,
-  ): Promise<OrganizationTeam> {
+  async createTeam(input: CreateOrganizationTeamInput): Promise<OrganizationTeam> {
     const parsed = createOrganizationTeamInputSchema.parse(input);
     const identity = this.teamIdentities.createTeam({ name: parsed.name });
     const duplicate = await this.teams.tryFindBySlug({
@@ -439,9 +432,7 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.teams.update(parsed);
   }
 
-  async archiveTeam(
-    input: GetOrganizationTeamInput,
-  ): Promise<OrganizationTeam> {
+  async archiveTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam> {
     const parsed = getOrganizationTeamInputSchema.parse(input);
     const team = await this.teams.get(parsed);
     if (team.isPersonal) {
@@ -484,21 +475,14 @@ export class OrganizationService extends OrganizationServiceContract {
     }
   }
 
-  async removeTeamMember(
-    input: RemoveOrganizationTeamMemberInput,
-  ): Promise<void> {
+  async removeTeamMember(input: RemoveOrganizationTeamMemberInput): Promise<void> {
     const parsed = changeOrganizationTeamMemberInputSchema.parse(input);
     const team = await this.teams.get(parsed);
     if (team.isPersonal) {
       throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
     }
-    const bindings = await this.teamBindings(
-      parsed.organizationId,
-      parsed.teamId,
-    );
-    const memberBindings = bindings.filter(
-      (binding) => binding.userId === parsed.userId,
-    );
+    const bindings = await this.teamBindings(parsed.organizationId, parsed.teamId);
+    const memberBindings = bindings.filter((binding) => binding.userId === parsed.userId);
     if (memberBindings.length === 0) {
       throw new TeamMembershipNotFoundError(parsed.userId);
     }
@@ -511,9 +495,7 @@ export class OrganizationService extends OrganizationServiceContract {
     }
     const administratorsAfter = await this.effectiveAdminUserIds({
       organizationId: parsed.organizationId,
-      bindings: bindings.filter(
-        (binding) => binding.userId !== parsed.userId,
-      ),
+      bindings: bindings.filter((binding) => binding.userId !== parsed.userId),
     });
     if (administratorsAfter.size === 0) {
       if (parsed.actor.type === "user" && parsed.actor.id === parsed.userId) {
@@ -576,9 +558,7 @@ export class OrganizationService extends OrganizationServiceContract {
       members: this.shapeTeamMembers({
         teamId: team.id,
         bindings: bindings.get(team.id) ?? [],
-        visibleEmailUserId: parsed.callerCanManage
-          ? undefined
-          : parsed.callerUserId,
+        visibleEmailUserId: parsed.callerCanManage ? undefined : parsed.callerUserId,
       }),
     };
   }
@@ -589,9 +569,7 @@ export class OrganizationService extends OrganizationServiceContract {
     const parsed = listOrganizationTeamsWithMembersInputSchema.parse(input);
     const teams = await this.teams.listActive({
       organizationId: parsed.organizationId,
-      visibleToUserId: parsed.callerCanManage
-        ? undefined
-        : parsed.callerUserId,
+      visibleToUserId: parsed.callerCanManage ? undefined : parsed.callerUserId,
     });
     const bindings = await this.authz.listTeamMemberBindings({
       organizationId: parsed.organizationId,
@@ -602,9 +580,7 @@ export class OrganizationService extends OrganizationServiceContract {
       members: this.shapeTeamMembers({
         teamId: team.id,
         bindings: bindings.get(team.id) ?? [],
-        visibleEmailUserId: parsed.callerCanManage
-          ? undefined
-          : parsed.callerUserId,
+        visibleEmailUserId: parsed.callerCanManage ? undefined : parsed.callerUserId,
       }),
     }));
   }
@@ -709,9 +685,7 @@ export class OrganizationService extends OrganizationServiceContract {
     const allBindings = [...teamBindings, ...projectBindings];
     const groupIds = [
       ...new Set(
-        allBindings.flatMap((binding) =>
-          binding.groupId ? [binding.groupId] : [],
-        ),
+        allBindings.flatMap((binding) => (binding.groupId ? [binding.groupId] : [])),
       ),
     ];
     const groupMembers = await this.groups.listMembersForGroups({
@@ -803,9 +777,7 @@ export class OrganizationService extends OrganizationServiceContract {
         const byName = compareNullableText(left.user.name, right.user.name);
         if (byName !== 0) return byName;
         const byEmail = compareNullableText(left.user.email, right.user.email);
-        return byEmail !== 0
-          ? byEmail
-          : left.userId.localeCompare(right.userId);
+        return byEmail !== 0 ? byEmail : left.userId.localeCompare(right.userId);
       });
   }
 
@@ -901,37 +873,34 @@ export class OrganizationService extends OrganizationServiceContract {
     const seenExpandedUserIds = new Set<string>();
     const expandedGroupMembers = [...groupBindings]
       .sort(
-        (left, right) =>
-          TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role],
+        (left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role],
       )
       .flatMap((binding): OrganizationTeamAccessMember[] => {
         if (!binding.groupId) return [];
-        return (input.groupMembers.get(binding.groupId) ?? []).flatMap(
-          (member) => {
-            if (
-              directUserIds.has(member.userId) ||
-              seenExpandedUserIds.has(member.userId)
-            ) {
-              return [];
-            }
-            seenExpandedUserIds.add(member.userId);
-            return [
-              {
-                bindingId: null,
-                userId: member.userId,
-                groupId: binding.groupId,
-                viaGroupId: binding.groupId,
-                viaGroupName: binding.group?.name ?? null,
-                name: member.name ?? member.email ?? "Unknown",
-                email: member.email,
-                image: member.image,
-                role: binding.role,
-                customRoleId: binding.customRoleId,
-                customRoleName: binding.customRole?.name ?? null,
-              },
-            ];
-          },
-        );
+        return (input.groupMembers.get(binding.groupId) ?? []).flatMap((member) => {
+          if (
+            directUserIds.has(member.userId) ||
+            seenExpandedUserIds.has(member.userId)
+          ) {
+            return [];
+          }
+          seenExpandedUserIds.add(member.userId);
+          return [
+            {
+              bindingId: null,
+              userId: member.userId,
+              groupId: binding.groupId,
+              viaGroupId: binding.groupId,
+              viaGroupName: binding.group?.name ?? null,
+              name: member.name ?? member.email ?? "Unknown",
+              email: member.email,
+              image: member.image,
+              role: binding.role,
+              customRoleId: binding.customRoleId,
+              customRoleName: binding.customRole?.name ?? null,
+            },
+          ];
+        });
       });
     const directMembers: OrganizationTeamAccessMember[] = [
       ...directUserBindings.map((binding) => ({
@@ -941,10 +910,7 @@ export class OrganizationService extends OrganizationServiceContract {
         viaGroupId: null,
         viaGroupName: null,
         name:
-          binding.user?.name ??
-          binding.user?.email ??
-          binding.apiKey?.name ??
-          "Unknown",
+          binding.user?.name ?? binding.user?.email ?? binding.apiKey?.name ?? "Unknown",
         email: binding.user?.email ?? null,
         image: binding.user?.image ?? null,
         role: binding.role,
@@ -992,9 +958,7 @@ export class OrganizationService extends OrganizationServiceContract {
       groupBindings.flatMap(({ groupId }) => (groupId ? [groupId] : [])),
     );
     for (const project of input.projects) {
-      const bindings = projectBindings.filter(
-        ({ scopeId }) => scopeId === project.id,
-      );
+      const bindings = projectBindings.filter(({ scopeId }) => scopeId === project.id);
       const overriddenUserIds = new Set(
         bindings.flatMap(({ userId }) => (userId ? [userId] : [])),
       );
@@ -1012,8 +976,7 @@ export class OrganizationService extends OrganizationServiceContract {
         }));
       const direct = bindings.map((binding) => {
         const teamBinding = input.teamBindings.find(
-          (candidate) =>
-            candidate.userId && candidate.userId === binding.userId,
+          (candidate) => candidate.userId && candidate.userId === binding.userId,
         );
         const inherits =
           (!!binding.userId && teamBoundUserIds.has(binding.userId)) ||
@@ -1050,9 +1013,7 @@ export class OrganizationService extends OrganizationServiceContract {
     };
   }
 
-  async getGroup(
-    input: GetOrganizationGroupInput,
-  ): Promise<OrganizationGroupDetails> {
+  async getGroup(input: GetOrganizationGroupInput): Promise<OrganizationGroupDetails> {
     const parsed = getOrganizationGroupInputSchema.parse(input);
     const [group, members, bindings] = await Promise.all([
       this.groups.get(parsed),
@@ -1062,9 +1023,7 @@ export class OrganizationService extends OrganizationServiceContract {
     return { ...group, members, bindings };
   }
 
-  async listGroups(
-    input: ListOrganizationGroupsInput,
-  ): Promise<OrganizationGroupPage> {
+  async listGroups(input: ListOrganizationGroupsInput): Promise<OrganizationGroupPage> {
     const parsed = listOrganizationGroupsInputSchema.parse(input);
     const [page, bindings] = await Promise.all([
       this.groups.list(parsed),
@@ -1099,9 +1058,7 @@ export class OrganizationService extends OrganizationServiceContract {
     }));
   }
 
-  async createGroup(
-    input: CreateOrganizationGroupInput,
-  ): Promise<OrganizationGroup> {
+  async createGroup(input: CreateOrganizationGroupInput): Promise<OrganizationGroup> {
     const parsed = createOrganizationGroupInputSchema.parse(input);
     const memberIds = [...new Set(parsed.memberIds ?? [])];
     await this.teams.getOrganizationMembers({
@@ -1125,9 +1082,7 @@ export class OrganizationService extends OrganizationServiceContract {
     if (bindings.length > 0) {
       await this.grants.attachBindings({
         organizationId: parsed.organizationId,
-        bindings: bindings.map((binding) =>
-          this.groupBindingWrite(group.id, binding),
-        ),
+        bindings: bindings.map((binding) => this.groupBindingWrite(group.id, binding)),
         actor: parsed.actor,
         onDuplicate: "skip",
       });
@@ -1135,9 +1090,7 @@ export class OrganizationService extends OrganizationServiceContract {
     return group;
   }
 
-  async renameGroup(
-    input: RenameOrganizationGroupInput,
-  ): Promise<OrganizationGroup> {
+  async renameGroup(input: RenameOrganizationGroupInput): Promise<OrganizationGroup> {
     const parsed = renameOrganizationGroupInputSchema.parse(input);
     const group = await this.groups.get(parsed);
     if (group.scimSource) throw new ScimManagedGroupError(group.id);
@@ -1164,9 +1117,7 @@ export class OrganizationService extends OrganizationServiceContract {
     await this.groups.delete(parsed);
   }
 
-  async addGroupMember(
-    input: ChangeOrganizationGroupMemberInput,
-  ): Promise<void> {
+  async addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
     const parsed = changeOrganizationGroupMemberInputSchema.parse(input);
     const group = await this.groups.get(parsed);
     if (group.scimSource) throw new ScimManagedGroupError(group.id);
@@ -1177,9 +1128,7 @@ export class OrganizationService extends OrganizationServiceContract {
     await this.groups.addMember(parsed);
   }
 
-  async removeGroupMember(
-    input: ChangeOrganizationGroupMemberInput,
-  ): Promise<void> {
+  async removeGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
     const parsed = changeOrganizationGroupMemberInputSchema.parse(input);
     const group = await this.groups.get(parsed);
     if (group.scimSource) throw new ScimManagedGroupError(group.id);
@@ -1230,9 +1179,7 @@ export class OrganizationService extends OrganizationServiceContract {
     };
   }
 
-  async removeGroupBinding(
-    input: RemoveOrganizationGroupBindingInput,
-  ): Promise<void> {
+  async removeGroupBinding(input: RemoveOrganizationGroupBindingInput): Promise<void> {
     const parsed = removeOrganizationGroupBindingInputSchema.parse(input);
     const rawBindings = parsed.groupId
       ? await this.authz.listGroupBindings({
@@ -1265,9 +1212,7 @@ export class OrganizationService extends OrganizationServiceContract {
     });
   }
 
-  async applyGroupEdits(
-    input: ApplyOrganizationGroupEditsInput,
-  ): Promise<void> {
+  async applyGroupEdits(input: ApplyOrganizationGroupEditsInput): Promise<void> {
     const parsed = applyOrganizationGroupEditsInputSchema.parse(input);
     const group = await this.groups.get(parsed);
     if (
@@ -1283,15 +1228,10 @@ export class OrganizationService extends OrganizationServiceContract {
       organizationId: parsed.organizationId,
       userIds: memberIdsToAdd,
     });
-    await this.validateGroupBindings(
-      parsed.organizationId,
-      parsed.bindingsToCreate,
-    );
+    await this.validateGroupBindings(parsed.organizationId, parsed.bindingsToCreate);
     const currentBindings = await this.readGroupBindings(parsed);
     const deletedIds = new Set(parsed.bindingIdsToDelete);
-    const bindingsToDelete = currentBindings.filter(({ id }) =>
-      deletedIds.has(id),
-    );
+    const bindingsToDelete = currentBindings.filter(({ id }) => deletedIds.has(id));
     await this.assertGroupScopes(parsed.organizationId, bindingsToDelete);
     if (bindingsToDelete.length > 0) {
       await this.grants.revokeBindings({
@@ -1338,9 +1278,7 @@ export class OrganizationService extends OrganizationServiceContract {
       throw new GroupCustomRoleRequiredError();
     }
     const customRoleIds = [
-      ...new Set(
-        customBindings.map(({ customRoleId }) => customRoleId as string),
-      ),
+      ...new Set(customBindings.map(({ customRoleId }) => customRoleId as string)),
     ];
     const roles =
       customRoleIds.length === 0
@@ -1353,8 +1291,7 @@ export class OrganizationService extends OrganizationServiceContract {
       const role = rolesById.get(binding.customRoleId as string);
       const permissions = Array.isArray(role?.permissions)
         ? role.permissions.filter(
-            (permission): permission is string =>
-              typeof permission === "string",
+            (permission): permission is string => typeof permission === "string",
           )
         : [];
       const refused = permissions.find(
@@ -1401,16 +1338,12 @@ export class OrganizationService extends OrganizationServiceContract {
     }
   }
 
-  private groupBindingWrite(
-    groupId: string,
-    binding: OrganizationGroupBindingInput,
-  ) {
+  private groupBindingWrite(groupId: string, binding: OrganizationGroupBindingInput) {
     return {
       bindingId: this.groupIdentities.createBindingId(),
       principal: { groupId },
       role: binding.role,
-      customRoleId:
-        binding.role === "CUSTOM" ? (binding.customRoleId ?? null) : null,
+      customRoleId: binding.role === "CUSTOM" ? (binding.customRoleId ?? null) : null,
       scopeType: binding.scopeType,
       scopeId: binding.scopeId,
     };

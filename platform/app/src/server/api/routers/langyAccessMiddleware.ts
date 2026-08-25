@@ -52,9 +52,7 @@ export const enforceLangyAccess: PermissionMiddleware<{
   // wins, an org-scoped procedure has the real one.
   const organizationId =
     input.organizationId ??
-    (input.projectId
-      ? await resolveOrganizationId(input.projectId)
-      : undefined);
+    (input.projectId ? await resolveOrganizationId(input.projectId) : undefined);
 
   const allowed = await hasLangyAccess({
     user: ctx.session.user,

@@ -6,13 +6,7 @@
  * variants (GROWTH_SEAT_EUR_ANNUAL, GROWTH_SEAT_USD_MONTHLY).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SubscriptionPage } from "../SubscriptionPage";
@@ -96,10 +90,7 @@ vi.mock("~/utils/api", async () => {
       },
       currency: {
         detectCurrency: {
-          useQuery: (
-            _input: Record<string, never>,
-            opts: { enabled: boolean },
-          ) =>
+          useQuery: (_input: Record<string, never>, opts: { enabled: boolean }) =>
             opts.enabled ? setup.mockDetectCurrency() : { data: undefined },
         },
       },
@@ -169,9 +160,7 @@ describe("<SubscriptionPage/>", () => {
       await waitFor(() => {
         const currencySelector = screen.getByTestId("currency-selector");
         expect(currencySelector).toBeInTheDocument();
-        expect(
-          within(currencySelector).getByDisplayValue("$ USD"),
-        ).toBeInTheDocument();
+        expect(within(currencySelector).getByDisplayValue("$ USD")).toBeInTheDocument();
       });
     });
 
@@ -200,9 +189,7 @@ describe("<SubscriptionPage/>", () => {
 
       await waitFor(() => {
         const currencySelector = screen.getByTestId("currency-selector");
-        expect(
-          within(currencySelector).getByDisplayValue("$ USD"),
-        ).toBeInTheDocument();
+        expect(within(currencySelector).getByDisplayValue("$ USD")).toBeInTheDocument();
       });
     });
 
@@ -243,9 +230,7 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
       });
 
-      expect(
-        screen.queryByTestId("billing-period-toggle"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("billing-period-toggle")).not.toBeInTheDocument();
       expect(screen.queryByTestId("currency-selector")).not.toBeInTheDocument();
     });
   });
@@ -359,9 +344,7 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
       });
 
-      expect(
-        screen.queryByTestId("update-seats-block"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
     });
 
     it("opens proration preview modal with correct params when clicking Update subscription", async () => {
@@ -377,9 +360,7 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /Update subscription/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /Update subscription/i }));
 
       await waitFor(() => {
         expect(mockOpenSeats).toHaveBeenCalledWith(
@@ -414,9 +395,7 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /Update subscription/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /Update subscription/i }));
 
       // Extract the onConfirm callback from the openSeats call and invoke it
       const openSeatsCall = mockOpenSeats.mock.calls[0]![0] as {
@@ -454,9 +433,7 @@ describe("<SubscriptionPage/>", () => {
 
       // Update seats block should disappear
       await waitFor(() => {
-        expect(
-          screen.queryByTestId("update-seats-block"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
       });
 
       // User count should return to original (2/2)
@@ -500,9 +477,7 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("user-count-link")).toHaveTextContent("3/2");
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /Update subscription/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /Update subscription/i }));
 
       // Extract and invoke the onConfirm callback to simulate the modal confirmation
       const openSeatsCall = mockOpenSeats.mock.calls.at(-1)![0] as {
@@ -552,9 +527,7 @@ describe("<SubscriptionPage/>", () => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
 
-        expect(
-          screen.queryByTestId("upgrade-plan-block"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
       });
 
       it("shows 2 Full Members after adding a manual seat in drawer", async () => {
@@ -583,9 +556,7 @@ describe("<SubscriptionPage/>", () => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
 
-        expect(
-          screen.queryByTestId("upgrade-plan-block"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
       });
     });
 
@@ -666,13 +637,9 @@ describe("<SubscriptionPage/>", () => {
 
       await waitFor(() => {
         const currentBlock = screen.getByTestId("current-plan-block");
-        expect(
-          within(currentBlock).getByText("Growth plan"),
-        ).toBeInTheDocument();
+        expect(within(currentBlock).getByText("Growth plan")).toBeInTheDocument();
         // 5 seats × €320/yr = €1,600/yr
-        expect(
-          within(currentBlock).getByText(/€1,600\/yr/),
-        ).toBeInTheDocument();
+        expect(within(currentBlock).getByText(/€1,600\/yr/)).toBeInTheDocument();
       });
     });
 
@@ -683,9 +650,7 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
       });
 
-      expect(
-        screen.queryByTestId("billing-period-toggle"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("billing-period-toggle")).not.toBeInTheDocument();
       expect(screen.queryByTestId("currency-selector")).not.toBeInTheDocument();
     });
 
@@ -709,9 +674,7 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
       });
 
-      await user.click(
-        screen.getByRole("button", { name: /Update subscription/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /Update subscription/i }));
 
       const openSeatsCall = mockOpenSeats.mock.calls.at(-1)![0] as {
         onConfirm: () => Promise<void>;
@@ -749,9 +712,7 @@ describe("<SubscriptionPage/>", () => {
 
       await waitFor(() => {
         const currentBlock = screen.getByTestId("current-plan-block");
-        expect(
-          within(currentBlock).getByText("Growth plan"),
-        ).toBeInTheDocument();
+        expect(within(currentBlock).getByText("Growth plan")).toBeInTheDocument();
         // 3 seats × $32/mo = $96/mo
         expect(within(currentBlock).getByText(/\$96\/mo/)).toBeInTheDocument();
       });

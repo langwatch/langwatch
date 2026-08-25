@@ -138,9 +138,7 @@ describe("foldLangyConversationTurn", () => {
         command: "ls",
         durationMs: 500,
       });
-      expect(state.ToolCalls[1]?.status).toBe(
-        LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
-      );
+      expect(state.ToolCalls[1]?.status).toBe(LANGY_TURN_TOOL_CALL_STATUS.INITIATED);
     });
 
     it("lands a terminal whose initiated frame never arrived (defensive upsert)", () => {

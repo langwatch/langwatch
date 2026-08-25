@@ -2,12 +2,7 @@ import { Box, Flex, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatDuration } from "../../../utils/formatters";
-import {
-  DENSE_SPAN_THRESHOLD,
-  ROW_GAP,
-  ROW_HEIGHT,
-  ZOOM_FIT_PADDING,
-} from "./constants";
+import { DENSE_SPAN_THRESHOLD, ROW_GAP, ROW_HEIGHT, ZOOM_FIT_PADDING } from "./constants";
 import { FlameAxis } from "./FlameAxis";
 import { FlameBreadcrumbs } from "./FlameBreadcrumbs";
 import { FlameContextStrip } from "./FlameContextStrip";
@@ -223,9 +218,7 @@ export const FlameView = memo(function FlameView({
   const visibleBlocks = useMemo(() => {
     if (dur <= 0) return tree.all;
     return tree.all.filter(
-      (n) =>
-        n.span.endTimeMs >= viewport.startMs &&
-        n.span.startTimeMs <= viewport.endMs,
+      (n) => n.span.endTimeMs >= viewport.startMs && n.span.startTimeMs <= viewport.endMs,
     );
   }, [tree.all, viewport.startMs, viewport.endMs, dur]);
 
@@ -245,8 +238,7 @@ export const FlameView = memo(function FlameView({
     if (visibleBlocks.length <= 200) return 0;
     let count = 0;
     for (const node of visibleBlocks) {
-      const widthPct =
-        ((node.span.endTimeMs - node.span.startTimeMs) / dur) * 100;
+      const widthPct = ((node.span.endTimeMs - node.span.startTimeMs) / dur) * 100;
       if (widthPct < 0.1) count++;
     }
     return count;
@@ -380,10 +372,8 @@ export const FlameView = memo(function FlameView({
           {relatedSpanIds?.parent &&
             (() => {
               const p = relatedSpanIds.parent.span;
-              const left =
-                dur > 0 ? ((p.startTimeMs - viewport.startMs) / dur) * 100 : 0;
-              const width =
-                dur > 0 ? ((p.endTimeMs - p.startTimeMs) / dur) * 100 : 100;
+              const left = dur > 0 ? ((p.startTimeMs - viewport.startMs) / dur) * 100 : 0;
+              const width = dur > 0 ? ((p.endTimeMs - p.startTimeMs) / dur) * 100 : 100;
               if (left + width < 0 || left > 100) return null;
               return (
                 <>
@@ -450,9 +440,7 @@ export const FlameView = memo(function FlameView({
           (() => {
             const selDur = dragSelection.endMs - dragSelection.startMs;
             const left =
-              dur > 0
-                ? ((dragSelection.startMs - viewport.startMs) / dur) * 100
-                : 0;
+              dur > 0 ? ((dragSelection.startMs - viewport.startMs) / dur) * 100 : 0;
             const width = dur > 0 ? (selDur / dur) * 100 : 0;
             return (
               <Box
@@ -497,8 +485,8 @@ export const FlameView = memo(function FlameView({
         {hiddenSpanCount > 0 && (
           <Flex justify="center" paddingY={1}>
             <Text textStyle="xs" color="fg.subtle">
-              {hiddenSpanCount} span{hiddenSpanCount !== 1 ? "s" : ""} too small
-              to display — zoom in to see
+              {hiddenSpanCount} span{hiddenSpanCount !== 1 ? "s" : ""} too small to
+              display — zoom in to see
             </Text>
           </Flex>
         )}

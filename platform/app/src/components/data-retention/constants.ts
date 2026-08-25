@@ -69,9 +69,7 @@ export const ENTERPRISE_RETENTION_PRESETS: RetentionPreset[] = [
 
 /** The preset list a plan tier may pick from. Enterprise (and self-hosted,
  *  which resolves to enterprise) additionally gets a custom field. */
-export function retentionPresetsForTier(
-  isEnterprise: boolean,
-): RetentionPreset[] {
+export function retentionPresetsForTier(isEnterprise: boolean): RetentionPreset[] {
   return isEnterprise ? ENTERPRISE_RETENTION_PRESETS : PAID_RETENTION_PRESETS;
 }
 

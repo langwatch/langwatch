@@ -40,9 +40,7 @@ describe("presentLangyToolError", () => {
     // the caller DOES hold looks like. The response cannot separate the two, so
     // the card states the consequence, which is true either way.
     it("names what the reader cannot do, in plain words, in one sentence", () => {
-      expect(present(denial).message).toBe(
-        "You can't manage scenarios in this project.",
-      );
+      expect(present(denial).message).toBe("You can't manage scenarios in this project.");
     });
 
     it("never headlines the internal permission name", () => {
@@ -220,9 +218,7 @@ describe("presentLangyToolError", () => {
     });
 
     it("shows the code alongside it", () => {
-      expect(present(notFound, "Loading dataset").code).toBe(
-        "dataset_not_found",
-      );
+      expect(present(notFound, "Loading dataset").code).toBe("dataset_not_found");
     });
   });
 
@@ -244,9 +240,7 @@ describe("presentLangyToolError", () => {
     });
 
     it("shows the code verbatim", () => {
-      expect(present(unknown, "Counting traces").code).toBe(
-        "clickhouse_unavailable",
-      );
+      expect(present(unknown, "Counting traces").code).toBe("clickhouse_unavailable");
     });
 
     it("does not call an infrastructure failure terminal", () => {

@@ -6,8 +6,7 @@ describe("evaluateApiKeysAndSecrets", () => {
     /** @scenario The secrets evaluator flags a leaked key in trace content */
     it("fails with a count and a per-rule summary", () => {
       const result = evaluateApiKeysAndSecrets({
-        input:
-          "here is my key sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xY thanks",
+        input: "here is my key sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xY thanks",
       });
       expect(result.status).toBe("processed");
       if (result.status !== "processed") return;

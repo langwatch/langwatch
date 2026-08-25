@@ -129,9 +129,7 @@ export function useMermaidRenderer({
           },
         });
 
-        const id = `mermaid-seq-${renderToken}-${Math.random()
-          .toString(36)
-          .slice(2, 9)}`;
+        const id = `mermaid-seq-${renderToken}-${Math.random().toString(36).slice(2, 9)}`;
         const { svg, bindFunctions } = await mermaid.render(id, result.syntax);
         if (cancelled || !stage) return;
         stage.innerHTML = svg;
@@ -147,9 +145,7 @@ export function useMermaidRenderer({
           rect.setAttribute("ry", "6");
         });
         stage
-          .querySelectorAll(
-            "rect.activation0, rect.activation1, rect.activation2",
-          )
+          .querySelectorAll("rect.activation0, rect.activation1, rect.activation2")
           .forEach((rect) => {
             rect.setAttribute("rx", "2");
             rect.setAttribute("ry", "2");
@@ -160,34 +156,29 @@ export function useMermaidRenderer({
         // selection. No JS-set fills or strokes — colours come exclusively
         // from CSS using Chakra's semantic-token-backed CSS vars (which are
         // light/dark aware by definition).
-        stage
-          .querySelectorAll<SVGGElement>("g.actor, g.node")
-          .forEach((node) => {
-            const label = node.querySelector("text")?.textContent?.trim() ?? "";
-            const match = label
-              ? Array.from(result.idToSpanId.entries()).find(
-                  ([id]) =>
-                    (result.idDisplay.get(id) ?? "").trim() === label.trim(),
-                )
-              : undefined;
-            const kindFromClass = ["agent", "llm", "tool", "other"].find((k) =>
-              node.classList.contains(k),
-            );
-            const kind =
-              (match ? result.idKind.get(match[0]) : undefined) ??
-              kindFromClass ??
-              "other";
-            node.setAttribute("data-kind", kind);
-            if (match) {
-              const [, spanId] = match;
-              (node as unknown as HTMLElement).style.cursor = "pointer";
-              node.addEventListener("click", (e) => {
-                if (isPanningRef.current) return;
-                e.stopPropagation();
-                onSelectSpan(spanId);
-              });
-            }
-          });
+        stage.querySelectorAll<SVGGElement>("g.actor, g.node").forEach((node) => {
+          const label = node.querySelector("text")?.textContent?.trim() ?? "";
+          const match = label
+            ? Array.from(result.idToSpanId.entries()).find(
+                ([id]) => (result.idDisplay.get(id) ?? "").trim() === label.trim(),
+              )
+            : undefined;
+          const kindFromClass = ["agent", "llm", "tool", "other"].find((k) =>
+            node.classList.contains(k),
+          );
+          const kind =
+            (match ? result.idKind.get(match[0]) : undefined) ?? kindFromClass ?? "other";
+          node.setAttribute("data-kind", kind);
+          if (match) {
+            const [, spanId] = match;
+            (node as unknown as HTMLElement).style.cursor = "pointer";
+            node.addEventListener("click", (e) => {
+              if (isPanningRef.current) return;
+              e.stopPropagation();
+              onSelectSpan(spanId);
+            });
+          }
+        });
 
         // Easter-egg avatar swap. Each Mermaid `actor` (stick figure)
         // contains a `<circle>` for the head — we replace it with an
@@ -202,10 +193,7 @@ export function useMermaidRenderer({
             const cx = Number(head.getAttribute("cx") ?? "0");
             const cy = Number(head.getAttribute("cy") ?? "0");
             const r = Number(head.getAttribute("r") ?? "8");
-            const img = document.createElementNS(
-              "http://www.w3.org/2000/svg",
-              "image",
-            );
+            const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
             img.setAttributeNS(
               "http://www.w3.org/1999/xlink",
               "href",

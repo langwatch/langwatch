@@ -122,13 +122,12 @@ export class LocalDatasetStorageAdapter implements DatasetStorage {
     maxBytes?: number;
   }): Promise<DatasetChunk[]> {
     assertNoTraversal(projectId, datasetId);
-    const chunks = toJsonlChunks(records, maxBytes ? { maxBytes } : {}).map(
-      (c) => ({ ...c, index: c.index + fromIndex }),
-    );
+    const chunks = toJsonlChunks(records, maxBytes ? { maxBytes } : {}).map((c) => ({
+      ...c,
+      index: c.index + fromIndex,
+    }));
     for (const chunk of chunks) {
-      const filePath = this.localPath(
-        chunkKey(projectId, datasetId, chunk.index),
-      );
+      const filePath = this.localPath(chunkKey(projectId, datasetId, chunk.index));
       try {
         await fs.mkdir(path.dirname(filePath), { recursive: true });
         await this.atomicWriteFile(filePath, chunk.jsonl);
@@ -250,11 +249,7 @@ export class LocalDatasetStorageAdapter implements DatasetStorage {
    * `putStaged`. The `key` is the same server-owned, tenant-scoped staging key
    * the S3 path uses, so finalize/normalize are backend-agnostic from here on.
    */
-  createPresignedUpload({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<PresignedUpload> {
+  createPresignedUpload({ projectId }: { projectId: string }): Promise<PresignedUpload> {
     const uploadId = nanoid();
     return Promise.resolve({
       uploadId,

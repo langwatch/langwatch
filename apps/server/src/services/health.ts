@@ -29,7 +29,11 @@ export async function pollUntilHealthy({
     lastReason = result.reason;
     await sleep(intervalMs);
   }
-  return { ok: false, durationMs: Date.now() - start, reason: `timed out: ${lastReason}` };
+  return {
+    ok: false,
+    durationMs: Date.now() - start,
+    reason: `timed out: ${lastReason}`,
+  };
 }
 
 export function httpGetCheck(
@@ -54,7 +58,11 @@ export function httpGetCheck(
       const status = res.status;
       const expected = opts.expectStatus ?? 200;
       if (status !== expected) {
-        return { ok: false, durationMs: Date.now() - start, reason: `status ${status} (expected ${expected})` };
+        return {
+          ok: false,
+          durationMs: Date.now() - start,
+          reason: `status ${status} (expected ${expected})`,
+        };
       }
       if (opts.expectBodyContains) {
         const body = await res.text();
@@ -86,7 +94,10 @@ export function execCheck(
   return async () => {
     const start = Date.now();
     try {
-      const { exitCode, stdout } = await execa(command, args, { reject: false, env: opts.env });
+      const { exitCode, stdout } = await execa(command, args, {
+        reject: false,
+        env: opts.env,
+      });
       if (exitCode !== 0) {
         return { ok: false, durationMs: Date.now() - start, reason: `exit ${exitCode}` };
       }
@@ -99,7 +110,11 @@ export function execCheck(
       }
       return { ok: true, durationMs: Date.now() - start };
     } catch (err) {
-      return { ok: false, durationMs: Date.now() - start, reason: (err as Error).message };
+      return {
+        ok: false,
+        durationMs: Date.now() - start,
+        reason: (err as Error).message,
+      };
     }
   };
 }

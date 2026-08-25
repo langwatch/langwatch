@@ -107,10 +107,7 @@ function alawToLinear(byte: number): number {
 }
 
 /** Expand companded G.711 bytes to linear PCM16 little-endian. */
-function g711ToPcm16(
-  samples: Uint8Array,
-  format: "g711_ulaw" | "g711_alaw",
-): Uint8Array {
+function g711ToPcm16(samples: Uint8Array, format: "g711_ulaw" | "g711_alaw"): Uint8Array {
   const decode = format === "g711_ulaw" ? ulawToLinear : alawToLinear;
   const out = new Uint8Array(samples.length * 2);
   const view = new DataView(out.buffer);
@@ -180,9 +177,7 @@ function bytesToBase64(bytes: Uint8Array): string {
   // Browser: chunk to stay under the argument-count limit of fromCharCode.
   const chunks: string[] = [];
   for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-    chunks.push(
-      String.fromCharCode(...bytes.subarray(offset, offset + 0x8000)),
-    );
+    chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 0x8000)));
   }
   return btoa(chunks.join(""));
 }

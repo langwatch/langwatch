@@ -1,10 +1,4 @@
-import {
-  AlertTriangle,
-  Check,
-  Clock,
-  type LucideIcon,
-  XCircle,
-} from "lucide-react";
+import { AlertTriangle, Check, Clock, type LucideIcon, XCircle } from "lucide-react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
 export interface ScenarioRunStatusConfig {
@@ -78,15 +72,14 @@ export const SCENARIO_RUN_STATUS_CONFIG: Record<
   },
 };
 
-export const SCENARIO_RUN_STATUS_ICONS: Record<ScenarioRunStatus, LucideIcon> =
-  {
-    [ScenarioRunStatus.SUCCESS]: Check,
-    [ScenarioRunStatus.FAILED]: XCircle,
-    [ScenarioRunStatus.ERROR]: XCircle,
-    [ScenarioRunStatus.CANCELLED]: XCircle,
-    [ScenarioRunStatus.STALLED]: AlertTriangle,
-    [ScenarioRunStatus.IN_PROGRESS]: Clock,
-    [ScenarioRunStatus.PENDING]: Clock,
-    [ScenarioRunStatus.QUEUED]: Clock,
-    [ScenarioRunStatus.RUNNING]: Clock,
-  };
+export const SCENARIO_RUN_STATUS_ICONS: Record<ScenarioRunStatus, LucideIcon> = {
+  [ScenarioRunStatus.SUCCESS]: Check,
+  [ScenarioRunStatus.FAILED]: XCircle,
+  [ScenarioRunStatus.ERROR]: XCircle,
+  [ScenarioRunStatus.CANCELLED]: XCircle,
+  [ScenarioRunStatus.STALLED]: AlertTriangle,
+  [ScenarioRunStatus.IN_PROGRESS]: Clock,
+  [ScenarioRunStatus.PENDING]: Clock,
+  [ScenarioRunStatus.QUEUED]: Clock,
+  [ScenarioRunStatus.RUNNING]: Clock,
+};

@@ -3,13 +3,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioCreateModal } from "../ScenarioCreateModal";
 
@@ -46,9 +40,9 @@ const mockOpenUpgradeModal = vi.fn();
 vi.mock("~/stores/upgradeModalStore", () => ({
   useUpgradeModalStore: (selector: unknown) => {
     if (typeof selector === "function") {
-      return (
-        selector as (state: { open: typeof mockOpenUpgradeModal }) => unknown
-      )({ open: mockOpenUpgradeModal });
+      return (selector as (state: { open: typeof mockOpenUpgradeModal }) => unknown)({
+        open: mockOpenUpgradeModal,
+      });
     }
     return { open: mockOpenUpgradeModal };
   },
@@ -174,9 +168,7 @@ describe("<ScenarioCreateModal/>", () => {
       });
 
       const dialog = getDialogContent();
-      expect(
-        within(dialog).getByText("Create new scenario"),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByText("Create new scenario")).toBeInTheDocument();
     });
 
     it("presents AI drafting as an editable step while keeping manual setup", () => {
@@ -234,9 +226,7 @@ describe("<ScenarioCreateModal/>", () => {
       });
 
       const dialog = getDialogContent();
-      expect(
-        within(dialog).getByText("Tool-calling Agent"),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByText("Tool-calling Agent")).toBeInTheDocument();
     });
 
     it("displays close button", () => {
@@ -245,9 +235,7 @@ describe("<ScenarioCreateModal/>", () => {
       });
 
       const dialog = getDialogContent();
-      expect(
-        within(dialog).getByRole("button", { name: /close/i }),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: /close/i })).toBeInTheDocument();
     });
   });
 
@@ -318,9 +306,7 @@ describe("<ScenarioCreateModal/>", () => {
       fireEvent.change(textarea, {
         target: { value: "My test scenario description" },
       });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       // Verify AI generation API was called
       await waitFor(() => {
@@ -412,13 +398,9 @@ describe("<ScenarioCreateModal/>", () => {
       });
 
       const dialog = getDialogContent();
+      expect(within(dialog).getByText("Model provider not ready")).toBeInTheDocument();
       expect(
-        within(dialog).getByText("Model provider not ready"),
-      ).toBeInTheDocument();
-      expect(
-        within(dialog).getByTestId(
-          "model-provider-required-modal-configure-button",
-        ),
+        within(dialog).getByTestId("model-provider-required-modal-configure-button"),
       ).toHaveAccessibleName("Configure model provider");
     });
 
@@ -481,9 +463,7 @@ describe("when default model is Azure deployment not in registry", () => {
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test azure scenario" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalled();
@@ -515,13 +495,9 @@ describe("when default model is Azure deployment not in registry", () => {
       });
 
       const dialog = getDialogContent();
+      expect(within(dialog).getByText("Model provider not ready")).toBeInTheDocument();
       expect(
-        within(dialog).getByText("Model provider not ready"),
-      ).toBeInTheDocument();
-      expect(
-        within(dialog).getByTestId(
-          "model-provider-required-modal-configure-button",
-        ),
+        within(dialog).getByTestId("model-provider-required-modal-configure-button"),
       ).toBeInTheDocument();
     });
   });
@@ -544,9 +520,7 @@ describe("when default model is Azure and provider is NOT configured at all", ()
     });
 
     const dialog = getDialogContent();
-    expect(
-      within(dialog).getByText("Model provider not ready"),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByText("Model provider not ready")).toBeInTheDocument();
   });
 });
 
@@ -576,9 +550,7 @@ describe("given azure is the only enabled provider and project.defaultModel is a
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test azure scenario" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -593,9 +565,7 @@ describe("given azure is the only enabled provider and project.defaultModel is a
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test azure scenario" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalled();
@@ -631,9 +601,7 @@ describe("given azure is the only enabled provider and project.defaultModel is n
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).getByTestId(
-          "model-provider-required-modal-configure-button",
-        ),
+        within(dialog).getByTestId("model-provider-required-modal-configure-button"),
       ).toHaveAccessibleName("Configure model provider");
     });
 
@@ -684,9 +652,7 @@ describe("given azure is the only enabled provider and project.defaultModel is o
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).getByTestId(
-          "model-provider-required-modal-configure-button",
-        ),
+        within(dialog).getByTestId("model-provider-required-modal-configure-button"),
       ).toHaveAccessibleName("Configure model provider");
     });
 
@@ -732,12 +698,8 @@ describe("given providers are still loading", () => {
       expect(
         within(dialog).queryByText(/api keys not configured/i),
       ).not.toBeInTheDocument();
-      expect(
-        within(dialog).queryByText(/no default model/i),
-      ).not.toBeInTheDocument();
-      expect(
-        within(dialog).queryByText(/provider.*disabled/i),
-      ).not.toBeInTheDocument();
+      expect(within(dialog).queryByText(/no default model/i)).not.toBeInTheDocument();
+      expect(within(dialog).queryByText(/provider.*disabled/i)).not.toBeInTheDocument();
     });
 
     it("renders the Generate with AI button", () => {

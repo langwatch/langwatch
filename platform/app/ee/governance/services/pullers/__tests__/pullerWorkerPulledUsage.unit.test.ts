@@ -164,10 +164,7 @@ describe("the pull effect's pulled-usage emit seam", () => {
       runOnce.mockResolvedValue({
         events: [
           usageEvent(),
-          usageEvent(
-            { dimensions: { workspaceId: "ws_2" } },
-            "usage:2026-08-01:ws_2",
-          ),
+          usageEvent({ dimensions: { workspaceId: "ws_2" } }, "usage:2026-08-01:ws_2"),
         ],
         cursor: null,
         errorCount: 0,
@@ -276,10 +273,7 @@ describe("the pull effect's pulled-usage emit seam", () => {
           // Unparseable bucket timestamp: this row will never map, on this
           // pull or any later one.
           { ...usageEvent(), event_timestamp: "not-a-timestamp" },
-          usageEvent(
-            { dimensions: { workspaceId: "ws_2" } },
-            "usage:2026-08-01:ws_2",
-          ),
+          usageEvent({ dimensions: { workspaceId: "ws_2" } }, "usage:2026-08-01:ws_2"),
         ],
         cursor: "next",
         errorCount: 0,
@@ -309,9 +303,7 @@ describe("the pull effect's pulled-usage emit seam", () => {
       });
       // A transient event-store outage, not a bad row: it heals by itself, and
       // advancing past it would lose this window's cost with nothing to retry.
-      const recordPulledUsage = vi
-        .fn()
-        .mockRejectedValue(new Error("ECONNRESET"));
+      const recordPulledUsage = vi.fn().mockRejectedValue(new Error("ECONNRESET"));
 
       await expect(
         runIngestionPull({

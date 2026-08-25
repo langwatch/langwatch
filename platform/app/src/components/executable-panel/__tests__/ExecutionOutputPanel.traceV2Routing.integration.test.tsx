@@ -56,10 +56,7 @@ describe("ExecutionOutputPanel Full Trace button", () => {
       const user = userEvent.setup();
 
       render(
-        <ExecutionOutputPanel
-          executionState={completedExecution}
-          isTracingEnabled
-        />,
+        <ExecutionOutputPanel executionState={completedExecution} isTracingEnabled />,
         { wrapper: Wrapper },
       );
 

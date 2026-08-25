@@ -7,10 +7,7 @@ import plugin from "../oxlint-plugin.mjs";
 RuleTester.describe = describe;
 RuleTester.it = it;
 
-const repositoryRoot = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../..",
-);
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const tester = new RuleTester({
   cwd: repositoryRoot,
   languageOptions: { sourceType: "module" },
@@ -23,8 +20,7 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       code: 'import { z } from "zod"; export const value = z.string();',
     },
     {
-      filename:
-        "packages/features/agent/server/src/repositories/prisma/example.ts",
+      filename: "packages/features/agent/server/src/repositories/prisma/example.ts",
       code: 'import type { PrismaClient } from "@prisma/client"; export type Db = PrismaClient;',
     },
     {
@@ -106,34 +102,30 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
   ],
 });
 
-tester.run(
-  "environment-boundaries",
-  plugin.rules["environment-boundaries"],
-  {
-    valid: [
-      {
-        filename: "platform/app/src/server/example.ts",
-        code: "export const value = process.env.APPLICATION_VALUE;",
-      },
-      {
-        filename: "packages/features/agent/tests/example.test.ts",
-        code: "export const value = process.env.TEST_VALUE;",
-      },
-    ],
-    invalid: [
-      {
-        filename: "packages/features/agent/contract/src/example.ts",
-        code: "export const value = process.env.AGENTS_VALUE;",
-        errors: [{ messageId: "environment" }],
-      },
-      {
-        filename: "packages/config/src/example.ts",
-        code: "export const value = import.meta.env.CONFIG_VALUE;",
-        errors: [{ messageId: "environment" }],
-      },
-    ],
-  },
-);
+tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
+  valid: [
+    {
+      filename: "platform/app/src/server/example.ts",
+      code: "export const value = process.env.APPLICATION_VALUE;",
+    },
+    {
+      filename: "packages/features/agent/tests/example.test.ts",
+      code: "export const value = process.env.TEST_VALUE;",
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/contract/src/example.ts",
+      code: "export const value = process.env.AGENTS_VALUE;",
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "packages/config/src/example.ts",
+      code: "export const value = import.meta.env.CONFIG_VALUE;",
+      errors: [{ messageId: "environment" }],
+    },
+  ],
+});
 
 tester.run("feature-module-classes", plugin.rules["feature-module-classes"], {
   valid: [
@@ -142,8 +134,7 @@ tester.run("feature-module-classes", plugin.rules["feature-module-classes"], {
       code: "export abstract class AgentService {}",
     },
     {
-      filename:
-        "packages/features/agent/server/src/repositories/agent.repository.ts",
+      filename: "packages/features/agent/server/src/repositories/agent.repository.ts",
       code: "export abstract class AgentRepository {}",
     },
     {
@@ -163,8 +154,7 @@ tester.run("feature-module-classes", plugin.rules["feature-module-classes"], {
       errors: [{ messageId: "abstract" }],
     },
     {
-      filename:
-        "packages/features/agent/server/src/projections/agent.projection.ts",
+      filename: "packages/features/agent/server/src/projections/agent.projection.ts",
       code: "export class AgentProjection {}",
       errors: [{ messageId: "create" }],
     },
@@ -205,8 +195,7 @@ tester.run("service-classes", plugin.rules["service-classes"], {
 tester.run("api-context-services", plugin.rules["api-context-services"], {
   valid: [
     {
-      filename:
-        "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { async handle(context, input) { await context.authorize(input.permission); return context.app.agents.create({ ...input, actorId: context.actor().id }); } }",
     },
     {
@@ -216,38 +205,32 @@ tester.run("api-context-services", plugin.rules["api-context-services"], {
   ],
   invalid: [
     {
-      filename:
-        "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { handle(context) { return this.options.service(context).list(); } }",
       errors: [{ messageId: "resolver" }],
     },
     {
-      filename:
-        "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { handle(context) { return this.options.projectId(context); } }",
       errors: [{ messageId: "resolver" }],
     },
     {
-      filename:
-        "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { handle(input) { return this.options.loadService(input.projectId).list(); } }",
       errors: [{ messageId: "resolver" }],
     },
     {
-      filename:
-        "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { handle(context) { return (context as Context).app.agents.list(); } }",
       errors: [{ messageId: "contextCast" }],
     },
     {
-      filename:
-        "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { handle() { return new AgentService(); } }",
       errors: [{ messageId: "construction" }],
     },
     {
-      filename:
-        "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { async handle(context) { return await (await loadAgentService(context)).list(); } }",
       errors: [{ messageId: "doubleAwait" }],
     },
@@ -257,8 +240,7 @@ tester.run("api-context-services", plugin.rules["api-context-services"], {
 tester.run("service-dependencies", plugin.rules["service-dependencies"], {
   valid: [
     {
-      filename:
-        "platform/app/src/server/app-layer/organizations/organization.service.ts",
+      filename: "platform/app/src/server/app-layer/organizations/organization.service.ts",
       code: 'import type { OrganizationRepository } from "./repositories/organization.repository"; import type { PromptTagService } from "../../prompt-config/prompt-tag.service"; export class OrganizationService {}',
     },
     {
@@ -269,14 +251,12 @@ tester.run("service-dependencies", plugin.rules["service-dependencies"], {
   ],
   invalid: [
     {
-      filename:
-        "platform/app/src/server/app-layer/organizations/organization.service.ts",
+      filename: "platform/app/src/server/app-layer/organizations/organization.service.ts",
       code: 'import type { PromptTagRepository } from "../../prompt-config/repositories/prompt-tag.repository"; export class OrganizationService {}',
       errors: [{ messageId: "foreignRepository" }],
     },
     {
-      filename:
-        "platform/app/src/server/app-layer/organizations/organization.service.ts",
+      filename: "platform/app/src/server/app-layer/organizations/organization.service.ts",
       code: 'import type { PromptTagRepository } from "../../prompt-config"; export class OrganizationService {}',
       errors: [{ messageId: "foreignRepository" }],
     },
@@ -287,14 +267,12 @@ tester.run("service-dependencies", plugin.rules["service-dependencies"], {
       errors: [{ messageId: "foreignRepository" }],
     },
     {
-      filename:
-        "platform/app/src/server/app-layer/organizations/organization.service.ts",
+      filename: "platform/app/src/server/app-layer/organizations/organization.service.ts",
       code: 'import { getApp } from "../app"; export class OrganizationService { run() { return getApp().projects; } }',
       errors: [{ messageId: "globalApplication" }],
     },
     {
-      filename:
-        "platform/app/src/server/app-layer/organizations/organization.service.ts",
+      filename: "platform/app/src/server/app-layer/organizations/organization.service.ts",
       code: 'import type { PrismaClient } from "~/generated/prisma/client"; export class OrganizationService { constructor(readonly prisma: PrismaClient) {} }',
       errors: [{ messageId: "databaseClient" }],
     },

@@ -19,9 +19,7 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
     super();
   }
 
-  static create(
-    cryptography: LicenseCryptographyPort,
-  ): LicenseGenerationService {
+  static create(cryptography: LicenseCryptographyPort): LicenseGenerationService {
     return new LicenseGenerationService(cryptography);
   }
 
@@ -62,17 +60,13 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
         name: template.name,
         maxMembers: seats,
         maxMembersLite: maxMembersLite ?? template.maxMembersLite,
-        maxMessagesPerMonth:
-          maxMessagesPerMonth ?? template.maxMessagesPerMonth,
+        maxMessagesPerMonth: maxMessagesPerMonth ?? template.maxMessagesPerMonth,
         canPublish: template.canPublish,
         webhookEndpointsEnabled: template.webhookEndpointsEnabled,
         usageUnit: template.usageUnit,
       }),
     };
-    const signedLicense = this.cryptography.signLicense(
-      licenseData,
-      privateKey,
-    );
+    const signedLicense = this.cryptography.signLicense(licenseData, privateKey);
     return {
       licenseKey: this.cryptography.encodeLicenseKey(signedLicense),
       licenseData,

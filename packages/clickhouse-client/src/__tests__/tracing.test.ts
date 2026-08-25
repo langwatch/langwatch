@@ -1,11 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { QueryRequest } from "../query";
-import {
-  SPAN_ATTRIBUTES,
-  type SpanPort,
-  type TracerPort,
-  QueryTracer,
-} from "../tracing";
+import { SPAN_ATTRIBUTES, type SpanPort, type TracerPort, QueryTracer } from "../tracing";
 
 const recordingTracer = () => {
   const attributes: Record<string, string | number | boolean> = {};
@@ -42,7 +37,10 @@ describe("trace", () => {
       it("records the tenant, table and operation", async () => {
         const { tracer, attributes } = recordingTracer();
 
-        await new QueryTracer({ tracer }).trace({ request, task: async () => ({ rows: [1, 2] }) });
+        await new QueryTracer({ tracer }).trace({
+          request,
+          task: async () => ({ rows: [1, 2] }),
+        });
 
         expect(attributes[SPAN_ATTRIBUTES.system]).toBe("clickhouse");
         expect(attributes[SPAN_ATTRIBUTES.tenant]).toBe("project_1");
@@ -53,10 +51,13 @@ describe("trace", () => {
       it("records how much came back", async () => {
         const { tracer, attributes } = recordingTracer();
 
-        await new QueryTracer({ tracer }).trace({ request, task: async () => ({
-          rows: [1, 2],
-          stats: { bytesRead: 4096 },
-        }) });
+        await new QueryTracer({ tracer }).trace({
+          request,
+          task: async () => ({
+            rows: [1, 2],
+            stats: { bytesRead: 4096 },
+          }),
+        });
 
         expect(attributes[SPAN_ATTRIBUTES.rows]).toBe(2);
         expect(attributes[SPAN_ATTRIBUTES.bytesRead]).toBe(4096);
@@ -68,7 +69,10 @@ describe("trace", () => {
         // content is allowed to reach.
         const { tracer, attributes } = recordingTracer();
 
-        await new QueryTracer({ tracer }).trace({ request, task: async () => ({ rows: [] }) });
+        await new QueryTracer({ tracer }).trace({
+          request,
+          task: async () => ({ rows: [] }),
+        });
 
         const recorded = JSON.stringify(attributes);
         expect(recorded).not.toContain("SELECT");
@@ -83,10 +87,13 @@ describe("trace", () => {
       it("records the stated reason so exemptions can be audited", async () => {
         const { tracer, attributes } = recordingTracer();
 
-        await new QueryTracer({ tracer }).trace({ request: {
-          ...request,
-          unscoped: { reason: "operational part-count check" },
-        }, task: async () => ({ rows: [] }) });
+        await new QueryTracer({ tracer }).trace({
+          request: {
+            ...request,
+            unscoped: { reason: "operational part-count check" },
+          },
+          task: async () => ({ rows: [] }),
+        });
 
         expect(attributes[SPAN_ATTRIBUTES.unscopedReason]).toBe(
           "operational part-count check",
@@ -104,9 +111,12 @@ describe("trace", () => {
         });
 
         await expect(
-          new QueryTracer({ tracer }).trace({ request, task: async () => {
-            throw failure;
-          } }),
+          new QueryTracer({ tracer }).trace({
+            request,
+            task: async () => {
+              throw failure;
+            },
+          }),
         ).rejects.toThrow("boom");
 
         expect(errors).toEqual([{ name: "Error", code: "ECONNRESET" }]);
@@ -119,11 +129,14 @@ describe("trace", () => {
         const { tracer, errors } = recordingTracer();
 
         await expect(
-          new QueryTracer({ tracer }).trace({ request, task: async () => {
-            throw new Error(
-              "Code: 62. DB::Exception: Syntax error (in query: SELECT Email FROM t WHERE Email = 'ops@example.com')",
-            );
-          } }),
+          new QueryTracer({ tracer }).trace({
+            request,
+            task: async () => {
+              throw new Error(
+                "Code: 62. DB::Exception: Syntax error (in query: SELECT Email FROM t WHERE Email = 'ops@example.com')",
+              );
+            },
+          }),
         ).rejects.toThrow();
 
         const recorded = JSON.stringify(errors);
@@ -135,9 +148,12 @@ describe("trace", () => {
         const { tracer, ended } = recordingTracer();
 
         await expect(
-          new QueryTracer({ tracer }).trace({ request, task: async () => {
-            throw new Error("boom");
-          } }),
+          new QueryTracer({ tracer }).trace({
+            request,
+            task: async () => {
+              throw new Error("boom");
+            },
+          }),
         ).rejects.toThrow();
 
         expect(ended()).toBe(1);
@@ -152,10 +168,13 @@ describe("trace", () => {
         const onComplete = vi.fn();
         let clock = 1000;
 
-        await new QueryTracer({ tracer, onComplete, now: () => clock }).trace({ request, task: async () => {
-          clock = 1075;
-          return { rows: [] };
-        } });
+        await new QueryTracer({ tracer, onComplete, now: () => clock }).trace({
+          request,
+          task: async () => {
+            clock = 1075;
+            return { rows: [] };
+          },
+        });
 
         expect(onComplete).toHaveBeenCalledWith(
           expect.objectContaining({ durationMs: 75, rowCount: 0 }),
@@ -167,9 +186,12 @@ describe("trace", () => {
         const onComplete = vi.fn();
 
         await expect(
-          new QueryTracer({ tracer, onComplete }).trace({ request, task: async () => {
-            throw new Error("boom");
-          } }),
+          new QueryTracer({ tracer, onComplete }).trace({
+            request,
+            task: async () => {
+              throw new Error("boom");
+            },
+          }),
         ).rejects.toThrow();
 
         expect(onComplete).toHaveBeenCalledWith(
@@ -195,7 +217,10 @@ describe("trace", () => {
         };
 
         await expect(
-          new QueryTracer({ tracer }).trace({ request, task: async () => ({ rows: [1] }) }),
+          new QueryTracer({ tracer }).trace({
+            request,
+            task: async () => ({ rows: [1] }),
+          }),
         ).resolves.toEqual({ rows: [1] });
       });
     });
@@ -217,7 +242,10 @@ describe("trace", () => {
         };
 
         await expect(
-          new QueryTracer({ tracer }).trace({ request, task: async () => ({ rows: [1] }) }),
+          new QueryTracer({ tracer }).trace({
+            request,
+            task: async () => ({ rows: [1] }),
+          }),
         ).resolves.toEqual({ rows: [1] });
       });
 
@@ -233,9 +261,12 @@ describe("trace", () => {
         };
 
         await expect(
-          new QueryTracer({ tracer }).trace({ request, task: async () => {
-            throw new Error("Code: 241. Memory limit exceeded");
-          } }),
+          new QueryTracer({ tracer }).trace({
+            request,
+            task: async () => {
+              throw new Error("Code: 241. Memory limit exceeded");
+            },
+          }),
         ).rejects.toThrow(/Memory limit exceeded/);
       });
     });
@@ -263,9 +294,12 @@ describe("trace", () => {
             onComplete: () => {
               throw exploding;
             },
-          }).trace({ request, task: async () => {
-            throw new Error("Code: 241. Memory limit exceeded");
-          } }),
+          }).trace({
+            request,
+            task: async () => {
+              throw new Error("Code: 241. Memory limit exceeded");
+            },
+          }),
         ).rejects.toThrow(/Memory limit exceeded/);
       });
     });

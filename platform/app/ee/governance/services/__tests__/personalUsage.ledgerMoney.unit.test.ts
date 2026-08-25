@@ -94,9 +94,7 @@ describe("the ingestion-ledger union's money", () => {
         },
       ]);
 
-      await expect(
-        repository.findIngestionPrincipalSummary(params),
-      ).rejects.toThrow();
+      await expect(repository.findIngestionPrincipalSummary(params)).rejects.toThrow();
     });
   });
 
@@ -169,9 +167,7 @@ describe("the ingestion-ledger union's money", () => {
         { Day: "2026-08-03", SpentNanoUsd: "1234567", Requests: 3 },
       ]);
       const buckets = await daily.findIngestionPrincipalBuckets(params);
-      expect(buckets.find((b) => b.day === "2026-08-03")?.spentUsd).toBe(
-        0.001234567,
-      );
+      expect(buckets.find((b) => b.day === "2026-08-03")?.spentUsd).toBe(0.001234567);
 
       const perModel = createRepository([
         { Label: "gpt-5-mini", SpentNanoUsd: "1234567", Requests: 3 },

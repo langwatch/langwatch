@@ -61,9 +61,7 @@ describe("useSuiteForm() — agent type filtering for availableTargets", () => {
           useSuiteForm({ ...baseParams, agents: mixedAgents }),
         );
 
-        const referenceIds = result.current.availableTargets.map(
-          (t) => t.referenceId,
-        );
+        const referenceIds = result.current.availableTargets.map((t) => t.referenceId);
 
         expect(referenceIds).not.toContain("agent_sig");
       });

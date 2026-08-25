@@ -1,10 +1,6 @@
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type {
-  HttpAuth,
-  HttpHeader,
-  HttpMethod,
-} from "@langwatch/workflow-contract";
+import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/workflow-contract";
 import { api } from "~/utils/api";
 import type { HttpTestResult } from "./HttpTestPanel";
 
@@ -37,9 +33,7 @@ export function useHttpTest({
   const httpProxyMutation = api.httpProxy.execute.useMutation();
 
   const handleTest = useCallback(
-    async (
-      templateVariables: Record<string, unknown>,
-    ): Promise<HttpTestResult> => {
+    async (templateVariables: Record<string, unknown>): Promise<HttpTestResult> => {
       if (!project?.id) {
         return { success: false, error: "No project selected" };
       }

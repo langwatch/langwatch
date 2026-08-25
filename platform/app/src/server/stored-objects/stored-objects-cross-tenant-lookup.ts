@@ -21,9 +21,7 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { getApp } from "~/server/app-layer/app";
 
-const tracer = getLangWatchTracer(
-  "langwatch.stored-objects.cross-tenant-lookup",
-);
+const tracer = getLangWatchTracer("langwatch.stored-objects.cross-tenant-lookup");
 
 /**
  * Thrown when no instance returned a hit AND at least one instance failed.
@@ -85,8 +83,7 @@ export async function resolveStoredObjectOwner({
     },
     async (span) => {
       const repository = getApp().storedObjects.crossTenantOwnerLookup;
-      const { hit, failedTargets, instancesSearched } =
-        await repository.findOwner(id);
+      const { hit, failedTargets, instancesSearched } = await repository.findOwner(id);
 
       span.setAttribute("clickhouse.instances_searched", instancesSearched);
       span.setAttribute("clickhouse.instances_failed", failedTargets.length);

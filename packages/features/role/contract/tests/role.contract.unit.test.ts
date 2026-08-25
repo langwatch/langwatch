@@ -17,7 +17,14 @@ describe("role contract", () => {
   });
 
   it("rejects unknown fields and reserved role input is left to the service", () => {
-    expect(() => roleCreateSchema.parse({ organizationId: "org_1", name: "Reviewer", permissions: ["traces:view"], extra: true })).toThrow();
+    expect(() =>
+      roleCreateSchema.parse({
+        organizationId: "org_1",
+        name: "Reviewer",
+        permissions: ["traces:view"],
+        extra: true,
+      }),
+    ).toThrow();
     expect(roleUpdateSchema.parse({ description: null })).toEqual({ description: null });
   });
 });

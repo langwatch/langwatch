@@ -64,9 +64,7 @@ const THINKING_MARKER_RE = /^🧠\s*/;
  * thinking marker, return the children with that prefix stripped. Returns
  * null when the marker is absent so the caller can fall back to plain em.
  */
-export function stripThinkingMarker(
-  children: React.ReactNode,
-): React.ReactNode | null {
+export function stripThinkingMarker(children: React.ReactNode): React.ReactNode | null {
   const arr = React.Children.toArray(children);
   const first = arr[0];
   if (typeof first !== "string") return null;

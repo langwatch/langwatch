@@ -1,7 +1,4 @@
-import {
-  SimulationRunStatus,
-  SimulationVerdict,
-} from "@langwatch/simulation-contract";
+import { SimulationRunStatus, SimulationVerdict } from "@langwatch/simulation-contract";
 
 export const ScenarioRunStatus = SimulationRunStatus;
 export type ScenarioRunStatus = SimulationRunStatus;

@@ -2,9 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { USAGE_UNKNOWN } from "~/server/traces/usage-count";
 import type { PlanLimitNotifierInput } from "@langwatch/enterprise-billing-contract";
 import type { NotificationService as NotificationRecordService } from "@langwatch/notification-contract";
-import type {
-  NotificationService,
-} from "~/runtime/app/features/billing";
+import type { NotificationService } from "~/runtime/app/features/billing";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -186,8 +184,7 @@ describe("UsageLimitService", () => {
 
     describe("when organization is not found", () => {
       it("returns without sending notifications", async () => {
-        const { service, organizationService, notificationService } =
-          createService();
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(null);
@@ -197,19 +194,14 @@ describe("UsageLimitService", () => {
           organizationId: "org_missing",
         });
 
-        expect(
-          notificationService.sendSlackPlanLimitAlert,
-        ).not.toHaveBeenCalled();
-        expect(
-          notificationService.sendHubspotPlanLimitForm,
-        ).not.toHaveBeenCalled();
+        expect(notificationService.sendSlackPlanLimitAlert).not.toHaveBeenCalled();
+        expect(notificationService.sendHubspotPlanLimitForm).not.toHaveBeenCalled();
       });
     });
 
     describe("when alert was sent recently (within 30 days)", () => {
       it("returns without sending notifications", async () => {
-        const { service, organizationService, notificationService } =
-          createService();
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue({
@@ -221,16 +213,13 @@ describe("UsageLimitService", () => {
           ...PLAN_LIMIT_INPUT,
         });
 
-        expect(
-          notificationService.sendSlackPlanLimitAlert,
-        ).not.toHaveBeenCalled();
+        expect(notificationService.sendSlackPlanLimitAlert).not.toHaveBeenCalled();
       });
     });
 
     describe("when no recent alert exists", () => {
       it("sends Slack and Hubspot notifications and updates the timestamp", async () => {
-        const { service, organizationService, notificationService } =
-          createService();
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(ORG_WITH_ADMIN);
@@ -239,9 +228,7 @@ describe("UsageLimitService", () => {
           ...PLAN_LIMIT_INPUT,
         });
 
-        expect(
-          notificationService.sendSlackPlanLimitAlert,
-        ).toHaveBeenCalledWith(
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledWith(
           expect.objectContaining({
             organizationId: "org_1",
             organizationName: "Acme Corp",
@@ -253,16 +240,15 @@ describe("UsageLimitService", () => {
             max: 10000,
           }),
         );
-        expect(
-          notificationService.sendHubspotPlanLimitForm,
-        ).toHaveBeenCalledWith(
+        expect(notificationService.sendHubspotPlanLimitForm).toHaveBeenCalledWith(
           expect.objectContaining({
             organizationId: "org_1",
           }),
         );
-        expect(
-          organizationService.updateSentPlanLimitAlert,
-        ).toHaveBeenCalledWith("org_1", expect.any(Date));
+        expect(organizationService.updateSentPlanLimitAlert).toHaveBeenCalledWith(
+          "org_1",
+          expect.any(Date),
+        );
       });
     });
 
@@ -270,12 +256,8 @@ describe("UsageLimitService", () => {
       it.each([
         { usageUnit: "traces" as const, limitType: "Monthly Traces" },
         { usageUnit: "events" as const, limitType: "Monthly Events" },
-      ])("labels a $usageUnit cap as $limitType", async ({
-        usageUnit,
-        limitType,
-      }) => {
-        const { service, organizationService, notificationService } =
-          createService();
+      ])("labels a $usageUnit cap as $limitType", async ({ usageUnit, limitType }) => {
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(ORG_WITH_ADMIN);
@@ -285,9 +267,7 @@ describe("UsageLimitService", () => {
           usageUnit,
         });
 
-        expect(
-          notificationService.sendSlackPlanLimitAlert,
-        ).toHaveBeenCalledWith(
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledWith(
           expect.objectContaining({
             limitType,
             current: 12000,
@@ -299,8 +279,7 @@ describe("UsageLimitService", () => {
 
     describe("when alert was sent more than 30 days ago", () => {
       it("sends notifications again", async () => {
-        const { service, organizationService, notificationService } =
-          createService();
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue({
@@ -318,8 +297,7 @@ describe("UsageLimitService", () => {
 
     describe("when called concurrently for the same organization", () => {
       it("sends only one notification", async () => {
-        const { service, organizationService, notificationService } =
-          createService();
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(ORG_WITH_ADMIN);
@@ -342,16 +320,13 @@ describe("UsageLimitService", () => {
           }),
         ]);
 
-        expect(
-          notificationService.sendSlackPlanLimitAlert,
-        ).toHaveBeenCalledTimes(1);
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
       });
     });
 
     describe("when called again after cooldown expires", () => {
       it("sends notification again", async () => {
-        const { service, organizationService, notificationService } =
-          createService();
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(ORG_WITH_ADMIN);
@@ -359,39 +334,30 @@ describe("UsageLimitService", () => {
         await service.notifyPlanLimitReached({
           ...PLAN_LIMIT_INPUT,
         });
-        expect(
-          notificationService.sendSlackPlanLimitAlert,
-        ).toHaveBeenCalledTimes(1);
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
 
         // Simulate cooldown expiry
         planLimitInFlight.delete("org_1");
         await planLimitCooldown.delete("org_1");
         vi.mocked(
-          notificationService.sendSlackPlanLimitAlert as ReturnType<
-            typeof vi.fn
-          >,
+          notificationService.sendSlackPlanLimitAlert as ReturnType<typeof vi.fn>,
         ).mockClear();
 
         await service.notifyPlanLimitReached({
           ...PLAN_LIMIT_INPUT,
         });
-        expect(
-          notificationService.sendSlackPlanLimitAlert,
-        ).toHaveBeenCalledTimes(1);
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
       });
     });
 
     describe("when one notification channel fails", () => {
       it("completes without throwing (fire-and-forget sends)", async () => {
-        const { service, organizationService, notificationService } =
-          createService();
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(ORG_WITH_ADMIN);
         (
-          notificationService.sendSlackPlanLimitAlert as ReturnType<
-            typeof vi.fn
-          >
+          notificationService.sendSlackPlanLimitAlert as ReturnType<typeof vi.fn>
         ).mockRejectedValueOnce(new Error("Slack down"));
 
         // Should not throw — allSettled absorbs the rejection
@@ -399,12 +365,8 @@ describe("UsageLimitService", () => {
           ...PLAN_LIMIT_INPUT,
         });
 
-        expect(
-          notificationService.sendSlackPlanLimitAlert,
-        ).toHaveBeenCalledTimes(1);
-        expect(
-          notificationService.sendHubspotPlanLimitForm,
-        ).toHaveBeenCalledTimes(1);
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
+        expect(notificationService.sendHubspotPlanLimitForm).toHaveBeenCalledTimes(1);
       });
     });
   });
@@ -434,9 +396,7 @@ describe("UsageLimitService", () => {
           max: 5,
         });
 
-        expect(
-          notificationService.sendSlackResourceLimitAlert,
-        ).not.toHaveBeenCalled();
+        expect(notificationService.sendSlackResourceLimitAlert).not.toHaveBeenCalled();
       });
     });
 
@@ -453,16 +413,13 @@ describe("UsageLimitService", () => {
           max: 5,
         });
 
-        expect(
-          notificationService.sendSlackResourceLimitAlert,
-        ).not.toHaveBeenCalled();
+        expect(notificationService.sendSlackResourceLimitAlert).not.toHaveBeenCalled();
       });
     });
 
     describe("when cooldown is active for a different limit type", () => {
       it("sends the notification (cooldown is per-org+type)", async () => {
-        const { service, organizationService, notificationService } =
-          createService();
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(ORG_WITH_ADMIN);
@@ -476,9 +433,7 @@ describe("UsageLimitService", () => {
         });
 
         vi.mocked(
-          notificationService.sendSlackResourceLimitAlert as ReturnType<
-            typeof vi.fn
-          >,
+          notificationService.sendSlackResourceLimitAlert as ReturnType<typeof vi.fn>,
         ).mockClear();
 
         // Second call with different type is NOT suppressed
@@ -489,16 +444,13 @@ describe("UsageLimitService", () => {
           max: 3,
         });
 
-        expect(
-          notificationService.sendSlackResourceLimitAlert,
-        ).toHaveBeenCalled();
+        expect(notificationService.sendSlackResourceLimitAlert).toHaveBeenCalled();
       });
     });
 
     describe("when notification conditions are met", () => {
       it("sends correct payload with org name, admin, plan, display label, and counts", async () => {
-        const { service, organizationService, notificationService } =
-          createService();
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(ORG_WITH_ADMIN);
@@ -510,9 +462,7 @@ describe("UsageLimitService", () => {
           max: 5,
         });
 
-        expect(
-          notificationService.sendSlackResourceLimitAlert,
-        ).toHaveBeenCalledWith({
+        expect(notificationService.sendSlackResourceLimitAlert).toHaveBeenCalledWith({
           organizationId: "org_1",
           organizationName: "Acme Corp",
           adminName: "Jane Admin",
@@ -527,8 +477,7 @@ describe("UsageLimitService", () => {
 
     describe("when called concurrently for the same organization", () => {
       it("sends at most one notification per concurrent batch (in-memory cooldown has a race window)", async () => {
-        const { service, organizationService, notificationService } =
-          createService();
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(ORG_WITH_ADMIN);
@@ -551,9 +500,7 @@ describe("UsageLimitService", () => {
         // The in-memory cooldown has a documented race window: two concurrent calls both see
         // a cache miss before either writes the cooldown entry. The worst case is a duplicate
         // alert (see NOTE in usage-limit.service.ts). Both calls proceed when concurrent.
-        expect(
-          notificationService.sendSlackResourceLimitAlert,
-        ).toHaveBeenCalledTimes(2);
+        expect(notificationService.sendSlackResourceLimitAlert).toHaveBeenCalledTimes(2);
       });
     });
 
@@ -571,23 +518,18 @@ describe("UsageLimitService", () => {
           max: 5,
         });
 
-        expect(
-          await resourceLimitCooldown.get("org_missing:members"),
-        ).toBeUndefined();
+        expect(await resourceLimitCooldown.get("org_missing:members")).toBeUndefined();
       });
     });
 
     describe("when notification dispatch fails", () => {
       it("releases the cooldown", async () => {
-        const { service, organizationService, notificationService } =
-          createService();
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(ORG_WITH_ADMIN);
         (
-          notificationService.sendSlackResourceLimitAlert as ReturnType<
-            typeof vi.fn
-          >
+          notificationService.sendSlackResourceLimitAlert as ReturnType<typeof vi.fn>
         ).mockRejectedValue(new Error("Slack down"));
 
         await service.notifyResourceLimitReached({
@@ -597,9 +539,7 @@ describe("UsageLimitService", () => {
           max: 5,
         });
 
-        expect(
-          await resourceLimitCooldown.get("org_1:members"),
-        ).toBeUndefined();
+        expect(await resourceLimitCooldown.get("org_1:members")).toBeUndefined();
       });
     });
 
@@ -624,9 +564,7 @@ describe("UsageLimitService", () => {
           max: 5,
         });
 
-        expect(
-          notificationService.sendSlackResourceLimitAlert,
-        ).toHaveBeenCalledWith(
+        expect(notificationService.sendSlackResourceLimitAlert).toHaveBeenCalledWith(
           expect.objectContaining({
             planName: "unknown",
           }),
@@ -661,21 +599,17 @@ describe("UsageLimitService", () => {
       });
 
       it("sends email to admin members and creates notification record", async () => {
-        const {
-          service,
-          organizationService,
-          usageService,
-          notificationService,
-        } = createService();
+        const { service, organizationService, usageService, notificationService } =
+          createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(ORG_WITH_ADMIN);
         (
           organizationService.findProjectsWithName as ReturnType<typeof vi.fn>
         ).mockResolvedValue([{ id: "p1", name: "My Project" }]);
-        (
-          usageService.getCountByProjects as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([{ projectId: "p1", count: 5500 }]);
+        (usageService.getCountByProjects as ReturnType<typeof vi.fn>).mockResolvedValue([
+          { projectId: "p1", count: 5500 },
+        ]);
 
         const result = await service.checkAndSendWarning({
           organizationId: "org_1",
@@ -740,19 +674,13 @@ describe("UsageLimitService", () => {
 
     describe("when notification was already sent for this threshold this month", () => {
       it("returns null without sending duplicate", async () => {
-        const {
-          service,
-          organizationService,
-          notificationRecords,
-          notificationService,
-        } = createService();
+        const { service, organizationService, notificationRecords, notificationService } =
+          createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(ORG_WITH_ADMIN);
         (
-          notificationRecords.listRecentByOrganization as ReturnType<
-            typeof vi.fn
-          >
+          notificationRecords.listRecentByOrganization as ReturnType<typeof vi.fn>
         ).mockResolvedValue([
           {
             id: "existing_notif",
@@ -796,9 +724,9 @@ describe("UsageLimitService", () => {
         (
           organizationService.findProjectsWithName as ReturnType<typeof vi.fn>
         ).mockResolvedValue([{ id: "proj_1", name: "Production" }]);
-        (
-          usageService.getCountByProjects as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(USAGE_UNKNOWN);
+        (usageService.getCountByProjects as ReturnType<typeof vi.fn>).mockResolvedValue(
+          USAGE_UNKNOWN,
+        );
 
         await service.checkAndSendWarning({
           organizationId: "org_1",
@@ -828,9 +756,9 @@ describe("UsageLimitService", () => {
         (
           organizationService.findProjectsWithName as ReturnType<typeof vi.fn>
         ).mockResolvedValue([]);
-        (
-          usageService.getCountByProjects as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([]);
+        (usageService.getCountByProjects as ReturnType<typeof vi.fn>).mockResolvedValue(
+          [],
+        );
         (
           notificationService.sendUsageLimitEmail as ReturnType<typeof vi.fn>
         ).mockRejectedValue(new Error("SMTP failure"));
@@ -863,8 +791,7 @@ describe("UsageLimitService", () => {
 
     describe("when admins have no email addresses", () => {
       it("returns null without sending emails", async () => {
-        const { service, organizationService, notificationService } =
-          createService();
+        const { service, organizationService, notificationService } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue({

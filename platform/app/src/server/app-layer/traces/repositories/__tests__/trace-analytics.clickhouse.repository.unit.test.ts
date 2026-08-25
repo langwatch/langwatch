@@ -46,9 +46,7 @@ const TRACE_ID = "trace-tz";
 const TABLE = "trace_analytics";
 
 function makeRepositoryReturning(record: Record<string, unknown>) {
-  return new TraceAnalyticsClickHouseRepository(async () =>
-    clientReturning(record),
-  );
+  return new TraceAnalyticsClickHouseRepository(async () => clientReturning(record));
 }
 
 function makeOrderingRepository(rows: Array<Record<string, unknown>>) {
@@ -108,13 +106,9 @@ describe("TraceAnalyticsClickHouseRepository DateTime64 decode", () => {
           traceId: TRACE_ID,
         });
 
-        expect(read?.row.occurredAtMs).toBe(
-          Date.UTC(2026, 6, 24, 12, 0, 0, 123),
-        );
+        expect(read?.row.occurredAtMs).toBe(Date.UTC(2026, 6, 24, 12, 0, 0, 123));
         expect(read?.row.createdAtMs).toBe(Date.UTC(2026, 6, 24, 12, 0, 1, 0));
-        expect(read?.row.updatedAtMs).toBe(
-          Date.UTC(2026, 6, 24, 12, 0, 2, 500),
-        );
+        expect(read?.row.updatedAtMs).toBe(Date.UTC(2026, 6, 24, 12, 0, 2, 500));
       });
     });
   });
@@ -277,12 +271,10 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
 
-        expect(
-          await windowedReadCount({ table: TABLE, outcome: "windowed_empty" }),
-        ).toBe(beforeEmpty + 1);
-        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(
-          beforeHit,
+        expect(await windowedReadCount({ table: TABLE, outcome: "windowed_empty" })).toBe(
+          beforeEmpty + 1,
         );
+        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(beforeHit);
       });
 
       it("passes the caller's bounds through to ClickHouse unchanged", async () => {
@@ -316,10 +308,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
         const query = seen[0]?.query ?? "";
         const innerScopeStart = query.indexOf("IN (");
         const outerScope = query.slice(0, innerScopeStart);
-        const innerScope = query.slice(
-          innerScopeStart,
-          query.indexOf("GROUP BY"),
-        );
+        const innerScope = query.slice(innerScopeStart, query.indexOf("GROUP BY"));
 
         expect(outerScope).toContain("fromUnixTimestamp64Milli");
         expect(innerScope).not.toContain("fromUnixTimestamp64Milli");
@@ -341,9 +330,9 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           traceId: TRACE_ID,
         });
 
-        expect(
-          await windowedReadCount({ table: TABLE, outcome: "unwindowed" }),
-        ).toBe(before + 1);
+        expect(await windowedReadCount({ table: TABLE, outcome: "unwindowed" })).toBe(
+          before + 1,
+        );
         expect(seen[0]?.query).not.toContain("fromUnixTimestamp64Milli");
       });
     });
@@ -407,9 +396,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
     describe("when a single row is upserted", () => {
       it("refuses to let ClickHouse silently drop an unknown column", async () => {
         const { client, inserts } = capturingInsertClient();
-        const repository = new TraceAnalyticsClickHouseRepository(
-          async () => client,
-        );
+        const repository = new TraceAnalyticsClickHouseRepository(async () => client);
 
         await repository.upsert(ROW);
 
@@ -422,9 +409,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
     describe("when a batch is upserted", () => {
       it("refuses to let ClickHouse silently drop an unknown column", async () => {
         const { client, inserts } = capturingInsertClient();
-        const repository = new TraceAnalyticsClickHouseRepository(
-          async () => client,
-        );
+        const repository = new TraceAnalyticsClickHouseRepository(async () => client);
 
         await repository.upsertBatch([{ row: ROW }]);
 

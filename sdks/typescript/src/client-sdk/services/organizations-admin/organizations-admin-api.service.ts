@@ -106,9 +106,7 @@ export class OrganizationsAdminApiService {
     });
   }
 
-  async get(
-    id: string,
-  ): Promise<{ organization: ProvisionedOrganizationSummary }> {
+  async get(id: string): Promise<{ organization: ProvisionedOrganizationSummary }> {
     return this.#request({
       operation: `fetch organization "${id}"`,
       path: `/api/organizations/${encodeURIComponent(id)}`,

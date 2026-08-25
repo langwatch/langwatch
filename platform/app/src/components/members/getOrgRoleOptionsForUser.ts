@@ -17,7 +17,5 @@ export function getOrgRoleOptionsForUser({
     return orgRoleOptions;
   }
 
-  return orgRoleOptions.filter(
-    (option) => option.value !== OrganizationUserRole.ADMIN,
-  );
+  return orgRoleOptions.filter((option) => option.value !== OrganizationUserRole.ADMIN);
 }

@@ -9,9 +9,7 @@ import { permissionsCell, printBindings } from "./_shared";
  * exists only in the create response, so this is safe to hand to a machine
  * caller as-is.
  */
-export const getApiKeyCommand = async (
-  id: string,
-): Promise<CommandResult | void> =>
+export const getApiKeyCommand = async (id: string): Promise<CommandResult | void> =>
   runManagement({
     action: "fetch API key",
     pending: `Fetching API key "${id}"...`,
@@ -26,10 +24,7 @@ export const getApiKeyCommand = async (
         ["Acts as", orDash(apiKey.assignedToUserId)],
         ["Permission mode", apiKey.permissionMode],
         ["Permissions", permissionsCell(apiKey)],
-        [
-          "Status",
-          apiKey.revokedAt ? chalk.red("revoked") : chalk.green("active"),
-        ],
+        ["Status", apiKey.revokedAt ? chalk.red("revoked") : chalk.green("active")],
         ["Expires", asDate(apiKey.expiresAt)],
         ["Last used", asDate(apiKey.lastUsedAt)],
       ]);

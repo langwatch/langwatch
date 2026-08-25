@@ -45,10 +45,7 @@ const STACKED_PROVIDERS = ["openai", "anthropic", "gemini"] as const;
 
 const SETTINGS_HREF = "/settings/model-providers";
 
-export function NoModelsConfiguredCallout({
-  size = "md",
-  forFeatureLabel,
-}: Props) {
+export function NoModelsConfiguredCallout({ size = "md", forFeatureLabel }: Props) {
   const featureSuffix = forFeatureLabel ? ` for ${forFeatureLabel}` : "";
 
   // Whole-row click navigates to settings in a new tab. The inner button

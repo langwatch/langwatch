@@ -1,46 +1,48 @@
 import { z } from "zod/v4";
 
-export const appBootConfigSchema = z.object({
-  nodeEnv: z.enum(["development", "test", "production"]),
-  environment: z.string().min(1).default("local"),
-  port: z.coerce.number().int().min(1).max(65_535).default(5_560),
-  apiPort: z.coerce.number().int().min(1).max(65_535).optional(),
-  workersInProcess: z
-    .union([
-      z.boolean(),
-      z.literal("true"),
-      z.literal("false"),
-      z.literal("1"),
-      z.literal("0"),
-    ])
-    .transform((value) => value === true || value === "true" || value === "1")
-    .default(false),
-  developmentHttp2: z
-    .union([
-      z.boolean(),
-      z.literal("true"),
-      z.literal("false"),
-      z.literal("1"),
-      z.literal("0"),
-    ])
-    .transform((value) => value === true || value === "true" || value === "1")
-    .default(false),
-  developmentHttpsCertificatePath: z.string().min(1).optional(),
-  developmentHttpsPrivateKeyPath: z.string().min(1).optional(),
-  developmentCertificateDirectory: z.string().min(1).optional(),
-  gatewaySecretsConfigured: z.boolean().default(false),
-}).superRefine((value, context) => {
-  if (
-    Boolean(value.developmentHttpsCertificatePath) !==
-    Boolean(value.developmentHttpsPrivateKeyPath)
-  ) {
-    context.addIssue({
-      code: "custom",
-      path: ["developmentHttpsCertificatePath"],
-      message: "Development HTTPS certificate and private key must be set together.",
-    });
-  }
-});
+export const appBootConfigSchema = z
+  .object({
+    nodeEnv: z.enum(["development", "test", "production"]),
+    environment: z.string().min(1).default("local"),
+    port: z.coerce.number().int().min(1).max(65_535).default(5_560),
+    apiPort: z.coerce.number().int().min(1).max(65_535).optional(),
+    workersInProcess: z
+      .union([
+        z.boolean(),
+        z.literal("true"),
+        z.literal("false"),
+        z.literal("1"),
+        z.literal("0"),
+      ])
+      .transform((value) => value === true || value === "true" || value === "1")
+      .default(false),
+    developmentHttp2: z
+      .union([
+        z.boolean(),
+        z.literal("true"),
+        z.literal("false"),
+        z.literal("1"),
+        z.literal("0"),
+      ])
+      .transform((value) => value === true || value === "true" || value === "1")
+      .default(false),
+    developmentHttpsCertificatePath: z.string().min(1).optional(),
+    developmentHttpsPrivateKeyPath: z.string().min(1).optional(),
+    developmentCertificateDirectory: z.string().min(1).optional(),
+    gatewaySecretsConfigured: z.boolean().default(false),
+  })
+  .superRefine((value, context) => {
+    if (
+      Boolean(value.developmentHttpsCertificatePath) !==
+      Boolean(value.developmentHttpsPrivateKeyPath)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["developmentHttpsCertificatePath"],
+        message: "Development HTTPS certificate and private key must be set together.",
+      });
+    }
+  });
 
 export type AppBootConfig = z.infer<typeof appBootConfigSchema>;
 

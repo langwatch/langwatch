@@ -54,9 +54,7 @@ beforeEach(() => {
 
   vi.doMock("@aws-sdk/client-s3", async () => {
     class FakeListCmd {
-      constructor(
-        public readonly input: { Prefix?: string; StartAfter?: string },
-      ) {}
+      constructor(public readonly input: { Prefix?: string; StartAfter?: string }) {}
     }
     class FakeGetCmd {
       constructor(public readonly input: { Bucket: string; Key: string }) {}
@@ -66,10 +64,8 @@ beforeEach(() => {
         if (cmd instanceof FakeListCmd) {
           lastListInvocation = cmd.input;
           const filtered = stubObjects.filter((o) => {
-            if (cmd.input.Prefix && !o.key.startsWith(cmd.input.Prefix))
-              return false;
-            if (cmd.input.StartAfter && o.key <= cmd.input.StartAfter)
-              return false;
+            if (cmd.input.Prefix && !o.key.startsWith(cmd.input.Prefix)) return false;
+            if (cmd.input.StartAfter && o.key <= cmd.input.StartAfter) return false;
             return true;
           });
           return {
@@ -107,16 +103,12 @@ describe("S3PollingPullerAdapter", () => {
 
     it("rejects an unknown parser value", () => {
       const adapter = new S3PollingPullerAdapter();
-      expect(() =>
-        adapter.validateConfig({ ...VALID_CONFIG, parser: "yaml" }),
-      ).toThrow();
+      expect(() => adapter.validateConfig({ ...VALID_CONFIG, parser: "yaml" })).toThrow();
     });
 
     it("rejects empty bucket name", () => {
       const adapter = new S3PollingPullerAdapter();
-      expect(() =>
-        adapter.validateConfig({ ...VALID_CONFIG, bucket: "" }),
-      ).toThrow();
+      expect(() => adapter.validateConfig({ ...VALID_CONFIG, bucket: "" })).toThrow();
     });
 
     it("defaults prefix to empty string when omitted", () => {
@@ -129,9 +121,8 @@ describe("S3PollingPullerAdapter", () => {
 
   describe("runOnce — ndjson parser", () => {
     it("happy-path drain: reads all keys lexicographically + advances cursor to last key", async () => {
-      const { S3PollingPullerAdapter: AdapterUnderTest } = await import(
-        "../s3PollingPullerAdapter"
-      );
+      const { S3PollingPullerAdapter: AdapterUnderTest } =
+        await import("../s3PollingPullerAdapter");
       const adapter = new AdapterUnderTest();
       stubObjects = [
         {
@@ -193,9 +184,8 @@ describe("S3PollingPullerAdapter", () => {
     });
 
     it("respects cursor: passes StartAfter to ListObjectsV2 + skips already-seen keys", async () => {
-      const { S3PollingPullerAdapter: AdapterUnderTest } = await import(
-        "../s3PollingPullerAdapter"
-      );
+      const { S3PollingPullerAdapter: AdapterUnderTest } =
+        await import("../s3PollingPullerAdapter");
       const adapter = new AdapterUnderTest();
       stubObjects = [
         {
@@ -226,9 +216,8 @@ describe("S3PollingPullerAdapter", () => {
     });
 
     it("returns empty result + cursor unchanged when no new keys", async () => {
-      const { S3PollingPullerAdapter: AdapterUnderTest } = await import(
-        "../s3PollingPullerAdapter"
-      );
+      const { S3PollingPullerAdapter: AdapterUnderTest } =
+        await import("../s3PollingPullerAdapter");
       const adapter = new AdapterUnderTest();
       // stubObjects empty
       const result = await adapter.runOnce(
@@ -241,9 +230,8 @@ describe("S3PollingPullerAdapter", () => {
     });
 
     it("skips malformed ndjson lines without aborting; cursor still advances", async () => {
-      const { S3PollingPullerAdapter: AdapterUnderTest } = await import(
-        "../s3PollingPullerAdapter"
-      );
+      const { S3PollingPullerAdapter: AdapterUnderTest } =
+        await import("../s3PollingPullerAdapter");
       const adapter = new AdapterUnderTest();
       stubObjects = [
         {
@@ -287,9 +275,8 @@ describe("S3PollingPullerAdapter", () => {
 
   describe("runOnce — json-array parser", () => {
     it("parses a top-level array into events", async () => {
-      const { S3PollingPullerAdapter: AdapterUnderTest } = await import(
-        "../s3PollingPullerAdapter"
-      );
+      const { S3PollingPullerAdapter: AdapterUnderTest } =
+        await import("../s3PollingPullerAdapter");
       const adapter = new AdapterUnderTest();
       stubObjects = [
         {
@@ -329,9 +316,8 @@ describe("S3PollingPullerAdapter", () => {
 
   describe("runOnce — csv parser", () => {
     it("parses headers + 3 data rows", async () => {
-      const { S3PollingPullerAdapter: AdapterUnderTest } = await import(
-        "../s3PollingPullerAdapter"
-      );
+      const { S3PollingPullerAdapter: AdapterUnderTest } =
+        await import("../s3PollingPullerAdapter");
       const adapter = new AdapterUnderTest();
       stubObjects = [
         {

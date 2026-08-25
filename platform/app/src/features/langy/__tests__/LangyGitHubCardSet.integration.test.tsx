@@ -67,8 +67,7 @@ describe("the GitHub card set", () => {
             toolCallId: "c1",
             state: "output-available",
             input: {
-              command:
-                "git clone https://x-access-token@github.com/acme/checkout",
+              command: "git clone https://x-access-token@github.com/acme/checkout",
             },
           },
           {

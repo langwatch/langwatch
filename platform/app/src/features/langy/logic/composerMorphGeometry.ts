@@ -42,10 +42,7 @@ export function glowRectFor(origin: MorphRect): MorphRect {
 }
 
 /** The halfway pose, for previewing the travel without waiting for it. */
-export function midpointRect(
-  origin: MorphRect,
-  destination: MorphRect,
-): MorphRect {
+export function midpointRect(origin: MorphRect, destination: MorphRect): MorphRect {
   return {
     top: origin.top + (destination.top - origin.top) / 2,
     left: origin.left + (destination.left - origin.left) / 2,

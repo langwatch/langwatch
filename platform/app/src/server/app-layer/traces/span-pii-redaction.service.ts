@@ -27,10 +27,9 @@ import {
  * the only selections that still require the analysis service; everything else
  * is redacted natively.
  */
-const STRICT_ONLY_PII_ENTITIES: readonly string[] =
-  PRESIDIO_STRICT_ENTITIES.filter(
-    (entity) => !new Set<string>(ESSENTIAL_PII_ENTITIES).has(entity),
-  );
+const STRICT_ONLY_PII_ENTITIES: readonly string[] = PRESIDIO_STRICT_ENTITIES.filter(
+  (entity) => !new Set<string>(ESSENTIAL_PII_ENTITIES).has(entity),
+);
 
 import { createLogger } from "@langwatch/observability";
 import { featureFlagService } from "~/server/featureFlag";
@@ -64,9 +63,7 @@ export type BatchClearPIIFunction = (
  * project's effective policy to drive the native secrets + essential-PII pass.
  */
 export type DataPrivacyResolver = {
-  getResolvedForProject(args: {
-    projectId: string;
-  }): Promise<ResolvedDataPrivacy>;
+  getResolvedForProject(args: { projectId: string }): Promise<ResolvedDataPrivacy>;
 };
 
 /**
@@ -118,11 +115,7 @@ const defaultBatchClearPII: BatchClearPIIFunction = async (texts, options) => {
   }
 
   try {
-    return await defaultBatchPresidioClearPII(
-      texts,
-      piiRedactionLevel,
-      entities,
-    );
+    return await defaultBatchPresidioClearPII(texts, piiRedactionLevel, entities);
   } catch {
     // The DLP fallback redacts by level, not by the custom entity subset; the
     // native pass already handled the pattern-based selections, so this only
@@ -236,8 +229,7 @@ export class OtlpSpanPiiRedactionService {
     if (!tenantId) return null;
     let resolved: ResolvedDataPrivacy;
     try {
-      const service =
-        this.deps.dataPrivacyResolver ?? getDataPrivacyPolicyService();
+      const service = this.deps.dataPrivacyResolver ?? getDataPrivacyPolicyService();
       resolved = await service.getResolvedForProject({ projectId: tenantId });
     } catch (error) {
       this.logger.warn(
@@ -308,13 +300,9 @@ export class OtlpSpanPiiRedactionService {
     exceptPatterns?: readonly string[];
   } | null {
     const exceptPatterns =
-      policy.pii.exceptPatterns.length > 0
-        ? policy.pii.exceptPatterns
-        : undefined;
+      policy.pii.exceptPatterns.length > 0 ? policy.pii.exceptPatterns : undefined;
     if (policy.pii.level === "strict") {
-      return exceptPatterns
-        ? { entities: STRICT_ONLY_PII_ENTITIES, exceptPatterns }
-        : {};
+      return exceptPatterns ? { entities: STRICT_ONLY_PII_ENTITIES, exceptPatterns } : {};
     }
     if (policy.pii.level === "custom") {
       const entities = this.customLambdaEntities(policy);
@@ -326,9 +314,7 @@ export class OtlpSpanPiiRedactionService {
   private nativeSecretPatterns(
     policy: ResolvedDataPrivacy,
   ): readonly RegExp[] | undefined {
-    return policy.secrets.enabled
-      ? compilePolicySecretPatterns(policy)
-      : undefined;
+    return policy.secrets.enabled ? compilePolicySecretPatterns(policy) : undefined;
   }
 
   /**
@@ -530,9 +516,7 @@ export class OtlpSpanPiiRedactionService {
    * so the read path can surface it. Names/locations may remain in the content.
    */
   private markPiiAnalysisIncomplete(span: OtlpSpan): void {
-    if (
-      span.attributes.some((a) => a.key === PRIVACY_PII_INCOMPLETE_MARKER_ATTR)
-    ) {
+    if (span.attributes.some((a) => a.key === PRIVACY_PII_INCOMPLETE_MARKER_ATTR)) {
       return;
     }
     span.attributes.push({
@@ -600,11 +584,7 @@ export class OtlpSpanPiiRedactionService {
     }
 
     if (resource?.attributes) {
-      const result = this.collectStringEntries(
-        resource.attributes,
-        entries,
-        totalLength,
-      );
+      const result = this.collectStringEntries(resource.attributes, entries, totalLength);
       anySkipped ||= result.skipped;
       anyRedacted ||= result.collected;
     }
@@ -802,9 +782,7 @@ export class OtlpSpanPiiRedactionService {
 
     if (!this.deps.isLangevalsConfigured) {
       if (piiEnforced) {
-        throw new Error(
-          "LANGEVALS_ENDPOINT is not set, PII check cannot be performed",
-        );
+        throw new Error("LANGEVALS_ENDPOINT is not set, PII check cannot be performed");
       }
       return null;
     }
@@ -814,9 +792,7 @@ export class OtlpSpanPiiRedactionService {
       enforced: piiEnforced,
       mainMethod: "presidio",
       ...(entities && entities.length > 0 ? { entities } : {}),
-      ...(exceptPatterns && exceptPatterns.length > 0
-        ? { exceptPatterns }
-        : {}),
+      ...(exceptPatterns && exceptPatterns.length > 0 ? { exceptPatterns } : {}),
     };
   }
 

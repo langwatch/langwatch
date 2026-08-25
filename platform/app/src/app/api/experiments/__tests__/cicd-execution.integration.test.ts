@@ -148,12 +148,9 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
   describe("POST /api/experiments/:slug/run", () => {
     describe("authentication", () => {
       it("returns 401 when no API key provided", async () => {
-        const response = await fetch(
-          `${getBaseUrl()}/api/experiments/${testSlug}/run`,
-          {
-            method: "POST",
-          },
-        );
+        const response = await fetch(`${getBaseUrl()}/api/experiments/${testSlug}/run`, {
+          method: "POST",
+        });
 
         expect(response.status).toBe(401);
         const body = await response.json();
@@ -161,15 +158,12 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
       });
 
       it("returns 401 with invalid API key", async () => {
-        const response = await fetch(
-          `${getBaseUrl()}/api/experiments/${testSlug}/run`,
-          {
-            method: "POST",
-            headers: {
-              "X-Auth-Token": "invalid-api-key",
-            },
+        const response = await fetch(`${getBaseUrl()}/api/experiments/${testSlug}/run`, {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": "invalid-api-key",
           },
-        );
+        });
 
         expect(response.status).toBe(401);
         const body = await response.json();
@@ -178,15 +172,12 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
 
       /** @scenario API key authentication via X-Auth-Token header */
       it("accepts X-Auth-Token header for authentication", async () => {
-        const response = await fetch(
-          `${getBaseUrl()}/api/experiments/${testSlug}/run`,
-          {
-            method: "POST",
-            headers: {
-              "X-Auth-Token": project.apiKey,
-            },
+        const response = await fetch(`${getBaseUrl()}/api/experiments/${testSlug}/run`, {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": project.apiKey,
           },
-        );
+        });
 
         // Should get past authentication
         expect(response.status).not.toBe(401);
@@ -194,15 +185,12 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
 
       /** @scenario API key authentication via Authorization Bearer header */
       it("accepts Authorization Bearer header for authentication", async () => {
-        const response = await fetch(
-          `${getBaseUrl()}/api/experiments/${testSlug}/run`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${project.apiKey}`,
-            },
+        const response = await fetch(`${getBaseUrl()}/api/experiments/${testSlug}/run`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${project.apiKey}`,
           },
-        );
+        });
 
         // Should get past authentication
         expect(response.status).not.toBe(401);
@@ -231,15 +219,12 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
     describe("polling mode (default)", () => {
       /** @scenario Default response returns runId for polling */
       it("returns runId immediately for polling", async () => {
-        const response = await fetch(
-          `${getBaseUrl()}/api/experiments/${testSlug}/run`,
-          {
-            method: "POST",
-            headers: {
-              "X-Auth-Token": project.apiKey,
-            },
+        const response = await fetch(`${getBaseUrl()}/api/experiments/${testSlug}/run`, {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": project.apiKey,
           },
-        );
+        });
 
         expect(response.status).toBe(200);
         const body = await response.json();
@@ -252,21 +237,16 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
 
     describe("SSE mode", () => {
       it("streams events with Accept: text/event-stream", async () => {
-        const response = await fetch(
-          `${getBaseUrl()}/api/experiments/${testSlug}/run`,
-          {
-            method: "POST",
-            headers: {
-              "X-Auth-Token": project.apiKey,
-              Accept: "text/event-stream",
-            },
+        const response = await fetch(`${getBaseUrl()}/api/experiments/${testSlug}/run`, {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": project.apiKey,
+            Accept: "text/event-stream",
           },
-        );
+        });
 
         expect(response.status).toBe(200);
-        expect(response.headers.get("content-type")).toContain(
-          "text/event-stream",
-        );
+        expect(response.headers.get("content-type")).toContain("text/event-stream");
 
         // Read stream events
         const reader = response.body?.getReader();
@@ -316,12 +296,9 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
   describe("GET /api/experiments/runs/:runId", () => {
     describe("authentication", () => {
       it("returns 401 when no API key provided", async () => {
-        const response = await fetch(
-          `${getBaseUrl()}/api/experiments/runs/some-run-id`,
-          {
-            method: "GET",
-          },
-        );
+        const response = await fetch(`${getBaseUrl()}/api/experiments/runs/some-run-id`, {
+          method: "GET",
+        });
 
         expect(response.status).toBe(401);
       });
@@ -372,9 +349,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
         expect(statusResponse.status).toBe(200);
         const body = await statusResponse.json();
         expect(body.runId).toBe(runId);
-        expect(["pending", "running", "completed", "failed"]).toContain(
-          body.status,
-        );
+        expect(["pending", "running", "completed", "failed"]).toContain(body.status);
         expect(body.total).toBe(2);
       }, 30000);
 

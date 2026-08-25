@@ -115,14 +115,8 @@ export const TreeRow = memo(function TreeRow({
     () => setHoveredSpanId(span.spanId),
     [setHoveredSpanId, span.spanId],
   );
-  const handleMouseLeave = useCallback(
-    () => setHoveredSpanId(null),
-    [setHoveredSpanId],
-  );
-  const handleClick = useCallback(
-    () => onSelect(span.spanId),
-    [onSelect, span.spanId],
-  );
+  const handleMouseLeave = useCallback(() => setHoveredSpanId(null), [setHoveredSpanId]);
+  const handleClick = useCallback(() => onSelect(span.spanId), [onSelect, span.spanId]);
   // Subscribe just to *this* row's pulse state — the selector returns a
   // boolean so only the row whose pulse flips actually re-renders, the
   // rest of the virtualized list stays untouched.
@@ -158,8 +152,7 @@ export const TreeRow = memo(function TreeRow({
   const duration = span.durationMs;
   const isZeroDuration = duration === 0;
   const offsetMs = Math.max(0, span.startTimeMs - rootStart);
-  const sharePct =
-    rootDuration > 0 ? Math.round((duration / rootDuration) * 100) : 0;
+  const sharePct = rootDuration > 0 ? Math.round((duration / rootDuration) * 100) : 0;
   const totalTokens =
     (span.inputTokens ?? 0) +
     (span.outputTokens ?? 0) +
@@ -168,12 +161,7 @@ export const TreeRow = memo(function TreeRow({
 
   const tooltipContent = (
     <Box minWidth="240px" maxWidth="340px">
-      <Text
-        textStyle="xs"
-        fontWeight="semibold"
-        color="fg"
-        wordBreak="break-word"
-      >
+      <Text textStyle="xs" fontWeight="semibold" color="fg" wordBreak="break-word">
         {displayName}
       </Text>
       <HStack gap={1.5} marginTop={1} flexWrap="wrap">
@@ -229,16 +217,10 @@ export const TreeRow = memo(function TreeRow({
             <TipCell label="Input" value={span.inputTokens.toLocaleString()} />
           )}
           {span.outputTokens != null && (
-            <TipCell
-              label="Output"
-              value={span.outputTokens.toLocaleString()}
-            />
+            <TipCell label="Output" value={span.outputTokens.toLocaleString()} />
           )}
           {span.cacheReadTokens != null && (
-            <TipCell
-              label="Cache read"
-              value={span.cacheReadTokens.toLocaleString()}
-            />
+            <TipCell label="Cache read" value={span.cacheReadTokens.toLocaleString()} />
           )}
           {span.cacheCreationTokens != null && (
             <TipCell
@@ -270,9 +252,7 @@ export const TreeRow = memo(function TreeRow({
         {isCollapsed && hiddenDescendantCount > 0 && (
           <TipCell label="Hidden spans" value={`${hiddenDescendantCount}`} />
         )}
-        {logCount > 0 && (
-          <TipCell label="Logs" value={`${logCount} — click to view`} />
-        )}
+        {logCount > 0 && <TipCell label="Logs" value={`${logCount} — click to view`} />}
         <TipCell label="Span ID" value={span.spanId.slice(0, 16)} mono />
         {/* Always rendered so the tooltip grid keeps a stable row count
             between spans — root spans show "none" instead of dropping
@@ -397,9 +377,7 @@ export const TreeRow = memo(function TreeRow({
           transition="all 0.1s ease"
           borderLeftWidth={isSelected ? "2px" : "0px"}
           borderLeftColor={
-            isSelected
-              ? { base: "fg.muted", _dark: "blue.solid" }
-              : "transparent"
+            isSelected ? { base: "fg.muted", _dark: "blue.solid" } : "transparent"
           }
         >
           {/* Chevron */}
@@ -452,21 +430,13 @@ export const TreeRow = memo(function TreeRow({
           </Flex>
 
           {/* Span name + metadata */}
-          <Flex
-            direction="column"
-            flex={1}
-            minWidth={0}
-            gap={0}
-            justify="center"
-          >
+          <Flex direction="column" flex={1} minWidth={0} gap={0} justify="center">
             <HStack gap={1} minWidth={0}>
               <Text
                 textStyle="xs"
                 color={isError ? "red.fg" : "fg"}
                 textDecoration={
-                  isDraftDeleted || isDeletedByCorrection
-                    ? "line-through"
-                    : undefined
+                  isDraftDeleted || isDeletedByCorrection ? "line-through" : undefined
                 }
                 truncate
                 minWidth={0}
@@ -542,12 +512,7 @@ export const TreeRow = memo(function TreeRow({
                   much it's hiding, so plain collapse reads differently
                   from a GroupRow's "×N repeated" fold. */}
               {isCollapsed && hiddenDescendantCount > 0 && (
-                <Text
-                  textStyle="2xs"
-                  color="fg.subtle"
-                  flexShrink={0}
-                  lineHeight={1.2}
-                >
+                <Text textStyle="2xs" color="fg.subtle" flexShrink={0} lineHeight={1.2}>
                   +{hiddenDescendantCount}
                 </Text>
               )}
@@ -574,9 +539,7 @@ export const TreeRow = memo(function TreeRow({
                   // correction removes it goes with the row, so it is struck
                   // through with the name rather than reading as a live one.
                   textDecoration={
-                    isDraftDeleted || isDeletedByCorrection
-                      ? "line-through"
-                      : undefined
+                    isDraftDeleted || isDeletedByCorrection ? "line-through" : undefined
                   }
                 >
                   {isLlm ? span.model! : span.toolName}
@@ -589,12 +552,7 @@ export const TreeRow = memo(function TreeRow({
               so they vertically center against the full row height
               instead of clinging to the top line on two-line LLM rows. */}
           {signals.length > 0 && (
-            <Flex
-              align="center"
-              flexShrink={0}
-              marginLeft={1}
-              alignSelf="center"
-            >
+            <Flex align="center" flexShrink={0} marginLeft={1} alignSelf="center">
               <LangwatchSignalBadges signals={signals} />
             </Flex>
           )}
@@ -864,9 +822,7 @@ function DeleteSpanAction({
         // "Delete span" on all of them tells a screen reader user nothing about
         // which one they are on.
         aria-label={
-          isDraftDeleted
-            ? `Restore span ${displayName}`
-            : `Delete span ${displayName}`
+          isDraftDeleted ? `Restore span ${displayName}` : `Delete span ${displayName}`
         }
       >
         <Icon as={isDraftDeleted ? LuRotateCcw : LuTrash2} boxSize={3} />

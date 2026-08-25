@@ -3,10 +3,7 @@ import {
   type Department,
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
-import {
-  Prisma,
-  type PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { DepartmentRepository } from "../../ports/department.port";
 
 export class PrismaDepartmentRepository extends DepartmentRepository {
@@ -36,9 +33,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     return row ? departmentSchema.parse(row) : null;
   }
 
-  async getAssignments(
-    organizationId: string,
-  ): Promise<DepartmentAssignments> {
+  async getAssignments(organizationId: string): Promise<DepartmentAssignments> {
     const [members, teams, projects] = await Promise.all([
       this.prisma.organizationUser.findMany({
         where: { organizationId },
@@ -72,13 +67,8 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     };
   }
 
-  async create(input: {
-    organizationId: string;
-    name: string;
-  }): Promise<Department> {
-    return departmentSchema.parse(
-      await this.prisma.department.create({ data: input }),
-    );
+  async create(input: { organizationId: string; name: string }): Promise<Department> {
+    return departmentSchema.parse(await this.prisma.department.create({ data: input }));
   }
 
   async resolveByNameOrCreate(input: {
@@ -117,10 +107,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     return result.count > 0;
   }
 
-  async archive(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<boolean> {
+  async archive(input: { id: string; organizationId: string }): Promise<boolean> {
     const result = await this.prisma.department.updateMany({
       where: input,
       data: { archivedAt: new Date() },

@@ -52,9 +52,7 @@ describe("the session context hook's per-session fingerprint", () => {
       });
 
       expect(posted).toHaveLength(2);
-      expect(attributesOf(posted[1]!)["vcs.ref.head.name"]).toBe(
-        "fix/regression",
-      );
+      expect(attributesOf(posted[1]!)["vcs.ref.head.name"]).toBe("fix/regression");
     });
 
     it("re-posts for a different session in the same repository", async () => {

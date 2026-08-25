@@ -50,9 +50,7 @@ describe("coerceEvaluatorScalar", () => {
 
   describe("when value is a bigint", () => {
     it("coerces to its decimal string form", () => {
-      expect(coerceEvaluatorScalar(BigInt("9007199254740993"))).toBe(
-        "9007199254740993",
-      );
+      expect(coerceEvaluatorScalar(BigInt("9007199254740993"))).toBe("9007199254740993");
     });
   });
 
@@ -66,9 +64,7 @@ describe("coerceEvaluatorScalar", () => {
     });
 
     it("JSON-stringifies nested structures", () => {
-      expect(coerceEvaluatorScalar({ a: [1, { b: true }] })).toBe(
-        '{"a":[1,{"b":true}]}',
-      );
+      expect(coerceEvaluatorScalar({ a: [1, { b: true }] })).toBe('{"a":[1,{"b":true}]}');
     });
   });
 });

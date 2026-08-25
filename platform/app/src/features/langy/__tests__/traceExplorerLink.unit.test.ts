@@ -43,9 +43,8 @@ describe("parseTraceSearchCommand", () => {
     describe("when the query is quoted and contains spaces", () => {
       it("keeps it as one value instead of splitting it into stray tokens", () => {
         expect(
-          parseTraceSearchCommand(
-            'langwatch trace search -q "payment gateway timeout"',
-          ).query,
+          parseTraceSearchCommand('langwatch trace search -q "payment gateway timeout"')
+            .query,
         ).toBe("payment gateway timeout");
       });
     });
@@ -67,15 +66,14 @@ describe("parseTraceSearchCommand", () => {
 
       it("keeps an escaped space inside an unquoted value", () => {
         expect(
-          parseTraceSearchCommand("langwatch trace search -q checkout\\ failed")
-            .query,
+          parseTraceSearchCommand("langwatch trace search -q checkout\\ failed").query,
         ).toBe("checkout failed");
       });
 
       it("unescapes a doubled backslash inside double quotes", () => {
-        expect(
-          parseTraceSearchCommand('langwatch trace search -q "a\\\\b"').query,
-        ).toBe("a\\b");
+        expect(parseTraceSearchCommand('langwatch trace search -q "a\\\\b"').query).toBe(
+          "a\\b",
+        );
       });
 
       it("leaves a backslash that escapes nothing the shell escapes alone", () => {
@@ -87,18 +85,16 @@ describe("parseTraceSearchCommand", () => {
       });
 
       it("treats a backslash inside single quotes as literal data", () => {
-        expect(
-          parseTraceSearchCommand("langwatch trace search -q 'a\\b'").query,
-        ).toBe("a\\b");
+        expect(parseTraceSearchCommand("langwatch trace search -q 'a\\b'").query).toBe(
+          "a\\b",
+        );
       });
     });
 
     describe("when flags are written as --flag=value", () => {
       it("reads the inline value", () => {
         expect(
-          parseTraceSearchCommand(
-            "langwatch trace search --query=refund --limit=5",
-          ),
+          parseTraceSearchCommand("langwatch trace search --query=refund --limit=5"),
         ).toEqual({ query: "refund", limit: 5 });
       });
     });
@@ -123,16 +119,14 @@ describe("parseTraceSearchCommand", () => {
     describe("when it carries an origin filter", () => {
       it("recovers a single origin", () => {
         expect(
-          parseTraceSearchCommand("langwatch trace search --origin evaluation")
-            .origins,
+          parseTraceSearchCommand("langwatch trace search --origin evaluation").origins,
         ).toEqual(["evaluation"]);
       });
 
       it("splits a comma-separated list, the way the CLI itself splits it", () => {
         expect(
-          parseTraceSearchCommand(
-            "langwatch trace search --origin evaluation,simulation",
-          ).origins,
+          parseTraceSearchCommand("langwatch trace search --origin evaluation,simulation")
+            .origins,
         ).toEqual(["evaluation", "simulation"]);
       });
 
@@ -175,15 +169,16 @@ describe("readTraceSearchQuery", () => {
       });
 
       it("reads a single origin as a one-item list", () => {
-        expect(
-          readTraceSearchQuery({ query: "errors", origin: "evaluation" }),
-        ).toEqual({ query: "errors", origins: ["evaluation"] });
+        expect(readTraceSearchQuery({ query: "errors", origin: "evaluation" })).toEqual({
+          query: "errors",
+          origins: ["evaluation"],
+        });
       });
 
       it("reads an already-structured list of origins", () => {
-        expect(
-          readTraceSearchQuery({ origins: ["evaluation", "simulation"] }),
-        ).toEqual({ origins: ["evaluation", "simulation"] });
+        expect(readTraceSearchQuery({ origins: ["evaluation", "simulation"] })).toEqual({
+          origins: ["evaluation", "simulation"],
+        });
       });
     });
   });
@@ -226,27 +221,23 @@ describe("asFreeTextTerm", () => {
 describe("buildExplorerQuery", () => {
   describe("given a search with only free text", () => {
     it("returns the quoted free-text term", () => {
-      expect(buildExplorerQuery({ query: "checkout failed" })).toBe(
-        '"checkout failed"',
-      );
+      expect(buildExplorerQuery({ query: "checkout failed" })).toBe('"checkout failed"');
     });
   });
 
   describe("given a search narrowed to one origin", () => {
     /** @scenario A search narrowed to where the traces came from stays narrowed */
     it("adds an origin filter", () => {
-      expect(buildExplorerQuery({ origins: ["evaluation"] })).toBe(
-        "origin:evaluation",
-      );
+      expect(buildExplorerQuery({ origins: ["evaluation"] })).toBe("origin:evaluation");
     });
   });
 
   describe("given a search narrowed to several origins", () => {
     /** @scenario A search narrowed to several origins keeps all of them */
     it("ORs them, so a trace from any one of them matches", () => {
-      expect(
-        buildExplorerQuery({ origins: ["evaluation", "simulation"] }),
-      ).toBe("(origin:evaluation OR origin:simulation)");
+      expect(buildExplorerQuery({ origins: ["evaluation", "simulation"] })).toBe(
+        "(origin:evaluation OR origin:simulation)",
+      );
     });
 
     it("parses as a real OR group, not two field filters ANDed together", () => {
@@ -264,15 +255,13 @@ describe("buildExplorerQuery", () => {
 
   describe("given a search with both free text and an origin filter", () => {
     it("ANDs the origin filter onto the free text", () => {
-      expect(
-        buildExplorerQuery({ query: "timeout", origins: ["gateway"] }),
-      ).toBe('"timeout" AND origin:gateway');
+      expect(buildExplorerQuery({ query: "timeout", origins: ["gateway"] })).toBe(
+        '"timeout" AND origin:gateway',
+      );
     });
 
     it("parses as an AND, so a trace must match both", () => {
-      const ast = parse(
-        buildExplorerQuery({ query: "timeout", origins: ["gateway"] })!,
-      );
+      const ast = parse(buildExplorerQuery({ query: "timeout", origins: ["gateway"] })!);
       expect(ast.type).toBe("LogicalExpression");
       const node = ast as unknown as { operator: { operator: string } };
       expect(node.operator.operator).toBe("AND");
@@ -283,9 +272,7 @@ describe("buildExplorerQuery", () => {
     it("trims them, so the facet value can actually match", () => {
       // Filtering on the trimmed value while quoting the untrimmed one emitted
       // `origin:" evaluation "` — padding included, matching nothing.
-      expect(buildExplorerQuery({ origins: [" evaluation "] })).toBe(
-        "origin:evaluation",
-      );
+      expect(buildExplorerQuery({ origins: [" evaluation "] })).toBe("origin:evaluation");
     });
 
     it("drops whitespace-only entries instead of emitting an empty facet", () => {
@@ -297,9 +284,7 @@ describe("buildExplorerQuery", () => {
 
   describe("given an origin value the query language would otherwise misparse", () => {
     it("quotes it the way the Explorer's own filter sidebar quotes a facet value", () => {
-      expect(buildExplorerQuery({ origins: ["my origin"] })).toBe(
-        'origin:"my origin"',
-      );
+      expect(buildExplorerQuery({ origins: ["my origin"] })).toBe('origin:"my origin"');
     });
   });
 
@@ -516,9 +501,7 @@ describe("buildTraceExplorerHref", () => {
   describe("given no project slug", () => {
     describe("when a link is requested", () => {
       it("returns null so the caller hides the control instead of linking nowhere", () => {
-        expect(
-          buildTraceExplorerHref({ projectSlug: null, search }),
-        ).toBeNull();
+        expect(buildTraceExplorerHref({ projectSlug: null, search })).toBeNull();
       });
     });
   });
@@ -555,9 +538,7 @@ describe("buildAutomationHref", () => {
           })!,
         );
 
-        expect(params.get("drawer.initialFilterQuery")).toBe(
-          '"checkout failed"',
-        );
+        expect(params.get("drawer.initialFilterQuery")).toBe('"checkout failed"');
       });
 
       it("keeps free text free text — the subject parses as an implicit term, never a field filter", () => {
@@ -605,9 +586,7 @@ describe("buildAutomationHref", () => {
           })!,
         );
 
-        expect(params.get("drawer.initialFilterQuery")).toBe(
-          "origin:evaluation",
-        );
+        expect(params.get("drawer.initialFilterQuery")).toBe("origin:evaluation");
       });
     });
   });
@@ -615,9 +594,7 @@ describe("buildAutomationHref", () => {
   describe("given a search with no text", () => {
     describe("when a link is requested", () => {
       it("returns null — a bare search has no subject to alert on", () => {
-        expect(
-          buildAutomationHref({ projectSlug: "acme", search: {} }),
-        ).toBeNull();
+        expect(buildAutomationHref({ projectSlug: "acme", search: {} })).toBeNull();
         expect(
           buildAutomationHref({
             projectSlug: "acme",

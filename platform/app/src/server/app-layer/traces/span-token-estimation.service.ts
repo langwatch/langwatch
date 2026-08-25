@@ -94,10 +94,7 @@ export class OtlpSpanTokenEstimationService {
     if (!hasInputTokens) {
       const inputText = this.extractInputText(span);
       if (inputText) {
-        const inputTokens = await this.deps.tokenizer.countTokens(
-          model,
-          inputText,
-        );
+        const inputTokens = await this.deps.tokenizer.countTokens(model, inputText);
         if (inputTokens !== undefined) {
           pendingAttributes.push({
             key: "gen_ai.usage.input_tokens",
@@ -111,10 +108,7 @@ export class OtlpSpanTokenEstimationService {
     if (!hasOutputTokens) {
       const outputText = this.extractOutputText(span);
       if (outputText) {
-        const outputTokens = await this.deps.tokenizer.countTokens(
-          model,
-          outputText,
-        );
+        const outputTokens = await this.deps.tokenizer.countTokens(model, outputText);
         if (outputTokens !== undefined) {
           pendingAttributes.push({
             key: "gen_ai.usage.output_tokens",
@@ -265,12 +259,7 @@ export class OtlpSpanTokenEstimationService {
     try {
       const parsed = JSON.parse(jsonStr);
 
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        "type" in parsed &&
-        "value" in parsed
-      ) {
+      if (parsed && typeof parsed === "object" && "type" in parsed && "value" in parsed) {
         if (parsed.type === "chat_messages" && Array.isArray(parsed.value)) {
           return this.messagesArrayToText(parsed.value);
         }

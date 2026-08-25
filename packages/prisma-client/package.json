@@ -4,7 +4,13 @@
   "private": true,
   "description": "Explicitly configured Prisma/Postgres construction and lifecycle services, plus the canonical LangWatch schema, migrations, and generated client.",
   "license": "MIT",
+  "files": [
+    "prisma",
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -15,12 +21,6 @@
       "default": "./src/generated/client.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": [
-    "prisma",
-    "src"
-  ],
   "scripts": {
     "prisma:generate": "prisma generate --config ./prisma.config.ts",
     "typecheck": "tsc --noEmit",

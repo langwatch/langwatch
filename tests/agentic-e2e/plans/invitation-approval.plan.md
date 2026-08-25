@@ -5,6 +5,7 @@
 ## Overview
 
 Tests the two-tier invitation system:
+
 - **Admins** create direct invites (PENDING status, immediate)
 - **Members** request invites (WAITING_APPROVAL status, needs admin approval)
 - **Admins** can approve/reject pending requests
@@ -12,6 +13,7 @@ Tests the two-tier invitation system:
 Members page: `/settings/members`
 
 **Environment:**
+
 - App runs on `http://localhost:5560`
 - Auth setup creates ADMIN test user
 - No email provider configured → submit button reads "Create invites"
@@ -85,17 +87,17 @@ Members page: `/settings/members`
 ## Step Definitions
 
 ```typescript
-givenIAmOnTheMembersPage(page)     // Navigate to /settings/members
-whenIClickAddMembers(page)          // Click "Add members" button
-whenIFillEmailWith(page, email)     // Fill email input
-whenISelectOrgRole(page, role)      // Select role dropdown
-whenIClickCreateInvites(page)       // Click submit button
-whenIApproveInvitationFor(page, email)  // Click Approve in row
-whenIRejectInvitationFor(page, email)   // Click Reject in row
-thenISeeSentInviteFor(page, email)      // Assert in Invites list with "Invited" badge
-thenISeePendingApprovalFor(page, email) // Assert in Invites list with badge
-thenISeeSuccessToast(page, title)       // Assert toast appears
-seedWaitingApprovalInvite({ page, email, organizationId, teamId })  // Create via tRPC API
+givenIAmOnTheMembersPage(page); // Navigate to /settings/members
+whenIClickAddMembers(page); // Click "Add members" button
+whenIFillEmailWith(page, email); // Fill email input
+whenISelectOrgRole(page, role); // Select role dropdown
+whenIClickCreateInvites(page); // Click submit button
+whenIApproveInvitationFor(page, email); // Click Approve in row
+whenIRejectInvitationFor(page, email); // Click Reject in row
+thenISeeSentInviteFor(page, email); // Assert in Invites list with "Invited" badge
+thenISeePendingApprovalFor(page, email); // Assert in Invites list with badge
+thenISeeSuccessToast(page, title); // Assert toast appears
+seedWaitingApprovalInvite({ page, email, organizationId, teamId }); // Create via tRPC API
 ```
 
 ## Toast Messages (actual implementation)

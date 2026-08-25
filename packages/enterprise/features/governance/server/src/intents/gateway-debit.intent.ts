@@ -39,9 +39,7 @@ export const writeGatewayDebitsSchema = z.object({
   occurred_at: z.number().int().positive(),
 });
 
-export type WriteGatewayDebitsPayload = z.infer<
-  typeof writeGatewayDebitsSchema
->;
+export type WriteGatewayDebitsPayload = z.infer<typeof writeGatewayDebitsSchema>;
 
 const EMPTY_USAGE: GatewaySpendUsage = {
   input_tokens: 0,
@@ -156,9 +154,7 @@ export class GatewayDebitIntent {
     ];
   }
 
-  private affectsEnforcementDecision(
-    budgets: GatewayResolvedBudget[],
-  ): boolean {
+  private affectsEnforcementDecision(budgets: GatewayResolvedBudget[]): boolean {
     return budgets.some(({ budget }) => budget.onBreach === "BLOCK");
   }
 }

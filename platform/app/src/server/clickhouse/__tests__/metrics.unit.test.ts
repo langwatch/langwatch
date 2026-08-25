@@ -112,17 +112,13 @@ describe("ClickHouse metrics", () => {
 
   describe("setClickHouseTableRows", () => {
     it("sets row count gauge", () => {
-      expect(() =>
-        metrics.setClickHouseTableRows("traces", 1000),
-      ).not.toThrow();
+      expect(() => metrics.setClickHouseTableRows("traces", 1000)).not.toThrow();
     });
   });
 
   describe("setClickHouseTableBytes", () => {
     it("sets byte size gauge", () => {
-      expect(() =>
-        metrics.setClickHouseTableBytes("spans", 1024 * 1024),
-      ).not.toThrow();
+      expect(() => metrics.setClickHouseTableBytes("spans", 1024 * 1024)).not.toThrow();
     });
   });
 
@@ -176,9 +172,7 @@ describe("ClickHouse metrics", () => {
         }),
       } as unknown as ClickHouseClient;
 
-      expect(() =>
-        metrics.startStorageStatsCollection(mockClient, 60000),
-      ).not.toThrow();
+      expect(() => metrics.startStorageStatsCollection(mockClient, 60000)).not.toThrow();
     });
 
     it("is idempotent - calling twice does not create duplicate intervals", () => {
@@ -308,9 +302,7 @@ describe("ClickHouse metrics", () => {
           } as unknown as ClickHouseClient;
 
           // Should not throw — backup errors are handled gracefully
-          await expect(
-            metrics.collectStorageStats(mockClient),
-          ).resolves.toBeUndefined();
+          await expect(metrics.collectStorageStats(mockClient)).resolves.toBeUndefined();
         });
       });
     });
@@ -321,9 +313,7 @@ describe("ClickHouse metrics", () => {
       } as unknown as ClickHouseClient;
 
       // Should not throw
-      await expect(
-        metrics.collectStorageStats(mockClient),
-      ).resolves.toBeUndefined();
+      await expect(metrics.collectStorageStats(mockClient)).resolves.toBeUndefined();
     });
   });
 
@@ -335,9 +325,7 @@ describe("ClickHouse metrics", () => {
     });
 
     it("sets backup last size bytes without throwing", () => {
-      expect(() =>
-        metrics.setClickHouseBackupLastSizeBytes(1073741824),
-      ).not.toThrow();
+      expect(() => metrics.setClickHouseBackupLastSizeBytes(1073741824)).not.toThrow();
     });
 
     it("sets backup status count without throwing", () => {
@@ -461,11 +449,7 @@ describe("ClickHouse metrics", () => {
       } as unknown as ClickHouseClient;
     };
 
-    const countCallsMatching = (
-      calls: unknown[][],
-      argIndex: number,
-      needle: string,
-    ) =>
+    const countCallsMatching = (calls: unknown[][], argIndex: number, needle: string) =>
       calls.filter((args) => {
         const arg = args[argIndex];
         return typeof arg === "string" && arg.includes(needle);
@@ -490,11 +474,7 @@ describe("ClickHouse metrics", () => {
           // logger.warn signature is (obj, msg). First failure warns;
           // subsequent failures fall through to debug.
           expect(
-            countCallsMatching(
-              loggerMocks.warn.mock.calls,
-              1,
-              "system.backup_log",
-            ),
+            countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
           ).toBe(1);
         });
       });
@@ -512,17 +492,11 @@ describe("ClickHouse metrics", () => {
           await metrics.collectStorageStats(client); // fail → warn (#2)
 
           expect(
-            countCallsMatching(
-              loggerMocks.warn.mock.calls,
-              1,
-              "system.backup_log",
-            ),
+            countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
           ).toBe(2);
           // logger.info("ClickHouse backup stats collection recovered ...")
           // is called with the message as the first arg.
-          expect(
-            countCallsMatching(loggerMocks.info.mock.calls, 0, "recovered"),
-          ).toBe(1);
+          expect(countCallsMatching(loggerMocks.info.mock.calls, 0, "recovered")).toBe(1);
         });
       });
     });
@@ -589,14 +563,7 @@ describe("ClickHouse metrics", () => {
       expect(metrics.shouldCollectBackupMetrics(env)).toBe(true);
     });
 
-    const optedOutValues: string[] = [
-      "false",
-      "FALSE",
-      "  false  ",
-      "0",
-      "no",
-      "off",
-    ];
+    const optedOutValues: string[] = ["false", "FALSE", "  false  ", "0", "no", "off"];
 
     it.each(optedOutValues)("skips when explicitly %s", (value) => {
       expect(

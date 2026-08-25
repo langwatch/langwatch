@@ -4,7 +4,7 @@ description: How the gateway enforces RPM and RPD (and v1.1 TPM) across VKs, bin
 sidebarTitle: Rate limits
 ---
 
-The gateway enforces rate limits at two independent layers, the **VK** and the **ModelProvider** (Advanced/Gateway tab): with cross-dimension token-bucket accounting so a request only needs enough tokens in *every* applicable bucket to pass.
+The gateway enforces rate limits at two independent layers, the **VK** and the **ModelProvider** (Advanced/Gateway tab): with cross-dimension token-bucket accounting so a request only needs enough tokens in _every_ applicable bucket to pass.
 
 ## Dimensions
 
@@ -24,7 +24,12 @@ Rolling-24-hour window. Every request consumes 1; counter resets at the first re
 
 ### TPM: tokens per minute (v1.1) <a id="tpm"></a>
 
-<Warning>TPM is a v1.1 feature. In v1 the limit is **accepted and stored** on VK + binding config but not enforced, requests pass through and the trace + budget ledger still record the real token count. Implementation blocker: the streaming-usage accumulator needs to be wired into the limiter before per-stream token counts can pressure the bucket.</Warning>
+<Warning>
+  TPM is a v1.1 feature. In v1 the limit is **accepted and stored** on VK + binding config
+  but not enforced, requests pass through and the trace + budget ledger still record the
+  real token count. Implementation blocker: the streaming-usage accumulator needs to be
+  wired into the limiter before per-stream token counts can pressure the bucket.
+</Warning>
 
 When v1.1 ships, TPM will consume tokens based on actual usage reported by the provider (or estimated on request body for pre-dispatch shaping). The accounting will be cross-dimension with RPM + RPD, so a request fits if every applicable bucket has room.
 
@@ -82,21 +87,33 @@ Rate-limit events surface via a dedicated counter plus the gateway's standard ob
 - **Response header** `X-LangWatch-RateLimit-Dimension`, the downstream key-switch signal (also included in the span error message for trace-level analysis).
 - **Trace error**: the rejected request's span carries `error.type="rate_limit_exceeded"` with the dimension in the message string.
 
-<Info>`gateway_rate_limit_denied_total` is the metric to build dashboards on: `sum by (dimension) (rate(gateway_rate_limit_denied_total[5m]))` slices gateway-enforced denials by dimension without parsing the trace stream, and adding `vk_id` pinpoints the noisy key. Subtracting it from `gateway_http_requests_total{status="429"}` leaves the 429s that came back from the provider.</Info>
+<Info>
+  `gateway_rate_limit_denied_total` is the metric to build dashboards on: `sum by
+  (dimension) (rate(gateway_rate_limit_denied_total[5m]))` slices gateway-enforced denials
+  by dimension without parsing the trace stream, and adding `vk_id` pinpoints the noisy
+  key. Subtracting it from `gateway_http_requests_total{(status = "429")}` leaves the 429s
+  that came back from the provider.
+</Info>
 
 ## Cross-replica coordination
 
 In multi-replica deployments the buckets are **per-replica by default**: the gateway's limiter is an in-memory `golang.org/x/time/rate` token bucket stored in an LRU cache, zero external dependency on the hot path. If your cluster runs N replicas, the effective org-wide RPM is `N × configured_rpm` (explicit design trade: zero-dependency on the hot path over strict cluster-wide correctness).
 
-<Warning>Redis-coordinated counters for strict cross-replica enforcement are a **v1.1 follow-up** (tracked in `services/gateway/internal/ratelimit/limiter.go` package doc). Deployments that need exact org-wide caps today can set the per-replica limit to `configured / N` and rely on the LB's round-robin to keep pods equally loaded, imperfect but usually fine.</Warning>
+<Warning>
+  Redis-coordinated counters for strict cross-replica enforcement are a **v1.1 follow-up**
+  (tracked in `services/gateway/internal/ratelimit/limiter.go` package doc). Deployments
+  that need exact org-wide caps today can set the per-replica limit to `configured / N`
+  and rely on the LB's round-robin to keep pods equally loaded, imperfect but usually
+  fine.
+</Warning>
 
 ## Permissions
 
-| Action | Permission |
-|---|---|
-| View rate-limit settings | `virtualKeys:view` + `modelProviders:view` |
-| Edit per-VK rate limits | `virtualKeys:update` |
-| Edit per-ModelProvider rate limits | `modelProviders:update` |
+| Action                             | Permission                                 |
+| ---------------------------------- | ------------------------------------------ |
+| View rate-limit settings           | `virtualKeys:view` + `modelProviders:view` |
+| Edit per-VK rate limits            | `virtualKeys:update`                       |
+| Edit per-ModelProvider rate limits | `modelProviders:update`                    |
 
 ## See also
 

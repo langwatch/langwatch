@@ -54,12 +54,8 @@ vi.mock("@chakra-ui/react", async (importOriginal) => {
     ...actual,
     // The pages under test only use these as layout wrappers; rendering them
     // for real would drag the whole Chakra provider in for no added coverage.
-    VStack: ({ children }: { children: React.ReactNode }) => (
-      <div>{children}</div>
-    ),
-    HStack: ({ children }: { children: React.ReactNode }) => (
-      <div>{children}</div>
-    ),
+    VStack: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    HStack: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Spacer: () => null,
     Button: ({ children }: { children: React.ReactNode }) => (
       <button type="button">{children}</button>

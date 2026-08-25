@@ -26,9 +26,7 @@ import {
   type TimeRangePreset,
 } from "../../utils/timeRangePresets";
 
-export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({
-  compact = false,
-}) => {
+export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const timeRange = useFilterStore((s) => s.timeRange);
   const setTimeRange = useFilterStore((s) => s.setTimeRange);
   const [open, setOpen] = useState(false);
@@ -251,9 +249,7 @@ const Footer: React.FC<{ range: TimeRange }> = ({ range }) => {
 };
 
 function formatTriggerLabel(range: TimeRange): string {
-  const preset = range.presetId
-    ? getPresetById(range.presetId)
-    : matchPreset(range);
+  const preset = range.presetId ? getPresetById(range.presetId) : matchPreset(range);
   // Verbose preset label ("Last 30 days") instead of the cryptic short
   // form ("30d"). Time window is the most-impactful control on the
   // page; the trigger should read at a glance. Absolute ranges still

@@ -7,14 +7,8 @@ import {
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Context } from "hono";
 import type { Project } from "~/generated/prisma/client";
-import {
-  appContextMiddleware,
-  appFromContext,
-} from "~/app/api/middleware/app-context";
-import {
-  canonicalAuthMiddleware,
-  requirePermission,
-} from "~/app/api/middleware/auth";
+import { appContextMiddleware, appFromContext } from "~/app/api/middleware/app-context";
+import { canonicalAuthMiddleware, requirePermission } from "~/app/api/middleware/auth";
 import { enforceApiKeyCeiling } from "~/server/api-key/auth-middleware";
 import type { ResolvedApiKeyToken as ResolvedToken } from "@langwatch/api-key-contract";
 import {
@@ -61,9 +55,7 @@ async function authorizeRequestPermission(
 ): Promise<void> {
   const resolved = context.get("resolvedToken") as ResolvedToken | undefined;
   if (!resolved) {
-    throw new Error(
-      "Project authentication did not provide a resolved credential",
-    );
+    throw new Error("Project authentication did not provide a resolved credential");
   }
   await enforceApiKeyCeiling({
     resolved,

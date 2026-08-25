@@ -56,13 +56,7 @@ export function deriveStatus({
 }
 
 /** Milliseconds past due; zero or negative when the schedule is not late. */
-export function latenessMs({
-  job,
-  now,
-}: {
-  job: SchedulerJobLike;
-  now: number;
-}): number {
+export function latenessMs({ job, now }: { job: SchedulerJobLike; now: number }): number {
   return now - new Date(job.nextRunAt).getTime();
 }
 

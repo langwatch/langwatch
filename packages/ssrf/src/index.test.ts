@@ -15,9 +15,7 @@ function repoRoot(): string {
     if (existsSync(join(dir, "go.mod"))) return dir;
     dir = dirname(dir);
   }
-  throw new Error(
-    "could not locate repo root (no go.mod found while walking up)",
-  );
+  throw new Error("could not locate repo root (no go.mod found while walking up)");
 }
 
 interface AddressVector {
@@ -26,13 +24,7 @@ interface AddressVector {
   note: string;
 }
 
-const corpusPath = join(
-  repoRoot(),
-  "pkg",
-  "ssrf",
-  "testdata",
-  "address_vectors.json",
-);
+const corpusPath = join(repoRoot(), "pkg", "ssrf", "testdata", "address_vectors.json");
 const vectors = (
   JSON.parse(readFileSync(corpusPath, "utf8")) as { vectors: AddressVector[] }
 ).vectors;

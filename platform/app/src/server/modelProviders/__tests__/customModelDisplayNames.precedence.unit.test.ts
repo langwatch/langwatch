@@ -107,9 +107,7 @@ describe("given an enabled row and a disabled row that both define the same mode
         enabled: false,
         id: "aaa-disabled",
         scopes: [{ scopeType: "PROJECT", scopeId: "proj_1" }],
-        customModels: [
-          { modelId: "vault-9", displayName: "Legacy Label", mode: "chat" },
-        ],
+        customModels: [{ modelId: "vault-9", displayName: "Legacy Label", mode: "chat" }],
       });
 
       const result = buildCustomModelDisplayNames([enabledRow, disabledRow]);
@@ -145,9 +143,7 @@ describe("given an enabled row and a disabled row whose winning row is returned 
         enabled: false,
         id: "aaa-disabled",
         scopes: [{ scopeType: "PROJECT", scopeId: "proj_4" }],
-        customModels: [
-          { modelId: "sigma-4", displayName: "Legacy Label", mode: "chat" },
-        ],
+        customModels: [{ modelId: "sigma-4", displayName: "Legacy Label", mode: "chat" }],
       });
 
       const result = buildCustomModelDisplayNames([disabledRow, enabledRow]);
@@ -179,15 +175,10 @@ describe("given a persisted row and a row with no id that both define the same m
         provider: "vendorJ",
         enabled: true,
         id: "mp_stored",
-        customModels: [
-          { modelId: "helix-3", displayName: "Stored Label", mode: "chat" },
-        ],
+        customModels: [{ modelId: "helix-3", displayName: "Stored Label", mode: "chat" }],
       });
 
-      const result = buildCustomModelDisplayNames([
-        placeholderRow,
-        persistedRow,
-      ]);
+      const result = buildCustomModelDisplayNames([placeholderRow, persistedRow]);
 
       expect(result["vendorJ/helix-3"]).toBe("Stored Label");
     });
@@ -228,15 +219,10 @@ describe("given a persisted row and a row with no id whose winning row is return
         provider: "vendorJ",
         enabled: true,
         id: "mp_stored",
-        customModels: [
-          { modelId: "helix-3", displayName: "Stored Label", mode: "chat" },
-        ],
+        customModels: [{ modelId: "helix-3", displayName: "Stored Label", mode: "chat" }],
       });
 
-      const result = buildCustomModelDisplayNames([
-        persistedRow,
-        placeholderRow,
-      ]);
+      const result = buildCustomModelDisplayNames([persistedRow, placeholderRow]);
 
       expect(result["vendorJ/helix-3"]).toBe("Stored Label");
     });
@@ -289,17 +275,13 @@ describe("given two equally-eligible rows whose lexicographically lowest id is r
         provider: "vendorK",
         enabled: true,
         id: "alpha-row",
-        customModels: [
-          { modelId: "orbit-7", displayName: "Chosen Name", mode: "chat" },
-        ],
+        customModels: [{ modelId: "orbit-7", displayName: "Chosen Name", mode: "chat" }],
       });
       const zuluRow = makeProvider({
         provider: "vendorK",
         enabled: true,
         id: "zulu-row",
-        customModels: [
-          { modelId: "orbit-7", displayName: "Other Name", mode: "chat" },
-        ],
+        customModels: [{ modelId: "orbit-7", displayName: "Other Name", mode: "chat" }],
       });
 
       const result = buildCustomModelDisplayNames([zuluRow, alphaRow]);
@@ -323,9 +305,7 @@ describe("given a whitespace-only display name on a narrower-scoped row and a re
         enabled: true,
         id: "aaa-blank",
         scopes: [{ scopeType: "PROJECT", scopeId: "proj_3" }],
-        customModels: [
-          { modelId: "omega-vault", displayName: "   ", mode: "chat" },
-        ],
+        customModels: [{ modelId: "omega-vault", displayName: "   ", mode: "chat" }],
       });
       const realOrganizationRow = makeProvider({
         provider: "vendorH",
@@ -341,10 +321,7 @@ describe("given a whitespace-only display name on a narrower-scoped row and a re
         ],
       });
 
-      const result = buildCustomModelDisplayNames([
-        blankProjectRow,
-        realOrganizationRow,
-      ]);
+      const result = buildCustomModelDisplayNames([blankProjectRow, realOrganizationRow]);
 
       expect(result["vendorH/omega-vault"]).toBe("Research Copilot");
     });

@@ -85,10 +85,7 @@ export function WaterfallView() {
       <Flex direction="column" gap={0.5}>
         {flat.map((item) => {
           const left = ((item.absoluteStartMs - minTime) / totalDuration) * 100;
-          const width = Math.max(
-            (item.span.durationMs / totalDuration) * 100,
-            0.5,
-          );
+          const width = Math.max((item.span.durationMs / totalDuration) * 100, 0.5);
           const isSelected = selectedSpanId === item.span.id;
           const barColor =
             item.span.status === "error"

@@ -180,12 +180,8 @@ describe("given a trace whose metadata repeats the models it used", () => {
     renderHeader();
 
     expect(screen.getByLabelText("Copy metadata.environment")).toBeVisible();
-    expect(
-      screen.queryByLabelText("Copy metadata.model"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByLabelText("Copy metadata.models"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Copy metadata.model")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Copy metadata.models")).not.toBeInTheDocument();
   });
 
   /** @scenario "The model metadata keys are not auto-pinned under the Model pill" */

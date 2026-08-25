@@ -1,7 +1,4 @@
-import {
-  type AnyValue,
-  type Logger,
-} from "@opentelemetry/api-logs";
+import { type AnyValue, type Logger } from "@opentelemetry/api-logs";
 import {
   type EmitOptions,
   type LangWatchLogger,
@@ -59,7 +56,10 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
   ): void {
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE,
-      { ...body, role: body.role ?? "system" } satisfies LangWatchSpanGenAISystemMessageEventBody,
+      {
+        ...body,
+        role: body.role ?? "system",
+      } satisfies LangWatchSpanGenAISystemMessageEventBody,
       {
         ...attributes,
         "gen_ai.system": system,
@@ -74,7 +74,10 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
   ) {
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE,
-      { ...body, role: body.role ?? "user" } satisfies LangWatchSpanGenAIUserMessageEventBody,
+      {
+        ...body,
+        role: body.role ?? "user",
+      } satisfies LangWatchSpanGenAIUserMessageEventBody,
       {
         ...attributes,
         "gen_ai.system": system,
@@ -89,7 +92,10 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
   ) {
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE,
-      { ...body, role: body.role ?? "assistant" } satisfies LangWatchSpanGenAIAssistantMessageEventBody,
+      {
+        ...body,
+        role: body.role ?? "assistant",
+      } satisfies LangWatchSpanGenAIAssistantMessageEventBody,
       {
         ...attributes,
         "gen_ai.system": system,

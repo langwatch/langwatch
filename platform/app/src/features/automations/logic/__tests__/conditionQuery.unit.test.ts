@@ -15,9 +15,7 @@ describe("serializeConditions", () => {
   describe("given a single membership condition", () => {
     it("emits field:value for is", () => {
       expect(
-        serializeConditions([
-          cond({ field: "status", operator: "is", value: "error" }),
-        ]),
+        serializeConditions([cond({ field: "status", operator: "is", value: "error" })]),
       ).toBe("status:error");
     });
 
@@ -39,9 +37,7 @@ describe("serializeConditions", () => {
 
     it("leaves a wildcard value bare", () => {
       expect(
-        serializeConditions([
-          cond({ field: "model", operator: "is", value: "gpt-4o*" }),
-        ]),
+        serializeConditions([cond({ field: "model", operator: "is", value: "gpt-4o*" })]),
       ).toBe("model:gpt-4o*");
     });
   });
@@ -49,14 +45,10 @@ describe("serializeConditions", () => {
   describe("given range conditions", () => {
     it("emits comparators", () => {
       expect(
-        serializeConditions([
-          cond({ field: "cost", operator: "gt", value: "0.1" }),
-        ]),
+        serializeConditions([cond({ field: "cost", operator: "gt", value: "0.1" })]),
       ).toBe("cost:>0.1");
       expect(
-        serializeConditions([
-          cond({ field: "cost", operator: "lte", value: "1" }),
-        ]),
+        serializeConditions([cond({ field: "cost", operator: "lte", value: "1" })]),
       ).toBe("cost:<=1");
     });
 

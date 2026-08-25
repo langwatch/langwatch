@@ -37,9 +37,7 @@ const SESSION_EVENT = {
   eventKind: "model_call",
 } as CodingAgentSessionEventRow;
 
-function makeRow(
-  overrides?: Partial<CodingAgentSessionRow>,
-): CodingAgentSessionRow {
+function makeRow(overrides?: Partial<CodingAgentSessionRow>): CodingAgentSessionRow {
   const base = projectCodingAgentSessionToRow({
     state: {
       // A structurally-complete empty state via the projection itself would
@@ -174,8 +172,7 @@ function makeService({
   const sessions: CodingAgentSessionRepository = {
     upsert: async () => {},
     findBySessionId: async () => row,
-    findBySessionIdWithApplied: async () =>
-      row ? { row, appliedEventIds: [] } : null,
+    findBySessionIdWithApplied: async () => (row ? { row, appliedEventIds: [] } : null),
     findManyRecent: async () => listed,
     listByRepositoryBranch: async () => [],
   };
@@ -195,8 +192,7 @@ function makeService({
     sessionEvents: onEventsRead
       ? {
           ensure: async () => {},
-          findBySessionId: async ({ occurredAt }) =>
-            onEventsRead({ occurredAt }),
+          findBySessionId: async ({ occurredAt }) => onEventsRead({ occurredAt }),
           sumTokensByModelPerSession: async () => [],
         }
       : new NullCodingAgentSessionEventsRepository(),
@@ -290,8 +286,7 @@ describe("CodingAgentSessionService", () => {
             // Empty until the read reaches past the guessed upper edge.
             const reachesNow =
               occurredAt !== undefined &&
-              occurredAt.toMs >
-                STARTED_AT_MS + CODING_AGENT_SESSION_READ_WINDOW_MS;
+              occurredAt.toMs > STARTED_AT_MS + CODING_AGENT_SESSION_READ_WINDOW_MS;
             return reachesNow
               ? { events: [SESSION_EVENT], nextCursor: null }
               : { events: [], nextCursor: null };

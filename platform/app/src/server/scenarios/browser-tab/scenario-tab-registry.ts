@@ -45,10 +45,7 @@ function tabSetKey(projectId: string, tabKey: string): string {
 }
 
 /** Exported as a test seam so suites never hand-copy the key format. */
-export function scenarioTabPendingKey(
-  projectId: string,
-  tabKey: string,
-): string {
+export function scenarioTabPendingKey(projectId: string, tabKey: string): string {
   return `${KEY_PREFIX}:pending:${projectId}:${tabKey}`;
 }
 
@@ -69,11 +66,7 @@ function memoryEntry(key: string): Map<string, number> {
   return entry;
 }
 
-function pruneMemory(
-  key: string,
-  entry: Map<string, number>,
-  now: number,
-): void {
+function pruneMemory(key: string, entry: Map<string, number>, now: number): void {
   const cutoff = now - SCENARIO_TAB_TTL_SECONDS * 1000;
   for (const [tabId, seenAt] of entry) {
     if (seenAt < cutoff) entry.delete(tabId);
@@ -151,8 +144,7 @@ export const scenarioTabRegistry = {
     const key = tabSetKey(projectId, tabKey);
     // Age the entry so it falls out of the live window `grace` from now.
     const retiredScore =
-      now -
-      (SCENARIO_TAB_TTL_SECONDS - SCENARIO_TAB_DISCONNECT_GRACE_SECONDS) * 1000;
+      now - (SCENARIO_TAB_TTL_SECONDS - SCENARIO_TAB_DISCONNECT_GRACE_SECONDS) * 1000;
 
     const connection = tryGetApp()?.redis ?? null;
     if (!connection) {
@@ -239,10 +231,7 @@ export const scenarioTabRegistry = {
     try {
       await connection.set(key, url, "EX", SCENARIO_TAB_PENDING_TTL_SECONDS);
     } catch (error) {
-      logger.warn(
-        { error, projectId },
-        "Failed to park a scenario tab handoff",
-      );
+      logger.warn({ error, projectId }, "Failed to park a scenario tab handoff");
     }
   },
 
@@ -271,10 +260,7 @@ export const scenarioTabRegistry = {
       return await connection.getdel(key);
     } catch (error) {
       if (!isUnknownCommandError(error)) {
-        logger.warn(
-          { error, projectId },
-          "Failed to read a parked scenario tab handoff",
-        );
+        logger.warn({ error, projectId }, "Failed to read a parked scenario tab handoff");
         return null;
       }
     }
@@ -289,10 +275,7 @@ export const scenarioTabRegistry = {
       if (url) await connection.del(key);
       return url;
     } catch (error) {
-      logger.warn(
-        { error, projectId },
-        "Failed to read a parked scenario tab handoff",
-      );
+      logger.warn({ error, projectId }, "Failed to read a parked scenario tab handoff");
       return null;
     }
   },

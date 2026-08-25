@@ -32,13 +32,9 @@ import { Toolbar } from "../Toolbar/Toolbar";
 import { IntegratePaneShell } from "./IntegratePaneShell";
 
 export const IntegratePane: React.FC = () => {
-  const setShowSamplePreview = useOnboardingStore(
-    (s) => s.setShowSamplePreview,
-  );
+  const setShowSamplePreview = useOnboardingStore((s) => s.setShowSamplePreview);
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
-  const setCurrentSpotlightId = useOnboardingStore(
-    (s) => s.setCurrentSpotlightId,
-  );
+  const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
   const { project, organization } = useOrganizationTeamProject();
   const publicEnv = usePublicEnv();
   const [token, setToken] = useState<string | null>(null);
@@ -77,17 +73,12 @@ export const IntegratePane: React.FC = () => {
         <AnalyticsBoundary name="traces_integrate">
           <VStack align="stretch" gap={6}>
             <VStack align="stretch" gap={1.5} minWidth={0}>
-              <Text
-                textStyle="2xl"
-                fontWeight="600"
-                color="fg"
-                letterSpacing="-0.015em"
-              >
+              <Text textStyle="2xl" fontWeight="600" color="fg" letterSpacing="-0.015em">
                 Instrument your agents in seconds
               </Text>
               <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-                Mint a token, then hand the setup to your coding agent or follow
-                the SDK instructions.
+                Mint a token, then hand the setup to your coding agent or follow the SDK
+                instructions.
               </Text>
             </VStack>
 
@@ -141,12 +132,7 @@ function SetupActions({
         apiKey={token ?? undefined}
         endpoint={endpoint ?? undefined}
       />
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={onToggleSdk}
-        aria-expanded={showSdk}
-      >
+      <Button size="sm" variant="outline" onClick={onToggleSdk} aria-expanded={showSdk}>
         <Icon as={Code2} boxSize={4} />
         See SDK instructions
       </Button>

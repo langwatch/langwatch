@@ -1,21 +1,10 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  HStack,
-  Table,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Card, HStack, Table, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
-import {
-  joinSubscriberHealth,
-  type SubscriberHealthRow,
-} from "./subscriberHealth";
+import { joinSubscriberHealth, type SubscriberHealthRow } from "./subscriberHealth";
 
 function EventTypesCell({ eventTypes }: { eventTypes: readonly string[] }) {
   const shown = eventTypes.slice(0, 2);
@@ -99,9 +88,7 @@ function SubscriberPauseAction({
   queueName: string;
   actions: ReturnType<typeof usePauseActions>;
 }) {
-  const mutation = row.isPaused
-    ? actions.unpauseMutation
-    : actions.pauseMutation;
+  const mutation = row.isPaused ? actions.unpauseMutation : actions.pauseMutation;
   return (
     <Button
       size="2xs"
@@ -166,11 +153,7 @@ function SubscriberRow({
       {hasAccess && (
         <Table.Cell>
           {queueName && (
-            <SubscriberPauseAction
-              row={row}
-              queueName={queueName}
-              actions={actions}
-            />
+            <SubscriberPauseAction row={row} queueName={queueName} actions={actions} />
           )}
         </Table.Cell>
       )}

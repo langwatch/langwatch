@@ -184,9 +184,7 @@ function makeInfraSpan(includeEvents?: boolean): SpanConfig {
   return span;
 }
 
-function synthesizePromptVariables(
-  inputs: PromptRef["inputs"],
-): Record<string, string> {
+function synthesizePromptVariables(inputs: PromptRef["inputs"]): Record<string, string> {
   const vars: Record<string, string> = {};
   for (const { identifier, type } of inputs) {
     switch (type) {
@@ -201,10 +199,7 @@ function synthesizePromptVariables(
         vars[identifier] = Math.random() < 0.5 ? "true" : "false";
         break;
       case "list[str]":
-        vars[identifier] = JSON.stringify([
-          pick(USER_MESSAGES),
-          pick(USER_MESSAGES),
-        ]);
+        vars[identifier] = JSON.stringify([pick(USER_MESSAGES), pick(USER_MESSAGES)]);
         break;
       default:
         vars[identifier] = `synthetic-${identifier}`;
@@ -213,10 +208,7 @@ function synthesizePromptVariables(
   return vars;
 }
 
-function makeLlmSpan(
-  prompts?: PromptRef[],
-  includeEvents?: boolean,
-): SpanConfig {
+function makeLlmSpan(prompts?: PromptRef[], includeEvents?: boolean): SpanConfig {
   const promptRef =
     prompts && prompts.length > 0 && Math.random() < 0.7 ? pick(prompts) : null;
   const model = promptRef?.model ?? pick(MODEL_NAMES);
@@ -302,9 +294,7 @@ function makeToolSpan(includeEvents?: boolean): SpanConfig {
     output: { type: "json", value: { results: ["item1", "item2"], count: 2 } },
   };
   if (includeEvents && status === "error") {
-    span.events = [
-      makeExceptionEvent(durationMs, `${toolName} invocation failed`),
-    ];
+    span.events = [makeExceptionEvent(durationMs, `${toolName} invocation failed`)];
   }
   return span;
 }
@@ -337,12 +327,7 @@ function makeGuardrailSpan(includeEvents?: boolean): SpanConfig {
   const durationMs = randInt(5, 80);
   const span: SpanConfig = {
     id: shortId(),
-    name: pick([
-      "pii_check",
-      "toxicity_filter",
-      "jailbreak_detector",
-      "content_policy",
-    ]),
+    name: pick(["pii_check", "toxicity_filter", "jailbreak_detector", "content_policy"]),
     type: "guardrail",
     durationMs,
     offsetMs: 0,
@@ -361,9 +346,7 @@ function makeGuardrailSpan(includeEvents?: boolean): SpanConfig {
         }),
   };
   if (includeEvents && !passed) {
-    span.events = [
-      makeExceptionEvent(durationMs, "Content policy violation detected"),
-    ];
+    span.events = [makeExceptionEvent(durationMs, "Content policy violation detected")];
   }
   return span;
 }
@@ -394,8 +377,7 @@ function appendLeafStep(isGenai: boolean, args: SubtreeArgs): StepResult {
   const { prompts, includeEvents } = args;
   if (!isGenai) return { span: makeInfraSpan(includeEvents), used: 1 };
   const leafType = Math.random();
-  if (leafType < 0.4)
-    return { span: makeLlmSpan(prompts, includeEvents), used: 1 };
+  if (leafType < 0.4) return { span: makeLlmSpan(prompts, includeEvents), used: 1 };
   if (leafType < 0.6) return { span: makeToolSpan(includeEvents), used: 1 };
   if (leafType < 0.8) return { span: makeRagSpan(), used: 1 };
   return { span: makeGuardrailSpan(includeEvents), used: 1 };
@@ -404,10 +386,7 @@ function appendLeafStep(isGenai: boolean, args: SubtreeArgs): StepResult {
 function appendAgentLoopStep(remaining: number, args: SubtreeArgs): StepResult {
   const { depth, maxDepth, genaiRatio, prompts, includeEvents } = args;
   const agentName = pick(AGENT_NAMES);
-  const loopIterations = Math.min(
-    randInt(1, 4),
-    Math.floor((remaining - 1) / 3),
-  );
+  const loopIterations = Math.min(randInt(1, 4), Math.floor((remaining - 1) / 3));
   const agent: SpanConfig = {
     id: shortId(),
     name: agentName,
@@ -462,10 +441,7 @@ function appendAgentLoopStep(remaining: number, args: SubtreeArgs): StepResult {
   return { span: agent, used };
 }
 
-function appendRagPipelineStep(
-  remaining: number,
-  args: SubtreeArgs,
-): StepResult {
+function appendRagPipelineStep(remaining: number, args: SubtreeArgs): StepResult {
   const { depth, maxDepth, genaiRatio, prompts, includeEvents } = args;
   const chain: SpanConfig = {
     id: shortId(),
@@ -516,12 +492,7 @@ function appendWorkflowStep(remaining: number, args: SubtreeArgs): StepResult {
   const { depth, maxDepth, genaiRatio, prompts, includeEvents } = args;
   const workflow: SpanConfig = {
     id: shortId(),
-    name: pick([
-      "process_request",
-      "handle_query",
-      "run_pipeline",
-      "execute_workflow",
-    ]),
+    name: pick(["process_request", "handle_query", "run_pipeline", "execute_workflow"]),
     type: "workflow",
     durationMs: 0,
     offsetMs: 0,
@@ -547,8 +518,7 @@ function appendWorkflowStep(remaining: number, args: SubtreeArgs): StepResult {
   used += sub.used;
 
   workflow.durationMs =
-    workflow.children.reduce((sum, c) => sum + c.durationMs, 0) +
-    randInt(5, 30);
+    workflow.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(5, 30);
   return { span: workflow, used };
 }
 
@@ -556,8 +526,7 @@ function appendSingleLeafStep(isGenai: boolean, args: SubtreeArgs): StepResult {
   const { prompts, includeEvents } = args;
   if (!isGenai) return { span: makeInfraSpan(includeEvents), used: 1 };
   const leafType = Math.random();
-  if (leafType < 0.5)
-    return { span: makeLlmSpan(prompts, includeEvents), used: 1 };
+  if (leafType < 0.5) return { span: makeLlmSpan(prompts, includeEvents), used: 1 };
   if (leafType < 0.75) return { span: makeToolSpan(includeEvents), used: 1 };
   return { span: makeRagSpan(), used: 1 };
 }
@@ -628,8 +597,7 @@ function countSpans(spans: SpanConfig[]): number {
 }
 
 export function generateTrace(options: GeneratorOptions): TraceConfig {
-  const { targetSpanCount, maxDepth, genaiRatio, prompts, includeEvents } =
-    options;
+  const { targetSpanCount, maxDepth, genaiRatio, prompts, includeEvents } = options;
 
   // Build the root span tree
   const rootAgent: SpanConfig = {
@@ -664,12 +632,7 @@ export function generateTrace(options: GeneratorOptions): TraceConfig {
     id: shortId(),
     name: `Generated Trace (${countSpans([rootAgent])} spans)`,
     resourceAttributes: {
-      "service.name": pick([
-        "ai-agent",
-        "chatbot-service",
-        "ml-pipeline",
-        "llm-gateway",
-      ]),
+      "service.name": pick(["ai-agent", "chatbot-service", "ml-pipeline", "llm-gateway"]),
       "service.version": `${randInt(1, 5)}.${randInt(0, 20)}.${randInt(0, 99)}`,
     },
     metadata: {

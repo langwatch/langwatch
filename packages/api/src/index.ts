@@ -3,12 +3,7 @@
 // ---------------------------------------------------------------------------
 
 export { createService, GroupRegistrar, ServiceBuilder } from "./builder.js";
-export type {
-  DefaultsChain,
-  RouteChain,
-  RpcChain,
-  SseChain,
-} from "./definition.js";
+export type { DefaultsChain, RouteChain, RpcChain, SseChain } from "./definition.js";
 export {
   DISCOVER_NAME,
   type DiscoveredOperation,
@@ -36,11 +31,7 @@ export function routeHandlers(app: Hono) {
   const h = handle(app);
   return { GET: h, POST: h, PUT: h, DELETE: h, PATCH: h } as const;
 }
-export {
-  createSSEResponse,
-  type SSEHandler,
-  type TypedSSEStream,
-} from "./sse.js";
+export { createSSEResponse, type SSEHandler, type TypedSSEStream } from "./sse.js";
 export {
   type BaseApp,
   type DateVersion,

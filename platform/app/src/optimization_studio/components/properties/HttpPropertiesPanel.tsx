@@ -13,11 +13,7 @@ import {
 } from "~/components/outputs/OutputsSection";
 import type { FieldMapping } from "~/components/variables";
 import { type Variable, VariablesSection } from "~/components/variables";
-import type {
-  HttpAuth,
-  HttpHeader,
-  HttpMethod,
-} from "@langwatch/workflow-contract";
+import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/workflow-contract";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { Component, Field as DslField } from "@langwatch/workflow-contract";
 import {
@@ -30,19 +26,14 @@ import { BasePropertiesPanel } from "./BasePropertiesPanel";
 /**
  * Get a parameter value from the node's parameters array.
  */
-function getParam(
-  parameters: DslField[] | undefined,
-  identifier: string,
-): unknown {
+function getParam(parameters: DslField[] | undefined, identifier: string): unknown {
   return parameters?.find((p) => p.identifier === identifier)?.value;
 }
 
 /**
  * Parse auth config from individual parameter fields into HttpAuth object.
  */
-function parseAuthFromParams(
-  parameters: DslField[] | undefined,
-): HttpAuth | undefined {
+function parseAuthFromParams(parameters: DslField[] | undefined): HttpAuth | undefined {
   const authType = getParam(parameters, "auth_type") as string | undefined;
   if (!authType || authType === "none") return undefined;
 
@@ -72,9 +63,7 @@ function parseAuthFromParams(
 /**
  * Parse headers from parameter field into HttpHeader array.
  */
-function parseHeadersFromParams(
-  parameters: DslField[] | undefined,
-): HttpHeader[] {
+function parseHeadersFromParams(parameters: DslField[] | undefined): HttpHeader[] {
   const raw = getParam(parameters, "headers");
   if (!raw || typeof raw !== "object") return [];
   if (Array.isArray(raw)) return raw as HttpHeader[];
@@ -107,12 +96,9 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
 
   // Read HTTP config from parameters
   const url = (getParam(node.data.parameters, "url") as string) ?? "";
-  const method =
-    (getParam(node.data.parameters, "method") as HttpMethod) ?? "POST";
-  const bodyTemplate =
-    (getParam(node.data.parameters, "body_template") as string) ?? "";
-  const outputPath =
-    (getParam(node.data.parameters, "output_path") as string) ?? "";
+  const method = (getParam(node.data.parameters, "method") as HttpMethod) ?? "POST";
+  const bodyTemplate = (getParam(node.data.parameters, "body_template") as string) ?? "";
+  const outputPath = (getParam(node.data.parameters, "output_path") as string) ?? "";
   const auth = parseAuthFromParams(node.data.parameters);
   const headers = parseHeadersFromParams(node.data.parameters);
 
@@ -218,9 +204,7 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
     (newVariables: Variable[]) => {
       const existingInputs = node.data.inputs ?? [];
       const newInputs: DslField[] = newVariables.map((v) => {
-        const existing = existingInputs.find(
-          (i) => i.identifier === v.identifier,
-        );
+        const existing = existingInputs.find((i) => i.identifier === v.identifier);
         return {
           identifier: v.identifier,
           type: v.type as DslField["type"],
@@ -257,13 +241,7 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
   });
 
   return (
-    <BasePropertiesPanel
-      node={node}
-      hideParameters
-      hideInputs
-      hideOutputs
-      paddingX={0}
-    >
+    <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs paddingX={0}>
       <HttpConfigEditor
         url={url}
         onUrlChange={handleUrlChange}

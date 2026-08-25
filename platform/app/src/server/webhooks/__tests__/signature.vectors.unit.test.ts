@@ -40,9 +40,7 @@ describe("webhook signature vectors", () => {
   const vectors = buildVectors();
 
   it("pins the tolerance the SDKs default to", () => {
-    expect(vectors.default_tolerance_seconds).toBe(
-      WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
-    );
+    expect(vectors.default_tolerance_seconds).toBe(WEBHOOK_SIGNATURE_TOLERANCE_SECONDS);
   });
 
   it("covers every outcome a receiver has to tell apart", () => {
@@ -81,9 +79,7 @@ describe("webhook signature vectors", () => {
     it("carries one v1 per non-empty secret, newest first", () => {
       const emitted = (vector.expected_header.match(/v1=/g) ?? []).length;
       expect(emitted).toBe(vector.secrets.filter((s) => s.length > 0).length);
-      expect(vector.expected_header.startsWith(`t=${vector.timestamp},`)).toBe(
-        true,
-      );
+      expect(vector.expected_header.startsWith(`t=${vector.timestamp},`)).toBe(true);
     });
   });
 });

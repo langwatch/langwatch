@@ -18,7 +18,10 @@ export async function listTriggers(): Promise<TriggerSummary[]> {
 }
 
 export async function getTrigger(id: string): Promise<TriggerSummary> {
-  return makeRequest("GET", `/api/triggers/${encodeURIComponent(id)}`) as Promise<TriggerSummary>;
+  return makeRequest(
+    "GET",
+    `/api/triggers/${encodeURIComponent(id)}`,
+  ) as Promise<TriggerSummary>;
 }
 
 export async function createTrigger(data: {
@@ -40,9 +43,18 @@ export async function updateTrigger(params: {
   alertType?: string | null;
 }): Promise<TriggerSummary> {
   const { id, ...data } = params;
-  return makeRequest("PATCH", `/api/triggers/${encodeURIComponent(id)}`, data) as Promise<TriggerSummary>;
+  return makeRequest(
+    "PATCH",
+    `/api/triggers/${encodeURIComponent(id)}`,
+    data,
+  ) as Promise<TriggerSummary>;
 }
 
-export async function deleteTrigger(id: string): Promise<{ id: string; deleted: boolean }> {
-  return makeRequest("DELETE", `/api/triggers/${encodeURIComponent(id)}`) as Promise<{ id: string; deleted: boolean }>;
+export async function deleteTrigger(
+  id: string,
+): Promise<{ id: string; deleted: boolean }> {
+  return makeRequest("DELETE", `/api/triggers/${encodeURIComponent(id)}`) as Promise<{
+    id: string;
+    deleted: boolean;
+  }>;
 }

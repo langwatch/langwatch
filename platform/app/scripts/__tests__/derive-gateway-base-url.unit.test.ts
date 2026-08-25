@@ -17,10 +17,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
-const HELPER = path.join(
-  REPO_ROOT,
-  "dev/scripts/lib/derive-gateway-base-url.sh",
-);
+const HELPER = path.join(REPO_ROOT, "dev/scripts/lib/derive-gateway-base-url.sh");
 
 function runHelper(env: Record<string, string | undefined>): {
   stdout: string;
@@ -29,9 +26,7 @@ function runHelper(env: Record<string, string | undefined>): {
 } {
   const exports = Object.entries(env)
     .map(([k, v]) =>
-      v === undefined
-        ? `unset ${k}`
-        : `export ${k}='${v.replace(/'/g, "'\\''")}'`,
+      v === undefined ? `unset ${k}` : `export ${k}='${v.replace(/'/g, "'\\''")}'`,
     )
     .join("\n");
   const script = `

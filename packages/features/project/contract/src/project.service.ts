@@ -16,9 +16,7 @@ import type {
 } from "./project";
 
 export abstract class ProjectService {
-  abstract tryFindInternal(
-    input: InternalProjectQuery,
-  ): Promise<InternalProject | null>;
+  abstract tryFindInternal(input: InternalProjectQuery): Promise<InternalProject | null>;
 
   abstract ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
 
@@ -49,18 +47,13 @@ export abstract class ProjectService {
     organizationId: string;
     data: UpdateProjectInput;
   }): Promise<Project>;
-  abstract archive(input: {
-    id: string;
+  abstract archive(input: { id: string; organizationId: string }): Promise<Project>;
+  abstract listByOrganization(input: {
     organizationId: string;
-  }): Promise<Project>;
-  abstract listByOrganization(
-    input: {
-      organizationId: string;
-      page: number;
-      limit: number;
-      projectIds?: string[];
-    },
-  ): Promise<PaginatedProjects>;
+    page: number;
+    limit: number;
+    projectIds?: string[];
+  }): Promise<PaginatedProjects>;
   abstract listByTeam(input: {
     organizationId: string;
     teamId: string;

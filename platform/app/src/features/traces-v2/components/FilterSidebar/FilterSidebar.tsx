@@ -1,11 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -464,28 +457,20 @@ export const FilterSidebar: React.FC = () => {
             content={
               <HStack gap={1.5}>
                 <Text>
-                  {allExpanded
-                    ? "Collapse all sections"
-                    : "Expand all sections"}
+                  {allExpanded ? "Collapse all sections" : "Expand all sections"}
                 </Text>
                 <Kbd>E</Kbd>
               </HStack>
             }
           >
             <IconButton
-              aria-label={
-                allExpanded ? "Collapse all sections" : "Expand all sections"
-              }
+              aria-label={allExpanded ? "Collapse all sections" : "Expand all sections"}
               size="2xs"
               variant="ghost"
               color="fg.subtle"
               onClick={handleToggleAll}
             >
-              {allExpanded ? (
-                <ChevronsDownUp size={14} />
-              ) : (
-                <ChevronsUpDown size={14} />
-              )}
+              {allExpanded ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
             </IconButton>
           </Tooltip>
         </HStack>
@@ -541,10 +526,7 @@ export const FilterSidebar: React.FC = () => {
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext
-              items={orderedKeys}
-              strategy={verticalListSortingStrategy}
-            >
+            <SortableContext items={orderedKeys} strategy={verticalListSortingStrategy}>
               {orderedKeys.map((key) => (
                 <SortableSection key={key} id={key} isAnyDragging={!!activeId}>
                   {(dragHandleProps) => renderSection({ key, dragHandleProps })}

@@ -17,10 +17,7 @@
  * (see `putFileToPresignedUrl`).
  */
 
-import type {
-  DatasetColumns,
-  DatasetConfirmColumns,
-} from "@langwatch/dataset-contract";
+import type { DatasetColumns, DatasetConfirmColumns } from "@langwatch/dataset-contract";
 
 /**
  * Sentinel error for "no browser-reachable object storage" (the backend's
@@ -30,9 +27,7 @@ import type {
  * server's same-named error so the modal can `instanceof`-check it.
  */
 export class DirectUploadUnavailableError extends Error {
-  constructor(
-    message = "Direct upload is unavailable; use the backend upload path",
-  ) {
+  constructor(message = "Direct upload is unavailable; use the backend upload path") {
     super(message);
     this.name = "DirectUploadUnavailableError";
   }
@@ -56,10 +51,7 @@ export class DatasetNameConflictError extends Error {
  * large ones). Carries the underlying cause for diagnostics.
  */
 export class PresignedUploadFailedError extends Error {
-  constructor(
-    message = "Failed to upload the file to object storage",
-    cause?: unknown,
-  ) {
+  constructor(message = "Failed to upload the file to object storage", cause?: unknown) {
     super(message, cause === undefined ? undefined : { cause });
     this.name = "PresignedUploadFailedError";
   }
@@ -165,9 +157,7 @@ export async function putFileToPresignedUrl(
     // upload mechanism). Cross-origin (S3): an opaque TypeError means a missing
     // bucket CORS rule (no status to read) — wrap it so the modal falls back.
     if (sameOrigin) {
-      throw error instanceof Error
-        ? error
-        : new Error("Failed to upload the file");
+      throw error instanceof Error ? error : new Error("Failed to upload the file");
     }
     throw new PresignedUploadFailedError(
       "Failed to upload the file to object storage (network or CORS error)",
@@ -187,9 +177,7 @@ export async function putFileToPresignedUrl(
         error?: string;
       };
       throw new Error(
-        body.message ??
-          body.error ??
-          `Upload failed (status ${response.status})`,
+        body.message ?? body.error ?? `Upload failed (status ${response.status})`,
       );
     }
     throw new PresignedUploadFailedError(

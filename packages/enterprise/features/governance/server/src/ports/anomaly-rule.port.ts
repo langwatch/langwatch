@@ -31,8 +31,5 @@ export abstract class AnomalyRuleRepository {
   abstract list(organizationId: string): Promise<AnomalyRule[]>;
   abstract tryFindById(id: string): Promise<AnomalyRule | null>;
   abstract create(input: NewAnomalyRule): Promise<AnomalyRule>;
-  abstract update(
-    id: string,
-    changes: AnomalyRuleChanges,
-  ): Promise<AnomalyRule>;
+  abstract update(id: string, changes: AnomalyRuleChanges): Promise<AnomalyRule>;
 }

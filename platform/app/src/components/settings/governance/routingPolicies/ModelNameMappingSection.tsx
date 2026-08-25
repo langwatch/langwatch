@@ -1,17 +1,6 @@
-import {
-  Button,
-  HStack,
-  IconButton,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
-import {
-  type Control,
-  type UseFormRegister,
-  useFieldArray,
-} from "react-hook-form";
+import { type Control, type UseFormRegister, useFieldArray } from "react-hook-form";
 
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 
@@ -46,8 +35,8 @@ export function ModelNameMappingSection({
         />
       </HStack>
       <Text fontSize="xs" color="fg.muted">
-        The model a mapping points at is checked against everything this policy
-        allows, so a mapping can never reach a model the key may not use.
+        The model a mapping points at is checked against everything this policy allows, so
+        a mapping can never reach a model the key may not use.
       </Text>
 
       {fields.length === 0 && (

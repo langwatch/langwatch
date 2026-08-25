@@ -110,9 +110,7 @@ function isAllowlisted(rel: string): boolean {
 function findOffendingStoredObjectsRefs(absDir: string): string[] {
   const files = findSourceFiles(absDir);
   return files
-    .filter((filePath) =>
-      /stored_objects/i.test(fs.readFileSync(filePath, "utf8")),
-    )
+    .filter((filePath) => /stored_objects/i.test(fs.readFileSync(filePath, "utf8")))
     .map((f) => path.relative(REPO_ROOT, f))
     .filter((rel) => !isAllowlisted(rel));
 }

@@ -25,9 +25,7 @@ describe("given a command running with the default text output", () => {
     it("keeps the text it was given", () => {
       setOutputFormat("table");
 
-      expect(createSpinner("Fetching agents...").text).toBe(
-        "Fetching agents...",
-      );
+      expect(createSpinner("Fetching agents...").text).toBe("Fetching agents...");
     });
   });
 });
@@ -53,9 +51,7 @@ describe("given a caller that asked for silence explicitly", () => {
     it("stays silent", () => {
       setOutputFormat(undefined);
 
-      expect(
-        createSpinner({ text: "quiet", isSilent: true }).isSilent,
-      ).toBe(true);
+      expect(createSpinner({ text: "quiet", isSilent: true }).isSilent).toBe(true);
     });
   });
 });

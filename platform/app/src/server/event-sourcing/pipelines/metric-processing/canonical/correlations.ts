@@ -1,8 +1,5 @@
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
-import type {
-  MetricKind,
-  MetricTraceCorrelation,
-} from "../schemas/metricDataPoint";
+import type { MetricKind, MetricTraceCorrelation } from "../schemas/metricDataPoint";
 import { finiteNumber, timestampDecimal, timestampMs } from "./numbers";
 import { isRecord } from "./serialization";
 
@@ -33,12 +30,8 @@ export function correlations(args: {
   const unique = new Map<string, MetricTraceCorrelation>();
   for (const raw of args.exemplars) {
     if (!isRecord(raw)) continue;
-    const traceId = (
-      decodeBase64OpenTelemetryId(raw.traceId) ?? ""
-    ).toLowerCase();
-    const spanId = (
-      decodeBase64OpenTelemetryId(raw.spanId) ?? ""
-    ).toLowerCase();
+    const traceId = (decodeBase64OpenTelemetryId(raw.traceId) ?? "").toLowerCase();
+    const spanId = (decodeBase64OpenTelemetryId(raw.spanId) ?? "").toLowerCase();
     if (!validTraceId(traceId) || !validSpanId(spanId)) continue;
     const exemplarTime = timestampDecimal(raw.timeUnixNano);
     const exemplarValue = finiteNumber(raw.asDouble ?? raw.asInt);
@@ -54,9 +47,7 @@ export function correlations(args: {
       metricUnit: args.metricUnit,
       metricKind: args.metricKind,
       exemplarValue,
-      exemplarTimeUnixMs: exemplarTime
-        ? timestampMs(exemplarTime)
-        : args.occurredAt,
+      exemplarTimeUnixMs: exemplarTime ? timestampMs(exemplarTime) : args.occurredAt,
       occurredAt: exemplarTime ? timestampMs(exemplarTime) : args.occurredAt,
     });
   }

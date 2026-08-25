@@ -55,32 +55,32 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 
 ## Skills
 
-| User intent | Skill | Primary commands |
-| --- | --- | --- |
-| "show me traces", "recent activity", "been up to", "what failed" | `agent-performance` | `langwatch trace search --errors-only --origin application` (errors live on spans), `langwatch trace get <id>` |
-| "cost", "latency", "stats", "usage", "pass rate", "how is my agent doing" | `agent-performance` | `langwatch analytics query --metric <metric>`, `langwatch trace export --format jsonl --origin application` |
-| "what should I do next", "improve my agent", "why does this keep failing" | `agent-improve` | `langwatch trace export`, `langwatch scenario create`, `langwatch monitor create`, `langwatch experiment run` |
-| "test my agent", "batch eval", "compare models", "benchmark" | `experiments` | `langwatch experiment list`, `langwatch experiment run <slug>`, `langwatch evaluator types` |
-| "monitor production", "online eval", "guardrail", "live quality" | `online-evaluations` | `langwatch monitor list`, `langwatch monitor create`, `langwatch evaluator types`, `langwatch evaluator create` |
-| "evaluate my agent" (no batch or live context) | `evaluations` | ask batch versus live first, then the matching row |
-| "scenario", "multi-turn test", "red team" | `scenarios` | `langwatch scenario list`, `langwatch scenario create <name> --situation <situation>`, `langwatch suite run <id>` |
-| "prompts", "version a prompt", "update prompt" | `prompts` | `langwatch prompt list`, `langwatch prompt versions <handle>`, `langwatch prompt create` |
-| "datasets", "training data", "add examples" | `datasets` | `langwatch dataset list`, `langwatch dataset create --columns input:string,output:string`, `langwatch dataset records add <slug>` (rows match the created columns) |
-| "set up tracing", "instrument my code" | `tracing` | `langwatch docs integration/<framework>` |
-| "set everything up", "overhaul", "level up" | `level-up` | runs multiple skills in order |
-| "traces aren't arriving", "broken instrumentation" | `debug-instrumentation` | `langwatch trace search` |
-| "audit my setup", "best practices" | `agent-best-practices` | parallel `langwatch <resource> list` |
-| "evaluate images / audio / multimodal" | `evaluate-multimodal` | `langwatch scenario-docs multimodal`, `langwatch experiment run` |
-| "generate a RAG eval dataset" | `generate-rag-dataset` | `langwatch dataset create`, `langwatch dataset upload <slug> <file>` |
-| "test compliance / regulated boundaries" | `test-compliance` | `langwatch scenario create`, `langwatch suite run <id>` |
-| "test my CLI's usability" | `test-cli-usability` | scenario tests |
-| "open a PR", "fix and submit", "send a patch" | `github` | `gh api /installation/repositories` (finds "my repo"), `gh repo clone`, `gh pr create` |
-| "configured agents", "create agent" | direct CLI | `langwatch agent list`, `langwatch agent create`, `langwatch agent run <id>` |
-| "dashboards" | direct CLI | `langwatch dashboard list`, `langwatch dashboard create` |
-| "alerts", "triggers" | direct CLI | `langwatch trigger list`, `langwatch trigger create` |
-| "workflows" | direct CLI | `langwatch workflow list`, `langwatch workflow run <id>` |
-| "annotations", "thumbs up/down a trace" | direct CLI | `langwatch annotation list`, `langwatch annotation create <traceId> --thumbs-up\|--thumbs-down --comment "…"` (no update command) |
-| "delete X", "remove", "clean up" | decline | no delete command; deletion is the user's own action, name the page |
+| User intent                                                               | Skill                   | Primary commands                                                                                                                                                   |
+| ------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "show me traces", "recent activity", "been up to", "what failed"          | `agent-performance`     | `langwatch trace search --errors-only --origin application` (errors live on spans), `langwatch trace get <id>`                                                     |
+| "cost", "latency", "stats", "usage", "pass rate", "how is my agent doing" | `agent-performance`     | `langwatch analytics query --metric <metric>`, `langwatch trace export --format jsonl --origin application`                                                        |
+| "what should I do next", "improve my agent", "why does this keep failing" | `agent-improve`         | `langwatch trace export`, `langwatch scenario create`, `langwatch monitor create`, `langwatch experiment run`                                                      |
+| "test my agent", "batch eval", "compare models", "benchmark"              | `experiments`           | `langwatch experiment list`, `langwatch experiment run <slug>`, `langwatch evaluator types`                                                                        |
+| "monitor production", "online eval", "guardrail", "live quality"          | `online-evaluations`    | `langwatch monitor list`, `langwatch monitor create`, `langwatch evaluator types`, `langwatch evaluator create`                                                    |
+| "evaluate my agent" (no batch or live context)                            | `evaluations`           | ask batch versus live first, then the matching row                                                                                                                 |
+| "scenario", "multi-turn test", "red team"                                 | `scenarios`             | `langwatch scenario list`, `langwatch scenario create <name> --situation <situation>`, `langwatch suite run <id>`                                                  |
+| "prompts", "version a prompt", "update prompt"                            | `prompts`               | `langwatch prompt list`, `langwatch prompt versions <handle>`, `langwatch prompt create`                                                                           |
+| "datasets", "training data", "add examples"                               | `datasets`              | `langwatch dataset list`, `langwatch dataset create --columns input:string,output:string`, `langwatch dataset records add <slug>` (rows match the created columns) |
+| "set up tracing", "instrument my code"                                    | `tracing`               | `langwatch docs integration/<framework>`                                                                                                                           |
+| "set everything up", "overhaul", "level up"                               | `level-up`              | runs multiple skills in order                                                                                                                                      |
+| "traces aren't arriving", "broken instrumentation"                        | `debug-instrumentation` | `langwatch trace search`                                                                                                                                           |
+| "audit my setup", "best practices"                                        | `agent-best-practices`  | parallel `langwatch <resource> list`                                                                                                                               |
+| "evaluate images / audio / multimodal"                                    | `evaluate-multimodal`   | `langwatch scenario-docs multimodal`, `langwatch experiment run`                                                                                                   |
+| "generate a RAG eval dataset"                                             | `generate-rag-dataset`  | `langwatch dataset create`, `langwatch dataset upload <slug> <file>`                                                                                               |
+| "test compliance / regulated boundaries"                                  | `test-compliance`       | `langwatch scenario create`, `langwatch suite run <id>`                                                                                                            |
+| "test my CLI's usability"                                                 | `test-cli-usability`    | scenario tests                                                                                                                                                     |
+| "open a PR", "fix and submit", "send a patch"                             | `github`                | `gh api /installation/repositories` (finds "my repo"), `gh repo clone`, `gh pr create`                                                                             |
+| "configured agents", "create agent"                                       | direct CLI              | `langwatch agent list`, `langwatch agent create`, `langwatch agent run <id>`                                                                                       |
+| "dashboards"                                                              | direct CLI              | `langwatch dashboard list`, `langwatch dashboard create`                                                                                                           |
+| "alerts", "triggers"                                                      | direct CLI              | `langwatch trigger list`, `langwatch trigger create`                                                                                                               |
+| "workflows"                                                               | direct CLI              | `langwatch workflow list`, `langwatch workflow run <id>`                                                                                                           |
+| "annotations", "thumbs up/down a trace"                                   | direct CLI              | `langwatch annotation list`, `langwatch annotation create <traceId> --thumbs-up\|--thumbs-down --comment "…"` (no update command)                                  |
+| "delete X", "remove", "clean up"                                          | decline                 | no delete command; deletion is the user's own action, name the page                                                                                                |
 
 These rows route common intents, not the inventory. The `skill` tool lists every installed skill; check it when a request matches no row.
 

@@ -97,13 +97,7 @@ function claudeLlmSpan(over: Partial<Span> = {}): Span {
   } as Span;
 }
 
-function makeTrace({
-  origin,
-  spans,
-}: {
-  origin: string;
-  spans: Span[];
-}): Trace {
+function makeTrace({ origin, spans }: { origin: string; spans: Span[] }): Trace {
   return {
     trace_id: TRACE_ID,
     project_id: PROJECT_ID,
@@ -223,11 +217,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
       await service.getById(PROJECT_ID, TRACE_ID, protections);
 
       expect(getLogs).toHaveBeenCalledTimes(1);
-      expect(getLogs).toHaveBeenCalledWith(
-        PROJECT_ID,
-        TRACE_ID,
-        1_700_000_000_000,
-      );
+      expect(getLogs).toHaveBeenCalledWith(PROJECT_ID, TRACE_ID, 1_700_000_000_000);
     });
 
     it("preserves the span's real token metrics and its stored cost", async () => {
@@ -407,9 +397,7 @@ describe("TraceService — multi-trace read enrichment", () => {
       );
 
       expect(result.groups[0]?.[0]?.spans?.[0]?.input).toEqual(enrichedInput);
-      expect(result.groups[0]?.[0]?.spans?.[0]?.metrics?.cost).toBe(
-        STORED_COST,
-      );
+      expect(result.groups[0]?.[0]?.spans?.[0]?.metrics?.cost).toBe(STORED_COST);
       expect(result.groups[1]?.[0]?.spans?.[0]?.input ?? null).toBeNull();
       expect(getLogs).toHaveBeenCalledTimes(1);
     });
@@ -437,9 +425,7 @@ describe("TraceService — multi-trace read enrichment", () => {
 
     it("returns the page untouched when no trace is coding-agent origin", async () => {
       const page = {
-        groups: [
-          [makeTrace({ origin: "application", spans: [claudeLlmSpan()] })],
-        ],
+        groups: [[makeTrace({ origin: "application", spans: [claudeLlmSpan()] })]],
         totalHits: 1,
         traceChecks: {},
       };
@@ -486,11 +472,7 @@ describe("TraceService — multi-trace read enrichment", () => {
       const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
       const service = makeService(getLogs);
 
-      await service.getTracesWithSpansByThreadIds(
-        PROJECT_ID,
-        ["thread-1"],
-        protections,
-      );
+      await service.getTracesWithSpansByThreadIds(PROJECT_ID, ["thread-1"], protections);
 
       expect(getLogs).not.toHaveBeenCalled();
     });

@@ -16,9 +16,7 @@ const { getProjectModelProvidersMock } = vi.hoisted(() => ({
 
 vi.mock("~/server/api/routers/modelProviders.utils", async (importOriginal) => {
   const actual =
-    await importOriginal<
-      typeof import("~/server/api/routers/modelProviders.utils")
-    >();
+    await importOriginal<typeof import("~/server/api/routers/modelProviders.utils")>();
   return {
     ...actual,
     getProjectModelProviders: getProjectModelProvidersMock,
@@ -124,8 +122,7 @@ describe("Feature: evaluationsRouter.availableEvaluators — Azure BYOK", () => 
           provider: "azure_safety",
           enabled: true,
           customKeys: {
-            AZURE_CONTENT_SAFETY_ENDPOINT:
-              "https://byok.cognitiveservices.azure.com/",
+            AZURE_CONTENT_SAFETY_ENDPOINT: "https://byok.cognitiveservices.azure.com/",
             AZURE_CONTENT_SAFETY_KEY: "byok-key",
           },
         },
@@ -160,8 +157,7 @@ describe("Feature: evaluationsRouter.availableEvaluators — Azure BYOK", () => 
           provider: "azure_safety",
           enabled: false,
           customKeys: {
-            AZURE_CONTENT_SAFETY_ENDPOINT:
-              "https://byok.cognitiveservices.azure.com/",
+            AZURE_CONTENT_SAFETY_ENDPOINT: "https://byok.cognitiveservices.azure.com/",
             AZURE_CONTENT_SAFETY_KEY: "byok-key",
           },
         },

@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Circle,
-  Heading,
-  HStack,
-  Spinner,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Circle, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
@@ -113,10 +105,7 @@ export type PromptEditorDrawerProps = {
   /**
    * Callback when input mappings change.
    */
-  onInputMappingsChange?: (
-    identifier: string,
-    mapping: FieldMapping | undefined,
-  ) => void;
+  onInputMappingsChange?: (identifier: string, mapping: FieldMapping | undefined) => void;
   /**
    * Callback when a version is loaded from history (for evaluations context).
    * Called before the form is reset with the new version data.
@@ -134,9 +123,7 @@ export type PromptEditorDrawerProps = {
 /**
  * Extracts LocalPromptConfig from form values for persisting unpublished changes.
  */
-const extractLocalConfig = (
-  formValues: PromptConfigFormValues,
-): LocalPromptConfig => ({
+const extractLocalConfig = (formValues: PromptConfigFormValues): LocalPromptConfig => ({
   llm: {
     model: formValues.version.configData.llm.model,
     temperature: formValues.version.configData.llm.temperature,
@@ -289,9 +276,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     props.promptVersionId ??
     drawerParams.promptVersionId ??
     (complexProps.promptVersionId as string | undefined);
-  const isOpen = props.headless
-    ? true
-    : props.open !== false && props.open !== undefined;
+  const isOpen = props.headless ? true : props.open !== false && props.open !== undefined;
 
   // Load existing prompt if editing
   // If promptVersionId is provided, fetch that specific version instead of latest
@@ -311,9 +296,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // Compute saved form values from the published prompt
   const savedFormValues = useMemo(() => {
     if (promptQuery.data) {
-      return versionedPromptToPromptConfigFormValuesWithSystemMessage(
-        promptQuery.data,
-      );
+      return versionedPromptToPromptConfigFormValuesWithSystemMessage(promptQuery.data);
     }
     return undefined;
   }, [promptQuery.data]);
@@ -323,9 +306,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // this seed, the subscription fires on defaults before the init useEffect
   // runs and clobbers the caller's local edits (#3155).
   const [configValues, setConfigValues] = useState<PromptConfigFormValues>(() =>
-    localConfigToFormValues(
-      props.initialLocalConfig ?? props.inlineConfigFallback,
-    ),
+    localConfigToFormValues(props.initialLocalConfig ?? props.inlineConfigFallback),
   );
   const [isFormInitialized, setIsFormInitialized] = useState(false);
   // Ref set directly in init/reset effects so the watch subscription
@@ -365,10 +346,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     if (!isOpen) return;
 
     if (promptQuery.data) {
-      const serverValues =
-        versionedPromptToPromptConfigFormValuesWithSystemMessage(
-          promptQuery.data,
-        );
+      const serverValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(
+        promptQuery.data,
+      );
 
       // Merge local config over server data if present
       const formValues = props.initialLocalConfig
@@ -432,9 +412,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // importing a workflow from another project). Use defaults with model's
       // max tokens, merging initialLocalConfig if available.
       const defaultModel = resolvedDefaultModel ?? "";
-      const defaultModelMetadata = defaultModel
-        ? modelMetadata[defaultModel]
-        : undefined;
+      const defaultModelMetadata = defaultModel ? modelMetadata[defaultModel] : undefined;
       const maxTokens = getMaxTokenLimit(defaultModelMetadata);
 
       const defaults = buildDefaultFormValues({
@@ -451,8 +429,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // Restore the node's config over defaults. Prefer genuine unpublished
       // edits, then the inline fallback (only set when the prompt was not found
       // in the project) so imported workflows still show their configuration.
-      const notFoundConfig =
-        props.initialLocalConfig ?? props.inlineConfigFallback;
+      const notFoundConfig = props.initialLocalConfig ?? props.inlineConfigFallback;
       const formValues = notFoundConfig
         ? {
             ...defaults,
@@ -494,11 +471,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       setIsFormInitialized(true);
 
       // Auto-map default inputs to matching dataset columns
-      if (
-        availableSources &&
-        availableSources.length > 0 &&
-        _onMappingsChangeProp
-      ) {
+      if (availableSources && availableSources.length > 0 && _onMappingsChangeProp) {
         const allFields = availableSources.flatMap((source) =>
           source.fields.map((f) => ({ ...f, sourceId: source.id })),
         );
@@ -830,8 +803,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     }
 
     const formValues = methods.getValues();
-    pendingSaveDataRef.current =
-      formValuesToTriggerSaveVersionParams(formValues);
+    pendingSaveDataRef.current = formValuesToTriggerSaveVersionParams(formValues);
     return true;
   }, [project?.id, methods]);
 
@@ -946,11 +918,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         return;
       }
       // Otherwise, warn about losing changes
-      if (
-        !window.confirm(
-          "You have unsaved changes. Are you sure you want to close?",
-        )
-      ) {
+      if (!window.confirm("You have unsaved changes. Are you sure you want to close?")) {
         return;
       }
     }
@@ -1018,13 +986,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     } catch (error) {
       console.error("Failed to upgrade to latest version:", error);
     }
-  }, [
-    promptId,
-    project?.id,
-    utils.prompts.getByIdOrHandle,
-    methods,
-    onVersionChange,
-  ]);
+  }, [promptId, project?.id, utils.prompts.getByIdOrHandle, methods, onVersionChange]);
 
   // Handle setting variable mapping when selecting a source field from the text area
   const handleSetVariableMapping = useCallback(
@@ -1078,12 +1040,12 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
   // Get available fields for message editor (with type information)
   const watchedInputs = methods.watch("version.configData.inputs");
-  const availableFields = (
-    Array.isArray(watchedInputs) ? watchedInputs : []
-  ).map((input) => ({
-    identifier: input.identifier,
-    type: input.type,
-  }));
+  const availableFields = (Array.isArray(watchedInputs) ? watchedInputs : []).map(
+    (input) => ({
+      identifier: input.identifier,
+      type: input.type,
+    }),
+  );
 
   // Watch messages to calculate which variables are used
   const watchedMessages = methods.watch("version.configData.messages");
@@ -1111,9 +1073,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
     // Get input identifiers
     const inputs = Array.isArray(watchedInputs) ? watchedInputs : [];
-    const inputIds = new Set(
-      inputs.map((i: { identifier: string }) => i.identifier),
-    );
+    const inputIds = new Set(inputs.map((i: { identifier: string }) => i.identifier));
 
     // Find variables that are both used and defined but missing a mapping
     const missing = new Set<string>();
@@ -1333,12 +1293,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
             )}
           </HStack>
         </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-        >
+        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           {loadingContent ?? formBodyContent}
         </Drawer.Body>
 

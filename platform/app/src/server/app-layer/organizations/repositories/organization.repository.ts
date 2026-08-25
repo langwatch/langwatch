@@ -344,32 +344,18 @@ export interface OrganizationRepository {
     teamId: string;
   }): Promise<OrganizationUserRole | null>;
   getProjectIds(organizationId: string): Promise<string[]>;
-  findWithAdmins(
-    organizationId: string,
-  ): Promise<OrganizationWithAdmins | null>;
-  updateSentPlanLimitAlert(
-    organizationId: string,
-    timestamp: Date,
-  ): Promise<void>;
+  findWithAdmins(organizationId: string): Promise<OrganizationWithAdmins | null>;
+  updateSentPlanLimitAlert(organizationId: string, timestamp: Date): Promise<void>;
   findProjectsWithName(
     organizationId: string,
   ): Promise<Array<{ id: string; name: string }>>;
   clearTrialLicense(organizationId: string): Promise<void>;
-  updateCurrency(input: {
-    organizationId: string;
-    currency: string;
-  }): Promise<void>;
+  updateCurrency(input: { organizationId: string; currency: string }): Promise<void>;
   getPricingModel(organizationId: string): Promise<string | null>;
   getStripeCustomerId(organizationId: string): Promise<string | null>;
-  findByStripeCustomerId(
-    stripeCustomerId: string,
-  ): Promise<{ id: string } | null>;
-  findNameById(
-    organizationId: string,
-  ): Promise<{ id: string; name: string } | null>;
-  findPrimaryIntentById(
-    organizationId: string,
-  ): Promise<OrganizationIntent | null>;
+  findByStripeCustomerId(stripeCustomerId: string): Promise<{ id: string } | null>;
+  findNameById(organizationId: string): Promise<{ id: string; name: string } | null>;
+  findPrimaryIntentById(organizationId: string): Promise<OrganizationIntent | null>;
   getOrganizationForBilling(
     organizationId: string,
   ): Promise<OrganizationForBilling | null>;
@@ -451,9 +437,7 @@ export interface OrganizationRepository {
   }): Promise<MemberTeamBinding[]>;
 
   /** The organization profile the management surface reads back. */
-  findSettingsById(
-    organizationId: string,
-  ): Promise<OrganizationSettings | null>;
+  findSettingsById(organizationId: string): Promise<OrganizationSettings | null>;
 
   /** Partial settings update; see {@link UpdateOrganizationSettingsInput}. */
   updateSettings(input: UpdateOrganizationSettingsInput): Promise<void>;
@@ -475,9 +459,7 @@ export interface OrganizationRepository {
    */
   getClient?(): PrismaClient | null;
 
-  updateMemberRole(
-    input: UpdateMemberRoleInput,
-  ): Promise<UpdateMemberRoleResult>;
+  updateMemberRole(input: UpdateMemberRoleInput): Promise<UpdateMemberRoleResult>;
 
   updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void>;
 
@@ -513,9 +495,7 @@ export class NullOrganizationRepository implements OrganizationRepository {
     return [];
   }
 
-  async findWithAdmins(
-    _organizationId: string,
-  ): Promise<OrganizationWithAdmins | null> {
+  async findWithAdmins(_organizationId: string): Promise<OrganizationWithAdmins | null> {
     return null;
   }
 
@@ -571,9 +551,7 @@ export class NullOrganizationRepository implements OrganizationRepository {
     return null;
   }
 
-  async createAndAssign(
-    _input: CreateAndAssignInput,
-  ): Promise<CreateAndAssignResult> {
+  async createAndAssign(_input: CreateAndAssignInput): Promise<CreateAndAssignResult> {
     return {
       organization: { id: "", name: "" },
       team: { id: "", slug: "", name: "" },
@@ -589,9 +567,7 @@ export class NullOrganizationRepository implements OrganizationRepository {
     };
   }
 
-  async findAllProvisioningSummaries(): Promise<
-    OrganizationProvisioningSummary[]
-  > {
+  async findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
     return [];
   }
 
@@ -657,29 +633,21 @@ export class NullOrganizationRepository implements OrganizationRepository {
     return [];
   }
 
-  async findSettingsById(
-    _organizationId: string,
-  ): Promise<OrganizationSettings | null> {
+  async findSettingsById(_organizationId: string): Promise<OrganizationSettings | null> {
     return null;
   }
 
-  async updateSettings(
-    _input: UpdateOrganizationSettingsInput,
-  ): Promise<void> {}
+  async updateSettings(_input: UpdateOrganizationSettingsInput): Promise<void> {}
 
   async deleteMember(_input: DeleteMemberInput): Promise<void> {}
 
   async setMemberDisabled(_input: SetMemberDisabledInput): Promise<void> {}
 
-  async updateMemberRole(
-    _input: UpdateMemberRoleInput,
-  ): Promise<UpdateMemberRoleResult> {
+  async updateMemberRole(_input: UpdateMemberRoleInput): Promise<UpdateMemberRoleResult> {
     return { teamsLeftWithoutAdmin: [] };
   }
 
-  async updateTeamMemberRole(
-    _input: UpdateTeamMemberRoleInput,
-  ): Promise<void> {}
+  async updateTeamMemberRole(_input: UpdateTeamMemberRoleInput): Promise<void> {}
 
   async getAuditLogs(
     _filters: AuditLogFilters,

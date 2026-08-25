@@ -74,9 +74,7 @@ export const workflowVersionHistoryModeSchema = z.enum([
   "previousDsl",
 ]);
 
-export type WorkflowVersionHistoryMode = z.infer<
-  typeof workflowVersionHistoryModeSchema
->;
+export type WorkflowVersionHistoryMode = z.infer<typeof workflowVersionHistoryModeSchema>;
 
 export const workflowVersionHistoryEntrySchema = z.object({
   id: z.string(),

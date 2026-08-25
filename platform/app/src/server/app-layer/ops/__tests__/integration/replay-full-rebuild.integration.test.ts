@@ -29,15 +29,7 @@ import {
   unmarkBatch,
 } from "@langwatch/eventing";
 import type { Redis } from "ioredis";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceAnalyticsRollupClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.clickhouse.repository";
 import {
   getTestClickHouseClient,
@@ -178,10 +170,7 @@ async function seedEventLog(tenantId: string, traceId: string): Promise<void> {
  * Leave behind exactly what an aborted run leaves: the aggregate recorded in
  * the projection's completed set, written by the same helper the replay uses.
  */
-async function seedCompletedMarker(
-  tenantId: string,
-  traceId: string,
-): Promise<void> {
+async function seedCompletedMarker(tenantId: string, traceId: string): Promise<void> {
   await unmarkBatch({
     redis,
     projectionName: PROJECTION_NAME,
@@ -312,11 +301,7 @@ describe("given identical span history for tenants whose rollup is empty", () =>
 
   afterAll(async () => {
     await cleanupAll({ redis, projectionName: PROJECTION_NAME });
-    for (const tenantId of [
-      witnessTenantId,
-      skippedTenantId,
-      rebuiltTenantId,
-    ]) {
+    for (const tenantId of [witnessTenantId, skippedTenantId, rebuiltTenantId]) {
       for (const table of ["event_log", "trace_analytics_rollup"]) {
         try {
           await client.exec({
@@ -383,9 +368,9 @@ describe("given identical span history for tenants whose rollup is empty", () =>
 
       // The run owns the markers end to end: cleared before discovery, and
       // cleared again by the replay path once every batch completed.
-      expect(
-        await getCompletedSet({ redis, projectionName: PROJECTION_NAME }),
-      ).toEqual(new Set());
+      expect(await getCompletedSet({ redis, projectionName: PROJECTION_NAME })).toEqual(
+        new Set(),
+      );
     });
   });
 });

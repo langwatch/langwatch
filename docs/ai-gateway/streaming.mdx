@@ -137,18 +137,22 @@ Same passthrough discipline.
 - Trace span per chunk would be too expensive, the gateway records a single span per streaming request with `langwatch.streaming=true` and the normal per-request attrs (`langwatch.model`, `langwatch.usage.*`, `langwatch.duration_ms`, `langwatch.cost_usd`).
 - Mid-stream failures are visible via `gateway_http_requests_total{status="500"}` + the single span's error state + request-id correlation to the gateway log line.
 
-<Info>Per-stream telemetry attrs (`langwatch.stream.chunk_count`, `.first_chunk_ms`, `.total_ms`, `.terminated_at_chunk`) are a v1.1 observability follow-up. In v1, the single-span-per-request model + log-line correlation is the operator signal.</Info>
+<Info>
+  Per-stream telemetry attrs (`langwatch.stream.chunk_count`, `.first_chunk_ms`,
+  `.total_ms`, `.terminated_at_chunk`) are a v1.1 observability follow-up. In v1, the
+  single-span-per-request model + log-line correlation is the operator signal.
+</Info>
 
 ## Usage extraction (critical for streaming budgets)
 
 Streaming responses are just as expensive as non-streaming, but the usage block (token counts, cost inputs) arrives asynchronously, typically in the terminal chunk, but providers differ:
 
-| Provider | How usage is reported on a stream |
-|---|---|
-| Anthropic | `message_delta` event with final `usage.output_tokens` (+ `usage.cache_read_input_tokens` when applicable) |
+| Provider             | How usage is reported on a stream                                                                                                                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Anthropic            | `message_delta` event with final `usage.output_tokens` (+ `usage.cache_read_input_tokens` when applicable)                                                                                                                      |
 | OpenAI, Azure OpenAI | The final data-only chunk carries `usage` when the request body has `stream_options: {include_usage: true}`. **The gateway auto-injects this flag** on OpenAI/Azure streaming requests when the caller hasn't set it, see below |
-| Bedrock | Usage on the final `message_delta` event, same as Anthropic |
-| Vertex, Gemini | Usage on the terminal `candidates[].finishReason` event |
+| Bedrock              | Usage on the final `message_delta` event, same as Anthropic                                                                                                                                                                     |
+| Vertex, Gemini       | Usage on the terminal `candidates[].finishReason` event                                                                                                                                                                         |
 
 The gateway watches every chunk for a non-zero usage block and debits the budget ledger based on the last non-empty snapshot. Key behaviour:
 

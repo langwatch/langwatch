@@ -67,10 +67,7 @@ import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import {
-  buildDisplayInput,
-  stringifySpanIO,
-} from "~/server/tracer/spanIOStringify";
+import { buildDisplayInput, stringifySpanIO } from "~/server/tracer/spanIOStringify";
 import type { Span } from "~/server/tracer/types";
 import {
   findPromptReferenceInAncestors,
@@ -88,10 +85,7 @@ import {
   extractRedactionsFromAllSpanOutputs,
   redactObject,
 } from "~/server/traces/mappers/redaction";
-import type {
-  CategoryVisibility,
-  Protections,
-} from "~/server/traces/protections";
+import type { CategoryVisibility, Protections } from "~/server/traces/protections";
 import {
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
@@ -140,9 +134,7 @@ const spanReadHintShape = {
 function occurredAtFromInput(input: {
   occurredAtMs?: number;
 }): { occurredAtMs: number } | Record<string, never> {
-  return input.occurredAtMs !== undefined
-    ? { occurredAtMs: input.occurredAtMs }
-    : {};
+  return input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {};
 }
 
 /**
@@ -156,11 +148,8 @@ function buildFilterWhere(input: {
   query?: string | null;
 }) {
   return (
-    translateFilterToClickHouse(
-      input.query ?? "",
-      input.projectId,
-      input.timeRange,
-    ) ?? undefined
+    translateFilterToClickHouse(input.query ?? "", input.projectId, input.timeRange) ??
+    undefined
   );
 }
 
@@ -168,12 +157,9 @@ function buildFilterWhere(input: {
 // Mappers – internal types → scoped output models
 // ---------------------------------------------------------------------------
 
-export function mapTraceSummaryToHeader(
-  summary: TraceSummaryData,
-): TraceHeader {
+export function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
   const totalTokens =
-    (summary.totalPromptTokenCount ?? 0) +
-    (summary.totalCompletionTokenCount ?? 0);
+    (summary.totalPromptTokenCount ?? 0) + (summary.totalCompletionTokenCount ?? 0);
 
   const status = deriveTraceStatus(summary);
 
@@ -189,8 +175,7 @@ export function mapTraceSummaryToHeader(
       occurredAt: summary.occurredAt,
       storageAnchorMs: summary.storageAnchorMs,
     }),
-    name:
-      summary.attributes["langwatch.span.name"] ?? summary.traceId.slice(0, 8),
+    name: summary.attributes["langwatch.span.name"] ?? summary.traceId.slice(0, 8),
     serviceName: summary.attributes["service.name"] ?? "",
     origin: summary.attributes["langwatch.origin"] ?? "application",
     conversationId:
@@ -248,9 +233,7 @@ export function mapSpanSummaryPage(page: SpanSummaryPage): {
   }
   return {
     nodes: page.rows.map(mapSpanSummaryToTreeNode),
-    nextCursor: last
-      ? { startTimeMs: last.startTimeMs, spanId: last.spanId }
-      : null,
+    nextCursor: last ? { startTimeMs: last.startTimeMs, spanId: last.spanId } : null,
   };
 }
 
@@ -629,9 +612,7 @@ function stripHiddenChatTurnsDeep(
     const out: unknown[] = [];
     for (const item of node) {
       const role =
-        item && typeof item === "object"
-          ? (item as { role?: unknown }).role
-          : undefined;
+        item && typeof item === "object" ? (item as { role?: unknown }).role : undefined;
       if (typeof role === "string" && roles.has(role)) continue;
       out.push(stripHiddenChatTurnsDeep(item, roles, stripToolCalls));
     }
@@ -669,10 +650,8 @@ export function redactV2Content<
   // A field is redacted only when there WAS content the viewer may not see, so a
   // genuinely empty input never renders the placeholder. The audience label
   // rides along so the drawer can say who it is visible to.
-  const inputRedacted =
-    protections.canSeeCapturedInput !== true && dto.input != null;
-  const outputRedacted =
-    protections.canSeeCapturedOutput !== true && dto.output != null;
+  const inputRedacted = protections.canSeeCapturedInput !== true && dto.input != null;
+  const outputRedacted = protections.canSeeCapturedOutput !== true && dto.output != null;
 
   // Strip hidden system/tool turns from any surviving (visible) conversation.
   const { roles, stripToolCalls } = turnsHiddenForViewer(protections);
@@ -692,9 +671,7 @@ export function redactV2Content<
     output: stripTurns(visibleOutput),
     inputRedacted,
     outputRedacted,
-    inputVisibleTo: inputRedacted
-      ? (protections.capturedInputVisibleTo ?? null)
-      : null,
+    inputVisibleTo: inputRedacted ? (protections.capturedInputVisibleTo ?? null) : null,
     outputVisibleTo: outputRedacted
       ? (protections.capturedOutputVisibleTo ?? null)
       : null,
@@ -722,28 +699,21 @@ export function redactV2Content<
   if (hidden.length > 0) {
     const matchers = compileHiddenAttributeMatchers(hidden);
     if (dto.attributes) {
-      redacted.attributes = redactHiddenAttributesCompiled(
-        dto.attributes,
-        matchers,
-      );
+      redacted.attributes = redactHiddenAttributesCompiled(dto.attributes, matchers);
     }
     if (dto.params) {
       redacted.params = redactHiddenAttributesCompiled(dto.params, matchers);
     }
     // Span-detail events carry their own attribute records (list-item events
     // do not, hence the localized cast instead of a constraint field).
-    const events = (
-      dto as { events?: Array<{ attributes?: Record<string, unknown> }> }
-    ).events;
+    const events = (dto as { events?: Array<{ attributes?: Record<string, unknown> }> })
+      .events;
     if (events?.some((event) => event.attributes)) {
       (redacted as Record<string, unknown>).events = events.map((event) =>
         event.attributes
           ? {
               ...event,
-              attributes: redactHiddenAttributesCompiled(
-                event.attributes,
-                matchers,
-              ),
+              attributes: redactHiddenAttributesCompiled(event.attributes, matchers),
             }
           : event,
       );
@@ -889,17 +859,11 @@ export function buildContentPrivacy(
       }
       const c = cats?.[category];
       if (c && !c.canSee) {
-        return [
-          category,
-          { state: "restricted", visibleTo: c.restrictVisibleTo },
-        ];
+        return [category, { state: "restricted", visibleTo: c.restrictVisibleTo }];
       }
       // Visible: a non-null label means restricted but THIS viewer is in the
       // audience (the "visible to you" badge); null means ordinary capture.
-      return [
-        category,
-        { state: "visible", visibleTo: c?.restrictVisibleTo ?? null },
-      ];
+      return [category, { state: "visible", visibleTo: c?.restrictVisibleTo ?? null }];
     }),
   ) as ContentPrivacy;
 }
@@ -953,8 +917,7 @@ async function enrichSpanDetailFromCodingAgentLogs({
 }): Promise<Span> {
   try {
     const needsSiblingRefs =
-      typeof (span.params as Record<string, unknown> | null)?.request_id ===
-      "string";
+      typeof (span.params as Record<string, unknown> | null)?.request_id === "string";
     const [logRows, summaryRows] = await Promise.all([
       app.traces.logRecords.getLogsByTraceId(tenantId, traceId, occurredAtMs),
       needsSiblingRefs
@@ -1170,9 +1133,7 @@ export const tracesV2Router = createTRPCRouter({
         pageSize: input.pageSize,
         cursor: input.cursor,
         filterWhere: buildFilterWhere(input),
-        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-          input.projectId,
-        ),
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(input.projectId),
       });
       return {
         ...page,
@@ -1217,9 +1178,7 @@ export const tracesV2Router = createTRPCRouter({
           terms: extractFreeTextTerms(input.query ?? ""),
           protections,
         }),
-        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-          input.projectId,
-        ),
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(input.projectId),
       });
       return {
         ...result,
@@ -1255,13 +1214,12 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(
-      async ({ input }): Promise<Record<string, TraceEventRollup>> =>
-        getApp().traces.spans.getTraceEventRollupsByTraceIds({
-          tenantId: input.projectId,
-          traceIds: input.traceIds,
-          timeRange: input.timeRange,
-        }),
+    .query(async ({ input }): Promise<Record<string, TraceEventRollup>> =>
+      getApp().traces.spans.getTraceEventRollupsByTraceIds({
+        tenantId: input.projectId,
+        traceIds: input.traceIds,
+        timeRange: input.timeRange,
+      }),
     ),
 
   facets: protectedProcedure
@@ -1357,9 +1315,7 @@ export const tracesV2Router = createTRPCRouter({
         page: 1,
         pageSize: 200,
         filterWhere,
-        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-          input.projectId,
-        ),
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(input.projectId),
       });
       const turns = page.items.map((t) =>
         toConversationContextTurn({ trace: t, protections }),
@@ -1524,9 +1480,7 @@ export const tracesV2Router = createTRPCRouter({
           ...(input.occurredAtMs !== undefined
             ? { occurredAtMs: input.occurredAtMs }
             : {}),
-          visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-            input.projectId,
-          ),
+          visibilityCutoffMs: await getVisibilityCutoffMsForProject(input.projectId),
           full: input.full,
         },
       );
@@ -1626,9 +1580,7 @@ export const tracesV2Router = createTRPCRouter({
       const page = await app.traces.spans.getSpansPaginated({
         tenantId: input.projectId,
         traceId: input.traceId,
-        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-          input.projectId,
-        ),
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(input.projectId),
         limit: input.limit,
         offset: input.offset,
         ...occurredAtFromInput(input),
@@ -1665,15 +1617,11 @@ export const tracesV2Router = createTRPCRouter({
         tenantId: input.projectId,
         traceId: input.traceId,
         sinceStartTimeMs: input.sinceStartTimeMs,
-        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-          input.projectId,
-        ),
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(input.projectId),
         ...occurredAtFromInput(input),
       });
       const redactions = buildSpanContentRedactions(spans, protections);
-      return spans.map((span) =>
-        applySpanProtections(span, protections, redactions),
-      );
+      return spans.map((span) => applySpanProtections(span, protections, redactions));
     }),
 
   /**
@@ -1886,9 +1834,7 @@ export const tracesV2Router = createTRPCRouter({
           tenantId: input.projectId,
           traceId: input.traceId,
           spanId: input.spanId,
-          visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-            input.projectId,
-          ),
+          visibilityCutoffMs: await getVisibilityCutoffMsForProject(input.projectId),
           ...hint,
         }),
         app.traces.spans.getSpanEvents({
@@ -1922,11 +1868,7 @@ export const tracesV2Router = createTRPCRouter({
       // attributes, hidden content scrubbed out of params and events), then
       // the DTO pass below.
       const redactions = buildSpanContentRedactions([targetSpan], protections);
-      const protectedSpan = applySpanProtections(
-        targetSpan,
-        protections,
-        redactions,
-      );
+      const protectedSpan = applySpanProtections(targetSpan, protections, redactions);
 
       const detail = mapSpanToDetail(
         protectedSpan,
@@ -1989,10 +1931,8 @@ export const tracesV2Router = createTRPCRouter({
         protections,
         readDroppedFromParams(detailParams),
       );
-      redactedDetail.piiAnalysisIncomplete =
-        readPiiIncompleteFromParams(detailParams);
-      redactedDetail.restrictedAttributes =
-        protections.restrictedAttributes ?? null;
+      redactedDetail.piiAnalysisIncomplete = readPiiIncompleteFromParams(detailParams);
+      redactedDetail.restrictedAttributes = protections.restrictedAttributes ?? null;
       return redactedDetail;
     }),
 
@@ -2038,12 +1978,8 @@ export const tracesV2Router = createTRPCRouter({
       return gateResources({
         resources: {
           rootSpanId: root?.spanId ?? null,
-          resourceAttributes: withoutHiddenResourceAttrs(
-            root?.resourceAttributes ?? {},
-          ),
-          scope: root
-            ? { name: root.scopeName ?? "", version: root.scopeVersion }
-            : null,
+          resourceAttributes: withoutHiddenResourceAttrs(root?.resourceAttributes ?? {}),
+          scope: root ? { name: root.scopeName ?? "", version: root.scopeVersion } : null,
           spans,
         },
         protections,
@@ -2235,9 +2171,7 @@ export function redactTraceLogContent(
   const contentKeys = logContentKeys(eventName);
   const hiddenKeys = contentKeys.filter((entry) => {
     const value = row.attributes[entry.key];
-    return (
-      typeof value === "string" && value.length > 0 && !canSee(entry.category)
-    );
+    return typeof value === "string" && value.length > 0 && !canSee(entry.category);
   });
   const hiddenDerivedKeys = Object.keys(row.attributes).filter((key) => {
     if (key.startsWith(DERIVED_INPUT_ATTR_PREFIX)) return !canSeeInput;
@@ -2253,11 +2187,7 @@ export function redactTraceLogContent(
   const shouldHideBody =
     row.body.length > 0 && row.body !== eventName && !canSee(bodyCategory);
 
-  if (
-    hiddenKeys.length === 0 &&
-    hiddenDerivedKeys.length === 0 &&
-    !shouldHideBody
-  ) {
+  if (hiddenKeys.length === 0 && hiddenDerivedKeys.length === 0 && !shouldHideBody) {
     return row;
   }
 
@@ -2270,19 +2200,14 @@ export function redactTraceLogContent(
   const hiddenCategories = new Set<LogContentCategory>([
     ...hiddenKeys.map((entry) => entry.category),
     ...(shouldHideBody ? [bodyCategory] : []),
-    ...(hiddenDerivedKeys.some((key) =>
-      key.startsWith(DERIVED_INPUT_ATTR_PREFIX),
-    )
+    ...(hiddenDerivedKeys.some((key) => key.startsWith(DERIVED_INPUT_ATTR_PREFIX))
       ? (["input"] as const)
       : []),
-    ...(hiddenDerivedKeys.some((key) =>
-      key.startsWith(DERIVED_OUTPUT_ATTR_PREFIX),
-    )
+    ...(hiddenDerivedKeys.some((key) => key.startsWith(DERIVED_OUTPUT_ATTR_PREFIX))
       ? (["output"] as const)
       : []),
   ]);
-  const onlyHidden =
-    hiddenCategories.size === 1 ? [...hiddenCategories][0] : null;
+  const onlyHidden = hiddenCategories.size === 1 ? [...hiddenCategories][0] : null;
 
   return {
     ...row,

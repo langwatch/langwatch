@@ -203,8 +203,7 @@ export async function dispatchTriggerAction({
       // Best-effort: if the trace is not found, the mapping still works off
       // a stub for the fields it has.
       const fullTrace =
-        (await deps.traceById(tenantId, traceId)) ??
-        ({ trace_id: traceId } as Trace);
+        (await deps.traceById(tenantId, traceId)) ?? ({ trace_id: traceId } as Trace);
       dispatched = await addTraceToDataset({
         deps,
         trigger,

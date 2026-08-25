@@ -130,9 +130,7 @@ describe("the trace summary persist gate", () => {
       const calls = upsertBatch.mock.calls as unknown as Array<
         [Array<{ data: TraceSummaryData }>]
       >;
-      expect(calls[0]![0].map((entry) => entry.data.traceId)).toEqual([
-        "trace_2",
-      ]);
+      expect(calls[0]![0].map((entry) => entry.data.traceId)).toEqual(["trace_2"]);
     });
   });
 });

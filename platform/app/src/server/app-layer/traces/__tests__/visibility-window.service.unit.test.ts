@@ -103,9 +103,7 @@ describe("given a trace beyond the visibility window", () => {
     });
 
     it("marks the trace as redacted by the visibility window", () => {
-      expect(
-        redactTraceContent(makeTrace()).redacted_by_visibility_window,
-      ).toBe(true);
+      expect(redactTraceContent(makeTrace()).redacted_by_visibility_window).toBe(true);
     });
 
     it("keeps metadata, metrics, and timestamps unchanged", () => {
@@ -157,9 +155,7 @@ describe("given a span beyond the visibility window", () => {
         },
       });
       const redacted = redactSpanContent(span);
-      const messages = (
-        redacted.input as { value: { content?: string | null }[] }
-      ).value;
+      const messages = (redacted.input as { value: { content?: string | null }[] }).value;
       expect(messages[0]?.content).toHaveLength(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
@@ -184,9 +180,7 @@ describe("given a span beyond the visibility window", () => {
       });
       const redacted = redactSpanContent(span);
       // 2000-char message -> ceil(10%) = 200 kept
-      expect(redacted.error?.message).toHaveLength(
-        200 + TEASER_ELLIPSIS.length,
-      );
+      expect(redacted.error?.message).toHaveLength(200 + TEASER_ELLIPSIS.length);
     });
   });
 
@@ -218,8 +212,8 @@ describe("given a span beyond the visibility window", () => {
         } as never,
       });
       const redacted = redactSpanContent(span);
-      const content = (redacted.input as { value: { content: unknown[] }[] })
-        .value[0]!.content as Record<string, unknown>[];
+      const content = (redacted.input as { value: { content: unknown[] }[] }).value[0]!
+        .content as Record<string, unknown>[];
       expect((content[0]!.text as string).length).toBeLessThanOrEqual(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
@@ -234,9 +228,9 @@ describe("given a span beyond the visibility window", () => {
       });
       const redacted = redactSpanContent(span);
       expect(redacted.input?.type).toBe("raw");
-      expect(
-        (redacted.input as { value: string }).value.length,
-      ).toBeLessThanOrEqual(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect((redacted.input as { value: string }).value.length).toBeLessThanOrEqual(
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
+      );
     });
   });
 });

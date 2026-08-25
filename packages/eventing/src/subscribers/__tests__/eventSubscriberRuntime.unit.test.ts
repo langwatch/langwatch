@@ -23,15 +23,7 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types";
 import { EventSourcedQueueProcessorMemory } from "../../queues/memory";
@@ -141,10 +133,7 @@ describe("event-subscriber runtime boundary", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         subscribers: [subscriber],
         globalQueue,
@@ -155,9 +144,7 @@ describe("event-subscriber runtime boundary", () => {
       await service.storeEvents([event], context_);
 
       // The subscriber ran via the queue (a registry entry was registered)…
-      expect(registry.has("test-pipeline:subscriber:conversationProcess")).toBe(
-        true,
-      );
+      expect(registry.has("test-pipeline:subscriber:conversationProcess")).toBe(true);
       // …and received the exact committed event the store persisted (the queue
       // carries the full envelope, trace-metadata enrichment included).
       const committedEvent = (
@@ -205,9 +192,7 @@ describe("event-subscriber runtime boundary", () => {
           handled.push(event);
           if (failFirstSubscriberCall) {
             failFirstSubscriberCall = false;
-            throw new Error(
-              "subscriber transient failure — will be redelivered",
-            );
+            throw new Error("subscriber transient failure — will be redelivered");
           }
         },
       };
@@ -215,10 +200,7 @@ describe("event-subscriber runtime boundary", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [fold],
         subscribers: [subscriber],
@@ -230,9 +212,7 @@ describe("event-subscriber runtime boundary", () => {
 
       // First delivery: the projection commits; the subscriber throws. The
       // subscriber failure is isolated (storeEvents logs, does not throw).
-      await expect(
-        service.storeEvents([event], context_),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents([event], context_)).resolves.not.toThrow();
 
       expect(applied).toHaveLength(1); // projection applied once
       expect(handled).toHaveLength(1); // subscriber attempted once (threw)
@@ -243,9 +223,7 @@ describe("event-subscriber runtime boundary", () => {
         "test-pipeline:subscriber:conversationProcess",
       );
       expect(subscriberEntry).toBeDefined();
-      await subscriberEntry!.process(
-        event as unknown as Record<string, unknown>,
-      );
+      await subscriberEntry!.process(event as unknown as Record<string, unknown>);
 
       expect(handled).toHaveLength(2); // subscriber retried and succeeded
       expect(applied).toHaveLength(1); // projection NOT reapplied by the retry
@@ -278,9 +256,7 @@ describe("event-subscriber runtime boundary", () => {
       // The real replay execution primitive rebuilds the fold from events.
       const processed = await replayEvents({
         projection: fold,
-        events: events as unknown as Parameters<
-          typeof replayEvents
-        >[0]["events"],
+        events: events as unknown as Parameters<typeof replayEvents>[0]["events"],
       });
 
       expect(processed).toBe(2);
@@ -311,10 +287,7 @@ describe("event-subscriber runtime boundary", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         subscribers: [subscriber],
         globalQueue,

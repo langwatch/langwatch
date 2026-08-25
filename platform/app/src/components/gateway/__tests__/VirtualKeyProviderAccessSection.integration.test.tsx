@@ -108,12 +108,8 @@ describe("VirtualKeyProviderAccessSection", () => {
         expect(onChange).toHaveBeenLastCalledWith(
           expect.objectContaining({ allProviders: false, providerIds: [] }),
         );
-        expect(
-          screen.getByRole("checkbox", { name: "Alpha Org" }),
-        ).not.toBeChecked();
-        expect(
-          screen.getByRole("checkbox", { name: "Beta Project" }),
-        ).not.toBeChecked();
+        expect(screen.getByRole("checkbox", { name: "Alpha Org" })).not.toBeChecked();
+        expect(screen.getByRole("checkbox", { name: "Beta Project" })).not.toBeChecked();
         expect(screen.getByTestId("vk-providers-invalid")).toHaveTextContent(
           "Select at least one provider, or allow all providers.",
         );

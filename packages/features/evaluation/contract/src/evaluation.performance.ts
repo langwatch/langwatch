@@ -14,9 +14,7 @@ export const monitorPerformanceQuerySchema = z.object({
   endMs: z.number().int(),
   timeZone: z.string(),
 });
-export type MonitorPerformanceQuery = z.infer<
-  typeof monitorPerformanceQuerySchema
->;
+export type MonitorPerformanceQuery = z.infer<typeof monitorPerformanceQuerySchema>;
 
 export const onlineEvaluationPerformanceSchema = z.object({
   monitorId: z.string(),

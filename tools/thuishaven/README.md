@@ -14,12 +14,12 @@ Each worktree's slug is simply its own directory name, sanitised (a checkout at
 `.../worktrees/portless` is the `portless` stack), cached in `.langwatch-slug`.
 Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 
-| Hostname | Service |
-| --- | --- |
-| `app.<slug>.langwatch.localhost` | App — the UI, **and its API at `/api`** |
-| `gateway.<slug>.langwatch.localhost` | AI Gateway (Go) |
-| `nlp.<slug>.langwatch.localhost` | NLP engine (Go) |
-| `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database |
+| Hostname                                | Service                                 |
+| --------------------------------------- | --------------------------------------- |
+| `app.<slug>.langwatch.localhost`        | App — the UI, **and its API at `/api`** |
+| `gateway.<slug>.langwatch.localhost`    | AI Gateway (Go)                         |
+| `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                         |
+| `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database  |
 
 The **app and its API are one origin**: open `app.<slug>.langwatch.localhost` for
 the UI and hit `app.<slug>.langwatch.localhost/api` for the API. There is no
@@ -29,11 +29,11 @@ confusable URLs. Vite serves the SPA and proxies `/api` (plus `/mcp`, `/sse`,
 
 Shared, machine-wide (one daemon serves all worktrees):
 
-| Hostname | What |
-| --- | --- |
-| `langwatch.localhost` | Dashboard — which worktree runs what |
-| `observability.langwatch.localhost` | The local Grafana LGTM stack (:3000) |
-| `telemetry.langwatch.localhost` | OTLP fan-out to **every** running stack |
+| Hostname                            | What                                    |
+| ----------------------------------- | --------------------------------------- |
+| `langwatch.localhost`               | Dashboard — which worktree runs what    |
+| `observability.langwatch.localhost` | The local Grafana LGTM stack (:3000)    |
+| `telemetry.langwatch.localhost`     | OTLP fan-out to **every** running stack |
 
 ## Setup
 
@@ -249,7 +249,7 @@ server inside a container/kind mount reintroduces the slow file-watching it
 already fights. haven routes across native processes **and** containerized
 backends uniformly by hostname, so a future backend swap (a shared `kind`
 cluster with per-worktree Helm value overlays: standard services off `main`,
-worktrees overriding select ones) is a change *behind* haven — the routing,
+worktrees overriding select ones) is a change _behind_ haven — the routing,
 registry, and dashboard stay the same.
 
 ## More of what haven does
@@ -295,7 +295,7 @@ registry, and dashboard stay the same.
   be serving a live run whatever its age. Ryuk itself is never touched, and the
   sweep never boots the VM just to clean it. See
   `specs/setup/haven-testcontainer-reaper.feature`.
-- **Always migrate + seed, fully static identity.** Every `up` migrates *and*
+- **Always migrate + seed, fully static identity.** Every `up` migrates _and_
   seeds idempotently. Nothing about the local dev identity is ever randomly
   generated — the same admin login, org/team/project/user IDs, and API
   tokens exist on every worktree and every machine. See the doc comment at
@@ -328,6 +328,7 @@ registry, and dashboard stay the same.
   `LANGY_WORKER_GATEWAY_URL`), and the host reaches the manager over a published
   loopback port. Production is never any of these — it always runs sandboxed under
   gVisor.
+
 - **`haven clean`.** One cleanup command. The interactive picker scans every
   worktree at once (git + database facts on a fast queue, disk size via `du` on
   a slow one), pre-ticks everything idle 5+ days (`--stale-days N`), lets you
@@ -353,5 +354,5 @@ registry, and dashboard stay the same.
   migrated + seeded" cover Postgres too.
 - **Shared `kind` cluster.** The baseline fallback already routes across a
   heterogeneous set, so the backend can become a shared `kind` cluster with
-  per-worktree Helm value overlays *behind* haven — the routing, registry, and
+  per-worktree Helm value overlays _behind_ haven — the routing, registry, and
   dashboard stay the same.

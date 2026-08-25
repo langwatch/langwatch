@@ -11,9 +11,7 @@ import {
   type OriginGateSubscriberDeps,
 } from "../originGate.subscriber";
 
-function createFoldState(
-  overrides: Partial<TraceSummaryData> = {},
-): TraceSummaryData {
+function createFoldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {
     traceId: "trace-1",
     traceName: "",
@@ -126,12 +124,7 @@ describe("originGate subscriber", () => {
     });
 
     it("skips for all origin types", async () => {
-      for (const origin of [
-        "application",
-        "evaluation",
-        "simulation",
-        "workflow",
-      ]) {
+      for (const origin of ["application", "evaluation", "simulation", "workflow"]) {
         const deps = createDeps();
         const handler = createOriginGateHandler(deps);
         const state = createFoldState({
@@ -197,9 +190,9 @@ describe("originGate subscriber", () => {
       it("returns true", () => {
         const state = createFoldState({ attributes: {} });
 
-        expect(
-          needsOriginResolution({ event: createEvent(), foldState: state }),
-        ).toBe(true);
+        expect(needsOriginResolution({ event: createEvent(), foldState: state })).toBe(
+          true,
+        );
       });
     });
 
@@ -209,9 +202,9 @@ describe("originGate subscriber", () => {
           attributes: { "langwatch.origin": "application" },
         });
 
-        expect(
-          needsOriginResolution({ event: createEvent(), foldState: state }),
-        ).toBe(false);
+        expect(needsOriginResolution({ event: createEvent(), foldState: state })).toBe(
+          false,
+        );
       });
     });
 
@@ -222,9 +215,7 @@ describe("originGate subscriber", () => {
           occurredAt: Date.now() - 2 * 60 * 60 * 1000,
         });
 
-        expect(
-          needsOriginResolution({ event: oldEvent, foldState: state }),
-        ).toBe(false);
+        expect(needsOriginResolution({ event: oldEvent, foldState: state })).toBe(false);
       });
     });
   });
@@ -260,9 +251,7 @@ describe("createDeferredOriginHandler()", () => {
 
   describe("when resolveOrigin throws", () => {
     it("propagates the error", async () => {
-      const resolveOriginFn = vi
-        .fn()
-        .mockRejectedValue(new Error("command failed"));
+      const resolveOriginFn = vi.fn().mockRejectedValue(new Error("command failed"));
       const handler = createDeferredOriginHandler(resolveOriginFn);
       const payload: DeferredOriginPayload = {
         id: "trace-1",

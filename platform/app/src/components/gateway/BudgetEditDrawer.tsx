@@ -104,12 +104,7 @@ export function BudgetEditDrawer({
   };
 
   return (
-    <Drawer.Root
-      open={!!budget}
-      onOpenChange={() => close()}
-      placement="end"
-      size="md"
-    >
+    <Drawer.Root open={!!budget} onOpenChange={() => close()} placement="end" size="md">
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Edit budget</Drawer.Title>
@@ -125,11 +120,7 @@ export function BudgetEditDrawer({
                   docHref="/ai-gateway/budgets#creating-a-budget"
                 />
               </Field.Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-              />
+              <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
             </Field.Root>
             <Field.Root>
               <Field.Label>Description</Field.Label>
@@ -144,11 +135,9 @@ export function BudgetEditDrawer({
                 {budget?.scopeType === "GROUP"
                   ? "group"
                   : budget?.scopeType.toLowerCase().replace("_", " ")}
-                {budget?.scopeTarget?.name
-                  ? `, ${budget.scopeTarget.name}`
-                  : ""}
-                {budget?.providerLabel ? `, ${budget.providerLabel} only` : ""}{" "}
-                (immutable after create)
+                {budget?.scopeTarget?.name ? `, ${budget.scopeTarget.name}` : ""}
+                {budget?.providerLabel ? `, ${budget.providerLabel} only` : ""} (immutable
+                after create)
               </Text>
               {budget?.scopeType === "GROUP" && (
                 <Field.HelperText>
@@ -180,9 +169,9 @@ export function BudgetEditDrawer({
               />
               {limitError && <Field.ErrorText>{limitError}</Field.ErrorText>}
               <Field.HelperText>
-                Raising the limit does not reset the window. Lowering it may
-                cause the budget to enter breach immediately if current spend
-                already exceeds the new value.
+                Raising the limit does not reset the window. Lowering it may cause the
+                budget to enter breach immediately if current spend already exceeds the
+                new value.
               </Field.HelperText>
             </Field.Root>
             <Field.Root required>
@@ -201,9 +190,7 @@ export function BudgetEditDrawer({
                   }
                 >
                   <option value="BLOCK">Block: reject requests at limit</option>
-                  <option value="WARN">
-                    Warn: tag responses, keep serving
-                  </option>
+                  <option value="WARN">Warn: tag responses, keep serving</option>
                 </NativeSelect.Field>
               </NativeSelect.Root>
             </Field.Root>
@@ -212,11 +199,7 @@ export function BudgetEditDrawer({
         <Drawer.Footer>
           <HStack width="full">
             <Spacer />
-            <Button
-              variant="ghost"
-              onClick={close}
-              disabled={updateMutation.isPending}
-            >
+            <Button variant="ghost" onClick={close} disabled={updateMutation.isPending}>
               Cancel
             </Button>
             <Button

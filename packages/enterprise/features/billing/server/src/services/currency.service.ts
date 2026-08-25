@@ -1,6 +1,9 @@
 // @ts-ignore — no type definitions for geoip-country
 import geoip from "geoip-country";
-import { Currency, type Currency as CurrencyType } from "@langwatch/enterprise-billing-contract";
+import {
+  Currency,
+  type Currency as CurrencyType,
+} from "@langwatch/enterprise-billing-contract";
 
 export type CurrencyRequest = {
   headers?: Record<string, string | string[] | undefined>;
@@ -38,13 +41,9 @@ export const EUR_COUNTRIES = new Set([
   "XK",
 ]);
 
-const getCurrencyFromCountry = (
-  countryCode: string | null | undefined,
-): CurrencyType => {
+const getCurrencyFromCountry = (countryCode: string | null | undefined): CurrencyType => {
   if (!countryCode) return DEFAULT_CURRENCY;
-  return EUR_COUNTRIES.has(countryCode.toUpperCase())
-    ? Currency.EUR
-    : Currency.USD;
+  return EUR_COUNTRIES.has(countryCode.toUpperCase()) ? Currency.EUR : Currency.USD;
 };
 
 /**

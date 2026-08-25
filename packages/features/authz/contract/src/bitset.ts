@@ -5,9 +5,7 @@
  */
 import { ALL_PERMISSIONS, permissionIndex } from "./registry";
 
-export function encodePermissionBitset(
-  permissions: Iterable<string>,
-): Uint8Array {
+export function encodePermissionBitset(permissions: Iterable<string>): Uint8Array {
   const bytes = new Uint8Array(Math.ceil(ALL_PERMISSIONS.length / 8));
   for (const permission of permissions) {
     const index = permissionIndex(permission);

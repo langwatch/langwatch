@@ -174,12 +174,8 @@ describe("virtual keys table", () => {
     /** @scenario "Virtual key list Routing column states its three modes" */
     it("renders a bare 'fallback' when the key falls back to any provider", () => {
       renderPage();
-      expect(
-        within(rowFor("fallback-key")).getByText("fallback"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText("fallback: all providers"),
-      ).not.toBeInTheDocument();
+      expect(within(rowFor("fallback-key")).getByText("fallback")).toBeInTheDocument();
+      expect(screen.queryByText("fallback: all providers")).not.toBeInTheDocument();
     });
 
     /** @scenario "Virtual key list Routing column states its three modes" */
@@ -207,20 +203,14 @@ describe("virtual keys table", () => {
     /** @scenario "Virtual key list shows a key's own budget under its month spend" */
     it("still shows the month total next to the bar", () => {
       renderPage();
-      expect(
-        within(rowFor("no-fallback-key")).getByText("$2.50"),
-      ).toBeInTheDocument();
+      expect(within(rowFor("no-fallback-key")).getByText("$2.50")).toBeInTheDocument();
     });
 
     /** @scenario "Virtual key list shows a key's own budget under its month spend" */
     it("draws no bar, and reserves no space, for a key with no budget", () => {
       renderPage();
-      expect(
-        screen.queryByTestId("vk-budget-bar-vk-all"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("vk-budget-bar-vk-policy"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("vk-budget-bar-vk-all")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("vk-budget-bar-vk-policy")).not.toBeInTheDocument();
     });
   });
 });

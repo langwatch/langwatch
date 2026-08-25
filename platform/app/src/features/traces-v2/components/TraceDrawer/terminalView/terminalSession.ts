@@ -75,13 +75,7 @@ export function toolPrimaryArg(input: unknown): string | null {
 }
 
 /** Tool names whose result is best shown as a code diff rather than raw output. */
-const DIFF_TOOLS = new Set([
-  "edit",
-  "write",
-  "multiedit",
-  "str_replace",
-  "create",
-]);
+const DIFF_TOOLS = new Set(["edit", "write", "multiedit", "str_replace", "create"]);
 
 export function isDiffTool(name: string): boolean {
   return DIFF_TOOLS.has(name.toLowerCase());

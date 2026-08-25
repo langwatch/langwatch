@@ -24,9 +24,7 @@ interface OnboardingFormContextValue extends OnboardingFormData {
   setRole: (value: RoleType | undefined) => void;
 }
 
-const OnboardingFormContext = createContext<OnboardingFormContextValue | null>(
-  null,
-);
+const OnboardingFormContext = createContext<OnboardingFormContextValue | null>(null);
 
 export function useOnboardingFormContext(): OnboardingFormContextValue {
   const ctx = useContext(OnboardingFormContext);

@@ -25,9 +25,7 @@ describe("suite-set-id", () => {
 
     describe("when given an on-platform internal set ID", () => {
       it("returns false", () => {
-        expect(isSuiteSetId("__internal__proj_1__on-platform-scenarios")).toBe(
-          false,
-        );
+        expect(isSuiteSetId("__internal__proj_1__on-platform-scenarios")).toBe(false);
       });
     });
 
@@ -41,17 +39,13 @@ describe("suite-set-id", () => {
   describe("extractSuiteId()", () => {
     describe("when given a suite set ID", () => {
       it("extracts the suite ID", () => {
-        expect(extractSuiteId("__internal__suite_abc123__suite")).toBe(
-          "suite_abc123",
-        );
+        expect(extractSuiteId("__internal__suite_abc123__suite")).toBe("suite_abc123");
       });
     });
 
     describe("when given a non-suite set ID", () => {
       it("returns null", () => {
-        expect(
-          extractSuiteId("__internal__proj_1__on-platform-scenarios"),
-        ).toBe(null);
+        expect(extractSuiteId("__internal__proj_1__on-platform-scenarios")).toBe(null);
         expect(extractSuiteId("my-custom-set")).toBe(null);
       });
     });

@@ -26,9 +26,7 @@ import { useOnboardingStore } from "../store/onboardingStore";
 export function useOnboardingActive(): boolean {
   const { project } = useOrganizationTeamProject();
   const { hasAnyTraces } = useProjectHasTraces();
-  const setupDismissedByProject = useOnboardingStore(
-    (s) => s.setupDismissedByProject,
-  );
+  const setupDismissedByProject = useOnboardingStore((s) => s.setupDismissedByProject);
   const tourActive = useOnboardingStore((s) => s.tourActive);
 
   if (!project) return false;

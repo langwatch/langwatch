@@ -1,8 +1,5 @@
 import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
-import {
-  type AuthzPermission,
-  isRegistryPermission,
-} from "@langwatch/authz-contract";
+import { type AuthzPermission, isRegistryPermission } from "@langwatch/authz-contract";
 import { Check } from "react-feather";
 import type { Action, Resource } from "~/utils/rbacVocabulary";
 import {
@@ -15,11 +12,7 @@ import {
  *
  * Single Responsibility: Displays permissions in a read-only, organized format
  */
-export function PermissionViewer({
-  permissions,
-}: {
-  permissions: AuthzPermission[];
-}) {
+export function PermissionViewer({ permissions }: { permissions: AuthzPermission[] }) {
   // The registry is the vocabulary the engine grants from, so it is the
   // vocabulary the settings UI offers: the legacy per-resource action table
   // produces the full Resource x Action cross product, most of which no
@@ -57,19 +50,13 @@ export function PermissionViewer({
         // If manage is present, filter out view, create, update, delete since manage includes them
         const hasManage = grantedActions.includes("manage");
         const displayActions = hasManage
-          ? grantedActions.filter(
-              (action) => action === "manage" || action === "share",
-            )
+          ? grantedActions.filter((action) => action === "manage" || action === "share")
           : grantedActions;
 
         return (
           <Box key={resource} width="full">
             <VStack align="start" gap={2} width="full">
-              <Text
-                fontWeight="semibold"
-                textTransform="capitalize"
-                fontSize="md"
-              >
+              <Text fontWeight="semibold" textTransform="capitalize" fontSize="md">
                 {resource}
               </Text>
               <VStack align="start" gap={1.5} paddingLeft={4} width="full">

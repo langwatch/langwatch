@@ -11,10 +11,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
 
 import { GATE_FIELD, GATE_HANDLE_ID } from "@langwatch/workflow-web";
-import {
-  store as storeCreator,
-  type WorkflowStore,
-} from "@langwatch/workflow-web";
+import { store as storeCreator, type WorkflowStore } from "@langwatch/workflow-web";
 
 const node = (
   id: string,
@@ -120,9 +117,7 @@ describe("workflowStoreCore - branch gate connections", () => {
   describe("when a connection drag starts", () => {
     /** @scenario Every node grows a temporary gate input while dragging a branch */
     it("flags a branch drag and records its source so nodes show the temporary gate", () => {
-      store
-        .getState()
-        .onConnectStart({ nodeId: "gate", handleId: "outputs.true" });
+      store.getState().onConnectStart({ nodeId: "gate", handleId: "outputs.true" });
       expect(store.getState().branchConnectionInProgress).toBe(true);
       expect(store.getState().branchConnectionSourceId).toBe("gate");
 
@@ -132,9 +127,7 @@ describe("workflowStoreCore - branch gate connections", () => {
     });
 
     it("does not flag a drag from an ordinary output handle", () => {
-      store
-        .getState()
-        .onConnectStart({ nodeId: "codeA", handleId: "outputs.answer" });
+      store.getState().onConnectStart({ nodeId: "codeA", handleId: "outputs.answer" });
       expect(store.getState().branchConnectionInProgress).toBe(false);
       expect(store.getState().branchConnectionSourceId).toBe(null);
     });

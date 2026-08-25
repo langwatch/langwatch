@@ -82,9 +82,7 @@ async function main() {
 
   console.log("\n[3] Session cookie is set");
   const cookies = await context.cookies();
-  const sessionCookie = cookies.find((c) =>
-    c.name.includes("better-auth.session_token"),
-  );
+  const sessionCookie = cookies.find((c) => c.name.includes("better-auth.session_token"));
   check("better-auth.session_token cookie present", !!sessionCookie);
   if (sessionCookie) {
     check("cookie is HttpOnly", sessionCookie.httpOnly === true);
@@ -96,9 +94,7 @@ async function main() {
   }
 
   console.log("\n[4] Session is active via API");
-  const getSessionRes = await page.request.get(
-    `${BASE_URL}/api/auth/get-session`,
-  );
+  const getSessionRes = await page.request.get(`${BASE_URL}/api/auth/get-session`);
   check("GET /api/auth/get-session → 200", getSessionRes.status() === 200);
   const sessionJson = await getSessionRes.json();
   check(
@@ -114,9 +110,7 @@ async function main() {
   check("POST /api/auth/sign-out → 200", signOutRes.status() === 200);
 
   console.log("\n[6] Session is gone after signout");
-  const afterSignout = await page.request.get(
-    `${BASE_URL}/api/auth/get-session`,
-  );
+  const afterSignout = await page.request.get(`${BASE_URL}/api/auth/get-session`);
   const afterJson = await afterSignout.json();
   check("get-session returns null after signout", afterJson === null);
 
@@ -174,9 +168,7 @@ async function main() {
     console.log(`✅ ALL CHECKS PASSED (${passes}/${passes})`);
     process.exit(0);
   } else {
-    console.log(
-      `❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`,
-    );
+    console.log(`❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`);
     process.exit(1);
   }
 }

@@ -28,8 +28,6 @@ export function deriveSpanCost({
     return { cost: null, nonBilledCost: null };
   }
   const cost = Number(rawCost.toFixed(6));
-  const nonBilledCost = spanCostService.isSpanCostNonBillable(span)
-    ? cost
-    : null;
+  const nonBilledCost = spanCostService.isSpanCostNonBillable(span) ? cost : null;
   return { cost, nonBilledCost };
 }

@@ -31,16 +31,8 @@ export interface SpanDedupService {
     traceId: string,
     spanId: string,
   ): Promise<boolean | null>;
-  tryConfirmProcessed(
-    tenantId: string,
-    traceId: string,
-    spanId: string,
-  ): Promise<void>;
-  tryReleaseOnFailure(
-    tenantId: string,
-    traceId: string,
-    spanId: string,
-  ): Promise<void>;
+  tryConfirmProcessed(tenantId: string, traceId: string, spanId: string): Promise<void>;
+  tryReleaseOnFailure(tenantId: string, traceId: string, spanId: string): Promise<void>;
 }
 
 /**
@@ -90,15 +82,9 @@ export class RedisSpanDedupeService implements SpanDedupService {
     spanId: string,
   ): Promise<void> {
     try {
-      await this.redis.expire(
-        buildKey(tenantId, traceId, spanId),
-        CONFIRMED_TTL_SECONDS,
-      );
+      await this.redis.expire(buildKey(tenantId, traceId, spanId), CONFIRMED_TTL_SECONDS);
     } catch (error) {
-      logger.error(
-        { error, tenantId, traceId, spanId },
-        "Failed to confirm span dedup",
-      );
+      logger.error({ error, tenantId, traceId, spanId }, "Failed to confirm span dedup");
     }
   }
 

@@ -64,8 +64,7 @@ export const TRANSFORM_ANALYZERS: Record<
   }),
   fold: (step) => ({
     consumes: stringList(step.fold),
-    produces:
-      stringList(step.as).length > 0 ? stringList(step.as) : ["key", "value"],
+    produces: stringList(step.as).length > 0 ? stringList(step.as) : ["key", "value"],
     isUnverifiable: false,
   }),
   flatten: (step) => ({
@@ -107,9 +106,7 @@ export const TRANSFORM_ANALYZERS: Record<
  * the conservative reading — and unreachable through the validator, whose
  * allowlist is this table's own keys.
  */
-export function analyzeTransform(
-  step: Record<string, unknown>,
-): TransformEffect {
+export function analyzeTransform(step: Record<string, unknown>): TransformEffect {
   for (const [name, analyze] of Object.entries(TRANSFORM_ANALYZERS)) {
     if (name in step) return analyze(step);
   }
@@ -126,16 +123,12 @@ function stringList(value: unknown): string[] {
 /** `field` on each entry of an `aggregate`/`window`/`joinaggregate` op list. */
 function opFields(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) =>
-    isPlainObject(entry) ? stringList(entry.field) : [],
-  );
+  return value.flatMap((entry) => (isPlainObject(entry) ? stringList(entry.field) : []));
 }
 
 function opOutputs(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) =>
-    isPlainObject(entry) ? stringList(entry.as) : [],
-  );
+  return value.flatMap((entry) => (isPlainObject(entry) ? stringList(entry.as) : []));
 }
 
 /**
@@ -154,29 +147,19 @@ function namedTransformOutputs(named: string[]): string[] {
 function binOutputs(step: Record<string, unknown>): string[] {
   const named = stringList(step.as);
   if (named.length > 0) return namedTransformOutputs(named);
-  return stringList(step.field).flatMap((field) => [
-    `bin_${field}`,
-    `bin_${field}_end`,
-  ]);
+  return stringList(step.field).flatMap((field) => [`bin_${field}`, `bin_${field}_end`]);
 }
 
 function stackOutputs(step: Record<string, unknown>): string[] {
   const named = stringList(step.as);
   if (named.length > 0) return namedTransformOutputs(named);
-  return stringList(step.stack).flatMap((field) => [
-    `${field}_start`,
-    `${field}_end`,
-  ]);
+  return stringList(step.stack).flatMap((field) => [`${field}_start`, `${field}_end`]);
 }
 
 function lookupOutputs(step: Record<string, unknown>): string[] {
   const from = step.from;
   if (!isPlainObject(from)) return stringList(step.as);
-  return [
-    ...stringList(step.as),
-    ...stringList(from.fields),
-    ...stringList(from.as),
-  ];
+  return [...stringList(step.as), ...stringList(from.fields), ...stringList(from.as)];
 }
 
 /** Field names a filter predicate reads, including its nested branches. */

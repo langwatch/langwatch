@@ -17,18 +17,13 @@ const GRACE_MS = 60_000;
 describe("settlement on the spend record (real ClickHouse)", () => {
   /** @scenario The full settlement sequence: silent admission settles, a late confirmation supersedes */
   it("folds admit, settle, then a late confirm superseding the settled row", async () => {
-    const { startTestContainers, stopTestContainers } = await import(
-      "~/server/event-sourcing/__tests__/integration/testContainers"
-    );
-    const { GatewaySpendEventsRepository } = await import(
-      "~/server/gateway/spendEvents.clickhouse.repository"
-    );
-    const { GatewaySpendFoldProjection } = await import(
-      "../projections/gatewaySpend.foldProjection"
-    );
-    const { GatewaySpendStore } = await import(
-      "../projections/gatewaySpend.store"
-    );
+    const { startTestContainers, stopTestContainers } =
+      await import("~/server/event-sourcing/__tests__/integration/testContainers");
+    const { GatewaySpendEventsRepository } =
+      await import("~/server/gateway/spendEvents.clickhouse.repository");
+    const { GatewaySpendFoldProjection } =
+      await import("../projections/gatewaySpend.foldProjection");
+    const { GatewaySpendStore } = await import("../projections/gatewaySpend.store");
     const { spendRowToEnvelope } = await import("~/runtime/app/features/webhooks");
     const { EventUtils, createTenantId } = await import("@langwatch/eventing");
     const constants = await import("../schemas/constants");
@@ -48,11 +43,7 @@ describe("settlement on the spend record (real ClickHouse)", () => {
       aggregateId: requestId,
     };
 
-    const makeEvent = (
-      type: string,
-      data: Record<string, unknown>,
-      at: number,
-    ) =>
+    const makeEvent = (type: string, data: Record<string, unknown>, at: number) =>
       EventUtils.createEvent({
         aggregateType: constants.GATEWAY_SPEND_AGGREGATE_TYPE,
         aggregateId: requestId,

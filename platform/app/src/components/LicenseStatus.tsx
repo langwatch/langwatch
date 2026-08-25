@@ -100,11 +100,7 @@ export function LicenseStatus({
           maxMembers={status.maxMembers}
         />
       )}
-      <LicenseDetailsCard
-        status={status}
-        onRemove={remove}
-        isRemoving={isRemoving}
-      />
+      <LicenseDetailsCard status={status} onRemove={remove} isRemoving={isRemoving} />
       <LicenseGeneratorDrawer
         open={isGeneratorOpen}
         onClose={() => onGeneratorOpenChange(false)}

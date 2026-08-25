@@ -27,7 +27,12 @@ export const createTriggerCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const validActions = ["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE"];
+  const validActions = [
+    "SEND_EMAIL",
+    "ADD_TO_DATASET",
+    "ADD_TO_ANNOTATION_QUEUE",
+    "SEND_SLACK_MESSAGE",
+  ];
   if (!validActions.includes(options.action)) {
     reportCommandError({
       error: commandValidationError(
@@ -72,7 +77,12 @@ export const createTriggerCommand = async (
       process.exit(1);
     }
 
-    const trigger = await response.json() as { id: string; name: string; action: string; platformUrl?: string };
+    const trigger = (await response.json()) as {
+      id: string;
+      name: string;
+      action: string;
+      platformUrl?: string;
+    };
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     return {
@@ -83,7 +93,9 @@ export const createTriggerCommand = async (
         console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
         console.log(`  ${chalk.gray("Action:")} ${trigger.action}`);
         if (trigger.platformUrl) {
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`);
+          console.log(
+            `  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`,
+          );
         }
         console.log();
       },

@@ -104,4 +104,3 @@ export function getConcreteProvider(provider: unknown): unknown {
 export function isConcreteProvider(provider: unknown): boolean {
   return !!getConcreteProvider(provider);
 }
-

@@ -50,10 +50,7 @@ function isNoisyKey(key: string): boolean {
  * strings — the goal is to give the LLM enough signal without blowing the
  * context window with framework boilerplate.
  */
-function flattenAttributes(
-  obj: Record<string, unknown>,
-  prefix = "",
-): string[] {
+function flattenAttributes(obj: Record<string, unknown>, prefix = ""): string[] {
   const out: string[] = [];
   for (const [k, v] of Object.entries(obj)) {
     const path = prefix ? `${prefix}.${k}` : k;
@@ -172,10 +169,7 @@ function compactIO(raw: string | null | undefined): string[] {
  * to do. Surfacing it as its own block at the top makes that obvious
  * without forcing the consumer to scroll the full input list.
  */
-function extractSystemMessages(
-  trace: TraceHeader,
-  fullSpans?: FullSpan[],
-): string[] {
+function extractSystemMessages(trace: TraceHeader, fullSpans?: FullSpan[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
 
@@ -265,8 +259,7 @@ function stringifyMessageContent(content: unknown): string {
  * We strip them out of the surrounding text and re-emit them as proper
  * thinking lines so the shimmer + tooltip apply uniformly.
  */
-const THINKING_TAG_RE =
-  /<(thinking|think|reasoning|reflection)>([\s\S]*?)<\/\1>/gi;
+const THINKING_TAG_RE = /<(thinking|think|reasoning|reflection)>([\s\S]*?)<\/\1>/gi;
 
 interface TextSegment {
   kind: "text" | "thinking";
@@ -332,9 +325,7 @@ function renderTextBlock(block: Block, lines: string[]): void {
   // blocks instead of using a dedicated block type — tease them apart
   // here so they get the same shimmer treatment.
   for (const seg of splitThinkingFromText(block.text)) {
-    lines.push(
-      seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content,
-    );
+    lines.push(seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content);
   }
 }
 
@@ -367,9 +358,7 @@ function renderToolCallBlock(block: Block, lines: string[]): void {
 
 function renderToolResultBlock(block: Block, lines: string[]): void {
   const id =
-    typeof block.tool_use_id === "string"
-      ? ` (${block.tool_use_id.slice(0, 8)})`
-      : "";
+    typeof block.tool_use_id === "string" ? ` (${block.tool_use_id.slice(0, 8)})` : "";
   lines.push(`tool_result${id}:`);
   const result = block.content;
   if (typeof result === "string") {
@@ -429,9 +418,7 @@ function renderMessageBlocks(content: unknown): string[] {
   for (const b of content) {
     if (typeof b === "string") {
       for (const seg of splitThinkingFromText(b)) {
-        lines.push(
-          seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content,
-        );
+        lines.push(seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content);
       }
       continue;
     }
@@ -465,23 +452,14 @@ function renderSpanTimeline(spans: SpanTreeNode[], width: number): string[] {
   // Sort by start so the waterfall reads top-to-bottom in execution order.
   const sorted = [...spans].sort((a, b) => a.startTimeMs - b.startTimeMs);
 
-  const labelMaxLen = Math.min(
-    28,
-    Math.max(...sorted.map((s) => s.name.length), 4),
-  );
+  const labelMaxLen = Math.min(28, Math.max(...sorted.map((s) => s.name.length), 4));
   const lines: string[] = [];
 
   for (const span of sorted) {
     const startFrac = (span.startTimeMs - minStart) / total;
     const endFrac = (span.endTimeMs - minStart) / total;
-    const startCell = Math.max(
-      0,
-      Math.min(width - 1, Math.floor(startFrac * width)),
-    );
-    const endCell = Math.max(
-      startCell + 1,
-      Math.min(width, Math.ceil(endFrac * width)),
-    );
+    const startCell = Math.max(0, Math.min(width - 1, Math.floor(startFrac * width)));
+    const endCell = Math.max(startCell + 1, Math.min(width, Math.ceil(endFrac * width)));
     const cells: string[] = new Array(width).fill(" ");
     for (let i = startCell; i < endCell; i++) {
       cells[i] = span.status === "error" ? "▓" : "█";
@@ -547,15 +525,9 @@ function renderUnicodeFlame(spans: SpanTreeNode[], width: number): string[] {
 
   const maxDepth = Math.max(0, ...Array.from(depthOf.values()));
   const cellFor = (timeMs: number): number =>
-    Math.max(
-      0,
-      Math.min(width - 1, Math.floor(((timeMs - minStart) / total) * width)),
-    );
+    Math.max(0, Math.min(width - 1, Math.floor(((timeMs - minStart) / total) * width)));
   const endCellFor = (timeMs: number): number =>
-    Math.max(
-      1,
-      Math.min(width, Math.ceil(((timeMs - minStart) / total) * width)),
-    );
+    Math.max(1, Math.min(width, Math.ceil(((timeMs - minStart) / total) * width)));
 
   // Rows from deepest to shallowest so the call stack reads top-down.
   const lines: string[] = [];
@@ -619,9 +591,7 @@ export function buildTraceMarkdown(
     quickLook.push(`💰 ${formatCost(trace.totalCost ?? 0)}`);
   }
   if (trace.spanCount) {
-    quickLook.push(
-      `📊 ${trace.spanCount} span${trace.spanCount === 1 ? "" : "s"}`,
-    );
+    quickLook.push(`📊 ${trace.spanCount} span${trace.spanCount === 1 ? "" : "s"}`);
   }
   if (trace.ttft != null) {
     quickLook.push(`⚡ TTFT ${formatDuration(trace.ttft)}`);
@@ -649,8 +619,7 @@ export function buildTraceMarkdown(
   if (trace.conversationId) {
     detail.push(`**Conversation** \`${trace.conversationId}\``);
   }
-  const scenarioRunId =
-    trace.scenarioRunId ?? trace.attributes["scenario.run_id"];
+  const scenarioRunId = trace.scenarioRunId ?? trace.attributes["scenario.run_id"];
   if (scenarioRunId) {
     detail.push(`**Scenario run** \`${scenarioRunId}\``);
   }
@@ -781,10 +750,7 @@ export function buildTraceMarkdown(
       // No code fence, no box-drawing — just YAML-style indented list.
       const renderSpanLine = (span: SpanTreeNode, depth: number): string => {
         const indent = "  ".repeat(depth);
-        const bits: string[] = [
-          span.type ?? "span",
-          formatDuration(span.durationMs),
-        ];
+        const bits: string[] = [span.type ?? "span", formatDuration(span.durationMs)];
         if (span.model) bits.push(span.model);
         if (span.status === "error") bits.push("error");
         return `${indent}- ${span.name} (${bits.join(", ")})`;
@@ -797,19 +763,12 @@ export function buildTraceMarkdown(
         const subIndent = "  ".repeat(depth + 1);
 
         if (opts.spanDetail === "full") {
-          const offsetMs = Math.max(
-            0,
-            Math.round(span.startTimeMs - trace.timestamp),
-          );
-          lines.push(
-            `${subIndent}id: ${span.spanId.slice(0, 16)} · +${offsetMs}ms`,
-          );
+          const offsetMs = Math.max(0, Math.round(span.startTimeMs - trace.timestamp));
+          lines.push(`${subIndent}id: ${span.spanId.slice(0, 16)} · +${offsetMs}ms`);
         }
 
         if (opts.includeSpanAttributes && full?.params) {
-          const flat = flattenAttributes(
-            full.params as Record<string, unknown>,
-          );
+          const flat = flattenAttributes(full.params as Record<string, unknown>);
           if (flat.length > 0) {
             lines.push(`${subIndent}attributes:`);
             for (const ln of flat) lines.push(`${subIndent}  ${ln}`);

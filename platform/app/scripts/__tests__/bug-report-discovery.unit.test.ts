@@ -43,9 +43,9 @@ describe("agent report discovery notices", () => {
           "<AgentReportNotice />",
         );
       }
-      expect(
-        existsSync(join(REPO_ROOT, "docs/snippets/agent-report-notice.mdx")),
-      ).toBe(true);
+      expect(existsSync(join(REPO_ROOT, "docs/snippets/agent-report-notice.mdx"))).toBe(
+        true,
+      );
     });
   });
 

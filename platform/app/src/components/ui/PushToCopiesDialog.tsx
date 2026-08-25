@@ -89,14 +89,9 @@ export function PushToCopiesDialog({
             {isLoading ? (
               <Text>Loading replicas...</Text>
             ) : error ? (
-              <HandledErrorAlert
-                error={error}
-                fallbackTitle="Couldn't load replicas"
-              />
+              <HandledErrorAlert error={error} fallbackTitle="Couldn't load replicas" />
             ) : copies.length === 0 ? (
-              <Text color="fg.muted">
-                {emptyMessage ?? "No replicas found."}
-              </Text>
+              <Text color="fg.muted">{emptyMessage ?? "No replicas found."}</Text>
             ) : (
               <VStack gap={2} align={"start"} width="full">
                 {copies.map((copy) => (

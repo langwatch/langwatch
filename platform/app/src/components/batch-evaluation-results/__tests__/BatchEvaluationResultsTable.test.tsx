@@ -93,11 +93,7 @@ describe("BatchEvaluationResultsTable", () => {
     /** @scenario Show loading skeleton while fetching results */
     it("shows skeleton when loading", () => {
       render(
-        <BatchEvaluationResultsTable
-          data={null}
-          isLoading
-          disableVirtualization
-        />,
+        <BatchEvaluationResultsTable data={null} isLoading disableVirtualization />,
         {
           wrapper: Wrapper,
         },
@@ -129,12 +125,9 @@ describe("BatchEvaluationResultsTable", () => {
     it("shows empty message when rows is empty", () => {
       const data = createTestData({ rows: [] });
 
-      render(
-        <BatchEvaluationResultsTable data={data} disableVirtualization />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("No results to display")).toBeInTheDocument();
     });
@@ -144,12 +137,9 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders row number column (empty header, shows row numbers in cells)", () => {
       const data = createTestData();
 
-      render(
-        <BatchEvaluationResultsTable data={data} disableVirtualization />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // Row number column has empty header but shows numbers in cells
       expect(screen.getByText("1")).toBeInTheDocument();
@@ -159,12 +149,9 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders dataset column headers", () => {
       const data = createTestData();
 
-      render(
-        <BatchEvaluationResultsTable data={data} disableVirtualization />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // Column names appear in both the table header and the column visibility popover
       // Check that at least one instance exists
@@ -177,12 +164,9 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders target column headers", () => {
       const data = createTestData();
 
-      render(
-        <BatchEvaluationResultsTable data={data} disableVirtualization />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("GPT-4o")).toBeInTheDocument();
     });
@@ -192,12 +176,9 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders row number", () => {
       const data = createTestData();
 
-      render(
-        <BatchEvaluationResultsTable data={data} disableVirtualization />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("1")).toBeInTheDocument();
     });
@@ -205,12 +186,9 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders dataset values", () => {
       const data = createTestData();
 
-      render(
-        <BatchEvaluationResultsTable data={data} disableVirtualization />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("What is 2+2?")).toBeInTheDocument();
       // Note: "4" appears multiple times (expected, output)
@@ -220,12 +198,9 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders target output", () => {
       const data = createTestData();
 
-      render(
-        <BatchEvaluationResultsTable data={data} disableVirtualization />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // The output is JSON stringified
       expect(screen.getByText(/response/)).toBeInTheDocument();
@@ -234,12 +209,9 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders evaluator chips", () => {
       const data = createTestData();
 
-      render(
-        <BatchEvaluationResultsTable data={data} disableVirtualization />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("Exact Match")).toBeInTheDocument();
     });
@@ -282,12 +254,9 @@ describe("BatchEvaluationResultsTable", () => {
         ],
       });
 
-      render(
-        <BatchEvaluationResultsTable data={data} disableVirtualization />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("Row 1 input")).toBeInTheDocument();
       expect(screen.getByText("Row 2 input")).toBeInTheDocument();
@@ -331,12 +300,9 @@ describe("BatchEvaluationResultsTable", () => {
         ],
       });
 
-      render(
-        <BatchEvaluationResultsTable data={data} disableVirtualization />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("GPT-4o")).toBeInTheDocument();
       expect(screen.getByText("Claude")).toBeInTheDocument();
@@ -581,20 +547,17 @@ describe("BatchEvaluationResultsTable", () => {
       const data = createTestData();
 
       render(
-        <BatchEvaluationResultsTable
-          data={data}
-          rowHeight="l"
-          disableVirtualization
-        />,
+        <BatchEvaluationResultsTable data={data} rowHeight="l" disableVirtualization />,
         { wrapper: Wrapper },
       );
 
       expect(
         screen.getByText("What is 2+2?").closest("[data-row-height]"),
       ).toHaveAttribute("data-row-height", "l");
-      expect(
-        screen.getByText(/response/).closest("[data-row-height]"),
-      ).toHaveAttribute("data-row-height", "l");
+      expect(screen.getByText(/response/).closest("[data-row-height]")).toHaveAttribute(
+        "data-row-height",
+        "l",
+      );
     });
   });
 });

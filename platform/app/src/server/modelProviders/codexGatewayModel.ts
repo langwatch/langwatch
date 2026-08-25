@@ -89,9 +89,7 @@ export async function getCodexVercelAIModel({
  */
 function codexGatewayV1BaseUrl(): string {
   const base =
-    env.LW_GATEWAY_INTERNAL_URL ??
-    env.LW_GATEWAY_PUBLIC_URL ??
-    env.LW_GATEWAY_BASE_URL;
+    env.LW_GATEWAY_INTERNAL_URL ?? env.LW_GATEWAY_PUBLIC_URL ?? env.LW_GATEWAY_BASE_URL;
   if (!base) {
     throw new Error(
       "The AI gateway URL is not configured on the control plane (LW_GATEWAY_INTERNAL_URL / LW_GATEWAY_PUBLIC_URL); it is required for Codex models.",

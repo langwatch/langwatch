@@ -55,9 +55,7 @@ export const sendLicenseEmail = async ({
           width="36"
         />
         <Heading as="h1">Your LangWatch License</Heading>
-        <p>
-          Thank you for purchasing a LangWatch license! Your license details:
-        </p>
+        <p>Thank you for purchasing a LangWatch license! Your license details:</p>
         <table
           style={{
             borderCollapse: "collapse",
@@ -65,24 +63,17 @@ export const sendLicenseEmail = async ({
           }}
         >
           <tr>
-            <td style={{ padding: "4px 12px 4px 0", fontWeight: "bold" }}>
-              Plan
-            </td>
+            <td style={{ padding: "4px 12px 4px 0", fontWeight: "bold" }}>Plan</td>
             <td style={{ padding: "4px 0" }}>
-              {planType.charAt(0).toUpperCase() +
-                planType.slice(1).toLowerCase()}
+              {planType.charAt(0).toUpperCase() + planType.slice(1).toLowerCase()}
             </td>
           </tr>
           <tr>
-            <td style={{ padding: "4px 12px 4px 0", fontWeight: "bold" }}>
-              Seats
-            </td>
+            <td style={{ padding: "4px 12px 4px 0", fontWeight: "bold" }}>Seats</td>
             <td style={{ padding: "4px 0" }}>{maxMembers}</td>
           </tr>
           <tr>
-            <td style={{ padding: "4px 12px 4px 0", fontWeight: "bold" }}>
-              Expires
-            </td>
+            <td style={{ padding: "4px 12px 4px 0", fontWeight: "bold" }}>Expires</td>
             <td style={{ padding: "4px 0" }}>{expirationDate}</td>
           </tr>
         </table>
@@ -91,8 +82,8 @@ export const sendLicenseEmail = async ({
           How to activate
         </Heading>
         <p>
-          A <code>.langwatch-license</code> file is attached to this email. To
-          activate your license:
+          A <code>.langwatch-license</code> file is attached to this email. To activate
+          your license:
         </p>
         <ol>
           <li>

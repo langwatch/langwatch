@@ -112,7 +112,5 @@ export default async function main() {
     }
   }
 
-  console.log(
-    `Migration complete. Updated: ${updatedCount}, Skipped: ${skippedCount}`,
-  );
+  console.log(`Migration complete. Updated: ${updatedCount}, Skipped: ${skippedCount}`);
 }

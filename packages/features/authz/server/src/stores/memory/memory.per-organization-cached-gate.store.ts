@@ -27,9 +27,7 @@ export class PerOrganizationCachedGateStore {
     return new PerOrganizationCachedGateStore(options);
   }
 
-  private constructor(
-    private readonly options: PerOrganizationCachedGateStoreOptions,
-  ) {}
+  private constructor(private readonly options: PerOrganizationCachedGateStoreOptions) {}
 
   async get({
     organizationId,

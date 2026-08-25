@@ -17,9 +17,7 @@ export type IngestionTemplateMutationResult =
 
 export abstract class IngestionTemplateRepository {
   abstract listUserVisible(organizationId: string): Promise<IngestionTemplate[]>;
-  abstract listAdminVisible(
-    organizationId: string,
-  ): Promise<IngestionTemplate[]>;
+  abstract listAdminVisible(organizationId: string): Promise<IngestionTemplate[]>;
   abstract tryFindVisible(input: {
     id: string;
     organizationId: string;

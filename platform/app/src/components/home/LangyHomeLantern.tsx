@@ -36,19 +36,14 @@ export function LangyHomeLantern() {
 
   const reach = useProjectReach();
   const isNewProject =
-    devState === "empty"
-      ? true
-      : devState === "populated"
-        ? false
-        : reach.isNewProject;
+    devState === "empty" ? true : devState === "populated" ? false : reach.isNewProject;
 
   // Until the project's reach is known, "has nothing" and "has not answered
   // yet" look identical, and offering the empty-project asks to a project with
   // months of runs (then swapping them out a beat later) is worse than a beat
   // of nothing: the reader reaches for a chip that moves. A pinned dev state
   // is an answer, so it skips the wait.
-  const reachKnown =
-    devState === "empty" || devState === "populated" || !reach.isLoading;
+  const reachKnown = devState === "empty" || devState === "populated" || !reach.isLoading;
   // Only once the answer is actually known. Leading with "send your first
   // trace" at a project that already has thousands is the product not knowing
   // its own customer, and `isNewProject` reads false while the check is still
@@ -339,8 +334,8 @@ function ReadOnlyNotice() {
       backdropFilter="blur(8px)"
     >
       <Text fontSize="12.5px" color="fg.muted">
-        You can read Langy conversations here. To start one, ask whoever manages
-        your account for access.
+        You can read Langy conversations here. To start one, ask whoever manages your
+        account for access.
       </Text>
     </HStack>
   );

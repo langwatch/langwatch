@@ -63,8 +63,7 @@ export class App {
   readonly presence: AppDependencies["presence"];
   readonly secrets: AppDependencies["secrets"];
   readonly traces: AppDependencies["traces"] & AppCommands["traces"];
-  readonly evaluations: AppDependencies["evaluations"] &
-    AppCommands["evaluations"];
+  readonly evaluations: AppDependencies["evaluations"] & AppCommands["evaluations"];
   /** The ADR-034 analytics read API. */
   readonly analytics: AppDependencies["analytics"];
   /** The process-owned restricted analytics SQL service. */
@@ -75,8 +74,7 @@ export class App {
   readonly simulationExports: AppDependencies["simulationExports"];
   readonly topics: AppDependencies["topics"];
   readonly topicClustering: AppCommands["topicClustering"];
-  readonly codingAgents: AppDependencies["codingAgents"] &
-    AppCommands["codingAgents"];
+  readonly codingAgents: AppDependencies["codingAgents"] & AppCommands["codingAgents"];
   readonly gateway: AppDependencies["gateway"];
   readonly filters: AppDependencies["filters"];
   readonly clickhouse: AppDependencies["clickhouse"];
@@ -176,10 +174,7 @@ export class App {
     this.presence = deps.presence;
     this.secrets = deps.secrets;
     this.traces = { ...deps.traces, ...deps.commands.traces };
-    this.evaluations = Object.assign(
-      deps.evaluations,
-      deps.commands.evaluations,
-    );
+    this.evaluations = Object.assign(deps.evaluations, deps.commands.evaluations);
     this.analytics = deps.analytics;
     this.langWatchQL = deps.langWatchQL;
     this.dashboard = deps.dashboard;

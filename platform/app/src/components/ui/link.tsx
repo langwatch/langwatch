@@ -11,12 +11,7 @@ type LinkProps = {
 export const Link = ({ href, isExternal, children, ...props }: LinkProps) => {
   if (isExternal) {
     return (
-      <ChakraLink
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        {...props}
-      >
+      <ChakraLink href={href} target="_blank" rel="noopener noreferrer" {...props}>
         {children}
       </ChakraLink>
     );

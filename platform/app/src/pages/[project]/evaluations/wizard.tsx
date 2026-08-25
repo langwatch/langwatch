@@ -17,8 +17,7 @@ export default function EvaluationWizardRedirect() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const hasRedirectedRef = useRef(false);
-  const slug =
-    typeof router.query.slug === "string" ? router.query.slug : undefined;
+  const slug = typeof router.query.slug === "string" ? router.query.slug : undefined;
 
   const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
     { projectId: project?.id ?? "", experimentSlug: slug ?? "" },

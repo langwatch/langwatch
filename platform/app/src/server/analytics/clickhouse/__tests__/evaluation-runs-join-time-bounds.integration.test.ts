@@ -33,10 +33,7 @@ import {
 import type { FilterField } from "../../../filters/types";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import type { AggregationTypes } from "../../types";
-import {
-  buildDataForFilterQuery,
-  buildTimeseriesQuery,
-} from "../aggregation-builder";
+import { buildDataForFilterQuery, buildTimeseriesQuery } from "../aggregation-builder";
 import { resetParamCounter } from "../filter-translator";
 import {
   deleteEvaluationRunsByTenant,

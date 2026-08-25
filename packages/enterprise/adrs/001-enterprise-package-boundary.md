@@ -29,8 +29,7 @@ RPC, user interface, persistence, or runtime installation surface.
 
 ## Dependencies
 
-The catalogue may depend only on portable Enterprise feature contracts and Zod
-4. It cannot depend on implementations or composition packages.
+The catalogue may depend only on portable Enterprise feature contracts and Zod 4. It cannot depend on implementations or composition packages.
 
 ## Persistence
 

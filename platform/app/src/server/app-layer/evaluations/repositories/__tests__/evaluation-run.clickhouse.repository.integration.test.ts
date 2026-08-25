@@ -49,8 +49,7 @@ function createEvaluations(client: ClickHouseClient): EvaluationService {
       query: async (input) => {
         const result = await client.query(input as never);
         return {
-          json: async <Result>() =>
-            (await result.json<Result>()) as unknown as Result[],
+          json: async <Result>() => (await result.json<Result>()) as unknown as Result[],
         };
       },
     }),
@@ -120,8 +119,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (ch) {
     await ch.exec({
-      query:
-        "ALTER TABLE evaluation_runs DELETE WHERE TenantId = {tenantId:String}",
+      query: "ALTER TABLE evaluation_runs DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId },
     });
   }

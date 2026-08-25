@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_LIMIT } from "@langwatch/enterprise-licensing-contract";
-import {
-  LicenseGenerationService,
-  NodeLicenseCryptographyAdapter,
-} from "../src";
+import { LicenseGenerationService, NodeLicenseCryptographyAdapter } from "../src";
 import {
   ENTERPRISE_TEMPLATE,
   GROWTH_TEMPLATE,
@@ -49,9 +46,7 @@ describe("generateLicenseKey", () => {
 
       expect(plan.maxMembersLite).toBe(GROWTH_TEMPLATE.maxMembersLite);
       expect(plan.maxMembersLite).toBe(DEFAULT_LIMIT);
-      expect(plan.maxMessagesPerMonth).toBe(
-        GROWTH_TEMPLATE.maxMessagesPerMonth,
-      );
+      expect(plan.maxMessagesPerMonth).toBe(GROWTH_TEMPLATE.maxMessagesPerMonth);
       expect(plan.maxMessagesPerMonth).toBe(DEFAULT_LIMIT);
     });
 
@@ -326,9 +321,7 @@ describe("generateLicenseKey overrides", () => {
     it("takes the template's numbers and a one-year expiry", () => {
       const { licenseData } = generateLicenseKey(enterpriseParams);
 
-      expect(licenseData.plan.maxMembersLite).toBe(
-        ENTERPRISE_TEMPLATE.maxMembersLite,
-      );
+      expect(licenseData.plan.maxMembersLite).toBe(ENTERPRISE_TEMPLATE.maxMembersLite);
       expect(licenseData.plan.maxMessagesPerMonth).toBe(
         ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
       );

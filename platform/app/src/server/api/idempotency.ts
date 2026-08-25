@@ -145,8 +145,7 @@ const CLAIM_ATTEMPTS = 3;
 export type IdempotencyConflictReason = "body_mismatch" | "in_progress";
 
 const CONFLICT_MESSAGES = {
-  body_mismatch:
-    "This Idempotency-Key was already used with a different request body.",
+  body_mismatch: "This Idempotency-Key was already used with a different request body.",
   in_progress:
     "The original request with this Idempotency-Key is still in progress; retry shortly.",
 } as const satisfies Record<IdempotencyConflictReason, string>;
@@ -180,9 +179,7 @@ export class IdempotencyConflictError extends HandledError {
  * to nothing, because a caller who sent one believes their retry is protected
  * and would otherwise find out from a duplicate row.
  */
-export function readIdempotencyKey(
-  raw: string | undefined | null,
-): string | null {
+export function readIdempotencyKey(raw: string | undefined | null): string | null {
   if (raw === undefined || raw === null) return null;
 
   const key = raw.trim();
@@ -716,10 +713,7 @@ async function releaseClaim({
   } catch (error) {
     // Called on the failure path, where the caller is already propagating
     // something more informative. A receipt left pending expires on its own.
-    logger.warn(
-      { receiptId, error },
-      "Failed to release a pending idempotency receipt",
-    );
+    logger.warn({ receiptId, error }, "Failed to release a pending idempotency receipt");
   }
 }
 
@@ -741,16 +735,10 @@ async function discardReceipt({
   try {
     await prisma.idempotencyReceipt.deleteMany({ where: { id: receiptId } });
   } catch (error) {
-    logger.warn(
-      { receiptId, error },
-      "Failed to discard a spent idempotency receipt",
-    );
+    logger.warn({ receiptId, error }, "Failed to discard a spent idempotency receipt");
   }
 }
 
 function isUniqueViolation(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
-  );
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }

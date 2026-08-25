@@ -50,10 +50,7 @@ function makeFold({
     init: () => ({ count: 0, LastEventOccurredAt: 0 }),
     apply: (state: CounterState, event: Event) => ({
       count: state.count + 1,
-      LastEventOccurredAt: Math.max(
-        state.LastEventOccurredAt,
-        event.occurredAt ?? 0,
-      ),
+      LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt ?? 0),
     }),
   }) as FoldProjectionDefinition<CounterState, Event>;
 
@@ -65,9 +62,7 @@ function makeFold({
   return { fold, store, eventLoader };
 }
 
-const refoldMetric = incrementEsFoldRefoldTotal as unknown as ReturnType<
-  typeof vi.fn
->;
+const refoldMetric = incrementEsFoldRefoldTotal as unknown as ReturnType<typeof vi.fn>;
 
 describe("FoldProjectionExecutor out-of-order re-fold", () => {
   const tenantId = createTestTenantId();
@@ -102,11 +97,7 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
     describe("when the projection declares no re-fold policy", () => {
       /** @scenario "An out-of-order batch re-folds from the event log by default" */
       it("loads the aggregate's full history and replays it from init state", async () => {
-        const history = [
-          eventAt(1_000),
-          eventAt(2_000),
-          eventAt(CHECKPOINT_MS),
-        ];
+        const history = [eventAt(1_000), eventAt(2_000), eventAt(CHECKPOINT_MS)];
         const { fold, store, eventLoader } = makeFold({
           storedState: { count: 99, LastEventOccurredAt: CHECKPOINT_MS },
           loadedEvents: history,

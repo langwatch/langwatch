@@ -3,18 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "description": "Executable package-boundary policies for the LangWatch monorepo.",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": [
-    "src"
-  ],
   "scripts": {
     "lint": "tsx src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration",
     "lint:declarations": "tsx src/cli.ts --root ../.. --no-legacy-application-migration",

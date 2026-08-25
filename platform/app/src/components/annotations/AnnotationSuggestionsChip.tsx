@@ -20,9 +20,7 @@ export function AnnotationSuggestionsChip({
       traceId={traceId}
       icon={<Lightbulb size={12} />}
       testId="annotation-suggestions-chip"
-      countLabel={(count) =>
-        `${count} ${count === 1 ? "suggestion" : "suggestions"}`
-      }
+      countLabel={(count) => `${count} ${count === 1 ? "suggestion" : "suggestions"}`}
       textOf={(annotation) => annotation.expectedOutput}
     />
   );

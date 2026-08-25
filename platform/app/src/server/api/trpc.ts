@@ -48,11 +48,7 @@ import type {
   ViaFieldFor,
 } from "@langwatch/authz-contract";
 import { authzDeclarationOf } from "@langwatch/authz-contract";
-import {
-  HandledError,
-  isZodLikeError,
-  ValidationError,
-} from "@langwatch/handled-error";
+import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import superjson from "superjson";
@@ -201,9 +197,7 @@ const MAX_CAUSE_DEPTH = 3;
 function donatedMessage(cause: unknown): string | undefined {
   if (typeof cause !== "object" || cause === null) return undefined;
   const message = (cause as { message?: unknown }).message;
-  return typeof message === "string" && message.length > 0
-    ? message
-    : undefined;
+  return typeof message === "string" && message.length > 0 ? message : undefined;
 }
 
 /**
@@ -402,11 +396,7 @@ export function errorFormatter({
     message,
     data: {
       ...shapeData,
-      cause:
-        missingModelCause ??
-        providerDisabledCause ??
-        aiCallFailedCause ??
-        limitInfo,
+      cause: missingModelCause ?? providerDisabledCause ?? aiCallFailedCause ?? limitInfo,
       error: domainError,
       // See `isAuthoredMessage`. Absent/false means the client must not render
       // `message` — it degrades to the generic unknown state instead.
@@ -464,42 +454,40 @@ const enforcePermissionCheck = t.middleware(({ ctx, next }) => {
   return next();
 });
 
-const auditLogTRPCErrors = t.middleware(
-  async ({ ctx, next, path, type, input }) => {
-    const result = await next();
-    if (
-      (type !== "mutation" || !ctx.permissionChecked) && // avoid duplicated audit logs for mutations
-      !result.ok &&
-      result.error instanceof TRPCError &&
-      result.error.code !== "INTERNAL_SERVER_ERROR" &&
-      ctx.session?.user.id
-    ) {
-      await auditLog({
-        userId: ctx.session.user.id,
-        organizationId: (input as any)?.organizationId,
-        projectId: (input as any)?.projectId,
-        action: path,
-        // Through the same redaction as the success path. This middleware
-        // sits before the input parser, so `input` is unset here today; the
-        // call is what keeps a chain that changes from storing in clear what
-        // the other middleware takes out.
-        args: redactAuditArgs({ input, action: path }),
-        error: result.error,
-        req: ctx.req,
-        // When an admin is impersonating, `session.user.id` reflects the
-        // impersonated user (correct for RBAC attribution). We stamp the
-        // real admin's identity in metadata so security forensics can
-        // filter on `metadata.impersonatorId` to find actions that were
-        // actually performed by an admin.
-        metadata: ctx.session.user.impersonator
-          ? { impersonatorId: ctx.session.user.impersonator.id }
-          : undefined,
-      });
-    }
+const auditLogTRPCErrors = t.middleware(async ({ ctx, next, path, type, input }) => {
+  const result = await next();
+  if (
+    (type !== "mutation" || !ctx.permissionChecked) && // avoid duplicated audit logs for mutations
+    !result.ok &&
+    result.error instanceof TRPCError &&
+    result.error.code !== "INTERNAL_SERVER_ERROR" &&
+    ctx.session?.user.id
+  ) {
+    await auditLog({
+      userId: ctx.session.user.id,
+      organizationId: (input as any)?.organizationId,
+      projectId: (input as any)?.projectId,
+      action: path,
+      // Through the same redaction as the success path. This middleware
+      // sits before the input parser, so `input` is unset here today; the
+      // call is what keeps a chain that changes from storing in clear what
+      // the other middleware takes out.
+      args: redactAuditArgs({ input, action: path }),
+      error: result.error,
+      req: ctx.req,
+      // When an admin is impersonating, `session.user.id` reflects the
+      // impersonated user (correct for RBAC attribution). We stamp the
+      // real admin's identity in metadata so security forensics can
+      // filter on `metadata.impersonatorId` to find actions that were
+      // actually performed by an admin.
+      metadata: ctx.session.user.impersonator
+        ? { impersonatorId: ctx.session.user.impersonator.id }
+        : undefined,
+    });
+  }
 
-    return result;
-  },
-);
+  return result;
+});
 
 /**
  * Pull the resource ID + kind from a tRPC mutation result so the audit
@@ -645,9 +633,7 @@ const REDACTED_VALUE_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
 
 /** Keeps an object's field names, drops every value. */
 function redactValues(source: Record<string, unknown>): Record<string, string> {
-  return Object.fromEntries(
-    Object.keys(source).map((name) => [name, "[redacted]"]),
-  );
+  return Object.fromEntries(Object.keys(source).map((name) => [name, "[redacted]"]));
 }
 
 /** The object fields whose values this action must not store. */
@@ -686,9 +672,7 @@ function redactHeaderValues(headers: readonly unknown[]): unknown[] {
   return headers.map((header) => {
     if (typeof header !== "object" || header === null) return "[redacted]";
     const { key } = header as Record<string, unknown>;
-    return typeof key === "string"
-      ? { key, value: "[redacted]" }
-      : "[redacted]";
+    return typeof key === "string" ? { key, value: "[redacted]" } : "[redacted]";
   });
 }
 
@@ -735,37 +719,35 @@ export function redactAuditArgs({
   return redacted ?? input;
 }
 
-const auditLogMutations = t.middleware(
-  async ({ ctx, next, type, path, input }) => {
-    if (type !== "mutation" || !ctx.session?.user || isAuditLogExempt(path)) {
-      return next();
-    }
+const auditLogMutations = t.middleware(async ({ ctx, next, type, path, input }) => {
+  if (type !== "mutation" || !ctx.session?.user || isAuditLogExempt(path)) {
+    return next();
+  }
 
-    const result = await next();
+  const result = await next();
 
-    const target = result.ok ? deriveAuditTarget(path, result.data) : {};
+  const target = result.ok ? deriveAuditTarget(path, result.data) : {};
 
-    await auditLog({
-      userId: ctx.session.user.id,
-      organizationId: (input as any)?.organizationId,
-      projectId: (input as any)?.projectId,
-      action: path,
-      args: redactAuditArgs({ input, action: path }),
-      error: !result.ok ? result.error : undefined,
-      req: ctx.req,
-      targetKind: target.targetKind,
-      targetId: target.targetId,
-      // Stamp the real admin id when the action is happening during
-      // impersonation. `userId` above is the impersonated target (the
-      // RBAC actor); metadata.impersonatorId is the human performing it.
-      metadata: ctx.session.user.impersonator
-        ? { impersonatorId: ctx.session.user.impersonator.id }
-        : undefined,
-    });
+  await auditLog({
+    userId: ctx.session.user.id,
+    organizationId: (input as any)?.organizationId,
+    projectId: (input as any)?.projectId,
+    action: path,
+    args: redactAuditArgs({ input, action: path }),
+    error: !result.ok ? result.error : undefined,
+    req: ctx.req,
+    targetKind: target.targetKind,
+    targetId: target.targetId,
+    // Stamp the real admin id when the action is happening during
+    // impersonation. `userId` above is the impersonated target (the
+    // RBAC actor); metadata.impersonatorId is the human performing it.
+    metadata: ctx.session.user.impersonator
+      ? { impersonatorId: ctx.session.user.impersonator.id }
+      : undefined,
+  });
 
-    return result;
-  },
-);
+  return result;
+});
 
 function spanAttributes(path: string, type: string) {
   return {
@@ -879,57 +861,55 @@ export function callerTraceContext({
   return propagation.extract(active, headers);
 }
 
-export const tracerMiddleware = t.middleware(
-  async ({ ctx, path, type, next }) => {
-    const tracer = otelTrace.getTracer("langwatch:trpc");
-    const spanName = `trpc.${path}`;
+export const tracerMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
+  const tracer = otelTrace.getTracer("langwatch:trpc");
+  const spanName = `trpc.${path}`;
 
-    // For silenced routes (presence heartbeats, SSE subscription
-    // messages) we want zero spans on the happy path — they otherwise
-    // drown out the trace surface — but failures still need a span so
-    // real errors stay visible. Capture the start time before `next()`
-    // so the error span's duration matches the actual call.
-    const parentContext = callerTraceContext({ req: ctx.req, type });
+  // For silenced routes (presence heartbeats, SSE subscription
+  // messages) we want zero spans on the happy path — they otherwise
+  // drown out the trace surface — but failures still need a span so
+  // real errors stay visible. Capture the start time before `next()`
+  // so the error span's duration matches the actual call.
+  const parentContext = callerTraceContext({ req: ctx.req, type });
 
-    if (isSilencedCall({ path, type })) {
-      const startTime = Date.now();
-      const result = await next();
-      if (result.ok) return result;
+  if (isSilencedCall({ path, type })) {
+    const startTime = Date.now();
+    const result = await next();
+    if (result.ok) return result;
 
-      const span = tracer.startSpan(
-        spanName,
-        {
-          kind: SpanKind.SERVER,
-          startTime,
-          attributes: spanAttributes(path, type),
-        },
-        parentContext,
-      );
-      rememberTraceId(result.error, span);
-      recordSpanError(span, result.error);
-      span.end();
-      return result;
-    }
-
-    return otelContext.with(parentContext, () =>
-      tracer.startActiveSpan(
-        spanName,
-        { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
-        async (span) => {
-          // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
-          // returned as { ok: false, error } result objects — NOT thrown.
-          const result = await next();
-          if (!result.ok) {
-            rememberTraceId(result.error, span);
-            recordSpanError(span, result.error);
-          }
-          span.end();
-          return result;
-        },
-      ),
+    const span = tracer.startSpan(
+      spanName,
+      {
+        kind: SpanKind.SERVER,
+        startTime,
+        attributes: spanAttributes(path, type),
+      },
+      parentContext,
     );
-  },
-);
+    rememberTraceId(result.error, span);
+    recordSpanError(span, result.error);
+    span.end();
+    return result;
+  }
+
+  return otelContext.with(parentContext, () =>
+    tracer.startActiveSpan(
+      spanName,
+      { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
+      async (span) => {
+        // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
+        // returned as { ok: false, error } result objects — NOT thrown.
+        const result = await next();
+        if (!result.ok) {
+          rememberTraceId(result.error, span);
+          recordSpanError(span, result.error);
+        }
+        span.end();
+        return result;
+      },
+    ),
+  );
+});
 
 function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
   const map: Partial<Record<number, TRPCError["code"]>> = {
@@ -1043,9 +1023,7 @@ const SLOW_CALL_THROTTLE_MS = 60_000;
 const slowCallThrottle = createWarnThrottle(SLOW_CALL_THROTTLE_MS);
 
 /** Zero or negative turns the warning off; unset or unparseable keeps the default. */
-export function resolveSlowCallBudgetMs(
-  env: NodeJS.ProcessEnv = process.env,
-): number {
+export function resolveSlowCallBudgetMs(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env.TRPC_SLOW_CALL_MS;
   if (typeof raw !== "string" || raw.trim() === "") return DEFAULT_SLOW_CALL_MS;
   const parsed = Number(raw);
@@ -1096,12 +1074,9 @@ export function handleTrpcCallLogging({
     // The response status hasn't been set yet at middleware time — tRPC sets
     // it later when serializing the response. So we map it ourselves.
     const resolvedStatus =
-      result.error instanceof TRPCError
-        ? getHTTPStatusCodeFromError(result.error)
-        : 500;
+      result.error instanceof TRPCError ? getHTTPStatusCodeFromError(result.error) : 500;
 
-    const cause =
-      result.error instanceof TRPCError ? result.error.cause : undefined;
+    const cause = result.error instanceof TRPCError ? result.error.cause : undefined;
     // isHandled also matches an instance from a second copy of the package,
     // which bare `instanceof` misses — see its brand check.
     const handledCause = HandledError.isHandled(cause) ? cause : undefined;
@@ -1179,13 +1154,7 @@ function isSilencedPath(path: string): boolean {
   return SILENCED_LOG_PATH_PREFIXES.some((p) => path.startsWith(p));
 }
 
-function isSilencedCall({
-  path,
-  type,
-}: {
-  path: string;
-  type: string;
-}): boolean {
+function isSilencedCall({ path, type }: { path: string; type: string }): boolean {
   return isSilencedPath(path) || SILENCED_LOG_TYPES.has(type);
 }
 
@@ -1200,9 +1169,7 @@ function isSilencedCall({
  * call the middleware never makes. This is the seam that can be asked the real
  * question.
  */
-export function recordTrpcCall(
-  args: Parameters<typeof handleTrpcCallLogging>[0],
-): void {
+export function recordTrpcCall(args: Parameters<typeof handleTrpcCallLogging>[0]): void {
   // Errors are still reported on a silenced path: the volume that earns the
   // silence is happy-path volume, and a failing heartbeat is worth seeing.
   if (isSilencedCall({ path: args.path, type: args.type }) && args.result.ok) {
@@ -1211,39 +1178,36 @@ export function recordTrpcCall(
   handleTrpcCallLogging(args);
 }
 
-export const loggerMiddleware = t.middleware(
-  async ({ path, type, input, ctx, next }) => {
-    // Import context utilities dynamically to avoid circular deps
-    const { createContextFromTRPC, runWithContext } = await import(
-      "../context/asyncContext"
-    );
+export const loggerMiddleware = t.middleware(async ({ path, type, input, ctx, next }) => {
+  // Import context utilities dynamically to avoid circular deps
+  const { createContextFromTRPC, runWithContext } =
+    await import("../context/asyncContext");
 
-    // Create context from tRPC context and input
-    const requestContext = createContextFromTRPC(ctx, input as any);
+  // Create context from tRPC context and input
+  const requestContext = createContextFromTRPC(ctx, input as any);
 
-    return runWithContext(requestContext, async () => {
-      const start = Date.now();
-      // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
-      // caught by callRecursive and returned as { ok: false, error } result
-      // objects. Use result.ok to detect errors — NOT try/catch.
-      const result = await next();
-      const duration = Date.now() - start;
+  return runWithContext(requestContext, async () => {
+    const start = Date.now();
+    // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
+    // caught by callRecursive and returned as { ok: false, error } result
+    // objects. Use result.ok to detect errors — NOT try/catch.
+    const result = await next();
+    const duration = Date.now() - start;
 
-      recordTrpcCall({
-        result,
-        path,
-        type,
-        duration,
-        userAgent: ctx.req?.headers["user-agent"] ?? null,
-        statusCode: ctx.res?.statusCode ?? null,
-        log: logger,
-        capture: captureException,
-      });
-
-      return result;
+    recordTrpcCall({
+      result,
+      path,
+      type,
+      duration,
+      userAgent: ctx.req?.headers["user-agent"] ?? null,
+      statusCode: ctx.res?.statusCode ?? null,
+      log: logger,
+      capture: captureException,
     });
-  },
-);
+
+    return result;
+  });
+});
 
 /**
  * Protected (authenticated) procedure
@@ -1411,10 +1375,7 @@ interface PendingPermissionProcedureBuilder<
  * `.permission()` reads its scope id from the validated input, so an input
  * must be declared first — `UnsetMarker` is tRPC's "no .input() yet".
  */
-type ValidateDeclaredPermission<
-  P extends AuthzPermission,
-  I,
-> = UnsetMarker extends I
+type ValidateDeclaredPermission<P extends AuthzPermission, I> = UnsetMarker extends I
   ? DeclarationError<"declare .input() before .permission() — the check reads its scope id from the validated input">
   : ValidatePermissionForInput<P, I>;
 
@@ -1428,8 +1389,7 @@ type PermissionAnyArgs<
     ]
   : I extends { projectId: string }
     ? {
-        [K in keyof Ps]: Ps[K] &
-          ValidatePermissionForInput<Ps[K] & AuthzPermission, I>;
+        [K in keyof Ps]: Ps[K] & ValidatePermissionForInput<Ps[K] & AuthzPermission, I>;
       }
     : [
         AuthzPermission &
@@ -1509,10 +1469,7 @@ const permissionProcedureBuilder = <
       return permissionProcedureBuilder(procedure.input(input as any));
     }) as Pending["input"],
     use: (middleware) => withPermissionCheck(middleware),
-    permission: ((
-      permission: AuthzPermission,
-      options?: { via?: ScopeTierField },
-    ) =>
+    permission: ((permission: AuthzPermission, options?: { via?: ScopeTierField }) =>
       withPermissionCheck(
         checkDeclaredPermission({ permission, via: options?.via }),
       )) as Pending["permission"],
@@ -1520,21 +1477,14 @@ const permissionProcedureBuilder = <
       withPermissionCheck(
         checkDeclaredPermissionAny(permissions),
       )) as Pending["permissionAny"],
-    noPermission: ((options: {
-      reason: string;
-      allow?: Record<string, string>;
-    }) =>
-      withPermissionCheck(
-        declaredNoPermission(options),
-      )) as Pending["noPermission"],
+    noPermission: ((options: { reason: string; allow?: Record<string, string> }) =>
+      withPermissionCheck(declaredNoPermission(options))) as Pending["noPermission"],
     authorizeInService: (options) =>
       withPermissionCheck(declaredServiceAuthorization(options)),
   };
 };
 
-export const protectedProcedure = permissionProcedureBuilder(
-  authProtectedProcedure,
-);
+export const protectedProcedure = permissionProcedureBuilder(authProtectedProcedure);
 
 /**
  * Public (unauthenticated) procedure
@@ -1546,9 +1496,8 @@ export const protectedProcedure = permissionProcedureBuilder(
  */
 export const publicProcedure = permissionProcedureBuilder(t.procedure);
 
-const authMiddlewares = (
-  enforceUserIsAuthed as unknown as { _middlewares: unknown[] }
-)._middlewares;
+const authMiddlewares = (enforceUserIsAuthed as unknown as { _middlewares: unknown[] })
+  ._middlewares;
 
 /**
  * Whether a built procedure skips `enforceUserIsAuthed` — i.e. was built from
@@ -1558,9 +1507,6 @@ const authMiddlewares = (
  */
 export function isPublicProcedure(procedure: unknown): boolean {
   const middlewares =
-    (procedure as { _def?: { middlewares?: unknown[] } })._def?.middlewares ??
-    [];
-  return !middlewares.some((middleware) =>
-    authMiddlewares.includes(middleware),
-  );
+    (procedure as { _def?: { middlewares?: unknown[] } })._def?.middlewares ?? [];
+  return !middlewares.some((middleware) => authMiddlewares.includes(middleware));
 }

@@ -56,9 +56,7 @@ describe("isSnapshotStale", () => {
     it("says nothing rather than putting an age on data that does not exist", () => {
       // The page already renders this as its loading state.
       expect(isSnapshotStale({ computedAtMs: null, now: NOW })).toBe(false);
-      expect(isSnapshotStale({ computedAtMs: undefined, now: NOW })).toBe(
-        false,
-      );
+      expect(isSnapshotStale({ computedAtMs: undefined, now: NOW })).toBe(false);
     });
   });
 });

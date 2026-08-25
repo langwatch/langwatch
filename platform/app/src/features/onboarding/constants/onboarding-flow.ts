@@ -1,8 +1,5 @@
 import type { OrganizationIntent } from "~/generated/prisma/client";
-import {
-  type OnboardingFlowConfig,
-  OnboardingScreenIndex,
-} from "../types/types";
+import { type OnboardingFlowConfig, OnboardingScreenIndex } from "../types/types";
 
 function buildConfig(
   variant: OnboardingFlowConfig["variant"],

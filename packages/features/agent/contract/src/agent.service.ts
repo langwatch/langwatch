@@ -15,10 +15,7 @@ import type {
 } from "./agent.queries";
 
 export abstract class AgentService {
-  abstract getById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<AgentWithFields>;
+  abstract getById(input: { id: string; projectId: string }): Promise<AgentWithFields>;
   abstract getAll(input: { projectId: string }): Promise<AgentWithFields[]>;
   abstract getReferenceStates(input: {
     ids: string[];
@@ -48,10 +45,7 @@ export abstract class AgentService {
     sourceAgentId: string;
     allowedProjectIds?: string[];
   }): Promise<AgentCopy[]>;
-  abstract getSourceOfCopy(input: {
-    agentId: string;
-    projectId: string;
-  }): Promise<Agent>;
+  abstract getSourceOfCopy(input: { agentId: string; projectId: string }): Promise<Agent>;
   abstract copy(input: CopyAgentCommand): Promise<{
     id: string;
     projectId: string;

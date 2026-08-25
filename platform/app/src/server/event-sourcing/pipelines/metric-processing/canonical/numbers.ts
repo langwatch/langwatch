@@ -30,10 +30,7 @@ function longBitsToBigInt({
 
 export function integerDecimal(
   value: unknown,
-  {
-    signed = false,
-    fallback = "0",
-  }: { signed?: boolean; fallback?: string } = {},
+  { signed = false, fallback = "0" }: { signed?: boolean; fallback?: string } = {},
 ): string {
   if (typeof value === "bigint") return value.toString();
   if (typeof value === "string" && /^-?\d+$/.test(value)) return value;
@@ -84,9 +81,7 @@ export function timestampDecimal(value: unknown): string | null {
 export function timestampMs(decimal: string): number {
   const ms = Number(BigInt(decimal) / 1_000_000n);
   if (!Number.isSafeInteger(ms) || ms < 0 || ms > MAX_DATE_MS) {
-    throw new Error(
-      `OTLP timestamp is outside the supported Date range: ${decimal}`,
-    );
+    throw new Error(`OTLP timestamp is outside the supported Date range: ${decimal}`);
   }
   return ms;
 }
@@ -132,15 +127,11 @@ export function checkedDouble({
 }
 
 export function integerDecimals(values: unknown): string[] {
-  return Array.isArray(values)
-    ? values.map((value) => integerDecimal(value))
-    : [];
+  return Array.isArray(values) ? values.map((value) => integerDecimal(value)) : [];
 }
 
 export function finiteNumbers(values: unknown): number[] {
   return Array.isArray(values)
-    ? values
-        .map(finiteNumber)
-        .filter((value): value is number => value !== null)
+    ? values.map(finiteNumber).filter((value): value is number => value !== null)
     : [];
 }

@@ -18,10 +18,7 @@ export class RedisPresenceRepository extends PresenceRepository {
     return new RedisPresenceRepository(redis);
   }
 
-  async upsert(
-    session: PresenceSession,
-    ttlSeconds: number,
-  ): Promise<void> {
+  async upsert(session: PresenceSession, ttlSeconds: number): Promise<void> {
     await this.redis.set(
       this.sessionKey(session.projectId, session.sessionId),
       JSON.stringify(session),
@@ -31,9 +28,7 @@ export class RedisPresenceRepository extends PresenceRepository {
   }
 
   async remove(projectId: string, sessionId: string): Promise<boolean> {
-    return (
-      (await this.redis.del(this.sessionKey(projectId, sessionId))) > 0
-    );
+    return (await this.redis.del(this.sessionKey(projectId, sessionId))) > 0;
   }
 
   async tryFindSession(
@@ -93,13 +88,7 @@ async function scanNode(
   const keys: string[] = [];
   let cursor = "0";
   do {
-    const [nextCursor, batch] = await node.scan(
-      cursor,
-      "MATCH",
-      pattern,
-      "COUNT",
-      256,
-    );
+    const [nextCursor, batch] = await node.scan(cursor, "MATCH", pattern, "COUNT", 256);
     cursor = nextCursor;
     keys.push(...batch);
   } while (cursor !== "0");

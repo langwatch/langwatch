@@ -61,9 +61,7 @@ export interface DiscoveredAggregateWithEventTypes extends DiscoveredAggregate {
  */
 export function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
   const data =
-    row.EventPayload && row.EventPayload.length > 0
-      ? JSON.parse(row.EventPayload)
-      : null;
+    row.EventPayload && row.EventPayload.length > 0 ? JSON.parse(row.EventPayload) : null;
 
   const occurredAt =
     row.EventOccurredAt && row.EventOccurredAt > 0
@@ -185,10 +183,7 @@ export interface CutoffInfo {
 }
 
 /** Compare canonical event-log positions. Aggregate IDs never define order. */
-export function compareEventPositions(
-  left: CutoffInfo,
-  right: CutoffInfo,
-): number {
+export function compareEventPositions(left: CutoffInfo, right: CutoffInfo): number {
   if (left.timestamp !== right.timestamp) {
     return left.timestamp - right.timestamp;
   }
@@ -200,9 +195,7 @@ export function maxEventPosition(positions: Iterable<CutoffInfo>): CutoffInfo {
   const iterator = positions[Symbol.iterator]();
   const first = iterator.next();
   if (first.done) {
-    throw new Error(
-      "Cannot find the latest event position in an empty collection",
-    );
+    throw new Error("Cannot find the latest event position in an empty collection");
   }
 
   let latest = first.value;
@@ -588,9 +581,7 @@ export async function batchLoadAggregateEvents({
 
 export class ClickHouseReplayEventSource implements ReplayEventSourcePort {
   constructor(
-    private readonly resolveClient: (
-      tenantId: string,
-    ) => Promise<ClickHouseClient>,
+    private readonly resolveClient: (tenantId: string) => Promise<ClickHouseClient>,
   ) {}
 
   async discoverAffectedAggregates(input: {
@@ -656,10 +647,7 @@ export class ClickHouseReplayEventSource implements ReplayEventSourcePort {
     });
   }
 
-  async optimizeTables(
-    tenantId: string,
-    tables: readonly string[],
-  ): Promise<void> {
+  async optimizeTables(tenantId: string, tables: readonly string[]): Promise<void> {
     const client = await this.resolveClient(tenantId);
     for (const table of tables) {
       await client.command({

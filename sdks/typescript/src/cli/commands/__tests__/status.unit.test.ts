@@ -11,7 +11,11 @@ vi.mock("@/internal/api/client", () => ({
 }));
 
 vi.mock("../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 import { statusCommand } from "../status";
@@ -61,7 +65,9 @@ const noExperiments = {
 };
 
 /** A budget row with sane defaults — override just the field under test. */
-const budgetFixture = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+const budgetFixture = (
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> => ({
   id: "bud_1",
   organization_id: "org_1",
   scope_type: "project",
@@ -169,9 +175,7 @@ describe("statusCommand", () => {
       throw new ProcessExitError((code as number) ?? 0);
     });
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     process.env.LANGWATCH_API_KEY = "test-key";
     process.env.LANGWATCH_ENDPOINT = "http://localhost:9876";
   });
@@ -344,7 +348,12 @@ describe("statusCommand", () => {
                   runId: "run_1",
                   workflowVersion: null,
                   // No finishedAt/stoppedAt → still running.
-                  timestamps: { createdAt: 1, updatedAt: 2, finishedAt: null, stoppedAt: null },
+                  timestamps: {
+                    createdAt: 1,
+                    updatedAt: 2,
+                    finishedAt: null,
+                    stoppedAt: null,
+                  },
                   progress: 5,
                   total: 10,
                   summary: { evaluations: {} },
@@ -586,7 +595,12 @@ describe("statusCommand", () => {
                 experimentId: "exp_1",
                 runId: "run_1",
                 workflowVersion: null,
-                timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 3, stoppedAt: null },
+                timestamps: {
+                  createdAt: 1,
+                  updatedAt: 2,
+                  finishedAt: 3,
+                  stoppedAt: null,
+                },
                 progress: 10,
                 total: 10,
                 summary: { evaluations: {} },
@@ -631,7 +645,9 @@ describe("statusCommand", () => {
         mockAllSuccess();
         // A limit of 0 admits no spend at all: maximally breached, not 0%.
         global.fetch = mockGatewayFetch({
-          budgets: [budgetFixture({ limit_usd: "0", spent_usd: "0", on_breach: "block" })],
+          budgets: [
+            budgetFixture({ limit_usd: "0", spent_usd: "0", on_breach: "block" }),
+          ],
         });
 
         await statusCommand();
@@ -694,9 +710,7 @@ describe("statusCommand", () => {
         // VK budget at 92% block was structurally invisible here. Now it is
         // a row like any other and must gate the tick.
         global.fetch = mockGatewayFetch({
-          budgets: [
-            budgetFixture({ scope_type: "virtual_key", scope_id: "vk_1" }),
-          ],
+          budgets: [budgetFixture({ scope_type: "virtual_key", scope_id: "vk_1" })],
         });
 
         await statusCommand();
@@ -864,7 +878,12 @@ describe("statusCommand", () => {
                 experimentId: "exp_1",
                 runId: "run_1",
                 workflowVersion: null,
-                timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 3, stoppedAt: null },
+                timestamps: {
+                  createdAt: 1,
+                  updatedAt: 2,
+                  finishedAt: 3,
+                  stoppedAt: null,
+                },
                 progress: 10,
                 total: 10,
                 summary: { evaluations: {} },

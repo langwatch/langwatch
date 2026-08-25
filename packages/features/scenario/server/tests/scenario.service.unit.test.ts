@@ -127,7 +127,9 @@ describe("ScenarioService", () => {
       labels: [],
     });
 
-    expect(await service.tryGetById({ id: "scenario_1", projectId: "project-b" })).toBeNull();
+    expect(
+      await service.tryGetById({ id: "scenario_1", projectId: "project-b" }),
+    ).toBeNull();
     await expect(
       service.getById({ id: "scenario_1", projectId: "project-b" }),
     ).rejects.toBeInstanceOf(ScenarioNotFoundError);

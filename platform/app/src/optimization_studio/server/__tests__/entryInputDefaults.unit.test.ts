@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Field, StudioWorkflow } from "@langwatch/workflow-contract";
-import {
-  applyEntryInputDefaults,
-  entryInlineWithDefaults,
-} from "../entryInputDefaults";
+import { applyEntryInputDefaults, entryInlineWithDefaults } from "../entryInputDefaults";
 
 const inline = (records: Record<string, unknown[]>) => ({
   records,
@@ -22,10 +19,7 @@ describe("entryInlineWithDefaults", () => {
         { identifier: "lang", type: "str", value: "en" },
       ];
 
-      const result = entryInlineWithDefaults(
-        inline({ query: ["a", "b"] }),
-        fields,
-      );
+      const result = entryInlineWithDefaults(inline({ query: ["a", "b"] }), fields);
 
       expect(result.records.lang).toEqual(["en", "en"]);
       expect(result.columnTypes.some((c) => c.name === "lang")).toBe(true);
@@ -34,9 +28,7 @@ describe("entryInlineWithDefaults", () => {
 
   describe("given a column that is present but has missing cells", () => {
     it("fills only the null/undefined cells and leaves provided values", () => {
-      const fields: Field[] = [
-        { identifier: "lang", type: "str", value: "en" },
-      ];
+      const fields: Field[] = [{ identifier: "lang", type: "str", value: "en" }];
 
       const result = entryInlineWithDefaults(
         inline({ lang: ["fr", null, undefined, ""] }),
@@ -90,10 +82,7 @@ describe("applyEntryInputDefaults", () => {
       const result = applyEntryInputDefaults(workflow);
       const entry = result.nodes.find((n) => n.id === "entry");
 
-      expect((entry?.data as any).dataset.inline.records.lang).toEqual([
-        "en",
-        "en",
-      ]);
+      expect((entry?.data as any).dataset.inline.records.lang).toEqual(["en", "en"]);
     });
   });
 

@@ -265,9 +265,7 @@ describe("usePostHogIdentify", () => {
         }),
       );
 
-      useUpgradeModalStore
-        .getState()
-        .openLiteMemberRestriction({ resource: "prompts" });
+      useUpgradeModalStore.getState().openLiteMemberRestriction({ resource: "prompts" });
 
       expect(mockCapture).toHaveBeenCalledWith("upgrade_modal_shown", {
         mode: "liteMemberRestriction",

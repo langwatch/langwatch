@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Field } from "@langwatch/workflow-contract";
-import {
-  datasetColumnTypeToFieldType,
-  fieldsToDatasetColumns,
-} from "../datasetUtils";
+import { datasetColumnTypeToFieldType, fieldsToDatasetColumns } from "../datasetUtils";
 
 describe("datasetUtils column/field type conversion", () => {
   describe("when a dataset column is typed image (URL)", () => {

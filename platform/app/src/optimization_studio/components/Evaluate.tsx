@@ -489,8 +489,7 @@ const DatasetSplitSelect = ({
                   value: {
                     ...field.value,
                     datasetEntry: value,
-                    label:
-                      value !== undefined ? `Entry ${value}` : "Specific entry",
+                    label: value !== undefined ? `Entry ${value}` : "Specific entry",
                   },
                 },
               });

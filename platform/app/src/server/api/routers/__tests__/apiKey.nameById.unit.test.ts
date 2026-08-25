@@ -5,9 +5,7 @@ import { apiKeyRouter } from "../apiKey";
 
 vi.mock("nanoid", () => ({
   nanoid: vi.fn(() => "mock-nano-id"),
-  customAlphabet: vi.fn(
-    () => () => "mock48characterrandomstringforapikeygeneration",
-  ),
+  customAlphabet: vi.fn(() => () => "mock48characterrandomstringforapikeygeneration"),
 }));
 
 vi.mock("../../rbac", async (importOriginal) => {
@@ -115,9 +113,8 @@ describe("apiKey.nameById", () => {
         apiKeyId: API_KEY_ID,
       });
 
-      const call = (
-        prisma.apiKey.findFirst as unknown as ReturnType<typeof vi.fn>
-      ).mock.calls[0]![0];
+      const call = (prisma.apiKey.findFirst as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]![0];
       expect(call.select).toEqual({ name: true, revokedAt: true });
     });
 
@@ -131,9 +128,8 @@ describe("apiKey.nameById", () => {
         apiKeyId: API_KEY_ID,
       });
 
-      const call = (
-        prisma.apiKey.findFirst as unknown as ReturnType<typeof vi.fn>
-      ).mock.calls[0]![0];
+      const call = (prisma.apiKey.findFirst as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]![0];
       expect(call.where).toEqual({ id: API_KEY_ID, organizationId: ORG_ID });
     });
   });

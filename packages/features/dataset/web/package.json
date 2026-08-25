@@ -3,26 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "description": "Browser-safe Dataset UI, state, and upload helpers.",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": ["src"],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@dnd-kit/sortable": "^10.0.0",
-    "@langwatch/dataset-contract": "workspace:*",
     "@chakra-ui/react": "^3.36.0",
+    "@dnd-kit/sortable": "^10.0.0",
     "@emotion/react": "^11.14.0",
+    "@langwatch/dataset-contract": "workspace:*",
     "date-fns": "^4.1.0",
     "lucide-react": "^1.22.0",
     "nanoid": "^5.1.5",

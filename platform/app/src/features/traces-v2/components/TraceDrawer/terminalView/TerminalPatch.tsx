@@ -88,13 +88,7 @@ function newLineNumbers(hunk: PatchHunk): Array<number | null> {
   return numbers;
 }
 
-function PatchLine({
-  line,
-  lineNumber,
-}: {
-  line: string;
-  lineNumber: number | null;
-}) {
+function PatchLine({ line, lineNumber }: { line: string; lineNumber: number | null }) {
   const isAdd = line.startsWith("+");
   const isRemove = line.startsWith("-");
 
@@ -106,9 +100,7 @@ function PatchLine({
       minWidth="full"
       // Full-width, saturated — the same block a real diff pager draws, not
       // a subtle tint clinging to the text.
-      bg={
-        isAdd ? DIFF_TOKENS.addBg : isRemove ? DIFF_TOKENS.removeBg : undefined
-      }
+      bg={isAdd ? DIFF_TOKENS.addBg : isRemove ? DIFF_TOKENS.removeBg : undefined}
     >
       <Text
         {...CELL}

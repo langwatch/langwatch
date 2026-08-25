@@ -12,17 +12,13 @@ import type { UpgradeModalVariant } from "../../stores/upgradeModalStore";
 import { trackEvent } from "../../utils/tracking";
 import { UpgradeModal } from "../UpgradeModalContent";
 
-const {
-  pushMock,
-  previewProrationMock,
-  showErrorToastMock,
-  subscriptionEnabled,
-} = vi.hoisted(() => ({
-  pushMock: vi.fn(),
-  previewProrationMock: vi.fn(),
-  showErrorToastMock: vi.fn(),
-  subscriptionEnabled: { value: true },
-}));
+const { pushMock, previewProrationMock, showErrorToastMock, subscriptionEnabled } =
+  vi.hoisted(() => ({
+    pushMock: vi.fn(),
+    previewProrationMock: vi.fn(),
+    showErrorToastMock: vi.fn(),
+    subscriptionEnabled: { value: true },
+  }));
 
 // Mock dependencies used by other content variants
 vi.mock("~/utils/compat/next-router", () => ({
@@ -102,9 +98,7 @@ describe("<UpgradeModal />", () => {
       expect(
         screen.getAllByText(/reached the limit of 5 team members/i).length,
       ).toBeGreaterThan(0);
-      expect(
-        screen.getAllByText("Current usage: 5 / 5").length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByText("Current usage: 5 / 5").length).toBeGreaterThan(0);
 
       const upgradeButtons = screen.getAllByRole("button", {
         name: "Manage Plan",
@@ -130,11 +124,7 @@ describe("<UpgradeModal />", () => {
       };
 
       renderWithProviders(
-        <UpgradeModal
-          open={true}
-          onClose={onClose}
-          variant={unlimitedVariant}
-        />,
+        <UpgradeModal open={true} onClose={onClose} variant={unlimitedVariant} />,
       );
 
       expect(
@@ -193,14 +183,10 @@ describe("<UpgradeModal />", () => {
         <UpgradeModal open={true} onClose={onClose} variant={baseVariant} />,
       );
 
-      expect(screen.getAllByText("Confirm seat update").length).toBeGreaterThan(
-        0,
-      );
+      expect(screen.getAllByText("Confirm seat update").length).toBeGreaterThan(0);
       expect(screen.getAllByText("5").length).toBeGreaterThan(0);
       expect(screen.getAllByText("7").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("New billing amount").length).toBeGreaterThan(
-        0,
-      );
+      expect(screen.getAllByText("New billing amount").length).toBeGreaterThan(0);
       expect(screen.getAllByText(/\$199\.00/).length).toBeGreaterThan(0);
     });
 
@@ -246,9 +232,7 @@ describe("<UpgradeModal />", () => {
         <UpgradeModal open={true} onClose={onClose} variant={baseVariant} />,
       );
 
-      expect(
-        screen.getAllByText("Credit applied today").length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByText("Credit applied today").length).toBeGreaterThan(0);
       expect(screen.queryByText("Due today")).toBeNull();
     });
 
@@ -334,9 +318,7 @@ describe("<UpgradeModal />", () => {
     });
 
     it("shows an error toast and keeps the modal open when onConfirm rejects", async () => {
-      const onConfirm = vi
-        .fn()
-        .mockRejectedValue(new Error("Payment declined"));
+      const onConfirm = vi.fn().mockRejectedValue(new Error("Payment declined"));
       renderWithProviders(
         <UpgradeModal
           open={true}
@@ -368,9 +350,8 @@ describe("<UpgradeModal />", () => {
       );
 
       expect(
-        screen.getAllByText(
-          "Seat management is not available in this deployment.",
-        ).length,
+        screen.getAllByText("Seat management is not available in this deployment.")
+          .length,
       ).toBeGreaterThan(0);
 
       const confirmButtons = screen.getAllByRole("button", {

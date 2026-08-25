@@ -12,9 +12,7 @@ import {
   redactEssentialPiiInText,
 } from "./essentialPii";
 
-const NATIVE_PII_ENTITY_SET: ReadonlySet<string> = new Set(
-  ESSENTIAL_PII_ENTITIES,
-);
+const NATIVE_PII_ENTITY_SET: ReadonlySet<string> = new Set(ESSENTIAL_PII_ENTITIES);
 
 /**
  * The native essential identifiers a resolved policy redacts in-process:
@@ -33,9 +31,7 @@ export function nativePiiEntitiesForPolicy(
     case "strict":
       return "all";
     case "custom":
-      return policy.pii.entities.filter((entity) =>
-        NATIVE_PII_ENTITY_SET.has(entity),
-      );
+      return policy.pii.entities.filter((entity) => NATIVE_PII_ENTITY_SET.has(entity));
   }
 }
 
@@ -81,10 +77,7 @@ export function redactStringNative({
   }
 
   const piiEntities = nativePiiEntitiesForPolicy(policy);
-  if (
-    piiEntities !== null &&
-    (piiEntities === "all" || piiEntities.length > 0)
-  ) {
+  if (piiEntities !== null && (piiEntities === "all" || piiEntities.length > 0)) {
     const pii = redactEssentialPiiInText({
       text: result,
       entities: piiEntities === "all" ? undefined : piiEntities,
@@ -178,9 +171,7 @@ export function needsStrictAnalysis(policy: ResolvedDataPrivacy): boolean {
  * Compile a resolved policy's custom secret patterns once, for reuse across all
  * of a span's strings.
  */
-export function compilePolicySecretPatterns(
-  policy: ResolvedDataPrivacy,
-): RegExp[] {
+export function compilePolicySecretPatterns(policy: ResolvedDataPrivacy): RegExp[] {
   return compileSecretPatterns(policy.secrets.customPatterns);
 }
 
@@ -188,8 +179,6 @@ export function compilePolicySecretPatterns(
  * Compile a resolved policy's PII exception patterns once (anchored to full
  * matches), for reuse across all of a span's strings.
  */
-export function compilePolicyPiiExceptions(
-  policy: ResolvedDataPrivacy,
-): RegExp[] {
+export function compilePolicyPiiExceptions(policy: ResolvedDataPrivacy): RegExp[] {
   return compilePiiExceptPatterns(policy.pii.exceptPatterns);
 }

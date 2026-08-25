@@ -1,7 +1,4 @@
-import type {
-  AggregationTemporality,
-  MetricKind,
-} from "../schemas/metricDataPoint";
+import type { AggregationTemporality, MetricKind } from "../schemas/metricDataPoint";
 import { isRecord, type UnknownRecord } from "./serialization";
 
 /** The OTLP field name carrying each kind's data container. */

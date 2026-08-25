@@ -117,14 +117,11 @@ export class LangWatchHandledError extends Error {
 }
 
 /** Narrows any caught value to a {@link LangWatchHandledError}. */
-export const isLangWatchHandledError = (
-  error: unknown,
-): error is LangWatchHandledError =>
+export const isLangWatchHandledError = (error: unknown): error is LangWatchHandledError =>
   error instanceof LangWatchHandledError ||
   (typeof error === "object" &&
     error !== null &&
-    (error as { isLangWatchHandledError?: unknown }).isLangWatchHandledError ===
-      true);
+    (error as { isLangWatchHandledError?: unknown }).isLangWatchHandledError === true);
 
 /**
  * Read a non-2xx response into a {@link LangWatchHandledError}, or `null` when the

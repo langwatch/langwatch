@@ -41,15 +41,11 @@ const ATTR_PROMPT_VARIABLES_PREFIX = "langwatch.prompt.variables.";
  * handles may contain `/` but never `:`. Disambiguation: positive integer
  * suffix → version; otherwise → tag. `"latest"` suffix is treated as a no-op.
  */
-export function parsePromptReference(
-  attrs: Record<string, unknown>,
-): PromptReference {
+export function parsePromptReference(attrs: Record<string, unknown>): PromptReference {
   const variables = parsePromptVariables(attrs);
   const versionIdRaw = attrs[ATTR_PROMPT_VERSION_ID];
   const versionId =
-    typeof versionIdRaw === "string" && versionIdRaw.length > 0
-      ? versionIdRaw
-      : null;
+    typeof versionIdRaw === "string" && versionIdRaw.length > 0 ? versionIdRaw : null;
 
   const nullResult: PromptReference = {
     promptHandle: null,
@@ -93,9 +89,7 @@ export function parsePromptReference(
     const versionNumber = parseVersionNumber(attrs[ATTR_PROMPT_VERSION_NUMBER]);
     const handleAttr = attrs[ATTR_PROMPT_HANDLE];
     const promptHandle =
-      typeof handleAttr === "string" && handleAttr.length > 0
-        ? handleAttr
-        : promptId;
+      typeof handleAttr === "string" && handleAttr.length > 0 ? handleAttr : promptId;
     return {
       promptHandle,
       promptVersionNumber: versionNumber,

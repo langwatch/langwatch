@@ -29,13 +29,11 @@ import * as overlayRaw from "../llmModels.overlay.json";
 import type { LLMModelEntry } from "../llmModels.types";
 import { llmModels, overlayOverriddenModelIds } from "../loadModelCatalog";
 
-const baseModels = (
-  baseRaw as unknown as { models: Record<string, LLMModelEntry> }
-).models;
+const baseModels = (baseRaw as unknown as { models: Record<string, LLMModelEntry> })
+  .models;
 
-const overlayModels = (
-  overlayRaw as unknown as { models: Record<string, LLMModelEntry> }
-).models;
+const overlayModels = (overlayRaw as unknown as { models: Record<string, LLMModelEntry> })
+  .models;
 
 /**
  * Models the catalog prices at zero on purpose.
@@ -143,9 +141,7 @@ describe("catalog price coverage", () => {
           const entry = llmModels.models[id];
           return !entry || pricedUnits(entry).size === 0;
         });
-        expect(stillUnpriced.sort()).toEqual(
-          Object.keys(KNOWN_UNPRICED).sort(),
-        );
+        expect(stillUnpriced.sort()).toEqual(Object.keys(KNOWN_UNPRICED).sort());
       });
     });
 
@@ -167,9 +163,7 @@ describe("catalog price coverage", () => {
             ...ONE_OF_EVERYTHING,
           });
           if (!cost || cost <= 0) {
-            zeroRated.push(
-              `${id} (matched ${matched.model}, rated ${cost ?? 0})`,
-            );
+            zeroRated.push(`${id} (matched ${matched.model}, rated ${cost ?? 0})`);
           }
         }
 
@@ -337,9 +331,7 @@ describe("overlay precedence", () => {
         for (const id of overlayOverriddenModelIds) {
           if (isPricedElsewhere(id)) continue;
           const matched = matchModelCostWithFallbacks(id, costs);
-          expect(matched?.model, `${id} did not resolve to its own rule`).toBe(
-            id,
-          );
+          expect(matched?.model, `${id} did not resolve to its own rule`).toBe(id);
           expect(
             matched?.inputCostPerToken,
             `${id} bills the generated input rate rather than the overlay's`,

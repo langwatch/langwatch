@@ -52,9 +52,7 @@ describe("assignSessionsToPullRequests", () => {
           session({ sessionId: "before", startedAtMs: base }),
           session({ sessionId: "during", startedAtMs: base + 5 * HOUR }),
         ],
-        pullRequests: [
-          pullRequest({ prNumber: 41, prCreatedAtMs: base + 2 * HOUR }),
-        ],
+        pullRequests: [pullRequest({ prNumber: 41, prCreatedAtMs: base + 2 * HOUR })],
       });
 
       expect(assignments.get("before")).toBe(41);
@@ -90,9 +88,7 @@ describe("assignSessionsToPullRequests", () => {
 
     it("attaches a session that ran between the two to the successor", () => {
       const assignments = assignSessionsToPullRequests({
-        sessions: [
-          session({ sessionId: "gap", startedAtMs: base + 15 * HOUR }),
-        ],
+        sessions: [session({ sessionId: "gap", startedAtMs: base + 15 * HOUR })],
         pullRequests: [
           pullRequest({
             prNumber: 10,
@@ -147,9 +143,7 @@ describe("assignSessionsToPullRequests", () => {
   describe("given a session after the last pull request on its branch closed", () => {
     it("attaches it to nothing", () => {
       const assignments = assignSessionsToPullRequests({
-        sessions: [
-          session({ sessionId: "orphan", startedAtMs: base + 50 * HOUR }),
-        ],
+        sessions: [session({ sessionId: "orphan", startedAtMs: base + 50 * HOUR })],
         pullRequests: [
           pullRequest({
             prNumber: 7,
@@ -186,9 +180,7 @@ describe("assignSessionsToPullRequests", () => {
 
     it("ends it at the merge time when only that is recorded", () => {
       const assignments = assignSessionsToPullRequests({
-        sessions: [
-          session({ sessionId: "outside", startedAtMs: base + 9 * HOUR }),
-        ],
+        sessions: [session({ sessionId: "outside", startedAtMs: base + 9 * HOUR })],
         pullRequests: [
           pullRequest({
             prNumber: 6,
@@ -206,9 +198,7 @@ describe("assignSessionsToPullRequests", () => {
   describe("given a session starting exactly when a pull request ended", () => {
     it("attaches it to that pull request", () => {
       const assignments = assignSessionsToPullRequests({
-        sessions: [
-          session({ sessionId: "edge", startedAtMs: base + 4 * HOUR }),
-        ],
+        sessions: [session({ sessionId: "edge", startedAtMs: base + 4 * HOUR })],
         pullRequests: [
           pullRequest({
             prNumber: 8,

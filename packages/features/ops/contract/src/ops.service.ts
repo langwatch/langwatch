@@ -14,19 +14,14 @@ import type {
   BlobSweepReport,
   RunBlobCleanupInput,
 } from "./blob-store";
-import type {
-  AdminOperationInput,
-  AdminOperationResult,
-} from "./admin-backoffice";
+import type { AdminOperationInput, AdminOperationResult } from "./admin-backoffice";
 
 /** The single portable capability for platform operations and backoffice work. */
 export abstract class OpsService {
   abstract isAdmin(identity: AdminIdentity): boolean;
   abstract startImpersonation(input: StartImpersonationInput): Promise<void>;
   abstract stopImpersonation(input: StopImpersonationInput): Promise<void>;
-  abstract adminOperation(
-    input: AdminOperationInput,
-  ): Promise<AdminOperationResult>;
+  abstract adminOperation(input: AdminOperationInput): Promise<AdminOperationResult>;
   abstract listBlobQueues(): Promise<string[]>;
   abstract getBlobStoreStats(): Promise<OpsBlobStoreStats>;
   abstract listBlobs(input: ListBlobsInput): Promise<OpsBlobPage>;

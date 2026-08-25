@@ -135,8 +135,7 @@ export function useAiTraceAction({
       const shouldCreateLens =
         mode === "lens" || (mode === "auto" && result.kind === "create_lens");
       if (shouldCreateLens) {
-        const lensName =
-          result.kind === "create_lens" ? result.name : "Untitled lens";
+        const lensName = result.kind === "create_lens" ? result.name : "Untitled lens";
         createLens(lensName);
       }
       onDone?.();

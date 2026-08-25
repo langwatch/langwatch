@@ -107,8 +107,7 @@ describe("createLogger", () => {
           level: "error",
           serializers: {
             error: (err: unknown) => {
-              if (!(err instanceof Error))
-                return pino.stdSerializers.err(err as Error);
+              if (!(err instanceof Error)) return pino.stdSerializers.err(err as Error);
               const serialized = superjson.serialize(err);
               return {
                 ...pino.stdSerializers.err(err),
@@ -136,8 +135,7 @@ describe("createLogger", () => {
           level: "error",
           serializers: {
             error: (err: unknown) => {
-              if (!(err instanceof Error))
-                return pino.stdSerializers.err(err as Error);
+              if (!(err instanceof Error)) return pino.stdSerializers.err(err as Error);
               return pino.stdSerializers.err(err);
             },
           },

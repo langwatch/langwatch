@@ -79,10 +79,7 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
     () => computeActiveSubValues(group, VERDICT_FIELD),
     [group],
   );
-  const activeLabels = useMemo(
-    () => computeActiveSubValues(group, LABEL_FIELD),
-    [group],
-  );
+  const activeLabels = useMemo(() => computeActiveSubValues(group, LABEL_FIELD), [group]);
   const currentScoreRange = group.score;
 
   if (!aggregates) return null;
@@ -146,9 +143,7 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
             scoreMax={aggregates.scoreMax}
             currentFrom={currentScoreRange?.from}
             currentTo={currentScoreRange?.to}
-            onChange={(from, to) =>
-              setScoreRange({ from: String(from), to: String(to) })
-            }
+            onChange={(from, to) => setScoreRange({ from: String(from), to: String(to) })}
             onClear={removeScoreRange}
           />
         )}
@@ -162,9 +157,7 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
                 palette="purple"
                 maxCount={maxLabelCount}
                 active={activeLabels.has(l.value)}
-                onClick={() =>
-                  toggleSubFilter({ field: LABEL_FIELD, value: l.value })
-                }
+                onClick={() => toggleSubFilter({ field: LABEL_FIELD, value: l.value })}
               />
             ))}
           </VStack>
@@ -240,15 +233,7 @@ const ValueRow: React.FC<{
   active: boolean;
   onClick: () => void;
   showDot?: boolean;
-}> = ({
-  label,
-  count,
-  palette,
-  maxCount,
-  active,
-  onClick,
-  showDot = false,
-}) => {
+}> = ({ label, count, palette, maxCount, active, onClick, showDot = false }) => {
   const fillPct =
     maxCount > 0 ? Math.max((count / maxCount) * 100, MIN_VISIBLE_FILL_PCT) : 0;
   return (

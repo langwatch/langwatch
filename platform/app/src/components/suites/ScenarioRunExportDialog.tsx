@@ -57,9 +57,7 @@ export function ScenarioRunExportDialog({
               </Text>
               <RadioGroup
                 value={mode}
-                onValueChange={({ value }) =>
-                  setMode(value as ScenarioRunExportMode)
-                }
+                onValueChange={({ value }) => setMode(value as ScenarioRunExportMode)}
               >
                 <VStack align="stretch" gap={2}>
                   {MODES.map((option) => (

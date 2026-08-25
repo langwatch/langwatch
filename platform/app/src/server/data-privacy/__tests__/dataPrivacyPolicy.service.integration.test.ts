@@ -304,9 +304,7 @@ describe("DataPrivacyPolicyService integration", () => {
       // the presentation registry), so it is pinned once rather than on every
       // case above, which assert the type instead.
       it("names the reason in the message a customer reads", async () => {
-        await expect(saveWithPattern(".*")).rejects.toThrow(
-          /also matches ordinary text/,
-        );
+        await expect(saveWithPattern(".*")).rejects.toThrow(/also matches ordinary text/);
       });
 
       it("still accepts a pattern that names an actual credential shape", async () => {

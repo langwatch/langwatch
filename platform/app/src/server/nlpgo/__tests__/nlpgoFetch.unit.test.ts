@@ -24,9 +24,7 @@ describe("nlpgoFetch.formatTraceparent", () => {
       traceId: "0af7651916cd43dd8448eb211c80319c",
       parentSpanId: "b7ad6b7169203331",
     });
-    expect(header).toBe(
-      "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
-    );
+    expect(header).toBe("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01");
   });
 
   it("lowercases hex input so producers can pass either case", () => {
@@ -34,9 +32,7 @@ describe("nlpgoFetch.formatTraceparent", () => {
       traceId: "0AF7651916CD43DD8448EB211C80319C",
       parentSpanId: "B7AD6B7169203331",
     });
-    expect(header).toBe(
-      "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
-    );
+    expect(header).toBe("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01");
   });
 
   /** @scenario formatTraceparent rejects malformed traceId */

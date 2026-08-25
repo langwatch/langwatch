@@ -8,7 +8,9 @@ keywords: langwatch, typescript, sdk, guide, observability, tracing, logging, da
 import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a
+  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set
+  this up for you automatically.
 </Tip>
 
 <div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
@@ -48,7 +50,8 @@ npm install @ai-sdk/openai ai
 ```
 
 <Note>
-The `@ai-sdk/openai` and `ai` packages are only required for the example in this guide. You can skip this step if you're only looking to install the LangWatch SDK.
+  The `@ai-sdk/openai` and `ai` packages are only required for the example in this guide.
+  You can skip this step if you're only looking to install the LangWatch SDK.
 </Note>
 
 ### Step 2: Set Up API Keys
@@ -70,7 +73,9 @@ export OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 <Note>
-  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained via `npx langwatch login` or from the project settings page already have the project context built in.
+  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or
+  multi-project setups). Project API keys obtained via `npx langwatch login` or from the
+  project settings page already have the project context built in.
 </Note>
 
 ### Step 3: Your First LLM Trace
@@ -123,7 +128,7 @@ npx tsx app.ts
 Now visit your LangWatch dashboard - you should see your first trace! 🎉
 
 <Check>
-**What you'll see**: A trace named "ask-ai" with input/output data, timing, and status.
+  **What you'll see**: A trace named "ask-ai" with input/output data, timing, and status.
 </Check>
 
 ## What Just Happened?
@@ -146,11 +151,13 @@ Think of LangWatch like a **debugger for your LLM applications**:
 - **Users** = Individual users (for analytics)
 
 <Note>
-For detailed explanations of all concepts, see our [Concepts Guide](/concepts).
+  For detailed explanations of all concepts, see our [Concepts Guide](/concepts).
 </Note>
 
 <Tip>
-For consistent observability across your application, learn about [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) - standardized naming guidelines for attributes and metadata.
+  For consistent observability across your application, learn about [Semantic
+  Conventions](/integration/typescript/tutorials/semantic-conventions) - standardized
+  naming guidelines for attributes and metadata.
 </Tip>
 
 ## Integrations
@@ -166,9 +173,10 @@ Below is a list of currently supported integrations. Click on each to learn more
 - [Vercel AI SDK](/integration/typescript/integrations/vercel-ai-sdk)
 
 <Note>
-For detailed integration guides, see our [integration documentation](/integration/typescript/integrations). Each integration includes framework-specific examples and best practices.
+  For detailed integration guides, see our [integration
+  documentation](/integration/typescript/integrations). Each integration includes
+  framework-specific examples and best practices.
 </Note>
-
 
 ## Common Development Scenarios
 
@@ -204,11 +212,11 @@ async function answerWithRAG(question: string) {
 
       // Record what documents were retrieved
       retrieveSpan.setRAGContexts(
-        documents.map(doc => ({
+        documents.map((doc) => ({
           document_id: doc.id,
           chunk_id: doc.chunkId,
-          content: doc.content
-        }))
+          content: doc.content,
+        })),
       );
 
       return documents;
@@ -225,26 +233,33 @@ async function answerWithRAG(question: string) {
 ```
 
 <Note>
-For consistent attribute naming and TypeScript autocomplete support, see our [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) guide. For advanced span management techniques, check out [Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation).
+  For consistent attribute naming and TypeScript autocomplete support, see our [Semantic
+  Conventions](/integration/typescript/tutorials/semantic-conventions) guide. For advanced
+  span management techniques, check out [Manual
+  Instrumentation](/integration/typescript/tutorials/manual-instrumentation).
 </Note>
 
 ### Scenario 3: Conversation Threading
 
 ```typescript
 async function handleConversation(userId: string, threadId: string, message: string) {
-  return await tracer.withActiveSpan("conversation-turn", {
-    attributes: {
-      "langwatch.user.id": userId,
-      "langwatch.thread.id": threadId
-    }
-  }, async (span) => {
-    // Your conversation logic here
-    const response = await processMessage(message);
+  return await tracer.withActiveSpan(
+    "conversation-turn",
+    {
+      attributes: {
+        "langwatch.user.id": userId,
+        "langwatch.thread.id": threadId,
+      },
+    },
+    async (span) => {
+      // Your conversation logic here
+      const response = await processMessage(message);
 
-    span.setOutput(response);
+      span.setOutput(response);
 
-    return response;
-  });
+      return response;
+    },
+  );
 }
 ```
 
@@ -268,8 +283,8 @@ const handle = setupObservability({
   // Optional: Global attributes for all traces
   attributes: {
     "service.version": "1.0.0",
-    "environment": process.env.NODE_ENV,
-  }
+    environment: process.env.NODE_ENV,
+  },
 });
 ```
 
@@ -292,9 +307,10 @@ const handle = setupObservability({
   dataCapture: "output", // Capture only output data in production
   attributes: {
     "deployment.environment.name": process.env.NODE_ENV,
-  }
+  },
 });
 ```
+
 </CodeGroup>
 
 ### Graceful Shutdown
@@ -310,8 +326,8 @@ By default, LangWatch flushes pending traces when your application receives `SIG
 const handle = setupObservability({
   serviceName: "my-service",
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
-  }
+    apiKey: process.env.LANGWATCH_API_KEY,
+  },
 });
 
 // No manual shutdown needed - handled automatically
@@ -324,18 +340,18 @@ stands aside. Your handler decides when the process ends, and it is never cut of
 part-way through.
 
 The one exception keeps one-shot scripts working. Node skips a signal's default action
-while any listener is registered, so if LangWatch's handler turns out to be the *only*
+while any listener is registered, so if LangWatch's handler turns out to be the _only_
 listener for that signal, it removes itself once the flush is done and re-raises the
 signal. The process then ends on the signal exactly as it would have if LangWatch were
 not installed.
 
 <Warning>
-  Earlier SDK versions called `process.exit(0)` as soon as LangWatch's own flush
-  finished, which ended the process out from under any other `SIGINT` / `SIGTERM`
-  listener. If your application relied on that to terminate (because it registers a
-  signal handler that never exits the process itself), either exit at the end of your own
-  handler (recommended) or set `advanced.UNSAFE_exitProcessAfterAutoShutdown: true` to
-  restore the old behaviour while you migrate.
+  Earlier SDK versions called `process.exit(0)` as soon as LangWatch's own flush finished,
+  which ended the process out from under any other `SIGINT` / `SIGTERM` listener. If your
+  application relied on that to terminate (because it registers a signal handler that
+  never exits the process itself), either exit at the end of your own handler
+  (recommended) or set `advanced.UNSAFE_exitProcessAfterAutoShutdown: true` to restore the
+  old behaviour while you migrate.
 </Warning>
 
 #### Manual Shutdown
@@ -346,27 +362,27 @@ For environments where you can't listen to `SIGTERM` or need custom shutdown log
 const handle = setupObservability({
   serviceName: "my-service",
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   advanced: {
     disableAutoShutdown: true, // Disable automatic SIGTERM handling
-  }
+  },
 });
 
 // Manual shutdown when your application terminates
-process.on('SIGTERM', async () => {
-  console.log('Shutting down observability...');
+process.on("SIGTERM", async () => {
+  console.log("Shutting down observability...");
   await handle.shutdown();
-  console.log('Observability shutdown complete');
+  console.log("Observability shutdown complete");
   process.exit(0);
 });
 
 // Force shutdown with timeout
-process.on('SIGINT', async () => {
-  console.log('Force shutdown...');
+process.on("SIGINT", async () => {
+  console.log("Force shutdown...");
   await Promise.race([
     handle.shutdown(),
-    new Promise(resolve => setTimeout(resolve, 5000))
+    new Promise((resolve) => setTimeout(resolve, 5000)),
   ]);
   process.exit(1);
 });
@@ -382,11 +398,13 @@ The shutdown process ensures data integrity:
 4. **Cleans up registered instrumentations**
 
 <Tip>
-Always call `shutdown()` before your application exits to prevent data loss. The method is safe to call multiple times.
+  Always call `shutdown()` before your application exits to prevent data loss. The method
+  is safe to call multiple times.
 </Tip>
 
 <Warning>
-If you don't call `shutdown()`, some traces may be lost when your application terminates abruptly.
+  If you don't call `shutdown()`, some traces may be lost when your application terminates
+  abruptly.
 </Warning>
 
 ## Development Workflow
@@ -394,6 +412,7 @@ If you don't call `shutdown()`, some traces may be lost when your application te
 ### Local Development
 
 1. **Set up environment**:
+
 ```bash
 export LANGWATCH_API_KEY=your_key
 export LANGWATCH_PROJECT_ID=your_project_id  # Required for service API keys
@@ -401,6 +420,7 @@ export NODE_ENV=development
 ```
 
 2. **Run your app**:
+
 ```bash
 npm run dev
 ```
@@ -420,7 +440,7 @@ const handle = setupObservability({
   debug: {
     consoleTracing: true,
     consoleLogging: true,
-    logLevel: 'info' // Lower this to `debug` if you're debugging the LangWatch integration
+    logLevel: "info", // Lower this to `debug` if you're debugging the LangWatch integration
   },
 });
 ```
@@ -439,9 +459,8 @@ const handle = setupObservability({
 </Accordion>
 
 <Accordion title="High memory usage">
-- Use batch processing: `processorType: 'batch'`
-- Implement graceful shutdown
-- Consider reducing data capture in production
+  - Use batch processing: `processorType: 'batch'` - Implement graceful shutdown -
+  Consider reducing data capture in production
 </Accordion>
 
 <Accordion title="Performance impact">
@@ -469,5 +488,6 @@ Now that you have basic tracing working, explore:
 - **[Framework Integrations](/integration/typescript/integrations)** - Specific guides for OpenAI, LangChain, Azure, and more
 
 <Tip>
-Start simple and add complexity gradually. You can always add more detailed tracing later as your application grows!
+  Start simple and add complexity gradually. You can always add more detailed tracing
+  later as your application grows!
 </Tip>

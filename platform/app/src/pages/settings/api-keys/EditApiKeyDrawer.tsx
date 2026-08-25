@@ -87,12 +87,8 @@ export function EditApiKeyDrawer({
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedScopes, setSelectedScopes] = useState<ScopeChipPickerEntry[]>(
-    [],
-  );
-  const [permissionMode, setPermissionMode] = useState<"all" | "restricted">(
-    "all",
-  );
+  const [selectedScopes, setSelectedScopes] = useState<ScopeChipPickerEntry[]>([]);
+  const [permissionMode, setPermissionMode] = useState<"all" | "restricted">("all");
   const [categorySelections, setCategorySelections] = useState<
     Record<string, PermissionSelection>
   >({});
@@ -126,16 +122,9 @@ export function EditApiKeyDrawer({
       organizationId,
       orgProjects,
       isServiceKey,
-      getTeamRolePermissions: (role) =>
-        getTeamRolePermissions(role as TeamUserRole),
+      getTeamRolePermissions: (role) => getTeamRolePermissions(role as TeamUserRole),
     });
-  }, [
-    myBindings.data,
-    ceilingScopes,
-    organizationId,
-    orgProjects,
-    isServiceKey,
-  ]);
+  }, [myBindings.data, ceilingScopes, organizationId, orgProjects, isServiceKey]);
 
   useEffect(() => {
     if (apiKey) {
@@ -179,9 +168,7 @@ export function EditApiKeyDrawer({
     setPermissionMode(mode);
     if (
       mode === "restricted" &&
-      Object.values(effectiveCategorySelections).every(
-        (v) => !v || v === "none",
-      )
+      Object.values(effectiveCategorySelections).every((v) => !v || v === "none")
     ) {
       const allSelected: Record<string, PermissionSelection> = {};
       for (const cat of PERMISSION_CATEGORIES) {
@@ -221,9 +208,7 @@ export function EditApiKeyDrawer({
       apiKeyId: apiKey.id,
       name: name !== apiKey.name ? name : undefined,
       description:
-        description !== (apiKey.description ?? "")
-          ? description || null
-          : undefined,
+        description !== (apiKey.description ?? "") ? description || null : undefined,
       permissionMode,
       scopeType: primaryScope.scopeType,
       scopeId: primaryScope.scopeId,
@@ -351,11 +336,7 @@ export function EditApiKeyDrawer({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              colorPalette="blue"
-              onClick={handleSave}
-              disabled={!canSave}
-            >
+            <Button colorPalette="blue" onClick={handleSave} disabled={!canSave}>
               Save
             </Button>
           </HStack>

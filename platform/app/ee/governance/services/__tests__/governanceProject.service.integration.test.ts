@@ -126,25 +126,19 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
         where: { id: { in: Array.from(createdProjectIds) } },
       });
     }
-    for (const orgId of [
-      primaryOrg?.id,
-      secondaryOrg?.id,
-      teamlessOrg?.id,
-    ].filter(Boolean) as string[]) {
+    for (const orgId of [primaryOrg?.id, secondaryOrg?.id, teamlessOrg?.id].filter(
+      Boolean,
+    ) as string[]) {
       await prisma.organizationUser
         .deleteMany({ where: { organizationId: orgId } })
         .catch(() => undefined);
       await prisma.team
         .deleteMany({ where: { organizationId: orgId } })
         .catch(() => undefined);
-      await prisma.organization
-        .delete({ where: { id: orgId } })
-        .catch(() => undefined);
+      await prisma.organization.delete({ where: { id: orgId } }).catch(() => undefined);
     }
     if (primaryUser?.id) {
-      await prisma.user
-        .delete({ where: { id: primaryUser.id } })
-        .catch(() => undefined);
+      await prisma.user.delete({ where: { id: primaryUser.id } }).catch(() => undefined);
     }
   });
 
@@ -158,10 +152,7 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
       });
       expect(before).toHaveLength(0);
 
-      const project = await ensureHiddenGovernanceProject(
-        prisma,
-        primaryOrg.id,
-      );
+      const project = await ensureHiddenGovernanceProject(prisma, primaryOrg.id);
       createdProjectIds.add(project.id);
 
       expect(project.kind).toBe("internal_governance");
@@ -228,18 +219,15 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
 
   describe("given an org with no team (fresh-admin pre-team state)", () => {
     it("throws — a real governance entity mint cannot precede team creation", async () => {
-      await expect(
-        ensureHiddenGovernanceProject(prisma, teamlessOrg.id),
-      ).rejects.toThrow(/has no team/);
+      await expect(ensureHiddenGovernanceProject(prisma, teamlessOrg.id)).rejects.toThrow(
+        /has no team/,
+      );
     });
   });
 
   describe("given two orgs each with a Governance Project (cross-tenant isolation)", () => {
     it("returns the calling org's Project, never the other org's", async () => {
-      const primaryProject = await ensureHiddenGovernanceProject(
-        prisma,
-        primaryOrg.id,
-      );
+      const primaryProject = await ensureHiddenGovernanceProject(prisma, primaryOrg.id);
       const secondaryProject = await ensureHiddenGovernanceProject(
         prisma,
         secondaryOrg.id,
@@ -282,26 +270,18 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
       const visibleProjectKinds = visibleProjects.map((p) => p.kind);
 
       expect(visibleProjectIds).not.toContain(governanceProject.id);
-      expect(visibleProjectKinds).not.toContain(
-        PROJECT_KIND.INTERNAL_GOVERNANCE,
-      );
+      expect(visibleProjectKinds).not.toContain(PROJECT_KIND.INTERNAL_GOVERNANCE);
     });
   });
 
   describe("schema invariants on the helper-minted Project", () => {
     it("traceSharingEnabled is false (governance data must not leak via public-share links)", async () => {
-      const project = await ensureHiddenGovernanceProject(
-        prisma,
-        primaryOrg.id,
-      );
+      const project = await ensureHiddenGovernanceProject(prisma, primaryOrg.id);
       expect(project.traceSharingEnabled).toBe(false);
     });
 
     it("slug is org-scoped + stable (governance-${organizationId})", async () => {
-      const project = await ensureHiddenGovernanceProject(
-        prisma,
-        primaryOrg.id,
-      );
+      const project = await ensureHiddenGovernanceProject(prisma, primaryOrg.id);
       expect(project.slug).toBe(`governance-${primaryOrg.id}`);
     });
   });

@@ -50,11 +50,7 @@ export function EventSourcingOverview() {
   return (
     <VStack align="stretch" gap={4}>
       {deadTotal > 0 && (
-        <DeadLetterBanner
-          total={deadTotal}
-          byProcess={deadByProcess}
-          now={now}
-        />
+        <DeadLetterBanner total={deadTotal} byProcess={deadByProcess} now={now} />
       )}
 
       <ProcessFleetStrip rows={rows} />
@@ -101,8 +97,8 @@ function DeadLetterBanner({
           </Box>
           <Box flex={1}>
             <Text textStyle="sm" fontWeight="medium">
-              {total} dead {total === 1 ? "message" : "messages"} — this work
-              will not run again until an operator redrives it
+              {total} dead {total === 1 ? "message" : "messages"} — this work will not run
+              again until an operator redrives it
             </Text>
             <Text textStyle="xs" color="fg.muted" marginTop={1}>
               Across{" "}
@@ -110,8 +106,8 @@ function DeadLetterBanner({
                 .slice(0, 3)
                 .map((row) => `${row.processName} (${row.count})`)
                 .join(", ")}
-              {byProcess.length > 3 ? `, +${byProcess.length - 3} more` : ""} ·
-              oldest {formatTimeAgo(oldest, now)}
+              {byProcess.length > 3 ? `, +${byProcess.length - 3} more` : ""} · oldest{" "}
+              {formatTimeAgo(oldest, now)}
             </Text>
           </Box>
           <Button size="xs" variant="outline" asChild>
@@ -141,8 +137,8 @@ function HealthLine({
   if (troubledCount === 0) {
     return (
       <Text textStyle="xs" color="fg.muted">
-        All {processCount} processes are keeping up — no overdue wakes, lapsed
-        leases, or backed-up pending messages.
+        All {processCount} processes are keeping up — no overdue wakes, lapsed leases, or
+        backed-up pending messages.
       </Text>
     );
   }
@@ -157,9 +153,7 @@ function HealthLine({
             </Text>
             <Text textStyle="xs" color="fg.muted" marginTop={1}>
               {troubledNames.slice(0, 4).join(", ")}
-              {troubledNames.length > 4
-                ? `, +${troubledNames.length - 4} more`
-                : ""}
+              {troubledNames.length > 4 ? `, +${troubledNames.length - 4} more` : ""}
             </Text>
           </Box>
           <Button size="xs" variant="outline" asChild>

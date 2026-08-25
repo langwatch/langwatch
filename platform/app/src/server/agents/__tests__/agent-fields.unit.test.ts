@@ -3,9 +3,7 @@ import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import { linkedWorkflowId, resolveAgentFields } from "../agent-fields";
 
-const dsl = (
-  endInputs: Array<{ identifier: string; type: string }>,
-): StudioWorkflow =>
+const dsl = (endInputs: Array<{ identifier: string; type: string }>): StudioWorkflow =>
   ({
     nodes: [
       {
@@ -16,9 +14,7 @@ const dsl = (
       { id: "code", type: "code", data: {} },
       { id: "end", type: "end", data: { inputs: endInputs } },
     ],
-    edges: [
-      { source: "entry", sourceHandle: "outputs.question", target: "code" },
-    ],
+    edges: [{ source: "entry", sourceHandle: "outputs.question", target: "code" }],
   }) as unknown as StudioWorkflow;
 
 describe("resolveAgentFields", () => {
@@ -47,9 +43,7 @@ describe("resolveAgentFields", () => {
           dsl: dsl([{ identifier: "output", type: "str" }]),
         });
 
-        expect(fields.inputFields).toEqual([
-          { identifier: "question", type: "str" },
-        ]);
+        expect(fields.inputFields).toEqual([{ identifier: "question", type: "str" }]);
       });
     });
 

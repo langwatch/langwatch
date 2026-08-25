@@ -29,8 +29,7 @@ const storeState = {
 };
 
 vi.mock("../../../stores/drawerStore", () => ({
-  useDrawerStore: (selector: (s: typeof storeState) => unknown) =>
-    selector(storeState),
+  useDrawerStore: (selector: (s: typeof storeState) => unknown) => selector(storeState),
 }));
 
 vi.mock("../../../hooks/useTraceDrawerNavigation", () => ({
@@ -152,9 +151,7 @@ describe("Summary view conversation context strip", () => {
     describe("when the context header toggle is clicked", () => {
       it("invokes togglePaneCollapsed with conversationContext", () => {
         renderSummaryBranch({ traceId: "trace_1", conversationId: "conv_1" });
-        fireEvent.click(
-          screen.getByRole("button", { name: /conversation context/i }),
-        );
+        fireEvent.click(screen.getByRole("button", { name: /conversation context/i }));
         expect(togglePaneCollapsed).toHaveBeenCalledTimes(1);
         expect(togglePaneCollapsed).toHaveBeenCalledWith("conversationContext");
       });
@@ -164,9 +161,7 @@ describe("Summary view conversation context strip", () => {
   describe("given a trace without a conversationId", () => {
     it("does not render the conversation context region", () => {
       renderSummaryBranch({ traceId: "trace_1", conversationId: null });
-      expect(
-        screen.queryByText(/conversation context/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/conversation context/i)).not.toBeInTheDocument();
     });
   });
 });

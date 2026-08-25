@@ -68,15 +68,10 @@ describe("FoldProjectionExecutor applied-set eviction", () => {
   }
 
   const appendingApply = () =>
-    vi.fn(
-      (state: FoldState, event: Event): FoldState => ({
-        ids: [...state.ids, event.id],
-        LastEventOccurredAt: Math.max(
-          state.LastEventOccurredAt,
-          event.occurredAt ?? 0,
-        ),
-      }),
-    );
+    vi.fn((state: FoldState, event: Event): FoldState => ({
+      ids: [...state.ids, event.id],
+      LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt ?? 0),
+    }));
 
   const committedAppliedIds = (storeFn: ReturnType<typeof vi.fn>): string[] =>
     ((storeFn.mock.calls[0]?.[1] as ProjectionStoreContext | undefined)
@@ -126,9 +121,7 @@ describe("FoldProjectionExecutor applied-set eviction", () => {
   describe("given a single already-applied event redelivered alongside nothing", () => {
     describe("when the batch is entirely redelivery", () => {
       it("does not store at all, so nothing can be evicted", async () => {
-        const events = ["c0", "c1"].map((id, index) =>
-          makeEvent(id, 1000 + index),
-        );
+        const events = ["c0", "c1"].map((id, index) => makeEvent(id, 1000 + index));
         const { store, storeFn } = durableStore({
           state: { ids: ["c0", "c1"], LastEventOccurredAt: 1001 },
           appliedEventIds: ["c0", "c1"],
@@ -152,9 +145,7 @@ describe("FoldProjectionExecutor applied-set eviction", () => {
   describe("given a fresh delivery with nothing previously applied", () => {
     describe("when it commits", () => {
       it("records exactly the delivered ids, keeping the set bounded", async () => {
-        const events = ["a", "b"].map((id, index) =>
-          makeEvent(id, 1000 + index),
-        );
+        const events = ["a", "b"].map((id, index) => makeEvent(id, 1000 + index));
         const { store, storeFn } = durableStore({
           state: null,
           appliedEventIds: [],

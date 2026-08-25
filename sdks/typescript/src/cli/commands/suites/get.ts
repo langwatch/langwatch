@@ -9,9 +9,7 @@ import type { CommandResult } from "../../utils/output";
  * Returns the suite rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getSuiteCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const getSuiteCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new SuitesApiService();
@@ -30,11 +28,19 @@ export const getSuiteCommand = async (
         console.log(`    ${chalk.gray("ID:")}          ${chalk.green(suite.id)}`);
         console.log(`    ${chalk.gray("Name:")}        ${chalk.cyan(suite.name)}`);
         console.log(`    ${chalk.gray("Slug:")}        ${chalk.yellow(suite.slug)}`);
-        console.log(`    ${chalk.gray("Description:")} ${suite.description ?? chalk.gray("—")}`);
+        console.log(
+          `    ${chalk.gray("Description:")} ${suite.description ?? chalk.gray("—")}`,
+        );
         console.log(`    ${chalk.gray("Repeat:")}      ${suite.repeatCount}`);
-        console.log(`    ${chalk.gray("Labels:")}      ${suite.labels.length > 0 ? suite.labels.join(", ") : chalk.gray("—")}`);
-        console.log(`    ${chalk.gray("Created:")}     ${new Date(suite.createdAt).toLocaleString()}`);
-        console.log(`    ${chalk.gray("Updated:")}     ${new Date(suite.updatedAt).toLocaleString()}`);
+        console.log(
+          `    ${chalk.gray("Labels:")}      ${suite.labels.length > 0 ? suite.labels.join(", ") : chalk.gray("—")}`,
+        );
+        console.log(
+          `    ${chalk.gray("Created:")}     ${new Date(suite.createdAt).toLocaleString()}`,
+        );
+        console.log(
+          `    ${chalk.gray("Updated:")}     ${new Date(suite.updatedAt).toLocaleString()}`,
+        );
 
         console.log();
         console.log(chalk.bold("  Scenarios:"));

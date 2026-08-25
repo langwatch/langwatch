@@ -51,9 +51,7 @@ const MARKER = "langwatch-check-queue-shim";
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), "../../..");
 const QUEUE = path.join(REPO_ROOT, "dev/scripts/check-queue.mjs");
-const DEFAULT_BIN_DIRS = [
-  path.join(REPO_ROOT, "platform/app/node_modules/.bin"),
-];
+const DEFAULT_BIN_DIRS = [path.join(REPO_ROOT, "platform/app/node_modules/.bin")];
 
 /**
  * The shim. POSIX sh rather than node so the targeted path, the one that has
@@ -203,9 +201,7 @@ function installAll(binDirs) {
       } catch (err) {
         // An install must never fail over this. Losing the shim costs the
         // queue its accounting for direct invocations, nothing else.
-        process.stderr.write(
-          `check-queue: could not shim ${name} (${err.message})\n`,
-        );
+        process.stderr.write(`check-queue: could not shim ${name} (${err.message})\n`);
       }
     }
   }

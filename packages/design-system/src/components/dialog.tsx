@@ -21,35 +21,34 @@ export interface DialogContentProps extends ChakraDialog.ContentProps {
   positionerProps?: ChakraDialog.PositionerProps;
 }
 
-export const DialogContent = React.forwardRef<
-  HTMLDivElement,
-  DialogContentProps
->(function DialogContent(
-  {
-    portalled = true,
-    portalRef,
-    backdrop = true,
-    backdropProps,
-    positionerProps,
-    ...contentProps
+export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
+  function DialogContent(
+    {
+      portalled = true,
+      portalRef,
+      backdrop = true,
+      backdropProps,
+      positionerProps,
+      ...contentProps
+    },
+    ref,
+  ) {
+    return (
+      <Portal disabled={!portalled} container={portalRef}>
+        {backdrop && (
+          <ChakraDialog.Backdrop
+            backdropFilter="var(--lw-backdrop-blur, blur(8px))"
+            {...backdropProps}
+            background="transparent"
+          />
+        )}
+        <ChakraDialog.Positioner {...positionerProps}>
+          <ChakraDialog.Content ref={ref} {...contentProps} />
+        </ChakraDialog.Positioner>
+      </Portal>
+    );
   },
-  ref,
-) {
-  return (
-    <Portal disabled={!portalled} container={portalRef}>
-      {backdrop && (
-        <ChakraDialog.Backdrop
-          backdropFilter="var(--lw-backdrop-blur, blur(8px))"
-          {...backdropProps}
-          background="transparent"
-        />
-      )}
-      <ChakraDialog.Positioner {...positionerProps}>
-        <ChakraDialog.Content ref={ref} {...contentProps} />
-      </ChakraDialog.Positioner>
-    </Portal>
-  );
-});
+);
 
 export const DialogCloseTrigger = React.forwardRef<
   HTMLButtonElement,

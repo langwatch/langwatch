@@ -4,10 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type {
-  SpanDetail,
-  TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { SpanDetail, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 
 const header = vi.hoisted(() => ({
@@ -25,9 +22,9 @@ vi.mock("../../../hooks/useTraceHeader", () => ({
 }));
 
 vi.mock("../../../hooks/useSpansFull", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../../hooks/useSpansFull")
-  >("../../../hooks/useSpansFull");
+  const actual = await vi.importActual<typeof import("../../../hooks/useSpansFull")>(
+    "../../../hooks/useSpansFull",
+  );
   return {
     ...actual,
     useSpansFullCanonical: () => ({ data: spansFull.current }),
@@ -77,9 +74,7 @@ describe("TraceEditDiffDialog", () => {
         expect(
           await screen.findByText(/"output": "the answer is 41"/),
         ).toBeInTheDocument();
-        expect(
-          screen.getByText(/"output": "the answer is 42"/),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/"output": "the answer is 42"/)).toBeInTheDocument();
       });
 
       /** @scenario "The diff lists the lines the correction added and removed" */
@@ -110,9 +105,7 @@ describe("TraceEditDiffDialog", () => {
           deletedSpanIds: [],
         });
 
-        expect(
-          await screen.findByText(/"name": "search the web"/),
-        ).toBeInTheDocument();
+        expect(await screen.findByText(/"name": "search the web"/)).toBeInTheDocument();
         expect(screen.queryByText("No changes")).not.toBeInTheDocument();
       });
 

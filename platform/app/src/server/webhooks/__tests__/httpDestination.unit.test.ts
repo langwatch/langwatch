@@ -136,9 +136,7 @@ describe("sendHttpDestination", () => {
     });
 
     it("throws terminal when the URL is SSRF-blocked", async () => {
-      mockedFetch.mockRejectedValue(
-        new Error("URL blocked: resolves to a private IP"),
-      );
+      mockedFetch.mockRejectedValue(new Error("URL blocked: resolves to a private IP"));
       const err = (await send().catch((e) => e)) as DispatchError;
       expect(err.retryable).toBe(false);
     });

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  computeDiscreteEligible,
-  resolveNumericModeByKey,
-} from "../discreteMode";
+import { computeDiscreteEligible, resolveNumericModeByKey } from "../discreteMode";
 import type { RangeSectionData } from "../types";
 
 /**

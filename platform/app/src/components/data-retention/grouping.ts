@@ -26,9 +26,7 @@ export type RetentionScopeGroup = {
  *  We collapse the three category rows per scope into a single logical group
  *  so the Scope|Policy table renders one row per scope — categories almost
  *  always share the same value in practice. */
-export function groupRulesByScope(
-  rules: RetentionRuleRow[],
-): RetentionScopeGroup[] {
+export function groupRulesByScope(rules: RetentionRuleRow[]): RetentionScopeGroup[] {
   const groups: RetentionScopeGroup[] = [];
   const indexByKey = new Map<string, number>();
   for (const r of rules) {
@@ -58,9 +56,7 @@ export function groupRulesByScope(
 export function renderPolicyValue(
   byCategory: Partial<Record<RetentionCategory, number>>,
 ): string {
-  const present = RETENTION_CATEGORIES.filter(
-    (c) => byCategory[c] !== undefined,
-  );
+  const present = RETENTION_CATEGORIES.filter((c) => byCategory[c] !== undefined);
   if (present.length === 0) return "—";
   const values = present.map((c) => byCategory[c]!);
   const allSame = values.every((v) => v === values[0]);
@@ -79,9 +75,7 @@ export function renderPolicyValue(
 export function renderPolicySummary(
   byCategory: Partial<Record<RetentionCategory, number>>,
 ): string {
-  const present = RETENTION_CATEGORIES.filter(
-    (c) => byCategory[c] !== undefined,
-  );
+  const present = RETENTION_CATEGORIES.filter((c) => byCategory[c] !== undefined);
   if (present.length === 0) return "—";
   const values = present.map((c) => byCategory[c]!);
   const allSame = values.every((v) => v === values[0]);

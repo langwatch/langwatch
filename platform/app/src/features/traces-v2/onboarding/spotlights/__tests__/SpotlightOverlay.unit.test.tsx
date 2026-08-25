@@ -4,14 +4,7 @@
  * Unit tests for SpotlightOverlay rendering and navigation.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -110,9 +103,7 @@ describe("<SpotlightOverlay />", () => {
     describe("when rendered", () => {
       it("renders nothing", () => {
         renderOverlay();
-        expect(
-          screen.queryByTestId("spotlight-popover"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("spotlight-popover")).not.toBeInTheDocument();
       });
     });
   });
@@ -136,9 +127,7 @@ describe("<SpotlightOverlay />", () => {
         renderOverlay();
         const title = TRACE_EXPLORER_SPOTLIGHTS[0]!.title;
         if (title) {
-          await waitFor(() =>
-            expect(screen.getByText(title)).toBeInTheDocument(),
-          );
+          await waitFor(() => expect(screen.getByText(title)).toBeInTheDocument());
         }
       });
 
@@ -241,9 +230,7 @@ describe("<SpotlightOverlay />", () => {
         await act(async () => {
           await new Promise((r) => setTimeout(r, 50));
         });
-        expect(
-          screen.queryByTestId("spotlight-popover"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("spotlight-popover")).not.toBeInTheDocument();
       });
     });
 
@@ -306,27 +293,21 @@ describe("anchor settle predicates", () => {
     describe("given the anchor's left edge is at or past the right viewport edge", () => {
       it("reports it parked off-screen", () => {
         expect(isAnchorParkedOffscreen(rect({ left: VW }), VW, 0)).toBe(true);
-        expect(isAnchorParkedOffscreen(rect({ left: VW + 500 }), VW, 0)).toBe(
-          true,
-        );
+        expect(isAnchorParkedOffscreen(rect({ left: VW + 500 }), VW, 0)).toBe(true);
       });
     });
 
     describe("given the anchor sits within the viewport", () => {
       it("reports it on-screen (a zero-rect included, for jsdom)", () => {
         expect(isAnchorParkedOffscreen(rect({ left: 200 }), VW, 0)).toBe(false);
-        expect(
-          isAnchorParkedOffscreen(rect({ left: 0, width: 0 }), VW, 0),
-        ).toBe(false);
+        expect(isAnchorParkedOffscreen(rect({ left: 0, width: 0 }), VW, 0)).toBe(false);
       });
     });
 
     describe("given the page is scrolled horizontally", () => {
       it("subtracts scrollX before testing the edge", () => {
         // left carries scrollX; a rect at viewport x=200 reads on-screen.
-        expect(isAnchorParkedOffscreen(rect({ left: VW + 200 }), VW, 500)).toBe(
-          false,
-        );
+        expect(isAnchorParkedOffscreen(rect({ left: VW + 200 }), VW, 500)).toBe(false);
       });
     });
   });
@@ -347,9 +328,9 @@ describe("anchor settle predicates", () => {
 
     describe("given the anchor moved since the last frame", () => {
       it("is not settled (still riding in)", () => {
-        expect(
-          isAnchorSettled(rect({ left: 200 }), rect({ left: 260 }), VW, 0),
-        ).toBe(false);
+        expect(isAnchorSettled(rect({ left: 200 }), rect({ left: 260 }), VW, 0)).toBe(
+          false,
+        );
       });
     });
 

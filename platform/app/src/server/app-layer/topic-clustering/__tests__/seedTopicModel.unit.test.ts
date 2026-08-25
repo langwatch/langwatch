@@ -29,8 +29,7 @@ const modelParams = (model: string, action: string, args: unknown) => ({
   runInTransaction: false,
 });
 
-const guard = (params: unknown) =>
-  guardProjectId(params as never, async () => undefined);
+const guard = (params: unknown) => guardProjectId(params as never, async () => undefined);
 
 const topicRow = (id: string, projectId: string) => ({
   id,
@@ -136,9 +135,7 @@ const fakeDbStub = ({
           .filter((id) => (requireTopics ? topicsByProject.has(id) : true))
           .filter((id) => gt === undefined || id > gt)
           .sort();
-        return matched
-          .slice(0, args?.take ?? matched.length)
-          .map((id) => ({ id }));
+        return matched.slice(0, args?.take ?? matched.length).map((id) => ({ id }));
       },
     },
     topic: {

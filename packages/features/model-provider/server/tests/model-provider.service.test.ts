@@ -1,63 +1,150 @@
 import { describe, expect, it } from "vitest";
 import {
-  type ModelCost, type ModelDefaultConfig, type ModelProvider,
+  type ModelCost,
+  type ModelDefaultConfig,
+  type ModelProvider,
   type ModelProviderApiKeyValidation,
 } from "@langwatch/model-provider-contract";
 import { ModelProviderService } from "../src/services/model-provider.service";
 import {
-  ManagedProviderService, ModelCostRepository, ModelDefaultRepository,
-  ModelProviderCatalog, ModelProviderCredentialPolicy, ModelProviderRepository,
+  ManagedProviderService,
+  ModelCostRepository,
+  ModelDefaultRepository,
+  ModelProviderCatalog,
+  ModelProviderCredentialPolicy,
+  ModelProviderRepository,
   ModelTranslationPort,
 } from "../src/ports/model-provider.port";
 
 const now = new Date();
 function provider(overrides: Partial<ModelProvider> = {}): ModelProvider {
   return {
-    id: "mp_1", organizationId: "org_1", provider: "openai", name: "OpenAI", enabled: true,
-    routingHandle: null, scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }], customKeys: { apiKey: "secret" },
-    customModels: [], customEmbeddingsModels: [], extraHeaders: [], rateLimitRpm: null, rateLimitTpm: null,
-    rateLimitRpd: null, fallbackPriorityGlobal: null, providerConfig: null, createdAt: now, updatedAt: now, ...overrides,
+    id: "mp_1",
+    organizationId: "org_1",
+    provider: "openai",
+    name: "OpenAI",
+    enabled: true,
+    routingHandle: null,
+    scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+    customKeys: { apiKey: "secret" },
+    customModels: [],
+    customEmbeddingsModels: [],
+    extraHeaders: [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: null,
+    providerConfig: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
   };
 }
 
 class Providers extends ModelProviderRepository {
   rows = [provider()];
-  tryFindById(input: { id: string }): Promise<ModelProvider | null> { return Promise.resolve(this.rows.find((row) => row.id === input.id) ?? null); }
-  tryFindByProviderForProject(input: { provider: string }): Promise<ModelProvider | null> { return Promise.resolve(this.rows.find((row) => row.provider === input.provider) ?? null); }
-  listForProject(): Promise<ModelProvider[]> { return Promise.resolve(this.rows); }
-  listForOrganization(): Promise<ModelProvider[]> { return Promise.resolve(this.rows); }
-  create(input: ModelProvider): Promise<ModelProvider> { this.rows.push(input); return Promise.resolve(input); }
-  update(input: ModelProvider): Promise<ModelProvider> { this.rows = this.rows.map((row) => row.id === input.id ? input : row); return Promise.resolve(input); }
-  delete(input: { id: string }): Promise<void> { this.rows = this.rows.filter((row) => row.id !== input.id); return Promise.resolve(); }
-  tryResolveOrganizationId(input: { projectId?: string; organizationId?: string }): Promise<string | null> { return Promise.resolve(input.organizationId ?? "org_1"); }
-  resolveOrganizationIdForScopes(): Promise<string> { return Promise.resolve("org_1"); }
+  tryFindById(input: { id: string }): Promise<ModelProvider | null> {
+    return Promise.resolve(this.rows.find((row) => row.id === input.id) ?? null);
+  }
+  tryFindByProviderForProject(input: {
+    provider: string;
+  }): Promise<ModelProvider | null> {
+    return Promise.resolve(
+      this.rows.find((row) => row.provider === input.provider) ?? null,
+    );
+  }
+  listForProject(): Promise<ModelProvider[]> {
+    return Promise.resolve(this.rows);
+  }
+  listForOrganization(): Promise<ModelProvider[]> {
+    return Promise.resolve(this.rows);
+  }
+  create(input: ModelProvider): Promise<ModelProvider> {
+    this.rows.push(input);
+    return Promise.resolve(input);
+  }
+  update(input: ModelProvider): Promise<ModelProvider> {
+    this.rows = this.rows.map((row) => (row.id === input.id ? input : row));
+    return Promise.resolve(input);
+  }
+  delete(input: { id: string }): Promise<void> {
+    this.rows = this.rows.filter((row) => row.id !== input.id);
+    return Promise.resolve();
+  }
+  tryResolveOrganizationId(input: {
+    projectId?: string;
+    organizationId?: string;
+  }): Promise<string | null> {
+    return Promise.resolve(input.organizationId ?? "org_1");
+  }
+  resolveOrganizationIdForScopes(): Promise<string> {
+    return Promise.resolve("org_1");
+  }
   hasStoredCredentials(id: string): Promise<boolean> {
-    return Promise.resolve(this.rows.some((row) => row.id === id && row.customKeys !== null));
+    return Promise.resolve(
+      this.rows.some((row) => row.id === id && row.customKeys !== null),
+    );
   }
 }
 class Defaults extends ModelDefaultRepository {
   configs: ModelDefaultConfig[] = [];
-  listForProject(): Promise<ModelDefaultConfig[]> { return Promise.resolve(this.configs); }
-  tryGetById(id: string): Promise<ModelDefaultConfig | null> { return Promise.resolve(this.configs.find((config) => config.id === id) ?? null); }
-  save(input: ModelDefaultConfig): Promise<ModelDefaultConfig> { this.configs.push(input); return Promise.resolve(input); }
-  set(): Promise<void> { return Promise.resolve(); }
-  delete(): Promise<void> { return Promise.resolve(); }
-  tryResolve(): Promise<string | null> { return Promise.resolve("gpt-4o"); }
+  listForProject(): Promise<ModelDefaultConfig[]> {
+    return Promise.resolve(this.configs);
+  }
+  tryGetById(id: string): Promise<ModelDefaultConfig | null> {
+    return Promise.resolve(this.configs.find((config) => config.id === id) ?? null);
+  }
+  save(input: ModelDefaultConfig): Promise<ModelDefaultConfig> {
+    this.configs.push(input);
+    return Promise.resolve(input);
+  }
+  set(): Promise<void> {
+    return Promise.resolve();
+  }
+  delete(): Promise<void> {
+    return Promise.resolve();
+  }
+  tryResolve(): Promise<string | null> {
+    return Promise.resolve("gpt-4o");
+  }
 }
 class Costs extends ModelCostRepository {
   rows: ModelCost[] = [];
-  listForProject(): Promise<ModelCost[]> { return Promise.resolve(this.rows); }
-  tryFindById(id: string): Promise<ModelCost | null> { return Promise.resolve(this.rows.find((row) => row.id === id) ?? null); }
-  save(input: ModelCost): Promise<ModelCost> { this.rows.push(input); return Promise.resolve(input); }
-  delete(): Promise<void> { return Promise.resolve(); }
-  tryResolveOrganizationId(): Promise<string | null> { return Promise.resolve("org_1"); }
+  listForProject(): Promise<ModelCost[]> {
+    return Promise.resolve(this.rows);
+  }
+  tryFindById(id: string): Promise<ModelCost | null> {
+    return Promise.resolve(this.rows.find((row) => row.id === id) ?? null);
+  }
+  save(input: ModelCost): Promise<ModelCost> {
+    this.rows.push(input);
+    return Promise.resolve(input);
+  }
+  delete(): Promise<void> {
+    return Promise.resolve();
+  }
+  tryResolveOrganizationId(): Promise<string | null> {
+    return Promise.resolve("org_1");
+  }
 }
 class Catalog extends ModelProviderCatalog {
-  exists(providerName: string): boolean { return providerName === "openai"; }
-  systemProviders(): Promise<[]> { return Promise.resolve([]); }
-  validateApiKey(): Promise<ModelProviderApiKeyValidation> { return Promise.resolve({ valid: true }); }
-  testConnection(): Promise<{ connected: boolean }> { return Promise.resolve({ connected: true }); }
-  tryMaskCredentials(keys: Record<string, unknown> | null): Record<string, unknown> | null { return keys ? { apiKey: "••••" } : null; }
+  exists(providerName: string): boolean {
+    return providerName === "openai";
+  }
+  systemProviders(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+  validateApiKey(): Promise<ModelProviderApiKeyValidation> {
+    return Promise.resolve({ valid: true });
+  }
+  testConnection(): Promise<{ connected: boolean }> {
+    return Promise.resolve({ connected: true });
+  }
+  tryMaskCredentials(
+    keys: Record<string, unknown> | null,
+  ): Record<string, unknown> | null {
+    return keys ? { apiKey: "••••" } : null;
+  }
 }
 class PricingCatalog extends Catalog {
   staticCostRates() {
@@ -71,11 +158,24 @@ class PricingCatalog extends Catalog {
     ];
   }
 }
-class Managed extends ManagedProviderService { isManagedProvider(): boolean { return false; } }
-class Translator extends ModelTranslationPort { translate(): Promise<string> { return Promise.resolve("translated"); } }
+class Managed extends ManagedProviderService {
+  isManagedProvider(): boolean {
+    return false;
+  }
+}
+class Translator extends ModelTranslationPort {
+  translate(): Promise<string> {
+    return Promise.resolve("translated");
+  }
+}
 class CredentialPolicy extends ModelProviderCredentialPolicy {
-  normalize(_provider: string, value: Record<string, unknown> | null) { return value; }
-  merge(input: { incoming: Record<string, unknown> | null; stored: Record<string, unknown> | null }) {
+  normalize(_provider: string, value: Record<string, unknown> | null) {
+    return value;
+  }
+  merge(input: {
+    incoming: Record<string, unknown> | null;
+    stored: Record<string, unknown> | null;
+  }) {
     return Object.fromEntries(
       Object.entries(input.incoming ?? {}).map(([key, value]) => [
         key,
@@ -87,9 +187,14 @@ class CredentialPolicy extends ModelProviderCredentialPolicy {
     return value ? { ...value, apiKey: "••••" } : null;
   }
   hasUsableReplacement(value: Record<string, unknown> | null): boolean {
-    return Object.values(value ?? {}).some((field) => typeof field === "string" && field.length > 0);
+    return Object.values(value ?? {}).some(
+      (field) => typeof field === "string" && field.length > 0,
+    );
   }
-  mergeHeaders(input: { incoming: Array<{ key: string; value: string }>; stored: Array<{ key: string; value: string }> }) {
+  mergeHeaders(input: {
+    incoming: Array<{ key: string; value: string }>;
+    stored: Array<{ key: string; value: string }>;
+  }) {
     return input.incoming.length > 0 ? input.incoming : input.stored;
   }
   maskHeaders(value: Array<{ key: string; value: string }>) {
@@ -101,7 +206,16 @@ function service(
   providers = new Providers(),
   catalog: ModelProviderCatalog = new Catalog(),
 ) {
-  return ModelProviderService.create({ repository: providers, credentialPolicy: new CredentialPolicy(), defaults: new Defaults(), costs: new Costs(), catalog, managedProviders: new Managed(), translation: new Translator(), generateId: () => "generated" });
+  return ModelProviderService.create({
+    repository: providers,
+    credentialPolicy: new CredentialPolicy(),
+    defaults: new Defaults(),
+    costs: new Costs(),
+    catalog,
+    managedProviders: new Managed(),
+    translation: new Translator(),
+    generateId: () => "generated",
+  });
 }
 
 describe("ModelProviderService", () => {
@@ -110,10 +224,14 @@ describe("ModelProviderService", () => {
     expect(result[0]?.customKeys).toEqual({ apiKey: "••••" });
   });
   it("rejects unknown providers before persistence", async () => {
-    await expect(service().upsert({ projectId: "project_1", provider: "unknown", enabled: true })).rejects.toMatchObject({ code: "model_provider_invalid" });
+    await expect(
+      service().upsert({ projectId: "project_1", provider: "unknown", enabled: true }),
+    ).rejects.toMatchObject({ code: "model_provider_invalid" });
   });
   it("resolves translation through the default-model repository and port", async () => {
-    await expect(service().translate({ projectId: "project_1", text: "hello" })).resolves.toEqual({ translation: "translated" });
+    await expect(
+      service().translate({ projectId: "project_1", text: "hello" }),
+    ).resolves.toEqual({ translation: "translated" });
   });
   it("uses the catalog-owned static rate cascade", () => {
     expect(
@@ -142,12 +260,16 @@ describe("ModelProviderService", () => {
   });
   it("returns safe Codex status without exposing the credential bag", async () => {
     const providers = new Providers();
-    providers.rows = [provider({
-      provider: "openai_codex",
-      customKeys: { CODEX_ACCESS_TOKEN: "secret", CODEX_PLAN: "plus" },
-    })];
+    providers.rows = [
+      provider({
+        provider: "openai_codex",
+        customKeys: { CODEX_ACCESS_TOKEN: "secret", CODEX_PLAN: "plus" },
+      }),
+    ];
 
-    await expect(service(providers).getCodexStatus({ projectId: "project_1" })).resolves.toEqual({
+    await expect(
+      service(providers).getCodexStatus({ projectId: "project_1" }),
+    ).resolves.toEqual({
       connected: true,
       providerId: "mp_1",
       plan: "plus",

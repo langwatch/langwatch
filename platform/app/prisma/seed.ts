@@ -108,9 +108,7 @@ const API_KEY_PEPPER: string =
   process.env.CREDENTIALS_SECRET ??
   process.env.NEXTAUTH_SECRET ??
   (() => {
-    throw new Error(
-      "CREDENTIALS_SECRET or NEXTAUTH_SECRET is required to seed API keys",
-    );
+    throw new Error("CREDENTIALS_SECRET or NEXTAUTH_SECRET is required to seed API keys");
   })();
 
 const PRIVATE_TOKEN_LOOKUP_ID = "LocalDevPrivate1";
@@ -297,17 +295,22 @@ async function main() {
     where: { lookupId: PRIVATE_TOKEN_LOOKUP_ID },
     create: {
       name: "Local Dev Private Access Token",
-      description:
-        "Static local-dev personal access token seeded by prisma/seed.ts",
+      description: "Static local-dev personal access token seeded by prisma/seed.ts",
       lookupId: PRIVATE_TOKEN_LOOKUP_ID,
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, API_KEY_PEPPER),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(
+        PRIVATE_TOKEN_SECRET,
+        API_KEY_PEPPER,
+      ),
       permissionMode: "all",
       userId: user.id,
       createdByUserId: user.id,
       organizationId: organization.id,
     },
     update: {
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, API_KEY_PEPPER),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(
+        PRIVATE_TOKEN_SECRET,
+        API_KEY_PEPPER,
+      ),
       userId: user.id,
       organizationId: organization.id,
       revokedAt: null,
@@ -353,12 +356,18 @@ async function main() {
       description:
         "Static local-dev ingestion-only token (traces:create) seeded by prisma/seed.ts",
       lookupId: PUBLIC_TOKEN_LOOKUP_ID,
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, API_KEY_PEPPER),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(
+        PUBLIC_TOKEN_SECRET,
+        API_KEY_PEPPER,
+      ),
       permissionMode: "restricted",
       organizationId: organization.id,
     },
     update: {
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, API_KEY_PEPPER),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(
+        PUBLIC_TOKEN_SECRET,
+        API_KEY_PEPPER,
+      ),
       organizationId: organization.id,
       revokedAt: null,
     },
@@ -483,9 +492,7 @@ function schemaKeyNames(schema: unknown): string[] {
 async function seedModelProvidersFromEnv(organizationId: string) {
   const flag = process.env.HAVEN_SEED_MODEL_PROVIDERS;
   if (flag === "0" || flag === "false") {
-    console.log(
-      "⏭️  Model providers: seeding disabled (HAVEN_SEED_MODEL_PROVIDERS=0)",
-    );
+    console.log("⏭️  Model providers: seeding disabled (HAVEN_SEED_MODEL_PROVIDERS=0)");
     return;
   }
   const envMap = loadSeedEnv();
@@ -495,8 +502,7 @@ async function seedModelProvidersFromEnv(organizationId: string) {
     if (!envMap[def.apiKey]) continue;
 
     const keyNames = schemaKeyNames(def.keysSchema);
-    const names =
-      keyNames.length > 0 ? keyNames : [def.apiKey, def.endpointKey];
+    const names = keyNames.length > 0 ? keyNames : [def.apiKey, def.endpointKey];
     const keys: Record<string, string> = {};
     for (const name of names) {
       if (name && envMap[name]) keys[name] = envMap[name];
@@ -506,18 +512,12 @@ async function seedModelProvidersFromEnv(organizationId: string) {
     // seed an enabled-but-unusable provider (e.g. Bedrock with only the access
     // key). Require every non-optional key; Azure needs its API key plus
     // either mode's endpoint, not both.
-    const optionalKeys = new Set(
-      "optionalKeys" in def ? (def.optionalKeys ?? []) : [],
-    );
+    const optionalKeys = new Set("optionalKeys" in def ? (def.optionalKeys ?? []) : []);
     let missing = names.filter(
-      (name): name is string =>
-        Boolean(name) && !optionalKeys.has(name!) && !keys[name!],
+      (name): name is string => Boolean(name) && !optionalKeys.has(name!) && !keys[name!],
     );
     if (provider === "azure") {
-      const endpointNames = [
-        "AZURE_OPENAI_ENDPOINT",
-        "AZURE_API_GATEWAY_BASE_URL",
-      ];
+      const endpointNames = ["AZURE_OPENAI_ENDPOINT", "AZURE_API_GATEWAY_BASE_URL"];
       missing = missing.filter((name) => !endpointNames.includes(name));
       if (!endpointNames.some((name) => keys[name])) {
         missing.push(endpointNames.join(" or "));

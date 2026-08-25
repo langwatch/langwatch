@@ -1,8 +1,5 @@
 import type { FoldProjectionStore } from "@langwatch/eventing";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
@@ -112,10 +109,8 @@ export const TRACE_SUMMARY_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * detail. The drawer reads these first and falls back to the raw per-span
  * key for traces folded before this landed.
  */
-export const RESERVED_CACHE_READ_TOKENS =
-  "langwatch.reserved.cache_read_tokens";
-export const RESERVED_CACHE_CREATION_TOKENS =
-  "langwatch.reserved.cache_creation_tokens";
+export const RESERVED_CACHE_READ_TOKENS = "langwatch.reserved.cache_read_tokens";
+export const RESERVED_CACHE_CREATION_TOKENS = "langwatch.reserved.cache_creation_tokens";
 export const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
 /**
  * Anthropic's cache-creation split by TTL, summed across the trace's model
@@ -134,10 +129,8 @@ export const RESERVED_CACHE_CREATION_1H_TOKENS =
  * of the call that set it (bookkeeping, so a later-arriving earlier span can
  * still win). See {@link recordContextSize}.
  */
-export const RESERVED_CONTEXT_SIZE_TOKENS =
-  "langwatch.reserved.context_size_tokens";
-export const RESERVED_CONTEXT_SIZE_AT_MS =
-  "langwatch.reserved.context_size_at_ms";
+export const RESERVED_CONTEXT_SIZE_TOKENS = "langwatch.reserved.context_size_tokens";
+export const RESERVED_CONTEXT_SIZE_AT_MS = "langwatch.reserved.context_size_at_ms";
 
 /**
  * Merge the models seen on one span (or log turn) into the running list,
@@ -189,8 +182,7 @@ function recordContextSize({
   span: NormalizedSpan;
   cacheTokens: { cacheReadTokens: number; cacheCreationTokens: number };
 }): void {
-  const contextTokens =
-    cacheTokens.cacheReadTokens + cacheTokens.cacheCreationTokens;
+  const contextTokens = cacheTokens.cacheReadTokens + cacheTokens.cacheCreationTokens;
   if (contextTokens <= 0) return;
   const priorAtMs = Number(attributes[RESERVED_CONTEXT_SIZE_AT_MS]);
   if (Number.isFinite(priorAtMs) && priorAtMs <= span.startTimeUnixMs) return;
@@ -250,11 +242,7 @@ export function applySpanToSummary({
     RESERVED_CACHE_CREATION_TOKENS,
     cacheTokens.cacheCreationTokens,
   );
-  addReservedTokenSum(
-    attributes,
-    RESERVED_REASONING_TOKENS,
-    cacheTokens.reasoningTokens,
-  );
+  addReservedTokenSum(attributes, RESERVED_REASONING_TOKENS, cacheTokens.reasoningTokens);
   recordContextSize({ attributes, span, cacheTokens });
 
   const newModels = spanCostService.extractModelsFromSpan(span);
@@ -354,25 +342,19 @@ function applyLogContribution({
     mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
     10,
   );
-  mergedAttributes["langwatch.reserved.log_record_count"] = String(
-    logCount + 1,
-  );
+  mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
 
   let computedInput = state.computedInput;
   let computedOutput = state.computedOutput;
   let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
   const currentOutputSource =
-    state.attributes["langwatch.reserved.output_source"] ??
-    OUTPUT_SOURCE.INFERRED;
+    state.attributes["langwatch.reserved.output_source"] ?? OUTPUT_SOURCE.INFERRED;
   const currentInputIsFallback =
     state.attributes["langwatch.reserved.input_is_fallback"] === "true";
   const currentOutputIsFallback =
     state.attributes["langwatch.reserved.output_is_fallback"] === "true";
 
-  if (
-    contribution.input !== null &&
-    (computedInput === null || currentInputIsFallback)
-  ) {
+  if (contribution.input !== null && (computedInput === null || currentInputIsFallback)) {
     computedInput = contribution.input;
     delete mergedAttributes["langwatch.reserved.input_is_fallback"];
   }
@@ -391,8 +373,7 @@ function applyLogContribution({
     if (shouldReplace) {
       computedOutput = contribution.output;
       outputSpanEndTimeMs = contribution.timeUnixMs;
-      mergedAttributes["langwatch.reserved.output_source"] =
-        OUTPUT_SOURCE.INFERRED;
+      mergedAttributes["langwatch.reserved.output_source"] = OUTPUT_SOURCE.INFERRED;
       delete mergedAttributes["langwatch.reserved.output_is_fallback"];
     }
   }
@@ -401,9 +382,7 @@ function applyLogContribution({
   // not overwrite: sum it into the reserved running totals and keep the
   // per-call keys out of the generic last-write-wins merge below.
   const cacheCreation5m = Number(
-    contribution.liftedAttributes[
-      ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS
-    ],
+    contribution.liftedAttributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS],
   );
   if (Number.isFinite(cacheCreation5m)) {
     addReservedTokenSum(
@@ -413,9 +392,7 @@ function applyLogContribution({
     );
   }
   const cacheCreation1h = Number(
-    contribution.liftedAttributes[
-      ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS
-    ],
+    contribution.liftedAttributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS],
   );
   if (Number.isFinite(cacheCreation1h)) {
     addReservedTokenSum(
@@ -453,15 +430,11 @@ function applyLogContribution({
       nonBilledCost = (nonBilledCost ?? 0) + cost;
     }
   }
-  const inputTokens = Number(
-    contribution.liftedAttributes["langwatch.input_tokens"],
-  );
+  const inputTokens = Number(contribution.liftedAttributes["langwatch.input_tokens"]);
   if (Number.isFinite(inputTokens) && inputTokens > 0) {
     totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
   }
-  const outputTokens = Number(
-    contribution.liftedAttributes["langwatch.output_tokens"],
-  );
+  const outputTokens = Number(contribution.liftedAttributes["langwatch.output_tokens"]);
   if (Number.isFinite(outputTokens) && outputTokens > 0) {
     totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
   }
@@ -677,10 +650,7 @@ export class TraceSummaryFoldProjection
    * stamp, and so an unhandled event type — which `super.apply` returns
    * untouched — anchors nothing.
    */
-  override apply(
-    state: TraceSummaryData,
-    event: { type: string },
-  ): TraceSummaryData {
+  override apply(state: TraceSummaryData, event: { type: string }): TraceSummaryData {
     const folded = super.apply(state, event);
     if (folded === state) return state;
     const eventOccurredAt = (event as { occurredAt?: unknown }).occurredAt;
@@ -702,13 +672,12 @@ export class TraceSummaryFoldProjection
       return { ...state, spanCount: state.spanCount + 1 };
     }
 
-    const normalizedSpan =
-      spanNormalizationPipelineService.normalizeSpanReceived(
-        event.tenantId,
-        event.data.span,
-        event.data.resource,
-        event.data.instrumentationScope,
-      );
+    const normalizedSpan = spanNormalizationPipelineService.normalizeSpanReceived(
+      event.tenantId,
+      event.data.span,
+      event.data.resource,
+      event.data.instrumentationScope,
+    );
     enrichRagContextIds(normalizedSpan);
 
     return {
@@ -763,8 +732,7 @@ export class TraceSummaryFoldProjection
         // A log-only emitter has no per-span markers; the receiver stamps the
         // bundled flag on the log record's resource, so classify the whole
         // increment by that.
-        nonBillable:
-          event.data.resourceAttributes?.[NON_BILLABLE_ATTR] === "true",
+        nonBillable: event.data.resourceAttributes?.[NON_BILLABLE_ATTR] === "true",
       },
     });
   }
@@ -797,9 +765,7 @@ export class TraceSummaryFoldProjection
     ) {
       const ttftMs = event.data.exemplarValue * 1000;
       timeToFirstTokenMs =
-        timeToFirstTokenMs === null
-          ? ttftMs
-          : Math.min(timeToFirstTokenMs, ttftMs);
+        timeToFirstTokenMs === null ? ttftMs : Math.min(timeToFirstTokenMs, ttftMs);
     }
 
     // Counts exemplar correlations, not metric data points: the canonical

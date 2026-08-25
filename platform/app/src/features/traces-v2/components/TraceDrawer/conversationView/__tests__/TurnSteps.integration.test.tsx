@@ -91,9 +91,7 @@ describe("TurnSteps", () => {
       it("reveals the model call and the tool run", async () => {
         renderStrip();
 
-        await userEvent.click(
-          screen.getByRole("button", { name: /2 steps ran/ }),
-        );
+        await userEvent.click(screen.getByRole("button", { name: /2 steps ran/ }));
 
         expect(screen.getByText("Bash")).toBeInTheDocument();
         expect(screen.getByText("pnpm test")).toBeInTheDocument();
@@ -102,9 +100,7 @@ describe("TurnSteps", () => {
 
       it("fetches the spans only then", async () => {
         renderStrip();
-        await userEvent.click(
-          screen.getByRole("button", { name: /2 steps ran/ }),
-        );
+        await userEvent.click(screen.getByRole("button", { name: /2 steps ran/ }));
 
         const lastCall = mockUseQuery.mock.calls.at(-1);
         expect(lastCall?.[1]).toMatchObject({ enabled: true });

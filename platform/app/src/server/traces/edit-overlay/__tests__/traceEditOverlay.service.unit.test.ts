@@ -28,9 +28,7 @@ const row = (patch: unknown): TraceEditOverlayRow =>
   }) as TraceEditOverlayRow;
 
 const buildService = (stored: unknown | null) => {
-  const upsert = vi.fn(async ({ patch }: { patch: TraceEditOverlayPatch }) =>
-    row(patch),
-  );
+  const upsert = vi.fn(async ({ patch }: { patch: TraceEditOverlayPatch }) => row(patch));
   const deleteRow = vi.fn(async () => undefined);
   const repository = {
     findByProjectAndTrace: vi.fn(async () => (stored ? row(stored) : null)),
@@ -85,9 +83,7 @@ describe("TraceEditOverlayService", () => {
         value: "the right answer",
       });
       expect(merged.patch.deletedSpanIds).toEqual(["span-noise"]);
-      expect(merged.patch.spans).toEqual([
-        { spanId: "span-1", name: "cleaned up" },
-      ]);
+      expect(merged.patch.spans).toEqual([{ spanId: "span-1", name: "cleaned up" }]);
       expect(upsert).toHaveBeenCalledTimes(1);
     });
   });

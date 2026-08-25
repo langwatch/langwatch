@@ -4,10 +4,7 @@ import type { Event } from "../domain/types";
 import type { EventSourcedQueueProcessor } from "../queues";
 import type { ExecutionTarget } from "../runtime.types";
 import { ConfigurationError } from "../services/errorHandling";
-import {
-  type JobRegistryEntry,
-  QueueManager,
-} from "../services/queues/queueManager";
+import { type JobRegistryEntry, QueueManager } from "../services/queues/queueManager";
 import type { EventStoreReadContext } from "../stores/eventStore.types";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
 import type { FoldProjectionDefinition } from "./foldProjection.types";
@@ -22,9 +19,7 @@ import { ProjectionRouter } from "./projectionRouter";
  * - No event store — purely incremental, processes live events only.
  */
 export class ProjectionRegistry<EventType extends Event = Event> {
-  private readonly logger = createLogger(
-    "langwatch:event-sourcing:projection-registry",
-  );
+  private readonly logger = createLogger("langwatch:event-sourcing:projection-registry");
   private readonly foldProjections = new Map<
     string,
     FoldProjectionDefinition<any, EventType>
@@ -44,9 +39,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
   private router?: ProjectionRouter<EventType>;
   private queueManager?: QueueManager<EventType>;
 
-  registerFoldProjection(
-    projection: FoldProjectionDefinition<any, EventType>,
-  ): void {
+  registerFoldProjection(projection: FoldProjectionDefinition<any, EventType>): void {
     if (this.foldProjections.has(projection.name)) {
       throw new ConfigurationError(
         "ProjectionRegistry",
@@ -57,9 +50,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     this.foldProjections.set(projection.name, projection);
   }
 
-  registerMapProjection(
-    projection: MapProjectionDefinition<any, EventType>,
-  ): void {
+  registerMapProjection(projection: MapProjectionDefinition<any, EventType>): void {
     if (this.mapProjections.has(projection.name)) {
       throw new ConfigurationError(
         "ProjectionRegistry",

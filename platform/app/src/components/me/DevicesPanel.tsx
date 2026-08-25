@@ -84,13 +84,9 @@ export function DevicesPanel() {
                 revocation.isRevokingDevice &&
                 pendingRevokeId === session.sessionStartedAtMs
               }
-              onRequestRevoke={() =>
-                setPendingRevokeId(session.sessionStartedAtMs)
-              }
+              onRequestRevoke={() => setPendingRevokeId(session.sessionStartedAtMs)}
               onCancelRevoke={() => setPendingRevokeId(null)}
-              onConfirmRevoke={() =>
-                revocation.revokeDevice(session.sessionStartedAtMs)
-              }
+              onConfirmRevoke={() => revocation.revokeDevice(session.sessionStartedAtMs)}
             />
           ))}
         </VStack>
@@ -161,8 +157,7 @@ function useDeviceRevocation({
   };
 }
 
-const tokenCount = (count: number): string =>
-  `${count} token${count === 1 ? "" : "s"}`;
+const tokenCount = (count: number): string => `${count} token${count === 1 ? "" : "s"}`;
 
 /**
  * Taking every device's access away at once, the account-takeover recovery
@@ -192,20 +187,10 @@ function RevokeAllConfirmation({
         Revoke every device on your account? You'll need to re-run{" "}
         <code>langwatch login</code> on each device after this.
       </Text>
-      <Button
-        size="xs"
-        variant="ghost"
-        onClick={onCancel}
-        disabled={isRevoking}
-      >
+      <Button size="xs" variant="ghost" onClick={onCancel} disabled={isRevoking}>
         Cancel
       </Button>
-      <Button
-        size="xs"
-        colorPalette="red"
-        onClick={onConfirm}
-        loading={isRevoking}
-      >
+      <Button size="xs" colorPalette="red" onClick={onConfirm} loading={isRevoking}>
         Confirm revoke all
       </Button>
     </HStack>
@@ -216,12 +201,7 @@ function RevokeAllConfirmation({
 function NoDevicesState() {
   return (
     <VStack align="stretch" gap={4}>
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        padding={6}
-      >
+      <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={6}>
         <VStack align="start" gap={2}>
           <Text fontSize="sm" fontWeight="medium">
             No devices signed in
@@ -319,8 +299,8 @@ function DeviceRow({
           borderRadius="sm"
         >
           <Text fontSize="xs" color="red.fg" flex={1}>
-            Revoke this device? The CLI on {session.hostname ?? "this device"}{" "}
-            will start failing immediately.
+            Revoke this device? The CLI on {session.hostname ?? "this device"} will start
+            failing immediately.
           </Text>
           <Button
             size="xs"

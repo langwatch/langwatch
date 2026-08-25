@@ -25,10 +25,7 @@ class PolicyHarness {
     );
   }
 
-  resolve(input: {
-    organizationId: string;
-    sourceType: string;
-  }): Promise<boolean> {
+  resolve(input: { organizationId: string; sourceType: string }): Promise<boolean> {
     return this.policy.resolveSourceNonBillable(input);
   }
 }
@@ -74,9 +71,7 @@ describe("resolveSourceNonBillable", () => {
 
     it("returns true when bundledPlan is omitted", async () => {
       expect(
-        await PolicyHarness.create([
-          { config: { assistantKind: "gemini" } },
-        ]).resolve({
+        await PolicyHarness.create([{ config: { assistantKind: "gemini" } }]).resolve({
           organizationId: "org_1",
           sourceType: "gemini",
         }),

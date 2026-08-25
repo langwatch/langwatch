@@ -1,12 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import {
-  Field,
-  HStack,
-  Input,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import type { GovernanceSourceType } from "@langwatch/enterprise-governance-contract";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Switch } from "@langwatch/design-system/switch";
@@ -47,15 +40,10 @@ const FREQUENCY_CHOICES: Array<{ value: string; label: string }> = [
 ];
 
 function choiceFromParts(parts: PullCadenceParts): string {
-  return parts.frequency === "minutes"
-    ? `m${parts.everyMinutes}`
-    : parts.frequency;
+  return parts.frequency === "minutes" ? `m${parts.everyMinutes}` : parts.frequency;
 }
 
-function partsFromChoice(
-  choice: string,
-  current: PullCadenceParts,
-): PullCadenceParts {
+function partsFromChoice(choice: string, current: PullCadenceParts): PullCadenceParts {
   if (choice.startsWith("m")) {
     return {
       ...current,
@@ -87,9 +75,7 @@ function CadenceCronEditor({
         placeholder={recommended}
         onChange={(e) => onChange(e.target.value)}
       />
-      {error !== null ? (
-        <Field.ErrorText fontSize="xs">{error}</Field.ErrorText>
-      ) : null}
+      {error !== null ? <Field.ErrorText fontSize="xs">{error}</Field.ErrorText> : null}
     </Field.Root>
   );
 }
@@ -156,8 +142,7 @@ function CadenceFrequencyPicker({
   emitParts: (next: Partial<PullCadenceParts>) => void;
   onPickChoice: (choice: string) => void;
 }) {
-  const isTimeOfDayVisible =
-    parts.frequency === "daily" || parts.frequency === "weekly";
+  const isTimeOfDayVisible = parts.frequency === "daily" || parts.frequency === "weekly";
   return (
     <VStack align="stretch" gap={3}>
       <HStack gap={3} align="flex-start">
@@ -196,9 +181,7 @@ function CadenceFrequencyPicker({
           <SegmentedControl
             size="sm"
             value={String(parts.dayOfWeek)}
-            onValueChange={({ value: day }) =>
-              emitParts({ dayOfWeek: Number(day) })
-            }
+            onValueChange={({ value: day }) => emitParts({ dayOfWeek: Number(day) })}
             items={WEEKDAY_OPTIONS.map((d) => ({
               value: String(d.value),
               label: d.short,

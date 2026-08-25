@@ -31,7 +31,12 @@ export class DatasetApiError extends DatasetError {
   readonly operation: string;
   readonly originalError?: unknown;
 
-  constructor(message: string, status: number, operation: string, originalError?: unknown) {
+  constructor(
+    message: string,
+    status: number,
+    operation: string,
+    originalError?: unknown,
+  ) {
     super(message);
     this.name = "DatasetApiError";
     this.status = status;

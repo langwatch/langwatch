@@ -1,12 +1,4 @@
-import {
-  Button,
-  HStack,
-  Icon,
-  Spacer,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, HStack, Icon, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Crosshair, RotateCcw, Trash2 } from "lucide-react";
 import { DiffCounts, DiffPanel, useOutputDiff } from "./AnnotationOutputDiff";
 import { ScoreFields } from "./AnnotationScoreFields";
@@ -26,11 +18,7 @@ export function AnnotateBody({ state }: { state: AnnotationFormState }) {
         <AnchorLine label={state.anchorLabel} />
       </VStack>
 
-      <CommentField
-        value={state.comment}
-        onChange={state.setComment}
-        autoFocus
-      />
+      <CommentField value={state.comment} onChange={state.setComment} autoFocus />
 
       <ScoreFields state={state} />
     </VStack>
@@ -102,9 +90,7 @@ export function SuggestBody({
       </VStack>
 
       <SectionLabel>
-        {state.suggestTarget === "input"
-          ? "Suggested input"
-          : "Expected output"}
+        {state.suggestTarget === "input" ? "Suggested input" : "Expected output"}
       </SectionLabel>
       <Textarea
         value={state.expectedOutput}

@@ -257,6 +257,7 @@ How to handle:
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -279,7 +280,10 @@ Your endpoint's existing authentication passes through the HTTP agent's header r
 When the normal authentication is built for human users (sessions, OAuth redirects), add a dedicated API key for scenario traffic instead: your server reads the expected key from an environment variable and checks it on each request, and the HTTP agent sends it from a secret. A dedicated key is also the one you revoke to close the testing path.
 
 <Note>
-  **Also check:** [Testing agents behind authentication](/agent-simulations/authenticated-agents) lists exactly which fields resolve secret references, and covers OAuth2 client-credentials exchange with a code agent.
+  **Also check:** [Testing agents behind
+  authentication](/agent-simulations/authenticated-agents) lists exactly which fields
+  resolve secret references, and covers OAuth2 client-credentials exchange with a code
+  agent.
 </Note>
 
 ## 3. Define the request and the response contract
@@ -293,12 +297,12 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 }
 ```
 
-| Variable | Value |
-|---|---|
-| `{{ messages }}` | The whole conversation as a raw JSON array of `{role, content}` messages |
-| `{{ input }}` | The text of the last user message |
-| `{{ threadId }}` | A conversation id, the same on every turn of a run |
-| `{{ params.NAME }}` | A [run parameter](/agent-simulations/scenario-parameters) |
+| Variable                             | Value                                                                                     |
+| ------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `{{ messages }}`                     | The whole conversation as a raw JSON array of `{role, content}` messages                  |
+| `{{ input }}`                        | The text of the last user message                                                         |
+| `{{ threadId }}`                     | A conversation id, the same on every turn of a run                                        |
+| `{{ params.NAME }}`                  | A [run parameter](/agent-simulations/scenario-parameters)                                 |
 | `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Linking your traces](/agent-simulations/remote-traces) |
 
 The URL and the header values render the same variables.
@@ -327,6 +331,7 @@ With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens 
     ```
 
     For Flask, attach in `before_request` (keep the token on `g`) and detach in `teardown_request`.
+
   </Tab>
   <Tab title="TypeScript">
     ```typescript
@@ -339,13 +344,15 @@ With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens 
     ```
 
     The middleware needs an initialized OpenTelemetry runtime: a registered context manager and propagator. The LangWatch SDK's `setupObservability()` and the OpenTelemetry `NodeSDK` both register them at startup; without one of them, `context.with` and `propagation.extract` are no-ops.
+
   </Tab>
 </Tabs>
 
 The agent must report its traces to the same LangWatch project that runs the scenarios. Traces sent to another project, or to another observability backend only, are invisible to the judge.
 
 <Note>
-  **Also check:** [Linking your traces](/agent-simulations/remote-traces) explains what the judge sees, how long it waits for traces, and what happens when they do not arrive.
+  **Also check:** [Linking your traces](/agent-simulations/remote-traces) explains what
+  the judge sees, how long it waits for traces, and what happens when they do not arrive.
 </Note>
 
 ## 5. Register the agent and run the first scenario
@@ -353,13 +360,21 @@ The agent must report its traces to the same LangWatch project that runs the sce
 In the platform, create the agent on the **Agents** page: type **HTTP**, then the URL, authentication, body template and output path from the steps above. The same registration is available as `POST /api/agents`.
 
 <Frame>
-<img className="block" src="/images/agent-simulations/register-http-agent.png" alt="The HTTP agent editor with the endpoint URL, request body template and output path" />
+  <img
+    className="block"
+    src="/images/agent-simulations/register-http-agent.png"
+    alt="The HTTP agent editor with the endpoint URL, request body template and output path"
+  />
 </Frame>
 
 The **Test** tab of the agent editor sends one real request to your endpoint with the current configuration. Use it to confirm the endpoint answers and the output path extracts the reply text before you run any scenario:
 
 <Frame>
-<img className="block" src="/images/agent-simulations/agent-test-request.png" alt="The Test tab showing a 200 response from the agent endpoint and the extracted reply" />
+  <img
+    className="block"
+    src="/images/agent-simulations/agent-test-request.png"
+    alt="The Test tab showing a 200 response from the agent endpoint and the extracted reply"
+  />
 </Frame>
 
 With the CLI:
@@ -394,26 +409,38 @@ Open the run in the **Simulations** section of your project. A connected setup s
 - Judge reasoning that cites spans, naming the tool call or lookup that satisfied a criterion.
 
 <Frame>
-<img className="block" src="/images/agent-simulations/run-detail-conversation.png" alt="The run detail with the conversation transcript and a View trace link on the turn" />
+  <img
+    className="block"
+    src="/images/agent-simulations/run-detail-conversation.png"
+    alt="The run detail with the conversation transcript and a View trace link on the turn"
+  />
 </Frame>
 
 <Frame>
-<img className="block" src="/images/agent-simulations/run-detail-verdict.png" alt="The run results with the verdict and the judge reasoning citing a tool call span from the trace" />
+  <img
+    className="block"
+    src="/images/agent-simulations/run-detail-verdict.png"
+    alt="The run results with the verdict and the judge reasoning citing a tool call span from the trace"
+  />
 </Frame>
 
 The trace link on a turn opens the full trace: the simulation's own steps first, then your agent's spans for that turn, adopted through the `traceparent` header. This is the evidence the judge reads:
 
 <Frame>
-<img className="block" src="/images/agent-simulations/run-trace.png" alt="The trace waterfall with the simulation spans and the agent's own spans in one trace" />
+  <img
+    className="block"
+    src="/images/agent-simulations/run-trace.png"
+    alt="The trace waterfall with the simulation spans and the agent's own spans in one trace"
+  />
 </Frame>
 
 A trace-dependent criterion that comes back inconclusive means the traces did not arrive; see the failures below.
 
 ## Common failures
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use [`langwatch agent dev`](/agent-simulations/local-development) for a local process. |
-| Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference names a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings → Secrets**. |
-| The transcript shows empty replies or raw JSON | `outputPath` does not match the response shape, so no reply text is found. | Set `outputPath` to the JSONPath of the reply text in your endpoint's real response. |
-| Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project. | Adopt the context as in step 4, and point the agent's tracing at the same project's API key. |
+| Symptom                                                                       | Cause                                                                                                                                              | Fix                                                                                                                               |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| The run fails with a connection error                                         | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service.                                       | Deploy the endpoint to a reachable URL, or use [`langwatch agent dev`](/agent-simulations/local-development) for a local process. |
+| Every turn fails with 401 or 403                                              | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference names a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings → Secrets**.                            |
+| The transcript shows empty replies or raw JSON                                | `outputPath` does not match the response shape, so no reply text is found.                                                                         | Set `outputPath` to the JSONPath of the reply text in your endpoint's real response.                                              |
+| Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project.                                       | Adopt the context as in step 4, and point the agent's tracing at the same project's API key.                                      |

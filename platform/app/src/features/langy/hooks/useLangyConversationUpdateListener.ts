@@ -44,9 +44,7 @@ export function useLangyConversationUpdateListener({
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Keyed by conversation id so repeated updates collapse to the freshest.
-  const pendingRef = useRef<Map<string, LangyConversationUpdateSignal>>(
-    new Map(),
-  );
+  const pendingRef = useRef<Map<string, LangyConversationUpdateSignal>>(new Map());
 
   const flush = useCallback(() => {
     if (debounceTimerRef.current) {
@@ -98,9 +96,7 @@ export function useLangyConversationUpdateListener({
         if (!data.event) return;
         try {
           const raw =
-            typeof data.event === "string"
-              ? JSON.parse(data.event)
-              : data.event;
+            typeof data.event === "string" ? JSON.parse(data.event) : data.event;
           const parsed = langyConversationUpdateSignalSchema.safeParse(raw);
           if (!parsed.success) return;
           setLastEventAt(Date.now());

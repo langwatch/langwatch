@@ -41,9 +41,7 @@ vi.mock("~/utils/api", () => ({
             id: "graph-1",
             name: "Latency",
             graph: {
-              series: [
-                { name: "p95 latency", key: "latency", aggregation: "p95" },
-              ],
+              series: [{ name: "p95 latency", key: "latency", aggregation: "p95" }],
             },
           },
           isLoading: false,

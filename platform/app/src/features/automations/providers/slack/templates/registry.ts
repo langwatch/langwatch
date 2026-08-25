@@ -122,8 +122,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "trace_alert_compact",
     displayName: "Compact alert",
     emoji: "🔔",
-    tagline:
-      "Header and evaluation, then the trace's input and output as quoted text.",
+    tagline: "Header and evaluation, then the trace's input and output as quoted text.",
     deliveryNote: "1 message per trace",
     cadenceFit: "immediate",
     kind: "trace",
@@ -134,8 +133,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "trace_alert_one_liner",
     displayName: "One-liner",
     emoji: "💬",
-    tagline:
-      "A single line: automation name, score, input snippet, link. Minimal noise.",
+    tagline: "A single line: automation name, score, input snippet, link. Minimal noise.",
     deliveryNote: "1 message per trace",
     cadenceFit: "immediate",
     kind: "trace",
@@ -146,8 +144,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "eval_failure_detailed",
     displayName: "Eval failure detail",
     emoji: "🛑",
-    tagline:
-      "Names the failing evaluator, then quotes the trace's input and output.",
+    tagline: "Names the failing evaluator, then quotes the trace's input and output.",
     deliveryNote: "1 message per trace",
     cadenceFit: "immediate",
     kind: "trace",
@@ -171,8 +168,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "eval_failure_rich",
     displayName: "Eval failure banner",
     emoji: "🛑",
-    tagline:
-      "A colour-coded banner for the verdict, then quoted input and output.",
+    tagline: "A colour-coded banner for the verdict, then quoted input and output.",
     deliveryNote: "1 message per trace",
     cadenceFit: "immediate",
     kind: "trace",
@@ -185,8 +181,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "digest_compact",
     displayName: "Digest — compact",
     emoji: "📊",
-    tagline:
-      "One line per matched trace. Best for hourly windows or busy channels.",
+    tagline: "One line per matched trace. Best for hourly windows or busy channels.",
     deliveryNote: "all matches, 1 message",
     cadenceFit: "digest",
     kind: "trace",
@@ -222,8 +217,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "digest_table",
     displayName: "Digest — table",
     emoji: "🧮",
-    tagline:
-      "Every matched trace as a row in a grid: score, evaluator, input, link.",
+    tagline: "Every matched trace as a row in a grid: score, evaluator, input, link.",
     deliveryNote: "all matches, 1 message",
     cadenceFit: "digest",
     kind: "trace",
@@ -235,8 +229,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "graph_alert_compact",
     displayName: "Alert — compact",
     emoji: "🚨",
-    tagline:
-      "Metric, condition, and current value as fields, with a trend line.",
+    tagline: "Metric, condition, and current value as fields, with a trend line.",
     deliveryNote: "1 message per alert",
     cadenceFit: "immediate",
     kind: "graphAlert",
@@ -247,8 +240,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "graph_alert_detailed",
     displayName: "Alert — detailed",
     emoji: "📈",
-    tagline:
-      "A chart of the metric's recent values with the breach in context.",
+    tagline: "A chart of the metric's recent values with the breach in context.",
     deliveryNote: "1 message per alert",
     cadenceFit: "immediate",
     kind: "graphAlert",
@@ -323,8 +315,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "report_digest",
     displayName: "List of traces",
     emoji: "📊",
-    tagline:
-      "One line per matching trace, with its model, cost, and duration beneath.",
+    tagline: "One line per matching trace, with its model, cost, and duration beneath.",
     deliveryNote: "1 message per report",
     cadenceFit: "both",
     kind: "report",
@@ -336,8 +327,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "report_summary_card",
     displayName: "Summary card",
     emoji: "🗂️",
-    tagline:
-      "A card with the trace count and total cost, then the traces listed.",
+    tagline: "A card with the trace count and total cost, then the traces listed.",
     deliveryNote: "1 message per report",
     cadenceFit: "both",
     kind: "report",

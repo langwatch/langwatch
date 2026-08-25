@@ -30,10 +30,7 @@ import {
   vi,
 } from "vitest";
 import { wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
-import {
-  collectMediaRefs,
-  mediaRefBelongsToSide,
-} from "~/shared/traces/media-refs";
+import { collectMediaRefs, mediaRefBelongsToSide } from "~/shared/traces/media-refs";
 import type { BlobStore } from "../../app-layer/traces/blob-store.service";
 import {
   maybeExtractSpanMedia,
@@ -359,9 +356,7 @@ describe("trace media extraction at the ingestion edge", () => {
       // Raw pcm16 is WAV-wrapped at store time so the reference is playable
       expect(part.input_audio.mimeType).toBe("audio/wav");
       expect(part.input_audio.data).toBeUndefined();
-      expect(part.input_audio.url).toMatch(
-        new RegExp(`^/api/files/${PROJECT}/`),
-      );
+      expect(part.input_audio.url).toMatch(new RegExp(`^/api/files/${PROJECT}/`));
       // No base64 audio remains anywhere in the command payload
       expect(JSON.stringify(result)).not.toContain(audio.toString("base64"));
 
@@ -416,12 +411,12 @@ describe("trace media extraction at the ingestion edge", () => {
 
       // Which is what keeps the caller's recording off the OUTPUT strip and
       // the agent's reply off the INPUT one.
-      expect(refs.filter((ref) => mediaRefBelongsToSide(ref, "input"))).toEqual(
-        [refs[0]],
-      );
-      expect(
-        refs.filter((ref) => mediaRefBelongsToSide(ref, "output")),
-      ).toEqual([refs[1]]);
+      expect(refs.filter((ref) => mediaRefBelongsToSide(ref, "input"))).toEqual([
+        refs[0],
+      ]);
+      expect(refs.filter((ref) => mediaRefBelongsToSide(ref, "output"))).toEqual([
+        refs[1],
+      ]);
     });
   });
 
@@ -456,9 +451,7 @@ describe("trace media extraction at the ingestion edge", () => {
         content: Array<{ type: string; input_audio?: { url?: string } }>;
       }>;
       expect(messages[0]!.content[1]!.type).toBe("input_audio");
-      expect(messages[0]!.content[1]!.input_audio!.url).toContain(
-        "/api/files/",
-      );
+      expect(messages[0]!.content[1]!.input_audio!.url).toContain("/api/files/");
       expect(JSON.stringify(result)).not.toContain(audio.toString("base64"));
     });
   });
@@ -509,14 +502,10 @@ describe("trace media extraction at the ingestion edge", () => {
       };
       const block = request.messages[0]!.content[1]!;
       expect(block.source?.type).toBe("url");
-      expect(block.source?.value).toMatch(
-        new RegExp(`^/api/files/${PROJECT}/`),
-      );
+      expect(block.source?.value).toMatch(new RegExp(`^/api/files/${PROJECT}/`));
       const id = block.source!.value.split("/").pop()!;
       expect((await chRowFor(id))?.media_type).toBe("image/png");
-      expect(JSON.stringify(result)).not.toContain(
-        PNG_BYTES.toString("base64"),
-      );
+      expect(JSON.stringify(result)).not.toContain(PNG_BYTES.toString("base64"));
     });
 
     /** @scenario "A Gemini inline-data part inside a span input is externalized before staging" */
@@ -562,9 +551,7 @@ describe("trace media extraction at the ingestion edge", () => {
       expect(part.source?.value).toMatch(new RegExp(`^/api/files/${PROJECT}/`));
       // The carrier held the bytes, so replacing the source alone would have
       // left them behind.
-      expect(JSON.stringify(result)).not.toContain(
-        PNG_BYTES.toString("base64"),
-      );
+      expect(JSON.stringify(result)).not.toContain(PNG_BYTES.toString("base64"));
     });
   });
 
@@ -695,9 +682,7 @@ describe("trace media extraction at the ingestion edge", () => {
         logger: testLogger,
       });
 
-      const attr = result.span.attributes.find(
-        (a) => a.key === "langwatch.output",
-      );
+      const attr = result.span.attributes.find((a) => a.key === "langwatch.output");
       const messages = JSON.parse(attr!.value!.stringValue!) as Array<{
         content: Array<{
           type: string;
@@ -819,11 +804,7 @@ describe("trace media extraction at the ingestion edge", () => {
       await fs.writeFile(blockerFile, "x");
       const mintUri: MintStorageUri = async ({ projectId: pid, sha256 }) =>
         mintFileUri({ root: blockerFile, projectId: pid, sha256 });
-      const brokenService = new StoredObjectsService(
-        repository,
-        registry,
-        mintUri,
-      );
+      const brokenService = new StoredObjectsService(repository, registry, mintUri);
 
       const audio = makeAudioBytes(4444);
       const span = makeSpan([

@@ -324,9 +324,7 @@ describe("AI Gateway — coding-agent matrix", () => {
     "codex · React vite hello world · trace + cost + cache captured",
     async () => {
       const vk = vkFor("openai")!;
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "lw-cmatrix-codex-vite-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "lw-cmatrix-codex-vite-"));
       const since = new Date();
       const start = Date.now();
 
@@ -454,13 +452,7 @@ describe("AI Gateway — coding-agent matrix", () => {
 
       const result = spawnSync(
         "gemini",
-        [
-          "--prompt",
-          GEMINI_TASK_PROMPT,
-          "--yolo",
-          "--model",
-          "gemini-2.5-flash",
-        ],
+        ["--prompt", GEMINI_TASK_PROMPT, "--yolo", "--model", "gemini-2.5-flash"],
         {
           cwd: tempFolder,
           encoding: "utf-8",

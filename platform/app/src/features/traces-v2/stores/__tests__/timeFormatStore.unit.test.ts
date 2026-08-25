@@ -68,19 +68,14 @@ describe("timeColumnSizing", () => {
   // so a stale narrow manual resize from relative mode is floored back up
   // to the ISO minSize instead of clipping the timestamp.
   describe("when a persisted manual resize is applied on top of the footprint", () => {
-    const clamp = (
-      format: "relative" | "iso",
-      override: number | undefined,
-    ): number => {
+    const clamp = (format: "relative" | "iso", override: number | undefined): number => {
       const { size, minSize, maxSize } = timeColumnSizing(format);
       return Math.min(Math.max(minSize, override ?? size), maxSize);
     };
 
     it("floors a stale narrow relative-mode width up to the ISO minimum", () => {
       const staleRelativeWidth = timeColumnSizing("relative").size;
-      expect(clamp("iso", staleRelativeWidth)).toBe(
-        timeColumnSizing("iso").minSize,
-      );
+      expect(clamp("iso", staleRelativeWidth)).toBe(timeColumnSizing("iso").minSize);
     });
 
     it("preserves a deliberate wide ISO-mode resize", () => {

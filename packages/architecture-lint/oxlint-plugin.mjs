@@ -1,13 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import {
-  basename,
-  dirname,
-  isAbsolute,
-  join,
-  relative,
-  resolve,
-  sep,
-} from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 const workspaceCache = new Map();
 const featureLayoutCache = new Map();
@@ -94,9 +86,7 @@ function classifyFile(filename, cwd) {
       workspacePath: normalized,
     };
   }
-  if (
-    /^packages\/(config|design-system|eventing|group-queue)\//.test(normalized)
-  ) {
+  if (/^packages\/(config|design-system|eventing|group-queue)\//.test(normalized)) {
     const role = normalized.startsWith("packages/design-system/")
       ? "design-system"
       : normalized.startsWith("packages/config/")
@@ -156,10 +146,8 @@ const boundaryRule = {
         "Feature server packages may be imported only by app or worker runtime composition roots.",
       crossFeature:
         "Cross-feature collaboration must use the owning feature's contract package.",
-      packageEscape:
-        "A relative import cannot escape its physical workspace package.",
-      packageRole:
-        "This dependency is not allowed in the current package role.",
+      packageEscape: "A relative import cannot escape its physical workspace package.",
+      packageRole: "This dependency is not allowed in the current package role.",
       prismaContainment:
         "Prisma may be imported only by a server repository adapter under src/repositories/prisma.",
       featureLayer:
@@ -217,9 +205,7 @@ const boundaryRule = {
               );
             const serviceImportsOuterLayer =
               /\/server\/src\/services\//.test(importer) &&
-              /\/server\/src\/(?:api|migrations)\//.test(
-                `/${targetWorkspacePath}`,
-              );
+              /\/server\/src\/(?:api|migrations)\//.test(`/${targetWorkspacePath}`);
             const serviceImportsConcreteAdapter =
               /\/server\/src\/services\//.test(importer) &&
               /\/server\/src\/(?:adapters\/|repositories\/[^/]+\/|stores\/[^/]+\/)/.test(
@@ -255,10 +241,7 @@ const boundaryRule = {
         ) {
           context.report({ node, messageId: "packageRole" });
         }
-        if (
-          classification.role === "contract" &&
-          target.pkg.role !== "contract"
-        ) {
+        if (classification.role === "contract" && target.pkg.role !== "contract") {
           context.report({ node, messageId: "packageRole" });
         }
         if (classification.role === "web" && target.pkg.role === "server") {
@@ -284,16 +267,13 @@ const boundaryRule = {
       if (prismaImport && classification.feature) {
         const allowed =
           classification.role === "server" &&
-          /\/src\/repositories\/prisma\//.test(
-            `/${classification.workspacePath}`,
-          );
+          /\/src\/repositories\/prisma\//.test(`/${classification.workspacePath}`);
         if (!allowed) context.report({ node, messageId: "prismaContainment" });
       }
 
       if (
         classification.feature &&
-        (specifier === "@hono/zod-validator" ||
-          specifier === "hono-openapi/zod")
+        (specifier === "@hono/zod-validator" || specifier === "hono-openapi/zod")
       ) {
         context.report({ node, messageId: "schemaBoundary" });
       }
@@ -301,9 +281,7 @@ const boundaryRule = {
       const nodeRuntime = specifier.startsWith("node:");
       const browserRuntime = /^(react|react-dom|@chakra-ui\/)/.test(specifier);
       const serverRuntime =
-        /^(hono|@trpc\/server|@langwatch\/(eventing|group-queue))/.test(
-          specifier,
-        );
+        /^(hono|@trpc\/server|@langwatch\/(eventing|group-queue))/.test(specifier);
       if (
         productionSource &&
         classification.role === "contract" &&
@@ -318,18 +296,13 @@ const boundaryRule = {
       ) {
         context.report({ node, messageId: "packageRole" });
       }
-      if (
-        productionSource &&
-        classification.role === "server" &&
-        browserRuntime
-      ) {
+      if (productionSource && classification.role === "server" && browserRuntime) {
         context.report({ node, messageId: "packageRole" });
       }
       if (
         productionSource &&
         classification.role !== "other" &&
-        (/^(~\/|@app\/|@ee\/)/.test(specifier) ||
-          specifier.includes("platform/app"))
+        (/^(~\/|@app\/|@ee\/)/.test(specifier) || specifier.includes("platform/app"))
       ) {
         context.report({ node, messageId: "packageRole" });
       }
@@ -407,10 +380,8 @@ const serviceClassesRule = {
   meta: {
     type: "suggestion",
     messages: {
-      create:
-        "A service class must expose construction through a static create method.",
-      missing:
-        "A service module must define a class whose name ends in Service.",
+      create: "A service class must expose construction through a static create method.",
+      missing: "A service module must define a class whose name ends in Service.",
       standalone:
         "Service modules keep behaviour on the service class, not in standalone functions.",
     },
@@ -433,16 +404,10 @@ const serviceClassesRule = {
           const exported =
             statement.type === "ExportNamedDeclaration" ||
             statement.type === "ExportDefaultDeclaration";
-          if (
-            statement.type === "ExportNamedDeclaration" &&
-            statement.declaration
-          ) {
+          if (statement.type === "ExportNamedDeclaration" && statement.declaration) {
             declaration = statement.declaration;
           }
-          if (
-            statement.type === "ExportDefaultDeclaration" &&
-            statement.declaration
-          ) {
+          if (statement.type === "ExportDefaultDeclaration" && statement.declaration) {
             declaration = statement.declaration;
           }
           if (exported && declaration.type === "FunctionDeclaration") {
@@ -498,10 +463,7 @@ function declaredClasses(program) {
     if (statement.type === "ExportNamedDeclaration" && statement.declaration) {
       declaration = statement.declaration;
     }
-    if (
-      statement.type === "ExportDefaultDeclaration" &&
-      statement.declaration
-    ) {
+    if (statement.type === "ExportDefaultDeclaration" && statement.declaration) {
       declaration = statement.declaration;
     }
     if (exported && declaration.type === "ClassDeclaration") {
@@ -566,8 +528,7 @@ const featureModuleClassesRule = {
   meta: {
     type: "problem",
     messages: {
-      abstract:
-        "A strict feature port module must export an abstract {{suffix}} class.",
+      abstract: "A strict feature port module must export an abstract {{suffix}} class.",
       concrete:
         "A strict feature runtime module must export a concrete {{suffix}} class.",
       create:
@@ -624,9 +585,7 @@ const featureModuleClassesRule = {
 
 function serviceSubject(filename) {
   const name = basename(filename);
-  return name.endsWith(".service.ts")
-    ? name.slice(0, -".service.ts".length)
-    : undefined;
+  return name.endsWith(".service.ts") ? name.slice(0, -".service.ts".length) : undefined;
 }
 
 function serviceOwnerRoot(filename, cwd) {
@@ -664,9 +623,7 @@ function importsRepository(node) {
     .endsWith(".repository");
   return (
     pathNamesRepository ||
-    node.specifiers.some((specifier) =>
-      importedName(specifier)?.endsWith("Repository"),
-    )
+    node.specifiers.some((specifier) => importedName(specifier)?.endsWith("Repository"))
   );
 }
 
@@ -681,9 +638,7 @@ function importsDatabaseClient(node) {
       specifier,
     ) ||
     node.specifiers.some((item) =>
-      /(?:PrismaClient|ClickHouseClient|RedisClient)$/.test(
-        importedName(item) ?? "",
-      ),
+      /(?:PrismaClient|ClickHouseClient|RedisClient)$/.test(importedName(item) ?? ""),
     )
   );
 }
@@ -729,11 +684,7 @@ const serviceDependenciesRule = {
           context.report({ node: node.source, messageId: "globalApplication" });
         }
         if (!importsRepository(node)) return;
-        const target = repositoryTarget(
-          node.source.value,
-          filename,
-          context.cwd,
-        );
+        const target = repositoryTarget(node.source.value, filename, context.cwd);
         if (!target || escapesRoot(ownerRoot, target)) {
           context.report({ node: node.source, messageId: "foreignRepository" });
         }

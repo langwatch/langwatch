@@ -41,10 +41,7 @@ const eventsTracked =
 
 const pendingOnceEvents = new Set<string>();
 
-export const trackEventOnce = (
-  eventName: string,
-  params: Record<string, any>,
-) => {
+export const trackEventOnce = (eventName: string, params: Record<string, any>) => {
   if (typeof window === "undefined") return;
   if (eventsTracked.includes(eventName) || pendingOnceEvents.has(eventName)) {
     return;
@@ -52,10 +49,7 @@ export const trackEventOnce = (
 
   const markSent = () => {
     eventsTracked.push(eventName);
-    window.localStorage.setItem(
-      "events_tracked",
-      JSON.stringify(eventsTracked),
-    );
+    window.localStorage.setItem("events_tracked", JSON.stringify(eventsTracked));
     pendingOnceEvents.delete(eventName);
   };
 

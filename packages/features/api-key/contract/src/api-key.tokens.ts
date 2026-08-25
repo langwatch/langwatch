@@ -12,11 +12,9 @@ const API_KEY_BODY_REGEX = /^[0-9A-Za-z]{16}_[0-9A-Za-z]{48}$/;
 export function splitApiKeyToken(
   token: string,
 ): { lookupId: string; secret: string } | null {
-  const prefix = [
-    LEGACY_PAT_PREFIX,
-    INGEST_KEY_PREFIX,
-    API_KEY_PREFIX,
-  ].find((candidate) => token.startsWith(candidate));
+  const prefix = [LEGACY_PAT_PREFIX, INGEST_KEY_PREFIX, API_KEY_PREFIX].find(
+    (candidate) => token.startsWith(candidate),
+  );
   if (!prefix) return null;
 
   const body = token.slice(prefix.length);
@@ -46,9 +44,7 @@ export const apiKeyTokenResolutionInputSchema = z
     projectId: z.string().min(1).nullable().optional(),
   })
   .strict();
-export type ApiKeyTokenResolutionInput = z.infer<
-  typeof apiKeyTokenResolutionInputSchema
->;
+export type ApiKeyTokenResolutionInput = z.infer<typeof apiKeyTokenResolutionInputSchema>;
 
 const resolvedApiKeyProjectShape = {
   project: projectWithTeamSchema,

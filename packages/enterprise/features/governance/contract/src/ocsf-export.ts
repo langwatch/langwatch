@@ -20,9 +20,7 @@ export const governanceOcsfExportRowSchema = z.object({
   anomalyAlertId: z.string(),
   rawOcsfJson: z.string(),
 });
-export type GovernanceOcsfExportRow = z.infer<
-  typeof governanceOcsfExportRowSchema
->;
+export type GovernanceOcsfExportRow = z.infer<typeof governanceOcsfExportRowSchema>;
 
 export const governanceOcsfExportPageSchema = z.object({
   events: z.array(governanceOcsfExportRowSchema),
@@ -31,9 +29,7 @@ export const governanceOcsfExportPageSchema = z.object({
     .object({ eventTimeMs: z.number().int().nonnegative(), eventId: z.string() })
     .nullable(),
 });
-export type GovernanceOcsfExportPage = z.infer<
-  typeof governanceOcsfExportPageSchema
->;
+export type GovernanceOcsfExportPage = z.infer<typeof governanceOcsfExportPageSchema>;
 
 export const governanceOcsfExportInputSchema = z
   .object({
@@ -43,12 +39,8 @@ export const governanceOcsfExportInputSchema = z
     limit: z.number().int().min(1).max(1_000),
   })
   .strict();
-export type GovernanceOcsfExportInput = z.infer<
-  typeof governanceOcsfExportInputSchema
->;
+export type GovernanceOcsfExportInput = z.infer<typeof governanceOcsfExportInputSchema>;
 
 export abstract class GovernanceOcsfExportService {
-  abstract list(
-    input: GovernanceOcsfExportInput,
-  ): Promise<GovernanceOcsfExportPage>;
+  abstract list(input: GovernanceOcsfExportInput): Promise<GovernanceOcsfExportPage>;
 }

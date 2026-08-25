@@ -55,10 +55,7 @@ export class UsageService {
     private readonly planResolver: PlanResolver,
     private readonly organizationRepository: OrganizationRepository | null,
   ) {
-    this.countCache = new TtlCache<number>(
-      CACHE_TTL_MS,
-      "ttlcache:usage:count:",
-    );
+    this.countCache = new TtlCache<number>(CACHE_TTL_MS, "ttlcache:usage:count:");
     this.decisionCache = new TtlCache<MeterDecision>(
       CACHE_TTL_MS,
       "ttlcache:usage:decision:",
@@ -182,8 +179,7 @@ export class UsageService {
       return cached;
     }
 
-    const projectIds =
-      await this.organizationService.getProjectIds(organizationId);
+    const projectIds = await this.organizationService.getProjectIds(organizationId);
     if (projectIds.length === 0) {
       // A real measurement: an organization with no projects has sent nothing.
       return 0;
@@ -261,8 +257,7 @@ export class UsageService {
     resolvedPlan?: PlanInfo,
   ): Promise<MeterDecision> {
     const pricingModel =
-      (await this.organizationRepository?.getPricingModel(organizationId)) ??
-      null;
+      (await this.organizationRepository?.getPricingModel(organizationId)) ?? null;
     const plan = resolvedPlan ?? (await this.planResolver(organizationId));
     const hasValidLicenseOverride = plan.planSource === "license";
 

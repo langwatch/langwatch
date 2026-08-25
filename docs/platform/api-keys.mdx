@@ -11,28 +11,31 @@ LangWatch uses API keys to authenticate SDK calls, MCP connections, and API requ
 
 LangWatch splits credentials into two concepts, the same way Datadog separates ingest-only API keys from RBAC-scoped application keys. An ingestion key is an `ik-lw-…` string and an API key is an `sk-lw-…` string, so you can tell them apart at a glance. They carry very different power:
 
-| | Ingestion key | API key |
-|---|---|---|
-| **What it does** | Writes traces, and nothing else | Reads and manages everything its scope allows |
-| **Role** | A built-in, write-only ingest-only role granting only `traces:create` | RBAC scopes you pick (personal: your ceiling; service: scope + mode) |
-| **Scope** | Exactly one project | One or more projects, teams, or the whole organization |
-| **Best for** | Spraying into agent environments, CLIs, and OTLP exporters (Claude Code, Cursor, Claude cowork, …) where you only want to push telemetry | SDK setup, MCP, CI/CD, dashboards, automation, anything that reads or changes data |
-| **Blast radius if leaked** | Minimal, it can only create traces in its one project, never read or delete | Whatever its RBAC scope grants, treat it like a password |
+|                            | Ingestion key                                                                                                                            | API key                                                                            |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **What it does**           | Writes traces, and nothing else                                                                                                          | Reads and manages everything its scope allows                                      |
+| **Role**                   | A built-in, write-only ingest-only role granting only `traces:create`                                                                    | RBAC scopes you pick (personal: your ceiling; service: scope + mode)               |
+| **Scope**                  | Exactly one project                                                                                                                      | One or more projects, teams, or the whole organization                             |
+| **Best for**               | Spraying into agent environments, CLIs, and OTLP exporters (Claude Code, Cursor, Claude cowork, …) where you only want to push telemetry | SDK setup, MCP, CI/CD, dashboards, automation, anything that reads or changes data |
+| **Blast radius if leaked** | Minimal, it can only create traces in its one project, never read or delete                                                              | Whatever its RBAC scope grants, treat it like a password                           |
 
 Because an ingestion key is genuinely write-only, it's safe to drop into an agent's environment or a managed-settings file. An [ingestion template](/ai-governance/ingestion-templates) mints one for you and wires it into the tool's `OTEL_EXPORTER_OTLP_HEADERS`; the `langwatch <tool>` CLI does the same on your behalf. An ingestion key may also reference an `IngestionTemplate` (its OTTL / catalog metadata) so the receiver shapes the trace into the canonical `gen_ai.*` form. The rest of this page covers the RBAC-scoped **API keys** you create from **Settings → API Keys**.
 
 ## Key Types
 
-| | Personal Key | Service Key |
-|---|---|---|
-| **Tied to** | A specific user | No user (org-level) |
-| **Best for** | Local development, AI assistants (MCP), personal workflows | CI/CD pipelines, automation, service-to-service |
-| **Permissions** | Inherits your RBAC permissions (ceiling model) | Scoped to specific projects with ADMIN access |
-| **Survives user removal** | No, disabled when user leaves the org | Yes, independent of any user |
-| **Requires `LANGWATCH_PROJECT_ID`** | Yes | Yes |
+|                                     | Personal Key                                               | Service Key                                     |
+| ----------------------------------- | ---------------------------------------------------------- | ----------------------------------------------- |
+| **Tied to**                         | A specific user                                            | No user (org-level)                             |
+| **Best for**                        | Local development, AI assistants (MCP), personal workflows | CI/CD pipelines, automation, service-to-service |
+| **Permissions**                     | Inherits your RBAC permissions (ceiling model)             | Scoped to specific projects with ADMIN access   |
+| **Survives user removal**           | No, disabled when user leaves the org                      | Yes, independent of any user                    |
+| **Requires `LANGWATCH_PROJECT_ID`** | Yes                                                        | Yes                                             |
 
 <Info>
-  **Legacy project keys** (the `LANGWATCH_API_KEY` shown on the project setup page) still work and will continue to be supported. They have the project context built in, so they don't require `LANGWATCH_PROJECT_ID`. New users should prefer creating keys from **Settings → API Keys** for better security and access control.
+  **Legacy project keys** (the `LANGWATCH_API_KEY` shown on the project setup page) still
+  work and will continue to be supported. They have the project context built in, so they
+  don't require `LANGWATCH_PROJECT_ID`. New users should prefer creating keys from
+  **Settings → API Keys** for better security and access control.
 </Info>
 
 ## Creating a Personal API Key
@@ -44,24 +47,24 @@ Personal keys are ideal for local development, connecting your AI coding assista
     Navigate to [Settings → API Keys](https://app.langwatch.ai/settings/api-keys) in your LangWatch dashboard.
   </Step>
 
-  <Step title="Click Create API Key">
-    Click the **Create API Key** button in the top right.
-  </Step>
+<Step title="Click Create API Key">
+  Click the **Create API Key** button in the top right.
+</Step>
 
-  <Step title="Configure the key">
-    - **Type**: Select **Personal**
-    - **Name**: Give it a descriptive name (e.g., "My MCP key", "Local dev")
-    - **Scope**: Select which projects, teams, or the whole organization the key can access
-    - **Expiration**: Optionally set an expiration date
-    - **Permissions**: Choose a permission mode:
-      - **All**: inherits your full permissions at each scope
-      - **Restricted**: fine-grained control over individual permission categories (see [Permission Categories](#permission-categories))
-  </Step>
+<Step title="Configure the key">
+  - **Type**: Select **Personal** - **Name**: Give it a descriptive name (e.g., "My MCP
+  key", "Local dev") - **Scope**: Select which projects, teams, or the whole organization
+  the key can access - **Expiration**: Optionally set an expiration date -
+  **Permissions**: Choose a permission mode: - **All**: inherits your full permissions at
+  each scope - **Restricted**: fine-grained control over individual permission categories
+  (see [Permission Categories](#permission-categories))
+</Step>
 
   <Step title="Copy your key">
     After creation, your key is shown **once**. Copy it and store it securely. You cannot see the full key again.
 
     The key format is: `sk-lw-<id>_<secret>`
+
   </Step>
 </Steps>
 
@@ -80,18 +83,16 @@ You can find your project ID in **Settings → Projects** or in the project URL.
 
 Service keys are designed for automated systems: CI/CD pipelines, production services, and multi-project setups. They aren't tied to any user, so they keep working even if team members leave.
 
-<Note>
-  Only organization **admins** can create service keys.
-</Note>
+<Note>Only organization **admins** can create service keys.</Note>
 
 <Steps>
   <Step title="Go to Settings → API Keys">
     Navigate to [Settings → API Keys](https://app.langwatch.ai/settings/api-keys) in your LangWatch dashboard.
   </Step>
 
-  <Step title="Click Create API Key">
-    Click the **Create API Key** button in the top right.
-  </Step>
+<Step title="Click Create API Key">
+  Click the **Create API Key** button in the top right.
+</Step>
 
   <Step title="Configure the key">
     - **Type**: Select **Service**
@@ -103,6 +104,7 @@ Service keys are designed for automated systems: CI/CD pipelines, production ser
     <Warning>
       A service key scoped to the organization with **All** permissions gets **org-wide ADMIN access**. Always scope to specific projects when possible.
     </Warning>
+
   </Step>
 
   <Step title="Copy your key">
@@ -126,10 +128,11 @@ LANGWATCH_PROJECT_ID="your-project-id"
 import langwatch
 
 langwatch.setup(
-    api_key="sk-lw-...",
-    project_id="your-project-id",
+api_key="sk-lw-...",
+project_id="your-project-id",
 )
-```
+
+````
 </Tab>
 <Tab title="TypeScript">
 ```typescript
@@ -139,7 +142,8 @@ const langwatch = new LangWatch({
   apiKey: 'sk-lw-...',
   projectId: 'your-project-id',
 });
-```
+````
+
 </Tab>
 </Tabs>
 
@@ -147,22 +151,22 @@ const langwatch = new LangWatch({
 
 When using **Restricted** permissions, you can grant read or write access to individual feature areas:
 
-| Category | Read | Write |
-|---|---|---|
-| **Traces** | View traces and spans | Create, update, and share traces |
-| **Cost** | View cost analytics | None |
-| **Scenarios** | View test scenarios | Create and manage scenarios |
-| **Annotations** | View annotations | Create and manage annotations |
-| **Analytics** | View analytics dashboards | Create and manage dashboards |
-| **Evaluations** | View evaluations | Create and manage evaluations |
-| **Datasets** | View datasets | Create and manage datasets |
-| **Triggers** | View triggers | Create and manage triggers |
-| **Workflows** | View workflows | Create and manage workflows |
-| **Prompts** | View prompts | Create and manage prompts |
-| **Secrets** | View secrets | Create and manage secrets |
-| **Audit Log** | View audit log | None |
-| **Team** | View team members | Manage team membership |
-| **Project** | View project settings | Create, update, and delete projects |
+| Category        | Read                      | Write                               |
+| --------------- | ------------------------- | ----------------------------------- |
+| **Traces**      | View traces and spans     | Create, update, and share traces    |
+| **Cost**        | View cost analytics       | None                                |
+| **Scenarios**   | View test scenarios       | Create and manage scenarios         |
+| **Annotations** | View annotations          | Create and manage annotations       |
+| **Analytics**   | View analytics dashboards | Create and manage dashboards        |
+| **Evaluations** | View evaluations          | Create and manage evaluations       |
+| **Datasets**    | View datasets             | Create and manage datasets          |
+| **Triggers**    | View triggers             | Create and manage triggers          |
+| **Workflows**   | View workflows            | Create and manage workflows         |
+| **Prompts**     | View prompts              | Create and manage prompts           |
+| **Secrets**     | View secrets              | Create and manage secrets           |
+| **Audit Log**   | View audit log            | None                                |
+| **Team**        | View team members         | Manage team membership              |
+| **Project**     | View project settings     | Create, update, and delete projects |
 
 Categories marked "None" for write are read-only by design.
 
@@ -201,6 +205,7 @@ claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey sk-lw-...
 </Tabs>
 
 See the [full MCP setup guide](/integration/mcp) for all supported editors.
+
   </Step>
 
   <Step title="Ask your assistant to instrument your code">
@@ -231,5 +236,6 @@ From the **Settings → API Keys** page you can:
 - **Revoke a key**: immediately disables the key (cannot be undone)
 
 <Tip>
-  Rotate keys regularly and revoke any that are no longer in use. Set expiration dates on keys used for temporary workflows.
+  Rotate keys regularly and revoke any that are no longer in use. Set expiration dates on
+  keys used for temporary workflows.
 </Tip>

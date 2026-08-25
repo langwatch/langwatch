@@ -46,8 +46,7 @@ function* walk(dir: string): Generator<string> {
  *  carries at least one VALUE specifier (not `import type`, and not a
  *  specifier itself prefixed with `type `). */
 function valueImportsOfClientModule(source: string): string[] {
-  const statements =
-    source.match(/import[\s\S]*?from\s+"[^"]+";/g) ?? ([] as string[]);
+  const statements = source.match(/import[\s\S]*?from\s+"[^"]+";/g) ?? ([] as string[]);
   return statements.filter((statement) => {
     if (!CLIENT_MODULE_SPECIFIERS.test(statement)) return false;
     if (/^import\s+type\b/.test(statement)) return false;
@@ -69,13 +68,11 @@ describe("given the two-door ClickHouse access policy", () => {
       for (const root of SCAN_ROOTS) {
         for (const file of walk(root)) {
           const appRelative = relative(APP_ROOT, file);
-          if (appRelative.startsWith(join("src", "server", "clickhouse")))
-            continue;
+          if (appRelative.startsWith(join("src", "server", "clickhouse"))) continue;
           if (/\.test\.tsx?$/.test(appRelative)) continue;
           if (appRelative.includes("__tests__")) continue;
           if (appRelative.startsWith(join("src", "test-utils"))) continue;
-          if (ALLOWED_IMPORTERS.has(appRelative.split("\\").join("/")))
-            continue;
+          if (ALLOWED_IMPORTERS.has(appRelative.split("\\").join("/"))) continue;
           const source = readFileSync(file, "utf8");
           if (valueImportsOfClientModule(source).length > 0) {
             offenders.push(appRelative);

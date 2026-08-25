@@ -7,7 +7,9 @@ keywords: langchain, instrumentation, callback, langwatch, python, tracing
 ---
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a
+  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set
+  this up for you automatically.
 </Tip>
 
 LangWatch integrates with Langchain to provide detailed observability into your chains, agents, LLM calls, and tool usage.
@@ -22,12 +24,14 @@ pip install langwatch langchain langchain-openai
 ```bash uv
 uv add langwatch langchain langchain-openai
 ```
+
 </CodeGroup>
 
 ## Usage
 
 <Info>
-The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment
+  variable.
 </Info>
 
 Use LangWatch's callback handler to instrument your Langchain agents and chains. The callback automatically captures LLM calls, tool usage, and chain execution as spans within your trace.

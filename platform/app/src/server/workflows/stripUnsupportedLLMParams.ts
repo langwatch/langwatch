@@ -26,9 +26,7 @@ async function loadProjectCustomModels(
   const providers = await service.getProjectModelProviders(projectId);
   const map: CustomModelsByProvider = {};
   for (const [providerKey, provider] of Object.entries(providers)) {
-    map[providerKey] = (provider.customModels ?? null) as
-      | CustomModelEntry[]
-      | null;
+    map[providerKey] = (provider.customModels ?? null) as CustomModelEntry[] | null;
   }
   return map;
 }
@@ -98,11 +96,7 @@ export async function stripUnsupportedLLMParamsFromWorkflow(opts: {
       replaceObjectContents(data.llm, filtered);
     }
     for (const param of data.parameters ?? []) {
-      if (
-        param.identifier === "llm" &&
-        param.value &&
-        typeof param.value === "object"
-      ) {
+      if (param.identifier === "llm" && param.value && typeof param.value === "object") {
         const value = param.value as LLMLike;
         const filtered = filterLLMNode(value, customModelsByProvider);
         replaceObjectContents(value, filtered);

@@ -165,10 +165,7 @@ export interface LangWatchQLTenantFixture {
   keyHash: string;
 }
 
-function tenantFixture(
-  tenantId: string,
-  rawSecret: string,
-): LangWatchQLTenantFixture {
+function tenantFixture(tenantId: string, rawSecret: string): LangWatchQLTenantFixture {
   return {
     tenantId,
     rawSecret,
@@ -183,10 +180,7 @@ function tenantFixture(
   };
 }
 
-export const TENANT_A = tenantFixture(
-  "tenant-a",
-  "raw-lwql-key-DO-NOT-LOG-abcdef123456",
-);
+export const TENANT_A = tenantFixture("tenant-a", "raw-lwql-key-DO-NOT-LOG-abcdef123456");
 export const TENANT_B = tenantFixture(
   "tenant-b",
   "raw-lwql-key-VICTIM-DO-NOT-LOG-fedcba654321",
@@ -285,11 +279,7 @@ export function lwqlNamesForSuite(suite: string): LangWatchQLNames {
   };
 }
 
-function writeConfigFile(
-  directory: string,
-  name: string,
-  contents: string,
-): string {
+function writeConfigFile(directory: string, name: string, contents: string): string {
   const path = join(directory, name);
   writeFileSync(path, contents);
   return path;
@@ -353,9 +343,7 @@ export async function startLangWatchQLClickHouse({
       },
     ])
     // Reaching PostgreSQL on the docker host; see the module comment.
-    .withExtraHosts([
-      { host: "host.docker.internal", ipAddress: "host-gateway" },
-    ])
+    .withExtraHosts([{ host: "host.docker.internal", ipAddress: "host-gateway" }])
     .withReuse()
     .withStartupTimeout(120_000)
     .start();
@@ -381,8 +369,7 @@ export async function startLangWatchQLClickHouse({
   await applyAsAdmin([`DROP DATABASE IF EXISTS ${names.database}`]);
   await applyAsAdmin([`CREATE DATABASE ${names.database}`]);
 
-  const factDatabase =
-    facts === "migrated" ? `${names.database}_facts` : names.database;
+  const factDatabase = facts === "migrated" ? `${names.database}_facts` : names.database;
   const lwqlTables = facts === "migrated" ? [] : LWQL_FACT_TABLES;
 
   if (facts === "migrated") {
@@ -905,10 +892,7 @@ async function seedRealFactRows({
 
   // A separate insert, so the two versions land in separate parts and the
   // engine has something to collapse.
-  for (const updatedAt of [
-    DEDUP_FIXTURE.staleUpdatedAt,
-    DEDUP_FIXTURE.latestUpdatedAt,
-  ]) {
+  for (const updatedAt of [DEDUP_FIXTURE.staleUpdatedAt, DEDUP_FIXTURE.latestUpdatedAt]) {
     await admin.insert({
       table: `${database}.trace_summaries`,
       format: "JSONEachRow",
@@ -980,8 +964,7 @@ async function seedRealFactRows({
             "langwatch.input": SEEDED_CONTENT.spanInput,
             "langwatch.output": SEEDED_CONTENT.spanOutput,
             "gen_ai.prompt": SEEDED_CONTENT.spanPromptAttribute,
-            "gen_ai.prompt.0.content":
-              SEEDED_CONTENT.spanExplodedPromptAttribute,
+            "gen_ai.prompt.0.content": SEEDED_CONTENT.spanExplodedPromptAttribute,
           },
           Cost: 0.0021,
         })),
@@ -1032,9 +1015,7 @@ async function seedRealFactRows({
         Name: "checkout flow",
         "Messages.Id": ["m1"],
         "Messages.Role": ["assistant"],
-        "Messages.Content": [
-          `${SEEDED_CONTENT.simulationMessage}/${tenant.tenantId}`,
-        ],
+        "Messages.Content": [`${SEEDED_CONTENT.simulationMessage}/${tenant.tenantId}`],
         "Messages.TraceId": [`${tenant.tenantId}-trace-${week}-0`],
         "Messages.Rest": ["{}"],
         TraceIds: [`${tenant.tenantId}-trace-${week}-0`],
@@ -1138,10 +1119,7 @@ async function seedAnalyticsProjections({
   });
 
   // Two versions in two parts, so `FINAL` has something to collapse here too.
-  for (const updatedAt of [
-    DEDUP_FIXTURE.staleUpdatedAt,
-    DEDUP_FIXTURE.latestUpdatedAt,
-  ]) {
+  for (const updatedAt of [DEDUP_FIXTURE.staleUpdatedAt, DEDUP_FIXTURE.latestUpdatedAt]) {
     await admin.insert({
       table: `${database}.trace_analytics`,
       format: "JSONEachRow",
@@ -1437,10 +1415,7 @@ export async function expectRestrictedIdentity({
   client: ClickHouseClient;
   names: LangWatchQLNames;
 }): Promise<void> {
-  const currentUser = await selectScalar<string>(
-    client,
-    "SELECT currentUser() AS value",
-  );
+  const currentUser = await selectScalar<string>(client, "SELECT currentUser() AS value");
   expect(
     currentUser,
     "queries in this suite must execute as the restricted identity",
@@ -1490,10 +1465,7 @@ export async function expectClickHouseError(
   ).toBeDefined();
   const code = clickHouseErrorCode(thrown);
   const message = thrown instanceof Error ? thrown.message : String(thrown);
-  expect(
-    code,
-    `${context}: no ClickHouse error code in "${message}"`,
-  ).not.toBeNull();
+  expect(code, `${context}: no ClickHouse error code in "${message}"`).not.toBeNull();
   expect(code, `${context}: wrong rejection — "${message}"`).toBe(expectedCode);
 }
 
@@ -1574,10 +1546,7 @@ export function expectOnlyTenantA<T extends Record<string, unknown>>({
   harness: LangWatchQLClickHouseHarness;
   context: string;
 }): void {
-  expect(
-    rows.length,
-    `${context}: read returned nothing to check`,
-  ).toBeGreaterThan(0);
+  expect(rows.length, `${context}: read returned nothing to check`).toBeGreaterThan(0);
   const tenants = [...new Set(rows.map((row) => String(row[tenantColumn])))];
   expect(tenants, `${context}: foreign tenant rows were returned`).toEqual([
     harness.tenantA.tenantId,
@@ -1637,9 +1606,7 @@ export async function expectZeroRowsWithControl({
   context: string;
 }): Promise<void> {
   const control = await recordSeedControl({ harness, table, tenantColumn });
-  const client = await harness.restrictedClient(
-    keyHash === undefined ? {} : { keyHash },
-  );
+  const client = await harness.restrictedClient(keyHash === undefined ? {} : { keyHash });
   const rows = await selectRows<Record<string, unknown>>(
     client,
     `SELECT * FROM ${harness.names.database}.${table}`,
@@ -1707,9 +1674,7 @@ export const PG_EXCLUDED_COLUMN = "comment";
 function mappedCatalogEntry(
   name: string,
 ): LangWatchQLViewDefinition & { postgres: LangWatchQLPostgresMapping } {
-  const entry = lwqlPostgresViews(LWQL_VIEW_CATALOG).find(
-    (view) => view.name === name,
-  );
+  const entry = lwqlPostgresViews(LWQL_VIEW_CATALOG).find((view) => view.name === name);
   if (!entry) {
     throw new Error(
       `lwql harness: "${name}" is not a PostgreSQL-resident dataset in the shipped catalog`,
@@ -1833,10 +1798,9 @@ const PG_BASE_TABLE_DDL: Record<string, string> = {
 const LWQL_TEST_CONCURRENT_CATALOGS = 6;
 
 /** The role's cap in this harness, so a test can assert the value that was set. */
-export const LWQL_TEST_POSTGRES_CONNECTION_LIMIT =
-  lwqlPostgresReaderConnectionLimit({
-    concurrentCatalogs: LWQL_TEST_CONCURRENT_CATALOGS,
-  });
+export const LWQL_TEST_POSTGRES_CONNECTION_LIMIT = lwqlPostgresReaderConnectionLimit({
+  concurrentCatalogs: LWQL_TEST_CONCURRENT_CATALOGS,
+});
 
 /** Filler tenants in the annotation load fixture. See below for why. */
 const PG_LOAD_FIXTURE_TENANTS = 40;
@@ -2049,15 +2013,12 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
     ...lwqlApprovedPostgresViewNames().map(
       (view) => `DROP VIEW IF EXISTS ${PG_SCHEMA}."${view}"`,
     ),
-    ...baseRelations.map(
-      (table) => `DROP TABLE IF EXISTS ${PG_SCHEMA}."${table}"`,
-    ),
+    ...baseRelations.map((table) => `DROP TABLE IF EXISTS ${PG_SCHEMA}."${table}"`),
     `DROP TYPE IF EXISTS ${PG_SCHEMA}."ExperimentType"`,
     `CREATE TYPE ${PG_SCHEMA}."ExperimentType" AS ENUM ` +
       `('DSPY', 'BATCH_EVALUATION', 'BATCH_EVALUATION_V2')`,
     ...baseRelations.map(
-      (table) =>
-        `CREATE TABLE ${PG_SCHEMA}."${table}" ${PG_BASE_TABLE_DDL[table]!}`,
+      (table) => `CREATE TABLE ${PG_SCHEMA}."${table}" ${PG_BASE_TABLE_DDL[table]!}`,
     ),
     ...[TENANT_A, TENANT_B].flatMap((tenant) =>
       postgresTenantSeedStatements({ tenantId: tenant.tenantId }),
@@ -2118,9 +2079,7 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
               `would silently report the previous one`,
           );
         }
-        await new Promise((resolve) =>
-          setTimeout(resolve, PG_BACKEND_EXIT_POLL_MS),
-        );
+        await new Promise((resolve) => setTimeout(resolve, PG_BACKEND_EXIT_POLL_MS));
       }
     },
     async rowsRead(baseRelation: string) {
@@ -2179,8 +2138,7 @@ export async function mapPostgresIntoClickHouse({
       },
     }),
     ...lwqlTables.map(
-      (lwqlTable) =>
-        `DROP TABLE IF EXISTS ${harness.names.database}.${lwqlTable.table}`,
+      (lwqlTable) => `DROP TABLE IF EXISTS ${harness.names.database}.${lwqlTable.table}`,
     ),
     ...lwqlPostgresEngineTableStatements({
       names: harness.names,
@@ -2239,10 +2197,7 @@ async function readContainerLog(
  * Diffing rather than parsing timestamps: the suite runs serially, so
  * everything new in the log belongs to the statement under measurement.
  */
-export function statementsLoggedSince(
-  previousLog: string,
-  currentLog: string,
-): string[] {
+export function statementsLoggedSince(previousLog: string, currentLog: string): string[] {
   const delta = currentLog.startsWith(previousLog)
     ? currentLog.slice(previousLog.length)
     : currentLog;
@@ -2274,12 +2229,8 @@ export function expectPostgresError(
     `${context}: expected a rejection, psql exited 0 with "${result.stdout.trim()}"`,
   ).not.toBe(0);
   const sqlState = postgresSqlState(result);
-  expect(
-    sqlState,
-    `${context}: no SQLSTATE in "${result.stderr.trim()}"`,
-  ).not.toBeNull();
-  expect(
-    sqlState,
-    `${context}: wrong rejection — "${result.stderr.trim()}"`,
-  ).toBe(expectedSqlState);
+  expect(sqlState, `${context}: no SQLSTATE in "${result.stderr.trim()}"`).not.toBeNull();
+  expect(sqlState, `${context}: wrong rejection — "${result.stderr.trim()}"`).toBe(
+    expectedSqlState,
+  );
 }

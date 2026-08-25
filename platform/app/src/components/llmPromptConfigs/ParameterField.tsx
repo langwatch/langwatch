@@ -94,9 +94,7 @@ function SliderField({
         max={effectiveMax}
         step={config.step}
         value={[boundedValue]}
-        onValueChange={(details) =>
-          onChange(details.value[0] ?? config.default)
-        }
+        onValueChange={(details) => onChange(details.value[0] ?? config.default)}
         disabled={disabled}
       >
         <Slider.Control>

@@ -174,13 +174,7 @@ describe("installOpencodeSessionContextPlugin", () => {
       process.env.XDG_CONFIG_HOME = path.join(tmpHome, "elsewhere");
 
       expect(opencodePluginTarget().path).toBe(
-        path.join(
-          tmpHome,
-          "elsewhere",
-          "opencode",
-          "plugins",
-          OPENCODE_PLUGIN_FILE_NAME,
-        ),
+        path.join(tmpHome, "elsewhere", "opencode", "plugins", OPENCODE_PLUGIN_FILE_NAME),
       );
     });
   });
@@ -225,9 +219,9 @@ describe("hasOpencodeSessionContextPlugin", () => {
     it("reports it present, by its marker", () => {
       installOpencodeSessionContextPlugin();
 
-      expect(fs.readFileSync(pluginPath, "utf8").startsWith(
-        OPENCODE_PLUGIN_MARKER,
-      )).toBe(true);
+      expect(fs.readFileSync(pluginPath, "utf8").startsWith(OPENCODE_PLUGIN_MARKER)).toBe(
+        true,
+      );
       expect(hasOpencodeSessionContextPlugin()).toBe(true);
     });
   });
@@ -280,9 +274,7 @@ describe("the generated plugin module", () => {
       });
 
       expect(invocation).not.toBeNull();
-      expect(["langwatch", ...invocation!.argv].join(" ")).toBe(
-        OPENCODE_HOOK_COMMAND,
-      );
+      expect(["langwatch", ...invocation!.argv].join(" ")).toBe(OPENCODE_HOOK_COMMAND);
       expect(JSON.parse(invocation!.stdin)).toEqual({
         session_id: "ses_abc",
         cwd: "/repo/worktrees/review",

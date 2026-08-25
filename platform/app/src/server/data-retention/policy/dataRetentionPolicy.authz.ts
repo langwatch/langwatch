@@ -47,10 +47,7 @@ export function requiredRetentionWritePermission(
   return "project:update";
 }
 
-async function canWriteScope(
-  ctx: RBACContext,
-  scope: RetentionScope,
-): Promise<boolean> {
+async function canWriteScope(ctx: RBACContext, scope: RetentionScope): Promise<boolean> {
   if (!ctx.session) return false;
   if (scope.scopeType === "ORGANIZATION") {
     return probeOrganizationPermission(
@@ -288,9 +285,7 @@ export function assertPlanAllowsRetentionValue(
     // The paid short presets (35/63) are the only values allowed below the
     // enterprise custom floor. Everything else must clear the floor; whole-week
     // alignment is already enforced by `retentionDaysSchema`.
-    if (
-      (PAID_RETENTION_PRESET_DAYS as readonly number[]).includes(retentionDays)
-    ) {
+    if ((PAID_RETENTION_PRESET_DAYS as readonly number[]).includes(retentionDays)) {
       return;
     }
     if (retentionDays < rule.customMin) {

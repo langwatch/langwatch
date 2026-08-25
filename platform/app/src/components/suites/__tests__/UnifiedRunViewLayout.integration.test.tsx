@@ -12,10 +12,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-} from "../RunHistoryFilters";
+import { RunHistoryFilters, type RunHistoryFilterValues } from "../RunHistoryFilters";
 import { availableGroupByOptions } from "../run-history-transforms";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -77,9 +74,7 @@ describe("Unified run view layout", () => {
 
       const selector = screen.getByLabelText("Group by");
       const renderedOptions = within(selector).getAllByRole("option");
-      const optionValues = renderedOptions.map(
-        (o) => (o as HTMLOptionElement).value,
-      );
+      const optionValues = renderedOptions.map((o) => (o as HTMLOptionElement).value);
       expect(optionValues).not.toContain("target");
     });
   });
@@ -166,9 +161,7 @@ describe("Unified run view layout", () => {
       );
 
       expect(screen.getByLabelText("Filter by scenario")).toBeInTheDocument();
-      expect(
-        screen.getByLabelText("Filter by pass/fail status"),
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Filter by pass/fail status")).toBeInTheDocument();
       expect(screen.getByLabelText("Group by")).toBeInTheDocument();
       expect(screen.getByLabelText("List view")).toBeInTheDocument();
       expect(screen.getByLabelText("Grid view")).toBeInTheDocument();

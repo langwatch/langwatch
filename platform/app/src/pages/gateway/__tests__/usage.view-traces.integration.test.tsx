@@ -166,9 +166,7 @@ describe("Usage page view-all-traces button", () => {
         const params = fragmentParams(hrefOfButton());
         expect(params.get("preset")).toBeNull();
         expect(Number(params.get("from"))).toBeGreaterThan(0);
-        expect(Number(params.get("to"))).toBeGreaterThan(
-          Number(params.get("from")),
-        );
+        expect(Number(params.get("to"))).toBeGreaterThan(Number(params.get("from")));
         cleanup();
       }
     });
@@ -177,9 +175,7 @@ describe("Usage page view-all-traces button", () => {
   describe("when no key is in focus", () => {
     it("offers nothing, since the organization has no single destination", () => {
       renderUsagePage("/gateway/usage?days=30");
-      expect(
-        screen.queryByTestId("usage-view-all-traces"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("usage-view-all-traces")).not.toBeInTheDocument();
     });
   });
 
@@ -192,9 +188,7 @@ describe("Usage page view-all-traces button", () => {
         traceProjectArchived: false,
       };
       renderUsagePage(`/gateway/usage?vk=${VK_ID}&days=30`);
-      expect(
-        screen.queryByTestId("usage-view-all-traces"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("usage-view-all-traces")).not.toBeInTheDocument();
     });
   });
 });

@@ -129,10 +129,7 @@ export function getRequiredCredentialKeys({
   const keys = Object.keys(fieldSchemas ?? {});
   const declaredOptional = optionalKeys ? new Set(optionalKeys) : undefined;
   const trimmedValues = Object.fromEntries(
-    Object.entries(values ?? {}).map(([key, value]) => [
-      key,
-      value?.trim() ?? "",
-    ]),
+    Object.entries(values ?? {}).map(([key, value]) => [key, value?.trim() ?? ""]),
   );
   const blankValues = Object.fromEntries(keys.map((key) => [key, ""]));
 
@@ -155,10 +152,7 @@ export function getRequiredCredentialKeys({
       values: blankValues,
       key,
     });
-    if (
-      alwaysDemanded &&
-      !schemaDemandsKey({ keysSchema, values: trimmedValues, key })
-    ) {
+    if (alwaysDemanded && !schemaDemandsKey({ keysSchema, values: trimmedValues, key })) {
       continue;
     }
     required.add(key);
@@ -222,10 +216,7 @@ export function buildCustomKeyState(
   const isUsingEnvVars = options?.providerEnabledWithEnvVars && !hasStoredKeys;
 
   Object.keys(displayKeyMap ?? {}).forEach((key) => {
-    if (
-      previousKeys &&
-      Object.prototype.hasOwnProperty.call(previousKeys, key)
-    ) {
+    if (previousKeys && Object.prototype.hasOwnProperty.call(previousKeys, key)) {
       const previousValue = previousKeys[key];
       if (typeof previousValue === "string") {
         result[key] = previousValue;
@@ -254,9 +245,7 @@ export function buildCustomKeyState(
  * @param customKeys - The form state containing API keys
  * @returns true if user entered a real API key value (not masked, not empty)
  */
-export function hasUserEnteredNewApiKey(
-  customKeys: Record<string, string>,
-): boolean {
+export function hasUserEnteredNewApiKey(customKeys: Record<string, string>): boolean {
   return Object.entries(customKeys).some(
     ([key, value]) =>
       isSecretCredentialField(key) &&
@@ -352,9 +341,7 @@ export function filterMaskedApiKeys(
   customKeys: Record<string, string>,
 ): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(customKeys).filter(
-      ([_, value]) => value !== MASKED_KEY_PLACEHOLDER,
-    ),
+    Object.entries(customKeys).filter(([_, value]) => value !== MASKED_KEY_PLACEHOLDER),
   );
 }
 

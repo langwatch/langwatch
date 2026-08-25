@@ -5,8 +5,7 @@ const mockObserveQueryDuration = vi.fn();
 const mockIncrementQueryCount = vi.fn();
 
 vi.mock("~/server/clickhouse/metrics", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/clickhouse/metrics")>();
+  const actual = await importOriginal<typeof import("~/server/clickhouse/metrics")>();
   return {
     ...actual,
     observeClickHouseQueryDuration: (...args: unknown[]) =>
@@ -76,9 +75,7 @@ describe("createResilientClickHouseClient()", () => {
       // Code first — the message is supplementary coverage.
       await expect(result.json()).rejects.toMatchObject({
         code: "999",
-        message: expect.stringContaining(
-          "Code: 999. DB::Exception: some future failure",
-        ),
+        message: expect.stringContaining("Code: 999. DB::Exception: some future failure"),
       });
     });
 
@@ -99,9 +96,7 @@ describe("createResilientClickHouseClient()", () => {
 
     it("records a dedicated in-band outcome without double-counting", async () => {
       const wrapper = createResilientClickHouseClient({
-        client: clientAnswering([
-          { exception: "Code: 241. DB::Exception: memory" },
-        ]),
+        client: clientAnswering([{ exception: "Code: 241. DB::Exception: memory" }]),
       });
 
       const result = await wrapper.query({ query: "SELECT 1" } as never);
@@ -115,14 +110,8 @@ describe("createResilientClickHouseClient()", () => {
       // The failure lands under its own outcome, never as a second terminal
       // outcome for the same query, and the latency histogram is not
       // sampled twice.
-      expect(mockIncrementQueryCount).toHaveBeenCalledWith(
-        "SELECT",
-        "inband_error",
-      );
-      expect(mockIncrementQueryCount).not.toHaveBeenCalledWith(
-        "SELECT",
-        "error",
-      );
+      expect(mockIncrementQueryCount).toHaveBeenCalledWith("SELECT", "inband_error");
+      expect(mockIncrementQueryCount).not.toHaveBeenCalledWith("SELECT", "error");
       expect(mockObserveQueryDuration).toHaveBeenCalledTimes(1);
     });
   });

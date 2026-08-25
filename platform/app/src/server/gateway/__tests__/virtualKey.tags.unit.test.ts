@@ -39,18 +39,13 @@ describe("normalizeVkTags", () => {
     });
 
     it("collapses duplicates, including ones that differ only by padding", () => {
-      expect(normalizeVkTags(["team=ml", " team=ml ", "team=ml"])).toEqual([
-        "team=ml",
-      ]);
+      expect(normalizeVkTags(["team=ml", " team=ml ", "team=ml"])).toEqual(["team=ml"]);
     });
   });
 
   describe("given a tag list large enough to be a cardinality problem", () => {
     it("caps the number of tags", () => {
-      const many = Array.from(
-        { length: VK_TAGS_MAX_COUNT + 50 },
-        (_, i) => `tag-${i}`,
-      );
+      const many = Array.from({ length: VK_TAGS_MAX_COUNT + 50 }, (_, i) => `tag-${i}`);
 
       const normalized = normalizeVkTags(many);
 
@@ -83,12 +78,7 @@ describe("normalizeVkTags", () => {
   describe("given values that are not strings at all", () => {
     it("skips them instead of stamping [object Object] on every span", () => {
       expect(
-        normalizeVkTags([
-          null,
-          42,
-          { team: "ml" },
-          "team=ml",
-        ] as unknown as string[]),
+        normalizeVkTags([null, 42, { team: "ml" }, "team=ml"] as unknown as string[]),
       ).toEqual(["team=ml"]);
     });
   });

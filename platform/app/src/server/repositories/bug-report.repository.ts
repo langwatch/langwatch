@@ -1,9 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import type {
-  BugReport,
-  Prisma,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { BugReport, Prisma, PrismaClient } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 /**
@@ -14,11 +10,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 export class BugReportRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async create({
-    data,
-  }: {
-    data: Prisma.BugReportCreateInput;
-  }): Promise<BugReport> {
+  async create({ data }: { data: Prisma.BugReportCreateInput }): Promise<BugReport> {
     return this.prisma.bugReport.create({
       data: {
         id: generate(KSUID_RESOURCES.BUG_REPORT).toString(),

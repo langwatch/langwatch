@@ -4,9 +4,20 @@ description: How LangWatch AI Gateway governance underwrites SOC 2 Type II, ISO 
 sidebarTitle: Compliance architecture
 ---
 
-<Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance processing folds them into OCSF-mapped events for SIEM export.</Info>
+<Info>
+  **Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans;
+  governance processing folds them into OCSF-mapped events for SIEM export.
+</Info>
 
-<Note>**Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store at the platform default retention window and an append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
+<Note>
+  **Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and
+  tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license.
+  The Apache 2.0 floor still gives you a single trace store at the platform default
+  retention window and an append-only event_log; the compliance underwriting documented
+  below is the Enterprise extension. See [Open-core
+  licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0,
+  Enterprise split.
+</Note>
 
 LangWatch AI Gateway governance is built on a **unified observability substrate**: every audit event, OTel span, webhook delivery, and S3 replay row lands in the same trace store that powers the rest of the platform. That single store is what underwrites the compliance posture below: one source of truth, one append-only event log, one set of retention controls, one set of access controls.
 
@@ -54,16 +65,16 @@ This page maps each compliance framework you might need to the mechanisms in Lan
 
 ## Framework coverage
 
-| Framework | Coverage | Mechanisms in LangWatch |
-|---|---|---|
-| **SOC 2 Type II** | ✅ Baseline | Append-only event log; per-origin retention class; RBAC via project membership; access logging; org-tenancy isolation |
-| **ISO 27001** | ✅ Baseline | All of the above; documented control mapping (Annex A.12 logging, A.18 compliance) |
-| **EU AI Act** (general-purpose tier) | ✅ Baseline | Audit trail durable in event_log; retention class meets logging requirements; non-repudiation guarantees |
-| **EU AI Act** (high-risk tier) | ⏳ Pending | Same baseline + cryptographic tamper-evidence (planned follow-up) |
-| **GDPR** | ✅ Baseline | Right-to-be-forgotten honoured at retention boundary; org-tenancy isolation; auditor read-only role for DPO access |
-| **HIPAA** (most uses) | ✅ Baseline | 7-year archive class + RBAC; event_log non-repudiation; org-tenancy isolation |
-| **HIPAA** (covered-entity strict, HITECH cryptographic verification) | ⏳ Pending | Same + tamper-evidence follow-up |
-| **SEC 17a-4** (broker-dealer WORM) | Out of scope | Requires WORM storage layer + cryptographic verification beyond LangWatch's current model |
+| Framework                                                            | Coverage     | Mechanisms in LangWatch                                                                                               |
+| -------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------- |
+| **SOC 2 Type II**                                                    | ✅ Baseline  | Append-only event log; per-origin retention class; RBAC via project membership; access logging; org-tenancy isolation |
+| **ISO 27001**                                                        | ✅ Baseline  | All of the above; documented control mapping (Annex A.12 logging, A.18 compliance)                                    |
+| **EU AI Act** (general-purpose tier)                                 | ✅ Baseline  | Audit trail durable in event_log; retention class meets logging requirements; non-repudiation guarantees              |
+| **EU AI Act** (high-risk tier)                                       | ⏳ Pending   | Same baseline + cryptographic tamper-evidence (planned follow-up)                                                     |
+| **GDPR**                                                             | ✅ Baseline  | Right-to-be-forgotten honoured at retention boundary; org-tenancy isolation; auditor read-only role for DPO access    |
+| **HIPAA** (most uses)                                                | ✅ Baseline  | 7-year archive class + RBAC; event_log non-repudiation; org-tenancy isolation                                         |
+| **HIPAA** (covered-entity strict, HITECH cryptographic verification) | ⏳ Pending   | Same + tamper-evidence follow-up                                                                                      |
+| **SEC 17a-4** (broker-dealer WORM)                                   | Out of scope | Requires WORM storage layer + cryptographic verification beyond LangWatch's current model                             |
 
 The follow-up contract for tamper-evidence (Merkle-root publication of event_log digests + customer-rotatable signing keys + verification REST API) is locked in spec form so the design isn't reinvented when a named customer requirement lands. See [Tamper-evidence boundaries](#tamper-evidence-boundaries) below.
 
@@ -87,13 +98,13 @@ LangWatch's RBAC layer (`platform/app/src/server/api/rbac.ts`) is the single sou
 
 **Governance permissions catalog** (added in this PR):
 
-| Resource | Actions | What it gates |
-|---|---|---|
-| `governance` | `view`, `manage` | Top-level Govern section visibility + governance dashboard read/write |
-| `ingestionSources` | `view`, `create`, `update`, `delete`, `manage` | IngestionSource composer + per-source detail page + secret rotation |
-| `anomalyRules` | `view`, `create`, `update`, `delete`, `manage` | AnomalyRule composer + alert review |
-| `complianceExport` | `view` only (read-only resource) | OCSF v1.1 read API for SIEM forwarding |
-| `activityMonitor` | `view` only (read-only resource) | Activity Monitor cross-source KPI dashboard |
+| Resource           | Actions                                        | What it gates                                                         |
+| ------------------ | ---------------------------------------------- | --------------------------------------------------------------------- |
+| `governance`       | `view`, `manage`                               | Top-level Govern section visibility + governance dashboard read/write |
+| `ingestionSources` | `view`, `create`, `update`, `delete`, `manage` | IngestionSource composer + per-source detail page + secret rotation   |
+| `anomalyRules`     | `view`, `create`, `update`, `delete`, `manage` | AnomalyRule composer + alert review                                   |
+| `complianceExport` | `view` only (read-only resource)               | OCSF v1.1 read API for SIEM forwarding                                |
+| `activityMonitor`  | `view` only (read-only resource)               | Activity Monitor cross-source KPI dashboard                           |
 
 `complianceExport` and `activityMonitor` are flagged read-only in `permissionsConfig.ts` because their rows are derived from fold projections (`governance_ocsf_events`, `governance_kpis`), never created through endpoints.
 

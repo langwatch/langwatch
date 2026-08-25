@@ -31,10 +31,7 @@ export const GroupRow = memo(function GroupRow({
   isExpanded: boolean;
   onToggle: (groupKey: string) => void;
 }) {
-  const handleToggle = useCallback(
-    () => onToggle(groupKey),
-    [onToggle, groupKey],
-  );
+  const handleToggle = useCallback(() => onToggle(groupKey), [onToggle, groupKey]);
   // Skill runs fold like any repeated tool, but keep the purple skill accent
   // so a folded row of skill invocations still reads as skills (see TreeRow).
   const isSkill = isSkillSpan({ type: group.type, name: group.name });
@@ -85,9 +82,7 @@ export const GroupRow = memo(function GroupRow({
         <Flex direction="column" flex={1} minWidth={0} gap={0} justify="center">
           <HStack gap={1.5} minWidth={0}>
             <Text textStyle="xs" color="fg" truncate>
-              {group.toolName
-                ? `${group.name} · ${group.toolName}`
-                : group.name}
+              {group.toolName ? `${group.name} · ${group.toolName}` : group.name}
             </Text>
             <Text
               textStyle="2xs"
@@ -109,8 +104,7 @@ export const GroupRow = memo(function GroupRow({
               avg {formatDuration(group.avgDuration)}
             </Text>
             <Text textStyle="xs" color="fg.subtle" whiteSpace="nowrap">
-              {formatDuration(group.minDuration)}–
-              {formatDuration(group.maxDuration)}
+              {formatDuration(group.minDuration)}–{formatDuration(group.maxDuration)}
             </Text>
             {group.errorCount > 0 && (
               <Text textStyle="xs" color="red.fg" whiteSpace="nowrap">

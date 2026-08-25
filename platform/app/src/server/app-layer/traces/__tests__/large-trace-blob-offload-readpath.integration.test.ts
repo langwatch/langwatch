@@ -273,9 +273,7 @@ describe.skipIf(!hasTestcontainers)(
       await startTestContainers();
       client = getTestClickHouseClient()!;
       if (!client) {
-        throw new Error(
-          "ClickHouse client not available; testcontainers required.",
-        );
+        throw new Error("ClickHouse client not available; testcontainers required.");
       }
     });
 
@@ -328,9 +326,7 @@ describe.skipIf(!hasTestcontainers)(
 
         // Guard the staging: preview is truncated and the eventref is present.
         expect(leanAttrs["langwatch.input"]).not.toContain(UNIQUE_TAIL);
-        expect(
-          leanAttrs[`${EVENTREF_ATTR_PREFIX}langwatch.input`],
-        ).toBeDefined();
+        expect(leanAttrs[`${EVENTREF_ATTR_PREFIX}langwatch.input`]).toBeDefined();
 
         const leanedSpan = makeNormalizedSpan({
           tenantId,
@@ -340,13 +336,10 @@ describe.skipIf(!hasTestcontainers)(
         });
 
         // 3) Drive the REAL v2 read entry point with the REAL BlobStore.
-        const service = new SpanStorageService(
-          new StagedSpanRepository([leanedSpan]),
-          {
-            blobStore: makeRealBlobStore(client),
-            ioExtractionService: new TraceIOExtractionService(),
-          },
-        );
+        const service = new SpanStorageService(new StagedSpanRepository([leanedSpan]), {
+          blobStore: makeRealBlobStore(client),
+          ioExtractionService: new TraceIOExtractionService(),
+        });
 
         const spans = await service.getSpansByTraceId({ tenantId, traceId });
 

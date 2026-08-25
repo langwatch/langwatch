@@ -10,9 +10,7 @@ import {
 
 const CONVERSATION_ID = "conv-1";
 
-function fold(
-  events: LangyConversationStateEvent[],
-): LangyConversationStateFoldState {
+function fold(events: LangyConversationStateEvent[]): LangyConversationStateFoldState {
   return events.reduce(foldLangyConversationState, initLangyConversationState());
 }
 
@@ -40,9 +38,7 @@ describe("foldLangyConversationState", () => {
   describe("when a turn is accepted carrying its model", () => {
     /** @scenario Reopening a conversation restores the model it last ran on */
     it("remembers the model as the conversation's last model", () => {
-      const state = fold([
-        accepted({ turnId: "t1", model: "openai/gpt-5-mini" }),
-      ]);
+      const state = fold([accepted({ turnId: "t1", model: "openai/gpt-5-mini" })]);
 
       expect(state.LastModel).toBe("openai/gpt-5-mini");
     });

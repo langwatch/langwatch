@@ -94,8 +94,7 @@ const CODEX_REDUNDANT_USAGE_SPAN_NAMES = new Set(["handle_responses"]);
 
 const asNumber = (raw: unknown): number | null => {
   if (raw === undefined || raw === null || raw === "") return null;
-  const n =
-    typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+  const n = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
   return Number.isFinite(n) ? n : null;
 };
 
@@ -127,8 +126,7 @@ type CanonicalLift = readonly [string, string | number | null];
  * this function exists to fix. Anything that is not UUID-shaped, or absent,
  * leaves the turn id as the answer.
  */
-const UUID_SHAPE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function conversationIdOf(attrs: {
   get: (key: string) => unknown;
@@ -167,9 +165,7 @@ function nonCachedInput({
 }): number | null {
   // Read, not taken: the coding-agent session fold reads codex's own count
   // off the same span.
-  const own = asNumber(
-    attrs.get("codex.turn.token_usage.non_cached_input_tokens"),
-  );
+  const own = asNumber(attrs.get("codex.turn.token_usage.non_cached_input_tokens"));
   const whole = asNumber(attrs.take("codex.turn.token_usage.input_tokens"));
   if (own !== null) return own;
   if (whole === null) return null;
@@ -249,9 +245,7 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
 
     const { attrs } = ctx.bag;
     const model = asString(attrs.take("model"));
-    const cacheRead = asNumber(
-      attrs.take("codex.turn.token_usage.cached_input_tokens"),
-    );
+    const cacheRead = asNumber(attrs.take("codex.turn.token_usage.cached_input_tokens"));
     const cacheCreation = asNumber(
       attrs.take("codex.turn.token_usage.cache_write_input_tokens"),
     );
@@ -319,15 +313,11 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       ],
       [
         ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
-        positiveOrNull(
-          asNumber(attrs.take("codex.usage.reasoning_output_tokens")),
-        ),
+        positiveOrNull(asNumber(attrs.take("codex.usage.reasoning_output_tokens"))),
       ],
       [
         ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-        positiveOrNull(
-          asNumber(attrs.get("gen_ai.usage.cache_write.input_tokens")),
-        ),
+        positiveOrNull(asNumber(attrs.get("gen_ai.usage.cache_write.input_tokens"))),
       ],
     ];
 
@@ -388,17 +378,15 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
    * explicit wire-level marker (either value) stays authoritative.
    */
   private markCodexProviderBundled(ctx: ExtractorContext): void {
-    const read = (key: string): unknown =>
-      ctx.out[key] ?? ctx.bag.attrs.get(key);
+    const read = (key: string): unknown => ctx.out[key] ?? ctx.bag.attrs.get(key);
 
     if (read(ATTR_KEYS.LANGWATCH_COST_NON_BILLABLE) !== undefined) return;
 
     const isCodex =
       read(ATTR_KEYS.GEN_AI_PROVIDER_NAME) === CODEX_PROVIDER_KEY ||
-      [
-        read(ATTR_KEYS.GEN_AI_REQUEST_MODEL),
-        read(ATTR_KEYS.GEN_AI_RESPONSE_MODEL),
-      ].some((model) => typeof model === "string" && isCodexModel(model));
+      [read(ATTR_KEYS.GEN_AI_REQUEST_MODEL), read(ATTR_KEYS.GEN_AI_RESPONSE_MODEL)].some(
+        (model) => typeof model === "string" && isCodexModel(model),
+      );
     if (!isCodex) return;
 
     ctx.setAttr(ATTR_KEYS.LANGWATCH_COST_NON_BILLABLE, "true");
@@ -431,9 +419,7 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     const cacheReadTokens = asNumber(ctx.bag.attrs.take("cached_token_count"));
     const threadId = asString(ctx.bag.attrs.take("conversation.id"));
     const principalEmail = asString(ctx.bag.attrs.take("user.email"));
-    const reasoningEffort = asString(
-      ctx.bag.attrs.take("model_reasoning_effort"),
-    );
+    const reasoningEffort = asString(ctx.bag.attrs.take("model_reasoning_effort"));
 
     let fired = false;
     if (reasoningEffort !== null) {

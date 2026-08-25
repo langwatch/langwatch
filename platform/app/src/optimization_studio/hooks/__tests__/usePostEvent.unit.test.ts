@@ -56,9 +56,7 @@ function handleErroredExecution(
   return lastToast();
 }
 
-function createMockStore(
-  overrides: Partial<WorkflowStore> = {},
-): WorkflowStore {
+function createMockStore(overrides: Partial<WorkflowStore> = {}): WorkflowStore {
   return {
     setSocketStatus: vi.fn(),
     getWorkflow: vi.fn().mockReturnValue({
@@ -254,8 +252,7 @@ describe("alertOnError", () => {
     it("uses the registry's copy, not the engine's message", () => {
       const toast = handleErroredExecution({
         error_type: "invalid_dataset",
-        error:
-          'dataset: column "expected_output" missing at /tmp/lw-run-9/rows.jsonl',
+        error: 'dataset: column "expected_output" missing at /tmp/lw-run-9/rows.jsonl',
       });
 
       expect(toast?.type).toBe("error");

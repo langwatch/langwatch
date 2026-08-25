@@ -1,8 +1,4 @@
-import {
-  AggregateTypeSchema,
-  EventSchema,
-  TenantIdSchema,
-} from "@langwatch/eventing";
+import { AggregateTypeSchema, EventSchema, TenantIdSchema } from "@langwatch/eventing";
 import { z } from "zod";
 import { logTraceContributionSchema } from "../../log-processing/schemas/logRecord";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
@@ -55,9 +51,7 @@ export const spanReceivedEventSchema = EventSchema.extend({
   metadata: spanReceivedEventMetadataSchema,
 });
 
-export type SpanReceivedEventMetadata = z.infer<
-  typeof spanReceivedEventMetadataSchema
->;
+export type SpanReceivedEventMetadata = z.infer<typeof spanReceivedEventMetadataSchema>;
 export type SpanReceivedEventData = z.infer<typeof spanReceivedEventDataSchema>;
 export type SpanReceivedEvent = z.infer<typeof spanReceivedEventSchema>;
 
@@ -119,9 +113,7 @@ export const spanReferencedPayloadSchema = z.object({
   idempotencyKey: z.string().optional(),
 });
 
-export type SpanReferencedPayloadData = z.infer<
-  typeof spanReferencedPayloadDataSchema
->;
+export type SpanReferencedPayloadData = z.infer<typeof spanReferencedPayloadDataSchema>;
 export type SpanReferencedPayload = z.infer<typeof spanReferencedPayloadSchema>;
 
 /**
@@ -133,9 +125,7 @@ export type SpanReferencedPayload = z.infer<typeof spanReferencedPayloadSchema>;
  * queue's retry — falling through would let a mixed-deploy job be mistaken
  * for another kind of payload and silently no-op.
  */
-export function parseSpanReferencedPayload(
-  value: unknown,
-): SpanReferencedPayload | null {
+export function parseSpanReferencedPayload(value: unknown): SpanReferencedPayload | null {
   if (typeof value !== "object" || value === null) return null;
   if ((value as { type?: unknown }).type !== SPAN_REFERENCED_PAYLOAD_TYPE) {
     return null;
@@ -259,12 +249,8 @@ export const topicAssignedEventSchema = EventSchema.extend({
   metadata: topicAssignedEventMetadataSchema,
 });
 
-export type TopicAssignedEventMetadata = z.infer<
-  typeof topicAssignedEventMetadataSchema
->;
-export type TopicAssignedEventData = z.infer<
-  typeof topicAssignedEventDataSchema
->;
+export type TopicAssignedEventMetadata = z.infer<typeof topicAssignedEventMetadataSchema>;
+export type TopicAssignedEventData = z.infer<typeof topicAssignedEventDataSchema>;
 export type TopicAssignedEvent = z.infer<typeof topicAssignedEventSchema>;
 
 /**
@@ -305,12 +291,8 @@ export const logRecordReceivedEventSchema = EventSchema.extend({
   metadata: logRecordReceivedEventMetadataSchema,
 });
 
-export type LogRecordReceivedEventData = z.infer<
-  typeof logRecordReceivedEventDataSchema
->;
-export type LogRecordReceivedEvent = z.infer<
-  typeof logRecordReceivedEventSchema
->;
+export type LogRecordReceivedEventData = z.infer<typeof logRecordReceivedEventDataSchema>;
+export type LogRecordReceivedEvent = z.infer<typeof logRecordReceivedEventSchema>;
 
 export function isLogRecordReceivedEvent(
   event: TraceProcessingEvent,
@@ -329,9 +311,7 @@ export const logContributedEventSchema = EventSchema.extend({
   metadata: eventMetadataBaseSchema,
 });
 
-export type LogContributedEventData = z.infer<
-  typeof logContributedEventDataSchema
->;
+export type LogContributedEventData = z.infer<typeof logContributedEventDataSchema>;
 export type LogContributedEvent = z.infer<typeof logContributedEventSchema>;
 
 export function isLogContributedEvent(
@@ -350,9 +330,7 @@ export const metricDataPointCorrelatedEventMetadataSchema = z
   })
   .passthrough();
 
-export const metricDataPointCorrelatedEventDataSchema = z.object(
-  metricCorrelationFields,
-);
+export const metricDataPointCorrelatedEventDataSchema = z.object(metricCorrelationFields);
 
 export const metricDataPointCorrelatedEventSchema = EventSchema.extend({
   type: z.literal(METRIC_DATA_POINT_CORRELATED_EVENT_TYPE),
@@ -396,9 +374,7 @@ export const originResolvedEventSchema = EventSchema.extend({
   metadata: originResolvedEventMetadataSchema,
 });
 
-export type OriginResolvedEventData = z.infer<
-  typeof originResolvedEventDataSchema
->;
+export type OriginResolvedEventData = z.infer<typeof originResolvedEventDataSchema>;
 export type OriginResolvedEvent = z.infer<typeof originResolvedEventSchema>;
 
 /**
@@ -433,9 +409,7 @@ export const annotationAddedEventSchema = EventSchema.extend({
   metadata: annotationAddedEventMetadataSchema,
 });
 
-export type AnnotationAddedEventData = z.infer<
-  typeof annotationAddedEventDataSchema
->;
+export type AnnotationAddedEventData = z.infer<typeof annotationAddedEventDataSchema>;
 export type AnnotationAddedEvent = z.infer<typeof annotationAddedEventSchema>;
 
 /**
@@ -470,12 +444,8 @@ export const annotationRemovedEventSchema = EventSchema.extend({
   metadata: annotationRemovedEventMetadataSchema,
 });
 
-export type AnnotationRemovedEventData = z.infer<
-  typeof annotationRemovedEventDataSchema
->;
-export type AnnotationRemovedEvent = z.infer<
-  typeof annotationRemovedEventSchema
->;
+export type AnnotationRemovedEventData = z.infer<typeof annotationRemovedEventDataSchema>;
+export type AnnotationRemovedEvent = z.infer<typeof annotationRemovedEventSchema>;
 
 /**
  * Type guard for AnnotationRemovedEvent.
@@ -512,9 +482,7 @@ export const annotationsBulkSyncedEventSchema = EventSchema.extend({
 export type AnnotationsBulkSyncedEventData = z.infer<
   typeof annotationsBulkSyncedEventDataSchema
 >;
-export type AnnotationsBulkSyncedEvent = z.infer<
-  typeof annotationsBulkSyncedEventSchema
->;
+export type AnnotationsBulkSyncedEvent = z.infer<typeof annotationsBulkSyncedEventSchema>;
 
 /**
  * Type guard for AnnotationsBulkSyncedEvent.
@@ -556,9 +524,7 @@ export const traceNameChangedEventSchema = EventSchema.extend({
   metadata: traceNameChangedEventMetadataSchema,
 });
 
-export type TraceNameChangedEventData = z.infer<
-  typeof traceNameChangedEventDataSchema
->;
+export type TraceNameChangedEventData = z.infer<typeof traceNameChangedEventDataSchema>;
 export type TraceNameChangedEvent = z.infer<typeof traceNameChangedEventSchema>;
 
 /**

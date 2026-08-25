@@ -47,13 +47,10 @@ export function resolveShellRoute({
   const isSettingsRoute = isSettingsShellRoute(pathname);
   const isPersonalScopeRoute =
     !isSettingsRoute &&
-    (isPersonalScope ||
-      isPathUnder({ pathname, base: "/me" }) ||
-      isOnOwnPersonalProject);
+    (isPersonalScope || isPathUnder({ pathname, base: "/me" }) || isOnOwnPersonalProject);
   const activeProductId = isSettingsRoute
     ? null
-    : ((isPersonalScopeRoute ? "me" : productFromPathname(pathname)) ??
-      "llm-ops");
+    : ((isPersonalScopeRoute ? "me" : productFromPathname(pathname)) ?? "llm-ops");
   const isOrgScopeRoute =
     isOrgScope ||
     isSettingsRoute ||

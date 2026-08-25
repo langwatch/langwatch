@@ -32,9 +32,7 @@ import type { PlanInfo } from "./license-plan";
  */
 type TierEntitlements = Partial<Pick<PlanInfo, "webhookEndpointsEnabled">>;
 
-export const ENTITLEMENTS_BY_PLAN_TYPE: Partial<
-  Record<string, TierEntitlements>
-> = {
+export const ENTITLEMENTS_BY_PLAN_TYPE: Partial<Record<string, TierEntitlements>> = {
   ENTERPRISE: { webhookEndpointsEnabled: true },
 };
 
@@ -49,9 +47,7 @@ export function applyPlanTypeEntitlements(plan: PlanInfo): PlanInfo {
   if (!entitlements) return plan;
 
   let filled: PlanInfo | undefined;
-  for (const field of Object.keys(entitlements) as Array<
-    keyof TierEntitlements
-  >) {
+  for (const field of Object.keys(entitlements) as Array<keyof TierEntitlements>) {
     if (plan[field] !== undefined) continue;
     filled ??= { ...plan };
     filled[field] = entitlements[field];

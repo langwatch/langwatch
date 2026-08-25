@@ -4,7 +4,10 @@ import {
   processSpanInputOutput,
   type SpanInputOutputMethod,
 } from "../input-output";
-import { type SpanInputOutput, type ChatMessage } from "../../../internal/generated/types/tracer";
+import {
+  type SpanInputOutput,
+  type ChatMessage,
+} from "../../../internal/generated/types/tracer";
 import { INPUT_OUTPUT_TYPES, type InputOutputType } from "../types";
 
 describe("INPUT_OUTPUT_TYPES", () => {
@@ -16,7 +19,7 @@ describe("INPUT_OUTPUT_TYPES", () => {
       "list",
       "json",
       "guardrail_result",
-      "evaluation_result"
+      "evaluation_result",
     ];
 
     expect(INPUT_OUTPUT_TYPES).toEqual(expectedTypes);
@@ -41,10 +44,10 @@ describe("InputOutputType", () => {
       "list",
       "json",
       "guardrail_result",
-      "evaluation_result"
+      "evaluation_result",
     ];
 
-    validTypes.forEach(type => {
+    validTypes.forEach((type) => {
       expect(INPUT_OUTPUT_TYPES).toContain(type);
     });
   });
@@ -52,7 +55,7 @@ describe("InputOutputType", () => {
 
 describe("isValidInputOutputType", () => {
   it("returns true for valid types", () => {
-    INPUT_OUTPUT_TYPES.forEach(type => {
+    INPUT_OUTPUT_TYPES.forEach((type) => {
       expect(isValidInputOutputType(type)).toBe(true);
     });
   });
@@ -67,10 +70,10 @@ describe("isValidInputOutputType", () => {
       "text ", // with space
       "123",
       null,
-      undefined
+      undefined,
     ];
 
-    invalidTypes.forEach(type => {
+    invalidTypes.forEach((type) => {
       expect(isValidInputOutputType(type as any)).toBe(false);
     });
   });
@@ -89,7 +92,7 @@ describe("processSpanInputOutput", () => {
 
       expect(result).toEqual({
         type: "text",
-        value: "Hello world"
+        value: "Hello world",
       });
     });
 
@@ -98,14 +101,14 @@ describe("processSpanInputOutput", () => {
 
       expect(result).toEqual({
         type: "raw",
-        value: "Raw content"
+        value: "Raw content",
       });
     });
 
     it("processes chat_messages type correctly", () => {
       const messages: ChatMessage[] = [
         { role: "user", content: "Hello" },
-        { role: "assistant", content: "Hi there!" }
+        { role: "assistant", content: "Hi there!" },
       ];
 
       const result = processSpanInputOutput("chat_messages", messages);
@@ -117,7 +120,7 @@ describe("processSpanInputOutput", () => {
     it("processes list type correctly", () => {
       const list: SpanInputOutput[] = [
         { type: "text", value: "Item 1" },
-        { type: "text", value: "Item 2" }
+        { type: "text", value: "Item 2" },
       ];
 
       const result = processSpanInputOutput("list", list);
@@ -133,7 +136,7 @@ describe("processSpanInputOutput", () => {
 
       expect(result).toEqual({
         type: "json",
-        value: jsonData
+        value: jsonData,
       });
     });
 
@@ -148,7 +151,7 @@ describe("processSpanInputOutput", () => {
 
       expect(result).toEqual({
         type: "text",
-        value: "123"
+        value: "123",
       });
     });
 
@@ -202,7 +205,7 @@ describe("processSpanInputOutput", () => {
 
       expect(result).toEqual({
         type: "text",
-        value: "Hello world"
+        value: "Hello world",
       });
     });
 
@@ -212,12 +215,12 @@ describe("processSpanInputOutput", () => {
 
       expect(nullResult).toEqual({
         type: "json",
-        value: null
+        value: null,
       });
 
       expect(undefinedResult).toEqual({
         type: "json",
-        value: null
+        value: null,
       });
     });
 
@@ -227,21 +230,21 @@ describe("processSpanInputOutput", () => {
 
       expect(result).toEqual({
         type: "chat_messages",
-        value: [message]
+        value: [message],
       });
     });
 
     it("autoes-detect chat message array", () => {
       const messages: ChatMessage[] = [
         { role: "user", content: "Hello" },
-        { role: "assistant", content: "Hi!" }
+        { role: "assistant", content: "Hi!" },
       ];
 
       const result = processSpanInputOutput(messages);
 
       expect(result).toEqual({
         type: "chat_messages",
-        value: messages
+        value: messages,
       });
     });
 
@@ -258,14 +261,14 @@ describe("processSpanInputOutput", () => {
         string: "test",
         number: 42,
         boolean: true,
-        nested: { array: [1, 2, 3] }
+        nested: { array: [1, 2, 3] },
       };
 
       const result = processSpanInputOutput(obj);
 
       expect(result).toEqual({
         type: "json",
-        value: obj
+        value: obj,
       });
     });
 
@@ -285,7 +288,7 @@ describe("processSpanInputOutput", () => {
 
       expect(result).toEqual({
         type: "list",
-        value: []
+        value: [],
       });
     });
 
@@ -294,7 +297,7 @@ describe("processSpanInputOutput", () => {
 
       expect(result).toEqual({
         type: "json",
-        value: {}
+        value: {},
       });
     });
 
@@ -302,13 +305,13 @@ describe("processSpanInputOutput", () => {
       const complex = {
         users: [
           { id: 1, messages: [{ role: "user", content: "Hello" }] },
-          { id: 2, messages: [{ role: "assistant", content: "Hi" }] }
+          { id: 2, messages: [{ role: "assistant", content: "Hi" }] },
         ],
         metadata: {
           count: 2,
           tags: ["chat", "test"],
-          config: null
-        }
+          config: null,
+        },
       };
 
       const result = processSpanInputOutput(complex);
@@ -368,7 +371,7 @@ describe("processSpanInputOutput", () => {
       const malformedMessages = [
         { role: "user" }, // missing content
         { content: "Hello" }, // missing role
-        { role: "invalid", content: "test" } // invalid role
+        { role: "invalid", content: "test" }, // invalid role
       ];
 
       const result = processSpanInputOutput("chat_messages", malformedMessages);
@@ -389,9 +392,9 @@ describe("processSpanInputOutput", () => {
         nested: {
           deep: {
             array: [1, 2, { more: "nesting" }],
-            func: () => "test"
-          }
-        }
+            func: () => "test",
+          },
+        },
       };
       const result2 = processSpanInputOutput(complexObj);
       expect(result2.type).toBe("json");
@@ -411,7 +414,7 @@ describe("processSpanInputOutput", () => {
       // Test with objects that have non-serializable properties
       const objWithFunction = {
         data: "test",
-        method: () => "hello"
+        method: () => "hello",
       };
 
       const result = processSpanInputOutput(objWithFunction);
@@ -444,10 +447,7 @@ describe("SpanInputOutputMethod type", () => {
   it("defines correct method signatures", () => {
     // This test verifies that the type definition is correct
     // by creating a mock function that implements the interface
-    const mockMethod: SpanInputOutputMethod<void> = (
-      typeOrValue: any,
-      value?: any
-    ) => {
+    const mockMethod: SpanInputOutputMethod<void> = (typeOrValue: any, value?: any) => {
       // Mock implementation
       if (typeof typeOrValue === "string" && value !== undefined) {
         // Explicit type case
@@ -474,11 +474,11 @@ describe("integration scenarios", () => {
   it("handles realistic LLM input/output", () => {
     const input = processSpanInputOutput("chat_messages", [
       { role: "system", content: "You are a helpful assistant." },
-      { role: "user", content: "What is the capital of France?" }
+      { role: "user", content: "What is the capital of France?" },
     ]);
 
     const output = processSpanInputOutput("chat_messages", [
-      { role: "assistant", content: "The capital of France is Paris." }
+      { role: "assistant", content: "The capital of France is Paris." },
     ]);
 
     expect(input.type).toBe("chat_messages");
@@ -490,13 +490,13 @@ describe("integration scenarios", () => {
   it("handles tool call scenarios", () => {
     const toolInput = processSpanInputOutput("json", {
       function: "get_weather",
-      arguments: { location: "Paris", unit: "celsius" }
+      arguments: { location: "Paris", unit: "celsius" },
     });
 
     const toolOutput = processSpanInputOutput("json", {
       temperature: 22,
       condition: "sunny",
-      humidity: 45
+      humidity: 45,
     });
 
     expect(toolInput.type).toBe("json");
@@ -507,30 +507,25 @@ describe("integration scenarios", () => {
     const contexts = [
       "Paris is the capital and most populous city of France.",
       "Paris is located in northern central France, in a north-bending arc of the river Seine.",
-      "The city proper has an area of 105 square kilometres."
+      "The city proper has an area of 105 square kilometres.",
     ];
 
-    const result = processSpanInputOutput("list", contexts.map(context =>
-      processSpanInputOutput("text", context)
-    ));
+    const result = processSpanInputOutput(
+      "list",
+      contexts.map((context) => processSpanInputOutput("text", context)),
+    );
 
     expect(result.type).toBe("list");
     expect(Array.isArray(result.value)).toBe(true);
   });
 
   it("handles streaming scenarios", () => {
-    const chunks = [
-      "The",
-      " capital",
-      " of",
-      " France",
-      " is",
-      " Paris."
-    ];
+    const chunks = ["The", " capital", " of", " France", " is", " Paris."];
 
-    const result = processSpanInputOutput("list", chunks.map(chunk =>
-      processSpanInputOutput("text", chunk)
-    ));
+    const result = processSpanInputOutput(
+      "list",
+      chunks.map((chunk) => processSpanInputOutput("text", chunk)),
+    );
 
     expect(result.type).toBe("list");
     expect(Array.isArray(result.value)).toBe(true);
@@ -546,7 +541,7 @@ describe("integration scenarios", () => {
     // Auto-detect chat messages
     const chatResult = processSpanInputOutput([
       { role: "user", content: "Hello" },
-      { role: "assistant", content: "Hi there!" }
+      { role: "assistant", content: "Hi there!" },
     ]);
     expect(chatResult.type).toBe("chat_messages");
     expect(Array.isArray(chatResult.value)).toBe(true);
@@ -555,7 +550,7 @@ describe("integration scenarios", () => {
     const objectResult = processSpanInputOutput({
       timestamp: "2024-01-01T00:00:00Z",
       data: { user_id: 123, action: "login" },
-      metadata: { source: "web", version: "1.0" }
+      metadata: { source: "web", version: "1.0" },
     });
     expect(objectResult.type).toBe("json");
     expect(typeof objectResult.value).toBe("object");

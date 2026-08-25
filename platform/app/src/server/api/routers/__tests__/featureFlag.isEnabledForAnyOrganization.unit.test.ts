@@ -63,9 +63,7 @@ function buildMockPrisma(memberOf: Set<string>) {
       findUnique: vi.fn(({ where }: any) => {
         const { userId, organizationId } = where.userId_organizationId;
         if (userId !== USER_ID) return Promise.resolve(null);
-        return Promise.resolve(
-          memberOf.has(organizationId) ? { organizationId } : null,
-        );
+        return Promise.resolve(memberOf.has(organizationId) ? { organizationId } : null);
       }),
     },
   } as unknown as PrismaClient;
@@ -91,9 +89,7 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
 
   describe("when the user is a member of every input organization", () => {
     it("evaluates the flag for those organizations", async () => {
-      const caller = buildCaller(
-        buildMockPrisma(new Set([OWN_ORG_A, OWN_ORG_B])),
-      );
+      const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG_A, OWN_ORG_B])));
       mockIsEnabled.mockImplementation(
         async (_flag, opts: any) => opts.organizationId === OWN_ORG_B,
       );
@@ -150,12 +146,10 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
       const memberCaller = buildCaller(buildMockPrisma(new Set([OWN_ORG_A])));
       mockIsEnabled.mockResolvedValue(false);
 
-      const nonMemberResult = await nonMemberCaller.isEnabledForAnyOrganization(
-        {
-          flag: FLAG,
-          organizationIds: [FOREIGN_ORG],
-        },
-      );
+      const nonMemberResult = await nonMemberCaller.isEnabledForAnyOrganization({
+        flag: FLAG,
+        organizationIds: [FOREIGN_ORG],
+      });
       const memberResult = await memberCaller.isEnabledForAnyOrganization({
         flag: FLAG,
         organizationIds: [OWN_ORG_A],

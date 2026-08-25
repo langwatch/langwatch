@@ -48,30 +48,25 @@ export const TerminalOutput = memo(function TerminalOutput({
   const [expanded, setExpanded] = useState(false);
   const { copy } = useCopyToClipboard();
 
-  const { visibleText, isCollapsible, foldLabel, isDisplayCapped } =
-    useMemo(() => {
-      const lines = text.split("\n");
-      const hiddenLineCount = lines.length - COLLAPSE_AT_LINES;
-      const collapsible =
-        hiddenLineCount > 0 || text.length > COLLAPSE_AT_CHARS;
-      const shown =
-        collapsible && !expanded
-          ? lines
-              .slice(0, COLLAPSE_AT_LINES)
-              .join("\n")
-              .slice(0, COLLAPSE_AT_CHARS)
-          : text.slice(0, RENDER_CEILING_CHARS);
-      const hiddenCharCount = text.length - shown.length;
-      return {
-        visibleText: shown,
-        isCollapsible: collapsible,
-        foldLabel:
-          hiddenLineCount > 0
-            ? `+${hiddenLineCount} lines`
-            : `+${formatCharCount(hiddenCharCount)}`,
-        isDisplayCapped: expanded && text.length > RENDER_CEILING_CHARS,
-      };
-    }, [text, expanded]);
+  const { visibleText, isCollapsible, foldLabel, isDisplayCapped } = useMemo(() => {
+    const lines = text.split("\n");
+    const hiddenLineCount = lines.length - COLLAPSE_AT_LINES;
+    const collapsible = hiddenLineCount > 0 || text.length > COLLAPSE_AT_CHARS;
+    const shown =
+      collapsible && !expanded
+        ? lines.slice(0, COLLAPSE_AT_LINES).join("\n").slice(0, COLLAPSE_AT_CHARS)
+        : text.slice(0, RENDER_CEILING_CHARS);
+    const hiddenCharCount = text.length - shown.length;
+    return {
+      visibleText: shown,
+      isCollapsible: collapsible,
+      foldLabel:
+        hiddenLineCount > 0
+          ? `+${hiddenLineCount} lines`
+          : `+${formatCharCount(hiddenCharCount)}`,
+      isDisplayCapped: expanded && text.length > RENDER_CEILING_CHARS,
+    };
+  }, [text, expanded]);
 
   const handleClick = useCallback(() => {
     const selection = window.getSelection?.();

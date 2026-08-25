@@ -72,9 +72,7 @@ export function WorkflowCardDisplay({
       </Text>
       {updatedAt && (
         <Text paddingX={4} color="fg.subtle" fontSize="12px">
-          {formatTimeAgo(
-            typeof updatedAt === "number" ? updatedAt : updatedAt.getTime(),
-          )}
+          {formatTimeAgo(typeof updatedAt === "number" ? updatedAt : updatedAt.getTime())}
         </Text>
       )}
     </WorkflowCardBase>
@@ -106,8 +104,7 @@ export function WorkflowCard({
   const syncFromSource = api.workflow.syncFromSource.useMutation();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
-  const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] =
-    useState(false);
+  const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] = useState(false);
 
   // Query related entities when delete dialog is open
   const relatedEntitiesQuery = api.workflow.getRelatedEntities.useQuery(
@@ -116,9 +113,7 @@ export function WorkflowCard({
   );
 
   // Get the workflow data to check if it's a copy or has copies
-  const workflow = workflowId
-    ? query?.data?.find((w) => w.id === workflowId)
-    : undefined;
+  const workflow = workflowId ? query?.data?.find((w) => w.id === workflowId) : undefined;
   const isCopiedWorkflow = !!workflow?.copiedFromWorkflowId;
   const hasCopies = (workflow?._count?.copiedWorkflows ?? 0) > 0;
 
@@ -190,9 +185,7 @@ export function WorkflowCard({
             toaster.create({
               title: `Workflow "${name}" deleted`,
               description:
-                parts.length > 0
-                  ? `Also deleted: ${parts.join(", ")}`
-                  : undefined,
+                parts.length > 0 ? `Also deleted: ${parts.join(", ")}` : undefined,
               type: "success",
             });
           },
@@ -253,9 +246,7 @@ export function WorkflowCard({
                 {isCopiedWorkflow && (
                   <Tooltip
                     content={
-                      sourceProjectPath
-                        ? `Copied from: ${sourceProjectPath}`
-                        : undefined
+                      sourceProjectPath ? `Copied from: ${sourceProjectPath}` : undefined
                     }
                     disabled={!sourceProjectPath}
                     positioning={{ placement: "right" }}
@@ -271,10 +262,7 @@ export function WorkflowCard({
                     <ArrowUp size={16} /> Push to replicas
                   </Menu.Item>
                 )}
-                <Menu.Item
-                  value="copy"
-                  onClick={() => setIsCopyDialogOpen(true)}
-                >
+                <Menu.Item value="copy" onClick={() => setIsCopyDialogOpen(true)}>
                   <Copy size={16} /> Replicate to another project
                 </Menu.Item>
                 <Menu.Item
@@ -307,9 +295,7 @@ export function WorkflowCard({
         open={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={onArchiveWorkflow}
-        isLoading={
-          cascadeArchiveWorkflow.isPending || archiveWorkflow.isPending
-        }
+        isLoading={cascadeArchiveWorkflow.isPending || archiveWorkflow.isPending}
         isLoadingRelated={relatedEntitiesQuery.isLoading}
         entityType="workflow"
         entityName={name}

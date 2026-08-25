@@ -103,9 +103,7 @@ describe("createAppAnalyticsClient", () => {
           isGtagReady: false,
         });
 
-        const posthogProvider = client.providers.find(
-          (p) => p.id === "posthog",
-        )!;
+        const posthogProvider = client.providers.find((p) => p.id === "posthog")!;
 
         await expect(
           posthogProvider.send(

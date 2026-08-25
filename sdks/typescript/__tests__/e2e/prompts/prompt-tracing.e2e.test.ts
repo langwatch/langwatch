@@ -16,7 +16,7 @@ describe("Prompt tracing", () => {
     const { LangWatch } = await getLangwatchSDK();
     langwatch = new LangWatch({
       apiKey: process.env.LANGWATCH_API_KEY,
-      endpoint: process.env.LANGWATCH_ENDPOINT
+      endpoint: process.env.LANGWATCH_ENDPOINT,
     });
   });
 
@@ -35,7 +35,7 @@ describe("Prompt tracing", () => {
       getSpan = await findFinishedSpanByName("PromptsApiService.get");
     });
 
-    it('creates 1 span', () => {
+    it("creates 1 span", () => {
       const allSpans = spanExporter.getFinishedSpans();
       expect(allSpans.length).toBe(1);
     });
@@ -45,9 +45,7 @@ describe("Prompt tracing", () => {
     });
 
     it("sets span type to 'prompt'", () => {
-      expect(getSpan?.attributes[attributes.ATTR_LANGWATCH_SPAN_TYPE]).toBe(
-        "prompt",
-      );
+      expect(getSpan?.attributes[attributes.ATTR_LANGWATCH_SPAN_TYPE]).toBe("prompt");
     });
 
     it("sets prompt metadata attributes", () => {
@@ -58,13 +56,9 @@ describe("Prompt tracing", () => {
     });
 
     it("sets output data", () => {
-      expect(
-        getSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT],
-      ).toBeDefined();
+      expect(getSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT]).toBeDefined();
 
-      const outputAttr = getSpan?.attributes[
-        attributes.ATTR_LANGWATCH_OUTPUT
-      ] as string;
+      const outputAttr = getSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT] as string;
       const output = JSON.parse(outputAttr);
 
       // Verify the prompt response structure is captured
@@ -95,9 +89,7 @@ describe("Prompt tracing", () => {
     });
 
     it("sets span type to 'prompt'", () => {
-      expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_SPAN_TYPE]).toBe(
-        "prompt",
-      );
+      expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_SPAN_TYPE]).toBe("prompt");
     });
 
     it("sets prompt metadata attributes", () => {
@@ -109,18 +101,14 @@ describe("Prompt tracing", () => {
 
     it("sets output data", () => {
       // Check that output was set (it should be JSON stringified)
-      expect(
-        compileSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT],
-      ).toBeDefined();
+      expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT]).toBeDefined();
 
       const outputAttr = compileSpan?.attributes[
         attributes.ATTR_LANGWATCH_OUTPUT
       ] as string;
       const output = JSON.parse(outputAttr);
 
-      expect(output.value.prompt).toBe(
-        "Hello Alice, how is the weather today?",
-      );
+      expect(output.value.prompt).toBe("Hello Alice, how is the weather today?");
       expect(output.value.messages[1].content).toBe("Tell me about weather");
     });
 

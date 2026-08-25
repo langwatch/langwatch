@@ -10,10 +10,7 @@
  * specs/rbac/typed-permission-declarations.feature is the behavioural
  * contract these pin.
  */
-import {
-  type Authorized,
-  PermissionDeniedError,
-} from "@langwatch/authz-contract";
+import { type Authorized, PermissionDeniedError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { App } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
@@ -105,11 +102,7 @@ describe("the imperative permission facade", () => {
       const app = appDeciding(true);
 
       await expect(
-        requireProjectPermission(
-          { session: null, app },
-          "project_1",
-          "traces:view",
-        ),
+        requireProjectPermission({ session: null, app }, "project_1", "traces:view"),
       ).rejects.toMatchObject({ code: "permission_denied" });
       expect(app.permissions.getDecision).not.toHaveBeenCalled();
     });

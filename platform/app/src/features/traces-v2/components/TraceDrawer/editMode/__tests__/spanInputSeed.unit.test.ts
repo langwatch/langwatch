@@ -70,9 +70,7 @@ describe("given a span whose system prompt is recorded as content blocks", () =>
     [
       "as an array of content blocks",
       {
-        "gen_ai.system_instructions": [
-          { type: "text", content: SYSTEM_PROMPT },
-        ],
+        "gen_ai.system_instructions": [{ type: "text", content: SYSTEM_PROMPT }],
       },
     ],
     [
@@ -144,12 +142,10 @@ describe("given a span with no system prompt attribute", () => {
     it("seeds what was captured", () => {
       const recorded = JSON.stringify(MESSAGES);
 
-      expect(capturedInputForEditing({ text: recorded, params: {} })).toBe(
-        recorded,
+      expect(capturedInputForEditing({ text: recorded, params: {} })).toBe(recorded);
+      expect(capturedInputForEditing({ text: "plain prose", params: null })).toBe(
+        "plain prose",
       );
-      expect(
-        capturedInputForEditing({ text: "plain prose", params: null }),
-      ).toBe("plain prose");
       expect(capturedInputForEditing({ text: null, params: null })).toBeNull();
     });
   });

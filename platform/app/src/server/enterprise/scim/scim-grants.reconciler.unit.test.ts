@@ -10,10 +10,7 @@ import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
-import {
-  type DesiredScimGrant,
-  reconcileScimGrants,
-} from "./scim-grants.reconciler";
+import { type DesiredScimGrant, reconcileScimGrants } from "./scim-grants.reconciler";
 
 const ORG_ID = "org_1";
 const USER_ID = "user_1";
@@ -120,9 +117,7 @@ describe("reconcileScimGrants", () => {
 
   describe("when a stored grant differs only by its role", () => {
     it("revokes the stale one and attaches the asserted one", async () => {
-      findMany.mockResolvedValue([
-        { ...storedMemberRow, role: TeamUserRole.VIEWER },
-      ]);
+      findMany.mockResolvedValue([{ ...storedMemberRow, role: TeamUserRole.VIEWER }]);
 
       const outcome = await reconcile({ desired: [memberOfOrg] });
 

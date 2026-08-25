@@ -70,15 +70,11 @@ export type AppGovernanceEventingAdapterOptions = {
 };
 
 class AppPulledUsageLedgerPort extends PulledUsageLedgerPort {
-  private constructor(
-    private readonly repository: GatewayBudgetClickHouseRepository,
-  ) {
+  private constructor(private readonly repository: GatewayBudgetClickHouseRepository) {
     super();
   }
 
-  static create(
-    repository: GatewayBudgetClickHouseRepository,
-  ): AppPulledUsageLedgerPort {
+  static create(repository: GatewayBudgetClickHouseRepository): AppPulledUsageLedgerPort {
     return new AppPulledUsageLedgerPort(repository);
   }
 
@@ -92,9 +88,7 @@ class AppPulledUsageDispatcherPort extends PulledUsageDispatcherPort {
     super();
   }
 
-  static create(
-    commands: PulledUsageCommands,
-  ): AppPulledUsageDispatcherPort {
+  static create(commands: PulledUsageCommands): AppPulledUsageDispatcherPort {
     return new AppPulledUsageDispatcherPort(commands);
   }
 
@@ -138,9 +132,7 @@ class AppIngestionPullOutcomePort extends IngestionPullOutcomePort {
     await this.requireCommands().recordRunCompleted(input);
   }
 
-  async failed(
-    input: Parameters<IngestionPullOutcomePort["failed"]>[0],
-  ): Promise<void> {
+  async failed(input: Parameters<IngestionPullOutcomePort["failed"]>[0]): Promise<void> {
     await this.requireCommands().recordRunFailed(input);
   }
 
@@ -155,9 +147,7 @@ class AppIngestionPullOutcomePort extends IngestionPullOutcomePort {
 }
 
 class AppIngestionPullMetricsPort extends IngestionPullMetricsPort {
-  count(
-    outcome: "completed" | "failed_retryable" | "failed_final",
-  ): void {
+  count(outcome: "completed" | "failed_retryable" | "failed_final"): void {
     incrementIngestionPullTotal({ outcome });
   }
 
@@ -199,9 +189,7 @@ class AppIngestionPullLifecycleCommandPort extends IngestionPullLifecycleCommand
     super();
   }
 
-  static create(
-    commands: IngestionPullCommands,
-  ): AppIngestionPullLifecycleCommandPort {
+  static create(commands: IngestionPullCommands): AppIngestionPullLifecycleCommandPort {
     return new AppIngestionPullLifecycleCommandPort(commands);
   }
 
@@ -225,9 +213,7 @@ class AppIngestionPullDiagnosticsPort extends GovernanceDiagnosticsPort {
 }
 
 export class AppGovernanceEventingAdapter {
-  private constructor(
-    private readonly options: AppGovernanceEventingAdapterOptions,
-  ) {}
+  private constructor(private readonly options: AppGovernanceEventingAdapterOptions) {}
 
   static create(
     options: AppGovernanceEventingAdapterOptions,
@@ -256,9 +242,7 @@ export class AppGovernanceEventingAdapter {
       PulledUsageEventingAdapter.create({
         ledger: this.options.pulledUsageLedger
           ? PulledUsageLedgerProcess.create(
-              AppPulledUsageLedgerPort.create(
-                this.options.pulledUsageLedger,
-              ),
+              AppPulledUsageLedgerPort.create(this.options.pulledUsageLedger),
             )
           : undefined,
       }).build(),
@@ -291,9 +275,7 @@ export class AppGovernanceEventingAdapter {
     return { commands: { ingestionPull, pulledUsage }, lifecycle };
   }
 
-  private lifecycle(
-    commands: IngestionPullCommands,
-  ): IngestionPullLifecycleService {
+  private lifecycle(commands: IngestionPullCommands): IngestionPullLifecycleService {
     return PostgresIngestionPullLifecycleAdapter.create({
       database: this.options.database,
       tenant: AppIngestionPullTenantPort.create(this.options.resolveTenantId),

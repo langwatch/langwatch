@@ -53,7 +53,7 @@ export async function listSuites(): Promise<SuiteSummary[]> {
 export async function getSuite(id: string): Promise<SuiteSummary> {
   return makeRequest(
     "GET",
-    `/api/suites/${encodeURIComponent(id)}`
+    `/api/suites/${encodeURIComponent(id)}`,
   ) as Promise<SuiteSummary>;
 }
 
@@ -83,7 +83,7 @@ export async function updateSuite(params: {
   return makeRequest(
     "PATCH",
     `/api/suites/${encodeURIComponent(id)}`,
-    data
+    data,
   ) as Promise<SuiteSummary>;
 }
 
@@ -91,28 +91,25 @@ export async function updateSuite(params: {
 export async function duplicateSuite(id: string): Promise<SuiteSummary> {
   return makeRequest(
     "POST",
-    `/api/suites/${encodeURIComponent(id)}/duplicate`
+    `/api/suites/${encodeURIComponent(id)}/duplicate`,
   ) as Promise<SuiteSummary>;
 }
 
 /** Triggers a suite run. */
 export async function runSuite(
   id: string,
-  idempotencyKey?: string
+  idempotencyKey?: string,
 ): Promise<SuiteRunResult> {
-  return makeRequest(
-    "POST",
-    `/api/suites/${encodeURIComponent(id)}/run`,
-    { idempotencyKey: idempotencyKey ?? `mcp-${Date.now()}-${Math.random().toString(36).slice(2)}` }
-  ) as Promise<SuiteRunResult>;
+  return makeRequest("POST", `/api/suites/${encodeURIComponent(id)}/run`, {
+    idempotencyKey:
+      idempotencyKey ?? `mcp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  }) as Promise<SuiteRunResult>;
 }
 
 /** Archives (soft-deletes) a suite. */
-export async function archiveSuite(
-  id: string
-): Promise<SuiteArchiveResponse> {
+export async function archiveSuite(id: string): Promise<SuiteArchiveResponse> {
   return makeRequest(
     "DELETE",
-    `/api/suites/${encodeURIComponent(id)}`
+    `/api/suites/${encodeURIComponent(id)}`,
   ) as Promise<SuiteArchiveResponse>;
 }

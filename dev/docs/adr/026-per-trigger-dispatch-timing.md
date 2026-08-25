@@ -27,10 +27,10 @@ trace. Cadence controls when accepted notification matches are delivered.
 
 Every trigger stores two timing values:
 
-| Setting | Meaning |
-|---|---|
-| `traceDebounceMs` | Width of the deterministic activity window used before filter evaluation |
-| `notificationCadence` | Wall-clock delivery window for human-facing notifications |
+| Setting               | Meaning                                                                  |
+| --------------------- | ------------------------------------------------------------------------ |
+| `traceDebounceMs`     | Width of the deterministic activity window used before filter evaluation |
+| `notificationCadence` | Wall-clock delivery window for human-facing notifications                |
 
 `traceDebounceMs` is an integer duration. `notificationCadence` is a stable
 string vocabulary whose supported values include immediate, five-minute,
@@ -39,15 +39,9 @@ fifteen-minute and hourly delivery.
 ### Every action has exactly one class
 
 ```ts
-const NOTIFY_TRIGGER_ACTIONS = new Set([
-  "SEND_EMAIL",
-  "SEND_SLACK_MESSAGE",
-]);
+const NOTIFY_TRIGGER_ACTIONS = new Set(["SEND_EMAIL", "SEND_SLACK_MESSAGE"]);
 
-const PERSIST_TRIGGER_ACTIONS = new Set([
-  "ADD_TO_DATASET",
-  "ADD_TO_ANNOTATION_QUEUE",
-]);
+const PERSIST_TRIGGER_ACTIONS = new Set(["ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE"]);
 ```
 
 The sets are exhaustive and disjoint. Notification cadence is available only

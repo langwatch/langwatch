@@ -38,9 +38,7 @@ afterEach(cleanup);
  * A settled trace search exactly as the live transport hands it to the panel:
  * a `bash` call the envelope retyped, its input still the shell payload.
  */
-function traceSearch(
-  over: { name?: string; state?: string; output?: unknown } = {},
-) {
+function traceSearch(over: { name?: string; state?: string; output?: unknown } = {}) {
   return {
     name: over.name ?? "langwatch.trace.search",
     state: over.state ?? "output-available",
@@ -72,8 +70,7 @@ function renderCall(call: {
   );
 }
 
-const chipRow = () =>
-  screen.queryByRole("navigation", { name: "Suggested next steps" });
+const chipRow = () => screen.queryByRole("navigation", { name: "Suggested next steps" });
 
 describe("LangyCapabilityRenderer follow-up chips", () => {
   describe("given a trace search that found traces", () => {

@@ -20,10 +20,7 @@ import { TraceService } from "~/server/traces/trace.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { getUserProtectionsForProject } from "../utils";
 import type { SharedTraceDto } from "./sharedTrace.schemas";
-import {
-  SHARE_MAX_FULL_SPANS,
-  sharedTraceDtoSchema,
-} from "./sharedTrace.schemas";
+import { SHARE_MAX_FULL_SPANS, sharedTraceDtoSchema } from "./sharedTrace.schemas";
 import {
   deriveTraceDropPrivacy,
   mapSpanSummaryToTreeNode,
@@ -111,8 +108,7 @@ export const sharedTraceRouter = createTRPCRouter({
     // only `input`/`use` so every procedure is forced through the permission
     // middleware, and it is that `use` which hands back the full tRPC builder.
     .noPermission({
-      reason:
-        "the share token in the input is the whole authorization; see ADR-057",
+      reason: "the share token in the input is the whole authorization; see ADR-057",
     })
     .output(sharedTraceDtoSchema)
     .query(async ({ input, ctx }) => {
@@ -265,11 +261,7 @@ export const sharedTraceRouter = createTRPCRouter({
           undefined,
           undefined,
           ctx.app.evaluations,
-        ).getEvaluationsMultiple(
-          projectId,
-          [traceId],
-          protections,
-        ),
+        ).getEvaluationsMultiple(projectId, [traceId], protections),
       ]);
 
       // Header (spend stripped; the DROP banner derives exactly as the
@@ -299,9 +291,7 @@ export const sharedTraceRouter = createTRPCRouter({
       // and the payload says so rather than rendering an empty detail pane.
       const isSpanDetailTruncated = fullSpans.length > SHARE_MAX_FULL_SPANS;
       const spansFull = mapSpansToDetailDtos(
-        isSpanDetailTruncated
-          ? fullSpans.slice(0, SHARE_MAX_FULL_SPANS)
-          : fullSpans,
+        isSpanDetailTruncated ? fullSpans.slice(0, SHARE_MAX_FULL_SPANS) : fullSpans,
         protections,
       );
 
@@ -366,12 +356,8 @@ function buildResourceInfo(
   const root = rows.find((r) => r.parentSpanId == null) ?? rows[0] ?? null;
   return {
     rootSpanId: root?.spanId ?? null,
-    resourceAttributes: withoutHiddenResourceAttrs(
-      root?.resourceAttributes ?? {},
-    ),
-    scope: root
-      ? { name: root.scopeName ?? "", version: root.scopeVersion }
-      : null,
+    resourceAttributes: withoutHiddenResourceAttrs(root?.resourceAttributes ?? {}),
+    scope: root ? { name: root.scopeName ?? "", version: root.scopeVersion } : null,
     spans,
   };
 }

@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Center,
-  HStack,
-  Spinner,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Center, HStack, Spinner, Text } from "@chakra-ui/react";
 import { JsonViewer } from "~/components/ops/JsonViewer";
 import { api } from "~/utils/api";
 import { EventDetail } from "./EventDetail";
@@ -80,9 +72,7 @@ export function CenterPanel({
 
   if (selectedProjection) {
     const state = projectionStateQuery.data?.state;
-    const prevState = showDiff
-      ? prevProjectionStateQuery.data?.state
-      : undefined;
+    const prevState = showDiff ? prevProjectionStateQuery.data?.state : undefined;
 
     return (
       <Box
@@ -125,15 +115,13 @@ export function CenterPanel({
           ) : state != null ? (
             <JsonViewer
               data={state}
-              previousData={
-                showDiff && prevState != null ? prevState : undefined
-              }
+              previousData={showDiff && prevState != null ? prevState : undefined}
               maxHeight="calc(100vh - 300px)"
             />
           ) : (
             <Text textStyle="xs" color="fg.muted">
-              No projection state computed. This projection may not handle the
-              events for this aggregate.
+              No projection state computed. This projection may not handle the events for
+              this aggregate.
             </Text>
           )}
         </Box>
@@ -142,13 +130,7 @@ export function CenterPanel({
   }
 
   return (
-    <Box
-      flex={1}
-      overflow="hidden"
-      display="flex"
-      flexDirection="column"
-      bg="bg.subtle"
-    >
+    <Box flex={1} overflow="hidden" display="flex" flexDirection="column" bg="bg.subtle">
       <HStack
         paddingX={4}
         paddingY={2}

@@ -40,12 +40,11 @@ describe("isOrgScopedPermission", () => {
   });
 
   describe("given a team-scoped permission", () => {
-    it.each([
-      "analytics:view",
-      "datasets:manage",
-      "evaluations:view",
-    ] as const)("does not route %s against the organization role", (permission) => {
-      expect(isOrgScopedPermission(permission)).toBe(false);
-    });
+    it.each(["analytics:view", "datasets:manage", "evaluations:view"] as const)(
+      "does not route %s against the organization role",
+      (permission) => {
+        expect(isOrgScopedPermission(permission)).toBe(false);
+      },
+    );
   });
 });

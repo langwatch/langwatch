@@ -55,13 +55,7 @@ function refloorPeriods({
 
 describe("anchored cycle math", () => {
   it("names exactly the windows that roll on their own", () => {
-    expect([...CYCLIC_WINDOWS]).toEqual([
-      "MINUTE",
-      "HOUR",
-      "DAY",
-      "WEEK",
-      "MONTH",
-    ]);
+    expect([...CYCLIC_WINDOWS]).toEqual(["MINUTE", "HOUR", "DAY", "WEEK", "MONTH"]);
     expect(isCyclicWindow("TOTAL")).toBe(false);
     expect(isCyclicWindow("MANUAL")).toBe(false);
     expect(isCyclicWindow("MONTH")).toBe(true);
@@ -74,12 +68,12 @@ describe("anchored cycle math", () => {
     // Mid-period: July 15th still belongs to the period that opened on the
     // 17th of June, and the next boundary is the 17th of July.
     const now = new Date("2026-07-15T00:00:00.000Z");
-    expect(
-      iso(anchoredPeriodStart({ window: "MONTH", anchorAt: anchor, now })),
-    ).toBe("2026-06-17T09:00:00.000Z");
-    expect(
-      iso(nextAnchoredResetAt({ window: "MONTH", anchorAt: anchor, now })),
-    ).toBe("2026-07-17T09:00:00.000Z");
+    expect(iso(anchoredPeriodStart({ window: "MONTH", anchorAt: anchor, now }))).toBe(
+      "2026-06-17T09:00:00.000Z",
+    );
+    expect(iso(nextAnchoredResetAt({ window: "MONTH", anchorAt: anchor, now }))).toBe(
+      "2026-07-17T09:00:00.000Z",
+    );
 
     // The boundary opens the new period: one millisecond before it the old
     // period still holds, at it exactly the new one does.

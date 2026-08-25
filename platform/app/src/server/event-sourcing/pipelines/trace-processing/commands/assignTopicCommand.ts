@@ -1,9 +1,5 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
-import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
@@ -19,25 +15,20 @@ import type { TopicAssignedEvent } from "../schemas/events";
 /**
  * Command handler for assigning topics to traces in the trace processing pipeline.
  */
-export class AssignTopicCommand
-  implements CommandHandler<Command<AssignTopicCommandData>, TopicAssignedEvent>
-{
+export class AssignTopicCommand implements CommandHandler<
+  Command<AssignTopicCommandData>,
+  TopicAssignedEvent
+> {
   static readonly schema = defineCommandSchema(
     ASSIGN_TOPIC_COMMAND_TYPE,
     assignTopicCommandDataSchema,
     "Command to assign a topic to a trace in the trace processing pipeline",
   );
 
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.assign-topic",
-  );
-  private readonly logger = createLogger(
-    "langwatch:trace-processing:assign-topic",
-  );
+  private readonly tracer = getLangWatchTracer("langwatch.trace-processing.assign-topic");
+  private readonly logger = createLogger("langwatch:trace-processing:assign-topic");
 
-  async handle(
-    command: Command<AssignTopicCommandData>,
-  ): Promise<TopicAssignedEvent[]> {
+  async handle(command: Command<AssignTopicCommandData>): Promise<TopicAssignedEvent[]> {
     return await this.tracer.withActiveSpan(
       "AssignTopicCommand.handle",
       {

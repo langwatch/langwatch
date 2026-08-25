@@ -47,9 +47,7 @@ export function useChoicesRefRows(
     return byType;
   }, [options]);
 
-  const [resolved, setResolved] = useState<Map<string, ChoicesRefRow>>(
-    () => new Map(),
-  );
+  const [resolved, setResolved] = useState<Map<string, ChoicesRefRow>>(() => new Map());
 
   useEffect(() => {
     if (!projectId || hydratable.size === 0) return;
@@ -75,9 +73,7 @@ export function useChoicesRefRows(
                 row
                   ? {
                       state: "live",
-                      ...(row.primary !== undefined
-                        ? { primary: row.primary }
-                        : {}),
+                      ...(row.primary !== undefined ? { primary: row.primary } : {}),
                       ...(row.secondary !== undefined
                         ? { secondary: row.secondary }
                         : {}),

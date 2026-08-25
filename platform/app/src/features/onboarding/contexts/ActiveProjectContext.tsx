@@ -25,9 +25,9 @@ export interface ActiveProjectContextValue {
   onFreshToken?: (token: string) => void;
 }
 
-const ActiveProjectContext = createContext<
-  ActiveProjectContextValue | undefined
->(undefined);
+const ActiveProjectContext = createContext<ActiveProjectContextValue | undefined>(
+  undefined,
+);
 
 export function ActiveProjectProvider({
   value,

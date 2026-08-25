@@ -100,8 +100,7 @@ export function deriveSessionBanner({
     }),
     // Some agents ship service.version already v-prefixed; the banner adds
     // its own v, so strip one here or it renders "vv24.11.1".
-    version:
-      str(resourceAttributes["service.version"])?.replace(/^v/, "") ?? null,
+    version: str(resourceAttributes["service.version"])?.replace(/^v/, "") ?? null,
     model,
     repo: str(resourceAttributes["project.repo"]),
   };

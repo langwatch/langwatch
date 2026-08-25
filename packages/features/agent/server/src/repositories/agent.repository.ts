@@ -25,10 +25,7 @@ export type PersistAgentInput = {
 };
 
 export abstract class AgentRepository {
-  abstract tryFindById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<Agent | null>;
+  abstract tryFindById(input: { id: string; projectId: string }): Promise<Agent | null>;
   abstract tryFindByIdOnly(id: string): Promise<Agent | null>;
   abstract findAll(input: { projectId: string }): Promise<Agent[]>;
   abstract findReferenceStates(input: {

@@ -105,21 +105,15 @@ function makeFakeClickHouse(rows: Row[]) {
         );
         if (matched.length === 0) {
           return {
-            json: async () => [
-              { cnt: "0", minOccurredAt: "0", maxOccurredAt: "0" },
-            ],
+            json: async () => [{ cnt: "0", minOccurredAt: "0", maxOccurredAt: "0" }],
           };
         }
         return {
           json: async () => [
             {
               cnt: String(matched.length),
-              minOccurredAt: String(
-                Math.min(...matched.map((r) => r.EventOccurredAt)),
-              ),
-              maxOccurredAt: String(
-                Math.max(...matched.map((r) => r.EventOccurredAt)),
-              ),
+              minOccurredAt: String(Math.min(...matched.map((r) => r.EventOccurredAt))),
+              maxOccurredAt: String(Math.max(...matched.map((r) => r.EventOccurredAt))),
             },
           ],
         };
@@ -173,14 +167,12 @@ function makeFakeClickHouse(rows: Row[]) {
           matched = matched.filter(
             (r) =>
               r.EventTimestamp > p.cursorTimestamp ||
-              (r.EventTimestamp === p.cursorTimestamp &&
-                r.EventId > p.cursorEventId),
+              (r.EventTimestamp === p.cursorTimestamp && r.EventId > p.cursorEventId),
           );
         }
         matched.sort(
           (a, b) =>
-            a.EventTimestamp - b.EventTimestamp ||
-            a.EventId.localeCompare(b.EventId),
+            a.EventTimestamp - b.EventTimestamp || a.EventId.localeCompare(b.EventId),
         );
         matched = matched.slice(0, p.batchSize ?? 5000);
         return {
@@ -339,12 +331,10 @@ describe("replayStateProjection", () => {
 
     const ctx: ReplayContext = {
       redis,
-      eventSource: new ClickHouseReplayEventSource(
-        async (tenantId?: string) => {
-          if (tenantId) resolvedTenants.push(tenantId);
-          return client;
-        },
-      ),
+      eventSource: new ClickHouseReplayEventSource(async (tenantId?: string) => {
+        if (tenantId) resolvedTenants.push(tenantId);
+        return client;
+      }),
       accumulatorOpts: {},
     };
 
@@ -364,9 +354,7 @@ describe("replayStateProjection", () => {
     // Never merged with an existing row.
     expect(store.load).not.toHaveBeenCalled();
     // Only SELECTs — the state path reads CH, never writes it.
-    expect(
-      queries.every((q) => q.trim().toUpperCase().startsWith("SELECT")),
-    ).toBe(true);
+    expect(queries.every((q) => q.trim().toUpperCase().startsWith("SELECT"))).toBe(true);
 
     // One row per (tenant, key).
     expect(writes).toHaveLength(2);

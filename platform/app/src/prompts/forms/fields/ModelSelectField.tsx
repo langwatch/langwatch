@@ -2,17 +2,13 @@ import { VStack } from "@chakra-ui/react";
 import { Controller, useFormContext } from "react-hook-form";
 
 import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "~/components/ModelSelector";
+import { allModelOptions, useModelSelectionOptions } from "~/components/ModelSelector";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";
 import type { PromptConfigFormValues } from "~/prompts";
 
 export function ModelSelectField() {
-  const { control, formState, watch, trigger } =
-    useFormContext<PromptConfigFormValues>();
+  const { control, formState, watch, trigger } = useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
 
   // Get the current model value from the form
@@ -62,9 +58,7 @@ export function ModelSelectField() {
       {isModelDisabled && (
         <AddModelProviderKey
           runWhat="run this prompt"
-          nodeProvidersWithoutCustomKeys={[
-            currentModel.split("/")[0] ?? "unknown",
-          ]}
+          nodeProvidersWithoutCustomKeys={[currentModel.split("/")[0] ?? "unknown"]}
         />
       )}
     </VStack>

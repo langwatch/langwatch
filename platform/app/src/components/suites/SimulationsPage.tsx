@@ -25,10 +25,7 @@ import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPan
 import { RunHistoryPanel } from "~/components/suites/RunHistoryPanel";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
 import { SuiteContextMenu } from "~/components/suites/SuiteContextMenu";
-import {
-  SuiteDetailPanel,
-  SuiteEmptyState,
-} from "~/components/suites/SuiteDetailPanel";
+import { SuiteDetailPanel, SuiteEmptyState } from "~/components/suites/SuiteDetailPanel";
 import { SuiteRunConfirmationDialog } from "~/components/suites/SuiteRunConfirmationDialog";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
 import { useRunSuite } from "~/components/suites/useRunSuite";
@@ -61,8 +58,7 @@ export default function SimulationsPage() {
   // the click opens the drawer rather than a spinner.
   usePreloadDrawer("scenarioRunDetail", "suiteEditor");
   const utils = api.useUtils();
-  const { selectedSuiteSlug, navigateToSuite, highlightBatchId } =
-    useSuiteRouting();
+  const { selectedSuiteSlug, navigateToSuite, highlightBatchId } = useSuiteRouting();
 
   // Auto-open run detail drawer when redirected from old individual run URL
   const router = useRouter();
@@ -75,18 +71,14 @@ export default function SimulationsPage() {
       });
       // Remove the query param to avoid re-opening on navigation
       const { openRun: _, ...restQuery } = router.query;
-      void router.replace(
-        { pathname: router.pathname, query: restQuery },
-        undefined,
-        { shallow: true },
-      );
+      void router.replace({ pathname: router.pathname, query: restQuery }, undefined, {
+        shallow: true,
+      });
     }
   }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Read pending batch from URL query param (set by "Save and Run" redirect)
-  const [urlPendingBatchId, setUrlPendingBatchId] = useState<string | null>(
-    null,
-  );
+  const [urlPendingBatchId, setUrlPendingBatchId] = useState<string | null>(null);
   useEffect(() => {
     if (!router.isReady) return;
     const pendingBatch = router.query.pendingBatch;
@@ -94,11 +86,9 @@ export default function SimulationsPage() {
       setUrlPendingBatchId(pendingBatch);
       // Remove the query param to keep URL clean
       const { pendingBatch: _, ...restQuery } = router.query;
-      void router.replace(
-        { pathname: router.pathname, query: restQuery },
-        undefined,
-        { shallow: true },
-      );
+      void router.replace({ pathname: router.pathname, query: restQuery }, undefined, {
+        shallow: true,
+      });
     }
   }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -204,8 +194,7 @@ export default function SimulationsPage() {
   }, [selectedSuiteSlug, suites]);
 
   const selectedExternalSetId = useMemo(() => {
-    if (!selectedSuiteSlug || !isExternalSetSelection(selectedSuiteSlug))
-      return null;
+    if (!selectedSuiteSlug || !isExternalSetSelection(selectedSuiteSlug)) return null;
     return extractExternalSetId(selectedSuiteSlug);
   }, [selectedSuiteSlug]);
 
@@ -217,8 +206,7 @@ export default function SimulationsPage() {
     if (isExternalSetSelection(selectedSuiteSlug) && externalSets) {
       const setId = extractExternalSetId(selectedSuiteSlug);
       lastRunTs =
-        externalSets.find((s) => s.scenarioSetId === setId)?.lastRunTimestamp ??
-        null;
+        externalSets.find((s) => s.scenarioSetId === setId)?.lastRunTimestamp ?? null;
     } else if (selectedSuite && runSummaries) {
       lastRunTs = runSummaries.get(selectedSuite.id)?.lastRunTimestamp ?? null;
     }
@@ -353,13 +341,10 @@ export default function SimulationsPage() {
     archiveMutation.mutate({ projectId: project.id, id: archiveConfirmId });
   }, [project, archiveConfirmId, archiveMutation]);
 
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent, suiteId: string) => {
-      e.preventDefault();
-      setContextMenu({ x: e.clientX, y: e.clientY, suiteId });
-    },
-    [],
-  );
+  const handleContextMenu = useCallback((e: React.MouseEvent, suiteId: string) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, suiteId });
+  }, []);
 
   return (
     <NowProvider>
@@ -400,13 +385,7 @@ export default function SimulationsPage() {
             />
 
             {/* Content box */}
-            <Box
-              flex={1}
-              height="full"
-              minWidth={0}
-              paddingBottom={3}
-              paddingRight={4}
-            >
+            <Box flex={1} height="full" minWidth={0} paddingBottom={3} paddingRight={4}>
               <Box
                 height="full"
                 width="full"
@@ -505,10 +484,7 @@ function MainPanel({
       <EmptyState.Root paddingY={12}>
         <EmptyState.Content>
           <Box maxWidth="420px" width="100%">
-            <HandledErrorAlert
-              error={error}
-              fallbackTitle="Couldn't load simulations"
-            />
+            <HandledErrorAlert error={error} fallbackTitle="Couldn't load simulations" />
           </Box>
         </EmptyState.Content>
       </EmptyState.Root>

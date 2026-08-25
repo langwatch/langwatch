@@ -87,15 +87,11 @@ describe("LegacyTraceDrawerRedirect", () => {
 
       expect(replace).toHaveBeenCalled();
       expect(push).not.toHaveBeenCalled();
-      expect(getDrawerStack().map((entry) => entry.drawer)).toEqual([
-        "traceV2Details",
-      ]);
+      expect(getDrawerStack().map((entry) => entry.drawer)).toEqual(["traceV2Details"]);
     });
 
     it("forwards the partition-pruning timestamp hint when the link carries one", () => {
-      render(
-        <LegacyTraceDrawerRedirect traceId="trace-abc" t="1733600000000" />,
-      );
+      render(<LegacyTraceDrawerRedirect traceId="trace-abc" t="1733600000000" />);
 
       expect(lastReplacedUrl()).toContain("1733600000000");
     });

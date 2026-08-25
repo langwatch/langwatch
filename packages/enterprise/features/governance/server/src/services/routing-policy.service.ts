@@ -60,10 +60,7 @@ export class DefaultGovernanceRoutingPolicyService extends GovernanceRoutingPoli
     }
     const parsed = createRoutingPolicyInputSchema.parse(input);
     this.assertModelsAreConcrete(parsed);
-    await this.assertProvidersReachable(
-      parsed.organizationId,
-      parsed.modelProviderIds,
-    );
+    await this.assertProvidersReachable(parsed.organizationId, parsed.modelProviderIds);
     return this.repository.create(parsed);
   }
 
@@ -75,17 +72,12 @@ export class DefaultGovernanceRoutingPolicyService extends GovernanceRoutingPoli
     await this.getOwn(parsed.id, parsed.organizationId);
     this.assertModelsAreConcrete(parsed);
     if (parsed.modelProviderIds) {
-      await this.assertProvidersReachable(
-        parsed.organizationId,
-        parsed.modelProviderIds,
-      );
+      await this.assertProvidersReachable(parsed.organizationId, parsed.modelProviderIds);
     }
     return this.repository.update(parsed);
   }
 
-  async setDefault(
-    input: SetDefaultRoutingPolicyInput,
-  ): Promise<RoutingPolicy> {
+  async setDefault(input: SetDefaultRoutingPolicyInput): Promise<RoutingPolicy> {
     const parsed = setDefaultRoutingPolicyInputSchema.parse(input);
     await this.getOwn(parsed.id, parsed.organizationId);
     return this.repository.setDefault(parsed);
@@ -105,10 +97,7 @@ export class DefaultGovernanceRoutingPolicyService extends GovernanceRoutingPoli
     );
   }
 
-  private async getOwn(
-    id: string,
-    organizationId: string,
-  ): Promise<RoutingPolicy> {
+  private async getOwn(id: string, organizationId: string): Promise<RoutingPolicy> {
     return this.getById({ id, organizationId });
   }
 
@@ -118,18 +107,12 @@ export class DefaultGovernanceRoutingPolicyService extends GovernanceRoutingPoli
   }): void {
     const defaultModel = input.defaultModel?.trim();
     if (defaultModel && MOVING_MODEL_NAME.test(defaultModel)) {
-      throw new RoutingPolicyModelMustBeConcreteError(
-        "defaultModel",
-        defaultModel,
-      );
+      throw new RoutingPolicyModelMustBeConcreteError("defaultModel", defaultModel);
     }
     for (const [source, target] of Object.entries(input.modelAliases ?? {})) {
       const value = target.trim();
       if (MOVING_MODEL_NAME.test(value)) {
-        throw new RoutingPolicyModelMustBeConcreteError(
-          `modelAliases.${source}`,
-          value,
-        );
+        throw new RoutingPolicyModelMustBeConcreteError(`modelAliases.${source}`, value);
       }
     }
   }

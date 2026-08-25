@@ -71,9 +71,7 @@ const ModelSelectorWithWarning = ({
       {isModelDisabled && (
         <AddModelProviderKey
           runWhat="run this evaluation"
-          nodeProvidersWithoutCustomKeys={[
-            field.value.split("/")[0] ?? "unknown",
-          ]}
+          nodeProvidersWithoutCustomKeys={[field.value.split("/")[0] ?? "unknown"]}
         />
       )}
     </VStack>
@@ -91,10 +89,7 @@ import { EvaluatorLLMConfigField } from "./EvaluatorLLMConfigField";
 // as clutter when always shown inline under the field. For those, split the
 // description into a short helper line plus a hover tooltip (little "i" icon)
 // carrying the supporting detail — same pattern as METRIC_META below.
-const FIELD_HELPER_OVERRIDES: Record<
-  string,
-  { helper: string; tooltip: string }
-> = {
+const FIELD_HELPER_OVERRIDES: Record<string, { helper: string; tooltip: string }> = {
   swap_and_confirm: {
     helper:
       "Run two judge calls with A/B positions swapped; tie on disagreement. Doubles judge cost.",
@@ -291,18 +286,12 @@ const ArrayField = <T extends EvaluatorTypes>({
               {variant === "studio" ? <Trash2 size={14} /> : <X size={18} />}
             </Button>
             <Box width={variant === "studio" ? "100%" : "95%"}>
-              {renderField(
-                arraySchema.element,
-                `${fieldName}.${index}`,
-                evaluator,
-              )}
+              {renderField(arraySchema.element, `${fieldName}.${index}`, evaluator)}
             </Box>
           </HStack>
         </Box>
       ))}
-      {variant !== "studio" && (
-        <Button onClick={() => append(defaultValues)}>Add</Button>
-      )}
+      {variant !== "studio" && <Button onClick={() => append(defaultValues)}>Add</Button>}
     </VStack>
   );
 };
@@ -332,14 +321,13 @@ const DynamicZodForm = ({
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
     { enabled: !!project?.id },
   );
-  const resolvedDefaultEmbeddings =
-    api.modelProvider.getResolvedDefault.useQuery(
-      {
-        projectId: project?.id ?? "",
-        featureKey: "analytics.topic_clustering_embeddings",
-      },
-      { enabled: !!project?.id },
-    );
+  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
+    {
+      projectId: project?.id ?? "",
+      featureKey: "analytics.topic_clustering_embeddings",
+    },
+    { enabled: !!project?.id },
+  );
 
   const renderField = <T extends EvaluatorTypes>(
     fieldSchema: ZodType,
@@ -354,8 +342,7 @@ const DynamicZodForm = ({
   ): React.JSX.Element | null => {
     const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
     let defaultValue =
-      evaluator?.settings?.[fieldName as keyof Evaluators[T]["settings"]]
-        ?.default;
+      evaluator?.settings?.[fieldName as keyof Evaluators[T]["settings"]]?.default;
 
     if (fieldName === "model") {
       defaultValue = (resolvedDefaultModel.data?.model ?? "") as any;
@@ -372,20 +359,14 @@ const DynamicZodForm = ({
     if (fieldSchema_ instanceof z.ZodDefault) {
       const innerSchema = fieldSchema_.unwrap();
       if (!(innerSchema instanceof z.ZodType)) return null;
-      return renderField(
-        innerSchema,
-        fieldName,
-        evaluator,
-        isTopLevel,
-      );
+      return renderField(innerSchema, fieldName, evaluator, isTopLevel);
     } else if (fieldSchema_ instanceof z.ZodNumber) {
       return (
         <Input
           type="number"
           size={variant === "studio" ? "sm" : "md"}
           step={
-            typeof defaultValue === "number" &&
-            Math.round(defaultValue) != defaultValue
+            typeof defaultValue === "number" && Math.round(defaultValue) != defaultValue
               ? "0.01"
               : "1"
           }
@@ -422,9 +403,7 @@ const DynamicZodForm = ({
                 fontWeight={variant === "studio" ? 400 : undefined}
                 fontSize={variant === "studio" ? "13px" : undefined}
               >
-                {camelCaseToTitleCase(
-                  fieldName.split(".").toReversed()[0] ?? "",
-                )}
+                {camelCaseToTitleCase(fieldName.split(".").toReversed()[0] ?? "")}
               </Field.Label>
             )}
           </HStack>
@@ -436,23 +415,17 @@ const DynamicZodForm = ({
       (fieldSchema_ instanceof z.ZodString &&
         (fieldName === "model" || fieldName === "embeddings_model"))
     ) {
-      const isSelectLiteral = (
-        value: z.util.Literal,
-      ): value is string | number =>
+      const isSelectLiteral = (value: z.util.Literal): value is string | number =>
         typeof value === "string" || typeof value === "number";
       const options: Array<{ value: string | number }> =
         fieldSchema_ instanceof z.ZodUnion
           ? fieldSchema_.options.flatMap((option) =>
               option instanceof z.ZodLiteral
-                ? [...option.values]
-                    .filter(isSelectLiteral)
-                    .map((value) => ({ value }))
+                ? [...option.values].filter(isSelectLiteral).map((value) => ({ value }))
                 : [],
             )
           : fieldSchema_ instanceof z.ZodLiteral
-            ? [...fieldSchema_.values]
-                .filter(isSelectLiteral)
-                .map((value) => ({ value }))
+            ? [...fieldSchema_.values].filter(isSelectLiteral).map((value) => ({ value }))
             : allModelOptions.map((option) => ({ value: option }));
       if (
         (fieldName === "model" || fieldName === "embeddings_model") &&
@@ -490,9 +463,7 @@ const DynamicZodForm = ({
               <NativeSelect.Field
                 {...field}
                 onChange={(e) => {
-                  const literalValues = options.map(
-                    (option: any) => option.value,
-                  );
+                  const literalValues = options.map((option: any) => option.value);
 
                   if (e.target.value === "") {
                     field.onChange(undefined);
@@ -506,9 +477,7 @@ const DynamicZodForm = ({
                   }
                 }}
               >
-                {fieldSchema instanceof z.ZodOptional && (
-                  <option value=""></option>
-                )}
+                {fieldSchema instanceof z.ZodOptional && <option value=""></option>}
                 {options.map((option, index) => (
                   <option key={index} value={option.value}>
                     {option.value}
@@ -523,17 +492,11 @@ const DynamicZodForm = ({
     } else if (fieldSchema_ instanceof z.ZodString) {
       if (["topic", "name"].includes(fieldKey) || !isNaN(+fieldKey)) {
         return (
-          <Input
-            size={variant === "studio" ? "sm" : "md"}
-            {...register(fullPath)}
-          />
+          <Input size={variant === "studio" ? "sm" : "md"} {...register(fullPath)} />
         );
       }
       return (
-        <Textarea
-          size={variant === "studio" ? "sm" : "md"}
-          {...register(fullPath)}
-        />
+        <Textarea size={variant === "studio" ? "sm" : "md"} {...register(fullPath)} />
       );
     } else if (fieldSchema_ instanceof z.ZodArray) {
       // Special-case: small, fixed sets of literal options render as toggle
@@ -545,15 +508,9 @@ const DynamicZodForm = ({
         element instanceof z.ZodUnion &&
         element.options.every((o: any) => o instanceof z.ZodLiteral);
       if (fieldKey === "include_metrics" && isLiteralUnion) {
-        const options = (element.options as z.ZodLiteral<string>[]).map(
-          (o) => o.value,
-        );
+        const options = (element.options as z.ZodLiteral<string>[]).map((o) => o.value);
         return (
-          <MetricToggleField
-            fieldName={fullPath}
-            options={options}
-            variant={variant}
-          />
+          <MetricToggleField fieldName={fullPath} options={options} variant={variant} />
         );
       }
       return (
@@ -578,11 +535,7 @@ const DynamicZodForm = ({
                     : titleCase(key)}
                 </SmallLabel>
               )}
-              {renderField(
-                fieldSchema_.shape[key],
-                `${fieldName}.${key}`,
-                evaluator,
-              )}
+              {renderField(fieldSchema_.shape[key], `${fieldName}.${key}`, evaluator)}
             </VStack>
           ))}
         </VStack>
@@ -592,10 +545,7 @@ const DynamicZodForm = ({
     return null;
   };
 
-  const renderSchema = <T extends EvaluatorTypes>(
-    schema: ZodType,
-    basePath = "",
-  ) => {
+  const renderSchema = <T extends EvaluatorTypes>(schema: ZodType, basePath = "") => {
     if (schema instanceof z.ZodObject) {
       const evaluatorDefinition = getEvaluatorDefinitions(
         evaluatorType,
@@ -645,9 +595,8 @@ const DynamicZodForm = ({
           const field = schema.shape[key];
           const isOptional = field instanceof z.ZodOptional;
           const helperText =
-            evaluatorDefinition?.settings?.[
-              key as keyof Evaluators[T]["settings"]
-            ].description ?? "";
+            evaluatorDefinition?.settings?.[key as keyof Evaluators[T]["settings"]]
+              .description ?? "";
           const isInvalid = errors && key in errors && !!(errors as any)[key];
           const helperOverride = FIELD_HELPER_OVERRIDES[key];
 
@@ -655,19 +604,14 @@ const DynamicZodForm = ({
             return (
               <VStack key={key} as="form" align="start" gap={3} width="full">
                 <HStack width="full">
-                  <PropertySectionTitle>
-                    {camelCaseToTitleCase(key)}
-                  </PropertySectionTitle>
+                  <PropertySectionTitle>{camelCaseToTitleCase(key)}</PropertySectionTitle>
                   {isOptional && (
                     <Text color="fg.muted" fontSize="12px">
                       (optional)
                     </Text>
                   )}
                   {helperText && (
-                    <Tooltip
-                      content={helperText}
-                      positioning={{ placement: "top" }}
-                    >
+                    <Tooltip content={helperText} positioning={{ placement: "top" }}>
                       <Info size={14} />
                     </Tooltip>
                   )}
@@ -687,9 +631,7 @@ const DynamicZodForm = ({
           return (
             <React.Fragment key={key}>
               <HorizontalFormControl
-                label={
-                  camelCaseToTitleCase(key) + (isOptional ? " (Optional)" : "")
-                }
+                label={camelCaseToTitleCase(key) + (isOptional ? " (Optional)" : "")}
                 helper={helperOverride?.helper}
                 tooltip={helperOverride?.tooltip ?? helperText}
                 invalid={isInvalid}

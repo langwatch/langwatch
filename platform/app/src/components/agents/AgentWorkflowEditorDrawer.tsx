@@ -33,10 +33,7 @@ import {
   parseStudioWorkflow,
 } from "@langwatch/workflow-contract";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
-import {
-  type AgentWithFields,
-  linkedWorkflowId,
-} from "~/server/agents/agent-fields";
+import { type AgentWithFields, linkedWorkflowId } from "~/server/agents/agent-fields";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
 
@@ -49,9 +46,7 @@ export type AgentWorkflowEditorDrawerProps = {
 };
 
 /** Narrow the stored agent config into a CustomComponentConfig. */
-function getWorkflowConfig(
-  config: AgentComponentConfig,
-): CustomComponentConfig {
+function getWorkflowConfig(config: AgentComponentConfig): CustomComponentConfig {
   return config as CustomComponentConfig;
 }
 
@@ -75,9 +70,7 @@ function extractVariables(dsl: StudioWorkflow | undefined): {
       ? [{ identifier: i.identifier, type: "str" as DSLField["type"] }]
       : [],
   );
-  const endNodeData = dsl.nodes.find(
-    (n) => n.type === "end" || n.id === "end",
-  )?.data;
+  const endNodeData = dsl.nodes.find((n) => n.type === "end" || n.id === "end")?.data;
   const rawOutputs: DSLField[] = Array.isArray(endNodeData?.inputs)
     ? (endNodeData.inputs as DSLField[])
     : [];
@@ -97,9 +90,7 @@ function extractVariables(dsl: StudioWorkflow | undefined): {
  * data maps into the workflow's entry/end nodes. Use WorkflowSelectorDrawer to
  * create new workflow agents.
  */
-export function AgentWorkflowEditorDrawer(
-  props: AgentWorkflowEditorDrawerProps,
-) {
+export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const drawerParams = useDrawerParams();
@@ -112,12 +103,12 @@ export function AgentWorkflowEditorDrawer(
 
   // Form state
   const [name, setName] = useState("");
-  const [scenarioMappings, setScenarioMappings] = useState<
-    Record<string, FieldMapping>
-  >({});
-  const [scenarioOutputField, setScenarioOutputField] = useState<
-    string | undefined
-  >(undefined);
+  const [scenarioMappings, setScenarioMappings] = useState<Record<string, FieldMapping>>(
+    {},
+  );
+  const [scenarioOutputField, setScenarioOutputField] = useState<string | undefined>(
+    undefined,
+  );
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Track whether form has been initialized for this drawer session
@@ -146,8 +137,7 @@ export function AgentWorkflowEditorDrawer(
       extractVariables(
         (workflowQuery.data?.currentVersion?.dsl
           ? parseStudioWorkflow(workflowQuery.data.currentVersion.dsl)
-          : undefined) ??
-          undefined,
+          : undefined) ?? undefined,
       ),
     [workflowQuery.data],
   );
@@ -184,13 +174,7 @@ export function AgentWorkflowEditorDrawer(
       setHasUnsavedChanges(false);
       formInitializedRef.current = true;
     }
-  }, [
-    agentQuery.data,
-    workflowInputs,
-    workflowId,
-    workflowQuery.isLoading,
-    agentId,
-  ]);
+  }, [agentQuery.data, workflowInputs, workflowId, workflowQuery.isLoading, agentId]);
 
   // Mutations
   const updateMutation = api.agents.update.useMutation({
@@ -203,8 +187,7 @@ export function AgentWorkflowEditorDrawer(
       onSave?.(agent);
       onClose();
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't save agent" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save agent" }),
   });
 
   const isSaving = updateMutation.isPending;
@@ -264,21 +247,14 @@ export function AgentWorkflowEditorDrawer(
     [],
   );
 
-  const handleScenarioOutputFieldChange = useCallback(
-    (field: string | undefined) => {
-      setScenarioOutputField(field);
-      setHasUnsavedChanges(true);
-    },
-    [],
-  );
+  const handleScenarioOutputFieldChange = useCallback((field: string | undefined) => {
+    setScenarioOutputField(field);
+    setHasUnsavedChanges(true);
+  }, []);
 
   const handleClose = () => {
     if (hasUnsavedChanges) {
-      if (
-        !window.confirm(
-          "You have unsaved changes. Are you sure you want to close?",
-        )
-      ) {
+      if (!window.confirm("You have unsaved changes. Are you sure you want to close?")) {
         return;
       }
     }
@@ -289,9 +265,7 @@ export function AgentWorkflowEditorDrawer(
   // entry inputs yet, the section renders an implicit `input` row so users
   // can still see the mapping UI.
   const scenarioInputsForUI: Variable[] =
-    workflowInputs.length > 0
-      ? workflowInputs
-      : [{ identifier: "input", type: "str" }];
+    workflowInputs.length > 0 ? workflowInputs : [{ identifier: "input", type: "str" }];
 
   const editorHref =
     project && workflowId ? `/${project.slug}/studio/${workflowId}` : undefined;
@@ -324,12 +298,7 @@ export function AgentWorkflowEditorDrawer(
             <Heading>Edit Workflow Agent</Heading>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-        >
+        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           {agentId && (agentQuery.isLoading || workflowQuery.isLoading) ? (
             <HStack justify="center" paddingY={8}>
               <Spinner size="md" />
@@ -376,10 +345,7 @@ export function AgentWorkflowEditorDrawer(
                         icon={workflowQuery.data.icon}
                         updatedAt={workflowQuery.data.updatedAt}
                         action={
-                          <ExternalLink
-                            size={16}
-                            color="var(--chakra-colors-fg-muted)"
-                          />
+                          <ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />
                         }
                         width="300px"
                       />
@@ -393,26 +359,24 @@ export function AgentWorkflowEditorDrawer(
                     />
                   )}
                   <Text fontSize="xs" color="fg.muted" marginTop={1}>
-                    Edit the workflow&apos;s nodes and logic in the studio. The
-                    mappings below control how scenario data flows into its
-                    entry inputs and which end output is returned.
+                    Edit the workflow&apos;s nodes and logic in the studio. The mappings
+                    below control how scenario data flows into its entry inputs and which
+                    end output is returned.
                   </Text>
                 </Field.Root>
               )}
 
               {workflowInputs.length === 0 && (
                 <Text fontSize="xs" color="fg.error">
-                  This workflow has no entry inputs yet. Publish a version with
-                  at least one entry input before running it as a scenario
-                  target.
+                  This workflow has no entry inputs yet. Publish a version with at least
+                  one entry input before running it as a scenario target.
                 </Text>
               )}
 
               {workflowOutputs.length === 0 && (
                 <Text fontSize="xs" color="fg.error">
-                  This workflow has no end outputs yet. Publish a version with
-                  at least one end output before running it as a scenario
-                  target.
+                  This workflow has no end outputs yet. Publish a version with at least
+                  one end output before running it as a scenario target.
                 </Text>
               )}
 

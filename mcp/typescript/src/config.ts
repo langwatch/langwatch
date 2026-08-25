@@ -111,7 +111,7 @@ export function requireApiKey(): string {
       new Error().stack,
     );
     throw new Error(
-      "LANGWATCH_API_KEY is required. Set it via --apiKey flag or LANGWATCH_API_KEY environment variable."
+      "LANGWATCH_API_KEY is required. Set it via --apiKey flag or LANGWATCH_API_KEY environment variable.",
     );
   }
   return config.apiKey;

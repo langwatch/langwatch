@@ -96,7 +96,11 @@ describe("createCodexIOStreamer", () => {
     it("posts nothing, then streams the turn once the reply is appended", async () => {
       await writeFile(
         rolloutFile(),
-        [line(taskStarted("t-one", "t1")), line(turnContext("t1")), line(userMsg("hi"))].join("\n"),
+        [
+          line(taskStarted("t-one", "t1")),
+          line(turnContext("t1")),
+          line(userMsg("hi")),
+        ].join("\n"),
       );
       const { posted, fetchImpl } = recordingFetch();
       const streamer = newStreamer(fetchImpl);
@@ -163,12 +167,10 @@ describe("createCodexIOStreamer", () => {
         // The streamer re-offers every in-window session on every tick. The
         // stored fingerprint is what keeps that from re-posting a context
         // that has not changed.
-        expect(
-          urls.filter((u) => u === "http://collector.test/v1/logs"),
-        ).toHaveLength(1);
-        expect(
-          urls.filter((u) => u === "http://collector.test/v1/traces"),
-        ).toHaveLength(2);
+        expect(urls.filter((u) => u === "http://collector.test/v1/logs")).toHaveLength(1);
+        expect(urls.filter((u) => u === "http://collector.test/v1/traces")).toHaveLength(
+          2,
+        );
       } finally {
         await rm(stateDir, { recursive: true, force: true });
       }

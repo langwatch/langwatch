@@ -18,20 +18,12 @@ import type { EvaluationAnalyticsRollupRow } from "~/server/event-sourcing/pipel
  * after its `BucketStart`.
  */
 export interface EvaluationAnalyticsRollupRepository {
-  insertRow(
-    row: EvaluationAnalyticsRollupRow,
-    retentionDays?: number,
-  ): Promise<void>;
-  insertRows(
-    rows: EvaluationAnalyticsRollupRow[],
-    retentionDays?: number,
-  ): Promise<void>;
+  insertRow(row: EvaluationAnalyticsRollupRow, retentionDays?: number): Promise<void>;
+  insertRows(rows: EvaluationAnalyticsRollupRow[], retentionDays?: number): Promise<void>;
 }
 
 /** No-op implementation for tests and ClickHouse-less environments. */
-export class NullEvaluationAnalyticsRollupRepository
-  implements EvaluationAnalyticsRollupRepository
-{
+export class NullEvaluationAnalyticsRollupRepository implements EvaluationAnalyticsRollupRepository {
   async insertRow(
     _row: EvaluationAnalyticsRollupRow,
     _retentionDays?: number,

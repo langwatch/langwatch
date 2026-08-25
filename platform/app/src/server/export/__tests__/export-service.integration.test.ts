@@ -95,9 +95,7 @@ function buildMockTraceService(options: {
         totalHits: options.totalHits,
         traceChecks: options.evaluations ?? {},
         scrollId:
-          callIndex < options.batches.length - 1
-            ? `scroll-${callIndex + 1}`
-            : undefined,
+          callIndex < options.batches.length - 1 ? `scroll-${callIndex + 1}` : undefined,
       };
       callIndex++;
       return Promise.resolve(result);
@@ -113,10 +111,7 @@ describe("ExportService", () => {
   describe("exportTraces()", () => {
     describe("when exporting summary CSV with a single batch", () => {
       it("yields one chunk with header and data rows", async () => {
-        const traces = [
-          buildTrace({ trace_id: "t1" }),
-          buildTrace({ trace_id: "t2" }),
-        ];
+        const traces = [buildTrace({ trace_id: "t1" }), buildTrace({ trace_id: "t2" })];
         const traceService = buildMockTraceService({
           batches: [traces],
           totalHits: 2,
@@ -185,10 +180,7 @@ describe("ExportService", () => {
         const traces = [
           buildTrace({
             trace_id: "t1",
-            spans: [
-              buildLLMSpan({ span_id: "s1" }),
-              buildLLMSpan({ span_id: "s2" }),
-            ],
+            spans: [buildLLMSpan({ span_id: "s1" }), buildLLMSpan({ span_id: "s2" })],
           }),
         ];
         const traceService = buildMockTraceService({

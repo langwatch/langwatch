@@ -60,12 +60,8 @@ export type LogRequestCollectionResult =
 const PERSISTENCE_ERROR_MESSAGE = "failed to record log record";
 
 export class LogRequestCollectionService {
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.log-processing.log-ingestion",
-  );
-  private readonly logger = createLogger(
-    "langwatch:log-processing:log-ingestion",
-  );
+  private readonly tracer = getLangWatchTracer("langwatch.log-processing.log-ingestion");
+  private readonly logger = createLogger("langwatch:log-processing:log-ingestion");
   private readonly piiRedactionService: LogRedactionService;
 
   constructor(private readonly deps: LogRequestCollectionDeps) {
@@ -131,10 +127,7 @@ export class LogRequestCollectionService {
               },
               "Failed to enqueue canonical log record batch",
             );
-            span.setAttribute(
-              "logs.ingestion.unavailable",
-              preparation.accepted.length,
-            );
+            span.setAttribute("logs.ingestion.unavailable", preparation.accepted.length);
             return {
               outcome: "unavailable",
               errorMessage: PERSISTENCE_ERROR_MESSAGE,
@@ -188,9 +181,7 @@ export class LogRequestCollectionService {
                 error,
                 tenantId,
                 contributionCount: contributions.length,
-                recordIds: contributions
-                  .slice(0, 10)
-                  .map(({ recordId }) => recordId),
+                recordIds: contributions.slice(0, 10).map(({ recordId }) => recordId),
               },
               "Failed to enqueue log trace contribution batch",
             );
@@ -199,9 +190,7 @@ export class LogRequestCollectionService {
 
         span.setAttribute("logs.ingestion.successes", acceptedLogRecords);
         span.setAttribute("logs.ingestion.failures", rejectedLogRecords);
-        const errorMessage = errors.length
-          ? errors.join("; ").slice(0, 1024)
-          : undefined;
+        const errorMessage = errors.length ? errors.join("; ").slice(0, 1024) : undefined;
         return {
           outcome: "collected",
           acceptedLogRecords,
@@ -214,9 +203,7 @@ export class LogRequestCollectionService {
 }
 
 function makeTraceContribution(
-  prepared: Awaited<
-    ReturnType<typeof prepareCanonicalLogRecords>
-  >["accepted"][number],
+  prepared: Awaited<ReturnType<typeof prepareCanonicalLogRecords>>["accepted"][number],
 ): LogTraceContribution {
   const { record, normalized } = prepared;
   const legacyView: LogRecordReceivedEventData = {
@@ -244,10 +231,8 @@ function makeTraceContribution(
     }
   }
   const io = extractIOFromLogRecord(legacyView);
-  const input =
-    io.input === null ? null : utf8Preview(io.input, IO_PREVIEW_BYTES);
-  const output =
-    io.output === null ? null : utf8Preview(io.output, IO_PREVIEW_BYTES);
+  const input = io.input === null ? null : utf8Preview(io.input, IO_PREVIEW_BYTES);
+  const output = io.output === null ? null : utf8Preview(io.output, IO_PREVIEW_BYTES);
   if (input !== io.input || output !== io.output) {
     liftedAttributes["langwatch.reserved.log_io_truncated"] = true;
   }

@@ -189,12 +189,7 @@ export function deriveWaveActivity({
 }
 
 /** Exponential approach with a real time constant — frame-rate independent. */
-function approach(
-  current: number,
-  target: number,
-  dt: number,
-  tau: number,
-): number {
+function approach(current: number, target: number, dt: number, tau: number): number {
   return current + (target - current) * (1 - Math.exp(-dt / tau));
 }
 
@@ -217,17 +212,10 @@ export function stepWaveMotion({
       current.energy,
       target.energy,
       dt,
-      target.energy > current.energy
-        ? WAVE_ENERGY_RISE_TAU_S
-        : WAVE_ENERGY_FALL_TAU_S,
+      target.energy > current.energy ? WAVE_ENERGY_RISE_TAU_S : WAVE_ENERGY_FALL_TAU_S,
     ),
     drift: approach(current.drift, target.drift, dt, WAVE_CHARACTER_TAU_S),
-    flutter: approach(
-      current.flutter,
-      target.flutter,
-      dt,
-      WAVE_CHARACTER_TAU_S,
-    ),
+    flutter: approach(current.flutter, target.flutter, dt, WAVE_CHARACTER_TAU_S),
     pulse: approach(current.pulse, target.pulse, dt, WAVE_CHARACTER_TAU_S),
   };
 }
@@ -243,10 +231,7 @@ export function isWakeTransition(
 ): boolean {
   const wasResting = previous === "idle" || previous === "settling";
   const isWorking =
-    next === "waiting" ||
-    next === "thinking" ||
-    next === "streaming" ||
-    next === "tool";
+    next === "waiting" || next === "thinking" || next === "streaming" || next === "tool";
   return wasResting && isWorking;
 }
 

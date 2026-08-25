@@ -72,13 +72,7 @@ export type CapabilitySurface = (typeof CAPABILITY_SURFACES)[number];
  *   - `diff`  — name/version header plus the fields that changed.
  *   - `text`  — the plain summary-lines fallback.
  */
-export type CapabilityBodyWidget =
-  | "stats"
-  | "rows"
-  | "facts"
-  | "diff"
-  | "text"
-  | "chart";
+export type CapabilityBodyWidget = "stats" | "rows" | "facts" | "diff" | "text" | "chart";
 
 /**
  * Icon overrides a catalog row may name when the surface's own icon is wrong

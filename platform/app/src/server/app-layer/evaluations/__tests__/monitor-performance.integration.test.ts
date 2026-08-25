@@ -67,8 +67,7 @@ function createEvaluations(client: ClickHouseClient): EvaluationService {
       query: async (input) => {
         const result = await client.query(input as never);
         return {
-          json: async <Result>() =>
-            (await result.json<Result>()) as unknown as Result[],
+          json: async <Result>() => (await result.json<Result>()) as unknown as Result[],
         };
       },
     }),
@@ -154,9 +153,7 @@ describe("online evaluation monitor performance", () => {
   /** @scenario Performance for every monitor is read in one bounded query */
   it("loads current and previous performance with one real ClickHouse query", async () => {
     queryCount = 0;
-    const performance = await createEvaluations(
-      countingClient(),
-    ).getMonitorPerformance({
+    const performance = await createEvaluations(countingClient()).getMonitorPerformance({
       tenantId,
       monitors: [
         { id: scoreEvaluatorId, isGuardrail: false },

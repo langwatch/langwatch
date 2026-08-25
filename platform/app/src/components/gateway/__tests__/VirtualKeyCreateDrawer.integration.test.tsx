@@ -41,12 +41,13 @@ type ApplicableBudget = {
   managedByVirtualKeyId: string | null;
 };
 
-const { createMutateAsync, applicableBudgetsData, capturedApplicableInputs } =
-  vi.hoisted(() => ({
+const { createMutateAsync, applicableBudgetsData, capturedApplicableInputs } = vi.hoisted(
+  () => ({
     createMutateAsync: vi.fn(),
     applicableBudgetsData: { rows: [] as ApplicableBudget[] },
     capturedApplicableInputs: [] as unknown[],
-  }));
+  }),
+);
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -92,8 +93,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: (input: unknown, opts?: { enabled?: boolean }) => {
           if (opts?.enabled !== false) capturedApplicableInputs.push(input);
           return {
-            data:
-              opts?.enabled === false ? undefined : applicableBudgetsData.rows,
+            data: opts?.enabled === false ? undefined : applicableBudgetsData.rows,
           };
         },
       },
@@ -194,9 +194,9 @@ describe("given the new-virtual-key drawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("vk-trace-destination").textContent,
-        ).toContain("Traces and costs land in web-app");
+        expect(screen.getByTestId("vk-trace-destination").textContent).toContain(
+          "Traces and costs land in web-app",
+        );
       });
     });
 
@@ -250,12 +250,8 @@ describe("given the new-virtual-key drawer", () => {
 
       await userEvent.type(screen.getByTestId("vk-budget-limit"), "30");
 
-      expect(
-        screen.queryByTestId("vk-budget-customize-reset"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("vk-budget-timezone"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("vk-budget-customize-reset")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("vk-budget-timezone")).not.toBeInTheDocument();
 
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await submit();
@@ -271,10 +267,7 @@ describe("given the new-virtual-key drawer", () => {
       renderDrawer();
 
       await userEvent.type(screen.getByTestId("vk-budget-limit"), "30");
-      await userEvent.selectOptions(
-        screen.getByTestId("vk-budget-window"),
-        "WEEK",
-      );
+      await userEvent.selectOptions(screen.getByTestId("vk-budget-window"), "WEEK");
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await submit();
 
@@ -355,9 +348,7 @@ describe("given the new-virtual-key drawer", () => {
     it("resolves the list for the draft's own scopes", async () => {
       renderDrawer();
 
-      await waitFor(() =>
-        expect(capturedApplicableInputs.length).toBeGreaterThan(0),
-      );
+      await waitFor(() => expect(capturedApplicableInputs.length).toBeGreaterThan(0));
       expect(capturedApplicableInputs.at(-1)).toMatchObject({
         organizationId: ORG_ID,
         scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
@@ -420,17 +411,13 @@ describe("given the new-virtual-key drawer", () => {
     it("writes the checked models as vendor-prefixed ids in models_allowed", async () => {
       renderDrawer();
 
-      await userEvent.click(
-        screen.getByTestId("vk-provider-mp-openai-models-toggle"),
-      );
+      await userEvent.click(screen.getByTestId("vk-provider-mp-openai-models-toggle"));
       await userEvent.click(screen.getByTestId("vk-model-openai/gpt-5-mini"));
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await submit();
 
       await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
-      expect(lastCreateInput().config.modelsAllowed).toEqual([
-        "openai/gpt-5-mini",
-      ]);
+      expect(lastCreateInput().config.modelsAllowed).toEqual(["openai/gpt-5-mini"]);
     });
 
     it("leaves models_allowed absent when nothing is checked", async () => {
@@ -467,9 +454,9 @@ describe("given the new-virtual-key drawer", () => {
       await userEvent.click(screen.getByTestId("vk-ownership-personal"));
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("vk-trace-destination").textContent,
-        ).toContain("personal workspace");
+        expect(screen.getByTestId("vk-trace-destination").textContent).toContain(
+          "personal workspace",
+        );
       });
 
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
@@ -519,9 +506,9 @@ describe("given the new-virtual-key drawer", () => {
       expect(
         (screen.getByTestId("vk-expiration-preset") as HTMLSelectElement).value,
       ).toBe("");
-      expect(
-        screen.getByTestId("vk-expiration-resolved").textContent,
-      ).toContain("This key never expires");
+      expect(screen.getByTestId("vk-expiration-resolved").textContent).toContain(
+        "This key never expires",
+      );
 
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await submit();
@@ -536,16 +523,11 @@ describe("given the new-virtual-key drawer", () => {
     it("states the resolved date and sends it with the key", async () => {
       renderDrawer();
 
-      await userEvent.selectOptions(
-        screen.getByTestId("vk-expiration-preset"),
-        "7",
-      );
+      await userEvent.selectOptions(screen.getByTestId("vk-expiration-preset"), "7");
 
       const expected = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await waitFor(() => {
-        expect(
-          screen.getByTestId("vk-expiration-resolved").textContent,
-        ).toContain(
+        expect(screen.getByTestId("vk-expiration-resolved").textContent).toContain(
           expected.toLocaleDateString("en-US", {
             weekday: "short",
             year: "numeric",
@@ -563,9 +545,7 @@ describe("given the new-virtual-key drawer", () => {
       const sent = lastCreateInput().expiresAt as Date;
       // Within a minute of seven days out: the drawer resolves the period
       // as the person picks it, not as the request is built.
-      expect(Math.abs(sent.getTime() - expected.getTime())).toBeLessThan(
-        60_000,
-      );
+      expect(Math.abs(sent.getTime() - expected.getTime())).toBeLessThan(60_000);
     });
   });
 
@@ -574,10 +554,7 @@ describe("given the new-virtual-key drawer", () => {
     it("keeps the key working for the whole of that day", async () => {
       renderDrawer();
 
-      await userEvent.selectOptions(
-        screen.getByTestId("vk-expiration-preset"),
-        "custom",
-      );
+      await userEvent.selectOptions(screen.getByTestId("vk-expiration-preset"), "custom");
       const dateInput = await screen.findByTestId("vk-expiration-date");
       await userEvent.type(dateInput, "2030-08-20");
 
@@ -594,10 +571,7 @@ describe("given the new-virtual-key drawer", () => {
       renderDrawer();
 
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
-      await userEvent.selectOptions(
-        screen.getByTestId("vk-expiration-preset"),
-        "custom",
-      );
+      await userEvent.selectOptions(screen.getByTestId("vk-expiration-preset"), "custom");
 
       await waitFor(() => {
         expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
@@ -623,14 +597,8 @@ describe("given the new-virtual-key drawer", () => {
       renderDrawer();
 
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
-      await userEvent.selectOptions(
-        screen.getByTestId("vk-expiration-preset"),
-        "custom",
-      );
-      await userEvent.type(
-        await screen.findByTestId("vk-expiration-date"),
-        "2030-08-20",
-      );
+      await userEvent.selectOptions(screen.getByTestId("vk-expiration-preset"), "custom");
+      await userEvent.type(await screen.findByTestId("vk-expiration-date"), "2030-08-20");
       await submit();
 
       await waitFor(() => {

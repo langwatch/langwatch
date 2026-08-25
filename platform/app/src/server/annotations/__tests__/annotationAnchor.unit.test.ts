@@ -34,9 +34,10 @@ const storedRow = (
 describe("the anchor a comment is written with", () => {
   describe("given an anchor naming a part of the trace", () => {
     it("accepts a span with no field named", () => {
-      expect(
-        anchorInput.parse({ anchorKind: "span", anchorId: "span-1" }),
-      ).toEqual({ anchorKind: "span", anchorId: "span-1" });
+      expect(anchorInput.parse({ anchorKind: "span", anchorId: "span-1" })).toEqual({
+        anchorKind: "span",
+        anchorId: "span-1",
+      });
     });
 
     it("accepts a field of a span", () => {
@@ -80,17 +81,14 @@ describe("the anchor a comment is written with", () => {
     });
 
     it("refuses a path with no kind", () => {
-      expect(anchorInput.safeParse({ anchorPath: "output" }).success).toBe(
-        false,
-      );
+      expect(anchorInput.safeParse({ anchorPath: "output" }).success).toBe(false);
     });
   });
 
   describe("given a kind that is not a part of a trace", () => {
     it("refuses it on the way in", () => {
       expect(
-        anchorInput.safeParse({ anchorKind: "gizmo", anchorId: "whatever" })
-          .success,
+        anchorInput.safeParse({ anchorKind: "gizmo", anchorId: "whatever" }).success,
       ).toBe(false);
     });
   });

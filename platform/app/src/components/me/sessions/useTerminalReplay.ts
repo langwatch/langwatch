@@ -42,10 +42,7 @@ export interface ReplayableSession {
  * explorer: the global mount renders it wherever the reader is, so closing it
  * puts them back on the table they narrowed rather than on a fresh one.
  */
-export function useTerminalReplay({
-  projectId,
-  projectSlug,
-}: TerminalReplayInput) {
+export function useTerminalReplay({ projectId, projectSlug }: TerminalReplayInput) {
   const utils = api.useUtils();
   const router = useRouter();
   const { openDrawer } = useDrawer();
@@ -81,9 +78,7 @@ export function useTerminalReplay({
         // second session while the first was still resolving is waiting on
         // that one, and clearing whatever happens to be current would take
         // its spinner away while it is still loading.
-        setOpeningSessionId((current) =>
-          current === row.sessionId ? null : current,
-        );
+        setOpeningSessionId((current) => (current === row.sessionId ? null : current));
       }
     },
     [projectId, utils],
@@ -91,9 +86,7 @@ export function useTerminalReplay({
 
   const openReplay = useCallback(
     (row: ReplayableSession) =>
-      withLastTurn(row, (turn) =>
-        openReplayHere({ turn, projectId, openDrawer }),
-      ),
+      withLastTurn(row, (turn) => openReplayHere({ turn, projectId, openDrawer })),
     [openDrawer, projectId, withLastTurn],
   );
 

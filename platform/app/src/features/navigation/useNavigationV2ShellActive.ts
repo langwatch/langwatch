@@ -11,9 +11,7 @@ import { useNavigationMode } from "./useNavigationMode";
  * Spec: specs/navigation/ops-navigation-v2.feature
  */
 export function isNavigationV2ShellRoute(pathname: string): boolean {
-  return (
-    productFromPathname(pathname) !== null || isSettingsShellRoute(pathname)
-  );
+  return productFromPathname(pathname) !== null || isSettingsShellRoute(pathname);
 }
 
 /**

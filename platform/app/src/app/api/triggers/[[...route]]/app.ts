@@ -311,9 +311,7 @@ secured.access(requires("triggers:manage")).delete(
         description: "Trigger deleted",
         content: {
           "application/json": {
-            schema: resolver(
-              z.object({ id: z.string(), deleted: z.boolean() }),
-            ),
+            schema: resolver(z.object({ id: z.string(), deleted: z.boolean() })),
           },
         },
       },

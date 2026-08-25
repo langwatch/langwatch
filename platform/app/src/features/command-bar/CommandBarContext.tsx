@@ -16,9 +16,7 @@ interface CommandBarContextValue {
   registerInlinePalette: (focus: () => void) => () => void;
 }
 
-export const CommandBarContext = createContext<CommandBarContextValue | null>(
-  null,
-);
+export const CommandBarContext = createContext<CommandBarContextValue | null>(null);
 
 export function useCommandBar() {
   const context = useContext(CommandBarContext);

@@ -57,9 +57,7 @@ function createRoundRobinProxy(replicaPorts: number[]): Server {
   return createServer((clientReq, clientRes) => {
     const port = replicaPorts[next % replicaPorts.length]!;
     next++;
-    console.error(
-      `[proxy] ${clientReq.method} ${clientReq.url} -> replica on :${port}`,
-    );
+    console.error(`[proxy] ${clientReq.method} ${clientReq.url} -> replica on :${port}`);
     const upstream = httpRequest(
       {
         host: "127.0.0.1",

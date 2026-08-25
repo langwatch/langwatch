@@ -37,8 +37,7 @@ const mockSetNode = vi.fn();
 const mockSetNodeParameter = vi.fn();
 
 vi.mock("@langwatch/workflow-web", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/workflow-web")>();
+  const actual = await importOriginal<typeof import("@langwatch/workflow-web")>();
   return {
     ...actual,
     useWorkflowStore: (selector: (state: unknown) => unknown) =>
@@ -91,9 +90,7 @@ vi.mock("../BasePropertiesPanel", () => ({
 import type { Component } from "@langwatch/workflow-contract";
 import { CodePropertiesPanel } from "../CodePropertiesPanel";
 
-const createMockNode = (
-  overrides: Partial<Component> = {},
-): Node<Component> => ({
+const createMockNode = (overrides: Partial<Component> = {}): Node<Component> => ({
   id: "node-1",
   type: "code",
   position: { x: 0, y: 0 },
@@ -130,9 +127,7 @@ describe("CodePropertiesPanel", () => {
   describe("code editor", () => {
     it("renders code editor with current code", () => {
       const node = createMockNode({
-        parameters: [
-          { identifier: "code", type: "code", value: "print('hello')" },
-        ],
+        parameters: [{ identifier: "code", type: "code", value: "print('hello')" }],
       });
       renderComponent(node);
 

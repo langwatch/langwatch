@@ -48,11 +48,9 @@ export class ShareLinkForbiddenError extends HandledError {
   declare readonly code: "share_link_forbidden";
 
   constructor() {
-    super(
-      "share_link_forbidden",
-      "You do not have access to this shared item.",
-      { httpStatus: 401 },
-    );
+    super("share_link_forbidden", "You do not have access to this shared item.", {
+      httpStatus: 401,
+    });
     this.name = "ShareLinkForbiddenError";
   }
 }
@@ -61,11 +59,9 @@ export class TraceSharingDisabledError extends HandledError {
   declare readonly code: "trace_sharing_disabled";
 
   constructor() {
-    super(
-      "trace_sharing_disabled",
-      "Trace sharing is disabled for this project",
-      { httpStatus: 403 },
-    );
+    super("trace_sharing_disabled", "Trace sharing is disabled for this project", {
+      httpStatus: 403,
+    });
     this.name = "TraceSharingDisabledError";
   }
 }

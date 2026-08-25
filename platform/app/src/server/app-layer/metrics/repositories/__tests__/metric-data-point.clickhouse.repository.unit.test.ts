@@ -59,8 +59,7 @@ function dataPoint(): CanonicalMetricDataPoint {
  * point in the same rollup bucket and an offset past it does not.
  */
 const base =
-  Math.floor(1_700_000_000_000 / METRIC_ROLLUP_INTERVAL_MS) *
-  METRIC_ROLLUP_INTERVAL_MS;
+  Math.floor(1_700_000_000_000 / METRIC_ROLLUP_INTERVAL_MS) * METRIC_ROLLUP_INTERVAL_MS;
 
 /** The 64-character hexadecimal identifiers the real table stores. */
 function hex(value: number): string {
@@ -120,9 +119,9 @@ const PARAM_BUDGET_CHARS = 3500;
 
 describe("MetricDataPointClickHouseRepository", () => {
   it("writes authoritative raw data before a payload-free shadow estimate", async () => {
-    const insert = vi.fn<
-      (args: { table: string; values: unknown[] }) => Promise<void>
-    >(async () => {});
+    const insert = vi.fn<(args: { table: string; values: unknown[] }) => Promise<void>>(
+      async () => {},
+    );
     const client = { insert } as never;
     const repository = new MetricDataPointClickHouseRepository({
       resolveClient: async () => client,
@@ -143,10 +142,7 @@ describe("MetricDataPointClickHouseRepository", () => {
     });
     expect(raw).not.toHaveProperty("OrganizationId");
     expect(raw).not.toHaveProperty("WrittenAt");
-    const shadow = insert.mock.calls[1]![0].values[0] as Record<
-      string,
-      unknown
-    >;
+    const shadow = insert.mock.calls[1]![0].values[0] as Record<string, unknown>;
     expect(shadow).toMatchObject({
       OrganizationId: "organization-1",
       TenantId: "project-1",
@@ -173,9 +169,9 @@ describe("MetricDataPointClickHouseRepository", () => {
 
   describe("when a replay chunk is written", () => {
     it("sends one insert per table rather than one per point", async () => {
-      const insert = vi.fn<
-        (args: { table: string; values: unknown[] }) => Promise<void>
-      >(async () => {});
+      const insert = vi.fn<(args: { table: string; values: unknown[] }) => Promise<void>>(
+        async () => {},
+      );
       const client = { insert } as never;
       const repository = new MetricDataPointClickHouseRepository({
         resolveClient: async () => client,
@@ -199,9 +195,9 @@ describe("MetricDataPointClickHouseRepository", () => {
     });
 
     it("collapses a series to its newest point, which is the only one that can win", async () => {
-      const insert = vi.fn<
-        (args: { table: string; values: unknown[] }) => Promise<void>
-      >(async () => {});
+      const insert = vi.fn<(args: { table: string; values: unknown[] }) => Promise<void>>(
+        async () => {},
+      );
       const client = { insert } as never;
       const repository = new MetricDataPointClickHouseRepository({
         resolveClient: async () => client,
@@ -217,9 +213,7 @@ describe("MetricDataPointClickHouseRepository", () => {
       await repository.upsertSeriesMany({ points, retentionDays: 49 });
 
       expect(insert).toHaveBeenCalledOnce();
-      const values = insert.mock.calls[0]![0].values as Array<
-        Record<string, unknown>
-      >;
+      const values = insert.mock.calls[0]![0].values as Array<Record<string, unknown>>;
       expect(values).toHaveLength(1);
       expect(values[0]).toMatchObject({ LastSeenAt: new Date(3_000) });
     });
@@ -269,9 +263,7 @@ describe("MetricDataPointClickHouseRepository", () => {
     expect(query.mock.calls[0]![0].query).toContain(
       "WHERE OrganizationId = {organizationId:String}",
     );
-    expect(query.mock.calls[0]![0].query).not.toContain(
-      "TenantId = {tenantId:String}",
-    );
+    expect(query.mock.calls[0]![0].query).not.toContain("TenantId = {tenantId:String}");
     expect(result).toEqual([
       {
         organizationId: "organization-1",
@@ -363,9 +355,7 @@ describe("MetricDataPointClickHouseRepository", () => {
       // The bound is what encodes "successor" — an ascending order with a `<`
       // bound would still read backwards, so pin the direction of both. The
       // open-ended look forward is the branch bounded by the span's far end.
-      expect(successorSeeks).toContain(
-        "series_points.SeekTime > spans.SpanToTime",
-      );
+      expect(successorSeeks).toContain("series_points.SeekTime > spans.SpanToTime");
       expect(successorSeeks).toContain(
         "ORDER BY series_points.SeriesId ASC, series_points.SeekTime ASC",
       );
@@ -464,9 +454,9 @@ describe("MetricDataPointClickHouseRepository", () => {
           ? { json: async () => [authoritativeRow] }
           : { json: async () => [seekRow] };
       });
-      const insert = vi.fn<
-        (args: { table: string; values: unknown[] }) => Promise<void>
-      >(async () => {});
+      const insert = vi.fn<(args: { table: string; values: unknown[] }) => Promise<void>>(
+        async () => {},
+      );
       const repository = new MetricDataPointClickHouseRepository({
         resolveClient: async () => ({ query, insert }) as never,
         resolveOrganizationClient: async () => ({ query, insert }) as never,
@@ -615,9 +605,7 @@ describe("MetricDataPointClickHouseRepository", () => {
 
     /** @scenario "A folded rollup read binds a fixed number of parameters" */
     it("splits the request once the series outgrow the budget", async () => {
-      expect(
-        (await successorRequests(acrossSeries(64))).length,
-      ).toBeGreaterThan(1);
+      expect((await successorRequests(acrossSeries(64))).length).toBeGreaterThan(1);
       expect(await successorRequests(acrossSeries(1))).toHaveLength(1);
     });
 
@@ -645,9 +633,7 @@ describe("MetricDataPointClickHouseRepository", () => {
         ),
       );
 
-      expect(Math.max(...lengths.flat())).toBeLessThanOrEqual(
-        PARAM_BUDGET_CHARS,
-      );
+      expect(Math.max(...lengths.flat())).toBeLessThanOrEqual(PARAM_BUDGET_CHARS);
     });
 
     /** @scenario "A folded rollup read keeps its encoded request inside a budget" */
@@ -667,17 +653,13 @@ describe("MetricDataPointClickHouseRepository", () => {
         expect(encodedParamLength(request.params)).toBeLessThanOrEqual(
           PARAM_BUDGET_CHARS,
         );
-        expect(
-          (request.params.seriesIds as string[]).length,
-        ).toBeLessThanOrEqual(64);
+        expect((request.params.seriesIds as string[]).length).toBeLessThanOrEqual(64);
       }
       // Split, not dropped: every series the chunk carried, each asked about
       // exactly once. An identity claim rather than a count — a chunker that
       // asked twice about one series, or once about a series nobody sent,
       // also totals 64.
-      const asked = requests.flatMap(
-        (request) => request.params.seriesIds as string[],
-      );
+      const asked = requests.flatMap((request) => request.params.seriesIds as string[]);
       expect([...new Set(asked)].sort()).toEqual(
         [...new Set(points.map((point) => point.seriesId))].sort(),
       );
@@ -769,8 +751,7 @@ describe("MetricDataPointClickHouseRepository", () => {
         const inSeries = table
           .filter(
             (row) =>
-              row.seriesId === seriesId &&
-              row.timeUnixMs >= (params.scanFrom as number),
+              row.seriesId === seriesId && row.timeUnixMs >= (params.scanFrom as number),
           )
           .sort(order);
         // The constant partition bounds each branch adds are applied here too,
@@ -784,8 +765,7 @@ describe("MetricDataPointClickHouseRepository", () => {
         );
         const pastSpan = inSeries.find(
           (row) =>
-            row.timeUnixMs >= (params.earliestSpanEnd as number) &&
-            order(row, to) > 0,
+            row.timeUnixMs >= (params.earliestSpanEnd as number) && order(row, to) > 0,
         );
         return pastSpan ? [...withinSpan, pastSpan] : withinSpan;
       });
@@ -836,9 +816,7 @@ describe("MetricDataPointClickHouseRepository", () => {
         for (const [name, value] of Object.entries(params)) {
           const seek = /^from(\d+)$/.exec(name);
           if (!seek) continue;
-          buckets.push(
-            `${String(params[`series${seek[1]!}`])}@${String(value)}`,
-          );
+          buckets.push(`${String(params[`series${seek[1]!}`])}@${String(value)}`);
         }
       };
       const query = vi.fn(
@@ -912,11 +890,7 @@ describe("MetricDataPointClickHouseRepository", () => {
       const interleaved = Array.from({ length: 63 }, (_, index) =>
         stored({ series: 1, offsetMs: index * 1_000 + 500 }),
       );
-      const table = [
-        ...chunk,
-        ...interleaved,
-        stored({ series: 1, offsetMs: 200_000 }),
-      ];
+      const table = [...chunk, ...interleaved, stored({ series: 1, offsetMs: 200_000 })];
 
       const { folded, perPoint } = await bothShapes({
         points: chunk.map(chunkPoint),
@@ -978,9 +952,7 @@ describe("MetricDataPointClickHouseRepository", () => {
       });
 
       expect(folded).toEqual(perPoint);
-      expect(folded).toContain(
-        `${first.seriesId}@${base + METRIC_ROLLUP_INTERVAL_MS}`,
-      );
+      expect(folded).toContain(`${first.seriesId}@${base + METRIC_ROLLUP_INTERVAL_MS}`);
     });
 
     /**
@@ -1021,12 +993,12 @@ describe("MetricDataPointClickHouseRepository", () => {
       expect(folded).toEqual(perPoint);
       // Both series have to be represented, or a bound that excluded one of
       // them entirely would still compare equal.
-      expect(
-        folded.some((entry) => entry.startsWith(early.chunk[0]!.seriesId)),
-      ).toBe(true);
-      expect(
-        folded.some((entry) => entry.startsWith(late.chunk[0]!.seriesId)),
-      ).toBe(true);
+      expect(folded.some((entry) => entry.startsWith(early.chunk[0]!.seriesId))).toBe(
+        true,
+      );
+      expect(folded.some((entry) => entry.startsWith(late.chunk[0]!.seriesId))).toBe(
+        true,
+      );
     });
 
     /** @scenario "A folded rollup read resolves the successors a per-point read did" */

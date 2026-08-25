@@ -18,9 +18,9 @@ test.describe("Settings Plans Comparison", () => {
     await expect(page).not.toHaveURL(/\/auth\/signin/);
 
     // Verify the page heading
-    await expect(
-      page.getByRole("heading", { name: "Plans" })
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: "Plans" })).toBeVisible({
+      timeout: 15000,
+    });
 
     // Verify all three plan columns are present
     const freePlan = page.getByTestId("plan-column-free");

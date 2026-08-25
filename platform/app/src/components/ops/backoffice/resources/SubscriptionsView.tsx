@@ -21,17 +21,9 @@ import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { PlanTypes, SubscriptionStatus } from "~/generated/prisma/client";
-import {
-  dateInputToISO,
-  EmptyCell,
-  formatDate,
-} from "@langwatch/ops-web";
+import { dateInputToISO, EmptyCell, formatDate } from "@langwatch/ops-web";
 import { BackofficeTable } from "../BackofficeTable";
-import {
-  useAdminCreate,
-  useAdminList,
-  useAdminUpdate,
-} from "../useAdminResource";
+import { useAdminCreate, useAdminList, useAdminUpdate } from "../useAdminResource";
 
 interface AdminSubscription {
   id: string;
@@ -191,18 +183,11 @@ export default function SubscriptionsView() {
                     {sub.status}
                   </Badge>
                 </Table.Cell>
-                <Table.Cell>
-                  {sub.stripeSubscriptionId ?? <EmptyCell />}
-                </Table.Cell>
+                <Table.Cell>{sub.stripeSubscriptionId ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>{formatDate(sub.startDate)}</Table.Cell>
                 <Table.Cell>{formatDate(sub.endDate)}</Table.Cell>
                 <Table.Cell textAlign="right">
-                  <Box
-                    width="full"
-                    height="full"
-                    display="flex"
-                    justifyContent="end"
-                  >
+                  <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>
                       <Menu.Trigger>
                         <MoreVertical size={16} />
@@ -317,8 +302,7 @@ function SubscriptionDrawer({
       const limitValues = LIMIT_FIELDS.reduce(
         (acc, f) => {
           const raw = subscription[f.key];
-          acc[f.key as LimitKey] =
-            typeof raw === "number" ? raw.toString() : "";
+          acc[f.key as LimitKey] = typeof raw === "number" ? raw.toString() : "";
           return acc;
         },
         {} as Record<LimitKey, string>,
@@ -365,8 +349,7 @@ function SubscriptionDrawer({
 
     const onSuccess = () => {
       toaster.create({
-        title:
-          mode === "edit" ? "Subscription updated" : "Subscription created",
+        title: mode === "edit" ? "Subscription updated" : "Subscription created",
         type: "success",
         duration: 3000,
       });
@@ -382,10 +365,7 @@ function SubscriptionDrawer({
       });
 
     if (mode === "edit" && subscription) {
-      update.mutate(
-        { id: subscription.id, data: payload },
-        { onSuccess, onError },
-      );
+      update.mutate({ id: subscription.id, data: payload }, { onSuccess, onError });
     } else {
       create.mutate(payload, { onSuccess, onError });
     }
@@ -445,9 +425,7 @@ function SubscriptionDrawer({
               <Field.Label>Stripe subscription ID</Field.Label>
               <Input
                 value={form.stripeSubscriptionId}
-                onChange={(e) =>
-                  setField("stripeSubscriptionId", e.target.value)
-                }
+                onChange={(e) => setField("stripeSubscriptionId", e.target.value)}
               />
             </Field.Root>
             <HStack gap={3}>
@@ -479,9 +457,7 @@ function SubscriptionDrawer({
                       <Input
                         type="number"
                         value={form[f.key as LimitKey]}
-                        onChange={(e) =>
-                          setField(f.key as LimitKey, e.target.value)
-                        }
+                        onChange={(e) => setField(f.key as LimitKey, e.target.value)}
                         placeholder="—"
                       />
                     </Field.Root>
@@ -497,8 +473,7 @@ function SubscriptionDrawer({
                 </Text>
                 {subscription.lastPaymentFailedDate && (
                   <Text fontSize="xs" color="red.500">
-                    Last payment failed:{" "}
-                    {formatDate(subscription.lastPaymentFailedDate)}
+                    Last payment failed: {formatDate(subscription.lastPaymentFailedDate)}
                   </Text>
                 )}
               </VStack>
@@ -547,10 +522,7 @@ function EnumSelect({
 }) {
   return (
     <NativeSelect.Root size="sm" width="full">
-      <NativeSelect.Field
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
+      <NativeSelect.Field value={value} onChange={(e) => onChange(e.target.value)}>
         {options.map((opt) => (
           <option key={opt} value={opt}>
             {opt}
@@ -607,10 +579,7 @@ function OrganizationPicker({
         onChange={(e) => setQuery(e.target.value)}
       />
       <NativeSelect.Root size="sm" width="full" mt={1}>
-        <NativeSelect.Field
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        >
+        <NativeSelect.Field value={value} onChange={(e) => onChange(e.target.value)}>
           <option value="">Select organization…</option>
           {options.map((org) => (
             <option key={org.id} value={org.id}>

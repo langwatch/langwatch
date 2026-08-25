@@ -63,8 +63,7 @@ describe("poison-guard timing invariants", () => {
        */
       it("expires the beacon before the group can be redispatched", () => {
         const heartbeatIntervalSec = GROUP_QUEUE_CONFIG.activeTtlSec / 3;
-        const redispatchFloorSec =
-          GROUP_QUEUE_CONFIG.activeTtlSec - heartbeatIntervalSec;
+        const redispatchFloorSec = GROUP_QUEUE_CONFIG.activeTtlSec - heartbeatIntervalSec;
 
         expect(WORKER_LIVENESS_TTL_SECONDS).toBeLessThan(redispatchFloorSec);
       });
@@ -81,9 +80,7 @@ describe("poison-guard timing invariants", () => {
       it("keeps the retirement tombstone alive longer than the markers it answers for", () => {
         // A marker outliving the tombstone that explains its owner would decay
         // from "retired" into "no beacon" — a false death on a clean shutdown.
-        expect(WORKER_RETIRED_TTL_SECONDS).toBeGreaterThan(
-          CLAIM_MARKER_TTL_SECONDS,
-        );
+        expect(WORKER_RETIRED_TTL_SECONDS).toBeGreaterThan(CLAIM_MARKER_TTL_SECONDS);
       });
     });
   });
@@ -103,11 +100,9 @@ describe("GroupQueueProcessor worker liveness beacon", () => {
     connections.push(conn);
     vi.spyOn(conn, "duplicate").mockReturnValue(conn as never);
 
-    const processor = new GroupQueueProcessor<TestPayload>(
-      makeDefinition(),
-      conn,
-      { consumerEnabled: true },
-    );
+    const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
+      consumerEnabled: true,
+    });
     const internals = processor as unknown as {
       workerId: string;
       livenessReady: Promise<void>;
@@ -130,16 +125,12 @@ describe("GroupQueueProcessor worker liveness beacon", () => {
         const { processor, internals } = createProcessor();
 
         const order: string[] = [];
-        vi.spyOn(internals.scripts, "recordWorkerAlive").mockImplementation(
-          async () => {
-            order.push("alive");
-          },
-        );
-        vi.spyOn(internals.scripts, "retireWorker").mockImplementation(
-          async () => {
-            order.push("retired");
-          },
-        );
+        vi.spyOn(internals.scripts, "recordWorkerAlive").mockImplementation(async () => {
+          order.push("alive");
+        });
+        vi.spyOn(internals.scripts, "retireWorker").mockImplementation(async () => {
+          order.push("retired");
+        });
 
         await internals.livenessReady;
         expect(internals.livenessTimer).toBeDefined();
@@ -148,9 +139,7 @@ describe("GroupQueueProcessor worker liveness beacon", () => {
 
         // The timer is cleared, so no refresh can follow the tombstone.
         expect(internals.livenessTimer).toBeUndefined();
-        expect(internals.scripts.retireWorker).toHaveBeenCalledWith(
-          internals.workerId,
-        );
+        expect(internals.scripts.retireWorker).toHaveBeenCalledWith(internals.workerId);
         expect(order.at(-1)).toBe("retired");
       });
     });
@@ -175,22 +164,18 @@ describe("GroupQueueProcessor worker liveness beacon", () => {
         const publishGate = new Promise<void>((resolve) => {
           releasePublish = resolve;
         });
-        vi.spyOn(
-          GroupStagingScripts.prototype,
-          "recordWorkerAlive",
-        ).mockImplementation(async () => {
-          await publishGate;
-        });
-        vi.spyOn(
-          GroupStagingScripts.prototype,
-          "retireWorker",
-        ).mockResolvedValue(undefined);
-
-        const processor = new GroupQueueProcessor<TestPayload>(
-          makeDefinition(),
-          conn,
-          { consumerEnabled: true },
+        vi.spyOn(GroupStagingScripts.prototype, "recordWorkerAlive").mockImplementation(
+          async () => {
+            await publishGate;
+          },
         );
+        vi.spyOn(GroupStagingScripts.prototype, "retireWorker").mockResolvedValue(
+          undefined,
+        );
+
+        const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
+          consumerEnabled: true,
+        });
         const internals = processor as unknown as {
           livenessReady: Promise<void>;
           livenessTimer: ReturnType<typeof setInterval> | undefined;
@@ -218,11 +203,9 @@ describe("GroupQueueProcessor worker liveness beacon", () => {
         });
         connections.push(conn);
 
-        const processor = new GroupQueueProcessor<TestPayload>(
-          makeDefinition(),
-          conn,
-          { consumerEnabled: false },
-        );
+        const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
+          consumerEnabled: false,
+        });
         const internals = processor as unknown as {
           livenessReady: Promise<void>;
           livenessTimer: ReturnType<typeof setInterval> | undefined;

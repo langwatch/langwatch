@@ -31,10 +31,7 @@ import { chromium } from "playwright";
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5560";
 const OUTPUT_DIR =
   process.env.OUTPUT_DIR ??
-  path.resolve(
-    process.env.HOME ?? "",
-    "Projects/pr-screenshots/ingestion-templates",
-  );
+  path.resolve(process.env.HOME ?? "", "Projects/pr-screenshots/ingestion-templates");
 const AUTH_FILE = path.resolve(__dirname, "auth.json");
 const VIEWPORT = { width: 1440, height: 900 };
 
@@ -62,9 +59,7 @@ void (async () => {
         await page.waitForLoadState("networkidle");
         const panel = page.locator('text="Personal OTLP Endpoint"').first();
         await panel.waitFor({ state: "visible", timeout: 10_000 });
-        const card = panel.locator(
-          'xpath=ancestor::*[contains(@class, "css-")][1]/..',
-        );
+        const card = panel.locator('xpath=ancestor::*[contains(@class, "css-")][1]/..');
         await card.first().screenshot({
           path: path.join(OUTPUT_DIR, "me-settings-personal-otlp-panel.png"),
         });
@@ -128,9 +123,7 @@ void (async () => {
         await page.goto(`${BASE_URL}/me/traces?source=claude_code`);
         await page.waitForLoadState("networkidle");
         const firstRow = page
-          .locator(
-            'a[href*="/traces/"], button:has-text("claude-code"), [role="row"]',
-          )
+          .locator('a[href*="/traces/"], button:has-text("claude-code"), [role="row"]')
           .first();
         if (await firstRow.count()) {
           await firstRow.click();
@@ -150,10 +143,7 @@ void (async () => {
       await capture();
       console.log(`✅ ${filename}`);
     } catch (err) {
-      console.error(
-        `❌ ${filename} failed:`,
-        err instanceof Error ? err.message : err,
-      );
+      console.error(`❌ ${filename} failed:`, err instanceof Error ? err.message : err);
     }
   }
 

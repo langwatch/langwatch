@@ -49,10 +49,7 @@ export const LATENCY_MINUTE_BUCKET_TTL_SECONDS = 2 * 60 * 60;
 /** Hour buckets outlive the week window they feed. */
 export const LATENCY_HOUR_BUCKET_TTL_SECONDS = 8 * 24 * 60 * 60;
 
-export function latencyMinuteBucketKey(
-  queueName: string,
-  nowMs: number,
-): string {
+export function latencyMinuteBucketKey(queueName: string, nowMs: number): string {
   return `${queueName}:gq:stats:lat-hist:m:${Math.floor(nowMs / LATENCY_MINUTE_BUCKET_MS)}`;
 }
 

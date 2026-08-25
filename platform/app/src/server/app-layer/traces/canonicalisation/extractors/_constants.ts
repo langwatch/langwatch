@@ -143,8 +143,7 @@ export const ATTR_KEYS = {
   LANGWATCH_TIMESTAMPS: "langwatch.timestamps",
   LANGWATCH_MODEL_INPUT_COST_PER_TOKEN: "langwatch.model.inputCostPerToken",
   LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN: "langwatch.model.outputCostPerToken",
-  LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN:
-    "langwatch.model.cacheReadCostPerToken",
+  LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN: "langwatch.model.cacheReadCostPerToken",
   LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN:
     "langwatch.model.cacheCreationCostPerToken",
   // The customer's own rate for an hour-long cache entry, which bills above a
@@ -183,8 +182,7 @@ export const ATTR_KEYS = {
   LANGWATCH_TAGS: "langwatch.tags", // Legacy/alternative name
 
   // LangWatch reserved attributes
-  LANGWATCH_RESERVED_PII_REDACTION_STATUS:
-    "langwatch.reserved.pii_redaction_status",
+  LANGWATCH_RESERVED_PII_REDACTION_STATUS: "langwatch.reserved.pii_redaction_status",
   LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS:
     "langwatch.reserved.pii_redaction_partial_span_ids",
   LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS:
@@ -241,8 +239,7 @@ export const ATTR_KEYS = {
   // Extended GenAI usage tokens
   GEN_AI_USAGE_REASONING_TOKENS: "gen_ai.usage.reasoning_tokens",
   GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS: "gen_ai.usage.cache_read.input_tokens",
-  GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS:
-    "gen_ai.usage.cache_creation.input_tokens",
+  GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS: "gen_ai.usage.cache_creation.input_tokens",
   // Anthropic's per-TTL cache-creation split (usage.cache_creation.
   // ephemeral_5m_input_tokens / ephemeral_1h_input_tokens in the response
   // body). The TTL is what decides the write's price, 5m bills at 1.25x base

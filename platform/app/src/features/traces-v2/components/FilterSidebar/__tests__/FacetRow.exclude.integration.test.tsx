@@ -104,9 +104,7 @@ describe("<FacetRow /> include / exclude affordance", () => {
     describe("when rendered", () => {
       it("labels the exclude affordance as a way to stop excluding", () => {
         renderRow({ state: "exclude" });
-        expect(
-          screen.getByLabelText("Stop excluding error"),
-        ).toBeInTheDocument();
+        expect(screen.getByLabelText("Stop excluding error")).toBeInTheDocument();
       });
     });
   });

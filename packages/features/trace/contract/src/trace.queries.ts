@@ -10,9 +10,7 @@ export const spanTreeTransportInputSchema = z.object({
   occurredAtMs: z.number().int().optional(),
 });
 
-export type SpanTreeTransportInput = z.infer<
-  typeof spanTreeTransportInputSchema
->;
+export type SpanTreeTransportInput = z.infer<typeof spanTreeTransportInputSchema>;
 
 /** Transport input plus the resolved authorization capability for the service. */
 export const spanTreeInputSchema = spanTreeTransportInputSchema.extend({

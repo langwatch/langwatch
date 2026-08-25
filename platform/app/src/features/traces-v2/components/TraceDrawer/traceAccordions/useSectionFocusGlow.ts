@@ -1,10 +1,4 @@
-import {
-  type RefObject,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 
 /**
@@ -66,9 +60,7 @@ export function useSectionFocusGlow({
     let observer: MutationObserver | null = null;
     let bailTimer = 0;
     const tryScrollAndGlow = () => {
-      const el = root.querySelector<HTMLElement>(
-        `[data-section="${glowSection}"]`,
-      );
+      const el = root.querySelector<HTMLElement>(`[data-section="${glowSection}"]`);
       if (!el) return false;
       el.scrollIntoView({ behavior: "smooth", block: "start" });
       // Mount the overlay AFTER the scroll starts so the pulse lands

@@ -61,18 +61,18 @@ describe("langyAgentErrorFromFrame", () => {
       // reached for gh/git-remote with no installation token. This is the wire
       // half of the connect-card flow — the explainer suppresses the red card
       // and the panel draws the install card instead.
-      expect(
-        langyAgentErrorFromFrame("langy_github_not_connected"),
-      ).toBeInstanceOf(LangyGithubNotConnectedError);
+      expect(langyAgentErrorFromFrame("langy_github_not_connected")).toBeInstanceOf(
+        LangyGithubNotConnectedError,
+      );
     });
 
     it("maps the GitHub gate's repo-not-accessible code onto its own domain error", () => {
       // Credentialed variant: the app installation doesn't cover the repo the
       // agent reached for (the clone 404'd). Terminal card pointing the user
       // at granting the app access.
-      expect(
-        langyAgentErrorFromFrame("langy_github_repo_not_accessible"),
-      ).toBeInstanceOf(LangyGithubRepoNotAccessibleError);
+      expect(langyAgentErrorFromFrame("langy_github_repo_not_accessible")).toBeInstanceOf(
+        LangyGithubRepoNotAccessibleError,
+      );
     });
 
     describe("given the frame carries a typed cause chain", () => {
@@ -126,9 +126,7 @@ describe("langyAgentErrorFromFrame", () => {
         const cause = handledErrorFromHerr({
           type: "agent_error",
           message: "the agent hit an error before finishing",
-          reasons: [
-            { type: "rate_limited", message: "rate limited", meta: {} },
-          ],
+          reasons: [{ type: "rate_limited", message: "rate limited", meta: {} }],
         });
 
         const error = langyAgentErrorFromErrorFrame({
@@ -152,9 +150,9 @@ describe("langyAgentErrorFromFrame", () => {
       });
 
       it("falls back to the bare-code mapping without a cause", () => {
-        expect(
-          langyAgentErrorFromErrorFrame({ code: "worker_stopped" }),
-        ).toBeInstanceOf(LangyWorkerStoppedError);
+        expect(langyAgentErrorFromErrorFrame({ code: "worker_stopped" })).toBeInstanceOf(
+          LangyWorkerStoppedError,
+        );
       });
     });
 
@@ -174,9 +172,7 @@ describe("langyAgentErrorFromFrame", () => {
       );
 
       expect(error).not.toBeInstanceOf(LangyAgentAtCapacityError);
-      expect(error.message).toBe(
-        "worker spawn failed: /home/langy-7: permission denied",
-      );
+      expect(error.message).toBe("worker spawn failed: /home/langy-7: permission denied");
       expect(classifyLangyTurnError(error).kind).toBe("unknown");
     });
   });

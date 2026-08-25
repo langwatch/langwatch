@@ -1,9 +1,9 @@
 import type { AutomationService } from "@langwatch/automation-contract";
 import {
-	AutomationClock,
-	PostgresAutomationAdapter,
-	SchedulerWake,
-	UnsubscribeTokenVerifier,
+  AutomationClock,
+  PostgresAutomationAdapter,
+  SchedulerWake,
+  UnsubscribeTokenVerifier,
 } from "@langwatch/automation-server";
 import type { Cluster, Redis } from "ioredis";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -14,51 +14,51 @@ import { verifyUnsubscribeToken } from "~/server/mailer/unsubscribeToken";
 type SchedulerRedis = Redis | Cluster | null | undefined;
 
 class AppAutomationClock extends AutomationClock {
-	now(): Date {
-		return new Date();
-	}
+  now(): Date {
+    return new Date();
+  }
 }
 
 class AppUnsubscribeTokenVerifier extends UnsubscribeTokenVerifier {
-	tryVerify(token: string) {
-		return verifyUnsubscribeToken(token);
-	}
+  tryVerify(token: string) {
+    return verifyUnsubscribeToken(token);
+  }
 }
 
 class AppSchedulerWake extends SchedulerWake {
-	constructor(private readonly redis: SchedulerRedis) {
-		super();
-	}
+  constructor(private readonly redis: SchedulerRedis) {
+    super();
+  }
 
-	publish(): void {
-		SchedulerService.publishWake(this.redis);
-	}
+  publish(): void {
+    SchedulerService.publishWake(this.redis);
+  }
 }
 
 /** Process-owned composition root for triggers, schedules and suppressions. */
 export class AppAutomationRuntime {
-	private constructor(
-		private readonly database: PrismaClient,
-		private readonly redis: SchedulerRedis,
-	) {}
+  private constructor(
+    private readonly database: PrismaClient,
+    private readonly redis: SchedulerRedis,
+  ) {}
 
-	static create(options: {
-		database: PrismaClient;
-		redis?: SchedulerRedis;
-	}): AppAutomationRuntime {
-		return new AppAutomationRuntime(options.database, options.redis);
-	}
+  static create(options: {
+    database: PrismaClient;
+    redis?: SchedulerRedis;
+  }): AppAutomationRuntime {
+    return new AppAutomationRuntime(options.database, options.redis);
+  }
 
-	build(): AutomationService {
-		const clock = new AppAutomationClock();
-		const jobs = new PrismaScheduledJobStore(this.database);
+  build(): AutomationService {
+    const clock = new AppAutomationClock();
+    const jobs = new PrismaScheduledJobStore(this.database);
 
-		return PostgresAutomationAdapter.create({
-			database: this.database,
-			jobs,
-			clock,
-			verifier: new AppUnsubscribeTokenVerifier(),
-			wake: new AppSchedulerWake(this.redis),
-		}).build();
-	}
+    return PostgresAutomationAdapter.create({
+      database: this.database,
+      jobs,
+      clock,
+      verifier: new AppUnsubscribeTokenVerifier(),
+      wake: new AppSchedulerWake(this.redis),
+    }).build();
+  }
 }

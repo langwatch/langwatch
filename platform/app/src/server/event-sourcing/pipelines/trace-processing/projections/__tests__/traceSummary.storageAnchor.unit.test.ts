@@ -203,8 +203,6 @@ describe("given the migration's account of what the anchor does not recover", ()
     expect(options.refoldOnStoreMiss).toBeUndefined();
     // A window far narrower than the ~56 years between the epoch partition and
     // a present-day event, which is why the miss happens at all.
-    expect(options.readWindow?.widthMs).toBeLessThan(
-      Date.now() - new Date(0).getTime(),
-    );
+    expect(options.readWindow?.widthMs).toBeLessThan(Date.now() - new Date(0).getTime());
   });
 });

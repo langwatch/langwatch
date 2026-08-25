@@ -85,10 +85,7 @@ export function PromptEditorHeader({
               />
             </>
           )}
-          <GeneratePromptApiSnippetDialog
-            promptHandle={handle}
-            apiKey={project?.apiKey}
-          >
+          <GeneratePromptApiSnippetDialog promptHandle={handle} apiKey={project?.apiKey}>
             <GeneratePromptApiSnippetDialog.Trigger>
               <GenerateApiSnippetButton hasHandle={!!handle} />
             </GeneratePromptApiSnippetDialog.Trigger>

@@ -14,13 +14,7 @@ import {
   REPORT_TRIGGER_DEFAULTS,
   TRACE_TRIGGER_DEFAULTS,
 } from "@langwatch/automation-contract";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "~/features/automations/providers/types";
@@ -30,21 +24,14 @@ vi.mock("@monaco-editor/react", () => ({ default: () => null }));
  *  one export as a textarea carrying its `value`, so a test can read back the
  *  template the editor was seeded with — the template an author's first
  *  keystroke would persist. Everything else in the module stays real. */
-vi.mock(
-  "~/features/automations/editors/templateAuthoring",
-  async (original) => {
-    const actual =
-      await original<
-        typeof import("~/features/automations/editors/templateAuthoring")
-      >();
-    return {
-      ...actual,
-      LiquidEditor: ({ value }: { value: string }) => (
-        <textarea readOnly value={value} />
-      ),
-    };
-  },
-);
+vi.mock("~/features/automations/editors/templateAuthoring", async (original) => {
+  const actual =
+    await original<typeof import("~/features/automations/editors/templateAuthoring")>();
+  return {
+    ...actual,
+    LiquidEditor: ({ value }: { value: string }) => <textarea readOnly value={value} />,
+  };
+});
 vi.mock("~/components/ui/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
@@ -109,12 +96,8 @@ describe("EmailConfigForm authoring tiers", () => {
       it("keeps the subject and body editors hidden", () => {
         renderForm();
 
-        expect(
-          screen.queryByTestId("email-subject-editor"),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByTestId("email-body-editor"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("email-subject-editor")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("email-body-editor")).not.toBeInTheDocument();
       });
 
       it("offers a customize wording expander", () => {
@@ -131,9 +114,7 @@ describe("EmailConfigForm authoring tiers", () => {
     it("reveals the subject and body editors", () => {
       renderForm();
 
-      fireEvent.click(
-        screen.getByRole("button", { name: /customize wording/i }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: /customize wording/i }));
 
       expect(screen.getByTestId("email-subject-editor")).toBeInTheDocument();
       expect(screen.getByTestId("email-body-editor")).toBeInTheDocument();
@@ -155,20 +136,14 @@ describe("EmailConfigForm default wording", () => {
     renderForm(ctx);
     fireEvent.click(screen.getByRole("button", { name: /customize wording/i }));
     return {
-      subject: within(screen.getByTestId("email-subject-editor")).getByRole(
-        "textbox",
-      ),
-      body: within(screen.getByTestId("email-body-editor")).getByRole(
-        "textbox",
-      ),
+      subject: within(screen.getByTestId("email-subject-editor")).getByRole("textbox"),
+      body: within(screen.getByTestId("email-body-editor")).getByRole("textbox"),
     };
   }
 
   describe("given a report draft", () => {
     it("seeds the report subject and body, not the trace ones", () => {
-      const { subject, body } = openedEditors(
-        makeCtx({ sourceKind: "report" }),
-      );
+      const { subject, body } = openedEditors(makeCtx({ sourceKind: "report" }));
 
       expect(subject).toHaveValue(REPORT_TRIGGER_DEFAULTS.emailSubject);
       expect(body).toHaveValue(REPORT_TRIGGER_DEFAULTS.emailBody);
@@ -183,9 +158,7 @@ describe("EmailConfigForm default wording", () => {
 
   describe("given a graph-alert draft", () => {
     it("seeds the alert subject and body", () => {
-      const { subject, body } = openedEditors(
-        makeCtx({ sourceKind: "graphAlert" }),
-      );
+      const { subject, body } = openedEditors(makeCtx({ sourceKind: "graphAlert" }));
 
       expect(subject).toHaveValue(ALERT_TRIGGER_DEFAULTS.emailSubject);
       expect(body).toHaveValue(ALERT_TRIGGER_DEFAULTS.emailBody);

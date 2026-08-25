@@ -8,16 +8,16 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 
 ## At a glance
 
-|  | `/api/otel/v1/traces` (existing, your apps) | `/api/ingest/otel/:sourceId` (governance, third-party platforms) |
-|---|---|---|
-| **Use it when** | Your application emits LLM traces, you want them in the LangWatch trace viewer | Your org runs a third-party AI platform (Claude Cowork, Workato, custom internal agents) and you want their audit data surfaced in LangWatch governance |
-| **Auth** | LangWatch project API key, PAT, `X-Auth-Token` or `Authorization: Bearer <project-token>` | IngestionSource bearer secret (`lw_is_<...>`), minted once via the secret-reveal modal |
-| **Tenancy** | Project-scoped (data lives in the project's CH partition) | Org-scoped, routed through a hidden internal Governance Project per org (lazy-ensured on first IngestionSource mint; never user-visible) |
-| **Storage** | `recorded_spans` + `log_records`, the LangWatch trace pipeline | **Same `recorded_spans` + `log_records`**, distinguished by `langwatch.origin.kind = "ingestion_source"` attribute stamped at the receiver edge |
-| **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Same trace viewer + log-detail pane (drill-down works regardless of origin) **plus** governance dashboard at `/governance`, anomaly detection, OCSF/SIEM forwarding |
-| **Plan accounting** | Counts against the project's trace allowance | Counts against the org's governance audit-event allowance |
-| **Source identity** | Whoever holds the project key (typically your own apps) | An IngestionSource the admin authored explicitly with per-platform config |
-| **Other shapes** | OTLP only | OTLP **plus** webhook envelope (`/api/ingest/webhook/:id` for Workato + s3_custom callback mode) and pull-mode workers for compliance feeds (OpenAI, Anthropic, Microsoft Copilot Studio) |
+|                          | `/api/otel/v1/traces` (existing, your apps)                                                   | `/api/ingest/otel/:sourceId` (governance, third-party platforms)                                                                                                                          |
+| ------------------------ | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Use it when**          | Your application emits LLM traces, you want them in the LangWatch trace viewer                | Your org runs a third-party AI platform (Claude Cowork, Workato, custom internal agents) and you want their audit data surfaced in LangWatch governance                                   |
+| **Auth**                 | LangWatch project API key, PAT, `X-Auth-Token` or `Authorization: Bearer <project-token>`     | IngestionSource bearer secret (`lw_is_<...>`), minted once via the secret-reveal modal                                                                                                    |
+| **Tenancy**              | Project-scoped (data lives in the project's CH partition)                                     | Org-scoped, routed through a hidden internal Governance Project per org (lazy-ensured on first IngestionSource mint; never user-visible)                                                  |
+| **Storage**              | `recorded_spans` + `log_records`, the LangWatch trace pipeline                                | **Same `recorded_spans` + `log_records`**, distinguished by `langwatch.origin.kind = "ingestion_source"` attribute stamped at the receiver edge                                           |
+| **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Same trace viewer + log-detail pane (drill-down works regardless of origin) **plus** governance dashboard at `/governance`, anomaly detection, OCSF/SIEM forwarding                       |
+| **Plan accounting**      | Counts against the project's trace allowance                                                  | Counts against the org's governance audit-event allowance                                                                                                                                 |
+| **Source identity**      | Whoever holds the project key (typically your own apps)                                       | An IngestionSource the admin authored explicitly with per-platform config                                                                                                                 |
+| **Other shapes**         | OTLP only                                                                                     | OTLP **plus** webhook envelope (`/api/ingest/webhook/:id` for Workato + s3_custom callback mode) and pull-mode workers for compliance feeds (OpenAI, Anthropic, Microsoft Copilot Studio) |
 
 ## Decision tree
 
@@ -25,7 +25,7 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 
 **Are you forwarding events from a third-party AI platform?** (Claude Cowork tenant, Workato workspace, Microsoft Copilot Studio, OpenAI Enterprise Compliance, custom S3 audit drops) → **`/api/ingest/otel/:sourceId`** (or `/webhook/:id` for non-OTLP feeds) with an IngestionSource bearer. The IngestionSource is created by an org admin under [Governance → Ingestion sources](/ai-governance/ingestion-sources/index). Per-platform setup pages: [Generic OTel](/ai-governance/ingestion-sources/otel-generic), [Claude Cowork](/ai-governance/ingestion-sources/claude-cowork), [Workato](/ai-governance/ingestion-sources/workato).
 
-**Are you driving an LLM call through the AI Gateway and want both?** That happens automatically, gateway requests already emit OTel traces back to the project that owns the virtual key, so your gateway traffic shows up in `/api/otel/v1/traces` semantics with no extra wiring. The governance endpoint is only for *external* platforms LangWatch doesn't proxy.
+**Are you driving an LLM call through the AI Gateway and want both?** That happens automatically, gateway requests already emit OTel traces back to the project that owns the virtual key, so your gateway traffic shows up in `/api/otel/v1/traces` semantics with no extra wiring. The governance endpoint is only for _external_ platforms LangWatch doesn't proxy.
 
 ## Why two URLs (not two pipelines)
 
@@ -41,7 +41,7 @@ The two URLs are split for **auth + routing convenience**, not for architectural
 
 The auth + tenancy split is what's actually different:
 
-- **Auth model**: A project API key authorises a specific project to write its own traces. An IngestionSource bearer authorises a specific *external system* to push events into one slot the admin has provisioned for it. Different "who is allowed to do what?" questions.
+- **Auth model**: A project API key authorises a specific project to write its own traces. An IngestionSource bearer authorises a specific _external system_ to push events into one slot the admin has provisioned for it. Different "who is allowed to do what?" questions.
 - **Tenancy resolution**: Trace data is partitioned per project. Governance data is org-scoped (the customer doesn't pick a project; the receiver routes it through a per-org hidden Governance Project the platform manages internally).
 - **Non-OTLP shapes**: The governance endpoint family also accepts webhook (`/api/ingest/webhook/:sourceId`) and pull-mode connectors. The webhook receiver normalises to OTLP `log_records` before handoff so the downstream pipeline only ever sees OTLP. The trace endpoint is OTLP-only.
 
@@ -49,13 +49,13 @@ The internal-architecture decision behind this is captured in [ADR-018](https://
 
 ## Common confusions
 
-**"My OTel collector is already pointed at `/api/otel/v1/traces`, do I need to add a second exporter for governance?"** No, not for your own apps. The trace endpoint is the right home for traces from systems your org owns. The governance endpoint is for *external* platforms (Cowork, Workato, etc.) that you don't own but want governance over.
+**"My OTel collector is already pointed at `/api/otel/v1/traces`, do I need to add a second exporter for governance?"** No, not for your own apps. The trace endpoint is the right home for traces from systems your org owns. The governance endpoint is for _external_ platforms (Cowork, Workato, etc.) that you don't own but want governance over.
 
 **"My collector pushes gzipped protobuf, does the governance endpoint accept that?"** Yes. Both URLs accept the full OTLP wire shape with all standard Content-Encoding values. Same shared parser.
 
 **"Can I send the same span to both endpoints?"** Technically yes, but it's not what the design assumes. A span describing a single LLM call doesn't need to be ingested twice. Spans you author from your own app go to the trace endpoint with your project key; spans you receive from a third-party platform go to the governance endpoint with an IngestionSource bearer.
 
-**"Will the two endpoints ever merge?"** Probably not, the auth + tenancy split is real customer-facing convenience. But the *internal* convergence already happened: every customer-facing claim about "what storage", "what trace viewer", "what compliance" applies equally to both URLs today. The two URLs share one pipeline.
+**"Will the two endpoints ever merge?"** Probably not, the auth + tenancy split is real customer-facing convenience. But the _internal_ convergence already happened: every customer-facing claim about "what storage", "what trace viewer", "what compliance" applies equally to both URLs today. The two URLs share one pipeline.
 
 ## Cross-references
 

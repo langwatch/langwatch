@@ -49,21 +49,12 @@ describe("redactSecretsInText", () => {
         "an OpenAI project key",
         "key sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xY here",
       ],
-      [
-        "an Anthropic key",
-        "key sk-ant-api03-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789 here",
-      ],
-      [
-        "a LangWatch key",
-        "key sk-lw-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789 here",
-      ],
+      ["an Anthropic key", "key sk-ant-api03-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789 here"],
+      ["a LangWatch key", "key sk-lw-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789 here"],
       ["a Slack token", `xoxb-${"1".repeat(20)} here`],
       ["a Google API key", `AIza${"A".repeat(35)} here`],
       ["a Stripe secret key", `sk_live_${"a".repeat(24)} here`],
-      [
-        "a JWT",
-        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123456",
-      ],
+      ["a JWT", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123456"],
     ];
 
     for (const [label, input] of cases) {
@@ -77,8 +68,7 @@ describe("redactSecretsInText", () => {
 
   describe("given a PEM private key block", () => {
     it("redacts the whole block", () => {
-      const input =
-        `key:\n${pemBlock("RSA PRIVATE KEY", "MIIabc\nDEFghi")}\ntail`;
+      const input = `key:\n${pemBlock("RSA PRIVATE KEY", "MIIabc\nDEFghi")}\ntail`;
       const { text } = redact(input);
       expect(text).not.toContain("MIIabc");
       expect(text).toContain("[SECRET]");
@@ -161,7 +151,9 @@ describe("redactSecretsInText", () => {
       const { text, redactedCount } = redact(input);
       expect(text).not.toContain("AKIAIOSFODNN7EXAMPLE");
       expect(redactedCount).toBe(1);
-      expect(text).toHaveLength(input.length - "AKIAIOSFODNN7EXAMPLE".length + "[SECRET]".length);
+      expect(text).toHaveLength(
+        input.length - "AKIAIOSFODNN7EXAMPLE".length + "[SECRET]".length,
+      );
     });
 
     it("finds a key that sits past the first slice boundary", () => {
@@ -180,9 +172,7 @@ describe("redactSecretsInText", () => {
     it("never splits a credential across two slices", () => {
       const results = [-40, -20, -1, 0, 1, 20, 40].map((offset) => {
         const filler = "x ".repeat((SCAN_BUDGET + offset) / 2);
-        const { text, redactedCount } = redact(
-          `${filler}AKIAIOSFODNN7EXAMPLE tail`,
-        );
+        const { text, redactedCount } = redact(`${filler}AKIAIOSFODNN7EXAMPLE tail`);
         return { offset, redactedCount, survived: text.includes("AKIAIOSFO") };
       });
       expect(results.filter((r) => r.survived)).toEqual([]);
@@ -203,8 +193,7 @@ describe("redactSecretsInText", () => {
 
     /** @scenario "A PEM block straddling a slice boundary is still redacted" */
     it("keeps a PEM block whole across a boundary", () => {
-      const pem =
-        pemBlock("PRIVATE KEY", "MIIEvQIBADANBgkqh\n".repeat(40).trimEnd());
+      const pem = pemBlock("PRIVATE KEY", "MIIEvQIBADANBgkqh\n".repeat(40).trimEnd());
       const input = `${"z ".repeat(SCAN_BUDGET / 2 - 5)}${pem} tail`;
       const { text, redactedCount } = redact(input);
       expect(text).not.toContain("MIIEvQIBADANBgkqh");
@@ -237,10 +226,7 @@ describe("redactSecretsInText", () => {
   describe("given a custom pattern", () => {
     it("redacts a company-specific token shape", () => {
       const custom = compileSecretPatterns(["acme_live_[a-z0-9]{8,}"]);
-      const { text, redactedCount } = redact(
-        "token acme_live_abcd1234 end",
-        custom,
-      );
+      const { text, redactedCount } = redact("token acme_live_abcd1234 end", custom);
       expect(text).toBe("token [SECRET] end");
       expect(redactedCount).toBe(1);
     });
@@ -261,16 +247,12 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
         "zyq_8fK2mQ7pXvL4nR9sT1wZ3yB6cD0eG5hJ2kM4pQ7rS9t";
       const { text, redactedCount } = redact(prompt);
 
-      expect(text).toBe(
-        "I had to kill the other exploring agent, key now: [SECRET]",
-      );
+      expect(text).toBe("I had to kill the other exploring agent, key now: [SECRET]");
       expect(redactedCount).toBe(1);
     });
 
     it("redacts it with no surrounding context at all", () => {
-      const { text } = redact(
-        "zyq_8fK2mQ7pXvL4nR9sT1wZ3yB6cD0eG5hJ2kM4pQ7rS9t",
-      );
+      const { text } = redact("zyq_8fK2mQ7pXvL4nR9sT1wZ3yB6cD0eG5hJ2kM4pQ7rS9t");
       expect(text).toBe("[SECRET]");
     });
   });
@@ -303,9 +285,7 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
 
     /** @scenario "Widely used vendor credentials are redacted" */
     it("redacts every one of them", () => {
-      const survived = vendorKeys.filter(
-        ([, key]) => redact(key).redactedCount === 0,
-      );
+      const survived = vendorKeys.filter(([, key]) => redact(key).redactedCount === 0);
       expect(survived.map(([vendor]) => vendor)).toEqual([]);
     });
   });
@@ -326,9 +306,7 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
 
     /** @scenario "A key minted by LangWatch is redacted on its prefix" */
     it("redacts every one of them, however short the body", () => {
-      const survived = ownKeys.filter(
-        ([, key]) => redact(key).redactedCount === 0,
-      );
+      const survived = ownKeys.filter(([, key]) => redact(key).redactedCount === 0);
       expect(survived.map(([kind]) => kind)).toEqual([]);
     });
   });
@@ -360,14 +338,8 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
       ["an Opsgenie GenieKey header", `Authorization: GenieKey ${BODY.slice(0, 32)}`],
       ["a Splunk header", `Authorization: Splunk ${BODY.slice(0, 32)}`],
       ["an OAuth header", `Authorization: OAuth ${BODY.slice(0, 32)}`],
-      [
-        "an encrypted PEM block",
-        pemBlock("ENCRYPTED PRIVATE KEY", "MIIabc"),
-      ],
-      [
-        "a PGP private key block",
-        pemBlock("PGP PRIVATE KEY BLOCK", "lQOYBF"),
-      ],
+      ["an encrypted PEM block", pemBlock("ENCRYPTED PRIVATE KEY", "MIIabc")],
+      ["a PGP private key block", pemBlock("PGP PRIVATE KEY BLOCK", "lQOYBF")],
       [
         "a PuTTY private key",
         "PuTTY-User-Key-File-3: ssh-rsa\nPrivate-Lines: 8\nAAAABBBB\n\ntail",
@@ -381,9 +353,7 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
 
     /** @scenario "Credentials the vendor list had missed are redacted" */
     it("redacts every one of them", () => {
-      const survived = missed.filter(
-        ([, value]) => redact(value).redactedCount === 0,
-      );
+      const survived = missed.filter(([, value]) => redact(value).redactedCount === 0);
       expect(survived.map(([label]) => label)).toEqual([]);
     });
 
@@ -392,10 +362,7 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
     it("still redacts the credentials that already worked", () => {
       expect(redact(`phx_${BODY.slice(0, 36)}`).redactedCount).toBe(1);
       expect(redact(`Bearer ${BODY.slice(0, 32)}`).redactedCount).toBe(1);
-      expect(
-        redact(pemBlock("PRIVATE KEY", "MIIabc"))
-          .redactedCount,
-      ).toBe(1);
+      expect(redact(pemBlock("PRIVATE KEY", "MIIabc")).redactedCount).toBe(1);
     });
   });
 
@@ -405,12 +372,8 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
     // standard-base64 bodies against 0.5% for base64url.
     /** @scenario "A key with a standard base64 body is redacted" */
     it("redacts it the same as a base64url body", () => {
-      expect(redact("acme_aB3dEf+gHi/jKlMnOpQrStUvWx0123456789xY").text).toBe(
-        "[SECRET]",
-      );
-      expect(redact("acme_aB+dEf/gHi+jKlMnOpQrStUvWx0123456789xY").text).toBe(
-        "[SECRET]",
-      );
+      expect(redact("acme_aB3dEf+gHi/jKlMnOpQrStUvWx0123456789xY").text).toBe("[SECRET]");
+      expect(redact("acme_aB+dEf/gHi+jKlMnOpQrStUvWx0123456789xY").text).toBe("[SECRET]");
     });
   });
 
@@ -448,9 +411,7 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
     it("redacts a value whose shape alone gives nothing away", () => {
       // Bare lowercase hex: an MD5 digest and a Twilio auth token are the same
       // shape, so only the keyword can tell them apart.
-      const { text } = redact(
-        "TWILIO_AUTH_TOKEN=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
-      );
+      const { text } = redact("TWILIO_AUTH_TOKEN=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6");
       expect(text).toBe("TWILIO_AUTH_TOKEN=[SECRET]");
     });
 
@@ -460,9 +421,7 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
     });
 
     it("redacts basic authorization credentials", () => {
-      const { text } = redact(
-        "Authorization: Basic dXNlcjpzdXBlcnNlY3JldDEyMw==",
-      );
+      const { text } = redact("Authorization: Basic dXNlcjpzdXBlcnNlY3JldDEyMw==");
       expect(text).toBe("Authorization: Basic [SECRET]");
     });
   });
@@ -516,10 +475,7 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     ["a kubernetes pod name", "pod/langwatch-app-7d9f8c6b5d-x2mnq restarted"],
     ["an AWS ARN", "arn:aws:iam::123456789012:role/langwatch-app-runtime-role"],
     ["a snake_case identifier", "const user_id_1234567890abcdef = row.id;"],
-    [
-      "reading an environment variable",
-      "const apiKey = process.env.OPENAI_API_KEY;",
-    ],
+    ["reading an environment variable", "const apiKey = process.env.OPENAI_API_KEY;"],
     ["a property access chain", "const token = config.auth.accessToken.value;"],
     [
       "a path following a credential keyword",
@@ -529,39 +485,21 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     ["an environment variable reference", "export ACME_API_KEY=$ACME_API_KEY"],
     ["a documented placeholder", "OPENAI_API_KEY=your-api-key-here"],
     ["a masked value", "api_key: xxxxxxxxxxxxxxxxxxxx"],
-    [
-      "a documented header",
-      "Send the Authorization: Basic <base64-credentials> header.",
-    ],
+    ["a documented header", "Send the Authorization: Basic <base64-credentials> header."],
     ["a sentence about basic auth", "This uses Basic authentication over TLS."],
-    [
-      "a documented bearer header",
-      "Send the Authorization: Bearer <your-token> header.",
-    ],
+    ["a documented bearer header", "Send the Authorization: Bearer <your-token> header."],
     [
       "prose using the word key",
       "The key insight is that the token budget was the bottleneck.",
     ],
-    [
-      "advice about a key",
-      "Set the api key in your .env file before running the tests",
-    ],
-    [
-      "an API version field",
-      '{"api_version": "2024-10-21", "model": "claude-opus-5"}',
-    ],
-    [
-      "a request id header",
-      "X-Request-Id: 7f3a9b2c-1d4e-5f6a-8b9c-0d1e2f3a4b5c",
-    ],
+    ["advice about a key", "Set the api key in your .env file before running the tests"],
+    ["an API version field", '{"api_version": "2024-10-21", "model": "claude-opus-5"}'],
+    ["a request id header", "X-Request-Id: 7f3a9b2c-1d4e-5f6a-8b9c-0d1e2f3a4b5c"],
     [
       "usage attributes",
       "gen_ai.usage.input_tokens=15234 gen_ai.usage.output_tokens=892",
     ],
-    [
-      "a branch name",
-      "feat/coding-agent-session-events and issue6124/red-team-native",
-    ],
+    ["a branch name", "feat/coding-agent-session-events and issue6124/red-team-native"],
     ["already-redacted text", "key now: [SECRET] and token: [SECRET]"],
     [
       "an ordinary agent sentence",
@@ -584,10 +522,7 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     // the character-mix gate still keep a bare name readable.
     ["an AWS environment variable name", "AWS_SECRET_ACCESS_KEY"],
     ["a database environment variable name", "DATABASE_URL_PRODUCTION"],
-    [
-      "a long environment variable name",
-      "LANGWATCH_TELEMETRY_ENDPOINT_OVERRIDE_URL",
-    ],
+    ["a long environment variable name", "LANGWATCH_TELEMETRY_ENDPOINT_OVERRIDE_URL"],
     // Identifier prefixes in front of a hex body. The prefixed-hex rule needs a
     // credential segment, and refuses these prefixes even when one is present.
     ["a prefixed commit id", "commit_51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5"],
@@ -597,10 +532,7 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
       "an identifier prefix carrying a credential segment",
       "commit_key_51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5",
     ],
-    [
-      "a trace prefix carrying a credential segment",
-      `trace_token_${HEX}aabbccdd`,
-    ],
+    ["a trace prefix carrying a credential segment", `trace_token_${HEX}aabbccdd`],
     // Ordinary words that merely contain a vendor prefix as a substring.
     [
       "words containing sk- and ask-",
@@ -641,10 +573,7 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     // is a value the corpus above already keeps on its own, which is what made
     // the cue the only thing destroying them.
     ["a key field holding a content hash", `{"key":"${"a1b2c3d4e5f6".repeat(3)}"}`],
-    [
-      "a key field holding a UUID",
-      '{"key":"550e8400-e29b-41d4-a716-446655440000"}',
-    ],
+    ["a key field holding a UUID", '{"key":"550e8400-e29b-41d4-a716-446655440000"}'],
     ["a key field holding a record id", `{"key":"project_${BODY.slice(0, 29)}"}`],
     ["a key entry in an OTLP attribute pair", '{"key":"gen_ai.usage.input_tokens"}'],
     ["a key field in YAML holding a commit", `key: ${"9f8e7d6c5b4a3928".repeat(2)}`],
@@ -711,7 +640,10 @@ describe("redactSecretsInText, given a payload the size of the scan budget", () 
       // Lowercase prose is the worst case for the connection-URL rule, whose
       // scheme is a run of letters. With the scheme leading the match every
       // letter in the text started a scan for a "://" that is not there.
-      ["lowercase prose with no URL in it", "the dashboard stopped loading ".repeat(8_000)],
+      [
+        "lowercase prose with no URL in it",
+        "the dashboard stopped loading ".repeat(8_000),
+      ],
       ["one URL per line", "postgres://svc:pw@10.0.0.4:5432/app\n".repeat(6_000)],
       ["a scheme-shaped run with no separator", `${"a".repeat(100_000)}://`],
     ];
@@ -753,16 +685,12 @@ describe("redactSecretsInText, given a hand-written custom pattern", () => {
     /** @scenario "A custom pattern does not fire inside an ordinary word" */
     it("leaves every one of them exactly as written", () => {
       const custom = userPattern();
-      const mangled = transcriptText.filter(
-        (line) => redact(line, custom).text !== line,
-      );
+      const mangled = transcriptText.filter((line) => redact(line, custom).text !== line);
       expect(mangled).toEqual([]);
     });
 
     it("leaves them alone under the built-in rules too", () => {
-      const mangled = transcriptText.filter(
-        (line) => redact(line).text !== line,
-      );
+      const mangled = transcriptText.filter((line) => redact(line).text !== line);
       expect(mangled).toEqual([]);
     });
   });
@@ -790,10 +718,7 @@ describe("redactSecretsInText, given a hand-written custom pattern", () => {
   describe("when the credential the pattern was written for shows up", () => {
     /** @scenario "A custom pattern still redacts the credential it was written for" */
     it("redacts it", () => {
-      const { text } = redact(
-        "sk-notarealprovider-abc123def456",
-        userPattern(),
-      );
+      const { text } = redact("sk-notarealprovider-abc123def456", userPattern());
       expect(text).toBe("[SECRET]");
     });
   });
@@ -803,9 +728,7 @@ describe("redactSecretsInText, given a hand-written custom pattern", () => {
       // A leading \b means the author already said where it may start, so the
       // guard must not be added on top and change what they asked for.
       const custom = compileSecretPatterns([String.raw`\bacme_[a-z0-9]{8,}`]);
-      expect(redact("token acme_abcd1234 end", custom).text).toBe(
-        "token [SECRET] end",
-      );
+      expect(redact("token acme_abcd1234 end", custom).text).toBe("token [SECRET] end");
     });
   });
 });
@@ -857,10 +780,8 @@ describe("overBroadSecretPatternProbe", () => {
     it("guards it like any other unanchored pattern", () => {
       expect(overBroadSecretPatternProbe("(?<key>sk-.*)")).toBeNull();
       expect(
-        redact(
-          "a <task-notification> here",
-          compileSecretPatterns(["(?<key>sk-.*)"]),
-        ).text,
+        redact("a <task-notification> here", compileSecretPatterns(["(?<key>sk-.*)"]))
+          .text,
       ).toBe("a <task-notification> here");
     });
 
@@ -964,8 +885,7 @@ describe("redactSecretsInText, given a whitespace separator", () => {
       const withRealNewline = "api_key = $OPENAI_API_KEY\nnext line here";
       expect(redact(withRealNewline).text).toBe(withRealNewline);
 
-      const terraform =
-        "github_token_secret = local.github_token_secret_name";
+      const terraform = "github_token_secret = local.github_token_secret_name";
       expect(redact(terraform).text).toBe(terraform);
     });
   });
@@ -996,12 +916,7 @@ describe("isSensitiveAttributeKey", () => {
   });
 
   describe("given an ordinary metadata key", () => {
-    for (const key of [
-      "model",
-      "latency",
-      "gen_ai.usage.input_tokens",
-      "span.name",
-    ]) {
+    for (const key of ["model", "latency", "gen_ai.usage.input_tokens", "span.name"]) {
       it(`does not flag ${key}`, () => {
         expect(isSensitiveAttributeKey(key)).toBe(false);
       });
@@ -1089,9 +1004,7 @@ describe("detectSecretsInText", () => {
 
   describe("given already-redacted text carrying a [SECRET] marker", () => {
     it("does not re-detect the marker as a secret", () => {
-      expect(detectSecretsInText({ text: "authorization: [SECRET]" })).toEqual(
-        [],
-      );
+      expect(detectSecretsInText({ text: "authorization: [SECRET]" })).toEqual([]);
     });
   });
 

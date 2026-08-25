@@ -4,13 +4,10 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
-import {
-  CONVERSATION_TURN_CAP,
-  useSessionScrollback,
-} from "../useSessionScrollback";
+import { CONVERSATION_TURN_CAP, useSessionScrollback } from "../useSessionScrollback";
 
-const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } =
-  vi.hoisted(() => {
+const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } = vi.hoisted(
+  () => {
     const fetchTranscript = vi.fn();
     const fetchSpans = vi.fn();
     const fetchEvents = vi.fn();
@@ -36,7 +33,8 @@ const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } =
         isLoading: false,
       },
     };
-  });
+  },
+);
 
 vi.mock("~/utils/api", () => ({ api: { useUtils: () => utils } }));
 
@@ -144,15 +142,8 @@ describe("useSessionScrollback", () => {
           result.current.loadEarlier();
         });
 
-        expect(result.current.entries).toEqual([
-          ...EARLIER_ENTRIES,
-          ...OPENED_ENTRIES,
-        ]);
-        expect(result.current.rowKeys).toEqual([
-          "turn-2#0",
-          "turn-2#1",
-          "turn-3#0",
-        ]);
+        expect(result.current.entries).toEqual([...EARLIER_ENTRIES, ...OPENED_ENTRIES]);
+        expect(result.current.rowKeys).toEqual(["turn-2#0", "turn-2#1", "turn-3#0"]);
         expect(result.current.turnDividers.get(2)).toEqual({
           turnNumber: 3,
           turnCount: 3,
@@ -443,13 +434,10 @@ describe("useSessionScrollback", () => {
 
   describe("given a session longer than the turn list reaches", () => {
     beforeEach(() => {
-      conversation.turns = Array.from(
-        { length: CONVERSATION_TURN_CAP },
-        (_, index) => ({
-          traceId: `turn-${index}`,
-          timestamp: index * 1_000,
-        }),
-      );
+      conversation.turns = Array.from({ length: CONVERSATION_TURN_CAP }, (_, index) => ({
+        traceId: `turn-${index}`,
+        timestamp: index * 1_000,
+      }));
     });
 
     describe("when the opened turn is past the end of the list", () => {

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  LangyTurnHandoffStore,
-  type LangyHandoffRedis,
-} from "@langwatch/langy-server";
+import { LangyTurnHandoffStore, type LangyHandoffRedis } from "@langwatch/langy-server";
 
 function fakeRedis(): LangyHandoffRedis & { values: Map<string, string> } {
   const values = new Map<string, string>();

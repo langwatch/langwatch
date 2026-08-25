@@ -1,13 +1,6 @@
 import { Box, Button, HStack, Icon, Input, Text } from "@chakra-ui/react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import {
-  LuCheck,
-  LuCopy,
-  LuEye,
-  LuLock,
-  LuPin,
-  LuPinOff,
-} from "react-icons/lu";
+import { LuCheck, LuCopy, LuEye, LuLock, LuPin, LuPinOff } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -36,10 +29,7 @@ const LABEL_WIDTH_DEFAULT = 200;
 
 function clampLabelWidth(value: number): number {
   if (!Number.isFinite(value)) return LABEL_WIDTH_DEFAULT;
-  return Math.min(
-    LABEL_WIDTH_MAX,
-    Math.max(LABEL_WIDTH_MIN, Math.round(value)),
-  );
+  return Math.min(LABEL_WIDTH_MAX, Math.max(LABEL_WIDTH_MIN, Math.round(value)));
 }
 
 /**
@@ -53,9 +43,7 @@ function useLabelColumnWidth() {
     if (typeof window === "undefined") return LABEL_WIDTH_DEFAULT;
     const raw = window.localStorage.getItem(LABEL_WIDTH_STORAGE_KEY);
     const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-    return Number.isFinite(parsed)
-      ? clampLabelWidth(parsed)
-      : LABEL_WIDTH_DEFAULT;
+    return Number.isFinite(parsed) ? clampLabelWidth(parsed) : LABEL_WIDTH_DEFAULT;
   });
 
   const setAndPersist = useCallback((next: number) => {
@@ -95,11 +83,7 @@ function useLabelColumnWidth() {
  * lockstep — visually scoped to the row the operator grabbed, but
  * functionally global.
  */
-function LabelResizeHandle({
-  onResize,
-}: {
-  onResize: (deltaPx: number) => void;
-}) {
+function LabelResizeHandle({ onResize }: { onResize: (deltaPx: number) => void }) {
   const [state, setState] = useState<"idle" | "hover" | "drag">("idle");
   const startXRef = useRef<number | null>(null);
 
@@ -353,9 +337,7 @@ function flattenAttributes(
   return out;
 }
 
-function buildNestedObject(
-  attrs: Record<string, unknown>,
-): Record<string, unknown> {
+function buildNestedObject(attrs: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(attrs)) {
     const parts = key.split(".");
@@ -619,9 +601,7 @@ function attributeRowLabel(attrKey: string): string {
 }
 
 function isApiKeyIdRow(attrKey: string, value: unknown): value is string {
-  return (
-    attrKey === API_KEY_ID_ATTRIBUTE && typeof value === "string" && !!value
-  );
+  return attrKey === API_KEY_ID_ATTRIBUTE && typeof value === "string" && !!value;
 }
 
 /** How one row behaves while the reviewer is correcting the span. */
@@ -748,11 +728,7 @@ function RowLabelCell({
   isRemoved: boolean;
 }) {
   return (
-    <Tooltip
-      content={attrKey}
-      openDelay={250}
-      positioning={{ placement: "top-start" }}
-    >
+    <Tooltip content={attrKey} openDelay={250} positioning={{ placement: "top-start" }}>
       <Text
         width={`${labelWidth}px`}
         flexShrink={0}
@@ -1176,10 +1152,7 @@ function findNestedKeyConflict({
   existingKeys: Set<string>;
 }): string | undefined {
   for (const existingKey of existingKeys) {
-    if (
-      existingKey.startsWith(`${key}.`) ||
-      key.startsWith(`${existingKey}.`)
-    ) {
+    if (existingKey.startsWith(`${key}.`) || key.startsWith(`${existingKey}.`)) {
       return existingKey;
     }
   }
@@ -1289,9 +1262,7 @@ export function AttributeTable({
     if (compiled.length === 0) return undefined;
     return (key: string): AttributeRestriction | null => {
       const match = compiled.find((r) => r.regex.test(key));
-      return match
-        ? { visibleTo: match.visibleTo, canSee: match.canSee }
-        : null;
+      return match ? { visibleTo: match.visibleTo, canSee: match.canSee } : null;
     };
   }, [restrictedAttributes]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -1301,14 +1272,8 @@ export function AttributeTable({
   // What the rows read before this session touched them, which is what an edit
   // is measured against and what keeps an edited value in the shape the trace
   // recorded it in.
-  const baselineFlat = useMemo(
-    () => flattenAttributes(attributes),
-    [attributes],
-  );
-  const baselineFor = useCallback(
-    (key: string) => baselineFlat[key],
-    [baselineFlat],
-  );
+  const baselineFlat = useMemo(() => flattenAttributes(attributes), [attributes]);
+  const baselineFor = useCallback((key: string) => baselineFlat[key], [baselineFlat]);
 
   // Keys the capture had that the correction does not. They keep their captured
   // value so the struck-through row still shows what is being taken away.
@@ -1349,8 +1314,7 @@ export function AttributeTable({
     return { ...correctedFlat, ...Object.fromEntries(removedRows) };
   }, [correctedFlat, removedKeys]);
   const flatResAttrs = useMemo(
-    () =>
-      resourceAttributes ? flattenAttributes(resourceAttributes) : undefined,
+    () => (resourceAttributes ? flattenAttributes(resourceAttributes) : undefined),
     [resourceAttributes],
   );
 
@@ -1382,10 +1346,7 @@ export function AttributeTable({
         : filterAttributesBySearch(correctedFlat, searchTerm),
     [flatAttrs, correctedFlat, filterAttrs, searchTerm],
   );
-  const allAttributeKeys = useMemo(
-    () => new Set(Object.keys(flatAttrs)),
-    [flatAttrs],
-  );
+  const allAttributeKeys = useMemo(() => new Set(Object.keys(flatAttrs)), [flatAttrs]);
   const filterResAttrs = useMemo(() => {
     if (!flatResAttrs) return undefined;
     const filtered = filterAttributesBySearch(flatResAttrs, searchTerm);

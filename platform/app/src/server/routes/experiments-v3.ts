@@ -15,10 +15,7 @@ import { type Context, Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod/v4";
-import {
-  createInitialUIState,
-  type EvaluationsV3State,
-} from "~/experiments-v3/types";
+import { createInitialUIState, type EvaluationsV3State } from "~/experiments-v3/types";
 import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
 import { ExperimentType } from "~/generated/prisma/client";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
@@ -122,10 +119,7 @@ const apiKeyAuthRun = handlerManagedAuth({
 export const legacyAliasApp = new Hono().basePath("/api/evaluations/v3");
 legacyAliasApp.all("/*", (c) => {
   const url = new URL(c.req.url);
-  url.pathname = url.pathname.replace(
-    /^\/api\/evaluations\/v3/,
-    "/api/experiments",
-  );
+  url.pathname = url.pathname.replace(/^\/api\/evaluations\/v3/, "/api/experiments");
   return app.fetch(new Request(url.toString(), c.req.raw));
 });
 
@@ -141,10 +135,7 @@ legacyAliasApp.all("/*", (c) => {
  * response has been built so `lastUsedAt` tracks fully-successful outcomes
  * (matches the route-owned pattern in `collector.ts`).
  */
-const authenticateRequest = async (
-  c: Context,
-  permission: Permission,
-) => {
+const authenticateRequest = async (c: Context, permission: Permission) => {
   const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) {
     return { error: "Missing credentials", status: 401 as const };
@@ -221,10 +212,7 @@ secured.access(sessionAuth).post(
     const request = await c.req.json();
     const { projectId } = request;
 
-    logger.info(
-      { projectId, scope: request.scope },
-      "Starting experiment execution",
-    );
+    logger.info({ projectId, scope: request.scope }, "Starting experiment execution");
 
     const session = await getServerAuthSession({ req: c.req.raw as any });
     if (!session) {
@@ -457,11 +445,7 @@ secured.access(apiKeyAuthRun).post(
               parameters: {
                 type: "object",
                 additionalProperties: {
-                  oneOf: [
-                    { type: "string" },
-                    { type: "number" },
-                    { type: "boolean" },
-                  ],
+                  oneOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }],
                 },
                 description:
                   "Constant inputs applied to every row, overriding fields of the same name",
@@ -469,8 +453,7 @@ secured.access(apiKeyAuthRun).post(
               row_indices: {
                 type: "array",
                 items: { type: "integer", minimum: 0 },
-                description:
-                  "Run only these rows of the dataset, by zero-based index",
+                description: "Run only these rows of the dataset, by zero-based index",
               },
             },
             not: { required: ["data", "dataset_id"] },
@@ -531,10 +514,10 @@ secured.access(apiKeyAuthRun).post(
     const { project, markUsed } = authResult;
 
     const experiment = await c.app.experiments.tryGetBySlugAndType({
-        projectId: project.id,
-        slug,
-        type: ExperimentType.EVALUATIONS_V3,
-      });
+      projectId: project.id,
+      slug,
+      type: ExperimentType.EVALUATIONS_V3,
+    });
 
     if (!experiment) {
       throw new ExperimentNotFoundError(slug);
@@ -544,10 +527,7 @@ secured.access(apiKeyAuthRun).post(
       experiment.workbenchState,
     );
     if (!parseResult.success) {
-      logger.error(
-        { slug, errors: parseResult.error.issues },
-        "Invalid workbenchState",
-      );
+      logger.error({ slug, errors: parseResult.error.issues }, "Invalid workbenchState");
       // The stored workbench state no longer matches its schema. The customer
       // did not type this and cannot repair it from the API, so it is ours:
       // `fault: "platform"` keeps it out of the customer-error noise.
@@ -653,10 +633,7 @@ secured.access(apiKeyAuthRun).post(
             }
           }
         } catch (error) {
-          logger.error(
-            { error, projectId: project.id, slug },
-            "Orchestrator error",
-          );
+          logger.error({ error, projectId: project.id, slug }, "Orchestrator error");
           captureException(toError(error), {
             extra: { projectId: project.id, slug },
           });
@@ -983,13 +960,9 @@ secured.access(apiKeyAuthRead).get(
     // edited any other experiment after the one that owned this run.
     const runState = await runStateManager.getRunState(runId);
     const slugFromState =
-      runState && runState.projectId === project.id
-        ? runState.experimentSlug
-        : undefined;
+      runState && runState.projectId === project.id ? runState.experimentSlug : undefined;
     const experimentIdFromState =
-      runState && runState.projectId === project.id
-        ? runState.experimentId
-        : undefined;
+      runState && runState.projectId === project.id ? runState.experimentId : undefined;
 
     const experimentSlug = c.req.query("experimentSlug") ?? slugFromState;
     let experimentId = experimentIdFromState;

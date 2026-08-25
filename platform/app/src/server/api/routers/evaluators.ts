@@ -276,9 +276,7 @@ export const evaluatorsRouter = createTRPCRouter({
             "evaluations:view",
           ),
         })),
-      ).then((results) =>
-        results.filter((r) => r.hasPermission).map((r) => r.copy),
-      );
+      ).then((results) => results.filter((r) => r.hasPermission).map((r) => r.copy));
 
       return authorizedCopies;
     }),

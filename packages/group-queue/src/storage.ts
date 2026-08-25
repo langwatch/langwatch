@@ -48,8 +48,5 @@ export function mintUriForDestination({
 }
 
 export function redactStorageUrisInText(text: string): string {
-  return text.replace(
-    /\b(?:s3|azure-blob|gs|file):\/\/[^\s'"]+/gi,
-    "<redacted-uri>",
-  );
+  return text.replace(/\b(?:s3|azure-blob|gs|file):\/\/[^\s'"]+/gi, "<redacted-uri>");
 }

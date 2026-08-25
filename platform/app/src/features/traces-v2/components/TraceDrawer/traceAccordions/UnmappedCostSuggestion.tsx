@@ -50,11 +50,7 @@ export function UnmappedCostSuggestion({ model }: { model: string }) {
         colorPalette="blue"
         flexShrink={0}
         onClick={() =>
-          window.open(
-            modelCostMappingUrl(model),
-            "_blank",
-            "noopener,noreferrer",
-          )
+          window.open(modelCostMappingUrl(model), "_blank", "noopener,noreferrer")
         }
       >
         Add cost mapping

@@ -5,10 +5,7 @@ vi.mock("../langwatch-api-scenarios.js", () => ({
   getScenario: vi.fn(),
 }));
 
-import {
-  listScenarios,
-  getScenario,
-} from "../langwatch-api-scenarios.js";
+import { listScenarios, getScenario } from "../langwatch-api-scenarios.js";
 
 import { handleListScenarios } from "../tools/list-scenarios.js";
 import { handleGetScenario } from "../tools/get-scenario.js";
@@ -63,7 +60,7 @@ describe("handleListScenarios()", () => {
     it("includes truncated situation preview", () => {
       expect(result).toContain("User attempts to log in");
       expect(result).not.toContain(
-        "User attempts to log in with valid credentials and expects a welcome message back from the system"
+        "User attempts to log in with valid credentials and expects a welcome message back from the system",
       );
     });
 
@@ -117,10 +114,7 @@ describe("handleGetScenario()", () => {
     id: "scen_abc123",
     name: "Login Flow Happy Path",
     situation: "User attempts to log in with valid credentials",
-    criteria: [
-      "Responds with a welcome message",
-      "Includes user name in greeting",
-    ],
+    criteria: ["Responds with a welcome message", "Includes user name in greeting"],
     labels: ["auth", "happy-path"],
   };
 

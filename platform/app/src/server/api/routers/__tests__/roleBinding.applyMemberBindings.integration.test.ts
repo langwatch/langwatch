@@ -18,15 +18,7 @@
 
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -168,9 +160,7 @@ describe("given an organization admin editing a member's access", () => {
 
       // The correction updates the row in place, so the id the admin staged
       // still names the same row after the seat change.
-      await expect(
-        soloTeamBinding(fixture.onlyAdminTeamId),
-      ).resolves.toMatchObject({
+      await expect(soloTeamBinding(fixture.onlyAdminTeamId)).resolves.toMatchObject({
         id: stagedBinding!.id,
         role: TeamUserRole.VIEWER,
       });
@@ -181,9 +171,7 @@ describe("given an organization admin editing a member's access", () => {
 
       // Which is why the removal the admin decided on is honoured, rather
       // than silently superseded by the correction.
-      await expect(
-        soloTeamBinding(fixture.onlyAdminTeamId),
-      ).resolves.toBeNull();
+      await expect(soloTeamBinding(fixture.onlyAdminTeamId)).resolves.toBeNull();
       await expect(fixture.organizationRoleOfSoloUser()).resolves.toBe(
         OrganizationUserRole.EXTERNAL,
       );

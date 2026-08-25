@@ -61,9 +61,7 @@ describe("useScenarioSelection()", () => {
           result.current.selectAll(visibleIds);
         });
 
-        expect(result.current.selectedIds).toEqual(
-          expect.arrayContaining(visibleIds),
-        );
+        expect(result.current.selectedIds).toEqual(expect.arrayContaining(visibleIds));
         expect(result.current.selectionCount).toBe(5);
       });
     });

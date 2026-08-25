@@ -75,10 +75,7 @@ export function isModelAllowedForFeature({
  * codex-allowed: LANGY (Langy's own role) and FAST (the assists). DEFAULT
  * and EMBEDDINGS carry general-inference surfaces and stay closed.
  */
-export function isModelAllowedAsRoleDefault(
-  modelId: string,
-  role: ModelRole,
-): boolean {
+export function isModelAllowedAsRoleDefault(modelId: string, role: ModelRole): boolean {
   if (!isCodexModel(modelId)) return true;
   return role === "LANGY" || role === "FAST";
 }

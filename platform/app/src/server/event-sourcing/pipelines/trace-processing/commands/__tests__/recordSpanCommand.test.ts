@@ -5,10 +5,7 @@ import {
 } from "~/server/routes/ingest/ingest-key-provenance.utils";
 import { type Command, createTenantId } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  PIIRedactionLevel,
-  RecordSpanCommandData,
-} from "../../schemas/commands";
+import type { PIIRedactionLevel, RecordSpanCommandData } from "../../schemas/commands";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -166,9 +163,7 @@ describe("RecordSpanCommand", () => {
 
         const command = createMockCommand("project-123", "trace-1", "span-1");
 
-        await expect(cmd.handle(command)).rejects.toThrow(
-          "PII service unavailable",
-        );
+        await expect(cmd.handle(command)).rejects.toThrow("PII service unavailable");
       });
 
       it("returns events normally when cost enrichment rejects", async () => {
@@ -185,8 +180,7 @@ describe("RecordSpanCommand", () => {
       });
 
       it("throws the PII error when both reject", async () => {
-        const { deps, mockRedactSpan, mockEnrichSpan } =
-          createMockDependencies();
+        const { deps, mockRedactSpan, mockEnrichSpan } = createMockDependencies();
         mockRedactSpan.mockRejectedValue(new Error("PII failure"));
         mockEnrichSpan.mockRejectedValue(new Error("Cost failure"));
         const cmd = new RecordSpanCommand(deps);
@@ -225,17 +219,11 @@ describe("RecordSpanCommand", () => {
         const event = events[0]!;
         expect(event.type).toBe(SPAN_RECEIVED_EVENT_TYPE);
         // The event should contain the redacted span data
-        expect(event.data.span.attributes[0]!.value.stringValue).toBe(
-          "[REDACTED]",
-        );
+        expect(event.data.span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
       });
 
       it("creates valid SpanReceivedEvent structure", async () => {
-        const command = createMockCommand(
-          "project-123",
-          "trace-abc",
-          "span-def",
-        );
+        const command = createMockCommand("project-123", "trace-abc", "span-def");
 
         const events = await handler.handle(command);
 
@@ -282,9 +270,7 @@ describe("RecordSpanCommand", () => {
         );
         expect(reservedAttr).toBeUndefined();
         // Non-reserved attributes should remain
-        const promptAttr = emittedSpan.attributes.find(
-          (a) => a.key === "gen_ai.prompt",
-        );
+        const promptAttr = emittedSpan.attributes.find((a) => a.key === "gen_ai.prompt");
         expect(promptAttr).toBeDefined();
       });
 
@@ -382,9 +368,7 @@ describe("RecordSpanCommand", () => {
 
         // Original command should still have the reserved attribute
         expect(command.data.span.attributes).toHaveLength(1);
-        expect(command.data.span.attributes[0]!.key).toBe(
-          "langwatch.reserved.something",
-        );
+        expect(command.data.span.attributes[0]!.key).toBe("langwatch.reserved.something");
       });
     });
 
@@ -414,9 +398,7 @@ describe("RecordSpanCommand", () => {
       it("keeps the API key id on the emitted resource", async () => {
         const emitted = await emittedResourceAfterReceiver("key_abc");
 
-        const stampedId = emitted.find(
-          (a) => a.key === PROVENANCE_ATTR_API_KEY_ID,
-        );
+        const stampedId = emitted.find((a) => a.key === PROVENANCE_ATTR_API_KEY_ID);
         expect(stampedId?.value.stringValue).toBe("key_abc");
       });
 
@@ -430,9 +412,7 @@ describe("RecordSpanCommand", () => {
       it("emits no API key id when the request had no ApiKey row", async () => {
         const emitted = await emittedResourceAfterReceiver(null);
 
-        expect(emitted.some((a) => a.key === PROVENANCE_ATTR_API_KEY_ID)).toBe(
-          false,
-        );
+        expect(emitted.some((a) => a.key === PROVENANCE_ATTR_API_KEY_ID)).toBe(false);
       });
     });
 
@@ -446,18 +426,14 @@ describe("RecordSpanCommand", () => {
         const events = await handler.handle(command);
 
         const emittedSpan = events[0]!.data.span;
-        const inputAttr = emittedSpan.attributes.find(
-          (a) => a.key === "langwatch.input",
-        );
+        const inputAttr = emittedSpan.attributes.find((a) => a.key === "langwatch.input");
         expect(inputAttr!.value.stringValue).toMatch(
           /^\[truncated: \d+ bytes, image\/png\]$/,
         );
         // The huge payload must not survive into the folded event.
         expect(inputAttr!.value.stringValue!.length).toBeLessThan(64);
         // Original command data is left untouched (immutability contract).
-        expect(command.data.span.attributes[0]!.value.stringValue).toBe(
-          bigDataUrl,
-        );
+        expect(command.data.span.attributes[0]!.value.stringValue).toBe(bigDataUrl);
       });
 
       it("leaves a normal small span attribute unchanged", async () => {
@@ -468,9 +444,7 @@ describe("RecordSpanCommand", () => {
         const events = await handler.handle(command);
 
         const emittedSpan = events[0]!.data.span;
-        const inputAttr = emittedSpan.attributes.find(
-          (a) => a.key === "langwatch.input",
-        );
+        const inputAttr = emittedSpan.attributes.find((a) => a.key === "langwatch.input");
         expect(inputAttr!.value.stringValue).toBe("what is 2+2?");
       });
     });

@@ -75,11 +75,7 @@ export const EVALUATOR_DEF: FieldDef = {
     const p = nextParam(ctx, "evaluatorId");
     ctx.params[p] = value;
     return wrap(
-      boundedSubquery(
-        "evaluation_runs",
-        "ScheduledAt",
-        `EvaluatorId = {${p}:String}`,
-      ),
+      boundedSubquery("evaluation_runs", "ScheduledAt", `EvaluatorId = {${p}:String}`),
       negated,
     );
   },

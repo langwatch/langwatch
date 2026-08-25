@@ -136,12 +136,8 @@ describe("useSpanTree with a correction", () => {
         };
 
         const { result } = renderHook(() => useSpanTreeWithCaptured());
-        const removed = result.current.display.data?.find(
-          (s) => s.spanId === "tool",
-        );
-        const kept = result.current.display.data?.find(
-          (s) => s.spanId === "root",
-        );
+        const removed = result.current.display.data?.find((s) => s.spanId === "tool");
+        const kept = result.current.display.data?.find((s) => s.spanId === "root");
 
         expect(removed?.name).toBe("web_search");
         // The rename still lands on the rows the correction kept.

@@ -28,13 +28,9 @@ const PAGES_REQUIRING_ORG_MANAGE = [
 
 describe("legacy /settings admin pages", () => {
   describe("when guarded by withPermissionGuard", () => {
-    it.each(
-      PAGES_REQUIRING_ORG_MANAGE,
-    )("%s requires organization:manage", (filename) => {
+    it.each(PAGES_REQUIRING_ORG_MANAGE)("%s requires organization:manage", (filename) => {
       const source = readFileSync(join(__dirname, "..", filename), "utf-8");
-      expect(source).toMatch(
-        /export default withPermissionGuard\("organization:manage"/,
-      );
+      expect(source).toMatch(/export default withPermissionGuard\("organization:manage"/);
     });
   });
 });

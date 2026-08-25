@@ -22,8 +22,7 @@ wireDefaultTestApp();
 
 // Mock license enforcement to avoid limits during tests
 vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../license-enforcement")>();
+  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
   return {
     ...actual,
     enforceLicenseLimit: vi.fn(),
@@ -129,9 +128,7 @@ describe("Agents Endpoints", () => {
       const config = result.config as typeof codeConfig;
       expect(config.parameters).toBeDefined();
       expect(
-        config.parameters?.some(
-          (p) => p.identifier === "code" && p.type === "code",
-        ),
+        config.parameters?.some((p) => p.identifier === "code" && p.type === "code"),
       ).toBe(true);
     });
 
@@ -439,9 +436,9 @@ describe("Agents Endpoints", () => {
       const targetCopy = copies.find((c) => c.projectId === targetProjectId);
       expect(targetCopy).toBeDefined();
       expect(targetCopy!.projectId).toBe(targetProjectId);
-      expect(
-        (targetCopy!.fullPath as string).includes("Test Project Copy Target"),
-      ).toBe(true);
+      expect((targetCopy!.fullPath as string).includes("Test Project Copy Target")).toBe(
+        true,
+      );
     });
 
     it("pushToCopies updates selected copies with source name and config", async () => {

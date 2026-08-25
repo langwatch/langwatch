@@ -93,10 +93,7 @@ export const runStateManager = {
   }): Promise<void> {
     const connection = tryGetApp()?.redis ?? null;
     if (!connection) {
-      logger.warn(
-        { runId: params.runId },
-        "Redis not available, run state not stored",
-      );
+      logger.warn({ runId: params.runId }, "Redis not available, run state not stored");
       return;
     }
 
@@ -113,12 +110,7 @@ export const runStateManager = {
     };
 
     const key = `${RUN_STATE_KEY_PREFIX}${params.runId}`;
-    await connection.set(
-      key,
-      JSON.stringify(state),
-      "EX",
-      RUN_STATE_TTL_SECONDS,
-    );
+    await connection.set(key, JSON.stringify(state), "EX", RUN_STATE_TTL_SECONDS);
     logger.info({ runId: params.runId }, "Run state created");
   },
 
@@ -135,12 +127,7 @@ export const runStateManager = {
     state.progress = progress;
 
     const key = `${RUN_STATE_KEY_PREFIX}${runId}`;
-    await connection.set(
-      key,
-      JSON.stringify(state),
-      "EX",
-      RUN_STATE_TTL_SECONDS,
-    );
+    await connection.set(key, JSON.stringify(state), "EX", RUN_STATE_TTL_SECONDS);
   },
 
   /**
@@ -166,21 +153,13 @@ export const runStateManager = {
     }
 
     const key = `${RUN_STATE_KEY_PREFIX}${runId}`;
-    await connection.set(
-      key,
-      JSON.stringify(state),
-      "EX",
-      RUN_STATE_TTL_SECONDS,
-    );
+    await connection.set(key, JSON.stringify(state), "EX", RUN_STATE_TTL_SECONDS);
   },
 
   /**
    * Mark run as completed with summary.
    */
-  async completeRun(
-    runId: string,
-    summary: RunState["summary"],
-  ): Promise<void> {
+  async completeRun(runId: string, summary: RunState["summary"]): Promise<void> {
     const connection = tryGetApp()?.redis ?? null;
     if (!connection) return;
 
@@ -193,12 +172,7 @@ export const runStateManager = {
     state.progress = state.total;
 
     const key = `${RUN_STATE_KEY_PREFIX}${runId}`;
-    await connection.set(
-      key,
-      JSON.stringify(state),
-      "EX",
-      RUN_STATE_TTL_SECONDS,
-    );
+    await connection.set(key, JSON.stringify(state), "EX", RUN_STATE_TTL_SECONDS);
     logger.info({ runId }, "Run completed");
   },
 
@@ -230,12 +204,7 @@ export const runStateManager = {
     state.traceId = failure.traceId;
 
     const key = `${RUN_STATE_KEY_PREFIX}${runId}`;
-    await connection.set(
-      key,
-      JSON.stringify(state),
-      "EX",
-      RUN_STATE_TTL_SECONDS,
-    );
+    await connection.set(key, JSON.stringify(state), "EX", RUN_STATE_TTL_SECONDS);
     logger.error(
       { runId, errorCode: failure.code, traceId: failure.traceId },
       "Run failed",
@@ -256,12 +225,7 @@ export const runStateManager = {
     state.finishedAt = Date.now();
 
     const key = `${RUN_STATE_KEY_PREFIX}${runId}`;
-    await connection.set(
-      key,
-      JSON.stringify(state),
-      "EX",
-      RUN_STATE_TTL_SECONDS,
-    );
+    await connection.set(key, JSON.stringify(state), "EX", RUN_STATE_TTL_SECONDS);
     logger.info({ runId }, "Run stopped");
   },
 

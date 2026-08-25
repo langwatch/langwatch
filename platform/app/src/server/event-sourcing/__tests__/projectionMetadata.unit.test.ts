@@ -17,13 +17,9 @@ import { getProjectionMetadata } from "../registration/pipelineRegistry";
 function definitionWith() {
   return {
     metadata: { name: "authz_grants", aggregateType: "authz_grants" },
-    foldProjections: new Map([
-      ["grantsFold", { definition: { name: "grantsFold" } }],
-    ]),
+    foldProjections: new Map([["grantsFold", { definition: { name: "grantsFold" } }]]),
     mapProjections: new Map(),
-    stateProjections: new Map([
-      ["authzGrantsState", { name: "authzGrantsState" }],
-    ]),
+    stateProjections: new Map([["authzGrantsState", { name: "authzGrantsState" }]]),
     commands: [],
     eventSubscribers: new Map(),
   };

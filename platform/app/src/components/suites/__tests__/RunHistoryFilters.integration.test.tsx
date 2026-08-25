@@ -11,10 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-} from "../RunHistoryFilters";
+import { RunHistoryFilters, type RunHistoryFilterValues } from "../RunHistoryFilters";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -49,9 +46,7 @@ describe("<RunHistoryFilters/>", () => {
       );
 
       expect(screen.getByLabelText("Filter by scenario")).toBeInTheDocument();
-      expect(
-        screen.getByLabelText("Filter by pass/fail status"),
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Filter by pass/fail status")).toBeInTheDocument();
     });
 
     describe("when a scenario is selected from the Scenario filter", () => {
@@ -92,9 +87,7 @@ describe("<RunHistoryFilters/>", () => {
           { wrapper: Wrapper },
         );
 
-        const statusSelect = screen.getByLabelText(
-          "Filter by pass/fail status",
-        );
+        const statusSelect = screen.getByLabelText("Filter by pass/fail status");
         await user.selectOptions(statusSelect, "fail");
 
         expect(onFiltersChange).toHaveBeenCalledWith({
@@ -118,9 +111,7 @@ describe("<RunHistoryFilters/>", () => {
           { wrapper: Wrapper },
         );
 
-        const statusSelect = screen.getByLabelText(
-          "Filter by pass/fail status",
-        );
+        const statusSelect = screen.getByLabelText("Filter by pass/fail status");
         await user.selectOptions(statusSelect, "pass");
 
         expect(onFiltersChange).toHaveBeenCalledWith({
@@ -148,9 +139,7 @@ describe("<RunHistoryFilters/>", () => {
           { wrapper: Wrapper },
         );
 
-        const statusSelect = screen.getByLabelText(
-          "Filter by pass/fail status",
-        );
+        const statusSelect = screen.getByLabelText("Filter by pass/fail status");
         await user.selectOptions(statusSelect, "fail");
 
         expect(onFiltersChange).toHaveBeenCalledWith({

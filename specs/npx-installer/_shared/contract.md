@@ -30,18 +30,18 @@ This is parity with `make dev-full` from the dev tree, but for an end-user, **wi
 
 ## 2. Repo & package layout
 
-| Component                      | Path                                        |
-| ------------------------------ | ------------------------------------------- |
-| Monorepo root                  | `/`                                         |
-| Root pnpm workspace            | `/package.json`, `/pnpm-workspace.yaml`     |
-| `@langwatch/server` package    | `/apps/server/`                    |
-| CLI entry                      | `/apps/server/src/cli.ts`          |
-| Built CLI                      | `/apps/server/dist/cli.cjs`        |
-| Predep installer               | `/apps/server/src/predeps/`        |
-| Service orchestration (julia)  | `/apps/server/src/services/`       |
-| Shared types/paths/env (smith) | `/apps/server/src/shared/`         |
-| BDD specs                      | `/specs/npx-installer/`                     |
-| CI workflows                   | `/.github/workflows/npx-server-*.yml`       |
+| Component                      | Path                                    |
+| ------------------------------ | --------------------------------------- |
+| Monorepo root                  | `/`                                     |
+| Root pnpm workspace            | `/package.json`, `/pnpm-workspace.yaml` |
+| `@langwatch/server` package    | `/apps/server/`                         |
+| CLI entry                      | `/apps/server/src/cli.ts`               |
+| Built CLI                      | `/apps/server/dist/cli.cjs`             |
+| Predep installer               | `/apps/server/src/predeps/`             |
+| Service orchestration (julia)  | `/apps/server/src/services/`            |
+| Shared types/paths/env (smith) | `/apps/server/src/shared/`              |
+| BDD specs                      | `/specs/npx-installer/`                 |
+| CI workflows                   | `/.github/workflows/npx-server-*.yml`   |
 
 The app — `@langwatch/web` since ADR-076, a Vite app in `langwatch/` — ships inside `@langwatch/server`'s tarball under `app/`, one workspace with the CLI.
 
@@ -51,25 +51,25 @@ The app — `@langwatch/web` since ADR-076, a Vite app in `langwatch/` — ships
 
 The CLI shows a multi-select that **lists every pre-dep but does not allow de-selection**. User confirms with Enter.
 
-| Pre-dep    | Why                                  | Install method                                 | Where                                                     |
-| ---------- | ------------------------------------ | ---------------------------------------------- | --------------------------------------------------------- |
-| uv         | drives langwatch_nlp + langevals     | `curl -LsSf https://astral.sh/uv/install.sh`   | `~/.cargo/bin/uv` (uv's default)                          |
-| postgres   | Prisma data store                    | `embedded-postgres` npm package (binary embed) | `~/.langwatch/postgres/` (data + binary)                  |
-| redis      | queues, caches                       | official binary build via `redis-server.zip`   | `~/.langwatch/redis/`                                     |
-| clickhouse | analytics + traces                   | langwatch/clickhouse-serverless tarball (~100MB) | `~/.langwatch/clickhouse/`                                |
-| go-gateway | AI Gateway (data plane)              | prebuilt monobinary from GH Releases           | `~/.langwatch/bin/aigateway-{os}-{arch}` |
+| Pre-dep    | Why                              | Install method                                   | Where                                    |
+| ---------- | -------------------------------- | ------------------------------------------------ | ---------------------------------------- |
+| uv         | drives langwatch_nlp + langevals | `curl -LsSf https://astral.sh/uv/install.sh`     | `~/.cargo/bin/uv` (uv's default)         |
+| postgres   | Prisma data store                | `embedded-postgres` npm package (binary embed)   | `~/.langwatch/postgres/` (data + binary) |
+| redis      | queues, caches                   | official binary build via `redis-server.zip`     | `~/.langwatch/redis/`                    |
+| clickhouse | analytics + traces               | langwatch/clickhouse-serverless tarball (~100MB) | `~/.langwatch/clickhouse/`               |
+| go-gateway | AI Gateway (data plane)          | prebuilt monobinary from GH Releases             | `~/.langwatch/bin/aigateway-{os}-{arch}` |
 
 **Skipped:** Go toolchain (we ship monobinaries built per platform — same matrix the helm/release pipeline already builds). Pnpm (npm/pnpm workspace install handles it transitively when `npx` resolves the package).
 
 **Platform matrix** the CLI must handle:
 
-| OS    | arch  | uv | postgres | redis | clickhouse | go-gateway |
-| ----- | ----- | -- | -------- | ----- | ---------- | ---------- |
-| macOS | arm64 | ✓  | ✓        | ✓     | ✓          | ✓          |
-| macOS | x86   | ✓  | ✓        | ✓     | ✓          | ✓          |
-| linux | arm64 | ✓  | ✓        | ✓     | ✓          | ✓          |
-| linux | x86   | ✓  | ✓        | ✓     | ✓          | ✓          |
-| win   | —     | —  | —        | —     | —          | —          |
+| OS    | arch  | uv  | postgres | redis | clickhouse | go-gateway |
+| ----- | ----- | --- | -------- | ----- | ---------- | ---------- |
+| macOS | arm64 | ✓   | ✓        | ✓     | ✓          | ✓          |
+| macOS | x86   | ✓   | ✓        | ✓     | ✓          | ✓          |
+| linux | arm64 | ✓   | ✓        | ✓     | ✓          | ✓          |
+| linux | x86   | ✓   | ✓        | ✓     | ✓          | ✓          |
+| win   | —     | —   | —        | —     | —          | —          |
 
 Windows: out of scope for v1. Tracked separately.
 
@@ -120,19 +120,19 @@ The CLI picks a **port-base** (default `5560`). Authoritative in code: `apps/ser
 
 Two **blocks** with a fixed +1000 offset, leaving room for future services without colliding with infra:
 
-| Service             | Offset      | Default | Block      |
-| ------------------- | ----------- | ------- | ---------- |
-| langwatch (Hono prod) | base + 0  | 5560    | services   |
-| langwatch_nlp       | base + 1    | 5561    | services   |
-| langevals           | base + 2    | 5562    | services   |
-| ai-gateway (Go)     | base + 3    | 5563    | services   |
-| _reserved_          | base + 4..7 |         | services   |
-| _reserved_          | base + 9    |         | services   |
-| postgres            | base + 1000 | 6560    | infra      |
-| redis               | base + 1001 | 6561    | infra      |
-| clickhouse HTTP     | base + 1002 | 6562    | infra      |
-| clickhouse native   | base + 1003 | 6563    | infra      |
-| _reserved_          | base + 1004..1009 |   | infra      |
+| Service               | Offset            | Default | Block    |
+| --------------------- | ----------------- | ------- | -------- |
+| langwatch (Hono prod) | base + 0          | 5560    | services |
+| langwatch_nlp         | base + 1          | 5561    | services |
+| langevals             | base + 2          | 5562    | services |
+| ai-gateway (Go)       | base + 3          | 5563    | services |
+| _reserved_            | base + 4..7       |         | services |
+| _reserved_            | base + 9          |         | services |
+| postgres              | base + 1000       | 6560    | infra    |
+| redis                 | base + 1001       | 6561    | infra    |
+| clickhouse HTTP       | base + 1002       | 6562    | infra    |
+| clickhouse native     | base + 1003       | 6563    | infra    |
+| _reserved_            | base + 1004..1009 |         | infra    |
 
 **Conflict handling:** before binding, the CLI calls `lsof -i :<port>` (or net.Listen probe) for every allocated port. If any port is occupied, it shifts the entire allocation by `PORT_SLOT_INCREMENT = 10` and re-probes (services 5570 + infra 6570, then 5580 + 6580…), up to `MAX_PORT_SLOT_ATTEMPTS = 30`. The CLI prints:
 
@@ -148,31 +148,31 @@ Authoritative in code: `apps/server/src/shared/env.ts` (function `buildEnv`). Ge
 
 Mirrors the helm chart's `app/secrets.yaml` for the four secrets we have parity for, plus three additional secrets that are AI-Gateway-specific.
 
-| Env var                       | Generation                                                | Helm chart equivalent              |
-| ----------------------------- | --------------------------------------------------------- | ---------------------------------- |
-| `NEXTAUTH_SECRET`             | `crypto.randomBytes(32).toString('base64')`               | `randAlphaNum 32` → b64            |
-| `CREDENTIALS_SECRET`          | `crypto.randomBytes(32).toString('hex')` (64 hex chars)   | `randAlphaNum 64 \| sha256sum`     |
-| `API_TOKEN_JWT_SECRET`        | `crypto.randomBytes(32).toString('hex')`                  | (no helm equiv — same pattern)     |
-| `LW_VIRTUAL_KEY_PEPPER`       | `crypto.randomBytes(32).toString('hex')`                  | `randAlphaNum 64 \| sha256sum`     |
-| `LW_GATEWAY_INTERNAL_SECRET`  | `crypto.randomBytes(32).toString('hex')`                  | `openssl rand -hex 32` (.env.example) |
-| `LW_GATEWAY_JWT_SECRET`       | `crypto.randomBytes(32).toString('hex')`                  | `openssl rand -hex 32` (.env.example) |
+| Env var                      | Generation                                              | Helm chart equivalent                 |
+| ---------------------------- | ------------------------------------------------------- | ------------------------------------- |
+| `NEXTAUTH_SECRET`            | `crypto.randomBytes(32).toString('base64')`             | `randAlphaNum 32` → b64               |
+| `CREDENTIALS_SECRET`         | `crypto.randomBytes(32).toString('hex')` (64 hex chars) | `randAlphaNum 64 \| sha256sum`        |
+| `API_TOKEN_JWT_SECRET`       | `crypto.randomBytes(32).toString('hex')`                | (no helm equiv — same pattern)        |
+| `LW_VIRTUAL_KEY_PEPPER`      | `crypto.randomBytes(32).toString('hex')`                | `randAlphaNum 64 \| sha256sum`        |
+| `LW_GATEWAY_INTERNAL_SECRET` | `crypto.randomBytes(32).toString('hex')`                | `openssl rand -hex 32` (.env.example) |
+| `LW_GATEWAY_JWT_SECRET`      | `crypto.randomBytes(32).toString('hex')`                | `openssl rand -hex 32` (.env.example) |
 
 Static (computed from port-base — code in `buildEnv`):
 
-| Env var                  | Value                                                                                          |
-| ------------------------ | ---------------------------------------------------------------------------------------------- |
-| `NODE_ENV`               | `production`                                                                                   |
-| `BASE_HOST`              | `http://localhost:${ports.langwatch}`                                                          |
-| `NEXTAUTH_URL`           | `http://localhost:${ports.langwatch}`                                                          |
-| `PORT`                   | `${ports.langwatch}`                                                                           |
-| `NEXTAUTH_PROVIDER`      | `email`                                                                                        |
-| `DATABASE_URL`           | `postgresql://langwatch@localhost:${ports.postgres}/langwatch_db?schema=langwatch_db&connection_limit=5` |
-| `REDIS_URL`              | `redis://localhost:${ports.redis}/0`                                                           |
-| `CLICKHOUSE_URL`         | `http://localhost:${ports.clickhouseHttp}/langwatch`                                           |
-| `LANGWATCH_NLP_SERVICE`  | `http://localhost:${ports.nlp}`                                                                |
-| `LANGEVALS_ENDPOINT`     | `http://localhost:${ports.langevals}`                                                          |
-| `LW_GATEWAY_BASE_URL`    | `http://localhost:${ports.langwatch}`                                                          |
-| `ENVIRONMENT`            | `local`                                                                                        |
+| Env var                 | Value                                                                                                    |
+| ----------------------- | -------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`              | `production`                                                                                             |
+| `BASE_HOST`             | `http://localhost:${ports.langwatch}`                                                                    |
+| `NEXTAUTH_URL`          | `http://localhost:${ports.langwatch}`                                                                    |
+| `PORT`                  | `${ports.langwatch}`                                                                                     |
+| `NEXTAUTH_PROVIDER`     | `email`                                                                                                  |
+| `DATABASE_URL`          | `postgresql://langwatch@localhost:${ports.postgres}/langwatch_db?schema=langwatch_db&connection_limit=5` |
+| `REDIS_URL`             | `redis://localhost:${ports.redis}/0`                                                                     |
+| `CLICKHOUSE_URL`        | `http://localhost:${ports.clickhouseHttp}/langwatch`                                                     |
+| `LANGWATCH_NLP_SERVICE` | `http://localhost:${ports.nlp}`                                                                          |
+| `LANGEVALS_ENDPOINT`    | `http://localhost:${ports.langevals}`                                                                    |
+| `LW_GATEWAY_BASE_URL`   | `http://localhost:${ports.langwatch}`                                                                    |
+| `ENVIRONMENT`           | `local`                                                                                                  |
 
 Provider keys (left blank in `.env`, propagated from process env if user has them set):
 
@@ -192,23 +192,23 @@ The CLI flow (smith) is:
 const runtime = await loadRuntime(); // dynamic import of services/runtime.ts, falls back to placeholder
 const ctx: RuntimeContext = { ports, paths, predeps, envFile, version };
 
-await runtime.scaffoldEnv(ctx);            // (1) write ~/.langwatch/.env if missing
-await runtime.installServices(ctx);        // (2) uv sync for langwatch_nlp + langevals (parallel)
+await runtime.scaffoldEnv(ctx); // (1) write ~/.langwatch/.env if missing
+await runtime.installServices(ctx); // (2) uv sync for langwatch_nlp + langevals (parallel)
 const handles = await runtime.startAll(ctx); // (3) spawn every service, return handles
 await runtime.waitForHealth(ctx, { timeoutMs: 60_000 }); // (4) block until every health check passes
 // CLI listens on runtime.events(ctx) throughout, renders listr2 + tees logs
 
 process.on("SIGINT", async () => {
-  await runtime.stopAll(handles);          // (5) graceful SIGTERM → SIGKILL fallback
+  await runtime.stopAll(handles); // (5) graceful SIGTERM → SIGKILL fallback
 });
 ```
 
 Inside `startAll(ctx)`:
 
-| Phase | Services started concurrently                  | Wait for                                      |
-| ----- | ---------------------------------------------- | --------------------------------------------- |
-| 1     | postgres, redis, clickhouse                    | `pg_isready`, `redis-cli ping`, `curl /ping` |
-| 2     | (run prisma migrate + clickhouse goose)        | exits 0                                       |
+| Phase | Services started concurrently                   | Wait for                                                                |
+| ----- | ----------------------------------------------- | ----------------------------------------------------------------------- |
+| 1     | postgres, redis, clickhouse                     | `pg_isready`, `redis-cli ping`, `curl /ping`                            |
+| 2     | (run prisma migrate + clickhouse goose)         | exits 0                                                                 |
 | 3     | langwatch_nlp, langevals, ai-gateway, langwatch | `curl /health` (or `/healthz` for gateway), `/api/health` for langwatch |
 
 Each child writes stdout+stderr to `~/.langwatch/logs/<service>.log`. The runtime emits `RuntimeEvent`s via `events(ctx)`:
@@ -218,7 +218,14 @@ type RuntimeEvent =
   | { type: "starting"; service: string }
   | { type: "healthy"; service: string; durationMs: number }
   | { type: "log"; service: string; stream: "stdout" | "stderr"; line: string }
-  | { type: "restarting"; service: string; code: number; attempt: number; maxAttempts: number; delayMs: number }
+  | {
+      type: "restarting";
+      service: string;
+      code: number;
+      attempt: number;
+      maxAttempts: number;
+      delayMs: number;
+    }
   | { type: "crashed"; service: string; code: number }
   | { type: "stopped"; service: string };
 ```
@@ -292,16 +299,19 @@ Auto-open browser on macOS (`open`) and Linux (`xdg-open`). Skip if `--no-open` 
 `.github/workflows/npx-server-smoke.yml`
 
 Triggers:
+
 - `workflow_dispatch` (manual)
 - `schedule: '0 4 * * *'` (nightly 04:00 UTC)
 - `push` paths: `package.json`, `pnpm-workspace.yaml`, `apps/server/**`, `langwatch_nlp/pyproject.toml`, `services/langevals/**/pyproject.toml`, `services/aigateway/**`, `platform/app/package.json`, `platform/app/scripts/**`
 
 Matrix:
+
 - `macos-latest` (arm64)
 - `ubuntu-22.04` (x86_64)
 - `ubuntu-22.04-arm` (arm64) — github-hosted arm runners
 
 Each job:
+
 1. checkout
 2. set up node 24
 3. `pnpm install --frozen-lockfile`
@@ -323,10 +333,12 @@ A failure on any step uploads `~/.langwatch/logs/` as a workflow artifact.
 `.github/workflows/npx-server-publish.yml`
 
 Triggers:
+
 - on `release.published` where the tag is **the main langwatch release** (currently `v3.1.0`-style — same as `release-langwatch-chart.yml`).
 - `workflow_dispatch` (manual override)
 
 Steps:
+
 1. checkout
 2. setup node 24 + pnpm
 3. `pnpm --filter @langwatch/server build` (which builds langwatch app + monobinary references)
@@ -338,13 +350,13 @@ Version is read from `platform/app/package.json`. The `@langwatch/server` packag
 
 ## 11. Rip-out list
 
-| Path                                                  | Reason                                              |
-| ----------------------------------------------------- | --------------------------------------------------- |
-| `/pyproject.toml`                                     | uvx publish path replaced by npm                    |
-| `/build_hooks.py`                                     | hatchling build hook — gone                         |
-| `/bin/cli.py`, `/bin/__init__.py`                     | python CLI replaced by `apps/server/src/cli.ts`     |
-| `/uv.lock`                                            | only uv root lock; per-service uv locks stay        |
-| `/.github/workflows/langwatch-server-publish.yml`     | replaced by `npx-server-publish.yml`                |
+| Path                                                         | Reason                                           |
+| ------------------------------------------------------------ | ------------------------------------------------ |
+| `/pyproject.toml`                                            | uvx publish path replaced by npm                 |
+| `/build_hooks.py`                                            | hatchling build hook — gone                      |
+| `/bin/cli.py`, `/bin/__init__.py`                            | python CLI replaced by `apps/server/src/cli.ts`  |
+| `/uv.lock`                                                   | only uv root lock; per-service uv locks stay     |
+| `/.github/workflows/langwatch-server-publish.yml`            | replaced by `npx-server-publish.yml`             |
 | `Makefile` targets `python-build`, `python-install`, `start` | uv/pip flow gone; `start` redundant with new CLI |
 
 **Keep** the `.python-version` pin (used by the Python projects). It now lives in each
@@ -366,6 +378,7 @@ holds no Python of its own.
 ## 13. Definition of done
 
 A CI job on every supported OS+arch:
+
 1. runs `npx @langwatch/server` from a fresh tarball
 2. waits for all services to be healthy
 3. logs into the UI, creates a project (`POST /api/auth/...`)

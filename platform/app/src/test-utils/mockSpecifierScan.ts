@@ -82,20 +82,13 @@ function lineOf({ source, node }: { source: SourceFile; node: Node }): number {
 }
 
 /** The literal text of a specifier argument, or undefined when computed. */
-function literalTextOf({
-  node,
-}: {
-  node: Expression | undefined;
-}): string | undefined {
+function literalTextOf({ node }: { node: Expression | undefined }): string | undefined {
   if (!node) return undefined;
   if (isStringLiteral(node)) return node.text;
   if (isNoSubstitutionTemplateLiteral(node)) return node.text;
   // Vitest 3's typed form, `vi.mock(import("./foo"), factory)`, names the
   // module through an import call rather than a bare string.
-  if (
-    isCallExpression(node) &&
-    node.expression.kind === SyntaxKind.ImportKeyword
-  ) {
+  if (isCallExpression(node) && node.expression.kind === SyntaxKind.ImportKeyword) {
     return literalTextOf({ node: node.arguments[0] });
   }
   return undefined;
@@ -121,11 +114,7 @@ function isMockCall({ node }: { node: CallExpression }): boolean {
  * meant to mirror, and the drift is invisible, because the file it wrongly
  * skips is reported clean.
  */
-export function mightContainMockCall({
-  sourceText,
-}: {
-  sourceText: string;
-}): boolean {
+export function mightContainMockCall({ sourceText }: { sourceText: string }): boolean {
   for (const method of MOCK_METHODS) {
     if (sourceText.includes(method)) return true;
   }
@@ -168,13 +157,7 @@ export function scanSourceForMockSpecifiers({
  * `"@"` (the SDK's alias for its own `src`) from claiming
  * `@opentelemetry/api`.
  */
-function aliasMatches({
-  find,
-  specifier,
-}: {
-  find: string;
-  specifier: string;
-}): boolean {
+function aliasMatches({ find, specifier }: { find: string; specifier: string }): boolean {
   if (specifier === find) return true;
   return specifier.startsWith(find.endsWith("/") ? find : `${find}/`);
 }

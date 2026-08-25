@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
-const mockSendSlackBillingThresholdFailureAlert = vi
-  .fn()
-  .mockResolvedValue(undefined);
+const mockSendSlackBillingThresholdFailureAlert = vi.fn().mockResolvedValue(undefined);
 const mockSetForScope = vi.fn().mockResolvedValue(undefined);
 const mockRemoveForScope = vi.fn().mockResolvedValue(undefined);
 // Seat provisioning is create-if-absent: it reads the org's current rules and
@@ -17,8 +15,7 @@ vi.mock("../../../src/server/app-layer/app", () => ({
   getApp: () => ({
     notifications: {
       sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
-      sendSlackBillingThresholdFailureAlert:
-        mockSendSlackBillingThresholdFailureAlert,
+      sendSlackBillingThresholdFailureAlert: mockSendSlackBillingThresholdFailureAlert,
     },
     dataRetention: {
       policy: {
@@ -242,9 +239,7 @@ describe("webhookService", () => {
           id: "sub_db_1",
           previousStatus: SubscriptionStatus.PENDING,
         });
-        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith(
-          "org_123",
-        );
+        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
       });
 
       /** @scenario Checkout fails when no subscription matches the reference */
@@ -281,9 +276,7 @@ describe("webhookService", () => {
         await promise;
 
         expect(subRepo.activate).toHaveBeenCalled();
-        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith(
-          "org_123",
-        );
+        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
       });
 
       /**
@@ -295,10 +288,8 @@ describe("webhookService", () => {
         const published = () =>
           traced(
             EEWebhookService.createWithDependencies({
-              subscriptionRepository:
-                subRepo as unknown as SubscriptionRepository,
-              organizationRepository:
-                orgRepo as unknown as OrganizationRepository,
+              subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+              organizationRepository: orgRepo as unknown as OrganizationRepository,
               stripe: mockStripeInstance as any,
               itemCalculator,
             }),
@@ -371,9 +362,7 @@ describe("webhookService", () => {
         await promise;
 
         expect(subRepo.activate).toHaveBeenCalled();
-        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith(
-          "org_123",
-        );
+        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
       });
 
       /** @scenario Checkout succeeds without an invite approval mechanism */
@@ -468,9 +457,7 @@ describe("webhookService", () => {
 
         expect(result.earlyReturn).toBe(false);
         expect(subRepo.activate).toHaveBeenCalled();
-        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith(
-          "org_123",
-        );
+        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
       });
 
       /** @scenario A threshold failure raises an alert for manual follow-up */
@@ -512,9 +499,7 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(
-          mockSendSlackBillingThresholdFailureAlert,
-        ).not.toHaveBeenCalled();
+        expect(mockSendSlackBillingThresholdFailureAlert).not.toHaveBeenCalled();
       });
 
       /** @scenario A threshold failure raises an alert for manual follow-up */
@@ -692,21 +677,17 @@ describe("webhookService", () => {
           organizationId: "org_123",
           excludeSubscriptionId: "sub_db_1",
         });
-        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith(
-          "sub_old_1",
-          { prorate: true },
-        );
-        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith(
-          "sub_old_2",
-          { prorate: true },
-        );
+        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith("sub_old_1", {
+          prorate: true,
+        });
+        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith("sub_old_2", {
+          prorate: true,
+        });
       });
 
       it("logs but does not fail when Stripe cancellation fails", async () => {
         const localStripe = createMockStripe();
-        localStripe.subscriptions.cancel.mockRejectedValue(
-          new Error("Stripe error"),
-        );
+        localStripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe error"));
         service = EEWebhookService.createWithDependencies({
           subscriptionRepository: subRepo as unknown as SubscriptionRepository,
           organizationRepository: orgRepo as unknown as OrganizationRepository,
@@ -771,9 +752,7 @@ describe("webhookService", () => {
             retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
           });
         }
-        expect(mockSetForScope).toHaveBeenCalledTimes(
-          RETENTION_CATEGORIES.length,
-        );
+        expect(mockSetForScope).toHaveBeenCalledTimes(RETENTION_CATEGORIES.length);
       });
 
       /** @scenario A billing event never overwrites an existing retention policy */
@@ -812,9 +791,7 @@ describe("webhookService", () => {
         expect(mockSetForScope).not.toHaveBeenCalledWith(
           expect.objectContaining({ category: "traces" }),
         );
-        expect(mockSetForScope).toHaveBeenCalledTimes(
-          RETENTION_CATEGORIES.length - 1,
-        );
+        expect(mockSetForScope).toHaveBeenCalledTimes(RETENTION_CATEGORIES.length - 1);
       });
 
       /** @scenario A retention failure never fails the billing webhook */
@@ -832,9 +809,7 @@ describe("webhookService", () => {
           }),
         );
         subRepo.migrateToSeatEvent.mockResolvedValue([]);
-        mockSetForScope.mockRejectedValueOnce(
-          new Error("retention store down"),
-        );
+        mockSetForScope.mockRejectedValueOnce(new Error("retention store down"));
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
@@ -1537,9 +1512,7 @@ describe("webhookService", () => {
 
     describe("when a subscription is deleted", () => {
       it("still cancels the subscription and resolves", async () => {
-        mockSendSlackSubscriptionEvent.mockRejectedValueOnce(
-          notificationFailure,
-        );
+        mockSendSlackSubscriptionEvent.mockRejectedValueOnce(notificationFailure);
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.ACTIVE }),
         );
@@ -1558,9 +1531,7 @@ describe("webhookService", () => {
 
     describe("when an invoice payment succeeds", () => {
       it("still activates the subscription and resolves", async () => {
-        mockSendSlackSubscriptionEvent.mockRejectedValueOnce(
-          notificationFailure,
-        );
+        mockSendSlackSubscriptionEvent.mockRejectedValueOnce(notificationFailure);
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );

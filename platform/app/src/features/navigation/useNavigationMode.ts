@@ -42,11 +42,10 @@ export function useNavigationMode(): NavigationModeResolution {
 
   // The same organization queries the dashboard layout itself runs; react-query
   // dedupes them, so the opted-out path stays at zero extra requests.
-  const { organization, isLoading: isOrganizationLoading } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+  const { organization, isLoading: isOrganizationLoading } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
 
   const { enabled: isFlagEnabled, isLoading: isFlagLoading } = useFeatureFlag(
     "release_ui_navigation_v2_enabled",
@@ -59,8 +58,7 @@ export function useNavigationMode(): NavigationModeResolution {
     },
   );
 
-  const isFlagAnswered =
-    isFlagNeeded && !isOrganizationLoading && !isFlagLoading;
+  const isFlagAnswered = isFlagNeeded && !isOrganizationLoading && !isFlagLoading;
 
   // Remembering the answer is what lets the next visit paint the right
   // shell on its first frame instead of starting on the other one.

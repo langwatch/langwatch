@@ -56,9 +56,7 @@ describe("given a tool frame from the live stream", () => {
     const command = "langwatch trace search --format json";
 
     it("is treated as the capability it is, not as a shell call", () => {
-      expect(effectiveToolName("bash", { command })).toBe(
-        "langwatch.trace.search",
-      );
+      expect(effectiveToolName("bash", { command })).toBe("langwatch.trace.search");
     });
 
     it("says what it is searching, never 'Coding'", () => {

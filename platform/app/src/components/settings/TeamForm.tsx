@@ -60,22 +60,21 @@ function TeamProjectsBody({
             </HStack>
           </Table.Cell>
           <Table.Cell textAlign="right">
-            {teamProject.id !== project?.id &&
-              hasPermission("project:delete") && (
-                <Button
-                  variant="ghost"
-                  color="red.fg"
-                  size="sm"
-                  onClick={() =>
-                    onArchiveClick({
-                      id: teamProject.id,
-                      name: teamProject.name,
-                    })
-                  }
-                >
-                  <Trash2 size={16} />
-                </Button>
-              )}
+            {teamProject.id !== project?.id && hasPermission("project:delete") && (
+              <Button
+                variant="ghost"
+                color="red.fg"
+                size="sm"
+                onClick={() =>
+                  onArchiveClick({
+                    id: teamProject.id,
+                    name: teamProject.name,
+                  })
+                }
+              >
+                <Trash2 size={16} />
+              </Button>
+            )}
           </Table.Cell>
         </Table.Row>
       ))}
@@ -199,10 +198,7 @@ export const TeamForm = ({
             <Field.ErrorText>Name is required</Field.ErrorText>
           </HorizontalFormControl>
           {team && (
-            <HorizontalFormControl
-              label="Slug"
-              helper="The unique ID of your team"
-            >
+            <HorizontalFormControl label="Slug" helper="The unique ID of your team">
               <Input width="full" disabled type="text" value={team.slug} />
             </HorizontalFormControl>
           )}
@@ -250,9 +246,7 @@ export const TeamForm = ({
                                 return (
                                   <Select.Root
                                     collection={rowCollection}
-                                    value={
-                                      field.value ? [field.value.value] : []
-                                    }
+                                    value={field.value ? [field.value.value] : []}
                                     onValueChange={(details) => {
                                       const selectedValue = details.value[0];
                                       if (selectedValue) {
@@ -265,18 +259,12 @@ export const TeamForm = ({
                                       }
                                     }}
                                   >
-                                    <Select.Trigger
-                                      width="full"
-                                      background="bg"
-                                    >
+                                    <Select.Trigger width="full" background="bg">
                                       <Select.ValueText placeholder="Select..." />
                                     </Select.Trigger>
                                     <Select.Content paddingY={2}>
                                       {rowCollection.items.map((option) => (
-                                        <Select.Item
-                                          key={option.value}
-                                          item={option}
-                                        >
+                                        <Select.Item key={option.value} item={option}>
                                           {option.label}
                                         </Select.Item>
                                       ))}
@@ -289,13 +277,12 @@ export const TeamForm = ({
                               content={
                                 <>
                                   <Text>
-                                    Those are existing members of your
-                                    organization.
+                                    Those are existing members of your organization.
                                   </Text>
                                   <Text paddingTop={2}>
-                                    Want to add a team member that is not listed
-                                    yet? You can create the team first and
-                                    invite them later to the organization
+                                    Want to add a team member that is not listed yet? You
+                                    can create the team first and invite them later to the
+                                    organization
                                   </Text>
                                 </>
                               }
@@ -388,10 +375,7 @@ export const TeamForm = ({
                       <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                     </Table.Row>
                   </Table.Header>
-                  <TeamProjectsBody
-                    team={team}
-                    onArchiveClick={setProjectToArchive}
-                  />
+                  <TeamProjectsBody team={team} onArchiveClick={setProjectToArchive} />
                 </Table.Root>
               </Card.Body>
             </Card.Root>

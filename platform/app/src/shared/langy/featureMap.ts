@@ -54,10 +54,7 @@ interface RawFeature {
 }
 
 function flatten(features: RawFeature[]): RawFeature[] {
-  return features.flatMap((feature) => [
-    feature,
-    ...flatten(feature.children ?? []),
-  ]);
+  return features.flatMap((feature) => [feature, ...flatten(feature.children ?? [])]);
 }
 
 /** Every feature in the map, flattened, in map order. */

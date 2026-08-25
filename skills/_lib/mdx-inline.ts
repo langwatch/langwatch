@@ -25,10 +25,7 @@ export interface InlineOptions {
   excludeShared?: string[];
 }
 
-const parser = unified()
-  .use(remarkParse)
-  .use(remarkFrontmatter, ["yaml"])
-  .use(remarkMdx);
+const parser = unified().use(remarkParse).use(remarkFrontmatter, ["yaml"]).use(remarkMdx);
 
 const stringifier = unified()
   .use(remarkStringify, { bullet: "-", fences: true, rule: "-" })
@@ -56,14 +53,12 @@ function parseImports(node: EsmNode): { name: string; source: string }[] {
   for (const stmt of body) {
     if (stmt.type !== "ImportDeclaration") {
       throw new Error(
-        `Only \`import Name from './path.mdx'\` statements are supported. Got: ${stmt.type}`
+        `Only \`import Name from './path.mdx'\` statements are supported. Got: ${stmt.type}`,
       );
     }
     const def = stmt.specifiers?.find((s) => s.type === "ImportDefaultSpecifier");
     if (!def?.local?.name || !stmt.source?.value) {
-      throw new Error(
-        `Default import expected: \`import Name from './path.mdx'\``
-      );
+      throw new Error(`Default import expected: \`import Name from './path.mdx'\``);
     }
     out.push({ name: def.local.name, source: stmt.source.value });
   }
@@ -79,9 +74,7 @@ const basename = (p: string) => path.basename(p, path.extname(p));
 
 function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Root {
   if (stack.includes(filePath)) {
-    throw new Error(
-      `Cyclic import detected: ${[...stack, filePath].join(" -> ")}`
-    );
+    throw new Error(`Cyclic import detected: ${[...stack, filePath].join(" -> ")}`);
   }
   const tree = parseFile(filePath);
   const dir = path.dirname(filePath);
@@ -109,9 +102,7 @@ function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Roo
     if (node.type === "mdxJsxFlowElement" && typeof node.name === "string") {
       const target = imports.get(node.name);
       if (!target) {
-        throw new Error(
-          `<${node.name} /> in ${filePath} has no matching import`
-        );
+        throw new Error(`<${node.name} /> in ${filePath} has no matching import`);
       }
       // Dedup only applies to repo-wide `_shared/` partials. Other imports
       // (skill-local helpers, future per-skill components) must always inline
@@ -128,18 +119,17 @@ function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Roo
         continue;
       }
       if (isSharedPartial) opts.seenShared?.add(target);
-      const inlined = inlineTree(
-        target,
-        { ...opts, stripFrontmatter: true },
-        [...stack, filePath]
-      );
+      const inlined = inlineTree(target, { ...opts, stripFrontmatter: true }, [
+        ...stack,
+        filePath,
+      ]);
       out.push(...inlined.children);
       continue;
     }
     if (node.type === "mdxJsxTextElement") {
       throw new Error(
         `Inline JSX <${(node as { name?: string }).name ?? "?"} /> in ${filePath} is not supported. ` +
-          `Use block-level JSX (on its own line).`
+          `Use block-level JSX (on its own line).`,
       );
     }
     out.push(node);

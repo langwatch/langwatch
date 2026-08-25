@@ -200,12 +200,8 @@ describe("ensureUserSyncedToCio()", () => {
   describe("given a Prisma query fails", () => {
     describe("when the user lookup throws", () => {
       it("does not throw (fire-and-forget)", async () => {
-        const { captureException } = await import(
-          "~/utils/posthogErrorCapture"
-        );
-        mockPrisma.user.findUnique.mockRejectedValueOnce(
-          new Error("DB connection lost"),
-        );
+        const { captureException } = await import("~/utils/posthogErrorCapture");
+        mockPrisma.user.findUnique.mockRejectedValueOnce(new Error("DB connection lost"));
 
         expect(() =>
           ensureUserSyncedToCio({ userId: "user-1", hasOrganization: true }),
@@ -217,9 +213,7 @@ describe("ensureUserSyncedToCio()", () => {
       });
 
       it("does not add user to the sync cache so next login can retry", async () => {
-        mockPrisma.user.findUnique.mockRejectedValueOnce(
-          new Error("DB connection lost"),
-        );
+        mockPrisma.user.findUnique.mockRejectedValueOnce(new Error("DB connection lost"));
 
         ensureUserSyncedToCio({ userId: "user-1", hasOrganization: true });
 

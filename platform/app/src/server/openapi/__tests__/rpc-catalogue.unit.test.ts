@@ -36,7 +36,10 @@ describe("the root RPC catalogue", () => {
   it("lists every service with the URL of its own catalogue", () => {
     const index = buildRpcServiceIndex({
       apps: [
-        appWithMounts(["/api/roles/2026-08-07/rpc.discover", "/api/roles/latest/rpc.discover"]),
+        appWithMounts([
+          "/api/roles/2026-08-07/rpc.discover",
+          "/api/roles/latest/rpc.discover",
+        ]),
         appWithMounts([THINGS_LATEST]),
       ],
       openapiUrl: OPENAPI_URL,
@@ -80,9 +83,7 @@ describe("the root RPC catalogue", () => {
       openapiUrl: OPENAPI_URL,
     });
 
-    expect(index.services).toEqual([
-      { name: "things", discover: THINGS_LATEST },
-    ]);
+    expect(index.services).toEqual([{ name: "things", discover: THINGS_LATEST }]);
   });
 
   it("answers an empty fleet when no service is on the framework", () => {
@@ -101,9 +102,6 @@ describe("the root RPC catalogue", () => {
       openapiUrl: OPENAPI_URL,
     });
 
-    expect(index.services.map((entry) => entry.name)).toEqual([
-      "alpha",
-      "zeta",
-    ]);
+    expect(index.services.map((entry) => entry.name)).toEqual(["alpha", "zeta"]);
   });
 });

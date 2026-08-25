@@ -88,9 +88,7 @@ function buildParametersExample(
 }
 
 /** Render a JS/TS object literal from an example record. */
-function toJsObjectLiteral(
-  record: Record<string, string | number | boolean>,
-): string {
+function toJsObjectLiteral(record: Record<string, string | number | boolean>): string {
   const entries = Object.entries(record).map(
     ([key, value]) => `${JSON.stringify(key)}: ${JSON.stringify(value)}`,
   );
@@ -98,17 +96,11 @@ function toJsObjectLiteral(
 }
 
 /** Render a python dict literal from an example record. */
-function toPyDictLiteral(
-  record: Record<string, string | number | boolean>,
-): string {
+function toPyDictLiteral(record: Record<string, string | number | boolean>): string {
   const entries = Object.entries(record).map(
     ([key, value]) =>
       `${JSON.stringify(key)}: ${
-        typeof value === "boolean"
-          ? value
-            ? "True"
-            : "False"
-          : JSON.stringify(value)
+        typeof value === "boolean" ? (value ? "True" : "False") : JSON.stringify(value)
       }`,
   );
   return `{${entries.join(", ")}}`;
@@ -171,10 +163,7 @@ function buildPythonSnippet(input: BuildRunSnippetInput): string {
     input.entryFields,
     input.datasetColumns,
   );
-  const inlineRow = buildInlineExampleRow(
-    input.entryFields,
-    input.datasetColumns,
-  );
+  const inlineRow = buildInlineExampleRow(input.entryFields, input.datasetColumns);
   const arg = sdkDataSourceArg({
     lang: "python",
     dataSource,
@@ -211,10 +200,7 @@ function buildTypescriptSnippet(input: BuildRunSnippetInput): string {
     input.entryFields,
     input.datasetColumns,
   );
-  const inlineRow = buildInlineExampleRow(
-    input.entryFields,
-    input.datasetColumns,
-  );
+  const inlineRow = buildInlineExampleRow(input.entryFields, input.datasetColumns);
   const arg = sdkDataSourceArg({
     lang: "typescript",
     dataSource,
@@ -253,10 +239,7 @@ function buildShellSnippet(input: BuildRunSnippetInput): string {
     input.entryFields,
     input.datasetColumns,
   );
-  const inlineRow = buildInlineExampleRow(
-    input.entryFields,
-    input.datasetColumns,
-  );
+  const inlineRow = buildInlineExampleRow(input.entryFields, input.datasetColumns);
 
   const startUrl =
     kind === "experiment"

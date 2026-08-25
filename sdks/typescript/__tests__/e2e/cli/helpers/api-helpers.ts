@@ -27,10 +27,7 @@ export class ApiHelpers {
       .filter(({ r }) => r.status === "rejected");
     if (failures.length > 0) {
       const detail = failures
-        .map(
-          ({ r, handle }) =>
-            `${handle}: ${(r as PromiseRejectedResult).reason}`,
-        )
+        .map(({ r, handle }) => `${handle}: ${(r as PromiseRejectedResult).reason}`)
         .join("; ");
       throw new Error(
         `cleanUpTestPrompts: ${failures.length} prompt deletion(s) failed: ${detail}`,

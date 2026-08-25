@@ -47,9 +47,7 @@ export function useProjectBySlugOrLatest(organization?: MinimalOrganization) {
     if (rawSlug) {
       const matching = allProjects
         .filter((p) => p.slug === rawSlug)
-        .sort(
-          (a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt),
-        );
+        .sort((a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt));
       if (matching[0]) return matching[0];
     }
 

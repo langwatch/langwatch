@@ -23,23 +23,21 @@ describe("nodeErrorToDomainError", () => {
 
   describe("given a code the customer owns", () => {
     it("attributes a failure in their own code node to them", () => {
-      expect(
-        nodeErrorToDomainError({ errorType: "code_runner_error" }).fault,
-      ).toBe("customer");
+      expect(nodeErrorToDomainError({ errorType: "code_runner_error" }).fault).toBe(
+        "customer",
+      );
     });
 
     it("attributes a bad dataset to them", () => {
-      expect(
-        nodeErrorToDomainError({ errorType: "invalid_dataset" }).fault,
-      ).toBe("customer");
+      expect(nodeErrorToDomainError({ errorType: "invalid_dataset" }).fault).toBe(
+        "customer",
+      );
     });
   });
 
   describe("given a code a third party owns", () => {
     it("attributes an LLM call failure to the provider", () => {
-      expect(nodeErrorToDomainError({ errorType: "llm_error" }).fault).toBe(
-        "provider",
-      );
+      expect(nodeErrorToDomainError({ errorType: "llm_error" }).fault).toBe("provider");
     });
   });
 
@@ -50,9 +48,7 @@ describe("nodeErrorToDomainError", () => {
      * guessing "provider" tells the operator there is nothing to look at.
      */
     it("attributes it to the platform", () => {
-      expect(nodeErrorToDomainError({ errorType: "ValueError" }).fault).toBe(
-        "platform",
-      );
+      expect(nodeErrorToDomainError({ errorType: "ValueError" }).fault).toBe("platform");
     });
 
     /**
@@ -61,9 +57,9 @@ describe("nodeErrorToDomainError", () => {
      * the operator's log line tells another.
      */
     it("does not blame a provider for a failed attachment fetch", () => {
-      expect(
-        nodeErrorToDomainError({ errorType: "attachment_fetch_error" }).fault,
-      ).toBe("platform");
+      expect(nodeErrorToDomainError({ errorType: "attachment_fetch_error" }).fault).toBe(
+        "platform",
+      );
     });
   });
 

@@ -12,9 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient, SimulationSuite } from "~/generated/prisma/client";
 import { SuiteRepository } from "../suite.repository";
 
-function makeSuiteRow(
-  overrides: Partial<SimulationSuite> = {},
-): SimulationSuite {
+function makeSuiteRow(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
   return {
     id: "suite_abc123",
     projectId: "proj_1",
@@ -59,9 +57,9 @@ describe("SuiteRepository", () => {
     describe("given valid input", () => {
       it("inserts a new suite with a generated id", async () => {
         const expected = makeSuiteRow();
-        (
-          prisma.simulationSuite.create as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(expected);
+        (prisma.simulationSuite.create as ReturnType<typeof vi.fn>).mockResolvedValue(
+          expected,
+        );
 
         const result = await repository.create({
           projectId: "proj_1",
@@ -74,9 +72,8 @@ describe("SuiteRepository", () => {
         });
 
         expect(result).toBe(expected);
-        const callArg = (
-          prisma.simulationSuite.create as ReturnType<typeof vi.fn>
-        ).mock.calls[0]![0];
+        const callArg = (prisma.simulationSuite.create as ReturnType<typeof vi.fn>).mock
+          .calls[0]![0];
         expect(callArg.data.id).toMatch(/^suite_/);
         expect(callArg.data.projectId).toBe("proj_1");
         expect(callArg.data.name).toBe("Critical Path");
@@ -88,9 +85,9 @@ describe("SuiteRepository", () => {
     describe("given an existing suite id and project", () => {
       it("returns the suite", async () => {
         const expected = makeSuiteRow();
-        (
-          prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(expected);
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(
+          expected,
+        );
 
         const result = await repository.findById({
           id: "suite_abc123",
@@ -110,9 +107,9 @@ describe("SuiteRepository", () => {
 
     describe("given a non-existent suite id", () => {
       it("returns null", async () => {
-        (
-          prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(null);
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(
+          null,
+        );
 
         const result = await repository.findById({
           id: "suite_nonexistent",
@@ -125,9 +122,9 @@ describe("SuiteRepository", () => {
 
     describe("given an archived suite", () => {
       it("returns null because archivedAt filter excludes it", async () => {
-        (
-          prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(null);
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(
+          null,
+        );
 
         const result = await repository.findById({
           id: "suite_archived",
@@ -149,9 +146,9 @@ describe("SuiteRepository", () => {
           makeSuiteRow({ id: "suite_1", name: "Suite A" }),
           makeSuiteRow({ id: "suite_2", name: "Suite B" }),
         ];
-        (
-          prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(suites);
+        (prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>).mockResolvedValue(
+          suites,
+        );
 
         const result = await repository.findAll({ projectId: "proj_1" });
 
@@ -168,9 +165,9 @@ describe("SuiteRepository", () => {
 
     describe("given a project with no suites", () => {
       it("returns an empty array", async () => {
-        (
-          prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([]);
+        (prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>).mockResolvedValue(
+          [],
+        );
 
         const result = await repository.findAll({ projectId: "proj_1" });
 
@@ -183,9 +180,9 @@ describe("SuiteRepository", () => {
     describe("given a valid suite id and update data", () => {
       it("updates and returns the suite", async () => {
         const updated = makeSuiteRow({ name: "Updated Name" });
-        (
-          prisma.simulationSuite.update as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(updated);
+        (prisma.simulationSuite.update as ReturnType<typeof vi.fn>).mockResolvedValue(
+          updated,
+        );
 
         const result = await repository.update({
           id: "suite_abc123",
@@ -209,12 +206,12 @@ describe("SuiteRepository", () => {
         const existing = makeSuiteRow({ archivedAt: null });
         const archived = makeSuiteRow({ archivedAt: new Date("2026-02-01") });
 
-        (
-          prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(existing);
-        (
-          prisma.simulationSuite.update as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(archived);
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(
+          existing,
+        );
+        (prisma.simulationSuite.update as ReturnType<typeof vi.fn>).mockResolvedValue(
+          archived,
+        );
 
         const result = await repository.archive({
           id: "suite_abc123",
@@ -234,9 +231,9 @@ describe("SuiteRepository", () => {
 
     describe("given a non-existent suite", () => {
       it("returns null without attempting update", async () => {
-        (
-          prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(null);
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(
+          null,
+        );
 
         const result = await repository.archive({
           id: "suite_nonexistent",
@@ -261,21 +258,20 @@ describe("SuiteRepository", () => {
           slug: "critical-path--archived",
         });
 
-        (
-          prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(existing);
-        (
-          prisma.simulationSuite.update as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(archived);
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(
+          existing,
+        );
+        (prisma.simulationSuite.update as ReturnType<typeof vi.fn>).mockResolvedValue(
+          archived,
+        );
 
         await repository.archive({
           id: "suite_abc123",
           projectId: "proj_1",
         });
 
-        const updateCall = (
-          prisma.simulationSuite.update as ReturnType<typeof vi.fn>
-        ).mock.calls[0]![0];
+        const updateCall = (prisma.simulationSuite.update as ReturnType<typeof vi.fn>)
+          .mock.calls[0]![0];
         expect(updateCall.data.archivedAt).toBe(originalDate);
       });
 
@@ -285,21 +281,20 @@ describe("SuiteRepository", () => {
           slug: "critical-path--archived",
         });
 
-        (
-          prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(existing);
-        (
-          prisma.simulationSuite.update as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(existing);
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(
+          existing,
+        );
+        (prisma.simulationSuite.update as ReturnType<typeof vi.fn>).mockResolvedValue(
+          existing,
+        );
 
         await repository.archive({
           id: "suite_abc123",
           projectId: "proj_1",
         });
 
-        const updateCall = (
-          prisma.simulationSuite.update as ReturnType<typeof vi.fn>
-        ).mock.calls[0]![0];
+        const updateCall = (prisma.simulationSuite.update as ReturnType<typeof vi.fn>)
+          .mock.calls[0]![0];
         expect(updateCall.data.slug).toBe("critical-path--archived");
       });
     });

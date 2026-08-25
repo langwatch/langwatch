@@ -107,22 +107,21 @@ describe("deriveSpanCost", () => {
       wireAttributes: Record<string, unknown>,
     ): NormalizedSpan => {
       const base = createTestSpan({ name: "gen_ai.responses" });
-      const { attributes } =
-        new CanonicalizeSpanAttributesService().canonicalize(
-          wireAttributes as NormalizedSpan["spanAttributes"],
-          [],
-          {
-            name: base.name,
-            kind: base.kind,
-            instrumentationScope: {
-              name: "langwatch-service-aigateway",
-              version: null,
-            },
-            statusMessage: base.statusMessage,
-            statusCode: base.statusCode,
-            parentSpanId: base.parentSpanId,
+      const { attributes } = new CanonicalizeSpanAttributesService().canonicalize(
+        wireAttributes as NormalizedSpan["spanAttributes"],
+        [],
+        {
+          name: base.name,
+          kind: base.kind,
+          instrumentationScope: {
+            name: "langwatch-service-aigateway",
+            version: null,
           },
-        );
+          statusMessage: base.statusMessage,
+          statusCode: base.statusCode,
+          parentSpanId: base.parentSpanId,
+        },
+      );
       return createTestSpan({
         name: base.name,
         spanAttributes: attributes,

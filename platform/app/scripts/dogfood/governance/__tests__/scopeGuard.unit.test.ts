@@ -11,9 +11,7 @@ import {
 describe("parseDemoOrgIdsEnv", () => {
   describe("when the env var is missing or empty", () => {
     it("throws DemoScopeMisconfigured for undefined", () => {
-      expect(() => parseDemoOrgIdsEnv(undefined)).toThrow(
-        DemoScopeMisconfigured,
-      );
+      expect(() => parseDemoOrgIdsEnv(undefined)).toThrow(DemoScopeMisconfigured);
     });
 
     it("throws DemoScopeMisconfigured for empty string", () => {
@@ -35,15 +33,18 @@ describe("parseDemoOrgIdsEnv", () => {
     });
 
     it("parses comma-separated ids and trims whitespace", () => {
-      expect(
-        parseDemoOrgIdsEnv("org_acme123, org_beta456 ,org_gamma789"),
-      ).toEqual(["org_acme123", "org_beta456", "org_gamma789"]);
+      expect(parseDemoOrgIdsEnv("org_acme123, org_beta456 ,org_gamma789")).toEqual([
+        "org_acme123",
+        "org_beta456",
+        "org_gamma789",
+      ]);
     });
 
     it("dedupes repeated ids", () => {
-      expect(parseDemoOrgIdsEnv("org_acme123,org_acme123,org_beta456")).toEqual(
-        ["org_acme123", "org_beta456"],
-      );
+      expect(parseDemoOrgIdsEnv("org_acme123,org_acme123,org_beta456")).toEqual([
+        "org_acme123",
+        "org_beta456",
+      ]);
     });
   });
 
@@ -53,21 +54,17 @@ describe("parseDemoOrgIdsEnv", () => {
     });
 
     it("rejects ids with disallowed characters (spaces inside)", () => {
-      expect(() => parseDemoOrgIdsEnv("org acme123")).toThrow(
-        DemoScopeMisconfigured,
-      );
+      expect(() => parseDemoOrgIdsEnv("org acme123")).toThrow(DemoScopeMisconfigured);
     });
 
     it("rejects ids with sql-injection-shaped characters", () => {
-      expect(() => parseDemoOrgIdsEnv("org_acme';--")).toThrow(
-        DemoScopeMisconfigured,
-      );
+      expect(() => parseDemoOrgIdsEnv("org_acme';--")).toThrow(DemoScopeMisconfigured);
     });
 
     it("rejects mixed-valid-and-invalid lists at the first invalid id", () => {
-      expect(() =>
-        parseDemoOrgIdsEnv("org_acme123,bad id,org_beta456"),
-      ).toThrow(DemoScopeMisconfigured);
+      expect(() => parseDemoOrgIdsEnv("org_acme123,bad id,org_beta456")).toThrow(
+        DemoScopeMisconfigured,
+      );
     });
   });
 });
@@ -86,9 +83,7 @@ describe("assertDemoOrgAllowed", () => {
   });
 
   it("throws DemoScopeViolation when the allowlist is empty", () => {
-    expect(() => assertDemoOrgAllowed("org_acme123", [])).toThrow(
-      DemoScopeViolation,
-    );
+    expect(() => assertDemoOrgAllowed("org_acme123", [])).toThrow(DemoScopeViolation);
   });
 
   it("is case-sensitive", () => {

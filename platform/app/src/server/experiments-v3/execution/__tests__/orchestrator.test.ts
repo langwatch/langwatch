@@ -274,10 +274,7 @@ describe("orchestrator", () => {
 
       const cells = generateCells(state, datasetRows, scope);
 
-      expect(cells.map((cell) => cell.targetId)).toEqual([
-        "target-1",
-        "target-2",
-      ]);
+      expect(cells.map((cell) => cell.targetId)).toEqual(["target-1", "target-2"]);
     });
 
     it("skips column-style n-way evaluator targets during phase 1", () => {
@@ -305,10 +302,7 @@ describe("orchestrator", () => {
 
       const cells = generateCells(state, datasetRows, scope);
 
-      expect(cells.map((cell) => cell.targetId)).toEqual([
-        "target-1",
-        "target-2",
-      ]);
+      expect(cells.map((cell) => cell.targetId)).toEqual(["target-1", "target-2"]);
     });
 
     it("does not rerun seeded comparison variants for a single comparison cell", () => {
@@ -425,9 +419,9 @@ describe("orchestrator", () => {
   // let Phase 2 clobber out-of-scope rows.
   describe("when resolving scoped row indices", () => {
     it("spans the dataset for scopes that mean 'everything'", () => {
-      expect(
-        resolveScopedRowIndices({ scope: { type: "full" }, rowCount: 3 }),
-      ).toEqual([0, 1, 2]);
+      expect(resolveScopedRowIndices({ scope: { type: "full" }, rowCount: 3 })).toEqual([
+        0, 1, 2,
+      ]);
       expect(
         resolveScopedRowIndices({
           scope: { type: "target", targetId: "t1" },
@@ -551,9 +545,7 @@ describe("orchestrator", () => {
       expect(cells[0]?.comparison?.candidates[1]?.output).toBe(
         '{"output":"answer from B"}',
       );
-      expect(cells[0]?.evaluatorConfigs[0]?.comparison?.goldenField).toBe(
-        "expected",
-      );
+      expect(cells[0]?.evaluatorConfigs[0]?.comparison?.goldenField).toBe("expected");
     });
 
     // Regression (#5528 follow-up): an experiment saved BEFORE the
@@ -789,9 +781,7 @@ describe("orchestrator", () => {
     // the run. A target emitting a structured output must therefore be either
     // narrowed to a field by variantOutputPaths, or serialized.
     describe("given a variant whose output is structured", () => {
-      const structuredState = (
-        variantOutputPaths?: Record<string, string[]>,
-      ) => {
+      const structuredState = (variantOutputPaths?: Record<string, string[]>) => {
         const state = createTestState(2, 0);
         state.targets.push({
           id: "comparison-target",
@@ -965,11 +955,7 @@ describe("orchestrator", () => {
         const state = createTestState(3, 0);
         // Turn the inline targets into saved prompts; targets 2 and 3 share the
         // "support-detailed" handle, exactly the reported duplicate-variant case.
-        const handles = [
-          "support-concise",
-          "support-detailed",
-          "support-detailed",
-        ];
+        const handles = ["support-concise", "support-detailed", "support-detailed"];
         state.targets = state.targets.map((t, i) => ({
           ...t,
           promptId: `prompt-${i + 1}`,
@@ -1082,9 +1068,7 @@ describe("orchestrator", () => {
           ]),
         });
 
-        expect(cells[0]?.comparison?.candidates[1]?.output).toBe(
-          "answer from B",
-        );
+        expect(cells[0]?.comparison?.candidates[1]?.output).toBe("answer from B");
       });
 
       // The scores map is optional — nothing appends when it is absent.
@@ -1096,9 +1080,7 @@ describe("orchestrator", () => {
           completedTargetOutputs: plainOutputs,
         });
 
-        expect(cells[0]?.comparison?.candidates[0]?.output).toBe(
-          "answer from A",
-        );
+        expect(cells[0]?.comparison?.candidates[0]?.output).toBe("answer from A");
       });
 
       // The output is narrowed to its field BEFORE the scores are appended, so
@@ -1125,9 +1107,7 @@ describe("orchestrator", () => {
           ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
         ]);
 
-        const scores = new Map([
-          ["0:target-1", [{ name: "Faithfulness", score: 0.91 }]],
-        ]);
+        const scores = new Map([["0:target-1", [{ name: "Faithfulness", score: 0.91 }]]]);
 
         it("appends the scores to the picked field, not the whole object", () => {
           const { cells } = generateComparisonCells({
@@ -1229,13 +1209,12 @@ describe("orchestrator", () => {
           includeMetrics: [],
         },
       });
-      const loadedPrompts = new Map<
-        string,
-        { handle: string } & Record<string, unknown>
-      >([
-        ["prompt_A", { handle: "say-hi" } as never],
-        ["prompt_B", { handle: "be-formal" } as never],
-      ]);
+      const loadedPrompts = new Map<string, { handle: string } & Record<string, unknown>>(
+        [
+          ["prompt_A", { handle: "say-hi" } as never],
+          ["prompt_B", { handle: "be-formal" } as never],
+        ],
+      );
       const { cells } = generateComparisonCells({
         scopedRowIndices: undefined,
         state,
@@ -1280,10 +1259,9 @@ describe("orchestrator", () => {
           includeMetrics: [],
         },
       });
-      const loadedPrompts = new Map<
-        string,
-        { handle: string } & Record<string, unknown>
-      >([["prompt_X", { handle: "shared-handle" } as never]]);
+      const loadedPrompts = new Map<string, { handle: string } & Record<string, unknown>>(
+        [["prompt_X", { handle: "shared-handle" } as never]],
+      );
 
       const { cells } = generateComparisonCells({
         scopedRowIndices: undefined,
@@ -1618,9 +1596,7 @@ describe("orchestrator", () => {
         string,
         Record<string, Record<string, { value: unknown }>>
       >;
-      expect(mappings["dataset-1"]?.["pairwise-target"]?.golden?.value).toBe(
-        undefined,
-      );
+      expect(mappings["dataset-1"]?.["pairwise-target"]?.golden?.value).toBe(undefined);
     });
   });
 

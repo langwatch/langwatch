@@ -6,9 +6,7 @@ dotenv.config({ path: ["../../.env", ".env"] });
 
 export default defineConfig({
   test: {
-    include: [
-      "ee/**/*.integration.{test,spec}.?(c|m)[jt]s?(x)",
-    ],
+    include: ["ee/**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
     exclude: [...configDefaults.exclude, ".next/**/*", ".next-saas/**/*"],
     testTimeout: 30_000,
     hookTimeout: 30_000,

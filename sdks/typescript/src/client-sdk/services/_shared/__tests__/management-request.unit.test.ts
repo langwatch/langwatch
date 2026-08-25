@@ -9,10 +9,7 @@ import {
   INSTANCE_ADMIN_KEY_ENV,
   OrganizationsAdminApiService,
 } from "../../organizations-admin/organizations-admin-api.service";
-import {
-  createManagementRequest,
-  managementPath,
-} from "../management-request";
+import { createManagementRequest, managementPath } from "../management-request";
 
 let mockFetch: ReturnType<typeof vi.fn>;
 
@@ -101,9 +98,9 @@ describe("OrganizationsAdminApiService", () => {
       }).list();
 
       const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(
-        (init.headers as Record<string, string>).Authorization,
-      ).toBe("Bearer instance-secret");
+      expect((init.headers as Record<string, string>).Authorization).toBe(
+        "Bearer instance-secret",
+      );
     });
   });
 });

@@ -1,10 +1,4 @@
-import {
-  type RefObject,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useState,
-} from "react";
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useState } from "react";
 
 /**
  * useIsOverflowing

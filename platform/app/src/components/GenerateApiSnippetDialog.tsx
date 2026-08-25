@@ -100,17 +100,13 @@ export function GenerateApiSnippetDialog({
   const [selectedTarget, setSelectedTarget] = useState<Target>(
     targets[0] ?? "python_python3",
   );
-  const [selectedTab, setSelectedTab] = useState<string>(
-    tabs?.[0]?.value ?? "python",
-  );
+  const [selectedTab, setSelectedTab] = useState<string>(tabs?.[0]?.value ?? "python");
 
   // Derived instead of synced via effect: an effect calling setState on every
   // `snippets` identity change caused infinite re-render loops (React #185)
   // when callers built `snippets` in their render body.
   const selectedSnippet = useMemo<Snippet | undefined>(
-    () =>
-      snippets.find((snippet) => snippet.target === selectedTarget) ??
-      snippets[0],
+    () => snippets.find((snippet) => snippet.target === selectedTarget) ?? snippets[0],
     [snippets, selectedTarget],
   );
 
@@ -129,9 +125,7 @@ export function GenerateApiSnippetDialog({
   }
 
   return (
-    <ApiSnippetDialogContext.Provider
-      value={{ open, onOpen: handleOpen, onClose }}
-    >
+    <ApiSnippetDialogContext.Provider value={{ open, onOpen: handleOpen, onClose }}>
       {children}
       <Dialog.Root
         open={open}
@@ -142,11 +136,7 @@ export function GenerateApiSnippetDialog({
           <Dialog.CloseTrigger />
           <Dialog.Header width="100%" marginTop={4}>
             <VStack alignItems="stretch" gap={3} width="100%">
-              <HStack
-                justifyContent="space-between"
-                width="100%"
-                alignItems="flex-start"
-              >
+              <HStack justifyContent="space-between" width="100%" alignItems="flex-start">
                 <VStack alignItems="flex-start" gap={2}>
                   <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
                   <Dialog.Description>{description}</Dialog.Description>
@@ -177,9 +167,7 @@ export function GenerateApiSnippetDialog({
           <Dialog.Body>
             <RenderCode
               code={
-                useTabs
-                  ? (activeTab?.content ?? "")
-                  : (selectedSnippet?.content ?? "")
+                useTabs ? (activeTab?.content ?? "") : (selectedSnippet?.content ?? "")
               }
               language={
                 useTabs
@@ -211,16 +199,14 @@ GenerateApiSnippetDialog.Trigger = function Trigger({
 }) {
   const ctx = useContext(ApiSnippetDialogContext);
 
-  if (!ctx)
-    throw new Error("Trigger must be used within GenerateApiSnippetDialog");
+  if (!ctx) throw new Error("Trigger must be used within GenerateApiSnippetDialog");
   // Clone the child and inject onClick to open the dialog
   return React.cloneElement(children as React.ReactElement<any>, {
     onClick: ctx.onOpen,
   });
 } as React.FC<{ children: React.ReactElement }>;
 
-GenerateApiSnippetDialog.Trigger.displayName =
-  "GenerateApiSnippetDialog.Trigger";
+GenerateApiSnippetDialog.Trigger.displayName = "GenerateApiSnippetDialog.Trigger";
 
 const LanguageMenu = React.memo(function LanguageMenu({
   selectedTarget,
@@ -234,10 +220,7 @@ const LanguageMenu = React.memo(function LanguageMenu({
   const { open, onOpen, onClose } = useDisclosure();
 
   return (
-    <Menu.Root
-      open={open}
-      onOpenChange={({ open }) => (open ? onOpen() : onClose())}
-    >
+    <Menu.Root open={open} onOpenChange={({ open }) => (open ? onOpen() : onClose())}>
       <Menu.Trigger asChild>
         <Button aria-label="Select language" size="sm" variant="outline">
           {formatTarget(selectedTarget)}

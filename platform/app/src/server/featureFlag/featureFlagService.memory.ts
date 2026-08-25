@@ -1,20 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
-import type {
-  FeatureFlagEvaluateOptions,
-  FeatureFlagServiceInterface,
-} from "./types";
+import type { FeatureFlagEvaluateOptions, FeatureFlagServiceInterface } from "./types";
 
 /**
  * In-memory feature flag service with default values.
  */
 export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
-  private readonly logger = createLogger(
-    "langwatch:memory-feature-flag-service",
-  );
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.memory-feature-flag-service",
-  );
+  private readonly logger = createLogger("langwatch:memory-feature-flag-service");
+  private readonly tracer = getLangWatchTracer("langwatch.memory-feature-flag-service");
 
   // In-memory feature flags storage
   private readonly flags: Record<string, boolean> = {};
@@ -35,10 +28,7 @@ export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
    * Note: extra fields on opts (projectId, organizationId, cacheTtlMs)
    * are accepted for interface compatibility but ignored.
    */
-  async isEnabled(
-    flagKey: string,
-    opts: FeatureFlagEvaluateOptions,
-  ): Promise<boolean> {
+  async isEnabled(flagKey: string, opts: FeatureFlagEvaluateOptions): Promise<boolean> {
     const { distinctId, defaultValue = true } = opts;
     return await this.tracer.withActiveSpan(
       "FeatureFlagServiceMemory.isEnabled",
@@ -82,10 +72,7 @@ export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
           results[flagKey] = this.getFlag(flagKey, defaultValue);
         }
 
-        span.setAttribute(
-          "feature.flag.results_count",
-          Object.keys(results).length,
-        );
+        span.setAttribute("feature.flag.results_count", Object.keys(results).length);
         return results;
       },
     );

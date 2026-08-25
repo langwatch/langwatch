@@ -197,9 +197,7 @@ describe("Workflow dataset dialog", () => {
       await user.click(screen.getByTestId("new-draft-dataset"));
 
       // Editor view opens directly on the draft
-      expect(
-        await screen.findByTestId("dataset-editor-table"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("dataset-editor-table")).toBeInTheDocument();
       expect(screen.getByText("Draft Dataset")).toBeInTheDocument();
       // No CSV upload gate anywhere in the path
       expect(screen.queryByText(/drop your csv/i)).not.toBeInTheDocument();
@@ -243,9 +241,7 @@ describe("Workflow dataset dialog", () => {
 
       await user.click(screen.getByTestId("new-draft-dataset"));
 
-      expect(
-        await screen.findByTestId("dataset-editor-table"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("dataset-editor-table")).toBeInTheDocument();
       const entry = getEntryNode();
       expect((entry?.data as Entry).dataset?.name).toBe("Draft Dataset");
     });

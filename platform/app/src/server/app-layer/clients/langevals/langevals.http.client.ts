@@ -12,10 +12,7 @@ import {
   EvaluatorExecutionError,
   EvaluatorInputTooLargeError,
 } from "../../evaluations/errors";
-import type {
-  LangEvalsClient,
-  LangEvalsEvaluateParams,
-} from "./langevals.client";
+import type { LangEvalsClient, LangEvalsEvaluateParams } from "./langevals.client";
 
 const logger = createLogger("langwatch:langevals-http-client");
 
@@ -28,9 +25,7 @@ export class LangEvalsHttpClient implements LangEvalsClient {
     private readonly timeoutMs: number = DEFAULT_TIMEOUT_MS,
   ) {}
 
-  async evaluate(
-    params: LangEvalsEvaluateParams,
-  ): Promise<SingleEvaluationResult> {
+  async evaluate(params: LangEvalsEvaluateParams): Promise<SingleEvaluationResult> {
     return this.evaluateWithRetry(params, this.maxRetries);
   }
 
@@ -58,10 +53,7 @@ export class LangEvalsHttpClient implements LangEvalsClient {
               input: tryAndConvertTo(data.input, "string"),
               output: tryAndConvertTo(data.output, "string"),
               contexts: tryAndConvertTo(data.contexts, "string[]"),
-              expected_contexts: tryAndConvertTo(
-                data.expected_contexts,
-                "string[]",
-              ),
+              expected_contexts: tryAndConvertTo(data.expected_contexts, "string[]"),
               expected_output: tryAndConvertTo(data.expected_output, "string"),
               conversation: tryAndConvertTo(data.conversation, "array"),
             },
@@ -72,10 +64,7 @@ export class LangEvalsHttpClient implements LangEvalsClient {
       });
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        logger.warn(
-          { url, timeoutMs: this.timeoutMs },
-          "Evaluator request timed out",
-        );
+        logger.warn({ url, timeoutMs: this.timeoutMs }, "Evaluator request timed out");
         throw new EvaluatorExecutionError(
           `Evaluator timed out after ${this.timeoutMs}ms`,
           { meta: { evaluatorType, url, timeoutMs: this.timeoutMs } },

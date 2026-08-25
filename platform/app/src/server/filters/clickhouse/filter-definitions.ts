@@ -52,10 +52,7 @@ function buildEvaluatorIdClickHouseFilter(
  * Each definition specifies how to query filter options from ClickHouse.
  * Set to null for filters with no ClickHouse options query.
  */
-export const clickHouseFilters: Record<
-  FilterField,
-  ClickHouseFilterDefinition | null
-> = {
+export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition | null> = {
   // Topics filters
   "topics.topics": {
     tableName: "trace_summaries",
@@ -416,9 +413,8 @@ export const clickHouseFilters: Record<
   // For now, we'll add scope via a subquery when scopeFilters are present
   "evaluations.evaluator_id": buildEvaluatorIdClickHouseFilter(""),
 
-  "evaluations.evaluator_id.guardrails_only": buildEvaluatorIdClickHouseFilter(
-    "AND IsGuardrail = 1",
-  ),
+  "evaluations.evaluator_id.guardrails_only":
+    buildEvaluatorIdClickHouseFilter("AND IsGuardrail = 1"),
 
   "evaluations.evaluator_id.has_passed": buildEvaluatorIdClickHouseFilter(
     "AND Passed IS NOT NULL",
@@ -529,10 +525,7 @@ export const clickHouseFilters: Record<
     // trigger can be configured before its first occurrence.
     extractResults: (rows) => {
       const observedCounts = new Map(
-        extractStandardResults(rows).map((option) => [
-          option.field,
-          option.count,
-        ]),
+        extractStandardResults(rows).map((option) => [option.field, option.count]),
       );
       return evaluationRunDataSchema.shape.status.options.map((status) => ({
         field: status,

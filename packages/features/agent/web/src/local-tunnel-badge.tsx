@@ -1,10 +1,7 @@
 import { Badge } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-export function agentHasDevTunnel(agent: {
-  type: string;
-  config?: unknown;
-}): boolean {
+export function agentHasDevTunnel(agent: { type: string; config?: unknown }): boolean {
   if (agent.type !== "http") return false;
   const config = agent.config;
   return Boolean(

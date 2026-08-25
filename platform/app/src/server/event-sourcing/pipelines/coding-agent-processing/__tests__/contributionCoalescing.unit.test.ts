@@ -137,9 +137,7 @@ describe("coding-agent contribution append coalescing", () => {
       // order; the fold's model-call chain cannot take that. The test below
       // this one is why.
       it("leaves the session key unsharded so one session stays one ordered lane", () => {
-        expect(
-          commandNamed("contributeLogFacts")?.options?.getGroupKey,
-        ).toBeUndefined();
+        expect(commandNamed("contributeLogFacts")?.options?.getGroupKey).toBeUndefined();
       });
     });
   });
@@ -194,14 +192,12 @@ describe("coding-agent contribution append coalescing", () => {
         await processCommandBatch(batchParamsFor({ payloads, storeEventsFn }));
 
         const [events] = storeEventsFn.mock.calls[0]!;
-        expect(
-          (events as Event[]).map((event) => event.idempotencyKey),
-        ).toEqual(
+        expect((events as Event[]).map((event) => event.idempotencyKey)).toEqual(
           payloads.map((payload) => `${TENANT_ID}:${payload.recordId}`),
         );
-        expect(
-          new Set((events as Event[]).map((event) => event.aggregateId)),
-        ).toEqual(new Set([SESSION_ID]));
+        expect(new Set((events as Event[]).map((event) => event.aggregateId))).toEqual(
+          new Set([SESSION_ID]),
+        );
       });
 
       /** @scenario 'an agent that reports only logs keeps its model-call sequence' */
@@ -217,9 +213,7 @@ describe("coding-agent contribution append coalescing", () => {
         ];
 
         const batched = vi.fn().mockResolvedValue(undefined);
-        await processCommandBatch(
-          batchParamsFor({ payloads, storeEventsFn: batched }),
-        );
+        await processCommandBatch(batchParamsFor({ payloads, storeEventsFn: batched }));
         const [batchedEvents] = batched.mock.calls[0]!;
 
         // The same payloads written one at a time, as the un-coalesced path did.
@@ -232,9 +226,7 @@ describe("coding-agent contribution append coalescing", () => {
           oneAtATime.push(...(single.mock.calls[0]![0] as Event[]));
         }
 
-        expect(foldInOrder(batchedEvents as Event[])).toEqual(
-          foldInOrder(oneAtATime),
-        );
+        expect(foldInOrder(batchedEvents as Event[])).toEqual(foldInOrder(oneAtATime));
       });
 
       /** @scenario 'an agent that reports only logs keeps its model-call sequence' */

@@ -9,13 +9,8 @@ export abstract class DepartmentRepository {
     id: string;
     organizationId: string;
   }): Promise<Department | null>;
-  abstract getAssignments(
-    organizationId: string,
-  ): Promise<DepartmentAssignments>;
-  abstract create(input: {
-    organizationId: string;
-    name: string;
-  }): Promise<Department>;
+  abstract getAssignments(organizationId: string): Promise<DepartmentAssignments>;
+  abstract create(input: { organizationId: string; name: string }): Promise<Department>;
   abstract resolveByNameOrCreate(input: {
     organizationId: string;
     name: string;
@@ -25,10 +20,7 @@ export abstract class DepartmentRepository {
     organizationId: string;
     name: string;
   }): Promise<boolean>;
-  abstract archive(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<boolean>;
+  abstract archive(input: { id: string; organizationId: string }): Promise<boolean>;
   abstract assignUser(input: {
     organizationId: string;
     userId: string;

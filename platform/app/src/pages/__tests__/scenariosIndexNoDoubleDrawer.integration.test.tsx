@@ -44,9 +44,7 @@ describe("Scenarios index page (regression #3194)", () => {
     it("still registers ScenarioFormDrawerFromUrl as the scenarioEditor drawer", async () => {
       const registry = await import("~/components/drawerRegistry");
       expect(registry.drawers).toHaveProperty("scenarioEditor");
-      expect(registry.drawers.scenarioEditor.name).toBe(
-        "ScenarioFormDrawerFromUrl",
-      );
+      expect(registry.drawers.scenarioEditor.name).toBe("ScenarioFormDrawerFromUrl");
     });
   });
 });

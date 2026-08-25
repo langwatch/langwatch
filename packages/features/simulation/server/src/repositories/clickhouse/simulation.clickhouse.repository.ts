@@ -42,8 +42,7 @@ export const RUN_ID_CAP = 10000;
  * become unreachable for the rest of the sweep while the count still includes
  * them. Coalescing here means there is one definition and no fallback in TS.
  */
-const EXPORT_SORT_KEY =
-  "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt))";
+const EXPORT_SORT_KEY = "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt))";
 
 /**
  * Every status a run carries while the batch still owes work.
@@ -373,9 +372,10 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return { minMs, maxMs };
   }
 
-  static buildStartedAtWindowClause(
-    window: SimulationWindowFragment | null,
-  ): { whereClause: string; params: Record<string, string> } {
+  static buildStartedAtWindowClause(window: SimulationWindowFragment | null): {
+    whereClause: string;
+    params: Record<string, string>;
+  } {
     if (!window) return { whereClause: "", params: {} };
     return {
       whereClause:
@@ -396,9 +396,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /** Guards against empty/missing tenantId before delegating to the injected resolver. */
-  private async getClient(
-    tenantId: string,
-  ): Promise<SimulationClickHouseClient> {
+  private async getClient(tenantId: string): Promise<SimulationClickHouseClient> {
     if (!tenantId) {
       throw new Error("tenantId is required for ClickHouse client resolution");
     }
@@ -658,20 +656,16 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
     const batches: SimulationBatchHistory["batches"] = pageRows.map((b) => {
       const lastUpdatedAt = Number(b.LastUpdatedAt);
-      if (lastUpdatedAt > globalLastUpdatedAt)
-        globalLastUpdatedAt = lastUpdatedAt;
+      if (lastUpdatedAt > globalLastUpdatedAt) globalLastUpdatedAt = lastUpdatedAt;
 
       const items = (itemsByBatch.get(b.BatchRunId) ?? []).map((r) => {
         const baseStatus = mapStatus(r.Status);
-        const durationMs =
-          r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
+        const durationMs = r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
         const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
         // Stored status is the only truth: unfinished runs collapse to
         // IN_PROGRESS; stalled runs arrive as stored ERROR via the
         // process-manager stall watchdog.
-        const resolvedStatus = hasFinished
-          ? baseStatus
-          : SimulationRunStatus.IN_PROGRESS;
+        const resolvedStatus = hasFinished ? baseStatus : SimulationRunStatus.IN_PROGRESS;
         return {
           scenarioRunId: r.ScenarioRunId,
           name: r.Name,
@@ -773,9 +767,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // --wait polls with just the batch id. An empty string is a real value
     // that selects the default set, so only an absent id drops the predicate.
     const scenarioSetIds =
-      scenarioSetId === undefined
-        ? undefined
-        : expandSetIdFilter(scenarioSetId);
+      scenarioSetId === undefined ? undefined : expandSetIdFilter(scenarioSetId);
     const setFilter = (alias: string) =>
       scenarioSetIds
         ? `AND ${alias}ScenarioSetId IN ({scenarioSetIds:Array(String)})`
@@ -807,10 +799,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     );
 
     const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row));
-    const lastUpdatedAt = runs.reduce(
-      (max, r) => Math.max(max, r.timestamp),
-      0,
-    );
+    const lastUpdatedAt = runs.reduce((max, r) => Math.max(max, r.timestamp), 0);
     return { changed: true, lastUpdatedAt, runs };
   }
 
@@ -1072,10 +1061,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
     const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
-    const lastUpdatedAt = runs.reduce(
-      (max, r) => Math.max(max, r.timestamp),
-      0,
-    );
+    const lastUpdatedAt = runs.reduce((max, r) => Math.max(max, r.timestamp), 0);
 
     return {
       changed: true,
@@ -1120,9 +1106,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          ${dateFilter.whereClause}`,
       {
         tenantId: projectId,
-        ...(scenarioSetId
-          ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) }
-          : {}),
+        ...(scenarioSetId ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) } : {}),
         ...dateFilter.params,
       },
     );
@@ -1304,9 +1288,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     );
 
     return new Set(
-      rows.map((r) =>
-        r.ScenarioSetId === "" ? DEFAULT_SET_ID : r.ScenarioSetId,
-      ),
+      rows.map((r) => (r.ScenarioSetId === "" ? DEFAULT_SET_ID : r.ScenarioSetId)),
     );
   }
 
@@ -1418,9 +1400,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       {
         tenantId: projectId,
         ...params,
-        ...(decoded
-          ? { cursorTs: decoded.ts, cursorRunId: decoded.scenarioRunId }
-          : {}),
+        ...(decoded ? { cursorTs: decoded.ts, cursorRunId: decoded.scenarioRunId } : {}),
         fetchLimit: String(validatedLimit + 1),
       },
     );
@@ -1437,8 +1417,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return {
       runs: pageRows.map((row) => ({
         ...mapClickHouseRowToScenarioRunData(row),
-        scenarioSetId:
-          row.ScenarioSetId === "" ? DEFAULT_SET_ID : row.ScenarioSetId,
+        scenarioSetId: row.ScenarioSetId === "" ? DEFAULT_SET_ID : row.ScenarioSetId,
         traceIds: row.TraceIds ?? [],
       })),
       nextCursor,
@@ -1514,8 +1493,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     }
 
     return {
-      stableClause:
-        stableParts.length > 0 ? `AND ${stableParts.join(" AND ")}` : "",
+      stableClause: stableParts.length > 0 ? `AND ${stableParts.join(" AND ")}` : "",
       dateClause,
       params,
     };
@@ -1529,9 +1507,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
    * shared pair so neither payload carries a field named for the other's key.
    */
   private encodeExportCursor(ts: string, scenarioRunId: string): string {
-    return Buffer.from(JSON.stringify({ ts, scenarioRunId })).toString(
-      "base64",
-    );
+    return Buffer.from(JSON.stringify({ ts, scenarioRunId })).toString("base64");
   }
 
   private decodeExportCursor(
@@ -1541,10 +1517,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       const parsed = JSON.parse(
         Buffer.from(cursor, "base64").toString("utf-8"),
       ) as Record<string, unknown>;
-      if (
-        typeof parsed.ts !== "string" ||
-        typeof parsed.scenarioRunId !== "string"
-      ) {
+      if (typeof parsed.ts !== "string" || typeof parsed.scenarioRunId !== "string") {
         return null;
       }
       return { ts: parsed.ts, scenarioRunId: parsed.scenarioRunId };
@@ -1562,10 +1535,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     try {
       const json = Buffer.from(cursor, "base64").toString("utf-8");
       const parsed = JSON.parse(json) as Record<string, unknown>;
-      if (
-        typeof parsed.ts !== "string" ||
-        typeof parsed.batchRunId !== "string"
-      ) {
+      if (typeof parsed.ts !== "string" || typeof parsed.batchRunId !== "string") {
         return null;
       }
       return { ts: parsed.ts, batchRunId: parsed.batchRunId };
@@ -1614,9 +1584,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       {
         tenantId: projectId,
         batchRunIds,
-        ...(scenarioSetId
-          ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) }
-          : {}),
+        ...(scenarioSetId ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) } : {}),
       },
     );
 

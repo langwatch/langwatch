@@ -132,9 +132,8 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
       },
     });
-    const { getTestClickHouseClient } = await import(
-      "~/server/event-sourcing/__tests__/integration/testContainers"
-    );
+    const { getTestClickHouseClient } =
+      await import("~/server/event-sourcing/__tests__/integration/testContainers");
     chRepo = new GatewayBudgetClickHouseRepository(async () => {
       const client = getTestClickHouseClient();
       if (!client) throw new Error("test ClickHouse client unavailable");
@@ -329,11 +328,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     );
     expect(Number.parseFloat(before[0]!.spentUsd)).toBeCloseTo(42, 3);
 
-    const ledgerBefore = await chRepo.recentEventsForBudget(
-      [PROJECT_ID],
-      manual.id,
-      10,
-    );
+    const ledgerBefore = await chRepo.recentEventsForBudget([PROJECT_ID], manual.id, 10);
     const reset = await service.reset({
       id: manual.id,
       organizationId: ORG_ID,
@@ -357,11 +352,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     );
     expect(Number.parseFloat(after[0]!.spentUsd)).toBe(0);
 
-    const ledgerAfter = await chRepo.recentEventsForBudget(
-      [PROJECT_ID],
-      manual.id,
-      10,
-    );
+    const ledgerAfter = await chRepo.recentEventsForBudget([PROJECT_ID], manual.id, 10);
     expect(ledgerAfter.length).toBe(ledgerBefore.length);
     expect(ledgerAfter.length).toBeGreaterThan(0);
   });
@@ -454,9 +445,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
       cycleAnchorAt: CYCLE_ANCHOR,
       actorUserId: USER_ID,
     });
-    expect(anchored.cycleAnchorAt?.toISOString()).toBe(
-      CYCLE_ANCHOR.toISOString(),
-    );
+    expect(anchored.cycleAnchorAt?.toISOString()).toBe(CYCLE_ANCHOR.toISOString());
     // Created mid-cycle, it reports the anchor's next boundary rather than
     // one month from the creation instant.
     expect(anchored.resetsAt.toISOString()).toBe(
@@ -467,13 +456,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
       }).toISOString(),
     );
 
-    const readAt = async ({
-      budget,
-      now,
-    }: {
-      budget: typeof anchored;
-      now: Date;
-    }) => {
+    const readAt = async ({ budget, now }: { budget: typeof anchored; now: Date }) => {
       const spends = await chRepo.getSpendForTargetsAcrossTenants(
         [PROJECT_ID],
         [
@@ -511,9 +494,10 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         occurredAt: spentAt,
       }),
     ]);
-    expect(
-      await readAt({ budget: anchored, now: anchored.createdAt }),
-    ).toBeCloseTo(42, 3);
+    expect(await readAt({ budget: anchored, now: anchored.createdAt })).toBeCloseTo(
+      42,
+      3,
+    );
 
     const reset = await service.reset({
       id: anchored.id,
@@ -547,9 +531,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         now: afterRollover,
       }).getTime(),
     );
-    expect(budgetPeriodFloorMs(reset, afterRollover)).toBe(
-      reset.resetsAt.getTime(),
-    );
+    expect(budgetPeriodFloorMs(reset, afterRollover)).toBe(reset.resetsAt.getTime());
   });
 
   it("floors an anchored per-seat template's bucket read at the anchored period start", async () => {
@@ -610,8 +592,6 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     // Only the debit inside the anchored period. The bucket floor is the
     // budget's own, since this seat has no boundary row of its own.
     expect(Number.parseFloat(spends[0]!.spentUsd)).toBeCloseTo(5, 3);
-    expect(bucketPeriodFloorMs(template, null, now)).toBe(
-      periodStart.getTime(),
-    );
+    expect(bucketPeriodFloorMs(template, null, now)).toBe(periodStart.getTime());
   });
 });

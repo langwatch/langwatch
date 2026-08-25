@@ -110,13 +110,8 @@ export function DeployPromptDialog({
 
     for (const tagDef of nonLatestTags) {
       const selectedVersionId = tagSelections[tagDef.name] ?? "";
-      const currentTag = tagDef.id
-        ? data.find((t) => t.tagId === tagDef.id)
-        : undefined;
-      if (
-        selectedVersionId &&
-        selectedVersionId !== (currentTag?.versionId ?? "")
-      ) {
+      const currentTag = tagDef.id ? data.find((t) => t.tagId === tagDef.id) : undefined;
+      if (selectedVersionId && selectedVersionId !== (currentTag?.versionId ?? "")) {
         mutations.push(
           assignTag.mutateAsync({
             projectId,
@@ -201,8 +196,7 @@ export function DeployPromptDialog({
       setIsAddingTag(false);
       setNewTagName("");
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Failed to create tag";
+      const message = error instanceof Error ? error.message : "Failed to create tag";
       if (message.toLowerCase().includes("already exists")) {
         setAddTagError(`${name} already exists`);
       } else {
@@ -233,11 +227,7 @@ export function DeployPromptDialog({
   const nonLatestTags = allTags.filter((t) => t.name !== "latest");
 
   return (
-    <DialogRoot
-      open={isOpen}
-      onOpenChange={(e) => !e.open && onClose()}
-      size="md"
-    >
+    <DialogRoot open={isOpen} onOpenChange={(e) => !e.open && onClose()} size="md">
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Deploy prompt</DialogTitle>
@@ -246,8 +236,8 @@ export function DeployPromptDialog({
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              Use tags to get specific prompt versions via the SDK and API.
-              Prompt versions with the production tag are returned by default.
+              Use tags to get specific prompt versions via the SDK and API. Prompt
+              versions with the production tag are returned by default.
             </Text>
 
             <HStack gap={2}>
@@ -294,11 +284,7 @@ export function DeployPromptDialog({
                     </Text>
                   </HStack>
                   <HStack gap={2}>
-                    <Text
-                      fontSize="sm"
-                      color="fg.muted"
-                      data-testid="latest-version"
-                    >
+                    <Text fontSize="sm" color="fg.muted" data-testid="latest-version">
                       {latestVersion ? `v${latestVersion.version}` : "--"}
                     </Text>
                     <Tooltip content="Automatically points to the latest version number.">
@@ -348,10 +334,7 @@ export function DeployPromptDialog({
                               : []
                           }
                           onValueChange={(details) => {
-                            setTagVersionId(
-                              tagDef.name,
-                              details.value[0] ?? "",
-                            );
+                            setTagVersionId(tagDef.name, details.value[0] ?? "");
                           }}
                           aria-label={`${tagDef.name.charAt(0).toUpperCase()}${tagDef.name.slice(1)} version`}
                         >
@@ -363,11 +346,7 @@ export function DeployPromptDialog({
                                   | undefined;
                                 if (!item) return "Select version";
                                 return (
-                                  <HStack
-                                    gap={1}
-                                    maxWidth="100%"
-                                    overflow="hidden"
-                                  >
+                                  <HStack gap={1} maxWidth="100%" overflow="hidden">
                                     <Text
                                       as="span"
                                       fontFamily="mono"
@@ -393,15 +372,8 @@ export function DeployPromptDialog({
                           <Select.Content>
                             {versionItems.map((v) => (
                               <Select.Item key={v.value} item={v}>
-                                <Tooltip
-                                  content={v.commitMessage}
-                                  openDelay={500}
-                                >
-                                  <HStack
-                                    gap={2}
-                                    maxWidth="100%"
-                                    overflow="hidden"
-                                  >
+                                <Tooltip content={v.commitMessage} openDelay={500}>
+                                  <HStack gap={2} maxWidth="100%" overflow="hidden">
                                     <Text
                                       as="span"
                                       fontFamily="mono"

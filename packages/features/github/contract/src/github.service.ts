@@ -29,9 +29,7 @@ export abstract class GithubService {
   ): GithubInstallStatePayload | null;
   abstract popupResponseHtml(login: string): string;
   abstract popupErrorHtml(message: string): string;
-  abstract tryParsePullRequestEvent(
-    payload: unknown,
-  ): GithubPullRequestEvent | null;
+  abstract tryParsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null;
   abstract getAllForOrganization(
     organizationId: string,
   ): Promise<readonly GithubInstallation[]>;

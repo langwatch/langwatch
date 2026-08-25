@@ -10,8 +10,8 @@ export function SlugConflictAlert({
 } & Alert.RootProps) {
   return (
     <SlugAlert {...props}>
-      A dataset named &quot;{conflictsWith}&quot; already uses this slug. Please
-      choose a different name.
+      A dataset named &quot;{conflictsWith}&quot; already uses this slug. Please choose a
+      different name.
     </SlugAlert>
   );
 }

@@ -23,13 +23,7 @@ export type LlmConfigVersionDTO = Omit<LatestConfigVersionSchema, "version">;
 
 export type CreateLlmConfigVersionParams = Omit<
   LlmPromptConfigVersion,
-  | "id"
-  | "author"
-  | "config"
-  | "createdAt"
-  | "configData"
-  | "name"
-  | "runtimeParameters"
+  "id" | "author" | "config" | "createdAt" | "configData" | "name" | "runtimeParameters"
 > & {
   configData: LatestConfigVersionSchema["configData"];
 };
@@ -90,9 +84,7 @@ export class LlmConfigVersionsRepository {
   }: {
     versionId: string;
     projectId: string;
-  }): Promise<
-    LlmPromptConfigVersion & { author: User | null; config: LlmPromptConfig }
-  > {
+  }): Promise<LlmPromptConfigVersion & { author: User | null; config: LlmPromptConfig }> {
     const version = await this.prisma.llmPromptConfigVersion.findFirst({
       where: {
         id: versionId,
@@ -190,12 +182,11 @@ export class LlmConfigVersionsRepository {
     const { versionData, organizationId } = params;
     // Verify the config exists
     const promptRepository = new LlmConfigRepository(this.prisma);
-    const config =
-      await promptRepository.tryGetConfigByIdOrHandleWithLatestVersion({
-        idOrHandle: versionData.configId,
-        projectId: versionData.projectId,
-        organizationId,
-      });
+    const config = await promptRepository.tryGetConfigByIdOrHandleWithLatestVersion({
+      idOrHandle: versionData.configId,
+      projectId: versionData.projectId,
+      organizationId,
+    });
 
     if (!config) {
       throw new TRPCError({

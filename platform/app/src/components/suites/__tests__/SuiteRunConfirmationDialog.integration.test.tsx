@@ -84,10 +84,9 @@ describe("<SuiteRunConfirmationDialog/>", () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
 
-      render(
-        <SuiteRunConfirmationDialog {...defaultProps} onClose={onClose} />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteRunConfirmationDialog {...defaultProps} onClose={onClose} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Cancel"));
       expect(onClose).toHaveBeenCalledOnce();
@@ -97,10 +96,9 @@ describe("<SuiteRunConfirmationDialog/>", () => {
       const user = userEvent.setup();
       const onConfirm = vi.fn();
 
-      render(
-        <SuiteRunConfirmationDialog {...defaultProps} onConfirm={onConfirm} />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteRunConfirmationDialog {...defaultProps} onConfirm={onConfirm} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Cancel"));
       expect(onConfirm).not.toHaveBeenCalled();
@@ -112,10 +110,9 @@ describe("<SuiteRunConfirmationDialog/>", () => {
       const user = userEvent.setup();
       const onConfirm = vi.fn();
 
-      render(
-        <SuiteRunConfirmationDialog {...defaultProps} onConfirm={onConfirm} />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteRunConfirmationDialog {...defaultProps} onConfirm={onConfirm} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Run 6 Jobs"));
       expect(onConfirm).toHaveBeenCalledOnce();
@@ -124,34 +121,30 @@ describe("<SuiteRunConfirmationDialog/>", () => {
 
   describe("when isLoading is true", () => {
     it("disables the Cancel button", () => {
-      render(
-        <SuiteRunConfirmationDialog {...defaultProps} isLoading={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteRunConfirmationDialog {...defaultProps} isLoading={true} />, {
+        wrapper: Wrapper,
+      });
 
       const cancelButton = screen.getByText("Cancel").closest("button");
       expect(cancelButton).toBeDisabled();
     });
 
     it("disables the Run button", () => {
-      render(
-        <SuiteRunConfirmationDialog {...defaultProps} isLoading={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteRunConfirmationDialog {...defaultProps} isLoading={true} />, {
+        wrapper: Wrapper,
+      });
 
       const buttons = screen.getAllByRole("button");
       const runButton = buttons.find(
-        (btn) =>
-          btn.textContent !== "Cancel" && !btn.getAttribute("aria-label"),
+        (btn) => btn.textContent !== "Cancel" && !btn.getAttribute("aria-label"),
       );
       expect(runButton).toBeDisabled();
     });
 
     it("shows a loading spinner instead of Run text", () => {
-      render(
-        <SuiteRunConfirmationDialog {...defaultProps} isLoading={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteRunConfirmationDialog {...defaultProps} isLoading={true} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.queryByText(/Run \d+ Jobs/)).not.toBeInTheDocument();
       expect(document.querySelector(".chakra-spinner")).toBeInTheDocument();

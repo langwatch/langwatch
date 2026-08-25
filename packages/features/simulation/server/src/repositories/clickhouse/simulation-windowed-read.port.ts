@@ -11,10 +11,7 @@ export type SimulationWindowFragment = {
   sqlFor(column: string): string;
 };
 
-export type SimulationWindowFallback =
-  | "unbounded"
-  | "none"
-  | { lookbackMs: number };
+export type SimulationWindowFallback = "unbounded" | "none" | { lookbackMs: number };
 
 export type SimulationWindowedReadInput<Result> = {
   table: string;
@@ -27,7 +24,5 @@ export type SimulationWindowedReadInput<Result> = {
 
 /** Application adapter for the shared query-window and telemetry policy. */
 export abstract class SimulationWindowedRead {
-  abstract query<Result>(
-    input: SimulationWindowedReadInput<Result>,
-  ): Promise<Result>;
+  abstract query<Result>(input: SimulationWindowedReadInput<Result>): Promise<Result>;
 }

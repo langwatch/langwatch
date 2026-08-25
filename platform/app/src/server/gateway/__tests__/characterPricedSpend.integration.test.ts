@@ -14,9 +14,7 @@
  *
  * Spec: specs/ai-gateway/audio-endpoints.feature
  */
-import {
-  type WriteGatewayDebitsPayload,
-} from "@langwatch/enterprise-governance-server";
+import { type WriteGatewayDebitsPayload } from "@langwatch/enterprise-governance-server";
 import { AppGatewayDebitAdapter } from "~/runtime/app/features/governance/gateway-debit.adapter";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -81,10 +79,7 @@ async function spentNanoUsd(): Promise<number> {
   const budget = await prisma.gatewayBudget.findUniqueOrThrow({
     where: { id: BUDGET_ID },
   });
-  const [spend] = await chRepo.getSpendForBudgetsAcrossTenants(
-    [PROJECT_ID],
-    [budget],
-  );
+  const [spend] = await chRepo.getSpendForBudgetsAcrossTenants([PROJECT_ID], [budget]);
   if (!spend) throw new Error("no spend row for the budget");
   return spend.spentNanoUsd;
 }

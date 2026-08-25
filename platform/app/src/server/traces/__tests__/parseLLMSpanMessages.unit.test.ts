@@ -211,14 +211,10 @@ describe("parseLLMSpanMessages()", () => {
   describe("when input has gen_ai.input.messages set and gen_ai.prompt also present", () => {
     it("prefers gen_ai.input.messages (the newer-SDK key)", () => {
       const attrs = {
-        "gen_ai.input.messages": JSON.stringify([
-          { role: "user", content: "newer" },
-        ]),
+        "gen_ai.input.messages": JSON.stringify([{ role: "user", content: "newer" }]),
         "gen_ai.prompt": JSON.stringify([{ role: "user", content: "older" }]),
       };
-      expect(parseLLMSpanMessages(attrs)).toEqual([
-        { role: "user", content: "newer" },
-      ]);
+      expect(parseLLMSpanMessages(attrs)).toEqual([{ role: "user", content: "newer" }]);
     });
   });
 });

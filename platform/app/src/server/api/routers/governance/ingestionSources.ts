@@ -29,9 +29,7 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
-const sourceTypeSchema = z.enum(
-  GOVERNANCE_INGESTION_SOURCE_TYPES,
-);
+const sourceTypeSchema = z.enum(GOVERNANCE_INGESTION_SOURCE_TYPES);
 
 const statusSchema = z.enum(["active", "disabled", "awaiting_first_event"]);
 
@@ -66,9 +64,7 @@ function toDto(row: {
 }) {
   const parser = (row.parserConfig as Record<string, unknown>) ?? {};
   const safeParser = Object.fromEntries(
-    Object.entries(parser).filter(
-      ([k]) => !k.startsWith("_") && k !== "credentials",
-    ),
+    Object.entries(parser).filter(([k]) => !k.startsWith("_") && k !== "credentials"),
   );
   return {
     id: row.id,
@@ -183,10 +179,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
       const service = ctx.app.governance.ingestionSources;
-      const rotated = await service.rotateSecret(
-        input.id,
-        input.organizationId,
-      );
+      const rotated = await service.rotateSecret(input.id, input.organizationId);
       return {
         source: toDto(rotated.source),
         ingestSecret: rotated.ingestSecret,

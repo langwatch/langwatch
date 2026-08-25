@@ -9,10 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { ManagementFlagError } from "../managementFlags";
-import {
-  composeInvitesFromFlags,
-  parseInvitesJson,
-} from "../managementInvites";
+import { composeInvitesFromFlags, parseInvitesJson } from "../managementInvites";
 
 describe("composeInvitesFromFlags", () => {
   describe("when one role covers the whole batch", () => {
@@ -122,9 +119,7 @@ describe("parseInvitesJson", () => {
   describe("when the document is a well formed batch", () => {
     it("accepts a bare array and the invites envelope the API answers with", () => {
       expect(parseInvitesJson(JSON.stringify(batch))).toEqual(batch);
-      expect(parseInvitesJson(JSON.stringify({ invites: batch }))).toEqual(
-        batch,
-      );
+      expect(parseInvitesJson(JSON.stringify({ invites: batch }))).toEqual(batch);
     });
   });
 
@@ -135,9 +130,9 @@ describe("parseInvitesJson", () => {
       expect(() => parseInvitesJson("[]")).toThrow(/empty/);
       expect(() => parseInvitesJson('[{"role":"MEMBER"}]')).toThrow(/no email/);
       expect(() => parseInvitesJson('[{"email":"a@b.c"}]')).toThrow(/no role/);
-      expect(() =>
-        parseInvitesJson('[{"email":"a@b.c","role":"MEMBER"}]'),
-      ).toThrow(/no teams/);
+      expect(() => parseInvitesJson('[{"email":"a@b.c","role":"MEMBER"}]')).toThrow(
+        /no teams/,
+      );
     });
   });
 
@@ -149,10 +144,7 @@ describe("parseInvitesJson", () => {
         role: "MEMBER",
         teams: [{ teamId: "team_1", role: "MEMBER" }],
       });
-      const document = JSON.stringify([
-        invite("a@example.com"),
-        invite("not-an-email"),
-      ]);
+      const document = JSON.stringify([invite("a@example.com"), invite("not-an-email")]);
 
       expect(() => parseInvitesJson(document)).toThrow(ManagementFlagError);
       expect(() => parseInvitesJson(document)).toThrow(

@@ -25,6 +25,7 @@ Instead of manually reading docs and writing boilerplate code, just ask your AI 
 Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create a **personal API key**. This key connects your coding assistant to your LangWatch account for observability, prompts, and analytics tools. Documentation tools work without a key.
 
 See the [API Keys guide](/platform/api-keys#creating-a-personal-api-key) for step-by-step instructions.
+
 </Step>
 
 <Step title="Configure your MCP">
@@ -38,7 +39,8 @@ See the [API Keys guide](/platform/api-keys#creating-a-personal-api-key) for ste
 
 The same steps work in Claude Cowork and in Claude chat on the web.
 
-*Requires a paid Claude plan.*
+_Requires a paid Claude plan._
+
 </Tab>
 
 <Tab title="Claude Code">
@@ -70,15 +72,14 @@ Under the `servers` object, add an entry named `langwatch` with these fields:
 - `command`: `npx`
 - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
 - `env.LANGWATCH_API_KEY`: your LangWatch API key
-</Tab>
+  </Tab>
 
 <Tab title="Cursor">
-1. Open Cursor Settings
-2. Navigate to the **Tools and MCP** section in the sidebar
-3. Add the LangWatch MCP server. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
-   - `command`: `npx`
-   - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
-   - `env.LANGWATCH_API_KEY`: your LangWatch API key
+  1. Open Cursor Settings 2. Navigate to the **Tools and MCP** section in the sidebar 3.
+  Add the LangWatch MCP server. Under the `mcpServers` object, add an entry named
+  `langwatch` with these fields: - `command`: `npx` - `args`: `-y`, then the package name
+  `@langwatch/mcp-server` on a separate token - `env.LANGWATCH_API_KEY`: your LangWatch
+  API key
 </Tab>
 
 <Tab title="ChatGPT">
@@ -87,7 +88,8 @@ Under the `servers` object, add an entry named `langwatch` with these fields:
 3. Enter the server URL: `https://app.langwatch.ai/sse`
 4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
-*Requires a Plus or Team plan.*
+_Requires a Plus or Team plan._
+
 </Tab>
 
 <Tab title="BoltAI, Other MCP Clients">
@@ -99,6 +101,7 @@ For any MCP client that supports remote servers with OAuth:
 4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
 The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically. Clients that speak the Streamable HTTP transport can point at `https://app.langwatch.ai/mcp` instead.
+
 </Tab>
 
 <Tab title="Other">
@@ -109,6 +112,7 @@ For other MCP-compatible editors, add an entry named `langwatch` under the `mcpS
 - `env.LANGWATCH_API_KEY`: your LangWatch API key
 
 Refer to your editor's MCP documentation for the specific configuration file location.
+
 </Tab>
 </Tabs>
 
@@ -121,9 +125,9 @@ Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shif
 
 ### Configuration
 
-| Environment Variable | CLI Argument | Description |
-|---------------------|-------------|-------------|
-| `LANGWATCH_API_KEY` | `--apiKey` | API key for authentication |
+| Environment Variable | CLI Argument | Description                                        |
+| -------------------- | ------------ | -------------------------------------------------- |
+| `LANGWATCH_API_KEY`  | `--apiKey`   | API key for authentication                         |
 | `LANGWATCH_ENDPOINT` | `--endpoint` | API endpoint (default: `https://app.langwatch.ai`) |
 
 ### Two Modes
@@ -151,9 +155,11 @@ Ask your AI assistant to write scenario tests for your agents:
 ```plaintext Edge cases
 "Write scenario tests for my customer support agent covering refund requests and policy questions"
 ```
+
 </CodeGroup>
 
 The AI assistant will:
+
 1. Fetch the Scenario documentation and best practices
 2. Create test files with proper imports and setup
 3. Write scenario scripts that simulate user interactions
@@ -221,9 +227,11 @@ Ask your AI assistant to add LangWatch tracking to your existing code:
 ```plaintext Framework-specific
 "Instrument this LangChain agent with LangWatch, including all tool calls"
 ```
+
 </CodeGroup>
 
 The AI assistant will:
+
 1. Fetch the relevant LangWatch documentation for your framework
 2. Add the necessary imports and setup code
 3. Wrap your functions with `@langwatch.trace()` decorators
@@ -233,6 +241,7 @@ The AI assistant will:
 **Example transformation:**
 
 Before:
+
 ```python
 from openai import OpenAI
 
@@ -247,6 +256,7 @@ def chat(message: str):
 ```
 
 After (automatically added by AI assistant):
+
 ```python
 from openai import OpenAI
 import langwatch
@@ -277,6 +287,7 @@ Ask your AI assistant to set up evaluation code for your LLM outputs:
 ```
 
 The AI assistant will:
+
 1. Fetch the relevant LangWatch evaluation documentation
 2. Create evaluation notebooks or scripts with proper setup
 3. Add evaluation metrics and criteria for your use case
@@ -298,6 +309,7 @@ Ask your AI assistant to find and analyze traces from your project:
 ```plaintext Analyze a conversation thread
 "Find all traces for thread thread_xyz and show me the full conversation flow"
 ```
+
 </CodeGroup>
 
 The AI assistant will use `search_traces` to find matching traces and `get_trace` to drill into individual ones. Traces are returned as AI-readable digests by default, showing the full span hierarchy with timing, inputs, outputs, and errors.
@@ -318,6 +330,7 @@ Ask about performance trends, costs, and usage patterns:
 ```plaintext Usage trends
 "How many traces have we had per day this week?"
 ```
+
 </CodeGroup>
 
 The assistant starts with `discover_schema` to understand available metrics and filters, then uses `get_analytics` to query timeseries data.
@@ -338,6 +351,7 @@ Ask your AI assistant to work with prompts:
 ```plaintext Update with versioning
 "Update the pdf-parser prompt to also handle images, and create a new version"
 ```
+
 </CodeGroup>
 
 The AI assistant will guide you through creating, versioning, and using prompts from LangWatch's [Prompt Management](/prompt-management/overview).
@@ -347,15 +361,15 @@ The AI assistant will guide you through creating, versioning, and using prompts 
 An AI agent can use the LangWatch MCP to instrument itself while it is being built, which lets it track and debug its own behavior.
 
 <Frame>
-<iframe
-  width="720"
-  height="460"
-  src="https://www.youtube.com/embed/ZPaG9H-N0uY"
-  title="AI Agent that vibe-codes itself - YouTube video player"
-  frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-  allowFullScreen
-></iframe>
+  <iframe
+    width="720"
+    height="460"
+    src="https://www.youtube.com/embed/ZPaG9H-N0uY"
+    title="AI Agent that vibe-codes itself - YouTube video player"
+    frameborder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowFullScreen
+  ></iframe>
 </Frame>
 
 ## MCP Tools Reference
@@ -364,45 +378,47 @@ The MCP server provides tools organized into categories. Your AI assistant autom
 
 ### Documentation and Support
 
-| Tool | Description |
-|------|-------------|
-| `fetch_langwatch_docs` | Fetch LangWatch integration docs |
-| `fetch_scenario_docs` | Fetch Scenario agent testing docs |
-| `report_issue` | Report anything that did not work to the LangWatch team (no API key needed, user permission required, secrets redacted locally). See the [reporting guide](/support#reporting-issues-from-coding-agents) |
+| Tool                   | Description                                                                                                                                                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fetch_langwatch_docs` | Fetch LangWatch integration docs                                                                                                                                                                         |
+| `fetch_scenario_docs`  | Fetch Scenario agent testing docs                                                                                                                                                                        |
+| `report_issue`         | Report anything that did not work to the LangWatch team (no API key needed, user permission required, secrets redacted locally). See the [reporting guide](/support#reporting-issues-from-coding-agents) |
 
 ### Observability (requires API key)
 
-| Tool | Description |
-|------|-------------|
-| `discover_schema` | Explore available filter fields, metrics, aggregation types, and group-by options |
-| `search_traces` | Search traces with filters, text query, and date range. Returns AI-readable digests by default |
-| `get_trace` | Get full trace details by ID with span hierarchy, evaluations, and metadata |
-| `get_analytics` | Query timeseries analytics (costs, latency, token usage, etc.) |
+| Tool              | Description                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------- |
+| `discover_schema` | Explore available filter fields, metrics, aggregation types, and group-by options              |
+| `search_traces`   | Search traces with filters, text query, and date range. Returns AI-readable digests by default |
+| `get_trace`       | Get full trace details by ID with span hierarchy, evaluations, and metadata                    |
+| `get_analytics`   | Query timeseries analytics (costs, latency, token usage, etc.)                                 |
 
 ### Prompts (requires API key)
 
-| Tool | Description |
-|------|-------------|
-| `list_prompts` | List all prompts in the project |
-| `get_prompt` | Get a prompt with messages, model config, and version history |
-| `create_prompt` | Create a new prompt with messages and model configuration |
-| `update_prompt` | Update a prompt or create a new version |
+| Tool            | Description                                                   |
+| --------------- | ------------------------------------------------------------- |
+| `list_prompts`  | List all prompts in the project                               |
+| `get_prompt`    | Get a prompt with messages, model config, and version history |
+| `create_prompt` | Create a new prompt with messages and model configuration     |
+| `update_prompt` | Update a prompt or create a new version                       |
 
 ### Organization Management (requires org-level API key)
 
-| Tool | Description |
-|------|-------------|
-| `platform_list_projects` | List all projects in the organization |
-| `platform_get_project` | Get project details by ID |
-| `platform_create_project` | Create a new project (returns a one-time service API key) |
-| `platform_update_project` | Update a project's name, language, framework, or PII settings |
-| `platform_archive_project` | Archive a project (soft-delete) |
-| `platform_list_api_keys` | List all API keys in the organization |
-| `platform_create_api_key` | Create a personal or service API key |
-| `platform_revoke_api_key` | Revoke an API key |
+| Tool                       | Description                                                   |
+| -------------------------- | ------------------------------------------------------------- |
+| `platform_list_projects`   | List all projects in the organization                         |
+| `platform_get_project`     | Get project details by ID                                     |
+| `platform_create_project`  | Create a new project (returns a one-time service API key)     |
+| `platform_update_project`  | Update a project's name, language, framework, or PII settings |
+| `platform_archive_project` | Archive a project (soft-delete)                               |
+| `platform_list_api_keys`   | List all API keys in the organization                         |
+| `platform_create_api_key`  | Create a personal or service API key                          |
+| `platform_revoke_api_key`  | Revoke an API key                                             |
 
 <Info>
-Organization management tools require an API key with org-level permissions. If the configured key lacks organization permissions, these tools will return a clear error message.
+  Organization management tools require an API key with org-level permissions. If the
+  configured key lacks organization permissions, these tools will return a clear error
+  message.
 </Info>
 
 ### Tool Details
@@ -412,6 +428,7 @@ Organization management tools require an API key with org-level permissions. If 
 Discover available filter fields, metrics, aggregation types, and group-by options for LangWatch queries. Call this before using `search_traces` or `get_analytics` to understand available options.
 
 **Parameters:**
+
 - `category` (required): One of `"filters"`, `"metrics"`, `"aggregations"`, `"groups"`, or `"all"`
 
 #### `search_traces`
@@ -419,6 +436,7 @@ Discover available filter fields, metrics, aggregation types, and group-by optio
 Search traces with filters, text query, and date range. Returns AI-readable trace digests by default.
 
 **Parameters:**
+
 - `query` (optional): Text search query
 - `startDate` (optional): Start date, ISO string or relative like `"24h"`, `"7d"`, `"30d"`. Default: 24h ago
 - `endDate` (optional): End date, ISO string or relative. Default: now
@@ -432,6 +450,7 @@ Search traces with filters, text query, and date range. Returns AI-readable trac
 Get full details of a single trace by ID. Returns AI-readable trace digest by default.
 
 **Parameters:**
+
 - `traceId` (required): The trace ID to retrieve
 - `format` (optional): `"digest"` (default, AI-readable) or `"json"` (full raw data)
 
@@ -440,6 +459,7 @@ Get full details of a single trace by ID. Returns AI-readable trace digest by de
 Query analytics timeseries from LangWatch. Metrics use `"category.name"` format (e.g., `"performance.completion_time"`).
 
 **Parameters:**
+
 - `metric` (required): Metric in `"category.name"` format (e.g., `"metadata.trace_id"`, `"performance.total_cost"`)
 - `aggregation` (optional): `avg`, `sum`, `min`, `max`, `median`, `p90`, `p95`, `p99`, `cardinality`, `terms`. Default: `avg`
 - `startDate` (optional): Start date, ISO string or relative. Default: 7 days ago
@@ -457,6 +477,7 @@ List all prompts configured in the LangWatch project. No parameters required.
 Get a specific prompt by ID or handle, including messages, model config, and version history.
 
 **Parameters:**
+
 - `idOrHandle` (required): Prompt ID or handle
 - `version` (optional): Specific version number (default: latest)
 
@@ -465,6 +486,7 @@ Get a specific prompt by ID or handle, including messages, model config, and ver
 Create a new prompt in the LangWatch project.
 
 **Parameters:**
+
 - `name` (required): Prompt name
 - `messages` (required): Array of `{role, content}` messages
 - `model` (required): Model name (e.g., `"gpt-4o"`, `"claude-sonnet-4-5-20250929"`)
@@ -477,6 +499,7 @@ Create a new prompt in the LangWatch project.
 Update an existing prompt or create a new version.
 
 **Parameters:**
+
 - `idOrHandle` (required): Prompt ID or handle to update
 - `messages` (optional): Updated messages array
 - `model` (optional): Updated model name
@@ -489,6 +512,7 @@ Update an existing prompt or create a new version.
 Fetches LangWatch documentation pages to understand how to implement features.
 
 **Parameters:**
+
 - `url` (optional): The full URL of a specific doc page. If not provided, fetches the docs index.
 
 #### `fetch_scenario_docs`
@@ -496,10 +520,12 @@ Fetches LangWatch documentation pages to understand how to implement features.
 Fetches Scenario documentation pages to understand how to write agent tests.
 
 **Parameters:**
+
 - `url` (optional): The full URL of a specific doc page. If not provided, fetches the docs index.
 
 <Info>
-Your AI assistant will automatically choose the right tools based on your request. You don't need to call these tools manually.
+  Your AI assistant will automatically choose the right tools based on your request. You
+  don't need to call these tools manually.
 </Info>
 
 <AgentReportNotice />

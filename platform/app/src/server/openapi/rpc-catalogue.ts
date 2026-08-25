@@ -47,9 +47,7 @@ const DISCOVER_SUFFIX = `/latest/${DISCOVER_NAME}`;
  * Reading the mount rather than a declared name is what keeps the index
  * derived: it cannot list a service whose catalogue does not answer.
  */
-function discoverMountOf(
-  app: Hono,
-): { name: string; discover: string } | undefined {
+function discoverMountOf(app: Hono): { name: string; discover: string } | undefined {
   const route = app.routes.find(
     (r) => r.method === "POST" && r.path.endsWith(DISCOVER_SUFFIX),
   );

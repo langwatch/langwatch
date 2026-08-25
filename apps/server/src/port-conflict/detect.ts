@@ -1,5 +1,11 @@
 import { execa } from "execa";
-import { allocatePorts, MAX_PORT_SLOT_ATTEMPTS, PORT_SLOT_INCREMENT, portsToCheck, type PortAllocation } from "../shared/ports.ts";
+import {
+  allocatePorts,
+  MAX_PORT_SLOT_ATTEMPTS,
+  PORT_SLOT_INCREMENT,
+  portsToCheck,
+  type PortAllocation,
+} from "../shared/ports.ts";
 
 export type PortConflict = {
   port: number;
@@ -17,8 +23,13 @@ export type ConflictReport = {
 
 async function pidHoldingPort(port: number): Promise<number | null> {
   try {
-    const { stdout } = await execa("lsof", ["-tiTCP:" + port, "-sTCP:LISTEN"], { reject: false });
-    const first = stdout.split("\n").map((s) => s.trim()).filter(Boolean)[0];
+    const { stdout } = await execa("lsof", ["-tiTCP:" + port, "-sTCP:LISTEN"], {
+      reject: false,
+    });
+    const first = stdout
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean)[0];
     if (!first) return null;
     const pid = Number.parseInt(first, 10);
     return Number.isFinite(pid) ? pid : null;
@@ -29,7 +40,9 @@ async function pidHoldingPort(port: number): Promise<number | null> {
 
 async function commandForPid(pid: number): Promise<string> {
   try {
-    const { stdout } = await execa("ps", ["-o", "command=", "-p", String(pid)], { reject: false });
+    const { stdout } = await execa("ps", ["-o", "command=", "-p", String(pid)], {
+      reject: false,
+    });
     return stdout.trim().slice(0, 100) || `pid ${pid}`;
   } catch {
     return `pid ${pid}`;
@@ -59,7 +72,9 @@ async function findFreeBase(start: number): Promise<number | null> {
     candidate += PORT_SLOT_INCREMENT;
     const allocCandidate = allocatePorts(candidate);
     const taken = await Promise.all(
-      portsToCheck(allocCandidate).map(async ({ port }) => (await pidHoldingPort(port)) != null)
+      portsToCheck(allocCandidate).map(
+        async ({ port }) => (await pidHoldingPort(port)) != null,
+      ),
     );
     if (!taken.some(Boolean)) return candidate;
   }
@@ -70,7 +85,9 @@ export async function killPidGroups(pids: number[]): Promise<void> {
   const groups = new Set<number>();
   for (const pid of pids) {
     try {
-      const { stdout } = await execa("ps", ["-o", "pgid=", "-p", String(pid)], { reject: false });
+      const { stdout } = await execa("ps", ["-o", "pgid=", "-p", String(pid)], {
+        reject: false,
+      });
       const pgid = Number.parseInt(stdout.trim(), 10);
       // 0 / 1 are bogus targets: `process.kill(-0, …)` is `process.kill(0, …)`
       // which signals THIS process group (us!), and `kill(-1, …)` signals

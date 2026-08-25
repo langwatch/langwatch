@@ -342,9 +342,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
       expect(Number(approved.stdout.trim())).toBeGreaterThan(0);
 
       expectPostgresError(
-        await postgres.asReader(
-          `SELECT count(*) FROM public."${postgres.baseTable}"`,
-        ),
+        await postgres.asReader(`SELECT count(*) FROM public."${postgres.baseTable}"`),
         POSTGRES_SQLSTATE.INSUFFICIENT_PRIVILEGE,
         "reading the base table behind the approved view",
       );
@@ -390,17 +388,13 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         `SELECT rolconnlimit FROM pg_roles WHERE rolname = '${postgres.readerRole}'`,
       );
       expect(limit.exitCode, limit.stderr).toBe(0);
-      expect(Number(limit.stdout.trim())).toBe(
-        LWQL_TEST_POSTGRES_CONNECTION_LIMIT,
-      );
+      expect(Number(limit.stdout.trim())).toBe(LWQL_TEST_POSTGRES_CONNECTION_LIMIT);
       // And the shipped one-deployment derivation clears one catalog's demand,
       // which is the property production depends on.
       expect(
         lwqlPostgresReaderConnectionLimit(),
         "the cap does not clear the pools the catalog's mapped tables hold open",
-      ).toBeGreaterThan(
-        POSTGRES_VIEWS.length * DEFAULT_POSTGRES_ENGINE_POOL_SIZE - 1,
-      );
+      ).toBeGreaterThan(POSTGRES_VIEWS.length * DEFAULT_POSTGRES_ENGINE_POOL_SIZE - 1);
 
       // The timeout is enforced, not merely configured.
       expectPostgresError(
@@ -479,10 +473,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
       );
       expect(rows).toHaveLength(1);
 
-      const statements = statementsLoggedSince(
-        before,
-        await postgres.readLog(),
-      );
+      const statements = statementsLoggedSince(before, await postgres.readLog());
       const scans = statements.filter((statement) =>
         statement.includes(postgres.approvedView),
       );
@@ -518,10 +509,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
           `WHERE TraceId = '${harness.tenantA.tenantId}-trace-1'`,
       );
 
-      const statements = statementsLoggedSince(
-        before,
-        await postgres.readLog(),
-      );
+      const statements = statementsLoggedSince(before, await postgres.readLog());
       const scans = statements.filter((statement) =>
         statement.includes(postgres.approvedView),
       );
@@ -540,15 +528,11 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     /** @scenario "The LangWatchQL view sends a tenant predicate PostgreSQL can use" */
     it("pushes the caller's tenant down to PostgreSQL when the LangWatchQL view is read", async () => {
       const before = await postgres.readLog();
-      await selectRows(
-        tenantA,
-        `SELECT count() FROM ${database}.${PG_MAPPED_VIEW}`,
-      );
+      await selectRows(tenantA, `SELECT count() FROM ${database}.${PG_MAPPED_VIEW}`);
 
-      const scans = statementsLoggedSince(
-        before,
-        await postgres.readLog(),
-      ).filter((statement) => statement.includes(postgres.approvedView));
+      const scans = statementsLoggedSince(before, await postgres.readLog()).filter(
+        (statement) => statement.includes(postgres.approvedView),
+      );
       expect(
         scans.length,
         "no statement against the approved view was logged — the measurement captured nothing",
@@ -582,14 +566,8 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         return postgres.rowsRead(postgres.baseTable);
       };
 
-      const withoutPredicate = await measure(
-        PG_MAPPED_TABLE,
-        harness.tenantA.keyHash,
-      );
-      const withPredicate = await measure(
-        PG_MAPPED_VIEW,
-        harness.tenantA.keyHash,
-      );
+      const withoutPredicate = await measure(PG_MAPPED_TABLE, harness.tenantA.keyHash);
+      const withPredicate = await measure(PG_MAPPED_VIEW, harness.tenantA.keyHash);
       const unknownKey = await measure(PG_MAPPED_VIEW, "not-a-real-key-hash");
 
       // Control: the unpredicated read must actually have cost something, or
@@ -634,15 +612,11 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         await postgres.resetStatistics();
         const before = await postgres.readLog();
 
-        const rows = await selectRows(
-          tenantA,
-          `SELECT * FROM ${database}.${probe}`,
-        );
+        const rows = await selectRows(tenantA, `SELECT * FROM ${database}.${probe}`);
 
-        const scans = statementsLoggedSince(
-          before,
-          await postgres.readLog(),
-        ).filter((statement) => statement.includes(postgres.approvedView));
+        const scans = statementsLoggedSince(before, await postgres.readLog()).filter(
+          (statement) => statement.includes(postgres.approvedView),
+        );
         await postgres.flushStatistics();
         const rowsReadOnPrimary = await postgres.rowsRead(postgres.baseTable);
 
@@ -650,9 +624,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         // really did read those rows: without both, "zero rows out" would prove
         // nothing about what the predicate can and cannot do.
         expect(
-          scans.some((scan) =>
-            scan.includes(`= '${harness.tenantB.tenantId}'`),
-          ),
+          scans.some((scan) => scan.includes(`= '${harness.tenantB.tenantId}'`)),
           `the foreign predicate never reached PostgreSQL:\n${scans.join("\n")}`,
         ).toBe(true);
         expect(

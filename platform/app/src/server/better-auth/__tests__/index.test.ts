@@ -57,9 +57,7 @@ describe("better-auth config", () => {
     it("does not register the BetterAuth admin plugin", async () => {
       const { auth } = await import("../index");
       const options = (auth as any).options;
-      const pluginIds = (options?.plugins ?? []).map(
-        (p: { id?: string }) => p?.id,
-      );
+      const pluginIds = (options?.plugins ?? []).map((p: { id?: string }) => p?.id);
       expect(pluginIds).not.toContain("admin");
       // Only genericOAuth (or empty) is acceptable — impersonation is handled
       // via the legacy Session.impersonating JSON column, not via the
@@ -101,9 +99,7 @@ describe("better-auth config", () => {
       // that enforces this — it must not be changed to `true`.
       const { auth } = await import("../index");
       const options = (auth as any).options;
-      expect(
-        options?.account?.accountLinking?.allowDifferentEmails,
-      ).toBeFalsy();
+      expect(options?.account?.accountLinking?.allowDifferentEmails).toBeFalsy();
     });
 
     /** @scenario Legacy bcrypt hashes still verify */
@@ -118,9 +114,7 @@ describe("better-auth config", () => {
         | undefined;
       expect(verifyFn).toBeDefined();
       const legacyHash = await hash("hunter2", 10);
-      expect(await verifyFn!({ password: "hunter2", hash: legacyHash })).toBe(
-        true,
-      );
+      expect(await verifyFn!({ password: "hunter2", hash: legacyHash })).toBe(true);
     });
 
     /** @scenario Wrong password is rejected */
@@ -131,9 +125,9 @@ describe("better-auth config", () => {
         | ((args: { password: string; hash: string }) => Promise<boolean>)
         | undefined;
       const legacyHash = await hash("hunter2", 10);
-      expect(
-        await verifyFn!({ password: "wrong-password", hash: legacyHash }),
-      ).toBe(false);
+      expect(await verifyFn!({ password: "wrong-password", hash: legacyHash })).toBe(
+        false,
+      );
     });
   });
 
@@ -144,9 +138,7 @@ describe("better-auth config", () => {
       // exercise auth0 mode without re-initializing the module under a
       // different NEXTAUTH_PROVIDER (which would need vi.resetModules()).
       const { isEmailPasswordEnabled } = await import("../index");
-      const { buildGenericOAuthConfigs } = await import(
-        "~/runtime/app/features/sso"
-      );
+      const { buildGenericOAuthConfigs } = await import("~/runtime/app/features/sso");
       const configuration = {
         provider: "auth0",
         baseUrl: "http://localhost:3000",
@@ -167,9 +159,7 @@ describe("better-auth config", () => {
         oidcIssuer: undefined,
       };
       const configs = buildGenericOAuthConfigs(configuration);
-      const providerIds = configs.map(
-        (c) => (c as { providerId?: string }).providerId,
-      );
+      const providerIds = configs.map((c) => (c as { providerId?: string }).providerId);
       expect(providerIds).toContain("auth0");
       // Lock the OAuth `redirect_uri` to the legacy NextAuth callback path.
       // Auth0 only has this path registered as an allowed callback; sending a
@@ -183,9 +173,9 @@ describe("better-auth config", () => {
         "http://localhost:3000/api/auth/callback/auth0",
       );
       // SSO-only enforcement on SaaS: no email/password bypass of the IdP.
-      expect(
-        isEmailPasswordEnabled({ NEXTAUTH_PROVIDER: "auth0", IS_SAAS: true }),
-      ).toBe(false);
+      expect(isEmailPasswordEnabled({ NEXTAUTH_PROVIDER: "auth0", IS_SAAS: true })).toBe(
+        false,
+      );
     });
 
     /** @scenario Self-hosted that never had a license hides SSO and offers email sign-in */
@@ -196,18 +186,16 @@ describe("better-auth config", () => {
       // unlicensed deployment can sign in, and a licensed one keeps password
       // reset reachable; the `before` hook is what refuses the email routes
       // when the gate allows.
-      expect(
-        isEmailPasswordEnabled({ NEXTAUTH_PROVIDER: "auth0", IS_SAAS: false }),
-      ).toBe(true);
+      expect(isEmailPasswordEnabled({ NEXTAUTH_PROVIDER: "auth0", IS_SAAS: false })).toBe(
+        true,
+      );
     });
   });
 
   describe("when NEXTAUTH_PROVIDER selects google", () => {
     /** @scenario Google mode */
     it("includes google in the socialProviders map", async () => {
-      const { buildSocialProviders } = await import(
-        "~/runtime/app/features/sso"
-      );
+      const { buildSocialProviders } = await import("~/runtime/app/features/sso");
       const socialProviders = buildSocialProviders({
         provider: "google",
         googleClientId: "google-client-id",
@@ -256,21 +244,9 @@ describe("better-auth config", () => {
     };
 
     it.each([
-      [
-        "google",
-        "google",
-        { googleClientId: "id", googleClientSecret: "secret" },
-      ],
-      [
-        "github",
-        "github",
-        { githubClientId: "id", githubClientSecret: "secret" },
-      ],
-      [
-        "gitlab",
-        "gitlab",
-        { gitlabClientId: "id", gitlabClientSecret: "secret" },
-      ],
+      ["google", "google", { googleClientId: "id", googleClientSecret: "secret" }],
+      ["github", "github", { githubClientId: "id", githubClientSecret: "secret" }],
+      ["gitlab", "gitlab", { gitlabClientId: "id", gitlabClientSecret: "secret" }],
       [
         "microsoft",
         "azure-ad",
@@ -280,24 +256,23 @@ describe("better-auth config", () => {
           azureAdTenantId: "tenant",
         },
       ],
-    ])("social provider %s never overwrites profile info on sign-in", async (_label, provider, creds) => {
-      const { buildSocialProviders } = await import(
-        "~/runtime/app/features/sso"
-      );
-      const providers = buildSocialProviders({
-        ...noSocialEnv,
-        provider,
-        ...creds,
-      } as Parameters<typeof buildSocialProviders>[0]);
-      const built = Object.values(providers);
-      expect(built).toHaveLength(1);
-      expect(overrideFlags(built[0])).toEqual([]);
-    });
+    ])(
+      "social provider %s never overwrites profile info on sign-in",
+      async (_label, provider, creds) => {
+        const { buildSocialProviders } = await import("~/runtime/app/features/sso");
+        const providers = buildSocialProviders({
+          ...noSocialEnv,
+          provider,
+          ...creds,
+        } as Parameters<typeof buildSocialProviders>[0]);
+        const built = Object.values(providers);
+        expect(built).toHaveLength(1);
+        expect(overrideFlags(built[0])).toEqual([]);
+      },
+    );
 
     it("generic-oauth (auth0/okta) never overwrites profile info on sign-in", async () => {
-      const { buildGenericOAuthConfigs } = await import(
-        "~/runtime/app/features/sso"
-      );
+      const { buildGenericOAuthConfigs } = await import("~/runtime/app/features/sso");
       const configs = buildGenericOAuthConfigs({
         provider: "auth0",
         baseUrl: "http://localhost:3000",

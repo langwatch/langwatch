@@ -73,8 +73,7 @@ export default function EditTraceCheck() {
     ? {
         ...check.data,
         checkType: check.data.checkType as CheckConfigFormData["checkType"],
-        preconditions: check.data
-          .preconditions as CheckConfigFormData["preconditions"],
+        preconditions: check.data.preconditions as CheckConfigFormData["preconditions"],
         settings: check.data.parameters as CheckConfigFormData["settings"],
         mappings: check.data.mappings as CheckConfigFormData["mappings"],
       }
@@ -128,11 +127,7 @@ export default function EditTraceCheck() {
                 </Button>
               </Menu.Trigger>
               <Menu.Content>
-                <Menu.Item
-                  value="delete"
-                  color="red.fg"
-                  onClick={handleDeleteCheck}
-                >
+                <Menu.Item value="delete" color="red.fg" onClick={handleDeleteCheck}>
                   Delete Check
                 </Menu.Item>
               </Menu.Content>

@@ -12,9 +12,7 @@ describe("graphTriggerActivityGroupKey", () => {
     it("routes them to the same lane", () => {
       const a = { tenantId: "project_x", aggregateId: "trace_1" } as never;
       const b = { tenantId: "project_x", aggregateId: "trace_2" } as never;
-      expect(graphTriggerActivityGroupKey(a)).toBe(
-        graphTriggerActivityGroupKey(b),
-      );
+      expect(graphTriggerActivityGroupKey(a)).toBe(graphTriggerActivityGroupKey(b));
     });
   });
 

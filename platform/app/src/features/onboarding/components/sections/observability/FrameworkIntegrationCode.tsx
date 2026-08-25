@@ -1,9 +1,6 @@
 import type React from "react";
 import { useCodegen } from "../../../regions/observability/codegen";
-import type {
-  FrameworkKey,
-  PlatformKey,
-} from "../../../regions/observability/types";
+import type { FrameworkKey, PlatformKey } from "../../../regions/observability/types";
 import { CodePreview } from "./CodePreview";
 
 export function FrameworkIntegrationCode({
@@ -18,11 +15,7 @@ export function FrameworkIntegrationCode({
   const codegenResult = useCodegen(platform, framework);
 
   if (!codegenResult) {
-    console.error(
-      "No snippets found for platform and framework",
-      platform,
-      framework,
-    );
+    console.error("No snippets found for platform and framework", platform, framework);
 
     return null;
   }

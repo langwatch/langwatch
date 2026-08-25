@@ -16,10 +16,7 @@ import { SpanAppendStore } from "../projections/spanStorage.store";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
 import { TraceSummaryStore } from "../projections/traceSummary.store";
-import {
-  RECORD_SPAN_COMMAND_TYPE,
-  SPAN_RECEIVED_EVENT_TYPE,
-} from "../schemas/constants";
+import { RECORD_SPAN_COMMAND_TYPE, SPAN_RECEIVED_EVENT_TYPE } from "../schemas/constants";
 import type { OtlpSpan } from "../schemas/otlp";
 
 class TestRecordSpanCommand extends RecordSpanCommand {
@@ -41,11 +38,7 @@ class TestRecordSpanCommand extends RecordSpanCommand {
   }
 }
 
-function buildSpan(
-  traceId: string,
-  spanId: string,
-  startTimeMs: number,
-): OtlpSpan {
+function buildSpan(traceId: string, spanId: string, startTimeMs: number): OtlpSpan {
   const response = JSON.stringify({ greeting: "Hallo" });
   const startTimeUnixNano = BigInt(startTimeMs) * 1_000_000n;
 

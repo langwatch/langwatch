@@ -16,18 +16,14 @@ export const departmentAssignableEntitySchema = z.object({
   name: z.string(),
   departmentId: z.string().nullable(),
 });
-export type DepartmentAssignableEntity = z.infer<
-  typeof departmentAssignableEntitySchema
->;
+export type DepartmentAssignableEntity = z.infer<typeof departmentAssignableEntitySchema>;
 
 export const departmentAssignmentsSchema = z.object({
   users: z.array(departmentAssignableEntitySchema),
   teams: z.array(departmentAssignableEntitySchema),
   projects: z.array(departmentAssignableEntitySchema),
 });
-export type DepartmentAssignments = z.infer<
-  typeof departmentAssignmentsSchema
->;
+export type DepartmentAssignments = z.infer<typeof departmentAssignmentsSchema>;
 
 export class DepartmentNotFoundError extends Error {
   readonly code = "department_not_found" as const;

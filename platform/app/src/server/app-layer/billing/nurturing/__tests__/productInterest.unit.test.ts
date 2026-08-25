@@ -46,21 +46,15 @@ describe("mapProductSelectionToIntegrationMethod()", () => {
     });
 
     it("maps 'via-platform' to 'platform'", () => {
-      expect(mapProductSelectionToIntegrationMethod("via-platform")).toBe(
-        "platform",
-      );
+      expect(mapProductSelectionToIntegrationMethod("via-platform")).toBe("platform");
     });
 
     it("maps 'via-claude-desktop' to 'mcp'", () => {
-      expect(mapProductSelectionToIntegrationMethod("via-claude-desktop")).toBe(
-        "mcp",
-      );
+      expect(mapProductSelectionToIntegrationMethod("via-claude-desktop")).toBe("mcp");
     });
 
     it("maps 'manually' to 'manual_sdk'", () => {
-      expect(mapProductSelectionToIntegrationMethod("manually")).toBe(
-        "manual_sdk",
-      );
+      expect(mapProductSelectionToIntegrationMethod("manually")).toBe("manual_sdk");
     });
   });
 
@@ -117,12 +111,8 @@ describe("fireIntegrationMethodNurturing()", () => {
   describe("when Customer.io API is unavailable", () => {
     /** @scenario 'Integration-method identify failure does not break onboarding navigation' */
     it("does not throw (fire-and-forget)", async () => {
-      const { captureException } = await import(
-        "~/utils/posthogErrorCapture"
-      );
-      mockNurturing.identifyUser.mockRejectedValueOnce(
-        new Error("CIO unavailable"),
-      );
+      const { captureException } = await import("~/utils/posthogErrorCapture");
+      mockNurturing.identifyUser.mockRejectedValueOnce(new Error("CIO unavailable"));
 
       expect(() =>
         fireIntegrationMethodNurturing({

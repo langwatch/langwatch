@@ -7,9 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProcessFleetSummary } from "~/server/app-layer/ops/manager-explorer.service";
 import { ProcessFleetCard } from "../ProcessFleetCard";
 
-function makeRow(
-  overrides: Partial<ProcessFleetSummary> = {},
-): ProcessFleetSummary {
+function makeRow(overrides: Partial<ProcessFleetSummary> = {}): ProcessFleetSummary {
   return {
     processName: "automations",
     pipelineName: "automations",
@@ -33,10 +31,7 @@ describe("ProcessFleetCard", () => {
       const onSelect = vi.fn();
       render(
         <ChakraProvider value={defaultSystem}>
-          <ProcessFleetCard
-            rows={[makeRow({ deadMessages: 7 })]}
-            onSelect={onSelect}
-          />
+          <ProcessFleetCard rows={[makeRow({ deadMessages: 7 })]} onSelect={onSelect} />
         </ChakraProvider>,
       );
       const row = screen.getByTestId("process-row-automations");

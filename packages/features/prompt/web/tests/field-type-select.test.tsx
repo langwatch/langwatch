@@ -14,9 +14,7 @@ const OPTIONS: FieldTypeOption[] = [
   { value: "bool", label: "Boolean" },
 ];
 
-const renderComponent = (
-  props: Partial<Parameters<typeof FieldTypeSelect>[0]> = {},
-) => {
+const renderComponent = (props: Partial<Parameters<typeof FieldTypeSelect>[0]> = {}) => {
   const defaultProps = {
     value: "str",
     options: OPTIONS,

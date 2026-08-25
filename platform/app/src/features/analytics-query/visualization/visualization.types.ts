@@ -25,9 +25,7 @@ export interface LangWatchQLDatasetColumn {
 export interface LangWatchQLVegaLiteChartProps {
   spec: unknown;
   datasets: Readonly<Record<string, LangWatchQLDataset>>;
-  columnsByDataset: Readonly<
-    Record<string, readonly LangWatchQLDatasetColumn[]>
-  >;
+  columnsByDataset: Readonly<Record<string, readonly LangWatchQLDatasetColumn[]>>;
   ariaLabel?: string;
 }
 
@@ -63,8 +61,7 @@ export const VEGA_VALIDATION_ERROR_CODES = [
   "empty-encoding",
 ] as const;
 
-export type VegaValidationErrorCode =
-  (typeof VEGA_VALIDATION_ERROR_CODES)[number];
+export type VegaValidationErrorCode = (typeof VEGA_VALIDATION_ERROR_CODES)[number];
 
 /**
  * Every LangWatchQL rule, by stable id. The catalogue in `vegaLitePolicy.ts` maps
@@ -134,8 +131,7 @@ export const VEGA_VALIDATION_WARNING_CODES = [
   "unrepresentable-value",
 ] as const;
 
-export type VegaValidationWarningCode =
-  (typeof VEGA_VALIDATION_WARNING_CODES)[number];
+export type VegaValidationWarningCode = (typeof VEGA_VALIDATION_WARNING_CODES)[number];
 
 export interface VegaValidationWarning {
   readonly code: VegaValidationWarningCode;

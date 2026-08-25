@@ -106,21 +106,14 @@ const useLeaderboardAnalysis = ({
   // so computing it in both places was a second visible pause.
   const variantMetrics = useVariantMetrics({ rows, variantIds });
 
-  const verdict = useMemo(
-    () => computeLeaderboardVerdict(leaderboard),
-    [leaderboard],
-  );
+  const verdict = useMemo(() => computeLeaderboardVerdict(leaderboard), [leaderboard]);
   const cheaperAlternative = useMemo(
     () => findCheaperTiedAlternative({ verdict, variantMetrics }),
     [verdict, variantMetrics],
   );
-  const sampleAdequacy = useMemo(
-    () => computeSampleAdequacy(leaderboard),
-    [leaderboard],
-  );
+  const sampleAdequacy = useMemo(() => computeSampleAdequacy(leaderboard), [leaderboard]);
   const verbosity = useMemo(
-    () =>
-      computeVerbosityProfile({ variantIds, rows, leaderId: verdict.leaderId }),
+    () => computeVerbosityProfile({ variantIds, rows, leaderId: verdict.leaderId }),
     [variantIds, rows, verdict.leaderId],
   );
   const judgeIndependence = useMemo(
@@ -200,12 +193,7 @@ function MatchupReasoning({
   );
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={3}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
       <Text fontWeight="semibold" fontSize="sm" marginBottom={2}>
         {variantNames[pair.winnerId] ?? pair.winnerId} vs{" "}
         {variantNames[pair.opponentId] ?? pair.opponentId}
@@ -233,39 +221,37 @@ function MatchupReasoning({
 
 const SHIP_HELP = (
   <>
-    Each verdict the judge gave is read as one matchup per pair of variants in
-    it. Each variant gets a score from those, weighted by how strong its
-    opponents were — so beating a good variant counts for more than beating a
-    weak one. The score is chess-rating style: 0 is average for this group, and
-    it is the GAP that means something, not the number. A 400-point gap is
-    roughly 10:1 odds; 0 is a coin flip. The shaded band behind each bar is
-    where that score could plausibly sit. Whether two variants actually differ
-    is judged on the gap between them rather than on those two bands: every
-    resample re-scores the whole field at once, so the scores move together and
-    the gap is pinned down better than either score is on its own. Two bands can
+    Each verdict the judge gave is read as one matchup per pair of variants in it. Each
+    variant gets a score from those, weighted by how strong its opponents were — so
+    beating a good variant counts for more than beating a weak one. The score is
+    chess-rating style: 0 is average for this group, and it is the GAP that means
+    something, not the number. A 400-point gap is roughly 10:1 odds; 0 is a coin flip. The
+    shaded band behind each bar is where that score could plausibly sit. Whether two
+    variants actually differ is judged on the gap between them rather than on those two
+    bands: every resample re-scores the whole field at once, so the scores move together
+    and the gap is pinned down better than either score is on its own. Two bands can
     overlap and the run still tell those variants apart.
   </>
 );
 
 const TRUST_HELP = (
   <>
-    Every check is reported either way, so a silent panel means the check passed
-    rather than that it was never run. Ticks are fine, amber is a real problem
-    worth acting on, and grey is a measurement for you to judge — like how much
-    longer the leading variant&apos;s answers were, which matters because judges
-    tend to favour longer answers whether or not they are better.
+    Every check is reported either way, so a silent panel means the check passed rather
+    than that it was never run. Ticks are fine, amber is a real problem worth acting on,
+    and grey is a measurement for you to judge — like how much longer the leading
+    variant&apos;s answers were, which matters because judges tend to favour longer
+    answers whether or not they are better.
   </>
 );
 
 const TRADEOFF_HELP = (
   <>
     Cost and latency are shown next to quality, never blended into it — a single
-    &quot;best overall&quot; number would hide the trade-off you are actually
-    making. All three are on one chart: two as position, the third as point
-    size. A variant that is no better on any of them is called out above, so you
-    do not have to find it yourself. The grid below counts how often each
-    variant beat each other one; click any cell to read the judge&apos;s own
-    words for those rows.
+    &quot;best overall&quot; number would hide the trade-off you are actually making. All
+    three are on one chart: two as position, the third as point size. A variant that is no
+    better on any of them is called out above, so you do not have to find it yourself. The
+    grid below counts how often each variant beat each other one; click any cell to read
+    the judge&apos;s own words for those rows.
   </>
 );
 
@@ -347,12 +333,7 @@ function LeaderboardNeedsResultsPage({ evaluatorId }: { evaluatorId: string }) {
   const { closeDrawer } = useDrawer();
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="lg"
-      onOpenChange={closeDrawer}
-    >
+    <Drawer.Root open={true} placement="end" size="lg" onOpenChange={closeDrawer}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
@@ -366,9 +347,8 @@ function LeaderboardNeedsResultsPage({ evaluatorId }: { evaluatorId: string }) {
             color="fg.muted"
             data-testid={`leaderboard-needs-results-page-${evaluatorId}`}
           >
-            This leaderboard is built from the run&apos;s results, which are not
-            carried in the link. Open the run and expand the leaderboard card to
-            see it.
+            This leaderboard is built from the run&apos;s results, which are not carried
+            in the link. Open the run and expand the leaderboard card to see it.
           </Text>
         </Drawer.Body>
       </Drawer.Content>
@@ -434,12 +414,7 @@ function LoadedComparisonLeaderboardDrawer({
   });
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="lg"
-      onOpenChange={closeDrawer}
-    >
+    <Drawer.Root open={true} placement="end" size="lg" onOpenChange={closeDrawer}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">

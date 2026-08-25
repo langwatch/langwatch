@@ -103,12 +103,8 @@ describe("resolveEmailProvider", () => {
     it("throws an error listing the supported gateways", () => {
       setEnv({ EMAIL_PROVIDER: "carrier-pigeon" });
 
-      expect(() => resolveEmailProvider()).toThrow(
-        EmailProviderConfigurationError,
-      );
-      expect(() => resolveEmailProvider()).toThrow(
-        /ses, sendgrid, smtp, resend/,
-      );
+      expect(() => resolveEmailProvider()).toThrow(EmailProviderConfigurationError);
+      expect(() => resolveEmailProvider()).toThrow(/ses, sendgrid, smtp, resend/);
     });
   });
 
@@ -128,9 +124,7 @@ describe("resolveEmailProvider", () => {
     it("does not silently fall back to another configured gateway", () => {
       setEnv({ EMAIL_PROVIDER: "resend", SENDGRID_API_KEY: "SG.test" });
 
-      expect(() => resolveEmailProvider()).toThrow(
-        EmailProviderConfigurationError,
-      );
+      expect(() => resolveEmailProvider()).toThrow(EmailProviderConfigurationError);
     });
   });
 });

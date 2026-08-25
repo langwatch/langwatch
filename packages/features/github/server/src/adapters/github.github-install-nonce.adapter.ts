@@ -9,12 +9,7 @@
  * be burned by the callback that lands after it.
  */
 export abstract class GithubNonceRedis {
-  abstract set(
-    key: string,
-    value: string,
-    mode: string,
-    ttl: number,
-  ): Promise<string>;
+  abstract set(key: string, value: string, mode: string, ttl: number): Promise<string>;
   abstract getdel?(key: string): Promise<string | null>;
   abstract eval?(
     script: string,

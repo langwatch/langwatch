@@ -1,13 +1,6 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { initConfig } from "../config.js";
 import { createMcpServer } from "../create-mcp-server.js";
 import { handleReportIssue } from "../tools/report-issue.js";

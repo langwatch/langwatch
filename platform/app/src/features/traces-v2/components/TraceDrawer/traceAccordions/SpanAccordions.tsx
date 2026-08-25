@@ -1,12 +1,4 @@
-import {
-  Box,
-  HStack,
-  Icon,
-  Skeleton,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HStack, Icon, Skeleton, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
 import {
@@ -81,8 +73,7 @@ export function SpanAccordions({
   const { changedFields, captured } = useSpanCorrection(span.spanId);
   const attributeEditing = useSpanAttributeEditing({
     spanId: span.spanId,
-    capturedParams:
-      (detail?.params as Record<string, unknown> | undefined) ?? {},
+    capturedParams: (detail?.params as Record<string, unknown> | undefined) ?? {},
     enabled: isEditing,
   });
   const resources = useTraceResources(traceId);
@@ -128,13 +119,11 @@ export function SpanAccordions({
     piiIncomplete ||
     (!!contentPrivacy &&
       Object.values(contentPrivacy).some(
-        (category) =>
-          category.state !== "visible" || category.visibleTo != null,
+        (category) => category.state !== "visible" || category.visibleTo != null,
       ));
   const hasResourceAttrs =
     !!spanResource && Object.keys(spanResource.resourceAttributes).length > 0;
-  const hasSpanAttrs =
-    !!detail?.params && Object.keys(detail.params).length > 0;
+  const hasSpanAttrs = !!detail?.params && Object.keys(detail.params).length > 0;
   const hasAttributes = hasSpanAttrs || hasResourceAttrs;
   const hasScope = !!spanScope?.name;
   // Prompt section only when there's actual prompt metadata. The no-prompt
@@ -384,9 +373,7 @@ export function SpanAccordions({
                         return (
                           <EventCard
                             key={`${log.timeUnixMs}-${i}`}
-                            name={
-                              summary ?? log.attributes["event.name"] ?? "log"
-                            }
+                            name={summary ?? log.attributes["event.name"] ?? "log"}
                             timestampMs={log.timeUnixMs}
                             anchorMs={span.startTimeMs}
                             attributes={attributes}
@@ -414,9 +401,8 @@ export function SpanAccordions({
             }
             if (id === "attributes") {
               const attrCount =
-                countFlatLeaves(
-                  detail?.params as Record<string, unknown> | undefined,
-                ) + countFlatLeaves(spanResource?.resourceAttributes);
+                countFlatLeaves(detail?.params as Record<string, unknown> | undefined) +
+                countFlatLeaves(spanResource?.resourceAttributes);
               return (
                 <Section
                   key="attributes"
@@ -434,17 +420,13 @@ export function SpanAccordions({
                   open={isOpen}
                 >
                   {!detailQuery.isLoading && detail?.costSuggestion && (
-                    <UnmappedCostSuggestion
-                      model={detail.costSuggestion.model}
-                    />
+                    <UnmappedCostSuggestion model={detail.costSuggestion.model} />
                   )}
                   {hasAttributes || isEditing ? (
                     <AttributeTable
                       attributes={attributeEditing.baselineParams}
                       resourceAttributes={
-                        hasResourceAttrs
-                          ? spanResource!.resourceAttributes
-                          : undefined
+                        hasResourceAttrs ? spanResource!.resourceAttributes : undefined
                       }
                       restrictedAttributes={detail?.restrictedAttributes}
                       title="Span Attributes"
@@ -452,9 +434,8 @@ export function SpanAccordions({
                       editing={attributeEditing.editing}
                       correctedFrom={
                         changedFields.includes("params")
-                          ? ((captured?.params as
-                              | Record<string, unknown>
-                              | undefined) ?? {})
+                          ? ((captured?.params as Record<string, unknown> | undefined) ??
+                            {})
                           : undefined
                       }
                       comments={attributeComments}
@@ -533,9 +514,7 @@ export function SpanAccordions({
                       )}
                     </VStack>
                   ) : (
-                    <EmptyHint>
-                      Error status with no exception details
-                    </EmptyHint>
+                    <EmptyHint>Error status with no exception details</EmptyHint>
                   )}
                 </Section>
               );

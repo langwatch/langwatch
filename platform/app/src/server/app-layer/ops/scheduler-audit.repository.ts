@@ -44,11 +44,7 @@ export class SchedulerAuditRepository implements SchedulerAuditSink {
    * answerable where it happened, rather than only in a log search somebody has
    * to know to run.
    */
-  async listRecent({
-    limit,
-  }: {
-    limit: number;
-  }): Promise<SchedulerAuditEntryView[]> {
+  async listRecent({ limit }: { limit: number }): Promise<SchedulerAuditEntryView[]> {
     const rows = await this.prisma.auditLog.findMany({
       where: { targetKind: "scheduled_job" },
       orderBy: { createdAt: "desc" },

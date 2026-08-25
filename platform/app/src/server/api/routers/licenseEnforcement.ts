@@ -22,11 +22,7 @@ export const licenseEnforcementRouter = createTRPCRouter({
     .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const service = createLicenseEnforcementService(ctx.prisma);
-      return service.checkLimit(
-        input.organizationId,
-        input.limitType,
-        ctx.session.user,
-      );
+      return service.checkLimit(input.organizationId, input.limitType, ctx.session.user);
     }),
 
   /**

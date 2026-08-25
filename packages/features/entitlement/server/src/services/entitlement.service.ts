@@ -43,10 +43,7 @@ export class EntitlementService
     const license = await this.tryResolvePaidPlan(this.options.license, input);
     if (license) return this.withSource(license, "license");
 
-    const subscription = await this.tryResolvePaidPlan(
-      this.options.subscription,
-      input,
-    );
+    const subscription = await this.tryResolvePaidPlan(this.options.subscription, input);
     if (subscription) return this.withSource(subscription, "subscription");
 
     const baseline = await this.resolveBaseline(input);
@@ -87,10 +84,7 @@ export class EntitlementService
     return plan;
   }
 
-  private applyAuthorization(
-    plan: Plan,
-    user: PlanProviderUser | undefined,
-  ): Plan {
+  private applyAuthorization(plan: Plan, user: PlanProviderUser | undefined): Plan {
     if (!this.options.authorization) return plan;
     const authorized = { ...plan };
     Object.assign(authorized, this.options.authorization.resolve(user));

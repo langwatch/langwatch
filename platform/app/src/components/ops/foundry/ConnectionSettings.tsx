@@ -71,23 +71,11 @@ export function ConnectionSettings({ compact = false }: { compact?: boolean }) {
             flexShrink={0}
           />
           <VStack align="start" gap={0} flex={1} minW={0}>
-            <Text
-              fontSize="xs"
-              color="fg.default"
-              truncate
-              w="full"
-              textAlign="left"
-            >
+            <Text fontSize="xs" color="fg.default" truncate w="full" textAlign="left">
               {selectedProject?.name ?? "Select a project"}
             </Text>
             {selectedProject && !compact && (
-              <Text
-                fontSize="10px"
-                color="fg.muted"
-                truncate
-                w="full"
-                textAlign="left"
-              >
+              <Text fontSize="10px" color="fg.muted" truncate w="full" textAlign="left">
                 {selectedProject.orgName}
               </Text>
             )}
@@ -200,13 +188,7 @@ function ProjectList({
               ) : (
                 <Box w={3} />
               )}
-              <Text
-                fontSize="xs"
-                color="fg.default"
-                flex={1}
-                textAlign="left"
-                truncate
-              >
+              <Text fontSize="xs" color="fg.default" flex={1} textAlign="left" truncate>
                 {project.name}
               </Text>
               <Text fontSize="10px" color="fg.muted" fontFamily="mono">

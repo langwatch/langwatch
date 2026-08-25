@@ -94,11 +94,7 @@ export const createHarness = () => {
 
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input.url;
+      typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
 
     if (url.includes("/api/experiment/init")) {
@@ -108,7 +104,7 @@ export const createHarness = () => {
           path: "/acme/experiments/comparison-test",
           id: "experiment-id",
         }),
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -126,7 +122,7 @@ export const createHarness = () => {
       loggedDatasetTargets.push(
         ((body.dataset ?? []) as { target_id?: string | null }[])
           .map((entry) => entry.target_id)
-          .filter((target): target is string => typeof target === "string")
+          .filter((target): target is string => typeof target === "string"),
       );
       return new Response(JSON.stringify({}), { status: 200 });
     }
@@ -194,7 +190,7 @@ export const runComparison = async (
   }: {
     outputs?: Record<string, unknown>;
     options?: Omit<Partial<ComparisonOptions>, "index">;
-  } = {}
+  } = {},
 ): Promise<{ verdict?: ComparisonVerdict; error?: unknown }> => {
   let verdict: ComparisonVerdict | undefined;
   let error: unknown;
@@ -202,8 +198,8 @@ export const runComparison = async (
   await experiment.run([{ question: "What is 2 + 2?" }], async ({ index }) => {
     await Promise.all(
       Object.entries(outputs).map(([target, output]) =>
-        experiment.withTarget(target, () => output)
-      )
+        experiment.withTarget(target, () => output),
+      ),
     );
 
     try {
@@ -220,5 +216,5 @@ export const comparisonEvaluations = (harness: {
   loggedEvaluations: LoggedEvaluation[];
 }): LoggedEvaluation[] =>
   harness.loggedEvaluations.filter(
-    (evaluation) => evaluation.evaluator === "langevals/select_best_compare"
+    (evaluation) => evaluation.evaluator === "langevals/select_best_compare",
   );

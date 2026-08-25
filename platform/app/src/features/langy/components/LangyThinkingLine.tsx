@@ -79,10 +79,7 @@ export function LangyThinkingLine({
   const [elapsedMs, setElapsedMs] = useState(0);
   useEffect(() => {
     const startedAt = Date.now();
-    const id = setInterval(
-      () => setElapsedMs(Date.now() - startedAt),
-      ELAPSED_TICK_MS,
-    );
+    const id = setInterval(() => setElapsedMs(Date.now() - startedAt), ELAPSED_TICK_MS);
     return () => clearInterval(id);
   }, []);
 
@@ -130,11 +127,7 @@ export function LangyThinkingLine({
       {/* A stuck turn keeps the slot but not the glow: the orb claims
           "alive", and by then that is the one thing we cannot claim. */}
       <StatusOrb active={line.tone !== "stuck"} />
-      <ThinkingLineText
-        text={text}
-        tone={line.tone}
-        reduceMotion={reduceMotion}
-      />
+      <ThinkingLineText text={text} tone={line.tone} reduceMotion={reduceMotion} />
     </HStack>
   );
 }
@@ -190,14 +183,10 @@ function ThinkingLineText({
           // The stuck line is a statement of fact, not ambient chrome: it drops
           // the gradient and reads as plain muted text.
           {...(tone === "stuck" ? { color: "fg.muted" } : { css: shimmerCss })}
-          initial={
-            reduceMotion ? false : { opacity: 0, filter: "blur(5px)", y: 5 }
-          }
+          initial={reduceMotion ? false : { opacity: 0, filter: "blur(5px)", y: 5 }}
           animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
           exit={
-            reduceMotion
-              ? { opacity: 0 }
-              : { opacity: 0, filter: "blur(5px)", y: -5 }
+            reduceMotion ? { opacity: 0 } : { opacity: 0, filter: "blur(5px)", y: -5 }
           }
           transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
         >

@@ -18,10 +18,7 @@ import type {
   BudgetSpendTarget,
   GatewayBudgetClickHouseRepository,
 } from "~/server/gateway/budget.clickhouse.repository";
-import {
-  budgetPeriodFloorMs,
-  currentPeriodStart,
-} from "~/server/gateway/budgetPeriod";
+import { budgetPeriodFloorMs, currentPeriodStart } from "~/server/gateway/budgetPeriod";
 
 const logger = createLogger("langwatch:governance:signals");
 
@@ -42,15 +39,11 @@ class AppGovernanceSignalDiagnostics extends GovernanceDiagnosticsPort {
 }
 
 class AppGovernanceSignalPort extends GovernanceSignalPort {
-  private constructor(
-    private readonly dependencies: AppGovernanceSignalsDependencies,
-  ) {
+  private constructor(private readonly dependencies: AppGovernanceSignalsDependencies) {
     super();
   }
 
-  static create(
-    dependencies: AppGovernanceSignalsDependencies,
-  ): AppGovernanceSignalPort {
+  static create(dependencies: AppGovernanceSignalsDependencies): AppGovernanceSignalPort {
     return new AppGovernanceSignalPort(dependencies);
   }
 
@@ -88,9 +81,7 @@ class AppGovernanceSignalPort extends GovernanceSignalPort {
       where: { id: { in: budgetIds }, archivedAt: null },
     });
     const budgetById = new Map(budgets.map((budget) => [budget.id, budget]));
-    const liveCandidates = candidates.filter(({ budgetId }) =>
-      budgetById.has(budgetId),
-    );
+    const liveCandidates = candidates.filter(({ budgetId }) => budgetById.has(budgetId));
     if (liveCandidates.length === 0) return [];
 
     const organizationIds = [
@@ -147,21 +138,16 @@ class AppGovernanceSignalPort extends GovernanceSignalPort {
         },
         spentUsd: spentByBudget.get(candidate.budgetId) ?? "0",
         periodStartedAtMs:
-          target.periodFloorMs ??
-          currentPeriodStart(budget.window, now).getTime(),
+          target.periodFloorMs ?? currentPeriodStart(budget.window, now).getTime(),
       };
     });
   }
 
-  async appendVirtualKeyLifecycle(
-    data: GovernanceVkLifecycleData,
-  ): Promise<void> {
+  async appendVirtualKeyLifecycle(data: GovernanceVkLifecycleData): Promise<void> {
     await this.commands()?.recordVkLifecycle?.send(data);
   }
 
-  async appendBudgetCrossing(
-    data: GovernanceBudgetCrossingData,
-  ): Promise<void> {
+  async appendBudgetCrossing(data: GovernanceBudgetCrossingData): Promise<void> {
     await this.commands()?.recordBudgetCrossing?.send(data);
   }
 
@@ -211,15 +197,11 @@ export class AppGovernanceSignalsService {
     );
   }
 
-  emitVirtualKeyLifecycle(
-    signal: GovernanceVirtualKeyLifecycleSignal,
-  ): Promise<void> {
+  emitVirtualKeyLifecycle(signal: GovernanceVirtualKeyLifecycleSignal): Promise<void> {
     return this.service.emitVirtualKeyLifecycle(signal);
   }
 
-  detectBudgetCrossings(
-    candidates: GatewayBudgetCrossingCandidate[],
-  ): Promise<void> {
+  detectBudgetCrossings(candidates: GatewayBudgetCrossingCandidate[]): Promise<void> {
     return this.service.detectBudgetCrossings(candidates);
   }
 }

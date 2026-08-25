@@ -10,26 +10,38 @@ keywords:
 
 Langy changes code in exactly one way: it opens a pull request. It pushes only to the branch it creates for that PR, never to your default or existing branches, and it never merges its own PR.
 
-<Info>**Also check:** [GitHub access](/langy/security/github-access) (the scopes and the boundary), [GitHub App setup](/self-hosting/langy/github-app) (registering the app when self-hosting), [Scenario tests and evals](/langy/scenario-tests-and-evals) (what runs in CI on the PR).</Info>
+<Info>
+  **Also check:** [GitHub access](/langy/security/github-access) (the scopes and the
+  boundary), [GitHub App setup](/self-hosting/langy/github-app) (registering the app when
+  self-hosting), [Scenario tests and evals](/langy/scenario-tests-and-evals) (what runs in
+  CI on the PR).
+</Info>
 
 ## How a Langy PR is made
 
 <Steps>
   <Step title="Langy drafts the change">
-    After it [reads your traces and writes a failing test](/langy/chat), Langy drafts a fix on a branch.
+    After it [reads your traces and writes a failing test](/langy/chat), Langy drafts a
+    fix on a branch.
   </Step>
   <Step title="It opens a bot-authored PR">
-    The GitHub App opens the pull request on the installed repo. The commits are authored by the bot; you are credited with a `Co-authored-by` trailer and a "Requested by @&lt;your-login&gt; via LangWatch" note on the PR.
+    The GitHub App opens the pull request on the installed repo. The commits are authored
+    by the bot; you are credited with a `Co-authored-by` trailer and a "Requested by
+    @&lt;your-login&gt; via LangWatch" note on the PR.
   </Step>
   <Step title="Your CI runs the tests it wrote">
-    The Scenario simulation tests Langy wrote run in your CI on the PR, so the PR carries its own proof.
+    The Scenario simulation tests Langy wrote run in your CI on the PR, so the PR carries
+    its own proof.
   </Step>
   <Step title="A human reviews and merges">
     You review the PR like any other. Langy never merges; a person does.
   </Step>
 </Steps>
 
-<Note>Langy contributes to your codebase exclusively through pull requests. Nothing touches your code without a human approving the merge.</Note>
+<Note>
+  Langy contributes to your codebase exclusively through pull requests. Nothing touches
+  your code without a human approving the merge.
+</Note>
 
 {/* TODO screenshot: a Langy-authored GitHub PR page showing the Co-authored-by / "Requested by @login" trailer and the in-chat card that produced it */}
 

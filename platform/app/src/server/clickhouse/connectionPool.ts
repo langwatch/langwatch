@@ -1,7 +1,4 @@
-import {
-  poolSizingFromEnv,
-  resolvePoolSize,
-} from "@langwatch/clickhouse-client";
+import { poolSizingFromEnv, resolvePoolSize } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:clickhouse:connection-pool");

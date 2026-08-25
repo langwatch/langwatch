@@ -4,10 +4,7 @@ import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import {
-  captureException,
-  getCurrentScope,
-} from "../../utils/posthogErrorCapture";
+import { captureException, getCurrentScope } from "../../utils/posthogErrorCapture";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
@@ -57,9 +54,7 @@ secured
       const credentials = extractCredentials((name) => c.req.header(name));
 
       if (!credentials) {
-        logger.warn(
-          "collector request is not authenticated, no auth token provided",
-        );
+        logger.warn("collector request is not authenticated, no auth token provided");
 
         return c.json(
           {
@@ -106,14 +101,9 @@ secured
       });
 
       if (!resolved) {
-        logger.warn(
-          "collector request is not authenticated, invalid auth token",
-        );
+        logger.warn("collector request is not authenticated, invalid auth token");
 
-        return c.json(
-          { error: "Unauthorized", message: "Invalid credentials" },
-          401,
-        );
+        return c.json({ error: "Unauthorized", message: "Invalid credentials" }, 401);
       }
 
       // Enforce API-key ceiling (legacy tokens bypass). `traces:create` gates write
@@ -129,8 +119,7 @@ secured
         logger.warn(
           {
             projectId: resolved.project.id,
-            apiKeyId:
-              resolved.type === "apiKey" ? resolved.apiKeyId : undefined,
+            apiKeyId: resolved.type === "apiKey" ? resolved.apiKeyId : undefined,
           },
           "collector request denied by API key ceiling",
         );
@@ -140,10 +129,7 @@ secured
 
       const project = resolved.project;
 
-      logger.info(
-        { projectId: project.id },
-        "collector request being processed",
-      );
+      logger.info({ projectId: project.id }, "collector request being processed");
 
       // The lookup is wrapped in try/catch on its own — on failure we log and
       // let the request through (same behaviour as before). The thrown limit
@@ -155,10 +141,7 @@ secured
           teamId: project.teamId,
         });
       } catch (error) {
-        logger.error(
-          { error, projectId: project.id },
-          "Error checking trace limit",
-        );
+        logger.error({ error, projectId: project.id }, "Error checking trace limit");
         captureException(new Error("Error checking trace limit"), {
           extra: { projectId: project.id, error },
         });
@@ -295,10 +278,7 @@ secured
         // the offending values, so it answers the sender and stays out of the
         // log; `validation` is the schema's own vocabulary and is what tells us
         // whether the rule, rather than the payload, is the thing that is wrong.
-        logger.warn(
-          { projectId: project.id, ...validation },
-          "invalid trace received",
-        );
+        logger.warn({ projectId: project.id, ...validation }, "invalid trace received");
 
         return c.json({ error: validationError.message }, 400);
       }
@@ -309,8 +289,7 @@ secured
         apiKeys.markUsed({ id: resolved.apiKeyId });
       }
 
-      const { trace_id: nullableTraceId, expected_output: expectedOutput } =
-        params;
+      const { trace_id: nullableTraceId, expected_output: expectedOutput } = params;
 
       if (body.spans && !Array.isArray(body.spans)) {
         // The type, not the value: whatever arrived in place of the array is
@@ -324,10 +303,7 @@ secured
           "invalid spans field, expecting array",
         );
 
-        return c.json(
-          { message: "Invalid 'spans' field, expecting array" },
-          400,
-        );
+        return c.json({ message: "Invalid 'spans' field, expecting array" }, 400);
       }
 
       if (body.spans?.length > 200) {
@@ -372,9 +348,9 @@ secured
       try {
         if (params.metadata) {
           reservedTraceMetadata = Object.fromEntries(
-            Object.entries(
-              reservedTraceMetadataSchema.parse(params.metadata),
-            ).filter(([_key, value]) => value !== null && value !== undefined),
+            Object.entries(reservedTraceMetadataSchema.parse(params.metadata)).filter(
+              ([_key, value]) => value !== null && value !== undefined,
+            ),
           );
           const remainingMetadata = Object.fromEntries(
             Object.entries(params.metadata).filter(
@@ -487,9 +463,7 @@ secured
       });
 
       const traceIds = Array.from(
-        new Set(
-          spans.filter((span) => span.trace_id).map((span) => span.trace_id),
-        ),
+        new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id)),
       );
       if (traceIds[0] && (traceIds.length > 1 || traceIds[0] != traceId)) {
         logger.error(
@@ -497,10 +471,7 @@ secured
           "trace ids are not the same",
         );
 
-        return c.json(
-          { message: "All spans must have the same trace id" },
-          400,
-        );
+        return c.json({ message: "All spans must have the same trace id" }, 400);
       }
 
       for (const [index, span] of spans.entries()) {
@@ -509,9 +480,7 @@ secured
           const validMetrics = spanMetricsSchema.safeParse(span.metrics);
           if (validMetrics.success) {
             const extrataneousMetrics = Object.fromEntries(
-              Object.entries(span.metrics).filter(
-                ([key]) => !(key in validMetrics.data),
-              ),
+              Object.entries(span.metrics).filter(([key]) => !(key in validMetrics.data)),
             );
             span.params = {
               ...span.params,
@@ -574,10 +543,7 @@ secured
       const freshSpans: Span[] = [];
       let droppedOldSpans = 0;
       for (const span of spans) {
-        if (
-          span.timestamps.started_at &&
-          span.timestamps.started_at < startedAtCutoff
-        ) {
+        if (span.timestamps.started_at && span.timestamps.started_at < startedAtCutoff) {
           droppedOldSpans++;
           continue;
         }
@@ -629,9 +595,7 @@ secured
         const failureErrors = results
           .map((r) => {
             if (r.status === "rejected") {
-              return r.reason instanceof Error
-                ? r.reason.message
-                : String(r.reason);
+              return r.reason instanceof Error ? r.reason.message : String(r.reason);
             }
             return r.value.status === "failed"
               ? (r.value.error ?? "span ingestion failed")
@@ -656,9 +620,7 @@ secured
         // Catch synchronous errors (e.g., from buildResource)
         dispatchFailures = freshSpans.length;
         rejectedSpans += freshSpans.length;
-        rejectionErrors.push(
-          error instanceof Error ? error.message : String(error),
-        );
+        rejectionErrors.push(error instanceof Error ? error.message : String(error));
         logger.error(
           { error, projectId: project.id, traceId },
           "Error initializing event sourcing dispatch",
@@ -701,11 +663,9 @@ secured
               .createHash("md5")
               .update(JSON.stringify({ traceId, evaluation }))
               .digest("hex");
-            const evaluationId =
-              evaluation.evaluation_id ?? `eval_md5_${evaluationMD5}`;
+            const evaluationId = evaluation.evaluation_id ?? `eval_md5_${evaluationMD5}`;
             const evaluatorId =
-              evaluation.evaluator_id ??
-              evaluationNameAutoslug(evaluation.name);
+              evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name);
             const status =
               evaluation.status ?? (evaluation.error ? "error" : "processed");
             // A verdict is only real when the evaluator ran to completion —
@@ -733,9 +693,7 @@ secured
             });
           } catch (error) {
             rejectedEvaluations++;
-            evaluationErrors.push(
-              error instanceof Error ? error.message : String(error),
-            );
+            evaluationErrors.push(error instanceof Error ? error.message : String(error));
             logger.error(
               {
                 error,

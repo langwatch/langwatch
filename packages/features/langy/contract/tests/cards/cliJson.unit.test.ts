@@ -4,9 +4,10 @@ import { parseCliJson } from "../../src/cards/cliJson.js";
 describe("parseCliJson", () => {
   describe("given stdout that is exactly the JSON document", () => {
     it("parses the object", () => {
-      expect(parseCliJson('{"traces":[],"pagination":{"totalHits":0}}')).toEqual(
-        { traces: [], pagination: { totalHits: 0 } },
-      );
+      expect(parseCliJson('{"traces":[],"pagination":{"totalHits":0}}')).toEqual({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
     });
 
     it("parses a top-level array", () => {
@@ -43,15 +44,13 @@ describe("parseCliJson", () => {
     });
 
     it("skips a brace that opens no valid document", () => {
-      expect(parseCliJson("hint: use {curly} braces\n{\"ok\":true}")).toEqual({
+      expect(parseCliJson('hint: use {curly} braces\n{"ok":true}')).toEqual({
         ok: true,
       });
     });
 
     it("lifts an array out of the noise", () => {
-      expect(parseCliJson('✔ Listed\n[{"id":"ds_1"}]\n')).toEqual([
-        { id: "ds_1" },
-      ]);
+      expect(parseCliJson('✔ Listed\n[{"id":"ds_1"}]\n')).toEqual([{ id: "ds_1" }]);
     });
 
     it("lifts the document under a log line that opens a bracket it never closes", () => {
@@ -103,11 +102,7 @@ describe("parseCliJson", () => {
     });
 
     it("still reads an array of literals as the document", () => {
-      expect(parseCliJson("✔ Done\n[true, false, null]\n")).toEqual([
-        true,
-        false,
-        null,
-      ]);
+      expect(parseCliJson("✔ Done\n[true, false, null]\n")).toEqual([true, false, null]);
     });
 
     it("lifts a document a spinner frame left on the same line", () => {
@@ -237,10 +232,39 @@ describe("parseCliJson", () => {
     // the grammar here, ask the parser that owns it.
     it("agrees with JSON.parse about what counts as a scalar", () => {
       const scalars = [
-        "0", "-0", "1", "42", "-42", "0.5", "-0.5", "1e3", "1E3", "1e+3",
-        "1e-3", "-2e10", "0.0", "123456789012345678901234567890",
-        "01", "-01", "007", "00", "1.", ".5", "-", "+1", "1e", "1e+", "0x1f",
-        "1_000", "Infinity", "NaN", "true", "false", "null", "tru", "nul",
+        "0",
+        "-0",
+        "1",
+        "42",
+        "-42",
+        "0.5",
+        "-0.5",
+        "1e3",
+        "1E3",
+        "1e+3",
+        "1e-3",
+        "-2e10",
+        "0.0",
+        "123456789012345678901234567890",
+        "01",
+        "-01",
+        "007",
+        "00",
+        "1.",
+        ".5",
+        "-",
+        "+1",
+        "1e",
+        "1e+",
+        "0x1f",
+        "1_000",
+        "Infinity",
+        "NaN",
+        "true",
+        "false",
+        "null",
+        "tru",
+        "nul",
       ];
 
       for (const scalar of scalars) {

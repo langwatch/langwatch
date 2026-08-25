@@ -15,10 +15,7 @@ export const platformToolPolicySchema = z
   .strict();
 export type PlatformToolSlug = z.infer<typeof platformToolSlugSchema>;
 export type PlatformToolPolicy = z.infer<typeof platformToolPolicySchema>;
-export type PlatformToolPolicyMap = Record<
-  PlatformToolSlug,
-  PlatformToolPolicy
->;
+export type PlatformToolPolicyMap = Record<PlatformToolSlug, PlatformToolPolicy>;
 
 export const PLATFORM_TOOL_POLICY_DEFAULTS: PlatformToolPolicyMap = {
   claude: { allowVk: true, allowOtelDirect: true },

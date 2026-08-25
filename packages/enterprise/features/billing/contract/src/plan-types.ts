@@ -88,10 +88,7 @@ export function compareBySubscriptionOrder(
   b: { id: string; createdAt: Date },
 ): number {
   for (const clause of ACTIVE_SUBSCRIPTION_ORDER_BY) {
-    const [field, direction] = Object.entries(clause)[0] as [
-      "createdAt" | "id",
-      "desc",
-    ];
+    const [field, direction] = Object.entries(clause)[0] as ["createdAt" | "id", "desc"];
     const left = a[field];
     const right = b[field];
     const ascending = left < right ? -1 : left > right ? 1 : 0;

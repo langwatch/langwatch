@@ -49,14 +49,10 @@ function buildSpanAttributes(span: Span): OtlpKeyValue[] {
   attrs.push(stringAttr(ATTR_KEYS.SPAN_TYPE, span.type));
 
   if (span.input) {
-    attrs.push(
-      stringAttr(ATTR_KEYS.LANGWATCH_INPUT, JSON.stringify(span.input)),
-    );
+    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_INPUT, JSON.stringify(span.input)));
   }
   if (span.output) {
-    attrs.push(
-      stringAttr(ATTR_KEYS.LANGWATCH_OUTPUT, JSON.stringify(span.output)),
-    );
+    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_OUTPUT, JSON.stringify(span.output)));
   }
 
   if ("model" in span && span.model) {
@@ -68,28 +64,19 @@ function buildSpanAttributes(span: Span): OtlpKeyValue[] {
 
   if ("contexts" in span && span.contexts) {
     attrs.push(
-      stringAttr(
-        ATTR_KEYS.LANGWATCH_RAG_CONTEXTS,
-        JSON.stringify(span.contexts),
-      ),
+      stringAttr(ATTR_KEYS.LANGWATCH_RAG_CONTEXTS, JSON.stringify(span.contexts)),
     );
   }
 
   if (span.metrics) {
     if (span.metrics.prompt_tokens != null) {
       attrs.push(
-        doubleAttr(
-          ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
-          span.metrics.prompt_tokens,
-        ),
+        doubleAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, span.metrics.prompt_tokens),
       );
     }
     if (span.metrics.completion_tokens != null) {
       attrs.push(
-        doubleAttr(
-          ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
-          span.metrics.completion_tokens,
-        ),
+        doubleAttr(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, span.metrics.completion_tokens),
       );
     }
     if (span.metrics.reasoning_tokens != null) {
@@ -118,10 +105,7 @@ function buildSpanAttributes(span: Span): OtlpKeyValue[] {
     }
     if (span.metrics.tokens_estimated != null) {
       attrs.push(
-        boolAttr(
-          ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED,
-          span.metrics.tokens_estimated,
-        ),
+        boolAttr(ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED, span.metrics.tokens_estimated),
       );
     }
     if (span.metrics.cost != null) {
@@ -130,9 +114,7 @@ function buildSpanAttributes(span: Span): OtlpKeyValue[] {
   }
 
   if (span.params) {
-    attrs.push(
-      stringAttr(ATTR_KEYS.LANGWATCH_PARAMS, JSON.stringify(span.params)),
-    );
+    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_PARAMS, JSON.stringify(span.params)));
   }
 
   if (span.error) {
@@ -156,23 +138,15 @@ function buildResource({
 
   if (reservedTraceMetadata.thread_id) {
     attrs.push(
-      stringAttr(
-        ATTR_KEYS.LANGWATCH_THREAD_ID,
-        reservedTraceMetadata.thread_id,
-      ),
+      stringAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, reservedTraceMetadata.thread_id),
     );
   }
   if (reservedTraceMetadata.user_id) {
-    attrs.push(
-      stringAttr(ATTR_KEYS.LANGWATCH_USER_ID, reservedTraceMetadata.user_id),
-    );
+    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_USER_ID, reservedTraceMetadata.user_id));
   }
   if (reservedTraceMetadata.customer_id) {
     attrs.push(
-      stringAttr(
-        ATTR_KEYS.LANGWATCH_CUSTOMER_ID,
-        reservedTraceMetadata.customer_id,
-      ),
+      stringAttr(ATTR_KEYS.LANGWATCH_CUSTOMER_ID, reservedTraceMetadata.customer_id),
     );
   }
   if (reservedTraceMetadata.labels && reservedTraceMetadata.labels.length > 0) {
@@ -184,14 +158,10 @@ function buildResource({
     );
   }
   if (reservedTraceMetadata.sdk_version) {
-    attrs.push(
-      stringAttr("langwatch.sdk.version", reservedTraceMetadata.sdk_version),
-    );
+    attrs.push(stringAttr("langwatch.sdk.version", reservedTraceMetadata.sdk_version));
   }
   if (reservedTraceMetadata.sdk_language) {
-    attrs.push(
-      stringAttr("langwatch.sdk.language", reservedTraceMetadata.sdk_language),
-    );
+    attrs.push(stringAttr("langwatch.sdk.language", reservedTraceMetadata.sdk_language));
   }
 
   for (const [key, value] of Object.entries(customMetadata)) {

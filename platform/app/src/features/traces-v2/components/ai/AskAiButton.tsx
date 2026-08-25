@@ -192,14 +192,9 @@ interface ProviderPrimerPopoverProps {
  * teach the user *why* they need a provider and link them straight to
  * the settings page so they can finish setup in one click.
  */
-const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({
-  trigger,
-}) => {
+const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({ trigger }) => {
   const [open, setOpen] = useState(false);
-  const handleOpenChange = useCallback(
-    (e: { open: boolean }) => setOpen(e.open),
-    [],
-  );
+  const handleOpenChange = useCallback((e: { open: boolean }) => setOpen(e.open), []);
 
   return (
     <PopoverRoot
@@ -230,15 +225,12 @@ const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({
               </Text>
             </HStack>
             <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-              Ask AI uses your own model provider keys to translate plain
-              English into trace queries — &ldquo;errors yesterday from
-              service-x&rdquo;, &ldquo;slow checkout traces with eval scores
-              under 0.5&rdquo;. Add a provider to unlock it.
+              Ask AI uses your own model provider keys to translate plain English into
+              trace queries — &ldquo;errors yesterday from service-x&rdquo;, &ldquo;slow
+              checkout traces with eval scores under 0.5&rdquo;. Add a provider to unlock
+              it.
             </Text>
-            <NextLink
-              href="/settings/model-providers"
-              style={{ display: "block" }}
-            >
+            <NextLink href="/settings/model-providers" style={{ display: "block" }}>
               <Button
                 size="xs"
                 width="full"

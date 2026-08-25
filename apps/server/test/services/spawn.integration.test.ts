@@ -82,7 +82,10 @@ describe("supervise", () => {
         spec: {
           name: "redis",
           command: "node",
-          args: ["-e", "process.on('SIGTERM', () => process.exit(0)); setInterval(() => {}, 1000);"],
+          args: [
+            "-e",
+            "process.on('SIGTERM', () => process.exit(0)); setInterval(() => {}, 1000);",
+          ],
           env: process.env,
         },
         paths: sp,

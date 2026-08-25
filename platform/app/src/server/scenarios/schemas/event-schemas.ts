@@ -5,11 +5,7 @@
 import { EventType } from "@ag-ui/core";
 import { z } from "zod/v4";
 import { chatMessageSchema } from "~/server/tracer/types";
-import {
-  ScenarioEventType,
-  ScenarioRunStatus,
-  Verdict,
-} from "../scenario-event.enums";
+import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-event.enums";
 
 /**
  * AG-UI Base Event Schema
@@ -211,11 +207,7 @@ export const scenarioMessageSnapshotSchema = baseScenarioEventSchema.extend({
   type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
   messages: z.array(
     z.intersection(
-      z.union([
-        agUiMessageSchema,
-        chatMessageSchema,
-        scenarioAudioMessageSchema,
-      ]),
+      z.union([agUiMessageSchema, chatMessageSchema, scenarioAudioMessageSchema]),
       z.object({
         id: z.string().optional(),
         trace_id: z.string().optional(),

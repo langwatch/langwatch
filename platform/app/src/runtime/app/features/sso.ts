@@ -16,9 +16,7 @@ import { createLogger } from "@langwatch/observability";
 import { getLicenseHandler } from "~/runtime/app/licensing";
 
 export const ssoConfiguration: SsoConfiguration = {
-  isSaas:
-    process.env.IS_SAAS === "1" ||
-    process.env.IS_SAAS?.toLowerCase() === "true",
+  isSaas: process.env.IS_SAAS === "1" || process.env.IS_SAAS?.toLowerCase() === "true",
   provider: process.env.NEXTAUTH_PROVIDER ?? "email",
   baseUrl: process.env.VERCEL_URL ?? process.env.NEXTAUTH_URL ?? "",
   instanceLicenseKey: process.env.LANGWATCH_LICENSE_KEY,
@@ -63,8 +61,7 @@ class AppSsoGateLogger extends SsoGateLogger {
 class AppSsoProviderMountInspector extends SsoProviderMountInspector {
   isMounted(configuration: SsoConfiguration): boolean {
     return (
-      Object.keys(BetterAuthSsoAdapter.buildSocialProviders(configuration))
-        .length > 0 ||
+      Object.keys(BetterAuthSsoAdapter.buildSocialProviders(configuration)).length > 0 ||
       BetterAuthSsoAdapter.buildGenericOAuthConfigs(configuration).length > 0
     );
   }
@@ -80,5 +77,4 @@ const gate = LicensingSsoAdapter.create({
 export const platformSSOAllowed = (): Promise<boolean> => gate.platformAllowed();
 export const authProviderIsMounted = (): boolean => gate.providerIsMounted();
 export const resolveAuthProvider = (): Promise<string> => gate.resolveProvider();
-export const __resetSsoGateForTests = (): void =>
-  gate.resetMemoizedDecisionForTests();
+export const __resetSsoGateForTests = (): void => gate.resetMemoizedDecisionForTests();

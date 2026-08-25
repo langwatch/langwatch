@@ -28,10 +28,7 @@ let projectId: string;
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-async function waitFor(
-  predicate: () => boolean,
-  timeoutMs: number,
-): Promise<void> {
+async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) return;

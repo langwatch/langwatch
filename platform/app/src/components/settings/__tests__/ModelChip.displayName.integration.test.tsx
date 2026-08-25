@@ -34,10 +34,7 @@ describe("<ModelChip/>", () => {
       /** @scenario Default models table chip shows the configured display name */
       it("reads the configured display name", () => {
         renderChip(
-          <ModelChip
-            model={FULL_ID}
-            displayNames={{ [FULL_ID]: DISPLAY_NAME }}
-          />,
+          <ModelChip model={FULL_ID} displayNames={{ [FULL_ID]: DISPLAY_NAME }} />,
         );
 
         expect(screen.getByText(DISPLAY_NAME)).toBeInTheDocument();
@@ -45,10 +42,7 @@ describe("<ModelChip/>", () => {
 
       it("does not read the raw model id", () => {
         renderChip(
-          <ModelChip
-            model={FULL_ID}
-            displayNames={{ [FULL_ID]: DISPLAY_NAME }}
-          />,
+          <ModelChip model={FULL_ID} displayNames={{ [FULL_ID]: DISPLAY_NAME }} />,
         );
 
         expect(screen.queryByText(MODEL_ID)).not.toBeInTheDocument();
@@ -73,10 +67,7 @@ describe("<ModelChip/>", () => {
 
       it("still picks the alias label from the id, not the display name", () => {
         renderChip(
-          <ModelChip
-            model={ALIAS_ID}
-            displayNames={{ [ALIAS_ID]: "My Latest" }}
-          />,
+          <ModelChip model={ALIAS_ID} displayNames={{ [ALIAS_ID]: "My Latest" }} />,
         );
 
         expect(screen.getByText("Latest")).toBeInTheDocument();

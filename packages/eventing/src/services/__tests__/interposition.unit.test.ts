@@ -27,10 +27,10 @@ import {
 // ---------------------------------------------------------------------------
 
 const leanMock = vi.fn((event: Event) => ({
-    ...event,
-    // Marker so tests can verify dispatch received the leaned shape
-    data: { ...((event.data as Record<string, unknown>) ?? {}), _leaned: true },
-  }));
+  ...event,
+  // Marker so tests can verify dispatch received the leaned shape
+  data: { ...((event.data as Record<string, unknown>) ?? {}), _leaned: true },
+}));
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -62,10 +62,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         prepareEventForProjection: leanMock,
         mapProjections: [mapDef],
@@ -82,18 +79,14 @@ describe("given EventSourcingService is configured with a map projection", () =>
       await service.storeEvents(events, context);
 
       // storeEvents sees the original event (no _leaned marker)
-      const storedArg = (eventStore.storeEvents as ReturnType<typeof vi.fn>)
-        .mock.calls[0]?.[0] as Event[];
-      expect(
-        (storedArg[0]?.data as Record<string, unknown>)?._leaned,
-      ).toBeUndefined();
+      const storedArg = (eventStore.storeEvents as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[0] as Event[];
+      expect((storedArg[0]?.data as Record<string, unknown>)?._leaned).toBeUndefined();
 
       // dispatch sees the leaned event (has _leaned marker)
       const dispatchedArg = (mapDef.map as ReturnType<typeof vi.fn>).mock
         .calls[0]?.[0] as Event;
-      expect((dispatchedArg.data as Record<string, unknown>)?._leaned).toBe(
-        true,
-      );
+      expect((dispatchedArg.data as Record<string, unknown>)?._leaned).toBe(true);
     });
   });
 
@@ -106,10 +99,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         prepareEventForProjection: leanMock,
         mapProjections: [{ ...mapDef, eventTypes: [] }],
@@ -154,10 +144,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         prepareEventForProjection: leanMock,
         mapProjections: [mapDef],
@@ -171,9 +158,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
         ),
       ];
 
-      await expect(service.storeEvents(events, context)).rejects.toThrow(
-        "lean exploded",
-      );
+      await expect(service.storeEvents(events, context)).rejects.toThrow("lean exploded");
     });
   });
 
@@ -199,20 +184,15 @@ describe("given EventSourcingService is configured with a map projection", () =>
       });
 
       const mapDef = createMockMapProjectionDefinition("order-test");
-      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation(
-        (event: Event) => {
-          callOrder.push("dispatch");
-          return event;
-        },
-      );
+      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation((event: Event) => {
+        callOrder.push("dispatch");
+        return event;
+      });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         prepareEventForProjection: leanMock,
         mapProjections: [{ ...mapDef, eventTypes: [] }],

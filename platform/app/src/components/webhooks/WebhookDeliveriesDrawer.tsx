@@ -59,11 +59,8 @@ function healthLabels(health: HealthView | undefined) {
         : formatAge(health.oldestUndeliveredAgeMs),
     sendsPerMinute: health.sendsPerMinute.toFixed(2),
     successRate:
-      health.successRate === null
-        ? "n/a"
-        : `${Math.round(health.successRate * 100)}%`,
-    p95Latency:
-      health.p95LatencyMs === null ? "n/a" : `${health.p95LatencyMs}ms`,
+      health.successRate === null ? "n/a" : `${Math.round(health.successRate * 100)}%`,
+    p95Latency: health.p95LatencyMs === null ? "n/a" : `${health.p95LatencyMs}ms`,
   };
 }
 
@@ -93,12 +90,7 @@ function WebhookHealthStrip({
   const lagging = (health?.oldestUndeliveredAgeMs ?? 0) > 300_000;
 
   return (
-    <VStack
-      align="start"
-      gap={1}
-      width="full"
-      data-testid="webhook-health-strip"
-    >
+    <VStack align="start" gap={1} width="full" data-testid="webhook-health-strip">
       <Text fontSize="sm" color="fg.muted" wordBreak="break-all">
         {endpoint.url}
       </Text>
@@ -119,26 +111,18 @@ function WebhookHealthStrip({
         <HealthStat label="p95" value={labels.p95Latency} />
         <HealthStat
           label="Last success"
-          value={
-            endpoint.lastSuccessAt
-              ? formatWhen(endpoint.lastSuccessAt)
-              : "never"
-          }
+          value={endpoint.lastSuccessAt ? formatWhen(endpoint.lastSuccessAt) : "never"}
         />
         <HealthStat
           label="Failing since"
           value={
-            endpoint.failingSince
-              ? formatWhen(endpoint.failingSince)
-              : "not failing"
+            endpoint.failingSince ? formatWhen(endpoint.failingSince) : "not failing"
           }
         />
         {endpoint.status === "DISABLED" && (
           <Badge colorPalette="red" data-testid="webhook-disabled-badge">
             disabled
-            {endpoint.disabledReason === "auto_failures_72h"
-              ? ": 72h of failures"
-              : ""}
+            {endpoint.disabledReason === "auto_failures_72h" ? ": 72h of failures" : ""}
           </Badge>
         )}
       </HStack>
@@ -150,9 +134,7 @@ function WebhookHealthStrip({
 function DeliveryRow({ delivery }: { delivery: DeliveryView }) {
   return (
     <Table.Row>
-      <Table.Cell whiteSpace="nowrap">
-        {formatWhen(delivery.firedAt)}
-      </Table.Cell>
+      <Table.Cell whiteSpace="nowrap">{formatWhen(delivery.firedAt)}</Table.Cell>
       <Table.Cell>{delivery.attempt}</Table.Cell>
       <Table.Cell>{delivery.eventCount}</Table.Cell>
       <Table.Cell>{outcomeBadge(delivery.outcome)}</Table.Cell>
@@ -225,20 +207,15 @@ function DeliveriesTable({
  * The drawer's data: the delivery page for the current keyset cursor plus the
  * polled health summary. A fresh endpoint resets pagination to the first page.
  */
-function useDeliveriesDrawerData(
-  organizationId: string,
-  endpoint: EndpointView | null,
-) {
-  const [cursor, setCursor] = useState<
-    { firedAt: Date; id: string } | undefined
-  >(undefined);
+function useDeliveriesDrawerData(organizationId: string, endpoint: EndpointView | null) {
+  const [cursor, setCursor] = useState<{ firedAt: Date; id: string } | undefined>(
+    undefined,
+  );
   // Loaded pages accumulate in load order, keyed by the cursor that fetched
   // each, so Load more APPENDS below what the reader already scanned and a
   // background refetch of the current page replaces its own slot instead of
   // duplicating it. A fresh endpoint starts the accumulation over.
-  const [pages, setPages] = useState<
-    Array<{ key: string; rows: DeliveryView[] }>
-  >([]);
+  const [pages, setPages] = useState<Array<{ key: string; rows: DeliveryView[] }>>([]);
   useEffect(() => {
     setCursor(undefined);
     setPages([]);
@@ -270,10 +247,7 @@ function useDeliveriesDrawerData(
     });
   }, [page, cursor]);
   const rows = useMemo(
-    () =>
-      pages.length > 0
-        ? pages.flatMap((p) => p.rows)
-        : (page?.deliveries ?? []),
+    () => (pages.length > 0 ? pages.flatMap((p) => p.rows) : (page?.deliveries ?? [])),
     [pages, page],
   );
   const health = api.webhookEndpoints.health.useQuery(
@@ -329,9 +303,7 @@ export function WebhookDeliveriesDrawer({
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="start" gap={4} width="full">
-            {endpoint && (
-              <WebhookHealthStrip endpoint={endpoint} health={health.data} />
-            )}
+            {endpoint && <WebhookHealthStrip endpoint={endpoint} health={health.data} />}
 
             {deliveries.isLoading && <Spinner size="sm" />}
             {deliveries.data && rows.length === 0 && isFirstPage && (

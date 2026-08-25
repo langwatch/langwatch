@@ -10,10 +10,7 @@ export type RemoveMessageButtonProps = {
  * Button to remove a message row.
  * Used in prompt playground and HTTP agent test panel.
  */
-export function RemoveMessageButton({
-  onRemove,
-  disabled,
-}: RemoveMessageButtonProps) {
+export function RemoveMessageButton({ onRemove, disabled }: RemoveMessageButtonProps) {
   return (
     <Button
       size="xs"

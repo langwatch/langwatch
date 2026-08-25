@@ -47,8 +47,7 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
             min={1}
             value={prompt.version ?? ""}
             onChange={(e) => {
-              const v =
-                e.target.value === "" ? undefined : Number(e.target.value);
+              const v = e.target.value === "" ? undefined : Number(e.target.value);
               updatePrompt({
                 version: Number.isInteger(v) && (v ?? 0) > 0 ? v : undefined,
               });

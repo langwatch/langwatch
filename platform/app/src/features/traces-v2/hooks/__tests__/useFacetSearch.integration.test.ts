@@ -21,9 +21,7 @@ vi.mock("~/utils/api", () => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: harness.projectId.value
-      ? { id: harness.projectId.value }
-      : undefined,
+    project: harness.projectId.value ? { id: harness.projectId.value } : undefined,
   }),
 }));
 
@@ -85,9 +83,7 @@ describe("useFacetSearch", () => {
 
   describe("when the facetKey is empty", () => {
     it("disables the query", () => {
-      renderHook(() =>
-        useFacetSearch({ facetKey: "", prefix: "fin", enabled: true }),
-      );
+      renderHook(() => useFacetSearch({ facetKey: "", prefix: "fin", enabled: true }));
 
       expect(lastOpts()?.enabled).toBe(false);
     });

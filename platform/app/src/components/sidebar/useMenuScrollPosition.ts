@@ -49,12 +49,7 @@ export function useMenuScrollPosition({
     const region = regionRef.current;
     if (!region) return;
 
-    const readerEvents = [
-      "wheel",
-      "touchstart",
-      "pointerdown",
-      "keydown",
-    ] as const;
+    const readerEvents = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
 
     const remember = () => {
       lastOffsetByMenu.set(menuKey, region.scrollTop);

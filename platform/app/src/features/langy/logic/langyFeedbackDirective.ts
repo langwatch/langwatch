@@ -32,9 +32,7 @@ export interface LangyFeedbackDirective {
 const DIRECTIVE_RE =
   /\[langy:feedback(?::(frustrated|delighted|neutral|high-friction|low-friction))?\]/gi;
 
-function normalizeSentiment(
-  raw: string | undefined,
-): LangyFeedbackSentiment | undefined {
+function normalizeSentiment(raw: string | undefined): LangyFeedbackSentiment | undefined {
   switch (raw?.toLowerCase()) {
     case "frustrated":
     case "high-friction":
@@ -49,9 +47,7 @@ function normalizeSentiment(
   }
 }
 
-export function parseLangyFeedbackDirective(
-  text: string,
-): LangyFeedbackDirective {
+export function parseLangyFeedbackDirective(text: string): LangyFeedbackDirective {
   let requested = false;
   let sentiment: LangyFeedbackSentiment | undefined;
   const cleanedText = text

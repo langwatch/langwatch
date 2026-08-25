@@ -133,8 +133,7 @@ export function CodeBlockEditor({
           border: `1px solid ${previewBorder}`,
           maxHeight: "200px",
           overflowY: "hidden",
-          fontFamily:
-            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
         }}
       />
 

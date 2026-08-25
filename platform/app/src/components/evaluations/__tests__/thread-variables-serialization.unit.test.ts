@@ -62,16 +62,13 @@ describe("Feature: Thread variables available in trace-level evaluator input map
 
         // Trace mapping should NOT have type "thread"
         const inputMapping = result.mapping.input!;
-        expect("type" in inputMapping && inputMapping.type === "thread").toBe(
-          false,
-        );
+        expect("type" in inputMapping && inputMapping.type === "thread").toBe(false);
         expect((inputMapping as { source: string }).source).toBe("input");
 
         // Thread mapping should have type "thread"
         const conversationMapping = result.mapping.conversation!;
         expect(
-          "type" in conversationMapping &&
-            conversationMapping.type === "thread",
+          "type" in conversationMapping && conversationMapping.type === "thread",
         ).toBe(true);
       });
     });
@@ -96,9 +93,7 @@ describe("Feature: Thread variables available in trace-level evaluator input map
           const result = deserializeMappingStateToUI(savedMappings, "trace");
 
           expect(result.conversation!.type).toBe("source");
-          expect((result.conversation as { sourceId: string }).sourceId).toBe(
-            "thread",
-          );
+          expect((result.conversation as { sourceId: string }).sourceId).toBe("thread");
         });
 
         it("correctly reconstructs the thread source and selectedFields in the path", () => {
@@ -116,9 +111,7 @@ describe("Feature: Thread variables available in trace-level evaluator input map
           const result = deserializeMappingStateToUI(savedMappings, "trace");
 
           expect(result.history!.type).toBe("source");
-          expect((result.history as { sourceId: string }).sourceId).toBe(
-            "thread",
-          );
+          expect((result.history as { sourceId: string }).sourceId).toBe("thread");
           expect((result.history as { path: string[] }).path).toEqual([
             "traces",
             "input",

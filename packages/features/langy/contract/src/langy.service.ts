@@ -129,7 +129,10 @@ export type LangyCredentialTurnCapability = {
   }): Promise<LangyCredentials>;
   tryGetEgressAllowlist(input: { projectId: string }): Promise<string[] | null>;
   resolveMirrorTier(input: { projectId: string }): Promise<LangyMirrorTier>;
-  tryGetModelsAllowed(input: { projectId: string; organizationId: string }): Promise<string[] | null>;
+  tryGetModelsAllowed(input: {
+    projectId: string;
+    organizationId: string;
+  }): Promise<string[] | null>;
 };
 
 export type LangyMessageTurnCapability = {
@@ -210,9 +213,7 @@ export abstract class LangyService {
     input: LangyConversationListInput,
   ): Promise<LangyConversationPage>;
 
-  abstract getConversation(
-    input: LangyConversationInput,
-  ): Promise<LangyConversation>;
+  abstract getConversation(input: LangyConversationInput): Promise<LangyConversation>;
 
   abstract createConversation(
     input: LangyCreateConversationInput,
@@ -226,13 +227,9 @@ export abstract class LangyService {
 
   abstract stopTurn(input: LangyStopTurnInput & { userId: string }): Promise<void>;
 
-  abstract listMessages(
-    input: LangyConversationInput,
-  ): Promise<readonly unknown[]>;
+  abstract listMessages(input: LangyConversationInput): Promise<readonly unknown[]>;
 
-  abstract resolveCredential(
-    input: LangyCredentialInput,
-  ): Promise<LangyCredential>;
+  abstract resolveCredential(input: LangyCredentialInput): Promise<LangyCredential>;
 
   abstract tryGetEgressAllowlist(
     input: LangyEgressProjectInput,
@@ -301,9 +298,7 @@ export abstract class LangyService {
     requestedConversationId: string | null;
     modelOverride?: string;
   }): Promise<{ conversationId: string | null; warmed: boolean }>;
-  abstract tryGetModelsAllowedForProject(
-    projectId: string,
-  ): Promise<string[] | null>;
+  abstract tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null>;
   abstract shouldAskFeedback(input: {
     userId: string;
     conversationId: string;

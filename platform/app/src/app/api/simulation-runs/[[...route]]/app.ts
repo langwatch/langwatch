@@ -41,10 +41,9 @@ const scenarioRunResponseSchema = z.object({
   totalCost: z.number().optional(),
 });
 
-const scenarioRunResponseWithPlatformUrlSchema =
-  scenarioRunResponseSchema.extend({
-    platformUrl: z.string().url(),
-  });
+const scenarioRunResponseWithPlatformUrlSchema = scenarioRunResponseSchema.extend({
+  platformUrl: z.string().url(),
+});
 
 const batchSummarySchema = z.object({
   batchRunId: z.string(),
@@ -242,10 +241,7 @@ secured.access(requires("scenarios:view")).get(
   async (c) => {
     const project = c.get("project");
     const { scenarioRunId } = c.req.param();
-    logger.info(
-      { projectId: project.id, scenarioRunId },
-      "Getting simulation run",
-    );
+    logger.info({ projectId: project.id, scenarioRunId }, "Getting simulation run");
 
     const simulations = c.app.simulations;
     const run = await simulations.tryGetScenarioRunData({
@@ -271,8 +267,7 @@ secured.access(requires("scenarios:view")).get(
 secured.access(requires("scenarios:view")).get(
   "/batches/list",
   describeRoute({
-    description:
-      "List batch summaries for a scenario set (pass/fail counts per batch)",
+    description: "List batch summaries for a scenario set (pass/fail counts per batch)",
     responses: {
       ...baseResponses,
       200: {
@@ -295,10 +290,7 @@ secured.access(requires("scenarios:view")).get(
   async (c) => {
     const project = c.get("project");
     const { scenarioSetId, limit, cursor } = c.req.valid("query");
-    logger.info(
-      { projectId: project.id, scenarioSetId },
-      "Listing batch history",
-    );
+    logger.info({ projectId: project.id, scenarioSetId }, "Listing batch history");
 
     const simulations = c.app.simulations;
     const result = await simulations.getBatchHistoryForScenarioSet({
@@ -320,8 +312,7 @@ secured.access(requires("scenarios:view")).get(
 secured.access(requires("scenarios:view")).get(
   "/batches/:batchRunId",
   describeRoute({
-    description:
-      "Get the summary of a single batch run, including its completion flag",
+    description: "Get the summary of a single batch run, including its completion flag",
     responses: {
       ...baseResponses,
       200: {

@@ -18,9 +18,7 @@ import type { MonitorService } from "@langwatch/monitor-contract";
 import { ExecuteEvaluationCommand } from "../commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../schemas/commands";
 
-function buildCommand(
-  evaluatorType: string,
-): Command<ExecuteEvaluationCommandData> {
+function buildCommand(evaluatorType: string): Command<ExecuteEvaluationCommandData> {
   const tenantId = createTenantId("proj-err-1");
   return {
     tenantId,
@@ -76,9 +74,7 @@ function buildCommandWithMocks({
   executionError?: Error;
 }) {
   const monitors = {
-    tryGetMonitorById: vi
-      .fn()
-      .mockResolvedValue(buildMonitor("azure/content_safety")),
+    tryGetMonitorById: vi.fn().mockResolvedValue(buildMonitor("azure/content_safety")),
   } as unknown as MonitorService;
 
   const spanStorage = {
@@ -136,9 +132,7 @@ describe("Feature: ExecuteEvaluationCommand — error propagation", () => {
           },
         });
 
-        const events = await command.handle(
-          buildCommand("azure/content_safety"),
-        );
+        const events = await command.handle(buildCommand("azure/content_safety"));
 
         expect(events).toHaveLength(1);
         const eventData = events[0]?.data as unknown as {
@@ -161,9 +155,7 @@ describe("Feature: ExecuteEvaluationCommand — error propagation", () => {
           },
         });
 
-        const events = await command.handle(
-          buildCommand("azure/content_safety"),
-        );
+        const events = await command.handle(buildCommand("azure/content_safety"));
 
         const eventData = events[0]?.data as unknown as {
           error?: string | null;
@@ -183,9 +175,7 @@ describe("Feature: ExecuteEvaluationCommand — error propagation", () => {
           executionError: new Error("boom"),
         });
 
-        const events = await command.handle(
-          buildCommand("azure/content_safety"),
-        );
+        const events = await command.handle(buildCommand("azure/content_safety"));
 
         const eventData = events[0]?.data as unknown as {
           status: string;

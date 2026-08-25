@@ -81,11 +81,7 @@ const VersionNumberBox = ({
  * have no author on record; that is stated in the tooltip rather than left
  * blank (which previously rendered as a nameless silhouette with no hover).
  */
-function VersionAuthor({
-  author,
-}: {
-  author?: VersionHistoryItemData["author"];
-}) {
+function VersionAuthor({ author }: { author?: VersionHistoryItemData["author"] }) {
   const [brokenImageUrl, setBrokenImageUrl] = useState<string | null>(null);
 
   const name = author?.name?.trim() ? author.name.trim() : null;
@@ -112,11 +108,7 @@ function VersionAuthor({
   );
 
   return (
-    <Tooltip
-      content={tooltipContent}
-      positioning={{ placement: "top" }}
-      showArrow
-    >
+    <Tooltip content={tooltipContent} positioning={{ placement: "top" }} showArrow>
       <HStack fontSize="12px" gap={1.5} minWidth={0} cursor="default">
         <Avatar.Root
           size="2xs"
@@ -126,10 +118,7 @@ function VersionAuthor({
           height="16px"
         >
           {showImage && image && (
-            <Avatar.Image
-              src={image}
-              onError={() => setBrokenImageUrl(image)}
-            />
+            <Avatar.Image src={image} onError={() => setBrokenImageUrl(image)} />
           )}
           <Avatar.Fallback name={name ?? ""} fontSize="6.4px" />
         </Avatar.Root>
@@ -179,12 +168,7 @@ function VersionHistoryItem({
                 {data.commitMessage}
               </Text>
               {isCurrent && (
-                <Tag.Root
-                  colorPalette="gray"
-                  size="sm"
-                  paddingX={2}
-                  fontWeight="normal"
-                >
+                <Tag.Root colorPalette="gray" size="sm" paddingX={2} fontWeight="normal">
                   <Tag.Label>current</Tag.Label>
                 </Tag.Root>
               )}
@@ -208,10 +192,7 @@ function VersionHistoryItem({
           <VersionAuthor author={data.author} />
         </VStack>
         {!isCurrent && (
-          <Tooltip
-            content="Load this version"
-            positioning={{ placement: "top" }}
-          >
+          <Tooltip content="Load this version" positioning={{ placement: "top" }}>
             <Button
               size="xs"
               data-testid={`restore-version-button-${data.version}`}
@@ -270,13 +251,7 @@ function VersionHistoryList({
   }
 
   return (
-    <VStack
-      align="start"
-      width="full"
-      padding={5}
-      maxHeight="350px"
-      overflowY="auto"
-    >
+    <VStack align="start" width="full" padding={5} maxHeight="350px" overflowY="auto">
       {versions.map((version, index) => {
         // If currentVersionId is provided, use it to determine which is current
         // Otherwise fall back to the first (latest) version
@@ -428,16 +403,15 @@ export function VersionHistoryListPopover({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const { project } = useOrganizationTeamProject();
-  const { data: prompts = [], isLoading } =
-    api.prompts.getAllVersionsForPrompt.useQuery(
-      {
-        idOrHandle: configId,
-        projectId: project?.id ?? "",
-      },
-      {
-        enabled: open && !!project?.id && !!configId,
-      },
-    );
+  const { data: prompts = [], isLoading } = api.prompts.getAllVersionsForPrompt.useQuery(
+    {
+      idOrHandle: configId,
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: open && !!project?.id && !!configId,
+    },
+  );
 
   /**
    * Load version data into the form without creating a new version.

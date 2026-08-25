@@ -3,9 +3,7 @@ import type { GovernanceEncryptionPort } from "../ports/governance-encryption.po
 const ENCRYPTED_PREFIX = "enc:v1:";
 
 export class IngestionCredentialsService {
-  static create(
-    encryption: GovernanceEncryptionPort,
-  ): IngestionCredentialsService {
+  static create(encryption: GovernanceEncryptionPort): IngestionCredentialsService {
     return new IngestionCredentialsService(encryption);
   }
 
@@ -43,8 +41,6 @@ export class IngestionCredentialsService {
         ? (parsed as Record<string, string>)
         : {};
     }
-    return raw && typeof raw === "object"
-      ? (raw as Record<string, string>)
-      : {};
+    return raw && typeof raw === "object" ? (raw as Record<string, string>) : {};
   }
 }

@@ -5,10 +5,7 @@
  * shared extractor otherwise (live frames, old turns).
  */
 import { describe, expect, it } from "vitest";
-import {
-  commandOfToolCall,
-  digestOfToolCall,
-} from "../logic/langyCapabilityDigest";
+import { commandOfToolCall, digestOfToolCall } from "../logic/langyCapabilityDigest";
 
 describe("commandOfToolCall", () => {
   describe("given a shell call carrying a LangWatch command (start frame)", () => {
@@ -17,8 +14,7 @@ describe("commandOfToolCall", () => {
         commandOfToolCall({
           name: "bash",
           input: {
-            command:
-              'langwatch trace search -q "refund policy" --limit 5 --format json',
+            command: 'langwatch trace search -q "refund policy" --limit 5 --format json',
           },
         }),
       ).toEqual({
@@ -65,9 +61,7 @@ describe("commandOfToolCall", () => {
     });
 
     it("resolves to null for a non-CLI tool", () => {
-      expect(
-        commandOfToolCall({ name: "read", input: { filePath: "a.ts" } }),
-      ).toBeNull();
+      expect(commandOfToolCall({ name: "read", input: { filePath: "a.ts" } })).toBeNull();
     });
   });
 });
@@ -100,8 +94,7 @@ describe("digestOfToolCall", () => {
       const digest = digestOfToolCall({
         name: "langwatch.trace.search",
         input: searchInput,
-        output:
-          '{"traces":[{"trace_id":"trace_1"}],"pagination":{"totalHits":1}}',
+        output: '{"traces":[{"trace_id":"trace_1"}],"pagination":{"totalHits":1}}',
         digest: { strategy: "made-up" },
       });
       expect(digest?.strategy).toBe("id-ref");

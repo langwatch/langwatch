@@ -116,9 +116,7 @@ describe("outbox backlog drain under slow deliveries", () => {
       expect(released).toBeGreaterThan(0);
       expect(fenced).toBe(0);
       expect(invocations.size).toBe(total);
-      expect([...invocations.values()].every((count) => count === 1)).toBe(
-        true,
-      );
+      expect([...invocations.values()].every((count) => count === 1)).toBe(true);
     });
   });
 

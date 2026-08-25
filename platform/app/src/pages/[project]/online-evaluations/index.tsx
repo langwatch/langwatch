@@ -57,18 +57,14 @@ function OnlineEvaluationsPage() {
   const experiments = api.experiments.getAllByProjectId.useQuery(
     { projectId: project?.id ?? "" },
     {
-      enabled:
-        !!project && canManage && canViewExperiments && monitors.isSuccess,
+      enabled: !!project && canManage && canViewExperiments && monitors.isSuccess,
       refetchOnWindowFocus: false,
       trpc: { context: { skipBatch: true } },
     },
   );
 
   const performanceByMonitor = useMemo(
-    () =>
-      new Map(
-        performance.data?.map((item) => [item.monitorId, item] as const) ?? [],
-      ),
+    () => new Map(performance.data?.map((item) => [item.monitorId, item] as const) ?? []),
     [performance.data],
   );
   const experimentSlugs = useMemo(
@@ -120,9 +116,7 @@ function OnlineEvaluationsPage() {
 
   if (!project) return null;
 
-  const monitorById = new Map(
-    monitors.data?.map((monitor) => [monitor.id, monitor]),
-  );
+  const monitorById = new Map(monitors.data?.map((monitor) => [monitor.id, monitor]));
   const editMonitor = (monitorId: string) => {
     const monitor = monitorById.get(monitorId);
     if (!monitor) return;
@@ -131,9 +125,7 @@ function OnlineEvaluationsPage() {
       ? experimentSlugs.get(monitor.experimentId)
       : undefined;
     if (experimentSlug) {
-      void router.push(
-        `/${project.slug}/experiments/workbench/${experimentSlug}`,
-      );
+      void router.push(`/${project.slug}/experiments/workbench/${experimentSlug}`);
       return;
     }
 
@@ -193,8 +185,8 @@ function OnlineEvaluationsPage() {
           <VStack width="full" gap={4} align="stretch">
             <VStack align="start" gap={1}>
               <Text color="fg.muted">
-                Online evaluations score live traces asynchronously. Guardrails
-                run synchronously and can stop unsafe requests or responses.
+                Online evaluations score live traces asynchronously. Guardrails run
+                synchronously and can stop unsafe requests or responses.
               </Text>
             </VStack>
             <OnlineEvaluationsTable

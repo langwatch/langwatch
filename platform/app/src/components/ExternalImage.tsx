@@ -21,8 +21,7 @@ export const getImageUrl = (str: unknown): string | null => {
 
   // Check for base64 image
   if (str_.startsWith("data:image/")) {
-    const base64Regex =
-      /^data:image\/(jpeg|jpg|gif|png|webp|svg\+xml|bmp);base64,/i;
+    const base64Regex = /^data:image\/(jpeg|jpg|gif|png|webp|svg\+xml|bmp);base64,/i;
     return base64Regex.test(str_) ? str_ : null;
   }
 
@@ -201,25 +200,14 @@ export const ExternalImage = ({
           width={props.width ?? "42px"}
           height={props.height ?? "48px"}
         >
-          <Image
-            src="/images/broken-image.svg"
-            alt="Broken Image"
-            width="40%"
-          />
+          <Image src="/images/broken-image.svg" alt="Broken Image" width="40%" />
         </Box>
       </Tooltip>
     );
   }
 
   if (dontLinkify) {
-    return (
-      <Image
-        alt={alt}
-        onError={() => setError(true)}
-        src={proxiedSrc}
-        {...props}
-      />
-    );
+    return <Image alt={alt} onError={() => setError(true)} src={proxiedSrc} {...props} />;
   }
 
   // Expandable mode - click to expand in place (centered on original image, clamped to viewport)
@@ -285,12 +273,7 @@ export const ExternalImage = ({
   // Default: open in new tab
   return (
     <a href={src} target="_blank" rel="noopener noreferrer">
-      <Image
-        alt={alt}
-        onError={() => setError(true)}
-        src={proxiedSrc}
-        {...props}
-      />
+      <Image alt={alt} onError={() => setError(true)} src={proxiedSrc} {...props} />
     </a>
   );
 };

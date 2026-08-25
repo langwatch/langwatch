@@ -27,9 +27,7 @@ const PRESET_ID = "30d";
  * a union rather than two optional fields that could contradict each other.
  * Epoch milliseconds, both or neither, matching `parseFragment`.
  */
-export type TracesWindow =
-  | { presetId: string }
-  | { fromMs: number; toMs: number };
+export type TracesWindow = { presetId: string } | { fromMs: number; toMs: number };
 
 export function tracesHrefForKey({
   projectSlug,

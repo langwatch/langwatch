@@ -166,10 +166,7 @@ function sampleRope(
     // and out over its life.
     if (ripple !== null) {
       x +=
-        Math.sin(Math.PI * ripple) *
-        w *
-        0.018 *
-        Math.exp(-(((ny - ripple) / 0.16) ** 2));
+        Math.sin(Math.PI * ripple) * w * 0.018 * Math.exp(-(((ny - ripple) / 0.16) ** 2));
     }
     // Error shake: the WHOLE rope shivers side to side (no `ny` term, so it
     // reads as one nervous line), high frequency, amplitude decaying to nothing
@@ -410,9 +407,7 @@ export function LangyWave({
 
   return (
     <Box
-      className={`langy-wave langy-wave--fold${
-        compact ? " langy-wave--compact" : ""
-      }`}
+      className={`langy-wave langy-wave--fold${compact ? " langy-wave--compact" : ""}`}
       aria-hidden
     >
       <div className="langy-wave-base" />

@@ -38,14 +38,14 @@ function LimitContentBody({
           </>
         ) : (
           <Text>
-            You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]}{" "}
-            on your current plan.
+            You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]} on your
+            current plan.
           </Text>
         )}
         {SEAT_LIMIT_TYPES.has(variant.limitType) && (
           <Text color="gray.500">
-            To free a seat instead, disable a membership from the members page.
-            That is reversible, and it keeps their role and everything they did.
+            To free a seat instead, disable a membership from the members page. That is
+            reversible, and it keeps their role and everything they did.
           </Text>
         )}
       </VStack>

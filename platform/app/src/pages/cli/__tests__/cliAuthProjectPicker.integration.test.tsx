@@ -170,35 +170,33 @@ const homeOrg = {
 const approveBodies: Array<Record<string, unknown>> = [];
 
 const serveCliAuthEndpoints = () => {
-  fetchMock.mockImplementation(
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes("/api/auth/cli/lookup")) {
-        return new Response(
-          JSON.stringify({
-            user_code: "WDJB-MJHT",
-            status: "pending",
-            expires_at: Date.now() + 10 * 60_000,
-            credential_type: "project_api_key",
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        );
-      }
-      if (url.includes("/api/auth/cli/approve")) {
-        approveBodies.push(
-          JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
-        );
-        return new Response(JSON.stringify({ ok: true, kind: "api_key" }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({}), {
+  fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/api/auth/cli/lookup")) {
+      return new Response(
+        JSON.stringify({
+          user_code: "WDJB-MJHT",
+          status: "pending",
+          expires_at: Date.now() + 10 * 60_000,
+          credential_type: "project_api_key",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+    if (url.includes("/api/auth/cli/approve")) {
+      approveBodies.push(
+        JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
+      );
+      return new Response(JSON.stringify({ ok: true, kind: "api_key" }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    },
-  );
+    }
+    return new Response(JSON.stringify({}), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
 };
 
 const renderPage = () =>
@@ -237,13 +235,9 @@ describe("/cli/auth project picker, given an organization with no shared project
     renderPage();
 
     await waitFor(() =>
-      expect(screen.getAllByText("Personal Workspace").length).toBeGreaterThan(
-        0,
-      ),
+      expect(screen.getAllByText("Personal Workspace").length).toBeGreaterThan(0),
     );
-    expect(
-      screen.getByText(/your personal project is preselected/i),
-    ).toBeDefined();
+    expect(screen.getByText(/your personal project is preselected/i)).toBeDefined();
     await waitFor(() => expect(approveButton().disabled).toBe(false));
   });
 
@@ -253,16 +247,12 @@ describe("/cli/auth project picker, given an organization with no shared project
     renderPage();
 
     await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: /Create project/i }),
-      ).toBeDefined(),
+      expect(screen.getByRole("button", { name: /Create project/i })).toBeDefined(),
     );
     await user.click(screen.getByRole("button", { name: /Create project/i }));
 
     await waitFor(() =>
-      expect(
-        screen.getByRole("dialog", { name: "Create New Project" }),
-      ).toBeDefined(),
+      expect(screen.getByRole("dialog", { name: "Create New Project" })).toBeDefined(),
     );
     expect(drawerProps[0]?.organizationId).toBe("org-1");
 
@@ -293,9 +283,7 @@ describe("/cli/auth project picker, given an organization with no shared project
     renderPage();
 
     await waitFor(() =>
-      expect(screen.getAllByText("Personal Workspace").length).toBeGreaterThan(
-        0,
-      ),
+      expect(screen.getAllByText("Personal Workspace").length).toBeGreaterThan(0),
     );
     await waitFor(() => expect(approveButton().disabled).toBe(false));
     await user.click(approveButton());
@@ -314,10 +302,7 @@ describe("/cli/auth project picker, given a switched-to organization whose proje
       homeOrg,
       acmeOrg([
         personalTeam,
-        sharedTeam([
-          sharedProject("proj-a", "Alpha"),
-          sharedProject("proj-b", "Beta"),
-        ]),
+        sharedTeam([sharedProject("proj-a", "Alpha"), sharedProject("proj-b", "Beta")]),
       ]),
     ];
     renderPage();

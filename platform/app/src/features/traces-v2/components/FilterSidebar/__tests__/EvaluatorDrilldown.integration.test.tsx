@@ -20,10 +20,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import {
-  EMPTY_AST,
-  parse,
-} from "~/server/app-layer/traces/query-language/parse";
+import { EMPTY_AST, parse } from "~/server/app-layer/traces/query-language/parse";
 import { EvaluatorDrilldown } from "../EvaluatorDrilldown";
 import type { FacetItem } from "../types";
 
@@ -222,12 +219,8 @@ describe("EvaluatorDrilldown", () => {
         // No slider, and no "Score" range inputs — the binary score adds
         // nothing the verdict rows don't already say.
         expect(screen.queryAllByRole("slider")).toHaveLength(0);
-        expect(
-          screen.queryByLabelText("Score minimum"),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByLabelText("Score maximum"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByLabelText("Score minimum")).not.toBeInTheDocument();
+        expect(screen.queryByLabelText("Score maximum")).not.toBeInTheDocument();
       });
     });
   });

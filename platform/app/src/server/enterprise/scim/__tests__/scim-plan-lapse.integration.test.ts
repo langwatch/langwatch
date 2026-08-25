@@ -92,15 +92,11 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
         headers: { Authorization: `Bearer ${bearerToken}` },
       });
       expect(refused.status).toBe(403);
-      expect(refused.headers.get("content-type")).toContain(
-        "application/scim+json",
-      );
+      expect(refused.headers.get("content-type")).toContain("application/scim+json");
       const refusedBody = await refused.json();
       expect(refusedBody.schemas).toEqual([SCIM_ERROR_SCHEMA]);
       expect(refusedBody.status).toBe("403");
-      expect(refusedBody.detail).toBe(
-        "SCIM provisioning requires an Enterprise plan",
-      );
+      expect(refusedBody.detail).toBe("SCIM provisioning requires an Enterprise plan");
 
       // And nothing is provisioned through the lapsed plan.
       const email = `${ns}-provisioned@example.com`;

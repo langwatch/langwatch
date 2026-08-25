@@ -19,8 +19,7 @@ export const RETENTION_WEEK_DAYS = 7;
  * Just under two years, so the horizon lands on a partition boundary and whole
  * weekly partitions still drop cleanly at the two-year mark.
  */
-export const SEEDED_RETENTION_DAYS =
-  365 * 2 - ((365 * 2) % RETENTION_WEEK_DAYS);
+export const SEEDED_RETENTION_DAYS = 365 * 2 - ((365 * 2) % RETENTION_WEEK_DAYS);
 
 /** Round a day count UP to the next whole number of weeks. */
 export function alignUpToWeeks(days: number): number {
@@ -39,11 +38,7 @@ export function seededRetentionDays(windowDays: number): number {
 }
 
 /** The categories the retention cascade resolves (retentionPolicy.schema.ts). */
-export const RETENTION_CATEGORIES = [
-  "traces",
-  "scenarios",
-  "experiments",
-] as const;
+export const RETENTION_CATEGORIES = ["traces", "scenarios", "experiments"] as const;
 
 export interface ApplySeedRetentionArgs {
   prisma: PrismaClient;
@@ -65,9 +60,7 @@ export interface ApplySeedRetentionArgs {
  * wait only happens when something actually changed. Returns whether any row
  * changed.
  */
-export async function applySeedRetention(
-  args: ApplySeedRetentionArgs,
-): Promise<boolean> {
+export async function applySeedRetention(args: ApplySeedRetentionArgs): Promise<boolean> {
   const {
     prisma,
     organizationId,

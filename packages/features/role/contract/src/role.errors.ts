@@ -12,11 +12,21 @@ export class RoleInUseError extends HandledError {
   declare readonly code: "custom_role_in_use";
   readonly userCount: number;
   readonly bindingCount: number;
-  constructor({ userCount, bindingCount = 0 }: { userCount: number; bindingCount?: number }) {
-    super("custom_role_in_use", `Cannot delete role that is in use by ${userCount} user assignment(s) and ${bindingCount} role binding(s)`, {
-      httpStatus: 409,
-      meta: { userCount, bindingCount },
-    });
+  constructor({
+    userCount,
+    bindingCount = 0,
+  }: {
+    userCount: number;
+    bindingCount?: number;
+  }) {
+    super(
+      "custom_role_in_use",
+      `Cannot delete role that is in use by ${userCount} user assignment(s) and ${bindingCount} role binding(s)`,
+      {
+        httpStatus: 409,
+        meta: { userCount, bindingCount },
+      },
+    );
     this.userCount = userCount;
     this.bindingCount = bindingCount;
     this.name = "RoleInUseError";
@@ -33,7 +43,9 @@ export class RoleNotFoundError extends NotFoundError {
 
 export class RoleReservedNameError extends HandledError {
   declare readonly code: "custom_role_name_reserved";
-  constructor(message = "Role names starting with 'apikey:' are reserved for system use") {
+  constructor(
+    message = "Role names starting with 'apikey:' are reserved for system use",
+  ) {
     super("custom_role_name_reserved", message, { httpStatus: 422 });
     this.name = "RoleReservedNameError";
   }

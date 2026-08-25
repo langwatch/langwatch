@@ -129,9 +129,7 @@ describe("usageLimitEmail", () => {
       expect(call).toBeDefined();
       const html = call![0].html;
 
-      expect(html).toContain(
-        "To continue using LangWatch, please upgrade your plan.",
-      );
+      expect(html).toContain("To continue using LangWatch, please upgrade your plan.");
     });
 
     it("uses correct progress bar color for different usage levels", async () => {
@@ -198,9 +196,7 @@ describe("usageLimitEmail", () => {
         ...baseProps,
         currentMonthMessagesCount: 1234567,
         maxMonthlyUsageLimit: 2000000,
-        projectUsageData: [
-          { id: "p1", name: "Project", messageCount: 1234567 },
-        ],
+        projectUsageData: [{ id: "p1", name: "Project", messageCount: 1234567 }],
       });
 
       expect(sendEmail).toHaveBeenCalled();

@@ -49,14 +49,8 @@ export function windowTurns({
 export function useTurnsWindow(traces: TraceListItem[]) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_TURNS);
   const window = windowTurns({ traces, visibleCount });
-  const showMore = useCallback(
-    () => setVisibleCount((c) => c + SHOW_MORE_STEP),
-    [],
-  );
-  const showAll = useCallback(
-    () => setVisibleCount(traces.length),
-    [traces.length],
-  );
+  const showMore = useCallback(() => setVisibleCount((c) => c + SHOW_MORE_STEP), []);
+  const showAll = useCallback(() => setVisibleCount(traces.length), [traces.length]);
   return {
     ...window,
     showMore,

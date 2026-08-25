@@ -8,19 +8,19 @@ import type { LangwatchPaths } from "../shared/paths.ts";
 import type { PortAllocation } from "../shared/ports.ts";
 
 export type RuntimeContext = {
-	ports: PortAllocation;
-	paths: LangwatchPaths;
-	predeps: PredepResult;
-	envFile: string;
-	version: string;
-	/** Pass-through env from the user shell (OPENAI_API_KEY, …), propagated to children, never persisted. */
-	userEnv: Record<string, string>;
+  ports: PortAllocation;
+  paths: LangwatchPaths;
+  predeps: PredepResult;
+  envFile: string;
+  version: string;
+  /** Pass-through env from the user shell (OPENAI_API_KEY, …), propagated to children, never persisted. */
+  userEnv: Record<string, string>;
 };
 
 export type ServiceHandle = {
-	name: string;
-	pid: number;
-	stop(): Promise<void>;
+  name: string;
+  pid: number;
+  stop(): Promise<void>;
 };
 
 /**
@@ -33,25 +33,25 @@ export type ServiceHandle = {
  * `events(ctx)` exactly once per CLI run.
  */
 export type RuntimeEvent =
-	| { type: "starting"; service: string }
-	| { type: "healthy"; service: string; durationMs: number }
-	| { type: "log"; service: string; stream: "stdout" | "stderr"; line: string }
-	/**
-	 * A previously-healthy service crashed and the supervisor is bringing it
-	 * back after `delayMs`. Emitted instead of "crashed" while restart budget
-	 * remains; when the budget runs out the crash falls through to "crashed".
-	 */
-	| {
-			type: "restarting";
-			service: string;
-			code: number;
-			signal?: NodeJS.Signals;
-			attempt: number;
-			maxAttempts: number;
-			delayMs: number;
-	  }
-	| { type: "crashed"; service: string; code: number; signal?: NodeJS.Signals }
-	| { type: "stopped"; service: string };
+  | { type: "starting"; service: string }
+  | { type: "healthy"; service: string; durationMs: number }
+  | { type: "log"; service: string; stream: "stdout" | "stderr"; line: string }
+  /**
+   * A previously-healthy service crashed and the supervisor is bringing it
+   * back after `delayMs`. Emitted instead of "crashed" while restart budget
+   * remains; when the budget runs out the crash falls through to "crashed".
+   */
+  | {
+      type: "restarting";
+      service: string;
+      code: number;
+      signal?: NodeJS.Signals;
+      attempt: number;
+      maxAttempts: number;
+      delayMs: number;
+    }
+  | { type: "crashed"; service: string; code: number; signal?: NodeJS.Signals }
+  | { type: "stopped"; service: string };
 
 /**
  * Format a process exit the same way everywhere it is reported: the
@@ -60,26 +60,23 @@ export type RuntimeEvent =
  * their own copy.
  */
 export function exitCause({
-	code,
-	signal,
+  code,
+  signal,
 }: {
-	code: number | null;
-	signal?: NodeJS.Signals | null;
+  code: number | null;
+  signal?: NodeJS.Signals | null;
 }): string {
-	return signal ? `signal ${signal}` : `code ${code ?? "unknown"}`;
+  return signal ? `signal ${signal}` : `code ${code ?? "unknown"}`;
 }
 
 export type RuntimeApi = {
-	scaffoldEnv(
-		ctx: RuntimeContext,
-		opts?: { shouldReconcilePorts?: boolean },
-	): Promise<{ written: boolean; path: string; reconciledKeys: string[] }>;
-	installServices(ctx: RuntimeContext): Promise<void>;
-	startAll(ctx: RuntimeContext): Promise<ServiceHandle[]>;
-	waitForHealth(
-		ctx: RuntimeContext,
-		opts: { timeoutMs: number },
-	): Promise<void>;
-	stopAll(handles: ServiceHandle[]): Promise<void>;
-	events(ctx: RuntimeContext): AsyncIterable<RuntimeEvent>;
+  scaffoldEnv(
+    ctx: RuntimeContext,
+    opts?: { shouldReconcilePorts?: boolean },
+  ): Promise<{ written: boolean; path: string; reconciledKeys: string[] }>;
+  installServices(ctx: RuntimeContext): Promise<void>;
+  startAll(ctx: RuntimeContext): Promise<ServiceHandle[]>;
+  waitForHealth(ctx: RuntimeContext, opts: { timeoutMs: number }): Promise<void>;
+  stopAll(handles: ServiceHandle[]): Promise<void>;
+  events(ctx: RuntimeContext): AsyncIterable<RuntimeEvent>;
 };

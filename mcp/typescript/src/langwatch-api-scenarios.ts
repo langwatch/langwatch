@@ -26,7 +26,7 @@ export async function listScenarios(): Promise<ScenarioSummary[]> {
 export async function getScenario(id: string): Promise<ScenarioSummary> {
   return makeRequest(
     "GET",
-    `/api/scenarios/${encodeURIComponent(id)}`
+    `/api/scenarios/${encodeURIComponent(id)}`,
   ) as Promise<ScenarioSummary>;
 }
 
@@ -52,16 +52,14 @@ export async function updateScenario(params: {
   return makeRequest(
     "PUT",
     `/api/scenarios/${encodeURIComponent(id)}`,
-    data
+    data,
   ) as Promise<ScenarioSummary>;
 }
 
 /** Archives (soft-deletes) a scenario. */
-export async function archiveScenario(
-  id: string
-): Promise<ScenarioArchiveResponse> {
+export async function archiveScenario(id: string): Promise<ScenarioArchiveResponse> {
   return makeRequest(
     "DELETE",
-    `/api/scenarios/${encodeURIComponent(id)}`
+    `/api/scenarios/${encodeURIComponent(id)}`,
   ) as Promise<ScenarioArchiveResponse>;
 }

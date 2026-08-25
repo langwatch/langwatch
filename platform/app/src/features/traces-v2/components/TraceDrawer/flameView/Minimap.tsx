@@ -191,13 +191,7 @@ export function Minimap({
         </Flex>
 
         {/* Span dot area */}
-        <Box
-          position="absolute"
-          top={`${headerH}px`}
-          left={0}
-          right={0}
-          bottom={0}
-        >
+        <Box position="absolute" top={`${headerH}px`} left={0} right={0} bottom={0}>
           {/* Quartile tick guide lines */}
           {minimapTickFractions.map((f) => (
             <Box
@@ -215,16 +209,14 @@ export function Minimap({
 
           {/* Span dots */}
           {allNodes.map((node) => {
-            const left =
-              ((node.span.startTimeMs - fullRange.startMs) / fullDur) * 100;
+            const left = ((node.span.startTimeMs - fullRange.startMs) / fullDur) * 100;
             const width = Math.max(
               0.2,
               ((node.span.endTimeMs - node.span.startTimeMs) / fullDur) * 100,
             );
             const top = 2 + node.depth * rowH;
             const color =
-              (SPAN_TYPE_COLORS[node.span.type ?? "span"] as string) ??
-              "gray.solid";
+              (SPAN_TYPE_COLORS[node.span.type ?? "span"] as string) ?? "gray.solid";
             return (
               <Box
                 key={node.span.spanId}

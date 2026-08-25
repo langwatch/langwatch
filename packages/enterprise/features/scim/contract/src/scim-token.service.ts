@@ -34,9 +34,7 @@ export abstract class ScimTokenService {
     token: string;
   }): Promise<{ organizationId: string } | null>;
 
-  abstract verifyEntitled(input: {
-    token: string;
-  }): Promise<ScimTokenEntitlement>;
+  abstract verifyEntitled(input: { token: string }): Promise<ScimTokenEntitlement>;
 }
 
 export { ScimTokenService as ScimTokenCapability };

@@ -11,9 +11,7 @@ import { resolveInputsMarker } from "~/server/app-layer/evaluations/evaluation-i
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 
 type EvaluationExecutionInput = Parameters<EvaluationExecutionPort["execute"]>[0];
-type EvaluationExecutionOutput = Awaited<
-  ReturnType<EvaluationExecutionPort["execute"]>
->;
+type EvaluationExecutionOutput = Awaited<ReturnType<EvaluationExecutionPort["execute"]>>;
 
 /**
  * Process-owned Evaluation composition. The App root supplies infrastructure
@@ -29,9 +27,7 @@ export type AppEvaluationRuntimeOptions = {
 };
 
 /** App infrastructure adapter for ADR-040 durable Evaluation inputs. */
-export class AppEvaluationInputsResolutionPort
-  extends EvaluationInputsResolutionPort
-{
+export class AppEvaluationInputsResolutionPort extends EvaluationInputsResolutionPort {
   static create(): AppEvaluationInputsResolutionPort {
     return new AppEvaluationInputsResolutionPort();
   }
@@ -55,9 +51,7 @@ export class AppEvaluationInputsResolutionPort
 /** Adapts the existing trace/evaluator engine at the process boundary. */
 export class AppEvaluationExecutionPort extends EvaluationExecutionPort {
   static create(
-    execute: (
-      input: EvaluationExecutionInput,
-    ) => Promise<EvaluationExecutionOutput>,
+    execute: (input: EvaluationExecutionInput) => Promise<EvaluationExecutionOutput>,
   ): AppEvaluationExecutionPort {
     return new AppEvaluationExecutionPort(execute);
   }
@@ -86,8 +80,7 @@ export class AppEvaluationRuntime {
     return EvaluationAdapter.create({
       ...this.options,
       inputResolution:
-        this.options.inputResolution ??
-        AppEvaluationInputsResolutionPort.create(),
+        this.options.inputResolution ?? AppEvaluationInputsResolutionPort.create(),
     });
   }
 }

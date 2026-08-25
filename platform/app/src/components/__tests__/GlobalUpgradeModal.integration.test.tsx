@@ -43,9 +43,7 @@ describe("GlobalUpgradeModal", () => {
         useUpgradeModalStore.getState().openLiteMemberRestriction({});
       });
 
-      expect(
-        await screen.findByText("Feature Not Available"),
-      ).toBeInTheDocument();
+      expect(await screen.findByText("Feature Not Available")).toBeInTheDocument();
     });
   });
 });

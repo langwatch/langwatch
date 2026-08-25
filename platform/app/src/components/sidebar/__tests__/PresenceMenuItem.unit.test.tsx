@@ -50,12 +50,8 @@ describe("PresenceMenuItem", () => {
         // toggleHidden); the mock receives a selector each time.
         const toggleHidden = vi.fn();
         usePresencePreferencesStoreMock.mockImplementation(
-          (
-            selector: (s: {
-              hidden: boolean;
-              toggleHidden: () => void;
-            }) => unknown,
-          ) => selector({ hidden: false, toggleHidden }),
+          (selector: (s: { hidden: boolean; toggleHidden: () => void }) => unknown) =>
+            selector({ hidden: false, toggleHidden }),
         );
 
         renderInOpenMenu();
@@ -74,20 +70,14 @@ describe("PresenceMenuItem", () => {
         });
         const toggleHidden = vi.fn();
         usePresencePreferencesStoreMock.mockImplementation(
-          (
-            selector: (s: {
-              hidden: boolean;
-              toggleHidden: () => void;
-            }) => unknown,
-          ) => selector({ hidden: false, toggleHidden }),
+          (selector: (s: { hidden: boolean; toggleHidden: () => void }) => unknown) =>
+            selector({ hidden: false, toggleHidden }),
         );
 
         renderInOpenMenu();
 
         const items = screen.getAllByRole("menuitem");
-        const row = items.find((el) =>
-          /Presence off/.test(el.textContent ?? ""),
-        )!;
+        const row = items.find((el) => /Presence off/.test(el.textContent ?? ""))!;
         expect(row.getAttribute("aria-disabled")).toBe("true");
         expect(toggleHidden).not.toHaveBeenCalled();
       });
@@ -103,19 +93,13 @@ describe("PresenceMenuItem", () => {
         });
         const toggleHidden = vi.fn();
         usePresencePreferencesStoreMock.mockImplementation(
-          (
-            selector: (s: {
-              hidden: boolean;
-              toggleHidden: () => void;
-            }) => unknown,
-          ) => selector({ hidden: true, toggleHidden }),
+          (selector: (s: { hidden: boolean; toggleHidden: () => void }) => unknown) =>
+            selector({ hidden: true, toggleHidden }),
         );
 
         renderInOpenMenu();
 
-        expect(screen.getAllByText("Presence hidden").length).toBeGreaterThan(
-          0,
-        );
+        expect(screen.getAllByText("Presence hidden").length).toBeGreaterThan(0);
       });
     });
   });
@@ -128,10 +112,7 @@ describe("PresenceMenuItem", () => {
   describe("given the main left navigation chrome", () => {
     /** @scenario Main left navigation no longer renders the presence toggle */
     it("does not import the legacy sidebar PresenceToggle component", () => {
-      const src = readFileSync(
-        resolve(__dirname, "../../MainMenu.tsx"),
-        "utf8",
-      );
+      const src = readFileSync(resolve(__dirname, "../../MainMenu.tsx"), "utf8");
       expect(src).not.toMatch(/PresenceToggle/);
     });
   });
@@ -149,18 +130,14 @@ describe("PresenceMenuItem", () => {
       expect(layoutSrc).toMatch(
         /showPresenceMenuItem\s*=\s*router\.pathname\.startsWith\("\/\[project\]\/traces"\)/,
       );
-      expect(layoutSrc).toMatch(
-        /showPresenceMenuItem=\{showPresenceMenuItem\}/,
-      );
+      expect(layoutSrc).toMatch(/showPresenceMenuItem=\{showPresenceMenuItem\}/);
       // The avatar menu was extracted to AppHeaderUserMenu; it renders
       // the entry only when the gate is passed in true.
       const menuSrc = readFileSync(
         resolve(__dirname, "../../AppHeaderUserMenu.tsx"),
         "utf8",
       );
-      expect(menuSrc).toMatch(
-        /\{showPresenceMenuItem\s*&&\s*<PresenceMenuItem\s*\/>\}/,
-      );
+      expect(menuSrc).toMatch(/\{showPresenceMenuItem\s*&&\s*<PresenceMenuItem\s*\/>\}/);
     });
   });
 });

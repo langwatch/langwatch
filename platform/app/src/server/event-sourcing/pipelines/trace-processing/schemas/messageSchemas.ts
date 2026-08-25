@@ -59,9 +59,7 @@ export const OpenTelemetryGenAIMessage = z
     role: z
       .enum(["system", "user", "assistant", "function", "tool", "unknown"])
       .optional(),
-    content: z
-      .union([z.string(), z.array(GenAIRichContent), z.null()])
-      .optional(),
+    content: z.union([z.string(), z.array(GenAIRichContent), z.null()]).optional(),
     function_call: GenAIFunctionCall.nullable().optional(),
     tool_calls: z.array(GenAIToolCall).nullable().optional(),
     tool_call_id: z.string().nullable().optional(),
@@ -71,9 +69,7 @@ export const OpenTelemetryGenAIMessage = z
     message: "At least one of 'role' or 'content' must be present",
   });
 
-export type OpenTelemetryGenAIMessage = z.infer<
-  typeof OpenTelemetryGenAIMessage
->;
+export type OpenTelemetryGenAIMessage = z.infer<typeof OpenTelemetryGenAIMessage>;
 
 /**
  * LangWatch format (current ChatMessage from types.ts)
@@ -330,9 +326,7 @@ const isGeminiFormat = (msg: Record<string, unknown>): boolean =>
  * Checks if a message has Cohere format (uppercase role)
  */
 const isCohereFormat = (msg: Record<string, unknown>): boolean =>
-  "role" in msg &&
-  typeof msg.role === "string" &&
-  msg.role === msg.role.toUpperCase();
+  "role" in msg && typeof msg.role === "string" && msg.role === msg.role.toUpperCase();
 
 /**
  * Anthropic-specific block types that distinguish it from OpenAI
@@ -353,8 +347,7 @@ const hasAnthropicContentBlocks = (msg: Record<string, unknown>): boolean => {
       block !== null &&
       "type" in block &&
       ANTHROPIC_BLOCK_TYPES.includes(
-        (block as { type: string })
-          .type as (typeof ANTHROPIC_BLOCK_TYPES)[number],
+        (block as { type: string }).type as (typeof ANTHROPIC_BLOCK_TYPES)[number],
       ),
   );
 };

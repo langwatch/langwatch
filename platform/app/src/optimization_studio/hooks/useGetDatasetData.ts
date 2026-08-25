@@ -4,10 +4,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../server/api/root";
-import type {
-  DatasetColumns,
-  DatasetRecordEntry,
-} from "@langwatch/dataset-contract";
+import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { api } from "../../utils/api";
 import type { Entry } from "@langwatch/workflow-contract";
 import {
@@ -43,8 +40,7 @@ export const useGetDatasetData = ({
       // hook returns `rows ?? []` below) instead of hammering the server.
       retry: (failureCount, error) => {
         if (
-          (error as { data?: { code?: string } })?.data?.code ===
-          "PRECONDITION_FAILED"
+          (error as { data?: { code?: string } })?.data?.code === "PRECONDITION_FAILED"
         ) {
           return false;
         }
@@ -58,50 +54,41 @@ export const useGetDatasetData = ({
     },
   );
   const databaseDataset_ =
-    databaseDataset.data?.dataset &&
-    "datasetRecords" in databaseDataset.data.dataset
+    databaseDataset.data?.dataset && "datasetRecords" in databaseDataset.data.dataset
       ? datasetDatabaseRecordsToInMemoryDataset(databaseDataset.data.dataset)
       : undefined;
 
-  const data:
-    | { records: DatasetRecordEntry[]; columnTypes: DatasetColumns }
-    | undefined = useMemo(() => {
-    if (dataset?.id) {
-      return databaseDataset_
-        ? {
-            records: databaseDataset_.datasetRecords,
-            columnTypes: databaseDataset_.columnTypes.slice(
-              0,
-              preview ? 5 : undefined,
-            ),
-          }
-        : undefined;
-    }
+  const data: { records: DatasetRecordEntry[]; columnTypes: DatasetColumns } | undefined =
+    useMemo(() => {
+      if (dataset?.id) {
+        return databaseDataset_
+          ? {
+              records: databaseDataset_.datasetRecords,
+              columnTypes: databaseDataset_.columnTypes.slice(0, preview ? 5 : undefined),
+            }
+          : undefined;
+      }
 
-    if (dataset?.inline) {
-      return {
-        records: transposeColumnsFirstToRowsFirstWithId(dataset.inline.records),
-        columnTypes: dataset.inline.columnTypes,
-      };
-    }
+      if (dataset?.inline) {
+        return {
+          records: transposeColumnsFirstToRowsFirstWithId(dataset.inline.records),
+          columnTypes: dataset.inline.columnTypes,
+        };
+      }
 
-    return undefined;
-  }, [dataset?.id, dataset?.inline, databaseDataset_, preview]);
+      return undefined;
+    }, [dataset?.id, dataset?.inline, databaseDataset_, preview]);
 
   const columnSet = useMemo(() => {
     return new Set(data?.columnTypes.map((col) => col.name));
   }, [data?.columnTypes]);
 
   const rows: DatasetRecordEntry[] | undefined = useMemo(() => {
-    const rows = data
-      ? data.records.slice(0, preview ? 5 : undefined)
-      : undefined;
+    const rows = data ? data.records.slice(0, preview ? 5 : undefined) : undefined;
 
     return rows?.map((row) => {
       const row_ = Object.fromEntries(
-        Object.entries(row).filter(
-          ([key]) => key === "id" || columnSet.has(key),
-        ),
+        Object.entries(row).filter(([key]) => key === "id" || columnSet.has(key)),
       );
 
       return row_;

@@ -1,7 +1,4 @@
-import {
-  type Tab,
-  useDraggableTabsBrowserStore,
-} from "./DraggableTabsBrowserStore";
+import { type Tab, useDraggableTabsBrowserStore } from "./DraggableTabsBrowserStore";
 
 /**
  * useTabById
@@ -15,8 +12,6 @@ import {
  */
 export function useTabById(tabId: string): Tab | undefined {
   return useDraggableTabsBrowserStore((state) =>
-    state.windows
-      .flatMap((window) => window.tabs)
-      .find((tab) => tab.id === tabId),
+    state.windows.flatMap((window) => window.tabs).find((tab) => tab.id === tabId),
   );
 }

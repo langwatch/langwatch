@@ -40,25 +40,19 @@ describe("useExportTraces()", () => {
 
   describe("when initialized", () => {
     it("starts with dialog closed", () => {
-      const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" }),
-      );
+      const { result } = renderHook(() => useExportTraces({ projectId: "proj-1" }));
 
       expect(result.current.isDialogOpen).toBe(false);
     });
 
     it("starts with isExporting false", () => {
-      const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" }),
-      );
+      const { result } = renderHook(() => useExportTraces({ projectId: "proj-1" }));
 
       expect(result.current.isExporting).toBe(false);
     });
 
     it("starts with zero progress", () => {
-      const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" }),
-      );
+      const { result } = renderHook(() => useExportTraces({ projectId: "proj-1" }));
 
       expect(result.current.progress).toEqual({ exported: 0, total: 0 });
     });
@@ -66,9 +60,7 @@ describe("useExportTraces()", () => {
 
   describe("when openExportDialog is called", () => {
     it("opens the dialog", () => {
-      const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" }),
-      );
+      const { result } = renderHook(() => useExportTraces({ projectId: "proj-1" }));
 
       act(() => {
         result.current.openExportDialog();
@@ -80,9 +72,7 @@ describe("useExportTraces()", () => {
 
   describe("when closeExportDialog is called", () => {
     it("closes the dialog", () => {
-      const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" }),
-      );
+      const { result } = renderHook(() => useExportTraces({ projectId: "proj-1" }));
 
       act(() => {
         result.current.openExportDialog();
@@ -108,9 +98,7 @@ describe("useExportTraces()", () => {
         }),
       );
 
-      const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" }),
-      );
+      const { result } = renderHook(() => useExportTraces({ projectId: "proj-1" }));
 
       act(() => {
         result.current.openExportDialog();
@@ -134,9 +122,7 @@ describe("useExportTraces()", () => {
         }),
       );
 
-      const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" }),
-      );
+      const { result } = renderHook(() => useExportTraces({ projectId: "proj-1" }));
 
       act(() => {
         result.current.startExport({ mode: "summary", format: "csv" });
@@ -157,9 +143,7 @@ describe("useExportTraces()", () => {
         }),
       );
 
-      const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" }),
-      );
+      const { result } = renderHook(() => useExportTraces({ projectId: "proj-1" }));
 
       act(() => {
         result.current.startExport({ mode: "full", format: "json" });
@@ -183,9 +167,7 @@ describe("useExportTraces()", () => {
         }),
       );
 
-      const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" }),
-      );
+      const { result } = renderHook(() => useExportTraces({ projectId: "proj-1" }));
 
       act(() => {
         result.current.startExport({ mode: "summary", format: "csv" });
@@ -217,9 +199,7 @@ describe("useExportTraces()", () => {
         }),
       );
 
-      const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" }),
-      );
+      const { result } = renderHook(() => useExportTraces({ projectId: "proj-1" }));
 
       act(() => {
         result.current.startExport({ mode: "summary", format: "csv" });
@@ -257,9 +237,7 @@ describe("useExportTraces()", () => {
         }),
       );
 
-      const { result } = renderHook(() =>
-        useExportTraces({ projectId: "proj-1" }),
-      );
+      const { result } = renderHook(() => useExportTraces({ projectId: "proj-1" }));
 
       // Start first export
       act(() => {
@@ -295,9 +273,7 @@ describe("useExportTraces()", () => {
 
   describe("when projectId is undefined", () => {
     it("does not start export and shows error toast", () => {
-      const { result } = renderHook(() =>
-        useExportTraces({ projectId: undefined }),
-      );
+      const { result } = renderHook(() => useExportTraces({ projectId: undefined }));
 
       act(() => {
         result.current.startExport({ mode: "summary", format: "csv" });

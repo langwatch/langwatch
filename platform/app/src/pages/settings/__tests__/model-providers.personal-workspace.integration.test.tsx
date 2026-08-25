@@ -202,9 +202,7 @@ import {
   SHARED_TEAM,
 } from "~/test-utils/personalWorkspaceOrganization";
 
-const { default: ModelProvidersPage } = await import(
-  "~/pages/settings/model-providers"
-);
+const { default: ModelProvidersPage } = await import("~/pages/settings/model-providers");
 
 function renderPage() {
   return render(

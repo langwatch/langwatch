@@ -3,10 +3,7 @@ import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 const PARTIAL_KEY = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
 const SKIPPED_KEY = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
@@ -25,10 +22,7 @@ describe("applySpanToSummary PII redaction status tracking", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    extractSpy = vi.spyOn(
-      TraceIOExtractionService.prototype,
-      "extractRichIOFromSpan",
-    );
+    extractSpy = vi.spyOn(TraceIOExtractionService.prototype, "extractRichIOFromSpan");
     extractSpy.mockReturnValue(null);
   });
 

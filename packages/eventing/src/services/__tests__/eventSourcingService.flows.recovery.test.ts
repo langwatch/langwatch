@@ -26,17 +26,12 @@ describe("EventSourcingService - Recovery Flows", () => {
 
   describe("when map projection (handler) failures occur", () => {
     it("map projection errors are non-critical and do not block subsequent events", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -67,31 +62,22 @@ describe("EventSourcingService - Recovery Flows", () => {
         .mockImplementation((event: Event) => event);
 
       // Process event1 - map fails but storeEvents does not throw
-      await expect(
-        service.storeEvents([event1], context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents([event1], context)).resolves.not.toThrow();
 
       // Process event2 - map projections no longer block on previous failures
-      await expect(
-        service.storeEvents([event2], context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents([event2], context)).resolves.not.toThrow();
 
       // Both events were dispatched to map (event1 failed, event2 succeeded)
       expect(mapDef.map).toHaveBeenCalledTimes(2);
     });
 
     it("multiple map projection failures do not block any events", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -119,11 +105,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       );
 
       // Store events
-      await eventStore.storeEvents(
-        [event1, event2, event3],
-        context,
-        aggregateType,
-      );
+      await eventStore.storeEvents([event1, event2, event3], context, aggregateType);
 
       // Make map fail for event1
       (mapDef.map as ReturnType<typeof vi.fn>)
@@ -145,17 +127,12 @@ describe("EventSourcingService - Recovery Flows", () => {
     });
 
     it("map projection can be retried by re-dispatching same event", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -177,9 +154,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       });
 
       // Process event - map fails
-      await expect(
-        service.storeEvents([event1], context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents([event1], context)).resolves.not.toThrow();
 
       // Fix map (bug fixed)
       (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation(
@@ -196,17 +171,12 @@ describe("EventSourcingService - Recovery Flows", () => {
 
   describe("when fold projection failures occur", () => {
     it("fold projection errors are caught and do not fail storeEvents", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const foldDef = createMockFoldProjectionDefinition("projection");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -228,9 +198,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       });
 
       // Process event - fold fails but storeEvents does not throw
-      await expect(
-        service.storeEvents([event1], context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents([event1], context)).resolves.not.toThrow();
 
       // Verify fold was attempted
       expect(foldDef.apply).toHaveBeenCalledTimes(1);
@@ -239,17 +207,12 @@ describe("EventSourcingService - Recovery Flows", () => {
 
   describe("duplicate prevention does not break map projection dispatch", () => {
     it("duplicate events are dispatched to map projections even after storage dedup", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
+      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -277,9 +240,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         .mockImplementation((event: Event) => event);
 
       // Process event1 - map fails but store succeeds
-      await expect(
-        service.storeEvents([event1], context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents([event1], context)).resolves.not.toThrow();
 
       // Verify event1 is stored (even though map failed)
       const eventsBefore = await eventStore.getEvents(
@@ -291,9 +252,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       expect(eventsBefore[0]?.id).toBe(event1.id);
 
       // Process event2 - succeeds (map no longer blocks on previous failures)
-      await expect(
-        service.storeEvents([event2], context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents([event2], context)).resolves.not.toThrow();
       expect(mapDef.map).toHaveBeenCalledTimes(2);
 
       // Verify both events are stored

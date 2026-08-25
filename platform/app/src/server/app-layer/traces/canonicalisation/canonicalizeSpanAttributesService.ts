@@ -21,10 +21,7 @@ import {
   VercelExtractor,
   VertexAdkExtractor,
 } from "./extractors";
-import type {
-  CanonicalAttributesExtractor,
-  ExtractorContext,
-} from "./extractors/_types";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./extractors/_types";
 import { SpanDataBag } from "./spanDataBag";
 
 export type CanonicalizeResult = {

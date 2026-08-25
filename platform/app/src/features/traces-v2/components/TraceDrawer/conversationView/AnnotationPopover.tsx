@@ -48,10 +48,7 @@ export function AnnotationPopover(props: AnnotationPopoverProps) {
       }}
     >
       {props.triggerTooltip ? (
-        <Tooltip
-          content={props.triggerTooltip}
-          positioning={{ placement: "top" }}
-        >
+        <Tooltip content={props.triggerTooltip} positioning={{ placement: "top" }}>
           <TriggerAnchor>
             <Popover.Trigger asChild>{props.trigger}</Popover.Trigger>
           </TriggerAnchor>
@@ -83,10 +80,7 @@ export function AnnotationPopover(props: AnnotationPopoverProps) {
         >
           {props.thread}
           {isSuggest ? (
-            <SuggestBody
-              state={formState}
-              originalOutput={props.output ?? ""}
-            />
+            <SuggestBody state={formState} originalOutput={props.output ?? ""} />
           ) : (
             <AnnotateBody state={formState} />
           )}

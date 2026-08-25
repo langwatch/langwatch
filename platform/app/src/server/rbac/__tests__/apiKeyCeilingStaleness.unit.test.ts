@@ -15,10 +15,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
-import {
-  resolveApiKeyPermission,
-  type ScopeRef,
-} from "../role-binding-resolver";
+import { resolveApiKeyPermission, type ScopeRef } from "../role-binding-resolver";
 
 const ORG = "org_1";
 const TEAM = "team_1";
@@ -98,23 +95,19 @@ describe("resolveApiKeyPermission, given a key minted before an access change", 
 
   describe("when the user's access has since been reduced", () => {
     it("refuses the write the key was minted for", async () => {
-      await expect(
-        allows(["scenarios:view"], "scenarios:manage"),
-      ).resolves.toBe(false);
+      await expect(allows(["scenarios:view"], "scenarios:manage")).resolves.toBe(false);
     });
 
     it("still allows what the user can still do", async () => {
-      await expect(allows(["scenarios:view"], "scenarios:view")).resolves.toBe(
-        true,
-      );
+      await expect(allows(["scenarios:view"], "scenarios:view")).resolves.toBe(true);
     });
   });
 
   describe("when the user has been removed from the project entirely", () => {
     it("refuses everything the key names", async () => {
-      await expect(
-        allows([], "scenarios:view", { userHasBinding: false }),
-      ).resolves.toBe(false);
+      await expect(allows([], "scenarios:view", { userHasBinding: false })).resolves.toBe(
+        false,
+      );
     });
   });
 });

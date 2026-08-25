@@ -101,8 +101,7 @@ function stubStateRuntime(replay: StubbedRuntime["service"]["replay"]) {
         pipelineName: "langy_conversation_processing",
         aggregateType: "langy_conversation",
         source: "pipeline",
-        pauseKey:
-          "langy_conversation_processing/stateProjection/langyConversationState",
+        pauseKey: "langy_conversation_processing/stateProjection/langyConversationState",
         kind: "state",
         definition: {} as never,
       },
@@ -115,9 +114,7 @@ function stubStateRuntime(replay: StubbedRuntime["service"]["replay"]) {
   return {};
 }
 
-function buildProgress(
-  overrides: Partial<ReplayProgress> = {},
-): ReplayProgress {
+function buildProgress(overrides: Partial<ReplayProgress> = {}): ReplayProgress {
   return {
     phase: "replaying",
     currentProjectionName: "traceSummary",
@@ -387,9 +384,7 @@ describe("ops ReplayService", () => {
 
           // First refresh fails (e.g. a Redis hiccup); later ones succeed
           // via the fake's real implementation.
-          vi.mocked(repo.refreshLock).mockRejectedValueOnce(
-            new Error("redis hiccup"),
-          );
+          vi.mocked(repo.refreshLock).mockRejectedValueOnce(new Error("redis hiccup"));
 
           let finishRun!: () => void;
           const runGate = new Promise<void>((resolve) => {

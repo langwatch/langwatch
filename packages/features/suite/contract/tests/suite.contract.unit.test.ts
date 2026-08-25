@@ -27,26 +27,28 @@ describe("Suite contract", () => {
   });
 
   it("keeps the durable run state contract explicit", () => {
-    expect(() => suiteRunStateDataSchema.parse({
-      SuiteRunId: "run_1",
-      BatchRunId: "batch_1",
-      ScenarioSetId: "set_1",
-      SuiteId: "suite_1",
-      Status: "SUCCESS",
-      Total: 1,
-      StartedCount: 1,
-      CompletedCount: 1,
-      FailedCount: 0,
-      Progress: 1,
-      PassRateBps: 10000,
-      CreatedAt: 1,
-      UpdatedAt: 2,
-      LastEventOccurredAt: 2,
-      StartedAt: 1,
-      FinishedAt: 2,
-      PassedCount: 1,
-      GradedCount: 1,
-      extra: true,
-    })).toThrow();
+    expect(() =>
+      suiteRunStateDataSchema.parse({
+        SuiteRunId: "run_1",
+        BatchRunId: "batch_1",
+        ScenarioSetId: "set_1",
+        SuiteId: "suite_1",
+        Status: "SUCCESS",
+        Total: 1,
+        StartedCount: 1,
+        CompletedCount: 1,
+        FailedCount: 0,
+        Progress: 1,
+        PassRateBps: 10000,
+        CreatedAt: 1,
+        UpdatedAt: 2,
+        LastEventOccurredAt: 2,
+        StartedAt: 1,
+        FinishedAt: 2,
+        PassedCount: 1,
+        GradedCount: 1,
+        extra: true,
+      }),
+    ).toThrow();
   });
 });

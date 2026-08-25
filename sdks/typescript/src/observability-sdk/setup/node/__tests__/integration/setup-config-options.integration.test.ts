@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { setupObservability } from '../../setup';
-import { type SetupObservabilityOptions } from '../../types';
-import { resourceFromAttributes } from '@opentelemetry/resources';
-import { trace } from '@opentelemetry/api';
-import { getConcreteProvider } from '../../../utils';
-import { resetObservabilitySdkConfig } from '../../../../config.js';
+import { setupObservability } from "../../setup";
+import { type SetupObservabilityOptions } from "../../types";
+import { resourceFromAttributes } from "@opentelemetry/resources";
+import { trace } from "@opentelemetry/api";
+import { getConcreteProvider } from "../../../utils";
+import { resetObservabilitySdkConfig } from "../../../../config.js";
 
 beforeEach(() => {
   trace.disable();
@@ -45,8 +45,8 @@ function getInternalTracerConfig(provider: any): any {
   return config;
 }
 
-describe('setupObservability Integration - Configuration Options', () => {
-  it('reflects apiKey and endpoint in the exporter', async () => {
+describe("setupObservability Integration - Configuration Options", () => {
+  it("reflects apiKey and endpoint in the exporter", async () => {
     const logger = createMockLogger();
     const exportSpy = vi.fn((spans, resultCallback) => resultCallback({ code: 0 }));
     class SpyExporter {
@@ -56,13 +56,13 @@ describe('setupObservability Integration - Configuration Options', () => {
     }
     const spyExporter = new SpyExporter();
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key', endpoint: 'https://custom.langwatch.ai' },
+      langwatch: { apiKey: "test-api-key", endpoint: "https://custom.langwatch.ai" },
       debug: { logger },
       traceExporter: spyExporter as any,
     };
     const handle = setupObservability(options);
-    const tracer = trace.getTracer('test-exporter');
-    const span = tracer.startSpan('test-span');
+    const tracer = trace.getTracer("test-exporter");
+    const span = tracer.startSpan("test-span");
     span.end();
 
     // Force flush to ensure spans are exported immediately
@@ -78,40 +78,48 @@ describe('setupObservability Integration - Configuration Options', () => {
     expect(exportSpy).toHaveBeenCalled();
   });
 
-  it('uses serviceName and attributes in resource', async () => {
+  it("uses serviceName and attributes in resource", async () => {
     const logger = createMockLogger();
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
-      serviceName: 'test-service',
-      attributes: { 'deployment.environment': 'test', 'service.version': '1.0.0' } as any,
+      langwatch: { apiKey: "test-api-key" },
+      serviceName: "test-service",
+      attributes: { "deployment.environment": "test", "service.version": "1.0.0" } as any,
       debug: { logger },
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(getInternalTracerConfig(provider).resource.attributes['service.name']).toBe('test-service');
-    expect(getInternalTracerConfig(provider).resource.attributes['deployment.environment']).toBe('test');
-    expect(getInternalTracerConfig(provider).resource.attributes['service.version']).toBe('1.0.0');
+    expect(getInternalTracerConfig(provider).resource.attributes["service.name"]).toBe(
+      "test-service",
+    );
+    expect(
+      getInternalTracerConfig(provider).resource.attributes["deployment.environment"],
+    ).toBe("test");
+    expect(getInternalTracerConfig(provider).resource.attributes["service.version"]).toBe(
+      "1.0.0",
+    );
     await handle.shutdown();
   });
 
-  it('uses custom Resource if provided', async () => {
+  it("uses custom Resource if provided", async () => {
     const logger = createMockLogger();
-    const resource = resourceFromAttributes({ 'custom.resource': 'yes' });
+    const resource = resourceFromAttributes({ "custom.resource": "yes" });
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       resource,
       debug: { logger },
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(getInternalTracerConfig(provider).resource.attributes['custom.resource']).toBe('yes');
+    expect(getInternalTracerConfig(provider).resource.attributes["custom.resource"]).toBe(
+      "yes",
+    );
     await handle.shutdown();
   });
 
-  it('uses spanLimits if provided', async () => {
+  it("uses spanLimits if provided", async () => {
     const logger = createMockLogger();
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       spanLimits: { attributeCountLimit: 1 },
       debug: { logger },
     };
@@ -121,10 +129,10 @@ describe('setupObservability Integration - Configuration Options', () => {
     await handle.shutdown();
   });
 
-  it('uses autoDetectResources if provided', async () => {
+  it("uses autoDetectResources if provided", async () => {
     const logger = createMockLogger();
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       autoDetectResources: false,
       debug: { logger },
     };
@@ -134,36 +142,41 @@ describe('setupObservability Integration - Configuration Options', () => {
     await handle.shutdown();
   });
 
-  it('uses sampler if provided', async () => {
+  it("uses sampler if provided", async () => {
     const logger = createMockLogger();
-    const customSampler = { shouldSample: vi.fn(), toString: () => 'customSampler' };
+    const customSampler = { shouldSample: vi.fn(), toString: () => "customSampler" };
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       sampler: customSampler as any,
       debug: { logger },
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(getInternalTracerConfig(provider).sampler.toString()).toBe('customSampler');
+    expect(getInternalTracerConfig(provider).sampler.toString()).toBe("customSampler");
     await handle.shutdown();
   });
 
-  it('uses idGenerator if provided', async () => {
+  it("uses idGenerator if provided", async () => {
     const logger = createMockLogger();
-    const customIdGenerator = { generateSpanId: () => 'spanid', generateTraceId: () => 'traceid' };
+    const customIdGenerator = {
+      generateSpanId: () => "spanid",
+      generateTraceId: () => "traceid",
+    };
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       idGenerator: customIdGenerator as any,
       debug: { logger },
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(getInternalTracerConfig(provider).idGenerator.generateSpanId()).toBe('spanid');
-    expect(getInternalTracerConfig(provider).idGenerator.generateTraceId()).toBe('traceid');
+    expect(getInternalTracerConfig(provider).idGenerator.generateSpanId()).toBe("spanid");
+    expect(getInternalTracerConfig(provider).idGenerator.generateTraceId()).toBe(
+      "traceid",
+    );
     await handle.shutdown();
   });
 
-  it('uses spanProcessors if provided', async () => {
+  it("uses spanProcessors if provided", async () => {
     const logger = createMockLogger();
     const onEndSpy = vi.fn();
     class SpyProcessor {
@@ -174,15 +187,15 @@ describe('setupObservability Integration - Configuration Options', () => {
     }
     const spyProcessor = new SpyProcessor();
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       spanProcessors: [spyProcessor as any],
       debug: { logger },
     };
     const handle = setupObservability(options);
-    const tracer = trace.getTracer('test-processor');
-    const span = tracer.startSpan('test-span');
+    const tracer = trace.getTracer("test-processor");
+    const span = tracer.startSpan("test-span");
     span.end();
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect(onEndSpy).toHaveBeenCalled();
     // Shutdown flushes the ended span through the default LangWatch exporter,
     // which fails to reach the fake endpoint. Tolerate only that expected
@@ -201,19 +214,21 @@ describe('setupObservability Integration - Configuration Options', () => {
   });
 
   // For options that cannot be directly inspected, keep logger or side-effect checks
-  it('uses instrumentations if provided (smoke test)', async () => {
+  it("uses instrumentations if provided (smoke test)", async () => {
     const logger = createMockLogger();
-    const customInstrumentations = [{
-      instrumentationName: 'custom',
-      instrumentationVersion: '1.0.0',
-      enable: vi.fn(),
-      disable: vi.fn(),
-      setTracerProvider: vi.fn(),
-      setMeterProvider: vi.fn(),
-      setLoggerProvider: vi.fn(),
-    }] as any;
+    const customInstrumentations = [
+      {
+        instrumentationName: "custom",
+        instrumentationVersion: "1.0.0",
+        enable: vi.fn(),
+        disable: vi.fn(),
+        setTracerProvider: vi.fn(),
+        setMeterProvider: vi.fn(),
+        setLoggerProvider: vi.fn(),
+      },
+    ] as any;
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       instrumentations: customInstrumentations,
       debug: { logger },
     };
@@ -224,15 +239,15 @@ describe('setupObservability Integration - Configuration Options', () => {
     }).not.toThrow();
   });
 
-  it('uses contextManager if provided (smoke test)', async () => {
+  it("uses contextManager if provided (smoke test)", async () => {
     const logger = createMockLogger();
     const customContextManager = {
       active: (_ctx: any) => undefined,
       with: (_ctx: any, fn: any) => fn(),
-      bind: (_ctx: any, target: any) => target
+      bind: (_ctx: any, target: any) => target,
     };
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       contextManager: customContextManager as any,
       debug: { logger },
     };
@@ -243,11 +258,15 @@ describe('setupObservability Integration - Configuration Options', () => {
     }).not.toThrow();
   });
 
-  it('uses textMapPropagator if provided (smoke test)', async () => {
+  it("uses textMapPropagator if provided (smoke test)", async () => {
     const logger = createMockLogger();
-    const customTextMapPropagator = { inject: vi.fn(), extract: vi.fn(), fields: vi.fn() };
+    const customTextMapPropagator = {
+      inject: vi.fn(),
+      extract: vi.fn(),
+      fields: vi.fn(),
+    };
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       textMapPropagator: customTextMapPropagator as any,
       debug: { logger },
     };
@@ -256,11 +275,15 @@ describe('setupObservability Integration - Configuration Options', () => {
     await handle.shutdown();
   });
 
-  it('uses logRecordProcessors if provided (smoke test)', async () => {
+  it("uses logRecordProcessors if provided (smoke test)", async () => {
     const logger = createMockLogger();
-    const customLogRecordProcessor = { onEmit: vi.fn(), forceFlush: vi.fn(), shutdown: vi.fn() };
+    const customLogRecordProcessor = {
+      onEmit: vi.fn(),
+      forceFlush: vi.fn(),
+      shutdown: vi.fn(),
+    };
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       logRecordProcessors: [customLogRecordProcessor as any],
       debug: { logger },
     };
@@ -269,11 +292,16 @@ describe('setupObservability Integration - Configuration Options', () => {
     await handle.shutdown();
   });
 
-  it('uses metricReader if provided (smoke test)', async () => {
+  it("uses metricReader if provided (smoke test)", async () => {
     const logger = createMockLogger();
-    const customMetricReader = { collect: vi.fn(), forceFlush: vi.fn(), shutdown: vi.fn(), setCallback: vi.fn() };
+    const customMetricReader = {
+      collect: vi.fn(),
+      forceFlush: vi.fn(),
+      shutdown: vi.fn(),
+      setCallback: vi.fn(),
+    };
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       metricReader: customMetricReader as any,
       debug: { logger },
     };
@@ -284,11 +312,11 @@ describe('setupObservability Integration - Configuration Options', () => {
     }).not.toThrow();
   });
 
-  it('uses views if provided (smoke test)', async () => {
+  it("uses views if provided (smoke test)", async () => {
     const logger = createMockLogger();
-    const customViews = [{ instrumentName: 'custom.instrument' }];
+    const customViews = [{ instrumentName: "custom.instrument" }];
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       views: customViews as any,
       debug: { logger },
     };
@@ -297,11 +325,11 @@ describe('setupObservability Integration - Configuration Options', () => {
     await handle.shutdown();
   });
 
-  it('uses resourceDetectors if provided (smoke test)', async () => {
+  it("uses resourceDetectors if provided (smoke test)", async () => {
     const logger = createMockLogger();
     const customResourceDetectors = [{ detect: vi.fn() }];
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       resourceDetectors: customResourceDetectors as any,
       debug: { logger },
     };
@@ -310,24 +338,24 @@ describe('setupObservability Integration - Configuration Options', () => {
     await handle.shutdown();
   });
 
-  it('uses consoleTracing if provided', async () => {
+  it("uses consoleTracing if provided", async () => {
     const logger = createMockLogger();
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       debug: {
         consoleTracing: true,
-        logger
+        logger,
       },
     };
     const handle = setupObservability(options);
     await handle.shutdown();
   });
 
-  it('uses custom traceExporter if provided', async () => {
+  it("uses custom traceExporter if provided", async () => {
     const logger = createMockLogger();
     const exporter = new OTLPTraceExporter();
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       traceExporter: exporter,
       debug: { logger },
     };
@@ -335,30 +363,30 @@ describe('setupObservability Integration - Configuration Options', () => {
     await handle.shutdown();
   });
 
-  it('uses logLevel if provided', async () => {
+  it("uses logLevel if provided", async () => {
     const logger = createMockLogger();
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       debug: {
-        logLevel: 'debug',
-        logger
+        logLevel: "debug",
+        logger,
       },
     };
     const handle = setupObservability(options);
     // Accept any logger method being called, not just info
     expect(
       logger.info.mock.calls.length +
-      logger.debug.mock.calls.length +
-      logger.error.mock.calls.length +
-      logger.warn.mock.calls.length
+        logger.debug.mock.calls.length +
+        logger.error.mock.calls.length +
+        logger.warn.mock.calls.length,
     ).toBeGreaterThan(0);
     await handle.shutdown();
   });
 
-  it('fallbacks to env vars for apiKey/endpoint/serviceName', async () => {
-    process.env.LANGWATCH_API_KEY = 'env-api-key';
-    process.env.LANGWATCH_ENDPOINT = 'https://env-endpoint';
-    process.env.LANGWATCH_SERVICE_NAME = 'env-service';
+  it("fallbacks to env vars for apiKey/endpoint/serviceName", async () => {
+    process.env.LANGWATCH_API_KEY = "env-api-key";
+    process.env.LANGWATCH_ENDPOINT = "https://env-endpoint";
+    process.env.LANGWATCH_SERVICE_NAME = "env-service";
     const logger = createMockLogger();
     // setupObservability should pick up env vars when not provided in options
     const options: SetupObservabilityOptions = { debug: { logger } };
@@ -366,9 +394,9 @@ describe('setupObservability Integration - Configuration Options', () => {
     // Accept any logger method being called, not just info
     expect(
       logger.info.mock.calls.length +
-      logger.debug.mock.calls.length +
-      logger.error.mock.calls.length +
-      logger.warn.mock.calls.length
+        logger.debug.mock.calls.length +
+        logger.error.mock.calls.length +
+        logger.warn.mock.calls.length,
     ).toBeGreaterThan(0);
     await handle.shutdown();
     delete process.env.LANGWATCH_API_KEY;
@@ -376,23 +404,23 @@ describe('setupObservability Integration - Configuration Options', () => {
     delete process.env.LANGWATCH_SERVICE_NAME;
   });
 
-  it('handles invalid/conflicting options gracefully', async () => {
+  it("handles invalid/conflicting options gracefully", async () => {
     const logger = createMockLogger();
     // e.g., both spanProcessors and consoleTracing
     const processor = new SimpleSpanProcessor(new OTLPTraceExporter());
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       spanProcessors: [processor],
       debug: {
         consoleTracing: true,
-        logger
+        logger,
       },
     };
     const handle = setupObservability(options);
     await handle.shutdown();
   });
 
-  it('skips OpenTelemetry setup if skipOpenTelemetrySetup is true', async () => {
+  it("skips OpenTelemetry setup if skipOpenTelemetrySetup is true", async () => {
     const logger = createMockLogger();
     const exportSpy = vi.fn();
     class SpyExporter {
@@ -402,15 +430,15 @@ describe('setupObservability Integration - Configuration Options', () => {
     }
     const spyExporter = new SpyExporter();
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       debug: { logger },
       traceExporter: spyExporter as any,
       advanced: { skipOpenTelemetrySetup: true },
     };
     const handle = setupObservability(options);
     // Try to create a span
-    const tracer = trace.getTracer('test-skip-otel');
-    const span = tracer.startSpan('should-not-export');
+    const tracer = trace.getTracer("test-skip-otel");
+    const span = tracer.startSpan("should-not-export");
     span.end();
     // Even after shutdown, no spans should be exported
     await handle.shutdown();
@@ -420,14 +448,14 @@ describe('setupObservability Integration - Configuration Options', () => {
     expect(provider).toBeUndefined();
   });
 
-  it('accepts new flat debug configuration structure', async () => {
+  it("accepts new flat debug configuration structure", async () => {
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
+      langwatch: { apiKey: "test-api-key" },
       debug: {
         consoleTracing: true,
         consoleLogging: true,
-        logLevel: 'debug'
-      }
+        logLevel: "debug",
+      },
     };
 
     const handle = setupObservability(options);
@@ -437,10 +465,10 @@ describe('setupObservability Integration - Configuration Options', () => {
     await handle.shutdown();
   });
 
-  it('handles advanced.disabled correctly in integration', async () => {
+  it("handles advanced.disabled correctly in integration", async () => {
     const options: SetupObservabilityOptions = {
-      langwatch: { apiKey: 'test-api-key' },
-      advanced: { disabled: true }
+      langwatch: { apiKey: "test-api-key" },
+      advanced: { disabled: true },
     };
 
     const handle = setupObservability(options);
@@ -452,14 +480,14 @@ describe('setupObservability Integration - Configuration Options', () => {
     await handle.shutdown();
   });
 
-  it('handles langwatch disabled configuration', async () => {
+  it("handles langwatch disabled configuration", async () => {
     const logger = createMockLogger();
     const options: SetupObservabilityOptions = {
-      langwatch: 'disabled',
+      langwatch: "disabled",
       debug: {
         consoleTracing: true,
         logger,
-      }
+      },
     };
 
     const handle = setupObservability(options);
@@ -471,14 +499,14 @@ describe('setupObservability Integration - Configuration Options', () => {
     await handle.shutdown();
   });
 
-  it('uses batch processors when specified', async () => {
+  it("uses batch processors when specified", async () => {
     const logger = createMockLogger();
     const options: SetupObservabilityOptions = {
       langwatch: {
-        apiKey: 'test-api-key',
-        processorType: 'batch'
+        apiKey: "test-api-key",
+        processorType: "batch",
       },
-      debug: { logger }
+      debug: { logger },
     };
 
     const handle = setupObservability(options);
@@ -489,18 +517,19 @@ describe('setupObservability Integration - Configuration Options', () => {
     await handle.shutdown();
   });
 
-  describe('data capture configuration', () => {
+  describe("data capture configuration", () => {
     it('sets "none" mode in observability config', async () => {
       const logger = createMockLogger();
       const options: SetupObservabilityOptions = {
-        langwatch: { apiKey: 'test-api-key' },
+        langwatch: { apiKey: "test-api-key" },
         dataCapture: "none",
         debug: { logger },
       };
       const handle = setupObservability(options);
 
       // Import config module to check the setting
-      const { shouldCaptureInput, shouldCaptureOutput } = await import('../../../../config.js');
+      const { shouldCaptureInput, shouldCaptureOutput } =
+        await import("../../../../config.js");
       expect(shouldCaptureInput()).toBe(false);
       expect(shouldCaptureOutput()).toBe(false);
 
@@ -510,14 +539,15 @@ describe('setupObservability Integration - Configuration Options', () => {
     it('sets "input" mode in observability config', async () => {
       const logger = createMockLogger();
       const options: SetupObservabilityOptions = {
-        langwatch: { apiKey: 'test-api-key' },
+        langwatch: { apiKey: "test-api-key" },
         dataCapture: "input",
         debug: { logger },
       };
       const handle = setupObservability(options);
 
       // Import config module to check the setting
-      const { shouldCaptureInput, shouldCaptureOutput } = await import('../../../../config.js');
+      const { shouldCaptureInput, shouldCaptureOutput } =
+        await import("../../../../config.js");
       expect(shouldCaptureInput()).toBe(true);
       expect(shouldCaptureOutput()).toBe(false);
 
@@ -527,14 +557,15 @@ describe('setupObservability Integration - Configuration Options', () => {
     it('sets "output" mode in observability config', async () => {
       const logger = createMockLogger();
       const options: SetupObservabilityOptions = {
-        langwatch: { apiKey: 'test-api-key' },
+        langwatch: { apiKey: "test-api-key" },
         dataCapture: "output",
         debug: { logger },
       };
       const handle = setupObservability(options);
 
       // Import config module to check the setting
-      const { shouldCaptureInput, shouldCaptureOutput } = await import('../../../../config.js');
+      const { shouldCaptureInput, shouldCaptureOutput } =
+        await import("../../../../config.js");
       expect(shouldCaptureInput()).toBe(false);
       expect(shouldCaptureOutput()).toBe(true);
 
@@ -544,14 +575,15 @@ describe('setupObservability Integration - Configuration Options', () => {
     it('sets "all" mode in observability config', async () => {
       const logger = createMockLogger();
       const options: SetupObservabilityOptions = {
-        langwatch: { apiKey: 'test-api-key' },
+        langwatch: { apiKey: "test-api-key" },
         dataCapture: "all",
         debug: { logger },
       };
       const handle = setupObservability(options);
 
       // Import config module to check the setting
-      const { shouldCaptureInput, shouldCaptureOutput } = await import('../../../../config.js');
+      const { shouldCaptureInput, shouldCaptureOutput } =
+        await import("../../../../config.js");
       expect(shouldCaptureInput()).toBe(true);
       expect(shouldCaptureOutput()).toBe(true);
 
@@ -561,13 +593,14 @@ describe('setupObservability Integration - Configuration Options', () => {
     it('defaults to "all" mode when not specified', async () => {
       const logger = createMockLogger();
       const options: SetupObservabilityOptions = {
-        langwatch: { apiKey: 'test-api-key' },
+        langwatch: { apiKey: "test-api-key" },
         debug: { logger },
       };
       const handle = setupObservability(options);
 
       // Import config module to check default values
-      const { shouldCaptureInput, shouldCaptureOutput } = await import('../../../../config.js');
+      const { shouldCaptureInput, shouldCaptureOutput } =
+        await import("../../../../config.js");
       expect(shouldCaptureInput()).toBe(true);
       expect(shouldCaptureOutput()).toBe(true);
 

@@ -192,12 +192,7 @@ export const LensTabs: React.FC = () => {
           minWidth={0}
         >
           <Box ref={scrollerRef} overflowX="hidden" flex="1" minWidth={0}>
-            <HStack
-              gap={0}
-              flexWrap="nowrap"
-              width="max-content"
-              align="center"
-            >
+            <HStack gap={0} flexWrap="nowrap" width="max-content" align="center">
               <Tabs.List borderBottomWidth={0} flexWrap="nowrap">
                 {flatLenses.map((lens) => (
                   <LensTab

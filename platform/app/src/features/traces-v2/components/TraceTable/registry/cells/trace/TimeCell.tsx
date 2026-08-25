@@ -101,8 +101,6 @@ const PeekButton: React.FC<{
     _hover={{ color: "fg", bg: "fg.subtle/10" }}
     transition="color 0.1s"
   >
-    <Icon boxSize="12px">
-      {isExpanded ? <ChevronDown /> : <ChevronRight />}
-    </Icon>
+    <Icon boxSize="12px">{isExpanded ? <ChevronDown /> : <ChevronRight />}</Icon>
   </Box>
 );

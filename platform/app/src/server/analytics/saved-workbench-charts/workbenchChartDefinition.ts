@@ -111,6 +111,4 @@ export const workbenchChartDefinitionSchema = z.object({
   vegaLiteSpec: z.record(z.string(), z.unknown()).optional(),
 });
 
-export type WorkbenchChartDefinition = z.infer<
-  typeof workbenchChartDefinitionSchema
->;
+export type WorkbenchChartDefinition = z.infer<typeof workbenchChartDefinitionSchema>;

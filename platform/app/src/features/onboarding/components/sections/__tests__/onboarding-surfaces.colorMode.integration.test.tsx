@@ -32,18 +32,14 @@ const noop = () => void 0;
  */
 /** Every emitted CSS rule that targets one of the element's own classes. */
 function rulesFor(element: Element): string[] {
-  const classNames = (element.getAttribute("class") ?? "")
-    .split(/\s+/)
-    .filter(Boolean);
+  const classNames = (element.getAttribute("class") ?? "").split(/\s+/).filter(Boolean);
   if (classNames.length === 0) return [];
 
   return Array.from(document.querySelectorAll("style"))
     .map((tag) => tag.textContent ?? "")
     .join("\n")
     .split("}")
-    .filter((rule) =>
-      classNames.some((className) => rule.includes(`.${className}`)),
-    );
+    .filter((rule) => classNames.some((className) => rule.includes(`.${className}`)));
 }
 
 /** The element's base (mode-independent) `background` declaration. */
@@ -55,9 +51,7 @@ function backgroundDeclarationFor(element: Element): string {
 }
 
 function hasDarkModeBackgroundRule(element: Element): boolean {
-  const classNames = (element.getAttribute("class") ?? "")
-    .split(/\s+/)
-    .filter(Boolean);
+  const classNames = (element.getAttribute("class") ?? "").split(/\s+/).filter(Boolean);
   if (classNames.length === 0) return false;
 
   const stylesheet = Array.from(document.querySelectorAll("style"))

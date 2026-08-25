@@ -20,10 +20,7 @@ const isEnvTrue = (value: string | undefined) => value === "true";
 
 // A trailing slash on the endpoint would produce `//v1/traces`, which some
 // collectors 404 on.
-const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.replace(
-  /\/+$/,
-  "",
-);
+const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.replace(/\/+$/, "");
 const langwatchTracingEnabled = !!process.env.LANGWATCH_API_KEY;
 
 const redisCommandTracingEnabled = isRedisCommandTracingEnabled();
@@ -39,11 +36,8 @@ const redisCommandTracingEnabled = isRedisCommandTracingEnabled();
 // synchronous `require` is the way to make the load conditional while keeping
 // the tracer registered before ./start evaluates. Same pattern as workers.ts.
 if (explicitEndpoint || langwatchTracingEnabled) {
-  const {
-    CompositePropagator,
-    W3CBaggagePropagator,
-    W3CTraceContextPropagator,
-  } = require("@opentelemetry/core") as typeof import("@opentelemetry/core");
+  const { CompositePropagator, W3CBaggagePropagator, W3CTraceContextPropagator } =
+    require("@opentelemetry/core") as typeof import("@opentelemetry/core");
   const { OTLPLogExporter } =
     require("@opentelemetry/exporter-logs-otlp-proto") as typeof import("@opentelemetry/exporter-logs-otlp-proto");
   const { OTLPTraceExporter } =
@@ -75,9 +69,7 @@ if (explicitEndpoint || langwatchTracingEnabled) {
   };
 
   const spanProcessors = [] as Array<InstanceType<typeof BatchSpanProcessor>>;
-  const logRecordProcessors = [] as Array<
-    InstanceType<typeof BatchLogRecordProcessor>
-  >;
+  const logRecordProcessors = [] as Array<InstanceType<typeof BatchLogRecordProcessor>>;
 
   if (explicitEndpoint) {
     // OTLPExporters automatically read OTEL_EXPORTER_OTLP_HEADERS from environment
@@ -129,10 +121,7 @@ if (explicitEndpoint || langwatchTracingEnabled) {
     spanProcessors: spanProcessors,
     logRecordProcessors: logRecordProcessors,
     textMapPropagator: new CompositePropagator({
-      propagators: [
-        new W3CTraceContextPropagator(),
-        new W3CBaggagePropagator(),
-      ],
+      propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
     }),
     // Explicit instrumentations instead of @opentelemetry/auto-instrumentations-node:
     // the aggregate loads all ~41 instrumentation packages at import time even

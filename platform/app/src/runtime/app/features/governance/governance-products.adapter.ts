@@ -30,9 +30,7 @@ class AppPersonalVirtualKeyIssuerPort extends PersonalVirtualKeyIssuerPort {
     super();
   }
 
-  static create(
-    virtualKeys: VirtualKeyService,
-  ): AppPersonalVirtualKeyIssuerPort {
+  static create(virtualKeys: VirtualKeyService): AppPersonalVirtualKeyIssuerPort {
     return new AppPersonalVirtualKeyIssuerPort(virtualKeys);
   }
 
@@ -75,7 +73,9 @@ class AppAiToolSlugPort extends AiToolSlugPort {
       .replace(/^-+|-+$/g, "")
       .slice(0, 48);
     const stem = base.length > 0 ? base : "tool";
-    return `${stem}-${nanoid(6).toLowerCase().replace(/[^a-z0-9]/g, "x")}`;
+    return `${stem}-${nanoid(6)
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "x")}`;
   }
 }
 
@@ -102,10 +102,7 @@ class AppCliBudgetOverviewPort extends CliBudgetOverviewPort {
     return new AppCliBudgetOverviewPort(budgets);
   }
 
-  async overviewForUser(input: {
-    userId: string;
-    organizationId: string;
-  }) {
+  async overviewForUser(input: { userId: string; organizationId: string }) {
     const overview = await this.budgets.overviewForUser(input);
     return {
       gatewayAccess: overview.gatewayAccess,

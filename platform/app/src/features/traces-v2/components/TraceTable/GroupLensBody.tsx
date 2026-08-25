@@ -11,12 +11,7 @@ import { useFilterStore } from "../../stores/filterStore";
 import { groupByForGrouping, type LensConfig } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
 import { buildGroupColumns } from "./columns";
-import {
-  buildGroups,
-  groupRegistry,
-  RegistryRow,
-  type TraceGroup,
-} from "./registry";
+import { buildGroups, groupRegistry, RegistryRow, type TraceGroup } from "./registry";
 import { groupSelectColumnDef } from "./selectColumn";
 import { buildGroupPlaceholderRows } from "./skeletonPlaceholders";
 import { TraceTableShell } from "./TraceTableShell";
@@ -52,9 +47,7 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
   ]);
   const columns = useMemo(
     () =>
-      groupBy
-        ? [groupSelectColumnDef, ...buildGroupColumns(lens.columns, groupBy)]
-        : [],
+      groupBy ? [groupSelectColumnDef, ...buildGroupColumns(lens.columns, groupBy)] : [],
     [lens.columns, groupBy],
   );
 

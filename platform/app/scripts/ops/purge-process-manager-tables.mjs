@@ -162,9 +162,7 @@ const TARGETS = [
  * @returns {Promise<number>}
  */
 async function countEligible(target) {
-  const rows = /** @type {Array<{ n: unknown }>} */ (
-    await target.countEligible()
-  );
+  const rows = /** @type {Array<{ n: unknown }>} */ (await target.countEligible());
   return Number(rows[0]?.n ?? 0);
 }
 

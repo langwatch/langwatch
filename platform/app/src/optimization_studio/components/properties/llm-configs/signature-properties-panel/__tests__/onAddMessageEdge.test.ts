@@ -71,9 +71,7 @@ describe("computeMessageEdgeUpdate", () => {
       // Should update messages[0] (adjusted index)
       expect(result.parameterToUpdate).toBe("messages");
       expect(result.messagesIndex).toBe(0);
-      expect(result.newValue).toEqual([
-        { role: "user", content: "Hello! {{question}}" },
-      ]);
+      expect(result.newValue).toEqual([{ role: "user", content: "Hello! {{question}}" }]);
     });
   });
 

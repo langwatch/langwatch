@@ -58,9 +58,7 @@ describe("creating an evaluator with an unknown type", () => {
       const [reason] = body.reasons;
       expect(reason.code).toBe("schema_failure");
       expect(reason.meta.field).toBe("config.evaluatorType");
-      expect(reason.meta.expected).toEqual(
-        Object.keys(AVAILABLE_EVALUATORS).sort(),
-      );
+      expect(reason.meta.expected).toEqual(Object.keys(AVAILABLE_EVALUATORS).sort());
       expect(reason.meta.received).toBe("ragas/answer_relevancy");
     });
 
@@ -78,9 +76,7 @@ describe("creating an evaluator with an unknown type", () => {
       const res = await post(staleSlug);
 
       const body = await res.json();
-      expect(body.reasons[0].meta.message).not.toContain(
-        "ragas/response_relevancy",
-      );
+      expect(body.reasons[0].meta.message).not.toContain("ragas/response_relevancy");
     });
   });
 

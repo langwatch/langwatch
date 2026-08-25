@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import {
-  SsoGate,
-  type SsoConfiguration,
-} from "@langwatch/enterprise-sso-contract";
+import { SsoGate, type SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 import type {
   LicensingService,
   PlatformLicenseInspection,

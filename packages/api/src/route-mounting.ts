@@ -10,18 +10,9 @@ import {
   buildEndpointMiddlewareStack,
   buildWithdrawnMiddlewareStack,
 } from "./pipeline.js";
-import type {
-  BaseApp,
-  HttpMethod,
-  ServiceConfig,
-  VersionStatus,
-} from "./types.js";
+import type { BaseApp, HttpMethod, ServiceConfig, VersionStatus } from "./types.js";
 import { isDateVersion } from "./types.js";
-import {
-  type ResolvedEndpoint,
-  VERSION_LATEST,
-  VERSION_PREVIEW,
-} from "./versioning.js";
+import { type ResolvedEndpoint, VERSION_LATEST, VERSION_PREVIEW } from "./versioning.js";
 
 type ProviderMap<TProject> = Record<
   string,
@@ -86,8 +77,7 @@ export function mountResolvedRoutes<TProject>({
     versionMap,
   });
 
-  const versionNamespace =
-    "/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
+  const versionNamespace = "/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
   const notFound: MiddlewareHandler = async (c) => c.notFound();
   for (const guardPath of [versionNamespace, `${versionNamespace}/*`]) {
     const handlers: [MiddlewareHandler, ...MiddlewareHandler[]] = fallback
@@ -318,8 +308,7 @@ function buildDateFallback<TProject>({
     }
     if (!effective) return next();
 
-    const rest =
-      c.req.path.slice(basePath.length + requested.length + 1) || "/";
+    const rest = c.req.path.slice(basePath.length + requested.length + 1) || "/";
     const method = c.req.method.toLowerCase();
     for (const candidate of table.get(effective)!) {
       if (candidate.method !== method) continue;
@@ -369,10 +358,7 @@ async function runStack(
  * `:name`, `:name{constraint}` (the constraint is honored, not templated away)
  * and a trailing `*`.
  */
-export function matchPath(
-  pattern: string,
-  path: string,
-): Record<string, string> | null {
+export function matchPath(pattern: string, path: string): Record<string, string> | null {
   const patternSegments = splitSegments(pattern);
   const pathSegments = splitSegments(path);
   const params: Record<string, string> = {};

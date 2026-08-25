@@ -22,8 +22,7 @@ vi.mock("~/utils/api", () => ({
           mockUseQuery("getAllVersionsForPrompt", ...args),
       },
       getTagsForConfig: {
-        useQuery: (...args: unknown[]) =>
-          mockUseQuery("getTagsForConfig", ...args),
+        useQuery: (...args: unknown[]) => mockUseQuery("getTagsForConfig", ...args),
       },
       assignTag: {
         useMutation: () => ({
@@ -243,9 +242,7 @@ describe("Scenario: Version Select inputs stay within the modal width", () => {
 
     // Each Select.Root rendered for a tag row must carry the anti-overflow
     // flex props that clamp the trigger to the row width.
-    const selectRoots = baseElement.querySelectorAll(
-      '[data-testid="select-root"]',
-    );
+    const selectRoots = baseElement.querySelectorAll('[data-testid="select-root"]');
     expect(selectRoots.length).toBeGreaterThan(0);
     selectRoots.forEach((root) => {
       expect(root).toHaveAttribute("data-flex", "1");

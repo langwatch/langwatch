@@ -28,8 +28,7 @@ const DIMENSION_COPY: Record<
 > = {
   tools: {
     label: "Tools",
-    description:
-      "Matched against the name of every tool a request offers the model.",
+    description: "Matched against the name of every tool a request offers the model.",
     denyPlaceholder: "^shell_.*\ndelete_user",
   },
   mcp: {
@@ -115,8 +114,8 @@ export function RestrictionsSection({
         <Accordion.ItemContent>
           <VStack align="stretch" gap={4} paddingTop={2} width="full">
             <Text fontSize="xs" color="fg.muted">
-              One pattern per line. A pattern the platform cannot read refuses
-              the request rather than letting it through.
+              One pattern per line. A pattern the platform cannot read refuses the request
+              rather than letting it through.
             </Text>
             {RESTRICTION_DIMENSIONS.map((dimension) => (
               <Box key={dimension}>

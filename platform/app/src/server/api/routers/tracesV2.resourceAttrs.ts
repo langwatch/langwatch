@@ -6,9 +6,7 @@ import { NON_BILLABLE_ATTR } from "~/server/event-sourcing/pipelines/trace-proce
  * are plumbing, not user-facing metadata (the billed/bundled split is shown
  * as real amounts), so they are filtered out of the drawer's resource view.
  */
-export const HIDDEN_RESOURCE_ATTRS: ReadonlySet<string> = new Set([
-  NON_BILLABLE_ATTR,
-]);
+export const HIDDEN_RESOURCE_ATTRS: ReadonlySet<string> = new Set([NON_BILLABLE_ATTR]);
 
 export function withoutHiddenResourceAttrs(
   attrs: Record<string, string>,

@@ -89,9 +89,8 @@ export function InstallCliCard({
         </Text>
 
         <Text fontSize="xs" color="fg.muted">
-          Requires Node.js 18 or newer (the <Code fontSize="xs">npm</Code>{" "}
-          command ships with it). Get it at{" "}
-          <Code fontSize="xs">nodejs.org</Code>.
+          Requires Node.js 18 or newer (the <Code fontSize="xs">npm</Code> command ships
+          with it). Get it at <Code fontSize="xs">nodejs.org</Code>.
         </Text>
 
         <CommandRow
@@ -108,8 +107,8 @@ export function InstallCliCard({
         {!isSaas && (
           <Text fontSize="xs" color="fg.muted">
             Self-hosted detected. The login flag targets{" "}
-            <Code fontSize="xs">{baseHost}</Code>; the endpoint is persisted
-            after that first login, so subsequent commands don&apos;t need it.
+            <Code fontSize="xs">{baseHost}</Code>; the endpoint is persisted after that
+            first login, so subsequent commands don&apos;t need it.
           </Text>
         )}
 

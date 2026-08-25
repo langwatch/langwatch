@@ -31,9 +31,7 @@ const CONFIGURATION_CODES = new Set([
   "model_provider_disabled",
 ]);
 
-export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({
-  error,
-}) => {
+export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({ error }) => {
   const [expanded, setExpanded] = useState(false);
   const expandable = hasAiErrorDetails(error);
   const setAiError = useFilterStore((s) => s.setAiError);
@@ -83,9 +81,7 @@ export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({
             alignItems="center"
             color="fg.muted"
           >
-            <Icon boxSize="11px">
-              {expanded ? <ChevronUp /> : <ChevronDown />}
-            </Icon>
+            <Icon boxSize="11px">{expanded ? <ChevronUp /> : <ChevronDown />}</Icon>
           </chakra.button>
         )}
         <chakra.button

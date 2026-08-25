@@ -107,10 +107,7 @@ describe("slack Block Kit template registry", () => {
           kind: "report",
           reportSource: "customGraph",
         });
-        expect(options.map((o) => o.id)).toEqual([
-          "report_chart",
-          "report_chart_card",
-        ]);
+        expect(options.map((o) => o.id)).toEqual(["report_chart", "report_chart_card"]);
       });
     });
 
@@ -175,9 +172,7 @@ describe("slack Block Kit template registry", () => {
     });
 
     it("keeps every auto layout out of the galleries", () => {
-      const auto = SLACK_BLOCK_KIT_TEMPLATES.filter(
-        (t) => t.autoFor !== undefined,
-      );
+      const auto = SLACK_BLOCK_KIT_TEMPLATES.filter((t) => t.autoFor !== undefined);
       expect(auto.length).toBeGreaterThan(0);
       for (const template of auto) {
         expect(
@@ -244,9 +239,7 @@ describe("slack Block Kit template registry", () => {
 
     describe("when the draft is a report", () => {
       it("picks the layout that fits what the report sends", () => {
-        const pick = (
-          reportSource: "traceQuery" | "customGraph" | "dashboard",
-        ) =>
+        const pick = (reportSource: "traceQuery" | "customGraph" | "dashboard") =>
           pickDefaultSlackBlockKitTemplateId({
             cadence: "digest",
             hasEvaluationFilter: false,

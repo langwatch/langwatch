@@ -46,11 +46,9 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
 
   describe("when LLM value is a string (legacy format)", () => {
     it("migrates legacy format to object with model field", () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {
-          /* this is just a mock implementation for a spy */
-        });
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* this is just a mock implementation for a spy */
+      });
       const nodeData = {
         parameters: [
           {
@@ -135,11 +133,9 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
 
   describe("when input identifier is empty string", () => {
     it("generates unique identifier", () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {
-          /* this is just a mock implementation for a spy */
-        });
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* this is just a mock implementation for a spy */
+      });
       const nodeData = {
         parameters: [],
         inputs: [{ identifier: "", type: "str" }],
@@ -156,11 +152,9 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
 
   describe("when input identifier is undefined", () => {
     it("generates unique identifier", () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {
-          /* this is just a mock implementation for a spy */
-        });
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* this is just a mock implementation for a spy */
+      });
       const nodeData = {
         parameters: [],
         inputs: [{ type: "str" }],
@@ -177,11 +171,9 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
 
   describe("when multiple inputs have empty identifiers", () => {
     it("generates unique identifiers for each", () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {
-          /* this is just a mock implementation for a spy */
-        });
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* this is just a mock implementation for a spy */
+      });
       const nodeData = {
         parameters: [],
         inputs: [
@@ -196,23 +188,17 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
         safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(nodeData);
 
       expect(result.version?.configData?.inputs?.[0]?.identifier).toBe("input");
-      expect(result.version?.configData?.inputs?.[1]?.identifier).toBe(
-        "input_1",
-      );
-      expect(result.version?.configData?.inputs?.[2]?.identifier).toBe(
-        "input_2",
-      );
+      expect(result.version?.configData?.inputs?.[1]?.identifier).toBe("input_1");
+      expect(result.version?.configData?.inputs?.[2]?.identifier).toBe("input_2");
       consoleWarnSpy.mockRestore();
     });
   });
 
   describe("when output identifier is empty string", () => {
     it("generates unique identifier", () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {
-          /* this is just a mock implementation for a spy */
-        });
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* this is just a mock implementation for a spy */
+      });
       const nodeData = {
         parameters: [],
         inputs: [],
@@ -222,20 +208,16 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
       const result =
         safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(nodeData);
 
-      expect(result.version?.configData?.outputs?.[0]?.identifier).toBe(
-        "output",
-      );
+      expect(result.version?.configData?.outputs?.[0]?.identifier).toBe("output");
       consoleWarnSpy.mockRestore();
     });
   });
 
   describe("when output identifier is undefined", () => {
     it("generates unique identifier", () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {
-          /* this is just a mock implementation for a spy */
-        });
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* this is just a mock implementation for a spy */
+      });
       const nodeData = {
         parameters: [],
         inputs: [],
@@ -245,20 +227,16 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
       const result =
         safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(nodeData);
 
-      expect(result.version?.configData?.outputs?.[0]?.identifier).toBe(
-        "output",
-      );
+      expect(result.version?.configData?.outputs?.[0]?.identifier).toBe("output");
       consoleWarnSpy.mockRestore();
     });
   });
 
   describe("when multiple outputs have empty identifiers", () => {
     it("generates unique identifiers for each", () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {
-          /* this is just a mock implementation for a spy */
-        });
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* this is just a mock implementation for a spy */
+      });
       const nodeData = {
         parameters: [],
         inputs: [],
@@ -271,12 +249,8 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
       const result =
         safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(nodeData);
 
-      expect(result.version?.configData?.outputs?.[0]?.identifier).toBe(
-        "output",
-      );
-      expect(result.version?.configData?.outputs?.[1]?.identifier).toBe(
-        "output_1",
-      );
+      expect(result.version?.configData?.outputs?.[0]?.identifier).toBe("output");
+      expect(result.version?.configData?.outputs?.[1]?.identifier).toBe("output_1");
       consoleWarnSpy.mockRestore();
     });
   });
@@ -312,9 +286,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
 
   describe("when prompt handle has no prefix", () => {
     it("keeps simple handle unchanged", () => {
-      const result = versionedPromptToPromptConfigFormValues(
-        createMockPrompt("gato"),
-      );
+      const result = versionedPromptToPromptConfigFormValues(createMockPrompt("gato"));
       expect(result.handle).toBe("gato");
     });
 
@@ -369,9 +341,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
 
   describe("when prompt handle is null", () => {
     it("keeps handle as null", () => {
-      const result = versionedPromptToPromptConfigFormValues(
-        createMockPrompt(null),
-      );
+      const result = versionedPromptToPromptConfigFormValues(createMockPrompt(null));
       expect(result.handle).toBeNull();
     });
   });
@@ -452,8 +422,7 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
       messages: [{ role: "user", content: "Say meow" }],
     });
 
-    const result =
-      versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
+    const result = versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
 
     // System message should be first in the array
     expect(result.version.configData.messages[0]).toEqual({
@@ -511,8 +480,7 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
       });
 
       // 2. Simulate what syncNodeDataWithFormValues does - convert form to node data
-      const nodeData =
-        promptConfigFormValuesToOptimizationStudioNodeData(formValues);
+      const nodeData = promptConfigFormValuesToOptimizationStudioNodeData(formValues);
 
       // Verify node data has the instructions (system prompt)
       const instructionsParam = nodeData.parameters?.find(
@@ -521,9 +489,7 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
       expect(instructionsParam?.value).toBe("You are a helpful cat assistant.");
 
       // Verify messages param does NOT have the system message (it's stored separately in instructions)
-      const messagesParam = nodeData.parameters?.find(
-        (p) => p.identifier === "messages",
-      );
+      const messagesParam = nodeData.parameters?.find((p) => p.identifier === "messages");
       expect(messagesParam?.value).toEqual([]);
     });
 
@@ -534,8 +500,7 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
       });
 
       // BUG: Using versionedPromptToPromptConfigFormValues (WITHOUT system message)
-      const formValuesWRONG =
-        versionedPromptToPromptConfigFormValues(savedPrompt);
+      const formValuesWRONG = versionedPromptToPromptConfigFormValues(savedPrompt);
 
       // Form values are MISSING the system message!
       expect(formValuesWRONG.version.configData.messages).toHaveLength(0);
@@ -626,9 +591,7 @@ describe("nodeDataToLocalPromptConfig()", () => {
 
   describe("when node has legacy string LLM value", () => {
     it("migrates to object format with model field", () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {});
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const nodeData = {
         parameters: [
           {
@@ -676,9 +639,7 @@ describe("nodeDataToLocalPromptConfig()", () => {
       const result = nodeDataToLocalPromptConfig(nodeData);
 
       expect(result).not.toBeUndefined();
-      expect(result!.messages).toEqual([
-        { role: "system", content: "You are a cat." },
-      ]);
+      expect(result!.messages).toEqual([{ role: "system", content: "You are a cat." }]);
     });
   });
 

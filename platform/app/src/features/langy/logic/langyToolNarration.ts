@@ -153,10 +153,7 @@ export function stripToolNarration({
     lineIndex += 1;
   }
 
-  const kept = [
-    ...(headRemainder ? [headRemainder] : []),
-    ...lines.slice(lineIndex),
-  ]
+  const kept = [...(headRemainder ? [headRemainder] : []), ...lines.slice(lineIndex)]
     .join("\n")
     .replace(/^\n+/, "")
     .trim();

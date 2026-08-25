@@ -46,13 +46,7 @@ function trace(id: string, startedAt: number) {
   };
 }
 
-function renderCard({
-  totalHits,
-  count,
-}: {
-  totalHits: number;
-  count: number;
-}) {
+function renderCard({ totalHits, count }: { totalHits: number; count: number }) {
   const traces = Array.from({ length: count }, (_, i) =>
     trace(`trace_${i}`, 1750000000000 + i),
   );
@@ -228,9 +222,7 @@ describe("LangyTraceSampleCard", () => {
         });
         renderHydrated();
 
-        expect(
-          screen.getByText("These traces are no longer available."),
-        ).toBeTruthy();
+        expect(screen.getByText("These traces are no longer available.")).toBeTruthy();
         expect(screen.queryByText("No traces matched.")).toBeNull();
         expect(screen.getByText("View in Trace Explorer")).toBeTruthy();
       });
@@ -247,9 +239,7 @@ describe("LangyTraceSampleCard", () => {
         });
         renderHydrated();
 
-        expect(
-          screen.getByText(/Couldn.t load these traces right now/),
-        ).toBeTruthy();
+        expect(screen.getByText(/Couldn.t load these traces right now/)).toBeTruthy();
         expect(screen.getByText("View in Trace Explorer")).toBeTruthy();
       });
     });

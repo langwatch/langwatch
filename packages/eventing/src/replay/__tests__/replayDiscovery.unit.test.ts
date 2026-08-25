@@ -41,12 +41,8 @@ describe("filterDiscoveredByAggregateIds", () => {
           aggregateIds: ["agg-1", "agg-3"],
         });
 
-        expect(byTenant.get("tenant-a")?.map((a) => a.aggregateId)).toEqual([
-          "agg-1",
-        ]);
-        expect(byTenant.get("tenant-b")?.map((a) => a.aggregateId)).toEqual([
-          "agg-3",
-        ]);
+        expect(byTenant.get("tenant-a")?.map((a) => a.aggregateId)).toEqual(["agg-1"]);
+        expect(byTenant.get("tenant-b")?.map((a) => a.aggregateId)).toEqual(["agg-3"]);
       });
     });
 
@@ -61,9 +57,7 @@ describe("filterDiscoveredByAggregateIds", () => {
         });
 
         expect(byTenant.has("tenant-a")).toBe(false);
-        expect(byTenant.get("tenant-b")?.map((a) => a.aggregateId)).toEqual([
-          "agg-3",
-        ]);
+        expect(byTenant.get("tenant-b")?.map((a) => a.aggregateId)).toEqual(["agg-3"]);
         expect(filtered.map((a) => a.aggregateId)).toEqual(["agg-3"]);
       });
     });

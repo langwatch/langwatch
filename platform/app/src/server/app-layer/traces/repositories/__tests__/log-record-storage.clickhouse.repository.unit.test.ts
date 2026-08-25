@@ -10,9 +10,7 @@ const repoCapturingQuery = (rows: unknown[] = []) => {
   const query = vi.fn().mockResolvedValue({ json: async () => rows });
   const resolveClient = (async () => ({
     query,
-  })) as unknown as ConstructorParameters<
-    typeof LogRecordStorageClickHouseRepository
-  >[0];
+  })) as unknown as ConstructorParameters<typeof LogRecordStorageClickHouseRepository>[0];
   const repo = new LogRecordStorageClickHouseRepository(resolveClient);
   return { repo, query };
 };
@@ -35,9 +33,7 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
       await repo.getLogsByTraceId("project_test", "trace-1", occurredAtMs);
 
       const { query: sql, query_params } = capturedQuery(query);
-      expect(sql.match(/TimeUnixMs >= fromUnixTimestamp64Milli/g)).toHaveLength(
-        2,
-      );
+      expect(sql.match(/TimeUnixMs >= fromUnixTimestamp64Milli/g)).toHaveLength(2);
       const windowMs = 2 * 24 * 60 * 60 * 1000;
       expect(query_params.fromMs).toBe(occurredAtMs - windowMs);
       expect(query_params.toMs).toBe(occurredAtMs + windowMs);
@@ -73,9 +69,7 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
 
       const after = Date.now();
       const { query: sql, query_params } = capturedQuery(query);
-      expect(sql.match(/TimeUnixMs >= fromUnixTimestamp64Milli/g)).toHaveLength(
-        2,
-      );
+      expect(sql.match(/TimeUnixMs >= fromUnixTimestamp64Milli/g)).toHaveLength(2);
       const partitionWindowMs = 2 * 24 * 60 * 60 * 1000;
       const lookbackMs = 90 * 24 * 60 * 60 * 1000;
       const toMs = query_params.toMs as number;
@@ -114,11 +108,7 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
     });
 
     it("returns only the oldest rows up to a caller-narrowed limit", async () => {
-      const { repo } = repoCapturingQuery([
-        storedRow(0),
-        storedRow(1),
-        storedRow(2),
-      ]);
+      const { repo } = repoCapturingQuery([storedRow(0), storedRow(1), storedRow(2)]);
 
       const rows = await repo.getLogsByTraceId(
         "project_test",

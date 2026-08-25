@@ -1,10 +1,7 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
-import {
-  hasPermissionWithHierarchy,
-  teamRoleHasPermission,
-} from "~/server/api/rbac";
+import { hasPermissionWithHierarchy, teamRoleHasPermission } from "~/server/api/rbac";
 
 export type CopyTargetProject = {
   label: string;
@@ -39,15 +36,12 @@ export function useProjectsForCopy(
 
     return organizations.flatMap((org) =>
       org.teams.flatMap((team) => {
-        const teamMember = team.members.find(
-          (member) => member.userId === currentUserId,
-        );
+        const teamMember = team.members.find((member) => member.userId === currentUserId);
         if (!teamMember) return [];
 
         let hasPermission = false;
         if (teamMember.assignedRole) {
-          const permissions =
-            (teamMember.assignedRole.permissions as string[]) ?? [];
+          const permissions = (teamMember.assignedRole.permissions as string[]) ?? [];
           if (permissions.length > 0) {
             hasPermission = hasPermissionWithHierarchy(permissions, permission);
           } else {

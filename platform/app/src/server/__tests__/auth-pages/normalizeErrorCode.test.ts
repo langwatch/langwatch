@@ -29,9 +29,9 @@ describe("normalizeErrorCode", () => {
 
   describe("when given a BetterAuth account-already-linked error", () => {
     it("maps account_already_linked_to_different_user to OAuthAccountNotLinked", () => {
-      expect(
-        normalizeErrorCode("account_already_linked_to_different_user"),
-      ).toBe("OAuthAccountNotLinked");
+      expect(normalizeErrorCode("account_already_linked_to_different_user")).toBe(
+        "OAuthAccountNotLinked",
+      );
     });
   });
 
@@ -49,9 +49,7 @@ describe("normalizeErrorCode", () => {
     });
 
     it("passes OAuthAccountNotLinked through unchanged", () => {
-      expect(normalizeErrorCode("OAuthAccountNotLinked")).toBe(
-        "OAuthAccountNotLinked",
-      );
+      expect(normalizeErrorCode("OAuthAccountNotLinked")).toBe("OAuthAccountNotLinked");
     });
   });
 
@@ -64,9 +62,7 @@ describe("normalizeErrorCode", () => {
 
 describe("isStableAuthError", () => {
   describe("when given a wrong-method / collision error the user must act on", () => {
-    it.each(
-      STABLE_AUTH_ERRORS,
-    )("treats %s as stable (no auto-redirect)", (code) => {
+    it.each(STABLE_AUTH_ERRORS)("treats %s as stable (no auto-redirect)", (code) => {
       expect(isStableAuthError(code)).toBe(true);
     });
 

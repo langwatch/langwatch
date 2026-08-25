@@ -25,8 +25,7 @@ export const InputGroup = React.forwardRef<HTMLDivElement, InputGroupProps>(
       ...rest
     } = props;
 
-    const child =
-      React.Children.only<React.ReactElement<InputElementProps>>(children);
+    const child = React.Children.only<React.ReactElement<InputElementProps>>(children);
 
     return (
       <Group ref={ref} {...rest}>

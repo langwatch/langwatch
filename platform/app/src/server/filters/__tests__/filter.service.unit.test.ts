@@ -45,9 +45,7 @@ const resolveClient = vi.fn();
 /** The service under test, reading through a real repository over a fake client. */
 function serviceOver(client: unknown): FilterService {
   resolveClient.mockResolvedValue(client);
-  return new FilterService(
-    new FilterOptionsClickHouseRepository(resolveClient),
-  );
+  return new FilterService(new FilterOptionsClickHouseRepository(resolveClient));
 }
 
 function makeInput(
@@ -99,9 +97,7 @@ describe("FilterService.getFilterOptions", () => {
       const client = makeClient();
       const service = serviceOver(client);
 
-      const result = await service.getFilterOptions(
-        makeInput({ field: "traces.name" }),
-      );
+      const result = await service.getFilterOptions(makeInput({ field: "traces.name" }));
 
       expect(result).toEqual([]);
       expect(client.query).not.toHaveBeenCalled();
@@ -176,14 +172,10 @@ describe("FilterService.getFilterOptions", () => {
       };
       const service = serviceOver(client);
 
-      const error = await service
-        .getFilterOptions(makeInput())
-        .catch((e: unknown) => e);
+      const error = await service.getFilterOptions(makeInput()).catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(ClickHouseOverloadedError);
-      expect((error as ClickHouseOverloadedError).code).toBe(
-        "clickhouse_overloaded",
-      );
+      expect((error as ClickHouseOverloadedError).code).toBe("clickhouse_overloaded");
     });
   });
 
@@ -198,9 +190,7 @@ describe("FilterService.getFilterOptions", () => {
       };
       const service = serviceOver(client);
 
-      const error = await service
-        .getFilterOptions(makeInput())
-        .catch((e: unknown) => e);
+      const error = await service.getFilterOptions(makeInput()).catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toBe("Failed to fetch filter options");

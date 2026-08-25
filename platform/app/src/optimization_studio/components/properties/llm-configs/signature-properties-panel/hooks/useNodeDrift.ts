@@ -37,8 +37,7 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
    * show a warning and provide a button to reload the latest version into the form (which should update the node data)
    */
   const hasDrift = useMemo(() => {
-    if (!latestPrompt || isFetchingLatestPrompt || isLoadingPrompt)
-      return false;
+    if (!latestPrompt || isFetchingLatestPrompt || isLoadingPrompt) return false;
     return !isNodeDataEqual(
       node.data,
       versionedPromptToOptimizationStudioNodeData(latestPrompt),

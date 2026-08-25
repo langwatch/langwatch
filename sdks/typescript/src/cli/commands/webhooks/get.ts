@@ -32,7 +32,9 @@ export const getWebhookCommand = async (id: string): Promise<CommandResult | voi
           console.log(`Destination:   HTTPS endpoint`);
           console.log(`URL:           ${endpoint.url}`);
         }
-        console.log(`Status:        ${endpoint.status}${endpoint.disabled_reason ? ` (${endpoint.disabled_reason})` : ""}`);
+        console.log(
+          `Status:        ${endpoint.status}${endpoint.disabled_reason ? ` (${endpoint.disabled_reason})` : ""}`,
+        );
         console.log(`Events:        ${endpoint.enabled_events.join(", ")}`);
         console.log(`Last success:  ${endpoint.last_success_at ?? "never"}`);
         console.log(`Failing since: ${endpoint.failing_since ?? "-"}`);

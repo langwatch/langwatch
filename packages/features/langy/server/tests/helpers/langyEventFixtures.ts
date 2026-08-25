@@ -54,10 +54,7 @@ function base({ id, occurredAt }: { id: string; occurredAt: number }) {
   };
 }
 
-export function conversationStartedEvent(params: {
-  id: string;
-  occurredAt: number;
-}) {
+export function conversationStartedEvent(params: { id: string; occurredAt: number }) {
   return LangyConversationStartedEventSchema.parse({
     ...base(params),
     type: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED,
@@ -206,10 +203,7 @@ export function agentResponseFailedEvent(params: {
   });
 }
 
-export function conversationArchivedEvent(params: {
-  id: string;
-  occurredAt: number;
-}) {
+export function conversationArchivedEvent(params: { id: string; occurredAt: number }) {
   return LangyConversationArchivedEventSchema.parse({
     ...base(params),
     type: LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED,
@@ -218,10 +212,7 @@ export function conversationArchivedEvent(params: {
   });
 }
 
-export function conversationRenamedEvent(params: {
-  id: string;
-  occurredAt: number;
-}) {
+export function conversationRenamedEvent(params: { id: string; occurredAt: number }) {
   return LangyConversationMetadataUpdatedEventSchema.parse({
     ...base(params),
     type: LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED,

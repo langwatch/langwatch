@@ -76,13 +76,8 @@ describe("the generated Vega-Lite v6 schema validator", () => {
     describe("when the generator is re-run", () => {
       /** @scenario "A spec validates against the bundled official Vega-Lite v6 schema" */
       it("reproduces the committed module byte for byte", () => {
-        const regenerated = generateVegaLiteValidatorSource(
-          readBundledVegaLiteSchema(),
-        );
-        const committed = readFileSync(
-          `${APP_ROOT}${GENERATED_VALIDATOR_PATH}`,
-          "utf8",
-        );
+        const regenerated = generateVegaLiteValidatorSource(readBundledVegaLiteSchema());
+        const committed = readFileSync(`${APP_ROOT}${GENERATED_VALIDATOR_PATH}`, "utf8");
 
         expect(
           regenerated === committed,
@@ -91,10 +86,7 @@ describe("the generated Vega-Lite v6 schema validator", () => {
       });
 
       it("carries the do-not-edit header naming the script that writes it", () => {
-        const committed = readFileSync(
-          `${APP_ROOT}${GENERATED_VALIDATOR_PATH}`,
-          "utf8",
-        );
+        const committed = readFileSync(`${APP_ROOT}${GENERATED_VALIDATOR_PATH}`, "utf8");
         expect(committed).toContain("GENERATED FILE — DO NOT EDIT");
         expect(committed).toContain("pnpm generate:vega-validator");
         // The point of the whole exercise: no `new Function` in the browser.

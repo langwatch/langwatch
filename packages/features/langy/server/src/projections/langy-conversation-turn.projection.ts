@@ -1,8 +1,5 @@
 import type { Projection, StateProjectionStore } from "@langwatch/eventing";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
 import {
   foldLangyConversationTurn,
   initLangyConversationTurnState,
@@ -29,8 +26,7 @@ import {
   LangyToolCallSucceededEventSchema,
 } from "../adapters/eventing.langy.adapter";
 
-export interface LangyConversationTurn
-  extends Projection<LangyConversationTurnData> {
+export interface LangyConversationTurn extends Projection<LangyConversationTurnData> {
   data: LangyConversationTurnData;
 }
 
@@ -65,10 +61,7 @@ export class LangyConversationTurnFoldProjection
     StateProjectionStore<LangyConversationTurnData>
   >
   implements
-    FoldEventHandlers<
-      typeof langyConversationTurnEvents,
-      LangyConversationTurnData
-    >
+    FoldEventHandlers<typeof langyConversationTurnEvents, LangyConversationTurnData>
 {
   readonly name = "langyConversationTurn";
   readonly version = LANGY_CONVERSATION_PROJECTION_VERSIONS.CONVERSATION_TURN;
@@ -78,18 +71,11 @@ export class LangyConversationTurnFoldProjection
 
   /** One document per (conversationId, turnId). */
   key = (event: { type: string }): string => {
-    const data = (
-      event as { data?: { conversationId?: string; turnId?: string } }
-    ).data;
-    return makeConversationTurnKey(
-      data?.conversationId ?? "",
-      data?.turnId ?? "",
-    );
+    const data = (event as { data?: { conversationId?: string; turnId?: string } }).data;
+    return makeConversationTurnKey(data?.conversationId ?? "", data?.turnId ?? "");
   };
 
-  constructor(deps: {
-    store: StateProjectionStore<LangyConversationTurnData>;
-  }) {
+  constructor(deps: { store: StateProjectionStore<LangyConversationTurnData> }) {
     super();
     this.store = deps.store;
   }

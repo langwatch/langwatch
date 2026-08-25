@@ -30,9 +30,7 @@ describe("followConversationModel", () => {
         resolvedDefault: DEFAULT,
       });
 
-      expect(useLangyStore.getState().modelOverride).toBe(
-        "custom/stealth/ox-alpha",
-      );
+      expect(useLangyStore.getState().modelOverride).toBe("custom/stealth/ox-alpha");
     });
 
     it("restores it over the panel-seeded default too", () => {
@@ -44,9 +42,7 @@ describe("followConversationModel", () => {
         resolvedDefault: DEFAULT,
       });
 
-      expect(useLangyStore.getState().modelOverride).toBe(
-        "custom/stealth/ox-alpha",
-      );
+      expect(useLangyStore.getState().modelOverride).toBe("custom/stealth/ox-alpha");
     });
   });
 
@@ -60,9 +56,7 @@ describe("followConversationModel", () => {
         resolvedDefault: DEFAULT,
       });
 
-      expect(useLangyStore.getState().modelOverride).toBe(
-        "anthropic/claude-sonnet-5",
-      );
+      expect(useLangyStore.getState().modelOverride).toBe("anthropic/claude-sonnet-5");
     });
   });
 

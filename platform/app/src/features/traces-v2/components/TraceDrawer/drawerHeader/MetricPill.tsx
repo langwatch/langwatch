@@ -69,20 +69,14 @@ export function PinnedMetricPill({
     <VStack align="stretch" gap={0.5} minWidth="180px" maxWidth="320px">
       <TooltipRow
         label={
-          auto
-            ? "Auto-pinned"
-            : pin.source === "resource"
-              ? "Resource"
-              : "Attribute"
+          auto ? "Auto-pinned" : pin.source === "resource" ? "Resource" : "Attribute"
         }
         value={pin.key}
       />
       <TooltipRow label="Value" value={display} />
       <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
         Click value to copy
-        {onNavigate
-          ? ` · click arrow to ${navigateLabel?.toLowerCase() ?? "open"}`
-          : ""}
+        {onNavigate ? ` · click arrow to ${navigateLabel?.toLowerCase() ?? "open"}` : ""}
         {onFilter ? " · click filter to scope the table" : ""}
         {auto ? "" : " · click pin to unpin"}
       </Text>
@@ -127,12 +121,7 @@ export function PinnedMetricPill({
           alignItems="center"
           flexShrink={0}
         >
-          <Icon
-            as={auto ? LuSparkles : LuPin}
-            boxSize={3}
-            color={fg}
-            flexShrink={0}
-          />
+          <Icon as={auto ? LuSparkles : LuPin} boxSize={3} color={fg} flexShrink={0} />
         </Box>
         {/* Mixed-case + no letter-spacing so pinned-attribute labels
             (e.g. "User", "Conversation") read at the same rhythm as
@@ -181,10 +170,7 @@ export function PinnedMetricPill({
           </Text>
         </Box>
         {onNavigate && value != null && (
-          <Tooltip
-            content={navigateLabel ?? "Open"}
-            positioning={{ placement: "top" }}
-          >
+          <Tooltip content={navigateLabel ?? "Open"} positioning={{ placement: "top" }}>
             <Box
               as="button"
               onClick={(e: React.MouseEvent) => {

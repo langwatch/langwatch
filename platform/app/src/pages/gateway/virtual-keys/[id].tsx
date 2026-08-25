@@ -56,10 +56,7 @@ import {
 import { VirtualKeyOwnershipReadOnly } from "~/components/gateway/VirtualKeyOwnershipSection";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
 import { VirtualKeyUsageSnippet } from "~/components/gateway/VirtualKeyUsageSnippet";
-import {
-  formatExpiry,
-  isExpired,
-} from "~/components/gateway/virtualKeyExpiration";
+import { formatExpiry, isExpired } from "~/components/gateway/virtualKeyExpiration";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
@@ -82,11 +79,10 @@ function VirtualKeyDetailPage() {
     { organizationId: orgId, id: vkId },
     { enabled: !!orgId && !!vkId },
   );
-  const orgProvidersQuery =
-    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
-      { organizationId: orgId },
-      { enabled: !!orgId },
-    );
+  const orgProvidersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId },
+  );
   // Reading a policy needs `routingPolicies:view`, which is stricter than
   // the permission that opens this page, so the query is allowed to fail:
   // the section falls back to the stored identifier rather than the name.
@@ -158,9 +154,7 @@ function VirtualKeyDetailPage() {
   // Null until the user clicks a provider row in the eligible-MP preview;
   // otherwise the snippet model is derived from the key's first eligible
   // provider (see snippetModel below).
-  const [snippetModelOverride, setSnippetModelOverride] = useState<
-    string | null
-  >(null);
+  const [snippetModelOverride, setSnippetModelOverride] = useState<string | null>(null);
 
   const canUpdate = hasPermission("virtualKeys:update");
   const canRotate = hasPermission("virtualKeys:rotate");
@@ -177,22 +171,18 @@ function VirtualKeyDetailPage() {
     () =>
       firstEligibleDefaultModel({
         scopes: vk?.scopes ?? [],
-        providers: (orgProvidersQuery.data?.providers ??
-          []) as OrgModelProvider[],
+        providers: (orgProvidersQuery.data?.providers ?? []) as OrgModelProvider[],
         availableProjects,
         organizationId: orgId,
       }),
     [vk?.scopes, orgProvidersQuery.data?.providers, availableProjects, orgId],
   );
-  const snippetModel =
-    snippetModelOverride ?? computedDefaultModel ?? "gpt-5-mini";
+  const snippetModel = snippetModelOverride ?? computedDefaultModel ?? "gpt-5-mini";
 
   // Guardrails are project-scoped: only a VK reachable from exactly one
   // PROJECT scope has a single guardrail surface to edit.
   const guardrailProject = useMemo(() => {
-    const projectScopes = (vk?.scopes ?? []).filter(
-      (s) => s.scopeType === "PROJECT",
-    );
+    const projectScopes = (vk?.scopes ?? []).filter((s) => s.scopeType === "PROJECT");
     if (projectScopes.length !== 1) return null;
     const id = projectScopes[0]!.scopeId;
     for (const t of organization?.teams ?? []) {
@@ -244,8 +234,8 @@ function VirtualKeyDetailPage() {
 
   const guardrailAttachments = useMemo(
     () =>
-      ((vk?.config as { guardrailAttachments?: unknown } | null)
-        ?.guardrailAttachments ?? []) as Array<{
+      ((vk?.config as { guardrailAttachments?: unknown } | null)?.guardrailAttachments ??
+        []) as Array<{
         direction: "pre" | "post" | "stream_chunk";
         guardrailIds: string[];
       }>,
@@ -313,9 +303,7 @@ function VirtualKeyDetailPage() {
               {/* Audit history stays available even when revoked —
                   operators forensically investigating a revoked VK
                   still need its create/update/rotate/revoke trail. */}
-              <Link
-                href={`/settings/audit-log?targetKind=virtual_key&targetId=${vk.id}`}
-              >
+              <Link href={`/settings/audit-log?targetKind=virtual_key&targetId=${vk.id}`}>
                 <Button variant="outline" size="sm">
                   <FileClock size={14} /> Audit history
                 </Button>
@@ -325,39 +313,23 @@ function VirtualKeyDetailPage() {
                   exactly when somebody needs it. */}
               {viewTracesHref && (
                 <Link href={viewTracesHref}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-testid="vk-header-view-traces"
-                  >
+                  <Button variant="outline" size="sm" data-testid="vk-header-view-traces">
                     <Bird size={14} /> View traces
                   </Button>
                 </Link>
               )}
               {vk.status === "active" && canUpdate && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditing(true)}
-                >
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
                   <Pencil size={14} /> Edit
                 </Button>
               )}
               {vk.status === "active" && canRotate && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setRotating(true)}
-                >
+                <Button variant="outline" size="sm" onClick={() => setRotating(true)}>
                   <RotateCw size={14} /> Rotate
                 </Button>
               )}
               {vk.status === "active" && canUpdate && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDisabling(true)}
-                >
+                <Button variant="outline" size="sm" onClick={() => setDisabling(true)}>
                   <PauseCircle size={14} /> Disable
                 </Button>
               )}
@@ -433,11 +405,7 @@ function VirtualKeyDetailPage() {
                       </Text>
                     </Tooltip>
                   ) : (
-                    <Text
-                      fontSize="sm"
-                      color="fg.muted"
-                      data-testid="vk-detail-expires"
-                    >
+                    <Text fontSize="sm" color="fg.muted" data-testid="vk-detail-expires">
                       Never
                     </Text>
                   )}
@@ -485,10 +453,7 @@ function VirtualKeyDetailPage() {
                 <VStack align="stretch" gap={3}>
                   <VirtualKeyOwnershipReadOnly
                     scopes={(vk.scopes ?? []).map((s) => ({
-                      scopeType: s.scopeType as
-                        | "ORGANIZATION"
-                        | "TEAM"
-                        | "PROJECT",
+                      scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
                       scopeId: s.scopeId,
                     }))}
                     principal={
@@ -533,8 +498,7 @@ function VirtualKeyDetailPage() {
                       )
                     ) : (
                       <Text fontSize="sm" color="fg.muted">
-                        default cascade, all eligible providers in priority
-                        order
+                        default cascade, all eligible providers in priority order
                       </Text>
                     )}
                   </HStack>
@@ -555,11 +519,7 @@ function VirtualKeyDetailPage() {
                       gap={2}
                       justifyContent="space-between"
                     >
-                      <Text
-                        fontSize="xs"
-                        fontWeight="semibold"
-                        color="fg.muted"
-                      >
+                      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                         Allowed model providers
                       </Text>
                       <ConfigureModelProvidersLink scopes={vk.scopes ?? []} />
@@ -688,13 +648,7 @@ function Section({
   );
 }
 
-function DetailRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <HStack gap={4} align="flex-start">
       <Text fontSize="sm" color="fg.muted" minWidth="140px">
@@ -781,8 +735,8 @@ function UsageSection({
     return (
       <Section title="Usage (last 30 days)" action={action}>
         <Text fontSize="sm" color="fg.muted">
-          No usage in the last 30 days. Send a request through this virtual key
-          and it'll show up here.
+          No usage in the last 30 days. Send a request through this virtual key and it'll
+          show up here.
         </Text>
       </Section>
     );
@@ -796,18 +750,9 @@ function UsageSection({
     <Section title="Usage (last 30 days)" action={action}>
       <VStack align="stretch" gap={4}>
         <HStack gap={6} wrap="wrap">
-          <VkStat
-            label="Total spend"
-            value={`$${Number(data.totalUsd).toFixed(2)}`}
-          />
-          <VkStat
-            label="Requests"
-            value={data.totalRequests.toLocaleString()}
-          />
-          <VkStat
-            label="Avg $/request"
-            value={formatVkAvgCost(data.avgUsdPerRequest)}
-          />
+          <VkStat label="Total spend" value={`$${Number(data.totalUsd).toFixed(2)}`} />
+          <VkStat label="Requests" value={data.totalRequests.toLocaleString()} />
+          <VkStat label="Avg $/request" value={formatVkAvgCost(data.avgUsdPerRequest)} />
           {data.blockedRequests > 0 && (
             <VkStat
               label="Blocked"
@@ -825,21 +770,14 @@ function UsageSection({
             height="180px"
           >
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={points}
-                margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
-              >
+              <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="vkSpendFill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
                     <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#e2e8f0"
-                  vertical={false}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis
                   dataKey="day"
                   tick={{ fontSize: 11, fill: "#64748b" }}
@@ -893,8 +831,7 @@ function UsageSection({
                       colorPalette={isSelected ? "orange" : undefined}
                       fontSize="2xs"
                     >
-                      {m.model} · ${Number(m.totalUsd).toFixed(2)} ·{" "}
-                      {m.requests}
+                      {m.model} · ${Number(m.totalUsd).toFixed(2)} · {m.requests}
                     </Badge>
                   </chakra.button>
                 );
@@ -909,11 +846,7 @@ function UsageSection({
                 Recent activity
               </Text>
               {selectedModel && (
-                <Text
-                  fontSize="xs"
-                  color="fg.muted"
-                  data-testid="vk-usage-model-filter"
-                >
+                <Text fontSize="xs" color="fg.muted" data-testid="vk-usage-model-filter">
                   {selectedModel} only. Click the model again to see all.
                 </Text>
               )}
@@ -937,9 +870,7 @@ function UsageSection({
                   {data.recentDebits.slice(0, 10).map((d) => (
                     <Table.Row key={d.id}>
                       <Table.Cell>
-                        <Tooltip
-                          content={new Date(d.occurredAt).toLocaleString()}
-                        >
+                        <Tooltip content={new Date(d.occurredAt).toLocaleString()}>
                           <Text fontSize="xs" color="fg.muted">
                             {formatTimeAgo(new Date(d.occurredAt).getTime())}
                           </Text>
@@ -974,15 +905,7 @@ function UsageSection({
   );
 }
 
-function VkStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "red";
-}) {
+function VkStat({ label, value, tone }: { label: string; value: string; tone?: "red" }) {
   return (
     <VStack align="start" gap={0}>
       <Text fontSize="2xs" color="fg.muted" textTransform="uppercase">
@@ -1038,11 +961,7 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
     (config.guardrails?.streamChunk?.length ?? 0);
 
   const cacheTone =
-    cacheMode === "force"
-      ? "orange"
-      : cacheMode === "disable"
-        ? "red"
-        : "green";
+    cacheMode === "force" ? "orange" : cacheMode === "disable" ? "red" : "green";
 
   return (
     <Section title="Configuration">
@@ -1050,12 +969,7 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
         <DetailRow label="Tags">
           <HStack gap={1} flexWrap="wrap">
             {tags.map((t) => (
-              <Badge
-                key={t}
-                variant="subtle"
-                colorPalette="gray"
-                fontSize="2xs"
-              >
+              <Badge key={t} variant="subtle" colorPalette="gray" fontSize="2xs">
                 {t}
               </Badge>
             ))}

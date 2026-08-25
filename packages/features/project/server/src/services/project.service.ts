@@ -176,16 +176,11 @@ export class ProjectService extends ProjectServiceContract {
     teamId: string;
     organizationId: string;
   }): Promise<void> {
-    const destinationTeam =
-      await this.repository.tryFindActiveTeamInOrganization(input);
+    const destinationTeam = await this.repository.tryFindActiveTeamInOrganization(input);
     if (!destinationTeam) {
-      throw new TeamNotInOrganizationError(
-        "Team does not belong to this organization",
-      );
+      throw new TeamNotInOrganizationError("Team does not belong to this organization");
     }
-    const violation = personalWorkspaceCreateViolation(
-      destinationTeam.isPersonal,
-    );
+    const violation = personalWorkspaceCreateViolation(destinationTeam.isPersonal);
     if (violation) throw new PersonalWorkspaceBoundaryError(violation);
   }
 
@@ -298,10 +293,7 @@ export class ProjectService extends ProjectServiceContract {
     return project;
   }
 
-  async archive(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<Project> {
+  async archive(input: { id: string; organizationId: string }): Promise<Project> {
     const existing = await this.repository.tryGetWithTeam(input.id);
     const violation =
       existing && existing.team.organizationId === input.organizationId
@@ -327,15 +319,10 @@ export class ProjectService extends ProjectServiceContract {
     limit: number;
     projectIds?: string[];
   }): Promise<PaginatedProjects> {
-    return this.repository.findAllByOrganization(
-      projectPaginationSchema.parse(input),
-    );
+    return this.repository.findAllByOrganization(projectPaginationSchema.parse(input));
   }
 
-  listByTeam(input: {
-    organizationId: string;
-    teamId: string;
-  }): Promise<Project[]> {
+  listByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
     return this.repository.findAllByTeam(input);
   }
 
@@ -386,10 +373,7 @@ export class ProjectService extends ProjectServiceContract {
     return this.repository.searchByQuery(input);
   }
 
-  async isFeatureEnabled(
-    projectId: string,
-    flag: ProjectFeatureFlag,
-  ): Promise<boolean> {
+  async isFeatureEnabled(projectId: string, flag: ProjectFeatureFlag): Promise<boolean> {
     const project = await this.repository.tryGetById(projectId);
     return Boolean(project && (project as unknown as Record<string, unknown>)[flag]);
   }
@@ -422,5 +406,4 @@ export class ProjectService extends ProjectServiceContract {
       return { userId: null, organizationId: null, firstMessage: false };
     }
   }
-
 }

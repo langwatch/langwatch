@@ -1,8 +1,5 @@
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import type {
-  Agent as TypedAgent,
-  AgentService,
-} from "@langwatch/agent-contract";
+import type { Agent as TypedAgent, AgentService } from "@langwatch/agent-contract";
 import { Response } from "undici";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpComponentConfig } from "@langwatch/workflow-contract";
@@ -128,9 +125,7 @@ describe("HttpAgentAdapter", () => {
         agentRepository: repository,
       });
 
-      await adapter.call(
-        createAgentInput([{ role: "user", content: "Hello" }]),
-      );
+      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
 
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;
@@ -156,9 +151,7 @@ describe("HttpAgentAdapter", () => {
         agentRepository: repository,
       });
 
-      await adapter.call(
-        createAgentInput([{ role: "user", content: "Hello" }]),
-      );
+      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
 
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;
@@ -184,9 +177,7 @@ describe("HttpAgentAdapter", () => {
         agentRepository: repository,
       });
 
-      await adapter.call(
-        createAgentInput([{ role: "user", content: "Hello" }]),
-      );
+      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
 
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;
@@ -213,9 +204,7 @@ describe("HttpAgentAdapter", () => {
         agentRepository: repository,
       });
 
-      await adapter.call(
-        createAgentInput([{ role: "user", content: "Hello" }]),
-      );
+      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
 
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;
@@ -620,9 +609,7 @@ describe("HttpAgentAdapter", () => {
         agentRepository: repository,
       });
 
-      await adapter.call(
-        createAgentInput([{ role: "user", content: "Hello" }]),
-      );
+      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
 
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;
@@ -649,9 +636,7 @@ describe("HttpAgentAdapter", () => {
         agentRepository: repository,
       });
 
-      await adapter.call(
-        createAgentInput([{ role: "user", content: "Hello" }]),
-      );
+      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
 
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;
@@ -696,9 +681,7 @@ describe("HttpAgentAdapter", () => {
         agentRepository: createMockAgentRepository(agent),
       });
 
-      await adapter.call(
-        createAgentInput([{ role: "user", content: "Hello" }]),
-      );
+      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
 
       expect(sentHeaders(mockFetch).traceparent).toBe(TRACEPARENT);
     });
@@ -715,9 +698,7 @@ describe("HttpAgentAdapter", () => {
         agentRepository: createMockAgentRepository(agent),
       });
 
-      await adapter.call(
-        createAgentInput([{ role: "user", content: "Hello" }]),
-      );
+      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
 
       const headers = sentHeaders(mockFetch);
       expect(headers["X-Custom"]).toBe("custom-value");
@@ -743,9 +724,7 @@ describe("HttpAgentAdapter", () => {
           agentRepository: createMockAgentRepository(agent),
         });
 
-        await adapter.call(
-          createAgentInput([{ role: "user", content: "Hello" }]),
-        );
+        await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
 
         const headers = sentHeaders(mockFetch);
         expect(headers.Traceparent).toBe(`00-${TRACE_ID}-0000000000000001-01`);
@@ -786,10 +765,7 @@ describe("HttpAgentAdapter", () => {
         }),
       );
 
-      const headers = mockFetch.mock.calls[0]?.[1]?.headers as Record<
-        string,
-        string
-      >;
+      const headers = mockFetch.mock.calls[0]?.[1]?.headers as Record<string, string>;
       expect(headers["X-Thread"]).toBe("thread-42");
     });
 
@@ -812,14 +788,9 @@ describe("HttpAgentAdapter", () => {
         agentRepository: createMockAgentRepository(agent),
       });
 
-      await adapter.call(
-        createAgentInput([{ role: "user", content: "Hello" }]),
-      );
+      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
 
-      const headers = mockFetch.mock.calls[0]?.[1]?.headers as Record<
-        string,
-        string
-      >;
+      const headers = mockFetch.mock.calls[0]?.[1]?.headers as Record<string, string>;
       expect(headers["X-Trace-Id"]).toBe(TRACE_ID);
       expect(headers["X-Parent"]).toBe(TRACEPARENT);
     });
@@ -837,14 +808,9 @@ describe("HttpAgentAdapter", () => {
         agentRepository: createMockAgentRepository(agent),
       });
 
-      await adapter.call(
-        createAgentInput([{ role: "user", content: "Hello" }]),
-      );
+      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
 
-      const headers = mockFetch.mock.calls[0]?.[1]?.headers as Record<
-        string,
-        string
-      >;
+      const headers = mockFetch.mock.calls[0]?.[1]?.headers as Record<string, string>;
       expect(headers["X-Key"]).toBe("{{ secrets.AGENT_TOKEN }}");
     });
 
@@ -991,9 +957,7 @@ describe("HttpAgentAdapter", () => {
           agentRepository: createMockAgentRepository(agent),
         });
 
-        await adapter.call(
-          createAgentInput([{ role: "user", content: "Hello" }]),
-        );
+        await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
 
         expect(mockFetch).toHaveBeenCalledWith(
           "https://api.example.com/chat",
@@ -1065,9 +1029,7 @@ describe("HttpAgentAdapter", () => {
         });
 
         await expect(
-          adapter.call(
-            createAgentInput([{ role: "user", content: "127.0.0.1" }]),
-          ),
+          adapter.call(createAgentInput([{ role: "user", content: "127.0.0.1" }])),
         ).rejects.toThrow("Access to private IP denied");
 
         expect(mockFetch).toHaveBeenCalledWith(
@@ -1080,27 +1042,30 @@ describe("HttpAgentAdapter", () => {
         ["localhost", "localhost"],
         ["127.0.0.1", "127.0.0.1"],
         ["169.254.169.254", "169.254.169.254"],
-      ])("passes %s-resolved url to ssrfSafeFetch so it can be rejected", async (label, ip) => {
-        const mockFetch = await setupSsrfMock();
-        const agent = createHttpAgent({
-          url: "https://{{input | raw}}/path",
-        });
-        const adapter = new HttpAgentAdapter({
-          agentId: "agent-123",
-          projectId: "project-123",
-          agentRepository: createMockAgentRepository(agent),
-        });
+      ])(
+        "passes %s-resolved url to ssrfSafeFetch so it can be rejected",
+        async (label, ip) => {
+          const mockFetch = await setupSsrfMock();
+          const agent = createHttpAgent({
+            url: "https://{{input | raw}}/path",
+          });
+          const adapter = new HttpAgentAdapter({
+            agentId: "agent-123",
+            projectId: "project-123",
+            agentRepository: createMockAgentRepository(agent),
+          });
 
-        await expect(
-          adapter.call(createAgentInput([{ role: "user", content: ip }])),
-        ).rejects.toThrow();
+          await expect(
+            adapter.call(createAgentInput([{ role: "user", content: ip }])),
+          ).rejects.toThrow();
 
-        expect(mockFetch).toHaveBeenCalledWith(
-          `https://${ip}/path`,
-          expect.any(Object),
-        );
-        expect(label).toBeTruthy();
-      });
+          expect(mockFetch).toHaveBeenCalledWith(
+            `https://${ip}/path`,
+            expect.any(Object),
+          );
+          expect(label).toBeTruthy();
+        },
+      );
     });
 
     describe("when url template is malformed", () => {

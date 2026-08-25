@@ -96,9 +96,7 @@ describe("log command append coalescing", () => {
           (candidate) => candidate.name === "recordLogRecord",
         );
 
-        expect(command?.options?.coalesceMaxBatch).toBe(
-          LOG_COMMAND_COALESCE_MAX_BATCH,
-        );
+        expect(command?.options?.coalesceMaxBatch).toBe(LOG_COMMAND_COALESCE_MAX_BATCH);
         expect(command?.options?.getGroupKey).toBeDefined();
       });
     });
@@ -135,9 +133,7 @@ describe("log command append coalescing", () => {
         await processCommandBatch(batchParamsFor({ payloads, storeEventsFn }));
 
         const [events] = storeEventsFn.mock.calls[0]!;
-        expect(
-          (events as Event[]).map((event) => event.idempotencyKey),
-        ).toEqual(
+        expect((events as Event[]).map((event) => event.idempotencyKey)).toEqual(
           payloads.map((payload) => `${TENANT_ID}:${payload.recordId}`),
         );
       });

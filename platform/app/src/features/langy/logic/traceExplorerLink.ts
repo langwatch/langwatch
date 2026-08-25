@@ -125,12 +125,9 @@ export function readTraceSearchQuery(input: unknown): TraceSearchQuery {
     ...pick(readOrigins(record.origins ?? record.origin), (origins) => ({
       origins,
     })),
-    ...pick(
-      readEpochMs(record.startDate ?? record.start_date),
-      (startDate) => ({
-        startDate,
-      }),
-    ),
+    ...pick(readEpochMs(record.startDate ?? record.start_date), (startDate) => ({
+      startDate,
+    })),
     ...pick(readEpochMs(record.endDate ?? record.end_date), (endDate) => ({
       endDate,
     })),
@@ -219,9 +216,7 @@ export function buildExplorerQuery(search: TraceSearchQuery): string | null {
     ?.map((origin) => origin.trim())
     .filter((origin) => origin !== "");
   if (origins && origins.length > 0) {
-    const group = origins
-      .map((origin) => `origin:${escapeValue(origin)}`)
-      .join(" OR ");
+    const group = origins.map((origin) => `origin:${escapeValue(origin)}`).join(" OR ");
     clauses.push(origins.length > 1 ? `(${group})` : group);
   }
 
@@ -294,9 +289,7 @@ function explorerFragment(
   // the missing end without knowing when the search ran, so we assert nothing
   // and let the Explorer's own default stand.
   const fragmentQuery = fragmentParams.toString();
-  return fragmentQuery
-    ? `${TRACE_EXPLORER_LENS}?${fragmentQuery}`
-    : TRACE_EXPLORER_LENS;
+  return fragmentQuery ? `${TRACE_EXPLORER_LENS}?${fragmentQuery}` : TRACE_EXPLORER_LENS;
 }
 
 /**

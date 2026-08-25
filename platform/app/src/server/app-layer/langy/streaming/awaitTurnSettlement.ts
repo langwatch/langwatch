@@ -60,10 +60,7 @@ const CONFIRM_POLL_MS = 250;
  * Sleep for `ms`, resolving early to `false` when the signal aborts — so a
  * waiter unblocks promptly on disconnect/deadline — otherwise `true`.
  */
-export function abortableDelay(
-  ms: number,
-  signal: AbortSignal,
-): Promise<boolean> {
+export function abortableDelay(ms: number, signal: AbortSignal): Promise<boolean> {
   if (signal.aborted) return Promise.resolve(false);
   return new Promise<boolean>((resolve) => {
     const onAbort = () => {
@@ -79,9 +76,7 @@ export function abortableDelay(
 }
 
 type ConversationTurnEvents = Awaited<
-  ReturnType<
-    ReturnType<typeof getApp>["langy"]["getEventsAfter"]
-  >
+  ReturnType<ReturnType<typeof getApp>["langy"]["getEventsAfter"]>
 >;
 
 /**
@@ -278,14 +273,11 @@ async function waitForNextPoll(
   pollMs: number,
   signal: AbortSignal,
 ): Promise<PollWaitOutcome> {
-  const delay = abortableDelay(pollMs, signal).then(
-    (completed): PollWaitOutcome => (completed ? "tick" : "abort"),
+  const delay = abortableDelay(pollMs, signal).then((completed): PollWaitOutcome =>
+    completed ? "tick" : "abort",
   );
   if (terminalSeen === null) return delay;
-  return Promise.race([
-    terminalSeen.then((): PollWaitOutcome => "terminal"),
-    delay,
-  ]);
+  return Promise.race([terminalSeen.then((): PollWaitOutcome => "terminal"), delay]);
 }
 
 export async function awaitTurnSettlement({

@@ -29,14 +29,9 @@ export const SCOPE_TIERS = {
   platform: { stored: "PLATFORM" },
 } as const;
 
-export const SCOPE_TIER_NAMES = Object.keys(
-  SCOPE_TIERS,
-) as readonly ScopeTier[];
+export const SCOPE_TIER_NAMES = Object.keys(SCOPE_TIERS) as readonly ScopeTier[];
 export const scopeTierSchema = z.enum(
-  Object.keys(SCOPE_TIERS) as [
-    keyof typeof SCOPE_TIERS,
-    ...(keyof typeof SCOPE_TIERS)[],
-  ],
+  Object.keys(SCOPE_TIERS) as [keyof typeof SCOPE_TIERS, ...(keyof typeof SCOPE_TIERS)[]],
 );
 export type ScopeTier = z.infer<typeof scopeTierSchema>;
 
@@ -83,14 +78,8 @@ export const SCOPE_TIER_BY_FIELD = {
   teamId: "team",
   organizationId: "organization",
 } as const satisfies Record<ScopeTierField, BindingScopeTier>;
-export const storedBindingScopeTierSchema = z.enum([
-  "PROJECT",
-  "TEAM",
-  "ORGANIZATION",
-]);
-export type StoredBindingScopeTier = z.infer<
-  typeof storedBindingScopeTierSchema
->;
+export const storedBindingScopeTierSchema = z.enum(["PROJECT", "TEAM", "ORGANIZATION"]);
+export type StoredBindingScopeTier = z.infer<typeof storedBindingScopeTierSchema>;
 
 /**
  * The kinds of thing a grant can name as its subject. `anyone` is the public
@@ -136,31 +125,19 @@ export const callerKindSchema = z.enum(CALLER_KINDS);
 export type CallerKind = z.infer<typeof callerKindSchema>;
 
 export const STORED_SCOPE_TIER = Object.fromEntries(
-  Object.entries(SCOPE_TIERS).map(([tier, spelling]) => [
-    tier,
-    spelling.stored,
-  ]),
+  Object.entries(SCOPE_TIERS).map(([tier, spelling]) => [tier, spelling.stored]),
 ) as Record<ScopeTier, StoredScopeTier>;
 
 export const SCOPE_TIER_FROM_STORED = Object.fromEntries(
-  Object.entries(SCOPE_TIERS).map(([tier, spelling]) => [
-    spelling.stored,
-    tier,
-  ]),
+  Object.entries(SCOPE_TIERS).map(([tier, spelling]) => [spelling.stored, tier]),
 ) as Record<StoredScopeTier, ScopeTier>;
 
 export const STORED_PRINCIPAL_KIND = Object.fromEntries(
-  Object.entries(PRINCIPAL_KINDS).map(([kind, spelling]) => [
-    kind,
-    spelling.stored,
-  ]),
+  Object.entries(PRINCIPAL_KINDS).map(([kind, spelling]) => [kind, spelling.stored]),
 ) as Record<PrincipalKind, StoredPrincipalKind>;
 
 export const PRINCIPAL_KIND_FROM_STORED = Object.fromEntries(
-  Object.entries(PRINCIPAL_KINDS).map(([kind, spelling]) => [
-    spelling.stored,
-    kind,
-  ]),
+  Object.entries(PRINCIPAL_KINDS).map(([kind, spelling]) => [spelling.stored, kind]),
 ) as Record<StoredPrincipalKind, PrincipalKind>;
 
 // An own-property check, not `in`: an object literal inherits from
@@ -181,9 +158,7 @@ export const isStoredScopeTier = (value: unknown): value is StoredScopeTier =>
 export const isPrincipalKind = (value: unknown): value is PrincipalKind =>
   typeof value === "string" && hasOwn(PRINCIPAL_KINDS, value);
 
-export const isStoredPrincipalKind = (
-  value: unknown,
-): value is StoredPrincipalKind =>
+export const isStoredPrincipalKind = (value: unknown): value is StoredPrincipalKind =>
   typeof value === "string" && hasOwn(PRINCIPAL_KIND_FROM_STORED, value);
 
 export const isBindingScopeTier = (value: unknown): value is BindingScopeTier =>

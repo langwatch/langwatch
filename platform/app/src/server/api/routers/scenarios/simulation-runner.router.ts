@@ -87,9 +87,7 @@ async function resolveParametersForRun({
     parameters: forScenario?.parameters ?? {},
     // Encrypted here, before the validation prefetch and before the queued
     // command: neither is allowed to hold a readable credential.
-    secretParameters: encryptRunSecretValues(
-      forScenario?.secretParameters ?? {},
-    ),
+    secretParameters: encryptRunSecretValues(forScenario?.secretParameters ?? {}),
   };
 }
 
@@ -242,10 +240,7 @@ export const simulationRunnerRouter = createTRPCRouter({
 
       // No explicit job scheduling — the execution subscriber picks up the queued
       // event via the GroupQueue and spawns the child process.
-      logger.info(
-        { batchRunId, scenarioRunId },
-        "Scenario queued via event-sourcing",
-      );
+      logger.info({ batchRunId, scenarioRunId }, "Scenario queued via event-sourcing");
 
       return {
         scheduled: true,

@@ -11,14 +11,7 @@
 import { Box, Button, HStack } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import numeral from "numeral";
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
@@ -86,10 +79,7 @@ export function BatchEvaluationV2EvaluationResult({
 
   const rowHeight = size === "sm" ? 28 : 34;
 
-  const totalRows = Math.max(
-    ...Object.values(datasetByIndex).map((d) => d.index + 1),
-    0,
-  );
+  const totalRows = Math.max(...Object.values(datasetByIndex).map((d) => d.index + 1), 0);
 
   const rowData = useMemo(() => {
     const resultsByIndex = new Map(results.map((r) => [r.index, r]));
@@ -168,13 +158,8 @@ export function BatchEvaluationV2EvaluationResult({
     });
 
     // Evaluation input columns
-    if (
-      results.length > 0 &&
-      evaluatorHeaders.evaluationInputsColumns.size > 0
-    ) {
-      for (const column of Array.from(
-        evaluatorHeaders.evaluationInputsColumns,
-      )) {
+    if (results.length > 0 && evaluatorHeaders.evaluationInputsColumns.size > 0) {
+      for (const column of Array.from(evaluatorHeaders.evaluationInputsColumns)) {
         cols.push({
           id: `eval_input_${column}`,
           header: titleCase(column),
@@ -183,15 +168,11 @@ export function BatchEvaluationV2EvaluationResult({
             const { datasetEntry, evaluationsForEntry } = row;
             if (datasetEntry?.error) return "Error";
             const value = evaluationsForEntry[evaluator]?.inputs?.[column];
-            return evaluationsForEntry[evaluator]
-              ? stringify(value ?? "-")
-              : "-";
+            return evaluationsForEntry[evaluator] ? stringify(value ?? "-") : "-";
           },
           text: (row) => {
             if (row.datasetEntry?.error) return row.datasetEntry.error;
-            return stringify(
-              row.evaluationsForEntry[evaluator]?.inputs?.[column] ?? "-",
-            );
+            return stringify(row.evaluationsForEntry[evaluator]?.inputs?.[column] ?? "-");
           },
           cellState: (row) => (row.datasetEntry?.error ? "error" : undefined),
         });
@@ -205,11 +186,8 @@ export function BatchEvaluationV2EvaluationResult({
       minWidth: 120,
       render: (row) => {
         const total =
-          (row.datasetEntry?.cost ?? 0) +
-          (row.evaluationsForEntry[evaluator]?.cost ?? 0);
-        return total
-          ? formatMoney({ amount: total, currency: "USD" }, "$0.00[00]")
-          : "-";
+          (row.datasetEntry?.cost ?? 0) + (row.evaluationsForEntry[evaluator]?.cost ?? 0);
+        return total ? formatMoney({ amount: total, currency: "USD" }, "$0.00[00]") : "-";
       },
       text: (row) => {
         const predCost = row.datasetEntry?.cost ?? 0;
@@ -245,14 +223,9 @@ export function BatchEvaluationV2EvaluationResult({
     });
 
     // Evaluation result columns (stable order)
-    const evalResultPreferredOrder = [
-      "score",
-      "passed",
-      "label",
-      "details",
-    ] as const;
-    const evaluationResultsColumnsOrdered = evalResultPreferredOrder.filter(
-      (c) => evaluatorHeaders.evaluationResultsColumns.has(c),
+    const evalResultPreferredOrder = ["score", "passed", "label", "details"] as const;
+    const evaluationResultsColumnsOrdered = evalResultPreferredOrder.filter((c) =>
+      evaluatorHeaders.evaluationResultsColumns.has(c),
     );
 
     for (const column of evaluationResultsColumnsOrdered) {
@@ -275,11 +248,7 @@ export function BatchEvaluationV2EvaluationResult({
             | undefined;
           if (isDetails) {
             return (
-              <HoverableBigText
-                lineClamp={1}
-                maxWidth="300px"
-                whiteSpace="pre-wrap"
-              >
+              <HoverableBigText lineClamp={1} maxWidth="300px" whiteSpace="pre-wrap">
                 {evaluation?.[column]}
               </HoverableBigText>
             );
@@ -364,8 +333,7 @@ export function BatchEvaluationV2EvaluationResult({
     if (!container) return;
     const onScroll = () => {
       isPinnedToBottomRef.current =
-        container.scrollTop + container.clientHeight >=
-        container.scrollHeight - 24;
+        container.scrollTop + container.clientHeight >= container.scrollHeight - 24;
     };
     onScroll();
     container.addEventListener("scroll", onScroll, { passive: true });
@@ -389,21 +357,17 @@ export function BatchEvaluationV2EvaluationResult({
     overscan: 20,
   });
 
-  const handleCellClick = useCallback(
-    (column: ResultColumn, row: EvaluationRowData) => {
-      const value = column.text?.(row);
-      if (!value || value === "-") return;
-      setExpandedText(value);
-    },
-    [],
-  );
+  const handleCellClick = useCallback((column: ResultColumn, row: EvaluationRowData) => {
+    const value = column.text?.(row);
+    if (!value || value === "-") return;
+    setExpandedText(value);
+  }, []);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
   const paddingBottom =
     virtualRows.length > 0
-      ? rowVirtualizer.getTotalSize() -
-        (virtualRows[virtualRows.length - 1]?.end ?? 0)
+      ? rowVirtualizer.getTotalSize() - (virtualRows[virtualRows.length - 1]?.end ?? 0)
       : 0;
 
   return (
@@ -475,9 +439,7 @@ export function BatchEvaluationV2EvaluationResult({
                     return (
                       <td
                         key={column.id}
-                        title={
-                          tooltip && tooltip.length < 1000 ? tooltip : undefined
-                        }
+                        title={tooltip && tooltip.length < 1000 ? tooltip : undefined}
                         style={{
                           minWidth: column.minWidth,
                           background: state ? CELL_STATE_BG[state] : undefined,

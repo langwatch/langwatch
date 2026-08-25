@@ -16,7 +16,7 @@ ORDER BY UpdatedAt DESC
 LIMIT 1
 ```
 
-This is the most common form of the bug because it looks innocent — surely "give me the row with the largest UpdatedAt" is fine? It is not. ClickHouse must read **every unmerged version** of every row matching the WHERE *together with all heavy columns* (Messages.*, ComputedInput, Inputs, Details, etc.) into memory in order to sort by `UpdatedAt`.
+This is the most common form of the bug because it looks innocent — surely "give me the row with the largest UpdatedAt" is fine? It is not. ClickHouse must read **every unmerged version** of every row matching the WHERE _together with all heavy columns_ (Messages.*, ComputedInput, Inputs, Details, etc.) into memory in order to sort by `UpdatedAt`.
 
 Under load, a single `(TenantId, key)` can have hundreds of unmerged versions of multi-MB rows. Production has observed individual `getByKey` calls reading 5+ MB and entire fleets driving 1+ GB/s of read traffic from these calls, saturating ClickHouse and stalling concurrent inserts. **Always use the IN-tuple form below for "latest version of one row" lookups.**
 
@@ -82,13 +82,13 @@ LIMIT 1
 
 ## Version Columns per Table
 
-| Table | Engine | Version Column | Dedup Key |
-|-------|--------|---------------|-----------|
-| `simulation_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, ScenarioRunId)` |
-| `trace_summaries` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, TraceId)` |
-| `stored_spans` | `ReplacingMergeTree(StartTime)` | `StartTime` | `(TenantId, TraceId, SpanId)` |
-| `evaluation_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, EvaluationId)` |
-| `experiment_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, RunId, ExperimentId)` |
+| Table             | Engine                          | Version Column | Dedup Key                         |
+| ----------------- | ------------------------------- | -------------- | --------------------------------- |
+| `simulation_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt`    | `(TenantId, ScenarioRunId)`       |
+| `trace_summaries` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt`    | `(TenantId, TraceId)`             |
+| `stored_spans`    | `ReplacingMergeTree(StartTime)` | `StartTime`    | `(TenantId, TraceId, SpanId)`     |
+| `evaluation_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt`    | `(TenantId, EvaluationId)`        |
+| `experiment_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt`    | `(TenantId, RunId, ExperimentId)` |
 
 **Note:** `stored_spans` uses `StartTime` as the version column, NOT `UpdatedAt`. Use `max(StartTime)` for dedup on that table.
 
@@ -102,10 +102,11 @@ const nextUpdatedAt = Math.max(Date.now(), prevUpdatedAt + 1);
 ```
 
 This means:
+
 - **Within one state chain, no ties** — each fold bumps `UpdatedAt` to at least `prevUpdatedAt + 1`, so successive versions written by one writer strictly increase
 
 **It does NOT mean `max(UpdatedAt)` identifies exactly one row.** The bump is
-relative to the `prevUpdatedAt` the writer *loaded*, so two writers that both
+relative to the `prevUpdatedAt` the writer _loaded_, so two writers that both
 resume from the same committed version compute their next stamp from the same
 predecessor and can land on the same millisecond. Both then satisfy the
 IN-tuple, and a bare `LIMIT 1` picks between them arbitrarily — returning a
@@ -158,11 +159,11 @@ HAVING toUnixTimestamp64Milli(max(CreatedAt)) >= ...
 
 Keep both: the WHERE prunes partitions, the HAVING ensures exact filtering for the edge case where `StartedAt` and `CreatedAt` differ.
 
-| Table | Partition Key |
-|-------|--------------|
-| `simulation_runs` | `toYearWeek(StartedAt)` |
-| `trace_summaries` | `toYearWeek(OccurredAt)` |
-| `stored_spans` | `toYearWeek(StartTime)` |
+| Table             | Partition Key             |
+| ----------------- | ------------------------- |
+| `simulation_runs` | `toYearWeek(StartedAt)`   |
+| `trace_summaries` | `toYearWeek(OccurredAt)`  |
+| `stored_spans`    | `toYearWeek(StartTime)`   |
 | `evaluation_runs` | `toYearWeek(ScheduledAt)` |
 
 ## TenantId is Always Required
@@ -188,7 +189,7 @@ Anything else that wants to skip the filter should be a repository method taking
 
 ### Carve-out: organization-scoped billing ledgers
 
-A table whose whole purpose is to total usage *across* an organization's projects cannot lead with `TenantId` — the aggregate it exists to answer has no single tenant. One table qualifies today:
+A table whose whole purpose is to total usage _across_ an organization's projects cannot lead with `TenantId` — the aggregate it exists to answer has no single tenant. One table qualifies today:
 
 - `metric_usage_estimates` (`queryMetricUsageEstimates`, `metric-data-point.usage.ts`) — ORDER BY `(OrganizationId, TenantId, PointId)`.
 
@@ -201,7 +202,7 @@ It is allowed to lead with `OrganizationId` **only** because all of these hold:
 5. A test pins that the organization-wide path uses the organization-resolved client and filters on `OrganizationId`.
 6. The caller has already proven the requesting user belongs to `organizationId`. The repository asserts only that the string is non-empty — it authenticates nothing. `queryMetricUsageEstimates` has no callers yet, so this costs nothing today; whoever wires the first route owns the membership check, because with condition 1 the predicate is the boundary and an unchecked `organizationId` from a request hands the caller someone else's ledger.
 
-A new table wanting this carve-out needs all six, plus a line here. Anything that merely *finds it convenient* to skip `TenantId` does not qualify.
+A new table wanting this carve-out needs all six, plus a line here. Anything that merely _finds it convenient_ to skip `TenantId` does not qualify.
 
 ## JOINs — Prefer Not To, Then Prefer `IN`
 
@@ -272,7 +273,7 @@ When reviewing a PR that touches a `*.clickhouse.repository.ts` or any service h
 - **`max(<column>)` used as a pagination cursor** instead of `argMax(<column>, UpdatedAt)` — pagination cursors derived from non-version columns can read stale values.
 - **Missing partition predicate** when a date range is available — every weekly-partitioned table (`trace_summaries`, `simulation_runs`, `stored_spans`, `evaluation_runs`, ...) needs a WHERE on its partition column to enable pruning.
 - **Heavy columns in dedup subqueries** — anything like `Messages.Content`, `Inputs`, `Details`, `ComputedInput`, `SpanAttributes`, `Examples`, `LlmCalls` belongs only in the outer SELECT, never in the dedup subquery.
-- **A range filter on a MOVABLE column inside a dedup subquery** — the previous check says to add a partition predicate; this one says where it may not go. If the partition column can change after the row is written (a fold taking `min`/`max` over business time — `coding_agent_sessions.StartedAt`, `trace_analytics.OccurredAt`, `evaluation_analytics.OccurredAt` all do), then range-filtering the inner `max(<version>)` scope drops the true latest version out of its own dedup group the moment it drifts past the window edge. The group resolves to a **stale in-window version** and the outer scope returns it — non-null, plausible, and no fallback catches it. **Bound the outer scope for pruning; leave the dedup scope unbounded on that column.** Not even an upper bound is safe: a read-back miss re-runs `init()` and can re-stamp the anchor *forwards*, so "the latest version holds the smallest value" does not hold. Only the **key** narrowing (`TenantId`) belongs in both scopes. Nothing else qualifies just by looking stable: `UserId` is written by the fold, is absent from spans, and returns to `null` whenever a read-back miss re-runs `init()`, so a later version can carry an empty value, hold `max(<version>)`, and hide the true latest from a `UserId`-filtered group — the same defect in a column that never moves in a range sense. Narrow on it in the outer scope only, and accept that a session whose newest version lost the value leaves the filtered list. See ADR-071 and `coding-agent-session.clickhouse.repository.ts` (`findManyRecent` / `findLatestRecord`), which document both the rule and its scan cost.
+- **A range filter on a MOVABLE column inside a dedup subquery** — the previous check says to add a partition predicate; this one says where it may not go. If the partition column can change after the row is written (a fold taking `min`/`max` over business time — `coding_agent_sessions.StartedAt`, `trace_analytics.OccurredAt`, `evaluation_analytics.OccurredAt` all do), then range-filtering the inner `max(<version>)` scope drops the true latest version out of its own dedup group the moment it drifts past the window edge. The group resolves to a **stale in-window version** and the outer scope returns it — non-null, plausible, and no fallback catches it. **Bound the outer scope for pruning; leave the dedup scope unbounded on that column.** Not even an upper bound is safe: a read-back miss re-runs `init()` and can re-stamp the anchor _forwards_, so "the latest version holds the smallest value" does not hold. Only the **key** narrowing (`TenantId`) belongs in both scopes. Nothing else qualifies just by looking stable: `UserId` is written by the fold, is absent from spans, and returns to `null` whenever a read-back miss re-runs `init()`, so a later version can carry an empty value, hold `max(<version>)`, and hide the true latest from a `UserId`-filtered group — the same defect in a column that never moves in a range sense. Narrow on it in the outer scope only, and accept that a session whose newest version lost the value leaves the filtered list. See ADR-071 and `coding-agent-session.clickhouse.repository.ts` (`findManyRecent` / `findLatestRecord`), which document both the rule and its scan cost.
 
 - **A `CAST` inside a JOIN key** — cast the bound parameter instead, so the column keeps its declared type. `FixedString(N)` vs `String` is the usual culprit, and it can silently drop rows rather than just cost time.
 - **A JOIN against a raw table** — pre-filter each side in a CTE/subquery first (tenant, partition, dedup), so the hash side is a small result rather than a table.

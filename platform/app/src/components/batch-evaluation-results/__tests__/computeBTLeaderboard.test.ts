@@ -1,18 +1,11 @@
 import { describe, expect, it } from "vitest";
-import {
-  computeBTLeaderboard,
-  type PairwiseComparison,
-} from "../computeBTLeaderboard";
+import { computeBTLeaderboard, type PairwiseComparison } from "../computeBTLeaderboard";
 
 /**
  * Build a comparisons list where `winner` beat each `loser` once. Helper
  * keeps the fixture code below readable.
  */
-const wins = (
-  winner: string,
-  losers: string[],
-  times = 1,
-): PairwiseComparison[] => {
+const wins = (winner: string, losers: string[], times = 1): PairwiseComparison[] => {
   const out: PairwiseComparison[] = [];
   for (let k = 0; k < times; k++) {
     for (const l of losers) {
@@ -24,8 +17,7 @@ const wins = (
 
 const ties = (a: string, b: string, times = 1): PairwiseComparison[] => {
   const out: PairwiseComparison[] = [];
-  for (let k = 0; k < times; k++)
-    out.push({ candidates: [a, b], winner: "tie" });
+  for (let k = 0; k < times; k++) out.push({ candidates: [a, b], winner: "tie" });
   return out;
 };
 
@@ -77,10 +69,7 @@ describe("computeBTLeaderboard", () => {
   });
 
   it("scores two evenly-matched variants near zero (symmetry)", () => {
-    const data: PairwiseComparison[] = [
-      ...wins("A", ["B"], 50),
-      ...wins("B", ["A"], 50),
-    ];
+    const data: PairwiseComparison[] = [...wins("A", ["B"], 50), ...wins("B", ["A"], 50)];
     const result = computeBTLeaderboard({
       comparisons: data,
       variantIds: ["A", "B"],
@@ -169,10 +158,7 @@ describe("computeBTLeaderboard", () => {
 
   /** @scenario "The leaderboard table shows a confidence interval per variant" */
   it("produces deterministic bootstrap CIs for a fixed seed", () => {
-    const data: PairwiseComparison[] = [
-      ...wins("A", ["B"], 8),
-      ...wins("B", ["A"], 4),
-    ];
+    const data: PairwiseComparison[] = [...wins("A", ["B"], 8), ...wins("B", ["A"], 4)];
     const r1 = computeBTLeaderboard({
       comparisons: data,
       variantIds: ["A", "B"],
@@ -204,10 +190,7 @@ describe("computeBTLeaderboard", () => {
     // one-element array returns that element for every q, so a single
     // resample collapses the interval to a point, while many resamples must
     // spread it. Asserting on that shape pins which argument is which.
-    const data: PairwiseComparison[] = [
-      ...wins("A", ["B"], 8),
-      ...wins("B", ["A"], 4),
-    ];
+    const data: PairwiseComparison[] = [...wins("A", ["B"], 8), ...wins("B", ["A"], 4)];
 
     it("collapses the interval to a point for a single resample", () => {
       const result = computeBTLeaderboard({
@@ -235,10 +218,7 @@ describe("computeBTLeaderboard", () => {
   });
 
   it("returns null CI when bootstrap is disabled", () => {
-    const data: PairwiseComparison[] = [
-      ...wins("A", ["B"], 5),
-      ...wins("B", ["A"], 5),
-    ];
+    const data: PairwiseComparison[] = [...wins("A", ["B"], 5), ...wins("B", ["A"], 5)];
     const result = computeBTLeaderboard({
       comparisons: data,
       variantIds: ["A", "B"],

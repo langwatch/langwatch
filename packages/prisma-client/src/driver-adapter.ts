@@ -100,10 +100,7 @@ function urlParams(databaseUrl: string): URLSearchParams {
   }
 }
 
-function positiveIntParam(
-  params: URLSearchParams,
-  name: string,
-): number | undefined {
+function positiveIntParam(params: URLSearchParams, name: string): number | undefined {
   const raw = params.get(name);
   if (raw === null) return undefined;
   const value = Number.parseInt(raw, 10);

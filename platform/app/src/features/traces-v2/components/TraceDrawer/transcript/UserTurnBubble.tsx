@@ -45,9 +45,7 @@ export function UserTurnBubble({
   // Pure-prose user message → classic chat bubble layout.
   if (onlyText) {
     const text = blocks
-      .filter(
-        (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
-      )
+      .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
       .map((b) => b.text)
       .join("\n");
     return (
@@ -141,11 +139,7 @@ export function UserTurnBubble({
           </>
         )}
       </HStack>
-      <BlockStack
-        blocks={blocks}
-        toolCalls={toolCalls}
-        collapseTools={collapseTools}
-      />
+      <BlockStack blocks={blocks} toolCalls={toolCalls} collapseTools={collapseTools} />
     </Box>
   );
 }

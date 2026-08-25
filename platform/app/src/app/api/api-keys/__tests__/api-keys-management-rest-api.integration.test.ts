@@ -264,9 +264,7 @@ describe("Feature: API keys management REST API", () => {
           userId: adminUserId,
           name: `fetch-target-${ns}`,
           description: "Reads the pipeline dashboards",
-          bindings: [
-            { role: "MEMBER", scopeType: "TEAM", scopeId: testTeam.id },
-          ],
+          bindings: [{ role: "MEMBER", scopeType: "TEAM", scopeId: testTeam.id }],
         });
 
         const res = await get(adminToken, apiKey.id);
@@ -299,9 +297,7 @@ describe("Feature: API keys management REST API", () => {
         const { apiKey } = await createKey({
           userId: adminUserId,
           name: `fetch-secrecy-${ns}`,
-          bindings: [
-            { role: "MEMBER", scopeType: "TEAM", scopeId: testTeam.id },
-          ],
+          bindings: [{ role: "MEMBER", scopeType: "TEAM", scopeId: testTeam.id }],
         });
 
         const res = await get(adminToken, apiKey.id);
@@ -328,9 +324,7 @@ describe("Feature: API keys management REST API", () => {
         const { apiKey } = await createKey({
           userId: memberUserId,
           name: `member-owned-${ns}`,
-          bindings: [
-            { role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id },
-          ],
+          bindings: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id }],
         });
 
         const res = await get(managerToken, apiKey.id);
@@ -349,9 +343,7 @@ describe("Feature: API keys management REST API", () => {
           createdByUserId: adminUserId,
           organizationId: testOrganization.id,
           permissionMode: "all",
-          bindings: [
-            { role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id },
-          ],
+          bindings: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id }],
         });
 
         const listed = await (
@@ -359,9 +351,9 @@ describe("Feature: API keys management REST API", () => {
             headers: headersFor(managerToken),
           })
         ).json();
-        expect(
-          listed.data.some((key: { id: string }) => key.id === apiKey.id),
-        ).toBe(true);
+        expect(listed.data.some((key: { id: string }) => key.id === apiKey.id)).toBe(
+          true,
+        );
 
         const res = await get(managerToken, apiKey.id);
 
@@ -377,9 +369,7 @@ describe("Feature: API keys management REST API", () => {
         const { apiKey } = await createKey({
           userId: memberUserId,
           name: `member-owned-for-admin-${ns}`,
-          bindings: [
-            { role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id },
-          ],
+          bindings: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id }],
         });
 
         const res = await get(adminToken, apiKey.id);
@@ -396,9 +386,7 @@ describe("Feature: API keys management REST API", () => {
         const { apiKey } = await createKey({
           userId: adminUserId,
           name: `rename-before-${ns}`,
-          bindings: [
-            { role: "MEMBER", scopeType: "TEAM", scopeId: testTeam.id },
-          ],
+          bindings: [{ role: "MEMBER", scopeType: "TEAM", scopeId: testTeam.id }],
         });
 
         const res = await patch(adminToken, apiKey.id, {
@@ -436,9 +424,7 @@ describe("Feature: API keys management REST API", () => {
         });
 
         const res = await patch(adminToken, apiKey.id, {
-          bindings: [
-            { role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id },
-          ],
+          bindings: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id }],
         });
 
         expect(res.status).toBe(200);
@@ -501,15 +487,11 @@ describe("Feature: API keys management REST API", () => {
         const { apiKey } = await createKey({
           userId: managerUserId,
           name: `widen-${ns}`,
-          bindings: [
-            { role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id },
-          ],
+          bindings: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id }],
         });
 
         const res = await patch(managerToken, apiKey.id, {
-          bindings: [
-            { role: "ADMIN", scopeType: "PROJECT", scopeId: testProject.id },
-          ],
+          bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: testProject.id }],
         });
 
         expect(res.status).toBe(403);
@@ -528,9 +510,7 @@ describe("Feature: API keys management REST API", () => {
         const { apiKey } = await createKey({
           userId: memberUserId,
           name: `foreign-edit-${ns}`,
-          bindings: [
-            { role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id },
-          ],
+          bindings: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id }],
         });
 
         const res = await patch(managerToken, apiKey.id, {
@@ -557,9 +537,7 @@ describe("Feature: API keys management REST API", () => {
         const res = await post(managerToken, {
           name,
           assignedToUserId: memberUserId,
-          bindings: [
-            { role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id },
-          ],
+          bindings: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id }],
         });
 
         expect(res.status).toBe(403);
@@ -576,9 +554,7 @@ describe("Feature: API keys management REST API", () => {
         const res = await post(adminToken, {
           name: `assigned-by-admin-${ns}`,
           assignedToUserId: memberUserId,
-          bindings: [
-            { role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id },
-          ],
+          bindings: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: testProject.id }],
         });
 
         expect(res.status).toBe(201);
@@ -594,9 +570,7 @@ describe("Feature: API keys management REST API", () => {
         const res = await post(adminToken, {
           name,
           assignedToUserId: memberUserId,
-          bindings: [
-            { role: "ADMIN", scopeType: "PROJECT", scopeId: testProject.id },
-          ],
+          bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: testProject.id }],
         });
 
         expect(res.status).toBe(403);
@@ -619,9 +593,7 @@ describe("Feature: API keys management REST API", () => {
           organizationId: testOrganization.id,
           permissionMode: "restricted",
           permissions: ["traces:view", "analytics:view"],
-          bindings: [
-            { role: "CUSTOM", scopeType: "PROJECT", scopeId: testProject.id },
-          ],
+          bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: testProject.id }],
         });
 
         const readBack = await (await get(adminToken, apiKey.id)).json();

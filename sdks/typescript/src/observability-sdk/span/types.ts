@@ -1,15 +1,10 @@
-import {
-  type AttributeValue,
-  type Span,
-  type SpanOptions,
-} from "@opentelemetry/api";
+import { type AttributeValue, type Span, type SpanOptions } from "@opentelemetry/api";
 import {
   type SpanInputOutput,
   type ChatMessage,
 } from "../../internal/generated/types/tracer";
 import { type Prompt } from "@/client-sdk/services/prompts";
 import { type AddEvaluationParams } from "../evaluation";
-
 
 /**
  * Simple chat message type with just role and content
@@ -29,11 +24,10 @@ export const INPUT_OUTPUT_TYPES = [
   "list",
   "json",
   "guardrail_result",
-  "evaluation_result"
+  "evaluation_result",
 ] as const;
 
-export type InputOutputType = typeof INPUT_OUTPUT_TYPES[number];
-
+export type InputOutputType = (typeof INPUT_OUTPUT_TYPES)[number];
 
 export type JsonSerializable =
   | string

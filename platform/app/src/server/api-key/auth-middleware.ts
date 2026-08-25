@@ -10,11 +10,7 @@ import {
   canonicalErrorFor,
   requestTraceIds,
 } from "~/app/api/shared/canonical-error";
-import type {
-  Organization,
-  PrismaClient,
-  Project,
-} from "~/generated/prisma/client";
+import type { Organization, PrismaClient, Project } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import { type App, getApp } from "~/server/app-layer/app";
 // A pure rule with a type-only dependency of its own, so reading it here adds
@@ -142,10 +138,7 @@ export function createUnifiedAuthMiddleware({
     });
 
     if (!outcome.ok) {
-      return c.json(
-        refusal(outcome.refusal),
-        outcome.refusal.status as 401 | 500,
-      );
+      return c.json(refusal(outcome.refusal), outcome.refusal.status as 401 | 500);
     }
 
     const { resolved } = outcome;
@@ -161,11 +154,7 @@ export function createUnifiedAuthMiddleware({
     await next();
 
     // Late markUsed: only when the handler produced a success response.
-    if (
-      resolved.type === "apiKey" &&
-      c.res.status >= 200 &&
-      c.res.status < 300
-    ) {
+    if (resolved.type === "apiKey" && c.res.status >= 200 && c.res.status < 300) {
       apiKeys.markUsed({ id: resolved.apiKeyId });
     }
   };
@@ -189,9 +178,7 @@ async function resolveProjectPrincipal({
   apiKeys: ApiKeyService;
   credentials: { token: string; projectId: string | null } | null;
   diag: AuthDiagnostics;
-}): Promise<
-  { ok: true; resolved: ResolvedToken } | { ok: false; refusal: AuthRefusal }
-> {
+}): Promise<{ ok: true; resolved: ResolvedToken } | { ok: false; refusal: AuthRefusal }> {
   if (!credentials) {
     logger.warn(
       diag,
@@ -344,10 +331,7 @@ export function createOrgAuthMiddleware({
 
     if (!outcome.ok) {
       if (refusals === "throw") raiseOrgAuthRefusal(outcome.refusal);
-      return c.json(
-        refusal(outcome.refusal),
-        outcome.refusal.status as 401 | 500,
-      );
+      return c.json(refusal(outcome.refusal), outcome.refusal.status as 401 | 500);
     }
 
     const { organization, resolved } = outcome;
@@ -473,8 +457,7 @@ async function resolveOrgPrincipal({
         status: 401,
         code: "missing_credentials",
         legacyError: "Unauthorized",
-        message:
-          "Authentication required. Use Authorization: Bearer <api-key>.",
+        message: "Authentication required. Use Authorization: Bearer <api-key>.",
       },
     };
   }

@@ -248,9 +248,7 @@ export function registerGovernanceMcpTools(
     "Update the ottlRules of an org-authored template. Platform rows are immutable. Requires aiTools:manage. Mirrors PATCH /api/governance/ingestion-templates/:id/ottl-rules.",
     {
       id: z.string(),
-      ottl_rules: z
-        .string()
-        .describe("New ottlRules body. Empty string permitted."),
+      ottl_rules: z.string().describe("New ottlRules body. Empty string permitted."),
     },
     async ({ id, ottl_rules }) => {
       const r = await resolve();

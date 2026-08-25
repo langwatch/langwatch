@@ -104,16 +104,11 @@ async function requireBillingPlan(c: Context, next: Next): Promise<void> {
  * minimum of -9007199254740991 and so documents a negative epoch as
  * acceptable while the server refuses it.
  */
-const epochMs = z.coerce
-  .number()
-  .int()
-  .positive()
-  .max(Number.MAX_SAFE_INTEGER)
-  .openapi({
-    description:
-      "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
-    example: 1782864000000,
-  });
+const epochMs = z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).openapi({
+  description:
+    "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
+  example: 1782864000000,
+});
 
 const spendEventsQuerySchema = z
   .object({
@@ -159,9 +154,7 @@ const usageSchema = z.object({
 const costSchema = z.object({
   total_usd: z
     .string()
-    .describe(
-      `Display value. ${USD_DISPLAY_STRING_FORMAT} Use nano_usd for arithmetic.`,
-    ),
+    .describe(`Display value. ${USD_DISPLAY_STRING_FORMAT} Use nano_usd for arithmetic.`),
   nano_usd: z
     .number()
     .int()
@@ -231,9 +224,7 @@ const endUserCapSchema = z.object({
   limit_usd: z
     .string()
     .describe(`The cap for this end user. ${USD_DISPLAY_STRING_FORMAT}`),
-  spent_usd: z
-    .string()
-    .describe(`Spend against that cap. ${USD_DISPLAY_STRING_FORMAT}`),
+  spent_usd: z.string().describe(`Spend against that cap. ${USD_DISPLAY_STRING_FORMAT}`),
   period_started_at: z.string(),
 });
 
@@ -296,9 +287,7 @@ const groupBySchema = z
       (key) => !SPEND_GROUP_BY_KEYS.includes(key as SpendGroupByKey),
     );
     if (unknown.length > 0) {
-      return refuse(
-        `group_by must name one or two of ${SPEND_GROUP_BY_KEYS.join(", ")}`,
-      );
+      return refuse(`group_by must name one or two of ${SPEND_GROUP_BY_KEYS.join(", ")}`);
     }
     if (keys.length > MAX_GROUP_BY_KEYS) {
       return refuse(`group_by takes at most ${MAX_GROUP_BY_KEYS} dimensions`);
@@ -422,8 +411,7 @@ secured.access(requires("gatewaySpend:view")).get(
     // holding a cursor minted before a rollup could group by two dimensions.
     if (query.cursor !== undefined) {
       const parts = decodeSpendSummariesCursor(query.cursor);
-      const dimensionCount =
-        query.group_by.length + (query.bucket === "none" ? 0 : 1);
+      const dimensionCount = query.group_by.length + (query.bucket === "none" ? 0 : 1);
       if (parts === null) {
         throw new BadRequestError("Invalid cursor.");
       }
@@ -728,10 +716,7 @@ secured.access(requires("gatewaySpend:manage")).post(
     tags: ["Gateway Spend"],
     summary: "Replay spend events to an endpoint",
     description: REPLAY_DESCRIPTION,
-    responses: okResponse(
-      "Replay accepted",
-      z.object({ data: replayResultSchema }),
-    ),
+    responses: okResponse("Replay accepted", z.object({ data: replayResultSchema })),
   }),
   zValidator("json", replayBodySchema),
   async (c) => {
@@ -744,9 +729,7 @@ secured.access(requires("gatewaySpend:manage")).post(
       endpointId: body.endpoint_id,
     });
     if (!endpoint) {
-      throw new BadRequestError(
-        "unknown or inactive endpoint for this organization",
-      );
+      throw new BadRequestError("unknown or inactive endpoint for this organization");
     }
 
     const webhookEventsRepository = getApp().gateway.webhookEvents;

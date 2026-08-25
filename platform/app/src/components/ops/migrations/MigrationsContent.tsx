@@ -50,8 +50,7 @@ const RUN_OUTCOME_LABEL: Record<string, string> = {
     "The organization is held: the work ran but the parity proof found disagreements to resolve. See its report below.",
   parked:
     "The organization parked on an error and will be retried. See its report below.",
-  rolled_back:
-    "The organization is pinned rolled back, so the run left it alone.",
+  rolled_back: "The organization is pinned rolled back, so the run left it alone.",
 };
 
 /**
@@ -96,10 +95,9 @@ export function MigrationsContent() {
   const query = api.ops.listSystemMigrations.useQuery(undefined, {
     refetchInterval: 30_000,
   });
-  const enrollmentsQuery = api.ops.listMigrationEnrollments.useQuery(
-    undefined,
-    { refetchInterval: 30_000 },
-  );
+  const enrollmentsQuery = api.ops.listMigrationEnrollments.useQuery(undefined, {
+    refetchInterval: 30_000,
+  });
   const utils = api.useUtils();
   const runPass = api.ops.runSystemMigrationPass.useMutation({
     onSuccess: async () => {
@@ -145,14 +143,13 @@ export function MigrationsContent() {
       <HStack alignItems="flex-start">
         <Stack gap={2} maxWidth="720px">
           <Text fontSize="sm" color="fg.muted">
-            One-time data migrations the system performs on itself, organization
-            by organization, at worker boot. They run as an ordered pipeline:
-            each step starts only after the previous steps finalized for that
-            organization. Held organizations finished the work but failed the
-            parity proof - they stay on their legacy path, behaving exactly as
-            before, until the disagreement in their report is resolved and a
-            later pass re-verifies them. Parked organizations hit an error and
-            are retried automatically.
+            One-time data migrations the system performs on itself, organization by
+            organization, at worker boot. They run as an ordered pipeline: each step
+            starts only after the previous steps finalized for that organization. Held
+            organizations finished the work but failed the parity proof - they stay on
+            their legacy path, behaving exactly as before, until the disagreement in their
+            report is resolved and a later pass re-verifies them. Parked organizations hit
+            an error and are retried automatically.
           </Text>
           {enrollmentsQuery.data && !isSaaS && (
             <Text fontSize="sm" color="fg.muted">
@@ -160,16 +157,17 @@ export function MigrationsContent() {
               organization, so there is nothing to enroll.
             </Text>
           )}
-          {enrollmentsQuery.error && !enrollmentsQuery.data && (
-            // The enrollment actions hide themselves when this read fails,
-            // which is the safe direction but an unexplained one: without
-            // this line a cloud operator sees a page that looks like a
-            // self-hosted installation.
-            <Text fontSize="sm" color="fg.muted">
-              Enrollment could not be read just now, so the enrollment actions
-              are hidden. The page retries every 30 seconds.
-            </Text>
-          )}
+          {enrollmentsQuery.error &&
+            !enrollmentsQuery.data && (
+              // The enrollment actions hide themselves when this read fails,
+              // which is the safe direction but an unexplained one: without
+              // this line a cloud operator sees a page that looks like a
+              // self-hosted installation.
+              <Text fontSize="sm" color="fg.muted">
+                Enrollment could not be read just now, so the enrollment actions are
+                hidden. The page retries every 30 seconds.
+              </Text>
+            )}
         </Stack>
         <Spacer />
         <Button
@@ -227,21 +225,9 @@ function CountBadge({
 function MigrationStatusBadges({ migration }: { migration: MigrationListing }) {
   return (
     <HStack marginBottom={4} flexWrap="wrap" gap={2}>
-      <CountBadge
-        label="Finalized"
-        count={migration.counts.finalized}
-        palette="green"
-      />
-      <CountBadge
-        label="Held"
-        count={migration.counts.migrated}
-        palette="orange"
-      />
-      <CountBadge
-        label="Parked"
-        count={migration.counts.parked}
-        palette="red"
-      />
+      <CountBadge label="Finalized" count={migration.counts.finalized} palette="green" />
+      <CountBadge label="Held" count={migration.counts.migrated} palette="orange" />
+      <CountBadge label="Parked" count={migration.counts.parked} palette="red" />
       {migration.counts.rolled_back > 0 && (
         <CountBadge
           label="Rolled back"
@@ -285,12 +271,7 @@ function MigrationSection({
   // requires it rather than recognising a step by its name.
   const requiresConfirmation = migration.requiresOperatorConfirmation;
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.emphasized"
-      borderRadius="lg"
-      padding={5}
-    >
+    <Box borderWidth="1px" borderColor="border.emphasized" borderRadius="lg" padding={5}>
       <HStack marginBottom={1} flexWrap="wrap" gap={3}>
         <Heading size="md">
           Step {step} · {migration.title}
@@ -334,15 +315,12 @@ function MigrationSection({
       <MigrationStatusBadges migration={migration} />
       {!migration.availableOnThisInstallation ? (
         <Text fontSize="sm" color="fg.muted">
-          Not yet available for self-hosted installations. It will run
-          automatically, for every organization, in a later release - nothing to
-          do until then.
+          Not yet available for self-hosted installations. It will run automatically, for
+          every organization, in a later release - nothing to do until then.
         </Text>
       ) : (
         <Stack gap={4}>
-          {isSaaS && (
-            <EnrollmentTable enrollments={enrollments} canManage={canManage} />
-          )}
+          {isSaaS && <EnrollmentTable enrollments={enrollments} canManage={canManage} />}
           {migration.attention.length === 0 ? (
             <Text fontSize="sm" color="fg.muted">
               No organizations need attention.
@@ -469,16 +447,13 @@ function EnrollAction({
   requiresConfirmation: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [organization, setOrganization] = useState<PickedOrganization | null>(
-    null,
-  );
+  const [organization, setOrganization] = useState<PickedOrganization | null>(null);
   const utils = api.useUtils();
   const enroll = api.ops.enrollMigrationTenant.useMutation({
     onSuccess: async () => {
       toaster.create({
         title: "Organization enrolled",
-        description:
-          "The next migration pass picks the enrollment up automatically.",
+        description: "The next migration pass picks the enrollment up automatically.",
         type: "success",
       });
       setOpen(false);
@@ -488,8 +463,7 @@ function EnrollAction({
         utils.ops.listSystemMigrations.invalidate(),
       ]);
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't enroll" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't enroll" }),
   });
 
   return (
@@ -576,8 +550,7 @@ function EnrollCohortAction({
         result.enrolled.length === 0
           ? {
               title: "No organizations enrolled",
-              description:
-                "No eligible organizations remained to enroll for this step.",
+              description: "No eligible organizations remained to enroll for this step.",
               type: "info",
             }
           : {
@@ -659,9 +632,7 @@ function RunForOrganizationAction({
   requiresConfirmation: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [organization, setOrganization] = useState<PickedOrganization | null>(
-    null,
-  );
+  const [organization, setOrganization] = useState<PickedOrganization | null>(null);
   const utils = api.useUtils();
   const run = api.ops.runSystemMigrationForOrganization.useMutation({
     onSuccess: async ({ status, waiting }) => {
@@ -722,9 +693,7 @@ function RollBackAction({
   migrationTitle: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [organization, setOrganization] = useState<PickedOrganization | null>(
-    null,
-  );
+  const [organization, setOrganization] = useState<PickedOrganization | null>(null);
   const utils = api.useUtils();
   const rollBack = api.ops.rollBackSystemMigrationTenant.useMutation({
     onSuccess: async () => {
@@ -738,8 +707,7 @@ function RollBackAction({
       setOrganization(null);
       await utils.ops.listSystemMigrations.invalidate();
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't roll back" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't roll back" }),
   });
 
   return (
@@ -794,9 +762,7 @@ function EnrollmentTable({
       </Text>
     );
   }
-  const visible = showAll
-    ? enrollments
-    : enrollments.slice(0, ENROLLMENT_PREVIEW_ROWS);
+  const visible = showAll ? enrollments : enrollments.slice(0, ENROLLMENT_PREVIEW_ROWS);
   const hiddenCount = enrollments.length - visible.length;
   return (
     <Stack gap={2}>
@@ -819,19 +785,18 @@ function EnrollmentTable({
           ))}
         </Table.Body>
       </ListTable>
-      {(hiddenCount > 0 || showAll) &&
-        enrollments.length > ENROLLMENT_PREVIEW_ROWS && (
-          <Button
-            size="xs"
-            variant="ghost"
-            alignSelf="flex-start"
-            onClick={() => setShowAll((value) => !value)}
-          >
-            {showAll
-              ? "Show fewer"
-              : `Show all ${enrollments.length} enrolled organizations`}
-          </Button>
-        )}
+      {(hiddenCount > 0 || showAll) && enrollments.length > ENROLLMENT_PREVIEW_ROWS && (
+        <Button
+          size="xs"
+          variant="ghost"
+          alignSelf="flex-start"
+          onClick={() => setShowAll((value) => !value)}
+        >
+          {showAll
+            ? "Show fewer"
+            : `Show all ${enrollments.length} enrolled organizations`}
+        </Button>
+      )}
     </Stack>
   );
 }
@@ -857,8 +822,7 @@ function EnrollmentRow({
         utils.ops.listSystemMigrations.invalidate(),
       ]);
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't withdraw" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't withdraw" }),
   });
 
   return (
@@ -902,11 +866,7 @@ function EnrollmentRow({
   );
 }
 
-function AttentionRow({
-  record,
-}: {
-  record: MigrationListing["attention"][number];
-}) {
+function AttentionRow({ record }: { record: MigrationListing["attention"][number] }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <>

@@ -9,10 +9,7 @@ export {
   PromptTextAreaWithVariables,
 } from "../prompt-textarea";
 export { FormVariablesSection } from "./FormVariablesSection";
-export {
-  type SelectedField,
-  VariableInsertMenu,
-} from "./VariableInsertMenu";
+export { type SelectedField, VariableInsertMenu } from "./VariableInsertMenu";
 export {
   type AvailableSource,
   type FieldMapping,

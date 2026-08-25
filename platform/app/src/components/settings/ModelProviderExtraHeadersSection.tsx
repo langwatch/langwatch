@@ -1,11 +1,4 @@
-import {
-  Button,
-  Grid,
-  GridItem,
-  HStack,
-  Input,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Grid, GridItem, HStack, Input, VStack } from "@chakra-ui/react";
 import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import React from "react";
 import type { ExtraHeader } from "../../hooks/useExtraHeaders";
@@ -44,12 +37,7 @@ export const ExtraHeadersSection = ({
   return (
     <VStack width="full" align="start" paddingTop={4}>
       {state.extraHeaders.length > 0 && (
-        <Grid
-          templateColumns="auto auto auto auto"
-          gap={4}
-          rowGap={2}
-          width="full"
-        >
+        <Grid templateColumns="auto auto auto auto" gap={4} rowGap={2} width="full">
           <GridItem color="fg.muted" colSpan={4}>
             <SmallLabel>Extra Headers</SmallLabel>
           </GridItem>
@@ -58,9 +46,7 @@ export const ExtraHeadersSection = ({
               <GridItem>
                 <Input
                   value={h.key}
-                  onChange={(e) =>
-                    actions.setExtraHeaderKey(index, e.target.value)
-                  }
+                  onChange={(e) => actions.setExtraHeaderKey(index, e.target.value)}
                   placeholder="Header name"
                   autoComplete="off"
                   width="full"
@@ -69,9 +55,7 @@ export const ExtraHeadersSection = ({
               <GridItem>
                 <Input
                   value={h.value}
-                  onChange={(e) =>
-                    actions.setExtraHeaderValue(index, e.target.value)
-                  }
+                  onChange={(e) => actions.setExtraHeaderValue(index, e.target.value)}
                   type={h.concealed ? "password" : "text"}
                   placeholder="Header value"
                   autoComplete="off"

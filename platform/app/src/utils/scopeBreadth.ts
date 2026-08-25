@@ -19,9 +19,7 @@ export type BreadthScopeType = keyof typeof SCOPE_BREADTH;
  * throwing, so a shared table never crashes on an unexpected scope kind.
  */
 export function scopeBreadthRank(scopeType: string): number {
-  return (
-    SCOPE_BREADTH[scopeType as BreadthScopeType] ?? SCOPE_BREADTH.PROJECT + 1
-  );
+  return SCOPE_BREADTH[scopeType as BreadthScopeType] ?? SCOPE_BREADTH.PROJECT + 1;
 }
 
 /**

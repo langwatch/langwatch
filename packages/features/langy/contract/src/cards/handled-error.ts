@@ -265,10 +265,8 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
           : typeof telemetry?.traceId === "string"
             ? telemetry.traceId
             : undefined,
-      traceUrl:
-        typeof serialized.traceUrl === "string" ? serialized.traceUrl : undefined,
-      logsUrl:
-        typeof serialized.logsUrl === "string" ? serialized.logsUrl : undefined,
+      traceUrl: typeof serialized.traceUrl === "string" ? serialized.traceUrl : undefined,
+      logsUrl: typeof serialized.logsUrl === "string" ? serialized.logsUrl : undefined,
       reasons: asReasons(serialized.reasons),
       suggestions:
         asSuggestions(serialized.tips) ?? asSuggestions(serialized.suggestions),
@@ -445,13 +443,7 @@ const codeForStatus = (status: number): string => {
   return "network_error";
 };
 
-const fallbackMessage = ({
-  status,
-  body,
-}: {
-  status: number;
-  body: unknown;
-}): string => {
+const fallbackMessage = ({ status, body }: { status: number; body: unknown }): string => {
   if (typeof body === "string" && body.trim()) return body.trim().slice(0, 300);
   return status > 0 ? `Request failed with status ${status}` : "Request failed";
 };
@@ -505,10 +497,7 @@ export const parseHandledError = ({
     // With no status to go on, the code decides: the platform only emits a
     // generic code when it fell over, so anything more specific than that is a
     // failure it chose to name — which is exactly what a domain error is.
-    isHandled:
-      status > 0
-        ? status < SERVER_ERROR_STATUS
-        : !isGenericCode(parsed.code),
+    isHandled: status > 0 ? status < SERVER_ERROR_STATUS : !isGenericCode(parsed.code),
   };
 };
 
@@ -555,11 +544,8 @@ export const toCliErrorDocument = (error: CliHandledError): CliErrorDocument => 
  * Null-on-miss rather than throw: stdout may hold a card, a human table, or
  * nothing at all, and none of those is an error document.
  */
-export const readCliErrorDocument = (
-  output: unknown,
-): CliHandledError | null => {
-  const document =
-    typeof output === "string" ? safeParseJson(output) : asRecord(output);
+export const readCliErrorDocument = (output: unknown): CliHandledError | null => {
+  const document = typeof output === "string" ? safeParseJson(output) : asRecord(output);
 
   const record = asRecord(document);
   if (!record || record.ok !== false) return null;
@@ -692,7 +678,6 @@ export const handledErrorFromThrown = (error: unknown): CliHandledError => {
 
   return {
     ...parsed,
-    message:
-      error instanceof Error && error.message ? error.message : parsed.message,
+    message: error instanceof Error && error.message ? error.message : parsed.message,
   };
 };

@@ -1,10 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "../../app";
-import {
-  captureException,
-  toError,
-} from "../../../../utils/posthogErrorCapture";
+import { captureException, toError } from "../../../../utils/posthogErrorCapture";
 
 const logger = createLogger("ee:nurturing:prompt-creation");
 

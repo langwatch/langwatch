@@ -38,8 +38,7 @@ export function createEventingGroupQueueFactory({
           return value as Record<string, unknown>;
         },
       },
-      groupBy: (payload) =>
-        eventingDefinition.groupKey?.(payload) ?? randomUUID(),
+      groupBy: (payload) => eventingDefinition.groupKey?.(payload) ?? randomUUID(),
       identify: () => randomUUID(),
       score: eventingDefinition.score,
       spanAttributes: eventingDefinition.spanAttributes,
@@ -56,14 +55,10 @@ export function createEventingGroupQueueFactory({
     const producer = new GroupQueueProducer(queueDefinition, dependencies);
     let consumer: RunningGroupQueueConsumer<Record<string, unknown>> | undefined;
     if (consumersEnabled) {
-      const configuredConsumer = new GroupQueueConsumer(
-        queueDefinition,
-        dependencies,
-      );
+      const configuredConsumer = new GroupQueueConsumer(queueDefinition, dependencies);
       consumer = eventingDefinition.processBatch
         ? configuredConsumer.handleBatch({
-            each: (payload, context) =>
-              eventingDefinition.process(payload, context),
+            each: (payload, context) => eventingDefinition.process(payload, context),
             batch: (payloads, context) =>
               eventingDefinition.processBatch!(payloads, context),
           })
@@ -76,10 +71,7 @@ export function createEventingGroupQueueFactory({
       send: (payload, options) => producer.send(payload, options),
       sendBatch: (payloads, options) => producer.sendBatch(payloads, options),
       async waitUntilReady() {
-        await Promise.all([
-          producer.waitUntilReady(),
-          consumer?.waitUntilReady(),
-        ]);
+        await Promise.all([producer.waitUntilReady(), consumer?.waitUntilReady()]);
       },
       async close() {
         await producer.close();

@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NormalizedSpanKind } from "../../schemas/spans";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * Full-flow integration tests that exercise the entire applySpanToSummary
@@ -129,9 +126,7 @@ describe("traceSummary full-flow integration", () => {
         expect(state.totalCost).toBeGreaterThan(0);
         expect(state.models).toContain("gpt-5-mini");
         expect(state.computedInput).toBe("What is the weather in Tokyo?");
-        expect(state.computedOutput).toBe(
-          "The weather in Tokyo is sunny, 22C.",
-        );
+        expect(state.computedOutput).toBe("The weather in Tokyo is sunny, 22C.");
         expect(state.containsErrorStatus).toBe(false);
         expect(state.occurredAt).toBe(1000);
         expect(state.totalDurationMs).toBe(4000);
@@ -191,8 +186,7 @@ describe("traceSummary full-flow integration", () => {
             "gen_ai.output.messages": [
               {
                 role: "assistant",
-                content:
-                  "Quantum computing uses qubits that can exist in superposition.",
+                content: "Quantum computing uses qubits that can exist in superposition.",
               },
             ],
           },
@@ -263,8 +257,7 @@ describe("traceSummary full-flow integration", () => {
             "langwatch.user.id": "user-42",
             "gen_ai.conversation.id": "conv-123",
             "langwatch.input": "Summarize the latest news",
-            "langwatch.output":
-              "Here is a summary of the latest news headlines.",
+            "langwatch.output": "Here is a summary of the latest news headlines.",
           },
           instrumentationScope: {
             name: "openinference.instrumentation.agno",
@@ -442,9 +435,7 @@ describe("traceSummary full-flow integration", () => {
         expect(state.models).toContain("gpt-5-mini");
         expect(state.totalPromptTokenCount).toBe(300);
         expect(state.totalCompletionTokenCount).toBe(150);
-        expect(state.computedInput).toBe(
-          "Calculate compound interest for $10000",
-        );
+        expect(state.computedInput).toBe("Calculate compound interest for $10000");
         expect(state.computedOutput).toBe(
           "The compound interest for $10000 at 5% over 10 years is $6288.95.",
         );

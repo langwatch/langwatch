@@ -158,8 +158,7 @@ function BindingsCell({ bindings }: { bindings: Binding[] }) {
             on
           </Text>
           <Badge colorPalette={scopePillColor(b.scopeType)} size="sm">
-            {scopeLabel(b.scopeType)} ·{" "}
-            {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
+            {scopeLabel(b.scopeType)} · {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
           </Badge>
         </HStack>
       ))}
@@ -254,8 +253,7 @@ function AccessAuditPage() {
           <Spacer />
           {bindings && (
             <Text fontSize="sm" color="fg.muted">
-              {principals.length}{" "}
-              {principals.length === 1 ? "principal" : "principals"}
+              {principals.length} {principals.length === 1 ? "principal" : "principals"}
             </Text>
           )}
         </HStack>
@@ -275,9 +273,7 @@ function AccessAuditPage() {
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader width="240px">Who</Table.ColumnHeader>
-                    <Table.ColumnHeader textAlign="right">
-                      Access
-                    </Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>

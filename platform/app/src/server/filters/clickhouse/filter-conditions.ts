@@ -18,9 +18,7 @@ const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
  * returning TRUE for every outer row. We use assumeNotNull() + IS NOT NULL to work around this.
  * See: https://github.com/langwatch/langwatch/issues/3000
  */
-function buildEvaluatorExistsCondition(
-  additionalWhere: string,
-): FilterConditionBuilder {
+function buildEvaluatorExistsCondition(additionalWhere: string): FilterConditionBuilder {
   return (values, paramId) => ({
     sql: `EXISTS (
       SELECT 1 FROM evaluation_runs es
@@ -87,10 +85,7 @@ export const clickHouseFilterConditions: Record<
       params[`${paramId}_k${i}_bare`] = rawKey;
     });
     return {
-      sql:
-        conditions.length === 1
-          ? conditions[0]!
-          : `(${conditions.join(" OR ")})`,
+      sql: conditions.length === 1 ? conditions[0]! : `(${conditions.join(" OR ")})`,
       params,
     };
   },
@@ -456,10 +451,10 @@ const SPAN_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
  * window (buffered). Returned `sql` is empty when no usable window is given, so
  * callers without a time range keep the previous unbounded behaviour.
  */
-function buildSpanTimeBound(timeWindow?: {
-  startDate?: number;
-  endDate?: number;
-}): { sql: string; params: Record<string, unknown> } {
+function buildSpanTimeBound(timeWindow?: { startDate?: number; endDate?: number }): {
+  sql: string;
+  params: Record<string, unknown>;
+} {
   if (
     !timeWindow ||
     typeof timeWindow.startDate !== "number" ||
@@ -470,10 +465,7 @@ function buildSpanTimeBound(timeWindow?: {
   return {
     sql: " AND sp.StartTime >= fromUnixTimestamp64Milli({spanWindowStart:UInt64}) AND sp.StartTime <= fromUnixTimestamp64Milli({spanWindowEnd:UInt64})",
     params: {
-      spanWindowStart: Math.max(
-        0,
-        timeWindow.startDate - SPAN_WINDOW_BUFFER_MS,
-      ),
+      spanWindowStart: Math.max(0, timeWindow.startDate - SPAN_WINDOW_BUFFER_MS),
       spanWindowEnd: timeWindow.endDate + SPAN_WINDOW_BUFFER_MS,
     },
   };

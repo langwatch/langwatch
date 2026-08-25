@@ -196,9 +196,7 @@ export function deriveFromPath({
   const rawSegments = Array.isArray(path) ? path : path ? [path] : [];
   // Drop segments that are actually query strings leaking in from the URL
   // (e.g. when a redirect fires before the catch-all has stripped "?foo=bar").
-  const segments = rawSegments.filter(
-    (s) => s && !s.startsWith("?") && !s.includes("="),
-  );
+  const segments = rawSegments.filter((s) => s && !s.startsWith("?") && !s.includes("="));
 
   // [] → All Runs
   if (segments.length === 0) {

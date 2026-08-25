@@ -41,8 +41,7 @@ import { prisma } from "../../../src/server/db";
 
 const APP_BASE_URL = process.env.LANGWATCH_BASE_URL ?? "http://localhost:5560";
 const CLICKHOUSE_URL =
-  process.env.CLICKHOUSE_URL ??
-  "http://default:langwatch@localhost:8123/langwatch";
+  process.env.CLICKHOUSE_URL ?? "http://default:langwatch@localhost:8123/langwatch";
 const POLL_TIMEOUT_MS = 90_000;
 const POLL_INTERVAL_MS = 3_000;
 
@@ -124,9 +123,7 @@ interface SubscriberEvidence {
   landed: boolean;
 }
 
-async function pollClickHouse(
-  projectId: string,
-): Promise<SubscriberEvidence[]> {
+async function pollClickHouse(projectId: string): Promise<SubscriberEvidence[]> {
   // CH `TenantId` column is the trace-processing tenant id, which is the
   // PROJECT id (not the organization id). Earlier smoke runs polled by
   // org id and consistently returned 0 rows even though subscribers had
@@ -180,9 +177,7 @@ async function pollClickHouse(
   return out;
 }
 
-async function postSyntheticIngestionSourceTrace(
-  seeded: SeededState,
-): Promise<string> {
+async function postSyntheticIngestionSourceTrace(seeded: SeededState): Promise<string> {
   // Build an OTLP/JSON payload for an ingestion-source-shaped trace.
   // governanceKpisSync + governanceOcsfEventsSync gate on
   // langwatch.origin.kind=ingestion_source + langwatch.ingestion_source.id.
@@ -223,14 +218,8 @@ async function postSyntheticIngestionSourceTrace(
                   // governanceKpisSync + governanceOcsfEventsSync subscribers
                   attrStr("langwatch.origin.kind", "ingestion_source"),
                   attrStr("langwatch.ingestion_source.id", ingestionSourceId),
-                  attrStr(
-                    "langwatch.ingestion_source.organization_id",
-                    seeded.org.id,
-                  ),
-                  attrStr(
-                    "langwatch.ingestion_source.source_type",
-                    "http_polling",
-                  ),
+                  attrStr("langwatch.ingestion_source.organization_id", seeded.org.id),
+                  attrStr("langwatch.ingestion_source.source_type", "http_polling"),
                   attrStr("gen_ai.system", "openai"),
                   attrStr("gen_ai.request.model", "gpt-4o-mini"),
                   attrInt("gen_ai.usage.input_tokens", 25),
@@ -268,9 +257,7 @@ async function postSyntheticIngestionSourceTrace(
 async function main() {
   console.log("[smoke] seeding fresh org/project/user…");
   const seeded = await seed();
-  console.log(
-    `[smoke] seeded: org=${seeded.org.id} project=${seeded.project.id}`,
-  );
+  console.log(`[smoke] seeded: org=${seeded.org.id} project=${seeded.project.id}`);
   console.log(
     `[smoke] posting synthetic OTLP ingestion-source trace to /api/otel/v1/traces…`,
   );

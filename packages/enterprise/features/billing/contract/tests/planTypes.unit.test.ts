@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  PlanTypes,
-  SUBSCRIBABLE_PLANS,
-  SubscriptionStatus,
-} from "../src/index";
+import { PlanTypes, SUBSCRIBABLE_PLANS, SubscriptionStatus } from "../src/index";
 
 describe("SUBSCRIBABLE_PLANS", () => {
   it("includes FREE for downgrade/cancel flow", () => {

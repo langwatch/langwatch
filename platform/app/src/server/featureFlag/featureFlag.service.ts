@@ -6,10 +6,7 @@ import {
 } from "./featureFlagStore.postgres";
 import type { FeatureFlagKey } from "./registry";
 import { resolveFlagDefinition } from "./registry";
-import type {
-  FeatureFlagEvaluateOptions,
-  FeatureFlagServiceInterface,
-} from "./types";
+import type { FeatureFlagEvaluateOptions, FeatureFlagServiceInterface } from "./types";
 
 /**
  * Main feature flag service.
@@ -82,10 +79,7 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     const definition = resolveFlagDefinition(flagKey);
 
     if (definition?.envOverridable !== false) {
-      const envOverride = checkFlagEnvOverride(
-        flagKey,
-        definition?.legacyEnvVar,
-      );
+      const envOverride = checkFlagEnvOverride(flagKey, definition?.legacyEnvVar);
       if (envOverride !== undefined) {
         return envOverride;
       }

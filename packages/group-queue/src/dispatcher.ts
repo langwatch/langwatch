@@ -52,8 +52,7 @@ export class GroupQueueDispatcher {
         } catch (error) {
           if (this.shutdownRequested) break;
 
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
 
           if (errorMessage.includes("Connection is closed")) {
             this.params.logger.debug(
@@ -119,18 +118,14 @@ export class GroupQueueDispatcher {
    */
   private async nextWakeTimeoutSec(): Promise<number> {
     const saturated =
-      this.params.processingQueue.length() +
-        this.params.processingQueue.running() >=
+      this.params.processingQueue.length() + this.params.processingQueue.running() >=
       this.params.globalConcurrency;
     if (saturated) return this.params.signalTimeoutSec;
     try {
       const earliest = await this.params.scripts.getEarliestReadyScore();
       if (earliest === null) return this.params.signalTimeoutSec;
       const untilDueSec = (earliest - Date.now()) / 1000;
-      return Math.min(
-        this.params.signalTimeoutSec,
-        Math.max(untilDueSec, 0.05),
-      );
+      return Math.min(this.params.signalTimeoutSec, Math.max(untilDueSec, 0.05));
     } catch {
       // Peek is best-effort; fall back to the fixed interval.
       return this.params.signalTimeoutSec;

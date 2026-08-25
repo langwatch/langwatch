@@ -157,9 +157,7 @@ describe("<ScenarioGridCard/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByText("Staging Agent: Refund Flow (#2)"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Staging Agent: Refund Flow (#2)")).toBeInTheDocument();
     });
   });
 

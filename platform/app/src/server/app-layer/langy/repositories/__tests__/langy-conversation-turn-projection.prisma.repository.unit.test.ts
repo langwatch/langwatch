@@ -2,10 +2,7 @@ import type { ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { LANGY_CONVERSATION_TURN_STATUS } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  type LangyConversationTurnProjection,
-  Prisma,
-} from "~/generated/prisma/client";
+import { type LangyConversationTurnProjection, Prisma } from "~/generated/prisma/client";
 import { PrismaLangyConversationTurnProjectionRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-conversation-turn-projection.repository";
 
 type Row = LangyConversationTurnProjection;
@@ -82,10 +79,7 @@ function context(projectId = "project-1"): ProjectionStoreContext {
 describe("PrismaLangyConversationTurnProjectionRepository", () => {
   it("validates and round-trips nested JSON without casts", async () => {
     const { repository, upsert } = setup(row());
-    const projection = await repository.load(
-      "conversation-1:turn-1",
-      context(),
-    );
+    const projection = await repository.load("conversation-1:turn-1", context());
 
     expect(projection?.state).toEqual(
       expect.objectContaining({
@@ -128,10 +122,7 @@ describe("PrismaLangyConversationTurnProjectionRepository", () => {
 
   it("represents an absent plan as database NULL on write", async () => {
     const { repository, upsert } = setup(row({ Plan: null }));
-    const projection = await repository.load(
-      "conversation-1:turn-1",
-      context(),
-    );
+    const projection = await repository.load("conversation-1:turn-1", context());
 
     await repository.store(projection!, context());
 
@@ -156,9 +147,7 @@ describe("PrismaLangyConversationTurnProjectionRepository", () => {
       }),
     );
 
-    await expect(
-      repository.load("conversation-1:turn-1", context()),
-    ).rejects.toThrow();
+    await expect(repository.load("conversation-1:turn-1", context())).rejects.toThrow();
   });
 
   it("uses project, conversation, and turn in the persistence key", async () => {

@@ -125,12 +125,8 @@ async function insertSpend({
 
 /** Every group key the rollup served, for the whole seeded window. */
 async function summariseBy(
-  groupBy: Parameters<
-    GatewaySpendEventsRepository["readSpendSummaries"]
-  >[0]["groupBy"],
-  extra: Partial<
-    Parameters<GatewaySpendEventsRepository["readSpendSummaries"]>[0]
-  > = {},
+  groupBy: Parameters<GatewaySpendEventsRepository["readSpendSummaries"]>[0]["groupBy"],
+  extra: Partial<Parameters<GatewaySpendEventsRepository["readSpendSummaries"]>[0]> = {},
 ): Promise<string[]> {
   const page = await repository().readSpendSummaries({
     tenantIds: [PROJECT_A_ID, PROJECT_B_ID],
@@ -324,9 +320,11 @@ describe("gateway spend filtering (real PG + real CH)", () => {
     });
 
     it("still serves a status the rollup can sum", async () => {
-      expect(
-        await summariseBy(["model"], { filters: { status: "confirmed" } }),
-      ).toEqual(["claude-opus-5", "gemini-3-pro", "gpt-5-mini"]);
+      expect(await summariseBy(["model"], { filters: { status: "confirmed" } })).toEqual([
+        "claude-opus-5",
+        "gemini-3-pro",
+        "gpt-5-mini",
+      ]);
     });
   });
 
@@ -415,9 +413,9 @@ describe("gateway spend filtering (real PG + real CH)", () => {
           filters: { endUserIds: ["enduser-b"] },
         }),
       ).toEqual(["gemini-3-pro"]);
-      expect(
-        await summariseBy(["model"], { filters: { labels: ["billable"] } }),
-      ).toEqual(["gpt-5-mini"]);
+      expect(await summariseBy(["model"], { filters: { labels: ["billable"] } })).toEqual(
+        ["gpt-5-mini"],
+      );
     });
   });
 
@@ -505,9 +503,7 @@ describe("gateway spend filtering (real PG + real CH)", () => {
     it("covers every project when none is named", async () => {
       clearSpendScopeCache();
       const scope = await resolveSpendScope({ organizationId: ORG_ID });
-      expect(scope.tenantIds.sort()).toEqual(
-        [PROJECT_A_ID, PROJECT_B_ID].sort(),
-      );
+      expect(scope.tenantIds.sort()).toEqual([PROJECT_A_ID, PROJECT_B_ID].sort());
     });
 
     /** @scenario "Naming projects narrows the read to them" */

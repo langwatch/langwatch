@@ -40,18 +40,16 @@ Anthropic requires `max_tokens`, omitting it returns a 400 from upstream which t
 
 ```json
 {
-  "model":      "claude-sonnet-4-6",
+  "model": "claude-sonnet-4-6",
   "max_tokens": 2048,
-  "system":     [
+  "system": [
     {
       "type": "text",
       "text": "Very long system prompt here (30k tokens+)...",
-      "cache_control": {"type": "ephemeral"}
+      "cache_control": { "type": "ephemeral" }
     }
   ],
-  "messages":   [
-    { "role": "user", "content": "What's the first paragraph?" }
-  ]
+  "messages": [{ "role": "user", "content": "What's the first paragraph?" }]
 }
 ```
 

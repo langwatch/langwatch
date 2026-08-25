@@ -61,9 +61,7 @@ export class StoredObjectOwnerClickHouseRepository {
         format: "JSONEachRow",
       });
       const rows = await result.json<{ project_id: string }>();
-      return rows.length > 0
-        ? { projectId: rows[0]!.project_id, target }
-        : null;
+      return rows.length > 0 ? { projectId: rows[0]!.project_id, target } : null;
     });
 
     const settled = await Promise.allSettled(lookups);

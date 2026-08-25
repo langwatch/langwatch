@@ -43,14 +43,7 @@
  * left hairline is its only border, and it wears the panel's own glass
  * (surface at alpha over a blur) so it reads as the same material.
  */
-import {
-  Box,
-  chakra,
-  HStack,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Eraser, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -235,13 +228,8 @@ export function LangyDevDrawer({
             {/* The tape holds arbitrary recorded wire data; one malformed
                 record must never take the panel down with the inspector.
                 Switching tabs re-attempts. */}
-            <IsolatedErrorBoundary
-              scope="The inspector crashed"
-              resetKeys={[tab]}
-            >
-              {tab === "log" ? (
-                <LogTab records={visibleRecords} live={live} />
-              ) : null}
+            <IsolatedErrorBoundary scope="The inspector crashed" resetKeys={[tab]}>
+              {tab === "log" ? <LogTab records={visibleRecords} live={live} /> : null}
               {tab === "tokens" ? (
                 <TokensTab records={visibleRecords} live={live} />
               ) : null}
@@ -360,10 +348,7 @@ function TimeScrubber({
   const live = scrubSeq === null;
   const first = records[0]?.seq ?? 0;
   const last = records.at(-1)?.seq ?? 0;
-  const replayed = useMemo(
-    () => replayTurnProjection(visibleRecords),
-    [visibleRecords],
-  );
+  const replayed = useMemo(() => replayTurnProjection(visibleRecords), [visibleRecords]);
   if (records.length === 0) return null;
   const at = visibleRecords.at(-1);
   return (
@@ -438,10 +423,7 @@ function TimeScrubber({
 }
 
 /** Per-lane colors + direction, so the unified log reads at a glance. */
-const LANE_STYLE: Record<
-  LangyDevLogRecord["lane"],
-  { glyph: string; color: string }
-> = {
+const LANE_STYLE: Record<LangyDevLogRecord["lane"], { glyph: string; color: string }> = {
   outbound: { glyph: "→", color: "blue.fg" },
   stream: { glyph: "←", color: "orange.fg" },
   durable: { glyph: "⇐", color: "purple.fg" },
@@ -455,13 +437,7 @@ const LANE_STYLE: Record<
  * cross-channel ordering ("did the signal beat the stream? did we send before
  * the terminal?") is the thing no partitioned view can show.
  */
-function LogTab({
-  records,
-  live,
-}: {
-  records: LangyDevLogRecord[];
-  live: boolean;
-}) {
+function LogTab({ records, live }: { records: LangyDevLogRecord[]; live: boolean }) {
   const dropped = useLangyDevLog((s) => s.dropped);
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -475,8 +451,8 @@ function LogTab({
     <Box padding={2}>
       {dropped > 0 ? (
         <Text textStyle="2xs" color="orange.fg" paddingX={1} paddingBottom={2}>
-          {dropped.toLocaleString()} earlier entries dropped — the tape keeps
-          the most recent {DEV_LOG_CAPACITY.toLocaleString()}.
+          {dropped.toLocaleString()} earlier entries dropped — the tape keeps the most
+          recent {DEV_LOG_CAPACITY.toLocaleString()}.
         </Text>
       ) : null}
       <VStack align="stretch" gap={0.5}>
@@ -511,13 +487,7 @@ function LogRow({ record }: { record: LangyDevLogRecord }) {
         aria-expanded={open}
         _hover={{ background: "bg.subtle" }}
       >
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          flexShrink={0}
-          css={MONO}
-          minWidth="34px"
-        >
+        <Text textStyle="2xs" color="fg.subtle" flexShrink={0} css={MONO} minWidth="34px">
           {record.seq}
         </Text>
         <Text
@@ -606,8 +576,8 @@ function TapeEmpty() {
   return (
     <VStack align="stretch" gap={3} paddingX="12px" paddingY="10px">
       <Text textStyle="xs" color="fg.muted">
-        Armed. Send a message — everything that crosses the wire lands here in
-        arrival order.
+        Armed. Send a message — everything that crosses the wire lands here in arrival
+        order.
       </Text>
       <VStack align="stretch" gap={1}>
         {LANE_LEGEND.map(({ lane, label, detail }) => (
@@ -637,8 +607,8 @@ function TapeEmpty() {
         ))}
       </VStack>
       <Text textStyle="2xs" color="fg.subtle" css={MONO}>
-        ring · keeps the last {DEV_LOG_CAPACITY.toLocaleString()} entries ·
-        scoped to this conversation
+        ring · keeps the last {DEV_LOG_CAPACITY.toLocaleString()} entries · scoped to this
+        conversation
       </Text>
     </VStack>
   );
@@ -649,18 +619,10 @@ const MONO = {
     "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace",
 } as const;
 
-function TokensTab({
-  records,
-  live,
-}: {
-  records: LangyDevLogRecord[];
-  live: boolean;
-}) {
+function TokensTab({ records, live }: { records: LangyDevLogRecord[]; live: boolean }) {
   const text = useMemo(() => tokenStreamText(records), [records]);
   const deltaCount = useMemo(
-    () =>
-      streamRecords(records).filter((record) => record.entry.type === "delta")
-        .length,
+    () => streamRecords(records).filter((record) => record.entry.type === "delta").length,
     [records],
   );
 
@@ -672,15 +634,12 @@ function TokensTab({
   }, [text, live]);
 
   if (!text) {
-    return (
-      <Empty>No tokens yet. Send a message and they will stream here.</Empty>
-    );
+    return <Empty>No tokens yet. Send a message and they will stream here.</Empty>;
   }
   return (
     <Box padding={3}>
       <Text textStyle="2xs" color="fg.subtle" marginBottom={2}>
-        {deltaCount.toLocaleString()} deltas · {text.length.toLocaleString()}{" "}
-        characters
+        {deltaCount.toLocaleString()} deltas · {text.length.toLocaleString()} characters
       </Text>
       <Box
         textStyle="xs"
@@ -723,8 +682,7 @@ function EphemeralTab({
   const signals = useMemo(
     () =>
       streamRecords(records).filter(
-        (record) =>
-          record.entry.type !== "delta" && record.entry.type !== "tool",
+        (record) => record.entry.type !== "delta" && record.entry.type !== "tool",
       ),
     [records],
   );
@@ -738,8 +696,8 @@ function EphemeralTab({
   if (signals.length === 0) {
     return (
       <Empty>
-        No signals yet — status, progress, reasoning and plan frames land here
-        as they arrive.
+        No signals yet — status, progress, reasoning and plan frames land here as they
+        arrive.
       </Empty>
     );
   }
@@ -756,8 +714,8 @@ function EphemeralTab({
         // Say so. A silently-truncated tape reads as a complete one, and that
         // is exactly how you end up debugging the wrong half of a turn.
         <Text textStyle="2xs" color="orange.fg" paddingX={1} paddingBottom={2}>
-          {dropped.toLocaleString()} earlier entries dropped — the tape keeps
-          the most recent {DEV_LOG_CAPACITY.toLocaleString()}.
+          {dropped.toLocaleString()} earlier entries dropped — the tape keeps the most
+          recent {DEV_LOG_CAPACITY.toLocaleString()}.
         </Text>
       ) : null}
       <VStack align="stretch" gap={0.5}>
@@ -808,13 +766,7 @@ function SignalRow({
         aria-expanded={open}
         _hover={{ background: "bg.subtle" }}
       >
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          flexShrink={0}
-          css={MONO}
-          minWidth="34px"
-        >
+        <Text textStyle="2xs" color="fg.subtle" flexShrink={0} css={MONO} minWidth="34px">
           {record.seq}
         </Text>
         <Text
@@ -874,13 +826,7 @@ function SignalRow({
  * name, which is why a call rendering as a plain activity line instead of a rich
  * card is only ever visible in this view.
  */
-function EventsTab({
-  records,
-  live,
-}: {
-  records: LangyDevLogRecord[];
-  live: boolean;
-}) {
+function EventsTab({ records, live }: { records: LangyDevLogRecord[]; live: boolean }) {
   const calls = useMemo(() => toolCallsFrom(records), [records]);
 
   const endRef = useRef<HTMLDivElement>(null);
@@ -903,10 +849,7 @@ function EventsTab({
 
 function EventRow({ call }: { call: DevToolCall }) {
   const [open, setOpen] = useState(false);
-  const capability = useMemo(
-    () => resolveCliCapability(call.name),
-    [call.name],
-  );
+  const capability = useMemo(() => resolveCliCapability(call.name), [call.name]);
   const running = call.settledAtMs === undefined;
 
   return (
@@ -960,8 +903,7 @@ function EventRow({ call }: { call: DevToolCall }) {
           </HStack>
         ) : (
           <Text textStyle="2xs" color="fg.muted">
-            No capability — not a CLI call, so it renders as a plain activity
-            line.
+            No capability — not a CLI call, so it renders as a plain activity line.
           </Text>
         )}
       </Box>
@@ -993,13 +935,7 @@ function EventRow({ call }: { call: DevToolCall }) {
 function DevField({ label, value }: { label: string; value: string }) {
   return (
     <HStack gap={2} align="baseline">
-      <Text
-        textStyle="2xs"
-        color="fg.subtle"
-        minWidth="60px"
-        flexShrink={0}
-        css={MONO}
-      >
+      <Text textStyle="2xs" color="fg.subtle" minWidth="60px" flexShrink={0} css={MONO}>
         {label}
       </Text>
       <Text textStyle="2xs" color="fg" css={MONO}>

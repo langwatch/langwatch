@@ -91,9 +91,7 @@ const build = vi.hoisted(() => ({ throwWith: null as unknown }));
 
 vi.mock("../visualization/buildLangWatchQLVegaSpec", async (importOriginal) => {
   const original =
-    await importOriginal<
-      typeof import("../visualization/buildLangWatchQLVegaSpec")
-    >();
+    await importOriginal<typeof import("../visualization/buildLangWatchQLVegaSpec")>();
   return {
     ...original,
     buildLangWatchQLVegaSpec: (
@@ -110,8 +108,7 @@ const colorModeHarness = vi.hoisted(() => ({
 }));
 
 vi.mock("~/components/ui/color-mode", async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import("~/components/ui/color-mode")>();
+  const original = await importOriginal<typeof import("~/components/ui/color-mode")>();
   return {
     ...original,
     useColorMode: () => ({
@@ -234,9 +231,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         });
         const describedBy = view.getAttribute("aria-describedby");
         expect(describedBy).not.toBeNull();
-        expect(document.getElementById(describedBy!)?.textContent).toContain(
-          "table",
-        );
+        expect(document.getElementById(describedBy!)?.textContent).toContain("table");
         expect(view.getAttribute("tabindex")).toBeNull();
       });
     });
@@ -254,9 +249,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         );
         await waitFor(() => expect(vega.state.calls).toHaveLength(1));
 
-        const reloaded: LangWatchQLDataset = [
-          { model: "gpt-5-mini", total: 9 },
-        ];
+        const reloaded: LangWatchQLDataset = [{ model: "gpt-5-mini", total: 9 }];
         rerender(
           <ChakraProvider value={defaultSystem}>
             <LangWatchQLVegaLiteChart
@@ -301,15 +294,10 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       it("rebuilds with a dark configuration when the colour mode flips", async () => {
         const { rerender } = withChakra(chart());
         await waitFor(() => expect(vega.state.calls).toHaveLength(1));
-        const light = vega.state.calls[0]!.options.config as Record<
-          string,
-          any
-        >;
+        const light = vega.state.calls[0]!.options.config as Record<string, any>;
 
         colorModeHarness.mode = "dark";
-        rerender(
-          <ChakraProvider value={defaultSystem}>{chart()}</ChakraProvider>,
-        );
+        rerender(<ChakraProvider value={defaultSystem}>{chart()}</ChakraProvider>);
 
         await waitFor(() => expect(vega.state.calls).toHaveLength(2));
         const dark = vega.state.calls[1]!.options.config as Record<string, any>;
@@ -370,9 +358,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
 
       expect(warnings.textContent).toContain("total");
       expect(
-        warnings
-          .querySelector("[data-warning-code]")
-          ?.getAttribute("data-warning-code"),
+        warnings.querySelector("[data-warning-code]")?.getAttribute("data-warning-code"),
       ).toBe("unrepresentable-value");
       // Nothing was coerced on the way in: the zero is still a zero and the
       // value that cannot be placed is still itself, warned about rather than
@@ -492,9 +478,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
 
       // The refusal outlives the render that clears it, so the mount point has
       // to survive it: without that, this is a chart that never comes back.
-      await waitFor(() =>
-        expect(screen.queryByTestId("lwql-chart-failure")).toBeNull(),
-      );
+      await waitFor(() => expect(screen.queryByTestId("lwql-chart-failure")).toBeNull());
       expect(vega.state.calls).toHaveLength(2);
       await screen.findByRole("img");
     });
@@ -509,17 +493,17 @@ describe("the LangWatchQL Vega-Lite chart", () => {
 
       await screen.findByTestId("lwql-chart-failure");
       expect(failureCode()).toBe("loader-blocked");
-      expect(
-        screen.getByTestId("lwql-chart-failure").textContent,
-      ).not.toContain("secret-value");
+      expect(screen.getByTestId("lwql-chart-failure").textContent).not.toContain(
+        "secret-value",
+      );
     });
 
     /** @scenario "A chart over too much data refuses clearly and leaves the table available" */
     it("refuses a result past the row ceiling, naming the limit it crossed", async () => {
-      const tooMany: LangWatchQLDataset = Array.from(
-        { length: 10_001 },
-        (_, index) => ({ model: `m${index}`, total: index }),
-      );
+      const tooMany: LangWatchQLDataset = Array.from({ length: 10_001 }, (_, index) => ({
+        model: `m${index}`,
+        total: index,
+      }));
 
       withChakra(chart({ rows: tooMany }));
 

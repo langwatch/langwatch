@@ -11,9 +11,8 @@ void (async () => {
   const { AppBoot } = await import("./runtime/app/boot");
   const { setEnvironment } = await import("@langwatch/ksuid");
   const { createLogger } = await import("@langwatch/observability");
-  const { installShutdownHandlers } = await import(
-    "./server/shutdown/runGracefulShutdown"
-  );
+  const { installShutdownHandlers } =
+    await import("./server/shutdown/runGracefulShutdown");
   const { SHUTDOWN_BUDGET } = await import("./server/shutdown/budget");
 
   setEnvironment(process.env.ENVIRONMENT ?? "local");
@@ -25,9 +24,7 @@ void (async () => {
   const logger = createLogger("langwatch:workers");
   logger.info("starting");
 
-  let booted:
-    | { close(): Promise<void> }
-    | undefined;
+  let booted: { close(): Promise<void> } | undefined;
 
   installShutdownHandlers((signal) => ({
     signal,
@@ -47,16 +44,13 @@ void (async () => {
       // completed before the App composition or worker transport evaluate.
       const { createWorker } = await import("./runtime/worker");
       const { startWorkers } = await import("./server/workers/startWorkers");
-      const { initializeWorkerApp } = (await import(
-        "./server/app-layer/presets"
-      )) as {
+      const { initializeWorkerApp } = (await import("./server/app-layer/presets")) as {
         initializeWorkerApp: () => import("./server/app-layer/app").App;
       };
 
       const runtime = await createWorker({
         composeApp: initializeWorkerApp,
-        startWorker: (app) =>
-          startWorkers({ shouldStartMetricsServer: true, app }),
+        startWorker: (app) => startWorkers({ shouldStartMetricsServer: true, app }),
         resources,
         ownsResources: false,
       });
@@ -88,7 +82,7 @@ void (async () => {
     process.exit(1);
   });
 })().catch((error: unknown) => {
-  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
   process.stderr.write(`[langwatch:workers] fatal boot failure: ${message}\n`);
   process.exit(1);
 });

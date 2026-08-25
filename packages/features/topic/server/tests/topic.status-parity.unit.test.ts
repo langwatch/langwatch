@@ -4,7 +4,10 @@ import type {
 } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 import { TopicClusteringSchedulePort } from "../src/ports/topic-clustering-schedule.port";
-import { TopicRepository, type TopicClusteringStatusRecord } from "../src/repositories/topic.repository";
+import {
+  TopicRepository,
+  type TopicClusteringStatusRecord,
+} from "../src/repositories/topic.repository";
 import { TopicService } from "../src/services/topic.service";
 import { TOPIC_CLUSTERING_STALE_RUN_MS } from "../src/topic-clustering.constants";
 
@@ -68,12 +71,14 @@ class FakeSchedule extends TopicClusteringSchedulePort {
   }
 }
 
-function service(options: {
-  status?: TopicClusteringStatusRecord["projection"];
-  history?: TopicClusteringRunHistoryEntry[];
-  nextWakeAt?: Date | null;
-  now?: number;
-} = {}) {
+function service(
+  options: {
+    status?: TopicClusteringStatusRecord["projection"];
+    history?: TopicClusteringRunHistoryEntry[];
+    nextWakeAt?: Date | null;
+    now?: number;
+  } = {},
+) {
   return TopicService.create({
     repository: new FakeTopicRepository(options.status, options.history),
     schedule: new FakeSchedule(options.nextWakeAt),
@@ -152,17 +157,20 @@ describe("TopicService clustering status parity", () => {
   it.each([
     ["manual", true],
     ["bootstrap", false],
-  ] as const)("only treats an unanswered %s request as in flight", async (trigger, expected) => {
-    const status = await service({
-      status: projection({
-        lastRequestedAt: NOW - 5_000,
-        lastRequestTrigger: trigger,
-      }),
-    }).getClusteringStatus({ projectId: PROJECT_ID });
+  ] as const)(
+    "only treats an unanswered %s request as in flight",
+    async (trigger, expected) => {
+      const status = await service({
+        status: projection({
+          lastRequestedAt: NOW - 5_000,
+          lastRequestTrigger: trigger,
+        }),
+      }).getClusteringStatus({ projectId: PROJECT_ID });
 
-    expect(status.isRunInFlight).toBe(expected);
-    expect(status.isInProgress).toBe(false);
-  });
+      expect(status.isRunInFlight).toBe(expected);
+      expect(status.isInProgress).toBe(false);
+    },
+  );
 
   it("stops treating an unanswered request as in flight at the stale boundary", async () => {
     const status = await service({

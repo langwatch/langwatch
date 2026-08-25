@@ -9,9 +9,7 @@ import { resolveOrgSwitchDestination } from "../logic/resolveOrgSwitchDestinatio
 import type { ProductId } from "../products";
 import { useProductFlagsByOrganization } from "./useProductFlagsByOrganization";
 
-function firstProjectSlug(
-  organization: FullyLoadedOrganization,
-): string | null {
+function firstProjectSlug(organization: FullyLoadedOrganization): string | null {
   for (const team of organization.teams ?? []) {
     if (team.isPersonal) continue;
     const project = team.projects?.[0];

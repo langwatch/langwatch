@@ -22,21 +22,11 @@
  * its connect card instead of an error — which is the behaviour item 19 hangs
  * on, made visible).
  */
-import {
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";
 import { LangyCard } from "~/features/asaplangy";
-import {
-  explainLangyError,
-  KNOWN_LANGY_ERROR_KINDS,
-} from "../logic/langyErrorExplainer";
+import { explainLangyError, KNOWN_LANGY_ERROR_KINDS } from "../logic/langyErrorExplainer";
 import { useLangyStore } from "../stores/langyStore";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import { LangyCapabilityRenderer } from "./capabilities/LangyCapabilityRenderer";
@@ -211,8 +201,8 @@ export function LangyCardGallery() {
           }
         >
           <Text textStyle="xs" color="fg.muted" lineHeight="1.45">
-            38% of last week&apos;s traces answer with context the retriever
-            never returned. A faithfulness check would catch that at ingestion.
+            38% of last week&apos;s traces answer with context the retriever never
+            returned. A faithfulness check would catch that at ingestion.
           </Text>
         </LangyCard>
         <LangyCard
@@ -360,8 +350,7 @@ export function LangyCardGallery() {
               name: "langwatch.trace.search",
               state: "output-available",
               input: {
-                command:
-                  "langwatch trace search --query 'status:error' --format json",
+                command: "langwatch trace search --query 'status:error' --format json",
               },
               output: { traces: [], pagination: { totalHits: 0 } },
             },
@@ -369,8 +358,7 @@ export function LangyCardGallery() {
               name: "langwatch.trace.search",
               state: "output-available",
               input: {
-                command:
-                  "langwatch trace search --query 'latency>5s' --format json",
+                command: "langwatch trace search --query 'latency>5s' --format json",
               },
               output: { traces: [], pagination: { totalHits: 0 } },
             },
@@ -422,8 +410,7 @@ export function LangyCardGallery() {
               name: "langwatch.trace.search",
               state: "output-available",
               input: {
-                command:
-                  "langwatch trace search --query 'cost>1' --format json",
+                command: "langwatch trace search --query 'cost>1' --format json",
               },
               output: { traces: [], pagination: { totalHits: 0 } },
             },
@@ -630,13 +617,7 @@ export function LangyCardGallery() {
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <VStack align="stretch" gap={2}>
       <Box

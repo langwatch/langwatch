@@ -56,11 +56,7 @@ function signInAsAdmin() {
   getBetterAuthSession.mockResolvedValue({ session: { id: "sess_1" } });
 }
 
-async function post(
-  path: string,
-  body: string,
-  contentType = "application/json",
-) {
+async function post(path: string, body: string, contentType = "application/json") {
   return app.request(
     path,
     {
@@ -175,10 +171,7 @@ describe("admin routes", () => {
       expect(response.status).toBe(422);
       const body = await bodyOf(response);
       expect(body.error).toBe("validation_error");
-      expect(Object.keys(body.fieldErrors)).toEqual([
-        "userIdToImpersonate",
-        "reason",
-      ]);
+      expect(Object.keys(body.fieldErrors)).toEqual(["userIdToImpersonate", "reason"]);
     });
 
     it("rejects a field of the wrong type rather than passing it on", async () => {

@@ -20,9 +20,7 @@ import type { RouteResponse } from "../../../shared/types";
  * // Returns: { description: "Success", content: { "application/json": { schema: ... } } }
  * ```
  */
-export const buildStandardSuccessResponse = (
-  zodSchema: ZodSchema,
-): RouteResponse => {
+export const buildStandardSuccessResponse = (zodSchema: ZodSchema): RouteResponse => {
   return {
     description: "Success",
     content: {

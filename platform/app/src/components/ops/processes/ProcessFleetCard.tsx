@@ -1,13 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Table,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Card, HStack, Spacer, Table, Text } from "@chakra-ui/react";
 import type { ProcessFleetSummary } from "~/server/app-layer/ops/manager-explorer.service";
 import { hasFleetTrouble } from "./processFleet";
 
@@ -118,19 +109,11 @@ export function ProcessFleetCard({
               <Table.Row>
                 <Table.ColumnHeader>Process</Table.ColumnHeader>
                 <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end">
-                  Instances
-                </Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end">
-                  Overdue wakes
-                </Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">Instances</Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">Overdue wakes</Table.ColumnHeader>
                 <Table.ColumnHeader textAlign="end">Pending</Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end">
-                  Overdue pending
-                </Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end">
-                  Lapsed leases
-                </Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">Overdue pending</Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">Lapsed leases</Table.ColumnHeader>
                 <Table.ColumnHeader textAlign="end">Dead</Table.ColumnHeader>
               </Table.Row>
             </Table.Header>

@@ -83,9 +83,7 @@ const BEHIND_CURSOR: LangyEventCursor = {
 };
 
 /** The recorded steps of the turn, identical for both conversations. */
-const recordedSteps = (
-  conversationId: string,
-): LangyConversationProcessingEvent[] =>
+const recordedSteps = (conversationId: string): LangyConversationProcessingEvent[] =>
   [
     {
       id: "2Aevt00001",
@@ -121,8 +119,7 @@ const recordedSteps = (
 
 /** The ClickHouse event-log read, the one boundary this file substitutes. */
 const eventsReader = {
-  getEventsOccurredSince: async (aggregateId: string) =>
-    recordedSteps(aggregateId),
+  getEventsOccurredSince: async (aggregateId: string) => recordedSteps(aggregateId),
 };
 
 /**
@@ -180,14 +177,10 @@ const NOTHING = Symbol("nothing");
 async function signalWithin(
   pending: Promise<IteratorResult<{ event: string }>>,
   ms: number,
-): Promise<
-  { conversationId: string; cursor: LangyEventCursor } | typeof NOTHING
-> {
+): Promise<{ conversationId: string; cursor: LangyEventCursor } | typeof NOTHING> {
   const settled = await Promise.race([
     pending,
-    new Promise<typeof NOTHING>((resolve) =>
-      setTimeout(() => resolve(NOTHING), ms),
-    ),
+    new Promise<typeof NOTHING>((resolve) => setTimeout(() => resolve(NOTHING), ms)),
   ]);
   if (settled === NOTHING) return NOTHING;
   return JSON.parse(settled.value.event) as {

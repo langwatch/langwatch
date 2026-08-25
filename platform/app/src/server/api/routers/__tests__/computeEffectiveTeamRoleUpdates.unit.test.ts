@@ -217,9 +217,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
       /** @scenario A seat change that names team roles outright still keeps the guard */
       it("keeps a team the caller named outright attributed to the caller", () => {
         const result = computeEffectiveTeamRoleUpdates({
-          requestedTeamRoleUpdates: [
-            { teamId: "team-1", role: TeamUserRole.VIEWER },
-          ],
+          requestedTeamRoleUpdates: [{ teamId: "team-1", role: TeamUserRole.VIEWER }],
           currentMemberships: [{ teamId: "team-1", role: TeamUserRole.ADMIN }],
           newOrganizationRole: OrganizationUserRole.EXTERNAL,
         });

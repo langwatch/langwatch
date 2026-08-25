@@ -182,9 +182,7 @@ const FAKE_PAYLOAD = {
   ],
 };
 
-function renderSection(
-  props: Partial<ComponentProps<typeof DefaultModelsSection>> = {},
-) {
+function renderSection(props: Partial<ComponentProps<typeof DefaultModelsSection>> = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <DefaultModelsSection {...props} />
@@ -229,9 +227,7 @@ describe("<DefaultModelsSection />", () => {
   it("renders one row per config in the All-you-can-see view", () => {
     renderSection();
     expect(screen.getByTestId("config-row-cfg_acme_org")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("config-row-cfg_ai_search_override"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("config-row-cfg_ai_search_override")).toBeInTheDocument();
   });
 
   /** @scenario A freshly onboarded org shows its three seeded org-scope rules */
@@ -243,9 +239,9 @@ describe("<DefaultModelsSection />", () => {
     expect(
       screen.getByTestId("config-row-cfg_acme_org-cell-default").textContent,
     ).toMatch(/gpt-5\.5/);
-    expect(
-      screen.getByTestId("config-row-cfg_acme_org-cell-fast").textContent,
-    ).toMatch(/gpt-5\.4-mini/);
+    expect(screen.getByTestId("config-row-cfg_acme_org-cell-fast").textContent).toMatch(
+      /gpt-5\.4-mini/,
+    );
     expect(
       screen.getByTestId("config-row-cfg_acme_org-cell-embeddings").textContent,
     ).toMatch(/text-embedding-3-small/);
@@ -272,9 +268,7 @@ describe("<DefaultModelsSection />", () => {
   it("fires the delete mutation when Delete is picked from the row menu", async () => {
     renderSection();
     fireEvent.click(screen.getByTestId("config-row-cfg_acme_org-actions"));
-    fireEvent.click(
-      await screen.findByTestId("config-row-cfg_acme_org-delete"),
-    );
+    fireEvent.click(await screen.findByTestId("config-row-cfg_acme_org-delete"));
     expect(mockDelete).toHaveBeenCalledWith({ id: "cfg_acme_org" });
   });
 
@@ -299,9 +293,9 @@ describe("<DefaultModelsSection />", () => {
           displayNames: { [CUSTOM_FULL_ID]: CUSTOM_DISPLAY_NAME },
         });
 
-        expect(
-          screen.getByTestId(`model-chip-${CUSTOM_FULL_ID}`).textContent,
-        ).toBe(CUSTOM_DISPLAY_NAME);
+        expect(screen.getByTestId(`model-chip-${CUSTOM_FULL_ID}`).textContent).toBe(
+          CUSTOM_DISPLAY_NAME,
+        );
       });
     });
   });

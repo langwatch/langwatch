@@ -95,8 +95,7 @@ function printTable(rows: SpendRow[]): void {
   const widths = header.map((h, i) =>
     Math.max(h.length, ...body.map((row) => row[i]!.length)),
   );
-  const line = (cells: string[]) =>
-    cells.map((c, i) => c.padEnd(widths[i]!)).join("  ");
+  const line = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i]!)).join("  ");
   process.stdout.write(`\n${line(header)}\n`);
   process.stdout.write(`${widths.map((w) => "-".repeat(w)).join("  ")}\n`);
   for (const row of body) process.stdout.write(`${line(row)}\n`);
@@ -129,9 +128,8 @@ function checkLedger(debits: LedgerDebit[]): void {
   const successDebits = debits.filter((d) => d.Status === "success");
   check(
     "three speech debits landed as success",
-    successDebits.filter(
-      (d) => d.AmountNanoUSD === String(EXPECTED_COST_NANO_USD),
-    ).length === SPEECH_CALLS,
+    successDebits.filter((d) => d.AmountNanoUSD === String(EXPECTED_COST_NANO_USD))
+      .length === SPEECH_CALLS,
     `${successDebits.length} success debits total`,
   );
 }
@@ -192,20 +190,12 @@ export async function assertOutcome(
   );
   printTable(rows);
 
-  const speechRows = rows.filter((r) =>
-    speechRequestIds.has(r.GatewayRequestId),
-  );
+  const speechRows = rows.filter((r) => speechRequestIds.has(r.GatewayRequestId));
   checkSpeechRows(speechRows);
 
-  const controlRow = rows.find(
-    (r) => !speechRequestIds.has(r.GatewayRequestId),
-  );
+  const controlRow = rows.find((r) => !speechRequestIds.has(r.GatewayRequestId));
   const controlNano = Number(controlRow?.CostNanoUSD ?? 0);
-  check(
-    "control call still prices",
-    controlNano > 0,
-    `CostNanoUSD=${controlNano}`,
-  );
+  check("control call still prices", controlNano > 0, `CostNanoUSD=${controlNano}`);
 
   checkLedger(
     await until(

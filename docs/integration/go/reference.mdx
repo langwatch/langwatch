@@ -16,7 +16,9 @@ go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
 ```
 
 <Tip>
-For a quick start guide with step-by-step instructions, see the [Go Integration Guide](/integration/go/guide). For practical examples of creating traces and spans, see the [Core Concepts section](/integration/go/guide#core-concepts) in the guide.
+  For a quick start guide with step-by-step instructions, see the [Go Integration
+  Guide](/integration/go/guide). For practical examples of creating traces and spans, see
+  the [Core Concepts section](/integration/go/guide#core-concepts) in the guide.
 </Tip>
 
 ## Core SDK (`langwatch`)
@@ -46,7 +48,9 @@ func setupLangWatch(ctx context.Context) func(context.Context) {
 The exporter reads `LANGWATCH_API_KEY` from your environment automatically.
 
 <Warning>
-**Always call shutdown!** Traces are buffered in memory before being sent. Without `defer shutdown(ctx)`, your traces will be lost when the application exits. This is critical for CLI tools, serverless functions, and any short-lived process.
+  **Always call shutdown!** Traces are buffered in memory before being sent. Without
+  `defer shutdown(ctx)`, your traces will be lost when the application exits. This is
+  critical for CLI tools, serverless functions, and any short-lived process.
 </Warning>
 
 For custom configuration, use `NewExporter` with options:
@@ -59,11 +63,11 @@ exporter, err := langwatch.NewExporter(ctx,
 )
 ```
 
-| Option | Description |
-| --- | --- |
-| `WithAPIKey(key)` | Set API key (defaults to `LANGWATCH_API_KEY` env var) |
+| Option              | Description                                           |
+| ------------------- | ----------------------------------------------------- |
+| `WithAPIKey(key)`   | Set API key (defaults to `LANGWATCH_API_KEY` env var) |
 | `WithEndpoint(url)` | Set endpoint (defaults to `https://app.langwatch.ai`) |
-| `WithFilters(...)` | Apply span filters (see [Filtering](#filtering)) |
+| `WithFilters(...)`  | Apply span filters (see [Filtering](#filtering))      |
 
 ### Tracer
 
@@ -73,18 +77,19 @@ exporter, err := langwatch.NewExporter(ctx,
 func Tracer(instrumentationName string, opts ...trace.TracerOption) LangWatchTracer
 ```
 
-| Parameter | Type | Description |
-| --- | --- | --- |
-| `instrumentationName` | `string` | Name of the library or application being instrumented. |
-| `opts` | `...trace.TracerOption`| Optional OpenTelemetry tracer options (e.g., `trace.WithInstrumentationVersion`). |
+| Parameter             | Type                    | Description                                                                       |
+| --------------------- | ----------------------- | --------------------------------------------------------------------------------- |
+| `instrumentationName` | `string`                | Name of the library or application being instrumented.                            |
+| `opts`                | `...trace.TracerOption` | Optional OpenTelemetry tracer options (e.g., `trace.WithInstrumentationVersion`). |
 
 **Example:**
+
 ```go
 // Basic usage
 tracer := langwatch.Tracer("my-app")
 
 // With instrumentation version
-tracer := langwatch.Tracer("my-app", 
+tracer := langwatch.Tracer("my-app",
     trace.WithInstrumentationVersion("1.0.0"))
 ```
 
@@ -99,6 +104,7 @@ type LangWatchTracer interface {
 ```
 
 **Example:**
+
 ```go
 tracer := langwatch.Tracer("my-app")
 ctx, span := tracer.Start(ctx, "HandleUserRequest")
@@ -114,53 +120,36 @@ span.RecordInputString("User query")
 The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several helper methods for LangWatch-specific data.
 
 <ParamField path="SetType(spanType SpanType)" type="function">
-  Sets the span type for categorization in LangWatch. This enables specialized UI treatment and analytics.
-  
-  **Example:**
-  ```go
-  span.SetType(langwatch.SpanTypeLLM)        // For LLM calls
-  span.SetType(langwatch.SpanTypeRAG)        // For RAG operations
-  span.SetType(langwatch.SpanTypeRetrieval)  // For document retrieval
-  span.SetType(langwatch.SpanTypeTool)       // For tool/function calls
-  ```
-  
+  Sets the span type for categorization in LangWatch. This enables specialized UI
+  treatment and analytics. **Example:** ```go span.SetType(langwatch.SpanTypeLLM) // For
+  LLM calls span.SetType(langwatch.SpanTypeRAG) // For RAG operations
+  span.SetType(langwatch.SpanTypeRetrieval) // For document retrieval
+  span.SetType(langwatch.SpanTypeTool) // For tool/function calls ```
   <Tip>
-  Using span types is optional but highly recommended as it enables LangWatch to provide more tailored insights and visualizations.
+    Using span types is optional but highly recommended as it enables LangWatch to provide
+    more tailored insights and visualizations.
   </Tip>
 </ParamField>
 
 <ParamField path="SetThreadID(threadID string)" type="function">
-  Assigns a thread ID to group this trace with a conversation. Useful for multi-turn conversations.
-  
-  **Example:**
-  ```go
-  span.SetThreadID("conversation-123")
-  span.SetThreadID("user-session-abc-def")
-  ```
-  
+  Assigns a thread ID to group this trace with a conversation. Useful for multi-turn
+  conversations. **Example:** ```go span.SetThreadID("conversation-123")
+  span.SetThreadID("user-session-abc-def") ```
   <Note>
-  All spans within the same trace will share the same thread ID, allowing you to group related interactions together.
+    All spans within the same trace will share the same thread ID, allowing you to group
+    related interactions together.
   </Note>
 </ParamField>
 
 <ParamField path="SetUserID(userID string)" type="function">
-  Assigns a user ID to the trace for user-centric analytics and filtering.
-  
-  **Example:**
-  ```go
-  span.SetUserID("user-abc-123")
-  span.SetUserID("customer-xyz-789")
-  ```
+  Assigns a user ID to the trace for user-centric analytics and filtering. **Example:**
+  ```go span.SetUserID("user-abc-123") span.SetUserID("customer-xyz-789") ```
 </ParamField>
 
 <ParamField path="RecordInputString(input string)" type="function">
-  Records a simple string as the span's input. Ideal for user queries or simple text inputs.
-  
-  **Example:**
-  ```go
-  span.RecordInputString("What is the weather like today?")
-  span.RecordInputString("User query text")
-  ```
+  Records a simple string as the span's input. Ideal for user queries or simple text
+  inputs. **Example:** ```go span.RecordInputString("What is the weather like today?")
+  span.RecordInputString("User query text") ```
 </ParamField>
 
 <ParamField path="RecordInput(input any)" type="function">
@@ -184,13 +173,9 @@ The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several 
 </ParamField>
 
 <ParamField path="RecordOutputString(output string)" type="function">
-  Records a simple string as the span's output. Ideal for AI responses or simple text outputs.
-  
-  **Example:**
-  ```go
-  span.RecordOutputString("The capital of France is Paris.")
-  span.RecordOutputString("AI response text")
-  ```
+  Records a simple string as the span's output. Ideal for AI responses or simple text
+  outputs. **Example:** ```go span.RecordOutputString("The capital of France is Paris.")
+  span.RecordOutputString("AI response text") ```
 </ParamField>
 
 <ParamField path="RecordOutput(output any)" type="function">
@@ -214,27 +199,19 @@ The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several 
 </ParamField>
 
 <ParamField path="SetRequestModel(model string)" type="function">
-  Sets the model identifier used for a request (e.g., an LLM call). This is the model you requested to use.
-  
-  **Example:**
-  ```go
-  span.SetRequestModel("gpt-4o-mini")
-  span.SetRequestModel("claude-3-sonnet")
-  span.SetRequestModel("llama-3.1-8b")
-  ```
+  Sets the model identifier used for a request (e.g., an LLM call). This is the model you
+  requested to use. **Example:** ```go span.SetRequestModel("gpt-4o-mini")
+  span.SetRequestModel("claude-3-sonnet") span.SetRequestModel("llama-3.1-8b") ```
 </ParamField>
 
 <ParamField path="SetResponseModel(model string)" type="function">
-  Sets the model identifier reported in a response. This is the actual model that processed your request.
-  
-  **Example:**
-  ```go
+  Sets the model identifier reported in a response. This is the actual model that
+  processed your request. **Example:** ```go
   span.SetResponseModel("gpt-4o-mini-2024-07-18")
-  span.SetResponseModel("claude-3-sonnet-20240229")
-  ```
-  
+  span.SetResponseModel("claude-3-sonnet-20240229") ```
   <Note>
-  The response model may differ from the request model, especially with OpenAI's model updates.
+    The response model may differ from the request model, especially with OpenAI's model
+    updates.
   </Note>
 </ParamField>
 
@@ -264,7 +241,8 @@ The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several 
 The `github.com/langwatch/langwatch/sdks/go/instrumentation/openai` package provides middleware for the official `openai-go` client.
 
 <Tip>
-For step-by-step instructions on setting up OpenAI instrumentation, see the [OpenAI integration guide](/integration/go/integrations/open-ai).
+  For step-by-step instructions on setting up OpenAI instrumentation, see the [OpenAI
+  integration guide](/integration/go/integrations/open-ai).
 </Tip>
 
 ### Middleware
@@ -276,58 +254,43 @@ func Middleware(instrumentationName string, opts ...Option) openai.Middleware
 ```
 
 **Parameters:**
+
 - `instrumentationName` - Name of your application or service
 - `opts` - Optional configuration options
 
 **Configuration Options (`...Option`):**
 
 <ParamField path="WithCaptureInput()" type="function">
-  Records the full input payload as a span attribute. This captures the complete request sent to the LLM.
-  
-  **Example:**
-  ```go
-  otelopenai.Middleware("my-app", otelopenai.WithCaptureInput())
-  ```
-  
+  Records the full input payload as a span attribute. This captures the complete request
+  sent to the LLM. **Example:** ```go otelopenai.Middleware("my-app",
+  otelopenai.WithCaptureInput()) ```
   <Warning>
-  Enabling input capture may include sensitive data in your traces. Ensure this aligns with your data privacy requirements.
+    Enabling input capture may include sensitive data in your traces. Ensure this aligns
+    with your data privacy requirements.
   </Warning>
 </ParamField>
 
 <ParamField path="WithCaptureOutput()" type="function">
-  Records the full response payload as a span attribute. For streams, this is the final accumulated response.
-  
-  **Example:**
-  ```go
-  otelopenai.Middleware("my-app", otelopenai.WithCaptureOutput())
-  ```
-  
+  Records the full response payload as a span attribute. For streams, this is the final
+  accumulated response. **Example:** ```go otelopenai.Middleware("my-app",
+  otelopenai.WithCaptureOutput()) ```
   <Tip>
-  This is particularly useful for debugging and understanding what the LLM actually returned.
+    This is particularly useful for debugging and understanding what the LLM actually
+    returned.
   </Tip>
 </ParamField>
 
 <ParamField path="WithGenAISystem(system string)" type="function">
-  Sets the `gen_ai.system` attribute. Useful for identifying providers like `"anthropic"` or `"azure"`. Defaults to `"openai"`.
-  
-  **Example:**
-  ```go
-  // For Anthropic Claude
-  otelopenai.Middleware("my-app", otelopenai.WithGenAISystem("anthropic"))
-  
-  // For Azure OpenAI
-  otelopenai.Middleware("my-app", otelopenai.WithGenAISystem("azure"))
-  ```
+  Sets the `gen_ai.system` attribute. Useful for identifying providers like `"anthropic"`
+  or `"azure"`. Defaults to `"openai"`. **Example:** ```go // For Anthropic Claude
+  otelopenai.Middleware("my-app", otelopenai.WithGenAISystem("anthropic")) // For Azure
+  OpenAI otelopenai.Middleware("my-app", otelopenai.WithGenAISystem("azure")) ```
 </ParamField>
 
 <ParamField path="WithTracerProvider(provider trace.TracerProvider)" type="function">
   Specifies the `trace.TracerProvider` to use. Defaults to the global provider.
-  
-  **Example:**
-  ```go
-  customProvider := sdktrace.NewTracerProvider(...)
-  otelopenai.Middleware("my-app", otelopenai.WithTracerProvider(customProvider))
-  ```
+  **Example:** ```go customProvider := sdktrace.NewTracerProvider(...)
+  otelopenai.Middleware("my-app", otelopenai.WithTracerProvider(customProvider)) ```
 </ParamField>
 
 ## Filtering
@@ -349,10 +312,10 @@ exporter, err := langwatch.NewExporter(ctx,
 )
 ```
 
-| Filter | Description |
-| --- | --- |
-| `ExcludeHTTPRequests()` | Removes HTTP verb spans (GET, POST, etc.) |
-| `LangWatchOnly()` | Keeps only spans from LangWatch instrumentation |
+| Filter                  | Description                                     |
+| ----------------------- | ----------------------------------------------- |
+| `ExcludeHTTPRequests()` | Removes HTTP verb spans (GET, POST, etc.)       |
+| `LangWatchOnly()`       | Keeps only spans from LangWatch instrumentation |
 
 ### Custom Filters
 
@@ -380,35 +343,37 @@ exporter, err := langwatch.NewExporter(ctx,
 
 ### Matchers
 
-| Matcher | Description |
-| --- | --- |
-| `Equals(s)` | Exact match |
-| `EqualsIgnoreCase(s)` | Case-insensitive exact match |
-| `StartsWith(prefix)` | Prefix match |
+| Matcher                        | Description                   |
+| ------------------------------ | ----------------------------- |
+| `Equals(s)`                    | Exact match                   |
+| `EqualsIgnoreCase(s)`          | Case-insensitive exact match  |
+| `StartsWith(prefix)`           | Prefix match                  |
 | `StartsWithIgnoreCase(prefix)` | Case-insensitive prefix match |
-| `MustMatchRegex(pattern)` | Regex match |
+| `MustMatchRegex(pattern)`      | Regex match                   |
 
 <Note>
-Multiple filters use AND semantics (span must pass all). Within a `Criteria`, matchers use OR semantics (span matches if any matcher matches).
+  Multiple filters use AND semantics (span must pass all). Within a `Criteria`, matchers
+  use OR semantics (span matches if any matcher matches).
 </Note>
 
 ## LangWatch Span Types
 
 `SpanType` is a string constant used with `span.SetType()` to categorize spans in LangWatch for specialized UI treatment and analytics.
 
-| Constant | Description | Use Case |
-| --- | --- | --- |
-| `SpanTypeLLM` | A call to a Large Language Model. | Direct LLM API calls, chat completions |
-| `SpanTypeChain` | A sequence of related operations or a sub-pipeline. | Multi-step processing, workflow orchestration |
-| `SpanTypeTool` | A call to an external tool or function. | Function calls, API integrations, database queries |
-| `SpanTypeAgent` | An autonomous agent's operation or decision-making step. | Agent reasoning, decision points, planning |
-| `SpanTypeRAG` | An overarching RAG operation, often containing retrieval and LLM spans. | Complete RAG workflows |
-| `SpanTypeRetrieval`| The specific step of retrieving documents from a knowledge base. | Vector database queries, document search |
-| `SpanTypeQuery` | A generic database or API query. | SQL queries, REST API calls |
-| `SpanTypeEmbedding` | The specific step of generating embeddings. | Text embedding generation |
+| Constant            | Description                                                             | Use Case                                           |
+| ------------------- | ----------------------------------------------------------------------- | -------------------------------------------------- |
+| `SpanTypeLLM`       | A call to a Large Language Model.                                       | Direct LLM API calls, chat completions             |
+| `SpanTypeChain`     | A sequence of related operations or a sub-pipeline.                     | Multi-step processing, workflow orchestration      |
+| `SpanTypeTool`      | A call to an external tool or function.                                 | Function calls, API integrations, database queries |
+| `SpanTypeAgent`     | An autonomous agent's operation or decision-making step.                | Agent reasoning, decision points, planning         |
+| `SpanTypeRAG`       | An overarching RAG operation, often containing retrieval and LLM spans. | Complete RAG workflows                             |
+| `SpanTypeRetrieval` | The specific step of retrieving documents from a knowledge base.        | Vector database queries, document search           |
+| `SpanTypeQuery`     | A generic database or API query.                                        | SQL queries, REST API calls                        |
+| `SpanTypeEmbedding` | The specific step of generating embeddings.                             | Text embedding generation                          |
 
 <Note>
-Using these span types is optional but highly recommended, as it enables LangWatch to provide more tailored insights and visualizations for your traces.
+  Using these span types is optional but highly recommended, as it enables LangWatch to
+  provide more tailored insights and visualizations for your traces.
 </Note>
 
 ## Collected Attributes
@@ -442,6 +407,7 @@ The OpenAI instrumentation automatically adds these attributes to spans:
 ### HTTP Attributes
 
 Standard HTTP client attributes are also included:
+
 - `http.request.method` - HTTP method
 - `url.path` - Request path
 - `server.address` - Server address
@@ -464,12 +430,13 @@ span.RecordInputString("What is the weather like today?")
 
 // Make OpenAI API call
 response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-    Model: openai.ChatModelGPT4oMini,
-    Messages: []openai.ChatCompletionMessageParamUnion{
-        openai.UserMessage("What is the weather like today?"),
-    },
+Model: openai.ChatModelGPT4oMini,
+Messages: []openai.ChatCompletionMessageParamUnion{
+openai.UserMessage("What is the weather like today?"),
+},
 })
-```
+
+````
 </RequestExample>
 
 <ResponseExample>
@@ -482,7 +449,8 @@ span.SetResponseModel(response.Model)
 // - Content: "I don't have access to real-time weather data..."
 // - Model: "gpt-4o-mini-2024-07-18"
 // - Usage: {InputTokens: 8, OutputTokens: 15}
-```
+````
+
 </ResponseExample>
 
 ### RAG Pipeline
@@ -506,12 +474,13 @@ retrievalSpan.RecordInputString("authentication Go implementation")
 // ... retrieval logic ...
 
 chunks := []langwatch.SpanRAGContextChunk{
-    {Content: documents[0], Source: "auth-guide", Score: 0.92},
-    {Content: documents[1], Source: "go-docs", Score: 0.88},
+{Content: documents[0], Source: "auth-guide", Score: 0.92},
+{Content: documents[1], Source: "go-docs", Score: 0.88},
 }
 retrievalSpan.SetRAGContextChunks(chunks)
 retrievalSpan.End()
-```
+
+````
 </RequestExample>
 
 <ResponseExample>
@@ -527,7 +496,8 @@ llmSpan.End()
 
 // Record final RAG response
 span.RecordOutputString("Final RAG response with citations...")
-```
+````
+
 </ResponseExample>
 
 ## Error Handling
@@ -539,6 +509,7 @@ All SDK methods handle errors gracefully. In case of failures:
 3. **Invalid data** - Sanitized or excluded from traces
 
 **Example error handling:**
+
 ```go
 func safeRecordInput(span langwatch.LangWatchSpan, input any) {
     defer func() {
@@ -553,9 +524,9 @@ func safeRecordInput(span langwatch.LangWatchSpan, input any) {
 
 ## Environment Variables
 
-| Variable | Description |
-| --- | --- |
-| `LANGWATCH_API_KEY` | Your LangWatch API key (required) |
+| Variable             | Description                                              |
+| -------------------- | -------------------------------------------------------- |
+| `LANGWATCH_API_KEY`  | Your LangWatch API key (required)                        |
 | `LANGWATCH_ENDPOINT` | Custom endpoint (defaults to `https://app.langwatch.ai`) |
 
 ## Complete Example
@@ -714,10 +685,12 @@ func setupLangWatch(ctx context.Context) func(context.Context) {
 ## Support
 
 For additional help:
+
 - [GitHub Issues](https://github.com/langwatch/langwatch/issues)
 - [Documentation](https://docs.langwatch.ai)
 - [Community Support](https://docs.langwatch.ai/support)
 
 <Tip>
-For common setup issues and troubleshooting tips, see the [Troubleshooting section](/integration/go/guide#troubleshooting) in the integration guide.
-</Tip> 
+  For common setup issues and troubleshooting tips, see the [Troubleshooting
+  section](/integration/go/guide#troubleshooting) in the integration guide.
+</Tip>

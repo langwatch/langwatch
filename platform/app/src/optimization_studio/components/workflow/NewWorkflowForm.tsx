@@ -148,9 +148,7 @@ export const getRandomWorkflowIcon = () => {
     "🏆",
   ];
 
-  return randomObjectEmojis[
-    Math.floor(Math.random() * randomObjectEmojis.length)
-  ]!;
+  return randomObjectEmojis[Math.floor(Math.random() * randomObjectEmojis.length)]!;
 };
 
 export const NewWorkflowForm = ({
@@ -165,9 +163,7 @@ export const NewWorkflowForm = ({
   const emojiPicker = useDisclosure();
 
   const [defaultIcon] = useState(
-    template.icon && template.icon !== "🧩"
-      ? template.icon
-      : getRandomWorkflowIcon(),
+    template.icon && template.icon !== "🧩" ? template.icon : getRandomWorkflowIcon(),
   );
 
   const form = useForm<FormData>({
@@ -210,13 +206,10 @@ export const NewWorkflowForm = ({
         onSuccess: (createdWorkflow) => {
           trackEvent("workflow_create", { project_id: project?.id });
           onClose();
-          void router.push(
-            `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
-          );
+          void router.push(`/${project.slug}/studio/${createdWorkflow.workflow.id}`);
         },
         onError: (error) => {
-          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
-            return;
+          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
           showErrorToast({
             error,
             fallbackTitle: "Couldn't create workflow",
@@ -258,11 +251,7 @@ export const NewWorkflowForm = ({
               />
               <Field.Label>Name and Icon</Field.Label>
               <HStack>
-                <Button
-                  variant="outline"
-                  onClick={emojiPicker.onOpen}
-                  fontSize="18px"
-                >
+                <Button variant="outline" onClick={emojiPicker.onOpen} fontSize="18px">
                   {icon}
                 </Button>
                 <Input

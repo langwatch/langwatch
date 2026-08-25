@@ -15,18 +15,12 @@
  * are about what the screen does next.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { sessionRef, publicEnvRef, searchParamsRef, registerRef, signInMock } =
-  vi.hoisted(() => ({
+const { sessionRef, publicEnvRef, searchParamsRef, registerRef, signInMock } = vi.hoisted(
+  () => ({
     sessionRef: { current: { data: null as unknown } },
     publicEnvRef: {
       current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
@@ -40,7 +34,8 @@ const { sessionRef, publicEnvRef, searchParamsRef, registerRef, signInMock } =
       },
     },
     signInMock: vi.fn(),
-  }));
+  }),
+);
 
 vi.mock("~/utils/auth-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/utils/auth-client")>();
@@ -170,9 +165,7 @@ describe("SignUp when the email already has an account", () => {
       fillAndSubmit(container);
 
       await waitFor(() => {
-        expect(
-          screen.getByText(/that email already has an account/i),
-        ).toBeTruthy();
+        expect(screen.getByText(/that email already has an account/i)).toBeTruthy();
       });
       expect(screen.getByText(/^sign in$/i)).toBeTruthy();
       expect(screen.getByText(/reset your password/i)).toBeTruthy();
@@ -224,9 +217,9 @@ describe("SignUp when the email already has an account", () => {
       fillAndSubmit(container);
 
       await waitFor(() => {
-        expect(
-          screen.getAllByText(/your account was created/i).length,
-        ).toBeGreaterThan(0);
+        expect(screen.getAllByText(/your account was created/i).length).toBeGreaterThan(
+          0,
+        );
       });
       expect(screen.queryByText(/failed to sign up/i)).toBeNull();
       expect(screen.queryByText(/SOME_UNMAPPED_IDENTIFIER/)).toBeNull();
@@ -252,9 +245,7 @@ describe("SignUp when the email already has an account", () => {
       const { container } = renderPage();
       fillAndSubmit(container);
 
-      await waitFor(() =>
-        expect(registerRef.current.mutateAsync).toHaveBeenCalled(),
-      );
+      await waitFor(() => expect(registerRef.current.mutateAsync).toHaveBeenCalled());
       expect(signInMock).not.toHaveBeenCalled();
     });
   });

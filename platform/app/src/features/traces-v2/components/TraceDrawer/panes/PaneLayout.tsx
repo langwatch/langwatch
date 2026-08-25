@@ -7,10 +7,7 @@ import {
   PanelResizeHandle,
 } from "react-resizable-panels";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
-import type {
-  SpanTreeNode,
-  TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { useConversationContext } from "../../../hooks/useConversationContext";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { ConversationContext } from "../ConversationContext";
@@ -95,8 +92,7 @@ export function PaneLayout({
   // resolves to ≤1. autoSaveId restores the body group's sizes across
   // that remount.
   const ctx = useConversationContext(trace.conversationId, trace.traceId);
-  const hasConversation =
-    !!trace.conversationId && (ctx.isLoading || ctx.total > 1);
+  const hasConversation = !!trace.conversationId && (ctx.isLoading || ctx.total > 1);
   const ctxState = paneState.conversationContext;
   const detailState = paneState.spanDetail;
 
@@ -176,8 +172,7 @@ export function PaneLayout({
       // back to the cached last-expanded value to keep the max-cap
       // stable across collapse/expand cycles.
       const bodyPx = contentEl?.scrollHeight ?? 0;
-      const fullPx =
-        bodyPx > 0 ? headerPx + CTX_SCROLL_VPAD_PX + bodyPx : headerPx;
+      const fullPx = bodyPx > 0 ? headerPx + CTX_SCROLL_VPAD_PX + bodyPx : headerPx;
       if (!ctxState.collapsed && bodyPx > 0) {
         lastExpandedContentPx.current = fullPx;
       }
@@ -305,8 +300,7 @@ export function PaneLayout({
         if (dim <= 0) return;
         const headerPx = headerEl?.offsetHeight ?? CTX_HEADER_HEIGHT_PX;
         const bodyPx = contentEl?.scrollHeight ?? 0;
-        const fullPx =
-          bodyPx > 0 ? headerPx + CTX_SCROLL_VPAD_PX + bodyPx + 6 : headerPx;
+        const fullPx = bodyPx > 0 ? headerPx + CTX_SCROLL_VPAD_PX + bodyPx + 6 : headerPx;
         // Pixel ceiling on first-open even for long conversations;
         // the operator can still drag larger up to ctxMaxSize.
         const cappedPx = Math.min(fullPx, CTX_MAX_HEIGHT_PX);
@@ -351,8 +345,7 @@ export function PaneLayout({
       }
       return;
     }
-    const target =
-      lastExpandedDetailSize.current ?? (layout === "horizontal" ? 45 : 50);
+    const target = lastExpandedDetailSize.current ?? (layout === "horizontal" ? 45 : 50);
     const current = handle.getSize();
     // Below the min floor → panel was collapsed-or-near-it, expand.
     // Library's own `isCollapsed()` is unreliable post-drag, so size
@@ -593,18 +586,12 @@ export function PaneLayout({
             // appear to no-op (it's "already" in the state the store
             // thinks it should reach).
             onCollapse={() => {
-              if (
-                !useDrawerStore.getState().paneState.conversationContext
-                  .collapsed
-              ) {
+              if (!useDrawerStore.getState().paneState.conversationContext.collapsed) {
                 togglePaneCollapsed("conversationContext");
               }
             }}
             onExpand={() => {
-              if (
-                useDrawerStore.getState().paneState.conversationContext
-                  .collapsed
-              ) {
+              if (useDrawerStore.getState().paneState.conversationContext.collapsed) {
                 togglePaneCollapsed("conversationContext");
               }
             }}
@@ -661,10 +648,9 @@ function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
       bg={{ base: "gray.200", _dark: "border.muted" }}
       transition="background 100ms ease"
       css={{
-        "[data-resize-handle-state='hover'] &, [data-resize-handle-state='drag'] &":
-          {
-            background: "var(--chakra-colors-blue-solid)",
-          },
+        "[data-resize-handle-state='hover'] &, [data-resize-handle-state='drag'] &": {
+          background: "var(--chakra-colors-blue-solid)",
+        },
       }}
     />
   );

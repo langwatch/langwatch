@@ -58,9 +58,7 @@ describe("LangyCard taxonomy", () => {
           <LangyCard intent={intent} title="x" overline="y" />,
         );
         const warm = container.querySelector(".langy-accent-wash") !== null;
-        expect(warm).toBe(
-          (ACCENT_INTENTS as readonly string[]).includes(intent),
-        );
+        expect(warm).toBe((ACCENT_INTENTS as readonly string[]).includes(intent));
         unmount();
       }
     });

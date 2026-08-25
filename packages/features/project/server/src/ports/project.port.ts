@@ -10,10 +10,7 @@ export abstract class ProjectCredentialsPort {
 }
 
 export abstract class ProjectKeyMapPort {
-  abstract syncProject(input: {
-    projectId: string;
-    lwqlKey: string;
-  }): Promise<void>;
+  abstract syncProject(input: { projectId: string; lwqlKey: string }): Promise<void>;
 }
 
 export abstract class ProjectStoredObjectsPort {
@@ -21,9 +18,6 @@ export abstract class ProjectStoredObjectsPort {
 }
 
 export abstract class ProjectDiagnosticsPort {
-  abstract error(
-    context: Record<string, unknown>,
-    message: string,
-  ): void;
+  abstract error(context: Record<string, unknown>, message: string): void;
   abstract capture(error: Error, context: Record<string, unknown>): void;
 }

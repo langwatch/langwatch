@@ -167,8 +167,7 @@ const hasScopePredicate = (where: any): boolean => {
       Array.isArray(some.OR) &&
       some.OR.length > 0 &&
       some.OR.every(
-        (o: any) =>
-          o && typeof o.scopeType === "string" && isScopeIdValue(o.scopeId),
+        (o: any) => o && typeof o.scopeType === "string" && isScopeIdValue(o.scopeId),
       )
     ) {
       return true;
@@ -186,10 +185,7 @@ const hasIdOrInPredicate = (where: any): boolean => {
   return false;
 };
 
-const validateRecursive = (
-  where: any,
-  passes: (clause: any) => boolean,
-): boolean => {
+const validateRecursive = (where: any, passes: (clause: any) => boolean): boolean => {
   if (!where || typeof where !== "object") return false;
   if (passes(where)) return true;
   if (Array.isArray(where.AND)) {
@@ -313,9 +309,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           (c.modelProviderId && Array.isArray(c.modelProviderId.in)) ||
           hasScopePredicate(c),
       );
-      return ok
-        ? null
-        : "requires a row id, modelProviderId, or scope predicate";
+      return ok ? null : "requires a row id, modelProviderId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -345,9 +339,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           (c.routingPolicyId && Array.isArray(c.routingPolicyId.in)) ||
           hasScopePredicate(c),
       );
-      return ok
-        ? null
-        : "requires a row id, routingPolicyId, or scope predicate";
+      return ok ? null : "requires a row id, routingPolicyId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -433,8 +425,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   },
   ModelDefaultConfig: {
     validateWhere: (where) => {
-      if (!where)
-        return "requires a row id, organizationId, or scope predicate";
+      if (!where) return "requires a row id, organizationId, or scope predicate";
       const ok = validateRecursive(
         where,
         (c) =>
@@ -442,9 +433,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           typeof c.organizationId === "string" ||
           hasScopePredicate(c),
       );
-      return ok
-        ? null
-        : "requires a row id, organizationId, or scope predicate";
+      return ok ? null : "requires a row id, organizationId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -639,8 +628,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       for (const d of records) {
         if (!d) return "create requires a data payload";
         const platformScoped =
-          typeof d.organizationId === "string" &&
-          typeof d.endpointId === "string";
+          typeof d.organizationId === "string" && typeof d.endpointId === "string";
         const automationsScoped =
           typeof d.projectId === "string" && typeof d.triggerId === "string";
         if (!platformScoped && !automationsScoped) {
@@ -684,10 +672,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       const records = Array.isArray(data) ? data : [data];
       for (const d of records) {
         if (!d) return "create requires a data payload";
-        if (
-          typeof d.migrationName !== "string" ||
-          typeof d.tenantId !== "string"
-        ) {
+        if (typeof d.migrationName !== "string" || typeof d.tenantId !== "string") {
           return "create requires a migrationName and tenantId in the data payload";
         }
       }
@@ -818,9 +803,7 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
     action === "findFirst" &&
     model === "VirtualKey" &&
     Array.isArray(params.args?.where?.OR) &&
-    params.args.where.OR.every(
-      (o: any) => o?.hashedSecret || o?.previousHashedSecret,
-    )
+    params.args.where.OR.every((o: any) => o?.hashedSecret || o?.previousHashedSecret)
   ) {
     return;
   }
@@ -844,9 +827,7 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
 
   if (action === "create" || action === "createMany") {
     const data =
-      action === "create"
-        ? params.args?.data
-        : params.args?.data?.map((d: any) => d);
+      action === "create" ? params.args?.data : params.args?.data?.map((d: any) => d);
     const hasProjectId = Array.isArray(data)
       ? data.every((d) => d.projectId)
       : data?.projectId;

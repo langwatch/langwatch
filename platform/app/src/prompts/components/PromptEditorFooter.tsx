@@ -60,8 +60,7 @@ export function PromptEditorFooter({
   // Use props if provided, otherwise fall back to form context
   const handle = handleProp ?? formMethods?.watch("handle");
   const configId = configIdProp ?? formMethods?.watch("configId");
-  const versionId =
-    currentVersionId ?? formMethods?.watch("versionMetadata")?.versionId;
+  const versionId = currentVersionId ?? formMethods?.watch("versionMetadata")?.versionId;
 
   return (
     <HStack gap={2} width="full">
@@ -79,10 +78,7 @@ export function PromptEditorFooter({
           hasUnsavedChanges={hasUnsavedChanges}
         />
       )}
-      <GeneratePromptApiSnippetDialog
-        promptHandle={handle}
-        apiKey={project?.apiKey}
-      >
+      <GeneratePromptApiSnippetDialog promptHandle={handle} apiKey={project?.apiKey}>
         <GeneratePromptApiSnippetDialog.Trigger>
           <GenerateApiSnippetButton hasHandle={!!handle} />
         </GeneratePromptApiSnippetDialog.Trigger>

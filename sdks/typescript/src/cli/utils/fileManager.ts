@@ -2,7 +2,12 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
 import chalk from "chalk";
-import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt, PromptsLock } from "../types";
+import type {
+  PromptsConfig,
+  LocalPromptConfig,
+  MaterializedPrompt,
+  PromptsLock,
+} from "../types";
 import { localPromptConfigSchema } from "../types-prompt";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptFileNotFoundError } from "./errors/prompt-not-found.error";
@@ -38,11 +43,7 @@ export class FileManager {
     return root;
   }
 
-  private static readonly PROJECT_MARKERS = [
-    ".git",
-    "package.json",
-    "pyproject.toml",
-  ];
+  private static readonly PROJECT_MARKERS = [".git", "package.json", "pyproject.toml"];
 
   private static hasProjectMarker(dir: string): boolean {
     return this.PROJECT_MARKERS.some((m) => fs.existsSync(path.join(dir, m)));
@@ -132,7 +133,9 @@ export class FileManager {
       const content = fs.readFileSync(configPath, "utf-8");
       return JSON.parse(content) as PromptsConfig;
     } catch (error) {
-      throw new Error(`Failed to parse prompts.json: ${formatApiErrorMessage({ error })}`);
+      throw new Error(
+        `Failed to parse prompts.json: ${formatApiErrorMessage({ error })}`,
+      );
     }
   }
 
@@ -160,7 +163,7 @@ export class FileManager {
     if (!fs.existsSync(lockPath)) {
       return {
         lockfileVersion: 1,
-        prompts: {}
+        prompts: {},
       };
     }
 
@@ -168,9 +171,11 @@ export class FileManager {
       const content = fs.readFileSync(lockPath, "utf-8");
       return JSON.parse(content) as PromptsLock;
     } catch (error) {
-      throw new Error(`Failed to parse prompts-lock.json: ${formatApiErrorMessage({ error })}`);
+      throw new Error(
+        `Failed to parse prompts-lock.json: ${formatApiErrorMessage({ error })}`,
+      );
     }
-  }
+  };
 
   static savePromptsLock(lock: PromptsLock): void {
     const lockPath = this.getPromptsLockPath();
@@ -184,7 +189,7 @@ export class FileManager {
     if (!existed) {
       const emptyLock: PromptsLock = {
         lockfileVersion: 1,
-        prompts: {}
+        prompts: {},
       };
       this.savePromptsLock(emptyLock);
       return { created: true, path: lockPath };
@@ -207,27 +212,35 @@ export class FileManager {
       // Validate with zod and provide nice error messages
       const result = localPromptConfigSchema.safeParse(rawData);
 
-            if (!result.success) {
+      if (!result.success) {
         // Format zod errors nicely (manually since z.prettifyError might not be available)
         const prettyError = result.error.issues
-          .map(issue => `✖ ${issue.message}${issue.path.length > 0 ? `\n  → at ${issue.path.join('.')}` : ''}`)
-          .join('\n');
+          .map(
+            (issue) =>
+              `✖ ${issue.message}${issue.path.length > 0 ? `\n  → at ${issue.path.join(".")}` : ""}`,
+          )
+          .join("\n");
 
         throw new Error(
-          `Invalid prompt configuration in ${chalk.yellow(filePath)}:\n${prettyError}`
+          `Invalid prompt configuration in ${chalk.yellow(filePath)}:\n${prettyError}`,
         );
       }
 
       return result.data;
     } catch (error) {
-      if (error instanceof Error && error.message.includes("Invalid prompt configuration")) {
+      if (
+        error instanceof Error &&
+        error.message.includes("Invalid prompt configuration")
+      ) {
         throw error; // Re-throw zod validation errors as-is
       }
-      throw new Error(`Failed to parse local prompt file ${filePath}: ${formatApiErrorMessage({ error })}`);
+      throw new Error(
+        `Failed to parse local prompt file ${filePath}: ${formatApiErrorMessage({ error })}`,
+      );
     }
-  }
+  };
 
-    static saveMaterializedPrompt(name: string, prompt: MaterializedPrompt): string {
+  static saveMaterializedPrompt(name: string, prompt: MaterializedPrompt): string {
     const materializedDir = this.getMaterializedDir();
     const parts = name.split("/");
     const fileName = `${parts[parts.length - 1]}.prompt.yaml`;
@@ -248,7 +261,7 @@ export class FileManager {
     const yamlString = yaml.dump(yamlContent, {
       lineWidth: -1,
       noRefs: true,
-      sortKeys: false
+      sortKeys: false,
     });
 
     fs.writeFileSync(filePath, yamlString);
@@ -286,7 +299,7 @@ export class FileManager {
 
     walkDir(promptsDir);
     return files;
-  }
+  };
 
   static promptNameFromPath(filePath: string): string {
     const promptsDir = this.getPromptsDir();
@@ -338,7 +351,12 @@ export class FileManager {
     return cleaned;
   }
 
-  static updateLockEntry(lock: PromptsLock, name: string, prompt: MaterializedPrompt, materializedPath: string): void {
+  static updateLockEntry(
+    lock: PromptsLock,
+    name: string,
+    prompt: MaterializedPrompt,
+    materializedPath: string,
+  ): void {
     const relativePath = path.relative(this.findProjectRoot(), materializedPath);
 
     lock.prompts[name] = {
@@ -366,7 +384,7 @@ export class FileManager {
 
     // Read existing .gitignore
     const content = fs.readFileSync(gitignorePath, "utf-8");
-    const lines = content.split("\n").map(line => line.trim());
+    const lines = content.split("\n").map((line) => line.trim());
 
     // Check if entry already exists
     if (lines.includes(entry)) {
@@ -374,7 +392,9 @@ export class FileManager {
     }
 
     // Add entry to .gitignore
-    const newContent = content.endsWith("\n") ? `${content}${entry}\n` : `${content}\n${entry}\n`;
+    const newContent = content.endsWith("\n")
+      ? `${content}${entry}\n`
+      : `${content}\n${entry}\n`;
     fs.writeFileSync(gitignorePath, newContent);
 
     return { added: true, existed: false };

@@ -120,9 +120,7 @@ const getImportedModelCosts = () => {
       // Make vendor prefix optional in regex (e.g., both "gpt-4o" and "openai/gpt-4o" should match)
       const hasVendorPrefix = modelId.includes("/");
       const vendorPrefix = hasVendorPrefix ? modelId.split("/")[0] : null;
-      const modelName = hasVendorPrefix
-        ? modelId.split("/").slice(1).join("/")
-        : modelId;
+      const modelName = hasVendorPrefix ? modelId.split("/").slice(1).join("/") : modelId;
 
       const escapedModelName = escapeStringRegexp(modelName)
         // Convert hex-escaped hyphens (\x2d) and escaped hyphens (\-) to literal hyphens
@@ -150,10 +148,7 @@ const getImportedModelCosts = () => {
         outputCostPerToken: model.pricing.outputCostPerToken ?? 0,
         cacheReadCostPerToken: model.pricing.inputCacheReadPerToken,
         cacheCreationCostPerToken: model.pricing.inputCacheWritePerToken,
-        cacheCreation1hCostPerToken: resolveCacheWrite1hRate(
-          modelId,
-          model.pricing,
-        ),
+        cacheCreation1hCostPerToken: resolveCacheWrite1hRate(modelId, model.pricing),
         inputAudioCostPerToken: model.pricing.audioCostPerToken,
         outputAudioCostPerToken: resolveAudioOutputRate(modelId, model.pricing),
         inputCostPerCharacter: model.pricing.inputCostPerCharacter,
@@ -165,10 +160,7 @@ const getImportedModelCosts = () => {
   // Exclude models with : after it if there is already the same model there without the :
   const mergedModels = Object.entries(tokenModels)
     .filter(([model_name, _]) => {
-      if (
-        model_name.includes(":") &&
-        model_name.split(":")[0]! in tokenModels
-      ) {
+      if (model_name.includes(":") && model_name.split(":")[0]! in tokenModels) {
         return false;
       }
       return true;
@@ -204,9 +196,7 @@ const getImportedModelCosts = () => {
     (model) => !model.model.includes("openrouter/"),
   );
 
-  return Object.fromEntries(
-    relevantModels.map((model) => [model.model, model]),
-  );
+  return Object.fromEntries(relevantModels.map((model) => [model.model, model]));
 };
 
 export type MaybeStoredLLMModelCost = {
@@ -337,16 +327,15 @@ export const getCustomLLMModelCosts = async ({
     projectId,
   });
 
-  const llmModelCostsCustomData =
-    await prismaClient.customLLMModelCost.findMany({
-      where: {
-        organizationId,
-        OR: chain.map((scope) => ({
-          scopeType: scope.scopeType,
-          scopeId: scope.scopeId,
-        })),
-      },
-    });
+  const llmModelCostsCustomData = await prismaClient.customLLMModelCost.findMany({
+    where: {
+      organizationId,
+      OR: chain.map((scope) => ({
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
+      })),
+    },
+  });
 
   return llmModelCostsCustomData
     .map(
@@ -361,10 +350,8 @@ export const getCustomLLMModelCosts = async ({
           inputCostPerToken: record.inputCostPerToken ?? undefined,
           outputCostPerToken: record.outputCostPerToken ?? undefined,
           cacheReadCostPerToken: record.cacheReadCostPerToken ?? undefined,
-          cacheCreationCostPerToken:
-            record.cacheCreationCostPerToken ?? undefined,
-          cacheCreation1hCostPerToken:
-            record.cacheCreation1hCostPerToken ?? undefined,
+          cacheCreationCostPerToken: record.cacheCreationCostPerToken ?? undefined,
+          cacheCreation1hCostPerToken: record.cacheCreation1hCostPerToken ?? undefined,
           updatedAt: record.updatedAt,
           createdAt: record.createdAt,
         }) as MaybeStoredLLMModelCost,

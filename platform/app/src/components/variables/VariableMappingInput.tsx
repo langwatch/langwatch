@@ -1,12 +1,4 @@
-import {
-  Box,
-  HStack,
-  Input,
-  Portal,
-  Tag,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HStack, Input, Portal, Tag, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronRight, Database, Type } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -14,10 +6,7 @@ import {
   ComponentIcon,
 } from "~/optimization_studio/components/ColorfulBlockIcons";
 import type { ComponentType, Field } from "@langwatch/workflow-contract";
-import {
-  VariableTypeBadge,
-  VariableTypeIcon,
-} from "@langwatch/prompt-web";
+import { VariableTypeBadge, VariableTypeIcon } from "@langwatch/prompt-web";
 
 // ============================================================================
 // Types
@@ -168,11 +157,7 @@ const SourceTypeIconComponent = ({ type }: { type: SourceType }) => {
   // Dataset is not a ComponentType, so handle it separately
   if (type === "dataset") {
     return (
-      <ColorfulBlockIcon
-        color="blue.solid"
-        size="xs"
-        icon={<Database size={12} />}
-      />
+      <ColorfulBlockIcon color="blue.solid" size="xs" icon={<Database size={12} />} />
     );
   }
 
@@ -199,9 +184,7 @@ export const VariableMappingInput = ({
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [isKeyboardNav, setIsKeyboardNav] = useState(false);
   // Local state to track the current value - prevents stale prop issues
-  const [localMapping, setLocalMapping] = useState<FieldMapping | undefined>(
-    mapping,
-  );
+  const [localMapping, setLocalMapping] = useState<FieldMapping | undefined>(mapping);
   // Track in-progress path selection (for nested fields)
   // This is the path being built up as user selects nested options
   const [inProgressPath, setInProgressPath] = useState<{
@@ -225,9 +208,7 @@ export const VariableMappingInput = ({
   // Get source info for the current mapping
   const sourceInfo = useMemo(() => {
     if (isSourceMapping && localMapping) {
-      const source = availableSources.find(
-        (s) => s.id === localMapping.sourceId,
-      );
+      const source = availableSources.find((s) => s.id === localMapping.sourceId);
       return source ? { source, path: localMapping.path } : null;
     }
     return null;
@@ -237,9 +218,7 @@ export const VariableMappingInput = ({
   const currentDropdownContext = useMemo(() => {
     // If we have an in-progress path, show children of the last selected field
     if (inProgressPath) {
-      const source = availableSources.find(
-        (s) => s.id === inProgressPath.sourceId,
-      );
+      const source = availableSources.find((s) => s.id === inProgressPath.sourceId);
       if (!source)
         return {
           fields: [],
@@ -268,11 +247,8 @@ export const VariableMappingInput = ({
       }
 
       // Check if the parent (last segment in path) is complete
-      const isParentComplete = parentField
-        ? isFieldComplete(parentField)
-        : false;
-      const parentFieldName =
-        inProgressPath.path[inProgressPath.path.length - 1] ?? null;
+      const isParentComplete = parentField ? isFieldComplete(parentField) : false;
+      const parentFieldName = inProgressPath.path[inProgressPath.path.length - 1] ?? null;
       const parentIsCompleteLabel = parentField?.isCompleteLabel ?? null;
 
       return {
@@ -326,9 +302,7 @@ export const VariableMappingInput = ({
       .map((source) => ({
         ...source,
         fields: source.fields.filter((field) =>
-          (field.label ?? field.name)
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()),
+          (field.label ?? field.name).toLowerCase().includes(searchQuery.toLowerCase()),
         ),
       }))
       .filter((source) => source.fields.length > 0);
@@ -384,11 +358,7 @@ export const VariableMappingInput = ({
         setInProgressPath({ ...inProgressPath, path: newPath });
       }
       setSearchQuery("");
-    } else if (
-      isSourceMapping &&
-      localMapping &&
-      localMapping.path.length > 1
-    ) {
+    } else if (isSourceMapping && localMapping && localMapping.path.length > 1) {
       // Remove last segment from completed mapping
       const newPath = localMapping.path.slice(0, -1);
       const newMapping: FieldMapping = {
@@ -521,9 +491,7 @@ export const VariableMappingInput = ({
         case "ArrowDown":
           e.preventDefault();
           setIsKeyboardNav(true);
-          setHighlightedIndex((prev) =>
-            prev < allOptions.length - 1 ? prev + 1 : prev,
-          );
+          setHighlightedIndex((prev) => (prev < allOptions.length - 1 ? prev + 1 : prev));
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -597,8 +565,7 @@ export const VariableMappingInput = ({
     const spaceAbove = rect.top - DROPDOWN_GAP;
 
     // If not enough space below but more space above, flip to top
-    const shouldFlipToTop =
-      spaceBelow < DROPDOWN_MAX_HEIGHT && spaceAbove > spaceBelow;
+    const shouldFlipToTop = spaceBelow < DROPDOWN_MAX_HEIGHT && spaceAbove > spaceBelow;
 
     if (shouldFlipToTop) {
       // Position above the input - measure actual dropdown height
@@ -704,9 +671,7 @@ export const VariableMappingInput = ({
 
           {/* In-progress path badges (when building nested selection) */}
           {inProgressPath?.path.map((segment, index) => {
-            const source = availableSources.find(
-              (s) => s.id === inProgressPath.sourceId,
-            );
+            const source = availableSources.find((s) => s.id === inProgressPath.sourceId);
             return (
               <HStack key={`${segment}-${index}`} gap={0}>
                 <Tag.Root
@@ -741,10 +706,7 @@ export const VariableMappingInput = ({
                   </Tag.EndElement>
                 </Tag.Root>
                 {index < inProgressPath.path.length - 1 && (
-                  <ChevronRight
-                    size={12}
-                    color="var(--chakra-colors-fg-muted)"
-                  />
+                  <ChevronRight size={12} color="var(--chakra-colors-fg-muted)" />
                 )}
               </HStack>
             );
@@ -752,9 +714,7 @@ export const VariableMappingInput = ({
 
           <Input
             ref={inputRef}
-            value={
-              isOpen ? searchQuery : isSourceMapping ? "" : getDisplayValue()
-            }
+            value={isOpen ? searchQuery : isSourceMapping ? "" : getDisplayValue()}
             onChange={handleInputChange}
             onFocus={() => setIsOpen(true)}
             onKeyDown={handleKeyDown}
@@ -823,9 +783,7 @@ export const VariableMappingInput = ({
                     marginBottom={1}
                   >
                     <Text fontSize="xs" color="blue.600">
-                      {inProgressPath.path
-                        .map((s) => s.replace(/_/g, " "))
-                        .join(" → ")}
+                      {inProgressPath.path.map((s) => s.replace(/_/g, " ")).join(" → ")}
                     </Text>
                     <Text fontSize="xs" color="blue.400">
                       →
@@ -842,9 +800,7 @@ export const VariableMappingInput = ({
                       gap={2}
                       cursor="pointer"
                       borderRadius="4px"
-                      background={
-                        highlightedIndex === -1 ? "blue.subtle" : "transparent"
-                      }
+                      background={highlightedIndex === -1 ? "blue.subtle" : "transparent"}
                       _hover={{ background: "blue.subtle" }}
                       onClick={handleSelectCurrentPath}
                       onMouseMove={() => {
@@ -859,11 +815,7 @@ export const VariableMappingInput = ({
                       marginBottom={1}
                     >
                       <Check size={12} color="var(--chakra-colors-green-fg)" />
-                      <Text
-                        fontSize="13px"
-                        fontWeight="medium"
-                        color="green.fg"
-                      >
+                      <Text fontSize="13px" fontWeight="medium" color="green.fg">
                         {currentDropdownContext.parentIsCompleteLabel ??
                           `Use all ${currentDropdownContext.parentFieldName}`}
                       </Text>
@@ -883,11 +835,7 @@ export const VariableMappingInput = ({
                         marginBottom={1}
                       >
                         <SourceTypeIconComponent type={source.type} />
-                        <Text
-                          fontSize="xs"
-                          fontWeight="semibold"
-                          color="fg.muted"
-                        >
+                        <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                           {source.name}
                         </Text>
                       </HStack>
@@ -908,14 +856,9 @@ export const VariableMappingInput = ({
                           gap={2}
                           cursor="pointer"
                           borderRadius="4px"
-                          background={
-                            isHighlighted ? "blue.subtle" : "transparent"
-                          }
+                          background={isHighlighted ? "blue.subtle" : "transparent"}
                           onMouseMove={() => {
-                            if (
-                              isKeyboardNav ||
-                              highlightedIndex !== optionIdx
-                            ) {
+                            if (isKeyboardNav || highlightedIndex !== optionIdx) {
                               setIsKeyboardNav(false);
                               setHighlightedIndex(optionIdx);
                             }
@@ -937,10 +880,7 @@ export const VariableMappingInput = ({
                             {(() => {
                               const label = field.label ?? field.name ?? "";
                               // Render "* (description)" with gray parenthesis part
-                              if (
-                                label.startsWith("* (") &&
-                                label.endsWith(")")
-                              ) {
+                              if (label.startsWith("* (") && label.endsWith(")")) {
                                 const parenContent = label.slice(2); // "(description)"
                                 return (
                                   <>
@@ -987,10 +927,7 @@ export const VariableMappingInput = ({
                       }
                       onMouseMove={() => {
                         const valueOptionIdx = allOptions.length - 1;
-                        if (
-                          isKeyboardNav ||
-                          highlightedIndex !== valueOptionIdx
-                        ) {
+                        if (isKeyboardNav || highlightedIndex !== valueOptionIdx) {
                           setIsKeyboardNav(false);
                           setHighlightedIndex(valueOptionIdx);
                         }
@@ -1001,9 +938,7 @@ export const VariableMappingInput = ({
                           value: searchQuery.trim(),
                         })
                       }
-                      data-highlighted={
-                        highlightedIndex === allOptions.length - 1
-                      }
+                      data-highlighted={highlightedIndex === allOptions.length - 1}
                       data-testid="use-as-value-option"
                     >
                       <Type size={14} color="var(--chakra-colors-gray-500)" />

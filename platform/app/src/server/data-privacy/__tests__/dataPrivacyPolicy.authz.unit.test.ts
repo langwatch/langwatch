@@ -12,9 +12,7 @@ describe("requiredDataPrivacyWritePermission", () => {
       expect(requiredDataPrivacyWritePermission("ORGANIZATION")).toBe(
         "organization:manage",
       );
-      expect(requiredDataPrivacyWritePermission("PROJECT")).toBe(
-        "project:update",
-      );
+      expect(requiredDataPrivacyWritePermission("PROJECT")).toBe("project:update");
       expect(requiredDataPrivacyWritePermission("ORGANIZATION")).not.toBe(
         requiredDataPrivacyWritePermission("PROJECT"),
       );
@@ -22,9 +20,7 @@ describe("requiredDataPrivacyWritePermission", () => {
   });
 
   it("maps departments to organization:manage and teams to team:manage", () => {
-    expect(requiredDataPrivacyWritePermission("DEPARTMENT")).toBe(
-      "organization:manage",
-    );
+    expect(requiredDataPrivacyWritePermission("DEPARTMENT")).toBe("organization:manage");
     expect(requiredDataPrivacyWritePermission("TEAM")).toBe("team:manage");
   });
 });

@@ -34,13 +34,7 @@ beforeEach(() => {
   confirmUnsubscribe.mockResolvedValue(undefined);
 });
 
-function request({
-  method = "POST",
-  token,
-}: {
-  method?: string;
-  token?: string;
-}) {
+function request({ method = "POST", token }: { method?: string; token?: string }) {
   const url =
     token != null
       ? `/api/unsubscribe?token=${encodeURIComponent(token)}`

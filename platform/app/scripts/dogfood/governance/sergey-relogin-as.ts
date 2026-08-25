@@ -62,15 +62,11 @@ async function main() {
     user.id,
   );
   if (!orgRows[0]) {
-    throw new Error(
-      "no Organization row joined to this user's OrganizationUser",
-    );
+    throw new Error("no Organization row joined to this user's OrganizationUser");
   }
   const org = orgRows[0];
   const organizationId = org.id;
-  console.error(
-    `[relogin] user=${user.id} org=${organizationId} slug=${org.slug}`,
-  );
+  console.error(`[relogin] user=${user.id} org=${organizationId} slug=${org.slug}`);
 
   try {
     require("node:fs").unlinkSync(args.configPath);
@@ -192,9 +188,7 @@ async function main() {
   // A device-session approval carries no credential, so the key issued above
   // is the one the account holds; the CLI reaches it on its first gateway call.
   await approveDeviceCode({ deviceCode, userId: user.id, organizationId });
-  console.error(
-    `[relogin] approved, waiting for poll → saveConfig → shell-rc prompt`,
-  );
+  console.error(`[relogin] approved, waiting for poll → saveConfig → shell-rc prompt`);
 
   // The CLI polls control-plane on dc.interval (typically 5s). Wait
   // for the ceremony output ("Gateway:" + "Dashboard:" lines, which
@@ -227,9 +221,7 @@ async function main() {
     new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10000)),
   ]);
   if (!exited) {
-    console.error(
-      `[relogin] CLI did not exit within 10s of stdin-close, SIGKILL`,
-    );
+    console.error(`[relogin] CLI did not exit within 10s of stdin-close, SIGKILL`);
     child.kill("SIGKILL");
   }
   await redis.quit();

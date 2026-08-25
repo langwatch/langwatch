@@ -38,8 +38,7 @@ vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
   return {
     ...actual,
     extractCredentials: (...args: unknown[]) => mockExtractCredentials(...args),
-    enforceApiKeyCeiling: (...args: unknown[]) =>
-      mockEnforceApiKeyCeiling(...args),
+    enforceApiKeyCeiling: (...args: unknown[]) => mockEnforceApiKeyCeiling(...args),
   };
 });
 
@@ -57,13 +56,11 @@ const mockResolveLangyKeyIdentity = vi.fn();
 const mockResolveLangyActorSession = vi.fn();
 
 vi.mock("~/server/app-layer/langy/langyApiKeyIdentity", () => ({
-  resolveLangyKeyIdentity: (...args: unknown[]) =>
-    mockResolveLangyKeyIdentity(...args),
+  resolveLangyKeyIdentity: (...args: unknown[]) => mockResolveLangyKeyIdentity(...args),
 }));
 
 vi.mock("~/server/app-layer/langy/langyApiKeyActorSession", () => ({
-  resolveLangyActorSession: (...args: unknown[]) =>
-    mockResolveLangyActorSession(...args),
+  resolveLangyActorSession: (...args: unknown[]) => mockResolveLangyActorSession(...args),
 }));
 
 // ─── App layer ────────────────────────────────────────────────────────────────
@@ -94,13 +91,7 @@ testApp.route("/", langyApp);
 const CONVERSATIONS_URL = "http://localhost/api/langy/conversations";
 const ADOPTED_ID = "run-42-thread";
 
-function postTurn({
-  path = "",
-  body,
-}: {
-  path?: string;
-  body: Record<string, unknown>;
-}) {
+function postTurn({ path = "", body }: { path?: string; body: Record<string, unknown> }) {
   return testApp.request(`${CONVERSATIONS_URL}${path}`, {
     method: "POST",
     headers: {
@@ -170,9 +161,7 @@ describe("/api/langy conversation-id adoption", () => {
       });
 
       expect(res.status).toBe(202);
-      const [args] = mockStartConversationTurn.mock.calls[0] as [
-        Record<string, unknown>,
-      ];
+      const [args] = mockStartConversationTurn.mock.calls[0] as [Record<string, unknown>];
       expect(args).not.toHaveProperty("adoptConversationId");
     });
   });

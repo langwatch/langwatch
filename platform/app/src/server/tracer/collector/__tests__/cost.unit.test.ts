@@ -202,10 +202,7 @@ describe("estimateCost", () => {
           inputCharacters: 4000,
           audioSeconds: 30,
         }),
-      ).toBeCloseTo(
-        100 * 0.000004 + 20 * 0.000016 + 4000 * 0.000015 + 30 * 0.0001,
-        10,
-      );
+      ).toBeCloseTo(100 * 0.000004 + 20 * 0.000016 + 4000 * 0.000015 + 30 * 0.0001, 10);
     });
   });
 
@@ -241,9 +238,7 @@ describe("normalizeModelName", () => {
     });
 
     it("normalizes minimaxai/ to minimax/", () => {
-      expect(normalizeModelName("minimaxai/minimax-m2.1")).toBe(
-        "minimax/minimax-m2.1",
-      );
+      expect(normalizeModelName("minimaxai/minimax-m2.1")).toBe("minimax/minimax-m2.1");
     });
 
     it("normalizes zai-org/ to z-ai/", () => {
@@ -299,31 +294,29 @@ describe("normalizeBedrockModelId", () => {
 
   describe("when given a versioned Bedrock model id", () => {
     it("strips the revision marker and version suffix", () => {
-      expect(
-        normalizeBedrockModelId("us.anthropic.claude-haiku-4-5-20251001-v1:0"),
-      ).toBe("anthropic/claude-haiku-4-5-20251001");
+      expect(normalizeBedrockModelId("us.anthropic.claude-haiku-4-5-20251001-v1:0")).toBe(
+        "anthropic/claude-haiku-4-5-20251001",
+      );
     });
   });
 
   describe("when given a litellm-style bedrock/ prefixed id (@regression)", () => {
     it("strips the bedrock/ envelope along with the region", () => {
-      expect(
-        normalizeBedrockModelId("bedrock/eu.anthropic.claude-sonnet-4-6"),
-      ).toBe("anthropic/claude-sonnet-4-6");
+      expect(normalizeBedrockModelId("bedrock/eu.anthropic.claude-sonnet-4-6")).toBe(
+        "anthropic/claude-sonnet-4-6",
+      );
     });
 
     it("strips the bedrock/ envelope on versioned ids", () => {
       expect(
-        normalizeBedrockModelId(
-          "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        ),
+        normalizeBedrockModelId("bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0"),
       ).toBe("anthropic/claude-haiku-4-5-20251001");
     });
 
     it("strips the bedrock/ envelope when no region prefix is present", () => {
-      expect(
-        normalizeBedrockModelId("bedrock/anthropic.claude-sonnet-4-6"),
-      ).toBe("anthropic/claude-sonnet-4-6");
+      expect(normalizeBedrockModelId("bedrock/anthropic.claude-sonnet-4-6")).toBe(
+        "anthropic/claude-sonnet-4-6",
+      );
     });
   });
 
@@ -347,9 +340,9 @@ describe("matchModelCostWithFallbacks", () => {
     });
 
     it("finds cost for model name with vendor prefix", () => {
-      expect(
-        matchModelCostWithFallbacks("openai/gpt-4o", fakeModelCosts)?.model,
-      ).toBe("openai/gpt-4o");
+      expect(matchModelCostWithFallbacks("openai/gpt-4o", fakeModelCosts)?.model).toBe(
+        "openai/gpt-4o",
+      );
     });
   });
 
@@ -361,50 +354,48 @@ describe("matchModelCostWithFallbacks", () => {
     });
 
     it("normalizes mixed-case vendor prefix to lowercase", () => {
-      expect(
-        matchModelCostWithFallbacks("OpenAI/GPT-4O", fakeModelCosts)?.model,
-      ).toBe("openai/gpt-4o");
+      expect(matchModelCostWithFallbacks("OpenAI/GPT-4O", fakeModelCosts)?.model).toBe(
+        "openai/gpt-4o",
+      );
     });
   });
 
   describe("when model name uses dot or hyphen in version numbers", () => {
     it("matches claude-opus-4.5 with a dot", () => {
-      expect(
-        matchModelCostWithFallbacks("claude-opus-4.5", fakeModelCosts)?.model,
-      ).toBe("anthropic/claude-opus-4.5");
+      expect(matchModelCostWithFallbacks("claude-opus-4.5", fakeModelCosts)?.model).toBe(
+        "anthropic/claude-opus-4.5",
+      );
     });
 
     it("matches claude-opus-4-5 with a hyphen (interchangeable with dot)", () => {
-      expect(
-        matchModelCostWithFallbacks("claude-opus-4-5", fakeModelCosts)?.model,
-      ).toBe("anthropic/claude-opus-4.5");
+      expect(matchModelCostWithFallbacks("claude-opus-4-5", fakeModelCosts)?.model).toBe(
+        "anthropic/claude-opus-4.5",
+      );
     });
 
     it("matches minimax-m2.1 with a dot", () => {
-      expect(
-        matchModelCostWithFallbacks("minimax-m2.1", fakeModelCosts)?.model,
-      ).toBe("minimax/minimax-m2.1");
+      expect(matchModelCostWithFallbacks("minimax-m2.1", fakeModelCosts)?.model).toBe(
+        "minimax/minimax-m2.1",
+      );
     });
 
     it("matches minimax-m2-1 with a hyphen", () => {
-      expect(
-        matchModelCostWithFallbacks("minimax-m2-1", fakeModelCosts)?.model,
-      ).toBe("minimax/minimax-m2.1");
+      expect(matchModelCostWithFallbacks("minimax-m2-1", fakeModelCosts)?.model).toBe(
+        "minimax/minimax-m2.1",
+      );
     });
   });
 
   describe("when model name has an extra vendor prefix from a proxy", () => {
     it("strips one prefix level and retries", () => {
       expect(
-        matchModelCostWithFallbacks("together_ai/gpt-4o", fakeModelCosts)
-          ?.model,
+        matchModelCostWithFallbacks("together_ai/gpt-4o", fakeModelCosts)?.model,
       ).toBe("openai/gpt-4o");
     });
 
     it("strips multiple prefix levels for multi-segment names", () => {
       expect(
-        matchModelCostWithFallbacks("together_ai/openai/gpt-4o", fakeModelCosts)
-          ?.model,
+        matchModelCostWithFallbacks("together_ai/openai/gpt-4o", fakeModelCosts)?.model,
       ).toBe("openai/gpt-4o");
     });
   });
@@ -412,44 +403,40 @@ describe("matchModelCostWithFallbacks", () => {
   describe("when model name uses a known vendor alias", () => {
     it("normalizes deepseek-ai/ to deepseek/ before matching", () => {
       expect(
-        matchModelCostWithFallbacks("deepseek-ai/deepseek-v3.2", fakeModelCosts)
-          ?.model,
+        matchModelCostWithFallbacks("deepseek-ai/deepseek-v3.2", fakeModelCosts)?.model,
       ).toBe("deepseek/deepseek-v3.2");
     });
 
     it("normalizes minimaxai/ to minimax/ before matching", () => {
       expect(
-        matchModelCostWithFallbacks("minimaxai/minimax-m2.1", fakeModelCosts)
-          ?.model,
+        matchModelCostWithFallbacks("minimaxai/minimax-m2.1", fakeModelCosts)?.model,
       ).toBe("minimax/minimax-m2.1");
     });
   });
 
   describe("when model name has a quantization suffix", () => {
     it("strips -fp8 suffix before matching", () => {
-      expect(
-        matchModelCostWithFallbacks("gpt-4o-fp8", fakeModelCosts)?.model,
-      ).toBe("openai/gpt-4o");
+      expect(matchModelCostWithFallbacks("gpt-4o-fp8", fakeModelCosts)?.model).toBe(
+        "openai/gpt-4o",
+      );
     });
 
     it("strips -gptq suffix before matching", () => {
-      expect(
-        matchModelCostWithFallbacks("gpt-4o-gptq", fakeModelCosts)?.model,
-      ).toBe("openai/gpt-4o");
+      expect(matchModelCostWithFallbacks("gpt-4o-gptq", fakeModelCosts)?.model).toBe(
+        "openai/gpt-4o",
+      );
     });
 
     it("strips -awq suffix before matching", () => {
-      expect(
-        matchModelCostWithFallbacks("gpt-4o-awq", fakeModelCosts)?.model,
-      ).toBe("openai/gpt-4o");
+      expect(matchModelCostWithFallbacks("gpt-4o-awq", fakeModelCosts)?.model).toBe(
+        "openai/gpt-4o",
+      );
     });
   });
 
   describe("when model name has a -turbo suffix", () => {
     it("does NOT strip -turbo (turbo is a distinct SKU with its own pricing)", () => {
-      expect(
-        matchModelCostWithFallbacks("gpt-4o-turbo", fakeModelCosts),
-      ).toBeUndefined();
+      expect(matchModelCostWithFallbacks("gpt-4o-turbo", fakeModelCosts)).toBeUndefined();
     });
   });
 
@@ -481,21 +468,20 @@ describe("matchModelCostWithFallbacks", () => {
     });
 
     it("matches real anthropic/claude-opus-4-5 entry by dotted version", () => {
-      expect(
-        matchModelCostWithFallbacks("claude-opus-4.5", realCosts)?.model,
-      ).toBe("anthropic/claude-opus-4-5");
+      expect(matchModelCostWithFallbacks("claude-opus-4.5", realCosts)?.model).toBe(
+        "anthropic/claude-opus-4-5",
+      );
     });
 
     it("matches real anthropic/claude-opus-4-6 entry by dotted version", () => {
-      expect(
-        matchModelCostWithFallbacks("claude-opus-4.6", realCosts)?.model,
-      ).toBe("anthropic/claude-opus-4-6");
+      expect(matchModelCostWithFallbacks("claude-opus-4.6", realCosts)?.model).toBe(
+        "anthropic/claude-opus-4-6",
+      );
     });
 
     it("matches real deepseek/deepseek-v3.2 via deepseek-ai/ alias", () => {
       expect(
-        matchModelCostWithFallbacks("deepseek-ai/deepseek-v3.2", realCosts)
-          ?.model,
+        matchModelCostWithFallbacks("deepseek-ai/deepseek-v3.2", realCosts)?.model,
       ).toBe("deepseek/deepseek-v3.2");
     });
 
@@ -512,18 +498,15 @@ describe("matchModelCostWithFallbacks", () => {
     /** @scenario A bare regional Bedrock model id keeps resolving registry pricing */
     it("matches eu.anthropic.claude-sonnet-4-6 to anthropic/claude-sonnet-4-6", () => {
       expect(
-        matchModelCostWithFallbacks("eu.anthropic.claude-sonnet-4-6", realCosts)
-          ?.model,
+        matchModelCostWithFallbacks("eu.anthropic.claude-sonnet-4-6", realCosts)?.model,
       ).toBe("anthropic/claude-sonnet-4-6");
     });
 
     /** @scenario A bedrock/-prefixed regional model id resolves registry pricing */
     it("matches bedrock/eu.anthropic.claude-sonnet-4-6 to anthropic/claude-sonnet-4-6", () => {
       expect(
-        matchModelCostWithFallbacks(
-          "bedrock/eu.anthropic.claude-sonnet-4-6",
-          realCosts,
-        )?.model,
+        matchModelCostWithFallbacks("bedrock/eu.anthropic.claude-sonnet-4-6", realCosts)
+          ?.model,
       ).toBe("anthropic/claude-sonnet-4-6");
     });
 
@@ -561,8 +544,7 @@ describe("matchModelCostWithFallbacks", () => {
     /** @scenario A codex-prefixed model id prices from the underlying OpenAI entry */
     it("matches openai_codex/gpt-5.6-terra to openai/gpt-5.6-terra", () => {
       expect(
-        matchModelCostWithFallbacks("openai_codex/gpt-5.6-terra", realCosts)
-          ?.model,
+        matchModelCostWithFallbacks("openai_codex/gpt-5.6-terra", realCosts)?.model,
       ).toBe("openai/gpt-5.6-terra");
     });
 
@@ -594,21 +576,21 @@ describe("matchModelCostWithFallbacks", () => {
     ];
 
     it("matches raw model string before normalizing", () => {
-      expect(
-        matchModelCostWithFallbacks("MyModel-V2", caseSensitiveCosts)?.model,
-      ).toBe("custom/MyModel-V2");
+      expect(matchModelCostWithFallbacks("MyModel-V2", caseSensitiveCosts)?.model).toBe(
+        "custom/MyModel-V2",
+      );
     });
 
     it("still falls back to normalized matching for lowercase input", () => {
-      expect(
-        matchModelCostWithFallbacks("gpt-4o", caseSensitiveCosts)?.model,
-      ).toBe("openai/gpt-4o");
+      expect(matchModelCostWithFallbacks("gpt-4o", caseSensitiveCosts)?.model).toBe(
+        "openai/gpt-4o",
+      );
     });
 
     it("falls back to normalized matching when raw does not match", () => {
-      expect(
-        matchModelCostWithFallbacks("GPT-4O", caseSensitiveCosts)?.model,
-      ).toBe("openai/gpt-4o");
+      expect(matchModelCostWithFallbacks("GPT-4O", caseSensitiveCosts)?.model).toBe(
+        "openai/gpt-4o",
+      );
     });
   });
 });

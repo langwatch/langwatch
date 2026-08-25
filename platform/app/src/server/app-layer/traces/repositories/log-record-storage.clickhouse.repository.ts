@@ -24,13 +24,9 @@ const TABLE_NAME = "stored_log_records" as const;
  */
 const FALLBACK_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 
-const logger = createLogger(
-  "langwatch:app-layer:traces:log-record-storage-repository",
-);
+const logger = createLogger("langwatch:app-layer:traces:log-record-storage-repository");
 
-export class LogRecordStorageClickHouseRepository
-  implements LogRecordStorageRepository
-{
+export class LogRecordStorageClickHouseRepository implements LogRecordStorageRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async getLogsByTraceId(
@@ -74,9 +70,7 @@ export class LogRecordStorageClickHouseRepository
         // partition bound nonsensical. `window` is always present here (both
         // the hinted "none" and the no-hint lookback yield a fragment); the
         // guard keeps the unbounded shape safe regardless.
-        const timeFilter = window
-          ? window.sqlFor(`${TABLE_NAME}.TimeUnixMs`)
-          : "";
+        const timeFilter = window ? window.sqlFor(`${TABLE_NAME}.TimeUnixMs`) : "";
 
         // Dedup to the latest version of each distinct stored log (the table is
         // a ReplacingMergeTree(UpdatedAt) keyed on

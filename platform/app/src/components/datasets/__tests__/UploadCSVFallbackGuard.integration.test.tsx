@@ -26,13 +26,11 @@ const putFileToPresignedUrl = vi.fn();
 const finalizeDirectUpload = vi.fn();
 const abortPendingUpload = vi.fn();
 vi.mock("@langwatch/dataset-web", async (importActual) => {
-  const actual =
-    await importActual<typeof import("@langwatch/dataset-web")>();
+  const actual = await importActual<typeof import("@langwatch/dataset-web")>();
   return {
     ...actual,
     requestDirectUpload: (...args: unknown[]) => requestDirectUpload(...args),
-    putFileToPresignedUrl: (...args: unknown[]) =>
-      putFileToPresignedUrl(...args),
+    putFileToPresignedUrl: (...args: unknown[]) => putFileToPresignedUrl(...args),
     finalizeDirectUpload: (...args: unknown[]) => finalizeDirectUpload(...args),
     abortPendingUpload: (...args: unknown[]) => abortPendingUpload(...args),
   };
@@ -107,13 +105,9 @@ describe("UploadCSVForm 409-fallback size guard", () => {
       });
       // The fallback parser's first call is `file.text()` — spy to prove it
       // never parses an oversize file.
-      const textSpy = vi
-        .spyOn(oversize, "text")
-        .mockResolvedValue("a,b\n1,2\n");
+      const textSpy = vi.spyOn(oversize, "text").mockResolvedValue("a,b\n1,2\n");
 
-      const input = document.querySelector(
-        'input[type="file"]',
-      ) as HTMLInputElement;
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
       await user.upload(input, oversize);
 
       const uploadButton = screen.getByRole("button", { name: /upload/i });
@@ -149,13 +143,9 @@ describe("UploadCSVForm 409-fallback size guard", () => {
       const smallFile = new File(["a,b\n1,2\n"], "small.csv", {
         type: "text/csv",
       });
-      const textSpy = vi
-        .spyOn(smallFile, "text")
-        .mockResolvedValue("a,b\n1,2\n");
+      const textSpy = vi.spyOn(smallFile, "text").mockResolvedValue("a,b\n1,2\n");
 
-      const input = document.querySelector(
-        'input[type="file"]',
-      ) as HTMLInputElement;
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
       await user.upload(input, smallFile);
 
       const uploadButton = screen.getByRole("button", { name: /upload/i });
@@ -198,13 +188,9 @@ describe("UploadCSVForm 409-fallback size guard", () => {
       const smallFile = new File(["a,b\n1,2\n"], "small.csv", {
         type: "text/csv",
       });
-      const textSpy = vi
-        .spyOn(smallFile, "text")
-        .mockResolvedValue("a,b\n1,2\n");
+      const textSpy = vi.spyOn(smallFile, "text").mockResolvedValue("a,b\n1,2\n");
 
-      const input = document.querySelector(
-        'input[type="file"]',
-      ) as HTMLInputElement;
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
       await user.upload(input, smallFile);
       await user.click(screen.getByRole("button", { name: /upload/i }));
 
@@ -240,13 +226,9 @@ describe("UploadCSVForm 409-fallback size guard", () => {
       Object.defineProperty(oversize, "size", {
         value: MAX_FILE_SIZE_BYTES + 1,
       });
-      const textSpy = vi
-        .spyOn(oversize, "text")
-        .mockResolvedValue("a,b\n1,2\n");
+      const textSpy = vi.spyOn(oversize, "text").mockResolvedValue("a,b\n1,2\n");
 
-      const input = document.querySelector(
-        'input[type="file"]',
-      ) as HTMLInputElement;
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
       await user.upload(input, oversize);
       await user.click(screen.getByRole("button", { name: /upload/i }));
 
@@ -297,21 +279,15 @@ describe("UploadCSVForm 409-fallback size guard", () => {
         type: "text/csv",
       });
       // If the cancelled upload WRONGLY fell back, the parser would read the file.
-      const textSpy = vi
-        .spyOn(smallFile, "text")
-        .mockResolvedValue("a,b\n1,2\n");
+      const textSpy = vi.spyOn(smallFile, "text").mockResolvedValue("a,b\n1,2\n");
 
-      const input = document.querySelector(
-        'input[type="file"]',
-      ) as HTMLInputElement;
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
       await user.upload(input, smallFile);
       await user.click(screen.getByRole("button", { name: /upload/i }));
 
       // Presign is in flight → the row shows a Cancel control. Cancel now.
       await waitFor(() => expect(requestDirectUpload).toHaveBeenCalledTimes(1));
-      await user.click(
-        await screen.findByRole("button", { name: /cancel upload/i }),
-      );
+      await user.click(await screen.findByRole("button", { name: /cancel upload/i }));
 
       // The presign now rejects the way a no-storage install would — post-cancel.
       await act(async () => {
@@ -355,13 +331,9 @@ describe("UploadCSVForm 409-fallback size guard", () => {
       const smallFile = new File(["a,b\n1,2\n"], "small.csv", {
         type: "text/csv",
       });
-      const textSpy = vi
-        .spyOn(smallFile, "text")
-        .mockResolvedValue("a,b\n1,2\n");
+      const textSpy = vi.spyOn(smallFile, "text").mockResolvedValue("a,b\n1,2\n");
 
-      const input = document.querySelector(
-        'input[type="file"]',
-      ) as HTMLInputElement;
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
       await user.upload(input, smallFile);
       await user.click(screen.getByRole("button", { name: /upload/i }));
 

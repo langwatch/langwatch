@@ -112,10 +112,7 @@ export async function submitBugReport({
     await notify({ report });
   } catch (error) {
     // The alert is best-effort; intake already succeeded.
-    logger.warn(
-      { error, reportId: report.id },
-      "bug report Slack alert failed",
-    );
+    logger.warn({ error, reportId: report.id }, "bug report Slack alert failed");
   }
 
   return { id: report.id };
@@ -129,9 +126,7 @@ function redactSubmission(input: SubmitBugReportInput): {
 } {
   return {
     title: redactReportText({ text: input.title }).text,
-    summary: input.summary
-      ? redactReportText({ text: input.summary }).text
-      : undefined,
+    summary: input.summary ? redactReportText({ text: input.summary }).text : undefined,
     sessionData: input.sessionData
       ? redactSessionJsonl({ jsonl: input.sessionData }).text
       : undefined,
@@ -139,9 +134,7 @@ function redactSubmission(input: SubmitBugReportInput): {
       ? Object.fromEntries(
           Object.entries(input.metadata).map(([key, value]) => [
             key,
-            typeof value === "string"
-              ? redactReportText({ text: value }).text
-              : value,
+            typeof value === "string" ? redactReportText({ text: value }).text : value,
           ]),
         )
       : undefined,
@@ -170,10 +163,7 @@ async function resolveLinkedProjectId({
     });
     return resolved?.project.id ?? null;
   } catch (error) {
-    logger.warn(
-      { error },
-      "bug report project linkage failed, storing unlinked",
-    );
+    logger.warn({ error }, "bug report project linkage failed, storing unlinked");
     return null;
   }
 }

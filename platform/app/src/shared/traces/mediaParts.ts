@@ -20,10 +20,7 @@
  * a part the extractor externalizes but the collector never surfaces is
  * stored bytes nothing renders. `media-walk-parity.unit.test.ts` pins that.
  */
-import {
-  rawPcmBase64ToWavBase64,
-  resolveRawPcmFormat,
-} from "~/shared/audio/pcmToWav";
+import { rawPcmBase64ToWavBase64, resolveRawPcmFormat } from "~/shared/audio/pcmToWav";
 import { containsMediaMarkers } from "~/shared/content-parts/media-markers";
 import {
   parseBase64DataUri,
@@ -105,10 +102,7 @@ const AUDIO_FORMAT_MIME: Record<string, string> = {
 };
 
 function audioFormatToMimeType(format?: string): string {
-  return (
-    (format ? AUDIO_FORMAT_MIME[format.toLowerCase()] : undefined) ??
-    "audio/wav"
-  );
+  return (format ? AUDIO_FORMAT_MIME[format.toLowerCase()] : undefined) ?? "audio/wav";
 }
 
 /** Fallback mime per media category when an inline data source carries none. */
@@ -286,10 +280,7 @@ export function audioPartToMediaData(part: unknown): MediaPartData | null {
   const media = mediaPartToMediaData(part);
   if (!media) return null;
   if (media.type === "audio") return media;
-  if (
-    media.type === "binary" &&
-    media.mimeType.toLowerCase().startsWith("audio/")
-  ) {
+  if (media.type === "binary" && media.mimeType.toLowerCase().startsWith("audio/")) {
     return media;
   }
   return null;

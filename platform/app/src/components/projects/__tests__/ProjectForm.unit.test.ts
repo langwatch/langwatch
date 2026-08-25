@@ -44,15 +44,11 @@ describe("ProjectForm validation logic", () => {
     });
 
     it("rejects empty new team name", () => {
-      expect(validateNewTeamName(NEW_TEAM_VALUE, "")).toBe(
-        "Team name is required",
-      );
+      expect(validateNewTeamName(NEW_TEAM_VALUE, "")).toBe("Team name is required");
     });
 
     it("rejects whitespace-only new team name", () => {
-      expect(validateNewTeamName(NEW_TEAM_VALUE, "   ")).toBe(
-        "Team name is required",
-      );
+      expect(validateNewTeamName(NEW_TEAM_VALUE, "   ")).toBe("Team name is required");
     });
 
     it("accepts valid new team name", () => {

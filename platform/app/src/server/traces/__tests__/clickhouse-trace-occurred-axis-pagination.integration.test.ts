@@ -18,10 +18,7 @@ import {
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
-import type {
-  GetAllTracesForProjectInput,
-  TracesForProjectResult,
-} from "../types";
+import type { GetAllTracesForProjectInput, TracesForProjectResult } from "../types";
 import { openProtections } from "./open-protections";
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
@@ -36,8 +33,7 @@ vi.mock("~/server/app-layer/app", async () => {
   const app = () => ({
     clickhouse: {
       enabled: true,
-      resolveClient: (tenantId: string) =>
-        clients.getClickHouseClientForTenant(tenantId),
+      resolveClient: (tenantId: string) => clients.getClickHouseClientForTenant(tenantId),
       resolveOrganizationClient: async () => {
         throw new Error("no organization client in this suite");
       },
@@ -116,9 +112,7 @@ function makeQueryInput(): GetAllTracesForProjectInput {
   };
 }
 
-async function fetchPage(
-  scrollId?: string | null,
-): Promise<TracesForProjectResult> {
+async function fetchPage(scrollId?: string | null): Promise<TracesForProjectResult> {
   const results = await service.getAllTracesForProject(
     makeQueryInput(),
     openProtections,
@@ -131,8 +125,7 @@ async function fetchPage(
   return results;
 }
 
-const traceIdsOf = (r: TracesForProjectResult) =>
-  r.groups.flat().map((t) => t.trace_id);
+const traceIdsOf = (r: TracesForProjectResult) => r.groups.flat().map((t) => t.trace_id);
 
 /**
  * Walk the scroll to exhaustion, returning what each page yielded, in order.
@@ -179,8 +172,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (ch) {
     await ch.exec({
-      query:
-        "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+      query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId },
     });
   }

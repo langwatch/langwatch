@@ -34,10 +34,7 @@ export interface LangWatchQLValueCellProps {
   columnName: string;
 }
 
-export function LangWatchQLValueCell({
-  cell,
-  columnName,
-}: LangWatchQLValueCellProps) {
+export function LangWatchQLValueCell({ cell, columnName }: LangWatchQLValueCellProps) {
   const text = lwqlCellText(cell);
 
   // Every other kind is a token standing in for a value rather than being one:
@@ -100,8 +97,7 @@ function ExpandedValue({
    * is only built for the one cell a member opens, never for the other ten
    * thousand in the table. Every other kind shows exactly what it copies.
    */
-  const full =
-    cell.kind === "structured" ? cell.pretty : (lwqlCellCopyText(cell) ?? "");
+  const full = cell.kind === "structured" ? cell.pretty : (lwqlCellCopyText(cell) ?? "");
 
   return (
     <Popover.Root

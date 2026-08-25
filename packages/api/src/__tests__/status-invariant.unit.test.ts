@@ -16,8 +16,7 @@ import { createTestService as createService } from "./test-service.js";
  * request.
  */
 
-const buildTestService = () =>
-  createService({ name: "test", basePath: "/api/test" });
+const buildTestService = () => createService({ name: "test", basePath: "/api/test" });
 
 describe("endpoint success status", () => {
   describe("given an output schema that accepts undefined as well as a value", () => {
@@ -146,9 +145,7 @@ describe("endpoint success status", () => {
         )
         .build();
 
-      expect((await app.request("/api/test/2025-03-15/nothing")).status).toBe(
-        204,
-      );
+      expect((await app.request("/api/test/2025-03-15/nothing")).status).toBe(204);
     });
   });
 

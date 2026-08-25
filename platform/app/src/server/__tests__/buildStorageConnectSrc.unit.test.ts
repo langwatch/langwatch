@@ -6,13 +6,10 @@ describe("buildStorageConnectSrc", () => {
     it("returns exactly that endpoint's origin", () => {
       expect(
         buildStorageConnectSrc({
-          S3_ENDPOINT:
-            "https://langwatch-storage-prod.s3.eu-central-1.amazonaws.com",
+          S3_ENDPOINT: "https://langwatch-storage-prod.s3.eu-central-1.amazonaws.com",
           S3_REGION: "eu-central-1",
         }),
-      ).toEqual([
-        "https://langwatch-storage-prod.s3.eu-central-1.amazonaws.com",
-      ]);
+      ).toEqual(["https://langwatch-storage-prod.s3.eu-central-1.amazonaws.com"]);
     });
 
     it("drops any path/query, keeping only the origin", () => {

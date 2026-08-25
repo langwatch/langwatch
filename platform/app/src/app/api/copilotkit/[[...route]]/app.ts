@@ -5,10 +5,7 @@
  * frontend. However, it's not currently doing anything, as we have disabled the input
  * feature of the frontend and we are setting the messages there directly.
  */
-import {
-  CopilotRuntime,
-  copilotRuntimeNodeHttpEndpoint,
-} from "@copilotkit/runtime";
+import { CopilotRuntime, copilotRuntimeNodeHttpEndpoint } from "@copilotkit/runtime";
 import { createLogger } from "@langwatch/observability";
 import { describeRoute } from "hono-openapi";
 import { createProjectApp, requires } from "~/server/api/security";

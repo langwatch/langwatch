@@ -16,11 +16,7 @@ export function SeriesFiltersDrawer({
 }: {
   onClose?: () => void;
   filters?: Record<FilterField, FilterParam>;
-  onChange?: ({
-    filters,
-  }: {
-    filters: Record<FilterField, FilterParam>;
-  }) => void;
+  onChange?: ({ filters }: { filters: Record<FilterField, FilterParam> }) => void;
 }) {
   const { closeDrawer } = useDrawer();
   const onClose_ = onClose ?? closeDrawer;
@@ -32,12 +28,7 @@ export function SeriesFiltersDrawer({
   }, [formFilters]);
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="lg"
-      onOpenChange={() => closeDrawer()}
-    >
+    <Drawer.Root open={true} placement="end" size="lg" onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Heading>Edit Series Filter</Heading>
@@ -53,9 +44,7 @@ export function SeriesFiltersDrawer({
               filters={filters}
               setFilters={(filters) => {
                 const updatedFilters = Object.fromEntries(
-                  Object.entries(filters).filter(
-                    ([_, value]) => value !== undefined,
-                  ),
+                  Object.entries(filters).filter(([_, value]) => value !== undefined),
                 ) as Record<FilterField, FilterParam>;
                 onChange?.({
                   filters: updatedFilters,

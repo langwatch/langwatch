@@ -129,9 +129,7 @@ describe("useModelProviderApiKeyValidation", () => {
             "Project and Location fields and save again; otherwise allow " +
             "the Generative Language API in the Google Cloud console.",
         );
-        expect(result.current.validationError).not.toContain(
-          "provider_key_restricted",
-        );
+        expect(result.current.validationError).not.toContain("provider_key_restricted");
       });
 
       it("surfaces a thrown request as an error rather than a pass", async () => {
@@ -179,9 +177,7 @@ describe("useModelProviderApiKeyValidation", () => {
             "correct and reachable.",
         );
         // The defect was this slug reaching the customer verbatim.
-        expect(result.current.validationError).not.toContain(
-          "provider_unreachable",
-        );
+        expect(result.current.validationError).not.toContain("provider_unreachable");
       });
     });
   });

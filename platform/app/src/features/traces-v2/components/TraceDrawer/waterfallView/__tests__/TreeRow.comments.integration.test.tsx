@@ -169,13 +169,9 @@ describe("given a span that carries two comments", () => {
   it("opens both comments and a way to add another", async () => {
     renderRow(comments);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "2 comments on web_search" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "2 comments on web_search" }));
 
-    expect(
-      await screen.findByText("this search returned nothing"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("this search returned nothing")).toBeInTheDocument();
     expect(screen.getByText("and it retried three times")).toBeInTheDocument();
     expect(screen.getByText("Add annotation")).toBeInTheDocument();
   });
@@ -184,9 +180,7 @@ describe("given a span that carries two comments", () => {
   it("reads the count without the row being hovered", () => {
     const { container } = renderRow(comments);
 
-    const action = container.querySelector(
-      '[aria-label="2 comments on web_search"]',
-    );
+    const action = container.querySelector('[aria-label="2 comments on web_search"]');
     expect(action).not.toHaveAttribute("aria-hidden", "true");
   });
 });
@@ -205,13 +199,9 @@ describe("given a span with nothing said about it", () => {
   it("keeps the action on the row itself rather than behind a menu", () => {
     const { container } = renderRow([]);
 
-    const commentAction = container.querySelector(
-      '[aria-label="Comment on web_search"]',
-    );
+    const commentAction = container.querySelector('[aria-label="Comment on web_search"]');
     expect(rowOf(container).contains(commentAction!)).toBe(true);
-    expect(
-      container.querySelector('[aria-label="Row actions"]'),
-    ).not.toBeInTheDocument();
+    expect(container.querySelector('[aria-label="Row actions"]')).not.toBeInTheDocument();
   });
 });
 
@@ -314,13 +304,9 @@ describe("when the reader may read annotations but not write them", () => {
   it("still reads the comments already left on the span", async () => {
     renderRow([comment()]);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "1 comment on web_search" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "1 comment on web_search" }));
 
-    expect(
-      await screen.findByText("this search returned nothing"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("this search returned nothing")).toBeInTheDocument();
     expect(screen.queryByText("Add annotation")).not.toBeInTheDocument();
   });
 });

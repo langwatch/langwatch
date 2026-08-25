@@ -1,7 +1,4 @@
-import type {
-  AgentHistoryEntry,
-  AgentWithFields,
-} from "@langwatch/agent-contract";
+import type { AgentHistoryEntry, AgentWithFields } from "@langwatch/agent-contract";
 import {
   AgentService,
   PrismaAgentAdapter,
@@ -10,10 +7,7 @@ import {
   type AgentsWorkflowPort,
 } from "@langwatch/agent-server";
 import type { PrismaClient } from "~/generated/prisma/client";
-import {
-  parseStudioWorkflow,
-  type StudioWorkflow,
-} from "@langwatch/workflow-contract";
+import { parseStudioWorkflow, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { workflowAgentFields } from "~/server/agents/agent-fields";
 import type { Session } from "~/server/auth";
 import type { WorkflowService } from "@langwatch/workflow-contract";
@@ -35,9 +29,7 @@ export class AgentsFeature {
     });
   }
 
-  private static workflowPort(
-    context: AgentsRuntimeContext,
-  ): AgentsWorkflowPort {
+  private static workflowPort(context: AgentsRuntimeContext): AgentsWorkflowPort {
     const { prisma } = context;
     return {
       async fields({ projectId, workflowIds }) {
@@ -66,12 +58,7 @@ export class AgentsFeature {
           select: { id: true, name: true },
         });
       },
-      async copy({
-        workflowId,
-        sourceProjectId,
-        targetProjectId,
-        actorUserId,
-      }) {
+      async copy({ workflowId, sourceProjectId, targetProjectId, actorUserId }) {
         return AgentsFeature.copyWorkflow(context, {
           workflowId,
           sourceProjectId,
@@ -109,9 +96,7 @@ export class AgentsFeature {
         });
         const userIds = [
           ...new Set(
-            logs
-              .map((log) => log.userId)
-              .filter((id): id is string => Boolean(id)),
+            logs.map((log) => log.userId).filter((id): id is string => Boolean(id)),
           ),
         ];
         const users = await prisma.user.findMany({
@@ -119,15 +104,13 @@ export class AgentsFeature {
           select: { id: true, name: true, email: true },
         });
         const usersById = new Map(users.map((user) => [user.id, user]));
-        return logs.map(
-          (log): AgentHistoryEntry => ({
-            id: log.id,
-            action: log.action,
-            createdAt: log.createdAt,
-            args: log.args,
-            user: log.userId ? (usersById.get(log.userId) ?? null) : null,
-          }),
-        );
+        return logs.map((log): AgentHistoryEntry => ({
+          id: log.id,
+          action: log.action,
+          createdAt: log.createdAt,
+          args: log.args,
+          user: log.userId ? (usersById.get(log.userId) ?? null) : null,
+        }));
       },
     };
   }

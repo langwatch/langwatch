@@ -26,9 +26,7 @@ export class AppExperimentEventingAdapter {
     return new AppExperimentEventingAdapter(resolveCommands);
   }
 
-  private constructor(
-    private readonly resolveCommands: () => ExperimentRunCommands,
-  ) {}
+  private constructor(private readonly resolveCommands: () => ExperimentRunCommands) {}
 
   build() {
     return {

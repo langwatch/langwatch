@@ -235,9 +235,7 @@ describe("ActivityMonitorService.spendByDepartment", () => {
     await prisma.organizationUser
       .deleteMany({ where: { organizationId: org.id } })
       .catch(() => undefined);
-    await prisma.user
-      .deleteMany({ where: { id: ROBIN } })
-      .catch(() => undefined);
+    await prisma.user.deleteMany({ where: { id: ROBIN } }).catch(() => undefined);
     await prisma.department
       .deleteMany({ where: { organizationId: { in: [org.id, crossOrg.id] } } })
       .catch(() => undefined);

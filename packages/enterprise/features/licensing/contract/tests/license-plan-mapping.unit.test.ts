@@ -177,9 +177,7 @@ describe("mapToPlanInfo", () => {
 
   /** @scenario A licensed webhook entitlement survives the PlanInfo mapping */
   it("carries webhookEndpointsEnabled into PlanInfo, leaving an omitted one to the tier", () => {
-    const withFlag = mapToPlanInfo(
-      createLicenseData({ webhookEndpointsEnabled: true }),
-    );
+    const withFlag = mapToPlanInfo(createLicenseData({ webhookEndpointsEnabled: true }));
     expect(withFlag.webhookEndpointsEnabled).toBe(true);
 
     const explicitlyOff = mapToPlanInfo(

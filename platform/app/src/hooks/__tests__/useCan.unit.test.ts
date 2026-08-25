@@ -89,9 +89,7 @@ describe("useCan", () => {
 
   describe("given the query has not answered yet", () => {
     it("refuses everything, unlike the legacy guard that rendered during load", () => {
-      mockEffectivePermissionsQuery.mockReturnValue(
-        queryResult({ isLoading: true }),
-      );
+      mockEffectivePermissionsQuery.mockReturnValue(queryResult({ isLoading: true }));
 
       const { result } = renderHook(() => useCan());
 

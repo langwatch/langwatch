@@ -17,10 +17,7 @@ export const MAX_QUERY_RETRIES = 4;
  */
 const HTTP_STATUS_TO_NOT_RETRY = [400, 401, 403, 404, 422, 431] as const;
 
-export function shouldRetryQuery(
-  failureCount: number,
-  error: unknown,
-): boolean {
+export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
   if (failureCount >= MAX_QUERY_RETRIES) {
     return false;
   }

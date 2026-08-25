@@ -65,8 +65,7 @@ describe("LangyCliEnvelopeService", () => {
         frame: bashFrame({
           phase: "end",
           input: {
-            command:
-              'langwatch trace search -q "refund policy" --limit 2 --format json',
+            command: 'langwatch trace search -q "refund policy" --limit 2 --format json',
           },
           output:
             '{"traces":[{"trace_id":"trace_1"},{"trace_id":"trace_2"}],"pagination":{"totalHits":34}}',

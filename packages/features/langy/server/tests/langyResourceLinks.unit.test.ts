@@ -7,10 +7,7 @@
  * conversation's links never lapse mid-session).
  */
 import { describe, expect, it, vi } from "vitest";
-import {
-  LangyResourceLinksStore,
-  type LangyLinkRedis,
-} from "@langwatch/langy-server";
+import { LangyResourceLinksStore, type LangyLinkRedis } from "@langwatch/langy-server";
 
 function fakeRedis() {
   const hashes = new Map<string, Map<string, string>>();
@@ -45,21 +42,15 @@ describe("langyResourceLinkStore", () => {
         ],
       });
 
-      expect(
-        await store.resolve({ conversationId: "conv-1", id: "batch_1" }),
-      ).toBe(href);
-      expect(
-        await store.resolve({ conversationId: "conv-1", id: "run_1" }),
-      ).toBe(href);
+      expect(await store.resolve({ conversationId: "conv-1", id: "batch_1" })).toBe(href);
+      expect(await store.resolve({ conversationId: "conv-1", id: "run_1" })).toBe(href);
     });
 
     it("returns null for a resource this conversation never surfaced", async () => {
       const { redis } = fakeRedis();
       const store = LangyResourceLinksStore.create({ redis });
 
-      expect(
-        await store.resolve({ conversationId: "conv-1", id: "unknown" }),
-      ).toBeNull();
+      expect(await store.resolve({ conversationId: "conv-1", id: "unknown" })).toBeNull();
     });
   });
 
@@ -72,9 +63,7 @@ describe("langyResourceLinkStore", () => {
         links: [{ id: "run_1", href: "https://app.langwatch.ai/a/x" }],
       });
 
-      expect(
-        await store.resolve({ conversationId: "conv-2", id: "run_1" }),
-      ).toBeNull();
+      expect(await store.resolve({ conversationId: "conv-2", id: "run_1" })).toBeNull();
     });
   });
 

@@ -1,7 +1,4 @@
-import {
-  FLOATING_PANEL_INSET,
-  resolveFloatingPanelWidth,
-} from "./langyPanelLayout";
+import { FLOATING_PANEL_INSET, resolveFloatingPanelWidth } from "./langyPanelLayout";
 
 /**
  * The minimised peek — the PANEL ITSELF, slid down (or right) until only a

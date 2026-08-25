@@ -36,9 +36,9 @@ describe("given the integration suite decides whether its files run concurrently
   describe("when a worker slot above the first appears", () => {
     /** @scenario "A second worker starts while files are serial" */
     it("fails naming the variable that re-enabled concurrency", () => {
-      expect(() =>
-        assertSerialWorkerSlot(env({ VITEST_POOL_ID: "2" })),
-      ).toThrowError(/VITEST_MAX_WORKERS/);
+      expect(() => assertSerialWorkerSlot(env({ VITEST_POOL_ID: "2" }))).toThrowError(
+        /VITEST_MAX_WORKERS/,
+      );
     });
 
     /** @scenario "A second worker starts in a deliberately parallel run" */
@@ -54,9 +54,7 @@ describe("given the integration suite decides whether its files run concurrently
   describe("when the only worker slot appears", () => {
     /** @scenario "The only worker starts" */
     it("proceeds", () => {
-      expect(() =>
-        assertSerialWorkerSlot(env({ VITEST_POOL_ID: "1" })),
-      ).not.toThrow();
+      expect(() => assertSerialWorkerSlot(env({ VITEST_POOL_ID: "1" }))).not.toThrow();
       expect(() => assertSerialWorkerSlot(env({}))).not.toThrow();
     });
   });

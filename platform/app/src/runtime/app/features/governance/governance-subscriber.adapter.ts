@@ -86,8 +86,7 @@ class AppTraceAlertTriggerPort extends TraceAlertTriggerPort {
   }
 
   async activeForProject(projectId: string) {
-    const triggers =
-      await this.triggers.getActiveTraceTriggersForProject(projectId);
+    const triggers = await this.triggers.getActiveTraceTriggersForProject(projectId);
     return triggers.map((trigger) => ({
       id: trigger.id,
       action: trigger.action,
@@ -96,8 +95,7 @@ class AppTraceAlertTriggerPort extends TraceAlertTriggerPort {
         : ("persist" as const),
       traceDebounceMs: trigger.traceDebounceMs,
       notificationCadence: trigger.notificationCadence,
-      hasEvaluationFilters: classifyTriggerFilters(trigger.filters)
-        .hasEvaluationFilters,
+      hasEvaluationFilters: classifyTriggerFilters(trigger.filters).hasEvaluationFilters,
     }));
   }
 }
@@ -111,18 +109,13 @@ class AppTraceAlertTriggerMatchPort extends TraceAlertTriggerMatchPort {
     return new AppTraceAlertTriggerMatchPort(matches);
   }
 
-  async send(
-    input: Parameters<TraceAlertTriggerMatchPort["send"]>[0],
-  ): Promise<void> {
+  async send(input: Parameters<TraceAlertTriggerMatchPort["send"]>[0]): Promise<void> {
     await this.matches.send(input);
   }
 }
 
 class AppTraceAlertOriginGuardPort extends TraceAlertOriginGuardPort {
-  passes(input: {
-    event: GovernanceTraceEvent;
-    state: GovernanceTraceSummary;
-  }): boolean {
+  passes(input: { event: GovernanceTraceEvent; state: GovernanceTraceSummary }): boolean {
     return passesTraceOriginGuards(input.event, input.state);
   }
 }
@@ -139,9 +132,7 @@ export class AppGovernanceSubscriberAdapter {
   ) {}
 
   static create(): AppGovernanceSubscriberAdapter {
-    return new AppGovernanceSubscriberAdapter(
-      new AppGovernanceSubscriberDiagnostics(),
-    );
+    return new AppGovernanceSubscriberAdapter(new AppGovernanceSubscriberDiagnostics());
   }
 
   kpis(writer: GovernanceKpiWriter): GovernanceKpisSubscriber {

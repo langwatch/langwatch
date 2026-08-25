@@ -7,10 +7,7 @@ import {
 } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import type { ScopeTier } from "~/server/scopes/scope.types";
-import type {
-  ResolvedRetention,
-  RetentionCategory,
-} from "../retentionPolicy.schema";
+import type { ResolvedRetention, RetentionCategory } from "../retentionPolicy.schema";
 import { canConfigureRetention } from "./dataRetentionPolicy.authz";
 
 export type ReadCtx = { prisma: PrismaClient; session: Session | null };
@@ -66,8 +63,7 @@ export async function getRetentionPolicySnapshot(
   const { projectId } = params;
   const app = getApp();
 
-  const effective =
-    await app.dataRetention.policy.getResolvedForProject(projectId);
+  const effective = await app.dataRetention.policy.getResolvedForProject(projectId);
 
   const project = await ctx.prisma.project.findUnique({
     where: { id: projectId },

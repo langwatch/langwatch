@@ -64,9 +64,7 @@ describe("<ScenarioRunActions/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(
-          screen.getByRole("button", { name: /run again/i }),
-        ).toBeVisible();
+        expect(screen.getByRole("button", { name: /run again/i })).toBeVisible();
       });
 
       it("does not show the Edit Scenario button", () => {

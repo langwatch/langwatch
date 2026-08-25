@@ -72,8 +72,7 @@ export class NodeLicenseCryptographyAdapter extends LicenseCryptographyPort {
    */
   static normalizePemKey(raw: string): string {
     const unescaped = raw.replace(/^﻿/, "").replace(/\\r\\n|\\n/g, "\n");
-    const match =
-      PEM_PRIVATE_KEY_BLOCK.exec(unescaped) ?? PEM_BLOCK.exec(unescaped);
+    const match = PEM_PRIVATE_KEY_BLOCK.exec(unescaped) ?? PEM_BLOCK.exec(unescaped);
     if (!match) return NodeLicenseCryptographyAdapter.dedent(unescaped);
 
     const [, label, body = ""] = match;
@@ -83,12 +82,9 @@ export class NodeLicenseCryptographyAdapter extends LicenseCryptographyPort {
 
     const base64 = body.replace(/\s+/g, "");
     const lines = base64.match(PEM_BODY_LINE) ?? [];
-    return [
-      `-----BEGIN ${label!}-----`,
-      ...lines,
-      `-----END ${label!}-----`,
-      "",
-    ].join("\n");
+    return [`-----BEGIN ${label!}-----`, ...lines, `-----END ${label!}-----`, ""].join(
+      "\n",
+    );
   }
 
   /** True when the key is passphrase-protected. */
@@ -126,10 +122,7 @@ export class NodeLicenseCryptographyAdapter extends LicenseCryptographyPort {
     }
   }
 
-  verifySignature(
-    signedLicense: SignedLicense,
-    publicKey = this.publicKey,
-  ): boolean {
+  verifySignature(signedLicense: SignedLicense, publicKey = this.publicKey): boolean {
     if (!signedLicense.signature || signedLicense.signature.trim() === "") {
       return false;
     }
@@ -180,8 +173,7 @@ export class NodeLicenseCryptographyAdapter extends LicenseCryptographyPort {
   }
 
   signLicense(data: LicenseData, privateKey: string): SignedLicense {
-    const normalizedKey =
-      NodeLicenseCryptographyAdapter.normalizePemKey(privateKey);
+    const normalizedKey = NodeLicenseCryptographyAdapter.normalizePemKey(privateKey);
     if (!NodeLicenseCryptographyAdapter.looksLikePemKey(normalizedKey)) {
       throw new LicenseSigningKeyNotPemError();
     }
@@ -202,9 +194,7 @@ export class NodeLicenseCryptographyAdapter extends LicenseCryptographyPort {
   }
 
   encodeLicenseKey(signedLicense: SignedLicense): string {
-    return Buffer.from(JSON.stringify(signedLicense), "utf-8").toString(
-      "base64",
-    );
+    return Buffer.from(JSON.stringify(signedLicense), "utf-8").toString("base64");
   }
 
   generateLicenseId(): string {

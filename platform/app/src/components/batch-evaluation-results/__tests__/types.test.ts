@@ -198,9 +198,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
-        dataset: [
-          { index: 0, entry: { input: "test" }, predicted: { out: "x" } },
-        ],
+        dataset: [{ index: 0, entry: { input: "test" }, predicted: { out: "x" } }],
         evaluations: [
           {
             evaluator: "llm_judge",
@@ -215,8 +213,7 @@ describe("transformBatchEvaluationData", () => {
       const result = transformBatchEvaluationData(data);
 
       const targetId = result.targetColumns[0]!.id;
-      const evalResult =
-        result.rows[0]!.targets[targetId]!.evaluatorResults[0]!;
+      const evalResult = result.rows[0]!.targets[targetId]!.evaluatorResults[0]!;
       expect(evalResult.status).toBe("error");
       expect(evalResult.details).toBe("API rate limit exceeded");
     });
@@ -245,9 +242,7 @@ describe("transformBatchEvaluationData", () => {
       expect(result.targetColumns[0]?.name).toBe("Output");
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0]?.datasetEntry).toEqual({ input: "test" });
-      expect(result.rows[0]?.targets._default?.error).toBe(
-        "Connection timeout",
-      );
+      expect(result.rows[0]?.targets._default?.error).toBe("Connection timeout");
     });
   });
 
@@ -361,9 +356,7 @@ describe("transformBatchEvaluationData", () => {
       expect(exactMatch?.passed).toBe(true);
       expect(exactMatch?.score).toBe(1.0);
 
-      const llmJudge = target.evaluatorResults.find(
-        (e) => e.evaluatorId === "llm_judge",
-      );
+      const llmJudge = target.evaluatorResults.find((e) => e.evaluatorId === "llm_judge");
       expect(llmJudge?.score).toBe(0.9);
       expect(llmJudge?.details).toBe("Answer is correct and concise");
     });
@@ -547,9 +540,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
-        dataset: [
-          { index: 0, entry: { input: "test" }, predicted: { out: "x" } },
-        ],
+        dataset: [{ index: 0, entry: { input: "test" }, predicted: { out: "x" } }],
         evaluations: [
           {
             evaluator: "eval-1",
@@ -619,12 +610,8 @@ describe("transformBatchEvaluationData", () => {
       });
 
       // Evaluator results should be attached
-      expect(result.rows[0]?.targets[targetId]?.evaluatorResults).toHaveLength(
-        1,
-      );
-      expect(
-        result.rows[0]?.targets[targetId]?.evaluatorResults[0]?.score,
-      ).toBe(0.95);
+      expect(result.rows[0]?.targets[targetId]?.evaluatorResults).toHaveLength(1);
+      expect(result.rows[0]?.targets[targetId]?.evaluatorResults[0]?.score).toBe(0.95);
     });
 
     it("extracts output from various evaluator input field names", () => {
@@ -709,18 +696,17 @@ describe("transformBatchEvaluationData", () => {
       });
 
       // Each target should have only its own evaluator result
-      expect(
-        result.rows[0]?.targets._eval_sample_metric?.evaluatorResults,
-      ).toHaveLength(1);
+      expect(result.rows[0]?.targets._eval_sample_metric?.evaluatorResults).toHaveLength(
+        1,
+      );
       expect(
         result.rows[0]?.targets._eval_sample_metric?.evaluatorResults[0]?.score,
       ).toBe(0.95);
+      expect(result.rows[0]?.targets._eval_sample_metric2?.evaluatorResults).toHaveLength(
+        1,
+      );
       expect(
-        result.rows[0]?.targets._eval_sample_metric2?.evaluatorResults,
-      ).toHaveLength(1);
-      expect(
-        result.rows[0]?.targets._eval_sample_metric2?.evaluatorResults[0]
-          ?.passed,
+        result.rows[0]?.targets._eval_sample_metric2?.evaluatorResults[0]?.passed,
       ).toBe(true);
     });
 
@@ -1042,14 +1028,12 @@ describe("transformBatchEvaluationData", () => {
       // GPT-4 should have 2 evaluator results
       expect(row0.targets["gpt-4"]?.evaluatorResults).toHaveLength(2);
       expect(
-        row0.targets["gpt-4"]?.evaluatorResults.find(
-          (e) => e.evaluatorId === "latency",
-        )?.score,
+        row0.targets["gpt-4"]?.evaluatorResults.find((e) => e.evaluatorId === "latency")
+          ?.score,
       ).toBe(100);
       expect(
-        row0.targets["gpt-4"]?.evaluatorResults.find(
-          (e) => e.evaluatorId === "quality",
-        )?.score,
+        row0.targets["gpt-4"]?.evaluatorResults.find((e) => e.evaluatorId === "quality")
+          ?.score,
       ).toBe(0.9);
 
       // Claude-3 should have 2 evaluator results

@@ -26,8 +26,7 @@ describe("redactStorageUri", () => {
 describe("redactStorageUrisInText", () => {
   describe("given an error message embedding a gs:// uri", () => {
     it("redacts the bucket out of the free text", () => {
-      const msg =
-        "failed to GET object at gs://customer-private/proj-abc/sha256: 404";
+      const msg = "failed to GET object at gs://customer-private/proj-abc/sha256: 404";
       expect(redactStorageUrisInText(msg)).toBe(
         "failed to GET object at gs://***/proj-abc/sha256: 404",
       );
@@ -36,8 +35,7 @@ describe("redactStorageUrisInText", () => {
 
   describe("given an error message embedding an uppercase S3:// uri", () => {
     it("redacts the bucket out of the free text", () => {
-      const msg =
-        "S3 SDK error: failed at S3://customer-private/proj-abc/sha256";
+      const msg = "S3 SDK error: failed at S3://customer-private/proj-abc/sha256";
       expect(redactStorageUrisInText(msg)).toBe(
         "S3 SDK error: failed at S3://***/proj-abc/sha256",
       );

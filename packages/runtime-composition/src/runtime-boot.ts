@@ -52,14 +52,20 @@ export type BootedRuntime<Config, Application> = {
 export class RuntimeBoot<Config, Application, Infrastructure = undefined> {
   private bootPromise: Promise<BootedRuntime<Config, Application>> | undefined;
 
-  constructor(private readonly options: RuntimeBootOptions<Config, Application, Infrastructure>) {}
+  constructor(
+    private readonly options: RuntimeBootOptions<Config, Application, Infrastructure>,
+  ) {}
 
-  boot(source: Readonly<Record<string, unknown>>): Promise<BootedRuntime<Config, Application>> {
+  boot(
+    source: Readonly<Record<string, unknown>>,
+  ): Promise<BootedRuntime<Config, Application>> {
     this.bootPromise ??= this.run(source);
     return this.bootPromise;
   }
 
-  private async run(source: Readonly<Record<string, unknown>>): Promise<BootedRuntime<Config, Application>> {
+  private async run(
+    source: Readonly<Record<string, unknown>>,
+  ): Promise<BootedRuntime<Config, Application>> {
     // Deliberately resolve before constructing a scope or invoking any
     // infrastructure factory. Invalid configuration cannot leak resources.
     const config = this.options.config.resolve(source);
@@ -109,5 +115,9 @@ export class RuntimeBoot<Config, Application, Infrastructure = undefined> {
 }
 
 function hasClose(value: unknown): value is { close(): void | Promise<void> } {
-  return typeof value === "object" && value !== null && typeof (value as { close?: unknown }).close === "function";
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { close?: unknown }).close === "function"
+  );
 }

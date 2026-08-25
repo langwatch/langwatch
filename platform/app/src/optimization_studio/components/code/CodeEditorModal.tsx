@@ -65,8 +65,7 @@ export function CodeEditorModal({
   // Kept in component state (not just refs) so the status bar re-renders when
   // the editor mounts. The status bar subscribes to the editor + monaco events
   // for cursor / marker updates itself, so we only need the initial bind here.
-  const [editorInstance, setEditorInstance] =
-    useState<MonacoEditorInstance | null>(null);
+  const [editorInstance, setEditorInstance] = useState<MonacoEditorInstance | null>(null);
   const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
 
   useEffect(() => {
@@ -427,10 +426,7 @@ export function CodeEditor({
             const name = e.dataTransfer?.getData("text/x-langwatch-secret");
             if (!name) return;
             e.preventDefault();
-            const target = editor.getTargetAtClientPoint?.(
-              e.clientX,
-              e.clientY,
-            );
+            const target = editor.getTargetAtClientPoint?.(e.clientX, e.clientY);
             const pos = target?.position ?? editor.getPosition();
             if (!pos) return;
             editor.focus();

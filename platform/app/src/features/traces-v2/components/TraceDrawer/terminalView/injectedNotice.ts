@@ -50,9 +50,7 @@ export interface ClassifiedPrompt {
 export function classifyPromptText(text: string): ClassifiedPrompt {
   if (text.trimStart().startsWith(SYSTEM_NOTIFICATION_MARKER)) {
     return {
-      notices: [
-        { label: summaryOf(text) ?? "system notification", body: text },
-      ],
+      notices: [{ label: summaryOf(text) ?? "system notification", body: text }],
       remainder: null,
     };
   }

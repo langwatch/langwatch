@@ -6,10 +6,7 @@ import type {
 
 export abstract class LicenseCryptographyPort {
   abstract tryParseLicenseKey(licenseKey: string): SignedLicense | null;
-  abstract verifySignature(
-    signedLicense: SignedLicense,
-    publicKey?: string,
-  ): boolean;
+  abstract verifySignature(signedLicense: SignedLicense, publicKey?: string): boolean;
   abstract isExpired(expiresAt: string, now?: Date): boolean;
   abstract validateLicense(input: {
     licenseKey: string;

@@ -14,13 +14,8 @@ import {
  * The `[occurredAtMs, traceId]` ClickHouse pagination cursor a full page
  * hands to the next one.
  */
-export const topicClusteringSearchAfterSchema = z.tuple([
-  z.number(),
-  z.string(),
-]);
-export type TopicClusteringSearchAfter = z.infer<
-  typeof topicClusteringSearchAfterSchema
->;
+export const topicClusteringSearchAfterSchema = z.tuple([z.number(), z.string()]);
+export type TopicClusteringSearchAfter = z.infer<typeof topicClusteringSearchAfterSchema>;
 
 /**
  * TopicClusteringRequested — a manual or bootstrap ask for clustering.
@@ -28,10 +23,7 @@ export type TopicClusteringSearchAfter = z.infer<
  * the process manager (ADR-051 §2).
  */
 export const topicClusteringRequestedEventDataSchema = z.object({
-  trigger: z.enum([
-    TOPIC_CLUSTERING_TRIGGER.MANUAL,
-    TOPIC_CLUSTERING_TRIGGER.BOOTSTRAP,
-  ]),
+  trigger: z.enum([TOPIC_CLUSTERING_TRIGGER.MANUAL, TOPIC_CLUSTERING_TRIGGER.BOOTSTRAP]),
   /** User who asked, for manual triggers. */
   requestedByUserId: z.string().optional(),
 });
@@ -87,10 +79,7 @@ export const topicClusteringRunCompletedEventDataSchema = z.object({
   runId: z.string(),
   /** 1-based page number within the run. */
   page: z.number(),
-  mode: z.enum([
-    TOPIC_CLUSTERING_RUN_MODE.BATCH,
-    TOPIC_CLUSTERING_RUN_MODE.INCREMENTAL,
-  ]),
+  mode: z.enum([TOPIC_CLUSTERING_RUN_MODE.BATCH, TOPIC_CLUSTERING_RUN_MODE.INCREMENTAL]),
   tracesProcessed: z.number(),
   topicsCount: z.number(),
   subtopicsCount: z.number(),
@@ -173,14 +162,8 @@ export type TopicModelEntry = z.infer<typeof topicModelEntrySchema>;
  * of these events; nothing else writes it.
  */
 export const topicClusteringTopicsRecordedEventDataSchema = z.object({
-  mode: z.enum([
-    TOPIC_MODEL_RECORD_MODE.REPLACE,
-    TOPIC_MODEL_RECORD_MODE.MERGE,
-  ]),
-  source: z.enum([
-    TOPIC_MODEL_RECORD_SOURCE.CLUSTERING,
-    TOPIC_MODEL_RECORD_SOURCE.SEED,
-  ]),
+  mode: z.enum([TOPIC_MODEL_RECORD_MODE.REPLACE, TOPIC_MODEL_RECORD_MODE.MERGE]),
+  source: z.enum([TOPIC_MODEL_RECORD_SOURCE.CLUSTERING, TOPIC_MODEL_RECORD_SOURCE.SEED]),
   /**
    * Deduplicates redeliveries: `run:<runId>:page-<n>` for clustering,
    * `seed:v1` for the boot seed.

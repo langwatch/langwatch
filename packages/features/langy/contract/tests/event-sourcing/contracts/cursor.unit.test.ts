@@ -35,9 +35,7 @@ describe("cursorHasReachedEvent", () => {
   const cursor = at(1_000, "2AAAAAAAAAAAAAAAAAAAAAAAAAA");
 
   it("has reached an event strictly before it", () => {
-    expect(
-      cursorHasReachedEvent(cursor, { id: "1ZZZZZ", createdAt: 999 }),
-    ).toBe(true);
+    expect(cursorHasReachedEvent(cursor, { id: "1ZZZZZ", createdAt: 999 })).toBe(true);
   });
 
   it("has reached the event it points at (inclusive)", () => {
@@ -59,8 +57,6 @@ describe("cursorHasReachedEvent", () => {
   });
 
   it("has not reached a later event", () => {
-    expect(
-      cursorHasReachedEvent(cursor, { id: "0AAAAA", createdAt: 1_001 }),
-    ).toBe(false);
+    expect(cursorHasReachedEvent(cursor, { id: "0AAAAA", createdAt: 1_001 })).toBe(false);
   });
 });

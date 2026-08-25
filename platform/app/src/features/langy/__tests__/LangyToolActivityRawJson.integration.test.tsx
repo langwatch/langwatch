@@ -64,9 +64,7 @@ describe("Langy tool activity raw payload", () => {
       expect(container.textContent).toContain('"tool": "skill"');
       expect(container.textContent).toContain("output-available");
       // Inspecting the payload did not collapse the card it belongs to.
-      expect(
-        screen.getByRole("button", { name: "Hide raw data" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Hide raw data" })).toBeInTheDocument();
     });
   });
 
@@ -75,9 +73,7 @@ describe("Langy tool activity raw payload", () => {
       devModeRef.current = false;
       const { container } = renderActivity();
 
-      expect(
-        screen.queryByRole("button", { name: /raw data/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /raw data/i })).not.toBeInTheDocument();
       expect(container.textContent).not.toContain('"tool"');
     });
   });

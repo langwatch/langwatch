@@ -65,11 +65,9 @@ export function StudioNodeDrawer() {
   // Don't open the drawer for evaluator/agent nodes without an entity set
   // (they're still in the picker flow)
   const isEmptyEvaluator =
-    selectedNode?.type === "evaluator" &&
-    !(selectedNode.data as Evaluator).evaluator;
+    selectedNode?.type === "evaluator" && !(selectedNode.data as Evaluator).evaluator;
   const isEmptyAgent =
-    selectedNode?.type === "agent" &&
-    !(selectedNode.data as AgentComponent).agent;
+    selectedNode?.type === "agent" && !(selectedNode.data as AgentComponent).agent;
 
   // Suppress the StudioDrawerWrapper when a URL-based drawer (e.g.
   // PromptListDrawer, EvaluatorListDrawer) is active. This prevents
@@ -81,8 +79,7 @@ export function StudioNodeDrawer() {
   // Only open the drawer when onNodeClick has confirmed a genuine click
   // (mousedown + mouseup without drag). This prevents the drawer from
   // opening when the user merely drags a node (which selects it on mousedown).
-  const hasClickConfirmation =
-    selectedNode && clickedNodeId === selectedNode.id;
+  const hasClickConfirmation = selectedNode && clickedNodeId === selectedNode.id;
 
   const effectiveNode =
     !hasUrlDrawer &&

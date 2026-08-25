@@ -117,10 +117,7 @@ export abstract class BaseAnalyticsSlimClickHouseRepository<
       await client.insert({
         table: this.config.tableName,
         values: entries.map(({ row, retentionDays }) =>
-          this.config.toRecord(
-            row,
-            retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
-          ),
+          this.config.toRecord(row, retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS),
         ),
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },

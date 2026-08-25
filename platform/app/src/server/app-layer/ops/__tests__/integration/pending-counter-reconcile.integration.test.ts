@@ -45,15 +45,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         await redis.del(markerKey);
 
         // Seed: group A has 3 jobs, group B has 2 jobs → ground truth = 5
-        await redis.zadd(
-          groupAJobsKey,
-          1000,
-          "job-a1",
-          1001,
-          "job-a2",
-          1002,
-          "job-a3",
-        );
+        await redis.zadd(groupAJobsKey, 1000, "job-a1", 1001, "job-a2", 1002, "job-a3");
         await redis.zadd(groupBJobsKey, 2000, "job-b1", 2001, "job-b2");
 
         // Also add both groups to the ready zset (production shape)
@@ -141,15 +133,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         await redis.del(markerKey);
 
         // Seed 7 jobs across groups
-        await redis.zadd(
-          `${queueName}:gq:group:ga:jobs`,
-          1,
-          "j1",
-          2,
-          "j2",
-          3,
-          "j3",
-        );
+        await redis.zadd(`${queueName}:gq:group:ga:jobs`, 1, "j1", 2, "j2", 3, "j3");
         await redis.zadd(`${queueName}:gq:group:gb:jobs`, 4, "j4", 5, "j5");
         await redis.zadd(`${queueName}:gq:group:gc:jobs`, 6, "j6", 7, "j7");
         await redis.zadd(`${queueName}:gq:ready`, 1, "ga", 1, "gb", 1, "gc");
@@ -207,13 +191,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         await redis.zadd(`${queueName}:gq:group:tenant-a/ready:jobs`, 1, "j1");
         await redis.zadd(`${queueName}:gq:ready`, 1, "tenant-a/ready");
 
-        await redis.zadd(
-          `${queueName}:gq:group:tenant-a/blocked:jobs`,
-          1,
-          "j2",
-          2,
-          "j3",
-        );
+        await redis.zadd(`${queueName}:gq:group:tenant-a/blocked:jobs`, 1, "j2", 2, "j3");
         await redis.sadd(`${queueName}:gq:blocked`, "tenant-a/blocked");
 
         await redis.zadd(
@@ -225,11 +203,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
           3,
           "j6",
         );
-        await redis.zadd(
-          `${queueName}:gq:parked:tenant-b`,
-          1,
-          "tenant-b/parked",
-        );
+        await redis.zadd(`${queueName}:gq:parked:tenant-b`, 1, "tenant-b/parked");
         await redis.sadd(`${queueName}:gq:parked-tenants`, "tenant-b");
 
         await redis.set(counterKey, "0");
@@ -250,13 +224,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
 
         await redis.del(markerKey);
 
-        await redis.zadd(
-          `${queueName}:gq:group:groupDup:jobs`,
-          1,
-          "j1",
-          2,
-          "j2",
-        );
+        await redis.zadd(`${queueName}:gq:group:groupDup:jobs`, 1, "j1", 2, "j2");
         await redis.zadd(`${queueName}:gq:ready`, 1, "groupDup");
         await redis.sadd(`${queueName}:gq:blocked`, "groupDup");
         await redis.set(counterKey, "0");
@@ -311,10 +279,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
           3,
           "j3",
         );
-        await redis.sadd(
-          `${queueName}:gq:pending-groups`,
-          "tenant-a/in-flight-move",
-        );
+        await redis.sadd(`${queueName}:gq:pending-groups`, "tenant-a/in-flight-move");
         await redis.set(counterKey, "0");
 
         const result = await repo.reconcileTotalPending(queueName);
@@ -336,20 +301,14 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         // No jobs zset at all: the shape left behind when the safety-net TTL
         // expires a group's jobs without any script running.
         await redis.sadd(indexKey, "tenant-a/drained");
-        await redis.zadd(
-          `${queueName}:gq:group:tenant-a/live:jobs`,
-          1,
-          "still-here",
-        );
+        await redis.zadd(`${queueName}:gq:group:tenant-a/live:jobs`, 1, "still-here");
         await redis.sadd(indexKey, "tenant-a/live");
         await redis.set(`${queueName}:gq:stats:total-pending`, "0");
 
         const result = await repo.reconcileTotalPending(queueName);
 
         expect(result!.groundTruth).toBe(1);
-        expect((await redis.smembers(indexKey)).sort()).toEqual([
-          "tenant-a/live",
-        ]);
+        expect((await redis.smembers(indexKey)).sort()).toEqual(["tenant-a/live"]);
       });
     });
   });
@@ -366,13 +325,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
 
         // The shape left by a pod on the previous release, or by anything staged
         // before the index existed: jobs and lifecycle membership, no index entry.
-        await redis.zadd(
-          `${queueName}:gq:group:legacy-group:jobs`,
-          1,
-          "j1",
-          2,
-          "j2",
-        );
+        await redis.zadd(`${queueName}:gq:group:legacy-group:jobs`, 1, "j1", 2, "j2");
         await redis.zadd(`${queueName}:gq:ready`, 1, "legacy-group");
         await redis.set(`${queueName}:gq:stats:total-pending`, "0");
 
@@ -449,9 +402,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
     // silently becomes zero and the measured drift is not the requested one.
     const counter = jobs + drift;
     if (counter < 0) {
-      throw new Error(
-        `fixture asks for counter ${counter}; raise jobs above ${-drift}`,
-      );
+      throw new Error(`fixture asks for counter ${counter}; raise jobs above ${-drift}`);
     }
     // The test containers are reused between runs and the queue names come from
     // a per-process counter, so the same names recur. Clear everything this
@@ -490,9 +441,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         const otherInstance = new QueueRedisRepository(redis);
         expect(await otherInstance.reconcileTotalPending(queueName)).toBeNull();
 
-        expect(await otherInstance.readPublishedPendingDrift([queueName])).toBe(
-          95,
-        );
+        expect(await otherInstance.readPublishedPendingDrift([queueName])).toBe(95);
       });
     });
   });
@@ -563,9 +512,9 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         await redis.del(`${neverReconciled}:gq:stats:pending-drift`);
         await reconcileWithDrift({ queue: queueName, jobs: 2, drift: 7 });
 
-        expect(
-          await repo.readPublishedPendingDrift([neverReconciled, queueName]),
-        ).toBe(7);
+        expect(await repo.readPublishedPendingDrift([neverReconciled, queueName])).toBe(
+          7,
+        );
       });
 
       it("survives a figure that is not a number at all", async () => {
@@ -576,9 +525,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         await redis.set(`${poked}:gq:stats:pending-drift`, "not-a-number");
         await reconcileWithDrift({ queue: queueName, jobs: 2, drift: 7 });
 
-        expect(await repo.readPublishedPendingDrift([poked, queueName])).toBe(
-          7,
-        );
+        expect(await repo.readPublishedPendingDrift([poked, queueName])).toBe(7);
       });
 
       it("survives a figure that is only partly a number", async () => {
@@ -590,9 +537,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         await redis.set(`${partial}:gq:stats:pending-drift`, "7oops");
         await reconcileWithDrift({ queue: queueName, jobs: 2, drift: 7 });
 
-        expect(await repo.readPublishedPendingDrift([partial, queueName])).toBe(
-          7,
-        );
+        expect(await repo.readPublishedPendingDrift([partial, queueName])).toBe(7);
       });
     });
   });
@@ -618,9 +563,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         });
         expect([a!.drift, b!.drift]).toEqual([30, -10]);
 
-        expect(await repo.readPublishedPendingDrift([queueName, second])).toBe(
-          40,
-        );
+        expect(await repo.readPublishedPendingDrift([queueName, second])).toBe(40);
       });
     });
   });

@@ -28,12 +28,14 @@ yarn add langwatch openai
 ```bash bun
 bun add langwatch openai
 ```
+
 </CodeGroup>
 
 ## Usage
 
 <Info>
-The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment
+  variable.
 </Info>
 
 Set up observability and use `withActiveSpan` to capture your OpenAI calls:
@@ -50,7 +52,7 @@ const tracer = getLangWatchTracer("<project_name>");
 async function main(message: string): Promise<string> {
   const openai = new OpenAI();
 
-  return await tracer.withActiveSpan("main", async span => {
+  return await tracer.withActiveSpan("main", async (span) => {
     span.setInput(message);
 
     const response = await openai.chat.completions.create({

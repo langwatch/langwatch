@@ -13,8 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.hoisted so these are initialized before the hoisted vi.mock factories
 // (which reference them) run at import time.
-const { invokePayloads, stageCalls, deleteCalls, lambdaState, mockEnv } =
-  vi.hoisted(() => ({
+const { invokePayloads, stageCalls, deleteCalls, lambdaState, mockEnv } = vi.hoisted(
+  () => ({
     invokePayloads: [] as string[],
     stageCalls: [] as any[],
     deleteCalls: [] as any[],
@@ -26,7 +26,8 @@ const { invokePayloads, stageCalls, deleteCalls, lambdaState, mockEnv } =
       LANGEVALS_STAGING_TTL_SECONDS: 600,
       EVAL_MAX_PAYLOAD_BYTES: 16_000_000,
     } as Record<string, unknown>,
-  }));
+  }),
+);
 
 vi.mock("../../env.mjs", () => ({ env: mockEnv }));
 
@@ -122,17 +123,13 @@ describe("lambdaFetch staging", () => {
       expect(stageCalls[0]!.projectId).toBe("project_b");
       expect(stageCalls[0]!.keyPrefix).toBe("nlpgo-staging/project_b");
       expect(stageCalls[0]!.ttlSeconds).toBe(600);
-      expect((stageCalls[0]!.serialized as Buffer).toString("utf-8")).toBe(
-        bigBody,
-      );
+      expect((stageCalls[0]!.serialized as Buffer).toString("utf-8")).toBe(bigBody);
 
       const env = lastEnvelope();
       expect(env.body).toBe("");
       expect(env.headers["X-Payload-S3-URL"]).toContain("https://s3.example/");
       // The rewritten envelope must be comfortably under the 6 MiB cap.
-      expect(Buffer.byteLength(invokePayloads[0]!, "utf-8")).toBeLessThan(
-        6291456,
-      );
+      expect(Buffer.byteLength(invokePayloads[0]!, "utf-8")).toBeLessThan(6291456);
     });
 
     /** @scenario "A staged object is deleted after the invoke returns" */
@@ -146,9 +143,7 @@ describe("lambdaFetch staging", () => {
       expect(stageCalls).toHaveLength(1);
       expect(deleteCalls).toHaveLength(1);
       expect(deleteCalls[0]!.s3Bucket).toBe("test-staging-bucket");
-      expect(deleteCalls[0]!.key).toBe(
-        stageCalls[0]!.keyPrefix + "/staged.json",
-      );
+      expect(deleteCalls[0]!.key).toBe(stageCalls[0]!.keyPrefix + "/staged.json");
       expect(deleteCalls[0]!.projectId).toBe("project_cleanup");
     });
 
@@ -232,9 +227,7 @@ describe("lambdaFetch staging", () => {
   describe("given a plain HTTP URL target instead of a Lambda ARN", () => {
     /** @scenario "A self-hosted HTTP nlpgo target never stages" */
     it("never stages and posts the body inline", async () => {
-      const fetchMock = vi.fn(
-        async () => new Response('{"ok":true}', { status: 200 }),
-      );
+      const fetchMock = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
       vi.stubGlobal("fetch", fetchMock);
 
       await lambdaFetch("http://localhost:5561", "/go/studio/execute_sync", {

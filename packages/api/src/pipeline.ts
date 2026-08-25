@@ -101,8 +101,7 @@ export function buildEndpointMiddlewareStack<TProject>(
   }
 
   if (config.resourceLimit) {
-    const createResourceLimitMiddleware =
-      serviceConfig._legacy?.resourceLimitMiddleware;
+    const createResourceLimitMiddleware = serviceConfig._legacy?.resourceLimitMiddleware;
     if (!createResourceLimitMiddleware) {
       throw new Error(
         `Endpoint resource limit "${config.resourceLimit}" requires resourceLimitMiddleware`,
@@ -120,9 +119,7 @@ export function buildEndpointMiddlewareStack<TProject>(
     documented,
     paramSource: options.paramSource ?? "route",
   });
-  stack.push(
-    contextVariablesMiddleware(config, options.paramSource ?? "route"),
-  );
+  stack.push(contextVariablesMiddleware(config, options.paramSource ?? "route"));
 
   if (config.cache && config.output && ep.method !== "sse") {
     stack.push(
@@ -167,9 +164,7 @@ function requestCapabilitiesMiddleware(
       enumerable: false,
       value: () => {
         if (!options.actor) {
-          throw new Error(
-            "This API service has no authenticated actor resolver",
-          );
+          throw new Error("This API service has no authenticated actor resolver");
         }
         return options.actor(context);
       },
@@ -177,13 +172,9 @@ function requestCapabilitiesMiddleware(
     Object.defineProperty(context, "authorize", {
       configurable: true,
       enumerable: false,
-      value: (permission: Parameters<
-        NonNullable<ServiceConfig["authorize"]>
-      >[1]) => {
+      value: (permission: Parameters<NonNullable<ServiceConfig["authorize"]>>[1]) => {
         if (!options.authorize) {
-          throw new Error(
-            "This API service has no dynamic permission authorizer",
-          );
+          throw new Error("This API service has no dynamic permission authorizer");
         }
         return options.authorize(context, permission);
       },
@@ -275,8 +266,7 @@ function versionContextMiddleware({
       // The date-namespace fallback serves an UNREGISTERED date with the
       // effective version's stack: the header names the namespace that was
       // asked for, not the one whose registration answered.
-      const answered =
-        (c.get("apiVersionRequest") as string | undefined) ?? version;
+      const answered = (c.get("apiVersionRequest") as string | undefined) ?? version;
       // Set in a `finally` so validation errors and 410 withdrawals carry the
       // version headers — and the deprecation warning — too.
       c.header("X-API-Version", answered);
@@ -345,16 +335,15 @@ function appendOpenApiMiddleware({
   if (!documented) return;
 
   const successStatus = String(config.status ?? 200);
-  const generatedSuccess: NonNullable<
-    DescribeRouteOptions["responses"]
-  >[string] = config.output
-    ? {
-        description: "Success",
-        content: {
-          "application/json": { schema: resolver(config.output) },
-        },
-      }
-    : { description: "Success" };
+  const generatedSuccess: NonNullable<DescribeRouteOptions["responses"]>[string] =
+    config.output
+      ? {
+          description: "Success",
+          content: {
+            "application/json": { schema: resolver(config.output) },
+          },
+        }
+      : { description: "Success" };
 
   const docs = config.docs;
   const options: DescribeRouteOptions = {
@@ -410,9 +399,7 @@ function appendValidationMiddleware({
    * `ZodIssue`s, so re-wrapping restores exactly the error v0.4 threw.
    */
   const asZodError = (error: unknown): unknown =>
-    Array.isArray(error)
-      ? createApiSchemaError(error as ApiSchemaIssue[])
-      : error;
+    Array.isArray(error) ? createApiSchemaError(error as ApiSchemaIssue[]) : error;
 
   const addValidator = (
     target: "param" | "query" | "json",
@@ -428,9 +415,7 @@ function appendValidationMiddleware({
       // undocumented mount (preview, hidden) would otherwise still surface its
       // path in the spec. Validation is not documentation: strip the metadata,
       // keep the validator.
-      delete (middleware as Partial<Record<typeof uniqueSymbol, unknown>>)[
-        uniqueSymbol
-      ];
+      delete (middleware as Partial<Record<typeof uniqueSymbol, unknown>>)[uniqueSymbol];
     }
     stack.push(middleware);
   };

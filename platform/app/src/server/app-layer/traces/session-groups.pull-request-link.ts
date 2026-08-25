@@ -115,9 +115,7 @@ export function linkableSessions({
 }
 
 /** The distinct (host, repository, branch) keys the page's sessions ran on. */
-export function branchKeysOf(
-  linkable: LinkableSession[],
-): PullRequestBranchKey[] {
+export function branchKeysOf(linkable: LinkableSession[]): PullRequestBranchKey[] {
   const keys = new Map<string, PullRequestBranchKey>();
   for (const { coding } of linkable) {
     const key = branchKeyOf(coding);
@@ -141,18 +139,14 @@ export function linkPullRequestsToSessions({
   pullRequests: PullRequestCandidate[];
 }): void {
   for (const [bucket, sessions] of bucketByRepository(linkable)) {
-    const candidates = pullRequests.filter(
-      (pull) => repositoryBucketOf(pull) === bucket,
-    );
+    const candidates = pullRequests.filter((pull) => repositoryBucketOf(pull) === bucket);
     if (candidates.length === 0) continue;
     linkOneRepository({ sessions, candidates });
   }
 }
 
 /** Group the linkable sessions by the (host, repository) they ran against. */
-function bucketByRepository(
-  linkable: LinkableSession[],
-): Map<string, LinkableSession[]> {
+function bucketByRepository(linkable: LinkableSession[]): Map<string, LinkableSession[]> {
   const byRepository = new Map<string, LinkableSession[]>();
   for (const entry of linkable) {
     const bucket = repositoryBucketOf(branchKeyOf(entry.coding));

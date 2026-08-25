@@ -33,11 +33,7 @@ vi.mock("~/utils/auth-client", () => ({
 // Mock useModelSelectionOptions
 vi.mock("../../ModelSelector", () => ({
   allModelOptions: ["openai/gpt-4.1", "openai/gpt-5"],
-  useModelSelectionOptions: (
-    _options: string[],
-    model: string,
-    _mode: string,
-  ) => {
+  useModelSelectionOptions: (_options: string[], model: string, _mode: string) => {
     const knownModels: Record<
       string,
       { label: string; icon: React.ReactNode; isDisabled: boolean }
@@ -72,9 +68,7 @@ vi.mock("../../ModelSelector", () => ({
 
 import { LLMModelDisplay } from "../LLMModelDisplay";
 
-const renderComponent = (
-  props: Partial<Parameters<typeof LLMModelDisplay>[0]> = {},
-) => {
+const renderComponent = (props: Partial<Parameters<typeof LLMModelDisplay>[0]> = {}) => {
   const defaultProps = {
     model: "openai/gpt-4.1",
   };

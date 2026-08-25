@@ -6,15 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CopyAgentDialog } from "../CopyAgentDialog";
 
 const SOURCE_PROJECT_ID = "test-project-id";
@@ -124,11 +116,7 @@ describe("CopyAgentDialog", () => {
     const onClose = vi.fn();
     const onSuccess = vi.fn();
     render(
-      <CopyAgentDialog
-        {...defaultProps}
-        onClose={onClose}
-        onSuccess={onSuccess}
-      />,
+      <CopyAgentDialog {...defaultProps} onClose={onClose} onSuccess={onSuccess} />,
       { wrapper: Wrapper },
     );
 

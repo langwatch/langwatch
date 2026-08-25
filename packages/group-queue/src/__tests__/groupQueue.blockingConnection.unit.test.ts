@@ -73,17 +73,13 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
   describe("given consumer mode is enabled", () => {
     describe("when the source connection is a standalone IORedis", () => {
       it("duplicates the connection with maxRetriesPerRequest: null for the blocking connection", () => {
-        const conn = track(
-          new IORedis({ lazyConnect: true, maxRetriesPerRequest: 0 }),
-        );
+        const conn = track(new IORedis({ lazyConnect: true, maxRetriesPerRequest: 0 }));
         const dupSentinel = {} as IORedis;
         vi.spyOn(conn, "duplicate").mockReturnValue(dupSentinel as any);
 
-        const processor = new GroupQueueProcessor<TestPayload>(
-          makeDefinition(),
-          conn,
-          { consumerEnabled: true },
-        );
+        const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
+          consumerEnabled: true,
+        });
 
         expect(conn.duplicate).toHaveBeenCalledWith({
           maxRetriesPerRequest: null,
@@ -102,11 +98,9 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
         const dupSentinel = {} as Cluster;
         vi.spyOn(conn, "duplicate").mockReturnValue(dupSentinel as any);
 
-        const processor = new GroupQueueProcessor<TestPayload>(
-          makeDefinition(),
-          conn,
-          { consumerEnabled: true },
-        );
+        const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
+          consumerEnabled: true,
+        });
 
         expect(conn.duplicate).toHaveBeenCalled();
         expect((processor as any).blockingConnection).toBe(dupSentinel);
@@ -117,16 +111,12 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
   describe("given consumer mode is disabled", () => {
     describe("when the source connection is a standalone IORedis", () => {
       it("uses the shared connection directly without duplicating", () => {
-        const conn = track(
-          new IORedis({ lazyConnect: true, maxRetriesPerRequest: 0 }),
-        );
+        const conn = track(new IORedis({ lazyConnect: true, maxRetriesPerRequest: 0 }));
         const dupSpy = vi.spyOn(conn, "duplicate");
 
-        const processor = new GroupQueueProcessor<TestPayload>(
-          makeDefinition(),
-          conn,
-          { consumerEnabled: false },
-        );
+        const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
+          consumerEnabled: false,
+        });
 
         expect(dupSpy).not.toHaveBeenCalled();
         expect((processor as any).blockingConnection).toBe(conn);
@@ -142,11 +132,9 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
         );
         const dupSpy = vi.spyOn(conn, "duplicate");
 
-        const processor = new GroupQueueProcessor<TestPayload>(
-          makeDefinition(),
-          conn,
-          { consumerEnabled: false },
-        );
+        const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
+          consumerEnabled: false,
+        });
 
         expect(dupSpy).not.toHaveBeenCalled();
         expect((processor as any).blockingConnection).toBe(conn);
@@ -158,14 +146,10 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
     describe("when its heartbeat interval elapses", () => {
       it("renews every participating envelope", async () => {
         vi.useFakeTimers();
-        const conn = track(
-          new IORedis({ lazyConnect: true, maxRetriesPerRequest: 0 }),
-        );
-        const processor = new GroupQueueProcessor<TestPayload>(
-          makeDefinition(),
-          conn,
-          { consumerEnabled: false },
-        );
+        const conn = track(new IORedis({ lazyConnect: true, maxRetriesPerRequest: 0 }));
+        const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
+          consumerEnabled: false,
+        });
         const refreshActiveKey = vi.fn().mockResolvedValue(undefined);
         const renewLease = vi.fn().mockResolvedValue(undefined);
         Object.assign(processor as any, {

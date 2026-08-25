@@ -52,9 +52,7 @@ interface TestOverrides {
   traceService?: Partial<
     Pick<
       TraceService,
-      | "getTracesWithSpans"
-      | "getTracesWithSpansByThreadIds"
-      | "getEvaluationsMultiple"
+      "getTracesWithSpans" | "getTracesWithSpansByThreadIds" | "getEvaluationsMultiple"
     >
   >;
   modelEnvResolver?: Partial<ModelEnvResolver>;
@@ -67,9 +65,7 @@ function createTestService(overrides: TestOverrides = {}) {
   const defaultTrace = "trace" in overrides ? overrides.trace : buildTrace();
 
   const mockTraceService = {
-    getTracesWithSpans: vi
-      .fn()
-      .mockResolvedValue(defaultTrace ? [defaultTrace] : []),
+    getTracesWithSpans: vi.fn().mockResolvedValue(defaultTrace ? [defaultTrace] : []),
     getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue([]),
     getEvaluationsMultiple: vi.fn().mockResolvedValue({}),
     ...overrides.traceService,
@@ -251,9 +247,7 @@ describe("extractParentTraceForNlpgo", () => {
           } as any,
         ],
       });
-      expect(extractParentTraceForNlpgo(trace)?.parentSpanId).toBe(
-        EARLIER_SPAN,
-      );
+      expect(extractParentTraceForNlpgo(trace)?.parentSpanId).toBe(EARLIER_SPAN);
     });
 
     it("falls back to span_id ordering when started_at ties", () => {
@@ -276,9 +270,7 @@ describe("extractParentTraceForNlpgo", () => {
           } as any,
         ],
       });
-      expect(extractParentTraceForNlpgo(trace)?.parentSpanId).toBe(
-        EARLIER_SPAN,
-      );
+      expect(extractParentTraceForNlpgo(trace)?.parentSpanId).toBe(EARLIER_SPAN);
     });
   });
 });
@@ -603,9 +595,7 @@ describe("EvaluationExecutionService", () => {
             } as any,
           });
 
-          expect(
-            mockTraceService.getTracesWithSpansByThreadIds,
-          ).toHaveBeenCalledWith(
+          expect(mockTraceService.getTracesWithSpansByThreadIds).toHaveBeenCalledWith(
             "proj-1",
             ["thread-1"],
             expect.objectContaining({
@@ -659,9 +649,7 @@ describe("EvaluationExecutionService", () => {
           expect(result.status).toBe("skipped");
           expect(result.details).toContain("thread_id");
           // short-circuits before building thread data or calling the evaluator
-          expect(
-            mockTraceService.getTracesWithSpansByThreadIds,
-          ).not.toHaveBeenCalled();
+          expect(mockTraceService.getTracesWithSpansByThreadIds).not.toHaveBeenCalled();
           expect(mockClient.evaluate).not.toHaveBeenCalled();
         });
       });
@@ -747,9 +735,7 @@ describe("maxCausalityDepthOfSpans", () => {
 
   it("falls back to dot-notation key when nested ns is absent", () => {
     expect(
-      maxCausalityDepthOfSpans([
-        { params: { "langwatch.causality_depth": "2" } },
-      ]),
+      maxCausalityDepthOfSpans([{ params: { "langwatch.causality_depth": "2" } }]),
     ).toBe(2);
   });
 });

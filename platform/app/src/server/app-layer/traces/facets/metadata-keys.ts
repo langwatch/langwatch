@@ -1,8 +1,4 @@
-import type {
-  DynamicKeysDef,
-  FacetQuery,
-  FacetQueryContext,
-} from "../facet-registry";
+import type { DynamicKeysDef, FacetQuery, FacetQueryContext } from "../facet-registry";
 import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
 
 /**
@@ -15,9 +11,7 @@ import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
  * The actual filter side (`trace.attribute.<k>:value` / legacy
  * `attribute.<k>:value`) is handled in `filter-to-clickhouse/ast.ts`.
  */
-export function buildMetadataKeysFacetQuery(
-  ctx: FacetQueryContext,
-): FacetQuery {
+export function buildMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
   const where = buildTimeWhere("OccurredAt");
   const prefixFilter = ctx.prefix
     ? "AND lower(key) ILIKE concat({prefix:String}, '%')"
@@ -71,9 +65,7 @@ export const METADATA_KEYS_FACET: DynamicKeysDef = {
  * still honoured by appending it after the namespace (`metadata.<search>`), so
  * the facet's "Filter keys…" box keeps working on the stripped portion.
  */
-export function buildTraceMetadataKeysFacetQuery(
-  ctx: FacetQueryContext,
-): FacetQuery {
+export function buildTraceMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
   return buildMetadataKeysFacetQuery({
     ...ctx,
     prefix: `metadata.${ctx.prefix ?? ""}`,

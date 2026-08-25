@@ -68,11 +68,7 @@ export abstract class AuthzGrantsService {
     args: AuthzOffboardMemberInput,
   ): Promise<AuthzOffboardMemberOutput>;
 
-  abstract defineRole(
-    args: AuthzDefineRoleInput,
-  ): Promise<AuthzDefineRoleOutput>;
+  abstract defineRole(args: AuthzDefineRoleInput): Promise<AuthzDefineRoleOutput>;
 
-  abstract deleteRole(
-    args: AuthzDeleteRoleInput,
-  ): Promise<AuthzDeleteRoleOutput>;
+  abstract deleteRole(args: AuthzDeleteRoleInput): Promise<AuthzDeleteRoleOutput>;
 }

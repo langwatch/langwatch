@@ -1,38 +1,36 @@
-import type {
-  TraceClickHouseClient,
-  TraceClickHouseResolver,
-} from "../src";
+import type { TraceClickHouseClient, TraceClickHouseResolver } from "../src";
 import { ModelProviderService } from "@langwatch/model-provider-contract";
 import { ClickHouseTraceAdapter } from "../src";
 import { ClickHouseTraceSpanRepository } from "../src/repositories/clickhouse/clickhouse.trace-span.repository";
 import { describe, expect, it } from "vitest";
 
-const resolver = (
-  calls: Array<{ tenantId: string; sql: string }>,
-  cost: string | number = 0.2,
-): TraceClickHouseResolver =>
+const resolver =
+  (
+    calls: Array<{ tenantId: string; sql: string }>,
+    cost: string | number = 0.2,
+  ): TraceClickHouseResolver =>
   async (tenantId): Promise<TraceClickHouseClient> => ({
     query: async <_Row>({ query }: { query: string }) => {
       calls.push({ tenantId, sql: query });
       const rows: unknown[] = [
-            {
-              SpanId: "span_1",
-              ParentSpanId: null,
-              SpanName: "llm",
-              SpanType: "llm",
-              ToolName: null,
-              Model: "model",
-              Cost: cost,
-              InputTokens: 2,
-              OutputTokens: 2,
-              CacheReadTokens: null,
-              CacheCreationTokens: null,
-              StartTimeMs: 10,
-              DurationMs: 20,
-              UpdatedAtMs: 30,
-              StatusCode: 1,
-            },
-          ];
+        {
+          SpanId: "span_1",
+          ParentSpanId: null,
+          SpanName: "llm",
+          SpanType: "llm",
+          ToolName: null,
+          Model: "model",
+          Cost: cost,
+          InputTokens: 2,
+          OutputTokens: 2,
+          CacheReadTokens: null,
+          CacheCreationTokens: null,
+          StartTimeMs: 10,
+          DurationMs: 20,
+          UpdatedAtMs: 30,
+          StatusCode: 1,
+        },
+      ];
       return { json: async <T>() => rows as T[] };
     },
   });
@@ -44,26 +42,66 @@ class StaticModelProviders extends ModelProviderService {
     this.inputs.push(input);
     return 0.47;
   }
-  listForProject(): Promise<[]> { return Promise.resolve([]); }
-  listForOrganization(): Promise<[]> { return Promise.resolve([]); }
-  getForProject(): Promise<Record<string, never>> { return Promise.resolve({}); }
-  upsert(): Promise<never> { throw new Error("not used"); }
-  delete(): Promise<void> { return Promise.resolve(); }
-  validateApiKey(): Promise<never> { throw new Error("not used"); }
-  testConnection(): Promise<{ connected: boolean }> { return Promise.resolve({ connected: false }); }
-  getCodexStatus(): Promise<never> { throw new Error("not used"); }
-  isManagedProvider(): boolean { return false; }
-  getDefaultSnapshot(): Promise<never> { throw new Error("not used"); }
-  getInheritedValues(): Promise<never> { throw new Error("not used"); }
-  tryGetResolvedDefault(): Promise<null> { return Promise.resolve(null); }
-  setDefault(): Promise<void> { return Promise.resolve(); }
-  saveDefaultConfig(): Promise<never> { throw new Error("not used"); }
-  tryGetDefaultConfig(): Promise<null> { return Promise.resolve(null); }
-  deleteDefaultConfig(): Promise<void> { return Promise.resolve(); }
-  listCosts(): Promise<[]> { return Promise.resolve([]); }
-  upsertCost(): Promise<never> { throw new Error("not used"); }
-  deleteCost(): Promise<void> { return Promise.resolve(); }
-  translate(): Promise<never> { throw new Error("not used"); }
+  listForProject(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+  listForOrganization(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+  getForProject(): Promise<Record<string, never>> {
+    return Promise.resolve({});
+  }
+  upsert(): Promise<never> {
+    throw new Error("not used");
+  }
+  delete(): Promise<void> {
+    return Promise.resolve();
+  }
+  validateApiKey(): Promise<never> {
+    throw new Error("not used");
+  }
+  testConnection(): Promise<{ connected: boolean }> {
+    return Promise.resolve({ connected: false });
+  }
+  getCodexStatus(): Promise<never> {
+    throw new Error("not used");
+  }
+  isManagedProvider(): boolean {
+    return false;
+  }
+  getDefaultSnapshot(): Promise<never> {
+    throw new Error("not used");
+  }
+  getInheritedValues(): Promise<never> {
+    throw new Error("not used");
+  }
+  tryGetResolvedDefault(): Promise<null> {
+    return Promise.resolve(null);
+  }
+  setDefault(): Promise<void> {
+    return Promise.resolve();
+  }
+  saveDefaultConfig(): Promise<never> {
+    throw new Error("not used");
+  }
+  tryGetDefaultConfig(): Promise<null> {
+    return Promise.resolve(null);
+  }
+  deleteDefaultConfig(): Promise<void> {
+    return Promise.resolve();
+  }
+  listCosts(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+  upsertCost(): Promise<never> {
+    throw new Error("not used");
+  }
+  deleteCost(): Promise<void> {
+    return Promise.resolve();
+  }
+  translate(): Promise<never> {
+    throw new Error("not used");
+  }
 }
 
 describe("ClickHouseTraceAdapter", () => {
@@ -146,9 +184,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     const calls: Array<{ sql: string; params?: Record<string, unknown> }> = [];
     const repository = ClickHouseTraceSpanRepository.create(
       async (): Promise<TraceClickHouseClient> => ({
-        query: async <_Row>(
-          input: Parameters<TraceClickHouseClient["query"]>[0],
-        ) => {
+        query: async <_Row>(input: Parameters<TraceClickHouseClient["query"]>[0]) => {
           calls.push({ sql: input.query, params: input.query_params });
           return {
             json: async <T>() =>
@@ -210,9 +246,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     const calls: string[] = [];
     const repository = ClickHouseTraceSpanRepository.create(
       async (): Promise<TraceClickHouseClient> => ({
-        query: async <_Row>(
-          input: Parameters<TraceClickHouseClient["query"]>[0],
-        ) => {
+        query: async <_Row>(input: Parameters<TraceClickHouseClient["query"]>[0]) => {
           calls.push(input.query);
           const rows =
             calls.length === 1
@@ -262,9 +296,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     }> = [];
     const repository = ClickHouseTraceSpanRepository.create(
       async (): Promise<TraceClickHouseClient> => ({
-        query: async <_Row>(
-          input: Parameters<TraceClickHouseClient["query"]>[0],
-        ) => {
+        query: async <_Row>(input: Parameters<TraceClickHouseClient["query"]>[0]) => {
           calls.push({ sql: input.query, params: input.query_params });
           return {
             json: async <T>() =>

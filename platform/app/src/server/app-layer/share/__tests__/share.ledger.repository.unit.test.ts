@@ -1,7 +1,4 @@
-import type {
-  AuthzGrantsService,
-  AuthzService,
-} from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient, ShareLink } from "~/generated/prisma/client";
 import { LedgerShareRepository } from "../repositories/share.ledger.repository";
@@ -82,9 +79,7 @@ function buildRepository({
   };
 }) {
   const legacy = spyLegacy();
-  const grantFindMany = vi
-    .fn()
-    .mockResolvedValue(grantIds.map((id) => ({ id })));
+  const grantFindMany = vi.fn().mockResolvedValue(grantIds.map((id) => ({ id })));
   // The consume and its compat mirror run on the TRANSACTION client; the
   // root client's own write surfaces stay separate mocks so a test can
   // prove the writes never bypass the transaction.
@@ -98,8 +93,7 @@ function buildRepository({
     create: vi.fn().mockResolvedValue(undefined),
   };
   const shareLink = {
-    findFirst:
-      compat?.findFirst ?? vi.fn().mockResolvedValue({ id: "share_1" }),
+    findFirst: compat?.findFirst ?? vi.fn().mockResolvedValue({ id: "share_1" }),
     findMany: compat?.findMany ?? vi.fn().mockResolvedValue([]),
     update: vi.fn().mockResolvedValue(undefined),
   };
@@ -229,8 +223,7 @@ describe("LedgerShareRepository", () => {
         });
 
         expect(writer.attachResourceGrant).toHaveBeenCalledTimes(1);
-        const emission = vi.mocked(writer.attachResourceGrant).mock
-          .calls[0]?.[0];
+        const emission = vi.mocked(writer.attachResourceGrant).mock.calls[0]?.[0];
         expect(emission).toMatchObject({
           organizationId: ORGANIZATION_ID,
           projectId: PROJECT_ID,
@@ -317,9 +310,7 @@ describe("LedgerShareRepository", () => {
         // link with no revocation for the fold to converge on.
         expect(
           vi.mocked(writer.revokeResourceGrants).mock.invocationCallOrder[0],
-        ).toBeLessThan(
-          vi.mocked(legacy.deleteById).mock.invocationCallOrder[0]!,
-        );
+        ).toBeLessThan(vi.mocked(legacy.deleteById).mock.invocationCallOrder[0]!);
       });
 
       /** @scenario "Revoking a link whose grant row has not landed still records the fact" */
@@ -369,8 +360,9 @@ describe("LedgerShareRepository", () => {
     describe("when the routing gate is stale or failing", () => {
       /** @scenario "Revocation routing never trusts a cached answer" */
       it("routes a revoke on the uncached projection read, past a stale cached answer", async () => {
-        const { repository, legacy, writer, cutoverFindUnique } =
-          buildRepository({ onEngine: false });
+        const { repository, legacy, writer, cutoverFindUnique } = buildRepository({
+          onEngine: false,
+        });
 
         // Warm the cached gate with "legacy" through a read/mint-class
         // write, then cut the organization over: the projection answers
@@ -396,11 +388,11 @@ describe("LedgerShareRepository", () => {
 
       /** @scenario "A failed cutover read routes a revocation toward deleting both heads" */
       it("fails a broken projection read toward the branch that deletes both heads", async () => {
-        const { repository, legacy, writer, cutoverFindUnique } =
-          buildRepository({ onEngine: true, grantIds: ["share_1"] });
-        cutoverFindUnique.mockRejectedValue(
-          new Error("projection unavailable"),
-        );
+        const { repository, legacy, writer, cutoverFindUnique } = buildRepository({
+          onEngine: true,
+          grantIds: ["share_1"],
+        });
+        cutoverFindUnique.mockRejectedValue(new Error("projection unavailable"));
 
         await repository.deleteById({ id: "share_1", projectId: PROJECT_ID });
 

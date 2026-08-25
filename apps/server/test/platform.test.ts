@@ -23,7 +23,8 @@ describe("detectPlatform", () => {
         const real = await vi.importActual<typeof import("node:os")>("node:os");
         return { ...real, platform: () => "win32", arch: () => "x64" };
       });
-      const { detectPlatform, UnsupportedPlatformError } = await import("../src/shared/platform.ts");
+      const { detectPlatform, UnsupportedPlatformError } =
+        await import("../src/shared/platform.ts");
       expect(() => detectPlatform()).toThrow(UnsupportedPlatformError);
       expect(() => detectPlatform()).toThrow(/WSL2/);
       expect(() => detectPlatform()).toThrow(/docker compose/);

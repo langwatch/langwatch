@@ -12,7 +12,7 @@ export type SupportedPlatform =
 export class UnsupportedPlatformError extends Error {
   constructor(readonly raw: string) {
     super(
-      `${raw} is not supported. Run via WSL2 on Windows, or use docker compose: https://docs.langwatch.ai/self-hosting/docker-compose`
+      `${raw} is not supported. Run via WSL2 on Windows, or use docker compose: https://docs.langwatch.ai/self-hosting/docker-compose`,
     );
     this.name = "UnsupportedPlatformError";
   }
@@ -44,7 +44,10 @@ function detectLibc(): "glibc" | "musl" {
     // exits 1; glibc's ldd prints "ldd (Ubuntu GLIBC ...)" and exits 0.
     // Either way the output mentions "musl" or a "GLIBC" tag, so a single
     // case-insensitive substring check is enough.
-    const out = execSync("ldd --version 2>&1", { encoding: "utf8", timeout: 2000 }).toLowerCase();
+    const out = execSync("ldd --version 2>&1", {
+      encoding: "utf8",
+      timeout: 2000,
+    }).toLowerCase();
     if (out.includes("musl")) return "musl";
   } catch {
     // ldd missing or unreadable: rare. Glibc-based distros always ship

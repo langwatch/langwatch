@@ -1,11 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import {
-  CostReferenceType,
-  CostType,
-  type Project,
-} from "~/generated/prisma/client";
+import { CostReferenceType, CostType, type Project } from "~/generated/prisma/client";
 import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
 import { env } from "../../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../utils/constants";
@@ -156,17 +152,12 @@ export const clusterTopicsForProject = async ({
     where: { projectId },
     select: { id: true, parentId: true, createdAt: true },
   });
-  const topicIds = topics
-    .filter((topic) => !topic.parentId)
-    .map((topic) => topic.id);
-  const subtopicIds = topics
-    .filter((topic) => topic.parentId)
-    .map((topic) => topic.id);
+  const topicIds = topics.filter((topic) => !topic.parentId).map((topic) => topic.id);
+  const subtopicIds = topics.filter((topic) => topic.parentId).map((topic) => topic.id);
 
   // If we have topics and more than 1200 traces are already assigned, we are in incremental processing mode
   // This checks helps us getting back into batch mode if we simply delete all the topics for a given project
-  const isIncrementalProcessing =
-    topicIds.length > 0 && assignedTracesCount >= 1200;
+  const isIncrementalProcessing = topicIds.length > 0 && assignedTracesCount >= 1200;
 
   const lastTopicCreatedAt = topics.reduce((acc, topic) => {
     return topic.createdAt > acc ? topic.createdAt : acc;
@@ -179,13 +170,11 @@ export const clusterTopicsForProject = async ({
   // the walk with a skip and no cursor — any batch backlog larger than one
   // page silently stopped after page one. The run was approved when its
   // first page passed the gate; later pages are the same run.
-  const daysFrequency =
-    assignedTracesCount < 100 ? 7 : assignedTracesCount < 500 ? 3 : 2;
+  const daysFrequency = assignedTracesCount < 100 ? 7 : assignedTracesCount < 500 ? 3 : 2;
   if (
     !searchAfter &&
     !isIncrementalProcessing &&
-    lastTopicCreatedAt >
-      new Date(Date.now() - daysFrequency * 24 * 60 * 60 * 1000)
+    lastTopicCreatedAt > new Date(Date.now() - daysFrequency * 24 * 60 * 60 * 1000)
   ) {
     logger.info(
       { projectId },
@@ -405,10 +394,7 @@ export async function fetchTracesFromClickHouse(
   // pagination. The page CTE bounds the result, so the cap is unnecessary.
   const pageHaving: string[] = [];
 
-  if (
-    isIncrementalProcessing &&
-    (topicIds.length > 0 || subtopicIds.length > 0)
-  ) {
+  if (isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)) {
     // Must either not have any of the known topics, or not have any of the known subtopics
     const topicCondition =
       topicIds.length > 0
@@ -433,9 +419,7 @@ export async function fetchTracesFromClickHouse(
     )`);
   }
 
-  const pageHavingClause = pageHaving.length
-    ? `HAVING ${pageHaving.join(" AND ")}`
-    : "";
+  const pageHavingClause = pageHaving.length ? `HAVING ${pageHaving.join(" AND ")}` : "";
 
   const result = await clickhouse.query({
     query: `
@@ -475,9 +459,7 @@ export async function fetchTracesFromClickHouse(
       fetchWindowStartMs,
       topicIds: topicIds.length > 0 ? topicIds : ["__none__"],
       subtopicIds: subtopicIds.length > 0 ? subtopicIds : ["__none__"],
-      ...(searchAfter
-        ? { lastTs: searchAfter[0], lastTraceId: searchAfter[1] }
-        : {}),
+      ...(searchAfter ? { lastTs: searchAfter[0], lastTraceId: searchAfter[1] } : {}),
     },
     format: "JSONEachRow",
     // The outer query reads ComputedInput (a potentially large payload) for the
@@ -533,12 +515,9 @@ export async function fetchTracesFromClickHouse(
       return {
         trace_id: row.TraceId,
         input: inputText.slice(0, 8192),
-        topic_id:
-          row.TopicId && topicIds.includes(row.TopicId) ? row.TopicId : null,
+        topic_id: row.TopicId && topicIds.includes(row.TopicId) ? row.TopicId : null,
         subtopic_id:
-          row.SubTopicId && subtopicIds.includes(row.SubTopicId)
-            ? row.SubTopicId
-            : null,
+          row.SubTopicId && subtopicIds.includes(row.SubTopicId) ? row.SubTopicId : null,
       };
     })
     .filter((t): t is TopicClusteringTrace => t !== null);
@@ -587,10 +566,10 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
   // retries through the outbox, and the run records run_failed with the
   // user-actionable model_not_configured code (surfaced as guidance on
   // the settings page).
-  const resolved = await resolveModelForFeature(
-    "analytics.topic_clustering_llm",
-    { prisma, projectId: project.id },
-  );
+  const resolved = await resolveModelForFeature("analytics.topic_clustering_llm", {
+    prisma,
+    projectId: project.id,
+  });
   const topicClusteringModel = resolved.model;
   const provider = topicClusteringModel.split("/")[0];
   if (!provider) {
@@ -838,9 +817,7 @@ export const storeResults = async (
             topicId: topic_id,
             topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,
             subtopicId: subtopic_id,
-            subtopicName: subtopic_id
-              ? (subtopicNameMap.get(subtopic_id) ?? null)
-              : null,
+            subtopicName: subtopic_id ? (subtopicNameMap.get(subtopic_id) ?? null) : null,
             isIncremental,
             occurredAt: Date.now(),
           }),
@@ -975,8 +952,7 @@ const postToTopicClustering = async (opts: {
   }, TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
   deadline.unref?.();
 
-  const label =
-    opts.kind === "topic_clustering_batch" ? "batch" : "incremental";
+  const label = opts.kind === "topic_clustering_batch" ? "batch" : "incremental";
 
   // The WHOLE exchange lives inside the deadline: staging upload, request,
   // and the body read. Clearing the timer as soon as fetch resolved left

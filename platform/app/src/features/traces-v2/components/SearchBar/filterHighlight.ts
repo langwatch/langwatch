@@ -22,12 +22,7 @@ import { parse as cachedParse } from "~/server/app-layer/traces/query-language/p
  * we accept it bare so users typing a partial range mid-edit don't get
  * flagged on every keystroke.
  */
-const GRAMMAR_OPERATOR_WORDS: ReadonlySet<string> = new Set([
-  "AND",
-  "OR",
-  "NOT",
-  "TO",
-]);
+const GRAMMAR_OPERATOR_WORDS: ReadonlySet<string> = new Set(["AND", "OR", "NOT", "TO"]);
 /**
  * Operator-shaped lexeme: 2–5 uppercase letters, surrounded by word
  * boundaries. Tightened from a generic ALL-CAPS pattern so all-caps
@@ -157,11 +152,9 @@ function tagClassName({
   // Unknown field — the query parses, but no part of the platform knows
   // how to filter on it. Yellow/dashed treatment makes the typo obvious
   // before the user submits and gets zero rows.
-  if (!isKnownField(fieldName))
-    return "filter-token filter-token-unknown-field";
+  if (!isKnownField(fieldName)) return "filter-token filter-token-unknown-field";
   if (negated) return "filter-token filter-token-exclude";
-  if (SCENARIO_FIELDS.has(fieldName))
-    return "filter-token filter-token-scenario";
+  if (SCENARIO_FIELDS.has(fieldName)) return "filter-token filter-token-scenario";
   if (NUMERIC_FIELDS.has(fieldName)) return "filter-token filter-token-numeric";
   return "filter-token";
 }
@@ -236,9 +229,7 @@ function walkAst(
       const isImplicit = tag.field.type === "ImplicitField";
       const fieldName = isImplicit ? "" : (tag.field as { name: string }).name;
       const value =
-        tag.expression.type === "LiteralExpression"
-          ? String(tag.expression.value)
-          : null;
+        tag.expression.type === "LiteralExpression" ? String(tag.expression.value) : null;
 
       if (isImplicit) return; // free text — no chip, no X widget.
       // Token coords are in @-stripped trimmed-string space — same as what
@@ -354,10 +345,7 @@ function regexFallback(
   return { slots, tokens };
 }
 
-export function buildDecorationPlan(
-  text: string,
-  baseOffset = 0,
-): DecorationPlan {
+export function buildDecorationPlan(text: string, baseOffset = 0): DecorationPlan {
   // The editor stores U+00A0 NBSP (we insert it after a value-accept so the
   // browser doesn't collapse the trailing space). Normalise to regular space
   // before parsing so liqe sees a token boundary — otherwise the `AND`
@@ -387,10 +375,7 @@ export function buildDecorationPlan(
 }
 
 /** Backwards-compat shim used by the existing test suite. */
-export function buildDecorationSlots(
-  text: string,
-  baseOffset = 0,
-): DecorationSlot[] {
+export function buildDecorationSlots(text: string, baseOffset = 0): DecorationSlot[] {
   return buildDecorationPlan(text, baseOffset).slots;
 }
 
@@ -470,9 +455,7 @@ const subscribedViews = new Set<EditorView>();
 
 export const LABEL_REFRESH_META = "filterHighlight:labelRefresh" as const;
 
-export function setFilterChipLabels(
-  next: Record<string, Record<string, string>>,
-): void {
+export function setFilterChipLabels(next: Record<string, Record<string, string>>): void {
   chipLabelLookup = next;
   for (const view of subscribedViews) {
     view.dispatch(view.state.tr.setMeta(LABEL_REFRESH_META, true));
@@ -539,9 +522,7 @@ function computeDecorations(doc: ProseMirrorNode): DecorationSet {
       // wants positions that round-trip through `removeNodeAtLocation`,
       // whereas the fallback path slices directly out of the editor text.
       const widgetPos =
-        token.kind === "ast"
-          ? pos + plan.leadingWs + token.end
-          : pos + token.end;
+        token.kind === "ast" ? pos + plan.leadingWs + token.end : pos + token.end;
       decorations.push(
         Decoration.widget(widgetPos, () => createDeleteWidget(token), {
           side: 1,

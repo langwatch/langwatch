@@ -19,18 +19,14 @@ test("Prompt Management from Workflow", async ({ page }) => {
   await page.getByRole("link", { name: "Workflows" }).click();
   await page.getByTestId("active-create-new-workflow-button").click();
   await page.getByTestId("new-workflow-card-simple_rag").click();
-  await page
-    .getByRole("textbox", { name: "Name and Icon" })
-    .press("ControlOrMeta+a");
+  await page.getByRole("textbox", { name: "Name and Icon" }).press("ControlOrMeta+a");
   await page
     .getByRole("textbox", { name: "Name and Icon" })
     .fill("Test New Rag for Prompt Management");
   await page.getByRole("button", { name: "Create Workflow" }).click();
   await page.getByTestId("rf__node-generate_query").click();
   await page.getByRole("textbox", { name: "Prompt Name" }).click();
-  await page
-    .getByRole("textbox", { name: "Prompt Name" })
-    .press("ControlOrMeta+a");
+  await page.getByRole("textbox", { name: "Prompt Name" }).press("ControlOrMeta+a");
   await page
     .getByRole("textbox", { name: "Prompt Name" })
     .fill("We will use this prompt in the other node");
@@ -88,16 +84,12 @@ test("Prompt Management from Workflow", async ({ page }) => {
   //   .locator('[id="field\\:\\:\\:r5i\\:"] > div > .chakra-button')
   //   .click();
   await page.getByTestId("save-version-button").click();
-  await page
-    .getByRole("textbox", { name: "Description" })
-    .fill("Saving a new version");
+  await page.getByRole("textbox", { name: "Description" }).fill("Saving a new version");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.locator("div:nth-child(2) > button:nth-child(3)").click();
   await page.getByRole("button", { name: "zoom out" }).click();
   await page.getByTestId("rf__node-generate_answer").click();
-  await page
-    .getByRole("button", { name: "GenerateAnswer - Save from" })
-    .click();
+  await page.getByRole("button", { name: "GenerateAnswer - Save from" }).click();
   await page
     .getByTestId("prompt-source-dialog")
     .getByText(/We will use this prompt in the other node/)
@@ -134,19 +126,10 @@ test("Prompt Management from Workflow", async ({ page }) => {
     .getByRole("row", { name: "We will use this prompt in" })
     .getByRole("button")
     .click();
-  await page
-    .getByRole("textbox", { name: "Type 'delete' to confirm" })
-    .fill("delete");
+  await page.getByRole("textbox", { name: "Type 'delete' to confirm" }).fill("delete");
   await page.getByRole("button", { name: "Delete" }).click();
-  await page
-    .getByRole("row", { name: "GenerateAnswer" })
-    .getByRole("button")
-    .click();
+  await page.getByRole("row", { name: "GenerateAnswer" }).getByRole("button").click();
   await page.getByRole("textbox", { name: "Type 'delete' to confirm" }).click();
-  await page
-    .getByRole("textbox", { name: "Type 'delete' to confirm" })
-    .fill("delete");
-  await page
-    .getByRole("textbox", { name: "Type 'delete' to confirm" })
-    .press("Enter");
+  await page.getByRole("textbox", { name: "Type 'delete' to confirm" }).fill("delete");
+  await page.getByRole("textbox", { name: "Type 'delete' to confirm" }).press("Enter");
 });

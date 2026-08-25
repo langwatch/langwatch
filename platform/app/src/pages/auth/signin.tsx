@@ -69,14 +69,7 @@ export default function SignIn() {
     return () => {
       if (signInTimeout) clearTimeout(signInTimeout);
     };
-  }, [
-    publicEnv.data,
-    session,
-    callbackUrl,
-    isAuthProvider,
-    isSocialProvider,
-    error,
-  ]);
+  }, [publicEnv.data, session, callbackUrl, isAuthProvider, isSocialProvider, error]);
 
   if (error) {
     return <SignInError error={error} />;
@@ -211,9 +204,7 @@ function SignInForm() {
                 <Box asChild>
                   <Link
                     href={`/auth/signup${
-                      callbackUrl
-                        ? `?callbackUrl=${encodeURIComponent(callbackUrl)}`
-                        : ""
+                      callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""
                     }`}
                     style={{ textDecoration: "underline" }}
                   >
@@ -221,11 +212,7 @@ function SignInForm() {
                   </Link>
                 </Box>
                 <Spacer />
-                <Button
-                  colorPalette="orange"
-                  type="submit"
-                  loading={signInLoading}
-                >
+                <Button colorPalette="orange" type="submit" loading={signInLoading}>
                   Sign in
                 </Button>
               </HStack>

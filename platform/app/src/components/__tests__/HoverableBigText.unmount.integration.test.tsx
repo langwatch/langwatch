@@ -47,10 +47,7 @@ describe("HoverableBigText overflow probe lifetime", () => {
 
         view.unmount();
 
-        expect(
-          vi.getTimerCount(),
-          "no measurement may outlive the component",
-        ).toBe(0);
+        expect(vi.getTimerCount(), "no measurement may outlive the component").toBe(0);
         expect(() => vi.runAllTimers()).not.toThrow();
       });
     });

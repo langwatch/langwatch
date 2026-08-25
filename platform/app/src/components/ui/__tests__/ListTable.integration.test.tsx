@@ -35,9 +35,7 @@ describe("ListTable", () => {
       );
 
       expect(screen.getAllByRole("table")).toHaveLength(1);
-      expect(
-        screen.getByRole("columnheader", { name: "Name" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
       expect(screen.getByText("production samples")).toBeInTheDocument();
     });
   });

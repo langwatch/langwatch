@@ -180,11 +180,7 @@ async function main() {
     where: { id: targetExp.id, projectId: project.id },
   });
   check("target row STILL exists in Postgres (soft archive)", !!row);
-  check(
-    "target row archivedAt is set",
-    !!row?.archivedAt,
-    String(row?.archivedAt),
-  );
+  check("target row archivedAt is set", !!row?.archivedAt, String(row?.archivedAt));
   check(
     "target row slug was renamed (contains '-archived-')",
     !!row?.slug?.includes("-archived-"),
@@ -194,14 +190,9 @@ async function main() {
   const liveRow = await prisma.experiment.findFirst({
     where: { id: liveExp.id, projectId: project.id },
   });
-  check(
-    "untouched experiment archivedAt remains null",
-    liveRow?.archivedAt === null,
-  );
+  check("untouched experiment archivedAt remains null", liveRow?.archivedAt === null);
 
-  console.log(
-    "\n[7] Idempotent re-archive returns success and does not move archivedAt",
-  );
+  console.log("\n[7] Idempotent re-archive returns success and does not move archivedAt");
   const firstArchivedAt = row!.archivedAt!;
   await new Promise((r) => setTimeout(r, 50));
   const archiveRes2 = await page.request.post(

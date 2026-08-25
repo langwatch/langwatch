@@ -6,13 +6,14 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { refetchMock, openDrawerMock, goBackMock, keepDraftOnReturnMock } =
-  vi.hoisted(() => ({
+const { refetchMock, openDrawerMock, goBackMock, keepDraftOnReturnMock } = vi.hoisted(
+  () => ({
     refetchMock: vi.fn(),
     openDrawerMock: vi.fn(),
     goBackMock: vi.fn(),
     keepDraftOnReturnMock: vi.fn(),
-  }));
+  }),
+);
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -104,10 +105,7 @@ describe("dataset automation configuration", () => {
       await chooseCreate();
 
       expect(openDrawerMock).toHaveBeenCalledTimes(1);
-      expect(openDrawerMock).toHaveBeenCalledWith(
-        "addOrEditDataset",
-        expect.anything(),
-      );
+      expect(openDrawerMock).toHaveBeenCalledWith("addOrEditDataset", expect.anything());
       // Leaving is not returning: until the sub-flow ends, nothing tells the
       // drawer to keep the draft on its next mount.
       expect(keepDraftOnReturnMock).not.toHaveBeenCalled();

@@ -102,9 +102,7 @@ function fixturePrisma(): PrismaClient {
       findFirst: vi.fn(({ where }: any) =>
         Promise.resolve(
           organizationUsers.find(
-            (m) =>
-              m.userId === where.userId &&
-              m.organizationId === where.organizationId,
+            (m) => m.userId === where.userId && m.organizationId === where.organizationId,
           ) ?? null,
         ),
       ),
@@ -123,9 +121,7 @@ function fixturePrisma(): PrismaClient {
               // Mirrors the direct-binding predicate: the bound user must
               // currently be a member of the queried organization.
               organizationUsers.some(
-                (m) =>
-                  m.userId === b.userId &&
-                  m.organizationId === where.organizationId,
+                (m) => m.userId === b.userId && m.organizationId === where.organizationId,
               ),
           ),
         ),

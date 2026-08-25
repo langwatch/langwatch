@@ -1,9 +1,6 @@
 import { Card, GridItem, Heading, HStack, SimpleGrid } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
-import {
-  CustomGraph,
-  type CustomGraphInput,
-} from "~/components/analytics/CustomGraph";
+import { CustomGraph, type CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import GraphsLayout from "~/components/GraphsLayout";
 import { TopicsSelector } from "../../../components/filters/TopicsSelector";

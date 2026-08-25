@@ -43,11 +43,7 @@ const check = (label: string, ok: boolean, extra = "") => {
   }
 };
 
-async function signUpAndIn(
-  ctx: BrowserContext,
-  email: string,
-  password: string,
-) {
+async function signUpAndIn(ctx: BrowserContext, email: string, password: string) {
   const page = await ctx.newPage();
   await page.goto(`${BASE_URL}/auth/signup`, { waitUntil: "networkidle" });
   await page.waitForSelector("form", { timeout: 10000 });
@@ -100,10 +96,7 @@ async function main() {
     const ctxB = await browser.newContext();
 
     const pageA0 = await signUpAndIn(ctxA, EMAIL, OLD_PASSWORD);
-    check(
-      "context A: signup succeeded",
-      !pageA0.url().includes("/auth/signup"),
-    );
+    check("context A: signup succeeded", !pageA0.url().includes("/auth/signup"));
 
     // Context B signs in fresh — this creates a SECOND Session row.
     const signInB = await signIn(ctxB, EMAIL, OLD_PASSWORD);
@@ -112,12 +105,8 @@ async function main() {
     // Both contexts should have independent session cookies.
     const cookiesA = await ctxA.cookies();
     const cookiesB = await ctxB.cookies();
-    const cookieA = cookiesA.find((c) =>
-      c.name.includes("better-auth.session_token"),
-    );
-    const cookieB = cookiesB.find((c) =>
-      c.name.includes("better-auth.session_token"),
-    );
+    const cookieA = cookiesA.find((c) => c.name.includes("better-auth.session_token"));
+    const cookieB = cookiesB.find((c) => c.name.includes("better-auth.session_token"));
     check("context A: has session cookie", !!cookieA);
     check("context B: has session cookie", !!cookieB);
     check(
@@ -171,8 +160,7 @@ async function main() {
       `status=${changeStatus}`,
     );
     const success =
-      Array.isArray(changeJson) &&
-      changeJson[0]?.result?.data?.json?.success === true;
+      Array.isArray(changeJson) && changeJson[0]?.result?.data?.json?.success === true;
     check("changePassword response: success=true", success);
 
     // ──────────────────────────────────────────────────────────────
@@ -214,43 +202,28 @@ async function main() {
     console.log("\n[5] Old password rejected, new password accepted");
     const ctxC = await browser.newContext();
     const oldPwSignIn = await signIn(ctxC, EMAIL, OLD_PASSWORD);
-    check(
-      "signin with OLD password: rejected",
-      !oldPwSignIn.ok,
-      oldPwSignIn.page.url(),
-    );
+    check("signin with OLD password: rejected", !oldPwSignIn.ok, oldPwSignIn.page.url());
     await ctxC.close();
 
     const ctxD = await browser.newContext();
     const newPwSignIn = await signIn(ctxD, EMAIL, NEW_PASSWORD);
-    check(
-      "signin with NEW password: accepted",
-      newPwSignIn.ok,
-      newPwSignIn.page.url(),
-    );
+    check("signin with NEW password: accepted", newPwSignIn.ok, newPwSignIn.page.url());
     await ctxD.close();
 
     // ──────────────────────────────────────────────────────────────
     // [6] Same-origin sign-out works (baseline CSRF sanity)
     // ──────────────────────────────────────────────────────────────
     console.log("\n[6] Same-origin sign-out");
-    const signOutRes = await pageA0.request.post(
-      `${BASE_URL}/api/auth/sign-out`,
-      {
-        headers: { "Content-Type": "application/json", Origin: BASE_URL },
-      },
-    );
+    const signOutRes = await pageA0.request.post(`${BASE_URL}/api/auth/sign-out`, {
+      headers: { "Content-Type": "application/json", Origin: BASE_URL },
+    });
     check(
       "POST /api/auth/sign-out (same origin): 200",
       signOutRes.status() === 200,
       `status=${signOutRes.status()}`,
     );
     const emailA3 = await getSessionEmail(ctxA);
-    check(
-      "context A: session gone after sign-out",
-      emailA3 === null,
-      emailA3 ?? "null",
-    );
+    check("context A: session gone after sign-out", emailA3 === null, emailA3 ?? "null");
 
     await ctxA.close();
     await ctxB.close();
@@ -275,9 +248,7 @@ async function main() {
     console.log(`✅ ALL CHECKS PASSED (${passes}/${passes})`);
     process.exit(0);
   } else {
-    console.log(
-      `❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`,
-    );
+    console.log(`❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`);
     process.exit(1);
   }
 }

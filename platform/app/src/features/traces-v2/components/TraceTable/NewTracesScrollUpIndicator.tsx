@@ -49,9 +49,9 @@ interface NewTracesScrollUpIndicatorProps {
  * animations. Replaced with a flat pill that just arrives once and
  * settles — the constant motion read as visual nag on busy projects.
  */
-export const NewTracesScrollUpIndicator: React.FC<
-  NewTracesScrollUpIndicatorProps
-> = ({ scrollRef }) => {
+export const NewTracesScrollUpIndicator: React.FC<NewTracesScrollUpIndicatorProps> = ({
+  scrollRef,
+}) => {
   const { count, acknowledge } = useTraceNewCount();
   const liveUpdatesMode = useSseStatusStore((s) => s.liveUpdatesMode);
   const [isScrolled, setIsScrolled] = useState(false);

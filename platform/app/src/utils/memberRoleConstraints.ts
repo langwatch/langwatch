@@ -11,10 +11,7 @@ export type TeamRoleValue = TeamUserRole | `custom:${string}`;
  * (a lite member) deliberately lands as VIEWER: a lite seat never confers
  * write access on a scope it is granted into.
  */
-export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
-  OrganizationUserRole,
-  TeamUserRole
-> = {
+export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<OrganizationUserRole, TeamUserRole> = {
   [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
   [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
   [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,

@@ -33,10 +33,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
@@ -68,8 +65,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       };
 
       // Create a map projection that throws to trigger the error logging path
-      const failingMapDef =
-        createMockMapProjectionDefinition("failing-handler");
+      const failingMapDef = createMockMapProjectionDefinition("failing-handler");
       (failingMapDef.map as ReturnType<typeof vi.fn>).mockImplementation(() => {
         throw new Error("Projection dispatch failed");
       });
@@ -77,10 +73,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [failingMapDef],
         logger: logger as any,
@@ -114,10 +107,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
@@ -145,10 +135,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -175,10 +162,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef],
       });
@@ -205,10 +189,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [foldDef1, foldDef2],
       });
@@ -222,24 +203,20 @@ describe("EventSourcingService - Store Events Flow", () => {
       ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
-      (foldDef1.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) => ({
-          id: "proj1-id",
-          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-          tenantId: tenantId,
-          version: TEST_CONSTANTS.BASE_TIMESTAMP,
-          data: {},
-        }),
-      );
-      (foldDef2.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) => ({
-          id: "proj2-id",
-          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-          tenantId: tenantId,
-          version: TEST_CONSTANTS.BASE_TIMESTAMP,
-          data: {},
-        }),
-      );
+      (foldDef1.apply as ReturnType<typeof vi.fn>).mockImplementation((_state: any) => ({
+        id: "proj1-id",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        tenantId: tenantId,
+        version: TEST_CONSTANTS.BASE_TIMESTAMP,
+        data: {},
+      }));
+      (foldDef2.apply as ReturnType<typeof vi.fn>).mockImplementation((_state: any) => ({
+        id: "proj2-id",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        tenantId: tenantId,
+        version: TEST_CONSTANTS.BASE_TIMESTAMP,
+        data: {},
+      }));
 
       await service.storeEvents(events, context);
 
@@ -256,10 +233,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
       });
 
@@ -307,12 +281,10 @@ describe("EventSourcingService - Store Events Flow", () => {
         callOrder.push("store");
         return Promise.resolve();
       });
-      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation(
-        (event: any) => {
-          callOrder.push("handler");
-          return event;
-        },
-      );
+      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation((event: any) => {
+        callOrder.push("handler");
+        return event;
+      });
       eventStore.getEvents = vi
         .fn()
         .mockResolvedValue([
@@ -322,32 +294,25 @@ describe("EventSourcingService - Store Events Flow", () => {
             tenantId,
           ),
         ]);
-      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) => {
-          callOrder.push("projection");
-          return {
-            id: "proj-id",
-            aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-            tenantId: tenantId,
-            version: TEST_CONSTANTS.BASE_TIMESTAMP,
-            data: {},
-          };
-        },
-      );
-      (foldDef.store.store as ReturnType<typeof vi.fn>).mockImplementation(
-        async () => {
-          callOrder.push("storeProjection");
-          return Promise.resolve();
-        },
-      );
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation((_state: any) => {
+        callOrder.push("projection");
+        return {
+          id: "proj-id",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          tenantId: tenantId,
+          version: TEST_CONSTANTS.BASE_TIMESTAMP,
+          data: {},
+        };
+      });
+      (foldDef.store.store as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+        callOrder.push("storeProjection");
+        return Promise.resolve();
+      });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
         foldProjections: [foldDef],
@@ -389,23 +354,18 @@ describe("EventSourcingService - Store Events Flow", () => {
             tenantId,
           ),
         ]);
-      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) => ({
-          id: "proj-id",
-          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-          tenantId: tenantId,
-          version: TEST_CONSTANTS.BASE_TIMESTAMP,
-          data: {},
-        }),
-      );
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation((_state: any) => ({
+        id: "proj-id",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        tenantId: tenantId,
+        version: TEST_CONSTANTS.BASE_TIMESTAMP,
+        data: {},
+      }));
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
         foldProjections: [foldDef],

@@ -39,10 +39,7 @@ describe("event subscribers", () => {
         const service = new EventSourcingService({
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+          allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
           eventStore,
           subscribers: [subscriber],
         });
@@ -82,10 +79,7 @@ describe("event subscribers", () => {
         const service = new EventSourcingService({
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+          allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
           eventStore,
           subscribers: [subscriber],
         });

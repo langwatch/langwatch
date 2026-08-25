@@ -36,9 +36,7 @@ function isRetryableTransactionError(error: unknown): boolean {
  * Postgres is the authority for both logical-send replay and one-active-turn
  * admission. The event projection remains a cheap rejection hint only.
  */
-export class PrismaLangyTurnAdmissionRepository
-  extends LangyTurnAdmissionRepository
-{
+export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionRepository {
   constructor(private readonly prisma: PrismaClient) {
     super();
   }
@@ -59,9 +57,7 @@ export class PrismaLangyTurnAdmissionRepository
         return await this.prisma.$transaction(
           async (tx) => {
             const now = new Date();
-            const leaseExpiresAt = new Date(
-              now.getTime() + PREPARATION_LEASE_MS,
-            );
+            const leaseExpiresAt = new Date(now.getTime() + PREPARATION_LEASE_MS);
             const claimToken = crypto.randomUUID();
 
             let receipt = await tx.langyTurnRequest.findUnique({
@@ -171,8 +167,7 @@ export class PrismaLangyTurnAdmissionRepository
             } else if (
               (active.status === PREPARING && active.leaseExpiresAt <= now) ||
               (active.status === COMMITTED &&
-                now.getTime() - active.updatedAt.getTime() >
-                  COMMITTED_ABANDON_MS)
+                now.getTime() - active.updatedAt.getTime() > COMMITTED_ABANDON_MS)
             ) {
               await tx.langyActiveTurn.update({
                 where: { id: active.id, projectId: input.projectId },
@@ -284,13 +279,8 @@ export class PrismaLangyTurnAdmissionRepository
         });
         // A matching terminal event may already have released this row. A row
         // for another turn is never an idempotent success.
-        if (
-          active &&
-          (active.turnId !== input.turnId || active.status !== COMMITTED)
-        ) {
-          throw new Error(
-            `Langy active-turn commit lost its claim for ${input.turnId}`,
-          );
+        if (active && (active.turnId !== input.turnId || active.status !== COMMITTED)) {
+          throw new Error(`Langy active-turn commit lost its claim for ${input.turnId}`);
         }
       }
     });

@@ -32,8 +32,8 @@ export function RevokeConfirmDialog({
         <Dialog.Body paddingBottom={6}>
           <VStack gap={4} align="start">
             <Text>
-              Are you sure you want to revoke this API key? Any integration
-              using it will stop working immediately.
+              Are you sure you want to revoke this API key? Any integration using it will
+              stop working immediately.
             </Text>
             <HStack width="full" justify="end" gap={2}>
               <Button variant="outline" onClick={onCancel}>

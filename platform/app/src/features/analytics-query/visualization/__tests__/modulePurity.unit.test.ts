@@ -21,10 +21,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { createNoNetworkVegaLoader } from "../noNetworkVegaLoader";
-import {
-  parseVegaLiteSpecText,
-  validateVegaLiteSpec,
-} from "../validateVegaLiteSpec";
+import { parseVegaLiteSpecText, validateVegaLiteSpec } from "../validateVegaLiteSpec";
 import { screenVegaExpression } from "../vegaLiteExpressions";
 import { validateFieldReferences } from "../vegaLiteFields";
 import {
@@ -39,10 +36,7 @@ import {
   validateAgainstVegaLiteSchema,
 } from "../vegaLiteSchema";
 import { collectViewNodes, measureSpecBytes } from "../vegaLiteStructure";
-import {
-  LWQL_VEGA_RULE_IDS,
-  VEGA_VALIDATION_ERROR_CODES,
-} from "../visualization.types";
+import { LWQL_VEGA_RULE_IDS, VEGA_VALIDATION_ERROR_CODES } from "../visualization.types";
 
 /** `…/visualization/__tests__` → `…/visualization` */
 const MODULE_DIR = fileURLToPath(new URL("../", import.meta.url));
@@ -106,13 +100,10 @@ describe("the Vega-Lite validator and policy modules", () => {
         const files = sourceFiles();
         expect(files.length).toBeGreaterThan(5);
         for (const { name, source } of files) {
-          expect(
-            importsBrowserRuntime(source),
-            `${name} imports a browser runtime`,
-          ).toBe(false);
-          expect(source.includes("import("), `${name} uses a lazy import`).toBe(
+          expect(importsBrowserRuntime(source), `${name} imports a browser runtime`).toBe(
             false,
           );
+          expect(source.includes("import("), `${name} uses a lazy import`).toBe(false);
         }
 
         // The schema module reaches the bundled schema only through the
@@ -123,9 +114,7 @@ describe("the Vega-Lite validator and policy modules", () => {
         // dying in exactly the environment it is hardened for.
         const schemaSource =
           files.find(({ name }) => name === "vegaLiteSchema.ts")?.source ?? "";
-        expect(schemaSource).toContain(
-          'from "./vegaLiteSchemaValidator.generated.js"',
-        );
+        expect(schemaSource).toContain('from "./vegaLiteSchemaValidator.generated.js"');
         expect(schemaSource).not.toMatch(/from\s+["']vega-lite[^"']*["']/);
         expect(schemaSource).not.toMatch(/new Ajv|\.compile\(/);
 
@@ -155,9 +144,7 @@ describe("the Vega-Lite validator and policy modules", () => {
             columnsByDataset: {},
           }).errors,
         ).toEqual([]);
-        expect(
-          screenVegaExpression("datum.a + 1").forbiddenIdentifiers,
-        ).toEqual([]);
+        expect(screenVegaExpression("datum.a + 1").forbiddenIdentifiers).toEqual([]);
         expect(collectViewNodes({ mark: "bar" })).toHaveLength(1);
         expect(measureSpecBytes({ a: 1 })).toBe(7);
         expect(parseVegaLiteSpecText("{}").ok).toBe(true);
@@ -214,14 +201,10 @@ describe("the Vega-Lite validator and policy modules", () => {
         ];
 
         for (const source of caught) {
-          expect(importsBrowserRuntime(source), `should catch: ${source}`).toBe(
-            true,
-          );
+          expect(importsBrowserRuntime(source), `should catch: ${source}`).toBe(true);
         }
         for (const source of admitted) {
-          expect(importsBrowserRuntime(source), `should admit: ${source}`).toBe(
-            false,
-          );
+          expect(importsBrowserRuntime(source), `should admit: ${source}`).toBe(false);
         }
       });
     });

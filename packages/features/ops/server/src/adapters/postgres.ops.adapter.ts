@@ -44,14 +44,11 @@ export class PostgresOpsAdapter {
     return new PostgresOpsAdapter(options);
   }
 
-  static readonly userBackofficeInclude =
-    PrismaAdminUserMapper.USER_BACKOFFICE_INCLUDE;
+  static readonly userBackofficeInclude = PrismaAdminUserMapper.USER_BACKOFFICE_INCLUDE;
   static readonly organizationSafeSelect = ORGANIZATION_SAFE_SELECT;
   static readonly projectSafeSelect = PROJECT_SAFE_SELECT;
 
-  static mapUserToBackofficeRow(
-    user: UserWithBackofficeIncludes,
-  ): BackofficeUserRow {
+  static mapUserToBackofficeRow(user: UserWithBackofficeIncludes): BackofficeUserRow {
     return PrismaAdminUserMapper.map(user);
   }
 
@@ -62,9 +59,7 @@ export class PostgresOpsAdapter {
     return OpsService.create({
       access,
       adminBackoffice: AdminBackofficeService.create({
-        repository: PrismaAdminBackofficeRepository.create(
-          this.options.database,
-        ),
+        repository: PrismaAdminBackofficeRepository.create(this.options.database),
         users: this.options.users,
         audit: this.options.audit,
       }),

@@ -39,13 +39,7 @@ function tryParse(candidate: string): { value: unknown } | null {
  * Index of the bracket that closes the one at `start`, or -1. String-aware, so
  * a `}` inside a JSON string value does not close the document early.
  */
-function findBalancedEnd({
-  text,
-  start,
-}: {
-  text: string;
-  start: number;
-}): number {
+function findBalancedEnd({ text, start }: { text: string; start: number }): number {
   let depth = 0;
   let inString = false;
 
@@ -100,13 +94,7 @@ function startsAtDocumentBoundary({
  * bracket the rest of the output never closes is otherwise read as a truncated
  * document, which stops the scan. Reading its first token tells the two apart.
  */
-function opensJsonContent({
-  text,
-  start,
-}: {
-  text: string;
-  start: number;
-}): boolean {
+function opensJsonContent({ text, start }: { text: string; start: number }): boolean {
   const opensObject = text[start] === "{";
   const close = opensObject ? "}" : "]";
 

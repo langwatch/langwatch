@@ -47,35 +47,29 @@ describe("virtual key crypto", () => {
       const secret = mintVirtualKeySecret(1_735_000_000_000);
       const parsed = parseVirtualKey(secret);
       expect(parsed.ulid).toHaveLength(26);
-      expect(parsed.displayPrefix).toHaveLength(
-        VIRTUAL_KEY_DISPLAY_PREFIX_LENGTH,
-      );
+      expect(parsed.displayPrefix).toHaveLength(VIRTUAL_KEY_DISPLAY_PREFIX_LENGTH);
       expect(parsed.displayPrefix.startsWith("vk-lw-")).toBe(true);
     });
 
     describe("when the key is malformed", () => {
       it("rejects a secret without the vk-lw- prefix", () => {
-        expect(() => parseVirtualKey("sk-live-abcdef")).toThrow(
-          VirtualKeyCryptoError,
-        );
+        expect(() => parseVirtualKey("sk-live-abcdef")).toThrow(VirtualKeyCryptoError);
       });
 
       it("rejects a legacy lw_vk_ token (clean break, no backcompat)", () => {
-        expect(() =>
-          parseVirtualKey("lw_vk_live_01H000000000000000000000"),
-        ).toThrow(VirtualKeyCryptoError);
-      });
-
-      it("rejects a ulid shorter than 26 chars", () => {
-        expect(() => parseVirtualKey("vk-lw-ABC")).toThrow(
+        expect(() => parseVirtualKey("lw_vk_live_01H000000000000000000000")).toThrow(
           VirtualKeyCryptoError,
         );
       });
 
+      it("rejects a ulid shorter than 26 chars", () => {
+        expect(() => parseVirtualKey("vk-lw-ABC")).toThrow(VirtualKeyCryptoError);
+      });
+
       it("rejects a ulid with non-Crockford characters", () => {
-        expect(() =>
-          parseVirtualKey("vk-lw-!!!!!!!!!!!!!!!!!!!!!!!!!!"),
-        ).toThrow(VirtualKeyCryptoError);
+        expect(() => parseVirtualKey("vk-lw-!!!!!!!!!!!!!!!!!!!!!!!!!!")).toThrow(
+          VirtualKeyCryptoError,
+        );
       });
     });
   });
@@ -104,9 +98,7 @@ describe("virtual key crypto", () => {
     describe("when the pepper is missing", () => {
       it("throws pepper_missing", () => {
         delete process.env.LW_VIRTUAL_KEY_PEPPER;
-        expect(() => hashVirtualKeySecret("vk-lw-x")).toThrow(
-          /LW_VIRTUAL_KEY_PEPPER/,
-        );
+        expect(() => hashVirtualKeySecret("vk-lw-x")).toThrow(/LW_VIRTUAL_KEY_PEPPER/);
       });
     });
   });

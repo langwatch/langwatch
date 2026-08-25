@@ -45,10 +45,7 @@ interface Operation {
 }
 
 const document = JSON.parse(
-  readFileSync(
-    join(LANGWATCH_ROOT, "src/app/api/openapiLangWatch.json"),
-    "utf8",
-  ),
+  readFileSync(join(LANGWATCH_ROOT, "src/app/api/openapiLangWatch.json"), "utf8"),
 ) as {
   paths: Record<string, Record<string, Operation>>;
   components: { securitySchemes: Record<string, unknown> };
@@ -64,10 +61,7 @@ const registeredOperations = (): {
   path: string;
   described: boolean;
 }[] => {
-  const source = readFileSync(
-    join(LANGWATCH_ROOT, "ee/scim/routes.ts"),
-    "utf8",
-  );
+  const source = readFileSync(join(LANGWATCH_ROOT, "ee/scim/routes.ts"), "utf8");
   const basePath = apiBasePathsOf(source)[0];
   if (basePath !== SCIM_PREFIX) {
     throw new Error(
@@ -129,9 +123,7 @@ describe("the SCIM 2.0 REST API", () => {
       for (const { method, path, key } of OPERATIONS) {
         const operationId = operationIn(method, path)?.operationId;
         expect(operationId, `${key} has no operationId`).toBeDefined();
-        expect(operationId, `${key} looks derived from its URL`).toMatch(
-          /^scim[A-Z]/,
-        );
+        expect(operationId, `${key} looks derived from its URL`).toMatch(/^scim[A-Z]/);
       }
 
       const ids = OPERATIONS.map(
@@ -149,9 +141,7 @@ describe("the SCIM 2.0 REST API", () => {
       expect(provisioning).toHaveLength(12);
 
       for (const { method, path, key } of provisioning) {
-        expect(operationIn(method, path)?.security, key).toEqual([
-          { scim_bearer: [] },
-        ]);
+        expect(operationIn(method, path)?.security, key).toEqual([{ scim_bearer: [] }]);
       }
     });
 
@@ -161,10 +151,7 @@ describe("the SCIM 2.0 REST API", () => {
       // publishes a credential these three endpoints neither want nor check.
       for (const key of DISCOVERY_OPERATIONS) {
         const [method, path] = key.split(" ");
-        expect(
-          operationIn(method!.toLowerCase(), path!)?.security,
-          key,
-        ).toEqual([]);
+        expect(operationIn(method!.toLowerCase(), path!)?.security, key).toEqual([]);
       }
     });
 
@@ -187,16 +174,12 @@ describe("the SCIM 2.0 REST API", () => {
       // naming a scheme the document never declares renders as an endpoint
       // nobody can authenticate, and a client generator resolving
       // `#/components/securitySchemes/...` finds nothing there.
-      const declared = new Set(
-        Object.keys(document.components.securitySchemes),
-      );
+      const declared = new Set(Object.keys(document.components.securitySchemes));
 
       const named = new Set(
         Object.values(document.paths).flatMap((item) =>
           Object.values(item).flatMap((operation) =>
-            (operation.security ?? []).flatMap((requirement) =>
-              Object.keys(requirement),
-            ),
+            (operation.security ?? []).flatMap((requirement) => Object.keys(requirement)),
           ),
         ),
       );

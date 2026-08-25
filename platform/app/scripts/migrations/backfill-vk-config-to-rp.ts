@@ -120,9 +120,7 @@ async function backfillAliasesAndRules(
   const primary = scopes[0]!;
 
   if (DRY_RUN) {
-    console.log(
-      `[dry-run] mint RP ${rpId} (${rpName}) scopes=${scopes.length}`,
-    );
+    console.log(`[dry-run] mint RP ${rpId} (${rpName}) scopes=${scopes.length}`);
     return rpId;
   }
 
@@ -273,9 +271,7 @@ async function main() {
     }
 
     if (DRY_RUN) {
-      console.log(
-        `[dry-run] update vk=${vk.id} routingPolicyId=${routingPolicyId}`,
-      );
+      console.log(`[dry-run] update vk=${vk.id} routingPolicyId=${routingPolicyId}`);
     } else {
       await prisma.virtualKey.update({
         where: { id: vk.id },

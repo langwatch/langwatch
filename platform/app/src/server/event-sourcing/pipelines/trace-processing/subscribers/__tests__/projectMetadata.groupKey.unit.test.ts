@@ -48,8 +48,7 @@ describe("projectMetadataGroupKey", () => {
 
 describe("projectMetadata lane wiring", () => {
   const pipeline = createTraceProcessingPipeline(buildTraceDeps());
-  const registration =
-    pipeline.foldSubscribers.get("projectMetadata")!.definition;
+  const registration = pipeline.foldSubscribers.get("projectMetadata")!.definition;
 
   function payloadFor({
     tenantId,
@@ -98,9 +97,7 @@ describe("projectMetadata lane wiring", () => {
 
       expect(
         groupKeyFn(payloadFor({ tenantId: "project_x", aggregateId: "t1" })),
-      ).not.toBe(
-        groupKeyFn(payloadFor({ tenantId: "project_y", aggregateId: "t1" })),
-      );
+      ).not.toBe(groupKeyFn(payloadFor({ tenantId: "project_y", aggregateId: "t1" })));
     });
   });
 

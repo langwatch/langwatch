@@ -75,35 +75,23 @@ export class GroupQueueMetricsCollector {
       const blockedKey = `${keyPrefix}blocked`;
       const parkedTenantsKey = `${keyPrefix}parked-tenants`;
 
-      const pendingGroupCount =
-        await this.params.redisConnection.zcard(readyKey);
-      const blockedGroupCount =
-        await this.params.redisConnection.scard(blockedKey);
+      const pendingGroupCount = await this.params.redisConnection.zcard(readyKey);
+      const blockedGroupCount = await this.params.redisConnection.scard(blockedKey);
 
       // Parked depth = sum of every over-cap tenant's parked zset. The registry
       // set is tiny (one entry per over-cap tenant) and empty in the cap=0
       // steady state, so this is effectively free when nothing is parked.
       let parkedGroupCount = 0;
-      const parkedTenants =
-        await this.params.redisConnection.smembers(parkedTenantsKey);
+      const parkedTenants = await this.params.redisConnection.smembers(parkedTenantsKey);
       for (const tenantId of parkedTenants) {
         parkedGroupCount += await this.params.redisConnection.zcard(
           `${keyPrefix}parked:${tenantId}`,
         );
       }
 
-      gqPendingGroups.set(
-        { queue_name: this.params.queueName },
-        pendingGroupCount,
-      );
-      gqBlockedGroups.set(
-        { queue_name: this.params.queueName },
-        blockedGroupCount,
-      );
-      gqParkedGroups.set(
-        { queue_name: this.params.queueName },
-        parkedGroupCount,
-      );
+      gqPendingGroups.set({ queue_name: this.params.queueName }, pendingGroupCount);
+      gqBlockedGroups.set({ queue_name: this.params.queueName }, blockedGroupCount);
+      gqParkedGroups.set({ queue_name: this.params.queueName }, parkedGroupCount);
       gqActiveGroups.set(
         { queue_name: this.params.queueName },
         this.params.activeJobCountFn(),
@@ -196,8 +184,7 @@ export class GroupQueueMetricsCollector {
       0,
       1,
     );
-    const eligibleDueMs =
-      oldestEligible.length >= 2 ? Number(oldestEligible[1]) : null;
+    const eligibleDueMs = oldestEligible.length >= 2 ? Number(oldestEligible[1]) : null;
     gqOldestPendingAgeMilliseconds.set(
       { queue_name: this.params.queueName },
       eligibleDueMs === null ? 0 : Math.max(0, nowMs - eligibleDueMs),
@@ -243,12 +230,7 @@ export class GroupQueueMetricsCollector {
 
     const headPipeline = this.params.redisConnection.pipeline();
     for (const groupId of deferredGroups) {
-      headPipeline.zrange(
-        `${keyPrefix}group:${groupId}:jobs`,
-        0,
-        0,
-        "WITHSCORES",
-      );
+      headPipeline.zrange(`${keyPrefix}group:${groupId}:jobs`, 0, 0, "WITHSCORES");
     }
     const headResults = (await headPipeline.exec()) ?? [];
     return minDueMs(seed, headResults, nowMs);

@@ -7,22 +7,13 @@ import {
   ShareLinkNotFoundError,
   TraceSharingDisabledError,
 } from "../errors";
-import type {
-  ShareRepository,
-  ShareWithProject,
-} from "../repositories/share.repository";
-import {
-  ShareService,
-  type ShareServiceDeps,
-  type ShareViewer,
-} from "../share.service";
+import type { ShareRepository, ShareWithProject } from "../repositories/share.repository";
+import { ShareService, type ShareServiceDeps, type ShareViewer } from "../share.service";
 
 const ORG_ID = "org_1";
 const PROJECT_ID = "project_1";
 
-function buildShare(
-  overrides: Partial<ShareWithProject> = {},
-): ShareWithProject {
+function buildShare(overrides: Partial<ShareWithProject> = {}): ShareWithProject {
   return {
     id: "share_1",
     token: "tok_abc",
@@ -434,9 +425,7 @@ describe("ShareService", () => {
           resourceId: "trace_a",
         });
 
-        expect(vi.mocked(repo.create).mock.calls[0]![0]).not.toHaveProperty(
-          "threadId",
-        );
+        expect(vi.mocked(repo.create).mock.calls[0]![0]).not.toHaveProperty("threadId");
       });
     });
 
@@ -461,12 +450,8 @@ describe("ShareService", () => {
     describe("when the rollback delete ALSO fails", () => {
       it("propagates the original pin error, not the rollback error", async () => {
         vi.mocked(repo.create).mockResolvedValue({ id: "share_1" } as never);
-        vi.mocked(pinnedTraces.autoPin).mockRejectedValue(
-          new Error("pin failed"),
-        );
-        vi.mocked(repo.deleteById).mockRejectedValue(
-          new Error("rollback failed"),
-        );
+        vi.mocked(pinnedTraces.autoPin).mockRejectedValue(new Error("pin failed"));
+        vi.mocked(repo.deleteById).mockRejectedValue(new Error("rollback failed"));
 
         // The caller must see the real cause (pin failed), never the masking
         // rollback error. The rollback failure is logged, not thrown.

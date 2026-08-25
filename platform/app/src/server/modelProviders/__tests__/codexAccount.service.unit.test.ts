@@ -27,10 +27,7 @@ const ID_TOKEN = fakeIdToken({
   },
 });
 
-type Script = Record<
-  string,
-  (body: string) => { status: number; json: unknown }
->;
+type Script = Record<string, (body: string) => { status: number; json: unknown }>;
 
 /** fetch stand-in routed by URL path, recording every request body. */
 function scriptedFetch(script: Script) {
@@ -220,9 +217,7 @@ describe("CodexAccountService", () => {
         }),
       });
       const service = new CodexAccountService(impl, "https://issuer.test");
-      await expect(service.startDeviceSignIn()).rejects.toBeInstanceOf(
-        CodexAuthError,
-      );
+      await expect(service.startDeviceSignIn()).rejects.toBeInstanceOf(CodexAuthError);
     });
   });
 });
@@ -271,11 +266,7 @@ describe("CodexGatewayRefreshService", () => {
     };
     const { impl } = scriptedFetch({ "/oauth/token": tokenEndpoint });
     const engine = new CodexAccountService(impl, "https://issuer.test");
-    const service = new CodexGatewayRefreshService(
-      repository,
-      changeEvents,
-      engine,
-    );
+    const service = new CodexGatewayRefreshService(repository, changeEvents, engine);
     return { service, replaced, events };
   }
 

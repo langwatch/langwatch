@@ -1,13 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  chakra,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, chakra, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { BookOpen } from "lucide-react";
 import type React from "react";
 import { memo, useMemo } from "react";
@@ -160,9 +151,7 @@ const GroupedItems: React.FC<{
     <>
       {grouped.map((section) => {
         const GroupIcon =
-          section.groupId !== "other"
-            ? GROUP_ICONS[section.groupId]
-            : undefined;
+          section.groupId !== "other" ? GROUP_ICONS[section.groupId] : undefined;
         return (
           <Box key={section.groupId}>
             <HStack
@@ -214,9 +203,7 @@ interface GroupedSection {
   rows: Array<{ row: SuggestionRow; flatIndex: number }>;
 }
 
-const FACET_GROUP_LABEL = new Map(
-  FACET_GROUPS.map((g) => [g.id, g.label] as const),
-);
+const FACET_GROUP_LABEL = new Map(FACET_GROUPS.map((g) => [g.id, g.label] as const));
 
 /**
  * Bucket the flat suggestion list by the SAME taxonomy the facet sidebar /
@@ -243,9 +230,7 @@ function groupRows(items: SuggestionRow[]): GroupedSection[] {
     if (!bucket) {
       bucket = {
         groupId: facetGroupId ?? "other",
-        label: facetGroupId
-          ? (FACET_GROUP_LABEL.get(facetGroupId) ?? "Other")
-          : "Other",
+        label: facetGroupId ? (FACET_GROUP_LABEL.get(facetGroupId) ?? "Other") : "Other",
         rows: [],
       };
       buckets.set(bucketKey, bucket);
@@ -294,85 +279,57 @@ interface SuggestionRowProps {
 // unchanged — only the previously/newly-selected rows flip `isSelected`.
 // Without memo every row re-rendered (re-instantiating a Lucide icon each),
 // which dominated the per-keystroke cost once the icon-rich redesign landed.
-const SuggestionRowView: React.FC<SuggestionRowProps> = memo(
-  function SuggestionRowView({ row, mode, count, isSelected, onSelect }) {
-    const isFieldMode = mode === "field";
-    const fieldMeta =
-      isFieldMode && !row.isPrefix ? SEARCH_FIELDS[row.value] : undefined;
-    // Field mode: the same per-facet icon the sidebar / manager use, so the
-    // two surfaces read with one visual language.
-    const FieldIcon = isFieldMode
-      ? getFacetIcon({ key: row.value })
-      : undefined;
-    // In value-mode, when the row carries a human-readable label (e.g.
-    // evaluator name "Faithfulness") that differs from the raw id
-    // (`ragas/faithfulness`), surface the id as a muted hint after the
-    // label so the operator knows what's actually going into the query.
-    const idHint =
-      mode === "value" && row.label !== row.value ? row.value : null;
+const SuggestionRowView: React.FC<SuggestionRowProps> = memo(function SuggestionRowView({
+  row,
+  mode,
+  count,
+  isSelected,
+  onSelect,
+}) {
+  const isFieldMode = mode === "field";
+  const fieldMeta = isFieldMode && !row.isPrefix ? SEARCH_FIELDS[row.value] : undefined;
+  // Field mode: the same per-facet icon the sidebar / manager use, so the
+  // two surfaces read with one visual language.
+  const FieldIcon = isFieldMode ? getFacetIcon({ key: row.value }) : undefined;
+  // In value-mode, when the row carries a human-readable label (e.g.
+  // evaluator name "Faithfulness") that differs from the raw id
+  // (`ragas/faithfulness`), surface the id as a muted hint after the
+  // label so the operator knows what's actually going into the query.
+  const idHint = mode === "value" && row.label !== row.value ? row.value : null;
 
-    return (
-      <chakra.button
-        type="button"
-        display="flex"
-        alignItems="center"
-        justifyContent="space-between"
-        width="full"
-        paddingX={3}
-        paddingY={1.5}
-        gap={2}
-        textAlign="left"
-        bg={isSelected ? "blue.solid/12" : "transparent"}
-        color="fg"
-        cursor="pointer"
-        _hover={{ bg: "blue.solid/8" }}
-        onMouseDown={(event) => {
-          event.preventDefault();
-          onSelect(row.value);
-        }}
-      >
-        <HStack gap={2} minWidth={0} flex={1}>
-          {FieldIcon && (
-            <Icon boxSize="13px" color="fg.subtle" flexShrink={0}>
-              <FieldIcon />
-            </Icon>
-          )}
-          {isFieldMode ? (
-            // Human label leads (reads like the facet sidebar), with the raw
-            // query field as a mono hint so users learn the syntax.
-            <>
-              <Text
-                textStyle="xs"
-                color="fg"
-                fontWeight="medium"
-                flexShrink={0}
-                truncate
-              >
-                {row.label}
-              </Text>
-              <Text
-                textStyle="2xs"
-                color="fg.subtle"
-                fontFamily="mono"
-                truncate
-                minWidth={0}
-                flexShrink={1}
-              >
-                {row.field}
-              </Text>
-            </>
-          ) : (
-            // Value mode: `field:value` with the value emphasised.
-            <Text textStyle="xs" flexShrink={0}>
-              <Text as="span" color="fg.muted">
-                {row.field}:
-              </Text>
-              <Text as="span" color="fg" fontWeight="medium">
-                {row.label}
-              </Text>
+  return (
+    <chakra.button
+      type="button"
+      display="flex"
+      alignItems="center"
+      justifyContent="space-between"
+      width="full"
+      paddingX={3}
+      paddingY={1.5}
+      gap={2}
+      textAlign="left"
+      bg={isSelected ? "blue.solid/12" : "transparent"}
+      color="fg"
+      cursor="pointer"
+      _hover={{ bg: "blue.solid/8" }}
+      onMouseDown={(event) => {
+        event.preventDefault();
+        onSelect(row.value);
+      }}
+    >
+      <HStack gap={2} minWidth={0} flex={1}>
+        {FieldIcon && (
+          <Icon boxSize="13px" color="fg.subtle" flexShrink={0}>
+            <FieldIcon />
+          </Icon>
+        )}
+        {isFieldMode ? (
+          // Human label leads (reads like the facet sidebar), with the raw
+          // query field as a mono hint so users learn the syntax.
+          <>
+            <Text textStyle="xs" color="fg" fontWeight="medium" flexShrink={0} truncate>
+              {row.label}
             </Text>
-          )}
-          {idHint && (
             <Text
               textStyle="2xs"
               color="fg.subtle"
@@ -381,30 +338,47 @@ const SuggestionRowView: React.FC<SuggestionRowProps> = memo(
               minWidth={0}
               flexShrink={1}
             >
-              {idHint}
+              {row.field}
             </Text>
-          )}
-          {fieldMeta && <FieldTypeBadge meta={fieldMeta} />}
-          {row.isPrefix && (
-            <Badge
-              size="xs"
-              variant="subtle"
-              colorPalette="purple"
-              flexShrink={0}
-            >
-              drill in
-            </Badge>
-          )}
-        </HStack>
-        {count !== undefined && (
-          <Text textStyle="2xs" color="fg.subtle" marginLeft={2}>
-            {count}
+          </>
+        ) : (
+          // Value mode: `field:value` with the value emphasised.
+          <Text textStyle="xs" flexShrink={0}>
+            <Text as="span" color="fg.muted">
+              {row.field}:
+            </Text>
+            <Text as="span" color="fg" fontWeight="medium">
+              {row.label}
+            </Text>
           </Text>
         )}
-      </chakra.button>
-    );
-  },
-);
+        {idHint && (
+          <Text
+            textStyle="2xs"
+            color="fg.subtle"
+            fontFamily="mono"
+            truncate
+            minWidth={0}
+            flexShrink={1}
+          >
+            {idHint}
+          </Text>
+        )}
+        {fieldMeta && <FieldTypeBadge meta={fieldMeta} />}
+        {row.isPrefix && (
+          <Badge size="xs" variant="subtle" colorPalette="purple" flexShrink={0}>
+            drill in
+          </Badge>
+        )}
+      </HStack>
+      {count !== undefined && (
+        <Text textStyle="2xs" color="fg.subtle" marginLeft={2}>
+          {count}
+        </Text>
+      )}
+    </chakra.button>
+  );
+});
 
 const TYPE_PALETTE: Record<SearchFieldMeta["valueType"], string> = {
   categorical: "blue",

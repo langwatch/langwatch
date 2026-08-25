@@ -3,8 +3,7 @@ import type { ConnectionState } from "~/hooks/useSSESubscription";
 
 const LIVE_UPDATES_STORAGE_KEY = "langwatch:traces-v2:live-updates-mode:v1";
 /** Legacy boolean preference from before "ask" mode existed. */
-const LEGACY_LIVE_UPDATES_BOOL_KEY =
-  "langwatch:traces-v2:live-updates-enabled:v1";
+const LEGACY_LIVE_UPDATES_BOOL_KEY = "langwatch:traces-v2:live-updates-enabled:v1";
 
 /**
  * Three-state live update preference.
@@ -42,10 +41,7 @@ function persistLiveUpdatesMode(value: LiveUpdatesMode) {
     window.localStorage.setItem(LIVE_UPDATES_STORAGE_KEY, value);
     // Keep the legacy boolean key roughly in sync so any consumer still
     // reading it doesn't get stuck on the old default.
-    window.localStorage.setItem(
-      LEGACY_LIVE_UPDATES_BOOL_KEY,
-      String(value !== "paused"),
-    );
+    window.localStorage.setItem(LEGACY_LIVE_UPDATES_BOOL_KEY, String(value !== "paused"));
   } catch {
     // Best-effort persistence.
   }

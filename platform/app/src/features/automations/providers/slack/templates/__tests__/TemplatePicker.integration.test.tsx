@@ -50,9 +50,7 @@ describe("SlackBlockKitTemplatePicker", () => {
     it("offers the digest layouts behind the other-cadence disclosure", () => {
       renderPicker();
 
-      expect(
-        screen.getByText(/more layouts for digest cadences/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/more layouts for digest cadences/i)).toBeInTheDocument();
     });
   });
 

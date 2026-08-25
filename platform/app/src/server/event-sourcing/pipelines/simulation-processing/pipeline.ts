@@ -111,10 +111,7 @@ export function createSimulationProcessingPipeline(
       "snapshotUpdateBroadcast",
       createSnapshotUpdateBroadcastSubscriber(deps.snapshotUpdateBroadcast),
     )
-    .withEventSubscriber(
-      "suiteRunSync",
-      createSuiteRunSyncSubscriber(deps.suiteRunSync),
-    )
+    .withEventSubscriber("suiteRunSync", createSuiteRunSyncSubscriber(deps.suiteRunSync))
     .withEventSubscriber(
       "traceMetricsSync",
       createTraceMetricsSyncSubscriber(deps.traceMetricsSync),

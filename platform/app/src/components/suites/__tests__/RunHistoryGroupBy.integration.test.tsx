@@ -13,10 +13,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { GroupRow } from "../GroupRow";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-} from "../RunHistoryFilters";
+import { RunHistoryFilters, type RunHistoryFilterValues } from "../RunHistoryFilters";
 import type { RunGroup } from "../run-history-transforms";
 import { computeGroupSummary } from "../run-history-transforms";
 import { makeScenarioRunData } from "./test-helpers";

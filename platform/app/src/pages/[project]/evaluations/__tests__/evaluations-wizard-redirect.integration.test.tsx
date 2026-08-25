@@ -60,9 +60,8 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-const { default: EvaluationWizardRedirect } = await import(
-  "~/pages/[project]/evaluations/wizard"
-);
+const { default: EvaluationWizardRedirect } =
+  await import("~/pages/[project]/evaluations/wizard");
 
 const renderRepeatedly = () => {
   const { rerender } = render(<EvaluationWizardRedirect />);
@@ -88,9 +87,7 @@ describe("Evaluation wizard redirect", () => {
       renderRepeatedly();
 
       expect(replaceMock).toHaveBeenCalledTimes(1);
-      expect(replaceMock).toHaveBeenCalledWith(
-        "/test-project/experiments/workbench",
-      );
+      expect(replaceMock).toHaveBeenCalledWith("/test-project/experiments/workbench");
     });
   });
 

@@ -7,11 +7,7 @@ import {
 
 import type { Session } from "~/server/auth";
 
-import {
-  batchScopePermissions,
-  hasProjectPermission,
-  hasTeamPermission,
-} from "../rbac";
+import { batchScopePermissions, hasProjectPermission, hasTeamPermission } from "../rbac";
 
 // A pre-existing cross-org binding: user_B is named at a scope in org_A but is
 // NOT an OrganizationUser of org_A (the row survives from a since-closed path).
@@ -37,9 +33,7 @@ const grantingProjectBinding = {
 describe("read-path tenant isolation", () => {
   describe("when a non-member has a stale project-scoped binding", () => {
     it("denies project access before consulting the binding", async () => {
-      const roleBindingFindMany = vi
-        .fn()
-        .mockResolvedValue([grantingProjectBinding]);
+      const roleBindingFindMany = vi.fn().mockResolvedValue([grantingProjectBinding]);
       const prisma = {
         project: {
           findUnique: vi.fn().mockResolvedValue({
@@ -77,9 +71,7 @@ describe("read-path tenant isolation", () => {
       ]);
       const prisma = {
         team: {
-          findUnique: vi
-            .fn()
-            .mockResolvedValue({ id: TEAM_A, organizationId: ORG_A }),
+          findUnique: vi.fn().mockResolvedValue({ id: TEAM_A, organizationId: ORG_A }),
         },
         // user_B is not an OrganizationUser of org_A.
         organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -108,9 +100,7 @@ describe("read-path tenant isolation", () => {
           }),
         },
         organizationUser: {
-          findFirst: vi
-            .fn()
-            .mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
+          findFirst: vi.fn().mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
         },
         groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
         roleBinding: {
@@ -173,9 +163,7 @@ describe("read-path tenant isolation", () => {
     it("still grants a genuine member", async () => {
       const prisma = {
         organizationUser: {
-          findFirst: vi
-            .fn()
-            .mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
+          findFirst: vi.fn().mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
         },
         groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
         roleBinding: {

@@ -24,7 +24,7 @@ that attacker can take is **outbound exfiltration**: `curl` the secrets it holds
 or the customer's trace/PII data it can read via MCP, to an attacker-controlled
 host.
 
-Two prior decisions bound the *pod* but not the *destination*:
+Two prior decisions bound the _pod_ but not the _destination_:
 
 - **ADR-033** closed sibling-to-sibling exfiltration (a worker driving another
   worker's `opencode` control port) with a per-worker `OPENCODE_SERVER_PASSWORD`,
@@ -47,12 +47,12 @@ limitation. So the L7 controls have to live somewhere the pod actually controls.
 
 The series splits the work so risk lands last:
 
-| PR | Adds | Blocks anything? |
-|----|------|------------------|
-| PR1 | The **egress seam**: a per-worker forward proxy the worker's tools egress through (`HTTPS_PROXY` in the worker env), mirroring the existing per-worker `authProxy` inbound pattern. | No |
-| PR2 | (series scaffolding — credential-envelope + config plumbing) | No |
-| PR3 | **Monitoring** on the seam: every outbound `CONNECT` is observed, attributed to a worker/conversation, and emitted as telemetry; anomalies are flagged. Observe → detect → flag. | **No — nothing is denied.** |
-| **PR4 (this ADR)** | **Enforcement** rungs on top: require-TLS + per-destination throttle, the **customer allow-list**, an always-on FQDN floor, and retirement of the superseded direct-egress path. | Yes — but default posture stays monitor-only. |
+| PR                 | Adds                                                                                                                                                                                | Blocks anything?                              |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| PR1                | The **egress seam**: a per-worker forward proxy the worker's tools egress through (`HTTPS_PROXY` in the worker env), mirroring the existing per-worker `authProxy` inbound pattern. | No                                            |
+| PR2                | (series scaffolding — credential-envelope + config plumbing)                                                                                                                        | No                                            |
+| PR3                | **Monitoring** on the seam: every outbound `CONNECT` is observed, attributed to a worker/conversation, and emitted as telemetry; anomalies are flagged. Observe → detect → flag.    | **No — nothing is denied.**                   |
+| **PR4 (this ADR)** | **Enforcement** rungs on top: require-TLS + per-destination throttle, the **customer allow-list**, an always-on FQDN floor, and retirement of the superseded direct-egress path.    | Yes — but default posture stays monitor-only. |
 
 ## Decision
 
@@ -67,7 +67,7 @@ legitimate ones.
 
 Every outbound flow is observed and attributed. Nothing below removes this
 floor; every deny/throttle/flag **also** emits the same telemetry, so an
-enforced deny is a *monitored* deny. This is what makes "flag it" and "block it"
+enforced deny is a _monitored_ deny. This is what makes "flag it" and "block it"
 the same event with a different verb.
 
 ### Rung 1: require TLS + per-destination throttle
@@ -81,11 +81,11 @@ At the L7 adapter:
    in-cluster control-plane/gateway paths are unaffected (they have their own
    explicit rules; see "Legitimate paths" below).
 2. **Per-destination throttle.** The adapter cannot see inside TLS, so the
-   throttle is on the *shape* of the flow, not its content: new-connection rate
+   throttle is on the _shape_ of the flow, not its content: new-connection rate
    and bytes-transferred **per destination host, per worker**. A worker opening
    a burst of connections to a rare host, or streaming a large volume to one
    destination — the classic exfiltration signature — is throttled (slowed, then
-   tar-pitted) rather than hard-denied. Throttle is a *soft* rung on purpose: it
+   tar-pitted) rather than hard-denied. Throttle is a _soft_ rung on purpose: it
    degrades a suspicious flow without a false-positive cliff, and it always
    flags (rung 0) so an operator sees it.
 
@@ -95,8 +95,8 @@ At the L7 adapter:
 optional allow-list of hosts Langy's workers may reach. The semantics are the
 whole point:
 
-- **No allow-list set → monitor only.** Every destination is *observed and
-  flagged* (rung 0) but **nothing is blocked** on allow-list grounds. This is the
+- **No allow-list set → monitor only.** Every destination is _observed and
+  flagged_ (rung 0) but **nothing is blocked** on allow-list grounds. This is the
   default. A customer who does nothing gets watching, not breakage.
 - **Allow-list set → restrict to it.** Every host on the list is allowed;
   **every other host is denied** and flagged. The customer has opted in to
@@ -104,7 +104,7 @@ whole point:
 
 An allow-list ("hosts I trust") is a cleaner mental model than a deny-list
 ("hosts I fear") — it is finite, it composes with the always-on monitoring
-beneath (the monitor tells you what to *add* to the list), and its default of
+beneath (the monitor tells you what to _add_ to the list), and its default of
 "unset = watch" is safe. A deny-list's default of "unset = allow-all" is not,
 and a deny-list can never be complete.
 
@@ -138,50 +138,51 @@ and reads the FQDN **directly out of the CONNECT authority** (and, as a
 cross-check, the TLS SNI). That is the only place in this pod where an FQDN is
 observable without netfilter, which ADR-033 established is dead under gVisor.
 NetworkPolicy stays exactly as it is: the coarse L3/L4 backstop with the RFC-1918
-+ metadata carve-out. It is not asked to do FQDN, because it cannot.
+
+- metadata carve-out. It is not asked to do FQDN, because it cannot.
 
 **Honest limit — the L7 adapter is cooperative, not mandatory, in the stock
-pod.** Within one pod netns, nothing at L3/L4 forces a worker's traffic *through*
+pod.** Within one pod netns, nothing at L3/L4 forces a worker's traffic _through_
 the loopback proxy: a prompt-injected worker can ignore `HTTPS_PROXY` and
 `connect()` straight to an external `IP:443`, because the pod-level NetworkPolicy
 still permits `:443` egress (it must — the proxy itself egresses there, and L4
 can't tell proxy bytes from worker bytes). Under gVisor we cannot `iptables
 REDIRECT` worker traffic into the proxy. So the adapter's FQDN/allow-list/TLS
 enforcement is authoritative for **cooperating** clients and is the primary
-mechanism; the **bypass path is not blocked but it is still *seen*** — PR3's
+mechanism; the **bypass path is not blocked but it is still _seen_** — PR3's
 monitoring must be at the flow level (VPC flow logs / a CNI flow layer), not
 only at the proxy, precisely so a direct-IP bypass is observed and flagged even
-when it isn't blocked. Two optional floors make enforcement *mandatory* for
+when it isn't blocked. Two optional floors make enforcement _mandatory_ for
 operators who need it, and the ADR recommends them without hard-requiring either:
 
 - **Preferred: a Cilium FQDN egress policy at the CNI.** Where the operator runs
   Cilium, a `CiliumNetworkPolicy` with `toFQDNs` enforces the same allow set in
   the datapath, which a worker cannot bypass. The adapter and the CNI policy
-  enforce the *same* list; the adapter is the CNI-agnostic default, the Cilium
+  enforce the _same_ list; the adapter is the CNI-agnostic default, the Cilium
   policy is the bypass-proof upgrade.
 - **Fallback: the ADR-033 "Fix B" per-worker netns.** Put each worker in its own
   network namespace whose only route out is the adapter's veth. ADR-033 validated
   this works under gVisor (needs `CAP_SYS_ADMIN`) and named the missing piece —
-  "egress without NAT needs a userspace forward proxy over the veth" — which *is*
+  "egress without NAT needs a userspace forward proxy over the veth" — which _is_
   this adapter. So if a customer needs bypass-proof enforcement without Cilium,
   Fix B + this adapter is the combination, at the cost of the broader capability.
 
 ## The SNI cross-check (rung 3's second reading)
 
-The CONNECT authority is what the client *claims*; the TLS SNI is what it is
+The CONNECT authority is what the client _claims_; the TLS SNI is what it is
 actually negotiating. Reading both and re-deciding on the SNI is what closes the
 gap where `CONNECT allowed.example:443` is followed by a handshake for
 `attacker.example` on a shared CDN IP. We parse the ClientHello **without
 terminating TLS** — the tunnel stays opaque — and the decision table is:
 
-| What the peek yields | Decision |
-| --- | --- |
-| An SNI that differs from the authority, and would **not** pass the same allow set | **Deny** (`denied_sni_mismatch`), before the destination is dialled |
-| An SNI that differs but **is** itself allowed | Allow, and flag — a differing SNI is anomalous whether or not the target is listed |
-| No readable SNI, **while a policy is enforcing** | **Deny** (`denied_sni_unreadable`) |
-| No readable SNI, monitor-only | Allow — the stock posture blocks nothing |
-| An IP-literal authority | Exempt — RFC 6066 forbids sending server_name for one |
-| A stream that is cleanly not TLS | Exempt — require-TLS is the rung that governs cleartext |
+| What the peek yields                                                              | Decision                                                                           |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| An SNI that differs from the authority, and would **not** pass the same allow set | **Deny** (`denied_sni_mismatch`), before the destination is dialled                |
+| An SNI that differs but **is** itself allowed                                     | Allow, and flag — a differing SNI is anomalous whether or not the target is listed |
+| No readable SNI, **while a policy is enforcing**                                  | **Deny** (`denied_sni_unreadable`)                                                 |
+| No readable SNI, monitor-only                                                     | Allow — the stock posture blocks nothing                                           |
+| An IP-literal authority                                                           | Exempt — RFC 6066 forbids sending server_name for one                              |
+| A stream that is cleanly not TLS                                                  | Exempt — require-TLS is the rung that governs cleartext                            |
 
 Two properties are load-bearing and easy to lose in a refactor. **A handshake we
 cannot follow is "unreadable", never "absent"**: a ClientHello may legally span
@@ -207,9 +208,9 @@ and `langy.ts` enforces it server-side as defense-in-depth before dispatch
 the same shape, with one deliberate divergence:
 
 - **Home: a project-level Langy egress policy, not the virtual key's config.**
-  `modelsAllowed` lives on the `VirtualKey` because the *gateway* is its
+  `modelsAllowed` lives on the `VirtualKey` because the _gateway_ is its
   enforcement point and the VK is the gateway's unit of policy. The egress
-  allow-list's enforcement point is the *agent pod's egress adapter*, not the
+  allow-list's enforcement point is the _agent pod's egress adapter_, not the
   gateway — putting it on the VK would be a category error. It is a Langy
   project network policy, so it lives with the project (a nullable
   `Project.langyEgressAllowlist` JSON column, or a small `LangyEgressPolicy`
@@ -230,7 +231,7 @@ the same shape, with one deliberate divergence:
   adapter is constructed with that worker's list, exactly as `startAuthProxy` is
   constructed with that worker's password.
 - **The presence of the list is the mode.** No separate `egressMode` enum: an
-  absent/empty list *is* monitor-only and a non-empty list *is* enforce. This is
+  absent/empty list _is_ monitor-only and a non-empty list _is_ enforce. This is
   the whole "default watch, opt-in to restrict" decision expressed as one field,
   and it keeps the envelope minimal.
 
@@ -243,15 +244,15 @@ the same shape, with one deliberate divergence:
   the allow set" into "here is the observed allow set," so every block is a
   block of something we watched not being used. It also lets a customer read
   their own traffic before deciding to enforce, which is what makes the
-  allow-list *theirs*.
+  allow-list _theirs_.
 - **Why customer-owned allow-list, not a LangWatch-owned deny-list.** We do not
   know a given customer's legitimate destinations — their internal hosts, their
   registries, their git remotes. A deny-list we maintain is both incomplete
   (misses their attacker) and wrong (blocks their internal host). An allow-list
-  they own is complete *for their environment* by construction, and the default
+  they own is complete _for their environment_ by construction, and the default
   of "unset = watch" means we never break an install that hasn't opted in.
 - **Trade-off accepted: cooperative L7 enforcement has a bypass in the stock
-  pod.** We accept this because (a) the bypass is *monitored*, not invisible;
+  pod.** We accept this because (a) the bypass is _monitored_, not invisible;
   (b) the honest alternative — mandatory enforcement — costs either a CNI
   dependency (Cilium) or the broader `CAP_SYS_ADMIN` + per-worker netns of
   ADR-033 Fix B, neither of which every operator wants; and (c) we surface both
@@ -267,11 +268,11 @@ the same shape, with one deliberate divergence:
   available to us, and we use both. A second consequence worth stating plainly:
   once an allow-list is set, a client whose ClientHello we cannot parse is now
   denied where it previously passed. Reassembling across records makes a
-  successful read *more* likely than before, but operators enabling enforcement
+  successful read _more_ likely than before, but operators enabling enforcement
   should watch `denied_sni_unreadable` after rollout.
 - **Trade-off accepted: throttle is heuristic.** Byte/connection-rate signatures
   are not proof of exfiltration; they can false-positive on a legitimate large
-  clone. That is exactly why throttle *slows and flags* rather than hard-denies,
+  clone. That is exactly why throttle _slows and flags_ rather than hard-denies,
   and why the hard-deny rung (allow-list) is customer-scoped.
 
 ## Consequences
@@ -282,7 +283,7 @@ the same shape, with one deliberate divergence:
   threads it into the envelope, alongside the existing model/GitHub plumbing.
 - **Egress adapter.** The PR1 adapter gains, per rung: a TLS-required guard, a
   per-destination throttle, an allow-list matcher (host + the always-on floor),
-  and the FQDN read from the CONNECT authority. All four *also* emit PR3's
+  and the FQDN read from the CONNECT authority. All four _also_ emit PR3's
   telemetry, so every enforcement action is a monitored event.
 - **Chart.** `charts/langyagent`: the always-on floor becomes a values list
   (`networkPolicy.egressFqdnFloor` / adapter config), documented as "operator
@@ -295,12 +296,12 @@ the same shape, with one deliberate divergence:
   limitation and names Cilium) is updated to point at the adapter as the primary
   FQDN enforcement point and this ADR as the design.
 - **No new user-facing breakage by default.** Because default posture stays
-  monitor-only, an existing install upgrades into *watching*, not *blocking*.
+  monitor-only, an existing install upgrades into _watching_, not _blocking_.
   Blocking begins only when a customer sets an allow-list, or when an operator
   turns on the FQDN floor / rung 4 after reading their monitoring.
 - **Hard dependency on PR3.** None of PR4 is safe to build or merge before PR3's
   monitoring seam exists and has observed real traffic — the enforcement rungs
-  are defined *relative to* what monitoring proved legitimate. This ADR exists so
+  are defined _relative to_ what monitoring proved legitimate. This ADR exists so
   PR4 is a fast-follow the moment PR3 lands.
 
 ## Decision: worker→manager hard network isolation (Fix B)
@@ -371,7 +372,7 @@ Give each worker its **own network namespace** and route its egress through a
   mitigated — not closed — by the hardening already applied alongside PR4: the
   CGNAT (`100.64.0.0/10`) egress deny, the dropped default-ServiceAccount token
   (`automountServiceAccountToken: false`), and the opt-in public-subnet node
-  placement. Fix B is the item that upgrades this from *mitigated* to *closed*.
+  placement. Fix B is the item that upgrades this from _mitigated_ to _closed_.
 
 Marked here as the **enforcement target**; not implemented in code in this PR.
 
@@ -386,7 +387,7 @@ Marked here as the **enforcement target**; not implemented in code in this PR.
   envelope + `buildWorkerEnv`), `services/langyagent/adapters/httpapi/handlers.go` (`/chat`
   dispatch), `platform/app/src/server/routes/langy.ts` (envelope construction +
   defense-in-depth allow-list check), `platform/app/src/server/services/langy/
-  LangyCredentialService.ts` (`getModelsAllowed` precedent).
+LangyCredentialService.ts` (`getModelsAllowed` precedent).
 - Chart: `charts/langyagent/templates/networkpolicy.yaml`,
   `charts/langyagent/values.yaml` (`networkPolicy.allowExternalHttps`).
 - Docs: `docs/langy-github-app.md §4` (NetworkPolicy / egress; existing FQDN /

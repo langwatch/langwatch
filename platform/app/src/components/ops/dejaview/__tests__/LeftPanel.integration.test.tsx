@@ -58,9 +58,7 @@ describe("LeftPanel", () => {
 
       it("names the event types a subscriber reacts to", () => {
         renderPanel();
-        expect(
-          screen.getByText("on trace.received, trace.updated"),
-        ).toBeDefined();
+        expect(screen.getByText("on trace.received, trace.updated")).toBeDefined();
       });
     });
   });

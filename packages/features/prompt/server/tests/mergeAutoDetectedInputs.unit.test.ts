@@ -36,8 +36,7 @@ describe("mergeAutoDetectedInputs()", () => {
     describe("when extracting variables", () => {
       it("detects collection variable but not loop iterator", () => {
         const result = mergeAutoDetectedInputs({
-          prompt:
-            "{% for col in column_headers %}{{ col.column_name }}{% endfor %}",
+          prompt: "{% for col in column_headers %}{{ col.column_name }}{% endfor %}",
           messages: [],
           inputs: [],
         });

@@ -105,8 +105,6 @@ describe("GenerateApiSnippetDialog derived snippet selection", () => {
       { wrapper: Wrapper },
     );
 
-    expect(
-      screen.getByText(/curl https:\/\/example\.test/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/curl https:\/\/example\.test/)).toBeInTheDocument();
   });
 });

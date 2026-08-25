@@ -208,26 +208,14 @@ const scimApiDefinitions = {
     };
   },
 
-  scimResource<T>({
-    description,
-    schema,
-  }: {
-    description: string;
-    schema: T;
-  }) {
+  scimResource<T>({ description, schema }: { description: string; schema: T }) {
     return {
       description,
       content: { [SCIM_MEDIA_TYPE]: { schema } },
     };
   },
 
-  discoveryResource<T>({
-    description,
-    schema,
-  }: {
-    description: string;
-    schema: T;
-  }) {
+  discoveryResource<T>({ description, schema }: { description: string; schema: T }) {
     return {
       description,
       content: { "application/json": { schema } },
@@ -577,10 +565,7 @@ export const GET_GROUP: DescribeRouteOptions = {
     "Reads one provisioned group and its members. A group that exists but was created in LangWatch rather than provisioned is not readable here.",
   tags: TAGS,
   security: SCIM_SECURITY,
-  parameters: [
-    idParameter("The LangWatch group id."),
-    EXCLUDED_ATTRIBUTES_PARAMETER,
-  ],
+  parameters: [idParameter("The LangWatch group id."), EXCLUDED_ATTRIBUTES_PARAMETER],
   responses: {
     "200": scimResource({ description: "The group.", schema: SCIM_GROUP }),
     "401": UNAUTHORIZED,

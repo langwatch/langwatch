@@ -47,8 +47,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       },
       ANTHROPIC_BASE_URL: {
         label: "Anthropic Base URL",
-        description:
-          "Optional: Custom API endpoint for Anthropic-compatible services",
+        description: "Optional: Custom API endpoint for Anthropic-compatible services",
       },
     },
   },
@@ -206,8 +205,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       },
       VERTEXAI_LOCATION: {
         label: "Vertex Location",
-        description:
-          "The GCP region for Vertex AI (e.g., us-central1, europe-west1)",
+        description: "The GCP region for Vertex AI (e.g., us-central1, europe-west1)",
       },
     },
   },
@@ -240,8 +238,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     fieldMetadata: {
       CUSTOM_API_KEY: {
         label: "API Key",
-        description:
-          "Optional: API key for your custom OpenAI-compatible endpoint",
+        description: "Optional: API key for your custom OpenAI-compatible endpoint",
       },
       CUSTOM_BASE_URL: {
         label: "Base URL",
@@ -276,19 +273,16 @@ export const modelProviderRegistry: ModelProviderRegistry = [
   },
 ];
 
-export function getModelProvider(
-  key: ModelProviderKey,
-): ModelProviderSpec | undefined {
+export function getModelProvider(key: ModelProviderKey): ModelProviderSpec | undefined {
   return modelProviderRegistry.find((provider) => provider.key === key);
 }
 
 /** Default base URLs keyed by backendModelProviderKey for API validation */
-export const providerDefaultBaseUrls: Record<string, string> =
-  Object.fromEntries(
-    modelProviderRegistry
-      .filter((p) => p.defaultBaseUrl)
-      .map((p) => [p.backendModelProviderKey, p.defaultBaseUrl!]),
-  );
+export const providerDefaultBaseUrls: Record<string, string> = Object.fromEntries(
+  modelProviderRegistry
+    .filter((p) => p.defaultBaseUrl)
+    .map((p) => [p.backendModelProviderKey, p.defaultBaseUrl!]),
+);
 
 /** Version-less API roots keyed by backendModelProviderKey — see `apiRoot`. */
 export const providerApiRoots: Record<string, string> = Object.fromEntries(

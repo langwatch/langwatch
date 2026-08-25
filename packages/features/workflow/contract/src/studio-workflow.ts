@@ -30,8 +30,17 @@ import { workflowDslSchema, type WorkflowDsl } from "./workflow";
 import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
 
 export const LlmConfigInputTypes = [
-  "str", "float", "bool", "image", "list", "list[str]", "list[float]",
-  "list[int]", "list[bool]", "dict", "chat_messages",
+  "str",
+  "float",
+  "bool",
+  "image",
+  "list",
+  "list[str]",
+  "list[float]",
+  "list[int]",
+  "list[bool]",
+  "dict",
+  "chat_messages",
 ] as const;
 export type LlmConfigInputType = (typeof LlmConfigInputTypes)[number];
 export const LlmConfigOutputTypes = ["str", "float", "bool", "json_schema"] as const;
@@ -377,7 +386,10 @@ const executionStateSchema = z.looseObject({
     })
     .optional(),
   timestamps: z
-    .looseObject({ started_at: z.number().optional(), finished_at: z.number().optional() })
+    .looseObject({
+      started_at: z.number().optional(),
+      finished_at: z.number().optional(),
+    })
     .optional(),
 });
 
@@ -432,10 +444,7 @@ const studioWorkflowWireSchema = workflowDslSchema
     description: z.string(),
     version: z
       .string()
-      .regex(
-        /^\d+(\.\d+)?$/,
-        "Version must be in the format 'number.number' (e.g. 1.0)",
-      ),
+      .regex(/^\d+(\.\d+)?$/, "Version must be in the format 'number.number' (e.g. 1.0)"),
     nodes: z.array(studioNodeSchema),
     edges: z.array(studioEdgeSchema),
     // Legacy field from spec_version <= 1.4: every LLM node now owns its
@@ -458,14 +467,19 @@ const studioWorkflowWireSchema = workflowDslSchema
             upstream_status: z.number().optional(),
             result: z.record(z.string(), z.unknown()).optional(),
             timestamps: z
-              .looseObject({ started_at: z.number().optional(), finished_at: z.number().optional() })
+              .looseObject({
+                started_at: z.number().optional(),
+                finished_at: z.number().optional(),
+              })
               .optional(),
           })
           .optional(),
         evaluation: z
           .looseObject({
             run_id: z.string().optional(),
-            status: z.enum(["idle", "waiting", "running", "success", "error", "skipped"]).optional(),
+            status: z
+              .enum(["idle", "waiting", "running", "success", "error", "skipped"])
+              .optional(),
             error: z.string().optional(),
             error_type: z.string().optional(),
             upstream_status: z.number().optional(),
@@ -483,7 +497,9 @@ const studioWorkflowWireSchema = workflowDslSchema
         optimization: z
           .looseObject({
             run_id: z.string().optional(),
-            status: z.enum(["idle", "waiting", "running", "success", "error", "skipped"]).optional(),
+            status: z
+              .enum(["idle", "waiting", "running", "success", "error", "skipped"])
+              .optional(),
             stdout: z.string().optional(),
             error: z.string().optional(),
             timestamps: z
@@ -593,9 +609,7 @@ const toStudioNode = (node: StudioWorkflowWireNode): StudioNode<Component> => ({
 
 const toStudioEdge = (edge: StudioWorkflowWireEdge): StudioEdge => ({ ...edge });
 
-const toStudioState = (
-  state: StudioWorkflowWire["state"],
-): StudioWorkflow["state"] => ({
+const toStudioState = (state: StudioWorkflowWire["state"]): StudioWorkflow["state"] => ({
   ...state,
   execution: state.execution,
   evaluation: state.evaluation,

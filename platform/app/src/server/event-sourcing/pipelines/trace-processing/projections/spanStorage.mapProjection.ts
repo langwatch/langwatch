@@ -1,17 +1,11 @@
 import type { AppendStore } from "@langwatch/eventing";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
 } from "~/server/app-layer/traces/span-normalization.service";
-import {
-  type SpanReceivedEvent,
-  spanReceivedEventSchema,
-} from "../schemas/events";
+import { type SpanReceivedEvent, spanReceivedEventSchema } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import { deriveSpanCost } from "./services/span-cost.derivation";
 import { SpanCostService } from "./services/span-cost.service";

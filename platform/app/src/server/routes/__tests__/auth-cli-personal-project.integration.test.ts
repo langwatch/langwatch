@@ -47,9 +47,7 @@ vi.mock("~/server/auth", () => ({
 // the old path leaves the real check running and the deny test inert.
 vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
   const actual =
-    await importActual<
-      typeof import("~/server/app-layer/permissions/imperative")
-    >();
+    await importActual<typeof import("~/server/app-layer/permissions/imperative")>();
   return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
@@ -268,10 +266,7 @@ async function seedUserWithCliToken(args: {
     "EX",
     3600,
   );
-  await redis.sadd(
-    `lwcli:user:${args.id}:tokens`,
-    `lwcli:access:${args.token}`,
-  );
+  await redis.sadd(`lwcli:user:${args.id}:tokens`, `lwcli:access:${args.token}`);
 }
 
 const personalTeamCount = (userId: string) =>
@@ -501,10 +496,7 @@ describe("/me credentials delivery, given a token whose user is no longer an act
 describe("/me credentials delivery, given POST /api/auth/cli/project-key (headless --project <slug>)", () => {
   /** @scenario `langwatch login --project <slug>` resolves the key through the device session, no browser */
   it("returns the shared project's existing key by slug", async () => {
-    const { status, json } = await projectKey(
-      exchange.access_token,
-      SHARED_PROJECT_SLUG,
-    );
+    const { status, json } = await projectKey(exchange.access_token, SHARED_PROJECT_SLUG);
 
     expect(status).toBe(200);
     expect(json.api_key).toBe(SHARED_API_KEY);
@@ -539,10 +531,7 @@ describe("/me credentials delivery, given POST /api/auth/cli/project-key (headle
   it("denies a project the caller cannot write, without leaking the key", async () => {
     vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
 
-    const { status, json } = await projectKey(
-      exchange.access_token,
-      SHARED_PROJECT_SLUG,
-    );
+    const { status, json } = await projectKey(exchange.access_token, SHARED_PROJECT_SLUG);
 
     expect(status).toBe(403);
     expect(JSON.stringify(json)).not.toContain(SHARED_API_KEY);

@@ -53,10 +53,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
 import { api } from "~/utils/api";
 import { ColumnTypeIcon } from "../../shared/ColumnTypeIcon";
-import {
-  COLUMN_TYPE_OPTIONS,
-  ColumnTypeSelect,
-} from "../../shared/ColumnTypeSelect";
+import { COLUMN_TYPE_OPTIONS, ColumnTypeSelect } from "../../shared/ColumnTypeSelect";
 import { Drawer } from "../../ui/drawer";
 import {
   DROPZONE_DOTTED_STYLE,
@@ -116,8 +113,7 @@ function BulkColumnFields({
   // The row currently being dragged — rendered in a DragOverlay so it floats
   // above (and is never clipped by) the drawer's scroll container.
   const [activeId, setActiveId] = useState<string | null>(null);
-  const activeColumn =
-    columnTypes.find((c) => c.sourceHeader === activeId) ?? null;
+  const activeColumn = columnTypes.find((c) => c.sourceHeader === activeId) ?? null;
 
   // Columns whose name is blank or duplicated — flagged inline and blocking the
   // upload, since normalize would otherwise drop/collide their values.
@@ -128,9 +124,7 @@ function BulkColumnFields({
     patch: Partial<DatasetConfirmColumns[number]>,
   ) =>
     onChange(
-      columnTypes.map((c) =>
-        c.sourceHeader === sourceHeader ? { ...c, ...patch } : c,
-      ),
+      columnTypes.map((c) => (c.sourceHeader === sourceHeader ? { ...c, ...patch } : c)),
     );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -149,9 +143,7 @@ function BulkColumnFields({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
-      onDragStart={(event: DragStartEvent) =>
-        setActiveId(String(event.active.id))
-      }
+      onDragStart={(event: DragStartEvent) => setActiveId(String(event.active.id))}
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
@@ -175,9 +167,7 @@ function BulkColumnFields({
                 columnTypes.length > 1
                   ? () =>
                       onChange(
-                        columnTypes.filter(
-                          (c) => c.sourceHeader !== col.sourceHeader,
-                        ),
+                        columnTypes.filter((c) => c.sourceHeader !== col.sourceHeader),
                       )
                   : undefined
               }
@@ -221,14 +211,8 @@ function SortableColumnRow({
   /** Exclude this column. Undefined when it's the last one (can't drop it). */
   onRemove?: () => void;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: col.sourceHeader });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: col.sourceHeader });
 
   return (
     <VStack
@@ -292,9 +276,7 @@ function SortableColumnRow({
       </HStack>
       {invalid && (
         <Text role="alert" fontSize="xs" color="red.500" paddingLeft={7}>
-          {col.name.trim() === ""
-            ? "Name is required"
-            : "Column names must be unique"}
+          {col.name.trim() === "" ? "Name is required" : "Column names must be unique"}
         </Text>
       )}
     </VStack>
@@ -545,9 +527,7 @@ function BulkFileRow({
   const canCancel = file.status === "uploading";
   const isProcessing = file.status === "processing";
   const canConfirm =
-    file.status === "pending" &&
-    !!file.columnTypes &&
-    file.columnTypes.length > 0;
+    file.status === "pending" && !!file.columnTypes && file.columnTypes.length > 0;
 
   // Poll the dataset status inline once finalized (no nested container). The
   // server normalizes off-thread; the row reports ready/failed in place.
@@ -567,8 +547,8 @@ function BulkFileRow({
     if (polledStatus === "ready") onReady();
     else if (polledStatus === "failed") {
       onFailed(
-        (statusQuery.data as { statusError?: string } | undefined)
-          ?.statusError ?? undefined,
+        (statusQuery.data as { statusError?: string } | undefined)?.statusError ??
+          undefined,
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -582,9 +562,7 @@ function BulkFileRow({
       borderWidth="1px"
       borderRadius="lg"
       borderColor={
-        file.status === "failed" || file.status === "rejected"
-          ? "red.300"
-          : "border"
+        file.status === "failed" || file.status === "rejected" ? "red.300" : "border"
       }
       bg="bg"
     >
@@ -600,11 +578,7 @@ function BulkFileRow({
           </Text>
         </VStack>
         <Spacer />
-        <RowTrailing
-          file={file}
-          isOpen={isOpen}
-          onToggle={() => setIsOpen((o) => !o)}
-        />
+        <RowTrailing file={file} isOpen={isOpen} onToggle={() => setIsOpen((o) => !o)} />
         {file.status === "failed" && (
           <Button size="xs" variant="outline" onClick={onRetry}>
             <RefreshCw size={12} /> Retry
@@ -648,10 +622,7 @@ function BulkFileRow({
             transition={{ duration: 0.2, ease: "easeInOut" }}
             style={{ overflow: "hidden", width: "100%" }}
           >
-            <BulkColumnFields
-              columnTypes={file.columnTypes}
-              onChange={onColumns}
-            />
+            <BulkColumnFields columnTypes={file.columnTypes} onChange={onColumns} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -704,19 +675,15 @@ export function BulkUploadDrawer({
   };
 
   return (
-    <Drawer.Root
-      open={open}
-      onOpenChange={({ open: o }) => !o && onClose()}
-      size="xl"
-    >
+    <Drawer.Root open={open} onOpenChange={({ open: o }) => !o && onClose()} size="xl">
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <VStack align="start" gap={1}>
             <Heading>Upload datasets</Heading>
             <Text fontSize="sm" color="fg.muted" fontWeight="normal">
-              Bring CSV or JSON files into LangWatch to build evaluation sets,
-              review past generations, and turn real data into new test cases.
+              Bring CSV or JSON files into LangWatch to build evaluation sets, review past
+              generations, and turn real data into new test cases.
             </Text>
           </VStack>
         </Drawer.Header>
@@ -756,24 +723,15 @@ export function BulkUploadDrawer({
             </Box>
 
             {bulk.counts.total > 0 && (
-              <HStack
-                fontSize="13px"
-                color="fg.muted"
-                gap={3}
-                data-testid="bulk-summary"
-              >
+              <HStack fontSize="13px" color="fg.muted" gap={3} data-testid="bulk-summary">
                 <Text>{bulk.counts.total} files</Text>
                 {bulk.counts.ready > 0 && (
                   <Text color="green.600">{bulk.counts.ready} ready</Text>
                 )}
                 {bulk.counts.preparing > 0 && (
-                  <Text color="blue.500">
-                    {bulk.counts.preparing} preparing
-                  </Text>
+                  <Text color="blue.500">{bulk.counts.preparing} preparing</Text>
                 )}
-                {bulk.counts.queued > 0 && (
-                  <Text>{bulk.counts.queued} queued</Text>
-                )}
+                {bulk.counts.queued > 0 && <Text>{bulk.counts.queued} queued</Text>}
                 {bulk.counts.failed > 0 && (
                   <HStack gap={1} color="red.500">
                     <AlertTriangle size={13} />
@@ -822,9 +780,7 @@ export function BulkUploadDrawer({
               </Button>
               <Button
                 colorPalette="blue"
-                disabled={
-                  !bulk.hasUploadable || !projectId || hasInvalidColumns
-                }
+                disabled={!bulk.hasUploadable || !projectId || hasInvalidColumns}
                 onClick={() => bulk.start()}
               >
                 Upload all

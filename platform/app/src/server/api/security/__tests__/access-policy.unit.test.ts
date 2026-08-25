@@ -62,9 +62,7 @@ describe("access policy helpers", () => {
       expect(describeAccessPolicy(publicEndpoint("share link"))).toBe(
         "public — share link",
       );
-      expect(describeAccessPolicy(internalSecret("cron"))).toBe(
-        "internal — cron",
-      );
+      expect(describeAccessPolicy(internalSecret("cron"))).toBe("internal — cron");
     });
   });
 });

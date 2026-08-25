@@ -30,23 +30,18 @@ function projection() {
 describe("LangyAnalyticsEventMapProjection", () => {
   it("registers and maps every durable Langy event type", () => {
     const subject = projection();
-    expect(subject.eventTypes).toEqual(
-      LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
-    );
+    expect(subject.eventTypes).toEqual(LANGY_CONVERSATION_PROCESSING_EVENT_TYPES);
 
-    const records = LANGY_CONVERSATION_PROCESSING_EVENT_TYPES.map(
-      (type, index) =>
-        subject.map({
-          ...base,
-          id: `event_${index}`,
-          type,
-          version: "2026-07-10",
-          data: { conversationId: "conversation_1", turnId: "turn_1" },
-        } as LangyConversationProcessingEvent),
+    const records = LANGY_CONVERSATION_PROCESSING_EVENT_TYPES.map((type, index) =>
+      subject.map({
+        ...base,
+        id: `event_${index}`,
+        type,
+        version: "2026-07-10",
+        data: { conversationId: "conversation_1", turnId: "turn_1" },
+      } as LangyConversationProcessingEvent),
     );
-    expect(records).toHaveLength(
-      LANGY_CONVERSATION_PROCESSING_EVENT_TYPES.length,
-    );
+    expect(records).toHaveLength(LANGY_CONVERSATION_PROCESSING_EVENT_TYPES.length);
     expect(records.every((record) => record !== null)).toBe(true);
   });
 
@@ -175,9 +170,7 @@ describe("LangyAnalyticsEventMapProjection", () => {
     ];
 
     const serialized = JSON.stringify(
-      events.map((event) =>
-        projection().map(event as LangyConversationProcessingEvent),
-      ),
+      events.map((event) => projection().map(event as LangyConversationProcessingEvent)),
     );
     expect(serialized).not.toContain("PRIVATE_COMMAND");
     expect(serialized).not.toContain("PRIVATE_INPUT");

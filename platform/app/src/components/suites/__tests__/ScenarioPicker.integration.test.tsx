@@ -79,12 +79,8 @@ describe("<ScenarioPicker />", () => {
       it("shows the archived-scenarios warning section", () => {
         renderPicker({ archivedIds });
 
-        expect(
-          screen.getByTestId("archived-scenarios-section"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText("2 archived scenarios linked:"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("archived-scenarios-section")).toBeInTheDocument();
+        expect(screen.getByText("2 archived scenarios linked:")).toBeInTheDocument();
       });
 
       it("displays each archived scenario name", () => {
@@ -116,9 +112,7 @@ describe("<ScenarioPicker />", () => {
           onRemoveArchived: onRemove,
         });
 
-        await user.click(
-          screen.getByTestId("remove-archived-scenario-scen_old_1"),
-        );
+        await user.click(screen.getByTestId("remove-archived-scenario-scen_old_1"));
 
         expect(onRemove).toHaveBeenCalledTimes(1);
         expect(onRemove).toHaveBeenCalledWith("scen_old_1");
@@ -133,9 +127,7 @@ describe("<ScenarioPicker />", () => {
           archivedIds: [{ id: "scen_old_1", name: "scen_old_1" }],
         });
 
-        expect(
-          screen.getByText("1 archived scenario linked:"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("1 archived scenario linked:")).toBeInTheDocument();
       });
     });
   });
@@ -145,9 +137,7 @@ describe("<ScenarioPicker />", () => {
       it("displays an Add Scenario button inline with the search input", () => {
         renderPicker();
 
-        expect(
-          screen.getByRole("button", { name: "Add Scenario" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Add Scenario" })).toBeInTheDocument();
       });
 
       it("displays a plus icon on the Add Scenario button", () => {
@@ -160,9 +150,7 @@ describe("<ScenarioPicker />", () => {
       it("does not display the old Create New Scenario button at the bottom", () => {
         renderPicker();
 
-        expect(
-          screen.queryByText("Create New Scenario"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText("Create New Scenario")).not.toBeInTheDocument();
       });
     });
 

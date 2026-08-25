@@ -57,11 +57,7 @@ export function SaveAsViewButton() {
         Save as view
       </Button>
 
-      <Dialog.Root
-        open={isOpen}
-        onOpenChange={(e) => setIsOpen(e.open)}
-        size="sm"
-      >
+      <Dialog.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)} size="sm">
         <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>Save as view</Dialog.Title>
@@ -71,9 +67,7 @@ export function SaveAsViewButton() {
               ref={inputRef}
               placeholder="View name..."
               value={viewName}
-              onChange={(e) =>
-                setViewName(e.target.value.slice(0, MAX_VIEW_NAME_LENGTH))
-              }
+              onChange={(e) => setViewName(e.target.value.slice(0, MAX_VIEW_NAME_LENGTH))}
               onKeyDown={handleKeyDown}
               data-testid="save-view-name-input"
             />

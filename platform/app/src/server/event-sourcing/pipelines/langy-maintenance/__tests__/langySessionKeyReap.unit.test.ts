@@ -98,9 +98,7 @@ describe("langySessionKeyReap process", () => {
           },
         });
 
-        const pm = pipeline.processManagers.get(
-          LANGY_SESSION_KEY_REAP_PROCESS_NAME,
-        );
+        const pm = pipeline.processManagers.get(LANGY_SESSION_KEY_REAP_PROCESS_NAME);
         expect(pm).toBeDefined();
         expect(pm?.config.schedule?.everyMs).toBeGreaterThan(0);
         // No event handlers: a scheduled-only process must not register a

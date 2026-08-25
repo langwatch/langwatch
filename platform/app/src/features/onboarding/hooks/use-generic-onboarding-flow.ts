@@ -52,10 +52,7 @@ export function useGenericOnboardingFlow<
 
     if (typeof stepFromQuery === "string") {
       const screenIndex = screenIdMap.idToIndex.get(stepFromQuery);
-      if (
-        screenIndex !== void 0 &&
-        flowConfig.visibleScreens.includes(screenIndex)
-      ) {
+      if (screenIndex !== void 0 && flowConfig.visibleScreens.includes(screenIndex)) {
         if (currentScreenIndex !== screenIndex) {
           setCurrentScreenIndex(screenIndex);
         }
@@ -138,8 +135,7 @@ export function useGenericOnboardingFlow<
     if (pos === -1) {
       setDirection(OnboardingFlowDirection.FORWARD);
       const firstScreen =
-        visible[Math.max(0, visible.indexOf(flowConfig.first))] ??
-        flowConfig.first;
+        visible[Math.max(0, visible.indexOf(flowConfig.first))] ?? flowConfig.first;
       setCurrentScreenIndex(firstScreen);
       updateUrlForScreen(firstScreen);
       return;
@@ -155,8 +151,7 @@ export function useGenericOnboardingFlow<
     if (pos === -1) {
       setDirection(OnboardingFlowDirection.BACKWARD);
       const firstScreen =
-        visible[Math.max(0, visible.indexOf(flowConfig.first))] ??
-        flowConfig.first;
+        visible[Math.max(0, visible.indexOf(flowConfig.first))] ?? flowConfig.first;
       setCurrentScreenIndex(firstScreen);
       updateUrlForScreen(firstScreen);
       return;

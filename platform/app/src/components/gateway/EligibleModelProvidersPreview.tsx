@@ -38,10 +38,7 @@ function scopeName(
  * scopes named the way the user picked them in the chips right above, so
  * the sentence reads back their own choice rather than a scope type.
  */
-function listScopeNames(
-  scopes: VirtualKeyScopeEntry[],
-  names: ScopeNames,
-): string {
+function listScopeNames(scopes: VirtualKeyScopeEntry[], names: ScopeNames): string {
   const labels = scopes.map((s) => scopeName(s, names) ?? s.scopeId);
   if (labels.length <= 1) return labels[0] ?? "";
   return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]!}`;
@@ -154,8 +151,7 @@ export function EligibleModelProvidersPreview({
           <Text as="span" fontFamily="mono">
             /settings/model-providers
           </Text>
-          . The key cannot route requests until at least one provider is in
-          scope.
+          . The key cannot route requests until at least one provider is in scope.
         </Text>
       </VStack>
     );
@@ -188,14 +184,10 @@ export function EligibleModelProvidersPreview({
                 : undefined
             }
             onClick={
-              interactive
-                ? () => onSelectProviderModel?.(mp.defaultModel)
-                : undefined
+              interactive ? () => onSelectProviderModel?.(mp.defaultModel) : undefined
             }
             title={
-              interactive
-                ? `Use ${mp.defaultModel} in the snippet above`
-                : undefined
+              interactive ? `Use ${mp.defaultModel} in the snippet above` : undefined
             }
           >
             <Box

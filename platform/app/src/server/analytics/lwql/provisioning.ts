@@ -263,11 +263,7 @@ export function qualified(
  * (`SELECT count() FROM <key map> WHERE KeyHash='hash-b'` returns 0) and
  * revokes instantly, with none of a dictionary's `LIFETIME` refresh lag.
  */
-export function lwqlKeyMapTableStatement({
-  names,
-}: {
-  names: LangWatchQLNames;
-}): string {
+export function lwqlKeyMapTableStatement({ names }: { names: LangWatchQLNames }): string {
   assertNames(names);
   return (
     `CREATE TABLE IF NOT EXISTS ${qualified(names, names.keyMapTable)} ` +
@@ -498,9 +494,7 @@ export function lwqlClickHouseSetupStatements({
       lwqlGrantStatement({ names, table: lwqlTable.table }),
     ),
     lwqlKeyMapRowPolicyStatement({ names }),
-    ...lwqlTables.map((lwqlTable) =>
-      lwqlRowPolicyStatement({ names, lwqlTable }),
-    ),
+    ...lwqlTables.map((lwqlTable) => lwqlRowPolicyStatement({ names, lwqlTable })),
   ];
 }
 
@@ -517,11 +511,7 @@ export function lwqlClickHouseSetupStatements({
  * view; an empty result is the healthy state. Run as an administrative user —
  * the restricted identity cannot read `system.tables` beyond its own grants.
  */
-export function definerViewAuditQuery({
-  names,
-}: {
-  names: LangWatchQLNames;
-}): string {
+export function definerViewAuditQuery({ names }: { names: LangWatchQLNames }): string {
   assertNames(names);
   return (
     `SELECT name, engine, create_table_query\n` +
@@ -565,11 +555,7 @@ export function definerViewAuditQuery({
  * Returns rows of `{ database, table, has_policy, is_invoker_view, covered }`,
  * each flag being ClickHouse's UInt8 0/1. Run as an administrative user.
  */
-export function lwqlPolicyCoverageQuery({
-  names,
-}: {
-  names: LangWatchQLNames;
-}): string {
+export function lwqlPolicyCoverageQuery({ names }: { names: LangWatchQLNames }): string {
   assertNames(names);
   const user = clickHouseLiteral(names.restrictedUser);
   return (
@@ -620,11 +606,7 @@ export function auditedSettingValue(value: string): string {
  *
  * Returns rows of `{ name }`; an empty result is the healthy state.
  */
-export function lwqlDictionaryAuditQuery({
-  names,
-}: {
-  names: LangWatchQLNames;
-}): string {
+export function lwqlDictionaryAuditQuery({ names }: { names: LangWatchQLNames }): string {
   assertNames(names);
   return (
     `SELECT name FROM system.dictionaries ` +

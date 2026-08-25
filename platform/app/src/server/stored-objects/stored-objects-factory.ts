@@ -103,8 +103,5 @@ export function createStoredObjectsService({
   projectId: string;
 }): StoredObjectsService {
   const repository = new StoredObjectsRepository();
-  return new StoredObjectsService(
-    repository,
-    createStorageRegistry({ projectId }),
-  );
+  return new StoredObjectsService(repository, createStorageRegistry({ projectId }));
 }

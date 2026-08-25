@@ -12,7 +12,7 @@ to the OpenTelemetry GenAI semantic conventions and LangWatch's extensions.
 The `genai` client lets you inject the HTTP client it uses
 (`ClientConfig.HTTPClient`, a `*http.Client` that is honored verbatim). This
 package traces at that HTTP layer via the shared [`otelhttp`](../otelhttp) base:
-it passes request and response bodies *through* to the caller byte-for-byte while
+it passes request and response bodies _through_ to the caller byte-for-byte while
 capturing a bounded copy off the critical path for attribute extraction. Tracing
 adds negligible latency and memory.
 
@@ -33,10 +33,10 @@ params, input/output content, usage and finish reasons — is read from the JSON
 **body** by the content extractor. The request body the extractor matches on
 carries a `contents[]` array (no `model` field).
 
-| Extractor          | Request discriminator                       | Streaming reconstruction |
-| ------------------ | ------------------------------------------- | ------------------------ |
+| Extractor          | Request discriminator                       | Streaming reconstruction                                                                                                                           |
+| ------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `generate_content` | `contents[]` (or a `:generateContent` path) | accumulate `candidates[].content.parts[].text`; **no `[DONE]` sentinel** — ends on EOF; usage / finish reason / model version from the final chunk |
-| `generic`          | anything (terminal fallback)                | best-effort Gemini-chunk probing |
+| `generic`          | anything (terminal fallback)                | best-effort Gemini-chunk probing                                                                                                                   |
 
 A Gemini `GenerateContentResponse` carries no top-level `object` discriminator, so
 the base routes non-streaming responses to the terminal fallback, which decodes
@@ -45,11 +45,11 @@ request/response pairing.
 
 ## Supported operations
 
-| API                                    | Support             | Docs                                                                            |
-| -------------------------------------- | ------------------- | ------------------------------------------------------------------------------- |
+| API                                    | Support             | Docs                                                                                    |
+| -------------------------------------- | ------------------- | --------------------------------------------------------------------------------------- |
 | `generateContent`                      | Full (Input/Output) | [Docs](https://ai.google.dev/api/generate-content#method:-models.generatecontent)       |
 | `streamGenerateContent` (SSE)          | Full (Input/Output) | [Docs](https://ai.google.dev/api/generate-content#method:-models.streamgeneratecontent) |
-| Other endpoints (embeddings, caches …) | Generic fallback    | —                                                                               |
+| Other endpoints (embeddings, caches …) | Generic fallback    | —                                                                                       |
 
 Both the Gemini Developer API and the Vertex AI backend are supported — the model
 is parsed from either path shape.
@@ -59,12 +59,12 @@ is parsed from either path shape.
 All token kinds Gemini reports in `usageMetadata` are captured and mapped onto the
 LangWatch `gen_ai.usage.*` attributes:
 
-| Gemini `usageMetadata`    | `gen_ai.usage.*`        |
-| ------------------------- | ----------------------- |
-| `promptTokenCount`        | `input_tokens`          |
-| `candidatesTokenCount`    | `output_tokens`         |
-| `totalTokenCount`         | `total_tokens`          |
-| `cachedContentTokenCount` | `cached_input_tokens`   |
+| Gemini `usageMetadata`    | `gen_ai.usage.*`          |
+| ------------------------- | ------------------------- |
+| `promptTokenCount`        | `input_tokens`            |
+| `candidatesTokenCount`    | `output_tokens`           |
+| `totalTokenCount`         | `total_tokens`            |
+| `cachedContentTokenCount` | `cached_input_tokens`     |
 | `thoughtsTokenCount`      | `reasoning.output_tokens` |
 
 Usage is recorded as `gen_ai.usage.*` attributes (the OTel-native view), which
@@ -152,11 +152,11 @@ authenticated transport as the base.
 
 ## Options
 
-| Option                   | Description                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------------- |
-| `WithTracerProvider(tp)` | Tracer provider to use. Defaults to the global provider.                                           |
+| Option                   | Description                                                                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `WithTracerProvider(tp)` | Tracer provider to use. Defaults to the global provider.                                                                                                     |
 | `WithDataCapture(mode)`  | Gates input/output **content** capture at the source. Defaults to `langwatch.DataCaptureAll`. Span structure, models, usage and metrics are always recorded. |
-| `WithGenAIProvider(kv)`  | Sets `gen_ai.provider.name`. Defaults to `gcp.gemini` (`semconv.GenAIProviderNameGCPGemini`).      |
+| `WithGenAIProvider(kv)`  | Sets `gen_ai.provider.name`. Defaults to `gcp.gemini` (`semconv.GenAIProviderNameGCPGemini`).                                                                |
 
 `WithDataCapture` composes with the exporter-level
 `langwatch.WithDataCapture(...)`: the transport gates content at the source and

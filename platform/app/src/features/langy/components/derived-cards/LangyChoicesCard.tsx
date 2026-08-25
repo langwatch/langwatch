@@ -94,9 +94,7 @@ export function LangyChoicesCard({
             size="xs"
             colorPalette="orange"
             disabled={picked.size === 0}
-            onClick={() =>
-              answer({ blockId: card.blockId, optionIds: [...picked] })
-            }
+            onClick={() => answer({ blockId: card.blockId, optionIds: [...picked] })}
           >
             <Check size={12} /> Answer
           </Button>
@@ -112,9 +110,7 @@ export function LangyChoicesCard({
           const selectable = open && !dead;
 
           const primary =
-            refRow.state === "live" && refRow.primary
-              ? refRow.primary
-              : option.label;
+            refRow.state === "live" && refRow.primary ? refRow.primary : option.label;
           const secondary = dead
             ? "No longer exists"
             : ((refRow.state === "live" ? refRow.secondary : undefined) ??
@@ -134,9 +130,7 @@ export function LangyChoicesCard({
               paddingY={1.5}
               borderWidth="1px"
               borderStyle="solid"
-              borderColor={
-                isChosen || isPicked ? "purple.emphasized" : "border.muted"
-              }
+              borderColor={isChosen || isPicked ? "purple.emphasized" : "border.muted"}
               borderRadius="md"
               background={isChosen || isPicked ? "bg.muted" : "transparent"}
               cursor={selectable ? "pointer" : "default"}
@@ -149,11 +143,7 @@ export function LangyChoicesCard({
               <Box
                 flexShrink={0}
                 color={
-                  isChosen || isPicked
-                    ? "purple.fg"
-                    : dead
-                      ? "fg.subtle"
-                      : "fg.muted"
+                  isChosen || isPicked ? "purple.fg" : dead ? "fg.subtle" : "fg.muted"
                 }
                 display="flex"
               >

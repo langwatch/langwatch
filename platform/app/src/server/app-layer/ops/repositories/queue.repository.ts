@@ -76,10 +76,7 @@ export interface ReconcileResult {
 export interface QueueRepository {
   discoverQueueNames(): Promise<string[]>;
 
-  scanQueues(params: {
-    queueNames: string[];
-    topN?: number;
-  }): Promise<QueueInfo[]>;
+  scanQueues(params: { queueNames: string[]; topN?: number }): Promise<QueueInfo[]>;
 
   getGroupJobs(params: {
     queueName: string;
@@ -122,9 +119,7 @@ export interface QueueRepository {
     groupId: string;
   }): Promise<{ wasBlocked: boolean }>;
 
-  unblockAll(params: {
-    queueName: string;
-  }): Promise<{ unblockedCount: number }>;
+  unblockAll(params: { queueName: string }): Promise<{ unblockedCount: number }>;
 
   drainGroup(params: {
     queueName: string;
@@ -187,10 +182,7 @@ export interface QueueRepository {
    * Discard an explicit set of DLQ groups: their jobs never run again.
    * Returns what the audit row must record — counts and an error sample.
    */
-  discardManyFromDlq(params: {
-    queueName: string;
-    groupIds: string[];
-  }): Promise<{
+  discardManyFromDlq(params: { queueName: string; groupIds: string[] }): Promise<{
     discardedCount: number;
     jobsDiscarded: number;
     lastErrors: string[];

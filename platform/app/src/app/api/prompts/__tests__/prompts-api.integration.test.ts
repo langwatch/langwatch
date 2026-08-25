@@ -143,10 +143,7 @@ describe("Prompts API", () => {
     // Clean up test data
     await cleanupTestRows(prisma, [
       ["llmPromptConfig", { projectId: testProjectId }],
-      [
-        "modelDefaultConfigScope",
-        { scopeType: "PROJECT", scopeId: testProjectId },
-      ],
+      ["modelDefaultConfigScope", { scopeType: "PROJECT", scopeId: testProjectId }],
       ["modelDefaultConfig", { id: testDefaultConfigId }],
     ]);
 
@@ -321,12 +318,9 @@ describe("Prompts API", () => {
           });
 
           it("gets all versions for a prompt", async () => {
-            const res = await app.request(
-              `/api/prompts/${config.id}/versions`,
-              {
-                headers: { "X-Auth-Token": testApiKey },
-              },
-            );
+            const res = await app.request(`/api/prompts/${config.id}/versions`, {
+              headers: { "X-Auth-Token": testApiKey },
+            });
 
             expect(res.status).toBe(200);
             const body = await res.json();
@@ -350,12 +344,9 @@ describe("Prompts API", () => {
           });
 
           it("gets empty array for a prompt with no versions", async () => {
-            const res = await app.request(
-              `/api/prompts/${config.id}/versions`,
-              {
-                headers: { "X-Auth-Token": testApiKey },
-              },
-            );
+            const res = await app.request(`/api/prompts/${config.id}/versions`, {
+              headers: { "X-Auth-Token": testApiKey },
+            });
 
             const body = await res.json();
             expect(res.status).toBe(200);
@@ -511,9 +502,7 @@ describe("Prompts API", () => {
           });
 
           // Verify the handle is in the correct format
-          expect(realPrompt?.handle).toBe(
-            `${testProjectId}/my-custom-ref-updated`,
-          );
+          expect(realPrompt?.handle).toBe(`${testProjectId}/my-custom-ref-updated`);
         });
 
         it("enforces unique handle constraint", async () => {
@@ -533,13 +522,10 @@ describe("Prompts API", () => {
           });
 
           // Set handle on first prompt
-          const updateRes = await helpers.api.put(
-            `/api/prompts/${prompt1.id}`,
-            {
-              commitMessage: "Updated handle",
-              handle: "second-ref",
-            },
-          );
+          const updateRes = await helpers.api.put(`/api/prompts/${prompt1.id}`, {
+            commitMessage: "Updated handle",
+            handle: "second-ref",
+          });
 
           // Should fail because the handle is already taken
           expect(updateRes.status).toBe(409);
@@ -580,9 +566,7 @@ describe("Prompts API", () => {
             handle: "update-all-fields-test",
             scope: "PROJECT",
             prompt: "Initial prompt text with {{variable}}",
-            messages: [
-              { role: "user", content: "Initial user message with {{input}}" },
-            ],
+            messages: [{ role: "user", content: "Initial user message with {{input}}" }],
             inputs: [
               { identifier: "variable", type: "str" },
               { identifier: "input", type: "str" },
@@ -601,39 +585,36 @@ describe("Prompts API", () => {
         expect(createRes.status).toBe(200);
 
         // Update all supported fields
-        const updateRes = await helpers.api.put(
-          `/api/prompts/${createdPrompt.id}`,
-          {
-            commitMessage: "Updated all fields",
-            handle: "updated-all-fields-test",
-            scope: "ORGANIZATION",
-            prompt: "Updated prompt text with {{new_variable}}",
-            messages: [
-              {
-                role: "user",
-                content: "Updated user message with {{new_input}}",
-              },
-              { role: "assistant", content: "Example response" },
-            ],
-            inputs: [
-              { identifier: "new_variable", type: "str" },
-              { identifier: "new_input", type: "str" },
-              { identifier: "additional_param", type: "float" },
-            ],
-            outputs: [
-              {
-                identifier: "updated_response",
-                type: "str",
-                json_schema: { type: "str" },
-              },
-              {
-                identifier: "metadata",
-                type: "json_schema",
-                json_schema: { type: "json_schema" },
-              },
-            ],
-          },
-        );
+        const updateRes = await helpers.api.put(`/api/prompts/${createdPrompt.id}`, {
+          commitMessage: "Updated all fields",
+          handle: "updated-all-fields-test",
+          scope: "ORGANIZATION",
+          prompt: "Updated prompt text with {{new_variable}}",
+          messages: [
+            {
+              role: "user",
+              content: "Updated user message with {{new_input}}",
+            },
+            { role: "assistant", content: "Example response" },
+          ],
+          inputs: [
+            { identifier: "new_variable", type: "str" },
+            { identifier: "new_input", type: "str" },
+            { identifier: "additional_param", type: "float" },
+          ],
+          outputs: [
+            {
+              identifier: "updated_response",
+              type: "str",
+              json_schema: { type: "str" },
+            },
+            {
+              identifier: "metadata",
+              type: "json_schema",
+              json_schema: { type: "json_schema" },
+            },
+          ],
+        });
 
         const updatedPrompt = await updateRes.json();
         expect(updateRes.status).toBe(200);
@@ -641,9 +622,7 @@ describe("Prompts API", () => {
         // Verify all fields were updated
         expect(updatedPrompt.handle).toBe("updated-all-fields-test");
         expect(updatedPrompt.scope).toBe("ORGANIZATION");
-        expect(updatedPrompt.prompt).toBe(
-          "Updated prompt text with {{new_variable}}",
-        );
+        expect(updatedPrompt.prompt).toBe("Updated prompt text with {{new_variable}}");
         expect(updatedPrompt.messages).toHaveLength(3);
         expect(updatedPrompt.messages[0].content).toBe(
           "Updated prompt text with {{new_variable}}",
@@ -664,17 +643,14 @@ describe("Prompts API", () => {
         const createdPrompt = await createRes.json();
 
         // Try to update with both prompt and system message - should fail
-        const updateRes = await helpers.api.put(
-          `/api/prompts/${createdPrompt.id}`,
-          {
-            commitMessage: "Testing conflict",
-            prompt: "This is a prompt text",
-            messages: [
-              { role: "system", content: "This is a system message" },
-              { role: "user", content: "User message" },
-            ],
-          },
-        );
+        const updateRes = await helpers.api.put(`/api/prompts/${createdPrompt.id}`, {
+          commitMessage: "Testing conflict",
+          prompt: "This is a prompt text",
+          messages: [
+            { role: "system", content: "This is a system message" },
+            { role: "user", content: "User message" },
+          ],
+        });
 
         expect(updateRes.status).toBe(409); // Changed from 400 to 409
         const errorBody = await updateRes.json();
@@ -691,16 +667,13 @@ describe("Prompts API", () => {
         const createdPrompt = await createRes.json();
 
         // Update with system message - should convert to messages format
-        const updateRes = await helpers.api.put(
-          `/api/prompts/${createdPrompt.id}`,
-          {
-            commitMessage: "Updated with system message",
-            messages: [
-              { role: "system", content: "New system message" },
-              { role: "user", content: "User message" },
-            ],
-          },
-        );
+        const updateRes = await helpers.api.put(`/api/prompts/${createdPrompt.id}`, {
+          commitMessage: "Updated with system message",
+          messages: [
+            { role: "system", content: "New system message" },
+            { role: "user", content: "User message" },
+          ],
+        });
 
         expect(updateRes.status).toBe(200);
         const updatedPrompt = await updateRes.json();
@@ -732,13 +705,10 @@ describe("Prompts API", () => {
         const createdPrompt = await createRes.json();
 
         // Update with prompt text - should convert to prompt format
-        const updateRes = await helpers.api.put(
-          `/api/prompts/${createdPrompt.id}`,
-          {
-            commitMessage: "Updated prompt text",
-            prompt: "New prompt text with {{variable}}",
-          },
-        );
+        const updateRes = await helpers.api.put(`/api/prompts/${createdPrompt.id}`, {
+          commitMessage: "Updated prompt text",
+          prompt: "New prompt text with {{variable}}",
+        });
 
         expect(updateRes.status).toBe(200);
         const updatedPrompt = await updateRes.json();
@@ -798,15 +768,12 @@ describe("Prompts API", () => {
 
     it("deletes a prompt by handle", async () => {
       // Delete the prompt by handle
-      const deleteRes = await app.request(
-        `/api/prompts/${promptToDelete.handle}`,
-        {
-          method: "DELETE",
-          headers: {
-            "X-Auth-Token": testApiKey,
-          },
+      const deleteRes = await app.request(`/api/prompts/${promptToDelete.handle}`, {
+        method: "DELETE",
+        headers: {
+          "X-Auth-Token": testApiKey,
         },
-      );
+      });
 
       const deleteBody = await deleteRes.json();
       console.log(promptToDelete.handle, deleteBody);
@@ -933,9 +900,7 @@ describe("Prompts API", () => {
         const original = await createRes.json();
 
         // 2) Soft-delete it.
-        const deleteRes = await helpers.api.delete(
-          `/api/prompts/${original.id}`,
-        );
+        const deleteRes = await helpers.api.delete(`/api/prompts/${original.id}`);
         expect(deleteRes.status).toBe(200);
 
         // 3) Create a fresh prompt with the same handle — this used to throw
@@ -959,18 +924,15 @@ describe("Prompts API", () => {
           .replace(/[^a-z0-9_-]/g, "x")}`;
 
         // 1) Sync creates the prompt.
-        const initialSync = await helpers.api.post(
-          `/api/prompts/${handle}/sync`,
-          {
-            configData: {
-              prompt: "v1",
-              messages: [],
-              inputs: [{ identifier: "input", type: "str" }],
-              outputs: [{ identifier: "output", type: "str" }],
-              model: "openai/gpt-5-mini",
-            },
+        const initialSync = await helpers.api.post(`/api/prompts/${handle}/sync`, {
+          configData: {
+            prompt: "v1",
+            messages: [],
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            model: "openai/gpt-5-mini",
           },
-        );
+        });
         expect(initialSync.status).toBe(200);
         const initialBody = await initialSync.json();
         expect(initialBody.action).toBe("created");
@@ -1017,12 +979,8 @@ describe("Prompts API", () => {
         expect(secondRes.status).toBe(409);
         const body = await secondRes.json();
         // Must NOT collapse to a generic 500/Internal server error.
-        expect(JSON.stringify(body).toLowerCase()).not.toContain(
-          "internal server error",
-        );
-        expect(JSON.stringify(body).toLowerCase()).toContain(
-          "handle already exists",
-        );
+        expect(JSON.stringify(body).toLowerCase()).not.toContain("internal server error");
+        expect(JSON.stringify(body).toLowerCase()).toContain("handle already exists");
       });
     });
   });

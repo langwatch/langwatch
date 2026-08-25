@@ -181,9 +181,7 @@ describe("Feature: Suites REST API", () => {
         name: overrides.name ?? "Test Suite",
         slug: `test-suite-${nanoid()}`,
         scenarioIds: overrides.scenarioIds ?? [scenario.id],
-        targets: overrides.targets ?? [
-          { type: "http", referenceId: "agent_test" },
-        ],
+        targets: overrides.targets ?? [{ type: "http", referenceId: "agent_test" }],
         repeatCount: 1,
         labels: [],
         archivedAt: overrides.archivedAt ?? null,
@@ -322,10 +320,7 @@ describe("Feature: Suites REST API", () => {
     it("creates a copy of the suite", async () => {
       const suite = await createSuite({ name: "Original" });
 
-      const res = await helpers.api.post(
-        `/api/suites/${suite.id}/duplicate`,
-        {},
-      );
+      const res = await helpers.api.post(`/api/suites/${suite.id}/duplicate`, {});
 
       expect(res.status).toBe(201);
       const body = await res.json();

@@ -72,17 +72,14 @@ export function TileIcon({
         height={`${size - 8}px`}
         objectFit="contain"
         _dark={
-          resolved.darkModeInvert
-            ? { filter: "invert(1) hue-rotate(180deg)" }
-            : undefined
+          resolved.darkModeInvert ? { filter: "invert(1) hue-rotate(180deg)" } : undefined
         }
       />
     );
   } else if (resolved?.kind === "node") {
     inner = resolved.node;
   } else if (iconKey) {
-    const brand =
-      modelProviderIcons[iconKey as keyof typeof modelProviderIcons];
+    const brand = modelProviderIcons[iconKey as keyof typeof modelProviderIcons];
     inner = brand ?? FALLBACK_ICONS[type];
   } else {
     inner = FALLBACK_ICONS[type];

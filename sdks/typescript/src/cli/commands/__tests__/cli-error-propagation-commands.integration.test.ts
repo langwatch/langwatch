@@ -6,15 +6,7 @@
  * various payload shapes) so regressions in error propagation are caught
  * at the boundary the user actually experiences.
  */
-import {
-  describe,
-  expect,
-  it,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
-} from "vitest";
+import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -171,9 +163,7 @@ describe("CLI error propagation across commands", () => {
 
       expect(result.exitCode).toBe(1);
       expect(result.combined.toLowerCase()).toContain("already exists");
-      expect(result.combined.toLowerCase()).not.toContain(
-        "error: internal server error",
-      );
+      expect(result.combined.toLowerCase()).not.toContain("error: internal server error");
     });
   });
 
@@ -216,9 +206,7 @@ describe("CLI error propagation across commands", () => {
       );
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toContain(
-        "must be a valid evaluator type",
-      );
+      expect(result.combined.toLowerCase()).toContain("must be a valid evaluator type");
     });
   });
 
@@ -256,9 +244,7 @@ describe("CLI error propagation across commands", () => {
       );
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toContain(
-        "missing required input",
-      );
+      expect(result.combined.toLowerCase()).toContain("missing required input");
     });
   });
 

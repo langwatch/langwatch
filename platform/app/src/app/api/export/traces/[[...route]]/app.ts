@@ -18,10 +18,7 @@ import { validator as zValidator } from "~/server/api/validation";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import {
-  ExportFailedError,
-  ExportUnauthenticatedError,
-} from "~/server/export/errors";
+import { ExportFailedError, ExportUnauthenticatedError } from "~/server/export/errors";
 import { ExportService } from "~/server/export/export.service";
 import { exportRequestSchema } from "~/server/export/types";
 import type { NextRequest } from "~/types/next-stubs";
@@ -100,9 +97,7 @@ secured
     const fileName = `${request.projectId} - Traces - ${today} - ${request.mode}.${extension}`;
 
     const contentType =
-      request.format === "csv"
-        ? "text/csv; charset=utf-8"
-        : "application/x-ndjson";
+      request.format === "csv" ? "text/csv; charset=utf-8" : "application/x-ndjson";
 
     let exportService: Awaited<ReturnType<typeof ExportService.create>>;
     let totalCount: number;
@@ -125,8 +120,7 @@ secured
       "Transfer-Encoding": "chunked",
       "X-Export-Id": exportId,
       "X-Total-Traces": String(totalCount),
-      "Access-Control-Expose-Headers":
-        "X-Export-Id, X-Total-Traces, Content-Disposition",
+      "Access-Control-Expose-Headers": "X-Export-Id, X-Total-Traces, Content-Disposition",
     });
     const encoder = new TextEncoder();
 
@@ -156,10 +150,7 @@ secured
           );
           controller.close();
         } catch (error) {
-          logger.error(
-            { error, projectId: request.projectId },
-            "Export stream error",
-          );
+          logger.error({ error, projectId: request.projectId }, "Export stream error");
           void broadcast.broadcastToTenant(
             request.projectId,
             JSON.stringify({

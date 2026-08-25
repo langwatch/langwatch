@@ -126,8 +126,7 @@ export function bindingIdentityKey({
   } else if (principal.apiKeyId) {
     resolvedPrincipal = { apiKeyId: principal.apiKeyId };
   }
-  if (!resolvedPrincipal)
-    throw new Error("a binding identity names no principal");
+  if (!resolvedPrincipal) throw new Error("a binding identity names no principal");
   return authzBindingIdentityKey({
     principal: resolvedPrincipal,
     scopeType,

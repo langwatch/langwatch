@@ -1,8 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 
-const logger = createLogger(
-  "langwatch:coding-agent-processing:session-seen-touch",
-);
+const logger = createLogger("langwatch:coding-agent-processing:session-seen-touch");
 
 /**
  * How long one process holds off repeating a project's touch.
@@ -25,10 +23,7 @@ const WINDOW_MAP_SWEEP_THRESHOLD = 10_000;
 
 /** What the touch needs to record the project's activity. */
 export interface CodingAgentSessionSeenTouchDeps {
-  touchCodingAgentSessionSeen(params: {
-    projectId: string;
-    at: Date;
-  }): Promise<void>;
+  touchCodingAgentSessionSeen(params: { projectId: string; at: Date }): Promise<void>;
   /** Injectable clock for the window tests. */
   now?: () => number;
 }

@@ -22,9 +22,7 @@ describe("the grants-ledger actor of an organization-authenticated request", () 
   describe("when the key acts for nobody", () => {
     it("names the credential, so a provisioning run's writes group together", () => {
       expect(
-        orgRequestLedgerActor(
-          contextWith({ apiKeyUserId: null, apiKeyId: "apikey_1" }),
-        ),
+        orgRequestLedgerActor(contextWith({ apiKeyUserId: null, apiKeyId: "apikey_1" })),
       ).toEqual({ type: "system", id: "apikey:apikey_1" });
     });
   });
@@ -39,9 +37,7 @@ describe("the grants-ledger actor of an organization-authenticated request", () 
 
     it("treats an empty key id the same way", () => {
       expect(
-        orgRequestLedgerActor(
-          contextWith({ apiKeyUserId: null, apiKeyId: "" }),
-        ),
+        orgRequestLedgerActor(contextWith({ apiKeyUserId: null, apiKeyId: "" })),
       ).toEqual({ type: "system", id: "system:management-api" });
     });
   });

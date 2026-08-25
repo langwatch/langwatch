@@ -1,6 +1,6 @@
 ---
-title: 'Update trace metadata'
-description: 'Update metadata on an existing trace by trace ID. Injects a synthetic span through the standard ingestion pipeline carrying the new attributes.'
+title: "Update trace metadata"
+description: "Update metadata on an existing trace by trace ID. Injects a synthetic span through the standard ingestion pipeline carrying the new attributes."
 ---
 
 ## `PATCH /api/traces/{traceId}/metadata`
@@ -13,9 +13,9 @@ Pass your LangWatch API key in the `X-Auth-Token` header.
 
 ### Path Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `traceId` | string | Yes | The trace ID to update |
+| Parameter | Type   | Required | Description            |
+| --------- | ------ | -------- | ---------------------- |
+| `traceId` | string | Yes      | The trace ID to update |
 
 ### Request Body
 
@@ -36,12 +36,12 @@ Pass your LangWatch API key in the `X-Auth-Token` header.
 
 #### Reserved Fields
 
-| Field | Type | Stored As | Description |
-|-------|------|-----------|-------------|
-| `user_id` | string | `langwatch.user_id` | User identity for analytics |
-| `customer_id` | string | `langwatch.customer_id` | Customer identity for analytics |
-| `thread_id` | string | `gen_ai.conversation.id` | Thread/conversation grouping |
-| `labels` | string[] | `langwatch.labels` | Trace labels for filtering |
+| Field         | Type     | Stored As                | Description                     |
+| ------------- | -------- | ------------------------ | ------------------------------- |
+| `user_id`     | string   | `langwatch.user_id`      | User identity for analytics     |
+| `customer_id` | string   | `langwatch.customer_id`  | Customer identity for analytics |
+| `thread_id`   | string   | `gen_ai.conversation.id` | Thread/conversation grouping    |
+| `labels`      | string[] | `langwatch.labels`       | Trace labels for filtering      |
 
 #### Custom Fields
 
@@ -55,10 +55,10 @@ Any key not in the reserved list is stored as `metadata.{key}` in trace attribut
 
 ### Size Limits
 
-| Limit | Value |
-|-------|-------|
-| Individual metadata value | 4 KB |
-| Total metadata payload | 32 KB |
+| Limit                     | Value |
+| ------------------------- | ----- |
+| Individual metadata value | 4 KB  |
+| Total metadata payload    | 32 KB |
 
 ### Permissions
 
@@ -74,10 +74,10 @@ Requires `traces:update` permission on the project.
 
 ### Error Responses
 
-| Status | Description |
-|--------|-------------|
-| 400 | Empty metadata object, oversized payload, or invalid field values |
-| 403 | Missing `traces:update` permission |
+| Status | Description                                                       |
+| ------ | ----------------------------------------------------------------- |
+| 400    | Empty metadata object, oversized payload, or invalid field values |
+| 403    | Missing `traces:update` permission                                |
 
 ### Example
 
@@ -128,12 +128,13 @@ const response = await fetch(
         environment: "staging",
       },
     }),
-  }
+  },
 );
 ```
 
 </CodeGroup>
 
 <Note>
-Custom metadata keys share the same namespace as metadata set via the SDK during trace ingestion. If both the SDK and this API set the same key, the last write wins.
+  Custom metadata keys share the same namespace as metadata set via the SDK during trace
+  ingestion. If both the SDK and this API set the same key, the last write wins.
 </Note>

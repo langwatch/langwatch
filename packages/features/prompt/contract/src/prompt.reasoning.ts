@@ -22,7 +22,6 @@
  * @see langwatch_nlp/langwatch_nlp/studio/utils.py#map_reasoning_to_provider
  */
 
-
 /**
  * Translation map from provider-specific parameter names to LiteLLM's expected parameter.
  *
@@ -111,7 +110,5 @@ export function normalizeReasoningFromProviderFields(
   data: ProviderReasoningFields,
 ): string | undefined {
   // Priority: reasoning > reasoning_effort > thinkingLevel > effort
-  return (
-    data.reasoning ?? data.reasoning_effort ?? data.thinkingLevel ?? data.effort
-  );
+  return data.reasoning ?? data.reasoning_effort ?? data.thinkingLevel ?? data.effort;
 }

@@ -122,13 +122,12 @@ function MembersList({
     onClose: onInviteLinkClose,
   } = useDisclosure();
 
-  const pendingInvites =
-    api.organization.getOrganizationPendingInvites.useQuery(
-      {
-        organizationId: organization?.id ?? "",
-      },
-      { enabled: !!organization },
-    );
+  const pendingInvites = api.organization.getOrganizationPendingInvites.useQuery(
+    {
+      organizationId: organization?.id ?? "",
+    },
+    { enabled: !!organization },
+  );
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
 
   const [selectedInvites, setSelectedInvites] = useState<
@@ -271,10 +270,7 @@ function MembersList({
     hasOrganizationManagePermission && memberId !== user?.id;
 
   const sentInvites = useMemo(
-    () =>
-      (pendingInvites.data ?? []).filter(
-        (invite) => invite.status === "PENDING",
-      ),
+    () => (pendingInvites.data ?? []).filter((invite) => invite.status === "PENDING"),
     [pendingInvites.data],
   );
 
@@ -296,15 +292,10 @@ function MembersList({
             <HStack gap={2}>
               <InlineInviteBox
                 onStartTyping={(email) =>
-                  openDrawer(
-                    "inviteMember",
-                    email ? { initialEmail: email } : undefined,
-                  )
+                  openDrawer("inviteMember", email ? { initialEmail: email } : undefined)
                 }
               />
-              <PageLayout.HeaderButton
-                onClick={() => openDrawer("inviteMember")}
-              >
+              <PageLayout.HeaderButton onClick={() => openDrawer("inviteMember")}>
                 <Plus size={20} />
                 Add members
               </PageLayout.HeaderButton>
@@ -312,10 +303,7 @@ function MembersList({
           )}
         </HStack>
         {hasOrganizationManagePermission && (
-          <MemberSeatUsage
-            organizationId={organization.id}
-            activePlan={activePlan}
-          />
+          <MemberSeatUsage organizationId={organization.id} activePlan={activePlan} />
         )}
         <Card.Root width="full" overflow="hidden">
           {/*
@@ -332,17 +320,11 @@ function MembersList({
                 <Table.Row>
                   <Table.ColumnHeader width="56px" />
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader maxWidth="280px">
-                    Email
-                  </Table.ColumnHeader>
+                  <Table.ColumnHeader maxWidth="280px">Email</Table.ColumnHeader>
                   {hasOrganizationManagePermission && (
-                    <Table.ColumnHeader textAlign="right">
-                      Access
-                    </Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
                   )}
-                  {showDepartment && (
-                    <Table.ColumnHeader>Department</Table.ColumnHeader>
-                  )}
+                  {showDepartment && <Table.ColumnHeader>Department</Table.ColumnHeader>}
                   <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
@@ -491,12 +473,7 @@ function MembersList({
 
               <VStack align="start" gap={4} width="full">
                 {selectedInvites.map((invite) => (
-                  <VStack
-                    key={invite.inviteCode}
-                    align="start"
-                    gap={6}
-                    width="full"
-                  >
+                  <VStack key={invite.inviteCode} align="start" gap={6} width="full">
                     <Text fontWeight="600">{invite.email}</Text>
                     <CopyInput
                       value={`${window.location.origin}/invite/accept?inviteCode=${invite.inviteCode}`}
@@ -581,18 +558,12 @@ function MemberRowActions({
         </Menu.Item>
         {canDisable &&
           (member.disabledAt ? (
-            <Menu.Item
-              value="enable"
-              onClick={() => onSetDisabled(member.userId, false)}
-            >
+            <Menu.Item value="enable" onClick={() => onSetDisabled(member.userId, false)}>
               <Undo2 size={16} />
               Enable
             </Menu.Item>
           ) : (
-            <Menu.Item
-              value="disable"
-              onClick={() => onSetDisabled(member.userId, true)}
-            >
+            <Menu.Item value="disable" onClick={() => onSetDisabled(member.userId, true)}>
               <Ban size={16} />
               Disable
             </Menu.Item>
@@ -612,11 +583,7 @@ function MemberRowActions({
   );
 }
 
-function InlineInviteBox({
-  onStartTyping,
-}: {
-  onStartTyping: (email: string) => void;
-}) {
+function InlineInviteBox({ onStartTyping }: { onStartTyping: (email: string) => void }) {
   const [value, setValue] = useState("");
   return (
     <Input
@@ -680,8 +647,7 @@ function MemberAccessDisplay({
           </Badge>
           <Text color="fg.muted">on</Text>
           <Badge colorPalette="purple" size="sm">
-            {scopeTypeLabel(b.scopeType)}{" "}
-            {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
+            {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
           </Badge>
           {b.groupId && (
             <Text

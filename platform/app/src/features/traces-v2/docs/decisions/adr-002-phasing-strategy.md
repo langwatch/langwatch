@@ -35,6 +35,7 @@ The foundation specs in `specs/traces-v2/` define the surface area that intellig
 ## What "Loose" Means
 
 The design doc (trace-v2.md) contains:
+
 - Problem statements for each Phase 3-5 feature
 - Interaction sketches (e.g., "one click → 3-sentence diagnosis")
 - Data requirements (e.g., "needs access to trace + simulation baseline")
@@ -46,6 +47,7 @@ This is sufficient for architectural planning (ensuring the foundation supports 
 ## When to Write Detailed Specs
 
 Write Phase 4+ feature files when:
+
 - The foundation specs in `specs/traces-v2/` are implemented and behind a feature flag
 - At least 2 weeks of internal dogfooding has happened on the foundation
 - User feedback from dogfooding has informed how people actually use the trace viewer

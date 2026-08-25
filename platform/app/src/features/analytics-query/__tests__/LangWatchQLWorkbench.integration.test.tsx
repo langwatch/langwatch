@@ -9,13 +9,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -179,8 +173,7 @@ vi.mock("../components/LazyLangWatchQLChartMode", () => ({
   ),
 }));
 
-const SQL =
-  "SELECT trace_id FROM analytics.traces_daily WHERE id = {since:String}";
+const SQL = "SELECT trace_id FROM analytics.traces_daily WHERE id = {since:String}";
 
 /**
  * The page period every case runs under unless it says otherwise.
@@ -307,9 +300,7 @@ describe("the LangWatchQL workbench", () => {
 
         expect(harness.mutation).toHaveBeenCalledTimes(1);
         // The action is back to Run query, waiting for the member to press it.
-        expect(
-          screen.getByRole("button", { name: "Run query" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Run query" })).toBeInTheDocument();
       });
     });
 
@@ -355,9 +346,7 @@ describe("the LangWatchQL workbench", () => {
         );
         typeSql(editor, `${SQL} FORMAT JSON`);
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
-        await waitFor(() =>
-          expect(screen.queryByTestId("stub-chart-mode")).toBeNull(),
-        );
+        await waitFor(() => expect(screen.queryByTestId("stub-chart-mode")).toBeNull());
 
         // They fix the statement and run it again: the chart is theirs, not the
         // example they started from.
@@ -382,9 +371,7 @@ describe("the LangWatchQL workbench", () => {
 
         const parameters = screen.getByTestId("lwql-parameters");
         expect(within(parameters).getByText("Enter a number.")).toBeVisible();
-        expect(
-          screen.getByRole("button", { name: "Run query" }),
-        ).toBeDisabled();
+        expect(screen.getByRole("button", { name: "Run query" })).toBeDisabled();
 
         // Nothing was sent behind their back while the row was unsendable.
         expect(harness.mutation).not.toHaveBeenCalled();
@@ -406,12 +393,8 @@ describe("the LangWatchQL workbench", () => {
         });
 
         const parameters = screen.getByTestId("lwql-parameters");
-        expect(
-          within(parameters).getByText("Name this parameter."),
-        ).toBeVisible();
-        expect(
-          screen.getByRole("button", { name: "Run query" }),
-        ).toBeDisabled();
+        expect(within(parameters).getByText("Name this parameter.")).toBeVisible();
+        expect(screen.getByRole("button", { name: "Run query" })).toBeDisabled();
       });
     });
 
@@ -432,9 +415,7 @@ describe("the LangWatchQL workbench", () => {
         const toggle = await screen.findByRole("button", {
           name: "Parameters",
         });
-        await waitFor(() =>
-          expect(toggle).toHaveAttribute("aria-expanded", "true"),
-        );
+        await waitFor(() => expect(toggle).toHaveAttribute("aria-expanded", "true"));
 
         // The refusal is answered in this form, so a click cannot close it.
         fireEvent.click(toggle);
@@ -446,9 +427,7 @@ describe("the LangWatchQL workbench", () => {
         typeSql(editor, `${SQL} LIMIT 1`);
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
 
-        await waitFor(() =>
-          expect(toggle).toHaveAttribute("aria-expanded", "false"),
-        );
+        await waitFor(() => expect(toggle).toHaveAttribute("aria-expanded", "false"));
       });
 
       /** @scenario "A missing bound parameter is reported against the parameter editor" */
@@ -466,9 +445,7 @@ describe("the LangWatchQL workbench", () => {
 
         const parameters = await screen.findByTestId("lwql-parameters");
         await waitFor(() =>
-          expect(within(parameters).getByRole("alert")).toHaveTextContent(
-            "since, until",
-          ),
+          expect(within(parameters).getByRole("alert")).toHaveTextContent("since, until"),
         );
         expect(within(parameters).getByRole("alert")).toHaveTextContent(
           "Give these parameters a value",
@@ -481,12 +458,8 @@ describe("the LangWatchQL workbench", () => {
       it("shows that window in the spelling the database is bound with", async () => {
         await renderWorkbench();
 
-        expect(screen.getByLabelText("period_start")).toHaveValue(
-          "2026-02-20 00:00:00",
-        );
-        expect(screen.getByLabelText("period_end")).toHaveValue(
-          "2026-02-27 00:00:00",
-        );
+        expect(screen.getByLabelText("period_start")).toHaveValue("2026-02-20 00:00:00");
+        expect(screen.getByLabelText("period_end")).toHaveValue("2026-02-27 00:00:00");
       });
 
       /** @scenario "The workbench fills the period parameters from the page's period selector" */
@@ -496,12 +469,8 @@ describe("the LangWatchQL workbench", () => {
           endDate: "2026-03-08T06:30:00.000Z",
         });
 
-        expect(screen.getByLabelText("period_start")).toHaveValue(
-          "2026-03-01 00:00:00",
-        );
-        expect(screen.getByLabelText("period_end")).toHaveValue(
-          "2026-03-08 06:30:00",
-        );
+        expect(screen.getByLabelText("period_start")).toHaveValue("2026-03-01 00:00:00");
+        expect(screen.getByLabelText("period_end")).toHaveValue("2026-03-08 06:30:00");
       });
     });
 
@@ -537,15 +506,11 @@ describe("the LangWatchQL workbench", () => {
           target: { value: "2026-02-24 09:00:00" },
         });
 
-        fireEvent.click(
-          screen.getByRole("button", { name: "Use the page period" }),
-        );
+        fireEvent.click(screen.getByRole("button", { name: "Use the page period" }));
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
 
         await waitFor(() => expect(harness.mutation).toHaveBeenCalledTimes(1));
-        expect(harness.mutation.mock.calls[0]![1].timeWindow).toEqual(
-          PAGE_WINDOW,
-        );
+        expect(harness.mutation.mock.calls[0]![1].timeWindow).toEqual(PAGE_WINDOW);
       });
 
       // The gap this closes: the fields keep showing what was typed while it
@@ -558,9 +523,7 @@ describe("the LangWatchQL workbench", () => {
         fireEvent.change(screen.getByLabelText("period_start"), {
           target: { value: "2026-02-30 12:00:00" },
         });
-        expect(
-          screen.getByRole("button", { name: "Run query" }),
-        ).toBeDisabled();
+        expect(screen.getByRole("button", { name: "Run query" })).toBeDisabled();
 
         fireEvent.change(screen.getByLabelText("period_start"), {
           target: { value: "2026-02-24 09:00:00" },
@@ -589,33 +552,27 @@ describe("the LangWatchQL workbench", () => {
         await userEvent.click(await screen.findByText("Traces per day"));
 
         await waitFor(() =>
-          expect(
-            screen.getByText("From the period on this page"),
-          ).toBeInTheDocument(),
+          expect(screen.getByText("From the period on this page")).toBeInTheDocument(),
         );
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
         await waitFor(() => expect(harness.mutation).toHaveBeenCalledTimes(1));
-        expect(harness.mutation.mock.calls[0]![1].timeWindow).toEqual(
-          PAGE_WINDOW,
-        );
+        expect(harness.mutation.mock.calls[0]![1].timeWindow).toEqual(PAGE_WINDOW);
       });
     });
 
     describe("when the answer's statement declared no time-window parameters", () => {
       /** @scenario "A statement with no period parameters runs, and says so" */
       it("says the query does not follow the page's period", async () => {
-        harness.mutation.mockResolvedValue(
-          lwqlResult({ followsTimeWindow: false }),
-        );
+        harness.mutation.mockResolvedValue(lwqlResult({ followsTimeWindow: false }));
 
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
 
         await screen.findByTestId("lwql-result-summary");
-        expect(
-          await screen.findByTestId("does-not-follow-period"),
-        ).toHaveTextContent("does not use the time window");
+        expect(await screen.findByTestId("does-not-follow-period")).toHaveTextContent(
+          "does not use the time window",
+        );
       });
 
       /** @scenario "A statement with no period parameters runs, and says so" */
@@ -625,9 +582,7 @@ describe("the LangWatchQL workbench", () => {
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
 
         await screen.findByTestId("lwql-result-summary");
-        expect(
-          screen.queryByTestId("does-not-follow-period"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("does-not-follow-period")).not.toBeInTheDocument();
       });
     });
 
@@ -647,13 +602,9 @@ describe("the LangWatchQL workbench", () => {
 
         const parameters = await screen.findByTestId("lwql-parameters");
         await waitFor(() =>
-          expect(within(parameters).getByRole("alert")).toHaveTextContent(
-            "period_start",
-          ),
+          expect(within(parameters).getByRole("alert")).toHaveTextContent("period_start"),
         );
-        expect(within(parameters).getByRole("alert")).toHaveTextContent(
-          "Remove these",
-        );
+        expect(within(parameters).getByRole("alert")).toHaveTextContent("Remove these");
       });
     });
   });

@@ -129,9 +129,7 @@ function AnnotateActions({
       label={copy.cluster}
       isHeld={isComposing || isTranslationHeld(translation)}
     >
-      {translation && (
-        <TranslateAction target={target} translation={translation} />
-      )}
+      {translation && <TranslateAction target={target} translation={translation} />}
       <HoverActionButton
         icon={Edit3}
         label="Annotate"

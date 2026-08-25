@@ -4,18 +4,18 @@
   "private": true,
   "description": "In-place, one-time data migrations the system runs on itself: a per-tenant state machine driven by a leased runner at worker boot. Storage-engine-free - the app implements the repository interfaces with Prisma and Redis. First rider: the ADR-092 stage-B authorization backfill.",
   "license": "MIT",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": [
-    "src"
-  ],
   "scripts": {
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run"

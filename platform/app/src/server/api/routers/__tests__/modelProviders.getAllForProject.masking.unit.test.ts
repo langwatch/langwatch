@@ -8,21 +8,16 @@ import { modelProviderRouter } from "../modelProviders";
 // ---------------------------------------------------------------------------
 // Hoisted mocks
 // ---------------------------------------------------------------------------
-const {
-  mockFindAllAccessibleForProject,
-  mockProjectFindUnique,
-  mockHasSetupPermission,
-} = vi.hoisted(() => ({
-  mockFindAllAccessibleForProject: vi.fn(),
-  mockProjectFindUnique: vi.fn(),
-  mockHasSetupPermission: vi.fn(),
-}));
+const { mockFindAllAccessibleForProject, mockProjectFindUnique, mockHasSetupPermission } =
+  vi.hoisted(() => ({
+    mockFindAllAccessibleForProject: vi.fn(),
+    mockProjectFindUnique: vi.fn(),
+    mockHasSetupPermission: vi.fn(),
+  }));
 
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
 
@@ -39,9 +34,7 @@ vi.mock("../../rbac", async (importOriginal) => {
 // The router's imperative check goes through the app-layer facade.
 vi.mock("~/server/app-layer/permissions/imperative", async (importOriginal) => {
   const actual =
-    await importOriginal<
-      typeof import("~/server/app-layer/permissions/imperative")
-    >();
+    await importOriginal<typeof import("~/server/app-layer/permissions/imperative")>();
   return { ...actual, probeProjectPermission: mockHasSetupPermission };
 });
 

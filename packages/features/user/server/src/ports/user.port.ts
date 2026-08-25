@@ -1,6 +1,4 @@
-import type {
-  UserAvatarMediaType,
-} from "@langwatch/user-contract";
+import type { UserAvatarMediaType } from "@langwatch/user-contract";
 
 export abstract class UserSessionRevocationPort {
   abstract revokeForUser(input: { userId: string }): Promise<void>;

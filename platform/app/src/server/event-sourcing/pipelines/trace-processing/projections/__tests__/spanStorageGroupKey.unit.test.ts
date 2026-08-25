@@ -80,16 +80,14 @@ describe("spanStorage shard group key", () => {
   describe("when the projection is constructed", () => {
     it("declares the shard key and the coalesce ceiling", () => {
       const projection = new SpanStorageMapProjection({ store: {} as never });
-      expect(projection.options.coalesceMaxBatch).toBe(
-        TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
-      );
+      expect(projection.options.coalesceMaxBatch).toBe(TRACE_SPAN_MAP_COALESCE_MAX_BATCH);
       // 256 is deliberate (matches the log/metric map ceilings); changing it
       // is a decision, so the exact value is pinned.
       expect(TRACE_SPAN_MAP_COALESCE_MAX_BATCH).toBe(256);
       // Guard against regressing to the per-event key.
-      expect(
-        projection.options.groupKeyFn(event("span_x", "evt_unique")),
-      ).not.toContain("evt_unique");
+      expect(projection.options.groupKeyFn(event("span_x", "evt_unique"))).not.toContain(
+        "evt_unique",
+      );
       expect(projection.options.groupKeyFn(event("span_x"))).toBe(
         spanStorageMapGroupKey(event("span_x")),
       );

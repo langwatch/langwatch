@@ -82,12 +82,7 @@ const GUIDES: Guide[] = [
 
 export function DocsGuides() {
   return (
-    <HomeCard
-      cursor="default"
-      padding={HOME_SECTION_PADDING}
-      height="full"
-      width="full"
-    >
+    <HomeCard cursor="default" padding={HOME_SECTION_PADDING} height="full" width="full">
       <VStack align="stretch" gap={HOME_SECTION_GAP} width="full">
         {/* "The Odyssey" was an internal name for this card, and a reader
             meeting it on their first day learns nothing from it. The title now

@@ -12,10 +12,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  SpanDetail,
-  SpanTreeNode,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { SpanDetail, SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { SpanAccordions } from "../SpanAccordions";
 
 const { mockDetailState } = vi.hoisted(() => ({
@@ -155,9 +152,7 @@ describe("Feature: Unmapped model cost suggestion in span details", () => {
     it("opens the model costs page prefilled in a new window", () => {
       renderSpanDetail();
 
-      fireEvent.click(
-        screen.getByRole("button", { name: /add cost mapping/i }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: /add cost mapping/i }));
 
       expect(window.open).toHaveBeenCalledTimes(1);
       const [url, target] = vi.mocked(window.open).mock.calls[0]!;
@@ -180,9 +175,7 @@ describe("Feature: Unmapped model cost suggestion in span details", () => {
 
       renderSpanDetail();
 
-      expect(
-        screen.queryByTestId("unmapped-cost-suggestion"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("unmapped-cost-suggestion")).not.toBeInTheDocument();
     });
   });
 });

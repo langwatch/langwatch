@@ -18,9 +18,7 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { getTestClickHouseClient } from "./testContainers";
 
-const logger = createLogger(
-  "langwatch:event-sourcing:tests:integration:test-pipelines",
-);
+const logger = createLogger("langwatch:event-sourcing:tests:integration:test-pipelines");
 
 // Test event type - now included in production schemas for validation
 export const TEST_EVENT_TYPE = "test.integration.event" as const;
@@ -64,9 +62,10 @@ export interface TestProjection extends Projection<TestProjectionData> {
   data: TestProjectionData;
 }
 
-export class TestCommandHandler
-  implements CommandHandler<Command<TestCommandPayload>, any>
-{
+export class TestCommandHandler implements CommandHandler<
+  Command<TestCommandPayload>,
+  any
+> {
   static readonly schema = defineCommandSchema(
     TEST_COMMAND_TYPE as any,
     testCommandPayloadSchema,
@@ -110,9 +109,7 @@ export interface TestEventHandlerRecord {
 /**
  * AppendStore that writes mapped records to a ClickHouse table.
  */
-class TestEventHandlerAppendStore
-  implements AppendStore<TestEventHandlerRecord>
-{
+class TestEventHandlerAppendStore implements AppendStore<TestEventHandlerRecord> {
   async append(
     record: TestEventHandlerRecord,
     _context: ProjectionStoreContext,
@@ -182,9 +179,7 @@ export const testMapProjection: MapProjectionDefinition<
 /**
  * In-memory fold projection store for tests.
  */
-class TestFoldProjectionStore
-  implements FoldProjectionStore<TestProjectionData>
-{
+class TestFoldProjectionStore implements FoldProjectionStore<TestProjectionData> {
   private data = new Map<string, TestProjectionData>();
 
   async get(
@@ -195,10 +190,7 @@ class TestFoldProjectionStore
     return this.data.get(key) ?? null;
   }
 
-  async store(
-    state: TestProjectionData,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
+  async store(state: TestProjectionData, context: ProjectionStoreContext): Promise<void> {
     const key = `${context.tenantId}:${context.aggregateId}`;
     this.data.set(key, state);
   }
@@ -207,36 +199,34 @@ class TestFoldProjectionStore
 /**
  * Test fold projection that aggregates events into accumulated state.
  */
-export const testFoldProjection: FoldProjectionDefinition<
-  TestProjectionData,
-  TestEvent
-> = {
-  name: "testProjection",
-  version: "2025-01-01",
-  LastEventOccurredAtKey: "LastEventOccurredAt",
-  eventTypes: [TEST_EVENT_TYPE],
+export const testFoldProjection: FoldProjectionDefinition<TestProjectionData, TestEvent> =
+  {
+    name: "testProjection",
+    version: "2025-01-01",
+    LastEventOccurredAtKey: "LastEventOccurredAt",
+    eventTypes: [TEST_EVENT_TYPE],
 
-  init(): TestProjectionData {
-    return {
-      totalValue: 0,
-      eventCount: 0,
-      lastMessage: undefined,
-    };
-  },
+    init(): TestProjectionData {
+      return {
+        totalValue: 0,
+        eventCount: 0,
+        lastMessage: undefined,
+      };
+    },
 
-  apply(state: TestProjectionData, event: TestEvent): TestProjectionData {
-    // Ensure value is coerced to number (ClickHouse may return strings)
-    const value =
-      typeof event.data.value === "number"
-        ? event.data.value
-        : Number(event.data.value);
+    apply(state: TestProjectionData, event: TestEvent): TestProjectionData {
+      // Ensure value is coerced to number (ClickHouse may return strings)
+      const value =
+        typeof event.data.value === "number"
+          ? event.data.value
+          : Number(event.data.value);
 
-    return {
-      totalValue: state.totalValue + value,
-      eventCount: state.eventCount + 1,
-      lastMessage: event.data.message ?? state.lastMessage,
-    };
-  },
+      return {
+        totalValue: state.totalValue + value,
+        eventCount: state.eventCount + 1,
+        lastMessage: event.data.message ?? state.lastMessage,
+      };
+    },
 
-  store: new TestFoldProjectionStore(),
-};
+    store: new TestFoldProjectionStore(),
+  };

@@ -7,6 +7,7 @@
 ## Context
 
 Local development required running multiple services (postgres, redis, clickhouse, NLP, workers, app) manually in separate terminals. Different developers need different service combinations:
+
 - Frontend work: app + postgres + redis + clickhouse
 - Scenario development: + workers + bullboard + ai-server (scenario processing is part of workers)
 - Full stack: everything
@@ -19,12 +20,12 @@ We use Docker Compose with **profiles** for selective service startup, and an **
 
 ### Profiles
 
-| Profile | Services | Use Case |
-|---------|----------|----------|
-| (none) | postgres, redis, clickhouse, app | Minimal frontend dev |
-| nlp | + langwatch_nlp, langevals | Evaluations |
+| Profile   | Services                                                  | Use Case             |
+| --------- | --------------------------------------------------------- | -------------------- |
+| (none)    | postgres, redis, clickhouse, app                          | Minimal frontend dev |
+| nlp       | + langwatch_nlp, langevals                                | Evaluations          |
 | scenarios | + workers (includes scenarios), bullboard, ai-server, nlp | Scenario development |
-| full | Everything | Full integration |
+| full      | Everything                                                | Full integration     |
 
 ### Init Container Pattern
 
@@ -34,12 +35,12 @@ init:
   command: sh -c "pnpm install && pnpm prisma generate"
   volumes:
     - ./langwatch:/app
-    - app_modules:/app/node_modules  # Named volume
+    - app_modules:/app/node_modules # Named volume
 
 app:
   volumes:
     - ./langwatch:/app
-    - app_modules:/app/node_modules  # Same volume
+    - app_modules:/app/node_modules # Same volume
   depends_on:
     init:
       condition: service_completed_successfully
@@ -79,6 +80,7 @@ The app uses `tsx src/server.ts` which wraps Next.js with metrics, proper upgrad
 ## Consequences
 
 **Commands:**
+
 ```bash
 make dev              # Minimal
 make dev-scenarios    # Scenario work
@@ -88,11 +90,13 @@ make down             # Stop all
 ```
 
 **Key files:**
+
 - `dev/compose.dev.yml` - Docker Compose configuration
 - `dev/scripts/dev.sh` - Interactive profile chooser
 - `Makefile` - Convenience targets
 
 **Trade-offs accepted:**
+
 - First startup slower (init container installs deps), but mitigated by shared pnpm store volume
 - Requires Docker Desktop with sufficient memory allocation
 - Host node_modules still needed for IDE tooling (separate from container's)
@@ -116,6 +120,7 @@ The original design used `VOLUME_PREFIX` for volume naming but `dev/scripts/dev.
 ### Decision: Named Volumes over Bind Mounts
 
 We considered switching node_modules to bind mounts for automatic per-worktree isolation. This was rejected because:
+
 - macOS VirtioFS performance degrades with 50K+ small files in node_modules
 - pnpm hard-links from store to node_modules break across filesystem boundaries (named volume is ext4, bind mount is macOS APFS)
 - Collapses the host/container node_modules separation (Linux ELF binaries would appear on host, breaking IDE tooling)
@@ -126,7 +131,7 @@ Instead, we use per-worktree named volumes via `VOLUME_PREFIX`, which gives the 
 
 ### Context
 
-The 2026-03 worktree-isolation amendment treated **every** volume as per-worktree, and the compose profile names (`dev`, `nlp`, `scenarios`, `full`) named *which services exist*, not *what the developer is doing*. Two side effects:
+The 2026-03 worktree-isolation amendment treated **every** volume as per-worktree, and the compose profile names (`dev`, `nlp`, `scenarios`, `full`) named _which services exist_, not _what the developer is doing_. Two side effects:
 
 1. Sign-up state didn't persist across worktrees. Sign up `browser-test@langwatch.ai` in worktree A; switch to worktree B; the account is gone.
 2. Profiles conflated "what services exist" with "what URLs the app should use". The `x-common-env` anchor hard-set `DATABASE_URL` / `REDIS_URL` / etc. to local Docker network names regardless of profile, so a contributor's `.env` URLs never won — even when their intent was "I'm doing UI work, just leave my .env alone."
@@ -137,13 +142,13 @@ The 2026-03 worktree-isolation amendment treated **every** volume as per-worktre
 
 **`make quickstart` is the single entry point** with five intent-based modes:
 
-| Mode | Compose services | URLs overridden in `.env.dev-up` |
-|---|---|---|
-| `frontend-only` | (none) | (none — pure `.env`) |
-| `backend-shared` | postgres + redis + clickhouse + app + init | `DATABASE_URL`, `REDIS_URL`, `CLICKHOUSE_URL` |
-| `migration` | postgres + clickhouse on host ports (5432, 8123) | `DATABASE_URL` and `CLICKHOUSE_URL` (localhost forms) |
-| `nlp` | + langwatch_nlp + langevals | + `LANGWATCH_NLP_SERVICE`, `LANGEVALS_ENDPOINT` |
-| `full-local` | `--profile full` (workers, scenarios, bullboard, ai-server) | all five infrastructure URLs |
+| Mode             | Compose services                                            | URLs overridden in `.env.dev-up`                      |
+| ---------------- | ----------------------------------------------------------- | ----------------------------------------------------- |
+| `frontend-only`  | (none)                                                      | (none — pure `.env`)                                  |
+| `backend-shared` | postgres + redis + clickhouse + app + init                  | `DATABASE_URL`, `REDIS_URL`, `CLICKHOUSE_URL`         |
+| `migration`      | postgres + clickhouse on host ports (5432, 8123)            | `DATABASE_URL` and `CLICKHOUSE_URL` (localhost forms) |
+| `nlp`            | + langwatch_nlp + langevals                                 | + `LANGWATCH_NLP_SERVICE`, `LANGEVALS_ENDPOINT`       |
+| `full-local`     | `--profile full` (workers, scenarios, bullboard, ai-server) | all five infrastructure URLs                          |
 
 Migration mode uses `dev/compose.dev.migration.yml` to expose host ports so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
 
@@ -185,7 +190,7 @@ queues. Some contributors would rather run a single process locally.
 
 Production is different and stays that way: it runs web and worker as separate
 Deployments (`charts/langwatch/templates/{app,workers}`) so they scale
-independently. Collapsing them is a *dev-only* convenience, never a prod change.
+independently. Collapsing them is a _dev-only_ convenience, never a prod change.
 
 ### Decision
 
@@ -226,7 +231,7 @@ reserving the worker-metrics port in that mode.
 - **Prod is unaffected**: `WORKERS_IN_PROCESS` is gated on `NODE_ENV=development`
   in both `start.sh` and `start.ts`, and prod never sets it.
 - Vite and the Go services (aigateway, nlpgo) remain separate processes — this
-  only folds in the *worker* Node process, not those.
+  only folds in the _worker_ Node process, not those.
 - In-process workers are instrumented. `server.mts` loads `instrumentation.node`
   before the app graph evaluates — precisely because the standalone workers lane,
   which does the same import, no longer runs under the single-process default.

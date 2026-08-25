@@ -11,18 +11,13 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  type BudgetOverviewItemView,
-  BudgetOverviewList,
-} from "../BudgetOverviewList";
+import { type BudgetOverviewItemView, BudgetOverviewList } from "../BudgetOverviewList";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function item(
-  overrides: Partial<BudgetOverviewItemView> = {},
-): BudgetOverviewItemView {
+function item(overrides: Partial<BudgetOverviewItemView> = {}): BudgetOverviewItemView {
   return {
     id: "b_org",
     name: "Org monthly",
@@ -64,9 +59,7 @@ describe("<BudgetOverviewList/>", () => {
       );
 
       expect(screen.getByText("(personal budget)")).toBeInTheDocument();
-      expect(
-        screen.getByText("(whole organization budget)"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("(whole organization budget)")).toBeInTheDocument();
       expect(screen.getByText("$2.43")).toBeInTheDocument();
       expect(screen.getByText("$100.00")).toBeInTheDocument();
       expect(screen.getByText("$25.00")).toBeInTheDocument();
@@ -79,10 +72,9 @@ describe("<BudgetOverviewList/>", () => {
   describe("given a provider-filtered budget", () => {
     /** @scenario "A provider-filtered budget names its provider" */
     it("says which provider the budget counts", () => {
-      render(
-        <BudgetOverviewList items={[item({ providerLabel: "OpenAI" })]} />,
-        { wrapper: Wrapper },
-      );
+      render(<BudgetOverviewList items={[item({ providerLabel: "OpenAI" })]} />, {
+        wrapper: Wrapper,
+      });
       expect(
         screen.getByText("(whole organization budget, OpenAI only)"),
       ).toBeInTheDocument();
@@ -105,21 +97,16 @@ describe("<BudgetOverviewList/>", () => {
         />,
         { wrapper: Wrapper },
       );
-      expect(
-        screen.getByText("(department budget (Engineering))"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("(department budget (Engineering))")).toBeInTheDocument();
       expect(screen.getByText(/this week/)).toBeInTheDocument();
     });
   });
 
   describe("given a TOTAL window budget", () => {
     it("renders no reset date", () => {
-      render(
-        <BudgetOverviewList
-          items={[item({ window: "TOTAL", resetsAt: null })]}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<BudgetOverviewList items={[item({ window: "TOTAL", resetsAt: null })]} />, {
+        wrapper: Wrapper,
+      });
       expect(screen.getByText(/all time/)).toBeInTheDocument();
       expect(screen.queryByText(/resets/)).not.toBeInTheDocument();
     });

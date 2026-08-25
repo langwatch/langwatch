@@ -1,4 +1,9 @@
-import type { Entry, Field, NodeDataset, StudioWorkflow } from "@langwatch/workflow-contract";
+import type {
+  Entry,
+  Field,
+  NodeDataset,
+  StudioWorkflow,
+} from "@langwatch/workflow-contract";
 
 type Inline = NonNullable<NodeDataset["inline"]>;
 
@@ -11,13 +16,9 @@ type Inline = NonNullable<NodeDataset["inline"]>;
  * always win, and an explicit empty string is left as-is. Returns a new inline
  * (the input is not mutated); a no-op when no field carries a default.
  */
-export function entryInlineWithDefaults(
-  inline: Inline,
-  outputs: Field[],
-): Inline {
+export function entryInlineWithDefaults(inline: Inline, outputs: Field[]): Inline {
   const defaults = outputs.filter(
-    (field) =>
-      field.value !== undefined && field.value !== null && field.value !== "",
+    (field) => field.value !== undefined && field.value !== null && field.value !== "",
   );
   if (defaults.length === 0) return inline;
 
@@ -31,10 +32,7 @@ export function entryInlineWithDefaults(
   for (const field of defaults) {
     const column = records[field.identifier];
     if (!column) {
-      records[field.identifier] = Array.from(
-        { length: rowCount },
-        () => field.value,
-      );
+      records[field.identifier] = Array.from({ length: rowCount }, () => field.value);
       if (!columnTypes.some((c) => c.name === field.identifier)) {
         columnTypes.push({ name: field.identifier, type: "string" as const });
       }

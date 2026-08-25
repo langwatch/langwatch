@@ -5,14 +5,8 @@ import type { Organization } from "~/generated/prisma/client";
 import { emitManagementAudit } from "~/server/api/management/audit";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import type {
-  ApiKeyDetail,
-  ApiKeyService,
-} from "@langwatch/api-key-contract";
-import {
-  ApiKeyNotFoundError,
-  ApiKeyNotOwnedError,
-} from "@langwatch/api-key-contract";
+import type { ApiKeyDetail, ApiKeyService } from "@langwatch/api-key-contract";
+import { ApiKeyNotFoundError, ApiKeyNotOwnedError } from "@langwatch/api-key-contract";
 import {
   API_KEY_PERMISSION_MODES,
   apiKeyPermissionFormatSchema as permissionFormatSchema,
@@ -63,11 +57,7 @@ const createApiKeySchema = z
       .describe(
         "A personal key acts as the user who created it and needs explicit bindings. A service key is not tied to a user.",
       ),
-    name: z
-      .string()
-      .min(1)
-      .max(100)
-      .describe("Human-readable name for this key"),
+    name: z.string().min(1).max(100).describe("Human-readable name for this key"),
     description: z.string().max(500).optional(),
     expiresAt: z.coerce
       .date()
@@ -86,9 +76,7 @@ const createApiKeySchema = z
       .array(bindingSchema)
       .max(20)
       .optional()
-      .describe(
-        "What this key may do, and where. Required for a personal key.",
-      ),
+      .describe("What this key may do, and where. Required for a personal key."),
     projectIds: z
       .array(z.string().min(1))
       .max(50)
@@ -96,18 +84,14 @@ const createApiKeySchema = z
       .describe("Service keys only: restricts the key to these projects"),
   })
   .refine(
-    (data) =>
-      data.keyType === "service" || (data.bindings && data.bindings.length > 0),
+    (data) => data.keyType === "service" || (data.bindings && data.bindings.length > 0),
     { message: "bindings are required for personal keys", path: ["bindings"] },
   )
   .refine(
     (data) =>
-      data.keyType === "service" ||
-      !data.projectIds ||
-      data.projectIds.length === 0,
+      data.keyType === "service" || !data.projectIds || data.projectIds.length === 0,
     {
-      message:
-        "projectIds is only supported for service keys; use bindings instead",
+      message: "projectIds is only supported for service keys; use bindings instead",
       path: ["projectIds"],
     },
   )
@@ -338,60 +322,53 @@ const refuseNonAdminPrivilegedMint = async ({
 // organization:manage in the handler.
 secured
   .access(requires("organization:view"))
-  .get(
-    "/",
-    apiKeyServiceMiddleware,
-    describeRoute(LIST_API_KEYS),
-    async (c) => {
-      const organization = c.get("organization") as Organization;
-      const userId = c.get("apiKeyUserId") as string | null;
-      const service = c.get("apiKeyService") as ApiKeyService;
+  .get("/", apiKeyServiceMiddleware, describeRoute(LIST_API_KEYS), async (c) => {
+    const organization = c.get("organization") as Organization;
+    const userId = c.get("apiKeyUserId") as string | null;
+    const service = c.get("apiKeyService") as ApiKeyService;
 
-      if (!userId) {
-        const canManage = await appFromContext(
-          c,
-        ).permissions.hasApiKeyPermission({
-          apiKeyId: c.get("apiKeyId") as string,
-          userId: null,
-          organizationId: organization.id,
-          scope: { type: "org", id: organization.id },
-          permission: "organization:manage",
-        });
-        if (!canManage) {
-          return c.json(
-            {
-              error: "Forbidden",
-              message:
-                "Listing every API key in the organization requires the organization:manage permission",
-            },
-            403,
-          );
-        }
-      }
-
-      const keys = userId
-        ? await service.list({ userId, organizationId: organization.id })
-        : await service.listAll({ organizationId: organization.id });
-
-      return c.json({
-        data: keys.map((key) => ({
-          id: key.id,
-          name: key.name,
-          description: key.description,
-          createdAt: key.createdAt,
-          expiresAt: key.expiresAt,
-          lastUsedAt: key.lastUsedAt,
-          revokedAt: key.revokedAt,
-          roleBindings: key.roleBindings.map((rb) => ({
-            id: rb.id,
-            role: rb.role,
-            scopeType: rb.scopeType,
-            scopeId: rb.scopeId,
-          })),
-        })),
+    if (!userId) {
+      const canManage = await appFromContext(c).permissions.hasApiKeyPermission({
+        apiKeyId: c.get("apiKeyId") as string,
+        userId: null,
+        organizationId: organization.id,
+        scope: { type: "org", id: organization.id },
+        permission: "organization:manage",
       });
-    },
-  );
+      if (!canManage) {
+        return c.json(
+          {
+            error: "Forbidden",
+            message:
+              "Listing every API key in the organization requires the organization:manage permission",
+          },
+          403,
+        );
+      }
+    }
+
+    const keys = userId
+      ? await service.list({ userId, organizationId: organization.id })
+      : await service.listAll({ organizationId: organization.id });
+
+    return c.json({
+      data: keys.map((key) => ({
+        id: key.id,
+        name: key.name,
+        description: key.description,
+        createdAt: key.createdAt,
+        expiresAt: key.expiresAt,
+        lastUsedAt: key.lastUsedAt,
+        revokedAt: key.revokedAt,
+        roleBindings: key.roleBindings.map((rb) => ({
+          id: rb.id,
+          role: rb.role,
+          scopeType: rb.scopeType,
+          scopeId: rb.scopeId,
+        })),
+      })),
+    });
+  });
 
 secured
   .access(requires("organization:manage"))
@@ -454,41 +431,36 @@ secured
 
 secured
   .access(requires("organization:view"))
-  .get(
-    "/:id",
-    apiKeyServiceMiddleware,
-    describeRoute(GET_API_KEY),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const callerUserId = c.get("apiKeyUserId") as string | null;
-      const service = c.get("apiKeyService") as ApiKeyService;
+  .get("/:id", apiKeyServiceMiddleware, describeRoute(GET_API_KEY), async (c) => {
+    const { id } = c.req.param();
+    const organization = c.get("organization") as Organization;
+    const callerUserId = c.get("apiKeyUserId") as string | null;
+    const service = c.get("apiKeyService") as ApiKeyService;
 
-      const apiKey = await service.getByIdForCaller({
-        id,
+    const apiKey = await service.getByIdForCaller({
+      id,
+      organizationId: organization.id,
+      callerUserId,
+      callerCanReadAnyKey: await resolveCallerCanReadAnyKey({
+        c,
+        service,
         organizationId: organization.id,
         callerUserId,
-        callerCanReadAnyKey: await resolveCallerCanReadAnyKey({
-          c,
-          service,
-          organizationId: organization.id,
-          callerUserId,
-        }),
-      });
+      }),
+    });
 
-      // The detail response names the member the key acts as and the member
-      // who minted it, so an admin can walk the organization's credentials one
-      // id at a time. That disclosure is auditable like the writes are.
-      emitManagementAudit({
-        c,
-        organizationId: organization.id,
-        action: "management.apiKey.read",
-        args: { apiKeyId: id },
-      });
+    // The detail response names the member the key acts as and the member
+    // who minted it, so an admin can walk the organization's credentials one
+    // id at a time. That disclosure is auditable like the writes are.
+    emitManagementAudit({
+      c,
+      organizationId: organization.id,
+      action: "management.apiKey.read",
+      args: { apiKeyId: id },
+    });
 
-      return c.json(apiKeyDetailResponse(apiKey));
-    },
-  );
+    return c.json(apiKeyDetailResponse(apiKey));
+  });
 
 secured
   .access(requires("organization:manage"))
@@ -556,34 +528,29 @@ secured
 
 secured
   .access(requires("organization:manage"))
-  .delete(
-    "/:id",
-    apiKeyServiceMiddleware,
-    describeRoute(REVOKE_API_KEY),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const userId = c.get("apiKeyUserId") as string | null;
-      const service = c.get("apiKeyService") as ApiKeyService;
+  .delete("/:id", apiKeyServiceMiddleware, describeRoute(REVOKE_API_KEY), async (c) => {
+    const { id } = c.req.param();
+    const organization = c.get("organization") as Organization;
+    const userId = c.get("apiKeyUserId") as string | null;
+    const service = c.get("apiKeyService") as ApiKeyService;
 
-      // Real adminness, so revoke() can enforce its owner-only path: without
-      // this, any organization:manage holder could revoke anyone's key.
-      const callerIsAdmin = await resolveCallerIsAdmin({
-        service,
-        organizationId: organization.id,
-        callerUserId: userId,
-        apiKeyId: c.get("apiKeyId") as string,
-      });
+    // Real adminness, so revoke() can enforce its owner-only path: without
+    // this, any organization:manage holder could revoke anyone's key.
+    const callerIsAdmin = await resolveCallerIsAdmin({
+      service,
+      organizationId: organization.id,
+      callerUserId: userId,
+      apiKeyId: c.get("apiKeyId") as string,
+    });
 
-      await service.revoke({
-        id,
-        callerUserId: userId,
-        callerIsAdmin,
-        organizationId: organization.id,
-      });
+    await service.revoke({
+      id,
+      callerUserId: userId,
+      callerIsAdmin,
+      organizationId: organization.id,
+    });
 
-      return c.json({ success: true });
-    },
-  );
+    return c.json({ success: true });
+  });
 
 export const app = secured.hono;

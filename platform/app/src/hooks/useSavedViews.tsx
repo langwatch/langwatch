@@ -176,9 +176,7 @@ function toClientView(dbView: {
     id: dbView.id,
     name: dbView.name,
     userId: dbView.userId,
-    filters: (dbView.filters ?? {}) as Partial<
-      Record<FilterField, FilterParam>
-    >,
+    filters: (dbView.filters ?? {}) as Partial<Record<FilterField, FilterParam>>,
     query: dbView.query ?? undefined,
     period: dbView.period as SavedView["period"],
   };
@@ -195,9 +193,7 @@ function useSavedViewsInternal() {
   const { filters } = useFilterParams();
   const utils = api.useUtils();
 
-  const [selectedViewId, setSelectedViewIdState] = useState<string | null>(
-    null,
-  );
+  const [selectedViewId, setSelectedViewIdState] = useState<string | null>(null);
 
   const skipNextMatchRef = useRef(false);
   const pendingRestoreRef = useRef(true);
@@ -267,21 +263,14 @@ function useSavedViewsInternal() {
   // -- Filter actions -------------------------------------------------------
 
   const resetAllFilters = useCallback(() => {
-    const RESET_KEEP = new Set([
-      "project",
-      "view",
-      "group_by",
-      "startDate",
-      "endDate",
-    ]);
+    const RESET_KEEP = new Set(["project", "view", "group_by", "startDate", "endDate"]);
     const cleanQuery = Object.fromEntries(
       Object.entries(router.query).filter(([key]) => RESET_KEEP.has(key)),
     );
-    void router.push(
-      { pathname: router.pathname, query: cleanQuery },
-      undefined,
-      { shallow: true, scroll: false },
-    );
+    void router.push({ pathname: router.pathname, query: cleanQuery }, undefined, {
+      shallow: true,
+      scroll: false,
+    });
   }, [router]);
 
   const applyViewFilters = useCallback(
@@ -296,10 +285,7 @@ function useSavedViewsInternal() {
       if (period) {
         if (period.relativeDays !== undefined) {
           endDate = new Date().toISOString();
-          startDate = subDays(
-            new Date(),
-            period.relativeDays - 1,
-          ).toISOString();
+          startDate = subDays(new Date(), period.relativeDays - 1).toISOString();
         } else if (period.startDate && period.endDate) {
           startDate = period.startDate;
           endDate = period.endDate;
@@ -307,10 +293,7 @@ function useSavedViewsInternal() {
       }
 
       const queryObj = buildViewQuery({
-        routerQuery: router.query as Record<
-          string,
-          string | string[] | undefined
-        >,
+        routerQuery: router.query as Record<string, string | string[] | undefined>,
         viewFilters,
         query,
         startDate,
@@ -357,11 +340,7 @@ function useSavedViewsInternal() {
     const customView = customViews.find((v) => v.id === selectedViewId);
     if (customView) {
       skipNextMatchRef.current = true;
-      void applyViewFilters(
-        customView.filters,
-        customView.query,
-        customView.period,
-      );
+      void applyViewFilters(customView.filters, customView.query, customView.period);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, projectId]);
@@ -383,11 +362,7 @@ function useSavedViewsInternal() {
       if (customView) {
         setSelectedViewIdState(viewId);
         writeSelectedViewId(projectId, viewId);
-        void applyViewFilters(
-          customView.filters,
-          customView.query,
-          customView.period,
-        );
+        void applyViewFilters(customView.filters, customView.query, customView.period);
       }
     },
     [customViews, projectId, resetAllFilters, applyViewFilters],
@@ -487,8 +462,7 @@ function useSavedViewsInternal() {
 
   const deleteView = useCallback(
     (viewId: string) => {
-      const newSelectedId =
-        selectedViewId === viewId ? "all-traces" : selectedViewId;
+      const newSelectedId = selectedViewId === viewId ? "all-traces" : selectedViewId;
 
       utils.savedViews.getAll.setData({ projectId }, (old) => {
         if (!old) return old;
@@ -504,13 +478,7 @@ function useSavedViewsInternal() {
 
       deleteMutation.mutate({ projectId, viewId });
     },
-    [
-      selectedViewId,
-      projectId,
-      resetAllFilters,
-      deleteMutation,
-      utils.savedViews.getAll,
-    ],
+    [selectedViewId, projectId, resetAllFilters, deleteMutation, utils.savedViews.getAll],
   );
 
   const renameView = useCallback(
@@ -519,9 +487,7 @@ function useSavedViewsInternal() {
 
       utils.savedViews.getAll.setData({ projectId }, (old) => {
         if (!old) return old;
-        return old.map((v) =>
-          v.id === viewId ? { ...v, name: trimmedName } : v,
-        );
+        return old.map((v) => (v.id === viewId ? { ...v, name: trimmedName } : v));
       });
 
       renameMutation.mutate({ projectId, viewId, name: trimmedName });
@@ -566,14 +532,7 @@ function useSavedViewsInternal() {
       urlEndDate,
       urlHasDateParams,
     });
-  }, [
-    filters,
-    currentQuery,
-    customViews,
-    urlStartDate,
-    urlEndDate,
-    urlHasDateParams,
-  ]);
+  }, [filters, currentQuery, customViews, urlStartDate, urlEndDate, urlHasDateParams]);
 
   useEffect(() => {
     if (!isInitialized) return;
@@ -613,16 +572,10 @@ type SavedViewsContextValue = ReturnType<typeof useSavedViewsInternal>;
 
 const SavedViewsContext = createContext<SavedViewsContextValue | null>(null);
 
-export function SavedViewsProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function SavedViewsProvider({ children }: { children: React.ReactNode }) {
   const value = useSavedViewsInternal();
   return (
-    <SavedViewsContext.Provider value={value}>
-      {children}
-    </SavedViewsContext.Provider>
+    <SavedViewsContext.Provider value={value}>{children}</SavedViewsContext.Provider>
   );
 }
 

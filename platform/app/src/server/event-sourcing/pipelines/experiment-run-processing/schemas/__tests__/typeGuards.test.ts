@@ -1,9 +1,6 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import {
-  EXPERIMENT_RUN_EVENT_TYPES,
-  EXPERIMENT_RUN_EVENT_VERSIONS,
-} from "../constants";
+import { EXPERIMENT_RUN_EVENT_TYPES, EXPERIMENT_RUN_EVENT_VERSIONS } from "../constants";
 import type { ExperimentRunProcessingEvent } from "../events";
 import {
   isEvaluatorResultEvent,

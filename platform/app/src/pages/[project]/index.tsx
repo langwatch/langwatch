@@ -17,9 +17,7 @@ function HomePageWithReturnTo() {
   const router = useRouter();
   const returnTo = router.query.return_to;
   const safeReturnToPath = getSafeReturnToPath(returnTo);
-  const shouldRedirect = Boolean(
-    safeReturnToPath && typeof window !== "undefined",
-  );
+  const shouldRedirect = Boolean(safeReturnToPath && typeof window !== "undefined");
 
   useEffect(() => {
     if (shouldRedirect && safeReturnToPath) {

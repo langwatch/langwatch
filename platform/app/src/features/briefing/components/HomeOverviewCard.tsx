@@ -1,12 +1,4 @@
-import {
-  Box,
-  chakra,
-  Grid,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, chakra, Grid, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import { type MouseEvent, useEffect, useRef, useState } from "react";
 import { LangyPanelSurface } from "~/features/asaplangy";
@@ -171,11 +163,7 @@ export function HomeOverviewCard({
 
   if (bare) return content;
 
-  return (
-    <LangyPanelSurface padding={{ base: 4, md: 5 }}>
-      {content}
-    </LangyPanelSurface>
-  );
+  return <LangyPanelSurface padding={{ base: 4, md: 5 }}>{content}</LangyPanelSurface>;
 }
 
 /** How long a figure's change-pulse runs. */
@@ -202,11 +190,7 @@ function OverviewCell({ cell }: { cell: StatusCell }) {
 
   const vanity = cell.tone === "vanity";
   const dot =
-    cell.tone === "good"
-      ? "green.solid"
-      : cell.tone === "bad"
-        ? "red.solid"
-        : undefined;
+    cell.tone === "good" ? "green.solid" : cell.tone === "bad" ? "red.solid" : undefined;
   // The figures ARE the content — even the table-stakes ones render in full
   // foreground so the eye lands on the number, not the label. `vanity` keeps
   // only its smaller size and lighter weight.
@@ -225,12 +209,7 @@ function OverviewCell({ cell }: { cell: StatusCell }) {
             flexShrink={0}
           />
         ) : null}
-        <Text
-          fontFamily="mono"
-          fontSize="11.5px"
-          letterSpacing="0.02em"
-          color="fg.muted"
-        >
+        <Text fontFamily="mono" fontSize="11.5px" letterSpacing="0.02em" color="fg.muted">
           {cell.label}
         </Text>
       </HStack>

@@ -43,9 +43,7 @@ describe("RedisStatTile", () => {
       it("shows the memory used as a single MB/GB value", () => {
         renderTile({ redisMemoryUsedBytes: 3_200_000_000 });
         // 3.2 * 10^9 / 1024^3 ≈ 2.98GB
-        expect(screen.getByTestId("redis-memory-stat").textContent).toContain(
-          "2.98GB",
-        );
+        expect(screen.getByTestId("redis-memory-stat").textContent).toContain("2.98GB");
       });
 
       it("shows the memory percent and configured maximum", () => {
@@ -60,16 +58,14 @@ describe("RedisStatTile", () => {
 
       it("shows the engine-processor percent", () => {
         renderTile({ redisEngineCpuPercent: 12.3 });
-        expect(
-          screen.getByTestId("redis-engine-cpu-stat").textContent,
-        ).toContain("12.3%");
+        expect(screen.getByTestId("redis-engine-cpu-stat").textContent).toContain(
+          "12.3%",
+        );
       });
 
       it("shows the connection count", () => {
         renderTile({ redisConnectedClients: 24 });
-        expect(screen.getByTestId("redis-clients-stat").textContent).toContain(
-          "24",
-        );
+        expect(screen.getByTestId("redis-clients-stat").textContent).toContain("24");
       });
 
       /** @scenario "Statistic labels are spelled out" */
@@ -94,9 +90,7 @@ describe("RedisStatTile", () => {
     describe("when the tile renders on the first collection cycle", () => {
       it("shows a dash and says it is still sampling", () => {
         renderTile({ redisEngineCpuPercent: null });
-        expect(
-          screen.getByTestId("redis-engine-cpu-stat").textContent,
-        ).toContain("—");
+        expect(screen.getByTestId("redis-engine-cpu-stat").textContent).toContain("—");
         expect(tile().textContent).toContain("sampling");
       });
     });

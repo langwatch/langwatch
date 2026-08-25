@@ -1,20 +1,10 @@
 import { Box, Button, HStack, Input, Text } from "@chakra-ui/react";
-import {
-  BookText,
-  ChevronDown,
-  Code,
-  Globe,
-  Plus,
-  Workflow,
-} from "lucide-react";
+import { BookText, ChevronDown, Code, Globe, Plus, Workflow } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
-import {
-  agentHasDevTunnel,
-  LocalTunnelBadge,
-} from "../agents/LocalTunnelBadge";
+import { agentHasDevTunnel, LocalTunnelBadge } from "../agents/LocalTunnelBadge";
 import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
 
 export type TargetValue = {
@@ -62,10 +52,7 @@ export function TargetSelector({
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
         setSearchValue("");
       }
@@ -78,8 +65,7 @@ export function TargetSelector({
   const filteredPrompts = useMemo(() => {
     const publishedPrompts = prompts?.filter((p) => p.version > 0) ?? [];
     const sorted = [...publishedPrompts].sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
     if (!searchValue) return sorted;
     return sorted.filter((p) =>
@@ -311,9 +297,7 @@ export function TargetSelector({
                         : "transparent"
                     }
                     _hover={{ bg: "bg.subtle" }}
-                    onClick={() =>
-                      handleSelect({ type: "prompt", id: prompt.id })
-                    }
+                    onClick={() => handleSelect({ type: "prompt", id: prompt.id })}
                   >
                     <BookText size={14} color="var(--chakra-colors-gray-500)" />
                     <Text fontSize="sm" flex={1}>

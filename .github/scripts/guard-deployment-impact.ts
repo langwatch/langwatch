@@ -37,10 +37,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 /** Logins whose pull requests get the hand-edited-manifest exemption. */
-export const DEPENDENCY_BOTS: readonly string[] = [
-  "dependabot[bot]",
-  "renovate[bot]",
-];
+export const DEPENDENCY_BOTS: readonly string[] = ["dependabot[bot]", "renovate[bot]"];
 
 /** Auto-generated resolution snapshots: no deployment surface by construction. */
 const LOCKFILES: readonly string[] = [

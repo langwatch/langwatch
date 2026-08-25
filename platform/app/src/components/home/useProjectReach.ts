@@ -35,8 +35,7 @@ export function useProjectReach(): ProjectReachResult {
   // re-reads the same column but its answer can lag (cache) or never come
   // (it is permission-gated); the row is authoritative for never leading a
   // traced project with "send your first trace".
-  const hasTraces =
-    (project?.firstMessage ?? false) || (data?.firstMessage ?? false);
+  const hasTraces = (project?.firstMessage ?? false) || (data?.firstMessage ?? false);
 
   return {
     isLoading: isLoading || !data,

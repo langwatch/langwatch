@@ -94,8 +94,8 @@ describe("uploadSingleFile", () => {
       // The raw File is handed to the PUT as-is — never read into an ArrayBuffer
       // first — so a multi-GB file streams without freezing the tab.
       expect(deps.putFileToPresignedUrl).toHaveBeenCalledTimes(1);
-      const putCall = (deps.putFileToPresignedUrl as ReturnType<typeof vi.fn>)
-        .mock.calls[0]!;
+      const putCall = (deps.putFileToPresignedUrl as ReturnType<typeof vi.fn>).mock
+        .calls[0]!;
       expect(putCall[0]).toBe("https://s3.example/put");
       expect(putCall[1]).toBe(theFile);
       expect(deps.finalizeDirectUpload).toHaveBeenCalledWith({
@@ -135,9 +135,7 @@ describe("uploadSingleFile", () => {
 
   describe("when the upload fails after the row was created", () => {
     it("reaps the pending row and rethrows", async () => {
-      const putFileToPresignedUrl = vi
-        .fn()
-        .mockRejectedValue(new Error("CORS"));
+      const putFileToPresignedUrl = vi.fn().mockRejectedValue(new Error("CORS"));
       const deps = makeDeps({ putFileToPresignedUrl });
 
       await expect(

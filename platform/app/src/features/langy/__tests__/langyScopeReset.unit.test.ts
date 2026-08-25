@@ -151,10 +151,7 @@ describe("Langy state across a change of scope", () => {
       it("empties the tape, so one project's wire is not readable from another", () => {
         langy().resetForScope(scopeA);
         devLog().setRecording(true);
-        devLog().record(
-          { type: "delta", text: "secret prompt text" },
-          "turn-1",
-        );
+        devLog().record({ type: "delta", text: "secret prompt text" }, "turn-1");
         expect(devLog().records).toHaveLength(1);
 
         langy().resetForScope({ ...scopeA, projectId: "project-b" });
@@ -258,13 +255,9 @@ describe("the scope reset's coverage", () => {
 
         langy().resetForScope({ ...scopeA, projectId: "project-b" });
 
-        const after = useLangyStore.getState() as unknown as Record<
-          string,
-          unknown
-        >;
+        const after = useLangyStore.getState() as unknown as Record<string, unknown>;
         const scoped = Object.entries(initial).filter(
-          ([key, value]) =>
-            typeof value !== "function" && !SURVIVORS.includes(key),
+          ([key, value]) => typeof value !== "function" && !SURVIVORS.includes(key),
         );
         // The conversation pointer and its fence are the reset's own business
         // (it restores them when the scope turns out to be the one we left).

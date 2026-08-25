@@ -8,13 +8,9 @@ import {
   type UserAvatarMediaType,
 } from "@langwatch/user-contract";
 
-const DATA_URL_PATTERN =
-  /^data:([a-z0-9.+-]+\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]*)$/iu;
+const DATA_URL_PATTERN = /^data:([a-z0-9.+-]+\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]*)$/iu;
 
-const SIGNATURES: Record<
-  UserAvatarMediaType,
-  (bytes: Uint8Array) => boolean
-> = {
+const SIGNATURES: Record<UserAvatarMediaType, (bytes: Uint8Array) => boolean> = {
   "image/png": (bytes) =>
     bytes.length >= 8 &&
     bytes[0] === 0x89 &&
@@ -26,10 +22,7 @@ const SIGNATURES: Record<
     bytes[6] === 0x1a &&
     bytes[7] === 0x0a,
   "image/jpeg": (bytes) =>
-    bytes.length >= 3 &&
-    bytes[0] === 0xff &&
-    bytes[1] === 0xd8 &&
-    bytes[2] === 0xff,
+    bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
   "image/gif": (bytes) => {
     const header = Buffer.from(bytes.subarray(0, 6)).toString("latin1");
     return header === "GIF87a" || header === "GIF89a";
@@ -88,11 +81,7 @@ export class UserAvatarCodec {
     return `/api/user-avatar/${encodeURIComponent(input.projectId)}/${encodeURIComponent(input.id)}`;
   }
 
-  private isAllowedMediaType(
-    mediaType: string,
-  ): mediaType is UserAvatarMediaType {
-    return (USER_AVATAR_ALLOWED_MEDIA_TYPES as readonly string[]).includes(
-      mediaType,
-    );
+  private isAllowedMediaType(mediaType: string): mediaType is UserAvatarMediaType {
+    return (USER_AVATAR_ALLOWED_MEDIA_TYPES as readonly string[]).includes(mediaType);
   }
 }

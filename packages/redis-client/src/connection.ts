@@ -73,11 +73,7 @@ export class RedisConnectionService {
    * own reasons — to log the mode, or to decide a code path — does not resolve
    * it twice.
    */
-  connectResolved({
-    config,
-  }: {
-    config: RedisConfigResolution;
-  }): RedisConnection | null {
+  connectResolved({ config }: { config: RedisConfigResolution }): RedisConnection | null {
     for (const warning of config.warnings) this.logger?.warn({}, warning);
 
     if (!config.configured) return null;
@@ -121,9 +117,7 @@ export class RedisConnectionService {
     // the guard is here so a future change to that resolution fails loudly
     // rather than silently handing back a cluster client.
     if (!config.configured || config.mode !== "standalone") {
-      throw new Error(
-        "Expected a standalone Redis configuration from a plain URL.",
-      );
+      throw new Error("Expected a standalone Redis configuration from a plain URL.");
     }
     return this.connectStandaloneResolved({ config });
   }
@@ -156,9 +150,7 @@ export class RedisConnectionService {
     if (!logger) return;
 
     connection.on("connect", () => logger.info(context, "connected"));
-    connection.on("ready", () =>
-      logger.info(context, "ready to accept commands"),
-    );
+    connection.on("ready", () => logger.info(context, "ready to accept commands"));
     connection.on("error", (error: Error) =>
       logger.error({ ...context, error }, "error"),
     );

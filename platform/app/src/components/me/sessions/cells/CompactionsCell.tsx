@@ -1,8 +1,5 @@
 import { Text, VStack } from "@chakra-ui/react";
-import {
-  MissingValue,
-  type SessionListRow,
-} from "@langwatch/coding-agent-web";
+import { MissingValue, type SessionListRow } from "@langwatch/coding-agent-web";
 import type React from "react";
 
 import { Tooltip } from "~/components/ui/tooltip";
@@ -41,8 +38,7 @@ export const CompactionsCell: React.FC<{ row: SessionListRow }> = ({ row }) => {
       <VStack align="start" gap={0} cursor="help" tabIndex={0}>
         {row.compactions > 0 ? (
           <Text fontSize="sm" whiteSpace="nowrap">
-            {row.compactions}{" "}
-            {row.compactions === 1 ? "compaction" : "compactions"}
+            {row.compactions} {row.compactions === 1 ? "compaction" : "compactions"}
           </Text>
         ) : null}
         {row.cacheRebuildCount > 0 ? (

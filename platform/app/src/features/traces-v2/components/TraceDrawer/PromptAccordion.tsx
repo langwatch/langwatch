@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
 import { Link } from "~/components/ui/link";
@@ -14,10 +6,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
 import { usePromptByHandle } from "../../hooks/usePromptByHandle";
-import {
-  extractPromptReference,
-  hasPromptMetadata,
-} from "../../utils/promptAttributes";
+import { extractPromptReference, hasPromptMetadata } from "../../utils/promptAttributes";
 
 export { hasPromptMetadata };
 
@@ -62,8 +51,8 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
     return (
       <Box paddingX={2} paddingY={3}>
         <Text textStyle="xs" color="fg.muted">
-          Span carries prompt metadata but no parseable handle or variables —
-          likely an incomplete SDK emit.
+          Span carries prompt metadata but no parseable handle or variables — likely an
+          incomplete SDK emit.
         </Text>
       </Box>
     );
@@ -73,11 +62,7 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
     <VStack align="stretch" gap={3} paddingY={2}>
       {/* Header */}
       <HStack gap={2} paddingX={2}>
-        <Text
-          textStyle="sm"
-          fontWeight="bold"
-          color={displayHandle ? "fg" : "fg.muted"}
-        >
+        <Text textStyle="sm" fontWeight="bold" color={displayHandle ? "fg" : "fg.muted"}>
           {displayHandle ?? "Prompt (no handle on span)"}
         </Text>
         {ref?.versionNumber != null && (
@@ -127,9 +112,7 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
                 key={key}
                 paddingX={3}
                 paddingY={1.5}
-                borderBottomWidth={
-                  i < variableEntries.length - 1 ? "1px" : "0px"
-                }
+                borderBottomWidth={i < variableEntries.length - 1 ? "1px" : "0px"}
                 borderColor="border.muted"
                 _hover={{ bg: "bg.muted" }}
                 gap={3}

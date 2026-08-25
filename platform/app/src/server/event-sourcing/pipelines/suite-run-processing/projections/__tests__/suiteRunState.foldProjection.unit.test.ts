@@ -1,10 +1,7 @@
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import {
-  SUITE_RUN_EVENT_TYPES,
-  SUITE_RUN_EVENT_VERSIONS,
-} from "../../schemas/constants";
+import { SUITE_RUN_EVENT_TYPES, SUITE_RUN_EVENT_VERSIONS } from "../../schemas/constants";
 import type {
   SuiteRunItemCompletedEvent,
   SuiteRunItemStartedEvent,
@@ -121,10 +118,7 @@ describe("suiteRunState fold projection", () => {
     it("increments CompletedCount for SUCCESS status", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 3 }));
-      state = projection.apply(
-        state,
-        createItemCompletedEvent({ status: "SUCCESS" }),
-      );
+      state = projection.apply(state, createItemCompletedEvent({ status: "SUCCESS" }));
 
       expect(state.CompletedCount).toBe(1);
       expect(state.FailedCount).toBe(0);
@@ -134,10 +128,7 @@ describe("suiteRunState fold projection", () => {
     it("increments FailedCount for FAILURE status", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 3 }));
-      state = projection.apply(
-        state,
-        createItemCompletedEvent({ status: "FAILURE" }),
-      );
+      state = projection.apply(state, createItemCompletedEvent({ status: "FAILURE" }));
 
       expect(state.CompletedCount).toBe(0);
       expect(state.FailedCount).toBe(1);
@@ -147,10 +138,7 @@ describe("suiteRunState fold projection", () => {
     it("increments FailedCount for ERROR status", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 3 }));
-      state = projection.apply(
-        state,
-        createItemCompletedEvent({ status: "ERROR" }),
-      );
+      state = projection.apply(state, createItemCompletedEvent({ status: "ERROR" }));
 
       expect(state.FailedCount).toBe(1);
     });

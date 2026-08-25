@@ -13,9 +13,7 @@ export const deleteRoleBindingCommand = async (
     succeed: () => `Deleted role binding "${id}"`,
     table: () => {
       console.log();
-      console.log(
-        chalk.gray("The principal no longer holds that role at that scope."),
-      );
+      console.log(chalk.gray("The principal no longer holds that role at that scope."));
       console.log();
     },
   });

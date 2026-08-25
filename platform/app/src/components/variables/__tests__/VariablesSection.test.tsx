@@ -34,9 +34,7 @@ const mockSources: AvailableSource[] = [
   },
 ];
 
-const renderComponent = (
-  props: Partial<Parameters<typeof VariablesSection>[0]> = {},
-) => {
+const renderComponent = (props: Partial<Parameters<typeof VariablesSection>[0]> = {}) => {
   const defaultProps = {
     variables: [],
     onChange: vi.fn(),
@@ -112,9 +110,7 @@ describe("VariablesSection", () => {
       await user.click(screen.getByTestId("add-variable-button"));
       await user.click(screen.getByRole("menuitem", { name: /Text/ }));
 
-      expect(onChange).toHaveBeenCalledWith([
-        { identifier: "input", type: "str" },
-      ]);
+      expect(onChange).toHaveBeenCalledWith([{ identifier: "input", type: "str" }]);
     });
 
     it("generates unique identifier when adding duplicate", async () => {
@@ -165,9 +161,7 @@ describe("VariablesSection", () => {
       await user.type(editInput, "new_name");
       fireEvent.blur(editInput);
 
-      expect(onChange).toHaveBeenCalledWith([
-        { identifier: "new_name", type: "str" },
-      ]);
+      expect(onChange).toHaveBeenCalledWith([{ identifier: "new_name", type: "str" }]);
     });
 
     it("normalizes spaces to underscores", async () => {
@@ -185,9 +179,7 @@ describe("VariablesSection", () => {
       await user.type(editInput, "my variable");
       fireEvent.blur(editInput);
 
-      expect(onChange).toHaveBeenCalledWith([
-        { identifier: "my_variable", type: "str" },
-      ]);
+      expect(onChange).toHaveBeenCalledWith([{ identifier: "my_variable", type: "str" }]);
     });
 
     it("converts to lowercase", async () => {
@@ -205,9 +197,7 @@ describe("VariablesSection", () => {
       await user.type(editInput, "MyVariable");
       fireEvent.blur(editInput);
 
-      expect(onChange).toHaveBeenCalledWith([
-        { identifier: "myvariable", type: "str" },
-      ]);
+      expect(onChange).toHaveBeenCalledWith([{ identifier: "myvariable", type: "str" }]);
     });
 
     it("removes dashes from identifier", async () => {
@@ -299,8 +289,8 @@ describe("VariablesSection", () => {
       if (lastCall) {
         const updatedVariables = lastCall[0];
         const hasQuestionTwice =
-          updatedVariables.filter((v: Variable) => v.identifier === "question")
-            .length > 1;
+          updatedVariables.filter((v: Variable) => v.identifier === "question").length >
+          1;
         expect(hasQuestionTwice).toBe(false);
       }
     });
@@ -330,9 +320,7 @@ describe("VariablesSection", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
       renderComponent({ variables, onChange: vi.fn(), canAddRemove: true });
 
-      expect(
-        screen.getByTestId("remove-variable-question"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("remove-variable-question")).toBeInTheDocument();
     });
 
     it("hides delete button when canAddRemove is false", () => {
@@ -340,12 +328,8 @@ describe("VariablesSection", () => {
       renderComponent({ variables, onChange: vi.fn(), canAddRemove: false });
 
       // No add button and no delete button (the type selector button stays)
-      expect(
-        screen.queryByTestId("add-variable-button"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("remove-variable-question"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("add-variable-button")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("remove-variable-question")).not.toBeInTheDocument();
     });
 
     it("calls onChange without the removed variable", async () => {
@@ -359,9 +343,7 @@ describe("VariablesSection", () => {
 
       await user.click(screen.getByTestId("remove-variable-question"));
 
-      expect(onChange).toHaveBeenCalledWith([
-        { identifier: "context", type: "str" },
-      ]);
+      expect(onChange).toHaveBeenCalledWith([{ identifier: "context", type: "str" }]);
     });
   });
 
@@ -442,9 +424,7 @@ describe("VariablesSection", () => {
       await user.click(screen.getByTestId("variable-type-select-question"));
       await user.click(screen.getByTestId("field-type-option-float"));
 
-      expect(onChange).toHaveBeenCalledWith([
-        { identifier: "question", type: "float" },
-      ]);
+      expect(onChange).toHaveBeenCalledWith([{ identifier: "question", type: "float" }]);
     });
 
     it("shows the type label without a button in read-only mode", () => {
@@ -495,18 +475,13 @@ describe("VariablesSection", () => {
       // Find the value input (after the = sign)
       const inputs = screen.getAllByRole("textbox");
       // The value input should be the one without a value (empty)
-      const valueInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "",
-      );
+      const valueInput = inputs.find((input) => (input as HTMLInputElement).value === "");
 
       if (valueInput) {
         await user.type(valueInput, "hello");
         expect(onValueChange).toHaveBeenCalled();
         // Should be called with identifier and new value
-        expect(onValueChange).toHaveBeenCalledWith(
-          "question",
-          expect.any(String),
-        );
+        expect(onValueChange).toHaveBeenCalledWith("question", expect.any(String));
       }
     });
 
@@ -562,9 +537,7 @@ describe("VariablesSection", () => {
       });
 
       // Input should not have a delete button
-      expect(
-        screen.queryByTestId("remove-variable-input"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("remove-variable-input")).not.toBeInTheDocument();
 
       // Context should still have a delete button
       expect(screen.getByTestId("remove-variable-context")).toBeInTheDocument();
@@ -604,9 +577,7 @@ describe("VariablesSection", () => {
       });
 
       // Should not show info icon
-      expect(
-        screen.queryByTestId("variable-info-input"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("variable-info-input")).not.toBeInTheDocument();
     });
   });
 

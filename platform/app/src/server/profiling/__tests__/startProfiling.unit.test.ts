@@ -116,9 +116,7 @@ describe("given telemetry identity carried on OTEL_RESOURCE_ATTRIBUTES", () => {
     // @scenario "Profiles carry the worktree label in local development"
     it("keeps the well-formed pairs alongside the junk", () => {
       expect(
-        tagsFromResourceAttributes(
-          "novalue,langwatch.worktree=portless,=orphan",
-        ),
+        tagsFromResourceAttributes("novalue,langwatch.worktree=portless,=orphan"),
       ).toEqual({ langwatch_worktree: "portless" });
     });
 

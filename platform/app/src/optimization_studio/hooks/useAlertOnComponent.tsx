@@ -6,17 +6,13 @@ import { explainExecutionStateError } from "../utils/executionStateError";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 
 export const useAlertOnComponent = () => {
-  const {
-    selectedNode,
-    propertiesExpanded,
-    setSelectedNode,
-    setPropertiesExpanded,
-  } = useWorkflowStore((state) => ({
-    selectedNode: state.nodes.find((node) => node.selected),
-    propertiesExpanded: state.propertiesExpanded,
-    setSelectedNode: state.setSelectedNode,
-    setPropertiesExpanded: state.setPropertiesExpanded,
-  }));
+  const { selectedNode, propertiesExpanded, setSelectedNode, setPropertiesExpanded } =
+    useWorkflowStore((state) => ({
+      selectedNode: state.nodes.find((node) => node.selected),
+      propertiesExpanded: state.propertiesExpanded,
+      setSelectedNode: state.setSelectedNode,
+      setPropertiesExpanded: state.setPropertiesExpanded,
+    }));
 
   return useCallback(
     ({
@@ -72,11 +68,6 @@ export const useAlertOnComponent = () => {
         },
       });
     },
-    [
-      selectedNode?.id,
-      propertiesExpanded,
-      setSelectedNode,
-      setPropertiesExpanded,
-    ],
+    [selectedNode?.id, propertiesExpanded, setSelectedNode, setPropertiesExpanded],
   );
 };

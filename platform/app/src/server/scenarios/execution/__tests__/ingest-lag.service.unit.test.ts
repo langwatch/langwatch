@@ -66,9 +66,7 @@ describe("resolveTraceWaitTimeoutMs", () => {
     describe("when the measured p95 lands between the clamps", () => {
       /** @scenario "The wait budget grows with the project's measured ingest lag" */
       it("returns a quarter more than the p95 plus five seconds", async () => {
-        const { client } = clientReturning([
-          { P95LagMs: 16_000, SampleCount: 100 },
-        ]);
+        const { client } = clientReturning([{ P95LagMs: 16_000, SampleCount: 100 }]);
 
         const budget = await resolveTraceWaitTimeoutMs({
           projectId: "proj_1",
@@ -83,9 +81,7 @@ describe("resolveTraceWaitTimeoutMs", () => {
         // A fractional p95 (ClickHouse quantile interpolates) must not leak a
         // fractional budget: the SDK hands it to timer APIs that reject
         // non-integer delays.
-        const { client } = clientReturning([
-          { P95LagMs: 16_193.75, SampleCount: 100 },
-        ]);
+        const { client } = clientReturning([{ P95LagMs: 16_193.75, SampleCount: 100 }]);
 
         const budget = await resolveTraceWaitTimeoutMs({
           projectId: "proj_frac",
@@ -119,9 +115,7 @@ describe("resolveTraceWaitTimeoutMs", () => {
 
     describe("when ClickHouse serializes the count as a string", () => {
       it("parses it and still applies the formula", async () => {
-        const { client } = clientReturning([
-          { P95LagMs: 16_000, SampleCount: "100" },
-        ]);
+        const { client } = clientReturning([{ P95LagMs: 16_000, SampleCount: "100" }]);
 
         const budget = await resolveTraceWaitTimeoutMs({
           projectId: "proj_str",
@@ -136,9 +130,7 @@ describe("resolveTraceWaitTimeoutMs", () => {
   describe("given a project with fewer than twenty recent traces", () => {
     /** @scenario "A project with few recent traces gets the default wait budget" */
     it("returns the thirty second default", async () => {
-      const { client } = clientReturning([
-        { P95LagMs: 200_000, SampleCount: 19 },
-      ]);
+      const { client } = clientReturning([{ P95LagMs: 200_000, SampleCount: 19 }]);
 
       const budget = await resolveTraceWaitTimeoutMs({
         projectId: "proj_sparse",
@@ -172,9 +164,7 @@ describe("resolveTraceWaitTimeoutMs", () => {
         .fn()
         .mockRejectedValueOnce(new Error("connection refused"))
         .mockResolvedValueOnce({
-          json: vi
-            .fn()
-            .mockResolvedValue([{ P95LagMs: 16_000, SampleCount: 100 }]),
+          json: vi.fn().mockResolvedValue([{ P95LagMs: 16_000, SampleCount: 100 }]),
         });
       const client = { query } as unknown as ClickHouseClient;
       const clientResolver = resolverFor(client);
@@ -207,9 +197,7 @@ describe("resolveTraceWaitTimeoutMs", () => {
     /** @scenario "A measured wait budget is reused for an hour" */
     it("serves the cached value for an hour, then measures again", async () => {
       vi.useFakeTimers();
-      const { client, query } = clientReturning([
-        { P95LagMs: 16_000, SampleCount: 100 },
-      ]);
+      const { client, query } = clientReturning([{ P95LagMs: 16_000, SampleCount: 100 }]);
       const clientResolver = resolverFor(client);
 
       const first = await resolveTraceWaitTimeoutMs({
@@ -235,9 +223,7 @@ describe("resolveTraceWaitTimeoutMs", () => {
 
     it("evicts other projects' expired entries instead of holding them forever", async () => {
       vi.useFakeTimers();
-      const { client } = clientReturning([
-        { P95LagMs: 16_000, SampleCount: 100 },
-      ]);
+      const { client } = clientReturning([{ P95LagMs: 16_000, SampleCount: 100 }]);
       const clientResolver = resolverFor(client);
 
       await resolveTraceWaitTimeoutMs({
@@ -277,9 +263,7 @@ describe("resolveTraceWaitTimeoutMs", () => {
 
   describe("given the query executes", () => {
     it("filters by tenant first and bounds the partition column", async () => {
-      const { client, query } = clientReturning([
-        { P95LagMs: 16_000, SampleCount: 100 },
-      ]);
+      const { client, query } = clientReturning([{ P95LagMs: 16_000, SampleCount: 100 }]);
 
       await resolveTraceWaitTimeoutMs({
         projectId: "proj_q",

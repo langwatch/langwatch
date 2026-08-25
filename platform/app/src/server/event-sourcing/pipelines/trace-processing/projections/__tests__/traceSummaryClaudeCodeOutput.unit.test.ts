@@ -16,10 +16,7 @@ import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { NormalizedSpan } from "../../schemas/spans";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 const DONE = "Done — output was `test otlp`.";
 
@@ -55,8 +52,7 @@ const callDecidesTool = claudeSpan({
   spanAttributes: {
     "langwatch.span.type": "llm",
     "gen_ai.request.model": "claude-opus-4-8",
-    "gen_ai.input.messages":
-      '[{"role":"user","content":"can you do `echo test otlp`"}]',
+    "gen_ai.input.messages": '[{"role":"user","content":"can you do `echo test otlp`"}]',
   },
 });
 

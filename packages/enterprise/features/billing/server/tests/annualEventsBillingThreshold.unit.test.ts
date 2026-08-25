@@ -2,22 +2,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
 
 const prices = {
-    GROWTH_SEAT_EUR_MONTHLY: "price_seat_eur_monthly",
-    GROWTH_SEAT_EUR_ANNUAL: "price_seat_eur_annual",
-    GROWTH_SEAT_USD_MONTHLY: "price_seat_usd_monthly",
-    GROWTH_SEAT_USD_ANNUAL: "price_seat_usd_annual",
-    GROWTH_EVENTS_EUR_MONTHLY: "price_events_eur_monthly",
-    GROWTH_EVENTS_EUR_ANNUAL: "price_events_eur_annual",
-    GROWTH_EVENTS_USD_MONTHLY: "price_events_usd_monthly",
-    GROWTH_EVENTS_USD_ANNUAL: "price_events_usd_annual",
-    GROWTH_EVENTS_EUR_MONTHLY_UNTIL_MAR_2026:
-      "price_events_eur_monthly_until_mar_2026",
-    GROWTH_EVENTS_EUR_ANNUAL_UNTIL_MAR_2026:
-      "price_events_eur_annual_until_mar_2026",
-    GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026:
-      "price_events_usd_monthly_until_mar_2026",
-    GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026:
-      "price_events_usd_annual_until_mar_2026",
+  GROWTH_SEAT_EUR_MONTHLY: "price_seat_eur_monthly",
+  GROWTH_SEAT_EUR_ANNUAL: "price_seat_eur_annual",
+  GROWTH_SEAT_USD_MONTHLY: "price_seat_usd_monthly",
+  GROWTH_SEAT_USD_ANNUAL: "price_seat_usd_annual",
+  GROWTH_EVENTS_EUR_MONTHLY: "price_events_eur_monthly",
+  GROWTH_EVENTS_EUR_ANNUAL: "price_events_eur_annual",
+  GROWTH_EVENTS_USD_MONTHLY: "price_events_usd_monthly",
+  GROWTH_EVENTS_USD_ANNUAL: "price_events_usd_annual",
+  GROWTH_EVENTS_EUR_MONTHLY_UNTIL_MAR_2026: "price_events_eur_monthly_until_mar_2026",
+  GROWTH_EVENTS_EUR_ANNUAL_UNTIL_MAR_2026: "price_events_eur_annual_until_mar_2026",
+  GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026: "price_events_usd_monthly_until_mar_2026",
+  GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026: "price_events_usd_annual_until_mar_2026",
 } as StripePriceMap;
 
 import type Stripe from "stripe";
@@ -33,8 +29,7 @@ const applyThreshold = ({
   stripe: Stripe;
   stripeSubscriptionId: string;
   isDryRun?: boolean;
-}) =>
-  AnnualEventsBillingThresholdService.create({ stripe, prices }).apply(input);
+}) => AnnualEventsBillingThresholdService.create({ stripe, prices }).apply(input);
 
 const makeStripeSubscription = ({
   priceIds,
@@ -95,10 +90,7 @@ describe("applyThreshold", () => {
     it("applies to grandfathered pre-March-2026 annual events prices", async () => {
       const stripe = makeStripe(
         makeStripeSubscription({
-          priceIds: [
-            "price_seat_eur_annual",
-            "price_events_eur_annual_until_mar_2026",
-          ],
+          priceIds: ["price_seat_eur_annual", "price_events_eur_annual_until_mar_2026"],
         }),
       );
 

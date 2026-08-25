@@ -33,7 +33,7 @@ Hard constraints that shape the design:
 - **A prompt row requires a `projectId` + `organizationId`; there is no global /
   "system" prompt scope** (`PromptScope` is only `PROJECT | ORGANIZATION`). Langy's
   agent definition is global to the deployment, not tied to a customer project, so
-  *where* the canonical row lives is a genuine decision, not an implementation
+  _where_ the canonical row lives is a genuine decision, not an implementation
   detail.
 - **The platform process must never hold a `LANGWATCH_API_KEY`**
   (`langwatchPlatformGuard.ts`) — it would self-ingest its own telemetry. So any
@@ -106,7 +106,7 @@ and migrations in this repo are schema-only.
 
 ## Rationale / Trade-offs
 
-An internal "system" project (Decision 2) is the only shape that gives a *single*
+An internal "system" project (Decision 2) is the only shape that gives a _single_
 versioned source on prod without inventing a new global prompt scope. The
 alternative — seeding Langy's prompt into every customer project lazily — was
 rejected: it duplicates the prompt everywhere, splinters the version history, and

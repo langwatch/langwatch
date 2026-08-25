@@ -70,8 +70,7 @@ const UNCACHED_CALL: ProviderUsage = {
  * invoice.
  */
 function billableInputTokens(usage: ProviderUsage): number {
-  const fresh =
-    usage.promptTokens - usage.cacheReadTokens - usage.cacheCreationTokens;
+  const fresh = usage.promptTokens - usage.cacheReadTokens - usage.cacheCreationTokens;
   return fresh < 0 ? usage.promptTokens : fresh;
 }
 
@@ -132,10 +131,7 @@ describe("the cost of one cached gateway call", () => {
       expect(input).toBe(78);
 
       expect(
-        surfaceGap(
-          traceCostUsd(CACHED_CALL, input),
-          billedCostUsd(CACHED_CALL, input),
-        ),
+        surfaceGap(traceCostUsd(CACHED_CALL, input), billedCostUsd(CACHED_CALL, input)),
       ).toBeLessThan(ONE_MILLIONTH_OF_A_DOLLAR);
       // 78 * 1.25e-6 + 10 * 1e-5 + 4736 * 1.25e-7
       expect(billedCostUsd(CACHED_CALL, input)).toBeCloseTo(0.0007895, 9);
@@ -144,10 +140,7 @@ describe("the cost of one cached gateway call", () => {
     /** @scenario "The trace and the bill price a cached request at the same number" */
     it("charges far more when the billed input count still holds the cached tokens", () => {
       const trace = traceCostUsd(CACHED_CALL, billableInputTokens(CACHED_CALL));
-      const cacheInclusive = billedCostUsd(
-        CACHED_CALL,
-        CACHED_CALL.promptTokens,
-      );
+      const cacheInclusive = billedCostUsd(CACHED_CALL, CACHED_CALL.promptTokens);
 
       // The cached tokens priced at the input rate on top of their own:
       // 4736 * 1.25e-6 above what the trace says the call cost.

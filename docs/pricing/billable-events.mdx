@@ -8,22 +8,23 @@ keywords: billable event, events, pricing, span, evaluation, experiment, simulat
 LangWatch Cloud bills on **ingested events per billing period**. The list below is complete, so you can predict a bill from your own workload rather than from a sample.
 
 <Note>
-Self-hosted deployments are not metered and send no usage data to LangWatch. This page applies to LangWatch Cloud. See [Editions and licensing](/self-hosting/licensing).
+  Self-hosted deployments are not metered and send no usage data to LangWatch. This page
+  applies to LangWatch Cloud. See [Editions and licensing](/self-hosting/licensing).
 </Note>
 
 ## The complete list
 
 These are the only events that increment your count. Everything else the platform does is free.
 
-| What you did | Billable event | Counted |
-|---|---|---|
-| Your app, or a coding assistant you track, sent a span (an LLM call, tool call, retrieval step, or any other step in a trace) | `lw.obs.trace.span_received` | One per span |
-| An evaluation produced a result | `lw.evaluation.reported` | One per evaluation result |
-| An experiment run started | `lw.experiment_run.started` | One per run |
-| An experiment recorded a target's output | `lw.experiment_run.target_result` | One per target result |
-| An experiment recorded an evaluator's score | `lw.experiment_run.evaluator_result` | One per evaluator result |
-| A scenario simulation started | `lw.simulation_run.started` | One per run |
-| A simulation recorded a conversation snapshot | `lw.simulation_run.message_snapshot` | One per snapshot |
+| What you did                                                                                                                  | Billable event                       | Counted                   |
+| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------- |
+| Your app, or a coding assistant you track, sent a span (an LLM call, tool call, retrieval step, or any other step in a trace) | `lw.obs.trace.span_received`         | One per span              |
+| An evaluation produced a result                                                                                               | `lw.evaluation.reported`             | One per evaluation result |
+| An experiment run started                                                                                                     | `lw.experiment_run.started`          | One per run               |
+| An experiment recorded a target's output                                                                                      | `lw.experiment_run.target_result`    | One per target result     |
+| An experiment recorded an evaluator's score                                                                                   | `lw.experiment_run.evaluator_result` | One per evaluator result  |
+| A scenario simulation started                                                                                                 | `lw.simulation_run.started`          | One per run               |
+| A simulation recorded a conversation snapshot                                                                                 | `lw.simulation_run.message_snapshot` | One per snapshot          |
 
 Spans dominate the count whenever your app sends traces. A single trace of an agent turn typically contains several spans, one per step.
 

@@ -53,9 +53,7 @@ vi.mock("~/prompts/utils/llmPromptConfigUtils", () => ({
 
 // ---- Helpers ----
 
-function createSignatureNode(
-  overrides: Partial<Signature> = {},
-): Node<Component> {
+function createSignatureNode(overrides: Partial<Signature> = {}): Node<Component> {
   return {
     id: "llm-1",
     type: "signature",
@@ -70,9 +68,7 @@ function createSignatureNode(
 }
 
 // ---- Import under test (after mocks) ----
-const { SignaturePromptEditorBridge } = await import(
-  "../SignaturePromptEditorBridge"
-);
+const { SignaturePromptEditorBridge } = await import("../SignaturePromptEditorBridge");
 
 // ---- Tests ----
 
@@ -483,9 +479,7 @@ describe("SignaturePromptEditorBridge", () => {
       const callData = mockSetNode.mock.calls[0]![0].data;
       expect(callData.localPromptConfig).toBe(config);
       expect(callData.inputs).toEqual([{ identifier: "query", type: "str" }]);
-      expect(callData.outputs).toEqual([
-        { identifier: "response", type: "str" },
-      ]);
+      expect(callData.outputs).toEqual([{ identifier: "response", type: "str" }]);
     });
   });
 

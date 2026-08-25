@@ -17,15 +17,7 @@
  */
 
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { prisma } from "../../../db";
 import {
@@ -34,9 +26,7 @@ import {
 } from "./seatChangeLastTeamAdminFixture";
 
 vi.mock("~/runtime/app/features/audit-log", async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import("~/runtime/app/features/audit-log")
-  >()),
+  ...(await importOriginal<typeof import("~/runtime/app/features/audit-log")>()),
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
@@ -89,9 +79,7 @@ describe("given a team whose only admin is one of its members", () => {
       // An empty list is a rename-only save and touches nobody; dropping the
       // admin means submitting a list without them.
       await expect(
-        saveTeam([
-          { userId: fixture.companionUserId, role: TeamUserRole.MEMBER },
-        ]),
+        saveTeam([{ userId: fixture.companionUserId, role: TeamUserRole.MEMBER }]),
       ).rejects.toMatchObject({
         cause: { code: "team_last_admin_required" },
       });
@@ -132,9 +120,7 @@ describe("given a team whose only admin is one of its members", () => {
         memberUserId: fixture.companionUserId,
         run: async () => {
           await expect(
-            saveTeam([
-              { userId: fixture.soloUserId, role: TeamUserRole.VIEWER },
-            ]),
+            saveTeam([{ userId: fixture.soloUserId, role: TeamUserRole.VIEWER }]),
           ).resolves.toMatchObject({ success: true });
 
           await expect(
@@ -155,9 +141,7 @@ describe("given a team whose only admin is one of its members", () => {
         teamId: fixture.onlyAdminTeamId,
         run: async () => {
           await expect(
-            saveTeam([
-              { userId: fixture.soloUserId, role: TeamUserRole.VIEWER },
-            ]),
+            saveTeam([{ userId: fixture.soloUserId, role: TeamUserRole.VIEWER }]),
           ).rejects.toMatchObject({
             cause: { code: "team_last_admin_required" },
           });
@@ -181,9 +165,7 @@ describe("given a team whose only admin is one of its members", () => {
       });
 
       await expect(
-        saveTeam([
-          { userId: fixture.companionUserId, role: TeamUserRole.MEMBER },
-        ]),
+        saveTeam([{ userId: fixture.companionUserId, role: TeamUserRole.MEMBER }]),
       ).resolves.toMatchObject({ success: true });
 
       await expect(

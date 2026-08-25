@@ -28,8 +28,7 @@ export function useArchivedItemsResolution({
   archivedTargets,
   projectId,
 }: UseArchivedItemsResolutionOptions) {
-  const hasArchived =
-    archivedScenarioIds.length > 0 || archivedTargets.length > 0;
+  const hasArchived = archivedScenarioIds.length > 0 || archivedTargets.length > 0;
 
   const { data: archivedNames } = api.suites.resolveArchivedNames.useQuery(
     {

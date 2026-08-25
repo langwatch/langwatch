@@ -39,9 +39,7 @@ const team = {
   isPersonal: false,
   ownerUserId: null,
   members: [{ userId: "user_1", role: "ADMIN" }],
-  projects: [
-    { id: "project_1", slug: "demo", name: "Demo", isPersonal: false },
-  ],
+  projects: [{ id: "project_1", slug: "demo", name: "Demo", isPersonal: false }],
 };
 const organization = {
   id: "org_1",
@@ -166,16 +164,12 @@ function recordScrollIntoView(): {
   element: HTMLElement;
   options?: ScrollIntoViewOptions;
 }[] {
-  const scrolls: { element: HTMLElement; options?: ScrollIntoViewOptions }[] =
-    [];
+  const scrolls: { element: HTMLElement; options?: ScrollIntoViewOptions }[] = [];
   (
     window.HTMLElement.prototype as unknown as {
       scrollIntoView: (options?: ScrollIntoViewOptions) => void;
     }
-  ).scrollIntoView = function (
-    this: HTMLElement,
-    options?: ScrollIntoViewOptions,
-  ) {
+  ).scrollIntoView = function (this: HTMLElement, options?: ScrollIntoViewOptions) {
     scrolls.push({ element: this, options });
   };
   return scrolls;
@@ -207,16 +201,13 @@ function stubMenuLayout({
     height,
     bottom: top + height,
   });
-  window.HTMLElement.prototype.getBoundingClientRect = function (
-    this: HTMLElement,
-  ) {
+  window.HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
     if (this.dataset.testid === "sidebar-scroll-region")
       return rectAt({ top: 0, height: menuHeight });
     const label = this.getAttribute("aria-label");
     const scrolled =
-      document.querySelector<HTMLElement>(
-        '[data-testid="sidebar-scroll-region"]',
-      )?.scrollTop ?? 0;
+      document.querySelector<HTMLElement>('[data-testid="sidebar-scroll-region"]')
+        ?.scrollTop ?? 0;
     return rectAt({
       top: ((label ? entryOffsets[label] : undefined) ?? 0) - scrolled,
       height: MENU_ENTRY_HEIGHT,
@@ -273,16 +264,13 @@ beforeEach(() => {
   forgetMenuScrollPositions();
 });
 
-const realGetBoundingClientRect =
-  window.HTMLElement.prototype.getBoundingClientRect;
+const realGetBoundingClientRect = window.HTMLElement.prototype.getBoundingClientRect;
 
 afterEach(() => {
   cleanup();
   // jsdom has no scrollIntoView; the deep-link test installs one.
-  delete (window.HTMLElement.prototype as { scrollIntoView?: unknown })
-    .scrollIntoView;
-  window.HTMLElement.prototype.getBoundingClientRect =
-    realGetBoundingClientRect;
+  delete (window.HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  window.HTMLElement.prototype.getBoundingClientRect = realGetBoundingClientRect;
 });
 
 describe("the product sidebar", () => {
@@ -378,14 +366,10 @@ describe("the product sidebar", () => {
 
       await waitFor(() => {
         expect(
-          scrolls.some((scroll) =>
-            scroll.element.textContent?.includes("Virtual Keys"),
-          ),
+          scrolls.some((scroll) => scroll.element.textContent?.includes("Virtual Keys")),
         ).toBe(true);
       });
-      expect(
-        scrolls.every((scroll) => scroll.options?.block === "nearest"),
-      ).toBe(true);
+      expect(scrolls.every((scroll) => scroll.options?.block === "nearest")).toBe(true);
     });
 
     /** @scenario "Opening a page below the fold reveals its sidebar entry" */
@@ -416,9 +400,10 @@ describe("the product sidebar", () => {
 
       const region = screen.getByTestId("sidebar-scroll-region");
       await waitFor(() => {
-        expect(
-          screen.getByRole("link", { name: "Virtual Keys" }),
-        ).toHaveAttribute("aria-current", "page");
+        expect(screen.getByRole("link", { name: "Virtual Keys" })).toHaveAttribute(
+          "aria-current",
+          "page",
+        );
       });
       // Anything above zero has taken Quick Search and the heading with it.
       expect(region.scrollTop).toBe(0);
@@ -532,15 +517,9 @@ describe("the product sidebar", () => {
       renderSidebar("governance");
 
       expect(screen.getByText("Usage")).toBeInTheDocument();
-      expect(
-        screen.getByRole("link", { name: "Settings" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Support" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("radiogroup", { name: "Theme" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Settings" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Support" })).toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: "Theme" })).toBeInTheDocument();
     });
 
     /** @scenario "A rule separates the bottom block from the pages above it" */
@@ -548,9 +527,7 @@ describe("the product sidebar", () => {
       renderSidebar("governance");
 
       const block = screen.getByTestId("sidebar-bottom-block");
-      expect(block).toContainElement(
-        screen.getByRole("radiogroup", { name: "Theme" }),
-      );
+      expect(block).toContainElement(screen.getByRole("radiogroup", { name: "Theme" }));
       expect(block).toHaveStyle({ borderTopWidth: "1px" });
     });
 
@@ -564,8 +541,7 @@ describe("the product sidebar", () => {
       // belongs to the wrapper, where both edges get it. An unset logical
       // margin reads as "" here, where a set one reads as its length.
       expect(
-        getComputedStyle(screen.getByTestId("sidebar-bottom-block"))
-          .marginInline,
+        getComputedStyle(screen.getByTestId("sidebar-bottom-block")).marginInline,
       ).toBe("");
     });
 
@@ -574,8 +550,7 @@ describe("the product sidebar", () => {
       renderSidebar("governance");
 
       const block = screen.getByTestId("sidebar-bottom-block");
-      const inset = (element: HTMLElement) =>
-        getComputedStyle(element).paddingInline;
+      const inset = (element: HTMLElement) => getComputedStyle(element).paddingInline;
 
       // Two steps of the spacing scale to the rule and one more to the
       // entries under it, which is the one step the entries above them take.
@@ -599,9 +574,7 @@ describe("the product sidebar", () => {
       // An unset margin reads as "0" here; a spacing step would read as the
       // variable the scale is written with, as the region's padding does.
       expect(getComputedStyle(block).marginTop).toBe("0");
-      expect(getComputedStyle(region).paddingBottom).toBe(
-        "var(--chakra-spacing-2)",
-      );
+      expect(getComputedStyle(region).paddingBottom).toBe("var(--chakra-spacing-2)");
     });
   });
 

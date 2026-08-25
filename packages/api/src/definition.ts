@@ -3,12 +3,7 @@ import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { parseApiSchemaSync, type ApiSchema } from "./schema.js";
 
-import type {
-  EndpointDef,
-  EndpointDocs,
-  HttpMethod,
-  RawEndpointDef,
-} from "./types.js";
+import type { EndpointDef, EndpointDocs, HttpMethod, RawEndpointDef } from "./types.js";
 import { VERSION_LATEST, VERSION_PREVIEW } from "./types.js";
 
 declare const inputDeclared: unique symbol;
@@ -275,13 +270,7 @@ export function assertRoutePath(path: string): void {
  * than aspirational: a dotted name has no `:param` to bind, and a query string
  * would smuggle arguments back into the URL that the operation name owns.
  */
-export function assertRpcDef({
-  name,
-  def,
-}: {
-  name: string;
-  def: RawEndpointDef;
-}): void {
+export function assertRpcDef({ name, def }: { name: string; def: RawEndpointDef }): void {
   const offending = (["params", "query"] as const).filter(
     (key) => def[key] !== undefined,
   );
@@ -295,13 +284,7 @@ export function assertRpcDef({
 }
 
 /** A stream has no request body and no path params; request data is query only. */
-export function assertSseDef({
-  name,
-  def,
-}: {
-  name: string;
-  def: RawEndpointDef;
-}): void {
+export function assertSseDef({ name, def }: { name: string; def: RawEndpointDef }): void {
   const offending = (["input", "params"] as const).filter(
     (key) => def[key] !== undefined,
   );

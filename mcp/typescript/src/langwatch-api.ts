@@ -1,7 +1,4 @@
-import type {
-  HandledErrorFault,
-  SerializedReason,
-} from "@langwatch/handled-error";
+import type { HandledErrorFault, SerializedReason } from "@langwatch/handled-error";
 import { getConfig, requireApiKey } from "./config.js";
 import type { EvaluationSummary } from "./utils/format-evaluations.js";
 
@@ -236,7 +233,7 @@ function describeReason(reason: SerializedReason): string | null {
 export async function makeRequest(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
-  body?: unknown
+  body?: unknown,
 ): Promise<unknown> {
   const config = getConfig();
   const url = config.endpoint + path;
@@ -275,18 +272,13 @@ export async function makeRequest(
     if (parsed.docsUrl) {
       lines.push(`Docs: ${parsed.docsUrl}`);
     }
-    throw new LangWatchApiError(
-      lines.join("\n"),
-      response.status,
-      responseBody,
-      {
-        code: parsed.code,
-        tips: parsed.tips,
-        docsUrl: parsed.docsUrl,
-        fault: parsed.fault,
-        reasons: parsed.reasons,
-      },
-    );
+    throw new LangWatchApiError(lines.join("\n"), response.status, responseBody, {
+      code: parsed.code,
+      tips: parsed.tips,
+      docsUrl: parsed.docsUrl,
+      fault: parsed.fault,
+      reasons: parsed.reasons,
+    });
   }
 
   if (response.status === 204 || response.headers?.get("content-length") === "0") {
@@ -322,11 +314,11 @@ export async function searchTraces(params: {
 /** Retrieves a single trace by its ID. */
 export async function getTraceById(
   traceId: string,
-  format: "digest" | "json" = "digest"
+  format: "digest" | "json" = "digest",
 ): Promise<TraceDetailResponse> {
   return makeRequest(
     "GET",
-    `/api/traces/${encodeURIComponent(traceId)}?format=${format}`
+    `/api/traces/${encodeURIComponent(traceId)}?format=${format}`,
   ) as Promise<TraceDetailResponse>;
 }
 
@@ -348,7 +340,7 @@ export async function getAnalyticsTimeseries(params: {
   return makeRequest(
     "POST",
     "/api/analytics/timeseries",
-    params
+    params,
   ) as Promise<AnalyticsTimeseriesResponse>;
 }
 
@@ -360,7 +352,7 @@ export async function listPrompts(): Promise<PromptSummary[]> {
 /** Retrieves a single prompt by ID or handle. */
 export async function getPrompt(
   idOrHandle: string,
-  options?: { version?: number; tag?: string }
+  options?: { version?: number; tag?: string },
 ): Promise<PromptDetailResponse> {
   const params = new URLSearchParams();
   if (options?.version != null) params.set("version", String(options.version));
@@ -368,7 +360,7 @@ export async function getPrompt(
   const query = params.toString() ? `?${params}` : "";
   return makeRequest(
     "GET",
-    `/api/prompts/${encodeURIComponent(idOrHandle)}${query}`
+    `/api/prompts/${encodeURIComponent(idOrHandle)}${query}`,
   ) as Promise<PromptDetailResponse>;
 }
 
@@ -379,11 +371,7 @@ export async function createPrompt(data: {
   model: string;
   tags?: string[];
 }): Promise<PromptMutationResponse> {
-  return makeRequest(
-    "POST",
-    "/api/prompts",
-    data
-  ) as Promise<PromptMutationResponse>;
+  return makeRequest("POST", "/api/prompts", data) as Promise<PromptMutationResponse>;
 }
 
 /** Updates an existing prompt by ID or handle. */
@@ -394,12 +382,12 @@ export async function updatePrompt(
     model?: string;
     commitMessage: string;
     tags?: string[];
-  }
+  },
 ): Promise<PromptMutationResponse> {
   return makeRequest(
     "PUT",
     `/api/prompts/${encodeURIComponent(idOrHandle)}`,
-    data
+    data,
   ) as Promise<PromptMutationResponse>;
 }
 
@@ -416,7 +404,7 @@ export async function assignPromptTag({
   return makeRequest(
     "PUT",
     `/api/prompts/${encodeURIComponent(idOrHandle)}/tags/${encodeURIComponent(tag)}`,
-    { versionId }
+    { versionId },
   );
 }
 
@@ -438,17 +426,10 @@ export async function renamePromptTag({
   tag: string;
   name: string;
 }): Promise<unknown> {
-  return makeRequest(
-    "PUT",
-    `/api/prompts/tags/${encodeURIComponent(tag)}`,
-    { name }
-  );
+  return makeRequest("PUT", `/api/prompts/tags/${encodeURIComponent(tag)}`, { name });
 }
 
 /** Deletes a prompt tag and all its assignments. */
 export async function deletePromptTag(tag: string): Promise<unknown> {
-  return makeRequest(
-    "DELETE",
-    `/api/prompts/tags/${encodeURIComponent(tag)}`
-  );
+  return makeRequest("DELETE", `/api/prompts/tags/${encodeURIComponent(tag)}`);
 }

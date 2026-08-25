@@ -14,11 +14,7 @@
  */
 
 import { DEMO_PLATFORM_IDS } from "../../prisma/demo-platform-ids";
-import {
-  EXPERIMENT_ROWS,
-  ORGANIC_TRAFFIC,
-  SCENARIO_FIXTURES,
-} from "./platform-fixtures";
+import { EXPERIMENT_ROWS, ORGANIC_TRAFFIC, SCENARIO_FIXTURES } from "./platform-fixtures";
 import {
   DAY_MS,
   dateKey,
@@ -156,10 +152,8 @@ function buildDayOrganicTraces({
   const conversations = 6 + Math.floor(random() * 8);
 
   for (let i = 0; i < conversations; i++) {
-    const startedAt =
-      dayStart + (9 * 60 + i * 55 + Math.floor(random() * 30)) * 60_000;
-    const topic =
-      ORGANIC_TRAFFIC[Math.floor(random() * ORGANIC_TRAFFIC.length)]!;
+    const startedAt = dayStart + (9 * 60 + i * 55 + Math.floor(random() * 30)) * 60_000;
+    const topic = ORGANIC_TRAFFIC[Math.floor(random() * ORGANIC_TRAFFIC.length)]!;
     const latencyMs = Math.round(700 + random() * 2_600);
     traces.push({
       traceId: `mass-organic-${day}-${i + 1}`,
@@ -198,8 +192,7 @@ function buildExperimentPair({
     return {
       runId: `mass-exp-${week}-${variant}`,
       variant,
-      startedAt:
-        dayStart + (13 + (variant === "improved" ? 2 : 0)) * 60 * 60_000,
+      startedAt: dayStart + (13 + (variant === "improved" ? 2 : 0)) * 60 * 60_000,
       scores: EXPERIMENT_ROWS.map((_, index) =>
         Number(
           Math.min(
@@ -237,9 +230,7 @@ export function buildMassTimeline(options: MassTimelineOptions): MassTimeline {
     const random = mulberry32(0x9e3779b9 ^ (dayIndex * 7_919));
     const trend = dayIndex / Math.max(1, days - 1);
 
-    scenarioRuns.push(
-      ...buildDayScenarioRuns({ day, dayStart, trend, random }),
-    );
+    scenarioRuns.push(...buildDayScenarioRuns({ day, dayStart, trend, random }));
     organicTraces.push(...buildDayOrganicTraces({ day, dayStart, random }));
     // One experiment run pair per week.
     if (dayIndex % 7 === 3) {

@@ -11,9 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { ReactNode } from "react";
-import {
-  type PaginationState,
-} from "@langwatch/ops-web";
+import { type PaginationState } from "@langwatch/ops-web";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { SearchInput } from "~/components/ui/SearchInput";
 import { HandledErrorAlert } from "~/features/errors";
@@ -100,13 +98,7 @@ export function BackofficeTable({
           ) : (
             <Box position="relative" width="full" overflow="auto">
               {isFetching && (
-                <Box
-                  position="absolute"
-                  top={2}
-                  right={2}
-                  zIndex={1}
-                  color="fg.muted"
-                >
+                <Box position="absolute" top={2} right={2} zIndex={1} color="fg.muted">
                   <Spinner size="xs" />
                 </Box>
               )}
@@ -121,12 +113,7 @@ export function BackofficeTable({
   );
 }
 
-function PaginationBar({
-  page,
-  perPage,
-  total,
-  onPageChange,
-}: PaginationState) {
+function PaginationBar({ page, perPage, total, onPageChange }: PaginationState) {
   const totalPages = Math.max(1, Math.ceil(total / perPage));
   const canPrev = page > 1;
   const canNext = page < totalPages;

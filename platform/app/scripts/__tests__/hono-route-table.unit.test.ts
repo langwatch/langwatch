@@ -32,9 +32,9 @@ describe("honoPathToTemplate", () => {
   });
 
   it("rewrites every parameter in a multi-parameter path", () => {
-    expect(
-      honoPathToTemplate("/api/workflows/:workflowId/:versionId/run"),
-    ).toBe("/api/workflows/{workflowId}/{versionId}/run");
+    expect(honoPathToTemplate("/api/workflows/:workflowId/:versionId/run")).toBe(
+      "/api/workflows/{workflowId}/{versionId}/run",
+    );
   });
 
   describe("when a parameter carries a Hono regex constraint", () => {
@@ -61,15 +61,15 @@ describe("honoPathToTemplate", () => {
 
 describe("joinRoutePath", () => {
   it("joins a basePath to a route path without doubling the separator", () => {
-    expect(
-      joinRoutePath({ basePath: "/api/experiments", routePath: "/runs" }),
-    ).toBe("/api/experiments/runs");
+    expect(joinRoutePath({ basePath: "/api/experiments", routePath: "/runs" })).toBe(
+      "/api/experiments/runs",
+    );
   });
 
   it("keeps the basePath alone when the route is the collection root", () => {
-    expect(
-      joinRoutePath({ basePath: "/api/experiments", routePath: "/" }),
-    ).toBe("/api/experiments");
+    expect(joinRoutePath({ basePath: "/api/experiments", routePath: "/" })).toBe(
+      "/api/experiments",
+    );
   });
 });
 
@@ -404,10 +404,7 @@ describe("serviceBasePathsOf", () => {
         'createService({ name: "roles" });',
       ].join("\n");
 
-      expect(serviceBasePathsOf(source)).toEqual([
-        "/api/roles",
-        "/api/role-bindings",
-      ]);
+      expect(serviceBasePathsOf(source)).toEqual(["/api/roles", "/api/role-bindings"]);
     });
   });
 
@@ -491,15 +488,15 @@ describe("serviceBasePathsOf", () => {
 
 describe("apiBasePathsOf", () => {
   it("reads the object-literal form the app builders use", () => {
-    expect(
-      apiBasePathsOf('createServiceApp({ basePath: "/api/experiments" })'),
-    ).toEqual(["/api/experiments"]);
+    expect(apiBasePathsOf('createServiceApp({ basePath: "/api/experiments" })')).toEqual([
+      "/api/experiments",
+    ]);
   });
 
   it("reads the chained form a bare Hono app uses", () => {
-    expect(
-      apiBasePathsOf('new Hono().basePath("/api/evaluations/v3")'),
-    ).toEqual(["/api/evaluations/v3"]);
+    expect(apiBasePathsOf('new Hono().basePath("/api/evaluations/v3")')).toEqual([
+      "/api/evaluations/v3",
+    ]);
   });
 
   it("ignores a basePath outside the /api surface", () => {
@@ -513,10 +510,7 @@ describe("apiBasePathsOf", () => {
         'export const legacyAliasApp = new Hono().basePath("/api/evaluations/v3");',
       ].join("\n");
 
-      expect(apiBasePathsOf(source)).toEqual([
-        "/api/experiments",
-        "/api/evaluations/v3",
-      ]);
+      expect(apiBasePathsOf(source)).toEqual(["/api/experiments", "/api/evaluations/v3"]);
     });
 
     it("does not repeat a basePath declared twice", () => {

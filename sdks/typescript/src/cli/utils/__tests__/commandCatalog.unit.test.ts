@@ -61,8 +61,7 @@ describe("buildCatalog", () => {
   it("covers every registered non-hidden top-level command", () => {
     const registered = buildProgram()
       .commands.filter(
-        (command) =>
-          (command as unknown as { _hidden?: boolean })._hidden !== true,
+        (command) => (command as unknown as { _hidden?: boolean })._hidden !== true,
       )
       .map((command) => command.name());
     const cataloged = catalog.map((entry) => entry.path);

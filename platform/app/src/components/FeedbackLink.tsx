@@ -18,8 +18,8 @@ export function FeedbackLink() {
           <Dialog.Body>
             <VStack align="start" paddingBottom={4}>
               <Text paddingBottom={4}>
-                Join our Discord community or open a Github Issue for any
-                issues, questions or ideas.
+                Join our Discord community or open a Github Issue for any issues,
+                questions or ideas.
               </Text>
               <Link href="https://discord.gg/kT4PhDS2gH" isExternal>
                 <Button variant="plain">

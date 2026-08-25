@@ -28,9 +28,7 @@ function makeContext(overrides: Partial<IntentContext> = {}): IntentContext {
   };
 }
 
-function makeExecutePayload(
-  overrides: Partial<ExecuteRunIntent> = {},
-): ExecuteRunIntent {
+function makeExecutePayload(overrides: Partial<ExecuteRunIntent> = {}): ExecuteRunIntent {
   return {
     scenarioRunId: RUN_ID,
     projectId: PROJECT_ID,
@@ -69,9 +67,7 @@ describe("createExecuteRunHandler", () => {
   describe("when this pod has an execution pool", () => {
     it("submits the job mapped onto ExecutionJobData", async () => {
       const submit = vi.fn();
-      const run = createExecuteRunHandler(
-        makeDeps({ getPool: () => ({ submit }) }),
-      );
+      const run = createExecuteRunHandler(makeDeps({ getPool: () => ({ submit }) }));
 
       await run(makeExecutePayload(), makeContext());
 
@@ -88,9 +84,7 @@ describe("createExecuteRunHandler", () => {
 
     it("forwards the run's parameters onto the pool job", async () => {
       const submit = vi.fn();
-      const run = createExecuteRunHandler(
-        makeDeps({ getPool: () => ({ submit }) }),
-      );
+      const run = createExecuteRunHandler(makeDeps({ getPool: () => ({ submit }) }));
 
       await run(
         makeExecutePayload({
@@ -108,9 +102,7 @@ describe("createExecuteRunHandler", () => {
 
     it("omits scenarioName when the intent carries no name", async () => {
       const submit = vi.fn();
-      const run = createExecuteRunHandler(
-        makeDeps({ getPool: () => ({ submit }) }),
-      );
+      const run = createExecuteRunHandler(makeDeps({ getPool: () => ({ submit }) }));
       const payload = makeExecutePayload();
       delete payload.name;
 
@@ -141,9 +133,7 @@ describe("createCancelExecutionHandler", () => {
   });
 
   it("propagates a publish failure so the outbox retries", async () => {
-    const publishCancellation = vi
-      .fn()
-      .mockRejectedValue(new Error("redis down"));
+    const publishCancellation = vi.fn().mockRejectedValue(new Error("redis down"));
     const run = createCancelExecutionHandler(makeDeps({ publishCancellation }));
 
     await expect(
@@ -155,9 +145,7 @@ describe("createCancelExecutionHandler", () => {
 describe("createFinishRunHandler", () => {
   it("reports the terminal outcome through the pipeline commands", async () => {
     const finishRun = vi.fn().mockResolvedValue(undefined);
-    const run = createFinishRunHandler(
-      makeDeps({ commands: () => ({ finishRun }) }),
-    );
+    const run = createFinishRunHandler(makeDeps({ commands: () => ({ finishRun }) }));
     const payload: FinishRunIntent = {
       scenarioRunId: RUN_ID,
       projectId: PROJECT_ID,
@@ -178,9 +166,7 @@ describe("createFinishRunHandler", () => {
 
   it("omits error when the intent carries none", async () => {
     const finishRun = vi.fn().mockResolvedValue(undefined);
-    const run = createFinishRunHandler(
-      makeDeps({ commands: () => ({ finishRun }) }),
-    );
+    const run = createFinishRunHandler(makeDeps({ commands: () => ({ finishRun }) }));
 
     await run(
       { scenarioRunId: RUN_ID, projectId: PROJECT_ID, status: "CANCELLED" },

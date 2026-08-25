@@ -1,10 +1,4 @@
-import {
-  Box,
-  Flex,
-  HStack,
-  useBreakpointValue,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Flex, HStack, useBreakpointValue, VStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
@@ -27,10 +21,7 @@ import { SpotlightOverlay } from "../../onboarding/spotlights/SpotlightOverlay";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { useFilterStore } from "../../stores/filterStore";
-import {
-  SELECT_ALL_MATCHING_CAP,
-  useSelectionStore,
-} from "../../stores/selectionStore";
+import { SELECT_ALL_MATCHING_CAP, useSelectionStore } from "../../stores/selectionStore";
 import { useUIStore } from "../../stores/uiStore";
 import { DensityProvider } from "../DensityProvider";
 import { ExportConfigDialog } from "../ExportConfigDialog";
@@ -102,15 +93,11 @@ export const TracesPage: React.FC = () => {
 
   const { project } = useOrganizationTeamProject();
   const { hasAnyTraces } = useProjectHasTraces();
-  const setupDismissedByProject = useOnboardingStore(
-    (s) => s.setupDismissedByProject,
-  );
+  const setupDismissedByProject = useOnboardingStore((s) => s.setupDismissedByProject);
   const setupDisengaged = useOnboardingStore((s) => s.setupDisengaged);
   const tourActive = useOnboardingStore((s) => s.tourActive);
   const showSamplePreview = useOnboardingStore((s) => s.showSamplePreview);
-  const setupDismissed = project
-    ? !!setupDismissedByProject[project.id]
-    : false;
+  const setupDismissed = project ? !!setupDismissedByProject[project.id] : false;
   // Read the onboarding stage at the top level so we can decide
   // whether to surface the FilterSidebar even while the empty
   // state is technically "active". The slice chapter
@@ -198,13 +185,7 @@ export const TracesPage: React.FC = () => {
             </Box>
           )}
 
-          <HStack
-            flex={1}
-            align="stretch"
-            width="full"
-            gap={0}
-            overflow="hidden"
-          >
+          <HStack flex={1} align="stretch" width="full" gap={0} overflow="hidden">
             {/* Hide the sidebar during the empty-state journey except
               for the facets / outro beats — those stages are
               *about* the sidebar, so we surface it then. During
@@ -230,9 +211,7 @@ export const TracesPage: React.FC = () => {
                   height="full"
                   overflow="hidden"
                 >
-                  <FilterAside
-                    dimmed={dimChrome && !sidebarVisibleDuringEmpty}
-                  />
+                  <FilterAside dimmed={dimChrome && !sidebarVisibleDuringEmpty} />
                 </Box>
               )}
             {/* Cross-fade between the three main pane modes. `mode="wait"`
@@ -404,9 +383,10 @@ const ResultsPane: React.FC = React.memo(() => {
   // its name rather than a raw id.
   const traceNamesById = useMemo(
     () =>
-      Object.fromEntries(
-        data.map((t) => [t.traceId, t.traceName || t.name]),
-      ) as Record<string, string | undefined>,
+      Object.fromEntries(data.map((t) => [t.traceId, t.traceName || t.name])) as Record<
+        string,
+        string | undefined
+      >,
     [data],
   );
   const selectionMode = useSelectionStore((s) => s.mode);
@@ -471,8 +451,7 @@ const ResultsPane: React.FC = React.memo(() => {
     return () => clearTimeout(t);
   }, [auroraArmedSample, auroraArmedFirstReal]);
 
-  const isSelectedExport =
-    selectionMode === "all-matching" || explicitCount > 0;
+  const isSelectedExport = selectionMode === "all-matching" || explicitCount > 0;
   const dialogTraceCount =
     selectionMode === "all-matching"
       ? Math.min(totalHits, SELECT_ALL_MATCHING_CAP)
@@ -513,11 +492,7 @@ const ResultsPane: React.FC = React.memo(() => {
           "Network" inversion). Dark mode keeps the legacy muted dark
           background that operators already approved.
         */}
-        <Box
-          height="full"
-          overflow="auto"
-          bg={{ base: "bg.surface", _dark: "bg.muted" }}
-        >
+        <Box height="full" overflow="auto" bg={{ base: "bg.surface", _dark: "bg.muted" }}>
           <TraceTable />
         </Box>
         {/* Aurora ribbon — plays once when the user enters sample-preview

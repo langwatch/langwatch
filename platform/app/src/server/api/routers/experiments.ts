@@ -8,10 +8,7 @@ import type { Dataset } from "@langwatch/dataset-contract";
 import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
 import { z } from "zod/v4";
-import {
-  EvaluationExecutionMode,
-  ExperimentType,
-} from "~/generated/prisma/client";
+import { EvaluationExecutionMode, ExperimentType } from "~/generated/prisma/client";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { persistedEvaluationsV3StateSchema } from "../../../experiments-v3/types/persistence";
@@ -24,11 +21,7 @@ import {
 } from "@langwatch/workflow-contract";
 import { slugify } from "../../../utils/slugify";
 import { prisma } from "../../db";
-import type {
-  DSPyRunsSummary,
-  DSPyStep,
-  DSPyStepSummary,
-} from "../../experiments/types";
+import type { DSPyRunsSummary, DSPyStep, DSPyStepSummary } from "../../experiments/types";
 import {
   isLegacyOnlineEvaluationWorkbenchState,
   type WizardState,
@@ -41,10 +34,7 @@ import {
   createTRPCRouter,
   protectedProcedure,
 } from "../trpc";
-import {
-  copyWorkflowWithDatasets,
-  saveOrCommitWorkflowVersion,
-} from "./workflows";
+import { copyWorkflowWithDatasets, saveOrCommitWorkflowVersion } from "./workflows";
 
 type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
@@ -266,12 +256,8 @@ export const experimentsRouter = createTRPCRouter({
             })
         : null;
 
-      const workbenchState = experiment.workbenchState as
-        | WizardState
-        | undefined;
-      const dsl = workflow?.currentVersion?.dsl as
-        | StudioWorkflow
-        | undefined;
+      const workbenchState = experiment.workbenchState as WizardState | undefined;
+      const dsl = workflow?.currentVersion?.dsl as StudioWorkflow | undefined;
       const evaluator = dsl?.nodes.find((node) => node.type === "evaluator") as
         | Node<Evaluator>
         | undefined;
@@ -440,17 +426,13 @@ export const experimentsRouter = createTRPCRouter({
       const totalHits = nonLegacyExperiments.length;
 
       // Apply pagination after excluding legacy online evaluations.
-      const experiments = nonLegacyExperiments.slice(
-        pageOffset,
-        pageOffset + pageSize,
-      );
+      const experiments = nonLegacyExperiments.slice(pageOffset, pageOffset + pageSize);
 
       const getDatasetId = (dsl: unknown) => {
         const parsed = studioWorkflowSchema.safeParse(dsl);
         if (!parsed.success) return undefined;
-        return (
-          parsed.data.nodes.find((node) => node.type === "entry") as Node<Entry>
-        )?.data.dataset?.id;
+        return (parsed.data.nodes.find((node) => node.type === "entry") as Node<Entry>)
+          ?.data.dataset?.id;
       };
 
       const datasetIds = experiments
@@ -460,13 +442,12 @@ export const experimentsRouter = createTRPCRouter({
         .filter(Boolean) as string[];
 
       const datasetsById = Object.fromEntries(
-        (await ctx.app.dataset.getByIds({
-          projectId: input.projectId,
-          datasetIds,
-        })).map((dataset: Dataset) => [
-          dataset.id,
-          { id: dataset.id, name: dataset.name },
-        ]),
+        (
+          await ctx.app.dataset.getByIds({
+            projectId: input.projectId,
+            datasetIds,
+          })
+        ).map((dataset: Dataset) => [dataset.id, { id: dataset.id, name: dataset.name }]),
       );
 
       const runsByExperimentId = await ctx.app.experiments.listRuns({
@@ -486,9 +467,7 @@ export const experimentsRouter = createTRPCRouter({
 
           return {
             ...experiment,
-            workbenchState: experiment.workbenchState as
-              | WizardState
-              | undefined,
+            workbenchState: experiment.workbenchState as WizardState | undefined,
             runsSummary: {
               count: runs.length,
               primaryMetric,
@@ -497,11 +476,8 @@ export const experimentsRouter = createTRPCRouter({
               },
             },
             dataset:
-              datasetsById[
-                getDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""
-              ],
-            updatedAt:
-              latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
+              datasetsById[getDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""],
+            updatedAt: latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
           };
         })
         .sort((a, b) => b.updatedAt - a.updatedAt);
@@ -551,9 +527,7 @@ export const experimentsRouter = createTRPCRouter({
 
       const result: DSPyRunsSummary[] = Array.from(runMap.entries())
         .map(([runId, runSteps]) => {
-          const versionId = runSteps.find(
-            (s) => s.workflowVersionId,
-          )?.workflowVersionId;
+          const versionId = runSteps.find((s) => s.workflowVersionId)?.workflowVersionId;
           return {
             runId,
             workflow_version: (versionId
@@ -576,9 +550,7 @@ export const experimentsRouter = createTRPCRouter({
                     timestamps: { created_at: s.createdAt },
                   }) as DSPyStepSummary,
               )
-              .sort(
-                (a, b) => a.timestamps.created_at - b.timestamps.created_at,
-              ),
+              .sort((a, b) => a.timestamps.created_at - b.timestamps.created_at),
             created_at: Math.min(...runSteps.map((s) => s.createdAt)),
           };
         })

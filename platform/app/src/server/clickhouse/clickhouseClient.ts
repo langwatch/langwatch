@@ -24,9 +24,7 @@ const logger = createLogger("langwatch:clickhouse:routing");
  * resolver. An exported resolver would be a third door that any module could
  * open by import, which is the reason there isn't one.
  */
-export type ClickHouseClientResolver = (
-  tenantId: string,
-) => Promise<ClickHouseClient>;
+export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseClient>;
 
 /**
  * Map of orgId → route, parsed from env vars at module load. The format and its
@@ -34,10 +32,7 @@ export type ClickHouseClientResolver = (
  *
  * Zero runtime overhead — no DB queries, no decryption.
  */
-const privateClickHouseUrls = parsePrivateEnvVars(
-  PRIVATE_CH_ENV_PREFIX,
-  "ClickHouse",
-);
+const privateClickHouseUrls = parsePrivateEnvVars(PRIVATE_CH_ENV_PREFIX, "ClickHouse");
 
 function parsePrivateEnvVars(
   prefix: string,
@@ -48,10 +43,7 @@ function parsePrivateEnvVars(
     if (!key.startsWith(prefix)) continue;
 
     if (!value || value.trim() === "") {
-      logger.warn(
-        { envVar: key },
-        `Skipping private ${label} env var: empty value`,
-      );
+      logger.warn({ envVar: key }, `Skipping private ${label} env var: empty value`);
       continue;
     }
 
@@ -200,9 +192,7 @@ export async function getAllClickHouseInstances(): Promise<
  * (shared or private). Use for feature-gating (e.g., deciding Real vs Null repository).
  */
 export function isClickHouseEnabled(): boolean {
-  return (
-    _getSharedClickHouseClient() !== null || privateClickHouseUrls.size > 0
-  );
+  return _getSharedClickHouseClient() !== null || privateClickHouseUrls.size > 0;
 }
 
 /**
@@ -275,7 +265,5 @@ export function getPrivateClickHouseUrls(): ReadonlyMap<string, string> {
   // per org and `tasks/clickhouseMigrate.ts` hands each value straight to goose
   // as a connection string — returning the route would have run every private
   // instance's migrations against "[object Object]".
-  return new Map(
-    [...privateClickHouseUrls].map(([orgId, route]) => [orgId, route.url]),
-  );
+  return new Map([...privateClickHouseUrls].map(([orgId, route]) => [orgId, route.url]));
 }

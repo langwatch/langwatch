@@ -48,9 +48,7 @@ export const useOptimizationExecution = () => {
       });
       toaster.create({
         title: `Timeout ${
-          triggerTimeout.timeout_on_status === "waiting"
-            ? "starting"
-            : "stopping"
+          triggerTimeout.timeout_on_status === "waiting" ? "starting" : "stopping"
         } optimization execution`,
         type: "error",
         duration: 5000,

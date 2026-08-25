@@ -222,9 +222,7 @@ export class SessionGroupsService {
     this.resolveOrganizationId = resolveOrganizationId;
   }
 
-  async getSessionGroups(
-    params: SessionGroupsParams,
-  ): Promise<SessionGroupsResult> {
+  async getSessionGroups(params: SessionGroupsParams): Promise<SessionGroupsResult> {
     const sortColumn =
       SORT_COLUMN_MAP[params.sort?.columnId ?? ""] ?? DEFAULT_SORT.column;
     const sortDirection = params.sort?.direction ?? DEFAULT_SORT.direction;
@@ -244,9 +242,7 @@ export class SessionGroupsService {
     });
 
     const hasMore = page.rows.length > params.pageSize;
-    const visibleRows = hasMore
-      ? page.rows.slice(0, params.pageSize)
-      : page.rows;
+    const visibleRows = hasMore ? page.rows.slice(0, params.pageSize) : page.rows;
 
     const enrichments = await this.enrich({
       tenantId: params.tenantId,

@@ -111,9 +111,7 @@ describe("the support menu chat placement", () => {
     it("folds the chat into the Support menu and drops the standalone entry", async () => {
       renderMenu({ chatPlacement: "in-menu" });
 
-      expect(
-        screen.queryByRole("button", { name: "Chat" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Chat" })).not.toBeInTheDocument();
 
       const user = await openSupportMenu();
       const chatItem = screen.getByText("Chat (with a human)");

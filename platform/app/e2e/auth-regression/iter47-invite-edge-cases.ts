@@ -120,10 +120,9 @@ async function main() {
 
     // Alice (signed in) navigates directly to the invite URL.
     const pageA = ctxA.pages()[0]!;
-    await pageA.goto(
-      `${BASE_URL}/invite/accept?inviteCode=${aliceInvite.inviteCode}`,
-      { waitUntil: "networkidle" },
-    );
+    await pageA.goto(`${BASE_URL}/invite/accept?inviteCode=${aliceInvite.inviteCode}`, {
+      waitUntil: "networkidle",
+    });
     // Wait for the accept mutation + hard-redirect.
     await pageA.waitForTimeout(5000);
     console.log(`  → final URL: ${pageA.url()}`);
@@ -158,10 +157,9 @@ async function main() {
     );
 
     const pageA2 = await ctxA.newPage();
-    await pageA2.goto(
-      `${BASE_URL}/invite/accept?inviteCode=${aliceInvite.inviteCode}`,
-      { waitUntil: "networkidle" },
-    );
+    await pageA2.goto(`${BASE_URL}/invite/accept?inviteCode=${aliceInvite.inviteCode}`, {
+      waitUntil: "networkidle",
+    });
     await pageA2.waitForTimeout(3000);
     console.log(`  → final URL: ${pageA2.url()}`);
     check(
@@ -196,10 +194,9 @@ async function main() {
     pageB.on("framenavigated", (frame) => {
       if (frame === pageB.mainFrame()) navTrail.push(frame.url());
     });
-    await pageB.goto(
-      `${BASE_URL}/invite/accept?inviteCode=${expiredInvite.inviteCode}`,
-      { waitUntil: "networkidle" },
-    );
+    await pageB.goto(`${BASE_URL}/invite/accept?inviteCode=${expiredInvite.inviteCode}`, {
+      waitUntil: "networkidle",
+    });
     console.log(`  → nav trail: ${JSON.stringify(navTrail)}`);
     // Wait for the mutation to fail and the SetupLayout error UI to
     // render. The page first shows LoadingScreen (no text), then on
@@ -260,10 +257,9 @@ async function main() {
     const carolLowerEmail = carolMixedCaseEmail.toLowerCase();
     await signUp(ctxC, carolLowerEmail, "iter47pass1234", "Carol");
     const pageC = ctxC.pages()[0]!;
-    await pageC.goto(
-      `${BASE_URL}/invite/accept?inviteCode=${carolInvite.inviteCode}`,
-      { waitUntil: "networkidle" },
-    );
+    await pageC.goto(`${BASE_URL}/invite/accept?inviteCode=${carolInvite.inviteCode}`, {
+      waitUntil: "networkidle",
+    });
     await pageC.waitForTimeout(5000);
 
     const carolMembership = await prisma.organizationUser.findFirst({
@@ -308,16 +304,8 @@ async function main() {
       error?: { json?: { data?: { code?: string } } };
     }> | null;
     const errorCode = trpcJson?.[0]?.error?.json?.data?.code;
-    check(
-      "unauthenticated POST returns 401",
-      trpcStatus === 401,
-      `status=${trpcStatus}`,
-    );
-    check(
-      "error code is UNAUTHORIZED",
-      errorCode === "UNAUTHORIZED",
-      String(errorCode),
-    );
+    check("unauthenticated POST returns 401", trpcStatus === 401, `status=${trpcStatus}`);
+    check("error code is UNAUTHORIZED", errorCode === "UNAUTHORIZED", String(errorCode));
 
     const danMembership = await prisma.organizationUser.findFirst({
       where: {
@@ -359,9 +347,7 @@ async function main() {
     console.log(`✅ ALL CHECKS PASSED (${passes}/${passes})`);
     process.exit(0);
   } else {
-    console.log(
-      `❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`,
-    );
+    console.log(`❌ ${fails} CHECKS FAILED (${passes}/${passes + fails} passed)`);
     process.exit(1);
   }
 }

@@ -51,11 +51,7 @@ describe("shouldFilterCodingAgentSpan", () => {
     describe("when the span is ingested", () => {
       /** @scenario "Opencode AI SDK spans survive the noise filter" */
       it("keeps the ai.* Vercel AI SDK operation spans", () => {
-        for (const name of [
-          "ai.streamText",
-          "ai.streamText.doStream",
-          "ai.toolCall",
-        ]) {
+        for (const name of ["ai.streamText", "ai.streamText.doStream", "ai.toolCall"]) {
           expect(
             shouldFilterCodingAgentSpan({
               scopeName: "opencode",
@@ -140,10 +136,7 @@ describe("shouldFilterCodingAgentSpan for the codex_exec scope", () => {
         shouldFilterCodingAgentSpan({
           scopeName: "codex_exec",
           spanName: "handle_responses",
-          attributeKeys: [
-            "gen_ai.usage.input_tokens",
-            "codex.request.reasoning_effort",
-          ],
+          attributeKeys: ["gen_ai.usage.input_tokens", "codex.request.reasoning_effort"],
         }),
       ).toBe(false);
     });

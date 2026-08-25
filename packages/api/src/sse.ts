@@ -1,11 +1,7 @@
 import type { Context } from "hono";
 import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 
-import {
-  parseApiSchema,
-  type ApiSchema,
-  type ApiSchemaOutput,
-} from "./schema.js";
+import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "./schema.js";
 import type { ServiceContext } from "./types.js";
 
 export interface SSECompletion {
@@ -142,8 +138,6 @@ export function createSSEResponse<TEvents extends Record<string, ApiSchema>>({
 }
 
 /** Returns the current SSE handler lifecycle for request instrumentation. */
-export function getSSECompletion(
-  c: Context,
-): Promise<SSECompletion> | undefined {
+export function getSSECompletion(c: Context): Promise<SSECompletion> | undefined {
   return completions.get(c);
 }

@@ -1,4 +1,14 @@
 {
-  "compilerOptions": { "target": "es2022", "lib": ["es2022"], "module": "preserve", "moduleResolution": "bundler", "strict": true, "skipLibCheck": true, "verbatimModuleSyntax": true, "noEmit": true, "types": ["node"] },
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
   "include": ["src/**/*.ts"]
 }

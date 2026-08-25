@@ -17,9 +17,9 @@ describe("platformUrl", () => {
 
   describe("when BASE_HOST is set", () => {
     it("builds a direct page URL", () => {
-      expect(
-        platformUrl({ projectSlug: "my-project", path: "/datasets/ds_123" }),
-      ).toBe("https://app.langwatch.ai/my-project/datasets/ds_123");
+      expect(platformUrl({ projectSlug: "my-project", path: "/datasets/ds_123" })).toBe(
+        "https://app.langwatch.ai/my-project/datasets/ds_123",
+      );
     });
 
     it("builds a drawer URL with query params", () => {
@@ -47,9 +47,7 @@ describe("platformUrl", () => {
     });
 
     it("returns a URL with empty base", () => {
-      expect(platformUrl({ projectSlug: "demo", path: "/agents" })).toBe(
-        "/demo/agents",
-      );
+      expect(platformUrl({ projectSlug: "demo", path: "/agents" })).toBe("/demo/agents");
     });
   });
 

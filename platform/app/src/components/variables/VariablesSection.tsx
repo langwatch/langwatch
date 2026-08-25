@@ -1,25 +1,11 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { FieldTypeSelect } from "@langwatch/prompt-web";
-import {
-  TYPE_LABELS,
-  VariableTypeIcon,
-} from "@langwatch/prompt-web";
-import {
-  generateUniqueIdentifier,
-  normalizeIdentifier,
-} from "~/utils/identifierUtils";
+import { TYPE_LABELS, VariableTypeIcon } from "@langwatch/prompt-web";
+import { generateUniqueIdentifier, normalizeIdentifier } from "~/utils/identifierUtils";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -45,10 +31,7 @@ export type VariablesSectionProps = {
   /** Mappings for each variable (keyed by identifier) */
   mappings?: Record<string, FieldMapping>;
   /** Callback when a mapping changes */
-  onMappingChange?: (
-    identifier: string,
-    mapping: FieldMapping | undefined,
-  ) => void;
+  onMappingChange?: (identifier: string, mapping: FieldMapping | undefined) => void;
   /** Available sources for mapping */
   availableSources?: AvailableSource[];
 
@@ -118,10 +101,7 @@ export const VariablesSection = ({
   const handleAddVariable = useCallback(
     (type: FieldType = "str") => {
       const existingIdentifiers = variables.map((v) => v.identifier);
-      const newIdentifier = generateUniqueIdentifier(
-        "input",
-        existingIdentifiers,
-      );
+      const newIdentifier = generateUniqueIdentifier("input", existingIdentifiers);
       onChange([...variables, { identifier: newIdentifier, type }]);
       // Auto-focus the new variable name
       setEditingId(newIdentifier);
@@ -165,11 +145,7 @@ export const VariablesSection = ({
       );
 
       // If identifier changed, update the mapping key
-      if (
-        updates.identifier &&
-        newIdentifier !== oldIdentifier &&
-        onMappingChange
-      ) {
+      if (updates.identifier && newIdentifier !== oldIdentifier && onMappingChange) {
         const existingMapping = mappings[oldIdentifier];
         if (existingMapping) {
           onMappingChange(oldIdentifier, undefined);
@@ -186,23 +162,14 @@ export const VariablesSection = ({
     <VStack align="stretch" gap={3} width="full">
       {/* Header */}
       <HStack width="full">
-        <Text
-          fontSize="xs"
-          fontWeight="bold"
-          textTransform="uppercase"
-          color="fg.muted"
-        >
+        <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color="fg.muted">
           {title}
         </Text>
         <Spacer />
         {shouldShowAddButton && !readOnly && (
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button
-                size="xs"
-                variant="outline"
-                data-testid="add-variable-button"
-              >
+              <Button size="xs" variant="outline" data-testid="add-variable-button">
                 <Plus size={14} />
                 Add
               </Button>
@@ -250,13 +217,9 @@ export const VariablesSection = ({
                 isEditing={editingId === variable.identifier}
                 isMissing={missingMappingIds.has(variable.identifier)}
                 optionalHighlighting={optionalHighlighting}
-                onStartEdit={() =>
-                  !isLocked && setEditingId(variable.identifier)
-                }
+                onStartEdit={() => !isLocked && setEditingId(variable.identifier)}
                 onEndEdit={() => setEditingId(null)}
-                onUpdate={(updates) =>
-                  handleUpdateVariable(variable.identifier, updates)
-                }
+                onUpdate={(updates) => handleUpdateVariable(variable.identifier, updates)}
                 onRemove={() => handleRemoveVariable(variable.identifier)}
                 onMappingChange={
                   onMappingChange
@@ -278,18 +241,11 @@ export const VariablesSection = ({
       )}
 
       {/* Validation error for missing mappings */}
-      {showMissingMappingsError &&
-        showMappings &&
-        missingMappingIds.size > 0 && (
-          <Text
-            data-testid="missing-mappings-error"
-            color="fg.error"
-            fontSize="xs"
-          >
-            Please map all required fields:{" "}
-            {Array.from(missingMappingIds).join(", ")}
-          </Text>
-        )}
+      {showMissingMappingsError && showMappings && missingMappingIds.size > 0 && (
+        <Text data-testid="missing-mappings-error" color="fg.error" fontSize="xs">
+          Please map all required fields: {Array.from(missingMappingIds).join(", ")}
+        </Text>
+      )}
     </VStack>
   );
 };
@@ -504,7 +460,4 @@ const VariableRow = ({
   );
 };
 
-export {
-  type AvailableSource,
-  type FieldMapping,
-} from "./VariableMappingInput";
+export { type AvailableSource, type FieldMapping } from "./VariableMappingInput";

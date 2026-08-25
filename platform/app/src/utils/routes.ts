@@ -271,9 +271,7 @@ export type Route = {
 
 type RouteMap = Record<keyof typeof projectRoutes, Route>;
 
-export const findCurrentRoute = (
-  currentPathname: string,
-): Route | undefined => {
+export const findCurrentRoute = (currentPathname: string): Route | undefined => {
   return Object.values(projectRoutes as RouteMap).find(
     (route) => route.path === currentPathname,
   );
@@ -355,9 +353,7 @@ export function buildProjectSwitchHref({
         .replace("[project]", targetSlug)
         .replace(/\/\/+/g, "/");
     }
-    return currentRoute.path
-      .replace("[project]", targetSlug)
-      .replace(/\/\/+/g, "/");
+    return currentRoute.path.replace("[project]", targetSlug).replace(/\/\/+/g, "/");
   }
 
   if (currentProjectSlug && resolvedPathname?.includes(currentProjectSlug)) {

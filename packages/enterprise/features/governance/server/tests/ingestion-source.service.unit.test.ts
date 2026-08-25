@@ -72,8 +72,7 @@ class FakeSourceRepository extends IngestionSourceRepository {
 
 class FakeProjects extends ProjectService {
   tryFindInternal = vi.fn(
-    async (_input: InternalProjectQuery): Promise<InternalProject | null> =>
-      null,
+    async (_input: InternalProjectQuery): Promise<InternalProject | null> => null,
   );
   ensureInternal = vi.fn(
     async (_input: InternalProjectQuery): Promise<InternalProject> => ({

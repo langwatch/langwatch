@@ -53,16 +53,10 @@ function sourceImports(root: string): SourceImport[] {
 }
 
 function generatedImport(specifier: string): boolean {
-  return (
-    specifier === PRISMA_GENERATED ||
-    specifier.startsWith(`${PRISMA_GENERATED}/`)
-  );
+  return specifier === PRISMA_GENERATED || specifier.startsWith(`${PRISMA_GENERATED}/`);
 }
 
-function isStrictPrismaAdapter(
-  pkg: ClassifiedPackage,
-  file: string,
-): boolean {
+function isStrictPrismaAdapter(pkg: ClassifiedPackage, file: string): boolean {
   return (
     pkg.kind === "server" &&
     isWithin(join(pkg.root, "src", "repositories", "prisma"), file)
@@ -97,8 +91,7 @@ export function lintPrismaBoundaries(
           file: sourceImport.file,
           line: sourceImport.line,
           specifier: sourceImport.specifier,
-          message:
-            "Feature packages cannot own Prisma connection or lifecycle services.",
+          message: "Feature packages cannot own Prisma connection or lifecycle services.",
           allowed:
             "Applications and composition roots construct @langwatch/prisma-client; feature services depend on narrow repository ports.",
         });

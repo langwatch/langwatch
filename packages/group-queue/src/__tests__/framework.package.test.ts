@@ -72,9 +72,7 @@ describe("Group Queue framework contract", () => {
     const encoded = await encodeJobEnvelope({ jobData: payload });
 
     expect(encoded.startsWith("GQ2|")).toBe(true);
-    await expect(decodeJobEnvelope({ value: encoded })).resolves.toEqual(
-      payload,
-    );
+    await expect(decodeJobEnvelope({ value: encoded })).resolves.toEqual(payload);
     expect(readJobRoutingMeta(encoded)).toEqual({
       pipelineName: "traces",
       jobType: "projection",

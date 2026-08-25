@@ -23,8 +23,7 @@ const variantDescriptions: Record<ModelProviderSurface, string> = {
     "We'll use this model to run your evaluations, and show you where your interactions shines, and where it doesn't.",
   prompts:
     "We'll use this model when you run evaluations on your datasets, in your traces, or analyze responses after they happen.",
-  langy:
-    "Langy uses this model to chat with you and help you work across the platform.",
+  langy: "Langy uses this model to chat with you and help you work across the platform.",
   onboarding:
     "The model LangWatch's AI assistant and AI assists run on. You can add more providers later in Settings.",
 };
@@ -34,12 +33,8 @@ const variantDescriptions: Record<ModelProviderSurface, string> = {
  * providers the surface recommends lead (badged), the rest keep registry
  * order, and providers the surface must not offer are gone entirely.
  */
-export function providersForSurface(
-  variant: ModelProviderSurface,
-): ModelProviderSpec[] {
-  const offered = modelProviderRegistry.filter(
-    (mp) => !mp.hiddenOn?.includes(variant),
-  );
+export function providersForSurface(variant: ModelProviderSurface): ModelProviderSpec[] {
+  const offered = modelProviderRegistry.filter((mp) => !mp.hiddenOn?.includes(variant));
   return [
     ...offered.filter((mp) => mp.recommendedOn?.includes(variant)),
     ...offered.filter((mp) => !mp.recommendedOn?.includes(variant)),
@@ -63,8 +58,7 @@ export function ModelProviderGrid({
       <VStack align="stretch" gap={0}>
         {!isCompact && (
           <Text fontSize="md" fontWeight="semibold">
-            Give LangWatch access to{" "}
-            {modelProvider?.label ?? "selected model provider"}
+            Give LangWatch access to {modelProvider?.label ?? "selected model provider"}
           </Text>
         )}
         <Text fontSize="xs" color="fg.muted">
@@ -82,9 +76,7 @@ export function ModelProviderGrid({
             selected={mp.key === modelProviderKey}
             onClick={() => onSelectModelProvider(mp.key)}
             ariaLabel={mp.label}
-            badge={
-              mp.recommendedOn?.includes(variant) ? "Recommended" : undefined
-            }
+            badge={mp.recommendedOn?.includes(variant) ? "Recommended" : undefined}
           />
         ))}
       </HStack>

@@ -31,8 +31,7 @@ export function havenHmrGate(options?: {
   burstGapMs?: number;
   burstSettleMs?: number;
 }): Plugin {
-  const marker =
-    options?.markerPath ?? path.resolve(process.cwd(), ".haven-hmr-gate");
+  const marker = options?.markerPath ?? path.resolve(process.cwd(), ".haven-hmr-gate");
   const BURST_GAP_MS = options?.burstGapMs ?? 300; // updates closer together than this = one burst
   const BURST_SETTLE_MS = options?.burstSettleMs ?? 500; // quiet time before the coalesced reload fires
   const MAX_GATE_MS = 60_000; // never hold longer than this, whatever the marker says

@@ -1236,10 +1236,9 @@ export const designSystemConfig = defineConfig({
             paddingInlineEnd: "3",
             // A hairline around a solid fill reads as an outline; the fill is
             // already the edge.
-            "&:is([data-type=error], [data-type=warning], [data-type=success])":
-              {
-                borderColor: "transparent",
-              },
+            "&:is([data-type=error], [data-type=warning], [data-type=success])": {
+              borderColor: "transparent",
+            },
             _dark: {
               ...toastPanel,
               backdropFilter: "var(--lw-backdrop-blur, blur(12px))",

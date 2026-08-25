@@ -21,18 +21,12 @@
 
 import { hash } from "bcrypt";
 import { nanoid } from "nanoid";
-import {
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@langwatch/prisma-client/generated";
+import { RoleBindingScopeType, TeamUserRole } from "@langwatch/prisma-client/generated";
 import { prisma } from "../src/server/db";
 import { LOCAL_DEV_ENTERPRISE_LICENSE_KEY } from "./localDevLicense";
 
 async function main() {
-  if (
-    process.env.NODE_ENV === "production" &&
-    !process.env.SEED_USER_PASSWORD
-  ) {
+  if (process.env.NODE_ENV === "production" && !process.env.SEED_USER_PASSWORD) {
     throw new Error(
       "Refusing to seed a hardcoded default admin credential with NODE_ENV=production. " +
         "Set SEED_USER_PASSWORD explicitly if you really intend to seed an admin user here.",
@@ -179,8 +173,7 @@ async function main() {
   // The app's own address, not a fixed port: a second checkout runs on
   // whatever slot was free, and a banner sending people to 5560 lands them on
   // another checkout (or nothing at all).
-  const appUrl =
-    process.env.BASE_HOST ?? `http://localhost:${process.env.PORT ?? 5560}`;
+  const appUrl = process.env.BASE_HOST ?? `http://localhost:${process.env.PORT ?? 5560}`;
 
   console.log("\n=== LOGIN CREDENTIALS ===");
   console.log(`  URL:          ${appUrl}/auth/signin`);

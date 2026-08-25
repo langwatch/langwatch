@@ -93,9 +93,8 @@ describe("extractDeduplicationKey", () => {
 
   describe("when event has idempotencyKey", () => {
     it("uses idempotencyKey", async () => {
-      const { extractDeduplicationKey } = await import(
-        "../orgBillableEventsMeter.mapProjection"
-      );
+      const { extractDeduplicationKey } =
+        await import("../orgBillableEventsMeter.mapProjection");
 
       const result = extractDeduplicationKey(
         makeEvent({ id: "evt-1", idempotencyKey: "business-key-123" }),
@@ -107,9 +106,8 @@ describe("extractDeduplicationKey", () => {
 
   describe("when event has no idempotencyKey", () => {
     it("falls back to event.id", async () => {
-      const { extractDeduplicationKey } = await import(
-        "../orgBillableEventsMeter.mapProjection"
-      );
+      const { extractDeduplicationKey } =
+        await import("../orgBillableEventsMeter.mapProjection");
 
       const result = extractDeduplicationKey(makeEvent({ id: "evt-42" }));
 
@@ -130,9 +128,8 @@ describe("orgBillableEventsMeterProjection.map", () => {
 
   describe("given any billable event", () => {
     it("produces a record with event.id as dedup key", async () => {
-      const { orgBillableEventsMeterProjection } = await import(
-        "../orgBillableEventsMeter.mapProjection"
-      );
+      const { orgBillableEventsMeterProjection } =
+        await import("../orgBillableEventsMeter.mapProjection");
 
       const result = orgBillableEventsMeterProjection.map(
         makeEvent({ id: "evt-1", type: "lw.obs.trace.span_received" }),
@@ -151,9 +148,8 @@ describe("orgBillableEventsMeterProjection.map", () => {
 
   describe("given event with idempotencyKey", () => {
     it("uses idempotencyKey as dedup key", async () => {
-      const { orgBillableEventsMeterProjection } = await import(
-        "../orgBillableEventsMeter.mapProjection"
-      );
+      const { orgBillableEventsMeterProjection } =
+        await import("../orgBillableEventsMeter.mapProjection");
 
       const result = orgBillableEventsMeterProjection.map(
         makeEvent({
@@ -193,9 +189,8 @@ describe("orgBillableEventsMeterStore", () => {
         team: { organizationId: "org-1" },
       });
 
-      const { orgBillableEventsMeterStore } = await import(
-        "../orgBillableEventsMeter.store"
-      );
+      const { orgBillableEventsMeterStore } =
+        await import("../orgBillableEventsMeter.store");
 
       const record = {
         organizationId: "",
@@ -226,9 +221,8 @@ describe("orgBillableEventsMeterStore", () => {
         team: { organizationId: "org-1" },
       });
 
-      const { orgBillableEventsMeterStore } = await import(
-        "../orgBillableEventsMeter.store"
-      );
+      const { orgBillableEventsMeterStore } =
+        await import("../orgBillableEventsMeter.store");
       await expect(
         orgBillableEventsMeterStore.append(
           {
@@ -252,9 +246,8 @@ describe("orgBillableEventsMeterStore", () => {
         team: null,
       });
 
-      const { orgBillableEventsMeterStore } = await import(
-        "../orgBillableEventsMeter.store"
-      );
+      const { orgBillableEventsMeterStore } =
+        await import("../orgBillableEventsMeter.store");
       await orgBillableEventsMeterStore.append(
         {
           organizationId: "",

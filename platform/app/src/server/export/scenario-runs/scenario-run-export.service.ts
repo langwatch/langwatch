@@ -18,10 +18,7 @@ import {
   categorizeRunStatus,
   type RunStatusCategory,
 } from "~/server/scenarios/scenario-run-category";
-import {
-  serializeRunsToCriteriaCsv,
-  serializeRunsToFullCsv,
-} from "./csv-serializer";
+import { serializeRunsToCriteriaCsv, serializeRunsToFullCsv } from "./csv-serializer";
 import type {
   ScenarioRunExportProgress,
   ScenarioRunExportRequest,
@@ -45,10 +42,7 @@ const logger = createLogger("langwatch:export:scenario-runs");
  * quiet runs ERROR), so the filter now yields an empty export in practice.
  * Kept so the dropdown/API contract stays valid.
  */
-const FILTER_TO_CATEGORY: Record<
-  ScenarioRunExportStatusFilter,
-  RunStatusCategory
-> = {
+const FILTER_TO_CATEGORY: Record<ScenarioRunExportStatusFilter, RunStatusCategory> = {
   pass: "success",
   fail: "failure",
   stalled: "stalled",
@@ -62,10 +56,7 @@ export class ScenarioRunExportService {
    * reconstructs Simulation's private ClickHouse repository.
    */
   static create(simulations: SimulationService): ScenarioRunExportService {
-    return traced(
-      new ScenarioRunExportService(simulations),
-      "ScenarioRunExportService",
-    );
+    return traced(new ScenarioRunExportService(simulations), "ScenarioRunExportService");
   }
 
   /**

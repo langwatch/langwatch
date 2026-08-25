@@ -15,11 +15,7 @@ import NextLink from "~/utils/compat/next-link";
  * This alert surfaces the privacy-settings link next to any trace that carries
  * redaction markers. It does NOT un-redact content.
  */
-export function PIIRedactionNotice({
-  content,
-}: {
-  content: string | null | undefined;
-}) {
+export function PIIRedactionNotice({ content }: { content: string | null | undefined }) {
   if (!hasRedactionMarker(content)) return null;
   return <PIIRedactionAlert />;
 }
@@ -38,8 +34,8 @@ export function PIIRedactionAlert() {
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description fontSize="sm">
-          Some content was redacted by this project's privacy settings (PII or
-          secrets redaction). Review them under{" "}
+          Some content was redacted by this project's privacy settings (PII or secrets
+          redaction). Review them under{" "}
           <Link asChild color="blue.600" textDecoration="underline">
             <NextLink href={settingsHref}>Settings</NextLink>
           </Link>

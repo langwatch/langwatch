@@ -53,10 +53,7 @@ import type {
   CheckPreconditionRule,
 } from "~/server/evaluations/types";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
-import type {
-  MappingState,
-  TRACE_MAPPINGS,
-} from "~/server/tracer/tracesMapping";
+import type { MappingState, TRACE_MAPPINGS } from "~/server/tracer/tracesMapping";
 import { api } from "~/utils/api";
 import type { EvaluatorMappingsConfig } from "../evaluators/EvaluatorEditorShared";
 import { HorizontalFormControl } from "../HorizontalFormControl";
@@ -178,8 +175,7 @@ const FLOW_SUB_DRAWERS = new Set([
 function isInActiveEvaluationFlow(): boolean {
   const stack = getDrawerStack();
   return stack.some(
-    (entry) =>
-      entry.drawer === "onlineEvaluation" || FLOW_SUB_DRAWERS.has(entry.drawer),
+    (entry) => entry.drawer === "onlineEvaluation" || FLOW_SUB_DRAWERS.has(entry.drawer),
   );
 }
 
@@ -196,8 +192,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
-    props.onSave ??
-    (complexProps.onSave as OnlineEvaluationDrawerProps["onSave"]);
+    props.onSave ?? (complexProps.onSave as OnlineEvaluationDrawerProps["onSave"]);
 
   const monitorId =
     props.monitorId ??
@@ -223,9 +218,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       level: onlineEvaluationDrawerState?.level ?? null,
       name: onlineEvaluationDrawerState?.name ?? "",
       sample: onlineEvaluationDrawerState?.sample ?? 1.0,
-      preconditions: onlineEvaluationDrawerState?.preconditions ?? [
-        DEFAULT_PRECONDITION,
-      ],
+      preconditions: onlineEvaluationDrawerState?.preconditions ?? [DEFAULT_PRECONDITION],
       threadIdleTimeout: onlineEvaluationDrawerState?.threadIdleTimeout ?? 300,
     },
   });
@@ -238,10 +231,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const threadIdleTimeout = form.watch("threadIdleTimeout");
 
   // These are managed separately due to complex interactions with drawer system
-  const [selectedEvaluator, setSelectedEvaluator] =
-    useState<EvaluatorWithFields | null>(
-      () => onlineEvaluationDrawerState?.selectedEvaluator ?? null,
-    );
+  const [selectedEvaluator, setSelectedEvaluator] = useState<EvaluatorWithFields | null>(
+    () => onlineEvaluationDrawerState?.selectedEvaluator ?? null,
+  );
   const [mappings, setMappings] = useState<Record<string, UIFieldMapping>>(
     () => onlineEvaluationDrawerState?.mappings ?? {},
   );
@@ -369,18 +361,13 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     const optionalFields = selectedEvaluator.fields
       .filter((f) => f.optional)
       .map((f) => f.identifier);
-    return validateEvaluatorMappingsWithFields(
-      requiredFields,
-      optionalFields,
-      mappings,
-    );
+    return validateEvaluatorMappingsWithFields(requiredFields, optionalFields, mappings);
   }, [selectedEvaluator, mappings]);
 
   // For backward compatibility with existing code
   const pendingFields = mappingValidation.missingRequiredFields;
   // Invalid if: required fields missing OR no fields mapped (when there are fields)
-  const hasPendingMappings =
-    selectedEvaluator !== null && !mappingValidation.isValid;
+  const hasPendingMappings = selectedEvaluator !== null && !mappingValidation.isValid;
 
   // Track if we've already loaded the monitor data (to prevent re-loading on remount)
   const monitorDataLoadedRef = useRef(false);
@@ -393,8 +380,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     // Reset when: no persisted state, OR stale state from a previous abandoned session.
     // Stale state = module-level state exists but we're NOT returning from a flow sub-drawer
     // (the drawer stack would have "onlineEvaluation" if we're returning from evaluator list/editor).
-    const hasStaleState =
-      !!onlineEvaluationDrawerState && !isInActiveEvaluationFlow();
+    const hasStaleState = !!onlineEvaluationDrawerState && !isInActiveEvaluationFlow();
     if (
       !prevIsOpenRef.current &&
       isOpen &&
@@ -449,11 +435,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   // Clear persisted state when drawer truly closes (via close button, not navigation)
   const handleClose = useCallback(() => {
     if (hasUnsavedChanges) {
-      if (
-        !window.confirm(
-          "You have unsaved changes. Are you sure you want to close?",
-        )
-      ) {
+      if (!window.confirm("You have unsaved changes. Are you sure you want to close?")) {
         return;
       }
     }
@@ -488,11 +470,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       const monitorSample = monitorQuery.data.sample;
       const monitorPreconditions =
         (monitorQuery.data.preconditions as CheckPrecondition[]) ?? [];
-      const monitorThreadIdleTimeout =
-        monitorQuery.data.threadIdleTimeout ?? null;
+      const monitorThreadIdleTimeout = monitorQuery.data.threadIdleTimeout ?? null;
       // Load level from monitor data (defaults to "trace" for backward compatibility)
-      const monitorLevel =
-        (monitorQuery.data.level as EvaluationLevel) ?? "trace";
+      const monitorLevel = (monitorQuery.data.level as EvaluationLevel) ?? "trace";
 
       // Reset form with loaded data
       form.reset({
@@ -504,8 +484,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       });
 
       // Load existing mappings
-      const existingMappings = monitorQuery.data
-        .mappings as MappingState | null;
+      const existingMappings = monitorQuery.data.mappings as MappingState | null;
       if (existingMappings?.mapping) {
         const uiMappings = deserializeMappingStateToUI(
           existingMappings,
@@ -581,14 +560,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         };
       }
     }
-  }, [
-    pendingEvaluatorQuery.data,
-    pendingEvaluatorId,
-    name,
-    level,
-    form,
-    markDirty,
-  ]);
+  }, [pendingEvaluatorQuery.data, pendingEvaluatorId, name, level, form, markDirty]);
 
   // Handle mapping change from evaluator editor
   // IMPORTANT: This persists to module-level state FIRST because OnlineEvaluationDrawer
@@ -615,9 +587,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       setMappings((prev) => {
         return mapping
           ? { ...prev, [identifier]: mapping }
-          : Object.fromEntries(
-              Object.entries(prev).filter(([k]) => k !== identifier),
-            );
+          : Object.fromEntries(Object.entries(prev).filter(([k]) => k !== identifier));
       });
 
       // Mark as dirty since user changed mappings
@@ -976,9 +946,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       : selectedEvaluator.type === "code"
         ? `code/${selectedEvaluator.id}`
         : (evaluatorConfig?.evaluatorType ?? "langevals/basic");
-    const settings = evaluatorSettingsSchema.parse(
-      evaluatorConfig?.settings ?? {},
-    );
+    const settings = evaluatorSettingsSchema.parse(evaluatorConfig?.settings ?? {});
 
     // Convert UIFieldMapping to MappingState format
     const mappingState = serializeMappingsToMappingState(mappings);
@@ -1032,11 +1000,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
   const canSave =
-    !!level &&
-    !!selectedEvaluator &&
-    !!name.trim() &&
-    !isLoading &&
-    !hasPendingMappings;
+    !!level && !!selectedEvaluator && !!name.trim() && !isLoading && !hasPendingMappings;
 
   // Run on text
   const runOnText =
@@ -1176,10 +1140,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                 label="Name"
                 helper="A descriptive name for this online evaluation"
               >
-                <Input
-                  {...form.register("name")}
-                  placeholder="Enter evaluation name"
-                />
+                <Input {...form.register("name")} placeholder="Enter evaluation name" />
               </HorizontalFormControl>
             )}
 
@@ -1197,8 +1158,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                 helper="Only run this evaluation when certain conditions are met"
               >
                 <VStack align="start" gap={3}>
-                  {isDefaultOnlyPrecondition(preconditions) &&
-                  !preconditionsExpanded ? (
+                  {isDefaultOnlyPrecondition(preconditions) && !preconditionsExpanded ? (
                     <>
                       <Text color="gray.500" fontStyle="italic">
                         This evaluation will run on every application trace
@@ -1212,8 +1172,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                       {preconditions.map((precondition, index) => {
                         const currentField =
                           precondition.field as CheckPreconditionFields;
-                        const allowedRules =
-                          getAllowedRulesForField(currentField);
+                        const allowedRules = getAllowedRulesForField(currentField);
                         const valueType = getFieldValueType(currentField);
                         const keyInfo = fieldRequiresKey(currentField);
 
@@ -1243,19 +1202,13 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                               >
                                 <X size={16} />
                               </Button>
-                              <SmallLabel>
-                                {index === 0 ? "When" : "and"}
-                              </SmallLabel>
+                              <SmallLabel>{index === 0 ? "When" : "and"}</SmallLabel>
                               <HStack gap={2} flexWrap="wrap">
                                 <NativeSelect.Root minWidth="fit-content">
                                   <NativeSelect.Field
                                     value={precondition.field}
                                     onChange={(e) =>
-                                      updatePrecondition(
-                                        index,
-                                        "field",
-                                        e.target.value,
-                                      )
+                                      updatePrecondition(index, "field", e.target.value)
                                     }
                                   >
                                     {fieldGroups.map((group) => (
@@ -1278,11 +1231,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                                   <Input
                                     value={precondition.key ?? ""}
                                     onChange={(e) =>
-                                      updatePrecondition(
-                                        index,
-                                        "key",
-                                        e.target.value,
-                                      )
+                                      updatePrecondition(index, "key", e.target.value)
                                     }
                                     placeholder={keyInfo.label}
                                     minWidth="120px"
@@ -1294,11 +1243,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                                   <NativeSelect.Field
                                     value={precondition.rule}
                                     onChange={(e) =>
-                                      updatePrecondition(
-                                        index,
-                                        "rule",
-                                        e.target.value,
-                                      )
+                                      updatePrecondition(index, "rule", e.target.value)
                                     }
                                   >
                                     {allowedRules.map((rule) => (
@@ -1316,11 +1261,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                                     <NativeSelect.Field
                                       value={precondition.value}
                                       onChange={(e) =>
-                                        updatePrecondition(
-                                          index,
-                                          "value",
-                                          e.target.value,
-                                        )
+                                        updatePrecondition(index, "value", e.target.value)
                                       }
                                     >
                                       <option value="true">true</option>
@@ -1336,11 +1277,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                                     <Input
                                       value={precondition.value}
                                       onChange={(e) =>
-                                        updatePrecondition(
-                                          index,
-                                          "value",
-                                          e.target.value,
-                                        )
+                                        updatePrecondition(index, "value", e.target.value)
                                       }
                                       placeholder={
                                         precondition.rule.includes("regex")
@@ -1360,8 +1297,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                       })}
                       <Text color="gray.500" fontStyle="italic">
                         This evaluation will run on {runOnText}
-                        {preconditions.length > 0 &&
-                          " matching the preconditions"}
+                        {preconditions.length > 0 && " matching the preconditions"}
                       </Text>
                       <Button variant="outline" onClick={addPrecondition}>
                         Add Precondition
@@ -1422,11 +1358,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
               >
                 <NativeSelect.Root width="250px">
                   <NativeSelect.Field
-                    value={
-                      threadIdleTimeout === null
-                        ? ""
-                        : String(threadIdleTimeout)
-                    }
+                    value={threadIdleTimeout === null ? "" : String(threadIdleTimeout)}
                     onChange={(e) => {
                       const val = e.target.value;
                       form.setValue(
@@ -1462,9 +1394,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
               colorPalette="blue"
               onClick={handleSave}
               disabled={!canSave}
-              title={
-                hasPendingMappings ? "Complete all mappings first" : undefined
-              }
+              title={hasPendingMappings ? "Complete all mappings first" : undefined}
             >
               {isLoading && <Spinner size="sm" marginRight={2} />}
               {monitorId ? "Save Changes" : "Create Online Evaluation"}

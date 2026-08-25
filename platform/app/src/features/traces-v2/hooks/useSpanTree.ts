@@ -1,17 +1,10 @@
-import {
-  keepPreviousData,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { applyOverlayToSpanTreeNodes } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
-import {
-  asSharedQueryResult,
-  useSharedTrace,
-} from "../context/SharedTraceContext";
+import { asSharedQueryResult, useSharedTrace } from "../context/SharedTraceContext";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 import {
   mergeSpanTreeDelta,
@@ -35,9 +28,7 @@ export function useSpanTreeCanonical() {
   // `span.stored` event and the merge happens push-style, so a timer would be
   // pure duplication; while SSE is down there is nothing to push, so it falls
   // back to an interval.
-  const sseConnected = useSseStatusStore(
-    (s) => s.sseConnectionState === "connected",
-  );
+  const sseConnected = useSseStatusStore((s) => s.sseConnectionState === "connected");
   const utils = api.useUtils();
   const queryClient = useQueryClient();
 
@@ -86,11 +77,7 @@ export function useSpanTreeCanonical() {
       // exists to avoid. Until the walk lands, the main query is the source of
       // truth (and its retries have no high-water mark to poll from anyway).
       enabled:
-        isReady &&
-        isLive &&
-        !shared &&
-        tree !== undefined &&
-        !treeQuery.isFetching,
+        isReady && isLive && !shared && tree !== undefined && !treeQuery.isFetching,
       // Only when SSE can't push. With SSE up, `useTraceFreshness` invalidates
       // this query per `span.stored` batch, which refetches it on the spot.
       refetchInterval: sseConnected ? false : LIVE_REFETCH_MS,
@@ -185,8 +172,7 @@ export function useSpanTreeWithCaptured() {
   );
 
   const display = useMemo(
-    () =>
-      displayData === nodes ? captured : { ...captured, data: displayData },
+    () => (displayData === nodes ? captured : { ...captured, data: displayData }),
     [captured, displayData, nodes],
   );
 

@@ -25,10 +25,9 @@ import {
   updateEvaluatorInputSchema,
 } from "./schemas";
 
-const apiResponseEvaluatorWithPlatformUrlSchema =
-  apiResponseEvaluatorSchema.extend({
-    platformUrl: z.string().url(),
-  });
+const apiResponseEvaluatorWithPlatformUrlSchema = apiResponseEvaluatorSchema.extend({
+  platformUrl: z.string().url(),
+});
 
 const logger = createLogger("langwatch:api:evaluators");
 
@@ -58,9 +57,7 @@ export function registerEvaluatorRoutes(
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(
-                z.array(apiResponseEvaluatorWithPlatformUrlSchema),
-              ),
+              schema: resolver(z.array(apiResponseEvaluatorWithPlatformUrlSchema)),
             },
           },
         },
@@ -70,10 +67,7 @@ export function registerEvaluatorRoutes(
       const service = c.get("evaluatorService");
       const project = c.get("project");
 
-      logger.info(
-        { projectId: project.id },
-        "Getting all evaluators for project",
-      );
+      logger.info({ projectId: project.id }, "Getting all evaluators for project");
 
       const evaluators = await service.getAllWithFields({
         projectId: project.id,
@@ -189,10 +183,7 @@ export function registerEvaluatorRoutes(
       const project = c.get("project");
       const data = c.req.valid("json");
 
-      logger.info(
-        { projectId: project.id, name: data.name },
-        "Creating evaluator",
-      );
+      logger.info({ projectId: project.id, name: data.name }, "Creating evaluator");
 
       const [resolvedDefault, resolvedEmbedding] = await Promise.all([
         c.app.modelProviders.tryGetResolvedDefault({
@@ -285,10 +276,7 @@ export function registerEvaluatorRoutes(
       const { id } = c.req.param();
       const data = c.req.valid("json");
 
-      logger.info(
-        { projectId: project.id, evaluatorId: id },
-        "Updating evaluator",
-      );
+      logger.info({ projectId: project.id, evaluatorId: id }, "Updating evaluator");
 
       // Verify evaluator exists
       const existing = await service.tryGetById({
@@ -308,10 +296,7 @@ export function registerEvaluatorRoutes(
           evaluatorType?: string;
         } | null;
         const existingType = existingConfig?.evaluatorType;
-        if (
-          existingType !== undefined &&
-          data.config.evaluatorType !== existingType
-        ) {
+        if (existingType !== undefined && data.config.evaluatorType !== existingType) {
           throw new HTTPException(400, {
             message: `evaluatorType cannot be changed after creation. Current type: "${existingType}"`,
           });
@@ -325,8 +310,7 @@ export function registerEvaluatorRoutes(
       }
       if (data.config !== undefined) {
         // Merge config: keep existing config values, override with provided ones
-        const existingConfig =
-          (existing.config as Record<string, unknown>) ?? {};
+        const existingConfig = (existing.config as Record<string, unknown>) ?? {};
         updateData.config = {
           ...existingConfig,
           ...data.config,
@@ -391,10 +375,7 @@ export function registerEvaluatorRoutes(
       const project = c.get("project");
       const { id } = c.req.param();
 
-      logger.info(
-        { projectId: project.id, evaluatorId: id },
-        "Archiving evaluator",
-      );
+      logger.info({ projectId: project.id, evaluatorId: id }, "Archiving evaluator");
 
       // Verify evaluator exists
       const existing = await service.tryGetById({

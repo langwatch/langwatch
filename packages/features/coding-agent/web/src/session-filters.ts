@@ -29,9 +29,7 @@ export function matchesSessionSearch({
   const digits = needle.startsWith("#") ? needle.slice(1) : needle;
   if (
     /^\d+$/.test(digits) &&
-    row.pullRequests.some((pullRequest) =>
-      String(pullRequest.number).includes(digits),
-    )
+    row.pullRequests.some((pullRequest) => String(pullRequest.number).includes(digits))
   ) {
     return true;
   }

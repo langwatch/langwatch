@@ -132,9 +132,7 @@ describe("<SearchBar /> unified error banner", () => {
 
     it("shows no expand chevron (parse errors have no structured details)", () => {
       renderSearchBar();
-      expect(
-        screen.queryByLabelText(/expand error details/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/expand error details/i)).not.toBeInTheDocument();
     });
 
     it("shows a dismiss X button", () => {
@@ -193,9 +191,7 @@ describe("<SearchBar /> unified error banner", () => {
 
     it("shows an expand chevron because details are present", () => {
       renderSearchBar();
-      expect(
-        screen.getByLabelText(/expand error details/i),
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/expand error details/i)).toBeInTheDocument();
     });
 
     it("does not show the AiPromptInput inline error badge", () => {
@@ -222,9 +218,7 @@ describe("<SearchBar /> unified error banner", () => {
         renderSearchBar();
         const user = userEvent.setup();
         await user.click(screen.getByLabelText(/expand error details/i));
-        expect(
-          screen.getByLabelText(/collapse error details/i),
-        ).toBeInTheDocument();
+        expect(screen.getByLabelText(/collapse error details/i)).toBeInTheDocument();
       });
     });
 
@@ -250,19 +244,13 @@ describe("<SearchBar /> unified error banner", () => {
 
     it("renders the generic unknown copy, not the raw failure", () => {
       renderSearchBar();
-      expect(
-        screen.getByText(registryCopy(simpleAiError.cause)),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText(/connection reset by peer/i),
-      ).not.toBeInTheDocument();
+      expect(screen.getByText(registryCopy(simpleAiError.cause))).toBeInTheDocument();
+      expect(screen.queryByText(/connection reset by peer/i)).not.toBeInTheDocument();
     });
 
     it("shows no expand chevron when there are no details", () => {
       renderSearchBar();
-      expect(
-        screen.queryByLabelText(/expand error details/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/expand error details/i)).not.toBeInTheDocument();
     });
   });
 

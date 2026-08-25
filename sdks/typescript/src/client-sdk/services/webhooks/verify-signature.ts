@@ -143,8 +143,7 @@ function digestsMatch(expected: string, candidate: string): boolean {
 
 function signedPayload(timestamp: number, body: string | Uint8Array): Buffer {
   const prefix = Buffer.from(`${timestamp}.`, "utf8");
-  const bytes =
-    typeof body === "string" ? Buffer.from(body, "utf8") : Buffer.from(body);
+  const bytes = typeof body === "string" ? Buffer.from(body, "utf8") : Buffer.from(body);
   return Buffer.concat([prefix, bytes]);
 }
 
@@ -181,9 +180,7 @@ function signedPayload(timestamp: number, body: string | Uint8Array): Buffer {
  * would let a receiver that lost its secret quietly refuse every delivery as
  * if the sender were at fault.
  */
-export function verifyWebhookSignature(
-  options: VerifyWebhookSignatureOptions,
-): void {
+export function verifyWebhookSignature(options: VerifyWebhookSignatureOptions): void {
   const secrets = (
     typeof options.secret === "string" ? [options.secret] : options.secret
   ).filter((secret) => typeof secret === "string" && secret.length > 0);

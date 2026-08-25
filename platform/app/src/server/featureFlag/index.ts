@@ -4,10 +4,7 @@ export {
   FeatureFlagStorePostgres,
   getFeatureFlagStore,
 } from "./featureFlagStore.postgres";
-export {
-  FRONTEND_FEATURE_FLAGS,
-  type FrontendFeatureFlag,
-} from "./frontendFeatureFlags";
+export { FRONTEND_FEATURE_FLAGS, type FrontendFeatureFlag } from "./frontendFeatureFlags";
 export type {
   FeatureFlagDefinition,
   FeatureFlagFamily,
@@ -35,7 +32,4 @@ export {
   parseRules,
   resolveEffectiveForListing,
 } from "./rules";
-export type {
-  FeatureFlagEvaluateOptions,
-  FeatureFlagServiceInterface,
-} from "./types";
+export type { FeatureFlagEvaluateOptions, FeatureFlagServiceInterface } from "./types";

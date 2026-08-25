@@ -37,7 +37,9 @@ export class EvaluatorService extends EvaluatorServiceContract {
     return new EvaluatorService(options);
   }
 
-  private constructor(private readonly options: EvaluatorServiceOptions) { super(); }
+  private constructor(private readonly options: EvaluatorServiceOptions) {
+    super();
+  }
 
   async tryGetById(input: { id: string; projectId: string }): Promise<Evaluator | null> {
     return this.options.repository.tryFindById(input);
@@ -47,11 +49,17 @@ export class EvaluatorService extends EvaluatorServiceContract {
     if (!evaluator) throw new EvaluatorNotFoundError(input.id);
     return evaluator;
   }
-  async tryGetByIdWithFields(input: { id: string; projectId: string }): Promise<EvaluatorWithFields | null> {
+  async tryGetByIdWithFields(input: {
+    id: string;
+    projectId: string;
+  }): Promise<EvaluatorWithFields | null> {
     const evaluator = await this.tryGetById(input);
     return evaluator ? this.enrichWithFields(evaluator) : null;
   }
-  async getByIdWithFields(input: { id: string; projectId: string }): Promise<EvaluatorWithFields> {
+  async getByIdWithFields(input: {
+    id: string;
+    projectId: string;
+  }): Promise<EvaluatorWithFields> {
     return this.enrichWithFields(await this.getById(input));
   }
   tryGetBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | null> {
@@ -62,7 +70,10 @@ export class EvaluatorService extends EvaluatorServiceContract {
     if (!evaluator) throw new EvaluatorNotFoundError(input.slug);
     return evaluator;
   }
-  tryGetByWorkflow(input: { workflowId: string; projectId: string }): Promise<Evaluator | null> {
+  tryGetByWorkflow(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<Evaluator | null> {
     return this.options.repository.tryFindByWorkflow(input);
   }
   getAll(input: { projectId: string }): Promise<Evaluator[]> {
@@ -97,16 +108,23 @@ export class EvaluatorService extends EvaluatorServiceContract {
   async createWithDefaults(input: EvaluatorCreateInput): Promise<Evaluator> {
     const config = evaluatorConfigSchema.parse(input.config);
     const evaluatorConfig = evaluatorConfigSchema.safeParse(config);
-    const evaluatorType = evaluatorConfig.success && typeof evaluatorConfig.data.evaluatorType === "string"
-      ? evaluatorConfig.data.evaluatorType
-      : undefined;
+    const evaluatorType =
+      evaluatorConfig.success && typeof evaluatorConfig.data.evaluatorType === "string"
+        ? evaluatorConfig.data.evaluatorType
+        : undefined;
     const definition = evaluatorType
       ? AVAILABLE_EVALUATORS[evaluatorType as keyof typeof AVAILABLE_EVALUATORS]
       : undefined;
     if (definition && input.type === "evaluator") {
       config.settings = {
-        ...getEvaluatorDefaultSettings(definition, input.resolved, this.options.fallbackModels),
-        ...(config.settings && typeof config.settings === "object" ? config.settings : {}),
+        ...getEvaluatorDefaultSettings(
+          definition,
+          input.resolved,
+          this.options.fallbackModels,
+        ),
+        ...(config.settings && typeof config.settings === "object"
+          ? config.settings
+          : {}),
       };
     }
     return this.create({ ...input, config });
@@ -137,15 +155,18 @@ export class EvaluatorService extends EvaluatorServiceContract {
     return this.options.repository.archive(input);
   }
 
-  private async enrichWithFields(
-    evaluator: Evaluator,
-  ): Promise<EvaluatorWithFields> {
+  private async enrichWithFields(evaluator: Evaluator): Promise<EvaluatorWithFields> {
     if (evaluator.type === "workflow" && evaluator.workflowId) {
-      const workflow = await this.options.workflows.getFields({ workflowId: evaluator.workflowId, projectId: evaluator.projectId });
+      const workflow = await this.options.workflows.getFields({
+        workflowId: evaluator.workflowId,
+        projectId: evaluator.projectId,
+      });
       return {
         ...evaluator,
         fields: workflow.fields,
-        outputFields: workflow.outputFields.length ? workflow.outputFields : [...standardEvaluatorOutputFields],
+        outputFields: workflow.outputFields.length
+          ? workflow.outputFields
+          : [...standardEvaluatorOutputFields],
         ...(workflow.workflowName ? { workflowName: workflow.workflowName } : {}),
         ...(workflow.workflowIcon ? { workflowIcon: workflow.workflowIcon } : {}),
       };
@@ -155,26 +176,57 @@ export class EvaluatorService extends EvaluatorServiceContract {
       return {
         ...evaluator,
         fields: config.success ? config.data.inputs : [],
-        outputFields: config.success ? config.data.outputs : [...standardEvaluatorOutputFields],
+        outputFields: config.success
+          ? config.data.outputs
+          : [...standardEvaluatorOutputFields],
       };
     }
     const evaluatorConfig = evaluatorConfigSchema.safeParse(evaluator.config);
-    const evaluatorType = evaluatorConfig.success && typeof evaluatorConfig.data.evaluatorType === "string"
-      ? evaluatorConfig.data.evaluatorType
+    const evaluatorType =
+      evaluatorConfig.success && typeof evaluatorConfig.data.evaluatorType === "string"
+        ? evaluatorConfig.data.evaluatorType
+        : undefined;
+    const definition = evaluatorType
+      ? AVAILABLE_EVALUATORS[evaluatorType as keyof typeof AVAILABLE_EVALUATORS]
       : undefined;
-    const definition = evaluatorType ? AVAILABLE_EVALUATORS[evaluatorType as keyof typeof AVAILABLE_EVALUATORS] : undefined;
     const fields: EvaluatorField[] = definition
-      ? [...definition.requiredFields.map((identifier) => ({ identifier, type: fieldType(identifier) })), ...definition.optionalFields.map((identifier) => ({ identifier, type: fieldType(identifier), optional: true }))]
+      ? [
+          ...definition.requiredFields.map((identifier) => ({
+            identifier,
+            type: fieldType(identifier),
+          })),
+          ...definition.optionalFields.map((identifier) => ({
+            identifier,
+            type: fieldType(identifier),
+            optional: true,
+          })),
+        ]
       : [];
     const outputFields = definition
-      ? Object.entries(definition.result).map(([identifier, result]) => ({ identifier, type: identifier === "score" ? "float" : identifier === "passed" ? "bool" : "str", ...(result ? {} : {}) }))
+      ? Object.entries(definition.result).map(([identifier, result]) => ({
+          identifier,
+          type:
+            identifier === "score" ? "float" : identifier === "passed" ? "bool" : "str",
+          ...(result ? {} : {}),
+        }))
       : [...standardEvaluatorOutputFields];
-    return { ...evaluator, fields, outputFields: outputFields.length ? outputFields : [...standardEvaluatorOutputFields] };
+    return {
+      ...evaluator,
+      fields,
+      outputFields: outputFields.length
+        ? outputFields
+        : [...standardEvaluatorOutputFields],
+    };
   }
 
   async getWorkflowFields(input: { id: string; projectId: string }): Promise<{
-    evaluatorId: string; evaluatorType: string; workflowId?: string; workflowName?: string;
-    workflowIcon?: string; fields: EvaluatorField[]; outputFields: EvaluatorField[];
+    evaluatorId: string;
+    evaluatorType: string;
+    workflowId?: string;
+    workflowName?: string;
+    workflowIcon?: string;
+    fields: EvaluatorField[];
+    outputFields: EvaluatorField[];
   }> {
     const evaluator = await this.getById(input);
     if (evaluator.type !== "workflow" || !evaluator.workflowId) {
@@ -185,9 +237,14 @@ export class EvaluatorService extends EvaluatorServiceContract {
         outputFields: [...standardEvaluatorOutputFields],
       };
     }
-    const workflow = await this.options.workflows.getFields({ workflowId: evaluator.workflowId, projectId: input.projectId });
+    const workflow = await this.options.workflows.getFields({
+      workflowId: evaluator.workflowId,
+      projectId: input.projectId,
+    });
     return {
-      evaluatorId: evaluator.id, evaluatorType: evaluator.type, workflowId: evaluator.workflowId,
+      evaluatorId: evaluator.id,
+      evaluatorType: evaluator.type,
+      workflowId: evaluator.workflowId,
       ...(workflow.workflowName ? { workflowName: workflow.workflowName } : {}),
       ...(workflow.workflowIcon ? { workflowIcon: workflow.workflowIcon } : {}),
       fields: workflow.fields,
@@ -197,44 +254,109 @@ export class EvaluatorService extends EvaluatorServiceContract {
     };
   }
 
-  async getCopies(input: { evaluatorId: string; projectId: string }): Promise<EvaluatorCopy[]> {
+  async getCopies(input: {
+    evaluatorId: string;
+    projectId: string;
+  }): Promise<EvaluatorCopy[]> {
     await this.getById({ id: input.evaluatorId, projectId: input.projectId });
     return this.options.repository.findCopies({ evaluatorId: input.evaluatorId });
   }
 
-  async pushToCopies(input: { projectId: string; evaluatorId: string; copyIds?: string[]; allowedProjectIds?: string[] }): Promise<{ pushedTo: number; selectedCopies: number }> {
-    const source = await this.getById({ id: input.evaluatorId, projectId: input.projectId });
-    const copies = await this.options.repository.findCopies({ evaluatorId: input.evaluatorId });
-    const selected = input.copyIds ? copies.filter((copy) => input.copyIds?.includes(copy.id)) : copies;
+  async pushToCopies(input: {
+    projectId: string;
+    evaluatorId: string;
+    copyIds?: string[];
+    allowedProjectIds?: string[];
+  }): Promise<{ pushedTo: number; selectedCopies: number }> {
+    const source = await this.getById({
+      id: input.evaluatorId,
+      projectId: input.projectId,
+    });
+    const copies = await this.options.repository.findCopies({
+      evaluatorId: input.evaluatorId,
+    });
+    const selected = input.copyIds
+      ? copies.filter((copy) => input.copyIds?.includes(copy.id))
+      : copies;
     if (!selected.length) throw new EvaluatorCopySelectionError(input.evaluatorId);
-    const allowed = input.allowedProjectIds ? new Set(input.allowedProjectIds) : undefined;
-    const writable = allowed ? selected.filter((copy) => allowed.has(copy.projectId)) : selected;
+    const allowed = input.allowedProjectIds
+      ? new Set(input.allowedProjectIds)
+      : undefined;
+    const writable = allowed
+      ? selected.filter((copy) => allowed.has(copy.projectId))
+      : selected;
     const config = evaluatorConfigSchema.safeParse(source.config);
-    await Promise.all(writable.map((copy) => this.options.repository.updateNameAndConfig({ id: copy.id, projectId: copy.projectId, name: source.name, config: config.success ? config.data : {} })));
+    await Promise.all(
+      writable.map((copy) =>
+        this.options.repository.updateNameAndConfig({
+          id: copy.id,
+          projectId: copy.projectId,
+          name: source.name,
+          config: config.success ? config.data : {},
+        }),
+      ),
+    );
     return { pushedTo: writable.length, selectedCopies: selected.length };
   }
 
-  async syncFromSource(input: { projectId: string; evaluatorId: string }): Promise<{ ok: true }> {
-    const copy = await this.getById({ id: input.evaluatorId, projectId: input.projectId });
-    const { source } = await this.getCopySource({ projectId: input.projectId, evaluatorId: input.evaluatorId });
+  async syncFromSource(input: {
+    projectId: string;
+    evaluatorId: string;
+  }): Promise<{ ok: true }> {
+    const copy = await this.getById({
+      id: input.evaluatorId,
+      projectId: input.projectId,
+    });
+    const { source } = await this.getCopySource({
+      projectId: input.projectId,
+      evaluatorId: input.evaluatorId,
+    });
     const config = evaluatorConfigSchema.safeParse(source.config);
-    await this.options.repository.updateNameAndConfig({ id: copy.id, projectId: input.projectId, name: source.name, config: config.success ? config.data : {} });
+    await this.options.repository.updateNameAndConfig({
+      id: copy.id,
+      projectId: input.projectId,
+      name: source.name,
+      config: config.success ? config.data : {},
+    });
     return { ok: true };
   }
 
-  async getCopySource(input: { projectId: string; evaluatorId: string }): Promise<{ copy: Evaluator; source: Evaluator }> {
-    const copy = await this.getById({ id: input.evaluatorId, projectId: input.projectId });
+  async getCopySource(input: {
+    projectId: string;
+    evaluatorId: string;
+  }): Promise<{ copy: Evaluator; source: Evaluator }> {
+    const copy = await this.getById({
+      id: input.evaluatorId,
+      projectId: input.projectId,
+    });
     if (!copy.copiedFromEvaluatorId) throw new EvaluatorIsNotCopyError(copy.id);
-    const source = await this.options.repository.tryFindByIdOnly(copy.copiedFromEvaluatorId);
+    const source = await this.options.repository.tryFindByIdOnly(
+      copy.copiedFromEvaluatorId,
+    );
     if (!source) throw new EvaluatorSourceNotFoundError(copy.copiedFromEvaluatorId);
     return { copy, source };
   }
 
-  async getHistory(input: { evaluatorId: string; projectId: string }): Promise<EvaluatorHistoryEntry[]> {
+  async getHistory(input: {
+    evaluatorId: string;
+    projectId: string;
+  }): Promise<EvaluatorHistoryEntry[]> {
     if (!this.options.auditLog) return [];
     const logs = await this.options.auditLog.history({ ...input, limit: 100 });
-    const users = await this.options.auditLog.users({ userIds: [...new Set(logs.map((log) => log.userId).filter((id): id is string => Boolean(id)))] });
+    const users = await this.options.auditLog.users({
+      userIds: [
+        ...new Set(
+          logs.map((log) => log.userId).filter((id): id is string => Boolean(id)),
+        ),
+      ],
+    });
     const usersById = new Map(users.map((user) => [user.id, user]));
-    return logs.map((log) => ({ id: log.id, action: log.action, createdAt: log.createdAt, args: log.args, user: log.userId ? usersById.get(log.userId) ?? null : null }));
+    return logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      createdAt: log.createdAt,
+      args: log.args,
+      user: log.userId ? (usersById.get(log.userId) ?? null) : null,
+    }));
   }
 }

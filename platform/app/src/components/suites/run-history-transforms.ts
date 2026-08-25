@@ -181,11 +181,7 @@ export function groupRunsByBatchId({
  * Returns groups sorted by timestamp descending (most recent first).
  * Uses the scenario's name as the group label.
  */
-export function groupRunsByScenarioId({
-  runs,
-}: {
-  runs: ScenarioRunData[];
-}): RunGroup[] {
+export function groupRunsByScenarioId({ runs }: { runs: ScenarioRunData[] }): RunGroup[] {
   const scenarioMap = new Map<string, ScenarioRunData[]>();
 
   for (const run of runs) {
@@ -288,11 +284,7 @@ export function computeBatchRunSummary({
  *   - simulation.clickhouse.repository.ts → getSetSummaries() (sidebar query)
  *   - SuiteSidebar.tsx → RunSummaryLine() (sidebar display)
  */
-export function computeGroupSummary({
-  group,
-}: {
-  group: RunGroup;
-}): RunGroupSummary {
+export function computeGroupSummary({ group }: { group: RunGroup }): RunGroupSummary {
   let passedCount = 0;
   let failedCount = 0;
   let stalledCount = 0;
@@ -324,15 +316,10 @@ export function computeGroupSummary({
   }
 
   const completedCount = passedCount + failedCount;
-  const settledCount =
-    passedCount + failedCount + stalledCount + cancelledCount;
+  const settledCount = passedCount + failedCount + stalledCount + cancelledCount;
   const totalCount = group.scenarioRuns.length;
   const passRate =
-    settledCount > 0
-      ? (passedCount / settledCount) * 100
-      : totalCount > 0
-        ? null
-        : 0;
+    settledCount > 0 ? (passedCount / settledCount) * 100 : totalCount > 0 ? null : 0;
 
   let totalCost = 0;
   let totalDurationMs = 0;
@@ -504,14 +491,9 @@ export function computeRunHistoryTotals({
   for (const run of runs) {
     const category = categorizeRunStatus(run.status);
     if (category === "success") passedCount++;
-    else if (
-      category === "failure" ||
-      category === "stalled" ||
-      category === "cancelled"
-    )
+    else if (category === "failure" || category === "stalled" || category === "cancelled")
       failedCount++;
-    else if (category === "queued" || category === "in_progress")
-      pendingCount++;
+    else if (category === "queued" || category === "in_progress") pendingCount++;
   }
 
   return {

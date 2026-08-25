@@ -1,11 +1,7 @@
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import type { DeepPartial } from "~/utils/types";
 import { buildPoint, type PreparedMetricPoint } from "./canonical/buildPoint";
-import {
-  candidatePointCount,
-  METRIC_KIND_DATA_KEY,
-  metricKind,
-} from "./canonical/kinds";
+import { candidatePointCount, METRIC_KIND_DATA_KEY, metricKind } from "./canonical/kinds";
 import {
   type PiiRedactionLevel,
   type RedactionService,
@@ -125,9 +121,7 @@ async function prepareMetric({
       );
     } catch (error) {
       rejections.reject(
-        `metric ${label}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `metric ${label}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

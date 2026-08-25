@@ -55,12 +55,7 @@ type SourceImport = {
 
 type LegacyBaselineDocument = {
   version: 1;
-  edges: Partial<
-    Record<
-      LegacyApplicationBoundaryKind,
-      Record<string, string[]>
-    >
-  >;
+  edges: Partial<Record<LegacyApplicationBoundaryKind, Record<string, string[]>>>;
 };
 
 const LEGACY_KINDS: readonly LegacyApplicationBoundaryKind[] = [
@@ -131,10 +126,7 @@ function importsIn(file: string): SourceImport[] {
       acceptsString = false;
       continue;
     }
-    if (
-      token === ts.SyntaxKind.Identifier &&
-      scanner.getTokenText() === "require"
-    ) {
+    if (token === ts.SyntaxKind.Identifier && scanner.getTokenText() === "require") {
       mode = "require";
       acceptsString = true;
       continue;
@@ -170,7 +162,8 @@ function importsIn(file: string): SourceImport[] {
     }
   }
   return found.sort(
-    (left, right) => left.line - right.line || left.specifier.localeCompare(right.specifier),
+    (left, right) =>
+      left.line - right.line || left.specifier.localeCompare(right.specifier),
   );
 }
 
@@ -190,9 +183,7 @@ function packageForSpecifier(
   specifier: string,
 ): ClassifiedPackage | undefined {
   return packages
-    .filter(
-      (pkg) => specifier === pkg.name || specifier.startsWith(`${pkg.name}/`),
-    )
+    .filter((pkg) => specifier === pkg.name || specifier.startsWith(`${pkg.name}/`))
     .sort((left, right) => right.name.length - left.name.length)[0];
 }
 
@@ -212,8 +203,7 @@ function packageForPhysicalApplicationSpecifier(
   const match = specifier.match(/^(?:\.\/|\.\.\/)*apps\/(ui|api|worker|server)(?:\/|$)/);
   if (!match) return undefined;
   return packages.find(
-    (pkg) =>
-      pkg.kind === "application" && pkg.applicationRole === match[1],
+    (pkg) => pkg.kind === "application" && pkg.applicationRole === match[1],
   );
 }
 
@@ -255,12 +245,9 @@ function lintClassifiedSourceImports(
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const sourcePackages = packages.filter((pkg) =>
-    [
-      "application",
-      "dev-runtime",
-      "enterprise-root",
-      "enterprise-composition",
-    ].includes(pkg.kind),
+    ["application", "dev-runtime", "enterprise-root", "enterprise-composition"].includes(
+      pkg.kind,
+    ),
   );
 
   for (const pkg of sourcePackages) {
@@ -360,9 +347,7 @@ function lintCompositionSourceShape(
     ) {
       continue;
     }
-    const files = walkFiles(join(pkg.root, "src"), (file) =>
-      SOURCE_FILE.test(file),
-    );
+    const files = walkFiles(join(pkg.root, "src"), (file) => SOURCE_FILE.test(file));
     for (const file of files) {
       const relativeFile = workspacePath(join(pkg.root, "src"), file);
       if (!PRODUCT_IMPLEMENTATION_PATH.test(relativeFile)) continue;
@@ -451,8 +436,7 @@ function lintRuntimeConstructionImports(
 
   for (const role of ["api", "worker"] as const) {
     const application = packages.find(
-      (pkg) =>
-        pkg.kind === "application" && pkg.applicationRole === role,
+      (pkg) => pkg.kind === "application" && pkg.applicationRole === role,
     );
     if (!application || exportedSubpaths(application).has("./runtime")) {
       continue;
@@ -482,11 +466,7 @@ function legacyArea(legacyRoot: string, file: string): LegacyArea {
   ) {
     return "backend";
   }
-  if (
-    /^(?:generated|factories|test-utils|types|utils)(?:\/|$)/.test(
-      sourcePath,
-    )
-  ) {
+  if (/^(?:generated|factories|test-utils|types|utils)(?:\/|$)/.test(sourcePath)) {
     return "unknown";
   }
   return "browser";
@@ -571,10 +551,7 @@ export function collectLegacyApplicationBoundaryEdges(
 export function formatLegacyApplicationBoundaryBaseline(
   edges: readonly LegacyApplicationBoundaryEdge[],
 ): string {
-  const grouped = new Map<
-    LegacyApplicationBoundaryKind,
-    Map<string, string[]>
-  >();
+  const grouped = new Map<LegacyApplicationBoundaryKind, Map<string, string[]>>();
   for (const edge of [...edges].sort((left, right) =>
     legacyEdgeKey(left).localeCompare(legacyEdgeKey(right)),
   )) {
@@ -585,7 +562,7 @@ export function formatLegacyApplicationBoundaryBaseline(
     grouped.set(edge.kind, importers);
   }
 
-  const lines = ['{', '  "version": 1,', '  "edges": {'];
+  const lines = ["{", '  "version": 1,', '  "edges": {'];
   const populatedKinds = LEGACY_KINDS.filter((kind) => grouped.has(kind));
   for (const [kindIndex, kind] of populatedKinds.entries()) {
     lines.push(`    ${JSON.stringify(kind)}: {`);
@@ -658,11 +635,7 @@ function readLegacyBaseline(root: string): {
   }
   for (const kind of canonicalKinds) {
     const importers = document.edges[kind];
-    if (
-      typeof importers !== "object" ||
-      importers === null ||
-      Array.isArray(importers)
-    ) {
+    if (typeof importers !== "object" || importers === null || Array.isArray(importers)) {
       violations.push({
         policy: "application-migration-baseline",
         file: path,
@@ -675,9 +648,7 @@ function readLegacyBaseline(root: string): {
       importerKeys.some(
         (importer, index) =>
           importer !==
-          [...importerKeys].sort((left, right) => left.localeCompare(right))[
-            index
-          ],
+          [...importerKeys].sort((left, right) => left.localeCompare(right))[index],
       )
     ) {
       violations.push({
@@ -703,9 +674,7 @@ function readLegacyBaseline(root: string): {
       const sortedSpecifiers = [...specifiers].sort();
       if (
         new Set(specifiers).size !== specifiers.length ||
-        specifiers.some(
-          (specifier, index) => specifier !== sortedSpecifiers[index],
-        )
+        specifiers.some((specifier, index) => specifier !== sortedSpecifiers[index])
       ) {
         violations.push({
           policy: "application-migration-baseline",
@@ -729,9 +698,7 @@ function readLegacyBaseline(root: string): {
   return { baseline, violations };
 }
 
-function lintLegacyApplicationBoundaries(
-  root: string,
-): ArchitectureViolation[] {
+function lintLegacyApplicationBoundaries(root: string): ArchitectureViolation[] {
   const path = join(root, LEGACY_BASELINE_PATH);
   const { baseline, violations } = readLegacyBaseline(root);
   const actual = collectLegacyApplicationBoundaryEdges(root);
@@ -744,9 +711,7 @@ function lintLegacyApplicationBoundaries(
     });
   }
   const actualByKey = new Map(actual.map((edge) => [legacyEdgeKey(edge), edge]));
-  const baselineByKey = new Map(
-    baseline.map((edge) => [legacyEdgeKey(edge), edge]),
-  );
+  const baselineByKey = new Map(baseline.map((edge) => [legacyEdgeKey(edge), edge]));
 
   for (const edge of actual) {
     if (baselineByKey.has(legacyEdgeKey(edge))) continue;
@@ -783,8 +748,7 @@ function lintNewEnterpriseAliases(root: string): ArchitectureViolation[] {
         line: sourceImport.line,
         specifier: sourceImport.specifier,
         message: "The legacy @ee alias cannot be introduced outside platform/app.",
-        allowed:
-          "Import the owning @langwatch/enterprise-<feature>-<surface> package.",
+        allowed: "Import the owning @langwatch/enterprise-<feature>-<surface> package.",
       });
     }
   }
@@ -802,9 +766,6 @@ export function lintApplicationBoundaries(
     ...lintRuntimeConstructionImports(root, packages),
     ...(options?.legacyMigration === false
       ? []
-      : [
-          ...lintLegacyApplicationBoundaries(root),
-          ...lintNewEnterpriseAliases(root),
-        ]),
+      : [...lintLegacyApplicationBoundaries(root), ...lintNewEnterpriseAliases(root)]),
   ];
 }

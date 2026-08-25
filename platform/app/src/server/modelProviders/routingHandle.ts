@@ -60,9 +60,7 @@ export type RoutingHandleProblem = "shape" | "reserved";
  * That is a real operation: it releases the name for another provider in the
  * organization.
  */
-export function normalizeRoutingHandle(
-  input: string | null | undefined,
-): string | null {
+export function normalizeRoutingHandle(input: string | null | undefined): string | null {
   if (input == null) return null;
   const trimmed = input.trim().toLowerCase();
   return trimmed === "" ? null : trimmed;
@@ -91,14 +89,9 @@ export function sanitizeRoutingHandleInput(input: string): string {
  * Callers turn the problem into the customer-facing refusal; this function
  * stays free of copy so the same rule can be applied anywhere.
  */
-export function routingHandleProblem(
-  handle: string | null,
-): RoutingHandleProblem | null {
+export function routingHandleProblem(handle: string | null): RoutingHandleProblem | null {
   if (handle === null) return null;
-  if (
-    handle.length > ROUTING_HANDLE_MAX_LENGTH ||
-    !ROUTING_HANDLE_PATTERN.test(handle)
-  ) {
+  if (handle.length > ROUTING_HANDLE_MAX_LENGTH || !ROUTING_HANDLE_PATTERN.test(handle)) {
     return "shape";
   }
   if (RESERVED_ROUTING_HANDLES.has(handle)) return "reserved";

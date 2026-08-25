@@ -70,21 +70,15 @@ export function TraceOverflowMenu({
   // Queueing a trace for annotation is the same authenticated review work the
   // correction is, so the share view leaves it out rather than relying on the
   // reader happening to hold no permission on the project.
-  const canQueueForAnnotation =
-    !readOnly && hasPermission("annotations:create");
+  const canQueueForAnnotation = !readOnly && hasPermission("annotations:create");
   // Annotating a trace is review work, which is the permission external
   // reviewers hold, and it is the same one the correction write itself checks.
   // A sample preview trace is left out: it exists only to show an empty project
   // what a trace looks like, so a pass over one could never be saved.
   const canEditTrace =
-    !readOnly &&
-    !isPreviewTraceId(traceId) &&
-    hasPermission("annotations:update");
+    !readOnly && !isPreviewTraceId(traceId) && hasPermission("annotations:update");
 
-  const handleEditTrace = useCallback(
-    () => enterTraceEditMode(traceId),
-    [traceId],
-  );
+  const handleEditTrace = useCallback(() => enterTraceEditMode(traceId), [traceId]);
 
   const utils = api.useUtils();
   const pinQuery = api.pinnedTrace.getPin.useQuery(
@@ -106,8 +100,7 @@ export function TraceOverflowMenu({
       }
       toaster.create({ title: "Trace pinned", type: "success" });
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't pin trace" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't pin trace" }),
   });
 
   const unpinMutation = api.pinnedTrace.unpin.useMutation({
@@ -117,8 +110,7 @@ export function TraceOverflowMenu({
       }
       toaster.create({ title: "Trace unpinned", type: "success" });
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't unpin trace" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't unpin trace" }),
   });
 
   const handleTogglePin = useCallback(() => {
@@ -131,8 +123,7 @@ export function TraceOverflowMenu({
   }, [project, traceId, isPinned, pinMutation, unpinMutation]);
 
   const conversationTurns = useConversationTurns(conversationId);
-  const conversationTraceIds =
-    conversationTurns.data?.items.map((t) => t.traceId) ?? [];
+  const conversationTraceIds = conversationTurns.data?.items.map((t) => t.traceId) ?? [];
   const hasConversation = !!conversationId && conversationTraceIds.length > 1;
 
   const handleAddTrace = useCallback(() => {
@@ -188,17 +179,12 @@ export function TraceOverflowMenu({
               <Icon as={LuMessagesSquare} boxSize={3.5} />
               <Text>Add conversation to dataset</Text>
             </HStack>
-            <Menu.ItemCommand>
-              {conversationTraceIds.length} turns
-            </Menu.ItemCommand>
+            <Menu.ItemCommand>{conversationTraceIds.length} turns</Menu.ItemCommand>
           </Menu.Item>
         )}
 
         {canQueueForAnnotation && (
-          <Menu.Item
-            value="add-to-annotation-queue"
-            onClick={onAddToAnnotationQueue}
-          >
+          <Menu.Item value="add-to-annotation-queue" onClick={onAddToAnnotationQueue}>
             <HStack gap={2}>
               <Icon as={LuListPlus} boxSize={3.5} />
               <Text>Add to annotation queue</Text>
@@ -238,18 +224,12 @@ export function TraceOverflowMenu({
           <Menu.Item
             value="pin"
             onClick={handleTogglePin}
-            disabled={
-              pinMutation.isPending || unpinMutation.isPending || isSharePin
-            }
+            disabled={pinMutation.isPending || unpinMutation.isPending || isSharePin}
           >
             <HStack gap={2}>
               <Icon as={isPinned ? LuPinOff : LuPin} boxSize={3.5} />
               <Text>
-                {isSharePin
-                  ? "Pinned by share"
-                  : isPinned
-                    ? "Unpin trace"
-                    : "Pin trace"}
+                {isSharePin ? "Pinned by share" : isPinned ? "Unpin trace" : "Pin trace"}
               </Text>
             </HStack>
           </Menu.Item>

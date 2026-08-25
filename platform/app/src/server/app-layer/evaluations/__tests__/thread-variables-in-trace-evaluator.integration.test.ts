@@ -44,9 +44,7 @@ interface TestOverrides {
   traceService?: Partial<
     Pick<
       TraceService,
-      | "getTracesWithSpans"
-      | "getTracesWithSpansByThreadIds"
-      | "getEvaluationsMultiple"
+      "getTracesWithSpans" | "getTracesWithSpansByThreadIds" | "getEvaluationsMultiple"
     >
   >;
   trace?: Trace | undefined;
@@ -56,9 +54,7 @@ function createTestService(overrides: TestOverrides = {}) {
   const defaultTrace = "trace" in overrides ? overrides.trace : buildTrace();
 
   const mockTraceService = {
-    getTracesWithSpans: vi
-      .fn()
-      .mockResolvedValue(defaultTrace ? [defaultTrace] : []),
+    getTracesWithSpans: vi.fn().mockResolvedValue(defaultTrace ? [defaultTrace] : []),
     getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue([]),
     getEvaluationsMultiple: vi.fn().mockResolvedValue({}),
     ...overrides.traceService,
@@ -124,9 +120,7 @@ describe("Feature: Thread variables available in trace-level evaluator input map
           const { service, mockTraceService } = createTestService({
             trace,
             traceService: {
-              getTracesWithSpansByThreadIds: vi
-                .fn()
-                .mockResolvedValue(threadTraces),
+              getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue(threadTraces),
             },
           });
 
@@ -151,9 +145,7 @@ describe("Feature: Thread variables available in trace-level evaluator input map
           });
 
           // Should fetch thread traces
-          expect(
-            mockTraceService.getTracesWithSpansByThreadIds,
-          ).toHaveBeenCalledWith(
+          expect(mockTraceService.getTracesWithSpansByThreadIds).toHaveBeenCalledWith(
             "proj-1",
             ["abc"],
             expect.objectContaining({ canSeeCapturedInput: true }),
@@ -223,9 +215,7 @@ describe("Feature: Thread variables available in trace-level evaluator input map
         const { service } = createTestService({
           trace,
           traceService: {
-            getTracesWithSpansByThreadIds: vi
-              .fn()
-              .mockResolvedValue(threadTraces),
+            getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue(threadTraces),
           },
         });
 
@@ -333,9 +323,7 @@ describe("Feature: Thread variables available in trace-level evaluator input map
         const { service } = createTestService({
           trace,
           traceService: {
-            getTracesWithSpansByThreadIds: vi
-              .fn()
-              .mockResolvedValue(threadTraces),
+            getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue(threadTraces),
           },
         });
 

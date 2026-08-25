@@ -92,11 +92,7 @@ describe("TraceService", () => {
 
       await service.getAllTracesForProject(input, protections);
 
-      expect(mockGetAllTracesForProjectCH).toHaveBeenCalledWith(
-        input,
-        protections,
-        {},
-      );
+      expect(mockGetAllTracesForProjectCH).toHaveBeenCalledWith(input, protections, {});
     });
   });
 

@@ -18,10 +18,7 @@
 
 import { buildMetricAlias } from "../clickhouse/metric-translator";
 import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
-import type {
-  AnalyticsTimeseriesBuilderInput,
-  BuiltAnalyticsQuery,
-} from "../types";
+import type { AnalyticsTimeseriesBuilderInput, BuiltAnalyticsQuery } from "../types";
 import { dateTrunc } from "./_shared";
 
 const ROLLUP_TABLE = "evaluation_analytics_rollup" as const;
@@ -62,9 +59,7 @@ function isEvalRollupMetricKey(metric: string): metric is EvalRollupMetricKey {
   );
 }
 
-function isEvalRollupGroupByKey(
-  groupBy: string,
-): groupBy is EvalRollupGroupByKey {
+function isEvalRollupGroupByKey(groupBy: string): groupBy is EvalRollupGroupByKey {
   return (
     groupBy === "evaluations.evaluator_type" ||
     groupBy === "evaluations.evaluation_status"

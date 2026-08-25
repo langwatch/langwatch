@@ -80,20 +80,14 @@ describe("readSummaryMetric", () => {
 
     it("keys the ungrouped read as {index}/{metric}/{aggregation}", () => {
       // Locks the literal format the read depends on.
-      expect(buildSeriesName(series[0]!, 0)).toBe(
-        "0/metadata.trace_id/cardinality",
-      );
+      expect(buildSeriesName(series[0]!, 0)).toBe("0/metadata.trace_id/cardinality");
     });
   });
 
   describe("when the series does not carry the requested metric", () => {
     it("returns undefined instead of a wrong index", () => {
-      const withoutCost = series.filter(
-        (s) => s.metric !== "performance.total_cost",
-      );
-      const buckets = [
-        bucketWith({ [buildSeriesName(withoutCost[0]!, 0)]: 15 }),
-      ];
+      const withoutCost = series.filter((s) => s.metric !== "performance.total_cost");
+      const buckets = [bucketWith({ [buildSeriesName(withoutCost[0]!, 0)]: 15 })];
       expect(
         readSummaryMetric({
           buckets,
@@ -106,12 +100,8 @@ describe("readSummaryMetric", () => {
 
     it("tracks the shifted index when cost is dropped", () => {
       // Without cost, completion_time moves from index 3 to index 2.
-      const withoutCost = series.filter(
-        (s) => s.metric !== "performance.total_cost",
-      );
-      const buckets = [
-        bucketWith({ [buildSeriesName(withoutCost[2]!, 2)]: 8400 }),
-      ];
+      const withoutCost = series.filter((s) => s.metric !== "performance.total_cost");
+      const buckets = [bucketWith({ [buildSeriesName(withoutCost[2]!, 2)]: 8400 })];
       expect(
         readSummaryMetric({
           buckets,
@@ -273,13 +263,11 @@ describe("buildBriefingReceipts", () => {
         ...base,
         currentErrorShapes: [
           {
-            value:
-              "Job 81349277 failed request 44e8b4cc-2f4c-4ace-ae7f-6b21097271f9",
+            value: "Job 81349277 failed request 44e8b4cc-2f4c-4ace-ae7f-6b21097271f9",
             count: 2,
           },
           {
-            value:
-              "Job 81349278 failed request c9b89b28-546c-4530-a487-725aa20c3ea9",
+            value: "Job 81349278 failed request c9b89b28-546c-4530-a487-725aa20c3ea9",
             count: 3,
           },
         ],
@@ -298,14 +286,10 @@ describe("buildBriefingReceipts", () => {
         ...base,
         sharedTraceNames: [{ value: "refund-agent", count: 6 }],
       });
-      const shared = receipts.find((item) =>
-        item.id.startsWith("shared-trace-name:"),
-      );
+      const shared = receipts.find((item) => item.id.startsWith("shared-trace-name:"));
       expect(shared?.subject).toBe("Shared error signal");
       expect(shared?.detail).toContain("Correlation, not a confirmed cause");
-      expect(shared?.context?.query).toBe(
-        'status:error AND traceName:"refund-agent"',
-      );
+      expect(shared?.context?.query).toBe('status:error AND traceName:"refund-agent"');
     });
   });
 

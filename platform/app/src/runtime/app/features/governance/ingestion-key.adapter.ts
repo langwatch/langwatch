@@ -40,7 +40,10 @@ class AppIngestionKeyIssuerPort extends IngestionKeyIssuerPort {
     super();
   }
 
-  static create(database: PrismaClient, apiKeys: ApiKeyService): AppIngestionKeyIssuerPort {
+  static create(
+    database: PrismaClient,
+    apiKeys: ApiKeyService,
+  ): AppIngestionKeyIssuerPort {
     void database;
     return new AppIngestionKeyIssuerPort(apiKeys);
   }
@@ -56,9 +59,7 @@ class AppIngestionKeyIssuerPort extends IngestionKeyIssuerPort {
     return { token: result.token, apiKey: { id: result.apiKey.id } };
   }
 
-  revoke(
-    input: Parameters<IngestionKeyIssuerPort["revoke"]>[0],
-  ): Promise<void> {
+  revoke(input: Parameters<IngestionKeyIssuerPort["revoke"]>[0]): Promise<void> {
     return this.apiKeys.revoke(input).then(() => undefined);
   }
 }
@@ -75,7 +76,11 @@ export class AppIngestionKeyAdapter {
     organizations: OrganizationService;
     apiKeys: ApiKeyService;
   }): AppIngestionKeyAdapter {
-    return new AppIngestionKeyAdapter(options.database, options.organizations, options.apiKeys);
+    return new AppIngestionKeyAdapter(
+      options.database,
+      options.organizations,
+      options.apiKeys,
+    );
   }
 
   build(): IngestionKeyService {

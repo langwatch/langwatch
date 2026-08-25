@@ -39,9 +39,7 @@ function RailTile({
       color={isActive ? "fg" : "gray.400"}
       transition="all 0.15s ease-in-out"
       _hover={
-        isActive
-          ? undefined
-          : { backgroundColor: "bg.panel/50", color: "fg.muted" }
+        isActive ? undefined : { backgroundColor: "bg.panel/50", color: "fg.muted" }
       }
       aria-label={label}
       aria-current={isActive ? "page" : undefined}
@@ -62,12 +60,7 @@ function RailTile({
       )}
       <VStack gap={1}>
         <Icon size={19} strokeWidth={isActive ? 2.1 : 1.9} />
-        <Text
-          fontSize="8.5px"
-          fontWeight="semibold"
-          lineHeight="1"
-          letterSpacing="tight"
-        >
+        <Text fontSize="8.5px" fontWeight="semibold" lineHeight="1" letterSpacing="tight">
           {label}
         </Text>
       </VStack>
@@ -96,8 +89,7 @@ export function IconRail({
   const projectSlug = useLlmOpsProjectSlug();
 
   const options = PRODUCTS.filter(
-    (product) =>
-      product.id === activeProductId || reachableProducts.includes(product.id),
+    (product) => product.id === activeProductId || reachableProducts.includes(product.id),
   );
 
   const openProduct = (product: ProductDefinition) => {

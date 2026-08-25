@@ -141,9 +141,7 @@ describe("given a trace that already carries suggestions", () => {
       const user = userEvent.setup();
       renderOutputs();
 
-      await user.click(
-        screen.getByRole("button", { name: /the corrected answer/ }),
-      );
+      await user.click(screen.getByRole("button", { name: /the corrected answer/ }));
 
       const popover = screen.getByTestId("correction-popover");
       expect(popover).toHaveAttribute("data-mode", "suggest");
@@ -185,9 +183,7 @@ describe("given suggestions that correct something other than the output", () =>
       renderOutputs();
 
       expect(screen.getByText("the corrected answer")).toBeInTheDocument();
-      expect(
-        screen.queryByText("what the user meant to ask"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("what the user meant to ask")).not.toBeInTheDocument();
       expect(screen.queryByText("Amsterdam")).not.toBeInTheDocument();
     });
   });

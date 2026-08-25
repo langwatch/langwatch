@@ -43,6 +43,10 @@ test.describe("Scenario Library", () => {
     const table = page.getByRole("table");
 
     // One of these should be visible
-    await welcomeScreen.or(emptyState).or(table).first().waitFor({ state: "visible", timeout: 10000 });
+    await welcomeScreen
+      .or(emptyState)
+      .or(table)
+      .first()
+      .waitFor({ state: "visible", timeout: 10000 });
   });
 });

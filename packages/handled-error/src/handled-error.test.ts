@@ -36,10 +36,7 @@ describe("HandledError.serialize", () => {
     }).serialize();
 
     expect(serialized.fault).toBe("platform");
-    expect(serialized.tips).toEqual([
-      "Try a smaller time range",
-      "Select fewer fields",
-    ]);
+    expect(serialized.tips).toEqual(["Try a smaller time range", "Select fewer fields"]);
     expect(serialized.docsUrl).toBe("https://docs.langwatch.ai/traces");
   });
 
@@ -64,8 +61,7 @@ describe("HandledError.serialize", () => {
     // A herr-deserialized cause carries its prose on `.message` (FromBody
     // promotes meta.message to the wire message) — the serialized reason must
     // keep it, or "credit balance too low" degrades to a bare code.
-    const providerMessage =
-      "Your credit balance is too low to access the Anthropic API.";
+    const providerMessage = "Your credit balance is too low to access the Anthropic API.";
     const err = new TestError("outer", {
       reasons: [
         handledErrorFromHerr({
@@ -85,9 +81,7 @@ describe("HandledError.serialize", () => {
 
   it("keeps an explicit meta.message over the error message and skips code-echo messages", () => {
     const explicit = new TestError("outer", {
-      reasons: [
-        new TestError("real prose", { meta: { message: "authored wins" } }),
-      ],
+      reasons: [new TestError("real prose", { meta: { message: "authored wins" } })],
     });
     expect(explicit.serialize().reasons[0]!.meta).toMatchObject({
       message: "authored wins",
@@ -154,9 +148,7 @@ describe("handledErrorFromHerr", () => {
 
     const serialized = err.serialize();
     expect(serialized.tips).toEqual(["Back off and retry"]);
-    expect(serialized.docsUrl).toBe(
-      "https://docs.langwatch.ai/gateway/rate-limits",
-    );
+    expect(serialized.docsUrl).toBe("https://docs.langwatch.ai/gateway/rate-limits");
   });
 });
 
@@ -260,9 +252,7 @@ describe("HandledError.toUserMessage", () => {
       "span_not_found",
       "That span no longer exists",
     );
-    expect(HandledError.toUserMessage(duplicate)).toBe(
-      "That span no longer exists",
-    );
+    expect(HandledError.toUserMessage(duplicate)).toBe("That span no longer exists");
   });
 
   it("masks an unhandled error and reports it to the log callback", () => {
@@ -298,8 +288,6 @@ describe("serialising a reason chain", () => {
       reasons: [new Error("connection reset by peer")],
     });
 
-    expect(error.serialize().reasons).toEqual([
-      { code: "unknown", kind: "unknown" },
-    ]);
+    expect(error.serialize().reasons).toEqual([{ code: "unknown", kind: "unknown" }]);
   });
 });

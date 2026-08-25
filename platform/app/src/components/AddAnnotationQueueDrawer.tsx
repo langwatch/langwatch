@@ -81,15 +81,14 @@ export const AddAnnotationQueueDrawer = ({
     onClose?.();
   };
 
-  const users =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      {
-        organizationId: organization?.id ?? "",
-      },
-      {
-        enabled: !!organization && !!open,
-      },
-    );
+  const users = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+    {
+      organizationId: organization?.id ?? "",
+    },
+    {
+      enabled: !!organization && !!open,
+    },
+  );
 
   const form = useForm<{
     name: string;
@@ -113,18 +112,14 @@ export const AddAnnotationQueueDrawer = ({
     description?: string | null;
   };
 
-  const [participants, setParticipants] = useState<
-    { id: string; name: string | null }[]
-  >(
+  const [participants, setParticipants] = useState<{ id: string; name: string | null }[]>(
     queue.data?.members.map((member) => ({
       id: member.user.id,
       name: member.user.name,
     })) ?? [],
   );
 
-  const [scoreTypes, setScoreTypes] = useState<
-    { id: string; name: string | null }[]
-  >(
+  const [scoreTypes, setScoreTypes] = useState<{ id: string; name: string | null }[]>(
     queue.data?.AnnotationQueueScores.map((score) => ({
       id: score.annotationScore.id,
       name: score.annotationScore.name,
@@ -189,8 +184,7 @@ export const AddAnnotationQueueDrawer = ({
           reset();
         },
         onError: (error) => {
-          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
-            return;
+          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
           showErrorToast({
             error,
             fallbackTitle: queueId
@@ -263,9 +257,7 @@ export const AddAnnotationQueueDrawer = ({
                 >
                   <Popover.Root
                     open={participantsPopoverOpen.open}
-                    onOpenChange={({ open }) =>
-                      participantsPopoverOpen.setOpen(open)
-                    }
+                    onOpenChange={({ open }) => participantsPopoverOpen.setOpen(open)}
                     positioning={{ placement: "bottom-start" }}
                   >
                     <Popover.Trigger asChild>
@@ -309,10 +301,7 @@ export const AddAnnotationQueueDrawer = ({
                                 fontWeight="normal"
                                 aria-pressed={isSelected}
                                 onClick={() =>
-                                  toggleParticipant(
-                                    member.user.id,
-                                    member.user.name,
-                                  )
+                                  toggleParticipant(member.user.id, member.user.name)
                                 }
                               >
                                 <Check
@@ -349,9 +338,7 @@ export const AddAnnotationQueueDrawer = ({
                   invalid={!!errors.description}
                 >
                   <Textarea {...register("description")} required />
-                  <Field.ErrorText>
-                    {errors.description?.message}
-                  </Field.ErrorText>
+                  <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
                 </FullWidthFormControl>
 
                 <FullWidthFormControl
@@ -360,9 +347,7 @@ export const AddAnnotationQueueDrawer = ({
                 >
                   <Popover.Root
                     open={scoreTypesPopoverOpen.open}
-                    onOpenChange={({ open }) =>
-                      scoreTypesPopoverOpen.setOpen(open)
-                    }
+                    onOpenChange={({ open }) => scoreTypesPopoverOpen.setOpen(open)}
                     positioning={{ placement: "bottom-start" }}
                   >
                     <Popover.Trigger asChild>
@@ -406,9 +391,7 @@ export const AddAnnotationQueueDrawer = ({
                                   height="auto"
                                   fontWeight="normal"
                                   aria-pressed={isSelected}
-                                  onClick={() =>
-                                    toggleScoreType(score.id, score.name)
-                                  }
+                                  onClick={() => toggleScoreType(score.id, score.name)}
                                 >
                                   <Check
                                     size={16}
@@ -420,11 +403,7 @@ export const AddAnnotationQueueDrawer = ({
                             })}
                           </VStack>
                         </Box>
-                        <Box
-                          padding={2}
-                          borderTop="1px solid"
-                          borderColor="border.muted"
-                        >
+                        <Box padding={2} borderTop="1px solid" borderColor="border.muted">
                           <Button
                             width="100%"
                             colorPalette="blue"

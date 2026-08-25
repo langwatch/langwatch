@@ -31,10 +31,7 @@ export interface CancellationPublisher {
 /** Minimal subscriber interface (subset of ioredis). */
 export interface CancellationSubscriber {
   subscribe(channel: string): Promise<unknown>;
-  on(
-    event: "message",
-    handler: (channel: string, message: string) => void,
-  ): void;
+  on(event: "message", handler: (channel: string, message: string) => void): void;
   quit(): Promise<unknown>;
 }
 

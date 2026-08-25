@@ -7,10 +7,9 @@ export type AutomationPauseReason = (typeof AUTOMATION_PAUSE_REASONS)[number];
 export const RUNAWAY_PAUSE_REASON: AutomationPauseReason = "runaway_volume";
 
 export function isAutomationPauseReason(
-	reason: string | null | undefined,
+  reason: string | null | undefined,
 ): reason is AutomationPauseReason {
-	return (
-		reason != null &&
-		(AUTOMATION_PAUSE_REASONS as readonly string[]).includes(reason)
-	);
+  return (
+    reason != null && (AUTOMATION_PAUSE_REASONS as readonly string[]).includes(reason)
+  );
 }

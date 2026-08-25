@@ -4,11 +4,7 @@ import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "./constants";
 import { metricCorrelationFields } from "./metricCorrelationFields";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
-export const piiRedactionLevelSchema = z.enum([
-  "STRICT",
-  "ESSENTIAL",
-  "DISABLED",
-]);
+export const piiRedactionLevelSchema = z.enum(["STRICT", "ESSENTIAL", "DISABLED"]);
 export type PIIRedactionLevel = z.infer<typeof piiRedactionLevelSchema>;
 
 /**
@@ -48,12 +44,9 @@ export const assignTopicCommandDataSchema = z.object({
   occurredAt: z.number(),
 });
 
-export type AssignTopicCommandData = z.infer<
-  typeof assignTopicCommandDataSchema
->;
+export type AssignTopicCommandData = z.infer<typeof assignTopicCommandDataSchema>;
 
-export const recordLogContributionCommandDataSchema =
-  logTraceContributionSchema;
+export const recordLogContributionCommandDataSchema = logTraceContributionSchema;
 export type RecordLogContributionCommandData = z.infer<
   typeof recordLogContributionCommandDataSchema
 >;
@@ -80,9 +73,7 @@ export const resolveOriginCommandDataSchema = z.object({
   occurredAt: z.number(),
 });
 
-export type ResolveOriginCommandData = z.infer<
-  typeof resolveOriginCommandDataSchema
->;
+export type ResolveOriginCommandData = z.infer<typeof resolveOriginCommandDataSchema>;
 
 /**
  * Strict input shape for the user-facing rename API. The trim is applied

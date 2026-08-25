@@ -50,9 +50,7 @@ describe("<SignInError/>", () => {
 
     it("steers the user to sign out and use their original / SSO method", () => {
       renderError("OAuthAccountNotLinked");
-      expect(
-        screen.getByText(/sign out completely and sign in again/i),
-      ).toBeTruthy();
+      expect(screen.getByText(/sign out completely and sign in again/i)).toBeTruthy();
       expect(screen.getByText(/method you used originally/i)).toBeTruthy();
     });
   });

@@ -62,11 +62,7 @@ describe("buildParetoPoints", () => {
      */
     it("does not plot it as a live option", () => {
       const points = buildParetoPoints({
-        entries: [
-          entry("sweeper", 476, true),
-          entry("a", -238),
-          entry("b", -238),
-        ],
+        entries: [entry("sweeper", 476, true), entry("a", -238), entry("b", -238)],
         variantMetrics: metricsFor(["sweeper", "a", "b"]),
         variantNames: { sweeper: "Sweeper", a: "A", b: "B" },
         targetColors: undefined,

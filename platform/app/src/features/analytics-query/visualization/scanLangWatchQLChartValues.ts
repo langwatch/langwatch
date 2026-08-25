@@ -18,11 +18,7 @@
  * different things, and they are left alone.
  */
 
-import {
-  JSON_POINTER_ROOT,
-  joinPointer,
-  visitJsonObjects,
-} from "./vegaLiteStructure";
+import { JSON_POINTER_ROOT, joinPointer, visitJsonObjects } from "./vegaLiteStructure";
 import type {
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
@@ -49,9 +45,7 @@ export function encodedFieldsByDataset({
 }: {
   spec: unknown;
   datasetNames: readonly string[];
-  columnsByDataset: Readonly<
-    Record<string, readonly LangWatchQLDatasetColumn[]>
-  >;
+  columnsByDataset: Readonly<Record<string, readonly LangWatchQLDatasetColumn[]>>;
 }): Record<string, string[]> {
   const referenced = new Set<string>();
   for (const { node } of visitJsonObjects(spec)) {
@@ -133,9 +127,7 @@ export function scanLangWatchQLChartValues({
 function columnTypes(
   columns: readonly LangWatchQLDatasetColumn[],
 ): Record<string, string> {
-  return Object.fromEntries(
-    columns.map((column) => [column.name, column.type]),
-  );
+  return Object.fromEntries(columns.map((column) => [column.name, column.type]));
 }
 
 function isWide(type: string | undefined): boolean {

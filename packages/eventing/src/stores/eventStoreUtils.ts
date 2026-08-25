@@ -18,10 +18,7 @@ export function recordToEvent<EventType extends Event>(
   aggregateId: string,
 ): EventType {
   let timestampMs: number;
-  if (
-    typeof record.EventTimestamp === "number" &&
-    !Number.isNaN(record.EventTimestamp)
-  ) {
+  if (typeof record.EventTimestamp === "number" && !Number.isNaN(record.EventTimestamp)) {
     timestampMs = record.EventTimestamp;
   } else if (typeof record.EventTimestamp === "string") {
     const parsed = Date.parse(record.EventTimestamp);
@@ -59,9 +56,7 @@ export function recordToEvent<EventType extends Event>(
 /**
  * Transforms a domain Event into an EventRecord for storage.
  */
-export function eventToRecord<EventType extends Event>(
-  event: EventType,
-): EventRecord {
+export function eventToRecord<EventType extends Event>(event: EventType): EventRecord {
   return {
     TenantId: String(event.tenantId),
     AggregateType: event.aggregateType,

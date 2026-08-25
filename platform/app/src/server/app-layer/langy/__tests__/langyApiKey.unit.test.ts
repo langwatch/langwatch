@@ -19,8 +19,7 @@ vi.mock("~/utils/encryption", () => ({
 
 const batchProjectPermissions = vi.fn();
 vi.mock("~/server/api/rbac", () => ({
-  batchProjectPermissions: (...args: unknown[]) =>
-    batchProjectPermissions(...args),
+  batchProjectPermissions: (...args: unknown[]) => batchProjectPermissions(...args),
 }));
 
 const apiKeyCreate = vi.fn();
@@ -201,9 +200,7 @@ describe("mintLangySessionApiKey", () => {
         // candidate in that family, resolved through the hierarchy.
         batchProjectPermissions.mockImplementation(
           (_ctx: unknown, args: { permissions: string[] }) =>
-            Promise.resolve(
-              args.permissions.filter((p) => p.startsWith("scenarios:")),
-            ),
+            Promise.resolve(args.permissions.filter((p) => p.startsWith("scenarios:"))),
         );
 
         await mintLangySessionApiKey({
@@ -372,8 +369,8 @@ describe("mintLangySessionApiKey", () => {
         });
 
         const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
-        const experimentPermissions = (arg.permissions as string[]).filter(
-          (p) => p.startsWith("experiments:"),
+        const experimentPermissions = (arg.permissions as string[]).filter((p) =>
+          p.startsWith("experiments:"),
         );
         expect(experimentPermissions).toEqual(["experiments:view"]);
       });
@@ -565,9 +562,7 @@ describe("reapExpiredLangySessionApiKeys", () => {
         const p = { apiKey: { updateMany } } as any;
         const now = new Date("2026-07-11T12:00:00Z");
 
-        await expect(
-          reapExpiredLangySessionApiKeys({ prisma: p, now }),
-        ).resolves.toBe(3);
+        await expect(reapExpiredLangySessionApiKeys({ prisma: p, now })).resolves.toBe(3);
 
         expect(updateMany).toHaveBeenCalledWith({
           where: {

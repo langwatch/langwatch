@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { InMemoryLogRecordExporter, LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import {
+  InMemoryLogRecordExporter,
+  LoggerProvider,
+  SimpleLogRecordProcessor,
+} from "@opentelemetry/sdk-logs";
 import { getLangWatchLogger, getLangWatchLoggerFromProvider } from "../..";
 import { NoOpLogger } from "../../../../logger";
 import { setupObservability } from "../../../setup/node";
@@ -82,7 +86,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       ...(dataCapture ? { dataCapture } : {}),
       attributes: {
         "test.suite": "logger-integration",
-        "test.environment": "vitest"
+        "test.environment": "vitest",
       },
     });
   }
@@ -159,7 +163,9 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       // Verify LangWatch-specific attributes
       expect(exportedLogRecord.attributes?.["langwatch.service"]).toBe("test-service");
       expect(exportedLogRecord.attributes?.["langwatch.environment"]).toBe("test");
-      expect(exportedLogRecord.attributes?.["langwatch.operation"]).toBe("test-operation");
+      expect(exportedLogRecord.attributes?.["langwatch.operation"]).toBe(
+        "test-operation",
+      );
       expect(exportedLogRecord.attributes?.["langwatch.user_id"]).toBe("user-123");
       expect(exportedLogRecord.attributes?.["custom.attribute"]).toBe("custom-value");
       expect(exportedLogRecord.attributes?.["performance.latency_ms"]).toBe(150);
@@ -174,30 +180,30 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
           severityText: "DEBUG",
           severityNumber: 5,
           body: "Debug message",
-          attributes: { "level": "debug" },
+          attributes: { level: "debug" },
         },
         {
           severityText: "INFO",
           severityNumber: 9,
           body: "Info message",
-          attributes: { "level": "info" },
+          attributes: { level: "info" },
         },
         {
           severityText: "WARN",
           severityNumber: 13,
           body: "Warning message",
-          attributes: { "level": "warn" },
+          attributes: { level: "warn" },
         },
         {
           severityText: "ERROR",
           severityNumber: 17,
           body: "Error message",
-          attributes: { "level": "error" },
+          attributes: { level: "error" },
         },
       ];
 
       // Emit all log records
-      logRecords.forEach(record => logger.emit(record));
+      logRecords.forEach((record) => logger.emit(record));
 
       await logRecordProcessor.forceFlush();
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
@@ -205,8 +211,8 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       expect(exportedLogRecords).toHaveLength(4);
 
       // Verify severity levels
-      const severityTexts = exportedLogRecords.map(r => r.severityText);
-      const severityNumbers = exportedLogRecords.map(r => r.severityNumber);
+      const severityTexts = exportedLogRecords.map((r) => r.severityText);
+      const severityNumbers = exportedLogRecords.map((r) => r.severityNumber);
 
       expect(severityTexts).toEqual(["DEBUG", "INFO", "WARN", "ERROR"]);
       expect(severityNumbers).toEqual([5, 9, 13, 17]);
@@ -253,7 +259,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: "Test log message with body",
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -283,7 +289,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: "Test log message with body",
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -313,7 +319,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: "Test log message with body",
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -343,7 +349,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: "Test log message with body",
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -373,7 +379,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: "Test log message with body",
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -403,7 +409,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "ERROR",
         severityNumber: 17,
         body: "Test log message with body",
-        attributes: { "test": "value", "custom": "attribute" },
+        attributes: { test: "value", custom: "attribute" },
         timestamp: timestamp,
       };
 
@@ -422,7 +428,10 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       expect(exportedLogRecord.severityText).toBe("ERROR");
       expect(exportedLogRecord.severityNumber).toBe(17);
       expect(exportedLogRecord.body).toBeUndefined(); // Only body should be modified
-      expect(exportedLogRecord.attributes).toEqual({ "test": "value", "custom": "attribute" });
+      expect(exportedLogRecord.attributes).toEqual({
+        test: "value",
+        custom: "attribute",
+      });
       // Note: timestamp is not available on ReadableLogRecord, so we don't assert it
     });
 
@@ -437,7 +446,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "INFO",
         severityNumber: 9,
         // No body property
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -511,7 +520,9 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       // Verify each log record has the correct version attributes
       exportedLogRecords.forEach((record, index) => {
         expect(record.body).toBe(`Message from version ${index}`);
-        expect(record.attributes?.["logger.version"]).toBe(["1.0.0", "2.0.0", "latest"][index]);
+        expect(record.attributes?.["logger.version"]).toBe(
+          ["1.0.0", "2.0.0", "latest"][index],
+        );
       });
     });
   });
@@ -546,7 +557,9 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       expect(exportedLogRecord.attributes?.["gen_ai.request.model"]).toBe("gpt-4");
       expect(exportedLogRecord.attributes?.["gen_ai.request.temperature"]).toBe(0.7);
       expect(exportedLogRecord.attributes?.["gen_ai.request.max_tokens"]).toBe(150);
-      expect(exportedLogRecord.attributes?.["gen_ai.response.finish_reason"]).toBe("stop");
+      expect(exportedLogRecord.attributes?.["gen_ai.response.finish_reason"]).toBe(
+        "stop",
+      );
       expect(exportedLogRecord.attributes?.["gen_ai.usage.prompt_tokens"]).toBe(15);
       expect(exportedLogRecord.attributes?.["gen_ai.usage.completion_tokens"]).toBe(25);
       expect(exportedLogRecord.attributes?.["gen_ai.usage.total_tokens"]).toBe(40);
@@ -584,8 +597,12 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       expect(exportedLogRecord.severityText).toBe("ERROR");
       expect(exportedLogRecord.severityNumber).toBe(17);
       expect(exportedLogRecord.body).toBe("GenAI API call failed");
-      expect(exportedLogRecord.attributes?.["gen_ai.error.code"]).toBe("rate_limit_exceeded");
-      expect(exportedLogRecord.attributes?.["gen_ai.error.message"]).toBe("Rate limit exceeded");
+      expect(exportedLogRecord.attributes?.["gen_ai.error.code"]).toBe(
+        "rate_limit_exceeded",
+      );
+      expect(exportedLogRecord.attributes?.["gen_ai.error.message"]).toBe(
+        "Rate limit exceeded",
+      );
       expect(exportedLogRecord.attributes?.["gen_ai.error.retry_after"]).toBe(60);
     });
   });
@@ -608,7 +625,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
 
           logger.emit(logRecord);
           return i;
-        })
+        }),
       );
 
       expect(concurrentOperations).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
@@ -668,8 +685,8 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         data: "x".repeat(50_000), // 50KB string
         numbers: Array.from({ length: 1000 }, (_, i) => i),
         nested: {
-          level1: { level2: { level3: "deeply nested data" } }
-        }
+          level1: { level2: { level3: "deeply nested data" } },
+        },
       };
 
       const largeDataLogRecord: LangWatchLogRecord = {
@@ -695,7 +712,9 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
 
       // Verify large data was handled correctly
       expect(exportedLogRecord.body).toBe("Large data log message");
-      expect(exportedLogRecord.attributes?.["data.size"]).toBe(JSON.stringify(largeData).length);
+      expect(exportedLogRecord.attributes?.["data.size"]).toBe(
+        JSON.stringify(largeData).length,
+      );
     });
   });
 
@@ -875,7 +894,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const logger = getLangWatchLoggerFromProvider(
         customProvider,
         "custom-provider-test-logger-28",
-        "1.0.0"
+        "1.0.0",
       );
 
       const customProviderLogRecord: LangWatchLogRecord = {

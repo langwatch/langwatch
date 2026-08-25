@@ -92,11 +92,7 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
     path: string;
     headers?: Record<string, string>;
   }) =>
-    app.request(
-      path,
-      { headers },
-      appContextBindingsFor(globalForApp.__langwatch_app!),
-    );
+    app.request(path, { headers }, appContextBindingsFor(globalForApp.__langwatch_app!));
 
   const getAuthenticated = (path: string) =>
     get({ path, headers: { "X-Auth-Token": testApiKey } });
@@ -107,9 +103,7 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
     it("serves the counts of that batch and reports it as not complete", async () => {
       const repository = withSummary(makeSummary());
 
-      const res = await getAuthenticated(
-        "/api/simulation-runs/batches/batch_1",
-      );
+      const res = await getAuthenticated("/api/simulation-runs/batches/batch_1");
       expect(res.status).toBe(200);
       const body = (await res.json()) as {
         batchRunId: string;
@@ -133,9 +127,7 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
         makeSummary({ settledCount: 2, runningCount: 0, allCompletedAt: 2000 }),
       );
 
-      const res = await getAuthenticated(
-        "/api/simulation-runs/batches/batch_1",
-      );
+      const res = await getAuthenticated("/api/simulation-runs/batches/batch_1");
       expect(res.status).toBe(200);
       const body = (await res.json()) as { isComplete: boolean };
 
@@ -148,9 +140,7 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
     it("answers 404", async () => {
       withSummary(null);
 
-      const res = await getAuthenticated(
-        "/api/simulation-runs/batches/batch_unknown",
-      );
+      const res = await getAuthenticated("/api/simulation-runs/batches/batch_unknown");
 
       expect(res.status).toBe(404);
     });

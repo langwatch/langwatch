@@ -12,10 +12,7 @@
 import { RUM_MAX_BODY_BYTES, RUM_SERVICE_NAME } from "@langwatch/react-rum";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  _getMemoryStoreSize,
-  _resetMemoryRateLimitStore,
-} from "~/server/rateLimit";
+import { _getMemoryStoreSize, _resetMemoryRateLimitStore } from "~/server/rateLimit";
 
 import {
   collectorHeaders,
@@ -49,13 +46,7 @@ const exportWith = (
     ],
   });
 
-const requestWith = ({
-  body,
-  contentLength,
-}: {
-  body: string;
-  contentLength?: string;
-}) =>
+const requestWith = ({ body, contentLength }: { body: string; contentLength?: string }) =>
   new Request("https://example.test/api/rum/v1/traces", {
     method: "POST",
     headers: contentLength ? { "content-length": contentLength } : {},
@@ -241,10 +232,7 @@ describe("given a browser posting telemetry", () => {
       ["not json at all", "<html>"],
       ["json with no resourceSpans", "{}"],
       ["an empty resourceSpans list", '{"resourceSpans":[]}'],
-      [
-        "resourceSpans carrying no spans",
-        '{"resourceSpans":[{"resource":{}}]}',
-      ],
+      ["resourceSpans carrying no spans", '{"resourceSpans":[{"resource":{}}]}'],
     ])("refuses %s", async (_case, body) => {
       await expect(
         ingestBrowserTraces({ body, callerKey: `invalid-${_case}` }),
@@ -271,10 +259,7 @@ describe("given a browser posting telemetry", () => {
         "scopeSpans that are not a list",
         '{"resourceSpans":[{"scopeSpans":{"spans":[{}]}}]}',
       ],
-      [
-        "spans that are not a list",
-        '{"resourceSpans":[{"scopeSpans":[{"spans":7}]}]}',
-      ],
+      ["spans that are not a list", '{"resourceSpans":[{"scopeSpans":[{"spans":7}]}]}'],
     ])("refuses %s rather than failing on it", async (_case, body) => {
       const ingest = ingestBrowserTraces({
         body,
@@ -305,8 +290,7 @@ describe("given a browser posting telemetry", () => {
 
   describe("when the collector expects a bearer token", () => {
     it("forwards the configured headers", () => {
-      process.env.OTEL_EXPORTER_OTLP_HEADERS =
-        "Authorization=Bearer abc123,x-scope=team";
+      process.env.OTEL_EXPORTER_OTLP_HEADERS = "Authorization=Bearer abc123,x-scope=team";
 
       const headers = collectorHeaders();
 

@@ -192,9 +192,7 @@ export class VirtualKeyRepository {
       where: {
         organizationId: args.organizationId,
         purpose: "USER",
-        ...(args.externalId !== undefined
-          ? { externalId: args.externalId }
-          : {}),
+        ...(args.externalId !== undefined ? { externalId: args.externalId } : {}),
         ...(args.cursor
           ? {
               OR: keysetAfter([
@@ -459,11 +457,7 @@ export class VirtualKeyRepository {
     });
   }
 
-  async recordUsage(
-    id: string,
-    at: Date,
-    tx?: Prisma.TransactionClient,
-  ): Promise<void> {
+  async recordUsage(id: string, at: Date, tx?: Prisma.TransactionClient): Promise<void> {
     const client = tx ?? this.prisma;
     await client.virtualKey.update({
       where: { id },

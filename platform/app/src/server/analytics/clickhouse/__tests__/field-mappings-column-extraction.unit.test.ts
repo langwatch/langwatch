@@ -50,9 +50,7 @@ describe("extractReferencedSpanColumns", () => {
     it("does not match Status when only StatusCode is present", () => {
       // "Status" is an evaluation column; "StatusCode" is a span column.
       // Naive includes("Status") would false-match on "StatusCode".
-      const result = extractReferencedEvaluationColumns([
-        "ss.StatusCode = 'ERROR'",
-      ]);
+      const result = extractReferencedEvaluationColumns(["ss.StatusCode = 'ERROR'"]);
       expect(result).not.toContain("Status");
     });
 
@@ -139,41 +137,31 @@ describe("extractReferencedEvaluationColumns", () => {
 
   describe("when expression contains substring false positives", () => {
     it("does not match Status when only StatusCode is present", () => {
-      const result = extractReferencedEvaluationColumns([
-        "StatusCode = 'ERROR'",
-      ]);
+      const result = extractReferencedEvaluationColumns(["StatusCode = 'ERROR'"]);
       expect(result).not.toContain("Status");
     });
 
     it("does not match Score when only ScoreNormalized is present", () => {
-      const result = extractReferencedEvaluationColumns([
-        "ScoreNormalized > 0.5",
-      ]);
+      const result = extractReferencedEvaluationColumns(["ScoreNormalized > 0.5"]);
       expect(result).not.toContain("Score");
     });
 
     it("does not match Label when only LabelCategory is present", () => {
-      const result = extractReferencedEvaluationColumns([
-        "LabelCategory = 'test'",
-      ]);
+      const result = extractReferencedEvaluationColumns(["LabelCategory = 'test'"]);
       expect(result).not.toContain("Label");
     });
   });
 
   describe("when expression uses alias-qualified references", () => {
     it("extracts column with es. alias", () => {
-      const result = extractReferencedEvaluationColumns([
-        "es.EvaluatorType = 'llm'",
-      ]);
+      const result = extractReferencedEvaluationColumns(["es.EvaluatorType = 'llm'"]);
       expect(result).toContain("EvaluatorType");
     });
   });
 
   describe("when Status is genuinely referenced", () => {
     it("matches Status followed by a space", () => {
-      const result = extractReferencedEvaluationColumns([
-        "Status = 'completed'",
-      ]);
+      const result = extractReferencedEvaluationColumns(["Status = 'completed'"]);
       expect(result).toContain("Status");
     });
 
@@ -227,10 +215,7 @@ describe("extractReferencedTraceColumns", () => {
 
   describe("when expression references no trace columns", () => {
     it("returns an empty set", () => {
-      const result = extractReferencedTraceColumns([
-        "ss.DurationMs > 100",
-        "1=1",
-      ]);
+      const result = extractReferencedTraceColumns(["ss.DurationMs > 100", "1=1"]);
       expect(result.size).toBe(0);
     });
   });
@@ -245,10 +230,7 @@ describe("spanAttributesNarrowProjection", () => {
 
   it("reconstructs a multi-key map preserving each referenced key", () => {
     expect(
-      spanAttributesNarrowProjection([
-        "langwatch.span.type",
-        "gen_ai.request.model",
-      ]),
+      spanAttributesNarrowProjection(["langwatch.span.type", "gen_ai.request.model"]),
     ).toBe(
       "map('langwatch.span.type', SpanAttributes['langwatch.span.type'], 'gen_ai.request.model', SpanAttributes['gen_ai.request.model']) AS SpanAttributes",
     );

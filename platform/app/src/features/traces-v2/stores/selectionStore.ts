@@ -55,9 +55,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
   setMany: (traceIds, checked) =>
     set((state) => {
       const next =
-        state.mode === "all-matching"
-          ? new Set<string>()
-          : new Set(state.traceIds);
+        state.mode === "all-matching" ? new Set<string>() : new Set(state.traceIds);
       // Only an id that addresses a trace may enter; anything at all may leave,
       // so a selection can always be emptied.
       for (const id of checked ? traceIds.filter(addressesATrace) : traceIds) {
@@ -67,8 +65,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       return { mode: "explicit", traceIds: next };
     }),
 
-  enableAllMatching: () =>
-    set({ mode: "all-matching", traceIds: new Set<string>() }),
+  enableAllMatching: () => set({ mode: "all-matching", traceIds: new Set<string>() }),
 
   clear: () => set({ mode: "explicit", traceIds: new Set<string>() }),
 

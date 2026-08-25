@@ -58,12 +58,12 @@ See the [Docker image README](../../infra/clickhouse-serverless/README.md) for t
 
 ### Primary Inputs
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `cpu` | CPU cores (Kubernetes quantity, e.g. `2`, `500m`) | `2` |
-| `memory` | Memory (Kubernetes quantity, e.g. `4Gi`, `16G`) | `4Gi` |
-| `replicas` | Number of ClickHouse nodes. 1 = standalone MergeTree, 3+ = ReplicatedMergeTree + Keeper (must be odd) | `1` |
-| `clusterName` | ClickHouse cluster name used in macros and remote_servers config | `langwatch` |
+| Name          | Description                                                                                           | Default     |
+| ------------- | ----------------------------------------------------------------------------------------------------- | ----------- |
+| `cpu`         | CPU cores (Kubernetes quantity, e.g. `2`, `500m`)                                                     | `2`         |
+| `memory`      | Memory (Kubernetes quantity, e.g. `4Gi`, `16G`)                                                       | `4Gi`       |
+| `replicas`    | Number of ClickHouse nodes. 1 = standalone MergeTree, 3+ = ReplicatedMergeTree + Keeper (must be odd) | `1`         |
+| `clusterName` | ClickHouse cluster name used in macros and remote_servers config                                      | `langwatch` |
 
 > **`memory` scales with ingest, not just stored size.** The image auto-tunes
 > `max_server_memory_usage` (~85% of the limit) and per-query limits from
@@ -74,49 +74,49 @@ See the [Docker image README](../../infra/clickhouse-serverless/README.md) for t
 
 ### Image
 
-| Name | Description | Default |
-|------|-------------|---------|
+| Name               | Description      | Default                           |
+| ------------------ | ---------------- | --------------------------------- |
 | `image.repository` | Image repository | `langwatch/clickhouse-serverless` |
-| `image.tag` | Image tag | `0.2.0` |
-| `image.pullPolicy` | Pull policy | `IfNotPresent` |
+| `image.tag`        | Image tag        | `0.2.0`                           |
+| `image.pullPolicy` | Pull policy      | `IfNotPresent`                    |
 
 ### Storage
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `storage.size` | PVC size for hot data | `50Gi` |
-| `storage.storageClass` | StorageClass name (empty = cluster default) | `""` |
+| Name                   | Description                                 | Default |
+| ---------------------- | ------------------------------------------- | ------- |
+| `storage.size`         | PVC size for hot data                       | `50Gi`  |
+| `storage.storageClass` | StorageClass name (empty = cluster default) | `""`    |
 
 ### Cold Storage
 
-| Name | Description | Default |
-|------|-------------|---------|
+| Name           | Description                                                        | Default |
+| -------------- | ------------------------------------------------------------------ | ------- |
 | `cold.enabled` | Enable tiered hot-to-cold data movement (requires `objectStorage`) | `false` |
 
 ### Object Storage (S3-compatible)
 
 Shared by cold storage and backups. Required when either `cold.enabled` or `backup.enabled` is true.
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `objectStorage.bucket` | Bucket name | `""` |
-| `objectStorage.region` | Region (used to build default AWS endpoint) | `""` |
-| `objectStorage.endpoint` | Custom S3-compatible endpoint (MinIO, R2, etc.) | `""` |
-| `objectStorage.useEnvironmentCredentials` | Use IRSA / workload identity / pod SA | `true` |
-| `objectStorage.credentials.secretKeyRef.name` | Secret name for static S3 credentials | `""` |
-| `objectStorage.credentials.secretKeyRef.accessKeyId` | Key for access key ID in secret | `accessKey` |
-| `objectStorage.credentials.secretKeyRef.secretAccessKey` | Key for secret access key in secret | `secretKey` |
+| Name                                                     | Description                                     | Default     |
+| -------------------------------------------------------- | ----------------------------------------------- | ----------- |
+| `objectStorage.bucket`                                   | Bucket name                                     | `""`        |
+| `objectStorage.region`                                   | Region (used to build default AWS endpoint)     | `""`        |
+| `objectStorage.endpoint`                                 | Custom S3-compatible endpoint (MinIO, R2, etc.) | `""`        |
+| `objectStorage.useEnvironmentCredentials`                | Use IRSA / workload identity / pod SA           | `true`      |
+| `objectStorage.credentials.secretKeyRef.name`            | Secret name for static S3 credentials           | `""`        |
+| `objectStorage.credentials.secretKeyRef.accessKeyId`     | Key for access key ID in secret                 | `accessKey` |
+| `objectStorage.credentials.secretKeyRef.secretAccessKey` | Key for secret access key in secret             | `secretKey` |
 
 ### Backups
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `backup.enabled` | Enable native ClickHouse BACKUP/RESTORE to S3 (requires `objectStorage`) | `false` |
-| `backup.database` | Database to back up | `langwatch` |
-| `backup.user` | ClickHouse user for backup/restore operations | `default` |
-| `backup.resources` | CPU/memory requests + limits for the backup/restore Job containers | requests `100m`/`128Mi`, limits `500m`/`512Mi` |
-| `backup.full.schedule` | Cron schedule for full backups | `0 */12 * * *` |
-| `backup.incremental.schedule` | Cron schedule for incremental backups | `0 * * * *` |
+| Name                          | Description                                                              | Default                                        |
+| ----------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
+| `backup.enabled`              | Enable native ClickHouse BACKUP/RESTORE to S3 (requires `objectStorage`) | `false`                                        |
+| `backup.database`             | Database to back up                                                      | `langwatch`                                    |
+| `backup.user`                 | ClickHouse user for backup/restore operations                            | `default`                                      |
+| `backup.resources`            | CPU/memory requests + limits for the backup/restore Job containers       | requests `100m`/`128Mi`, limits `500m`/`512Mi` |
+| `backup.full.schedule`        | Cron schedule for full backups                                           | `0 */12 * * *`                                 |
+| `backup.incremental.schedule` | Cron schedule for incremental backups                                    | `0 * * * *`                                    |
 
 ### Backup alerting
 
@@ -139,17 +139,17 @@ has gone away, which would otherwise resolve every other rule into silence).
 
 Runbook: [`dev/docs/runbooks/clickhouse-backup-alerts.md`](../../dev/docs/runbooks/clickhouse-backup-alerts.md).
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `backup.monitoring.enabled` | Render the backup alerting rules (also requires `backup.enabled`) | `false` |
-| `backup.monitoring.runbookUrl` | Value for the `runbook_url` annotation on every alert | `""` |
-| `backup.monitoring.additionalLabels` | Labels merged into every alert, for Alertmanager or Grafana routing | `{}` |
-| `backup.monitoring.for` | How long a backup may look broken before the alert fires | `15m` |
-| `backup.monitoring.absentFor` | How long the CronJob's metrics may be missing before alerting | `30m` |
-| `backup.monitoring.prometheusRule.enabled` | Emit a `PrometheusRule` instead of a ConfigMap (needs prometheus-operator CRDs) | `false` |
-| `backup.monitoring.prometheusRule.labels` | Extra labels on the `PrometheusRule`, for the operator's `ruleSelector` | `{}` |
-| `backup.monitoring.configMapLabels` | Labels on the rules ConfigMap, for a rules sidecar to discover it | `{langwatch.ai/prometheus-rules: "true"}` |
-| `backup.monitoring.targets` | Backups to watch: `name`, `cronjob` or `cronjobName`, `staleAfterHours` | full at 26h, incremental at 3h |
+| Name                                       | Description                                                                     | Default                                   |
+| ------------------------------------------ | ------------------------------------------------------------------------------- | ----------------------------------------- |
+| `backup.monitoring.enabled`                | Render the backup alerting rules (also requires `backup.enabled`)               | `false`                                   |
+| `backup.monitoring.runbookUrl`             | Value for the `runbook_url` annotation on every alert                           | `""`                                      |
+| `backup.monitoring.additionalLabels`       | Labels merged into every alert, for Alertmanager or Grafana routing             | `{}`                                      |
+| `backup.monitoring.for`                    | How long a backup may look broken before the alert fires                        | `15m`                                     |
+| `backup.monitoring.absentFor`              | How long the CronJob's metrics may be missing before alerting                   | `30m`                                     |
+| `backup.monitoring.prometheusRule.enabled` | Emit a `PrometheusRule` instead of a ConfigMap (needs prometheus-operator CRDs) | `false`                                   |
+| `backup.monitoring.prometheusRule.labels`  | Extra labels on the `PrometheusRule`, for the operator's `ruleSelector`         | `{}`                                      |
+| `backup.monitoring.configMapLabels`        | Labels on the rules ConfigMap, for a rules sidecar to discover it               | `{langwatch.ai/prometheus-rules: "true"}` |
+| `backup.monitoring.targets`                | Backups to watch: `name`, `cronjob` or `cronjobName`, `staleAfterHours`         | full at 26h, incremental at 3h            |
 
 Add an entry to `backup.monitoring.targets` for any other backup CronJob in the
 same namespace, including ones this chart does not create. Name it either way:
@@ -173,23 +173,23 @@ has no kube-state-metrics series and cannot be watched from here.
 
 ### Authentication
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `autogen.enabled` | Chart materialises the credentials Secret via per-key `lookup-or-rand` (existing values reused on upgrade). Must be enabled unless `auth.existingSecret` is set. | `false` |
-| `auth.password` | Seed value when `autogen.enabled=true` and you want a deterministic password instead of `randAlphaNum`. Ignored when `auth.existingSecret` is set. | `""` |
-| `auth.clusterSecret` | Seed value for the Keeper inter-node cluster secret (only used when `replicas>1`). Ignored when `auth.existingSecret` is set. | `""` |
-| `auth.existingSecret` | Name of an operator-owned Secret. When set, the chart skips its own Secret render and a preflight Job verifies the required keys exist before pods roll. | `""` |
-| `auth.secretKeys.passwordKey` | Key name for the password in both autogen and existingSecret paths | `password` |
-| `auth.secretKeys.clusterSecretKey` | Key name for the Keeper cluster secret | `clusterSecret` |
-| `preflight.enabled` | Run the pre-install/pre-upgrade Secret-keys Job when `auth.existingSecret` is set | `true` |
-| `preflight.image` | Container image (needs `sh` + `kubectl` + `jq`; the Job fails fast if `jq` is missing) | `alpine/k8s:1.30.0` |
-| `preflight.activeDeadlineSeconds` | Hard timeout for the preflight Job | `60` |
+| Name                               | Description                                                                                                                                                      | Default             |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `autogen.enabled`                  | Chart materialises the credentials Secret via per-key `lookup-or-rand` (existing values reused on upgrade). Must be enabled unless `auth.existingSecret` is set. | `false`             |
+| `auth.password`                    | Seed value when `autogen.enabled=true` and you want a deterministic password instead of `randAlphaNum`. Ignored when `auth.existingSecret` is set.               | `""`                |
+| `auth.clusterSecret`               | Seed value for the Keeper inter-node cluster secret (only used when `replicas>1`). Ignored when `auth.existingSecret` is set.                                    | `""`                |
+| `auth.existingSecret`              | Name of an operator-owned Secret. When set, the chart skips its own Secret render and a preflight Job verifies the required keys exist before pods roll.         | `""`                |
+| `auth.secretKeys.passwordKey`      | Key name for the password in both autogen and existingSecret paths                                                                                               | `password`          |
+| `auth.secretKeys.clusterSecretKey` | Key name for the Keeper cluster secret                                                                                                                           | `clusterSecret`     |
+| `preflight.enabled`                | Run the pre-install/pre-upgrade Secret-keys Job when `auth.existingSecret` is set                                                                                | `true`              |
+| `preflight.image`                  | Container image (needs `sh` + `kubectl` + `jq`; the Job fails fast if `jq` is missing)                                                                           | `alpine/k8s:1.30.0` |
+| `preflight.activeDeadlineSeconds`  | Hard timeout for the preflight Job                                                                                                                               | `60`                |
 
 ### Users
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `users` | Custom users string: `user1:pass1:readwrite:db1,db2;user2:pass2:readonly:*` | `""` |
+| Name    | Description                                                                 | Default |
+| ------- | --------------------------------------------------------------------------- | ------- |
+| `users` | Custom users string: `user1:pass1:readwrite:db1,db2;user2:pass2:readonly:*` | `""`    |
 
 Example:
 
@@ -201,36 +201,36 @@ This creates two users: `analyst` with read-only access to all databases, and `e
 
 ### Advanced
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `env` | Override any auto-computed value (applied last). Example: `{ MAX_CONCURRENT_QUERIES: "200" }` | `{}` |
+| Name  | Description                                                                                   | Default |
+| ----- | --------------------------------------------------------------------------------------------- | ------- |
+| `env` | Override any auto-computed value (applied last). Example: `{ MAX_CONCURRENT_QUERIES: "200" }` | `{}`    |
 
 ### Keeper (replicated mode only)
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `keeper.resources.requests.cpu` | Keeper CPU request | `250m` |
+| Name                               | Description           | Default |
+| ---------------------------------- | --------------------- | ------- |
+| `keeper.resources.requests.cpu`    | Keeper CPU request    | `250m`  |
 | `keeper.resources.requests.memory` | Keeper memory request | `512Mi` |
-| `keeper.resources.limits.cpu` | Keeper CPU limit | `1` |
-| `keeper.resources.limits.memory` | Keeper memory limit | `1Gi` |
-| `keeper.storage.size` | Keeper PVC size | `10Gi` |
+| `keeper.resources.limits.cpu`      | Keeper CPU limit      | `1`     |
+| `keeper.resources.limits.memory`   | Keeper memory limit   | `1Gi`   |
+| `keeper.storage.size`              | Keeper PVC size       | `10Gi`  |
 
 ### Scheduling
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `scheduling.nodeSelector` | Node selector labels | `{}` |
-| `scheduling.affinity` | Affinity rules | `{}` |
-| `scheduling.tolerations` | Tolerations | `[]` |
+| Name                      | Description          | Default |
+| ------------------------- | -------------------- | ------- |
+| `scheduling.nodeSelector` | Node selector labels | `{}`    |
+| `scheduling.affinity`     | Affinity rules       | `{}`    |
+| `scheduling.tolerations`  | Tolerations          | `[]`    |
 
 ### ServiceAccount
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `serviceAccount.create` | Create a dedicated ServiceAccount | `true` |
-| `serviceAccount.name` | ServiceAccount name (defaults to the chart fullname) | `""` |
+| Name                                          | Description                                                                                                                                             | Default |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `serviceAccount.create`                       | Create a dedicated ServiceAccount                                                                                                                       | `true`  |
+| `serviceAccount.name`                         | ServiceAccount name (defaults to the chart fullname)                                                                                                    | `""`    |
 | `serviceAccount.automountServiceAccountToken` | Mount the SA token; ClickHouse/Keeper need no Kubernetes API access. Also set on the pod specs so policies that inspect the pod (not the SA) accept it. | `false` |
-| `serviceAccount.annotations` | ServiceAccount annotations (e.g. IRSA role ARN) | `{}` |
+| `serviceAccount.annotations`                  | ServiceAccount annotations (e.g. IRSA role ARN)                                                                                                         | `{}`    |
 
 ### Scratch volumes
 
@@ -238,10 +238,10 @@ Writable `emptyDir`s for the paths touched outside the data PVC, so the pods can
 run with a read-only root filesystem. Bounded so a runaway pod is evicted on its
 own quota instead of filling the node.
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `scratch.logsSizeLimit` | Size cap for `/var/log/clickhouse-server` and `/var/log/clickhouse-keeper` | `2Gi` |
-| `scratch.tmpSizeLimit` | Size cap for `/tmp` on the server, Keeper, and the backup/restore Jobs | `1Gi` |
+| Name                    | Description                                                                | Default |
+| ----------------------- | -------------------------------------------------------------------------- | ------- |
+| `scratch.logsSizeLimit` | Size cap for `/var/log/clickhouse-server` and `/var/log/clickhouse-keeper` | `2Gi`   |
+| `scratch.tmpSizeLimit`  | Size cap for `/tmp` on the server, Keeper, and the backup/restore Jobs     | `1Gi`   |
 
 ## Pod Security
 

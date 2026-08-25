@@ -14,12 +14,10 @@ import {
 
 const licenseCryptography = NodeLicenseCryptographyAdapter.create();
 
-const { mockNotifyResourceLimitReached, mockCaptureException } = vi.hoisted(
-  () => ({
-    mockNotifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
-    mockCaptureException: vi.fn(),
-  }),
-);
+const { mockNotifyResourceLimitReached, mockCaptureException } = vi.hoisted(() => ({
+  mockNotifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
+  mockCaptureException: vi.fn(),
+}));
 
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
@@ -318,12 +316,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo(plan.maxMembers);
 
       await expect(
-        assertMemberTypeLimitNotExceeded(
-          "lite-to-full",
-          organizationId,
-          mockRepo,
-          plan,
-        ),
+        assertMemberTypeLimitNotExceeded("lite-to-full", organizationId, mockRepo, plan),
       ).rejects.toMatchObject({
         code: "resource_limit_exceeded",
         meta: { limitType: "members" },
@@ -337,12 +330,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo(plan.maxMembers - 1);
 
       await expect(
-        assertMemberTypeLimitNotExceeded(
-          "lite-to-full",
-          organizationId,
-          mockRepo,
-          plan,
-        ),
+        assertMemberTypeLimitNotExceeded("lite-to-full", organizationId, mockRepo, plan),
       ).resolves.toBeUndefined();
     });
   });

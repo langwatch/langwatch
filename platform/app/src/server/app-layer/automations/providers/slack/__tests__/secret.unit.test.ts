@@ -142,9 +142,7 @@ describe("redactSlackActionParams", () => {
 
 describe("decryptSlackBotToken", () => {
   it("decrypts the stored token", () => {
-    expect(decryptSlackBotToken({ slackBotToken: "enc(xoxb-live)" })).toBe(
-      "xoxb-live",
-    );
+    expect(decryptSlackBotToken({ slackBotToken: "enc(xoxb-live)" })).toBe("xoxb-live");
   });
 
   it("returns null when no token is stored", () => {

@@ -29,9 +29,7 @@ import { fieldSchema } from "@langwatch/workflow-contract";
  *
  * This is a pure function; it does not mutate its input.
  */
-export function mergeLocalConfigsIntoDsl(
-  nodes: Node<Component>[],
-): Node<Component>[] {
+export function mergeLocalConfigsIntoDsl(nodes: Node<Component>[]): Node<Component>[] {
   return nodes.map((node) => {
     if (node.type === "signature" && hasLocalPromptConfig(node.data)) {
       return mergeSignatureLocalConfig(node);
@@ -95,19 +93,17 @@ function mergeSignatureLocalConfig(node: Node<Component>): Node<Component> {
     },
   ];
 
-  const outputs: LlmPromptConfigComponent["outputs"] = local.outputs.map(
-    (output) => {
-      const field = fieldSchema.parse({
-        identifier: output.identifier,
-        type: output.type,
-        json_schema: output.json_schema,
-      });
-      return {
-        ...field,
-        type: output.type as LlmConfigOutputType,
-      };
-    },
-  );
+  const outputs: LlmPromptConfigComponent["outputs"] = local.outputs.map((output) => {
+    const field = fieldSchema.parse({
+      identifier: output.identifier,
+      type: output.type,
+      json_schema: output.json_schema,
+    });
+    return {
+      ...field,
+      type: output.type as LlmConfigOutputType,
+    };
+  });
 
   const mergedData: LlmPromptConfigComponent = {
     ...data,

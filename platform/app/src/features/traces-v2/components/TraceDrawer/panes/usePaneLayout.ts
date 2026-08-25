@@ -31,9 +31,7 @@ export type DrawerLayout = "vertical" | "horizontal";
  * A `null` ref or SSR returns "vertical" to match the legacy stacked
  * layout.
  */
-export function usePaneLayout(
-  containerRef: RefObject<HTMLElement | null>,
-): DrawerLayout {
+export function usePaneLayout(containerRef: RefObject<HTMLElement | null>): DrawerLayout {
   const widthPx = useDrawerStore((s) => s.widthPx);
 
   // Compute the "drag-driven" layout: any widthPx that's wider than
@@ -46,8 +44,7 @@ export function usePaneLayout(
     return widthPx > availableHeight ? "horizontal" : "vertical";
   })();
 
-  const [observedLayout, setObservedLayout] =
-    useState<DrawerLayout>(widthDrivenLayout);
+  const [observedLayout, setObservedLayout] = useState<DrawerLayout>(widthDrivenLayout);
 
   useEffect(() => {
     const el = containerRef.current;

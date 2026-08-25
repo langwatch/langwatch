@@ -52,9 +52,7 @@ export class PromptTagAssignmentRepository {
         { versionId, configId, projectId },
         "Version does not belong to prompt config",
       );
-      throw new TagValidationError(
-        "Version does not belong to this prompt config",
-      );
+      throw new TagValidationError("Version does not belong to this prompt config");
     }
   }
 

@@ -104,9 +104,9 @@ describe("redactReportText", () => {
     });
 
     it("redacts Luhn-valid card numbers, formatted or bare", () => {
-      expect(
-        redactReportText({ text: "card 4111 1111 1111 1111 on file" }).text,
-      ).toBe("card [CREDIT_CARD] on file");
+      expect(redactReportText({ text: "card 4111 1111 1111 1111 on file" }).text).toBe(
+        "card [CREDIT_CARD] on file",
+      );
       expect(redactReportText({ text: "card 4111111111111111 ok" }).text).toBe(
         "card [CREDIT_CARD] ok",
       );
@@ -147,9 +147,7 @@ describe("redactReportText", () => {
       const filler = "x".repeat(300_000);
       const text = `${filler}\nkey sk-proj-abcdefghijklmnopqrstuvwxyz123456 end`;
       const result = redactReportText({ text });
-      expect(result.text).not.toContain(
-        "sk-proj-abcdefghijklmnopqrstuvwxyz123456",
-      );
+      expect(result.text).not.toContain("sk-proj-abcdefghijklmnopqrstuvwxyz123456");
       expect(result.text).toContain("[SECRET]");
     });
   });
@@ -192,8 +190,7 @@ describe("redactSessionJsonl", () => {
     });
 
     it("redacts lines that fail to parse as plain text", () => {
-      const jsonl =
-        "not json but has sk-proj-abcdefghijklmnopqrstuvwxyz123456 inside";
+      const jsonl = "not json but has sk-proj-abcdefghijklmnopqrstuvwxyz123456 inside";
       const result = redactSessionJsonl({ jsonl });
       expect(result.text).toBe("not json but has [SECRET] inside");
     });
@@ -220,10 +217,7 @@ describe("truncateJsonlToByteBudget", () => {
   describe("given a transcript over the budget", () => {
     /** @scenario "Oversized sessions are truncated from the start, keeping the most recent activity" */
     it("keeps only the most recent whole lines and flags truncation", () => {
-      const lines = Array.from(
-        { length: 100 },
-        (_, i) => `line-${i}-${"y".repeat(50)}`,
-      );
+      const lines = Array.from({ length: 100 }, (_, i) => `line-${i}-${"y".repeat(50)}`);
       const result = truncateJsonlToByteBudget({
         jsonl: lines.join("\n"),
         maxBytes: 300,

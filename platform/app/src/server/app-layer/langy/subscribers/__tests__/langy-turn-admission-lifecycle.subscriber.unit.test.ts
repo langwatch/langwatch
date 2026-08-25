@@ -79,10 +79,7 @@ describe("Langy turn admission lifecycle subscriber", () => {
     const deps = makeDeps();
     const subscriber = createLangyTurnAdmissionLifecycleSubscriber(deps);
 
-    await subscriber.handle(
-      event(LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED, {}),
-      context,
-    );
+    await subscriber.handle(event(LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED, {}), context);
 
     expect(deps.admissions.release).toHaveBeenCalledWith({
       projectId: "project-1",

@@ -113,8 +113,7 @@ const CURTAINS: Curtain[] = [
   },
 ];
 
-const gradientId = (index: number, suffix: string) =>
-  `tracesV2Aurora${suffix}${index}`;
+const gradientId = (index: number, suffix: string) => `tracesV2Aurora${suffix}${index}`;
 
 interface AuroraSvgProps {
   /** Suffix appended to gradient IDs so multiple instances on a page don't collide. */

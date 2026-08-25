@@ -612,10 +612,7 @@ export const registry: IntegrationRegistry = [
       internal: "/integration/java/integrations/spring-ai",
       external: "https://spring.io/projects/spring-ai",
     },
-    icon: singleIcon(
-      "/images/external-icons/spring-boot.svg",
-      "Spring Boot AI",
-    ),
+    icon: singleIcon("/images/external-icons/spring-boot.svg", "Spring Boot AI"),
     snippet: yamlRef(springAiYamlSource as unknown as string),
   },
 
@@ -626,10 +623,7 @@ export const registry: IntegrationRegistry = [
       internal: "/integration/opentelemetry/guide",
       external: "https://opentelemetry.io/docs/getting-started/dev/",
     },
-    icon: singleIcon(
-      "/images/external-icons/opentelemetry.svg",
-      "OpenTelemetry",
-    ),
+    icon: singleIcon("/images/external-icons/opentelemetry.svg", "OpenTelemetry"),
     label: "OpenTelemetry",
     category: "traditional",
     customComponent: OpenTelemetrySetup,
@@ -687,17 +681,12 @@ export function getRegistryEntry(
   if (!framework) {
     return registry.find((r) => r.platform === platform);
   }
-  return registry.find(
-    (r) => r.platform === platform && r.framework === framework,
-  );
+  return registry.find((r) => r.platform === platform && r.framework === framework);
 }
 
 export function deriveFrameworksByPlatform(
   category?: IntegrationCategory,
-): Record<
-  PlatformKey,
-  { key: FrameworkKey; label: string; icon?: IconData }[]
-> {
+): Record<PlatformKey, { key: FrameworkKey; label: string; icon?: IconData }[]> {
   const out: Record<
     PlatformKey,
     { key: FrameworkKey; label: string; icon?: IconData }[]

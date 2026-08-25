@@ -13,6 +13,7 @@ This test plan covers HTTP Agent support in the Evaluations V3 Workbench. HTTP a
 ## Suite 1: Full Evaluation Run with HTTP Agent Target
 
 Covers feature scenario lines 222-231:
+
 ```gherkin
 @e2e
 Scenario: Full evaluation run with HTTP agent target
@@ -31,6 +32,7 @@ Scenario: Full evaluation run with HTTP agent target
 **File:** `tests/evaluations-v3/http-agent-full-evaluation.spec.ts`
 
 **Steps:**
+
 1. Navigate to Evaluations page at `/{project}/evaluations`
 2. Click "New Evaluation" dropdown > "Experiment"
 3. Wait for redirect to `/experiments/workbench/{slug}`
@@ -54,6 +56,7 @@ Scenario: Full evaluation run with HTTP agent target
 13. Wait for execution to complete
 
 **Expected Results:**
+
 - All 3 target cells show echoed output
 - All 3 evaluator chips show pass (green checkmark)
 - Target header shows aggregate "100%" or "3/3 passed"
@@ -63,6 +66,7 @@ Scenario: Full evaluation run with HTTP agent target
 ## Suite 2: Single Cell Re-execution
 
 Covers feature scenario lines 233-238:
+
 ```gherkin
 @e2e
 Scenario: Single cell re-execution for HTTP agent
@@ -79,12 +83,14 @@ Scenario: Single cell re-execution for HTTP agent
 **Prerequisites:** Evaluation results exist from Test 1
 
 **Steps:**
+
 1. Modify row 1 input from "world" to "modified"
 2. Hover over target cell in row 1
 3. Click the play button on the cell
 4. Wait for loading to complete
 
 **Expected Results:**
+
 - Only row 1 shows loading skeleton during execution
 - Rows 0 and 2 remain unchanged
 - Row 1 target cell now shows "modified"
@@ -112,6 +118,7 @@ Scenario: Single cell re-execution for HTTP agent
 ## Mock Endpoint
 
 Use `https://httpbin.org/post` which:
+
 - Accepts POST requests
 - Echoes request body in `.json` field
 - Publicly available, no auth required
@@ -119,6 +126,7 @@ Use `https://httpbin.org/post` which:
 ## Chakra UI Notes
 
 Use `.last()` to target visible dialog elements:
+
 ```typescript
 await page.getByRole("button", { name: "Create Agent" }).last().click();
 ```

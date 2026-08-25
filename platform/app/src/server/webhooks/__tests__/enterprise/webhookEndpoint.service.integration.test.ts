@@ -159,9 +159,7 @@ describe("webhook endpoint service", () => {
         url: "http://localhost:4101/webhooks/langwatch",
         enabledEvents: ["gateway.request.completed"],
       });
-      expect(created.endpoint.url).toBe(
-        "http://localhost:4101/webhooks/langwatch",
-      );
+      expect(created.endpoint.url).toBe("http://localhost:4101/webhooks/langwatch");
     } finally {
       if (previous === undefined) {
         delete process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;

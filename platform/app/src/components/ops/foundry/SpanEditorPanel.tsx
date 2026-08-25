@@ -17,12 +17,7 @@ import { LLMSpanEditor } from "./span-editors/LLMSpanEditor";
 import { PromptSpanEditor } from "./span-editors/PromptSpanEditor";
 import { RAGSpanEditor } from "./span-editors/RAGSpanEditor";
 import { useTraceStore } from "./traceStore";
-import {
-  SPAN_TYPE_ICONS,
-  SPAN_TYPES,
-  type SpanConfig,
-  type SpanType,
-} from "./types";
+import { SPAN_TYPE_ICONS, SPAN_TYPES, type SpanConfig, type SpanType } from "./types";
 
 function findSpan(spans: SpanConfig[], id: string): SpanConfig | undefined {
   for (const span of spans) {
@@ -65,18 +60,10 @@ export function SpanEditorPanel() {
           {span.name}
         </Text>
         <HStack gap={1}>
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => indentSpan(span.id)}
-          >
+          <Button size="xs" variant="outline" onClick={() => indentSpan(span.id)}>
             <ArrowRight size={14} />
           </Button>
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => outdentSpan(span.id)}
-          >
+          <Button size="xs" variant="outline" onClick={() => outdentSpan(span.id)}>
             <ArrowLeft size={14} />
           </Button>
         </HStack>
@@ -101,9 +88,7 @@ export function SpanEditorPanel() {
             size="sm"
             collection={spanTypeCollection}
             value={[span.type]}
-            onValueChange={(e) =>
-              updateSpan(span.id, { type: e.value[0] as SpanType })
-            }
+            onValueChange={(e) => updateSpan(span.id, { type: e.value[0] as SpanType })}
           >
             <Select.Trigger>
               <Select.ValueText />

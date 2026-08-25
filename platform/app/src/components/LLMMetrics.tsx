@@ -181,11 +181,7 @@ export function LLMMetrics() {
                 unmountOnExit
               >
                 <Tabs.List gap={12}>
-                  <Tabs.Trigger
-                    value="llmCallsGraph"
-                    paddingX={0}
-                    paddingBottom={4}
-                  >
+                  <Tabs.Trigger value="llmCallsGraph" paddingX={0} paddingBottom={4}>
                     <CustomGraph
                       input={{
                         ...llmCallsGraph,
@@ -199,11 +195,7 @@ export function LLMMetrics() {
                     />
                   </Tabs.Trigger>
                   {hasPermission("cost:view") && (
-                    <Tabs.Trigger
-                      value="totalCostGraph"
-                      paddingX={0}
-                      paddingBottom={4}
-                    >
+                    <Tabs.Trigger value="totalCostGraph" paddingX={0} paddingBottom={4}>
                       <CustomGraph
                         input={{ ...totalCostGraph, graphType: "summary" }}
                         titleProps={{
@@ -213,11 +205,7 @@ export function LLMMetrics() {
                       />
                     </Tabs.Trigger>
                   )}
-                  <Tabs.Trigger
-                    value="tokensGraph"
-                    paddingX={0}
-                    paddingBottom={4}
-                  >
+                  <Tabs.Trigger value="tokensGraph" paddingX={0} paddingBottom={4}>
                     <CustomGraph
                       input={totalTokensSummary}
                       titleProps={{

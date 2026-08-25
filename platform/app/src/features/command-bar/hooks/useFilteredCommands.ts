@@ -15,10 +15,7 @@ import {
   supportCommands,
   themeCommands,
 } from "../command-registry";
-import {
-  MIN_CATEGORY_MATCH_LENGTH,
-  MIN_SEARCH_QUERY_LENGTH,
-} from "../constants";
+import { MIN_CATEGORY_MATCH_LENGTH, MIN_SEARCH_QUERY_LENGTH } from "../constants";
 import { getPageCommands } from "../pageCommands";
 import type { Command } from "../types";
 
@@ -57,9 +54,7 @@ export function useFilteredCommands(
     // Check if searching for navigation category (must be a close match)
     const navKeywords = ["navigation", "navigate", "go to", "jump to", "pages"];
     const isSearchingCategory = navKeywords.some(
-      (kw) =>
-        kw.startsWith(lowerQuery) &&
-        lowerQuery.length >= MIN_CATEGORY_MATCH_LENGTH,
+      (kw) => kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_CATEGORY_MATCH_LENGTH,
     );
 
     if (isSearchingCategory) {
@@ -77,26 +72,14 @@ export function useFilteredCommands(
     return FRONTEND_FEATURE_FLAGS.map((flag) => {
       const current = featureFlagOverrides[flag];
       const stateLabel =
-        current === undefined
-          ? "server-resolved"
-          : current
-            ? "forced ON"
-            : "forced OFF";
+        current === undefined ? "server-resolved" : current ? "forced ON" : "forced OFF";
       return {
         id: `action-feature-flag-toggle:${flag}`,
         label: `Toggle ${flag}`,
         description: `Currently ${stateLabel} — cycles default → on → off`,
         icon: ToggleLeft,
         category: "actions",
-        keywords: [
-          "feature",
-          "flag",
-          "flags",
-          "toggle",
-          "dev",
-          "override",
-          flag,
-        ],
+        keywords: ["feature", "flag", "flags", "toggle", "dev", "override", flag],
         action: () => {
           const next =
             current === undefined ? true : current === true ? false : undefined;
@@ -124,20 +107,9 @@ export function useFilteredCommands(
           : "Keep Ops visible in the sidebar (this browser)",
         icon: pinned ? PinOff : Pin,
         category: "actions",
-        keywords: [
-          "ops",
-          "pin",
-          "sidebar",
-          "always",
-          "show",
-          "operations",
-          "menu",
-        ],
+        keywords: ["ops", "pin", "sidebar", "always", "show", "operations", "menu"],
         action: () => {
-          setFeatureFlagOverride(
-            "ops_ui_ops_menu_pinned",
-            pinned ? undefined : true,
-          );
+          setFeatureFlagOverride("ops_ui_ops_menu_pinned", pinned ? undefined : true);
         },
       },
     ];
@@ -162,9 +134,7 @@ export function useFilteredCommands(
     // Check if searching for actions category (must be a close match)
     const actionKeywords = ["new", "create", "add new", "actions"];
     const isSearchingCategory = actionKeywords.some(
-      (kw) =>
-        kw.startsWith(lowerQuery) &&
-        lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
+      (kw) => kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
     );
 
     if (isSearchingCategory) {
@@ -181,17 +151,9 @@ export function useFilteredCommands(
     const lowerQuery = query.toLowerCase().trim();
 
     // Check if searching for support/help category
-    const supportKeywords = [
-      "support",
-      "help",
-      "docs",
-      "documentation",
-      "chat",
-    ];
+    const supportKeywords = ["support", "help", "docs", "documentation", "chat"];
     const isSearchingCategory = supportKeywords.some(
-      (kw) =>
-        kw.startsWith(lowerQuery) &&
-        lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
+      (kw) => kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
     );
 
     // Filter out "Open Chat" if not SAAS and set dynamic paths
@@ -221,9 +183,7 @@ export function useFilteredCommands(
     // Check if searching for theme category
     const themeKeywords = ["theme", "dark", "light", "mode", "appearance"];
     const isSearchingCategory = themeKeywords.some(
-      (kw) =>
-        kw.startsWith(lowerQuery) &&
-        lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
+      (kw) => kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
     );
 
     if (isSearchingCategory) {

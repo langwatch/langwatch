@@ -389,10 +389,7 @@ export class VirtualKeysApiService {
     return virtual_key;
   }
 
-  async rotate(
-    id: string,
-    options?: MutationOptions,
-  ): Promise<VirtualKeyWithSecret> {
+  async rotate(id: string, options?: MutationOptions): Promise<VirtualKeyWithSecret> {
     return this.request<VirtualKeyWithSecret>(
       `rotate virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/rotate`,

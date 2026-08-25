@@ -22,6 +22,7 @@ Or call the script directly:
 ```
 
 The script will:
+
 1. Fetch latest from `origin`
 2. Derive a branch name (`issue<N>/<slug>` or `feat/<name>`)
 3. Create the worktree in `.worktrees/<branch-with-slash-as-hyphen>/`
@@ -45,10 +46,10 @@ langwatch/                                    # Repo root
 
 ## Branch Naming Convention
 
-| Input | Branch Name | Directory |
-|-------|-------------|-----------|
-| `1663` (issue) | `issue1663/<slug-from-title>` | `.worktrees/issue1663-<slug>` |
-| `add-dark-mode` | `feat/add-dark-mode` | `.worktrees/feat-add-dark-mode` |
+| Input           | Branch Name                   | Directory                       |
+| --------------- | ----------------------------- | ------------------------------- |
+| `1663` (issue)  | `issue1663/<slug-from-title>` | `.worktrees/issue1663-<slug>`   |
+| `add-dark-mode` | `feat/add-dark-mode`          | `.worktrees/feat-add-dark-mode` |
 
 Slugs are derived from issue titles: lowercase, hyphens, special characters stripped, truncated at word boundary for very long titles.
 

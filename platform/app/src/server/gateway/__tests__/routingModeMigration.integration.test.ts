@@ -262,9 +262,7 @@ describe("keys that predate the routing choice keep falling back against real PG
       routingMode: "FALLBACK_ALL",
     });
 
-    const bundle = await new GatewayConfigMaterialiser(prisma).materialise(
-      virtualKey,
-    );
+    const bundle = await new GatewayConfigMaterialiser(prisma).materialise(virtualKey);
 
     expect(bundle.routing_mode).toBe("fallback_all");
     expect(bundle.fallback.chain).toEqual(
@@ -285,9 +283,7 @@ describe("keys that predate the routing choice keep falling back against real PG
 
     expect(virtualKey.routingMode).toBe("NONE");
 
-    const bundle = await new GatewayConfigMaterialiser(prisma).materialise(
-      virtualKey,
-    );
+    const bundle = await new GatewayConfigMaterialiser(prisma).materialise(virtualKey);
     expect(bundle.routing_mode).toBe("none");
     expect(bundle.fallback.max_attempts).toBe(1);
   });

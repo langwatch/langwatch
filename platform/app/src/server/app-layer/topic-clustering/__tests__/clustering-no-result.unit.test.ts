@@ -14,12 +14,13 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { assignTopicMock, recordTopicsMock, stagedLangevalsFetchMock } =
-  vi.hoisted(() => ({
+const { assignTopicMock, recordTopicsMock, stagedLangevalsFetchMock } = vi.hoisted(
+  () => ({
     assignTopicMock: vi.fn(),
     recordTopicsMock: vi.fn(),
     stagedLangevalsFetchMock: vi.fn(),
-  }));
+  }),
+);
 
 const mockClickHouseQuery = vi.fn();
 /** The resolver the caller threads in — the production seam, injected here
@@ -54,15 +55,11 @@ vi.mock("~/server/embeddings", () => ({
 }));
 
 vi.mock("~/server/modelProviders/resolveModelForFeature", () => ({
-  resolveModelForFeature: vi
-    .fn()
-    .mockResolvedValue({ model: "openai/gpt-5-mini" }),
+  resolveModelForFeature: vi.fn().mockResolvedValue({ model: "openai/gpt-5-mini" }),
 }));
 
 vi.mock("~/server/api/routers/modelProviders.utils", () => ({
-  getProjectModelProviders: vi
-    .fn()
-    .mockResolvedValue({ openai: { enabled: true } }),
+  getProjectModelProviders: vi.fn().mockResolvedValue({ openai: { enabled: true } }),
   prepareLitellmParams: vi.fn().mockResolvedValue({ model: "gpt-5-mini" }),
 }));
 
@@ -112,9 +109,7 @@ describe("clusterTopicsForProject", () => {
     vi.mocked(prisma.topic.findMany).mockResolvedValue([]);
     vi.mocked(prisma.topic.deleteMany).mockResolvedValue({ count: 0 } as any);
     vi.mocked(prisma.topic.createMany).mockResolvedValue({ count: 0 } as any);
-    vi.mocked(prisma.project.findUnique).mockResolvedValue(
-      makeProject() as any,
-    );
+    vi.mocked(prisma.project.findUnique).mockResolvedValue(makeProject() as any);
     resolveClickHouseClient.mockResolvedValue({
       query: mockClickHouseQuery,
     } as any);
@@ -124,8 +119,7 @@ describe("clusterTopicsForProject", () => {
     describe("when a batch page of clusterable traces is run", () => {
       beforeEach(() => {
         mockClickHouseQuery.mockResolvedValueOnce({
-          json: () =>
-            Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
+          json: () => Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
         });
         mockClickHouseQuery.mockResolvedValueOnce({
           json: () => Promise.resolve(usableTraceRows(12)),
@@ -185,9 +179,7 @@ describe("storeResults", () => {
       });
 
       it("returns null so the caller can report a skip", async () => {
-        await expect(
-          storeResults("proj-1", undefined, false),
-        ).resolves.toBeNull();
+        await expect(storeResults("proj-1", undefined, false)).resolves.toBeNull();
       });
     });
   });
@@ -234,9 +226,7 @@ describe("storeResults", () => {
             tenantId: "proj-1",
             mode: "replace",
             source: "clustering",
-            topics: [
-              expect.objectContaining({ id: "topic_a", name: "Greetings" }),
-            ],
+            topics: [expect.objectContaining({ id: "topic_a", name: "Greetings" })],
           }),
         );
       });

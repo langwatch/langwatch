@@ -81,15 +81,11 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
 
     it("returns 'application' when origin is explicitly 'application'", () => {
-      expect(matcher(makeTraceData({ origin: "application" }), "")).toBe(
-        "application",
-      );
+      expect(matcher(makeTraceData({ origin: "application" }), "")).toBe("application");
     });
 
     it("returns the origin value when present", () => {
-      expect(matcher(makeTraceData({ origin: "playground" }), "")).toBe(
-        "playground",
-      );
+      expect(matcher(makeTraceData({ origin: "playground" }), "")).toBe("playground");
     });
   });
 
@@ -133,9 +129,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.customer_id"]!;
 
     it("returns customerId from trace data", () => {
-      expect(matcher(makeTraceData({ customerId: "cust_1" }), "")).toBe(
-        "cust_1",
-      );
+      expect(matcher(makeTraceData({ customerId: "cust_1" }), "")).toBe("cust_1");
     });
   });
 
@@ -143,10 +137,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.labels"]!;
 
     it("returns labels array from trace data", () => {
-      expect(matcher(makeTraceData({ labels: ["a", "b"] }), "")).toEqual([
-        "a",
-        "b",
-      ]);
+      expect(matcher(makeTraceData({ labels: ["a", "b"] }), "")).toEqual(["a", "b"]);
     });
 
     it("returns empty array when labels is empty", () => {
@@ -211,9 +202,10 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["spans.type"]!;
 
     it("returns spanTypes array from trace data", () => {
-      expect(matcher(makeTraceData({ spanTypes: ["llm", "rag"] }), "")).toEqual(
-        ["llm", "rag"],
-      );
+      expect(matcher(makeTraceData({ spanTypes: ["llm", "rag"] }), "")).toEqual([
+        "llm",
+        "rag",
+      ]);
     });
   });
 
@@ -221,9 +213,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["spans.model"]!;
 
     it("returns spanModels array from trace data", () => {
-      expect(matcher(makeTraceData({ spanModels: ["gpt-4"] }), "")).toEqual([
-        "gpt-4",
-      ]);
+      expect(matcher(makeTraceData({ spanModels: ["gpt-4"] }), "")).toEqual(["gpt-4"]);
     });
   });
 
@@ -231,9 +221,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["topics.topics"]!;
 
     it("returns topicId wrapped in array when present", () => {
-      expect(matcher(makeTraceData({ topicId: "topic_1" }), "")).toEqual([
-        "topic_1",
-      ]);
+      expect(matcher(makeTraceData({ topicId: "topic_1" }), "")).toEqual(["topic_1"]);
     });
 
     it("returns null when topicId is not set", () => {
@@ -245,9 +233,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["topics.subtopics"]!;
 
     it("returns subTopicId wrapped in array when present", () => {
-      expect(matcher(makeTraceData({ subTopicId: "sub_1" }), "")).toEqual([
-        "sub_1",
-      ]);
+      expect(matcher(makeTraceData({ subTopicId: "sub_1" }), "")).toEqual(["sub_1"]);
     });
 
     it("returns null when subTopicId is not set", () => {
@@ -259,9 +245,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["annotations.hasAnnotation"]!;
 
     it("returns 'true' when annotationIds is non-empty", () => {
-      expect(matcher(makeTraceData({ annotationIds: ["ann-1"] }), "")).toBe(
-        "true",
-      );
+      expect(matcher(makeTraceData({ annotationIds: ["ann-1"] }), "")).toBe("true");
     });
 
     it("returns 'false' when annotationIds is empty", () => {
@@ -269,9 +253,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
 
     it("returns null when annotationIds is undefined", () => {
-      expect(
-        matcher(makeTraceData({ annotationIds: undefined }), ""),
-      ).toBeNull();
+      expect(matcher(makeTraceData({ annotationIds: undefined }), "")).toBeNull();
     });
   });
 
@@ -400,9 +382,7 @@ describe("PRECONDITION_ALLOWED_RULES", () => {
 
   it("allows only 'is' for boolean fields", () => {
     expect(PRECONDITION_ALLOWED_RULES["traces.error"]).toEqual(["is"]);
-    expect(PRECONDITION_ALLOWED_RULES["annotations.hasAnnotation"]).toEqual([
-      "is",
-    ]);
+    expect(PRECONDITION_ALLOWED_RULES["annotations.hasAnnotation"]).toEqual(["is"]);
   });
 
   it("allows only 'is' for enum fields", () => {
@@ -411,17 +391,13 @@ describe("PRECONDITION_ALLOWED_RULES", () => {
     expect(PRECONDITION_ALLOWED_RULES["spans.model"]).toEqual(["is"]);
     expect(PRECONDITION_ALLOWED_RULES["events.event_type"]).toEqual(["is"]);
     expect(PRECONDITION_ALLOWED_RULES["events.metrics.key"]).toEqual(["is"]);
-    expect(PRECONDITION_ALLOWED_RULES["events.event_details.key"]).toEqual([
-      "is",
-    ]);
+    expect(PRECONDITION_ALLOWED_RULES["events.event_details.key"]).toEqual(["is"]);
   });
 
   it("allows is, contains, not_contains for array fields", () => {
     const arrayRules = ["is", "contains", "not_contains"];
     expect(PRECONDITION_ALLOWED_RULES["metadata.labels"]).toEqual(arrayRules);
-    expect(PRECONDITION_ALLOWED_RULES["metadata.prompt_ids"]).toEqual(
-      arrayRules,
-    );
+    expect(PRECONDITION_ALLOWED_RULES["metadata.prompt_ids"]).toEqual(arrayRules);
     expect(PRECONDITION_ALLOWED_RULES["topics.topics"]).toEqual(arrayRules);
     expect(PRECONDITION_ALLOWED_RULES["topics.subtopics"]).toEqual(arrayRules);
   });
@@ -430,9 +406,7 @@ describe("PRECONDITION_ALLOWED_RULES", () => {
     const textRules = ["is", "contains", "not_contains", "matches_regex"];
     expect(PRECONDITION_ALLOWED_RULES["metadata.user_id"]).toEqual(textRules);
     expect(PRECONDITION_ALLOWED_RULES["metadata.thread_id"]).toEqual(textRules);
-    expect(PRECONDITION_ALLOWED_RULES["metadata.customer_id"]).toEqual(
-      textRules,
-    );
+    expect(PRECONDITION_ALLOWED_RULES["metadata.customer_id"]).toEqual(textRules);
     expect(PRECONDITION_ALLOWED_RULES["metadata.value"]).toEqual(textRules);
   });
 
@@ -493,9 +467,7 @@ describe("getAvailablePreconditionFields()", () => {
   it("returns allowedRules matching PRECONDITION_ALLOWED_RULES", () => {
     const fields = getAvailablePreconditionFields();
     for (const entry of fields) {
-      expect(entry.allowedRules).toEqual(
-        PRECONDITION_ALLOWED_RULES[entry.field],
-      );
+      expect(entry.allowedRules).toEqual(PRECONDITION_ALLOWED_RULES[entry.field]);
     }
   });
 });
@@ -522,9 +494,7 @@ describe("getFieldLabel()", () => {
 
   it("returns registry name for filter fields like evaluations.evaluator_id", () => {
     // evaluations.evaluator_id has a name in the filter registry
-    expect(getFieldLabel("evaluations.evaluator_id")).toBe(
-      "Contains Evaluation",
-    );
+    expect(getFieldLabel("evaluations.evaluator_id")).toBe("Contains Evaluation");
   });
 });
 
@@ -545,9 +515,7 @@ describe("normalizePreconditionTraceData()", () => {
 
     describe("when origin is null", () => {
       it("defaults origin to 'application'", () => {
-        const result = normalizePreconditionTraceData(
-          makeTraceData({ origin: null }),
-        );
+        const result = normalizePreconditionTraceData(makeTraceData({ origin: null }));
         expect(result.origin).toBe("application");
       });
     });

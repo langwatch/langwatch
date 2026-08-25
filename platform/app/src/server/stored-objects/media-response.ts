@@ -11,9 +11,7 @@ import { isReadbackSafe } from "./safe-media-types";
  * row, never echo user content: a locked-down CSP + sandbox + nosniff so a
  * stored payload can't be interpreted as active content, and no referrer leak.
  */
-export const STORED_OBJECT_RESPONSE_BASE_HEADERS: Readonly<
-  Record<string, string>
-> = {
+export const STORED_OBJECT_RESPONSE_BASE_HEADERS: Readonly<Record<string, string>> = {
   "X-Content-Type-Options": "nosniff",
   "Content-Security-Policy": "default-src 'none'; sandbox",
   "Referrer-Policy": "no-referrer",
@@ -58,9 +56,7 @@ export function rateLimitedResponse(resetAtMs: number): Response {
     status: 429,
     headers: {
       "Content-Type": "application/json",
-      "Retry-After": String(
-        Math.max(1, Math.ceil((resetAtMs - Date.now()) / 1000)),
-      ),
+      "Retry-After": String(Math.max(1, Math.ceil((resetAtMs - Date.now()) / 1000))),
       ...STORED_OBJECT_RESPONSE_BASE_HEADERS,
     },
   });

@@ -542,9 +542,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
           ),
         ).toBe(true);
         expect(
-          tracerSpanNames.some((s) =>
-            /getById|StoredObjectsService\.get/i.test(s),
-          ),
+          tracerSpanNames.some((s) => /getById|StoredObjectsService\.get/i.test(s)),
         ).toBe(true);
       });
     });

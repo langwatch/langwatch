@@ -194,8 +194,7 @@ export function DataPrivacyPage({ projectId }: { projectId: string }) {
         ? { id: available.organization.id, name: available.organization.name }
         : null,
       teams: available?.teams.map((t) => ({ id: t.id, name: t.name })) ?? [],
-      projects:
-        available?.projects.map((p) => ({ id: p.id, name: p.name })) ?? [],
+      projects: available?.projects.map((p) => ({ id: p.id, name: p.name })) ?? [],
     }),
     [available],
   );
@@ -205,8 +204,7 @@ export function DataPrivacyPage({ projectId }: { projectId: string }) {
     projectId,
   });
 
-  const invalidate = () =>
-    utils.dataPrivacy.getSnapshot.invalidate({ projectId });
+  const invalidate = () => utils.dataPrivacy.getSnapshot.invalidate({ projectId });
 
   const removeForScope = api.dataPrivacy.removeForScope.useMutation();
 
@@ -231,16 +229,13 @@ export function DataPrivacyPage({ projectId }: { projectId: string }) {
   const matchesFilter = (rule: DataPrivacyRule): boolean => {
     if (scopeFilter.kind === "all") return true;
     if (scopeFilter.kind === "team-current") {
-      return (
-        rule.scopeType === "TEAM" && rule.scopeId === currentProject?.teamId
-      );
+      return rule.scopeType === "TEAM" && rule.scopeId === currentProject?.teamId;
     }
     if (scopeFilter.kind === "project-current") {
       return rule.scopeType === "PROJECT" && rule.scopeId === projectId;
     }
     return (
-      rule.scopeType === scopeFilter.scopeType &&
-      rule.scopeId === scopeFilter.scopeId
+      rule.scopeType === scopeFilter.scopeType && rule.scopeId === scopeFilter.scopeId
     );
   };
   const filteredRules = snapshot ? snapshot.rules.filter(matchesFilter) : [];
@@ -292,9 +287,8 @@ export function DataPrivacyPage({ projectId }: { projectId: string }) {
         </HStack>
 
         <Text fontSize="sm" color="fg.muted">
-          Control what trace content LangWatch stores, who can see it, and how
-          secrets and PII are scrubbed, at any scope, inherited down to
-          projects.
+          Control what trace content LangWatch stores, who can see it, and how secrets and
+          PII are scrubbed, at any scope, inherited down to projects.
         </Text>
 
         {snapshot && snapshot.rules.length === 0 ? (
@@ -309,17 +303,13 @@ export function DataPrivacyPage({ projectId }: { projectId: string }) {
                     <VStack textAlign="center" gap={1}>
                       <EmptyState.Title>No privacy rules</EmptyState.Title>
                       <EmptyState.Description>
-                        Secrets redaction and essential PII redaction are on by
-                        default, and content is captured and visible to your
-                        team. Add a rule to change that at any scope.
+                        Secrets redaction and essential PII redaction are on by default,
+                        and content is captured and visible to your team. Add a rule to
+                        change that at any scope.
                       </EmptyState.Description>
                     </VStack>
                     {canWrite && (
-                      <Button
-                        colorPalette="blue"
-                        variant="outline"
-                        onClick={openAdd}
-                      >
+                      <Button colorPalette="blue" variant="outline" onClick={openAdd}>
                         <Plus /> Add privacy rule
                       </Button>
                     )}
@@ -593,9 +583,7 @@ function describeAudienceSelection(
   for (const id of audience.groupIds) {
     parts.push(options.groups.find((g) => g.id === id)?.name ?? "a group");
   }
-  return parts.length > 0
-    ? `Visible to: ${parts.join(", ")}`
-    : "No one (fully hidden)";
+  return parts.length > 0 ? `Visible to: ${parts.join(", ")}` : "No one (fully hidden)";
 }
 
 function secretPatternError(pattern: string): string | null {
@@ -621,9 +609,7 @@ function customSecretPatternError(pattern: string): string | null {
   const invalid = secretPatternError(pattern);
   if (invalid) return invalid;
   const eaten = overBroadSecretPatternProbe(pattern);
-  return eaten
-    ? `Too broad: this also matches ordinary text like ${eaten}`
-    : null;
+  return eaten ? `Too broad: this also matches ordinary text like ${eaten}` : null;
 }
 
 function attributePatternError(pattern: string): string | null {
@@ -680,15 +666,11 @@ export function PrivacyRuleDrawer({
   const [piiExceptPatterns, setPiiExceptPatterns] = useState<string[]>([]);
   const [secretsChoice, setSecretsChoice] = useState<SecretsChoice>("inherit");
   const [secretsPatterns, setSecretsPatterns] = useState<string[]>([]);
-  const [customAttributes, setCustomAttributes] = useState<
-    CustomAttributeFormRow[]
-  >([]);
+  const [customAttributes, setCustomAttributes] = useState<CustomAttributeFormRow[]>([]);
 
   const togglePiiEntity = (entity: string) => {
     setPiiEntities((prev) =>
-      prev.includes(entity)
-        ? prev.filter((e) => e !== entity)
-        : [...prev, entity],
+      prev.includes(entity) ? prev.filter((e) => e !== entity) : [...prev, entity],
     );
   };
 
@@ -719,9 +701,7 @@ export function PrivacyRuleDrawer({
       applyForm(configToFormState(editingRule.config));
       return;
     }
-    const projectInAvailable = available.projects.some(
-      (p) => p.id === projectId,
-    );
+    const projectInAvailable = available.projects.some((p) => p.id === projectId);
     const initialScopes: ScopeChipPickerEntry[] = projectInAvailable
       ? [{ scopeType: "PROJECT", scopeId: projectId }]
       : [];
@@ -778,8 +758,7 @@ export function PrivacyRuleDrawer({
   const hasChange = editingRule
     ? !configsEqual(config, editingRule.config)
     : !isEmptyRuleConfig(config);
-  const canSave =
-    scopes.length > 0 && hasChange && !hasInvalidPatterns && !isSaving;
+  const canSave = scopes.length > 0 && hasChange && !hasInvalidPatterns && !isSaving;
 
   const editIcon = editingRule
     ? editingRule.personalOnly
@@ -833,12 +812,7 @@ export function PrivacyRuleDrawer({
                 availableTeams={available.teams}
                 availableProjects={available.projects}
                 availableDepartments={available.departments}
-                allowedScopeTypes={[
-                  "ORGANIZATION",
-                  "DEPARTMENT",
-                  "TEAM",
-                  "PROJECT",
-                ]}
+                allowedScopeTypes={["ORGANIZATION", "DEPARTMENT", "TEAM", "PROJECT"]}
                 personalScopes
                 currentOrganizationId={currentOrganizationId}
                 currentTeamId={currentTeamId}
@@ -864,8 +838,7 @@ export function PrivacyRuleDrawer({
                         onValueChange={(d) =>
                           setDispositions((prev) => ({
                             ...prev,
-                            [category]:
-                              (d.value[0] as CategoryChoice) ?? "inherit",
+                            [category]: (d.value[0] as CategoryChoice) ?? "inherit",
                           }))
                         }
                       >
@@ -945,9 +918,7 @@ export function PrivacyRuleDrawer({
                         onChange={(e) =>
                           setCustomAttributes((prev) =>
                             prev.map((r, i) =>
-                              i === index
-                                ? { ...r, pattern: e.target.value }
-                                : r,
+                              i === index ? { ...r, pattern: e.target.value } : r,
                             ),
                           )
                         }
@@ -964,8 +935,7 @@ export function PrivacyRuleDrawer({
                                 ? {
                                     ...r,
                                     disposition:
-                                      (d.value[0] as "restrict" | "drop") ??
-                                      "restrict",
+                                      (d.value[0] as "restrict" | "drop") ?? "restrict",
                                   }
                                 : r,
                             ),
@@ -1033,8 +1003,8 @@ export function PrivacyRuleDrawer({
                   PII redaction
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
-                  Masks personal data like emails, phones, cards, and IDs in
-                  stored content.
+                  Masks personal data like emails, phones, cards, and IDs in stored
+                  content.
                 </Text>
               </VStack>
               <RadioGroup.Root
@@ -1046,9 +1016,7 @@ export function PrivacyRuleDrawer({
                   // it starts from a sensible base the customer can pare down.
                   if (next === "custom") {
                     setPiiEntities((prev) =>
-                      prev.length > 0
-                        ? prev
-                        : Object.keys(ESSENTIAL_PII_ENTITY_LABELS),
+                      prev.length > 0 ? prev : Object.keys(ESSENTIAL_PII_ENTITY_LABELS),
                     );
                   }
                 }}
@@ -1162,18 +1130,14 @@ export function PrivacyRuleDrawer({
                             borderColor={error ? "red.500" : undefined}
                             onChange={(e) =>
                               setPiiExceptPatterns((prev) =>
-                                prev.map((p, i) =>
-                                  i === index ? e.target.value : p,
-                                ),
+                                prev.map((p, i) => (i === index ? e.target.value : p)),
                               )
                             }
                           />
                           <Button
                             size="xs"
                             variant="ghost"
-                            aria-label={`Remove PII exception pattern ${
-                              index + 1
-                            }`}
+                            aria-label={`Remove PII exception pattern ${index + 1}`}
                             onClick={() =>
                               setPiiExceptPatterns((prev) =>
                                 prev.filter((_, i) => i !== index),
@@ -1195,17 +1159,15 @@ export function PrivacyRuleDrawer({
                     <Button
                       size="xs"
                       variant="ghost"
-                      onClick={() =>
-                        setPiiExceptPatterns((prev) => [...prev, ""])
-                      }
+                      onClick={() => setPiiExceptPatterns((prev) => [...prev, ""])}
                     >
                       <Plus size={14} /> Add exception
                     </Button>
                   </Box>
                   {piiExceptPatterns.length === 0 && (
                     <Text fontSize="xs" color="fg.muted">
-                      Keep known-safe formats that look like personal data, such
-                      as internal reservation numbers.
+                      Keep known-safe formats that look like personal data, such as
+                      internal reservation numbers.
                     </Text>
                   )}
                 </VStack>
@@ -1219,8 +1181,8 @@ export function PrivacyRuleDrawer({
                     Secrets redaction
                   </Text>
                   <Text fontSize="xs" color="fg.muted">
-                    Scrubs API keys, tokens, private keys, and database URLs. On
-                    by default.
+                    Scrubs API keys, tokens, private keys, and database URLs. On by
+                    default.
                   </Text>
                 </VStack>
                 <Select.Root
@@ -1232,10 +1194,7 @@ export function PrivacyRuleDrawer({
                     setSecretsChoice((d.value[0] as SecretsChoice) ?? "inherit")
                   }
                 >
-                  <Select.Trigger
-                    background="bg"
-                    aria-label="Secrets redaction"
-                  >
+                  <Select.Trigger background="bg" aria-label="Secrets redaction">
                     <Select.ValueText />
                   </Select.Trigger>
                   <Select.Content>
@@ -1249,9 +1208,7 @@ export function PrivacyRuleDrawer({
               </HStack>
               {secretsChoice === "inherit" && (
                 <Text fontSize="xs" color="fg.muted" textAlign="end">
-                  {inheritedHint(
-                    inheritedBaseline.secrets.enabled ? "On" : "Off",
-                  )}
+                  {inheritedHint(inheritedBaseline.secrets.enabled ? "On" : "Off")}
                 </Text>
               )}
               {secretsChoice === "on" && (
@@ -1275,18 +1232,14 @@ export function PrivacyRuleDrawer({
                             borderColor={error ? "red.500" : undefined}
                             onChange={(e) =>
                               setSecretsPatterns((prev) =>
-                                prev.map((p, i) =>
-                                  i === index ? e.target.value : p,
-                                ),
+                                prev.map((p, i) => (i === index ? e.target.value : p)),
                               )
                             }
                           />
                           <Button
                             size="xs"
                             variant="ghost"
-                            aria-label={`Remove custom secret pattern ${
-                              index + 1
-                            }`}
+                            aria-label={`Remove custom secret pattern ${index + 1}`}
                             onClick={() =>
                               setSecretsPatterns((prev) =>
                                 prev.filter((_, i) => i !== index),
@@ -1308,16 +1261,13 @@ export function PrivacyRuleDrawer({
                     <Button
                       size="xs"
                       variant="ghost"
-                      onClick={() =>
-                        setSecretsPatterns((prev) => [...prev, ""])
-                      }
+                      onClick={() => setSecretsPatterns((prev) => [...prev, ""])}
                     >
                       <Plus size={14} /> Add custom pattern
                     </Button>
                   </Box>
                   <Text fontSize="xs" color="fg.muted">
-                    Extra regular expressions redacted on top of the built-in
-                    catalog.
+                    Extra regular expressions redacted on top of the built-in catalog.
                   </Text>
                 </VStack>
               )}
@@ -1426,10 +1376,7 @@ function AudiencePicker({
         onChange(selectionToAudience(applyAudienceSelection(selected, d.value)))
       }
     >
-      <Select.Trigger
-        background="bg"
-        aria-label="Restricted content is visible to"
-      >
+      <Select.Trigger background="bg" aria-label="Restricted content is visible to">
         <Select.ValueText placeholder="No one (fully hidden)">
           {() =>
             selected.length > 0 ? (

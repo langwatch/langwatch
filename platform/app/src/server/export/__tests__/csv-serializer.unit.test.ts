@@ -7,13 +7,7 @@
 
 import Parse from "papaparse";
 import { describe, expect, it } from "vitest";
-import type {
-  Evaluation,
-  LLMSpan,
-  RAGSpan,
-  Span,
-  Trace,
-} from "~/server/tracer/types";
+import type { Evaluation, LLMSpan, RAGSpan, Span, Trace } from "~/server/tracer/types";
 import { stripCsvHeader } from "../export.service";
 import {
   serializeTracesToFullCsv,
@@ -570,10 +564,7 @@ describe("when an export spans several batches", () => {
   it("keeps every row intact across a batch boundary", () => {
     const evaluatorNames: string[] = [];
     const batch1 = serializeTracesToSummaryCsv({
-      traces: [
-        buildTrace({ trace_id: "trace-1" }),
-        buildTrace({ trace_id: "trace-2" }),
-      ],
+      traces: [buildTrace({ trace_id: "trace-1" }), buildTrace({ trace_id: "trace-2" })],
       evaluatorNames,
     });
     const batch2 = stripCsvHeader(

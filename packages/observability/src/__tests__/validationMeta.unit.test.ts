@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  MAX_VALIDATION_ISSUES,
-  validationMeta,
-} from "../validation/validationMeta";
+import { MAX_VALIDATION_ISSUES, validationMeta } from "../validation/validationMeta";
 
 /**
  * The issues are hand-built rather than produced by zod on purpose: this
@@ -98,11 +95,7 @@ describe("validationMeta", () => {
 
     /** @scenario A rejected enum reports the options without the value */
     it("names the options the schema allows", () => {
-      expect(validationMeta(error)?.issues[0]?.options).toEqual([
-        "llm",
-        "chain",
-        "tool",
-      ]);
+      expect(validationMeta(error)?.issues[0]?.options).toEqual(["llm", "chain", "tool"]);
     });
 
     it("omits the value that arrived", () => {
@@ -208,10 +201,7 @@ describe("validationMeta", () => {
 
       const meta = validationMeta(error);
       expect(meta?.issueCount).toBe(2);
-      expect(meta?.issues.map((i) => i.code)).toEqual([
-        "invalid_union",
-        "invalid_type",
-      ]);
+      expect(meta?.issues.map((i) => i.code)).toEqual(["invalid_union", "invalid_type"]);
     });
   });
 

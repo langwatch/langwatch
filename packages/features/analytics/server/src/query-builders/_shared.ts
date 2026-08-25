@@ -71,10 +71,7 @@ export function hasFilterValues(
 }
 
 export function collectStringValues(
-  value:
-    | string[]
-    | Record<string, string[]>
-    | Record<string, Record<string, string[]>>,
+  value: string[] | Record<string, string[]> | Record<string, Record<string, string[]>>,
 ): string[] {
   if (Array.isArray(value)) return value;
   const out: string[] = [];
@@ -120,8 +117,7 @@ export function adjustTimeScaleForBucketCap(params: {
 }): number | "full" | undefined {
   const { timeScale, startDate, endDate } = params;
   if (typeof timeScale === "number") {
-    const totalMinutes =
-      (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE;
+    const totalMinutes = (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE;
     const estimatedBuckets = totalMinutes / timeScale;
     if (estimatedBuckets > MAX_TIMESERIES_BUCKETS) {
       return MINUTES_PER_DAY;

@@ -51,10 +51,7 @@ export type AgentConfigLookup = (params: {
   agentId: string;
 }) => Promise<Record<string, unknown> | null>;
 
-const defaultAgentConfigLookup: AgentConfigLookup = async ({
-  projectId,
-  agentId,
-}) => {
+const defaultAgentConfigLookup: AgentConfigLookup = async ({ projectId, agentId }) => {
   const agent = await AgentsFeature.create({ prisma, session: null }).getById({
     id: agentId,
     projectId,
@@ -85,9 +82,7 @@ export class ScenarioFailureHandler {
    * common failure paths never pay for the agent lookup; a lookup failure
    * degrades to the generic classification rather than blocking the event.
    */
-  private async targetHasDevTunnel(
-    params: FailureEventParams,
-  ): Promise<boolean> {
+  private async targetHasDevTunnel(params: FailureEventParams): Promise<boolean> {
     if (params.cancelled) return false;
     if (params.target?.type !== "http") return false;
     if (!isTransportLevelScenarioFailure(params.error)) return false;
@@ -97,9 +92,7 @@ export class ScenarioFailureHandler {
         agentId: params.target.referenceId,
       });
       return (
-        !!config &&
-        typeof config.devTunnel === "object" &&
-        config.devTunnel !== null
+        !!config && typeof config.devTunnel === "object" && config.devTunnel !== null
       );
     } catch (err) {
       logger.warn(
@@ -133,11 +126,8 @@ export class ScenarioFailureHandler {
         },
       },
       async (span) => {
-        const { projectId, scenarioId, setId, batchRunId, error, cancelled } =
-          params;
-        const status = cancelled
-          ? ScenarioRunStatus.CANCELLED
-          : ScenarioRunStatus.ERROR;
+        const { projectId, scenarioId, setId, batchRunId, error, cancelled } = params;
+        const status = cancelled ? ScenarioRunStatus.CANCELLED : ScenarioRunStatus.ERROR;
         const scenarioRunId = params.scenarioRunId;
 
         if (!scenarioRunId) {
@@ -181,10 +171,7 @@ export class ScenarioFailureHandler {
           });
           span.setAttribute("result.emitted_run_finished", true);
         } catch (err) {
-          logger.error(
-            { err, scenarioRunId },
-            "Failed to dispatch finishRun event",
-          );
+          logger.error({ err, scenarioRunId }, "Failed to dispatch finishRun event");
           throw err;
         }
 

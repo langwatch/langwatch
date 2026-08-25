@@ -25,9 +25,10 @@ const expectedPublishedSlugs = (): { slug: string; isRecipe: boolean }[] => {
   const match = /export const FEATURE_SKILLS = \[([\s\S]*?)\] as const;/.exec(
     featureSkillsSrc,
   );
-  const featureSkills = [...(match?.[1] ?? "").matchAll(/"([^"]+)"/g)].map(
-    (m) => ({ slug: m[1]!, isRecipe: false }),
-  );
+  const featureSkills = [...(match?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((m) => ({
+    slug: m[1]!,
+    isRecipe: false,
+  }));
   const recipes = fs
     .readdirSync(path.join(SKILLS_ROOT, "recipes"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -46,9 +47,7 @@ const skill = (slug: string): BundledSkill => {
 
 describe("the embedded skills bundle", () => {
   it("matches skills/version.txt", () => {
-    const version = fs
-      .readFileSync(path.join(SKILLS_ROOT, "version.txt"), "utf8")
-      .trim();
+    const version = fs.readFileSync(path.join(SKILLS_ROOT, "version.txt"), "utf8").trim();
     expect(SKILLS_BUNDLE_VERSION).toBe(version);
   });
 
@@ -88,7 +87,9 @@ describe("the embedded skills bundle", () => {
   it("embeds every body fully inlined: frontmatter intact, no MDX imports or JSX left", () => {
     for (const entry of SKILLS_BUNDLE) {
       expect(entry.body.startsWith("---"), `${entry.slug} frontmatter`).toBe(true);
-      expect(/^import .*\.mdx/m.test(entry.body), `${entry.slug} MDX imports`).toBe(false);
+      expect(/^import .*\.mdx/m.test(entry.body), `${entry.slug} MDX imports`).toBe(
+        false,
+      );
       expect(/<[A-Z][A-Za-z]* \/>/.test(entry.body), `${entry.slug} JSX`).toBe(false);
       expect(entry.description.length).toBeGreaterThan(0);
     }
@@ -96,12 +97,8 @@ describe("the embedded skills bundle", () => {
 
   it("splices shared partials into the bodies that use them", () => {
     // cli-setup.mdx's docs snippet appears verbatim inside importing skills.
-    expect(skill("tracing").body).toContain(
-      "langwatch docs integration/python/guide",
-    );
-    expect(skill("recipes/setup-lw").body).toContain(
-      "LANGWATCH_API_KEY",
-    );
+    expect(skill("tracing").body).toContain("langwatch docs integration/python/guide");
+    expect(skill("recipes/setup-lw").body).toContain("LANGWATCH_API_KEY");
   });
 
   it("carries name, description and user-prompt from the frontmatter", () => {

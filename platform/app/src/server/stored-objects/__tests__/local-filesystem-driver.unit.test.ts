@@ -37,10 +37,7 @@ let tmpDir: string;
 let driver: LocalFilesystemDriver;
 
 beforeEach(async () => {
-  tmpDir = path.join(
-    os.tmpdir(),
-    `lw-fs-driver-${randomBytes(6).toString("hex")}`,
-  );
+  tmpDir = path.join(os.tmpdir(), `lw-fs-driver-${randomBytes(6).toString("hex")}`);
   await fs.mkdir(tmpDir, { recursive: true });
   driver = new LocalFilesystemDriver();
 });
@@ -100,11 +97,7 @@ describe("when put writes a temporary file first", () => {
       sha256: "atomicsha256",
     });
 
-    await driver.put(
-      uri,
-      Buffer.from("atomic bytes"),
-      "application/octet-stream",
-    );
+    await driver.put(uri, Buffer.from("atomic bytes"), "application/octet-stream");
 
     const dir = path.join(tmpDir, "proj-atomic");
     const entries = await fs.readdir(dir);
@@ -270,9 +263,7 @@ describe("given a URI whose encoded segment decodes into path separators", () =>
   });
 
   it("leaves nothing behind at the escaped location", async () => {
-    const escaped = path.resolve(
-      decodeURIComponent(new URL(escaping).pathname),
-    );
+    const escaped = path.resolve(decodeURIComponent(new URL(escaping).pathname));
 
     await driver.put(escaping, Buffer.from("owned"), "text/plain").catch(() => {
       // expected — the assertion is that the refusal wrote nothing
@@ -298,9 +289,7 @@ describe("given a storage root configured with a trailing slash", () => {
 
     await driver.put(uri, Buffer.from("payload"), "application/octet-stream");
 
-    expect(await streamToBuffer(await driver.get(uri))).toEqual(
-      Buffer.from("payload"),
-    );
+    expect(await streamToBuffer(await driver.get(uri))).toEqual(Buffer.from("payload"));
     await expect(
       fs.access(path.join(tmpDir, "proj-1", "abc123")),
     ).resolves.toBeUndefined();

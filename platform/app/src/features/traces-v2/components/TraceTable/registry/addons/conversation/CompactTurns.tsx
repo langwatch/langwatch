@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Circle,
-  HStack,
-  Icon,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Circle, HStack, Icon, Text } from "@chakra-ui/react";
 import type { Cell } from "@tanstack/react-table";
 import { AlertTriangle, Bot, Clock, User, Zap } from "lucide-react";
 import type React from "react";
@@ -68,8 +60,9 @@ export const CompactTurns: React.FC<CompactTurnsProps> = ({
   density,
   cells,
 }) => {
-  const { head, tail, hiddenCount, showMore, showAll, canShowMore } =
-    useTurnsWindow(group.traces);
+  const { head, tail, hiddenCount, showMore, showAll, canShowMore } = useTurnsWindow(
+    group.traces,
+  );
 
   return (
     <>
@@ -156,9 +149,7 @@ const ConversationTurnRow: React.FC<ConversationTurnRowProps> = ({
   // it matches the rest of the row instead of seaming to the shell-forced
   // bg.surface.
   const rowBg = isSelected ? "blue.subtle" : EXPANDED_BG;
-  const firstCellBg = isSelected
-    ? "var(--chakra-colors-blue-subtle)"
-    : EXPANDED_BG_CSS;
+  const firstCellBg = isSelected ? "var(--chakra-colors-blue-subtle)" : EXPANDED_BG_CSS;
 
   const gapSeconds = turnGapSeconds({ trace, prevTrace });
   // The selected/error turn paints its own rail segment so selection and
@@ -168,11 +159,7 @@ const ConversationTurnRow: React.FC<ConversationTurnRowProps> = ({
   return (
     <>
       {gapSeconds > TURN_GAP_VISIBLE_SECONDS && (
-        <GapRow
-          seconds={gapSeconds}
-          colCount={cells.length}
-          borderColor={borderColor}
-        />
+        <GapRow seconds={gapSeconds} colCount={cells.length} borderColor={borderColor} />
       )}
       <Tr
         bg={rowBg}
@@ -239,9 +226,7 @@ function turnCellContent({
         dash
       ) : (
         <MonoCell>
-          {trace.contextSizeTokens === 0
-            ? "0"
-            : formatTokens(trace.contextSizeTokens)}
+          {trace.contextSizeTokens === 0 ? "0" : formatTokens(trace.contextSizeTokens)}
         </MonoCell>
       );
     // Session-level coding-agent facts have no per-turn meaning: the
@@ -335,15 +320,9 @@ const TurnPreviewCell: React.FC<{
       />
     ) : null}
     {trace.events.totalCount > 0 && (
-      <CountChip
-        icon={<Zap />}
-        iconColor="orange.fg"
-        value={trace.events.totalCount}
-      />
+      <CountChip icon={<Zap />} iconColor="orange.fg" value={trace.events.totalCount} />
     )}
-    {trace.evaluations.length > 0 && (
-      <EvaluationChip evaluations={trace.evaluations} />
-    )}
+    {trace.evaluations.length > 0 && <EvaluationChip evaluations={trace.evaluations} />}
   </HStack>
 );
 

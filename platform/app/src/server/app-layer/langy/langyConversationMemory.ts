@@ -71,10 +71,7 @@ import {
   cliResultDigestSchema,
   extractLangyTextFromParts,
 } from "@langwatch/langy-contract";
-import {
-  MAX_LABEL_LENGTH,
-  sanitizeLangyPromptValue,
-} from "./langyTurnContext.schema";
+import { MAX_LABEL_LENGTH, sanitizeLangyPromptValue } from "./langyTurnContext.schema";
 import type { LangyMessageRow } from "@langwatch/langy-contract";
 
 /** More entries than a follow-up could plausibly mean, and a bounded prompt. */
@@ -170,14 +167,8 @@ export function extractLangyConversationMemory({
         .slice(0, MAX_MEMORY_IDS_PER_ENTRY);
       if (ids.length === 0) continue;
 
-      const resource = sanitizeLangyPromptValue(
-        digest.resource,
-        MAX_MEMORY_TERM_LENGTH,
-      );
-      const verb = sanitizeLangyPromptValue(
-        digest.verb,
-        MAX_MEMORY_TERM_LENGTH,
-      );
+      const resource = sanitizeLangyPromptValue(digest.resource, MAX_MEMORY_TERM_LENGTH);
+      const verb = sanitizeLangyPromptValue(digest.verb, MAX_MEMORY_TERM_LENGTH);
       if (!resource || !verb) continue;
 
       const name = digest.name
@@ -207,15 +198,11 @@ export function extractLangyConversationMemory({
 
 /** One entry as the line the model reads. */
 function describeEntry(entry: LangyConversationMemoryEntry): string {
-  const what = entry.name
-    ? `${entry.resource} "${entry.name}"`
-    : entry.resource;
+  const what = entry.name ? `${entry.resource} "${entry.name}"` : entry.resource;
   const ids =
     entry.ids.length === 1
       ? `id ${entry.ids[0]}`
-      : `ids ${entry.ids.join(", ")}${
-          entry.total ? ` (of ${entry.total} matched)` : ""
-        }`;
+      : `ids ${entry.ids.join(", ")}${entry.total ? ` (of ${entry.total} matched)` : ""}`;
   return `- turn ${entry.turn} — ${entry.verb} ${what} — ${ids}`;
 }
 
@@ -276,9 +263,7 @@ function sanitizeTranscriptText(value: string): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   if (cleaned.length <= MAX_TRANSCRIPT_MESSAGE_CHARS) return cleaned;
-  return (
-    [...cleaned].slice(0, MAX_TRANSCRIPT_MESSAGE_CHARS).join("").trimEnd() + "…"
-  );
+  return [...cleaned].slice(0, MAX_TRANSCRIPT_MESSAGE_CHARS).join("").trimEnd() + "…";
 }
 
 /**
@@ -327,9 +312,7 @@ export function renderLangyConversationTranscript({
   const spoken: { role: "user" | "assistant"; text: string }[] = [];
   for (const message of messages) {
     if (message.role !== "user" && message.role !== "assistant") continue;
-    const text = sanitizeTranscriptText(
-      extractLangyTextFromParts(message.parts),
-    );
+    const text = sanitizeTranscriptText(extractLangyTextFromParts(message.parts));
     if (!text) continue;
     spoken.push({ role: message.role, text });
   }

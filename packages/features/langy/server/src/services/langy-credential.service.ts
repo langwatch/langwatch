@@ -107,10 +107,7 @@ export class LangyCredentialService {
         langwatchApiKey = minted.token;
         langwatchApiKeyId = minted.apiKeyId;
       } catch (error) {
-        if (
-          error instanceof Error &&
-          error.name === "LangySessionKeyScopeError"
-        ) {
+        if (error instanceof Error && error.name === "LangySessionKeyScopeError") {
           throw new LangyCredentialResolutionError(error.message);
         }
         this.deps.errors?.report(error, {
@@ -171,9 +168,7 @@ export class LangyCredentialService {
     };
   }
 
-  async tryGetModelsAllowedForProject(
-    projectId: string,
-  ): Promise<string[] | null> {
+  async tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null> {
     const project = await this.deps.repository.tryFindProject(projectId);
     if (!project) return null;
     return this.tryGetModelsAllowed({
@@ -222,9 +217,7 @@ export class LangyCredentialService {
     allowlist: string[];
   }): Promise<string[] | null> {
     const parsed = langyEgressAllowlistSchema.parse(allowlist);
-    const normalized = parsed.map((host) =>
-      host.trim().replace(/\.$/, "").toLowerCase(),
-    );
+    const normalized = parsed.map((host) => host.trim().replace(/\.$/, "").toLowerCase());
     const value = normalized.length > 0 ? normalized : null;
     await this.deps.repository.saveEgressAllowlist(projectId, value);
     return value;

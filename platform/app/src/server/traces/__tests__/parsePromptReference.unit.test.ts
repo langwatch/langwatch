@@ -430,8 +430,7 @@ describe("parsePromptReference()", () => {
 
     it("extracts variables even without prompt handle", () => {
       const attrs = {
-        "langwatch.prompt.variables":
-          '{"type":"json","value":{"name":"Alice"}}',
+        "langwatch.prompt.variables": '{"type":"json","value":{"name":"Alice"}}',
       };
       const result = parsePromptReference(attrs);
       expect(result.promptHandle).toBeNull();

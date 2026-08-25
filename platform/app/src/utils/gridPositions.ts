@@ -16,9 +16,7 @@ type GridItem = {
  * Calculate grid positions for items after reordering.
  * This uses a simple row-by-row layout algorithm for a 2-column grid.
  */
-export const calculateGridPositions = <T extends GridItem>(
-  items: T[],
-): GridLayout[] => {
+export const calculateGridPositions = <T extends GridItem>(items: T[]): GridLayout[] => {
   const layouts: GridLayout[] = [];
 
   // Track which cells are occupied
@@ -27,12 +25,7 @@ export const calculateGridPositions = <T extends GridItem>(
 
   const cellKey = (col: number, row: number) => `${col},${row}`;
 
-  const isAreaFree = (
-    col: number,
-    row: number,
-    colSpan: number,
-    rowSpan: number,
-  ) => {
+  const isAreaFree = (col: number, row: number, colSpan: number, rowSpan: number) => {
     for (let c = col; c < col + colSpan; c++) {
       for (let r = row; r < row + rowSpan; r++) {
         if (c >= 2 || occupied.has(cellKey(c, r))) {
@@ -43,12 +36,7 @@ export const calculateGridPositions = <T extends GridItem>(
     return true;
   };
 
-  const occupyArea = (
-    col: number,
-    row: number,
-    colSpan: number,
-    rowSpan: number,
-  ) => {
+  const occupyArea = (col: number, row: number, colSpan: number, rowSpan: number) => {
     for (let c = col; c < col + colSpan; c++) {
       for (let r = row; r < row + rowSpan; r++) {
         occupied.add(cellKey(c, r));

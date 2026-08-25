@@ -36,9 +36,9 @@ describe("buildReportTriggerData", () => {
       expect(data.name).toBe("Weekly errors");
       expect(data.filters).toEqual({});
       expect(data.active).toBe(true);
-      expect(
-        (data.actionParams as { source: { kind: string } }).source.kind,
-      ).toBe("traceQuery");
+      expect((data.actionParams as { source: { kind: string } }).source.kind).toBe(
+        "traceQuery",
+      );
       expect((data.actionParams as { slackWebhook: string }).slackWebhook).toBe(
         "https://hooks.slack.com/services/x",
       );
@@ -49,9 +49,7 @@ describe("buildReportTriggerData", () => {
 describe("reportScheduleSchema", () => {
   const issuePaths = (cron: string, timezone: string): string[] => {
     const parsed = reportScheduleSchema.safeParse({ cron, timezone });
-    return parsed.success
-      ? []
-      : parsed.error.issues.map((issue) => issue.path.join("."));
+    return parsed.success ? [] : parsed.error.issues.map((issue) => issue.path.join("."));
   };
 
   describe("given a schedule the scheduler can actually run", () => {
@@ -62,9 +60,7 @@ describe("reportScheduleSchema", () => {
       { cron: "0 */6 * * *", timezone: "UTC" },
       { cron: "*/15 * * * *", timezone: "UTC" },
     ])("accepts $cron ($timezone)", ({ cron, timezone }) => {
-      expect(reportScheduleSchema.safeParse({ cron, timezone }).success).toBe(
-        true,
-      );
+      expect(reportScheduleSchema.safeParse({ cron, timezone }).success).toBe(true);
     });
   });
 
@@ -106,8 +102,7 @@ describe("reportSourceSchema", () => {
   describe("when discriminating the source kind", () => {
     it("accepts dashboard, customGraph, and traceQuery, and rejects unknown", () => {
       expect(
-        reportSourceSchema.safeParse({ kind: "dashboard", dashboardId: "d1" })
-          .success,
+        reportSourceSchema.safeParse({ kind: "dashboard", dashboardId: "d1" }).success,
       ).toBe(true);
       expect(
         reportSourceSchema.safeParse({
@@ -115,12 +110,8 @@ describe("reportSourceSchema", () => {
           customGraphId: "g1",
         }).success,
       ).toBe(true);
-      expect(reportSourceSchema.safeParse({ kind: "traceQuery" }).success).toBe(
-        true,
-      ); // filters/topN default
-      expect(
-        reportSourceSchema.safeParse({ kind: "spreadsheet" }).success,
-      ).toBe(false);
+      expect(reportSourceSchema.safeParse({ kind: "traceQuery" }).success).toBe(true); // filters/topN default
+      expect(reportSourceSchema.safeParse({ kind: "spreadsheet" }).success).toBe(false);
     });
 
     it("defaults trace-query topN to 5 and filters to empty", () => {
@@ -137,9 +128,7 @@ describe("extractReportFromTriggerRow", () => {
       const out = extractReportFromTriggerRow(row);
       expect(out?.source.kind).toBe("traceQuery");
       expect(out?.schedule.cron).toBe("0 9 * * 1");
-      expect((out as unknown as { members: string[] }).members).toEqual([
-        "a@b.co",
-      ]);
+      expect((out as unknown as { members: string[] }).members).toEqual(["a@b.co"]);
     });
   });
 

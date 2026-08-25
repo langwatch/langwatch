@@ -42,8 +42,7 @@ const renderSection = () =>
     </ChakraProvider>,
   );
 
-const selfHosted = () =>
-  publicEnvMock.mockReturnValue({ data: { IS_SAAS: false } });
+const selfHosted = () => publicEnvMock.mockReturnValue({ data: { IS_SAAS: false } });
 const cloud = () => publicEnvMock.mockReturnValue({ data: { IS_SAAS: true } });
 
 describe("<EnterpriseCapabilitiesSection />", () => {
@@ -92,14 +91,10 @@ describe("<EnterpriseCapabilitiesSection />", () => {
       renderSection();
 
       expect(
-        screen
-          .getByRole("link", { name: /how licensing works/i })
-          .getAttribute("href"),
+        screen.getByRole("link", { name: /how licensing works/i }).getAttribute("href"),
       ).toBe("https://docs.langwatch.ai/self-hosting/licensing");
       expect(
-        screen
-          .getByRole("link", { name: /activate a license/i })
-          .getAttribute("href"),
+        screen.getByRole("link", { name: /activate a license/i }).getAttribute("href"),
       ).toBe("/settings/license");
     });
 
@@ -107,9 +102,7 @@ describe("<EnterpriseCapabilitiesSection />", () => {
       selfHosted();
       renderSection();
 
-      expect(
-        screen.getByText(/unlimited members, teams, and projects/i),
-      ).toBeDefined();
+      expect(screen.getByText(/unlimited members, teams, and projects/i)).toBeDefined();
     });
   });
 
@@ -122,9 +115,7 @@ describe("<EnterpriseCapabilitiesSection />", () => {
 
       expect(screen.getAllByText("Available")).toHaveLength(3);
       expect(screen.queryByText("Enterprise license")).toBeNull();
-      expect(
-        screen.queryByRole("link", { name: /activate a license/i }),
-      ).toBeNull();
+      expect(screen.queryByRole("link", { name: /activate a license/i })).toBeNull();
     });
   });
 
@@ -184,9 +175,7 @@ describe("<EnterpriseCapabilitiesSection />", () => {
 
       expect(screen.getByTestId("sso-not-started-notice")).toBeTruthy();
       expect(
-        screen.getByText(
-          "Single sign-on is configured but could not be started",
-        ),
+        screen.getByText("Single sign-on is configured but could not be started"),
       ).toBeTruthy();
       expect(screen.getByText("cognito")).toBeTruthy();
       expect(screen.getByText(/signing in by email/i)).toBeTruthy();

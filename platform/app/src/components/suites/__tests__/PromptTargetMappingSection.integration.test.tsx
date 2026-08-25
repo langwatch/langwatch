@@ -77,9 +77,7 @@ describe("PromptTargetMappingSection", () => {
     });
 
     it("renders nothing for non-prompt targets", () => {
-      const { container } = renderSection([
-        { type: "http", referenceId: "agent_http" },
-      ]);
+      const { container } = renderSection([{ type: "http", referenceId: "agent_http" }]);
 
       expect(container.innerHTML).toBe("");
     });

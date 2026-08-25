@@ -25,8 +25,7 @@ export class PostgresBillingAdapter {
       notifications: PostgresNotificationAdapter.create({
         database: this.database,
       }).build(),
-      organizationPricing:
-        PrismaOrganizationPricingRepository.create(this.database),
+      organizationPricing: PrismaOrganizationPricingRepository.create(this.database),
       subscriptions: PrismaSubscriptionRepository.create(this.database),
     };
   }

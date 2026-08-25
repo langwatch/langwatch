@@ -84,9 +84,7 @@ describe("PostgresAuthzAdapter", () => {
     expect(built.authz).toBeInstanceOf(AuthzServiceContract);
     expect(built.grants).toBeInstanceOf(AuthzGrantsServiceContract);
     expect(built.pipeline.metadata.name).toBe(AUTHZ_GRANT_PIPELINE_NAME);
-    expect([...built.pipeline.mapProjections.keys()]).toEqual([
-      "authzGrantsWrite",
-    ]);
+    expect([...built.pipeline.mapProjections.keys()]).toEqual(["authzGrantsWrite"]);
     expect([...built.pipeline.eventSubscribers.keys()]).toEqual(["auditTrail"]);
     expect(built.migration.name).toBe(AUTHZ_ENGINE_MIGRATION_NAME);
     expect(dispatcher.calls).toBe(0);

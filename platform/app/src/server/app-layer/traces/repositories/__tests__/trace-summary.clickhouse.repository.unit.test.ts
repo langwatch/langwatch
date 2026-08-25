@@ -66,9 +66,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
 
   it("issues a bounded heavy read when the resolve returns a positive OccurredAt", async () => {
     const { repo, queries } = makeRepo((sql) =>
-      isResolve(sql)
-        ? [{ rowCount: "1", occurredAtMs: String(Date.now()) }]
-        : [heavyRow],
+      isResolve(sql) ? [{ rowCount: "1", occurredAtMs: String(Date.now()) }] : [heavyRow],
     );
 
     const result = await repo.findByTraceId("tenant-1", "t1");

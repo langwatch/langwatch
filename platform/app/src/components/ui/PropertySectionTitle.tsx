@@ -14,12 +14,7 @@ export function PropertySectionTitle({
 }: PropertySectionTitleProps) {
   return (
     <HStack paddingLeft={2} {...props}>
-      <Text
-        fontSize="12px"
-        fontWeight="bold"
-        textTransform="uppercase"
-        color="fg.muted"
-      >
+      <Text fontSize="12px" fontWeight="bold" textTransform="uppercase" color="fg.muted">
         {children}
       </Text>
       {tooltip && (

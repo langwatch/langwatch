@@ -26,7 +26,7 @@ import { ListTable } from "~/components/ui/ListTable";
       </Table.Row>
     ))}
   </Table.Body>
-</ListTable>
+</ListTable>;
 ```
 
 `ListTable` renders the bordered container and the `Table.Root`; you compose the

@@ -33,14 +33,8 @@ const NON_ENV_OVERRIDABLE_FLAG = "release_langy_enabled";
 const UNREGISTERED_FLAG = "experiment_some_adhoc_unregistered_flag";
 
 class InMemoryStore {
-  private values = new Map<
-    string,
-    { enabled: boolean; rules: FeatureFlagRules }
-  >();
-  async get(
-    key: string,
-    ctx: RuleEvaluationContext = {},
-  ): Promise<boolean | null> {
+  private values = new Map<string, { enabled: boolean; rules: FeatureFlagRules }>();
+  async get(key: string, ctx: RuleEvaluationContext = {}): Promise<boolean | null> {
     const row = this.values.get(key);
     if (!row) return null;
     const ruleHit = evaluateRules(row.rules, ctx);
@@ -57,8 +51,7 @@ class InMemoryStore {
     // non-matching contexts keep the registry default rather than
     // silently flipping to false.
     this.values.set(key, {
-      enabled:
-        existing?.enabled ?? resolveFlagDefinition(key)?.defaultValue ?? false,
+      enabled: existing?.enabled ?? resolveFlagDefinition(key)?.defaultValue ?? false,
       rules,
     });
   }
@@ -198,9 +191,7 @@ describe("FeatureFlagService", () => {
       it("returns false regardless of what the legacy service would have returned", async () => {
         const { service, store, legacy } = buildService();
         await store.set(PRODUCT_FLAG, false);
-        (legacy.isEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-          true,
-        );
+        (legacy.isEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
         const enabled = await service.isEnabled(PRODUCT_FLAG, {
           distinctId: "user-1",
           defaultValue: true,
@@ -266,9 +257,7 @@ describe("FeatureFlagService", () => {
   describe("given an unregistered flag", () => {
     it("falls through to the legacy service so ad-hoc flags still work", async () => {
       const { service, legacy } = buildService();
-      (legacy.isEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        true,
-      );
+      (legacy.isEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
       // Cast: deliberately a non-registered flag to assert the
       // legacy-fallback path. Production callers can't reach this branch
       // because the FeatureFlagKey signature wouldn't accept the key.

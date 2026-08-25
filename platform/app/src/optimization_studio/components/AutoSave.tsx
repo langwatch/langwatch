@@ -57,11 +57,7 @@ export function AutoSave() {
       if (hasPendingChanges()) {
         const autosavedWorkflow = getAutosavedWorkflow()!;
 
-        const setAsLatestVersion = hasDSLChanged(
-          autosavedWorkflow,
-          stateWorkflow,
-          false,
-        );
+        const setAsLatestVersion = hasDSLChanged(autosavedWorkflow, stateWorkflow, false);
         autosave.mutate(
           {
             projectId: project.id,

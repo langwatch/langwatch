@@ -29,10 +29,7 @@ import {
   LangWatchQLService,
   setLangWatchQLService,
 } from "../lwql.service";
-import {
-  GATED_DATASET,
-  GATED_DATASET_QUALIFIED_NAME,
-} from "./gatedDatasetFixture";
+import { GATED_DATASET, GATED_DATASET_QUALIFIED_NAME } from "./gatedDatasetFixture";
 
 const DATABASE = "analytics";
 
@@ -126,9 +123,7 @@ async function codeOf(run: () => Promise<unknown>): Promise<unknown> {
 }
 
 /** The `meta` of a thrown handled error. */
-async function metaOf(
-  run: () => Promise<unknown>,
-): Promise<Record<string, unknown>> {
+async function metaOf(run: () => Promise<unknown>): Promise<Record<string, unknown>> {
   try {
     await run();
   } catch (error) {
@@ -175,9 +170,7 @@ describe("given the LangWatchQL service", () => {
       );
       // The raw key is the secret the digest exists to keep out of the
       // database; a capability that merely contained it would be a leak.
-      expect(executor.calls[0]!.tenantCapability).not.toContain(
-        PROJECT.lwqlKey,
-      );
+      expect(executor.calls[0]!.tenantCapability).not.toContain(PROJECT.lwqlKey);
     });
 
     /**
@@ -227,9 +220,7 @@ describe("given the LangWatchQL service", () => {
 
   describe("when the executor reports the result was cut short", () => {
     it("marks truncation and carries a diagnostic naming the ceiling", async () => {
-      const result = await serviceWith(
-        recordingExecutor({ truncated: true }),
-      ).execute({
+      const result = await serviceWith(recordingExecutor({ truncated: true })).execute({
         project: PROJECT,
         protections: FULLY_PERMITTED,
         sql:
@@ -238,9 +229,7 @@ describe("given the LangWatchQL service", () => {
       });
 
       expect(result.truncated).toBe(true);
-      expect(result.diagnostics.map((entry) => entry.code)).toEqual([
-        "RESULT_TRUNCATED",
-      ]);
+      expect(result.diagnostics.map((entry) => entry.code)).toEqual(["RESULT_TRUNCATED"]);
       expect(result.diagnostics[0]!.meta).toMatchObject({ maxRows: 10_000 });
     });
   });
@@ -259,10 +248,7 @@ describe("given the LangWatchQL service", () => {
           }),
         ),
       ).toBe("lwql_not_permitted");
-      expect(
-        executor.calls,
-        "a refused query reached the database",
-      ).toHaveLength(0);
+      expect(executor.calls, "a refused query reached the database").toHaveLength(0);
     });
 
     it("refuses a table outside the catalog and a reserved schema", async () => {
@@ -354,9 +340,7 @@ describe("given the LangWatchQL service", () => {
         }),
       );
       expect(
-        (meta.violations as { code: string }[]).map(
-          (violation) => violation.code,
-        ),
+        (meta.violations as { code: string }[]).map((violation) => violation.code),
       ).toContain("WILDCARD_NOT_ALLOWED");
     });
 
@@ -385,9 +369,7 @@ describe("given the LangWatchQL service", () => {
         "SELECT TotalCost FROM analytics.traces",
       ]) {
         expect(
-          await codeOf(() =>
-            service.execute({ project: PROJECT, protections: {}, sql }),
-          ),
+          await codeOf(() => service.execute({ project: PROJECT, protections: {}, sql })),
           sql,
         ).toBe("lwql_not_permitted");
       }
@@ -546,9 +528,10 @@ describe("given the LangWatchQL service", () => {
         });
       }
 
-      expect(
-        executor.calls.map((call) => call.parameters?.period_start),
-      ).toEqual(["2026-02-20 00:00:00", "2026-03-20 00:00:00"]);
+      expect(executor.calls.map((call) => call.parameters?.period_start)).toEqual([
+        "2026-02-20 00:00:00",
+        "2026-03-20 00:00:00",
+      ]);
     });
 
     /** @scenario "A caller that supplies a reserved period parameter itself is refused" */
@@ -637,10 +620,7 @@ describe("given the LangWatchQL service", () => {
         sql: PERIOD_SQL,
       });
       expect(validated.followsTimeWindow).toBe(true);
-      expect(validated.awaitingTimeWindow).toEqual([
-        "period_end",
-        "period_start",
-      ]);
+      expect(validated.awaitingTimeWindow).toEqual(["period_end", "period_start"]);
     });
   });
 
@@ -688,8 +668,7 @@ describe("given the LangWatchQL service", () => {
 
     it("still describes the schema, which discloses nothing a caller could read", () => {
       expect(
-        serviceWith(null).describeSchema({ protections: FULLY_PERMITTED })
-          .datasets,
+        serviceWith(null).describeSchema({ protections: FULLY_PERMITTED }).datasets,
       ).toHaveLength(LWQL_VIEW_CATALOG.length);
     });
   });
@@ -714,9 +693,7 @@ describe("given the LangWatchQL service", () => {
           protections: FULLY_PERMITTED,
           sql: "SELECT count() FROM analytics.traces",
         }),
-      ).rejects.toThrow(
-        "LangWatchQL tenant capability requires a non-empty secret",
-      );
+      ).rejects.toThrow("LangWatchQL tenant capability requires a non-empty secret");
 
       // Nothing reached the database: the refusal is before execution, not a
       // query that ran and quietly answered nothing.

@@ -72,8 +72,7 @@ export const LOGS_ONLY_AGENT_IDS: ReadonlySet<string> = new Set(
  */
 export const EVENTS_FOLD_TOOL_RUNS_AGENT_IDS: ReadonlySet<string> = new Set(
   CODING_AGENT_REGISTRY.filter(
-    (agent) =>
-      agent.logsOnly === true || agent.foldsToolRunsFromEvents === true,
+    (agent) => agent.logsOnly === true || agent.foldsToolRunsFromEvents === true,
   ).map((agent) => agent.id),
 );
 
@@ -89,8 +88,7 @@ export const WRAPPER_TOOL_NAMES_BY_AGENT_ID: ReadonlyMap<
   ReadonlySet<string>
 > = new Map(
   CODING_AGENT_REGISTRY.filter(
-    (agent) =>
-      agent.wrapperToolNames !== undefined && agent.wrapperToolNames.length > 0,
+    (agent) => agent.wrapperToolNames !== undefined && agent.wrapperToolNames.length > 0,
   ).map((agent) => [agent.id, new Set(agent.wrapperToolNames)]),
 );
 
@@ -102,7 +100,7 @@ export const WRAPPER_TOOL_NAMES_BY_AGENT_ID: ReadonlyMap<
  * Same string-typed shape and reasoning as {@link LOGS_ONLY_AGENT_IDS}.
  */
 export const LOGS_REQUIRE_SESSION_KEY_AGENT_IDS: ReadonlySet<string> = new Set(
-  CODING_AGENT_REGISTRY.filter(
-    (agent) => agent.logsRequireSessionKey === true,
-  ).map((agent) => agent.id),
+  CODING_AGENT_REGISTRY.filter((agent) => agent.logsRequireSessionKey === true).map(
+    (agent) => agent.id,
+  ),
 );

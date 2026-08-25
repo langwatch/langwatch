@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai", projectId: "proj_123" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+    projectId: "proj_123",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -58,13 +63,16 @@ describe("listSecretsCommand()", () => {
   it("lists secrets in table format", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => [makeSecret(), makeSecret({ id: "secret_def", name: "DB_PASSWORD" })],
+      json: async () => [
+        makeSecret(),
+        makeSecret({ id: "secret_def", name: "DB_PASSWORD" }),
+      ],
     });
 
     await listSecretsCommand();
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("/api/secrets/latest/secrets.list"),
-      expect.objectContaining({ method: "POST", headers: expect.any(Object) })
+      expect.objectContaining({ method: "POST", headers: expect.any(Object) }),
     );
   });
 
@@ -113,12 +121,16 @@ describe("getSecretCommand()", () => {
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("secret_abc"),
-      })
+      }),
     );
   });
 
   it("exits when secret not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
     await expect(getSecretCommand("nonexistent")).rejects.toThrow(ProcessExitError);
   });
 });
@@ -147,14 +159,14 @@ describe("createSecretCommand()", () => {
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("MY_API_KEY"),
-      })
+      }),
     );
   });
 
   it("rejects invalid name format", async () => {
-    await expect(
-      createSecretCommand("invalid-name", { value: "test" })
-    ).rejects.toThrow(ProcessExitError);
+    await expect(createSecretCommand("invalid-name", { value: "test" })).rejects.toThrow(
+      ProcessExitError,
+    );
   });
 
   it("exits on conflict (409)", async () => {
@@ -163,9 +175,9 @@ describe("createSecretCommand()", () => {
       status: 409,
       text: async () => "Already exists",
     });
-    await expect(
-      createSecretCommand("MY_KEY", { value: "val" })
-    ).rejects.toThrow(ProcessExitError);
+    await expect(createSecretCommand("MY_KEY", { value: "val" })).rejects.toThrow(
+      ProcessExitError,
+    );
   });
 });
 
@@ -197,15 +209,19 @@ describe("updateSecretCommand()", () => {
           id: "secret_abc",
           value: "new-value",
         }),
-      })
+      }),
     );
   });
 
   it("exits when secret not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
-    await expect(
-      updateSecretCommand("bad_id", { value: "val" })
-    ).rejects.toThrow(ProcessExitError);
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
+    await expect(updateSecretCommand("bad_id", { value: "val" })).rejects.toThrow(
+      ProcessExitError,
+    );
   });
 });
 
@@ -233,12 +249,16 @@ describe("deleteSecretCommand()", () => {
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("secret_abc"),
-      })
+      }),
     );
   });
 
   it("exits when secret not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
     await expect(deleteSecretCommand("bad_id")).rejects.toThrow(ProcessExitError);
   });
 });

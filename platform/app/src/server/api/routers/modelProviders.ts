@@ -54,13 +54,26 @@ function toLegacyProvider(provider: CanonicalProvider) {
     deploymentMapping: null,
     models: provider.models ?? null,
     embeddingsModels: provider.embeddingsModels ?? null,
-    customModels: provider.customModels.map((model) => ({ modelId: model.id, displayName: model.label, mode: "chat" as const })),
-    customEmbeddingsModels: provider.customEmbeddingsModels.map((model) => ({ modelId: model.id, displayName: model.label, mode: "embedding" as const })),
+    customModels: provider.customModels.map((model) => ({
+      modelId: model.id,
+      displayName: model.label,
+      mode: "chat" as const,
+    })),
+    customEmbeddingsModels: provider.customEmbeddingsModels.map((model) => ({
+      modelId: model.id,
+      displayName: model.label,
+      mode: "embedding" as const,
+    })),
   };
 }
 
-function toLegacyProviderMap(providers: Record<string, CanonicalProvider>, _includeKeys: boolean) {
-  return Object.fromEntries(Object.entries(providers).map(([key, provider]) => [key, toLegacyProvider(provider)]));
+function toLegacyProviderMap(
+  providers: Record<string, CanonicalProvider>,
+  _includeKeys: boolean,
+) {
+  return Object.fromEntries(
+    Object.entries(providers).map(([key, provider]) => [key, toLegacyProvider(provider)]),
+  );
 }
 
 function toCanonicalModels(value: unknown, type: "chat" | "embedding") {
@@ -69,7 +82,15 @@ function toCanonicalModels(value: unknown, type: "chat" | "embedding") {
     if (typeof model === "string") return [{ id: model, label: model, type }];
     if (!model || typeof model !== "object") return [];
     const item = model as { modelId?: unknown; displayName?: unknown };
-    return typeof item.modelId === "string" ? [{ id: item.modelId, label: typeof item.displayName === "string" ? item.displayName : item.modelId, type }] : [];
+    return typeof item.modelId === "string"
+      ? [
+          {
+            id: item.modelId,
+            label: typeof item.displayName === "string" ? item.displayName : item.modelId,
+            type,
+          },
+        ]
+      : [];
   });
 }
 
@@ -126,7 +147,10 @@ export const modelProviderRouter = createTRPCRouter({
         projectId,
         "project:update",
       );
-      return toLegacyProviderMap(await ctx.app.modelProviders.getForProject({ projectId }), hasSetupPermission);
+      return toLegacyProviderMap(
+        await ctx.app.modelProviders.getForProject({ projectId }),
+        hasSetupPermission,
+      );
     }),
   /**
    * List shape: one entry per stored ModelProvider row, no collapsing
@@ -140,7 +164,9 @@ export const modelProviderRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("project:view")
     .query(async ({ input, ctx }) => {
-      return (await ctx.app.modelProviders.listForProject({ projectId: input.projectId })).map(toLegacyProvider);
+      return (
+        await ctx.app.modelProviders.listForProject({ projectId: input.projectId })
+      ).map(toLegacyProvider);
     }),
   /**
    * Org-wide variant: returns every ModelProvider attached anywhere
@@ -153,7 +179,11 @@ export const modelProviderRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("organization:view")
     .query(async ({ input, ctx }) => {
-      return (await ctx.app.modelProviders.listForOrganization({ organizationId: input.organizationId })).map(toLegacyProvider);
+      return (
+        await ctx.app.modelProviders.listForOrganization({
+          organizationId: input.organizationId,
+        })
+      ).map(toLegacyProvider);
     }),
   update: protectedProcedure
     .input(
@@ -172,9 +202,7 @@ export const modelProviderRouter = createTRPCRouter({
           enabled: z.boolean(),
           customKeys: z.object({}).passthrough().optional().nullable(),
           customModels: customModelUpdateInputSchema.optional().nullable(),
-          customEmbeddingsModels: customModelUpdateInputSchema
-            .optional()
-            .nullable(),
+          customEmbeddingsModels: customModelUpdateInputSchema.optional().nullable(),
           extraHeaders: z
             .array(z.object({ key: z.string(), value: z.string() }))
             .optional()
@@ -216,34 +244,36 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .use(checkProjectOrOrganizationPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
-      const result = await ctx.app.modelProviders.upsert(
-        {
-          id: input.id,
-          projectId: input.projectId,
-          organizationId: input.organizationId,
-          provider: input.provider,
-          name: input.name,
-          enabled: input.enabled,
-          customKeys: input.customKeys as
-            | Record<string, unknown>
-            | null
-            | undefined,
-          customModels: toCanonicalModels(input.customModels, "chat"),
-          customEmbeddingsModels: toCanonicalModels(input.customEmbeddingsModels, "embedding"),
-          extraHeaders: input.extraHeaders,
-          defaultModel: input.defaultModel,
-          routingHandle: input.routingHandle,
-          scopes: input.scopes ?? (input.scopeType && input.scopeId ? [{ scopeType: input.scopeType, scopeId: input.scopeId }] : undefined),
-          rateLimitRpm: input.rateLimitRpm,
-          rateLimitTpm: input.rateLimitTpm,
-          rateLimitRpd: input.rateLimitRpd,
-          fallbackPriorityGlobal: input.fallbackPriorityGlobal,
-          providerConfig: input.providerConfig as
-            | Record<string, unknown>
-            | null
-            | undefined,
-        },
-      );
+      const result = await ctx.app.modelProviders.upsert({
+        id: input.id,
+        projectId: input.projectId,
+        organizationId: input.organizationId,
+        provider: input.provider,
+        name: input.name,
+        enabled: input.enabled,
+        customKeys: input.customKeys as Record<string, unknown> | null | undefined,
+        customModels: toCanonicalModels(input.customModels, "chat"),
+        customEmbeddingsModels: toCanonicalModels(
+          input.customEmbeddingsModels,
+          "embedding",
+        ),
+        extraHeaders: input.extraHeaders,
+        defaultModel: input.defaultModel,
+        routingHandle: input.routingHandle,
+        scopes:
+          input.scopes ??
+          (input.scopeType && input.scopeId
+            ? [{ scopeType: input.scopeType, scopeId: input.scopeId }]
+            : undefined),
+        rateLimitRpm: input.rateLimitRpm,
+        rateLimitTpm: input.rateLimitTpm,
+        rateLimitRpd: input.rateLimitRpd,
+        fallbackPriorityGlobal: input.fallbackPriorityGlobal,
+        providerConfig: input.providerConfig as
+          | Record<string, unknown>
+          | null
+          | undefined,
+      });
 
       return toLegacyProvider(result);
     }),
@@ -362,15 +392,13 @@ export const modelProviderRouter = createTRPCRouter({
         return { status: "pending" as const };
       }
 
-      const saved = await ctx.app.modelProviders.upsert(
-        {
-          projectId: input.projectId,
-          provider: "openai_codex",
-          enabled: true,
-          customKeys: poll.keys,
-          scopes: input.scopes,
-        },
-      );
+      const saved = await ctx.app.modelProviders.upsert({
+        projectId: input.projectId,
+        provider: "openai_codex",
+        enabled: true,
+        customKeys: poll.keys,
+        scopes: input.scopes,
+      });
 
       if (input.setAsCodingDefaults) {
         // The widest selected scope carries the defaults; role values
@@ -552,7 +580,10 @@ export const modelProviderRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("project:view")
     .query(async ({ input, ctx }) => {
-      return ctx.app.modelProviders.getDefaultSnapshot({ projectId: input.projectId, actorId: ctx.session?.user?.id });
+      return ctx.app.modelProviders.getDefaultSnapshot({
+        projectId: input.projectId,
+        actorId: ctx.session?.user?.id,
+      });
     }),
 
   /**
@@ -640,7 +671,11 @@ export const modelProviderRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const saved = await ctx.app.modelProviders.saveDefaultConfig({ ...input, authorId: ctx.session?.user?.id ?? null, actorId: ctx.session?.user?.id });
+      const saved = await ctx.app.modelProviders.saveDefaultConfig({
+        ...input,
+        authorId: ctx.session?.user?.id ?? null,
+        actorId: ctx.session?.user?.id,
+      });
       return { id: saved.id };
     }),
 
@@ -652,7 +687,10 @@ export const modelProviderRouter = createTRPCRouter({
   deleteDefaultModelsConfig: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      await ctx.app.modelProviders.deleteDefaultConfig({ id: input.id, actorId: ctx.session?.user?.id });
+      await ctx.app.modelProviders.deleteDefaultConfig({
+        id: input.id,
+        actorId: ctx.session?.user?.id,
+      });
       return { ok: true };
     }),
 

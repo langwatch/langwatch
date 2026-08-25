@@ -19,14 +19,10 @@ export function hoistSystemMessage(source: {
   messages: PromptMessage[] | undefined;
 } {
   const systemMessage = source.messages?.find((msg) => msg.role === "system");
-  const nonSystemMessages = source.messages?.filter(
-    (msg) => msg.role !== "system",
-  );
+  const nonSystemMessages = source.messages?.filter((msg) => msg.role !== "system");
 
   return {
-    prompt: systemMessage
-      ? systemMessage.content
-      : (source.prompt ?? undefined),
+    prompt: systemMessage ? systemMessage.content : (source.prompt ?? undefined),
     messages: nonSystemMessages?.length ? nonSystemMessages : undefined,
   };
 }

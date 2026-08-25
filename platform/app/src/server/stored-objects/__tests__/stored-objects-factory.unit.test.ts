@@ -61,10 +61,7 @@ vi.mock("~/server/dataplane-s3", () => ({
 
 import { resolveAzureCredentials } from "../azure-credentials";
 import { resolveProjectStorageDestination } from "../project-storage-destination";
-import {
-  createStorageRegistry,
-  maybeAzureDriver,
-} from "../stored-objects-factory";
+import { createStorageRegistry, maybeAzureDriver } from "../stored-objects-factory";
 
 const INJECTED_WORKLOAD_IDENTITY_VARS = [
   "AZURE_CLIENT_ID",
@@ -201,14 +198,11 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
     it(`reports azure as usable=${String(expectedUsable)} identically for both the destination resolver and the driver registration`, async () => {
       Object.assign(mockEnv, env);
 
-      const { isDestinationAzure, isDriverRegistered } =
-        await evaluateAzureUsability();
+      const { isDestinationAzure, isDriverRegistered } = await evaluateAzureUsability();
 
       expect(isDestinationAzure).toBe(expectedUsable);
       expect(isDriverRegistered).toBe(expectedUsable);
-      expect(isWriteOutage({ isDestinationAzure, isDriverRegistered })).toBe(
-        false,
-      );
+      expect(isWriteOutage({ isDestinationAzure, isDriverRegistered })).toBe(false);
     });
   });
 
@@ -272,14 +266,11 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
       mockEnv.AZURE_BLOB_ACCOUNT_KEY = "a2V5";
       mockEnv.AZURE_BLOB_CONTAINER = "lw-container";
 
-      const { isDestinationAzure, isDriverRegistered } =
-        await evaluateAzureUsability();
+      const { isDestinationAzure, isDriverRegistered } = await evaluateAzureUsability();
 
       expect(isDestinationAzure).toBe(false);
       expect(isDriverRegistered).toBe(true);
-      expect(isWriteOutage({ isDestinationAzure, isDriverRegistered })).toBe(
-        false,
-      );
+      expect(isWriteOutage({ isDestinationAzure, isDriverRegistered })).toBe(false);
     });
   });
 
@@ -295,8 +286,7 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
       process.env.AZURE_FEDERATED_TOKEN_FILE =
         "/var/run/secrets/azure/tokens/azure-identity-token";
 
-      const { isDestinationAzure, isDriverRegistered } =
-        await evaluateAzureUsability();
+      const { isDestinationAzure, isDriverRegistered } = await evaluateAzureUsability();
 
       expect(isDestinationAzure).toBe(true);
       expect(isDriverRegistered).toBe(true);
@@ -313,8 +303,7 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
       // AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_FEDERATED_TOKEN_FILE
       // deliberately left unset.
 
-      const { isDestinationAzure, isDriverRegistered } =
-        await evaluateAzureUsability();
+      const { isDestinationAzure, isDriverRegistered } = await evaluateAzureUsability();
 
       expect(isDestinationAzure).toBe(false);
       expect(isDriverRegistered).toBe(false);

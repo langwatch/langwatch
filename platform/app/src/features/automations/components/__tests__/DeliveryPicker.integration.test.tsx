@@ -18,9 +18,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const renderPicker = (
-  props: Partial<Parameters<typeof DeliveryPicker>[0]> = {},
-) =>
+const renderPicker = (props: Partial<Parameters<typeof DeliveryPicker>[0]> = {}) =>
   render(
     <DeliveryPicker
       value={null}
@@ -60,12 +58,12 @@ describe("DeliveryPicker", () => {
     it("keeps the notify cards enabled", () => {
       renderPicker({ source: "customGraph" });
 
-      expect(
-        screen.getByRole("button", { name: /email/i }),
-      ).not.toHaveAttribute("aria-disabled");
-      expect(
-        screen.getByRole("button", { name: /slack/i }),
-      ).not.toHaveAttribute("aria-disabled");
+      expect(screen.getByRole("button", { name: /email/i })).not.toHaveAttribute(
+        "aria-disabled",
+      );
+      expect(screen.getByRole("button", { name: /slack/i })).not.toHaveAttribute(
+        "aria-disabled",
+      );
     });
   });
 
@@ -92,9 +90,7 @@ describe("DeliveryPicker", () => {
       renderPicker({ webhookEnabled: false });
 
       expect(screen.queryByText(/webhook/i)).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /webhook/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /webhook/i })).not.toBeInTheDocument();
     });
 
     it("shows an existing webhook selection read-only with a clear notice", () => {

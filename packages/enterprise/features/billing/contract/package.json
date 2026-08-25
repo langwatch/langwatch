@@ -4,17 +4,31 @@
   "private": true,
   "description": "Portable LangWatch Enterprise billing contracts.",
   "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
   "type": "module",
-  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "files": ["src"],
-  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run", "test:unit": "vitest run" },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
   "dependencies": {
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "zod": "^4.4.3"
   },
-  "devDependencies": { "typescript": "^7.0.2", "vitest": "^4.1.9" }
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
 }

@@ -7,9 +7,7 @@ import { classifyPromptText } from "../injectedNotice";
 describe("classifyPromptText", () => {
   describe("given a message the human typed", () => {
     it("keeps every word of it as the prompt", () => {
-      const result = classifyPromptText(
-        "check git status and bump the version",
-      );
+      const result = classifyPromptText("check git status and bump the version");
 
       expect(result.notices).toEqual([]);
       expect(result.remainder).toBe("check git status and bump the version");
@@ -45,9 +43,7 @@ describe("classifyPromptText", () => {
     it("keeps the block itself for the reader who opens it", () => {
       const result = classifyPromptText(notification);
 
-      expect(result.notices[0]?.body).toContain(
-        "2 new comments on langwatch#4711",
-      );
+      expect(result.notices[0]?.body).toContain("2 new comments on langwatch#4711");
     });
 
     it("leaves nothing behind as the prompt", () => {
@@ -77,9 +73,7 @@ describe("classifyPromptText", () => {
       );
 
       const label = result.notices[0]?.label ?? "";
-      expect(label.length).toBeLessThanOrEqual(
-        "task notification: ".length + 120,
-      );
+      expect(label.length).toBeLessThanOrEqual("task notification: ".length + 120);
       expect(label.endsWith("…")).toBe(true);
     });
 
@@ -100,9 +94,7 @@ describe("classifyPromptText", () => {
         "<system-reminder>Background task finished.</system-reminder>\n\nnow ship it",
       );
 
-      expect(result.notices.map((notice) => notice.label)).toEqual([
-        "system reminder",
-      ]);
+      expect(result.notices.map((notice) => notice.label)).toEqual(["system reminder"]);
       expect(result.remainder).toBe("now ship it");
     });
   });

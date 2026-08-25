@@ -52,9 +52,7 @@ export function getZodIssueMessage(issue: ZodIssue): string {
 /**
  * Parses Zod error to extract field-specific error messages
  */
-export function parseZodFieldErrors(
-  zodError: ZodErrorStructure,
-): Record<string, string> {
+export function parseZodFieldErrors(zodError: ZodErrorStructure): Record<string, string> {
   const fieldErrors: Record<string, string> = {};
 
   // Handle union errors by flattening them
@@ -66,11 +64,7 @@ export function parseZodFieldErrors(
           unionError.issues?.forEach((nestedIssue) => {
             if (nestedIssue.path && nestedIssue.path.length > 0) {
               const fieldName = nestedIssue.path[0];
-              if (
-                fieldName &&
-                typeof fieldName === "string" &&
-                !fieldErrors[fieldName]
-              ) {
+              if (fieldName && typeof fieldName === "string" && !fieldErrors[fieldName]) {
                 fieldErrors[fieldName] = getZodIssueMessage(nestedIssue);
               }
             }
@@ -78,11 +72,7 @@ export function parseZodFieldErrors(
         });
       } else if (issue.path && issue.path.length > 0) {
         const fieldName = issue.path[0];
-        if (
-          fieldName &&
-          typeof fieldName === "string" &&
-          !fieldErrors[fieldName]
-        ) {
+        if (fieldName && typeof fieldName === "string" && !fieldErrors[fieldName]) {
           fieldErrors[fieldName] = getZodIssueMessage(issue);
         }
       }

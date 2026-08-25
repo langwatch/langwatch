@@ -53,9 +53,7 @@ const configFor = (
   configs: ReturnType<typeof buildGenericOAuthConfigs>,
   providerId: string,
 ) =>
-  configs.find(
-    (c) => (c as { providerId?: string }).providerId === providerId,
-  ) as
+  configs.find((c) => (c as { providerId?: string }).providerId === providerId) as
     | {
         clientId?: string;
         clientSecret?: string;
@@ -71,9 +69,7 @@ describe("buildGenericOAuthConfigs", () => {
   describe("when provider is cognito", () => {
     /** @scenario Cognito mode */
     it("mounts a cognito provider that discovers its endpoints from the issuer", () => {
-      const configs = buildGenericOAuthConfigs(
-        envWith({ provider: "cognito" }),
-      );
+      const configs = buildGenericOAuthConfigs(envWith({ provider: "cognito" }));
 
       expect(providerIds(configs)).toContain("cognito");
       const cognito = configFor(configs, "cognito");
@@ -86,17 +82,13 @@ describe("buildGenericOAuthConfigs", () => {
 
     /** @scenario Only the named provider is mounted */
     it("mounts nothing else, even though every other credential is present", () => {
-      const configs = buildGenericOAuthConfigs(
-        envWith({ provider: "cognito" }),
-      );
+      const configs = buildGenericOAuthConfigs(envWith({ provider: "cognito" }));
 
       expect(providerIds(configs)).toEqual(["cognito"]);
     });
 
     it("asks for the scopes needed to identify the user", () => {
-      const configs = buildGenericOAuthConfigs(
-        envWith({ provider: "cognito" }),
-      );
+      const configs = buildGenericOAuthConfigs(envWith({ provider: "cognito" }));
 
       expect(configFor(configs, "cognito")?.scopes).toEqual([
         "openid",
@@ -106,9 +98,7 @@ describe("buildGenericOAuthConfigs", () => {
     });
 
     it("uses PKCE", () => {
-      const configs = buildGenericOAuthConfigs(
-        envWith({ provider: "cognito" }),
-      );
+      const configs = buildGenericOAuthConfigs(envWith({ provider: "cognito" }));
 
       expect(configFor(configs, "cognito")?.pkce).toBe(true);
     });
@@ -117,9 +107,7 @@ describe("buildGenericOAuthConfigs", () => {
   describe("when provider is onelogin", () => {
     /** @scenario OneLogin mode */
     it("mounts a onelogin provider that discovers its endpoints from the issuer", () => {
-      const configs = buildGenericOAuthConfigs(
-        envWith({ provider: "onelogin" }),
-      );
+      const configs = buildGenericOAuthConfigs(envWith({ provider: "onelogin" }));
 
       expect(providerIds(configs)).toContain("onelogin");
       const onelogin = configFor(configs, "onelogin");
@@ -132,9 +120,7 @@ describe("buildGenericOAuthConfigs", () => {
 
     /** @scenario Only the named provider is mounted */
     it("mounts nothing else, even though every other credential is present", () => {
-      const configs = buildGenericOAuthConfigs(
-        envWith({ provider: "onelogin" }),
-      );
+      const configs = buildGenericOAuthConfigs(envWith({ provider: "onelogin" }));
 
       expect(providerIds(configs)).toEqual(["onelogin"]);
     });
@@ -240,9 +226,7 @@ describe("buildGenericOAuthConfigs", () => {
   describe("when the identity provider returns a profile with no name", () => {
     /** @scenario A profile without a display name still yields a usable name */
     it("falls back through the fields providers actually populate", () => {
-      const configs = buildGenericOAuthConfigs(
-        envWith({ provider: "cognito" }),
-      );
+      const configs = buildGenericOAuthConfigs(envWith({ provider: "cognito" }));
       const map = configFor(configs, "cognito")?.mapProfileToUser;
 
       expect(map?.({ preferred_username: "dogfood" }).name).toBe("dogfood");
@@ -259,9 +243,7 @@ describe("discoveryUrlFor", () => {
       const expected = `${cognitoIssuer}/.well-known/openid-configuration`;
 
       expect(discoveryUrlFor(cognitoIssuer, "cognitoIssuer")).toBe(expected);
-      expect(discoveryUrlFor(`${cognitoIssuer}/`, "cognitoIssuer")).toBe(
-        expected,
-      );
+      expect(discoveryUrlFor(`${cognitoIssuer}/`, "cognitoIssuer")).toBe(expected);
       expect(
         discoveryUrlFor(
           "cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123",
@@ -274,21 +256,19 @@ describe("discoveryUrlFor", () => {
     it("produces the same discovery URL for a OneLogin issuer", () => {
       const expected = `${oneLoginIssuer}/.well-known/openid-configuration`;
 
-      expect(discoveryUrlFor(oneLoginIssuer, "oneLoginIssuer")).toBe(
+      expect(discoveryUrlFor(oneLoginIssuer, "oneLoginIssuer")).toBe(expected);
+      expect(discoveryUrlFor("acme.onelogin.com/oidc/2/", "oneLoginIssuer")).toBe(
         expected,
       );
-      expect(
-        discoveryUrlFor("acme.onelogin.com/oidc/2/", "oneLoginIssuer"),
-      ).toBe(expected);
     });
   });
 
   describe("given an issuer that cannot be read as a URL", () => {
     /** @scenario An unusable issuer is rejected by name */
     it("names the env var and the value it rejected", () => {
-      expect(() =>
-        discoveryUrlFor("not a url at all !!!", "cognitoIssuer"),
-      ).toThrow(/Invalid cognitoIssuer.*not a url at all/);
+      expect(() => discoveryUrlFor("not a url at all !!!", "cognitoIssuer")).toThrow(
+        /Invalid cognitoIssuer.*not a url at all/,
+      );
     });
   });
 });
@@ -296,9 +276,9 @@ describe("discoveryUrlFor", () => {
 describe("fallbackName", () => {
   describe("given a Cognito profile", () => {
     it("prefers the name Cognito sends over the derived ones", () => {
-      expect(
-        fallbackName({ name: "SSO Dogfood", email: "sso@example.com" }),
-      ).toBe("SSO Dogfood");
+      expect(fallbackName({ name: "SSO Dogfood", email: "sso@example.com" })).toBe(
+        "SSO Dogfood",
+      );
     });
   });
 });

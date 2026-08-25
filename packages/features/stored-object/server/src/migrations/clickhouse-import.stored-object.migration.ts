@@ -142,9 +142,7 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
     }
     const audience = audienceForLegacyStoredObjectPurpose(row.purpose);
     if (!audience) {
-      throw new TypeError(
-        "Legacy Stored Object purpose has no delivery audience",
-      );
+      throw new TypeError("Legacy Stored Object purpose has no delivery audience");
     }
     const address = await this.options.locations.parse({
       projectId,
@@ -152,10 +150,7 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
     });
     const fingerprint = this.fingerprint(row);
     const current = await this.options.store.tryFind({ tenantId: projectId, id });
-    if (
-      current?.source === "canonical" ||
-      current?.legacyFingerprint === fingerprint
-    ) {
+    if (current?.source === "canonical" || current?.legacyFingerprint === fingerprint) {
       return "unchanged";
     }
     const now = this.now();

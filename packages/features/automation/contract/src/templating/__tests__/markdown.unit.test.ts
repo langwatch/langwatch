@@ -4,9 +4,7 @@ import { markdownToEmailHtml } from "../markdown";
 describe("markdownToEmailHtml", () => {
   describe("when given Markdown headings and links", () => {
     it("renders them to HTML", () => {
-      const html = markdownToEmailHtml(
-        "# Title\n\n[link](https://example.com)",
-      );
+      const html = markdownToEmailHtml("# Title\n\n[link](https://example.com)");
       expect(html).toContain("<h1>Title</h1>");
       expect(html).toContain('href="https://example.com"');
     });
@@ -20,9 +18,7 @@ describe("markdownToEmailHtml", () => {
 
   describe("when the Markdown contains raw HTML scripts", () => {
     it("strips the script tag", () => {
-      const html = markdownToEmailHtml(
-        "Hello <script>alert('x')</script> world",
-      );
+      const html = markdownToEmailHtml("Hello <script>alert('x')</script> world");
       expect(html).not.toContain("<script");
       expect(html).not.toContain("alert(");
     });
@@ -30,9 +26,7 @@ describe("markdownToEmailHtml", () => {
 
   describe("when the Markdown contains an event handler attribute", () => {
     it("strips the handler", () => {
-      const html = markdownToEmailHtml(
-        '<a href="https://x.com" onclick="evil()">x</a>',
-      );
+      const html = markdownToEmailHtml('<a href="https://x.com" onclick="evil()">x</a>');
       expect(html).not.toContain("onclick");
     });
   });
@@ -44,9 +38,7 @@ describe("markdownToEmailHtml", () => {
     });
 
     it("drops a data:text/html href", () => {
-      const html = markdownToEmailHtml(
-        "[x](data:text/html,<script>alert(1)</script>)",
-      );
+      const html = markdownToEmailHtml("[x](data:text/html,<script>alert(1)</script>)");
       expect(html).not.toContain("data:text/html");
       expect(html).not.toContain("<script");
     });
@@ -54,9 +46,7 @@ describe("markdownToEmailHtml", () => {
 
   describe("when the Markdown embeds an image", () => {
     it("strips markdown image syntax (img is off the allowlist)", () => {
-      const html = markdownToEmailHtml(
-        "![alt](https://tracker.example/pixel.gif)",
-      );
+      const html = markdownToEmailHtml("![alt](https://tracker.example/pixel.gif)");
       expect(html).not.toContain("<img");
       expect(html).not.toContain("tracker.example");
     });

@@ -187,10 +187,7 @@ describe("EvaluationAnalyticsStore read-back version gate", () => {
     it("reads the state and the durable watermark back", async () => {
       const { store } = storeOver(project(committedState()));
 
-      const { state, appliedEventIds } = await store.getWithApplied(
-        "eval-rb",
-        context,
-      );
+      const { state, appliedEventIds } = await store.getWithApplied("eval-rb", context);
 
       expect(state?.startedAt).toBe(BASE_MS - 1000);
       expect(state?.status).toBe("processed");

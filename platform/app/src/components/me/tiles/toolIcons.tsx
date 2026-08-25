@@ -29,10 +29,7 @@ export const TOOL_KINDS = [
 
 export type ToolKind = (typeof TOOL_KINDS)[number];
 
-export const TOOL_PRESETS: Record<
-  ToolKind,
-  { label: string; Icon: LucideIcon }
-> = {
+export const TOOL_PRESETS: Record<ToolKind, { label: string; Icon: LucideIcon }> = {
   wrench: { label: "Wrench", Icon: Wrench },
   globe: { label: "Globe", Icon: Globe },
   book: { label: "Book", Icon: BookOpen },
@@ -52,9 +49,7 @@ export function isToolPresetAsset(value: string): boolean {
 export function resolveToolPreset(value: string): ToolKind | null {
   if (!value.startsWith(TOOL_PREFIX)) return null;
   const key = value.slice(TOOL_PREFIX.length);
-  return (TOOL_KINDS as readonly string[]).includes(key)
-    ? (key as ToolKind)
-    : null;
+  return (TOOL_KINDS as readonly string[]).includes(key) ? (key as ToolKind) : null;
 }
 
 export function toolPresetAsset(kind: ToolKind): string {

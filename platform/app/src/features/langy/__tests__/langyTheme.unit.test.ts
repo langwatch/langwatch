@@ -40,10 +40,7 @@ const appConfig = defineConfig({
   },
 });
 
-const system = createSystem(
-  defaultConfig,
-  mergeConfigs(appConfig, langyThemeConfig),
-);
+const system = createSystem(defaultConfig, mergeConfigs(appConfig, langyThemeConfig));
 
 // getTokenCss() emits `{"@layer tokens": {"<selector> &": {--var: value}}}`.
 const tokenLayer = (
@@ -76,9 +73,7 @@ describe("langyTheme token emission", () => {
     /** @scenario Dark mode keeps the ink palette */
     it("overrides the surface to the ink ground in Langy dark", () => {
       expect(langyDark["--chakra-colors-bg-surface"]).toBe("#141417");
-      expect(langyDark["--chakra-colors-border"]).toBe(
-        "rgba(255, 255, 255, 0.1)",
-      );
+      expect(langyDark["--chakra-colors-border"]).toBe("rgba(255, 255, 255, 0.1)");
       expect(langyDark["--chakra-colors-fg"]).toBe("#ffffff");
     });
 
@@ -120,9 +115,7 @@ describe("langyTheme token emission", () => {
       expect(ruleBody(".langy-wash {")).toContain("display: none");
       expect(ruleBody(".langy-signal-grid {")).toContain("display: none");
       // ...and only the .dark gate reveals them on the ink ground.
-      expect(ruleBody(".dark .langy-root .langy-wash")).toContain(
-        "display: block",
-      );
+      expect(ruleBody(".dark .langy-root .langy-wash")).toContain("display: block");
       expect(ruleBody(".dark .langy-signal-grid")).toContain("display: block");
       // The film-grain overlay is gone from both grounds, not merely gated.
       expect(css).not.toContain(".langy-grain");

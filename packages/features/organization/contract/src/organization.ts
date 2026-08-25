@@ -6,9 +6,7 @@ export const getOldestTeamInputSchema = z.object({
   organizationId: organizationIdSchema,
 });
 
-export type GetOldestTeamInput = z.infer<
-  typeof getOldestTeamInputSchema
->;
+export type GetOldestTeamInput = z.infer<typeof getOldestTeamInputSchema>;
 
 export const getOrganizationBillingProfileInputSchema = z
   .object({ organizationId: organizationIdSchema })
@@ -24,9 +22,7 @@ export const organizationBillingProfileSchema = z
     billingCustomerId: z.string().min(1).nullable(),
   })
   .strict();
-export type OrganizationBillingProfile = z.infer<
-  typeof organizationBillingProfileSchema
->;
+export type OrganizationBillingProfile = z.infer<typeof organizationBillingProfileSchema>;
 
 export const claimOrganizationBillingCustomerInputSchema = z
   .object({

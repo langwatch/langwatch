@@ -29,9 +29,7 @@ export type AnalyticsMetricSource = "trace" | "evaluation";
  * Returns `undefined` when the metric belongs to a group with no fast-path
  * mapping — the router treats those as legacy-only.
  */
-export function getMetricSource(
-  metricKey: string,
-): AnalyticsMetricSource | undefined {
+export function getMetricSource(metricKey: string): AnalyticsMetricSource | undefined {
   if (
     metricKey.startsWith("performance.") ||
     metricKey.startsWith("metadata.") ||

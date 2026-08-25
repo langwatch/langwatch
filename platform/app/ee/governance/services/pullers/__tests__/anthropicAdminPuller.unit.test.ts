@@ -216,8 +216,7 @@ describe("the Anthropic Admin puller", () => {
     });
 
     it("falls back to the legacy flat cache-creation field when the nested object is absent", async () => {
-      const { cache_creation: _nested, ...row } =
-        USAGE_PAGE.data[0]!.results[0]!;
+      const { cache_creation: _nested, ...row } = USAGE_PAGE.data[0]!.results[0]!;
       fetchMock.mockResolvedValue(
         jsonResponse({
           ...USAGE_PAGE,
@@ -279,9 +278,7 @@ describe("the Anthropic Admin puller", () => {
           data: [
             {
               starting_at: "2026-08-01T00:00:00Z",
-              results: [
-                { ...COST_PAGE.data[0]!.results[0], amount: "1234.567890123" },
-              ],
+              results: [{ ...COST_PAGE.data[0]!.results[0], amount: "1234.567890123" }],
             },
           ],
         }),
@@ -541,10 +538,7 @@ describe("the Anthropic Admin puller", () => {
       const puller = new AnthropicAdminPuller();
       const cursor = await midWindowCursor(puller);
 
-      await puller.runOnce(
-        { ...RUN_OPTIONS, cursor },
-        { ...config, bucketWidth: "1d" },
-      );
+      await puller.runOnce({ ...RUN_OPTIONS, cursor }, { ...config, bucketWidth: "1d" });
 
       // Same config → the mid-window token is safe to replay.
       expect(String(fetchMock.mock.calls[0]?.[0])).toContain("page=page_2");
@@ -554,10 +548,7 @@ describe("the Anthropic Admin puller", () => {
       const puller = new AnthropicAdminPuller();
       const cursor = await midWindowCursor(puller);
 
-      await puller.runOnce(
-        { ...RUN_OPTIONS, cursor },
-        { ...config, bucketWidth: "1h" },
-      );
+      await puller.runOnce({ ...RUN_OPTIONS, cursor }, { ...config, bucketWidth: "1h" });
 
       const url = String(fetchMock.mock.calls[0]?.[0]);
       expect(url).not.toContain("page=");
@@ -568,9 +559,7 @@ describe("the Anthropic Admin puller", () => {
       // is the in-window watermark the cut-off run recorded (the bucket's
       // `starting_at`, not the window's `2026-08-01T00:00:00.000Z` start):
       // at most one bucket is re-read.
-      expect(url).toContain(
-        `starting_at=${encodeURIComponent("2026-08-01T00:00:00Z")}`,
-      );
+      expect(url).toContain(`starting_at=${encodeURIComponent("2026-08-01T00:00:00Z")}`);
     });
 
     it("records the newest bucket emitted beside the page token when a run is cut off", async () => {
@@ -634,9 +623,7 @@ describe("the Anthropic Admin puller", () => {
       const url = String(fetchMock.mock.calls[0]?.[0]);
       expect(url).not.toContain("page=");
       // NOT rewound to the configured start — the watermark is kept.
-      expect(url).toContain(
-        `starting_at=${encodeURIComponent("2026-08-01T00:00:00Z")}`,
-      );
+      expect(url).toContain(`starting_at=${encodeURIComponent("2026-08-01T00:00:00Z")}`);
     });
 
     it("falls back to the configured start when a kept usage watermark is not a date", async () => {
@@ -687,9 +674,7 @@ describe("the Anthropic Admin puller", () => {
       );
 
       const url = String(fetchMock.mock.calls[0]?.[0]);
-      expect(url).toContain(
-        `starting_at=${encodeURIComponent("2026-06-01T00:00:00Z")}`,
-      );
+      expect(url).toContain(`starting_at=${encodeURIComponent("2026-06-01T00:00:00Z")}`);
     });
 
     it("rewinds a drained cost cursor from the 100x era so restatement can repair it", async () => {
@@ -701,8 +686,7 @@ describe("the Anthropic Admin puller", () => {
           // A mature source: drained (no page token), watermark well past the
           // buckets whose costs were stored 100x. Keeping the watermark would
           // strand those rows forever — no scheduled run ever re-reads them.
-          cursor:
-            '{"startingAt":"2026-08-05T00:00:00Z","page":null,"query":null}',
+          cursor: '{"startingAt":"2026-08-05T00:00:00Z","page":null,"query":null}',
         },
         {
           adapter: "anthropic_admin",
@@ -791,10 +775,7 @@ describe("the Anthropic Admin puller", () => {
       fetchMock.mockClear();
       fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
 
-      await puller.runOnce(
-        { ...RUN_OPTIONS, cursor: firstRun.cursor },
-        costConfig,
-      );
+      await puller.runOnce({ ...RUN_OPTIONS, cursor: firstRun.cursor }, costConfig);
 
       expect(String(fetchMock.mock.calls[0]?.[0])).toContain("page=page_2");
     });
@@ -880,9 +861,7 @@ describe("the Anthropic Admin puller", () => {
       );
 
       expect(result.errorCount).toBe(1);
-      expect(result.cursor).toBe(
-        '{"startingAt":"2026-08-01T00:00:00Z","page":null}',
-      );
+      expect(result.cursor).toBe('{"startingAt":"2026-08-01T00:00:00Z","page":null}');
       expect(result.events).toHaveLength(0);
     });
   });
@@ -920,9 +899,7 @@ describe("the Anthropic Admin puller", () => {
       // prove the exclusivity this asserts. Pin it to `report`: pulling both
       // reports would count the same spend twice (ADR-088 Decision 6).
       expect(error).toBeInstanceOf(ZodError);
-      expect((error as ZodError).issues.map((i) => i.path.join("."))).toContain(
-        "report",
-      );
+      expect((error as ZodError).issues.map((i) => i.path.join("."))).toContain("report");
     });
   });
 });

@@ -76,11 +76,17 @@ describe("pull_request_target workflow guard", () => {
   });
 
   it("detects privileged pull_request_target risk signals", () => {
-    assert.equal(hasSensitivePermissions(["permissions:", "  contents: write"].join("\n")), true);
+    assert.equal(
+      hasSensitivePermissions(["permissions:", "  contents: write"].join("\n")),
+      true,
+    );
     assert.equal(hasSensitivePermissions("permissions: write-all"), true);
     assert.equal(hasSensitivePermissions("# contents: write"), false);
 
-    assert.equal(usesNonGithubTokenSecret("token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"), true);
+    assert.equal(
+      usesNonGithubTokenSecret("token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"),
+      true,
+    );
     assert.equal(usesNonGithubTokenSecret("token: ${{ secrets.GITHUB_TOKEN }}"), false);
   });
 });

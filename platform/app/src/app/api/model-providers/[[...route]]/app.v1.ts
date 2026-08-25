@@ -18,7 +18,8 @@ const logger = createLogger("langwatch:api:model-providers");
 
 patchZodOpenapi();
 
-export type ModelProviderAppVariables = AuthMiddlewareVariables & OrganizationMiddlewareVariables;
+export type ModelProviderAppVariables = AuthMiddlewareVariables &
+  OrganizationMiddlewareVariables;
 
 export function registerModelProviderRoutes(
   secured: SecuredApp<{ Variables: ModelProviderAppVariables }>,
@@ -33,8 +34,7 @@ export function registerModelProviderRoutes(
     "/",
     organizationMiddleware,
     describeRoute({
-      description:
-        "List all model providers for a project with masked API keys",
+      description: "List all model providers for a project with masked API keys",
       responses: {
         ...baseResponses,
         200: {
@@ -51,10 +51,7 @@ export function registerModelProviderRoutes(
       const service = c.var.langwatchApp.modelProviders;
       const project = c.get("project");
 
-      logger.info(
-        { projectId: project.id },
-        "Getting all model providers for project",
-      );
+      logger.info({ projectId: project.id }, "Getting all model providers for project");
 
       const providers = await service.getForProject({ projectId: project.id });
 
@@ -96,10 +93,7 @@ export function registerModelProviderRoutes(
       const { provider } = c.req.param();
       const data = c.req.valid("json");
 
-      logger.info(
-        { projectId: project.id, provider },
-        "Upserting model provider",
-      );
+      logger.info({ projectId: project.id, provider }, "Upserting model provider");
 
       try {
         // Ensure defaultModel has the provider prefix (e.g. "openai/gpt-4o")
@@ -119,7 +113,10 @@ export function registerModelProviderRoutes(
           enabled: data.enabled,
           customKeys: data.customKeys as Record<string, unknown> | undefined,
           customModels: toCanonicalModels(data.customModels, "chat"),
-          customEmbeddingsModels: toCanonicalModels(data.customEmbeddingsModels, "embedding"),
+          customEmbeddingsModels: toCanonicalModels(
+            data.customEmbeddingsModels,
+            "embedding",
+          ),
           extraHeaders: data.extraHeaders,
           defaultModel,
         });
@@ -143,18 +140,45 @@ export function registerModelProviderRoutes(
   );
 }
 
-function toLegacyProviders(providers: Record<string, { id: string; provider: string; enabled: boolean; customKeys: Record<string, unknown> | null; customModels: Array<{ id: string; label: string; type: string }>; customEmbeddingsModels: Array<{ id: string; label: string; type: string }>; models?: string[] | null; embeddingsModels?: string[] | null }>) {
-  return Object.fromEntries(Object.entries(providers).map(([key, provider]) => [key, {
-    id: provider.id,
-    provider: provider.provider,
-    enabled: provider.enabled,
-    customKeys: provider.customKeys,
-    deploymentMapping: null,
-    models: provider.models ?? null,
-    embeddingsModels: provider.embeddingsModels ?? null,
-    customModels: provider.customModels.map((model) => ({ modelId: model.id, displayName: model.label, mode: "chat" as const })),
-    customEmbeddingsModels: provider.customEmbeddingsModels.map((model) => ({ modelId: model.id, displayName: model.label, mode: "embedding" as const })),
-  }]));
+function toLegacyProviders(
+  providers: Record<
+    string,
+    {
+      id: string;
+      provider: string;
+      enabled: boolean;
+      customKeys: Record<string, unknown> | null;
+      customModels: Array<{ id: string; label: string; type: string }>;
+      customEmbeddingsModels: Array<{ id: string; label: string; type: string }>;
+      models?: string[] | null;
+      embeddingsModels?: string[] | null;
+    }
+  >,
+) {
+  return Object.fromEntries(
+    Object.entries(providers).map(([key, provider]) => [
+      key,
+      {
+        id: provider.id,
+        provider: provider.provider,
+        enabled: provider.enabled,
+        customKeys: provider.customKeys,
+        deploymentMapping: null,
+        models: provider.models ?? null,
+        embeddingsModels: provider.embeddingsModels ?? null,
+        customModels: provider.customModels.map((model) => ({
+          modelId: model.id,
+          displayName: model.label,
+          mode: "chat" as const,
+        })),
+        customEmbeddingsModels: provider.customEmbeddingsModels.map((model) => ({
+          modelId: model.id,
+          displayName: model.label,
+          mode: "embedding" as const,
+        })),
+      },
+    ]),
+  );
 }
 
 function toCanonicalModels(value: unknown, type: "chat" | "embedding") {
@@ -163,6 +187,14 @@ function toCanonicalModels(value: unknown, type: "chat" | "embedding") {
     if (typeof model === "string") return [{ id: model, label: model, type }];
     if (!model || typeof model !== "object") return [];
     const item = model as { modelId?: unknown; displayName?: unknown };
-    return typeof item.modelId === "string" ? [{ id: item.modelId, label: typeof item.displayName === "string" ? item.displayName : item.modelId, type }] : [];
+    return typeof item.modelId === "string"
+      ? [
+          {
+            id: item.modelId,
+            label: typeof item.displayName === "string" ? item.displayName : item.modelId,
+            type,
+          },
+        ]
+      : [];
   });
 }

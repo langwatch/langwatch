@@ -207,9 +207,7 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
         pageSize: 25,
       });
 
-      const gatewayRows = result.auditLogs.filter(
-        (r) => r.source === "gateway",
-      );
+      const gatewayRows = result.auditLogs.filter((r) => r.source === "gateway");
       expect(gatewayRows.length).toBeGreaterThan(0);
 
       const sample = gatewayRows[0]!;

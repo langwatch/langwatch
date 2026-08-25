@@ -13,8 +13,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 // Test KSUID generation patterns directly
 describe("KSUID resource patterns", () => {
   describe("SCENARIO_BATCH resource", () => {
-    const generateBatchRunId = () =>
-      generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
+    const generateBatchRunId = () => generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
 
     it("generates IDs with scenariobatch_ prefix", () => {
       const id = generateBatchRunId();
@@ -36,8 +35,7 @@ describe("KSUID resource patterns", () => {
   });
 
   describe("SCENARIO resource", () => {
-    const generateScenarioId = () =>
-      generate(KSUID_RESOURCES.SCENARIO).toString();
+    const generateScenarioId = () => generate(KSUID_RESOURCES.SCENARIO).toString();
 
     /** @scenario New scenario ID uses "scenario_" prefix with KSUID */
     it("generates IDs with scenario_ prefix", () => {
@@ -59,8 +57,7 @@ describe("KSUID resource patterns", () => {
   });
 
   describe("SCENARIO_RUN resource", () => {
-    const generateScenarioRunId = () =>
-      generate(KSUID_RESOURCES.SCENARIO_RUN).toString();
+    const generateScenarioRunId = () => generate(KSUID_RESOURCES.SCENARIO_RUN).toString();
 
     /** @scenario Synthetic scenario run ID uses "scenariorun_" prefix with KSUID */
     it("generates IDs with scenariorun_ prefix", () => {

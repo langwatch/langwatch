@@ -5,10 +5,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { CustomQueryMenuLink } from "~/features/analytics-query/components/CustomQueryMenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  AnalyticsHeader,
-  type AnalyticsHeaderProps,
-} from "./analytics/AnalyticsHeader";
+import { AnalyticsHeader, type AnalyticsHeaderProps } from "./analytics/AnalyticsHeader";
 import { useFilterToggle } from "./filters/FilterToggle";
 import { SmallLabel } from "./SmallLabel";
 
@@ -55,12 +52,8 @@ export default function GraphsLayout({
             >
               Engagement
             </SmallLabel>
-            <MenuLink href={`/${project?.slug}/analytics/users`}>
-              Users
-            </MenuLink>
-            <MenuLink href={`/${project?.slug}/analytics/topics`}>
-              Topics
-            </MenuLink>
+            <MenuLink href={`/${project?.slug}/analytics/users`}>Users</MenuLink>
+            <MenuLink href={`/${project?.slug}/analytics/topics`}>Topics</MenuLink>
           </VStack>
           <VStack align="start" width="full" gap={1}>
             <SmallLabel
@@ -72,9 +65,7 @@ export default function GraphsLayout({
             >
               Observability
             </SmallLabel>
-            <MenuLink href={`/${project?.slug}/analytics/metrics`}>
-              LLM Metrics
-            </MenuLink>
+            <MenuLink href={`/${project?.slug}/analytics/metrics`}>LLM Metrics</MenuLink>
             <MenuLink href={`/${project?.slug}/analytics/evaluations`}>
               Online Evaluations
             </MenuLink>
@@ -90,14 +81,9 @@ export default function GraphsLayout({
               Custom
             </SmallLabel>
             {project?.id && project.slug && (
-              <CustomQueryMenuLink
-                projectId={project.id}
-                projectSlug={project.slug}
-              />
+              <CustomQueryMenuLink projectId={project.id} projectSlug={project.slug} />
             )}
-            {project?.slug && (
-              <CustomDashboardsSection projectSlug={project.slug} />
-            )}
+            {project?.slug && <CustomDashboardsSection projectSlug={project.slug} />}
           </VStack>
         </VStack>
         <Container

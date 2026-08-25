@@ -23,9 +23,7 @@ import { CodingAgentSessionStore } from "../codingAgentSession.store";
  */
 const tenantId = createTenantId("tenant-1");
 
-function makeState(
-  over: Partial<CodingAgentSessionState> = {},
-): CodingAgentSessionState {
+function makeState(over: Partial<CodingAgentSessionState> = {}): CodingAgentSessionState {
   return {
     ...createInitCodingAgentSession(),
     sessionKeySource: "provider",
@@ -118,9 +116,7 @@ class FakeRepo implements CodingAgentSessionRepository {
   }
 }
 
-const context = (
-  over: Partial<ProjectionStoreContext> = {},
-): ProjectionStoreContext => ({
+const context = (over: Partial<ProjectionStoreContext> = {}): ProjectionStoreContext => ({
   aggregateId: "session-1",
   tenantId,
   ...over,
@@ -202,10 +198,7 @@ describe("CodingAgentSessionStore durable dedup", () => {
         const repo = new FakeRepo();
         const store = new CodingAgentSessionStore(repo);
 
-        await store.store(
-          makeState(),
-          context({ appliedEventIds: ["e1", "e2"] }),
-        );
+        await store.store(makeState(), context({ appliedEventIds: ["e1", "e2"] }));
 
         expect(repo.upsertCalls).toHaveLength(1);
         expect(repo.upsertCalls[0]!.appliedEventIds).toEqual(["e1", "e2"]);
@@ -304,9 +297,7 @@ describe("CodingAgentSessionStore durable dedup", () => {
           onSessionsStored: () => Promise.reject(new Error("boom")),
         });
 
-        await expect(
-          store.store(makeState(), context()),
-        ).resolves.toBeUndefined();
+        await expect(store.store(makeState(), context())).resolves.toBeUndefined();
       });
     });
   });
@@ -494,10 +485,7 @@ describe("CodingAgentSessionStore read-back gate", () => {
         // row wore, the rewrite carries the current one. The refold itself
         // belongs to the executor and is exercised there — what matters here
         // is that the rewritten row reads back, which is what retires it.
-        await store.store(
-          committedState(),
-          context({ appliedEventIds: ["e1", "e2"] }),
-        );
+        await store.store(committedState(), context({ appliedEventIds: ["e1", "e2"] }));
         const written = repo.upsertCalls[0]!;
         repo.withApplied = {
           row: written.row,

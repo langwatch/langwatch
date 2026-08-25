@@ -27,10 +27,7 @@ describe("generateDocumentId", () => {
   describe("when content is an array", () => {
     it("returns MD5 hash of joined array content", () => {
       const content = ["line 1", "line 2"];
-      const expected = crypto
-        .createHash("md5")
-        .update("line 1\nline 2")
-        .digest("hex");
+      const expected = crypto.createHash("md5").update("line 1\nline 2").digest("hex");
 
       expect(generateDocumentId(content)).toBe(expected);
     });

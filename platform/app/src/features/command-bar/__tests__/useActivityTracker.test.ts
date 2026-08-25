@@ -26,9 +26,7 @@ describe("useActivityTracker URL parsing", () => {
     }
 
     // Span page
-    const spanMatch = relativePath.match(
-      /^\/messages\/([^/]+)\/([^/]+)\/([^/]+)$/,
-    );
+    const spanMatch = relativePath.match(/^\/messages\/([^/]+)\/([^/]+)\/([^/]+)$/);
     if (spanMatch) {
       return { type: "span", id: spanMatch[3]!, iconName: "traces" };
     }
@@ -46,9 +44,7 @@ describe("useActivityTracker URL parsing", () => {
     }
 
     // Simulation run
-    const simRunMatch = relativePath.match(
-      /^\/simulations\/([^/]+)\/([^/]+)\/([^/]+)$/,
-    );
+    const simRunMatch = relativePath.match(/^\/simulations\/([^/]+)\/([^/]+)\/([^/]+)$/);
     if (simRunMatch) {
       return {
         type: "simulation-run",
@@ -62,10 +58,7 @@ describe("useActivityTracker URL parsing", () => {
 
   describe("trace detection", () => {
     it("detects trace page URL", () => {
-      const result = parseEntityUrl(
-        "/my-project/messages/trace_abc123",
-        "my-project",
-      );
+      const result = parseEntityUrl("/my-project/messages/trace_abc123", "my-project");
       expect(result).toEqual({
         type: "trace",
         id: "trace_abc123",
@@ -116,10 +109,7 @@ describe("useActivityTracker URL parsing", () => {
 
   describe("dataset detection", () => {
     it("detects dataset page URL", () => {
-      const result = parseEntityUrl(
-        "/my-project/datasets/dataset_abc123",
-        "my-project",
-      );
+      const result = parseEntityUrl("/my-project/datasets/dataset_abc123", "my-project");
       expect(result).toEqual({
         type: "entity",
         id: "dataset_abc123",

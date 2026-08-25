@@ -13,9 +13,7 @@ export function clampMetricCommandShardCount(value: number): number {
   );
 }
 
-export function resolveMetricCommandShardCount(
-  value: string | undefined,
-): number {
+export function resolveMetricCommandShardCount(value: string | undefined): number {
   if (!value) return DEFAULT_METRIC_COMMAND_SHARDS;
   const parsed = Number(value);
   return Number.isFinite(parsed)

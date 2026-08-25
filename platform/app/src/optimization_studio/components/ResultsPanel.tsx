@@ -82,11 +82,7 @@ export function ResultsPanel({
         <Tabs.List borderBottomWidth="2px">
           <Tabs.Trigger value="evaluations">Evaluations</Tabs.Trigger>
         </Tabs.List>
-        <Tabs.Content
-          value="evaluations"
-          padding={0}
-          height="calc(100% - 32px)"
-        >
+        <Tabs.Content value="evaluations" padding={0} height="calc(100% - 32px)">
           {!isCollapsed && (
             <EvaluationResults
               workflowId={workflowId}
@@ -190,33 +186,31 @@ export function EvaluationResults({
     : null;
 
   // Transform runs for new sidebar
-  const sidebarRuns: BatchRunSummary[] = (
-    batchEvaluationRuns.data?.runs ?? []
-  ).map((run) => ({
-    runId: run.runId,
-    workflowVersion: run.workflowVersion,
-    timestamps: run.timestamps,
-    progress: run.progress,
-    total: run.total,
-    summary: {
-      datasetCost: run.summary.datasetCost,
-      evaluationsCost: run.summary.evaluationsCost,
-      evaluations: Object.fromEntries(
-        Object.entries(run.summary.evaluations).map(([id, ev]) => [
-          id,
-          {
-            name: ev.name,
-            averageScore: ev.averageScore,
-            averagePassed: ev.averagePassed,
-          },
-        ]),
-      ),
-    },
-  }));
-
-  const sidebarSelectedRun = sidebarRuns.find(
-    (r) => r.runId === selectedRunId_,
+  const sidebarRuns: BatchRunSummary[] = (batchEvaluationRuns.data?.runs ?? []).map(
+    (run) => ({
+      runId: run.runId,
+      workflowVersion: run.workflowVersion,
+      timestamps: run.timestamps,
+      progress: run.progress,
+      total: run.total,
+      summary: {
+        datasetCost: run.summary.datasetCost,
+        evaluationsCost: run.summary.evaluationsCost,
+        evaluations: Object.fromEntries(
+          Object.entries(run.summary.evaluations).map(([id, ev]) => [
+            id,
+            {
+              name: ev.name,
+              averageScore: ev.averageScore,
+              averagePassed: ev.averagePassed,
+            },
+          ]),
+        ),
+      },
+    }),
   );
+
+  const sidebarSelectedRun = sidebarRuns.find((r) => r.runId === selectedRunId_);
 
   if (
     (experiment.isError && experiment.error.data?.httpStatus === 404) ||
@@ -258,9 +252,7 @@ export function EvaluationResults({
   const workflow = getWorkflow();
   const entryFields = getWorkflowEntryOutputs(workflow);
   const entryDataset = (
-    workflow.nodes.find((node) => node.type === "entry")?.data as
-      | Entry
-      | undefined
+    workflow.nodes.find((node) => node.type === "entry")?.data as Entry | undefined
   )?.dataset;
   const datasetColumns =
     entryDataset?.inline?.columnTypes.map((column) => column.name) ?? [];

@@ -280,9 +280,9 @@ describe("AgentCodeEditorDrawer", () => {
 
       // The existing mapping should show as a tag (ScenarioInputMappingSection also
       // renders mapping tags, so use getAllByTestId)
-      expect(
-        screen.getAllByTestId("source-mapping-tag").length,
-      ).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByTestId("source-mapping-tag").length).toBeGreaterThanOrEqual(
+        1,
+      );
     });
 
     it("calls onInputMappingsChange when a mapping is cleared", async () => {
@@ -296,9 +296,9 @@ describe("AgentCodeEditorDrawer", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getAllByTestId("source-mapping-tag").length,
-        ).toBeGreaterThanOrEqual(1);
+        expect(screen.getAllByTestId("source-mapping-tag").length).toBeGreaterThanOrEqual(
+          1,
+        );
       });
 
       // Clear the first clear-mapping-button (belongs to the main Inputs section)

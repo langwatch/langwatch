@@ -33,8 +33,7 @@ import {
 } from "./planCurrentResolver";
 
 /** The public list of every event type that counts toward the usage lines below. */
-const BILLABLE_EVENTS_DOCS_URL =
-  "https://docs.langwatch.ai/pricing/billable-events";
+const BILLABLE_EVENTS_DOCS_URL = "https://docs.langwatch.ai/pricing/billable-events";
 
 type PlanColumn = {
   id: ComparisonPlanId;
@@ -231,26 +230,17 @@ export function PlansComparisonPage({
   const showTieredNotice = pricingModel === "TIERED" && !activePlan?.free;
 
   const detectedCurrency = api.currency.detectCurrency.useQuery({});
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(
-    null,
-  );
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
   const currency =
     selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
-  const [billingPeriod, setBillingPeriod] =
-    useState<BillingInterval>("monthly");
+  const [billingPeriod, setBillingPeriod] = useState<BillingInterval>("monthly");
 
   if (detectedCurrency.isLoading) {
     return <Spinner />;
   }
 
   return (
-    <VStack
-      gap={6}
-      width="full"
-      align="stretch"
-      maxWidth="900px"
-      marginX="auto"
-    >
+    <VStack gap={6} width="full" align="stretch" maxWidth="900px" marginX="auto">
       <Flex justifyContent="space-between" alignItems="flex-start">
         <Box flex={1}>
           <Link href="/settings/subscription">
@@ -336,9 +326,7 @@ export function PlansComparisonPage({
             }}
             onClick={() =>
               setSelectedCurrency(
-                currency === PrismaCurrency.EUR
-                  ? PrismaCurrency.USD
-                  : PrismaCurrency.EUR,
+                currency === PrismaCurrency.EUR ? PrismaCurrency.USD : PrismaCurrency.EUR,
               )
             }
           >

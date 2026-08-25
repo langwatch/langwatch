@@ -8,10 +8,7 @@ export const adminIdentitySchema = z.object({
 
 export type AdminIdentity = z.infer<typeof adminIdentitySchema>;
 
-const adminAuditHeaderValueSchema = z.union([
-  z.string(),
-  z.array(z.string()),
-]);
+const adminAuditHeaderValueSchema = z.union([z.string(), z.array(z.string())]);
 
 /** Transport-neutral request metadata needed by the audit adapter. */
 export const adminAuditRequestSchema = z.object({
@@ -29,17 +26,13 @@ export const startImpersonationInputSchema = z.object({
   req: adminAuditRequestSchema,
 });
 
-export type StartImpersonationInput = z.infer<
-  typeof startImpersonationInputSchema
->;
+export type StartImpersonationInput = z.infer<typeof startImpersonationInputSchema>;
 
 export const stopImpersonationInputSchema = z.object({
   sessionId: z.string().min(1),
 });
 
-export type StopImpersonationInput = z.infer<
-  typeof stopImpersonationInputSchema
->;
+export type StopImpersonationInput = z.infer<typeof stopImpersonationInputSchema>;
 
 export const adminResourceNameSchema = z.enum([
   "user",

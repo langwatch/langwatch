@@ -1,20 +1,14 @@
 import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
-import {
-  OrganizationUserRole,
-  type PrismaClient,
-} from "~/generated/prisma/client";
+import { OrganizationUserRole, type PrismaClient } from "~/generated/prisma/client";
 
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { sendAutomationLimitEmail } from "~/server/mailer/automationLimitEmail";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { AutomationService } from "@langwatch/automation-contract";
-import type {
-  ClaimLease,
-  RunawayContainmentDeps,
-} from "./runaway-containment.service";
+import type { ClaimLease, RunawayContainmentDeps } from "./runaway-containment.service";
 
 const logger = createLogger("langwatch:automations:runaway-containment");
 
@@ -216,8 +210,7 @@ export function defaultRunawayContainmentDeps({
 
     sendLimitEmail: (params) => sendAutomationLimitEmail(params),
 
-    claimOnce: (key, ttlSeconds) =>
-      claimOnce({ connection: redis, key, ttlSeconds }),
+    claimOnce: (key, ttlSeconds) => claimOnce({ connection: redis, key, ttlSeconds }),
     releaseClaim: (lease) => releaseClaim({ connection: redis, lease }),
 
     projectName: async (projectId) =>

@@ -160,9 +160,7 @@ describe("given the eligible model providers panel at a project scope", () => {
         { ...projectProvider, disabledAt: new Date("2026-07-01T00:00:00Z") },
       ]);
 
-      expect(container.textContent).toContain(
-        "No model providers visible at this scope",
-      );
+      expect(container.textContent).toContain("No model providers visible at this scope");
     });
   });
 

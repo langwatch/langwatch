@@ -53,9 +53,7 @@ let redisConnection: Redis | null = null;
 
 export function chRepo(): GatewayBudgetClickHouseRepository {
   const ch = getTestClickHouseClient();
-  return new GatewayBudgetClickHouseRepository(
-    async () => ch as ClickHouseClient,
-  );
+  return new GatewayBudgetClickHouseRepository(async () => ch as ClickHouseClient);
 }
 
 export function overviewService(): BudgetOverviewService {
@@ -419,8 +417,7 @@ export async function teardownBudgetOverviewFixture(): Promise<void> {
       });
     }
   }
-  if (redisConnection)
-    await redisConnection.del(`lwcli:access:${ACCESS_TOKEN}`);
+  if (redisConnection) await redisConnection.del(`lwcli:access:${ACCESS_TOKEN}`);
   await prisma.gatewayBudget.deleteMany({
     where: { organizationId: ORG_ID },
   });

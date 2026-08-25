@@ -2,13 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
@@ -97,9 +91,7 @@ const entries: TranscriptEntry[] = [
   },
 ];
 
-function renderView(
-  props: Partial<React.ComponentProps<typeof TerminalView>> = {},
-) {
+function renderView(props: Partial<React.ComponentProps<typeof TerminalView>> = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <TerminalView entries={entries} {...props} />
@@ -118,9 +110,7 @@ describe("TerminalView", () => {
 
     it("shows the assistant prose", () => {
       renderView();
-      expect(
-        screen.getByText("Checking the working tree."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Checking the working tree.")).toBeInTheDocument();
     });
 
     it("shows each tool call with its name and primary argument", () => {
@@ -155,10 +145,7 @@ describe("TerminalView", () => {
         entries[0]!,
         entries[1]!,
         {
-          ...(entries[2] as Extract<
-            TranscriptEntry,
-            { kind: "assistant_message" }
-          >),
+          ...(entries[2] as Extract<TranscriptEntry, { kind: "assistant_message" }>),
           text: null,
         },
         entries[3]!,
@@ -185,9 +172,7 @@ describe("TerminalView", () => {
         },
       ];
       renderView({ entries: withDenial });
-      expect(
-        screen.getByText(/denied by the user, never ran/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/denied by the user, never ran/)).toBeInTheDocument();
     });
   });
 
@@ -302,9 +287,7 @@ describe("TerminalView", () => {
         },
       ];
       renderView({ entries: growingEntries });
-      expect(
-        screen.getByText("Context growing: 50.0K tokens"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Context growing: 50.0K tokens")).toBeInTheDocument();
     });
   });
 
@@ -374,9 +357,7 @@ describe("TerminalView", () => {
     it("collapses it to one line, with the size a reader is deciding on", () => {
       renderView({ entries: systemEntries });
       expect(
-        screen.getByText(
-          /session context: 52 chars of system prompt and tools/,
-        ),
+        screen.getByText(/session context: 52 chars of system prompt and tools/),
       ).toBeInTheDocument();
       expect(screen.queryByText(/always use pnpm/)).not.toBeInTheDocument();
     });
@@ -410,9 +391,7 @@ describe("TerminalView", () => {
 
         prependEarlierTurn(view, { scrollHeight: 1800 });
 
-        expect(offsetUnderTopEdge(view.screenEl, "bump the version")).toBe(
-          before,
-        );
+        expect(offsetUnderTopEdge(view.screenEl, "bump the version")).toBe(before);
         // Two entries and the turn divider arrived above the reader, and the
         // screen moved by exactly those three rows.
         expect(view.screenEl.scrollTop).toBe(3 * ROW_HEIGHT);
@@ -440,17 +419,13 @@ describe("TerminalView", () => {
 
         prependEarlierTurn(view, { scrollHeight: 7 * ROW_HEIGHT });
 
-        expect(offsetUnderTopEdge(view.screenEl, "bump the version")).toBe(
-          before,
-        );
+        expect(offsetUnderTopEdge(view.screenEl, "bump the version")).toBe(before);
       });
 
       it("keeps a row's expanded state with the row it belongs to", async () => {
         const user = userEvent.setup();
         const view = renderScrollback();
-        await user.click(
-          screen.getByRole("button", { name: /session context/ }),
-        );
+        await user.click(screen.getByRole("button", { name: /session context/ }));
         expect(screen.getByText(/always use pnpm/)).toBeInTheDocument();
 
         prependEarlierTurn(view, { scrollHeight: 500 });
@@ -863,10 +838,7 @@ describe("TerminalView", () => {
             entries: [...GROWN_EARLIER_TURN, ...GROWN_OPENED_TURN],
             rowKeys: ["turn-4#0", "turn-4#1", "turn-5#0", "turn-5#1"],
             turnDividers: new Map([
-              [
-                GROWN_EARLIER_TURN.length,
-                { turnNumber: 5, turnCount: 5, atMs: 5000 },
-              ],
+              [GROWN_EARLIER_TURN.length, { turnNumber: 5, turnCount: 5, atMs: 5000 }],
             ]),
             scrollback: {
               status: "start",
@@ -876,9 +848,7 @@ describe("TerminalView", () => {
           });
         });
 
-        expect(
-          screen.getByText("Context growing: 52.0K tokens"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Context growing: 52.0K tokens")).toBeInTheDocument();
         expect(
           screen.queryByText("Context growing: 60.0K tokens"),
         ).not.toBeInTheDocument();
@@ -924,12 +894,8 @@ describe("TerminalView", () => {
           });
         });
 
-        expect(
-          screen.getByText("Context growing: 60.0K tokens"),
-        ).toBeInTheDocument();
-        expect(offsetUnderTopEdge(view.screenEl, "bump the version")).toBe(
-          before,
-        );
+        expect(screen.getByText("Context growing: 60.0K tokens")).toBeInTheDocument();
+        expect(offsetUnderTopEdge(view.screenEl, "bump the version")).toBe(before);
         // Two entries and the turn divider arrived above the reader. The note
         // below them is not part of that, and does not move the screen.
         expect(view.screenEl.scrollTop).toBe(3 * ROW_HEIGHT);
@@ -996,9 +962,7 @@ describe("TerminalView", () => {
       await user.click(note);
 
       expect(note).toHaveAttribute("aria-expanded", "true");
-      expect(
-        screen.getByText(/2 new comments on langwatch#4711/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/2 new comments on langwatch#4711/)).toBeInTheDocument();
     });
 
     /** @scenario "A mixed message keeps the human words as the prompt" */
@@ -1009,9 +973,7 @@ describe("TerminalView", () => {
         ),
       });
 
-      expect(
-        screen.getByRole("button", { name: /system reminder/ }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /system reminder/ })).toBeInTheDocument();
       expect(screen.getByText("now ship it")).toBeInTheDocument();
     });
   });
@@ -1234,12 +1196,7 @@ type ViewProps = Partial<React.ComponentProps<typeof TerminalView>>;
 function renderScrollback(props: ViewProps = {}) {
   const tree = (extra: ViewProps) => (
     <ChakraProvider value={defaultSystem}>
-      <TerminalView
-        entries={OPENED_TURN}
-        rowKeys={OPENED_KEYS}
-        {...props}
-        {...extra}
-      />
+      <TerminalView entries={OPENED_TURN} rowKeys={OPENED_KEYS} {...props} {...extra} />
     </ChakraProvider>
   );
   const view = render(tree({}));
@@ -1296,31 +1253,27 @@ describe("the bottom bar's cost stat", () => {
 
   describe("given the reader has the whole session on screen", () => {
     it("drops the suffix rather than stating a figure of itself", () => {
-      expect(
-        statusLineCostLabel({ costUsd: 210.001, sessionCostUsd: 210 }),
-      ).toBe("$210.00");
+      expect(statusLineCostLabel({ costUsd: 210.001, sessionCostUsd: 210 })).toBe(
+        "$210.00",
+      );
     });
   });
 
   describe("given no session row exists for the trace", () => {
     it("keeps the running figure alone, as before", () => {
-      expect(
-        statusLineCostLabel({ costUsd: 12.34, sessionCostUsd: null }),
-      ).toBe("$12.34");
+      expect(statusLineCostLabel({ costUsd: 12.34, sessionCostUsd: null })).toBe(
+        "$12.34",
+      );
     });
   });
 
   describe("given the loaded steps carry no cost", () => {
     it("still states the session total rather than nothing", () => {
-      expect(statusLineCostLabel({ costUsd: null, sessionCostUsd: 210 })).toBe(
-        "$210.00",
-      );
+      expect(statusLineCostLabel({ costUsd: null, sessionCostUsd: 210 })).toBe("$210.00");
     });
 
     it("shows nothing when neither figure exists", () => {
-      expect(
-        statusLineCostLabel({ costUsd: null, sessionCostUsd: null }),
-      ).toBeNull();
+      expect(statusLineCostLabel({ costUsd: null, sessionCostUsd: null })).toBeNull();
     });
   });
 });

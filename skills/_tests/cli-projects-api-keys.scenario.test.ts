@@ -87,9 +87,7 @@ Then run CLI commands directly:
 
             const allText = state.messages
               .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
+                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
               )
               .join("\n");
 
@@ -163,9 +161,7 @@ Then: \`langwatch api-keys create --name "CI Deploy Key"\`
 
             const allText = state.messages
               .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
+                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
               )
               .join("\n");
 

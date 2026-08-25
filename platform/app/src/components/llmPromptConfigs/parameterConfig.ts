@@ -14,10 +14,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import type { ReasoningConfig } from "../../server/modelProviders/llmModels.types";
-import {
-  type ParameterDefinition,
-  parameterRegistry,
-} from "./parameterRegistry";
+import { type ParameterDefinition, parameterRegistry } from "./parameterRegistry";
 
 // ============================================================================
 // Parameter Name Mapping (snake_case ↔ camelCase)
@@ -86,10 +83,7 @@ export type {
  * @deprecated Use parameterRegistry.getConfig(name) instead
  */
 export const PARAMETER_CONFIG: Record<string, ParameterDefinition> =
-  parameterRegistry.buildParameterConfig() as Record<
-    string,
-    ParameterDefinition
-  >;
+  parameterRegistry.buildParameterConfig() as Record<string, ParameterDefinition>;
 
 // ============================================================================
 // Default Parameters (derived from registry)
@@ -145,9 +139,7 @@ export function getParameterIcon(paramName: string): ParameterIcon {
 /**
  * Get the config for a parameter, or undefined if not configured
  */
-export function getParameterConfig(
-  paramName: string,
-): ParameterDefinition | undefined {
+export function getParameterConfig(paramName: string): ParameterDefinition | undefined {
   return PARAMETER_CONFIG[paramName];
 }
 

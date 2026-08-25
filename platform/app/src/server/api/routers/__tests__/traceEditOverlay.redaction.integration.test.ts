@@ -166,10 +166,7 @@ describe("Reading a trace correction", () => {
       await cleanupTestRows(prisma, [
         ["traceEditOverlay", { projectId: project.id }],
         ["dataPrivacyPolicy", { organizationId }],
-        [
-          "roleBinding",
-          { userId: { in: [adminUserId, memberUserId] }, organizationId },
-        ],
+        ["roleBinding", { userId: { in: [adminUserId, memberUserId] }, organizationId }],
         [
           "organizationUser",
           { userId: { in: [adminUserId, memberUserId] }, organizationId },
@@ -184,27 +181,21 @@ describe("Reading a trace correction", () => {
   describe("given a reviewer the privacy policy keeps from captured content", () => {
     /** @scenario "A viewer who may not read captured content is handed only the structural edits" */
     it("hands over the structural edits and none of the corrected content", async () => {
-      const overlay = await callerFor(
-        memberUserId,
-      ).traceEditOverlay.getByTraceId({
+      const overlay = await callerFor(memberUserId).traceEditOverlay.getByTraceId({
         projectId: project.id,
         traceId: TRACE_ID,
       });
 
       expect(overlay).not.toBeNull();
       expect(overlay!.patch.trace).toBeUndefined();
-      expect(overlay!.patch.spans).toEqual([
-        { spanId: "span-1", name: "renamed" },
-      ]);
+      expect(overlay!.patch.spans).toEqual([{ spanId: "span-1", name: "renamed" }]);
       expect(overlay!.patch.deletedSpanIds).toEqual(["span-2"]);
     });
   });
 
   describe("given a reviewer the privacy policy allows", () => {
     it("hands over the whole correction", async () => {
-      const overlay = await callerFor(
-        adminUserId,
-      ).traceEditOverlay.getByTraceId({
+      const overlay = await callerFor(adminUserId).traceEditOverlay.getByTraceId({
         projectId: project.id,
         traceId: TRACE_ID,
       });

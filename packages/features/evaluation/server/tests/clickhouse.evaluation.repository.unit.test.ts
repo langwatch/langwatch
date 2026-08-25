@@ -85,14 +85,13 @@ function harness(rows: unknown[][] = []): {
     insert: vi.fn(async (input: { values: unknown[] }) => {
       client.inserts.push(input.values[0]);
     }),
-    query: vi.fn(async (input: {
-      query: string;
-      query_params: Record<string, unknown>;
-    }) => {
-      client.queries.push(input.query);
-      client.queryParams.push(input.query_params);
-      return result(queue.shift() ?? []);
-    }),
+    query: vi.fn(
+      async (input: { query: string; query_params: Record<string, unknown> }) => {
+        client.queries.push(input.query);
+        client.queryParams.push(input.query_params);
+        return result(queue.shift() ?? []);
+      },
+    ),
   } as unknown as EvaluationClickHouseClient & {
     queries: string[];
     queryParams: Array<Record<string, unknown>>;
@@ -133,9 +132,7 @@ describe("ClickHouseEvaluationRepository", () => {
 
   it("validates tenants before writes and rejects mixed batches", async () => {
     const { client, repository } = harness();
-    await expect(
-      repository.upsert({ tenantId: "", data: run }),
-    ).rejects.toThrow();
+    await expect(repository.upsert({ tenantId: "", data: run })).rejects.toThrow();
     await expect(
       repository.upsertBatch([
         { tenantId: "org_1", data: run },
@@ -153,9 +150,15 @@ describe("ClickHouseEvaluationRepository", () => {
       [row],
     ]);
     await expect(
-      repository.tryFindByEvaluationId({ tenantId: "org_1", evaluationId: "evaluation_1" }),
+      repository.tryFindByEvaluationId({
+        tenantId: "org_1",
+        evaluationId: "evaluation_1",
+      }),
     ).resolves.toMatchObject({ LastEventOccurredAt: 1_700_000_001_000 });
-    expect(floor.getFloorMs).toHaveBeenCalledWith({ table: "evaluation_runs", tenantId: "org_1" });
+    expect(floor.getFloorMs).toHaveBeenCalledWith({
+      table: "evaluation_runs",
+      tenantId: "org_1",
+    });
     expect(client.queries[0]).toContain("argMax(ScheduledAt, UpdatedAt)");
     expect(client.queries.at(-1)).toContain("PREWHERE");
     expect(client.queries.at(-1)).toContain("scheduledAtFrom");
@@ -167,10 +170,7 @@ describe("ClickHouseEvaluationRepository", () => {
     vi.setSystemTime(new Date("2026-08-03T12:00:00Z"));
     try {
       const scheduledAtMs = Date.now() - 60_000;
-      const { client, repository } = harness([
-        [{ scheduledAtMs }],
-        [],
-      ]);
+      const { client, repository } = harness([[{ scheduledAtMs }], []]);
 
       await repository.tryFindByEvaluationId({
         tenantId: "org_1",
@@ -212,17 +212,13 @@ describe("ClickHouseEvaluationRepository", () => {
       expect(resolverRequests).toHaveLength(2);
       expect(resolverRequests[1]?.params.sinceMs).toBe(1_500_000_000_000);
 
-      const heavyIndex = client.queries.findIndex((query) =>
-        query.includes("PREWHERE"),
-      );
+      const heavyIndex = client.queries.findIndex((query) => query.includes("PREWHERE"));
       expect(client.queries[heavyIndex]).toContain("t.ScheduledAt >=");
       expect(client.queries[heavyIndex]).not.toContain("t.ScheduledAt <=");
       expect(client.queryParams[heavyIndex]).toMatchObject({
         scheduledAtFrom: 1_500_000_000_000,
       });
-      expect(client.queryParams[heavyIndex]).not.toHaveProperty(
-        "scheduledAtTo",
-      );
+      expect(client.queryParams[heavyIndex]).not.toHaveProperty("scheduledAtTo");
     } finally {
       vi.useRealTimers();
     }
@@ -236,7 +232,9 @@ describe("ClickHouseEvaluationRepository", () => {
         fixtureRow({ EvaluationId: "evaluation_2", TraceId: "trace_1", Label: "second" }),
       ],
     ]);
-    await expect(repository.findByTraceId({ tenantId: "org_1", traceId: "trace_1" })).resolves.toHaveLength(1);
+    await expect(
+      repository.findByTraceId({ tenantId: "org_1", traceId: "trace_1" }),
+    ).resolves.toHaveLength(1);
     const summaries = await repository.findSummariesByTraceIds({
       tenantId: "org_1",
       traceIds: ["trace_1"],
@@ -282,9 +280,7 @@ describe("ClickHouseEvaluationRepository", () => {
         evaluationId: "evaluation_1",
       }),
     ).resolves.toEqual({ input: "hello", output: "world" });
-    expect(client.queries[0]).toContain(
-      "EvaluationId = {evaluationId:String}",
-    );
+    expect(client.queries[0]).toContain("EvaluationId = {evaluationId:String}");
     expect(client.queries[0]).not.toContain("TraceId");
 
     const unavailable = ClickHouseEvaluationRepository.create({

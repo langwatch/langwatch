@@ -21,9 +21,7 @@ interface ModelProviderExtraHeadersProps {
   onAddHeader: () => void;
 }
 
-export const ModelProviderExtraHeaders: React.FC<
-  ModelProviderExtraHeadersProps
-> = ({
+export const ModelProviderExtraHeaders: React.FC<ModelProviderExtraHeadersProps> = ({
   headers,
   onHeaderKeyChange,
   onHeaderValueChange,

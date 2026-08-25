@@ -185,18 +185,12 @@ export interface ProcessOpsRepository {
    * thousands of intents all due now hands the dispatcher one batch the size
    * of the backlog.
    */
-  redriveAllDeadMessages(params: {
-    processName?: string;
-    now: number;
-  }): Promise<number>;
+  redriveAllDeadMessages(params: { processName?: string; now: number }): Promise<number>;
 
   /**
    * Dead messages marked discarded; same scoping, and bounded the same way.
    */
-  discardAllDeadMessages(params: {
-    processName?: string;
-    now: number;
-  }): Promise<number>;
+  discardAllDeadMessages(params: { processName?: string; now: number }): Promise<number>;
 
   /** The message's failed attempts, oldest first. */
   findAttempts(params: {

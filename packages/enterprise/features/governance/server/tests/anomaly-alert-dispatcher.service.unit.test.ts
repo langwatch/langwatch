@@ -105,9 +105,7 @@ describe("AnomalyAlertDispatcherService", () => {
     );
 
     const call = http.calls[0]!;
-    const expected = createHmac("sha256", "secret")
-      .update(call.body)
-      .digest("hex");
+    const expected = createHmac("sha256", "secret").update(call.body).digest("hex");
     expect(call.headers["X-LangWatch-Signature"]).toBe(`sha256=${expected}`);
   });
 
@@ -126,12 +124,10 @@ describe("AnomalyAlertDispatcherService", () => {
       destinations: [{ type: "webhook", url: "https://hooks.test/alert" }],
     });
 
-    await expect(
-      createDispatcher(transient).dispatchAlert(input),
-    ).resolves.toMatchObject({ dispatchTag: "dispatched_webhook_1" });
-    const permanentResult = await createDispatcher(permanent).dispatchAlert(
-      input,
+    await expect(createDispatcher(transient).dispatchAlert(input)).resolves.toMatchObject(
+      { dispatchTag: "dispatched_webhook_1" },
     );
+    const permanentResult = await createDispatcher(permanent).dispatchAlert(input);
 
     expect(transient.calls).toHaveLength(2);
     expect(permanent.calls).toHaveLength(1);
@@ -156,12 +152,8 @@ describe("AnomalyAlertDispatcherService", () => {
       }),
     );
 
-    expect(
-      http.calls.filter((call) => call.url.includes("primary")),
-    ).toHaveLength(3);
-    expect(
-      http.calls.filter((call) => call.url.includes("backup")),
-    ).toHaveLength(1);
+    expect(http.calls.filter((call) => call.url.includes("primary"))).toHaveLength(3);
+    expect(http.calls.filter((call) => call.url.includes("backup"))).toHaveLength(1);
     expect(result.dispatchTag).toBe("dispatched_webhook_1_failed_1");
   });
 
@@ -178,9 +170,7 @@ describe("AnomalyAlertDispatcherService", () => {
       outcomes: [],
     });
     await expect(
-      dispatcher.dispatchAlert(
-        dispatchInput({ slack_channel: "#operations" }),
-      ),
+      dispatcher.dispatchAlert(dispatchInput({ slack_channel: "#operations" })),
     ).resolves.toEqual({
       dispatchTag: "log_only_invalid_config",
       outcomes: [],

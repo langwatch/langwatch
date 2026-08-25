@@ -47,5 +47,6 @@ export function validatePreconditionRules(
 /**
  * Preconditions schema with cross-field validation applied.
  */
-export const validatedPreconditionsSchema =
-  checkPreconditionsSchema.superRefine(validatePreconditionRules);
+export const validatedPreconditionsSchema = checkPreconditionsSchema.superRefine(
+  validatePreconditionRules,
+);

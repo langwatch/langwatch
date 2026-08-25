@@ -25,8 +25,7 @@ export default function EditCustomAnalyticsPage() {
   const alert: CustomGraphFormData["alert"] | undefined =
     rawAlert != null &&
     rawAlert.type != null &&
-    (rawAlert.action === "SEND_EMAIL" ||
-      rawAlert.action === "SEND_SLACK_MESSAGE")
+    (rawAlert.action === "SEND_EMAIL" || rawAlert.action === "SEND_SLACK_MESSAGE")
       ? (rawAlert as unknown as CustomGraphFormData["alert"])
       : undefined;
 
@@ -37,8 +36,7 @@ export default function EditCustomAnalyticsPage() {
           Graph not found
         </Text>
         <Text color="gray.600">
-          The graph you are looking for does not exist or you do not have access
-          to it.
+          The graph you are looking for does not exist or you do not have access to it.
         </Text>
       </VStack>
     );

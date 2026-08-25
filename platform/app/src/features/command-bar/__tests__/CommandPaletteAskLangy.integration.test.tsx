@@ -88,8 +88,7 @@ function renderPalette({ query }: { query: string }) {
   return { ...view, onDone, setQuery, deactivate };
 }
 
-const paletteInput = () =>
-  screen.getByPlaceholderText("Where would you like to go?");
+const paletteInput = () => screen.getByPlaceholderText("Where would you like to go?");
 
 const langyModeSurface = (container: HTMLElement) =>
   container.querySelector("[data-langy-command-mode='true']");

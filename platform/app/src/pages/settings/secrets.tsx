@@ -25,8 +25,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 export default function SecretsPage() {
-  const { project, organizations, hasPermission } =
-    useOrganizationTeamProject();
+  const { project, organizations, hasPermission } = useOrganizationTeamProject();
   const canManageSecrets = hasPermission("secrets:manage");
 
   const secretsQuery = api.secrets.list.useQuery(
@@ -112,10 +111,7 @@ export default function SecretsPage() {
             <ProjectSelector organizations={organizations} project={project} />
           )}
           {canManageSecrets && (
-            <Tooltip
-              content="Add a new secret for use in code blocks"
-              disabled={false}
-            >
+            <Tooltip content="Add a new secret for use in code blocks" disabled={false}>
               <PageLayout.HeaderButton onClick={() => setIsAddDialogOpen(true)}>
                 <Plus /> Add Secret
               </PageLayout.HeaderButton>
@@ -161,9 +157,7 @@ export default function SecretsPage() {
                         <Text>{secret.createdBy?.name ?? "-"}</Text>
                       </Table.Cell>
                       <Table.Cell>
-                        <Text>
-                          {new Date(secret.updatedAt).toLocaleDateString()}
-                        </Text>
+                        <Text>{new Date(secret.updatedAt).toLocaleDateString()}</Text>
                       </Table.Cell>
                       <Table.Cell textAlign="right">
                         {canManageSecrets && (
@@ -287,9 +281,7 @@ export default function SecretsPage() {
               <Dialog.Title>Delete {secretToDelete?.name ?? ""}?</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
-              <Text>
-                Code blocks referencing this secret will no longer have access.
-              </Text>
+              <Text>Code blocks referencing this secret will no longer have access.</Text>
             </Dialog.Body>
             <Dialog.Footer>
               <Dialog.ActionTrigger asChild>
@@ -319,9 +311,7 @@ export default function SecretsPage() {
         >
           <Dialog.Content bg="bg">
             <Dialog.Header>
-              <Dialog.Title>
-                Update Value for {secretToUpdate?.name ?? ""}
-              </Dialog.Title>
+              <Dialog.Title>Update Value for {secretToUpdate?.name ?? ""}</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <VStack gap={1} align="start" width="full">

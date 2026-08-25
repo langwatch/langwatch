@@ -38,14 +38,10 @@ function fromRow(row: Row): StoredProjection<LangyConversationStateData> {
 }
 
 /** Postgres row I/O for the type-aware conversation projection. */
-export class PrismaLangyConversationProjectionRepository
-  implements StateProjectionStore<LangyConversationStateData>
-{
+export class PrismaLangyConversationProjectionRepository implements StateProjectionStore<LangyConversationStateData> {
   constructor(private readonly prisma: ConversationProjectionPrismaClient) {}
 
-  static create(
-    database: object,
-  ): PrismaLangyConversationProjectionRepository {
+  static create(database: object): PrismaLangyConversationProjectionRepository {
     return new PrismaLangyConversationProjectionRepository(
       database as ConversationProjectionPrismaClient,
     );

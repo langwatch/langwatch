@@ -9,19 +9,14 @@ import { escapeMarkdown } from "../utils/escape-markdown.js";
  *
  * Exported for unit testing.
  */
-export function formatDatasetResponse(
-  dataset: DatasetDetailResponse,
-): string {
+export function formatDatasetResponse(dataset: DatasetDetailResponse): string {
   const lines: string[] = [];
   lines.push(`# Dataset: ${escapeMarkdown(dataset.name)}\n`);
   lines.push(`**Slug**: ${escapeMarkdown(dataset.slug)}`);
   lines.push(`**ID**: ${escapeMarkdown(dataset.id)}`);
 
   // Column table
-  if (
-    Array.isArray(dataset.columnTypes) &&
-    dataset.columnTypes.length > 0
-  ) {
+  if (Array.isArray(dataset.columnTypes) && dataset.columnTypes.length > 0) {
     lines.push("\n## Columns\n");
     lines.push("| Name | Type |");
     lines.push("|------|------|");
@@ -34,7 +29,9 @@ export function formatDatasetResponse(
   if (Array.isArray(dataset.data) && dataset.data.length > 0) {
     lines.push(`\n## Records (${dataset.data.length} shown)\n`);
     for (const record of dataset.data) {
-      lines.push(`**${escapeMarkdown(record.id)}**: ${escapeMarkdown(JSON.stringify(record.entry))}`);
+      lines.push(
+        `**${escapeMarkdown(record.id)}**: ${escapeMarkdown(JSON.stringify(record.entry))}`,
+      );
     }
   } else {
     lines.push("\nNo records in this dataset.");

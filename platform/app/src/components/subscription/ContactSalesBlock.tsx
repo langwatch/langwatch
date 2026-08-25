@@ -9,11 +9,7 @@ import { ENTERPRISE_PLAN_FEATURES } from "./billing-plans";
 
 export function ContactSalesBlock() {
   return (
-    <Card.Root
-      data-testid="contact-sales-block"
-      borderWidth={1}
-      borderColor="border"
-    >
+    <Card.Root data-testid="contact-sales-block" borderWidth={1} borderColor="border">
       <Card.Body paddingY={5} paddingX={6}>
         <Text fontWeight="semibold" fontSize="lg">
           Need more?

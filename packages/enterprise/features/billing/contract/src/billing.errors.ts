@@ -85,11 +85,11 @@ export class InvalidPlanError extends HandledError {
   declare readonly code: "billing_plan_price_missing";
 
   constructor(plan: string) {
-    super(
-      "billing_plan_price_missing",
-      "This plan is not available for purchase yet",
-      { httpStatus: 500, fault: "platform", meta: { plan } },
-    );
+    super("billing_plan_price_missing", "This plan is not available for purchase yet", {
+      httpStatus: 500,
+      fault: "platform",
+      meta: { plan },
+    });
     this.name = "InvalidPlanError";
   }
 }
@@ -149,11 +149,10 @@ export class SubscriptionNotLinkedError extends HandledError {
   declare readonly code: "subscription_not_linked";
 
   constructor() {
-    super(
-      "subscription_not_linked",
-      "This subscription isn't connected to billing yet",
-      { httpStatus: 409, fault: "platform" },
-    );
+    super("subscription_not_linked", "This subscription isn't connected to billing yet", {
+      httpStatus: 409,
+      fault: "platform",
+    });
     this.name = "SubscriptionNotLinkedError";
   }
 }
@@ -376,11 +375,11 @@ export class BillingProviderUnavailableError extends HandledError {
   declare readonly code: "billing_provider_unavailable";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
-    super(
-      "billing_provider_unavailable",
-      "The payment provider could not be reached",
-      { httpStatus: 503, fault: "provider", ...options },
-    );
+    super("billing_provider_unavailable", "The payment provider could not be reached", {
+      httpStatus: 503,
+      fault: "provider",
+      ...options,
+    });
     this.name = "BillingProviderUnavailableError";
   }
 }

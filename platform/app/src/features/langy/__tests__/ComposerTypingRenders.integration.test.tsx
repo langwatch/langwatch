@@ -137,9 +137,7 @@ describe("given the Langy composer is idle", () => {
 
       expect(reachedTheField).toBe(false);
       expect(useLangyStore.getState().draft).toBe("run ");
-      expect(screen.getByTestId("langy-palette-title")).toHaveTextContent(
-        "Skills",
-      );
+      expect(screen.getByTestId("langy-palette-title")).toHaveTextContent("Skills");
     });
 
     it("lets the slash reach the field mid-word instead of opening the palette", () => {
@@ -153,9 +151,7 @@ describe("given the Langy composer is idle", () => {
       // palette stayed shut and the field kept what was typed.
       expect(reachedTheField).toBe(true);
       expect(useLangyStore.getState().draft).toBe("and/or");
-      expect(
-        screen.queryByTestId("langy-palette-title"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("langy-palette-title")).not.toBeInTheDocument();
     });
   });
 });

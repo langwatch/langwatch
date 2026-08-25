@@ -65,9 +65,7 @@ export default function NewExperimentWorkbench() {
   const hasCreatedRef = useRef(false);
 
   const datasetId =
-    typeof router.query.datasetId === "string"
-      ? router.query.datasetId
-      : undefined;
+    typeof router.query.datasetId === "string" ? router.query.datasetId : undefined;
 
   const datasetQuery = api.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
@@ -109,23 +107,14 @@ export default function NewExperimentWorkbench() {
           >[0]["state"],
         });
 
-        void router.replace(
-          `/${project.slug}/experiments/workbench/${experiment.slug}`,
-        );
+        void router.replace(`/${project.slug}/experiments/workbench/${experiment.slug}`);
       } catch (error) {
         console.error("Failed to create new experiment:", error);
         // hasCreatedRef stays true to prevent retry loops
         // Error will be shown in the UI via createExperiment.isError
       }
     })();
-  }, [
-    project,
-    router,
-    createExperiment,
-    isDatasetReady,
-    datasetId,
-    datasetQuery.data,
-  ]);
+  }, [project, router, createExperiment, isDatasetReady, datasetId, datasetQuery.data]);
 
   return (
     <DashboardLayout backgroundColor="bg.panel">

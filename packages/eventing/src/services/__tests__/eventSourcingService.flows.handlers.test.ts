@@ -46,10 +46,7 @@ describe("EventSourcingService - Handler Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
         logger: logger as any,
@@ -61,9 +58,7 @@ describe("EventSourcingService - Handler Flows", () => {
         tenantId,
       );
 
-      await expect(
-        service.storeEvents([event], context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents([event], context)).resolves.not.toThrow();
 
       // Error handling uses standardized error handling in ProjectionRouter
       // which uses its own logger, so we can't verify the exact log call here
@@ -83,10 +78,7 @@ describe("EventSourcingService - Handler Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef1, mapDef2],
       });
@@ -97,9 +89,7 @@ describe("EventSourcingService - Handler Flows", () => {
         tenantId,
       );
 
-      await expect(
-        service.storeEvents([event], context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents([event], context)).resolves.not.toThrow();
 
       expect(mapDef1.map).toHaveBeenCalledTimes(1);
       expect(mapDef2.map).toHaveBeenCalledTimes(1);
@@ -122,10 +112,7 @@ describe("EventSourcingService - Handler Flows", () => {
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
-        allowedEventTypes: [
-          TEST_CONSTANTS.EVENT_TYPE_1,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        ],
+        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
         globalQueue,

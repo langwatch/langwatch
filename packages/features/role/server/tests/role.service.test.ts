@@ -168,10 +168,7 @@ class TestPermissionPort extends RolePermissionPort {
     permission: string;
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   }): Error {
-    return new OrgExclusivePermissionScopeError(
-      input.permission,
-      input.scopeType,
-    );
+    return new OrgExclusivePermissionScopeError(input.permission, input.scopeType);
   }
 }
 
@@ -212,10 +209,7 @@ describe("Role service", () => {
 
   it("refuses an organization-exclusive role at team scope", async () => {
     const repository = new TestRoleRepository();
-    repository.roles.set(
-      "role-1",
-      role({ permissions: ["organization:manage"] }),
-    );
+    repository.roles.set("role-1", role({ permissions: ["organization:manage"] }));
 
     await expect(
       serviceWith(repository).assignToUser({

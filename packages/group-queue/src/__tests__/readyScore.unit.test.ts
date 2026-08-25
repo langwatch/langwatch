@@ -41,15 +41,12 @@ describe("resolveReadyScore", () => {
       ["a customer clock years in the future", Date.UTC(2030, 0, 1)],
       ["just beyond the past skew", NOW - MAX_SCORE_PAST_SKEW_MS - 1],
       ["just beyond the future skew", NOW + MAX_SCORE_FUTURE_SKEW_MS + 1],
-    ])(
-      "falls back to the staging time when the score is %s",
-      (_label, score) => {
-        expect(resolveReadyScore({ score })).toEqual({
-          score: NOW,
-          isRejected: true,
-        });
-      },
-    );
+    ])("falls back to the staging time when the score is %s", (_label, score) => {
+      expect(resolveReadyScore({ score })).toEqual({
+        score: NOW,
+        isRejected: true,
+      });
+    });
 
     it("falls back to the shared clock reading when one is supplied", () => {
       const shared = NOW - 5_000;

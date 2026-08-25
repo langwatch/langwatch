@@ -34,9 +34,7 @@ export function translateDatasetError(error: unknown): unknown {
     return new TRPCError({
       code: "CONFLICT",
       message:
-        error.reason === "stale_columns"
-          ? "dataset_stale_columns"
-          : "dataset_name_taken",
+        error.reason === "stale_columns" ? "dataset_stale_columns" : "dataset_name_taken",
       cause: error,
     });
   }

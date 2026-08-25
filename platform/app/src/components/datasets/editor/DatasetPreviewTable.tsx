@@ -31,10 +31,7 @@ import {
 import { JSON_LIKE_TYPES } from "./EditableCell";
 import { TableCell } from "./TableCell";
 
-type PreviewRow = { id?: string; isSelected?: boolean } & Record<
-  string,
-  unknown
->;
+type PreviewRow = { id?: string; isSelected?: boolean } & Record<string, unknown>;
 
 const CHECKBOX_WIDTH_PX = 36;
 const ROW_NUMBER_WIDTH_PX = 48;
@@ -92,10 +89,7 @@ export function DatasetPreviewTable({
     (): DatasetTableRowData[] =>
       rows.map((row, index) => {
         const dataset = Object.fromEntries(
-          visibleColumns.map((col) => [
-            col.id,
-            stringifyPreviewValue(row[col.name]),
-          ]),
+          visibleColumns.map((col) => [col.id, stringifyPreviewValue(row[col.name])]),
         );
         return {
           rowIndex: index,
@@ -108,15 +102,9 @@ export function DatasetPreviewTable({
 
   // Cell interaction state, same semantics as the editor's store but local:
   // the preview owns no data, so this is pure view state.
-  const [selectedCell, setSelectedCell] = useState<CellPosition | undefined>(
-    undefined,
-  );
-  const [editingCell, setEditingCell] = useState<CellPosition | undefined>(
-    undefined,
-  );
-  const [expandedCells, setExpandedCells] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [selectedCell, setSelectedCell] = useState<CellPosition | undefined>(undefined);
+  const [editingCell, setEditingCell] = useState<CellPosition | undefined>(undefined);
+  const [expandedCells, setExpandedCells] = useState<Set<string>>(() => new Set());
 
   const areAllSelected =
     isSelectable && rows.length > 0 && rows.every((row) => !!row.isSelected);
@@ -170,10 +158,7 @@ export function DatasetPreviewTable({
     ],
   );
 
-  const columnHelper = useMemo(
-    () => createColumnHelper<DatasetTableRowData>(),
-    [],
-  );
+  const columnHelper = useMemo(() => createColumnHelper<DatasetTableRowData>(), []);
 
   const tableColumns = useMemo(() => {
     const cols: ColumnDef<DatasetTableRowData>[] = [];
@@ -319,10 +304,7 @@ export function DatasetPreviewTable({
                   <th key={header.id}>
                     {header.isPlaceholder
                       ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
+                      : flexRender(header.column.columnDef.header, header.getContext())}
                   </th>
                 ))}
               </tr>

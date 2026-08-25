@@ -74,9 +74,7 @@ export function VegaLiteSpecEditor({
           language="json"
           value={specText}
           theme={colorMode === "dark" ? "vs-dark" : "vs"}
-          onChange={(value: string | undefined) =>
-            onSpecTextChange(value ?? "")
-          }
+          onChange={(value: string | undefined) => onSpecTextChange(value ?? "")}
           options={EDITOR_OPTIONS}
         />
       </Box>

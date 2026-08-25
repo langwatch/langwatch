@@ -92,9 +92,7 @@ export class ProcessAuditRepository implements ProcessAuditSink {
     });
   }
 
-  async listRecent(params: {
-    limit: number;
-  }): Promise<ProcessAuditEntryView[]> {
+  async listRecent(params: { limit: number }): Promise<ProcessAuditEntryView[]> {
     const rows = await this.prisma.auditLog.findMany({
       where: { targetKind: TARGET_KIND },
       orderBy: { createdAt: "desc" },

@@ -6,10 +6,7 @@ import {
   type RecordWorkspaceViewResult,
   recordWorkspaceViewInputSchema,
 } from "@langwatch/enterprise-governance-contract";
-import {
-  PROJECT_KIND,
-  type ProjectService,
-} from "@langwatch/project-contract";
+import { PROJECT_KIND, type ProjectService } from "@langwatch/project-contract";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
 import type {
   AdminWorkspaceViewAuditRepository,
@@ -41,22 +38,19 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService extends GovernanceA
     diagnostics?: GovernanceDiagnosticsPort;
     clock?: () => number;
   }): DefaultGovernanceAdminWorkspaceViewAuditService {
-    return new DefaultGovernanceAdminWorkspaceViewAuditService(
-      options.repository,
-      { ...options, clock: options.clock ?? Date.now },
-    );
+    return new DefaultGovernanceAdminWorkspaceViewAuditService(options.repository, {
+      ...options,
+      clock: options.clock ?? Date.now,
+    });
   }
 
-  async recordView(
-    input: RecordWorkspaceViewInput,
-  ): Promise<RecordWorkspaceViewResult> {
+  async recordView(input: RecordWorkspaceViewInput): Promise<RecordWorkspaceViewResult> {
     const parsed = recordWorkspaceViewInputSchema.parse(input);
     const team = await this.repository.tryFindTarget({
       teamId: parsed.targetTeamId,
       actorUserId: parsed.actorUserId,
     });
-    if (!team || team.organizationId !== parsed.organizationId)
-      return skipped();
+    if (!team || team.organizationId !== parsed.organizationId) return skipped();
     if (
       (team.isPersonal && team.ownerUserId === parsed.actorUserId) ||
       team.actorIsMember

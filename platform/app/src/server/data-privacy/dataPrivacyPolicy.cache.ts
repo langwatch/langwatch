@@ -72,9 +72,7 @@ export class DataPrivacyPolicyCache {
     this.cache.delete(projectId).catch(() => undefined);
   }
 
-  private async loadResolved(
-    projectId: string,
-  ): Promise<ResolvedDataPrivacy | null> {
+  private async loadResolved(projectId: string): Promise<ResolvedDataPrivacy | null> {
     const facts = await this.repository.getProjectScopeFacts({ projectId });
     if (!facts) return null;
 

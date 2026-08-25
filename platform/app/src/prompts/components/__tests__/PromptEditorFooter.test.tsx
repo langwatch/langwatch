@@ -9,14 +9,11 @@ import type { PromptConfigFormValues } from "~/prompts";
 import { PromptEditorFooter } from "../PromptEditorFooter";
 
 // Mock child components to isolate the footer's rendering logic
-vi.mock(
-  "~/prompts/forms/prompt-config-form/components/VersionHistoryButton",
-  () => ({
-    VersionHistoryButton: () => (
-      <button data-testid="version-history-button">History</button>
-    ),
-  }),
-);
+vi.mock("~/prompts/forms/prompt-config-form/components/VersionHistoryButton", () => ({
+  VersionHistoryButton: () => (
+    <button data-testid="version-history-button">History</button>
+  ),
+}));
 
 vi.mock("~/prompts/components/GeneratePromptApiSnippetDialog", () => {
   const Dialog = ({ children }: { children: React.ReactNode }) => (
@@ -29,9 +26,7 @@ vi.mock("~/prompts/components/GeneratePromptApiSnippetDialog", () => {
 });
 
 vi.mock("~/components/GenerateApiSnippetButton", () => ({
-  GenerateApiSnippetButton: () => (
-    <button data-testid="api-snippet-button">API</button>
-  ),
+  GenerateApiSnippetButton: () => <button data-testid="api-snippet-button">API</button>,
 }));
 
 vi.mock("~/prompts/components/SavePromptButton", () => ({
@@ -145,9 +140,7 @@ describe("<PromptEditorFooter/>", () => {
         </TestWrapper>,
       );
 
-      expect(
-        screen.queryByRole("button", { name: "Apply" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
     });
   });
 
@@ -159,9 +152,7 @@ describe("<PromptEditorFooter/>", () => {
         </TestWrapper>,
       );
 
-      expect(
-        screen.getByRole("button", { name: "Discard" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
     });
   });
 
@@ -173,9 +164,7 @@ describe("<PromptEditorFooter/>", () => {
         </TestWrapper>,
       );
 
-      expect(
-        screen.queryByRole("button", { name: "Discard" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
     });
   });
 

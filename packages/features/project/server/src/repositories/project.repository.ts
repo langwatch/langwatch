@@ -48,9 +48,7 @@ export abstract class ProjectRepository {
     input: TouchCodingAgentActivityInput,
   ): Promise<void>;
   abstract tryGetWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
-  abstract tryGetTraceSharingConfig(
-    id: string,
-  ): Promise<TraceSharingConfig | null>;
+  abstract tryGetTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
   abstract searchByQuery(input: {
     query: string;
     organizationId?: string;
@@ -62,10 +60,7 @@ export abstract class ProjectRepository {
     organizationId: string;
     data: UpdateProjectInput;
   }): Promise<Project>;
-  abstract archive(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<Project>;
+  abstract archive(input: { id: string; organizationId: string }): Promise<Project>;
   abstract findAllByOrganization(input: {
     organizationId: string;
     page: number;
@@ -76,9 +71,7 @@ export abstract class ProjectRepository {
     organizationId: string;
     teamId: string;
   }): Promise<Project[]>;
-  abstract findActiveByScopes(
-    input: ActiveProjectsByScopesInput,
-  ): Promise<Project[]>;
+  abstract findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]>;
   abstract tryFindBySlugInTeam(input: {
     slug: string;
     teamId: string;

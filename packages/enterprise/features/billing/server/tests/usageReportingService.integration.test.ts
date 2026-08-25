@@ -48,8 +48,7 @@ describeIfStripeKey("Usage reporting integration", () => {
     return customer;
   };
 
-  const uniqueId = () =>
-    `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const uniqueId = () => `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   describe("reportUsageDelta()", () => {
     it("sends a meter event to Stripe and returns reported: true", async () => {

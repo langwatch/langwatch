@@ -1,11 +1,5 @@
-import {
-  findRedactionMarkers,
-  SECRET_MARKER_ENTITY,
-} from "@langwatch/redaction";
-import {
-  evaluationDurationHistogram,
-  getEvaluationStatusCounter,
-} from "../../metrics";
+import { findRedactionMarkers, SECRET_MARKER_ENTITY } from "@langwatch/redaction";
+import { evaluationDurationHistogram, getEvaluationStatusCounter } from "../../metrics";
 import type { SingleEvaluationResult } from "../evaluators";
 import { API_KEYS_AND_SECRETS_DETECTION } from "../evaluators.native";
 import { evaluateApiKeysAndSecrets } from "./apiKeysAndSecretsDetection";
@@ -38,9 +32,7 @@ export async function executeNativeEvaluation({
           traceback: [],
         };
     }
-    evaluationDurationHistogram
-      .labels(evaluatorType)
-      .observe(performance.now() - start);
+    evaluationDurationHistogram.labels(evaluatorType).observe(performance.now() - start);
     getEvaluationStatusCounter(evaluatorType, result.status).inc();
     return result;
   } catch (error) {
@@ -131,9 +123,7 @@ export function augmentEvaluationResult({
   if (markerHits === 0 && !droppedFail) return result;
 
   const baseScore =
-    result.status === "processed" && typeof result.score === "number"
-      ? result.score
-      : 0;
+    result.status === "processed" && typeof result.score === "number" ? result.score : 0;
   const noun = kind === "secret" ? "secret" : "PII";
 
   const notes: string[] = [];
@@ -155,11 +145,7 @@ export function augmentEvaluationResult({
     score: baseScore + markerHits + (droppedFail && markerHits === 0 ? 1 : 0),
     passed: false,
     details: `${prior}(${notes.join("; ")})`,
-    ...(result.status === "processed" && result.label
-      ? { label: result.label }
-      : {}),
-    ...(result.status === "processed" && result.cost
-      ? { cost: result.cost }
-      : {}),
+    ...(result.status === "processed" && result.label ? { label: result.label } : {}),
+    ...(result.status === "processed" && result.cost ? { cost: result.cost } : {}),
   };
 }

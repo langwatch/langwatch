@@ -55,9 +55,7 @@ const NOW = Date.UTC(2026, 7, 17, 12, 0, 0);
 const FIXTURE_PROCESS_KEY = "req_aaaaaaaabbbbbbbbccccccccdddddddd";
 const FIXTURE_TRACE_ID = "00000000000000000000000000000abc";
 
-function makeMessage(
-  overrides: Partial<DeadLetterMessage> = {},
-): DeadLetterMessage {
+function makeMessage(overrides: Partial<DeadLetterMessage> = {}): DeadLetterMessage {
   return {
     id: "msg_1",
     processName: "webhookDelivery",
@@ -106,9 +104,9 @@ describe("DeadLettersCard", () => {
       expect(screen.getByTestId("dead-total").textContent).toContain(
         "104 dead messages across 2 processes",
       );
-      expect(
-        screen.getByTestId("dead-filter-triggerSettlement").textContent,
-      ).toContain("92");
+      expect(screen.getByTestId("dead-filter-triggerSettlement").textContent).toContain(
+        "92",
+      );
     });
 
     it("narrows to one process when its chip is pressed", () => {
@@ -149,9 +147,7 @@ describe("DeadLettersCard", () => {
         />,
       );
 
-      const row = screen.getByTestId(
-        "dead-row-process:req_01:deliver:confirmed",
-      );
+      const row = screen.getByTestId("dead-row-process:req_01:deliver:confirmed");
       expect(row.textContent).toContain("webhookDelivery");
       expect(row.textContent).toContain("deliver");
       expect(row.textContent).toContain("11");
@@ -256,8 +252,7 @@ describe("DeadLettersCard", () => {
       expect(second.textContent).toContain("receiver returned 410");
       // Oldest first: the story reads top to bottom.
       expect(
-        first.compareDocumentPosition(second) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 

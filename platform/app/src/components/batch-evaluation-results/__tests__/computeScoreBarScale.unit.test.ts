@@ -40,10 +40,7 @@ describe("computeScoreBarScale", () => {
         entry("b", 100),
         entry("swept", -900, true),
       ])!;
-      const withoutSink = computeScoreBarScale([
-        entry("a", 150),
-        entry("b", 100),
-      ])!;
+      const withoutSink = computeScoreBarScale([entry("a", 150), entry("b", 100)])!;
 
       expect(withSink.min).toBeCloseTo(withoutSink.min, 6);
       expect(withSink.max).toBeCloseTo(withoutSink.max, 6);

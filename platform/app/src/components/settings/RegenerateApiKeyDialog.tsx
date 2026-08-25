@@ -29,16 +29,15 @@ export function RegenerateApiKeyDialog({
           <Dialog.Body>
             <VStack align="start" gap={4}>
               <Text>
-                This will invalidate your current API key immediately. Any
-                applications or services using the old key will stop working.
+                This will invalidate your current API key immediately. Any applications or
+                services using the old key will stop working.
               </Text>
               <Alert.Root status="error" borderRadius="md">
                 <Alert.Indicator />
                 <Alert.Content>
                   <Alert.Title>This action cannot be undone</Alert.Title>
                   <Alert.Description>
-                    You&apos;ll need to update all applications using this API
-                    key.
+                    You&apos;ll need to update all applications using this API key.
                   </Alert.Description>
                 </Alert.Content>
               </Alert.Root>

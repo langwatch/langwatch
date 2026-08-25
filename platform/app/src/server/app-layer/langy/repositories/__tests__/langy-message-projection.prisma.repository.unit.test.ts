@@ -6,9 +6,7 @@ import type { LangyMessageProjection } from "~/generated/prisma/client";
 import { PrismaLangyMessageProjectionRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-message-projection.repository";
 
 type Row = LangyMessageProjection;
-type Client = ConstructorParameters<
-  typeof PrismaLangyMessageProjectionRepository
->[0];
+type Client = ConstructorParameters<typeof PrismaLangyMessageProjectionRepository>[0];
 type Upsert = Client["langyMessageProjection"]["upsert"];
 
 const record: LangyMessageProjectionRecord = {

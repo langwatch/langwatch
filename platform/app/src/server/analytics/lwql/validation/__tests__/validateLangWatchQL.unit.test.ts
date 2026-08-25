@@ -46,10 +46,7 @@ function codesOf(result: LangWatchQLValidation): LangWatchQLViolationCode[] {
 describe("validateLangWatchQL", () => {
   describe("given SQL the LangWatchQL API is meant to answer", () => {
     it.each([
-      [
-        "a projection with a filter",
-        "SELECT TraceId FROM traces WHERE Cost > 1",
-      ],
+      ["a projection with a filter", "SELECT TraceId FROM traces WHERE Cost > 1"],
       [
         "a common table expression",
         "WITH recent AS (SELECT TraceId, Cost FROM traces) SELECT TraceId FROM recent",
@@ -70,10 +67,7 @@ describe("validateLangWatchQL", () => {
         "a named window",
         "SELECT sum(Cost) OVER w FROM traces WINDOW w AS (PARTITION BY Model)",
       ],
-      [
-        "a UNION ALL",
-        "SELECT TraceId FROM traces UNION ALL SELECT TraceId FROM spans",
-      ],
+      ["a UNION ALL", "SELECT TraceId FROM traces UNION ALL SELECT TraceId FROM spans"],
       [
         "a join on an equality key",
         "SELECT t.TraceId, s.Name FROM traces AS t INNER JOIN spans AS s ON t.TraceId = s.TraceId",
@@ -94,10 +88,7 @@ describe("validateLangWatchQL", () => {
         "array, map and JSON access",
         "SELECT Tags[1], Attributes['model'], JSONExtractString(Metadata, 'k') FROM traces",
       ],
-      [
-        "a lambda over an array",
-        "SELECT arrayMap(x -> x * 2, Durations) FROM traces",
-      ],
+      ["a lambda over an array", "SELECT arrayMap(x -> x * 2, Durations) FROM traces"],
       ["a row count over every row", "SELECT count(*) FROM traces"],
       [
         "DISTINCT with LIMIT BY",
@@ -118,10 +109,7 @@ describe("validateLangWatchQL", () => {
         "SELECT t.TraceId FROM traces AS t JOIN analytics.spans AS s ON t.TraceId = s.TraceId",
       );
 
-      expect(result.ok && result.tables).toEqual([
-        "analytics.traces",
-        "analytics.spans",
-      ]);
+      expect(result.ok && result.tables).toEqual(["analytics.traces", "analytics.spans"]);
     });
 
     it("accepts bound parameters and reports what they declare", () => {
@@ -145,9 +133,7 @@ describe("validateLangWatchQL", () => {
     });
 
     it("accepts a wildcard when the caller has no restricted fields", () => {
-      expect(codesOf(validate("SELECT * FROM traces", UNGATED_POLICY))).toEqual(
-        [],
-      );
+      expect(codesOf(validate("SELECT * FROM traces", UNGATED_POLICY))).toEqual([]);
     });
   });
 
@@ -175,9 +161,7 @@ describe("validateLangWatchQL", () => {
 
     it("refuses two statements in one submission", () => {
       expect(
-        codesOf(
-          validate("SELECT TraceId FROM traces; SELECT TraceId FROM spans"),
-        ),
+        codesOf(validate("SELECT TraceId FROM traces; SELECT TraceId FROM spans")),
       ).toEqual(["MULTIPLE_STATEMENTS"]);
     });
 
@@ -201,10 +185,7 @@ describe("validateLangWatchQL", () => {
 
   describe("given a SETTINGS clause", () => {
     it.each([
-      [
-        "trailing the statement",
-        "SELECT TraceId FROM traces SETTINGS max_threads = 1",
-      ],
+      ["trailing the statement", "SELECT TraceId FROM traces SETTINGS max_threads = 1"],
       [
         "buried in a subquery",
         "SELECT TraceId FROM (SELECT TraceId FROM traces SETTINGS max_threads = 1)",
@@ -230,10 +211,7 @@ describe("validateLangWatchQL", () => {
   describe("given a reference to server metadata", () => {
     it.each([
       ["the system schema", "SELECT * FROM system.tables"],
-      [
-        "the standard information schema",
-        "SELECT * FROM information_schema.tables",
-      ],
+      ["the standard information schema", "SELECT * FROM information_schema.tables"],
       ["its upper-case spelling", "SELECT * FROM INFORMATION_SCHEMA.tables"],
       ["a quoted system schema", "SELECT * FROM `system`.query_log"],
       [
@@ -248,14 +226,8 @@ describe("validateLangWatchQL", () => {
   describe("given a table outside the caller's catalog", () => {
     it.each([
       ["another database", "SELECT id FROM billing.invoices"],
-      [
-        "an unlisted table in the LangWatchQL database",
-        "SELECT id FROM api_key_map",
-      ],
-      [
-        "a table chosen by a bound parameter",
-        "SELECT id FROM {which:Identifier}",
-      ],
+      ["an unlisted table in the LangWatchQL database", "SELECT id FROM api_key_map"],
+      ["a table chosen by a bound parameter", "SELECT id FROM {which:Identifier}"],
       [
         "a table whose database is chosen by a bound parameter",
         "SELECT id FROM {db:Identifier}.traces",
@@ -271,9 +243,7 @@ describe("validateLangWatchQL", () => {
      * terminals and agent logs through `message` and `meta.violations`.
      */
     it("strips control characters and bidi overrides from the echoed name", () => {
-      const result = validate(
-        "SELECT id FROM `evil\u001b[31m\u202ename\u200b`",
-      );
+      const result = validate("SELECT id FROM `evil\u001b[31m\u202ename\u200b`");
       expect(result.ok).toBe(false);
       if (result.ok) return;
       const messages = result.violations.map((violation) => violation.message);
@@ -292,10 +262,7 @@ describe("validateLangWatchQL", () => {
       ["s3", "SELECT * FROM s3('https://bucket/k', 'CSV')"],
       ["remote", "SELECT * FROM remote('other-host', 'db', 'tbl')"],
       ["file", "SELECT * FROM file('/etc/passwd', 'CSV')"],
-      [
-        "postgresql",
-        "SELECT * FROM postgresql('h:5432', 'db', 'tbl', 'u', 'p')",
-      ],
+      ["postgresql", "SELECT * FROM postgresql('h:5432', 'db', 'tbl', 'u', 'p')"],
       ["cluster", "SELECT * FROM cluster('c', analytics.traces)"],
       ["merge", "SELECT * FROM merge('analytics', '^traces')"],
       ["numbers", "SELECT * FROM numbers(10)"],
@@ -332,11 +299,7 @@ describe("validateLangWatchQL", () => {
         "SELECT t.TraceId FROM traces AS t JOIN spans AS s ON t.body = s.TraceId",
         "join",
       ],
-      [
-        "window",
-        "SELECT count() OVER (PARTITION BY body) FROM traces",
-        "window",
-      ],
+      ["window", "SELECT count() OVER (PARTITION BY body) FROM traces", "window"],
       [
         "subquery",
         "SELECT TraceId FROM traces WHERE TraceId IN (SELECT body FROM spans)",
@@ -368,9 +331,9 @@ describe("validateLangWatchQL", () => {
      * parameter itself.
      */
     it("refuses a field named by a bound parameter in identifier position", () => {
-      expect(
-        codesOf(validate("SELECT {which:Identifier}.TraceId FROM traces")),
-      ).toEqual(["GATED_COLUMN"]);
+      expect(codesOf(validate("SELECT {which:Identifier}.TraceId FROM traces"))).toEqual([
+        "GATED_COLUMN",
+      ]);
     });
 
     /**
@@ -388,20 +351,21 @@ describe("validateLangWatchQL", () => {
      * refused is what keeps the refusal above about the shape rather than
      * about a gate that quietly stopped working.
      */
-    it.each(
-      POLICY.gatedColumns,
-    )("refuses a parameter standing in for the withheld column %s", (gated) => {
-      const bound = codesOf(validate("SELECT {c:Identifier} FROM traces"));
-      expect(
-        bound,
-        "a bound identifier reached the column position ungated",
-      ).not.toEqual([]);
-      // The literal spelling is the control: if this stopped being refused,
-      // the case above would pass for the wrong reason.
-      expect(codesOf(validate(`SELECT ${gated} FROM traces`))).toContain(
-        "GATED_COLUMN",
-      );
-    });
+    it.each(POLICY.gatedColumns)(
+      "refuses a parameter standing in for the withheld column %s",
+      (gated) => {
+        const bound = codesOf(validate("SELECT {c:Identifier} FROM traces"));
+        expect(
+          bound,
+          "a bound identifier reached the column position ungated",
+        ).not.toEqual([]);
+        // The literal spelling is the control: if this stopped being refused,
+        // the case above would pass for the wrong reason.
+        expect(codesOf(validate(`SELECT ${gated} FROM traces`))).toContain(
+          "GATED_COLUMN",
+        );
+      },
+    );
 
     it.each([
       ["a projection", "SELECT {c:Identifier} FROM traces"],
@@ -417,18 +381,15 @@ describe("validateLangWatchQL", () => {
       ["a bare wildcard", "SELECT * FROM traces"],
       ["a qualified wildcard", "SELECT t.* FROM traces AS t"],
       ["a wildcard minus a column", "SELECT * EXCEPT (Cost) FROM traces"],
-      [
-        "a regular-expression column set",
-        "SELECT COLUMNS('^Trace') FROM traces",
-      ],
+      ["a regular-expression column set", "SELECT COLUMNS('^Trace') FROM traces"],
     ])("refuses %s, whose members it cannot enumerate", (_case, sql) => {
       expect(codesOf(validate(sql))).toContain("WILDCARD_NOT_ALLOWED");
     });
 
     it("still refuses a restricted field named inside an explicit column set", () => {
-      expect(
-        codesOf(validate("SELECT COLUMNS(TraceId, body) FROM traces")),
-      ).toContain("GATED_COLUMN");
+      expect(codesOf(validate("SELECT COLUMNS(TraceId, body) FROM traces"))).toContain(
+        "GATED_COLUMN",
+      );
     });
   });
 
@@ -485,17 +446,15 @@ describe("validateLangWatchQL", () => {
 
   describe("given a join shape the LangWatchQL schema does not define", () => {
     it("refuses a positional PASTE join", () => {
-      expect(
-        codesOf(validate("SELECT TraceId FROM traces PASTE JOIN spans")),
-      ).toContain("UNSUPPORTED_SYNTAX");
+      expect(codesOf(validate("SELECT TraceId FROM traces PASTE JOIN spans"))).toContain(
+        "UNSUPPORTED_SYNTAX",
+      );
     });
   });
 
   describe("given a query that breaks several rules at once", () => {
     it("reports each of them, so one round trip is enough to fix it", () => {
-      const result = validate(
-        "SELECT body FROM system.tables SETTINGS max_threads = 1",
-      );
+      const result = validate("SELECT body FROM system.tables SETTINGS max_threads = 1");
 
       expect(new Set(codesOf(result))).toEqual(
         new Set(["GATED_COLUMN", "SCHEMA_NOT_ALLOWED", "SETTINGS_CLAUSE"]),
@@ -552,8 +511,7 @@ describe("validateLangWatchQL", () => {
 
     it("records a USING join as the same column on both sides", () => {
       expect(
-        blocksOf("SELECT TraceId FROM traces JOIN spans USING (TraceId)")[0]
-          ?.joins,
+        blocksOf("SELECT TraceId FROM traces JOIN spans USING (TraceId)")[0]?.joins,
       ).toEqual([{ left: "TraceId", right: "TraceId" }]);
     });
 
@@ -636,9 +594,7 @@ describe("validateLangWatchQL", () => {
           "SELECT TraceId, spend FROM totals",
       );
 
-      expect(
-        blocks.some((block) => block.hasGroupBy && block.isAggregated),
-      ).toBe(true);
+      expect(blocks.some((block) => block.hasGroupBy && block.isAggregated)).toBe(true);
       const outermost = blocks[0];
       expect(outermost).toMatchObject({
         tables: [],

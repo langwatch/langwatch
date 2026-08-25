@@ -37,10 +37,8 @@ export const PerformancePreview = ({ row }: { row: PerformanceRow }) => {
   }
 
   const { current, previous, metric, points } = performance;
-  const delta =
-    current !== null && previous !== null ? current - previous : null;
-  const trend =
-    delta === null || delta === 0 ? "neutral" : delta > 0 ? "up" : "down";
+  const delta = current !== null && previous !== null ? current - previous : null;
+  const trend = delta === null || delta === 0 ? "neutral" : delta > 0 ? "up" : "down";
   const trendColor =
     trend === "up" ? "green.fg" : trend === "down" ? "red.fg" : "fg.muted";
 
@@ -60,9 +58,7 @@ export const PerformancePreview = ({ row }: { row: PerformanceRow }) => {
       <Sparkline points={points} trend={trend} name={row.name} />
       <VStack minWidth="82px" align="start" gap={0}>
         <Text fontWeight="semibold">
-          {metric === "pass_rate"
-            ? `${Math.round(current * 100)}%`
-            : current.toFixed(2)}
+          {metric === "pass_rate" ? `${Math.round(current * 100)}%` : current.toFixed(2)}
         </Text>
         <Text textStyle="xs" color={trendColor} data-trend={trend}>
           {formatTrend(metric, delta)}
@@ -109,8 +105,7 @@ const Sparkline = ({
       const x =
         finitePoints.length === 1
           ? width / 2
-          : padding +
-            (index / (finitePoints.length - 1)) * (width - padding * 2);
+          : padding + (index / (finitePoints.length - 1)) * (width - padding * 2);
       const y = isFlat
         ? height / 2
         : height - padding - ((point - min) / range) * (height - padding * 2);

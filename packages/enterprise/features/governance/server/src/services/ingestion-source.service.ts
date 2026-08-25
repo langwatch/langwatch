@@ -12,10 +12,7 @@ import {
   type GovernanceIngestionSource,
   type UpdateGovernanceIngestionSourceCommand,
 } from "@langwatch/enterprise-governance-contract";
-import {
-  PROJECT_KIND,
-  type ProjectService,
-} from "@langwatch/project-contract";
+import { PROJECT_KIND, type ProjectService } from "@langwatch/project-contract";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
 import type {
   IngestionSourceEntitlementsPort,
@@ -87,8 +84,7 @@ export class IngestionSourceService extends GovernanceIngestionSourceService {
     const direct = await this.repository.tryFindByCurrentSecretHash(candidateHash);
     if (direct) return direct;
 
-    const candidates =
-      await this.repository.findByPriorSecretHash(candidateHash);
+    const candidates = await this.repository.findByPriorSecretHash(candidateHash);
     const now = this.now();
     return (
       candidates.find((candidate) => {
@@ -111,9 +107,7 @@ export class IngestionSourceService extends GovernanceIngestionSourceService {
     if (!(await this.entitlements.hasEnterprisePlan(input.organizationId))) {
       const existing = await this.repository.countLive(input.organizationId);
       if (existing >= NON_ENTERPRISE_INGESTION_SOURCE_CAP) {
-        throw new IngestionSourceCapReachedError(
-          NON_ENTERPRISE_INGESTION_SOURCE_CAP,
-        );
+        throw new IngestionSourceCapReachedError(NON_ENTERPRISE_INGESTION_SOURCE_CAP);
       }
     }
 
@@ -163,8 +157,7 @@ export class IngestionSourceService extends GovernanceIngestionSourceService {
     if (input.description !== undefined) update.description = input.description;
     if (input.status !== undefined) update.status = input.status;
     if (input.teamId !== undefined) update.teamId = input.teamId;
-    if (input.pullSchedule !== undefined)
-      update.pullSchedule = input.pullSchedule;
+    if (input.pullSchedule !== undefined) update.pullSchedule = input.pullSchedule;
     if (input.parserConfig !== undefined) {
       const incoming = { ...input.parserConfig };
       if (this.credentials.isEncrypted(incoming.credentials)) {
@@ -183,8 +176,7 @@ export class IngestionSourceService extends GovernanceIngestionSourceService {
         }
       }
       this.destinations.assertAllowed(incoming);
-      update.parserConfig =
-        this.credentials.tryEncryptParserConfig(incoming) ?? incoming;
+      update.parserConfig = this.credentials.tryEncryptParserConfig(incoming) ?? incoming;
     }
 
     const source = await this.repository.update(existing.id, update);
@@ -214,10 +206,7 @@ export class IngestionSourceService extends GovernanceIngestionSourceService {
     return { source, ingestSecret };
   }
 
-  async archive(
-    id: string,
-    organizationId: string,
-  ): Promise<GovernanceIngestionSource> {
+  async archive(id: string, organizationId: string): Promise<GovernanceIngestionSource> {
     const existing = await this.getById(id, organizationId);
     const source = await this.repository.update(existing.id, {
       archivedAt: new Date(this.now()),
@@ -234,10 +223,7 @@ export class IngestionSourceService extends GovernanceIngestionSourceService {
     });
   }
 
-  async getById(
-    id: string,
-    organizationId: string,
-  ): Promise<GovernanceIngestionSource> {
+  async getById(id: string, organizationId: string): Promise<GovernanceIngestionSource> {
     const source = await this.tryFindById(id, organizationId);
     if (!source) throw new IngestionSourceNotFoundError(id);
     return source;
@@ -254,9 +240,7 @@ export class IngestionSourceService extends GovernanceIngestionSourceService {
     );
   }
 
-  private async syncBestEffort(
-    source: GovernanceIngestionSource,
-  ): Promise<void> {
+  private async syncBestEffort(source: GovernanceIngestionSource): Promise<void> {
     try {
       await this.lifecycle.sync(source);
     } catch (error) {

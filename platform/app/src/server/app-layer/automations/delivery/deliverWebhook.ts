@@ -15,9 +15,7 @@ const logger = createLogger("langwatch:webhook-delivery");
 
 /** Records one attempt of the delivery log (ADR-040 §6). Optional — the
  *  test-fire path passes none, so nothing is logged for ephemeral tests. */
-export type WebhookDeliveryRecorder = (
-  input: WebhookDeliveryInput,
-) => Promise<void>;
+export type WebhookDeliveryRecorder = (input: WebhookDeliveryInput) => Promise<void>;
 
 /** How much of the failure message the log row keeps. */
 const LOG_ERROR_CHARS = 500;
@@ -33,9 +31,7 @@ function captureFailureResponse({
   return {
     body: result.body.slice(0, LOG_RESPONSE_CHARS),
     ...(result.responseHeaders ? { headers: result.responseHeaders } : {}),
-    ...(result.retryAfterMs !== undefined
-      ? { retryAfterMs: result.retryAfterMs }
-      : {}),
+    ...(result.retryAfterMs !== undefined ? { retryAfterMs: result.retryAfterMs } : {}),
   };
 }
 

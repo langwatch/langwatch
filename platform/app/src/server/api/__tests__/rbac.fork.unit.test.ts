@@ -106,11 +106,7 @@ describe("the fork at the permission seams", () => {
       it("returns the engine's answer, and never runs legacy", async () => {
         const { ctx, roleBindingFindMany } = buildPrisma({ onEngine: true });
 
-        const result = await resolveProjectPermission(
-          ctx,
-          PROJECT_ID,
-          "traces:view",
-        );
+        const result = await resolveProjectPermission(ctx, PROJECT_ID, "traces:view");
 
         // Legacy has no binding row to grant this; the engine has a grant.
         expect(result).toEqual({ permitted: true, organizationRole: "MEMBER" });
@@ -134,9 +130,7 @@ describe("the fork at the permission seams", () => {
             ...(ctx as Record<string, unknown>),
             permissionChecked: false,
             app: {
-              permissions: appPermissionsService(
-                (ctx as { prisma: never }).prisma,
-              ),
+              permissions: appPermissionsService((ctx as { prisma: never }).prisma),
             },
           },
           input: { projectId: PROJECT_ID },
@@ -205,11 +199,7 @@ describe("the fork at the permission seams", () => {
       it("keeps the legacy answer and the stage-A4 shadow", async () => {
         const { ctx, grantFindMany } = buildPrisma({ onEngine: false });
 
-        const result = await resolveProjectPermission(
-          ctx,
-          PROJECT_ID,
-          "traces:view",
-        );
+        const result = await resolveProjectPermission(ctx, PROJECT_ID, "traces:view");
 
         expect(result).toEqual({
           permitted: false,
@@ -224,11 +214,7 @@ describe("the fork at the permission seams", () => {
       it("reads as legacy, which is every organization today", async () => {
         const { ctx } = buildPrisma({ onEngine: undefined });
 
-        const result = await resolveProjectPermission(
-          ctx,
-          PROJECT_ID,
-          "traces:view",
-        );
+        const result = await resolveProjectPermission(ctx, PROJECT_ID, "traces:view");
 
         expect(result.permitted).toBe(false);
       });
@@ -258,11 +244,7 @@ describe("the fork at the permission seams", () => {
       try {
         const { ctx, grantFindMany } = buildPrisma({ onEngine: true });
 
-        const result = await resolveProjectPermission(
-          ctx,
-          PROJECT_ID,
-          "traces:view",
-        );
+        const result = await resolveProjectPermission(ctx, PROJECT_ID, "traces:view");
 
         expect(result).toEqual({ permitted: true, organizationRole: null });
         // The demo rule is identical on both paths, so the early return stays

@@ -15,17 +15,15 @@ import { traceAttributeKeyForMetadata } from "./traceMetadataEditableKeys";
  * under `input` because it carries the request payload; `name`, `type` and
  * `error` are structural and belong to no category, so they are never withheld.
  */
-const SPAN_FIELD_CONTENT_CATEGORY: Record<
-  TraceEditSpanField,
-  "input" | "output" | null
-> = {
-  name: null,
-  type: null,
-  error: null,
-  input: "input",
-  params: "input",
-  output: "output",
-};
+const SPAN_FIELD_CONTENT_CATEGORY: Record<TraceEditSpanField, "input" | "output" | null> =
+  {
+    name: null,
+    type: null,
+    error: null,
+    input: "input",
+    params: "input",
+    output: "output",
+  };
 
 /**
  * Whether this viewer is denied each content category on this trace. Keyed by
@@ -41,10 +39,8 @@ function deniedCategoriesFor({
   isWindowRedacted?: boolean;
 }): IsDeniedByCategory {
   return {
-    input:
-      protections.canSeeCapturedInput !== true || isWindowRedacted === true,
-    output:
-      protections.canSeeCapturedOutput !== true || isWindowRedacted === true,
+    input: protections.canSeeCapturedInput !== true || isWindowRedacted === true,
+    output: protections.canSeeCapturedOutput !== true || isWindowRedacted === true,
   };
 }
 
@@ -115,10 +111,7 @@ function redactSpanPatch({
  * `input` because it is what the caller sent with the request, and the restrict
  * rules that hide individual attributes apply to it as well.
  */
-const TRACE_FIELD_CONTENT_CATEGORY: Record<
-  TraceEditTraceField,
-  "input" | "output"
-> = {
+const TRACE_FIELD_CONTENT_CATEGORY: Record<TraceEditTraceField, "input" | "output"> = {
   input: "input",
   metadata: "input",
   output: "output",

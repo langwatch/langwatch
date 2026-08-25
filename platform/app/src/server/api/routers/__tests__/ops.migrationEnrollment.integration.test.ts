@@ -105,9 +105,7 @@ describe("ops migration enrollment procedures", () => {
         migrationName: "authz-team-user-backfill",
         actorUserId: "user_alex",
       });
-      expect(demandedPermissions.get("enrollMigrationTenant")).toBe(
-        "ops:manage",
-      );
+      expect(demandedPermissions.get("enrollMigrationTenant")).toBe("ops:manage");
     });
 
     it("enrolls for cutover only behind its typed confirmation", async () => {
@@ -161,9 +159,7 @@ describe("ops migration enrollment procedures", () => {
         sampleSize: 25,
         actorUserId: "user_alex",
       });
-      expect(demandedPermissions.get("enrollMigrationCohort")).toBe(
-        "ops:manage",
-      );
+      expect(demandedPermissions.get("enrollMigrationCohort")).toBe("ops:manage");
     });
 
     /** @scenario "A cutover cohort takes the typed confirmation" */
@@ -261,9 +257,7 @@ describe("ops migration enrollment procedures", () => {
       expect(service.searchOrganizations).toHaveBeenCalledWith({
         query: "acme",
       });
-      expect(demandedPermissions.get("searchMigrationOrganizations")).toBe(
-        "ops:view",
-      );
+      expect(demandedPermissions.get("searchMigrationOrganizations")).toBe("ops:view");
     });
   });
 
@@ -283,9 +277,7 @@ describe("ops migration enrollment procedures", () => {
         migrationName: "authz-team-user-backfill",
         actorUserId: "user_alex",
       });
-      expect(demandedPermissions.get("withdrawMigrationTenant")).toBe(
-        "ops:manage",
-      );
+      expect(demandedPermissions.get("withdrawMigrationTenant")).toBe("ops:manage");
     });
   });
 
@@ -296,9 +288,7 @@ describe("ops migration enrollment procedures", () => {
       const caller = buildCaller();
 
       await expect(caller.listMigrationEnrollments()).resolves.toEqual(listing);
-      expect(demandedPermissions.get("listMigrationEnrollments")).toBe(
-        "ops:view",
-      );
+      expect(demandedPermissions.get("listMigrationEnrollments")).toBe("ops:view");
       // The listing carries the enrollers' names, so the service audits the
       // read - the route has to say who is reading.
       expect(service.getEnrollments).toHaveBeenCalledWith({

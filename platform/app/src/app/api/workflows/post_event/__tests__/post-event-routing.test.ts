@@ -41,9 +41,7 @@ vi.mock("../../../../../optimization_studio/server/lambda", () => ({
       // instead of logging a "Studio invalid response" error on close.
       const stream = new ReadableStream<Uint8Array>({
         start(controller) {
-          controller.enqueue(
-            new TextEncoder().encode('data: {"type":"done"}\n\n'),
-          );
+          controller.enqueue(new TextEncoder().encode('data: {"type":"done"}\n\n'));
           controller.close();
         },
       });

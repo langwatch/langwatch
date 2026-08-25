@@ -19,15 +19,19 @@ import { BillingPricingService } from "@langwatch/enterprise-billing-web";
 import { formatNumber } from "~/utils/formatNumber";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 
-export { formatPrice, isAnnualTieredPlan, parseGrowthSeatPlanType, resolveGrowthSeatPlanType };
+export {
+  formatPrice,
+  isAnnualTieredPlan,
+  parseGrowthSeatPlanType,
+  resolveGrowthSeatPlanType,
+};
 export type { BillingInterval, CurrencyType as Currency };
 
 const pricingService = BillingPricingService.create(
   import.meta.env.MODE === "production" ? "live" : "test",
 );
 
-export const getGrowthSeatPriceCents = () =>
-  pricingService.getGrowthSeatPriceCents();
+export const getGrowthSeatPriceCents = () => pricingService.getGrowthSeatPriceCents();
 
 export const getAnnualDiscountPercent = (currency: CurrencyType) =>
   pricingService.getAnnualDiscountPercent(currency);
@@ -84,8 +88,7 @@ export const getGrowthPlanFeatures = (currency: Currency): string[] => [
   "Slack support",
 ];
 
-export const WEBHOOK_FEATURE_LABEL =
-  "Gateway webhooks for metering and rebilling";
+export const WEBHOOK_FEATURE_LABEL = "Gateway webhooks for metering and rebilling";
 
 /**
  * What the Enterprise tier offers, with each bullet tied to the entitlement

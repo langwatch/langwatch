@@ -12,7 +12,9 @@ import {
   type AnalyticsTimeseriesQuery,
 } from "../src/repositories/analytics.repository";
 
-const input = (overrides: Partial<AnalyticsTimeseriesInput> = {}): AnalyticsTimeseriesInput => ({
+const input = (
+  overrides: Partial<AnalyticsTimeseriesInput> = {},
+): AnalyticsTimeseriesInput => ({
   projectId: "project-1",
   startDate: Date.UTC(2026, 0, 1),
   endDate: Date.UTC(2026, 0, 2),
@@ -32,7 +34,9 @@ class RecordingRepository extends AnalyticsRepository {
   lastFeedbackInput: unknown;
   lastDocumentsInput: unknown;
 
-  async runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult> {
+  async runTimeseries(
+    query: AnalyticsTimeseriesQuery,
+  ): Promise<AnalyticsTimeseriesResult> {
     this.lastQuery = query;
     return result;
   }
@@ -196,29 +200,29 @@ describe("AnalyticsService", () => {
             const query = String(options.query ?? "");
             return {
               json: async () =>
-              query.includes("uniq(toString(context.document_id))")
-                ? [{ total: "7" }]
-                : query.includes("document_refs")
-                  ? [
-                      {
-                        documentId: "doc-1",
-                        count: "3",
-                        traceId: "trace-1",
-                        content: "hello",
-                      },
-                    ]
-                  : [
-                      {
-                        trace_id: "trace-1",
-                        event_id: "event-1",
-                        started_at: "1700000000123",
-                        event_type: "thumbs_up_down",
-                        attributes: {
-                          "event.metrics.vote": "1",
-                          reason: "helpful",
+                query.includes("uniq(toString(context.document_id))")
+                  ? [{ total: "7" }]
+                  : query.includes("document_refs")
+                    ? [
+                        {
+                          documentId: "doc-1",
+                          count: "3",
+                          traceId: "trace-1",
+                          content: "hello",
                         },
-                      },
-                    ],
+                      ]
+                    : [
+                        {
+                          trace_id: "trace-1",
+                          event_id: "event-1",
+                          started_at: "1700000000123",
+                          event_type: "thumbs_up_down",
+                          attributes: {
+                            "event.metrics.vote": "1",
+                            reason: "helpful",
+                          },
+                        },
+                      ],
             };
           },
         }) as unknown as ClickHouseClient,

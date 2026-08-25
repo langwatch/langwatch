@@ -26,7 +26,12 @@ export const archiveGatewayBudgetCommand = async (
       data: budget,
       table: () => {
         console.log();
-        console.log(chalk.gray("Archived at: ") + (budget.archived_at ? new Date(budget.archived_at).toLocaleString() : chalk.gray("—")));
+        console.log(
+          chalk.gray("Archived at: ") +
+            (budget.archived_at
+              ? new Date(budget.archived_at).toLocaleString()
+              : chalk.gray("—")),
+        );
         console.log();
       },
     };

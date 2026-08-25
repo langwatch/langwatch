@@ -75,10 +75,7 @@ export class StripeUsageReportingService implements UsageReportingService {
     this.meterId = deps.meterId;
   }
 
-  static create(deps: {
-    stripe: Stripe;
-    meterId: string;
-  }): StripeUsageReportingService {
+  static create(deps: { stripe: Stripe; meterId: string }): StripeUsageReportingService {
     return new StripeUsageReportingService(deps);
   }
 
@@ -166,9 +163,7 @@ export class StripeUsageReportingService implements UsageReportingService {
     }
   }
 
-  async reportUsageDelta(
-    input: ReportUsageDeltaInput,
-  ): Promise<MeterEventResult[]> {
+  async reportUsageDelta(input: ReportUsageDeltaInput): Promise<MeterEventResult[]> {
     const validated = reportUsageDeltaInputSchema.parse(input);
     const results: MeterEventResult[] = [];
 
@@ -205,9 +200,7 @@ export class StripeUsageReportingService implements UsageReportingService {
     return results;
   }
 
-  async reportUsageSet(
-    input: ReportUsageSetInput,
-  ): Promise<MeterEventResult[]> {
+  async reportUsageSet(input: ReportUsageSetInput): Promise<MeterEventResult[]> {
     const validated = reportUsageSetInputSchema.parse(input);
     const results: MeterEventResult[] = [];
 
@@ -264,9 +257,7 @@ export class StripeUsageReportingService implements UsageReportingService {
     stripeCustomerId: string;
     startTime: number;
     endTime: number;
-  }): Promise<
-    Awaited<ReturnType<Stripe["billing"]["meters"]["listEventSummaries"]>>
-  > {
+  }): Promise<Awaited<ReturnType<Stripe["billing"]["meters"]["listEventSummaries"]>>> {
     try {
       return await this.stripe.billing.meters.listEventSummaries(this.meterId, {
         customer: stripeCustomerId,
@@ -274,10 +265,7 @@ export class StripeUsageReportingService implements UsageReportingService {
         end_time: endTime,
       });
     } catch (error) {
-      if (
-        isStripeInvalidRequestError(error) ||
-        isStripeAuthenticationError(error)
-      ) {
+      if (isStripeInvalidRequestError(error) || isStripeAuthenticationError(error)) {
         logger.error(
           { stripeCustomerId, meterId: this.meterId, error: error.message },
           "[billing] Usage summary rejected by Stripe",
@@ -311,10 +299,7 @@ export class StripeUsageReportingService implements UsageReportingService {
       };
     }
 
-    const aggregatedValue = response.data.reduce(
-      (sum, s) => sum + s.aggregated_value,
-      0,
-    );
+    const aggregatedValue = response.data.reduce((sum, s) => sum + s.aggregated_value, 0);
 
     logger.info(
       {

@@ -59,14 +59,13 @@ export const CredentialsSection = ({
   apiKeyValidationError?: string;
   onApiKeyValidationClear?: () => void;
 }) => {
-  const { data: managedProviderData } =
-    api.modelProvider.isManagedProvider.useQuery(
-      {
-        organizationId: organizationId ?? "",
-        provider: provider.provider,
-      },
-      { enabled: !!organizationId },
-    );
+  const { data: managedProviderData } = api.modelProvider.isManagedProvider.useQuery(
+    {
+      organizationId: organizationId ?? "",
+      provider: provider.provider,
+    },
+    { enabled: !!organizationId },
+  );
   const isManaged = managedProviderData?.managed ?? false;
 
   const fieldMetadata = fieldMetadataFor(provider.provider);
@@ -106,12 +105,7 @@ export const CredentialsSection = ({
           const isInvalid = Boolean(fieldErrors[key]);
 
           return (
-            <Field.Root
-              key={key}
-              required={!isOptional}
-              invalid={isInvalid}
-              width="full"
-            >
+            <Field.Root key={key} required={!isOptional} invalid={isInvalid} width="full">
               <SmallLabel>
                 {key}
                 {!isOptional && <Field.RequiredIndicator />}
@@ -139,12 +133,8 @@ export const CredentialsSection = ({
                   width="full"
                 />
               </Box>
-              {description && (
-                <Field.HelperText>{description}</Field.HelperText>
-              )}
-              {fieldErrors[key] && (
-                <Field.ErrorText>{fieldErrors[key]}</Field.ErrorText>
-              )}
+              {description && <Field.HelperText>{description}</Field.HelperText>}
+              {fieldErrors[key] && <Field.ErrorText>{fieldErrors[key]}</Field.ErrorText>}
             </Field.Root>
           );
         })}

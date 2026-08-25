@@ -58,9 +58,7 @@ export type HttpTestPanelProps = {
    * body: the workflow engine renders the template, so the endpoint sees the
    * same body during a test that it sees during a run.
    */
-  onTest: (
-    templateVariables: Record<string, unknown>,
-  ) => Promise<HttpTestResult>;
+  onTest: (templateVariables: Record<string, unknown>) => Promise<HttpTestResult>;
   disabled?: boolean;
   /** Current URL being tested (for preview) */
   url?: string;
@@ -120,13 +118,7 @@ export function getStatusColor(status: number): string {
 /**
  * CopyButton - Small button to copy text to clipboard
  */
-function CopyButton({
-  text,
-  label = "Copy",
-}: {
-  text: string;
-  label?: string;
-}) {
+function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -137,13 +129,7 @@ function CopyButton({
 
   return (
     <Tooltip content={copied ? "Copied!" : label}>
-      <Button
-        variant="ghost"
-        size="xs"
-        onClick={handleCopy}
-        padding={1}
-        minWidth="auto"
-      >
+      <Button variant="ghost" size="xs" onClick={handleCopy} padding={1} minWidth="auto">
         {copied ? <Check size={14} /> : <Copy size={14} />}
       </Button>
     </Tooltip>
@@ -328,9 +314,7 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
               </HStack>
             )}
           </HStack>
-          {responseString && (
-            <CopyButton text={responseString} label="Copy response" />
-          )}
+          {responseString && <CopyButton text={responseString} label="Copy response" />}
         </HStack>
       )}
 
@@ -378,24 +362,23 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
       )}
 
       {/* Response Headers */}
-      {result.responseHeaders &&
-        Object.keys(result.responseHeaders).length > 0 && (
-          <CollapsibleSection title="Response Headers">
-            <Box
-              as="pre"
-              fontSize="xs"
-              fontFamily="mono"
-              bg="bg.subtle"
-              padding={2}
-              borderRadius="md"
-              overflow="auto"
-            >
-              {Object.entries(result.responseHeaders)
-                .map(([key, value]) => `${key}: ${value}`)
-                .join("\n")}
-            </Box>
-          </CollapsibleSection>
-        )}
+      {result.responseHeaders && Object.keys(result.responseHeaders).length > 0 && (
+        <CollapsibleSection title="Response Headers">
+          <Box
+            as="pre"
+            fontSize="xs"
+            fontFamily="mono"
+            bg="bg.subtle"
+            padding={2}
+            borderRadius="md"
+            overflow="auto"
+          >
+            {Object.entries(result.responseHeaders)
+              .map(([key, value]) => `${key}: ${value}`)
+              .join("\n")}
+          </Box>
+        </CollapsibleSection>
+      )}
 
       {/* Response Body */}
       {result.response !== undefined && (
@@ -430,10 +413,7 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
             <Text fontSize="sm" fontWeight="medium" color="blue.700">
               Extracted Output (JSONPath)
             </Text>
-            <CopyButton
-              text={result.extractedOutput}
-              label="Copy extracted output"
-            />
+            <CopyButton text={result.extractedOutput} label="Copy extracted output" />
           </HStack>
           <Box
             as="pre"
@@ -575,12 +555,7 @@ export function HttpTestPanel({
       <Separator />
 
       {/* Request Preview */}
-      <RequestPreview
-        url={url}
-        method={method}
-        headers={headers}
-        body={renderedBody}
-      />
+      <RequestPreview url={url} method={method} headers={headers} body={renderedBody} />
 
       <Separator />
 

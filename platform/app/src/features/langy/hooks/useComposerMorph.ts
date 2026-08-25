@@ -146,15 +146,7 @@ export function useComposerMorph({
         );
       });
     },
-    [
-      askLangy,
-      clearTimers,
-      focusPanelComposer,
-      heroCardRef,
-      hold,
-      isOpen,
-      reduceMotion,
-    ],
+    [askLangy, clearTimers, focusPanelComposer, heroCardRef, hold, isOpen, reduceMotion],
   );
 
   return {

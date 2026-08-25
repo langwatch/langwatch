@@ -170,8 +170,7 @@ export class GovernanceOcsfEventsClickHouseRepository extends GovernanceOcsfEven
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(
         {
           tenantId: row.tenantId,
@@ -192,9 +191,7 @@ export class GovernanceOcsfEventsClickHouseRepository extends GovernanceOcsfEven
    *
    * Spec: specs/ai-gateway/governance/siem-export.feature
    */
-  async findAll(
-    input: FindOcsfEventsInput,
-  ): Promise<GovernanceOcsfExportRow[]> {
+  async findAll(input: FindOcsfEventsInput): Promise<GovernanceOcsfExportRow[]> {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
       query: `

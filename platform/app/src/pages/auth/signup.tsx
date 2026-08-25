@@ -22,26 +22,21 @@ import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { api } from "../../utils/api";
-import {
-  authFailureMessage,
-  isCredentialRejection,
-} from "./authFailureMessage";
+import { authFailureMessage, isCredentialRejection } from "./authFailureMessage";
 
 /**
  * Wording for a sign-in failure this screen can't name. The account has
  * already been created by the time that leg runs, so the copy says so rather
  * than implying the sign-up itself failed.
  */
-const SIGN_UP_FALLBACK =
-  "Your account was created — sign in with your new details.";
+const SIGN_UP_FALLBACK = "Your account was created — sign in with your new details.";
 
 /**
  * The same wording for the other direction: the address already had an account
  * and the sign-in this screen ran on the customer's behalf failed for a reason
  * it can't name. Saying the account "was created" there would be a lie.
  */
-const RECOVERY_FALLBACK =
-  "That email already has an account. Sign in with it instead.";
+const RECOVERY_FALLBACK = "That email already has an account. Sign in with it instead.";
 
 export default function SignUp() {
   const { data: session } = useSession();
@@ -85,9 +80,7 @@ function SignUpForm() {
     .object({
       name: z.string().min(1, { message: "Name is required" }),
       email: z.string().min(1).email(),
-      password: z
-        .string()
-        .min(8, { message: "Password must be at least 8 characters" }),
+      password: z.string().min(8, { message: "Password must be at least 8 characters" }),
       confirmPassword: z
         .string()
         .min(8, { message: "Password must be at least 8 characters" }),
@@ -170,9 +163,7 @@ function SignUpForm() {
             code: response.code,
             message: response.error,
             status: response.status,
-            fallback: accountWasJustCreated
-              ? SIGN_UP_FALLBACK
-              : RECOVERY_FALLBACK,
+            fallback: accountWasJustCreated ? SIGN_UP_FALLBACK : RECOVERY_FALLBACK,
           });
         }
       }
@@ -244,9 +235,7 @@ function SignUpForm() {
               <HorizontalFormControl
                 label="Confirm Password"
                 helper="Confirm your password"
-                invalid={
-                  form.formState.errors.confirmPassword?.message !== undefined
-                }
+                invalid={form.formState.errors.confirmPassword?.message !== undefined}
                 error={form.formState.errors.confirmPassword}
               >
                 <Input type="password" {...form.register("confirmPassword")} />

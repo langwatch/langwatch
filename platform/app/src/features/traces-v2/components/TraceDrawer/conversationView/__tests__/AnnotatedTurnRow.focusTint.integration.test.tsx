@@ -95,8 +95,7 @@ function renderRow({
   );
 }
 
-const tint = () =>
-  document.querySelector('[data-focused-turn="true"]') as HTMLElement;
+const tint = () => document.querySelector('[data-focused-turn="true"]') as HTMLElement;
 
 afterEach(cleanup);
 
@@ -106,9 +105,7 @@ describe("given the turn under review carries annotations in the rail beside it"
     renderRow({ isFocused: true });
 
     expect(tint()).toContainElement(screen.getByTestId("chat-turn-row"));
-    expect(tint()).not.toContainElement(
-      screen.getByTestId("turn-annotation-rail"),
-    );
+    expect(tint()).not.toContainElement(screen.getByTestId("turn-annotation-rail"));
 
     // Every millimetre of room the tint takes around the turn is given back as
     // margin, so the turn and its neighbours sit exactly where they would
@@ -129,9 +126,7 @@ describe("given the turn under review carries annotations in the rail beside it"
     renderRow({ isFocused: true, railLayout: STACKED_LAYOUT });
 
     expect(tint()).toContainElement(screen.getByTestId("chat-turn-row"));
-    expect(tint()).not.toContainElement(
-      screen.getByTestId("turn-annotation-rail"),
-    );
+    expect(tint()).not.toContainElement(screen.getByTestId("turn-annotation-rail"));
   });
 });
 

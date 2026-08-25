@@ -35,8 +35,7 @@ export function useRunViaApiTabs(
   setDataSource: (dataSource: RunSnippetDataSource) => void;
   tabs: ApiSnippetTab[];
 } {
-  const [dataSource, setDataSource] =
-    useState<RunSnippetDataSource>("attached");
+  const [dataSource, setDataSource] = useState<RunSnippetDataSource>("attached");
 
   const tabs = useMemo<ApiSnippetTab[]>(
     () =>

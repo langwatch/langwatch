@@ -64,57 +64,55 @@ const tracer = getLangWatchTracer("langwatch.langy.api-key");
 // rights it must not have, to buy a create it should already have had. When a
 // Langy write is refused for a permission this list already contains, look at
 // the route's `requires(...)` first.
-export const LANGY_CANDIDATE_PERMISSIONS: readonly Permission[] = Object.freeze(
-  [
-    "project:view",
-    "traces:view",
-    "traces:create",
-    "traces:update",
-    "evaluations:view",
-    "evaluations:create",
-    "evaluations:update",
-    "datasets:view",
-    "datasets:create",
-    "datasets:update",
-    "scenarios:view",
-    "scenarios:create",
-    "scenarios:update",
-    "annotations:view",
-    "annotations:create",
-    "annotations:update",
-    "analytics:view",
-    "analytics:create",
-    "analytics:update",
-    "prompts:view",
-    "prompts:create",
-    "prompts:update",
-    // Read only, deliberately, and the odd one out in this list.
-    //
-    // Everything else here creates DATA: a row Langy wrote, which does nothing
-    // until someone reads it. A trigger is a standing instruction — it keeps
-    // acting, on its own schedule, on rows Langy never saw. And it is durable, so
-    // it outlives the session key's short TTL by an unbounded margin: the thing
-    // that authorised it is long gone while it is still running.
-    //
-    // A person setting one up chooses its destination and owns what it does
-    // afterwards. Delegating that authorship is a different decision from
-    // delegating a write, and this list is not the place to make it.
-    "triggers:view",
-    "workflows:view",
-    "workflows:create",
-    "workflows:update",
-    // The second read-only family, and for the opposite reason to triggers: the
-    // view is simply all the family has to offer Langy. Experiments used to ride
-    // on `workflows:view`; they now have their own permission, and `GET
-    // /api/experiments` is the one route that asks for it — so leaving it out
-    // refused `langwatch experiment list`, and with it `langwatch status`, a read
-    // every project role already holds down to VIEWER and the EXTERNAL lite
-    // member. The family's only other action is `:manage`, which is the delete
-    // Langy must never hold; RUNNING an experiment is gated by the evaluations
-    // family above, not this one.
-    "experiments:view",
-  ],
-);
+export const LANGY_CANDIDATE_PERMISSIONS: readonly Permission[] = Object.freeze([
+  "project:view",
+  "traces:view",
+  "traces:create",
+  "traces:update",
+  "evaluations:view",
+  "evaluations:create",
+  "evaluations:update",
+  "datasets:view",
+  "datasets:create",
+  "datasets:update",
+  "scenarios:view",
+  "scenarios:create",
+  "scenarios:update",
+  "annotations:view",
+  "annotations:create",
+  "annotations:update",
+  "analytics:view",
+  "analytics:create",
+  "analytics:update",
+  "prompts:view",
+  "prompts:create",
+  "prompts:update",
+  // Read only, deliberately, and the odd one out in this list.
+  //
+  // Everything else here creates DATA: a row Langy wrote, which does nothing
+  // until someone reads it. A trigger is a standing instruction — it keeps
+  // acting, on its own schedule, on rows Langy never saw. And it is durable, so
+  // it outlives the session key's short TTL by an unbounded margin: the thing
+  // that authorised it is long gone while it is still running.
+  //
+  // A person setting one up chooses its destination and owns what it does
+  // afterwards. Delegating that authorship is a different decision from
+  // delegating a write, and this list is not the place to make it.
+  "triggers:view",
+  "workflows:view",
+  "workflows:create",
+  "workflows:update",
+  // The second read-only family, and for the opposite reason to triggers: the
+  // view is simply all the family has to offer Langy. Experiments used to ride
+  // on `workflows:view`; they now have their own permission, and `GET
+  // /api/experiments` is the one route that asks for it — so leaving it out
+  // refused `langwatch experiment list`, and with it `langwatch status`, a read
+  // every project role already holds down to VIEWER and the EXTERNAL lite
+  // member. The family's only other action is `:manage`, which is the delete
+  // Langy must never hold; RUNNING an experiment is gated by the evaluations
+  // family above, not this one.
+  "experiments:view",
+]);
 
 // A leaked Langy session key auto-expires after this window. Sized to comfortably
 // outlast a single chat turn / worker idle lifetime (the worker is short-lived)
@@ -448,9 +446,7 @@ export async function mintLangySessionApiKey({
         organizationId,
         permissionMode: "restricted",
         permissions: heldPermissions,
-        bindings: [
-          { role: "CUSTOM", scopeType: "PROJECT", scopeId: projectId },
-        ],
+        bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: projectId }],
         expiresAt: new Date(Date.now() + LANGY_SESSION_KEY_TTL_MS),
       }),
   );

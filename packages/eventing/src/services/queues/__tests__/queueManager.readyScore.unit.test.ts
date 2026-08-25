@@ -26,11 +26,7 @@ function createMockSharedQueue(): EventSourcedQueueProcessor<any> {
   };
 }
 
-function createMockCommandHandlerClass(): CommandHandlerClass<
-  any,
-  CommandType,
-  Event
-> {
+function createMockCommandHandlerClass(): CommandHandlerClass<any, CommandType, Event> {
   class MockCommandHandler implements CommandHandler<Command<any, any>, Event> {
     static readonly schema = defineCommandSchema(
       "test.command.readyScore" as CommandType,
@@ -111,9 +107,9 @@ describe("QueueManager ready scores", () => {
       const entry = registry.get("test-pipeline:job:passThrough");
 
       expect(entry?.scoreFn({ tenantId: "t1", occurredAt: 0 })).toBe(0);
-      expect(
-        entry?.scoreFn({ tenantId: "t1", occurredAt: Date.UTC(2021, 0, 1) }),
-      ).toBe(Date.UTC(2021, 0, 1));
+      expect(entry?.scoreFn({ tenantId: "t1", occurredAt: Date.UTC(2021, 0, 1) })).toBe(
+        Date.UTC(2021, 0, 1),
+      );
     });
 
     it("keeps an explicitly supplied score function", () => {

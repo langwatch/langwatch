@@ -32,9 +32,7 @@ export class IngestionKeyService extends GovernanceIngestionKeyService {
     );
   }
 
-  async ensureForProject(
-    input: IngestionKeyMintCommand,
-  ): Promise<IssuedIngestionKey> {
+  async ensureForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey> {
     const prior = await this.repository.tryFindIngestKey({
       organizationId: input.organizationId,
       projectId: input.projectId,
@@ -56,9 +54,7 @@ export class IngestionKeyService extends GovernanceIngestionKeyService {
     });
   }
 
-  async issueForProject(
-    input: IngestionKeyMintCommand,
-  ): Promise<IssuedIngestionKey> {
+  async issueForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey> {
     const origin = input.createdByDeviceLabel
       ? `${input.sourceType}, ${input.createdByDeviceLabel}`
       : input.sourceType;
@@ -121,9 +117,7 @@ export class IngestionKeyService extends GovernanceIngestionKeyService {
       organizationId: input.organizationId,
       permissionMode: "restricted",
       permissions: ["traces:create"],
-      bindings: [
-        { role: "CUSTOM", scopeType: "PROJECT", scopeId: input.projectId },
-      ],
+      bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: input.projectId }],
       ingestSourceType: input.sourceType,
       ingestionTemplateId: input.ingestionTemplateId ?? null,
       createdByDeviceLabel: input.createdByDeviceLabel ?? null,

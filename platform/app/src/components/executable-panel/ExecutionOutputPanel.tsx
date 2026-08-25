@@ -31,10 +31,7 @@ export const ExecutionOutputPanel = ({
   isTracingEnabled = false,
   nodeType,
 }: OutputPanelProps) => {
-  const [isWaitingLong] = useDebounceValue(
-    executionState?.status === "waiting",
-    600,
-  );
+  const [isWaitingLong] = useDebounceValue(executionState?.status === "waiting", 600);
 
   const isExecutionComplete =
     executionState?.status === "success" || executionState?.status === "error";
@@ -78,28 +75,21 @@ const ExecutionMetadata = ({
 }) => {
   const { openDrawer } = useDrawer();
   const hasTiming =
-    executionState.timestamps?.started_at &&
-    executionState.timestamps?.finished_at;
+    executionState.timestamps?.started_at && executionState.timestamps?.finished_at;
 
   return (
     <HStack gap={3}>
       {executionState.cost !== undefined && (
-        <Text color="fg.muted">
-          {numeral(executionState.cost).format("$0.00[000]a")}
-        </Text>
+        <Text color="fg.muted">{numeral(executionState.cost).format("$0.00[000]a")}</Text>
       )}
 
       {hasTiming && (
         <>
-          {executionState.cost !== undefined && (
-            <Text color="fg.subtle">·</Text>
-          )}
+          {executionState.cost !== undefined && <Text color="fg.subtle">·</Text>}
           <SpanDuration
             span={{
               error:
-                executionState?.status === "error"
-                  ? executionState.error
-                  : undefined,
+                executionState?.status === "error" ? executionState.error : undefined,
               timestamps: {
                 started_at: executionState.timestamps?.started_at ?? 0,
                 finished_at: executionState.timestamps?.finished_at ?? 0,
@@ -178,12 +168,7 @@ const renderExecutionError = (executionState: ExecutionState) => {
 
   return (
     <VStack width="full" align="start" gap={3}>
-      <Text
-        fontSize="13px"
-        fontWeight="bold"
-        textTransform="uppercase"
-        color="fg.muted"
-      >
+      <Text fontSize="13px" fontWeight="bold" textTransform="uppercase" color="fg.muted">
         Error
       </Text>
       <OutputBox
@@ -197,10 +182,7 @@ const renderExecutionError = (executionState: ExecutionState) => {
 /**
  * Renders successful execution outputs
  */
-const renderExecutionOutputs = (
-  executionState: ExecutionState,
-  nodeType?: string,
-) => {
+const renderExecutionOutputs = (executionState: ExecutionState, nodeType?: string) => {
   if (executionState.status !== "success" || !executionState.outputs) {
     return null;
   }
@@ -232,14 +214,10 @@ const renderExecutionOutputs = (
     .filter(([_, value]) => value !== null)
     .map(([identifier, value]) => {
       const isFail =
-        (nodeType === "evaluator" &&
-          identifier === "passed" &&
-          value === false) ||
+        (nodeType === "evaluator" && identifier === "passed" && value === false) ||
         (identifier === "status" && value === "error");
       const isSkipped =
-        nodeType === "evaluator" &&
-        identifier === "status" &&
-        value === "skipped";
+        nodeType === "evaluator" && identifier === "status" && value === "skipped";
       const isSuccess =
         nodeType === "evaluator" && identifier === "passed" && value === true;
 

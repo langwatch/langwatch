@@ -18,9 +18,7 @@ interface LangyAnalyticsEventSink {
 }
 
 /** App-layer adapter for the analytics-only ClickHouse event sink. */
-export class LangyAnalyticsEventAppendStore
-  implements AppendStore<LangyAnalyticsEventProjectionRecord>
-{
+export class LangyAnalyticsEventAppendStore implements AppendStore<LangyAnalyticsEventProjectionRecord> {
   constructor(
     private readonly repository: LangyAnalyticsEventSink,
     private readonly defaultRetentionDays: number,

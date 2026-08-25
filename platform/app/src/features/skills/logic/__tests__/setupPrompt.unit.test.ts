@@ -33,9 +33,7 @@ describe("withCredentials()", () => {
       expect(prompt.indexOf("Use these keys to instrument:")).toBe(0);
       expect(prompt).toContain('LANGWATCH_API_KEY="sk-lw-abc"');
       expect(prompt).toContain('LANGWATCH_PROJECT_ID="project_1"');
-      expect(prompt).toContain(
-        'LANGWATCH_ENDPOINT="https://langwatch.acme.internal"',
-      );
+      expect(prompt).toContain('LANGWATCH_ENDPOINT="https://langwatch.acme.internal"');
       expect(prompt.indexOf(SKILL)).toBeGreaterThan(0);
     });
 

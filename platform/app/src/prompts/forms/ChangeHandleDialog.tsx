@@ -1,12 +1,4 @@
-import {
-  Button,
-  Field,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Field, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Building, Check, ChevronDown, Users } from "lucide-react";
 import { useCallback, useEffect } from "react";
@@ -52,9 +44,7 @@ export function ChangeHandleDialog({
       handle,
       scope: scope,
     },
-    resolver: zodResolver(
-      createChangeHandleFormSchema({ checkHandleUniqueness }),
-    ),
+    resolver: zodResolver(createChangeHandleFormSchema({ checkHandleUniqueness })),
   });
 
   /**
@@ -112,12 +102,11 @@ export function ChangeHandleDialog({
             <VStack width="full" gap={4}>
               {currentHandle && (
                 <Text color="red.fg" fontSize="12px" fontWeight="medium" mb={2}>
-                  ⚠ Warning: Changing the prompt identifier or scope may break
-                  any existing integrations, API calls, or workflows that use
-                  &quot;
+                  ⚠ Warning: Changing the prompt identifier or scope may break any
+                  existing integrations, API calls, or workflows that use &quot;
                   {currentHandle}
-                  &quot;. Make sure to update all references in your codebase
-                  and documentation.
+                  &quot;. Make sure to update all references in your codebase and
+                  documentation.
                 </Text>
               )}
               <Field.Root invalid={!!errors.handle}>
@@ -136,9 +125,7 @@ export function ChangeHandleDialog({
                   }}
                 />
                 {errors.handle ? (
-                  <Field.ErrorText>
-                    {errors.handle.message?.toString()}
-                  </Field.ErrorText>
+                  <Field.ErrorText>{errors.handle.message?.toString()}</Field.ErrorText>
                 ) : (
                   <Field.HelperText paddingY={2}>
                     {'e.g. "prompt-name" or "marketing/tone-of-voice"'}
@@ -161,9 +148,7 @@ export function ChangeHandleDialog({
                         <Building size={14} />
                       )}
                       <Text>
-                        {field.value === PromptScope.PROJECT
-                          ? "Project"
-                          : "Organization"}
+                        {field.value === PromptScope.PROJECT ? "Project" : "Organization"}
                       </Text>
                       <ChevronDown size={12} />
                     </Button>
@@ -177,9 +162,7 @@ export function ChangeHandleDialog({
                         <Users size={14} />
                         <Text>Project</Text>
                       </HStack>
-                      {field.value === PromptScope.PROJECT && (
-                        <Check size={14} />
-                      )}
+                      {field.value === PromptScope.PROJECT && <Check size={14} />}
                     </Menu.Item>
                     <Menu.Item
                       value="organization"
@@ -189,9 +172,7 @@ export function ChangeHandleDialog({
                         <Building size={14} />
                         <Text>Organization</Text>
                       </HStack>
-                      {field.value === PromptScope.ORGANIZATION && (
-                        <Check size={14} />
-                      )}
+                      {field.value === PromptScope.ORGANIZATION && <Check size={14} />}
                     </Menu.Item>
                   </Menu.Content>
                 </Menu.Root>

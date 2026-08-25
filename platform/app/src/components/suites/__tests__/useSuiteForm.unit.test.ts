@@ -739,9 +739,7 @@ describe("useSuiteForm()", () => {
           result.current.removeArchivedScenario("scen_archived");
         });
 
-        expect(result.current.selectedScenarioIds).not.toContain(
-          "scen_archived",
-        );
+        expect(result.current.selectedScenarioIds).not.toContain("scen_archived");
         expect(result.current.selectedScenarioIds).toContain("scen_1");
       });
     });

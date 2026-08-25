@@ -83,9 +83,7 @@ describe("easterEggs", () => {
     });
 
     it("barrel roll has keepOpen flag", () => {
-      const barrelRoll = easterEggs.find(
-        (egg) => egg.id === "easter-barrel-roll",
-      );
+      const barrelRoll = easterEggs.find((egg) => egg.id === "easter-barrel-roll");
       expect(barrelRoll?.keepOpen).toBe(true);
     });
   });

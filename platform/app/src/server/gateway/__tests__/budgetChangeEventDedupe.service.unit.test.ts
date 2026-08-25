@@ -28,9 +28,7 @@ describe("budget change-event dedupe", () => {
         const set = vi.fn().mockResolvedValue("OK");
         const service = new RedisBudgetChangeEventDedupeService(redisStub(set));
 
-        await expect(
-          service.shouldEmit({ projectId: "project-1" }),
-        ).resolves.toBe(true);
+        await expect(service.shouldEmit({ projectId: "project-1" })).resolves.toBe(true);
       });
 
       it("claims the window with a fixed expiry, not a sliding one", async () => {
@@ -58,9 +56,7 @@ describe("budget change-event dedupe", () => {
         const set = vi.fn().mockResolvedValue(null);
         const service = new RedisBudgetChangeEventDedupeService(redisStub(set));
 
-        await expect(
-          service.shouldEmit({ projectId: "project-1" }),
-        ).resolves.toBe(false);
+        await expect(service.shouldEmit({ projectId: "project-1" })).resolves.toBe(false);
       });
     });
 
@@ -84,9 +80,7 @@ describe("budget change-event dedupe", () => {
         const set = vi.fn().mockRejectedValue(new Error("connection refused"));
         const service = new RedisBudgetChangeEventDedupeService(redisStub(set));
 
-        await expect(
-          service.shouldEmit({ projectId: "project-1" }),
-        ).resolves.toBe(true);
+        await expect(service.shouldEmit({ projectId: "project-1" })).resolves.toBe(true);
       });
     });
   });
@@ -96,12 +90,8 @@ describe("budget change-event dedupe", () => {
       it("emits every time, matching the pre-dedupe behavior", async () => {
         const service = createBudgetChangeEventDedupeService(null);
 
-        await expect(
-          service.shouldEmit({ projectId: "project-1" }),
-        ).resolves.toBe(true);
-        await expect(
-          service.shouldEmit({ projectId: "project-1" }),
-        ).resolves.toBe(true);
+        await expect(service.shouldEmit({ projectId: "project-1" })).resolves.toBe(true);
+        await expect(service.shouldEmit({ projectId: "project-1" })).resolves.toBe(true);
       });
     });
   });

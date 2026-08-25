@@ -16,8 +16,7 @@ vi.mock("../modelProvider.repository", () => ({
 }));
 
 vi.mock("../providerValidation", () => ({
-  validateProviderApiKey: (...args: unknown[]) =>
-    validateProviderApiKeyMock(...args),
+  validateProviderApiKey: (...args: unknown[]) => validateProviderApiKeyMock(...args),
 }));
 
 vi.mock("../../rateLimit", () => ({
@@ -28,8 +27,7 @@ vi.mock("~/server/app-layer/permissions/imperative", () => ({
   probeOrganizationPermission: (...args: unknown[]) =>
     hasOrganizationPermissionMock(...args),
   probeTeamPermission: (...args: unknown[]) => hasTeamPermissionMock(...args),
-  probeProjectPermission: (...args: unknown[]) =>
-    hasProjectPermissionMock(...args),
+  probeProjectPermission: (...args: unknown[]) => hasProjectPermissionMock(...args),
 }));
 
 import {
@@ -135,10 +133,7 @@ describe("testConnection", () => {
 
       // The project-shaped lookup matches PROJECT grants only, so reaching for
       // it here would report a perfectly good org-scoped credential as absent.
-      expect(findByIdForOrganizationMock).toHaveBeenCalledWith(
-        "mp_1",
-        ORGANIZATION_ID,
-      );
+      expect(findByIdForOrganizationMock).toHaveBeenCalledWith("mp_1", ORGANIZATION_ID);
       expect(findByProviderMock).not.toHaveBeenCalled();
       expect(result.outcome).toBe("verified");
     });
@@ -166,9 +161,7 @@ describe("testConnection", () => {
       // it vacuously, and the org-anchored lookup has no scope predicate to
       // stop such a row being addressed by id. Without the scope-carrying
       // guard this is the shape that walks straight through.
-      findByIdForOrganizationMock.mockResolvedValueOnce(
-        orgScopedRow({ scopes: [] }),
-      );
+      findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow({ scopes: [] }));
 
       await expect(
         service().testConnection({

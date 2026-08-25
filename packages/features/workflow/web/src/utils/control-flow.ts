@@ -19,10 +19,7 @@ export const GATE_HANDLE_ID = `inputs.${GATE_FIELD}`;
 const IF_ELSE = "if_else";
 const BRANCH_HANDLES = new Set(["true", "false"]);
 
-function stripPrefix(
-  handle: string | null | undefined,
-  prefix: string,
-): string {
+function stripPrefix(handle: string | null | undefined, prefix: string): string {
   if (!handle) return "";
   return handle.startsWith(prefix) ? handle.slice(prefix.length) : handle;
 }
@@ -34,9 +31,7 @@ function nodeInputs(node: Node | undefined): FieldLike[] {
 }
 
 /** Whether a source handle is an If/Else branch handle (`outputs.true`/`false`). */
-export function isBranchSourceHandle(
-  handle: string | null | undefined,
-): boolean {
+export function isBranchSourceHandle(handle: string | null | undefined): boolean {
   return BRANCH_HANDLES.has(stripPrefix(handle, "outputs."));
 }
 

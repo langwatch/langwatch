@@ -17,12 +17,10 @@ export const useWorkflowExecution = () => {
     timeout_on_status: "waiting" | "running";
   } | null>(null);
 
-  const { getWorkflow, setWorkflowExecutionState } = useWorkflowStore(
-    (state) => ({
-      getWorkflow: state.getWorkflow,
-      setWorkflowExecutionState: state.setWorkflowExecutionState,
-    }),
-  );
+  const { getWorkflow, setWorkflowExecutionState } = useWorkflowStore((state) => ({
+    getWorkflow: state.getWorkflow,
+    setWorkflowExecutionState: state.setWorkflowExecutionState,
+  }));
 
   const socketAvailable = useCallback(() => {
     if (socketStatus !== "connected") {
@@ -57,9 +55,7 @@ export const useWorkflowExecution = () => {
       });
       toaster.create({
         title: `Timeout ${
-          triggerTimeout.timeout_on_status === "waiting"
-            ? "starting"
-            : "stopping"
+          triggerTimeout.timeout_on_status === "waiting" ? "starting" : "stopping"
         } workflow execution`,
         type: "error",
         duration: 5000,

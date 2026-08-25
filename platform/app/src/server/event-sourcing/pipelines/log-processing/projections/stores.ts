@@ -7,9 +7,7 @@ import type { CanonicalLogRecordRepository } from "~/server/app-layer/logs/repos
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { CanonicalLogRecord } from "../schemas/logRecord";
 
-export class CanonicalLogAppendStore
-  implements AppendStore<CanonicalLogRecord>
-{
+export class CanonicalLogAppendStore implements AppendStore<CanonicalLogRecord> {
   constructor(private readonly repository: CanonicalLogRecordRepository) {}
 
   async append(

@@ -56,11 +56,7 @@ function buildFrames(): string[][] {
     [
       // 4: Bullet hits right
       line([L, "O"], [R - 1, "*"], [R, "O"]),
-      line(
-        [L - 1, lGun],
-        [L + 3, "\u00B7 \u00B7 \u00B7 \u00B7 \u00B7"],
-        [R - 1, rStand],
-      ),
+      line([L - 1, lGun], [L + 3, "\u00B7 \u00B7 \u00B7 \u00B7 \u00B7"], [R - 1, rStand]),
       line([L - 1, lLegs], [R - 1, rLegs]),
     ],
     [
@@ -84,11 +80,7 @@ function buildFrames(): string[][] {
     [
       // 8: Bullet hits left
       line([L + 1, "*"], [L, "O"], [R, "O"]),
-      line(
-        [L - 1, lStand],
-        [L + 2, "\u00B7 \u00B7 \u00B7 \u00B7 \u00B7"],
-        [R - 2, rGun],
-      ),
+      line([L - 1, lStand], [L + 2, "\u00B7 \u00B7 \u00B7 \u00B7 \u00B7"], [R - 2, rGun]),
       line([L - 1, lLegs], [R - 1, rLegs]),
     ],
     [
@@ -117,15 +109,7 @@ function buildFrames(): string[][] {
     ],
     [
       // 12: Explosion
-      line(
-        [L, "O"],
-        [15, "\\"],
-        [17, "*"],
-        [19, "|"],
-        [21, "*"],
-        [23, "/"],
-        [R, "O"],
-      ),
+      line([L, "O"], [15, "\\"], [17, "*"], [19, "|"], [21, "*"], [23, "/"], [R, "O"]),
       line(
         [L - 1, lGun],
         [13, bullet(2)],

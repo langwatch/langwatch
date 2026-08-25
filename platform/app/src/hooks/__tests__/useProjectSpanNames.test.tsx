@@ -36,9 +36,7 @@ describe("useProjectSpanNames", () => {
       error: null,
     });
 
-    const { result } = renderHook(() =>
-      useProjectSpanNames({ projectId: undefined }),
-    );
+    const { result } = renderHook(() => useProjectSpanNames({ projectId: undefined }));
 
     expect(result.current.spanNames).toEqual([]);
     expect(result.current.metadataKeys).toEqual([]);
@@ -80,15 +78,9 @@ describe("useProjectSpanNames", () => {
     );
 
     expect(result.current.spanNames).toHaveLength(3);
-    expect(result.current.spanNames.map((s) => s.key)).toContain(
-      "openai/gpt-4",
-    );
-    expect(result.current.spanNames.map((s) => s.key)).toContain(
-      "my-custom-span",
-    );
-    expect(result.current.spanNames.map((s) => s.key)).toContain(
-      "another-span",
-    );
+    expect(result.current.spanNames.map((s) => s.key)).toContain("openai/gpt-4");
+    expect(result.current.spanNames.map((s) => s.key)).toContain("my-custom-span");
+    expect(result.current.spanNames.map((s) => s.key)).toContain("another-span");
   });
 
   it("returns empty spanNames when no data", () => {
@@ -152,9 +144,7 @@ describe("useProjectSpanNames", () => {
       error: null,
     });
 
-    renderHook(() =>
-      useProjectSpanNames({ projectId: "project-123", enabled: false }),
-    );
+    renderHook(() => useProjectSpanNames({ projectId: "project-123", enabled: false }));
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       expect.anything(),
@@ -171,9 +161,7 @@ describe("useProjectSpanNames", () => {
       error: null,
     });
 
-    renderHook(() =>
-      useProjectSpanNames({ projectId: "project-123", enabled: true }),
-    );
+    renderHook(() => useProjectSpanNames({ projectId: "project-123", enabled: true }));
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       expect.anything(),
@@ -244,12 +232,8 @@ describe("useProjectSpanNames", () => {
     );
 
     expect(result.current.evaluationNames).toHaveLength(2);
-    expect(result.current.evaluationNames.map((e) => e.key)).toContain(
-      "evaluator-pii",
-    );
-    expect(result.current.evaluationNames.map((e) => e.label)).toContain(
-      "PII Check",
-    );
+    expect(result.current.evaluationNames.map((e) => e.key)).toContain("evaluator-pii");
+    expect(result.current.evaluationNames.map((e) => e.label)).toContain("PII Check");
   });
 
   it("returns empty evaluationNames when absent from the response", () => {

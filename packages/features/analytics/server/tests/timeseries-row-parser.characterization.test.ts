@@ -5,7 +5,11 @@ describe("Analytics timeseries row compatibility", () => {
   it("keeps current and previous bucket ordering and preserves nullable metrics", () => {
     const result = parseTimeseriesRows({
       rows: [
-        { period: "previous", date: "2026-01-01", "0__performance_completion_time__avg": null },
+        {
+          period: "previous",
+          date: "2026-01-01",
+          "0__performance_completion_time__avg": null,
+        },
         { period: "current", date: "2026-01-03", "0__performance_total_cost__sum": "3" },
         { period: "current", date: "2026-01-02", "0__performance_total_cost__sum": "2" },
       ],
@@ -38,8 +42,18 @@ describe("Analytics timeseries row compatibility", () => {
   it("does not invent groups from the other period", () => {
     const result = parseTimeseriesRows({
       rows: [
-        { period: "previous", date: "2026-01-01", group_key: "old", "0__performance_total_cost__sum": "1" },
-        { period: "current", date: "2026-01-01", group_key: "new", "0__performance_total_cost__sum": "2" },
+        {
+          period: "previous",
+          date: "2026-01-01",
+          group_key: "old",
+          "0__performance_total_cost__sum": "1",
+        },
+        {
+          period: "current",
+          date: "2026-01-01",
+          group_key: "new",
+          "0__performance_total_cost__sum": "2",
+        },
       ],
       series: [{ metric: "performance.total_cost", aggregation: "sum" }],
       groupBy: "metadata.user_id",

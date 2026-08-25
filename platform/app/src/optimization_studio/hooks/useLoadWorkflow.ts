@@ -5,9 +5,7 @@ import { api } from "../../utils/api";
 export const useLoadWorkflow = () => {
   const router = useRouter();
   const workflowId =
-    typeof router.query.workflow === "string"
-      ? router.query.workflow
-      : undefined;
+    typeof router.query.workflow === "string" ? router.query.workflow : undefined;
   const { project } = useOrganizationTeamProject();
   const workflow = api.workflow.getById.useQuery(
     { workflowId: workflowId ?? "", projectId: project?.id ?? "" },

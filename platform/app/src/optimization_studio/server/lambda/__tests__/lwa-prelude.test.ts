@@ -13,10 +13,7 @@ const dec = new TextDecoder();
  * mode: a JSON prelude with statusCode + headers, then 8 zero bytes,
  * then the response body bytes.
  */
-function buildLWAResponse(
-  prelude: object,
-  body: string | Uint8Array,
-): Uint8Array {
+function buildLWAResponse(prelude: object, body: string | Uint8Array): Uint8Array {
   const preludeBytes = enc.encode(JSON.stringify(prelude));
   const sep = new Uint8Array(LWA_PRELUDE_SEPARATOR_LEN);
   const bodyBytes = typeof body === "string" ? enc.encode(body) : body;
@@ -76,9 +73,7 @@ describe("findLWAPreludeSeparator", () => {
     );
     const sepIdx = findLWAPreludeSeparator(tightlyPacked);
     expect(sepIdx).toBeGreaterThan(0);
-    expect(
-      dec.decode(tightlyPacked.slice(sepIdx + LWA_PRELUDE_SEPARATOR_LEN)),
-    ).toBe("d");
+    expect(dec.decode(tightlyPacked.slice(sepIdx + LWA_PRELUDE_SEPARATOR_LEN))).toBe("d");
   });
 });
 
@@ -150,8 +145,7 @@ describe("LWA prelude-strip end-to-end behavior", () => {
     headers: { "content-type": "text/event-stream" },
     cookies: [],
   };
-  const SSE_BODY =
-    'data: {"type":"is_alive_response"}\n\ndata: {"type":"done"}\n\n';
+  const SSE_BODY = 'data: {"type":"is_alive_response"}\n\ndata: {"type":"done"}\n\n';
 
   it("strips the prelude when prelude+body arrive in ONE chunk (the prod is_alive failure mode)", () => {
     const fullChunk = buildLWAResponse(PRELUDE, SSE_BODY);

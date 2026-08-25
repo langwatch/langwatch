@@ -47,9 +47,7 @@ vi.mock("~/server/app-layer/app", async () => {
   // The REST org-auth middleware decides through
   // appFromContext(c).permissions (ADR-092); the fake carries the real
   // composition over the real test database so requests reach the routes.
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   const { prisma: dbForPermissions } = await import("~/server/db");
   const permissions = appPermissionsService(dbForPermissions);
   return {
@@ -63,13 +61,9 @@ vi.mock("~/server/app-layer/app", async () => {
         }),
       },
       gateway: {
-        budgets: new GatewayBudgetClickHouseRepository(
-          resolveTestClickHouseClient,
-        ),
+        budgets: new GatewayBudgetClickHouseRepository(resolveTestClickHouseClient),
         virtualKeySpend: undefined,
-        spendEvents: new GatewaySpendEventsRepository(
-          resolveTestClickHouseClient,
-        ),
+        spendEvents: new GatewaySpendEventsRepository(resolveTestClickHouseClient),
         webhookEvents: WebhookEventsClickHouseRepository.create(
           resolveTestClickHouseClient,
         ),
@@ -80,9 +74,7 @@ vi.mock("~/server/app-layer/app", async () => {
 
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
   const original =
-    await importOriginal<
-      typeof import("~/server/clickhouse/clickhouseClient")
-    >();
+    await importOriginal<typeof import("~/server/clickhouse/clickhouseClient")>();
   return {
     ...original,
     getClickHouseClientForTenant: resolveTestClickHouseClient,
@@ -328,10 +320,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     await dropSpendRowsForTenants([project?.id, foreignProject?.id]);
     await deleteOrganizationDependents([organization, foreignOrganization]);
     const projectIds = [project?.id ?? "", foreignProject?.id ?? ""];
-    const organizationIds = [
-      organization?.id ?? "",
-      foreignOrganization?.id ?? "",
-    ];
+    const organizationIds = [organization?.id ?? "", foreignOrganization?.id ?? ""];
     await prisma.project.deleteMany({ where: { id: { in: projectIds } } });
     await prisma.team.deleteMany({
       where: { organizationId: { in: organizationIds } },
@@ -422,10 +411,9 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
     /** @scenario A request-validation failure answers the canonical error envelope at 400 */
     it("answers a request-validation failure with it, at 400 and with the offending fields under meta", async () => {
-      const res = await app.request(
-        "/api/gateway/v1/spend-summaries?group_by=nonsense",
-        { headers: headers() },
-      );
+      const res = await app.request("/api/gateway/v1/spend-summaries?group_by=nonsense", {
+        headers: headers(),
+      });
       const error = await expectCanonicalError(res, {
         status: 400,
         type: "bad_request",
@@ -496,9 +484,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       spendRow(`${ns}-r1`, { occurredAt: new Date(baseTime + 1_000) }),
       spendRow(`${ns}-r2`, { occurredAt: new Date(baseTime + 2_000) }),
     ]);
-    await seed([
-      spendRow(`${ns}-r3`, { occurredAt: new Date(baseTime + 3_000) }),
-    ]);
+    await seed([spendRow(`${ns}-r3`, { occurredAt: new Date(baseTime + 3_000) })]);
 
     const page1Res = await app.request(
       `/api/gateway/v1/spend-events?limit=2&from=${baseTime - 120_000}&to=${baseTime + 600_000}`,
@@ -514,9 +500,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
     // A late fold: OLDER occurred-at than everything served, inserted while
     // the walk is mid-flight. Insert-order pagination must still serve it.
-    await seed([
-      spendRow(`${ns}-late`, { occurredAt: new Date(baseTime - 60_000) }),
-    ]);
+    await seed([spendRow(`${ns}-late`, { occurredAt: new Date(baseTime - 60_000) })]);
 
     const seen: string[] = page1.data.map((e) => e.id);
     let cursor = page1.next_cursor;
@@ -575,9 +559,8 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
   /** @scenario Replay re-delivers a window's envelopes to one endpoint through the delivery path */
   it("replays a window to one endpoint with unchanged envelope ids", async () => {
-    const { WEBHOOK_DELIVERY_PROCESS_NAME } = await import(
-      "~/runtime/app/features/webhooks"
-    );
+    const { WEBHOOK_DELIVERY_PROCESS_NAME } =
+      await import("~/runtime/app/features/webhooks");
     const previous = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
     process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = "1";
     const endpoints = createEnterpriseWebhookEndpointService({ prisma });
@@ -648,18 +631,15 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       expect(ids.sort()).toEqual([`${ns2}-a:completed`, `${ns2}-b:completed`]);
 
       // An inverted or over-wide window is refused.
-      const inverted = await app.request(
-        "/api/gateway/v1/spend-events/replay",
-        {
-          method: "POST",
-          headers: { ...headers(), "Content-Type": "application/json" },
-          body: JSON.stringify({
-            from: baseTime + 510_000,
-            to: baseTime + 500_000,
-            endpoint_id: endpointId,
-          }),
-        },
-      );
+      const inverted = await app.request("/api/gateway/v1/spend-events/replay", {
+        method: "POST",
+        headers: { ...headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: baseTime + 510_000,
+          to: baseTime + 500_000,
+          endpoint_id: endpointId,
+        }),
+      });
       expect(inverted.status).toBe(400);
     } finally {
       if (previous === undefined) {
@@ -691,16 +671,11 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
   /** @scenario An over-limit replay queues nothing */
   it("refuses an over-limit window before queuing a single envelope", async () => {
-    const { WebhookEventsService } = await import(
-      "~/runtime/app/features/webhooks"
-    );
+    const { WebhookEventsService } = await import("~/runtime/app/features/webhooks");
     const previous = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
     process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = "1";
     const endpoints = createEnterpriseWebhookEndpointService({ prisma });
-    const emitted = vi.spyOn(
-      WebhookEventsService.prototype,
-      "getEmittedEvents",
-    );
+    const emitted = vi.spyOn(WebhookEventsService.prototype, "getEmittedEvents");
     let endpointId = "";
     const ns3 = `${ns}-flood`;
     try {
@@ -776,9 +751,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = previous;
       }
       if (endpointId) {
-        await cleanupTestRows(prisma, [
-          ["webhookEndpoint", { id: endpointId }],
-        ]);
+        await cleanupTestRows(prisma, [["webhookEndpoint", { id: endpointId }]]);
       }
     }
   });
@@ -867,10 +840,9 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         limit: "2",
       });
       if (cursor) q.set("cursor", cursor);
-      const res = await app.request(
-        `/api/gateway/v1/spend-summaries?${q.toString()}`,
-        { headers: headers() },
-      );
+      const res = await app.request(`/api/gateway/v1/spend-summaries?${q.toString()}`, {
+        headers: headers(),
+      });
       expect(res.status).toBe(200);
       return (await res.json()) as {
         data: Array<{ key: string }>;
@@ -983,9 +955,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         createdById: userId,
       },
     });
-    const budgetCH = new GatewayBudgetClickHouseRepository(
-      async () => chClient,
-    );
+    const budgetCH = new GatewayBudgetClickHouseRepository(async () => chClient);
     await budgetCH.insertDebitsForBudgets([
       {
         tenantId: project.id,
@@ -1095,9 +1065,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       // The dimension and the moment it settles, so a caller can retry
       // deliberately rather than guess how long to wait.
       expect(error.meta?.group_by).toEqual(["model"]);
-      expect(Date.parse(String(error.meta?.settles_at))).toBeGreaterThan(
-        Date.now(),
-      );
+      expect(Date.parse(String(error.meta?.settles_at))).toBeGreaterThan(Date.now());
     });
 
     /** @scenario "The same grouping is served once the window has settled" */
@@ -1195,8 +1163,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         ...settled(),
       });
       expect(first.status).toBe(200);
-      const cursor = ((await first.json()) as { next_cursor: string | null })
-        .next_cursor;
+      const cursor = ((await first.json()) as { next_cursor: string | null }).next_cursor;
       expect(cursor).not.toBeNull();
 
       const res = await summaries({
@@ -1317,9 +1284,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       const body = (await res.json()) as {
         data: Array<{ data: { gateway_request_id: string; status: string } }>;
       };
-      expect(body.data.map((e) => e.data.gateway_request_id)).toEqual([
-        `${ns}-inflight`,
-      ]);
+      expect(body.data.map((e) => e.data.gateway_request_id)).toEqual([`${ns}-inflight`]);
       expect(body.data[0]?.data.status).toBe("admitted");
     });
 

@@ -229,9 +229,7 @@ describe("resolveOffloadedTraces() — AC1: >64 KB field byte-identical after re
             logger,
           });
 
-          const resolved = result.resolvedSpans[0]!.spanAttributes[
-            attrKey
-          ] as string;
+          const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
           expect(Buffer.byteLength(resolved, "utf8")).toBe(
             Buffer.byteLength(fullValue, "utf8"),
           );
@@ -249,9 +247,7 @@ describe("resolveOffloadedTraces() — AC1: >64 KB field byte-identical after re
             logger,
           });
 
-          const resolved = result.resolvedSpans[0]!.spanAttributes[
-            attrKey
-          ] as string;
+          const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
           expect(resolved).toBe(fullValue);
         });
 
@@ -267,9 +263,7 @@ describe("resolveOffloadedTraces() — AC1: >64 KB field byte-identical after re
             logger,
           });
 
-          const resolved = result.resolvedSpans[0]!.spanAttributes[
-            attrKey
-          ] as string;
+          const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
           expect(resolved.endsWith("…")).toBe(false);
         });
 
@@ -285,13 +279,9 @@ describe("resolveOffloadedTraces() — AC1: >64 KB field byte-identical after re
             logger,
           });
 
-          const resolved = result.resolvedSpans[0]!.spanAttributes[
-            attrKey
-          ] as string;
+          const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
           // Must be the full 400 KB, not the 64 KB preview (65536) + "…" (3 bytes UTF-8 = 1 char)
-          expect(Buffer.byteLength(resolved, "utf8")).toBeGreaterThan(
-            IO_PREVIEW_BYTES,
-          );
+          expect(Buffer.byteLength(resolved, "utf8")).toBeGreaterThan(IO_PREVIEW_BYTES);
           // And === the exact ingested byte count
           expect(Buffer.byteLength(resolved, "utf8")).toBe(LARGE_BYTE_COUNT);
         });
@@ -343,9 +333,7 @@ describe("resolveOffloadedTraces() — AC1: >64 KB field byte-identical after re
           logger,
         });
 
-        const resolved = result.resolvedSpans[0]!.spanAttributes[
-          attrKey
-        ] as string;
+        const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
         // The emoji must be present and intact
         expect(resolved).toContain(MULTIBYTE_BOUNDARY_EMOJI);
       });
@@ -362,9 +350,7 @@ describe("resolveOffloadedTraces() — AC1: >64 KB field byte-identical after re
           logger,
         });
 
-        const resolved = result.resolvedSpans[0]!.spanAttributes[
-          attrKey
-        ] as string;
+        const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
         expect(Buffer.byteLength(resolved, "utf8")).toBe(
           Buffer.byteLength(fullValue, "utf8"),
         );
@@ -438,9 +424,7 @@ describe("resolveOffloadedTraces() — AC3: eventref resolves + reserved keys st
           logger,
         });
 
-        expect(result.resolvedSpans[0]!.spanAttributes[attrKey]).toBe(
-          fullValue,
-        );
+        expect(result.resolvedSpans[0]!.spanAttributes[attrKey]).toBe(fullValue);
       });
     });
   });
@@ -516,9 +500,9 @@ describe("resolveOffloadedTraces() — AC4: no-eventref trace reads identical to
           logger,
         });
 
-        expect(
-          result.resolvedSpans[0]!.spanAttributes["langwatch.output"],
-        ).toBe("a normal ≤64 KB output value");
+        expect(result.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
+          "a normal ≤64 KB output value",
+        );
       });
     });
   });
@@ -578,9 +562,7 @@ describe("resolveOffloadedTraces() — AC5: resolution failure degrades to previ
           ioExtractionService: realIOService,
           logger,
         });
-        expect(result.resolvedSpans[0]!.spanAttributes[attrKey]).toBe(
-          previewValue,
-        );
+        expect(result.resolvedSpans[0]!.spanAttributes[attrKey]).toBe(previewValue);
       });
 
       it("logger.warn is called at least once", async () => {
@@ -649,9 +631,7 @@ describe("resolveOffloadedTraces() — AC5: resolution failure degrades to previ
           ioExtractionService: realIOService,
           logger,
         });
-        expect(result.resolvedSpans[0]!.spanAttributes[attrKey]).toBe(
-          previewValue,
-        );
+        expect(result.resolvedSpans[0]!.spanAttributes[attrKey]).toBe(previewValue);
       });
 
       it("logger.warn is called at least once", async () => {
@@ -693,9 +673,7 @@ describe("resolveOffloadedTraces() — AC5: resolution failure degrades to previ
           ioExtractionService: realIOService,
           logger,
         });
-        expect(result.resolvedSpans[0]!.spanAttributes[attrKey]).toBe(
-          previewValue,
-        );
+        expect(result.resolvedSpans[0]!.spanAttributes[attrKey]).toBe(previewValue);
       });
 
       it("logger.warn is called (not silently swallowed)", async () => {
@@ -749,9 +727,7 @@ describe("resolveOffloadedTraces() — AC6: partial/mixed resolution in same tra
           logger,
         });
 
-        expect(result.resolvedSpans[0]!.spanAttributes[largeAttr]).toBe(
-          fullValue,
-        );
+        expect(result.resolvedSpans[0]!.spanAttributes[largeAttr]).toBe(fullValue);
       });
 
       it("the ≤64 KB field is unchanged", async () => {
@@ -766,9 +742,7 @@ describe("resolveOffloadedTraces() — AC6: partial/mixed resolution in same tra
           logger,
         });
 
-        expect(result.resolvedSpans[0]!.spanAttributes[smallAttr]).toBe(
-          smallValue,
-        );
+        expect(result.resolvedSpans[0]!.spanAttributes[smallAttr]).toBe(smallValue);
       });
 
       it("anyResolved is true", async () => {
@@ -851,9 +825,7 @@ describe("resolveOffloadedTraces() — AC6: partial/mixed resolution in same tra
           ioExtractionService: realIOService,
           logger,
         });
-        expect(result.resolvedSpans[0]!.spanAttributes[attrB]).toBe(
-          previewValue,
-        );
+        expect(result.resolvedSpans[0]!.spanAttributes[attrB]).toBe(previewValue);
       });
 
       it("does not throw — the span-level error is absorbed", async () => {

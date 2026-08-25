@@ -4,9 +4,7 @@ import type { BroadcastService } from "../../../../app-layer/broadcast/broadcast
 import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
 import type { SimulationProcessingEvent } from "../schemas/events";
 
-const logger = createLogger(
-  "langwatch:simulation-processing:snapshot-update-broadcast",
-);
+const logger = createLogger("langwatch:simulation-processing:snapshot-update-broadcast");
 
 export interface SnapshotUpdateBroadcastSubscriberDeps {
   broadcast: BroadcastService;
@@ -77,11 +75,7 @@ export function createSnapshotUpdateBroadcastSubscriber(
           ...(data.status !== undefined && { status: data.status }),
         });
 
-        await deps.broadcast.broadcastToTenant(
-          tenantId,
-          payload,
-          "simulation_updated",
-        );
+        await deps.broadcast.broadcastToTenant(tenantId, payload, "simulation_updated");
 
         logger.debug(
           { tenantId, scenarioRunId, batchRunId: data.batchRunId },

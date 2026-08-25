@@ -45,11 +45,8 @@ type LangWatchQLQueryInput = {
  * constraint below stops being satisfied and this file fails to compile
  * instead of failing at runtime.
  */
-type AssignableToQueryInput<
-  T extends RouterInputs["analytics"]["lwql"]["query"],
-> = T;
-type _LangWatchQLQueryInputMatchesRouter =
-  AssignableToQueryInput<LangWatchQLQueryInput>;
+type AssignableToQueryInput<T extends RouterInputs["analytics"]["lwql"]["query"]> = T;
+type _LangWatchQLQueryInputMatchesRouter = AssignableToQueryInput<LangWatchQLQueryInput>;
 
 /**
  * Binds an executor to one project.

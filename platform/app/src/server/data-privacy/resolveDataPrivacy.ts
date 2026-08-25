@@ -50,9 +50,7 @@ interface Candidate {
  * the structural one); per-field merge makes conflicts rare. personalOnly
  * candidates rank just above their non-personal counterpart at the same tier.
  */
-export function buildDataPrivacyChain(
-  facts: DataPrivacyScopeFacts,
-): Candidate[] {
+export function buildDataPrivacyChain(facts: DataPrivacyScopeFacts): Candidate[] {
   const chain: Candidate[] = [
     { scopeType: "PROJECT", scopeId: facts.projectId, personalOnly: false },
   ];

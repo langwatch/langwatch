@@ -11,14 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  BrainCircuit,
-  Edit,
-  MoreVertical,
-  PlugZap,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { BrainCircuit, Edit, MoreVertical, PlugZap, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -50,8 +43,7 @@ import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
 import { broadestScopeRank } from "../../utils/scopeBreadth";
 
 export default function ModelsPage() {
-  const { project, organization, team, hasPermission } =
-    useOrganizationTeamProject();
+  const { project, organization, team, hasPermission } = useOrganizationTeamProject();
   const hasModelProvidersManagePermission = hasPermission("project:manage");
   // A provider belongs to the organization and reaches the scopes attached
   // to it, so the write path takes either handle and a project is only the
@@ -79,11 +71,7 @@ export default function ModelsPage() {
   });
   // Flat, uncollapsed list — see useAllModelProvidersList for why this
   // table can't use the collapsed Record from useModelProvidersSettings.
-  const {
-    providers: allProvidersList,
-    isLoading,
-    refetch,
-  } = useAllModelProvidersList();
+  const { providers: allProvidersList, isLoading, refetch } = useAllModelProvidersList();
 
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
@@ -155,13 +143,11 @@ export default function ModelsPage() {
     };
     const labelOf = (p: (typeof filtered)[number]): string =>
       (p as { name?: string }).name ??
-      modelProvidersRegistry[p.provider as keyof typeof modelProvidersRegistry]
-        ?.name ??
+      modelProvidersRegistry[p.provider as keyof typeof modelProvidersRegistry]?.name ??
       p.provider;
     return [...filtered].sort(
       (a, b) =>
-        broadestScopeRank(scopeTypesOf(a)) -
-          broadestScopeRank(scopeTypesOf(b)) ||
+        broadestScopeRank(scopeTypesOf(a)) - broadestScopeRank(scopeTypesOf(b)) ||
         labelOf(a).localeCompare(labelOf(b)),
     );
   }, [allEnabledProviders, scopeFilter, hierarchy, team?.id, project?.id]);
@@ -181,12 +167,9 @@ export default function ModelsPage() {
       .map((providerKey) => ({
         provider: providerKey as keyof typeof modelProvidersRegistry,
         name:
-          modelProvidersRegistry[
-            providerKey as keyof typeof modelProvidersRegistry
-          ]?.name ?? providerKey,
-        icon: modelProviderIcons[
-          providerKey as keyof typeof modelProviderIcons
-        ],
+          modelProvidersRegistry[providerKey as keyof typeof modelProvidersRegistry]
+            ?.name ?? providerKey,
+        icon: modelProviderIcons[providerKey as keyof typeof modelProviderIcons],
         // Sign-in providers (Codex) are a niche, subscription-billed harness,
         // not a general API-key provider — so they sort to the bottom of the
         // add menu here. On Langy / onboarding the surface-aware grid promotes
@@ -194,9 +177,9 @@ export default function ModelsPage() {
         // literal entry types via `satisfies`, so widen to read the optional
         // authFlow — same pattern as ModelProviderForm's isOAuthDeviceProvider.
         authFlow: (
-          modelProvidersRegistry[
-            providerKey as keyof typeof modelProvidersRegistry
-          ] as { authFlow?: "api-key" | "oauth-device" } | undefined
+          modelProvidersRegistry[providerKey as keyof typeof modelProvidersRegistry] as
+            | { authFlow?: "api-key" | "oauth-device" }
+            | undefined
         )?.authFlow,
       }))
       .sort((a, b) => {
@@ -364,9 +347,7 @@ export default function ModelsPage() {
 
                     const isSystem = !!(provider as any).isSystem;
                     return (
-                      <Table.Row
-                        key={provider.id ?? `system-${provider.provider}`}
-                      >
+                      <Table.Row key={provider.id ?? `system-${provider.provider}`}>
                         <Table.Cell>
                           <HStack gap={3} align="center">
                             <Box width="24px" height="24px">
@@ -434,11 +415,7 @@ export default function ModelsPage() {
                                       });
                                     }}
                                   >
-                                    <Box
-                                      display="flex"
-                                      alignItems="center"
-                                      gap={2}
-                                    >
+                                    <Box display="flex" alignItems="center" gap={2}>
                                       <Edit size={14} />
                                       Edit Provider
                                     </Box>
@@ -452,11 +429,7 @@ export default function ModelsPage() {
                                       void connectionTests.test(provider.id);
                                     }}
                                   >
-                                    <Box
-                                      display="flex"
-                                      alignItems="center"
-                                      gap={2}
-                                    >
+                                    <Box display="flex" alignItems="center" gap={2}>
                                       <PlugZap size={14} />
                                       Test Connection
                                     </Box>
@@ -474,8 +447,7 @@ export default function ModelsPage() {
                                         // registry name so the dialog names the
                                         // exact provider the user clicked.
                                         name:
-                                          (provider as { name?: string })
-                                            .name ??
+                                          (provider as { name?: string }).name ??
                                           providerSpec?.name ??
                                           provider.provider,
                                         projectId,
@@ -483,11 +455,7 @@ export default function ModelsPage() {
                                       });
                                     }}
                                   >
-                                    <Box
-                                      display="flex"
-                                      alignItems="center"
-                                      gap={2}
-                                    >
+                                    <Box display="flex" alignItems="center" gap={2}>
                                       <Trash2 size={14} />
                                       Delete Provider
                                     </Box>
@@ -548,12 +516,12 @@ export default function ModelsPage() {
             <Dialog.Body>
               <VStack gap={3} align="start">
                 <Text>
-                  This permanently deletes the provider and its stored API keys.
-                  This cannot be undone.
+                  This permanently deletes the provider and its stored API keys. This
+                  cannot be undone.
                 </Text>
                 <Text fontSize="sm" color="fg.muted">
-                  Default model configs that reference this provider will
-                  surface as &ldquo;Update needed&rdquo; in the table below.
+                  Default model configs that reference this provider will surface as
+                  &ldquo;Update needed&rdquo; in the table below.
                 </Text>
               </VStack>
             </Dialog.Body>
@@ -612,11 +580,7 @@ export default function ModelsPage() {
  * "Testing…" transition nor the answer replacing it — so without this the
  * control is a button that appears to do nothing at all.
  */
-function ConnectionTestVerdict({
-  state,
-}: {
-  state: ConnectionTestState | undefined;
-}) {
+function ConnectionTestVerdict({ state }: { state: ConnectionTestState | undefined }) {
   const verdict = () => {
     if (!state) return null;
 
@@ -637,10 +601,7 @@ function ConnectionTestVerdict({
     }
 
     return (
-      <Text
-        fontSize="xs"
-        color={state.status === "refused" ? "red.fg" : "fg.muted"}
-      >
+      <Text fontSize="xs" color={state.status === "refused" ? "red.fg" : "fg.muted"}>
         {state.message}
       </Text>
     );
@@ -721,11 +682,7 @@ function AddModelProviderMenu({
  */
 function ProvidersTableSkeleton() {
   return (
-    <Card.Root
-      width="full"
-      overflow="hidden"
-      data-testid="providers-table-skeleton"
-    >
+    <Card.Root width="full" overflow="hidden" data-testid="providers-table-skeleton">
       <Card.Body paddingY={0} paddingX={0} overflowX="auto">
         <Table.Root variant="line" size="md" width="full">
           <Table.Header>

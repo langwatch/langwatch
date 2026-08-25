@@ -49,13 +49,10 @@ function installFakeCrisp(): FakeCrisp {
 }
 
 function hideCount(fake: FakeCrisp): number {
-  return fake.pushes.filter(
-    (args) => args[0] === "do" && args[1] === "chat:hide",
-  ).length;
+  return fake.pushes.filter((args) => args[0] === "do" && args[1] === "chat:hide").length;
 }
 
-const isSuppressed = () =>
-  document.documentElement.hasAttribute(SUPPRESSED_ATTRIBUTE);
+const isSuppressed = () => document.documentElement.hasAttribute(SUPPRESSED_ATTRIBUTE);
 
 let uninstall: (() => void) | undefined;
 
@@ -92,11 +89,7 @@ describe("crispBubblePolicy", () => {
       const registered = fake.pushes
         .filter((args) => args[0] === "on")
         .map((args) => args[1]);
-      expect(registered).toEqual([
-        "chat:opened",
-        "chat:closed",
-        "message:received",
-      ]);
+      expect(registered).toEqual(["chat:opened", "chat:closed", "message:received"]);
     });
   });
 
@@ -302,14 +295,8 @@ describe("crispBubblePolicy", () => {
       const queue = crispGlobals().$crisp as unknown[][];
       expect(Array.isArray(queue)).toBe(true);
       expect(queue).toContainEqual(["do", "chat:hide"]);
-      const registered = queue
-        .filter((args) => args[0] === "on")
-        .map((args) => args[1]);
-      expect(registered).toEqual([
-        "chat:opened",
-        "chat:closed",
-        "message:received",
-      ]);
+      const registered = queue.filter((args) => args[0] === "on").map((args) => args[1]);
+      expect(registered).toEqual(["chat:opened", "chat:closed", "message:received"]);
     });
   });
 

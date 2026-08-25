@@ -117,9 +117,7 @@ function toClickHouseRecord(
   };
 }
 
-export class EvaluationAnalyticsClickHouseRepository
-  implements EvaluationAnalyticsRepository
-{
+export class EvaluationAnalyticsClickHouseRepository implements EvaluationAnalyticsRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async upsert(
@@ -260,9 +258,7 @@ export class EvaluationAnalyticsClickHouseRepository
       } | null>({
         table: TABLE_NAME,
         hintMs: window !== undefined ? (window.fromMs + window.toMs) / 2 : null,
-        ...(window !== undefined
-          ? { windowMs: (window.toMs - window.fromMs) / 2 }
-          : {}),
+        ...(window !== undefined ? { windowMs: (window.toMs - window.fromMs) / 2 } : {}),
         fallback: "none",
         isEmpty: (result) => result === null,
         run: async (fragment) =>
@@ -382,9 +378,7 @@ export class EvaluationAnalyticsClickHouseRepository
       query_params: {
         tenantId,
         evaluationId,
-        ...(window !== undefined
-          ? { from: window.fromMs, to: window.toMs }
-          : {}),
+        ...(window !== undefined ? { from: window.fromMs, to: window.toMs } : {}),
       },
       format: "JSONEachRow",
     });

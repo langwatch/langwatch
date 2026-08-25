@@ -29,13 +29,13 @@ Each conversation is an event-sourced aggregate:
 
 The command vocabulary includes:
 
-| Command | Purpose |
-|---|---|
-| `SendMessage` | accept a user message |
-| `StartAgentTurn` | begin an assistant turn |
-| `ReconcileAgentTurn` | record the authoritative final answer |
-| `ArchiveConversation` | remove a conversation from active use |
-| `UpdateConversationMetadata` | rename or update sharing metadata |
+| Command                      | Purpose                               |
+| ---------------------------- | ------------------------------------- |
+| `SendMessage`                | accept a user message                 |
+| `StartAgentTurn`             | begin an assistant turn               |
+| `ReconcileAgentTurn`         | record the authoritative final answer |
+| `ArchiveConversation`        | remove a conversation from active use |
+| `UpdateConversationMetadata` | rename or update sharing metadata     |
 
 Command retries reuse their command identity. Emitted events have deterministic
 idempotency identities derived from the command and event position.

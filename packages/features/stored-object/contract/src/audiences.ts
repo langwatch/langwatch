@@ -47,9 +47,7 @@ export const legacyStoredObjectPurposeSchema = z.enum([
   "trace_content",
   "evaluation_inputs",
 ]);
-export type LegacyStoredObjectPurpose = z.infer<
-  typeof legacyStoredObjectPurposeSchema
->;
+export type LegacyStoredObjectPurpose = z.infer<typeof legacyStoredObjectPurposeSchema>;
 
 /** Unknown legacy purposes intentionally have no broad fallback audience. */
 export function audienceForLegacyStoredObjectPurpose(

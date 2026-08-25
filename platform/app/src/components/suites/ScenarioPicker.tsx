@@ -5,15 +5,7 @@
  * scrollable checkbox list, and a footer with count + select all/clear.
  */
 
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, Plus, X } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { SearchInput } from "../ui/SearchInput";
@@ -133,13 +125,7 @@ export function ScenarioPicker({
       )}
 
       {/* Scenario list */}
-      <VStack
-        maxHeight="200px"
-        overflow="auto"
-        paddingX={3}
-        gap={1}
-        align="stretch"
-      >
+      <VStack maxHeight="200px" overflow="auto" paddingX={3} gap={1} align="stretch">
         {scenarios.map((scenario) => (
           <HStack key={scenario.id} gap={2} paddingY={1} cursor="pointer">
             <Checkbox

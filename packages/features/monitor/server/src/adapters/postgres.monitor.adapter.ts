@@ -1,7 +1,10 @@
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { MonitorService as MonitorServiceContract } from "@langwatch/monitor-contract";
 import { MonitorService } from "../services/monitor.service";
-import { PrismaMonitorRepository, type MonitorDatabase } from "../repositories/prisma/prisma.monitor.repository";
+import {
+  PrismaMonitorRepository,
+  type MonitorDatabase,
+} from "../repositories/prisma/prisma.monitor.repository";
 
 export type PostgresMonitorAdapterOptions = {
   database: MonitorDatabase;

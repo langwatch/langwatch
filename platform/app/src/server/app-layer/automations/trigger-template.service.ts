@@ -104,11 +104,8 @@ const LIQUID_TEMPLATE_COLUMNS = [
   "emailBodyTemplate",
 ] as const satisfies readonly (keyof TemplateDraft)[];
 
-function normalizeSlackType(
-  raw: string | null | undefined,
-): SlackTemplateType | null {
-  return raw != null &&
-    (SLACK_TEMPLATE_TYPES as readonly string[]).includes(raw)
+function normalizeSlackType(raw: string | null | undefined): SlackTemplateType | null {
+  return raw != null && (SLACK_TEMPLATE_TYPES as readonly string[]).includes(raw)
     ? (raw as SlackTemplateType)
     : null;
 }
@@ -122,9 +119,7 @@ function normalizeSlackType(
 export function validateTemplateDraft(draft: TemplateDraft): void {
   if (
     draft.slackTemplateType != null &&
-    !(SLACK_TEMPLATE_TYPES as readonly string[]).includes(
-      draft.slackTemplateType,
-    )
+    !(SLACK_TEMPLATE_TYPES as readonly string[]).includes(draft.slackTemplateType)
   ) {
     throw new TemplateValidationError(
       "slackTemplateType",

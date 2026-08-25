@@ -45,11 +45,7 @@ export const resourceMetadataSchema = z
  * two ids that read identically collide with each other on one row and not on
  * the next.
  */
-export const externalIdSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(EXTERNAL_ID_MAX_LENGTH);
+export const externalIdSchema = z.string().trim().min(1).max(EXTERNAL_ID_MAX_LENGTH);
 
 export type ResourceMetadata = z.infer<typeof resourceMetadataSchema>;
 
@@ -116,8 +112,6 @@ export function identityPatchData(patch: {
     ...(patch.externalId !== undefined
       ? { externalId: externalIdPatch(patch.externalId) }
       : {}),
-    ...(patch.metadata !== undefined
-      ? { metadata: metadataPatch(patch.metadata) }
-      : {}),
+    ...(patch.metadata !== undefined ? { metadata: metadataPatch(patch.metadata) } : {}),
   };
 }

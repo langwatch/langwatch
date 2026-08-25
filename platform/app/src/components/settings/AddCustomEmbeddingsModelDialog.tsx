@@ -87,9 +87,7 @@ export function AddCustomEmbeddingsModelDialog({
 
   return (
     <DialogRoot open={open} onOpenChange={(e) => !e.open && handleClose()}>
-      <DialogContent
-        {...(dialogBackground ? { background: dialogBackground } : {})}
-      >
+      <DialogContent {...(dialogBackground ? { background: dialogBackground } : {})}>
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Embeddings Model" : "Add Embeddings Model"}

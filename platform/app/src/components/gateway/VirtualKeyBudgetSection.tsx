@@ -62,9 +62,7 @@ export function budgetAnnotation(value: VirtualKeyBudgetValue): string {
  * parseFloat alone, is what rejects partial parses like "10abc": the
  * whole trimmed string must be the number.
  */
-export function budgetInvalidReason(
-  value: VirtualKeyBudgetValue,
-): string | null {
+export function budgetInvalidReason(value: VirtualKeyBudgetValue): string | null {
   const trimmed = value.limitUsd.trim();
   if (!trimmed) return null;
   if (!/^\d+(\.\d+)?$/.test(trimmed)) {

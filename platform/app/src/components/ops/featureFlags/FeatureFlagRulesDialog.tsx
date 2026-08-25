@@ -133,9 +133,7 @@ export function FeatureFlagRulesDialog({
   }, [open, initialRules]);
 
   const updateRule = (index: number, patch: Partial<UIRule>) => {
-    setDraft((current) =>
-      current.map((r, i) => (i === index ? { ...r, ...patch } : r)),
-    );
+    setDraft((current) => current.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   };
 
   const addRule = () => {
@@ -180,10 +178,9 @@ export function FeatureFlagRulesDialog({
         <DialogBody>
           <VStack align="stretch" gap={3}>
             <Text fontSize="sm" color="fg.muted">
-              Rules are evaluated top-to-bottom; the first match wins. When no
-              rule matches, the row-level toggle is used as the fallback. Once a
-              row exists in postgres, PostHog is no longer consulted for this
-              flag.
+              Rules are evaluated top-to-bottom; the first match wins. When no rule
+              matches, the row-level toggle is used as the fallback. Once a row exists in
+              postgres, PostHog is no longer consulted for this flag.
             </Text>
             <Box>
               <Text fontFamily="mono" fontSize="xs" color="fg.muted">
@@ -200,8 +197,7 @@ export function FeatureFlagRulesDialog({
                 borderColor="border.muted"
               >
                 <Text fontSize="sm" color="fg.muted" textAlign="center">
-                  No targeting rules. The row-level toggle decides the value for
-                  everyone.
+                  No targeting rules. The row-level toggle decides the value for everyone.
                 </Text>
               </Box>
             ) : (
@@ -216,12 +212,7 @@ export function FeatureFlagRulesDialog({
                 ))}
               </VStack>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              alignSelf="flex-start"
-              onClick={addRule}
-            >
+            <Button variant="ghost" size="sm" alignSelf="flex-start" onClick={addRule}>
               <Plus size={14} /> Add rule
             </Button>
           </VStack>
@@ -232,11 +223,7 @@ export function FeatureFlagRulesDialog({
               Cancel
             </Button>
           </DialogActionTrigger>
-          <Button
-            onClick={handleSave}
-            loading={setRules.isPending}
-            colorPalette="blue"
-          >
+          <Button onClick={handleSave} loading={setRules.isPending} colorPalette="blue">
             Save rules
           </Button>
         </DialogFooter>
@@ -318,19 +305,12 @@ function RuleRow({
         <HStack height="32px" alignItems="center">
           <Switch
             checked={rule.enabled}
-            onCheckedChange={(details) =>
-              onChange({ enabled: details.checked })
-            }
+            onCheckedChange={(details) => onChange({ enabled: details.checked })}
           />
           <Text fontSize="xs">{rule.enabled ? "on" : "off"}</Text>
         </HStack>
       </Field.Root>
-      <IconButton
-        aria-label="Remove rule"
-        size="sm"
-        variant="ghost"
-        onClick={onRemove}
-      >
+      <IconButton aria-label="Remove rule" size="sm" variant="ghost" onClick={onRemove}>
         <Trash2 size={14} />
       </IconButton>
     </HStack>

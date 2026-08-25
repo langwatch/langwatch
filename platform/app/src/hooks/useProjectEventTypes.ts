@@ -29,10 +29,7 @@ export function useProjectEventTypes({
   enabled?: boolean;
 }) {
   const endDate = useMemo(() => Date.now(), []);
-  const startDate = useMemo(
-    () => endDate - 30 * 24 * 60 * 60 * 1000,
-    [endDate],
-  );
+  const startDate = useMemo(() => endDate - 30 * 24 * 60 * 60 * 1000, [endDate]);
 
   const query = api.analytics.dataForFilter.useQuery(
     {

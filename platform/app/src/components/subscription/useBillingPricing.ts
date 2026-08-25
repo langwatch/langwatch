@@ -29,8 +29,7 @@ export function useBillingPricing({
       : priceCents[currency].monthly;
   const periodSuffix = billingPeriod === "annual" ? "/yr" : "/mo";
 
-  const totalFullMembers =
-    countFullMembers(users) + countFullMembers(plannedUsers);
+  const totalFullMembers = countFullMembers(users) + countFullMembers(plannedUsers);
 
   return {
     seatPricePerPeriodCents: seatCents,

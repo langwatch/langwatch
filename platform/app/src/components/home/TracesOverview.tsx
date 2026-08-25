@@ -1,12 +1,4 @@
-import {
-  Box,
-  chakra,
-  Grid,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, chakra, Grid, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -51,10 +43,7 @@ function NewProjectQuickView({ projectSlug }: { projectSlug: string }) {
           These are good first ways to explore LangWatch.
         </Text>
       </HStack>
-      <Grid
-        templateColumns={{ base: "1fr", sm: "repeat(3, minmax(0, 1fr))" }}
-        gap={2}
-      >
+      <Grid templateColumns={{ base: "1fr", sm: "repeat(3, minmax(0, 1fr))" }} gap={2}>
         {QUICK_STARTS.map((item) => (
           <Link
             key={item.path}
@@ -159,16 +148,14 @@ export function TracesOverview({
   const compact = variant !== "full";
   // Two forms of one fact: the chip above the figures, and the same window
   // read as part of a sentence in the control that opens the trend.
-  const periodLabel =
-    daysDifference === 1 ? "Last day" : `Last ${daysDifference} days`;
+  const periodLabel = daysDifference === 1 ? "Last day" : `Last ${daysDifference} days`;
   const periodPhrase =
     daysDifference === 1 ? "the last day" : `the last ${daysDifference} days`;
   // The window is bucketed daily for the curve, so its length IS the number of
   // readings the curve would be drawn through.
   const trendIsMeaningful = daysDifference >= MIN_POINTS_FOR_A_TREND;
   const showTrend =
-    trendIsMeaningful &&
-    (variant === "trend" || (variant === "strip" && chartOpen));
+    trendIsMeaningful && (variant === "trend" || (variant === "strip" && chartOpen));
 
   const tracesOverviewGraph: CustomGraphInput = {
     graphId: "tracesOverview",
@@ -283,14 +270,8 @@ export function TracesOverview({
                 cursor="pointer"
                 _hover={{ color: "fg" }}
               >
-                {chartOpen ? (
-                  <LuChevronDown size={12} />
-                ) : (
-                  <LuChevronRight size={12} />
-                )}
-                {chartOpen
-                  ? "Hide the trend"
-                  : `Show the trend over ${periodPhrase}`}
+                {chartOpen ? <LuChevronDown size={12} /> : <LuChevronRight size={12} />}
+                {chartOpen ? "Hide the trend" : `Show the trend over ${periodPhrase}`}
               </chakra.button>
             ) : null
           ) : (

@@ -90,22 +90,12 @@ export function buildMarkdownComponents(colorMode: string) {
       );
     },
     del: ({ children }: { children?: React.ReactNode }) => (
-      <Text
-        as="del"
-        textDecoration="line-through"
-        color="fg.muted"
-        display="inline"
-      >
+      <Text as="del" textDecoration="line-through" color="fg.muted" display="inline">
         {children}
       </Text>
     ),
     hr: () => (
-      <Box
-        as="hr"
-        borderTopWidth="1px"
-        borderTopColor="border.muted"
-        marginY={3}
-      />
+      <Box as="hr" borderTopWidth="1px" borderTopColor="border.muted" marginY={3} />
     ),
     table: ({ children }: { children?: React.ReactNode }) => (
       <Box overflowX="auto" marginY={2}>
@@ -129,11 +119,7 @@ export function buildMarkdownComponents(colorMode: string) {
     td: ({ children }: { children?: React.ReactNode }) => (
       <Table.Cell>{children}</Table.Cell>
     ),
-    code(props: {
-      className?: string;
-      children?: React.ReactNode;
-      inline?: boolean;
-    }) {
+    code(props: { className?: string; children?: React.ReactNode; inline?: boolean }) {
       const { className, children } = props;
       const match = /language-(\w+)/.exec(className ?? "");
       const lang = match ? match[1] : undefined;
@@ -158,9 +144,7 @@ export function buildMarkdownComponents(colorMode: string) {
           </Text>
         );
       }
-      return (
-        <ShikiCodeBlock code={code} language={lang} colorMode={colorMode} />
-      );
+      return <ShikiCodeBlock code={code} language={lang} colorMode={colorMode} />;
     },
     pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
   };

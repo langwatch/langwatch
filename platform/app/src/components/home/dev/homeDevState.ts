@@ -59,9 +59,7 @@ export const DEFAULT_HOME_CHART_VARIANT = "strip" as const;
  * Separate from the state list so the chart variants can be previewed without
  * every other pinned state having to declare an opinion about the figures.
  */
-export function chartVariantFor(
-  state: HomeDevState | null,
-): "full" | "strip" | "trend" {
+export function chartVariantFor(state: HomeDevState | null): "full" | "strip" | "trend" {
   switch (state) {
     case "chart-trend":
       return "trend";

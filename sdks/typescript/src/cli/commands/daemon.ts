@@ -8,11 +8,7 @@
 
 import chalk from "chalk";
 
-import {
-  requestStatus,
-  requestStop,
-  type DaemonStatus,
-} from "../daemon/client";
+import { requestStatus, requestStop, type DaemonStatus } from "../daemon/client";
 import {
   inspectSocketTrust,
   isDaemonSupported,
@@ -61,9 +57,7 @@ function resolveIdleTimeout(option?: string): number {
  * need. `socket-missing` and `socket-dir-missing` are the ordinary empty state
  * and are deliberately NOT in here.
  */
-function describeTrustProblem(
-  problem: SocketTrustProblem,
-): string | null {
+function describeTrustProblem(problem: SocketTrustProblem): string | null {
   switch (problem) {
     case "socket-missing":
     case "socket-dir-missing":
@@ -94,9 +88,7 @@ function reportUntrustedSocket(socketPath: string): boolean {
   const description = describeTrustProblem(problem);
   if (description === null) return false;
 
-  console.error(
-    chalk.red(`Refusing to use the langwatch daemon: ${description}.`),
-  );
+  console.error(chalk.red(`Refusing to use the langwatch daemon: ${description}.`));
   console.error(chalk.gray(`  socket: ${socketPath}`));
   console.error(
     chalk.gray(
@@ -155,9 +147,7 @@ export async function daemonStartCommand(options: {
     });
     console.log(chalk.green("Daemon starting in the background."));
     console.log(chalk.gray(`  socket: ${identity.socketPath}`));
-    console.log(
-      chalk.gray(`  idle timeout: ${Math.round(idleTimeoutMs / 1000)}s`),
-    );
+    console.log(chalk.gray(`  idle timeout: ${Math.round(idleTimeoutMs / 1000)}s`));
     return;
   }
 
@@ -231,9 +221,7 @@ export async function daemonStopCommand(): Promise<void> {
   );
 }
 
-export async function daemonStatusCommand(options: {
-  json?: boolean;
-}): Promise<void> {
+export async function daemonStatusCommand(options: { json?: boolean }): Promise<void> {
   const identity = resolveIdentity(process.env);
   const status: DaemonStatus | null = isDaemonSupported()
     ? await requestStatus(identity.socketPath)
@@ -270,14 +258,8 @@ export async function daemonStatusCommand(options: {
   console.log(chalk.gray(`  pid:          ${status.pid}`));
   console.log(chalk.gray(`  version:      ${status.cliVersion}`));
   console.log(chalk.gray(`  socket:       ${status.socketPath}`));
-  console.log(
-    chalk.gray(`  uptime:       ${Math.round(status.uptimeMs / 1000)}s`),
-  );
-  console.log(
-    chalk.gray(
-      `  idle timeout: ${Math.round(status.idleTimeoutMs / 1000)}s`,
-    ),
-  );
+  console.log(chalk.gray(`  uptime:       ${Math.round(status.uptimeMs / 1000)}s`));
+  console.log(chalk.gray(`  idle timeout: ${Math.round(status.idleTimeoutMs / 1000)}s`));
   console.log(chalk.gray(`  served:       ${status.served}`));
   console.log(chalk.gray(`  in flight:    ${status.inflight}`));
 }

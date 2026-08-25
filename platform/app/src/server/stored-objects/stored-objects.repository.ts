@@ -322,12 +322,8 @@ export class StoredObjectsRepository {
       async (span) => {
         const client = await getApp().clickhouse.resolveClient(projectId);
 
-        const purposePredicate = purpose
-          ? "AND t.purpose = {purpose:String}"
-          : "";
-        const innerPurposePredicate = purpose
-          ? "AND purpose = {purpose:String}"
-          : "";
+        const purposePredicate = purpose ? "AND t.purpose = {purpose:String}" : "";
+        const innerPurposePredicate = purpose ? "AND purpose = {purpose:String}" : "";
 
         const result = await client.query({
           query: `
@@ -354,10 +350,8 @@ export class StoredObjectsRepository {
           object_count: string | number | null;
         }>();
         const raw = rows[0];
-        const totalBytes =
-          raw?.total_bytes != null ? Number(raw.total_bytes) : 0;
-        const objectCount =
-          raw?.object_count != null ? Number(raw.object_count) : 0;
+        const totalBytes = raw?.total_bytes != null ? Number(raw.total_bytes) : 0;
+        const objectCount = raw?.object_count != null ? Number(raw.object_count) : 0;
         span.setAttribute("stored_objects.total_bytes", totalBytes);
         span.setAttribute("stored_objects.object_count", objectCount);
         return { totalBytes, objectCount };

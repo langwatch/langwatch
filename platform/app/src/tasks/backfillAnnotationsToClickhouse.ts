@@ -68,9 +68,7 @@ async function backfillProject({
   totals.annotations += annotations.length;
 
   let projectTraces = 0;
-  for (const [traceId, annotationIds] of groupAnnotationIdsByTrace(
-    annotations,
-  )) {
+  for (const [traceId, annotationIds] of groupAnnotationIdsByTrace(annotations)) {
     const synced = await syncTraceAnnotations({
       app,
       projectId,

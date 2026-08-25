@@ -184,9 +184,7 @@ export function enrichTeamWithRoleBindings<
 function clientFromRepo(repo: OrganizationRepository): PrismaClient {
   const client = repo.getClient?.();
   if (!client) {
-    throw new Error(
-      "This operation requires a Prisma-backed organization repository",
-    );
+    throw new Error("This operation requires a Prisma-backed organization repository");
   }
   return client;
 }
@@ -252,12 +250,7 @@ async function assertPlanPermitsRoleChange({
   teamRoleUpdates?: Array<{ role: string; customRoleId?: string }>;
   planUser?: PlanProviderUser;
 }): Promise<void> {
-  const changeType = getRoleChangeType(
-    currentRole,
-    userPermissions,
-    role,
-    undefined,
-  );
+  const changeType = getRoleChangeType(currentRole, userPermissions, role, undefined);
 
   const subscriptionLimits = await getApp().planProvider.getActivePlan({
     organizationId,
@@ -309,9 +302,10 @@ export class OrganizationService extends OrganizationServiceContract {
         organizationId: input.organizationId,
         userId: input.userId,
       })
-      .then((membership) =>
-        membership !== null &&
-        (input.includeDeactivated === true || membership.disabledAt == null),
+      .then(
+        (membership) =>
+          membership !== null &&
+          (input.includeDeactivated === true || membership.disabledAt == null),
       );
   }
 
@@ -323,9 +317,7 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.getCanonicalService().getTeam(input);
   }
 
-  listTeams(
-    input: ListOrganizationTeamsInput,
-  ): Promise<OrganizationTeamPage> {
+  listTeams(input: ListOrganizationTeamsInput): Promise<OrganizationTeamPage> {
     return this.getCanonicalService().listTeams(input);
   }
 
@@ -377,9 +369,7 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.getCanonicalService().createTeamWithMembers(input);
   }
 
-  updateTeamWithMembers(
-    input: UpdateOrganizationTeamWithMembersInput,
-  ): Promise<void> {
+  updateTeamWithMembers(input: UpdateOrganizationTeamWithMembersInput): Promise<void> {
     return this.getCanonicalService().updateTeamWithMembers(input);
   }
 
@@ -443,15 +433,11 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.getCanonicalService().applyGroupEdits(input);
   }
 
-  getBillingProfile(
-    input: GetOrganizationBillingProfileInput,
-  ) {
+  getBillingProfile(input: GetOrganizationBillingProfileInput) {
     return this.getCanonicalService().getBillingProfile(input);
   }
 
-  claimBillingCustomerId(
-    input: ClaimOrganizationBillingCustomerInput,
-  ) {
+  claimBillingCustomerId(input: ClaimOrganizationBillingCustomerInput) {
     return this.getCanonicalService().claimBillingCustomerId(input);
   }
 
@@ -525,22 +511,15 @@ export class OrganizationService extends OrganizationServiceContract {
    * The org's declared primary intent (ADR-038); null = intent unset
    * (legacy org). Consumed by the home resolver to pin the "/" landing.
    */
-  async getPrimaryIntent(
-    organizationId: string,
-  ): Promise<OrganizationIntent | null> {
+  async getPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
     return this.repo.findPrimaryIntentById(organizationId);
   }
 
-  async findWithAdmins(
-    organizationId: string,
-  ): Promise<OrganizationWithAdmins | null> {
+  async findWithAdmins(organizationId: string): Promise<OrganizationWithAdmins | null> {
     return this.repo.findWithAdmins(organizationId);
   }
 
-  async updateSentPlanLimitAlert(
-    organizationId: string,
-    timestamp: Date,
-  ): Promise<void> {
+  async updateSentPlanLimitAlert(organizationId: string, timestamp: Date): Promise<void> {
     return this.repo.updateSentPlanLimitAlert(organizationId, timestamp);
   }
 
@@ -574,8 +553,7 @@ export class OrganizationService extends OrganizationServiceContract {
     primaryIntent?: OrganizationIntent | null;
     userDisplayName?: string | null;
   }): Promise<CreateAndAssignResult> {
-    const orgName =
-      params.orgName ?? params.userDisplayName ?? "My Organization";
+    const orgName = params.orgName ?? params.userDisplayName ?? "My Organization";
     const orgId = generate(KSUID_RESOURCES.ORGANIZATION).toString();
     const orgSlug =
       slugify(orgName, { lower: true, strict: true }) +
@@ -670,9 +648,7 @@ export class OrganizationService extends OrganizationServiceContract {
   }
 
   /** Every organization on the instance, for the instance-admin surface. */
-  async listProvisioningSummaries(): Promise<
-    OrganizationProvisioningSummary[]
-  > {
+  async listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
     return this.repo.findAllProvisioningSummaries();
   }
 
@@ -759,9 +735,7 @@ export class OrganizationService extends OrganizationServiceContract {
     return {
       ...settings,
       s3Endpoint: settings.s3Endpoint ? decrypt(settings.s3Endpoint) : null,
-      s3AccessKeyId: settings.s3AccessKeyId
-        ? decrypt(settings.s3AccessKeyId)
-        : null,
+      s3AccessKeyId: settings.s3AccessKeyId ? decrypt(settings.s3AccessKeyId) : null,
     };
   }
 
@@ -791,9 +765,7 @@ export class OrganizationService extends OrganizationServiceContract {
       // share links behind an organization that says it has none. Every
       // project is attempted, and the caller is told which ones survived.
       const outcomes = await Promise.allSettled(
-        projectIds.map((projectId) =>
-          getApp().share.revokeAllTraceShares(projectId),
-        ),
+        projectIds.map((projectId) => getApp().share.revokeAllTraceShares(projectId)),
       );
       const unrevoked = projectIds.filter(
         (_, index) => outcomes[index]?.status === "rejected",
@@ -954,8 +926,7 @@ export class OrganizationService extends OrganizationServiceContract {
     currentUserId: string | null;
     planUser?: PlanProviderUser;
   }): Promise<UpdateMemberRoleResult> {
-    const { organizationId, userId, role, teamRoleUpdates, currentUserId } =
-      params;
+    const { organizationId, userId, role, teamRoleUpdates, currentUserId } = params;
     const prisma = clientFromRepo(this.repo);
 
     const currentMember = await this.repo.findMembership({

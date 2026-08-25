@@ -8,9 +8,7 @@ export const personalWorkspaceInputSchema = z
     displayEmail: z.string().nullable().optional(),
   })
   .strict();
-export type PersonalWorkspaceInput = z.infer<
-  typeof personalWorkspaceInputSchema
->;
+export type PersonalWorkspaceInput = z.infer<typeof personalWorkspaceInputSchema>;
 
 export const findPersonalWorkspaceInputSchema = z
   .object({
@@ -18,9 +16,7 @@ export const findPersonalWorkspaceInputSchema = z
     organizationId: z.string().min(1),
   })
   .strict();
-export type FindPersonalWorkspaceInput = z.infer<
-  typeof findPersonalWorkspaceInputSchema
->;
+export type FindPersonalWorkspaceInput = z.infer<typeof findPersonalWorkspaceInputSchema>;
 
 export const personalWorkspaceSchema = z
   .object({
@@ -48,9 +44,7 @@ export type PersonalWorkspace = z.infer<typeof personalWorkspaceSchema>;
 export const ensuredPersonalWorkspaceSchema = personalWorkspaceSchema.extend({
   created: z.boolean(),
 });
-export type EnsuredPersonalWorkspace = z.infer<
-  typeof ensuredPersonalWorkspaceSchema
->;
+export type EnsuredPersonalWorkspace = z.infer<typeof ensuredPersonalWorkspaceSchema>;
 
 export const PERSONAL_FEATURES = [
   "evaluations",

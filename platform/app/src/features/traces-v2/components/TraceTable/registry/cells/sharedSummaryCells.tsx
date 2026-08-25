@@ -1,9 +1,5 @@
 import { Text } from "@chakra-ui/react";
-import {
-  formatCost,
-  formatDuration,
-  formatTokens,
-} from "../../../../utils/formatters";
+import { formatCost, formatDuration, formatTokens } from "../../../../utils/formatters";
 import { MonoCell } from "../../MonoCell";
 import type { CellDef } from "../types";
 
@@ -45,9 +41,7 @@ export function createDurationCell<T extends { totalDuration: number }>(
   return {
     id: "duration",
     label: "Duration",
-    render: ({ row }) => (
-      <MonoCell>{formatDuration(row.totalDuration)}</MonoCell>
-    ),
+    render: ({ row }) => <MonoCell>{formatDuration(row.totalDuration)}</MonoCell>,
     renderComfortable: ({ row }) => (
       <Text textStyle={comfortableTextStyle} color="fg.muted" textAlign="right">
         {formatDuration(row.totalDuration)}

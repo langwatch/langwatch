@@ -16,14 +16,11 @@ export function WaitingForTracesChip(): React.ReactElement {
   const [detected, setDetected] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [isVisible, setIsVisible] = useState<boolean>(
-    typeof document === "undefined"
-      ? true
-      : document.visibilityState === "visible",
+    typeof document === "undefined" ? true : document.visibilityState === "visible",
   );
 
   useEffect(() => {
-    const onVisibility = () =>
-      setIsVisible(document.visibilityState === "visible");
+    const onVisibility = () => setIsVisible(document.visibilityState === "visible");
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
@@ -75,12 +72,7 @@ export function WaitingForTracesChip(): React.ReactElement {
 
     window.location.href = `/${project.slug}/traces?${params.toString()}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    project?.slug,
-    router,
-    tracesQuery.status,
-    tracesQuery.data?.groups?.length,
-  ]);
+  }, [project?.slug, router, tracesQuery.status, tracesQuery.data?.groups?.length]);
 
   useEffect(() => {
     if (!detected) return;

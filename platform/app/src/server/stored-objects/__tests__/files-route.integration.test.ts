@@ -24,15 +24,7 @@
 
 import { Readable } from "node:stream";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
@@ -130,9 +122,7 @@ import type { StoredObject } from "~/server/stored-objects/stored-object";
 // ---------------------------------------------------------------------------
 
 /** Builds a minimal StoredObject row suitable for getById mock responses. */
-function makeStoredObjectRow(
-  overrides: Partial<StoredObject> = {},
-): StoredObject {
+function makeStoredObjectRow(overrides: Partial<StoredObject> = {}): StoredObject {
   return {
     id: `test-id-${nanoid(6)}`,
     project_id: "proj-test",
@@ -257,9 +247,7 @@ describe("GET /api/files/:id", () => {
 
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toBe("image/png");
-      expect(res.headers.get("Content-Length")).toBe(
-        String(Buffer.from(content).length),
-      );
+      expect(res.headers.get("Content-Length")).toBe(String(Buffer.from(content).length));
 
       const body = await res.text();
       expect(body).toBe(content);
@@ -530,10 +518,9 @@ describe("GET /api/files/:projectId/:id (project-scoped — #4947)", () => {
       expect(disposition).toMatch(/^inline; filename="[A-Za-z0-9._-]+"$/);
 
       // An empty filename param falls back to the object id.
-      const res2 = await app.request(
-        `/api/files/${projectAId}/${fileId}?filename=`,
-        { headers: { "X-Auth-Token": projectAKey } },
-      );
+      const res2 = await app.request(`/api/files/${projectAId}/${fileId}?filename=`, {
+        headers: { "X-Auth-Token": projectAKey },
+      });
       expect(res2.status).toBe(200);
       expect(res2.headers.get("Content-Disposition")).toBe(
         `inline; filename="${fileId}"`,
@@ -562,9 +549,7 @@ describe("GET /api/files/:projectId/:id (project-scoped — #4947)", () => {
       });
 
       expect(res.status).toBe(200);
-      expect(res.headers.get("Content-Length")).toBe(
-        String(Buffer.from(content).length),
-      );
+      expect(res.headers.get("Content-Length")).toBe(String(Buffer.from(content).length));
       // HEAD must not stream a body.
       expect(await res.text()).toBe("");
       expect(mockResolveOwnerProject).not.toHaveBeenCalled();
@@ -589,12 +574,9 @@ describe("GET /api/files/:projectId/:id (project-scoped — #4947)", () => {
       // B's scope has no such row.
       mockGetById.mockResolvedValueOnce(null);
 
-      const res = await app.request(
-        `/api/files/${projectBId}/${crossTenantId}`,
-        {
-          headers: { "X-Auth-Token": projectBKey },
-        },
-      );
+      const res = await app.request(`/api/files/${projectBId}/${crossTenantId}`, {
+        headers: { "X-Auth-Token": projectBKey },
+      });
 
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({ status: "not_found" });

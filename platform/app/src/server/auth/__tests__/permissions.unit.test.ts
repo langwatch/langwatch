@@ -4,15 +4,12 @@ import { OrganizationUserRole } from "~/generated/prisma/client";
 const resolveProjectPermissionMock = vi.fn();
 
 vi.mock("~/server/api/rbac", () => ({
-  resolveProjectPermission: (...args: unknown[]) =>
-    resolveProjectPermissionMock(...args),
+  resolveProjectPermission: (...args: unknown[]) => resolveProjectPermissionMock(...args),
 }));
 
 // The wrapper resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
 

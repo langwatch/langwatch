@@ -33,8 +33,8 @@ export const sendInviteEmail = async ({
         <Heading as="h1">LangWatch Invite</Heading>
         <p>
           You have been invited to join the <strong>{organization.name}</strong>
-          Organization on LangWatch. Please click the button below to create
-          your account or login with the email <b>{email}</b>:
+          Organization on LangWatch. Please click the button below to create your account
+          or login with the email <b>{email}</b>:
         </p>
         <Button
           href={acceptInviteUrl}

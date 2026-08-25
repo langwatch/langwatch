@@ -17,13 +17,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LangWatchQLQueryResult } from "~/server/analytics/lwql";
@@ -84,9 +78,7 @@ describe("the LangWatchQL result table", () => {
               { name: "trace_id", type: "String" },
               { name: "latency_ms", type: "Nullable(Float64)" },
             ],
-            rows: [
-              { occurred_on: "2026-02-20", trace_id: "t-1", latency_ms: 12.5 },
-            ],
+            rows: [{ occurred_on: "2026-02-20", trace_id: "t-1", latency_ms: 12.5 }],
           }),
         );
 
@@ -113,9 +105,7 @@ describe("the LangWatchQL result table", () => {
         );
 
         expect(
-          screen
-            .getAllByTestId("lwql-column-type")
-            .map((node) => node.textContent),
+          screen.getAllByTestId("lwql-column-type").map((node) => node.textContent),
         ).toEqual(["Date", "Nullable(Float64)"]);
       });
     });
@@ -233,9 +223,7 @@ describe("the LangWatchQL result table", () => {
           }),
         );
 
-        expect(await screen.findByTestId("lwql-value-full")).toHaveTextContent(
-          "counts",
-        );
+        expect(await screen.findByTestId("lwql-value-full")).toHaveTextContent("counts");
 
         fireEvent.click(
           screen.getByRole("button", {
@@ -324,9 +312,7 @@ describe("the LangWatchQL result table", () => {
       it("says nothing when every column name is distinct", () => {
         renderTable(lwqlResult());
 
-        expect(
-          screen.queryByTestId("lwql-duplicate-columns"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("lwql-duplicate-columns")).not.toBeInTheDocument();
       });
     });
   });

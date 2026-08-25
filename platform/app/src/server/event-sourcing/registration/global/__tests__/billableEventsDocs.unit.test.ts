@@ -60,9 +60,7 @@ const BILLABLE_FAMILIES = [
  */
 function pricingDefinition(): string {
   const doc = readRepoFile(PRICING_DOC);
-  const definition = /A \*\*billable event\*\* is[^\n]*\n([\s\S]*?)\n\n/.exec(
-    doc,
-  );
+  const definition = /A \*\*billable event\*\* is[^\n]*\n([\s\S]*?)\n\n/.exec(doc);
   if (!definition) {
     throw new Error(`No billable-event definition in ${PRICING_DOC}`);
   }
@@ -96,11 +94,12 @@ describe("Billable-event documentation", () => {
   describe("given the meter bills spans, evaluations, experiments and simulations", () => {
     describe("when a customer reads only the short answer", () => {
       /** @scenario "The Events section covers all four billable families" */
-      it.each(
-        BILLABLE_FAMILIES,
-      )("names $family in the pricing-page definition", ({ synonyms }) => {
-        expect(pricingDefinition()).toMatch(synonyms);
-      });
+      it.each(BILLABLE_FAMILIES)(
+        "names $family in the pricing-page definition",
+        ({ synonyms }) => {
+          expect(pricingDefinition()).toMatch(synonyms);
+        },
+      );
 
       /** @scenario "The Events section covers all four billable families" */
       it("sends the reader to the full list for the counting rules", () => {
@@ -108,11 +107,12 @@ describe("Billable-event documentation", () => {
       });
 
       /** @scenario "The pricing FAQ answer covers all four billable families" */
-      it.each(BILLABLE_FAMILIES)("names $family in the pricing FAQ answer", ({
-        synonyms,
-      }) => {
-        expect(pricingFaqAnswer()).toMatch(synonyms);
-      });
+      it.each(BILLABLE_FAMILIES)(
+        "names $family in the pricing FAQ answer",
+        ({ synonyms }) => {
+          expect(pricingFaqAnswer()).toMatch(synonyms);
+        },
+      );
     });
   });
 
@@ -130,9 +130,7 @@ describe("Billable-event documentation", () => {
 
       /** @scenario "The documented list bills nothing the meter does not" */
       it("advertises nothing the meter does not bill", () => {
-        const metered = new Set<string>(
-          orgBillableEventsMeterProjection.eventTypes,
-        );
+        const metered = new Set<string>(orgBillableEventsMeterProjection.eventTypes);
         const overclaimed = [...documentedEventTypes()].filter(
           (type) => !metered.has(type),
         );

@@ -1,8 +1,6 @@
 import type { TemplateContext, TemplateMatchVars } from "../templateContext";
 
-export function makeMatch(
-  overrides: Partial<TemplateMatchVars> = {},
-): TemplateMatchVars {
+export function makeMatch(overrides: Partial<TemplateMatchVars> = {}): TemplateMatchVars {
   return {
     trace: {
       id: "trace_1",
@@ -16,9 +14,7 @@ export function makeMatch(
   };
 }
 
-export function makeContext(
-  overrides: Partial<TemplateContext> = {},
-): TemplateContext {
+export function makeContext(overrides: Partial<TemplateContext> = {}): TemplateContext {
   const matches = overrides.matches ?? [makeMatch()];
   const match = overrides.match ?? matches[0] ?? null;
   return {

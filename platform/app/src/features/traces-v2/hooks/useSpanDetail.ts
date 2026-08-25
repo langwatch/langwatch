@@ -1,10 +1,7 @@
 import { useMemo } from "react";
 import { applyOverlayToSpanDetail } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { api } from "~/utils/api";
-import {
-  asSharedQueryResult,
-  useSharedTrace,
-} from "../context/SharedTraceContext";
+import { asSharedQueryResult, useSharedTrace } from "../context/SharedTraceContext";
 import { useDrawerStore } from "../stores/drawerStore";
 import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
@@ -33,9 +30,7 @@ export function useSpanDetailCanonical() {
     // (both live only on the single-span `tracesV2.spanDetail` read). The
     // trace-level events timeline covers the share page; per-span events in
     // the payload are an ADR-057 follow-up.
-    const detail = spanId
-      ? shared.spansFull.find((s) => s.spanId === spanId)
-      : undefined;
+    const detail = spanId ? shared.spansFull.find((s) => s.spanId === spanId) : undefined;
     return asSharedQueryResult(detail) as unknown as typeof query;
   }
   return query;

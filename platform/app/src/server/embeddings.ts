@@ -13,10 +13,10 @@ export const getProjectEmbeddingsModel = async (projectId: string) => {
   // ModelNotConfiguredError if no scope has it set; the caller surfaces
   // that as a sticky toast prompting the user to add an
   // embedding-capable provider.
-  const resolved = await resolveModelForFeature(
-    "analytics.topic_clustering_embeddings",
-    { prisma, projectId },
-  );
+  const resolved = await resolveModelForFeature("analytics.topic_clustering_embeddings", {
+    prisma,
+    projectId,
+  });
   const embeddingsModel = resolved.model;
   const provider = embeddingsModel.split("/")[0];
   if (!provider) {

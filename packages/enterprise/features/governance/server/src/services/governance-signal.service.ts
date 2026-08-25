@@ -95,12 +95,10 @@ export class GovernanceSignalService {
       bucket_scope_id: candidate.bucketScopeId,
       end_user_id: candidate.endUserId,
       virtual_key_id:
-        budget.scopeType === "VIRTUAL_KEY" ||
-        budget.scopeType === "ATTRIBUTED_USER"
+        budget.scopeType === "VIRTUAL_KEY" || budget.scopeType === "ATTRIBUTED_USER"
           ? budget.scopeId
           : null,
-      anchor_project_id:
-        budget.scopeType === "PROJECT" ? budget.scopeId : null,
+      anchor_project_id: budget.scopeType === "PROJECT" ? budget.scopeId : null,
       window: budget.window,
       period_started_at_ms: resolved.periodStartedAtMs,
       limit_usd: limit.toFixed(6),

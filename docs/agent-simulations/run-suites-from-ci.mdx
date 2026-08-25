@@ -30,8 +30,16 @@ The response carries the two values the CI job needs:
   "jobCount": 2,
   "skippedArchived": { "scenarios": [], "targets": [] },
   "items": [
-    { "scenarioRunId": "run_1", "scenarioId": "scn_1", "name": "Cancel on the free plan" },
-    { "scenarioRunId": "run_2", "scenarioId": "scn_2", "name": "Cancel on the enterprise plan" }
+    {
+      "scenarioRunId": "run_1",
+      "scenarioId": "scn_1",
+      "name": "Cancel on the free plan"
+    },
+    {
+      "scenarioRunId": "run_2",
+      "scenarioId": "scn_2",
+      "name": "Cancel on the enterprise plan"
+    }
   ]
 }
 ```
@@ -64,12 +72,12 @@ curl "https://app.langwatch.ai/api/simulation-runs/batches/batch_xyz789" \
 }
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `totalCount` | Runs the batch holds now. |
-| `runningCount` | Runs that are queued or in progress. |
+| Field          | Meaning                                                                                      |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| `totalCount`   | Runs the batch holds now.                                                                    |
+| `runningCount` | Runs that are queued or in progress.                                                         |
 | `settledCount` | Runs that are neither queued nor in progress: passed, failed, errored, cancelled or stalled. |
-| `isComplete` | True when `settledCount` equals `totalCount`. |
+| `isComplete`   | True when `settledCount` equals `totalCount`.                                                |
 
 Stop the poll when `isComplete` is true **and** `totalCount` is at least `jobCount`. The two conditions go together: the platform creates the runs asynchronously, so a batch read right after the trigger can hold fewer runs than `jobCount`, and a batch of two created runs out of six reports itself complete.
 

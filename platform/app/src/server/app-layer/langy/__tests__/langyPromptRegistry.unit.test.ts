@@ -57,9 +57,7 @@ describe("resolveLangyPrompt", () => {
         tag: "latest",
       });
 
-      expect(read).toHaveBeenCalledWith(
-        expect.objectContaining({ tag: "latest" }),
-      );
+      expect(read).toHaveBeenCalledWith(expect.objectContaining({ tag: "latest" }));
     });
   });
 

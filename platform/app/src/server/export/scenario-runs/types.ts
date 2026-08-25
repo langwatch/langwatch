@@ -26,11 +26,7 @@ export type ScenarioRunExportMode = z.infer<typeof scenarioRunExportModeSchema>;
  * Pass/fail filter, using the same values the run history dropdown emits so a
  * filtered export matches the filtered list exactly.
  */
-export const scenarioRunExportStatusFilterSchema = z.enum([
-  "pass",
-  "fail",
-  "stalled",
-]);
+export const scenarioRunExportStatusFilterSchema = z.enum(["pass", "fail", "stalled"]);
 export type ScenarioRunExportStatusFilter = z.infer<
   typeof scenarioRunExportStatusFilterSchema
 >;
@@ -45,9 +41,7 @@ export const scenarioRunExportRequestSchema = z.object({
   startDate: z.number().optional(),
   endDate: z.number().optional(),
 });
-export type ScenarioRunExportRequest = z.infer<
-  typeof scenarioRunExportRequestSchema
->;
+export type ScenarioRunExportRequest = z.infer<typeof scenarioRunExportRequestSchema>;
 
 /**
  * Progress is counted in runs *visited*, not rows written. A criteria-mode
@@ -59,6 +53,4 @@ export const scenarioRunExportProgressSchema = z.object({
   exported: z.number(),
   total: z.number(),
 });
-export type ScenarioRunExportProgress = z.infer<
-  typeof scenarioRunExportProgressSchema
->;
+export type ScenarioRunExportProgress = z.infer<typeof scenarioRunExportProgressSchema>;

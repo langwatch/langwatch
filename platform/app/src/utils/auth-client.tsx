@@ -157,11 +157,7 @@ export const useSession = (
       : "unauthenticated";
 
   useEffect(() => {
-    if (
-      options?.required &&
-      status === "unauthenticated" &&
-      options.onUnauthenticated
-    ) {
+    if (options?.required && status === "unauthenticated" && options.onUnauthenticated) {
       options.onUnauthenticated();
     }
   }, [options?.required, options?.onUnauthenticated, status]);
@@ -342,13 +338,7 @@ export const signOut = async (opts?: {
   navigate("/api/auth/logout");
 };
 
-const SOCIAL_PROVIDERS = new Set([
-  "google",
-  "github",
-  "gitlab",
-  "microsoft",
-  "azure-ad",
-]);
+const SOCIAL_PROVIDERS = new Set(["google", "github", "gitlab", "microsoft", "azure-ad"]);
 
 /**
  * Link an OAuth account to the currently signed-in user. This is distinct

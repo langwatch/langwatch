@@ -86,10 +86,7 @@ function harness(options?: {
   return { store, manager, definition };
 }
 
-async function bootstrap(
-  manager: ProcessManagerService<unknown>,
-  occurredAt = 10_000,
-) {
+async function bootstrap(manager: ProcessManagerService<unknown>, occurredAt = 10_000) {
   return manager.handleEvent({
     envelope: toEnvelope(
       makeEvent({

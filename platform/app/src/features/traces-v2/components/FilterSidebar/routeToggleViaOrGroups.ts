@@ -49,9 +49,7 @@ export function routeToggleViaOrGroups({
 }): ToggleRouting {
   const groupIds = analysis.fieldToGroupIds.get(field);
   const groupId = groupIds?.[0];
-  const group = groupId
-    ? analysis.groups.find((g) => g.id === groupId)
-    : undefined;
+  const group = groupId ? analysis.groups.find((g) => g.id === groupId) : undefined;
   if (group) {
     // The field already participates in an OR group — extend that
     // scope rather than starting a new one (this is the same-field

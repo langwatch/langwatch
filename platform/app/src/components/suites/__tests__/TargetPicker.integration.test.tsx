@@ -82,9 +82,7 @@ describe("<TargetPicker />", () => {
       it("does not show the archived-targets section", () => {
         renderPicker({ archivedTargets: [] });
 
-        expect(
-          screen.queryByTestId("archived-targets-section"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("archived-targets-section")).not.toBeInTheDocument();
       });
     });
   });
@@ -103,12 +101,8 @@ describe("<TargetPicker />", () => {
       it("shows the archived-targets warning section", () => {
         renderPicker({ archivedTargets });
 
-        expect(
-          screen.getByTestId("archived-targets-section"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText("2 archived targets linked:"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("archived-targets-section")).toBeInTheDocument();
+        expect(screen.getByText("2 archived targets linked:")).toBeInTheDocument();
       });
 
       it("displays each archived target name", () => {
@@ -143,9 +137,7 @@ describe("<TargetPicker />", () => {
           onRemoveArchived: onRemove,
         });
 
-        await user.click(
-          screen.getByTestId("remove-archived-target-agent_old"),
-        );
+        await user.click(screen.getByTestId("remove-archived-target-agent_old"));
 
         expect(onRemove).toHaveBeenCalledTimes(1);
         expect(onRemove).toHaveBeenCalledWith(
@@ -175,9 +167,7 @@ describe("<TargetPicker />", () => {
           onClear: vi.fn(),
         });
 
-        expect(
-          screen.getByRole("button", { name: "Select All" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Select All" })).toBeInTheDocument();
       });
 
       it("displays a Clear button in the footer", () => {
@@ -188,9 +178,7 @@ describe("<TargetPicker />", () => {
           onClear: vi.fn(),
         });
 
-        expect(
-          screen.getByRole("button", { name: "Clear" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
       });
 
       it("displays the selection count", () => {
@@ -266,9 +254,7 @@ describe("<TargetPicker />", () => {
           ],
         });
 
-        expect(
-          screen.getByText("1 archived target linked:"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("1 archived target linked:")).toBeInTheDocument();
       });
     });
   });
@@ -278,9 +264,7 @@ describe("<TargetPicker />", () => {
       it("displays an Add Target button inline with the search input", () => {
         renderPicker();
 
-        expect(
-          screen.getByRole("button", { name: "Add Target" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Add Target" })).toBeInTheDocument();
       });
 
       it("displays a plus icon on the Add Target button", () => {

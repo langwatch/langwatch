@@ -19,9 +19,7 @@ export interface BillingReportingPipelineDeps {
  * The subscriber that dispatches commands is registered in the EventSourcing
  * constructor alongside the global fold and map projections.
  */
-export function createBillingReportingPipeline(
-  deps: BillingReportingPipelineDeps,
-) {
+export function createBillingReportingPipeline(deps: BillingReportingPipelineDeps) {
   return definePipeline<Event>({
     name: BILLING_REPORTING_PIPELINE_NAME,
     aggregate: defineAggregate({

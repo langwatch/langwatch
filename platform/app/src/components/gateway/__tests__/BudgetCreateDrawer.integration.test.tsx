@@ -144,10 +144,7 @@ describe("BudgetCreateDrawer", () => {
           expect(screen.getByTestId("budget-create-anyway")).toBeTruthy();
         });
 
-        await user.selectOptions(
-          screen.getByTestId("budget-target"),
-          OTHER_PROJECT_ID,
-        );
+        await user.selectOptions(screen.getByTestId("budget-target"), OTHER_PROJECT_ID);
 
         expect(screen.queryByTestId("budget-create-anyway")).toBeNull();
         expect(screen.queryByTestId("budget-submit-error")).toBeNull();

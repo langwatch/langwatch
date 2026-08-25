@@ -276,9 +276,7 @@ describe("SerializedPromptConfigAdapter", () => {
           content: string;
         }>;
 
-        expect(messages[0]!.content).toBe(
-          "question: How are you?\nthread: thread_abc",
-        );
+        expect(messages[0]!.content).toBe("question: How are you?\nthread: thread_abc");
       });
 
       /** @scenario "An input nothing can be bound to renders as a visible placeholder" */
@@ -310,9 +308,7 @@ describe("SerializedPromptConfigAdapter", () => {
           content: string;
         }>;
 
-        expect(messages[0]!.content).toBe(
-          "tier: [unbound input: customer_tier]",
-        );
+        expect(messages[0]!.content).toBe("tier: [unbound input: customer_tier]");
       });
     });
 
@@ -502,9 +498,7 @@ describe("SerializedPromptConfigAdapter", () => {
           ...defaultConfig,
           systemPrompt:
             "You serve a {{ params.account_tier }} customer in {{ params.region }}.",
-          messages: [
-            { role: "user", content: "Tier: {{ params.account_tier }}" },
-          ],
+          messages: [{ role: "user", content: "Tier: {{ params.account_tier }}" }],
         },
         litellmParams: defaultLitellmParams,
         nlpServiceUrl: "http://localhost:8080",
@@ -513,8 +507,10 @@ describe("SerializedPromptConfigAdapter", () => {
 
       await adapter.call(defaultInput);
 
-      const promptMessages = mockGenerateText.mock.calls[0]![0]
-        .messages as Array<{ role: string; content: string }>;
+      const promptMessages = mockGenerateText.mock.calls[0]![0].messages as Array<{
+        role: string;
+        content: string;
+      }>;
 
       expect(promptMessages[0]?.content).toBe(
         "You serve a platinum customer in eu-central.",

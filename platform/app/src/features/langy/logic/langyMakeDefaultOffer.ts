@@ -77,9 +77,7 @@ export function makeDefaultOffer({
 
   return {
     kind:
-      resolvedDefault.source === "feature_override"
-        ? "feature-override"
-        : "role-default",
+      resolvedDefault.source === "feature_override" ? "feature-override" : "role-default",
     scopeType: SCOPE_TIER_BY_LABEL[scopeLabel],
     scopeId,
     scopeLabel,

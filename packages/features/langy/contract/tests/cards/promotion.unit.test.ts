@@ -7,8 +7,10 @@ import {
 } from "../../src/cards/registry.js";
 import { toCliToolResult } from "../../src/cards/tool-result.js";
 
-const promote = (nominal: Parameters<typeof promoteCard>[0]["nominal"], payload: unknown) =>
-  promoteCard({ nominal, payload, probes: CARD_PROBES });
+const promote = (
+  nominal: Parameters<typeof promoteCard>[0]["nominal"],
+  payload: unknown,
+) => promoteCard({ nominal, payload, probes: CARD_PROBES });
 
 describe("promoteCard", () => {
   describe("given a generic read whose payload carries cost", () => {

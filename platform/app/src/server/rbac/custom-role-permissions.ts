@@ -4,9 +4,7 @@ import type { Prisma } from "~/generated/prisma/client";
 import { Actions, Resources } from "~/utils/rbacVocabulary";
 
 const VALID_PERMISSIONS: Set<string> = new Set(
-  Object.values(Resources).flatMap((r) =>
-    Object.values(Actions).map((a) => `${r}:${a}`),
-  ),
+  Object.values(Resources).flatMap((r) => Object.values(Actions).map((a) => `${r}:${a}`)),
 );
 
 export const permissionFormatSchema = z

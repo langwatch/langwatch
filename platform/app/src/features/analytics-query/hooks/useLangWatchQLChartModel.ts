@@ -36,9 +36,7 @@ import { useLangwatchVegaTokens } from "./useLangwatchVegaTokens";
 
 export interface LangWatchQLChartModel {
   /** Where the running view attaches, or would attach. */
-  readonly containerRef: ReturnType<
-    typeof useLangWatchQLVegaView
-  >["containerRef"];
+  readonly containerRef: ReturnType<typeof useLangWatchQLVegaView>["containerRef"];
   readonly state: LangWatchQLVegaViewState;
   /** The refusals to show. Empty means nothing refused this chart. */
   readonly failures: readonly VegaValidationError[];
@@ -58,10 +56,7 @@ export function useLangWatchQLChartModel({
     () => langwatchVegaConfig({ colorMode, tokens }),
     [colorMode, tokens],
   );
-  const pinnedConfig = useMemo(
-    () => langwatchVegaPinnedConfig({ tokens }),
-    [tokens],
-  );
+  const pinnedConfig = useMemo(() => langwatchVegaPinnedConfig({ tokens }), [tokens]);
 
   // Keyed on the row counts rather than `datasets` itself: a data-only
   // reload produces a new `datasets` object on every render, and keying on
@@ -101,8 +96,7 @@ export function useLangWatchQLChartModel({
     };
   }, [validation, datasets, columnsByDataset]);
 
-  const isDrawable =
-    validation.ok && scan !== null && !scan.allEncodedValuesEmpty;
+  const isDrawable = validation.ok && scan !== null && !scan.allEncodedValuesEmpty;
 
   const { containerRef, state } = useLangWatchQLVegaView({
     spec: validation.ok ? validation.normalized : null,
@@ -149,9 +143,7 @@ function collectFailures({
   if (!validation.ok) return validation.errors;
   if (scan === null) return [];
   if (scan.allEncodedValuesEmpty) {
-    return [
-      lwqlEmptyEncodingFailure({ fieldsByDataset: scan.fieldsByDataset }),
-    ];
+    return [lwqlEmptyEncodingFailure({ fieldsByDataset: scan.fieldsByDataset })];
   }
   if (viewFailure !== null) return [viewFailure];
   return [];

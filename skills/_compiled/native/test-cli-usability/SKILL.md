@@ -78,9 +78,9 @@ Add this assertion to every test:
 
 ```typescript
 function assertNoInteractiveWorkarounds(state) {
-  const output = state.messages.map(m =>
-    typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
-  ).join('\n');
+  const output = state.messages
+    .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
+    .join("\n");
 
   expect(output).not.toMatch(/echo\s+["']?[yY](?:es)?["']?\s*\|/);
   expect(output).not.toMatch(/\byes\s*\|/);

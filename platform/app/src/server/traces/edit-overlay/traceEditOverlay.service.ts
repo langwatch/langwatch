@@ -173,9 +173,7 @@ export class TraceEditOverlayService {
     );
     const next: TraceEditOverlayPatch = {
       ...current,
-      ...(hasRemainingTraceEdits
-        ? { trace: remainingTraceEdits }
-        : { trace: void 0 }),
+      ...(hasRemainingTraceEdits ? { trace: remainingTraceEdits } : { trace: void 0 }),
     };
 
     if (!patchHasAnyEdit(next)) {
@@ -269,9 +267,7 @@ export class TraceEditOverlayService {
       ...current,
       spans: spanKeepsEdits
         ? current.spans.map((span) =>
-            span.spanId === spanId
-              ? (remainingSpanEdits as TraceEditSpanPatch)
-              : span,
+            span.spanId === spanId ? (remainingSpanEdits as TraceEditSpanPatch) : span,
           )
         : current.spans.filter((span) => span.spanId !== spanId),
     };
@@ -310,9 +306,7 @@ export class TraceEditOverlayService {
       traceId,
     });
     if (!existing) return emptyTraceEditOverlayPatch();
-    return (
-      parseTraceEditOverlayPatch(existing.patch) ?? emptyTraceEditOverlayPatch()
-    );
+    return parseTraceEditOverlayPatch(existing.patch) ?? emptyTraceEditOverlayPatch();
   }
 }
 

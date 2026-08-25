@@ -105,13 +105,7 @@ function startRun({
   isDetached = false,
   script = QUEUE_SCRIPT,
 }: RunOptions): Run {
-  const argv = argvOverride ?? [
-    "node",
-    fakeCommand,
-    logFile,
-    tag,
-    String(holdMs),
-  ];
+  const argv = argvOverride ?? ["node", fakeCommand, logFile, tag, String(holdMs)];
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries({
     ...process.env,
@@ -177,9 +171,7 @@ function readEvents(): Event[] {
 
 /** The most runs that were ever inside the command at the same moment. */
 function maxOverlap(events: Event[]): number {
-  const ordered = [...events].sort(
-    (a, b) => a.at - b.at || (a.event === "end" ? -1 : 1),
-  );
+  const ordered = [...events].sort((a, b) => a.at - b.at || (a.event === "end" ? -1 : 1));
   let current = 0;
   let peak = 0;
   for (const event of ordered) {
@@ -298,10 +290,7 @@ describe("check queue", () => {
       // One counter only covers both if both scripts actually route through it.
       const scripts = (
         JSON.parse(
-          readFileSync(
-            path.join(REPO_ROOT, "platform/app/package.json"),
-            "utf8",
-          ),
+          readFileSync(path.join(REPO_ROOT, "platform/app/package.json"), "utf8"),
         ) as { scripts: Record<string, string> }
       ).scripts;
       for (const name of [
@@ -315,10 +304,7 @@ describe("check queue", () => {
         // Named first, because a script that has been renamed or deleted
         // reaches `toContain` as undefined and fails on the argument type
         // rather than on the thing this test is about.
-        expect(
-          Object.keys(scripts),
-          `${name} is not a script any more`,
-        ).toContain(name);
+        expect(Object.keys(scripts), `${name} is not a script any more`).toContain(name);
         expect(scripts[name], `${name} bypasses the check queue`).toContain(
           "check-queue.mjs",
         );
@@ -348,9 +334,7 @@ describe("check queue", () => {
       expect(second.stderr).toContain("still queued at position 1 after");
       // Named by label and by how long it has held the slot, so a waiter knows
       // which worktree to go look at.
-      expect(second.stderr).toMatch(
-        /Active: @langwatch\/web typecheck \(.+\) for \d+s/,
-      );
+      expect(second.stderr).toMatch(/Active: @langwatch\/web typecheck \(.+\) for \d+s/);
     });
 
     /** @scenario "Waiters are served in arrival order" */

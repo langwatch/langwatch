@@ -1,7 +1,4 @@
-import type {
-  DatasetColumns,
-  DatasetRecordInput,
-} from "@langwatch/dataset-contract";
+import type { DatasetColumns, DatasetRecordInput } from "@langwatch/dataset-contract";
 
 const TRUE_VALUES = new Set(["true", "1", "yes", "y", "on", "ok"]);
 const FALSE_VALUES = new Set([

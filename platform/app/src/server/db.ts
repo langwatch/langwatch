@@ -35,9 +35,7 @@ const createGuardedPrismaClient = (): PrismaClient => {
     // The process-env fallback mirrors the classic engine, which resolved the
     // schema's `env("DATABASE_URL")` from process.env itself — test suites
     // that mock `~/env.mjs` with a partial env relied on that.
-    adapter: createPrismaPgAdapter(
-      env.DATABASE_URL ?? process.env.DATABASE_URL ?? "",
-    ),
+    adapter: createPrismaPgAdapter(env.DATABASE_URL ?? process.env.DATABASE_URL ?? ""),
     log: env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 
@@ -57,24 +55,16 @@ const createGuardedPrismaClient = (): PrismaClient => {
         },
       },
       $queryRaw({ args, query }) {
-        return withGuards({ action: "queryRaw", args }, (a) =>
-          query(a as typeof args),
-        );
+        return withGuards({ action: "queryRaw", args }, (a) => query(a as typeof args));
       },
       $queryRawUnsafe({ args, query }) {
-        return withGuards({ action: "queryRaw", args }, (a) =>
-          query(a as typeof args),
-        );
+        return withGuards({ action: "queryRaw", args }, (a) => query(a as typeof args));
       },
       $executeRaw({ args, query }) {
-        return withGuards({ action: "executeRaw", args }, (a) =>
-          query(a as typeof args),
-        );
+        return withGuards({ action: "executeRaw", args }, (a) => query(a as typeof args));
       },
       $executeRawUnsafe({ args, query }) {
-        return withGuards({ action: "executeRaw", args }, (a) =>
-          query(a as typeof args),
-        );
+        return withGuards({ action: "executeRaw", args }, (a) => query(a as typeof args));
       },
     },
   }) as unknown as PrismaClient;

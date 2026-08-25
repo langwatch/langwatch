@@ -26,9 +26,7 @@ const harness = vi.hoisted(() => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
   const rbac =
-    await vi.importActual<typeof import("~/server/api/rbac")>(
-      "~/server/api/rbac",
-    );
+    await vi.importActual<typeof import("~/server/api/rbac")>("~/server/api/rbac");
   const holds = (permission: string) =>
     rbac.hasPermissionWithHierarchy(harness.permissions, permission);
   return {
@@ -93,8 +91,7 @@ vi.mock("~/utils/api", () => {
           if (typeof property !== "string") return undefined;
           if (property === "useQuery") {
             const key = path.join(".");
-            return () =>
-              queryResult(key === "routingPolicy.list" ? POLICIES : undefined);
+            return () => queryResult(key === "routingPolicy.list" ? POLICIES : undefined);
           }
           if (property === "useMutation") return mutationResult;
           if (property === "invalidate") return vi.fn();
@@ -153,9 +150,7 @@ describe("routing policies page access", () => {
       expect(
         screen.getByRole("button", { name: /Actions for House default/ }),
       ).toBeInTheDocument();
-      expect(
-        screen.queryByText(/routingPolicies:manage/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/routingPolicies:manage/)).not.toBeInTheDocument();
     });
   });
 

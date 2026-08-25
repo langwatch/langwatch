@@ -2,12 +2,7 @@
  * Compatibility layer: next/head → react-helmet-async
  * Provides a simple Head component that updates document head.
  */
-import {
-  Fragment,
-  isValidElement,
-  type ReactNode,
-  useLayoutEffect,
-} from "react";
+import { Fragment, isValidElement, type ReactNode, useLayoutEffect } from "react";
 
 interface HeadProps {
   children?: ReactNode;

@@ -36,9 +36,7 @@ function makeSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
   };
 }
 
-function makeState(
-  overrides: Partial<TraceSummaryData> = {},
-): TraceSummaryData {
+function makeState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {
     traceId: "trace-1",
     traceName: "",

@@ -82,10 +82,7 @@ export function createStreamingStore() {
   let rafId: number | null = null;
 
   // Buffer for CONTENT deltas that arrive before START
-  const earlyDeltas = new Map<
-    string,
-    { deltas: string[]; receivedAt: number }
-  >();
+  const earlyDeltas = new Map<string, { deltas: string[]; receivedAt: number }>();
   const EARLY_DELTA_TTL_MS = 10_000;
 
   function scheduleNotify() {

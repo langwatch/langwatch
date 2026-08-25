@@ -1,7 +1,16 @@
 import { EventEmitter } from "node:events";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 // The tunnel path verifies the binary it is about to run on every start, and
 // the mock below points at the node executable. Verification fails closed on
@@ -126,9 +135,11 @@ describe("agent dev session", () => {
       data: [makeAgent()],
       pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
     });
-    mockUpdate = vi.fn().mockImplementation((_id, params) =>
-      Promise.resolve(makeAgent({ config: params.config })),
-    );
+    mockUpdate = vi
+      .fn()
+      .mockImplementation((_id, params) =>
+        Promise.resolve(makeAgent({ config: params.config })),
+      );
     vi.mocked(AgentsApiService).mockImplementation(function () {
       return {
         list: mockList,
@@ -196,9 +207,7 @@ describe("agent dev session", () => {
       expect(restored.url).toBe("https://staging.example.com/agent");
       expect(restored.devTunnel).toBeUndefined();
       expect(
-        (restored.headers as { key: string }[]).find(
-          (h) => h.key === DEV_SECRET_HEADER,
-        ),
+        (restored.headers as { key: string }[]).find((h) => h.key === DEV_SECRET_HEADER),
       ).toBeUndefined();
 
       // A second shutdown does not PATCH again.
@@ -222,12 +231,8 @@ describe("agent dev session", () => {
       // The advice points at the UI, which edits the URL field alone. It
       // must never name `agent update --config`: that command replaces the
       // whole config, so a url-only payload would wipe headers and auth.
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining("LangWatch UI"),
-      );
-      expect(console.error).not.toHaveBeenCalledWith(
-        expect.stringContaining("--config"),
-      );
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining("LangWatch UI"));
+      expect(console.error).not.toHaveBeenCalledWith(expect.stringContaining("--config"));
       await expect(session.done).resolves.toBe(0);
     });
   });
@@ -285,9 +290,7 @@ describe("agent dev session", () => {
       // The auth proxy sits outside a bring-your-own tunnel's chain, so no
       // session secret header is written either.
       expect(
-        (written.headers as { key: string }[]).find(
-          (h) => h.key === DEV_SECRET_HEADER,
-        ),
+        (written.headers as { key: string }[]).find((h) => h.key === DEV_SECRET_HEADER),
       ).toBeUndefined();
 
       await session.shutdown(0);
@@ -321,9 +324,9 @@ describe("agent dev session", () => {
 
   describe("when neither --port nor --url is passed", () => {
     it("fails with guidance instead of guessing a port", async () => {
-      await expect(
-        startAgentDevSession({ agent: "agent_abc123" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(startAgentDevSession({ agent: "agent_abc123" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 
@@ -386,10 +389,7 @@ describe("agent dev session", () => {
         // Let the session start, then end it the way Ctrl-C would.
         await vi.waitFor(() => expect(mockUpdate).toHaveBeenCalled());
         const written = (
-          mockUpdate.mock.calls[0] as [
-            string,
-            { config: Record<string, unknown> },
-          ]
+          mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
         )[1].config;
         mockGet.mockResolvedValue(makeAgent({ config: written }));
         process.emit("SIGINT");

@@ -50,13 +50,8 @@ function AnnouncementItem({ announcement }: { announcement: Announcement }) {
         <HStack width="full">
           <Text>{announcement.message}</Text>
           <Button size="xs" variant="outline" colorPalette="blue" asChild>
-            <a
-              href={announcement.linkUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {announcement.linkLabel ?? "Learn more"}{" "}
-              <LuArrowRight size={12} />
+            <a href={announcement.linkUrl} target="_blank" rel="noopener noreferrer">
+              {announcement.linkLabel ?? "Learn more"} <LuArrowRight size={12} />
             </a>
           </Button>
         </HStack>

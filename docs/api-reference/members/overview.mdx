@@ -4,7 +4,10 @@ description: "Manage the people in the organization: list them, read one with th
 ---
 
 <Note>
-  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused
+  with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments
+  need an Enterprise license for the same endpoints. To enable it, reach out to
+  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
 ## Intro
@@ -25,13 +28,13 @@ Reading the list and a single member needs `organization:view`. Changing, removi
 
 ## Endpoints
 
-| Method | Path | Permission | Description |
-|--------|------|------------|-------------|
-| `GET` | `/api/organization/members` | `organization:view` | List members with their role and status |
-| `GET` | `/api/organization/members/{userId}` | `organization:view` | Read one member and the teams they reach |
-| `PATCH` | `/api/organization/members/{userId}` | `organization:manage` | Change the organization role, or disable and re-enable access |
-| `DELETE` | `/api/organization/members/{userId}` | `organization:manage` | Remove a member from the organization and its teams |
-| `GET` | `/api/organization/members/{userId}/access` | `organization:manage` | Read everything the member can reach and where it comes from |
+| Method   | Path                                        | Permission            | Description                                                   |
+| -------- | ------------------------------------------- | --------------------- | ------------------------------------------------------------- |
+| `GET`    | `/api/organization/members`                 | `organization:view`   | List members with their role and status                       |
+| `GET`    | `/api/organization/members/{userId}`        | `organization:view`   | Read one member and the teams they reach                      |
+| `PATCH`  | `/api/organization/members/{userId}`        | `organization:manage` | Change the organization role, or disable and re-enable access |
+| `DELETE` | `/api/organization/members/{userId}`        | `organization:manage` | Remove a member from the organization and its teams           |
+| `GET`    | `/api/organization/members/{userId}/access` | `organization:manage` | Read everything the member can reach and where it comes from  |
 
 Disabled members are left out of the list unless you pass `includeDisabled=true`.
 

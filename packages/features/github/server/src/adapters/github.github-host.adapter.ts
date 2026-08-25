@@ -32,9 +32,7 @@ export function getGithubHost(config: GithubHostConfig = {}): string {
 /** github.com answers on a separate hostname; Enterprise Server does not. */
 export function getGithubApiBase(config: GithubHostConfig = {}): string {
   const host = getGithubHost(config);
-  return host === GITHUB_DOT_COM
-    ? "https://api.github.com"
-    : `https://${host}/api/v3`;
+  return host === GITHUB_DOT_COM ? "https://api.github.com" : `https://${host}/api/v3`;
 }
 
 /** The origin the account settings and uninstall pages are addressed from. */
@@ -54,9 +52,7 @@ export function getGithubAppInstallUrl(
 ): string {
   const host = getGithubHost(config);
   const segment = host === GITHUB_DOT_COM ? "apps" : "github-apps";
-  return `https://${host}/${segment}/${encodeURIComponent(
-    appSlug,
-  )}/installations/new`;
+  return `https://${host}/${segment}/${encodeURIComponent(appSlug)}/installations/new`;
 }
 
 /**

@@ -76,11 +76,7 @@ export abstract class BaseEventSourcingError extends Error {
  * Base class for critical errors that must cause operation to fail immediately.
  */
 export abstract class CriticalError extends BaseEventSourcingError {
-  constructor(
-    message: string,
-    context: Record<string, unknown> = {},
-    cause?: unknown,
-  ) {
+  constructor(message: string, context: Record<string, unknown> = {}, cause?: unknown) {
     super(message, ErrorCategory.CRITICAL, context, cause);
   }
 }
@@ -89,11 +85,7 @@ export abstract class CriticalError extends BaseEventSourcingError {
  * Base class for recoverable errors that should trigger retry logic.
  */
 export abstract class RecoverableError extends BaseEventSourcingError {
-  constructor(
-    message: string,
-    context: Record<string, unknown> = {},
-    cause?: unknown,
-  ) {
+  constructor(message: string, context: Record<string, unknown> = {}, cause?: unknown) {
     super(message, ErrorCategory.RECOVERABLE, context, cause);
   }
 }
@@ -102,11 +94,7 @@ export abstract class RecoverableError extends BaseEventSourcingError {
  * Base class for non-critical errors that should be logged but don't fail the operation.
  */
 export abstract class NonCriticalError extends BaseEventSourcingError {
-  constructor(
-    message: string,
-    context: Record<string, unknown> = {},
-    cause?: unknown,
-  ) {
+  constructor(message: string, context: Record<string, unknown> = {}, cause?: unknown) {
     super(message, ErrorCategory.NON_CRITICAL, context, cause);
   }
 }
@@ -173,11 +161,7 @@ export class ConfigurationError extends CriticalError {
   readonly component: string;
   readonly details: string;
 
-  constructor(
-    component: string,
-    details: string,
-    context: Record<string, unknown> = {},
-  ) {
+  constructor(component: string, details: string, context: Record<string, unknown> = {}) {
     super(`Configuration error in ${component}: ${details}`, {
       ...context,
       component,
@@ -351,10 +335,7 @@ export function handleError(
       case ErrorCategory.RECOVERABLE:
         // Recoverable errors are logged with retry indication
         if (logger) {
-          logger.warn(
-            mergedContext,
-            "Recoverable error occurred, should retry",
-          );
+          logger.warn(mergedContext, "Recoverable error occurred, should retry");
         }
         // Don't throw - caller should implement retry logic
         break;
@@ -378,10 +359,7 @@ export function handleError(
     case ErrorCategory.NON_CRITICAL:
       // Non-critical errors are logged but don't throw
       if (logger) {
-        logger.error(
-          mergedContext,
-          "Non-critical error occurred, continuing operation",
-        );
+        logger.error(mergedContext, "Non-critical error occurred, continuing operation");
       }
       break;
 
@@ -513,10 +491,7 @@ export function classifyClickHouseError(error: unknown): ErrorCategory {
   // statement CRITICAL: a job refused precisely BECAUSE the platform was busy
   // was then dropped rather than re-staged, which is the one outcome shedding
   // exists to avoid.
-  if (
-    HandledError.isHandled(error) &&
-    TRANSIENT_HANDLED_CODES.has(error.code)
-  ) {
+  if (HandledError.isHandled(error) && TRANSIENT_HANDLED_CODES.has(error.code)) {
     return ErrorCategory.RECOVERABLE;
   }
 

@@ -21,13 +21,8 @@ export abstract class AnomalySpendReaderPort {
 
 export abstract class SpendSpikeAnomalyRepository {
   abstract listActiveRules(): Promise<AnomalyRule[]>;
-  abstract tryResolveGovernanceTenantId(
-    organizationId: string,
-  ): Promise<string | null>;
-  abstract hasOpenAlert(input: {
-    ruleId: string;
-    since: Date;
-  }): Promise<boolean>;
+  abstract tryResolveGovernanceTenantId(organizationId: string): Promise<string | null>;
+  abstract hasOpenAlert(input: { ruleId: string; since: Date }): Promise<boolean>;
   abstract createAlert(input: {
     rule: AnomalyRule;
     result: SpendSpikeEvaluationResult;

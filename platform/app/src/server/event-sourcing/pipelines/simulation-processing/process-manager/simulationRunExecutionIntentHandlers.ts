@@ -8,9 +8,7 @@ import type {
   FinishRunIntent,
 } from "./simulationRunExecutionProcess.types";
 
-const logger = createLogger(
-  "langwatch:simulation-processing:run-execution-effects",
-);
+const logger = createLogger("langwatch:simulation-processing:run-execution-effects");
 
 /**
  * The subset of the scenario execution pool the execute intent needs. The
@@ -83,9 +81,7 @@ export function createExecuteRunHandler(
       setId: payload.scenarioSetId,
       ...(payload.name !== undefined ? { scenarioName: payload.name } : {}),
       target: payload.target,
-      ...(payload.parameters !== undefined
-        ? { parameters: payload.parameters }
-        : {}),
+      ...(payload.parameters !== undefined ? { parameters: payload.parameters } : {}),
       ...(payload.secretParameters !== undefined
         ? { secretParameters: payload.secretParameters }
         : {}),

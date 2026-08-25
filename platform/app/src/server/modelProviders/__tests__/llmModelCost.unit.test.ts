@@ -9,8 +9,7 @@ import {
 describe("getStaticModelCosts", () => {
   const costs = getStaticModelCosts();
 
-  const findByModel = (modelId: string) =>
-    costs.find((c) => c.model === modelId);
+  const findByModel = (modelId: string) => costs.find((c) => c.model === modelId);
 
   const matches = (modelId: string, input: string) => {
     const entry = findByModel(modelId);
@@ -47,10 +46,7 @@ describe("getStaticModelCosts", () => {
         "minimax/minimax-m2.1",
       ];
       for (const model of expectedModels) {
-        expect(
-          findByModel(model),
-          `${model} missing from registry`,
-        ).toBeDefined();
+        expect(findByModel(model), `${model} missing from registry`).toBeDefined();
       }
     });
   });
@@ -65,15 +61,13 @@ describe("getStaticModelCosts", () => {
     });
 
     it("matches anthropic/claude-opus-4-5 with the vendor prefix", () => {
-      expect(
-        matches("anthropic/claude-opus-4-5", "anthropic/claude-opus-4-5"),
-      ).toBe(true);
+      expect(matches("anthropic/claude-opus-4-5", "anthropic/claude-opus-4-5")).toBe(
+        true,
+      );
     });
 
     it("matches anthropic/claude-opus-4-5 without the vendor prefix", () => {
-      expect(matches("anthropic/claude-opus-4-5", "claude-opus-4-5")).toBe(
-        true,
-      );
+      expect(matches("anthropic/claude-opus-4-5", "claude-opus-4-5")).toBe(true);
     });
 
     it("still matches longer prefixed variants, which downstream lookup disambiguates by order", () => {
@@ -83,15 +77,11 @@ describe("getStaticModelCosts", () => {
 
   describe("dot/hyphen interchangeability in version numbers", () => {
     it("matches claude-opus-4-5 when sent with a dot separator", () => {
-      expect(matches("anthropic/claude-opus-4-5", "claude-opus-4.5")).toBe(
-        true,
-      );
+      expect(matches("anthropic/claude-opus-4-5", "claude-opus-4.5")).toBe(true);
     });
 
     it("matches claude-opus-4-6 when sent with a dot separator", () => {
-      expect(matches("anthropic/claude-opus-4-6", "claude-opus-4.6")).toBe(
-        true,
-      );
+      expect(matches("anthropic/claude-opus-4-6", "claude-opus-4.6")).toBe(true);
     });
 
     it("matches minimax-m2.1 when sent with a hyphen separator", () => {
@@ -143,9 +133,8 @@ describe("getStaticModelCosts", () => {
           },
         }));
 
-        const { getStaticModelCosts: getMockedStaticModelCosts } = await import(
-          "../llmModelCost"
-        );
+        const { getStaticModelCosts: getMockedStaticModelCosts } =
+          await import("../llmModelCost");
         const mockedCosts = getMockedStaticModelCosts();
 
         expect(mockedCosts.map((entry) => entry.model)).toEqual([
@@ -153,8 +142,7 @@ describe("getStaticModelCosts", () => {
           "verylongvendor/abc",
         ]);
         expect(
-          mockedCosts.find((entry) => new RegExp(entry.regex).test("abc-def"))
-            ?.model,
+          mockedCosts.find((entry) => new RegExp(entry.regex).test("abc-def"))?.model,
         ).toBe("x/abc-def");
       });
     });
@@ -185,8 +173,7 @@ describe("hour-long cache write rate", () => {
     /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
     it("derives it across the Anthropic family, aliases included", () => {
       const anthropic = costs.filter(
-        (c) =>
-          /^~?anthropic\//.test(c.model) && c.cacheCreationCostPerToken != null,
+        (c) => /^~?anthropic\//.test(c.model) && c.cacheCreationCostPerToken != null,
       );
       expect(anthropic.length).toBeGreaterThan(0);
       for (const entry of anthropic) {
@@ -197,9 +184,7 @@ describe("hour-long cache write rate", () => {
       }
       // The tilde-prefixed aliases are Anthropic too, and would be missed by a
       // plain prefix check.
-      const aliases = anthropic.filter((c) =>
-        c.model.startsWith("~anthropic/"),
-      );
+      const aliases = anthropic.filter((c) => c.model.startsWith("~anthropic/"));
       expect(aliases.length).toBeGreaterThan(0);
     });
 
@@ -207,8 +192,7 @@ describe("hour-long cache write rate", () => {
     it("leaves models from other providers without one", () => {
       const others = costs.filter(
         (c) =>
-          !/^~?anthropic\//.test(c.model) &&
-          c.cacheCreation1hCostPerToken !== undefined,
+          !/^~?anthropic\//.test(c.model) && c.cacheCreation1hCostPerToken !== undefined,
       );
       expect(others).toEqual([]);
     });
@@ -284,22 +268,17 @@ describe("resolveCacheWrite1hRate", () => {
 
 describe("audio token rates in the static registry", () => {
   const costs = getStaticModelCosts();
-  const findByModel = (modelId: string) =>
-    costs.find((c) => c.model === modelId);
+  const findByModel = (modelId: string) => costs.find((c) => c.model === modelId);
   const match = (model: string) => matchModelCostWithFallbacks(model, costs);
 
   describe("given a model the catalog prices audio input for", () => {
     describe("when the registry is built", () => {
       it("maps the catalog's audioCostPerToken onto the input audio rate", () => {
-        expect(findByModel("openai/gpt-audio")?.inputAudioCostPerToken).toBe(
-          0.000032,
-        );
+        expect(findByModel("openai/gpt-audio")?.inputAudioCostPerToken).toBe(0.000032);
       });
 
       it("derives the output audio rate at twice the input rate", () => {
-        expect(findByModel("openai/gpt-audio")?.outputAudioCostPerToken).toBe(
-          0.000064,
-        );
+        expect(findByModel("openai/gpt-audio")?.outputAudioCostPerToken).toBe(0.000064);
       });
     });
   });
@@ -332,9 +311,7 @@ describe("audio token rates in the static registry", () => {
   describe("given an OpenAI audio model with no audio input price", () => {
     describe("when the rate is resolved", () => {
       it("derives nothing, because there is nothing to scale", () => {
-        expect(
-          resolveAudioOutputRate("openai/gpt-realtime", {}),
-        ).toBeUndefined();
+        expect(resolveAudioOutputRate("openai/gpt-realtime", {})).toBeUndefined();
       });
     });
   });
@@ -391,9 +368,7 @@ describe("the ElevenLabs conversational entry", () => {
     describe("when it is matched", () => {
       it("is not captured by the conversational entry", () => {
         expect(match("scribe_v1")?.model).toBe("elevenlabs/scribe_v1");
-        expect(match("elevenlabs/scribe_v1")?.model).toBe(
-          "elevenlabs/scribe_v1",
-        );
+        expect(match("elevenlabs/scribe_v1")?.model).toBe("elevenlabs/scribe_v1");
       });
     });
   });

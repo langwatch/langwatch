@@ -206,18 +206,17 @@ describe("FeatureFlagService", () => {
       });
 
       it("runs at the top level so the legacy service is bypassed", async () => {
-        process.env.FEATURE_FLAG_FORCE_ENABLE =
-          "release_ui_ai_gateway_menu_enabled";
+        process.env.FEATURE_FLAG_FORCE_ENABLE = "release_ui_ai_gateway_menu_enabled";
         const legacy = buildLegacy(false);
         const service = new FeatureFlagService({
           legacy,
           store: buildNoopStore(),
         });
 
-        const result = await service.isEnabled(
-          "release_ui_ai_gateway_menu_enabled",
-          { distinctId: "u", defaultValue: false },
-        );
+        const result = await service.isEnabled("release_ui_ai_gateway_menu_enabled", {
+          distinctId: "u",
+          defaultValue: false,
+        });
 
         expect(result).toBe(true);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
@@ -225,8 +224,7 @@ describe("FeatureFlagService", () => {
 
       it("per-flag envOverride takes precedence over FEATURE_FLAG_FORCE_ENABLE", async () => {
         process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED = "0";
-        process.env.FEATURE_FLAG_FORCE_ENABLE =
-          "release_ui_simulations_menu_enabled";
+        process.env.FEATURE_FLAG_FORCE_ENABLE = "release_ui_simulations_menu_enabled";
         const service = FeatureFlagService.create();
 
         const result = await service.isEnabled(

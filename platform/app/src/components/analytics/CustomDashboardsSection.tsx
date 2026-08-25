@@ -1,12 +1,5 @@
 import { Box, Button, Input, Spinner } from "@chakra-ui/react";
-import {
-  ArrowDown,
-  ArrowUp,
-  Edit2,
-  MoreVertical,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { MenuLink } from "~/components/MenuLink";
@@ -21,9 +14,7 @@ interface CustomDashboardsSectionProps {
   projectSlug: string;
 }
 
-export function CustomDashboardsSection({
-  projectSlug,
-}: CustomDashboardsSectionProps) {
+export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSectionProps) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
@@ -31,13 +22,9 @@ export function CustomDashboardsSection({
   const { openDrawer } = useDrawer();
   const queryClient = api.useUtils();
 
-  const [editingDashboardId, setEditingDashboardId] = useState<string | null>(
-    null,
-  );
+  const [editingDashboardId, setEditingDashboardId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
-  const [dashboardToDelete, setDashboardToDelete] = useState<string | null>(
-    null,
-  );
+  const [dashboardToDelete, setDashboardToDelete] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const dashboardsQuery = api.dashboards.getAll.useQuery(
@@ -94,10 +81,7 @@ export function CustomDashboardsSection({
     setEditingName("");
   };
 
-  const handleMoveDashboard = (
-    dashboardId: string,
-    direction: "up" | "down",
-  ) => {
+  const handleMoveDashboard = (dashboardId: string, direction: "up" | "down") => {
     const currentIndex = dashboards.findIndex((p) => p.id === dashboardId);
     if (currentIndex === -1) return;
 
@@ -262,9 +246,7 @@ export function CustomDashboardsSection({
                   <Menu.Content>
                     <Menu.Item
                       value="rename"
-                      onClick={() =>
-                        handleStartRename(dashboard.id, dashboard.name)
-                      }
+                      onClick={() => handleStartRename(dashboard.id, dashboard.name)}
                     >
                       <Edit2 size={14} /> Rename
                     </Menu.Item>
@@ -279,9 +261,7 @@ export function CustomDashboardsSection({
                     {canMoveDown && (
                       <Menu.Item
                         value="move-down"
-                        onClick={() =>
-                          handleMoveDashboard(dashboard.id, "down")
-                        }
+                        onClick={() => handleMoveDashboard(dashboard.id, "down")}
                       >
                         <ArrowDown size={14} /> Move Down
                       </Menu.Item>
@@ -304,12 +284,7 @@ export function CustomDashboardsSection({
           </Box>
         );
       })}
-      <Button
-        size="sm"
-        width="full"
-        variant="ghost"
-        onClick={handleCreateDashboard}
-      >
+      <Button size="sm" width="full" variant="ghost" onClick={handleCreateDashboard}>
         <Plus size={14} /> Add Dashboard
       </Button>
     </>

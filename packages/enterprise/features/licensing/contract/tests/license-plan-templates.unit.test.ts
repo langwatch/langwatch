@@ -79,10 +79,7 @@ describe("GROWTH_TEMPLATE", () => {
   describe("when inspecting feature limits", () => {
     /** @scenario GROWTH plan includes all features with no artificial limits */
     it("sets all other limits to unlimited (DEFAULT_LIMIT)", () => {
-      const unlimitedFields = [
-        "maxMembersLite",
-        "maxMessagesPerMonth",
-      ] as const;
+      const unlimitedFields = ["maxMembersLite", "maxMessagesPerMonth"] as const;
 
       for (const field of unlimitedFields) {
         expect(GROWTH_TEMPLATE[field], `${field} is not DEFAULT_LIMIT`).toBe(

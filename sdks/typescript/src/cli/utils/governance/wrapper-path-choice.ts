@@ -197,9 +197,7 @@ export interface ResolveWrapperPathOptions {
    * path the admin disabled AFTER login is honored without a re-login. Returns
    * null (or throws) when offline; the resolver then keeps the cached map.
    */
-  refreshPolicies?: (
-    cfg: GovernanceConfig,
-  ) => Promise<PlatformToolPolicyMap | null>;
+  refreshPolicies?: (cfg: GovernanceConfig) => Promise<PlatformToolPolicyMap | null>;
 }
 
 export interface ResolveWrapperPathResult {
@@ -434,14 +432,12 @@ export async function resolveWrapperPath(
     // Best-effort persist - a write failure shouldn't block the run.
   }
 
-  const label =
-    chosen === "gateway" ? "an API key (gateway)" : "your own plan (otlp)";
+  const label = chosen === "gateway" ? "an API key (gateway)" : "your own plan (otlp)";
   // The prompt answer is the route that actually moves copilot spend off
   // the user's seat — it must name the shift like every other gateway
   // route (ADR-039 D3), not leave the user to learn it from the pinned
   // branch on run 2.
-  const seatSuffix =
-    chosen === "gateway" ? copilotSeatBypassSuffix(tool) : "";
+  const seatSuffix = chosen === "gateway" ? copilotSeatBypassSuffix(tool) : "";
   writeImpl(
     `${lwTag()} saved. \`${tool}\` will use ${label}. ` +
       `Override with --tool-mode=${chosen === "gateway" ? "otlp" : "gateway"}, ` +

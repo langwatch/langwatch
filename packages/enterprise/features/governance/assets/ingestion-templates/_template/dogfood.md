@@ -10,14 +10,14 @@ The verifications align 1:1 with the scenarios in `specs/ai-gateway/governance/p
 
 Two parts of the spec'd ritual are deferred to v1.1 / v2 per @sergey's lane-S checkpoint (24f48a159):
 
-| Capability | v1 status | What it means for the ritual |
-|---|---|---|
-| Receiver auth via ik-lw-* token | ✅ shipped (60ae9847a) | hash lookup → defense-in-depth re-verify → personal project tenancy works end-to-end |
-| Receiver-stamped attribution keys (B6 16-key set: `langwatch.user.id`, `.team.id`, `.organization.id`, `.project.id`, `.tenant_id`, etc.) | ✅ shipped (existing B6 guard) | trace lands with correct user/team/org/project regardless of what the payload claims |
-| Receiver-stamped provenance keys (`langwatch.template.id`, `.user_ingestion_binding.id`, `.source`) | 🔵 deferred (next sergey commit) | Step 4 Then-clause asserting these keys is **blocked on sergey's provenance-stamping work** |
-| 19-key `protectedTemplateAttributeKeys` principal-field guard | 🟡 deferred to v1.1 / v2 | v1 templates ship empty `ottlRules` → no template OTTL ever runs → no audit row fires v1. **Step 6 forge-audit-row Then-clause is blocked on the principal-field-guard work.** Receiver still re-stamps attribution keys via existing B6 guard. |
-| `gateway.template_ottl_protected_field_attempt` audit row | 🟡 deferred to v1.1 / v2 | same as above |
-| Template OTTL transform | 🟡 deferred to v2 (admin-OTTL authoring UI) | v1 platform templates rely on the upstream tool emitting canonical gen_ai already (Claude Code / Cursor / claude_cowork all do). The receiver passthrough produces the canonical shape without OTTL involvement v1. |
+| Capability                                                                                                                                | v1 status                                   | What it means for the ritual                                                                                                                                                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Receiver auth via ik-lw-* token                                                                                                           | ✅ shipped (60ae9847a)                      | hash lookup → defense-in-depth re-verify → personal project tenancy works end-to-end                                                                                                                                                            |
+| Receiver-stamped attribution keys (B6 16-key set: `langwatch.user.id`, `.team.id`, `.organization.id`, `.project.id`, `.tenant_id`, etc.) | ✅ shipped (existing B6 guard)              | trace lands with correct user/team/org/project regardless of what the payload claims                                                                                                                                                            |
+| Receiver-stamped provenance keys (`langwatch.template.id`, `.user_ingestion_binding.id`, `.source`)                                       | 🔵 deferred (next sergey commit)            | Step 4 Then-clause asserting these keys is **blocked on sergey's provenance-stamping work**                                                                                                                                                     |
+| 19-key `protectedTemplateAttributeKeys` principal-field guard                                                                             | 🟡 deferred to v1.1 / v2                    | v1 templates ship empty `ottlRules` → no template OTTL ever runs → no audit row fires v1. **Step 6 forge-audit-row Then-clause is blocked on the principal-field-guard work.** Receiver still re-stamps attribution keys via existing B6 guard. |
+| `gateway.template_ottl_protected_field_attempt` audit row                                                                                 | 🟡 deferred to v1.1 / v2                    | same as above                                                                                                                                                                                                                                   |
+| Template OTTL transform                                                                                                                   | 🟡 deferred to v2 (admin-OTTL authoring UI) | v1 platform templates rely on the upstream tool emitting canonical gen_ai already (Claude Code / Cursor / claude_cowork all do). The receiver passthrough produces the canonical shape without OTTL involvement v1.                             |
 
 **v1 effectively proves**: real upstream tool with canonical gen_ai → user's binding token → receiver auth → personal-project tenancy → /me/traces with cost/tokens/model populated. That's the headline use case.
 
@@ -31,10 +31,10 @@ When running this ritual on v1, mark deferred steps as **"blocked on sergey's pr
 
 Two parallel tracks. Both must pass (modulo the deferred-step exemptions above). **Fixture-only sign-off is forbidden.** Per `feedback_fixtures_dont_replace_real_user_dogfood.md`: fixtures lie when the real path has friction the fixture skipped — broken OAuth redirects, OTTL not loading at runtime, drawer copy mismatched, bound credentials not wired through to receiver auth, etc. Fixtures catch parser correctness; only the real path catches flow correctness.
 
-| Track | What it proves | Tools | When to run |
-|---|---|---|---|
-| **Fixture track** | Receiver/parser handles the canonical post-OTTL shape; principal-field guard rejects forge attempts | `scripts/dogfood/governance/emit-otlp.sh` + `payloads/<slug>.json` + `forge-attempt/{attribution,provenance}.json` | Every commit that touches receiver/OTTL/principal-guard code; runs in seconds |
-| **Real-user track** | The actual user flow works end-to-end — admin publishes via UI, user installs via UI form, real upstream tool emits, receiver auth + OTTL + cost extraction all wire through, /me/traces shows parsed trace | Real admin UI + real `/me` install drawer + real upstream tool (Claude Code / Cursor / Claude cowork session) + real `/me/traces` browse | Before tile ships green; before claiming feature works |
+| Track               | What it proves                                                                                                                                                                                              | Tools                                                                                                                                    | When to run                                                                   |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **Fixture track**   | Receiver/parser handles the canonical post-OTTL shape; principal-field guard rejects forge attempts                                                                                                         | `scripts/dogfood/governance/emit-otlp.sh` + `payloads/<slug>.json` + `forge-attempt/{attribution,provenance}.json`                       | Every commit that touches receiver/OTTL/principal-guard code; runs in seconds |
+| **Real-user track** | The actual user flow works end-to-end — admin publishes via UI, user installs via UI form, real upstream tool emits, receiver auth + OTTL + cost extraction all wire through, /me/traces shows parsed trace | Real admin UI + real `/me` install drawer + real upstream tool (Claude Code / Cursor / Claude cowork session) + real `/me/traces` browse | Before tile ships green; before claiming feature works                        |
 
 **Report both tracks side by side.** If real-user can't be done yet (e.g., upstream tool wrapper not built, OAuth provider not wired), say **"blocked on X"** explicitly so the dependency is visible.
 
@@ -67,6 +67,7 @@ The 7 steps below cover the fixture track. They use `emit-otlp.sh` to fire canne
 Open `/me`, scroll to the **Trace Ingest** section, click **Install** on the `<TEMPLATE_SLUG>` tile.
 
 Verify:
+
 - Drawer opens with template name + iconKey + description copy
 - Endpoint URL renders (read-only, copyable): `<BASE_HOST>/api/otel` — the OTEL SDK exporter auto-appends `/v1/traces` per OTLP convention. Receiver POSTs land at `<BASE_HOST>/api/otel/v1/traces`. The drawer shows the BASE URL (matches `OpenTelemetrySetup` pattern + the `OTEL_EXPORTER_OTLP_ENDPOINT` env-var convention).
 - Binding access token renders (one-time-show, masked thereafter, prefix-only display): first 9 chars `ik-lw-XYZ…`
@@ -82,6 +83,7 @@ If the drawer ever shows the token unmasked-but-not-just-revealed, **blocker** (
 ### Step 2 — Bind-install audit row
 
 Open `/settings/audit-log`. Verify a row appears within 5 seconds:
+
 - `action = gateway.user_ingestion_binding.installed`
 - `actor = <jane>` (or whichever user installed)
 - `target = <TEMPLATE_SLUG>` (the template slug, NOT the binding id — slug is the user-facing handle)
@@ -112,6 +114,7 @@ If the wrapper returns non-2xx, capture the response body (`--verbose`) and trea
 Open `/me/traces` filtered by `langwatch.source = "<TEMPLATE_SLUG>"`. Verify the trace from step 3 appears within 5 seconds.
 
 Click into the trace and verify:
+
 - `gen_ai.system` populated (template-OTTL-output)
 - `gen_ai.request.model` + `gen_ai.response.model` populated
 - `gen_ai.usage.input_tokens` + `gen_ai.usage.output_tokens` are both > 0
@@ -154,6 +157,7 @@ Re-emit using the forge fixtures. **Both variants must run.**
 ```
 
 Verify (per `template-ottl-principal-guard.feature`):
+
 - The trace lands at `/me/traces` (receiver does NOT 4xx the request — it accepts but re-stamps)
 - `langwatch.user.id` == binding-authoritative jane's id, NOT the `FORGE_user_other` claim from the payload
 - `langwatch.template.id` == binding-authoritative `<TEMPLATE_SLUG>` template id, NOT `FORGE_template_other`
@@ -169,6 +173,7 @@ If the receiver echoes the FORGE_* values into the trace (instead of restoring a
 Trigger token rotation from the `/me` Trace Ingest tile (rotate button on the installed tile). Capture the new `ik-lw-*` token.
 
 Verify:
+
 - New token `T_NEW` is issued and shown one-time in a drawer (same shape as install drawer)
 - `bindingAccessTokenHash` column updates to `SHA256(T_NEW)` (verifiable by tail-of-`pg_dump` or Prisma Studio)
 - `bindingAccessTokenPrefix` column updates to `T_NEW`'s first 9 chars

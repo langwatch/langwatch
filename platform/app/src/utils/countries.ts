@@ -254,8 +254,9 @@ const sortedEntries = (
   Object.entries(countryCodeToNameUnsorted) as [CountryMapCode, string][]
 ).sort((a, b) => a[1].localeCompare(b[1], void 0, { sensitivity: "base" }));
 
-export const countryCodeToName: Record<CountryMapCode, string> =
-  Object.fromEntries(sortedEntries) as Record<CountryMapCode, string>;
+export const countryCodeToName: Record<CountryMapCode, string> = Object.fromEntries(
+  sortedEntries,
+) as Record<CountryMapCode, string>;
 
 export const COMMON_COUNTRIES: readonly CountryMapCode[] = [
   "NL",

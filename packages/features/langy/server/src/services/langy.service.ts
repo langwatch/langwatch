@@ -56,10 +56,7 @@ import {
   LangyCredentialService,
   type LangyCredentialServiceOptions,
 } from "./langy-credential.service";
-import {
-  LangyTurnRelay,
-  type LangyRelayRedis,
-} from "../streaming/langy-turn-relay";
+import { LangyTurnRelay, type LangyRelayRedis } from "../streaming/langy-turn-relay";
 import { LangyFeedbackPromptPolicy } from "../ports/langy-feedback-prompt.port";
 
 export type LangyRelayCompositionOptions = {
@@ -315,17 +312,13 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
     return this.repositories;
   }
 
-  listConversations(
-    input: LangyConversationListInput,
-  ): Promise<LangyConversationPage> {
+  listConversations(input: LangyConversationListInput): Promise<LangyConversationPage> {
     return this.persistence.conversations.list(
       langyConversationListInputSchema.parse(input),
     );
   }
 
-  async getConversation(
-    input: LangyConversationInput,
-  ): Promise<LangyConversation> {
+  async getConversation(input: LangyConversationInput): Promise<LangyConversation> {
     const parsed = langyConversationInputSchema.parse(input);
     const result = await this.persistence.conversations.tryGet(parsed);
     if (!result) {
@@ -334,9 +327,7 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
     return result;
   }
 
-  createConversation(
-    input: LangyCreateConversationInput,
-  ): Promise<LangyConversation> {
+  createConversation(input: LangyCreateConversationInput): Promise<LangyConversation> {
     return this.persistence.conversations.create(
       langyCreateConversationInputSchema.parse(input),
     );
@@ -356,12 +347,14 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
 
   async stopTurn(input: LangyStopTurnInput & { userId?: string }): Promise<void> {
     if (input.userId !== undefined) {
-      await this.appCapabilities().turns.stopTurn(input as {
-        projectId: string;
-        conversationId: string;
-        turnId: string;
-        userId: string;
-      });
+      await this.appCapabilities().turns.stopTurn(
+        input as {
+          projectId: string;
+          conversationId: string;
+          turnId: string;
+          userId: string;
+        },
+      );
       return;
     }
     const parsed = langyStopTurnInputSchema.parse(input);
@@ -369,30 +362,27 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
     await this.persistence.turns.stop(parsed);
   }
 
-  async listMessages(
-    input: LangyConversationInput,
-  ): Promise<readonly unknown[]> {
+  async listMessages(input: LangyConversationInput): Promise<readonly unknown[]> {
     const parsed = langyConversationInputSchema.parse(input);
     await this.getConversation(parsed);
     return this.persistence.messages.list(parsed);
   }
 
   resolveCredential(input: LangyCredentialInput): Promise<LangyCredential> {
-    return this.persistence.credentials.resolve(
-      langyCredentialInputSchema.parse(input),
-    );
+    return this.persistence.credentials.resolve(langyCredentialInputSchema.parse(input));
   }
 
-  tryGetEgressAllowlist(
-    input: { projectId: string },
-  ): Promise<LangyEgressAllowlist | null> {
+  tryGetEgressAllowlist(input: {
+    projectId: string;
+  }): Promise<LangyEgressAllowlist | null> {
     const projectId = langyEgressProjectInputSchema.parse(input).projectId;
     return this.persistence.credentials.tryGetEgressAllowlist(projectId);
   }
 
-  trySetEgressAllowlist(
-    input: { projectId: string; allowlist: LangyEgressAllowlist },
-  ): Promise<LangyEgressAllowlist | null> {
+  trySetEgressAllowlist(input: {
+    projectId: string;
+    allowlist: LangyEgressAllowlist;
+  }): Promise<LangyEgressAllowlist | null> {
     const projectId = langyEgressProjectInputSchema.parse(input).projectId;
     const allowlist = langyEgressAllowlistSchema.parse(input.allowlist);
     return this.persistence.credentials.trySetEgressAllowlist(
@@ -422,9 +412,7 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
   }
 
   tryFindByIdVisible(
-    input: Parameters<
-      AppCapabilities["conversations"]["tryFindByIdVisible"]
-    >[0],
+    input: Parameters<AppCapabilities["conversations"]["tryFindByIdVisible"]>[0],
   ): Promise<ContractConversationDetail | null> {
     return this.appCapabilities().conversations.tryFindByIdVisible(input);
   }
@@ -472,24 +460,18 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
   }
 
   tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null> {
-    return this.appCapabilities().credentials.tryGetModelsAllowedForProject(
-      projectId,
-    );
+    return this.appCapabilities().credentials.tryGetModelsAllowedForProject(projectId);
   }
 
-  shouldAskFeedback(
-    input: {
-      userId: string;
-      conversationId: string;
-      assistantAnswerCount: number;
-    },
-  ): Promise<boolean> {
+  shouldAskFeedback(input: {
+    userId: string;
+    conversationId: string;
+    assistantAnswerCount: number;
+  }): Promise<boolean> {
     return this.feedbackPrompt.shouldAsk(input);
   }
 
-  markFeedbackShown(
-    input: { userId: string; conversationId: string },
-  ): Promise<void> {
+  markFeedbackShown(input: { userId: string; conversationId: string }): Promise<void> {
     return this.feedbackPrompt.markShown(input);
   }
 
@@ -510,33 +492,25 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
   }
 
   recordToolCallStarted(
-    input: Parameters<
-      AppCapabilities["conversations"]["recordToolCallStarted"]
-    >[0],
+    input: Parameters<AppCapabilities["conversations"]["recordToolCallStarted"]>[0],
   ): Promise<void> {
     return this.appCapabilities().conversations.recordToolCallStarted(input);
   }
 
   recordToolCallCompleted(
-    input: Parameters<
-      AppCapabilities["conversations"]["recordToolCallCompleted"]
-    >[0],
+    input: Parameters<AppCapabilities["conversations"]["recordToolCallCompleted"]>[0],
   ): Promise<void> {
     return this.appCapabilities().conversations.recordToolCallCompleted(input);
   }
 
   recordTurnHandoff(
-    input: Parameters<
-      AppCapabilities["conversations"]["recordTurnHandoff"]
-    >[0],
+    input: Parameters<AppCapabilities["conversations"]["recordTurnHandoff"]>[0],
   ): Promise<void> {
     return this.appCapabilities().conversations.recordTurnHandoff(input);
   }
 
   recordPlanUpdated(
-    input: Parameters<
-      AppCapabilities["conversations"]["recordPlanUpdated"]
-    >[0],
+    input: Parameters<AppCapabilities["conversations"]["recordPlanUpdated"]>[0],
   ): Promise<void> {
     return this.appCapabilities().conversations.recordPlanUpdated(input);
   }

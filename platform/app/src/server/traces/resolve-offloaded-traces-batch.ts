@@ -31,10 +31,7 @@ import type {
   NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
-import type {
-  ResolvedTraceSpans,
-  WarnLogger,
-} from "./resolve-offloaded-traces";
+import type { ResolvedTraceSpans, WarnLogger } from "./resolve-offloaded-traces";
 
 /**
  * Maximum number of concurrent `event_log` reads in flight at once across an
@@ -115,10 +112,7 @@ function warnResolutionFailure(
   attrKey: string,
   error: unknown,
 ): void {
-  if (
-    error instanceof BlobNotFoundError ||
-    error instanceof BlobFieldNotFoundError
-  ) {
+  if (error instanceof BlobNotFoundError || error instanceof BlobFieldNotFoundError) {
     logger.warn(
       {
         projectId,

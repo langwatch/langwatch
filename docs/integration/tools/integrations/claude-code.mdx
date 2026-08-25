@@ -26,15 +26,16 @@ langwatch claude
 
 The first run asks one question:
 
-| Answer | What it does |
-| --- | --- |
-| **Using a Claude subscription** | Claude Code keeps your own plan and your own login. LangWatch receives telemetry only. |
-| **Using an API key** | Claude Code calls travel through the LangWatch gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
+| Answer                          | What it does                                                                                                                                       |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Using a Claude subscription** | Claude Code keeps your own plan and your own login. LangWatch receives telemetry only.                                                             |
+| **Using an API key**            | Claude Code calls travel through the LangWatch gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch claude` accepts the same flags, the same subcommands and the same keyboard shortcuts as `claude`, and it returns the same exit code.
 
 <Note>
-  A virtual key is created the first time you choose the gateway, not at login. If you always keep your own subscription, LangWatch never creates one for you.
+  A virtual key is created the first time you choose the gateway, not at login. If you
+  always keep your own subscription, LangWatch never creates one for you.
 </Note>
 
 ## Set up a machine without starting Claude Code
@@ -49,12 +50,12 @@ langwatch instrument claude
 
 Pass one scope flag, and one only.
 
-| Command | Destination | Needs a login |
-| --- | --- | --- |
-| `langwatch instrument claude` | Your personal workspace | Yes |
-| `langwatch instrument claude --project <id-or-slug>` | A team project | Yes |
-| `langwatch instrument claude --key <ingest-key>` | The project that owns the key | No |
-| `langwatch instrument claude --personal` | Back to your personal workspace | Yes |
+| Command                                              | Destination                     | Needs a login |
+| ---------------------------------------------------- | ------------------------------- | ------------- |
+| `langwatch instrument claude`                        | Your personal workspace         | Yes           |
+| `langwatch instrument claude --project <id-or-slug>` | A team project                  | Yes           |
+| `langwatch instrument claude --key <ingest-key>`     | The project that owns the key   | No            |
+| `langwatch instrument claude --personal`             | Back to your personal workspace | Yes           |
 
 ### Send the telemetry to a team project
 
@@ -140,12 +141,12 @@ A long-lived session that picks up several pull requests should switch this way 
 
 The setup that `langwatch claude` and `langwatch instrument claude` write turns on the four Claude Code content flags, because the content is what makes a trace worth reading:
 
-| Flag | What it puts on the wire |
-| --- | --- |
-| `OTEL_LOG_USER_PROMPTS` | The text of every prompt |
-| `OTEL_LOG_TOOL_DETAILS` | What each tool call was asked to do, such as the command text or the change to a file |
-| `OTEL_LOG_TOOL_CONTENT` | What each tool call returned, including the contents of files it read |
-| `OTEL_LOG_RAW_API_BODIES` | The request and the response of every model call |
+| Flag                      | What it puts on the wire                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------- |
+| `OTEL_LOG_USER_PROMPTS`   | The text of every prompt                                                              |
+| `OTEL_LOG_TOOL_DETAILS`   | What each tool call was asked to do, such as the command text or the change to a file |
+| `OTEL_LOG_TOOL_CONTENT`   | What each tool call returned, including the contents of files it read                 |
+| `OTEL_LOG_RAW_API_BODIES` | The request and the response of every model call                                      |
 
 Remove the flags from `~/.claude/settings.json` to keep only the usage numbers: tokens, cost, model, latency, the tool call tree and the subagent tree stay, and the content stops.
 
@@ -160,15 +161,20 @@ Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT
     Restart Claude Code. It reads `~/.claude/settings.json` at start, so a session that was already open when you ran `langwatch instrument claude` keeps its old configuration.
 
     Then run `langwatch instrument claude` again and read what it prints. It names the file it wrote and the destination the telemetry goes to.
+
   </Accordion>
 
-  <Accordion title="The trace has no tool call tree, no latencies and no subagents">
-    `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is missing. It is the flag that turns spans on, and `OTEL_TRACES_EXPORTER` does nothing without it. Cost and tokens still arrive, so the session appears, but LangWatch has no structure to attach them to and every subagent folds into the main session.
-  </Accordion>
+<Accordion title="The trace has no tool call tree, no latencies and no subagents">
+  `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is missing. It is the flag that turns spans on,
+  and `OTEL_TRACES_EXPORTER` does nothing without it. Cost and tokens still arrive, so the
+  session appears, but LangWatch has no structure to attach them to and every subagent
+  folds into the main session.
+</Accordion>
 
-  <Accordion title="The trace has no prompt">
-    `OTEL_LOG_USER_PROMPTS` is missing. Claude Code removes the prompt text from its `user_prompt` event by default.
-  </Accordion>
+<Accordion title="The trace has no prompt">
+  `OTEL_LOG_USER_PROMPTS` is missing. Claude Code removes the prompt text from its
+  `user_prompt` event by default.
+</Accordion>
 
   <Accordion title="The trace has no response">
     Both `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_ASSISTANT_RESPONSES` are missing. Claude Code reports the response text of the assistant on its `api_response_body` event (needs `OTEL_LOG_RAW_API_BODIES=1`, and carries the full request and response JSON) or on its lighter `assistant_response` event (needs `OTEL_LOG_ASSISTANT_RESPONSES=1`, and carries only the response text). Both are off by default. Set `OTEL_LOG_ASSISTANT_RESPONSES=1` if you want the response without the rest of the body.
@@ -176,6 +182,7 @@ Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT
     Claude Code docs describe `OTEL_LOG_ASSISTANT_RESPONSES` as falling back to the value of `OTEL_LOG_USER_PROMPTS`. Don't rely on that fallback: set it explicitly.
 
     Claude Code also reports `api_response_body` and `assistant_response` for work that is not a conversation, such as an autosuggestion or a session title. LangWatch filters those out, so a title never becomes the output of a trace.
+
   </Accordion>
 
   <Accordion title="The telemetry goes to the wrong workspace">
@@ -186,6 +193,7 @@ Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT
     Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
 
     On a machine with a login, run `langwatch login --device` again to refresh the session.
+
   </Accordion>
 
   <Accordion title="The cost is zero although the traces arrive">
@@ -224,7 +232,8 @@ The header takes an ingest key (`ik-lw-…`), which can create traces and nothin
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Claude Code appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
 <Warning>
-  The five `OTEL_LOG_*` flags put your session content in LangWatch. Read [Content and privacy](#content-and-privacy) before you use them where the content matters.
+  The five `OTEL_LOG_*` flags put your session content in LangWatch. Read [Content and
+  privacy](#content-and-privacy) before you use them where the content matters.
 </Warning>
 
 ### Settings file
@@ -275,14 +284,15 @@ export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code,department=engineering
 <Warning>
   `OTEL_RESOURCE_ATTRIBUTES` follows the [W3C Baggage specification](https://www.w3.org/TR/baggage/). Write comma-separated `key=value` pairs. Values cannot contain a space, a double quote, a comma, a semicolon or a backslash. Percent-encode any other character outside that range.
 
-  ```bash
-  # Rejected, the value contains a space
-  export OTEL_RESOURCE_ATTRIBUTES="org.name=Acme Corporation"
+```bash
+# Rejected, the value contains a space
+export OTEL_RESOURCE_ATTRIBUTES="org.name=Acme Corporation"
 
-  # Accepted
-  export OTEL_RESOURCE_ATTRIBUTES="org.name=Acme_Corporation"
-  export OTEL_RESOURCE_ATTRIBUTES="org.name=Acme%20Corporation"
-  ```
+# Accepted
+export OTEL_RESOURCE_ATTRIBUTES="org.name=Acme_Corporation"
+export OTEL_RESOURCE_ATTRIBUTES="org.name=Acme%20Corporation"
+```
+
 </Warning>
 
 ### Headers from a script
@@ -303,5 +313,7 @@ echo "{\"Authorization\": \"Bearer $(get-langwatch-token.sh)\"}"
 ```
 
 <Warning>
-  Claude Code reads the headers at start only, so a token that expires mid-session is not refreshed. For frequent refresh, send the telemetry to an OpenTelemetry Collector and let the collector refresh its own headers.
+  Claude Code reads the headers at start only, so a token that expires mid-session is not
+  refreshed. For frequent refresh, send the telemetry to an OpenTelemetry Collector and
+  let the collector refresh its own headers.
 </Warning>

@@ -33,9 +33,7 @@ async function collectSSE(res: Response): Promise<string[]> {
   return chunks;
 }
 
-function parseSSEEvents(
-  chunks: string[],
-): Array<{ event: string; data: unknown }> {
+function parseSSEEvents(chunks: string[]): Array<{ event: string; data: unknown }> {
   const raw = chunks.join("");
   const events: Array<{ event: string; data: unknown }> = [];
 
@@ -86,9 +84,7 @@ describe("registerSse", () => {
       )
       .build();
 
-    const watchMounts = mounted.filter((route) =>
-      route.path.endsWith("/things.watch"),
-    );
+    const watchMounts = mounted.filter((route) => route.path.endsWith("/things.watch"));
     expect(watchMounts.map((r) => `${r.method} ${r.path}`).sort()).toEqual([
       "get /api/test/2025-03-15/things.watch",
       "get /api/test/latest/things.watch",
@@ -186,14 +182,10 @@ describe("registerSse", () => {
         )
         .build();
 
-      const res = await app.request(
-        "/api/test/2025-03-15/things.watch?channel=updates",
-      );
+      const res = await app.request("/api/test/2025-03-15/things.watch?channel=updates");
       const events = parseSSEEvents(await collectSSE(res));
 
-      expect(events).toEqual([
-        { event: "ready", data: { channel: "updates" } },
-      ]);
+      expect(events).toEqual([{ event: "ready", data: { channel: "updates" } }]);
     });
 
     it("refuses a request body or path params at registration", () => {
@@ -218,9 +210,7 @@ describe("registerSse", () => {
 
   describe("when an SSE handler throws", () => {
     it("reports the error through the configured framework error handler", async () => {
-      const onError = vi.fn((error: Error, c) =>
-        c.json({ message: error.message }, 500),
-      );
+      const onError = vi.fn((error: Error, c) => c.json({ message: error.message }, 500));
       const app = createService({
         name: "test",
         basePath: "/api/test",

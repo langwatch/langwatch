@@ -27,9 +27,9 @@ describe("given a request whose URL carries a project id", () => {
     it("answers with the credential's project", () => {
       const project = projectOf("project-a");
 
-      expect(
-        callerProject({ project, requestedProjectId: "project-a" }),
-      ).toStrictEqual(project);
+      expect(callerProject({ project, requestedProjectId: "project-a" })).toStrictEqual(
+        project,
+      );
     });
   });
 

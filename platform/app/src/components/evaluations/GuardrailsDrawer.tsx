@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Heading,
-  Link,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, Link, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
@@ -287,8 +279,8 @@ EOF
                   </Box>
 
                   <Text fontSize="sm" color="gray.600">
-                    Set the <code>LANGWATCH_API_KEY</code> environment variable
-                    with your API key.{" "}
+                    Set the <code>LANGWATCH_API_KEY</code> environment variable with your
+                    API key.{" "}
                     <Link
                       href={apiKeyLink}
                       color="blue.500"

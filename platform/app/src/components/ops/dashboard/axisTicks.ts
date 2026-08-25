@@ -20,8 +20,7 @@ export function niceMax(raw: number): number {
   if (!Number.isFinite(raw) || raw <= 0) return 1;
   const magnitude = 10 ** Math.floor(Math.log10(raw));
   const normalized = raw / magnitude;
-  const nice =
-    normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  const nice = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
   return nice * magnitude;
 }
 
@@ -56,14 +55,8 @@ export function axisTicks(max: number): number[] {
  * An axis sized for `500` clips `500.0k`, which is exactly the case that shows
  * up when a count series runs into the hundreds of thousands.
  */
-export function axisWidthFor(
-  ticks: number[],
-  format: (value: number) => string,
-): number {
-  const longest = ticks.reduce(
-    (max, tick) => Math.max(max, format(tick).length),
-    1,
-  );
+export function axisWidthFor(ticks: number[], format: (value: number) => string): number {
+  const longest = ticks.reduce((max, tick) => Math.max(max, format(tick).length), 1);
   // ~7px per character at the chart's 10px tick font, plus breathing room so
   // the label never touches the plot area.
   return Math.max(32, longest * 7 + 8);

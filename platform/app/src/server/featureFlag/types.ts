@@ -37,8 +37,5 @@ export interface FeatureFlagEvaluateOptions {
  * implementations. New callers must register the flag first.
  */
 export interface FeatureFlagServiceInterface {
-  isEnabled(
-    flagKey: FeatureFlagKey,
-    opts: FeatureFlagEvaluateOptions,
-  ): Promise<boolean>;
+  isEnabled(flagKey: FeatureFlagKey, opts: FeatureFlagEvaluateOptions): Promise<boolean>;
 }

@@ -24,9 +24,7 @@ import {
 } from "../postgresMapping";
 
 /** A role that is valid in every respect, so a case varies exactly one thing. */
-function readerRole(
-  overrides: Partial<PostgresReaderRole> = {},
-): PostgresReaderRole {
+function readerRole(overrides: Partial<PostgresReaderRole> = {}): PostgresReaderRole {
   return {
     role: "ChReader",
     password: "not-a-real-password",
@@ -46,9 +44,7 @@ describe("given the PostgreSQL reader role statements", () => {
       });
 
       expect(
-        statements.some((statement) =>
-          statement.includes("CONNECTION LIMIT 7"),
-        ),
+        statements.some((statement) => statement.includes("CONNECTION LIMIT 7")),
       ).toBe(true);
     });
   });
@@ -67,10 +63,7 @@ describe("given the PostgreSQL reader role statements", () => {
       // REVOKE ALL ON SCHEMA covers CREATE and USAGE on the schema itself.
       // Table and view privileges live on the relations and outlive it, so a
       // view dropped from approvedViews stays readable without this.
-      expect(
-        statements,
-        "schema-level revoke does not reach relation grants",
-      ).toContain(
+      expect(statements, "schema-level revoke does not reach relation grants").toContain(
         `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA "public" FROM "ChReader"`,
       );
     });

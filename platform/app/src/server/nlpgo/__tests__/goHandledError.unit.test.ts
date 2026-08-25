@@ -100,12 +100,8 @@ describe("isAbortLikeError()", () => {
   it("matches a DOMException abort by name (the AbortSignal.timeout reason shape)", () => {
     // A DOMException is NOT instanceof Error in this runtime — the exact quirk
     // the helper matches on `name` to guard against.
-    expect(
-      isAbortLikeError(new DOMException("timed out", "TimeoutError")),
-    ).toBe(true);
-    expect(isAbortLikeError(new DOMException("aborted", "AbortError"))).toBe(
-      true,
-    );
+    expect(isAbortLikeError(new DOMException("timed out", "TimeoutError"))).toBe(true);
+    expect(isAbortLikeError(new DOMException("aborted", "AbortError"))).toBe(true);
   });
 
   it("matches the Next.js ResponseAborted name (mirrors the SDK's isAbortError)", () => {

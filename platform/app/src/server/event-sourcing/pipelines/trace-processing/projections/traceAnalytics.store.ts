@@ -1,7 +1,4 @@
-import type {
-  FoldProjectionStore,
-  ProjectionStoreContext,
-} from "@langwatch/eventing";
+import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { TraceAnalyticsRepository } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import {
@@ -46,22 +43,13 @@ const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
  * so a cold-cache retry still dedups a redelivered batch. Decoding is gated on
  * the row's projection version — see `getWithApplied`.
  */
-export class TraceAnalyticsStore
-  implements FoldProjectionStore<TraceAnalyticsData>
-{
+export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsData> {
   constructor(private readonly repo: TraceAnalyticsRepository) {}
 
-  async store(
-    state: TraceAnalyticsData,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
+  async store(state: TraceAnalyticsData, context: ProjectionStoreContext): Promise<void> {
     const entry = this.toRow(state, context);
     if (!entry) return;
-    await this.repo.upsert(
-      entry.row,
-      entry.retentionDays,
-      entry.appliedEventIds,
-    );
+    await this.repo.upsert(entry.row, entry.retentionDays, entry.appliedEventIds);
   }
 
   async storeBatch(
@@ -113,13 +101,10 @@ export class TraceAnalyticsStore
         tenantId: String(context.tenantId),
         version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
       }),
-      retentionDays:
-        context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      retentionDays: context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
       // The executor's redelivery-dedup watermark, persisted next to the row so
       // a retry with a cold cache still recognises a batch it committed.
-      appliedEventIds: context.appliedEventIds
-        ? [...context.appliedEventIds]
-        : [],
+      appliedEventIds: context.appliedEventIds ? [...context.appliedEventIds] : [],
     };
   }
 

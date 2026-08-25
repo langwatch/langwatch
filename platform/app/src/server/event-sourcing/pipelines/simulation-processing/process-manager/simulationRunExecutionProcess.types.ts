@@ -3,8 +3,7 @@ import { runParameterValuesSchema } from "@langwatch/scenario-contract";
 import { z } from "zod/v4";
 import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
 
-export const SIMULATION_RUN_EXECUTION_PROCESS_NAME =
-  "simulation_run_execution" as const;
+export const SIMULATION_RUN_EXECUTION_PROCESS_NAME = "simulation_run_execution" as const;
 
 /**
  * The intents this process may emit. Property-style like the other

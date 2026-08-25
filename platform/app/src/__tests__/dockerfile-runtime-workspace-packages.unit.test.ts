@@ -81,14 +81,8 @@ describe("Dockerfile runtime stage", () => {
         /COPY --from=builder \/app\/platform\/app\s+\.\/platform\/app/,
       );
 
-      expect(
-        storeCopy,
-        "runtime stage must COPY /app/node_modules",
-      ).toBeGreaterThan(-1);
-      expect(
-        appCopy,
-        "runtime stage must COPY /app/platform/app",
-      ).toBeGreaterThan(-1);
+      expect(storeCopy, "runtime stage must COPY /app/node_modules").toBeGreaterThan(-1);
+      expect(appCopy, "runtime stage must COPY /app/platform/app").toBeGreaterThan(-1);
       expect(
         storeCopy,
         "the store copy must precede the app copy — the app tree is symlinks into it",
@@ -104,14 +98,13 @@ describe("Dockerfile runtime stage", () => {
       expect(requiredDirs).toContain("langy");
     });
 
-    it.each(
-      requiredDirs,
-    )("copies packages/%s into the runtime image", (dir) => {
+    it.each(requiredDirs)("copies packages/%s into the runtime image", (dir) => {
       // Copying the whole tree satisfies this more strongly than naming the
       // package: it cannot go stale when a new root workspace package is
       // added. Either shape is accepted; neither being present is the bug.
-      const hasWholeTreeCopy =
-        /COPY --from=builder \/app\/packages\s+\.\/packages/.test(stage);
+      const hasWholeTreeCopy = /COPY --from=builder \/app\/packages\s+\.\/packages/.test(
+        stage,
+      );
 
       expect(
         hasWholeTreeCopy || stage.includes(`/app/packages/${dir}`),

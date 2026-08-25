@@ -42,9 +42,7 @@ export class PostgresIngestionSourceAdapter {
 
   build(): IngestionSourceService {
     return IngestionSourceService.create({
-      repository: PrismaIngestionSourceRepository.create(
-        this.options.database,
-      ),
+      repository: PrismaIngestionSourceRepository.create(this.options.database),
       projects: this.options.projects,
       entitlements: this.options.entitlements,
       lifecycle: this.options.lifecycle,

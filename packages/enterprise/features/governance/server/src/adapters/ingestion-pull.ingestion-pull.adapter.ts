@@ -35,9 +35,7 @@ export type IngestionPullEventingAdapterOptions = {
 };
 
 export class IngestionPullEventingAdapter {
-  private constructor(
-    private readonly options: IngestionPullEventingAdapterOptions,
-  ) {}
+  private constructor(private readonly options: IngestionPullEventingAdapterOptions) {}
 
   static create(
     options: IngestionPullEventingAdapterOptions,
@@ -63,9 +61,7 @@ export class IngestionPullEventingAdapter {
       }),
     })
       .withPostgresProjection(
-        IngestionPullRunStatusEventingProjection.create(
-          this.options.runStatusStore,
-        ),
+        IngestionPullRunStatusEventingProjection.create(this.options.runStatusStore),
       )
       .withCommand("configure", ConfigureIngestionPullCommand)
       .withCommand("disable", DisableIngestionPullCommand)
@@ -89,8 +85,7 @@ const ConfigureIngestionPullCommand = defineCommand({
   idempotencyKey: (data) =>
     `${data.sourceId}:ingestion_pull:configure:${data.configVersion}`,
   spanAttributes: (data) => ({ "payload.source_id": data.sourceId }),
-  makeJobId: (data) =>
-    `${data.sourceId}:ingestion_pull:configure:${data.configVersion}`,
+  makeJobId: (data) => `${data.sourceId}:ingestion_pull:configure:${data.configVersion}`,
 });
 
 const DisableIngestionPullCommand = defineCommand({
@@ -103,8 +98,7 @@ const DisableIngestionPullCommand = defineCommand({
   idempotencyKey: (data) =>
     `${data.sourceId}:ingestion_pull:disable:${data.configVersion}`,
   spanAttributes: (data) => ({ "payload.source_id": data.sourceId }),
-  makeJobId: (data) =>
-    `${data.sourceId}:ingestion_pull:disable:${data.configVersion}`,
+  makeJobId: (data) => `${data.sourceId}:ingestion_pull:disable:${data.configVersion}`,
 });
 
 const RecordIngestionPullRunCompletedCommand = defineCommand({
@@ -114,15 +108,13 @@ const RecordIngestionPullRunCompletedCommand = defineCommand({
   aggregateType: INGESTION_PULL_AGGREGATE_TYPE,
   schema: ingestionPullRunCompletedEventDataSchema,
   aggregateId: (data) => data.sourceId,
-  idempotencyKey: (data) =>
-    `${data.sourceId}:ingestion_pull:${data.runId}:completed`,
+  idempotencyKey: (data) => `${data.sourceId}:ingestion_pull:${data.runId}:completed`,
   spanAttributes: (data) => ({
     "payload.source_id": data.sourceId,
     "payload.run_id": data.runId,
     "payload.event_count": data.eventCount,
   }),
-  makeJobId: (data) =>
-    `${data.sourceId}:ingestion_pull:${data.runId}:completed`,
+  makeJobId: (data) => `${data.sourceId}:ingestion_pull:${data.runId}:completed`,
 });
 
 const RecordIngestionPullRunFailedCommand = defineCommand({
@@ -132,8 +124,7 @@ const RecordIngestionPullRunFailedCommand = defineCommand({
   aggregateType: INGESTION_PULL_AGGREGATE_TYPE,
   schema: ingestionPullRunFailedEventDataSchema,
   aggregateId: (data) => data.sourceId,
-  idempotencyKey: (data) =>
-    `${data.sourceId}:ingestion_pull:${data.runId}:failed`,
+  idempotencyKey: (data) => `${data.sourceId}:ingestion_pull:${data.runId}:failed`,
   spanAttributes: (data) => ({
     "payload.source_id": data.sourceId,
     "payload.run_id": data.runId,

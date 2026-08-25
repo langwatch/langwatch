@@ -135,14 +135,10 @@ const renderDrawer = () =>
     </Wrapper>,
   );
 
-const saveButton = () =>
-  screen.getByRole("button", { name: /^save( anyway)?$/i });
+const saveButton = () => screen.getByRole("button", { name: /^save( anyway)?$/i });
 
 /** Types a fresh key over the masked placeholder the drawer starts with. */
-const enterKey = async (
-  user: ReturnType<typeof userEvent.setup>,
-  value: string,
-) => {
+const enterKey = async (user: ReturnType<typeof userEvent.setup>, value: string) => {
   const field = inputFor(API_KEY_FIELD);
   await user.clear(field);
   await user.type(field, value);

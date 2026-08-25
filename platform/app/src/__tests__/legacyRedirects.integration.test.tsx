@@ -11,11 +11,7 @@
  */
 
 import { act, render, waitFor } from "@testing-library/react";
-import {
-  createMemoryRouter,
-  type RouteObject,
-  RouterProvider,
-} from "react-router";
+import { createMemoryRouter, type RouteObject, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { LegacyPrefixRedirect } from "../components/LegacyPrefixRedirect";
 import { legacyRedirectRoutes } from "../legacyRedirects";
@@ -83,9 +79,7 @@ describe("legacy gateway redirects", () => {
       ]);
 
       await waitFor(() => {
-        expect(router.state.location.pathname).toBe(
-          "/gateway/virtual-keys/vk_123",
-        );
+        expect(router.state.location.pathname).toBe("/gateway/virtual-keys/vk_123");
       });
       expect(router.state.location.search).toBe("?tab=usage");
       expect(router.state.location.hash).toBe("#limits");
@@ -93,15 +87,10 @@ describe("legacy gateway redirects", () => {
 
     /** @scenario An old gateway deep link lands on the same page at its new address */
     it("replaces the history entry so back skips the old address", async () => {
-      const router = renderRouterAt([
-        "/start",
-        "/settings/gateway/virtual-keys/vk_123",
-      ]);
+      const router = renderRouterAt(["/start", "/settings/gateway/virtual-keys/vk_123"]);
 
       await waitFor(() => {
-        expect(router.state.location.pathname).toBe(
-          "/gateway/virtual-keys/vk_123",
-        );
+        expect(router.state.location.pathname).toBe("/gateway/virtual-keys/vk_123");
       });
 
       await act(async () => {
@@ -150,14 +139,10 @@ describe("legacy governance redirects", () => {
   describe("when an old governance deep link is cold-loaded", () => {
     /** @scenario An old governance deep link lands on the same page at its new address */
     it("lands on the new address with sub-path and query intact", async () => {
-      const router = renderRouterAt([
-        "/settings/governance/teams/team_123?range=30d",
-      ]);
+      const router = renderRouterAt(["/settings/governance/teams/team_123?range=30d"]);
 
       await waitFor(() => {
-        expect(router.state.location.pathname).toBe(
-          "/governance/teams/team_123",
-        );
+        expect(router.state.location.pathname).toBe("/governance/teams/team_123");
       });
       expect(router.state.location.search).toBe("?range=30d");
     });
@@ -169,22 +154,16 @@ describe("legacy governance redirects", () => {
       const router = renderRouterAt(["/settings/routing-policies"]);
 
       await waitFor(() => {
-        expect(router.state.location.pathname).toBe(
-          "/gateway/routing-policies",
-        );
+        expect(router.state.location.pathname).toBe("/gateway/routing-policies");
       });
     });
 
     /** @scenario Routing policies join the gateway */
     it("keeps the query and hash on the way over", async () => {
-      const router = renderRouterAt([
-        "/settings/routing-policies?scope=team#policy_1",
-      ]);
+      const router = renderRouterAt(["/settings/routing-policies?scope=team#policy_1"]);
 
       await waitFor(() => {
-        expect(router.state.location.pathname).toBe(
-          "/gateway/routing-policies",
-        );
+        expect(router.state.location.pathname).toBe("/gateway/routing-policies");
       });
       expect(router.state.location.search).toBe("?scope=team");
       expect(router.state.location.hash).toBe("#policy_1");

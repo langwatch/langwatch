@@ -14,10 +14,7 @@ import { PrismaProcessStore } from "../prismaProcessStore";
 const store = new PrismaProcessStore(prisma);
 let processName: string;
 
-function ref(
-  processKey = "conversation-1",
-  projectId = "project-1",
-): ProcessRef {
+function ref(processKey = "conversation-1", projectId = "project-1"): ProcessRef {
   return { processName, projectId, processKey };
 }
 
@@ -158,9 +155,7 @@ describe("PrismaProcessStore", () => {
       expect.objectContaining({ state: { step: 1 }, revision: 1 }),
     );
     expect(
-      (await store.findMessagesByRef({ ref: ref() })).map(
-        (row) => row.messageKey,
-      ),
+      (await store.findMessagesByRef({ ref: ref() })).map((row) => row.messageKey),
     ).toEqual(["message-1"]);
   });
 
@@ -418,9 +413,7 @@ describe("PrismaProcessStore", () => {
       leaseDurationMs: 30_000,
     });
     const retryLease = initialLeases.find((row) => row.messageKey === "retry")!;
-    const successLease = initialLeases.find(
-      (row) => row.messageKey === "success",
-    )!;
+    const successLease = initialLeases.find((row) => row.messageKey === "success")!;
 
     await store.markFailed({
       identity: {
@@ -506,9 +499,7 @@ describe("PrismaProcessStore", () => {
   });
 
   it("returns only due wakes with the revision that scheduled them", async () => {
-    await store.commit(
-      commit({ target: ref("due"), nextWakeAt: 1_500, messages: [] }),
-    );
+    await store.commit(commit({ target: ref("due"), nextWakeAt: 1_500, messages: [] }));
     await store.commit(
       commit({
         target: ref("future"),
@@ -715,13 +706,13 @@ describe("PrismaProcessStore", () => {
       },
       orderBy: { messageKey: "asc" },
     });
-    expect(
-      remaining.map((row) => ({ key: row.messageKey, status: row.status })),
-    ).toEqual([
-      { key: "dead-letter-msg", status: "dead" },
-      { key: "fresh-dispatched-msg", status: "dispatched" },
-      { key: "still-pending-msg", status: "pending" },
-    ]);
+    expect(remaining.map((row) => ({ key: row.messageKey, status: row.status }))).toEqual(
+      [
+        { key: "dead-letter-msg", status: "dead" },
+        { key: "fresh-dispatched-msg", status: "dispatched" },
+        { key: "still-pending-msg", status: "pending" },
+      ],
+    );
   });
 
   // A source event id is `idempotencyKey ?? id`, composed by whichever pipeline
@@ -814,10 +805,7 @@ describe("PrismaProcessStore", () => {
           }),
         );
 
-        expect([first.outcome, second.outcome]).toEqual([
-          "committed",
-          "committed",
-        ]);
+        expect([first.outcome, second.outcome]).toEqual(["committed", "committed"]);
         expect(
           await prisma.processManagerInbox.count({
             where: { processName, projectId: "project-1" },
@@ -967,9 +955,7 @@ describe("PrismaProcessStore", () => {
         leaseDurationMs: 30_000,
         processNames: [processName],
       });
-      expect(leased.map((m) => m.messageKey)).toEqual([
-        "send:endpoint-b:222222",
-      ]);
+      expect(leased.map((m) => m.messageKey)).toEqual(["send:endpoint-b:222222"]);
     });
   });
 
@@ -1053,9 +1039,7 @@ describe("PrismaProcessStore", () => {
           where: { processName, projectId: "project-1" },
           select: { messageKey: true },
         });
-        expect(remaining.map((row) => row.messageKey)).toEqual([
-          "inside-window-msg",
-        ]);
+        expect(remaining.map((row) => row.messageKey)).toEqual(["inside-window-msg"]);
       });
 
       /** @scenario "Pending outbox rows are never swept" */
@@ -1075,9 +1059,9 @@ describe("PrismaProcessStore", () => {
             limit: 5_000,
           }),
         ).toBe(0);
-        expect(
-          await store.deleteDeadOutboxBatch({ before: cutoff, limit: 5_000 }),
-        ).toBe(0);
+        expect(await store.deleteDeadOutboxBatch({ before: cutoff, limit: 5_000 })).toBe(
+          0,
+        );
 
         const leased = await store.leaseDueMessages({
           now: recent,
@@ -1125,18 +1109,18 @@ describe("PrismaProcessStore", () => {
             limit: 5_000,
           }),
         ).toBe(0);
-        expect(
-          await store.deleteDeadOutboxBatch({ before: deadAt, limit: 5_000 }),
-        ).toBe(0);
+        expect(await store.deleteDeadOutboxBatch({ before: deadAt, limit: 5_000 })).toBe(
+          0,
+        );
         expect(
           await prisma.processManagerOutbox.count({
             where: { processName, projectId: "project-1" },
           }),
         ).toBe(1);
 
-        expect(
-          await store.deleteDeadOutboxBatch({ before: recent, limit: 5_000 }),
-        ).toBe(1);
+        expect(await store.deleteDeadOutboxBatch({ before: recent, limit: 5_000 })).toBe(
+          1,
+        );
         expect(
           await prisma.processManagerOutbox.count({
             where: { processName, projectId: "project-1" },
@@ -1173,9 +1157,7 @@ describe("PrismaProcessStore", () => {
           where: { processName, projectId: "project-1" },
           select: { sourceEventId: true },
         });
-        expect(remaining.map((row) => row.sourceEventId)).toEqual([
-          "event-recent-inbox",
-        ]);
+        expect(remaining.map((row) => row.sourceEventId)).toEqual(["event-recent-inbox"]);
       });
 
       /** @scenario "The sweep reaches process names that never registered retention" */

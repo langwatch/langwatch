@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CodexExtractor } from "../codex";
-import {
-  createExtractorContext,
-  createLogExtractorContext,
-} from "./_testHelpers";
+import { createExtractorContext, createLogExtractorContext } from "./_testHelpers";
 
 const SCOPE = "openai.codex"; // scope-agnostic; gating is on event.name
 
@@ -97,13 +94,10 @@ describe("CodexExtractor.applyLog", () => {
 
   describe("when the event is non-codex", () => {
     it("returns no-op for claude_code.api_request", () => {
-      const ctx = createLogExtractorContext(
-        "com.anthropic.claude_code.events",
-        {
-          "event.name": "api_request",
-          model: "claude-opus-4-7",
-        },
-      );
+      const ctx = createLogExtractorContext("com.anthropic.claude_code.events", {
+        "event.name": "api_request",
+        model: "claude-opus-4-7",
+      });
 
       new CodexExtractor().applyLog(ctx);
 
@@ -321,9 +315,7 @@ describe("CodexExtractor.applyLog", () => {
 
       new CodexExtractor().apply(ctx);
 
-      expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe(
-        "true",
-      );
+      expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
       expect(ctx.out["langwatch.span.type"]).toBe("llm");
     });
 
@@ -345,12 +337,8 @@ describe("CodexExtractor.applyLog", () => {
       new CodexExtractor().apply(ctx);
 
       expect(ctx.out["langwatch.span.type"]).toBe("llm");
-      expect(
-        ctx.out["langwatch.reserved.skip_token_accumulation"],
-      ).toBeUndefined();
-      expect(ctx.recordRule).not.toHaveBeenCalledWith(
-        "codex/skip-redundant-usage",
-      );
+      expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBeUndefined();
+      expect(ctx.recordRule).not.toHaveBeenCalledWith("codex/skip-redundant-usage");
     });
 
     it("does not flag a non-turn codex span without usage", () => {
@@ -364,9 +352,7 @@ describe("CodexExtractor.applyLog", () => {
 
       new CodexExtractor().apply(ctx);
 
-      expect(
-        ctx.out["langwatch.reserved.skip_token_accumulation"],
-      ).toBeUndefined();
+      expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBeUndefined();
     });
 
     it("is a no-op for codex_cli_rs spans other than session_task.turn", () => {
@@ -551,9 +537,7 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire)", () => {
 
     new CodexExtractor().apply(ctx);
 
-    expect(
-      ctx.out["langwatch.reserved.skip_token_accumulation"],
-    ).toBeUndefined();
+    expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBeUndefined();
   });
 
   it("still types the response span as a model call, which the skip marker is independent of", () => {
@@ -653,9 +637,7 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire)", () => {
 
     new CodexExtractor().apply(ctx);
 
-    expect(
-      ctx.out["langwatch.reserved.skip_token_accumulation"],
-    ).toBeUndefined();
+    expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBeUndefined();
   });
 });
 

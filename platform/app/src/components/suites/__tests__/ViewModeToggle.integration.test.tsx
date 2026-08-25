@@ -13,10 +13,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GroupRow } from "../GroupRow";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-} from "../RunHistoryFilters";
+import { RunHistoryFilters, type RunHistoryFilterValues } from "../RunHistoryFilters";
 import { RunRow } from "../RunRow";
 import type { RunGroup, RunGroupSummary } from "../run-history-transforms";
 import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers";
@@ -54,9 +51,7 @@ function makeGroup(overrides: Partial<RunGroup> = {}): RunGroup {
   };
 }
 
-function makeGroupSummary(
-  overrides: Partial<RunGroupSummary> = {},
-): RunGroupSummary {
+function makeGroupSummary(overrides: Partial<RunGroupSummary> = {}): RunGroupSummary {
   return {
     passRate: 100,
     passedCount: 2,

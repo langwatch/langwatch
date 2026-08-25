@@ -83,9 +83,7 @@ export const FormOutputsSection = ({
         // Removed an output - find which one
         for (let i = 0; i < currentFields.length; i++) {
           const currentField = currentFields[i];
-          if (
-            !newOutputs.some((o) => o.identifier === currentField?.identifier)
-          ) {
+          if (!newOutputs.some((o) => o.identifier === currentField?.identifier)) {
             remove(i);
             break;
           }

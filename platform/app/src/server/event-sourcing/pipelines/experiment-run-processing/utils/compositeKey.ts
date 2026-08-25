@@ -7,10 +7,7 @@
  * guarantee uniqueness.
  */
 
-export function makeExperimentRunKey(
-  experimentId: string,
-  runId: string,
-): string {
+export function makeExperimentRunKey(experimentId: string, runId: string): string {
   return `${experimentId}:${runId}`;
 }
 

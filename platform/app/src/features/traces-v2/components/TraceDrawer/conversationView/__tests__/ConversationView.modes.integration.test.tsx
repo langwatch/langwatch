@@ -76,8 +76,7 @@ function renderView({
 }
 
 /** The header strip, found by the label that always sits at its left. */
-const conversationHeader = () =>
-  screen.getByText("Conversation").parentElement!;
+const conversationHeader = () => screen.getByText("Conversation").parentElement!;
 
 afterEach(cleanup);
 
@@ -95,9 +94,11 @@ describe("given the trace drawer is open on a conversation", () => {
 
     await user.click(trigger);
     await screen.findByRole("menuitem", { name: "Thread" });
-    expect(
-      screen.getAllByRole("menuitem").map((item) => item.textContent),
-    ).toEqual(["Thread", "Bubbles", "Markdown"]);
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "Thread",
+      "Bubbles",
+      "Markdown",
+    ]);
   });
 
   it("names the conversation it is showing", () => {

@@ -1,8 +1,5 @@
 import { HStack, Text, type Tokens } from "@chakra-ui/react";
-import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
 import { CONSOLE_COLORS, STATUS_DISPLAY_TEXT_MAP } from "./constants";
 
 interface StatusDisplayProps {

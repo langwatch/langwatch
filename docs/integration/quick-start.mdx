@@ -6,7 +6,9 @@ mode: "wide"
 import AgentReportNotice from "/snippets/agent-report-notice.mdx";
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a
+  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set
+  this up for you automatically.
 </Tip>
 
 LangWatch helps you understand every user interaction (**Thread**), each individual AI task (**Trace**), and all the underlying steps (**Span**) involved.
@@ -39,6 +41,7 @@ LangWatch helps you understand every user interaction (**Thread**), each individ
     <Note>
       Keys created from **Settings → API Keys** (both personal and service) require `LANGWATCH_PROJECT_ID` so the SDK knows which project to send traces to. You can find the project ID in your project settings or URL.
     </Note>
+
   </Step>
 
   <Step title="Let LangWatch MCP do the rest for you (Optional)">
@@ -56,27 +59,33 @@ LangWatch helps you understand every user interaction (**Thread**), each individ
     ```plaintext
     "Instrument my codebase with LangWatch"
     ```
+
   </Step>
 
   <Step title="Install the LangWatch SDK">
     We have official SDKs for Python and Node.js ready to go. If you're using another language, our [OpenTelemetry Integration Guide](/integration/opentelemetry/guide) provides the details you need.
 
     <CodeGroup>
+
 ```bash Python
 pip install langwatch
 # or
 uv add langwatch
 ```
+
 ```bash JavaScript
 npm install langwatch @vercel/otel @opentelemetry/api-logs @opentelemetry/instrumentation @opentelemetry/sdk-logs
 ```
+
     </CodeGroup>
+
   </Step>
 
   <Step title="Add LangWatch to your project">
     Initialize the SDK within your project:
 
     <CodeGroup>
+
 ```python Python
 import langwatch
 import os
@@ -88,6 +97,7 @@ langwatch.setup(
     instrumentors=[OpenAIInstrumentor()] # Add the instrumentor for your LLM
 )
 ```
+
 ```javascript JavaScript
 // ./next.config.js - Enable the Next.js instrumentation hook
 /** @type {import('next').NextConfig} */
@@ -100,35 +110,38 @@ const nextConfig = {
 module.exports = nextConfig;
 
 // ./src/instrumentation.ts - Configure LangWatch export
-import { registerOTel } from '@vercel/otel';
-import { LangWatchExporter } from 'langwatch';
+import { registerOTel } from "@vercel/otel";
+import { LangWatchExporter } from "langwatch";
 
 export function register() {
   registerOTel({
-    serviceName: 'your-app-name', // Give your service a clear name
+    serviceName: "your-app-name", // Give your service a clear name
     traceExporter: new LangWatchExporter({
       apiKey: process.env.LANGWATCH_API_KEY, // Your LangWatch API key
       projectId: process.env.LANGWATCH_PROJECT_ID, // Required for service API keys
-    })
+    }),
   });
 }
 
 // ./src/index.ts - Enable telemetry where needed
 const result = await generateText({
-  model: openai('gpt-5'),
-  prompt: 'How many calories do I burn jumping to conclusions?',
+  model: openai("gpt-5"),
+  prompt: "How many calories do I burn jumping to conclusions?",
   experimental_telemetry: {
     isEnabled: true, // Ensure telemetry is active for relevant operations
   },
 });
 ```
+
     </CodeGroup>
+
   </Step>
 
   <Step title="Start observing!">
     Open your LangWatch dashboard to see your data. You'll find **Traces** (individual AI tasks) and their detailed **Spans** (the steps within), all organized into **Threads** (complete user sessions). Add **User IDs** or custom **Labels** to filter and group them.
 
     <img src="/images/llm-observability/quick-start/setup-monitor.webp" />
+
   </Step>
 </Steps>
 

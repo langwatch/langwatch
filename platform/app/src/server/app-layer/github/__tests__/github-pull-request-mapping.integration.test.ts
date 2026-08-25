@@ -12,15 +12,7 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
@@ -41,10 +33,7 @@ import {
 } from "../github-branch-recheck.worker";
 import { GithubInstallationsService } from "../github-installations.service";
 import { GithubPullRequestMappingService } from "../github-pull-request-mapping.service";
-import {
-  type GithubAppTokenService,
-  GithubRateLimitedError,
-} from "../githubAppToken";
+import { type GithubAppTokenService, GithubRateLimitedError } from "../githubAppToken";
 import { parseGithubPullRequestEvent } from "../githubPullRequestEvent";
 import { PrismaGithubInstallationsRepository } from "../repositories/github-installations.prisma.repository";
 import { PrismaGithubPullRequestsRepository } from "../repositories/github-pull-requests.prisma.repository";
@@ -499,9 +488,7 @@ describe("branch pull-request mapping", () => {
       ).toEqual([]);
 
       // The pull request is opened, and the branch's backoff elapses.
-      listPullRequestsForHead.mockResolvedValue([
-        apiPullRequest({ number: 77 }),
-      ]);
+      listPullRequestsForHead.mockResolvedValue([apiPullRequest({ number: 77 })]);
       await prisma.githubBranchPullRequestCheck.updateMany({
         where: { organizationId, headBranch: "feat/later" },
         data: { recheckAfter: new Date(Date.now() - 1000) },
@@ -547,9 +534,7 @@ describe("branch pull-request mapping", () => {
         where: { organizationId, headBranch: "feat/abandoned" },
         data: {
           recheckAfter: new Date(Date.now() - 1000),
-          lastRequestedAt: new Date(
-            Date.now() - RECHECK_ACTIVE_WITHIN_MS - 1000,
-          ),
+          lastRequestedAt: new Date(Date.now() - RECHECK_ACTIVE_WITHIN_MS - 1000),
         },
       });
 
@@ -559,9 +544,7 @@ describe("branch pull-request mapping", () => {
         limit: 50,
       });
 
-      expect(due.some((row) => row.headBranch === "feat/abandoned")).toBe(
-        false,
-      );
+      expect(due.some((row) => row.headBranch === "feat/abandoned")).toBe(false);
     });
   });
 
@@ -617,10 +600,7 @@ describe("branch pull-request mapping", () => {
       const branchesAsked = listPullRequestsForHead.mock.calls.map(
         (call) => (call[0] as { branch: string }).branch,
       );
-      expect(branchesAsked.sort()).toEqual([
-        "feat/backfill-a",
-        "feat/backfill-b",
-      ]);
+      expect(branchesAsked.sort()).toEqual(["feat/backfill-a", "feat/backfill-b"]);
     });
 
     /** @scenario "Connecting GitHub records the backfilled pull requests on their projects" */
@@ -640,9 +620,7 @@ describe("branch pull-request mapping", () => {
         }),
       );
 
-      const touchCodingAgentPullRequestSeen = vi
-        .fn()
-        .mockResolvedValue(undefined);
+      const touchCodingAgentPullRequestSeen = vi.fn().mockResolvedValue(undefined);
       const { installations } = servicesWith({
         listPullRequestsForHead: vi
           .fn()
@@ -731,14 +709,11 @@ describe("branch pull-request mapping", () => {
 
       expect(pruned.branchChecks).toBe(1);
 
-      const remainingChecks =
-        await prisma.githubBranchPullRequestCheck.findMany({
-          where: { organizationId },
-          select: { headBranch: true },
-        });
-      expect(remainingChecks.map((row) => row.headBranch)).toEqual([
-        "feat/still-read",
-      ]);
+      const remainingChecks = await prisma.githubBranchPullRequestCheck.findMany({
+        where: { organizationId },
+        select: { headBranch: true },
+      });
+      expect(remainingChecks.map((row) => row.headBranch)).toEqual(["feat/still-read"]);
 
       // Both pull requests survive, including the one whose branch went quiet.
       // A merged pull request is exactly what the Pull Requests page is for,
@@ -855,12 +830,8 @@ describe("branch pull-request mapping", () => {
       await mapping.requestBranchMapping(request);
 
       const check = await branchCheckFor("feat/demanded");
-      expect(check?.lastRequestedAt.getTime()).toBeGreaterThan(
-        staleDemand.getTime(),
-      );
-      expect(check?.lastRequestedAt.getTime()).toBeGreaterThan(
-        Date.now() - 60_000,
-      );
+      expect(check?.lastRequestedAt.getTime()).toBeGreaterThan(staleDemand.getTime());
+      expect(check?.lastRequestedAt.getTime()).toBeGreaterThan(Date.now() - 60_000);
     });
   });
 
@@ -940,10 +911,7 @@ describe("branch pull-request mapping", () => {
       const { mapping } = servicesWith({
         listPullRequestsForHead: vi.fn(),
       });
-      await deliver(
-        mapping,
-        pullRequestDelivery({ branch: "feat/merging", number: 71 }),
-      );
+      await deliver(mapping, pullRequestDelivery({ branch: "feat/merging", number: 71 }));
       expect((await storedFor("feat/merging"))[0]?.prMergedAt).toBeNull();
 
       const mergedAt = new Date().toISOString();
@@ -1037,9 +1005,7 @@ describe("branch pull-request mapping", () => {
 
       // The pull request is opened and the delivery never arrives, so only the
       // branch's backoff elapsing can find it.
-      listPullRequestsForHead.mockResolvedValue([
-        apiPullRequest({ number: 99 }),
-      ]);
+      listPullRequestsForHead.mockResolvedValue([apiPullRequest({ number: 99 })]);
       await prisma.githubBranchPullRequestCheck.updateMany({
         where: { organizationId, headBranch: "feat/missed-hook" },
         data: { recheckAfter: new Date(Date.now() - 1000) },
@@ -1047,9 +1013,7 @@ describe("branch pull-request mapping", () => {
 
       await runBranchRecheckPass({ repository, mapping });
 
-      expect(
-        (await storedFor("feat/missed-hook")).map((r) => r.prNumber),
-      ).toEqual([99]);
+      expect((await storedFor("feat/missed-hook")).map((r) => r.prNumber)).toEqual([99]);
     });
   });
 
@@ -1314,9 +1278,7 @@ describe("branch pull-request mapping", () => {
     /** @scenario "A pull request found for a project's session records it on the project" */
     it("records the pull-request activity on that project", async () => {
       await seedInstallation();
-      const touchCodingAgentPullRequestSeen = vi
-        .fn()
-        .mockResolvedValue(undefined);
+      const touchCodingAgentPullRequestSeen = vi.fn().mockResolvedValue(undefined);
       const { mapping } = servicesWith({
         listPullRequestsForHead: vi.fn().mockResolvedValue([apiPullRequest()]),
         touchCodingAgentPullRequestSeen,
@@ -1333,9 +1295,7 @@ describe("branch pull-request mapping", () => {
     /** @scenario "A branch with no pull request records nothing on the project" */
     it("records nothing when the branch has no pull request", async () => {
       await seedInstallation();
-      const touchCodingAgentPullRequestSeen = vi
-        .fn()
-        .mockResolvedValue(undefined);
+      const touchCodingAgentPullRequestSeen = vi.fn().mockResolvedValue(undefined);
       const { mapping } = servicesWith({
         listPullRequestsForHead: vi.fn().mockResolvedValue([]),
         touchCodingAgentPullRequestSeen,
@@ -1352,9 +1312,7 @@ describe("branch pull-request mapping", () => {
     /** @scenario "A pull request announced over the webhook records nothing on any project" */
     it("records nothing for a pull request announced over the webhook", async () => {
       await seedInstallation();
-      const touchCodingAgentPullRequestSeen = vi
-        .fn()
-        .mockResolvedValue(undefined);
+      const touchCodingAgentPullRequestSeen = vi.fn().mockResolvedValue(undefined);
       const { mapping } = servicesWith({
         listPullRequestsForHead: vi.fn().mockResolvedValue([]),
         touchCodingAgentPullRequestSeen,

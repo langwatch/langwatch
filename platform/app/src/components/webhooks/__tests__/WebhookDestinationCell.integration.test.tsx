@@ -47,29 +47,28 @@ describe("WebhookDestinationCell", () => {
           destinationKind: "sqs",
           url: null,
           sqs: {
-            queueUrl:
-              "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-billing",
+            queueUrl: "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-billing",
             accountId: "381491922238",
             queueName: "lw-billing",
           },
         },
       ]);
 
-      expect(
-        screen.getByTestId("webhook-destination-badge-wh_http"),
-      ).toHaveTextContent("HTTPS endpoint");
-      expect(
-        screen.getByTestId("webhook-destination-address-wh_http"),
-      ).toHaveTextContent("https://receiver.example.com/webhooks/langwatch");
+      expect(screen.getByTestId("webhook-destination-badge-wh_http")).toHaveTextContent(
+        "HTTPS endpoint",
+      );
+      expect(screen.getByTestId("webhook-destination-address-wh_http")).toHaveTextContent(
+        "https://receiver.example.com/webhooks/langwatch",
+      );
 
-      expect(
-        screen.getByTestId("webhook-destination-badge-wh_sqs"),
-      ).toHaveTextContent("Amazon SQS queue");
+      expect(screen.getByTestId("webhook-destination-badge-wh_sqs")).toHaveTextContent(
+        "Amazon SQS queue",
+      );
       // A queue row shows the queue rather than the blank a `url` read would
       // leave, since a queue endpoint has no URL at all.
-      expect(
-        screen.getByTestId("webhook-destination-address-wh_sqs").textContent,
-      ).toBe("381491922238/lw-billing");
+      expect(screen.getByTestId("webhook-destination-address-wh_sqs").textContent).toBe(
+        "381491922238/lw-billing",
+      );
     });
   });
 
@@ -82,8 +81,7 @@ describe("WebhookDestinationCell", () => {
           destinationKind: "sqs",
           url: null,
           sqs: {
-            queueUrl:
-              "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-billing",
+            queueUrl: "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-billing",
             accountId: "381491922238",
             queueName: "lw-billing",
           },
@@ -93,8 +91,7 @@ describe("WebhookDestinationCell", () => {
           destinationKind: "sqs",
           url: null,
           sqs: {
-            queueUrl:
-              "https://sqs.eu-central-1.amazonaws.com/999988887777/lw-billing-eu",
+            queueUrl: "https://sqs.eu-central-1.amazonaws.com/999988887777/lw-billing-eu",
             accountId: "999988887777",
             queueName: "lw-billing-eu",
           },
@@ -135,9 +132,9 @@ describe("WebhookDestinationCell", () => {
         },
       ]);
 
-      expect(
-        screen.getByTestId("webhook-destination-address-wh_odd"),
-      ).toHaveTextContent("https://sqs.eu-central-1.amazonaws.com/queue");
+      expect(screen.getByTestId("webhook-destination-address-wh_odd")).toHaveTextContent(
+        "https://sqs.eu-central-1.amazonaws.com/queue",
+      );
     });
   });
 });

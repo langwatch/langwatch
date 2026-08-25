@@ -30,9 +30,9 @@ describe("isTerminalOrigin", () => {
 
   describe("given none of the terminal signals", () => {
     it("is false for a plain application trace", () => {
-      expect(
-        isTerminalOrigin({ serviceName: "my-api", origin: "application" }),
-      ).toBe(false);
+      expect(isTerminalOrigin({ serviceName: "my-api", origin: "application" })).toBe(
+        false,
+      );
     });
 
     it("is false for empty signals", () => {

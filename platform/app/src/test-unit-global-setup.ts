@@ -19,10 +19,7 @@
  */
 import { relative } from "node:path";
 
-import {
-  shardModuleTally,
-  shardSawFailure,
-} from "./test-utils/shardFailureReporter";
+import { shardModuleTally, shardSawFailure } from "./test-utils/shardFailureReporter";
 
 /**
  * A healthy unit shard finishes in ~3 min, so a 4-min floor only fires on a
@@ -96,8 +93,7 @@ export function hardFloorReport({
     unreportedFiles: readonly string[];
   };
 }): { exitCode: 0 | 1; lines: string[] } {
-  const { selected, shardSelected, started, reported, unreportedFiles } =
-    modules;
+  const { selected, shardSelected, started, reported, unreportedFiles } = modules;
   // What this shard was given, which on a sharded run is a quarter or so of
   // `selected`. Without it the counts below compare a shard against the suite.
   const mine = shardSelected ?? selected;

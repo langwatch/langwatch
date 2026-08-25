@@ -22,7 +22,7 @@ export const createMonitorCommand = async (
     evaluatorId?: string;
     level?: string;
     parameters?: string;
-  }
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -50,8 +50,7 @@ export const createMonitorCommand = async (
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Creating monitor "${name}"...`).start();
 

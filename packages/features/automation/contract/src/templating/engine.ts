@@ -226,10 +226,7 @@ export async function renderLiquid({
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new RenderTimeoutError(timeoutMs)),
-      timeoutMs,
-    );
+    timer = setTimeout(() => reject(new RenderTimeoutError(timeoutMs)), timeoutMs);
   });
 
   try {

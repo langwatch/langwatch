@@ -52,9 +52,7 @@ export const PersonalSidebarLinks = function PersonalSidebarLinks({
 }) {
   const router = useRouter();
   const { personalProjectSlug, features } = usePersonalWorkspace();
-  const tracesHref = personalProjectSlug
-    ? `/${personalProjectSlug}/traces`
-    : null;
+  const tracesHref = personalProjectSlug ? `/${personalProjectSlug}/traces` : null;
 
   return (
     <>
@@ -101,9 +99,7 @@ export const PersonalSidebarLinks = function PersonalSidebarLinks({
         isActive={router.pathname.startsWith("/me/configure")}
         showLabel={showExpanded}
       />
-      {shouldIncludeGovernSection && (
-        <GovernSection showExpanded={showExpanded} />
-      )}
+      {shouldIncludeGovernSection && <GovernSection showExpanded={showExpanded} />}
     </>
   );
 };

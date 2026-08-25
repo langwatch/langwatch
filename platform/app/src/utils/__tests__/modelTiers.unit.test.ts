@@ -16,21 +16,15 @@ describe("given the OpenAI chat model tier grammar", () => {
     });
 
     it("accepts the named flagship tier", () => {
-      expect(ranks({ id: "openai/gpt-5.6-sol", variant: "flagship" })).toBe(
-        true,
-      );
+      expect(ranks({ id: "openai/gpt-5.6-sol", variant: "flagship" })).toBe(true);
     });
 
     it("rejects the balanced middle tier", () => {
-      expect(ranks({ id: "openai/gpt-5.6-terra", variant: "flagship" })).toBe(
-        false,
-      );
+      expect(ranks({ id: "openai/gpt-5.6-terra", variant: "flagship" })).toBe(false);
     });
 
     it("rejects the fast tier", () => {
-      expect(ranks({ id: "openai/gpt-5.6-luna", variant: "flagship" })).toBe(
-        false,
-      );
+      expect(ranks({ id: "openai/gpt-5.6-luna", variant: "flagship" })).toBe(false);
     });
 
     it.each([
@@ -83,10 +77,7 @@ describe("given the OpenAI chat model tier grammar", () => {
 
     it("puts the newest generation first", () => {
       expect(
-        sorted(
-          ["openai/gpt-5.4", "openai/gpt-5.6-sol", "openai/gpt-5.5"],
-          "flagship",
-        ),
+        sorted(["openai/gpt-5.4", "openai/gpt-5.6-sol", "openai/gpt-5.5"], "flagship"),
       ).toEqual(["openai/gpt-5.6-sol", "openai/gpt-5.5", "openai/gpt-5.4"]);
     });
 
@@ -99,9 +90,9 @@ describe("given the OpenAI chat model tier grammar", () => {
 
     /** @scenario A generation shipping both an unsuffixed model and a named flagship */
     it("breaks a same-generation tie in favour of the named tier", () => {
-      expect(
-        sorted(["openai/gpt-5.7", "openai/gpt-5.7-sol"], "flagship")[0],
-      ).toBe("openai/gpt-5.7-sol");
+      expect(sorted(["openai/gpt-5.7", "openai/gpt-5.7-sol"], "flagship")[0]).toBe(
+        "openai/gpt-5.7-sol",
+      );
     });
   });
 });

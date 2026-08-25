@@ -26,9 +26,7 @@ function describeEdit({
 }): string {
   const parts: string[] = [];
   if (changedFields > 0) {
-    parts.push(
-      `${changedFields} field${changedFields === 1 ? "" : "s"} changed`,
-    );
+    parts.push(`${changedFields} field${changedFields === 1 ? "" : "s"} changed`);
   }
   if (deletedSpans > 0) {
     parts.push(`${deletedSpans} span${deletedSpans === 1 ? "" : "s"} deleted`);
@@ -257,12 +255,7 @@ export function EditModeBar({ traceId }: { traceId: string }) {
           {describeEdit(summary)}
         </Text>
         <CommentsWritten count={commentsSaved} />
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={handleJumpToTraceOutput}
-          gap={1.5}
-        >
+        <Button size="xs" variant="ghost" onClick={handleJumpToTraceOutput} gap={1.5}>
           <Icon as={LuFileOutput} boxSize={3} />
           <Text textStyle="2xs">Trace output</Text>
         </Button>
@@ -323,8 +316,8 @@ function DiscardTraceEditsDialog({
         </Dialog.Header>
         <Dialog.Body>
           <Text textStyle="sm" color="fg.muted">
-            Your corrections to this trace have not been saved. Comments are
-            saved as you write them and are not discarded.
+            Your corrections to this trace have not been saved. Comments are saved as you
+            write them and are not discarded.
           </Text>
         </Dialog.Body>
         <Dialog.Footer>

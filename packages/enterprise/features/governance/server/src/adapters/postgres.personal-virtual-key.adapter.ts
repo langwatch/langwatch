@@ -1,6 +1,4 @@
-import type {
-  GovernanceRoutingPolicyService,
-} from "@langwatch/enterprise-governance-contract";
+import type { GovernanceRoutingPolicyService } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PersonalVirtualKeyIssuerPort } from "../ports/personal-virtual-key.port";
 import { PrismaPersonalVirtualKeyRepository } from "../repositories/prisma/prisma.personal-virtual-key.repository";
@@ -29,9 +27,7 @@ export class PostgresPersonalVirtualKeyAdapter {
 
   build(): DefaultGovernancePersonalVirtualKeyService {
     return DefaultGovernancePersonalVirtualKeyService.create({
-      repository: PrismaPersonalVirtualKeyRepository.create(
-        this.options.database,
-      ),
+      repository: PrismaPersonalVirtualKeyRepository.create(this.options.database),
       issuer: this.options.issuer,
       organizations: this.options.organizations,
       policies: this.options.policies,

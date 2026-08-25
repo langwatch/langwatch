@@ -133,11 +133,9 @@ export class CannotRemoveSelfError extends HandledError {
   declare readonly code: "cannot_remove_self";
 
   constructor() {
-    super(
-      "cannot_remove_self",
-      "You cannot remove yourself from the organization",
-      { httpStatus: 400 },
-    );
+    super("cannot_remove_self", "You cannot remove yourself from the organization", {
+      httpStatus: 400,
+    });
     this.name = "CannotRemoveSelfError";
   }
 }
@@ -161,14 +159,10 @@ export class MemberSeatLimitReachedError extends HandledError {
       meta?: { limitType: string; current: number; max: number };
     } = {},
   ) {
-    super(
-      "member_seat_limit_reached",
-      "The plan's member seats are all in use",
-      {
-        httpStatus: 403,
-        ...(options.meta ? { meta: options.meta } : {}),
-      },
-    );
+    super("member_seat_limit_reached", "The plan's member seats are all in use", {
+      httpStatus: 403,
+      ...(options.meta ? { meta: options.meta } : {}),
+    });
     this.name = "MemberSeatLimitReachedError";
   }
 }
@@ -182,15 +176,11 @@ export class OrganizationSlugTakenError extends HandledError {
   declare readonly code: "organization_slug_taken";
 
   constructor(slug: string) {
-    super(
-      "organization_slug_taken",
-      "An organization with this slug already exists",
-      {
-        httpStatus: 409,
-        meta: { slug },
-        ...remediation("organization_slug_taken"),
-      },
-    );
+    super("organization_slug_taken", "An organization with this slug already exists", {
+      httpStatus: 409,
+      meta: { slug },
+      ...remediation("organization_slug_taken"),
+    });
     this.name = "OrganizationSlugTakenError";
   }
 }

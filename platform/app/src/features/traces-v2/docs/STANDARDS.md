@@ -46,6 +46,7 @@ follows these conventions.
 ```
 
 **Key rules:**
+
 - Components never import tRPC or Zustand directly. They call data hooks.
 - Data hooks are the ONLY bridge between intent (Zustand) and data (TanStack Query).
 - Zustand stores hold what the user wants (filters, active view, which drawer is open).
@@ -150,6 +151,7 @@ features/traces-v2/
 ```
 
 **Naming rules:**
+
 - Component files: `PascalCase.tsx`
 - Hook files: `camelCase.ts` (e.g., `useTraceList.ts`)
 - Store files: `camelCase.ts` (e.g., `filterStore.ts`)
@@ -193,6 +195,7 @@ export const TraceTableRow: React.FC<TraceTableRowProps> = ({
 ```
 
 **Rules:**
+
 - Functional components only. No classes.
 - Type with `React.FC<Props>` for explicit return type checking.
 - Named exports. No default exports (except pages if required by router).
@@ -247,23 +250,25 @@ export const TraceTable: React.FC<TraceTableProps> = () => {
 // ❌ Prop drilling
 <Page density={density}>
   <Table density={density}>
-    <Row density={density} />   // drilled 3 levels
+    <Row density={density} /> // drilled 3 levels
   </Table>
-</Page>
+</Page>;
 
 // ❌ Context
 const DensityContext = createContext<Density>("comfortable");
 
 // ✅ Zustand via CSS (for density specifically)
-<DensityProvider>              {/* sets data-density attribute */}
+<DensityProvider>
+  {" "}
+  {/* sets data-density attribute */}
   <Table>
-    <Row />                    {/* uses trace.rowPy token, no prop needed */}
+    <Row /> {/* uses trace.rowPy token, no prop needed */}
   </Table>
-</DensityProvider>
+</DensityProvider>;
 
 // ✅ Zustand via hook (for other shared state)
 export const TraceTableRow: React.FC<TraceTableRowProps> = ({ trace }) => {
-  const { open } = useDrawerStore();  // reads from store, no prop drilling
+  const { open } = useDrawerStore(); // reads from store, no prop drilling
   return <Tr onClick={() => open(trace.traceId)}>...</Tr>;
 };
 ```
@@ -307,7 +312,7 @@ Each slice owns one domain of user intent. Slices are separate stores, not a mon
 ```tsx
 // stores/filterStore.ts
 interface FilterState {
-  ast: FilterNode;                    // source of truth for all filters
+  ast: FilterNode; // source of truth for all filters
   setFilter: (field: string, value: FilterValue) => void;
   removeFilter: (field: string) => void;
   clearAll: () => void;
@@ -327,8 +332,8 @@ export const useFilterStore = create<FilterState>((set) => ({
 // stores/viewStore.ts
 interface ViewState {
   activeLensId: string;
-  presetFilters: FilterNode[];          // locked filters owned by the active lens
-  columnOrder: string[];                // ordered column ids; visibility is membership
+  presetFilters: FilterNode[]; // locked filters owned by the active lens
+  columnOrder: string[]; // ordered column ids; visibility is membership
   grouping: GroupingMode;
   sort: SortConfig;
   selectLens: (lensId: string) => void;
@@ -365,6 +370,7 @@ interface UiState {
 ```
 
 **Rules:**
+
 - One store per slice. Not a single combined store.
 - Immutable updates via `set()`.
 - Actions are methods on the store interface, not separate functions.
@@ -395,9 +401,9 @@ export function useTraceList() {
       grouping,
     },
     {
-      staleTime: STALE_TIMES.traceList,       // 30s
-      placeholderData: keepPreviousData,       // smooth transitions on filter change
-    }
+      staleTime: STALE_TIMES.traceList, // 30s
+      placeholderData: keepPreviousData, // smooth transitions on filter change
+    },
   );
 }
 ```
@@ -406,6 +412,7 @@ export function useTraceList() {
 `{ data, isLoading, isError, error, isFetching }`. Components consume this directly.
 
 **Rules:**
+
 - One hook per query endpoint.
 - Hooks read from Zustand stores, not from props.
 - Hooks never mutate stores. They read intent and return data.
@@ -418,12 +425,14 @@ export function useTraceList() {
 ### Existing Semantic Tokens (use these, don't reinvent)
 
 Foreground:
+
 - `fg` — body text
 - `fg.muted` — secondary text
 - `fg.subtle` — tertiary text
 - `fg.inverted` — text on dark backgrounds
 
 Background:
+
 - `bg.page` — outermost container
 - `bg.surface` — main content area
 - `bg.panel` — cards, panels
@@ -432,12 +441,14 @@ Background:
 - `bg.subtle` — table headers, section backgrounds
 
 Border:
+
 - `border` — standard borders
 - `border.muted` — subtle borders
 - `border.subtle` — very subtle borders
 - `border.emphasized` — strong borders
 
 Status:
+
 - `success` / `error` / `warning` / `pending` / `info` — semantic status colors
 
 ### Density Tokens (NEW — traces-v2)
@@ -481,7 +492,7 @@ export function DensityProvider({ children }: { children: React.ReactNode }) {
 // TraceTableRow.tsx — uses tokens, stays dumb
 <Tr py="trace.rowPy" px="trace.cellPx" fontSize="trace.sm">
   {/* density resolves automatically via ancestor's data-density */}
-</Tr>
+</Tr>;
 ```
 
 ### Span Type Colors
@@ -518,33 +529,34 @@ semanticTokens: {
 
 ### Typography
 
-| Context              | Font          | Size token    | Weight |
-|----------------------|---------------|---------------|--------|
-| Table body text      | Inter         | `trace.sm`    | 400    |
-| Table header text    | Inter         | `trace.xs`    | 600    |
-| Badge text           | Inter         | `trace.xxs`   | 500    |
-| Code/data values     | JetBrains Mono| `trace.sm`    | 400    |
-| Drawer headings      | Inter         | md (Chakra)   | 500    |
-| Drawer body          | Inter         | sm (Chakra)   | 400    |
-| Span I/O content     | JetBrains Mono| sm (Chakra)   | 400    |
+| Context           | Font           | Size token  | Weight |
+| ----------------- | -------------- | ----------- | ------ |
+| Table body text   | Inter          | `trace.sm`  | 400    |
+| Table header text | Inter          | `trace.xs`  | 600    |
+| Badge text        | Inter          | `trace.xxs` | 500    |
+| Code/data values  | JetBrains Mono | `trace.sm`  | 400    |
+| Drawer headings   | Inter          | md (Chakra) | 500    |
+| Drawer body       | Inter          | sm (Chakra) | 400    |
+| Span I/O content  | JetBrains Mono | sm (Chakra) | 400    |
 
 Monospace font stack:
+
 ```
 "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, Monaco, monospace
 ```
 
 ### Animation
 
-| Action                  | Duration | Easing          | Library       |
-|-------------------------|----------|-----------------|---------------|
-| Drawer open/close       | 250ms    | ease-out        | motion/react  |
-| Drawer content fade     | 150ms    | ease-in         | motion/react  |
-| Row hover               | 100ms    | ease            | CSS transition|
-| Tooltip enter           | 150ms    | ease-out        | CSS transition|
-| Skeleton shimmer        | 1.4s     | linear (loop)   | CSS animation |
-| Filter chip add/remove  | 150ms    | ease-out        | motion/react  |
-| Confetti (onboarding)   | 2000ms   | —               | CSS particles |
-| Density toggle reflow   | 0ms      | —               | instant (CSS) |
+| Action                 | Duration | Easing        | Library        |
+| ---------------------- | -------- | ------------- | -------------- |
+| Drawer open/close      | 250ms    | ease-out      | motion/react   |
+| Drawer content fade    | 150ms    | ease-in       | motion/react   |
+| Row hover              | 100ms    | ease          | CSS transition |
+| Tooltip enter          | 150ms    | ease-out      | CSS transition |
+| Skeleton shimmer       | 1.4s     | linear (loop) | CSS animation  |
+| Filter chip add/remove | 150ms    | ease-out      | motion/react   |
+| Confetti (onboarding)  | 2000ms   | —             | CSS particles  |
+| Density toggle reflow  | 0ms      | —             | instant (CSS)  |
 
 Use `motion/react` (Framer Motion) for enter/exit animations.
 Use CSS transitions for hover/active/focus micro-interactions.
@@ -678,17 +690,17 @@ stores/__tests__/
 
 ### What to test
 
-| Layer      | What to test                                    | What NOT to test           |
-|------------|-------------------------------------------------|---------------------------|
-| Components | Renders correct output for given props/hook data| Internal Chakra styling    |
-|            | Calls correct handlers on interaction           | CSS property values        |
-|            | Handles loading/error/empty states              | Exact DOM structure        |
-| Hooks      | Returns correct data shape                      | tRPC internals             |
-|            | Reads correct Zustand selectors                 | Network layer              |
-|            | Constructs correct query params from store state|                           |
-| Stores     | State transitions (set/update/clear)            | Zustand internals          |
-|            | Action methods produce correct next state       | Persistence (if any)       |
-| Utils      | Pure function input/output                      |                           |
+| Layer      | What to test                                     | What NOT to test        |
+| ---------- | ------------------------------------------------ | ----------------------- |
+| Components | Renders correct output for given props/hook data | Internal Chakra styling |
+|            | Calls correct handlers on interaction            | CSS property values     |
+|            | Handles loading/error/empty states               | Exact DOM structure     |
+| Hooks      | Returns correct data shape                       | tRPC internals          |
+|            | Reads correct Zustand selectors                  | Network layer           |
+|            | Constructs correct query params from store state |                         |
+| Stores     | State transitions (set/update/clear)             | Zustand internals       |
+|            | Action methods produce correct next state        | Persistence (if any)    |
+| Utils      | Pure function input/output                       |                         |
 
 ### Test data factories
 
@@ -734,7 +746,7 @@ vi.mock("../../stores/viewStore", () => ({
       columns: defaultColumns,
       sortOrder: { field: "timestamp", dir: "desc" },
       grouping: "flat",
-    })
+    }),
   ),
 }));
 

@@ -137,9 +137,7 @@ describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () =>
       const legacy = await createOrg({});
 
       for (const result of [governance, llmops, legacy]) {
-        expect(Object.keys(result).sort()).toEqual(
-          Object.keys(governance).sort(),
-        );
+        expect(Object.keys(result).sort()).toEqual(Object.keys(governance).sort());
         expect(result.organization).toEqual(
           expect.objectContaining({
             id: expect.any(String),

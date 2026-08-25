@@ -103,9 +103,7 @@ describe("audit middlewares", () => {
         expect(mockAuditLog).toHaveBeenCalledTimes(1);
         const call = mockAuditLog.mock.calls[0]?.[0];
         expect(call?.action).toBe("scenarios.run");
-        expect(JSON.stringify(recordedArgs() ?? null)).not.toContain(
-          "tok-live-1",
-        );
+        expect(JSON.stringify(recordedArgs() ?? null)).not.toContain("tok-live-1");
       });
     });
   });

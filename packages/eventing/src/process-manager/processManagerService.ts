@@ -89,24 +89,19 @@ export class ProcessManagerService<State> {
   private readonly store: ProcessStore;
   private readonly tracer: Tracer;
   private readonly signalRevisionRetries: number;
-  private readonly logger = createLogger(
-    "langwatch:event-sourcing:process-manager",
-  );
+  private readonly logger = createLogger("langwatch:event-sourcing:process-manager");
 
   constructor(options: ProcessManagerServiceOptions<State>) {
     this.definition = options.definition;
     this.store = options.store;
-    this.tracer =
-      options.tracer ?? trace.getTracer("langwatch.process-manager");
+    this.tracer = options.tracer ?? trace.getTracer("langwatch.process-manager");
     this.signalRevisionRetries =
       options.signalRevisionRetries ?? DEFAULT_SIGNAL_REVISION_RETRIES;
     if (
       !Number.isSafeInteger(this.signalRevisionRetries) ||
       this.signalRevisionRetries < 0
     ) {
-      throw new RangeError(
-        "signalRevisionRetries must be a non-negative safe integer",
-      );
+      throw new RangeError("signalRevisionRetries must be a non-negative safe integer");
     }
   }
 
@@ -191,10 +186,7 @@ export class ProcessManagerService<State> {
     });
   }
 
-  async handleWake(params: {
-    wake: DueWake;
-    now: number;
-  }): Promise<HandleResult> {
+  async handleWake(params: { wake: DueWake; now: number }): Promise<HandleResult> {
     const { wake, now } = params;
 
     return await this.inEvolveSpan({
@@ -475,10 +467,7 @@ export class ProcessManagerService<State> {
       now: params.now,
     });
 
-    if (
-      result.outcome === "committed" &&
-      result.duplicateMessageKeys.length > 0
-    ) {
+    if (result.outcome === "committed" && result.duplicateMessageKeys.length > 0) {
       incrementEsProcessIntentsSuppressed({
         processName: ref.processName,
         count: result.duplicateMessageKeys.length,
@@ -542,9 +531,7 @@ export class ProcessManagerService<State> {
     return carrier;
   }
 
-  private async inEvolveSpan<
-    T extends HandleResult | SignalHandleResult<State>,
-  >(params: {
+  private async inEvolveSpan<T extends HandleResult | SignalHandleResult<State>>(params: {
     inputKind: "event" | "wake" | "signal";
     logContext: Record<string, string | number | undefined>;
     attributes: Attributes;

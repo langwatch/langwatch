@@ -129,14 +129,10 @@ describe("offloadInputsIfOversized", () => {
       expect(isStoredObjectMarker(result.inputs)).toBe(true);
       expect(storedObjects.stored.size).toBe(1);
 
-      const marker = (result.inputs as Record<string, any>)[
-        STORED_OBJECT_MARKER_KEY
-      ];
+      const marker = (result.inputs as Record<string, any>)[STORED_OBJECT_MARKER_KEY];
       expect(marker.id).toBeTruthy();
       expect(marker.sha256).toMatch(/^[0-9a-f]{64}$/);
-      expect(marker.sizeBytes).toBe(
-        Buffer.byteLength(JSON.stringify(inputs), "utf8"),
-      );
+      expect(marker.sizeBytes).toBe(Buffer.byteLength(JSON.stringify(inputs), "utf8"));
       expect(marker.truncatedPreview).toBe(true);
       expect(Buffer.byteLength(marker.preview, "utf8")).toBeLessThanOrEqual(
         EVAL_INPUTS_PREVIEW_BYTES,
@@ -203,9 +199,7 @@ describe("offloadInputsIfOversized", () => {
       expect(result.offloaded).toBe(false);
       expect(storedObjects.stored.size).toBe(0);
       expect(isStoredObjectMarker(result.inputs)).toBe(true);
-      const marker = (result.inputs as Record<string, any>)[
-        STORED_OBJECT_MARKER_KEY
-      ];
+      const marker = (result.inputs as Record<string, any>)[STORED_OBJECT_MARKER_KEY];
       expect(marker.ceilingExceeded).toBe(true);
       expect(marker.id).toBe("");
       expect(marker.sha256).toBeNull();
@@ -236,22 +230,18 @@ describe("offloadInputsIfOversized", () => {
       // preview-only marker so event_log stays bounded under an S3 outage.
       expect(result.offloaded).toBe(false);
       expect(isStoredObjectMarker(result.inputs)).toBe(true);
-      const marker = (result.inputs as Record<string, any>)[
-        STORED_OBJECT_MARKER_KEY
-      ];
+      const marker = (result.inputs as Record<string, any>)[STORED_OBJECT_MARKER_KEY];
       expect(marker.offloadFailed).toBe(true);
       expect(marker.id).toBe("");
       expect(marker.sha256).toBeNull();
-      expect(marker.sizeBytes).toBe(
-        Buffer.byteLength(JSON.stringify(inputs), "utf8"),
-      );
+      expect(marker.sizeBytes).toBe(Buffer.byteLength(JSON.stringify(inputs), "utf8"));
       expect(marker.truncatedPreview).toBe(true);
       expect(Buffer.byteLength(marker.preview, "utf8")).toBeLessThanOrEqual(
         EVAL_INPUTS_PREVIEW_BYTES,
       );
-      expect(
-        Buffer.byteLength(JSON.stringify(result.inputs), "utf8"),
-      ).toBeLessThan(EVAL_INPUTS_INLINE_MAX_BYTES);
+      expect(Buffer.byteLength(JSON.stringify(result.inputs), "utf8")).toBeLessThan(
+        EVAL_INPUTS_INLINE_MAX_BYTES,
+      );
       // A preview-only marker resolves to itself (nothing durable to fetch).
       const resolved = await resolveInputsMarker({
         inputs: result.inputs,
@@ -367,9 +357,7 @@ describe("resolveInputsMarker", () => {
 
 describe("isStoredObjectMarker", () => {
   it("distinguishes markers from plain objects, arrays, and primitives", () => {
-    expect(
-      isStoredObjectMarker({ [STORED_OBJECT_MARKER_KEY]: { id: "x" } }),
-    ).toBe(true);
+    expect(isStoredObjectMarker({ [STORED_OBJECT_MARKER_KEY]: { id: "x" } })).toBe(true);
     expect(isStoredObjectMarker({ some: "inputs" })).toBe(false);
     expect(isStoredObjectMarker([1, 2, 3])).toBe(false);
     expect(isStoredObjectMarker(null)).toBe(false);

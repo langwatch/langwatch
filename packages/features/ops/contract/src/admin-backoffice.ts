@@ -1,9 +1,6 @@
 import { z } from "zod";
 
-import {
-  adminAuditRequestSchema,
-  adminResourceNameSchema,
-} from "./admin";
+import { adminAuditRequestSchema, adminResourceNameSchema } from "./admin";
 
 export const adminOperationMethodSchema = z.enum([
   "getList",

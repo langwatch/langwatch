@@ -13,10 +13,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  ScenarioWelcomeModal,
-  ScenarioWelcomeScreen,
-} from "../ScenarioWelcomeScreen";
+import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../ScenarioWelcomeScreen";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -87,11 +84,7 @@ describe("<ScenarioWelcomeModal/>", () => {
   describe("when open", () => {
     it("displays a title mentioning scenarios", () => {
       render(
-        <ScenarioWelcomeModal
-          open={true}
-          onOpenChange={vi.fn()}
-          onProceed={vi.fn()}
-        />,
+        <ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={vi.fn()} />,
         { wrapper: Wrapper },
       );
 
@@ -100,11 +93,7 @@ describe("<ScenarioWelcomeModal/>", () => {
 
     it("displays a primary call-to-action button", () => {
       render(
-        <ScenarioWelcomeModal
-          open={true}
-          onOpenChange={vi.fn()}
-          onProceed={vi.fn()}
-        />,
+        <ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={vi.fn()} />,
         { wrapper: Wrapper },
       );
 
@@ -138,11 +127,7 @@ describe("<ScenarioWelcomeModal/>", () => {
   describe("when closed", () => {
     it("does not show an open dialog", () => {
       const { container } = render(
-        <ScenarioWelcomeModal
-          open={false}
-          onOpenChange={vi.fn()}
-          onProceed={vi.fn()}
-        />,
+        <ScenarioWelcomeModal open={false} onOpenChange={vi.fn()} onProceed={vi.fn()} />,
         { wrapper: Wrapper },
       );
 

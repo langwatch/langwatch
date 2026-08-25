@@ -89,12 +89,7 @@ describe("mergeSessionTurns", () => {
         firstTurnNumber: 4,
       });
 
-      expect(merged.rowKeys).toEqual([
-        "turn-1#0",
-        "turn-1#1",
-        "turn-2#0",
-        "turn-2#1",
-      ]);
+      expect(merged.rowKeys).toEqual(["turn-1#0", "turn-1#1", "turn-2#0", "turn-2#1"]);
     });
 
     it("keeps the opened turn's row names identical after a turn is prepended", () => {
@@ -107,9 +102,7 @@ describe("mergeSessionTurns", () => {
         firstTurnNumber: 4,
       });
 
-      expect(after.rowKeys.slice(-before.rowKeys.length)).toEqual(
-        before.rowKeys,
-      );
+      expect(after.rowKeys.slice(-before.rowKeys.length)).toEqual(before.rowKeys);
     });
 
     it("unions the tool spans, which are unique across the whole session", () => {
@@ -158,12 +151,7 @@ describe("mergeSessionTurns", () => {
         firstTurnNumber: 4,
       });
 
-      expect(merged.rowKeys).toEqual([
-        "turn-1#0",
-        "turn-1#1",
-        "turn-2#0",
-        "turn-2#1",
-      ]);
+      expect(merged.rowKeys).toEqual(["turn-1#0", "turn-1#1", "turn-2#0", "turn-2#1"]);
       expect([...merged.turnDividers.keys()]).toEqual([2]);
     });
 

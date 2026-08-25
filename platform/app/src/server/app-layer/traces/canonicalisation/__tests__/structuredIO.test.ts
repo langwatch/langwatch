@@ -107,9 +107,7 @@ describe("CanonicalizeSpanAttributesService: structured IO", () => {
         stubSpan,
       );
 
-      expect(result.attributes["gen_ai.system_instructions"]).toBe(
-        "You are helpful.",
-      );
+      expect(result.attributes["gen_ai.system_instructions"]).toBe("You are helpful.");
     });
 
     it("preserves original wrapper in langwatch.input", () => {
@@ -117,11 +115,7 @@ describe("CanonicalizeSpanAttributesService: structured IO", () => {
         type: "chat_messages",
         value: [{ role: "user", content: "Hello" }],
       });
-      const result = service.canonicalize(
-        { "langwatch.input": wrapper },
-        [],
-        stubSpan,
-      );
+      const result = service.canonicalize({ "langwatch.input": wrapper }, [], stubSpan);
 
       // The wrapper object is re-set back to langwatch.input
       expect(result.attributes["langwatch.input"]).toEqual({
@@ -387,20 +381,14 @@ describe("CanonicalizeSpanAttributesService: structured IO", () => {
         stubSpan,
       );
 
-      expect(
-        result.attributes["langwatch.reserved.value_types"],
-      ).toBeUndefined();
+      expect(result.attributes["langwatch.reserved.value_types"]).toBeUndefined();
     });
   });
 
   describe("when wrapper is malformed", () => {
     it("treats {type: 123, value: ...} as non-structured (type not string)", () => {
       const wrapper = JSON.stringify({ type: 123, value: [1, 2, 3] });
-      const result = service.canonicalize(
-        { "langwatch.input": wrapper },
-        [],
-        stubSpan,
-      );
+      const result = service.canonicalize({ "langwatch.input": wrapper }, [], stubSpan);
 
       expect(result.attributes["gen_ai.input.messages"]).toBeUndefined();
       expect(result.attributes["langwatch.input"]).toBeDefined();
@@ -408,11 +396,7 @@ describe("CanonicalizeSpanAttributesService: structured IO", () => {
 
     it("treats {type: 'chat_messages'} missing value as non-structured", () => {
       const wrapper = JSON.stringify({ type: "chat_messages" });
-      const result = service.canonicalize(
-        { "langwatch.input": wrapper },
-        [],
-        stubSpan,
-      );
+      const result = service.canonicalize({ "langwatch.input": wrapper }, [], stubSpan);
 
       expect(result.attributes["gen_ai.input.messages"]).toBeUndefined();
       expect(result.attributes["langwatch.input"]).toBeDefined();

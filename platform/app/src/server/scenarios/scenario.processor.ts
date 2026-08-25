@@ -23,10 +23,7 @@ import {
   type JobContextMetadata,
   runWithContext,
 } from "../context/asyncContext";
-import {
-  getJobProcessingCounter,
-  getJobProcessingDurationHistogram,
-} from "../metrics";
+import { getJobProcessingCounter, getJobProcessingDurationHistogram } from "../metrics";
 import {
   type CancellationMessage,
   subscribeToCancellations,
@@ -38,14 +35,8 @@ import {
   type DataPrefetcherDependencies,
   prefetchScenarioData,
 } from "./execution/data-prefetcher";
-import type {
-  ExecutionJobData,
-  ScenarioExecutionPool,
-} from "./execution/execution-pool";
-import type {
-  ChildProcessJobData,
-  ScenarioExecutionResult,
-} from "./execution/types";
+import type { ExecutionJobData, ScenarioExecutionPool } from "./execution/execution-pool";
+import type { ChildProcessJobData, ScenarioExecutionResult } from "./execution/types";
 import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
 import {
   type FailureEventParams,
@@ -252,9 +243,7 @@ function parseResultLine(line: string): ChildProcessResult | null {
   return {
     success: record.success,
     ...(typeof record.error === "string" ? { error: record.error } : {}),
-    ...(typeof record.reasoning === "string"
-      ? { reasoning: record.reasoning }
-      : {}),
+    ...(typeof record.reasoning === "string" ? { reasoning: record.reasoning } : {}),
   };
 }
 
@@ -269,9 +258,7 @@ function parseResultLine(line: string): ChildProcessResult | null {
  *
  * @internal Exported for testing
  */
-export function parseChildProcessResult(
-  stdout: string,
-): ChildProcessResult | null {
+export function parseChildProcessResult(stdout: string): ChildProcessResult | null {
   const lines = stdout.split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {
     const result = parseResultLine(lines[i] ?? "");
@@ -330,11 +317,7 @@ export async function executeScenarioRun(
     // Check if cancellation was requested while we were prefetching
     if (pool.wasCancelled(jobData.scenarioRunId)) {
       jobLogger.info("Scenario cancelled during prefetch");
-      await handleCancelledJobResult(
-        jobData,
-        "Cancelled before execution started",
-        deps,
-      );
+      await handleCancelledJobResult(jobData, "Cancelled before execution started", deps);
       return;
     }
 
@@ -611,11 +594,7 @@ export async function startScenarioProcessor({
       { scenarioRunId: jobData.scenarioRunId },
       "Dispatching finished(CANCELLED) for skipped cancelled job",
     );
-    void handleCancelledJobResult(
-      jobData,
-      "Cancelled before execution started",
-      deps,
-    );
+    void handleCancelledJobResult(jobData, "Cancelled before execution started", deps);
   });
 
   // Subscribe to cancellation signals from the event-sourcing subscriber

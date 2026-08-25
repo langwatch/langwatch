@@ -30,9 +30,7 @@ function renderMenu({ isCompact }: { isCompact: boolean }) {
   return render(
     <ChakraProvider value={defaultSystem}>
       {isCompact ? (
-        <SideMenuDensityProvider density="compact">
-          {menu}
-        </SideMenuDensityProvider>
+        <SideMenuDensityProvider density="compact">{menu}</SideMenuDensityProvider>
       ) : (
         menu
       )}

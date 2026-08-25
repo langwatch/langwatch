@@ -21,9 +21,7 @@
  * is the only kind of amount that can tell an exact total from a rounded one,
  * and real per-request costs are routinely this shape.
  */
-import {
-  type WriteGatewayDebitsPayload,
-} from "@langwatch/enterprise-governance-server";
+import { type WriteGatewayDebitsPayload } from "@langwatch/enterprise-governance-server";
 import { AppGatewayDebitAdapter } from "~/runtime/app/features/governance/gateway-debit.adapter";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -148,10 +146,7 @@ async function spendFor(
   const budget = await prisma.gatewayBudget.findUniqueOrThrow({
     where: { id: budgetId },
   });
-  const [spend] = await chRepo.getSpendForBudgetsAcrossTenants(
-    [PROJECT_ID],
-    [budget],
-  );
+  const [spend] = await chRepo.getSpendForBudgetsAcrossTenants([PROJECT_ID], [budget]);
   if (!spend) throw new Error(`no spend row for ${budgetId}`);
   return { spentNanoUsd: spend.spentNanoUsd, spentUsd: spend.spentUsd };
 }
@@ -274,9 +269,7 @@ describe("given a request priced below one microdollar", () => {
 
   /** @scenario "A budget totals a cost that is not a whole number of microdollars" */
   it("totals the exact nano-USD the request was priced at", async () => {
-    await writeDebits(
-      servedRequest({ virtualKeyId: SINGLE_VK, costNanoUsd: ODD_NANO }),
-    );
+    await writeDebits(servedRequest({ virtualKeyId: SINGLE_VK, costNanoUsd: ODD_NANO }));
 
     const spend = await spendFor(budgetId);
     expect(spend.spentNanoUsd).toBe(ODD_NANO);

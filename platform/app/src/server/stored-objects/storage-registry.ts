@@ -28,9 +28,7 @@ type StorageDriverFactory = () => StorageDriver | undefined;
  */
 export class StorageRegistry {
   private readonly drivers: Partial<Record<UriScheme, StorageDriver>>;
-  private readonly driverFactories: Partial<
-    Record<UriScheme, StorageDriverFactory>
-  >;
+  private readonly driverFactories: Partial<Record<UriScheme, StorageDriverFactory>>;
 
   constructor({
     s3,

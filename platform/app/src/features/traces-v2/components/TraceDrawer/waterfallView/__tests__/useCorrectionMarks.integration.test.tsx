@@ -63,9 +63,7 @@ describe("given a correction that removes a span", () => {
     it("marks the removed span so the row can say so", () => {
       const { result } = renderHook(() => useCorrectionMarks(SPANS));
 
-      expect(result.current.deletedByCorrectionSpanIds.has("removed")).toBe(
-        true,
-      );
+      expect(result.current.deletedByCorrectionSpanIds.has("removed")).toBe(true);
       expect(result.current.deletedByCorrectionSpanIds.has("kept")).toBe(false);
     });
   });

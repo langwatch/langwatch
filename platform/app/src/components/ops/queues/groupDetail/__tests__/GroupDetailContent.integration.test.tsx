@@ -185,9 +185,7 @@ describe("GroupDetailContent", () => {
     describe("when the jobs section renders", () => {
       /** @scenario "The jobs list pages rather than truncating" */
       it("states the on-screen slice and offers the next page", () => {
-        const jobs = Array.from({ length: 20 }, (_, i) =>
-          makeJob({ jobId: `job-${i}` }),
-        );
+        const jobs = Array.from({ length: 20 }, (_, i) => makeJob({ jobId: `job-${i}` }));
         const { container } = renderContent({
           detail: makeGroup({ pendingJobs: 132 }),
           jobs: { jobs, total: 132 },
@@ -196,19 +194,14 @@ describe("GroupDetailContent", () => {
           onJobsPageChange: () => undefined,
         });
         expect(container.textContent).toContain("1–20 of 132");
-        expect(
-          screen.getByRole("button", { name: "Next jobs page" }),
-        ).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Next jobs page" })).toBeTruthy();
       });
     });
   });
 
   describe("given a page filter", () => {
     it("narrows the visible jobs to matches within the page", () => {
-      const jobs = [
-        makeJob({ jobId: "job-alpha" }),
-        makeJob({ jobId: "job-beta" }),
-      ];
+      const jobs = [makeJob({ jobId: "job-alpha" }), makeJob({ jobId: "job-beta" })];
       const { container } = renderContent({
         detail: makeGroup(),
         jobs: { jobs, total: 2 },

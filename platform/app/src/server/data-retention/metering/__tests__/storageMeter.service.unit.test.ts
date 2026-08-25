@@ -21,9 +21,7 @@ describe("StorageMeterService memory guard", () => {
     return { service, query };
   }
 
-  function assertGuarded(call: {
-    clickhouse_settings?: Record<string, unknown>;
-  }) {
+  function assertGuarded(call: { clickhouse_settings?: Record<string, unknown> }) {
     expect(call.clickhouse_settings).toBeDefined();
     expect(call.clickhouse_settings!.max_threads).toBe(2);
     // A coarse guardrail so a runaway byteSize recompute can't grind for a
@@ -87,9 +85,7 @@ describe("StorageMeterService memory guard", () => {
         if (failing.has(tenantId)) throw new Error("cluster unreachable");
         return {
           query: vi.fn(async (arg: { query_params: { tenantId: string } }) => ({
-            json: async () => [
-              { total: String(totals[arg.query_params.tenantId] ?? 0) },
-            ],
+            json: async () => [{ total: String(totals[arg.query_params.tenantId] ?? 0) }],
           })),
         } as any;
       });
@@ -102,11 +98,7 @@ describe("StorageMeterService memory guard", () => {
     it("sums each tenant's total", async () => {
       const { service } = makeMultiTenantService({ a: 10, b: 20, c: 30 });
 
-      const total = await service.getTotalStorageBytesForTenants([
-        "a",
-        "b",
-        "c",
-      ]);
+      const total = await service.getTotalStorageBytesForTenants(["a", "b", "c"]);
 
       expect(total).toBe(60);
     });
@@ -114,11 +106,7 @@ describe("StorageMeterService memory guard", () => {
     it("counts each tenant once even if passed twice", async () => {
       const { service, resolver } = makeMultiTenantService({ a: 10, b: 20 });
 
-      const total = await service.getTotalStorageBytesForTenants([
-        "a",
-        "a",
-        "b",
-      ]);
+      const total = await service.getTotalStorageBytesForTenants(["a", "a", "b"]);
 
       expect(total).toBe(30);
       // 'a' resolved once despite appearing twice in the input
@@ -135,16 +123,9 @@ describe("StorageMeterService memory guard", () => {
     });
 
     it("degrades a failing tenant to 0 instead of failing the scope total", async () => {
-      const { service } = makeMultiTenantService(
-        { a: 10, b: 20, c: 30 },
-        new Set(["b"]),
-      );
+      const { service } = makeMultiTenantService({ a: 10, b: 20, c: 30 }, new Set(["b"]));
 
-      const total = await service.getTotalStorageBytesForTenants([
-        "a",
-        "b",
-        "c",
-      ]);
+      const total = await service.getTotalStorageBytesForTenants(["a", "b", "c"]);
 
       expect(total).toBe(40);
     });
@@ -288,16 +269,12 @@ describe("StorageMeterService memory guard", () => {
         // The combined UNION ALL aggregate trips the per-query limit, but each
         // table's own query still succeeds — the total should degrade to the
         // sum of the per-table subtotals rather than failing the whole metric.
-        const query = vi
-          .fn()
-          .mockImplementation(async (arg: { query: string }) => {
-            if (arg.query.includes("UNION ALL")) {
-              throw new Error(
-                "Code: 241. DB::Exception: memory limit exceeded",
-              );
-            }
-            return { json: async () => [{ total: "10" }] };
-          });
+        const query = vi.fn().mockImplementation(async (arg: { query: string }) => {
+          if (arg.query.includes("UNION ALL")) {
+            throw new Error("Code: 241. DB::Exception: memory limit exceeded");
+          }
+          return { json: async () => [{ total: "10" }] };
+        });
         const client = { query } as const;
         const service = new StorageMeterService({
           resolveClickHouseClient: async () => client as any,
@@ -309,12 +286,8 @@ describe("StorageMeterService memory guard", () => {
 
         expect(total).toBe(10 * PRODUCTION_STORAGE_METER_TABLES.length);
         // one failed aggregate attempt + one query per table for the fallback
-        expect(query).toHaveBeenCalledTimes(
-          1 + PRODUCTION_STORAGE_METER_TABLES.length,
-        );
-        const queries = query.mock.calls
-          .map((call) => call[0].query)
-          .join("\n");
+        expect(query).toHaveBeenCalledTimes(1 + PRODUCTION_STORAGE_METER_TABLES.length);
+        const queries = query.mock.calls.map((call) => call[0].query).join("\n");
         expect(queries).not.toContain("metric_data_points");
         expect(queries).not.toContain("metric_series");
         expect(queries).not.toContain("metric_time_rollups");

@@ -15,11 +15,7 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import type {
-  CustomGraph,
-  Prisma,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { CustomGraph, Prisma, PrismaClient } from "~/generated/prisma/client";
 
 import { WORKBENCH_SQL_CHART_KIND } from "../chartKinds";
 
@@ -49,10 +45,7 @@ export type UpdateSavedWorkbenchChartInput = {
  */
 export interface SavedWorkbenchChartStore {
   findAll(input: { projectId: string }): Promise<CustomGraph[]>;
-  findById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<CustomGraph | null>;
+  findById(input: { id: string; projectId: string }): Promise<CustomGraph | null>;
   create(input: CreateSavedWorkbenchChartInput): Promise<CustomGraph>;
   update(input: UpdateSavedWorkbenchChartInput): Promise<CustomGraph | null>;
   delete(input: { id: string; projectId: string }): Promise<number>;
@@ -73,10 +66,7 @@ export class SavedWorkbenchChartRepository implements SavedWorkbenchChartStore {
   }
 
   /** Finds one saved workbench chart by id within a project. */
-  async findById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<CustomGraph | null> {
+  async findById(input: { id: string; projectId: string }): Promise<CustomGraph | null> {
     return await this.prisma.customGraph.findFirst({
       where: {
         id: input.id,
@@ -106,9 +96,7 @@ export class SavedWorkbenchChartRepository implements SavedWorkbenchChartStore {
    * the ordinary answer for another tenant's id and the caller turns it into
    * the refusal it wants.
    */
-  async update(
-    input: UpdateSavedWorkbenchChartInput,
-  ): Promise<CustomGraph | null> {
+  async update(input: UpdateSavedWorkbenchChartInput): Promise<CustomGraph | null> {
     // One statement: `UPDATE ... RETURNING` answers with the row it wrote, so
     // there is no window in which another writer's delete could turn a
     // successful update into a not-found read-back.

@@ -32,10 +32,7 @@ import { INTERRUPTED_THRESHOLD_MS, isRunFinished } from "./isRunFinished";
  */
 export type BatchRunSummary = {
   runId: string;
-  workflowVersion?: Pick<
-    WorkflowVersion,
-    "id" | "version" | "commitMessage"
-  > | null;
+  workflowVersion?: Pick<WorkflowVersion, "id" | "version" | "commitMessage"> | null;
   timestamps: {
     createdAt: number;
     updatedAt?: number | null;
@@ -88,9 +85,7 @@ type BatchRunsSidebarProps = {
 /**
  * Check if a run was interrupted (no explicit finish/stop but stale)
  */
-const isRunInterrupted = (
-  timestamps: BatchRunSummary["timestamps"],
-): boolean => {
+const isRunInterrupted = (timestamps: BatchRunSummary["timestamps"]): boolean => {
   // Has explicit finish or stop - not interrupted
   if (timestamps.finishedAt ?? timestamps.stoppedAt) {
     return false;
@@ -116,17 +111,11 @@ const formatEvalSummary = (
   },
   compact = false,
 ): string => {
-  if (
-    evaluation.averagePassed !== undefined &&
-    evaluation.averagePassed !== null
-  ) {
+  if (evaluation.averagePassed !== undefined && evaluation.averagePassed !== null) {
     const pct = Math.round(evaluation.averagePassed * 100);
     return compact ? `${pct}%` : `${pct}% passed`;
   }
-  if (
-    evaluation.averageScore !== undefined &&
-    evaluation.averageScore !== null
-  ) {
+  if (evaluation.averageScore !== undefined && evaluation.averageScore !== null) {
     const score = evaluation.averageScore.toFixed(2);
     return compact ? score : `avg ${score}`;
   }
@@ -198,12 +187,7 @@ export function BatchRunsSidebar({
       overflowY="auto"
     >
       {/* Header with title and compare button */}
-      <HStack
-        paddingX={3}
-        paddingBottom={2}
-        justify="space-between"
-        align="center"
-      >
+      <HStack paddingX={3} paddingBottom={2} justify="space-between" align="center">
         <Text fontSize="sm" fontWeight="semibold" color="fg">
           Experiment Runs
         </Text>
@@ -286,11 +270,9 @@ export function BatchRunsSidebar({
             const isSelected = selectedRunId === run.runId;
             const isFinished = isRunFinished(run.timestamps);
             const _runCost =
-              (run.summary.datasetCost ?? 0) +
-              (run.summary.evaluationsCost ?? 0);
+              (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
 
-            const chronologicalIndex =
-              chronologicalIndexMap.get(run.runId) ?? 0;
+            const chronologicalIndex = chronologicalIndexMap.get(run.runId) ?? 0;
             const runName = getRunDisplayName({
               commitMessage: run.workflowVersion?.commitMessage,
               runId: run.runId,
@@ -317,8 +299,7 @@ export function BatchRunsSidebar({
               ? "red.400"
               : interrupted
                 ? "orange.400"
-                : (runColors[run.runId] ??
-                  getColorForString("colors", run.runId).color);
+                : (runColors[run.runId] ?? getColorForString("colors", run.runId).color);
 
             return (
               <HStack
@@ -411,9 +392,7 @@ export function BatchRunsSidebar({
                         v{run.workflowVersion.version}
                       </Text>
                     )}
-                    {!isFinished && (
-                      <Spinner size="xs" color="blue.500" flexShrink={0} />
-                    )}
+                    {!isFinished && <Spinner size="xs" color="blue.500" flexShrink={0} />}
                   </HStack>
 
                   {/* Line 2: Time ago + status */}

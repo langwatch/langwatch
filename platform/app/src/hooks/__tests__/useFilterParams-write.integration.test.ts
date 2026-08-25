@@ -75,9 +75,7 @@ function lastPushUrl(): string {
   // Fall back to first arg for string-form or object-form pushes.
   if (typeof lastCall[1] === "string") return lastCall[1];
   if (typeof lastCall[0] === "string") return lastCall[0];
-  throw new Error(
-    "router.push did not receive a string URL in either `url` or `as`",
-  );
+  throw new Error("router.push did not receive a string URL in either `url` or `as`");
 }
 
 // ---------------------------------------------------------------------------
@@ -109,8 +107,7 @@ describe("useFilterParams() write operations", () => {
     describe("when setting event_metric filter", () => {
       it("does not strip event_metric_value from URL", () => {
         mockRouterQuery = { "event_metric_value.click.count": "0,100" };
-        mockRouterAsPath =
-          "/test-project/messages?event_metric_value.click.count=0,100";
+        mockRouterAsPath = "/test-project/messages?event_metric_value.click.count=0,100";
 
         const { result } = renderHook(() => useFilterParams());
         result.current.setFilter("events.metrics.key", ["count"]);
@@ -129,8 +126,7 @@ describe("useFilterParams() write operations", () => {
   describe("given a scroll already in progress", () => {
     const withCursor = () => {
       mockRouterQuery = { scrollId: "cursor-token", metadata_key: "env" };
-      mockRouterAsPath =
-        "/test-project/messages?scrollId=cursor-token&metadata_key=env";
+      mockRouterAsPath = "/test-project/messages?scrollId=cursor-token&metadata_key=env";
     };
 
     describe("when a filter is applied", () => {
@@ -290,8 +286,7 @@ describe("useFilterParams() write operations", () => {
           id: "graph-abc",
           dashboard: "dash-123",
         };
-        mockRouterAsPath =
-          "/my-project/analytics/custom/graph-abc?dashboard=dash-123";
+        mockRouterAsPath = "/my-project/analytics/custom/graph-abc?dashboard=dash-123";
       });
 
       it("does not leak route params into the query string", () => {
@@ -328,8 +323,7 @@ describe("useFilterParams() write operations", () => {
           "metadata.env": "prod",
           origin: "application",
         };
-        mockRouterAsPath =
-          "/test-project/messages?metadata.env=prod&origin=application";
+        mockRouterAsPath = "/test-project/messages?metadata.env=prod&origin=application";
 
         const { result } = renderHook(() => useFilterParams());
         result.current.setNegateFilters(true);

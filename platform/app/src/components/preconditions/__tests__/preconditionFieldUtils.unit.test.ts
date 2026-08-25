@@ -76,12 +76,7 @@ describe("preconditionFieldUtils", () => {
   describe("getAllowedRulesForField()", () => {
     it("returns all 4 rules for text fields like input", () => {
       const rules = getAllowedRulesForField("input");
-      expect(rules).toEqual([
-        "is",
-        "contains",
-        "not_contains",
-        "matches_regex",
-      ]);
+      expect(rules).toEqual(["is", "contains", "not_contains", "matches_regex"]);
     });
 
     it("returns only 'is' for enum fields like traces.origin", () => {
@@ -161,9 +156,7 @@ describe("preconditionFieldUtils", () => {
 
     it("returns false when single precondition is not the default", () => {
       expect(
-        isDefaultOnlyPrecondition([
-          { field: "input", rule: "contains", value: "test" },
-        ]),
+        isDefaultOnlyPrecondition([{ field: "input", rule: "contains", value: "test" }]),
       ).toBe(false);
     });
 

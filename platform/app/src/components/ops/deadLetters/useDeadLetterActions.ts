@@ -22,9 +22,7 @@ const refOf = (message: DeadLetterMessage) => ({
 function useRowActions(onSettled: () => void) {
   const [redrivingId, setRedrivingId] = useState<string | null>(null);
   const [discardingId, setDiscardingId] = useState<string | null>(null);
-  const [discardTarget, setDiscardTarget] = useState<DeadLetterMessage | null>(
-    null,
-  );
+  const [discardTarget, setDiscardTarget] = useState<DeadLetterMessage | null>(null);
   const settle = () => {
     setRedrivingId(null);
     setDiscardingId(null);

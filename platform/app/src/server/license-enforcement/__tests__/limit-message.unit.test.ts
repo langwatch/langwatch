@@ -36,8 +36,7 @@ describe("buildMessagePrefix", () => {
 describe("buildUpgradeAction", () => {
   beforeEach(() => {
     (env as { IS_SAAS: boolean }).IS_SAAS = false;
-    (env as { BASE_HOST: string | undefined }).BASE_HOST =
-      "https://app.langwatch.ai";
+    (env as { BASE_HOST: string | undefined }).BASE_HOST = "https://app.langwatch.ai";
   });
 
   describe("on SaaS", () => {

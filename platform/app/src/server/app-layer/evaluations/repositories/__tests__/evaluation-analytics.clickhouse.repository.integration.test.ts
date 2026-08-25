@@ -30,9 +30,7 @@ const tenantId = `${tag}-project`;
 const baseMs = Date.now();
 const window = { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 };
 
-function evalRow(
-  over: Partial<EvaluationAnalyticsRow> = {},
-): EvaluationAnalyticsRow {
+function evalRow(over: Partial<EvaluationAnalyticsRow> = {}): EvaluationAnalyticsRow {
   return {
     tenantId,
     evaluationId: `${tag}-e`,

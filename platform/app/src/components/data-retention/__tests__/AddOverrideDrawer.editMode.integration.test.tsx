@@ -12,10 +12,7 @@ vi.mock("~/components/settings/ScopeChipPicker", () => ({
   ScopeChipPicker: () => <div data-testid="scope-chip-picker" />,
 }));
 
-import {
-  AddOverrideDrawer,
-  type RetentionEditTarget,
-} from "../AddOverrideDrawer";
+import { AddOverrideDrawer, type RetentionEditTarget } from "../AddOverrideDrawer";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

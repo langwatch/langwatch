@@ -67,8 +67,9 @@ function PromptSaveHarness({
     name: "version.configData.messages",
   });
   const isValid = hasNonEmptySystemMessage(messages);
-  const messagesError = methods.formState.errors.version?.configData
-    ?.messages as { message?: string } | undefined;
+  const messagesError = methods.formState.errors.version?.configData?.messages as
+    | { message?: string }
+    | undefined;
 
   const handleClick = async () => {
     const valid = await methods.trigger();
@@ -95,11 +96,7 @@ function PromptSaveHarness({
         }}
       />
       {messagesError?.message && <p role="alert">{messagesError.message}</p>}
-      <button
-        type="button"
-        disabled={!isValid}
-        onClick={() => void handleClick()}
-      >
+      <button type="button" disabled={!isValid} onClick={() => void handleClick()}>
         Save
       </button>
     </form>

@@ -45,10 +45,7 @@ import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../server/api/root";
 import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
-import {
-  type DatasetColumns,
-  datasetColumnsSchema,
-} from "@langwatch/dataset-contract";
+import { type DatasetColumns, datasetColumnsSchema } from "@langwatch/dataset-contract";
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 
@@ -181,8 +178,7 @@ function DatasetsPage() {
           if (isHandledByGlobalHandler(error)) return;
           toaster.create({
             title: "Failed to delete dataset",
-            description:
-              "There was an error deleting the dataset. Please try again.",
+            description: "There was an error deleting the dataset. Please try again.",
             type: "error",
             duration: 5000,
           });
@@ -191,8 +187,7 @@ function DatasetsPage() {
     );
   };
 
-  const { showDeleteDialog, DeleteDialog } =
-    useDeleteDatasetConfirmation(deleteDataset);
+  const { showDeleteDialog, DeleteDialog } = useDeleteDatasetConfirmation(deleteDataset);
 
   const goToDataset = (id: string) => {
     void router.push({
@@ -222,13 +217,9 @@ function DatasetsPage() {
             addEditDatasetDrawer.onOpen();
           }}
         >
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="upload-or-create-dataset"
-          >
-            <Upload height={17} width={17} strokeWidth={2.5} /> Upload or create
-            dataset <ChevronDown size={16} />
+          <Button variant="outline" size="sm" data-testid="upload-or-create-dataset">
+            <Upload height={17} width={17} strokeWidth={2.5} /> Upload or create dataset{" "}
+            <ChevronDown size={16} />
           </Button>
         </UploadOrCreateDatasetMenu>
       </PageLayout.Header>
@@ -315,10 +306,7 @@ function DatasetsPage() {
                       name: dataset.name,
                     })}
                   >
-                    <Table.Row
-                      cursor="pointer"
-                      onClick={() => goToDataset(dataset.id)}
-                    >
+                    <Table.Row cursor="pointer" onClick={() => goToDataset(dataset.id)}>
                       <Table.Cell>
                         <HStack gap={2}>
                           <Text>{dataset.name}</Text>
@@ -343,9 +331,7 @@ function DatasetsPage() {
                           ))}
                         </HStack>
                       </Table.Cell>
-                      <Table.Cell>
-                        {datasetDisplayRecordCount(dataset)}
-                      </Table.Cell>
+                      <Table.Cell>{datasetDisplayRecordCount(dataset)}</Table.Cell>
                       <Table.Cell>
                         {new Date(
                           dataset.updatedAt ?? dataset.createdAt,
@@ -370,8 +356,7 @@ function DatasetsPage() {
                               Gate them on ready (a null status = legacy = ready).
                               Delete stays available so a stuck/failed dataset can
                               always be cleaned up. */}
-                            {(dataset.status === "ready" ||
-                              dataset.status == null) && (
+                            {(dataset.status === "ready" || dataset.status == null) && (
                               <Menu.Item
                                 value="copy"
                                 onClick={(event) => {

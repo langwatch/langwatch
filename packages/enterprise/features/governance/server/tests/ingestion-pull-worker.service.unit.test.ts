@@ -52,15 +52,11 @@ class FakeSources extends IngestionPullSourcePort {
   }
 }
 class FakeProjects extends ProjectService {
-  async tryFindInternal(
-    _input: InternalProjectQuery,
-  ): Promise<InternalProject | null> {
+  async tryFindInternal(_input: InternalProjectQuery): Promise<InternalProject | null> {
     return null;
   }
 
-  async ensureInternal(
-    _input: InternalProjectQuery,
-  ): Promise<InternalProject> {
+  async ensureInternal(_input: InternalProjectQuery): Promise<InternalProject> {
     return {
       id: "gov-project",
       name: "Governance (internal)",
@@ -145,9 +141,10 @@ describe("IngestionPullWorkerService", () => {
       errorCount: 0,
     }));
 
-    await expect(
-      service.run({ sourceId: "source-1", cursor: null }),
-    ).resolves.toEqual({ nextCursor: "next", eventCount: 1 });
+    await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toEqual({
+      nextCursor: "next",
+      eventCount: 1,
+    });
     expect(sink.insertEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: "gov-project",
@@ -159,10 +156,7 @@ describe("IngestionPullWorkerService", () => {
   });
 
   it("cuts off an uncooperative adapter without advancing the cursor", async () => {
-    const { service, sink } = worker(
-      () => new Promise<PullResult>(() => undefined),
-      5,
-    );
+    const { service, sink } = worker(() => new Promise<PullResult>(() => undefined), 5);
 
     await expect(
       service.run({ sourceId: "source-1", cursor: "held" }),

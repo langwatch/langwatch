@@ -65,13 +65,9 @@ export abstract class AuthzService {
     } as Authorized<Tier, Permission>;
   }
 
-  abstract check(
-    args: AuthzCheckInput,
-  ): Promise<import("./authz").AuthzDecision>;
+  abstract check(args: AuthzCheckInput): Promise<import("./authz").AuthzDecision>;
 
-  abstract checkDetailed(
-    args: AuthzCheckInput,
-  ): Promise<AuthzCheckDetailedOutput>;
+  abstract checkDetailed(args: AuthzCheckInput): Promise<AuthzCheckDetailedOutput>;
 
   abstract can(args: AuthzCheckInput): Promise<boolean>;
 
@@ -89,30 +85,22 @@ export abstract class AuthzService {
     args: AuthzEffectivePermissionsInput,
   ): Promise<AuthzEffectivePermissionsOutput>;
 
-  abstract checkByIds(
-    args: AuthzCheckByIdsInput,
-  ): Promise<AuthzCheckByIdsOutput>;
+  abstract checkByIds(args: AuthzCheckByIdsInput): Promise<AuthzCheckByIdsOutput>;
 
-  abstract canAnyByIds(
-    args: AuthzCanAnyByIdsInput,
-  ): Promise<AuthzCanAnyByIdsOutput>;
+  abstract canAnyByIds(args: AuthzCanAnyByIdsInput): Promise<AuthzCanAnyByIdsOutput>;
 
   abstract canBatchByIds(
     args: AuthzCanBatchByIdsInput,
   ): Promise<AuthzCanBatchByIdsOutput>;
 
-  abstract tryResolveScope(
-    args: AuthzResolveScopeInput,
-  ): Promise<AuthzScopeRef | null>;
+  abstract tryResolveScope(args: AuthzResolveScopeInput): Promise<AuthzScopeRef | null>;
 
   abstract explainDecision(
     args: AuthzExplainDecisionInput,
   ): Promise<AuthzExplainDecisionOutput>;
 
   // Composed compatibility capability replacing the app PermissionsService.
-  abstract getDecision(
-    args: AuthzGetDecisionInput,
-  ): Promise<PermissionDecision>;
+  abstract getDecision(args: AuthzGetDecisionInput): Promise<PermissionDecision>;
 
   abstract getProjectAnyDecision(
     args: AuthzGetProjectAnyDecisionInput,
@@ -177,9 +165,7 @@ export abstract class AuthzService {
 
   /** Temporary rollout boundary for legacy callers that still own their
    * pre-engine fallback. Persistence and migration state remain private. */
-  abstract isOnEngine(
-    args: AuthzListOrganizationBindingsInput,
-  ): Promise<boolean>;
+  abstract isOnEngine(args: AuthzListOrganizationBindingsInput): Promise<boolean>;
 
   /** Finalized migration time for compatibility facts, or null before cutover. */
   abstract tryGetEngineCutoverAt(

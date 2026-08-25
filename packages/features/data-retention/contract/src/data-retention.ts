@@ -4,10 +4,12 @@ export const retentionScopeTypes = ["ORGANIZATION", "TEAM", "PROJECT"] as const;
 export const retentionScopeSchema = z.enum(retentionScopeTypes);
 export type RetentionScopeType = z.infer<typeof retentionScopeSchema>;
 
-export const scopeAssignmentSchema = z.object({
-  scopeType: retentionScopeSchema,
-  scopeId: z.string().min(1),
-}).strict();
+export const scopeAssignmentSchema = z
+  .object({
+    scopeType: retentionScopeSchema,
+    scopeId: z.string().min(1),
+  })
+  .strict();
 export type ScopeAssignment = z.infer<typeof scopeAssignmentSchema>;
 
 export const retentionCategories = ["traces", "scenarios", "experiments"] as const;
@@ -35,35 +37,51 @@ export const platformDefaultRetentionDaysSchema = z
     message: `The platform retention default must be a whole number of weeks (a multiple of ${RETENTION_WEEK_DAYS} days).`,
   });
 
-export const retentionDaysSchema = z.number().int().min(MIN_RETENTION_DAYS).max(MAX_RETENTION_DAYS)
+export const retentionDaysSchema = z
+  .number()
+  .int()
+  .min(MIN_RETENTION_DAYS)
+  .max(MAX_RETENTION_DAYS)
   .refine((days) => days % RETENTION_WEEK_DAYS === 0, {
     message: `Retention must be a whole number of weeks (a multiple of ${RETENTION_WEEK_DAYS} days).`,
   })
   .refine(
-    (days) => PAID_RETENTION_PRESET_DAYS.includes(days as (typeof PAID_RETENTION_PRESET_DAYS)[number]) || days >= ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
-    { message: `Retention under ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} days is only available as a fixed plan option.` },
+    (days) =>
+      PAID_RETENTION_PRESET_DAYS.includes(
+        days as (typeof PAID_RETENTION_PRESET_DAYS)[number],
+      ) || days >= ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
+    {
+      message: `Retention under ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} days is only available as a fixed plan option.`,
+    },
   );
 
-export const retentionDaysInputSchema = z.union([z.literal(INDEFINITE_RETENTION_DAYS), retentionDaysSchema]);
+export const retentionDaysInputSchema = z.union([
+  z.literal(INDEFINITE_RETENTION_DAYS),
+  retentionDaysSchema,
+]);
 
-export const retentionPolicySchema = z.object({
-  id: z.string().min(1),
-  organizationId: z.string().min(1),
-  scopeType: retentionScopeSchema,
-  scopeId: z.string().min(1),
-  category: retentionCategorySchema,
-  retentionDays: retentionDaysInputSchema,
-  createdAt: z.date(),
-  updatedAt: z.date(),
-}).strict();
+export const retentionPolicySchema = z
+  .object({
+    id: z.string().min(1),
+    organizationId: z.string().min(1),
+    scopeType: retentionScopeSchema,
+    scopeId: z.string().min(1),
+    category: retentionCategorySchema,
+    retentionDays: retentionDaysInputSchema,
+    createdAt: z.date(),
+    updatedAt: z.date(),
+  })
+  .strict();
 export type RetentionPolicy = z.infer<typeof retentionPolicySchema>;
 
-export const retentionRowSchema = z.object({
-  scopeType: retentionScopeSchema,
-  scopeId: z.string().min(1),
-  category: retentionCategorySchema,
-  retentionDays: retentionDaysInputSchema,
-}).strict();
+export const retentionRowSchema = z
+  .object({
+    scopeType: retentionScopeSchema,
+    scopeId: z.string().min(1),
+    category: retentionCategorySchema,
+    retentionDays: retentionDaysInputSchema,
+  })
+  .strict();
 export type RetentionRow = z.infer<typeof retentionRowSchema>;
 
 export const resolvedRetentionSchema = z
@@ -75,11 +93,13 @@ export const resolvedRetentionSchema = z
   .strict();
 export type ResolvedRetention = z.infer<typeof resolvedRetentionSchema>;
 
-export const projectScopeContextSchema = z.object({
-  organizationId: z.string().min(1),
-  teamId: z.string().min(1),
-  projectId: z.string().min(1),
-}).strict();
+export const projectScopeContextSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    teamId: z.string().min(1),
+    projectId: z.string().min(1),
+  })
+  .strict();
 export type ProjectScopeContext = z.infer<typeof projectScopeContextSchema>;
 
 export function resolveScopeChain(context: ProjectScopeContext): ScopeAssignment[] {
@@ -102,7 +122,14 @@ export function resolveRetention(input: {
   };
   for (const category of retentionCategories) {
     const match = input.chain
-      .map((scope) => input.rows.find((row) => row.scopeType === scope.scopeType && row.scopeId === scope.scopeId && row.category === category))
+      .map((scope) =>
+        input.rows.find(
+          (row) =>
+            row.scopeType === scope.scopeType &&
+            row.scopeId === scope.scopeId &&
+            row.category === category,
+        ),
+      )
       .find((row) => row !== undefined);
     if (match) resolved[category] = match.retentionDays;
   }

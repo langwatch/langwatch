@@ -234,10 +234,7 @@ export type BoundedSection = z.infer<typeof boundedSchema>;
  */
 const lastParse = new WeakMap<object, { raw: string; value: unknown }>();
 
-export function parseSnapshot<T>(
-  schema: z.ZodType<T>,
-  raw: string | null,
-): T | null {
+export function parseSnapshot<T>(schema: z.ZodType<T>, raw: string | null): T | null {
   if (!raw) return null;
 
   const cached = lastParse.get(schema);

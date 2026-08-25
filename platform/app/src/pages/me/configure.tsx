@@ -50,8 +50,7 @@ function MySettingsPage() {
   // docs and from the old /me/devices path, and a link that lands on the keys
   // tab does not take the reader where it said it would.
   const [searchParams, setSearchParams] = useSearchParams();
-  const credentialsTab =
-    searchParams.get("tab") === "devices" ? "devices" : "keys";
+  const credentialsTab = searchParams.get("tab") === "devices" ? "devices" : "keys";
   const selectCredentialsTab = (tab: string) =>
     setSearchParams(
       (prev) => {
@@ -93,8 +92,7 @@ function MySettingsPage() {
     { organizationId: ctx.organizationId },
     { enabled: !!ctx.organizationId, refetchOnWindowFocus: false },
   );
-  const personalProjectId =
-    personalContextQuery.data?.workspace.project.id ?? null;
+  const personalProjectId = personalContextQuery.data?.workspace.project.id ?? null;
 
   const featuresQuery = api.personalWorkspaceFeatures.get.useQuery(
     { projectId: personalProjectId ?? "" },
@@ -106,49 +104,46 @@ function MySettingsPage() {
     featuresQuery.data?.annotations &&
     featuresQuery.data?.automations
   );
-  const enableAllMutation = api.personalWorkspaceFeatures.enableAll.useMutation(
-    {
-      onSuccess: () => {
-        if (personalProjectId) {
-          void utils.personalWorkspaceFeatures.get.invalidate({
-            projectId: personalProjectId,
-          });
-        }
-        toaster.create({
-          title: "Advanced features enabled",
-          description:
-            "Evaluations, datasets, annotations, and automations now appear in your sidebar.",
-          type: "success",
+  const enableAllMutation = api.personalWorkspaceFeatures.enableAll.useMutation({
+    onSuccess: () => {
+      if (personalProjectId) {
+        void utils.personalWorkspaceFeatures.get.invalidate({
+          projectId: personalProjectId,
         });
-      },
-      onError: (err) =>
-        showErrorToast({
-          error: err,
-          fallbackTitle: "Couldn't enable advanced features",
-        }),
+      }
+      toaster.create({
+        title: "Advanced features enabled",
+        description:
+          "Evaluations, datasets, annotations, and automations now appear in your sidebar.",
+        type: "success",
+      });
     },
-  );
-  const disableAllMutation =
-    api.personalWorkspaceFeatures.disableAll.useMutation({
-      onSuccess: () => {
-        if (personalProjectId) {
-          void utils.personalWorkspaceFeatures.get.invalidate({
-            projectId: personalProjectId,
-          });
-        }
-        toaster.create({
-          title: "Advanced features disabled",
-          description:
-            "Sidebar entries hidden. Existing data is preserved and reappears on re-enable.",
-          type: "success",
+    onError: (err) =>
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't enable advanced features",
+      }),
+  });
+  const disableAllMutation = api.personalWorkspaceFeatures.disableAll.useMutation({
+    onSuccess: () => {
+      if (personalProjectId) {
+        void utils.personalWorkspaceFeatures.get.invalidate({
+          projectId: personalProjectId,
         });
-      },
-      onError: (err) =>
-        showErrorToast({
-          error: err,
-          fallbackTitle: "Couldn't disable advanced features",
-        }),
-    });
+      }
+      toaster.create({
+        title: "Advanced features disabled",
+        description:
+          "Sidebar entries hidden. Existing data is preserved and reappears on re-enable.",
+        type: "success",
+      });
+    },
+    onError: (err) =>
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't disable advanced features",
+      }),
+  });
 
   const revokeMutation = api.personalVirtualKeys.revokePersonal.useMutation({
     onSuccess: () => {
@@ -232,11 +227,7 @@ function MySettingsPage() {
           action={
             credentialsTab === "keys" &&
             !showAddForm && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowAddForm(true)}
-              >
+              <Button size="sm" variant="outline" onClick={() => setShowAddForm(true)}>
                 + Add a new key
               </Button>
             )
@@ -282,8 +273,8 @@ function MySettingsPage() {
                       onChange={(e) => setNewKeyLabel(e.target.value)}
                     />
                     <Text fontSize="xs" color="fg.muted">
-                      Lowercase letters, numbers, dash, underscore. The secret
-                      is shown once on creation.
+                      Lowercase letters, numbers, dash, underscore. The secret is shown
+                      once on creation.
                     </Text>
                     <HStack gap={2}>
                       <Button
@@ -311,8 +302,8 @@ function MySettingsPage() {
 
               {ctx.apiKeys.length === 0 ? (
                 <Text fontSize="sm" color="fg.muted">
-                  No personal keys yet. Run <code>langwatch login</code> in your
-                  terminal to issue your first one.
+                  No personal keys yet. Run <code>langwatch login</code> in your terminal
+                  to issue your first one.
                 </Text>
               ) : (
                 <VStack align="stretch" gap={2}>
@@ -321,9 +312,7 @@ function MySettingsPage() {
                       key={key.id}
                       apiKey={key}
                       isPendingRevoke={pendingRevokeId === key.id}
-                      isRevoking={
-                        revokeMutation.isPending && pendingRevokeId === key.id
-                      }
+                      isRevoking={revokeMutation.isPending && pendingRevokeId === key.id}
                       onRequestRevoke={() => setPendingRevokeId(key.id)}
                       onCancelRevoke={() => setPendingRevokeId(null)}
                       onConfirmRevoke={() => onRevoke(key.id)}
@@ -380,8 +369,7 @@ function MySettingsPage() {
                 }
               }}
             >
-              Enable advanced features (evaluations, datasets, annotations,
-              automations)
+              Enable advanced features (evaluations, datasets, annotations, automations)
             </Checkbox>
           </SectionCard>
         ) : null}
@@ -419,12 +407,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
       <HStack alignItems="start" marginBottom={3}>
         <VStack align="start" gap={0}>
           <Text fontSize="sm" fontWeight="semibold">

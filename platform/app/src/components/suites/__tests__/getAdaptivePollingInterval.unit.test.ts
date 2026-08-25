@@ -59,9 +59,7 @@ describe("getAdaptivePollingInterval()", () => {
     /** @scenario "Polling interval returns to fast when a new run starts" */
     it("drops the interval to between 2000 and 3000 ms", () => {
       // First call with settled data
-      const settledRuns = [
-        makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS }),
-      ];
+      const settledRuns = [makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS })];
       const settledInterval = getAdaptivePollingInterval({
         runs: settledRuns,
       });

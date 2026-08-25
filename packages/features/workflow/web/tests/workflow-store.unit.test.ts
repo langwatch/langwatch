@@ -398,9 +398,7 @@ describe("workflowStoreCore", () => {
 
         const state = testStore.getState();
         const nodeA = state.nodes.find((n) => n.id === "nodeA");
-        expect(nodeA?.data.inputs).toEqual([
-          { identifier: "input", type: "str" },
-        ]);
+        expect(nodeA?.data.inputs).toEqual([{ identifier: "input", type: "str" }]);
         // Edge survives because nodeA.outputs and nodeB.inputs still match the handles
         expect(state.edges).toHaveLength(1);
       });
@@ -435,13 +433,9 @@ describe("workflowStoreCore", () => {
 
         state = testStore.getState();
         nodeA = state.nodes.find((n) => n.id === "nodeA");
-        expect(
-          (nodeA?.data as Record<string, unknown>).localConfig,
-        ).toBeUndefined();
+        expect((nodeA?.data as Record<string, unknown>).localConfig).toBeUndefined();
         // Array fields remain untouched
-        expect(nodeA?.data.inputs).toEqual([
-          { identifier: "input", type: "str" },
-        ]);
+        expect(nodeA?.data.inputs).toEqual([{ identifier: "input", type: "str" }]);
       });
     });
 
@@ -490,9 +484,9 @@ describe("workflowStoreCore", () => {
           value: unknown;
         }>;
 
-        expect(
-          params.find((p) => p.identifier === "some_param")?.value,
-        ).toEqual({ ref: "new_name" });
+        expect(params.find((p) => p.identifier === "some_param")?.value).toEqual({
+          ref: "new_name",
+        });
         expect(params.find((p) => p.identifier === "other_param")?.value).toBe(
           "plain_value",
         );

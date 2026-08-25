@@ -13,9 +13,7 @@ export const useTextareaResize = ({
   containerRef,
   minHeightPx,
 }: UseTextareaResizeProps) => {
-  const [userResizedHeight, setUserResizedHeight] = useState<number | null>(
-    null,
-  );
+  const [userResizedHeight, setUserResizedHeight] = useState<number | null>(null);
   const isUserResizingRef = useRef(false);
   const pendingHeightRef = useRef<number | null>(null);
 

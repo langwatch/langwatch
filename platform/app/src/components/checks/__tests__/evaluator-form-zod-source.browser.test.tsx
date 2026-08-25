@@ -21,10 +21,7 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 import type { z } from "zod";
-import {
-  AVAILABLE_EVALUATORS,
-  evaluatorsSchema,
-} from "@langwatch/evaluator-contract";
+import { AVAILABLE_EVALUATORS, evaluatorsSchema } from "@langwatch/evaluator-contract";
 
 afterEach(() => cleanup());
 
@@ -60,8 +57,8 @@ function Catalog() {
           Evaluator catalog (Zod-first)
         </Heading>
         <Text fontSize="sm" color="gray.600" marginBottom={4}>
-          {Object.keys(evaluatorsSchema.shape).length} evaluators · schemas and
-          defaults inferred from Zod, no ts-to-zod
+          {Object.keys(evaluatorsSchema.shape).length} evaluators · schemas and defaults
+          inferred from Zod, no ts-to-zod
         </Text>
         <VStack align="stretch" gap={3}>
           {SHOWCASE.map((type) => {
@@ -145,23 +142,17 @@ describe("given the Zod-first evaluator catalog", () => {
       render(<Catalog />);
 
       await waitFor(() =>
-        expect(
-          screen.getByText(/Evaluator catalog \(Zod-first\)/),
-        ).toBeVisible(),
+        expect(screen.getByText(/Evaluator catalog \(Zod-first\)/)).toBeVisible(),
       );
       // Defaults come straight from the Zod schema (.parse({}))
-      expect(
-        screen.getAllByText(/default: "openai\/gpt-5"/).length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByText(/default: "openai\/gpt-5"/).length).toBeGreaterThan(0);
       expect(screen.getByText("case_sensitive")).toBeVisible();
 
       // exact_match's output/expected_output carry defaults in langevals, so the
       // catalog (which drives the mapping UI) classifies them as optional — not
       // required. expected_output is unique to exact_match in this showcase.
       expect(screen.getByText("expected_output · optional")).toBeVisible();
-      expect(screen.getAllByText("output · optional").length).toBeGreaterThan(
-        0,
-      );
+      expect(screen.getAllByText("output · optional").length).toBeGreaterThan(0);
 
       await page.screenshot({
         path: "/tmp/pr4651/evaluator-catalog-zod.png",

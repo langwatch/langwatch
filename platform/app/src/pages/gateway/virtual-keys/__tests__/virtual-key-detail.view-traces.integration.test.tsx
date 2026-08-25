@@ -145,9 +145,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function keyDetail(
-  overrides: Partial<VirtualKeyDetail> = {},
-): VirtualKeyDetail {
+function keyDetail(overrides: Partial<VirtualKeyDetail> = {}): VirtualKeyDetail {
   return {
     id: VK_ID,
     name: "Billing tenant",
@@ -184,13 +182,8 @@ describe("View traces on the virtual key page", () => {
         render(<VirtualKeyDetailPage />, { wrapper: Wrapper });
 
         const href =
-          screen
-            .getByTestId("vk-view-traces")
-            .closest("a")
-            ?.getAttribute("href") ?? "";
-        expect(href.startsWith(`/${PROJECT_SLUG}/traces#all-traces?`)).toBe(
-          true,
-        );
+          screen.getByTestId("vk-view-traces").closest("a")?.getAttribute("href") ?? "";
+        expect(href.startsWith(`/${PROJECT_SLUG}/traces#all-traces?`)).toBe(true);
         expect(href).toContain(encodeURIComponent(`"${VK_ID}"`));
       });
     });

@@ -133,10 +133,7 @@ function captureError(error: unknown): EvaluationErrorCapture {
  * @param span - The OpenTelemetry span to attach the evaluation event to.
  * @param params - The evaluation parameters. See {@link AddEvaluationParams}.
  */
-export function emitEvaluationEvent(
-  span: Span,
-  params: AddEvaluationParams,
-): void {
+export function emitEvaluationEvent(span: Span, params: AddEvaluationParams): void {
   const spanContext = span.spanContext();
   const spanId =
     spanContext && isSpanContextValid(spanContext) ? spanContext.spanId : null;

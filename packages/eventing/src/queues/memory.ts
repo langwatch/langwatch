@@ -42,8 +42,7 @@ interface QueuedJob<Payload> {
  */
 export class EventSourcedQueueProcessorMemory<
   Payload extends Record<string, unknown>,
-> implements EventSourcedQueueProcessor<Payload>
-{
+> implements EventSourcedQueueProcessor<Payload> {
   private readonly logger = createLogger("langwatch:event-sourcing:queue");
   private readonly tracer: ReturnType<typeof getLangWatchTracer>;
   private readonly queueName: string;
@@ -56,10 +55,7 @@ export class EventSourcedQueueProcessorMemory<
   // Simple queue state
   private readonly queue: QueuedJob<Payload>[] = [];
   /** Map of deduplication ID to job for deduplication */
-  private readonly pendingJobsByDeduplicationId = new Map<
-    string,
-    QueuedJob<Payload>
-  >();
+  private readonly pendingJobsByDeduplicationId = new Map<string, QueuedJob<Payload>>();
   /**
    * Dedup ids whose job already dispatched but whose TTL is still running,
    * for senders that asked to survive dispatch. Mirrors the GroupQueue Lua's
@@ -71,8 +67,7 @@ export class EventSourcedQueueProcessorMemory<
   private dispatchTimerAt = Number.POSITIVE_INFINITY;
 
   constructor(definition: EventSourcedQueueDefinition<Payload>) {
-    const { name, process, spanAttributes, deduplication, delay, options } =
-      definition;
+    const { name, process, spanAttributes, deduplication, delay, options } = definition;
 
     this.tracer = getLangWatchTracer("langwatch.event-sourcing.queue");
     this.spanAttributes = spanAttributes;
@@ -99,10 +94,7 @@ export class EventSourcedQueueProcessorMemory<
     return `${this.queueName}:${payloadId}`;
   }
 
-  async send(
-    payload: Payload,
-    options?: QueueSendOptions<Payload>,
-  ): Promise<void> {
+  async send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void> {
     // Memory implementation allows sends after close since it has no persistent state
     // This is different from groupQueue, which rejects sends after shutdown
 
@@ -114,13 +106,11 @@ export class EventSourcedQueueProcessorMemory<
 
     const now = Date.now();
     const dispatchAt = now + (effectiveDelay ?? 0);
-    const dedupExpiresAt =
-      dedup?.ttlMs === undefined ? undefined : now + dedup.ttlMs;
+    const dedupExpiresAt = dedup?.ttlMs === undefined ? undefined : now + dedup.ttlMs;
 
     // Simple job deduplication: squash onto existing job with same deduplication ID
     if (deduplicationId) {
-      const suppressedUntil =
-        this.suppressedUntilByDeduplicationId.get(deduplicationId);
+      const suppressedUntil = this.suppressedUntilByDeduplicationId.get(deduplicationId);
       if (suppressedUntil !== undefined) {
         if (suppressedUntil > now) {
           this.logger.debug(
@@ -132,12 +122,10 @@ export class EventSourcedQueueProcessorMemory<
         this.suppressedUntilByDeduplicationId.delete(deduplicationId);
       }
 
-      const existingJob =
-        this.pendingJobsByDeduplicationId.get(deduplicationId);
+      const existingJob = this.pendingJobsByDeduplicationId.get(deduplicationId);
       if (existingJob) {
         const expired =
-          existingJob.dedupExpiresAt !== undefined &&
-          existingJob.dedupExpiresAt <= now;
+          existingJob.dedupExpiresAt !== undefined && existingJob.dedupExpiresAt <= now;
         if (expired) {
           // The window closed while the job waited. It still runs, but it
           // stops absorbing sends so this one stages as genuinely new.
@@ -311,8 +299,7 @@ export class EventSourcedQueueProcessorMemory<
         }
       } catch (error) {
         // If spanAttributes throws, log error and continue with base attributes only
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         this.logger.error(
           {
             queueName: this.queueName,
@@ -338,8 +325,7 @@ export class EventSourcedQueueProcessorMemory<
       );
       job.resolve();
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
       this.logger.error(
         {
@@ -365,10 +351,7 @@ export class EventSourcedQueueProcessorMemory<
    * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
    */
   async close(): Promise<void> {
-    this.logger.debug(
-      { queueName: this.queueName },
-      "Closing memory queue processor",
-    );
+    this.logger.debug({ queueName: this.queueName }, "Closing memory queue processor");
 
     if (this.dispatchTimer !== null) {
       clearTimeout(this.dispatchTimer);
@@ -384,9 +367,7 @@ export class EventSourcedQueueProcessorMemory<
     // Reject any remaining queued jobs
     for (const job of this.queue) {
       job.reject(
-        new Error(
-          `Queue ${this.queueName} was closed before job could be processed`,
-        ),
+        new Error(`Queue ${this.queueName} was closed before job could be processed`),
       );
     }
     this.queue.length = 0;

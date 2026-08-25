@@ -83,13 +83,9 @@ describe("mapping the LangWatchQL schema response", () => {
           ...SCHEMA_DATASET_NAMES,
           ...SCHEMA_AVAILABLE_COLUMN_NAMES,
         ]);
-        expect(items.map((item) => item.label).sort()).toEqual(
-          [...fromResponse].sort(),
-        );
+        expect(items.map((item) => item.label).sort()).toEqual([...fromResponse].sort());
         expect(items.map((item) => item.label)).not.toContain("total_cost");
-        expect(items.find((item) => item.label === "latency_ms")?.detail).toBe(
-          "Float64",
-        );
+        expect(items.find((item) => item.label === "latency_ms")?.detail).toBe("Float64");
       });
     });
   });
@@ -104,9 +100,7 @@ describe("mapping the LangWatchQL schema response", () => {
           detail: "Float64",
           documentation: "End to end latency of the trace. Measured in ms.",
         });
-        expect(
-          lwqlHoverFor({ model, identifier: "total_cost" }),
-        ).toBeUndefined();
+        expect(lwqlHoverFor({ model, identifier: "total_cost" })).toBeUndefined();
         expect(lwqlHoverFor({ model, identifier: "traces_daily" })?.title).toBe(
           "analytics.traces_daily",
         );
@@ -135,9 +129,9 @@ describe("mapping the LangWatchQL schema response", () => {
         expect(byColumn.datasets.map((dataset) => dataset.name)).toEqual([
           "analytics.traces_daily",
         ]);
-        expect(
-          byColumn.datasets[0]!.columns.map((column) => column.name),
-        ).toEqual(["latency_ms"]);
+        expect(byColumn.datasets[0]!.columns.map((column) => column.name)).toEqual([
+          "latency_ms",
+        ]);
 
         expect(
           filterLangWatchQLSchemaModel({ model, search: "   " }).datasets,

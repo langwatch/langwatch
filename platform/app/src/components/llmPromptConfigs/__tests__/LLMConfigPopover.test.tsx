@@ -150,9 +150,7 @@ vi.mock("../../ModelSelector", () => ({
 import { Popover } from "../../ui/popover";
 import { LLMConfigPopover, type Output } from "../LLMConfigPopover";
 
-const renderComponent = (
-  props: Partial<Parameters<typeof LLMConfigPopover>[0]> = {},
-) => {
+const renderComponent = (props: Partial<Parameters<typeof LLMConfigPopover>[0]> = {}) => {
   const defaultProps: Parameters<typeof LLMConfigPopover>[0] = {
     values: { model: "openai/gpt-4.1", temperature: 0.7, max_tokens: 1024 },
     onChange: vi.fn(),
@@ -220,9 +218,7 @@ describe("LLMConfigPopover", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(
-          screen.getByTestId("parameter-row-temperature"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-temperature")).toBeInTheDocument();
       });
 
       it("shows Top P parameter", () => {
@@ -236,27 +232,21 @@ describe("LLMConfigPopover", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(
-          screen.getByTestId("parameter-row-max_tokens"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-max_tokens")).toBeInTheDocument();
       });
 
       it("shows Frequency Penalty parameter", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(
-          screen.getByTestId("parameter-row-frequency_penalty"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-frequency_penalty")).toBeInTheDocument();
       });
 
       it("shows Presence Penalty parameter", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(
-          screen.getByTestId("parameter-row-presence_penalty"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-presence_penalty")).toBeInTheDocument();
       });
 
       it("does not show Reasoning parameter", () => {
@@ -276,9 +266,7 @@ describe("LLMConfigPopover", () => {
         });
 
         // Should find "Reasoning Effort" (label from reasoningConfig.parameterName mapping)
-        expect(screen.getAllByText("Reasoning Effort").length).toBeGreaterThan(
-          0,
-        );
+        expect(screen.getAllByText("Reasoning Effort").length).toBeGreaterThan(0);
       });
 
       it("shows reasoning parameter row", () => {
@@ -286,18 +274,14 @@ describe("LLMConfigPopover", () => {
           values: { model: "openai/gpt-5", reasoning: "medium" },
         });
         // Parameter row uses unified 'reasoning' key
-        expect(
-          screen.getByTestId("parameter-row-reasoning"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-reasoning")).toBeInTheDocument();
       });
 
       it("shows Max Tokens parameter", () => {
         renderComponent({
           values: { model: "openai/gpt-5", reasoning: "medium" },
         });
-        expect(
-          screen.getByTestId("parameter-row-max_tokens"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-max_tokens")).toBeInTheDocument();
       });
 
       it("does not show Temperature parameter", () => {
@@ -325,9 +309,7 @@ describe("LLMConfigPopover", () => {
             temperature: 1,
           },
         });
-        expect(
-          screen.getByTestId("parameter-row-max_tokens"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-max_tokens")).toBeInTheDocument();
       });
 
       it("still renders the Temperature slider that the entry does declare", () => {
@@ -337,9 +319,7 @@ describe("LLMConfigPopover", () => {
             temperature: 1,
           },
         });
-        expect(
-          screen.getByTestId("parameter-row-temperature"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-temperature")).toBeInTheDocument();
       });
     });
   });
@@ -362,9 +342,7 @@ describe("LLMConfigPopover", () => {
 
     describe("when non-default output (toggle should be on)", () => {
       it("shows Outputs section", () => {
-        const outputs: Output[] = [
-          { identifier: "custom_output", type: "json_schema" },
-        ];
+        const outputs: Output[] = [{ identifier: "custom_output", type: "json_schema" }];
         renderComponent({
           showStructuredOutputs: true,
           outputs,
@@ -375,9 +353,7 @@ describe("LLMConfigPopover", () => {
       });
 
       it("shows custom output identifier", () => {
-        const outputs: Output[] = [
-          { identifier: "custom_output", type: "json_schema" },
-        ];
+        const outputs: Output[] = [{ identifier: "custom_output", type: "json_schema" }];
         renderComponent({
           showStructuredOutputs: true,
           outputs,
@@ -442,9 +418,7 @@ describe("LLMConfigPopover", () => {
       it("disables the toggle", async () => {
         const user = userEvent.setup();
         // Start with non-default outputs so toggle starts enabled
-        const outputs: Output[] = [
-          { identifier: "custom_output", type: "json_schema" },
-        ];
+        const outputs: Output[] = [{ identifier: "custom_output", type: "json_schema" }];
         renderComponent({
           showStructuredOutputs: true,
           outputs,
@@ -461,9 +435,7 @@ describe("LLMConfigPopover", () => {
 
       it("hides the Outputs section", async () => {
         const user = userEvent.setup();
-        const outputs: Output[] = [
-          { identifier: "custom_output", type: "json_schema" },
-        ];
+        const outputs: Output[] = [{ identifier: "custom_output", type: "json_schema" }];
         renderComponent({
           showStructuredOutputs: true,
           outputs,
@@ -481,9 +453,7 @@ describe("LLMConfigPopover", () => {
       it("calls onOutputsChange with default output", async () => {
         const user = userEvent.setup();
         const onOutputsChange = vi.fn();
-        const outputs: Output[] = [
-          { identifier: "custom_output", type: "json_schema" },
-        ];
+        const outputs: Output[] = [{ identifier: "custom_output", type: "json_schema" }];
         renderComponent({
           showStructuredOutputs: true,
           outputs,
@@ -507,18 +477,14 @@ describe("LLMConfigPopover", () => {
           temperature: { message: "Temperature must be between 0 and 2" },
         },
       });
-      expect(
-        screen.getByText("Temperature must be between 0 and 2"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Temperature must be between 0 and 2")).toBeInTheDocument();
     });
 
     it("shows maxTokens error when provided", () => {
       renderComponent({
         errors: { maxTokens: { message: "Max tokens must be positive" } },
       });
-      expect(
-        screen.getByText("Max tokens must be positive"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Max tokens must be positive")).toBeInTheDocument();
     });
   });
 

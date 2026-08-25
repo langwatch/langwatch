@@ -100,9 +100,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
     /** @scenario "Restricted identity with a valid key context reads only its own tenant's rows" */
     /** @scenario "Detaching the row policy makes the other tenant's rows visible" */
     it("exposes the other tenant's rows once the row policy is detached, and hides them again once restored", async () => {
-      const spans = harness.lwqlTables.find(
-        (lwqlTable) => lwqlTable.table === "spans",
-      );
+      const spans = harness.lwqlTables.find((lwqlTable) => lwqlTable.table === "spans");
       // Before the try, because the `finally` below reattaches the row policy
       // using this same entry: a rename would otherwise throw inside the try
       // and then throw again while restoring, masking the first failure and
@@ -619,9 +617,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
         tenantA,
         `SELECT DISTINCT TenantId FROM ${database}.${harness.names.keyMapTable}`,
       );
-      expect(tenants.map((row) => row.TenantId)).toEqual([
-        harness.tenantA.tenantId,
-      ]);
+      expect(tenants.map((row) => row.TenantId)).toEqual([harness.tenantA.tenantId]);
     });
 
     /**
@@ -643,23 +639,14 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
     /** @scenario "Writes, DDL, and temporary objects are rejected by the restricted identity itself" */
     it("rejects every write, DDL, and temporary-object statement by grants", async () => {
       const rejected: Array<[string, string]> = [
-        [
-          "INSERT",
-          `INSERT INTO ${database}.traces VALUES ('tenant-b','x','m',1)`,
-        ],
+        ["INSERT", `INSERT INTO ${database}.traces VALUES ('tenant-b','x','m',1)`],
         ["ALTER", `ALTER TABLE ${database}.traces DELETE WHERE 1`],
-        [
-          "CREATE TABLE",
-          `CREATE TABLE ${database}.evil (x UInt8) ENGINE = Memory`,
-        ],
+        ["CREATE TABLE", `CREATE TABLE ${database}.evil (x UInt8) ENGINE = Memory`],
         ["CREATE TEMPORARY TABLE", "CREATE TEMPORARY TABLE evil (x UInt8)"],
         ["DROP", `DROP TABLE ${database}.traces`],
         ["TRUNCATE", `TRUNCATE TABLE ${database}.traces`],
         ["CREATE VIEW", `CREATE VIEW ${database}.evil_view AS SELECT 1`],
-        [
-          "ATTACH",
-          `ATTACH TABLE ${database}.evil_attached (x UInt8) ENGINE = Memory`,
-        ],
+        ["ATTACH", `ATTACH TABLE ${database}.evil_attached (x UInt8) ENGINE = Memory`],
         [
           "CREATE ROW POLICY",
           `CREATE ROW POLICY evil ON ${database}.traces USING 1 TO ${harness.names.restrictedUser}`,
@@ -680,10 +667,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
           "GRANT",
           `GRANT SELECT ON ${database}.traces TO ${harness.names.restrictedUser}`,
         ],
-        [
-          "CREATE USER",
-          "CREATE USER evil IDENTIFIED WITH plaintext_password BY 'x'",
-        ],
+        ["CREATE USER", "CREATE USER evil IDENTIFIED WITH plaintext_password BY 'x'"],
       ];
 
       for (const [label, query] of rejected) {
@@ -699,9 +683,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
         tenantA,
         `SELECT DISTINCT TenantId FROM ${database}.traces`,
       );
-      expect(rows.map((row) => row.TenantId)).toEqual([
-        harness.tenantA.tenantId,
-      ]);
+      expect(rows.map((row) => row.TenantId)).toEqual([harness.tenantA.tenantId]);
     });
 
     /** @scenario "Multiple statements in one request are rejected" */
@@ -718,18 +700,9 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
     /** @scenario "Table functions are rejected for the restricted identity by grants" */
     it("rejects the table functions that reach external systems", async () => {
       const rejected: Array<[string, string]> = [
-        [
-          "url",
-          `SELECT * FROM url('http://example.invalid/', 'CSV', 'a String')`,
-        ],
-        [
-          "s3",
-          `SELECT * FROM s3('http://example.invalid/f.csv', 'CSV', 'a String')`,
-        ],
-        [
-          "remote",
-          `SELECT * FROM remote('127.0.0.1', 'system', 'one', 'u', 'p')`,
-        ],
+        ["url", `SELECT * FROM url('http://example.invalid/', 'CSV', 'a String')`],
+        ["s3", `SELECT * FROM s3('http://example.invalid/f.csv', 'CSV', 'a String')`],
+        ["remote", `SELECT * FROM remote('127.0.0.1', 'system', 'one', 'u', 'p')`],
         ["file", `SELECT * FROM file('x.csv', 'CSV', 'a String')`],
         [
           "postgresql",
@@ -846,9 +819,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
         tenantA,
         `SELECT name FROM system.tables WHERE database = '${database}' ORDER BY name`,
       );
-      expect(visible.map((row) => row.name)).toEqual(
-        granted.map((row) => row.table),
-      );
+      expect(visible.map((row) => row.name)).toEqual(granted.map((row) => row.table));
     });
   });
 

@@ -46,9 +46,9 @@ describe("buildDisplayInput", () => {
         params: { "gen_ai.system_instructions": "be terse" },
       });
       const parsed = JSON.parse(out!);
-      expect(
-        parsed.filter((m: { role: string }) => m.role === "system"),
-      ).toEqual([{ role: "system", content: "already here" }]);
+      expect(parsed.filter((m: { role: string }) => m.role === "system")).toEqual([
+        { role: "system", content: "already here" },
+      ]);
     });
   });
 

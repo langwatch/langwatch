@@ -72,25 +72,17 @@ export function EvaluatorTypePicker({
   onConfigureAzureSafety,
   evaluators = AVAILABLE_EVALUATORS,
 }: EvaluatorTypePickerProps) {
-  const evaluatorTypes = (Object.keys(evaluatorCategoryMap) as EvaluatorTypes[])
-    .filter(
-      (evaluatorType) =>
-        evaluatorCategoryMap[evaluatorType] === category &&
-        evaluators[evaluatorType],
-    );
+  const evaluatorTypes = (Object.keys(evaluatorCategoryMap) as EvaluatorTypes[]).filter(
+    (evaluatorType) =>
+      evaluatorCategoryMap[evaluatorType] === category && evaluators[evaluatorType],
+  );
 
   return (
     <VStack gap={4} align="stretch" flex={1} overflow="hidden">
       <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
         Select an evaluator to configure and save.
       </Text>
-      <VStack
-        gap={3}
-        align="stretch"
-        paddingX={6}
-        paddingBottom={4}
-        overflowY="auto"
-      >
+      <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4} overflowY="auto">
         {evaluatorTypes.map((evaluatorType) => {
           const evaluator = evaluators[evaluatorType]!;
           const available = availability?.[evaluatorType];
@@ -164,9 +156,7 @@ function EvaluatorTypeCard({
       cursor={disabled ? "default" : "pointer"}
       textAlign="left"
       width="full"
-      _hover={
-        disabled ? undefined : { borderColor: "green.muted", bg: "green.subtle" }
-      }
+      _hover={disabled ? undefined : { borderColor: "green.muted", bg: "green.subtle" }}
       transition="all 0.15s"
       data-testid={testId}
       data-disabled={disabled ? "true" : undefined}

@@ -10,13 +10,16 @@ Historically every project carried its own copy of every provider credential. Th
 
 <CardGroup cols={3}>
   <Card title="Organisation scope" icon="building">
-    One credential; every project in the org can use it. The common case for enterprise accounts with a single billing entity.
+    One credential; every project in the org can use it. The common case for enterprise
+    accounts with a single billing entity.
   </Card>
   <Card title="Team scope" icon="users">
-    One credential; every project under a team inherits. For teams with their own model budget or fine-tuning account.
+    One credential; every project under a team inherits. For teams with their own model
+    budget or fine-tuning account.
   </Card>
   <Card title="Project scope" icon="folder">
-    One credential; only this project uses it. For test projects, per-customer isolation, or narrow experiments.
+    One credential; only this project uses it. For test projects, per-customer isolation,
+    or narrow experiments.
   </Card>
 </CardGroup>
 
@@ -42,11 +45,11 @@ Project "acme-api" sees:
 
 **Settings → Model Providers → New provider** opens the create drawer with an **Availability** radio group near the bottom of the form, three options: Project, Team, Organization.
 
-| Option | Requires | Available to |
-|---|---|---|
-| **Project** | project-admin on the selected project | that project only |
-| **Team** | team-admin on the selected team | every project under the team |
-| **Organisation** | org-admin | every project in the org |
+| Option           | Requires                              | Available to                 |
+| ---------------- | ------------------------------------- | ---------------------------- |
+| **Project**      | project-admin on the selected project | that project only            |
+| **Team**         | team-admin on the selected team       | every project under the team |
+| **Organisation** | org-admin                             | every project in the org     |
 
 Radio options that your role doesn't cover are hidden (not greyed-out), e.g. a user on a personal org with no team sees only Project + Organization; a user who doesn't belong to a team sees the Team option omitted. Default selection is **Project**: least-privilege by default. Helper text under the radio describes each scope's blast radius:
 
@@ -58,7 +61,12 @@ Once you've picked the scope, the rest of the form is the same as before: provid
 
 ## Changing a provider's scope
 
-<Note>**v1 behaviour**: scope is set at create time and is immutable in the edit drawer. To change a provider's scope, create a new row at the desired scope, then delete the original. In-place widen/narrow with automatic binding reconciliation is a v1.1 follow-up. The design for that flow is described below for forward reference.</Note>
+<Note>
+  **v1 behaviour**: scope is set at create time and is immutable in the edit drawer. To
+  change a provider's scope, create a new row at the desired scope, then delete the
+  original. In-place widen/narrow with automatic binding reconciliation is a v1.1
+  follow-up. The design for that flow is described below for forward reference.
+</Note>
 
 ### v1.1 plan: Widening (Project → Team → Organisation)
 
@@ -68,19 +76,36 @@ Strictly additive. The provider becomes available to more projects; existing bin
 
 Narrowing can orphan downstream bindings. The edit drawer will show a confirmation modal listing every binding that will be archived before saving. Archival is explicit, each archived binding emits an audit-log entry so you can reconstruct exactly what happened.
 
-<Warning>Narrowing scope never silent-revokes. When shipped, the flow will show you exactly which bindings fall outside the new scope before you confirm.</Warning>
+<Warning>
+  Narrowing scope never silent-revokes. When shipped, the flow will show you exactly which
+  bindings fall outside the new scope before you confirm.
+</Warning>
 
 ## Overriding an inherited provider at a narrower scope
 
 If a project needs its own OpenAI key, different rate limits, different region, a dedicated billing account, you don't have to remove the inherited one. Create a new provider with the same type at **Project** scope; the narrower row takes precedence and is the effective credential. The inherited row remains visible in the list (so you understand where it came from) but is no longer used for resolution on that project.
 
-<Note>In v1 the inherited row shows its scope badge (Org, Team) but does not have an **Override at project scope** action in its kebab menu, you create the project-scoped row directly from **New provider**. The inline override affordance is a v1.1 follow-up.</Note>
+<Note>
+  In v1 the inherited row shows its scope badge (Org, Team) but does not have an
+  **Override at project scope** action in its kebab menu, you create the project-scoped
+  row directly from **New provider**. The inline override affordance is a v1.1 follow-up.
+</Note>
 
 ## AI Gateway provider bindings
 
 Every `GatewayProviderCredential` (the thing a VK is bound to) references a `ModelProvider` by id, independent of the provider's scope. So **scope changes never break bindings**, and binding creation works identically whether the bound provider is org, team, or project.
 
-<Note>**Provider scope ≠ binding scope.** A binding is always **per-project** (it belongs to a project's VK). What an org-scoped provider enables is (a) **visibility**: every project in the org sees the provider in Settings + the Bind drawer, (b) **credential sharing**: the decrypted API key comes from the one org row, so rotation at the org level propagates everywhere. Each project still creates its own binding because gateway-specific knobs (rate limits, slot, fallback priority) are per-project decisions. An org-scoped provider visible across 5 projects that all want gateway routing still needs 5 binding operations, that's intentional, preserves governance and budget attribution.</Note>
+<Note>
+  **Provider scope ≠ binding scope.** A binding is always **per-project** (it belongs to a
+  project's VK). What an org-scoped provider enables is (a) **visibility**: every project
+  in the org sees the provider in Settings + the Bind drawer, (b) **credential sharing**:
+  the decrypted API key comes from the one org row, so rotation at the org level
+  propagates everywhere. Each project still creates its own binding because
+  gateway-specific knobs (rate limits, slot, fallback priority) are per-project decisions.
+  An org-scoped provider visible across 5 projects that all want gateway routing still
+  needs 5 binding operations, that's intentional, preserves governance and budget
+  attribution.
+</Note>
 
 The AI Gateway → Providers → Bind provider drawer groups the Select options by scope origin:
 
@@ -99,11 +124,11 @@ Hovering any option shows why it's visible at the current project, the scope-lad
 
 The scope ladder reuses the existing RBAC model with three new manage permissions:
 
-| Permission | Who gets it by default | Lets you |
-|---|---|---|
-| `modelProviders:manage:organization` | org-admin | Create, edit, delete org-scoped providers |
-| `modelProviders:manage:team` | team-admin | Create, edit, delete providers scoped to any team you admin |
-| `modelProviders:manage:project` | project-admin | Create, edit, delete project-scoped providers |
+| Permission                           | Who gets it by default | Lets you                                                    |
+| ------------------------------------ | ---------------------- | ----------------------------------------------------------- |
+| `modelProviders:manage:organization` | org-admin              | Create, edit, delete org-scoped providers                   |
+| `modelProviders:manage:team`         | team-admin             | Create, edit, delete providers scoped to any team you admin |
+| `modelProviders:manage:project`      | project-admin          | Create, edit, delete project-scoped providers               |
 
 See [RBAC](/platform/rbac) for the full permission model.
 

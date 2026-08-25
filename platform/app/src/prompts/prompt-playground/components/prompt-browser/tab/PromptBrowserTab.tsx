@@ -13,9 +13,7 @@ interface PromptBrowserTabProps extends StackProps {
   isCrowded?: boolean;
 }
 
-type PromptBrowserTabControllerProps = ReturnType<
-  typeof usePromptBrowserTabController
->;
+type PromptBrowserTabControllerProps = ReturnType<typeof usePromptBrowserTabController>;
 
 /**
  * PromptBrowserTabView

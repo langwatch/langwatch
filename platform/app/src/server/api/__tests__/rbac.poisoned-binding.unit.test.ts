@@ -96,9 +96,7 @@ function makePrisma({
       findUnique: vi.fn().mockResolvedValue({ organizationId: ORG_ID }),
     },
     organizationUser: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
+      findFirst: vi.fn().mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
     },
     groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     roleBinding: { findMany: vi.fn().mockResolvedValue(bindings) },
@@ -107,18 +105,14 @@ function makePrisma({
       findMany: vi.fn().mockResolvedValue([]),
     },
     customRole: {
-      findUnique: vi.fn(
-        async ({ where }: { where: Record<string, unknown> }) => {
-          const found = customRoles.find((role) => matches({ role, where }));
-          return found ? { ...found } : null;
-        },
-      ),
-      findFirst: vi.fn(
-        async ({ where }: { where: Record<string, unknown> }) => {
-          const found = customRoles.find((role) => matches({ role, where }));
-          return found ? { ...found } : null;
-        },
-      ),
+      findUnique: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
+        const found = customRoles.find((role) => matches({ role, where }));
+        return found ? { ...found } : null;
+      }),
+      findFirst: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
+        const found = customRoles.find((role) => matches({ role, where }));
+        return found ? { ...found } : null;
+      }),
       findMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) =>
         customRoles
           .filter((role) => matches({ role, where }))
@@ -155,9 +149,7 @@ describe("session-user permission paths, given a poisoned custom-role binding", 
   describe("when the per-call path meets a binding naming another organization's role", () => {
     it("denies the permission the foreign role would grant", async () => {
       const prisma = makePrisma({
-        bindings: [
-          customBinding({ customRoleId: "role_foreign", scope: teamScope }),
-        ],
+        bindings: [customBinding({ customRoleId: "role_foreign", scope: teamScope })],
         customRoles: [
           {
             id: "role_foreign",
@@ -180,9 +172,7 @@ describe("session-user permission paths, given a poisoned custom-role binding", 
   describe("when the per-call path meets a binding naming an API key's system role", () => {
     it("denies the permission the system role carries", async () => {
       const prisma = makePrisma({
-        bindings: [
-          customBinding({ customRoleId: "role_system", scope: teamScope }),
-        ],
+        bindings: [customBinding({ customRoleId: "role_system", scope: teamScope })],
         customRoles: [
           {
             id: "role_system",
@@ -205,9 +195,7 @@ describe("session-user permission paths, given a poisoned custom-role binding", 
   describe("when the per-call path meets a same-organization custom role", () => {
     it("still grants the role's permissions", async () => {
       const prisma = makePrisma({
-        bindings: [
-          customBinding({ customRoleId: "role_local", scope: teamScope }),
-        ],
+        bindings: [customBinding({ customRoleId: "role_local", scope: teamScope })],
         customRoles: [
           {
             id: "role_local",
@@ -230,9 +218,7 @@ describe("session-user permission paths, given a poisoned custom-role binding", 
   describe("when the batched path loads a binding naming another organization's role", () => {
     it("denies the permission the foreign role would grant", async () => {
       const prisma = makePrisma({
-        bindings: [
-          customBinding({ customRoleId: "role_foreign", scope: projectScope }),
-        ],
+        bindings: [customBinding({ customRoleId: "role_foreign", scope: projectScope })],
         customRoles: [
           {
             id: "role_foreign",
@@ -259,9 +245,7 @@ describe("session-user permission paths, given a poisoned custom-role binding", 
   describe("when the batched path loads a same-organization custom role", () => {
     it("still grants the role's permissions", async () => {
       const prisma = makePrisma({
-        bindings: [
-          customBinding({ customRoleId: "role_local", scope: projectScope }),
-        ],
+        bindings: [customBinding({ customRoleId: "role_local", scope: projectScope })],
         customRoles: [
           {
             id: "role_local",

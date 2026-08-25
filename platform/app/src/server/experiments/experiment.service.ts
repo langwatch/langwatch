@@ -1,9 +1,5 @@
 import { nanoid } from "nanoid";
-import type {
-  Experiment,
-  Prisma,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { Experiment, Prisma, PrismaClient } from "~/generated/prisma/client";
 import { ExperimentType } from "~/generated/prisma/client";
 import { slugify } from "../../utils/slugify";
 import { isUniqueConstraintError } from "../utils/prismaErrors";
@@ -78,11 +74,7 @@ export class ExperimentService {
     return { experiments, totalHits };
   }
 
-  async getLatest({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<Experiment | null> {
+  async getLatest({ projectId }: { projectId: string }): Promise<Experiment | null> {
     return this.repository.findLatest({ projectId });
   }
 
@@ -224,13 +216,7 @@ export class ExperimentService {
    * The routes use this to refuse to serve results once the owning
    * experiment is archived, without paying for the full row.
    */
-  async isActive({
-    projectId,
-    id,
-  }: {
-    projectId: string;
-    id: string;
-  }): Promise<boolean> {
+  async isActive({ projectId, id }: { projectId: string; id: string }): Promise<boolean> {
     const row = await this.repository.findFirstActive({
       where: { projectId, id },
       select: { id: true },
@@ -419,11 +405,7 @@ export class ExperimentService {
   /**
    * Finds the next available "Draft Evaluation (N)" name for a project.
    */
-  async findNextDraftName({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<string> {
+  async findNextDraftName({ projectId }: { projectId: string }): Promise<string> {
     const experiments = await this.repository.findDraftNames({ projectId });
 
     const slugs = new Set(

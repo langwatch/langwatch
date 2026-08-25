@@ -59,16 +59,12 @@ describe("useNavigationV2Tracking", () => {
     /** @scenario Navigating the app keeps the memory current */
     it("keeps the per-organization product memory current", async () => {
       const router = renderRouterAt("/gateway/virtual-keys");
-      expect(readLastVisitedProduct({ organizationId: "org_1" })).toBe(
-        "gateway",
-      );
+      expect(readLastVisitedProduct({ organizationId: "org_1" })).toBe("gateway");
 
       await act(async () => {
         await router.navigate("/governance/departments");
       });
-      expect(readLastVisitedProduct({ organizationId: "org_1" })).toBe(
-        "governance",
-      );
+      expect(readLastVisitedProduct({ organizationId: "org_1" })).toBe("governance");
     });
   });
 

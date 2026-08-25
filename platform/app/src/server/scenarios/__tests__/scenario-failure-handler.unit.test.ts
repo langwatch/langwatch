@@ -4,15 +4,9 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
 import { ScenarioFailureHandler } from "../scenario-failure-handler";
-import {
-  decodeScenarioError,
-  ScenarioInfraErrorCode,
-} from "../scenario-infra-error";
+import { decodeScenarioError, ScenarioInfraErrorCode } from "../scenario-infra-error";
 
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);
 
@@ -104,13 +98,10 @@ describe("ScenarioFailureHandler", () => {
         error: "TypeError: fetch failed (ECONNREFUSED)",
       });
 
-      const results = (
-        mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } }
-      ).results;
+      const results = (mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } })
+        .results;
       const decoded = decodeScenarioError(results.error);
-      expect(decoded?.code).toBe(
-        ScenarioInfraErrorCode.AgentDevTunnelUnreachable,
-      );
+      expect(decoded?.code).toBe(ScenarioInfraErrorCode.AgentDevTunnelUnreachable);
       expect(decoded?.hint).toContain("langwatch agent dev");
       expect(lookupWithDevTunnel).toHaveBeenCalledWith({
         projectId: "proj_123",
@@ -125,9 +116,8 @@ describe("ScenarioFailureHandler", () => {
           "HTTP 530: error from https://gone.trycloudflare.com (request-id: abc): error code: 1033",
       });
 
-      const results = (
-        mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } }
-      ).results;
+      const results = (mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } })
+        .results;
       expect(decodeScenarioError(results.error)?.code).toBe(
         ScenarioInfraErrorCode.AgentDevTunnelUnreachable,
       );
@@ -139,9 +129,8 @@ describe("ScenarioFailureHandler", () => {
         error: "provider_error: API key is invalid",
       });
 
-      const results = (
-        mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } }
-      ).results;
+      const results = (mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } })
+        .results;
       expect(decodeScenarioError(results.error)?.code).toBe(
         ScenarioInfraErrorCode.ModelProviderError,
       );
@@ -157,9 +146,8 @@ describe("ScenarioFailureHandler", () => {
         error: "TypeError: fetch failed",
       });
 
-      const results = (
-        mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } }
-      ).results;
+      const results = (mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } })
+        .results;
       expect(decodeScenarioError(results.error)?.code).toBe(
         ScenarioInfraErrorCode.PlatformUnreachable,
       );
@@ -169,9 +157,7 @@ describe("ScenarioFailureHandler", () => {
   describe("when the target is an HTTP agent without a devTunnel marker", () => {
     /** @scenario "A transport failure on a regular agent keeps its generic classification" */
     it("keeps the unreachable-endpoint classification", async () => {
-      const lookup = vi
-        .fn()
-        .mockResolvedValue({ url: "https://api.example.com" });
+      const lookup = vi.fn().mockResolvedValue({ url: "https://api.example.com" });
       handler = ScenarioFailureHandler.create(lookup);
 
       await handler.ensureFailureEventsEmitted({
@@ -180,9 +166,8 @@ describe("ScenarioFailureHandler", () => {
         error: "TypeError: fetch failed (ECONNREFUSED)",
       });
 
-      const results = (
-        mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } }
-      ).results;
+      const results = (mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } })
+        .results;
       expect(decodeScenarioError(results.error)?.code).toBe(
         ScenarioInfraErrorCode.PlatformUnreachable,
       );

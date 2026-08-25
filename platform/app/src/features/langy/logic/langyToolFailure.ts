@@ -214,9 +214,7 @@ const isAccessDenial = (domain: CliHandledError): boolean =>
   ACCESS_DENIAL_CODES.has(normalizedCode(domain));
 
 const asCount = (value: unknown): number | undefined =>
-  typeof value === "number" && Number.isFinite(value) && value >= 0
-    ? value
-    : undefined;
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 
 /** What ran out, named the way the customer names it. */
 function limitLabel(limitType: unknown): string | undefined {
@@ -240,9 +238,7 @@ function readPlanLimit(domain: CliHandledError): LangyToolFailureLimit | null {
     ...(asCount(domain.meta.current) !== undefined
       ? { current: asCount(domain.meta.current)! }
       : {}),
-    ...(asCount(domain.meta.max) !== undefined
-      ? { max: asCount(domain.meta.max)! }
-      : {}),
+    ...(asCount(domain.meta.max) !== undefined ? { max: asCount(domain.meta.max)! } : {}),
   };
 }
 
@@ -354,13 +350,11 @@ export function presentLangyToolError({
   // nested block so old documents keep their trace/logs actions.
   const trace = asRecord(domain.meta.trace);
   const traceId =
-    domain.traceId ??
-    (typeof trace?.traceId === "string" ? trace.traceId : undefined);
+    domain.traceId ?? (typeof trace?.traceId === "string" ? trace.traceId : undefined);
   const traceUrl = safeHttpUrl(domain.traceUrl) ?? safeHttpUrl(trace?.traceUrl);
   const logsUrl = safeHttpUrl(domain.logsUrl) ?? safeHttpUrl(trace?.logsUrl);
   const docsUrl = safeHttpUrl(domain.docUrl);
-  const { message, detail, limit, remediationApplies } =
-    describeFailure(domain);
+  const { message, detail, limit, remediationApplies } = describeFailure(domain);
 
   return {
     title: `${title} failed`,
@@ -401,5 +395,8 @@ function firstLine(raw: string): string {
     /failed to|request failed|error|self_signed_cert_in_chain/i.test(line),
   );
   const line = named ?? lines.find((part) => part.length > 0) ?? raw;
-  return line.replace(/^✖\s*/, "").trim().slice(0, 300);
+  return line
+    .replace(/^✖\s*/, "")
+    .trim()
+    .slice(0, 300);
 }

@@ -31,11 +31,7 @@ import { createServiceApp, internalSecret } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import {
-  CREATE_ORGANIZATION,
-  GET_ORGANIZATION,
-  LIST_ORGANIZATIONS,
-} from "./openapi";
+import { CREATE_ORGANIZATION, GET_ORGANIZATION, LIST_ORGANIZATIONS } from "./openapi";
 
 /**
  * The configured instance credential, read per request so a deployment (or a
@@ -118,8 +114,7 @@ const createOrganizationSchema = z.object({
   adminApiKeyName: z.string().trim().min(1).max(100).optional(),
 });
 
-const organizationService = (context: Context) =>
-  appFromContext(context).organizations;
+const organizationService = (context: Context) => appFromContext(context).organizations;
 
 const secured = createServiceApp({
   basePath: "/api/organizations",
@@ -234,8 +229,7 @@ secured
 secured
   .access(instanceAdminPolicy())
   .get("/", describeRoute(LIST_ORGANIZATIONS), async (c) => {
-    const organizations =
-      await organizationService(c).listProvisioningSummaries();
+    const organizations = await organizationService(c).listProvisioningSummaries();
     return c.json({ organizations });
   });
 

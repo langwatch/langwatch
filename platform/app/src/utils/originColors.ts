@@ -18,10 +18,7 @@ import { getColorForString } from "./rotatingColors";
  * Known origin values mapped to their display colors.
  * Colors use the subtle/emphasized pattern for badge rendering.
  */
-export const originColors: Record<
-  string,
-  { background: string; color: string }
-> = {
+export const originColors: Record<string, { background: string; color: string }> = {
   application: { background: "blue.subtle", color: "blue.emphasized" },
   evaluation: { background: "green.subtle", color: "green.emphasized" },
   simulation: { background: "pink.subtle", color: "pink.emphasized" },

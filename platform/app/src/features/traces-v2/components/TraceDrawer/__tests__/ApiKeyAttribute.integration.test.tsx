@@ -20,13 +20,9 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 }));
 
 vi.mock("~/utils/compat/next-link", () => ({
-  default: ({
-    href,
-    children,
-  }: {
-    href: string;
-    children: React.ReactNode;
-  }) => <a href={href}>{children}</a>,
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
 }));
 
 const mockNameById = vi.fn();
@@ -62,9 +58,7 @@ describe("langwatch.api_key.id attribute row", () => {
       renderWithApiKeyAttribute();
 
       expect(screen.getByText("langwatch.api_key")).toBeInTheDocument();
-      expect(
-        screen.queryByText("langwatch.api_key.id"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("langwatch.api_key.id")).not.toBeInTheDocument();
     });
 
     /** @scenario The value resolves to the key's name and links to it */
@@ -75,10 +69,7 @@ describe("langwatch.api_key.id attribute row", () => {
       renderWithApiKeyAttribute();
 
       const link = screen.getByRole("link", { name: "CI Pipeline" });
-      expect(link).toHaveAttribute(
-        "href",
-        "/settings/api-keys#api-key-key_abc123",
-      );
+      expect(link).toHaveAttribute("href", "/settings/api-keys#api-key-key_abc123");
       // The raw id is not what the operator reads, only what they copy.
       expect(screen.queryByText("key_abc123")).not.toBeInTheDocument();
     });

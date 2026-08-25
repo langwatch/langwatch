@@ -123,9 +123,7 @@ describe("ProviderScopeSection", () => {
       expect(screen.getByText(/^Organization$/i)).toBeInTheDocument();
       // No combobox on read-only view
       expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-      expect(
-        screen.getByText(/Scope is fixed after create/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Scope is fixed after create/i)).toBeInTheDocument();
     });
 
     it("shows 'Project' badge for a project-scoped row when org/team exists", () => {
@@ -207,13 +205,9 @@ describe("ProviderScopeSection", () => {
 
       await user.click(screen.getByRole("combobox"));
       // Team option renders by team name.
-      await user.click(
-        await screen.findByRole("option", { name: /platform/i }),
-      );
+      await user.click(await screen.findByRole("option", { name: /platform/i }));
 
-      expect(setScopes).toHaveBeenCalledWith([
-        { scopeType: "TEAM", scopeId: "team_1" },
-      ]);
+      expect(setScopes).toHaveBeenCalledWith([{ scopeType: "TEAM", scopeId: "team_1" }]);
     });
 
     it("shows a scope-specific description for the active scope", () => {

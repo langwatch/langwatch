@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
-import {
-  buildCsvData,
-  buildCsvHeaders,
-  generateCsvContent,
-} from "../csvExport";
+import { buildCsvData, buildCsvHeaders, generateCsvContent } from "../csvExport";
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
@@ -866,8 +862,7 @@ describe("csvExport", () => {
 
     const ROW_0_REASONING =
       "gpt-5-mini gives the exact reset link; the others bury it in preamble.";
-    const ROW_1_REASONING =
-      "Both answers state the same policy with the same caveats.";
+    const ROW_1_REASONING = "Both answers state the same policy with the same caveats.";
     const ROW_3_REASONING =
       "gemini-flash produced nothing for this row, so it was not judged.";
 
@@ -897,9 +892,7 @@ describe("csvExport", () => {
     };
 
     /** One target, one dataset column, one comparison over three candidates. */
-    const createComparisonData = (
-      column: BatchComparisonColumn,
-    ): BatchEvaluationData =>
+    const createComparisonData = (column: BatchComparisonColumn): BatchEvaluationData =>
       createMinimalData({
         datasetColumns: [{ name: "input", hasImages: false }],
         targetColumns: [
@@ -954,9 +947,7 @@ describe("csvExport", () => {
       describe("when the headers are built", () => {
         /** @scenario "CSV contains the comparison verdict" */
         it("adds the winner, candidates and reasoning columns after the target block", () => {
-          const headers = buildCsvHeaders(
-            createComparisonData(FULL_RUN_COLUMN),
-          );
+          const headers = buildCsvHeaders(createComparisonData(FULL_RUN_COLUMN));
 
           expect(headers).toEqual([
             "index",
@@ -975,14 +966,10 @@ describe("csvExport", () => {
         // The results page deliberately hides the verdict's numeric score: on
         // its own, 1.0 or 0.5 reads as noise next to the name of the winner.
         it("adds no score column for the verdict", () => {
-          const headers = buildCsvHeaders(
-            createComparisonData(FULL_RUN_COLUMN),
-          );
+          const headers = buildCsvHeaders(createComparisonData(FULL_RUN_COLUMN));
 
           expect(headers).not.toContain("comparison_score");
-          expect(headers.filter((header) => header.endsWith("_score"))).toEqual(
-            [],
-          );
+          expect(headers.filter((header) => header.endsWith("_score"))).toEqual([]);
         });
       });
 

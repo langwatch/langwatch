@@ -48,15 +48,10 @@ function setup(initial: StoredProjection<CounterState> | null = null) {
       stored = projection;
     }),
   };
-  const apply = vi.fn(
-    (state: CounterState, source: Event<{ amount: number }>) => ({
-      count: state.count + source.data.amount,
-    }),
-  );
-  const projection: StateProjectionDefinition<
-    CounterState,
-    Event<{ amount: number }>
-  > = {
+  const apply = vi.fn((state: CounterState, source: Event<{ amount: number }>) => ({
+    count: state.count + source.data.amount,
+  }));
+  const projection: StateProjectionDefinition<CounterState, Event<{ amount: number }>> = {
     name: "counter",
     version: "2026-07-15",
     eventTypes: ["test.integration.event"],
@@ -147,9 +142,7 @@ describe("StateProjectionExecutor", () => {
           boundaryIds[1]!,
         ].map((id) => event({ id, acceptedAt: 200, occurredAt: 100 }));
 
-        expect(orderEvents(shuffled).map((entry) => entry.id)).toEqual(
-          boundaryIds,
-        );
+        expect(orderEvents(shuffled).map((entry) => entry.id)).toEqual(boundaryIds);
       });
     });
 

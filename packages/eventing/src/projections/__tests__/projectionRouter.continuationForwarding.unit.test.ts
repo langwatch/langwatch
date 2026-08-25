@@ -33,10 +33,7 @@ describe("continuation forwarding", () => {
       const registry = new Map<
         string,
         {
-          processBatch?: (
-            events: Event[],
-            delivery?: JobDelivery,
-          ) => Promise<void>;
+          processBatch?: (events: Event[], delivery?: JobDelivery) => Promise<void>;
         }
       >();
       const queueManager = new QueueManager<Event>({
@@ -76,8 +73,9 @@ describe("continuation forwarding", () => {
   describe("when the router's batch callback receives a continuation context", () => {
     it("commits with the applied set extended rather than replaced", async () => {
       const queueManager = createMockQueueManager();
-      const initializeSpy =
-        queueManager.initializeProjectionQueues as ReturnType<typeof vi.fn>;
+      const initializeSpy = queueManager.initializeProjectionQueues as ReturnType<
+        typeof vi.fn
+      >;
 
       const router = new ProjectionRouter(
         TEST_CONSTANTS.AGGREGATE_TYPE,

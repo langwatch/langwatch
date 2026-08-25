@@ -33,8 +33,7 @@ const roleOrganizationPermission = ({
   declareAuthzMiddleware(
     {
       kind: "custom",
-      reason:
-        "the role's organization is loaded by its id; the check runs there",
+      reason: "the role's organization is loaded by its id; the check runs there",
       permissions: [permission],
     },
     async ({
@@ -49,13 +48,7 @@ const roleOrganizationPermission = ({
       const roles = ctx.app?.roles;
       if (!roles) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const role = await roles.get({ roleId: input.roleId });
-      if (
-        !(await probeOrganizationPermission(
-          ctx,
-          role.organizationId,
-          permission,
-        ))
-      ) {
+      if (!(await probeOrganizationPermission(ctx, role.organizationId, permission))) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
       if (enterprise) {

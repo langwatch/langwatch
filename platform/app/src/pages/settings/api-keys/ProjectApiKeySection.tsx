@@ -19,8 +19,8 @@ export function ProjectApiKeySection() {
   return (
     <VStack gap={4} width="full" align="stretch">
       <Text fontSize="sm" color="fg.muted">
-        One shared key per project, used by the SDK and older integrations that
-        send traces on behalf of the project rather than a user.
+        One shared key per project, used by the SDK and older integrations that send
+        traces on behalf of the project rather than a user.
       </Text>
       <HStack
         align="start"
@@ -39,9 +39,9 @@ export function ProjectApiKeySection() {
           <Text as="span" fontWeight="600">
             API Keys
           </Text>{" "}
-          for new integrations. They&apos;re scoped to a user, honor your role
-          bindings, and can be revoked individually. Project API keys remain
-          available for backwards compatibility.
+          for new integrations. They&apos;re scoped to a user, honor your role bindings,
+          and can be revoked individually. Project API keys remain available for backwards
+          compatibility.
         </Text>
       </HStack>
       <CodeBlock

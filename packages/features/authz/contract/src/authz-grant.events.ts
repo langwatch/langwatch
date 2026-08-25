@@ -3,8 +3,7 @@ import { z } from "zod";
 export const AUTHZ_ENGINE_MIGRATION_NAME = "authz-engine" as const;
 
 export const GRANT_ATTACHED_EVENT_TYPE = "lw.authz.grant.attached" as const;
-export const GRANT_ROLE_CHANGED_EVENT_TYPE =
-  "lw.authz.grant.role_changed" as const;
+export const GRANT_ROLE_CHANGED_EVENT_TYPE = "lw.authz.grant.role_changed" as const;
 export const GRANT_REVOKED_EVENT_TYPE = "lw.authz.grant.revoked" as const;
 export const ROLE_DEFINED_EVENT_TYPE = "lw.authz.role.defined" as const;
 export const ROLE_PERMISSIONS_CHANGED_EVENT_TYPE =
@@ -41,23 +40,15 @@ export const ledgerPrincipalSchema = z
     id: z.string().nullable(),
   })
   .strict()
-  .refine(
-    (principal) => (principal.type === "anyone") === (principal.id === null),
-    {
-      message:
-        "principal id is null for `anyone` and required for every other principal type",
-      path: ["id"],
-    },
-  );
+  .refine((principal) => (principal.type === "anyone") === (principal.id === null), {
+    message:
+      "principal id is null for `anyone` and required for every other principal type",
+    path: ["id"],
+  });
 export type LedgerPrincipal = z.infer<typeof ledgerPrincipalSchema>;
 export type LedgerPrincipalType = LedgerPrincipal["type"];
 
-export const legacyBindingRoleSchema = z.enum([
-  "ADMIN",
-  "MEMBER",
-  "VIEWER",
-  "CUSTOM",
-]);
+export const legacyBindingRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type LegacyBindingRole = z.infer<typeof legacyBindingRoleSchema>;
 
 export const ledgerScopeSchema = z
@@ -151,9 +142,7 @@ export const grantRoleChangedPayloadSchema = z
     actor: grantsLedgerActorSchema,
   })
   .strict();
-export type GrantRoleChangedPayload = z.infer<
-  typeof grantRoleChangedPayloadSchema
->;
+export type GrantRoleChangedPayload = z.infer<typeof grantRoleChangedPayloadSchema>;
 
 export const grantRevokedPayloadSchema = z
   .object({
@@ -222,9 +211,7 @@ export const authzGrantEventPayloadSchema = z.discriminatedUnion("type", [
     data: roleDeletedPayloadSchema,
   }),
 ]);
-export type AuthzGrantEventPayload = z.infer<
-  typeof authzGrantEventPayloadSchema
->;
+export type AuthzGrantEventPayload = z.infer<typeof authzGrantEventPayloadSchema>;
 
 export const grantFactSchema = attachGrantEntryFactSchema();
 export type GrantFact = z.infer<typeof grantFactSchema>;

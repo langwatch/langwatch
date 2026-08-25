@@ -43,8 +43,7 @@ export function useNewScenarioFlow({
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Inline welcome is visible when: no scenarios, not loading, not yet dismissed
-  const showInlineWelcome =
-    !isLoading && scenarioCount === 0 && !welcomeDismissed;
+  const showInlineWelcome = !isLoading && scenarioCount === 0 && !welcomeDismissed;
 
   const dismissWelcome = useCallback(() => {
     setWelcomeSeen();

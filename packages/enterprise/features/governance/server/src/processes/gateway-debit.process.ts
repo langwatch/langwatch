@@ -89,9 +89,7 @@ export class GatewayDebitProcess {
     return Object.values(usage).every((quantity) => quantity === 0);
   }
 
-  private attributionFromState(
-    state: GatewayDebitsState,
-  ): GatewaySpendAttribution {
+  private attributionFromState(state: GatewayDebitsState): GatewaySpendAttribution {
     return {
       organization_id: state.organizationId,
       team_id: state.teamId,
@@ -198,9 +196,7 @@ export class GatewayDebitProcess {
     return state.admitted
       ? {
           state,
-          intents: [
-            context.intents.writeDebits(`debits:${outcome.status}`, payload),
-          ],
+          intents: [context.intents.writeDebits(`debits:${outcome.status}`, payload)],
         }
       : { state: { ...state, pendingOutcome: payload } };
   }

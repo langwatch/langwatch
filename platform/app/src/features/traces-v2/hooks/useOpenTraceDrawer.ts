@@ -234,10 +234,7 @@ export function useOpenTraceDrawer() {
         // full: true matches useTraceHeader's own query key — `input` itself
         // stays bare (no `full`) since it's shared below as the spanTree
         // query key too.
-        void utils.tracesV2.header.prefetch(
-          { ...input, full: true },
-          { staleTime: 0 },
-        );
+        void utils.tracesV2.header.prefetch({ ...input, full: true }, { staleTime: 0 });
         // Same key + queryFn as `useSpanTree`, so the drawer's mount joins
         // this in-flight paged fetch instead of firing a second one.
         void queryClient.prefetchQuery({

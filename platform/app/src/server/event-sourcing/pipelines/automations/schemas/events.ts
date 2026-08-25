@@ -25,7 +25,5 @@ export const triggerMatchRecordedEventSchema = EventSchema.extend({
 export type TriggerMatchRecordedEventData = z.infer<
   typeof triggerMatchRecordedEventDataSchema
 >;
-export type TriggerMatchRecordedEvent = z.infer<
-  typeof triggerMatchRecordedEventSchema
->;
+export type TriggerMatchRecordedEvent = z.infer<typeof triggerMatchRecordedEventSchema>;
 export type AutomationEvent = TriggerMatchRecordedEvent;

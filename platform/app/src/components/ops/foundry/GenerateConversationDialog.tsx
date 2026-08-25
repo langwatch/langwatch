@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Flex,
-  HStack,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { MessagesSquare } from "lucide-react";
 import { useState } from "react";
 import {
@@ -96,8 +88,8 @@ export function GenerateConversationDialog() {
             Send a fake conversation
           </Text>
           <Text fontSize="xs" color="fg.muted" mb={3}>
-            Each turn is its own trace, sharing a thread ID. Input grows with
-            the chat history; output is the latest assistant reply.
+            Each turn is its own trace, sharing a thread ID. Input grows with the chat
+            history; output is the latest assistant reply.
           </Text>
 
           <VStack gap={4} align="stretch">
@@ -115,9 +107,7 @@ export function GenerateConversationDialog() {
                 type="number"
                 value={turnCount}
                 onChange={(e) =>
-                  setTurnCount(
-                    Math.max(1, Math.min(200, parseInt(e.target.value) || 1)),
-                  )
+                  setTurnCount(Math.max(1, Math.min(200, parseInt(e.target.value) || 1)))
                 }
                 min={1}
                 max={200}
@@ -152,9 +142,7 @@ export function GenerateConversationDialog() {
                 size="sm"
                 type="number"
                 value={staggerMs}
-                onChange={(e) =>
-                  setStaggerMs(Math.max(0, parseInt(e.target.value) || 0))
-                }
+                onChange={(e) => setStaggerMs(Math.max(0, parseInt(e.target.value) || 0))}
                 min={0}
                 step={50}
               />

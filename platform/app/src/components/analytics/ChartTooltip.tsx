@@ -29,9 +29,7 @@ export function ChartTooltip({
 }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
 
-  const formattedLabel = labelFormatter
-    ? labelFormatter(label, payload)
-    : label;
+  const formattedLabel = labelFormatter ? labelFormatter(label, payload) : label;
 
   return (
     <Box

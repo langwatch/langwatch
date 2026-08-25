@@ -73,60 +73,60 @@ const PARAMS = {
 };
 
 describe("media walk parity", () => {
-  describe.each(
-    EXTRACTABLE_PART_EXAMPLES,
-  )("given the extractable shape: $name", ({ part }) => {
-    it("is classified extractable, matching the store-side rewriter", async () => {
-      expect(isExtractableMediaPart(part)).toBe(true);
-      const { part: rewritten, ref } = await processContentPart({
-        part,
-        service: makeFakeService(),
-        ...PARAMS,
+  describe.each(EXTRACTABLE_PART_EXAMPLES)(
+    "given the extractable shape: $name",
+    ({ part }) => {
+      it("is classified extractable, matching the store-side rewriter", async () => {
+        expect(isExtractableMediaPart(part)).toBe(true);
+        const { part: rewritten, ref } = await processContentPart({
+          part,
+          service: makeFakeService(),
+          ...PARAMS,
+        });
+        expect(ref).not.toBeNull();
+        expect(rewritten).not.toBe(part);
       });
-      expect(ref).not.toBeNull();
-      expect(rewritten).not.toBe(part);
-    });
 
-    /** @scenario Attributes without media markers are never parsed or rewritten */
-    it("trips the media-marker gate in serialized form (plain and escaped)", () => {
-      const wrapped = JSON.stringify([{ role: "user", content: [part] }]);
-      expect(containsMediaMarkers(wrapped)).toBe(true);
-      // Typed-raw envelopes carry the messages as an escaped JSON string —
-      // the exact shape of the original bug report.
-      const escaped = JSON.stringify({ type: "raw", value: wrapped });
-      expect(containsMediaMarkers(escaped)).toBe(true);
-    });
-
-    it("is surfaced by the render-side collector before extraction", () => {
-      const collected = collectMediaParts([{ role: "user", content: [part] }]);
-      expect(collected.length).toBeGreaterThan(0);
-    });
-
-    it("is surfaced by the render-side collector after extraction", async () => {
-      const { part: rewritten } = await processContentPart({
-        part,
-        service: makeFakeService(),
-        ...PARAMS,
+      /** @scenario Attributes without media markers are never parsed or rewritten */
+      it("trips the media-marker gate in serialized form (plain and escaped)", () => {
+        const wrapped = JSON.stringify([{ role: "user", content: [part] }]);
+        expect(containsMediaMarkers(wrapped)).toBe(true);
+        // Typed-raw envelopes carry the messages as an escaped JSON string —
+        // the exact shape of the original bug report.
+        const escaped = JSON.stringify({ type: "raw", value: wrapped });
+        expect(containsMediaMarkers(escaped)).toBe(true);
       });
-      const collected = collectMediaParts([
-        { role: "user", content: [rewritten] },
-      ]);
-      expect(collected.length).toBeGreaterThan(0);
-    });
-  });
 
-  describe.each(
-    NON_EXTRACTABLE_PART_EXAMPLES,
-  )("given the non-extractable shape: $name", ({ part }) => {
-    it("is not classified extractable and passes the rewriter untouched", async () => {
-      expect(isExtractableMediaPart(part)).toBe(false);
-      const { part: rewritten, ref } = await processContentPart({
-        part,
-        service: makeFakeService(),
-        ...PARAMS,
+      it("is surfaced by the render-side collector before extraction", () => {
+        const collected = collectMediaParts([{ role: "user", content: [part] }]);
+        expect(collected.length).toBeGreaterThan(0);
       });
-      expect(ref).toBeNull();
-      expect(rewritten).toBe(part);
-    });
-  });
+
+      it("is surfaced by the render-side collector after extraction", async () => {
+        const { part: rewritten } = await processContentPart({
+          part,
+          service: makeFakeService(),
+          ...PARAMS,
+        });
+        const collected = collectMediaParts([{ role: "user", content: [rewritten] }]);
+        expect(collected.length).toBeGreaterThan(0);
+      });
+    },
+  );
+
+  describe.each(NON_EXTRACTABLE_PART_EXAMPLES)(
+    "given the non-extractable shape: $name",
+    ({ part }) => {
+      it("is not classified extractable and passes the rewriter untouched", async () => {
+        expect(isExtractableMediaPart(part)).toBe(false);
+        const { part: rewritten, ref } = await processContentPart({
+          part,
+          service: makeFakeService(),
+          ...PARAMS,
+        });
+        expect(ref).toBeNull();
+        expect(rewritten).toBe(part);
+      });
+    },
+  );
 });

@@ -19,8 +19,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 import posthog from "posthog-js";
 import { VoiceAgentsCallout } from "../VoiceAgentsCallout";
 
-const STORAGE_KEY =
-  "langwatch:simulations-voice-callout-dismissed:v1:project-1";
+const STORAGE_KEY = "langwatch:simulations-voice-callout-dismissed:v1:project-1";
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
@@ -96,9 +95,7 @@ describe("<VoiceAgentsCallout />", () => {
         expect(raw).not.toBeNull();
         const expiresAt = Number(raw);
         const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
-        expect(expiresAt).toBeGreaterThanOrEqual(
-          before + FOURTEEN_DAYS_MS - 1000,
-        );
+        expect(expiresAt).toBeGreaterThanOrEqual(before + FOURTEEN_DAYS_MS - 1000);
         expect(expiresAt).toBeLessThanOrEqual(before + FOURTEEN_DAYS_MS + 5000);
       });
     });

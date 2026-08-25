@@ -113,8 +113,7 @@ export function InlineTagsInput({
               color: "var(--chakra-colors-blue-fg)",
             }}
             onMouseOver={(e) =>
-              (e.currentTarget.style.color =
-                "var(--chakra-colors-blue-emphasized)")
+              (e.currentTarget.style.color = "var(--chakra-colors-blue-emphasized)")
             }
             onMouseOut={(e) =>
               (e.currentTarget.style.color = "var(--chakra-colors-blue-fg)")

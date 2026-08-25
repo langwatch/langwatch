@@ -30,10 +30,7 @@ interface FailureCopy {
  * Keyed by the refusal code union, so adding a code without deciding what the
  * member reads is a type error rather than a blank panel.
  */
-export const LWQL_CHART_FAILURE_COPY: Record<
-  VegaValidationErrorCode,
-  FailureCopy
-> = {
+export const LWQL_CHART_FAILURE_COPY: Record<VegaValidationErrorCode, FailureCopy> = {
   "invalid-json": {
     title: "The chart specification is not valid JSON",
     guidance: "Fix the syntax below and the chart will redraw as you type.",
@@ -97,9 +94,7 @@ export interface LangWatchQLChartFailureProps {
  * the test id, so "each case renders its own intentional state" is observable
  * rather than asserted about prose.
  */
-export function LangWatchQLChartFailure({
-  errors,
-}: LangWatchQLChartFailureProps) {
+export function LangWatchQLChartFailure({ errors }: LangWatchQLChartFailureProps) {
   const leading = errors[0];
   if (leading === undefined) return null;
 

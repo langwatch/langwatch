@@ -1,8 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type {
-  Organization,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import type { Organization, PrismaClient } from "@langwatch/prisma-client/generated";
 import { DemoOrgScope } from "../_lib/scopeGuard";
 import type { SeedActionContext } from "../_lib/seedRunner";
 
@@ -41,10 +38,7 @@ function makePrismaMock(shape: {
   return mock as unknown as PrismaClient;
 }
 
-function makeContext(
-  execute: boolean,
-  prisma: PrismaClient,
-): SeedActionContext {
+function makeContext(execute: boolean, prisma: PrismaClient): SeedActionContext {
   return {
     prisma,
     scope: new DemoOrgScope([ORG_ID]),

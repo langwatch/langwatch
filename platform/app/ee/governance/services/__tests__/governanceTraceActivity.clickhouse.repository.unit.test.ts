@@ -49,9 +49,7 @@ describe("GovernanceTraceActivityClickHouseRepository", () => {
       // ClickHouse JSONEachRow may return integers as strings depending on
       // the column type. Number() coercion happens at the repository
       // boundary — every consumer sees a real number.
-      const client = makeClient([
-        { sourceId: "is-typed-str", spanCount: "75" },
-      ]);
+      const client = makeClient([{ sourceId: "is-typed-str", spanCount: "75" }]);
       const repo = new GovernanceTraceActivityClickHouseRepository(
         async () => client as never,
       );

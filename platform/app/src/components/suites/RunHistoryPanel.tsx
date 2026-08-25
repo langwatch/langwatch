@@ -33,10 +33,7 @@ import { isSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { GroupRow } from "./GroupRow";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-} from "./RunHistoryFilters";
+import { RunHistoryFilters, type RunHistoryFilterValues } from "./RunHistoryFilters";
 import { RunHistorySkeleton } from "./RunHistorySkeleton";
 import { RunRow } from "./RunRow";
 import { RunSummaryCounts } from "./RunSummaryCounts";
@@ -136,15 +133,8 @@ export function RunHistoryPanel({
   // Pagination
   const startDateMs = period.startDate.getTime();
   const endDateMs = period.endDate.getTime();
-  const {
-    allRuns,
-    allScenarioSetIds,
-    hasMore,
-    loadMore,
-    isLoading,
-    error,
-    refetch,
-  } = useRunHistoryPagination({ scenarioSetId, startDateMs, sseConnected });
+  const { allRuns, allScenarioSetIds, hasMore, loadMore, isLoading, error, refetch } =
+    useRunHistoryPagination({ scenarioSetId, startDateMs, sseConnected });
 
   // CSV export, scoped to whatever this panel is currently showing.
   const {
@@ -192,29 +182,27 @@ export function RunHistoryPanel({
   // Track the specific job ID currently being cancelled for per-button loading state
   const [cancellingJobId, setCancellingJobId] = useState<string | null>(null);
 
-  const { cancelJob, cancelBatchRun, isCancellingBatch } = useCancelScenarioRun(
-    {
-      onCancelJobSuccess: () => {
-        setCancellingJobId(null);
-        void refetch();
-        toaster.create({
-          title: "Cancellation requested",
-          type: "info",
-        });
-      },
-      onCancelJobError: (error) => {
-        setCancellingJobId(null);
-        void refetch();
-        showErrorToast({ error, fallbackTitle: "Couldn't cancel job" });
-      },
-      onCancelBatchSuccess: () => {
-        void refetch();
-        toaster.create({ title: "Jobs cancelled", type: "success" });
-      },
-      onCancelBatchError: (error) =>
-        showErrorToast({ error, fallbackTitle: "Couldn't cancel jobs" }),
+  const { cancelJob, cancelBatchRun, isCancellingBatch } = useCancelScenarioRun({
+    onCancelJobSuccess: () => {
+      setCancellingJobId(null);
+      void refetch();
+      toaster.create({
+        title: "Cancellation requested",
+        type: "info",
+      });
     },
-  );
+    onCancelJobError: (error) => {
+      setCancellingJobId(null);
+      void refetch();
+      showErrorToast({ error, fallbackTitle: "Couldn't cancel job" });
+    },
+    onCancelBatchSuccess: () => {
+      void refetch();
+      toaster.create({ title: "Jobs cancelled", type: "success" });
+    },
+    onCancelBatchError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't cancel jobs" }),
+  });
 
   // Apply filters to raw runs
   const filteredRuns = useMemo(() => {
@@ -231,8 +219,7 @@ export function RunHistoryPanel({
     } else if (filters.passFailStatus === "fail") {
       runs = runs.filter(
         (r) =>
-          r.status === ScenarioRunStatus.ERROR ||
-          r.status === ScenarioRunStatus.FAILED,
+          r.status === ScenarioRunStatus.ERROR || r.status === ScenarioRunStatus.FAILED,
       );
     } else if (filters.passFailStatus === "stalled") {
       runs = runs.filter((r) => r.status === ScenarioRunStatus.STALLED);
@@ -281,8 +268,7 @@ export function RunHistoryPanel({
   useEffect(() => {
     if (!onStatsReady) return;
     const finishedCount = totals.passedCount + totals.failedCount;
-    const passRate =
-      finishedCount > 0 ? (totals.passedCount / finishedCount) * 100 : 0;
+    const passRate = finishedCount > 0 ? (totals.passedCount / finishedCount) * 100 : 0;
 
     onStatsReady({
       runCount: totals.runCount,
@@ -357,10 +343,7 @@ export function RunHistoryPanel({
       <EmptyState.Root paddingY={12}>
         <EmptyState.Content>
           <Box maxWidth="420px" width="100%">
-            <HandledErrorAlert
-              error={error}
-              fallbackTitle="Couldn't load runs"
-            />
+            <HandledErrorAlert error={error} fallbackTitle="Couldn't load runs" />
           </Box>
           <Button size="sm" variant="outline" onClick={() => void refetch()}>
             <RefreshCw size={14} /> Try again
@@ -574,12 +557,7 @@ export function RunHistoryPanel({
 
           {/* Load More button */}
           {hasMore && (
-            <Box
-              paddingX={6}
-              paddingY={6}
-              display="flex"
-              justifyContent="center"
-            >
+            <Box paddingX={6} paddingY={6} display="flex" justifyContent="center">
               <Button variant="outline" onClick={loadMore}>
                 Load More...
               </Button>

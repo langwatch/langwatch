@@ -16,13 +16,8 @@ import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
 
 export interface MetricRequestCollectionDeps {
   recordDataPoints: (data: CanonicalMetricDataPoint[]) => Promise<void>;
-  recordMetricCorrelations: (
-    data: RecordMetricCorrelationCommandData[],
-  ) => Promise<void>;
-  piiRedactionService?: Pick<
-    OtlpSpanPiiRedactionService,
-    "redactMetricAttributes"
-  >;
+  recordMetricCorrelations: (data: RecordMetricCorrelationCommandData[]) => Promise<void>;
+  piiRedactionService?: Pick<OtlpSpanPiiRedactionService, "redactMetricAttributes">;
 }
 
 /**
@@ -66,9 +61,7 @@ export class MetricRequestCollectionService {
   private readonly tracer = getLangWatchTracer(
     "langwatch.metric-processing.metric-ingestion",
   );
-  private readonly logger = createLogger(
-    "langwatch:metric-processing:metric-ingestion",
-  );
+  private readonly logger = createLogger("langwatch:metric-processing:metric-ingestion");
   private readonly piiRedactionService: Pick<
     OtlpSpanPiiRedactionService,
     "redactMetricAttributes"
@@ -107,15 +100,14 @@ export class MetricRequestCollectionService {
       },
       async (span): Promise<MetricRequestCollectionResult> => {
         const acceptedAt = Date.now();
-        const preparation: MetricPreparationResult =
-          await prepareMetricDataPoints({
-            tenantId,
-            organizationId,
-            request: metricRequest,
-            piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
-            redactionService: this.piiRedactionService,
-            acceptedAt,
-          });
+        const preparation: MetricPreparationResult = await prepareMetricDataPoints({
+          tenantId,
+          organizationId,
+          request: metricRequest,
+          piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
+          redactionService: this.piiRedactionService,
+          acceptedAt,
+        });
 
         const acceptedDataPoints = preparation.accepted.length;
         const rejectedDataPoints = preparation.rejectedDataPoints;
@@ -169,9 +161,7 @@ export class MetricRequestCollectionService {
                   error,
                   tenantId,
                   correlationCount: correlations.length,
-                  pointIds: correlations
-                    .slice(0, 10)
-                    .map(({ pointId }) => pointId),
+                  pointIds: correlations.slice(0, 10).map(({ pointId }) => pointId),
                 },
                 "Failed to enqueue metric exemplar correlation batch",
               );
@@ -182,9 +172,7 @@ export class MetricRequestCollectionService {
         span.setAttribute("metrics.ingestion.successes", acceptedDataPoints);
         span.setAttribute("metrics.ingestion.failures", rejectedDataPoints);
 
-        const errorMessage = errors.length
-          ? errors.join("; ").slice(0, 1024)
-          : undefined;
+        const errorMessage = errors.length ? errors.join("; ").slice(0, 1024) : undefined;
         return {
           outcome: "collected",
           acceptedDataPoints,

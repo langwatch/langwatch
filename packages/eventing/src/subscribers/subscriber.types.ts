@@ -79,15 +79,9 @@ export interface SubscriberDispatchDefinition<
    * predicate sees exactly what handle() would receive — do not use this for
    * conditions that should be re-evaluated against fresher state later.
    */
-  shouldDispatch?(
-    event: E,
-    context: SubscriberDispatchContext<FoldState>,
-  ): boolean;
+  shouldDispatch?(event: E, context: SubscriberDispatchContext<FoldState>): boolean;
   /** Side-effect handler called after fold succeeds */
-  handle(
-    event: E,
-    context: SubscriberDispatchContext<FoldState>,
-  ): Promise<void>;
+  handle(event: E, context: SubscriberDispatchContext<FoldState>): Promise<void>;
   /** Optional configuration */
   options?: SubscriberDispatchOptions;
 }

@@ -4,10 +4,7 @@ import { useMemo } from "react";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { SmallLabel } from "../SmallLabel";
 import { ProviderScopeChips } from "../settings/ProviderScopeChips";
-import {
-  ScopeChipPicker,
-  type ScopeTriadEntry,
-} from "../settings/ScopeChipPicker";
+import { ScopeChipPicker, type ScopeTriadEntry } from "../settings/ScopeChipPicker";
 import { ViewTracesButton } from "./ViewTracesButton";
 
 /**
@@ -15,11 +12,7 @@ import { ViewTracesButton } from "./ViewTracesButton";
  * traces and costs land. This replaces the old abstract "scope" picker
  * with the four shapes a key actually takes.
  */
-export type VirtualKeyOwnershipKind =
-  | "PROJECT"
-  | "PERSONAL"
-  | "TEAM"
-  | "ORGANIZATION";
+export type VirtualKeyOwnershipKind = "PROJECT" | "PERSONAL" | "TEAM" | "ORGANIZATION";
 
 export type VirtualKeyOwnership = {
   kind: VirtualKeyOwnershipKind;
@@ -82,9 +75,7 @@ export function ownershipToScopes(
  * keys return null: their single PROJECT access scope IS the
  * destination, and duplicating it would create a value that can drift.
  */
-export function ownershipTraceProjectId(
-  value: VirtualKeyOwnership,
-): string | null {
+export function ownershipTraceProjectId(value: VirtualKeyOwnership): string | null {
   switch (value.kind) {
     case "PROJECT":
     case "PERSONAL":
@@ -104,9 +95,7 @@ export function ownershipIncompleteReason(
     case "PROJECT":
       return value.projectId ? null : "Pick the project this key belongs to.";
     case "PERSONAL":
-      return ctx.personalProjectId
-        ? null
-        : "Resolving your personal workspace…";
+      return ctx.personalProjectId ? null : "Resolving your personal workspace…";
     case "TEAM":
       if (!value.teamId) return "Pick the team this key belongs to.";
       return value.traceProjectId
@@ -183,9 +172,7 @@ export function VirtualKeyOwnershipSection({
   ) => (
     <VStack align="start" width="full" gap={1}>
       <ScopeChipPicker
-        value={
-          picked ? [{ scopeType: "PROJECT" as const, scopeId: picked }] : []
-        }
+        value={picked ? [{ scopeType: "PROJECT" as const, scopeId: picked }] : []}
         onChange={(next) => write(next[0]?.scopeId ?? null)}
         organizationId={ctx.organizationId}
         organizationName={ctx.organizationName}
@@ -251,8 +238,7 @@ export function VirtualKeyOwnershipSection({
 
       {value.kind === "PERSONAL" && (
         <Text fontSize="xs" color="fg.muted" data-testid="vk-trace-destination">
-          Only you can use this key. Traces and costs land in your personal
-          workspace.
+          Only you can use this key. Traces and costs land in your personal workspace.
         </Text>
       )}
 
@@ -368,9 +354,8 @@ export function VirtualKeyOwnershipReadOnly({
             <>Traces and costs land in {destination}.</>
           ) : (
             <>
-              This key has no trace destination, so its traces and costs are not
-              filed into any project. Give it a trace project through the
-              management API.
+              This key has no trace destination, so its traces and costs are not filed
+              into any project. Give it a trace project through the management API.
             </>
           )}
         </Text>
@@ -390,9 +375,8 @@ export function VirtualKeyOwnershipReadOnly({
       </HStack>
       {traceProjectArchived && (
         <Text fontSize="xs" color="fg.muted">
-          This key keeps sending its traces and costs there. Restore the project
-          to see them again, or point the key at another project through the
-          management API.
+          This key keeps sending its traces and costs there. Restore the project to see
+          them again, or point the key at another project through the management API.
         </Text>
       )}
     </VStack>

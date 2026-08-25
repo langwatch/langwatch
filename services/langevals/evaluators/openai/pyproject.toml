@@ -2,22 +2,13 @@
 name = "langevals-openai"
 version = "3.0.0"
 description = "LangEvals OpenAI moderation evaluator for LLM outputs."
-authors = [
-    {name = "Rogerio Chaves", email = "rogerio@langwatch.ai"},
-]
-license = {text = "MIT"}
+authors = [{ name = "Rogerio Chaves", email = "rogerio@langwatch.ai" }]
+license = { text = "MIT" }
 requires-python = ">=3.11"
-dependencies = [
-    "langevals-core>=0.1.0",
-    "openai>=1.27.0",
-    "tqdm>=4.66.4",
-]
+dependencies = ["langevals-core>=0.1.0", "openai>=1.27.0", "tqdm>=4.66.4"]
 
 [dependency-groups]
-test = [
-    "pytest>=7.4.2",
-    "python-dotenv==1.2.2",
-]
+test = ["pytest>=7.4.2", "python-dotenv==1.2.2"]
 
 [build-system]
 requires = ["hatchling"]

@@ -2,9 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { EventExplorerClickHouseRepository } from "../event-explorer.clickhouse.repository";
 
 const repoCapturingQuery = () => {
-  const query = vi
-    .fn()
-    .mockResolvedValue({ json: async () => [] as unknown[] });
+  const query = vi.fn().mockResolvedValue({ json: async () => [] as unknown[] });
   const client = { query } as unknown as ConstructorParameters<
     typeof EventExplorerClickHouseRepository
   >[0];
@@ -65,9 +63,9 @@ describe("EventExplorerClickHouseRepository.searchAggregates", () => {
     describe("when searchAggregates is called", () => {
       it("rejects the call rather than scanning the whole event_log table", async () => {
         const { repo } = repoCapturingQuery();
-        await expect(
-          repo.searchAggregates({ query: "", tenantIds: [] }),
-        ).rejects.toThrow(/search query or pick at least one tenant/);
+        await expect(repo.searchAggregates({ query: "", tenantIds: [] })).rejects.toThrow(
+          /search query or pick at least one tenant/,
+        );
       });
 
       it("rejects when tenantIds is omitted entirely and query is whitespace", async () => {

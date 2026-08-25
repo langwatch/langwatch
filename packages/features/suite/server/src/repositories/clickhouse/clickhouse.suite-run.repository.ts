@@ -16,9 +16,7 @@ import {
   type SuiteRunStateData,
   type SuiteRunStateInput,
 } from "@langwatch/suite-contract";
-import {
-  SuiteRunRepository,
-} from "../suite-run.repository";
+import { SuiteRunRepository } from "../suite-run.repository";
 import type { SuiteClickHouseClient } from "../../ports/suite-clickhouse.port";
 
 export type SuiteRunClickHouseRepositoryOptions = {
@@ -31,7 +29,9 @@ const logger = createLogger("langwatch:suite-run-processing:run-state-repository
 
 /** Reads the latest event-sourced Suite run rows, before background merges. */
 export class ClickHouseSuiteRunRepository extends SuiteRunRepository {
-  static create(options: SuiteRunClickHouseRepositoryOptions): ClickHouseSuiteRunRepository {
+  static create(
+    options: SuiteRunClickHouseRepositoryOptions,
+  ): ClickHouseSuiteRunRepository {
     return new ClickHouseSuiteRunRepository(options);
   }
 
@@ -43,7 +43,10 @@ export class ClickHouseSuiteRunRepository extends SuiteRunRepository {
     aggregateId: string,
     context: ProjectionStoreReadContext,
   ): Promise<Projection<SuiteRunStateData> | null> {
-    EventUtils.validateTenantId(context, "SuiteRunStateRepositoryClickHouse.getProjection");
+    EventUtils.validateTenantId(
+      context,
+      "SuiteRunStateRepositoryClickHouse.getProjection",
+    );
     try {
       const client = await this.options.resolveClient(String(context.tenantId));
       const result = await client.query({
@@ -77,7 +80,10 @@ export class ClickHouseSuiteRunRepository extends SuiteRunRepository {
     projection: Projection<SuiteRunStateData>,
     context: ProjectionStoreWriteContext,
   ): Promise<void> {
-    EventUtils.validateTenantId(context, "SuiteRunStateRepositoryClickHouse.storeProjection");
+    EventUtils.validateTenantId(
+      context,
+      "SuiteRunStateRepositoryClickHouse.storeProjection",
+    );
     if (!EventUtils.isValidProjection(projection)) {
       throw new ValidationError(
         "Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
@@ -97,7 +103,9 @@ export class ClickHouseSuiteRunRepository extends SuiteRunRepository {
       const client = await this.options.resolveClient(String(context.tenantId));
       await client.insert({
         table: TABLE_NAME,
-        values: [mapProjectionToRow(projection, context, this.options.defaultRetentionDays)],
+        values: [
+          mapProjectionToRow(projection, context, this.options.defaultRetentionDays),
+        ],
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
@@ -106,7 +114,11 @@ export class ClickHouseSuiteRunRepository extends SuiteRunRepository {
         operation: "storeProjection",
         message: `Failed to store projection ${projection.id} for batch run ${projection.aggregateId}`,
         context: { projectionId: projection.id, batchRunId: projection.aggregateId },
-        logContext: { tenantId: context.tenantId, batchRunId: String(projection.aggregateId), projectionId: projection.id },
+        logContext: {
+          tenantId: context.tenantId,
+          batchRunId: String(projection.aggregateId),
+          projectionId: projection.id,
+        },
         logMessage: "Failed to store projection in ClickHouse",
         error,
       });
@@ -118,17 +130,27 @@ export class ClickHouseSuiteRunRepository extends SuiteRunRepository {
     context: ProjectionStoreWriteContext,
   ): Promise<void> {
     if (projections.length === 0) return;
-    EventUtils.validateTenantId(context, "SuiteRunStateRepositoryClickHouse.storeProjectionBatch");
+    EventUtils.validateTenantId(
+      context,
+      "SuiteRunStateRepositoryClickHouse.storeProjectionBatch",
+    );
     for (const projection of projections) {
       if (projection.tenantId !== context.tenantId) {
-        throw new SecurityError("storeProjectionBatch", `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`, projection.tenantId, { contextTenantId: context.tenantId });
+        throw new SecurityError(
+          "storeProjectionBatch",
+          `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+          projection.tenantId,
+          { contextTenantId: context.tenantId },
+        );
       }
     }
     try {
       const client = await this.options.resolveClient(String(context.tenantId));
       await client.insert({
         table: TABLE_NAME,
-        values: projections.map((projection) => mapProjectionToRow(projection, context, this.options.defaultRetentionDays)),
+        values: projections.map((projection) =>
+          mapProjectionToRow(projection, context, this.options.defaultRetentionDays),
+        ),
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
@@ -224,9 +246,17 @@ export class ClickHouseSuiteRunRepository extends SuiteRunRepository {
     logMessage: string;
     error: unknown;
   }): StoreError {
-    const errorMessage = input.error instanceof Error ? input.error.message : String(input.error);
+    const errorMessage =
+      input.error instanceof Error ? input.error.message : String(input.error);
     logger.warn({ ...input.logContext, error: input.error }, input.logMessage);
-    return new StoreError(input.operation, "SuiteRunStateRepositoryClickHouse", `${input.message}: ${errorMessage}`, classifyClickHouseError(input.error), input.context, input.error);
+    return new StoreError(
+      input.operation,
+      "SuiteRunStateRepositoryClickHouse",
+      `${input.message}: ${errorMessage}`,
+      classifyClickHouseError(input.error),
+      input.context,
+      input.error,
+    );
   }
 }
 

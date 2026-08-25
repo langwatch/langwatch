@@ -38,8 +38,7 @@ class MemoryDepartmentRepository extends DepartmentRepository {
     id: string;
     organizationId: string;
   }): Promise<Department | null> {
-    return this.row?.id === input.id &&
-      this.row.organizationId === input.organizationId
+    return this.row?.id === input.id && this.row.organizationId === input.organizationId
       ? this.row
       : null;
   }

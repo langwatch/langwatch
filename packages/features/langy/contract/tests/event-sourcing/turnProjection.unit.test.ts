@@ -104,10 +104,7 @@ describe("the local turn projection", () => {
         applyLangyTurnEvents(initialLangyTurnProjection, [e1]),
         [e1, e2],
       );
-      const straight = applyLangyTurnEvents(initialLangyTurnProjection, [
-        e1,
-        e2,
-      ]);
+      const straight = applyLangyTurnEvents(initialLangyTurnProjection, [e1, e2]);
       expect(viaOverlap).toEqual(straight);
     });
   });

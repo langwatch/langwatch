@@ -25,14 +25,11 @@ const mockBuildUrl = vi.fn((spanId: string, action?: string) => {
   return url;
 });
 
-vi.mock(
-  "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground",
-  () => ({
-    useGoToSpanInPlaygroundTabUrlBuilder: () => ({
-      buildUrl: mockBuildUrl,
-    }),
+vi.mock("~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground", () => ({
+  useGoToSpanInPlaygroundTabUrlBuilder: () => ({
+    buildUrl: mockBuildUrl,
   }),
-);
+}));
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -80,9 +77,7 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
     <MemoryRouter>
       <ChakraProvider value={defaultSystem}>
-        <React.Suspense fallback={<div>Loading...</div>}>
-          {children}
-        </React.Suspense>
+        <React.Suspense fallback={<div>Loading...</div>}>{children}</React.Suspense>
       </ChakraProvider>
     </MemoryRouter>
   );

@@ -11,10 +11,7 @@ import type { RedisConnection } from "./types";
  * module singleton.
  */
 export class RedisShutdownService {
-  private readonly closePromises = new WeakMap<
-    RedisConnection,
-    Promise<void>
-  >();
+  private readonly closePromises = new WeakMap<RedisConnection, Promise<void>>();
 
   private constructor() {}
 

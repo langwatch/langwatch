@@ -276,8 +276,7 @@ describe("useFilterParams() saved view localStorage fallback", () => {
 
   describe("when URL has date params but no filters (shared link)", () => {
     it("does not apply saved view filters on top of shared dates", () => {
-      mockRouterAsPath =
-        "/test-project/messages?startDate=2025-01-01&endDate=2025-01-31";
+      mockRouterAsPath = "/test-project/messages?startDate=2025-01-01&endDate=2025-01-31";
       mockRouterQuery = {
         startDate: "2025-01-01",
         endDate: "2025-01-31",

@@ -5,10 +5,7 @@ import type { StudioClientEvent } from "~/optimization_studio/types/events";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
 import { nlpgoFetch } from "~/server/nlpgo/nlpgoFetch";
 import { prisma } from "../db";
-import {
-  buildCodeEvaluatorDsl,
-  codeEvaluatorConfigSchema,
-} from "./codeEvaluator";
+import { buildCodeEvaluatorDsl, codeEvaluatorConfigSchema } from "./codeEvaluator";
 
 const coerceResultScalars = (result: Record<string, unknown>) => {
   if (

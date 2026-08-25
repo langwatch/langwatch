@@ -21,26 +21,21 @@ describe("isRedisCommandTracingEnabled", () => {
   });
 
   it('is on only for exactly "true"', () => {
-    expect(
-      isRedisCommandTracingEnabled({ OTEL_TRACE_REDIS_COMMANDS: "true" }),
-    ).toBe(true);
+    expect(isRedisCommandTracingEnabled({ OTEL_TRACE_REDIS_COMMANDS: "true" })).toBe(
+      true,
+    );
   });
 
   // Being wrong in this direction costs money, so anything that merely looks
   // affirmative stays off.
-  it.each([
-    "false",
-    "1",
-    "yes",
-    "TRUE",
-    "True",
-    " true",
-    "",
-  ])("stays off for %j", (value) => {
-    expect(
-      isRedisCommandTracingEnabled({ OTEL_TRACE_REDIS_COMMANDS: value }),
-    ).toBe(false);
-  });
+  it.each(["false", "1", "yes", "TRUE", "True", " true", ""])(
+    "stays off for %j",
+    (value) => {
+      expect(isRedisCommandTracingEnabled({ OTEL_TRACE_REDIS_COMMANDS: value })).toBe(
+        false,
+      );
+    },
+  );
 
   it("reads process.env when no environment is passed", () => {
     const previous = process.env.OTEL_TRACE_REDIS_COMMANDS;
@@ -62,15 +57,13 @@ describe("isRedisCommandTracingEnabled", () => {
 
 describe("redisStatementSerializer", () => {
   it("keeps the command and its first key", () => {
-    expect(redisStatementSerializer("get", ["session:abc"])).toBe(
-      "get session:abc",
-    );
+    expect(redisStatementSerializer("get", ["session:abc"])).toBe("get session:abc");
   });
 
   it("drops the values, so a span cannot carry secrets", () => {
-    expect(
-      redisStatementSerializer("set", ["session:abc", "a-secret-token"]),
-    ).toBe("set session:abc");
+    expect(redisStatementSerializer("set", ["session:abc", "a-secret-token"])).toBe(
+      "set session:abc",
+    );
   });
 
   it("returns the bare command when there are no arguments", () => {
@@ -98,9 +91,7 @@ describe("redisStatementSerializer", () => {
 
       it("marks the truncation, so a shortened key cannot pass for a real one", () => {
         expect(redisStatementSerializer("get", [hugeKey])).toMatch(/\.\.\.$/);
-        expect(redisStatementSerializer("get", [hugeKey])).toMatch(
-          /^get k+\.\.\.$/,
-        );
+        expect(redisStatementSerializer("get", [hugeKey])).toMatch(/^get k+\.\.\.$/);
       });
     });
   });
@@ -123,9 +114,7 @@ describe("redisStatementSerializer", () => {
 
     describe("when serializing", () => {
       it("leaves the statement untouched", () => {
-        expect(redisStatementSerializer("get", [nearKey])).toBe(
-          `get ${nearKey}`,
-        );
+        expect(redisStatementSerializer("get", [nearKey])).toBe(`get ${nearKey}`);
       });
     });
   });

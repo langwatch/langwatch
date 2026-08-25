@@ -19,10 +19,7 @@ export class PrismaGatewayAdapter {
 
   build(): GatewayService {
     return GatewayService.create({
-      repository: PrismaGatewayBudgetRepository.create(
-        this.database,
-        this.clickHouse,
-      ),
+      repository: PrismaGatewayBudgetRepository.create(this.database, this.clickHouse),
     });
   }
 }

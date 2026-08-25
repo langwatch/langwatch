@@ -16,15 +16,7 @@
  * the storage path.
  */
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
@@ -40,17 +32,15 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 // onError handler turns that into a 500 — masking the route logic entirely.
 // Hoisted so the DELETE scope-guard tests can control the set-scoped run-id
 // lookup and assert which runs get archived (or that none do).
-const { mockGetRunIdsForSet, mockDeleteRun, mockMessageSnapshot } = vi.hoisted(
-  () => ({
-    mockGetRunIdsForSet: vi
-      .fn()
-      .mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
-    mockDeleteRun: vi.fn().mockResolvedValue(undefined),
-    // Hoisted so tests can assert the REWRITTEN payload reaches dispatch —
-    // the seam between "route returned 201" and "the user sees the turn".
-    mockMessageSnapshot: vi.fn().mockResolvedValue(undefined),
-  }),
-);
+const { mockGetRunIdsForSet, mockDeleteRun, mockMessageSnapshot } = vi.hoisted(() => ({
+  mockGetRunIdsForSet: vi
+    .fn()
+    .mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
+  mockDeleteRun: vi.fn().mockResolvedValue(undefined),
+  // Hoisted so tests can assert the REWRITTEN payload reaches dispatch —
+  // the seam between "route returned 201" and "the user sees the turn".
+  mockMessageSnapshot: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
@@ -88,14 +78,12 @@ vi.mock("~/server/app-layer/app", () => ({
 // the actual authMiddleware (project resolution from X-Auth-Token); only
 // the project-permission gate is replaced with a passthrough.
 vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
   return {
     ...actual,
-    requirePermission:
-      () => async (_c: unknown, next: () => Promise<unknown>) => {
-        await next();
-      },
+    requirePermission: () => async (_c: unknown, next: () => Promise<unknown>) => {
+      await next();
+    },
   };
 });
 
@@ -116,14 +104,12 @@ vi.mock("~/server/stored-objects/stored-objects-factory", () => ({
 // route emits (e.g. AC34: the ingest log line must list every stored_objects
 // id extracted for an event). Each createLogger() call returns the same
 // proxy backed by a single vi.fn() ledger keyed by level.
-const { mockLogInfo, mockLogWarn, mockLogError, mockLogDebug } = vi.hoisted(
-  () => ({
-    mockLogInfo: vi.fn(),
-    mockLogWarn: vi.fn(),
-    mockLogError: vi.fn(),
-    mockLogDebug: vi.fn(),
-  }),
-);
+const { mockLogInfo, mockLogWarn, mockLogError, mockLogDebug } = vi.hoisted(() => ({
+  mockLogInfo: vi.fn(),
+  mockLogWarn: vi.fn(),
+  mockLogError: vi.fn(),
+  mockLogDebug: vi.fn(),
+}));
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -409,9 +395,7 @@ describe("POST /api/scenario-events (ingest)", () => {
     /** @scenario "Storage put failure aborts the entire event with a 5xx and no partial state" */
     it("returns a 5xx and does not partially persist any data", async () => {
       // Arrange: storage PUT will throw
-      mockStoreFromBytes.mockRejectedValueOnce(
-        new Error("storage unavailable"),
-      );
+      mockStoreFromBytes.mockRejectedValueOnce(new Error("storage unavailable"));
 
       const scenarioRunId = `run-${nanoid(6)}`;
       const body = makeEventWithInlineImage(scenarioRunId);
@@ -584,9 +568,7 @@ describe("POST /api/scenario-events (ingest)", () => {
               {
                 type: "file",
                 mediaType: "application/pdf",
-                data: Buffer.from("%PDF-1.4 ai-sdk file bytes").toString(
-                  "base64",
-                ),
+                data: Buffer.from("%PDF-1.4 ai-sdk file bytes").toString("base64"),
                 filename: "document.pdf",
               },
             ],
@@ -759,10 +741,10 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
         reachedCap: false,
       });
 
-      const res = await app.request(
-        "/api/scenario-events?scenarioSetId=set-a",
-        { method: "DELETE", headers: { "X-Auth-Token": testApiKey } },
-      );
+      const res = await app.request("/api/scenario-events?scenarioSetId=set-a", {
+        method: "DELETE",
+        headers: { "X-Auth-Token": testApiKey },
+      });
 
       expect(res.status).toBe(200);
       expect(mockGetRunIdsForSet).toHaveBeenCalledWith(
@@ -800,10 +782,10 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
         reachedCap: true,
       });
 
-      const res = await app.request(
-        "/api/scenario-events?scenarioSetId=big-set",
-        { method: "DELETE", headers: { "X-Auth-Token": testApiKey } },
-      );
+      const res = await app.request("/api/scenario-events?scenarioSetId=big-set", {
+        method: "DELETE",
+        headers: { "X-Auth-Token": testApiKey },
+      });
 
       expect(res.status).toBe(200);
       const body = (await res.json()) as { hasMore: boolean };

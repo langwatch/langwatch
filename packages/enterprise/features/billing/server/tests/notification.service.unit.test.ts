@@ -109,9 +109,7 @@ describe("NotificationService", () => {
 
     describe("when email fails", () => {
       it("rethrows the error", async () => {
-        usageLimitEmail.send.mockRejectedValueOnce(
-          new Error("SMTP failure"),
-        );
+        usageLimitEmail.send.mockRejectedValueOnce(new Error("SMTP failure"));
 
         await expect(service.sendUsageLimitEmail(emailParams)).rejects.toThrow(
           "SMTP failure",
@@ -156,16 +154,16 @@ describe("NotificationService", () => {
           expected:
             "Plan limit reached: Acme, jane@acme.com, Plan: Free, Monthly Events: 12000/10000",
         },
-      ])("names the $limitType cap and the numbers behind it", async ({
-        limitType,
-        expected,
-      }) => {
-        config.slackPlanLimitChannel = "https://hooks.slack.com/test";
+      ])(
+        "names the $limitType cap and the numbers behind it",
+        async ({ limitType, expected }) => {
+          config.slackPlanLimitChannel = "https://hooks.slack.com/test";
 
-        await service.sendSlackPlanLimitAlert({ ...context, limitType });
+          await service.sendSlackPlanLimitAlert({ ...context, limitType });
 
-        expect(mockSlackSend).toHaveBeenCalledWith({ text: expected });
-      });
+          expect(mockSlackSend).toHaveBeenCalledWith({ text: expected });
+        },
+      );
 
       /** @scenario "Plan limit alert still sends when the organization has no admin email" */
       it("falls back to unknown when the org has no admin email", async () => {
@@ -291,9 +289,7 @@ describe("NotificationService", () => {
 
         await scopedService.sendSlackBillingThresholdFailureAlert(context);
 
-        expect(createSlackWebhook).toHaveBeenCalledWith(
-          "https://hooks.slack.com/subs",
-        );
+        expect(createSlackWebhook).toHaveBeenCalledWith("https://hooks.slack.com/subs");
         expect(mockSlackSend).toHaveBeenCalledWith(
           expect.objectContaining({
             text: expect.stringContaining("sub_stripe_1"),
@@ -608,9 +604,7 @@ describe("NotificationService", () => {
 
     describe("when HubSpot env vars are set", () => {
       it("submits form data to HubSpot", async () => {
-        const mockFetch = vi
-          .fn()
-          .mockResolvedValue(new Response("ok", { status: 200 }));
+        const mockFetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
         const localService = NotificationService.create({
           config: {
             ...config,
@@ -710,9 +704,7 @@ describe("NotificationService", () => {
 
     describe("when both hubspotPortalId and hubspotFormId are configured", () => {
       it("submits form data to the correct HubSpot URL with correct fields", async () => {
-        const mockFetch = vi
-          .fn()
-          .mockResolvedValue(new Response("ok", { status: 200 }));
+        const mockFetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
         const localService = NotificationService.create({
           config: {
             ...config,
@@ -773,9 +765,7 @@ describe("NotificationService", () => {
       });
 
       it("splits a multi-word userName into firstname and lastname", async () => {
-        const mockFetch = vi
-          .fn()
-          .mockResolvedValue(new Response("ok", { status: 200 }));
+        const mockFetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
         const localService = NotificationService.create({
           config: {
             ...config,
@@ -792,20 +782,14 @@ describe("NotificationService", () => {
         });
 
         const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);
-        const firstNameField = body.fields.find(
-          (f: any) => f.name === "firstname",
-        );
-        const lastNameField = body.fields.find(
-          (f: any) => f.name === "lastname",
-        );
+        const firstNameField = body.fields.find((f: any) => f.name === "firstname");
+        const lastNameField = body.fields.find((f: any) => f.name === "lastname");
         expect(firstNameField.value).toBe("Mary");
         expect(lastNameField.value).toBe("Watson");
       });
 
       it("applies per-field defaults when signUpData is missing", async () => {
-        const mockFetch = vi
-          .fn()
-          .mockResolvedValue(new Response("ok", { status: 200 }));
+        const mockFetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
         const localService = NotificationService.create({
           config: {
             ...config,
@@ -834,9 +818,7 @@ describe("NotificationService", () => {
       });
 
       it("falls back to top-level utmCampaign when signUpData has none", async () => {
-        const mockFetch = vi
-          .fn()
-          .mockResolvedValue(new Response("ok", { status: 200 }));
+        const mockFetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
         const localService = NotificationService.create({
           config: {
             ...config,
@@ -854,9 +836,7 @@ describe("NotificationService", () => {
         });
 
         const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);
-        const campaignField = body.fields.find(
-          (f: any) => f.name === "utm_campaign",
-        );
+        const campaignField = body.fields.find((f: any) => f.name === "utm_campaign");
         expect(campaignField.value).toBe("top-level-campaign");
       });
     });

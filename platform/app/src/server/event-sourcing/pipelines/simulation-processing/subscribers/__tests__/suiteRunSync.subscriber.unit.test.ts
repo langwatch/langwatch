@@ -145,10 +145,7 @@ describe("suiteRunSync subscriber", () => {
       const deps = makeDeps();
       const subscriber = createSuiteRunSyncSubscriber(deps);
 
-      await subscriber.handler(
-        finishedEvent({ scenarioSetId: PLAIN_SET_ID }),
-        CONTEXT,
-      );
+      await subscriber.handler(finishedEvent({ scenarioSetId: PLAIN_SET_ID }), CONTEXT);
 
       expect(deps.completeSuiteRunItem).not.toHaveBeenCalled();
     });

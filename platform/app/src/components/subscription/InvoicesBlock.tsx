@@ -33,11 +33,7 @@ export function InvoicesBlock({
   const invoices = api.subscription.listInvoices.useQuery({ organizationId });
 
   return (
-    <Card.Root
-      data-testid="invoices-block"
-      borderWidth={1}
-      borderColor="border"
-    >
+    <Card.Root data-testid="invoices-block" borderWidth={1} borderColor="border">
       <Card.Body paddingY={5} paddingX={6}>
         <VStack align="stretch" gap={4}>
           <Flex justifyContent="space-between" alignItems="center">
@@ -80,18 +76,11 @@ export function InvoicesBlock({
             </Text>
           )}
 
-          {!invoices.isLoading &&
-            !invoices.isError &&
-            invoices.data?.length === 0 && (
-              <Text
-                color="fg.muted"
-                fontSize="sm"
-                textAlign="center"
-                paddingY={4}
-              >
-                No invoices yet
-              </Text>
-            )}
+          {!invoices.isLoading && !invoices.isError && invoices.data?.length === 0 && (
+            <Text color="fg.muted" fontSize="sm" textAlign="center" paddingY={4}>
+              No invoices yet
+            </Text>
+          )}
 
           {!invoices.isLoading &&
             !invoices.isError &&
@@ -114,9 +103,7 @@ export function InvoicesBlock({
                         <Text fontSize="sm">{invoice.number ?? "--"}</Text>
                       </Table.Cell>
                       <Table.Cell>
-                        <Text fontSize="sm">
-                          {formatInvoiceDate(invoice.date)}
-                        </Text>
+                        <Text fontSize="sm">{formatInvoiceDate(invoice.date)}</Text>
                       </Table.Cell>
                       <Table.Cell>
                         <Text fontSize="sm">

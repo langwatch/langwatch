@@ -53,9 +53,7 @@ describe("SimulationRunMetricsMapProjection", () => {
       store: { append: vi.fn() },
     });
 
-    expect(
-      projection.map({ type: "lw.simulation_run.finished" } as any),
-    ).toBeNull();
+    expect(projection.map({ type: "lw.simulation_run.finished" } as any)).toBeNull();
   });
 
   it("subscribes to metrics_computed only", () => {
@@ -63,9 +61,7 @@ describe("SimulationRunMetricsMapProjection", () => {
       store: { append: vi.fn() },
     });
 
-    expect(projection.eventTypes).toEqual([
-      SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED,
-    ]);
+    expect(projection.eventTypes).toEqual([SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED]);
   });
 });
 

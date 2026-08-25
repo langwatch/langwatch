@@ -123,9 +123,7 @@ describe("the expanded comparison leaderboard, opened straight from a URL", () =
       renderDrawerFromUrlAlone();
 
       expect(
-        screen.getByTestId(
-          `leaderboard-needs-results-page-${column.evaluatorId}`,
-        ),
+        screen.getByTestId(`leaderboard-needs-results-page-${column.evaluatorId}`),
       ).toBeInTheDocument();
     });
 

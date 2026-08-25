@@ -66,8 +66,7 @@ afterEach(cleanup);
  * the mark that a card is derived is the frame itself, and pinning these to a
  * particular wording is what made every copy edit a test edit.
  */
-const derivedFrames = () =>
-  document.querySelectorAll("[data-derived-by-langy]");
+const derivedFrames = () => document.querySelectorAll("[data-derived-by-langy]");
 const formingFrames = () => document.querySelectorAll("[data-derived-forming]");
 
 const statsCardPart = {
@@ -306,9 +305,7 @@ describe("given a derived timeseries with hints", () => {
     // A derived hint carries no dates and makes no claim about when its data is
     // from, so the link must NOT stamp the CLI's 24h default on it — that would
     // point a card summarising older data at a one-day window and show nothing.
-    expect(link?.getAttribute("href")).toBe(
-      "/demo/traces#all-traces?q=%22checkout%22",
-    );
+    expect(link?.getAttribute("href")).toBe("/demo/traces#all-traces?q=%22checkout%22");
   });
 
   it("binds an explore hint narrowed only by origin, no free text", () => {
@@ -536,9 +533,7 @@ describe("given a card renderer that throws", () => {
     // object, which formatCell/StreamingStatCard cannot have been built for.
     // parseLangyCardPart REFUSES it (strict schema), so it degrades to the
     // failed disclosure — and the prose around it still renders.
-    const consoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     renderMessage(
       assistantMessage([
         { type: "text", text: "healthy prose" },

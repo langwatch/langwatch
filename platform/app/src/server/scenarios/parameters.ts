@@ -59,11 +59,7 @@ export const SCENARIO_PARAMETER_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
  * otherwise depend on which side of the merge it arrived from. Refusing the
  * three names keeps one behavior for every name a caller can write.
  */
-const RESERVED_PARAMETER_NAMES = new Set([
-  "__proto__",
-  "constructor",
-  "prototype",
-]);
+const RESERVED_PARAMETER_NAMES = new Set(["__proto__", "constructor", "prototype"]);
 
 const PARAMETER_NAME_MESSAGE =
   "Parameter names start with a letter or underscore and may contain only letters, digits and underscores";
@@ -73,8 +69,7 @@ const RESERVED_NAME_MESSAGE = `Parameter names cannot be ${[...RESERVED_PARAMETE
 /** Whether `name` is a name a run may address. */
 function isUsableParameterName(name: string): boolean {
   return (
-    SCENARIO_PARAMETER_NAME_PATTERN.test(name) &&
-    !RESERVED_PARAMETER_NAMES.has(name)
+    SCENARIO_PARAMETER_NAME_PATTERN.test(name) && !RESERVED_PARAMETER_NAMES.has(name)
   );
 }
 
@@ -263,9 +258,7 @@ export function withoutParameterNames({
   names: ReadonlySet<string>;
 }): RunParameterValues | undefined {
   if (!values || names.size === 0) return values;
-  return Object.fromEntries(
-    Object.entries(values).filter(([name]) => !names.has(name)),
-  );
+  return Object.fromEntries(Object.entries(values).filter(([name]) => !names.has(name)));
 }
 
 /**
@@ -285,10 +278,7 @@ export function mergeRunParameters({
   // to the prototype setter instead of dropping it where it can be seen.
   const resolved = new Map<string, ScenarioParameterValue>();
   for (const definition of definitions) {
-    if (
-      definition.defaultValue !== undefined &&
-      isUsableParameterName(definition.name)
-    ) {
+    if (definition.defaultValue !== undefined && isUsableParameterName(definition.name)) {
       resolved.set(definition.name, definition.defaultValue);
     }
   }

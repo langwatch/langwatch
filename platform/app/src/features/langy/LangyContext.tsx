@@ -90,9 +90,7 @@ export function LangyProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return (
-    <LangyContext.Provider value={value}>{children}</LangyContext.Provider>
-  );
+  return <LangyContext.Provider value={value}>{children}</LangyContext.Provider>;
 }
 
 export function useLangy(): LangyContextValue {

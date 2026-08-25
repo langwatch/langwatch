@@ -42,9 +42,7 @@ export type AuthzDeclaration =
       enforces?: EnforcedScopeFields;
     };
 
-export type DeclaredAuthzMiddleware<
-  M extends (params: never) => Promise<unknown>,
-> = M & {
+export type DeclaredAuthzMiddleware<M extends (params: never) => Promise<unknown>> = M & {
   [AUTHZ_DECLARATION]: AuthzDeclaration;
 };
 
@@ -54,9 +52,10 @@ export type DeclaredAuthzMiddleware<
  * creation) can declare themselves too and be counted by the sweep instead
  * of allowlisted.
  */
-export function declareAuthzMiddleware<
-  M extends (params: never) => Promise<unknown>,
->(declaration: AuthzDeclaration, middleware: M): DeclaredAuthzMiddleware<M> {
+export function declareAuthzMiddleware<M extends (params: never) => Promise<unknown>>(
+  declaration: AuthzDeclaration,
+  middleware: M,
+): DeclaredAuthzMiddleware<M> {
   // Wrap rather than stamp the passed function: `Object.assign(middleware, …)`
   // mutates the caller's object, so declaring one shared middleware instance
   // twice with different descriptors would leave both procedures reporting the
@@ -71,9 +70,7 @@ export function declareAuthzMiddleware<
 export function authzDeclarationOf(value: unknown): AuthzDeclaration | null {
   if (typeof value !== "function") return null;
   const declaration = (
-    value as Partial<
-      DeclaredAuthzMiddleware<(params: never) => Promise<unknown>>
-    >
+    value as Partial<DeclaredAuthzMiddleware<(params: never) => Promise<unknown>>>
   )[AUTHZ_DECLARATION];
   return declaration ?? null;
 }

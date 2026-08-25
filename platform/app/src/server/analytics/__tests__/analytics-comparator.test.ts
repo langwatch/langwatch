@@ -296,12 +296,7 @@ describe("AnalyticsComparator", () => {
 
       // Does not throw
       expect(() => {
-        comparator.compare(
-          "getTimeseries",
-          { projectId: "test" },
-          esResult,
-          chResult,
-        );
+        comparator.compare("getTimeseries", { projectId: "test" }, esResult, chResult);
       }).not.toThrow();
     });
 
@@ -313,12 +308,7 @@ describe("AnalyticsComparator", () => {
       };
 
       expect(() => {
-        comparator.compare(
-          "getTimeseries",
-          { projectId: "test" },
-          result,
-          result,
-        );
+        comparator.compare("getTimeseries", { projectId: "test" }, result, result);
       }).not.toThrow();
     });
   });
@@ -337,10 +327,7 @@ describe("AnalyticsComparator", () => {
         previousPeriod: [],
       };
 
-      const strictDiscrepancies = strictComparator.findDiscrepancies(
-        esResult,
-        chResult,
-      );
+      const strictDiscrepancies = strictComparator.findDiscrepancies(esResult, chResult);
       const lenientDiscrepancies = lenientComparator.findDiscrepancies(
         esResult,
         chResult,

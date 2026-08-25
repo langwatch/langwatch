@@ -10,7 +10,8 @@ import { SuiteRunRepository } from "../suite-run.repository";
 /** Eventing's no-ClickHouse store; service reads intentionally remain empty. */
 export class MemorySuiteRunRepository
   extends BaseMemoryProjectionStore<Projection<SuiteRunStateData>>
-  implements SuiteRunRepository {
+  implements SuiteRunRepository
+{
   static create(): MemorySuiteRunRepository {
     return new MemorySuiteRunRepository();
   }

@@ -53,9 +53,7 @@ describe("isAccessTokenExpired", () => {
 describe("canRefreshSession", () => {
   it("needs a refresh token", () => {
     expect(canRefreshSession(baseConfig())).toBe(true);
-    expect(canRefreshSession(baseConfig({ refresh_token: undefined }))).toBe(
-      false,
-    );
+    expect(canRefreshSession(baseConfig({ refresh_token: undefined }))).toBe(false);
   });
 });
 
@@ -84,10 +82,9 @@ describe("refreshSession", () => {
 
   it("reports unavailable with no refresh token to spend", async () => {
     const refreshImpl = vi.fn();
-    const outcome = await refreshSession(
-      baseConfig({ refresh_token: undefined }),
-      { refreshImpl: refreshImpl as never },
-    );
+    const outcome = await refreshSession(baseConfig({ refresh_token: undefined }), {
+      refreshImpl: refreshImpl as never,
+    });
 
     expect(outcome.status).toBe("unavailable");
     expect(refreshImpl).not.toHaveBeenCalled();

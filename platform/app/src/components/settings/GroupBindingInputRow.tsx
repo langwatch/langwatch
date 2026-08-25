@@ -8,13 +8,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { Search } from "lucide-react";
-import {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useState,
-} from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
@@ -124,9 +118,7 @@ function defaultRoleValueFor(organizationRole?: OrganizationUserRole): string {
 /** A Lite Member seat has no organization-scoped rows, so the scope goes too. */
 function scopeTypeItemsForSeat(organizationRole?: OrganizationUserRole) {
   return organizationRole === OrganizationUserRole.EXTERNAL
-    ? SCOPE_TYPE_ITEMS.filter(
-        (item) => item.value !== RoleBindingScopeType.ORGANIZATION,
-      )
+    ? SCOPE_TYPE_ITEMS.filter((item) => item.value !== RoleBindingScopeType.ORGANIZATION)
     : SCOPE_TYPE_ITEMS;
 }
 
@@ -171,9 +163,7 @@ function pickerSnapForSeat({
   }
   const selectionAllowed = isBindingRoleAllowedForOrganizationRole({
     organizationRole,
-    role: (customRoleId
-      ? `custom:${customRoleId}`
-      : roleValue) as TeamRoleValue,
+    role: (customRoleId ? `custom:${customRoleId}` : roleValue) as TeamRoleValue,
   });
   return {
     snapRoleToViewer: !selectionAllowed,
@@ -229,9 +219,7 @@ export const BindingInputRow = forwardRef<
   );
   const [scopeId, setScopeId] = useState("");
   const [roleValue, setRoleValue] = useState(defaultRoleValue);
-  const [customRoleId, setCustomRoleId] = useState<string | undefined>(
-    undefined,
-  );
+  const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
   const [teamSearch, setTeamSearch] = useState("");
   const [projectTeamId, setProjectTeamId] = useState("");
   const [projectTeamSearch, setProjectTeamSearch] = useState("");
@@ -345,8 +333,7 @@ export const BindingInputRow = forwardRef<
   );
 
   const isReady =
-    isDirty &&
-    (scopeId !== "" || scopeType === RoleBindingScopeType.ORGANIZATION);
+    isDirty && (scopeId !== "" || scopeType === RoleBindingScopeType.ORGANIZATION);
 
   useEffect(() => {
     onReadyChange?.(isReady);
@@ -354,19 +341,14 @@ export const BindingInputRow = forwardRef<
 
   function buildBinding(): PendingBinding {
     const cid = customRoleId;
-    const cname = cid
-      ? customRoles.data?.find((r) => r.id === cid)?.name
-      : undefined;
+    const cname = cid ? customRoles.data?.find((r) => r.id === cid)?.name : undefined;
     return {
       roleValue,
       role: cid ? "CUSTOM" : roleValue,
       customRoleId: cid,
       customRoleName: cname,
       scopeType,
-      scopeId:
-        scopeType === RoleBindingScopeType.ORGANIZATION
-          ? organizationId
-          : scopeId,
+      scopeId: scopeType === RoleBindingScopeType.ORGANIZATION ? organizationId : scopeId,
       scopeName: scopeNameFor({
         scopeType,
         scopeId,
@@ -438,9 +420,7 @@ export const BindingInputRow = forwardRef<
         collection={scopeTypeCollection}
         value={[scopeType]}
         onValueChange={(e) => {
-          setScopeType(
-            (e.value[0] as RoleBindingScopeType) ?? RoleBindingScopeType.TEAM,
-          );
+          setScopeType((e.value[0] as RoleBindingScopeType) ?? RoleBindingScopeType.TEAM);
           setScopeId("");
           setTeamSearch("");
           setProjectTeamId("");

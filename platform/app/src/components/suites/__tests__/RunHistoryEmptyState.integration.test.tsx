@@ -117,14 +117,11 @@ describe("<RunHistoryPanel/>", () => {
 
     /** @scenario "Empty state displays when suite has no runs" */
     it("displays an empty state message indicating no runs exist", () => {
-      render(
-        <RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />,
-        { wrapper: Wrapper },
-      );
+      render(<RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />, {
+        wrapper: Wrapper,
+      });
 
-      expect(
-        screen.getByText("Run this suite to see results here."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Run this suite to see results here.")).toBeInTheDocument();
     });
 
     /**
@@ -135,14 +132,11 @@ describe("<RunHistoryPanel/>", () => {
      */
     /** @scenario Export is unavailable when no runs match */
     it("disables Export CSV rather than offering a header-only file", () => {
-      render(
-        <RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />,
-        { wrapper: Wrapper },
-      );
+      render(<RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />, {
+        wrapper: Wrapper,
+      });
 
-      expect(
-        screen.getByRole("button", { name: /export csv/i }),
-      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: /export csv/i })).toBeDisabled();
     });
   });
 
@@ -161,10 +155,9 @@ describe("<RunHistoryPanel/>", () => {
         error: null,
       });
 
-      render(
-        <RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />,
-        { wrapper: Wrapper },
-      );
+      render(<RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByRole("button", { name: /export csv/i })).toBeEnabled();
     });
@@ -200,10 +193,9 @@ describe("<RunHistoryPanel/>", () => {
 
     /** @scenario "Empty state disappears when runs exist" */
     it("does not display the empty state and shows run results", () => {
-      render(
-        <RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />,
-        { wrapper: Wrapper },
-      );
+      render(<RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />, {
+        wrapper: Wrapper,
+      });
 
       expect(
         screen.queryByText("Run this suite to see results here."),
@@ -228,14 +220,11 @@ describe("<RunHistoryPanel/>", () => {
         endDate: new Date("2024-06-30T23:59:59Z"),
       };
 
-      render(
-        <RunHistoryPanel scenarioSetId={scenarioSetId} period={narrowPeriod} />,
-        { wrapper: Wrapper },
-      );
+      render(<RunHistoryPanel scenarioSetId={scenarioSetId} period={narrowPeriod} />, {
+        wrapper: Wrapper,
+      });
 
-      expect(
-        screen.getByText("Run this suite to see results here."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Run this suite to see results here.")).toBeInTheDocument();
     });
   });
 });

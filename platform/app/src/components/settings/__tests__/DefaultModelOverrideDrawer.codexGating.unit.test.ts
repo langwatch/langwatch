@@ -51,9 +51,9 @@ describe("roleSelectModelOptions()", () => {
 describe("featureRowModelOptions()", () => {
   describe("when the row's feature is codex-licensed", () => {
     it("includes codex models for langy.chat", () => {
-      expect(
-        featureRowModelOptions({ options: POOL, featureKey: "langy.chat" }),
-      ).toEqual(POOL);
+      expect(featureRowModelOptions({ options: POOL, featureKey: "langy.chat" })).toEqual(
+        POOL,
+      );
     });
 
     it("includes codex models for traces.ai_search", () => {

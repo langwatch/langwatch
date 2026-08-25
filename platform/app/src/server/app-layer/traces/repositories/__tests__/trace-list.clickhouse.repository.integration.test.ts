@@ -51,10 +51,7 @@ async function hasQueryLog(client: ClickHouseClient): Promise<boolean> {
   return Number(rows[0]?.n ?? 0) > 0;
 }
 
-function makeTraceSummaryRow(
-  i: number,
-  overrides: Record<string, unknown> = {},
-) {
+function makeTraceSummaryRow(i: number, overrides: Record<string, unknown> = {}) {
   return {
     ProjectionId: `proj-${nanoid()}`,
     TenantId: tenantId,
@@ -159,9 +156,7 @@ beforeAll(async () => {
   ch = containers.clickHouseClient;
   repo = new TraceListClickHouseRepository(async () => ch);
 
-  const rows = Array.from({ length: TOTAL_TRACES }, (_, i) =>
-    makeTraceSummaryRow(i),
-  );
+  const rows = Array.from({ length: TOTAL_TRACES }, (_, i) => makeTraceSummaryRow(i));
   await insertRows(rows);
 
   // A stale earlier version of the newest trace (same OccurredAt, older
@@ -180,8 +175,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (ch) {
     await ch.exec({
-      query:
-        "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+      query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId },
     });
   }
@@ -208,9 +202,7 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
 
     it("returns the latest version of a duplicated trace, not the stale one", async () => {
       const page = await repo.findAll(baseQuery());
-      const newest = page.rows.find(
-        (r) => r.traceId === traceIdFor(TOTAL_TRACES - 1),
-      );
+      const newest = page.rows.find((r) => r.traceId === traceIdFor(TOTAL_TRACES - 1));
       expect(newest).toBeDefined();
       expect(newest?.computedInput).toContain(`input-${TOTAL_TRACES - 1}-`);
       expect(newest?.computedInput).not.toContain("stale");
@@ -232,9 +224,7 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
       // creates that table, so say why the check cannot run rather than
       // failing on an UNKNOWN_TABLE that reads like a broken query.
       if (!(await hasQueryLog(ch))) {
-        skip(
-          "ClickHouse runs with log_queries=0, so system.query_log is absent",
-        );
+        skip("ClickHouse runs with log_queries=0, so system.query_log is absent");
       }
 
       const dedup = `(TenantId, TraceId, UpdatedAt) IN (
@@ -350,18 +340,10 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
 
       const row = page.rows.find((r) => r.traceId === "cache-trace");
       expect(row).toBeDefined();
-      expect(row?.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
-        "31680",
-      );
-      expect(row?.attributes["langwatch.reserved.cache_creation_tokens"]).toBe(
-        "6",
-      );
-      expect(row?.attributes["langwatch.reserved.reasoning_tokens"]).toBe(
-        "100",
-      );
-      expect(row?.attributes["langwatch.reserved.context_size_tokens"]).toBe(
-        "52878",
-      );
+      expect(row?.attributes["langwatch.reserved.cache_read_tokens"]).toBe("31680");
+      expect(row?.attributes["langwatch.reserved.cache_creation_tokens"]).toBe("6");
+      expect(row?.attributes["langwatch.reserved.reasoning_tokens"]).toBe("100");
+      expect(row?.attributes["langwatch.reserved.context_size_tokens"]).toBe("52878");
       // The pre-existing allow-listed keys still flow through.
       expect(row?.attributes["langwatch.origin"]).toBe("coding_agent");
     });
@@ -454,13 +436,11 @@ describe("TraceListClickHouseRepository.findCount (integration)", () => {
   afterAll(async () => {
     if (!ch) return;
     await ch.exec({
-      query:
-        "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+      query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId: fcTenant },
     });
     await ch.exec({
-      query:
-        "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+      query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId: fcTenant },
     });
   });
@@ -511,11 +491,7 @@ describe("TraceListClickHouseRepository filtering across row versions", () => {
 
   /** The filter the sidebar compiles, so the test reads the production SQL. */
   const filterFor = (queryText: string) => {
-    const compiled = translateFilterToClickHouse(
-      queryText,
-      versionTenant,
-      timeRange,
-    );
+    const compiled = translateFilterToClickHouse(queryText, versionTenant, timeRange);
     if (!compiled) throw new Error(`"${queryText}" compiled to no filter`);
     return compiled;
   };
@@ -563,8 +539,7 @@ describe("TraceListClickHouseRepository filtering across row versions", () => {
   afterAll(async () => {
     if (!ch) return;
     await ch.exec({
-      query:
-        "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+      query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId: versionTenant },
     });
   });

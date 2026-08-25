@@ -165,9 +165,7 @@ describe("given the Add source menu", () => {
       await user.hover(screen.getByText("Add source"));
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Your plan includes up to 3 sources."),
-        ).toBeTruthy();
+        expect(screen.getByText("Your plan includes up to 3 sources.")).toBeTruthy();
       });
     });
   });

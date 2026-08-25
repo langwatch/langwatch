@@ -30,10 +30,7 @@ import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getModelById } from "~/server/modelProviders/registry";
-import {
-  type LangyModelGroup,
-  profileLangyModel,
-} from "../logic/langyModelProfile";
+import { type LangyModelGroup, profileLangyModel } from "../logic/langyModelProfile";
 import { splitLangyModels } from "../logic/langyModelSuggestions";
 import { LangyComboboxSearch } from "./LangyComboboxSearch";
 
@@ -169,9 +166,7 @@ export const LangyModelPill = memo(function LangyModelPill({
   // provider+name text, rebuilt per keystroke — the list is modest.
   const collection = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const items = q
-      ? allItems.filter((item) => item.searchText.includes(q))
-      : allItems;
+    const items = q ? allItems.filter((item) => item.searchText.includes(q)) : allItems;
     return createListCollection({
       items,
       itemToValue: (item) => item.value,
@@ -281,9 +276,7 @@ export const LangyModelPill = memo(function LangyModelPill({
             cursor={disabled ? "not-allowed" : "pointer"}
             transition="border-color 150ms ease, color 150ms ease, opacity 150ms ease"
             _hover={
-              disabled
-                ? undefined
-                : { borderColor: "orange.emphasized", color: "fg" }
+              disabled ? undefined : { borderColor: "orange.emphasized", color: "fg" }
             }
             _focusVisible={{
               outline: "none",
@@ -323,29 +316,15 @@ export const LangyModelPill = memo(function LangyModelPill({
                 />
               </Box>
             ) : (
-              <Box
-                flexShrink={0}
-                display="grid"
-                placeItems="center"
-                color="fg.subtle"
-              >
-                {modelsLoading ? (
-                  <LoaderCircle size={15} />
-                ) : (
-                  <Layers3 size={15} />
-                )}
+              <Box flexShrink={0} display="grid" placeItems="center" color="fg.subtle">
+                {modelsLoading ? <LoaderCircle size={15} /> : <Layers3 size={15} />}
               </Box>
             )}
             <chakra.span className="model-reveal">
               <Text textStyle="xs" fontWeight="500" truncate>
                 {currentLabel}
               </Text>
-              <Box
-                color="fg.subtle"
-                flexShrink={0}
-                display="grid"
-                placeItems="center"
-              >
+              <Box color="fg.subtle" flexShrink={0} display="grid" placeItems="center">
                 <ChevronDown size={12} />
               </Box>
             </chakra.span>
@@ -375,12 +354,7 @@ export const LangyModelPill = memo(function LangyModelPill({
             ) : (
               <>
                 <LangyComboboxSearch placeholder="Search models" />
-                <Combobox.Empty
-                  paddingX={2}
-                  paddingY={2}
-                  color="fg.muted"
-                  textStyle="xs"
-                >
+                <Combobox.Empty paddingX={2} paddingY={2} color="fg.muted" textStyle="xs">
                   No models match your search.
                 </Combobox.Empty>
               </>
@@ -454,37 +428,35 @@ export const LangyModelPill = memo(function LangyModelPill({
               ) : null}
 
               {moreOpen
-                ? groupedItems.map(
-                    ({ id, label, hint, icon: GroupIcon, items }) => (
-                      <Combobox.ItemGroup key={id}>
-                        <Combobox.ItemGroupLabel
-                          display="flex"
-                          alignItems="center"
-                          gap={1.5}
-                          paddingX={2}
-                          paddingTop={2}
-                          paddingBottom={1}
-                          color="fg.subtle"
+                ? groupedItems.map(({ id, label, hint, icon: GroupIcon, items }) => (
+                    <Combobox.ItemGroup key={id}>
+                      <Combobox.ItemGroupLabel
+                        display="flex"
+                        alignItems="center"
+                        gap={1.5}
+                        paddingX={2}
+                        paddingTop={2}
+                        paddingBottom={1}
+                        color="fg.subtle"
+                      >
+                        <GroupIcon size={11} />
+                        <Text
+                          textStyle="2xs"
+                          fontWeight="600"
+                          textTransform="uppercase"
+                          letterSpacing="0.07em"
                         >
-                          <GroupIcon size={11} />
-                          <Text
-                            textStyle="2xs"
-                            fontWeight="600"
-                            textTransform="uppercase"
-                            letterSpacing="0.07em"
-                          >
-                            {label}
-                          </Text>
-                          <Text textStyle="2xs" fontWeight="400" opacity={0.72}>
-                            · {hint}
-                          </Text>
-                        </Combobox.ItemGroupLabel>
-                        {items.map((item) => (
-                          <ModelRow key={item.value} item={item} />
-                        ))}
-                      </Combobox.ItemGroup>
-                    ),
-                  )
+                          {label}
+                        </Text>
+                        <Text textStyle="2xs" fontWeight="400" opacity={0.72}>
+                          · {hint}
+                        </Text>
+                      </Combobox.ItemGroupLabel>
+                      {items.map((item) => (
+                        <ModelRow key={item.value} item={item} />
+                      ))}
+                    </Combobox.ItemGroup>
+                  ))
                 : null}
             </Box>
             {/* Same escape hatch the shared ModelSelector pins to its foot:
@@ -538,17 +510,9 @@ function ModelRow({ item }: { item: ModelItem }) {
       _highlighted={{ background: "bg.subtle" }}
     >
       <HStack gap={2} width="full">
-        <Box
-          flexShrink={0}
-          display="grid"
-          placeItems="center"
-          color="fg.subtle"
-        >
+        <Box flexShrink={0} display="grid" placeItems="center" color="fg.subtle">
           {hasProviderIcon ? (
-            <ProviderIconGlyph
-              provider={item.provider as ProviderKey}
-              size="15px"
-            />
+            <ProviderIconGlyph provider={item.provider as ProviderKey} size="15px" />
           ) : (
             <Layers3 size={15} />
           )}
@@ -558,11 +522,7 @@ function ModelRow({ item }: { item: ModelItem }) {
             four trait icons plus the "Langy default" badge squeezed the label
             to "g…" — the one row a user most needs to read was the one row
             they could not. */}
-        <Combobox.ItemText
-          css={{ flex: 1, minWidth: "8ch" }}
-          fontSize="13px"
-          truncate
-        >
+        <Combobox.ItemText css={{ flex: 1, minWidth: "8ch" }} fontSize="13px" truncate>
           {item.label}
         </Combobox.ItemText>
         {/* Traits yield first: they are a glanceable extra, and losing one to
@@ -580,12 +540,7 @@ function ModelRow({ item }: { item: ModelItem }) {
           ) : null}
         </HStack>
         {item.isLangyDefault ? (
-          <Text
-            textStyle="2xs"
-            color="orange.fg"
-            whiteSpace="nowrap"
-            flexShrink={0}
-          >
+          <Text textStyle="2xs" color="orange.fg" whiteSpace="nowrap" flexShrink={0}>
             Default
           </Text>
         ) : null}
@@ -599,13 +554,7 @@ function ModelRow({ item }: { item: ModelItem }) {
   );
 }
 
-function ModelTrait({
-  label,
-  icon: Icon,
-}: {
-  label: string;
-  icon: typeof Zap;
-}) {
+function ModelTrait({ label, icon: Icon }: { label: string; icon: typeof Zap }) {
   return (
     <Tooltip content={label} positioning={{ placement: "top" }}>
       <Box

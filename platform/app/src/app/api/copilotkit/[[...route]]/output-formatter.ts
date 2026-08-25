@@ -12,10 +12,7 @@ export interface OutputConfig {
  * Checks if a value is valid for the given type.
  * Returns true if the value can be formatted for streaming.
  */
-function isValidValueForType(
-  value: unknown,
-  type: LlmConfigOutputType,
-): boolean {
+function isValidValueForType(value: unknown, type: LlmConfigOutputType): boolean {
   if (value === undefined || value === null) {
     return false;
   }
@@ -60,9 +57,7 @@ export function formatOutputForStreaming(
     case "bool":
       return typeof value === "boolean" ? String(value) : undefined;
     case "json_schema":
-      return typeof value === "object"
-        ? JSON.stringify(value, null, 2)
-        : undefined;
+      return typeof value === "object" ? JSON.stringify(value, null, 2) : undefined;
     default:
       // Exhaustive check - TypeScript will error if new types are added
       const _exhaustive: never = type;
@@ -113,9 +108,7 @@ export function extractStreamableOutput(
     // Custom identifier: wrap in JSON object with the identifier as key
     // Coerce str types to ensure consistent string representation
     const valueToWrap =
-      config.type === "str"
-        ? formatOutputForStreaming(rawValue, "str")
-        : rawValue;
+      config.type === "str" ? formatOutputForStreaming(rawValue, "str") : rawValue;
     return JSON.stringify({ [config.identifier]: valueToWrap }, null, 2);
   }
 
@@ -128,9 +121,7 @@ export function extractStreamableOutput(
     if (isValidValueForType(rawValue, config.type)) {
       // Coerce str types to ensure consistent string representation
       combinedOutputs[config.identifier] =
-        config.type === "str"
-          ? formatOutputForStreaming(rawValue, "str")
-          : rawValue;
+        config.type === "str" ? formatOutputForStreaming(rawValue, "str") : rawValue;
       hasAnyOutput = true;
     }
   }

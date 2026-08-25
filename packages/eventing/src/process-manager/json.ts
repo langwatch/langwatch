@@ -122,7 +122,6 @@ export function isDeepJsonEqual(a: unknown, b: unknown): boolean {
   const leftKeys = Object.keys(left);
   if (leftKeys.length !== Object.keys(right).length) return false;
   return leftKeys.every(
-    (key) =>
-      Object.hasOwn(right, key) && isDeepJsonEqual(left[key], right[key]),
+    (key) => Object.hasOwn(right, key) && isDeepJsonEqual(left[key], right[key]),
   );
 }

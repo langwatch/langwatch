@@ -5,10 +5,7 @@ export {
   LicenseRetentionPort,
   type LicenseRetentionRule,
 } from "./ports/license-retention.port";
-export {
-  LicenseUsagePort,
-  type LicenseUsageCount,
-} from "./ports/license-usage.port";
+export { LicenseUsagePort, type LicenseUsageCount } from "./ports/license-usage.port";
 export {
   LicenseRepository,
   type OrganizationLicenseCandidate,

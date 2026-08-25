@@ -12,10 +12,7 @@ export class PostgresGovernanceOcsfExportAdapter {
     database: object;
     events?: GovernanceOcsfEventsReaderPort;
   }): PostgresGovernanceOcsfExportAdapter {
-    return new PostgresGovernanceOcsfExportAdapter(
-      options.database,
-      options.events,
-    );
+    return new PostgresGovernanceOcsfExportAdapter(options.database, options.events);
   }
 
   build(): DefaultGovernanceOcsfExportService {

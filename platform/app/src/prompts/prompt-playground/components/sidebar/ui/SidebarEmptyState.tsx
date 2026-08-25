@@ -6,13 +6,7 @@ import { Text } from "@chakra-ui/react";
  */
 export function SidebarEmptyState() {
   return (
-    <Text
-      fontSize="sm"
-      color="fg.muted"
-      textAlign="center"
-      paddingY={6}
-      paddingX={4}
-    >
+    <Text fontSize="sm" color="fg.muted" textAlign="center" paddingY={6} paddingX={4}>
       No prompts yet
     </Text>
   );

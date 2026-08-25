@@ -99,9 +99,7 @@ describe("WelcomeHeader", () => {
 
     describe("when name is null", () => {
       it("returns anonymous morning greeting", () => {
-        expect(getGreeting({ timeOfDay: "morning", name: null })).toBe(
-          "Good morning",
-        );
+        expect(getGreeting({ timeOfDay: "morning", name: null })).toBe("Good morning");
       });
 
       it("returns anonymous afternoon greeting", () => {
@@ -111,9 +109,7 @@ describe("WelcomeHeader", () => {
       });
 
       it("returns anonymous evening greeting", () => {
-        expect(getGreeting({ timeOfDay: "evening", name: null })).toBe(
-          "Good evening",
-        );
+        expect(getGreeting({ timeOfDay: "evening", name: null })).toBe("Good evening");
       });
     });
   });

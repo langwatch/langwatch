@@ -125,9 +125,7 @@ describe("<RunHistoryPanel/> run-history window", () => {
         { startDate?: number; endDate?: number },
       ];
 
-      expect(listQueryInput.startDate).toBe(
-        new Date("2024-05-16T12:00:00Z").getTime(),
-      );
+      expect(listQueryInput.startDate).toBe(new Date("2024-05-16T12:00:00Z").getTime());
       // The bound the router would otherwise default to Date.now() per request.
       expect(listQueryInput.endDate).toBeUndefined();
     });

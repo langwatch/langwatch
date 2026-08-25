@@ -221,9 +221,7 @@ describe("OpenInferenceExtractor", () => {
 
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]).toBe(12);
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(120);
-      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(
-        30,
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(30);
     });
 
     it("consumes all llm.token_count.* keys so they don't leak into params", () => {
@@ -258,9 +256,7 @@ describe("OpenInferenceExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.recordRule).toHaveBeenCalledWith(
-        "openinference:llm.token_count",
-      );
+      expect(ctx.recordRule).toHaveBeenCalledWith("openinference:llm.token_count");
     });
 
     it("does not overwrite a canonical token already set by gen_ai.usage.*", () => {

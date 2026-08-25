@@ -17,9 +17,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 // Helper to create run summary
-const createRunSummary = (
-  overrides: Partial<BatchRunSummary> = {},
-): BatchRunSummary => ({
+const createRunSummary = (overrides: Partial<BatchRunSummary> = {}): BatchRunSummary => ({
   runId: "run-1",
   timestamps: {
     createdAt: Date.now() - 60000, // 1 minute ago

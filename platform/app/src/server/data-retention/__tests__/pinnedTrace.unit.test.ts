@@ -39,9 +39,7 @@ describe("PinnedTraceService", () => {
     describe("when pin() is called", () => {
       /** @scenario Pinning a trace does not change retention */
       it("creates a PinnedTrace row and issues no ClickHouse commands", async () => {
-        const repository = new PinnedTraceRepository(
-          createPinnedTracePrisma() as any,
-        );
+        const repository = new PinnedTraceRepository(createPinnedTracePrisma() as any);
         // Service is constructed with only the repository — no CH client needed.
         const service = new PinnedTraceService(repository);
 
@@ -62,9 +60,7 @@ describe("PinnedTraceService", () => {
 
     describe("when autoPin() is called", () => {
       it("creates a PinnedTrace row marked as share and issues no ClickHouse commands", async () => {
-        const repository = new PinnedTraceRepository(
-          createPinnedTracePrisma() as any,
-        );
+        const repository = new PinnedTraceRepository(createPinnedTracePrisma() as any);
         const service = new PinnedTraceService(repository);
 
         const pin = await service.autoPin({
@@ -85,9 +81,7 @@ describe("PinnedTraceService", () => {
   describe("given a pinned trace", () => {
     describe("when unpin() is called", () => {
       it("deletes the PinnedTrace row and issues no ClickHouse commands", async () => {
-        const repository = new PinnedTraceRepository(
-          createPinnedTracePrisma() as any,
-        );
+        const repository = new PinnedTraceRepository(createPinnedTracePrisma() as any);
         const service = new PinnedTraceService(repository);
 
         await service.pin({ projectId: "project-1", traceId: "abc123" });
@@ -111,9 +105,7 @@ describe("PinnedTraceService", () => {
      */
     describe("when unpin() is called manually", () => {
       it("throws PinnedToActiveShareError and leaves the pin intact", async () => {
-        const repository = new PinnedTraceRepository(
-          createPinnedTracePrisma() as any,
-        );
+        const repository = new PinnedTraceRepository(createPinnedTracePrisma() as any);
         const service = new PinnedTraceService(
           repository,
           async () => true, // share is still active
@@ -146,9 +138,7 @@ describe("PinnedTraceService", () => {
      */
     describe("when unpin() is called manually", () => {
       it("throws PinnedToActiveShareError — share keeps the trace pinned regardless of source", async () => {
-        const repository = new PinnedTraceRepository(
-          createPinnedTracePrisma() as any,
-        );
+        const repository = new PinnedTraceRepository(createPinnedTracePrisma() as any);
         const service = new PinnedTraceService(
           repository,
           async () => true, // share is still active
@@ -176,9 +166,7 @@ describe("PinnedTraceService", () => {
   describe("given a source=share pin whose share has already been removed", () => {
     describe("when unpin() is called manually", () => {
       it("allows the unpin — there's no longer a share to protect", async () => {
-        const repository = new PinnedTraceRepository(
-          createPinnedTracePrisma() as any,
-        );
+        const repository = new PinnedTraceRepository(createPinnedTracePrisma() as any);
         const service = new PinnedTraceService(
           repository,
           async () => false, // share is gone
@@ -198,9 +186,7 @@ describe("PinnedTraceService", () => {
     describe("when autoUnpin() runs after share is removed", () => {
       /** @scenario Manual pin survives unsharing an auto-shared trace */
       it("keeps the trace pinned", async () => {
-        const repository = new PinnedTraceRepository(
-          createPinnedTracePrisma() as any,
-        );
+        const repository = new PinnedTraceRepository(createPinnedTracePrisma() as any);
         const service = new PinnedTraceService(repository);
 
         await service.autoPin({ projectId: "project-1", traceId: "abc123" });

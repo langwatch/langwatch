@@ -45,10 +45,7 @@ import {
   langyFrameEnvelopeSchema,
   langyRelayFrameSchema,
 } from "./langy-relay-frame";
-import type {
-  LangyLinkRedis,
-  LangyResourceLinkStore,
-} from "./langy-resource-links";
+import type { LangyLinkRedis, LangyResourceLinkStore } from "./langy-resource-links";
 import { LangyFrameDedupStore } from "./langy-frame-dedup";
 import type { LangyFrameDedupRedis } from "./langy-frame-dedup";
 import { LangyResourceLinksStore } from "./langy-resource-links";
@@ -127,9 +124,7 @@ const ITEM_ID_KEYS = ["id", "scenarioRunId", "batchRunId", "runId"] as const;
  * the navigate silently dropped. Depth-capped defensive walk; only precise
  * per-resource links qualify, and only allowlisted id fields key them.
  */
-function collectItemPlatformLinks(
-  payload: unknown,
-): Array<{ id: string; href: string }> {
+function collectItemPlatformLinks(payload: unknown): Array<{ id: string; href: string }> {
   const links = new Map<string, string>();
   const walk = (node: unknown, depth: number): void => {
     if (!node || typeof node !== "object" || depth > 4) return;
@@ -154,11 +149,7 @@ function collectItemPlatformLinks(
 
 /** The slice of the token buffer the relay writes (the live edge). */
 export interface LangyRelayBuffer {
-  appendChunk(a: {
-    conversationId: string;
-    turnId: string;
-    text: string;
-  }): Promise<void>;
+  appendChunk(a: { conversationId: string; turnId: string; text: string }): Promise<void>;
   appendReasoning(a: {
     conversationId: string;
     turnId: string;
@@ -204,11 +195,7 @@ export interface LangyRelayBuffer {
     turnId: string;
     backstopSilentTurn?: boolean;
   }): Promise<{ backstopped: boolean }>;
-  markError(a: {
-    conversationId: string;
-    turnId: string;
-    error: string;
-  }): Promise<void>;
+  markError(a: { conversationId: string; turnId: string; error: string }): Promise<void>;
   heartbeat(a: { conversationId: string; turnId: string }): Promise<void>;
   appendNavigate(a: {
     conversationId: string;
@@ -402,8 +389,7 @@ export class LangyTurnRelay {
   }): LangyTurnRelay {
     const redis = options.redis;
     const buffer =
-      options.buffer ??
-      (redis ? LangyTokenBuffer.create({ redis }) : undefined);
+      options.buffer ?? (redis ? LangyTokenBuffer.create({ redis }) : undefined);
     if (!buffer) {
       throw new Error("Langy relay requires Redis or a buffer");
     }
@@ -416,8 +402,7 @@ export class LangyTurnRelay {
       throw new Error("Langy relay requires Redis or resource links");
     }
     const reserveFrameNonce =
-      options.reserveFrameNonce ??
-      (frameDedup?.reserveFrameNonce.bind(frameDedup));
+      options.reserveFrameNonce ?? frameDedup?.reserveFrameNonce.bind(frameDedup);
     if (!reserveFrameNonce) {
       throw new Error("Langy relay requires frame nonce deduplication");
     }
@@ -429,11 +414,7 @@ export class LangyTurnRelay {
         ? { readHandoffRunToken: options.readHandoffRunToken }
         : handoff
           ? {
-              readHandoffRunToken: async ({
-                projectId,
-                conversationId,
-                turnId,
-              }) => {
+              readHandoffRunToken: async ({ projectId, conversationId, turnId }) => {
                 const row = await handoff.read({ conversationId, turnId });
                 if (!row || row.projectId !== projectId) return null;
                 return row.runToken || null;
@@ -489,9 +470,7 @@ export class LangyTurnRelay {
     });
     if (!fresh) return { status: "duplicate" };
 
-    const frameParse = langyRelayFrameSchema.safeParse(
-      safeJson(envelope.payload),
-    );
+    const frameParse = langyRelayFrameSchema.safeParse(safeJson(envelope.payload));
     if (!frameParse.success) {
       return this.reject({ reason: "invalid-payload", envelope });
     }
@@ -608,9 +587,7 @@ export class LangyTurnRelay {
           ...(frame.progress !== undefined ? { progress: frame.progress } : {}),
           ...(frame.current !== undefined ? { current: frame.current } : {}),
           ...(frame.total !== undefined ? { total: frame.total } : {}),
-          ...(frame.batchItems !== undefined
-            ? { batchItems: frame.batchItems }
-            : {}),
+          ...(frame.batchItems !== undefined ? { batchItems: frame.batchItems } : {}),
           ...(frame.batchDurationMs !== undefined
             ? { batchDurationMs: frame.batchDurationMs }
             : {}),
@@ -690,9 +667,7 @@ export class LangyTurnRelay {
           turnId,
           status: "completed",
           ...(text !== undefined ? { text } : {}),
-          ...(frame.toolCalls !== undefined
-            ? { toolCalls: frame.toolCalls }
-            : {}),
+          ...(frame.toolCalls !== undefined ? { toolCalls: frame.toolCalls } : {}),
         });
         return { status: "terminal" };
       }
@@ -831,12 +806,8 @@ export class LangyTurnRelay {
         ...(call.isError !== undefined ? { isError: call.isError } : {}),
         ...(frame.command !== undefined ? { command: frame.command } : {}),
         ...(call.input !== undefined ? { input: call.input } : {}),
-        ...(frame.durationMs !== undefined
-          ? { durationMs: frame.durationMs }
-          : {}),
-        ...(call.isError && call.output !== undefined
-          ? { errorText: call.output }
-          : {}),
+        ...(frame.durationMs !== undefined ? { durationMs: frame.durationMs } : {}),
+        ...(call.isError && call.output !== undefined ? { errorText: call.output } : {}),
       });
     }
     return { status: "applied" };
@@ -974,10 +945,7 @@ export class LangyTurnRelay {
     envelope,
   }: {
     reason: LangyRelayRejection;
-    envelope?: Pick<
-      LangyFrameEnvelope,
-      "conversationId" | "turnId" | "projectId"
-    >;
+    envelope?: Pick<LangyFrameEnvelope, "conversationId" | "turnId" | "projectId">;
   }): LangyRelayOutcome {
     // The envelope ids are CLAIMED, not verified, for every reason that fires
     // before the MAC check — but a flood of bad-signature frames is exactly

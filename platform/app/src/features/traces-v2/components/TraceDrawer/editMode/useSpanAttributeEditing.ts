@@ -50,9 +50,7 @@ export function useSpanAttributeEditing({
 
   const editing = useMemo(
     () =>
-      enabled
-        ? { edits: edits ?? {}, onEditAttribute, onResetAttribute }
-        : undefined,
+      enabled ? { edits: edits ?? {}, onEditAttribute, onResetAttribute } : undefined,
     [enabled, edits, onEditAttribute, onResetAttribute],
   );
 

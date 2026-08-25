@@ -7,8 +7,7 @@ import { customAlphabet } from "nanoid";
  * @returns A new API key string
  */
 export const generateApiKey = (): string => {
-  const alphabet =
-    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
   const randomPart = customAlphabet(alphabet, 48)();
   return `sk-lw-${randomPart}`;
 };

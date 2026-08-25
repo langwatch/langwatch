@@ -56,11 +56,7 @@ export function useUrlScopeFilter({
     }
     const scopeType = raw.slice(0, sepIdx);
     const scopeId = raw.slice(sepIdx + 1);
-    if (
-      scopeType !== "ORGANIZATION" &&
-      scopeType !== "TEAM" &&
-      scopeType !== "PROJECT"
-    ) {
+    if (scopeType !== "ORGANIZATION" && scopeType !== "TEAM" && scopeType !== "PROJECT") {
       setScopeFilter({ kind: "all" });
       return;
     }

@@ -79,13 +79,9 @@ describe("buildAnthropicAdminPullConfig", () => {
       ),
     ).toBeNull();
     expect(
-      buildAnthropicAdminPullConfig(
-        composer({ ...base, startingAt: "not-a-date" }),
-      ),
+      buildAnthropicAdminPullConfig(composer({ ...base, startingAt: "not-a-date" })),
     ).toBeNull();
-    expect(
-      buildAnthropicAdminPullConfig(composer({ report: "cost" })),
-    ).toBeNull();
+    expect(buildAnthropicAdminPullConfig(composer({ report: "cost" }))).toBeNull();
   });
 
   it("given a bucket width on a cost report, refuses to build", () => {
@@ -108,9 +104,7 @@ describe("buildAnthropicAdminPullConfig", () => {
     // Date.parse rolls this forward to March 2 rather than failing, which would
     // backfill from a date nobody chose.
     expect(
-      buildAnthropicAdminPullConfig(
-        composer({ ...base, startingAt: "2026-02-30" }),
-      ),
+      buildAnthropicAdminPullConfig(composer({ ...base, startingAt: "2026-02-30" })),
     ).toBeNull();
     // Spec'd as local time, so the same typed value means a different instant
     // for an admin in Amsterdam than one in Tokyo.

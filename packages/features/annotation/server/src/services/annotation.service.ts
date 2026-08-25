@@ -60,9 +60,7 @@ export class AnnotationService extends AnnotationServiceContract {
     });
   }
 
-  async getProjectOrganizationId(input: {
-    projectId: string;
-  }): Promise<string> {
+  async getProjectOrganizationId(input: { projectId: string }): Promise<string> {
     const organizationId = await this.repository.findProjectOrganizationId(input);
     if (organizationId === null) {
       throw new AnnotationProjectNotFoundError(input.projectId);

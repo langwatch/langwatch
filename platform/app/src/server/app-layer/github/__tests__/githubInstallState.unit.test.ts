@@ -29,9 +29,7 @@ describe("signGithubInstallState + verifyGithubInstallState", () => {
   describe("when a fresh state is verified with the right key", () => {
     it("round-trips the payload exactly", () => {
       const token = signGithubInstallState(makePayload(), SIGNING_KEY);
-      expect(verifyGithubInstallState(token, SIGNING_KEY, NOW)).toEqual(
-        makePayload(),
-      );
+      expect(verifyGithubInstallState(token, SIGNING_KEY, NOW)).toEqual(makePayload());
     });
   });
 
@@ -47,10 +45,9 @@ describe("signGithubInstallState + verifyGithubInstallState", () => {
       const token = signGithubInstallState(makePayload(), SIGNING_KEY);
       const [body, sig] = token.split(".");
       const tampered =
-        Buffer.from(
-          JSON.stringify(makePayload({ userId: "attacker" })),
-          "utf8",
-        ).toString("base64url") +
+        Buffer.from(JSON.stringify(makePayload({ userId: "attacker" })), "utf8").toString(
+          "base64url",
+        ) +
         "." +
         sig;
       expect(verifyGithubInstallState(tampered, SIGNING_KEY, NOW)).toBeNull();

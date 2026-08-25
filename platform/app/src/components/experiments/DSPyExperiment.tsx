@@ -33,11 +33,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type {
-  Experiment,
-  Project,
-  WorkflowVersion,
-} from "~/generated/prisma/client";
+import type { Experiment, Project, WorkflowVersion } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
@@ -145,8 +141,7 @@ export function DSPyExperiment({
                   </Card.Body>
                 </Card.Root>
                 {stepToDisplay &&
-                  (!highlightedRun ||
-                    highlightedRun === stepToDisplay.run_id) && (
+                  (!highlightedRun || highlightedRun === stepToDisplay.run_id) && (
                     <Card.Root width="100%">
                       <Card.Body padding={0}>
                         <RunDetails
@@ -207,9 +202,7 @@ export const useDSPyExperimentState = ({
   const selectedRuns_ = useMemo(() => {
     let selectedRuns_ =
       selectedRuns ??
-      (typeof router.query.runIds === "string"
-        ? router.query.runIds.split(",")
-        : null);
+      (typeof router.query.runIds === "string" ? router.query.runIds.split(",") : null);
     if (!selectedRuns_ || selectedRuns_.length === 0) {
       selectedRuns_ = dspyRuns.data?.[0]?.runId ? [dspyRuns.data[0].runId] : [];
     }
@@ -282,15 +275,11 @@ export const useDSPyExperimentState = ({
 
   const optimizerNames = Array.from(
     new Set(
-      visibleRuns?.flatMap((run) =>
-        run.steps.map((step) => step.optimizer.name),
-      ) ?? [],
+      visibleRuns?.flatMap((run) => run.steps.map((step) => step.optimizer.name)) ?? [],
     ),
   );
   const labelNames = Array.from(
-    new Set(
-      visibleRuns?.flatMap((run) => run.steps.map((step) => step.label)) ?? [],
-    ),
+    new Set(visibleRuns?.flatMap((run) => run.steps.map((step) => step.label)) ?? []),
   );
 
   const nonMatchingRunIds = Array.from(
@@ -343,18 +332,13 @@ export function DSPyExperimentRunList({
   size?: "md" | "sm";
   incomingRunIds?: string[];
 }) {
-  const hasAnyVersion = dspyRunsPlusIncoming?.some(
-    (run) => run.workflow_version,
-  );
+  const hasAnyVersion = dspyRunsPlusIncoming?.some((run) => run.workflow_version);
 
   // Map real run IDs to their chronological index for stable "Run #N" numbering
   const runIndexById = useMemo(
     () =>
       new Map(
-        (dspyRuns.data ?? []).map((realRun, realIndex) => [
-          realRun.runId,
-          realIndex,
-        ]),
+        (dspyRuns.data ?? []).map((realRun, realIndex) => [realRun.runId, realIndex]),
       ),
     [dspyRuns.data],
   );
@@ -413,16 +397,10 @@ export function DSPyExperimentRunList({
               width="100%"
               cursor="pointer"
               role="button"
-              opacity={
-                !selectedRuns || selectedRuns.includes(run.runId) ? 1 : 0.5
-              }
-              background={
-                selectedRuns?.includes(run.runId) ? "gray.200" : "none"
-              }
+              opacity={!selectedRuns || selectedRuns.includes(run.runId) ? 1 : 0.5}
+              background={selectedRuns?.includes(run.runId) ? "gray.200" : "none"}
               _hover={{
-                background: selectedRuns?.includes(run.runId)
-                  ? "gray.200"
-                  : "gray.100",
+                background: selectedRuns?.includes(run.runId) ? "gray.200" : "gray.100",
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -449,18 +427,10 @@ export function DSPyExperimentRunList({
                   <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
                   <VStack align="start" gap={2} width="100%" paddingRight={2}>
                     <HStack width="100%">
-                      <Skeleton
-                        height="12px"
-                        background="gray.400"
-                        flexGrow={1}
-                      />
+                      <Skeleton height="12px" background="gray.400" flexGrow={1} />
                       <Spinner size="xs" flexShrink={0} />
                     </HStack>
-                    <Skeleton
-                      width="100%"
-                      height="12px"
-                      background="gray.400"
-                    />
+                    <Skeleton width="100%" height="12px" background="gray.400" />
                   </VStack>
                 </>
               ) : (
@@ -478,9 +448,7 @@ export function DSPyExperimentRunList({
                       minHeight="24px"
                       background="gray.300"
                       borderRadius="100%"
-                      backgroundColor={
-                        getColorForString("colors", run.runId).color
-                      }
+                      backgroundColor={getColorForString("colors", run.runId).color}
                     />
                   )}
                   <VStack width="full" align="start" gap={0} paddingRight={2}>
@@ -493,14 +461,10 @@ export function DSPyExperimentRunList({
                           minHeight="12px"
                           background="gray.300"
                           borderRadius="100%"
-                          backgroundColor={
-                            getColorForString("colors", run.runId).color
-                          }
+                          backgroundColor={getColorForString("colors", run.runId).color}
                         />
                       )}
-                      <Text fontSize={size === "sm" ? "13px" : "14px"}>
-                        {runName}
-                      </Text>
+                      <Text fontSize={size === "sm" ? "13px" : "14px"}>{runName}</Text>
                       {(incomingRunIds ?? []).includes(run.runId) && (
                         <>
                           <Spacer />
@@ -509,10 +473,7 @@ export function DSPyExperimentRunList({
                       )}
                     </HStack>
 
-                    <HStack
-                      color="fg.subtle"
-                      fontSize={size === "sm" ? "12px" : "13px"}
-                    >
+                    <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"}>
                       <Text>
                         {run.created_at
                           ? formatTimeAgo(run.created_at, "yyyy-MM-dd HH:mm", 5)
@@ -595,9 +556,7 @@ export const RunDetails = React.memo(
                   width="24px"
                   height="24px"
                   borderRadius="100%"
-                  background={
-                    getColorForString("colors", dspyStepSummary.run_id).color
-                  }
+                  background={getColorForString("colors", dspyStepSummary.run_id).color}
                 />
               )}
               <Heading as="h2" size="md" marginTop="-1px">
@@ -618,9 +577,9 @@ export const RunDetails = React.memo(
               />
               <MetadataTag
                 label="Step Tokens"
-                value={numeral(
-                  dspyStepSummary.llm_calls_summary.total_tokens,
-                ).format("0a")}
+                value={numeral(dspyStepSummary.llm_calls_summary.total_tokens).format(
+                  "0a",
+                )}
               />
               <MetadataTag
                 label={
@@ -674,21 +633,17 @@ export const RunDetails = React.memo(
                   <Field.Root>
                     <Switch
                       checked={displayRawParams}
-                      onCheckedChange={() =>
-                        setDisplayRawParams(!displayRawParams)
-                      }
+                      onCheckedChange={() => setDisplayRawParams(!displayRawParams)}
                     />
                   </Field.Root>
                 </HStack>
               </Box>
             )}
             <Tabs.Trigger value="0">
-              Predictors{" "}
-              {dspyStep.data && `(${dspyStep.data.predictors.length})`}
+              Predictors {dspyStep.data && `(${dspyStep.data.predictors.length})`}
             </Tabs.Trigger>
             <Tabs.Trigger value="1">
-              Evaluations{" "}
-              {dspyStep.data && `(${dspyStep.data.examples.length})`}
+              Evaluations {dspyStep.data && `(${dspyStep.data.examples.length})`}
             </Tabs.Trigger>
             <Tabs.Trigger value="2">
               LLM Calls {dspyStep.data && `(${dspyStep.data.llm_calls.length})`}
@@ -715,9 +670,7 @@ export const RunDetails = React.memo(
                   <Separator orientation="vertical" />
                   <Text>
                     Step Tokens:{" "}
-                    {numeral(
-                      dspyStepSummary.llm_calls_summary.total_tokens,
-                    ).format("0a")}
+                    {numeral(dspyStepSummary.llm_calls_summary.total_tokens).format("0a")}
                   </Text>
                   <Separator orientation="vertical" />
                   <Text>
@@ -812,44 +765,42 @@ export const RunDetails = React.memo(
                       <Table.Cell colSpan={5}>No entries</Table.Cell>
                     </Table.Row>
                   ) : dspyStep.data ? (
-                    dspyStep.data.predictors.map(
-                      ({ name, predictor }, index) => {
-                        const signature =
-                          predictor?.extended_signature ?? predictor?.signature;
-                        return (
-                          <Table.Row key={index}>
-                            <Table.Cell background="gray.50" textAlign="center">
-                              {index + 1}
-                            </Table.Cell>
-                            <Table.Cell>{name}</Table.Cell>
-                            <Table.Cell whiteSpace="pre-wrap">
-                              {signature?.instructions ?? "-"}
-                            </Table.Cell>
-                            <Table.Cell>
-                              <CollapsableSignature signature={signature} />
-                            </Table.Cell>
-                            <Table.Cell>
-                              {predictor?.demos ? (
-                                <RenderInputOutput
-                                  value={JSON.stringify(
-                                    predictor.demos.map((demo: any) =>
-                                      demo._store ? demo._store : demo,
-                                    ),
-                                  )}
-                                  collapseStringsAfterLength={140}
-                                  shouldCollapse={(field) => {
-                                    return field.type === "array";
-                                  }}
-                                  displayObjectSize={true}
-                                />
-                              ) : (
-                                "-"
-                              )}
-                            </Table.Cell>
-                          </Table.Row>
-                        );
-                      },
-                    )
+                    dspyStep.data.predictors.map(({ name, predictor }, index) => {
+                      const signature =
+                        predictor?.extended_signature ?? predictor?.signature;
+                      return (
+                        <Table.Row key={index}>
+                          <Table.Cell background="gray.50" textAlign="center">
+                            {index + 1}
+                          </Table.Cell>
+                          <Table.Cell>{name}</Table.Cell>
+                          <Table.Cell whiteSpace="pre-wrap">
+                            {signature?.instructions ?? "-"}
+                          </Table.Cell>
+                          <Table.Cell>
+                            <CollapsableSignature signature={signature} />
+                          </Table.Cell>
+                          <Table.Cell>
+                            {predictor?.demos ? (
+                              <RenderInputOutput
+                                value={JSON.stringify(
+                                  predictor.demos.map((demo: any) =>
+                                    demo._store ? demo._store : demo,
+                                  ),
+                                )}
+                                collapseStringsAfterLength={140}
+                                shouldCollapse={(field) => {
+                                  return field.type === "array";
+                                }}
+                                displayObjectSize={true}
+                              />
+                            ) : (
+                              "-"
+                            )}
+                          </Table.Cell>
+                        </Table.Row>
+                      );
+                    })
                   ) : null}
                 </Table.Body>
               </Table.Root>
@@ -1036,8 +987,7 @@ export const RunDetails = React.memo(
                         <Table.Cell>
                           <RenderInputOutput
                             value={JSON.stringify(
-                              llmCall.response?.prompt ??
-                                llmCall.response?.messages,
+                              llmCall.response?.prompt ?? llmCall.response?.messages,
                             )}
                             collapseStringsAfterLength={140}
                             collapsed={true}
@@ -1118,9 +1068,7 @@ function CollapsableSignature({
                 return [
                   key,
                   Object.fromEntries(
-                    Object.entries(value as any).filter(
-                      ([key]) => key !== "__class__",
-                    ),
+                    Object.entries(value as any).filter(([key]) => key !== "__class__"),
                   ),
                 ];
               }),
@@ -1219,12 +1167,7 @@ export function DSPyRunsScoresChart({
   return (
     <Box width="100%" position="relative">
       {data.length === 0 && (
-        <Box
-          position="absolute"
-          top="50%"
-          left="50%"
-          transform="translate(-50%, -50%)"
-        >
+        <Box position="absolute" top="50%" left="50%" transform="translate(-50%, -50%)">
           It can take up to 5 minutes for the first steps to arrive,
           <br />
           check the logs for progress meanwhile
@@ -1294,9 +1237,7 @@ export function DSPyRunsScoresChart({
               const version = props.payload[`${name}_version`];
               return [
                 numeral(value).format("0.[00]"),
-                [version ? `[${version}]` : name, label]
-                  .filter((x) => x)
-                  .join(" "),
+                [version ? `[${version}]` : name, label].filter((x) => x).join(" "),
               ];
             }}
           />
@@ -1337,11 +1278,7 @@ export function DSPyRunsScoresChart({
             (!highlightedRun || highlightedRun === stepToDisplay.run_id) && (
               <ReferenceDot
                 x={stepToDisplay.index}
-                y={
-                  stepsFlattenedByIndex[stepToDisplay.index]?.[
-                    stepToDisplay.run_id
-                  ]
-                }
+                y={stepsFlattenedByIndex[stepToDisplay.index]?.[stepToDisplay.run_id]}
                 stroke={getColor(stepToDisplay.run_id)}
                 fill={getColor(stepToDisplay.run_id)}
               />
@@ -1377,21 +1314,18 @@ export function DSPyExperimentSummary({
     experiment,
   });
 
-  const { totalCost, bestScore, bestScoreStepSummary, bestScoreLabel } =
-    useMemo(() => {
-      const totalCost = run?.steps
-        ?.map((step) => step.llm_calls_summary.total_cost)
-        .reduce((acc, cost) => acc + cost, 0);
-      const bestScore = run?.steps
-        ?.map((step) => step.score)
-        .reduce((acc, score) => (score > acc ? score : acc), 0);
-      const bestScoreStepSummary = run?.steps?.find(
-        (step) => step.score === bestScore,
-      );
-      const bestScoreLabel = bestScoreStepSummary?.label;
+  const { totalCost, bestScore, bestScoreStepSummary, bestScoreLabel } = useMemo(() => {
+    const totalCost = run?.steps
+      ?.map((step) => step.llm_calls_summary.total_cost)
+      .reduce((acc, cost) => acc + cost, 0);
+    const bestScore = run?.steps
+      ?.map((step) => step.score)
+      .reduce((acc, score) => (score > acc ? score : acc), 0);
+    const bestScoreStepSummary = run?.steps?.find((step) => step.score === bestScore);
+    const bestScoreLabel = bestScoreStepSummary?.label;
 
-      return { totalCost, bestScore, bestScoreStepSummary, bestScoreLabel };
-    }, [run]);
+    return { totalCost, bestScore, bestScoreStepSummary, bestScoreLabel };
+  }, [run]);
 
   const bestScoreStep = api.experiments.getExperimentDSPyStep.useQuery(
     {
@@ -1418,16 +1352,14 @@ export function DSPyExperimentSummary({
   );
 
   const onApplyOptimization = (predictors: DSPyPredictor[]) => {
-    const appliedOptimizations: AppliedOptimization[] = predictors.map(
-      (predictor) => {
-        const optimization: AppliedOptimization = {
-          id: predictor.name,
-          instructions:
-            predictor.predictor.extended_signature?.instructions ??
-            predictor.predictor.signature?.instructions,
-          fields: Object.entries(
-            predictor.predictor.signature?.fields ?? {},
-          ).map(([key, value]: [string, any]) => {
+    const appliedOptimizations: AppliedOptimization[] = predictors.map((predictor) => {
+      const optimization: AppliedOptimization = {
+        id: predictor.name,
+        instructions:
+          predictor.predictor.extended_signature?.instructions ??
+          predictor.predictor.signature?.instructions,
+        fields: Object.entries(predictor.predictor.signature?.fields ?? {}).map(
+          ([key, value]: [string, any]) => {
             const field: AppliedOptimizationField = {
               identifier: key,
               field_type: value.field_type ?? "input",
@@ -1436,14 +1368,14 @@ export function DSPyExperimentSummary({
             };
 
             return field;
-          }),
-          demonstrations: predictor.predictor.demos
-            ?.map((demo: any) => demo._store ?? demo)
-            .filter(Boolean),
-        };
-        return optimization;
-      },
-    );
+          },
+        ),
+        demonstrations: predictor.predictor.demos
+          ?.map((demo: any) => demo._store ?? demo)
+          .filter(Boolean),
+      };
+      return optimization;
+    });
 
     if (onApply) {
       onApply(appliedOptimizations);

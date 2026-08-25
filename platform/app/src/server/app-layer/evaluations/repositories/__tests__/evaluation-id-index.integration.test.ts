@@ -147,18 +147,14 @@ describe("evaluation_runs EvaluationId skip-index (migration 00062)", () => {
         updatedAt: new Date("2026-03-09T00:00:01.000Z"),
       });
 
-      expect(await resolveScheduledAtMs(tenantId, evaluationId)).toBe(
-        newer.getTime(),
-      );
+      expect(await resolveScheduledAtMs(tenantId, evaluationId)).toBe(newer.getTime());
     });
   });
 
   describe("when resolving an evaluation that does not exist", () => {
     it("returns undefined so the caller stays unbounded", async () => {
       const tenantId = `${tag}-tenant-a`;
-      expect(
-        await resolveScheduledAtMs(tenantId, `${tag}-missing-eval`),
-      ).toBeUndefined();
+      expect(await resolveScheduledAtMs(tenantId, `${tag}-missing-eval`)).toBeUndefined();
     });
   });
 

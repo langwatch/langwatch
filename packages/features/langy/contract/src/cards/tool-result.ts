@@ -79,9 +79,7 @@ export type CliToolResult = z.infer<typeof cliToolResultSchema>;
 
 /** The payload rendered by a card, without the transport discriminator. */
 export function cliToolResultPayload(result: CliToolResult): unknown {
-  return result.kind === "card" || result.kind === "json"
-    ? result.payload
-    : result.text;
+  return result.kind === "card" || result.kind === "json" ? result.payload : result.text;
 }
 
 /**
@@ -103,8 +101,7 @@ export function toCliToolResult({
   // card, but only from a generic one and never over a deliberate `byVerb`
   // binding. See promotion.ts and ADR-079.
   const nominal = cardKindFor({ resource, verb });
-  const card =
-    promoteCard({ nominal, payload, probes: CARD_PROBES }) ?? nominal;
+  const card = promoteCard({ nominal, payload, probes: CARD_PROBES }) ?? nominal;
   // One map, the shared one. A second copy here drifted from the schemas the
   // rest of the contract reads by, which is how a create card could accept a
   // payload `parseCliResult` refuses.

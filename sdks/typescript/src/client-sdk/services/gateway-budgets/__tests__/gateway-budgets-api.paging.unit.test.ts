@@ -68,7 +68,7 @@ const queryOf = (call: number): string => {
 };
 
 /** Reads an iterator to exhaustion and hands back every row it yielded. */
-const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {
+const drain = async <T>(rows: AsyncIterable<T>): Promise<T[]> => {
   const collected: T[] = [];
   for await (const row of rows) collected.push(row);
   return collected;
@@ -116,9 +116,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
       await new GatewayBudgetsApiService().list();
 
       expect(queryOf(0)).toBe("limit=200");
-      expect(new URLSearchParams(queryOf(1)).get("cursor")).toBe(
-        "op aq ue/+cursor",
-      );
+      expect(new URLSearchParams(queryOf(1)).get("cursor")).toBe("op aq ue/+cursor");
     });
 
     it("keeps the scope filter on every page of the walk", async () => {
@@ -292,9 +290,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
       const result = await new GatewayBudgetsApiService().get("b1");
 
       expect(result.id).toBe("b1");
-      expect(String(mockFetch.mock.calls[0]![0])).toContain(
-        "/api/gateway/v1/budgets/b1",
-      );
+      expect(String(mockFetch.mock.calls[0]![0])).toContain("/api/gateway/v1/budgets/b1");
     });
 
     it("percent-encodes an id so it stays one path segment", async () => {
@@ -326,9 +322,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
 
       // A filter dropped after page one silently widens the answer.
       for (const call of [0, 1]) {
-        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(
-          "acct-42",
-        );
+        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe("acct-42");
       }
     });
 
@@ -340,9 +334,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
       await drain(new GatewayBudgetsApiService().iterate({ externalId: "acct-42" }));
 
       for (const call of [0, 1]) {
-        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(
-          "acct-42",
-        );
+        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe("acct-42");
       }
     });
   });

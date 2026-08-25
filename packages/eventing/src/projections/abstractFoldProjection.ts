@@ -7,19 +7,14 @@ import {
   type StripPrefix,
   type UnionToIntersection,
 } from "./eventTypeTransforms";
-import type {
-  FoldProjectionOptions,
-  FoldProjectionStore,
-} from "./foldProjection.types";
+import type { FoldProjectionOptions, FoldProjectionStore } from "./foldProjection.types";
 
 // ---------------------------------------------------------------------------
 // Schema → event type extraction
 // ---------------------------------------------------------------------------
 
 /** Zod schema for an event with a literal `type` field. */
-export type AnyEventSchema = z.ZodObject<
-  { type: z.ZodLiteral<string> } & z.ZodRawShape
->;
+export type AnyEventSchema = z.ZodObject<{ type: z.ZodLiteral<string> } & z.ZodRawShape>;
 
 // ---------------------------------------------------------------------------
 // Schema tuple → handler interface

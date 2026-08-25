@@ -49,11 +49,7 @@ function extractFunctionBody(source: string, functionName: string): string {
 }
 
 describe("trace dedup OOM safety", () => {
-  const traceServicePath = path.resolve(
-    __dirname,
-    "..",
-    "clickhouse-trace.service.ts",
-  );
+  const traceServicePath = path.resolve(__dirname, "..", "clickhouse-trace.service.ts");
   const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
   // The org-wide counts moved into a repository so the CH client is reached
@@ -93,10 +89,7 @@ describe("trace dedup OOM safety", () => {
       traceServiceSource,
       "fetchTracesWithPagination",
     );
-    const summaryBody = extractMethodBody(
-      traceServiceSource,
-      "fetchTraceSummaryRows",
-    );
+    const summaryBody = extractMethodBody(traceServiceSource, "fetchTraceSummaryRows");
     const body = paginationBody + summaryBody;
 
     describe("when the pagination query SQL is inspected", () => {
@@ -119,10 +112,7 @@ describe("trace dedup OOM safety", () => {
   // clickhouse-trace.service.ts: fetchTracesWithSpansJoined
   // ---------------------------------------------------------------------------
   describe("fetchTracesWithSpansJoined()", () => {
-    const body = extractMethodBody(
-      traceServiceSource,
-      "fetchTracesWithSpansJoined",
-    );
+    const body = extractMethodBody(traceServiceSource, "fetchTracesWithSpansJoined");
 
     describe("when the trace summary query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for trace_summaries dedup", () => {
@@ -231,10 +221,7 @@ describe("trace dedup OOM safety", () => {
       "span-storage.clickhouse.repository.ts",
     );
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
-    const body = extractMethodBody(
-      spanStorageSource,
-      "getTraceEventsByTraceId",
-    );
+    const body = extractMethodBody(spanStorageSource, "getTraceEventsByTraceId");
 
     describe("when the events-only query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
@@ -251,10 +238,7 @@ describe("trace dedup OOM safety", () => {
   // instance-usage.clickhouse.repository.ts: findScenarioRunCount
   // ---------------------------------------------------------------------------
   describe("InstanceUsageStatsClickHouseRepository.findScenarioRunCount()", () => {
-    const body = extractMethodBody(
-      instanceUsageStatsRepoSource,
-      "findScenarioRunCount",
-    );
+    const body = extractMethodBody(instanceUsageStatsRepoSource, "findScenarioRunCount");
 
     describe("when the scenario count query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
@@ -278,10 +262,7 @@ describe("trace dedup OOM safety", () => {
   // topicClustering.ts: fetchTracesFromClickHouse
   // ---------------------------------------------------------------------------
   describe("fetchTracesFromClickHouse()", () => {
-    const body = extractFunctionBody(
-      topicClusteringSource,
-      "fetchTracesFromClickHouse",
-    );
+    const body = extractFunctionBody(topicClusteringSource, "fetchTracesFromClickHouse");
 
     describe("when the topic clustering query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
@@ -307,14 +288,8 @@ describe("trace dedup OOM safety", () => {
       "clickhouse",
       "aggregation-builder.ts",
     );
-    const aggregationBuilderSource = fs.readFileSync(
-      aggregationBuilderPath,
-      "utf-8",
-    );
-    const body = extractFunctionBody(
-      aggregationBuilderSource,
-      "dedupedTraceSummaries",
-    );
+    const aggregationBuilderSource = fs.readFileSync(aggregationBuilderPath, "utf-8");
+    const body = extractFunctionBody(aggregationBuilderSource, "dedupedTraceSummaries");
 
     describe("when the dedup SQL template is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
@@ -377,10 +352,7 @@ describe("trace dedup OOM safety", () => {
       "clickhouse",
       "clickhouse.experiment-run.repository.ts",
     );
-    const experimentRunServiceSource = fs.readFileSync(
-      experimentRunServicePath,
-      "utf-8",
-    );
+    const experimentRunServiceSource = fs.readFileSync(experimentRunServicePath, "utf-8");
 
     it("does not use LIMIT 1 BY anywhere", () => {
       expect(experimentRunServiceSource).not.toContain("LIMIT 1 BY");

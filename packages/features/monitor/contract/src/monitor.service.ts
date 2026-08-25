@@ -11,11 +11,16 @@ import type {
 } from "./monitor";
 
 export abstract class MonitorService {
-  abstract getAllForProject(input: { projectId: string }): Promise<MonitorWithEvaluator[]>;
+  abstract getAllForProject(input: {
+    projectId: string;
+  }): Promise<MonitorWithEvaluator[]>;
   abstract getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]>;
   abstract getById(input: MonitorIdInput): Promise<MonitorWithEvaluator>;
   abstract tryGetMonitorById(input: MonitorIdInput): Promise<MonitorWithEvaluator | null>;
-  abstract getAllByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]>;
+  abstract getAllByIds(input: {
+    monitorIds: string[];
+    projectId: string;
+  }): Promise<Monitor[]>;
   abstract toggle(input: MonitorToggleInput): Promise<{ success: true }>;
   abstract create(input: MonitorCreateInput): Promise<Monitor>;
   abstract update(input: MonitorUpdateInput): Promise<Monitor>;
@@ -24,6 +29,8 @@ export abstract class MonitorService {
     projectId: string;
     experimentId: string;
   }): Promise<void>;
-  abstract isNameAvailable(input: MonitorNameAvailabilityInput): Promise<{ available: boolean }>;
+  abstract isNameAvailable(
+    input: MonitorNameAvailabilityInput,
+  ): Promise<{ available: boolean }>;
   abstract replicate(input: MonitorReplicationInput): Promise<Monitor>;
 }

@@ -1,11 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import { performance } from "node:perf_hooks";
-import {
-  Counter,
-  collectDefaultMetrics,
-  Histogram,
-  register,
-} from "prom-client";
+import { Counter, collectDefaultMetrics, Histogram, register } from "prom-client";
 import type { AutomationPauseReason } from "@langwatch/automation-contract";
 
 // Enable default metrics collection (heap, stack, GC, etc.)
@@ -25,8 +20,7 @@ export const isMetricsAuthorized = (req: IncomingMessage): boolean => {
     throw new Error("METRICS_API_KEY is not set");
   }
   return (
-    !process.env.METRICS_API_KEY ||
-    authHeader === `Bearer ${process.env.METRICS_API_KEY}`
+    !process.env.METRICS_API_KEY || authHeader === `Bearer ${process.env.METRICS_API_KEY}`
   );
 };
 
@@ -50,11 +44,7 @@ export const normalizeMetricsPath = (path: string): string => {
     // purely numeric
     if (/^\d+$/.test(segment)) return "{id}";
     // uuid
-    if (
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        segment,
-      )
-    )
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment))
       return "{id}";
     // bare hex ids (trace ids are 16/32 hex chars)
     if (/^[0-9a-f]{8,}$/i.test(segment)) return "{id}";
@@ -138,8 +128,8 @@ export const traceSpanCountHistogram = new Histogram({
   name: "trace_span_count",
   help: "Number of spans in a trace",
   buckets: [
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100, 125,
-    150, 175, 200,
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100, 125, 150, 175,
+    200,
   ],
 });
 
@@ -176,8 +166,8 @@ export const jobProcessingDurationHistogram = new Histogram({
   help: "Duration of jobs in milliseconds",
   labelNames: ["job_type"] as const,
   buckets: [
-    10, 100, 300, 500, 700, 1000, 2500, 5000, 7500, 10000, 15000, 20000, 30000,
-    45000, 60000, 90000, 120000,
+    10, 100, 300, 500, 700, 1000, 2500, 5000, 7500, 10000, 15000, 20000, 30000, 45000,
+    60000, 90000, 120000,
   ],
 });
 
@@ -252,9 +242,8 @@ const authzDirectProjectionWriteCounter = new Counter({
   labelNames: ["reason"] as const,
 });
 
-export const getAuthzDirectProjectionWriteCounter = (
-  reason: "revocation" | "offboard",
-) => authzDirectProjectionWriteCounter.labels(reason);
+export const getAuthzDirectProjectionWriteCounter = (reason: "revocation" | "offboard") =>
+  authzDirectProjectionWriteCounter.labels(reason);
 
 register.removeSingleMetric("authz_engine_gate_read_failures_total");
 const authzEngineGateReadFailuresCounter = new Counter({
@@ -293,8 +282,8 @@ export const evaluationDurationHistogram = new Histogram({
   help: "Duration of evaluations in milliseconds",
   labelNames: ["evaluator_type"] as const,
   buckets: [
-    10, 100, 300, 500, 700, 1000, 2500, 5000, 7500, 10000, 15000, 20000, 30000,
-    45000, 60000, 90000, 120000,
+    10, 100, 300, 500, 700, 1000, 2500, 5000, 7500, 10000, 15000, 20000, 30000, 45000,
+    60000, 90000, 120000,
   ],
 });
 
@@ -320,8 +309,7 @@ export const piiChecksCounter = new Counter({
   labelNames: ["method"] as const,
 });
 
-export const getPiiChecksCounter = (method: string) =>
-  piiChecksCounter.labels(method);
+export const getPiiChecksCounter = (method: string) => piiChecksCounter.labels(method);
 
 // ============================================================================
 // Event Sourcing Metrics
@@ -362,12 +350,7 @@ register.removeSingleMetric("es_projection_total");
 const esProjectionTotal = new Counter({
   name: "es_projection_total",
   help: "Total number of event-sourcing projection executions",
-  labelNames: [
-    "pipeline_name",
-    "projection_kind",
-    "projection_name",
-    "status",
-  ] as const,
+  labelNames: ["pipeline_name", "projection_kind", "projection_name", "status"] as const,
 });
 
 export const incrementEsProjectionTotal = ({
@@ -381,9 +364,7 @@ export const incrementEsProjectionTotal = ({
   projectionName: string;
   status: ESStatus;
 }) =>
-  esProjectionTotal
-    .labels(pipelineName, projectionKind, projectionName, status)
-    .inc();
+  esProjectionTotal.labels(pipelineName, projectionKind, projectionName, status).inc();
 
 register.removeSingleMetric("es_projection_duration_milliseconds");
 const esProjectionDuration = new Histogram({
@@ -479,9 +460,7 @@ export const observeEsFoldProjectionDuration = ({
   projectionName: string;
   durationMs: number;
 }) => {
-  esFoldProjectionDuration
-    .labels(pipelineName, projectionName)
-    .observe(durationMs);
+  esFoldProjectionDuration.labels(pipelineName, projectionName).observe(durationMs);
   observeEsProjectionDuration({
     pipelineName,
     projectionKind: "fold",
@@ -635,9 +614,7 @@ export const incrementEsMapProjectionEnqueueTotal = ({
   count?: number;
 }) => {
   if (count <= 0) return;
-  esMapProjectionEnqueueTotal
-    .labels(pipelineName, projectionName, outcome)
-    .inc(count);
+  esMapProjectionEnqueueTotal.labels(pipelineName, projectionName, outcome).inc(count);
 };
 
 export const incrementEsMapProjectionTotal = ({
@@ -675,9 +652,7 @@ export const observeEsMapProjectionDuration = ({
   projectionName: string;
   durationMs: number;
 }) => {
-  esMapProjectionDuration
-    .labels(pipelineName, projectionName)
-    .observe(durationMs);
+  esMapProjectionDuration.labels(pipelineName, projectionName).observe(durationMs);
   observeEsProjectionDuration({
     pipelineName,
     projectionKind: "map",
@@ -748,8 +723,7 @@ export const observeEsSubscriberDuration = ({
   pipelineName: string;
   subscriberName: string;
   durationMs: number;
-}) =>
-  esSubscriberDuration.labels(pipelineName, subscriberName).observe(durationMs);
+}) => esSubscriberDuration.labels(pipelineName, subscriberName).observe(durationMs);
 
 /**
  * Outcome of a subscriber's enqueue-time fan-out decision (payload-cost
@@ -804,8 +778,7 @@ export const incrementEsSubscriberEnqueueTotal = ({
   pipelineName: string;
   subscriberName: string;
   outcome: SubscriberEnqueueOutcome;
-}) =>
-  esSubscriberEnqueueTotal.labels(pipelineName, subscriberName, outcome).inc();
+}) => esSubscriberEnqueueTotal.labels(pipelineName, subscriberName, outcome).inc();
 
 // --- Process manager metrics ---
 register.removeSingleMetric("es_process_manager_total");
@@ -846,8 +819,7 @@ export const observeEsProcessManagerDuration = ({
   processName: string;
   inputKind: "event" | "wake";
   durationMs: number;
-}) =>
-  esProcessManagerDuration.labels(processName, inputKind).observe(durationMs);
+}) => esProcessManagerDuration.labels(processName, inputKind).observe(durationMs);
 
 // Retention sweep over the process-manager substrate's own tables. Labelled by
 // FAMILY rather than by table because two of the three families (dispatched and
@@ -936,9 +908,8 @@ const automationAutoPausedTotal = new Counter({
   labelNames: ["reason"] as const,
 });
 
-export const incrementAutomationAutoPausedTotal = (
-  reason: AutomationPauseReason,
-) => automationAutoPausedTotal.labels(reason).inc();
+export const incrementAutomationAutoPausedTotal = (reason: AutomationPauseReason) =>
+  automationAutoPausedTotal.labels(reason).inc();
 
 register.removeSingleMetric("automation_containment_failed_total");
 const automationContainmentFailedTotal = new Counter({
@@ -1006,8 +977,7 @@ export const observeEsProcessOutboxDuration = ({
   processName: string;
   intentType: string;
   durationMs: number;
-}) =>
-  esProcessOutboxDuration.labels(processName, intentType).observe(durationMs);
+}) => esProcessOutboxDuration.labels(processName, intentType).observe(durationMs);
 
 // How late a wake fires relative to the instant it was scheduled for
 // (ADR-054): the direct answer to "is the scheduler stalling". Buckets run
@@ -1019,8 +989,7 @@ const esProcessWakeLag = new Histogram({
   help: "Delay between a process wake's scheduled instant and it being handled",
   labelNames: ["process_name"] as const,
   buckets: [
-    100, 1000, 5000, 15000, 60000, 300000, 900000, 1800000, 3600000, 21600000,
-    86400000,
+    100, 1000, 5000, 15000, 60000, 300000, 900000, 1800000, 3600000, 21600000, 86400000,
   ],
 });
 
@@ -1041,9 +1010,7 @@ const esProcessOutboxDispatchLag = new Histogram({
   name: "es_process_outbox_dispatch_lag_milliseconds",
   help: "Delay between an intent being committed and its first dispatch starting",
   labelNames: ["process_name"] as const,
-  buckets: [
-    50, 250, 1000, 5000, 15000, 60000, 300000, 900000, 1800000, 3600000,
-  ],
+  buckets: [50, 250, 1000, 5000, 15000, 60000, 300000, 900000, 1800000, 3600000],
 });
 
 export const observeEsProcessOutboxDispatchLag = ({
@@ -1052,8 +1019,7 @@ export const observeEsProcessOutboxDispatchLag = ({
 }: {
   processName: string;
   lagMs: number;
-}) =>
-  esProcessOutboxDispatchLag.labels(processName).observe(Math.max(0, lagMs));
+}) => esProcessOutboxDispatchLag.labels(processName).observe(Math.max(0, lagMs));
 
 // Commits whose intents were dropped as already-dispatched (ADR-054).
 // Legitimate on event redelivery — but a sustained per-process rate is
@@ -1134,16 +1100,11 @@ const ingestionPullDuration = new Histogram({
   // adapter kind lives behind the run port — no cheap low-cardinality label.
   // A pull is a network poll plus row inserts, capped by the worker's
   // 5-minute soft deadline, so buckets run 100ms to 5min.
-  buckets: [
-    100, 250, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000, 300000,
-  ],
+  buckets: [100, 250, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000, 300000],
 });
 
-export const observeIngestionPullDuration = ({
-  durationMs,
-}: {
-  durationMs: number;
-}) => ingestionPullDuration.observe(durationMs);
+export const observeIngestionPullDuration = ({ durationMs }: { durationMs: number }) =>
+  ingestionPullDuration.observe(durationMs);
 
 // --- Fold cache metrics ---
 register.removeSingleMetric("es_fold_cache_total");
@@ -1205,10 +1166,8 @@ const esFoldCacheEntryBytes = new Histogram({
   buckets: [1_024, 8_192, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216],
 });
 
-export const observeEsFoldCacheEntryBytes = (
-  projectionName: string,
-  bytes: number,
-) => esFoldCacheEntryBytes.labels(projectionName).observe(bytes);
+export const observeEsFoldCacheEntryBytes = (projectionName: string, bytes: number) =>
+  esFoldCacheEntryBytes.labels(projectionName).observe(bytes);
 
 // ============================================================================
 // Fold redelivery
@@ -1265,10 +1224,8 @@ const esFoldBlindReapplyEvents = new Histogram({
  * 500 of them are the same increment on the counter and very different
  * incidents — a coalescing fold can double-count an entire batch at once.
  */
-export const observeEsFoldBlindReapplyEvents = (
-  projectionName: string,
-  events: number,
-) => esFoldBlindReapplyEvents.labels(projectionName).observe(events);
+export const observeEsFoldBlindReapplyEvents = (projectionName: string, events: number) =>
+  esFoldBlindReapplyEvents.labels(projectionName).observe(events);
 
 // ============================================================================
 // Langy Metrics
@@ -1362,9 +1319,8 @@ const langyBlocksTotal = new Counter({
   help: "Model-emitted langy-card blocks stamped by the relay, by outcome",
   labelNames: ["outcome"] as const,
 });
-export const getLangyBlocksCounter = (
-  outcome: "stamped" | "unsalvageable" | "invalid",
-) => langyBlocksTotal.labels(outcome);
+export const getLangyBlocksCounter = (outcome: "stamped" | "unsalvageable" | "invalid") =>
+  langyBlocksTotal.labels(outcome);
 
 // ============================================================================
 // Fold redelivery
@@ -1481,9 +1437,7 @@ export const getStoredObjectSizeBytesHistogram = (purpose: string) =>
  */
 export type CodingAgentSessionListReadOutcome = "hit" | "empty" | "error";
 
-register.removeSingleMetric(
-  "coding_agent_session_list_read_duration_milliseconds",
-);
+register.removeSingleMetric("coding_agent_session_list_read_duration_milliseconds");
 const codingAgentSessionListReadDuration = new Histogram({
   name: "coding_agent_session_list_read_duration_milliseconds",
   help: "Duration of the coding-agent session list read, whose dedup scope scans the tenant unpruned, by table and outcome",
@@ -1534,8 +1488,7 @@ export const observeCodingAgentSessionListReadDuration = ({
   table: string;
   outcome: CodingAgentSessionListReadOutcome;
   durationMs: number;
-}) =>
-  codingAgentSessionListReadDuration.labels(table, outcome).observe(durationMs);
+}) => codingAgentSessionListReadDuration.labels(table, outcome).observe(durationMs);
 
 // ============================================================================
 // withMetrics utility

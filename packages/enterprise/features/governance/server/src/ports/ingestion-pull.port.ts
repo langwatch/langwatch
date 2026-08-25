@@ -36,9 +36,7 @@ export abstract class IngestionPullOutcomePort {
 }
 
 export abstract class IngestionPullMetricsPort {
-  abstract count(
-    outcome: "completed" | "failed_retryable" | "failed_final",
-  ): void;
+  abstract count(outcome: "completed" | "failed_retryable" | "failed_final"): void;
   abstract observeDuration(durationMs: number): void;
 }
 

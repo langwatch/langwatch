@@ -58,14 +58,8 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
         vi.fn(),
       );
 
-      const entry = globalJobRegistry.get(
-        "test-pipeline:reactor:evaluationTrigger",
-      );
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const entry = globalJobRegistry.get("test-pipeline:reactor:evaluationTrigger");
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
       const groupKey = entry?.groupKeyFn({ event, foldState: {} });
       expect(groupKey).toBe(
@@ -98,14 +92,8 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
         vi.fn(),
       );
 
-      const entry = globalJobRegistry.get(
-        "test-pipeline:reactor:spanStorageBroadcast",
-      );
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const entry = globalJobRegistry.get("test-pipeline:reactor:spanStorageBroadcast");
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
       const groupKey = entry?.groupKeyFn({ event, foldState: {} });
       expect(groupKey).toBe(
@@ -126,10 +114,8 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
         globalJobRegistry,
       });
 
-      const customGroupKeyFn = (payload: {
-        event: Event;
-        foldState: unknown;
-      }) => `custom:${(payload.event as any).data?.runId}`;
+      const customGroupKeyFn = (payload: { event: Event; foldState: unknown }) =>
+        `custom:${(payload.event as any).data?.runId}`;
 
       manager.initializeProjectionSubscriberQueues(
         {
@@ -144,15 +130,9 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
         vi.fn(),
       );
 
-      const entry = globalJobRegistry.get(
-        "test-pipeline:reactor:customSubscriber",
-      );
+      const entry = globalJobRegistry.get("test-pipeline:reactor:customSubscriber");
       const event = {
-        ...createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          aggregateType,
-          tenantId,
-        ),
+        ...createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId),
         data: { runId: "run-42" },
       };
 
@@ -193,11 +173,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
         vi.fn(),
       );
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
       const payload = { event, foldState: {} };
 
       const evalTriggerEntry = globalJobRegistry.get(

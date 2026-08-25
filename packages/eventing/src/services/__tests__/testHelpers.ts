@@ -13,10 +13,7 @@ import type {
   AppendStore,
   MapProjectionDefinition,
 } from "../../projections/mapProjection.types";
-import type {
-  EventStore,
-  EventStoreReadContext,
-} from "../../stores/eventStore.types";
+import type { EventStore, EventStoreReadContext } from "../../stores/eventStore.types";
 import type { QueueManager } from "../queues/queueManager";
 
 export const TEST_EVENT_TYPES = ["test.event.one", "test.event.two"] as const;
@@ -42,8 +39,7 @@ export function createMockQueueManager(overrides?: {
     getHandlerQueue: vi.fn().mockReturnValue(undefined),
     getSubscriberQueue: vi.fn().mockReturnValue(undefined),
     getProjectionSubscriberQueue:
-      overrides?.getProjectionSubscriberQueue ??
-      vi.fn().mockReturnValue(undefined),
+      overrides?.getProjectionSubscriberQueue ?? vi.fn().mockReturnValue(undefined),
     close: vi.fn().mockResolvedValue(void 0),
     waitUntilReady: vi.fn().mockResolvedValue(void 0),
     initializeProjectionQueues: vi.fn(),
@@ -63,25 +59,15 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
     getEventsOccurredSince: vi.fn().mockResolvedValue([]),
     getEventsUpTo: vi
       .fn()
-      .mockImplementation(
-        async (aggregateId, context, aggregateType, upToEvent) => {
-          // Default implementation: get all events and filter
-          const allEvents = await mockStore.getEvents(
-            aggregateId,
-            context,
-            aggregateType,
-          );
-          const upToIndex = allEvents.findIndex(
-            (e: T) => e.id === upToEvent.id,
-          );
-          if (upToIndex === -1) {
-            throw new Error(
-              `Event ${upToEvent.id} not found in aggregate ${aggregateId}`,
-            );
-          }
-          return allEvents.slice(0, upToIndex + 1);
-        },
-      ),
+      .mockImplementation(async (aggregateId, context, aggregateType, upToEvent) => {
+        // Default implementation: get all events and filter
+        const allEvents = await mockStore.getEvents(aggregateId, context, aggregateType);
+        const upToIndex = allEvents.findIndex((e: T) => e.id === upToEvent.id);
+        if (upToIndex === -1) {
+          throw new Error(`Event ${upToEvent.id} not found in aggregate ${aggregateId}`);
+        }
+        return allEvents.slice(0, upToIndex + 1);
+      }),
     countEventsBefore: vi.fn().mockResolvedValue(0),
   };
   return mockStore;
@@ -90,9 +76,7 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
 /**
  * Creates a mock FoldProjectionStore with default implementations.
  */
-export function createMockFoldProjectionStore<
-  State,
->(): FoldProjectionStore<State> {
+export function createMockFoldProjectionStore<State>(): FoldProjectionStore<State> {
   return {
     get: vi.fn().mockResolvedValue(null),
     store: vi.fn().mockResolvedValue(void 0),
@@ -114,9 +98,7 @@ export function createMockAppendStore<Record>(): AppendStore<Record> {
  * The apply function acts as a pass-through by default: it returns the state unchanged.
  * Tests can override apply behavior by mocking the returned definition's apply function.
  */
-export function createMockFoldProjectionDefinition<
-  TEvent extends Event = Event,
->(
+export function createMockFoldProjectionDefinition<TEvent extends Event = Event>(
   name: string,
   overrides?: {
     store?: FoldProjectionStore<any>;
@@ -134,8 +116,7 @@ export function createMockFoldProjectionDefinition<
     LastEventOccurredAtKey: "LastEventOccurredAt",
     eventTypes: overrides?.eventTypes ?? TEST_EVENT_TYPES,
     init: overrides?.init ?? vi.fn().mockReturnValue({}),
-    apply:
-      overrides?.apply ?? vi.fn().mockImplementation((state: any) => state),
+    apply: overrides?.apply ?? vi.fn().mockImplementation((state: any) => state),
     store,
     options: overrides?.options,
   };

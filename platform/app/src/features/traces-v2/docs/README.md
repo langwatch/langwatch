@@ -10,27 +10,27 @@ Phase 1 + 2 mock UI is done. Phase 3A real-data wiring (tRPC routers, app-layer 
 
 ## Timeline
 
-| Date | What happened |
-|------|---------------|
-| 2026-04-22 | Design doc approved. 7 vendor competitive analysis complete. Approach D (Foundation + Intelligence Spikes) chosen. |
-| 2026-04-22 | Phase 0 schema validation: queried dev ClickHouse, confirmed grouping by session/user/service/model all feasible. |
-| 2026-04-22–23 | Phase 1 foundation: mock implemented for 16 surfaces, 2 ADRs. |
-| 2026-04-23 | CEO review restructured phases. Lens engine elevated from Phase 5 to Phase 2. AI features moved to Phase 4+. |
-| 2026-04-23 | Phase 2 lens engine: mock implemented (view system, column config, grouping, conditional formatting, view analytics). Sidebar/toolbar polish pass. |
-| 2026-04-23 | Data Layer + Prompt Facets bridges drafted to feed Phase 3A. |
-| 2026-04-27 | Trace explorer page wired to tRPC: `tracesV2.list/header/spanTree/evals`. Drawer surfaces instrumentation scope + resource attributes; conversation context + back-stack + keyboard shortcuts; refresh progress bar reworked as a continuous wave. |
-| 2026-04-28 | Lens-engine polish + AI on-ramp: ChipBar + Prompts tab in TraceDrawer, AI query composer + SearchBar UX polish, trace-level prompt rollup projection, Welcome dialog rebrand to Beta, EmptyState onboarding rework with PAT minting + sample data, refresh signal + empty-state gating, FilterSidebar facet group "is modified" dot, density extracted into its own global store, expanded sidebar facets (traceName, guardrail, annotation, containsAi, errorMessage, tokens, ttlt, …), TraceDrawer follow-ups (add-to-filter chips, drawer↔table cache coherence). |
-| 2026-05-01 | PRD documents retired — `specs/traces-v2/` Gherkin feature files are the single source of truth. |
+| Date          | What happened                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-04-22    | Design doc approved. 7 vendor competitive analysis complete. Approach D (Foundation + Intelligence Spikes) chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 2026-04-22    | Phase 0 schema validation: queried dev ClickHouse, confirmed grouping by session/user/service/model all feasible.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 2026-04-22–23 | Phase 1 foundation: mock implemented for 16 surfaces, 2 ADRs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 2026-04-23    | CEO review restructured phases. Lens engine elevated from Phase 5 to Phase 2. AI features moved to Phase 4+.                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 2026-04-23    | Phase 2 lens engine: mock implemented (view system, column config, grouping, conditional formatting, view analytics). Sidebar/toolbar polish pass.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 2026-04-23    | Data Layer + Prompt Facets bridges drafted to feed Phase 3A.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 2026-04-27    | Trace explorer page wired to tRPC: `tracesV2.list/header/spanTree/evals`. Drawer surfaces instrumentation scope + resource attributes; conversation context + back-stack + keyboard shortcuts; refresh progress bar reworked as a continuous wave.                                                                                                                                                                                                                                                                                                                   |
+| 2026-04-28    | Lens-engine polish + AI on-ramp: ChipBar + Prompts tab in TraceDrawer, AI query composer + SearchBar UX polish, trace-level prompt rollup projection, Welcome dialog rebrand to Beta, EmptyState onboarding rework with PAT minting + sample data, refresh signal + empty-state gating, FilterSidebar facet group "is modified" dot, density extracted into its own global store, expanded sidebar facets (traceName, guardrail, annotation, containsAi, errorMessage, tokens, ttlt, …), TraceDrawer follow-ups (add-to-filter chips, drawer↔table cache coherence). |
+| 2026-05-01    | PRD documents retired — `specs/traces-v2/` Gherkin feature files are the single source of truth.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ## Phase Roadmap
 
-| Phase | Name | Repo | Data | Status |
-|-------|------|------|------|--------|
-| 1 | Foundation UI | this repo | Mock | **Complete** — 16 surfaces, mock built |
-| 2 | Lens Engine | this repo | Mock | **Complete** — view system, columns, grouping, conditional formatting, view analytics |
-| 3A | App Networking Layer | this repo | Real (tRPC + ClickHouse) | **In progress** — `tracesV2` router landed; data-layer wiring + prompt-facet projection live |
-| 3B | tRPC Backend Hardening | this repo | Real | In progress (queries, projections, caching) |
-| 4+ | Intelligence Features | this repo | Real | Started — `tracesV2.aiAction` composer + lens generation |
+| Phase | Name                   | Repo      | Data                     | Status                                                                                       |
+| ----- | ---------------------- | --------- | ------------------------ | -------------------------------------------------------------------------------------------- |
+| 1     | Foundation UI          | this repo | Mock                     | **Complete** — 16 surfaces, mock built                                                       |
+| 2     | Lens Engine            | this repo | Mock                     | **Complete** — view system, columns, grouping, conditional formatting, view analytics        |
+| 3A    | App Networking Layer   | this repo | Real (tRPC + ClickHouse) | **In progress** — `tracesV2` router landed; data-layer wiring + prompt-facet projection live |
+| 3B    | tRPC Backend Hardening | this repo | Real                     | In progress (queries, projections, caching)                                                  |
+| 4+    | Intelligence Features  | this repo | Real                     | Started — `tracesV2.aiAction` composer + lens generation                                     |
 
 ### Phase 3A (production frontend)
 
@@ -80,15 +80,19 @@ Phase 1 + 2 mock UI is done. Phase 3A real-data wiring (tRPC routers, app-layer 
 ## Documentation Index
 
 ### Strategy
+
 - [Design Doc](trace-v2.md) — Problem statement, personas, product philosophy, approach rationale. The "why."
 
 ### Specifications
+
 - BDD feature files: [`specs/traces-v2/`](../../../../../../specs/traces-v2/) at the repo root — one per surface. The single source of truth for acceptance criteria.
 
 ### Decisions
+
 - [ADR-001: Visualization Types](decisions/adr-001-visualization-types.md) — Why Waterfall + Flame Graph + Span List.
 - [ADR-002: Phasing Strategy](decisions/adr-002-phasing-strategy.md) — Foundation first, differentiators loose.
 
 ### Engineering
+
 - [STANDARDS.md](STANDARDS.md) — File org, React patterns, state, design tokens, testing.
 - [trace-architecture.dot](trace-architecture.dot) — Graphviz overview of the data + UI graph.

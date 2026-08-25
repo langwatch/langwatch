@@ -209,9 +209,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
         stubSpan,
       );
 
-      expect(result.attributes["gen_ai.conversation.id"]).toBe(
-        "explicit-thread",
-      );
+      expect(result.attributes["gen_ai.conversation.id"]).toBe("explicit-thread");
     });
 
     it("prefers explicit langwatch.customer.id over metadata customer_id", () => {
@@ -269,9 +267,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
       // Array is not a JSON object, so no field promotion
       expect(result.attributes["langwatch.user.id"]).toBeUndefined();
       // Array stored as metadata._raw
-      expect(result.attributes["metadata._raw"]).toBe(
-        JSON.stringify([1, 2, 3]),
-      );
+      expect(result.attributes["metadata._raw"]).toBe(JSON.stringify([1, 2, 3]));
     });
   });
 
@@ -299,9 +295,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
         stubSpan,
       );
 
-      expect(result.attributes["gen_ai.conversation.id"]).toBe(
-        "legacy-thread-1",
-      );
+      expect(result.attributes["gen_ai.conversation.id"]).toBe("legacy-thread-1");
     });
 
     it("passes through langwatch.user.id", () => {

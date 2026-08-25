@@ -1,10 +1,7 @@
 import { useCallback, useRef } from "react";
 import { createEvaluatorEditorCallbacks } from "~/experiments-v3/utils/evaluatorEditorCallbacks";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "@langwatch/evaluator-contract";
+import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type { NodeWithOptionalPosition } from "~/types";
 import type { Component, Field } from "@langwatch/workflow-contract";
@@ -69,13 +66,11 @@ function computeFieldsFromEvaluatorType(evaluatorType: string): {
  */
 export function useEvaluatorPickerFlow() {
   const { openDrawer, closeDrawer } = useDrawer();
-  const { setNode, deleteNode, setSelectedNode } = useWorkflowStore(
-    (state) => ({
-      setNode: state.setNode,
-      deleteNode: state.deleteNode,
-      setSelectedNode: state.setSelectedNode,
-    }),
-  );
+  const { setNode, deleteNode, setSelectedNode } = useWorkflowStore((state) => ({
+    setNode: state.setNode,
+    deleteNode: state.deleteNode,
+    setSelectedNode: state.setSelectedNode,
+  }));
 
   const pendingEvaluatorRef = useRef<string | null>(null);
 
@@ -92,12 +87,10 @@ export function useEvaluatorPickerFlow() {
               type: f.type as Field["type"],
               ...(f.optional ? { optional: true } : {}),
             }));
-            const outputs: Field[] = (evaluator.outputFields ?? []).map(
-              (f) => ({
-                identifier: f.identifier,
-                type: f.type as Field["type"],
-              }),
-            );
+            const outputs: Field[] = (evaluator.outputFields ?? []).map((f) => ({
+              identifier: f.identifier,
+              type: f.type as Field["type"],
+            }));
 
             setNode({
               id: pendingEvaluatorRef.current,
@@ -126,9 +119,7 @@ export function useEvaluatorPickerFlow() {
                 ? computeFieldsFromEvaluatorType(saved.evaluatorType)
                 : {
                     inputs: [] as Field[],
-                    outputs: [
-                      { identifier: "passed", type: "bool" as const },
-                    ] as Field[],
+                    outputs: [{ identifier: "passed", type: "bool" as const }] as Field[],
                   };
 
               setNode({

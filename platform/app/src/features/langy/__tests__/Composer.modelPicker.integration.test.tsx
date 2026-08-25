@@ -61,8 +61,7 @@ function renderComposer(
   );
 }
 
-const resetPhase = () =>
-  useLangyStore.setState({ turnPhase: "idle", draft: "" });
+const resetPhase = () => useLangyStore.setState({ turnPhase: "idle", draft: "" });
 
 beforeEach(resetPhase);
 afterEach(() => {
@@ -86,9 +85,7 @@ describe("given the integrated Langy composer", () => {
     it("swaps the send control for a stop control", () => {
       // The composer reads the durable turn-phase machine, not a busy prop —
       // drive it the way the panel does when the server accepts a turn.
-      useLangyStore
-        .getState()
-        .beginTurn({ conversationId: "conv-1", turnId: "turn-1" });
+      useLangyStore.getState().beginTurn({ conversationId: "conv-1", turnId: "turn-1" });
 
       renderComposer();
 
@@ -103,9 +100,7 @@ describe("given the integrated Langy composer", () => {
 
       const picker = screen.getByTestId("langy-model-picker");
       expect(picker.getAttribute("data-loading")).toBe("true");
-      expect(picker.getAttribute("aria-label")).toBe(
-        "Model: Models are still loading…",
-      );
+      expect(picker.getAttribute("aria-label")).toBe("Model: Models are still loading…");
     });
   });
 });

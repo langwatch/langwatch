@@ -32,11 +32,7 @@ import {
 } from "recharts";
 
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
-import {
-  axisLabelProps,
-  buildAxisLabels,
-  truncateLabel,
-} from "./chartAxisLabels";
+import { axisLabelProps, buildAxisLabels, truncateLabel } from "./chartAxisLabels";
 
 import type { BatchComparisonColumn } from "./types";
 
@@ -104,11 +100,7 @@ export type WinRateChartProps = {
 // the results page. This chart used to hand-roll its own 10-char trim and never
 // rotate, which is why its axis was the least readable of the three.
 
-export function WinRateChart({
-  column,
-  chartHeight,
-  targetColors,
-}: WinRateChartProps) {
+export function WinRateChart({ column, chartHeight, targetColors }: WinRateChartProps) {
   const verdicts = Object.values(column.verdictsByRow);
 
   const winsByVariantId = new Map<string, number>();
@@ -159,9 +151,7 @@ export function WinRateChart({
   // axis stays elided so it can't eat the chart, and the full name is one
   // hover away. Disambiguated the same way so "(1)"/"(2)" still identify the
   // same bar in both places.
-  const variantFullNames = disambiguateNames(
-    column.variants.map((v) => v.name),
-  );
+  const variantFullNames = disambiguateNames(column.variants.map((v) => v.name));
 
   const chartData = [
     ...column.variants.map((variant, index) => ({
@@ -246,8 +236,8 @@ export function WinRateChart({
             // name lives, so hovering a bar always tells you exactly which
             // variant it is.
             labelFormatter={(label, payload) =>
-              (payload?.[0]?.payload as { fullName?: string } | undefined)
-                ?.fullName ?? label
+              (payload?.[0]?.payload as { fullName?: string } | undefined)?.fullName ??
+              label
             }
           />
           <Bar dataKey="wins" name="Wins" radius={[4, 4, 0, 0]}>

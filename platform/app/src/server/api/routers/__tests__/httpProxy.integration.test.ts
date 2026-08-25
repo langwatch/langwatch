@@ -195,9 +195,7 @@ describe("HTTP agent test button", () => {
 
       const result = await caller.httpProxy.execute(testRequest);
 
-      expect(result.warnings).toEqual([
-        "template variable not found: question",
-      ]);
+      expect(result.warnings).toEqual(["template variable not found: question"]);
     });
 
     it("stringifies an output that is not a string", async () => {
@@ -287,9 +285,7 @@ describe("HTTP agent test button", () => {
     });
 
     it("fails a dispatch that never reached the engine without quoting it", async () => {
-      mockPostEvent.mockRejectedValue(
-        new Error("connect ECONNREFUSED 10.4.1.9:5560"),
-      );
+      mockPostEvent.mockRejectedValue(new Error("connect ECONNREFUSED 10.4.1.9:5560"));
 
       const result = await caller.httpProxy.execute(testRequest);
 

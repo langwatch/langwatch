@@ -5,10 +5,7 @@
  * The two drawers render the same field, so the copy and the limits live here
  * rather than being written twice and drifting apart.
  */
-import {
-  VK_TAG_MAX_LENGTH,
-  VK_TAGS_MAX_COUNT,
-} from "~/server/gateway/virtualKey.config";
+import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "~/server/gateway/virtualKey.config";
 
 /**
  * The paragraph behind the field's (i). Everything a person needs before
@@ -37,8 +34,7 @@ export const VK_TAGS_FIELD_DESCRIPTION =
  * doubled. That way the field cap can never clip a list the server would have
  * kept whole; it only stops a runaway paste from getting that far.
  */
-export const TAGS_CSV_MAX_LENGTH =
-  VK_TAGS_MAX_COUNT * (VK_TAG_MAX_LENGTH * 2 + 2);
+export const TAGS_CSV_MAX_LENGTH = VK_TAGS_MAX_COUNT * (VK_TAG_MAX_LENGTH * 2 + 2);
 
 /** The typed line, split into the tags the drawer submits. */
 export function parseTagsCsv(csv: string): string[] {
@@ -66,9 +62,7 @@ export function tagsBeyondLimitsNotice(csv: string): string | null {
     notices.push(`Only the first ${VK_TAGS_MAX_COUNT} tags will be saved.`);
   }
   if (overLength) {
-    notices.push(
-      `Tags longer than ${VK_TAG_MAX_LENGTH} characters will be shortened.`,
-    );
+    notices.push(`Tags longer than ${VK_TAG_MAX_LENGTH} characters will be shortened.`);
   }
   return notices.length > 0 ? notices.join(" ") : null;
 }

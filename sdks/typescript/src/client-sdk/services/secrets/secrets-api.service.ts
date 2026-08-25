@@ -1,7 +1,4 @@
-import {
-  scopedApiKey,
-  scopedProjectId,
-} from "@/internal/credentialContext";
+import { scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
@@ -44,9 +41,7 @@ export class SecretsApiService {
 
   private projectId(): string {
     const projectId =
-      this.configuredProjectId ??
-      scopedProjectId() ??
-      process.env.LANGWATCH_PROJECT_ID;
+      this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
     if (!projectId) {
       throw new SecretsApiError(
         "A projectId is required for secret operations",
@@ -74,7 +69,10 @@ export class SecretsApiService {
       } catch {
         // leave as raw text
       }
-      const message = formatApiErrorMessage({ error: parsed, options: { status: response.status } });
+      const message = formatApiErrorMessage({
+        error: parsed,
+        options: { status: response.status },
+      });
       throwIfHandledError({
         operation: options?.method ?? "GET",
         error: parsed,

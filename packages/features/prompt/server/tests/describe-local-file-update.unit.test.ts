@@ -4,9 +4,7 @@ import { describeLocalFileUpdate } from "../src/ports/prompt-describe-local-file
 describe("describeLocalFileUpdate()", () => {
   describe("given no differences were computed", () => {
     it("falls back to the generic message", () => {
-      expect(describeLocalFileUpdate(undefined)).toBe(
-        "Updated from local file",
-      );
+      expect(describeLocalFileUpdate(undefined)).toBe("Updated from local file");
       expect(describeLocalFileUpdate([])).toBe("Updated from local file");
     });
   });

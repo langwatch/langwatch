@@ -71,8 +71,7 @@ describe("parseGithubPrCard", () => {
   describe("given an unrecognised state", () => {
     it("falls back to open rather than rendering a state we invented", () => {
       expect(
-        parseGithubPrCard(JSON.stringify({ ...RICH, state: "exploded" }))
-          ?.state,
+        parseGithubPrCard(JSON.stringify({ ...RICH, state: "exploded" }))?.state,
       ).toBe("open");
     });
   });

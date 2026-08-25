@@ -13,8 +13,7 @@ import { EventSourcedQueueProcessorMemory } from "../memory";
 
 type Payload = { id: string; value: string };
 
-const settle = (ms: number) =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * The throttle contract the subscribers rely on has to hold on the in-memory

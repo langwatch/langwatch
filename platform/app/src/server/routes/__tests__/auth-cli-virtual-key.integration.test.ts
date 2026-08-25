@@ -39,10 +39,7 @@ const MODEL_PROVIDER_ID = `mp-vk-${suffix}`;
 
 let redisConnection: Redis | null = null;
 
-async function issueVirtualKey(
-  token: string | null,
-  body?: Record<string, unknown>,
-) {
+async function issueVirtualKey(token: string | null, body?: Record<string, unknown>) {
   const headers: Record<string, string> = {
     "content-type": "application/json",
   };
@@ -58,10 +55,7 @@ async function issueVirtualKey(
   };
 }
 
-async function liveKeyNames(
-  organizationId: string,
-  userId: string,
-): Promise<string[]> {
+async function liveKeyNames(organizationId: string, userId: string): Promise<string[]> {
   const rows = await prisma.virtualKey.findMany({
     where: { organizationId, principalUserId: userId, revokedAt: null },
     select: { name: true },

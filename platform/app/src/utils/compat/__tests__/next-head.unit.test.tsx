@@ -8,9 +8,7 @@ import { extractTitleText } from "../next-head";
 describe("extractTitleText", () => {
   describe("given a plain string", () => {
     it("returns the string verbatim", () => {
-      expect(extractTitleText("Governance · LangWatch")).toBe(
-        "Governance · LangWatch",
-      );
+      expect(extractTitleText("Governance · LangWatch")).toBe("Governance · LangWatch");
     });
   });
 
@@ -24,9 +22,9 @@ describe("extractTitleText", () => {
 
   describe("given an array of text fragments", () => {
     it("flattens and joins them", () => {
-      expect(
-        extractTitleText(["LangWatch", " - ", "MyProject", " - ", "Home"]),
-      ).toBe("LangWatch - MyProject - Home");
+      expect(extractTitleText(["LangWatch", " - ", "MyProject", " - ", "Home"])).toBe(
+        "LangWatch - MyProject - Home",
+      );
     });
   });
 
@@ -39,9 +37,7 @@ describe("extractTitleText", () => {
           {" - Settings"}
         </>
       );
-      expect(extractTitleText(fragment)).toBe(
-        "LangWatch - MyProject - Settings",
-      );
+      expect(extractTitleText(fragment)).toBe("LangWatch - MyProject - Settings");
     });
   });
 

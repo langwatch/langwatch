@@ -66,10 +66,7 @@ export function encodeWireValue(mpId: string, model: string): string {
  * current user is allowed to see. Returns the target MP + model when
  * the value is unambiguous, or a typed failure the UI can render.
  */
-export function resolveWireValue(
-  value: string,
-  accessibleMps: WireMp[],
-): WireResolution {
+export function resolveWireValue(value: string, accessibleMps: WireMp[]): WireResolution {
   const parsed = parseWireValue(value);
   if (parsed.kind === "unknown") {
     return {
@@ -90,9 +87,7 @@ export function resolveWireValue(
     };
   }
   // Legacy `provider/model` path.
-  const candidates = accessibleMps.filter(
-    (m) => m.provider === parsed.provider,
-  );
+  const candidates = accessibleMps.filter((m) => m.provider === parsed.provider);
   if (candidates.length === 0) {
     return {
       ok: false,

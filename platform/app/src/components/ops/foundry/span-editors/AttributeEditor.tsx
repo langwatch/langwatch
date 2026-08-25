@@ -30,13 +30,7 @@ export function AttributeEditor({
     <Flex direction="column" gap={1} mt={1}>
       {entries.map(([key, value]) => (
         <Flex key={key} align="center" gap={2}>
-          <Text
-            fontSize="xs"
-            color="fg.subtle"
-            w="140px"
-            flexShrink={0}
-            truncate
-          >
+          <Text fontSize="xs" color="fg.subtle" w="140px" flexShrink={0} truncate>
             {key}
           </Text>
           <Input
@@ -72,12 +66,7 @@ export function AttributeEditor({
           onKeyDown={(e) => e.key === "Enter" && addAttribute()}
           placeholder="attribute.key"
         />
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={addAttribute}
-          disabled={!newKey}
-        >
+        <Button size="xs" variant="outline" onClick={addAttribute} disabled={!newKey}>
           <Plus size={12} /> Add
         </Button>
       </Flex>

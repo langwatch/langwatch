@@ -17,9 +17,7 @@ import type {
   SpanInputOutput,
 } from "./types";
 
-export const getRAGChunks = (
-  spans: (ElasticSearchSpan | Span)[],
-): RAGChunk[] => {
+export const getRAGChunks = (spans: (ElasticSearchSpan | Span)[]): RAGChunk[] => {
   const sortedSpans = flattenSpanTree(
     organizeSpansIntoTree(spans as Span[]),
     "inside-out",
@@ -59,14 +57,8 @@ export const getRAGInfo = (
     throw new Error("RAG span does not have output");
   }
 
-  let input = typedValueToText(
-    elasticSearchToTypedValue(lastRagSpan.input),
-    true,
-  );
-  let output = typedValueToText(
-    elasticSearchToTypedValue(lastRagSpan.output),
-    true,
-  );
+  let input = typedValueToText(elasticSearchToTypedValue(lastRagSpan.input), true);
+  let output = typedValueToText(elasticSearchToTypedValue(lastRagSpan.output), true);
 
   try {
     input = JSON.parse(input);
@@ -95,8 +87,7 @@ export const elasticSearchToTypedValue = (
   try {
     return {
       type: typed.type,
-      value:
-        typeof typed.value === "string" ? JSON.parse(typed.value) : typed.value,
+      value: typeof typed.value === "string" ? JSON.parse(typed.value) : typed.value,
     } as any;
   } catch {
     return {
@@ -205,10 +196,7 @@ export const setNestedProperty = (
       obj[key] = unflattened[key];
     } else {
       // Deep merge if both are objects
-      if (
-        typeof obj[key] === "object" &&
-        typeof unflattened[key] === "object"
-      ) {
+      if (typeof obj[key] === "object" && typeof unflattened[key] === "object") {
         obj[key] = { ...obj[key], ...unflattened[key] };
       } else {
         obj[key] = unflattened[key];

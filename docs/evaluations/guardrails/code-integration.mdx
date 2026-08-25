@@ -5,7 +5,9 @@ description: Add guardrails to your LLM application to block harmful content in 
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations
+  prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started
+  automatically.
 </Tip>
 
 This guide shows how to integrate guardrails into your application using the LangWatch SDK. Guardrails run evaluators synchronously and return results you can act on immediately.
@@ -20,23 +22,23 @@ The key difference between guardrails and regular evaluations is the `as_guardra
 import langwatch
 
 @langwatch.trace()
-def my_llm_app(user_input):
-    # Run guardrail check
-    guardrail = langwatch.evaluation.evaluate(
-        "azure/jailbreak",
-        name="Jailbreak Detection",
-        as_guardrail=True,
-        data={"input": user_input},
-    )
-    
+def my_llm_app(user_input): # Run guardrail check
+guardrail = langwatch.evaluation.evaluate(
+"azure/jailbreak",
+name="Jailbreak Detection",
+as_guardrail=True,
+data={"input": user_input},
+)
+
     # Check result and handle failure
     if not guardrail.passed:
         return "I'm sorry, I can't help with that request."
-    
+
     # Continue with normal processing
     response = call_llm(user_input)
     return response
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -51,17 +53,18 @@ async function myLLMApp(userInput: string): Promise<string> {
     asGuardrail: true,
     data: { input: userInput },
   });
-  
+
   // Check result and handle failure
   if (!guardrail.passed) {
     return "I'm sorry, I can't help with that request.";
   }
-  
+
   // Continue with normal processing
   const response = await callLLM(userInput);
   return response;
 }
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -69,12 +72,12 @@ async function myLLMApp(userInput: string): Promise<string> {
 
 When you run a guardrail, you get back a result object with these fields:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `passed` | boolean | Whether the guardrail passed (true = safe, false = blocked) |
-| `score` | number | Numeric score from 0-1 (if applicable) |
-| `label` | string | Category label (if applicable) |
-| `details` | string | Explanation of the result |
+| Field     | Type    | Description                                                 |
+| --------- | ------- | ----------------------------------------------------------- |
+| `passed`  | boolean | Whether the guardrail passed (true = safe, false = blocked) |
+| `score`   | number  | Numeric score from 0-1 (if applicable)                      |
+| `label`   | string  | Category label (if applicable)                              |
+| `details` | string  | Explanation of the result                                   |
 
 ```python
 import langwatch
@@ -109,10 +112,10 @@ def chatbot(user_input):
         as_guardrail=True,
         data={"input": user_input},
     )
-    
+
     if not input_check.passed:
         return "I can't process that request."
-    
+
     # Safe to proceed
     return call_llm(user_input)
 ```
@@ -127,7 +130,7 @@ import langwatch
 @langwatch.trace()
 def chatbot(user_input):
     response = call_llm(user_input)
-    
+
     # Check output for PII before returning
     output_check = langwatch.evaluation.evaluate(
         "presidio/pii_detection",
@@ -135,10 +138,10 @@ def chatbot(user_input):
         as_guardrail=True,
         data={"output": response},
     )
-    
+
     if not output_check.passed:
         return "I apologize, but I cannot share that information."
-    
+
     return response
 ```
 
@@ -160,7 +163,7 @@ def chatbot(user_input):
     )
     if not jailbreak.passed:
         return "I can't help with that request."
-    
+
     moderation = langwatch.evaluation.evaluate(
         "openai/moderation",
         name="Content Moderation",
@@ -169,10 +172,10 @@ def chatbot(user_input):
     )
     if not moderation.passed:
         return "Please keep our conversation appropriate."
-    
+
     # Generate response
     response = call_llm(user_input)
-    
+
     # Output guardrails
     pii = langwatch.evaluation.evaluate(
         "presidio/pii_detection",
@@ -182,7 +185,7 @@ def chatbot(user_input):
     )
     if not pii.passed:
         return "I cannot share personal information."
-    
+
     return response
 ```
 
@@ -196,21 +199,21 @@ For async applications, use `async_evaluate`:
 import langwatch
 
 @langwatch.trace()
-async def async_chatbot(user_input):
-    # Async guardrail check
-    guardrail = await langwatch.evaluation.async_evaluate(
-        "azure/jailbreak",
-        name="Jailbreak Detection",
-        as_guardrail=True,
-        data={"input": user_input},
-    )
-    
+async def async_chatbot(user_input): # Async guardrail check
+guardrail = await langwatch.evaluation.async_evaluate(
+"azure/jailbreak",
+name="Jailbreak Detection",
+as_guardrail=True,
+data={"input": user_input},
+)
+
     if not guardrail.passed:
         return "I can't help with that request."
-    
+
     response = await async_call_llm(user_input)
     return response
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -224,7 +227,8 @@ const guardrail = await langwatch.evaluations.evaluate("azure/jailbreak", {
   asGuardrail: true,
   data: { input: userInput },
 });
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -239,30 +243,29 @@ import asyncio
 import langwatch
 
 @langwatch.trace()
-async def chatbot_with_parallel_guards(user_input):
-    # Run multiple guardrails in parallel
-    jailbreak, moderation, off_topic = await asyncio.gather(
-        langwatch.evaluation.async_evaluate(
-            "azure/jailbreak",
-            name="Jailbreak Detection",
-            as_guardrail=True,
-            data={"input": user_input},
-        ),
-        langwatch.evaluation.async_evaluate(
-            "openai/moderation",
-            name="Content Moderation",
-            as_guardrail=True,
-            data={"input": user_input},
-        ),
-        langwatch.evaluation.async_evaluate(
-            "langevals/off_topic",
-            name="Off Topic Check",
-            as_guardrail=True,
-            data={"input": user_input},
-            settings={"allowed_topics": ["customer support", "product questions"]},
-        ),
-    )
-    
+async def chatbot_with_parallel_guards(user_input): # Run multiple guardrails in parallel
+jailbreak, moderation, off_topic = await asyncio.gather(
+langwatch.evaluation.async_evaluate(
+"azure/jailbreak",
+name="Jailbreak Detection",
+as_guardrail=True,
+data={"input": user_input},
+),
+langwatch.evaluation.async_evaluate(
+"openai/moderation",
+name="Content Moderation",
+as_guardrail=True,
+data={"input": user_input},
+),
+langwatch.evaluation.async_evaluate(
+"langevals/off_topic",
+name="Off Topic Check",
+as_guardrail=True,
+data={"input": user_input},
+settings={"allowed_topics": ["customer support", "product questions"]},
+),
+)
+
     # Check all results
     if not jailbreak.passed:
         return "I can't process that request."
@@ -270,9 +273,10 @@ async def chatbot_with_parallel_guards(user_input):
         return "Please keep our conversation appropriate."
     if not off_topic.passed:
         return "I can only help with customer support questions."
-    
+
     return await async_call_llm(user_input)
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -300,7 +304,7 @@ async function chatbotWithParallelGuards(userInput: string): Promise<string> {
       settings: { allowed_topics: ["customer support", "product questions"] },
     }),
   ]);
-  
+
   // Check all results
   if (!jailbreak.passed) {
     return "I can't process that request.";
@@ -311,10 +315,11 @@ async function chatbotWithParallelGuards(userInput: string): Promise<string> {
   if (!offTopic.passed) {
     return "I can only help with customer support questions.";
   }
-  
+
   return await callLLM(userInput);
 }
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -335,7 +340,7 @@ def chatbot_with_custom_guardrail(user_input):
         data={"input": user_input},
         settings={
             "prompt": """Evaluate if this user message violates our company policy.
-            
+
 Policy rules:
 - No requests for financial advice
 - No requests for medical diagnosis
@@ -347,10 +352,10 @@ Does this message violate our policy? Answer only 'true' or 'false'.""",
             "model": "openai/gpt-4o-mini",
         },
     )
-    
+
     if not policy_check.passed:
         return "I'm not able to help with that topic. Please contact our support team."
-    
+
     return call_llm(user_input)
 ```
 
@@ -370,17 +375,17 @@ def chatbot_with_error_handling(user_input):
             as_guardrail=True,
             data={"input": user_input},
         )
-        
+
         if not guardrail.passed:
             return "I can't help with that request."
-            
+
     except Exception as e:
         # Log the error but don't block the user
         print(f"Guardrail error: {e}")
         # Optionally: fail open or fail closed based on your security needs
         # return "Service temporarily unavailable"  # Fail closed
         pass  # Fail open - continue without guardrail
-    
+
     return call_llm(user_input)
 ```
 

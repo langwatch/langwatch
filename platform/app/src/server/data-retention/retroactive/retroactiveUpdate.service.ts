@@ -27,9 +27,7 @@ interface TriggerRetroactiveUpdateParams {
 export class RetroactiveMutationInProgressError extends Error {
   readonly name = "RetroactiveMutationInProgressError" as const;
   constructor(public readonly blocked: MutationProgress[]) {
-    const summary = blocked
-      .map((m) => `${m.table} (${m.mutationId})`)
-      .join(", ");
+    const summary = blocked.map((m) => `${m.table} (${m.mutationId})`).join(", ");
     super(
       `Retroactive update already in progress for: ${summary}. ` +
         `Wait for completion or kill the listed mutation(s) before starting another.`,
@@ -219,7 +217,6 @@ export class RetroactiveUpdateService {
     isDone: r.isDone === 1,
     partsToDo: r.partsToDo,
     createTime: r.createTime,
-    category:
-      RETENTION_TABLE_CATEGORY_MAP[r.table as RetentionManagedTable] ?? null,
+    category: RETENTION_TABLE_CATEGORY_MAP[r.table as RetentionManagedTable] ?? null,
   });
 }

@@ -45,9 +45,7 @@ export function buildMetricRollups({
   });
 
   const rows: MetricRollupRow[] = [];
-  for (const [bucketStartMs, entries] of [...bucketMap].sort(
-    ([a], [b]) => a - b,
-  )) {
+  for (const [bucketStartMs, entries] of [...bucketMap].sort(([a], [b]) => a - b)) {
     const first = entries[0]?.point;
     if (!first) continue;
     const row = baseRow({ point: first, bucketStartMs });

@@ -89,8 +89,7 @@ const PROJECTION_FRESHNESS = "seconds behind ingestion";
 const TRACES: LangWatchQLViewDefinition = {
   name: "traces",
   sourceTable: "trace_summaries",
-  description:
-    "One row per trace, with its timing, token, cost and error rollups.",
+  description: "One row per trace, with its timing, token, cost and error rollups.",
   gates: [],
   grain: "one row per (TenantId, TraceId), latest version only",
   joinKeys: ["TenantId", "TraceId"],
@@ -122,8 +121,7 @@ const TRACES: LangWatchQLViewDefinition = {
     {
       name: "OccurredAt",
       type: "DateTime64(3)",
-      description:
-        "When the trace started. Filter on this to prune partitions.",
+      description: "When the trace started. Filter on this to prune partitions.",
       gates: [],
       sourceColumns: ["OccurredAt"],
     },
@@ -302,8 +300,7 @@ const TRACES: LangWatchQLViewDefinition = {
     {
       name: "Attributes",
       type: "Map(String, String)",
-      description:
-        "Trace-level attributes, with every captured-content key removed.",
+      description: "Trace-level attributes, with every captured-content key removed.",
       gates: [],
       sourceColumns: ["Attributes"],
       expression: (source) => contentFilteredMapSql(source("Attributes")),
@@ -466,12 +463,10 @@ const SPANS: LangWatchQLViewDefinition = {
     {
       name: "ResourceAttributes",
       type: "Map(String, String)",
-      description:
-        "Resource attributes, with every captured-content key removed.",
+      description: "Resource attributes, with every captured-content key removed.",
       gates: [],
       sourceColumns: ["ResourceAttributes"],
-      expression: (source) =>
-        contentFilteredMapSql(source("ResourceAttributes")),
+      expression: (source) => contentFilteredMapSql(source("ResourceAttributes")),
     },
     {
       name: "CapturedInput",
@@ -600,8 +595,7 @@ const EVALUATIONS: LangWatchQLViewDefinition = {
     {
       name: "ScheduledAt",
       type: "DateTime64(3)",
-      description:
-        "When the run was scheduled. Filter on this to prune partitions.",
+      description: "When the run was scheduled. Filter on this to prune partitions.",
       gates: [],
       sourceColumns: ["ScheduledAt"],
     },
@@ -774,8 +768,7 @@ const SIMULATIONS: LangWatchQLViewDefinition = {
     {
       name: "MessageContents",
       type: "Array(String)",
-      description:
-        "What was said in the simulated conversation, in message order.",
+      description: "What was said in the simulated conversation, in message order.",
       // Both gates: a transcript is what the user said *and* what the model
       // answered, so it is readable only by a caller permitted to see both.
       gates: ["input", "output"],
@@ -1109,8 +1102,7 @@ const TRACE_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
     {
       name: "ErrorCount",
       type: "UInt64",
-      description:
-        "Traces in the bucket whose root span ended in an error status.",
+      description: "Traces in the bucket whose root span ended in an error status.",
       gates: [],
       sourceColumns: ["ErrorCount"],
       summed: true,
@@ -1138,8 +1130,7 @@ const TRACE_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
       name: "DurationSum",
       type: "Int64",
       unit: "ms",
-      description:
-        "Total wall-clock duration of the bucket's traces, in milliseconds.",
+      description: "Total wall-clock duration of the bucket's traces, in milliseconds.",
       gates: [],
       sourceColumns: ["DurationSum"],
       summed: true,
@@ -1241,16 +1232,14 @@ const MODEL_USAGE_BY_MINUTE: LangWatchQLViewDefinition = {
     {
       name: "Model",
       type: "LowCardinality(String)",
-      description:
-        "Model the spans in this bucket used, empty when they recorded none.",
+      description: "Model the spans in this bucket used, empty when they recorded none.",
       gates: [],
       sourceColumns: ["Model"],
     },
     {
       name: "SpanType",
       type: "LowCardinality(String)",
-      description:
-        "Kind of span the bucket covers, empty when the spans recorded none.",
+      description: "Kind of span the bucket covers, empty when the spans recorded none.",
       gates: [],
       sourceColumns: ["SpanType"],
     },
@@ -1450,8 +1439,7 @@ const EVALUATION_METRICS: LangWatchQLViewDefinition = {
     {
       name: "Model",
       type: "Nullable(String)",
-      description:
-        "Model the evaluator itself used, not the model under evaluation.",
+      description: "Model the evaluator itself used, not the model under evaluation.",
       gates: [],
       sourceColumns: ["Model"],
     },
@@ -1468,8 +1456,7 @@ const EVALUATION_METRICS: LangWatchQLViewDefinition = {
     {
       name: "ConversationId",
       type: "Nullable(String)",
-      description:
-        "Conversation the trace the evaluation ran against belongs to.",
+      description: "Conversation the trace the evaluation ran against belongs to.",
       gates: [],
       sourceColumns: ["ConversationId"],
     },
@@ -1573,8 +1560,7 @@ const EVALUATION_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
     {
       name: "Status",
       type: "LowCardinality(String)",
-      description:
-        "Terminal state the bucket covers: processed, skipped, or error.",
+      description: "Terminal state the bucket covers: processed, skipped, or error.",
       gates: [],
       sourceColumns: ["Status"],
     },
@@ -1700,8 +1686,6 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
 ];
 
 /** Looks a view up by the name a caller writes. */
-export function lwqlViewByName(
-  name: string,
-): LangWatchQLViewDefinition | undefined {
+export function lwqlViewByName(name: string): LangWatchQLViewDefinition | undefined {
   return LWQL_VIEW_CATALOG.find((view) => view.name === name);
 }

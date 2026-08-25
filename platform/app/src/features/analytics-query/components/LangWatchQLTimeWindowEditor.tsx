@@ -33,8 +33,7 @@ import {
 import type { LangWatchQLTimeWindowValues } from "../logic/lwqlRequestState";
 
 /** What a member may type, as UTC: a date, or a date and a time. */
-const TYPED_INSTANT =
-  /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/;
+const TYPED_INSTANT = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/;
 
 /**
  * A typed instant as epoch milliseconds, or `undefined` when it is not one yet.
@@ -55,15 +54,12 @@ const TYPED_INSTANT =
  * while spelling out a minute, and it parses to ten o'clock — an hour that was
  * never on screen.
  */
-export function parseLangWatchQLTimeWindowText(
-  text: string,
-): number | undefined {
+export function parseLangWatchQLTimeWindowText(text: string): number | undefined {
   const match = TYPED_INSTANT.exec(text.trim());
   if (!match) return undefined;
   // An absent group is `undefined`, so a date with no time means midnight —
   // which is what the member reads, since that is how the fields spell it back.
-  const [, year, month, day, hours = "00", minutes = "00", seconds = "00"] =
-    match;
+  const [, year, month, day, hours = "00", minutes = "00", seconds = "00"] = match;
   const parsed = Date.UTC(
     Number(year),
     Number(month) - 1,
@@ -190,11 +186,8 @@ export function LangWatchQLTimeWindowEditor({
   // Its own answer rather than folded into per-field validity, because it
   // needs its own words: both fields are fine on their own.
   const inverted =
-    startInstant !== undefined &&
-    endInstant !== undefined &&
-    startInstant >= endInstant;
-  const sendable =
-    startInstant !== undefined && endInstant !== undefined && !inverted;
+    startInstant !== undefined && endInstant !== undefined && startInstant >= endInstant;
+  const sendable = startInstant !== undefined && endInstant !== undefined && !inverted;
 
   useEffect(() => {
     onSendableChange(sendable);

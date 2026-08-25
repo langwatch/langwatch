@@ -35,12 +35,8 @@ import { getProjectModelProviders } from "~/server/api/routers/modelProviders.ut
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "../utils";
 
-const mockPrismaFindUnique = prisma.project.findUnique as ReturnType<
-  typeof vi.fn
->;
-const mockGetProjectModelProviders = getProjectModelProviders as ReturnType<
-  typeof vi.fn
->;
+const mockPrismaFindUnique = prisma.project.findUnique as ReturnType<typeof vi.fn>;
+const mockGetProjectModelProviders = getProjectModelProviders as ReturnType<typeof vi.fn>;
 
 describe("getVercelAIModel", () => {
   beforeEach(() => {
@@ -60,9 +56,7 @@ describe("getVercelAIModel", () => {
           projectId: "project-123",
           model: "azure/my-gpt4-deployment",
         }),
-      ).rejects.toThrow(
-        'Model provider "azure" is not configured for this project.',
-      );
+      ).rejects.toThrow('Model provider "azure" is not configured for this project.');
     });
 
     it("throws descriptive error when azure provider is disabled", async () => {
@@ -109,9 +103,7 @@ describe("getVercelAIModel", () => {
           model: "openai_codex/gpt-5.6-terra",
           featureKey: "langy.chat",
         }),
-      ).rejects.toThrow(
-        'Model provider "openai_codex" is configured but disabled.',
-      );
+      ).rejects.toThrow('Model provider "openai_codex" is configured but disabled.');
     });
 
     it("returns the gateway handle when the provider is connected and enabled", async () => {
@@ -179,9 +171,7 @@ describe("getVercelAIModel", () => {
           },
         });
 
-        await expect(
-          getVercelAIModel({ projectId: "project-123" }),
-        ).rejects.toThrow(
+        await expect(getVercelAIModel({ projectId: "project-123" })).rejects.toThrow(
           /All configured model providers are disabled or have no usable models/,
         );
       });
@@ -191,9 +181,9 @@ describe("getVercelAIModel", () => {
       it("throws error about no providers configured", async () => {
         mockGetProjectModelProviders.mockResolvedValue({});
 
-        await expect(
-          getVercelAIModel({ projectId: "project-123" }),
-        ).rejects.toThrow("No model providers configured");
+        await expect(getVercelAIModel({ projectId: "project-123" })).rejects.toThrow(
+          "No model providers configured",
+        );
       });
     });
 
@@ -214,9 +204,9 @@ describe("getVercelAIModel", () => {
           },
         });
 
-        await expect(
-          getVercelAIModel({ projectId: "project-123" }),
-        ).rejects.toThrow("All configured model providers are disabled");
+        await expect(getVercelAIModel({ projectId: "project-123" })).rejects.toThrow(
+          "All configured model providers are disabled",
+        );
       });
     });
 

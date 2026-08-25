@@ -18,9 +18,7 @@ const WINDOW_PAD_MS = 60 * 60 * 1000;
  * the list's columns and filter time range; a thread has neither, so it reads
  * over the span the turns themselves cover.
  */
-export function useConversationTurnEvents(
-  turns: TraceListItem[],
-): TraceListItem[] {
+export function useConversationTurnEvents(turns: TraceListItem[]): TraceListItem[] {
   const projectId = useDrawerProjectId();
   const isReadOnly = useIsReadOnlyTrace();
 

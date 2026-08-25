@@ -13,9 +13,7 @@ export const USER_AVATAR_ALLOWED_MEDIA_TYPES = [
   "image/gif",
 ] as const;
 
-export const userAvatarMediaTypeSchema = z.enum(
-  USER_AVATAR_ALLOWED_MEDIA_TYPES,
-);
+export const userAvatarMediaTypeSchema = z.enum(USER_AVATAR_ALLOWED_MEDIA_TYPES);
 export type UserAvatarMediaType = z.infer<typeof userAvatarMediaTypeSchema>;
 
 export function safeUserAvatarMediaType(mediaType: string): string {
@@ -44,9 +42,7 @@ export const userIdInputSchema = z.object({ id: z.string().min(1) }).strict();
 export type UserIdInput = z.infer<typeof userIdInputSchema>;
 
 export const userEmailSchema = z.string().trim().pipe(z.email());
-export const userEmailInputSchema = z
-  .object({ email: userEmailSchema })
-  .strict();
+export const userEmailInputSchema = z.object({ email: userEmailSchema }).strict();
 export type UserEmailInput = z.infer<typeof userEmailInputSchema>;
 
 export const createUserInputSchema = z
@@ -61,18 +57,12 @@ export const updateUserProfileInputSchema = z
     email: userEmailSchema.optional(),
   })
   .strict();
-export type UpdateUserProfileInput = z.infer<
-  typeof updateUserProfileInputSchema
->;
+export type UpdateUserProfileInput = z.infer<typeof updateUserProfileInputSchema>;
 
-export const userAccountInfoSchema = z
-  .object({ createdAt: z.date() })
-  .strict();
+export const userAccountInfoSchema = z.object({ createdAt: z.date() }).strict();
 export type UserAccountInfo = z.infer<typeof userAccountInfoSchema>;
 
-export const userSsoStatusSchema = z
-  .object({ pendingSsoSetup: z.boolean() })
-  .strict();
+export const userSsoStatusSchema = z.object({ pendingSsoSetup: z.boolean() }).strict();
 export type UserSsoStatus = z.infer<typeof userSsoStatusSchema>;
 
 export const userTourPreferenceSchema = z
@@ -89,9 +79,7 @@ export const setUserHomePathInputSchema = z
     path: z.string().min(1).max(1024).startsWith("/").nullable(),
   })
   .strict();
-export type SetUserHomePathInput = z.infer<
-  typeof setUserHomePathInputSchema
->;
+export type SetUserHomePathInput = z.infer<typeof setUserHomePathInputSchema>;
 
 export const setUserAvatarInputSchema = z
   .object({
@@ -107,9 +95,7 @@ export type SetUserAvatarInput = z.infer<typeof setUserAvatarInputSchema>;
 export const removeUserAvatarInputSchema = z
   .object({ userId: z.string().min(1) })
   .strict();
-export type RemoveUserAvatarInput = z.infer<
-  typeof removeUserAvatarInputSchema
->;
+export type RemoveUserAvatarInput = z.infer<typeof removeUserAvatarInputSchema>;
 
 export const userAvatarResultSchema = z.object({ image: z.string() }).strict();
 export type UserAvatarResult = z.infer<typeof userAvatarResultSchema>;

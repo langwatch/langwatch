@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Card,
-  HStack,
-  Spacer,
-  Status,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Card, HStack, Spacer, Status, Text, VStack } from "@chakra-ui/react";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import NextLink from "~/utils/compat/next-link";
@@ -72,12 +64,7 @@ export function ActiveOperationsSection({ data }: { data: DashboardData }) {
             </Text>
             <HStack gap={2} flexWrap="wrap">
               {pausedKeys.map((key) => (
-                <Badge
-                  key={key}
-                  size="sm"
-                  colorPalette="orange"
-                  variant="subtle"
-                >
+                <Badge key={key} size="sm" colorPalette="orange" variant="subtle">
                   {key}
                 </Badge>
               ))}

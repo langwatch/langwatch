@@ -134,7 +134,7 @@ function isNotFoundError(error: unknown): boolean {
     return false;
   }
   const name = (error as { name?: string }).name;
-  const statusCode = (error as { $metadata?: { httpStatusCode?: number } })
-    .$metadata?.httpStatusCode;
+  const statusCode = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+    ?.httpStatusCode;
   return name === "NoSuchKey" || name === "NotFound" || statusCode === 404;
 }

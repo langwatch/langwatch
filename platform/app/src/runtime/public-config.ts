@@ -63,9 +63,7 @@ const decodeBase64Url = (value: string): string => {
       buffer &= (1 << availableBits) - 1;
     }
   }
-  return new TextDecoder("utf-8", { fatal: true }).decode(
-    Uint8Array.from(bytes),
-  );
+  return new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(bytes));
 };
 
 /**
@@ -89,9 +87,7 @@ export const injectPublicAppConfigIntoHtml = ({
   return `${html.slice(0, headEnd)}${element}${html.slice(headEnd)}`;
 };
 
-export const createPublicAppConfigMetaTag = (
-  config: PublicAppConfig,
-): string => {
+export const createPublicAppConfigMetaTag = (config: PublicAppConfig): string => {
   const parsed = publicAppConfigSchema.parse(config);
   const payload = encodeBase64Url(JSON.stringify(parsed));
   return `<meta name="${PUBLIC_APP_CONFIG_META_NAME}" content="${payload}">`;

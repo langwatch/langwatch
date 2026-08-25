@@ -3,10 +3,7 @@ import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { applyOverlayToTraceHeader } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
-import {
-  applyOverlayToSpansFull,
-  useSpansFullCanonical,
-} from "../../hooks/useSpansFull";
+import { applyOverlayToSpansFull, useSpansFullCanonical } from "../../hooks/useSpansFull";
 import { useTraceHeaderCanonical } from "../../hooks/useTraceHeader";
 import { SegmentedToggle } from "./SegmentedToggle";
 import { computeLineDiff, type DiffLine, diffStat } from "./terminalView/diff";
@@ -30,11 +27,7 @@ interface TraceEditDiffDialogProps {
  * walk: a correction can change anything, and a reviewer checking their own
  * work wants to read the same shape they read everywhere else in the drawer.
  */
-export function TraceEditDiffDialog({
-  open,
-  onClose,
-  patch,
-}: TraceEditDiffDialogProps) {
+export function TraceEditDiffDialog({ open, onClose, patch }: TraceEditDiffDialogProps) {
   // Null until the reader picks a side themselves, so the dialog can keep
   // opening on whichever one has something to read as the payloads land.
   const [pickedTab, setPickedTab] = useState<DiffTab | null>(null);
@@ -66,12 +59,7 @@ export function TraceEditDiffDialog({
       size="xl"
       placement="center"
     >
-      <Dialog.Content
-        bg="bg"
-        maxHeight="85vh"
-        display="flex"
-        flexDirection="column"
-      >
+      <Dialog.Content bg="bg" maxHeight="85vh" display="flex" flexDirection="column">
         <Dialog.Header borderBottomWidth="1px" borderColor="border">
           <HStack gap={3} align="center">
             <Dialog.Title>
@@ -283,13 +271,7 @@ function DiffRow({ line }: { line: DiffLine }) {
       >
         {lineNo ?? ""}
       </Text>
-      <Text
-        as="span"
-        color={style.marker}
-        width="1.2em"
-        flexShrink={0}
-        userSelect="none"
-      >
+      <Text as="span" color={style.marker} width="1.2em" flexShrink={0} userSelect="none">
         {style.sign}
       </Text>
       <Text

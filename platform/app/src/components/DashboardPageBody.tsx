@@ -71,10 +71,7 @@ export const DashboardPageBody = ({
       refetchOnMount: false,
     },
   );
-  const { data: ssoStatus } = api.user.getSsoStatus.useQuery(
-    {},
-    { enabled: !!session },
-  );
+  const { data: ssoStatus } = api.user.getSsoStatus.useQuery({}, { enabled: !!session });
 
   const user = session?.user;
   const isOnOwnPersonalProject =
@@ -101,16 +98,13 @@ export const DashboardPageBody = ({
       ? { label: team.name }
       : null;
   const isPersonalScopeRoute =
-    personalScope ||
-    router.pathname.startsWith("/me") ||
-    isOnOwnPersonalProject;
+    personalScope || router.pathname.startsWith("/me") || isOnOwnPersonalProject;
 
   // Audit/OCSF emission for cross-scope reads. Fires once per project
   // navigation when admin's drilled into another user/team's workspace -
   // recordWorkspaceView writes the AuditLog row + OCSF event
   // synchronously. Fail-quiet: emission errors don't block render.
-  const recordWorkspaceViewMutation =
-    api.governance.recordWorkspaceView.useMutation();
+  const recordWorkspaceViewMutation = api.governance.recordWorkspaceView.useMutation();
   const targetTeamId = adminViewingAs ? team?.id : undefined;
   useEffect(() => {
     if (
@@ -173,102 +167,89 @@ export const DashboardPageBody = ({
             <Alert.Indicator />
             <Alert.Content>
               <Text>
-                Please check your environment variables, the following variables
-                are not set which are required for evaluations and workflows:
+                Please check your environment variables, the following variables are not
+                set which are required for evaluations and workflows:
               </Text>
               {!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE && (
                 <Text>LANGWATCH_NLP_SERVICE</Text>
               )}
-              {!publicEnv.data?.HAS_LANGEVALS_ENDPOINT && (
-                <Text>LANGEVALS_ENDPOINT</Text>
-              )}
+              {!publicEnv.data?.HAS_LANGEVALS_ENDPOINT && <Text>LANGEVALS_ENDPOINT</Text>}
             </Alert.Content>
           </Alert.Root>
         )}
-      {usage.data?.messageLimitInfo &&
-        usage.data.messageLimitInfo.status !== "ok" && (
-          <Alert.Root
-            status={
-              usage.data.messageLimitInfo.status === "exceeded"
-                ? "error"
-                : "warning"
-            }
-            width="full"
-            borderBottom="1px solid"
-            borderBottomColor={
-              usage.data.messageLimitInfo.status === "exceeded"
-                ? "red.300"
-                : "yellow.300"
-            }
-          >
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                {usage.data.messageLimitInfo.message}{" "}
-                <Link
-                  href={planManagementUrl}
-                  textDecoration="underline"
-                  _hover={{
-                    textDecoration: "none",
-                  }}
-                  onClick={() => {
-                    trackEvent("subscription_hook_click", {
-                      project_id: project?.id,
-                      hook:
-                        usage.data?.messageLimitInfo.status === "exceeded"
-                          ? "messages_limit_reached"
-                          : "messages_limit_warning",
-                    });
-                  }}
-                >
-                  Click here
-                </Link>{" "}
-                to upgrade your plan.
-              </Text>
-            </Alert.Content>
-          </Alert.Root>
-        )}
-      {usage.data &&
-        usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
-          <Alert.Root
-            status="warning"
-            width="full"
-            borderBottom="1px solid"
-            borderBottomColor="yellow.300"
-          >
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                You reached the limit of{" "}
-                {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")} usage
-                cost for this month, evaluations and guardrails will not be
-                processed.{" "}
-                <Link
-                  href="/settings/usage"
-                  textDecoration="underline"
-                  _hover={{
-                    textDecoration: "none",
-                  }}
-                  onClick={() => {
-                    trackEvent("subscription_hook_click", {
-                      project_id: project?.id,
-                      hook: "usage_cost_limit_reached",
-                    });
-                  }}
-                >
-                  Go to settings
-                </Link>{" "}
-                to check your usage spending limit or upgrade your plan.
-              </Text>
-            </Alert.Content>
-          </Alert.Root>
-        )}
+      {usage.data?.messageLimitInfo && usage.data.messageLimitInfo.status !== "ok" && (
+        <Alert.Root
+          status={usage.data.messageLimitInfo.status === "exceeded" ? "error" : "warning"}
+          width="full"
+          borderBottom="1px solid"
+          borderBottomColor={
+            usage.data.messageLimitInfo.status === "exceeded" ? "red.300" : "yellow.300"
+          }
+        >
+          <Alert.Indicator />
+          <Alert.Content>
+            <Text>
+              {usage.data.messageLimitInfo.message}{" "}
+              <Link
+                href={planManagementUrl}
+                textDecoration="underline"
+                _hover={{
+                  textDecoration: "none",
+                }}
+                onClick={() => {
+                  trackEvent("subscription_hook_click", {
+                    project_id: project?.id,
+                    hook:
+                      usage.data?.messageLimitInfo.status === "exceeded"
+                        ? "messages_limit_reached"
+                        : "messages_limit_warning",
+                  });
+                }}
+              >
+                Click here
+              </Link>{" "}
+              to upgrade your plan.
+            </Text>
+          </Alert.Content>
+        </Alert.Root>
+      )}
+      {usage.data && usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
+        <Alert.Root
+          status="warning"
+          width="full"
+          borderBottom="1px solid"
+          borderBottomColor="yellow.300"
+        >
+          <Alert.Indicator />
+          <Alert.Content>
+            <Text>
+              You reached the limit of{" "}
+              {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")} usage cost for
+              this month, evaluations and guardrails will not be processed.{" "}
+              <Link
+                href="/settings/usage"
+                textDecoration="underline"
+                _hover={{
+                  textDecoration: "none",
+                }}
+                onClick={() => {
+                  trackEvent("subscription_hook_click", {
+                    project_id: project?.id,
+                    hook: "usage_cost_limit_reached",
+                  });
+                }}
+              >
+                Go to settings
+              </Link>{" "}
+              to check your usage spending limit or upgrade your plan.
+            </Text>
+          </Alert.Content>
+        </Alert.Root>
+      )}
 
       <AnnouncementBanner />
 
-      {adminViewingAs && (
-        <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
-      )}
+      {adminViewingAs && <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />}
 
       {ssoStatus?.pendingSsoSetup && (
         <Alert.Root
@@ -289,17 +270,11 @@ export const DashboardPageBody = ({
                   Action Required: Link your SSO account
                 </Alert.Title>
                 <Text fontSize="sm">
-                  Your organization requires SSO login. Please link your account
-                  by logging in via the email input box on the sign-in page.
+                  Your organization requires SSO login. Please link your account by
+                  logging in via the email input box on the sign-in page.
                 </Text>
               </VStack>
-              <Button
-                size="sm"
-                colorPalette="red"
-                flexShrink={0}
-                color="white"
-                asChild
-              >
+              <Button size="sm" colorPalette="red" flexShrink={0} color="white" asChild>
                 <Link href="/settings/authentication">
                   <KeyRound size={14} />
                   Link SSO Account
@@ -344,13 +319,7 @@ export const DashboardPageBody = ({
         // already render with their intrinsic heights because
         // VStack defaults to `align-items: stretch` and Alert
         // boxes don't shrink below content.
-        <Box
-          flex="1"
-          minHeight={0}
-          width="full"
-          display="flex"
-          flexDirection="column"
-        >
+        <Box flex="1" minHeight={0} width="full" display="flex" flexDirection="column">
           <ErrorBoundary
             FallbackComponent={PageErrorFallback}
             resetKeys={[router.pathname]}
@@ -382,8 +351,8 @@ export const DashboardPageBody = ({
           <Alert.Content>
             <HStack width="full" gap={4}>
               <Text flex={1}>
-                You are not part of any team in this organization. Ask your
-                administrator to add you, or{" "}
+                You are not part of any team in this organization. Ask your administrator
+                to add you, or{" "}
                 <Link href="/" textDecoration="underline">
                   go back to your home page
                 </Link>

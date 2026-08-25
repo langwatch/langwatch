@@ -9,11 +9,7 @@
  * See specs/traces-v2/bulk-actions.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
+import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -77,8 +73,7 @@ describe("given the trace table's select column", () => {
 
       expect(selectAllButton()).not.toBeInTheDocument();
 
-      for (const element of screen.queryAllByRole("button"))
-        await user.click(element);
+      for (const element of screen.queryAllByRole("button")) await user.click(element);
       expect(selection()).toEqual([]);
     });
   });

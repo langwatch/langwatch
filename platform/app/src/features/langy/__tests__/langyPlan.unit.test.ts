@@ -83,9 +83,7 @@ describe("langyPlan", () => {
 
       const plan = langyPlan(message)!;
       expect(plan.preamble).toHaveLength(1);
-      expect((plan.preamble[0] as { toolCallId: string }).toolCallId).toBe(
-        "warmup",
-      );
+      expect((plan.preamble[0] as { toolCallId: string }).toolCallId).toBe("warmup");
       expect(
         plan.itemParts[0]!.map((p) => (p as { toolCallId: string }).toolCallId),
       ).toEqual(["search"]);
@@ -117,9 +115,7 @@ describe("langyPlan", () => {
           "Create an evaluator (in_progress: blocked by insufficient permissions)",
         ),
       ).toBe("Create an evaluator");
-      expect(cleanPlanContent("Finish the report (completed)")).toBe(
-        "Finish the report",
-      );
+      expect(cleanPlanContent("Finish the report (completed)")).toBe("Finish the report");
     });
 
     it("ignores rows without content and tolerates an unknown status", () => {
@@ -151,15 +147,11 @@ describe("langyPlan", () => {
         ],
       };
       const plan = langyPlan(message)!;
-      expect(plan.items).toEqual([
-        { content: "Only real step", status: "in_progress" },
-      ]);
+      expect(plan.items).toEqual([{ content: "Only real step", status: "in_progress" }]);
     });
 
     it("accepts a bare array of todos, not only { todos: [...] }", () => {
-      const items = parseTodoList([
-        { content: "Step one", status: "completed" },
-      ]);
+      const items = parseTodoList([{ content: "Step one", status: "completed" }]);
       expect(items).toEqual([{ content: "Step one", status: "completed" }]);
     });
   });
@@ -202,9 +194,7 @@ describe("langyPlan", () => {
         // …but the manager's typed snapshot (capped/truncated) wins.
         overrideItems: [{ content: "Capped step", status: "in_progress" }],
       })!;
-      expect(plan.items).toEqual([
-        { content: "Capped step", status: "in_progress" },
-      ]);
+      expect(plan.items).toEqual([{ content: "Capped step", status: "in_progress" }]);
     });
 
     it("still attributes tool calls from the message's snapshot history", () => {
@@ -236,9 +226,7 @@ describe("langyPlan", () => {
         parts: [todo([{ content: "From parts", status: "in_progress" }])],
       };
       const plan = langyPlan(message, { overrideItems: [] })!;
-      expect(plan.items).toEqual([
-        { content: "From parts", status: "in_progress" },
-      ]);
+      expect(plan.items).toEqual([{ content: "From parts", status: "in_progress" }]);
     });
   });
 

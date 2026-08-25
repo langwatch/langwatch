@@ -36,11 +36,7 @@ vi.mock(
 
 import { useRouter } from "~/utils/compat/next-router";
 import { createRunHistoryStore } from "../useRunHistoryStore";
-import {
-  ALL_RUNS_ID,
-  EXTERNAL_SET_PREFIX,
-  useSuiteRouting,
-} from "../useSuiteRouting";
+import { ALL_RUNS_ID, EXTERNAL_SET_PREFIX, useSuiteRouting } from "../useSuiteRouting";
 
 type Store = ReturnType<typeof createRunHistoryStore>;
 
@@ -85,10 +81,7 @@ function renderHarness(initialUrl: string) {
   render(
     <MemoryRouter initialEntries={[initialUrl]}>
       <Routes>
-        <Route
-          path="/:project/simulations/*"
-          element={<Harness store={store} />}
-        />
+        <Route path="/:project/simulations/*" element={<Harness store={store} />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -105,24 +98,18 @@ describe("given the Runs page at /my-project/simulations (All Runs)", () => {
       const store = renderHarness("/my-project/simulations");
 
       expect(screen.getByTestId("selection").textContent).toBe(ALL_RUNS_ID);
-      expect(screen.getByTestId("pathname").textContent).toBe(
-        "/my-project/simulations",
-      );
+      expect(screen.getByTestId("pathname").textContent).toBe("/my-project/simulations");
 
       await act(async () => {
         store.getState().setFilter("passFailStatus", "fail");
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("search").textContent).toContain(
-          "passFailStatus=fail",
-        );
+        expect(screen.getByTestId("search").textContent).toContain("passFailStatus=fail");
       });
 
       expect(screen.getByTestId("selection").textContent).toBe(ALL_RUNS_ID);
-      expect(screen.getByTestId("pathname").textContent).toBe(
-        "/my-project/simulations",
-      );
+      expect(screen.getByTestId("pathname").textContent).toBe("/my-project/simulations");
       expect(screen.getByTestId("selection").textContent).not.toContain(
         EXTERNAL_SET_PREFIX,
       );
@@ -140,15 +127,11 @@ describe("given the Runs page at /my-project/simulations (All Runs)", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("search").textContent).toContain(
-          "scenarioId=scen_1",
-        );
+        expect(screen.getByTestId("search").textContent).toContain("scenarioId=scen_1");
       });
 
       expect(screen.getByTestId("selection").textContent).toBe(ALL_RUNS_ID);
-      expect(screen.getByTestId("pathname").textContent).toBe(
-        "/my-project/simulations",
-      );
+      expect(screen.getByTestId("pathname").textContent).toBe("/my-project/simulations");
     });
   });
 
@@ -163,15 +146,11 @@ describe("given the Runs page at /my-project/simulations (All Runs)", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("search").textContent).toContain(
-          "groupBy=scenario",
-        );
+        expect(screen.getByTestId("search").textContent).toContain("groupBy=scenario");
       });
 
       expect(screen.getByTestId("selection").textContent).toBe(ALL_RUNS_ID);
-      expect(screen.getByTestId("pathname").textContent).toBe(
-        "/my-project/simulations",
-      );
+      expect(screen.getByTestId("pathname").textContent).toBe("/my-project/simulations");
     });
   });
 });
@@ -179,9 +158,7 @@ describe("given the Runs page at /my-project/simulations (All Runs)", () => {
 describe("given the Runs page at /my-project/simulations/run-plans/critical-path (suite detail)", () => {
   describe("when a filter is applied", () => {
     it("keeps selection as critical-path and preserves the suite path", async () => {
-      const store = renderHarness(
-        "/my-project/simulations/run-plans/critical-path",
-      );
+      const store = renderHarness("/my-project/simulations/run-plans/critical-path");
 
       expect(screen.getByTestId("selection").textContent).toBe("critical-path");
 
@@ -190,9 +167,7 @@ describe("given the Runs page at /my-project/simulations/run-plans/critical-path
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("search").textContent).toContain(
-          "passFailStatus=pass",
-        );
+        expect(screen.getByTestId("search").textContent).toContain("passFailStatus=pass");
       });
 
       expect(screen.getByTestId("selection").textContent).toBe("critical-path");
@@ -217,9 +192,7 @@ describe("given the Runs page at /my-project/simulations/python-examples (extern
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("search").textContent).toContain(
-          "scenarioId=scen_1",
-        );
+        expect(screen.getByTestId("search").textContent).toContain("scenarioId=scen_1");
       });
 
       expect(screen.getByTestId("selection").textContent).toBe(
@@ -231,9 +204,7 @@ describe("given the Runs page at /my-project/simulations/python-examples (extern
       // Bug symptom: selection would become "external:?scenarioId=scen_1" or
       // similar if the compat layer leaks the querystring into path segments.
       expect(screen.getByTestId("selection").textContent).not.toContain("?");
-      expect(screen.getByTestId("selection").textContent).not.toContain(
-        "scen_1",
-      );
+      expect(screen.getByTestId("selection").textContent).not.toContain("scen_1");
     });
   });
 });

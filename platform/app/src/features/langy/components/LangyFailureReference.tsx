@@ -17,13 +17,7 @@ import { useCopyToClipboard } from "~/features/traces-v2/hooks/useCopyToClipboar
  * The button copies the FULL failure document rather than just the code, because
  * that is what a support thread actually needs.
  */
-export function LangyFailureReference({
-  code,
-  raw,
-}: {
-  code: string;
-  raw?: string;
-}) {
+export function LangyFailureReference({ code, raw }: { code: string; raw?: string }) {
   const { copied, copy } = useCopyToClipboard();
 
   return (
@@ -42,9 +36,7 @@ export function LangyFailureReference({
         size="2xs"
         variant="ghost"
         color={copied ? "green.fg" : "fg.subtle"}
-        aria-label={
-          copied ? "Copied the error details" : "Copy the error details"
-        }
+        aria-label={copied ? "Copied the error details" : "Copy the error details"}
         onClick={() => copy(raw ?? code)}
       >
         {copied ? (

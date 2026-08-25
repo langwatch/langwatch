@@ -3,11 +3,7 @@ import {
   discoverProjectionAggregates,
   filterDiscoveredByAggregateIds,
 } from "./replayDiscovery";
-import {
-  pauseProjection,
-  unpauseProjection,
-  waitForActiveJobs,
-} from "./replayDrain";
+import { pauseProjection, unpauseProjection, waitForActiveJobs } from "./replayDrain";
 import {
   type DiscoveredAggregate,
   type ReplayEventSource,
@@ -142,14 +138,9 @@ export async function replayStateProjection({
   for (const [tenantId, tenantAggregates] of tenants) {
     // One accumulator per tenant: a projection key may group several aggregates,
     // so we fold the whole tenant before writing one row per key.
-    const accumulator = new StateAccumulator(
-      projection.definition,
-      ctx.accumulatorOpts,
-    );
+    const accumulator = new StateAccumulator(projection.definition, ctx.accumulatorOpts);
 
-    const totalBatches = Math.ceil(
-      tenantAggregates.length / aggregateBatchSize,
-    );
+    const totalBatches = Math.ceil(tenantAggregates.length / aggregateBatchSize);
 
     try {
       for (let i = 0; i < tenantAggregates.length; i += aggregateBatchSize) {

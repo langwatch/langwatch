@@ -185,13 +185,10 @@ export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
 
   // AI tools (coding assistants). Fall back to the built-in wrappers when the
   // org published none, so the user always gets a runnable next-step.
-  const tools =
-    input.tools && input.tools.length > 0 ? input.tools : DEFAULT_TOOLS;
+  const tools = input.tools && input.tools.length > 0 ? input.tools : DEFAULT_TOOLS;
   lines.push("");
   lines.push("Your AI tools (run any of these):");
-  const cmdWidth = Math.max(
-    ...tools.map((t) => `langwatch ${t.slug}`.length),
-  );
+  const cmdWidth = Math.max(...tools.map((t) => `langwatch ${t.slug}`.length));
   for (const tool of tools) {
     const cmd = `langwatch ${tool.slug}`;
     const labelSuffix = tool.displayName ? `  # ${tool.displayName}` : "";

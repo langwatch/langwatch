@@ -12,7 +12,11 @@ your team's policy.
 This page is the **end-user** flow. If you're an admin setting it up
 for your organization, see [Admin setup](/ai-gateway/governance/admin-setup).
 
-<Note>On SaaS, governance rollout is managed per organization: if you don't see these surfaces, or `langwatch login --device` is refused with a governance error, ask your admin.</Note>
+<Note>
+  On SaaS, governance rollout is managed per organization: if you don't see these
+  surfaces, or `langwatch login --device` is refused with a governance error, ask your
+  admin.
+</Note>
 
 ## Why this exists
 
@@ -60,7 +64,11 @@ npx langwatch login --device
 
 </CodeGroup>
 
-<Note>The single-binary installers (`curl ... | sh`, Homebrew tap, PowerShell `iex`) are on the roadmap but not yet published. Until then, `npm install -g langwatch` is the canonical path on every OS where Node.js is available.</Note>
+<Note>
+  The single-binary installers (`curl ... | sh`, Homebrew tap, PowerShell `iex`) are on
+  the roadmap but not yet published. Until then, `npm install -g langwatch` is the
+  canonical path on every OS where Node.js is available.
+</Note>
 
 Verify:
 
@@ -121,9 +129,10 @@ Behind the scenes:
 
 Tokens persisted at `~/.langwatch/config.json` (mode 0600).
 
-<Note>You did **not** pick a model provider during setup. Your
-admin already wired up Anthropic, OpenAI, Gemini, etc. at the
-organization level. You just inherit them.</Note>
+<Note>
+  You did **not** pick a model provider during setup. Your admin already wired up
+  Anthropic, OpenAI, Gemini, etc. at the organization level. You just inherit them.
+</Note>
 
 ### 3. Use your tools normally
 
@@ -147,11 +156,21 @@ $ langwatch gemini   "explain this stack trace"
 $ langwatch opencode                          # opens opencode with gateway env
 ```
 
-<Info>**Verified end-to-end in CI.** `langwatch login` + each of the five wrappers above (`claude`, `codex`, `cursor`, `gemini`, `opencode`) is exercised in the `governance-wrapper.e2e.test.ts` Node-only e2e suite (fake control-plane, fake gateway, mocked tool binaries) covering login config write, env-var injection, routing with bearer-VK, budget pre-flight (402/200/5xx), and exit-code propagation. 16 scenarios, 3-second runtime, runs on every PR. See [CLI debug → e2e coverage](/ai-governance/cli-debug#cli-wrapper-e2e-coverage) for the assertion shape per tool.</Info>
+<Info>
+  **Verified end-to-end in CI.** `langwatch login` + each of the five wrappers above
+  (`claude`, `codex`, `cursor`, `gemini`, `opencode`) is exercised in the
+  `governance-wrapper.e2e.test.ts` Node-only e2e suite (fake control-plane, fake gateway,
+  mocked tool binaries) covering login config write, env-var injection, routing with
+  bearer-VK, budget pre-flight (402/200/5xx), and exit-code propagation. 16 scenarios,
+  3-second runtime, runs on every PR. See [CLI debug → e2e
+  coverage](/ai-governance/cli-debug#cli-wrapper-e2e-coverage) for the assertion shape per
+  tool.
+</Info>
 
 ### 4. Or, set it up without the wrapper
 
 If typing `langwatch` every time is friction, `langwatch instrument
+
 <tool>` writes the telemetry wiring for a tool and exits. A plain
 `claude` or `codex` run then reports to LangWatch on its own:
 

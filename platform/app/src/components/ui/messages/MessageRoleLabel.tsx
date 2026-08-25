@@ -12,11 +12,7 @@ export type MessageRoleLabelProps = Omit<TextProps, "children"> & {
  */
 export function MessageRoleLabel({ role, ...props }: MessageRoleLabelProps) {
   const label =
-    role === "system"
-      ? "System prompt"
-      : role === "user"
-        ? "User"
-        : "Assistant";
+    role === "system" ? "System prompt" : role === "user" ? "User" : "Assistant";
 
   return (
     <Text

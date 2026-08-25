@@ -2,11 +2,7 @@ import {
   GovernanceEventDeliveryProcess,
   GOVERNANCE_EVENTS_PROCESS_NAME,
 } from "@langwatch/enterprise-governance-server";
-import {
-  defineAggregate,
-  defineEvents,
-  definePipeline,
-} from "@langwatch/eventing";
+import { defineAggregate, defineEvents, definePipeline } from "@langwatch/eventing";
 import {
   RecordBudgetCrossingCommand,
   RecordVkLifecycleCommand,
@@ -31,9 +27,7 @@ export interface GovernanceEventsPipelineDeps {
  * platform by its process manager. Aggregate = the governed subject, so
  * each key and each budget is an ordered stream.
  */
-export function createGovernanceEventsPipeline(
-  deps: GovernanceEventsPipelineDeps,
-) {
+export function createGovernanceEventsPipeline(deps: GovernanceEventsPipelineDeps) {
   let pipeline = definePipeline<GovernanceEventsProcessingEvent>({
     name: GOVERNANCE_EVENTS_PIPELINE_NAME,
     aggregate: defineAggregate({

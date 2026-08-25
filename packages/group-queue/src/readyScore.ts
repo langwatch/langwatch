@@ -94,10 +94,7 @@ export function isPlausibleReadyScore(value: unknown): value is number {
  * `nowMs` is injected rather than read here so callers can validate a batch
  * against one shared reading, and so the bounds stay testable.
  */
-export function isUsableReadyScore(
-  score: unknown,
-  nowMs: number,
-): score is number {
+export function isUsableReadyScore(score: unknown, nowMs: number): score is number {
   return (
     isPlausibleReadyScore(score) &&
     score >= nowMs - MAX_SCORE_PAST_SKEW_MS &&

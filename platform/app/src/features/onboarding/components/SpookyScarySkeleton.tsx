@@ -5,33 +5,16 @@ interface SpookyScarySkeletonProps {
   loading: boolean;
 }
 
-const SpookyScarySkeleton: React.FC<SpookyScarySkeletonProps> = ({
-  loading,
-}) => {
+const SpookyScarySkeleton: React.FC<SpookyScarySkeletonProps> = ({ loading }) => {
   return (
     <VStack gap={6} align="stretch">
       <VStack gap={2} align="stretch">
-        <Skeleton
-          loading={loading}
-          h="40px"
-          borderRadius="lg"
-          variant="shine"
-        />
+        <Skeleton loading={loading} h="40px" borderRadius="lg" variant="shine" />
         <SkeletonText loading={loading} noOfLines={1} gap={2} variant="shine" />
 
         <HStack gap={3} align="center">
-          <Skeleton
-            loading={loading}
-            boxSize="20px"
-            borderRadius="xs"
-            variant="shine"
-          />
-          <SkeletonText
-            loading={loading}
-            noOfLines={1}
-            w="65%"
-            variant="shine"
-          />
+          <Skeleton loading={loading} boxSize="20px" borderRadius="xs" variant="shine" />
+          <SkeletonText loading={loading} noOfLines={1} w="65%" variant="shine" />
         </HStack>
       </VStack>
 

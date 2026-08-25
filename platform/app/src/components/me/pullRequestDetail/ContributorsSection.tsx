@@ -4,10 +4,7 @@ import numeral from "numeral";
 import type React from "react";
 
 import { ListTable } from "~/components/ui/ListTable";
-import {
-  formatCost,
-  formatTokens,
-} from "~/features/traces-v2/utils/formatters";
+import { formatCost, formatTokens } from "~/features/traces-v2/utils/formatters";
 
 import { AgentLabel } from "../AgentLabel";
 import { ContributorName } from "./ContributorName";

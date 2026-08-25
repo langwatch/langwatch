@@ -42,11 +42,11 @@ export const DetailRow: React.FC<{
 export function hasAiErrorDetails(error: AiActionError): boolean {
   return Boolean(
     error.details &&
-      (error.details.provider ||
-        error.details.model ||
-        error.details.httpStatus !== undefined ||
-        error.details.reason ||
-        error.details.lastQuery),
+    (error.details.provider ||
+      error.details.model ||
+      error.details.httpStatus !== undefined ||
+      error.details.reason ||
+      error.details.lastQuery),
   );
 }
 
@@ -66,9 +66,7 @@ export function hasAiErrorDetails(error: AiActionError): boolean {
  * `safeProse` still clamps: a server-authored sentence belongs in a row, not a
  * paragraph.
  */
-export const AiErrorDetails: React.FC<{ error: AiActionError }> = ({
-  error,
-}) => (
+export const AiErrorDetails: React.FC<{ error: AiActionError }> = ({ error }) => (
   <VStack align="stretch" gap={0.5} width="full">
     {error.details?.httpStatus !== undefined && (
       <DetailRow label="Status" value={String(error.details.httpStatus)} />
@@ -76,15 +74,9 @@ export const AiErrorDetails: React.FC<{ error: AiActionError }> = ({
     {error.details?.provider && (
       <DetailRow label="Provider" value={error.details.provider} />
     )}
-    {error.details?.model && (
-      <DetailRow label="Model" value={error.details.model} />
-    )}
+    {error.details?.model && <DetailRow label="Model" value={error.details.model} />}
     {error.details?.reason && (
-      <DetailRow
-        label="Reason"
-        value={safeProse(error.details.reason)}
-        multiline
-      />
+      <DetailRow label="Reason" value={safeProse(error.details.reason)} multiline />
     )}
     {error.details?.lastQuery && (
       <DetailRow label="Last query" value={error.details.lastQuery} multiline />

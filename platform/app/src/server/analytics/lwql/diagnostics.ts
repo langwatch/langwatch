@@ -37,15 +37,9 @@
  * @see specs/analytics/lwql-api.feature
  */
 
-import {
-  type LangWatchQLViewDefinition,
-  lwqlGrainColumns,
-} from "./catalog/types";
+import { type LangWatchQLViewDefinition, lwqlGrainColumns } from "./catalog/types";
 import type { LangWatchQLColumn, LangWatchQLResultLimits } from "./executor";
-import type {
-  AcceptedLangWatchQL,
-  LangWatchQLQueryBlock,
-} from "./validation/validate";
+import type { AcceptedLangWatchQL, LangWatchQLQueryBlock } from "./validation/validate";
 
 /**
  * Every note this API can attach to a result.
@@ -180,9 +174,7 @@ function truncationDiagnostics({
  * `ON child.TraceId = parent.TraceId` from reporting the parent as fanning out
  * the child, which it does not.
  */
-const IMPLICITLY_MATCHED_KEY_COLUMNS: ReadonlySet<string> = new Set([
-  "tenantid",
-]);
+const IMPLICITLY_MATCHED_KEY_COLUMNS: ReadonlySet<string> = new Set(["tenantid"]);
 
 /** One of a block's table references, resolved to the dataset it names. */
 interface ResolvedTableReference {
@@ -276,9 +268,7 @@ function unmatchedGrainColumns(
 ): readonly string[] {
   return lwqlGrainColumns(view).filter((column) => {
     const lowered = column.toLowerCase();
-    return (
-      !matched.has(lowered) && !IMPLICITLY_MATCHED_KEY_COLUMNS.has(lowered)
-    );
+    return !matched.has(lowered) && !IMPLICITLY_MATCHED_KEY_COLUMNS.has(lowered);
   });
 }
 
@@ -321,9 +311,7 @@ function fanoutDiagnostic({
       /** Grain columns of the multiplying dataset the join did not match. */
       unmatchedGrainColumns: unmatched,
       /** Columns the join matched, on either side. */
-      joinedOn: [
-        ...new Set([...pair.leftColumns, ...pair.rightColumns]),
-      ].sort(),
+      joinedOn: [...new Set([...pair.leftColumns, ...pair.rightColumns])].sort(),
       /** Whether the block collapses rows, which decides what is at risk. */
       aggregated: isRowCollapsing,
     },
@@ -374,9 +362,7 @@ function joinedPairs({
   const pairs = new Map<string, JoinedPair>();
   const pairFor = (leftIndex: number, rightIndex: number): JoinedPair => {
     const [low, high] =
-      leftIndex < rightIndex
-        ? [leftIndex, rightIndex]
-        : [rightIndex, leftIndex];
+      leftIndex < rightIndex ? [leftIndex, rightIndex] : [rightIndex, leftIndex];
     const key = `${low}:${high}`;
     const existing = pairs.get(key);
     if (existing) return existing;
@@ -465,9 +451,7 @@ function applyQualifiedEquality({
   const leftIndex =
     left.qualifier === undefined ? undefined : byQualifier.get(left.qualifier);
   const rightIndex =
-    right.qualifier === undefined
-      ? undefined
-      : byQualifier.get(right.qualifier);
+    right.qualifier === undefined ? undefined : byQualifier.get(right.qualifier);
   if (leftIndex === undefined || rightIndex === undefined) return;
   if (leftIndex === rightIndex) return;
 
@@ -510,8 +494,7 @@ function resolveTableReferences({
   for (const reference of block.tables) {
     const view = views.find(
       (candidate) =>
-        `${database}.${candidate.name}`.toLowerCase() ===
-        reference.table.toLowerCase(),
+        `${database}.${candidate.name}`.toLowerCase() === reference.table.toLowerCase(),
     );
     if (!view) continue;
     resolved.push({
@@ -633,9 +616,7 @@ function timeBucketAxis({
   const [column] = temporal;
   if (temporal.length !== 1 || !column) return null;
 
-  const grouped = new Set(
-    validation.blocks.flatMap((block) => block.groupByColumns),
-  );
+  const grouped = new Set(validation.blocks.flatMap((block) => block.groupByColumns));
   if (!grouped.has(column.name.trim().toLowerCase())) return null;
 
   const buckets = [
@@ -749,8 +730,7 @@ function isWholeMultiple(value: number, unit: number): boolean {
   // and `missingBucketDiagnostics` skips the same gap, so the count of absent
   // buckets comes back zero.
   return (
-    Math.abs(multiple - nearest) <=
-    BUCKET_ALIGNMENT_TOLERANCE * Math.max(1, nearest)
+    Math.abs(multiple - nearest) <= BUCKET_ALIGNMENT_TOLERANCE * Math.max(1, nearest)
   );
 }
 

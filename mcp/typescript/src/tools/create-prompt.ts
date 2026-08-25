@@ -32,7 +32,7 @@ export async function handleCreatePrompt(params: {
   const handle = params.handle?.trim() || toHandle(params.name);
   if (!handle || !HANDLE_PATTERN.test(handle)) {
     throw new Error(
-      `Invalid prompt handle "${handle || ""}". Handle must match ${HANDLE_PATTERN}. Provide a valid \`handle\` explicitly.`
+      `Invalid prompt handle "${handle || ""}". Handle must match ${HANDLE_PATTERN}. Provide a valid \`handle\` explicitly.`,
     );
   }
 

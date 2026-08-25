@@ -1,49 +1,51 @@
 {
-	"compilerOptions": {
-		"target": "es2020",
-		"lib": ["dom", "dom.iterable", "esnext"],
-		"allowJs": true,
-		"checkJs": true,
-		"skipLibCheck": true,
-		"strict": true,
-		"forceConsistentCasingInFileNames": true,
-		"noEmit": true,
-		"esModuleInterop": true,
-		"module": "esnext",
-		"moduleResolution": "bundler",
-		"allowImportingTsExtensions": true,
-		"moduleDetection": "force",
-		"resolveJsonModule": true,
-		"isolatedModules": true,
-		"jsx": "react-jsx",
-		"incremental": true,
-		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsc-editor.tsbuildinfo",
-		"noUncheckedIndexedAccess": true,
-		"verbatimModuleSyntax": true,
-		"baseUrl": ".",
-		"paths": {
-			"~/generated/prisma/client": ["../../packages/prisma-client/src/generated/client.ts"],
-			"~/*": ["./src/*"],
-			"@ee/*": ["./ee/*"],
-			"@app/*": ["./src/server/app-layer/*"],
-			"zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"]
-		},
-		"plugins": []
-	},
-	"include": [
-		// "./src/**/*"
-		".eslintrc.cjs",
-		"**/*.ts",
-		"**/*.tsx",
-		"**/*.cjs",
-		"**/*.mjs"
-	],
-	"exclude": [
-		"node_modules",
-		"dist",
-		".next",
-		".next-saas",
-		"**/*.snippet.*",
-		"src/**/codegen/snippets/**/*"
-	]
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "checkJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsc-editor.tsbuildinfo",
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "baseUrl": ".",
+    "paths": {
+      "~/generated/prisma/client": [
+        "../../packages/prisma-client/src/generated/client.ts"
+      ],
+      "~/*": ["./src/*"],
+      "@ee/*": ["./ee/*"],
+      "@app/*": ["./src/server/app-layer/*"],
+      "zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"]
+    },
+    "plugins": []
+  },
+  "include": [
+    // "./src/**/*"
+    ".eslintrc.cjs",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.cjs",
+    "**/*.mjs"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".next",
+    ".next-saas",
+    "**/*.snippet.*",
+    "src/**/codegen/snippets/**/*"
+  ]
 }

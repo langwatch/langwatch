@@ -140,10 +140,7 @@ void (async () => {
     // so the shot shows the card, not the page header.
     await page.goto(`${BASE_URL}/me`);
     await page.waitForSelector("text=Coding-agent usage", { timeout: 60_000 });
-    await page
-      .locator("text=Coding-agent usage")
-      .first()
-      .scrollIntoViewIfNeeded();
+    await page.locator("text=Coding-agent usage").first().scrollIntoViewIfNeeded();
     await page.waitForTimeout(2000);
     await shoot(page, "10-me-usage-card");
   } finally {

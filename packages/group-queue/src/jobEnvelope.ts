@@ -2,10 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { Logger } from "@langwatch/observability";
 
-import {
-  errorText as errText,
-  safeParseErrorText as safeParseErrText,
-} from "./errors";
+import { errorText as errText, safeParseErrorText as safeParseErrText } from "./errors";
 import { MAX_BLOB_BYTES } from "./blobConstants";
 import {
   type CompressionCodec,
@@ -244,18 +241,13 @@ function routingHeader(
   version: number,
 ): EnvelopeHeader {
   const header: EnvelopeHeader = { v: version, e: "j" };
-  if (typeof jobData.__pipelineName === "string")
-    header.p = jobData.__pipelineName;
+  if (typeof jobData.__pipelineName === "string") header.p = jobData.__pipelineName;
   if (typeof jobData.__jobType === "string") header.t = jobData.__jobType;
   if (typeof jobData.__jobName === "string") header.n = jobData.__jobName;
   return header;
 }
 
-function finalize(
-  prefix: string,
-  header: EnvelopeHeader,
-  body: string,
-): string {
+function finalize(prefix: string, header: EnvelopeHeader, body: string): string {
   const headerJson = JSON.stringify(header);
   // Header length is in BYTES: the Lua reader slices bytes, and UTF-16 code
   // units diverge from bytes if a routing field carries non-ASCII.
@@ -298,9 +290,7 @@ async function inlineBody(
 export class PayloadTooLargeError extends Error {
   readonly byteLength: number;
   constructor(byteLength: number) {
-    super(
-      `Job payload is ${byteLength} bytes, over the ${MAX_BLOB_BYTES}-byte ceiling`,
-    );
+    super(`Job payload is ${byteLength} bytes, over the ${MAX_BLOB_BYTES}-byte ceiling`);
     this.name = "PayloadTooLargeError";
     this.byteLength = byteLength;
   }
@@ -347,13 +337,7 @@ export type DecodeFailureReason =
  */
 export class DecodeFailureError extends Error {
   readonly reason: DecodeFailureReason;
-  constructor({
-    message,
-    reason,
-  }: {
-    message: string;
-    reason: DecodeFailureReason;
-  }) {
+  constructor({ message, reason }: { message: string; reason: DecodeFailureReason }) {
     super(message);
     this.name = "DecodeFailureError";
     this.reason = reason;
@@ -656,19 +640,14 @@ export function readJobPayloadBytes(value: string): number {
 export function readJobAttempt(value: string): number | null {
   try {
     if (!isEnvelope(value)) return null;
-    const machinery = (splitEnvelope(value).header.m ?? {}) as Record<
-      string,
-      unknown
-    >;
+    const machinery = (splitEnvelope(value).header.m ?? {}) as Record<string, unknown>;
     const attempt = machinery.__attempt;
     // Reported verbatim: this is a reader, and one that silently reshapes what
     // is stored cannot be used to check what was written. `__attempt` is lifted
     // out of the payload by name, so a job whose payload carried that key could
     // name a number past the budget — the ladder then treats it as already
     // spent and retires the job, which is the fail-closed direction.
-    return typeof attempt === "number" &&
-      Number.isInteger(attempt) &&
-      attempt > 0
+    return typeof attempt === "number" && Number.isInteger(attempt) && attempt > 0
       ? attempt
       : null;
   } catch {
@@ -735,9 +714,7 @@ export function readEnvelopeLeaseFromHeader(
  * A forged or mis-routed envelope could read another tenant's blob that way.
  * Validate the ref; use the lease only for renewal (ADR-029).
  */
-export function readEnvelopeTieredRefFromHeader(
-  header: EnvelopeHeader,
-): BlobRef | null {
+export function readEnvelopeTieredRefFromHeader(header: EnvelopeHeader): BlobRef | null {
   if ((header.e === "redis" || header.e === "s3") && header.ref) {
     return header.ref;
   }
@@ -809,9 +786,7 @@ export function splitEnvelope(value: string): {
   // Prefix and length digits are ASCII, so lenEnd is the same offset in bytes
   // and code units; the header itself must be sliced as bytes to match Lua.
   const buf = Buffer.from(value, "utf8");
-  const headerJson = buf
-    .subarray(lenEnd + 1, lenEnd + 1 + headerLen)
-    .toString("utf8");
+  const headerJson = buf.subarray(lenEnd + 1, lenEnd + 1 + headerLen).toString("utf8");
   // Guarded for the same reason the body parses are: a corrupt header segment
   // makes V8 echo it back ("Unexpected token 's', \"serId\":\"us\"..."), and the
   // header carries `m.__context` (traceId / userId / projectId). That message

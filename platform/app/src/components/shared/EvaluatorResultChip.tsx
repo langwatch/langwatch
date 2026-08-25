@@ -8,15 +8,7 @@
  * For the interactive version with edit/remove menu, see:
  * experiments-v3/components/TargetSection/EvaluatorChip.tsx
  */
-import {
-  Box,
-  Circle,
-  HStack,
-  Icon,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Circle, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
 import { LuChevronRight, LuCircleX } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
@@ -46,11 +38,7 @@ export type EvaluatorResultChipProps = {
 /**
  * Sub-tooltip content for displaying evaluator inputs data
  */
-const DataTooltipContent = ({
-  inputs,
-}: {
-  inputs: Record<string, unknown>;
-}) => (
+const DataTooltipContent = ({ inputs }: { inputs: Record<string, unknown> }) => (
   <VStack align="stretch" gap={1} padding={2} maxWidth="300px">
     <Text fontSize="12px" fontWeight="semibold" color="fg" marginBottom={1}>
       Evaluator Inputs
@@ -90,8 +78,7 @@ export function EvaluatorResultChip({
 
   // Use interactive tooltip when we have inputs (nested tooltip)
   const hasInputs = inputs && Object.keys(inputs).length > 0;
-  const { isOpen, handleMouseEnter, handleMouseLeave } =
-    useInteractiveTooltip(150);
+  const { isOpen, handleMouseEnter, handleMouseLeave } = useInteractiveTooltip(150);
 
   // Format inline result display
   const getInlineResult = () => {

@@ -54,11 +54,5 @@ export function useWorkspaceCurrent(
     }
 
     return { kind: "unknown" };
-  }, [
-    router.pathname,
-    project,
-    organization?.id,
-    switcher.teams,
-    switcher.projects,
-  ]);
+  }, [router.pathname, project, organization?.id, switcher.teams, switcher.projects]);
 }

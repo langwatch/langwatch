@@ -135,9 +135,7 @@ afterAll(async () => {
     // group already gone
   }
   const exited = await Promise.race([
-    new Promise<boolean>((resolve) =>
-      nlpgoProcess!.once("exit", () => resolve(true)),
-    ),
+    new Promise<boolean>((resolve) => nlpgoProcess!.once("exit", () => resolve(true))),
     sleep(2000).then(() => false),
   ]);
   if (!exited) {

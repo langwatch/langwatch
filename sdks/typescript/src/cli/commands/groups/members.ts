@@ -67,9 +67,7 @@ export const removeGroupMemberCommand = async ({
     succeed: () => `Removed member "${userId}" from group "${groupId}"`,
     table: () => {
       console.log();
-      console.log(
-        chalk.gray("The member loses the access this group granted them."),
-      );
+      console.log(chalk.gray("The member loses the access this group granted them."));
       console.log();
     },
   });

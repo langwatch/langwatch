@@ -7,7 +7,12 @@ import {
 } from "@langwatch/prompt-contract";
 import type { PrismaClient } from "../repositories/prisma/prisma.prompt.repository";
 function isUniqueConstraintError(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002";
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
+  );
 }
 import {
   PROTECTED_TAGS,
@@ -27,9 +32,7 @@ const PURELY_NUMERIC_REGEX = /^\d+$/;
  */
 export function validateTagName(name: string): void {
   if (!name) {
-    throw new PromptTagValidationError(
-      `Invalid tag name. Tag name must not be empty.`,
-    );
+    throw new PromptTagValidationError(`Invalid tag name. Tag name must not be empty.`);
   }
 
   if (PURELY_NUMERIC_REGEX.test(name)) {
@@ -73,11 +76,7 @@ export class PromptTagService {
   /**
    * Returns all custom tag definitions for the given org.
    */
-  async getAll({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<PromptTag[]> {
+  async getAll({ organizationId }: { organizationId: string }): Promise<PromptTag[]> {
     return this.repo.findAll({ organizationId });
   }
 

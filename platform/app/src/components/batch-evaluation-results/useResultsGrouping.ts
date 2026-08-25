@@ -29,12 +29,7 @@ export interface UseResultsGroupingResult {
 
 /** Keys that the chart treats specially via dedicated "Model" / "Prompt"
  * options — excluded from the generic metadata-key list. */
-const TARGET_METADATA_RESERVED = new Set([
-  "model",
-  "prompt_id",
-  "prompt",
-  "version",
-]);
+const TARGET_METADATA_RESERVED = new Set(["model", "prompt_id", "prompt", "version"]);
 
 export function useResultsGrouping({
   source,
@@ -84,8 +79,7 @@ function discoverDatasetEntryKeys(data: ComparisonRunData[]): string[] {
     }
   }
 
-  const isGroupable = (distinct: number) =>
-    distinct >= 2 && distinct < maxRowsInAnyRun;
+  const isGroupable = (distinct: number) => distinct >= 2 && distinct < maxRowsInAnyRun;
 
   return Array.from(distinctValuesPerKey.entries())
     .filter(([, values]) => isGroupable(values.size))
@@ -111,9 +105,5 @@ function discoverTargetMetadataKeys(data: ComparisonRunData[]): string[] {
   return Array.from(keys).sort();
 }
 
-const unreservedKeys = (
-  metadata: Record<string, unknown> | undefined | null,
-): string[] =>
-  Object.keys(metadata ?? {}).filter(
-    (key) => !TARGET_METADATA_RESERVED.has(key),
-  );
+const unreservedKeys = (metadata: Record<string, unknown> | undefined | null): string[] =>
+  Object.keys(metadata ?? {}).filter((key) => !TARGET_METADATA_RESERVED.has(key));

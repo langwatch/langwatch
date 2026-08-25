@@ -86,10 +86,7 @@ export function mapLicenseStatusToLimits(
  * Maps usage data to ResourceLimits format using a plan's limits.
  * Used when displaying limits for organizations without a license (free tier).
  */
-export function mapUsageToLimits(
-  usage: UsageData,
-  plan: PlanInfo,
-): ResourceLimits {
+export function mapUsageToLimits(usage: UsageData, plan: PlanInfo): ResourceLimits {
   return {
     members: { current: usage.membersCount, max: plan.maxMembers },
     membersLite: { current: usage.membersLiteCount, max: plan.maxMembersLite },

@@ -99,9 +99,7 @@ export function FocusedTurnFrame({
       padding={`${TINT_BLEED_PX}px`}
       margin={`-${TINT_BLEED_PX}px`}
       animation={
-        isBlinking
-          ? `tracesV2FocusedTurnBlink ${BLINK_MS}ms ease-in-out`
-          : undefined
+        isBlinking ? `tracesV2FocusedTurnBlink ${BLINK_MS}ms ease-in-out` : undefined
       }
     >
       <style>{BLINK_KEYFRAMES}</style>

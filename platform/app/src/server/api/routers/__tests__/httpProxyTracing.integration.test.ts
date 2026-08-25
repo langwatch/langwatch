@@ -35,9 +35,7 @@ const { mockScheduleTrace } = vi.hoisted(() => ({
 // `.permission()` procedures decide through getApp().permissions (ADR-092),
 // so both fakes carry the real composition over the real test database.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   const { prisma: dbForPermissions } = await import("~/server/db");
   return {
     // Consumers that degrade without Redis read through this one.
@@ -51,9 +49,7 @@ vi.mock("~/server/app-layer/app", async () => {
   };
 });
 vi.mock("../../../app-layer/app", async () => {
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   const { prisma: dbForPermissions } = await import("~/server/db");
   return {
     getApp: () => ({
@@ -115,10 +111,8 @@ function getTraceJob(): CollectorJobFacade {
   const span = args.span;
   const inputJson = findAttr(span.attributes, "langwatch.input")?.stringValue;
   const outputJson = findAttr(span.attributes, "langwatch.output")?.stringValue;
-  const hasError =
-    findAttr(span.attributes, "error.has_error")?.boolValue ?? false;
-  const errorMessage =
-    findAttr(span.attributes, "error.message")?.stringValue ?? "";
+  const hasError = findAttr(span.attributes, "error.has_error")?.boolValue ?? false;
+  const errorMessage = findAttr(span.attributes, "error.message")?.stringValue ?? "";
   return {
     projectId: args.tenantId,
     traceId: span.traceId,
@@ -176,9 +170,7 @@ describe("HTTP Proxy Tracing", () => {
 
   const engineReplies = engineRepliesWith(mockPostEvent);
 
-  function mockSuccessResponse(
-    body: Record<string, unknown> = { result: "success" },
-  ) {
+  function mockSuccessResponse(body: Record<string, unknown> = { result: "success" }) {
     engineReplies({
       status: "success",
       outputs: { output: body },
@@ -194,8 +186,7 @@ describe("HTTP Proxy Tracing", () => {
 
   /** The headers the router put on the node it dispatched. */
   function dispatchedHeaders(): Record<string, string> {
-    const event = mockPostEvent.mock.calls[0]?.[0]
-      ?.message as StudioClientEvent;
+    const event = mockPostEvent.mock.calls[0]?.[0]?.message as StudioClientEvent;
     if (event?.type !== "execute_component") throw new Error("no dispatch");
     const node = event.payload.workflow.nodes.find(
       (candidate) => candidate.id === event.payload.node_id,
@@ -462,10 +453,7 @@ describe("HTTP Proxy Tracing", () => {
         bodyTemplate: "{}",
       });
 
-      const inputValue = getTraceJob().spans[0]!.input?.value as Record<
-        string,
-        unknown
-      >;
+      const inputValue = getTraceJob().spans[0]!.input?.value as Record<string, unknown>;
       const headers = inputValue.headers as Record<string, string>;
       for (const name of [
         "X-API-Key",
@@ -500,10 +488,7 @@ describe("HTTP Proxy Tracing", () => {
         bodyTemplate: "{}",
       });
 
-      const inputValue = getTraceJob().spans[0]!.input?.value as Record<
-        string,
-        unknown
-      >;
+      const inputValue = getTraceJob().spans[0]!.input?.value as Record<string, unknown>;
       const headers = inputValue.headers as Record<string, string>;
       expect(headers.Authorization).toBe("Bearer [REDACTED]");
     });
@@ -528,10 +513,7 @@ describe("HTTP Proxy Tracing", () => {
         bodyTemplate: "{}",
       });
 
-      const inputValue = getTraceJob().spans[0]!.input?.value as Record<
-        string,
-        unknown
-      >;
+      const inputValue = getTraceJob().spans[0]!.input?.value as Record<string, unknown>;
       const headers = inputValue.headers as Record<string, string>;
       expect(headers["X-API-Key"]).toBe("[REDACTED]");
     });
@@ -555,10 +537,7 @@ describe("HTTP Proxy Tracing", () => {
         bodyTemplate: "{}",
       });
 
-      const inputValue = getTraceJob().spans[0]!.input?.value as Record<
-        string,
-        unknown
-      >;
+      const inputValue = getTraceJob().spans[0]!.input?.value as Record<string, unknown>;
       const headers = inputValue.headers as Record<string, string>;
       expect(headers.Authorization).toBe("Basic [REDACTED]");
     });

@@ -32,12 +32,8 @@ export function useDepartmentColumn(organizationId: string) {
   const departments = listQuery.data ?? [];
   const assignments = assignmentsQuery.data;
 
-  const byUser = new Map(
-    assignments?.users.map((u) => [u.id, u.departmentId]) ?? [],
-  );
-  const byTeam = new Map(
-    assignments?.teams.map((t) => [t.id, t.departmentId]) ?? [],
-  );
+  const byUser = new Map(assignments?.users.map((u) => [u.id, u.departmentId]) ?? []);
+  const byTeam = new Map(assignments?.teams.map((t) => [t.id, t.departmentId]) ?? []);
   const byProject = new Map(
     assignments?.projects.map((p) => [p.id, p.departmentId]) ?? [],
   );

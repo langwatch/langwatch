@@ -39,8 +39,7 @@ const SENTENCE_BY_CODE: Record<string, string> = {
   custom_role_name_taken: "A role with that name already exists here",
   role_binding_principal_invalid:
     "A role binding names exactly one principal: a user, a group, or an API key",
-  role_binding_already_exists:
-    "That principal already holds that role at that scope",
+  role_binding_already_exists: "That principal already holds that role at that scope",
   org_exclusive_permission_scope:
     "That role carries an organization-only permission, so it cannot be bound to a team or a project",
   member_seat_limit_reached: "The plan's member seats are all in use",
@@ -49,8 +48,7 @@ const SENTENCE_BY_CODE: Record<string, string> = {
   already_organization_member: "They are already in this organization",
   user_not_in_organization: "That user is not a member of this organization",
   group_not_in_organization: "That group does not belong to this organization",
-  api_key_not_in_organization:
-    "That API key does not belong to this organization",
+  api_key_not_in_organization: "That API key does not belong to this organization",
   team_not_in_organization: "That team does not belong to this organization",
   scope_not_in_organization: "That scope does not belong to this organization",
   // Humanizing turns an acronym into a word: "Api key not found", "Scim token

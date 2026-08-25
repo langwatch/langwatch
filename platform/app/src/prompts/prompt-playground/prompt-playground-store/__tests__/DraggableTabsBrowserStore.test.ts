@@ -136,9 +136,7 @@ describe("DraggableTabsBrowserStore", () => {
         const firstTabId = tabbedWindow?.tabs[0]?.id;
         const secondTabId = tabbedWindow?.tabs[1]?.id;
 
-        store
-          .getState()
-          .setActiveTab({ windowId: tabbedWindow!.id, tabId: firstTabId! });
+        store.getState().setActiveTab({ windowId: tabbedWindow!.id, tabId: firstTabId! });
         store.getState().removeTab({ tabId: firstTabId! });
 
         expect(store.getState().windows[0]?.activeTabId).toBe(secondTabId);
@@ -226,9 +224,9 @@ describe("DraggableTabsBrowserStore", () => {
           index: 0,
         });
 
-        expect(
-          store.getState().windows[0]?.tabs.some((t) => t.id === firstTabId),
-        ).toBe(false);
+        expect(store.getState().windows[0]?.tabs.some((t) => t.id === firstTabId)).toBe(
+          false,
+        );
         expect(store.getState().windows[1]?.tabs[0]?.id).toBe(firstTabId);
       });
     });
@@ -252,9 +250,7 @@ describe("DraggableTabsBrowserStore", () => {
         const targetWindow = store
           .getState()
           .windows.find((w) => w.id === targetWindowId);
-        expect(targetWindow?.tabs[targetWindow.tabs.length - 1]?.id).toBe(
-          firstTabId,
-        );
+        expect(targetWindow?.tabs[targetWindow.tabs.length - 1]?.id).toBe(firstTabId);
       });
     });
 
@@ -409,9 +405,7 @@ describe("DraggableTabsBrowserStore", () => {
       const firstTabId = tabbedWindow?.tabs[0]?.id;
       expect(firstTabId).toBeDefined();
 
-      store
-        .getState()
-        .setActiveTab({ windowId: tabbedWindow!.id, tabId: firstTabId! });
+      store.getState().setActiveTab({ windowId: tabbedWindow!.id, tabId: firstTabId! });
 
       expect(store.getState().windows[0]?.activeTabId).toBe(firstTabId);
       expect(store.getState().activeWindowId).toBe(tabbedWindow!.id);
@@ -436,9 +430,7 @@ describe("DraggableTabsBrowserStore", () => {
 
   describe("updateTabData", () => {
     it("applies updater function to tab data", () => {
-      store
-        .getState()
-        .addTab({ data: createTabData({ meta: { title: "Original" } }) });
+      store.getState().addTab({ data: createTabData({ meta: { title: "Original" } }) });
 
       const tabId = store.getState().windows[0]?.tabs[0]?.id;
       expect(tabId).toBeDefined();
@@ -451,9 +443,7 @@ describe("DraggableTabsBrowserStore", () => {
         }),
       });
 
-      expect(store.getState().windows[0]?.tabs[0]?.data.meta.title).toBe(
-        "Updated",
-      );
+      expect(store.getState().windows[0]?.tabs[0]?.data.meta.title).toBe("Updated");
     });
   });
 
@@ -547,10 +537,7 @@ describe("DraggableTabsBrowserStore", () => {
 
         // Both tabs survive the upgrade with their data intact.
         const state = store.getState();
-        expect(state.windows[0]?.tabs.map((t) => t.id)).toEqual([
-          "tab-1",
-          "tab-2",
-        ]);
+        expect(state.windows[0]?.tabs.map((t) => t.id)).toEqual(["tab-1", "tab-2"]);
         expect(state.getByTabId("tab-1")?.meta.title).toBe("Legacy A");
         expect(state.getByTabId("tab-2")?.meta.title).toBe("Legacy B");
 
@@ -559,12 +546,8 @@ describe("DraggableTabsBrowserStore", () => {
           tabId: "tab-1",
           updater: (data) => ({ ...data, meta: { ...data.meta, title: "A2" } }),
         });
-        expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:tab-1`)).toContain(
-          "A2",
-        );
-        expect(
-          localStorage.getItem(`${TEST_PROJECT_ID}:tab:tab-2`),
-        ).not.toBeNull();
+        expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:tab-1`)).toContain("A2");
+        expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:tab-2`)).not.toBeNull();
       });
     });
 
@@ -721,15 +704,11 @@ describe("DraggableTabsBrowserStore", () => {
     it("removes the per-tab localStorage keys of its own tabs", () => {
       store.getState().addTab({ data: createTabData() });
       const tabId = store.getState().windows[0]?.tabs[0]?.id;
-      expect(
-        localStorage.getItem(`${TEST_PROJECT_ID}:tab:${tabId}`),
-      ).not.toBeNull();
+      expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:${tabId}`)).not.toBeNull();
 
       store.getState().reset();
 
-      expect(
-        localStorage.getItem(`${TEST_PROJECT_ID}:tab:${tabId}`),
-      ).toBeNull();
+      expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:${tabId}`)).toBeNull();
       expect(
         localStorage.getItem(`${TEST_PROJECT_ID}:draggable-tabs-browser-store`),
       ).toBeNull();

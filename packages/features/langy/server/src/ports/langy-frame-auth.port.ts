@@ -85,10 +85,7 @@ function signingInput(frame: LangyFrameSigned): Buffer {
  * Compute the frame MAC. `runToken` is the 32-byte secret as hex; the HMAC key
  * is its decoded bytes.
  */
-export function computeFrameMac(
-  runToken: string,
-  frame: LangyFrameSigned,
-): string {
+export function computeFrameMac(runToken: string, frame: LangyFrameSigned): string {
   const key = Buffer.from(runToken, "hex");
   return createHmac("sha256", key).update(signingInput(frame)).digest("hex");
 }
@@ -113,10 +110,7 @@ export function signFrame(
  * pass/fail. This is authenticity only: `turnId`-is-in-flight and
  * `frameNonce`-unseen are the relay's checks, not this function's.
  */
-export function verifyFrame(
-  runToken: string,
-  frame: LangyFrameEnvelope,
-): boolean {
+export function verifyFrame(runToken: string, frame: LangyFrameEnvelope): boolean {
   const expected = Buffer.from(computeFrameMac(runToken, frame), "hex");
   const got = macBytes(frame.mac);
   if (got === null || got.length !== expected.length) return false;

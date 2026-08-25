@@ -117,8 +117,7 @@ function renderTable({
     traceId: TRACE_ID,
     anchorId: SPAN_ID,
     pathPrefix: "params",
-    commentsFor: (anchorPath) =>
-      stored.filter((a) => a.anchorPath === anchorPath),
+    commentsFor: (anchorPath) => stored.filter((a) => a.anchorPath === anchorPath),
   };
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -154,9 +153,7 @@ describe("given a span with attributes", () => {
     it("records the comment as being about that attribute", async () => {
       renderTable();
 
-      fireEvent.click(
-        screen.getByRole("button", { name: `Comment on ${MODEL_KEY}` }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: `Comment on ${MODEL_KEY}` }));
       fireEvent.change(await screen.findByPlaceholderText("Optional"), {
         target: { value: "this model was not the one we pinned" },
       });
@@ -177,9 +174,7 @@ describe("given a span with attributes", () => {
     it("offers no correction to go with the comment", async () => {
       renderTable();
 
-      fireEvent.click(
-        screen.getByRole("button", { name: `Comment on ${MODEL_KEY}` }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: `Comment on ${MODEL_KEY}` }));
       await screen.findByPlaceholderText("Optional");
 
       expect(
@@ -210,9 +205,7 @@ describe("given an attribute the reader is not allowed to read", () => {
     const { container } = renderTable({ restrictedAttributes: RESTRICTED });
 
     expect(
-      container.querySelector(
-        '[aria-label="Comment on gen_ai.request.temperature"]',
-      ),
+      container.querySelector('[aria-label="Comment on gen_ai.request.temperature"]'),
     ).not.toBeInTheDocument();
     expect(
       container.querySelector(`[aria-label="Comment on ${MODEL_KEY}"]`),

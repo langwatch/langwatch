@@ -946,7 +946,6 @@ app:
 # Uses the same container image as the app but runs `pnpm start:workers`.
 ## @section Workers
 workers:
-
   # See app.otel — named separately so worker telemetry is distinguishable.
   ## @extra workers.otel OpenTelemetry identity for the workers.
   ## @param workers.otel.serviceName [string, default: langwatch-workers] Service name reported in traces and logs.
@@ -1070,7 +1069,6 @@ workers:
   extraInitContainers: []
   ## @param workers.extraVolumeMounts [array] Additional volume mounts for workers container.
   extraVolumeMounts: []
-
 
 # =============================================================================
 # LangWatch NLP Service Configuration

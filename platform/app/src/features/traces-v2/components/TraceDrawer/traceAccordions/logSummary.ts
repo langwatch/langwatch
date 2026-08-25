@@ -22,10 +22,7 @@ export function summarizeLogEvent(log: TraceLogRecordDto): string | null {
   return describe(event, log.attributes);
 }
 
-function describe(
-  event: CodingAgentEvent,
-  attrs: Record<string, string>,
-): string {
+function describe(event: CodingAgentEvent, attrs: Record<string, string>): string {
   switch (event) {
     case "user_prompt":
       return `User sent a prompt (${attrs.prompt_length ?? attrs.prompt?.length ?? "?"} chars)`;
@@ -126,11 +123,7 @@ function describeSessionEvent({
   event,
   attrs,
 }: {
-  event:
-    | "session_created"
-    | "session_context"
-    | "session_idle"
-    | "session_error";
+  event: "session_created" | "session_context" | "session_idle" | "session_error";
   attrs: Record<string, string>;
 }): string {
   switch (event) {
@@ -141,18 +134,13 @@ function describeSessionEvent({
     case "session_idle":
       return "Session went idle";
     case "session_error":
-      return attrs.error
-        ? `Session error: ${attrs.error}`
-        : "The session hit an error";
+      return attrs.error ? `Session error: ${attrs.error}` : "The session hit an error";
   }
 }
 
 /** Where the session ran, as the companion event reported it. */
 function describeSessionContext(attrs: Record<string, string>): string {
-  const repository = [
-    attrs["vcs.repository.owner"],
-    attrs["vcs.repository.name"],
-  ]
+  const repository = [attrs["vcs.repository.owner"], attrs["vcs.repository.name"]]
     .filter(Boolean)
     .join("/");
   const branch = attrs["vcs.ref.head.name"];

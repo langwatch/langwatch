@@ -93,9 +93,7 @@ describe("langyDerivedCardSchema", () => {
     // the failure this whole merge had to not introduce. `CARD_SHAPE` decides
     // which kinds belong here, so a re-classification (the only way to widen
     // the allowlist past the type gates) shows up as a failure right here.
-    const resourceShaped = CARD_KINDS.filter(
-      (kind) => CARD_SHAPE[kind] === "resource",
-    );
+    const resourceShaped = CARD_KINDS.filter((kind) => CARD_SHAPE[kind] === "resource");
 
     it.each(resourceShaped)("refuses kind %s", (kind) => {
       const parsed = langyDerivedCardSchema.safeParse({ ...stats, kind });
@@ -163,10 +161,7 @@ describe("langyDerivedCardSchema", () => {
       ["stats", stats],
       ["choices", choices],
     ])("refuses the %s card", (_kind, block) => {
-      const { blockId: _dropped, ...withoutId } = block as Record<
-        string,
-        unknown
-      >;
+      const { blockId: _dropped, ...withoutId } = block as Record<string, unknown>;
       expect(langyDerivedCardSchema.safeParse(withoutId).success).toBe(false);
     });
   });
@@ -200,9 +195,9 @@ describe("langyDerivedCardSchema", () => {
     });
 
     it("refuses stats with an empty items list", () => {
-      expect(
-        langyDerivedCardSchema.safeParse({ ...stats, items: [] }).success,
-      ).toBe(false);
+      expect(langyDerivedCardSchema.safeParse({ ...stats, items: [] }).success).toBe(
+        false,
+      );
     });
 
     it("accepts a ragged table row rather than failing the block", () => {

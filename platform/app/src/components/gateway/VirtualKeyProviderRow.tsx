@@ -5,10 +5,7 @@ import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { Checkbox } from "~/components/ui/checkbox";
 import { ProviderScopeChips } from "../settings/ProviderScopeChips";
 
-import type {
-  EligibleModelProvider,
-  OrgModelProvider,
-} from "./eligibleModelProviders";
+import type { EligibleModelProvider, OrgModelProvider } from "./eligibleModelProviders";
 
 function providerModels(provider: OrgModelProvider | undefined): string[] {
   if (!provider) return [];
@@ -72,9 +69,7 @@ export function ProviderRow({
           size="sm"
           checked={checked}
           disabled={allProviders}
-          onCheckedChange={(d: { checked: unknown }) =>
-            onCheck(d.checked === true)
-          }
+          onCheckedChange={(d: { checked: unknown }) => onCheck(d.checked === true)}
           inputProps={{ "aria-label": mp.label }}
           data-testid={`vk-provider-${mp.id}`}
         />
@@ -129,12 +124,7 @@ export function ProviderRow({
         )}
       </HStack>
       {expanded && models.length > 0 && (
-        <Box
-          borderTopWidth="1px"
-          borderColor="border.subtle"
-          paddingX={2}
-          paddingY={2}
-        >
+        <Box borderTopWidth="1px" borderColor="border.subtle" paddingX={2} paddingY={2}>
           <Text fontSize="2xs" color="fg.muted" marginBottom={1.5}>
             {pickedForProvider.length === 0
               ? "All models allowed. Check models to restrict."

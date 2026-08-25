@@ -60,9 +60,7 @@ export const downloadCommand = async (
 
   const format = options.format ?? "csv";
   if (format !== "csv" && format !== "jsonl") {
-    console.error(
-      chalk.red(`Invalid format "${format}". Use "csv" or "jsonl".`),
-    );
+    console.error(chalk.red(`Invalid format "${format}". Use "csv" or "jsonl".`));
     process.exit(1);
   }
 

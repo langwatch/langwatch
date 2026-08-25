@@ -8,9 +8,7 @@ keywords: langwatch, typescript, javascript, filtering, spans, traces, observabi
 
 A trace filter decides which spans the LangWatch exporter sends. Use filters to keep AI and business spans while dropping framework chatter.
 
-<Info>
-Introduced in `langwatch@0.8.0`.
-</Info>
+<Info>Introduced in `langwatch@0.8.0`.</Info>
 
 ## Defaults
 
@@ -22,19 +20,21 @@ import { setupObservability } from "langwatch/observability/node";
 import { LangWatchTraceExporter } from "langwatch";
 
 setupObservability({
-  // We are specifying a custom trace exporter, so we need to disable default
-  // integration to prevent double exporting
-  langwatch: "disabled",
-  traceExporter: new LangWatchTraceExporter(),
+// We are specifying a custom trace exporter, so we need to disable default
+// integration to prevent double exporting
+langwatch: "disabled",
+traceExporter: new LangWatchTraceExporter(),
 });
-```
+
+````
 
 ```typescript Creating an exporter
 import { LangWatchTraceExporter } from "langwatch";
 
 // Default: excludes HTTP request spans
 const exporter = new LangWatchTraceExporter();
-```
+````
+
 </CodeGroup>
 
 <Note>
@@ -55,23 +55,25 @@ new LangWatchTraceExporter({ filters: [{ preset: "vercelAIOnly" }] });
 ```typescript Explicit default
 new LangWatchTraceExporter({ filters: [{ preset: "excludeHttpRequests" }] });
 ```
+
 </CodeGroup>
 
 ## Custom filters
 
 Use `include` to keep matches; use `exclude` to drop matches. Criteria support:
+
 - `instrumentationScopeName`
 - `name`
 
 ```typescript
 // Keep only spans from the 'ai' scope
 new LangWatchTraceExporter({
-  filters: [{ include: { instrumentationScopeName: [{ equals: "ai" }] } }]
+  filters: [{ include: { instrumentationScopeName: [{ equals: "ai" }] } }],
 });
 
 // Drop internal spans by name prefix
 new LangWatchTraceExporter({
-  filters: [{ exclude: { name: [{ startsWith: "internal." }] } }]
+  filters: [{ exclude: { name: [{ startsWith: "internal." }] } }],
 });
 ```
 
@@ -81,16 +83,24 @@ Matchers are case-sensitive unless you set `ignoreCase: true`.
 
 ```typescript
 // equals (exact)
-{ name: [{ equals: "chat.completion" }] }
+{
+  name: [{ equals: "chat.completion" }];
+}
 
 // startsWith (prefix)
-{ name: [{ startsWith: "chat." }] }
+{
+  name: [{ startsWith: "chat." }];
+}
 
 // matches (RegExp)
-{ name: [{ matches: /^(GET|POST)\b/ }] }
+{
+  name: [{ matches: /^(GET|POST)\b/ }];
+}
 
 // case-insensitive
-{ name: [{ equals: "Chat.Completion", ignoreCase: true }] }
+{
+  name: [{ equals: "Chat.Completion", ignoreCase: true }];
+}
 ```
 
 ## Logic
@@ -115,8 +125,8 @@ new LangWatchTraceExporter({
   filters: [
     { include: { instrumentationScopeName: [{ equals: "ai" }] } },
     { preset: "excludeHttpRequests" },
-    { exclude: { name: [{ matches: /test/ }] } }
-  ]
+    { exclude: { name: [{ matches: /test/ }] } },
+  ],
 });
 ```
 
@@ -131,8 +141,8 @@ setupObservability({
   // integration to prevent double exporting
   langwatch: "disabled",
   traceExporter: new LangWatchTraceExporter({
-    filters: [{ preset: "excludeHttpRequests" }]
-  })
+    filters: [{ preset: "excludeHttpRequests" }],
+  }),
 });
 ```
 
@@ -147,7 +157,7 @@ setupObservability({
   langwatch: "disabled",
   spanProcessors: [
     new BatchSpanProcessor(
-      new LangWatchTraceExporter({ filters: [{ preset: "vercelAIOnly" }] })
+      new LangWatchTraceExporter({ filters: [{ preset: "vercelAIOnly" }] }),
     ),
   ],
 });
@@ -167,5 +177,6 @@ import type { TraceFilter, Criteria, Match } from "langwatch";
 ```
 
 <Tip>
-Use simple matchers (`equals`, `startsWith`) where possible; regex matches more patterns but is slower and harder to read.
+  Use simple matchers (`equals`, `startsWith`) where possible; regex matches more patterns
+  but is slower and harder to read.
 </Tip>

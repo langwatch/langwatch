@@ -24,20 +24,11 @@ export const IconCheckboxCardGroup = <T extends string = string>({
   ariaLabel,
 }: IconCheckboxCardGroupProps<T>) => {
   const toggle = (item: T) => {
-    onChange(
-      value.includes(item) ? value.filter((v) => v !== item) : [...value, item],
-    );
+    onChange(value.includes(item) ? value.filter((v) => v !== item) : [...value, item]);
   };
 
   return (
-    <VStack
-      role="group"
-      aria-label={ariaLabel ?? label}
-      gap="2"
-      w="full"
-      p="1"
-      m="-1"
-    >
+    <VStack role="group" aria-label={ariaLabel ?? label} gap="2" w="full" p="1" m="-1">
       {label && (
         <Text textStyle="sm" fontWeight="medium">
           {label}
@@ -61,18 +52,12 @@ export const IconCheckboxCardGroup = <T extends string = string>({
             px={isSelected ? "5" : "3"}
             h="auto"
             transition="all 0.2s ease"
-            boxShadow={
-              isSelected ? "0 0 0 1px var(--colors-orange-muted)" : "none"
-            }
+            boxShadow={isSelected ? "0 0 0 1px var(--colors-orange-muted)" : "none"}
             position="relative"
             _hover={{
-              borderColor: isSelected
-                ? "orange.emphasized"
-                : "border.emphasized",
+              borderColor: isSelected ? "orange.emphasized" : "border.emphasized",
               bg: isSelected ? "orange.subtle" : "bg.muted",
-              boxShadow: isSelected
-                ? "0 0 0 1px var(--colors-orange-muted)"
-                : "sm",
+              boxShadow: isSelected ? "0 0 0 1px var(--colors-orange-muted)" : "sm",
               transform: "translateY(-1px)",
               zIndex: 1,
             }}
@@ -107,9 +92,7 @@ export const IconCheckboxCardGroup = <T extends string = string>({
                 transition="all 0.15s ease"
                 flexShrink={0}
               >
-                {isSelected && (
-                  <Check size={10} color="white" strokeWidth={3} />
-                )}
+                {isSelected && <Check size={10} color="white" strokeWidth={3} />}
               </HStack>
             </HStack>
           </Button>

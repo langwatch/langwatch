@@ -199,13 +199,7 @@ export function LLMModelCostMatchingSpans({
                       {span.model}
                     </Text>
                   </Badge>
-                  <Text
-                    textStyle="xs"
-                    color="fg.muted"
-                    truncate
-                    flex={1}
-                    minWidth={0}
-                  >
+                  <Text textStyle="xs" color="fg.muted" truncate flex={1} minWidth={0}>
                     {span.spanName}
                   </Text>
                   <TokenPair
@@ -219,9 +213,7 @@ export function LLMModelCostMatchingSpans({
                     minWidth="56px"
                     textAlign="right"
                   >
-                    {span.exampleCost === null
-                      ? "—"
-                      : formatCost(span.exampleCost)}
+                    {span.exampleCost === null ? "—" : formatCost(span.exampleCost)}
                   </Text>
                   <Text
                     textStyle="xs"
@@ -248,8 +240,8 @@ export function LLMModelCostMatchingSpans({
               {data.unmatchedModels.length > 0 ? (
                 <>
                   <Text textStyle="xs" color="fg.muted">
-                    Models seen in this project that do not match, click one to
-                    fill the regex:
+                    Models seen in this project that do not match, click one to fill the
+                    regex:
                   </Text>
                   <Box>
                     <HStack gap={1.5} flexWrap="wrap">
@@ -283,8 +275,8 @@ export function LLMModelCostMatchingSpans({
                 </>
               ) : (
                 <Text textStyle="xs" color="fg.subtle">
-                  No spans with a model were recorded in this project in the
-                  last {data.windowDays} days.
+                  No spans with a model were recorded in this project in the last{" "}
+                  {data.windowDays} days.
                 </Text>
               )}
             </VStack>

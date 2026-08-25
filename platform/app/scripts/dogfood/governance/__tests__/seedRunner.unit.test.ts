@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  Organization,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import type { Organization, PrismaClient } from "@langwatch/prisma-client/generated";
 import { DemoOrgScope } from "../_lib/scopeGuard";
 import {
   formatReport,
@@ -41,15 +38,11 @@ describe("runSeedActions", () => {
     it("runs each action once and reports succeeded outcomes", async () => {
       const action1: SeedAction = {
         name: "first",
-        run: vi
-          .fn()
-          .mockResolvedValue({ status: "succeeded", summary: "ok-1" }),
+        run: vi.fn().mockResolvedValue({ status: "succeeded", summary: "ok-1" }),
       };
       const action2: SeedAction = {
         name: "second",
-        run: vi
-          .fn()
-          .mockResolvedValue({ status: "succeeded", summary: "ok-2" }),
+        run: vi.fn().mockResolvedValue({ status: "succeeded", summary: "ok-2" }),
       };
 
       const report = await runSeedActions({

@@ -5,9 +5,7 @@ import { createDefaultPromptFormValues } from "../useLoadSpanIntoPromptPlaygroun
 
 type SpanData = RouterOutputs["spans"]["getForPromptStudio"];
 
-function buildSpanData(
-  overrides: Partial<SpanData["llmConfig"]> = {},
-): SpanData {
+function buildSpanData(overrides: Partial<SpanData["llmConfig"]> = {}): SpanData {
   return {
     spanId: "span-1",
     traceId: "trace-1",

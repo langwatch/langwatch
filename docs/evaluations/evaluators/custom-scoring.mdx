@@ -14,13 +14,15 @@ Custom scoring lets you send evaluation results from your own code to LangWatch.
 - You want to track any custom metric alongside your traces
 
 **See also:**
+
 - [Built-in Evaluators](/evaluations/evaluators/built-in-evaluators) - Use LangWatch's ready-made evaluators
 - [Saved Evaluators](/evaluations/evaluators/saved-evaluators) - Reuse configured evaluators across your project
-</Info>
+  </Info>
 
 ## How It Works
 
 With custom scoring, you:
+
 1. Run your own evaluation logic
 2. Send the results (score, passed, label, details) to LangWatch
 3. View results in traces, analytics, and dashboards
@@ -83,7 +85,7 @@ async function myLLMStep(userInput: string): Promise<string> {
       name: "my_custom_metric",
       passed: isValid,
       score: score,
-      details: "Custom evaluation based on domain rules"
+      details: "Custom evaluation based on domain rules",
     });
 
     return output;
@@ -127,7 +129,7 @@ import langwatch
 experiment = langwatch.experiment.init("my-experiment")
 
 for index, row in experiment.loop(df.iterrows()):
-    output = my_llm(row["input"])
+output = my_llm(row["input"])
 
     # Run your custom evaluation
     score = my_custom_evaluator(row["input"], output, row["expected"])
@@ -141,7 +143,8 @@ for index, row in experiment.loop(df.iterrows()):
         passed=score > 0.7,
         details="Custom domain-specific evaluation"
     )
-```
+
+````
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -168,21 +171,22 @@ await experiment.run(
     });
   }
 );
-```
+````
+
 </CodeGroup>
 
 ## Evaluation Result Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Identifier for this evaluation (shows in UI) |
-| `passed` | boolean | No | Whether the evaluation passed |
-| `score` | number | No | Numeric score (typically 0-1) |
-| `label` | string | No | Category label (e.g., "positive", "negative") |
-| `details` | string | No | Human-readable explanation |
+| Field     | Type    | Required | Description                                   |
+| --------- | ------- | -------- | --------------------------------------------- |
+| `name`    | string  | Yes      | Identifier for this evaluation (shows in UI)  |
+| `passed`  | boolean | No       | Whether the evaluation passed                 |
+| `score`   | number  | No       | Numeric score (typically 0-1)                 |
+| `label`   | string  | No       | Category label (e.g., "positive", "negative") |
+| `details` | string  | No       | Human-readable explanation                    |
 
 <Note>
-At least one of `passed`, `score`, or `label` should be provided for meaningful results.
+  At least one of `passed`, `score`, or `label` should be provided for meaningful results.
 </Note>
 
 ## Example Use Cases
@@ -294,6 +298,7 @@ def my_llm_step(user_input: str):
 ## Viewing Custom Scores
 
 Custom scores appear in:
+
 - **Trace Details** - Under the Evaluations section
 - **Analytics Dashboard** - Filterable by evaluation name
 - **Experiments** - In the results table alongside other evaluators

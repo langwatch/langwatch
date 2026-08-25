@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-export const ADMIN_WORKSPACE_VIEW_ACTION =
-  "governance.viewWorkspaceAs" as const;
+export const ADMIN_WORKSPACE_VIEW_ACTION = "governance.viewWorkspaceAs" as const;
 export const ADMIN_WORKSPACE_VIEW_DEDUP_MS = 5 * 60 * 1_000;
 
 export const adminWorkspaceKindSchema = z.enum(["personal", "team"]);
@@ -16,9 +15,7 @@ export const recordWorkspaceViewInputSchema = z
     workspaceLabel: z.string().optional(),
   })
   .strict();
-export type RecordWorkspaceViewInput = z.infer<
-  typeof recordWorkspaceViewInputSchema
->;
+export type RecordWorkspaceViewInput = z.infer<typeof recordWorkspaceViewInputSchema>;
 
 export const recordWorkspaceViewResultSchema = z
   .object({
@@ -26,9 +23,7 @@ export const recordWorkspaceViewResultSchema = z
     auditLogId: z.string().min(1).nullable(),
   })
   .strict();
-export type RecordWorkspaceViewResult = z.infer<
-  typeof recordWorkspaceViewResultSchema
->;
+export type RecordWorkspaceViewResult = z.infer<typeof recordWorkspaceViewResultSchema>;
 
 export abstract class GovernanceAdminWorkspaceViewAuditService {
   abstract recordView(

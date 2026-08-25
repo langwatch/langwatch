@@ -11,7 +11,10 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
-import { DERIVED_SAFE_CARD_KINDS, langyDerivedCardSchema } from "../../src/cards/derived-safe";
+import {
+  DERIVED_SAFE_CARD_KINDS,
+  langyDerivedCardSchema,
+} from "../../src/cards/derived-safe";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const promptPath = path.resolve(

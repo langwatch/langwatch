@@ -15,10 +15,7 @@
  * replaces the document (past turns are rendered from message history, not
  * from this projection).
  */
-import {
-  compareLangyEventCursors,
-  type LangyEventCursor,
-} from "./contracts/cursor";
+import { compareLangyEventCursors, type LangyEventCursor } from "./contracts/cursor";
 import type { LangyConversationTurnWireEvent } from "./contracts/turnWire";
 import {
   foldLangyConversationTurn,
@@ -60,8 +57,7 @@ export function seedLangyTurnProjection(
 ): LangyTurnProjectionState {
   if (
     state.cursor &&
-    (!snapshot.cursor ||
-      compareLangyEventCursors(snapshot.cursor, state.cursor) <= 0)
+    (!snapshot.cursor || compareLangyEventCursors(snapshot.cursor, state.cursor) <= 0)
   ) {
     return state;
   }
@@ -93,9 +89,7 @@ export function applyLangyTurnEvents(
     }
     const isNewTurn = next.turnId !== event.data.turnId;
     const base =
-      isNewTurn || next.turn === null
-        ? initLangyConversationTurnState()
-        : next.turn;
+      isNewTurn || next.turn === null ? initLangyConversationTurnState() : next.turn;
     next = {
       cursor: at,
       turnId: event.data.turnId,
@@ -110,11 +104,7 @@ export function applyLangyTurnEvents(
  * history has new durable content to reconcile (the answer lands on the
  * message projection at the same terminal), and to settle the phase machine.
  */
-export function isLangyTurnProjectionTerminal(
-  state: LangyTurnProjectionState,
-): boolean {
+export function isLangyTurnProjectionTerminal(state: LangyTurnProjectionState): boolean {
   const status = state.turn?.Status;
-  return (
-    status === "completed" || status === "failed" || status === "stopped"
-  );
+  return status === "completed" || status === "failed" || status === "stopped";
 }

@@ -156,8 +156,7 @@ describe.skipIf(!hasCredentialsSecret)(
         ctx(),
       );
 
-      const result =
-        await service().getProjectModelProvidersForFrontend(projectId);
+      const result = await service().getProjectModelProvidersForFrontend(projectId);
 
       expect(result.openai).toBeDefined();
       // `noUncheckedIndexedAccess` makes `result.openai` possibly
@@ -198,8 +197,7 @@ describe.skipIf(!hasCredentialsSecret)(
         ctx(),
       );
 
-      const result =
-        await service().getProjectModelProvidersForFrontend(projectId);
+      const result = await service().getProjectModelProvidersForFrontend(projectId);
 
       expect(result.anthropic).toBeDefined();
       expect(result.anthropic!.enabled).toBe(true);

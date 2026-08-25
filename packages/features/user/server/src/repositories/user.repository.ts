@@ -15,9 +15,7 @@ export abstract class UserRepository {
   abstract updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
   abstract tryGetAccountInfo(id: string): Promise<UserAccountInfo | null>;
   abstract getSsoStatus(id: string): Promise<UserSsoStatus>;
-  abstract getTraceExplorerTourPreference(
-    id: string,
-  ): Promise<UserTourPreference>;
+  abstract getTraceExplorerTourPreference(id: string): Promise<UserTourPreference>;
   abstract setTraceExplorerTourDismissedAt(
     id: string,
     dismissedAt: Date,
@@ -25,9 +23,6 @@ export abstract class UserRepository {
   abstract setLastLoginAt(id: string, lastLoginAt: Date): Promise<void>;
   abstract getLastHomePath(id: string): Promise<string | null>;
   abstract setLastHomePath(id: string, path: string | null): Promise<void>;
-  abstract setDeactivatedAt(
-    id: string,
-    deactivatedAt: Date | null,
-  ): Promise<UserProfile>;
+  abstract setDeactivatedAt(id: string, deactivatedAt: Date | null): Promise<UserProfile>;
   abstract setAvatar(id: string, image: string | null): Promise<void>;
 }

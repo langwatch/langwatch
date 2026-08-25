@@ -73,7 +73,7 @@ The payload is bounded in two independent ways. Its **shape** comes from
 from the corresponding internal read schema and is applied as the procedure's
 tRPC `.output()` parser: Zod strips keys the schema does not name, server-side,
 so a new column on an internal read is dropped at the share boundary instead of
-silently published. Two fields are *pinned* rather than omitted — `header.userId`
+silently published. Two fields are _pinned_ rather than omitted — `header.userId`
 to `null` and evaluator `error.stacktrace` to empty — because for those an
 omission would be indistinguishable from a legitimately absent field, and a
 redaction regression should fail loudly (a parse error) rather than quietly. The
@@ -94,7 +94,7 @@ simultaneous opens of a single-view link admit at most one viewer. A page load
 counts once because the page, the layout chrome and every drawer hook share one
 React Query key (`sharedTrace.get({ token })`) and dedupe onto a single request.
 
-A view is a *viewing*, not an HTTP request. Within a 30-minute window the same
+A view is a _viewing_, not an HTTP request. Within a 30-minute window the same
 viewer re-opening a link — a refresh, a restored tab — does not consume another,
 via a Redis `SET NX` keyed on the share id and a hash of the viewer's IP and
 user agent (`ShareViewDedupeService`, mirroring the span-dedupe service). Without
@@ -108,12 +108,12 @@ is never stored or logged.
 
 **Cost of the anonymous surface.** `sharedTrace.get` is the one trace read the
 open internet can drive, and each call costs five ClickHouse reads plus a view
-write, so it is bounded three ways. It is rate limited per token *and* per IP
+write, so it is bounded three ways. It is rate limited per token _and_ per IP
 (via the existing `rateLimit` helper) — per-token alone would let one host
 spread load across many leaked tokens, per-IP alone would let a distributed
 caller hammer one link. The assembled payload is cached for 60s, keyed by token
 plus a fingerprint of the viewer's `protections` so two viewers with different
-redactions can never share an entry; the cache is consulted only *after* the
+redactions can never share an entry; the cache is consulted only _after_ the
 token resolves, so it can never serve a revoked link, and a hit is re-parsed
 through the output schema so a stale entry from an older deploy is stripped to
 today's contract. And `spansFull` is capped at `SHARE_MAX_FULL_SPANS`: the
@@ -142,7 +142,7 @@ which unmounts every affordance that mutates or needs a session (rename,
 refresh, maximize, dock, close, overflow menu, share dialog, back-history) and
 disables the queries behind them (`pinnedTrace.getPin`, `share.listForResource`,
 `scenarios.getRunState`, `prompts.getByIdOrHandle`, `traces.getEvaluationInputs`,
-`ops.getScope`, presence SSE + cursor broadcast). `readOnly` is a *rendering*
+`ops.getScope`, presence SSE + cursor broadcast). `readOnly` is a _rendering_
 concern, never a security boundary — the anonymous payload is authorized and
 gated once, server-side.
 

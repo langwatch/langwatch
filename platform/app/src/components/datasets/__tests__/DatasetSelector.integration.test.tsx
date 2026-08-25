@@ -57,8 +57,7 @@ const selector = (props: Partial<SelectorProps> = {}) => (
   </ChakraProvider>
 );
 
-const renderSelector = (props: Partial<SelectorProps> = {}) =>
-  render(selector(props));
+const renderSelector = (props: Partial<SelectorProps> = {}) => render(selector(props));
 
 afterEach(cleanup);
 
@@ -90,9 +89,7 @@ describe("DatasetSelector", () => {
 
         rerender(
           selector({
-            datasets: [
-              buildDataset({ name: "offline evals", id: "dataset-1" }),
-            ],
+            datasets: [buildDataset({ name: "offline evals", id: "dataset-1" })],
             isLoading: false,
           }),
         );

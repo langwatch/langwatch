@@ -100,9 +100,7 @@ describe("CopilotExtractor", () => {
 
       new CopilotExtractor().apply(ctx);
 
-      expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe(
-        "true",
-      );
+      expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
     });
 
     it("leaves chat spans unflagged so the model call's tokens count", () => {
@@ -115,9 +113,7 @@ describe("CopilotExtractor", () => {
 
       new CopilotExtractor().apply(ctx);
 
-      expect(
-        ctx.out["langwatch.reserved.skip_token_accumulation"],
-      ).toBeUndefined();
+      expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBeUndefined();
     });
 
     it("maps copilot's dotted reasoning usage spelling onto the canonical key", () => {
@@ -235,9 +231,7 @@ describe("CopilotExtractor", () => {
     // service merges them into the result at the end.
     const canonicalize = (attrs: Record<string, unknown>) =>
       new CanonicalizeSpanAttributesService().canonicalize(
-        attrs as Parameters<
-          CanonicalizeSpanAttributesService["canonicalize"]
-        >[0],
+        attrs as Parameters<CanonicalizeSpanAttributesService["canonicalize"]>[0],
         [],
         {
           name: "chat gpt-5",
@@ -246,9 +240,7 @@ describe("CopilotExtractor", () => {
           statusMessage: null,
           statusCode: null,
           parentSpanId: null,
-        } as unknown as Parameters<
-          CanonicalizeSpanAttributesService["canonicalize"]
-        >[2],
+        } as unknown as Parameters<CanonicalizeSpanAttributesService["canonicalize"]>[2],
       );
 
     /** @scenario A copilot chat span yields model and token usage on the canonical trace */
@@ -266,16 +258,12 @@ describe("CopilotExtractor", () => {
       // appliedRules pins the delegation: without GenAIExtractor in the
       // chain these attrs would still merge via remaining(), so the
       // value assertions alone would be unfalsifiable.
-      expect(result.appliedRules.some((r) => r.startsWith("genai:"))).toBe(
-        true,
-      );
+      expect(result.appliedRules.some((r) => r.startsWith("genai:"))).toBe(true);
       expect(result.attributes["gen_ai.request.model"]).toBe("gpt-5-mini");
       expect(result.attributes["gen_ai.usage.input_tokens"]).toBe(1200);
       expect(result.attributes["gen_ai.usage.output_tokens"]).toBe(350);
       // Extras — Copilot's work.
-      expect(result.appliedRules.some((r) => r.startsWith("copilot:"))).toBe(
-        true,
-      );
+      expect(result.appliedRules.some((r) => r.startsWith("copilot:"))).toBe(true);
       expect(result.attributes["metadata.copilot_premium_requests"]).toBe("1");
       expect(result.attributes["langwatch.user.id"]).toBe("hash");
     });
@@ -316,9 +304,7 @@ describe("CopilotExtractor", () => {
     // "no VS-Code-specific extractor code in v1".
     const canonicalizeVscode = (attrs: Record<string, unknown>) =>
       new CanonicalizeSpanAttributesService().canonicalize(
-        attrs as Parameters<
-          CanonicalizeSpanAttributesService["canonicalize"]
-        >[0],
+        attrs as Parameters<CanonicalizeSpanAttributesService["canonicalize"]>[0],
         [],
         {
           name: "chat oswe-vscode-prime",
@@ -327,9 +313,7 @@ describe("CopilotExtractor", () => {
           statusMessage: null,
           statusCode: null,
           parentSpanId: null,
-        } as unknown as Parameters<
-          CanonicalizeSpanAttributesService["canonicalize"]
-        >[2],
+        } as unknown as Parameters<CanonicalizeSpanAttributesService["canonicalize"]>[2],
       );
 
     /** @scenario A copilot-chat span yields model and token usage on the canonical trace */
@@ -345,19 +329,13 @@ describe("CopilotExtractor", () => {
         copilot_usage_nano_aiu: 230235000,
       });
 
-      expect(result.appliedRules.some((r) => r.startsWith("genai:"))).toBe(
-        true,
-      );
-      expect(result.attributes["gen_ai.request.model"]).toBe(
-        "oswe-vscode-prime",
-      );
+      expect(result.appliedRules.some((r) => r.startsWith("genai:"))).toBe(true);
+      expect(result.attributes["gen_ai.request.model"]).toBe("oswe-vscode-prime");
       expect(result.attributes["gen_ai.usage.input_tokens"]).toBe(618820);
       expect(result.attributes["gen_ai.usage.output_tokens"]).toBe(11348);
       // the copilot extractor gates on the github.copilot scope, so it never
       // fires for copilot-chat — no VS-Code-specific extractor code.
-      expect(result.appliedRules.some((r) => r.startsWith("copilot:"))).toBe(
-        false,
-      );
+      expect(result.appliedRules.some((r) => r.startsWith("copilot:"))).toBe(false);
     });
 
     /** @scenario Captured prompt content is lifted as span input */

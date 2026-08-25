@@ -15,15 +15,11 @@ describe("retentionDaysSchema", () => {
   describe("given a whole-week value within the allowed range", () => {
     it("accepts the absolute minimum (35 days / 5 weeks, the paid floor)", () => {
       expect(MIN_RETENTION_DAYS).toBe(35);
-      expect(retentionDaysSchema.safeParse(MIN_RETENTION_DAYS).success).toBe(
-        true,
-      );
+      expect(retentionDaysSchema.safeParse(MIN_RETENTION_DAYS).success).toBe(true);
     });
 
     it("accepts the UInt16-aligned ceiling", () => {
-      expect(retentionDaysSchema.safeParse(MAX_RETENTION_DAYS).success).toBe(
-        true,
-      );
+      expect(retentionDaysSchema.safeParse(MAX_RETENTION_DAYS).success).toBe(true);
     });
 
     it("accepts an arbitrary whole-week value", () => {
@@ -35,9 +31,7 @@ describe("retentionDaysSchema", () => {
     // Every managed table is partitioned weekly (toYearWeek), so retention
     // must align to a 7-day boundary.
     it("rejects a day count that isn't a multiple of 7", () => {
-      expect(
-        retentionDaysSchema.safeParse(MIN_RETENTION_DAYS + 1).success,
-      ).toBe(false);
+      expect(retentionDaysSchema.safeParse(MIN_RETENTION_DAYS + 1).success).toBe(false);
       expect(retentionDaysSchema.safeParse(50).success).toBe(false);
     });
   });
@@ -50,8 +44,7 @@ describe("retentionDaysSchema", () => {
     it("rejects a whole-week count above the ceiling", () => {
       expect(retentionDaysSchema.safeParse(100002).success).toBe(false);
       expect(
-        retentionDaysSchema.safeParse(MAX_RETENTION_DAYS + RETENTION_WEEK_DAYS)
-          .success,
+        retentionDaysSchema.safeParse(MAX_RETENTION_DAYS + RETENTION_WEEK_DAYS).success,
       ).toBe(false);
     });
   });
@@ -59,8 +52,7 @@ describe("retentionDaysSchema", () => {
   describe("when the value is below the minimum", () => {
     it("rejects it even when it is a whole number of weeks", () => {
       expect(
-        retentionDaysSchema.safeParse(MIN_RETENTION_DAYS - RETENTION_WEEK_DAYS)
-          .success,
+        retentionDaysSchema.safeParse(MIN_RETENTION_DAYS - RETENTION_WEEK_DAYS).success,
       ).toBe(false);
     });
   });
@@ -97,23 +89,21 @@ describe("retentionDaysInputSchema", () => {
   // only). The plain `retentionDaysSchema` (a tier value) still rejects 0.
   describe("given the indefinite sentinel", () => {
     it("accepts 0 (keep forever)", () => {
-      expect(
-        retentionDaysInputSchema.safeParse(INDEFINITE_RETENTION_DAYS).success,
-      ).toBe(true);
+      expect(retentionDaysInputSchema.safeParse(INDEFINITE_RETENTION_DAYS).success).toBe(
+        true,
+      );
     });
 
     it("is rejected by the plain tier-value schema", () => {
-      expect(
-        retentionDaysSchema.safeParse(INDEFINITE_RETENTION_DAYS).success,
-      ).toBe(false);
+      expect(retentionDaysSchema.safeParse(INDEFINITE_RETENTION_DAYS).success).toBe(
+        false,
+      );
     });
   });
 
   describe("given a finite value", () => {
     it("accepts a whole-week value at or above the minimum", () => {
-      expect(
-        retentionDaysInputSchema.safeParse(MIN_RETENTION_DAYS).success,
-      ).toBe(true);
+      expect(retentionDaysInputSchema.safeParse(MIN_RETENTION_DAYS).success).toBe(true);
       expect(retentionDaysInputSchema.safeParse(91).success).toBe(true);
     });
 
@@ -132,9 +122,7 @@ describe("plan-tier retention constants", () => {
   // the absolute schema floor had to drop to 35 (the gate re-enforces 49 for
   // non-paid custom values). Guard the ordering so the two floors don't drift.
   it("keeps the absolute floor below the enterprise custom floor", () => {
-    expect(MIN_RETENTION_DAYS).toBeLessThan(
-      ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
-    );
+    expect(MIN_RETENTION_DAYS).toBeLessThan(ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS);
     expect(ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS).toBe(49);
   });
 
@@ -164,14 +152,10 @@ describe("PLATFORM_DEFAULT_RETENTION_DAYS", () => {
   });
 
   it("sits within the allowed override range", () => {
-    expect(PLATFORM_DEFAULT_RETENTION_DAYS).toBeGreaterThanOrEqual(
-      MIN_RETENTION_DAYS,
+    expect(PLATFORM_DEFAULT_RETENTION_DAYS).toBeGreaterThanOrEqual(MIN_RETENTION_DAYS);
+    expect(PLATFORM_DEFAULT_RETENTION_DAYS).toBeLessThanOrEqual(MAX_RETENTION_DAYS);
+    expect(retentionDaysSchema.safeParse(PLATFORM_DEFAULT_RETENTION_DAYS).success).toBe(
+      true,
     );
-    expect(PLATFORM_DEFAULT_RETENTION_DAYS).toBeLessThanOrEqual(
-      MAX_RETENTION_DAYS,
-    );
-    expect(
-      retentionDaysSchema.safeParse(PLATFORM_DEFAULT_RETENTION_DAYS).success,
-    ).toBe(true);
   });
 });

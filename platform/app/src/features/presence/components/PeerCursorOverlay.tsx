@@ -4,10 +4,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useCursorBroadcast } from "../hooks/useCursorBroadcast";
 import { type PeerCursor, usePeerCursors } from "../hooks/usePeerCursors";
 import { usePresenceFeatureEnabled } from "../hooks/usePresenceFeatureEnabled";
-import {
-  presenceUserColor,
-  presenceUserDisplayName,
-} from "../utils/sessionColor";
+import { presenceUserColor, presenceUserDisplayName } from "../utils/sessionColor";
 
 interface PeerCursorOverlayProps {
   /**
@@ -37,8 +34,7 @@ export function PeerCursorOverlay({
   const { enabled: featureEnabled } = usePresenceFeatureEnabled();
   const effectivelyEnabled = enabled && featureEnabled;
   const internalRef = useRef<HTMLDivElement | null>(null);
-  const ref = (containerRef ??
-    internalRef) as React.RefObject<HTMLDivElement | null>;
+  const ref = (containerRef ?? internalRef) as React.RefObject<HTMLDivElement | null>;
 
   useCursorBroadcast({
     projectId,

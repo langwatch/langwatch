@@ -9,13 +9,7 @@
  * Boundary mocks mirror LangyReasoningTitleGrouping.integration.test.tsx.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -157,9 +151,7 @@ describe("the completed receipt's tool results", () => {
       const row = screen.getAllByRole("listitem")[0]!;
       fireEvent.click(within(row).getAllByRole("button")[0]!);
 
-      expect(
-        screen.getByText('$ langwatch trace search --start "now-1d"'),
-      ).toBeDefined();
+      expect(screen.getByText('$ langwatch trace search --start "now-1d"')).toBeDefined();
       expect(screen.getByText("$ langwatch trace search")).toBeDefined();
     });
   });

@@ -48,7 +48,7 @@ describe("Scenarios Skill", () => {
     "creates scenario tests for a Python OpenAI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-scenario-test-py-")
+        path.join(os.tmpdir(), "langwatch-skill-scenario-test-py-"),
       );
 
       copyFixtureToWorkDir({
@@ -76,7 +76,7 @@ describe("Scenarios Skill", () => {
         ],
         script: [
           scenario.user(
-            "add agent simulation tests for my agent. This is a conversational bot, so include multi-turn tests. Run them after writing to verify they work."
+            "add agent simulation tests for my agent. This is a conversational bot, so include multi-turn tests. Run them after writing to verify they work.",
           ),
           scenario.agent(),
           (state) => {
@@ -86,7 +86,7 @@ describe("Scenarios Skill", () => {
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(
               testFiles.length,
-              `Expected at least one test_*.py file in ${tempFolder}`
+              `Expected at least one test_*.py file in ${tempFolder}`,
             ).toBeGreaterThan(0);
 
             const testContent = testFiles
@@ -99,24 +99,26 @@ describe("Scenarios Skill", () => {
             // Verify at least one multi-turn scenario exists
             expect(
               testContent.includes("max_turns") ||
-              testContent.includes("scenario.user(") ||
-              testContent.includes("script="),
-              "Expected at least one multi-turn scenario (max_turns, scripted user/agent turns)"
+                testContent.includes("scenario.user(") ||
+                testContent.includes("script="),
+              "Expected at least one multi-turn scenario (max_turns, scripted user/agent turns)",
             ).toBe(true);
 
             expect(testContent).not.toMatch(
-              /from\s+(agent_tester|simulation_framework|langwatch\.testing|test_framework)/
+              /from\s+(agent_tester|simulation_framework|langwatch\.testing|test_framework)/,
             );
 
             // Verify the agent attempted to run the tests (look for pytest cache or execution evidence)
-            const ranTests = fs.existsSync(path.join(tempFolder, ".pytest_cache")) ||
-              state.messages.some(m => {
-                const text = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+            const ranTests =
+              fs.existsSync(path.join(tempFolder, ".pytest_cache")) ||
+              state.messages.some((m) => {
+                const text =
+                  typeof m.content === "string" ? m.content : JSON.stringify(m.content);
                 return /pytest|uv run pytest|python -m pytest/.test(text);
               });
             expect(
               ranTests,
-              "Expected the agent to run the scenario tests after writing them"
+              "Expected the agent to run the scenario tests after writing them",
             ).toBe(true);
           },
           scenario.judge(),
@@ -125,14 +127,14 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "creates scenario tests for a TypeScript Vercel AI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-scenario-test-ts-")
+        path.join(os.tmpdir(), "langwatch-skill-scenario-test-ts-"),
       );
 
       copyFixtureToWorkDir({
@@ -158,9 +160,7 @@ describe("Scenarios Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "add agent simulation tests for my agent"
-          ),
+          scenario.user("add agent simulation tests for my agent"),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
@@ -169,7 +169,7 @@ describe("Scenarios Skill", () => {
             const testFiles = findTestFiles(tempFolder, /\.test\.ts$/);
             expect(
               testFiles.length,
-              `Expected at least one .test.ts file in ${tempFolder}`
+              `Expected at least one .test.ts file in ${tempFolder}`,
             ).toBeGreaterThan(0);
 
             const testContent = testFiles
@@ -178,12 +178,10 @@ describe("Scenarios Skill", () => {
 
             expect(testContent).toContain("@langwatch/scenario");
             expect(testContent).toMatch(/scenario\.run\(/);
-            expect(testContent).toMatch(
-              /(?:from\s+["']vitest["']|import\s+.*vitest)/
-            );
+            expect(testContent).toMatch(/(?:from\s+["']vitest["']|import\s+.*vitest)/);
 
             expect(testContent).not.toMatch(
-              /from\s+["'](agent_tester|simulation_framework|langwatch\.testing|test_framework)["']/
+              /from\s+["'](agent_tester|simulation_framework|langwatch\.testing|test_framework)["']/,
             );
           },
           scenario.judge(),
@@ -192,14 +190,14 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "creates scenario tests for a Python LangGraph agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-scenarios-langgraph-")
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-langgraph-"),
       );
       copyFixtureToWorkDir({
         fixtureSubpath: "python-langgraph",
@@ -210,8 +208,7 @@ describe("Scenarios Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "Python LangGraph scenario tests",
-        description:
-          "Adding scenario tests to a Python LangGraph agent project.",
+        description: "Adding scenario tests to a Python LangGraph agent project.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -224,9 +221,7 @@ describe("Scenarios Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "add agent simulation tests for my agent"
-          ),
+          scenario.user("add agent simulation tests for my agent"),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
@@ -243,14 +238,14 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "creates red team tests for a Python OpenAI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-scenarios-red-team-py-")
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-red-team-py-"),
       );
 
       copyFixtureToWorkDir({
@@ -276,9 +271,7 @@ describe("Scenarios Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "red team my agent for vulnerabilities"
-          ),
+          scenario.user("red team my agent for vulnerabilities"),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
@@ -287,7 +280,7 @@ describe("Scenarios Skill", () => {
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(
               testFiles.length,
-              `Expected at least one test_*.py file in ${tempFolder}`
+              `Expected at least one test_*.py file in ${tempFolder}`,
             ).toBeGreaterThan(0);
 
             const testContent = testFiles
@@ -299,7 +292,7 @@ describe("Scenarios Skill", () => {
             expect(testContent).toMatch(/scenario\.run\(/);
 
             expect(testContent).not.toMatch(
-              /from\s+(agent_tester|simulation_framework|langwatch\.testing|red_team_framework)/
+              /from\s+(agent_tester|simulation_framework|langwatch\.testing|red_team_framework)/,
             );
           },
           scenario.judge(),
@@ -308,14 +301,14 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "creates red team tests for a TypeScript Vercel AI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-scenarios-red-team-ts-")
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-red-team-ts-"),
       );
 
       copyFixtureToWorkDir({
@@ -341,9 +334,7 @@ describe("Scenarios Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "red team my agent for vulnerabilities"
-          ),
+          scenario.user("red team my agent for vulnerabilities"),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
@@ -352,7 +343,7 @@ describe("Scenarios Skill", () => {
             const testFiles = findTestFiles(tempFolder, /\.(test|spec)\.ts$/);
             expect(
               testFiles.length,
-              `Expected at least one .test.ts or .spec.ts file in ${tempFolder}`
+              `Expected at least one .test.ts or .spec.ts file in ${tempFolder}`,
             ).toBeGreaterThan(0);
 
             const testContent = testFiles
@@ -362,12 +353,10 @@ describe("Scenarios Skill", () => {
             expect(testContent).toContain("@langwatch/scenario");
             expect(testContent).toMatch(/redTeam(?:Crescendo|Agent)/);
             expect(testContent).toMatch(/scenario\.run\(/);
-            expect(testContent).toMatch(
-              /(?:from\s+["']vitest["']|import\s+.*vitest)/
-            );
+            expect(testContent).toMatch(/(?:from\s+["']vitest["']|import\s+.*vitest)/);
 
             expect(testContent).not.toMatch(
-              /from\s+["'](agent_tester|simulation_framework|langwatch\.testing|red_team_framework)["']/
+              /from\s+["'](agent_tester|simulation_framework|langwatch\.testing|red_team_framework)["']/,
             );
           },
           scenario.judge(),
@@ -376,14 +365,14 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "creates a targeted scenario for a specific behavior",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-scenarios-targeted-")
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-targeted-"),
       );
 
       copyFixtureToWorkDir({
@@ -410,7 +399,7 @@ describe("Scenarios Skill", () => {
         ],
         script: [
           scenario.user(
-            "write a scenario test that verifies my bot always includes emojis in its responses when asked about technology topics"
+            "write a scenario test that verifies my bot always includes emojis in its responses when asked about technology topics",
           ),
           scenario.agent(),
           (state) => {
@@ -429,14 +418,14 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "uses the langwatch CLI to create scenarios when no codebase is present",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-scenarios-platform-")
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-platform-"),
       );
 
       // No fixture copied — empty directory
@@ -446,13 +435,10 @@ describe("Scenarios Skill", () => {
       const apiKey = process.env.LANGWATCH_API_KEY?.trim();
       if (!apiKey) {
         throw new Error(
-          "LANGWATCH_API_KEY must be set to run platform-mode scenario tests"
+          "LANGWATCH_API_KEY must be set to run platform-mode scenario tests",
         );
       }
-      fs.writeFileSync(
-        path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${apiKey}\n`
-      );
+      fs.writeFileSync(path.join(tempFolder, ".env"), `LANGWATCH_API_KEY=${apiKey}\n`);
 
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
@@ -472,7 +458,7 @@ describe("Scenarios Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a test scenario for a customer support agent that handles refund requests"
+            "create a test scenario for a customer support agent that handles refund requests",
           ),
           scenario.agent(),
           (state) => {
@@ -483,9 +469,7 @@ describe("Scenarios Skill", () => {
 
             const allContent = state.messages
               .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content)
+                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
               )
               .join("\n");
 
@@ -493,7 +477,7 @@ describe("Scenarios Skill", () => {
               allContent.includes("langwatch scenario create") ||
                 allContent.includes("langwatch scenario list") ||
                 allContent.includes("langwatch suite create"),
-              "Expected agent to invoke `langwatch scenario create`, `langwatch scenario list`, or `langwatch suite create` via the CLI"
+              "Expected agent to invoke `langwatch scenario create`, `langwatch scenario list`, or `langwatch suite create` via the CLI",
             ).toBe(true);
           },
           scenario.judge(),
@@ -502,14 +486,14 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "creates scenario tests for a TypeScript Mastra agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-scenarios-mastra-")
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-mastra-"),
       );
       copyFixtureToWorkDir({
         fixtureSubpath: "typescript-mastra",
@@ -520,8 +504,7 @@ describe("Scenarios Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Mastra scenario tests",
-        description:
-          "Adding scenario tests to a TypeScript Mastra agent project.",
+        description: "Adding scenario tests to a TypeScript Mastra agent project.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -533,18 +516,14 @@ describe("Scenarios Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "add agent simulation tests for my agent"
-          ),
+          scenario.user("add agent simulation tests for my agent"),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /\.(test|spec)\.ts$/);
             expect(testFiles.length).toBeGreaterThan(0);
-            const content = testFiles
-              .map((f) => fs.readFileSync(f, "utf8"))
-              .join("\n");
+            const content = testFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n");
             expect(content).toContain("@langwatch/scenario");
           },
           scenario.judge(),
@@ -552,14 +531,14 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "creates domain-specific scenarios for a RAG agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-scenarios-rag-")
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-rag-"),
       );
       copyFixtureToWorkDir({
         fixtureSubpath: "python-rag-agent",
@@ -586,7 +565,7 @@ describe("Scenarios Skill", () => {
         ],
         script: [
           scenario.user(
-            "add agent simulation tests for my farm advisory agent. Read the codebase to understand what it does. Include multi-turn tests. Run the tests after writing them."
+            "add agent simulation tests for my farm advisory agent. Read the codebase to understand what it does. Include multi-turn tests. Run the tests after writing them.",
           ),
           scenario.agent(),
           (state) => {
@@ -610,11 +589,11 @@ describe("Scenarios Skill", () => {
               content.includes("harvest");
             expect(
               hasDomainTerms,
-              "Expected scenarios to reference agricultural domain concepts"
+              "Expected scenarios to reference agricultural domain concepts",
             ).toBe(true);
 
             expect(content).not.toMatch(
-              /capital of france|what is 2 ?\+ ?2|quantum computing/
+              /capital of france|what is 2 ?\+ ?2|quantum computing/,
             );
           },
           scenario.judge(),
@@ -622,14 +601,14 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "suggests domain-specific improvements after delivering initial scenarios",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-scenarios-consultant-")
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-consultant-"),
       );
       copyFixtureToWorkDir({
         fixtureSubpath: "python-rag-agent",
@@ -656,7 +635,7 @@ describe("Scenarios Skill", () => {
         ],
         script: [
           scenario.user(
-            "add scenario tests for my farm advisory agent. After you're done and tests pass, suggest how to make them even better — be specific about what domain edge cases I should cover."
+            "add scenario tests for my farm advisory agent. After you're done and tests pass, suggest how to make them even better — be specific about what domain edge cases I should cover.",
           ),
           scenario.agent(),
           (state) => {
@@ -671,9 +650,7 @@ describe("Scenarios Skill", () => {
             const agentMessages = state.messages
               .filter((m) => m.role === "assistant")
               .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content)
+                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
               )
               .join("\n")
               .toLowerCase();
@@ -687,7 +664,7 @@ describe("Scenarios Skill", () => {
               agentMessages.includes("improve");
             expect(
               hasDeepSuggestions,
-              "Expected agent to suggest domain-specific improvements"
+              "Expected agent to suggest domain-specific improvements",
             ).toBe(true);
           },
           scenario.judge(),
@@ -695,22 +672,20 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000 // longer timeout — agent needs to run tests + generate suggestions
+    900_000, // longer timeout — agent needs to run tests + generate suggestions
   );
 
   it.skipIf(isCI)(
     "creates voice scenario tests for a Python OpenAI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-scenarios-voice-py-")
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-voice-py-"),
       );
       console.log(`[voice dogfood] working dir: ${tempFolder}`);
 
-      fs.cpSync(
-        path.resolve(__dirname, "fixtures/python-openai"),
-        tempFolder,
-        { recursive: true }
-      );
+      fs.cpSync(path.resolve(__dirname, "fixtures/python-openai"), tempFolder, {
+        recursive: true,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -725,7 +700,7 @@ describe("Scenarios Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent created a voice scenario test using one of Scenario's voice adapters (OpenAIRealtimeAgentAdapter, ElevenLabsAgentAdapter, PipecatAgentAdapter, GeminiLiveAgentAdapter, or TwilioAgentAdapter) — NOT a generic text-only scenario",
-              "Agent seeded a voice on the UserSimulatorAgent (e.g. `voice=\"elevenlabs/...\"` or `voice=\"openai/...\"`) so the simulated caller speaks rather than types",
+              'Agent seeded a voice on the UserSimulatorAgent (e.g. `voice="elevenlabs/..."` or `voice="openai/..."`) so the simulated caller speaks rather than types',
               "Agent used the `langwatch scenario-docs` CLI command to read Scenario documentation, OR explicitly read the voice docs surface (voice/getting-started, voice/choosing-an-adapter, voice/capability-matrix, voice/recipes/*)",
             ],
           }),
@@ -735,9 +710,7 @@ describe("Scenarios Skill", () => {
           // https://github.com/langwatch/scenario/pull/598) tell users to
           // type. This dogfoods that the SKILL itself picks up on the
           // "voice testing" intent without us coaching it further.
-          scenario.user(
-            "/scenarios add voice testing to my agent"
-          ),
+          scenario.user("/scenarios add voice testing to my agent"),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
@@ -746,7 +719,7 @@ describe("Scenarios Skill", () => {
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(
               testFiles.length,
-              `Expected at least one test_*.py file in ${tempFolder}`
+              `Expected at least one test_*.py file in ${tempFolder}`,
             ).toBeGreaterThan(0);
 
             const testContent = testFiles
@@ -759,7 +732,7 @@ describe("Scenarios Skill", () => {
             expect(testContent).toContain("import scenario");
             expect(testContent).toMatch(/scenario\.run\(/);
             expect(testContent).not.toMatch(
-              /from\s+(agent_tester|simulation_framework|langwatch\.testing|voice_test_framework)/
+              /from\s+(agent_tester|simulation_framework|langwatch\.testing|voice_test_framework)/,
             );
 
             // Voice-specific guardrails. At least ONE voice adapter
@@ -772,9 +745,9 @@ describe("Scenarios Skill", () => {
             // fixture, which has no voice transport of its own).
             expect(
               testContent,
-              "Expected the test to instantiate a voice adapter (OpenAIRealtimeAgentAdapter / ElevenLabsAgentAdapter / PipecatAgentAdapter / GeminiLiveAgentAdapter / TwilioAgentAdapter / ComposableVoiceAgent) — bare mentions in comments or imports don't count."
+              "Expected the test to instantiate a voice adapter (OpenAIRealtimeAgentAdapter / ElevenLabsAgentAdapter / PipecatAgentAdapter / GeminiLiveAgentAdapter / TwilioAgentAdapter / ComposableVoiceAgent) — bare mentions in comments or imports don't count.",
             ).toMatch(
-              /\b(?:scenario\.)?(?:OpenAIRealtimeAgentAdapter|ElevenLabsAgentAdapter|PipecatAgentAdapter|GeminiLiveAgentAdapter|TwilioAgentAdapter|ComposableVoiceAgent)\s*\(/
+              /\b(?:scenario\.)?(?:OpenAIRealtimeAgentAdapter|ElevenLabsAgentAdapter|PipecatAgentAdapter|GeminiLiveAgentAdapter|TwilioAgentAdapter|ComposableVoiceAgent)\s*\(/,
             );
 
             // The user simulator should carry a voice — either an
@@ -785,9 +758,9 @@ describe("Scenarios Skill", () => {
             // call, not in a comment, docstring, or unrelated dict.
             expect(
               testContent,
-              'Expected UserSimulatorAgent(voice="elevenlabs/..." | "openai/...") so the simulated caller speaks'
+              'Expected UserSimulatorAgent(voice="elevenlabs/..." | "openai/...") so the simulated caller speaks',
             ).toMatch(
-              /UserSimulatorAgent\s*\([\s\S]*?voice\s*=\s*["'](?:elevenlabs|openai)\/[^"']+["']/
+              /UserSimulatorAgent\s*\([\s\S]*?voice\s*=\s*["'](?:elevenlabs|openai)\/[^"']+["']/,
             );
           },
           scenario.judge(),
@@ -796,14 +769,14 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "creates voice scenario tests for a TypeScript voice agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-scenario-test-ts-voice-")
+        path.join(os.tmpdir(), "langwatch-skill-scenario-test-ts-voice-"),
       );
 
       copyFixtureToWorkDir({
@@ -831,7 +804,7 @@ describe("Scenarios Skill", () => {
         ],
         script: [
           scenario.user(
-            "add agent simulation tests for my voice agent. It's a voice bot, so the tests need to drive real audio, not text."
+            "add agent simulation tests for my voice agent. It's a voice bot, so the tests need to drive real audio, not text.",
           ),
           scenario.agent(),
           (state) => {
@@ -841,7 +814,7 @@ describe("Scenarios Skill", () => {
             const testFiles = findTestFiles(tempFolder, /\.(test|spec)\.ts$/);
             expect(
               testFiles.length,
-              `Expected at least one .test.ts or .spec.ts file in ${tempFolder}`
+              `Expected at least one .test.ts or .spec.ts file in ${tempFolder}`,
             ).toBeGreaterThan(0);
 
             const testContent = testFiles
@@ -853,23 +826,23 @@ describe("Scenarios Skill", () => {
 
             // Guard against home-rolled test frameworks instead of @langwatch/scenario
             expect(testContent).not.toMatch(
-              /from\s+["'](?:agent-tester|simulation-framework|voice-test-framework|langwatch-testing)["']/
+              /from\s+["'](?:agent-tester|simulation-framework|voice-test-framework|langwatch-testing)["']/,
             );
 
             // Verify a voice adapter factory is CALLED (not just mentioned in a comment)
             expect(
               testContent,
-              "Expected the test to call a voice adapter factory (openAIRealtimeAgent / pipecatAgent / elevenLabsAgent / geminiLiveAgent / twilioAgent / composableAgent) — bare mentions in comments or string literals do not count."
+              "Expected the test to call a voice adapter factory (openAIRealtimeAgent / pipecatAgent / elevenLabsAgent / geminiLiveAgent / twilioAgent / composableAgent) — bare mentions in comments or string literals do not count.",
             ).toMatch(
-              /\b(?:scenario\.)?(?:openAIRealtimeAgent|pipecatAgent|elevenLabsAgent|geminiLiveAgent|twilioAgent|composableAgent)\s*\(/
+              /\b(?:scenario\.)?(?:openAIRealtimeAgent|pipecatAgent|elevenLabsAgent|geminiLiveAgent|twilioAgent|composableAgent)\s*\(/,
             );
 
             // Verify the simulator was configured with a voice inside the userSimulatorAgent call
             expect(
               testContent,
-              'Expected userSimulatorAgent({ voice: "openai/..." | "elevenlabs/..." }) so the simulated caller speaks'
+              'Expected userSimulatorAgent({ voice: "openai/..." | "elevenlabs/..." }) so the simulated caller speaks',
             ).toMatch(
-              /userSimulatorAgent\s*\(\s*\{[^}]*?voice\s*:\s*["'](?:elevenlabs|openai)\/[^"']+["']/
+              /userSimulatorAgent\s*\(\s*\{[^}]*?voice\s*:\s*["'](?:elevenlabs|openai)\/[^"']+["']/,
             );
           },
           scenario.judge(),
@@ -878,7 +851,6 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    1_800_000
+    1_800_000,
   );
-
 });

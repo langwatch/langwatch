@@ -79,9 +79,7 @@ describe("WebhookDeliveriesDrawer", () => {
       limit: 25,
       cursor: undefined,
     });
-    expect(
-      screen.getByTestId("webhook-deliveries-load-more"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("webhook-deliveries-load-more")).toBeInTheDocument();
   });
 
   /** @scenario The deliveries drawer loads more on demand */
@@ -132,9 +130,7 @@ describe("WebhookDeliveriesDrawer", () => {
     for (const latency of ["101ms", "102ms", "103ms", "104ms"]) {
       expect(screen.getByText(latency)).toBeInTheDocument();
     }
-    expect(
-      screen.queryByTestId("webhook-deliveries-load-more"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("webhook-deliveries-load-more")).not.toBeInTheDocument();
   });
 
   /** @scenario No Load more when the page is the last */
@@ -145,8 +141,6 @@ describe("WebhookDeliveriesDrawer", () => {
       isFetching: false,
     });
     renderDrawer();
-    expect(
-      screen.queryByTestId("webhook-deliveries-load-more"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("webhook-deliveries-load-more")).not.toBeInTheDocument();
   });
 });

@@ -109,17 +109,13 @@ export abstract class AuthzMigrationRepository {
     organizationId: string;
   }): Promise<LegacyBindingRow[]>;
 
-  abstract findLegacyRoleRows(args: {
-    organizationId: string;
-  }): Promise<LegacyRoleRow[]>;
+  abstract findLegacyRoleRows(args: { organizationId: string }): Promise<LegacyRoleRow[]>;
 
   abstract findOrganizationMembers(args: {
     organizationId: string;
   }): Promise<OrganizationMemberFact[]>;
 
-  abstract findLegacyTeamRows(args: {
-    organizationId: string;
-  }): Promise<LegacyTeamRow[]>;
+  abstract findLegacyTeamRows(args: { organizationId: string }): Promise<LegacyTeamRow[]>;
 
   abstract findShareLinkRows(args: {
     organizationId: string;
@@ -137,13 +133,9 @@ export abstract class AuthzMigrationRepository {
     organizationId: string;
   }): Promise<Array<{ userId: string; groupId: string }>>;
 
-  abstract findGrantHeadRows(args: {
-    organizationId: string;
-  }): Promise<GrantHeadRow[]>;
+  abstract findGrantHeadRows(args: { organizationId: string }): Promise<GrantHeadRow[]>;
 
-  abstract findRoleHeads(args: {
-    organizationId: string;
-  }): Promise<RoleHeadRow[]>;
+  abstract findRoleHeads(args: { organizationId: string }): Promise<RoleHeadRow[]>;
 
   abstract findResourceGrantRows(args: {
     organizationId: string;

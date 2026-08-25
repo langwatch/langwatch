@@ -36,9 +36,7 @@ export type AuthzRuntimeContext = {
 /** Late binding between package-owned commands and the app's pipeline registry. */
 class AppAuthzCommandDispatcher extends AuthzGrantsCommandDispatcher {
   private senders: AuthzGrantsCommandSenders | undefined;
-  private readonly waiters = new Set<
-    (senders: AuthzGrantsCommandSenders) => void
-  >();
+  private readonly waiters = new Set<(senders: AuthzGrantsCommandSenders) => void>();
 
   connect(senders: AuthzGrantsCommandSenders): void {
     if (this.senders && this.senders !== senders) {
@@ -52,20 +50,18 @@ class AppAuthzCommandDispatcher extends AuthzGrantsCommandDispatcher {
   async commands(): Promise<{ commands: AuthzGrantsCommandSenders }> {
     if (this.senders) return { commands: this.senders };
 
-    const senders = await new Promise<AuthzGrantsCommandSenders>(
-      (resolve, reject) => {
-        const onConnected = (value: AuthzGrantsCommandSenders) => {
-          clearTimeout(timeout);
-          this.waiters.delete(onConnected);
-          resolve(value);
-        };
-        const timeout = setTimeout(() => {
-          this.waiters.delete(onConnected);
-          reject(new AuthzLedgerUnavailableError());
-        }, LEDGER_APP_HANDLE_WAIT_MS);
-        this.waiters.add(onConnected);
-      },
-    );
+    const senders = await new Promise<AuthzGrantsCommandSenders>((resolve, reject) => {
+      const onConnected = (value: AuthzGrantsCommandSenders) => {
+        clearTimeout(timeout);
+        this.waiters.delete(onConnected);
+        resolve(value);
+      };
+      const timeout = setTimeout(() => {
+        this.waiters.delete(onConnected);
+        reject(new AuthzLedgerUnavailableError());
+      }, LEDGER_APP_HANDLE_WAIT_MS);
+      this.waiters.add(onConnected);
+    });
     return { commands: senders };
   }
 }

@@ -121,9 +121,7 @@ describe("given a score key the reviewer opened", () => {
       renderScores();
       await userEvent.click(chip("Helpfulness"));
 
-      await userEvent.click(
-        await screen.findByRole("radio", { name: "Helpful" }),
-      );
+      await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
 
       expect(screen.getByRole("radio", { name: "Helpful" })).toBeChecked();
       expect(screen.getByRole("button", { name: "OK" })).toBeVisible();
@@ -134,9 +132,7 @@ describe("given a score key the reviewer opened", () => {
       renderScores();
       await userEvent.click(chip("Helpfulness"));
 
-      await userEvent.click(
-        await screen.findByRole("radio", { name: "Helpful" }),
-      );
+      await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
 
       expect(chip("Helpfulness")).toHaveTextContent(/^Helpfulness$/);
       expect(composed.scoreOptions["score-1"]).toBeUndefined();
@@ -148,9 +144,7 @@ describe("given a score key the reviewer opened", () => {
     it("closes the editor and keeps the rating with its reason", async () => {
       renderScores();
       await userEvent.click(chip("Helpfulness"));
-      await userEvent.click(
-        await screen.findByRole("radio", { name: "Helpful" }),
-      );
+      await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
       await userEvent.type(
         screen.getByPlaceholderText("Reason (optional)"),
         "answered the actual question",
@@ -159,9 +153,7 @@ describe("given a score key the reviewer opened", () => {
       await userEvent.click(screen.getByRole("button", { name: "OK" }));
 
       await waitFor(() =>
-        expect(
-          screen.queryByRole("radio", { name: "Helpful" }),
-        ).not.toBeInTheDocument(),
+        expect(screen.queryByRole("radio", { name: "Helpful" })).not.toBeInTheDocument(),
       );
       expect(composed.scoreOptions["score-1"]).toEqual({
         value: "helpful",
@@ -173,9 +165,7 @@ describe("given a score key the reviewer opened", () => {
     it("reads the rating on the chip and says it carries a reason", async () => {
       renderScores();
       await userEvent.click(chip("Helpfulness"));
-      await userEvent.click(
-        await screen.findByRole("radio", { name: "Helpful" }),
-      );
+      await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
       await userEvent.type(
         screen.getByPlaceholderText("Reason (optional)"),
         "answered the actual question",
@@ -183,9 +173,7 @@ describe("given a score key the reviewer opened", () => {
       await userEvent.click(screen.getByRole("button", { name: "OK" }));
 
       expect(chip(/Helpfulness/)).toHaveTextContent("Helpfulness: helpful");
-      expect(
-        screen.getByLabelText("Helpfulness has a reason"),
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Helpfulness has a reason")).toBeInTheDocument();
     });
   });
 
@@ -196,9 +184,7 @@ describe("given a score key the reviewer opened", () => {
         initial: { "score-1": { value: "unhelpful", reason: "" } },
       });
       await userEvent.click(chip(/Helpfulness/));
-      await userEvent.click(
-        await screen.findByRole("radio", { name: "Helpful" }),
-      );
+      await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
 
       await userEvent.click(document.body);
 
@@ -213,9 +199,7 @@ describe("given a score key the reviewer opened", () => {
     it("leaves an unrated score unrated on Escape", async () => {
       renderScores();
       await userEvent.click(chip("Helpfulness"));
-      await userEvent.click(
-        await screen.findByRole("radio", { name: "Helpful" }),
-      );
+      await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
 
       await userEvent.keyboard("{Escape}");
 
@@ -229,16 +213,12 @@ describe("given a score key the reviewer opened", () => {
         initial: { "score-1": { value: "unhelpful", reason: "" } },
       });
       await userEvent.click(chip(/Helpfulness/));
-      await userEvent.click(
-        await screen.findByRole("radio", { name: "Helpful" }),
-      );
+      await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
       await userEvent.keyboard("{Escape}");
 
       await userEvent.click(chip(/Helpfulness/));
 
-      expect(
-        await screen.findByRole("radio", { name: "Unhelpful" }),
-      ).toBeChecked();
+      expect(await screen.findByRole("radio", { name: "Unhelpful" })).toBeChecked();
       expect(screen.getByRole("radio", { name: "Helpful" })).not.toBeChecked();
     });
   });
@@ -255,14 +235,10 @@ describe("given a score the reviewer already rated", () => {
       });
       await userEvent.click(chip(/Helpfulness/));
 
-      await userEvent.click(
-        await screen.findByRole("button", { name: "Clear" }),
-      );
+      await userEvent.click(await screen.findByRole("button", { name: "Clear" }));
 
       expect(chip("Helpfulness")).toHaveTextContent(/^Helpfulness$/);
-      expect(
-        screen.queryByLabelText("Helpfulness has a reason"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Helpfulness has a reason")).not.toBeInTheDocument();
       expect(composed.scoreOptions["score-1"]).toEqual({
         value: "",
         reason: "",
@@ -278,9 +254,7 @@ describe("given a score key whose options are multiple-choice", () => {
       renderScores({ scores: [MULTIPLE_CHOICE_SCORE] });
       await userEvent.click(chip("Traits"));
 
-      await userEvent.click(
-        await screen.findByRole("checkbox", { name: "Concise" }),
-      );
+      await userEvent.click(await screen.findByRole("checkbox", { name: "Concise" }));
       await userEvent.click(screen.getByRole("checkbox", { name: "Correct" }));
       await userEvent.click(screen.getByRole("button", { name: "OK" }));
 
@@ -294,9 +268,7 @@ describe("given a score key whose options are multiple-choice", () => {
     it("reads on the chip as carrying both", async () => {
       renderScores({ scores: [MULTIPLE_CHOICE_SCORE] });
       await userEvent.click(chip("Traits"));
-      await userEvent.click(
-        await screen.findByRole("checkbox", { name: "Concise" }),
-      );
+      await userEvent.click(await screen.findByRole("checkbox", { name: "Concise" }));
       await userEvent.click(screen.getByRole("checkbox", { name: "Correct" }));
       await userEvent.click(screen.getByRole("button", { name: "OK" }));
 

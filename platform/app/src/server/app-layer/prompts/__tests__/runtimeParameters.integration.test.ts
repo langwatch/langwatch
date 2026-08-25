@@ -8,9 +8,7 @@ import { prisma } from "~/server/db";
 import { getApp } from "~/server/app-layer/app";
 
 vi.mock("~/server/modelProviders/resolveModelForFeature", () => ({
-  resolveModelForFeature: vi
-    .fn()
-    .mockResolvedValue({ model: "openai/gpt-5-mini" }),
+  resolveModelForFeature: vi.fn().mockResolvedValue({ model: "openai/gpt-5-mini" }),
 }));
 
 describe("Feature: Prompt runtime parameters", () => {

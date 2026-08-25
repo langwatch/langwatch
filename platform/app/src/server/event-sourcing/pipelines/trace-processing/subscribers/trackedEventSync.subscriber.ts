@@ -65,11 +65,7 @@ export interface ReconstructedTrackedEvent {
  * cannot break, because every hop mints a fresh span id.
  */
 function isRecordableEventType(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    value.length > 0 &&
-    value !== FEEDBACK_EVENT_NAME
-  );
+  return typeof value === "string" && value.length > 0 && value !== FEEDBACK_EVENT_NAME;
 }
 
 export interface TrackedEventSyncSubscriberDeps {
@@ -140,11 +136,7 @@ function readMetricValue(value: OtlpAnyValue | undefined): number | undefined {
  * attribute arriving as an int or a bool is dropped rather than coerced.
  */
 function readStringValue(value: OtlpAnyValue | undefined): string | undefined {
-  if (
-    value &&
-    "stringValue" in value &&
-    typeof value.stringValue === "string"
-  ) {
+  if (value && "stringValue" in value && typeof value.stringValue === "string") {
     return value.stringValue;
   }
   return undefined;
@@ -465,6 +457,5 @@ export function createTrackedEventSyncHandler(
   event: TraceProcessingEvent,
   context: TriggerContext<TraceSummaryData>,
 ) => Promise<void> {
-  return (event, context) =>
-    syncTrackedEventsFromSpan({ event, context, deps });
+  return (event, context) => syncTrackedEventsFromSpan({ event, context, deps });
 }

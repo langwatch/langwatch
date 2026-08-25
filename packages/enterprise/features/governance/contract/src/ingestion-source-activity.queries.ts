@@ -1,16 +1,10 @@
 import { z } from "zod";
 
-export const spendSortFieldSchema = z.enum([
-  "spend",
-  "requests",
-  "lastActivity",
-]);
+export const spendSortFieldSchema = z.enum(["spend", "requests", "lastActivity"]);
 export type SpendSortField = z.infer<typeof spendSortFieldSchema>;
 
 export const governanceSortDirectionSchema = z.enum(["asc", "desc"]);
-export type GovernanceSortDirection = z.infer<
-  typeof governanceSortDirectionSchema
->;
+export type GovernanceSortDirection = z.infer<typeof governanceSortDirectionSchema>;
 
 export const spendOverTimeGroupBySchema = z.enum(["team", "user", "model"]);
 export type SpendOverTimeGroupBy = z.infer<typeof spendOverTimeGroupBySchema>;
@@ -21,9 +15,7 @@ export const activityMonitorWindowQuerySchema = z
     windowDays: z.number().int().positive(),
   })
   .strict();
-export type ActivityMonitorWindowQuery = z.infer<
-  typeof activityMonitorWindowQuerySchema
->;
+export type ActivityMonitorWindowQuery = z.infer<typeof activityMonitorWindowQuerySchema>;
 
 export const activityMonitorPagedWindowQuerySchema =
   activityMonitorWindowQuerySchema.extend({
@@ -53,9 +45,7 @@ export const activityMonitorSummarySchema = z
       .strict(),
   })
   .strict();
-export type ActivityMonitorSummary = z.infer<
-  typeof activityMonitorSummarySchema
->;
+export type ActivityMonitorSummary = z.infer<typeof activityMonitorSummarySchema>;
 
 export const spendByUserRowSchema = z
   .object({
@@ -105,17 +95,13 @@ export const ingestionSourceHealthRowSchema = z
     eventsLast24h: z.number().int().nonnegative(),
   })
   .strict();
-export type IngestionSourceHealthRow = z.infer<
-  typeof ingestionSourceHealthRowSchema
->;
+export type IngestionSourceHealthRow = z.infer<typeof ingestionSourceHealthRowSchema>;
 
 export const spendOverTimeBucketSchema = z
   .object({
     bucketIso: z.string(),
     points: z.array(
-      z
-        .object({ key: z.string(), label: z.string(), spendUsd: z.string() })
-        .strict(),
+      z.object({ key: z.string(), label: z.string(), spendUsd: z.string() }).strict(),
     ),
   })
   .strict();
@@ -140,9 +126,7 @@ export const activityEventDetailRowSchema = z
     rawPayload: z.string(),
   })
   .strict();
-export type ActivityEventDetailRow = z.infer<
-  typeof activityEventDetailRowSchema
->;
+export type ActivityEventDetailRow = z.infer<typeof activityEventDetailRowSchema>;
 
 export const recentAnomalyRowSchema = z
   .object({
@@ -176,15 +160,9 @@ export const sourceHealthMetricsSchema = z
 export type SourceHealthMetrics = z.infer<typeof sourceHealthMetricsSchema>;
 
 export abstract class GovernanceActivityMonitorService {
-  abstract summary(
-    input: ActivityMonitorWindowQuery,
-  ): Promise<ActivityMonitorSummary>;
-  abstract spendByUser(
-    input: ActivityMonitorPagedWindowQuery,
-  ): Promise<SpendByUserRow[]>;
-  abstract spendByTeam(
-    input: ActivityMonitorPagedWindowQuery,
-  ): Promise<SpendByTeamRow[]>;
+  abstract summary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary>;
+  abstract spendByUser(input: ActivityMonitorPagedWindowQuery): Promise<SpendByUserRow[]>;
+  abstract spendByTeam(input: ActivityMonitorPagedWindowQuery): Promise<SpendByTeamRow[]>;
   abstract spendByDepartment(
     input: ActivityMonitorWindowQuery,
   ): Promise<SpendByDepartmentRow[]>;

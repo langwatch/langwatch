@@ -102,9 +102,7 @@ export interface HerrEnvelope {
  * wires its Grafana link builder in via {@link setTraceUrlProvider} at module
  * load. Defaults to no trace URLs.
  */
-export type TraceUrlProvider = (
-  traceId: string | undefined,
-) => string | undefined;
+export type TraceUrlProvider = (traceId: string | undefined) => string | undefined;
 
 let traceUrlProvider: TraceUrlProvider = () => undefined;
 
@@ -233,9 +231,7 @@ export abstract class HandledError extends Error {
    * handled at all?"), or compare `err.code` to pick out one subclass.
    */
   static is<T extends HandledError>(
-    this: abstract new (
-      ...args: never
-    ) => T,
+    this: abstract new (...args: never) => T,
     error: unknown,
   ): error is T {
     return error instanceof this;
@@ -296,10 +292,7 @@ export abstract class HandledError extends Error {
  * `handledErrorFromHerr` here, or `isHandledErrorLike` in `packages/api`.
  */
 function hasHandledErrorBrand(error: unknown): error is HandledError {
-  return (
-    error instanceof Error &&
-    (error as { isHandled?: unknown }).isHandled === true
-  );
+  return error instanceof Error && (error as { isHandled?: unknown }).isHandled === true;
 }
 
 /**

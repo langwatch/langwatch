@@ -29,12 +29,12 @@ Three problems this PR fixes:
 
 2. **Every Langy chat runs through one shared, admin-equivalent service key.**
    The dedicated "Langy" `ApiKey` grants view/create/update on nine resource
-   families to *anyone* who passes the route's coarse permission gate. Any
+   families to _anyone_ who passes the route's coarse permission gate. Any
    editor-or-above therefore acts with the full authority of that shared key,
    not their own. A bug in the gate is a full privilege escalation.
 
 3. **The deploy story lets the unsafe posture slip through.** The chart's
-   `values.yaml` *claims* it "refuses to deploy" without a sandboxed runtime,
+   `values.yaml` _claims_ it "refuses to deploy" without a sandboxed runtime,
    but nothing enforces it. The e2e pod manifest ships the known-unsafe
    `runAsUser: 1000` + all-caps-dropped config — the exact shape ADR-033 says
    re-opens cross-worker credential theft (and which also breaks per-worker UID
@@ -77,8 +77,8 @@ Concretely:
   parameter.
 - **Telemetry** is `pkg/otelsetup` plus a `telemetry` package that emits spans
   and metrics on the manager: worker spawn/kill, at-capacity, per-turn latency,
-  readiness. The manager previously emitted **zero** OTel. *This is a
-  load-bearing seam: PR4's egress monitoring depends on it.* The global
+  readiness. The manager previously emitted **zero** OTel. _This is a
+  load-bearing seam: PR4's egress monitoring depends on it._ The global
   `TracerProvider` is installed by `otelsetup`, so spans export today; the
   metric instruments are created against the global `Meter` (a no-op until a
   `MeterProvider` is wired) so the call sites exist and light up the moment PR4
@@ -114,7 +114,7 @@ At chat time, instead of handing the worker the shared admin-equivalent "Langy"
 service key, mint a **per-session `ApiKey` owned by the requesting user**,
 restricted to the intersection of the Langy permission set and what that user
 actually holds in the project, PROJECT-scoped, and short-lived (auto-expiring).
-Because the key is *owned by the user*, `ApiKeyService`'s ceiling check clamps
+Because the key is _owned by the user_, `ApiKeyService`'s ceiling check clamps
 it to the user's own authority — **a Langy tool call can never exceed what that
 user could do by hand.** The held-subset intersection guarantees the mint never
 throws for a legitimately-gated caller. The change lives in the langy service
@@ -220,7 +220,7 @@ pool-lifetime context):
 - **Cooperative graceful shutdown.** Today `SIGTERM` marks the pod draining
   (`/readyz` → 503), waits a drain delay for the load balancer to remove it,
   then process-group-kills each worker within the graceful budget
-  (`SERVER_GRACEFUL_SECONDS`). A richer version would *signal each worker* to
+  (`SERVER_GRACEFUL_SECONDS`). A richer version would _signal each worker_ to
   checkpoint into a recoverable state (e.g. flush its session) within a few
   seconds before the kill.
 - **Horizontal scaling + zero-downtime rollouts.** Langy is single-replica by

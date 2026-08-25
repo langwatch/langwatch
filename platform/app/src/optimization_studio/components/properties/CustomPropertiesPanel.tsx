@@ -19,12 +19,7 @@ import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
 export function CustomPropertiesPanel({ node }: { node: Node<Custom> }) {
   return (
-    <BasePropertiesPanel
-      node={node}
-      hideParameters
-      inputsReadOnly
-      outputsReadOnly
-    >
+    <BasePropertiesPanel node={node} hideParameters inputsReadOnly outputsReadOnly>
       <CustomComponentInfo node={node} />
     </BasePropertiesPanel>
   );
@@ -64,18 +59,13 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
 
   return (
     <HStack width="full" gap={3}>
-      {currentVersion && (
-        <VersionBox version={currentVersion} minWidth="44px" />
-      )}
+      {currentVersion && <VersionBox version={currentVersion} minWidth="44px" />}
       <VStack align="start" width="full" gap={1}>
         <HStack>
           <Text fontWeight={600} fontSize="13px" lineClamp={1}>
             {currentVersion?.commitMessage}
           </Text>
-          <Link
-            href={`/${project?.slug}/studio/${node.data.workflow_id}`}
-            isExternal
-          >
+          <Link href={`/${project?.slug}/studio/${node.data.workflow_id}`} isExternal>
             <ExternalLink size={14} />
           </Link>
           {currentVersion?.isPublishedVersion ? (

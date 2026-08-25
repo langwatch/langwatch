@@ -26,283 +26,266 @@ let codexHome: string;
 let priorCodexHome: string | undefined;
 
 function writeRollout(threadId: string, traceId: string, reply: string): void {
-	const dir = join(codexHome, "sessions", "2026", "08", "02");
-	mkdirSync(dir, { recursive: true });
-	const lines = [
-		{
-			type: "event_msg",
-			payload: {
-				type: "task_started",
-				turn_id: "turn-1",
-				trace_id: traceId,
-				started_at: 1785654946,
-			},
-		},
-		{
-			type: "response_item",
-			payload: {
-				type: "message",
-				role: "user",
-				content: [{ type: "input_text", text: "hi" }],
-			},
-		},
-		{
-			type: "event_msg",
-			payload: { type: "agent_message", message: reply, phase: "final_answer" },
-		},
-	];
-	writeFileSync(
-		join(dir, `rollout-2026-08-02T09-15-46-${threadId}.jsonl`),
-		lines.map((l) => JSON.stringify(l)).join("\n"),
-	);
+  const dir = join(codexHome, "sessions", "2026", "08", "02");
+  mkdirSync(dir, { recursive: true });
+  const lines = [
+    {
+      type: "event_msg",
+      payload: {
+        type: "task_started",
+        turn_id: "turn-1",
+        trace_id: traceId,
+        started_at: 1785654946,
+      },
+    },
+    {
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: "hi" }],
+      },
+    },
+    {
+      type: "event_msg",
+      payload: { type: "agent_message", message: reply, phase: "final_answer" },
+    },
+  ];
+  writeFileSync(
+    join(dir, `rollout-2026-08-02T09-15-46-${threadId}.jsonl`),
+    lines.map((l) => JSON.stringify(l)).join("\n"),
+  );
 }
 
 function enableCapture(endpoint: string): void {
-	writeCodexOtelBlock(
-		{
-			baseEndpoint: endpoint,
-			ingestionToken: "sk-lw-test-key",
-			environment: "test",
-		},
-		{ filePath: join(codexHome, "config.toml"), persistAuthHeader: true },
-	);
+  writeCodexOtelBlock(
+    {
+      baseEndpoint: endpoint,
+      ingestionToken: "sk-lw-test-key",
+      environment: "test",
+    },
+    { filePath: join(codexHome, "config.toml"), persistAuthHeader: true },
+  );
 }
 
 beforeEach(() => {
-	codexHome = mkdtempSync(join(tmpdir(), "lw-codex-home-"));
-	priorCodexHome = process.env.CODEX_HOME;
-	process.env.CODEX_HOME = codexHome;
+  codexHome = mkdtempSync(join(tmpdir(), "lw-codex-home-"));
+  priorCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = codexHome;
 });
 
 afterEach(() => {
-	if (priorCodexHome === undefined) delete process.env.CODEX_HOME;
-	else process.env.CODEX_HOME = priorCodexHome;
-	rmSync(codexHome, { recursive: true, force: true });
-	vi.restoreAllMocks();
+  if (priorCodexHome === undefined) delete process.env.CODEX_HOME;
+  else process.env.CODEX_HOME = priorCodexHome;
+  rmSync(codexHome, { recursive: true, force: true });
+  vi.restoreAllMocks();
 });
 
 describe("ingest codex", () => {
-	describe("given LangWatch cannot be reached", () => {
-		describe("when codex runs the harvest after a completed turn", () => {
-			/** @scenario "A harvest that fails does not disturb the coding session" */
-			it("returns quietly, without throwing, exiting, or printing to the session", async () => {
-				enableCapture(UNREACHABLE);
-				writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
+  describe("given LangWatch cannot be reached", () => {
+    describe("when codex runs the harvest after a completed turn", () => {
+      /** @scenario "A harvest that fails does not disturb the coding session" */
+      it("returns quietly, without throwing, exiting, or printing to the session", async () => {
+        enableCapture(UNREACHABLE);
+        writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
 
-				const stdout = vi
-					.spyOn(process.stdout, "write")
-					.mockImplementation(() => true);
-				const stderr = vi
-					.spyOn(process.stderr, "write")
-					.mockImplementation(() => true);
-				const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-				const exit = vi
-					.spyOn(process, "exit")
-					.mockImplementation((() => undefined) as never);
+        const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+        const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+        const exit = vi
+          .spyOn(process, "exit")
+          .mockImplementation((() => undefined) as never);
 
-				await expect(
-					ingestCodexCommand({
-						notify: JSON.stringify({
-							type: "agent-turn-complete",
-							"thread-id": "thread-a",
-						}),
-					}),
-				).resolves.toBeUndefined();
+        await expect(
+          ingestCodexCommand({
+            notify: JSON.stringify({
+              type: "agent-turn-complete",
+              "thread-id": "thread-a",
+            }),
+          }),
+        ).resolves.toBeUndefined();
 
-				expect(exit).not.toHaveBeenCalled();
-				expect(stdout).not.toHaveBeenCalled();
-				expect(stderr).not.toHaveBeenCalled();
-				expect(log).not.toHaveBeenCalled();
-			});
-		});
-	});
+        expect(exit).not.toHaveBeenCalled();
+        expect(stdout).not.toHaveBeenCalled();
+        expect(stderr).not.toHaveBeenCalled();
+        expect(log).not.toHaveBeenCalled();
+      });
+    });
+  });
 
-	describe("given capture was never enabled", () => {
-		describe("when codex runs the harvest", () => {
-			it("stays quiet rather than complaining on every turn", async () => {
-				writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
-				const stderr = vi
-					.spyOn(process.stderr, "write")
-					.mockImplementation(() => true);
-				const exit = vi
-					.spyOn(process, "exit")
-					.mockImplementation((() => undefined) as never);
+  describe("given capture was never enabled", () => {
+    describe("when codex runs the harvest", () => {
+      it("stays quiet rather than complaining on every turn", async () => {
+        writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
+        const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        const exit = vi
+          .spyOn(process, "exit")
+          .mockImplementation((() => undefined) as never);
 
-				await ingestCodexCommand({ notify: '{"thread-id":"thread-a"}' });
+        await ingestCodexCommand({ notify: '{"thread-id":"thread-a"}' });
 
-				expect(stderr).not.toHaveBeenCalled();
-				expect(exit).not.toHaveBeenCalled();
-			});
-		});
-	});
+        expect(stderr).not.toHaveBeenCalled();
+        expect(exit).not.toHaveBeenCalled();
+      });
+    });
+  });
 
-	describe("given codex handed over a payload that cannot be read", () => {
-		describe("when the harvest resolves which transcript to read", () => {
-			/** @scenario "A turn-completion payload that cannot be read falls back to recent sessions" */
-			it("sweeps the recently-written sessions so the finished turn is still captured", async () => {
-				const posted: any[] = [];
-				vi.spyOn(globalThis, "fetch").mockImplementation((async (
-					_url: string,
-					init: any,
-				) => {
-					posted.push(JSON.parse(init.body));
-					return { ok: true, status: 200 } as any;
-				}) as any);
-				enableCapture("https://app.langwatch.test/api/otel");
-				writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
+  describe("given codex handed over a payload that cannot be read", () => {
+    describe("when the harvest resolves which transcript to read", () => {
+      /** @scenario "A turn-completion payload that cannot be read falls back to recent sessions" */
+      it("sweeps the recently-written sessions so the finished turn is still captured", async () => {
+        const posted: any[] = [];
+        vi.spyOn(globalThis, "fetch").mockImplementation((async (
+          _url: string,
+          init: any,
+        ) => {
+          posted.push(JSON.parse(init.body));
+          return { ok: true, status: 200 } as any;
+        }) as any);
+        enableCapture("https://app.langwatch.test/api/otel");
+        writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
 
-				await ingestCodexCommand({ notify: "not-json-at-all" });
+        await ingestCodexCommand({ notify: "not-json-at-all" });
 
-				const traceIds = posted
-					.flatMap((b) =>
-						b.resourceSpans.flatMap((rs: any) =>
-							rs.scopeSpans.flatMap((ss: any) => ss.spans),
-						),
-					)
-					.map((s: any) => s.traceId);
-				expect(traceIds).toContain("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-			});
-		});
-	});
+        const traceIds = posted
+          .flatMap((b) =>
+            b.resourceSpans.flatMap((rs: any) =>
+              rs.scopeSpans.flatMap((ss: any) => ss.spans),
+            ),
+          )
+          .map((s: any) => s.traceId);
+        expect(traceIds).toContain("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+      });
+    });
+  });
 
-	describe("given sessions that completed before capture was enabled", () => {
-		describe("when the user backfills them", () => {
-			/** @scenario "Sessions already on disk can be captured after the fact" */
-			it("recovers each session's turns onto the traces codex reported at the time", async () => {
-				const posted: any[] = [];
-				const server = vi.spyOn(globalThis, "fetch").mockImplementation((async (
-					_url: string,
-					init: any,
-				) => {
-					posted.push(JSON.parse(init.body));
-					return { ok: true, status: 200 } as any;
-				}) as any);
-				enableCapture("https://app.langwatch.test/api/otel");
-				writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "first");
-				writeRollout("thread-b", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "second");
-				const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+  describe("given sessions that completed before capture was enabled", () => {
+    describe("when the user backfills them", () => {
+      /** @scenario "Sessions already on disk can be captured after the fact" */
+      it("recovers each session's turns onto the traces codex reported at the time", async () => {
+        const posted: any[] = [];
+        const server = vi.spyOn(globalThis, "fetch").mockImplementation((async (
+          _url: string,
+          init: any,
+        ) => {
+          posted.push(JSON.parse(init.body));
+          return { ok: true, status: 200 } as any;
+        }) as any);
+        enableCapture("https://app.langwatch.test/api/otel");
+        writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "first");
+        writeRollout("thread-b", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "second");
+        const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
-				await ingestCodexCommand({ all: true, json: true });
+        await ingestCodexCommand({ all: true, json: true });
 
-				expect(server).toHaveBeenCalled();
-				const traceIds = posted
-					.flatMap((b) =>
-						b.resourceSpans.flatMap((rs: any) =>
-							rs.scopeSpans.flatMap((ss: any) => ss.spans),
-						),
-					)
-					.map((s: any) => s.traceId);
-				expect(traceIds).toEqual(
-					expect.arrayContaining([
-						"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-						"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-					]),
-				);
-				expect(log).toHaveBeenCalledWith(expect.stringContaining('"turns":2'));
-			});
-		});
-	});
+        expect(server).toHaveBeenCalled();
+        const traceIds = posted
+          .flatMap((b) =>
+            b.resourceSpans.flatMap((rs: any) =>
+              rs.scopeSpans.flatMap((ss: any) => ss.spans),
+            ),
+          )
+          .map((s: any) => s.traceId);
+        expect(traceIds).toEqual(
+          expect.arrayContaining([
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          ]),
+        );
+        expect(log).toHaveBeenCalledWith(expect.stringContaining('"turns":2'));
+      });
+    });
+  });
 
-	describe("given LangWatch refuses the conversation", () => {
-		/** A reachable server that answers every upload with `status`. */
-		function refusingServer(status: number) {
-			return vi.spyOn(globalThis, "fetch").mockImplementation((async () =>
-				({ ok: false, status }) as any) as any);
-		}
+  describe("given LangWatch refuses the conversation", () => {
+    /** A reachable server that answers every upload with `status`. */
+    function refusingServer(status: number) {
+      return vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation((async () => ({ ok: false, status }) as any) as any);
+    }
 
-		describe("when the user backfills", () => {
-			/** @scenario "A conversation LangWatch rejects is not reported as recovered" */
-			it("reports the failure instead of a count of recovered turns", async () => {
-				refusingServer(500);
-				enableCapture("https://app.langwatch.test/api/otel");
-				writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
-				const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-				const stderr = vi
-					.spyOn(process.stderr, "write")
-					.mockImplementation(() => true);
-				const exit = vi
-					.spyOn(process, "exit")
-					.mockImplementation((() => undefined) as never);
+    describe("when the user backfills", () => {
+      /** @scenario "A conversation LangWatch rejects is not reported as recovered" */
+      it("reports the failure instead of a count of recovered turns", async () => {
+        refusingServer(500);
+        enableCapture("https://app.langwatch.test/api/otel");
+        writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
+        const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+        const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        const exit = vi
+          .spyOn(process, "exit")
+          .mockImplementation((() => undefined) as never);
 
-				await ingestCodexCommand({ all: true });
+        await ingestCodexCommand({ all: true });
 
-				expect(log).not.toHaveBeenCalledWith(
-					expect.stringContaining("Recovered"),
-				);
-				expect(stderr).toHaveBeenCalled();
-				expect(exit).toHaveBeenCalledWith(1);
-			});
+        expect(log).not.toHaveBeenCalledWith(expect.stringContaining("Recovered"));
+        expect(stderr).toHaveBeenCalled();
+        expect(exit).toHaveBeenCalledWith(1);
+      });
 
-			/** @scenario "A rejected ingest key reads as an authentication problem" */
-			it("names the key and how to issue a new one when LangWatch refuses it", async () => {
-				refusingServer(401);
-				enableCapture("https://app.langwatch.test/api/otel");
-				writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
-				const stderr = vi
-					.spyOn(process.stderr, "write")
-					.mockImplementation(() => true);
-				vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+      /** @scenario "A rejected ingest key reads as an authentication problem" */
+      it("names the key and how to issue a new one when LangWatch refuses it", async () => {
+        refusingServer(401);
+        enableCapture("https://app.langwatch.test/api/otel");
+        writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
+        const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
 
-				await ingestCodexCommand({ all: true });
+        await ingestCodexCommand({ all: true });
 
-				const reported = stderr.mock.calls.map((c) => String(c[0])).join("");
-				expect(reported).toContain("ingest key");
-				expect(reported).toContain("langwatch ingest install codex");
-			});
-		});
+        const reported = stderr.mock.calls.map((c) => String(c[0])).join("");
+        expect(reported).toContain("ingest key");
+        expect(reported).toContain("langwatch ingest install codex");
+      });
+    });
 
-		describe("when codex runs the harvest after a completed turn", () => {
-			/** @scenario "A rejected turn still leaves the coding session alone" */
-			it("returns quietly, without throwing, exiting, or printing to the session", async () => {
-				refusingServer(401);
-				enableCapture("https://app.langwatch.test/api/otel");
-				writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
+    describe("when codex runs the harvest after a completed turn", () => {
+      /** @scenario "A rejected turn still leaves the coding session alone" */
+      it("returns quietly, without throwing, exiting, or printing to the session", async () => {
+        refusingServer(401);
+        enableCapture("https://app.langwatch.test/api/otel");
+        writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
 
-				const stdout = vi
-					.spyOn(process.stdout, "write")
-					.mockImplementation(() => true);
-				const stderr = vi
-					.spyOn(process.stderr, "write")
-					.mockImplementation(() => true);
-				const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-				const exit = vi
-					.spyOn(process, "exit")
-					.mockImplementation((() => undefined) as never);
+        const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+        const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+        const exit = vi
+          .spyOn(process, "exit")
+          .mockImplementation((() => undefined) as never);
 
-				await expect(
-					ingestCodexCommand({
-						notify: JSON.stringify({
-							type: "agent-turn-complete",
-							"thread-id": "thread-a",
-						}),
-					}),
-				).resolves.toBeUndefined();
+        await expect(
+          ingestCodexCommand({
+            notify: JSON.stringify({
+              type: "agent-turn-complete",
+              "thread-id": "thread-a",
+            }),
+          }),
+        ).resolves.toBeUndefined();
 
-				expect(exit).not.toHaveBeenCalled();
-				expect(stdout).not.toHaveBeenCalled();
-				expect(stderr).not.toHaveBeenCalled();
-				expect(log).not.toHaveBeenCalled();
-			});
-		});
-	});
+        expect(exit).not.toHaveBeenCalled();
+        expect(stdout).not.toHaveBeenCalled();
+        expect(stderr).not.toHaveBeenCalled();
+        expect(log).not.toHaveBeenCalled();
+      });
+    });
+  });
 
-	describe("given the config points somewhere the POST is refused", () => {
-		describe("when the user backfills", () => {
-			it("reports the failure, unlike the turn-completion path which must stay silent", async () => {
-				enableCapture(UNREACHABLE);
-				writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
-				const stderr = vi
-					.spyOn(process.stderr, "write")
-					.mockImplementation(() => true);
-				const exit = vi
-					.spyOn(process, "exit")
-					.mockImplementation((() => undefined) as never);
+  describe("given the config points somewhere the POST is refused", () => {
+    describe("when the user backfills", () => {
+      it("reports the failure, unlike the turn-completion path which must stay silent", async () => {
+        enableCapture(UNREACHABLE);
+        writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
+        const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        const exit = vi
+          .spyOn(process, "exit")
+          .mockImplementation((() => undefined) as never);
 
-				await ingestCodexCommand({ all: true });
+        await ingestCodexCommand({ all: true });
 
-				expect(stderr).toHaveBeenCalled();
-				expect(exit).toHaveBeenCalledWith(1);
-			});
-		});
-	});
+        expect(stderr).toHaveBeenCalled();
+        expect(exit).toHaveBeenCalledWith(1);
+      });
+    });
+  });
 });

@@ -89,10 +89,8 @@ export function EvaluatorCategorySelectorDrawer(
     props.onSelectCategory ??
     (complexProps.onSelectCategory as EvaluatorCategorySelectorDrawerProps["onSelectCategory"]);
   const onSelectWorkflow =
-    props.onSelectWorkflow ??
-    (() => openDrawer("workflowSelectorForEvaluator"));
-  const onSelectCode =
-    props.onSelectCode ?? (() => openDrawer("codeEvaluatorEditor"));
+    props.onSelectWorkflow ?? (() => openDrawer("workflowSelectorForEvaluator"));
+  const onSelectCode = props.onSelectCode ?? (() => openDrawer("codeEvaluatorEditor"));
   // `open` arrives from CurrentDrawer as the drawer-name string (e.g.
   // "evaluatorCategorySelector"), not a boolean. Treat any non-false,
   // non-undefined value as open.
@@ -247,10 +245,7 @@ export function EvaluatorCategorySelectorDrawer(
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="border">
           {view.step === "editor" ? (
-            <EvaluatorEditorFooter
-              controller={editorController}
-              onCancel={onClose}
-            />
+            <EvaluatorEditorFooter controller={editorController} onCancel={onClose} />
           ) : (
             <Button variant="outline" onClick={onClose}>
               Cancel

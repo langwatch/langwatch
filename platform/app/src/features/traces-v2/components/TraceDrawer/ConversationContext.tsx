@@ -29,10 +29,7 @@ import {
   useTextTranslation,
 } from "../../hooks/useTextTranslation";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
-import {
-  getDrawerDensityTokens,
-  useDensityStore,
-} from "../../stores/densityStore";
+import { getDrawerDensityTokens, useDensityStore } from "../../stores/densityStore";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { formatPreview } from "../../utils/previewFormatter";
 import { useDisplayRoleVisuals } from "./scenarioRoles";
@@ -174,8 +171,7 @@ function buildRows({
     key: `${pos}-placeholder`,
     traceId: "",
     userText: null,
-    assistantText:
-      boundary === "start" ? "Start of conversation" : "End of conversation",
+    assistantText: boundary === "start" ? "Start of conversation" : "End of conversation",
     userRedacted: false,
     assistantRedacted: false,
     userVisibleTo: null,
@@ -207,9 +203,7 @@ function buildRows({
     ? buildSlot(previous, "previous", "prev")
     : placeholder("previous", "start");
   const currRow = current ? buildSlot(current, "current", "curr") : null;
-  const nextRow = next
-    ? buildSlot(next, "next", "next")
-    : placeholder("next", "end");
+  const nextRow = next ? buildSlot(next, "next", "next") : placeholder("next", "end");
 
   return currRow ? [prevRow, currRow, nextRow] : [];
 }
@@ -251,10 +245,7 @@ export const ConversationContext = memo(function ConversationContext({
     for (const row of rows) {
       if (row.isPlaceholder) continue;
       if (row.userText) {
-        out[`${row.key}:user`] = row.userText.slice(
-          0,
-          TRANSLATE_TEXT_MAX_CHARS,
-        );
+        out[`${row.key}:user`] = row.userText.slice(0, TRANSLATE_TEXT_MAX_CHARS);
       }
       if (row.assistantText) {
         out[`${row.key}:assistant`] = row.assistantText.slice(
@@ -278,8 +269,7 @@ export const ConversationContext = memo(function ConversationContext({
               ? (translation.displayTexts[`${row.key}:user`] ?? row.userText)
               : row.userText,
             assistantText: row.assistantText
-              ? (translation.displayTexts[`${row.key}:assistant`] ??
-                row.assistantText)
+              ? (translation.displayTexts[`${row.key}:assistant`] ?? row.assistantText)
               : row.assistantText,
           },
     );
@@ -471,9 +461,7 @@ function ContextHeader({
           transform={collapsed ? "rotate(0deg)" : "rotate(180deg)"}
         />
       </chakra.button>
-      {shouldShowTranslate ? (
-        <ContextTranslateButton translation={translation} />
-      ) : null}
+      {shouldShowTranslate ? <ContextTranslateButton translation={translation} /> : null}
     </HStack>
   );
 }
@@ -700,12 +688,7 @@ const ConversationRow = memo(function ConversationRow({
         cursor="default"
       >
         <Flex align="center" gap={2.5} flex={1} minWidth={0} opacity={0.55}>
-          <Icon
-            as={PlaceholderIcon}
-            boxSize={3.5}
-            color="fg.subtle"
-            flexShrink={0}
-          />
+          <Icon as={PlaceholderIcon} boxSize={3.5} color="fg.subtle" flexShrink={0} />
           <Text
             textStyle="xs"
             color="fg.subtle"
@@ -737,18 +720,12 @@ const ConversationRow = memo(function ConversationRow({
         // "this is the current turn" cue is consistent across
         // surfaces. Non-selected rows are white (light) / transparent
         // (dark) so the panel chrome shows through.
-        bg={
-          isCurrent
-            ? "blue.subtle"
-            : { base: "bg.surface", _dark: "transparent" }
-        }
+        bg={isCurrent ? "blue.subtle" : { base: "bg.surface", _dark: "transparent" }}
         borderBottomWidth={isLast ? 0 : "1px"}
         borderColor={{ base: "gray.200", _dark: "border.muted" }}
         cursor={isCurrent ? "default" : "pointer"}
         onClick={isCurrent ? undefined : handleClick}
-        _hover={
-          isCurrent ? undefined : { bg: { base: "gray.50", _dark: "bg.muted" } }
-        }
+        _hover={isCurrent ? undefined : { bg: { base: "gray.50", _dark: "bg.muted" } }}
         transition="background 0.12s ease"
         textAlign="left"
         width="full"

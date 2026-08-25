@@ -57,12 +57,10 @@ function ChatContent() {
             useApi={true}
             workflowId={workflowId}
             nodes={
-              parseStudioWorkflow(publishedWorkflow.data.dsl)
-                ?.nodes as unknown as Node[]
+              parseStudioWorkflow(publishedWorkflow.data.dsl)?.nodes as unknown as Node[]
             }
             edges={
-              parseStudioWorkflow(publishedWorkflow.data.dsl)
-                ?.edges as unknown as Edge[]
+              parseStudioWorkflow(publishedWorkflow.data.dsl)?.edges as unknown as Edge[]
             }
           />
         </ChakraCard.Root>

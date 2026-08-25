@@ -217,9 +217,8 @@ export function usePersonalContext(): PersonalContext {
     email: userEmail,
     fullName: userName,
     joinedOn:
-      personalContextQuery.data?.workspace.team.createdAt
-        ?.toISOString()
-        ?.slice(0, 10) ?? "—",
+      personalContextQuery.data?.workspace.team.createdAt?.toISOString()?.slice(0, 10) ??
+      "—",
     organizationName: orgName,
     organizationId: orgId,
     routingPolicyName: personalContextQuery.data?.routingPolicy?.name ?? null,
@@ -252,8 +251,7 @@ export function usePersonalContext(): PersonalContext {
       })) ?? [],
     isPersonalProjectResolved: personalContextQuery.isSuccess,
     personalProjectId: personalContextQuery.data?.workspace.project.id ?? null,
-    personalProjectSlug:
-      personalContextQuery.data?.workspace.project.slug ?? null,
+    personalProjectSlug: personalContextQuery.data?.workspace.project.slug ?? null,
     apiKeys,
   };
 }

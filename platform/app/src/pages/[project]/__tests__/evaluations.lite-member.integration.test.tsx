@@ -57,17 +57,14 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     organization: { id: "org-1" },
     organizations: [{ id: "org-1", name: "Test Org" }],
     project: { id: "proj-1", slug: "test-project" },
-    hasPermission: (permission: string) =>
-      mockHasPermissionRef.current(permission),
+    hasPermission: (permission: string) => mockHasPermissionRef.current(permission),
     hasOrgPermission: () => false,
     hasAnyPermission: () => false,
   }),
 }));
 
 vi.mock("~/components/DashboardLayout", () => ({
-  DashboardLayout: ({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  ),
+  DashboardLayout: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("~/components/WithPermissionGuard", () => ({
@@ -127,9 +124,7 @@ vi.mock("~/components/NavigationFooter", () => ({
     pageSize: 25,
     useUpdateTotalHits: vi.fn(),
   }),
-  NavigationFooter: ({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  ),
+  NavigationFooter: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("~/components/OverflownText", () => ({
@@ -146,12 +141,8 @@ vi.mock("~/components/ui/layouts/PageLayout", () => ({
   PageLayout: {
     Header: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Heading: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    HeaderButton: ({ children }: { children?: ReactNode }) => (
-      <div>{children}</div>
-    ),
-    Container: ({ children }: { children?: ReactNode }) => (
-      <div>{children}</div>
-    ),
+    HeaderButton: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Container: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Content: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   },
 }));
@@ -161,13 +152,9 @@ vi.mock("~/components/ui/menu", () => ({
     Root: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Trigger: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Content: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    Item: ({
-      children,
-      ...props
-    }: {
-      children?: ReactNode;
-      [key: string]: any;
-    }) => <div {...props}>{children}</div>,
+    Item: ({ children, ...props }: { children?: ReactNode; [key: string]: any }) => (
+      <div {...props}>{children}</div>
+    ),
   },
 }));
 
@@ -197,12 +184,9 @@ vi.mock("~/server/experiments/workbenchState", () => ({
   },
 }));
 
-vi.mock(
-  "~/components/experiments/BatchEvaluationV2/BatchEvaluationSummary",
-  () => ({
-    formatEvaluationSummary: vi.fn(() => ""),
-  }),
-);
+vi.mock("~/components/experiments/BatchEvaluationV2/BatchEvaluationSummary", () => ({
+  formatEvaluationSummary: vi.fn(() => ""),
+}));
 
 vi.mock("~/generated/prisma/client", () => ({
   ExperimentType: {
@@ -214,9 +198,8 @@ vi.mock("~/generated/prisma/client", () => ({
 }));
 
 // Lazy import to ensure mocks are set up first
-const { GuardedExperimentsPage: ExperimentsPage } = await import(
-  "~/pages/[project]/evaluations"
-);
+const { GuardedExperimentsPage: ExperimentsPage } =
+  await import("~/pages/[project]/evaluations");
 
 function renderPage() {
   return render(

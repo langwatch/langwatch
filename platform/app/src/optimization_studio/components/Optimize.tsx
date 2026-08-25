@@ -492,8 +492,8 @@ export function OptimizeModalContent({
               <Alert.Indicator />
               <Alert.Content>
                 <Text>
-                  You need at least one evaluator node in your workflow to be
-                  able to run optimizations
+                  You need at least one evaluator node in your workflow to be able to run
+                  optimizations
                 </Text>
               </Alert.Content>
             </Alert.Root>
@@ -503,9 +503,7 @@ export function OptimizeModalContent({
           <VStack align="start" width="full" gap={3}>
             <HStack width="full">
               <VStack align="start" gap={0}>
-                <Text fontWeight={500}>
-                  {train.length} optimization set entries
-                </Text>
+                <Text fontWeight={500}>{train.length} optimization set entries</Text>
               </VStack>
               <Spacer />
               <Tooltip content={isDisabled}>
@@ -513,8 +511,7 @@ export function OptimizeModalContent({
                   variant="outline"
                   type="submit"
                   loading={
-                    commitVersion.isPending ||
-                    optimizationState?.status === "waiting"
+                    commitVersion.isPending || optimizationState?.status === "waiting"
                   }
                   disabled={!!isDisabled}
                 >

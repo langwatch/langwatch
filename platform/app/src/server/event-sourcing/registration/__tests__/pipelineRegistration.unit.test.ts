@@ -32,23 +32,17 @@ function autoStub(): any {
 }
 
 function registeredPipelineNames(): string[] {
-  const register = vi.fn(
-    (pipeline: { name?: string; metadata?: { name?: string } }) => {
-      // `build()` puts the name on `metadata`; read both so the guard survives
-      // either shape rather than silently matching nothing.
-      names.push(pipeline?.metadata?.name ?? pipeline?.name ?? "<unnamed>");
-      return autoStub();
-    },
-  );
+  const register = vi.fn((pipeline: { name?: string; metadata?: { name?: string } }) => {
+    // `build()` puts the name on `metadata`; read both so the guard survives
+    // either shape rather than silently matching nothing.
+    names.push(pipeline?.metadata?.name ?? pipeline?.name ?? "<unnamed>");
+    return autoStub();
+  });
   const names: string[] = [];
 
-  const deps = new Proxy(
-    { eventSourcing: { register } } as Record<string, unknown>,
-    {
-      get: (target, prop) =>
-        prop in target ? (target as any)[prop] : autoStub(),
-    },
-  );
+  const deps = new Proxy({ eventSourcing: { register } } as Record<string, unknown>, {
+    get: (target, prop) => (prop in target ? (target as any)[prop] : autoStub()),
+  });
 
   try {
     new PipelineRegistry(deps as never).registerAll();

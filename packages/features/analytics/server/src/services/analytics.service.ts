@@ -36,16 +36,16 @@ function currentAndPreviousDates(
   readonly previousPeriodStartDate: Date;
 } {
   const periodInDays = period === undefined ? 1 : period / MINUTES_PER_DAY;
-  const days = Math.max(
-    periodInDays,
-    differenceInCalendarDays(endDate, startDate) + 1,
-  );
+  const days = Math.max(periodInDays, differenceInCalendarDays(endDate, startDate) + 1);
   const previousPeriodStartDate = addDays(startDate, -days);
   return { startDate, endDate, previousPeriodStartDate };
 }
 
 export class AnalyticsService extends AnalyticsServiceContract {
-  static create(options: { repository: AnalyticsRepository; tripwire?: AnalyticsTripwire }): AnalyticsService {
+  static create(options: {
+    repository: AnalyticsRepository;
+    tripwire?: AnalyticsTripwire;
+  }): AnalyticsService {
     return new AnalyticsService(options.repository, options.tripwire);
   }
 
@@ -104,9 +104,7 @@ export class AnalyticsService extends AnalyticsServiceContract {
     const estimatedBuckets =
       parsed.timeScale === undefined || parsed.timeScale === "full"
         ? Number.POSITIVE_INFINITY
-        : (endDate.getTime() - startDate.getTime()) /
-          MS_PER_MINUTE /
-          parsed.timeScale;
+        : (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE / parsed.timeScale;
     const adjustedTimeScale =
       parsed.timeScale === undefined
         ? MINUTES_PER_DAY
@@ -124,7 +122,11 @@ export class AnalyticsService extends AnalyticsServiceContract {
       adjustedTimeScale,
       maxResultRows: options?.maxResultRows,
     };
-    if (table === "trace_summaries" || table === "evaluation_runs" || !(await this.tripwire?.isEnabled(parsed.projectId))) {
+    if (
+      table === "trace_summaries" ||
+      table === "evaluation_runs" ||
+      !(await this.tripwire?.isEnabled(parsed.projectId))
+    ) {
       return analyticsTimeseriesResultSchema.parse(
         await this.repository.runTimeseries(query),
       );
@@ -136,7 +138,12 @@ export class AnalyticsService extends AnalyticsServiceContract {
       this.repository.runTimeseries(query),
       this.repository.runTimeseries({ ...query, table: legacyTable }),
     ]);
-    this.tripwire?.compare({ projectId: parsed.projectId, table, routed: result, legacy });
+    this.tripwire?.compare({
+      projectId: parsed.projectId,
+      table,
+      routed: result,
+      legacy,
+    });
     return analyticsTimeseriesResultSchema.parse(result);
   }
 

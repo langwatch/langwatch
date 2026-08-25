@@ -23,8 +23,7 @@ export const ChangeTraceNameCommand = defineCommand({
   aggregateType: "trace",
   schema: traceNameChangedEventDataSchema,
   aggregateId: (d) => d.traceId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.traceId}:change_trace_name:${d.newName}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.traceId}:change_trace_name:${d.newName}`,
   spanAttributes: (d) => ({
     "payload.trace.id": d.traceId,
     "payload.new_name.length": d.newName.length,

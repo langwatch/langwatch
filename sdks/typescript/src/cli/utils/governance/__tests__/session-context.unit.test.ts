@@ -121,9 +121,9 @@ describe("sessionContextFingerprint", () => {
 
   describe("given a session outside any repository", () => {
     it("still names the titles it carries", () => {
-      expect(
-        sessionContextFingerprint({}, { name: "pr-reviewer" }),
-      ).toBe("@#!~pr-reviewer");
+      expect(sessionContextFingerprint({}, { name: "pr-reviewer" })).toBe(
+        "@#!~pr-reviewer",
+      );
     });
   });
 
@@ -157,9 +157,7 @@ describe("parseTraceparent", () => {
   describe("given a live version 00 traceparent", () => {
     it("reads the trace and span ids", () => {
       expect(
-        parseTraceparent(
-          "00-16872e6253edb3e8748023ff172703c4-be7ce7c6bf1173f5-01",
-        ),
+        parseTraceparent("00-16872e6253edb3e8748023ff172703c4-be7ce7c6bf1173f5-01"),
       ).toEqual({
         traceId: "16872e6253edb3e8748023ff172703c4",
         spanId: "be7ce7c6bf1173f5",
@@ -171,19 +169,13 @@ describe("parseTraceparent", () => {
     it("returns null rather than naming a trace that never existed", () => {
       // What an OTel SDK injects when the current context is invalid.
       expect(
-        parseTraceparent(
-          "00-00000000000000000000000000000000-0000000000000000-00",
-        ),
+        parseTraceparent("00-00000000000000000000000000000000-0000000000000000-00"),
       ).toBeNull();
       expect(
-        parseTraceparent(
-          "00-00000000000000000000000000000000-be7ce7c6bf1173f5-01",
-        ),
+        parseTraceparent("00-00000000000000000000000000000000-be7ce7c6bf1173f5-01"),
       ).toBeNull();
       expect(
-        parseTraceparent(
-          "00-16872e6253edb3e8748023ff172703c4-0000000000000000-01",
-        ),
+        parseTraceparent("00-16872e6253edb3e8748023ff172703c4-0000000000000000-01"),
       ).toBeNull();
     });
   });
@@ -193,9 +185,7 @@ describe("parseTraceparent", () => {
       expect(parseTraceparent(undefined)).toBeNull();
       expect(parseTraceparent("")).toBeNull();
       expect(
-        parseTraceparent(
-          "01-16872e6253edb3e8748023ff172703c4-be7ce7c6bf1173f5-01",
-        ),
+        parseTraceparent("01-16872e6253edb3e8748023ff172703c4-be7ce7c6bf1173f5-01"),
       ).toBeNull();
       expect(parseTraceparent("00-tooshort-be7ce7c6bf1173f5-01")).toBeNull();
     });
@@ -302,9 +292,7 @@ describe("buildSessionContextLogPayload", () => {
 
     it("omits the attribute when there is no title", () => {
       for (const title of [null, undefined, ""]) {
-        expect(attrsOf(title).map((a) => a.key)).not.toContain(
-          "langwatch.session.title",
-        );
+        expect(attrsOf(title).map((a) => a.key)).not.toContain("langwatch.session.title");
       }
     });
   });
@@ -313,16 +301,18 @@ describe("buildSessionContextLogPayload", () => {
 describe("sessionTitleFromPrompt", () => {
   describe("given a prompt someone typed", () => {
     it("keeps the first line, collapses whitespace, and caps the length", () => {
-      expect(
-        sessionTitleFromPrompt("  Fix   the pricing bug\nStart with tests."),
-      ).toBe("Fix the pricing bug");
+      expect(sessionTitleFromPrompt("  Fix   the pricing bug\nStart with tests.")).toBe(
+        "Fix the pricing bug",
+      );
       expect(sessionTitleFromPrompt(`${"x".repeat(200)} tail`)).toHaveLength(120);
     });
   });
 
   describe("given text no one typed", () => {
     it("names nothing from tags or blank text", () => {
-      expect(sessionTitleFromPrompt("<environment_context>\n</environment_context>")).toBeNull();
+      expect(
+        sessionTitleFromPrompt("<environment_context>\n</environment_context>"),
+      ).toBeNull();
       expect(sessionTitleFromPrompt("   \n  ")).toBeNull();
     });
   });

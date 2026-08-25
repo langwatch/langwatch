@@ -5,10 +5,7 @@ import type {
   PlanProviderUser,
 } from "@langwatch/entitlement-contract";
 
-export type {
-  PlanProvider,
-  PlanProviderUser,
-} from "@langwatch/entitlement-contract";
+export type { PlanProvider, PlanProviderUser } from "@langwatch/entitlement-contract";
 export type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
 
 /**

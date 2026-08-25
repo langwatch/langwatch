@@ -9,7 +9,13 @@ import { MAX_FIELD_BYTES, TRUNCATION_MARKER } from "./protocol.js";
 describe("contentText", () => {
   it("joins the text blocks of a result", () => {
     expect(
-      contentText({ content: [{ type: "text", text: "a" }, { type: "image" }, { type: "text", text: "b" }] }),
+      contentText({
+        content: [
+          { type: "text", text: "a" },
+          { type: "image" },
+          { type: "text", text: "b" },
+        ],
+      }),
     ).toBe("a\nb");
     expect(contentText(undefined)).toBe("");
     expect(contentText({ content: "nope" })).toBe("");
@@ -20,7 +26,8 @@ describe("settledToolOutput", () => {
   const scratchDirs: string[] = [];
 
   afterEach(() => {
-    for (const dir of scratchDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+    for (const dir of scratchDirs.splice(0))
+      rmSync(dir, { recursive: true, force: true });
   });
 
   describe("when pi truncated the tool output to a saved file", () => {
@@ -31,7 +38,9 @@ describe("settledToolOutput", () => {
       const document = `{"traces":[{"id":"t1"}],"pagination":{"totalHits":44}}`;
       writeFileSync(full, document);
       const result = {
-        content: [{ type: "text", text: '"tail fragment only"\n[Showing lines 10-20 of 20]' }],
+        content: [
+          { type: "text", text: '"tail fragment only"\n[Showing lines 10-20 of 20]' },
+        ],
         details: { truncation: { truncated: true }, fullOutputPath: full },
       };
       expect(settledToolOutput(result)).toBe(document);
@@ -40,14 +49,19 @@ describe("settledToolOutput", () => {
     it("falls back to the tail text when the file cannot be read", () => {
       const result = {
         content: [{ type: "text", text: "tail fragment" }],
-        details: { truncation: { truncated: true }, fullOutputPath: "/nonexistent/pi-bash.log" },
+        details: {
+          truncation: { truncated: true },
+          fullOutputPath: "/nonexistent/pi-bash.log",
+        },
       };
       expect(settledToolOutput(result)).toBe("tail fragment");
     });
   });
 
   it("returns the content text untouched when nothing was truncated", () => {
-    expect(settledToolOutput({ content: [{ type: "text", text: "plain" }] })).toBe("plain");
+    expect(settledToolOutput({ content: [{ type: "text", text: "plain" }] })).toBe(
+      "plain",
+    );
   });
 });
 
@@ -56,7 +70,10 @@ describe("TurnEventMapper", () => {
     it("maps text deltas to delta and thinking deltas to reasoning", () => {
       const mapper = new TurnEventMapper("t1");
       expect(
-        mapper.map({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "Hi" } }),
+        mapper.map({
+          type: "message_update",
+          assistantMessageEvent: { type: "text_delta", delta: "Hi" },
+        }),
       ).toEqual([{ type: "delta", turnId: "t1", text: "Hi" }]);
       expect(
         mapper.map({
@@ -65,7 +82,10 @@ describe("TurnEventMapper", () => {
         }),
       ).toEqual([{ type: "reasoning", turnId: "t1", text: "hm" }]);
       expect(
-        mapper.map({ type: "message_update", assistantMessageEvent: { type: "text_start" } }),
+        mapper.map({
+          type: "message_update",
+          assistantMessageEvent: { type: "text_start" },
+        }),
       ).toEqual([]);
     });
   });
@@ -75,8 +95,15 @@ describe("TurnEventMapper", () => {
       const mapper = new TurnEventMapper("t1");
       const args = { command: "ls -la" };
       expect(
-        mapper.map({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args }),
-      ).toEqual([{ type: "tool_start", turnId: "t1", id: "c1", name: "bash", input: args }]);
+        mapper.map({
+          type: "tool_execution_start",
+          toolCallId: "c1",
+          toolName: "bash",
+          args,
+        }),
+      ).toEqual([
+        { type: "tool_start", turnId: "t1", id: "c1", name: "bash", input: args },
+      ]);
       expect(
         mapper.map({
           type: "tool_execution_update",
@@ -85,7 +112,9 @@ describe("TurnEventMapper", () => {
           args,
           partialResult: { content: [{ type: "text", text: "partial" }] },
         }),
-      ).toEqual([{ type: "tool_update", turnId: "t1", id: "c1", name: "bash", output: "partial" }]);
+      ).toEqual([
+        { type: "tool_update", turnId: "t1", id: "c1", name: "bash", output: "partial" },
+      ]);
       expect(
         mapper.map({
           type: "tool_execution_end",
@@ -109,7 +138,12 @@ describe("TurnEventMapper", () => {
 
     it("marks errored tools", () => {
       const mapper = new TurnEventMapper("t1");
-      mapper.map({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: {} });
+      mapper.map({
+        type: "tool_execution_start",
+        toolCallId: "c1",
+        toolName: "bash",
+        args: {},
+      });
       const [end] = mapper.map({
         type: "tool_execution_end",
         toolCallId: "c1",
@@ -128,15 +162,27 @@ describe("TurnEventMapper", () => {
         toolName: "bash",
         partialResult: { content: [] },
       });
-      expect(update).toEqual({ type: "tool_update", turnId: "t1", id: "c1", name: "bash" });
+      expect(update).toEqual({
+        type: "tool_update",
+        turnId: "t1",
+        id: "c1",
+        name: "bash",
+      });
     });
   });
 
   describe("when todowrite settles", () => {
     it("also emits a plan snapshot from its input", () => {
       const mapper = new TurnEventMapper("t1");
-      const args = { todos: [{ content: "Find the slowest traces", status: "in_progress" }] };
-      mapper.map({ type: "tool_execution_start", toolCallId: "c1", toolName: "todowrite", args });
+      const args = {
+        todos: [{ content: "Find the slowest traces", status: "in_progress" }],
+      };
+      mapper.map({
+        type: "tool_execution_start",
+        toolCallId: "c1",
+        toolName: "todowrite",
+        args,
+      });
       const events = mapper.map({
         type: "tool_execution_end",
         toolCallId: "c1",
@@ -192,7 +238,12 @@ describe("TurnEventMapper", () => {
   describe("when a field is oversized", () => {
     it("bounds tool output at the 1MB cap with the marker", () => {
       const mapper = new TurnEventMapper("t1");
-      mapper.map({ type: "tool_execution_start", toolCallId: "c1", toolName: "read", args: {} });
+      mapper.map({
+        type: "tool_execution_start",
+        toolCallId: "c1",
+        toolName: "read",
+        args: {},
+      });
       const [end] = mapper.map({
         type: "tool_execution_end",
         toolCallId: "c1",

@@ -14,10 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SimulationExportRun } from "@langwatch/simulation-contract";
 import { globalForApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
-import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
 import { app } from "../[[...route]]/app";
 
 const session = {
@@ -37,19 +34,12 @@ vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog }));
 // The route reads probeProjectPermission from the app-layer imperative
 // module (it moved off ~/server/api/rbac with ADR-092); mocking the old
 // path leaves the real check running.
-vi.mock(
-  "~/server/app-layer/permissions/imperative",
-  async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import("~/server/app-layer/permissions/imperative")
-    >()),
-    probeProjectPermission,
-  }),
-);
+vi.mock("~/server/app-layer/permissions/imperative", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/app-layer/permissions/imperative")>()),
+  probeProjectPermission,
+}));
 
-function buildRun(
-  overrides: Partial<SimulationExportRun> = {},
-): SimulationExportRun {
+function buildRun(overrides: Partial<SimulationExportRun> = {}): SimulationExportRun {
   return {
     scenarioRunId: "run_1",
     scenarioId: "scenario_1",
@@ -221,19 +211,15 @@ describe("POST /api/export/scenario-runs/download", () => {
     it("stops sweeping when nobody is reading the response", async () => {
       const testApp = createTestApp();
       let calls = 0;
-      vi.spyOn(testApp.simulations, "countRunsForExport").mockResolvedValue(
-        10_000,
-      );
-      vi.spyOn(testApp.simulations, "findRunsForExport").mockImplementation(
-        async () => {
-          calls += 1;
-          return {
-            runs: [buildRun({ scenarioRunId: `run_${calls}` })],
-            hasMore: true,
-            nextCursor: String(calls),
-          };
-        },
-      );
+      vi.spyOn(testApp.simulations, "countRunsForExport").mockResolvedValue(10_000);
+      vi.spyOn(testApp.simulations, "findRunsForExport").mockImplementation(async () => {
+        calls += 1;
+        return {
+          runs: [buildRun({ scenarioRunId: `run_${calls}` })],
+          hasMore: true,
+          nextCursor: String(calls),
+        };
+      });
       globalForApp.__langwatch_app = testApp;
 
       const response = await download();
@@ -265,9 +251,7 @@ describe("POST /api/export/scenario-runs/download", () => {
      */
     it("breaks the stream when the sweep fails mid-flight", async () => {
       const testApp = createTestApp();
-      vi.spyOn(testApp.simulations, "countRunsForExport").mockResolvedValue(
-        100,
-      );
+      vi.spyOn(testApp.simulations, "countRunsForExport").mockResolvedValue(100);
       vi.spyOn(testApp.simulations, "findRunsForExport").mockRejectedValue(
         new Error("clickhouse blew up"),
       );

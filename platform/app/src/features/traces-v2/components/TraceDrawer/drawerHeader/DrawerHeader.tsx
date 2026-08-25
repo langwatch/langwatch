@@ -69,20 +69,12 @@ import { RawJsonDialog } from "../RawJsonDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
 import { EditableTraceName } from "./EditableTraceName";
 import { MetricPill } from "./MetricPill";
-import {
-  type CategorizedPin,
-  type PinCategory,
-  renderPinPills,
-} from "./PinStrip";
+import { type CategorizedPin, type PinCategory, renderPinPills } from "./PinStrip";
 import { ShareTraceDialog } from "./ShareTraceDialog";
 import { SyntheticTraceBadge } from "./SyntheticTraceBadge";
 import { TraceOverflowMenu } from "./TraceOverflowMenu";
 import { useRetainedTraceHeader } from "./useRetainedTraceHeader";
-import {
-  formatPinValue,
-  readNumberAttribute,
-  resolveAttributeValue,
-} from "./utils";
+import { formatPinValue, readNumberAttribute, resolveAttributeValue } from "./utils";
 
 interface DrawerHeaderProps {
   trace: TraceHeader;
@@ -162,13 +154,7 @@ function TraceIdChip({ traceId }: { traceId: string }) {
         ".chip-root:hover & [data-expanded]": { display: "inline" },
       }}
     >
-      <Text
-        as="span"
-        data-collapsed
-        textStyle="xs"
-        color="fg"
-        fontWeight="medium"
-      >
+      <Text as="span" data-collapsed textStyle="xs" color="fg" fontWeight="medium">
         {short}
       </Text>
       <Text
@@ -204,13 +190,7 @@ function TraceIdChip({ traceId }: { traceId: string }) {
  * a brief blue pulse so the eye lands. OK traces render the dot
  * non-interactively (just the help tooltip).
  */
-function StatusChip({
-  trace,
-  statusColor,
-}: {
-  trace: TraceHeader;
-  statusColor: string;
-}) {
+function StatusChip({ trace, statusColor }: { trace: TraceHeader; statusColor: string }) {
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const setViewMode = useDrawerStore((s) => s.setViewMode);
   const requestFocus = useFocusSectionStore((s) => s.request);
@@ -440,8 +420,7 @@ const HOISTED_AUTO_PINS: HoistedPinDef[] = [
     key: "scenario.run_id",
     label: "Scenario run",
     category: "run",
-    resolve: (trace) =>
-      trace.scenarioRunId ?? trace.attributes["scenario.run_id"],
+    resolve: (trace) => trace.scenarioRunId ?? trace.attributes["scenario.run_id"],
   },
   { key: "evaluation.run_id", label: "Eval run", category: "run" },
   // Prompt enrichment lives on top-level summary fields rather than raw
@@ -460,8 +439,7 @@ const HOISTED_AUTO_PINS: HoistedPinDef[] = [
     // When selected and last-used are the same, only the "Prompt" pin
     // shows — duplicating the same handle adds noise to the strip.
     resolve: (trace) =>
-      trace.lastUsedPromptId &&
-      trace.lastUsedPromptId !== trace.selectedPromptId
+      trace.lastUsedPromptId && trace.lastUsedPromptId !== trace.selectedPromptId
         ? trace.lastUsedPromptId
         : null,
   },
@@ -485,10 +463,7 @@ const HOISTED_AUTO_PINS: HoistedPinDef[] = [
  * the pill it duplicates. A key the reviewer pins explicitly is still theirs
  * and still renders, because the user-pin check runs first.
  */
-const AUTO_PIN_SUPPRESSED_METADATA_KEYS = new Set([
-  "metadata.model",
-  "metadata.models",
-]);
+const AUTO_PIN_SUPPRESSED_METADATA_KEYS = new Set(["metadata.model", "metadata.models"]);
 
 export const DrawerHeader = memo(function DrawerHeader({
   trace: traceProp,
@@ -692,9 +667,7 @@ export const DrawerHeader = memo(function DrawerHeader({
         continue;
       }
       if (userKeys.has(`attribute:${def.key}`)) continue;
-      const resolved = def.resolve
-        ? def.resolve(trace)
-        : trace.attributes[def.key];
+      const resolved = def.resolve ? def.resolve(trace) : trace.attributes[def.key];
       const value = formatPinValue({ key: def.key, value: resolved ?? null });
       if (!value) continue;
       const filterField = FILTERABLE_PIN_FIELDS[def.key];
@@ -767,9 +740,7 @@ export const DrawerHeader = memo(function DrawerHeader({
 
     for (const p of pins) {
       const valueSource =
-        p.source === "resource"
-          ? resources.resourceAttributes
-          : trace.attributes;
+        p.source === "resource" ? resources.resourceAttributes : trace.attributes;
       const value = formatPinValue({
         key: p.key,
         value: resolveAttributeValue(valueSource, p.key),
@@ -853,9 +824,7 @@ export const DrawerHeader = memo(function DrawerHeader({
     if (trace.serviceName) parts.push(`service:"${trace.serviceName}"`);
     if (trace.status === "error") parts.push("status:error");
     if (trace.traceName) {
-      const escaped = trace.traceName
-        .replace(/\\/g, "\\\\")
-        .replace(/"/g, '\\"');
+      const escaped = trace.traceName.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
       parts.push(`"${escaped}"`);
     }
     return parts.join(" ");
@@ -868,9 +837,7 @@ export const DrawerHeader = memo(function DrawerHeader({
     });
   }, [applyQueryText, closeDrawer, findSimilarQuery]);
 
-  const { refresh: handleRefresh, isRefreshing } = useTraceRefresh(
-    trace.traceId,
-  );
+  const { refresh: handleRefresh, isRefreshing } = useTraceRefresh(trace.traceId);
 
   // Title fallback chain: explicit traceName attribute → root span name (the
   // server populates `trace.name` from it) → trace ID prefix as a last
@@ -884,11 +851,7 @@ export const DrawerHeader = memo(function DrawerHeader({
     const explicit = trace.traceName?.trim();
     if (explicit) return { titleText: explicit, titleIsFallback: false };
     const spanName = trace.name?.trim();
-    if (
-      spanName &&
-      spanName !== trace.traceId &&
-      !trace.traceId.startsWith(spanName)
-    ) {
+    if (spanName && spanName !== trace.traceId && !trace.traceId.startsWith(spanName)) {
       return { titleText: spanName, titleIsFallback: false };
     }
     return {
@@ -911,8 +874,10 @@ export const DrawerHeader = memo(function DrawerHeader({
   // eval status is the highest-signal data on the strip, not something
   // to bury after a half-dozen capabilities. Anything beyond 10 still
   // rolls into "+N more" so the row stays scannable.
-  const { primary: primaryChips, overflowChip: chipsOverflow } =
-    splitChipsForOverflow(chipDefs, 10);
+  const { primary: primaryChips, overflowChip: chipsOverflow } = splitChipsForOverflow(
+    chipDefs,
+    10,
+  );
   // Pins: auto-pins (identity/run/tag) always inline. Custom + metadata
   // pins inline up to MAX_INLINE_PINS — the rest still spill into the
   // overflow popover so a pathological 200-pin trace can't blow out the
@@ -1071,8 +1036,7 @@ export const DrawerHeader = memo(function DrawerHeader({
                   isRefreshing
                     ? {
                         "& svg": {
-                          animation:
-                            "tracesV2DrawerRefreshSpin 0.9s linear infinite",
+                          animation: "tracesV2DrawerRefreshSpin 0.9s linear infinite",
                         },
                         "@keyframes tracesV2DrawerRefreshSpin": {
                           from: { transform: "rotate(0deg)" },
@@ -1100,10 +1064,7 @@ export const DrawerHeader = memo(function DrawerHeader({
                 onClick={handleMaximizeClick}
                 aria-label={isMaximized ? "Restore drawer" : "Maximize drawer"}
               >
-                <Icon
-                  as={isMaximized ? LuMinimize2 : LuMaximize2}
-                  boxSize={3.5}
-                />
+                <Icon as={isMaximized ? LuMinimize2 : LuMaximize2} boxSize={3.5} />
               </Button>
             </Tooltip>
             <TraceOverflowMenu
@@ -1170,12 +1131,7 @@ export const DrawerHeader = memo(function DrawerHeader({
           The strip wraps naturally — height tracks content rather than
           locking to two rows, so traces with a single row of pills don't
           carry a permanent ~28px empty band underneath. */}
-      <HStack
-        gap={1.5}
-        flexWrap="wrap"
-        align="center"
-        alignContent="flex-start"
-      >
+      <HStack gap={1.5} flexWrap="wrap" align="center" alignContent="flex-start">
         {/* Section 1: Performance metrics */}
         <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />
         {trace.spanCount > 0 && (
@@ -1220,10 +1176,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             positioning={{ placement: "top" }}
           >
             <Box>
-              <MetricPill
-                label="Context size"
-                value={formatTokens(contextSizeTokens)}
-              />
+              <MetricPill label="Context size" value={formatTokens(contextSizeTokens)} />
             </Box>
           </Tooltip>
         )}
@@ -1300,12 +1253,7 @@ export const DrawerHeader = memo(function DrawerHeader({
           trace-without is small enough (~28px) that it's cheaper than the
           permanent waste. */}
       {(pinResult.inline.length > 0 || pinResult.overflow != null) && (
-        <HStack
-          gap={1.5}
-          flexWrap="wrap"
-          align="center"
-          alignContent="flex-start"
-        >
+        <HStack gap={1.5} flexWrap="wrap" align="center" alignContent="flex-start">
           {pinResult.inline}
           {pinResult.overflow}
         </HStack>
@@ -1353,17 +1301,12 @@ export const DrawerHeader = memo(function DrawerHeader({
                   row — out of the way of the title and not crowding the
                   action cluster. Copy trace ID lives in the overflow
                   menu / `Y` shortcut, so the inline chip is gone. */}
-              <TracePresenceAvatars
-                traceId={trace.traceId}
-                max={5}
-                size="2xs"
-              />
+              <TracePresenceAvatars traceId={trace.traceId} max={5} size="2xs" />
               <Tooltip
                 content={
                   <VStack align="start" gap={0.5}>
                     <Text textStyle="xs">
-                      First span recorded{" "}
-                      {formatRelativeTimeAgo(trace.timestamp)}
+                      First span recorded {formatRelativeTimeAgo(trace.timestamp)}
                     </Text>
                     <Text textStyle="xs" color="fg.muted">
                       {formatAbsoluteTime(trace.timestamp)}
@@ -1389,11 +1332,7 @@ export const DrawerHeader = memo(function DrawerHeader({
           }
         />
       </Box>
-      <RawJsonDialog
-        open={rawOpen}
-        onClose={() => setRawOpen(false)}
-        trace={trace}
-      />
+      <RawJsonDialog open={rawOpen} onClose={() => setRawOpen(false)} trace={trace} />
       {!readOnly && (
         <>
           <ShareTraceDialog

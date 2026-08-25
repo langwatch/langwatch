@@ -12,11 +12,7 @@ export abstract class GroupRepository {
     groupId: string;
     organizationId: string;
   }): Promise<OrganizationGroup>;
-  abstract list(input: {
-    organizationId: string;
-    page: number;
-    limit: number;
-  }): Promise<{
+  abstract list(input: { organizationId: string; page: number; limit: number }): Promise<{
     data: OrganizationGroupWithMemberCount[];
     pagination: { page: number; limit: number; total: number };
   }>;
@@ -50,10 +46,7 @@ export abstract class GroupRepository {
     name: string;
     slug: string;
   }): Promise<OrganizationGroup>;
-  abstract delete(input: {
-    groupId: string;
-    organizationId: string;
-  }): Promise<void>;
+  abstract delete(input: { groupId: string; organizationId: string }): Promise<void>;
   abstract addMember(input: {
     groupId: string;
     organizationId: string;

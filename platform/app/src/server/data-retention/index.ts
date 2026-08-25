@@ -5,10 +5,7 @@ export { DataRetentionPolicyRepository } from "./policy/dataRetentionPolicy.repo
 export { DataRetentionPolicyService } from "./policy/dataRetentionPolicy.service";
 export type { RetentionRow } from "./resolveRetentionDays";
 export { resolveRetention } from "./resolveRetentionDays";
-export type {
-  ResolvedRetention,
-  RetentionCategory,
-} from "./retentionPolicy.schema";
+export type { ResolvedRetention, RetentionCategory } from "./retentionPolicy.schema";
 export {
   MIN_RETENTION_DAYS,
   PRODUCTION_STORAGE_METER_TABLES,

@@ -19,9 +19,7 @@ export const storedObjectUploadTokenSchema = z
   .min(1, "uploadToken is required")
   .max(8192, "uploadToken is too long")
   .regex(/^\S+$/u, "uploadToken must not contain whitespace");
-export type StoredObjectUploadToken = z.infer<
-  typeof storedObjectUploadTokenSchema
->;
+export type StoredObjectUploadToken = z.infer<typeof storedObjectUploadTokenSchema>;
 
 export const storedObjectUploadMetadataSchema = z
   .object({
@@ -31,14 +29,10 @@ export const storedObjectUploadMetadataSchema = z
     sha256: storedObjectSha256Schema,
   })
   .strict();
-export type StoredObjectUploadMetadata = z.infer<
-  typeof storedObjectUploadMetadataSchema
->;
+export type StoredObjectUploadMetadata = z.infer<typeof storedObjectUploadMetadataSchema>;
 
 /** Builds the same upload shape with the runtime's configured byte ceiling. */
-export function createStoredObjectUploadMetadataSchema(
-  maximumUploadBytes: number,
-) {
+export function createStoredObjectUploadMetadataSchema(maximumUploadBytes: number) {
   return storedObjectUploadMetadataSchema.extend({
     byteLength: createStoredObjectByteLengthSchema(maximumUploadBytes),
   });
@@ -64,34 +58,29 @@ export type StoredObjectsCreateUploadInput = z.infer<
   typeof storedObjectsCreateUploadInputSchema
 >;
 
-export function createStoredObjectsCreateUploadInputSchema(
-  maximumUploadBytes: number,
-) {
+export function createStoredObjectsCreateUploadInputSchema(maximumUploadBytes: number) {
   return createStoredObjectUploadMetadataSchema(maximumUploadBytes).extend({
     projectId: storedObjectProjectIdSchema,
   });
 }
 
-export const storedObjectsCreateUploadOutputSchema = z.discriminatedUnion(
-  "status",
-  [
-    z
-      .object({
-        status: z.literal("existing"),
-        reference: storedObjectReferenceSchema,
-      })
-      .strict(),
-    z
-      .object({
-        status: z.literal("pending"),
-        objectId: storedObjectIdSchema,
-        operationId: storedObjectOperationIdSchema,
-        uploadToken: storedObjectUploadTokenSchema,
-        upload: storedObjectDirectUploadTargetSchema,
-      })
-      .strict(),
-  ],
-);
+export const storedObjectsCreateUploadOutputSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("existing"),
+      reference: storedObjectReferenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("pending"),
+      objectId: storedObjectIdSchema,
+      operationId: storedObjectOperationIdSchema,
+      uploadToken: storedObjectUploadTokenSchema,
+      upload: storedObjectDirectUploadTargetSchema,
+    })
+    .strict(),
+]);
 export type StoredObjectsCreateUploadOutput = z.infer<
   typeof storedObjectsCreateUploadOutputSchema
 >;
@@ -106,8 +95,7 @@ export type StoredObjectsConfirmUploadInput = z.infer<
   typeof storedObjectsConfirmUploadInputSchema
 >;
 
-export const storedObjectsConfirmUploadOutputSchema =
-  storedObjectReferenceSchema;
+export const storedObjectsConfirmUploadOutputSchema = storedObjectReferenceSchema;
 export type StoredObjectsConfirmUploadOutput = z.infer<
   typeof storedObjectsConfirmUploadOutputSchema
 >;

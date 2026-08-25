@@ -131,9 +131,7 @@ function makeOrg({
 }
 
 async function createHandler() {
-  const { ReportUsageForMonthCommand } = await import(
-    "../reportUsageForMonth.command"
-  );
+  const { ReportUsageForMonthCommand } = await import("../reportUsageForMonth.command");
 
   return new ReportUsageForMonthCommand({
     organizations: mockOrganizations as any,
@@ -262,9 +260,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockReportUsageDelta).toHaveBeenCalledWith(
         expect.objectContaining({
           stripeCustomerId: "cus_123",
-          events: expect.arrayContaining([
-            expect.objectContaining({ value: 50 }),
-          ]),
+          events: expect.arrayContaining([expect.objectContaining({ value: 50 })]),
         }),
       );
 
@@ -306,9 +302,7 @@ describe("ReportUsageForMonthCommand", () => {
       // Reports full 50 (lastReportedTotal defaults to 0)
       expect(mockReportUsageDelta).toHaveBeenCalledWith(
         expect.objectContaining({
-          events: expect.arrayContaining([
-            expect.objectContaining({ value: 50 }),
-          ]),
+          events: expect.arrayContaining([expect.objectContaining({ value: 50 })]),
         }),
       );
 
@@ -504,9 +498,8 @@ describe("ReportUsageForMonthCommand", () => {
 
   describe("static properties", () => {
     it("exposes schema, getAggregateId, and getSpanAttributes", async () => {
-      const { ReportUsageForMonthCommand } = await import(
-        "../reportUsageForMonth.command"
-      );
+      const { ReportUsageForMonthCommand } =
+        await import("../reportUsageForMonth.command");
 
       expect(ReportUsageForMonthCommand.schema.type).toBe(
         "lw.billing_report.report_usage_for_month",

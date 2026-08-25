@@ -59,10 +59,7 @@ export type ModelMetadataForFrontend = {
   parameterConstraints?: ParameterConstraints;
 };
 
-export const getProjectModelProviders = async (
-  projectId: string,
-  includeKeys = true,
-) => {
+export const getProjectModelProviders = async (projectId: string, includeKeys = true) => {
   const service = ModelProviderService.create(prisma);
   return await service.getProjectModelProviders(projectId, includeKeys);
 };
@@ -148,10 +145,7 @@ export const getProjectModelProvidersForFrontend = async (
 
   // Include model metadata for all models, merged with custom model entries
   const registryMetadata = getModelMetadataForFrontend();
-  const modelMetadata = mergeCustomModelMetadata(
-    registryMetadata,
-    maskedProviders,
-  );
+  const modelMetadata = mergeCustomModelMetadata(registryMetadata, maskedProviders);
 
   return {
     providers: maskedProviders,
@@ -165,21 +159,15 @@ export const getProjectModelProvidersForFrontend = async (
 // "OpenAI — Project override" side by side. The Record-by-provider-key
 // `getProjectModelProvidersForFrontend` collapses those duplicates and
 // is not safe to use here.
-export const listOrgModelProvidersForFrontend = async (
-  organizationId: string,
-) => {
+export const listOrgModelProvidersForFrontend = async (organizationId: string) => {
   const service = ModelProviderService.create(prisma);
-  const providers =
-    await service.listOrgModelProvidersForFrontend(organizationId);
+  const providers = await service.listOrgModelProvidersForFrontend(organizationId);
 
   const registryMetadata = getModelMetadataForFrontend();
   const providersAsRecord = Object.fromEntries(
     providers.map((p) => [p.id ?? `system-${p.provider}`, p]),
   );
-  const modelMetadata = mergeCustomModelMetadata(
-    registryMetadata,
-    providersAsRecord,
-  );
+  const modelMetadata = mergeCustomModelMetadata(registryMetadata, providersAsRecord);
 
   return {
     providers,
@@ -187,21 +175,15 @@ export const listOrgModelProvidersForFrontend = async (
   };
 };
 
-export const listProjectModelProvidersForFrontend = async (
-  projectId: string,
-) => {
+export const listProjectModelProvidersForFrontend = async (projectId: string) => {
   const service = ModelProviderService.create(prisma);
-  const providers =
-    await service.listProjectModelProvidersForFrontend(projectId);
+  const providers = await service.listProjectModelProvidersForFrontend(projectId);
 
   const registryMetadata = getModelMetadataForFrontend();
   const providersAsRecord = Object.fromEntries(
     providers.map((p) => [p.id ?? p.provider, p]),
   );
-  const modelMetadata = mergeCustomModelMetadata(
-    registryMetadata,
-    providersAsRecord,
-  );
+  const modelMetadata = mergeCustomModelMetadata(registryMetadata, providersAsRecord);
 
   return {
     providers,
@@ -216,8 +198,7 @@ const getModelOrDefaultEnvKey = (
   return (
     // Allow env var to be set to empty string '' on purpose to fallback to process.env defined one
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    (modelProvider.customKeys as Record<string, string>)?.[envKey] ||
-    process.env[envKey]
+    (modelProvider.customKeys as Record<string, string>)?.[envKey] || process.env[envKey]
   );
 };
 
@@ -230,9 +211,7 @@ const getModelOrDefaultApiKey = (modelProvider: MaybeStoredModelProvider) => {
   return getModelOrDefaultEnvKey(modelProvider, providerDefinition.apiKey);
 };
 
-const getModelOrDefaultEndpointKey = (
-  modelProvider: MaybeStoredModelProvider,
-) => {
+const getModelOrDefaultEndpointKey = (modelProvider: MaybeStoredModelProvider) => {
   const providerDefinition =
     modelProviders[modelProvider.provider as keyof typeof modelProviders];
   if (!providerDefinition) {
@@ -416,8 +395,7 @@ export const prepareLitellmParams = async ({
     params.aws_access_key_id =
       getModelOrDefaultEnvKey(modelProvider, "AWS_ACCESS_KEY_ID") ?? "invalid";
     params.aws_secret_access_key =
-      getModelOrDefaultEnvKey(modelProvider, "AWS_SECRET_ACCESS_KEY") ??
-      "invalid";
+      getModelOrDefaultEnvKey(modelProvider, "AWS_SECRET_ACCESS_KEY") ?? "invalid";
     params.aws_region_name =
       getModelOrDefaultEnvKey(modelProvider, "AWS_REGION_NAME") ?? "invalid";
   }
@@ -459,8 +437,7 @@ export const prepareLitellmParams = async ({
       // `model` may still be the canonical `mp_.../...` wire format), so key
       // the lookups off it for both the bare and full-key forms.
       const bareModel = params.model.split("/").slice(1).join("/");
-      const deployment =
-        deploymentMap[bareModel] ?? deploymentMap[params.model];
+      const deployment = deploymentMap[bareModel] ?? deploymentMap[params.model];
       if (deployment) {
         params.deployment = deployment;
       }

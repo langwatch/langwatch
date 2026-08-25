@@ -14,8 +14,7 @@ const jsonResponse = (status: number, body: unknown): Response =>
     status,
     headers: { "Content-Type": "application/json" },
   });
-const emptyResponse = (status: number): Response =>
-  new Response("", { status });
+const emptyResponse = (status: number): Response => new Response("", { status });
 
 describe("startDeviceCode", () => {
   it("posts to /api/auth/cli/device-code and returns the spec shape", async () => {
@@ -120,15 +119,19 @@ describe("exchange", () => {
   ] as const) {
     it(`maps ${status} to DeviceFlowError kind=${kind}`, async () => {
       const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(status));
-      await expect(exchange({ baseUrl: url, fetchImpl }, "DC"))
-        .rejects.toMatchObject({ name: "DeviceFlowError", kind });
+      await expect(exchange({ baseUrl: url, fetchImpl }, "DC")).rejects.toMatchObject({
+        name: "DeviceFlowError",
+        kind,
+      });
     });
   }
 
   it("throws DeviceFlowError(other) on unexpected status", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(500, { error: "boom" }));
-    await expect(exchange({ baseUrl: url, fetchImpl }, "DC"))
-      .rejects.toMatchObject({ name: "DeviceFlowError", kind: "other" });
+    await expect(exchange({ baseUrl: url, fetchImpl }, "DC")).rejects.toMatchObject({
+      name: "DeviceFlowError",
+      kind: "other",
+    });
   });
 
   it("attaches client_info (hostname, uname, platform) to the exchange POST body", async () => {
@@ -148,9 +151,7 @@ describe("exchange", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const init = fetchImpl.mock.calls[0]?.[1] as RequestInit | undefined;
     const rawBody = init?.body;
-    const sent = JSON.parse(
-      typeof rawBody === "string" ? rawBody : "{}",
-    ) as {
+    const sent = JSON.parse(typeof rawBody === "string" ? rawBody : "{}") as {
       device_code: string;
       client_info?: {
         hostname?: string;
@@ -182,10 +183,13 @@ describe("pollUntilDone", () => {
         }),
       );
     });
-    const r = await pollUntilDone(
-      { baseUrl: "http://x", fetchImpl },
-      { device_code: "DC", user_code: "u", verification_uri: "http://x/cli/auth", expires_in: 60, interval: 0.05 } as any,
-    );
+    const r = await pollUntilDone({ baseUrl: "http://x", fetchImpl }, {
+      device_code: "DC",
+      user_code: "u",
+      verification_uri: "http://x/cli/auth",
+      expires_in: 60,
+      interval: 0.05,
+    } as any);
     expect(r.kind).toBe("device_session");
     if (r.kind !== "device_session") throw new Error("unreachable");
     expect(r.access_token).toBe("at");
@@ -195,10 +199,13 @@ describe("pollUntilDone", () => {
   it("propagates denied without retrying further", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(410));
     await expect(
-      pollUntilDone(
-        { baseUrl: "http://x", fetchImpl },
-        { device_code: "DC", user_code: "u", verification_uri: "http://x/cli/auth", expires_in: 60, interval: 0.05 } as any,
-      ),
+      pollUntilDone({ baseUrl: "http://x", fetchImpl }, {
+        device_code: "DC",
+        user_code: "u",
+        verification_uri: "http://x/cli/auth",
+        expires_in: 60,
+        interval: 0.05,
+      } as any),
     ).rejects.toMatchObject({ kind: "denied" });
   });
 });
@@ -206,7 +213,11 @@ describe("pollUntilDone", () => {
 describe("refresh", () => {
   it("returns rotated tokens on 200", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
-      jsonResponse(200, { access_token: "at_new", refresh_token: "rt_new", expires_in: 3600 }),
+      jsonResponse(200, {
+        access_token: "at_new",
+        refresh_token: "rt_new",
+        expires_in: 3600,
+      }),
     );
     const r = await refresh({ baseUrl: "http://x", fetchImpl }, "rt_old");
     expect(r.access_token).toBe("at_new");
@@ -214,8 +225,9 @@ describe("refresh", () => {
 
   it("throws DeviceFlowError(unauthorized) on 401 so the caller can wipe local state", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(401));
-    await expect(refresh({ baseUrl: "http://x", fetchImpl }, "rt_x"))
-      .rejects.toMatchObject({ kind: "unauthorized" });
+    await expect(
+      refresh({ baseUrl: "http://x", fetchImpl }, "rt_x"),
+    ).rejects.toMatchObject({ kind: "unauthorized" });
   });
 });
 
@@ -223,13 +235,16 @@ describe("logout", () => {
   it("treats 200/401/404 as success (idempotent)", async () => {
     for (const status of [200, 401, 404]) {
       const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(status));
-      await expect(logout({ baseUrl: "http://x", fetchImpl }, "rt")).resolves.toBeUndefined();
+      await expect(
+        logout({ baseUrl: "http://x", fetchImpl }, "rt"),
+      ).resolves.toBeUndefined();
     }
   });
 
   it("propagates other failures", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(500, {}));
-    await expect(logout({ baseUrl: "http://x", fetchImpl }, "rt"))
-      .rejects.toBeInstanceOf(DeviceFlowError);
+    await expect(logout({ baseUrl: "http://x", fetchImpl }, "rt")).rejects.toBeInstanceOf(
+      DeviceFlowError,
+    );
   });
 });

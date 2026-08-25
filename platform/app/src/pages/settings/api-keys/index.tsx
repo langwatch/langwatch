@@ -21,10 +21,7 @@ export default function ApiKeysPage() {
             Manage credentials used to authenticate with the LangWatch API.
           </Text>
         </VStack>
-        <ApiKeysSection
-          organizationId={organization.id}
-          projectId={project?.id}
-        />
+        <ApiKeysSection organizationId={organization.id} projectId={project?.id} />
       </VStack>
     </SettingsLayout>
   );

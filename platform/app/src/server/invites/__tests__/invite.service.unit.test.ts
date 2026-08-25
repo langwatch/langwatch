@@ -112,9 +112,7 @@ describe("classifyInvitesByMemberType()", () => {
           teams: [{ customRoleId: "role-1" }],
         },
       ];
-      const customRoleMap = new Map([
-        ["role-1", ["traces:view", "traces:manage"]],
-      ]);
+      const customRoleMap = new Map([["role-1", ["traces:view", "traces:manage"]]]);
 
       const result = classifyInvitesByMemberType(invites, customRoleMap);
 
@@ -400,9 +398,7 @@ describe("InviteService", () => {
     describe("when a PENDING invite exists for the email", () => {
       it("returns the existing invite", async () => {
         const existingInvite = { id: "inv-1", email: "test@example.com" };
-        mockPrisma.organizationInvite.findFirst.mockResolvedValue(
-          existingInvite,
-        );
+        mockPrisma.organizationInvite.findFirst.mockResolvedValue(existingInvite);
 
         const result = await service.checkDuplicateInvite({
           email: "test@example.com",
@@ -416,9 +412,7 @@ describe("InviteService", () => {
     describe("when a WAITING_APPROVAL invite exists for the email", () => {
       it("returns the existing invite", async () => {
         const existingInvite = { id: "inv-2", email: "test@example.com" };
-        mockPrisma.organizationInvite.findFirst.mockResolvedValue(
-          existingInvite,
-        );
+        mockPrisma.organizationInvite.findFirst.mockResolvedValue(existingInvite);
 
         const result = await service.checkDuplicateInvite({
           email: "test@example.com",
@@ -745,9 +739,7 @@ describe("InviteService", () => {
       ];
 
       beforeEach(() => {
-        mockPrisma.organizationInvite.findMany.mockResolvedValue(
-          pendingInvites,
-        );
+        mockPrisma.organizationInvite.findMany.mockResolvedValue(pendingInvites);
         mockPrisma.organizationInvite.update.mockImplementation(
           ({ where }: { where: { id: string } }) => {
             const invite = pendingInvites.find((i) => i.id === where.id);
@@ -775,8 +767,7 @@ describe("InviteService", () => {
         });
 
         expect(mockPrisma.organizationInvite.update).toHaveBeenCalledTimes(2);
-        const firstCall =
-          mockPrisma.organizationInvite.update.mock.calls[0]![0];
+        const firstCall = mockPrisma.organizationInvite.update.mock.calls[0]![0];
         expect(firstCall.data.expiration).toBeInstanceOf(Date);
       });
 
@@ -917,9 +908,7 @@ describe("InviteService", () => {
         }
 
         // Verify: team-scoped grant was attached
-        const teamBinding = roleBindingsCreated.find(
-          (rb) => rb.scopeType === "TEAM",
-        );
+        const teamBinding = roleBindingsCreated.find((rb) => rb.scopeType === "TEAM");
         expect(teamBinding).toBeDefined();
         expect(teamBinding!.principal).toEqual({ userId: "user-flow-1" });
         expect(teamBinding!.scopeId).toBe("team-1");
@@ -1025,9 +1014,7 @@ describe("InviteService", () => {
 
           const teamCommands = ledger.attachBindings.mock.calls
             .map((call: any[]) => call[0])
-            .filter(
-              (envelope: any) => envelope.bindings[0]?.scopeType === "TEAM",
-            );
+            .filter((envelope: any) => envelope.bindings[0]?.scopeType === "TEAM");
           expect(teamCommands).toHaveLength(1);
           expect(teamCommands[0]!.bindings.map((b: any) => b.scopeId)).toEqual([
             "team-1",

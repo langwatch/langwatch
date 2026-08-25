@@ -4,10 +4,7 @@ import {
   type AnomalyRule,
   type SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
-import type {
-  Prisma,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { SpendSpikeAnomalyRepository } from "../../ports/spend-spike-anomaly.port";
 
 const GOVERNANCE_PROJECT_KIND = "internal_governance";
@@ -32,9 +29,7 @@ export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     return rows.map((row) => anomalyRuleSchema.parse(row));
   }
 
-  async tryResolveGovernanceTenantId(
-    organizationId: string,
-  ): Promise<string | null> {
+  async tryResolveGovernanceTenantId(organizationId: string): Promise<string | null> {
     const project = await this.prisma.project.findFirst({
       where: {
         kind: GOVERNANCE_PROJECT_KIND,
@@ -46,10 +41,7 @@ export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     return project?.id ?? null;
   }
 
-  async hasOpenAlert(input: {
-    ruleId: string;
-    since: Date;
-  }): Promise<boolean> {
+  async hasOpenAlert(input: { ruleId: string; since: Date }): Promise<boolean> {
     return (
       (await this.prisma.anomalyAlert.count({
         where: {
@@ -68,9 +60,7 @@ export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     const detail = {
       baselineSpendUsd: input.result.baselineSpendUsd,
       windowSec:
-        (input.result.windowEnd.getTime() -
-          input.result.windowStart.getTime()) /
-        1_000,
+        (input.result.windowEnd.getTime() - input.result.windowStart.getTime()) / 1_000,
       reason: input.result.reason,
       dispatch: "pending",
     };

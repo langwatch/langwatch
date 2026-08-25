@@ -26,13 +26,7 @@
  *   pnpm check:feature-parity --json       # machine-readable report
  */
 
-import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-  realpathSync,
-  statSync,
-} from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -198,10 +192,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
  * langevals scorers would have no way to satisfy parity short of a
  * misleading TS stub.
  */
-const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
-  "services/langevals",
-  "sdks/python",
-];
+const DEFAULT_PYTHON_TEST_ROOTS: string[] = ["services/langevals", "sdks/python"];
 
 /**
  * Feature files whose unbound `@unit` / `@integration` scenarios are
@@ -793,10 +784,7 @@ function parseFeature(absPath: string): Scenario[] {
   return scenarios;
 }
 
-function walkFiles(
-  root: string,
-  predicate: (name: string) => boolean,
-): string[] {
+function walkFiles(root: string, predicate: (name: string) => boolean): string[] {
   const out: string[] = [];
   let entries: string[];
   try {
@@ -829,9 +817,7 @@ function walkFiles(
  * the check goes green having measured nothing. Fail closed instead — the tree
  * is either there or the check refuses to run.
  */
-export function discoverFeatureFiles(
-  roots: readonly string[] = SPECS_ROOTS,
-): string[] {
+export function discoverFeatureFiles(roots: readonly string[] = SPECS_ROOTS): string[] {
   const files = roots.flatMap((root) => {
     if (!existsSync(root)) {
       throw new Error(
@@ -889,9 +875,7 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
   for (const r of testRoots) {
-    files.push(
-      ...walkFiles(resolve(REPO_ROOT, r), (n) => TEST_FILE_RE.test(n)),
-    );
+    files.push(...walkFiles(resolve(REPO_ROOT, r), (n) => TEST_FILE_RE.test(n)));
   }
 
   for (const file of files) {
@@ -1009,11 +993,7 @@ const GO_SUBTEST_SCAN_BUDGET = 4096;
  * significant character, or `-1` if `limit` is reached first. Linear: every
  * character is visited at most once, no backtracking.
  */
-function skipGoSpaceAndComments(
-  src: string,
-  start: number,
-  limit: number,
-): number {
+function skipGoSpaceAndComments(src: string, start: number, limit: number): number {
   let i = start;
   while (i < limit) {
     const ch = src[i];
@@ -1150,9 +1130,7 @@ export function collectGoBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
   for (const r of testRoots) {
-    files.push(
-      ...walkFiles(resolve(REPO_ROOT, r), (n) => GO_TEST_FILE_RE.test(n)),
-    );
+    files.push(...walkFiles(resolve(REPO_ROOT, r), (n) => GO_TEST_FILE_RE.test(n)));
   }
 
   for (const file of files) {
@@ -1234,9 +1212,7 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
   for (const r of testRoots) {
-    files.push(
-      ...walkFiles(resolve(REPO_ROOT, r), (n) => PYTHON_TEST_FILE_RE.test(n)),
-    );
+    files.push(...walkFiles(resolve(REPO_ROOT, r), (n) => PYTHON_TEST_FILE_RE.test(n)));
   }
 
   for (const file of files) {
@@ -1353,9 +1329,7 @@ function buildReport(
   const absFeature = resolve(REPO_ROOT, featureRelPath);
   const allScenarios = parseFeature(absFeature);
   const scenarios = allScenarios.filter(
-    (s) =>
-      s.tags.some((t) => BOUND_TAGS.has(t)) &&
-      !s.tags.includes(UNIMPLEMENTED_TAG),
+    (s) => s.tags.some((t) => BOUND_TAGS.has(t)) && !s.tags.includes(UNIMPLEMENTED_TAG),
   );
 
   const unbound: Scenario[] = [];
@@ -1370,9 +1344,8 @@ function buildReport(
     scenarios: annotated,
     unbound,
     totalScenarios: allScenarios.length,
-    unimplementedScenarios: allScenarios.filter((s) =>
-      s.tags.includes(UNIMPLEMENTED_TAG),
-    ).length,
+    unimplementedScenarios: allScenarios.filter((s) => s.tags.includes(UNIMPLEMENTED_TAG))
+      .length,
   };
 }
 
@@ -1381,9 +1354,7 @@ function buildReport(
  * and enforces none of them. Callers decide whether a given file is tolerated
  * (`LEGACY_INERT`) or fatal.
  */
-export function isInert(
-  r: Pick<Report, "scenarios" | "totalScenarios">,
-): boolean {
+export function isInert(r: Pick<Report, "scenarios" | "totalScenarios">): boolean {
   return r.totalScenarios > 0 && r.scenarios.length === 0;
 }
 
@@ -1450,9 +1421,7 @@ function printLegacySummary(reports: LegacyReport[]): void {
     `  ${reports.length} file(s), ${totalBound}/${totalScenarios} bound, ${totalUnbound} unbound`,
   );
   for (const r of reports) {
-    console.log(
-      `  · ${r.feature}  ${r.bound}/${r.total} bound, ${r.unbound} unbound`,
-    );
+    console.log(`  · ${r.feature}  ${r.bound}/${r.total} bound, ${r.unbound} unbound`);
   }
   console.log(
     `\n  Shrink this list by binding scenarios, flagging @unimplemented, or removing stale scenarios. See dev/docs/TESTING_PHILOSOPHY.md.`,

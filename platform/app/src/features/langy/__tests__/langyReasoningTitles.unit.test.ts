@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  foldReasoningTitles,
-  stripReasoningTitles,
-} from "../logic/langyReasoningTitles";
+import { foldReasoningTitles, stripReasoningTitles } from "../logic/langyReasoningTitles";
 
 /**
  * The reasoning-summary fold (see logic/langyReasoningTitles.ts): a codex
@@ -52,9 +49,7 @@ describe("foldReasoningTitles", () => {
         text: LEAKED_TEXT,
         hasActivity: true,
       });
-      expect(fold.text).toBe(
-        "Mostly Langy conversations and assistant responses.",
-      );
+      expect(fold.text).toBe("Mostly Langy conversations and assistant responses.");
     });
   });
 
@@ -114,9 +109,7 @@ describe("foldReasoningTitles", () => {
         "Planning task execution strategy",
         "Summarizing recent trace counts",
       ]);
-      expect(fold.text).toBe(
-        "Mostly Langy conversations and assistant responses.",
-      );
+      expect(fold.text).toBe("Mostly Langy conversations and assistant responses.");
     });
   });
 
@@ -155,8 +148,7 @@ describe("foldReasoningTitles", () => {
     });
 
     it("keeps a bold run that sits mid-answer", () => {
-      const text =
-        "The traces look fine.\n\n**Planning next steps** is up to you.";
+      const text = "The traces look fine.\n\n**Planning next steps** is up to you.";
       const fold = foldReasoningTitles({ parts: [], text, hasActivity: true });
       expect(fold.titles).toEqual([]);
       expect(fold.text).toBe(text);
@@ -177,17 +169,17 @@ describe("foldReasoningTitles", () => {
 describe("stripReasoningTitles", () => {
   describe("when a prose segment opens with the leaked headlines", () => {
     it("returns only the reply text", () => {
-      expect(
-        stripReasoningTitles({ text: LEAKED_TEXT, hasActivity: true }),
-      ).toBe("Mostly Langy conversations and assistant responses.");
+      expect(stripReasoningTitles({ text: LEAKED_TEXT, hasActivity: true })).toBe(
+        "Mostly Langy conversations and assistant responses.",
+      );
     });
   });
 
   describe("when the turn has no activity record", () => {
     it("returns the text untouched", () => {
-      expect(
-        stripReasoningTitles({ text: LEAKED_TEXT, hasActivity: false }),
-      ).toBe(LEAKED_TEXT);
+      expect(stripReasoningTitles({ text: LEAKED_TEXT, hasActivity: false })).toBe(
+        LEAKED_TEXT,
+      );
     });
   });
 });

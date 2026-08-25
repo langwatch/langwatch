@@ -24,10 +24,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     useOrganizationTeamProjectMock(...args),
 }));
 
-import {
-  loadStoredNavigationMode,
-  useNavigationModeStore,
-} from "../navigationModeStore";
+import { loadStoredNavigationMode, useNavigationModeStore } from "../navigationModeStore";
 import { useNavigationMode } from "../useNavigationMode";
 
 const STORAGE_KEY = "langwatch:navigation-mode:v1";
@@ -100,9 +97,7 @@ describe("useNavigationMode", () => {
       renderHook(() => useNavigationMode());
 
       expect(localStorage.getItem(FLAG_STORAGE_KEY)).toBe("on");
-      expect(useNavigationModeStore.getState().isLastKnownFlagEnabled).toBe(
-        true,
-      );
+      expect(useNavigationModeStore.getState().isLastKnownFlagEnabled).toBe(true);
     });
   });
 
@@ -167,9 +162,7 @@ describe("useNavigationMode", () => {
 
       expect(result.current).toEqual({ status: "ready", mode: "legacy" });
       expect(localStorage.getItem(STORAGE_KEY)).toBe("product-switcher");
-      expect(useNavigationModeStore.getState().storedMode).toBe(
-        "product-switcher",
-      );
+      expect(useNavigationModeStore.getState().storedMode).toBe("product-switcher");
     });
   });
 });

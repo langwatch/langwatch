@@ -24,15 +24,7 @@
  */
 
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { prisma } from "../../../db";
 import { hasTeamPermission } from "../../rbac";
@@ -69,9 +61,9 @@ describe("given a member who is the only admin of shared teams", () => {
   describe("when an organization admin moves them to a Lite Member seat", () => {
     /** @scenario Moving the only admin of a shared team to a Lite Member seat goes through */
     it("saves the seat change", async () => {
-      await expect(
-        moveSoloUserTo(OrganizationUserRole.EXTERNAL),
-      ).resolves.toMatchObject({ success: true });
+      await expect(moveSoloUserTo(OrganizationUserRole.EXTERNAL)).resolves.toMatchObject({
+        success: true,
+      });
 
       await expect(fixture.organizationRoleOfSoloUser()).resolves.toBe(
         OrganizationUserRole.EXTERNAL,
@@ -94,9 +86,9 @@ describe("given a member who is the only admin of shared teams", () => {
     it("names every team left without a team admin", async () => {
       const result = await moveSoloUserTo(OrganizationUserRole.EXTERNAL);
 
-      expect(
-        result.teamsLeftWithoutAdmin.map((team) => team.id).sort(),
-      ).toEqual([fixture.onlyAdminTeamId, fixture.alsoOnlyAdminTeamId].sort());
+      expect(result.teamsLeftWithoutAdmin.map((team) => team.id).sort()).toEqual(
+        [fixture.onlyAdminTeamId, fixture.alsoOnlyAdminTeamId].sort(),
+      );
     });
 
     /** @scenario The teams left without a team admin are named back to the admin */
@@ -167,9 +159,7 @@ describe("given a member who is the only admin of shared teams", () => {
         run: async () => {
           const result = await moveSoloUserTo(OrganizationUserRole.EXTERNAL);
 
-          const reportedIds = result.teamsLeftWithoutAdmin.map(
-            (team) => team.id,
-          );
+          const reportedIds = result.teamsLeftWithoutAdmin.map((team) => team.id);
           expect(reportedIds).not.toContain(fixture.onlyAdminTeamId);
           // The sibling team has no group covering it, so the report still
           // fires where nobody is actually left.

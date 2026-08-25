@@ -1,9 +1,6 @@
 import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
-import {
-  type OrganizationUserRole,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import { type OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { api } from "../../utils/api";
 import {
   getAutoCorrectedTeamRoleForOrganizationRole,
@@ -22,10 +19,7 @@ export type RoleOption = {
 
 export const MISSING_CUSTOM_ROLE_VALUE = "custom:missing";
 
-export const teamRolesOptions: Record<
-  "ADMIN" | "MEMBER" | "VIEWER",
-  RoleOption
-> = {
+export const teamRolesOptions: Record<"ADMIN" | "MEMBER" | "VIEWER", RoleOption> = {
   [TeamUserRole.ADMIN]: {
     label: "Admin",
     value: TeamUserRole.ADMIN,
@@ -48,11 +42,7 @@ export type TeamUserRoleForm = {
   role: RoleOption;
 };
 
-export const TeamRoleSelectItemContent = ({
-  option,
-}: {
-  option: RoleOption;
-}) => (
+export const TeamRoleSelectItemContent = ({ option }: { option: RoleOption }) => (
   <VStack align="start" gap={0} flex={1}>
     <HStack>
       <Text>{option.label}</Text>
@@ -100,8 +90,7 @@ export const TeamUserRoleField = ({
       ? {
           label: "Missing Custom Role",
           value: MISSING_CUSTOM_ROLE_VALUE,
-          description:
-            "This member references a deleted or unavailable custom role",
+          description: "This member references a deleted or unavailable custom role",
         }
       : selectedRoleValue.startsWith("custom:")
         ? {
@@ -113,9 +102,7 @@ export const TeamUserRoleField = ({
             isCustom: true,
             customRoleId: selectedRoleValue.replace("custom:", ""),
           }
-        : teamRolesOptions[
-            selectedRoleValue as Exclude<TeamUserRole, "CUSTOM">
-          ];
+        : teamRolesOptions[selectedRoleValue as Exclude<TeamUserRole, "CUSTOM">];
 
   return (
     <VStack align="start">
@@ -152,16 +139,13 @@ export const TeamRoleSelect = ({
   const allRoleOptions = useMemo(() => {
     const constrainedOptions = [
       ...Object.values(teamRolesOptions),
-      ...(customRoles.data ?? []).map(
-        (role): RoleOption => ({
-          label: role.name,
-          value: `custom:${role.id}`,
-          description:
-            role.description ?? `${role.permissions.length} permissions`,
-          isCustom: true,
-          customRoleId: role.id,
-        }),
-      ),
+      ...(customRoles.data ?? []).map((role): RoleOption => ({
+        label: role.name,
+        value: `custom:${role.id}`,
+        description: role.description ?? `${role.permissions.length} permissions`,
+        isCustom: true,
+        customRoleId: role.id,
+      })),
     ].filter((option) =>
       isTeamRoleAllowedForOrganizationRole({
         organizationRole,
@@ -199,9 +183,7 @@ export const TeamRoleSelect = ({
       onValueChange={(details) => {
         const selectedValue = details.value[0] as TeamRoleValue | undefined;
         if (selectedValue) {
-          const selectedOption = allRoleOptions.find(
-            (o) => o.value === selectedValue,
-          );
+          const selectedOption = allRoleOptions.find((o) => o.value === selectedValue);
           if (selectedOption) {
             onChange(selectedOption);
           }

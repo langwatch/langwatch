@@ -83,9 +83,7 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   // trust. Falling short of the full set makes `claimsEverything` false below,
   // which is the safe direction — the caller still toasts, so nothing the form
   // declined to render is lost.
-  const showableFormErrors = hasFormErrorSlot
-    ? formErrors.slice(0, MAX_FORM_ERRORS)
-    : [];
+  const showableFormErrors = hasFormErrorSlot ? formErrors.slice(0, MAX_FORM_ERRORS) : [];
 
   // Whether the form can show the WHOLE rejection. When it can't, the caller
   // still toasts, so the parts this form can't display aren't lost.

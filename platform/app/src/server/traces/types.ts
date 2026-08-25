@@ -67,9 +67,7 @@ export interface GetAllTracesForProjectOptions {
  * Used by the ClickHouse trace service.
  * Extends the shared filters input schema with pagination and sorting options.
  */
-export type GetAllTracesForProjectInput = z.infer<
-  typeof sharedFiltersInputSchema
-> & {
+export type GetAllTracesForProjectInput = z.infer<typeof sharedFiltersInputSchema> & {
   // No pageOffset: offset paging was dropped in the ClickHouse migration and
   // the boundary now rejects a non-zero one (#6808). Paging is scrollId only.
   pageSize?: number;

@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  Collapsible,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Collapsible, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -47,9 +39,7 @@ export const CollapsibleMenuGroup = ({
 }: CollapsibleMenuGroupProps) => {
   const density = useSideMenuDensity();
   const isAnyChildActive = children.some((child) => child.isActive);
-  const [isExpanded, setIsExpanded] = useState(
-    defaultExpanded || isAnyChildActive,
-  );
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded || isAnyChildActive);
 
   // Stay open while you're inside the group. The initial `useState` only
   // captures active-ness on mount; the persistent rail stays mounted across
@@ -104,10 +94,7 @@ export const CollapsibleMenuGroup = ({
                 width={`${density.iconSize}px`}
                 height={`${density.iconSize}px`}
               >
-                <Icon
-                  size={density.iconSize}
-                  color="var(--chakra-colors-nav-fg-muted)"
-                />
+                <Icon size={density.iconSize} color="var(--chakra-colors-nav-fg-muted)" />
               </Box>
               {showLabel && (
                 <>
@@ -132,15 +119,9 @@ export const CollapsibleMenuGroup = ({
                   )}
                   <Spacer />
                   {isExpanded ? (
-                    <ChevronDown
-                      size={14}
-                      color="var(--chakra-colors-nav-fg-muted)"
-                    />
+                    <ChevronDown size={14} color="var(--chakra-colors-nav-fg-muted)" />
                   ) : (
-                    <ChevronRight
-                      size={14}
-                      color="var(--chakra-colors-nav-fg-muted)"
-                    />
+                    <ChevronRight size={14} color="var(--chakra-colors-nav-fg-muted)" />
                   )}
                 </>
               )}
@@ -150,13 +131,7 @@ export const CollapsibleMenuGroup = ({
 
         {/* Child items */}
         <Collapsible.Content>
-          <VStack
-            width="full"
-            gap={0.5}
-            align="start"
-            paddingLeft={4}
-            paddingTop={0.5}
-          >
+          <VStack width="full" gap={0.5} align="start" paddingLeft={4} paddingTop={0.5}>
             {children.map((child) => (
               <CollapsibleMenuChildItem
                 key={child.label}

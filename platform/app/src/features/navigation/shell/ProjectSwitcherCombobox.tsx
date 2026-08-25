@@ -80,11 +80,7 @@ export function ProjectSwitcherCombobox({
 }
 
 /** The chip that opens the popup, styled the same as the plain menu's. */
-function ProjectComboboxTrigger({
-  currentProjectName,
-}: {
-  currentProjectName: string;
-}) {
+function ProjectComboboxTrigger({ currentProjectName }: { currentProjectName: string }) {
   return (
     // Ark positions the listbox against the CONTROL, so the trigger
     // must live inside one that generates a layout box.

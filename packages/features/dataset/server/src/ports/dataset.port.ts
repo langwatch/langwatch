@@ -25,10 +25,7 @@ import type {
 } from "@langwatch/dataset-contract";
 
 export abstract class DatasetExperimentPort {
-  abstract getName(input: {
-    projectId: string;
-    experimentId: string;
-  }): Promise<string>;
+  abstract getName(input: { projectId: string; experimentId: string }): Promise<string>;
 }
 
 /**
@@ -46,10 +43,15 @@ export abstract class DatasetUploadPort {
   ): Promise<CreateDatasetFromUploadResult>;
   abstract createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult>;
   abstract writeStagedUpload(input: StagedUploadInput): Promise<void>;
-  abstract abortPendingUpload(input: AbortPendingUploadInput): Promise<{ datasetId: string; aborted: true }>;
-  abstract finalizeUpload(input: FinalizeUploadInput): Promise<{ datasetId: string; status: "processing" }>;
-  abstract retryNormalize(input: RetryNormalizeInput): Promise<{ datasetId: string; status: "processing" }>;
-
+  abstract abortPendingUpload(
+    input: AbortPendingUploadInput,
+  ): Promise<{ datasetId: string; aborted: true }>;
+  abstract finalizeUpload(
+    input: FinalizeUploadInput,
+  ): Promise<{ datasetId: string; status: "processing" }>;
+  abstract retryNormalize(
+    input: RetryNormalizeInput,
+  ): Promise<{ datasetId: string; status: "processing" }>;
 }
 
 /** Durable queue seam used by normalize/finalize work. */
@@ -84,9 +86,7 @@ export abstract class DatasetContentPort {
     entrySelection: DatasetEntrySelection;
     limitMb: number | null;
   }): Promise<DatasetWithRecords>;
-  abstract getDatasetHead(input: {
-    dataset: Dataset;
-  }): Promise<DatasetHead>;
+  abstract getDatasetHead(input: { dataset: Dataset }): Promise<DatasetHead>;
   abstract upsertRecord(input: {
     dataset: Dataset;
     input: UpdateDatasetRecordInput & { recordId: string };

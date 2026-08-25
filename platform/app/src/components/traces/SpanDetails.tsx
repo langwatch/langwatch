@@ -13,11 +13,7 @@ import { useMemo } from "react";
 import { ChevronDown, Clock, Play, Settings } from "react-feather";
 import type { Project } from "~/generated/prisma/client";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
-import type {
-  ErrorCapture,
-  EvaluationResult,
-  Span,
-} from "../../server/tracer/types";
+import type { ErrorCapture, EvaluationResult, Span } from "../../server/tracer/types";
 import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,
@@ -25,10 +21,7 @@ import {
 } from "../../server/traces/findPromptReferenceInAncestors";
 import { durationColor } from "../../utils/durationColor";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import {
-  evaluationPassed,
-  evaluationStatusColor,
-} from "../checks/EvaluationStatus";
+import { evaluationPassed, evaluationStatusColor } from "../checks/EvaluationStatus";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Link } from "../ui/link";
 import { Menu } from "../ui/menu";
@@ -94,10 +87,7 @@ export function SpanDetails({
         spans: lookupSpans,
       });
 
-      if (
-        ref?.promptHandle &&
-        (ref.promptVersionNumber != null || ref.promptTag)
-      ) {
+      if (ref?.promptHandle && (ref.promptVersionNumber != null || ref.promptTag)) {
         const suffix = ref.promptTag ?? String(ref.promptVersionNumber);
         return `${ref.promptHandle}:${suffix}`;
       }
@@ -139,8 +129,7 @@ export function SpanDetails({
         </HStack>
         <HStack>
           <Text>
-            <b>Timestamp:</b>{" "}
-            {new Date(span.timestamps.started_at).toISOString()}
+            <b>Timestamp:</b> {new Date(span.timestamps.started_at).toISOString()}
           </Text>
         </HStack>
         {span.timestamps.first_token_at && (
@@ -179,11 +168,9 @@ export function SpanDetails({
               (() => {
                 const durationFromFirstToken =
                   span.timestamps.finished_at -
-                  (span.timestamps.first_token_at ??
-                    span.timestamps.started_at);
+                  (span.timestamps.first_token_at ?? span.timestamps.started_at);
                 return ` (${Math.round(
-                  span.metrics.completion_tokens /
-                    (durationFromFirstToken / 1000),
+                  span.metrics.completion_tokens / (durationFromFirstToken / 1000),
                 )} tokens/s)`;
               })()}
             {span.metrics?.tokens_estimated && estimatedCost}
@@ -231,9 +218,7 @@ export function SpanDetails({
             <RenderInputOutput
               value={JSON.stringify(
                 Object.fromEntries(
-                  Object.entries(span.params).filter(
-                    ([key]) => key !== "_keys",
-                  ),
+                  Object.entries(span.params).filter(([key]) => key !== "_keys"),
                 ),
               )}
               collapsed={
@@ -312,12 +297,7 @@ export function SpanDetails({
       )}
       {span.error ? (
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
-          <Box
-            fontSize="13px"
-            color="red.fg"
-            textTransform="uppercase"
-            fontWeight="bold"
-          >
+          <Box fontSize="13px" color="red.fg" textTransform="uppercase" fontWeight="bold">
             Exception
           </Box>
           <Box
@@ -392,10 +372,7 @@ function OpenInPromptsMenu({
 }: {
   spanId: string;
   promptRef: string;
-  buildUrl: (
-    spanId: string,
-    action?: "open-existing" | "create-new",
-  ) => URL | null;
+  buildUrl: (spanId: string, action?: "open-existing" | "create-new") => URL | null;
 }) {
   return (
     <Menu.Root>
@@ -408,18 +385,12 @@ function OpenInPromptsMenu({
       </Menu.Trigger>
       <Menu.Content>
         <Menu.Item value="open-existing" asChild>
-          <Link
-            href={buildUrl(spanId, "open-existing")?.toString() ?? ""}
-            isExternal
-          >
+          <Link href={buildUrl(spanId, "open-existing")?.toString() ?? ""} isExternal>
             Open {promptRef}
           </Link>
         </Menu.Item>
         <Menu.Item value="create-new" asChild>
-          <Link
-            href={buildUrl(spanId, "create-new")?.toString() ?? ""}
-            isExternal
-          >
+          <Link href={buildUrl(spanId, "create-new")?.toString() ?? ""} isExternal>
             Create new prompt
           </Link>
         </Menu.Item>
@@ -428,9 +399,7 @@ function OpenInPromptsMenu({
   );
 }
 
-export const getEvaluationResult = (
-  span: Span,
-): EvaluationResult | undefined => {
+export const getEvaluationResult = (span: Span): EvaluationResult | undefined => {
   if (!span.output?.value) {
     return undefined;
   }
@@ -451,8 +420,7 @@ export const getEvaluationResult = (
 
 export const SpanTypeTag = ({ span }: { span: Span }) => {
   const evaluationResult = getEvaluationResult(span);
-  const evaluationPassed_ =
-    evaluationResult && evaluationPassed(evaluationResult);
+  const evaluationPassed_ = evaluationResult && evaluationPassed(evaluationResult);
 
   return (
     <Badge
@@ -525,10 +493,7 @@ export const SpanDuration = ({
         </>
       }
     >
-      <HStack
-        gap={"6px"}
-        color={span.error ? "red" : durationColor("span", duration)}
-      >
+      <HStack gap={"6px"} color={span.error ? "red" : durationColor("span", duration)}>
         <Clock width={12} />
         <Text>{formatMilliseconds(duration)}</Text>
       </HStack>

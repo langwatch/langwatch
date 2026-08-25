@@ -1,9 +1,5 @@
 import { HStack } from "@chakra-ui/react";
-import {
-  formatCount,
-  formatMs,
-  formatRate,
-} from "@langwatch/ops-web";
+import { formatCount, formatMs, formatRate } from "@langwatch/ops-web";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import { LATENCY_SAMPLE_SIZE } from "~/shared/ops/latency";
 import { api } from "~/utils/api";
@@ -27,14 +23,8 @@ const LATENCY_BASIS = `Processing time across each queue's last ${LATENCY_SAMPLE
  * connections together or not at all.
  */
 export function StatStrip({ data }: { data: DashboardData }) {
-  const totalBlocked = data.queues.reduce(
-    (sum, q) => sum + q.blockedGroupCount,
-    0,
-  );
-  const totalParked = data.queues.reduce(
-    (sum, q) => sum + q.parkedGroupCount,
-    0,
-  );
+  const totalBlocked = data.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0);
+  const totalParked = data.queues.reduce((sum, q) => sum + q.parkedGroupCount, 0);
   const totalDlq = data.queues.reduce((sum, q) => sum + q.dlqCount, 0);
   // The other dead-letter substrate. The queue figure alone once read "0"
   // while 94 process-outbox messages sat dead further down the page — the
@@ -50,12 +40,7 @@ export function StatStrip({ data }: { data: DashboardData }) {
   );
 
   return (
-    <HStack
-      gap={1}
-      align="stretch"
-      overflowX="auto"
-      data-testid="ops-stat-strip"
-    >
+    <HStack gap={1} align="stretch" overflowX="auto" data-testid="ops-stat-strip">
       <ThroughputStats data={data} />
       <LinkedStat
         label="Blocked"
@@ -103,9 +88,7 @@ function ThroughputStats({ data }: { data: DashboardData }) {
         label="Failed/s"
         value={formatRate(data.failedPerSec)}
         sublabel={
-          data.totalFailed > 0
-            ? `${formatCount(data.totalFailed)} total`
-            : undefined
+          data.totalFailed > 0 ? `${formatCount(data.totalFailed)} total` : undefined
         }
         color={data.failedPerSec > 0 ? "red.500" : undefined}
       />

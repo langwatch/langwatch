@@ -139,7 +139,10 @@ secured.access(requires("analytics:view")).get(
     const { id } = c.req.param();
 
     try {
-      const graph = await c.app.dashboard.getGraph({ projectId: project.id, graphId: id });
+      const graph = await c.app.dashboard.getGraph({
+        projectId: project.id,
+        graphId: id,
+      });
       return c.json(toGraphResponse(graph));
     } catch (error) {
       if (error instanceof Error && error.name === "GraphNotFoundError") {
@@ -261,9 +264,7 @@ secured.access(requires("analytics:manage")).delete(
         description: "Graph deleted",
         content: {
           "application/json": {
-            schema: resolver(
-              z.object({ id: z.string(), deleted: z.boolean() }),
-            ),
+            schema: resolver(z.object({ id: z.string(), deleted: z.boolean() })),
           },
         },
       },

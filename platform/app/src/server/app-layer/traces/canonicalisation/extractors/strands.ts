@@ -20,10 +20,7 @@ import type { NormalizedEvent } from "../../../../event-sourcing/pipelines/trace
 import { ATTR_KEYS } from "./_constants";
 import { extractOutputMessages, recordValueType } from "./_extraction";
 import { safeJsonParse } from "./_guards";
-import {
-  extractSystemInstructionFromMessages,
-  stripSystemMessages,
-} from "./_messages";
+import { extractSystemInstructionFromMessages, stripSystemMessages } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 /**
@@ -50,9 +47,7 @@ const OPERATION_NAMES_SPAN_TYPE_MAP: Record<string, string> = {
  * - Array of content parts: [{ text: "..." }]
  * - Nested in gen_ai.content attribute
  */
-const extractStrandsContent = (
-  eventAttrs: Record<string, unknown>,
-): unknown => {
+const extractStrandsContent = (eventAttrs: Record<string, unknown>): unknown => {
   // Try various content attribute names
   const contentCandidates = [
     eventAttrs.content,
@@ -79,11 +74,7 @@ const extractStrandsContent = (
     }
 
     // If it's an object with content, extract it
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      !Array.isArray(parsed)
-    ) {
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
       const obj = parsed as Record<string, unknown>;
       if (obj.text && typeof obj.text === "string") {
         return obj.text;
@@ -173,24 +164,16 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
             (m as Record<string, unknown>).role === "system",
         );
         if (systemOnly.length > 0) {
-          const sysInstruction =
-            extractSystemInstructionFromMessages(systemOnly);
+          const sysInstruction = extractSystemInstructionFromMessages(systemOnly);
           if (sysInstruction !== null) {
-            ctx.setAttrIfAbsent(
-              ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-              sysInstruction,
-            );
+            ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
           }
         }
 
         if (chatMessages.length > 0) {
           ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMessages);
           ctx.recordRule(`${this.id}:events->gen_ai.input.messages`);
-          recordValueType(
-            ctx,
-            ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
-            "chat_messages",
-          );
+          recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
         }
       }
     }
@@ -205,10 +188,7 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
           type: "event",
           name: "gen_ai.choice",
           extractor: (event: NormalizedEvent) => {
-            const eventAttrs = (event.attributes ?? {}) as Record<
-              string,
-              unknown
-            >;
+            const eventAttrs = (event.attributes ?? {}) as Record<string, unknown>;
 
             const content = extractStrandsContent(eventAttrs);
             const role = (eventAttrs.role as string | undefined) ?? "assistant";

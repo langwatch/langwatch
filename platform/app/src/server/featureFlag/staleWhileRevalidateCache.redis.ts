@@ -60,10 +60,7 @@ export class StaleWhileRevalidateCache {
    * 60 s consumer; without it, the short-window read would defeat the
    * override the long-window caller asked for.
    */
-  async get(
-    key: string,
-    ttlOverrideMs?: number,
-  ): Promise<CacheEntry | undefined> {
+  async get(key: string, ttlOverrideMs?: number): Promise<CacheEntry | undefined> {
     const entry = await this.cache.get(key);
     if (!entry) return undefined;
     const age = Date.now() - entry.timestamp;
@@ -94,10 +91,7 @@ export class StaleWhileRevalidateCache {
   }
 
   shouldRefresh(entry: CacheEntry): boolean {
-    return (
-      Date.now() - entry.timestamp > this.refreshThresholdMs &&
-      !entry.isRefreshing
-    );
+    return Date.now() - entry.timestamp > this.refreshThresholdMs && !entry.isRefreshing;
   }
 
   async markRefreshing(key: string, entry: CacheEntry): Promise<void> {

@@ -74,9 +74,7 @@ describe("Model provider scope — dropdown-only picker", () => {
     // and the quick-pick row was dropped so the picker reads consistent
     // with the default-models override drawer.
     renderSection();
-    expect(
-      screen.queryByRole("group", { name: /quick scope/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: /quick scope/i })).not.toBeInTheDocument();
     expect(screen.getByRole("combobox")).toBeInTheDocument();
   });
 
@@ -86,9 +84,7 @@ describe("Model provider scope — dropdown-only picker", () => {
       <ChakraProvider value={defaultSystem}>
         <ProviderScopeSection
           state={baseState()}
-          actions={
-            { setScopes: vi.fn() } as unknown as UseModelProviderFormActions
-          }
+          actions={{ setScopes: vi.fn() } as unknown as UseModelProviderFormActions}
           provider={baseProvider}
           teamId={undefined}
           organizationId={undefined}

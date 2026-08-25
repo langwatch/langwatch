@@ -76,10 +76,7 @@ function declaredSize(headers: Headers): number | null {
  * `bodyLimit` below: the constructor must never be handed another request
  * object to interpret.
  */
-function withBufferedBody(
-  request: Request,
-  body: Uint8Array<ArrayBuffer>,
-): Request {
+function withBufferedBody(request: Request, body: Uint8Array<ArrayBuffer>): Request {
   return new Request(request.url, {
     method: request.method,
     headers: request.headers,

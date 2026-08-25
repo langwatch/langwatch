@@ -93,10 +93,7 @@ function foldState({
 /** One fold commit. Separate calls on purpose where a request has more than
  *  one version, so the superseded row lands as its own part rather than
  *  being collapsed inside a single insert block. */
-async function fold(
-  gatewayRequestId: string,
-  state: GatewaySpendState,
-): Promise<void> {
+async function fold(gatewayRequestId: string, state: GatewaySpendState): Promise<void> {
   await repo.upsertFromFold([{ tenantId, gatewayRequestId, state }]);
 }
 
@@ -250,23 +247,17 @@ describe("open admissions on the spend record (real ClickHouse)", () => {
     describe("when the sweeper reads the open admissions", () => {
       /** @scenario A confirmation stands the sweeper down */
       it("leaves out a request whose confirmation superseded its admission", () => {
-        expect(open.map((row) => row.gatewayRequestId)).not.toContain(
-          CONFIRMED,
-        );
+        expect(open.map((row) => row.gatewayRequestId)).not.toContain(CONFIRMED);
       });
 
       /** @scenario An admission inside its grace is not open yet */
       it("leaves out an admission whose grace has not elapsed", () => {
-        expect(open.map((row) => row.gatewayRequestId)).not.toContain(
-          INSIDE_GRACE,
-        );
+        expect(open.map((row) => row.gatewayRequestId)).not.toContain(INSIDE_GRACE);
       });
 
       /** @scenario A rewritten admission is offered once, not once per version */
       it("offers a twice-written admission a single time", () => {
-        const offered = open.filter(
-          (row) => row.gatewayRequestId === REWRITTEN,
-        );
+        const offered = open.filter((row) => row.gatewayRequestId === REWRITTEN);
         expect(offered).toHaveLength(1);
       });
 
@@ -279,9 +270,7 @@ describe("open admissions on the spend record (real ClickHouse)", () => {
 
       /** @scenario An admission older than the lookback is left where it is */
       it("leaves out an admission older than the lookback", () => {
-        expect(open.map((row) => row.gatewayRequestId)).not.toContain(
-          BEFORE_LOOKBACK,
-        );
+        expect(open.map((row) => row.gatewayRequestId)).not.toContain(BEFORE_LOOKBACK);
       });
 
       // Exact, not `toContain`: anything selected here becomes a settle
@@ -328,9 +317,7 @@ describe("open admissions on the spend record (real ClickHouse)", () => {
         (_, i) => ({
           tenantId,
           gatewayRequestId:
-            i === MAX_OPEN_ADMISSIONS_PER_SWEEP
-              ? capNewest
-              : `req-cap-${i}-${run}`,
+            i === MAX_OPEN_ADMISSIONS_PER_SWEEP ? capNewest : `req-cap-${i}-${run}`,
           state: foldState({
             status: "admitted",
             occurredAtMs: CAP_BASE + i,

@@ -102,9 +102,7 @@ function unnamedExportsOf(source: string): string[] {
       /^[ \t]*export\s*\*\s*(?:as\s+[A-Za-z_$][\w$]*\s*)?from\s*["']([^"']+)["']/gm,
     ),
   ].map((match) => `* from "${match[1]}"`);
-  return /^[ \t]*export\s+default\b/m.test(source)
-    ? ["default", ...stars]
-    : stars;
+  return /^[ \t]*export\s+default\b/m.test(source) ? ["default", ...stars] : stars;
 }
 
 /** `export function x`, `export const x`, `export class x`, and friends. */
@@ -252,8 +250,7 @@ function scan(): ScanResult {
     for (const absolute of walk(join(PACKAGE_ROOT, root))) {
       walked += 1;
       const source = readFileSync(absolute, "utf8");
-      const constructs =
-        DRIVER_MODULE.test(source) && CONSTRUCTS_CLIENT.test(source);
+      const constructs = DRIVER_MODULE.test(source) && CONSTRUCTS_CLIENT.test(source);
       const resolves = RESOLVES_CLIENT.test(source);
       const resolvesViaApp = RESOLVES_VIA_APP.test(source);
       if (!constructs && !resolves && !resolvesViaApp) continue;
@@ -325,9 +322,7 @@ describe("the ClickHouse client access boundary", () => {
     it("keeps that list honest, so a deleted export cannot sit here forever", () => {
       const source = readFileSync(join(PACKAGE_ROOT, CLIENT_MODULE), "utf8");
       const actual = new Set(valueExportsOf(source));
-      const stale = [...CLIENT_MODULE_VALUE_EXPORTS].filter(
-        (name) => !actual.has(name),
-      );
+      const stale = [...CLIENT_MODULE_VALUE_EXPORTS].filter((name) => !actual.has(name));
 
       expect(
         stale,
@@ -362,9 +357,7 @@ describe("the ClickHouse client access boundary", () => {
       const constructors = new Set(
         scanned.filter((file) => file.constructs).map((file) => file.path),
       );
-      const stale = [...MAY_CONSTRUCT].filter(
-        (path) => !constructors.has(path),
-      );
+      const stale = [...MAY_CONSTRUCT].filter((path) => !constructors.has(path));
 
       expect(
         stale,
@@ -396,9 +389,7 @@ describe("the ClickHouse client access boundary", () => {
       const resolvers = new Set(
         scanned.filter((file) => file.resolves).map((file) => file.path),
       );
-      const stale = [...RESOLVES_DIRECTLY_BACKLOG].filter(
-        (path) => !resolvers.has(path),
-      );
+      const stale = [...RESOLVES_DIRECTLY_BACKLOG].filter((path) => !resolvers.has(path));
 
       expect(
         stale,

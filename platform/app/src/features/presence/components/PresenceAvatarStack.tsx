@@ -35,12 +35,7 @@ export function PresenceAvatarStack({
         />
       ))}
       {overflow > 0 ? (
-        <Text
-          textStyle="xs"
-          color="fg.muted"
-          marginLeft="6px"
-          fontWeight="medium"
-        >
+        <Text textStyle="xs" color="fg.muted" marginLeft="6px" fontWeight="medium">
           +{overflow}
         </Text>
       ) : null}

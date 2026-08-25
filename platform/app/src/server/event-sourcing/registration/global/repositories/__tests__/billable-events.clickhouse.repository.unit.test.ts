@@ -25,9 +25,7 @@ describe("BillableEventsClickHouseRepository", () => {
       it("inserts the row into billable_events", async () => {
         resolveClient.mockResolvedValue({ insert: mockClickHouseInsert });
         mockClickHouseInsert.mockResolvedValue(undefined);
-        const repository = new BillableEventsMeterClickHouseRepository(
-          resolveClient,
-        );
+        const repository = new BillableEventsMeterClickHouseRepository(resolveClient);
 
         await repository.insert({ record: record(), organizationId: "org-1" });
 
@@ -54,9 +52,7 @@ describe("BillableEventsClickHouseRepository", () => {
     describe("when a billable event is inserted", () => {
       it("skips the insert without throwing", async () => {
         resolveClient.mockResolvedValue(null);
-        const repository = new BillableEventsMeterClickHouseRepository(
-          resolveClient,
-        );
+        const repository = new BillableEventsMeterClickHouseRepository(resolveClient);
 
         await repository.insert({ record: record(), organizationId: "org-1" });
 
@@ -72,9 +68,7 @@ describe("BillableEventsClickHouseRepository", () => {
         mockClickHouseInsert.mockRejectedValue(
           new Error("ClickHouse connection timeout"),
         );
-        const repository = new BillableEventsMeterClickHouseRepository(
-          resolveClient,
-        );
+        const repository = new BillableEventsMeterClickHouseRepository(resolveClient);
 
         await expect(
           repository.insert({ record: record(), organizationId: "org-1" }),

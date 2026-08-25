@@ -25,10 +25,7 @@ import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import type { Organization } from "~/generated/prisma/client";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
-import {
-  isOrgExclusivePermission,
-  type Permission,
-} from "~/server/api/rbac";
+import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
 import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
 import { Actions, Resources } from "~/utils/rbacVocabulary";
 
@@ -84,7 +81,9 @@ const permissionCatalogSchema = z.object({
 const idParamsSchema = z.object({ id: z.string().min(1) });
 
 const roleWire = (
-  role: Pick<Role, "id" | "name" | "description" | "createdAt" | "updatedAt"> & { permissions: string[] },
+  role: Pick<Role, "id" | "name" | "description" | "createdAt" | "updatedAt"> & {
+    permissions: string[];
+  },
 ): z.infer<typeof roleSchema> => ({
   id: role.id,
   name: role.name,
@@ -103,7 +102,9 @@ const paramsOf = <T>(c: RolesContext): T => c.get("params") as T;
 // ── handlers ─────────────────────────────────────────────────────────────────
 
 const listRolesHandler = async (c: RolesContext) => {
-  const roles = await c.var.langwatchApp.roles.list({ organizationId: organizationOf(c).id });
+  const roles = await c.var.langwatchApp.roles.list({
+    organizationId: organizationOf(c).id,
+  });
   return { roles: roles.map(roleWire) };
 };
 
@@ -129,9 +130,7 @@ const permissionCatalogHandler = async () => {
   return {
     resources: (Object.values(Resources) as string[]).map((resource) => ({
       resource,
-      organizationExclusive: isOrgExclusivePermission(
-        `${resource}:view` as Permission,
-      ),
+      organizationExclusive: isOrgExclusivePermission(`${resource}:view` as Permission),
       actions,
       permissions: actions.map((action) => `${resource}:${action}`),
     })),
@@ -159,12 +158,8 @@ const updateRoleHandler = async (
     organizationId: organization.id,
     changes: {
       ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.description !== undefined
-        ? { description: input.description }
-        : {}),
-      ...(input.permissions !== undefined
-        ? { permissions: input.permissions }
-        : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.permissions !== undefined ? { permissions: input.permissions } : {}),
     },
     actor: orgRequestLedgerActor(c),
   });
@@ -191,8 +186,7 @@ export const app = service
       .withDocs({
         operationId: "listRoles",
         tags: ["Roles"],
-        description:
-          "List the organization's custom roles with their permission sets.",
+        description: "List the organization's custom roles with their permission sets.",
       }),
   )
   .registerRoute("post", "/", MANAGEMENT_API_VERSION, createRoleHandler, (b) =>
@@ -234,37 +228,27 @@ export const app = service
           "Read one custom role. An id from another organization answers 404 custom_role_not_found.",
       }),
   )
-  .registerRoute(
-    "patch",
-    "/:id",
-    MANAGEMENT_API_VERSION,
-    updateRoleHandler,
-    (b) =>
-      guard("organization:manage")(b)
-        .withParams(idParamsSchema)
-        .withInput(updateRoleSchema)
-        .withOutput(roleSchema)
-        .withDocs({
-          operationId: "updateRole",
-          tags: ["Roles"],
-          description:
-            "Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright.",
-        }),
+  .registerRoute("patch", "/:id", MANAGEMENT_API_VERSION, updateRoleHandler, (b) =>
+    guard("organization:manage")(b)
+      .withParams(idParamsSchema)
+      .withInput(updateRoleSchema)
+      .withOutput(roleSchema)
+      .withDocs({
+        operationId: "updateRole",
+        tags: ["Roles"],
+        description:
+          "Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright.",
+      }),
   )
-  .registerRoute(
-    "delete",
-    "/:id",
-    MANAGEMENT_API_VERSION,
-    deleteRoleHandler,
-    (b) =>
-      guard("organization:manage")(b)
-        .withParams(idParamsSchema)
-        .withOutput(z.object({ success: z.literal(true) }))
-        .withDocs({
-          operationId: "deleteRole",
-          tags: ["Roles"],
-          description:
-            "Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta.",
-        }),
+  .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, deleteRoleHandler, (b) =>
+    guard("organization:manage")(b)
+      .withParams(idParamsSchema)
+      .withOutput(z.object({ success: z.literal(true) }))
+      .withDocs({
+        operationId: "deleteRole",
+        tags: ["Roles"],
+        description:
+          "Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta.",
+      }),
   )
   .build();

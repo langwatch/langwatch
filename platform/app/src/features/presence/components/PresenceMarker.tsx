@@ -1,10 +1,7 @@
 import { Box, chakra, HStack, Text } from "@chakra-ui/react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PresenceSession } from "@langwatch/presence-contract";
-import {
-  presenceDisplayName,
-  presenceSessionColor,
-} from "../utils/sessionColor";
+import { presenceDisplayName, presenceSessionColor } from "../utils/sessionColor";
 
 interface PresenceMarkerProps {
   peers: PresenceSession[];
@@ -54,12 +51,7 @@ export function PresenceMarker({
         />
       ))}
       {overflow > 0 ? (
-        <Text
-          textStyle="2xs"
-          color="fg.muted"
-          fontWeight="semibold"
-          marginLeft="4px"
-        >
+        <Text textStyle="2xs" color="fg.muted" fontWeight="semibold" marginLeft="4px">
           +{overflow}
         </Text>
       ) : null}
@@ -119,8 +111,7 @@ function PresenceChip({
       flexShrink={0}
       style={{ animationDelay: `${enterDelayMs}ms` }}
       css={{
-        animation:
-          "presenceMarkerPop 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
+        animation: "presenceMarkerPop 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
         "@keyframes presenceMarkerPop": {
           "0%": { transform: "scale(0.4)", opacity: 0 },
           "100%": { transform: "scale(1)", opacity: 1 },
@@ -159,20 +150,9 @@ function PresenceChip({
         boxShadow="sm"
       >
         {image ? (
-          <chakra.img
-            src={image}
-            alt=""
-            width="100%"
-            height="100%"
-            objectFit="cover"
-          />
+          <chakra.img src={image} alt="" width="100%" height="100%" objectFit="cover" />
         ) : (
-          <Text
-            color="white"
-            fontWeight="semibold"
-            lineHeight="1"
-            style={{ fontSize }}
-          >
+          <Text color="white" fontWeight="semibold" lineHeight="1" style={{ fontSize }}>
             {initials}
           </Text>
         )}
@@ -188,10 +168,7 @@ function computeInitials(name: string): string {
   return (first + second).toUpperCase() || "?";
 }
 
-function formatTooltip(
-  peers: PresenceSession[],
-  suffix: string | undefined,
-): string {
+function formatTooltip(peers: PresenceSession[], suffix: string | undefined): string {
   const names = peers.map(presenceDisplayName);
   const head =
     names.length === 1

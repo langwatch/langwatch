@@ -3,10 +3,7 @@ import { useState } from "react";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
-import {
-  hasPermissionWithHierarchy,
-  teamRoleHasPermission,
-} from "../../server/api/rbac";
+import { hasPermissionWithHierarchy, teamRoleHasPermission } from "../../server/api/rbac";
 import { api } from "../../utils/api";
 import { Dialog } from "../ui/dialog";
 import { Select } from "../ui/select";
@@ -34,15 +31,12 @@ export const CopyDatasetDialog = ({
     organizations?.flatMap((org) =>
       org.teams.flatMap((team) => {
         // Find the current user's membership in this team
-        const teamMember = team.members.find(
-          (member) => member.userId === currentUserId,
-        );
+        const teamMember = team.members.find((member) => member.userId === currentUserId);
         if (!teamMember) return [];
 
         let hasCreatePermission = false;
         if (teamMember.assignedRole) {
-          const permissions =
-            (teamMember.assignedRole.permissions as string[]) ?? [];
+          const permissions = (teamMember.assignedRole.permissions as string[]) ?? [];
           if (permissions.length > 0) {
             hasCreatePermission = hasPermissionWithHierarchy(
               permissions,
@@ -55,10 +49,7 @@ export const CopyDatasetDialog = ({
             );
           }
         } else {
-          hasCreatePermission = teamRoleHasPermission(
-            teamMember.role,
-            "datasets:create",
-          );
+          hasCreatePermission = teamRoleHasPermission(teamMember.role, "datasets:create");
         }
 
         if (!hasCreatePermission) return [];

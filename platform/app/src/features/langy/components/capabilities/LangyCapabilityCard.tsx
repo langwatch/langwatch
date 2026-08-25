@@ -48,10 +48,7 @@ import { toRelativeSameOriginHref } from "@langwatch/langy-contract";
 import { useSpaLinkClick } from "../../logic/spaLink";
 import { LangySpaAnchor } from "../LangySpaAnchor";
 import { langyThinkingShimmerStyles } from "../langyShimmer";
-import type {
-  CapabilityIconName,
-  CapabilitySurface,
-} from "./capabilityCatalog";
+import type { CapabilityIconName, CapabilitySurface } from "./capabilityCatalog";
 import {
   buildSurfaceHref,
   type CapabilityTone,
@@ -263,8 +260,7 @@ export function CapabilityDeepLinkChip({
   const preciseHref = platformUrl
     ? toRelativeSameOriginHref({ url: platformUrl, origin })
     : null;
-  const href =
-    preciseHref ?? buildSurfaceHref({ surface, projectSlug, resourceId });
+  const href = preciseHref ?? buildSurfaceHref({ surface, projectSlug, resourceId });
   const onClick = useSpaLinkClick(href ?? "");
   if (!href) return null;
   return (

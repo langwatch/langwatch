@@ -31,8 +31,7 @@ function renderBrowser(onInsert = vi.fn()) {
   return { onInsert };
 }
 
-const escapeRegExp = (value: string) =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * The dataset toggle's accessible name is its visible row — the mono dataset
@@ -66,9 +65,7 @@ describe("the LangWatchQL schema browser", () => {
         }
         // Nothing suggests reachable ClickHouse beyond those datasets.
         expect(screen.queryByText(/system\./)).not.toBeInTheDocument();
-        expect(
-          screen.queryByText(/information_schema/i),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText(/information_schema/i)).not.toBeInTheDocument();
       });
     });
 
@@ -81,16 +78,10 @@ describe("the LangWatchQL schema browser", () => {
         expect(
           screen.getByText("One row per trace, rolled up by day."),
         ).toBeInTheDocument();
-        expect(
-          screen.getByText("one row per trace per day"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText("up to 15 minutes behind ingestion"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("one row per trace per day")).toBeInTheDocument();
+        expect(screen.getByText("up to 15 minutes behind ingestion")).toBeInTheDocument();
         expect(screen.getByText("time: occurred_on")).toBeInTheDocument();
-        expect(
-          screen.getByText("Joins on trace_id, project_id"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Joins on trace_id, project_id")).toBeInTheDocument();
         expect(
           screen.getByRole("button", {
             name: "Insert example query for analytics.traces_daily",
@@ -107,10 +98,7 @@ describe("the LangWatchQL schema browser", () => {
         expect(within(column).getByText("Float64")).toBeInTheDocument();
         // The description rides on the row's tooltip rather than a line of its
         // own, so the list stays scannable.
-        expect(column).toHaveAttribute(
-          "title",
-          "End to end latency of the trace.",
-        );
+        expect(column).toHaveAttribute("title", "End to end latency of the trace.");
         // The unit symbol verbatim, not spelled out: the copy rules exempt
         // standard symbols, and the browser must not invent a rendering the
         // schema response did not carry.
@@ -125,10 +113,7 @@ describe("the LangWatchQL schema browser", () => {
         const withheld = screen.getByTestId("lwql-schema-column-total_cost");
         expect(withheld).toHaveAttribute("aria-disabled", "true");
         expect(within(withheld).getByText("no access")).toBeInTheDocument();
-        expect(withheld).toHaveAttribute(
-          "title",
-          "Needs permission to see costs.",
-        );
+        expect(withheld).toHaveAttribute("title", "Needs permission to see costs.");
         expect(
           screen.queryByRole("button", { name: "Insert column total_cost" }),
         ).not.toBeInTheDocument();
@@ -147,21 +132,15 @@ describe("the LangWatchQL schema browser", () => {
 
         expand("analytics.traces_daily");
 
-        fireEvent.click(
-          screen.getByRole("button", { name: "Insert column latency_ms" }),
-        );
-        expect(onInsert).toHaveBeenCalledWith(
-          "analytics.traces_daily.latency_ms",
-        );
+        fireEvent.click(screen.getByRole("button", { name: "Insert column latency_ms" }));
+        expect(onInsert).toHaveBeenCalledWith("analytics.traces_daily.latency_ms");
 
         fireEvent.click(
           screen.getByRole("button", {
             name: "Insert example query for analytics.traces_daily",
           }),
         );
-        expect(onInsert).toHaveBeenCalledWith(
-          SCHEMA_RESPONSE.datasets[0]!.exampleSql,
-        );
+        expect(onInsert).toHaveBeenCalledWith(SCHEMA_RESPONSE.datasets[0]!.exampleSql);
       });
     });
 
@@ -175,14 +154,10 @@ describe("the LangWatchQL schema browser", () => {
         });
 
         expect(datasetToggle("analytics.traces_daily")).toBeInTheDocument();
-        expect(
-          queryDatasetToggle("analytics.evaluations_daily"),
-        ).not.toBeInTheDocument();
+        expect(queryDatasetToggle("analytics.evaluations_daily")).not.toBeInTheDocument();
 
         expand("analytics.traces_daily");
-        expect(
-          screen.getByTestId("lwql-schema-column-latency_ms"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("lwql-schema-column-latency_ms")).toBeInTheDocument();
         expect(
           screen.queryByTestId("lwql-schema-column-trace_id"),
         ).not.toBeInTheDocument();

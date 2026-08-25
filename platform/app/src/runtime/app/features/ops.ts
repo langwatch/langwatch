@@ -1,8 +1,5 @@
 import { auditLog } from "~/runtime/app/features/audit-log";
-import type {
-  AdminAuditRequest,
-  AuditLogRequestLike,
-} from "@langwatch/ops-contract";
+import type { AdminAuditRequest, AuditLogRequestLike } from "@langwatch/ops-contract";
 import {
   AdminAuditSink,
   mapUserToBackofficeRow,
@@ -37,9 +34,7 @@ export class AppOpsAuditSink extends AdminAuditSink {
 function auditLogRequestFrom(value: AdminAuditRequest): AuditLogRequestLike {
   return {
     headers: value.headers,
-    ...(value.remoteAddress
-      ? { socket: { remoteAddress: value.remoteAddress } }
-      : {}),
+    ...(value.remoteAddress ? { socket: { remoteAddress: value.remoteAddress } } : {}),
   };
 }
 

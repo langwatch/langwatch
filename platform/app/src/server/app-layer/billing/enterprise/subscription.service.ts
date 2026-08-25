@@ -161,8 +161,7 @@ export class EESubscriptionService implements SubscriptionService {
       }
     }
 
-    const lastSubscription =
-      await this.repository.findLastNonCancelled(organizationId);
+    const lastSubscription = await this.repository.findLastNonCancelled(organizationId);
 
     if (
       lastSubscription?.stripeSubscriptionId &&
@@ -181,10 +180,9 @@ export class EESubscriptionService implements SubscriptionService {
         membersToAdd: effectiveMembers,
       });
 
-      await this.stripe.subscriptions.update(
-        lastSubscription.stripeSubscriptionId,
-        { items: itemsToUpdate },
-      );
+      await this.stripe.subscriptions.update(lastSubscription.stripeSubscriptionId, {
+        items: itemsToUpdate,
+      });
 
       return { success: true };
     }
@@ -226,8 +224,7 @@ export class EESubscriptionService implements SubscriptionService {
       });
     }
 
-    const lastSubscription =
-      await this.repository.findLastNonCancelled(organizationId);
+    const lastSubscription = await this.repository.findLastNonCancelled(organizationId);
 
     if (
       lastSubscription?.stripeSubscriptionId &&
@@ -380,8 +377,7 @@ export class EESubscriptionService implements SubscriptionService {
     note?: string;
     actorEmail: string;
   }): Promise<{ success: boolean }> {
-    const organization =
-      await this.organizationRepository.findNameById(organizationId);
+    const organization = await this.organizationRepository.findNameById(organizationId);
 
     if (!organization) {
       throw new OrganizationNotFoundError();
@@ -452,8 +448,7 @@ export class EESubscriptionService implements SubscriptionService {
     subscriptionId: string;
     baseUrl: string;
   }): Promise<{ url: string | null }> {
-    const response =
-      await this.stripe.subscriptions.cancel(stripeSubscriptionId);
+    const response = await this.stripe.subscriptions.cancel(stripeSubscriptionId);
 
     if (response.status === "canceled") {
       await this.repository.updateStatus({
@@ -490,10 +485,9 @@ export class EESubscriptionService implements SubscriptionService {
       membersToAdd,
     });
 
-    const response = await this.stripe.subscriptions.update(
-      stripeSubscriptionId,
-      { items: itemsToUpdate },
-    );
+    const response = await this.stripe.subscriptions.update(stripeSubscriptionId, {
+      items: itemsToUpdate,
+    });
 
     if (response.status === "active") {
       await this.repository.updatePlan({
@@ -556,8 +550,7 @@ export class EESubscriptionService implements SubscriptionService {
     // Stripe Adaptive Pricing from offering unsupported currencies.
     const SUPPORTED_CHECKOUT_CURRENCIES = ["usd", "eur"] as const;
     const basePriceId = this.itemCalculator.prices[plan as StripePriceName];
-    const rawCurrency =
-      stripePricesFile.prices[basePriceId]?.currency?.toLowerCase();
+    const rawCurrency = stripePricesFile.prices[basePriceId]?.currency?.toLowerCase();
     const checkoutCurrency =
       rawCurrency &&
       SUPPORTED_CHECKOUT_CURRENCIES.includes(

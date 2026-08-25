@@ -456,9 +456,7 @@ function readsErrorMessage(value: string, facts: FileFacts): boolean {
  * a raw error to a customer while the guard reported a clean tree.
  */
 function stringifiesError(value: string, facts: FileFacts): boolean {
-  for (const match of value.matchAll(
-    /\b(?:String|JSON\s*\.\s*stringify)\s*\(/g,
-  )) {
+  for (const match of value.matchAll(/\b(?:String|JSON\s*\.\s*stringify)\s*\(/g)) {
     const argument = readValue(value, match.index + match[0].length);
     if (isErrorExpression(argument, facts)) return true;
   }
@@ -598,8 +596,7 @@ const SLOT_AT =
   /["']?(title|description|fallbackTitle|message)["']?\s*[:=](?!=)\s*(\{)?/y;
 
 /** `{ description }` / `, description }` — shorthand for `description: description`. */
-const SHORTHAND_AT =
-  /[{,]\s*(title|description|fallbackTitle|message)\s*(?=[,}])/y;
+const SHORTHAND_AT = /[{,]\s*(title|description|fallbackTitle|message)\s*(?=[,}])/y;
 
 /** The identifier or member expression being called at `parenAt`. */
 function calleeBefore(source: string, parenAt: number): string {
@@ -875,15 +872,9 @@ describe("the raw-message detector", () => {
         "destructured and then laundered through a local",
         `const { message } = err;\nconst shown = message;\ntoaster.create({ description: shown })`,
       ],
-      [
-        "JSON.stringified",
-        `toaster.create({ description: JSON.stringify(err) })`,
-      ],
+      ["JSON.stringified", `toaster.create({ description: JSON.stringify(err) })`],
       ["via toString", `toaster.create({ description: err.toString() })`],
-      [
-        "stringified off the cause",
-        `toaster.create({ description: String(err.cause) })`,
-      ],
+      ["stringified off the cause", `toaster.create({ description: String(err.cause) })`],
     ])("catches a message %s", (_shape, source) => {
       expect(leaksIn(source)).toBe(true);
     });
@@ -929,18 +920,9 @@ describe("the raw-message detector", () => {
         "a JSX text child alongside other children",
         `<Alert.Description>\n  {error.message}\n  {renderAction(error.type)}\n</Alert.Description>`,
       ],
-      [
-        "a quoted key",
-        `toaster.create({ "description": error.message, type: "error" })`,
-      ],
-      [
-        "a toaster shorthand method",
-        `toaster.error({ description: error.message })`,
-      ],
-      [
-        "the form bridge",
-        `form.setError(FORM_SERVER_ERROR, { message: error.message })`,
-      ],
+      ["a quoted key", `toaster.create({ "description": error.message, type: "error" })`],
+      ["a toaster shorthand method", `toaster.error({ description: error.message })`],
+      ["the form bridge", `form.setError(FORM_SERVER_ERROR, { message: error.message })`],
       [
         "the form bridge destructured out of useForm",
         `const { setError } = useForm();\nsetError(FORM_SERVER_ERROR, { message: error.message })`,
@@ -957,10 +939,7 @@ describe("the raw-message detector", () => {
         `toaster.create({ description: notification.message })`,
       ],
       ["plain copy", `toaster.create({ description: "Something went wrong" })`],
-      [
-        "a correct call",
-        `showErrorToast({ error, fallbackTitle: "Couldn't save" })`,
-      ],
+      ["a correct call", `showErrorToast({ error, fallbackTitle: "Couldn't save" })`],
       [
         "a map parameter named e",
         "items.map((e) => toaster.create({ title: `${e.label}` }))",
@@ -1012,14 +991,8 @@ describe("the raw-message detector", () => {
         "a config object in a file that also toasts",
         `toaster.create({ title: "Failed" });\nconst columns = [{ title: error.message }];`,
       ],
-      [
-        "a JSX attribute on an ordinary component",
-        `<Tooltip title={error.message} />`,
-      ],
-      [
-        "a JSX text child of an ordinary component",
-        `<Box>{error.message}</Box>`,
-      ],
+      ["a JSX attribute on an ordinary component", `<Tooltip title={error.message} />`],
+      ["a JSX text child of an ordinary component", `<Box>{error.message}</Box>`],
       [
         "an attribute after a description that closed over nested markup",
         `<Alert.Description><b>Saved</b></Alert.Description>\n<Tooltip title={error.message} />`,

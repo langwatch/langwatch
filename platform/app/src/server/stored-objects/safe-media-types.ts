@@ -34,7 +34,6 @@ export const SAFE_MEDIA_TYPES_EXACT = new Set(["application/pdf"]);
  */
 export function isReadbackSafe(mediaType: string): boolean {
   if (SAFE_MEDIA_TYPES_EXACT.has(mediaType)) return true;
-  if (SAFE_MEDIA_TYPE_PREFIXES.some((p) => mediaType.startsWith(p)))
-    return true;
+  if (SAFE_MEDIA_TYPE_PREFIXES.some((p) => mediaType.startsWith(p))) return true;
   return false;
 }

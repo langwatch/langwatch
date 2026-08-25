@@ -100,6 +100,4 @@ if (fatal.length > 0) {
   process.exit(1);
 }
 
-console.log(
-  `BOOT SMOKE PASSED (#root mounted: ${mounted}, chunks scanned: ${scanned})`,
-);
+console.log(`BOOT SMOKE PASSED (#root mounted: ${mounted}, chunks scanned: ${scanned})`);

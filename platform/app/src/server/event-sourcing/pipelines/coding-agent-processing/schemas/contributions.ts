@@ -112,6 +112,4 @@ export const metricFactsContributionSchema = contributionBaseSchema.extend({
   /** Wall-clock of the newest point folded in — the LWW version. */
   asOfUnixMs: z.number(),
 });
-export type MetricFactsContribution = z.infer<
-  typeof metricFactsContributionSchema
->;
+export type MetricFactsContribution = z.infer<typeof metricFactsContributionSchema>;

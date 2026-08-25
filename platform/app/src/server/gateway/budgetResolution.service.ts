@@ -27,11 +27,7 @@
  * Spec: specs/ai-gateway/gateway-budget-targeting.feature
  *       specs/ai-gateway/budgets-principal-cascade.feature
  */
-import type {
-  GatewayBudget,
-  Prisma,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { GatewayBudget, Prisma, PrismaClient } from "~/generated/prisma/client";
 
 export type BudgetResolutionTarget = {
   organizationId: string;
@@ -209,14 +205,10 @@ export async function resolveApplicableBudgets({
 }
 
 /** The ids actually worth querying: present, non-empty, and each asked for once. */
-function presentIds(
-  ids: (string | null | undefined)[] | null | undefined,
-): string[] {
+function presentIds(ids: (string | null | undefined)[] | null | undefined): string[] {
   if (!ids) return [];
   return Array.from(
-    new Set(
-      ids.filter((id): id is string => typeof id === "string" && id.length > 0),
-    ),
+    new Set(ids.filter((id): id is string => typeof id === "string" && id.length > 0)),
   );
 }
 
@@ -285,10 +277,7 @@ async function memberGroupIds({
  * user ids are cuids, neither contains a colon, so the pair round-trips
  * unambiguously through the ledger's ScopeId column.
  */
-export function groupBucketScopeId(
-  groupId: string,
-  principalUserId: string,
-): string {
+export function groupBucketScopeId(groupId: string, principalUserId: string): string {
   return `${groupId}:${principalUserId}`;
 }
 
@@ -299,10 +288,7 @@ export function groupBucketScopeId(
  * from the left; the end-user id is external input and may contain
  * anything, which is why nothing ever parses this key from the right.
  */
-export function attributedUserBucketScopeId(
-  anchorId: string,
-  endUserId: string,
-): string {
+export function attributedUserBucketScopeId(anchorId: string, endUserId: string): string {
   return `${anchorId}:${endUserId}`;
 }
 

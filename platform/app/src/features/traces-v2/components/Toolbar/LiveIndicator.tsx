@@ -6,15 +6,9 @@ import { Tooltip } from "~/components/ui/tooltip";
 import type { ConnectionState } from "~/hooks/useSSESubscription";
 import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
 import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
-import {
-  type LiveUpdatesMode,
-  useSseStatusStore,
-} from "../../stores/sseStatusStore";
+import { type LiveUpdatesMode, useSseStatusStore } from "../../stores/sseStatusStore";
 
-const SSE_STATE_STYLE: Record<
-  ConnectionState,
-  { dotColor: string; pulse: boolean }
-> = {
+const SSE_STATE_STYLE: Record<ConnectionState, { dotColor: string; pulse: boolean }> = {
   connected: { dotColor: "green.solid", pulse: true },
   connecting: { dotColor: "yellow.solid", pulse: false },
   error: { dotColor: "red.solid", pulse: false },
@@ -89,11 +83,7 @@ export const LiveIndicator: React.FC = () => {
           aria-label={`Live updates mode: ${liveUpdatesMode}. Click to switch to ${nextLabel(liveUpdatesMode)}.`}
           aria-pressed={liveUpdatesMode !== "paused"}
         >
-          {liveUpdatesMode === "paused" ? (
-            <WifiOff size={12} />
-          ) : (
-            <Wifi size={12} />
-          )}
+          {liveUpdatesMode === "paused" ? <WifiOff size={12} /> : <Wifi size={12} />}
           <Box
             width="6px"
             height="6px"
@@ -172,10 +162,7 @@ function describeMode({
   }
 }
 
-function describeSseState(
-  state: ConnectionState,
-  lastEventAt: number | null,
-): string {
+function describeSseState(state: ConnectionState, lastEventAt: number | null): string {
   switch (state) {
     case "connected":
       return lastEventAt

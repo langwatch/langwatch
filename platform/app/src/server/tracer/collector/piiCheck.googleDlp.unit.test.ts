@@ -66,9 +66,7 @@ describe("googleDLPClearPII", () => {
           piiRedactionLevel: "STRICT",
         });
 
-        expect(wrapper.value.startsWith("[REDACTED] met [REDACTED]")).toBe(
-          true,
-        );
+        expect(wrapper.value.startsWith("[REDACTED] met [REDACTED]")).toBe(true);
         expect(wrapper.value).not.toContain("John");
         expect(wrapper.value).not.toContain("Mary");
         expect(wrapper.value.endsWith("TAIL")).toBe(true);

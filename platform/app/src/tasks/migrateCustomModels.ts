@@ -150,10 +150,7 @@ export function migrateCustomModelsRow({
   });
 
   // If neither field needs migration, return null
-  if (
-    migratedCustomModels === null &&
-    migratedCustomEmbeddingsModels === null
-  ) {
+  if (migratedCustomModels === null && migratedCustomEmbeddingsModels === null) {
     return null;
   }
 
@@ -226,7 +223,5 @@ export default async function main() {
     }
   }
 
-  console.log(
-    `Migration complete. Updated: ${updatedCount}, Skipped: ${skippedCount}`,
-  );
+  console.log(`Migration complete. Updated: ${updatedCount}, Skipped: ${skippedCount}`);
 }

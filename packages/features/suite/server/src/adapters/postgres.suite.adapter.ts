@@ -1,16 +1,20 @@
 import type { Projection, ProjectionStore } from "@langwatch/eventing";
 import type { SuiteService as SuiteServiceContract } from "@langwatch/suite-contract";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import { PrismaSuiteRepository, type SuiteDatabase } from "../repositories/prisma/prisma.suite.repository";
 import {
-  ClickHouseSuiteRunRepository,
-} from "../repositories/clickhouse/clickhouse.suite-run.repository";
+  PrismaSuiteRepository,
+  type SuiteDatabase,
+} from "../repositories/prisma/prisma.suite.repository";
+import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository";
 import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port";
 import type { SuiteRunRepository } from "../repositories/suite-run.repository";
 import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository";
 import { SuiteService, type SuiteServiceOptions } from "../services/suite.service";
 
-export type PostgresSuiteAdapterOptions = Omit<SuiteServiceOptions, "repository" | "runRepository"> & {
+export type PostgresSuiteAdapterOptions = Omit<
+  SuiteServiceOptions,
+  "repository" | "runRepository"
+> & {
   database: SuiteDatabase;
   resolveClickHouseClient: ((projectId: string) => Promise<SuiteClickHouseClient>) | null;
   defaultRetentionDays: number;

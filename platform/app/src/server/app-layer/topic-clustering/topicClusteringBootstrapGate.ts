@@ -52,13 +52,7 @@ export function createRateLimitedBootstrap({
   return async (projectId: string): Promise<void> => {
     let claimed = true;
     try {
-      const result = await redis.set(
-        buildKey(projectId),
-        "1",
-        "EX",
-        ttlSeconds,
-        "NX",
-      );
+      const result = await redis.set(buildKey(projectId), "1", "EX", ttlSeconds, "NX");
       claimed = result === "OK";
     } catch (error) {
       logger.warn(

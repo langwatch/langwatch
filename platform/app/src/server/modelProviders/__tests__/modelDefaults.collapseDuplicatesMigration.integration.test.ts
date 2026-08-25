@@ -74,8 +74,7 @@ describe("given configs written before the one-config-per-scope rule (real DB)",
 
   /** A fixed anchor so the seeded createdAt ordering is explicit. */
   const anchor = new Date("2026-08-01T00:00:00.000Z");
-  const atMinutes = (minutes: number) =>
-    new Date(anchor.getTime() + minutes * 60_000);
+  const atMinutes = (minutes: number) => new Date(anchor.getTime() + minutes * 60_000);
 
   beforeAll(async () => {
     const organization = await prisma.organization.create({
@@ -127,9 +126,7 @@ describe("given configs written before the one-config-per-scope rule (real DB)",
               config: { DEFAULT: "openai/gpt-5.4-mini" },
               createdAt: atMinutes(0),
               scopes: {
-                create: [
-                  { scopeType: "ORGANIZATION", scopeId: organizationId },
-                ],
+                create: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
               },
             },
           });
@@ -139,9 +136,7 @@ describe("given configs written before the one-config-per-scope rule (real DB)",
               config: { DEFAULT: "gemini/gemini-2.5-pro" },
               createdAt: atMinutes(10),
               scopes: {
-                create: [
-                  { scopeType: "ORGANIZATION", scopeId: organizationId },
-                ],
+                create: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
               },
             },
           });

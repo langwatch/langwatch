@@ -80,18 +80,10 @@ export function GraphCardHeader({
   // to the first series and let them switch inside the drawer if they want
   // a different one. Encoded in the canonical id format the threshold
   // dispatcher reads.
-  const defaultSeriesName = useMemo(
-    () => deriveSeriesIdentifier(graph, 0),
-    [graph],
-  );
+  const defaultSeriesName = useMemo(() => deriveSeriesIdentifier(graph, 0), [graph]);
 
   const hasFilters = useMemo(
-    () =>
-      !!(
-        filters &&
-        typeof filters === "object" &&
-        Object.keys(filters).length > 0
-      ),
+    () => !!(filters && typeof filters === "object" && Object.keys(filters).length > 0),
     [filters],
   );
 
@@ -138,11 +130,7 @@ export function GraphCardHeader({
            * automations drawer is the only alert-authoring path.
            */}
           {trigger?.active ? (
-            <Tooltip
-              content="Edit alert"
-              positioning={{ placement: "top" }}
-              showArrow
-            >
+            <Tooltip content="Edit alert" positioning={{ placement: "top" }} showArrow>
               <Box
                 role="button"
                 aria-label="Edit alert"
@@ -187,9 +175,7 @@ export function GraphCardHeader({
 
       {hasFilters && (
         <GraphFilterIndicator
-          filters={
-            filters as Record<FilterField, string[] | Record<string, string[]>>
-          }
+          filters={filters as Record<FilterField, string[] | Record<string, string[]>>}
         />
       )}
 

@@ -44,7 +44,7 @@ Every failure renders through the code-keyed error registry, never a wire
 message:
 
 - `readLangWatchQLFailure` (`logic/lwqlFailure.ts`) lifts the
-  *structure* a registry entry cannot carry — violation positions, clause
+  _structure_ a registry entry cannot carry — violation positions, clause
   names, missing parameter names — off `meta`. It never carries the words a
   member reads; those come from the presentation registry keyed by `code`
   (`error-handling.md`).
@@ -53,13 +53,13 @@ message:
   extra detail," never a crash in the pane that was about to explain the
   failure.
 - `lwqlUnavailablePayload()` mints a client-side payload carrying the
-  `lwql_unavailable` code so the *availability* answer (a boolean, not
+  `lwql_unavailable` code so the _availability_ answer (a boolean, not
   a failure) renders through the same registry copy as a real refusal, rather
   than a second hand-written copy of the words.
 
 ## Value fidelity
 
-`logic/lwqlValueFormat.ts` decides what a result cell *says*; never
+`logic/lwqlValueFormat.ts` decides what a result cell _says_; never
 reach for `Number()` on a value from a LangWatchQL result.
 
 - **64-bit integers and high-precision decimals arrive as digit strings** when
@@ -115,7 +115,7 @@ bundled v6 schema → LangWatchQL policy → field references.
 4. **Render** (`hooks/useLangWatchQLVegaView.ts`) — `vega-embed` is called with
    `ast: true`, which makes it parse expressions into a syntax tree and
    evaluate them with `vega-interpreter` instead of compiling with `new
-   Function`. Do not add `expr` to `lwqlVegaEmbedOptions` — `vega@6`
+Function`. Do not add `expr` to `lwqlVegaEmbedOptions` — `vega@6`
    exports no `expressionInterpreter`, so `ast: true` alone already reaches
    the interpreter; passing one explicitly only duplicates it in the bundle.
    The loader is `createNoNetworkVegaLoader()` — every method rejects, so a

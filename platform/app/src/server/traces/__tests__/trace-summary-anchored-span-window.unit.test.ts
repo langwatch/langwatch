@@ -148,9 +148,7 @@ function matchRows({
  * break rather than as a confusing `undefined` assertion failure.
  */
 async function readTraces(traceIds: string[]) {
-  const { ClickHouseTraceService } = await import(
-    "../clickhouse-trace.service"
-  );
+  const { ClickHouseTraceService } = await import("../clickhouse-trace.service");
   const service = new ClickHouseTraceService({
     prisma: {
       project: { findUnique: vi.fn() },

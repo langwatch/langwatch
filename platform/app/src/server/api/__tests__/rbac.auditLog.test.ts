@@ -5,11 +5,7 @@ import {
   getValidActionsForResource,
   orderedResources,
 } from "../../../utils/permissionsConfig";
-import {
-  canView,
-  getOrganizationRolePermissions,
-  teamRoleHasPermission,
-} from "../rbac";
+import { canView, getOrganizationRolePermissions, teamRoleHasPermission } from "../rbac";
 
 // Companion to rbac.secrets.test.ts — covers the auditLog:view permission
 // added by the gateway audit consolidation. Verifies the perm is granted
@@ -26,33 +22,25 @@ describe("AuditLog resource in RBAC", () => {
 
   describe("given the ADMIN team role", () => {
     it("includes auditLog:view permission", () => {
-      expect(teamRoleHasPermission(TeamUserRole.ADMIN, "auditLog:view")).toBe(
-        true,
-      );
+      expect(teamRoleHasPermission(TeamUserRole.ADMIN, "auditLog:view")).toBe(true);
     });
   });
 
   describe("given the MEMBER team role", () => {
     it("includes auditLog:view permission", () => {
-      expect(teamRoleHasPermission(TeamUserRole.MEMBER, "auditLog:view")).toBe(
-        true,
-      );
+      expect(teamRoleHasPermission(TeamUserRole.MEMBER, "auditLog:view")).toBe(true);
     });
   });
 
   describe("given the VIEWER team role", () => {
     it("includes auditLog:view permission", () => {
-      expect(teamRoleHasPermission(TeamUserRole.VIEWER, "auditLog:view")).toBe(
-        true,
-      );
+      expect(teamRoleHasPermission(TeamUserRole.VIEWER, "auditLog:view")).toBe(true);
     });
   });
 
   describe("given the CUSTOM fallback team role", () => {
     it("includes auditLog:view permission", () => {
-      expect(teamRoleHasPermission(TeamUserRole.CUSTOM, "auditLog:view")).toBe(
-        true,
-      );
+      expect(teamRoleHasPermission(TeamUserRole.CUSTOM, "auditLog:view")).toBe(true);
     });
   });
 
@@ -61,18 +49,10 @@ describe("AuditLog resource in RBAC", () => {
       // auditLog:view flows through TeamUser / RoleBindings, not via the
       // OrganizationUser role enum (organization:* perms are the only
       // built-in org-role grants).
-      const adminPerms = getOrganizationRolePermissions(
-        OrganizationUserRole.ADMIN,
-      );
-      const memberPerms = getOrganizationRolePermissions(
-        OrganizationUserRole.MEMBER,
-      );
-      expect(adminPerms.filter((p) => p.startsWith("auditLog:"))).toHaveLength(
-        0,
-      );
-      expect(memberPerms.filter((p) => p.startsWith("auditLog:"))).toHaveLength(
-        0,
-      );
+      const adminPerms = getOrganizationRolePermissions(OrganizationUserRole.ADMIN);
+      const memberPerms = getOrganizationRolePermissions(OrganizationUserRole.MEMBER);
+      expect(adminPerms.filter((p) => p.startsWith("auditLog:"))).toHaveLength(0);
+      expect(memberPerms.filter((p) => p.startsWith("auditLog:"))).toHaveLength(0);
     });
   });
 

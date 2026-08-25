@@ -57,25 +57,20 @@ vi.mock("~/server/featureFlag", () => ({
 // import graph read further rbac exports (Resources etc.).
 // The route reads probeOrganizationPermission from the app-layer imperative
 // module (it moved off ~/server/api/rbac with ADR-092).
-vi.mock(
-  import("~/server/app-layer/permissions/imperative"),
-  async (importOriginal) => ({
-    ...(await importOriginal()),
-    probeOrganizationPermission: ((...args: unknown[]) =>
-      probeOrganizationPermission(...args)) as never,
-  }),
-);
+vi.mock(import("~/server/app-layer/permissions/imperative"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  probeOrganizationPermission: ((...args: unknown[]) =>
+    probeOrganizationPermission(...args)) as never,
+}));
 const githubService = {
   getAppConfig: () => appConfig,
   getWebBase: () => "https://github.com",
-  getAppInstallUrl: () =>
-    "https://github.com/apps/langwatch-langy/installations/new",
+  getAppInstallUrl: () => "https://github.com/apps/langwatch-langy/installations/new",
   getInstallStateTtlMs: () => 10 * 60 * 1000,
   registerInstallNonce: vi.fn(async () => false),
   tryConsumeInstallNonce: vi.fn(async () => true),
   signInstallState: (payload: Record<string, unknown>) => signState(payload),
-  tryVerifyInstallState: (token: string | null | undefined) =>
-    verifyState(token),
+  tryVerifyInstallState: (token: string | null | undefined) => verifyState(token),
   popupResponseHtml: (login: string) => `<p>github-connected @${login}</p>`,
   popupErrorHtml: (message: string) => `<p>github-error ${message}</p>`,
   tryParsePullRequestEvent: (payload: unknown) => parsePullRequestEvent(payload),
@@ -178,9 +173,7 @@ describe("GET /api/github/install", () => {
       );
       expect(res.status).toBe(302);
       const location = res.headers.get("location") ?? "";
-      expect(location).toContain(
-        "github.com/apps/langwatch-langy/installations/new",
-      );
+      expect(location).toContain("github.com/apps/langwatch-langy/installations/new");
       expect(location).toContain("state=");
     });
   });
@@ -333,9 +326,8 @@ describe("GET /api/github/setup", () => {
 
   describe("when the installation is already owned by another organization", () => {
     async function mockConflictRejection() {
-      const { GithubInstallationConflictError } = await import(
-        "@langwatch/github-contract"
-      );
+      const { GithubInstallationConflictError } =
+        await import("@langwatch/github-contract");
       recordInstallation.mockRejectedValue(
         new GithubInstallationConflictError({
           installationId: "555",
@@ -418,9 +410,7 @@ describe("GET /api/github/setup", () => {
 
 describe("POST /api/github/webhook", () => {
   function sign(body: string): string {
-    return (
-      "sha256=" + createHmac("sha256", "whsecret").update(body).digest("hex")
-    );
+    return "sha256=" + createHmac("sha256", "whsecret").update(body).digest("hex");
   }
 
   describe("when the signature matches", () => {

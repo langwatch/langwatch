@@ -56,9 +56,7 @@ const CATEGORY_GATE: Record<ContentCategory, FieldProtection> = {
  * gated columns.
  */
 export const CONTENT_ATTRIBUTE_KEYS: readonly string[] = [
-  ...new Set(
-    CONTENT_CATEGORIES.flatMap((category) => CONTENT_KEY_CATALOG[category]),
-  ),
+  ...new Set(CONTENT_CATEGORIES.flatMap((category) => CONTENT_KEY_CATALOG[category])),
 ].sort();
 
 /**
@@ -74,9 +72,7 @@ export const CONTENT_ATTRIBUTE_KEY_PREFIXES: readonly string[] =
   CONTENT_ATTRIBUTE_KEYS.map((key) => `${key}.`);
 
 /** The gate governing a content category, per {@link CATEGORY_GATE}. */
-export function gateForContentCategory(
-  category: ContentCategory,
-): FieldProtection {
+export function gateForContentCategory(category: ContentCategory): FieldProtection {
   return CATEGORY_GATE[category];
 }
 
@@ -104,8 +100,7 @@ export function isContentAttributeKey(key: string): boolean {
  */
 export function contentKeyExclusionSql(keyParameter = "k"): string {
   const keys = CONTENT_ATTRIBUTE_KEYS.map(clickHouseLiteral).join(", ");
-  const prefixes =
-    CONTENT_ATTRIBUTE_KEY_PREFIXES.map(clickHouseLiteral).join(", ");
+  const prefixes = CONTENT_ATTRIBUTE_KEY_PREFIXES.map(clickHouseLiteral).join(", ");
   return (
     `${keyParameter} NOT IN (${keys}) ` +
     `AND NOT arrayExists(p -> startsWith(${keyParameter}, p), [${prefixes}])`

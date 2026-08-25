@@ -40,9 +40,7 @@ describe("CommandBarLangyMode", () => {
 
     expect(input).toHaveFocus();
     expect(input).toHaveValue("why did checkout slow down?");
-    expect(
-      container.querySelector("[data-langy-command-mode='true']"),
-    ).not.toBeNull();
+    expect(container.querySelector("[data-langy-command-mode='true']")).not.toBeNull();
     expect(container.querySelector(".langy-mark")).not.toBeNull();
     expect(container.querySelector(".langy-composer-sheen")).not.toBeNull();
     expect(screen.queryByText("AI")).not.toBeInTheDocument();

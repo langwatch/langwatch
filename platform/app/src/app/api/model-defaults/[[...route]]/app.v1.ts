@@ -2,11 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
-import {
-  anyAuthenticated,
-  requires,
-  type SecuredApp,
-} from "~/server/api/security";
+import { anyAuthenticated, requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
@@ -63,7 +59,10 @@ export function registerModelDefaultsRoutes(
     async (c) => {
       const project = c.get("project");
       const userId = c.get("apiKeyUserId");
-      const snapshot = await c.var.langwatchApp.modelProviders.getDefaultSnapshot({ projectId: project.id, actorId: userId });
+      const snapshot = await c.var.langwatchApp.modelProviders.getDefaultSnapshot({
+        projectId: project.id,
+        actorId: userId,
+      });
 
       return c.json(
         apiResponseModelDefaultsSchema.parse({
@@ -73,7 +72,12 @@ export function registerModelDefaultsRoutes(
             organizationId: snapshot.organizationId,
             organizationName: snapshot.organizationName,
           },
-          effective: Object.fromEntries(["DEFAULT", "FAST", "EMBEDDINGS"].map((role) => [role, snapshot.effective[role] ?? null])),
+          effective: Object.fromEntries(
+            ["DEFAULT", "FAST", "EMBEDDINGS"].map((role) => [
+              role,
+              snapshot.effective[role] ?? null,
+            ]),
+          ),
           configs: snapshot.configs.map((c) => ({
             id: c.id,
             config: c.config,
@@ -114,8 +118,16 @@ export function registerModelDefaultsRoutes(
       const body = c.req.valid("json");
 
       try {
-        if (!userId) throw new HTTPException(401, { message: "A user-bound credential is required for default-model writes" });
-        const saved = await c.var.langwatchApp.modelProviders.saveDefaultConfig({ config: body.config, scopes: body.scopes, authorId: userId ?? null, actorId: userId });
+        if (!userId)
+          throw new HTTPException(401, {
+            message: "A user-bound credential is required for default-model writes",
+          });
+        const saved = await c.var.langwatchApp.modelProviders.saveDefaultConfig({
+          config: body.config,
+          scopes: body.scopes,
+          authorId: userId ?? null,
+          actorId: userId,
+        });
         const id = saved.id;
         logger.info(
           { projectId: project.id, configId: id, userId },
@@ -148,8 +160,17 @@ export function registerModelDefaultsRoutes(
       const body = c.req.valid("json");
 
       try {
-        if (!userId) throw new HTTPException(401, { message: "A user-bound credential is required for default-model writes" });
-        const saved = await c.var.langwatchApp.modelProviders.saveDefaultConfig({ id, config: body.config, scopes: body.scopes, authorId: userId ?? null, actorId: userId });
+        if (!userId)
+          throw new HTTPException(401, {
+            message: "A user-bound credential is required for default-model writes",
+          });
+        const saved = await c.var.langwatchApp.modelProviders.saveDefaultConfig({
+          id,
+          config: body.config,
+          scopes: body.scopes,
+          authorId: userId ?? null,
+          actorId: userId,
+        });
         if (!saved) throw new HTTPException(404, { message: "Config not found" });
         logger.info(
           { projectId: project.id, configId: id, userId },
@@ -178,8 +199,14 @@ export function registerModelDefaultsRoutes(
       const { id } = c.req.param();
 
       try {
-        if (!userId) throw new HTTPException(401, { message: "A user-bound credential is required for default-model writes" });
-        await c.var.langwatchApp.modelProviders.deleteDefaultConfig({ id, actorId: userId });
+        if (!userId)
+          throw new HTTPException(401, {
+            message: "A user-bound credential is required for default-model writes",
+          });
+        await c.var.langwatchApp.modelProviders.deleteDefaultConfig({
+          id,
+          actorId: userId,
+        });
         logger.info(
           { projectId: project.id, configId: id, userId },
           "Deleted default-model config",

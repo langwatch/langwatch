@@ -1,5 +1,8 @@
 import type {
-  Evaluator, EvaluatorConfig, EvaluatorCopy, EvaluatorUpdateInput,
+  Evaluator,
+  EvaluatorConfig,
+  EvaluatorCopy,
+  EvaluatorUpdateInput,
 } from "@langwatch/evaluator-contract";
 
 /** The persistence surface consumed by the private Postgres adapter. */
@@ -13,22 +16,39 @@ export type EvaluatorDatabase = {
 };
 
 export type PersistEvaluatorInput = {
-  id: string; projectId: string; name: string; slug?: string;
-  type: Evaluator["type"]; config: EvaluatorConfig; workflowId?: string;
+  id: string;
+  projectId: string;
+  name: string;
+  slug?: string;
+  type: Evaluator["type"];
+  config: EvaluatorConfig;
+  workflowId?: string;
   copiedFromEvaluatorId?: string;
 };
 
 export abstract class EvaluatorRepository {
-  abstract tryFindById(input: { id: string; projectId: string }): Promise<Evaluator | null>;
+  abstract tryFindById(input: {
+    id: string;
+    projectId: string;
+  }): Promise<Evaluator | null>;
   abstract tryFindByIdOnly(id: string): Promise<Evaluator | null>;
-  abstract tryFindBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | null>;
-  abstract tryFindByWorkflow(input: { workflowId: string; projectId: string }): Promise<Evaluator | null>;
+  abstract tryFindBySlug(input: {
+    slug: string;
+    projectId: string;
+  }): Promise<Evaluator | null>;
+  abstract tryFindByWorkflow(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<Evaluator | null>;
   abstract findAll(input: { projectId: string }): Promise<Evaluator[]>;
   abstract create(input: PersistEvaluatorInput): Promise<Evaluator>;
   abstract update(input: EvaluatorUpdateInput): Promise<Evaluator>;
   abstract archive(input: { id: string; projectId: string }): Promise<Evaluator>;
   abstract findCopies(input: { evaluatorId: string }): Promise<EvaluatorCopy[]>;
   abstract updateNameAndConfig(input: {
-    id: string; projectId: string; name: string; config: EvaluatorConfig;
+    id: string;
+    projectId: string;
+    name: string;
+    config: EvaluatorConfig;
   }): Promise<void>;
 }

@@ -84,10 +84,7 @@ export class LegacyApiKeyGrantService {
 
   mint(apiKey: ApiKey): void {
     try {
-      const binding = legacyGrantForApiKey(
-        apiKey,
-        this.options.deriveBindingId,
-      );
+      const binding = legacyGrantForApiKey(apiKey, this.options.deriveBindingId);
       if (!binding || this.guardHeld(apiKey.id)) return;
       this.holdGuard(apiKey.id);
       void this.persist(apiKey, binding).catch((error: unknown) =>

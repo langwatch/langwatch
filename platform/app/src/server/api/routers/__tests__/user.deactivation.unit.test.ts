@@ -11,9 +11,7 @@ vi.mock("~/runtime/app/features/audit-log", () => ({
 }));
 
 vi.mock("~/runtime/app/features/admin", () => ({
-  isAdmin: vi.fn(
-    ({ email }: { email: string }) => email === "admin@example.com",
-  ),
+  isAdmin: vi.fn(({ email }: { email: string }) => email === "admin@example.com"),
 }));
 
 vi.mock("../../rbac", async (importOriginal) => {

@@ -17,15 +17,9 @@ vi.mock("../emailSender", () => ({
 import { injectFooterIntoBody, sendTriggerEmail } from "../triggerEmail";
 import { TEST_FIRE_TRIGGER_ID_SENTINEL } from "../triggerNoReply";
 
-function callEmailWithDedup(
-  sent: Set<string>,
-  overrides?: { triggerEmails?: string[] },
-) {
+function callEmailWithDedup(sent: Set<string>, overrides?: { triggerEmails?: string[] }) {
   return sendTriggerEmail({
-    triggerEmails: overrides?.triggerEmails ?? [
-      "user@example.com",
-      "other@example.com",
-    ],
+    triggerEmails: overrides?.triggerEmails ?? ["user@example.com", "other@example.com"],
     triggerData,
     triggerName: "Quality Alert",
     triggerId: "trigger_test123",
@@ -71,9 +65,7 @@ describe("injectFooterIntoBody", () => {
           "<html><body><p>hi</p></body></html>",
           "<div>footer</div>",
         );
-        expect(result).toBe(
-          "<html><body><p>hi</p><div>footer</div></body></html>",
-        );
+        expect(result).toBe("<html><body><p>hi</p><div>footer</div></body></html>");
       });
 
       it("matches the closing tag case-insensitively", () => {
@@ -83,9 +75,7 @@ describe("injectFooterIntoBody", () => {
         );
         // Footer lands before the (case-insensitively matched) closing body tag,
         // never appended after the document.
-        expect(result).toMatch(
-          /<p>hi<\/p><div>footer<\/div><\/body><\/HTML>$/i,
-        );
+        expect(result).toMatch(/<p>hi<\/p><div>footer<\/div><\/body><\/HTML>$/i);
         expect(result).not.toMatch(/<\/HTML><div>footer/i);
       });
     });
@@ -148,9 +138,7 @@ describe("sendTriggerEmail", () => {
         expect(args.headers["List-Unsubscribe"]).toMatch(
           /^<.*\/api\/unsubscribe\?token=/,
         );
-        expect(args.headers["List-Unsubscribe-Post"]).toBe(
-          "List-Unsubscribe=One-Click",
-        );
+        expect(args.headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
         const match = args.headers["List-Unsubscribe"]!.match(/token=([^>&]+)/);
         expect(match).not.toBeNull();
         tokens.push(match![1]!);
@@ -187,9 +175,7 @@ describe("sendTriggerEmail", () => {
         await callEmail();
         const args = sendEmailMock.mock.calls[0]![0] as { html: string };
         if (/<\/body>/i.test(args.html)) {
-          const footerIdx = args.html.indexOf(
-            "Stop receiving this notification",
-          );
+          const footerIdx = args.html.indexOf("Stop receiving this notification");
           const bodyCloseIdx = args.html.search(/<\/body>/i);
           expect(footerIdx).toBeGreaterThanOrEqual(0);
           expect(footerIdx).toBeLessThan(bodyCloseIdx);
@@ -295,9 +281,7 @@ describe("sendTriggerEmail", () => {
 
           // Only the second recipient should be sent on retry.
           expect(sendEmailMock).toHaveBeenCalledTimes(1);
-          const retrySentBcc = (
-            sendEmailMock.mock.calls[0]![0] as { bcc: string[] }
-          ).bcc;
+          const retrySentBcc = (sendEmailMock.mock.calls[0]![0] as { bcc: string[] }).bcc;
           expect(retrySentBcc).toEqual(["other@example.com"]);
         });
       });

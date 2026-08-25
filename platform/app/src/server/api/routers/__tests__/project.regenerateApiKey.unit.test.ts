@@ -17,17 +17,13 @@ import type { RequestAppServices } from "~/runtime/app/requestApp";
 // Mock nanoid to control API key generation
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
 
 vi.mock("nanoid", () => ({
   nanoid: vi.fn(() => "mock-nano-id"),
-  customAlphabet: vi.fn(
-    () => () => "mock48characterrandomstringforapikeygeneration",
-  ),
+  customAlphabet: vi.fn(() => () => "mock48characterrandomstringforapikeygeneration"),
 }));
 
 // Mock the permission resolver to always allow; use importOriginal so other rbac exports stay available to transitive imports
@@ -91,11 +87,8 @@ describe("project.regenerateApiKey mutation logic", () => {
     it("regenerates the API key and returns the new key", async () => {
       // Arrange
       const projectId = "project_123";
-      const expectedApiKey =
-        "sk-lw-mock48characterrandomstringforapikeygeneration";
-      mockApiKeys.regenerateLegacyProjectKey.mockResolvedValueOnce(
-        expectedApiKey,
-      );
+      const expectedApiKey = "sk-lw-mock48characterrandomstringforapikeygeneration";
+      mockApiKeys.regenerateLegacyProjectKey.mockResolvedValueOnce(expectedApiKey);
 
       // Act
       const result = await caller.regenerateApiKey({ projectId });
@@ -138,9 +131,7 @@ describe("project.regenerateApiKey mutation logic", () => {
       );
 
       // Act & Assert - Call actual mutation and verify it throws correct error
-      await expect(
-        caller.regenerateApiKey({ projectId }),
-      ).rejects.toMatchObject({
+      await expect(caller.regenerateApiKey({ projectId })).rejects.toMatchObject({
         code: "NOT_FOUND",
         message: "Project not found",
       });
@@ -155,9 +146,7 @@ describe("project.regenerateApiKey mutation logic", () => {
       mockApiKeys.regenerateLegacyProjectKey.mockRejectedValueOnce(serviceError);
 
       // Act & Assert - tRPC wraps service errors as INTERNAL_SERVER_ERROR
-      await expect(
-        caller.regenerateApiKey({ projectId }),
-      ).rejects.toMatchObject({
+      await expect(caller.regenerateApiKey({ projectId })).rejects.toMatchObject({
         code: "INTERNAL_SERVER_ERROR",
         message: "Connection error",
       });
@@ -171,9 +160,7 @@ describe("project.regenerateApiKey mutation logic", () => {
       mockApiKeys.regenerateLegacyProjectKey.mockRejectedValueOnce(genericError);
 
       // Act & Assert - tRPC wraps generic errors as INTERNAL_SERVER_ERROR
-      await expect(
-        caller.regenerateApiKey({ projectId }),
-      ).rejects.toMatchObject({
+      await expect(caller.regenerateApiKey({ projectId })).rejects.toMatchObject({
         code: "INTERNAL_SERVER_ERROR",
         message: "Database connection failed",
       });
@@ -191,9 +178,7 @@ describe("project.regenerateApiKey mutation logic", () => {
         new Error("Database connection failed"),
       );
 
-      await expect(
-        caller.regenerateApiKey({ projectId }),
-      ).rejects.toBeDefined();
+      await expect(caller.regenerateApiKey({ projectId })).rejects.toBeDefined();
 
       expect(auditLog).not.toHaveBeenCalledWith(
         expect.objectContaining({ action: "project.apiKey.regenerated" }),
@@ -207,14 +192,9 @@ describe("project.regenerateApiKey mutation logic", () => {
       // new key. The DB write already committed; swallowing the audit error
       // and returning the key is the only safe path.
       const projectId = "project_123";
-      const expectedApiKey =
-        "sk-lw-mock48characterrandomstringforapikeygeneration";
-      mockApiKeys.regenerateLegacyProjectKey.mockResolvedValueOnce(
-        expectedApiKey,
-      );
-      vi.mocked(auditLog).mockRejectedValueOnce(
-        new Error("audit service unavailable"),
-      );
+      const expectedApiKey = "sk-lw-mock48characterrandomstringforapikeygeneration";
+      mockApiKeys.regenerateLegacyProjectKey.mockResolvedValueOnce(expectedApiKey);
+      vi.mocked(auditLog).mockRejectedValueOnce(new Error("audit service unavailable"));
 
       const result = await caller.regenerateApiKey({ projectId });
 

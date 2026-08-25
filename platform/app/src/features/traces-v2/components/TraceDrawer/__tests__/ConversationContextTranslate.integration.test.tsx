@@ -29,11 +29,9 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-const translateMock = vi.fn(
-  async ({ textToTranslate }: { textToTranslate: string }) => ({
-    translation: `EN::${textToTranslate}`,
-  }),
-);
+const translateMock = vi.fn(async ({ textToTranslate }: { textToTranslate: string }) => ({
+  translation: `EN::${textToTranslate}`,
+}));
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -115,9 +113,7 @@ describe("Conversation Context translate", () => {
   describe("when the panel is expanded with turn content", () => {
     it("shows a Translate action", () => {
       renderStrip();
-      expect(
-        screen.getByRole("button", { name: /translate/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /translate/i })).toBeInTheDocument();
     });
 
     it("translates the visible previews and flips back on Show original", async () => {

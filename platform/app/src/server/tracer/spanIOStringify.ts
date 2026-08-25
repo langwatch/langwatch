@@ -61,9 +61,7 @@ export function readSystemInstructions(
   if (flat !== null) return flat;
   const genAi = params.gen_ai;
   if (genAi && typeof genAi === "object" && !Array.isArray(genAi)) {
-    return systemInstructionsText(
-      (genAi as Record<string, unknown>).system_instructions,
-    );
+    return systemInstructionsText((genAi as Record<string, unknown>).system_instructions);
   }
   return null;
 }
@@ -79,9 +77,7 @@ export function readSystemInstructions(
  * the stored attribute split semconv-correct while every view mode (pretty /
  * text / json / copy) stays consistent. All other shapes fall through.
  */
-export function buildDisplayInput(
-  span: Pick<Span, "input" | "params">,
-): string | null {
+export function buildDisplayInput(span: Pick<Span, "input" | "params">): string | null {
   const io = span.input;
   if (io && io.type === "chat_messages" && Array.isArray(io.value)) {
     const system = readSystemInstructions(span.params ?? null);
@@ -100,9 +96,7 @@ export function buildDisplayInput(
  * and edits. Pure and dependency-free so the client applies a correction with
  * exactly the same rendering the server used for the original.
  */
-export function stringifySpanIO(
-  io: SpanInputOutput | null | undefined,
-): string | null {
+export function stringifySpanIO(io: SpanInputOutput | null | undefined): string | null {
   if (!io) return null;
   switch (io.type) {
     case "text":

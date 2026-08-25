@@ -150,10 +150,7 @@ export default function UsersView() {
                 <Table.Cell>{user.name ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>{user.email ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>
-                  <RefChipList
-                    refs={user.organizations}
-                    resource="organizations"
-                  />
+                  <RefChipList refs={user.organizations} resource="organizations" />
                 </Table.Cell>
                 <Table.Cell>
                   <RefChipList refs={user.projects} resource="projects" />
@@ -180,21 +177,13 @@ export default function UsersView() {
                   )}
                 </Table.Cell>
                 <Table.Cell textAlign="right">
-                  <Box
-                    width="full"
-                    height="full"
-                    display="flex"
-                    justifyContent="end"
-                  >
+                  <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>
                       <Menu.Trigger>
                         <MoreVertical size={16} />
                       </Menu.Trigger>
                       <Menu.Content>
-                        <Menu.Item
-                          value="edit"
-                          onClick={() => setEditing(user)}
-                        >
+                        <Menu.Item value="edit" onClick={() => setEditing(user)}>
                           <Pencil size={16} />
                           Edit
                         </Menu.Item>
@@ -218,10 +207,7 @@ export default function UsersView() {
       </BackofficeTable>
 
       <UserEditDrawer user={editing} onClose={() => setEditing(null)} />
-      <ImpersonateDialog
-        user={impersonating}
-        onClose={() => setImpersonating(null)}
-      />
+      <ImpersonateDialog user={impersonating} onClose={() => setImpersonating(null)} />
     </>
   );
 }
@@ -550,10 +536,7 @@ function ToggleRow({
           </Text>
         </VStack>
         <Spacer />
-        <Switch
-          checked={checked}
-          onCheckedChange={(e) => onChange(e.checked)}
-        />
+        <Switch checked={checked} onCheckedChange={(e) => onChange(e.checked)} />
       </HStack>
     </Field.Root>
   );

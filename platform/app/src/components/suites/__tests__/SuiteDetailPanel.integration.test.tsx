@@ -348,9 +348,7 @@ describe("<SuiteEmptyState/>", () => {
     });
 
     expect(
-      screen.getByText(
-        "Select a run plan from the sidebar or create a new one",
-      ),
+      screen.getByText("Select a run plan from the sidebar or create a new one"),
     ).toBeInTheDocument();
   });
 

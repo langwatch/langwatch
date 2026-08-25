@@ -75,10 +75,7 @@ describe("findUnclosedPercentBraces()", () => {
 
   describe("when multiple {% exist in text", () => {
     it("returns the last unclosed {% before cursor", () => {
-      const result = findUnclosedPercentBraces(
-        "{% if x %}hello{% endif %} {%",
-        29,
-      );
+      const result = findUnclosedPercentBraces("{% if x %}hello{% endif %} {%", 29);
       expect(result).toEqual({ start: 29, query: "" });
     });
 

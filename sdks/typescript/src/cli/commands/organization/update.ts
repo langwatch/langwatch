@@ -3,10 +3,7 @@ import {
   OrganizationApiService,
   type UpdateOrganizationInput,
 } from "@/client-sdk/services/organization/organization-api.service";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
 import { orDash, printFacts, runManagement } from "../management/_shared";
 
@@ -57,10 +54,7 @@ export const updateOrganizationCommand = async (
         ["Slug", organization.slug],
         ["Support contact", orDash(organization.supportContact)],
         ["Presence", organization.presenceEnabled ? "enabled" : "disabled"],
-        [
-          "Trace sharing",
-          organization.traceSharingEnabled ? "enabled" : "disabled",
-        ],
+        ["Trace sharing", organization.traceSharingEnabled ? "enabled" : "disabled"],
       ]);
     },
   });

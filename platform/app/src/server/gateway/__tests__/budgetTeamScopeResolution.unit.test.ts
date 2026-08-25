@@ -40,16 +40,13 @@ function prismaStub({ teamScopeIds }: { teamScopeIds: string[] }) {
  */
 function teamClauses(findMany: ReturnType<typeof vi.fn>): unknown[] {
   const ors = findMany.mock.calls[0]?.[0]?.where?.OR ?? [];
-  return ors.filter(
-    (clause: { scopeType?: string }) => clause.scopeType === "TEAM",
-  );
+  return ors.filter((clause: { scopeType?: string }) => clause.scopeType === "TEAM");
 }
 
 /** Every team id the built query would match a TEAM budget against. */
 function teamIdsAsked(findMany: ReturnType<typeof vi.fn>): string[] {
   const ids = teamClauses(findMany).flatMap((clause) => {
-    const scopeId = (clause as { scopeId?: string | { in?: string[] } })
-      .scopeId;
+    const scopeId = (clause as { scopeId?: string | { in?: string[] } }).scopeId;
     if (typeof scopeId === "string") return [scopeId];
     return scopeId?.in ?? [];
   });

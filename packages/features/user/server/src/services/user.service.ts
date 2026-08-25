@@ -79,13 +79,9 @@ export class UserService extends UserServiceContract {
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
     const parsed = updateUserProfileInputSchema.parse(input);
     const normalizedEmail =
-      parsed.email === undefined
-        ? undefined
-        : parsed.email.trim().toLowerCase();
+      parsed.email === undefined ? undefined : parsed.email.trim().toLowerCase();
     const current =
-      normalizedEmail === undefined
-        ? null
-        : await this.repository.tryFindById(parsed.id);
+      normalizedEmail === undefined ? null : await this.repository.tryFindById(parsed.id);
     if (normalizedEmail !== undefined && !current) {
       throw new UserNotFoundError(parsed.id);
     }
@@ -114,21 +110,14 @@ export class UserService extends UserServiceContract {
     return this.repository.getSsoStatus(parsed.id);
   }
 
-  getTraceExplorerTourPreference(
-    input: UserIdInput,
-  ): Promise<UserTourPreference> {
+  getTraceExplorerTourPreference(input: UserIdInput): Promise<UserTourPreference> {
     const parsed = userIdInputSchema.parse(input);
     return this.repository.getTraceExplorerTourPreference(parsed.id);
   }
 
-  dismissTraceExplorerTour(
-    input: UserIdInput,
-  ): Promise<UserTourPreference> {
+  dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {
     const parsed = userIdInputSchema.parse(input);
-    return this.repository.setTraceExplorerTourDismissedAt(
-      parsed.id,
-      this.now(),
-    );
+    return this.repository.setTraceExplorerTourDismissedAt(parsed.id, this.now());
   }
 
   async updateLastLogin(input: UserIdInput): Promise<void> {
@@ -148,10 +137,7 @@ export class UserService extends UserServiceContract {
 
   async deactivate(input: UserIdInput): Promise<UserProfile> {
     const parsed = userIdInputSchema.parse(input);
-    const user = await this.repository.setDeactivatedAt(
-      parsed.id,
-      this.now(),
-    );
+    const user = await this.repository.setDeactivatedAt(parsed.id, this.now());
     await this.sessions.revokeForUser({ userId: parsed.id });
     await this.cliTokens.revokeForUser({ userId: parsed.id });
     return user;

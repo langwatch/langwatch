@@ -124,9 +124,9 @@ describe("scenarioMessageSnapshotSchema — regression: previously-valid shapes 
  * conversation turns in the simulations UI.
  */
 describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () => {
-  const WEBP_DATA_URI = `data:image/webp;base64,${Buffer.from(
-    "fake-webp-bytes",
-  ).toString("base64")}`;
+  const WEBP_DATA_URI = `data:image/webp;base64,${Buffer.from("fake-webp-bytes").toString(
+    "base64",
+  )}`;
   const PDF_DATA_URI = `data:application/pdf;base64,${Buffer.from(
     "%PDF-1.4 fake pdf bytes",
   ).toString("base64")}`;
@@ -143,9 +143,7 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
     });
 
     it("ACCEPTS an image-only turn with no text part", () => {
-      const event = makeSnapshotEvent([
-        { type: "image", image: WEBP_DATA_URI },
-      ]);
+      const event = makeSnapshotEvent([{ type: "image", image: WEBP_DATA_URI }]);
 
       expect(scenarioEventSchema.safeParse(event).success).toBe(true);
     });

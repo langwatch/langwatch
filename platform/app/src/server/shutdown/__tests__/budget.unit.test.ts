@@ -24,9 +24,7 @@ describe("resolveShutdownBudget", () => {
 
           expect(b.queueDrainMs).toBeLessThan(b.appCloseMs);
           expect(b.appCloseMs).toBeLessThan(b.processDeadlineMs);
-          expect(b.processDeadlineMs).toBeLessThan(
-            b.requiredGracePeriodSeconds * 1000,
-          );
+          expect(b.processDeadlineMs).toBeLessThan(b.requiredGracePeriodSeconds * 1000);
         }
       });
 
@@ -39,9 +37,9 @@ describe("resolveShutdownBudget", () => {
 
         expect(raised.appCloseMs - base.appCloseMs).toBe(100_000);
         expect(raised.processDeadlineMs - base.processDeadlineMs).toBe(100_000);
-        expect(
-          raised.requiredGracePeriodSeconds - base.requiredGracePeriodSeconds,
-        ).toBe(100);
+        expect(raised.requiredGracePeriodSeconds - base.requiredGracePeriodSeconds).toBe(
+          100,
+        );
       });
 
       // The margin over the drain is written down in three places that no
@@ -57,16 +55,13 @@ describe("resolveShutdownBudget", () => {
         const b = resolveShutdownBudget();
         expect(b.requiredGracePeriodSeconds).toBe(50);
 
-        const marginSeconds =
-          b.requiredGracePeriodSeconds - b.queueDrainMs / 1000;
+        const marginSeconds = b.requiredGracePeriodSeconds - b.queueDrainMs / 1000;
 
         const helpers = readFileSync(
           resolve(REPO_ROOT, "charts/langwatch/templates/_helpers.tpl"),
           "utf8",
         );
-        const helperMargin = helpers.match(
-          /\$required\s*:=\s*add\s+\$drain\s+(\d+)/,
-        );
+        const helperMargin = helpers.match(/\$required\s*:=\s*add\s+\$drain\s+(\d+)/);
         expect(helperMargin?.[1]).toBeDefined();
         expect(Number(helperMargin?.[1])).toBe(marginSeconds);
 
@@ -115,18 +110,16 @@ describe("resolveShutdownBudget", () => {
         const read = (p: string) => readFileSync(resolve(REPO_ROOT, p), "utf8");
 
         const values = read("charts/langwatch/values.yaml");
-        const declared = [
-          ...values.matchAll(/^\s+shutdownDrainSeconds:\s*(\d+)/gm),
-        ].map((m) => Number(m[1]));
+        const declared = [...values.matchAll(/^\s+shutdownDrainSeconds:\s*(\d+)/gm)].map(
+          (m) => Number(m[1]),
+        );
         // One per component (app, workers) — both must match, and there must
         // be at least one, or a rename would make this vacuous.
         expect(declared.length).toBeGreaterThan(0);
         for (const value of declared) expect(value).toBe(drainSeconds);
 
         const suite = read("charts/langwatch/tests/workers-shutdown.sh");
-        expect(Number(suite.match(/DRAIN_SECONDS=(\d+)/)?.[1])).toBe(
-          drainSeconds,
-        );
+        expect(Number(suite.match(/DRAIN_SECONDS=(\d+)/)?.[1])).toBe(drainSeconds);
 
         const helpers = read("charts/langwatch/templates/_helpers.tpl");
         const fallbacks = [

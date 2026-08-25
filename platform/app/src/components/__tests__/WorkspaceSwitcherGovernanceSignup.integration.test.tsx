@@ -144,11 +144,11 @@ describe("workspace switcher for a coding-usage signup with an empty shared team
     await user.click(addButton);
 
     // The click lands on the create-project drawer, scoped by URL params.
-    const pushedUrls = (mockRouter.push as unknown as Mock).mock.calls.map(
-      (call) => String(call[0]),
+    const pushedUrls = (mockRouter.push as unknown as Mock).mock.calls.map((call) =>
+      String(call[0]),
     );
-    expect(
-      pushedUrls.some((url) => url.includes("drawer.open=createProject")),
-    ).toBe(true);
+    expect(pushedUrls.some((url) => url.includes("drawer.open=createProject"))).toBe(
+      true,
+    );
   });
 });

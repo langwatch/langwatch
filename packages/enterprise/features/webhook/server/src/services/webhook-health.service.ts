@@ -21,10 +21,7 @@ const RATE_WINDOW_MS = 60 * 60 * 1000;
 const LATENCY_SAMPLE_LIMIT = 500;
 
 export interface WebhookEndpointHealthSource {
-  tryGetStatusSnapshot(input: {
-    organizationId: string;
-    endpointId: string;
-  }): Promise<{
+  tryGetStatusSnapshot(input: { organizationId: string; endpointId: string }): Promise<{
     status: "ACTIVE" | "DISABLED";
     disabledReason: string | null;
     failingSince: Date | null;
@@ -73,19 +70,13 @@ function backlogOfStream(read: EndpointStreamRead): StreamBacklog {
   let dlqDepth = 0;
   let oldestUndeliveredMs: number | null = null;
   for (const entry of read.instance?.state.pending ?? []) {
-    oldestUndeliveredMs = earlierInstant(
-      oldestUndeliveredMs,
-      entry.appendedAtMs,
-    );
+    oldestUndeliveredMs = earlierInstant(oldestUndeliveredMs, entry.appendedAtMs);
   }
   for (const message of read.messages) {
     if (message.intentType !== "sendBatch") continue;
     if (message.status === "dead") dlqDepth++;
     if (message.status === "pending") {
-      oldestUndeliveredMs = earlierInstant(
-        oldestUndeliveredMs,
-        message.createdAt,
-      );
+      oldestUndeliveredMs = earlierInstant(oldestUndeliveredMs, message.createdAt);
     }
   }
   return { dlqDepth, oldestUndeliveredMs };
@@ -146,9 +137,7 @@ export class WebhookHealthService extends WebhookHealthServiceContract {
       lastSuccessAt: endpoint.lastSuccessAt,
       lastFailureAt: endpoint.lastFailureAt,
       oldestUndeliveredAgeMs:
-        oldestUndeliveredMs === null
-          ? null
-          : Math.max(0, now - oldestUndeliveredMs),
+        oldestUndeliveredMs === null ? null : Math.max(0, now - oldestUndeliveredMs),
       dlqDepth,
       sendsPerMinute: attempted / (RATE_WINDOW_MS / 60_000),
       successRate: attempted === 0 ? null : delivered / attempted,

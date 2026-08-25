@@ -20,13 +20,11 @@ const requestDirectUpload = vi.fn();
 const putFileToPresignedUrl = vi.fn();
 const finalizeDirectUpload = vi.fn();
 vi.mock("@langwatch/dataset-web", async (importActual) => {
-  const actual =
-  await importActual<typeof import("@langwatch/dataset-web")>();
+  const actual = await importActual<typeof import("@langwatch/dataset-web")>();
   return {
     ...actual,
     requestDirectUpload: (...args: unknown[]) => requestDirectUpload(...args),
-    putFileToPresignedUrl: (...args: unknown[]) =>
-      putFileToPresignedUrl(...args),
+    putFileToPresignedUrl: (...args: unknown[]) => putFileToPresignedUrl(...args),
     finalizeDirectUpload: (...args: unknown[]) => finalizeDirectUpload(...args),
     abortPendingUpload: vi.fn(),
     HEADER_PARSE_MAX_BYTES: 262144,
@@ -103,9 +101,7 @@ describe("UploadCSVForm column-confirm seam", () => {
       const file = new File(["score,name\n1,a\n"], "data.csv", {
         type: "text/csv",
       });
-      const input = document.querySelector(
-        'input[type="file"]',
-      ) as HTMLInputElement;
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
       await user.upload(input, file);
       const uploadButton = screen.getByRole("button", { name: /upload/i });
       await waitFor(() => expect(uploadButton).toBeEnabled());
@@ -114,9 +110,7 @@ describe("UploadCSVForm column-confirm seam", () => {
 
       // The host's confirm step is invoked with the parsed columns — NOT a direct
       // upload yet.
-      await waitFor(() =>
-        expect(requestColumnConfirm).toHaveBeenCalledTimes(1),
-      );
+      await waitFor(() => expect(requestColumnConfirm).toHaveBeenCalledTimes(1));
       expect(requestDirectUpload).not.toHaveBeenCalled();
       const confirmArg = requestColumnConfirm.mock.calls[0]![0];
       expect(confirmArg.columns).toEqual([

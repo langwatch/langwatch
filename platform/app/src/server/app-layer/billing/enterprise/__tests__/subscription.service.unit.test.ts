@@ -19,10 +19,7 @@ import type { SubscriptionRepository } from "~/server/app-layer/subscription/sub
 import type { SubscriptionService } from "~/server/app-layer/subscription/subscription.service";
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import type { SeatEventSubscriptionService as SeatEventSubscriptionFns } from "~/runtime/app/features/billing";
-import {
-  EESubscriptionService,
-  RECENT_INVOICES_LIMIT,
-} from "../subscription.service";
+import { EESubscriptionService, RECENT_INVOICES_LIMIT } from "../subscription.service";
 
 const createMockStripe = () => ({
   subscriptions: {
@@ -151,9 +148,7 @@ describe("EESubscriptionService", () => {
   let db: ReturnType<typeof createMockDb>;
   let repository: ReturnType<typeof createMockRepository>;
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
-  let organizationRepository: ReturnType<
-    typeof createMockOrganizationRepository
-  >;
+  let organizationRepository: ReturnType<typeof createMockOrganizationRepository>;
   let service: EESubscriptionService;
 
   describe("interface conformance", () => {
@@ -172,9 +167,7 @@ describe("EESubscriptionService", () => {
       expect(typeof asInterface.updateSubscriptionItems).toBe("function");
       expect(typeof asInterface.createOrUpdateSubscription).toBe("function");
       expect(typeof asInterface.createBillingPortalSession).toBe("function");
-      expect(typeof asInterface.getLastNonCancelledSubscription).toBe(
-        "function",
-      );
+      expect(typeof asInterface.getLastNonCancelledSubscription).toBe("function");
       expect(typeof asInterface.notifyProspective).toBe("function");
     });
   });
@@ -191,8 +184,7 @@ describe("EESubscriptionService", () => {
       repository: repository as unknown as SubscriptionRepository,
       stripe: stripe as unknown as Stripe,
       itemCalculator,
-      organizationRepository:
-        organizationRepository as unknown as OrganizationRepository,
+      organizationRepository: organizationRepository as unknown as OrganizationRepository,
     });
   });
 
@@ -209,9 +201,7 @@ describe("EESubscriptionService", () => {
         stripe.subscriptions.retrieve.mockResolvedValue({
           items: { data: [{ id: "si_1", price: { id: "price_launch" } }] },
         });
-        itemCalculator.getItemsToUpdate.mockReturnValue([
-          { id: "si_1", quantity: 1 },
-        ]);
+        itemCalculator.getItemsToUpdate.mockReturnValue([{ id: "si_1", quantity: 1 }]);
         stripe.subscriptions.update.mockResolvedValue({});
 
         const result = await service.updateSubscriptionItems({
@@ -224,10 +214,9 @@ describe("EESubscriptionService", () => {
         });
 
         expect(result).toEqual({ success: true });
-        expect(stripe.subscriptions.update).toHaveBeenCalledWith(
-          "sub_stripe_1",
-          { items: [{ id: "si_1", quantity: 1 }] },
-        );
+        expect(stripe.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
+          items: [{ id: "si_1", quantity: 1 }],
+        });
       });
     });
 
@@ -362,9 +351,7 @@ describe("EESubscriptionService", () => {
           customerId: "cus_123",
         });
 
-        expect(result.url).toBe(
-          "https://app.test/settings/subscription?success",
-        );
+        expect(result.url).toBe("https://app.test/settings/subscription?success");
         expect(repository.updatePlan).toHaveBeenCalledWith({
           id: "sub_db_1",
           plan: PlanTypes.ACCELERATE,
@@ -464,9 +451,7 @@ describe("EESubscriptionService", () => {
         stripe.subscriptions.retrieve.mockResolvedValue({
           items: { data: [] },
         });
-        stripe.subscriptions.update.mockRejectedValue(
-          new Error("Stripe update failed"),
-        );
+        stripe.subscriptions.update.mockRejectedValue(new Error("Stripe update failed"));
 
         await expect(
           service.createOrUpdateSubscription({
@@ -488,9 +473,7 @@ describe("EESubscriptionService", () => {
           stripeSubscriptionId: "sub_stripe_1",
           status: SubscriptionStatus.ACTIVE,
         });
-        stripe.subscriptions.cancel.mockRejectedValue(
-          new Error("Stripe cancel failed"),
-        );
+        stripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe cancel failed"));
 
         await expect(
           service.createOrUpdateSubscription({

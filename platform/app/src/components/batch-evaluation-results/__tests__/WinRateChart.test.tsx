@@ -31,9 +31,7 @@ vi.mock("recharts", () => {
     // order) as text so the test can assert on it without depending on
     // recharts' internal SVG tick rendering.
     BarChart: ({ data }: { data: Array<{ name: string }> }) => (
-      <div data-testid="bar-chart-data">
-        {data.map((d) => d.name).join(", ")}
-      </div>
+      <div data-testid="bar-chart-data">{data.map((d) => d.name).join(", ")}</div>
     ),
     Bar: MockComponent,
     XAxis: MockComponent,

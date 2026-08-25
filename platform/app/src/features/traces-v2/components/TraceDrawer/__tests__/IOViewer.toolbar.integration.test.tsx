@@ -46,14 +46,11 @@ vi.mock("~/components/me/PersonalFeatureGateDialog", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
-vi.mock(
-  "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground",
-  () => ({
-    useGoToSpanInPlaygroundTabUrlBuilder: () => ({
-      buildUrl: () => new URL("https://app.test/prompts?span=span-7"),
-    }),
+vi.mock("~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground", () => ({
+  useGoToSpanInPlaygroundTabUrlBuilder: () => ({
+    buildUrl: () => new URL("https://app.test/prompts?span=span-7"),
   }),
-);
+}));
 
 vi.mock("~/hooks/useFieldRedaction", () => ({
   useFieldRedaction: () => ({
@@ -65,9 +62,7 @@ vi.mock("~/hooks/useFieldRedaction", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useQueries: () => [
-      { data: mocks.storedComments, isLoading: false, isError: false },
-    ],
+    useQueries: () => [{ data: mocks.storedComments, isLoading: false, isError: false }],
     useUtils: () => ({
       annotation: {
         getByTraceId: { invalidate: vi.fn() },
@@ -165,8 +160,7 @@ function renderViewer(over: Partial<React.ComponentProps<typeof IOViewer>>) {
   );
 }
 
-const formatTrigger = () =>
-  screen.getByRole("button", { name: "Input view format" });
+const formatTrigger = () => screen.getByRole("button", { name: "Input view format" });
 
 /**
  * The row `useOverflowVisibility` measures, resolved from the slots it measures
@@ -178,9 +172,7 @@ const formatTrigger = () =>
  * pass whatever the toolbar rendered.
  */
 function measuredRow(): HTMLElement {
-  const slots = [
-    ...document.querySelectorAll<HTMLElement>("[data-overflow-id]"),
-  ];
+  const slots = [...document.querySelectorAll<HTMLElement>("[data-overflow-id]")];
   const row = slots[0]?.parentElement;
   // Throws rather than asserts, so the check travels with the helper instead
   // of being repeated in every caller. Either way the test fails, and it must:
@@ -204,9 +196,7 @@ describe("given an input panel with JSON content", () => {
       await user.click(formatTrigger());
 
       for (const name of ["Pretty", "Text", "JSON", "Markdown"]) {
-        expect(
-          await screen.findByRole("menuitem", { name }),
-        ).toBeInTheDocument();
+        expect(await screen.findByRole("menuitem", { name })).toBeInTheDocument();
       }
 
       await user.click(screen.getByRole("menuitem", { name: "Text" }));
@@ -249,12 +239,8 @@ describe("given a chat-shaped input rendered in the Pretty format", () => {
     const user = userEvent.setup();
     renderViewer({ content: chatContent });
 
-    expect(
-      screen.getByRole("button", { name: "Thread view" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Bubbles view" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Thread view" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Bubbles view" })).toBeInTheDocument();
 
     await user.click(formatTrigger());
     await user.click(await screen.findByRole("menuitem", { name: "Markdown" }));
@@ -262,12 +248,8 @@ describe("given a chat-shaped input rendered in the Pretty format", () => {
     expect(
       await screen.findByRole("button", { name: "Rendered view" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Source view" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Thread view" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Source view" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Thread view" })).not.toBeInTheDocument();
   });
 });
 
@@ -301,12 +283,8 @@ describe("given a toolbar too narrow for all action buttons", () => {
       screen.getByRole("menuitem", { name: "Open in Playground" }),
     ).toBeInTheDocument();
     // The ones that still fit stay inline, not in the menu.
-    expect(
-      screen.queryByRole("menuitem", { name: "Translate" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: "Comment" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Translate" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Comment" })).not.toBeInTheDocument();
   });
 
   /** @scenario "Copy is always the last visible control" */
@@ -321,8 +299,7 @@ describe("given a toolbar too narrow for all action buttons", () => {
     });
     expect(copyButton).toBeInTheDocument();
     expect(
-      menuTrigger.compareDocumentPosition(copyButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      menuTrigger.compareDocumentPosition(copyButton) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
@@ -331,18 +308,14 @@ describe("given a toolbar too narrow for all action buttons", () => {
     const user = userEvent.setup();
     renderViewer({});
 
-    await user.click(
-      await screen.findByRole("button", { name: "More actions" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "More actions" }));
 
     // The menu holds the two actions that overflowed and nothing else — Copy
     // is not one of the measured items, so it can never be folded in.
     expect(
       (await screen.findAllByRole("menuitem")).map((item) => item.textContent),
     ).toEqual(["Suggest edit", "Open in Playground"]);
-    expect(
-      screen.getByRole("button", { name: "Copy to clipboard" }),
-    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Copy to clipboard" })).toBeVisible();
   });
 
   /**
@@ -382,16 +355,10 @@ describe("given an action that fits the row but not the trigger's slot", () => {
     const user = userEvent.setup();
     renderViewer({});
 
-    await user.click(
-      await screen.findByRole("button", { name: "More actions" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "More actions" }));
 
-    expect(
-      await screen.findByRole("menuitem", { name: "Comment" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: "Translate" }),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Comment" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Translate" })).not.toBeInTheDocument();
   });
 });
 
@@ -422,14 +389,10 @@ describe("given a reader who cannot manage annotations", () => {
       itemRights = { translate: 60, playground: 320 };
       renderViewer({});
 
-      await user.click(
-        await screen.findByRole("button", { name: "More actions" }),
-      );
+      await user.click(await screen.findByRole("button", { name: "More actions" }));
 
       expect(
-        (await screen.findAllByRole("menuitem")).map(
-          (item) => item.textContent,
-        ),
+        (await screen.findAllByRole("menuitem")).map((item) => item.textContent),
       ).toEqual(["Open in Playground"]);
     });
   });
@@ -478,12 +441,8 @@ describe("given the translate action collapsed into the overflow menu", () => {
     const user = userEvent.setup();
     renderViewer({});
 
-    await user.click(
-      await screen.findByRole("button", { name: "More actions" }),
-    );
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Translate" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Translate" }));
 
     await waitFor(() => {
       expect(mocks.translate).toHaveBeenCalled();

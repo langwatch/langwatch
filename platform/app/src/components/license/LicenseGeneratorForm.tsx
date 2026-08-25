@@ -48,10 +48,7 @@ type PrivateKeyInputMethod = "file" | "key";
 interface LicenseGeneratorFormProps {
   organizationId: string;
   onGeneratedLicenseChange?: (hasLicense: boolean) => void;
-  onFormStateChange?: (state: {
-    isGenerating: boolean;
-    isFormValid: boolean;
-  }) => void;
+  onFormStateChange?: (state: { isGenerating: boolean; isFormValid: boolean }) => void;
 }
 
 export interface LicenseGeneratorFormRef {
@@ -173,10 +170,7 @@ export const LicenseGeneratorForm = forwardRef<
     }));
   };
 
-  const handleInputChange = (
-    field: keyof FormData,
-    value: string | number | boolean,
-  ) => {
+  const handleInputChange = (field: keyof FormData, value: string | number | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -308,18 +302,10 @@ export const LicenseGeneratorForm = forwardRef<
   }));
 
   if (generatedLicense) {
-    const sanitizedName = formData.organizationName.replace(
-      /[\/\\:*?"<>|]/g,
-      "_",
-    );
+    const sanitizedName = formData.organizationName.replace(/[\/\\:*?"<>|]/g, "_");
     return (
       <VStack align="start" gap={4} width="full" paddingX={6} paddingY={4}>
-        <Box
-          backgroundColor="green.50"
-          padding={4}
-          borderRadius="md"
-          width="full"
-        >
+        <Box backgroundColor="green.50" padding={4} borderRadius="md" width="full">
           <VStack align="start" gap={2}>
             <Text fontSize="sm" fontWeight="medium" color="green.700">
               License generated and downloaded!
@@ -459,9 +445,7 @@ export const LicenseGeneratorForm = forwardRef<
         <Field.Label fontWeight="medium">Organization Name</Field.Label>
         <Input
           value={formData.organizationName}
-          onChange={(e) =>
-            handleInputChange("organizationName", e.target.value)
-          }
+          onChange={(e) => handleInputChange("organizationName", e.target.value)}
           placeholder="Acme Corp"
         />
       </Field.Root>
@@ -556,17 +540,13 @@ export const LicenseGeneratorForm = forwardRef<
             <NumberField
               label="Max Messages/Month"
               value={formData.maxMessagesPerMonth}
-              onChange={(value) =>
-                handleInputChange("maxMessagesPerMonth", value)
-              }
+              onChange={(value) => handleInputChange("maxMessagesPerMonth", value)}
             />
           </HStack>
 
           <Checkbox.Root
             checked={formData.canPublish}
-            onCheckedChange={(e) =>
-              handleInputChange("canPublish", !!e.checked)
-            }
+            onCheckedChange={(e) => handleInputChange("canPublish", !!e.checked)}
           >
             <Checkbox.HiddenInput />
             <Checkbox.Control />

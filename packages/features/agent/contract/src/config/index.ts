@@ -10,12 +10,7 @@ export * from "./http";
 export * from "./signature";
 export * from "./workflow";
 
-export const agentTypeSchema = z.enum([
-  "signature",
-  "code",
-  "workflow",
-  "http",
-]);
+export const agentTypeSchema = z.enum(["signature", "code", "workflow", "http"]);
 export type AgentType = z.infer<typeof agentTypeSchema>;
 
 export const agentConfigSchema = z.discriminatedUnion("type", [
@@ -34,10 +29,7 @@ export type AgentConfig =
   | z.infer<typeof workflowAgentConfigSchema>
   | z.infer<typeof httpAgentConfigSchema>;
 
-export function parseAgentConfig(
-  type: AgentType,
-  config: unknown,
-): AgentConfig {
+export function parseAgentConfig(type: AgentType, config: unknown): AgentConfig {
   switch (type) {
     case "signature":
       return signatureAgentConfigSchema.parse(config);

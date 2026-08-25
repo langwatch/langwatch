@@ -39,9 +39,7 @@ void (async () => {
   await page
     .goto(`${BASE_URL}/me`, { waitUntil: "domcontentloaded", timeout: 60_000 })
     .catch(() => {});
-  await page
-    .waitForSelector("text=/Claude Code/i", { timeout: 30_000 })
-    .catch(() => {});
+  await page.waitForSelector("text=/Claude Code/i", { timeout: 30_000 }).catch(() => {});
   await page
     .waitForSelector("text=/Spent this month|SPENT THIS MONTH/i", {
       timeout: 30_000,
@@ -49,10 +47,9 @@ void (async () => {
     .catch(() => {});
   // Wait for at least one model row in the By-tool breakdown to render
   await page
-    .waitForSelector(
-      "text=/claude-sonnet|claude-opus|claude-haiku|gpt-5|gemini/i",
-      { timeout: 30_000 },
-    )
+    .waitForSelector("text=/claude-sonnet|claude-opus|claude-haiku|gpt-5|gemini/i", {
+      timeout: 30_000,
+    })
     .catch(() => {});
   // Don't strict-wait for "By tool" header — fall through if missing,
   // we'll see in the screenshot.
@@ -74,9 +71,7 @@ void (async () => {
   // Diagnostic: log whether By tool / Recent activity rendered
   const byToolCount = await page.locator("text=/By tool/i").count();
   const recentCount = await page.locator("text=/Recent activity/i").count();
-  console.log(
-    `[diagnostic] 'By tool' rendered: ${byToolCount > 0 ? "YES" : "NO"}`,
-  );
+  console.log(`[diagnostic] 'By tool' rendered: ${byToolCount > 0 ? "YES" : "NO"}`);
   console.log(
     `[diagnostic] 'Recent activity' rendered: ${recentCount > 0 ? "YES" : "NO"}`,
   );

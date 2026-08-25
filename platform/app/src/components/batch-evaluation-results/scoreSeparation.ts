@@ -31,10 +31,7 @@
  * being conservative is the right way to be wrong.
  */
 
-import type {
-  BTLeaderboardEntry,
-  ScoreDifferenceCI,
-} from "./computeBTLeaderboard";
+import type { BTLeaderboardEntry, ScoreDifferenceCI } from "./computeBTLeaderboard";
 import { type Comparability, isIncomparable } from "./computeComparability";
 
 /** Two intervals overlap unless one ends strictly before the other starts. */

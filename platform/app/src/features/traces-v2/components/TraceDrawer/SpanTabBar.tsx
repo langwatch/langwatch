@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Button,
-  Circle,
-  Flex,
-  HStack,
-  Icon,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Button, Circle, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { memo, useMemo, useRef } from "react";
 import {
   LuChevronDown,
@@ -95,13 +87,7 @@ interface SpanTabBarProps {
   collapsePosition?: "leading" | "trailing";
 }
 
-function SpanFocusPresenceDot({
-  traceId,
-  spanId,
-}: {
-  traceId: string;
-  spanId: string;
-}) {
+function SpanFocusPresenceDot({ traceId, spanId }: { traceId: string; spanId: string }) {
   const peers = usePresenceStore(
     useShallow((s) =>
       selectPeersMatching(
@@ -132,9 +118,7 @@ export const SpanTabBar = memo(function SpanTabBar({
   // The Details pane no longer has its own header — the collapse
   // affordance sits at the leftmost edge of this tab row (mirrors
   // Chrome DevTools' "Headers / Cookies / Request / Response" row).
-  const detailCollapsed = useDrawerStore(
-    (s) => s.paneState.spanDetail.collapsed,
-  );
+  const detailCollapsed = useDrawerStore((s) => s.paneState.spanDetail.collapsed);
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
   // Icon orientation tracks the pane's edge: horizontal layout puts the
   // detail pane on the right, so the collapse chevron points
@@ -182,9 +166,7 @@ export const SpanTabBar = memo(function SpanTabBar({
 
   const selectedSpan = useMemo(
     () =>
-      selectedSpanId
-        ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null)
-        : null,
+      selectedSpanId ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null) : null,
     [selectedSpanId, spanTree],
   );
 
@@ -201,9 +183,7 @@ export const SpanTabBar = memo(function SpanTabBar({
     : false;
 
   const overflowing = pinnedSpans.length > MAX_INLINE_PINNED;
-  const inlineCount = overflowing
-    ? INLINE_KEEP_WHEN_OVERFLOW
-    : pinnedSpans.length;
+  const inlineCount = overflowing ? INLINE_KEEP_WHEN_OVERFLOW : pinnedSpans.length;
   // Both slices are memoized: they feed `tabDescriptors` → `tabIds` →
   // `useOverflowVisibility`, whose effect resets state whenever the
   // items array changes by reference. Before this memo each render
@@ -302,10 +282,7 @@ export const SpanTabBar = memo(function SpanTabBar({
             onSecondaryAction={clearSpan}
             presence={
               traceId ? (
-                <SpanFocusPresenceDot
-                  traceId={traceId}
-                  spanId={selectedSpan.spanId}
-                />
+                <SpanFocusPresenceDot traceId={traceId} spanId={selectedSpan.spanId} />
               ) : null
             }
           />
@@ -409,19 +386,11 @@ export const SpanTabBar = memo(function SpanTabBar({
           the chip, the cutoff iterator hides the chip first because
           its `data-overflow-id` sits last in DOM order.
         */}
-        <Flex
-          marginLeft="auto"
-          align="center"
-          gap="5px"
-          flexShrink={0}
-          minWidth={0}
-        >
+        <Flex marginLeft="auto" align="center" gap="5px" flexShrink={0} minWidth={0}>
           {rightSlot ? (
             <Flex
               data-overflow-id={RIGHT_SLOT_OVERFLOW_ID}
-              display={
-                hiddenTabIds.has(RIGHT_SLOT_OVERFLOW_ID) ? "none" : "flex"
-              }
+              display={hiddenTabIds.has(RIGHT_SLOT_OVERFLOW_ID) ? "none" : "flex"}
               align="center"
               flexShrink={0}
             >
@@ -493,9 +462,7 @@ function SpanTab({
       content={
         // spanTabLabel already falls back to the span id for nameless
         // spans — appending it again would read `id · id`.
-        span.name
-          ? `${spanTabLabel(span)} · ${span.spanId}`
-          : spanTabLabel(span)
+        span.name ? `${spanTabLabel(span)} · ${span.spanId}` : spanTabLabel(span)
       }
       positioning={{ placement: "bottom" }}
       openDelay={400}
@@ -540,9 +507,7 @@ function SpanTab({
           {formatDuration(span.durationMs)}
         </Text>
 
-        {span.status === "error" && (
-          <Circle size="6px" bg="red.solid" flexShrink={0} />
-        )}
+        {span.status === "error" && <Circle size="6px" bg="red.solid" flexShrink={0} />}
 
         {presence}
 
@@ -686,10 +651,7 @@ function PinnedSpanOverflowMenu({
                 {span.status === "error" && (
                   <Circle size="6px" bg="red.solid" flexShrink={0} />
                 )}
-                <Tooltip
-                  content="Unpin span tab"
-                  positioning={{ placement: "top" }}
-                >
+                <Tooltip content="Unpin span tab" positioning={{ placement: "top" }}>
                   <Flex
                     as="button"
                     align="center"

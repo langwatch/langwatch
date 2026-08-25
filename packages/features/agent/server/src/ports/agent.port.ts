@@ -19,10 +19,7 @@ export interface AgentsWorkflowPort {
     targetProjectId: string;
     actorUserId: string;
   }): Promise<{ workflowId: string }>;
-  archive(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<{ id: string }>;
+  archive(input: { workflowId: string; projectId: string }): Promise<{ id: string }>;
   remove(input: { workflowId: string; projectId: string }): Promise<void>;
 }
 

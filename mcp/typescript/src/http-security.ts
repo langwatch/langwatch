@@ -54,9 +54,7 @@ const ALWAYS_ALLOWED_ORIGIN_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
  * a usable origin, including the opaque `null` origin sent by sandboxed frames
  * and `file://` pages.
  */
-function normalizeOrigin(
-  origin: string
-): { origin: string; hostname: string } | null {
+function normalizeOrigin(origin: string): { origin: string; hostname: string } | null {
   let parsed: URL;
   try {
     parsed = new URL(origin.trim());
@@ -117,9 +115,7 @@ const KEY_DERIVATION_SECRET = randomBytes(32);
 
 /** Derives an opaque identifier from an API key, for use as a map key. */
 export function hashApiKey(apiKey: string): string {
-  return createHmac("sha256", KEY_DERIVATION_SECRET)
-    .update(apiKey)
-    .digest("hex");
+  return createHmac("sha256", KEY_DERIVATION_SECRET).update(apiKey).digest("hex");
 }
 
 /** Constant-time API key comparison over fixed-length digests. */

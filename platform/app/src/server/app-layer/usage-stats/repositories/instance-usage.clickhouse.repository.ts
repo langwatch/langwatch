@@ -21,9 +21,7 @@ export interface InstanceUsageStatsRepository {
   findScenarioRunCount(input: InstanceUsageCountsInput): Promise<number>;
 }
 
-export class InstanceUsageStatsClickHouseRepository
-  implements InstanceUsageStatsRepository
-{
+export class InstanceUsageStatsClickHouseRepository implements InstanceUsageStatsRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async findScenarioRunCount({

@@ -22,9 +22,7 @@ export interface TokenTimelinePoint {
   costUsd: number;
 }
 
-export function deriveTokenTimeline(
-  entries: TranscriptEntry[],
-): TokenTimelinePoint[] {
+export function deriveTokenTimeline(entries: TranscriptEntry[]): TokenTimelinePoint[] {
   const points: TokenTimelinePoint[] = [];
   for (const entry of entries) {
     if (entry.kind !== "model_call") continue;
@@ -63,9 +61,7 @@ export interface CacheRebuildEvent {
 const REBUILD_RATIO_THRESHOLD = 0.5;
 const REBUILD_MIN_TOKENS = 1_000;
 
-export function findCacheRebuilds(
-  entries: TranscriptEntry[],
-): CacheRebuildEvent[] {
+export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent[] {
   const events: CacheRebuildEvent[] = [];
   let previousContextTokens = 0;
   let callIndex = -1;
@@ -79,8 +75,7 @@ export function findCacheRebuilds(
       callIndex > 0 &&
       entry.cacheCreationTokens >= REBUILD_MIN_TOKENS &&
       previousContextTokens > 0 &&
-      entry.cacheCreationTokens / previousContextTokens >=
-        REBUILD_RATIO_THRESHOLD
+      entry.cacheCreationTokens / previousContextTokens >= REBUILD_RATIO_THRESHOLD
     ) {
       events.push({
         callIndex,
@@ -97,10 +92,7 @@ export function findCacheRebuilds(
   return events;
 }
 
-function nearestPrecedingPrompt(
-  entries: TranscriptEntry[],
-  atMs: number,
-): string | null {
+function nearestPrecedingPrompt(entries: TranscriptEntry[], atMs: number): string | null {
   let best: string | null = null;
   for (const entry of entries) {
     if (entry.atMs > atMs) break;

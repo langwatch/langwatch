@@ -375,9 +375,7 @@ function readInitialFromURL(): InitialFromURL {
     const viewMode: DrawerViewMode = isViewMode(mode)
       ? mode
       : (loadLastViewMode() ?? "summary");
-    const vizTab: VizTab = isVizTab(vizRaw)
-      ? vizRaw
-      : (loadLastVizTab() ?? "waterfall");
+    const vizTab: VizTab = isVizTab(vizRaw) ? vizRaw : (loadLastVizTab() ?? "waterfall");
     const pinnedSpanIds = parsePinnedSpansParam(pinnedRaw);
     const isEditing = parseEditParam({
       raw: params.get("drawer.edit"),
@@ -466,17 +464,12 @@ export function parsePinnedSpansParam(raw: string | null): string[] {
 }
 
 /** Inverse of {@link parsePinnedSpansParam} — serialises for the URL. */
-export function serializePinnedSpansParam(
-  ids: readonly string[],
-): string | undefined {
+export function serializePinnedSpansParam(ids: readonly string[]): string | undefined {
   if (ids.length === 0) return undefined;
   return ids.slice(0, MAX_PINNED_SPANS).join(",");
 }
 
-function arraysShallowEqual(
-  a: readonly string[],
-  b: readonly string[],
-): boolean {
+function arraysShallowEqual(a: readonly string[], b: readonly string[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) return false;
@@ -737,8 +730,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
         DRAWER_MIN_WIDTH_PX,
         viewportWidth - DRAWER_MAXIMIZE_EDGE_PX,
       );
-      const isAtSnap =
-        s.widthPx !== null && Math.abs(s.widthPx - snapWidth) < 2;
+      const isAtSnap = s.widthPx !== null && Math.abs(s.widthPx - snapWidth) < 2;
       if (isAtSnap) {
         const restore =
           s.preMaximizeWidthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth);
@@ -751,8 +743,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       }
       persistWidth(snapWidth);
       return {
-        preMaximizeWidthPx:
-          s.widthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth),
+        preMaximizeWidthPx: s.widthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth),
         widthPx: snapWidth,
         isMaximized: true,
       };
@@ -856,11 +847,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   pushTraceHistory: (entry) =>
     set((s) => {
       const top = s.traceBackStack[s.traceBackStack.length - 1];
-      if (
-        top &&
-        top.traceId === entry.traceId &&
-        top.viewMode === entry.viewMode
-      ) {
+      if (top && top.traceId === entry.traceId && top.viewMode === entry.viewMode) {
         return s;
       }
       return { traceBackStack: [...s.traceBackStack, entry] };
@@ -891,10 +878,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       if (next.vizTab !== undefined && next.vizTab !== s.vizTab) {
         patch.vizTab = next.vizTab;
       }
-      if (
-        next.selectedSpanId !== undefined &&
-        next.selectedSpanId !== s.selectedSpanId
-      ) {
+      if (next.selectedSpanId !== undefined && next.selectedSpanId !== s.selectedSpanId) {
         patch.selectedSpanId = next.selectedSpanId;
       }
       if (
@@ -909,8 +893,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
         // unsaved correction with no way to get it back, so a dirty session
         // stays open and the URL is re-asserted by the sync effect.
         const wouldDiscardUnsavedWork =
-          !next.isEditing &&
-          selectIsTraceEditDirty(useTraceEditStore.getState());
+          !next.isEditing && selectIsTraceEditDirty(useTraceEditStore.getState());
         if (!wouldDiscardUnsavedWork) patch.isEditing = next.isEditing;
       }
       return Object.keys(patch).length === 0 ? s : patch;

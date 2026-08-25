@@ -59,9 +59,7 @@ export class DefaultGovernanceCliBootstrapService extends GovernanceCliBootstrap
   }
 }
 
-function collapseOverview(
-  overview: CliBudgetOverview,
-): CliBootstrapResult["budget"] {
+function collapseOverview(overview: CliBudgetOverview): CliBootstrapResult["budget"] {
   const monthly = overview.gatewayAccess
     ? overview.budgets.find(({ window }) => window === "MONTH")
     : undefined;

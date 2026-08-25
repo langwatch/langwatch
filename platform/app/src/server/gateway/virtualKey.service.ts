@@ -345,11 +345,7 @@ export class VirtualKeyService {
           },
           tx,
         );
-        await this.assertProvidersAllowedReachable(
-          vk,
-          config.providersAllowed,
-          tx,
-        );
+        await this.assertProvidersAllowedReachable(vk, config.providersAllowed, tx);
         if (input.budget) {
           await this.upsertKeyBudget(
             {
@@ -472,9 +468,7 @@ export class VirtualKeyService {
             ...(input.routingPolicyId !== undefined
               ? { routingPolicyId: input.routingPolicyId }
               : {}),
-            ...(input.expiresAt !== undefined
-              ? { expiresAt: input.expiresAt }
-              : {}),
+            ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
             traceProjectId,
             routingMode,
             revision: { increment: 1n },
@@ -482,11 +476,7 @@ export class VirtualKeyService {
           include: { scopes: true },
         });
 
-        await this.assertProvidersAllowedReachable(
-          vk,
-          config.providersAllowed,
-          tx,
-        );
+        await this.assertProvidersAllowedReachable(vk, config.providersAllowed, tx);
 
         if (input.budget !== undefined) {
           if (input.budget) {
@@ -1096,11 +1086,7 @@ export class VirtualKeyService {
     tx: Prisma.TransactionClient,
   ): Promise<void> {
     if (!providersAllowed) return;
-    const reachable = await scopeReachableModelProvidersForVk(
-      this.prisma,
-      vk,
-      tx,
-    );
+    const reachable = await scopeReachableModelProvidersForVk(this.prisma, vk, tx);
     const reachableIds = new Set(reachable.map((mp) => mp.id));
     const unreachable = providersAllowed.filter((id) => !reachableIds.has(id));
     if (unreachable.length > 0) {
@@ -1154,8 +1140,7 @@ function resolveRoutingMode(
   if (mode === "POLICY" && !routingPolicyId) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message:
-        "routing_policy_required: routingMode POLICY needs a routingPolicyId",
+      message: "routing_policy_required: routingMode POLICY needs a routingPolicyId",
     });
   }
   if (mode !== "POLICY" && routingPolicyId) {

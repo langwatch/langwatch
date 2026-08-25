@@ -17,35 +17,32 @@ import { migrateDSLVersion } from "../src/workflow-dsl-migration";
 const legacyWorkflow = (overrides: {
   default_llm?: Record<string, unknown>;
   llmParamValue?: unknown;
-}): StudioWorkflow =>
-  ({
-    spec_version: "1.4",
-    name: "Legacy",
-    icon: "🧩",
-    description: "",
-    version: "1.0",
-    ...(overrides.default_llm !== undefined
-      ? { default_llm: overrides.default_llm }
-      : {}),
-    template_adapter: "default",
-    enable_tracing: true,
-    state: {},
-    edges: [],
-    nodes: [
-      {
-        id: "llm_call",
-        type: "signature",
-        position: { x: 0, y: 0 },
-        data: {
-          name: "LLM Call",
-          parameters: [
-            { identifier: "llm", type: "llm", value: overrides.llmParamValue },
-            { identifier: "instructions", type: "str", value: "hi" },
-          ],
-        },
+}): StudioWorkflow => ({
+  spec_version: "1.4",
+  name: "Legacy",
+  icon: "🧩",
+  description: "",
+  version: "1.0",
+  ...(overrides.default_llm !== undefined ? { default_llm: overrides.default_llm } : {}),
+  template_adapter: "default",
+  enable_tracing: true,
+  state: {},
+  edges: [],
+  nodes: [
+    {
+      id: "llm_call",
+      type: "signature",
+      position: { x: 0, y: 0 },
+      data: {
+        name: "LLM Call",
+        parameters: [
+          { identifier: "llm", type: "llm", value: overrides.llmParamValue },
+          { identifier: "instructions", type: "str", value: "hi" },
+        ],
       },
-    ],
-  });
+    },
+  ],
+});
 
 const llmValueOf = (dsl: StudioWorkflow): LLMConfig | undefined =>
   dsl.nodes[0]!.data.parameters?.find((p) => p.type === "llm")?.value as
@@ -139,9 +136,7 @@ describe("migrateDSLVersion 1.4 → 1.5 (default_llm fold)", () => {
           type: "code",
           position: { x: 0, y: 0 },
           data: {
-            parameters: [
-              { identifier: "instructions", type: "str", defaultValue: null },
-            ],
+            parameters: [{ identifier: "instructions", type: "str", defaultValue: null }],
           },
         },
       ],
@@ -196,8 +191,6 @@ describe("migrateDSLVersion 1.4 → 1.5 (default_llm fold)", () => {
     expect(migrated.edges[0]!.future_edge_key).toBe("kept");
     expect(migrated.state.future_state_key).toBe("kept");
     expect(migrated.state.execution?.future_execution_key).toBe("kept");
-    expect(migrated.state.execution?.timestamps?.future_timestamp_key).toBe(
-      "kept",
-    );
+    expect(migrated.state.execution?.timestamps?.future_timestamp_key).toBe("kept");
   });
 });

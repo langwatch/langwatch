@@ -1,7 +1,4 @@
-import {
-  type AuthzPermission,
-  permissionSatisfiedBy,
-} from "@langwatch/authz-contract";
+import { type AuthzPermission, permissionSatisfiedBy } from "@langwatch/authz-contract";
 import { useCallback, useMemo } from "react";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";

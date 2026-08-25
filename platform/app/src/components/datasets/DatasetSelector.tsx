@@ -7,12 +7,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { type ReactNode, useEffect, useState } from "react";
-import type {
-  FieldErrors,
-  Path,
-  PathValue,
-  UseFormSetValue,
-} from "react-hook-form";
+import type { FieldErrors, Path, PathValue, UseFormSetValue } from "react-hook-form";
 import type { Dataset } from "~/generated/prisma/client";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Select } from "../ui/select";
@@ -135,9 +130,7 @@ export function DatasetSelector<T extends { datasetId: string }>({
         </Select.Root>
       )}
       {errors.datasetId && (
-        <Field.ErrorText>
-          {errors.datasetId.message as ReactNode}
-        </Field.ErrorText>
+        <Field.ErrorText>{errors.datasetId.message as ReactNode}</Field.ErrorText>
       )}
       <Button
         colorPalette="blue"

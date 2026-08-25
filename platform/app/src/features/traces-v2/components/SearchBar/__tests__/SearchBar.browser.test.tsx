@@ -77,9 +77,7 @@ describe("SearchBar wiring in real Chromium", () => {
     it("commits the parsed query to the filterStore", async () => {
       renderSearchBar();
       // Cold mount → placeholder. Click activates the real editor.
-      const placeholder = document.querySelector(
-        "[data-placeholder]",
-      ) as HTMLElement;
+      const placeholder = document.querySelector("[data-placeholder]") as HTMLElement;
       await userEvent.click(placeholder);
       const editor = getEditor();
       await userEvent.click(editor);
@@ -95,9 +93,7 @@ describe("SearchBar wiring in real Chromium", () => {
   describe("when the typed query is unparseable", () => {
     it("surfaces the parse error indicator and keeps the previous AST", async () => {
       renderSearchBar();
-      await userEvent.click(
-        document.querySelector("[data-placeholder]") as HTMLElement,
-      );
+      await userEvent.click(document.querySelector("[data-placeholder]") as HTMLElement);
       const editor = getEditor();
       await userEvent.click(editor);
       await userEvent.keyboard('status:"unclosed');
@@ -106,9 +102,7 @@ describe("SearchBar wiring in real Chromium", () => {
         expect(useFilterStore.getState().parseError).toBeTruthy();
       });
       // The parse-error pill exposes itself as a popover trigger.
-      const indicator = document.querySelector(
-        '[aria-label="View syntax error"]',
-      );
+      const indicator = document.querySelector('[aria-label="View syntax error"]');
       expect(indicator).toBeTruthy();
     });
   });
@@ -116,9 +110,7 @@ describe("SearchBar wiring in real Chromium", () => {
   describe("when the user clicks the clear button", () => {
     it("empties the editor and the store", async () => {
       renderSearchBar();
-      await userEvent.click(
-        document.querySelector("[data-placeholder]") as HTMLElement,
-      );
+      await userEvent.click(document.querySelector("[data-placeholder]") as HTMLElement);
       const editor = getEditor();
       await userEvent.click(editor);
       await userEvent.keyboard("status:error");
@@ -148,9 +140,7 @@ describe("SearchBar wiring in real Chromium", () => {
       // Spy on parse to confirm the LRU cache absorbs duplicate parses
       // (filterHighlight + filterStore both parsing the same text per key).
       renderSearchBar();
-      await userEvent.click(
-        document.querySelector("[data-placeholder]") as HTMLElement,
-      );
+      await userEvent.click(document.querySelector("[data-placeholder]") as HTMLElement);
       const editor = getEditor();
       await userEvent.click(editor);
       await userEvent.keyboard("status:error");

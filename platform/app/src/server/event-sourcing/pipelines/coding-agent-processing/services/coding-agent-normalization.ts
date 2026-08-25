@@ -81,9 +81,7 @@ export function detectCodingAgent({
  * Order matters only in that all of these are the same value when more than one
  * is present, so the first hit wins and no agent is disadvantaged.
  */
-export function resolveConversationKey(
-  attrs: Record<string, unknown>,
-): string | null {
+export function resolveConversationKey(attrs: Record<string, unknown>): string | null {
   const candidates = [
     "session.id",
     "conversation.id",
@@ -120,12 +118,9 @@ export function resolveSpanConversationKey({
   name: string;
   attrs: Record<string, unknown>;
 }): string | null {
-  const definition = CODING_AGENT_REGISTRY.find(
-    (candidate) => candidate.id === agent,
-  );
+  const definition = CODING_AGENT_REGISTRY.find((candidate) => candidate.id === agent);
   return (
-    definition?.sessionKeyFromSpan?.({ name, attrs }) ??
-    resolveConversationKey(attrs)
+    definition?.sessionKeyFromSpan?.({ name, attrs }) ?? resolveConversationKey(attrs)
   );
 }
 
@@ -424,8 +419,7 @@ export const SESSION_TITLE_FACT_KEY = "langwatch.session.title";
  * headless session), and a row named by what the user first asked beats an
  * untitled one.
  */
-export const SESSION_TITLE_FALLBACK_FACT_KEY =
-  "langwatch.session.title_fallback";
+export const SESSION_TITLE_FALLBACK_FACT_KEY = "langwatch.session.title_fallback";
 
 /**
  * The fact key the session's own name rides on, lifted from the companion
@@ -475,9 +469,7 @@ export function sessionTitleFromPrompt(text: string): string | null {
  * registry cannot resolve would become a permanent agent id on the session row
  * (agent labeling is first-writer-wins in the fold).
  */
-export function declaredCodingAgent(
-  facts: Record<string, unknown>,
-): CodingAgent | null {
+export function declaredCodingAgent(facts: Record<string, unknown>): CodingAgent | null {
   const declared = facts["coding_agent.name"];
   if (typeof declared !== "string" || declared.length === 0) return null;
   const match = CODING_AGENT_REGISTRY.find((agent) => agent.id === declared);
@@ -566,9 +558,7 @@ function stripAgentPrefix(name: string): string {
  * `cache_read` / `cached_input` from silently mispricing a session — which
  * does not throw, and is worse than throwing.
  */
-export function normalizeTokenType(
-  rawType: string | null | undefined,
-): TokenType | null {
+export function normalizeTokenType(rawType: string | null | undefined): TokenType | null {
   if (!rawType) return null;
   // Fold camelCase and snake_case together so `cacheRead` and `cache_read` are
   // one thing, then match on the flattened form.
@@ -661,10 +651,7 @@ export function parseMcpToolName(
   return { server, tool };
 }
 
-function firstString(
-  attrs: Record<string, unknown>,
-  keys: string[],
-): string | null {
+function firstString(attrs: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
     const value = attrs[key];
     if (typeof value === "string" && value.length > 0) return value;

@@ -23,13 +23,11 @@ export function deserializeMappingStateToUI(
         }
       } else {
         if ("key" in mapping && mapping.key) pathParts.push(mapping.key);
-        if ("subkey" in mapping && mapping.subkey)
-          pathParts.push(mapping.subkey);
+        if ("subkey" in mapping && mapping.subkey) pathParts.push(mapping.subkey);
       }
 
       const isThreadMapping = "type" in mapping && mapping.type === "thread";
-      const sourceId =
-        monitorLevel === "thread" || isThreadMapping ? "thread" : "trace";
+      const sourceId = monitorLevel === "thread" || isThreadMapping ? "thread" : "trace";
 
       uiMappings[field] = {
         type: "source",

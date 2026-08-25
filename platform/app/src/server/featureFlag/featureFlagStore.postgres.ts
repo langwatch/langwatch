@@ -49,10 +49,7 @@ export class FeatureFlagStorePostgres {
   // Per-pod in-process cache. Sits in front of Redis so the trace-
   // processing subscriber (called per event) does not generate a Redis GET
   // per event.
-  private readonly local = new Map<
-    string,
-    { row: CachedRow; expiresAt: number }
-  >();
+  private readonly local = new Map<string, { row: CachedRow; expiresAt: number }>();
 
   /**
    * Resolve `key` against the calling context. Returns `null` when no
@@ -60,10 +57,7 @@ export class FeatureFlagStorePostgres {
    * default). When a row exists, targeting rules are evaluated first;
    * the row-level `enabled` is the fallback if no rule matches.
    */
-  async get(
-    key: string,
-    ctx: RuleEvaluationContext = {},
-  ): Promise<boolean | null> {
+  async get(key: string, ctx: RuleEvaluationContext = {}): Promise<boolean | null> {
     const row = await this.getRow(key);
     if (row === null) return null;
     const ruleHit = evaluateRules(row.rules, ctx);
@@ -151,11 +145,7 @@ export class FeatureFlagStorePostgres {
    * Operator write of the row-level enabled value (the rule-fallback
    * default). Existing rules are preserved on update.
    */
-  async set(
-    key: string,
-    enabled: boolean,
-    lastEditedBy: string | null,
-  ): Promise<void> {
+  async set(key: string, enabled: boolean, lastEditedBy: string | null): Promise<void> {
     await prisma.featureFlag.upsert({
       where: { key },
       create: { key, enabled, lastEditedBy },

@@ -38,11 +38,7 @@ import type {
   VegaValidationError,
 } from "../visualization/visualization.types";
 
-export type LangWatchQLVegaViewStatus =
-  | "idle"
-  | "embedding"
-  | "ready"
-  | "failed";
+export type LangWatchQLVegaViewStatus = "idle" | "embedding" | "ready" | "failed";
 
 export interface LangWatchQLVegaViewState {
   readonly status: LangWatchQLVegaViewStatus;

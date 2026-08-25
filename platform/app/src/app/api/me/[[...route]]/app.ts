@@ -1,9 +1,5 @@
 import { describeRoute, resolver } from "hono-openapi";
-import {
-  createProjectApp,
-  requires,
-  type SecuredApp,
-} from "~/server/api/security";
+import { createProjectApp, requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 

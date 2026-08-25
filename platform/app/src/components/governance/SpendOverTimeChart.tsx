@@ -101,22 +101,13 @@ export function SpendOverTimeChart({
         height="280px"
       >
         {rows.length === 0 ? (
-          <VStack
-            align="center"
-            justify="center"
-            height="100%"
-            color="fg.muted"
-            gap={1}
-          >
+          <VStack align="center" justify="center" height="100%" color="fg.muted" gap={1}>
             <Text fontSize="sm">No spend in this window yet.</Text>
             {emptyHint && <Text fontSize="xs">{emptyHint}</Text>}
           </VStack>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={rows}
-              margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
-            >
+            <AreaChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
               <defs>
                 {seriesKeys.map((s) => {
                   const color = getHexColorForString(s.label);
@@ -130,20 +121,12 @@ export function SpendOverTimeChart({
                       y2="1"
                     >
                       <stop offset="0%" stopColor={color} stopOpacity={0.45} />
-                      <stop
-                        offset="100%"
-                        stopColor={color}
-                        stopOpacity={0.05}
-                      />
+                      <stop offset="100%" stopColor={color} stopOpacity={0.05} />
                     </linearGradient>
                   );
                 })}
               </defs>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="#e2e8f0"
-                vertical={false}
-              />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
               <XAxis
                 dataKey="day"
                 tick={{ fontSize: 11, fill: "#64748b" }}
@@ -152,16 +135,13 @@ export function SpendOverTimeChart({
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "#64748b" }}
-                tickFormatter={(v: number) =>
-                  `$${numeral(v).format("0,0.[00]")}`
-                }
+                tickFormatter={(v: number) => `$${numeral(v).format("0,0.[00]")}`}
                 width={60}
               />
               <Tooltip
                 formatter={(value, name) => {
                   const label =
-                    seriesKeys.find((s) => s.key === String(name))?.label ??
-                    String(name);
+                    seriesKeys.find((s) => s.key === String(name))?.label ?? String(name);
                   return [`$${Number(value).toFixed(4)}`, label];
                 }}
                 labelFormatter={(label) => formatDayTick(label as string)}

@@ -18,8 +18,7 @@ export const codeAgentConfigSchema = baseAgentConfigSchema.extend({
     .refine(
       (parameters) =>
         parameters.some(
-          (parameter) =>
-            parameter.identifier === "code" && parameter.type === "code",
+          (parameter) => parameter.identifier === "code" && parameter.type === "code",
         ),
       "Code agent config requires a code parameter.",
     ),

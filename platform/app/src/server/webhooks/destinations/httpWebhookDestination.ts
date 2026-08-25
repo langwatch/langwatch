@@ -24,16 +24,10 @@ const RESPONSE_SNIPPET_CHARS = 1000;
  * function the throwing assertion uses, so this cannot drift from what the
  * platform has always done.
  */
-export function httpWebhookDestination({
-  url,
-}: {
-  url: string;
-}): WebhookDestination {
+export function httpWebhookDestination({ url }: { url: string }): WebhookDestination {
   return {
     kind: "http",
-    async send(
-      request: WebhookDispatchRequest,
-    ): Promise<WebhookDispatchResult> {
+    async send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult> {
       const result = await sendWebhook({
         url,
         body: request.body,
@@ -59,9 +53,7 @@ export function httpWebhookDestination({
         verdict,
         status: result.status,
         body: result.body.slice(0, RESPONSE_SNIPPET_CHARS),
-        ...(result.responseHeaders
-          ? { responseHeaders: result.responseHeaders }
-          : {}),
+        ...(result.responseHeaders ? { responseHeaders: result.responseHeaders } : {}),
         ...(result.retryAfterMs !== undefined
           ? { retryAfterMs: result.retryAfterMs }
           : {}),

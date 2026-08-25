@@ -35,9 +35,7 @@ export const issuedPersonalVirtualKeySchema = z
     label: z.string().min(1),
   })
   .strict();
-export type IssuedPersonalVirtualKey = z.infer<
-  typeof issuedPersonalVirtualKeySchema
->;
+export type IssuedPersonalVirtualKey = z.infer<typeof issuedPersonalVirtualKeySchema>;
 
 export const ensureDefaultPersonalVirtualKeyInputSchema = z
   .object({
@@ -137,16 +135,8 @@ export abstract class GovernancePersonalVirtualKeyService {
   abstract ensureDefault(
     input: EnsureDefaultPersonalVirtualKeyInput,
   ): Promise<IssuedPersonalVirtualKey>;
-  abstract issue(
-    input: IssuePersonalVirtualKeyInput,
-  ): Promise<IssuedPersonalVirtualKey>;
-  abstract list(
-    input: ListPersonalVirtualKeysInput,
-  ): Promise<PersonalVirtualKey[]>;
-  abstract revoke(
-    input: RevokePersonalVirtualKeyInput,
-  ): Promise<PersonalVirtualKey>;
-  abstract revokeAllForUser(
-    input: RevokeAllPersonalVirtualKeysInput,
-  ): Promise<number>;
+  abstract issue(input: IssuePersonalVirtualKeyInput): Promise<IssuedPersonalVirtualKey>;
+  abstract list(input: ListPersonalVirtualKeysInput): Promise<PersonalVirtualKey[]>;
+  abstract revoke(input: RevokePersonalVirtualKeyInput): Promise<PersonalVirtualKey>;
+  abstract revokeAllForUser(input: RevokeAllPersonalVirtualKeysInput): Promise<number>;
 }

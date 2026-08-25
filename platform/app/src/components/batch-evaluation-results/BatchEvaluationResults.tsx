@@ -21,11 +21,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 import { Link } from "~/components/ui/link";
-import {
-  type Experiment,
-  ExperimentType,
-  type Project,
-} from "~/generated/prisma/client";
+import { type Experiment, ExperimentType, type Project } from "~/generated/prisma/client";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -44,10 +40,7 @@ import { downloadCsv } from "./csvExport";
 import { getRunDisplayName } from "./getRunDisplayName";
 import { isRunFinished } from "./isRunFinished";
 import { TableSkeleton } from "./TableSkeleton";
-import {
-  type BatchEvaluationData,
-  transformBatchEvaluationData,
-} from "./types";
+import { type BatchEvaluationData, transformBatchEvaluationData } from "./types";
 import { useComparisonMode } from "./useComparisonMode";
 import { RUN_COLORS, useMultiRunData } from "./useMultiRunData";
 import { useResultDisplayPreferences } from "./useResultDisplayPreferences";
@@ -111,8 +104,7 @@ export function BatchEvaluationResults({
   // Which target fields render, and how much of each cell's content shows —
   // see useResultDisplayPreferences for why fields reset per session while
   // row height persists.
-  const { fields, toggleField, rowHeight, setRowHeight } =
-    useResultDisplayPreferences();
+  const { fields, toggleField, rowHeight, setRowHeight } = useResultDisplayPreferences();
 
   // Toggle column visibility
   const toggleColumn = useCallback((columnName: string) => {
@@ -202,8 +194,7 @@ export function BatchEvaluationResults({
   useEffect(() => {
     if (finishedAt === null) return;
 
-    const timeUntilGraceExpires =
-      REFETCH_GRACE_PERIOD_MS - (Date.now() - finishedAt);
+    const timeUntilGraceExpires = REFETCH_GRACE_PERIOD_MS - (Date.now() - finishedAt);
     if (timeUntilGraceExpires <= 0) return;
 
     const timer = setTimeout(() => {
@@ -225,9 +216,7 @@ export function BatchEvaluationResults({
 
   // Update isSomeRunning state
   useEffect(() => {
-    const hasRunning = runsQuery.data?.runs.some(
-      (r) => !isRunFinished(r.timestamps),
-    );
+    const hasRunning = runsQuery.data?.runs.some((r) => !isRunFinished(r.timestamps));
     setIsSomeRunning(!!hasRunning);
   }, [runsQuery.data?.runs]);
 
@@ -340,11 +329,9 @@ export function BatchEvaluationResults({
       if (onSelectRunId) return;
       const newQuery = queryWithGroupBy(router.query, next);
       if (!newQuery) return;
-      void router.replace(
-        { pathname: router.pathname, query: newQuery },
-        undefined,
-        { shallow: true },
-      );
+      void router.replace({ pathname: router.pathname, query: newQuery }, undefined, {
+        shallow: true,
+      });
     },
     [onSelectRunId, router],
   );
@@ -369,11 +356,9 @@ export function BatchEvaluationResults({
       const currentCompare = router.query.compare;
       const newCompare = newQuery.compare;
       if (currentCompare !== newCompare) {
-        void router.replace(
-          { pathname: router.pathname, query: newQuery },
-          undefined,
-          { shallow: true },
-        );
+        void router.replace({ pathname: router.pathname, query: newQuery }, undefined, {
+          shallow: true,
+        });
       }
     },
     [onSelectRunId, router],
@@ -457,13 +442,7 @@ export function BatchEvaluationResults({
         isLoading: false,
       },
     ];
-  }, [
-    compareMode,
-    transformedData,
-    targetCount,
-    stableRunColorMap,
-    runNameMap,
-  ]);
+  }, [compareMode, transformedData, targetCount, stableRunColorMap, runNameMap]);
 
   // Chart data to display - either comparison data or single run data
   // Derived here so the toolbar button and the table agree on which keys
@@ -490,8 +469,7 @@ export function BatchEvaluationResults({
     downloadCsv(transformedData, experiment.name ?? experiment.slug);
   }, [transformedData, experiment]);
 
-  const isDownloadCSVEnabled =
-    !!transformedData && transformedData.rows.length > 0;
+  const isDownloadCSVEnabled = !!transformedData && transformedData.rows.length > 0;
 
   // Error state
   if (runsQuery.error) {
@@ -504,13 +482,7 @@ export function BatchEvaluationResults({
   }
 
   return (
-    <HStack
-      align="stretch"
-      width="full"
-      height="full"
-      gap={0}
-      overflow="hidden"
-    >
+    <HStack align="stretch" width="full" height="full" gap={0} overflow="hidden">
       {/* Sidebar - fixed width, doesn't shrink */}
       <Box flexShrink={0}>
         <BatchRunsSidebar
@@ -529,14 +501,7 @@ export function BatchEvaluationResults({
       </Box>
 
       {/* Main content - flex column that fills available space */}
-      <VStack
-        flex={1}
-        minWidth={0}
-        height="full"
-        gap={0}
-        align="stretch"
-        overflow="auto"
-      >
+      <VStack flex={1} minWidth={0} height="full" gap={0} align="stretch" overflow="auto">
         {/* Header - fixed height */}
         <PageLayout.Header paddingX={2} withBorder={false} flexShrink={0}>
           <HStack gap={1} minWidth={0} overflow="hidden" flexShrink={1}>
@@ -643,13 +608,7 @@ export function BatchEvaluationResults({
 
         {/* Table container - fills remaining space */}
         {runsQuery.isLoading ? (
-          <Box
-            flex={1}
-            minHeight="300px"
-            overflow="auto"
-            paddingX={2}
-            paddingBottom={2}
-          >
+          <Box flex={1} minHeight="300px" overflow="auto" paddingX={2} paddingBottom={2}>
             <TableSkeleton withCard />
           </Box>
         ) : sidebarRuns.length === 0 ? (

@@ -210,13 +210,7 @@ export function createLangyWorkerPort(config: {
       }
     },
 
-    async warm({
-      projectId,
-      actorUserId,
-      conversationId,
-      credentials,
-      modelOverride,
-    }) {
+    async warm({ projectId, actorUserId, conversationId, credentials, modelOverride }) {
       // Its own span, the one worth staring at: the warm is fire-and-forget, so
       // the only way to know whether the boot actually hides behind the rest of
       // the turn is to see this span overlap the ones that follow it. traceparent
@@ -340,9 +334,7 @@ export function createLangyWorkerPort(config: {
                       : "unavailable";
             span.setAttribute("langy.dispatch.outcome", outcome);
             getLangyDispatchCounter(
-              outcome === "credentialsRequired"
-                ? "credentials_required"
-                : outcome,
+              outcome === "credentialsRequired" ? "credentials_required" : outcome,
             ).inc();
             return outcome;
           } catch (error) {
